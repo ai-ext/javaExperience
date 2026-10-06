@@ -1,0 +1,315 @@
+# D08. CI/CD와 협업 흐름 — Git 브랜치부터 파이프라인·GitOps까지
+
+> 3줄 요약 — 변경은 짧은 Git 브랜치와 PR로 검토하고, CI가 같은 커밋을 빌드·테스트해 병합 가능 여부를 알려준다.
+> CI는 검증과 배포 가능한 산출물 생성까지 자동화한다. CD는 승인 후 배포할 준비를 하거나, 조건을 만족하면 운영 반영까지 자동화한다.
+> GitOps에서는 CI가 클러스터를 직접 바꾸는 대신 선언 파일을 Git에 반영하고, Argo CD가 목표 상태와 실제 상태를 맞춘다.
+
+## 1. 큰 그림
+
+```mermaid
+flowchart LR
+  A["요구사항 이슈"] --> B["짧은 작업 브랜치"]
+  B --> C["커밋과 원격 푸시"]
+  C --> D["PR 생성과 코드 리뷰"]
+  D --> E["CI 체크아웃 빌드 테스트 분석"]
+  E -->|"실패하면 수정 후 재실행"| B
+  E -->|"통과"| F["승인과 보호 규칙 확인"]
+  F --> G["기본 브랜치에 병합"]
+  G --> H["릴리스 산출물과 컨테이너 이미지"]
+  H --> I["이미지 레지스트리"]
+  I --> J["환경 선언 저장소 갱신"]
+  J --> K["Argo CD 감시와 동기화"]
+  K --> L["Kubernetes 실제 상태"]
+  L --> M["관측과 피드백"]
+  M --> A
+```
+
+그림은 개발자가 이슈를 브랜치에서 구현하고, PR을 통해 사람과 자동화의 검증을 거친 다음, 재현 가능한 산출물을 환경에 승격하는 흐름이다. PR에서 테스트를 통과해도 승인 규칙이 남아 있으면 병합할 수 없다. 반대로 승인만 받아도 필수 CI 체크가 실패하면 병합할 수 없다. 둘은 서로 다른 문턱이다. GitHub Flow 문서는 브랜치 생성→변경·커밋·푸시→PR→피드백 반영→병합→작업 브랜치 삭제의 순서를 제시한다.[4]
+
+CI 파이프라인은 대개 PR에서 코드의 품질을 확인하고, 병합 뒤에는 배포에 쓸 패키지나 이미지를 만든다. CD라는 말은 팀에 따라 테스트·스테이징까지 자동으로 보내는 Continuous Delivery를 뜻하거나, 운영까지 승인 없이 반영하는 Continuous Deployment를 뜻한다. 회의에서는 “CD가 운영 자동 배포까지 포함하나요?”라고 범위를 확인한다. GitOps는 이 흐름에서 선언된 목표 상태의 출처를 Git으로 두는 배포 운영 방식이다.
+
+이 문서는 D01 전체 개발 과정 중 **구현이 PR·검증을 거쳐 릴리스와 운영 반영으로 넘어가는 협업 및 자동화 구간**을 다룬다. 빌드 태스크와 의존성 해석은 D04, 롤링·카나리 같은 배포 전략은 D06을 참조한다.
+
+## 2. 용어 사전
+
+| 용어 | 한 줄 정의 | 실무 예시 | 헷갈리는 것과 차이 |
+|---|---|---|---|
+| 저장소 repository | 소스, Git 이력, 협업 설정을 담는다 | 코드와 workflow 파일 관리 | 로컬·원격 저장소는 각각 개발자와 서버의 복제본 |
+| 커밋 commit | 부모 이력과 변경을 담는 식별 가능한 기록 | `git commit -m "Add search"` | 푸시는 로컬 커밋을 원격으로 전송 |
+| 브랜치 branch | 커밋을 가리키는 이동 가능한 이름 | `feat/order-search` | 파일 복사본이 아니라 커밋 포인터 |
+| 기본 브랜치 main | 통합 기준으로 삼는 브랜치 | PR 대상 `main` | 배포 브랜치인지는 별도 정책 |
+| trunk | 자주 통합하는 중심 브랜치 | 하루 안팎의 작은 변경 통합 | 흔히 `main`을 가리키는 협업 원칙 |
+| 머지 merge | 두 이력의 변경을 결합 | 기능 브랜치 병합 | merge commit은 통합 지점을 보존할 수 있음 |
+| 리베이스 rebase | 커밋을 새 기준 위에 다시 적용 | 개인 브랜치를 최신 `main` 위로 갱신 | SHA가 바뀌므로 공유 이력 재작성 주의 |
+| 충돌 conflict | Git이 같은 변경의 최종 내용을 결정하지 못함 | 양쪽 의도 반영 후 테스트 | 마커 삭제만으로 의미 충돌이 해결되진 않음 |
+| 태그 tag | 특정 커밋을 이름으로 고정 | 릴리스 `v1.4.0` | 브랜치 이름은 보통 움직이고 태그는 릴리스 기준으로 고정 |
+| PR / MR | 변경을 통합하기 위한 검토 요청 | 배경·변경·검증 방법 작성 | GitHub는 PR, GitLab은 MR이라는 용어 |
+| 리뷰어 reviewer | 정확성·운영 영향 등을 검토 | 도메인 담당자 지정 | 지정은 승인을 뜻하지 않음 |
+| 승인 approval | 리뷰 정책상 변경을 받아들인다는 표시 | 필수 승인 1개 | CI 상태 체크와는 독립 조건 |
+| 상태 체크 | 커밋에 대한 CI·품질 검사 결과 | `test`, `sonar` 통과 | 리뷰 의견은 자동 상태 체크가 아님 |
+| 보호 브랜치 | 원격 병합 조건과 직접 변경 제한을 강제 | `main`에 승인·체크 요구 | 로컬 Git 기능이 아니라 호스팅 정책 |
+| squash merge | PR의 여러 커밋을 한 커밋으로 합침 | PR 단위 이력 | 이력은 간결하지만 세부 커밋은 기본 브랜치에서 사라짐 |
+| GitHub Flow | 짧은 브랜치와 PR로 기본 브랜치에 통합 | 변경 후 필요 시 바로 릴리스 | 제품 기능이 아닌 협업 방식 |
+| Git Flow | main·develop·release·hotfix 흐름을 정형화 | 버전별 유지보수 | 릴리스선 분리에는 유리하나 장기 브랜치 비용 발생 |
+| Trunk-Based Development | 작은 변경을 중심 브랜치에 자주 통합 | 짧은 PR, 기능 플래그 | 무검토 직접 푸시를 뜻하지 않음 |
+| CI | 잦은 통합과 자동 검증으로 통합 오류를 조기 발견 | PR별 빌드·테스트 | YAML이나 Jenkins 서버 자체가 CI는 아님 |
+| Continuous Delivery | 배포 가능한 상태를 자동 준비, 운영 승인은 남길 수 있음 | 스테이징 자동·운영 승인 | Continuous Deployment는 운영 반영까지 자동 |
+| Continuous Deployment | 통과한 변경을 운영까지 자동 반영 | 무인 운영 배포 | 약어 CD만으로 둘 중 무엇인지 알 수 없음 |
+| 파이프라인 pipeline | 트리거부터 검사·배포까지의 자동화 흐름 | PR 검증과 배포 분리 | 제품마다 pipeline의 경계가 다를 수 있음 |
+| 트리거 trigger | 파이프라인을 시작하는 사건·조건 | PR 열기, main 푸시, 태그 | job 안의 조건문과 다른 단계 |
+| 스테이지 stage | 큰 단계와 실행 의존성의 경계 | verify 후 publish | Actions는 job 의존으로 비슷하게 표현 가능 |
+| 잡 job | 한 러너에서 실행되는 작업 묶음 | test와 lint를 병렬 수행 | job 안 step은 보통 실행 환경을 공유 |
+| 스텝 step / 태스크 task | job에서 실행하는 명령·재사용 동작 | `./gradlew test` | Azure는 사전 포장 동작을 task라 부르기도 함 |
+| 러너 / 에이전트 | job을 실행하는 머신·컨테이너·프로세스 | GitHub runner, Jenkins agent | 이름은 달라도 도구와 권한이 준비돼야 함 |
+| 아티팩트 artifact | 특정 실행에서 만든 보관·전달 결과 | JAR, 테스트 리포트 | 재사용 속도 목적의 캐시와 다름 |
+| 캐시 cache | 다음 실행에서 재사용할 재생성 가능 데이터 | Gradle 의존성 | 캐시 miss에도 빌드가 성공해야 함 |
+| 시크릿 secret | 제한적으로 주입하는 토큰·비밀번호 | 레지스트리 인증 값 | 설정 파일에 실제 값을 커밋하지 않음 |
+| 이미지 레지스트리 | 버전별 컨테이너 이미지를 보관 | 이미지 태그·digest 푸시 | Git 저장소와 다름. 가변 태그는 불변성을 보장하지 않음 |
+| 환경 environment | 배포 대상과 보호 정책의 이름 | dev, staging, production | 이름만으로 격리·승인이 보장되지 않음 |
+| 승격 promotion | 검증한 버전을 다음 환경에서 사용 | 같은 이미지 digest를 운영에 반영 | 환경마다 재빌드하면 산출물이 달라질 수 있음 |
+| GitOps | Git 선언을 목표 상태로 보고 운영을 조정 | Argo CD가 매니페스트 비교 | 배포 파일을 Git에 둔 것만으로 충분하지 않음 |
+| 조정 reconciliation / sync | 목표 상태와 실제 상태를 비교·적용 | Argo CD가 OutOfSync 상태 sync | 한 번 실행하고 끝나는 명령이 아니라 반복 루프 |
+
+## 3. 단계별로 보기
+
+### 3.1 브랜치와 PR
+
+브랜치는 기본 브랜치에 영향을 주지 않고 변경을 만들며, PR은 병합 전 사람과 CI가 검토하는 절차다. PR 본문에는 문제·변경·검증 방법을 적는다. 리뷰 코멘트와 자동 체크는 별도 신호이며, 수정 푸시 때 새 커밋 SHA를 다시 검증한다.
+
+```mermaid
+sequenceDiagram
+  actor Dev as 개발자
+  participant Git as 원격 저장소
+  participant CI as CI 서비스
+  actor Reviewer as 리뷰어
+  Dev->>Git: 작업 브랜치 푸시와 PR 생성
+  Git->>CI: PR 커밋 검증 요청
+  CI-->>Git: 해당 SHA의 체크 결과
+  Reviewer->>Git: 질문이나 변경 제안
+  Dev->>Git: 수정 커밋 푸시
+  Git->>CI: 새 SHA 검증
+  Reviewer->>Git: 승인
+  Git-->>Dev: 보호 조건 통과 후 병합
+```
+
+필수 리뷰, 상태 체크, force push 금지 등은 보호 브랜치 정책으로 강제한다. 리뷰어 지정은 승인과 다르며, 체크 이름이 workflow 간 중복되면 필수 체크가 모호해 병합이 막힐 수 있다.[9] Squash merge는 PR 여러 커밋을 한 커밋으로 묶고, merge commit은 통합 지점을 남긴다. 저장소가 허용한 방법과 브랜치 규칙이 충돌하면 병합할 수 없다.[10]
+
+### 3.2 브랜치 전략 선택
+
+| 전략 | 흐름 | 적합한 상황·비용 |
+|---|---|---|
+| GitHub Flow | 짧은 브랜치→PR→main 병합 | 기본 브랜치를 자주 릴리스. 장기 버전선이 필요하면 별도 정책 필요 |
+| Git Flow | main·develop·release·hotfix | 정기 버전과 여러 유지보수선을 관리. 장기 브랜치 동기화 비용 증가 |
+| Trunk-Based | 작은 변경을 중심 브랜치에 자주 통합 | 빠른 피드백과 강한 자동 검증. 미완성 기능은 feature flag로 숨김 |
+
+Trunk-Based는 장기 개발 브랜치를 피하고 최소 하루 단위로 통합하는 CI 실천을 강조한다. 짧은 PR도 허용하므로 trunk를 무검토로 바꾸라는 뜻은 아니다.[3] **기본 추천은 Trunk-Based를 지향하는 짧은 브랜치+PR**이다. 릴리스나 감사 요구가 실제로 생길 때 장기 release 브랜치를 추가한다.
+
+`merge`는 이력을 연결하고, `rebase`는 커밋을 새 기준에 다시 적용해 SHA를 바꾼다. 공개 브랜치를 rebase하면 동료 이력과 갈라질 수 있어 개인 브랜치에서 주로 쓴다. 충돌은 표시만 지우지 말고 양쪽 의도를 확인해 테스트한다. 태그는 보통 릴리스 커밋을 식별하고, 이후 이동할 수 있는 브랜치와 다르다.
+
+### 3.3 CI 파이프라인
+
+CI는 통합 변경을 자동으로 빌드·검사해 오류를 조기에 발견하고 배포 가능한 산출물을 만드는 과정이다. GitHub Actions는 event가 workflow를 실행하고, workflow가 job을 묶고, 각 job은 runner에서 step을 실행한다.[1] Azure Pipelines는 pipeline→stage→job→agent→step/task로 비슷한 구조를 부른다.[2]
+
+1. **Checkout:** PR의 커밋 SHA를 가져온다. 다른 SHA를 검사하면 결과가 PR 최신 변경을 보증하지 않는다.
+2. **Build:** 지정 JDK와 Gradle wrapper로 컴파일·패키징한다. 빌드 내부는 D04 참조.
+3. **Test:** 단위·통합 테스트와 리포트를 남긴다. 외부 DB가 필요한 검사는 서비스 설정을 명시한다.
+4. **Static analysis:** SonarQube 등 품질 게이트를 status check에 연결한다. 서버 연결 실패와 코드 기준 미달은 구분한다.
+5. **Image:** 통과한 앱을 커밋 SHA나 버전으로 식별되는 컨테이너 이미지로 만든다.
+6. **Push:** 보호 브랜치·태그에서 레지스트리에 이미지를 게시한다. fork PR에는 불필요한 배포 권한을 주지 않는다.
+7. **Artifact:** JAR·테스트 리포트·로그를 해당 실행 결과로 보관한다. 의존성 cache는 재생성 가능한 반복 입력이라 artifact와 다르다.[5][6]
+
+PR 검증은 빌드·테스트·분석, main 병합 후에는 통과한 버전의 이미지 생성·게시를 연결하는 구성이 기본이다. test와 분석은 병렬화할 수 있지만 publish는 검증 성공 뒤에 둔다. 실패 조사 시 실행 SHA와 첫 실패 job의 최초 오류를 확인한다. 뒤 job의 `skipped`는 선행 실패 결과일 수 있다.
+
+### 3.4 CD와 GitOps
+
+Continuous Delivery는 운영 배포 준비를 자동화하되 마지막 승인을 남길 수 있고, Continuous Deployment는 검증 통과 후 운영까지 자동 반영한다.[14] 회의에서 “CD”라고만 하면 승인 지점을 확인한다. 환경 승격은 같은 불변 이미지 digest를 dev→staging→production으로 옮겨 스테이징에서 검증한 바이너리를 운영에도 쓰는 것이 추적하기 쉽다.
+
+Push 배포는 CI runner가 클러스터 API에 자격 증명으로 변경을 밀어 넣는다. GitOps Pull에서는 CI가 선언 저장소를 갱신하고 Argo CD 컨트롤러가 Git 목표 상태와 클러스터 실제 상태를 비교해 sync한다.
+
+```mermaid
+sequenceDiagram
+  actor CI as CI 파이프라인
+  participant Git as 환경 선언 저장소
+  participant Argo as Argo CD 컨트롤러
+  participant K8s as Kubernetes
+  CI->>Git: 검증된 이미지 버전 반영
+  Argo->>Git: 목표 revision과 매니페스트 읽기
+  Argo->>K8s: 실제 상태 조회
+  K8s-->>Argo: 현재 상태 반환
+  Argo->>Argo: 목표와 차이 계산
+  Argo->>K8s: sync 적용
+  K8s-->>Argo: 반영 상태 반환
+```
+
+Argo CD의 repository server는 Git revision에서 매니페스트를 렌더링하고 application controller는 차이를 감시한다.[13] 자동 sync는 CI가 Argo API에 직접 배포하지 않게 해 권한 경계를 줄인다. 자동 sync만으로 삭제(prune)나 수동 변경 복구(self-heal)가 보장되지는 않는다. 해당 옵션을 의도적으로 정하고 상태를 관찰한다. 공식 문서상 기본 재조정 주기는 120초에 최대 60초 지터가 더해질 수 있다.[15] 롤링·카나리 등 배포 전략은 D06 참조.
+
+## 4. 직접 해보기
+
+### 4.1 로컬에서 검증
+
+Spring Boot 4.1 프로젝트의 Gradle wrapper와 Java 25를 기준으로 실행한다.
+
+```bash
+java -version
+./gradlew --version
+git switch -c feat/ci-lab
+./gradlew --no-daemon clean test bootJar
+```
+
+성공하면 `build/reports/tests/test/index.html`과 `build/libs/`를 확인한다. 실패하면 최초 테스트 오류나 `Caused by`를 찾고 같은 명령을 재현한다. 로컬과 CI의 OS, 환경변수, DB, secret이 다르면 로컬 통과만으로 원격 CI 성공을 보장하지 않는다.
+
+### 4.2 같은 Gradle 검증을 도구별 문법으로
+
+아래는 검증 job의 짧은 예시다. 각 runner/agent에 Java 25와 Linux 셸이 준비돼야 한다. 실제 action 버전과 권한은 조직 정책을 따른다.
+
+**GitHub Actions — `.github/workflows/ci.yml`**
+
+```yaml
+name: verify
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+      - run: ./gradlew --no-daemon clean test bootJar
+```
+
+**GitLab CI — `.gitlab-ci.yml`**
+
+```yaml
+stages: [verify]
+verify:
+  stage: verify
+  image: eclipse-temurin:25-jdk
+  script:
+    - chmod +x gradlew
+    - ./gradlew --no-daemon clean test bootJar
+  artifacts:
+    when: always
+    paths: [build/reports/tests/test/, build/libs/]
+```
+
+**Jenkins — `Jenkinsfile`**
+
+```groovy
+pipeline {
+  agent any
+  stages {
+    stage('Verify') {
+      steps { sh './gradlew --no-daemon clean test bootJar' }
+    }
+  }
+}
+```
+
+**Azure Pipelines — `azure-pipelines.yml`**
+
+```yaml
+trigger:
+  branches:
+    include: [main]
+pool:
+  vmImage: ubuntu-latest
+steps:
+  - bash: ./gradlew --no-daemon clean test bootJar
+    displayName: Verify Java application
+```
+
+GitLab의 `stages`/job, Jenkins의 `agent`/`stages`/`steps`, Azure의 `pool`/`steps`, Actions의 `jobs`/`runs-on`은 실행 단위와 순서를 각기 표현한다.[2][11][12] 실제 Azure agent와 Jenkins agent에 JDK 25를 설치하고, GitLab의 Docker image는 runner executor가 지원하는지 확인한다.
+
+### 4.3 선택 — 이미지와 GitOps
+
+컨테이너 런타임이 있으면 테스트 통과 뒤 이미지 태그에 `git rev-parse --short HEAD`를 사용해 빌드하고 로컬 실행을 확인한다. 레지스트리 push와 Kubernetes 실습은 계정·권한 또는 비용이 들 수 있다. GitOps 실습에서는 CI가 이미지 버전을 선언 저장소에 반영하고 Argo CD가 읽도록 구성한다.
+
+## 5. 자주 하는 오해와 실수
+
+1. **“CI 초록이면 제품 정상” →** 설정한 검사 범위만 통과했다. → 미검증 경로·운영 의존성은 별도로 테스트하고 관측한다.
+2. **“리뷰어 지정은 승인” →** 리뷰와 필수 체크는 별도 병합 조건이다. → 보호 브랜치의 요구 승인 수와 최신 SHA 체크를 확인한다.
+3. **“캐시가 빌드 산출물” →** 캐시는 재생성 가능한 속도 개선 자료다. → JAR·테스트 결과는 artifact로 보관하고 캐시가 없어도 빌드되게 한다.[5][6]
+4. **“PR workflow에 secret을 적으면 안전” →** 포크 코드나 로그가 민감 값을 노출할 수 있다. → 최소 권한을 주고 보호 환경의 publish job에서만 주입한다.[8]
+5. **“운영 승인 뒤 배포면 Continuous Deployment” →** 사람이 마지막 승인을 한다면 보통 Continuous Delivery다. → CD가 어느 뜻인지 명시한다.[14]
+6. **“Argo 자동 sync가 모든 차이를 즉시 원복” →** prune·self-heal은 기본 동작으로 보장되지 않는다. → 리소스 삭제와 수동 변경 복구 정책을 따로 켜고 확인한다.[15]
+7. **“충돌 표시만 지우면 해결” →** 코드상 충돌과 기능 의도는 별개다. → 양쪽 변경을 검토하고 테스트한다.
+8. **“환경마다 이미지 재빌드” →** 검증한 바이너리와 운영 바이너리가 달라진다. → 같은 digest를 환경별로 승격한다.
+9. **“마지막 로그가 원인” →** 후속 job은 최초 실패 때문에 건너뛴 것일 수 있다. → 실패 SHA·job의 첫 오류부터 코드, 환경, 권한 문제를 분리한다.
+
+## 6. 시각화 설계 메모
+
+1. **전체 흐름** — [목적] 변경의 개발부터 운영까지 추적. [노드/요소] 이슈, 브랜치, PR, CI, 이미지, Git 선언 저장소, Argo CD, 클러스터. [화살표/관계] 성공 경로와 실패 수정 루프, 승인 게이트. [단계별 애니메이션 순서] 이슈→PR→검증→병합→이미지→운영. [강조할 오해] 체크 성공과 승인, 이미지 생성과 운영 배포는 별개. 1절 그림과 연결.
+2. **PR 타임라인** — [목적] 리뷰와 자동 검사의 차이 설명. [노드/요소] 개발자, 원격 Git, 리뷰어, CI. [화살표/관계] PR SHA에서 job 실행, 수정 푸시 때 재실행. [단계별 애니메이션 순서] 요청→병렬 체크→리뷰→수정→승인. [강조할 오해] 이전 SHA의 성공은 새 커밋을 검증하지 않는다. 3.1절 sequenceDiagram과 연결.
+3. **CI 파이프라인 DAG** — [목적] 병렬 job과 의존 순서 설명. [노드/요소] checkout, test, 분석, package, image, publish. [화살표/관계] test·분석 병렬, publish는 보호 조건 이후. [단계별 애니메이션 순서] checkout→검증→품질 게이트→저장. [강조할 오해] cache는 전달 artifact가 아니다. 3.3절과 연결.
+4. **Push와 GitOps Pull** — [목적] 배포 권한과 지속 조정을 비교. [노드/요소] CI, 선언 저장소, Argo CD, 클러스터 목표·실제 상태. [화살표/관계] CI 직접 배포와 컨트롤러 sync 경로 비교. [단계별 애니메이션 순서] 이미지→선언 갱신→차이 계산→sync. [강조할 오해] GitOps는 단순히 파일을 Git에 저장하는 일이 아니다. 3.4절 그림과 연결.
+
+## 7. 자가점검 Q&A (면접 대비)
+
+**Q1. PR이 초록인데 병합되지 않는 이유는?**
+
+체크 성공은 자동 검사 결과일 뿐이다. 필수 리뷰, 대화 해결, 최신 기본 브랜치 기준 재검증 등 보호 조건이 남을 수 있다. 병합 화면에서 체크와 보호 규칙을 각각 확인한다.
+
+꼬리질문: 새 커밋을 추가하면? — 새 SHA의 검증이 필요하다.
+
+**Q2. squash와 merge commit은 무엇을 기준으로 고르는가?**
+
+Squash는 PR을 한 커밋으로 묶어 기본 이력을 간결하게 한다. Merge commit은 통합 경계와 브랜치 커밋을 보존한다. 팀의 회귀 추적과 감사 단위에 맞춘다.
+
+꼬리질문: squash 뒤 원래 커밋별 이력이 기본 브랜치에 남나? — 보통 단일 통합 커밋만 남으므로 별도 링크나 다른 병합 방식을 쓴다.
+
+**Q3. 공유 브랜치에서 rebase가 위험한 이유는?**
+
+Rebase는 커밋을 새 부모에 다시 적용해 SHA를 바꾼다. 동료가 이전 이력 위에서 작업했다면 각자 다른 이력을 갖게 된다. 개인 브랜치에서 주로 사용한다.
+
+꼬리질문: merge는? — 기존 SHA를 보존하며 두 이력을 연결할 수 있다.
+
+**Q4. cache와 artifact를 나누는 이유는?**
+
+캐시는 재생성 가능한 입력을 재사용해 시간을 줄인다. Artifact는 실행 결과인 JAR·리포트를 전달하거나 추적한다. 캐시 miss도 정상 빌드여야 한다.
+
+꼬리질문: Gradle 의존성은? — 보통 cache이고 빌드한 JAR은 artifact다.
+
+**Q5. Continuous Delivery와 Deployment의 차이는?**
+
+Delivery는 배포 가능한 상태를 자동 준비하며 운영 승인을 남길 수 있다. Deployment는 검증 후 운영 반영까지 자동화한다. CD 약어만으로 승인을 추정하면 안 된다.
+
+꼬리질문: 수동 승인이 있으면 CI/CD가 아닌가? — 자동 릴리스 준비가 있으면 Continuous Delivery다.
+
+**Q6. GitOps에서 Argo CD와 CI의 책임은?**
+
+CI는 검증·이미지 생성을 하고 환경 선언의 버전을 갱신한다. Argo CD는 Git 목표 상태와 클러스터 실제 상태를 비교해 조정한다. CI에 클러스터 권한을 직접 주지 않아도 된다.
+
+꼬리질문: 사람이 클러스터에서 바꾸면 즉시 복구되나? — self-heal 설정과 조정 주기에 달려 있다.
+
+**Q7. 실패한 파이프라인은 어디부터 읽나?**
+
+실행 SHA와 트리거를 확인하고 실패 job의 첫 오류를 찾는다. 후속 skipped·cancelled job은 원인이 아닐 수 있다. 환경·권한·코드 오류를 로컬 재현으로 나눈다.
+
+꼬리질문: 로그에서 토큰이 노출됐다면? — 폐기·회전하고 출력 경로와 권한을 제거한다.
+
+## 8. 참고문헌
+
+1. Understanding GitHub Actions — https://docs.github.com/en/actions/about-github-actions/understanding-github-actions — workflow부터 runner·step까지의 기본 구조.
+2. Key Azure Pipelines concepts — https://learn.microsoft.com/en-us/azure/devops/pipelines/get-started/key-pipelines-concepts — stage·agent·task·artifact 용어.
+3. Introduction — https://trunkbaseddevelopment.com/ — 짧은 브랜치와 지속 통합.
+4. GitHub flow — https://docs.github.com/get-started/quickstart/github-flow — PR 중심 브랜치 협업 순서.
+5. Workflow artifacts — https://docs.github.com/en/actions/concepts/workflows-and-actions/workflow-artifacts — artifact와 cache의 차이.
+6. Dependency caching — https://docs.github.com/en/actions/concepts/workflows-and-actions/dependency-caching — 반복 의존성의 캐시.
+7. Deployment environments — https://docs.github.com/en/actions/concepts/workflows-and-actions/deployment-environments — 환경 승인·브랜치·secret 정책.
+8. Secrets — https://docs.github.com/en/actions/concepts/security/secrets — secret을 workflow에 주입하는 방식.
+9. About protected branches — https://docs.github.com/articles/about-required-reviews-for-pull-requests — 필수 리뷰와 상태 체크.
+10. About merge methods on GitHub — https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/about-merge-methods-on-github — merge·squash·rebase 병합 방식.
+11. CI/CD YAML syntax reference — https://docs.gitlab.com/ci/yaml/ — GitLab job과 YAML 구성.
+12. Pipeline Syntax — https://www.jenkins.io/doc/book/pipeline/syntax/ — Jenkins Declarative Pipeline 구성.
+13. Architectural Overview — https://argo-cd.readthedocs.io/en/stable/operator-manual/architecture/ — Argo CD 구성요소와 controller.
+14. What is Continuous Delivery? — https://aws.amazon.com/devops/continuous-delivery/ — Delivery와 Deployment의 운영 승인 차이.
+15. Automated Sync Policy — https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/ — 자동 sync, prune, self-heal 정책.

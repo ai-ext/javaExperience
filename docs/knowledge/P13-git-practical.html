@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P13. Git 실무 — 충돌 해결·되돌리기·브랜치 작업</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
+<main>
+
+<h1 id="p13-git-실무--충돌-해결되돌리기브랜치-작업"><a class="anchor" href="#p13-git-실무--충돌-해결되돌리기브랜치-작업" aria-hidden="true">#</a>P13. Git 실무 — 충돌 해결·되돌리기·브랜치 작업</h1>
+<blockquote>
+<p>Git은 작업 디렉터리·스테이징·저장소를 구분한다.
+충돌은 두 커밋의 같은 부분을 자동 선택하지 못한 상태다.
+공유한 커밋은 reset보다 새 커밋인 revert로 되돌리는 것이 기본이다.</p>
+</blockquote>
+<h2 id="1-한-줄로-말하면"><a class="anchor" href="#1-한-줄로-말하면" aria-hidden="true">#</a>1. 한 줄로 말하면</h2>
+<p>Git은 작업 디렉터리의 변경을 index(스테이징)에 올린 뒤 커밋 객체로 저장하고, 브랜치가 그 커밋을 가리키게 하는 분산 버전 관리 시스템이다. 브랜치는 커밋을 가리키는 이동 가능한 이름이고 HEAD는 현재 브랜치 또는 커밋을 가리킨다.</p>
+<p>이 구분이 필요한 이유는 “파일을 버린다”, “마지막 커밋을 고친다”, “원격 변경을 가져온다”가 서로 다른 동작이기 때문이다. Spring Boot에서 application.yml이나 테스트를 여러 사람이 고치면 이를 모르는 순간 설정 누락, 잘못된 배포, 동료 커밋 삭제로 이어진다.</p>
+<p>기본 추천은 작업 시작 전 git status와 git switch -c feature/..., 커밋 전 git diff --cached, 공유 후 되돌리기는 git revert다. reset --hard는 대상과 복구 방법을 확인한 개인 작업에서만 쓴다.</p>
+<h2 id="2-당장-알아야-할-것"><a class="anchor" href="#2-당장-알아야-할-것" aria-hidden="true">#</a>2. 당장 알아야 할 것</h2>
+<h3 id="21-세-영역과-head"><a class="anchor" href="#21-세-영역과-head" aria-hidden="true">#</a>2.1 세 영역과 HEAD</h3>
+<pre><code class="language-text">작업 디렉터리 --git add--&gt; 스테이징(index) --git commit--&gt; 저장소(objects)
+       ^                          ^                         |
+       |-- git restore -----------|                         v
+                         HEAD/브랜치가 커밋을 가리킴</code></pre>
+<p>git diff는 작업 디렉터리와 index의 차이, git diff --cached는 index와 HEAD의 차이다. 따라서 git add -p로 한 파일의 기능 변경과 디버그 출력을 분리할 수 있다.</p>
+<pre><code class="language-bash">git status --short
+git diff
+git add -p src/main/java/com/acme/order/OrderService.java
+git diff --cached
+git commit -m &quot;fix(order): reject duplicate payment&quot;</code></pre>
+<p>git show --stat HEAD는 방금 커밋, git log --oneline --graph --decorate --all은 브랜치 관계를 보여준다.</p>
+<h3 id="22-브랜치는-복사본이-아니라-이름이다"><a class="anchor" href="#22-브랜치는-복사본이-아니라-이름이다" aria-hidden="true">#</a>2.2 브랜치는 복사본이 아니라 이름이다</h3>
+<pre><code class="language-bash">git switch main
+git pull --ff-only origin main
+git switch -c feature/order-timeout
+git push -u origin feature/order-timeout</code></pre>
+<p>switch -c는 현재 커밋에서 새 브랜치를 만들고 이동한다. -u는 tracking 대상인 origin/feature/order-timeout을 기록하므로 이후 push와 pull의 대상이 결정된다. 삭제는 git branch -d feature/order-timeout; 병합되지 않은 브랜치를 지우는 -D는 log 확인 뒤에만 쓴다.</p>
+<p>git switch --detach <commit>은 브랜치가 아닌 커밋을 직접 가리키는 detached HEAD다. 그 상태에서 만든 커밋은 이름이 없으므로 즉시 git switch -c rescue/<name>으로 보존한다.</p>
+<h3 id="23-원격은-fetch와-pull을-나눈다"><a class="anchor" href="#23-원격은-fetch와-pull을-나눈다" aria-hidden="true">#</a>2.3 원격은 fetch와 pull을 나눈다</h3>
+<p>git fetch origin은 원격 객체와 원격 추적 브랜치만 갱신하고 작업 파일은 바꾸지 않는다. git pull은 fetch 뒤 현재 브랜치에 통합(merge 또는 설정된 rebase)까지 한다.</p>
+<pre><code class="language-bash">git fetch origin
+git log --oneline HEAD..origin/main
+git diff HEAD...origin/main
+git merge --ff-only origin/main</code></pre>
+<p>--ff-only가 실패하면 로컬 main에 독자 커밋이 있다는 뜻이다. 원격 main을 reset --hard로 덮지 말고 merge 또는 rebase를 명시적으로 선택한다.</p>
+<h3 id="24-충돌을-읽고-해결한다"><a class="anchor" href="#24-충돌을-읽고-해결한다" aria-hidden="true">#</a>2.4 충돌을 읽고 해결한다</h3>
+<p>충돌은 merge, rebase, cherry-pick에서 발생한다. 파일은 다음 세 구간으로 표시된다.</p>
+<pre><code class="language-text">&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD          # 현재 체크아웃한 쪽(ours)
+현재 브랜치 내용
+=======
+합치려는 커밋 내용     # theirs
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; feature/x</code></pre>
+<p>마커를 보고 한쪽을 무조건 택하는 것이 해결은 아니다. Spring 설정이면 두 값의 의미, 운영 기본값, 테스트를 확인해 최종 파일을 직접 작성한다.</p>
+<pre><code class="language-bash">git status
+git diff
+# 편집기로 충돌 마커를 모두 제거하고 최종 내용을 저장
+git add src/main/resources/application.yml
+git diff --cached
+git merge --continue</code></pre>
+<p>rebase 중이면 git add <file> 후 git rebase --continue다. 포기하려면 merge는 git merge --abort, rebase는 git rebase --abort다.</p>
+<h3 id="25-되돌리기-결정표"><a class="anchor" href="#25-되돌리기-결정표" aria-hidden="true">#</a>2.5 되돌리기 결정표</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상황</th>
+<th>명령</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>수정한 tracked 파일 폐기</td>
+<td>git restore file</td>
+<td>작업 디렉터리 복구</td>
+</tr>
+<tr>
+<td>git add 취소</td>
+<td>git restore --staged file</td>
+<td>내용은 남고 staged 해제</td>
+</tr>
+<tr>
+<td>로컬 커밋 합치기</td>
+<td>git reset --soft HEAD~1</td>
+<td>커밋만 취소, 내용 보존</td>
+</tr>
+<tr>
+<td>커밋은 유지하고 index 해제</td>
+<td>git reset HEAD~1</td>
+<td>기본 mixed, index를 HEAD에 맞춤</td>
+</tr>
+<tr>
+<td>로컬 작업까지 강제 복구</td>
+<td>git reset --hard <commit></td>
+<td>추적 변경을 덮음</td>
+</tr>
+<tr>
+<td>이미 push한 커밋 반전</td>
+<td>git revert <commit></td>
+<td>새 커밋 생성</td>
+</tr>
+<tr>
+<td>마지막 메시지 수정</td>
+<td>git commit --amend</td>
+<td>push 전 히스토리 재작성</td>
+</tr>
+</tbody></table></div>
+<p>restore는 파일 내용, reset은 주로 HEAD/index, revert는 기존 커밋의 효과를 반대 패치로 기록한다. reset 공식 문서의 기본 모드는 mixed이며 soft는 작업 트리와 index를 보존하고 hard는 대상 커밋에 맞춰 덮어쓴다.</p>
+<h3 id="26-stash는-임시-선반이다"><a class="anchor" href="#26-stash는-임시-선반이다" aria-hidden="true">#</a>2.6 stash는 임시 선반이다</h3>
+<pre><code class="language-bash">git stash push -u -m &quot;wip payment validation&quot;
+git switch main
+git pull --ff-only
+git switch feature/payment
+git stash pop</code></pre>
+<p>기본 stash는 추적 파일 변경을 저장하고 untracked 파일은 제외한다. 새 파일까지 넣으려면 -u가 필요하다. pop은 적용 후 stash를 삭제하지만 충돌 시 남을 수 있으므로 git stash list로 확인한다. 오래 보관할 작업은 WIP 커밋이나 별도 브랜치가 더 안전하다.</p>
+<h3 id="27-merge-rebase-cherry-pick"><a class="anchor" href="#27-merge-rebase-cherry-pick" aria-hidden="true">#</a>2.7 merge, rebase, cherry-pick</h3>
+<p>merge는 두 부모를 가진 통합 커밋을 만들고 기존 커밋 ID를 보존한다. rebase는 내 커밋을 새 base 위에 다시 적용해 새 ID를 만들므로 개인 feature 브랜치에 적합하다. 이미 다른 사람이 fetch한 브랜치를 rebase한 뒤 강제 push하면 그 사람의 기반을 흔든다.</p>
+<pre><code class="language-bash">git switch feature/x
+git fetch origin
+git rebase origin/main
+git add &lt;file&gt;
+git rebase --continue
+git push --force-with-lease origin feature/x</code></pre>
+<p>공유 브랜치는 merge 또는 팀이 합의한 통합 방식을 쓴다. --force 대신 --force-with-lease를 쓰면 내가 마지막으로 본 원격 값이 바뀐 경우 push를 거부한다. 특정 커밋 하나만 옮길 때는 git cherry-pick <commit>을 쓰고 중복과 충돌을 확인한다.</p>
+<h3 id="28-비밀값과-ignore"><a class="anchor" href="#28-비밀값과-ignore" aria-hidden="true">#</a>2.8 비밀값과 ignore</h3>
+<p>.gitignore는 아직 추적하지 않은 파일만 무시한다. 이미 커밋된 application-local.yml에 비밀이 들어갔다면 ignore 추가만으로 과거 커밋에서 사라지지 않는다.</p>
+<pre><code class="language-gitignore">.env
+application-*.local.yml
+!.env.example
+build/
+.idea/</code></pre>
+<pre><code class="language-bash">git rm --cached application-local.yml
+git commit -m &quot;chore: stop tracking local configuration&quot;</code></pre>
+<p>실제 토큰이 원격에 올라갔다면 먼저 키를 폐기·교체하고 전체 히스토리 정리를 협의한다. reset은 이미 clone한 사람의 복사본에서 비밀을 지우지 못한다.</p>
+<h2 id="3-따라-하기"><a class="anchor" href="#3-따라-하기" aria-hidden="true">#</a>3. 따라 하기</h2>
+<p>아래 실습은 Java/Spring 프로젝트에 대입할 수 있도록 application.properties를 충돌 파일로 사용했다. 실행한 스크립트와 생성 레포는 _scratch/P13/ 아래에 있다.</p>
+<h3 id="31-레포-생성과-분기"><a class="anchor" href="#31-레포-생성과-분기" aria-hidden="true">#</a>3.1 레포 생성과 분기</h3>
+<pre><code class="language-bash">mkdir git-demo &amp;&amp; cd git-demo
+git init -b main
+git config user.name &quot;P13 Demo&quot;
+git config user.email &quot;p13@example.invalid&quot;
+echo version=1 &gt; application.properties
+git add application.properties
+git commit -m &quot;chore: initialize configuration&quot;
+git switch -c feature/timeout</code></pre>
+<p>확인 방법: git status가 clean이고 git branch --show-current가 feature/timeout을 출력하면 된다.</p>
+<h3 id="32-의도적으로-충돌-만들기"><a class="anchor" href="#32-의도적으로-충돌-만들기" aria-hidden="true">#</a>3.2 의도적으로 충돌 만들기</h3>
+<pre><code class="language-bash">echo version=2 &gt; application.properties
+echo timeout=2s &gt;&gt; application.properties
+git add application.properties
+git commit -m &quot;feat(config): add request timeout&quot;
+git switch main
+echo version=1 &gt; application.properties
+echo timeout=5s &gt;&gt; application.properties
+git add application.properties
+git commit -m &quot;fix(config): raise default timeout&quot;
+git merge feature/timeout</code></pre>
+<p>확인 방법: CONFLICT (content): Merge conflict in application.properties가 나오고 git status가 both modified를 보여야 한다. 실제 실행 충돌 파일은 다음과 같았다.</p>
+<pre><code class="language-text">&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+version=1
+timeout=5s
+=======
+version=2
+timeout=2s
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; feature/timeout</code></pre>
+<p>이 예에서는 version은 feature의 2, timeout은 운영 정책으로 선택한 5초로 직접 저장한다.</p>
+<pre><code class="language-bash">echo version=2 &gt; application.properties
+echo timeout=5s &gt;&gt; application.properties
+git add application.properties
+git diff --cached
+git commit -m &quot;merge: resolve timeout policy&quot;
+git log --oneline --graph --all</code></pre>
+<p>확인 방법: staged diff에 마커가 없고 로그에 merge: resolve timeout policy가 두 부모를 가진 그래프로 나타난다. 파일만 저장하고 git add하지 않으면 Git은 계속 충돌 중으로 본다.</p>
+<h3 id="33-실수한-수정-stash-soft-reset"><a class="anchor" href="#33-실수한-수정-stash-soft-reset" aria-hidden="true">#</a>3.3 실수한 수정, stash, soft reset</h3>
+<pre><code class="language-bash">echo version=3 &gt; application.properties
+echo timeout=5s &gt;&gt; application.properties
+git diff
+git restore application.properties
+git status --short
+echo local-only=true &gt; local.properties
+git stash push -u -m &quot;wip local setting&quot;
+git stash list
+git stash pop</code></pre>
+<p>확인 방법: 첫 diff에는 version 2→3이 나오고 restore 뒤에는 출력이 없다. stash list에는 wip local setting이 보이며 pop 뒤 ?? local.properties가 돌아온다. -u를 빼면 이 untracked 파일은 stash에 들어가지 않는다.</p>
+<pre><code class="language-bash">git add local.properties
+git commit -m &quot;chore: add local setting for demo&quot;
+git reset --soft HEAD~1
+git status --short
+git restore --staged local.properties</code></pre>
+<p>확인 방법: soft reset 뒤 마지막 커밋은 merge 커밋으로 돌아가지만 local.properties는 A로 staged 상태에 남는다.</p>
+<h3 id="34-reflog로-head-찾기"><a class="anchor" href="#34-reflog로-head-찾기" aria-hidden="true">#</a>3.4 reflog로 HEAD 찾기</h3>
+<pre><code class="language-bash">git reflog -5 --oneline
+git show HEAD@{1} --stat
+git branch rescue/before-reset HEAD@{1}</code></pre>
+<p>실행 결과에는 reset: moving to HEAD~1과 그 직전 커밋이 기록됐다. reflog는 원격에 공유되는 로그가 아니라 로컬 ref 이동 기록이므로 먼저 show로 검증하고 rescue 브랜치로 보존한다.</p>
+<p>실제 임시 레포 실행 출력의 핵심은 다음과 같다(커밋 ID는 실행마다 달라진다).</p>
+<pre><code class="language-text">=== graph before merge ===
+* 0f47d39 feat(config): add request timeout
+| * abb8940 fix(config): raise default timeout
+|/
+* 959ff45 chore: initialize configuration
+=== merge conflict ===
+CONFLICT (content): Merge conflict in application.properties
+=== graph after merge ===
+*   3917e51 merge: resolve timeout policy
+|\
+| * 0f47d39 feat(config): add request timeout
+* | abb8940 fix(config): raise default timeout
+|/
+* 959ff45 chore: initialize configuration
+=== stash ===
+stash@{0}: On main: wip local setting
+=== after soft reset ===
+A  local.properties
+3917e51 merge: resolve timeout policy
+=== reflog ===
+3917e51 HEAD@{0}: reset: moving to HEAD~1
+51f1447 HEAD@{1}: commit: chore: add local setting for demo</code></pre>
+<h3 id="35-spring-boot-pr-전-순서"><a class="anchor" href="#35-spring-boot-pr-전-순서" aria-hidden="true">#</a>3.5 Spring Boot PR 전 순서</h3>
+<pre><code class="language-bash">git switch main
+git fetch origin
+git merge --ff-only origin/main
+git switch -c feature/order-timeout
+./gradlew test
+git diff --check
+git add -p src/main/java src/test/java
+git diff --cached
+git commit -m &quot;feat(order): configure request timeout&quot;
+git log --oneline --decorate -5
+git push -u origin feature/order-timeout</code></pre>
+<p>Maven이면 ./gradlew test 대신 ./mvnw test다. 확인 방법은 테스트 성공, git diff --check 무출력, staged diff가 의도한 파일만 포함하는지, git branch -vv에 tracking이 보이는지다. PR 전 비밀값·빌드 산출물·IDE 파일도 점검한다.</p>
+<h2 id="4-치트시트"><a class="anchor" href="#4-치트시트" aria-hidden="true">#</a>4. 치트시트</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>용도</th>
+<th>예시</th>
+<th>주의</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>status</td>
+<td>상태·충돌·브랜치 확인</td>
+<td>git status --short</td>
+<td>첫 명령</td>
+</tr>
+<tr>
+<td>add -p</td>
+<td>변경 일부 stage</td>
+<td>git add -p src/</td>
+<td>각 diff 검토</td>
+</tr>
+<tr>
+<td>diff</td>
+<td>unstaged 변경</td>
+<td>git diff</td>
+<td>staged는 --cached</td>
+</tr>
+<tr>
+<td>show</td>
+<td>커밋 상세</td>
+<td>git show --stat HEAD</td>
+<td>부모 확인</td>
+</tr>
+<tr>
+<td>log</td>
+<td>히스토리·분기</td>
+<td>git log --oneline --graph --all</td>
+<td>--all 사용</td>
+</tr>
+<tr>
+<td>switch -c</td>
+<td>생성·전환</td>
+<td>git switch -c feature/x</td>
+<td>시작점 확인</td>
+</tr>
+<tr>
+<td>fetch</td>
+<td>원격 ref 갱신</td>
+<td>git fetch origin</td>
+<td>파일은 안 바꿈</td>
+</tr>
+<tr>
+<td>push -u</td>
+<td>원격 브랜치 게시</td>
+<td>git push -u origin feature/x</td>
+<td>tracking 설정</td>
+</tr>
+<tr>
+<td>restore</td>
+<td>파일/index 복구</td>
+<td>git restore --staged f</td>
+<td>폐기 전 diff</td>
+</tr>
+<tr>
+<td>reset --soft</td>
+<td>커밋만 취소</td>
+<td>git reset --soft HEAD~1</td>
+<td>공유 금지</td>
+</tr>
+<tr>
+<td>reset --hard</td>
+<td>강제 일치</td>
+<td>git reset --hard origin/main</td>
+<td>변경 폐기</td>
+</tr>
+<tr>
+<td>revert</td>
+<td>공유 커밋 반전</td>
+<td>git revert abc123</td>
+<td>새 커밋</td>
+</tr>
+<tr>
+<td>stash -u</td>
+<td>untracked 포함 보관</td>
+<td>git stash push -u -m wip</td>
+<td>백업 아님</td>
+</tr>
+<tr>
+<td>reflog</td>
+<td>로컬 ref 복구</td>
+<td>git reflog -5</td>
+<td>rescue 먼저</td>
+</tr>
+<tr>
+<td>cherry-pick</td>
+<td>특정 커밋 적용</td>
+<td>git cherry-pick abc123</td>
+<td>중복 확인</td>
+</tr>
+</tbody></table></div>
+<h2 id="5-자주-나는-에러와-해결"><a class="anchor" href="#5-자주-나는-에러와-해결" aria-hidden="true">#</a>5. 자주 나는 에러와 해결</h2>
+<h3 id="non-fast-forward"><a class="anchor" href="#non-fast-forward" aria-hidden="true">#</a>non-fast-forward</h3>
+<p>원격에 로컬이 모르는 커밋이 있어 push가 거부된 것이다. fetch 후 git log HEAD..origin/브랜치로 차이를 보고, 내 커밋을 보존해야 하면 rebase 또는 merge 후 push한다. 공용 브랜치를 --force로 덮지 않는다.</p>
+<h3 id="detached-head"><a class="anchor" href="#detached-head" aria-hidden="true">#</a>detached HEAD</h3>
+<p>브랜치가 아닌 커밋·태그를 직접 가리키는 상태다. 작업 커밋을 남겼다면 git switch -c feature/from-detached로 이름을 붙인다. 잃어버린 것처럼 보이면 reflog에서 찾는다.</p>
+<h3 id="local-changes-would-be-overwritten"><a class="anchor" href="#local-changes-would-be-overwritten" aria-hidden="true">#</a>local changes would be overwritten</h3>
+<p>현재 변경과 전환 대상 파일이 겹쳐 Git이 덮어쓰기를 막은 것이다. 커밋하거나 git stash push -u하고 전환한다. 버릴 것이면 git diff 확인 뒤 git restore한다.</p>
+<h3 id="untracked-working-tree-files-would-be-overwritten"><a class="anchor" href="#untracked-working-tree-files-would-be-overwritten" aria-hidden="true">#</a>untracked working tree files would be overwritten</h3>
+<p>untracked 파일과 대상 브랜치의 tracked 파일 경로가 충돌한다. git add 또는 git stash -u로 보존한다. git clean -fd는 실행 전 git clean -nd로 대상을 확인한다.</p>
+<h3 id="conflict--needs-merge"><a class="anchor" href="#conflict--needs-merge" aria-hidden="true">#</a>CONFLICT / needs merge</h3>
+<p>같은 위치를 다르게 바꿔 index에 미해결 단계가 남은 상태다. git status의 파일을 수정하고 마커를 제거한 뒤 git add한다. 포기하려면 작업 종류에 맞는 merge --abort 또는 rebase --abort를 쓴다.</p>
+<h3 id="crlflf-때문에-파일-전체가-변경됨"><a class="anchor" href="#crlflf-때문에-파일-전체가-변경됨" aria-hidden="true">#</a>CRLF/LF 때문에 파일 전체가 변경됨</h3>
+<p>줄바꿈이 운영체제나 editor에 의해 바뀐 것이다. git diff --ignore-space-at-eol로 내용 변경인지 확인하고 저장소의 .gitattributes 정책을 따른다. 무작정 전역 core.autocrlf를 바꾸지 않는다.</p>
+<h3 id="reset---hard를-후회함"><a class="anchor" href="#reset---hard를-후회함" aria-hidden="true">#</a>reset --hard를 후회함</h3>
+<p>저장된 커밋은 reflog에서 찾고 show로 검증한 뒤 rescue 브랜치를 만든다. 커밋·stash에 없던 작업 디렉터리 변경은 reflog로 복구되지 않는다. 위험 명령 전에는 작은 커밋이나 stash를 남긴다.</p>
+<h2 id="6-한-단계-더"><a class="anchor" href="#6-한-단계-더" aria-hidden="true">#</a>6. 한 단계 더</h2>
+<p>커밋은 부모 커밋을 가리키는 불변 객체이고 브랜치는 그 커밋을 가리키는 ref다. HEAD가 브랜치를 가리키면 커밋 시 브랜치 ref가 앞으로 이동한다. merge는 두 부모를 가진 새 커밋으로 두 역사를 보존하고, rebase는 커밋을 다른 부모 위에 다시 만들어 ID를 바꾼다. reset은 ref/index/작업 트리 중 무엇을 옮길지 선택하고, revert는 기존 객체를 건드리지 않고 반대 변경을 새 객체로 기록한다. reflog는 ref 이동의 로컬 기록이어서 reset 직후 복구 지점이 된다.</p>
+<p>브랜치 전략과 CI/CD는 이 문서의 소유 범위가 아니다 → <a class="docref" href="D08-cicd-collaboration.html">D08</a> 참조. Spring 빈·트랜잭션은 별도 주제이며, 충돌 해결 뒤에는 해당 도메인의 테스트를 다시 실행한다.</p>
+<h2 id="7-자가점검-qa-면접-대비"><a class="anchor" href="#7-자가점검-qa-면접-대비" aria-hidden="true">#</a>7. 자가점검 Q&amp;A (면접 대비)</h2>
+<h3 id="q1-git-diff와-git-diff---cached의-차이는"><a class="anchor" href="#q1-git-diff와-git-diff---cached의-차이는" aria-hidden="true">#</a>Q1. git diff와 git diff --cached의 차이는?</h3>
+<p>전자는 작업 디렉터리와 index 사이, 후자는 index와 HEAD 사이를 비교한다. git add 후 일반 diff가 비어도 staged 변경은 남을 수 있다. 커밋 직전에는 git diff --cached를 읽는다.</p>
+<p>꼬리질문: git restore --staged file은 내용도 지우는가?<br>아니다. index만 HEAD로 되돌리고 작업 디렉터리 내용은 남긴다.</p>
+<h3 id="q2-충돌-마커의-ours와-theirs는"><a class="anchor" href="#q2-충돌-마커의-ours와-theirs는" aria-hidden="true">#</a>Q2. 충돌 마커의 ours와 theirs는?</h3>
+<p>merge에서는 HEAD 쪽이 ours, 합치려는 브랜치가 theirs다. 마커를 지우고 두 요구사항을 만족하는 최종 파일을 만든 뒤 git add해야 한다. 자동 선택은 비즈니스 판단을 대체하지 않는다.</p>
+<p>꼬리질문: 해결했는데 계속 충돌 중이면?<br>파일 저장만 했을 가능성이 크므로 git status를 보고 git add 후 continue 또는 commit한다.</p>
+<h3 id="q3-push한-커밋은-왜-reset보다-revert인가"><a class="anchor" href="#q3-push한-커밋은-왜-reset보다-revert인가" aria-hidden="true">#</a>Q3. push한 커밋은 왜 reset보다 revert인가?</h3>
+<p>reset은 브랜치 위치를 과거로 옮겨 다른 clone과 역사를 다르게 만든다. revert는 원래 커밋을 남기고 반대 변경을 새 커밋으로 추가한다. 개인 feature를 아직 공유하지 않았다면 reset이 가능하다.</p>
+<p>꼬리질문: revert가 충돌하면?<br>해결·add 후 git revert --continue, 포기는 git revert --abort다.</p>
+<h3 id="q4-merge와-rebase는-언제-선택하는가"><a class="anchor" href="#q4-merge와-rebase는-언제-선택하는가" aria-hidden="true">#</a>Q4. merge와 rebase는 언제 선택하는가?</h3>
+<p>merge는 기존 ID와 통합 지점을 보존한다. rebase는 개인 작업을 최신 main 위에 재적용해 ID가 바뀐다. 공유 전 feature에는 rebase, 여러 사람이 기반으로 쓰는 브랜치에는 merge를 기본으로 판단한다.</p>
+<p>꼬리질문: rebase 후 왜 --force-with-lease인가?<br>재작성 커밋을 올리되 내가 마지막으로 본 원격 ref가 바뀌었으면 거부해 동료 작업 덮어쓰기를 줄인다.</p>
+<h3 id="q5-fetch와-pull의-차이는"><a class="anchor" href="#q5-fetch와-pull의-차이는" aria-hidden="true">#</a>Q5. fetch와 pull의 차이는?</h3>
+<p>fetch는 원격 추적 브랜치만 갱신해 작업 트리를 건드리지 않는다. pull은 fetch 후 현재 브랜치에 merge 또는 rebase까지 실행한다. 변경을 검토해야 하는 저장소에서는 fetch 후 log와 diff를 보는 흐름이 안전하다.</p>
+<p>꼬리질문: pull --ff-only 실패의 의미는?<br>로컬과 원격이 단순히 앞뒤 관계가 아니므로 merge 또는 rebase가 필요하다.</p>
+<h3 id="q6-stash에-새-파일이-빠지는-이유는"><a class="anchor" href="#q6-stash에-새-파일이-빠지는-이유는" aria-hidden="true">#</a>Q6. stash에 새 파일이 빠지는 이유는?</h3>
+<p>기본 stash는 추적 파일 변경 대상이다. untracked까지 보관하려면 git stash push -u를 쓴다. 중요한 작업은 stash보다 커밋·별도 브랜치로 보존한다.</p>
+<p>꼬리질문: stash pop 충돌 시 stash는?<br>보통 삭제되지 않는다. git stash list로 확인하고 해결 후 필요하면 drop한다.</p>
+<h3 id="q7-reset-후-커밋을-복구하는-방법은"><a class="anchor" href="#q7-reset-후-커밋을-복구하는-방법은" aria-hidden="true">#</a>Q7. reset 후 커밋을 복구하는 방법은?</h3>
+<p>git reflog에서 reset 직전의 HEAD@{n} 또는 ID를 찾고 git show로 검증한다. git branch rescue/lost-work <id>처럼 이름을 붙여 보존한다. 커밋되지 않은 파일 변경은 reflog로 복구되지 않는다.</p>
+<p>꼬리질문: 다른 사람 원격 브랜치도 reflog로 찾는가?<br>내 로컬에 그 ref 이동 기록이 있다는 보장이 없으므로 다른 clone이나 백업을 확인한다.</p>
+<h3 id="q8-ignore했는데-비밀값이-원격에-남는-이유는"><a class="anchor" href="#q8-ignore했는데-비밀값이-원격에-남는-이유는" aria-hidden="true">#</a>Q8. ignore했는데 비밀값이 원격에 남는 이유는?</h3>
+<p>ignore는 untracked 파일에만 적용되며 이미 커밋된 파일에는 적용되지 않는다. git rm --cached 후 커밋하고, 이미 노출된 키는 먼저 폐기·교체한다. 히스토리 정리는 별도 협의한다.</p>
+<p>꼬리질문: 공유 설정은 어떻게 제공하는가?<br>실제 값 없는 application-local.example.yml만 커밋하고 로컬 파일은 ignore한다.</p>
+<h2 id="8-참고문헌"><a class="anchor" href="#8-참고문헌" aria-hidden="true">#</a>8. 참고문헌</h2>
+<ul>
+<li>Pro Git 2nd Edition — <a href="https://git-scm.com/book/en/v2" target="_blank" rel="noopener">https://git-scm.com/book/en/v2</a> — Git 영역, 브랜치·merge·원격의 출발점.</li>
+<li>Basic Branching and Merging — <a href="https://git-scm.com/book/en/v2/Git-Branching-Basic-Branching-and-Merging" target="_blank" rel="noopener">https://git-scm.com/book/en/v2/Git-Branching-Basic-Branching-and-Merging</a> — 브랜치 분기와 병합 흐름.</li>
+<li>git-reset — <a href="https://git-scm.com/docs/git-reset" target="_blank" rel="noopener">https://git-scm.com/docs/git-reset</a> — soft/mixed/hard와 HEAD/index/작업 트리.</li>
+<li>git-rebase — <a href="https://git-scm.com/docs/git-rebase" target="_blank" rel="noopener">https://git-scm.com/docs/git-rebase</a> — 커밋 재적용과 continue/abort.</li>
+<li>git-switch — <a href="https://git-scm.com/docs/git-switch" target="_blank" rel="noopener">https://git-scm.com/docs/git-switch</a> — 브랜치 전환과 detached HEAD.</li>
+<li>git-restore — <a href="https://git-scm.com/docs/git-restore" target="_blank" rel="noopener">https://git-scm.com/docs/git-restore</a> — 작업 트리와 index 복구.</li>
+<li>git-revert — <a href="https://git-scm.com/docs/git-revert" target="_blank" rel="noopener">https://git-scm.com/docs/git-revert</a> — 새 반전 커밋으로 되돌리기.</li>
+<li>git-stash — <a href="https://git-scm.com/docs/git-stash" target="_blank" rel="noopener">https://git-scm.com/docs/git-stash</a> — dirty working directory 보관과 -u.</li>
+<li>git-reflog — <a href="https://git-scm.com/docs/git-reflog" target="_blank" rel="noopener">https://git-scm.com/docs/git-reflog</a> — 로컬 ref 이동 기록과 복구.</li>
+<li>gitignore — <a href="https://git-scm.com/docs/gitignore" target="_blank" rel="noopener">https://git-scm.com/docs/gitignore</a> — ignore 패턴과 추적 파일 예외.</li>
+<li>git-fetch — <a href="https://git-scm.com/docs/git-fetch" target="_blank" rel="noopener">https://git-scm.com/docs/git-fetch</a> — 원격 ref 갱신.</li>
+<li>Conventional Commits 1.0.0 — <a href="https://www.conventionalcommits.org/en/v1.0.0/" target="_blank" rel="noopener">https://www.conventionalcommits.org/en/v1.0.0/</a> — 커밋 메시지 구조와 breaking change.</li>
+</ul>
+
+
+</main>
+
+</body>
+</html>

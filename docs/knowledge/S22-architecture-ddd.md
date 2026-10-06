@@ -1,0 +1,334 @@
+# S22. 아키텍처 스타일과 DDD 기초 — 코드를 어떻게 나눌까
+
+> 레이어드의 핵심 문제는 레이어 수가 아니라 비즈니스 규칙이 `Service`와 ORM 모델에 흩어지고 의존성 방향이 뒤엉키는 데 있다.
+> 헥사고날·클린 아키텍처는 도메인/유스케이스가 기술 세부사항을 모르도록 포트와 의존성 방향을 정한다.
+> DDD는 모든 CRUD에 적용하는 장식이 아니라, 경계·언어·불변식이 복잡한 영역을 모듈러 모놀리스로 먼저 견고하게 만드는 도구다.
+
+## 1. 왜 알아야 하나
+
+주문 취소 규칙이 바뀌었는데 `OrderService.cancel()`, 환불 배치, 관리자 Controller의 세 곳에 조건문이 따로 있다면 한 곳을 빠뜨린 순간 상태가 갈라진다. `Order`가 JPA 엔티티라서 어디서나 setter를 호출할 수 있으면 `CONFIRMED` 주문에 상품을 추가하는 코드도 컴파일되고, 장애는 커밋 시점이나 다음 조회 때 드러난다. 이것은 “Service가 있으니 계층형”인 문제 해결이 아니다. 규칙을 소유하는 객체와 변경 가능한 경계를 정하지 않은 문제다.
+
+또 다른 흔한 사고는 내부 패키지의 구현 클래스를 다른 기능이 직접 주입하는 것이다. 처음에는 빠르지만 결제 DB 교체, 테스트용 저장소, 메시지 발행 방식 변경이 도메인 코드까지 번진다. 레이어드 구조에서 `service -> repository`는 지켜도 `order.service -> payment.service -> order.repository` 같은 양방향 기능 의존성이 생기면 순환과 변경 전파를 막지 못한다.
+
+면접에서 헥사고날을 육각형 폴더나 DDD를 애노테이션으로 설명하면 부족하다. 판단 기준은 다음 세 가지다.
+
+1. 어떤 규칙이 함께 변경되고 반드시 함께 참이어야 하는가?
+2. 그 규칙을 호출하는 쪽과 구현 기술을 바꿔도 안쪽의 의미가 보존되는가?
+3. 모듈 사이 접근을 코드 리뷰가 아니라 자동 검증으로 막을 수 있는가?
+
+MVC의 Controller·Service·Repository 기초는 P02, 메시징 운영은 S14, MSA 운영 패턴은 S20에서 다룬다. 여기서는 그 위에서 업무 경계를 설계하는 문제만 다룬다.
+
+## 2. 핵심 개념
+
+### 용어 정리
+
+| 용어 | 의미 | 코드에서 보이는 형태 |
+|---|---|---|
+| 도메인 | 해결하려는 업무의 문제 영역과 규칙 | 주문, 재고, 환불 정책 |
+| 유비쿼터스 언어 | 기획자·개발자·코드가 공유하는 업무 단어 | `confirm`, `Refundable`, `Reservation` |
+| 바운디드 컨텍스트 | 한 모델과 언어가 유효한 명시적 경계 | `sales.Order`와 `shipping.Order` |
+| 엔티티 | 속성보다 연속적인 식별성과 생명주기가 중요한 객체 | `Order(id)` |
+| 값 객체 | 식별자 없이 값과 제약으로 동일성을 판단하는 불변 객체 | `Money`, `Address`, `ProductId` |
+| 애그리거트 | 변경 불변식을 한 트랜잭션에서 지키는 객체 묶음 | `Order`와 `OrderLine` |
+| 애그리거트 루트 | 외부가 접근하는 유일한 진입점 | `Order.addLine()` |
+| 리포지토리 | 도메인이 필요로 하는 애그리거트 저장/조회 추상화 | `OrderRepository` 포트 |
+| 도메인 서비스 | 한 엔티티에 자연스럽게 속하지 않는 도메인 연산 | `ExchangeRatePolicy` |
+| 도메인 이벤트 | 도메인에서 중요한 상태 변화가 일어났다는 사실 | `OrderConfirmed` |
+| 포트 | 애플리케이션과 외부 세계 사이의 의미 있는 계약 | `LoadOrder`, `OrderRepository` |
+| 어댑터 | 포트를 HTTP·JPA·Kafka 등 기술로 연결하는 구현 | `JpaOrderRepositoryAdapter` |
+
+### 레이어드, 헥사고날, 클린 비교
+
+| 스타일 | 기본 분리 | 의존성 규칙 | 강점 | 자주 망가지는 지점 |
+|---|---|---|---|---|
+| 레이어드 | Controller–Service–Repository | 위 레이어가 아래 레이어를 호출 | 단순 CRUD, 팀 진입성 | 거대한 Service, 도메인 양방향 의존 |
+| 헥사고날 | 애플리케이션 중심 + 포트/어댑터 | 안쪽은 바깥 기술을 모름 | 입출력 교체, 테스트 격리 | 모든 클래스를 포트로 만들어 추상화 과잉 |
+| 클린 | Entities–Use Cases–Adapters–Frameworks | 소스 의존성은 안쪽으로만 | 정책과 세부사항의 수명 분리 | 경계가 이름뿐이고 DTO가 안쪽까지 침투 |
+| 모듈러 모놀리스 | 한 프로세스 안의 업무 모듈 | 모듈 API로만 접근, 순환 금지 | 배포 복잡도 없이 경계 검증 | 패키지만 나누고 내부를 모두 public으로 노출 |
+
+헥사고날과 클린은 서로 다른 제품이 아니다. 둘 다 핵심은 육각형 그림이 아니라 컴파일 가능한 의존성 방향이다.
+
+## 3. 내부 동작·원리
+
+### 레이어드가 비대해지는 과정
+
+```text
+HTTP Controller ──> OrderService ──> OrderRepository ──> JPA/DB
+                         │  ▲
+                         │  └── PaymentService / CouponService
+                         └── 조건·계산·트랜잭션·DTO 변환이 계속 유입
+```
+
+처음에는 요청 하나가 `Service` 하나로 끝난다. 그러나 업무 규칙이 여러 유스케이스에서 공유되면서 Service가 모든 엔티티를 읽고, 조건을 계산하고, 상태를 직접 바꾸고, 외부 API를 호출한다. 서비스끼리 서로 호출하면 순환이 생기고, Repository 인터페이스가 JPA 타입을 반환하면 저장 기술이 위로 새어 나온다. 레이어는 물리적 폴더가 아니라 “누가 어떤 정책을 소유하는가”를 제한해야 한다.
+
+### 포트·어댑터 호출 흐름
+
+```text
+[Web Adapter]
+POST /orders
+   │  Command 변환
+   ▼
+[Input Port] PlaceOrder ──> [Application Use Case]
+                              │
+                              ├──> [Domain] Order.confirm()
+                              │       └── 불변식·값 객체·이벤트
+                              │
+                              ├──> [Output Port] OrderRepository.save()
+                              │                    ▲
+                              └──> [Output Port] PaymentPort.charge()
+                                                   ▲
+                           [JPA Adapter]     [HTTP Adapter]
+```
+
+실제 런타임에는 Spring이 어댑터 Bean을 생성하고 생성자 주입으로 포트에 연결한다. Controller는 입력 포트를 호출하고, 유스케이스는 트랜잭션을 조정하며, 도메인 객체가 규칙을 실행한다. `OrderRepository`의 구현체가 JPA인지 메모리인지 안쪽은 알지 못한다. 테스트 대상이 기술이 아닌 의미 있는 포트에 의존하므로 테스트에 유리하다.
+
+### 패키지 예시: 기능 중심 + 내부 은닉
+
+```text
+com.acme.shop
+├─ ShopApplication.java
+├─ order
+│  ├─ OrderConfiguration.java       # 모듈 조립 지점
+│  ├─ api
+│  │  ├─ PlaceOrder.java            # 다른 모듈이 사용할 공개 API
+│  │  └─ OrderConfirmed.java        # 공개 이벤트
+│  ├─ application
+│  │  └─ PlaceOrderHandler.java     # 유스케이스, 얇은 조정자
+│  ├─ domain
+│  │  ├─ Order.java, OrderLine.java, Money.java
+│  │  └─ OrderRepository.java       # 도메인 관점 포트
+│  └─ internal
+│     ├─ JpaOrderRepository.java
+│     └─ OrderWebAdapter.java       # 외부 진입 어댑터
+├─ payment
+│  ├─ api/PaymentPort.java
+│  └─ internal/HttpPaymentAdapter.java
+└─ shared
+   └─ ClockPort.java                # 정말 여러 모듈의 언어일 때만
+```
+
+기능별 패키지는 변경 이유를 모은다. 기술별 최상위 패키지(`controller`, `service`, `repository`)는 파일을 흩어 놓고 모듈 경계를 흐리기 쉽다. 단순 CRUD라면 레이어드로 시작해도 된다.
+
+### Spring Modulith의 모듈 경계 검증
+
+Spring Modulith는 Spring Boot 앱의 직접 하위 패키지를 기본 애플리케이션 모듈로 간주하고, 모듈의 공개 API와 내부 구현을 구분한다. `ApplicationModules.of(Application.class)`가 코드베이스의 모듈 모델을 만들고 `.verify()`가 다음을 검사한다.
+
+```java
+@Test
+void modules_are_well_formed() {
+    ApplicationModules.of(ShopApplication.class).verify();
+}
+```
+
+검증 대상은 모듈 의존성 그래프의 순환, 다른 모듈의 내부 패키지 참조, 설정한 허용 의존성 위반이다. 위반 시 예외가 나므로 빌드 테스트에 넣을 수 있다. `internal`이라는 이름만으로는 부족하며 공개 인터페이스와 검증 규칙도 필요하다. `detectViolations()`를 쓰면 위반 목록을 필터링할 수 있다.
+
+## 4. 코드로 확인
+
+### 예제 1 — 풍부한 애그리거트와 값 객체
+
+다음은 Java 21에서 실행한 순수 Java 예제다. `Order`가 상태 변경과 한도 불변식을 소유하고 `Money`가 산술을 소유한다. `OrderConfirmed`는 루트가 발행한 도메인 이벤트의 최소 형태다.
+
+```java
+// _scratch/S22/OrderDemo.java
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+
+public class OrderDemo {
+    public static void main(String[] args) {
+        Order order = new Order("O-100", new Money("10000"));
+        order.add(new ProductId("P-1"), 2, new Money("1200"));
+        order.add(new ProductId("P-2"), 1, new Money("500"));
+        order.confirm();
+        System.out.println(order.status() + " / " + order.total()
+                + " / events=" + order.pullEvents().size());
+        try {
+            order.add(new ProductId("P-3"), 1, new Money("100"));
+        } catch (IllegalStateException e) {
+            System.out.println(e.getMessage());
+        }
+    }
+    record ProductId(String value) {}
+    record Money(BigDecimal value) {
+        Money(String value) { this(new BigDecimal(value)); }
+        Money add(Money other) { return new Money(value.add(other.value)); }
+        Money multiply(int count) { return new Money(value.multiply(BigDecimal.valueOf(count))); }
+        public String toString() { return value.toPlainString(); }
+    }
+    record Line(ProductId productId, int quantity, Money unitPrice) {
+        Line { if (quantity <= 0) throw new IllegalArgumentException("quantity must be positive"); }
+        Money subtotal() { return unitPrice.multiply(quantity); }
+    }
+    record OrderConfirmed(String orderId) {}
+    static final class Order {
+        private final String id; private final Money limit;
+        private final List<Line> lines = new ArrayList<>();
+        private final List<Object> events = new ArrayList<>();
+        private Status status = Status.DRAFT;
+        Order(String id, Money limit) { this.id = id; this.limit = limit; }
+        void add(ProductId p, int q, Money price) {
+            if (status != Status.DRAFT) throw new IllegalStateException("confirmed order cannot change");
+            Line line = new Line(p, q, price);
+            if (total().add(line.subtotal()).value().compareTo(limit.value()) > 0)
+                throw new IllegalStateException("order limit exceeded");
+            lines.add(line);
+        }
+        void confirm() {
+            if (lines.isEmpty()) throw new IllegalStateException("empty order cannot be confirmed");
+            status = Status.CONFIRMED; events.add(new OrderConfirmed(id));
+        }
+        Money total() { return lines.stream().map(Line::subtotal).reduce(new Money("0"), Money::add); }
+        Status status() { return status; }
+        List<Object> pullEvents() { List<Object> r = List.copyOf(events); events.clear(); return r; }
+        enum Status { DRAFT, CONFIRMED }
+    }
+}
+```
+
+실행 출력:
+
+```text
+CONFIRMED / 2900 / events=1
+confirmed order cannot change
+```
+
+애플리케이션 서비스는 `confirm()` 호출 순서만 조정하고, “확정 후 변경 금지”는 루트 경계가 소유한다. 이벤트의 커밋 연계나 outbox는 별도 결정이며 메시징 운영은 S14 범위다.
+
+### 예제 2 — Spring Boot 4.1용 포트와 어댑터
+
+다음은 실행 가능한 전체 앱이 아니라 핵심 Spring 구조 예시이며, Boot 4.1 / Framework 7 기준 설계 스케치다. 사용자가 만든 입력 포트와 저장 포트를 Spring Bean으로 조립하고, JPA 구현은 `internal`에 둔다.
+
+```java
+// order/api/PlaceOrder.java
+public interface PlaceOrder {
+    OrderResult handle(PlaceOrderCommand command);
+}
+
+// order/domain/OrderRepository.java
+public interface OrderRepository {
+    void save(Order order);
+}
+
+// order/application/PlaceOrderHandler.java
+@Service
+final class PlaceOrderHandler implements PlaceOrder {
+    private final OrderRepository orders;
+    PlaceOrderHandler(OrderRepository orders) { this.orders = orders; }
+
+    @Override
+    @Transactional
+    public OrderResult handle(PlaceOrderCommand command) {
+        Order order = Order.place(command.orderId(), command.lines());
+        orders.save(order);
+        return OrderResult.from(order);
+    }
+}
+
+// order/internal/JpaOrderRepository.java
+@Repository
+final class JpaOrderRepository implements OrderRepository {
+    private final SpringDataOrderRepository delegate;
+    JpaOrderRepository(SpringDataOrderRepository delegate) { this.delegate = delegate; }
+    public void save(Order order) { delegate.save(OrderEntity.from(order)); }
+}
+```
+
+JPA의 기본 생성자·식별자·지연 로딩은 도메인 캡슐화와 충돌한다. `@Entity`를 직접 붙이면 매핑 비용은 줄지만 프록시·컬렉션·setter가 모델을 오염시킬 수 있고, 분리하면 변환 비용이 생긴다. 규칙이 복잡하면 분리 매핑, 단순 CRUD면 공개 setter를 없앤 동일 클래스를 기본으로 삼는다.
+
+값 객체는 JPA `@Embeddable`/`@Embedded`로 저장할 수 있지만, 컬럼 변경이 도메인 값 전체 변경과 같은 의미인지 확인한다. `@OneToMany` 컬렉션도 외부에 직접 노출하지 말고 루트 명령 메서드만 공개한다. 여러 리포지토리를 묶는 유스케이스의 `@Transactional` 경계가 원자성을 결정한다.
+
+### 빈약한 모델과 풍부한 모델
+
+빈약한 모델은 `Order`가 getter/setter만 제공하고 `OrderService`가 계산·상태 전이·검사를 모두 한다. 풍부한 모델은 `order.confirm()`, `order.cancel(reason)`, `money.add()`처럼 행동과 불변식을 함께 둔다. 조회 DTO에 억지로 행동을 넣을 필요는 없다. 빈약한 모델은 ORM 비용은 지면서 행동 조직화 이점은 잃는다.
+
+## 5. 버전별 변화 — 왜 바뀌었나
+
+- 2005년 Cockburn의 “Hexagonal (Ports & Adapters)” 원문은 UI와 DB에 묶인 로직을 자동 회귀 테스트와 교체 가능한 어댑터로부터 분리하는 문제를 정리했다. 이전 레이어가 외부 기술과 업무 규칙의 얽힘을 막지 못했기 때문에 “안쪽/바깥쪽” 비대칭과 포트가 제안됐다. 근거: 원문 URL은 참고문헌에 있다.
+- 2003년 Fowler의 Anemic Domain Model 논의는 getter/setter 객체와 모든 규칙을 담은 서비스가 객체지향 모델의 비용만 남기는 문제를 설명했다. 단순 서비스 계층이 도메인 행동을 대체하던 한계가 풍부한 모델 논쟁을 낳았다.
+- Spring Modulith 1.x~2.x 계열은 Spring Boot 안에서 논리 모듈을 구조적으로 검증·문서화·테스트하는 도구로 발전했다. 마이크로서비스로 바로 쪼개 배포하는 비용을 감당하기 전에 패키지 경계를 검증해야 한다는 요구가 배경이다. 확인한 공식 문서는 현재 stable `2.1.1`과 호환성 매트릭스 링크를 제시한다. 이 작업 기준의 Spring Boot 4.1과 정확한 Modulith 호환 조합은 매트릭스에서 프로젝트 시점에 확인해야 하며, 여기서는 `(미확인)`으로 둔다.
+- 기준 버전은 Java 25, Spring Boot 4.1.x, Spring Framework 7.0.x다. 이 문서의 순수 Java 예제는 Java 21에서도 동작하는 문법만 사용했다. 이 주제에서 Java 25 전용 문법을 사용할 이유는 없으므로 해당 JEP 변화는 큰 변화 없음이다.
+
+## 6. 실무 가이드
+
+기본값 추천은 “기능 중심 모듈러 모놀리스 + 얇은 애플리케이션 서비스 + 복잡한 규칙만 풍부한 도메인 모델”이다.
+
+- 규칙이 한 애그리거트의 상태와 함께 항상 참이어야 하면 → 애그리거트 루트의 명령 메서드로 둬라, 여러 서비스가 같은 불변식을 복제하지 않게 하기 위해서다.
+- 한 유스케이스가 여러 애그리거트/포트를 조정하면 → 애플리케이션 서비스에 `@Transactional`을 두고 도메인 객체에 순서 제어를 넣지 마라, 유스케이스 조정과 도메인 규칙의 책임이 다르기 때문이다.
+- 외부 API·DB·시계·파일을 바꿀 가능성이 있거나 순수 단위 테스트가 필요하면 → 안쪽에 출력 포트를 두고 바깥에 어댑터를 둬라, 기술 교체가 도메인 컴파일 의존성을 만들지 않게 하기 위해서다.
+- 조회 화면이 복잡하고 도메인 규칙이 거의 없으면 → 별도 query DTO/Repository를 사용하고 애그리거트 전체를 로딩하지 마라, 읽기 요구를 쓰기 모델에 억지로 맞추지 않기 위해서다.
+- 팀이 한 프로세스로 빠르게 개발하지만 업무 모듈 간 접근이 늘면 → Spring Modulith `ApplicationModules.of(...).verify()`를 테스트에 넣어라, 순환과 내부 접근을 자동으로 발견하기 위해서다.
+- 외부 모듈이 다른 모듈의 엔티티를 직접 참조하려 하면 → 공개 API 명령/이벤트/DTO를 설계하고 내부 타입은 package-private 또는 internal 패키지로 숨겨라, 모듈 경계를 데이터베이스 테이블 경계보다 먼저 세우기 위해서다.
+- 팀이 작고 업무가 단순한 CRUD면 → 레이어드 구조와 트랜잭션 서비스로 시작하라, 포트·어댑터·매핑 계층의 고정 비용이 얻는 격리 이익보다 클 수 있기 때문이다.
+- 규칙이 두 컨텍스트에서 같은 단어지만 의미가 다르면 → 바운디드 컨텍스트별 모델을 만들고 변환 지점을 명시하라, 전역 `Order` 하나가 서로 다른 의미를 떠안지 않게 하기 위해서다.
+- MSA 분리를 언젠가 고려한다면 → 먼저 모듈러 모놀리스에서 API와 이벤트를 통해 모듈을 연결하라, 네트워크·운영 장애까지 한 번에 도입하지 않고 경계의 유효성을 검증할 수 있기 때문이다.
+
+## 7. 함정·안티패턴
+
+1. 증상: `OrderService`가 800줄이고 할인·재고·환불 규칙이 한 메서드에 섞인다 → 원인: 엔티티를 데이터 가방으로 두고 모든 행동을 서비스에 집중했다 → 대처: 함께 참이어야 하는 규칙을 애그리거트 명령으로 옮기고 서비스는 포트 조정만 한다.
+2. 증상: `order.internal.JpaOrderRepository`를 결제 모듈이 직접 주입한다 → 원인: 패키지를 나눴지만 공개 API와 자동 검증이 없다 → 대처: API 패키지만 공개하고 `ApplicationModules.verify()`를 CI에서 실행한다.
+3. 증상: 모듈 A와 B가 서로 Bean을 주입해 애플리케이션 시작부터 순환 오류가 난다 → 원인: 의존성 그래프가 방향 없는 공유 서비스 호출로 변했다 → 대처: 한쪽이 소유하는 포트, 공개 이벤트, 또는 상위 조정 모듈로 방향을 하나만 만든다.
+4. 증상: 확정 주문인데 다른 코드가 `setStatus()`나 `getLines().add()`로 수정한다 → 원인: JPA 편의성과 캡슐화를 바꾸고 컬렉션을 그대로 노출했다 → 대처: 필드 접근을 제한하고 `confirm`, `addLine`, `cancel` 같은 의도 기반 메서드와 방어적 조회를 제공한다.
+5. 증상: JPA 저장 후 도메인 이벤트가 발행됐지만 트랜잭션 롤백 뒤에도 소비자가 처리한다 → 원인: 이벤트를 커밋과 독립된 시점에 발행했다 → 대처: 트랜잭션 경계와 이벤트 전달 보장을 설계하고 필요하면 outbox를 적용한다. 메시지 전달 세부사항은 S14를 참조한다.
+6. 증상: 모든 클래스마다 `FooPort`, `FooAdapter`, `FooMapper`가 생겼지만 테스트와 변경 속도는 나아지지 않는다 → 원인: 외부 변화 가능성과 규칙 복잡도를 평가하지 않고 패턴 이름을 복제했다 → 대처: 교체 가능성·독립 테스트·팀 경계 중 하나도 없으면 단순 구현을 유지한다.
+
+## 8. 자가점검 Q&A (면접 대비)
+
+### Q1. 헥사고날 아키텍처에서 포트와 어댑터의 방향은?
+
+포트는 안쪽이 외부와 맺는 의미 있는 계약이고 어댑터는 기술별 구현이다. HTTP Controller는 입력 포트를 호출하는 driving adapter, JPA 저장소는 출력 포트를 구현하는 driven adapter다. 안쪽은 JPA나 HTTP 클래스를 import하지 않아야 한다.
+
+꼬리질문: 인터페이스를 모든 클래스에 만들면 더 헥사고날인가? 아니다. 교체되거나 격리할 경계에만 포트를 둬야 한다.
+
+### Q2. 애그리거트와 단순 엔티티의 차이는?
+
+애그리거트는 함께 변경되어야 하는 불변식과 트랜잭션 경계를 기준으로 묶은 단위다. 루트 외부에서 내부 엔티티를 직접 조회·변경하지 않는다. 테이블 관계나 객체 그래프가 크다는 이유만으로 하나의 애그리거트가 되지는 않는다.
+
+꼬리질문: Order가 모든 OrderLine을 항상 한 트랜잭션으로 가져야 하나? 아니며, 함께 검증해야 하는 규칙이 있는 범위까지만 묶는다.
+
+### Q3. 도메인 서비스와 애플리케이션 서비스는 어떻게 구분하나?
+
+애플리케이션 서비스는 유스케이스를 시작하고 트랜잭션·포트 호출·작업 순서를 조정한다. 도메인 서비스는 여러 도메인 객체에 걸치지만 특정 객체 하나에 자연스럽게 속하지 않는 업무 규칙을 표현한다. 애플리케이션 서비스에 계산 규칙이 계속 늘면 빈약한 모델 신호다.
+
+꼬리질문: 도메인 서비스가 Repository를 직접 호출해도 되나? 가능하지만 도메인 정책과 저장 기술을 섞지 않도록 도메인 포트만 의존하게 한다.
+
+### Q4. JPA 엔티티와 도메인 엔티티를 분리할 때의 비용과 이익은?
+
+분리하면 ORM 프록시와 도메인 캡슐화를 독립적으로 설계할 수 있지만 변환 비용이 생긴다. 규칙이 복잡하면 분리하고, 단순 CRUD면 같은 클래스를 제한적으로 사용한다.
+
+꼬리질문: `@Entity`에 setter를 모두 열면 왜 위험한가? 어떤 호출자도 불변식을 거치지 않고 상태를 바꿀 수 있기 때문이다.
+
+### Q5. 모듈러 모놀리스가 MSA와 다른 점은?
+
+모듈러 모놀리스는 한 프로세스·배포 단위 안에서 업무 경계와 의존성 규칙을 지킨다. MSA는 네트워크 호출, 독립 배포, 장애 격리, 데이터 소유권까지 추가한다. 따라서 모듈 경계를 먼저 검증한 뒤 운영상 독립 배포 이익이 분명한 모듈만 분리한다.
+
+꼬리질문: 패키지 분리만으로 모듈러 모놀리스인가? 아니다. 공개 API와 내부 은닉, 순환 금지, 자동 검증이 필요하다.
+
+### Q6. 바운디드 컨텍스트가 필요한 신호는?
+
+같은 `Customer`, `Order`, `Status`라는 단어가 팀마다 다른 규칙과 생명주기를 뜻하면 경계를 의심한다. 컨텍스트별 유비쿼터스 언어를 코드에 반영하고, 경계 사이에는 변환 모델이나 명시적 계약을 둔다. 전역 공통 모델을 만들면 의미 차이가 nullable 필드와 조건문으로 누적된다.
+
+꼬리질문: 모든 팀/테이블마다 컨텍스트를 나누나? 아니다. 의미와 변경 이유가 실제로 갈라질 때만 나눈다.
+
+### Q7. `ApplicationModules.verify()`가 잡는 것은?
+
+공식 검증은 모듈 간 순환, 다른 모듈 내부 패키지 접근, 설정한 허용 의존성 위반을 검사한다. 실패하면 예외가 발생하므로 테스트에 넣어 구조 회귀를 막을 수 있다. 업무 불변식이나 DB 정합성 검증을 대신하지는 않는다.
+
+꼬리질문: 모듈 간 통신을 모두 이벤트로 바꾸면 해결되나? 아니다. 동기 응답이 필요한 공개 API까지 이벤트로 바꾸면 추적성과 일관성 비용이 커진다.
+
+### Q8. DDD를 도입하면 안 되는 경우는?
+
+화면 CRUD와 단순 조회처럼 규칙·상태 전이가 거의 없고 팀 규모도 작다면 풍부한 애그리거트와 다중 매핑은 비용만 늘린다. 이때는 명확한 레이어드 구조와 트랜잭션 서비스가 낫다. 반대로 규칙이 자주 바뀌고 여러 유스케이스에서 충돌하며 용어 합의가 필요한 영역이면 선택 가치가 있다.
+
+꼬리질문: DDD의 최소 도입 단위는? 전 시스템이 아니라 가장 복잡한 한 바운디드 컨텍스트와 그 안의 핵심 애그리거트부터다.
+
+## 9. 참고문헌
+
+- Hexagonal architecture — https://alistair.cockburn.us/hexagonal-architecture/ — 포트·어댑터의 목적, 외부 장치와 애플리케이션 로직 분리.
+- Spring Modulith 개요 — https://docs.spring.io/spring-modulith/reference/ — Spring Boot 기반 도메인 중심 모듈화와 버전 메타데이터.
+- Spring Modulith Fundamentals — https://docs.spring.io/spring-modulith/reference/fundamentals.html — 애플리케이션 모듈의 공개/내부 인터페이스와 패키지 기반 탐색.
+- Verifying Application Module Structure — https://docs.spring.io/spring-modulith/reference/verification.html — `ApplicationModules.verify()`의 순환·내부 접근 검증 규칙.
+- Domain Driven Design — https://martinfowler.com/bliki/DomainDrivenDesign.html — 유비쿼터스 언어, 엔티티·값 객체·애그리거트·바운디드 컨텍스트 개요.
+- Anemic Domain Model — https://martinfowler.com/bliki/AnemicDomainModel.html — 빈약한 모델의 증상과 얇은 애플리케이션 서비스의 역할.
+- Classpath Scanning and Managed Components — https://docs.spring.io/spring-framework/reference/core/beans/classpath-scanning.html — Spring stereotype 의미.
+- Transactionality — https://docs.spring.io/spring-data/jpa/reference/jpa/transactions.html — Repository 기본 트랜잭션과 여러 Repository를 묶는 서비스 경계.
+- Jakarta Persistence 3.2 Specification — https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2.html — Entity·Embeddable 및 ORM 매핑 규격.

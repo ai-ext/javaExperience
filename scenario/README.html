@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시나리오 — 게시판 API를 단계별로 키우며 만들기</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="시나리오--게시판-api를-단계별로-키우며-만들기"><a class="anchor" href="#시나리오--게시판-api를-단계별로-키우며-만들기" aria-hidden="true">#</a>시나리오 — 게시판 API를 단계별로 키우며 만들기</h1>
+<p>API 하나를 처음부터 끝까지 만든다. 1장에서는 <code>POST /api/posts</code>(게시글 작성) 하나를 <strong>&quot;success만 돌려주기&quot;에서 시작해 DTO 응답 → 계층 분리 → DB 저장 → 입력 검증 → 토큰 인증</strong>까지 단계마다 조금씩 키운다. 실제 백엔드에서 API 하나가 만들어지는 순서 그대로다. 이후 장에서 조회·수정·좋아요·댓글·북마크로 넓혀 간다.</p>
+<h2 id="진행-방법"><a class="anchor" href="#진행-방법" aria-hidden="true">#</a>진행 방법</h2>
+<ol>
+<li><strong>준비</strong> — 레포 루트에서 <code>docker compose up -d</code>로 DB를 띄우고, IntelliJ에서 <code>Main</code>을 실행한다(<a href="../README.html#실행">README의 &quot;실행&quot;</a>).</li>
+<li><strong>단계 페이지를 읽는다</strong> — 상황, 만들 것(요청·응답 명세), 채점 기준, 필요한 지식 링크가 있다.</li>
+<li><strong>만든다</strong> — 막히면 &quot;필요한 지식&quot;의 문서를 먼저 보고, 그래도 막히면 페이지 아래 힌트를 연다.</li>
+<li><strong>직접 확인한다</strong> — 페이지의 curl 명령(또는 IntelliJ HTTP Client)으로 호출해 본다.</li>
+<li><strong>결과 테스트</strong> — 서버를 띄운 채로 페이지 맨 아래 &quot;결과 테스트 프롬프트&quot;를 복사해 <strong>Claude Code에 붙여 넣는다.</strong> Claude가 API를 호출하고 DB를 조회해서 채점표와 피드백(잘한 점·부족한 점·다음 단계 전에 고칠 것·더 볼 문서)을 준다. 코드는 고치지 않는다.</li>
+<li>피드백을 반영하고 커밋한 뒤 다음 단계로 간다.</li>
+</ol>
+<blockquote>
+<p><strong>채점은 그 단계의 계약만 본다.</strong> 1-1은 <code>success</code>, 1-2부터는 JSON을 돌려주는 것처럼 단계마다 응답이 바뀐다. 다음 단계로 넘어가면 이전 단계의 채점은 실패하는 게 정상이다.</p>
+</blockquote>
+<ul>
+<li><strong>작업 브랜치</strong> — 각자 자기 브랜치에서 한다(예: <code>git switch -c hyemin/ch1</code>). 단계마다 커밋해 두면 diff로 &quot;무엇이 바뀌었나&quot;를 볼 수 있다. <code>main</code>에는 직접 push하지 않는다.</li>
+<li><strong>채점이 만드는 데이터</strong> — 결과 테스트는 실제로 글을 만든다. 제목이 <code>[채점]</code>으로 시작하는 글이 그것이다. DB를 처음 상태로 돌리려면 <code>docker compose down -v &amp;&amp; docker compose up -d</code>.</li>
+</ul>
+<h2 id="시나리오-데이터-community-db"><a class="anchor" href="#시나리오-데이터-community-db" aria-hidden="true">#</a>시나리오 데이터 (<code>community</code> DB)</h2>
+<p>게시글은 여러분이 API로 만든다. 처음에는 아래 데이터만 있다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>회원 id</th>
+<th>닉네임</th>
+<th>역할·상태</th>
+<th>토큰(<code>Authorization: Bearer …</code>)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>운영자</td>
+<td>ADMIN</td>
+<td><code>tok-admin</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>김자바</td>
+<td>USER — <strong>여러분이 쓰는 기본 계정</strong></td>
+<td><code>tok-kimjava</code> · 만료 <code>tok-kimjava-old</code> · 폐기 <code>tok-kimjava-revoked</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>이스프링</td>
+<td>USER</td>
+<td><code>tok-lee</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>박디비</td>
+<td>USER</td>
+<td><code>tok-park</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>최정지</td>
+<td>USER, <strong>정지(SUSPENDED)</strong></td>
+<td><code>tok-choi</code></td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>게시판 slug</th>
+<th>이름</th>
+<th>글쓰기</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>notice</code></td>
+<td>공지사항</td>
+<td>운영자만</td>
+</tr>
+<tr>
+<td><code>dev</code> · <code>qna</code> · <code>free</code></td>
+<td>개발 · 질문 · 자유</td>
+<td>누구나</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li>남이 쓴 글 3개(id 1~3)가 있다 — 좋아요·댓글 장에서 쓴다. 여러분이 만드는 글은 id 4부터 붙는다.</li>
+<li>태그 8개: <code>java</code>, <code>spring</code>, <code>jpa</code>, <code>mysql</code>, <code>docker</code>, <code>테스트</code>, <code>회고</code>, <code>질문</code></li>
+<li>토큰 테이블은 <code>api_token</code>. 로그인·토큰 발급 기능은 만들지 않고, 미리 발급된 토큰을 쓴다고 가정한다.</li>
+<li>테이블 구조와 데이터는 dump 파일 <a href="../docker/mysql/init/01-community.sql"><code>docker/mysql/init/01-community.sql</code></a>에 있다. 눈으로 보려면 CloudBeaver(<code>http://localhost:8978</code>, <code>cbadmin</code> / <code>Admin1234</code>)의 <code>community (시나리오)</code> 연결을 연다.</li>
+</ul>
+<h2 id="목차"><a class="anchor" href="#목차" aria-hidden="true">#</a>목차</h2>
+<!-- toc:start — tools/site/build.mjs가 scenario.json으로 다시 쓴다. 직접 고치지 마라 -->
+<h3 id="1장-게시글-작성--post-apiposts"><a class="anchor" href="#1장-게시글-작성--post-apiposts" aria-hidden="true">#</a>1장. 게시글 작성 — POST /api/posts</h3>
+<p>같은 API 하나를 &quot;success만 돌려주기&quot;에서 시작해 DTO 응답 → 계층 분리 → DB 저장 → 검증 → 토큰 인증까지 키운다. 백엔드 API 하나가 만들어지는 순서 그대로다.</p>
+<ul>
+<li><a href="ch1-create-post/1-1-receive-request.html">1-1. 요청 받기 — 일단 success</a></li>
+<li><a href="ch1-create-post/1-2-dto-response.html">1-2. DTO로 응답하기 — 201과 Location</a></li>
+<li><a href="ch1-create-post/1-3-service-layer.html">1-3. 서비스·저장소로 나누기</a></li>
+<li><a href="ch1-create-post/1-4-save-to-db.html">1-4. DB에 저장하기 — JPA</a></li>
+<li><a href="ch1-create-post/1-5-validation.html">1-5. 입력 검증과 에러 응답</a></li>
+<li><a href="ch1-create-post/1-6-token-auth.html">1-6. 토큰으로 작성자 정하기</a></li>
+</ul>
+<h3 id="2장-게시글-조회--get-apiposts--준비-중"><a class="anchor" href="#2장-게시글-조회--get-apiposts--준비-중" aria-hidden="true">#</a>2장. 게시글 조회 — GET /api/posts — 준비 중</h3>
+<p>단건 조회부터 목록·페이징·&quot;볼 수 있는 글만&quot; 규칙·N+1 줄이기까지.</p>
+<ul>
+<li>2-1. 단건 조회와 404</li>
+<li>2-2. 게시판별 목록과 페이징</li>
+<li>2-3. 임시저장·삭제·팔로워 공개 글 거르기</li>
+<li>2-4. 쿼리 수 줄이기(N+1)</li>
+</ul>
+<h3 id="3장-게시글-수정삭제--준비-중"><a class="anchor" href="#3장-게시글-수정삭제--준비-중" aria-hidden="true">#</a>3장. 게시글 수정·삭제 — 준비 중</h3>
+<p>본인 글만 고치고 지우기, 지운 글은 행을 남기는 soft delete.</p>
+<ul>
+<li>3-1. 부분 수정(PATCH)과 본인 확인</li>
+<li>3-2. soft delete와 조회에서 숨기기</li>
+</ul>
+<h3 id="4장-좋아요--준비-중"><a class="anchor" href="#4장-좋아요--준비-중" aria-hidden="true">#</a>4장. 좋아요 — 준비 중</h3>
+<p>몇 번 눌러도 결과가 같은 좋아요, 동시에 눌러도 맞는 숫자, 내가 좋아요한 글 목록.</p>
+<ul>
+<li>4-1. 좋아요·취소(멱등)</li>
+<li>4-2. 동시에 눌러도 like_count가 맞게</li>
+<li>4-3. 내가 좋아요한 글(커서 페이징)</li>
+</ul>
+<h3 id="5장-댓글답글--준비-중"><a class="anchor" href="#5장-댓글답글--준비-중" aria-hidden="true">#</a>5장. 댓글·답글 — 준비 중</h3>
+<p>댓글과 1단계 답글, 지운 댓글 자리 남기기, 댓글 수 맞추기.</p>
+<ul>
+<li>5-1. 댓글 작성</li>
+<li>5-2. 답글(1단계까지)</li>
+<li>5-3. 댓글 목록과 삭제된 댓글 자리</li>
+</ul>
+<h3 id="6장-북마크즐겨찾기--준비-중"><a class="anchor" href="#6장-북마크즐겨찾기--준비-중" aria-hidden="true">#</a>6장. 북마크(즐겨찾기) — 준비 중</h3>
+<p>북마크와 폴더, 내 북마크 목록.</p>
+<ul>
+<li>6-1. 북마크 추가·삭제</li>
+<li>6-2. 폴더(최대 10개, 이름 중복 불가)</li>
+<li>6-3. 내 북마크 목록</li>
+</ul>
+<h3 id="7장-테스트로-지키기--준비-중"><a class="anchor" href="#7장-테스트로-지키기--준비-중" aria-hidden="true">#</a>7장. 테스트로 지키기 — 준비 중</h3>
+<p>지금까지 만든 API를 계층별 테스트로 고정한다(mock·spy 포함).</p>
+<ul>
+<li>7-1. 컨트롤러 슬라이스 테스트</li>
+<li>7-2. 서비스 단위 테스트 — mock과 spy</li>
+<li>7-3. 통합 테스트 — Testcontainers</li>
+</ul>
+<!-- toc:end -->
+
+
+</main>
+
+</body>
+</html>

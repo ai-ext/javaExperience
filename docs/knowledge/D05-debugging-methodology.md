@@ -1,0 +1,332 @@
+# D05. 디버깅 방법론 — 재현·관찰·가설·검증
+
+> 디버깅은 증상을 재현하고 원인 후보를 증거로 좁히는 과정이다.
+> 한 번에 한 가설을 바꾸고, 기대 결과와 실제 결과를 비교한 뒤 수정 사항을 회귀 테스트로 고정한다.
+> 개발에서는 브레이크포인트와 작은 재현을, 운영에서는 로그·트레이스·덤프를 단계적으로 쓴다.
+
+## 1. 큰 그림
+
+```mermaid
+flowchart TD
+    A["증상 또는 알림"] --> B["영향 범위와 관찰 기준을 고정"]
+    B --> C{"재현 조건을 확보했는가"}
+    C -->|예| D["최소 재현을 만든다"]
+    C -->|아니오| E["요청·데이터·설정·배포 차이를 수집"]
+    E --> D
+    D --> F["로그·스택·HTTP·DB 증거를 모은다"]
+    F --> G["원인 후보를 하나씩 세운다"]
+    G --> H["예측 가능한 실험으로 후보를 검증"]
+    H --> I{"가설이 증거와 맞는가"}
+    I -->|아니오| G
+    I -->|예| J["최소 수정"]
+    J --> K["회귀 테스트와 전체 확인"]
+    K --> L["배포 후 같은 지표를 관찰"]
+    L -->|재발| F
+    L -->|안정| M["원인과 재발 방지 기록"]
+```
+
+“어디서 오류가 났나”보다 “무엇이 언제, 어떤 조건에서 잘못됐나”부터 묻는다. 요청·권한·데이터·버전·프로파일·외부 응답이 다르면 같은 API도 다르게 동작한다. 시간, 영향 범위, 정상과 실패의 차이를 고정한다. 운영은 사용자 영향 완화와 원인 규명을 병행하고, 롤백 전 증거를 보존한다.
+
+재현되면 입력과 환경을 줄여 최소 재현을 만든다. 로그·스택·HTTP·SQL의 관찰과 추측을 나누고, 가설마다 예측을 적는다. 빗나가면 가설을 버리고 원래 조건을 회귀 테스트로 고정한다.
+
+이 문서는 전체 개발 과정(D01)에서 구현 뒤 결함을 발견하고 고쳐 릴리스에 되돌리는 피드백 고리다. 에러별 처방 목록은 P07, 프로파일링 도구 상세는 J15, 관측성 구현은 S16을 참조한다.
+
+## 2. 용어 사전
+
+| 용어 | 한 줄 정의 | 실무 예시 | 헷갈리는 것과 차이 |
+|---|---|---|---|
+| 디버깅 | 원인을 찾아 수정·재발 방지 | 주문 API 500 추적 | 검색은 단서 수집 |
+| 버그 | 기대와 실제 동작의 차이 | 취소 주문 재결제 | 장애는 사용자 영향 사건 |
+| 증상 | 관찰된 실패 현상 | 500·중복·지연 | 원인은 아직 미확정 |
+| incident | 대응이 필요한 운영 사건 | 결제 성공률 급락 | 외부 장애도 incident |
+| 재현 | 같은 조건에서 실패 관찰 | 동일 요청에서 500 | 비슷한 오류와 다름 |
+| 최소 재현 | 실패를 남기는 최소 조건 | 상태 한 건으로 실패 | 전체 시스템 복제와 다름 |
+| 범위 좁히기 | 원인 후보를 단계적으로 제한 | 특정 리전만 실패 | 확정은 검증 후 |
+| 가설 | 예측 가능한 원인 주장 | 시간대 경계가 하루 이동 | 반증 가능해야 함 |
+| 로그 | 시점별 사건 기록 | requestId 포함 오류 | 메트릭은 집계값 |
+| 로그 레벨 | 기록의 상세도 분류 | 대상 패키지만 DEBUG | WARN 남발은 진단 방해 |
+| 스택트레이스 | 예외 생성 때 호출 경로 | 첫 앱 프레임 추적 | 변수 전체를 보여주진 않음 |
+| cause | 감싸진 하위 원인 예외 | SQLTimeoutException | 상위 문구와 다를 수 있음 |
+| suppressed | 처리 중의 부가 예외 | 자원 종료 예외 | cause와 별도 연결 |
+| 브레이크포인트 | 실행을 멈추는 위치 표식 | 서비스 줄에서 중단 | 로그포인트는 안 멈춤 |
+| 조건부 중단 | 조건식이 참이면 정지 | id가 42일 때 | 평가 비용이 생길 수 있음 |
+| 로그포인트 | 코드 수정 없이 값 기록 | 드문 분기 관찰 | println과 다름 |
+| step 실행 | 호출 안·밖으로 이동 | Over·Into·Out | Into는 라이브러리 진입 가능 |
+| Evaluate Expression | 정지 문맥에서 식 계산 | 변환 결과 확인 | 상태 변경 가능 |
+| 상관 ID | 여러 계층 로그를 한 요청으로 연결 | requestId로 검색 | 사용자 ID와 다름 |
+| HTTP 캡처 | 실제 요청·응답 확인 | Network 탭 payload 비교 | 서버 로그와 별도 증거 |
+| 바인딩 값 | SQL에 전달된 실행 파라미터 | 날짜 값 비교 | SQL 문자열만으론 부족 |
+| 실행 계획 | DB가 택한 연산 경로 | 인덱스 대신 full scan | 예상·실행 통계 구분 |
+| 스레드 덤프 | 스레드 상태와 호출 스택 | 같은 lock 대기 확인 | CPU 그래프와 다름 |
+| 힙 덤프 | 힙 객체·참조의 스냅샷 | 누수 객체 찾기 | 비용·민감정보 위험 |
+| 원격 디버깅 | 네트워크로 JVM 디버거 연결 | 개발 Pod 임시 접속 | 로그 조회보다 권한 큼 |
+| git bisect | 커밋 범위 이분 탐색 | 회귀 도입점 찾기 | 라인 탐색과 다름 |
+| 회귀 테스트 | 수정한 결함 재발 확인 | 실패 요청 테스트화 | 운영 일치 보장은 아님 |
+| 롤백 | 안정 버전으로 되돌리기 | 배포 뒤 오류율 급증 | 원인 수정과 별개 |
+
+현업에서 “배포”, “릴리스”, “디플로이”는 팀마다 범위가 다르다. 이 문서에서는 배포를 실행 환경에 버전을 적용하는 일, 릴리스를 사용자에게 기능을 노출하는 결정까지 포함할 수 있는 더 넓은 말로 쓴다. 운영 대응에서 두 용어를 들으면 코드 반영, 트래픽 전환, 기능 플래그 중 무엇을 가리키는지 확인한다.
+
+## 3. 단계별로 보기
+
+### 3.1 증상 고정과 재현
+
+실패 요청 한 건의 시각·시간대, URL·메서드·상태, 비식별 입력, 사용자 역할, 데이터 상태, 앱 버전·프로파일, 외부 응답을 기록하고 정상 사례와 비교한다. “가끔 안 된다” 대신 발생 조건을 구체적으로 적는다.
+
+데이터를 복사할 땐 개인정보와 비밀값을 제거하되 문제의 상태 전이는 보존한다. 재시도로 결제·메일·재고 변경이 생기지 않도록 격리 환경이나 대역을 쓴다. 재현되지 않으면 타이밍·동시성·데이터량·JVM·의존 버전·설정 차이를 더 관찰한다.
+
+### 3.2 범위를 줄이고 가설을 세운다
+
+입력, 데이터, 코드 경로, 외부 의존, 배포 버전을 한 번에 하나씩 분리한다. “DB가 느리다”면 커넥션 대기와 SQL 실행 시간을 나눠 잰다. 느린 응답만으로 DB 원인을 단정하지 않는다.
+
+가설은 반증 가능한 예측을 포함해야 한다. 예: 캐시를 우회하면 같은 키가 성공하고 캐시에 구 스키마 필드가 남아 있을 것이다. 결과와 변경한 코드·설정·데이터를 함께 기록한다.
+
+### 3.3 예외와 스택트레이스 읽기
+
+```mermaid
+flowchart TD
+    A["상위 예외"] --> B["내 코드의 첫 프레임"]
+    A --> C["Caused by 하위 예외"]
+    C --> D["하위 계층의 실패 단서"]
+    A -.-> E["Suppressed 부가 예외"]
+```
+
+예외 이름·메시지와 호출 위치를 본다. 보통 생성 프레임이 위, 호출자가 아래지만 **맨 아래가 항상 근본 원인은 아니다**. 최상위 예외의 계층을 확인하고 **Caused by:** 체인을 따라 하위 실패를 찾은 뒤, 프레임워크를 지나 **내 코드의 첫 프레임**에서 입력·분기를 살핀다.
+
+예컨대 **DataAccessException**의 cause가 **SQLTimeoutException**이어도 풀 대기·DB 실행·네트워크 지연을 나눠 확인한다. **... 12 more**는 공통 프레임 생략, **Suppressed:**는 부가 예외다. 스택은 Throwable 생성 시점의 스레드 스냅샷이다.
+
+### 3.4 로그와 디버거로 실행 흐름을 관찰
+
+로그는 사후 비교, 디버거는 특정 실행의 변수·분기 관찰에 쓴다. 시각·레벨·스레드·요청 ID와 안전한 업무 키를 남긴다. Spring Boot 기본 출력은 시각·레벨·프로세스·스레드·로거·메시지를 포함하고 starter 기본 구현은 Logback이다. 안 보인다고 미실행으로 단정하지 말고 로거 레벨과 환경 설정을 확인한다.
+
+- ERROR는 현재 요청이나 작업 실패처럼 운영자 대응이 필요한 사건, WARN은 비정상 조건이지만 처리가 계속된 사건에 쓴다.
+- INFO는 업무 흐름에서 중요한 정상 이벤트, DEBUG는 개발·장애 분석에 유용한 상세 상태, TRACE는 더 세밀한 진단에 한정한다.
+- 요청 본문 전체·인증 토큰·비밀번호·카드 정보는 로그에 남기지 않는다. 개인정보가 포함될 수 있는 로그는 권한과 보존기간도 제한한다.
+- 같은 장애를 설명하는 로그에 requestId나 traceId를 넣으면 여러 계층의 기록을 한 요청으로 모을 수 있다. 식별자가 전파되지 않는 구간이 있으면 그 단절도 단서다.
+
+IntelliJ에서 라인 브레이크포인트로 Debug 실행한다. Step Over는 호출 안으로 들어가지 않고, Step Into는 들어가며, Step Out은 메서드에서 나온다. 조건부 중단은 원하는 입력으로 좁히고, 로그포인트는 멈추지 않고 값을 남긴다. 예외 브레이크포인트는 프레임워크의 정상 예외에도 멈출 수 있으므로 타입과 조건을 제한한다.
+
+Evaluate Expression이나 변수 변경은 상태를 바꿀 수 있고 getter가 DB 조회를 유발할 수도 있다. 재현을 다시 실행할 수 있게 준비한다. 운영 JVM 정지는 다른 요청에도 영향을 주므로 IDE 중단점을 걸지 않는다.
+
+### 3.5 계층을 바꿔가며 요청·DB를 본다
+
+브라우저 Network 탭에서 요청 헤더·payload와 응답·status·initiator·timing을 비교한다. curl의 **-i** 옵션으로 응답 헤더와 상태도 본다. 차이가 있으면 쿠키·인증·CORS·프록시·리다이렉트·캐시를 확인한다. HAR에는 쿠키·Authorization이 있을 수 있어 공유 전 삭제한다.
+
+DB에서는 생성 SQL, 실제 바인딩 값, 실행 계획·시간을 구분한다. Hibernate의 **hibernate.show_sql**은 생성 SQL을 출력하며 기본값은 false다. 바인딩 확인은 해당 버전의 logger 설정을 찾아 제한된 재현에서만 켠다. 개인정보 유출에 주의한다. **EXPLAIN ANALYZE**처럼 실제 실행하는 옵션은 변경 가능성을 검토한 뒤 쓴다.
+
+### 3.6 운영 장애에서 더 무거운 증거로 이동
+
+```mermaid
+sequenceDiagram
+    participant Alert as "알림"
+    participant Oncall as "담당자"
+    participant Dash as "대시보드"
+    participant Log as "로그"
+    participant Trace as "분산 트레이스"
+    participant JVM as "JVM 진단"
+    Alert->>Oncall: "영향과 발생 시각 확인"
+    Oncall->>Dash: "오류율·지연·포화도 비교"
+    Dash-->>Oncall: "변경 시점과 범위 후보 제공"
+    Oncall->>Log: "요청 ID와 시간 구간으로 검색"
+    Log-->>Oncall: "예외와 호출 경로 확인"
+    Oncall->>Trace: "느린 요청의 서비스 경계 확인"
+    Trace-->>Oncall: "DB·외부 호출 구간 식별"
+    opt "코드 수준 증거가 더 필요한 경우"
+        Oncall->>JVM: "권한을 확인해 스레드·힙 진단"
+        JVM-->>Oncall: "덤프를 안전한 저장소에 보관"
+    end
+```
+
+알림 후 영향도와 시작 시각을 정하고 오류율·지연·처리량·포화도의 변화를 본다. 로그는 시간과 요청 ID로 좁히고 trace는 서비스 경계의 대기를 찾는다. 한 trace를 전체 분포로 일반화하지 않는다. 반복 스레드 덤프는 정체 확인에, 힙 덤프는 객체 참조 분석에 쓴다. 덤프는 부하와 민감정보 위험이 있으므로 권한·저장·보존을 확인하고 필요한 경우만 수집한다.
+
+컨테이너 연결은 별도 개발 클러스터에서 **kubectl port-forward pod/<pod> 5005:5005**로 일시 수행한다. JDWP를 Service나 Ingress에 상시 노출하지 않는다. 디버거는 실행을 멈추고 값을 조작할 수 있으므로 접근을 통제하고 사용 직후 종료한다.
+
+원인 후보 유형을 아래처럼 분류하면 “서버 문제”라는 뭉뚱그린 진단을 피할 수 있다.
+
+| 유형 | 단서 | 확인할 비교 |
+|---|---|---|
+| 설정 | 특정 환경·프로파일에서만 발생 | 환경변수, 활성 프로파일, 기본값, secret 버전 |
+| 데이터 | 일부 ID·상태·경계값에 집중 | 정상/실패 레코드, null·중복·시간대·정렬 순서 |
+| 동시성 | 부하나 재시도 때만 발생 | 동일 키 동시 요청, 락 대기, 재현 타이밍 |
+| 외부 의존 | 특정 공급자·리전에서 증가 | timeout·상태 코드·재시도와 장애 시작 시점 |
+| 배포 차이 | 버전 전환 뒤 갑자기 시작 | 이미지·의존성·스키마·기능 플래그 차이 |
+
+### 3.7 회귀 테스트와 이분 탐색
+
+수정 뒤 실패 조건을 회귀 테스트로 고정한다. 단위 테스트는 로직, 통합 테스트는 DB·HTTP·설정 경계를 검증한다. 배포 뒤 같은 오류율·상태·지연·업무 결과를 확인하고, 테스트가 불가능하면 수동 절차와 결과를 남긴다.
+
+여러 커밋이 지난 뒤 회귀가 시작됐고 정상 커밋과 실패 커밋을 알고 있으면 **git bisect**로 커밋 구간을 이분 탐색한다.
+
+~~~text
+git bisect start
+git bisect bad HEAD
+git bisect good <known-good-commit>
+# 현재 커밋에서 재현 절차를 실행하고 결과를 표시한다
+git bisect good   # 현재 커밋에서 문제가 없을 때
+git bisect bad    # 문제가 재현될 때
+git bisect reset  # 탐색을 끝내고 원래 상태로 복귀
+~~~
+
+중간 판정은 같은 입력과 환경에서 반복 가능해야 한다. flaky 테스트, 실행 불가능한 옛 커밋, 중간에 바뀐 의존 서비스가 있으면 결과가 커밋 차이를 뜻하지 않을 수 있다. 재현 명령을 자동화할 수 있을 때 **git bisect run <command>**을 쓰면 매 단계 사람의 판정 차이를 줄일 수 있다.
+
+## 4. 직접 해보기
+
+Spring Initializr에서 Boot **4.1.1**, Java **25**, Gradle, Spring Web로 프로젝트를 만든다. 예제는 **미실행**이다.
+
+~~~java
+package com.example.debuglab;
+
+import java.sql.SQLException;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
+
+@SpringBootApplication
+public class DebugLabApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(DebugLabApplication.class, args);
+    }
+}
+
+@RestController
+class OrderController {
+    private static final Logger log = LoggerFactory.getLogger(OrderController.class);
+
+    @GetMapping("/orders/{id}")
+    Map<String, Object> find(@PathVariable long id) {
+        log.info("order lookup id={}", id);
+        if (id == 13) {
+            throw new IllegalStateException(
+                    "order lookup failed",
+                    new SQLException("simulated database timeout"));
+        }
+        return Map.of("id", id, "status", "OK");
+    }
+}
+~~~
+
+**src/main/resources/application.properties**에는 애플리케이션 로그를 추가한다.
+
+~~~properties
+logging.level.com.example.debuglab=DEBUG
+~~~
+
+Gradle wrapper가 생성된 프로젝트 루트에서 애플리케이션을 실행한다.
+
+~~~bash
+./gradlew bootRun
+~~~
+
+다른 터미널에서 정상 요청과 실패 요청을 각각 보낸다.
+
+~~~bash
+curl -i http://localhost:8080/orders/7
+curl -i http://localhost:8080/orders/13
+~~~
+
+첫 요청은 200, 두 번째는 500이어야 한다. 서버 로그에서 **IllegalStateException**, **Caused by: java.sql.SQLException**, **OrderController.find**를 찾아 cause와 첫 애플리케이션 프레임을 함께 읽는다. DB를 호출하지 않으므로 “database timeout”은 가상 원인이지 실제 DB 증거가 아니다.
+
+IntelliJ에서 **if (id == 13)**에 조건부 브레이크포인트를 두고 **id**를 확인한다. Step Over로 예외 발생까지 이동한다. Evaluate Expression은 단순 값만 확인하고 상태를 바꾸는 식은 피한다. 로그포인트와 **IllegalStateException** 예외 브레이크포인트도 비교한다.
+
+로컬 JVM에만 붙이는 원격 디버깅 예시는 다음과 같다. 이미 실행 중인 Boot 프로세스 대신 JAR을 이 명령으로 시작해야 한다.
+
+~~~bash
+java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=127.0.0.1:5005 -jar build/libs/debuglab.jar
+~~~
+
+IntelliJ의 Remote JVM Debug 구성에서 localhost:5005에 연결한다. 종료 후 프로세스를 내린다. 컨테이너나 Kubernetes 실습은 선택이다. 별도 개발 클러스터에서 승인된 Pod에만 JDWP를 켜고, 예를 들어 **kubectl port-forward pod/debug-lab 5005:5005**로 일시 연결한다. 운영 클러스터의 JVM에 연결하거나 디버그 포트를 외부에 노출하지 않는다. 스레드 상태는 동일 머신·OS 사용자 권한으로 **jcmd <pid> Thread.print**를 확인한다. 힙 덤프는 영향도와 저장 보안을 먼저 검토한다.
+
+DB 실습이 필요하면 사용하는 Spring Data JPA·Hibernate 버전에 맞춰 별도 로컬 DB를 붙인다. Hibernate의 **hibernate.show_sql=true**는 생성 SQL을 확인하는 최소 도구다. 실제 파라미터 값과 실행 계획은 대상 ORM·DB 문서를 확인하고, 민감한 값을 제한된 환경에서만 관찰한다. SQL 로그를 켰다는 이유만으로 값·시간·실행 계획까지 다 관찰됐다고 오해하지 않는다.
+
+## 5. 자주 하는 오해와 실수
+
+1. **“마지막 예외 문구가 원인이다” →** 최상위 예외는 상위 계층의 설명일 수 있다. **Caused by** 체인과 내 코드 첫 프레임, 호출 시간 증거를 함께 본다.
+2. **“스택트레이스의 맨 아래 줄이 늘 수정 위치다” →** 아래 프레임은 호출자일 수 있고, cause 체인의 마지막도 증상 설명일 뿐인 경우가 있다. 예외가 만들어진 계층과 실패한 입력을 따라간다.
+3. **“재현이 안 되면 해결됐다” →** 데이터·타이밍·배포 설정 차이로 다시 안 보일 수 있다. 재현 미확보를 기록하고 증거 수집 범위를 넓힌다.
+4. **“로그가 많으면 원인을 빨리 찾는다” →** 중복·민감정보·고카디널리티 값이 섞이면 검색이 어려워지고 비용도 커진다. 요청 식별자와 업무상 필요한 필드만 구조적으로 남긴다.
+5. **“운영에서 DEBUG를 켜도 안전하다” →** 민감 데이터와 트래픽 양에 따라 노출·비용·성능 문제가 생긴다. 좁은 패키지·시간 범위로 켜고 종료 시각을 정한다.
+6. **“브레이크포인트는 관찰만 한다” →** JVM을 멈춰 동시 요청과 timeout을 바꾸고, Evaluate Expression은 상태를 변경할 수 있다. 로컬 또는 격리 환경에서 재현한다.
+7. **“JDWP 포트는 사내용이라 괜찮다” →** 연결자는 스레드를 멈추거나 값을 읽고 바꿀 수 있다. 외부 공개하지 말고, 격리·접근 통제·짧은 활성화 후 종료한다.
+8. **“SQL만 보면 DB 문제를 안다” →** 값이 달라 같은 SQL도 다른 결과를 내며, 실행 계획·잠금·커넥션 대기는 SQL 문자열 밖에 있다. 파라미터와 DB 실행 증거를 별도로 확보한다.
+9. **“한 번에 여러 설정을 바꿔 빨리 확인한다” →** 무엇이 결과를 바꿨는지 알 수 없고 되돌리기도 어렵다. 한 실험에서 독립 변수 하나만 바꾼다.
+10. **“덤프는 로그보다 정확하니 먼저 뜬다” →** 덤프 수집은 운영 부하와 데이터 유출 위험이 있다. 저비용 지표·로그부터 보고 필요한 질문이 있을 때 한정 수집한다.
+11. **“git bisect의 good/bad는 주관적으로 정해도 된다” →** 일관되지 않은 판정은 이분 탐색 결과를 망친다. 동일한 재현 절차와 같은 환경을 기준으로 판정한다.
+
+## 6. 시각화 설계 메모
+
+1. **디버깅 전체 순환**  
+   [목적 | 증상부터 회귀 확인까지 표현 | 노드/요소 | 증상, 조건, 재현, 가설, 검증, 수정, 테스트 | 화살표/관계 | 반증은 가설로, 재발은 증거 수집으로 회귀 | 애니메이션 | 증상→조건→증거→수정→재발 판정 | 오해 | 테스트 통과만으로 운영 해결을 단정]. 1절 flowchart와 연결한다.
+
+2. **스택트레이스 읽기**  
+   [목적 | 예외 계층과 사용자 프레임 구분 | 노드/요소 | 최상위, 호출 프레임, cause, suppressed | 관계 | 호출 스택과 예외 체인을 다른 화살표로 표시 | 애니메이션 | 최상위→cause→생략 프레임→내 코드 | 오해 | 맨 아래가 항상 원인이라는 생각].
+
+3. **HTTP에서 DB까지 한 요청 추적**  
+   [목적 | 각 계층의 증거 구분 | 노드/요소 | 브라우저, 프록시, 컨트롤러, 서비스, ORM, DB | 관계 | 요청·응답 방향과 traceId 연결, ORM에서 SQL 전달 | 애니메이션 | payload→응답→호출 시간→SQL·값→계획 | 오해 | 서버 로그로 클라이언트 응답 단정].
+
+4. **운영 진단의 증거 사다리**  
+   [목적 | 증거를 단계적으로 상세화 | 노드/요소 | 알림, 지표, 로그, trace, 스레드·힙 덤프 | 관계 | 영향 범위 축소 후 다음 단계, 고위험 수집은 권한·보존 확인 | 애니메이션 | 오류율→요청→느린 구간→필요한 덤프 | 오해 | 처음부터 전체 덤프·무차별 DEBUG].
+
+## 7. 자가점검 Q&A (면접 대비)
+
+**Q1. 재현할 수 없는 버그를 받으면 어떻게 시작하나?**  
+사용자가 본 정상·실패 결과와 발생 시각, 요청 조건, 버전, 환경 차이를 먼저 기록한다.  
+실패가 한정되는 데이터·권한·동시성 조건을 찾아 범위를 줄이고, 영향이 낮은 관찰부터 추가한다.  
+운영 요청을 그대로 반복해 부수 효과를 만들지 않도록 복제·가명 데이터와 격리 환경을 쓴다.  
+재현 실패는 완료가 아니라 아직 조건을 포착하지 못했다는 결과다.  
+꼬리질문: 재현이 되지 않으면 수정도 할 수 없나?  
+답: 관찰 증거로 후보를 좁힐 수는 있지만, 회귀 조건을 잡지 못했다면 해결 여부의 확신이 낮다고 명시한다.
+
+**Q2. 스택트레이스에서 Caused by와 첫 애플리케이션 프레임을 왜 함께 보나?**  
+Caused by는 낮은 계층의 실패 정보를 감싼 예외에서 보존할 수 있다.  
+첫 애플리케이션 프레임은 업무 코드가 프레임워크나 라이브러리를 호출한 경계를 찾게 해 준다.  
+하위 예외의 종류만으로 입력이나 운영 환경 중 무엇이 원인인지 단정하지 않는다.  
+꼬리질문: Suppressed는 무엇을 의미하나?  
+답: 주 예외를 처리하는 도중 함께 발생한 부가 예외로, cause 체인과 구분해 읽는다.
+
+**Q3. 로그와 디버거는 어떤 상황에서 선택하나?**  
+여러 요청에서 일어난 흐름을 사후에 비교하거나 운영에서 정지를 피해야 할 때 로그가 적합하다.  
+특정 분기의 변수 변화와 호출 맥락을 한 번 깊게 확인할 때는 개발 환경의 디버거가 빠르다.  
+디버거는 JVM을 멈추고 평가식이 상태를 바꿀 수 있으므로 운영에 무심코 적용하지 않는다.  
+꼬리질문: 간헐적 오류에 조건부 브레이크포인트가 항상 최선인가?  
+답: 정지 자체가 타이밍을 바꿀 수 있으므로 로그포인트나 요청 식별 로그가 더 적합할 수 있다.
+
+**Q4. 브라우저는 500을 받는데 서버 로그에는 오류가 없으면 무엇을 확인하나?**  
+Network 탭에서 실제 URL, 메서드, 요청 헤더·payload, 상태·응답 본문과 timing을 확인한다.  
+브라우저와 curl 요청의 인증·쿠키·CORS·프록시·캐시 조건을 비교한다.  
+gateway나 CDN이 서버 앞에서 응답을 만들었을 가능성도 시간과 상관 ID로 확인한다.  
+꼬리질문: HAR 파일을 바로 티켓에 붙여도 되나?  
+답: 쿠키와 Authorization, 개인정보가 포함될 수 있으니 제거하고 필요한 요청만 공유한다.
+
+**Q5. SQL 로그를 켰는데 바인딩 값을 알 수 없는 이유는?**  
+ORM에서 생성한 SQL 문장과 실행 시 파라미터 값은 서로 다른 로깅 정보다.  
+Hibernate의 SQL 출력 옵션은 쿼리 형태를 보여 주지만 바인딩 값 전체를 보장하지 않는다.  
+대상 버전의 bind logger나 DB 측 추적을 별도로 확인하고 데이터 노출을 제한한다.  
+꼬리질문: SQL이 정상인데 요청이 느리면 다음은?  
+답: 바인딩 값, 실제 실행 시간·계획, 잠금과 커넥션 대기를 나눠 확인한다.
+
+**Q6. 운영에서 원격 디버깅을 피해야 하는 까닭은?**  
+JDWP 연결은 JVM의 스레드 실행을 멈추고 메모리 값을 읽거나 변경할 수 있다.  
+서비스 지연과 timeout을 유발하며, 접속이 노출되면 앱 내부 상태를 읽고 조작하는 권한이 생긴다.  
+개발·격리 환경에서만 포워딩을 통제하고 짧게 열며, 운영은 관찰 자료와 제한된 진단 명령을 우선한다.  
+꼬리질문: 원격 디버깅은 언제 허용할 수 있나?  
+답: 격리된 환경, 승인된 접근 경로와 담당자, 종료 시각과 영향 평가가 확보됐을 때 한정한다.
+
+## 8. 참고문헌
+
+- Debug code — https://www.jetbrains.com/help/idea/debugging-code.html — 디버거 실행·중단·프로그램 상태 관찰의 일반 절차.
+- Breakpoints — https://www.jetbrains.com/help/idea/using-breakpoints.html — 브레이크포인트 종류와 조건 사용.
+- JPDA Connection and Invocation Details — https://docs.oracle.com/en/java/javase/25/docs/specs/jpda/conninv.html — JPDA transport와 디버거·대상 JVM의 연결 구조.
+- The java Command — https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html — -agentlib:jdwp로 JVM을 디버거와 함께 시작하는 옵션.
+- Throwable — https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Throwable.html — 스택 스냅샷, cause 및 예외 체인의 의미.
+- git-bisect — https://git-scm.com/docs/git-bisect — 양분 탐색으로 버그를 도입한 커밋을 찾는 절차.
+- Logging :: Spring Boot — https://docs.spring.io/spring-boot/reference/features/logging.html — Boot 기본 로깅 구성과 기본 로그 형식.
+- Network panel: Analyze network load and resources — https://developer.chrome.com/docs/devtools/network/overview — Network 패널의 요청 기록·헤더·payload·응답·timing 확인.
+- Hibernate ORM User Guide — https://docs.hibernate.org/stable/orm/userguide/html_single/ — hibernate.show_sql 설명과 기본값(false).
+- Use Port Forwarding to Access Applications in a Cluster — https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/ — kubectl port-forward로 클러스터 애플리케이션에 접근하는 방법.
+- The jcmd Command — https://docs.oracle.com/en/java/javase/25/docs/specs/man/jcmd.html — 실행 JVM 진단 명령을 보내는 도구.
+

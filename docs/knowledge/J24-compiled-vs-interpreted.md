@@ -1,0 +1,242 @@
+# J24. 컴파일 언어 vs 인터프리터 언어 — Java는 어떻게 실행되나
+
+> Java는 소스를 바이트코드로 컴파일하고, JVM은 그 바이트코드를 해석하거나 네이티브 코드로 컴파일해 실행한다.
+> 컴파일/인터프리트는 언어에 붙는 꼬리표가 아니라 구현이 선택한 처리 방식이다.
+> 서버에서는 기동·워밍업 비용과 장시간 처리량을 함께 보고, 기본은 표준 JVM 실행 모델로 시작한다.
+
+## 1. 왜 알아야 하나
+
+로컬에서 `javac`로 만든 프로그램이 서버의 `java`에서 `UnsupportedClassVersionError`로 시작도 못 하는 일은 “Java는 플랫폼 독립”이라는 말을 잘못 이해했을 때 생긴다. 바이트코드는 CPU 기계어와 다르지만, 실행 JVM이 해당 class 파일 버전을 이해하고 필요한 Java API를 제공해야 한다. 컨테이너에 JRE를 따로 넣거나 빌드 JDK와 런타임을 다르게 고정하면 이 호환 조건을 놓치기 쉽다.
+
+반대로 “Java는 컴파일 언어니까 실행할 때 컴파일 비용이 없다”고 생각하면 서버 기동 직후 지연을 설명하지 못한다. `javac`가 만든 `.class`는 JVM 명령어다. HotSpot은 메서드를 우선 인터프리터로 실행하며 프로파일을 모으고, 자주 실행되는 코드를 JIT 컴파일해 네이티브 코드로 바꿀 수 있다. 초기에는 인터프리터 실행과 컴파일 비용이 나타나고, 이후에는 최적화된 코드가 처리량을 높일 수 있다. 짧은 배치나 서버리스 함수는 충분히 워밍업하기 전에 종료될 수도 있다.
+
+면접에서 “Java는 컴파일 언어인가, 인터프리터 언어인가?”에 한 단어로 답하면 실행 단계를 혼동한 셈이다. Java 언어의 소스 컴파일, JVM 바이트코드의 실행, 특정 JVM의 JIT/AOT 구현을 나눠 설명해야 한다.
+
+## 2. 핵심 개념
+
+| 용어 | 의미 | Java에서의 예 |
+|---|---|---|
+| 컴파일(compile) | 한 표현을 다른 표현으로 변환한다. 결과가 반드시 CPU 기계어일 필요는 없다. | `javac`: `.java` → JVM class 파일(`.class`) |
+| 인터프리트(interpret) | 프로그램 명령을 실행 엔진이 읽고 동작을 수행한다. | HotSpot 인터프리터가 바이트코드 메서드를 실행 |
+| 바이트코드(bytecode) | 가상 머신의 추상 명령어로 된 중간 형식. CPU 명령어와 구별된다. | JVM instruction과 class 파일 메타데이터 |
+| JIT 컴파일 | 실행 중 프로파일을 바탕으로 코드 일부를 네이티브 코드로 변환한다. | HotSpot의 계층형 컴파일, C1/C2 컴파일러 |
+| AOT 컴파일 | 실행 전에 코드 또는 실행 준비 정보를 만든다. “AOT”가 무엇을 산출하는지는 기술마다 다르다. | GraalVM Native Image의 네이티브 실행 파일, JEP 483의 AOT class cache |
+| 트랜스파일(transpile) | 같은 실행 플랫폼에서 쓰일 다른 고수준 언어/문법으로 변환한다. | TypeScript `tsc`: 타입 검사 후 JavaScript 출력 |
+
+| 흔히 섞는 표현 | 정확한 구분 |
+|---|---|
+| 컴파일 언어 vs 인터프리터 언어 | 언어 명세가 실행 방식을 하나로 고정하지 않는다. 구현체가 컴파일러·인터프리터·혼합 방식을 택한다. JVM 명세도 JVM 명령을 해석하는 구현과 CPU 명령으로 컴파일하는 구현 모두 허용한다. |
+| 바이트코드 vs 기계어 | 바이트코드는 JVM 같은 가상 머신 명령이다. 기계어는 특정 CPU가 직접 실행하는 명령이다. JIT가 둘 사이를 실행 중 연결할 수 있다. |
+| 컴파일 vs 네이티브 컴파일 | `javac`도 컴파일러지만 일반적으로 JVM 바이트코드를 만든다. “컴파일했다”만으로 타깃 CPU용 실행 파일이 나왔다고 단정할 수 없다. |
+| JIT vs AOT | JIT는 실행 중 관찰 정보를 이용해 코드 일부를 바꾼다. AOT는 실행 전 준비를 수행한다. AOT 산출물이 네이티브 코드일 수도, class 로딩·링킹 캐시일 수도 있다. |
+
+## 3. 내부 동작·원리
+
+Java 프로그램의 보편적인 HotSpot 흐름을 단순화하면 다음과 같다. JVM 명세가 강제하는 것은 class 파일 형식과 동작 의미이지, “반드시 인터프리터 다음에 C1, 그다음 C2” 같은 내부 구현 순서가 아니다.
+
+```mermaid
+flowchart LR
+    A["Hello.java"] -->|"javac: 분석·타입 검사·코드 생성"| B["Hello.class\nJVM 바이트코드 + 상수 풀·메타데이터"]
+    B --> C["java가 JVM 시작"]
+    C --> D["클래스 로딩·검증·링킹·초기화"]
+    D --> E["인터프리터가 바이트코드 실행\n실행 횟수·분기 프로파일 수집"]
+    E -->|"뜨거운 메서드/반복 구간"| F["JIT 컴파일\nHotSpot 구현에서는 C1/C2 계층"]
+    F --> G["현재 CPU용 네이티브 코드 실행"]
+    G -->|"예측 가정이 깨지면"| E
+    H["java Hello.java\nsource-file mode"] -->|"런처가 컴파일하고 실행"| C
+```
+
+1. **컴파일 단계.** `javac`는 소스의 선언을 읽고 타입·접근 규칙을 확인한 다음 class 파일을 만든다. 이 산출물은 JVM 명령어와 심볼릭 참조, 상수 풀, 버전 등 실행에 필요한 구조를 담는다. `.class`는 일반적인 CPU의 기계어 파일이 아니므로, 특정 OS/CPU에 맞춘 네이티브 링크 단계와 다르다.
+2. **실행 준비.** `java` 런처가 JVM을 시작하고 요청된 메인 클래스를 찾는다. JVM은 필요한 클래스를 로드하고 class 파일 구조·바이트코드를 검증하며 참조를 연결하고 초기화를 수행한다. 모든 클래스가 프로그램 시작 전에 한꺼번에 로드되는 것은 아니다. 이 동적·지연 로딩은 런타임 확장성을 주지만 첫 사용 비용으로 나타날 수 있다.
+3. **초기 실행과 관찰.** 메서드가 실행될 때 HotSpot 인터프리터는 바이트코드를 수행하며 호출 횟수나 분기 경향 같은 정보를 모을 수 있다. 모든 코드가 JIT 컴파일되는 것은 아니다. 거의 실행되지 않는 코드에는 컴파일 비용을 들이지 않는 편이 이득일 수 있다.
+4. **최적화와 되돌림.** HotSpot은 프로파일상 자주 실행되는 메서드나 루프를 네이티브 코드로 컴파일할 수 있다. 계층형 컴파일에서는 빠르게 코드를 만들며 프로파일을 모으는 계층과 더 강하게 최적화하는 계층을 이용할 수 있다. 흔히 C1/C2라고 부르는 이름은 HotSpot 구현의 이름이지 JVM 규격의 구성 요소가 아니다. 최적화는 관찰된 타입·분기 패턴을 가정할 수 있어, 가정이 어긋나면 최적화 코드를 무효화(deoptimization)하고 인터프리터나 덜 최적화된 경로로 돌아갈 수 있다.
+
+`java Hello.java`는 별도의 `javac` 명령을 사용자에게 요구하지 않는 source-file mode다. 런처는 `.java` 파일을 입력으로 인식해 그 소스를 컴파일한 뒤 메인 클래스를 실행한다. 즉 “Java를 인터프리터만으로 실행한다”는 뜻이 아니며, 소스 모드에서도 JVM 바이트코드 실행 경로를 거친다. 여러 파일 소스 프로그램은 Java 22의 JEP 458에서 별도 지원이 추가됐다.
+
+“Write once, run anywhere”는 JVM용으로 컴파일된 코드를 호환되는 JVM과 플랫폼 API가 있는 환경에서 다시 빌드하지 않고 실행할 수 있다는 뜻이다. CPU별 기계어를 하나로 통일한다는 뜻은 아니다. class 파일 버전, Java API 버전, OS 파일 경로·인코딩·권한, JNI로 연결한 네이티브 라이브러리, 외부 실행 파일 등은 이식성을 제한한다. 바이트코드 호환성은 실행 가능성의 핵심 조건이지, 결과 성능이나 운영 환경까지 동일하다는 보증은 아니다.
+
+비교할 때는 “어떤 언어냐”보다 “이 구현이 어떤 중간 표현을 만들고, 그 표현을 언제 무엇이 실행하나”를 묻는다.
+
+| 생태계 | 전형적인 경로 | 실행상 주의 |
+|---|---|---|
+| Java / HotSpot | `.java` → `javac` → JVM `.class` 바이트코드 → 인터프리터 및 선택적 C1/C2 JIT → 네이티브 코드 | 바이트코드는 JVM 간 이식성을 주고, JIT 워밍업·클래스 로딩 비용이 생길 수 있다. 다른 JVM 구현은 다른 실행 전략을 택할 수 있다. |
+| JavaScript / V8 | 소스 파싱·바이트코드 생성 → Ignition 인터프리터 → 뜨거운 코드의 최적화 컴파일(TurboFan 등) | 실행 중 관찰로 빠른 경로를 만든다. V8의 실제 계층·정책은 버전에 따라 달라질 수 있어 도식은 개념적이다. |
+| Python / CPython | `.py` 소스 → CPython 바이트코드 → CPython 가상 머신이 명령 실행 | 바이트코드는 CPython 구현 세부사항이며 Python 버전이나 다른 Python VM 사이의 안정된 배포 형식으로 보장되지 않는다. |
+| C / Go | 소스 → 컴파일·링크 → OS/CPU 타깃의 네이티브 실행 파일 | 실행 전에 타깃 환경을 정해야 한다. 크로스 컴파일도 가능하지만 산출물은 지정 타깃과 ABI에 맞아야 한다. |
+| TypeScript | `.ts` → `tsc`의 타입 검사·변환 → `.js` → JavaScript 엔진 | 브라우저나 Node.js가 실행하는 것은 출력 JavaScript다. TypeScript 타입 표기는 주 실행 코드가 아니며, 컴파일 뒤 런타임 입력 데이터까지 검증해 주지는 않는다. |
+
+컴파일 단계와 런타임 오류는 “컴파일 언어면 오류가 없다”처럼 나뉘지 않는다. Java에서 `int count = "42";` 같은 타입 불일치는 `javac`가 거부한다. 반면 `Object value = "42"; Integer n = (Integer) value;`는 정적 타입 규칙에 맞아 컴파일되지만 실제 객체가 `Integer`가 아니므로 실행 시 `ClassCastException`이 난다. 배열 저장 검사, `null` 역참조, 정수 0 나눗셈도 실행 시 예외가 될 수 있다. JavaScript는 동적 값의 조합에서 `TypeError`가 런타임에 드러나기 쉽다. TypeScript는 더 많은 실수를 정적으로 찾지만 `any`, 타입 단언, 검증되지 않은 JSON 때문에 런타임 오류를 없애지는 않는다.
+
+## 4. 코드로 확인
+
+### 예제 1 — `javac`, `javap -c`, JVM 실행, 소스 파일 실행
+
+다음 코드를 JDK 21로 실제 컴파일하고 실행했다. `javac`가 만든 class 파일을 `javap -c`로 보면 정수 상수, 필드 조회, 메서드 호출 같은 JVM 명령이 보인다. `"2 + 3 = "` 문자열 결합에는 JDK 21 컴파일 결과의 `invokedynamic` 명령이 쓰였다.
+
+```java
+public class Hello {
+    public static void main(String[] args) {
+        int result = 2 + 3;
+        System.out.println("Hello, Java!");
+        System.out.println("2 + 3 = " + result);
+    }
+}
+```
+
+실행 명령과 결과:
+
+```text
+$ javac -d _scratch/J24 _scratch/J24/Hello.java
+$ java -cp _scratch/J24 Hello
+Hello, Java!
+2 + 3 = 5
+
+$ javap -c -classpath _scratch/J24 Hello
+Compiled from "Hello.java"
+public class Hello {
+  public Hello();
+    Code:
+       0: aload_0
+       1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+       4: return
+
+  public static void main(java.lang.String[]);
+    Code:
+       0: iconst_5
+       1: istore_1
+       2: getstatic     #7                  // Field java/lang/System.out:Ljava/io/PrintStream;
+       5: ldc           #13                 // String Hello, Java!
+       7: invokevirtual #15                 // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+      10: getstatic     #7                  // Field java/lang/System.out:Ljava/io/PrintStream;
+      13: iload_1
+      14: invokedynamic #21,  0             // InvokeDynamic #0:makeConcatWithConstants:(I)Ljava/lang/String;
+      19: invokevirtual #15                 // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+      22: return
+}
+
+$ java _scratch/J24/Hello.java
+Hello, Java!
+2 + 3 = 5
+```
+
+마지막 실행은 `javac`를 직접 호출하지 않았지만 별도 실행 모델을 증명하지 않는다. JDK 21 런처의 source-file mode로 입력 `.java`를 컴파일하고 실행한 결과다. `javap -c`의 결과는 JVM 바이트코드이지, 현재 CPU의 네이티브 어셈블리 덤프가 아니다.
+
+### 예제 2 — 정적 검사와 런타임 타입 검사
+
+`javac`는 아래 메서드 선언에서 `Object`를 받으므로 컴파일 시점에 실제 객체가 `Integer`인지 알 수 없다. 명시적 캐스트를 실행할 때 JVM이 실제 객체 클래스를 검사한다. 이 예제도 JDK 21에서 컴파일·실행했다.
+
+```java
+public class RuntimeCast {
+    static Integer parse(Object value) {
+        return (Integer) value;
+    }
+
+    public static void main(String[] args) {
+        try {
+            System.out.println(parse("42"));
+        } catch (ClassCastException e) {
+            System.out.println(e.getClass().getSimpleName());
+        }
+    }
+}
+```
+
+```text
+$ javac -d _scratch/J24 _scratch/J24/RuntimeCast.java
+$ java -cp _scratch/J24 RuntimeCast
+ClassCastException
+```
+
+대조적으로 `int count = "42";`는 타입 규칙 위반이라 컴파일 자체가 거부된다. 타입 시스템은 가능한 오류를 미리 제거하지만, 런타임 값이나 외부 입력에 대한 모든 조건을 증명하는 도구는 아니다.
+
+## 5. 버전별 변화 — 왜 바뀌었나
+
+- **Java SE 7 — HotSpot 계층형 컴파일 도입.** 서버 VM이 인터프리터로 프로파일을 모은 뒤 최종 최적화 코드를 기다리는 동안 초기 실행이 느려질 수 있었다. 계층형 방식은 프로파일을 수집하는 컴파일 계층과 서버 컴파일러를 함께 사용해 초기 응답과 피크 성능의 균형을 잡으려 했다. 근거: [Oracle, Java HotSpot VM Performance Enhancements](https://docs.oracle.com/javase/8/docs/technotes/guides/vm/performance-enhancements-7.html).
+- **Java 11 — 단일 파일 소스 실행(JEP 330).** 작은 도구나 학습 예제를 실행할 때 매번 `javac`를 호출하고 class 파일을 정리하는 번거로움이 있었다. 런처에 source-file mode를 추가해 `java Hello.java` 한 번으로 컴파일과 실행을 시작할 수 있게 했다. 언어의 실행 원리를 인터프리트로 바꾼 것은 아니다. 근거: [JEP 330](https://openjdk.org/jeps/330).
+- **Java 24 — AOT Class Loading & Linking(JEP 483).** 애플리케이션이 시작할 때마다 같은 class 파일을 읽고 파싱·로딩·링킹하는 반복 비용이 컸다. 한 번의 실행에서 관찰한 로드·링크 상태를 캐시해 다음 실행의 준비 비용을 줄이는 기능이 전달됐다. 이 AOT cache는 Native Image처럼 애플리케이션 전체를 CPU별 네이티브 실행 파일로 만드는 기능이 아니다. 근거: [JEP 483](https://openjdk.org/jeps/483).
+
+## 6. 실무 가이드
+
+- **기본값:** 일반적인 Java 서비스는 우선 표준 `javac` → class 파일 → 지원되는 HotSpot JVM 경로로 빌드·배포한다. class 파일 호환성과 JIT의 장시간 최적화를 유지하면서 JVM의 진단·운영 도구를 그대로 쓸 수 있다.
+- if/then: 배포 환경을 바꾸거나 JDK 이미지를 줄일 때는 빌드 도구의 target/release 설정과 운영 런타임의 class 파일 지원 범위를 함께 고정한다. “컴파일 성공”은 운영 JVM 호환의 증거가 아니다.
+- if/then: 짧은 작업에서 첫 요청 지연이 문제면 평균 처리량만 보지 말고 프로세스 시작부터 첫 유효 응답까지 측정한다. AOT class cache나 Native Image 후보를 비교하되, 같은 최적화로 취급하지 않는다.
+- if/then: 장시간 API의 피크 처리량을 볼 때는 워밍업 전후를 분리해 측정하고, 동일한 요청 분포·JDK·CPU 제한·힙 옵션에서 비교한다. 짧은 한 번의 실행은 JIT가 안정화된 성능을 대표하지 않는다.
+- if/then: Java 라이브러리가 리플렉션·동적 클래스 로딩을 많이 쓰면 Native Image 전에 그 기능과 설정 가능성을 확인한다. 정적 분석으로 도달 가능한 코드를 정하는 AOT 네이티브 빌드와 동적 JVM의 기능 범위는 같지 않을 수 있다.
+
+JVM 클래스 로딩 상세 → J13, JIT 튜닝·프로파일링 → J15, 빌드 도구 → D04·P08, 컨테이너 AOT → J16 참조.
+
+## 7. 함정·안티패턴
+
+1. **`javac`를 네이티브 컴파일러로 오해** — 증상: 같은 `.class`가 모든 CPU에서 그대로 기계어처럼 돈다고 설명한다. → 원인: “컴파일”을 곧 CPU 기계어 생성으로 좁힌다. → 대처: `.java` → JVM 바이트코드와 JIT의 바이트코드 → CPU 네이티브 코드 변환을 분리한다.
+2. **빌드 JDK와 런타임 버전 불일치** — 증상: 배포 때 class 파일 버전 오류나 API 부재가 난다. → 원인: WORA를 JVM·API 호환 조건 없는 무제한 호환으로 해석한다. → 대처: 빌드 target과 실제 컨테이너의 `java -version`을 확인하고 같은 배포 파이프라인에서 검증한다.
+3. **콜드 실행 수치로 처리량 비교** — 증상: 벤치마크가 반복 실행마다 크게 달라지거나 실제 장시간 서버와 결론이 다르다. → 원인: 클래스 로딩·JIT 컴파일 비용과 최적화 후 처리량을 하나의 숫자로 섞는다. → 대처: 콜드 스타트 지연과 워밍업 후 처리량을 별도 지표로 기록한다.
+4. **JIT는 모든 메서드를 컴파일한다고 가정** — 증상: 한 번만 실행된 코드의 네이티브 코드가 왜 없는지 혼란스럽다. → 원인: 실행 중 최적화가 비용 대비 이득을 따르는 선택이라는 점을 놓친다. → 대처: “JVM은 바이트코드를 실행하며 뜨거운 코드를 컴파일할 수 있다”고 표현한다.
+5. **`java File.java`를 인터프리터 모드로 착각** — 증상: IDE의 `javac` 빌드와 다른 언어 규칙으로 실행될 것이라 기대한다. → 원인: 편리한 런처 문법을 다른 언어 의미와 혼동한다. → 대처: JEP 330의 source-file mode, 즉 런처가 소스를 컴파일한 다음 JVM에서 실행하는 방식으로 설명한다.
+6. **TypeScript 타입을 런타임 검증으로 믿음** — 증상: 컴파일된 뒤 외부 JSON 필드가 잘못돼도 타입 선언이 막아줄 것으로 기대한다. → 원인: 정적 타입 검사를 실제 값 검사와 혼동한다. → 대처: 네트워크·파일 입력은 런타임 스키마 검증을 별도로 하고 `any`·타입 단언 경계를 줄인다.
+
+## 8. 자가점검 Q&A (면접 대비)
+
+### Q1. Java는 컴파일 언어인가, 인터프리터 언어인가?
+
+`javac` 관점에서는 소스 언어를 class 파일로 컴파일한다. HotSpot 실행 관점에서는 JVM 바이트코드를 인터프리트하면서 일부 뜨거운 코드를 JIT 컴파일할 수 있다. 언어와 구현 단계가 다르므로 둘 중 하나로만 답하지 않는다.
+
+**꼬리질문:** JVM은 꼭 인터프리터가 있어야 하나? **답:** 아니다. JVM 명세는 구현 기술을 고정하지 않으며 JVM 명령을 네이티브 명령으로 컴파일하는 구현도 허용한다.
+
+### Q2. `javac`가 생성하는 `.class`는 왜 플랫폼 독립적인가?
+
+`.class`는 정해진 JVM 명령어와 class 파일 형식으로 표현된다. 각 플랫폼의 호환 JVM이 그 명령을 해당 환경에서 실행하므로 CPU 기계어를 그대로 싣지 않는다. 실행 JVM의 class 버전과 API가 맞는다는 조건은 남는다.
+
+**꼬리질문:** 그러면 모든 환경에서 동일하게 실행되나? **답:** 아니며, 네이티브 라이브러리·OS API·인코딩·외부 명령과 JVM 버전 차이가 동작을 제한할 수 있다.
+
+### Q3. `java Hello.java`는 `javac` 없이 인터프리트하는 기능인가?
+
+사용자가 `javac` 명령을 생략하도록 한 런처의 source-file mode다. 런처가 소스를 컴파일하고 메인 클래스를 JVM으로 실행한다. 별도 class 파일을 직접 관리하지 않아도 된다는 편의 기능이다.
+
+**꼬리질문:** 어떤 Java 버전에서 들어왔나? **답:** JEP 330에 따라 Java 11에서 단일 파일 소스 프로그램 실행이 추가됐다.
+
+### Q4. 바이트코드 인터프리터가 있는데 JIT가 필요한 이유는?
+
+처음부터 모든 코드를 고급 최적화하는 비용을 부담하지 않고 프로그램을 시작할 수 있다. 런타임 프로파일은 자주 쓰는 코드와 실제 타입·분기 경향을 알려줘 그 부분만 최적화하게 한다. 대신 워밍업 지연과 컴파일 비용이 추가된다.
+
+**꼬리질문:** JIT는 항상 이득인가? **답:** 아니다. 짧은 작업은 이득을 회수하기 전에 끝날 수 있고, 컴파일·코드 캐시 비용이 생긴다.
+
+### Q5. C1과 C2는 JVM 사양에 있는 컴파일러인가?
+
+아니다. HotSpot 구현에서 사용하는 컴파일러 이름이며, 다른 JVM은 다른 컴파일 구조를 선택할 수 있다. 개념적으로는 빠른 컴파일·프로파일링과 더 높은 최적화 수준을 층으로 제공하는 방식으로 설명할 수 있다.
+
+**꼬리질문:** 최적화된 네이티브 코드가 영원히 유지되나? **답:** 프로파일에 근거한 가정이 틀리면 최적화 코드를 버리고 다른 실행 단계로 되돌릴 수 있다.
+
+### Q6. 컴파일 타임 오류와 런타임 타입 오류를 예로 비교하라.
+
+`int n = "42";`는 정적 타입 규칙이 맞지 않아 `javac`가 거부한다. `(Integer) value`는 문법·정적 타입 검사를 통과할 수 있지만 실제 `value`가 문자열이면 실행 중 `ClassCastException`이 발생한다. 컴파일 성공은 모든 입력에 대한 무오류 증명이 아니다.
+
+**꼬리질문:** TypeScript는 런타임 타입 오류를 제거하나? **답:** 아니다. 타입 검사는 개발 중 오류를 더 일찍 찾지만, JSON·사용자 입력과 타입 단언은 별도 런타임 검증이 필요하다.
+
+### Q7. JEP 483의 AOT cache와 GraalVM Native Image의 차이는?
+
+JEP 483은 이전 실행에서 얻은 클래스 로딩·링킹 상태를 캐시해 다음 시작의 준비 비용을 줄이는 HotSpot 기능이다. Native Image는 도달 가능한 코드를 분석해 특정 OS·CPU용 네이티브 실행 파일을 빌드한다. 둘 다 “실행 전” 작업이지만 캐시 대상과 결과물이 다르다.
+
+**꼬리질문:** 둘 중 하나가 항상 더 빠른가? **답:** 보장되지 않는다. 시작 시간, 피크 처리량, 빌드 비용, 동적 기능, 메모리와 운영 도구를 서비스 조건으로 비교해야 한다.
+
+### Q8. V8이나 CPython도 “인터프리터 언어”라고만 부르면 무엇을 놓치나?
+
+V8은 JavaScript 바이트코드 인터프리터와 최적화 컴파일을 함께 써 실행 중 뜨거운 코드를 빠르게 할 수 있다. CPython은 바이트코드를 실행하며 그 바이트코드 형식은 구현·버전 세부사항이다. 이분법은 각 런타임의 여러 단계를 감춘다.
+
+**꼬리질문:** 그러면 분류할 때 무엇을 물어야 하나? **답:** 어느 구현과 버전에서 어떤 표현을 만들고, 그 표현을 언제 어떤 엔진이 실행·컴파일하는지 묻는다.
+
+## 9. 참고문헌
+
+- The `javac` Command — https://docs.oracle.com/en/java/javase/25/docs/specs/man/javac.html — `javac`가 Java 선언을 class 파일로 컴파일함을 확인.
+- The Java Virtual Machine Specification, Chapter 1 — https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-1.html — JVM 명령·class 파일의 역할과 JVM 구현이 특정 실행 기술에 종속되지 않음을 확인.
+- The Java Command — https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html — 런처의 source-file mode가 소스를 컴파일하고 실행함을 확인.
+- The `javap` Command — https://docs.oracle.com/en/java/javase/25/docs/specs/man/javap.html — `javap -c`가 class 파일의 바이트코드 명령을 출력함을 확인.
+- JEP 330: Launch Single-File Source-Code Programs — https://openjdk.org/jeps/330 — Java 11 단일 파일 소스 실행의 배경과 동작을 확인.
+- JEP 458: Launch Multi-File Source-Code Programs — https://openjdk.org/jeps/458 — Java 22 다중 파일 소스 실행 추가를 확인.
+- Java HotSpot VM Performance Enhancements — https://docs.oracle.com/javase/8/docs/technotes/guides/vm/performance-enhancements-7.html — Java SE 7 계층형 컴파일 도입의 취지와 인터프리터·컴파일러 프로파일 흐름을 확인.
+- JEP 483: Ahead-of-Time Class Loading & Linking — https://openjdk.org/jeps/483 — Java 24 AOT class cache의 대상과 반복 시작 비용 문제를 확인.
+- Native Image — https://www.graalvm.org/latest/reference-manual/native-image/ — GraalVM Native Image의 AOT 네이티브 실행 파일 빌드 흐름을 확인.
+- Firing up the Ignition interpreter — https://v8.dev/blog/ignition-interpreter — V8 Ignition 바이트코드 인터프리터와 JIT 컴파일러 조합을 확인.
+- `dis` — https://docs.python.org/3/library/dis.html — CPython 바이트코드가 인터프리터 구현 세부사항이며 버전 간 보장되지 않음을 확인.
+- TypeScript: `tsc` CLI Options — https://www.typescriptlang.org/docs/handbook/compiler-options.html — `tsc` 입력과 JavaScript 출력 옵션을 확인.
+- `go command` — https://go.dev/cmd/go/ — Go 도구의 패키지 컴파일 및 빌드 명령 역할을 확인.
+- The Java Language Specification, `15.5 — https://docs.oracle.com/javase/specs/jls/se25/html/jls-15.html#jls-15.5 — 참조 형식 캐스팅의 런타임 검사와 `ClassCastException` 근거.

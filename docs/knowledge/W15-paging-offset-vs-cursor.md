@@ -1,0 +1,269 @@
+# W15. 페이징 — OFFSET vs 커서(키셋), 무엇을 언제
+
+> 3줄 요약 — 얕고 번호 이동·전체 건수가 필요한 목록은 `OFFSET`과 `Page`가 단순하다.
+> 피드처럼 뒤로 계속 읽고 데이터가 많다면 정렬 키를 담아 다음 범위를 찾는 키셋 커서가 깊은 페이지 비용과 삽입에 따른 밀림을 줄인다.
+> 일반 검색 목록의 기본값은 정렬·최대 페이지 크기를 제한한 `Page`; 무한 스크롤과 깊은 목록은 `Window`의 키셋 스크롤 또는 직접 구현한 커서 API로 전환한다.
+
+## 1. 질문
+
+처음엔 관리자 목록을 `PageRequest.of(page, size)`로 만들고 화면도 번호 버튼을 붙였다. 데이터가 몇 천 건일 때는 괜찮았는데 운영 데이터가 쌓이자 “10,000번째 페이지를 열면 왜 느린가?”라는 질문이 나온다. 크기 50, offset 499,950이면 DB가 반환할 행은 50개뿐이어도 그 앞의 거의 50만 행을 건너뛰어야 한다.
+
+둘째 장면은 타임라인을 “더 보기”로 읽는 경우다. 첫 응답 후 새 글이 맨 위에 추가되면 `OFFSET 50`은 밀린 위치에서 시작해 이미 본 행을 다시 줄 수 있다. 중간 행 삭제는 아직 못 본 행을 건너뛸 수 있다.
+
+셋째 장면은 면접에서 “커서가 더 빠르다는데 모든 페이지 API를 커서로 바꾸면 되나요?”라는 질문을 받는 상황이다. 사용자가 37쪽으로 바로 이동하거나 전체 건수를 봐야 하는 관리자 검색과, 새 항목을 앞에 계속 추가하는 무한 스크롤은 같은 요구가 아니다. 화면 동작·정렬·일관성 요구까지 나눠 봐야 답이 나온다.
+
+## 2. 짧은 답
+
+- `OFFSET`은 정렬된 결과에서 앞의 N개를 세어 버리고 다음 구간을 받는다. 얕은 페이지와 임의 페이지 이동에 단순하다.
+- `OFFSET`은 깊어질수록 건너뛸 행도 늘어난다. LIMIT의 크기만 작다고 깊은 페이지 비용이 작아지지 않는다.
+- 키셋(커서)은 마지막으로 받은 정렬 키를 `WHERE` 경계로 넘겨 그 뒤 구간을 찾는다. 대량 순차 조회와 피드에 알맞다.
+- 키셋에는 결정적인 정렬이 필요하다. 정렬 키는 유일해야 하며, 보통 업무 정렬 키 뒤에 PK를 붙여 동률을 해소한다.
+- 삽입으로 페이지 위치가 밀리는 문제는 완화하지만, 정렬 키 변경이나 전체 조회 시점의 스냅샷 일관성까지 보장하지 않는다.
+- **기본값 추천:** 일반적인 관리자·검색 목록은 최대 크기를 제한한 `Page`와 명시적 정렬로 시작한다. 깊은 페이지가 실제 병목이거나 “더 보기”가 주 UI면 키셋으로 설계한다.
+- Spring Data에서 `Page`는 전체 수, `Slice`는 다음 조각 존재 여부, `Window`는 스크롤 위치를 표현한다. `Window`도 위치 유형에 따라 OFFSET 또는 키셋으로 동작한다.
+
+## 3. 왜 그런가 — 원리
+
+### OFFSET은 위치 번호를 알아내기 위해 앞부분을 지나간다
+
+SQL의 `OFFSET n`은 “이전 요청에서 어느 행까지 받았는가”라는 정보를 주지 않고 “정렬 결과의 처음부터 n개를 버려라”는 숫자만 준다. DB가 B-tree 인덱스 순서로 읽더라도 앞의 엔트리를 따라가며 버려야 한다. `LIMIT 50 OFFSET 500000`의 반환량은 50개지만 읽기 작업은 대략 앞선 500,000개와 반환분까지 영향을 받는다. 실제 row lookup·정렬·필터 비용은 인덱스와 쿼리 계획에 따라 달라지므로 고정된 배수나 시간으로 단정하지 않는다.
+
+`ORDER BY`가 인덱스를 타면 정렬 전체를 매번 메모리에 만들 필요가 없어 비용을 낮출 수 있다. 하지만 정렬 인덱스를 사용한다고 OFFSET이 “500,000번째로 바로 점프”하는 것은 아니다. 정렬 키 경계를 받는 키셋 쿼리는 반대로 인덱스에서 그 값에 가까운 위치를 찾고 필요한 수만 읽도록 계획할 수 있다. 단, 필터와 정렬에 맞는 인덱스가 없거나 옵티마이저가 다른 계획을 고르면 키셋 쿼리도 느릴 수 있다.
+
+### MySQL에서 실제 계획을 비교한다
+
+§5의 실습처럼 같은 필터·정렬을 둔 깊은 OFFSET 쿼리와 커서 경계 쿼리를 `EXPLAIN ANALYZE`로 비교한다. MySQL 8.4에서 `EXPLAIN`은 옵티마이저 계획을, `EXPLAIN ANALYZE`는 실제 실행과 iterator별 추정/실제 행 수·시간을 보여준다. 추정 `rows`만 보지 말고 실제 iterator와 선택된 인덱스를 본다. `EXPLAIN ANALYZE`는 SELECT를 실행하므로 큰 운영 쿼리를 무심코 실행하지 않는다. 필터·정렬 컬럼에 맞는 인덱스가 쓰이는지 확인하되, 이는 측정값을 대신하지 않는다.
+
+### 커서 경계는 완전한 정렬 순서여야 한다
+
+`ORDER BY published_at DESC`만 지정하면 같은 시각의 행들 사이 순서는 보장되지 않는다. 페이지 크기나 실행 계획에 따라 동률 행의 순서가 바뀌어 중복 또는 누락이 생길 수 있다. 유일한 순서를 만들려면 `ORDER BY published_at DESC, id DESC`처럼 유일 키를 마지막에 붙인다. 커서에도 두 값을 모두 담는다.
+
+동일 방향의 복합 정렬에서 다음 페이지는 사전식 비교다. 내림차순 둘이라면 `(published_at, id)`가 마지막 키보다 작은 행, 즉 `published_at < lastPublishedAt OR (published_at = lastPublishedAt AND id < lastId)`를 찾는다. 정렬 방향이 섞이면 각 비교 부호도 해당 컬럼 방향에 맞춰 바뀐다. 예컨대 `published_at DESC, id ASC`라면 `published_at`은 `<`, 같은 시각 안의 `id`는 `>`여야 한다. 커서 조건을 정렬 순서와 한 글자라도 다르게 쓰면 경계에서 행이 빠지거나 반복된다.
+
+커서 정렬 키는 가능하면 불변·비NULL 값으로 잡는다. NULL 비교는 UNKNOWN이 될 수 있고 정렬 키 갱신은 행을 커서 경계 너머로 옮긴다. nullable 정렬이 필수면 NULL 순서까지 비교식·인덱스·계획에 반영한다.
+
+### OFFSET과 키셋의 동시성 차이는 스냅샷과 다르다
+
+내림차순 최신 목록에서 첫 페이지 50개를 받은 뒤 새 글이 맨 앞에 들어오면 이전 50번째 글은 현재 51번째가 된다. 다음 호출이 `OFFSET 50`이면 그 글을 다시 포함한다. 커서는 마지막 글의 키 아래에서 시작하므로 새 글이 경계보다 앞에 들어온 것만으로 이미 본 행이 한 칸 밀려 재등장하지 않는다. 중간 삭제도 OFFSET의 위치를 이동시키지만 커서는 값의 경계를 기준으로 하므로 남은 행의 위치가 달라지지 않는다.
+
+커서는 여러 HTTP 요청을 하나의 DB 스냅샷으로 묶지 않는다. 과거 날짜 삽입이나 정렬 키 수정은 후속 결과를 바꿀 수 있다. 조회 시작 시점의 데이터를 빠짐없이 읽어야 한다면 스냅샷·워터마크·불변 시퀀스 키·export 작업을 별도로 검토한다.
+
+```mermaid
+flowchart LR
+  A["첫 요청 — 정렬 후 50개"] --> B["OFFSET 0 응답"]
+  B --> C["새 행이 맨 앞에 삽입"]
+  C --> D["다음 OFFSET 50 — 기존 경계가 이동"]
+  D --> E["중복 또는 누락 가능"]
+  B --> F["마지막 정렬 키를 커서에 저장"]
+  F --> G["다음 요청 — 키보다 뒤의 범위 검색"]
+  G --> H["인덱스 경계에서 다음 50개"]
+```
+
+### 총 건수는 별도 질문이다
+
+`Page<T>`는 전체 페이지 수·전체 결과 수를 제공해야 하므로 콘텐츠 조회 외에 총 건수 계산이 필요해질 수 있다. 필터 조건이 복잡하거나 대상이 크면 `COUNT`가 본문 쿼리와 별도의 비용이 된다. 반면 `Slice<T>`는 다음 조각이 있는지만 나타내고 `Window<T>`는 이어갈 위치를 제공하므로 “몇 건 남았나?”를 답하려 하지 않는다. 전체 수가 제품 요구가 아니면 매 요청마다 정확한 total을 계산하지 않는 편이 낫다. 통계 캐시나 근사 수를 보여줄 수는 있지만, 그것은 정확한 `Page.getTotalElements()`와 다른 계약이다.
+
+## 4. 선택지 비교
+
+| 선택지 | 어떻게 동작 | 장점 | 단점 | 언제 쓰나 | 국내 실무에서 흔한가 |
+|---|---|---|---|---|---|
+| `Page<T>` + OFFSET | `Pageable`의 페이지 번호·크기로 위치를 계산하고 전체 수를 제공 | 구현과 API가 직관적, 임의 페이지 이동과 전체 건수 표시가 쉽다 | 깊은 페이지에서 앞 행을 건너뛰고, total 계산 비용이 추가될 수 있다 | 관리자 검색, 데이터가 작거나 사용자가 페이지 번호/총수를 요구하는 목록 | Spring Data 기본 API라 CRUD 목록에서 접하기 쉽다. 국내 빈도 조사 수치는 확인하지 못했다 |
+| `Slice<T>` + OFFSET | `Pageable` 위치로 읽고 다음 조각 존재 여부만 제공 | 정확한 전체 수 계산 없이 “다음” UI를 만들 수 있다 | 깊은 OFFSET 비용과 페이지 경계 이동은 그대로다 | 페이지 번호보다 다음/이전 버튼이 중요하고 total은 필요 없는 얕은 목록 | 구현 용이성은 높다. 국내 빈도 수치는 미확인 |
+| `Window<T>` + offset `ScrollPosition` | Spring Data의 `Window`로 결과 창을 읽지만 위치는 offset 숫자로 이어간다 | 반복 소비 API가 편리하고 조각 단위 처리에 적합 | Window라는 타입만으로 키셋이 되는 것은 아니다. offset 한계도 남는다 | 기존 offset 동작을 Spring Data 스크롤 인터페이스로 표현할 때 | 국내 채택률은 미확인 |
+| `Window<T>` + keyset `ScrollPosition` | 마지막 정렬 키와 PK를 커서로 삼아 다음 창의 WHERE 경계를 구성 | 큰 결과의 순차 소비·피드에서 깊은 offset과 위치 밀림을 줄인다 | 결정적 정렬, 키셋 인덱스, 커서 처리 필요. 임의 페이지 점프와 전체 수에 맞지 않는다 | 무한 스크롤, “더 보기”, 대량 배치성 조회 | Spring Data API로 구현 가능. 국내 채택률은 미확인 |
+| 직접 SQL/커서 API | 토큰을 해석해 직접 seek 조건을 만들고 필요한 응답을 구성 | 쿼리·토큰·역방향 탐색·버전 호환을 세밀히 통제 | 경계 비교, 인코딩, 검증, 인덱스, 테스트를 직접 책임진다 | 복합 검색 조건이나 공개 API 계약이 Spring Data 기본 스크롤과 맞지 않을 때 | 제품별 차이가 커 국내 빈도는 확인하지 못했다 |
+
+`Page`/`Slice`와 `Window`는 타입 비교이고, OFFSET과 키셋은 DB를 이어 읽는 위치 전략이다. `Window`를 쓴다고 자동으로 키셋이 되는 것이 아니다. `ScrollPosition.offset()`은 offset 스크롤, `ScrollPosition.keyset()`은 키셋 스크롤 시작 위치다. UI도 방식 선택의 힌트일 뿐 강제 규칙은 아니다. 번호 페이지는 임의 위치에 적합하고 무한 스크롤은 보통 커서와 잘 맞지만, “더 보기” 버튼을 OFFSET으로 구현하거나 작은 목록을 커서로 읽는 것도 가능하다.
+
+## 5. 코드로 보기
+
+아래 실습은 같은 필터·정렬의 깊은 offset과 경계 조건 조회를 비교한다. 실제 비용은 데이터 분포와 인덱스에서 측정한다. 테넌트 필터가 있다면 해당 조건도 인덱스에 반영하고, 실행 계획에서 인덱스가 선택됐는지 확인한다.
+
+```sql
+-- 첫 페이지: OFFSET 방식
+SELECT id, published_at, title
+FROM article
+WHERE status = 'PUBLISHED'
+ORDER BY published_at DESC, id DESC
+LIMIT 50 OFFSET 0;
+
+-- 열 번째 페이지 예시: 반환량은 같지만 앞의 450행을 지나간다.
+SELECT id, published_at, title
+FROM article
+WHERE status = 'PUBLISHED'
+ORDER BY published_at DESC, id DESC
+LIMIT 50 OFFSET 450;
+
+-- 커서 방식: 직전 응답 마지막 행의 published_at, id를 경계로 전달한다.
+SELECT id, published_at, title
+FROM article
+WHERE status = 'PUBLISHED'
+  AND (published_at < TIMESTAMP '2026-09-01 12:00:00'
+       OR (published_at = TIMESTAMP '2026-09-01 12:00:00' AND id < 700000))
+ORDER BY published_at DESC, id DESC
+LIMIT 51;
+```
+
+복합 인덱스가 항상 선택된다고 가정하지 않는다. `EXPLAIN ANALYZE`에서 정렬 노드, 접근 인덱스, 실제 행 수와 시간을 비교한다. 인덱스 정렬은 LIMIT에서 일찍 멈출 수 있지만 filesort는 매칭 행 대부분을 먼저 정렬할 수 있다.
+
+Spring Data JPA 4.1 세대 API 예시다. `Article`은 `id` PK와 NULL이 아닌 `publishedAt`, `status` 필드를 가진 `@Entity`라고 가정한다. 페이지와 조각 조회는 같은 `Pageable` 정렬을 받고, Window 쿼리는 동일한 정렬을 메서드 이름으로 고정했다. Spring 코드는 (미실행). 적용 전 현재 프로젝트에서 컴파일·DB 계획을 확인한다.
+
+```java
+package example.paging;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.ScrollPosition;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Window;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+interface ArticleRepository extends JpaRepository<Article, Long> {
+    Page<Article> findByStatus(String status, Pageable pageable);
+
+    Slice<Article> findSliceByStatus(String status, Pageable pageable);
+
+    Window<Article> findFirst50ByStatusOrderByPublishedAtDescIdDesc(
+            String status, ScrollPosition position);
+}
+```
+
+```java
+package example.paging;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.ScrollPosition;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Window;
+
+class ArticlePagingExample {
+    void compare(ArticleRepository repository) {
+        Sort order = Sort.by(
+                Sort.Order.desc("publishedAt"),
+                Sort.Order.desc("id"));
+        var pageable = PageRequest.of(0, 50, order);
+
+        Page<Article> numbered = repository.findByStatus("PUBLISHED", pageable);
+        long total = numbered.getTotalElements();
+
+        Slice<Article> chunk = repository.findSliceByStatus("PUBLISHED", pageable);
+        boolean hasMoreOffset = chunk.hasNext();
+
+        Window<Article> window = repository.findFirst50ByStatusOrderByPublishedAtDescIdDesc(
+                "PUBLISHED", ScrollPosition.keyset());
+        while (!window.isEmpty()) {
+            window.forEach(this::consume);
+            if (window.isLast()) {
+                break;
+            }
+            ScrollPosition next = window.positionAt(window.size() - 1);
+            window = repository.findFirst50ByStatusOrderByPublishedAtDescIdDesc(
+                    "PUBLISHED", next);
+        }
+    }
+
+    private void consume(Article article) {
+        // DTO 변환 또는 호출자에게 전달
+    }
+}
+```
+
+`findSliceByStatus`라는 파생 쿼리 이름은 반환형만으로도 슬라이스 처리 의도를 보여준다. 첫 번째 Window 위치로 `ScrollPosition.keyset()`을 전달하고, 다음 요청은 직전 Window의 마지막 요소에서 얻는다. `ScrollPosition.offset()`을 전달하면 같은 `Window` 메서드라도 offset 기반 스크롤이 된다. 실제 공개 API에서는 Spring 내부 객체를 그대로 직렬화하기보다 필요한 정렬 키를 토큰으로 인코딩한다.
+
+`nextCursor`는 마지막 반환 행의 정렬 키로 만들고 마지막 창이면 `null`로 둔다.
+
+```json
+{
+  "items": [{ "id": 700000, "publishedAt": "2026-09-01T12:00:00Z" }],
+  "nextCursor": "eyJ2IjoxLCJwdWJsaX...signature"
+}
+```
+
+토큰에는 버전과 정렬 키를 넣는다. Base64는 서명이 아니므로 위조 방지는 HMAC 등으로 처리한다. 매 요청에서 권한을 확인하고 필터·정렬이 토큰과 맞는지 검증한다.
+
+## 6. 실무에서는 실제로
+
+- **신규 서비스:** 관리자 검색과 일반 목록은 `Page`로 시작해 페이지 크기 상한(예: 서비스 정책에 따른 100개 제한)과 고정된 정렬을 강제한다. 정확한 전체 수가 UI 요구가 아니면 처음부터 `Slice`를 검토한다. 공용 타임라인·알림함처럼 계속 이어 읽고 깊어질 수 있는 화면은 cursor 계약을 둔다.
+- **레거시:** 기존 `/items?page=...&size=...` 소비자가 있으면 먼저 느린 쿼리의 실제 깊이·호출량·실행 계획을 측정한다. 정렬을 결정적으로 만들고 인덱스를 보완하는 것이 가장 작은 조치일 수 있다. 충분치 않다면 `/v2/items?cursor=...`처럼 새 계약을 추가해 화면을 단계적으로 이동한다. OFFSET endpoint를 갑자기 재해석하면 같은 URL의 의미가 바뀌므로 피한다.
+- **SI·금융·운영 보고:** 번호 페이지와 총 건수, 조건 재검색, 감사 가능한 결과가 필요하면 offset이 실용적이다. 대용량 전체 추출은 사용자가 몇 만 페이지를 넘기게 하기보다 백그라운드 export와 고정 시점 기준을 제공한다. “커서가 빠르다”는 이유만으로 감사 보고의 재현성 요구를 대체하지 않는다.
+- **스타트업·피드형 제품:** 최근 항목이 위에 추가되는 탐색은 키셋과 “더 보기”가 자연스럽다. 앞서 본 행이 새 삽입 때문에 반복되는 문제도 줄어든다. 다만 과거 시각으로 입력되는 데이터와 정렬 키 수정 정책은 별도 점검한다.
+- **혼합 패턴:** 같은 테이블이라도 내부 관리자 endpoint는 Page, 사용자 홈 피드는 cursor, 배치 처리는 ID 범위나 Spring `Window`로 나눌 수 있다. 응답 타입을 모든 사용처에 하나로 강제하지 않는다.
+- **마이그레이션 순서:** 실제 느린 구간을 확인하고 → 안정 정렬과 인덱스를 마련하고 → 새 cursor endpoint에서 경계·hasNext·필터 검증을 만들고 → 동시 삽입/삭제/동률 데이터로 회귀 확인하고 → 클라이언트 전환 후 기존 주소를 종료한다. 기준 시점 일관성이 필요하면 이 목록과 별도 요구사항으로 합의한다.
+
+버전 기준은 이 문서의 공통 규칙을 따른다. Boot 4.1.1이 관리하는 Spring Data JPA 4.1.1 기준으로 예제를 썼다. 참고로 Spring Data JPA 3.1.1 레퍼런스에도 대량 결과를 조각 단위로 읽는 Scrolling이 등장하며, 현재 4.1 레퍼런스는 `Window<T>`와 `ScrollPosition`의 offset/keyset 방식을 설명한다. 따라서 기존 `Pageable`을 폐기해야 하는 변화가 아니라, 번호 페이지와 순차 스크롤 중 요구에 맞는 계약을 고를 수 있는 확장으로 이해한다. Java 언어의 특정 최신 문법에는 의존하지 않는다.
+
+DB 인덱스 설계 상세는 → D10 참조. Spring Data 전반은 → S10 참조.
+
+## 7. 흔한 오해와 실수
+
+1. **“LIMIT 50이면 50행만 읽는다” →** OFFSET은 앞 행을 버리기 위해 지나가야 하므로 깊이에 따라 읽기 비용이 커진다. **대처:** 허용 가능한 최대 페이지를 정하고 실제 쿼리를 `EXPLAIN ANALYZE`로 확인한다.
+2. **“`ORDER BY published_at`이면 정렬은 안정적이다” →** 같은 시각 안의 순서는 미정이다. 실행 계획이나 LIMIT에 따라 동률 순서가 바뀔 수 있다. **대처:** 유일한 tie-breaker인 PK까지 `ORDER BY`와 커서에 넣는다.
+3. **“마지막 ID만 커서로 넘기면 된다” →** 정렬이 날짜 내림차순이면 ID 하나로는 그 정렬 위치를 표현할 수 없다. **대처:** 전체 정렬 tuple을 보관하고 같은 방향 규칙으로 seek 조건을 만든다.
+4. **“모든 컬럼에 `<`를 쓰면 복합 정렬도 된다” →** 내림차순/오름차순이 섞이면 비교 방향도 컬럼마다 달라진다. **대처:** 정렬과 비교식을 표로 나란히 적고, 동률 경계 샘플로 확인한다.
+5. **“커서면 데이터가 고정된다” →** 커서는 위치 이동 문제를 줄이지만 여러 요청을 같은 스냅샷으로 묶지 않는다. 과거 데이터 삽입과 정렬 키 수정은 결과에 영향을 준다. **대처:** immutable key·워터마크·스냅샷 중 일관성 요구에 맞는 장치를 따로 둔다.
+6. **“`Window`를 반환하면 키셋이다” →** `Window`는 결과 창 추상화다. 시작 위치가 `offset()`이면 계속 offset이다. **대처:** `keyset()` 시작 위치를 선택했는지, 정렬 키가 키셋 요건을 만족하는지 확인한다.
+7. **“Page total은 공짜다” →** 전체 일치 수가 필요하면 COUNT 계산이 본문 쿼리와 별도 비용이 될 수 있다. **대처:** total을 노출할 이유가 없으면 Slice/Window를 쓴다. total이 필요하면 필터별 COUNT 계획도 측정한다.
+8. **“커서 문자열은 숨겨져 있으니 안전하다” →** Base64는 읽기 어려워 보일 뿐 위조 방지가 아니다. 커서 값은 권한도 아니다. **대처:** 무결성 서명 또는 서버 저장, 사용자 권한 재검사, 필터·정렬 버전 검증을 적용한다.
+9. **“키셋 쿼리에 인덱스가 있으니 항상 빠르다” →** 선두 필터 컬럼, NULL, 혼합 정렬, 데이터 선택도에 따라 filesort·넓은 스캔이 남을 수 있다. **대처:** 실제 통계와 `EXPLAIN ANALYZE`를 보고 쿼리·인덱스를 조정한다.
+
+## 8. 자가점검 Q&A (면접 대비)
+
+### Q1. OFFSET이 깊은 페이지에서 느려지는 이유는 무엇인가?
+`OFFSET n`은 DB에 이전 페이지의 마지막 키를 알려주지 않고 앞의 n개를 건너뛰라고 한다. 정렬 인덱스가 있어도 건너뛸 엔트리를 순회해야 한다. 반환 크기가 고정이어도 offset이 커지면 일이 커질 수 있다. 필터·정렬 계획에 따라 실제 비용은 `EXPLAIN ANALYZE`로 확인한다.
+
+**꼬리질문:** 인덱스를 만들면 OFFSET 문제가 사라지나?
+**답:** 정렬/필터 비용은 줄지만 앞 행을 세어 버리는 의미는 그대로다. 깊은 순차 조회에는 커서 경계 탐색이 맞는지 검토한다.
+
+### Q2. 키셋 페이징은 동시 삽입·삭제에 완전히 안전한가?
+첫 페이지 경계 앞에 삽입된 행이 기존 offset 페이지를 밀어 중복되는 현상을 줄인다. 커서 아래에서 조회하므로 다른 행의 위치 변동에도 덜 민감하다. 다만 여러 HTTP 요청이 동일한 DB 스냅샷을 공유하지는 않는다. 커서보다 뒤에 들어온 과거 데이터나 정렬 키 수정은 후속 결과를 바꿀 수 있다.
+
+**꼬리질문:** 변경 시점의 전체 결과를 내보내려면?
+**답:** immutable sequence/watermark, 일관된 snapshot 또는 비동기 export 결과를 사용한다. 일반 cursor 하나에 snapshot 의미를 기대하지 않는다.
+
+### Q3. `ORDER BY created_at DESC`와 `WHERE created_at < :last`면 충분한가?
+`created_at`이 중복될 수 있으므로 같은 시각의 행 순서가 결정되지 않는다. 커서가 동률 구간을 건너뛰거나 다시 읽을 수 있다. `ORDER BY created_at DESC, id DESC`처럼 고유한 순서를 만들고 두 값을 경계로 쓴다.
+
+**꼬리질문:** 유일 키를 언제 붙이나?
+**답:** 정렬 컬럼 조합만으로 모든 행이 유일하게 구분되지 않을 때 붙인다. 대개 PK를 마지막 tie-breaker로 사용한다.
+
+### Q4. Spring Data의 `Page`, `Slice`, `Window`는 각각 무엇을 표현하나?
+`Page`는 Pageable 조각과 전체 결과 메타데이터를 제공한다. `Slice`는 조각과 다음 조각 여부가 필요하고 전체 수는 필요 없을 때 쓴다. `Window`는 스크롤 결과와 다음 `ScrollPosition`을 표현한다. `Window`의 위치는 offset 또는 keyset일 수 있다.
+
+**꼬리질문:** 무한 스크롤이면 무조건 `Window`인가?
+**답:** Spring Data에서는 적합한 선택지지만 직접 SQL/토큰 API도 가능하다. 중요한 건 정렬·커서 계약이며 반환형 이름만으로 DB 전략은 결정되지 않는다.
+
+### Q5. 내림차순 복합 정렬의 커서 조건은 어떻게 쓰나?
+`ORDER BY created_at DESC, id DESC`라면 다음 구간은 `(created_at < lastCreatedAt) OR (created_at = lastCreatedAt AND id < lastId)`다. 이는 마지막 tuple 뒤의 사전식 구간이다. 혼합 방향이라면 각 tie 단계의 비교 부호를 해당 정렬 방향에 맞춘다.
+
+**꼬리질문:** 키셋에서 정렬 컬럼이 NULL이어도 되나?
+**답:** SQL의 NULL 비교는 UNKNOWN이 될 수 있어 단순 부등식이 빠뜨릴 수 있다. 비NULL 정렬 키가 바람직하며, nullable이면 NULL 순서까지 명시해 구현과 인덱스를 검증한다.
+
+### Q6. `Slice`나 `Window`를 쓰면 DB 쿼리가 항상 더 빨라지나?
+전체 count를 계산하지 않는 이점은 있을 수 있지만 OFFSET 위치를 쓰면 깊이 비용은 남는다. 키셋이어도 맞는 복합 인덱스가 없거나 필터 선택도가 낮으면 느릴 수 있다. 타입 선택과 SQL 실행 전략을 별도로 확인한다.
+
+**꼬리질문:** hasNext는 어떻게 알 수 있나?
+**답:** 보통 page size보다 하나 더 조회해 다음 행이 있는지 확인하거나 프레임워크가 창의 끝 여부를 계산한다. 응답 항목은 요청 크기까지만 내리고 cursor는 마지막으로 실제 반환한 항목에서 만든다.
+
+### Q7. 번호 페이지 UI를 키셋으로 바꿀 수 있나?
+첫·다음 순차 이동은 가능하지만 “57페이지로 이동”은 위치 키 없이 바로 찾기 어렵다. 키셋은 정렬 경계이지 페이지 번호 인덱스가 아니다. 번호 점프가 필수면 offset을 유지하거나 페이지별 anchor를 저장하는 별도 설계가 필요하다.
+
+**꼬리질문:** 이전 페이지는 어떻게 제공하나?
+**답:** 클라이언트가 이전 요청의 커서를 스택으로 보관하거나 정렬을 뒤집어 역방향 조회 후 순서를 다시 맞춘다. 서버 계약과 필터가 바뀌면 저장 커서는 무효화해야 한다.
+
+### Q8. cursor를 Base64로 인코딩하면 변조를 막을 수 있나?
+아니다. Base64는 바이트를 표현할 뿐 암호화·서명을 제공하지 않는다. 클라이언트가 키를 바꿀 수 있으므로 HMAC 등으로 무결성을 확인하거나 서버 측 식별자를 쓴다. 권한 필터는 커서에 의존하지 않고 매 요청에서 확인한다.
+
+**꼬리질문:** 커서에 무엇을 포함하는 게 좋은가?
+**답:** 정렬 경계 키와 토큰 버전, 필요하면 정렬 방향 및 필터 지문을 넣는다. 권한 자체나 비밀 정보를 넣지 않고, 검증되지 않은 필드는 조회 기준으로 신뢰하지 않는다.
+
+## 9. 참고문헌
+
+- Markus Winand, “We need tool support for keyset pagination” — https://use-the-index-luke.com/no-offset — OFFSET이 앞 행을 버리는 비용과 키셋 seek 원리를 설명한다.
+- Spring Data JPA, “Defining Query Methods” — https://docs.spring.io/spring-data/jpa/reference/repositories/query-methods-details.html — Spring Data repository 쿼리 메서드 구조와 파생 쿼리 개요를 확인했다.
+- Spring Data JPA, “Scrolling” — https://docs.spring.io/spring-data/jpa/reference/data-commons/repositories/scrolling.html — `Window`, `ScrollPosition`, offset/keyset 스크롤과 순차 소비 예제를 설명한다.
+- Spring Data JPA, “Repository query return types” — https://docs.spring.io/spring-data/jpa/reference/repositories/query-return-types-reference.html — `Page`, `Slice`, `Window`의 반환 정보와 Pageable/ScrollPosition 요구를 비교한다.
+- Spring Data JPA 3.1.1, “Reference Documentation” — https://docs.spring.io/spring-data/jpa/docs/3.1.1/reference/html/ — 3.1.1 문서에도 Paging과 Scrolling 설명이 있음을 확인했다.
+- MySQL 8.4 Reference Manual, “LIMIT Query Optimization” — https://dev.mysql.com/doc/refman/8.4/en/limit-optimization.html — LIMIT, ORDER BY, 인덱스 정렬 및 동률 정렬의 비결정성을 설명한다.
+- MySQL 8.4 Reference Manual, “EXPLAIN Statement” — https://dev.mysql.com/doc/refman/8.4/en/explain.html — 실행 계획 확인과 `EXPLAIN ANALYZE`의 실제 실행·iterator 정보를 설명한다.

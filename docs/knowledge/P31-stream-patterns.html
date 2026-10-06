@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P31. Stream 실무 패턴 모음 — for문과 나란히, 언제 무엇을</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
+<main>
+
+<h1 id="p31-stream-실무-패턴-모음--for문과-나란히-언제-무엇을"><a class="anchor" href="#p31-stream-실무-패턴-모음--for문과-나란히-언제-무엇을" aria-hidden="true">#</a>P31. Stream 실무 패턴 모음 — for문과 나란히, 언제 무엇을</h1>
+<blockquote>
+<p>Stream은 데이터 변환·선별·집계를 파이프라인으로 읽기 좋게 쓴다.
+break·여러 상태 변경·예외별 복구가 중심이면 for문이 더 명료하다.
+아래 35쌍은 한 파일로 실행해 결과를 확인했다.</p>
+</blockquote>
+<h2 id="1-한-줄로-말하면"><a class="anchor" href="#1-한-줄로-말하면" aria-hidden="true">#</a>1. 한 줄로 말하면</h2>
+<p>Stream은 소스 원소를 중간 연산으로 변환·선별해 최종 연산에서 소비하는 일회성 파이프라인이다. 복잡한 제어 흐름은 반복문이 낫다.</p>
+<h2 id="2-당장-알아야-할-것"><a class="anchor" href="#2-당장-알아야-할-것" aria-hidden="true">#</a>2. 당장 알아야 할 것</h2>
+<ol>
+<li><strong>지연·일회 소비</strong> — <code>filter/map</code>은 최종 연산 때 실행된다. 재탐색은 수집 후 한다.</li>
+<li><strong>연산 선택</strong> — 1:1은 <code>map</code>, 제외는 <code>filter</code>, 중첩 원소는 <code>flatMap(o -&gt; o.items().stream())</code>.</li>
+<li><strong>정렬·중복</strong> — <code>comparing(...).thenComparing(...)</code>, <code>.reversed()</code>, <code>nullsLast(...)</code>; <code>distinct()</code>는 <code>equals</code> 기준.</li>
+<li><strong>그룹·Map</strong> — <code>groupingBy(..., counting())</code> 등 downstream을 쓴다. <code>toMap</code> 충돌은 예외; 병합·Map 순서를 정한다.</li>
+<li><strong>집계·결과</strong> — <code>mapToInt(...).sum()/average()/summaryStatistics()</code>; 빈 값 처리가 필요하다. 가변 누적은 <code>collect</code>.</li>
+<li><strong>흐름·디버깅</strong> — break/continue·예외 복구는 for문. <code>forEach</code> 중 원본 변경·업무용 <code>peek</code>는 금지; Stream Trace로 본다.</li>
+</ol>
+<h2 id="3-따라-하기"><a class="anchor" href="#3-따라-하기" aria-hidden="true">#</a>3. 따라 하기</h2>
+<ol>
+<li>Boot 4.1/Java 25: Gradle은 <code>java { toolchain { languageVersion.set(JavaLanguageVersion.of(25)) } }</code>; Maven은 <code>&lt;maven.compiler.release&gt;25&lt;/maven.compiler.release&gt;</code>. 추가 의존성 없음.</li>
+<li><code>_scratch/P31/StreamPatternsDemo.java</code>로 저장한다(JDK 21 검증).</li>
+<li>루트에서 실행한다. 같은 결과는 공통값으로 출력한다.</li>
+</ol>
+<pre><code class="language-sh">java _scratch/P31/StreamPatternsDemo.java</code></pre>
+<h3 id="전체-예제"><a class="anchor" href="#전체-예제" aria-hidden="true">#</a>전체 예제</h3>
+<pre><code class="language-java">import java.util.*;
+import java.util.stream.*;
+import static java.util.stream.Collectors.*;
+
+public class StreamPatternsDemo {
+ record E(int id,String name,String dept,int salary,boolean active,Integer score){}
+ record DTO(int id,String name,String dept){}
+ record Item(String sku,int qty){}
+ record Order(int id,List&lt;Item&gt; items){}
+ record Totals(long count,long sum,double average){}
+ static final List&lt;E&gt; p=List.of(new E(1,&quot;Hana&quot;,&quot;API&quot;,700,true,8),new E(2,&quot;Min&quot;,&quot;DB&quot;,650,false,null),new E(3,&quot;Jun&quot;,&quot;API&quot;,800,true,5),new E(4,&quot;Ara&quot;,&quot;DB&quot;,750,true,9));
+ static int n;
+ static void show(String label,Object loop,Object stream){System.out.printf(&quot;%02d %s: %s%n&quot;,++n,label,Objects.equals(loop,stream)?loop:loop+&quot; &lt;&gt; &quot;+stream);}
+ public static void main(String[] args){
+  var a=new ArrayList&lt;String&gt;();for(var e:p)if(e.active())a.add(e.name());show(&quot;filter&quot;,a,p.stream().filter(E::active).map(E::name).toList());
+  a=new ArrayList&lt;&gt;();for(var e:p)a.add(e.name().toUpperCase(Locale.ROOT));show(&quot;map&quot;,a,p.stream().map(e-&gt;e.name().toUpperCase(Locale.ROOT)).toList());
+  var d=new ArrayList&lt;DTO&gt;();for(var e:p)d.add(new DTO(e.id(),e.name(),e.dept()));show(&quot;DTO&quot;,d,p.stream().map(e-&gt;new DTO(e.id(),e.name(),e.dept())).toList());
+  var s=new ArrayList&lt;&gt;(p);s.sort(Comparator.comparingInt(E::salary));show(&quot;sort&quot;,s.stream().map(E::name).toList(),p.stream().sorted(Comparator.comparingInt(E::salary)).map(E::name).toList());
+  s.sort(Comparator.comparing(E::dept).thenComparing(E::name));show(&quot;thenComparing&quot;,s.stream().map(E::name).toList(),p.stream().sorted(Comparator.comparing(E::dept).thenComparing(E::name)).map(E::name).toList());
+  s.sort(Comparator.comparingInt(E::salary).reversed());show(&quot;reversed&quot;,s.stream().map(E::salary).toList(),p.stream().sorted(Comparator.comparingInt(E::salary).reversed()).map(E::salary).toList());
+  var cmp=Comparator.comparing(E::score,Comparator.nullsLast(Comparator.naturalOrder()));s.sort(cmp);show(&quot;nullsLast&quot;,s.stream().map(E::name).toList(),p.stream().sorted(cmp).map(E::name).toList());
+  var tags=List.of(&quot;java&quot;,&quot;spring&quot;,&quot;java&quot;,&quot;boot&quot;);var u=new ArrayList&lt;String&gt;();for(var t:tags)if(!u.contains(t))u.add(t);show(&quot;distinct&quot;,u,tags.stream().distinct().toList());
+  var first=new LinkedHashMap&lt;String,E&gt;();for(var e:p)first.putIfAbsent(e.dept(),e);show(&quot;distinct key&quot;,first.values().stream().map(E::name).toList(),p.stream().collect(toMap(E::dept,e-&gt;e,(x,y)-&gt;x,LinkedHashMap::new)).values().stream().map(E::name).toList());
+  var g=new TreeMap&lt;String,List&lt;String&gt;&gt;();for(var e:p)g.computeIfAbsent(e.dept(),k-&gt;new ArrayList&lt;&gt;()).add(e.name());show(&quot;grouping&quot;,g,p.stream().collect(groupingBy(E::dept,TreeMap::new,mapping(E::name,toList()))));
+  var c=new TreeMap&lt;String,Long&gt;();for(var e:p)c.merge(e.dept(),1L,Long::sum);show(&quot;counting&quot;,c,p.stream().collect(groupingBy(E::dept,TreeMap::new,counting())));
+  var sums=new TreeMap&lt;String,Integer&gt;();for(var e:p)sums.merge(e.dept(),e.salary(),Integer::sum);show(&quot;summingInt&quot;,sums,p.stream().collect(groupingBy(E::dept,TreeMap::new,summingInt(E::salary))));
+  var sets=new TreeMap&lt;String,Set&lt;String&gt;&gt;();for(var e:p)sets.computeIfAbsent(e.dept(),k-&gt;new TreeSet&lt;&gt;()).add(e.name());show(&quot;mapping/toSet&quot;,sets,p.stream().collect(groupingBy(E::dept,TreeMap::new,mapping(E::name,toCollection(TreeSet::new)))));
+  var part=new TreeMap&lt;Boolean,List&lt;String&gt;&gt;();part.put(true,new ArrayList&lt;&gt;());part.put(false,new ArrayList&lt;&gt;());for(var e:p)part.get(e.active()).add(e.name());show(&quot;partitioning&quot;,part,p.stream().collect(partitioningBy(E::active,mapping(E::name,toList()))));
+  var ids=new TreeMap&lt;Integer,String&gt;();for(var e:p)ids.put(e.id(),e.name());show(&quot;toMap unique&quot;,ids,p.stream().collect(toMap(E::id,E::name,(x,y)-&gt;x,TreeMap::new)));
+  String d1,d2;try{var m=new HashMap&lt;String,Integer&gt;();for(var t:tags)if(m.putIfAbsent(t,1)!=null)throw new IllegalStateException();d1=&quot;none&quot;;}catch(IllegalStateException ex){d1=&quot;IllegalStateException&quot;;}try{tags.stream().collect(toMap(t-&gt;t,t-&gt;1));d2=&quot;none&quot;;}catch(IllegalStateException ex){d2=&quot;IllegalStateException&quot;;}show(&quot;toMap duplicate&quot;,d1,d2);
+  var tc=new LinkedHashMap&lt;String,Integer&gt;();for(var t:tags)tc.merge(t,1,Integer::sum);show(&quot;toMap merge&quot;,tc,tags.stream().collect(toMap(t-&gt;t,t-&gt;1,Integer::sum,LinkedHashMap::new)));
+  var ordered=new LinkedHashMap&lt;Integer,String&gt;();for(var e:p)ordered.put(e.id(),e.name());show(&quot;LinkedHashMap&quot;,ordered.keySet(),p.stream().collect(toMap(E::id,E::name,(x,y)-&gt;x,LinkedHashMap::new)).keySet());
+  var stock=new LinkedHashMap&lt;String,Integer&gt;();stock.put(&quot;pen&quot;,0);stock.put(&quot;book&quot;,3);stock.put(&quot;cup&quot;,2);var avail=new ArrayList&lt;String&gt;();stock.forEach((k,v)-&gt;{if(v&gt;0)avail.add(k);});show(&quot;Map filter&quot;,avail,stock.entrySet().stream().filter(e-&gt;e.getValue()&gt;0).map(Map.Entry::getKey).toList());
+  var raised=new TreeMap&lt;String,Integer&gt;();for(var e:p)raised.put(e.name(),e.salary()+100);show(&quot;Map values&quot;,raised,p.stream().collect(toMap(E::name,e-&gt;e.salary()+100,(x,y)-&gt;x,TreeMap::new)));
+  var orders=List.of(new Order(101,List.of(new Item(&quot;A&quot;,2),new Item(&quot;B&quot;,1))),new Order(102,List.of(new Item(&quot;C&quot;,4))));var lines=new ArrayList&lt;String&gt;();for(var o:orders)for(var i:o.items())lines.add(o.id()+&quot;:&quot;+i.sku());show(&quot;flatMap&quot;,lines,orders.stream().flatMap(o-&gt;o.items().stream().map(i-&gt;o.id()+&quot;:&quot;+i.sku())).toList());
+  int total=0;for(var e:p)total+=e.salary();show(&quot;sum&quot;,total,p.stream().mapToInt(E::salary).sum());
+  int st=0;for(var e:p)st+=e.salary();double avg=p.isEmpty()?0:(double)st/p.size();show(&quot;average&quot;,avg,p.stream().mapToInt(E::salary).average().orElse(0));
+  var stat=new IntSummaryStatistics();for(var e:p)stat.accept(e.salary());show(&quot;statistics&quot;,stat.toString(),p.stream().mapToInt(E::salary).summaryStatistics().toString());
+  E hi=null,lo=null;for(var e:p){if(hi==null||e.salary()&gt;hi.salary())hi=e;if(lo==null||e.salary()&lt;lo.salary())lo=e;}show(&quot;max/min&quot;,hi.name()+&quot;/&quot;+lo.name(),p.stream().max(Comparator.comparingInt(E::salary)).orElseThrow().name()+&quot;/&quot;+p.stream().min(Comparator.comparingInt(E::salary)).orElseThrow().name());
+  boolean any=false,all=true,none=true;for(var e:p){any|=e.salary()&gt;=800;all&amp;=e.salary()&gt;0;none&amp;=e.active();}show(&quot;match&quot;,any+&quot;/&quot;+all+&quot;/&quot;+none,p.stream().anyMatch(e-&gt;e.salary()&gt;=800)+&quot;/&quot;+p.stream().allMatch(e-&gt;e.salary()&gt;0)+&quot;/&quot;+p.stream().noneMatch(e-&gt;!e.active()));
+  String f=&quot;none&quot;;for(var e:p)if(e.active()){f=e.name();break;}show(&quot;findFirst&quot;,f,p.stream().filter(E::active).map(E::name).findFirst().orElse(&quot;none&quot;));
+  var joined=new StringBuilder();for(var e:p){if(joined.length()&gt;0)joined.append(&quot;, &quot;);joined.append(e.name());}show(&quot;joining&quot;,joined.toString(),p.stream().map(E::name).collect(joining(&quot;, &quot;)));
+  int page=1,size=2,from=Math.min(page*size,p.size()),to=Math.min(from+size,p.size());a=new ArrayList&lt;&gt;();for(int i=from;i&lt;to;i++)a.add(p.get(i).name());show(&quot;page&quot;,a,p.stream().skip((long)page*size).limit(size).map(E::name).toList());
+  var left=List.of(&quot;a&quot;,&quot;b&quot;,&quot;c&quot;);var right=List.of(&quot;1&quot;,&quot;2&quot;,&quot;3&quot;);var paired=new ArrayList&lt;String&gt;();for(int i=0;i&lt;left.size();i++)paired.add(left.get(i)+right.get(i));show(&quot;IntStream.range&quot;,paired,IntStream.range(0,left.size()).mapToObj(i-&gt;left.get(i)+right.get(i)).toList());
+  var names=Map.of(1,&quot;Hana&quot;,2,&quot;Min&quot;,3,&quot;Jun&quot;);var owners=List.of(3,1);a=new ArrayList&lt;&gt;();for(int id:owners)a.add(names.get(id));show(&quot;join by key&quot;,a,owners.stream().map(names::get).toList());
+  total=0;for(var e:p)total+=e.salary();show(&quot;reduce&quot;,total,p.stream().map(E::salary).reduce(0,Integer::sum));
+  long n=0,sum=0;for(var e:p){n++;sum+=e.salary();}var ltot=new Totals(n,sum,(double)sum/n);var stot=p.stream().collect(teeing(counting(),summingInt(E::salary),(cnt,v)-&gt;new Totals(cnt,v,(double)v/cnt)));show(&quot;teeing&quot;,ltot,stot);
+  a=new ArrayList&lt;&gt;();for(var e:p)a.add(e.name());a.add(&quot;Extra&quot;);var immutable=p.stream().map(E::name).toList();String mut;try{immutable.add(&quot;Extra&quot;);mut=&quot;mutable&quot;;}catch(UnsupportedOperationException ex){mut=&quot;unmodifiable&quot;;}var collected=p.stream().map(E::name).collect(toList());boolean cm;try{collected.add(&quot;Extra&quot;);cm=true;}catch(UnsupportedOperationException ex){cm=false;}show(&quot;toList/collect&quot;, &quot;mutable size=&quot;+a.size(),&quot;toList=&quot;+mut+&quot;, collect(toList) mutable=&quot;+cm);
+  String found=&quot;not found&quot;;for(var e:p)if(e.id()==99){found=e.name();break;}show(&quot;Optional&quot;,found,p.stream().filter(e-&gt;e.id()==99).map(E::name).findFirst().orElse(&quot;not found&quot;));
+  System.out.println(&quot;reuse -&gt; &quot;+reused());
+ }
+ static boolean reused(){Stream&lt;String&gt;s=Stream.of(&quot;a&quot;,&quot;b&quot;);s.count();try{s.count();return false;}catch(IllegalStateException ex){return true;}}
+}</code></pre>
+<h3 id="jdk-21-실제-출력"><a class="anchor" href="#jdk-21-실제-출력" aria-hidden="true">#</a>JDK 21 실제 출력</h3>
+<pre><code class="language-text">01 filter: [Hana, Jun, Ara]
+02 map: [HANA, MIN, JUN, ARA]
+03 DTO: [DTO[id=1, name=Hana, dept=API], DTO[id=2, name=Min, dept=DB], DTO[id=3, name=Jun, dept=API], DTO[id=4, name=Ara, dept=DB]]
+04 sort: [Min, Hana, Ara, Jun]
+05 thenComparing: [Hana, Jun, Ara, Min]
+06 reversed: [800, 750, 700, 650]
+07 nullsLast: [Jun, Hana, Ara, Min]
+08 distinct: [java, spring, boot]
+09 distinct key: [Hana, Min]
+10 grouping: {API=[Hana, Jun], DB=[Min, Ara]}
+11 counting: {API=2, DB=2}
+12 summingInt: {API=1500, DB=1400}
+13 mapping/toSet: {API=[Hana, Jun], DB=[Ara, Min]}
+14 partitioning: {false=[Min], true=[Hana, Jun, Ara]}
+15 toMap unique: {1=Hana, 2=Min, 3=Jun, 4=Ara}
+16 toMap duplicate: IllegalStateException
+17 toMap merge: {java=2, spring=1, boot=1}
+18 LinkedHashMap: [1, 2, 3, 4]
+19 Map filter: [book, cup]
+20 Map values: {Ara=850, Hana=800, Jun=900, Min=750}
+21 flatMap: [101:A, 101:B, 102:C]
+22 sum: 2900
+23 average: 725.0
+24 statistics: IntSummaryStatistics{count=4, sum=2900, min=650, average=725.000000, max=800}
+25 max/min: Jun/Min
+26 match: true/true/false
+27 findFirst: Hana
+28 joining: Hana, Min, Jun, Ara
+29 page: [Jun, Ara]
+30 IntStream.range: [a1, b2, c3]
+31 join by key: [Jun, Hana]
+32 reduce: 2900
+33 teeing: Totals[count=4, sum=2900, average=725.0]
+34 toList/collect: mutable size=5 &lt;&gt; toList=unmodifiable, collect(toList) mutable=true
+35 Optional: not found
+reuse -&gt; true</code></pre>
+<h2 id="4-치트시트"><a class="anchor" href="#4-치트시트" aria-hidden="true">#</a>4. 치트시트</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>용도</th>
+<th>예시</th>
+<th>주의</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>filter/map</td>
+<td>선별·DTO</td>
+<td><code>.filter(...).map(...)</code></td>
+<td>부수 효과 금지</td>
+</tr>
+<tr>
+<td>sorted/distinct</td>
+<td>정렬·중복</td>
+<td><code>thenComparing</code>, <code>distinct</code></td>
+<td>null·equals 기준</td>
+</tr>
+<tr>
+<td>grouping/toMap</td>
+<td>집계·맵</td>
+<td><code>groupingBy</code>, <code>toMap</code></td>
+<td>정책·순서 지정</td>
+</tr>
+<tr>
+<td>Map/flatMap</td>
+<td>변환·평탄화</td>
+<td><code>entrySet()</code>, <code>flatMap(...)</code></td>
+<td>원본 수정 금지</td>
+</tr>
+<tr>
+<td>숫자·검색</td>
+<td>합계·조건</td>
+<td><code>mapToInt(...).sum()</code>, <code>findFirst</code></td>
+<td>빈 값 처리</td>
+</tr>
+<tr>
+<td>joining/page/index</td>
+<td>결합·슬라이스</td>
+<td><code>joining</code>, <code>skip().limit()</code>, <code>range</code></td>
+<td>DB 페이징 아님</td>
+</tr>
+<tr>
+<td>결과/debug/teeing</td>
+<td>변경·추적·결합</td>
+<td><code>toList</code>, <code>peek</code>, <code>teeing</code></td>
+<td>불변·부수 효과 유의</td>
+</tr>
+</tbody></table></div>
+<h2 id="5-자주-나는-에러와-해결"><a class="anchor" href="#5-자주-나는-에러와-해결" aria-hidden="true">#</a>5. 자주 나는 에러와 해결</h2>
+<ul>
+<li><code>IllegalStateException: Duplicate key</code> → <code>toMap</code> 충돌 → 병합 규칙을 넣거나 중복을 검증한다.</li>
+<li><code>UnsupportedOperationException</code> → <code>Stream.toList()</code> 결과 수정 → <code>toCollection(ArrayList::new)</code>.</li>
+<li>두 번째 종단 연산 <code>IllegalStateException</code> → Stream 재사용 → 새 인스턴스 생성.</li>
+<li><code>NoSuchElementException</code> → 빈 Optional의 <code>get()</code> → <code>orElseThrow</code> 등으로 처리.</li>
+<li><code>ConcurrentModificationException</code>/누락 → 순회 중 원본 변경 → <code>filter</code>로 새 결과.</li>
+</ul>
+<h2 id="6-한-단계-더"><a class="anchor" href="#6-한-단계-더" aria-hidden="true">#</a>6. 한 단계 더</h2>
+<p>단락 연산은 일부만 소비하므로 <code>peek</code>에 의존하지 않는다. JDK 12 <code>teeing</code>, JDK 16 <code>Stream.toList()</code>. 내부·병렬 → <a class="docref" href="J09-stream-api.html">J09</a>, 람다 → <a class="docref" href="J08-lambda-functional.html">J08</a>, 컬렉션 → <a class="docref" href="P10-data-structures-usage.html">P10</a>.</p>
+<h2 id="7-자가점검-qa-면접-대비"><a class="anchor" href="#7-자가점검-qa-면접-대비" aria-hidden="true">#</a>7. 자가점검 Q&amp;A (면접 대비)</h2>
+<p><strong>Q1. <code>map</code>과 <code>flatMap</code> 차이는?</strong><br><code>map</code>은 입력 하나당 출력 하나를 만든다.<br><code>flatMap</code>은 각 입력이 만든 Stream을 하나로 편다.<br>중첩된 주문 품목 등에 쓴다.<br>꼬리: 주문 품목 전체는? → <code>flatMap</code>.</p>
+<p><strong>Q2. 중간 연산은 언제 실행되나?</strong><br><code>filter/map</code>은 중간 연산이라 호출만으로 계산하지 않는다.<br>최종 연산이 값을 요구할 때 원소가 흐른다.<br>단락 연산은 답을 얻으면 멈춘다.<br>꼬리: 빈 소스의 <code>peek</code>? → 호출되지 않는다.</p>
+<p><strong>Q3. <code>toMap</code> 중복 키는?</strong><br>기본 overload는 어떤 값을 남길지 정할 수 없어 예외를 낸다.<br>merge overload는 기존 값과 새 값을 받아 병합한다.<br>꼬리: 첫 값 보존은? → <code>(first, later) -&gt; first</code>.</p>
+<p><strong>Q4. 두 <code>toList</code> 방식은?</strong><br><code>Stream.toList()</code> 결과는 불변이다.<br><code>Collectors.toList()</code>는 수정 가능성을 보장하지 않는다.<br>수정 보장이 필요하면 <code>toCollection(ArrayList::new)</code>를 쓴다.<br>꼬리: 변경 불가 결과를 원하면? → <code>Stream.toList()</code>.</p>
+<p><strong>Q5. <code>findFirst</code>와 <code>findAny</code>는?</strong><br><code>findFirst</code>는 순서상 첫 값을 반환한다.<br><code>findAny</code>는 순서가 중요하지 않을 때 임의의 값을 고른다.<br>둘 다 값이 없을 수 있어 Optional을 반환한다.<br>꼬리: 값이 없으면 예외? → <code>orElseThrow</code>.</p>
+<p><strong>Q6. 언제 for문이 낫나?</strong><br>break/continue로 반복 흐름을 직접 제어할 때다.<br>여러 상태를 바꾸거나 항목별 예외 복구가 필요할 때도 그렇다.<br>코드가 더 짧고 단계별 관찰이 쉬운 쪽을 고른다.<br>꼬리: 복잡한 Stream 디버깅? → Trace 또는 for문.</p>
+<h2 id="8-참고문헌"><a class="anchor" href="#8-참고문헌" aria-hidden="true">#</a>8. 참고문헌</h2>
+<ul>
+<li>Stream 패키지 (Java 25) — <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html</a> — lazy·일회 소비.</li>
+<li><code>Collectors</code> (Java 25) — <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html</a> — Collector API.</li>
+<li><code>Stream</code> (Java 25) — <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Stream.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Stream.html</a> — API.</li>
+<li>IntelliJ Stream Trace — <a href="https://www.jetbrains.com/help/idea/analyze-java-stream-operations.html" target="_blank" rel="noopener">https://www.jetbrains.com/help/idea/analyze-java-stream-operations.html</a> — Trace 도구.</li>
+<li><code>Collectors</code> (Java 12) — <a href="https://docs.oracle.com/en/java/javase/12/docs/api/java.base/java/util/stream/Collectors.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/12/docs/api/java.base/java/util/stream/Collectors.html</a> — <code>teeing</code>.</li>
+<li><code>Stream</code> (Java 16) — <a href="https://docs.oracle.com/en/java/javase/16/docs/api/java.base/java/util/stream/Stream.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/16/docs/api/java.base/java/util/stream/Stream.html</a> — <code>toList</code>.</li>
+</ul>
+
+
+</main>
+
+</body>
+</html>

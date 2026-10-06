@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1-3. 서비스·저장소로 나누기</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 1장. 게시글 작성 — POST /api/posts › 1-3</p>
+<h1 id="1-3-서비스저장소로-나누기"><a class="anchor" href="#1-3-서비스저장소로-나누기" aria-hidden="true">#</a>1-3. 서비스·저장소로 나누기</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p>컨트롤러 하나에 요청 받기, id 발급, 보관, 응답 만들기가 다 들어 있다. 다음 단계에서 메모리 대신 DB에 저장해야 하는데, 지금 구조라면 컨트롤러를 통째로 고쳐야 한다.</p>
+<p><strong>API는 그대로 두고 코드만 세 층으로 나눈다.</strong> 저장 방식이 바뀌어도 바뀌는 곳이 한 군데가 되도록.</p>
+<pre class="mermaid">flowchart LR
+  C[&quot;PostController&lt;br/&gt;HTTP ↔ DTO 변환&quot;] --&gt; S[&quot;PostService&lt;br/&gt;글 만들기 규칙&quot;]
+  S --&gt; R[&quot;PostRepository&lt;br/&gt;(인터페이스)&quot;]
+  M[&quot;MemoryPostRepository&lt;br/&gt;메모리 보관·id 발급&quot;] -. 구현 .-&gt; R</pre>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>층</th>
+<th>하는 일</th>
+<th>하지 않는 일</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>PostController</code></td>
+<td>요청 DTO 받기 → 서비스 호출 → 응답 DTO·201·Location 만들기</td>
+<td>보관, id 발급, 시각 정하기</td>
+</tr>
+<tr>
+<td><code>PostService</code></td>
+<td>글 하나 만들기(생성 시각 정하기, 저장소에 저장)</td>
+<td>HTTP(<code>ResponseEntity</code>, 헤더)를 알지 않는다</td>
+</tr>
+<tr>
+<td><code>PostRepository</code></td>
+<td>저장·id 발급의 <strong>약속(인터페이스)</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>MemoryPostRepository</code></td>
+<td>그 약속의 메모리 구현(<code>Map</code> + <code>AtomicLong</code>)</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li><strong>API 계약은 1-2와 완전히 같다.</strong> 요청·응답·상태 코드·<code>Location</code> 모두 그대로.</li>
+<li>저장되는 글은 요청·응답 DTO와 다른 클래스로 둔다(예: <code>Post</code>). 이 클래스가 다음 단계에서 JPA 엔티티가 된다.</li>
+<li>객체는 Spring이 만들어 넣어 주게 한다(생성자 주입). 직접 <code>new PostService()</code> 하지 않는다.</li>
+</ul>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<p>1-2와 같다. 요청 A를 두 번 보내 <code>201</code>, <code>Location</code>, id 증가를 확인한다.</p>
+<pre><code class="language-bash">BASE=http://localhost:8080
+curl -i -X POST &quot;$BASE/api/posts&quot; -H 'Content-Type: application/json' \
+  -d '{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[채점] 첫 게시글&quot;,&quot;content&quot;:&quot;Spring Boot로 만든 첫 게시글입니다.&quot;,&quot;tags&quot;:[&quot;spring&quot;,&quot;jpa&quot;],&quot;visibility&quot;:&quot;PUBLIC&quot;}'</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), R = 코드 리뷰(피드백용). 이 단계는 <strong>구조를 바꾸는 단계라 R 항목이 핵심 피드백</strong>이다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 A</td>
+<td>상태 <code>201</code>, <code>Location</code>이 <code>/api/posts/{응답의 id}</code>로 끝난다</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 A</td>
+<td>본문 7개 필드(<code>id</code>·<code>boardSlug</code>·<code>title</code>·<code>content</code>·<code>tags</code>·<code>visibility</code>·<code>createdAt</code>), <code>id</code>·<code>createdAt</code> 말고는 요청 값과 같다</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 A를 한 번 더</td>
+<td><code>id</code>가 정확히 1 커진다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>컨트롤러</td>
+<td><code>Map</code>, 카운터, 저장 코드가 컨트롤러에 남아 있지 않다. 서비스만 호출한다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>서비스</td>
+<td><code>@Service</code> 클래스가 있고 HTTP 타입(<code>ResponseEntity</code>, <code>HttpServletRequest</code> 등)을 쓰지 않는다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>저장소</td>
+<td><code>PostRepository</code> 인터페이스와 메모리 구현(<code>@Repository</code>)이 있고, 서비스는 <strong>인터페이스 타입</strong>에 의존한다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>주입</td>
+<td>생성자 주입 + <code>final</code> 필드. <code>@Autowired</code> 필드 주입이나 <code>new</code>로 직접 만들기가 없다</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>모델 분리</td>
+<td>저장되는 클래스(<code>Post</code> 등)와 요청·응답 DTO가 분리되어 있다. 변환 위치가 한 군데로 정해져 있다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/W02-why-layers.html">W02 왜 Controller·Service·Repository로 나누나</a> — 안 나누면 생기는 일</li>
+<li><a href="../../docs/knowledge/P02-mvc-layered-architecture.html">P02 MVC 패턴과 계층형 구조</a></li>
+<li><a href="../../docs/knowledge/W12-why-interfaces.html">W12 인터페이스는 왜 만드나</a> — 다음 단계에서 저장소를 갈아 끼우는 이유</li>
+<li><a href="../../docs/knowledge/P11-bean-registration-di.html">P11 빈 등록과 의존성 주입</a> — <code>@Service</code>·<code>@Repository</code>와 생성자 주입</li>
+<li><a href="../../docs/knowledge/P03-annotations-cheatsheet.html#22-생성자-주입과-빈-선택">P03 — 생성자 주입과 빈 선택</a></li>
+<li><a href="../../docs/knowledge/P12-why-beans-ioc-intro.html">P12 왜 빈과 IoC인가</a> — <code>new</code>를 직접 안 쓰는 이유</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 저장소 약속</summary>
+
+<p><code>interface PostRepository { Post save(Post post); }</code> 정도로 시작한다. 메모리 구현은 <code>ConcurrentHashMap&lt;Long, Post&gt;</code>와 <code>AtomicLong</code>으로 id를 붙여 저장한 뒤 돌려준다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 생성자 주입</summary>
+
+<p><code>private final PostService postService;</code> 필드와 그 필드를 받는 생성자 하나. 생성자가 하나면 <code>@Autowired</code>를 안 붙여도 Spring이 주입한다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="1-4-save-to-db.html">1-4. DB에 저장하기</a> — <code>MemoryPostRepository</code>를 JPA로 바꾼다. 이 단계에서 잘 나눴다면 컨트롤러는 거의 안 바뀐다.</p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 1-3. 서비스·저장소로 나누기\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch1-create-post/1-3-service-layer.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라.\n5. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n6. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="1-2-dto-response.html">← 이전 1-2. DTO로 응답하기 — 201과 Location</a><a href="1-4-save-to-db.html">다음 → 1-4. DB에 저장하기 — JPA</a></nav>
+</main>
+<script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</script>
+</body>
+</html>

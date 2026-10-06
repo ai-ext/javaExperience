@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D14. 백엔드 개발자를 위한 운영체제 기초 — 프로세스·스레드·메모리·I/O</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
+<main>
+
+<h1 id="d14-백엔드-개발자를-위한-운영체제-기초--프로세스스레드메모리io"><a class="anchor" href="#d14-백엔드-개발자를-위한-운영체제-기초--프로세스스레드메모리io" aria-hidden="true">#</a>D14. 백엔드 개발자를 위한 운영체제 기초 — 프로세스·스레드·메모리·I/O</h1>
+<blockquote>
+<p>프로그램은 프로세스가 되어 주소 공간을 얻고, 스레드가 CPU를 나눠 쓰며, 시스템 콜을 통해 커널의 메모리·파일·소켓을 사용한다.
+서버 성능은 CPU 계산 시간만이 아니라 스케줄링, 페이지 폴트, 파일 디스크립터, I/O 대기와 스레드풀 포화의 합이다.
+JVM과 Spring도 이 흐름 위에 있으므로, 장애 때 Java 로그와 <code>ps</code>, <code>/proc</code>, <code>vmstat</code>를 함께 본다.</p>
+</blockquote>
+<h2 id="1-큰-그림"><a class="anchor" href="#1-큰-그림" aria-hidden="true">#</a>1. 큰 그림</h2>
+<pre class="mermaid">flowchart LR
+    A[&quot;클라이언트 요청&quot;] --&gt; B[&quot;소켓 파일 디스크립터&quot;]
+    B --&gt; C[&quot;커널 네트워크 스택&quot;]
+    C --&gt; D[&quot;Tomcat 스레드 또는 Netty 이벤트루프&quot;]
+    D --&gt; E[&quot;JVM 스레드가 Java 코드 실행&quot;]
+    E --&gt; F[&quot;힙·스택·메타데이터 접근&quot;]
+    E --&gt; G[&quot;파일·DB·외부 API I/O&quot;]
+    G --&gt; H[&quot;시스템 콜과 블로킹/이벤트 통지&quot;]
+    H --&gt; C
+    F --&gt; I[&quot;GC·페이지 폴트·메모리 압박&quot;]
+    I --&gt; J[&quot;cgroup 제한 또는 OOM&quot;]</pre>
+<p>운영체제는 여러 프로그램을 동시에 실행하는 것처럼 보이게 한다. 프로세스별 가상 주소 공간을 만들고, 각 프로세스의 스레드를 CPU 코어에 배치한다. 파일·소켓 작업은 시스템 콜로 커널에 요청하며, 커널은 잠든 스레드를 깨우거나 <code>epoll</code>로 여러 디스크립터를 감시한다.</p>
+<p>Spring Boot의 요청 한 건도 이 흐름의 한 지점이다. JVM 프로세스 안에서 Tomcat 작업 스레드가 요청을 실행하거나, WebFlux의 Netty 이벤트루프가 이벤트를 처리한다. 컨테이너에서는 같은 프로세스가 namespace로 보이는 자원을 격리하고 cgroup으로 CPU·메모리 사용량을 제한한다. 이 문서는 전체 개발 과정(<a class="docref" href="D01-dev-lifecycle-overview.html">D01</a>) 중 “프로그램이 실행되어 서버 자원과 상호작용하는 단계”를 소유한다.</p>
+<h2 id="2-용어-사전"><a class="anchor" href="#2-용어-사전" aria-hidden="true">#</a>2. 용어 사전</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>용어</th>
+<th>한 줄 정의</th>
+<th>실무 예시</th>
+<th>헷갈리는 것과 차이</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>프로그램</td>
+<td>디스크에 저장된 실행 파일과 코드·데이터</td>
+<td><code>java -jar app.jar</code></td>
+<td>실행 중인 인스턴스는 프로세스다</td>
+</tr>
+<tr>
+<td>프로세스</td>
+<td>독립된 가상 주소 공간과 자원으로 실행 중인 프로그램</td>
+<td>JVM 한 개, PID 1234</td>
+<td>스레드는 같은 프로세스 자원을 공유한다</td>
+</tr>
+<tr>
+<td>PID</td>
+<td>프로세스 식별자</td>
+<td><code>ps -p 1234</code></td>
+<td>TID는 스레드 식별자다</td>
+</tr>
+<tr>
+<td>스레드</td>
+<td>CPU 스케줄링의 실행 단위</td>
+<td>요청 처리 스레드</td>
+<td>프로세스보다 가볍지만 공유 상태 경쟁이 생긴다</td>
+</tr>
+<tr>
+<td>플랫폼 스레드</td>
+<td>OS 스레드에 일대일로 연결된 Java 스레드</td>
+<td>Tomcat worker</td>
+<td>virtual thread와 달리 OS 스레드를 생애 동안 점유한다</td>
+</tr>
+<tr>
+<td>가상 스레드</td>
+<td>JVM이 소수의 OS 스레드에 많은 Java 스레드를 매핑하는 스레드</td>
+<td><code>Thread.ofVirtual()</code></td>
+<td>빠른 CPU가 아니라 대기 동시성 확장이 목적이다</td>
+</tr>
+<tr>
+<td>컨텍스트 스위칭</td>
+<td>실행 스레드를 바꾸며 레지스터·스택 상태를 저장/복원하는 일</td>
+<td>runnable 스레드가 코어 수보다 많음</td>
+<td>병렬 실행은 여러 코어에서 동시에 실행되는 상태다</td>
+</tr>
+<tr>
+<td>동시성</td>
+<td>작업이 겹치는 시간 구간을 갖도록 구성한 것</td>
+<td>여러 요청의 I/O 대기</td>
+<td>병렬성은 실제로 여러 코어에서 동시에 계산하는 것</td>
+</tr>
+<tr>
+<td>스케줄러</td>
+<td>runnable 작업에 CPU를 배분하는 커널 구성요소</td>
+<td>CPU 부하 때 run queue 증가</td>
+<td>애플리케이션 Executor는 작업 큐를 관리한다</td>
+</tr>
+<tr>
+<td>주소 공간</td>
+<td>프로세스가 자기 것처럼 보는 가상 주소 범위</td>
+<td>heap, stack, mmap 영역</td>
+<td>물리 RAM과 같지 않으며 페이지로 매핑된다</td>
+</tr>
+<tr>
+<td>코드(text)</td>
+<td>실행 명령이 놓이는 읽기 중심 영역</td>
+<td>클래스 로더가 실행 코드 사용</td>
+<td>Java 클래스 메타데이터는 주로 native 메모리 영역이다</td>
+</tr>
+<tr>
+<td>데이터 영역</td>
+<td>전역·정적 데이터와 초기화되지 않은 데이터</td>
+<td>native 프로그램의 전역 변수</td>
+<td>Java 객체 정적 필드는 JVM 관리 구조에 놓인다</td>
+</tr>
+<tr>
+<td>힙</td>
+<td>동적으로 할당한 객체 영역</td>
+<td><code>new Order()</code></td>
+<td>JVM heap과 OS 프로세스 전체 RSS는 같은 값이 아니다</td>
+</tr>
+<tr>
+<td>스택</td>
+<td>함수 호출 프레임과 지역 변수의 실행 중 저장소</td>
+<td>Java 메서드 호출 스택</td>
+<td>스레드마다 있으며 <code>StackOverflowError</code>와 관련된다</td>
+</tr>
+<tr>
+<td>페이지</td>
+<td>가상 메모리의 고정 크기 관리 단위</td>
+<td>page fault, resident page</td>
+<td>페이지 크기와 객체 크기를 혼동하지 않는다</td>
+</tr>
+<tr>
+<td>스왑</td>
+<td>RAM 페이지를 디스크로 내보내는 공간/동작</td>
+<td>swap-in 지연</td>
+<td>OOM과 같은 말은 아니나 압박을 키울 수 있다</td>
+</tr>
+<tr>
+<td>페이지 폴트</td>
+<td>필요한 페이지 매핑이 없어 커널 처리가 필요한 사건</td>
+<td>demand paging, mmap</td>
+<td>항상 오류는 아니다. 정상적인 minor fault도 있다</td>
+</tr>
+<tr>
+<td>RSS</td>
+<td>현재 물리 메모리에 상주한 페이지의 대략적 양</td>
+<td>컨테이너 메모리 사용량 관찰</td>
+<td>JVM <code>-Xmx</code>보다 native·스레드·파일 매핑이 더해진다</td>
+</tr>
+<tr>
+<td>OOM Killer</td>
+<td>메모리가 고갈될 때 커널이 희생 프로세스를 종료하는 동작</td>
+<td>컨테이너가 갑자기 137 종료</td>
+<td>Java heap OOM은 JVM 예외, kernel OOM은 프로세스 밖 종료다</td>
+</tr>
+<tr>
+<td>파일 디스크립터(FD)</td>
+<td>프로세스의 열린 파일/소켓을 가리키는 작은 정수</td>
+<td><code>0,1,2</code>, TCP 소켓, epoll FD</td>
+<td>파일만 뜻하지 않고 커널 객체 핸들이다</td>
+</tr>
+<tr>
+<td>소켓</td>
+<td>프로세스가 네트워크 통신에 사용하는 FD 기반 끝점</td>
+<td>HTTP keep-alive 연결</td>
+<td>연결(connection)은 소켓 두 끝점의 상태다</td>
+</tr>
+<tr>
+<td>시스템 콜</td>
+<td>사용자 모드가 커널 기능을 요청하는 경계</td>
+<td><code>read</code>, <code>write</code>, <code>epoll_wait</code></td>
+<td>일반 Java 메서드 호출보다 비용과 권한 전환이 크다</td>
+</tr>
+<tr>
+<td>사용자 모드</td>
+<td>애플리케이션 권한으로 실행되는 CPU 상태</td>
+<td>JVM 바이트코드 실행</td>
+<td>커널 모드에서만 장치·스케줄링을 직접 관리한다</td>
+</tr>
+<tr>
+<td>블로킹 I/O</td>
+<td>작업이 완료될 때까지 호출 스레드가 기다리는 I/O</td>
+<td><code>InputStream.read()</code></td>
+<td>non-blocking은 즉시 반환하고 준비 이벤트를 다시 기다린다</td>
+</tr>
+<tr>
+<td>I/O 멀티플렉싱</td>
+<td>한 스레드가 여러 FD의 준비 상태를 감시하는 모델</td>
+<td><code>select</code>, <code>poll</code>, <code>epoll</code></td>
+<td>비동기 I/O는 완료 통지를 중심으로 한 더 넓은 모델이다</td>
+</tr>
+<tr>
+<td>이벤트루프</td>
+<td>이벤트를 하나씩 꺼내 콜백/작업을 실행하는 반복기</td>
+<td>Netty event loop</td>
+<td>이벤트루프에서 긴 블로킹 작업을 하면 모든 연결이 지연된다</td>
+</tr>
+<tr>
+<td>스레드풀</td>
+<td>작업을 재사용 스레드와 큐에 배분하는 구조</td>
+<td>Tomcat executor, DB pool</td>
+<td>큐 크기와 거부 정책까지 포함해 용량을 정한다</td>
+</tr>
+<tr>
+<td>뮤텍스</td>
+<td>한 번에 한 소유자만 임계구역에 들어가는 잠금</td>
+<td>공유 캐시 갱신</td>
+<td>세마포어는 허용 수를 나타내며 소유자 개념이 다르다</td>
+</tr>
+<tr>
+<td>세마포어</td>
+<td>동시에 진입 가능한 수를 나타내는 카운터</td>
+<td>제한된 외부 API 동시 호출</td>
+<td>뮤텍스는 보통 상호배제 하나를 표현한다</td>
+</tr>
+<tr>
+<td>데드락</td>
+<td>서로 자원을 기다리며 영원히 진행하지 못하는 상태</td>
+<td>lock A→B, 다른 쪽 B→A</td>
+<td>단순히 느린 락 경합과 다르다</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>프로세스가 보는 PID·mount·network 등의 시야를 분리</td>
+<td>컨테이너 PID 1</td>
+<td>자원 사용량 제한은 cgroup의 역할이다</td>
+</tr>
+<tr>
+<td>cgroup</td>
+<td>프로세스 그룹의 자원을 제한·계측하는 커널 기능</td>
+<td>컨테이너 memory limit</td>
+<td>격리(namespace)와 제한(cgroup)은 별개다</td>
+</tr>
+</tbody></table></div>
+<h2 id="3-단계별로-보기"><a class="anchor" href="#3-단계별로-보기" aria-hidden="true">#</a>3. 단계별로 보기</h2>
+<h3 id="31-실행-프로그램에서-프로세스로"><a class="anchor" href="#31-실행-프로그램에서-프로세스로" aria-hidden="true">#</a>3.1 실행: 프로그램에서 프로세스로</h3>
+<p>쉘이 <code>java -jar app.jar</code>를 실행하면 런처가 JVM 프로세스를 만들고, JVM은 자신의 가상 주소 공간에 코드, 클래스 메타데이터, Java heap, 스레드 스택, native 라이브러리와 mmap 영역을 배치한다. Linux <code>fork()</code>는 호출 프로세스를 복제한 자식 프로세스를 만들며 부모와 자식의 주소 공간은 분리된다. 구현은 처음부터 모든 RAM을 복사하기보다 copy-on-write 페이지를 공유하고, 한쪽이 쓰는 시점에 페이지를 분리하는 방식으로 복제 비용을 늦춘다. <code>fork()</code> 후 자식이 <code>execve()</code>를 호출하면 실행 이미지를 다른 프로그램으로 바꾼다.</p>
+<p>Java 프로세스의 RSS에는 heap 외에 플랫폼 스레드 스택, Metaspace, JIT 코드 캐시, direct buffer, native allocator, 파일 매핑과 소켓 버퍼도 포함된다. 그래서 <code>-Xmx</code>를 컨테이너 제한과 같게 잡으면 native 여유가 사라질 수 있다.</p>
+<h3 id="32-실행-스레드와-스케줄링"><a class="anchor" href="#32-실행-스레드와-스케줄링" aria-hidden="true">#</a>3.2 실행: 스레드와 스케줄링</h3>
+<pre class="mermaid">sequenceDiagram
+    participant P as 프로세스
+    participant E as Executor 또는 서버 스레드풀
+    participant S as OS 스케줄러
+    participant C as CPU 코어
+    P-&gt;&gt;E: 요청 작업을 큐에 제출
+    E-&gt;&gt;S: runnable 플랫폼 스레드 실행 가능
+    S-&gt;&gt;C: 한 스레드에 time slice 배분
+    C--&gt;&gt;S: I/O 대기 또는 time slice 만료
+    S-&gt;&gt;C: 다른 runnable 스레드로 context switch</pre>
+<p>스레드마다 호출 프레임과 지역 변수를 위한 스택이 있으므로 프로세스의 메모리와 공유 객체는 보통 힙·static 영역을 통해 공유된다. 스케줄러는 runnable 스레드 중 하나를 코어에 올린다. runnable 수가 코어 수를 넘으면 모두가 동시에 빨라지는 것이 아니라 대기열, 캐시 손실, context switch가 늘어난다. 반대로 I/O 대기 스레드는 CPU를 계속 차지하지 않으므로, “스레드 수가 CPU 코어 수보다 많다”만으로 문제라고 단정할 수 없다. CPU-bound 작업과 I/O-bound 작업을 구분해야 한다.</p>
+<p>동시성은 I/O 대기 중 다른 작업을 진행하는 구조이고, 병렬성은 여러 코어의 실제 동시 계산이다. 비동기 I/O가 CPU 계산을 병렬화하지는 않는다. 공유 상태와 메모리 가시성은 JMM 주제(<a class="docref" href="J10-jmm-threads.html">J10</a>)로 이어진다.</p>
+<h3 id="33-메모리-주소에서-페이지까지"><a class="anchor" href="#33-메모리-주소에서-페이지까지" aria-hidden="true">#</a>3.3 메모리: 주소에서 페이지까지</h3>
+<pre class="mermaid">flowchart TD
+    A[&quot;Java 객체 참조&quot;] --&gt; B[&quot;JVM 가상 주소&quot;]
+    B --&gt; C[&quot;페이지 테이블&quot;]
+    C --&gt; D{페이지가 RAM에 있는가}
+    D -- &quot;예&quot; --&gt; E[&quot;CPU가 계속 실행&quot;]
+    D -- &quot;아니오&quot; --&gt; F[&quot;page fault 시스템 경로&quot;]
+    F --&gt; G[&quot;파일/스왑에서 읽거나 새 페이지 할당&quot;]
+    G --&gt; E</pre>
+<p>프로세스는 가상 주소를 사용하고 MMU와 페이지 테이블이 이를 물리 프레임으로 번역한다. 새로 할당했지만 아직 접근하지 않은 메모리는 demand paging으로 실제 페이지가 필요할 때 준비될 수 있다. <code>mmap</code> 파일도 페이지 단위로 로드된다. Linux 메모리 관리 문서는 이를 같은 subsystem의 책임으로 설명한다.</p>
+<p>메모리 압박에는 여러 얼굴이 있다. JVM heap이 가득 차면 GC 후에도 공간이 없어 <code>OutOfMemoryError</code>가 발생할 수 있다. 반면 cgroup의 memory limit을 넘거나 시스템 전체 여유가 없어지면 커널 OOM 처리로 프로세스가 SIGKILL될 수 있다. 전자는 애플리케이션이 예외를 기록할 기회가 있지만 후자는 종료 코드 137, 컨테이너 이벤트, 커널 로그로 나타날 수 있다. swap이 심하면 프로세스가 죽기 전에도 page fault와 swap-in 지연으로 latency가 급증한다.</p>
+<h3 id="34-io-시스템-콜부터-이벤트루프까지"><a class="anchor" href="#34-io-시스템-콜부터-이벤트루프까지" aria-hidden="true">#</a>3.4 I/O: 시스템 콜부터 이벤트루프까지</h3>
+<pre class="mermaid">sequenceDiagram
+    participant T as 요청 스레드/이벤트루프
+    participant U as 사용자 모드
+    participant K as 커널
+    participant N as 네트워크 장치
+    T-&gt;&gt;U: socket과 read/write 호출
+    U-&gt;&gt;K: 시스템 콜 진입
+    K-&gt;&gt;N: 수신 버퍼 또는 송신 큐 처리
+    alt 블로킹
+        K--&gt;&gt;T: 데이터 준비까지 잠듦
+        N--&gt;&gt;K: 패킷 도착
+        K--&gt;&gt;T: 스레드 깨움 후 read 반환
+    else epoll 기반 non-blocking
+        K--&gt;&gt;T: 즉시 EAGAIN 또는 준비 이벤트
+        N--&gt;&gt;K: FD를 ready list에 등록
+        T-&gt;&gt;K: epoll_wait로 여러 FD 확인
+    end</pre>
+<p>블로킹 <code>read</code>는 호출 스레드를 재우고, 데이터가 준비되면 커널이 깨운다. 연결 수가 많고 각 연결이 대부분 기다리는 서버는 연결마다 전용 플랫폼 스레드를 두면 스레드 스택과 스케줄링 비용이 커진다. <code>select</code>·<code>poll</code>·<code>epoll</code>은 한 실행 흐름이 여러 FD의 “지금 읽거나 쓸 수 있는가”를 감시하는 I/O 멀티플렉싱이다. <code>select(2)</code>는 FD 번호가 1024 미만이어야 한다는 제한이 있어 현대 애플리케이션에는 <code>poll</code>·<code>epoll</code>이 권장된다.</p>
+<p><code>epoll</code> 인스턴스는 관심 목록(interest list)과 준비 목록(ready list)을 커널에 둔다. <code>epoll_ctl</code>로 감시할 FD를 등록하고 <code>epoll_wait</code>로 준비된 항목을 받는다. level-triggered는 아직 읽을 데이터가 남아 있으면 계속 준비로 보고, edge-triggered는 상태 변화 때만 알린다. edge-triggered에서는 non-blocking FD를 사용하고 <code>read</code>/<code>write</code>가 <code>EAGAIN</code>을 반환할 때까지 처리해야 한다. 일부만 읽고 다시 기다리면 남은 데이터가 있어도 새 이벤트가 오지 않아 연결이 멈출 수 있다.</p>
+<p>Spring Boot servlet 애플리케이션은 기본적으로 embedded Tomcat을 포함하고, WebFlux는 Reactor Netty를 포함한다. Tomcat 모델에서는 작업 스레드가 요청 코드의 블로킹 I/O 동안 기다리는 것이 자연스럽다. Netty 이벤트루프 모델에서는 이벤트루프가 짧은 작업만 처리하고, JDBC·파일 읽기 같은 블로킹 작업을 이벤트루프에서 실행하면 같은 루프의 여러 연결이 함께 지연된다. virtual thread는 Java 21에서 정식화된 JEP 444 기능으로, 블로킹 I/O 때 Java 실행을 suspend하여 carrier OS 스레드를 다른 virtual thread에 양보한다. 그래도 CPU-bound 코드를 더 빨리 만들거나 DB 커넥션 풀의 한도를 없애지는 않는다.</p>
+<h2 id="4-직접-해보기"><a class="anchor" href="#4-직접-해보기" aria-hidden="true">#</a>4. 직접 해보기</h2>
+<h3 id="41-java에서-플랫폼-스레드virtual-thread파일-io-확인"><a class="anchor" href="#41-java에서-플랫폼-스레드virtual-thread파일-io-확인" aria-hidden="true">#</a>4.1 Java에서 플랫폼 스레드·virtual thread·파일 I/O 확인</h3>
+<p>아래 예제는 JDK 21에서도 실행 가능하고, Java 25 기준에서도 같은 API를 쓸 수 있다. virtual thread는 JEP 444(Java 21)로 정식화되었다. 예제는 스레드 종류를 구분하고, 파일 읽기라는 I/O를 실행한다.</p>
+<pre><code class="language-java">import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.CountDownLatch;
+
+public class OsBasicsDemo {
+    public static void main(String[] args) throws Exception {
+        CountDownLatch ready = new CountDownLatch(2);
+        Thread platform = new Thread(() -&gt; { ready.countDown(); sleep(120); }, &quot;worker-io&quot;);
+        Thread virtual = Thread.ofVirtual().name(&quot;worker-virtual&quot;).start(() -&gt; {
+            ready.countDown(); sleep(80);
+        });
+        platform.start();
+        ready.await();
+        System.out.println(&quot;pid=&quot; + ProcessHandle.current().pid());
+        System.out.println(&quot;platform=&quot; + platform.getName()
+                + &quot;, virtual=&quot; + virtual.getName());
+        System.out.println(&quot;hosts-lines&gt;=&quot; + Files.readAllLines(Path.of(&quot;/etc/hosts&quot;)).size());
+        platform.join();
+        virtual.join();
+        System.out.println(&quot;done=true&quot;);
+    }
+    static void sleep(long ms) {
+        try { Thread.sleep(ms); }
+        catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    }
+}</code></pre>
+<p>실행:</p>
+<pre><code class="language-bash">java _scratch/D14/OsBasicsDemo.java</code></pre>
+<p>실제 출력:</p>
+<pre><code class="language-text">pid=6933
+platform=worker-io, virtual=worker-virtual
+hosts-lines&gt;=33
+done=true</code></pre>
+<p>PID는 실행할 때마다 달라진다. 실행 중인 PID를 별도 터미널에서 관찰하려면 <code>ps -p &lt;PID&gt; -o pid,ppid,%cpu,%mem,rss,vsz,stat,command</code>, <code>ps -L -p &lt;PID&gt;</code>, <code>ls -l /proc/&lt;PID&gt;/fd</code>를 사용한다. <code>ps -L</code>은 프로세스 안의 스레드 단위까지 보여주며, <code>/proc/&lt;PID&gt;/fd</code> 항목 수는 열린 파일·소켓·epoll 수의 단서다.</p>
+<h3 id="42-java-프로세스와-jvm-메모리-관찰"><a class="anchor" href="#42-java-프로세스와-jvm-메모리-관찰" aria-hidden="true">#</a>4.2 Java 프로세스와 JVM 메모리 관찰</h3>
+<pre><code class="language-bash">jps -lv
+jcmd &lt;PID&gt; VM.command_line
+jcmd &lt;PID&gt; Thread.print
+jcmd &lt;PID&gt; GC.heap_info
+cat /proc/&lt;PID&gt;/status | egrep 'VmRSS|VmSize|Threads|FDSize'
+vmstat 1 5</code></pre>
+<p><code>GC.heap_info</code>는 heap, <code>VmRSS</code>는 프로세스 상주 물리 페이지 관점이다. 둘의 차이는 Metaspace·direct buffer·thread stack·mmap도 포함해 해석한다. <code>vmstat</code>의 runnable·swap·si/so·wa로 CPU 포화와 I/O 대기를 구분한다.</p>
+<h3 id="43-fd-누수와-한도-확인"><a class="anchor" href="#43-fd-누수와-한도-확인" aria-hidden="true">#</a>4.3 FD 누수와 한도 확인</h3>
+<pre><code class="language-bash">ulimit -n
+cat /proc/&lt;PID&gt;/limits | grep -i 'open files'
+ls /proc/&lt;PID&gt;/fd | wc -l
+lsof -p &lt;PID&gt; | head -n 30
+ss -tanp | grep &lt;PID&gt;</code></pre>
+<p>권한이 부족하면 <code>/proc/&lt;PID&gt;/fd</code>와 connection pool metric을 먼저 본다. FD 한도 증가는 누수 은폐가 될 수 있으므로, 증가하는 소켓·파일과 close 보장부터 확인한다.</p>
+<h3 id="44-spring-boot-41에서-연결하기"><a class="anchor" href="#44-spring-boot-41에서-연결하기" aria-hidden="true">#</a>4.4 Spring Boot 4.1에서 연결하기</h3>
+<p>Spring MVC는 <code>spring-boot-starter-webmvc</code>와 embedded Tomcat을, WebFlux는 <code>spring-boot-starter-webflux</code>와 Reactor Netty를 기본 조합으로 사용한다. Boot 4.1.1·Java 25 Gradle에서 <code>jps -lv</code>, <code>jcmd &lt;PID&gt; Thread.print</code>, <code>curl http://localhost:8080/</code>를 확인한다. 컨트롤러의 <code>Thread.sleep(5000)</code>은 Tomcat 스레드 점유를 보여준다. WebFlux 이벤트루프의 JDBC·파일 I/O는 여러 연결을 지연시키므로 실험 후 제거한다.</p>
+<h2 id="5-자주-하는-오해와-실수"><a class="anchor" href="#5-자주-하는-오해와-실수" aria-hidden="true">#</a>5. 자주 하는 오해와 실수</h2>
+<ol>
+<li><p><strong>“프로세스 메모리 = <code>-Xmx</code>” →</strong> <code>-Xmx</code>는 Java heap 상한일 뿐이다. 스레드 스택, Metaspace, direct memory, native library, mmap과 페이지가 더해져 컨테이너 OOM이 날 수 있다. <strong>대처:</strong> heap과 RSS를 함께 보고 cgroup limit 아래에 native 여유를 남긴다.</p>
+</li>
+<li><p><strong>“스레드를 늘리면 처리량이 늘어난다” →</strong> CPU-bound 작업은 코어보다 많은 스레드가 경합과 context switch를 키운다. I/O-bound 작업은 대기 동안 CPU를 놓치므로 다른 적정 모델이 필요하다. <strong>대처:</strong> CPU 사용률, run queue, 대기 시간, 풀 큐를 측정하고 상한을 정한다.</p>
+</li>
+<li><p><strong>“non-blocking이면 아무 코드나 이벤트루프에서 실행해도 된다” →</strong> 네트워크 read가 non-blocking이어도 동기 JDBC·파일 I/O·큰 JSON 직렬화는 이벤트루프를 점유한다. <strong>대처:</strong> 이벤트루프에는 짧은 작업만 두고 별도 scheduler/worker로 격리하거나 blocking 서버 모델을 선택한다.</p>
+</li>
+<li><p><strong>“Java <code>OutOfMemoryError</code>와 컨테이너 OOM은 같다” →</strong> 전자는 JVM이 예외를 던지는 heap/native 영역 고갈이고, 후자는 커널/cgroup이 프로세스를 SIGKILL할 수 있는 사건이다. <strong>대처:</strong> 애플리케이션 로그, 종료 코드 137, cgroup 이벤트와 커널 로그를 함께 확인한다.</p>
+</li>
+<li><p><strong>“FD 한도를 올리면 Too many open files가 해결된다” →</strong> 한도 증가는 정상적인 높은 동시 연결에만 맞는 조치다. close 누수라면 더 늦게 장애가 날 뿐이다. <strong>대처:</strong> <code>/proc/&lt;pid&gt;/fd</code>, <code>lsof</code>, pool active/idle metric으로 증가하는 종류를 찾고 수명 관리를 고친다.</p>
+</li>
+<li><p><strong>“virtual thread는 CPU 작업도 빠르게 한다” →</strong> virtual thread는 OS 스레드를 효율적으로 공유해 대기 동시성을 높이는 기능이지 CPU 실행 속도를 높이는 기능이 아니다. <strong>대처:</strong> I/O 대기 중심 작업에 적용하고 CPU 작업은 코어 수와 별도 executor로 제한한다.</p>
+</li>
+<li><p><strong>“서버가 느리면 GC부터 튜닝한다” →</strong> swap, page fault, FD 고갈, 스레드풀 큐, DB 커넥션 대기일 수 있다. <strong>대처:</strong> 요청 latency와 함께 <code>vmstat</code>, <code>ps -L</code>, <code>/proc</code>, 풀 metric을 시간축으로 맞춘다.</p>
+</li>
+</ol>
+<h2 id="6-시각화-설계-메모"><a class="anchor" href="#6-시각화-설계-메모" aria-hidden="true">#</a>6. 시각화 설계 메모</h2>
+<ol>
+<li><p><strong>[요청의 OS 경로 | 요소: client, socket FD, kernel, Tomcat/Netty, JVM, DB | 관계: 호출·대기·깨움 | 순서: 도착→ready→실행→DB 대기→응답 | 오해: Java 메서드 호출만으로 끝나지 않음]</strong> 위 flowchart를 기본 장면으로 쓴다.</p>
+</li>
+<li><p><strong>[프로세스와 스레드 | 요소: PID, heap, stack, TID | 관계: 경계는 격리, heap은 공유 | 순서: JVM 생성→스레드 추가→carrier 공유 | 오해: 스레드는 프로세스와 같은 경계가 아님]</strong> 2절과 3.2를 연결한다.</p>
+</li>
+<li><p><strong>[가상 메모리 | 요소: 참조, 페이지, page table, RAM, swap | 관계: 번역·fault·swap-in | 순서: 접근→fault→로드→재실행 | 오해: heap 상한과 RSS는 다름]</strong> 3.3을 확장한다.</p>
+</li>
+<li><p><strong>[I/O 모델 비교 | 요소: 연결, 스레드, event loop, ready list | 관계: sleep/wakeup·notification | 순서: 증가→풀 포화→ready list→처리 | 오해: non-blocking FD와 앱 전체는 다름]</strong> 3.4를 나란히 보여준다.</p>
+</li>
+</ol>
+<h2 id="7-자가점검-qa-면접-대비"><a class="anchor" href="#7-자가점검-qa-면접-대비" aria-hidden="true">#</a>7. 자가점검 Q&amp;A (면접 대비)</h2>
+<h3 id="q1-프로세스와-스레드의-차이는-무엇인가"><a class="anchor" href="#q1-프로세스와-스레드의-차이는-무엇인가" aria-hidden="true">#</a>Q1. 프로세스와 스레드의 차이는 무엇인가?</h3>
+<p>프로세스는 독립된 가상 주소 공간과 자원 경계를 갖고, 스레드는 한 프로세스 안의 실행 단위다. 스레드는 heap·FD 같은 자원을 공유해 전환과 통신이 상대적으로 가볍지만 경쟁과 장애 전파가 생긴다. 프로세스 분리는 비용이 더 크지만 한 프로세스의 메모리 오류가 다른 프로세스로 바로 번지지 않는다.</p>
+<p>꼬리질문: <code>fork()</code> 직후 부모와 자식은 메모리를 바로 두 벌 복사하는가?  → 보통 copy-on-write로 페이지를 공유하다가 쓰기 시 분리한다.</p>
+<h3 id="q2-동시성과-병렬성은-어떻게-다른가"><a class="anchor" href="#q2-동시성과-병렬성은-어떻게-다른가" aria-hidden="true">#</a>Q2. 동시성과 병렬성은 어떻게 다른가?</h3>
+<p>동시성은 여러 작업이 진행 가능하도록 번갈아 실행하거나 대기와 실행을 겹치는 구조다. 병렬성은 여러 CPU 코어가 실제로 동시에 작업을 실행하는 상태다. 한 코어의 event loop도 많은 연결을 동시 처리하지만 CPU 계산을 병렬 처리하는 것은 아니다.</p>
+<p>꼬리질문: I/O를 non-blocking으로 바꾸면 CPU-bound 계산도 빨라지는가? → 아니다. I/O 대기 점유를 줄일 뿐 계산량과 코어 수는 그대로다.</p>
+<h3 id="q3-컨텍스트-스위칭이-왜-비용인가"><a class="anchor" href="#q3-컨텍스트-스위칭이-왜-비용인가" aria-hidden="true">#</a>Q3. 컨텍스트 스위칭이 왜 비용인가?</h3>
+<p>스케줄러가 현재 스레드의 실행 상태를 저장하고 다른 스레드의 상태를 복원해야 한다. 이때 직접 작업 시간이 들고 CPU cache와 TLB locality가 약해질 수 있다. 따라서 runnable 스레드를 무작정 늘리는 대신 CPU-bound 풀의 상한과 큐를 관리한다.</p>
+<p>꼬리질문: I/O 대기 스레드는 항상 context switch 악화의 주범인가? → 아니다. 잠든 스레드는 CPU를 쓰지 않으며, 문제는 runnable 과다·빈번한 전환과 메모리 비용까지 함께 봐야 한다.</p>
+<h3 id="q4-epoll은-무엇을-해결하며-edge-triggered의-함정은"><a class="anchor" href="#q4-epoll은-무엇을-해결하며-edge-triggered의-함정은" aria-hidden="true">#</a>Q4. <code>epoll</code>은 무엇을 해결하며 edge-triggered의 함정은?</h3>
+<p>많은 FD의 I/O 준비 상태를 커널이 관리하고, 한 실행 흐름이 ready list를 받아 처리하게 한다. edge-triggered는 상태 변화 때 주로 알리므로 이벤트 후 non-blocking read/write를 <code>EAGAIN</code>까지 반복해야 한다. 일부 데이터만 소비하고 다시 기다리면 새 변화가 없어 영원히 알림을 못 받을 수 있다.</p>
+<p>꼬리질문: level-triggered는 왜 초보 구현에서 다루기 쉬운가? → 읽을 데이터가 남아 있는 동안 다시 ready로 알려 처리 누락에 덜 취약하다.</p>
+<h3 id="q5-java-heap은-충분한데-컨테이너가-oom으로-죽을-수-있는가"><a class="anchor" href="#q5-java-heap은-충분한데-컨테이너가-oom으로-죽을-수-있는가" aria-hidden="true">#</a>Q5. Java heap은 충분한데 컨테이너가 OOM으로 죽을 수 있는가?</h3>
+<p>가능하다. RSS에는 heap 외에 Metaspace, thread stack, direct buffer, native library, mmap과 페이지가 포함된다. cgroup limit은 이 프로세스 관점의 총 사용량에 적용되므로 <code>-Xmx</code>만 limit보다 작게 잡았다는 사실은 안전을 보장하지 않는다.</p>
+<p>꼬리질문: Java 예외가 남지 않고 137로 끝났다면? → JVM 내부 OOM보다 SIGKILL/cgroup 또는 커널 OOM 가능성을 먼저 컨테이너 이벤트와 커널 로그에서 확인한다.</p>
+<h3 id="q6-뮤텍스와-세마포어는-어떻게-구분하는가"><a class="anchor" href="#q6-뮤텍스와-세마포어는-어떻게-구분하는가" aria-hidden="true">#</a>Q6. 뮤텍스와 세마포어는 어떻게 구분하는가?</h3>
+<p>뮤텍스는 한 소유자만 임계구역에 들어가도록 상호배제를 표현하는 잠금이다. 세마포어는 허용된 동시 진입 수를 카운터로 표현하므로 DB 커넥션이나 외부 API 호출 수 제한에 맞다. 둘 다 잘못된 순서·해제 누락으로 대기와 장애를 만들 수 있다.</p>
+<p>꼬리질문: 데드락의 전형적인 조건은? → 상호배제, 점유 후 대기, 강제 선점 불가, 순환 대기의 네 조건이 동시에 성립하는 상태다.</p>
+<h2 id="8-참고문헌"><a class="anchor" href="#8-참고문헌" aria-hidden="true">#</a>8. 참고문헌</h2>
+<ul>
+<li><code>epoll(7) — Linux manual page</code> — <a href="https://man7.org/linux/man-pages/man7/epoll.7.html" target="_blank" rel="noopener">https://man7.org/linux/man-pages/man7/epoll.7.html</a> — epoll과 LT·ET.</li>
+<li><code>fork(2) — Linux manual page</code> — <a href="https://man7.org/linux/man-pages/man2/fork.2.html" target="_blank" rel="noopener">https://man7.org/linux/man-pages/man2/fork.2.html</a> — 프로세스 복제와 FD 상속.</li>
+<li><code>Operating Systems: Three Easy Pieces</code> — <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/" target="_blank" rel="noopener">https://pages.cs.wisc.edu/~remzi/OSTEP/</a> — 프로세스·메모리·I/O 학습 구조.</li>
+<li><code>cgroups(7) — Linux manual page</code> — <a href="https://man7.org/linux/man-pages/man7/cgroups.7.html" target="_blank" rel="noopener">https://man7.org/linux/man-pages/man7/cgroups.7.html</a> — 계층적 자원 제한.</li>
+<li><code>Memory Management — Linux Kernel</code> — <a href="https://www.kernel.org/doc/html/latest/admin-guide/mm/index.html" target="_blank" rel="noopener">https://www.kernel.org/doc/html/latest/admin-guide/mm/index.html</a> — virtual memory와 paging.</li>
+<li><code>proc_pid_fd(5)</code> — <a href="https://man7.org/linux/man-pages/man5/proc_pid_fd.5.html" target="_blank" rel="noopener">https://man7.org/linux/man-pages/man5/proc_pid_fd.5.html</a> — FD와 소켓 관찰.</li>
+<li><code>select(2)</code> — <a href="https://man7.org/linux/man-pages/man2/select.2.html" target="_blank" rel="noopener">https://man7.org/linux/man-pages/man2/select.2.html</a> — FD_SETSIZE와 multiplexing.</li>
+<li><code>Virtual Threads — Java SE 25</code> — <a href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html</a> — virtual thread 적용 범위.</li>
+<li><code>JEP 444: Virtual Threads</code> — <a href="https://openjdk.org/jeps/444" target="_blank" rel="noopener">https://openjdk.org/jeps/444</a> — Java 21 정식화.</li>
+<li><code>Embedded Web Servers :: Spring Boot</code> — <a href="https://docs.spring.io/spring-boot/how-to/webserver.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/how-to/webserver.html</a> — Tomcat과 Reactor Netty.</li>
+</ul>
+
+
+</main>
+<script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</script>
+</body>
+</html>

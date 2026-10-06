@@ -1,0 +1,394 @@
+# J13. JVM 구조·클래스 로딩·바이트코드
+
+> JVM 명세는 클래스 이름만으로 타입을 구별하지 않는다. **바이너리 이름과 정의한 클래스로더**가 함께 타입 정체성을 만든다.
+> 클래스 로딩, 링킹, 초기화는 별도 단계이며, JVM은 링킹 시점을 늦출 수 있다. 클래스 파일에 적힌 심볼릭 참조가 처음 실제 사용될 때 문제가 드러나기도 한다.
+> `javap -c -v`로 Java 소스가 실제 바이트코드로 어떻게 바뀌었는지 확인하면 디스패치, 람다 호출, 클래스 로더 문제를 구체적으로 설명할 수 있다.
+
+## 1. 왜 알아야 하나
+
+운영 중인 웹 애플리케이션을 재배포했는데도 이전 버전의 클래스가 남아 Metaspace 사용량이 계속 오를 수 있다. 요청을 처리하던 서버 스레드가 앱의 `ThreadLocal` 값이나 `Thread.currentThread().getContextClassLoader()`를 붙잡고 있으면, 앱 클래스 로더가 도달 불가능해지지 않는다. 파일만 새 버전으로 바꿨다고 클래스가 교체되는 구조가 아니기 때문이다.
+
+플러그인 구조에서는 더 짧은 장애가 난다. 로그에는 `com.example.Plugin`이라는 같은 이름이 찍히는데 `ClassCastException: X cannot be cast to X`가 발생한다. 두 클래스가 이름은 같아도 서로 다른 클래스로더가 정의했다면 JVM이 다른 타입으로 취급한다. 공유 인터페이스까지 플러그인마다 따로 로드하면 경계에서 캐스팅이 깨진다.
+
+또한 잘못된 의존성은 애플리케이션 시작이 아니라 특정 요청에서 처음 터질 수 있다. JVM은 심볼릭 참조를 지연해석할 수 있으므로, `NoSuchMethodError`, `IllegalAccessError`, `NoClassDefFoundError`의 발생 지점이 실제 원인 클래스의 로딩 시점과 다를 수 있다. 로딩·링킹·초기화 구분과 `javap` 확인법을 모르면 장애 로그에서 원인과 증상을 뒤집어 읽는다.
+
+## 2. 핵심 개념
+
+| 용어 | 의미 | 실무에서 구분할 점 |
+|---|---|---|
+| 클래스 파일 | 상수 풀·필드·메서드 정보와 바이트코드를 담는 JVM 바이너리 형식. | 소스와 실행 명령은 다를 수 있다. |
+| 런타임 상수 풀 | 클래스마다 있는 상수·타입·필드·메서드의 런타임 표현. | 심볼릭 참조는 지연 해석될 수 있다. |
+| 정의 로더 | 클래스를 `defineClass`한 로더. | 클래스 타입 정체성을 결정한다. |
+| 시작 로더 | `loadClass`를 요청한 로더. 위임하는 로더도 해당될 수 있다. | 정의 로더와 다를 수 있다. |
+| 로딩 | 바이너리를 찾아 클래스를 런타임에 정의하는 과정. | 클래스 로더가 바이트를 제공한다. |
+| 링킹 | 검증·준비·해석으로 실행 가능한 상태를 만드는 과정. | JVM이 시점을 늦출 수 있다. |
+| 초기화 | `<clinit>`에서 명시적 static 초기화를 실행하는 과정. | 준비 단계의 기본값 대입과 다르다. |
+| 프레임 | 호출별 지역 변수 배열·피연산자 스택·상수 풀 참조. | 호출 시 생성, 반환 시 제거된다. |
+| 모듈 | `requires`, `exports`, `opens`로 의존·접근을 나타내는 경계. | 클래스로더와 별개다. |
+
+**링킹과 초기화 비교**
+
+| 구분 | 링킹 | 초기화 |
+|---|---|---|
+| 하위 단계 | 검증 → 준비 → 해석 | `<clinit>` 실행 |
+| static 필드 | 기본값 (`0`, `false`, `null`) | 선언부·static 블록의 명시적 초기화 |
+| 실패 예 | `VerifyError`, `NoSuchMethodError` 등 | 첫 실패는 보통 `ExceptionInInitializerError`, 이후 `NoClassDefFoundError` |
+
+클래스 타입의 식별을 단순화하면 다음과 같다.
+
+```text
+Class identity = (binary name, defining ClassLoader)
+```
+
+이름이 모두 `com.acme.Model`이어도 웹앱 로더 A와 플러그인 로더 B가 정의했다면 대입 호환되지 않는다. 공통 API를 부모 로더가 정의하면 자식 로더들이 같은 타입을 공유한다.
+
+JVM 명세의 런타임 데이터 영역은 구현체의 구체 메모리 배치를 강제하지 않는다. 아래는 논리적 구획이다.
+
+| 영역 | 공유 범위 | 주된 내용 |
+|---|---|---|
+| `pc` 레지스터 | 스레드별 | 현재 바이트코드 위치. native 실행 중 값은 명세상 정의되지 않는다. |
+| JVM 스택 | 스레드별 | 메서드 프레임과 지역 변수·연산 상태. |
+| 힙 | 모든 스레드 공유 | 객체와 배열. 상세·GC 동작은 → J14 참조. |
+| 메서드 영역 | 모든 스레드 공유 | 상수 풀·필드·메서드 코드의 논리 영역. 실제 배치와 수집 방식은 구현 의존. |
+| native 메서드 스택 | 구현 의존 | native 호출을 지원하기 위한 영역. 구현은 JVM 스택과 분리하거나 통합할 수 있다. |
+
+## 3. 내부 동작·원리
+
+### 3.1 실행 영역과 메서드 호출
+
+```text
+JVM 시작
+  ├─ 공유: 힙 / 메서드 영역(논리적) / 클래스별 런타임 상수 풀
+  └─ 스레드 생성
+       ├─ pc 레지스터
+       ├─ JVM 스택: main 프레임
+       └─ 메서드 호출 때 프레임 push
+            ├─ 지역 변수 배열 (this, 인자, 지역값)
+            └─ 피연산자 스택 (연산의 입력과 중간값)
+```
+
+바이트코드는 프레임의 지역 변수 배열과 피연산자 스택을 쓴다. `aload_0`은 지역 변수 0을 스택에 올리고, `invokevirtual`은 수신 객체·인자를 소비해 새 프레임을 만든다. 반환하면 호출자 프레임으로 돌아온다. 스택 머신은 명세 모델이며 실제 명령 최적화는 → J15 참조.
+
+프레임이 반드시 OS native stack에 놓이는 것은 아니다. 스택 한도 초과는 `StackOverflowError`, 확장·신규 스레드 생성 실패는 `OutOfMemoryError`가 될 수 있다.
+
+### 3.2 로딩·링킹·초기화 흐름
+
+```mermaid
+flowchart LR
+  A[요청: 바이너리 이름] --> B[로딩: 바이트 탐색·클래스 정의]
+  B --> C[링킹: 검증]
+  C --> D[준비: static 기본값]
+  D --> E[해석: 상수 풀 심볼릭 참조]
+  E --> F[초기화 조건 충족]
+  F --> G[상위 클래스 초기화]
+  G --> H[<clinit> 실행]
+  H --> I[사용]
+```
+
+1. **로딩**: 클래스로더가 바이트를 찾아 `defineClass`로 정의한다. 이때 정의 로더가 정해진다. 같은 바이트도 서로 다른 로더가 정의하면 다른 타입이다.
+2. **검증**: 클래스 파일 구조와 바이트코드가 JVM 규칙에 맞는지 검사한다. 참조 타입의 추가 로딩이 생길 수 있다.
+3. **준비**: static 필드는 기본값을 받는다. `static int size = 10`의 대입은 초기화 때다. 컴파일 타임 상수는 인라인되어 선언 클래스를 초기화하지 않을 수 있다.
+4. **해석**: 상수 풀 참조를 실제 타입·멤버·호출 지점에 연결한다. 사용 시점까지 지연될 수 있다.
+5. **초기화**: `<clinit>`이 명시적 static 초기화를 수행한다. 인스턴스 생성·static 메서드 호출·비상수 static 필드 사용 등이 촉발하며 상위 클래스가 먼저 초기화된다.
+
+동시 초기화는 동기화된다. 순환 초기화는 기본값을 읽게 할 수 있으므로 `<clinit>`에서 외부 I/O·상호 static 의존·스레드 시작을 피한다. 실패 후 접근은 `NoClassDefFoundError`가 될 수 있다.
+
+### 3.3 기본 위임과 클래스 정체성
+
+```text
+요청 로더 L의 loadClass(name)
+  1. 이미 로드한 클래스인지 확인
+  2. 부모 로더에 위임
+  3. 부모가 못 찾으면 findClass(name)으로 직접 탐색
+  4. 필요하면 resolveClass(clazz)
+
+일반적인 Java 25 내장 로더 계층
+  Bootstrap (ClassLoader 객체로 노출될 때 null일 수 있음)
+       ↑ parent
+  Platform Class Loader
+       ↑ parent
+  System/Application Class Loader
+       ↑
+  애플리케이션이 만든 자식 로더들
+```
+
+기본 `loadClass`는 부모 우선이며, 실패하면 `findClass`를 호출한다. 검색 위치 변경은 보통 `findClass` 재정의로 충분하다. 서버·플러그인 로더는 일부 패키지에서 자식 우선을 구현할 수 있지만, `java.*`와 공유 API를 갈라 놓으면 타입·호환성 문제가 생긴다.
+
+요청을 보낸 자식은 시작 로더이고 `defineClass`한 부모는 정의 로더다. 로더별 타입이 인자·반환에서 충돌하면 JVM은 `LinkageError`를 낼 수 있다.
+
+### 3.4 클래스 로더 누수와 언로딩
+
+일반적인 재배포 누수 경로는 다음처럼 이어진다.
+
+```text
+GC Root
+  → 서버 공용 스레드 / 공용 캐시 / static 참조
+  → ThreadLocal 값·TCCL·등록 리스너·드라이버
+  → 웹앱 클래스 인스턴스 또는 Class 객체
+  → 웹앱 ClassLoader
+  → 그 로더가 정의한 모든 클래스와 메타데이터
+```
+
+로더에 강한 참조가 남으면 해당 클래스·메타데이터도 회수할 수 없다. 개별 클래스 언로드 API는 없고 시점은 구현·GC에 달려 있다. 재배포 반복 시 힙 덤프에서 로더별 `Class`·`Method`·`ThreadLocalMap` 참조를 찾는다.
+
+주요 Root는 미종료 스레드·executor, 복원하지 않은 TCCL, `ThreadLocal` 값, 부모 static 캐시·리스너·JDBC 드라이버다. 요청 스레드의 `finally`에서 `ThreadLocal.remove()`를 하고, 앱 종료 때 소유 작업을 멈추고 등록 해제·TCCL 복원을 한다.
+
+### 3.5 바이트코드 호출 명령
+
+모든 호출 명령은 호출 대상 메서드의 이름·설명자(descriptor) 등을 상수 풀의 심볼릭 참조로 가리킨다. 실행 시 명령별 규칙으로 호출 대상을 선택한다.
+
+| 명령 | 주 대상 | 선택 방식·주 용도 |
+|---|---|---|
+| `invokestatic` | static 메서드 | 수신 객체 없이 호출한다. 선언 클래스가 초기화되지 않았으면 호출 전에 초기화한다. |
+| `invokespecial` | 생성자, private 메서드, `super` 호출 등 | 가상 오버라이드 선택을 거치지 않고 생성 클래스·상위 클래스 규칙으로 직접 선택한다. 생성자 호출에서 자주 보인다. |
+| `invokevirtual` | 클래스의 인스턴스 메서드 | 상수 풀 참조를 해석한 후 수신 객체의 런타임 클래스를 기준으로 오버라이드 메서드를 선택한다. |
+| `invokeinterface` | 인터페이스 인스턴스 메서드 | 인터페이스 메서드 참조를 해석한 뒤 수신 객체의 실제 타입에서 구현 메서드를 선택한다. |
+| `invokedynamic` | 동적으로 계산되는 호출 지점 | 상수 풀의 부트스트랩 메서드·정적 인자 정보를 사용해 특정 호출 지점에 `CallSite`와 대상 `MethodHandle`을 연결한다. |
+
+`invokevirtual`과 `invokeinterface`는 런타임 객체에 따라 구현을 고르지만 상수 풀 참조와 선택 규칙이 다르다. `invokedynamic`은 리플렉션이 아니다. 람다·동적 언어 런타임은 부트스트랩 메서드가 연결한 `CallSite` 대상으로 호출한다.
+
+### 3.6 JPMS 기초: 모듈 그래프와 클래스 로더
+
+```text
+--module-path: 모듈 정의를 찾는다
+       ↓ 의존성 해결 (requires)
+  읽기 가능 그래프
+       ↓ 패키지 접근 경계
+  exports: 다른 모듈의 일반 코드가 공개 타입에 접근
+  opens: 런타임 깊은 리플렉션 접근을 허용
+
+--class-path의 클래스 → 이름 없는 모듈(unnamed module)
+```
+
+`module com.acme.api { exports com.acme.api; }`는 패키지를 공개하고 소비자는 `requires com.acme.api;`로 의존한다. `requires transitive`는 의존 관계를 소비자에게 전파한다. `opens`는 런타임 깊은 리플렉션을 허용한다.
+
+모듈 경로는 모듈·의존 그래프를, 클래스 경로는 개별 클래스·리소스를 찾는다. 클래스 경로 코드는 이름 없는 모듈에 속한다. JPMS는 로딩을 대체하지 않고, `ModuleLayer`로 런타임 모듈 계층을 만들 수 있다.
+
+## 4. 코드로 확인
+
+아래 예제는 Corretto JDK 21.0.6에서 직접 컴파일·실행했다. 첫 예제는 서로 다른 호출 형태를 만들고 `javap`으로 바이트코드를 확인한다. 두 번째 예제는 같은 클래스 바이트를 다른 로더에서 정의해 이름만으로 타입이 합쳐지지 않음을 보인다.
+
+### 예제 1 — 소스 호출과 바이트코드 명령
+
+```java
+public class CallSitesDemo {
+    interface Speaker {
+        void speak();
+    }
+
+    static class Animal {
+        void sound() {
+            System.out.println("Animal.sound");
+        }
+    }
+
+    static final class Dog extends Animal implements Speaker {
+        @Override
+        void sound() {
+            System.out.println("Dog.sound");
+        }
+
+        @Override
+        public void speak() {
+            System.out.println("Dog.speak");
+        }
+    }
+
+    static void staticCall() {
+        System.out.println("staticCall");
+    }
+
+    static void virtualCall(Animal animal) {
+        animal.sound();
+    }
+
+    static void interfaceCall(Speaker speaker) {
+        speaker.speak();
+    }
+
+    public static void main(String[] args) {
+        staticCall();
+        Dog dog = new Dog();
+        virtualCall(dog);
+        interfaceCall(dog);
+        Runnable lambda = () -> System.out.println("lambda");
+        lambda.run();
+    }
+}
+```
+
+```sh
+javac -d _scratch/J13 _scratch/J13/CallSitesDemo.java
+java -cp _scratch/J13 CallSitesDemo
+javap -c -classpath _scratch/J13 CallSitesDemo
+```
+
+실제 실행 출력:
+
+```text
+staticCall
+Dog.sound
+Dog.speak
+lambda
+```
+
+실제 `javap -c` 출력 중 호출 부분:
+
+```text
+static void virtualCall(CallSitesDemo$Animal);
+  0: aload_0
+  1: invokevirtual #21  // Method CallSitesDemo$Animal.sound:()V
+
+static void interfaceCall(CallSitesDemo$Speaker);
+  0: aload_0
+  1: invokeinterface #26,  1  // InterfaceMethod CallSitesDemo$Speaker.speak:()V
+
+public static void main(java.lang.String[]);
+  0: invokestatic #31  // Method staticCall:()V
+  3: new           #35  // class CallSitesDemo$Dog
+  7: invokespecial #37  // Method CallSitesDemo$Dog."<init>":()V
+ 19: invokedynamic #46,  0  // InvokeDynamic #0:run:()Ljava/lang/Runnable;
+```
+
+`virtualCall`의 정적 매개변수 타입은 `Animal`이지만 실제 수신 객체는 `Dog`여서 `Dog.sound`가 출력된다. `Runnable` 구현 클래스의 이름을 직접 적지 않았어도 컴파일러가 람다 호출 지점을 `invokedynamic`으로 만들었다. 상수 풀의 bootstrap method와 메서드 핸들 정보는 `javap -v`로 더 확인할 수 있다. `new Dog()`와 `Object.<init>`에는 `invokespecial`, `staticCall()`에는 `invokestatic`이 보인다.
+
+### 예제 2 — 바이너리 이름이 같아도 로더가 다르면 다른 타입
+
+```java
+import java.io.IOException;
+import java.io.InputStream;
+
+public class LoaderIdentityDemo {
+    static final class Marker {
+    }
+
+    static final class MirrorLoader extends ClassLoader {
+        MirrorLoader() {
+            super(LoaderIdentityDemo.class.getClassLoader());
+        }
+
+        Class<?> defineMarker(byte[] bytes) {
+            return defineClass("LoaderIdentityDemo$Marker", bytes, 0, bytes.length);
+        }
+    }
+
+    public static void main(String[] args) throws IOException {
+        byte[] bytes;
+        try (InputStream in = LoaderIdentityDemo.class.getResourceAsStream("/LoaderIdentityDemo$Marker.class")) {
+            if (in == null) {
+                throw new IllegalStateException("Marker.class not found");
+            }
+            bytes = in.readAllBytes();
+        }
+
+        Class<?> original = Marker.class;
+        Class<?> mirror = new MirrorLoader().defineMarker(bytes);
+        System.out.println("same binary name: " + original.getName().equals(mirror.getName()));
+        System.out.println("same Class object: " + (original == mirror));
+        System.out.println("same defining loader: " + (original.getClassLoader() == mirror.getClassLoader()));
+        System.out.println("assignable: " + original.isAssignableFrom(mirror));
+    }
+}
+```
+
+```sh
+javac -d _scratch/J13 _scratch/J13/LoaderIdentityDemo.java
+java -cp _scratch/J13 LoaderIdentityDemo
+```
+
+실제 실행 출력:
+
+```text
+same binary name: true
+same Class object: false
+same defining loader: false
+assignable: false
+```
+
+여기서는 `MirrorLoader`가 `Marker.class`의 바이트를 직접 정의했다. `ClassLoader.loadClass` 기본 경로를 통하지 않도록 예제의 `defineMarker`를 사용한 이유다. 실제 플러그인 로더는 공용 API 클래스는 부모에게 위임하고, 플러그인 구현 패키지만 자기 로더에서 정의해야 한다.
+
+## 5. 버전별 변화 — 왜 바뀌었나
+
+| 시기 | 변화와 이전 방식의 한계 | 근거 |
+|---|---|---|
+| Java SE 7 (2011) | JSR 292가 `invokedynamic`을 JVM에 추가했다. 기존 명령은 정적 메서드·타입 정보를 중심으로 호출했기 때문에, 동적 언어 구현자가 매 호출마다 우회 계층을 만들지 않고 유연하게 호출 지점을 연결하기 어려웠다. | [JSR 292](https://jcp.org/en/jsr/detail?id=292) |
+| Java 9 (2017) | JEP 261이 JPMS와 모듈 경로·의존성 해결을 도입했다. 클래스 경로만으로는 모듈 간 읽기 관계와 패키지 캡슐화를 명시하기 어려워, `requires`·`exports`·`opens`가 있는 모듈 그래프를 추가했다. 런타임에는 부트스트랩·플랫폼·시스템 로더 역할이 구분된다. | [JEP 261](https://openjdk.org/jeps/261), [ClassLoader API](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/ClassLoader.html) |
+
+호출 명령의 디스패치 규칙, 런타임 영역, 로딩·링킹·초기화의 기본 모델은 JVM 명세에 계속 기술되어 있다. 이 영역에서 위 두 변화 외에 별도로 강조할 버전 변화는 없다.
+
+## 6. 실무 가이드
+
+- **기본값 추천 — 특수 요구가 없다면 기본 부모 우선 로딩을 유지하라.** 공유 타입을 중복 정의하는 충돌을 줄인다.
+- 플러그인을 격리한다면 **공용 API는 부모, 구현체만 자식 로더에 두라.** 경계 타입이 로더마다 갈라지지 않는다.
+- 재배포한다면 **요청 스레드의 `finally`에서 `ThreadLocal.remove()`를 하고, 종료 때 앱 소유 스레드·executor를 멈추고 리스너·드라이버·TCCL을 정리하라.**
+- 특정 요청에서 링크 오류가 나면 **실패 타입의 로더와 JAR 출처를 확인하라.** HotSpot은 `-Xlog:class+load=info`로 로딩을 추적할 수 있다.
+- 명령을 볼 때는 **`javap -c -v`를 실행하라.** `-c`는 바이트코드, `-v`는 상수 풀·부트스트랩 정보를 보여 준다.
+- 일반 공개 API는 **`exports`, 깊은 리플렉션은 필요한 패키지에만 `opens`를 사용하라.**
+
+## 7. 함정·안티패턴
+
+1. **증상:** `X cannot be cast to X` 또는 같은 클래스명이 로그에 중복된다. **원인:** 바이너리 이름만 비교하고 서로 다른 정의 로더를 놓쳤다. **대처:** 클래스와 공유 API의 정의 로더·코드 출처를 확인하고, 공유 타입은 부모에서 한 번만 정의한다.
+2. **증상:** 재배포 후 클래스 로더와 Metaspace 사용량이 버전 수만큼 누적된다. **원인:** 살아 있는 공용 스레드, TCCL, `ThreadLocal`, 부모 로더 static 캐시 등이 앱 객체나 `Class`를 참조한다. **대처:** 소유 리소스를 종료·해제하고 참조 경로를 힙 덤프에서 찾아 끊는다. 컨테이너가 대신 강제 종료해 주리라 기대하지 않는다.
+3. **증상:** 클래스 초기화 순서에 따라 static 필드가 `null` 또는 기본값으로 보인다. **원인:** 서로 순환하는 `<clinit>` 코드가 상대 클래스의 명시적 대입 전에 값을 읽는다. **대처:** 서로 의존하는 static 초기화를 분리하고 명시적인 초기화 경계를 둔다.
+4. **증상:** 특정 요청에서 `NoSuchMethodError`·`IllegalAccessError`가 갑자기 발생한다. **원인:** 지연된 심볼릭 참조 해석이 해당 호출 시점까지 미뤄졌거나, 로더가 예상과 다른 클래스 버전을 골랐다. **대처:** 클래스 로딩 출처, 의존 JAR, 상수 풀 참조, 호출 opcode를 확인한다.
+5. **증상:** JDK 또는 프레임워크 내부 필드 리플렉션이 `InaccessibleObjectException`으로 실패한다. **원인:** JPMS에서 `exports`만 필요한 경우와 깊은 리플렉션을 위한 `opens`가 필요한 경우를 혼동했다. **대처:** 모듈 선언의 대상 패키지만 `opens`하거나 해당 의존 라이브러리를 모듈 경계에 맞춰 업그레이드한다.
+
+## 8. 자가점검 Q&A (면접 대비)
+
+**Q1. 클래스 정체성에 이름 외에 클래스로더가 필요한 이유는?**
+
+JVM 한 프로세스에서 같은 바이너리 이름을 여러 버전으로 격리할 수 있어야 한다. 애플리케이션 서버·플러그인이 서로 다른 라이브러리 버전을 독립적으로 정의할 수 있다. 그 대신 경계를 넘는 API 타입은 같은 정의 로더에서 공유해야 한다.
+
+꼬리질문: 이름이 같은 두 객체를 바로 캐스팅할 수 있나? **답:** 정의 로더가 다르면 클래스 타입은 다른 타입이므로 보장되지 않는다. 공통 부모가 정의한 인터페이스로 경계를 설계한다.
+
+**Q2. 로딩, 링킹, 초기화는 어떤 차이가 있나?**
+
+로딩은 바이너리 표현을 찾아 클래스를 정의한다. 링킹은 검증·준비·심볼릭 참조 해석으로 실행에 필요한 연결을 만든다. 초기화는 `<clinit>`을 실행해 명시적 static 초기화 코드를 적용한다.
+
+꼬리질문: `static int x = 5`의 `5`는 준비 단계에서 들어가나? **답:** 아니다. 준비 단계에서는 기본값 `0`이 들어가고, 클래스 초기화 단계에서 대입식이 실행된다.
+
+**Q3. 모든 커스텀 클래스로더는 부모 우선이어야 하나?**
+
+아니다. 기본 `ClassLoader.loadClass` 구현은 부모에게 먼저 위임하지만, 서버·플러그인 로더가 일부 범위에 자식 우선을 적용할 수 있다. 바꾸는 이유가 분명해야 하며 `java.*`, 컨테이너 API, 공유 인터페이스까지 복제하면 충돌이 난다.
+
+꼬리질문: 보통 클래스 로더를 처음 만들 때 어느 메서드를 재정의하나? **답:** 검색 위치만 바꾸려면 대개 `findClass`를 재정의하고 기본 위임을 유지한다.
+
+**Q4. `invokevirtual`과 `invokespecial` 차이를 설명하라.**
+
+`invokevirtual`은 수신 객체의 런타임 클래스에 따라 오버라이드 메서드를 선택한다. `invokespecial`은 생성자, 상위 클래스 호출, private 호출처럼 일반 가상 디스패치를 하지 않는 호출에 쓴다. 호출 바이트코드를 확인하면 `super` 호출과 오버라이드 호출을 구별할 수 있다.
+
+꼬리질문: 생성자 호출도 `invokevirtual`인가? **답:** 아니다. 생성자는 오버라이드 대상이 아니고 보통 `invokespecial`로 호출한다.
+
+**Q5. `invokedynamic`은 리플렉션과 같은가?**
+
+같지 않다. `invokedynamic`은 상수 풀의 부트스트랩 정보로 특정 호출 지점을 `CallSite`와 메서드 핸들에 연결하는 JVM 명령이다. 람다 같은 자바 기능과 동적 언어 런타임 모두가 이 연결 방식을 활용할 수 있다.
+
+꼬리질문: 부트스트랩 메서드가 매 호출마다 실행되나? **답:** 아니다. 명세는 호출 지점별 동적 연결과 연결된 대상 호출을 구분한다. 실제 호출은 연결된 `CallSite`의 대상을 따른다.
+
+**Q6. 클래스 로더 누수는 어떻게 찾아야 하나?**
+
+어떤 살아 있는 GC Root에서 웹앱 로더까지 참조가 이어지는지 확인한다. 서버 스레드의 `ThreadLocal`·TCCL, 미종료 스레드, 부모 로더 static 캐시, 등록 리스너·드라이버를 우선 점검한다. 재배포 전후의 힙 덤프에서 로더별 인스턴스와 `Class` 참조를 비교한다.
+
+꼬리질문: 새 로더를 만들고 이전 로더 변수에 `null`을 대입하면 즉시 언로드되나? **답:** 아니다. 다른 강한 참조가 없어도 회수 시점은 GC와 JVM 구현에 달려 있다.
+
+**Q7. `exports`와 `opens`를 구분하라.**
+
+`exports`는 모듈이 공개 API로 내놓은 패키지의 공개 타입에 일반 코드가 접근하도록 한다. `opens`는 런타임 깊은 리플렉션이 필요한 패키지를 연다. 의존성을 읽게 하는 `requires`와도 각각 다른 관계다.
+
+꼬리질문: 공개 메서드를 쓰려면 `opens`가 필요한가? **답:** 보통은 `exports`로 충분하다. private 필드 등에 깊은 리플렉션이 필요한 경우 좁은 범위의 `opens`를 검토한다.
+
+**Q8. 왜 `NoSuchMethodError`가 서버 시작 때가 아니라 특정 코드 경로에서 발생할 수 있나?**
+
+JVM 명세는 링킹 시점에 구현 유연성을 둔다. 상수 풀의 심볼릭 참조가 처음 실제 사용될 때 해석되면, 해당 메서드를 호출하는 경로가 실행되어야 오류가 보인다. 따라서 시작 성공이 모든 코드 경로의 이진 호환성을 증명하지는 않는다.
+
+꼬리질문: 원인 분석 때 어떤 정보를 함께 모으나? **답:** 예외의 최초 프레임, 문제 타입의 정의 로더와 코드 출처, 의존 JAR 버전, `javap -v`의 상수 풀·호출부를 함께 확인한다.
+
+## 9. 참고문헌
+
+- The Java Virtual Machine Specification, Chapter 2 — https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-2.html — 런타임 데이터 영역, 프레임, 지역 변수·피연산자 스택의 명세.
+- The Java Virtual Machine Specification, Chapter 5 — https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-5.html — 클래스 로딩·링킹·초기화, 상수 풀 참조와 로딩 제약의 근거.
+- The Java Virtual Machine Specification, Chapter 6 — https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-6.html — `invokevirtual`·`invokeinterface`·`invokespecial`·`invokestatic`·`invokedynamic` 명령 의미.
+- ClassLoader (Java SE 25 API) — https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/ClassLoader.html — 기본 위임 모델, 내장 로더 역할과 커스텀 로더 API.
+- JEP 261: Module System — https://openjdk.org/jeps/261 — JPMS, 모듈 경로, 읽기 관계, `exports`·`opens` 도입 근거.
+- JSR 292: Supporting Dynamically Typed Languages on the Java Platform — https://jcp.org/en/jsr/detail?id=292 — `invokedynamic`의 목적과 Java SE 7 반영 시점.
+- MemoryLeakProtection — https://cwiki.apache.org/confluence/spaces/TOMCAT/pages/103099526/MemoryLeakProtection — Tomcat 재배포 시 `ThreadLocal`, TCCL, 미종료 스레드 등 클래스 로더 누수 사례와 컨테이너 대응 한계.

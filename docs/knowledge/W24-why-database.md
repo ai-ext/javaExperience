@@ -1,0 +1,357 @@
+# W24. DB는 왜 쓰나 — 파일이나 메모리에 저장하면 안 되나
+
+> 회원·주문을 한 서버 메모리에만 두면 프로세스 재시작 순간 사라지고, 파일에 바로 쓰면 동시 요청과 부분 실패를 직접 해결해야 한다.
+> DB는 단순한 저장 장소가 아니라 여러 요청과 서버가 공유하는 데이터의 질의·제약·복구·트랜잭션 경계를 제공한다.
+> 기본값은 회원·주문 같은 업무 데이터를 관계형 DB에 저장하고, 메모리는 캐시, 파일·객체 스토리지는 업로드 원본에 쓴다.
+
+## 1. 질문
+
+스프링으로 회원 가입 API를 만든 뒤 `Map<Long, Member>`에 넣어 보니 조회와 저장이 간단하다. 로컬에선 잘 되는데 애플리케이션을 다시 실행하자 회원 목록이 비었다. “서버가 계속 떠 있으면 괜찮은 것 아닌가?”라는 질문이 생긴다.
+
+다음에는 두 요청이 동시에 마지막 좌석이나 같은 이메일을 등록한다. 자바 코드에서 `if (!members.containsKey(email)) members.put(...)`를 했는데 둘 다 확인을 통과한다. 이번엔 파일로 바꿔 보지만 두 요청이 같은 JSON 파일을 읽고 각자 수정본을 저장해 한 요청의 변경이 사라지거나 JSON이 중간에 잘린다.
+
+주문 생성 도중 주문 행은 저장됐는데 재고 차감이나 결제 기록 단계에서 예외가 난다. 파일이나 메모리에서는 어디까지 되돌릴지 직접 구현해야 한다. 이런 상황이 “왜 DB를 쓰지?”의 출발점이다. DB는 생명주기와 동시 사용자 요구가 메모리·파일의 단순함을 넘을 때 선택한다.
+
+## 2. 짧은 답
+
+회원·주문처럼 재시작 뒤에도 남아야 하고, 여러 요청이 함께 읽고 쓰며, 일부만 저장되면 안 되는 데이터는 DB에 둔다.
+
+JVM 메모리는 프로세스와 함께 사라지고 파일은 질의·동시 갱신·복구 규칙을 애플리케이션이 떠안는다. DB는 인덱스·제약·트랜잭션·복구 도구를 제공하지만 설정과 운영 비용이 든다.
+
+**기본값 추천:** 업무상 원본 데이터는 관리형 관계형 DB 한 곳에 정본으로 저장한다. 캐시는 필요할 때 추가하고, 업로드한 이미지·문서의 원본 바이트는 파일 또는 객체 스토리지에 둔다.
+
+메모리·파일은 “쓸 수 없어서”가 아니라 요구하는 내구성·공유 범위·질의·동시성 규칙이 단순할 때 더 나은 선택이다. DB를 쓰더라도 격리 수준, 락 대기, 커넥션 풀, 백업은 별도로 설계하고 확인해야 한다.
+
+## 3. 왜 그런가 — 원리
+
+### 저장 위치와 생명주기
+
+`HashMap`은 JVM 힙에 있어 재시작과 함께 사라진다. 서버 두 대의 맵도 별개다. 파일은 남지만 호스트에 묶이고, 공유하려면 파일 시스템과 잠금 규칙을 운영해야 한다.
+
+DB는 여러 앱 인스턴스가 접속하는 별도 공유 서비스다. 저장·복구는 DB 설정에 좌우되지만 앱이 파일 형식, 검색 색인, 동시 쓰기 프로토콜을 직접 만들 필요를 줄인다.
+
+```mermaid
+flowchart TD
+    request["회원 가입 요청"] --> app["애플리케이션 인스턴스"]
+    app --> mem["JVM Map"]
+    app --> file["로컬 JSON 파일"]
+    app --> db["공유 DB 트랜잭션"]
+    mem --> restart["프로세스 종료 시 힙 소멸"]
+    file --> race["동시 수정과 복구 규칙을 앱이 구현"]
+    db --> query["질의·인덱스·제약조건"]
+    db --> log["트랜잭션 로그와 복구"]
+    db --> replica["여러 앱 인스턴스가 같은 정본 사용"]
+```
+
+### 동시 쓰기와 부분 실패
+
+`count = count + 1`은 읽기·계산·쓰기라 두 스레드가 같은 값을 읽으면 증가가 유실된다. `ConcurrentHashMap`도 `get`과 `put` 전체를 원자화하지 않는다. Java `Map` 기본 메서드는 동기화·원자성을 약속하지 않으며, happens-before 없이는 다른 스레드의 변경 가시성도 보장되지 않는다.
+
+두 요청이 같은 JSON을 읽어 각자 저장하면 나중 저장이 앞선 변경을 덮는다. 파일 잠금·임시 파일 복구·여러 파일 변경 규칙은 앱이 정해야 한다. DB는 SQL 변경을 트랜잭션으로 묶고 격리 수준과 잠금으로 경쟁을 제어하지만, lost update·대기·교착은 여전히 고려 대상이다.
+
+### ACID가 막는 실패와 한계
+
+| ACID | 막으려는 실패 | DB 장치와 남는 책임 |
+|---|---|---|
+| Atomicity 원자성 | 주문만 저장되고 항목 저장은 실패하는 부분 기록 | 여러 변경을 함께 커밋·롤백한다. 외부 결제 호출까지 되돌리지는 않는다. |
+| Consistency 일관성 | 중복 이메일, 고아 주문, 음수 수량 | 선언한 `UNIQUE`, `FOREIGN KEY`, `CHECK`, `NOT NULL`을 강제한다. 선언하지 않은 규칙은 자동 추론하지 않는다. |
+| Isolation 격리성 | 동시 요청이 중간 상태를 보거나 같은 재고를 중복 차감 | 격리 수준·잠금으로 상호작용을 제어한다. 강한 격리는 대기·교착·처리량 비용을 낳는다. |
+| Durability 지속성 | 커밋 직후 장애로 변경이 소실 | 로그와 저장 장치에서 복구한다. 설정·파일시스템·디스크에 좌우되며 백업은 별도다. |
+
+MySQL InnoDB 문서는 ACID를 트랜잭션·제약·격리 수준·로그와 연결하고, PostgreSQL은 전부 성공 또는 실패를 설명한다. 업무 제약, 트랜잭션 범위, 저장 설정과 복구 계획은 별도로 정해야 한다.
+
+### 직접 만들 때 늘어나는 비용
+
+파일 검색은 전체 JSON을 읽고 파싱하게 되며 별도 색인을 만들면 본문과 일치시켜야 한다. DB 인덱스도 저장 공간과 쓰기 비용이 들고 모든 쿼리가 이를 쓰는 건 아니다. 외래 키와 유니크 제약은 앱 인스턴스와 무관하게 관계·중복 규칙을 강제한다.
+
+DB는 덤프·물리 백업·로그 복구 도구를 제공하지만 보관 위치와 권한, 복원 훈련은 운영자가 정한다. 같은 서버의 복사본은 서버 장애에서 함께 사라질 수 있다.
+
+## 4. 선택지 비교
+
+| 선택지 | 어떻게 동작 | 장점 | 단점 | 언제 쓰나 | 국내 실무에서 흔한가 |
+|---|---|---|---|---|---|
+| JVM 메모리 `Map` | 한 애플리케이션 프로세스 힙에 보관 | 코드가 단순하고 네트워크 왕복이 없다 | 재시작·재배포 때 사라지고 여러 서버가 공유하지 못한다. 동시성·백업·질의를 직접 해결한다 | 임시 계산값, 테스트 대역, 짧은 생명주기의 캐시 | 프로덕션 정본 저장소로는 부적합하다. 메모리 캐시 사용은 흔하지만 캐시는 별도 주제(W23 참조) |
+| JSON·CSV 파일 | 애플리케이션이 파일을 읽고 쓰며 형식을 직접 관리 | 별도 DB 서비스 없이 시작 가능하고 사람이 열어 볼 수 있다 | 동시 수정, 검색, 스키마 변경, 여러 레코드 원자성, 복구 정책을 직접 구현 | 설정 파일, 작은 내보내기, 단일 작업 산출물 | 업무 레코드 저장소로 채택할지는 조직별이며 빈도 통계는 미확인 |
+| 임베디드 DB | SQLite처럼 DB 엔진과 데이터를 한 파일에 두고 SQL 사용 | SQL, 제약, 트랜잭션을 쓰며 서버 운영이 적다 | 동시 쓰기·공유 접근의 범위가 서버형 DB보다 제한되고 파일 백업·잠금 고려가 남는다 | 단일 사용자 도구, 데스크톱·모바일, 소규모 배포형 앱 | 국내 백엔드 서비스의 공통 기본값인지 확인된 통계 없음 |
+| 서버형 관계형 DB | 여러 애플리케이션이 네트워크로 접속해 공용 테이블을 질의·갱신 | 트랜잭션, 제약, 인덱스, 권한, 백업·복구 도구를 제공 | 운영·비용, 네트워크 지연, 커넥션 관리, 스키마 변경이 필요 | 회원·주문·결제 등 공유되고 정합성이 중요한 업무 데이터 | 대표적인 선택지이나 국내 비율은 미확인 |
+| Redis 같은 외부 키-값 저장소 | 별도 서버 프로세스의 자료구조를 네트워크로 읽고 쓴다 | 여러 앱 인스턴스가 공유하고 캐시·만료·원자 연산에 적합 | 메모리 중심 운영과 지속성 설정을 이해해야 한다. 관계형 질의와 제약 모델을 대신하지 않는다 | 캐시, 짧은 TTL 데이터, 적절히 설계한 카운터·세션 | 국내 사용 빈도는 미확인 |
+
+선택표에서 “DB”는 한 종류의 제품이 아니다. SQLite 같은 임베디드 엔진과 PostgreSQL·MySQL 같은 서버형 관계형 DB는 배포·공유 방식이 다르다. RDB와 NoSQL 제품군의 자세한 비교는 R02 참조.
+
+## 5. 코드로 보기
+
+아래 예는 모두 “회원 이메일을 저장하고 ID로 찾는다”는 동일한 기능이다. 메모리와 파일은 단순한 구현이 왜 프로덕션 저장소로 부족할 수 있는지 보이는 최소 예다. DB 예는 스프링 애플리케이션에서 SQL을 실행하는 모양을 보인다. 스프링 예는 Boot 4.1 / Framework 7 대상이며 미실행이다.
+
+### 메모리 `Map`
+
+```java
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import org.springframework.stereotype.Repository;
+
+record Member(long id, String email) {}
+
+@Repository
+final class InMemoryMemberStore {
+    private final AtomicLong sequence = new AtomicLong();
+    private final ConcurrentHashMap<Long, Member> members = new ConcurrentHashMap<>();
+
+    Member save(String email) {
+        Member member = new Member(sequence.incrementAndGet(), email);
+        members.put(member.id(), member);
+        return member;
+    }
+
+    Optional<Member> findById(long id) {
+        return Optional.ofNullable(members.get(id));
+    }
+}
+```
+
+`ConcurrentHashMap`은 같은 JVM의 여러 스레드가 접근할 때 개별 `put`과 `get`을 안전하게 수행하도록 돕지만 저장 데이터는 프로세스 종료와 함께 사라진다. 이메일 유일성도 구현하지 않았다. `containsValue`를 확인하고 `put`하는 식으로 붙이면 두 호출 사이 경쟁이 생기므로 `putIfAbsent`에 맞는 키 모델이나 DB의 `UNIQUE`가 필요하다. 두 컬렉션을 함께 바꾸는 주문 처리를 원자화해 주지도 않는다.
+
+### JSON Lines 파일
+
+```java
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.Optional;
+import tools.jackson.databind.ObjectMapper;
+import org.springframework.stereotype.Repository;
+
+record Member(long id, String email) {}
+
+@Repository
+final class JsonlMemberStore {
+    private final ObjectMapper mapper;
+    private final Path file = Path.of("data/members.jsonl");
+
+    JsonlMemberStore(ObjectMapper mapper) {
+        this.mapper = mapper;
+    }
+
+    void save(Member member) throws IOException {
+        Files.createDirectories(file.getParent());
+        String line = mapper.writeValueAsString(member) + System.lineSeparator();
+        Files.writeString(file, line, StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+    }
+
+    Optional<Member> findById(long id) throws IOException {
+        if (Files.notExists(file)) return Optional.empty();
+        for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+            Member member = mapper.readValue(line, Member.class);
+            if (member.id() == id) return Optional.of(member);
+        }
+        return Optional.empty();
+    }
+}
+```
+
+JSON 직렬화는 쉼표나 따옴표 이스케이프를 직접 처리하는 문제를 줄이지만 이 코드는 파일 전체를 읽어 선형 검색한다. 동시 append가 레코드 경계에서 안전하다는 보장, 중복 ID 방지, 회원 여러 명을 묶는 트랜잭션, 손상된 마지막 줄 복구는 없다. 
+### 관계형 DB와 스프링 JDBC
+
+```sql
+CREATE TABLE member (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    email VARCHAR(320) NOT NULL UNIQUE
+);
+```
+
+> 위 DDL은 표준 SQL 문법(PostgreSQL·H2·Oracle)이다. MySQL에서는 `id BIGINT AUTO_INCREMENT PRIMARY KEY`로 쓴다(그대로 실행하면 ERROR 1064). 타입·제약 상세 → R03.
+
+```java
+import java.util.Optional;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Repository;
+
+record Member(long id, String email) {}
+
+@Repository
+final class JdbcMemberStore {
+    private final JdbcClient jdbc;
+
+    JdbcMemberStore(JdbcClient jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    void save(String email) {
+        jdbc.sql("INSERT INTO member(email) VALUES (:email)")
+                .param("email", email)
+                .update();
+    }
+
+    Optional<Member> findById(long id) {
+        return jdbc.sql("SELECT id, email FROM member WHERE id = :id")
+                .param("id", id)
+                .query((rs, rowNum) -> new Member(
+                        rs.getLong("id"), rs.getString("email")))
+                .optional();
+    }
+}
+```
+
+`JdbcClient`는 SQL을 실행하고 결과를 객체로 옮기는 기본 JDBC 작업을 맡는다. 이메일 중복은 두 인스턴스가 동시에 저장해도 DB의 유니크 제약이 최종 차단한다. 같은 기능이지만 이 저장소 코드를 호출한다고 다단계 업무가 자동으로 한 트랜잭션이 되는 것은 아니다.
+
+주문과 항목처럼 여러 행을 만드는 업무는 서비스 계층의 `@Transactional` 메서드 안에서 두 SQL을 실행한다. 두 번째 insert 실패가 트랜잭션 밖으로 전달되면 첫 번째 변경도 롤백된다. 파일은 임시 파일 교체·잠금·복구를 직접 정의해야 하며, 외부 결제 API는 DB 롤백으로 취소되지 않는다.
+
+### 동시 파일·Map 쓰기 재현 — JDK 21에서 실행
+
+다음 코드는 두 스레드가 파일을 동시에 truncate한 뒤 각자 같은 시작 위치에 다른 회원 줄을 덮어쓰게 한다. 이어서 둘 다 같은 카운터를 읽고 같은 값을 기록하도록 장벽을 둬 읽기-수정-쓰기의 소실을 재현한다. barrier는 재현 순서를 맞출 뿐, 업무상 동기화 전략으로 제시하는 것이 아니다.
+
+```java
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+public class ConcurrentWriteDemo {
+    public static void main(String[] args) throws Exception {
+        Path file = Path.of("_scratch/W24/shared.txt");
+        Files.createDirectories(file.getParent());
+        CyclicBarrier bothOpened = new CyclicBarrier(2);
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            Future<?> a = pool.submit(() -> writeSameFile(file, bothOpened, "MEMBER_A\n"));
+            Future<?> b = pool.submit(() -> writeSameFile(file, bothOpened, "MEMBER_B\n"));
+            a.get();
+            b.get();
+        }
+        long lines = Files.readAllLines(file).size();
+        System.out.printf("file records=%d, expected=2%n", lines);
+        Files.deleteIfExists(file);
+
+        Map<String, Integer> counts = new HashMap<>();
+        counts.put("orders", 0);
+        CyclicBarrier bothRead = new CyclicBarrier(2);
+        CyclicBarrier bothWrote = new CyclicBarrier(2);
+        int rounds = 1_000;
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            Future<?> a = pool.submit(() -> incrementTogether(counts, bothRead, bothWrote, rounds));
+            Future<?> b = pool.submit(() -> incrementTogether(counts, bothRead, bothWrote, rounds));
+            a.get();
+            b.get();
+        }
+        System.out.printf("map count=%d, expected=%d%n", counts.get("orders"), rounds * 2);
+    }
+
+    private static void writeSameFile(Path file, CyclicBarrier bothOpened, String value) {
+        try (FileChannel channel = FileChannel.open(file, StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
+            bothOpened.await();
+            ByteBuffer bytes = StandardCharsets.UTF_8.encode(value);
+            while (bytes.hasRemaining()) channel.write(bytes);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static void incrementTogether(Map<String, Integer> counts,
+            CyclicBarrier bothRead, CyclicBarrier bothWrote, int rounds) {
+        try {
+            for (int i = 0; i < rounds; i++) {
+                int current = counts.get("orders");
+                bothRead.await();
+                counts.put("orders", current + 1);
+                bothWrote.await();
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+```
+
+실행 명령: `java _scratch/W24/ConcurrentWriteDemo.java`
+
+```text
+file records=1, expected=2
+map count=1000, expected=2000
+```
+
+파일 결과는 두 기록 중 어느 내용이 최종으로 남는지와 무관하게 한 줄뿐이다. 두 파일 채널이 모두 파일을 연 뒤 쓰게 barrier로 순서를 제한했다. `Map`은 1,000회 매 회 두 스레드가 같은 값을 읽고 각각 다음 값을 쓴다. 두 번 증가해야 하지만 같은 숫자를 두 번 써서 최종 값은 1,000이다. 실제 운영에서 스레드 스케줄링은 이 코드처럼 반복마다 정확히 엇갈리지 않지만, 손실 가능성 자체는 코드 구조에 있다.
+
+## 6. 실무에서는 실제로
+
+**신규 서비스:** 회원·주문 원본은 관계형 DB 하나를 정본으로 시작한다. 여러 저장소를 미리 도입하면 배포·권한·모니터링·백업 지점이 늘어난다. 병목을 측정한 뒤 캐시 등을 추가한다.
+
+**레거시:** 기존 파일을 바로 없애지 말고 형식과 쓰기 경로를 조사한다. DB 스키마를 만들고 적재 결과를 대조한 뒤 읽기를 전환한다. 이중 쓰기를 한다면 어느 쪽이 정본인지와 재시도·중복 방지를 정해야 한다.
+
+**SI·금융:** DB 원장을 두고 배치 결과를 파일로 내보내는 식으로 공존할 수 있다. 파일 생성과 DB 커밋은 한 작업으로 취급하지 않는다. 고객 조직의 DB·백업 표준을 먼저 따른다.
+
+**스타트업:** 인력과 데이터 손실 허용도를 기준으로 관리형 DB, 파일, 메모리를 고른다. 업무 원본을 파일로 시작해야 하는 정해진 규칙은 없다. 단일 프로세스의 재생성 가능한 임시 데이터라면 메모리·파일이 더 경제적일 수 있다.
+
+**혼합 패턴:** 이미지 원본은 객체 스토리지, 소유자와 URL 같은 메타데이터는 DB, 자주 읽는 값은 캐시에 둔다. 캐시는 없어져도 정본에서 다시 채울 수 있어야 한다. 업로드는 P17, 캐시는 W23 참조.
+
+## 7. 흔한 오해와 실수
+
+1. **“서버가 한 대라 `Map`이면 충분하다” →** 재배포·크래시 때 데이터가 사라지고, 이후 스케일아웃에 막힌다. **대처:** 유실 시 재생성 가능한 데이터인지 판단하고 업무 원본은 외부 저장소에 둔다.
+2. **“JSON 파일에 쓰면 저장은 끝이다” →** 동시 read-modify-write가 서로 덮고 중간 실패가 파일을 손상시킬 수 있다. **대처:** 단일 작성자·낮은 중요도에 제한하거나 잠금·임시 파일·복구를 구현한다.
+3. **“`ConcurrentHashMap`이면 모든 동시성 문제를 해결한다” →** 개별 연산 안전성과 여러 호출·여러 데이터 변경의 원자성은 다르다. **대처:** 필요한 원자 범위를 정하고 공유 정본은 DB 트랜잭션으로 묶는다.
+4. **“DB가 중복을 알아서 막는다” →** `UNIQUE`가 없으면 중복이 저장된다. 사전 조회는 동시 요청 둘 다 통과할 수 있다. **대처:** 제약을 선언하고 중복 키 예외를 API 오류로 바꾼다.
+5. **“트랜잭션이 외부 시스템도 되돌린다” →** 롤백은 DB만 되돌리며 결제·메일은 이미 실행됐을 수 있다. **대처:** 멱등 키, outbox, 보상 흐름을 둔다(S08 참조).
+6. **“커밋됐으니 백업은 불필요하다” →** 잘못된 삭제나 DB 전체 손실은 지속성만으로 복구되지 않는다. **대처:** 독립 보관과 권한 분리, 복원 훈련을 운영한다.
+7. **“DB는 느리니 파일이 낫다” →** 네트워크 왕복은 있지만 전체 파일 파싱과 자체 잠금·복구 비용도 있다. **대처:** 쿼리·인덱스·연결 재사용을 측정하고 최적화한다.
+8. **“DB면 동시성 문제는 끝난다” →** 락 대기·교착·lost update·커넥션 고갈이 남는다. **대처:** 조건부 갱신, 격리 수준, 타임아웃을 업무 규칙에 맞춘다(P18 참조).
+
+## 8. 자가점검 Q&A (면접 대비)
+
+### Q1. 서버 메모리에 저장한 회원이 왜 재시작하면 사라지나?
+
+메모리 컬렉션은 JVM 프로세스의 힙 객체라 프로세스와 같은 생명주기다. 재시작 후에는 새 힙이 만들어지며 과거 객체는 복원되지 않는다. 여러 서버를 띄우면 각 인스턴스가 자기 복사본을 갖는다.
+
+**꼬리질문:** 세션에 넣으면 해결되나? 세션도 저장 위치가 로컬 메모리라면 같은 재시작·스케일아웃 문제가 있다. 외부 세션 저장소나 무상태 인증 등 별도 방식을 선택해야 한다.
+
+### Q2. 파일도 디스크에 남는데 업무 데이터 저장소로 부족한 핵심 이유는?
+
+파일은 바이트를 남길 뿐 질의 계획, 행 단위 제약, 여러 변경의 트랜잭션, 동시 갱신 규약을 자동으로 주지 않는다. 이런 기능을 직접 만들수록 포맷 버전·잠금·손상 복구가 별도 시스템이 된다. 단일 작성자 설정이나 로그처럼 범위가 단순한 파일은 여전히 적절하다.
+
+**꼬리질문:** 파일 잠금을 추가하면 DB와 같아지나? 잠금은 일부 경쟁을 제어할 뿐 인덱스·제약·백업·복구와 다중 레코드 트랜잭션까지 제공하지 않는다.
+
+### Q3. `ConcurrentHashMap`과 DB는 둘 다 여러 스레드 접근을 처리하는데 무엇이 다른가?
+
+`ConcurrentHashMap`은 한 JVM 안의 맵 연산을 안전하게 하는 도구다. DB는 별도 프로세스의 공유 저장소로 여러 애플리케이션이 접근하며, 트랜잭션·제약·질의·복구 기능을 제공한다. 맵의 메서드 스레드 안전성과 주문 전체의 원자성은 서로 다른 문제다.
+
+**꼬리질문:** 모든 캐시도 DB로 바꿔야 하나? 아니다. 손실되어도 정본에서 다시 채울 수 있고 만료를 허용하는 데이터는 캐시가 알맞다.
+
+### Q4. 주문 저장 중 주문 항목 저장이 실패하면 원자성은 어떻게 보장하나?
+
+DB에서 두 insert를 하나의 트랜잭션 안에 실행하고 실패를 트랜잭션 경계 밖으로 전달해 롤백한다. 그러면 앞선 insert도 커밋되지 않는다. 외부 결제 API는 같은 DB 트랜잭션에 묶이지 않으므로 별도 멱등성·보상 설계가 필요하다.
+
+**꼬리질문:** 예외를 잡고 정상 반환하면? 기본 롤백 규칙이 적용되지 않을 수 있다. 오류를 다시 던지거나 명시적으로 rollback-only 처리해야 한다.
+
+### Q5. “이메일이 없는지 조회한 뒤 저장”했는데 왜 중복이 생기나?
+
+요청 A와 B가 동시에 조회해 둘 다 없음 결과를 받은 뒤 각각 insert할 수 있다. 확인과 insert 사이에는 경쟁 구간이 있다. DB `UNIQUE` 제약으로 최종 조건을 강제하고 중복 예외를 처리해야 한다.
+
+**꼬리질문:** 애플리케이션 검증은 불필요한가? 사용자에게 빠른 오류를 주는 사전 검증은 유용하지만 최종 무결성은 DB 제약이 담당한다.
+
+### Q6. ACID의 D가 있으면 백업은 없어도 되나?
+
+아니다. 지속성은 커밋 데이터가 장애 후 남도록 하는 성질이며, 실수로 삭제한 행이나 DB 전체 손실의 과거 시점 복구를 대신하지 않는다. 백업 보관과 복원 검증은 별도다. 설정과 저장 하드웨어에 따라 커밋 지속성의 세부 보장도 달라진다.
+
+**꼬리질문:** 백업 파일이 생성되면 복구 가능성이 증명되나? 실제 복원 테스트로 데이터와 서비스가 목표 시간 안에 복구되는지 확인해야 한다.
+
+## 9. 참고문헌
+
+- MySQL 8.4 Reference Manual, InnoDB and the ACID Model — https://dev.mysql.com/doc/refman/8.4/en/mysql-acid.html — ACID 각 항목과 InnoDB 로그·저장 장치·백업 설정의 관계를 확인했다.
+- PostgreSQL 18 Documentation, Transactions — https://www.postgresql.org/docs/current/tutorial-transactions.html — 트랜잭션의 전부 성공·전부 실패 의미를 확인했다.
+- PostgreSQL 18 Documentation, Constraints — https://www.postgresql.org/docs/current/ddl-constraints.html — CHECK, NOT NULL, UNIQUE, PK, FK 제약의 공식 항목을 확인했다.
+- PostgreSQL 18 Documentation, Indexes — https://www.postgresql.org/docs/current/indexes.html — 인덱스가 조회 성능을 높이는 일반 수단이며 종류와 활용 분석이 있음을 확인했다.
+- PostgreSQL 18 Documentation, Backup and Restore — https://www.postgresql.org/docs/current/backup.html — SQL dump, 파일시스템 백업, 연속 아카이빙과 시점 복구 범위를 확인했다.
+- Java Tutorials, Memory Consistency Errors — https://docs.oracle.com/javase/tutorial/essential/concurrency/memconsist.html — happens-before가 없으면 스레드 간 변경 가시성을 보장할 수 없음을 확인했다.
+- Java SE 21 API, `Map` — https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html — `Map` 기본 메서드가 동기화·원자성을 보장하지 않는다는 API 계약을 확인했다.
+- Spring Framework Reference, JDBC Core — https://docs.spring.io/spring-framework/reference/data-access/jdbc/core.html — `JdbcTemplate`과 `JdbcClient`의 SQL 실행·결과 처리 역할을 확인했다.
+
+DB 서버의 정의는 R01, RDB와 NoSQL 비교는 R02, 트랜잭션 상세는 S08, 동시성 실전은 P18 참조.

@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1-6. 토큰으로 작성자 정하기</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 1장. 게시글 작성 — POST /api/posts › 1-6</p>
+<h1 id="1-6-토큰으로-작성자-정하기"><a class="anchor" href="#1-6-토큰으로-작성자-정하기" aria-hidden="true">#</a>1-6. 토큰으로 작성자 정하기</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p>지금은 누가 보내도 작성자가 김자바다. 실제 서비스에서는 사용자가 로그인한 뒤 받은 <strong>토큰</strong>을 요청 헤더에 실어 보낸다.</p>
+<p>로그인과 토큰 발급은 이번에 만들지 않는다. <strong>토큰은 이미 발급되어 <code>api_token</code> 테이블에 있다고 가정</strong>하고, 요청에 실려 온 토큰의 주인을 작성자로 정한다.</p>
+<pre class="mermaid">sequenceDiagram
+  participant F as 프론트
+  participant A as 토큰 확인(한 곳)
+  participant C as PostController
+  participant S as PostService
+  F-&gt;&gt;A: POST /api/posts&lt;br/&gt;Authorization: Bearer tok-lee
+  A-&gt;&gt;A: api_token 조회 → 만료·폐기·회원 상태 확인
+  alt 토큰 없음/잘못됨/만료/폐기
+    A--&gt;&gt;F: 401
+  else 회원이 정지 상태
+    A--&gt;&gt;F: 403
+  else 정상
+    A-&gt;&gt;C: 로그인 회원(3, 이스프링)
+    C-&gt;&gt;S: 작성(작성자 = 로그인 회원)
+    S--&gt;&gt;F: 201
+  end</pre>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<p><strong>요청 헤더</strong> — <code>Authorization: Bearer &lt;토큰&gt;</code></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>토큰</th>
+<th>주인</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tok-kimjava</code></td>
+<td>2 김자바</td>
+<td>정상</td>
+</tr>
+<tr>
+<td><code>tok-lee</code></td>
+<td>3 이스프링</td>
+<td>정상</td>
+</tr>
+<tr>
+<td><code>tok-admin</code></td>
+<td>1 운영자(ADMIN)</td>
+<td>정상 — 공지 게시판에 쓸 수 있다</td>
+</tr>
+<tr>
+<td><code>tok-kimjava-old</code></td>
+<td>2 김자바</td>
+<td><strong>만료</strong>(<code>expires_at</code> = 2026-01-01)</td>
+</tr>
+<tr>
+<td><code>tok-kimjava-revoked</code></td>
+<td>2 김자바</td>
+<td><strong>폐기</strong>(<code>revoked_at</code> 있음)</td>
+</tr>
+<tr>
+<td><code>tok-choi</code></td>
+<td>5 최정지</td>
+<td>토큰은 유효하지만 <strong>회원이 정지(SUSPENDED)</strong></td>
+</tr>
+</tbody></table></div>
+<p><strong>규칙</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상황</th>
+<th>응답</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>헤더 없음 / <code>Bearer </code> 형식이 아님 / 없는 토큰 / 만료 / 폐기</td>
+<td><code>401</code>, <code>application/problem+json</code>, 응답 헤더 <code>WWW-Authenticate: Bearer</code></td>
+</tr>
+<tr>
+<td>토큰은 유효한데 회원이 <code>ACTIVE</code>가 아님</td>
+<td><code>403</code>, <code>application/problem+json</code></td>
+</tr>
+<tr>
+<td>정상</td>
+<td>작성자 = <strong>토큰 주인</strong>. 응답 <code>author</code>도 토큰 주인</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li><strong>인증을 먼저 본다.</strong> 토큰이 없으면 본문이 잘못돼도 <code>401</code>이다(400이 아님).</li>
+<li>요청 본문에 <code>&quot;authorId&quot;</code> 같은 값이 와도 <strong>무시한다.</strong> 작성자를 클라이언트가 정하게 두면 남의 이름으로 글을 쓸 수 있다.</li>
+<li>1-5의 공지 게시판 규칙(운영자만)은 이제 토큰 주인 기준이다.</li>
+<li>만료는 &quot;지금 시각 ≥ <code>expires_at</code>&quot;이다.</li>
+</ul>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+BODY='{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[채점] 토큰&quot;,&quot;content&quot;:&quot;토큰으로 쓴 글&quot;,&quot;tags&quot;:[&quot;spring&quot;],&quot;visibility&quot;:&quot;PUBLIC&quot;}'
+post() { curl -s -i -X POST &quot;$BASE/api/posts&quot; -H 'Content-Type: application/json' &quot;$@&quot;; echo; echo ----; }
+
+post -H 'Authorization: Bearer tok-lee' -d &quot;$BODY&quot;                                   # T1 정상(이스프링)
+post -H 'Authorization: Bearer tok-kimjava' \
+  -d '{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[채점] 토큰-작성자위조&quot;,&quot;content&quot;:&quot;본문&quot;,&quot;tags&quot;:[],&quot;visibility&quot;:&quot;PUBLIC&quot;,&quot;authorId&quot;:1}'   # T2 authorId 무시
+post -d &quot;$BODY&quot;                                                                       # T3 헤더 없음
+post -H 'Authorization: tok-kimjava' -d &quot;$BODY&quot;                                       # T4 Bearer 없음
+post -H 'Authorization: Bearer no-such-token' -d &quot;$BODY&quot;                              # T5 없는 토큰
+post -H 'Authorization: Bearer tok-kimjava-old' -d &quot;$BODY&quot;                            # T6 만료
+post -H 'Authorization: Bearer tok-kimjava-revoked' -d &quot;$BODY&quot;                        # T7 폐기
+post -H 'Authorization: Bearer tok-choi' -d &quot;$BODY&quot;                                   # T8 정지 회원
+post -d '{&quot;title&quot;: &quot;[채점] 깨짐&quot;'                                                       # T9 깨진 본문 + 헤더 없음
+post -H 'Authorization: Bearer tok-admin' \
+  -d '{&quot;boardSlug&quot;:&quot;notice&quot;,&quot;title&quot;:&quot;[채점] 토큰-공지&quot;,&quot;content&quot;:&quot;공지&quot;,&quot;tags&quot;:[],&quot;visibility&quot;:&quot;PUBLIC&quot;}'           # T10 운영자 공지
+post -H 'Authorization: Bearer tok-kimjava' \
+  -d '{&quot;boardSlug&quot;:&quot;notice&quot;,&quot;title&quot;:&quot;[채점] 토큰-공지-실패&quot;,&quot;content&quot;:&quot;공지&quot;,&quot;tags&quot;:[],&quot;visibility&quot;:&quot;PUBLIC&quot;}'      # T11 일반 회원 공지</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용). 요청은 위 T1~T11을 그대로 쓴다. <code>{id}</code>는 T1 응답의 <code>id</code>다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>T1</td>
+<td><code>201</code>, <code>author.id</code> = <code>3</code>, <code>author.nickname</code> = <code>이스프링</code></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>T2</td>
+<td><code>201</code>, <code>author.id</code> = <code>2</code>(본문의 <code>authorId: 1</code>은 무시)</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>T3</td>
+<td><code>401</code>, <code>Content-Type: application/problem+json</code>, 응답 헤더 <code>WWW-Authenticate</code>가 <code>Bearer</code>로 시작</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>T4</td>
+<td><code>401</code></td>
+</tr>
+<tr>
+<td>C5</td>
+<td>T5</td>
+<td><code>401</code></td>
+</tr>
+<tr>
+<td>C6</td>
+<td>T6</td>
+<td><code>401</code></td>
+</tr>
+<tr>
+<td>C7</td>
+<td>T7</td>
+<td><code>401</code></td>
+</tr>
+<tr>
+<td>C8</td>
+<td>T8</td>
+<td><code>403</code>, <code>Content-Type: application/problem+json</code></td>
+</tr>
+<tr>
+<td>C9</td>
+<td>T9</td>
+<td><code>401</code>(인증이 먼저 — 400이 아님)</td>
+</tr>
+<tr>
+<td>C10</td>
+<td>T10</td>
+<td><code>201</code>, <code>author.id</code> = <code>1</code></td>
+</tr>
+<tr>
+<td>C11</td>
+<td>T11</td>
+<td><code>403</code></td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT author_id FROM post WHERE id = {id}</code></td>
+<td><code>3</code></td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT COUNT(*) FROM post WHERE title = &#39;[채점] 토큰-공지-실패&#39;</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td>R1</td>
+<td>한 곳에서 확인</td>
+<td>토큰 확인이 컨트롤러 메서드마다 반복되지 않는다(인터셉터·필터·<code>HandlerMethodArgumentResolver</code> 등 한 곳)</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>401과 403</td>
+<td>&quot;누구인지 모름&quot;(401)과 &quot;누구인지는 알지만 안 됨&quot;(403)을 구분한다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>시각</td>
+<td>만료 판단의 현재 시각을 바꿔 끼울 수 있다(예: <code>Clock</code> 빈 주입) — 테스트에서 시간을 고정할 수 있다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>비밀값</td>
+<td>토큰 원문을 로그에 남기지 않는다</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>작성자 출처</td>
+<td>서비스가 작성자를 요청 본문이 아니라 인증된 회원에서 받는다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/D11-web-security-basics.html#32-인증과-인가-신원-확인-후-객체까지-확인">D11 웹 보안 기초 — 인증과 인가</a> — 401과 403</li>
+<li><a href="../../docs/knowledge/B01-account-lifecycle.html">B01 계정 생애주기</a> — 토큰·세션, 정지·탈퇴 회원 처리</li>
+<li><a href="../../docs/knowledge/S05-mvc-request-flow.html#필터-인터셉터-aop-비교">S05 — 필터, 인터셉터, AOP 비교</a> — 토큰 확인을 어디에 둘까</li>
+<li><a href="../../docs/knowledge/S05-mvc-request-flow.html#q2-argumentresolver와-messageconverter는-어떻게-다른가">S05 — ArgumentResolver와 MessageConverter는 어떻게 다른가</a> — C9(인증 먼저)와 관련</li>
+<li><a href="../../docs/knowledge/W13-frontend-backend-boundary.html">W13 프론트와 백엔드의 경계</a> — 클라이언트가 보낸 값을 믿으면 안 되는 이유(C2)</li>
+<li><a href="../../docs/knowledge/W20-time-timezone.html">W20 시간과 타임존</a> — 만료 시각 비교와 <code>Clock</code></li>
+<li>(선택) <a href="../../docs/knowledge/S12-security-architecture.html">S12 Spring Security 아키텍처</a> · <a href="../../docs/knowledge/S13-jwt-oauth2.html">S13 JWT·OAuth2</a> — 같은 일을 Spring Security와 JWT로 한다면</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 어디서 확인할까</summary>
+
+<p><code>HandlerInterceptor</code>의 <code>preHandle</code>은 컨트롤러 메서드의 매개변수(<code>@RequestBody</code>)를 만들기 <strong>전에</strong> 실행된다. 그래서 C9(깨진 본문 + 토큰 없음 → 401)를 맞추기 쉽다. 확인한 회원은 <code>request.setAttribute(...)</code>로 넘긴다. <code>/api/**</code>에만 적용하고 <code>/hello</code>는 빼는 식으로 등록 경로를 정한다(<code>WebMvcConfigurer.addInterceptors</code>).</p>
+</details>
+
+<details>
+<summary>힌트 2 — 컨트롤러에서 회원 받기</summary>
+
+<p><code>@LoginMember</code> 같은 애노테이션을 만들고 <code>HandlerMethodArgumentResolver</code>로 그 매개변수에 회원을 넣어 주면 컨트롤러가 <code>create(@LoginMember LoginMember me, @Valid @RequestBody PostCreateRequest req)</code>처럼 깔끔해진다.</p>
+</details>
+
+<details>
+<summary>힌트 3 — 401 응답 만들기</summary>
+
+<p>인터셉터에서 예외를 던지면 1-5에서 만든 <code>@RestControllerAdvice</code>가 처리할 수 있다. <code>WWW-Authenticate</code> 헤더는 <code>ResponseEntity</code>나 <code>HttpServletResponse</code>로 붙인다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p>1장 끝. 2장(게시글 조회)은 준비 중이다 — <a href="../README.html#목차">시나리오 목차</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 1-6. 토큰으로 작성자 정하기\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch1-create-post/1-6-token-auth.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라.\n5. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n6. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="1-5-validation.html">← 이전 1-5. 입력 검증과 에러 응답</a><span></span></nav>
+</main>
+<script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</script>
+</body>
+</html>

@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W18. REST vs GraphQL vs gRPC — 선택 기준</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
+<main>
+
+<h1 id="w18-rest-vs-graphql-vs-grpc--선택-기준"><a class="anchor" href="#w18-rest-vs-graphql-vs-grpc--선택-기준" aria-hidden="true">#</a>W18. REST vs GraphQL vs gRPC — 선택 기준</h1>
+<blockquote>
+<p>세 방식은 서로 다른 계층의 문제를 푼다. REST는 HTTP 자원과 표준 의미를, GraphQL은 클라이언트가 필요한 필드를 조합하는 질의 계약을, gRPC는 스키마로 생성하는 원격 메서드 계약을 제공한다.
+브라우저가 쓰는 신규 공개 API의 기본 선택은 REST다. HTTP 도구·캐시·호환성이 넓고 팀이 운영하기 쉽기 때문이다.
+화면별 응답 조합이 문제면 GraphQL을 BFF에, 타입이 강한 내부 서비스 통신이나 스트리밍이 요구되면 gRPC를 추가한다.</p>
+</blockquote>
+<h2 id="1-질문"><a class="anchor" href="#1-질문" aria-hidden="true">#</a>1. 질문</h2>
+<p><strong>상황 1 — 모바일 화면에 필요 없는 응답까지 온다.</strong> <code>GET /products/42</code>가 상세 설명, 전체 리뷰, 재고 이력까지 한꺼번에 반환해 모바일 화면은 일부만 쓰고도 큰 JSON을 받는다. REST가 잘못된 것인지, GraphQL로 바꾸면 DB 호출까지 자동으로 효율적이 되는지 헷갈린다.</p>
+<p><strong>상황 2 — 화면 하나가 여러 서비스에 연달아 요청한다.</strong> 상품 화면은 상품·가격·재고·혜택 API를 호출한다. 프론트 개발자가 병렬 호출, 실패 처리, 응답 조합을 매 화면마다 구현한다. BFF나 GraphQL이 왕복을 줄여도 각 필드의 resolver가 DB를 반복 조회하면 서버 내부 비용은 오히려 커질 수 있다.</p>
+<p><strong>상황 3 — 주문 서비스가 재고 서비스와 대화한다.</strong> Java끼리 호출하니 JSON REST 대신 gRPC가 빠르다는 말을 듣는다. 하지만 브라우저에서도 직접 호출할 수 있는지, <code>.proto</code> 변경을 여러 팀이 함께 배포해야 하는지, 기존 Spring Boot에서 어떻게 붙이는지 결정 근거가 필요하다.</p>
+<h2 id="2-짧은-답"><a class="anchor" href="#2-짧은-답" aria-hidden="true">#</a>2. 짧은 답</h2>
+<ul>
+<li>외부 고객과 브라우저가 쓰는 CRUD·공개 API라면 <strong>REST + HTTP/JSON</strong>을 기본값으로 둔다.</li>
+<li>여러 화면이 같은 도메인 데이터를 서로 다른 모양으로 요구하고 BFF가 필드 선택을 통제할 수 있으면 <strong>GraphQL</strong>을 검토한다.</li>
+<li>서버 간 호출에서 명시적인 타입 계약, 코드 생성, 다언어 연동, 양방향 스트리밍이 필요하면 <strong>gRPC</strong>를 검토한다.</li>
+<li>REST는 자원 중심, GraphQL은 클라이언트가 쓰는 스키마 질의, gRPC는 서비스와 메서드 중심 계약이다. 이름만 바꾼 같은 API가 아니다.</li>
+<li>GraphQL은 over-fetching을 줄일 뿐 N+1, 비싼 질의, 권한 검사를 해결해 주지 않는다. gRPC는 바이너리라고 자동으로 빠르거나 재시도 안전하지 않다.</li>
+<li>한 시스템 안에서 섞어도 된다. 외부 REST → BFF/GraphQL → 내부 gRPC처럼 경계를 따라 선택한다.</li>
+<li><strong>기본값 추천: REST.</strong> 별도 요구가 생길 때 GraphQL 또는 gRPC를 특정 경계에 도입한다.</li>
+</ul>
+<h2 id="3-왜-그런가--원리"><a class="anchor" href="#3-왜-그런가--원리" aria-hidden="true">#</a>3. 왜 그런가 — 원리</h2>
+<h3 id="세-가지는-계약을-두는-위치가-다르다"><a class="anchor" href="#세-가지는-계약을-두는-위치가-다르다" aria-hidden="true">#</a>세 가지는 계약을 두는 위치가 다르다</h3>
+<p>REST에서 클라이언트는 URI가 가리키는 자원에 HTTP 메서드로 의도를 표현하고, HTTP 상태 코드·헤더·표현으로 결과를 받는다. REST는 단순히 JSON을 반환하는 컨트롤러를 뜻하지 않으며, 아키텍처 제약과 균일한 인터페이스에 관한 스타일이다. 현업의 “REST API”는 REST 제약을 전부 적용하지 않은 HTTP/JSON API를 가리키기도 하므로 실제 계약을 확인해야 한다. HTTP 캐시는 메서드·대상 URI와 응답 지시자를 활용한다. 흔한 공유 캐시가 GET 응답 위주로 구성된다는 점은 <code>/products/42</code> 같은 읽기 경로에 강점을 준다.</p>
+<p>GraphQL은 서버 스키마에 맞춰 클라이언트가 operation과 selection set을 보내고, 서버가 검증 후 필드 resolver를 실행한다. 응답이 요청 필드 모양을 따르며 연관 객체도 한 질의로 읽어 왕복과 불필요한 필드를 줄이기 쉽다. 하지만 resolver별 SQL은 N+1을 만들 수 있다. 깊이·복잡도, batching, 권한과 타임아웃은 애플리케이션이 설계해야 한다. 질의 본문이 다양한 <code>/graphql</code>은 URL만으로 캐시하기 어렵다. GET 질의나 persisted query를 적용해도 REST의 GET 자원 캐시처럼 자동 동작하지 않는다.</p>
+<p>gRPC는 <code>.proto</code>의 메시지와 service/RPC 정의를 빌드 때 언어별 코드로 생성한다. 호출자는 생성된 stub 메서드를 부르고, gRPC 런타임이 HTTP/2 기반 프레이밍과 protobuf 직렬화를 처리한다. 단항(unary) 요청·응답 외에 서버 스트리밍, 클라이언트 스트리밍, 양방향 스트리밍을 계약에 표현할 수 있다. 강한 계약은 여러 언어의 서비스 사이에서 유리한 대신, proto 변경·코드 생성·클라이언트 호환 정책을 배포 과정에 포함해야 한다. 일반 브라우저의 <code>fetch</code>가 네이티브 gRPC를 직접 호출하는 형태는 아니며, 브라우저 클라이언트에는 gRPC-Web와 프록시 또는 HTTP 게이트웨이가 필요하다.</p>
+<pre class="mermaid">flowchart LR
+  UI[&quot;브라우저·외부 클라이언트&quot;] --&gt;|&quot;HTTP 자원·JSON&quot;| REST[&quot;REST API&quot;]
+  UI --&gt;|&quot;스키마 질의·JSON&quot;| GQL[&quot;GraphQL BFF&quot;]
+  GQL --&gt;|&quot;조합·권한·캐시&quot;| REST
+  GQL --&gt;|&quot;내부 RPC&quot;| GRPC[&quot;gRPC 서비스&quot;]
+  REST --&gt;|&quot;HTTP/2·Protobuf&quot;| GRPC
+  GRPC --&gt;|&quot;타입 계약·스트림&quot;| SVC[&quot;내부 서비스&quot;]</pre>
+<p>선택할 때 “왕복 횟수”와 “총 비용”을 구분한다. GraphQL 한 번으로 합쳐도 resolver가 DB를 열 번 읽으면 서버 내부 왕복은 늘 수 있다. gRPC가 페이로드를 줄여도 연결 설정, 직렬화, 서버 처리, 재시도 폭풍이 전체 지연을 결정한다. REST도 압축·캐시·부분 표현·배치 API로 최적화할 수 있다. 반드시 실제 병목과 운영 조건을 측정한다.</p>
+<h2 id="4-선택지-비교"><a class="anchor" href="#4-선택지-비교" aria-hidden="true">#</a>4. 선택지 비교</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>선택지</th>
+<th>어떻게 동작</th>
+<th>장점</th>
+<th>단점</th>
+<th>언제 쓰나</th>
+<th>국내 실무에서 흔한가</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>REST / HTTP JSON</td>
+<td>자원 URI와 HTTP 메서드·상태 코드, JSON 표현으로 교환</td>
+<td>브라우저 기본 지원, 프록시·로그·테스트 도구가 성숙, HTTP 캐시·인증 생태계를 활용하기 쉬움</td>
+<td>화면별 고정 DTO는 over-fetch/under-fetch가 생길 수 있음. 규칙 없는 엔드포인트는 RPC처럼 변질</td>
+<td>공개 API, 일반 웹·모바일 CRUD, 파트너 연동</td>
+<td>HTTP/JSON은 널리 쓰이는 기본 선택. 조직별 차이를 감안해야 함</td>
+</tr>
+<tr>
+<td>GraphQL</td>
+<td>보통 하나의 HTTP 경로에 schema 기반 query/mutation, 선택 필드 요청</td>
+<td>클라이언트가 필요한 필드 선택, 여러 관계 데이터를 한 질의로 조합, 스키마 탐색·검증 도구</td>
+<td>resolver N+1, 질의 복잡도·권한·캐시·관측 설계 부담, 운영자가 호출비용 예측하기 어려움</td>
+<td>여러 프론트엔드의 응답 조합을 맡는 BFF, 데이터 탐색 UI</td>
+<td>모든 팀의 기본 기술이라고 볼 공개 통계는 확인하지 못함. BFF/제품 조직별 선택</td>
+</tr>
+<tr>
+<td>gRPC</td>
+<td><code>.proto</code> service와 메시지에서 stub 생성, HTTP/2 위에서 호출</td>
+<td>명시적 타입·다언어 코드 생성, 작고 효율적인 protobuf 표현, 스트리밍 RPC</td>
+<td>브라우저 직접 호출 제약, 계약·생성코드·호환 관리 필요, 사람이 패킷을 읽기 어려움</td>
+<td>내부 서비스 간 통신, 스트리밍, 엄격한 스키마 계약</td>
+<td>서비스 언어·플랫폼 표준에 따라 편차. 국내 점유율 근거 자료는 확인하지 못함</td>
+</tr>
+<tr>
+<td>혼합형(BFF/게이트웨이)</td>
+<td>외부 REST 또는 GraphQL 뒤에서 내부 gRPC를 호출</td>
+<td>각 경계의 소비자에게 맞는 계약, 내부 성능·타입 계약과 외부 호환성을 분리</td>
+<td>중복 DTO·매핑·추적 경로, 장애 지점과 운영 스택 증가</td>
+<td>외부 브라우저는 HTTP, 내부는 gRPC가 적합한 시스템</td>
+<td>대규모 조직에서 선택 가능한 구조이나 “흔하다”는 통계 근거는 없음</td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>비교 기준</th>
+<th>REST</th>
+<th>GraphQL</th>
+<th>gRPC</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>over/under-fetching</td>
+<td>DTO가 고정되면 화면 요구와 어긋남. 프로젝션으로 조절 가능</td>
+<td>응답 필드는 선택하나 DB 조회량은 보장하지 않음</td>
+<td>응답 메시지가 고정 계약</td>
+</tr>
+<tr>
+<td>타입 계약</td>
+<td>OpenAPI 같은 별도 명세로 보완</td>
+<td>SDL schema와 입력·출력 타입</td>
+<td><code>.proto</code> 서비스·메시지 타입에서 코드 생성</td>
+</tr>
+<tr>
+<td>캐시</td>
+<td>GET·URI·<code>Cache-Control</code>·<code>ETag</code>로 HTTP/CDN 적용이 쉬움</td>
+<td>본문 질의로 기본 HTTP 키가 복잡. GET/persisted query 별도 설계</td>
+<td>일반 브라우저 HTTP 캐시를 기대하기 어려워 앱 캐시 필요</td>
+</tr>
+<tr>
+<td>브라우저·도구</td>
+<td><code>fetch</code>, curl, 게이트웨이에 친숙</td>
+<td>브라우저, GraphiQL, 스키마 코드 생성</td>
+<td>gRPC-Web/프록시 필요. <code>grpcurl</code> 등 사용</td>
+</tr>
+<tr>
+<td>스트리밍·운영</td>
+<td>SSE/WebSocket 별도 선택. HTTP 도구 성숙</td>
+<td>subscription 전송 별도 구성. resolver·비용 제한 필요</td>
+<td>3종 streaming RPC. proto 호환·HTTP/2 운영 필요</td>
+</tr>
+<tr>
+<td>학습·운영 부담</td>
+<td>낮은 편. HTTP 의미·상태 코드 합의는 필요</td>
+<td>중간~높음. SDL, resolver, 질의 비용 제한·캐시·권한 설계</td>
+<td>중간~높음. proto 호환, 빌드 코드 생성, HTTP/2 디버깅·재시도 이해 필요</td>
+</tr>
+</tbody></table></div>
+<p>GraphQL은 전송 프로토콜이 아니다. Boot 4.1은 GraphQL starter에 MVC, WebSocket, WebFlux, RSocket 전송을 조합하며, gRPC는 protobuf 외에 service 계약·코드 생성·런타임도 포함한다. Boot 4.1 릴리스 노트는 클라이언트·서버 개발/테스트, Netty standalone 및 Servlet HTTP/2를 지원한다고 밝힌다. Spring gRPC 1.0.x는 Boot 4.1.x를 지원한다. <code>grpc-ecosystem</code> starter와 Spring gRPC는 별도 통합 경로이므로 문서와 의존성을 혼용하지 않는다.</p>
+<h2 id="5-코드로-보기"><a class="anchor" href="#5-코드로-보기" aria-hidden="true">#</a>5. 코드로 보기</h2>
+<p>동일 상품 조회 기능을 공통 인메모리 서비스에 붙였다. Boot 4.1 / Framework 7 API 예제이며 모두 **(미실행)**이다. REST는 <code>spring-boot-starter-web</code>, GraphQL은 <code>spring-boot-starter-graphql</code>과 HTTP 전송 starter, gRPC는 Boot 공식 proto 플러그인·서버 설정을 전제한다.</p>
+<p>공통 서비스:</p>
+<pre><code class="language-java">package com.example.catalog;
+
+import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.ResponseStatus;
+
+@Service
+public class ProductService {
+    private final Map&lt;Long, Product&gt; products = Map.of(
+        42L, new Product(42L, &quot;Keyboard&quot;, 12900L),
+        43L, new Product(43L, &quot;Mouse&quot;, 7900L)
+    );
+
+    public Product get(long id) {
+        Product product = products.get(id);
+        if (product == null) throw new ProductNotFoundException(id);
+        return product;
+    }
+
+    public record Product(long id, String name, long priceCents) {}
+
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public static class ProductNotFoundException extends RuntimeException {
+        public ProductNotFoundException(long id) {
+            super(&quot;Product not found: &quot; + id);
+        }
+    }
+}</code></pre>
+<h3 id="rest-자원-uri와-http-의미를-드러낸다"><a class="anchor" href="#rest-자원-uri와-http-의미를-드러낸다" aria-hidden="true">#</a>REST: 자원 URI와 HTTP 의미를 드러낸다</h3>
+<p><code>GET /api/products/42</code>는 캐시 가능한 읽기 요청으로 표현되고, 클라이언트는 HTTP 응답 코드와 JSON DTO를 받는다. 이 샘플은 도메인 레코드를 그대로 반환해 단순화했다. 실제 공개 API라면 응답 DTO와 도메인 모델을 분리해 내부 필드 노출을 막는다. <strong>(미실행)</strong></p>
+<pre><code class="language-java">package com.example.catalog;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(&quot;/api/products&quot;)
+public class ProductRestController {
+    private final ProductService products;
+
+    public ProductRestController(ProductService products) {
+        this.products = products;
+    }
+
+    @GetMapping(&quot;/{id}&quot;)
+    public ProductService.Product get(@PathVariable long id) {
+        return products.get(id);
+    }
+}</code></pre>
+<p><code>GET /api/products/42</code>는 <code>{&quot;id&quot;:42,&quot;name&quot;:&quot;Keyboard&quot;,&quot;priceCents&quot;:12900}</code>를 반환한다. JSON 필드 삭제·의미 변경은 클라이언트를 깨뜨릴 수 있다.</p>
+<h3 id="graphql-같은-기능을-클라이언트-질의로-표현한다"><a class="anchor" href="#graphql-같은-기능을-클라이언트-질의로-표현한다" aria-hidden="true">#</a>GraphQL: 같은 기능을 클라이언트 질의로 표현한다</h3>
+<p><code>src/main/resources/graphql/schema.graphqls</code>:</p>
+<pre><code class="language-graphql">type Query {
+  product(id: ID!): Product
+}
+
+type Product {
+  id: ID!
+  name: String!
+  priceCents: Int!
+}</code></pre>
+<p>HTTP 요청 본문에는 <code>{ product(id: &quot;42&quot;) { name priceCents } }</code>를 보낸다. 응답은 <code>{ &quot;data&quot;: { &quot;product&quot;: { &quot;name&quot;: &quot;Keyboard&quot;, &quot;priceCents&quot;: 12900 } } }</code> 모양이다. 클라이언트는 <code>id</code>가 필요 없으면 선택하지 않아도 된다. 이 요청의 필드 데이터 resolver 하나가 상품을 가져오도록 만든 것이며, 중첩 관계를 늘릴 경우 batching과 접근 제어를 추가해야 한다. <strong>(미실행)</strong></p>
+<pre><code class="language-java">package com.example.catalog;
+
+import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.stereotype.Controller;
+
+@Controller
+public class ProductGraphQlController {
+    private final ProductService products;
+
+    public ProductGraphQlController(ProductService products) {
+        this.products = products;
+    }
+
+    @QueryMapping
+    public ProductService.Product product(@Argument String id) {
+        return products.get(Long.parseLong(id));
+    }
+}</code></pre>
+<h3 id="grpc-service-메서드와-protobuf-타입을-고정한다"><a class="anchor" href="#grpc-service-메서드와-protobuf-타입을-고정한다" aria-hidden="true">#</a>gRPC: service 메서드와 protobuf 타입을 고정한다</h3>
+<p><code>src/main/proto/product.proto</code>를 빌드 때 Java stub으로 생성한다. 한 개 필드의 타입 변경이 네트워크 계약이므로, 기존 필드 번호를 재사용하지 말고 제거한 번호/이름은 <code>reserved</code> 처리한다. <strong>(미실행)</strong></p>
+<pre><code class="language-proto">syntax = &quot;proto3&quot;;
+
+option java_package = &quot;com.example.catalog.proto&quot;;
+option java_multiple_files = true;
+
+service ProductCatalog {
+  rpc GetProduct(ProductRequest) returns (ProductReply);
+}
+
+message ProductRequest {
+  int64 id = 1;
+}
+
+message ProductReply {
+  int64 id = 1;
+  string name = 2;
+  int64 price_cents = 3;
+}</code></pre>
+<p>서버 구현은 Spring Bean으로 등록하고 생성 stub의 기본 클래스를 확장한다. gRPC 상태 코드를 HTTP 응답 코드와 같다고 가정하지 말고 클라이언트 계약으로 다룬다. <strong>(미실행)</strong></p>
+<pre><code class="language-java">package com.example.catalog;
+
+import com.example.catalog.ProductService.ProductNotFoundException;
+import com.example.catalog.proto.ProductCatalogGrpc;
+import com.example.catalog.proto.ProductReply;
+import com.example.catalog.proto.ProductRequest;
+import io.grpc.Status;
+import io.grpc.stub.StreamObserver;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ProductGrpcService extends ProductCatalogGrpc.ProductCatalogImplBase {
+    private final ProductService products;
+
+    public ProductGrpcService(ProductService products) {
+        this.products = products;
+    }
+
+    @Override
+    public void getProduct(ProductRequest request,
+                           StreamObserver&lt;ProductReply&gt; responseObserver) {
+        try {
+            ProductService.Product product = products.get(request.getId());
+            ProductReply reply = ProductReply.newBuilder()
+                .setId(product.id())
+                .setName(product.name())
+                .setPriceCents(product.priceCents())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (ProductNotFoundException ex) {
+            responseObserver.onError(Status.NOT_FOUND
+                .withDescription(ex.getMessage())
+                .asRuntimeException());
+        }
+    }
+}</code></pre>
+<p>선택지마다 외부 표현은 다르지만 상품 규칙은 <code>ProductService</code>에서 공유한다. GraphQL resolver 안에 가격 계산 규칙을 넣거나 REST 컨트롤러와 gRPC 서비스에서 각각 재고 정책을 복제하면 인터페이스 선택이 도메인 규칙 중복으로 번진다.</p>
+<h2 id="6-실무에서는-실제로"><a class="anchor" href="#6-실무에서는-실제로" aria-hidden="true">#</a>6. 실무에서는 실제로</h2>
+<p><strong>신규 웹 서비스:</strong> 공개 소비자가 브라우저·모바일이고 CRUD 중심이면 REST를 먼저 낸다. <code>GET</code>은 명확한 상태 코드·검증·OpenAPI 문서와 함께 설계하고, 응답 DTO의 호환성 및 인증 정책을 정한다. 화면 조합이 실제 병목으로 나타나면 모든 API를 옮기지 말고 BFF에서 GraphQL을 시험한다.</p>
+<p><strong>레거시 서비스:</strong> REST 클라이언트가 많으면 외부 계약은 유지한다. 새 내부 경계에 gRPC를 추가하고 매핑을 게이트웨이에 둔다. 추적 ID, deadline, 오류 매핑, proto 호환 검사를 배포 파이프라인에 넣고 호출 경계를 점진 이전한다.</p>
+<p><strong>SI·금융·파트너 연동:</strong> 보안 구간, 프록시·방화벽·게이트웨이, 감사 로그, 상대 기관의 지원 프로토콜을 확인한다. 상호운용성과 가시성이 우선이면 REST/JSON이 설명·검증하기 쉽다. HTTP/2 통과가 불확실하면 gRPC를 먼저 채택하지 않는다. “금융은 항상 REST” 같은 단정은 피한다.</p>
+<p><strong>스타트업·여러 클라이언트 제품:</strong> 팀이 작고 공개 연동이 중요하면 REST가 단순하다. 화면 조합 비용이 커질 때 GraphQL을 BFF에 한정하고, 서비스·언어가 분리되면 내부 호출부터 gRPC를 검토한다. 작은 단일 배포 서비스에 세 방식을 모두 넣으면 운영·온보딩 비용이 늘 수 있다.</p>
+<p><strong>섞어 쓰는 전형적 구조:</strong></p>
+<pre><code class="language-text">브라우저 ── REST 또는 GraphQL(BFF) ── API 경계
+                                      ├── 기존 REST 서비스
+                                      └── gRPC ── 내부 서비스</code></pre>
+<p>BFF가 클라이언트별 응답을 조립하고 내부 gRPC를 감싸면 브라우저가 <code>.proto</code>에 묶이지 않는다. 반대로 gRPC 결과를 외부에 공개할 필요가 없다면 gateway의 응답 모델은 별도 계약으로 유지한다. REST를 GraphQL로 바꾸는 작업은 데이터 스키마·에러·캐시·권한을 같이 재검토하는 마이그레이션이지 URL 경로 변경이 아니다.</p>
+<p><strong>선택 절차:</strong> 소비자·네트워크 경계와 필수 조건(브라우저, 캐시, 스트리밍, 다언어 계약)을 정한다. 단순한 방식으로 시작해 왕복·payload·DB 호출·p95·장애 모드를 측정하고, 이점이 확인된 경계만 확장한다.</p>
+<h2 id="7-흔한-오해와-실수"><a class="anchor" href="#7-흔한-오해와-실수" aria-hidden="true">#</a>7. 흔한 오해와 실수</h2>
+<ol>
+<li><strong>“REST는 JSON이다” →</strong> REST는 아키텍처 제약이고 JSON은 표현 형식이다. <code>/doSomething</code>에 POST 하나만 두면 HTTP/JSON이어도 자원 중심 API라고 보기 어렵다. <strong>대처:</strong> 자원 URI, 메서드 의미, 응답 상태를 먼저 설계한다.</li>
+<li><strong>“GraphQL이면 필요한 데이터만 DB에서 읽는다” →</strong> 응답 필드가 줄어도 resolver가 엔티티마다 별도 조회하면 N+1이 발생한다. <strong>대처:</strong> DataLoader/batching, 쿼리 수 관측, 깊이·복잡도 한도, 타임아웃을 적용한다.</li>
+<li><strong>“GraphQL 요청은 한 번이니 무조건 빠르다” →</strong> 클라이언트 왕복 하나와 서버의 하위 서비스·DB 호출량은 별개다. 깊은 질의 하나가 여러 REST 요청보다 비쌀 수 있다. <strong>대처:</strong> 필드별 비용을 제한하고 실제 추적 데이터로 비교한다.</li>
+<li><strong>“gRPC는 바이너리라서 무조건 더 빠르다” →</strong> 처리시간에는 네트워크, 직렬화, 서버 부하, 연결, 재시도가 함께 들어간다. 브라우저·게이트웨이 제약도 생긴다. <strong>대처:</strong> 대표 payload와 동시성 조건에서 측정하고 배포·디버깅 비용까지 비교한다.</li>
+<li><strong>“protobuf 필드는 순서대로라서 번호를 바꿔도 된다” →</strong> 필드 번호가 wire tag의 일부다. 필드 번호 재사용은 구버전 데이터·클라이언트와 충돌한다. <strong>대처:</strong> 번호를 고정하고 삭제 번호를 <code>reserved</code>로 남기며 호환성 검사를 한다.</li>
+<li><strong>“GraphQL schema가 있으면 권한도 검증된다” →</strong> 타입 검증은 질의 모양을 검사할 뿐 사용자가 특정 행을 읽을 권한인지 보장하지 않는다. <strong>대처:</strong> resolver/서비스 계층에서 객체 단위 권한을 검사하고 민감 필드 테스트를 둔다.</li>
+<li><strong>“gRPC deadline이 없으면 서버가 알아서 끝낸다” →</strong> 호출 체인의 지연이 길어져도 클라이언트와 하위 서비스가 무한정 기다릴 수 있다. 자동 재시도는 중복 작업도 만들 수 있다. <strong>대처:</strong> 요청 deadline·취소 전파, 재시도 가능한 멱등 작업과 멱등 키를 분리한다.</li>
+<li><strong>“외부 API니까 내부도 같은 프로토콜이어야 한다” →</strong> 외부 호환성과 내부 서비스 계약의 요구는 다를 수 있다. <strong>대처:</strong> 게이트웨이 경계에서 모델을 변환하고 한 서비스에 여러 어댑터를 허용한다.</li>
+</ol>
+<p>REST 상세 설계와 HTTP 클라이언트는 <strong><a class="docref" href="S06-rest-api-clients.html">S06</a></strong>, 요구사항부터 REST API를 만드는 흐름은 <strong><a class="docref" href="D03-rest-api-dev-process.html">D03</a></strong> 참조.</p>
+<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+<p><strong>Q1. 신규 공개 API의 기본값으로 REST를 추천하는 이유는?</strong><br>브라우저와 HTTP 중간 장비가 바로 이해하며 URI, 상태 코드, 헤더, 캐시, 관측 도구가 널리 지원된다. 계약도 OpenAPI로 보완할 수 있다. 특정 화면 조합이나 스트리밍 요구가 확인되면 그 경계에 다른 방식을 추가한다.<br><strong>꼬리질문: REST여도 캐시가 자동으로 되나?</strong> 아니다. 메서드와 <code>Cache-Control</code>, <code>ETag</code>, 인증/변형 헤더 등 실제 설정에 달렸다.</p>
+<p><strong>Q2. GraphQL이 REST의 over-fetching과 under-fetching을 어떻게 줄이나?</strong><br>클라이언트가 스키마에서 필요한 필드를 선택하고 연관 필드를 한 질의에 포함할 수 있다. 그래서 고정 응답 DTO를 여러 화면에 맞추느라 생기는 낭비를 줄인다. 다만 resolver가 데이터베이스에서 최소 컬럼만 가져오는지까지 보장하지는 않는다.<br><strong>꼬리질문: 화면 필드 수만 제한하면 충분한가?</strong> 아니다. 깊이·복잡도와 resolver의 실제 DB/원격 호출 비용을 함께 제한한다.</p>
+<p><strong>Q3. GraphQL 요청 하나가 REST 여러 번보다 항상 빠른가?</strong><br>아니다. 클라이언트 왕복은 줄 수 있지만 서버에서 resolver와 하위 서비스 호출이 늘 수 있다. 요청 본문에 따라 비용 편차도 커서 캐시와 장애 분석이 더 까다롭다. 실제 화면 trace와 p95/p99, 하위 호출 수를 비교해야 한다.<br><strong>꼬리질문: 흔한 서버 측 병목은?</strong> 중첩 필드의 N+1 조회다. 요청 단위 batching과 query 비용 제한으로 줄인다.</p>
+<p><strong>Q4. 내부 서비스 통신에 gRPC를 선택할 조건은?</strong><br>proto 기반 타입 계약과 다언어 코드 생성이 이득이고, HTTP/2 경로가 확보되며, 팀이 호환성·deadline·관측을 운영할 준비가 되었을 때다. 서버/클라이언트 스트리밍도 강한 선택 이유다. 단순 CRUD라는 이유만으로 바꾸지는 않는다.<br><strong>꼬리질문: Java끼리라면 계약 관리가 덜 필요한가?</strong> 아니다. 생성 stub과 서버가 동시에 바뀌지 않을 수 있으므로 버전 호환을 계속 지켜야 한다.</p>
+<p><strong>Q5. GraphQL과 gRPC 모두 스키마가 있는데 무엇이 다른가?</strong><br>GraphQL schema는 클라이언트가 필드를 선택하는 데이터 그래프 API다. gRPC의 proto는 호출 가능한 원격 메서드와 메시지 wire 계약을 선언하고 언어 stub을 생성한다. 전자는 외부 조회 유연성, 후자는 서비스 간 RPC 계약에 잘 맞는다.<br><strong>꼬리질문: 둘 다 브라우저에서 바로 쓸 수 있나?</strong> GraphQL은 HTTP/WebSocket 전송과 브라우저 클라이언트가 일반적이다. 네이티브 gRPC에는 브라우저 제약이 있어 gRPC-Web나 게이트웨이가 필요하다.</p>
+<p><strong>Q6. 한 프로젝트에서 REST·GraphQL·gRPC를 섞어도 되나?</strong><br>가능하다. 외부에 안정적인 REST, 화면 조합을 맡는 GraphQL BFF, 내부 RPC의 gRPC처럼 소비자 경계에 따라 둘 수 있다. 다만 변환·추적·권한·장애 처리의 소유자를 분명히 정한다.<br><strong>꼬리질문: 세 개를 모두 도입하면 확장성이 좋아지나?</strong> 요구 없이 늘리면 운영 스택과 온보딩 비용만 커진다. 경계마다 측정된 문제를 해결하는 최소 조합을 쓴다.</p>
+<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+<ul>
+<li>Spring Boot 4.1 Release Notes — <a href="https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.1-Release-Notes" target="_blank" rel="noopener">https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.1-Release-Notes</a> — Boot 4.1의 Spring gRPC 클라이언트·서버 지원과 Netty/Servlet 구성을 확인했다.</li>
+<li>gRPC :: Spring Boot — <a href="https://docs.spring.io/spring-boot/reference/io/grpc.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/io/grpc.html</a> — Boot 4.1에서 protobuf 서비스 정의, 코드 생성, gRPC 개발·테스트 지원을 확인했다.</li>
+<li>Spring for GraphQL :: Spring Boot — <a href="https://docs.spring.io/spring-boot/reference/web/spring-graphql.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/web/spring-graphql.html</a> — GraphQL starter, 전송 조합, SDL 및 annotated controller 구성을 확인했다.</li>
+<li>Getting Started :: Spring gRPC Reference — <a href="https://docs.spring.io/spring-grpc/reference/getting-started.html" target="_blank" rel="noopener">https://docs.spring.io/spring-grpc/reference/getting-started.html</a> — Spring gRPC 1.0.x의 Boot 4.1.x 지원, proto/stub 생성과 서비스 구현 예를 확인했다.</li>
+<li>Introduction to gRPC — <a href="https://grpc.io/docs/what-is-grpc/introduction/" target="_blank" rel="noopener">https://grpc.io/docs/what-is-grpc/introduction/</a> — gRPC의 RPC 계약, protobuf IDL·메시지와 stub 구조를 확인했다.</li>
+<li>Protocol Buffers Overview — <a href="https://protobuf.dev/overview/" target="_blank" rel="noopener">https://protobuf.dev/overview/</a> — protobuf 직렬화와 생성 코드, 기존 메시지와의 호환성 원칙을 확인했다.</li>
+<li>Learn GraphQL — <a href="https://graphql.org/learn/" target="_blank" rel="noopener">https://graphql.org/learn/</a> — GraphQL 학습 항목과 질의·스키마·실행·HTTP 주제를 확인했다.</li>
+<li>Queries — <a href="https://graphql.org/learn/queries/" target="_blank" rel="noopener">https://graphql.org/learn/queries/</a> — selection set, 응답 모양, 연관 필드 조회와 operation을 확인했다.</li>
+<li>GraphQL Specification, October 2021 — <a href="https://spec.graphql.org/October2021/" target="_blank" rel="noopener">https://spec.graphql.org/October2021/</a> — GraphQL이 특정 언어·저장소에 종속되지 않는 서비스 질의 언어임을 확인했다.</li>
+<li>RFC 9110: HTTP Semantics — <a href="https://www.rfc-editor.org/rfc/rfc9110.html" target="_blank" rel="noopener">https://www.rfc-editor.org/rfc/rfc9110.html</a> — HTTP 자원·요청/응답·메서드 의미 및 버전 공통 의미론을 확인했다.</li>
+<li>RFC 9111: HTTP Caching — <a href="https://www.rfc-editor.org/rfc/rfc9111.html" target="_blank" rel="noopener">https://www.rfc-editor.org/rfc/rfc9111.html</a> — 캐시 키의 최소 구성과 캐시 재사용·응답 지시자를 확인했다.</li>
+</ul>
+
+
+</main>
+<script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</script>
+</body>
+</html>

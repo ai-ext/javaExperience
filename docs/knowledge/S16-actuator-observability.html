@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S16. Actuator·관측성 (메트릭·트레이싱·로깅)</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
+<main>
+
+<h1 id="s16-actuator관측성-메트릭트레이싱로깅"><a class="anchor" href="#s16-actuator관측성-메트릭트레이싱로깅" aria-hidden="true">#</a>S16. Actuator·관측성 (메트릭·트레이싱·로깅)</h1>
+<blockquote>
+<ul>
+<li>Actuator는 운영 엔드포인트를 제공하지만, <strong>사용 가능(access)</strong> 과 <strong>외부 노출(exposure)</strong> 은 별개다. 필요한 엔드포인트만 인증·네트워크 경계 안에 노출한다.</li>
+<li>Micrometer의 메트릭은 이름과 태그 조합마다 시계열을 만든다. 사용자·요청 식별자를 메트릭 태그로 넣으면 메트릭 저장소와 애플리케이션 메모리가 함께 커진다.</li>
+<li>Observation으로 업무 구간을 한 번 계측하고 메트릭·트레이스 핸들러가 각각의 신호로 내보내게 한다. 로그의 trace ID 전파와 함께 써야 요청의 지표·흐름·상세 기록을 연결할 수 있다.</li>
+</ul>
+</blockquote>
+<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<p><code>/actuator/env</code>를 인증 없이 공개하면 설정 정보가 노출된다. 반대로 Prometheus registry만 추가하고 scrape endpoint를 공개하지 않아 지표가 비는 일도 있다. Actuator는 endpoint access와 전송 경로 exposure를 함께 설정해야 안전하게 동작한다.</p>
+<p>Kubernetes liveness에 DB 검사를 넣으면 DB 장애가 Pod 재시작 폭주로 번질 수 있고, readiness에 모든 health indicator를 넣으면 전체 인스턴스가 트래픽에서 빠질 수 있다. 생존 여부와 트래픽 수용 가능성을 구분해야 한다.</p>
+<p>request ID·사용자 ID·원본 URL을 메트릭 태그로 만들면 값 조합마다 시계열과 Meter가 생긴다. 고유값을 메트릭으로 모으지 말고 route template과 제한된 상태 값으로 집계하고, 개별 요청 정보는 로그·trace에 둔다.</p>
+<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>용어</th>
+<th>뜻</th>
+<th>점검점</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Actuator endpoint</td>
+<td>health·metrics·loggers 등 운영 기능</td>
+<td>기본 HTTP 경로는 <code>/actuator/{id}</code></td>
+</tr>
+<tr>
+<td>Access / Exposure</td>
+<td>허용 작업 / HTTP·JMX로 공개하는 경로</td>
+<td>둘 다 허용돼야 실제 사용 가능</td>
+</tr>
+<tr>
+<td>HealthIndicator</td>
+<td>상태와 선택 정보를 반환하는 구성요소</td>
+<td>여러 contributor를 health endpoint가 모음</td>
+</tr>
+<tr>
+<td>Meter / MeterRegistry</td>
+<td>측정값과 exporter 연결점</td>
+<td>이름·태그 조합이 meter를 구분</td>
+</tr>
+<tr>
+<td>Cardinality</td>
+<td>고유 태그 조합 또는 시계열 수</td>
+<td>무제한 값이 들어오면 급증</td>
+</tr>
+<tr>
+<td>Observation / Span</td>
+<td>관측 구간 / 분산 요청의 작업 단위</td>
+<td>handler가 메트릭·trace로 변환</td>
+</tr>
+<tr>
+<td>MDC</td>
+<td>로그 이벤트에 붙는 문맥 map</td>
+<td>비동기 경계에서 전파 확인 필요</td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>헷갈리는 쌍</th>
+<th>구분</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Access vs Exposure</td>
+<td>Boot 4.1 access 기본은 shutdown·heapdump 외 unrestricted이나, 기본 HTTP/JMX exposure는 health뿐이다.</td>
+</tr>
+<tr>
+<td>Liveness vs Readiness</td>
+<td>liveness는 재시작이 필요한 내부 생존, readiness는 지금 트래픽을 받아도 되는지 판단한다.</td>
+</tr>
+<tr>
+<td>Counter vs Gauge</td>
+<td>Counter는 누적 이벤트, Gauge는 현재 큐 길이처럼 오르내리는 값이다.</td>
+</tr>
+<tr>
+<td>Metric tag vs trace attribute</td>
+<td>메트릭은 저카디널리티 집계용, trace는 개별 흐름 분석용이다. 개인정보는 어느 쪽에도 무심코 넣지 않는다.</td>
+</tr>
+</tbody></table></div>
+<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+<h3 id="31-endpoint-접근과-노출"><a class="anchor" href="#31-endpoint-접근과-노출" aria-hidden="true">#</a>3.1 Endpoint 접근과 노출</h3>
+<pre><code class="language-text">Endpoint bean → access 허용? → HTTP/JMX exposure에 포함? → 보안 필터·네트워크 허용? → 응답</code></pre>
+<p>세 조건은 독립적이다. 기본 HTTP/JMX 노출은 health이며, Prometheus endpoint를 쓰려면 레지스트리 의존성·access·exposure를 모두 갖춰야 한다. <code>exclude</code>는 <code>include</code>보다 우선한다. <code>/env</code>, <code>/configprops</code>, <code>/quartz</code> 값은 기본 마스킹된다. <code>show-values=always</code>는 피하고 필요하면 <code>when-authorized</code>와 운영 역할을 사용한다.</p>
+<h3 id="32-health와-kubernetes"><a class="anchor" href="#32-health와-kubernetes" aria-hidden="true">#</a>3.2 Health와 Kubernetes</h3>
+<p>Health endpoint는 <code>HealthContributorRegistry</code>의 상태를 합친다. <code>HealthIndicator</code>는 단일 상태를, <code>CompositeHealthContributor</code>는 하위 상태 묶음을 제공한다. <code>management.endpoint.health.group.&lt;name&gt;.include/exclude</code>로 그룹을 만들면 <code>/actuator/health/{name}</code>에서 확인한다.</p>
+<p>Boot probe 지원은 liveness/readiness 그룹으로 애플리케이션 availability를 노출한다. 시작 중에는 liveness가 <code>BROKEN</code>, readiness가 <code>REFUSING_TRAFFIC</code>일 수 있고, 초기화가 끝나면 <code>CORRECT</code>와 <code>ACCEPTING_TRAFFIC</code>가 된다. 종료 때 readiness가 먼저 트래픽을 거부한다.</p>
+<p>liveness에는 DB·Redis 같은 외부 검사를 넣지 않는다. 외부 장애를 재시작으로 고치려 하면 재시작 폭주와 연쇄 장애가 난다. readiness에는 필수 외부 의존성만 서비스 정책에 맞게 넣는다. 관리 포트만 검사하면 실제 요청 포트 장애를 놓칠 수 있으므로 <code>management.endpoint.health.probes.add-additional-paths=true</code>로 메인 포트의 <code>/livez</code>, <code>/readyz</code>를 고려한다.</p>
+<h3 id="33-meter와-cardinality"><a class="anchor" href="#33-meter와-cardinality" aria-hidden="true">#</a>3.3 Meter와 cardinality</h3>
+<p>Micrometer는 측정 코드를 <code>MeterRegistry</code>에 등록하고 클래스패스의 registry가 backend로 전달한다. Boot는 지원 registry를 자동 구성하고 composite로 묶을 수 있다. Meter는 이름과 tag 조합으로 식별된다.</p>
+<ul>
+<li><code>Counter</code>: 증가하는 이벤트 수. 주문 접수 횟수에 사용.</li>
+<li><code>Gauge</code>: 큐 길이 같은 순간값. 대상 객체를 bean 필드로 유지해 GC되지 않게 한다.</li>
+<li><code>Timer</code>: 호출 수와 누적 시간·분포를 기록해 latency 측정에 적합.</li>
+<li><code>DistributionSummary</code>: 바이트 수 등 시간 외 값의 분포. <code>LongTaskTimer</code>: 아직 끝나지 않은 작업.</li>
+</ul>
+<p><code>uri=/users/123</code>처럼 값이 매번 바뀌면 시계열이 증가한다. <code>/users/{id}</code>로 정규화하고 userId·requestId·timestamp는 tag에서 뺀다. 태그 값 후보가 각각 5·10·100개면 조합이 최대 5,000개다. Micrometer의 <code>HighCardinalityTagsDetector</code>는 같은 이름의 meter 수를 세어 경고하는 진단기이며 동적 metric 이름이나 실제 수집을 차단하지 않는다.</p>
+<p>latency percentile을 인스턴스별로 계산해 평균내면 전체 서비스의 percentile이 되지 않는다. 여러 인스턴스 집계가 필요하면 histogram/SLO bucket을 검토한다. Prometheus 연동은 <code>micrometer-registry-prometheus</code>와 <code>/actuator/prometheus</code> exposure가 필요하며, endpoint는 기본 노출에 포함되지 않는다.</p>
+<h3 id="34-observation-trace-mdc"><a class="anchor" href="#34-observation-trace-mdc" aria-hidden="true">#</a>3.4 Observation, trace, MDC</h3>
+<p><code>ObservationRegistry</code>는 Observation을 시작·종료하고 handler가 이를 메트릭이나 span으로 변환한다. Boot는 registry를 자동 구성한다. 저카디널리티 tag는 메트릭과 trace에, 고카디널리티 값은 trace에만 두는 것이 기본 원칙이다.</p>
+<pre><code class="language-text">Observation → low-cardinality tags → Meter
+            → context + high-cardinality tags → Span → trace backend
+            → 현재 trace 문맥 → 로그의 traceId/spanId</code></pre>
+<p>Boot 기본 sampling probability는 0.1이며 <code>management.tracing.sampling.probability</code>로 조정한다. 샘플링되지 않은 요청도 메트릭·로그에는 남을 수 있다. 원격 호출 trace 전파에는 Boot가 구성한 <code>RestClient.Builder</code>, <code>RestTemplateBuilder</code>, <code>WebClient.Builder</code>를 사용한다. 직접 만든 client는 전파가 빠질 수 있다.</p>
+<p>Reactor에서 ThreadLocal은 자동 복원되지 않는다. <code>spring.reactor.context-propagation=auto</code>, Boot <code>@Async</code> executor의 <code>spring.task.execution.propagate-context=true</code>를 검토한다. 직접 구성한 executor에는 <code>ContextPropagatingTaskDecorator</code>를 등록한다. MDC도 실행 흐름이 바뀔 때 자동 전파된다고 가정하지 말고 <code>MDC.putCloseable</code>로 현재 scope를 정리한다.</p>
+<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+<p>아래 Spring 예제는 Boot 4.1 API를 기준으로 한 코드이며, 이 작업 환경에서 애플리케이션을 빌드해 검증하지 않았다. 각 Java 클래스는 적힌 파일명으로 별도 파일에 둔다. 애플리케이션의 HTTP starter와 빌드 플러그인은 이미 구성되어 있다고 가정한다.</p>
+<h3 id="예제-1-actuator-prometheus-otlp-노출-경계"><a class="anchor" href="#예제-1-actuator-prometheus-otlp-노출-경계" aria-hidden="true">#</a>예제 1: Actuator, Prometheus, OTLP 노출 경계</h3>
+<p>Gradle 의존성 예시:</p>
+<pre><code class="language-kotlin">// build.gradle.kts (Spring Boot 4.1.1 의존성 관리 사용)
+dependencies {
+    implementation(&quot;org.springframework.boot:spring-boot-starter-actuator&quot;)
+    implementation(&quot;org.springframework.boot:spring-boot-starter-opentelemetry&quot;)
+    runtimeOnly(&quot;io.micrometer:micrometer-registry-prometheus&quot;)
+}</code></pre>
+<p>운영용 <code>application.yaml</code> 예시. 포트 접근은 사내 모니터링 네트워크와 앱 보안 설정으로 제한한다.</p>
+<pre><code class="language-yaml">management:
+  endpoints:
+    access:
+      default: none
+    web:
+      exposure:
+        include: &quot;health,info,prometheus&quot;
+  endpoint:
+    health:
+      access: read-only
+      probes:
+        enabled: true
+        add-additional-paths: true
+      show-details: when-authorized
+      roles: OPS
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db # DB가 이 서비스의 필수 준비 조건일 때만 포함
+    info:
+      access: read-only
+    prometheus:
+      access: read-only
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${APP_ENV:local}
+  tracing:
+    sampling:
+      probability: 0.1
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+
+logging:
+  structured:
+    format:
+      console: ecs</code></pre>
+<p><code>management.endpoints.access.default=none</code>을 설정했으므로 노출 목록에 넣은 endpoint도 개별 read access를 열어야 한다. 이 예제는 세 endpoint만 read-only로 허용한다. 앱에 DB health contributor가 없다면 readiness include에서 <code>db</code>를 제거한다. 운영 역할 인증과 실제 네트워크 제한은 앱 배포 환경에 맞춰 더한다. <strong>(미실행: Spring Boot 애플리케이션 설정 예시)</strong></p>
+<h3 id="예제-2-counter와-생명주기가-있는-gauge"><a class="anchor" href="#예제-2-counter와-생명주기가-있는-gauge" aria-hidden="true">#</a>예제 2: Counter와 생명주기가 있는 Gauge</h3>
+<p><code>OrderMetrics.java</code> — 고정된 metric name에 누적 주문 수와 현재 처리 중 주문 수를 기록한다.</p>
+<pre><code class="language-java">import java.util.concurrent.atomic.AtomicInteger;
+
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.stereotype.Component;
+
+@Component
+public class OrderMetrics {
+    private final Counter accepted;
+    private final AtomicInteger inFlight = new AtomicInteger();
+
+    public OrderMetrics(MeterRegistry registry) {
+        this.accepted = Counter.builder(&quot;orders.accepted&quot;)
+                .description(&quot;Accepted order count&quot;)
+                .register(registry);
+        Gauge.builder(&quot;orders.inflight&quot;, this.inFlight, AtomicInteger::get)
+                .description(&quot;Orders currently being processed&quot;)
+                .register(registry);
+    }
+
+    public void orderAccepted() {
+        accepted.increment();
+    }
+
+    public void processingStarted() {
+        inFlight.incrementAndGet();
+    }
+
+    public void processingFinished() {
+        inFlight.decrementAndGet();
+    }
+}</code></pre>
+<p>Gauge의 대상인 <code>inFlight</code>가 bean 필드라 registry가 값을 읽을 때 사라지지 않는다. 실제 서비스에서는 완료·실패 경로 모두 <code>processingFinished()</code>가 호출되도록 <code>try/finally</code>나 작업 수명주기에 연결한다. <strong>(미실행: Boot context 필요)</strong></p>
+<h3 id="예제-3-업무-동작을-observation으로-감싸기"><a class="anchor" href="#예제-3-업무-동작을-observation으로-감싸기" aria-hidden="true">#</a>예제 3: 업무 동작을 Observation으로 감싸기</h3>
+<p><code>CheckoutObservation.java</code> — <code>region</code>은 제한된 종류라 metric tag에 두고, 요청 식별자는 trace에만 둔다.</p>
+<pre><code class="language-java">import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
+import org.springframework.stereotype.Component;
+
+@Component
+public class CheckoutObservation {
+    private final ObservationRegistry registry;
+
+    public CheckoutObservation(ObservationRegistry registry) {
+        this.registry = registry;
+    }
+
+    public void reserve(String region, String requestId, Runnable businessOperation) {
+        Observation.createNotStarted(&quot;checkout.reserve&quot;, registry)
+                .lowCardinalityKeyValue(&quot;region&quot;, region)
+                .highCardinalityKeyValue(&quot;request.id&quot;, requestId)
+                .observe(businessOperation);
+    }
+}</code></pre>
+<p><code>requestId</code>는 예시를 위해 trace에만 붙였다. 개인정보나 비밀값을 trace attribute로 보내도 된다는 뜻은 아니다. 업무 동작의 예외는 Observation 종료 동작에 반영되므로 호출자가 예외 정책을 소유한다. <strong>(미실행: Boot context 및 관측 handler 필요)</strong></p>
+<h3 id="예제-4-구조화-로그와-mdc-정리"><a class="anchor" href="#예제-4-구조화-로그와-mdc-정리" aria-hidden="true">#</a>예제 4: 구조화 로그와 MDC 정리</h3>
+<p><code>OrderAuditLogger.java</code> — ECS 형식은 위 YAML에서 켜고, SLF4J fluent key-value와 MDC를 사용한다.</p>
+<pre><code class="language-java">import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.stereotype.Component;
+
+@Component
+public class OrderAuditLogger {
+    private static final Logger log = LoggerFactory.getLogger(OrderAuditLogger.class);
+
+    public void accepted(String orderId) {
+        try (MDC.MDCCloseable ignored = MDC.putCloseable(&quot;event&quot;, &quot;order.accepted&quot;)) {
+            log.atInfo()
+                    .addKeyValue(&quot;orderId&quot;, orderId)
+                    .log(&quot;Order accepted&quot;);
+        }
+    }
+}</code></pre>
+<p>Boot의 ECS 출력은 MDC의 key-value를 JSON 필드로 포함한다. <code>orderId</code>처럼 값 종류가 큰 필드는 로그에서는 요청을 좁히는 데 쓸 수 있지만, 메트릭 태그로 재사용하지 않는다. MDC scope는 현재 실행 흐름에서 닫힌다. 별도 스레드나 Reactor로 넘길 때는 문맥 전파 설정을 추가로 확인한다. <strong>(미실행: Boot logging 설정 및 SLF4J 2 런타임 필요)</strong></p>
+<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>시기</th>
+<th>변화와 이전 한계</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Boot 3.0</td>
+<td>Micrometer 1.10 Observation API와 Micrometer Tracing 자동 구성을 도입했다. 메트릭과 trace를 따로 계측하던 수고를 하나의 관측 구간으로 줄였다.</td>
+<td><a href="https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-3.0-Release-Notes" target="_blank" rel="noopener">3.0 Release Notes</a></td>
+</tr>
+<tr>
+<td>Boot 4.0</td>
+<td><code>spring-boot-starter-opentelemetry</code>를 추가해 SDK 구성과 OTLP 메트릭·trace 내보내기를 묶었다. exporter를 직접 조립하던 시작 비용을 줄였다.</td>
+<td><a href="https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Release-Notes" target="_blank" rel="noopener">4.0 Release Notes</a></td>
+</tr>
+<tr>
+<td>Boot 4.1.1 기준</td>
+<td>관리 버전은 Micrometer 1.17.1이다. 하위 버전은 임의로 덮어쓰기보다 Boot dependency management를 따른다.</td>
+<td><a href="https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html" target="_blank" rel="noopener">Dependency Coordinates</a></td>
+</tr>
+</tbody></table></div>
+<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+<p><strong>기본값 추천:</strong> health와 필요한 scrape endpoint만 read-only로 노출하고, 관리 포트·네트워크 정책·인증으로 보호한다. 전체 endpoint 공개는 기본값으로 두지 않는다.</p>
+<ul>
+<li>if 상태 확인이 목적이면 then health를 열고 상세 정보는 <code>when-authorized</code>로 둔다.</li>
+<li>if Prometheus를 붙이면 then registry 의존성, endpoint access/exposure, scrape path를 모두 맞추고 수집망을 제한한다.</li>
+<li>if Kubernetes liveness를 구성하면 then 내부 liveness 상태만 확인한다. 외부 의존성은 필요할 때 readiness에서 판단한다.</li>
+<li>if 지표를 추가하면 then Counter/Timer/Gauge를 용도에 맞게 선택하고 제한된 값만 tag에 넣는다. percentile 집계가 필요하면 histogram/SLO를 검토한다.</li>
+<li>if 한 요청을 여러 신호에서 연결하려면 then Observation과 trace correlation을 쓰고, request ID는 메트릭 tag에서 제외한다.</li>
+<li>if async 실행 뒤에 traceId가 없으면 then Reactor·TaskExecutor 문맥 전파와 직접 만든 executor의 decorator를 확인한다.</li>
+<li>if 로그 수집 형식이 JSON이면 then ECS·GELF·Logstash JSON 중 파이프라인에 맞는 것을 쓴다. logfmt는 Boot 내장 형식이라 단정하지 말고 <code>StructuredLogFormatter</code> 구현을 검토한다.</li>
+<li>배포 파이프라인과 이미지 운용은 이 문서 범위가 아니다 → <a class="docref" href="S19-packaging-deploy.html">S19</a> 참조.</li>
+</ul>
+<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>증상</th>
+<th>원인</th>
+<th>대처</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>민감 Actuator endpoint가 외부에서 조회됨</td>
+<td><code>include=*</code>와 인증·네트워크 제한 부재</td>
+<td>endpoint 최소 공개, read-only access, 역할 인증과 관리망 제한</td>
+</tr>
+<tr>
+<td>Prometheus scrape가 비어 있음</td>
+<td>registry만 추가하고 endpoint 노출 또는 scrape path 누락</td>
+<td>의존성·access·exposure·<code>metrics_path</code> 확인</td>
+</tr>
+<tr>
+<td>DB 장애에 Pod가 재시작·퇴출됨</td>
+<td>DB 검사를 liveness에 넣거나 모든 지표를 readiness에 포함</td>
+<td>liveness는 내부 상태, readiness는 필수 조건만</td>
+</tr>
+<tr>
+<td>시계열·메모리가 급증</td>
+<td>ID·원본 URL 등 무제한 tag 또는 metric 이름 사용</td>
+<td>route template과 제한된 tag 사용, detector로 meter 수 확인</td>
+</tr>
+<tr>
+<td>Gauge가 0이 되거나 사라짐</td>
+<td>측정 대상 객체가 GC됨</td>
+<td>대상 객체를 충분한 수명의 bean 필드로 유지</td>
+</tr>
+<tr>
+<td>trace 하위 호출이나 비동기 로그에서 문맥이 끊김</td>
+<td>수동 client 생성, ThreadLocal 전파·정리 누락</td>
+<td>Boot builder와 context propagation 사용, MDC scope 정리</td>
+</tr>
+</tbody></table></div>
+<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+<h3 id="q1-기본-health-노출은-모든-actuator-endpoint가-공개됐다는-뜻인가"><a class="anchor" href="#q1-기본-health-노출은-모든-actuator-endpoint가-공개됐다는-뜻인가" aria-hidden="true">#</a>Q1. 기본 health 노출은 모든 Actuator endpoint가 공개됐다는 뜻인가?</h3>
+<p>아니다. Boot 4.1은 access와 HTTP/JMX exposure를 따로 설정한다. 기본 exposure는 health뿐이며 다른 endpoint는 별도로 공개해야 한다.</p>
+<p><strong>꼬리질문:</strong> access 기본값을 <code>none</code>으로 바꾼 경우 health exposure만으로 충분한가? <strong>답:</strong> 아니다. health access도 다시 허용해야 한다.</p>
+<h3 id="q2-db-장애-때-liveness와-readiness-중-무엇을-실패시킬까"><a class="anchor" href="#q2-db-장애-때-liveness와-readiness-중-무엇을-실패시킬까" aria-hidden="true">#</a>Q2. DB 장애 때 liveness와 readiness 중 무엇을 실패시킬까?</h3>
+<p>보통 readiness만 고려한다. liveness 실패는 Pod 재시작으로 이어지므로 DB 장애를 앱 재시작으로 해결하려 해서는 안 된다. readiness도 모든 Pod를 동시에 제외할 위험을 검토한다.</p>
+<p><strong>꼬리질문:</strong> DB가 모든 Pod에서 공유된다면? <strong>답:</strong> 전체 트래픽 차단과 fallback·부분 기능 저하 중 서비스 정책에 맞는 선택을 한다.</p>
+<h3 id="q3-request-id를-메트릭-tag로-넣으면-왜-위험한가"><a class="anchor" href="#q3-request-id를-메트릭-tag로-넣으면-왜-위험한가" aria-hidden="true">#</a>Q3. request ID를 메트릭 tag로 넣으면 왜 위험한가?</h3>
+<p>태그 조합마다 Meter와 시계열이 생긴다. 요청마다 ID가 달라지면 메트릭 수가 요청량을 따라 늘어 비용과 메모리가 압박받는다. 개별 요청 값은 로그·trace에 둔다.</p>
+<p><strong>꼬리질문:</strong> <code>/users/123</code> 경로는? <strong>답:</strong> <code>/users/{id}</code>처럼 정규화한다.</p>
+<h3 id="q4-timer와-counter를-어떻게-구분하는가-인스턴스별-p95-평균은-전체-p95인가"><a class="anchor" href="#q4-timer와-counter를-어떻게-구분하는가-인스턴스별-p95-평균은-전체-p95인가" aria-hidden="true">#</a>Q4. Timer와 Counter를 어떻게 구분하는가? 인스턴스별 p95 평균은 전체 p95인가?</h3>
+<p>Counter는 누적 이벤트, Timer는 작업 수와 시간 분포를 기록한다. 여러 인스턴스의 p95 평균은 전체 분포의 p95가 아니다. 집계 가능한 histogram/SLO bucket을 검토한다.</p>
+<p><strong>꼬리질문:</strong> Gauge를 쓸 때 주의점은? <strong>답:</strong> Gauge 대상 객체의 생명주기를 유지해야 한다.</p>
+<h3 id="q5-observation은-로그메트릭trace를-같은-저장소에-넣는-api인가"><a class="anchor" href="#q5-observation은-로그메트릭trace를-같은-저장소에-넣는-api인가" aria-hidden="true">#</a>Q5. Observation은 로그·메트릭·trace를 같은 저장소에 넣는 API인가?</h3>
+<p>아니다. 관측 구간을 정의하고 handler가 메트릭과 span 등으로 변환한다. 저카디널리티 tag는 두 신호에 쓸 수 있고 고카디널리티 값은 trace에만 둔다. 로그는 별도 형식과 correlation으로 연결한다.</p>
+<p><strong>꼬리질문:</strong> 모든 요청 span이 남는가? <strong>답:</strong> 아니다. 기본 sampling probability가 0.1이다.</p>
+<h3 id="q6-직접-생성한-restclient에도-trace-propagation이-자동-적용되는가"><a class="anchor" href="#q6-직접-생성한-restclient에도-trace-propagation이-자동-적용되는가" aria-hidden="true">#</a>Q6. 직접 생성한 <code>RestClient</code>에도 trace propagation이 자동 적용되는가?</h3>
+<p>Boot가 구성한 <code>RestClient.Builder</code>, <code>RestTemplateBuilder</code>, <code>WebClient.Builder</code>를 써야 자동 전파를 기대할 수 있다. 직접 만든 client는 전파 설정이 빠질 수 있다.</p>
+<p><strong>꼬리질문:</strong> async 로그에 traceId가 없다면? <strong>답:</strong> client builder, Reactor/TaskExecutor 전파, MDC 형식과 정리 범위를 확인한다.</p>
+<h3 id="q7-ecs-json과-logfmt는-어떻게-선택하는가"><a class="anchor" href="#q7-ecs-json과-logfmt는-어떻게-선택하는가" aria-hidden="true">#</a>Q7. ECS JSON과 logfmt는 어떻게 선택하는가?</h3>
+<p>Boot structured logging은 ECS·GELF·Logstash JSON을 제공하고 MDC 및 SLF4J key-value를 JSON 필드로 출력할 수 있다. logfmt는 내장 형식이라고 가정하지 말고 필요하면 <code>StructuredLogFormatter</code>로 지원한다.</p>
+<p><strong>꼬리질문:</strong> MDC를 <code>put</code>하고 정리하지 않으면? <strong>답:</strong> 재사용 스레드에 값이 남을 수 있으므로 <code>putCloseable</code> 같은 scope를 쓴다.</p>
+<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+<ul>
+<li>Production-ready Features — <a href="https://docs.spring.io/spring-boot/reference/actuator/index.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/actuator/index.html</a> — Actuator 운영 기능 개요.</li>
+<li>Endpoints — <a href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/actuator/endpoints.html</a> — access·exposure·보안·health 그룹·probe.</li>
+<li>Monitoring over HTTP — <a href="https://docs.spring.io/spring-boot/reference/actuator/monitoring.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/actuator/monitoring.html</a> — HTTP 경로와 management endpoint 설정.</li>
+<li>Metrics — <a href="https://docs.spring.io/spring-boot/reference/actuator/metrics.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/actuator/metrics.html</a> — Micrometer, 커스텀 meter, Prometheus scrape.</li>
+<li>Observability — <a href="https://docs.spring.io/spring-boot/reference/actuator/observability.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/actuator/observability.html</a> — Observation과 cardinality·context propagation.</li>
+<li>Tracing — <a href="https://docs.spring.io/spring-boot/reference/actuator/tracing.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/actuator/tracing.html</a> — OTLP, sampling, client propagation, correlation ID.</li>
+<li>Logging — <a href="https://docs.spring.io/spring-boot/reference/features/logging.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/features/logging.html</a> — ECS·GELF·Logstash JSON과 MDC.</li>
+<li>Meters — <a href="https://docs.micrometer.io/micrometer/reference/concepts/meters.html" target="_blank" rel="noopener">https://docs.micrometer.io/micrometer/reference/concepts/meters.html</a> — Meter 종류와 이름·태그 식별.</li>
+<li>High Cardinality Tags Detector — <a href="https://docs.micrometer.io/micrometer/reference/concepts/high-cardinality-tags-detector.html" target="_blank" rel="noopener">https://docs.micrometer.io/micrometer/reference/concepts/high-cardinality-tags-detector.html</a> — 카디널리티 위험과 detector의 한계.</li>
+<li>Spring Boot 3.0 Release Notes — <a href="https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-3.0-Release-Notes" target="_blank" rel="noopener">https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-3.0-Release-Notes</a> — Observation·Tracing 자동 구성 도입.</li>
+<li>Spring Boot 4.0 Release Notes — <a href="https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Release-Notes" target="_blank" rel="noopener">https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Release-Notes</a> — OpenTelemetry 스타터와 OTLP 지원.</li>
+<li>Managed Dependency Coordinates — <a href="https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html</a> — Boot 4.1.1의 Micrometer 1.17.1.</li>
+</ul>
+
+
+</main>
+
+</body>
+</html>

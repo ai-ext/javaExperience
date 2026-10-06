@@ -1,0 +1,330 @@
+# S19. 패키징·컨테이너화·배포
+
+> 실행 JAR는 배포 가능한 단위이고, 계층은 변경 범위를 작게 만드는 장치다.  
+> 컨테이너의 probe·자원·설정·종료 유예 시간은 애플리케이션의 실제 수명 주기와 맞춰야 한다.  
+> 기본 선택은 JVM 기반 계층형 이미지이며, 빌드팩은 단순함, Native Image는 시작 시간·메모리 요구가 분명할 때 선택한다.
+
+## 1. 왜 알아야 하나
+
+개발 환경에서는 `java -jar app.jar`가 잘 되는데 컨테이너를 매번 새로 내려받느라 배포 시간이 길거나, Pod가 시작하자마자 liveness probe에 실패해 재시작을 반복할 수 있다. 실행 중인 요청이 남아 있는데 Kubernetes가 종료 유예 시간을 다 써 버리면 사용자는 배포 때마다 502·연결 끊김을 본다. 반대로 liveness가 DB 응답까지 검사하면 DB가 잠깐 느려졌을 때 살아 있는 애플리케이션을 한꺼번에 재시작해 장애를 키운다.
+
+JAR 하나만 넣으면 앱 코드가 바뀔 때 의존성 Docker layer까지 무효화될 수 있다. 배포 설계는 변경 주기, 종료 신호, 트래픽 전환을 함께 맞추는 일이다. 이 장은 실행 가능 JAR, 계층, 빌드팩, AOT/native, Kubernetes를 잇는다.
+
+## 2. 핵심 개념
+
+| 용어 | 뜻 | 기억할 점 |
+|---|---|---|
+| 실행 가능 JAR | `java -jar`로 실행할 수 있게 Spring Boot loader와 애플리케이션·의존성을 담은 아카이브 | 일반 JAR의 `Main-Class` 실행과 구조가 다르다. Boot Maven·Gradle 플러그인이 패키징한다. |
+| Layered JAR | JAR의 내용물을 의존성·loader·애플리케이션 같은 변경 주기별 그룹으로 나눈 패키지 | JAR 내부 계층과 컨테이너 이미지 layer는 다른 개념이다. 추출 후 각 계층을 별도 `COPY`해야 캐시 효과가 난다. |
+| `jarmode=tools` | 실행 JAR의 loader가 애플리케이션 시작 대신 `extract`, `list-layers` 같은 도구 명령을 수행하는 모드 | `layers.idx`가 있는 JAR에 도구 모드가 포함된다. 실행 결과물 자체가 달라지는 것은 아니다. |
+| Cloud Native Buildpacks (CNB) | 소스·빌드 산출물을 builder와 buildpack 조합으로 OCI 이미지로 만드는 표준 | `bootBuildImage` 또는 Maven의 `spring-boot:build-image`를 사용한다. Dockerfile 작성량은 줄지만 builder와 이미지 정책을 알아야 한다. |
+| Spring AOT | 빌드 시점에 애플리케이션 컨텍스트를 분석해 최적화 코드·힌트를 생성하는 Spring 처리 | JVM 실행에서도 쓸 수 있고 Native Image 빌드의 기반이 된다. 빌드 때 정한 조건·프로필은 런타임 빈 구성과 같다고 가정하면 안 된다. |
+| GraalVM Native Image | 분석된 애플리케이션을 대상 플랫폼용 네이티브 실행 파일로 미리 컴파일한 결과 | JVM보다 시작·메모리 특성이 유리할 수 있지만, 리플렉션·동적 프록시·리소스는 빌드 시점에 알려야 한다. |
+| CDS / AOT cache | JVM 실행에 재사용할 수 있는 클래스 데이터 또는 사전 계산 캐시 | 네이티브 실행 파일과 다르다. Spring Boot 배포 설정은 J16 참조. |
+| Liveness / Readiness / Startup probe | 각각 재시작 필요 여부, 트래픽 수신 가능 여부, 초기화 완료 여부를 나타내는 검사 | 역할을 섞으면 재시작 폭주 또는 준비 안 된 Pod로 트래픽이 간다. 상세 endpoint 구성은 S16 참조. |
+| Graceful shutdown | 종료 신호 뒤 새 요청을 받지 않고 진행 중인 요청에 제한 시간을 주는 종료 절차 | Spring Boot 웹 서버의 HTTP 요청 처리와 애플리케이션의 자체 백그라운드 작업 종료는 구분한다. |
+
+### 헷갈리는 선택 비교
+
+| 선택 | 언제 적합한가 | 장점 | 비용·주의점 |
+|---|---|---|---|
+| JVM 실행 가능 JAR | 개발·운영에서 범용 배포 단위가 필요할 때 | 단순한 빌드·실행, JVM 진단 도구와 동작 환경을 유지 | 계층화하지 않은 컨테이너는 작은 코드 변경에도 큰 이미지 부분이 바뀔 수 있다. |
+| Dockerfile + layered JAR | OS·사용자·패키지·복사 순서를 명시적으로 관리해야 할 때 | 이미지 구성과 보안 기준을 직접 통제 | Dockerfile과 기반 이미지 업데이트·스캔 책임이 팀에 있다. |
+| `bootBuildImage` | 표준적인 Spring 앱 이미지를 빠르게 만들고 싶을 때 | builder가 런타임 구성·캐시·계층을 처리하고 Maven·Gradle에 통합 | builder/run image 버전·환경 변수·빌드 네트워크 의존을 추적해야 한다. |
+| Native Image | 시작 시간이 핵심이고 동적 JVM 기능 의존을 줄일 수 있을 때 | 독립 실행 파일, 빠른 기동과 낮은 유휴 메모리를 목표로 할 수 있음 | 빌드가 무겁고 느리며, 지원되지 않는 동적 접근은 힌트와 테스트가 필요하다. |
+
+## 3. 내부 동작·원리
+
+### 3.1 실행 가능 JAR는 어떻게 시작되는가
+
+플러그인은 애플리케이션과 의존성 외에 Boot loader를 포함하고 manifest에 실행 진입점을 기록한다. 보통 `BOOT-INF/classes`는 앱 클래스, `BOOT-INF/lib`는 의존성, `BOOT-INF/layers.idx`는 계층 정의다. manifest의 `Main-Class`는 Boot launcher이고 실제 진입점은 `Start-Class`다. `java -jar`가 launcher를 실행하면 loader가 중첩 의존성을 읽어 앱 main을 호출한다. 따라서 이를 `java -cp app.jar Main`으로 대체하면 nested JAR 의존성이 classpath에 풀리지 않는다.
+
+중첩 JAR 실행은 편리하지만 작은 시작 비용이 있다. Boot는 외부 `lib/` 디렉터리를 사용하는 추출 레이아웃을 효율적이고 AOT cache/CDS에 친화적인 방법으로 안내한다. `java -Djarmode=tools -jar app.jar extract --layers`는 앱 대신 JAR를 계층별로 푼다. 추출은 이미지 빌드 때 하고, 컨테이너 시작 시 반복하지 않는다.
+
+기본 계층 순서는 대략 다음처럼 변경 빈도와 로더를 분리한다.
+
+```text
+app.jar
+└── layers.idx
+    ├── dependencies          # 고정 버전 외부 의존성
+    ├── spring-boot-loader    # Boot 실행 코드
+    ├── snapshot-dependencies
+    └── application           # 프로젝트 모듈·클래스·리소스
+```
+
+Docker는 각 `COPY`를 이미지 layer로 저장한다. 변경이 드문 의존성을 먼저, 변경이 잦은 앱 코드를 나중에 복사하면 코드만 바뀔 때 의존성 layer를 재사용할 수 있다. Boot 계층이 Docker 캐시를 자동 보장하지 않으므로 Dockerfile에서 디렉터리를 각각 복사해야 한다.
+
+### 3.2 Dockerfile과 Buildpacks가 이미지를 만드는 흐름
+
+```text
+Maven/Gradle 패키징
+        │
+        ├─ Dockerfile: builder 단계에서 JAR 추출 → runtime 이미지에 계층 복사
+        │
+        └─ bootBuildImage: builder가 buildpack 실행 → OCI 이미지 생성
+                                      │
+                                      ▼
+                        registry push → Kubernetes 배포
+```
+
+Dockerfile은 builder와 최종 runtime을 명시하고, runtime에는 필요한 JRE·추출 결과만 둔다. 비루트 `USER`, 고정된 기반 이미지, `.git`·비밀 파일 제외를 기본으로 한다. Buildpacks는 Maven·Gradle에서 builder를 호출해 앱 종류를 감지하고 이미지를 조립한다. Docker 호환 데몬·인증·builder는 여전히 필요하다. Paketo는 `layers.idx` 사용자 정의를 반영하지만 리소스의 수정 시각을 조작할 수 있으므로 앱이 원래 `last modified` 값에 의존하지 않는지 확인한다.
+
+### 3.3 AOT·Native Image·CDS/AOT cache의 차이
+
+Spring AOT는 컨텍스트를 분석해 코드와 힌트를 만들고 Native Image는 이를 GraalVM 정적 분석과 결합해 실행 파일로 만든다. 리플렉션·직렬화·리소스·동적 프록시는 분석이 놓칠 수 있어 metadata가 필요하다. Boot가 일부 힌트를 자동 생성하지만 직접 리플렉션하는 코드는 `RuntimeHintsRegistrar`, `@ImportRuntimeHints`, `@RegisterReflectionForBinding` 등을 검토한다. 추적 에이전트는 관찰한 경로의 후보를 만들 뿐 미실행 코드를 증명하지 않는다.
+
+AOT 분석은 빌드 프로필·조건에 영향을 받으므로 런타임에 새 프로필로 빈 구성을 바꾸는 일반 JVM 방식과 다를 수 있다. 실제 배포 설정으로 검증한다. Native 빌드는 시간·메모리 비용이 더 들며 결과물도 대상 OS·CPU·libc에 맞춰야 한다.
+
+CDS와 JVM AOT cache는 JVM용 캐시이고 Native Image는 별도 바이너리다. Boot 4.1은 Java 25 이상에서 Buildpacks 환경 변수 `BP_JVM_AOTCACHE_ENABLED=true`로 AOT cache를 훈련·저장할 수 있다. 훈련 실행이 DB 변경이나 메시지 발행을 하지 않도록 격리한다. JVM 캐시 원리와 옵션은 J16 참조.
+
+### 3.4 종료 신호, probe, 트래픽 전환
+
+Boot는 내장 Tomcat·Jetty·Reactor Netty의 graceful shutdown을 기본 활성화한다. 컨텍스트 종료 초기에 서버가 새 요청을 멈추고 진행 중 요청에 시간을 준다. `spring.lifecycle.timeout-per-shutdown-phase`는 종료 단계 제한이며 앱 자체 스레드·스케줄러·소비자는 별도 lifecycle로 닫아야 한다.
+
+Kubernetes는 종료 신호 후 `terminationGracePeriodSeconds`가 지나면 프로세스를 강제 종료한다. 이 값은 앱의 종료 timeout보다 길게 두고 endpoint 갱신·sidecar 등에도 여유를 둔다. Startup 성공 전에는 다른 probe가 대기한다. Liveness 실패는 재시작, readiness 실패는 서비스 endpoint에서 제외를 뜻한다. DB 장애를 liveness에 연결하면 재시작 폭주가 날 수 있다. Actuator probe 상세는 S16 참조.
+
+## 4. 코드로 확인
+
+아래 Spring Boot 4.1 배포 예시는 환경별 이미지·registry·Service Connection을 프로젝트 값으로 바꿔 사용한다. (미실행)
+
+### 예제 1 — 계층형 JAR 추출 Dockerfile
+
+패키징 결과는 `target/app.jar`라고 가정한다. Gradle은 `JAR_FILE`을 `build/libs`에 맞춘다.
+
+```dockerfile
+FROM bellsoft/liberica-openjre-debian:25-cds AS builder
+WORKDIR /builder
+ARG JAR_FILE=target/app.jar
+COPY ${JAR_FILE} application.jar
+RUN java -Djarmode=tools -jar application.jar extract --layers --destination extracted
+
+FROM bellsoft/liberica-openjre-debian:25-cds
+WORKDIR /application
+COPY --from=builder --chown=10001:10001 /builder/extracted/dependencies/ ./
+COPY --from=builder --chown=10001:10001 /builder/extracted/spring-boot-loader/ ./
+COPY --from=builder --chown=10001:10001 /builder/extracted/snapshot-dependencies/ ./
+COPY --from=builder --chown=10001:10001 /builder/extracted/application/ ./
+USER 10001:10001
+ENTRYPOINT ["java", "-jar", "application.jar"]
+```
+
+`docker build -t registry.example.com/team/app:1.0.0 .`로 빌드한다. 경로를 명시해 plain JAR가 선택되지 않게 한다. 대안은 Maven `./mvnw spring-boot:build-image -Dspring-boot.build-image.imageName=registry.example.com/team/app:1.0.0` 또는 Gradle `./gradlew bootBuildImage --imageName=registry.example.com/team/app:1.0.0`이다.
+
+### 예제 2 — Native Image 빌드
+
+Spring Initializr가 GraalVM Native Build Tools와 `native` 프로필을 설정한 Maven 프로젝트라면 다음 명령으로 빌드한다. Gradle 프로젝트는 플러그인 설정 후 `nativeCompile` 태스크를 사용한다. 빌드 성공만으로 리플렉션 힌트나 실제 배포 구성이 검증되지는 않는다. (미실행)
+
+```sh
+./mvnw -Pnative native:compile
+# Gradle: ./gradlew nativeCompile
+```
+
+### 예제 3 — Graceful shutdown과 Kubernetes 배포
+
+Actuator endpoint를 애플리케이션 포트에서 노출한다고 가정한 예다. Kubernetes 종료 유예 시간은 Spring 제한보다 길다.
+
+```yaml
+# application.yaml
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 25s
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: orders
+  template:
+    metadata:
+      labels:
+        app: orders
+    spec:
+      terminationGracePeriodSeconds: 40
+      containers:
+        - name: app
+          image: registry.example.com/team/orders:1.0.0
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: orders-config
+                  key: datasource-url
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: orders-secret
+                  key: datasource-password
+            - name: SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE
+              value: 25s
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 500m
+              memory: 768Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+```
+
+`orders-config`에는 비밀이 아닌 값, 비밀번호는 `Secret`에 둔다. 자원 값은 실측하고, startup 허용 시간은 최악 기동을 넘도록 한다. CPU limit은 throttling, 메모리 초과는 OOM 종료가 될 수 있다.
+
+### 예제 4 — Azure Pipelines에서 이미지 빌드·배포
+
+Azure DevOps에 Registry·Kubernetes Service Connection을 등록하고 `k8s/deployment.yaml`을 저장소에 둔다. 에이전트는 Java 25를 제공해야 한다.
+
+```yaml
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  imageRepository: orders
+  dockerRegistryServiceConnection: acr-connection
+  kubernetesServiceConnection: aks-connection
+  containerRegistry: myregistry.azurecr.io
+  tag: $(Build.BuildId)
+
+steps:
+  - checkout: self
+
+  - script: ./mvnw -B verify
+    displayName: Build and verify
+
+  - task: Docker@2
+    displayName: Build and push image
+    inputs:
+      command: buildAndPush
+      repository: $(imageRepository)
+      dockerfile: $(Build.SourcesDirectory)/Dockerfile
+      containerRegistry: $(dockerRegistryServiceConnection)
+      tags: |
+        $(tag)
+
+  - task: KubernetesManifest@1
+    inputs:
+      action: deploy
+      kubernetesServiceConnection: $(kubernetesServiceConnection)
+      namespace: production
+      manifests: $(Build.SourcesDirectory)/k8s/deployment.yaml
+      containers: $(containerRegistry)/$(imageRepository):$(tag)
+```
+
+에이전트의 JDK를 고정하고, 운영 태그는 빌드 ID처럼 변경 불가능한 값으로 둔다. 태그를 덮어쓰면 같은 manifest가 다른 이미지를 가리킨다. (미실행)
+
+## 5. 버전별 변화 — 왜 바뀌었나
+
+- **Spring Boot 2.3.0.M1 (2020)**: JAR 전체 복사로 코드 변경마다 의존성 layer까지 갱신되는 문제를 줄이려 Buildpacks와 layered JAR를 도입했다. [Spring 블로그](https://spring.io/blog/2020/01/27/creating-docker-images-with-spring-boot-2-3-0-m1/)
+- **Spring Boot 3.0 세대 (2022)**: 동적 JVM 실행만으로 빠른 기동·작은 footprint를 달성하기 어려워 AOT와 GraalVM Native Image 지원을 강화했다. [Spring Boot 3.0.0-M5](https://spring.io/blog/2022/09/22/spring-boot-3-0-0-m5-available-now/)
+- **현재 기준: Spring Boot 4.1.1**: 2.3 시절 builder 설정을 복사하지 말고 `jarmode=tools`·AOT cache 등 현재 공식 설정을 따른다.
+
+## 6. 실무 가이드
+
+- **기본값 추천:** JVM 실행 가능 JAR를 계층별로 추출하는 멀티 스테이지 Dockerfile과 비루트 runtime을 쓴다. 앱 변경 시 의존성 layer를 재사용하기 쉽고 운영 JVM 진단성을 유지한다.
+- 이미지 구성을 직접 통제하면 Dockerfile, 표준 이미지 생성을 간소화하려면 `bootBuildImage`를 고른다. builder/run image와 버전은 고정한다.
+- 다운로드량이 크면 `jarmode=tools extract --layers`와 계층별 `COPY`를 쓴다. 단일 JAR 복사는 캐시를 분리하지 못한다.
+- Java 25+ Buildpacks 이미지에서 `BP_JVM_AOTCACHE_ENABLED=true`를 검토한다. 훈련 실행의 외부 쓰기를 막는다. 콜드 스타트 SLO가 중요하고 동적 기능을 관리할 수 있을 때만 Native Image를 평가한다.
+- 긴 초기화에는 startup probe, 트래픽 준비 상태에는 readiness, 복구 불가능한 정지에는 liveness를 쓴다. liveness에 외부 서비스를 연결하지 않는다.
+- Spring 종료 제한보다 `terminationGracePeriodSeconds`를 길게 두고 소비자·스케줄러도 종료한다.
+- ConfigMap에는 비밀 아닌 설정, Secret에는 자격 증명을 둔다. 환경 변수 변경은 새 Pod rollout으로 반영한다.
+- Azure Pipelines는 `verify → build/push → deploy` 순서, 불변 이미지 태그, 최소 권한 Service Connection을 사용한다.
+- JVM 옵션·CDS/Leyden 원리는 J16, probe endpoint 상세는 S16 참조.
+
+## 7. 함정·안티패턴
+
+1. **앱만 바꿔도 이미지 전체 재전송 →** JAR를 한 번에 `COPY` → `jarmode=tools extract --layers` 후 계층별 복사.
+2. **`ClassNotFoundException` →** plain JAR 또는 Boot loader를 classpath로 실행 → repackaged JAR를 `java -jar`로 실행.
+3. **Pod 시작 직후 재시작 →** liveness 허용 시간이 실제 기동보다 짧음 → startup probe로 초기화 시간을 분리.
+4. **DB 장애 때 전체 Pod 재시작 →** liveness가 DB를 검사 → readiness와 분리하고 liveness는 프로세스 상태만 검사.
+5. **배포 중 요청 손실 →** 앱 종료 시간이 Kubernetes 유예 시간보다 김 → 앱 제한보다 긴 grace period와 비동기 작업 종료를 구성.
+6. **비밀 유출 →** 비밀번호를 ConfigMap·Docker `ARG`에 포함 → Secret 또는 외부 secret store 사용.
+7. **OOMKilled·CPU throttling →** request·limit이 실측과 무관 → 부하를 측정해 조정하고 JVM 메모리는 J16과 맞춤.
+8. **ConfigMap 변경이 기존 Pod에 미반영 →** 환경 변수는 시작 때 주입 → 새 Pod로 rollout.
+
+## 8. 자가점검 Q&A (면접 대비)
+
+### Q1. 실행 가능 JAR가 일반 JAR와 다른 점은?
+Boot loader가 중첩 의존성을 읽고 manifest의 `Start-Class`를 호출한다. 일반 `java -cp app.jar Main`은 내부 JAR를 classpath에 풀지 않는다. 따라서 Boot 실행 JAR는 `java -jar`로 시작한다.
+
+**꼬리질문:** 왜 `BOOT-INF/lib`를 쓰나? Boot loader가 그 안의 nested JAR를 읽어 클래스 경로를 구성하기 때문이다.
+
+### Q2. layered JAR가 Docker 이미지 전송량을 줄이는 원리는?
+계층화 자체가 아카이브 크기를 줄이진 않는다. 바뀌기 드문 의존성과 자주 바뀌는 코드를 별도 Docker layer로 복사해 전자를 캐시한다. 계층별 `COPY`가 없으면 효과도 없다.
+
+**꼬리질문:** Boot layer와 Docker layer는 같은가? 아니다. 전자는 JAR 내용 분류, 후자는 이미지 파일시스템 계층이다.
+
+### Q3. `jarmode=tools`는 앱 런타임인가?
+아니다. Boot loader가 기본 main 대신 추출·계층 나열을 수행하는 도구 모드다. 이미지 빌드 단계에서 풀고 최종 컨테이너에서는 앱 JAR를 실행한다.
+
+**꼬리질문:** 추출하면 실행 JAR를 버리나? 아니다. 추출 구조에도 실행 가능한 애플리케이션 JAR가 남는다.
+
+### Q4. Buildpacks와 Dockerfile은 언제 각각 고르나?
+정책·OS·복사 순서를 직접 통제하려면 Dockerfile이 맞다. 표준 이미지를 빠르게 만들고 유지할 Docker 코드를 줄이려면 Buildpacks가 편하다. builder/run image의 출처와 버전은 어느 쪽이든 관리한다.
+
+**꼬리질문:** Buildpacks 이미지도 스캔해야 하나? 그렇다. 결과는 일반 OCI 이미지이며 기반 이미지 취약점도 포함한다.
+
+### Q5. Spring AOT와 Native Image는 같은 뜻인가?
+아니다. AOT는 컨텍스트를 분석해 코드와 힌트를 만드는 과정이고 Native Image는 정적 분석 결과로 실행 바이너리를 만든다. 리플렉션 등 동적 사용은 자동 추론되지 않을 수 있어 힌트와 테스트가 필요하다.
+
+**꼬리질문:** 추적 에이전트만 돌리면 충분한가? 아니다. 관찰하지 못한 코드 경로의 힌트는 만들지 못한다.
+
+### Q6. Liveness와 readiness는 어떤 상황에서 실패해야 하나?
+Readiness 실패는 트래픽 제외, liveness 실패는 컨테이너 재시작이다. 외부 DB 지연을 liveness로 연결하면 모든 Pod가 재시작할 수 있다. 시작이 오래 걸리면 startup probe로 초기화를 보호한다.
+
+**꼬리질문:** startup probe가 성공하기 전에는? liveness·readiness가 실행되지 않아 기동 시간을 확보한다.
+
+### Q7. Graceful shutdown이 보장하는 범위는?
+웹 서버가 새 요청을 멈추고 이미 진행 중인 요청에 제한 시간을 준다. 모든 비동기·메시지 작업의 완료까지 보장하지 않으므로 소비자와 스케줄러는 별도 종료 절차가 필요하다.
+
+**꼬리질문:** K8s 유예와 Spring timeout을 같게 두면 충분한가? 앱 제한 뒤 정리할 시간이 필요하므로 K8s 값을 더 길게 둔다.
+
+### Q8. ConfigMap·Secret·resource request/limit을 어떻게 구분하나?
+ConfigMap은 비밀 아닌 설정, Secret은 자격 증명 용도다. request는 주로 스케줄 배치에 쓰이고 limit은 사용 상한이며 CPU는 throttling, 메모리는 초과 시 OOM 종료가 가능하다.
+
+**꼬리질문:** ConfigMap을 환경 변수로 바꾸면 기존 JVM이 즉시 읽나? 아니다. 새 Pod를 rollout해야 한다.
+
+## 9. 참고문헌
+
+- The Executable Jar Format — https://docs.spring.io/spring-boot/specification/executable-jar/index.html — JAR 구조.
+- Efficient Deployments — https://docs.spring.io/spring-boot/reference/packaging/efficient.html — 추출 레이아웃과 tools 모드.
+- Dockerfiles — https://docs.spring.io/spring-boot/reference/packaging/container-images/dockerfiles.html — 계층 추출·AOT cache.
+- Cloud Native Buildpacks — https://docs.spring.io/spring-boot/reference/packaging/container-images/cloud-native-buildpacks.html — builder 및 리소스 메타데이터.
+- Advanced Native Images Topics — https://docs.spring.io/spring-boot/reference/packaging/native-image/advanced-topics.html — Native Image hints.
+- AOT Cache — https://docs.spring.io/spring-boot/how-to/aot-cache.html — Java 25+ Buildpacks 설정.
+- Graceful Shutdown — https://docs.spring.io/spring-boot/reference/web/graceful-shutdown.html — 종료 처리와 timeout.
+- Endpoints — https://docs.spring.io/spring-boot/reference/actuator/endpoints.html — liveness/readiness 상태.
+- Kubernetes Probes — https://kubernetes.io/docs/concepts/configuration/liveness-readiness-startup-probes/ — probe 종류와 효과.
+- Kubernetes Resource Management — https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ — requests·limits.
+- Kubernetes ConfigMaps — https://kubernetes.io/docs/concepts/configuration/configmap/ — 설정 주입과 비밀 정보 구분.
+- Azure Pipelines for AKS — https://learn.microsoft.com/en-us/azure/aks/devops-pipeline — 이미지 push 및 manifest 배포.
+- Spring Boot 2.3 Docker images — https://spring.io/blog/2020/01/27/creating-docker-images-with-spring-boot-2-3-0-m1/ — Buildpacks·layered JAR 도입.
+- Spring Boot 3.0 M5 — https://spring.io/blog/2022/09/22/spring-boot-3-0-0-m5-available-now/ — AOT·Native 지원 강화.

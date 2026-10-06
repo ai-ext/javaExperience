@@ -1,0 +1,432 @@
+# P02. MVC 패턴과 계층형 구조 — Controller·Service·Repository
+
+> MVC는 HTTP 요청과 응답을 다루는 표현 계층의 방식이다.  
+> Controller는 HTTP 경계를, Service는 유스케이스와 업무 규칙을, Repository는 저장소 접근을 맡긴다.  
+> 요청·응답 DTO와 내부 도메인 객체를 분리하고, Controller → Service → Repository 방향을 지킨다.
+
+## 1. 한 줄로 말하면
+
+Spring MVC는 Servlet 기반 웹 프레임워크에서 HTTP 요청을 Controller에 연결해 HTML 뷰를 렌더링하거나 응답 본문을 만드는 구조다. MVC의 Model·View·Controller와 애플리케이션의 Controller·Service·Repository는 서로 다른 분류다. Controller·Service·Repository는 기능을 나누는 계층형 구조이며, 웹 요청이 업무 로직과 저장소 코드에 뒤섞이지 않도록 경계를 둔다.
+
+이 경계를 놓치면 파라미터 검증, 업무 규칙, DB 코드가 Controller 하나에 몰린다. 같은 규칙을 다른 API에서 복사하다 동작이 달라지고, JSON에 DB Entity를 그대로 노출해 내부 필드가 계약에 새거나 순환 참조·지연 로딩 오류가 생긴다. 작은 기능을 만들 때부터 각 계층에 한 가지 책임을 두면 변경할 위치가 분명해진다.
+
+## 2. 당장 알아야 할 것
+
+아래 코드는 설명용 발췌이며 미실행이다.
+
+### 2.1 MVC란
+
+Model은 View에 전달할 데이터, View는 HTML 등의 표현, Controller는 요청 처리 연결을 맡는다. MVC의 Model은 Repository를 뜻하지 않는다. Spring MVC는 화면과 JSON API 모두 처리한다.
+
+### 2.2 화면과 REST 응답
+
+`@Controller`의 `return "hello"`는 뷰 이름이고, `@RestController`에서 반환한 객체는 HTTP 본문으로 변환된다. Thymeleaf 화면은 `Model`에 데이터를 담고, REST는 응답 DTO를 반환한다.
+
+### 2.3 MVC와 계층형 구조
+
+Spring MVC는 웹 처리 프레임워크다. Controller·Service·Repository는 책임을 나누는 계층이므로 REST API도 이 구조를 쓸 수 있다. 기본 호출 방향은 Controller → Service → Repository다.
+
+### 2.4 Controller
+
+경로·HTTP 메서드를 매핑하고 요청 DTO를 받아 Service를 호출한다. 응답 상태와 DTO를 정하되 업무 규칙과 SQL은 두지 않는다. 예: `@PostMapping` + `@RequestBody`.
+
+### 2.5 Service
+
+유스케이스와 업무 규칙, 여러 저장 동작의 순서를 소유한다. Controller에 규칙을 두면 다른 진입점에서 중복되므로 업무 판단을 Service에 둔다.
+
+### 2.6 Repository
+
+저장·조회 계약을 제공하고 DB 접근 구현을 감춘다. 쿼리는 맡지만 업무 허용 여부를 결정하지 않는다. 예: `MemoRepository.save(...)`.
+
+### 2.7 DTO와 Entity
+
+요청 DTO는 입력 허용 필드, 응답 DTO는 공개 필드, Entity/도메인 객체는 내부 데이터와 업무 개념이다. Entity를 외부에 노출하면 내부 필드가 계약이 되고, 요청으로 받으면 대량 할당 위험이 생긴다. 간단한 변환은 Service, 반복되면 Mapper에 둔다.
+
+### 2.8 DTO에 `record`
+
+`record MemoResponse(long id, String title)`처럼 불변 데이터를 선언한다. 접근자와 생성자를 제공하며 Java 16에 정식화됐다(JEP 395). 변경 가능한 상태가 필요하면 일반 클래스를 쓴다.
+
+### 2.9 패키지 구조
+
+| 방식 | 예시 | 특징 |
+|---|---|---|
+| 계층별 | `controller/`, `service/` | 작을 땐 단순, 기능이 늘면 관련 파일이 흩어짐 |
+| 기능별 | `memo/api/`, `memo/application/` | 관련 코드가 모여 기능별 변경에 유리 |
+
+기본값은 **기능별 최상위 패키지 안에서 역할별로 분리**다. 시작 클래스는 컴포넌트의 상위 패키지에 두고 기본 패키지는 피한다.
+
+### 2.10 의존 방향
+
+Controller → Service → Repository로 흐르게 한다. 순환 호출을 막고 생성자 주입으로 의존성을 드러낸다. 구현체를 직접 `new` 하면 교체·격리하기 어렵다.
+
+## 3. 따라 하기
+
+Java 25·Boot 4.1.1·Gradle Kotlin DSL 예제다. 메모리는 재시작하면 사라진다. MVC 연습용이며 Spring 코드 **(미실행)**.
+
+### 3.1 프로젝트 만들기
+
+[start.spring.io](https://start.spring.io)에서 Gradle - Kotlin, Java 25, Boot 4.1.1, Spring Web MVC를 선택해 `memo-demo`를 만든다. Boot 4 MVC 아티팩트는 `spring-boot-starter-webmvc`다. Maven은 같은 artifact를 dependency로 추가한다.
+
+Initializr의 wrapper와 생성 파일을 유지하고 `build.gradle.kts` 핵심 설정을 확인한다.
+
+```kotlin
+plugins {
+    java
+    id("org.springframework.boot") version "4.1.1"
+}
+
+group = "com.example"
+version = "0.0.1-SNAPSHOT"
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories { mavenCentral() }
+
+dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
+}
+```
+
+Maven 대응 의존성:
+
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-webmvc</artifactId>
+</dependency>
+```
+
+**확인:** Gradle은 `./gradlew dependencies --configuration runtimeClasspath`, Maven은 `./mvnw dependency:tree`로 starter를 확인한다. (미실행)
+
+### 3.2 패키지와 파일 만들기
+
+```bash
+mkdir -p src/main/java/com/example/memo/{api,application,domain,repository}
+```
+
+시작 클래스 `src/main/java/com/example/memo/MemoApplication.java`:
+
+```java
+package com.example.memo;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class MemoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(MemoApplication.class, args);
+    }
+}
+```
+
+도메인 값 `src/main/java/com/example/memo/domain/Memo.java`:
+
+```java
+package com.example.memo.domain;
+
+public record Memo(long id, String title, String content) {}
+```
+
+요청 DTO `src/main/java/com/example/memo/api/MemoCreateRequest.java`:
+
+```java
+package com.example.memo.api;
+
+public record MemoCreateRequest(String title, String content) {}
+```
+
+응답 DTO `src/main/java/com/example/memo/api/MemoResponse.java`:
+
+```java
+package com.example.memo.api;
+
+public record MemoResponse(long id, String title, String content) {}
+```
+
+**확인:** 모든 package가 `com.example.memo` 아래인지 확인한다. 시작 클래스가 하위 컴포넌트 스캔의 기준이다.
+
+### 3.3 저장소와 업무 계층 구현하기
+
+`src/main/java/com/example/memo/repository/MemoRepository.java`:
+
+```java
+package com.example.memo.repository;
+
+import com.example.memo.domain.Memo;
+import java.util.List;
+
+public interface MemoRepository {
+    Memo save(String title, String content);
+    List<Memo> findAll();
+}
+```
+
+`src/main/java/com/example/memo/repository/InMemoryMemoRepository.java`:
+
+```java
+package com.example.memo.repository;
+
+import com.example.memo.domain.Memo;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class InMemoryMemoRepository implements MemoRepository {
+    private final AtomicLong sequence = new AtomicLong();
+    private final ConcurrentHashMap<Long, Memo> memos = new ConcurrentHashMap<>();
+
+    @Override
+    public Memo save(String title, String content) {
+        long id = sequence.incrementAndGet();
+        Memo memo = new Memo(id, title, content);
+        memos.put(id, memo);
+        return memo;
+    }
+
+    @Override
+    public List<Memo> findAll() {
+        return memos.values().stream()
+                .sorted(Comparator.comparingLong(Memo::id))
+                .toList();
+    }
+}
+```
+
+`src/main/java/com/example/memo/application/MemoService.java`:
+
+```java
+package com.example.memo.application;
+
+import com.example.memo.api.MemoCreateRequest;
+import com.example.memo.api.MemoResponse;
+import com.example.memo.domain.Memo;
+import com.example.memo.repository.MemoRepository;
+import java.util.List;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MemoService {
+    private final MemoRepository repository;
+
+    public MemoService(MemoRepository repository) {
+        this.repository = repository;
+    }
+
+    public MemoResponse create(MemoCreateRequest request) {
+        Memo saved = repository.save(request.title(), request.content());
+        return toResponse(saved);
+    }
+
+    public List<MemoResponse> findAll() {
+        return repository.findAll().stream().map(this::toResponse).toList();
+    }
+
+    private MemoResponse toResponse(Memo memo) {
+        return new MemoResponse(memo.id(), memo.title(), memo.content());
+    }
+}
+```
+
+간결성을 위해 Service가 DTO 변환을 맡았다. 커지면 별도 Command/Query나 Mapper로 분리하되 Entity를 HTTP 응답으로 직접 노출하지 않는다.
+
+**확인:** 구현에 `@Repository`, Service에 `@Service`가 있고 생성자에서 Repository를 받는지 본다. (미실행)
+
+### 3.4 Controller에서 HTTP 입출력을 연결하기
+
+`src/main/java/com/example/memo/api/MemoController.java`:
+
+```java
+package com.example.memo.api;
+
+import com.example.memo.application.MemoService;
+import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/memos")
+public class MemoController {
+    private final MemoService service;
+
+    public MemoController(MemoService service) {
+        this.service = service;
+    }
+
+    @PostMapping
+    public ResponseEntity<MemoResponse> create(@RequestBody MemoCreateRequest request) {
+        MemoResponse created = service.create(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @GetMapping
+    public List<MemoResponse> findAll() {
+        return service.findAll();
+    }
+}
+```
+
+`@RequestMapping`과 메서드 애노테이션을 조합해 두 URL을 처리한다. JSON POST 요청은 `Content-Type: application/json`으로 보낸다.
+
+**확인:** `./gradlew bootRun` 또는 `./mvnw spring-boot:run` 후 로그의 기동 메시지와 8080 포트를 확인한다. (미실행)
+
+### 3.5 curl로 요청 보내기
+
+새 터미널에서 메모를 등록한다. 예상 응답은 `201 Created`와 id가 포함된 JSON이다.
+
+```bash
+curl -i -X POST http://localhost:8080/api/memos \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"첫 메모","content":"계층을 나눴다"}'
+```
+
+목록 조회를 이어서 요청한다.
+
+```bash
+curl -i http://localhost:8080/api/memos
+```
+
+목록 본문은 등록된 DTO 배열이다. 재시작하면 데이터가 사라진다. **미실행: 응답은 코드 기준 예상값이다.**
+
+### 3.6 같은 프로젝트에 Thymeleaf 화면 붙이기
+
+HTML 렌더링을 위해 다음 의존성(또는 Maven의 같은 artifact)을 추가한다.
+
+```kotlin
+implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
+```
+
+`src/main/java/com/example/memo/api/GreetingPageController.java`:
+
+```java
+package com.example.memo.api;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+
+@Controller
+public class GreetingPageController {
+    @GetMapping("/hello")
+    public String hello(Model model) {
+        model.addAttribute("name", "Spring MVC");
+        return "hello";
+    }
+}
+```
+
+`src/main/resources/templates/hello.html`:
+
+```html
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><title>인사</title></head>
+<body><h1 th:text="|안녕하세요, ${name}!|">인사</h1></body>
+</html>
+```
+
+**확인:** 서버에서 `/hello`를 열어 `안녕하세요, Spring MVC!`가 렌더링되는지 본다. (미실행)
+
+## 4. 치트시트
+
+| 이름 | 용도 | 예시 | 주의 |
+|---|---|---|---|
+| `@Controller` | 화면 라우팅 | `return "hello"` | 문자열은 뷰 이름 |
+| `@RestController` | HTTP API | `return response` | 객체는 응답 본문 |
+| `@GetMapping` | 조회 매핑 | `@GetMapping("/{id}")` | 경로를 요청과 맞춘다 |
+| `@PostMapping` | 본문 요청 | `@PostMapping` | JSON은 Content-Type 지정 |
+| `@RequestBody` | 본문 DTO 변환 | `create(RequestDto dto)` | Entity를 직접 받지 않는다 |
+| `ResponseEntity<T>` | 상태·헤더·본문 | `status(201).body(dto)` | 필요한 경우 사용 |
+| `@Service` | 업무 계층 빈 | `MemoService` | 업무 규칙을 둔다 |
+| `@Repository` | 저장소 빈 | `MemoRepository` | 저장 접근을 맡긴다 |
+| `record` | 값 DTO | `record Result(long id)` | 변경 가능한 상태에는 부적합 |
+| `spring-boot-starter-webmvc` | Boot 4 MVC | Gradle `implementation(...)` | 화면은 Thymeleaf starter 추가 |
+
+## 5. 자주 나는 에러와 해결
+
+1. **`404 Not Found`** → URL·HTTP 메서드가 매핑과 다르다. `@RequestMapping`과 요청 주소를 대조한다.
+2. **`415 Unsupported Media Type`** → 요청 형식을 표시하지 않았다. JSON 본문에 `Content-Type: application/json`을 보낸다.
+3. **`No qualifying bean of type 'MemoRepository' available`** → 구현 빈이 없거나 스캔 범위 밖이다. 구현에 `@Repository`를 붙이고 시작 클래스를 루트 패키지에 둔다.
+4. **`TemplateInputException: Error resolving template [hello]`** → Thymeleaf 의존성·템플릿 위치·뷰 이름 중 하나가 안 맞는다. `templates/hello.html`과 `return "hello"`를 확인한다.
+5. **`@Controller`가 문자열을 뷰로 찾음** → 문자열을 응답 본문으로 생각했다. 본문이면 `@ResponseBody`나 `@RestController`를 쓴다.
+6. **JSON 요청에 400 응답** → JSON 문법이나 DTO 필드 타입·이름이 맞지 않는다. 요청 본문과 record 선언을 비교하고 변환 오류 로그를 확인한다.
+7. **`Port 8080 was already in use`** → 포트를 다른 프로세스가 사용한다. 기존 프로세스를 종료하거나 `server.port`를 바꾼다.
+
+## 6. 한 단계 더
+
+요청 매핑과 메시지 변환의 내부 순서는 → S05 참조. REST 자원·상태 코드 설계는 → S06, 여러 DB 변경을 원자 처리하는 방법은 → S08 참조. 여기서는 HTTP 경계를 Controller, 업무 판단을 Service, 데이터 접근을 Repository에 두고 도메인 객체를 HTTP 계약에 직접 노출하지 않는 원칙을 익힌다. 복잡한 도메인 의존이 생기면 포트·어댑터를 검토한다.
+
+## 7. 자가점검 Q&A (면접 대비)
+
+### Q1. MVC의 Model은 Repository와 같은 뜻인가?
+
+아니다. Model은 View가 렌더링할 데이터이고 Repository는 저장소 접근 계층이다. JSON 응답 DTO가 Model의 일부 역할을 해도 Repository는 아니다.
+
+**꼬리질문:** REST에 View가 없어도 Spring MVC인가?  
+**답:** 그렇다. 요청 매핑은 Spring MVC가 처리하고 JSON은 메시지 변환기로 본문에 쓴다.
+
+### Q2. `@Controller`와 `@RestController`의 반환값 차이는?
+
+`@Controller`의 문자열은 보통 뷰 이름이다. 응답 본문 어노테이션이 적용되면 값을 본문으로 기록하며 `@RestController`는 이 동작을 기본 적용한다.
+
+**꼬리질문:** `@Controller`에서 JSON을 반환하려면?  
+**답:** 메서드에 `@ResponseBody`를 붙이거나 `@RestController`를 쓴다.
+
+### Q3. 업무 규칙을 Controller에 넣으면 왜 문제가 되나?
+
+HTTP 진입점에 규칙이 묶여 다른 진입 방식에서 재사용하기 어렵고 중복 규칙이 달라질 수 있다. 유스케이스 판단은 Service에 둔다.
+
+**꼬리질문:** 한 줄짜리 Service도 항상 만들어야 하나?  
+**답:** 기계적으로 늘릴 필요는 없다. 규칙·재사용 책임이 생기는 시점에 경계를 둔다.
+
+### Q4. DTO와 Entity를 왜 분리하는가?
+
+Entity를 요청으로 받으면 내부 필드를 외부에서 변경하는 대량 할당 위험이 있다. 응답으로 내보내면 내부 구조가 API 계약이 된다. DTO로 입출력 필드를 명시한다.
+
+**꼬리질문:** 필드가 같아도 분리하는가?  
+**답:** 공개 계약과 내부 모델의 변경 이유가 다르면 분리한다. 단순 매핑 비용과 독립성의 균형을 팀 기준으로 정한다.
+
+### Q5. Repository에 업무 규칙을 두면 안 되는가?
+
+Repository는 조회·저장 방식과 쿼리 책임을 갖고, 업무상 허용 여부는 Service가 판단한다. 저장소 제약은 데이터 무결성의 최종 방어로 함께 쓸 수 있다.
+
+**꼬리질문:** 이메일 중복 가입을 막는다면?  
+**답:** 중복 조회는 Repository, 가입 거절 결정은 Service, 동시 요청 보장은 DB unique 제약으로 처리한다.
+
+### Q6. 계층별과 기능별 패키지 중 무엇을 선택할까?
+
+작은 앱에선 계층별이 간단하지만 기능이 많아지면 한 기능의 코드가 흩어진다. 기능별 최상위 패키지 아래 역할을 나누는 구성을 기본값으로 삼는다.
+
+**꼬리질문:** 기능 내부 계층은 항상 나눠야 하나?  
+**답:** 작으면 생략할 수 있다. 책임이 섞이고 클래스가 늘 때 하위 패키지를 만든다.
+
+### Q7. Repository 인터페이스를 Service 생성자로 받는 이유는?
+
+Service를 저장소 구현에서 분리해 교체할 수 있고 생성자 주입이 의존성을 드러낸다. 구현 빈이 여러 개면 `@Primary`나 `@Qualifier` 등으로 선택을 명시한다.
+
+**꼬리질문:** 구현을 직접 `new` 하면 어떤 비용이 있나?  
+**답:** 구현 교체와 테스트 격리가 어려워지고 객체 생명주기를 컨테이너에 맡길 수 없다.
+
+## 8. 참고문헌
+
+- Spring Web MVC — https://docs.spring.io/spring-framework/reference/web/webmvc.html — Servlet 기반 Spring MVC 개요.
+- Building a RESTful Web Service — https://spring.io/guides/gs/rest-service — JSON REST 가이드와 생성 절차.
+- Serving Web Content with Spring MVC — https://spring.io/guides/gs/serving-web-content — Spring MVC 화면 가이드.
+- Annotated Controllers — https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller.html — Controller 애노테이션 모델.
+- Return Values — https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/return-types.html — 본문 변환과 뷰 반환 규칙.
+- View Technologies — https://docs.spring.io/spring-framework/reference/web/webmvc-view.html — Thymeleaf 등 뷰 기술.
+- Servlet Web Applications — https://docs.spring.io/spring-boot/reference/web/servlet.html — Boot Servlet MVC 자동 구성.
+- Web — https://docs.spring.io/spring-boot/reference/web/index.html — Boot MVC 스타터.
+- Structuring Your Code — https://docs.spring.io/spring-boot/reference/using/structuring-your-code.html — 메인 클래스 및 패키지 구조 권장.

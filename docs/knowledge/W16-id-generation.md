@@ -1,0 +1,296 @@
+# W16. ID 생성 전략 — AUTO_INCREMENT vs UUID vs ULID·Snowflake
+
+> 기본 단일 DB CRUD라면 내부 PK는 `BIGINT AUTO_INCREMENT`가 가장 단순하고 인덱스도 작다.
+> DB 왕복 전에 ID가 필요하거나 여러 노드에서 독립 생성해야 하면 UUIDv7·Snowflake 같은 앱 생성 ID를 검토한다.
+> 외부 공개 식별자와 내부 PK는 목적이 다르다. 기본 추천은 내부 숫자 PK와 별도 공개 UUID를 쓰고, ID 자체를 권한으로 취급하지 않는 것이다.
+
+## 1. 질문
+
+신입 개발자가 자주 마주치는 장면은 이렇다.
+
+- `@GeneratedValue(strategy = IDENTITY)`로 대량 등록을 구현했더니 INSERT batch가 동작하지 않는다. DB 생성 키를 받아야 한다는 점과 배치 성능의 관계가 궁금하다.
+- `/orders/1842`처럼 순번이 드러나는 주소를 피하려 UUID를 PK로 바꾸려다 InnoDB 인덱스와 쓰기 비용에 대한 리뷰를 받는다.
+- 여러 인스턴스에서 DB를 기다리지 않고 만들 ID를 고른다. UUID, ULID, Snowflake의 크기·정렬·시계 의존성을 비교하고 싶다.
+
+## 2. 짧은 답
+
+- 단일 관계형 DB에서 일반 CRUD를 시작한다면 내부 PK는 `BIGINT AUTO_INCREMENT`를 기본값으로 둔다. 짧고 InnoDB 삽입 위치가 대체로 끝에 모이며 운영이 쉽다.
+- 쓰기 전 ID가 필요하거나 DB가 여러 개라면 앱 생성 ID를 쓴다. UUIDv7은 표준 128비트 UUID 중 시간 순서에 가까운 선택이고, Snowflake는 중앙 조정 없이 64비트 숫자를 만들 때 맞는다.
+- UUIDv4는 생성 위치와 무관하게 랜덤 ID가 필요할 때 간단하지만, InnoDB PK로 대량 삽입하면 임의 페이지 쓰기를 만든다.
+- ULID도 시간 정렬 문자열이 필요할 때 후보지만, UUID 표준과의 상호운용·DB 저장 형태를 팀이 정해야 한다.
+- Hibernate/JPA의 `GenerationType.UUID`는 “UUID를 생성한다”는 계약이지 “UUIDv7을 만든다”는 보장이 아니다. 버전이 필요하면 생성기를 명시한다.
+- MySQL의 `IDENTITY`는 DB 삽입 뒤에 키를 알기 때문에 Hibernate JDBC insert batching에 제약이 있다. 배치가 핵심이면 시퀀스를 쓸 수 있는 DB에서 `SEQUENCE`, 또는 앱 생성 키를 검토한다.
+- 외부 노출은 내부 PK 타입과 분리할 수 있다. UUID도 인가 검사를 대체하지 않는다.
+
+## 3. 왜 그런가 — 원리
+
+### 생성 위치가 생명주기와 배치를 결정한다
+
+키가 DB에서 나오는지 애플리케이션에서 나오는지가 ORM의 INSERT 시점을 바꾼다. `IDENTITY`는 INSERT를 실행하고 결과 키를 받아야 엔티티 ID가 정해진다. Hibernate는 여러 INSERT를 키를 모르는 채 JDBC batch로 보내기 어렵다. 반면 `SEQUENCE`는 INSERT 전에 `next value`를 확보할 수 있고, UUID·Snowflake도 엔티티를 DB에 보내기 전에 값이 있으므로 여러 INSERT를 모아 보낼 여지가 있다. 실제 배치 여부는 드라이버, 트랜잭션, 매핑, Hibernate 설정과 DB가 함께 결정한다.
+
+```mermaid
+flowchart TD
+    A["애플리케이션에서 Entity 구성"] --> B{"ID를 누가 생성하나?"}
+    B -->|"IDENTITY"| C["INSERT 요청"]
+    C --> D["DB가 ID 생성 후 반환"]
+    D --> E["엔티티 ID 확정"]
+    B -->|"SEQUENCE"| F["DB 시퀀스에서 선할당"]
+    F --> G["ID를 가진 INSERT들을 batch로 전송 가능"]
+    B -->|"UUIDv4·UUIDv7·ULID·Snowflake"| H["앱 또는 ID 서비스에서 선생성"]
+    H --> G
+```
+
+“배치 가능”이 자동으로 빠르다는 뜻은 아니다. `hibernate.jdbc.batch_size`, 동일 SQL, 트랜잭션 등 조건이 맞아야 한다. pooled sequence는 왕복을 줄이는 대신 재시작·롤백으로 ID 공백을 만들 수 있으며, 공백은 오류가 아니다.
+
+### InnoDB에서 PK는 단순한 행 번호가 아니다
+
+InnoDB는 행을 clustered index에 저장하며 PK가 그 인덱스가 된다. `AUTO_INCREMENT`는 새 값을 대체로 오른쪽 최신 페이지에 추가하지만, UUIDv4는 임의 페이지에 삽입한다. 페이지 읽기·수정·분할이 늘 수 있어 RFC 9562도 v4의 낮은 인덱스 지역성을 설명한다. 실제 차이는 행 크기, 버퍼 풀, 쓰기량, 보조 인덱스에 따라 측정한다.
+
+보조 인덱스에도 PK 값이 들어간다. `BIGINT` 8바이트를 UUID 16바이트로 바꾸면 모든 보조 인덱스가 커지고, 36자 문자열은 더 크다. `BINARY(16)`은 UUID를 16바이트로 보관한다. Hibernate는 DB에 따라 native 또는 binary UUID를 기본 매핑하고 CHAR도 설정할 수 있다. API 문자열 표현과 저장 형식은 별개다.
+
+UUIDv7은 Unix millisecond timestamp를 앞에 두고 난수 또는 선택적인 카운터를 둔다. 시간 순 정렬로 v4보다 지역성이 나을 수 있지만, 같은 밀리초의 난수와 호스트 시계 오차 때문에 전역 단조 증가하지 않는다. ULID는 48비트 시간·80비트 난수를 26자 Crockford Base32로 표현한다. 기본 생성은 같은 밀리초 순서를 보장하지 않으며 monotonic 모드는 프로세스 안에서 난수 부분을 증가시킨다.
+
+### 분산 유일성은 배치 상태 또는 확률에 의존한다
+
+UUIDv4에는 122비트, UUIDv7에는 74비트, ULID에는 80비트 난수 영역이 있다. 충돌 가능성이 매우 낮아도 0은 아니므로 PK/UNIQUE 제약은 유지한다.
+
+Snowflake 계열은 보통 64비트 부호 있는 정수에 시각, 노드 식별자, 같은 시간 단위 안의 sequence를 붙인다. Twitter의 2010 구현은 부호 비트 1개를 남기고 41비트 시간, 데이터센터 5비트, 워커 5비트, sequence 12비트를 사용했다. 이 배치에서는 밀리초당 한 워커에서 4096개 값을 만들 수 있지만, 이를 넘으면 다음 밀리초를 기다려야 한다. 워커 번호 중복은 충돌을 만들고, 서버 시계가 마지막 생성 시각보다 뒤로 가면 구현은 거부하거나 보정해야 한다. 따라서 Snowflake의 “유일성”은 노드 ID 할당과 시계 정책이 올바르다는 운영 조건에 기대고 있다.
+
+어떤 방식도 생성 시각을 커밋 순서로 바꾸지는 않는다. 트랜잭션 A가 작은 ID를 먼저 받고 오래 열린 동안 트랜잭션 B가 큰 ID를 받고 먼저 커밋할 수 있다. 롤백, 시간 동기화 차이, 같은 밀리초 난수도 있으므로 ID 정렬을 업무 이벤트의 정확한 순서로 쓰지 않는다.
+
+## 4. 선택지 비교
+
+| 선택지 | 어떻게 동작 | 장점 | 단점 | 언제 쓰나 | 국내 실무에서 흔한가 |
+|---|---|---|---|---|---|
+| `AUTO_INCREMENT` / `IDENTITY` | DB insert 때 숫자 키 할당 | 8바이트 `BIGINT`, 구현·조회·인덱스가 단순하고 끝쪽 삽입에 유리 | ID를 받으려 DB insert가 필요; 여러 DB/노드에서 기본적으로 전역 유일하지 않음; 값이 추측 가능 | 단일 DB 중심 CRUD, 레거시 스키마, 단순 운영 | MySQL·MariaDB 서비스와 SI에서 흔함(통계 미확인) |
+| `SEQUENCE` | DB sequence에서 insert 전에 숫자 확보 | 선할당과 Hibernate batch에 유리; pooled allocation으로 시퀀스 왕복 감소 가능 | DB별 지원 차이, 설정·마이그레이션 필요; 공백 가능; 여러 DB면 조정 필요 | PostgreSQL·Oracle 등 sequence 지원 DB의 쓰기량이 많은 서비스 | JPA의 일반 선택지(국내 비율 자료 없음) |
+| UUIDv4 | 앱 또는 ORM이 난수 기반 128비트 ID 생성 | 단일 노드·DB 없이 생성; 추측이 어려운 임의 식별자; 표준 상호운용 | 16바이트 이상; InnoDB PK에서 랜덤 쓰기; 정렬 불가; 공개해도 인가를 대신하지 않음 | 노출 URL을 순번과 분리하거나 DB 쓰기 전 ID가 필요할 때 | API ID 사용 사례(국내 빈도 미확인) |
+| UUIDv7 | 48비트 millisecond 시간 + 74비트 난수/선택 데이터 | 128비트 UUID 호환, 근사 시간 정렬, v4보다 인덱스 지역성 개선 기대 | 시각 노출·호스트 시계 오차; 전역 단조 증가 아님; Java 25 `UUID`에는 표준 v7 생성 팩토리가 없음 | 앱 생성 ID와 정렬성을 함께 원하며 팀이 생성기를 관리할 때 | 신규 표준(국내 도입 통계 없음) |
+| ULID | 128비트 중 48비트 시간+80비트 난수, 26자 Base32 | URL에 넣기 쉬운 대소문자 무시 문자열, 사전식 정렬, UUID와 같은 비트 폭 | 기본 구현의 같은 밀리초 순서는 비보장; 생태계·DB 타입 합의 필요; 문자열 PK는 넓음 | 사람이 다루는 sortable ID 문자열이 제품 요구일 때 | 선택 사례(통계 미확인) |
+| Snowflake 계열 | 시간+노드+sequence를 합친 64비트 값 | 8바이트 숫자, 앱에서 빠른 분산 생성, 시간 근사 정렬 | 노드 ID 배정·시계 후퇴·초당량·epoch·롤오버를 운영해야 함; 시간과 노드 정보 노출 | 여러 쓰기 노드에서 숫자형 ID가 필요하고 ID 서비스/운영 역량이 있을 때 | 대규모 플랫폼 특화 |
+
+외부 ID만 랜덤하면 내부 숫자 PK와 `public_id UUID UNIQUE`를 함께 둘 수 있다. 조회 단계와 인덱스는 추가되지만 PK 폭은 작게 유지된다.
+
+## 5. 코드로 보기
+
+아래 첫 예시는 표준 JPA 생성 전략 세 가지를 같은 형태로 놓는다. `GenerationType.UUID`는 Jakarta Persistence의 UUID 생성 계약이고, UUID 버전을 고정하지 않는다. Hibernate의 기본 UUID 생성 결과나 바이너리 매핑 세부에 의존하지 않으려면 버전과 저장 형식을 명시적으로 검토한다. `SEQUENCE`의 `allocationSize`는 운영 DB sequence 설정과 맞춰야 한다.
+
+```java
+package com.example.iddemo;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
+import java.util.UUID;
+
+@Entity
+@Table(name = "payment_identity")
+class IdentityPayment {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    protected IdentityPayment() {}
+}
+
+@Entity
+@Table(name = "payment_sequence")
+class SequencePayment {
+    @Id
+    @SequenceGenerator(name = "payment_seq", sequenceName = "payment_seq", allocationSize = 50)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "payment_seq")
+    private Long id;
+
+    protected SequencePayment() {}
+}
+
+@Entity
+@Table(name = "payment_uuid")
+class UuidPayment {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    protected UuidPayment() {}
+}
+```
+
+Spring Boot 4.1 / Jakarta Persistence 코드 **(미실행)**. 첫 두 클래스는 Long PK, 셋째는 UUID PK다. `SEQUENCE`는 IDENTITY와 달리 INSERT 전에 ID를 알아 JDBC batch 조건에 유리하다. MySQL UUID 컬럼은 migration으로 `BINARY(16)`처럼 저장 폭을 명시하고, 자동 스키마 생성 결과와 비교한다.
+
+다음 순수 Java 예제는 Java 21에서 실행했다. Java 25의 `UUID.randomUUID()`도 UUIDv4를 만든다. UUIDv7 부분은 Java의 공개 `UUID(long, long)` 생성자를 이용해 RFC 비트 레이아웃을 조립한다. same-millisecond 순서 보정은 하지 않아 UUIDv7의 시간 필드만 제공한다. Snowflake는 Twitter 계열 41/5/5/12 비트 배치를 간단히 구현한다. 실제 배포에서는 worker/datacenter ID를 설정으로 받고 중복 배정을 막아야 한다.
+
+```java
+import java.security.SecureRandom;
+import java.util.UUID;
+
+public class UuidKindsDemo {
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final long TWITTER_EPOCH_MILLIS = 1_288_834_974_657L;
+    private static final long MAX_TIMESTAMP = (1L << 41) - 1;
+    private static final long DATACENTER_ID = 3L;
+    private static final long WORKER_ID = 7L;
+    private static final long SEQUENCE_MASK = (1L << 12) - 1;
+    private static long lastMillis = -1L;
+    private static long sequence = 0L;
+
+    public static void main(String[] args) {
+        UUID v4 = UUID.randomUUID();
+        UUID v7 = nextUuidV7();
+        long snowflake = nextSnowflake();
+
+        System.out.printf("uuid-v4.version=%d variant=%d chars=%d%n",
+                v4.version(), v4.variant(), v4.toString().length());
+        System.out.printf("uuid-v7.version=%d variant=%d chars=%d timestamp-ms=%d%n",
+                v7.version(), v7.variant(), v7.toString().length(),
+                v7.getMostSignificantBits() >>> 16);
+        System.out.printf("snowflake.bits=%d nonNegative=%s sequence=%d%n",
+                Long.SIZE, snowflake >= 0, snowflake & SEQUENCE_MASK);
+    }
+
+    private static UUID nextUuidV7() {
+        long timestamp = System.currentTimeMillis();
+        long randomA = RANDOM.nextInt(1 << 12);
+        long randomB = RANDOM.nextLong() & 0x3fff_ffff_ffff_ffffL;
+        long msb = ((timestamp & 0x0000_ffff_ffff_ffffL) << 16)
+                | 0x7000L | randomA;
+        long lsb = 0x8000_0000_0000_0000L | randomB;
+        return new UUID(msb, lsb);
+    }
+
+    private static synchronized long nextSnowflake() {
+        long now = System.currentTimeMillis();
+        if (now < TWITTER_EPOCH_MILLIS) {
+            throw new IllegalStateException("Clock is before the configured epoch");
+        }
+        if (now < lastMillis) {
+            throw new IllegalStateException("Clock moved backwards");
+        }
+        if (now == lastMillis) {
+            sequence = (sequence + 1) & SEQUENCE_MASK;
+            if (sequence == 0) {
+                do {
+                    now = System.currentTimeMillis();
+                } while (now <= lastMillis);
+            }
+        } else {
+            sequence = 0;
+        }
+        lastMillis = now;
+        long elapsed = now - TWITTER_EPOCH_MILLIS;
+        if (elapsed > MAX_TIMESTAMP) {
+            throw new IllegalStateException("Configured 41-bit timestamp range expired");
+        }
+        return (elapsed << 22)
+                | (DATACENTER_ID << 17)
+                | (WORKER_ID << 12)
+                | sequence;
+    }
+}
+```
+
+실제 출력은 매 실행마다 UUIDv7 timestamp가 바뀐다.
+
+```text
+uuid-v4.version=4 variant=2 chars=36
+uuid-v7.version=7 variant=2 chars=36 timestamp-ms=1791100791316
+snowflake.bits=64 nonNegative=true sequence=0
+```
+
+이 예제는 교육용 단일 프로세스 구현이다. UUIDv7의 같은 밀리초 순서와 Snowflake 워커 ID 재시작 관리는 구현하지 않는다.
+
+## 6. 실무에서는 실제로
+
+### 신규 서비스
+
+단일 MySQL이면 내부 PK를 `BIGINT AUTO_INCREMENT`로 시작한다. PK와 보조 인덱스가 작고 운영이 단순하다. URL 순번을 감추려면 내부 PK를 바꾸기보다 `public_id`를 분리하고, v4/v7은 노출 시각과 정렬 요구로 고른다.
+
+쓰기량이 크고 PostgreSQL/Oracle처럼 sequence 지원 DB를 쓰면 `SEQUENCE`와 pooled allocation을 검토한다. `allocationSize`, 실제 sequence increment, 트랜잭션과 JDBC 로그를 확인하고 batch 여부를 측정한다.
+
+앱 생성 ID가 필요하면 MySQL에 UUIDv7을 `BINARY(16)`으로 저장하고 삽입 분포와 인덱스 크기를 시험한다. v4보다 랜덤 삽입은 줄어도 8바이트 숫자보다 PK가 커지는 비용은 남는다. ULID 문자열 PK는 26자 저장 비용과 collation을 migration에 고정한다.
+
+### 레거시·SI·금융
+
+연계 시스템이 `BIGINT`를 참조하면 URL 노출만으로 PK를 UUID로 바꾸지 않는다. FK, 배치, 파일 인터페이스, CDC, 운영 쿼리와 외부 타입을 고쳐야 한다. 대신 UNIQUE `public_id`를 추가해 새 요청에서 내부 row를 찾는다.
+
+금융·감사에서도 ID를 거래 순서로 보지 않는다. 거래 시각·commit 시각·업무 sequence를 따로 모델링한다. 번호 연속성이 요건이면 별도 통제된 발번 절차를 둔다.
+
+### 스타트업·여러 서비스
+
+DB insert 전에 이벤트가 ID를 필요로 하면 앱 생성이 편하다. UUIDv7은 시계 정책을, Snowflake는 worker 중복·clock rollback·sequence 한도를 정한다. 공통 ID 서비스가 있으면 그 계약을 우선 검토한다.
+
+테이블별로 내부 사용자 PK는 `BIGINT`, 공개 API 키는 UUIDv4, 고쓰기 이벤트 ID는 UUIDv7 또는 Snowflake로 섞을 수 있다. JSON DTO·이벤트 필드는 `id`, `publicId`, `eventId`처럼 역할을 구분한다.
+
+마이그레이션은 공개 ID 추가 → backfill → UNIQUE → API 전환 순으로 한다. 기본 PK 변경은 FK·인덱스·rollback을 별도로 검토한다.
+
+**기본값 추천:** 신규 단일 DB CRUD는 내부 `BIGINT AUTO_INCREMENT` + 필요 시 별도 공개 UUID를 사용한다. 여러 DB에서 생성 전 참조가 필수이거나 인덱스 순서 개선이 중요한 경우에만 UUIDv7/Snowflake로 기본값을 바꾼다.
+
+## 7. 흔한 오해와 실수
+
+1. **“UUID면 외부에서 안전하다” →** UUIDv4는 순번보다 추측하기 어렵지만, 권한 검사를 대신하지 않는다. ID가 알려져도 다른 사용자 리소스면 API가 403/404 정책대로 차단해야 한다. **대처:** 모든 요청에서 사용자·테넌트 소유권을 확인한다.
+2. **“UUIDv7은 순서대로 증가한다” →** 밀리초 timestamp로 대략 정렬되지만 같은 밀리초 난수와 호스트 시계가 있어 전역 단조성은 없다. **대처:** 정확한 업무 순서에는 별도 sequence·event time·commit 기록을 쓴다.
+3. **“UUID는 16바이트라 어디 저장해도 같다” →** 문자열 UUID는 하이픈 포함 36자이고, MySQL binary 컬럼·CHAR 컬럼·native UUID 컬럼의 인덱스 폭과 정렬이 다르다. **대처:** DDL 타입, 드라이버/JPA 변환, API 문자열 표현을 각각 확인한다.
+4. **“IDENTITY와 SEQUENCE는 어노테이션 표기만 다르다” →** IDENTITY는 DB INSERT 결과를 기다리고, SEQUENCE는 대개 INSERT 전에 값을 얻는다. Hibernate IDENTITY는 JDBC insert batching을 제한한다. **대처:** 배치 적재가 요구사항이면 DB 지원과 실제 batch 로그부터 확인한다.
+5. **“AUTO가 환경을 알아서 같은 방식으로 골라 준다” →** `AUTO`는 persistence provider가 DB와 타입에 맞는 방식을 선택한다. DB/Provider 교체 때 DDL과 성능 특성이 달라질 수 있다. **대처:** PK 전략이 스키마 계약이면 `IDENTITY`, `SEQUENCE`, `UUID`를 명시한다.
+6. **“Snowflake는 그냥 timestamp와 랜덤 숫자를 이어 붙이면 된다” →** worker 중복, 같은 시각의 sequence 중복, 시계 후퇴, sequence 초과가 각각 충돌이나 정지 원인이 된다. **대처:** 노드 ID 할당, 동기화·재시작, 초과 처리, epoch 만료 테스트를 구현한다.
+7. **“숫자 ID는 생성 순서대로 커밋된다” →** 트랜잭션이 ID를 받은 순서와 커밋 순서는 다를 수 있고 롤백은 번호를 비운다. **대처:** 누락 없는 업무 번호와 PK를 분리한다.
+8. **“UUIDv4에서 UUIDv7로 바꾸면 인덱스 문제가 끝난다” →** 시간 지역성은 나아져도 16바이트 PK와 보조 인덱스의 PK 중복 저장은 남는다. **대처:** 실제 데이터 크기와 보조 인덱스 비용을 재고, 내부 숫자 PK + 공개 UUID 조합도 비교한다.
+
+## 8. 자가점검 Q&A (면접 대비)
+
+### Q1. MySQL에서 UUIDv4 PK가 AUTO_INCREMENT보다 느려질 수 있는 이유는?
+
+InnoDB PK가 clustered index이고 row 데이터가 PK 순서로 저장되기 때문이다. 증가형 키는 새 행이 비슷한 끝쪽 페이지에 모이지만, v4는 B-tree 곳곳에 삽입된다. 페이지 읽기·분할이 늘 수 있고 보조 인덱스도 긴 UUID PK를 함께 저장한다. 정확한 차이는 워크로드로 측정한다.
+
+**꼬리질문 — UUIDv7이면 해결되나?** 시간 순서에 가까워 랜덤 페이지 삽입은 완화하지만, 16바이트 폭과 같은 밀리초 내 난수는 남는다.
+
+### Q2. JPA `IDENTITY`와 `SEQUENCE`를 배치 INSERT 관점에서 비교하면?
+
+IDENTITY는 DB가 INSERT 때 ID를 생성하므로 Hibernate가 ID를 받으려 insert해야 한다. Hibernate는 IDENTITY 생성 엔티티의 JDBC insert batching을 하지 않는다. SEQUENCE는 INSERT 전 ID를 확보할 수 있어 같은 종류의 INSERT를 묶을 수 있다. sequence allocation과 드라이버 설정도 확인해야 한다.
+
+**꼬리질문 — SEQUENCE면 무조건 batch가 되나?** 아니다. 배치 크기, 트랜잭션, SQL 일관성, 드라이버 지원이 모두 맞아야 한다.
+
+### Q3. `GenerationType.UUID`를 지정하면 UUIDv7이 생성되나?
+
+아니다. Jakarta Persistence는 UUID 생성 전략과 타입을 규정하지만 UUID 버전을 v7로 고정하지 않는다. Hibernate 기본 generator도 버전 요구와 같다고 가정하지 말아야 한다. v7이 필요하면 provider별 generator나 검증된 애플리케이션 생성기를 지정하고 버전 비트를 테스트한다.
+
+**꼬리질문 — Java 25 표준 API로 v7을 만들 수 있나?** `UUID.randomUUID()`는 v4이며 JDK 25 `UUID` API에는 표준 v7 factory가 없다. 구현을 직접 검증하거나 라이브러리 의존성을 고정한다.
+
+### Q4. UUIDv7은 정렬 가능한데 이벤트 순서 키로 쓰면 안 되나?
+
+UUIDv7의 timestamp는 생성 호스트의 밀리초 시계다. 호스트 간 clock skew, 시계 후퇴, 동시 생성이 있고 DB commit 순서와도 일치하지 않는다. 대략적인 생성 시각 필터나 B-tree 지역성에는 유용하지만, 업무 순번의 근거는 아니다.
+
+**꼬리질문 — 같은 프로세스 안에서 증가를 보장할 수 있나?** 생성기에 monotonic counter를 넣으면 범위 내 보정할 수 있지만 프로세스 간 전역 순서는 별도 조정 없이 보장되지 않는다.
+
+### Q5. 내부 PK와 외부 공개 ID를 분리하면 무엇을 얻고 무엇을 내나?
+
+내부 FK와 보조 인덱스는 작은 숫자로 유지하고 외부에 순번을 그대로 내보내지 않을 수 있다. 대신 공개 ID unique index와 ID→row 탐색 비용, DTO/이벤트 필드 관리가 추가된다. 공개 ID가 알려져도 인가 검사는 별도로 해야 한다.
+
+**꼬리질문 — UUID public ID가 접근 제어 수단인가?** 아니다. 무작위성은 열거를 어렵게 만들 뿐 소유권 확인을 없애지 않는다.
+
+### Q6. Snowflake가 UUID보다 작은데도 모든 서비스의 기본 ID가 되지 않는 이유는?
+
+8바이트 숫자와 앱 생성이라는 이점 대신, 노드 ID를 유일하게 할당하고 시계 후퇴·초당 sequence 한도·epoch 만료를 운영해야 한다. 잘못된 worker 배정은 충돌을 낳는다. 독립 팀이 이 규칙을 유지할 이득이 있을 때 선택한다.
+
+**꼬리질문 — 노드 ID를 컨테이너 hostname 해시로 만들면 되나?** 이름 충돌·재사용과 배포 격리를 증명하지 못한다. 중앙 lease나 명시적 범위 할당처럼 중복을 막는 방법이 필요하다.
+
+### Q7. 숫자 PK가 증가한다면 최대 ID를 통해 전체 레코드 수를 알 수 있나?
+
+아니다. 삭제·rollback·sequence 선할당·다중 writer 때문에 공백이 있고 최댓값은 행 수와 다르다. 행 수는 SQL 집계로 구한다.
+
+**꼬리질문 — Snowflake ID에서 생성 시각은 정확한가?** 저장한 epoch 기준의 호스트 시각이지 DB commit 시각이 아니다. 로그 상관관계의 근사치로만 보고 신뢰 시각 필드와 구분한다.
+
+## 9. 참고문헌
+
+- RFC 9562, *Universally Unique Identifiers (UUIDs)* — https://www.rfc-editor.org/rfc/rfc9562.html — UUIDv4의 랜덤 비트, 시간 정렬 버전, DB 인덱스 지역성과 보안 고려를 정의한다.
+- Hibernate ORM 7.4 User Guide, Identifiers and Generators — https://docs.hibernate.org/orm/7.4/userguide/html_single/Hibernate_User_Guide.html#identifiers-generators — IDENTITY·SEQUENCE·UUID 생성, optimizer 및 JDBC batch 동작을 확인했다.
+- MySQL 8.4 Reference Manual, Clustered and Secondary Indexes — https://dev.mysql.com/doc/refman/8.4/en/innodb-index-types.html — InnoDB PK가 clustered index가 되고 보조 인덱스가 PK 값을 저장함을 설명한다.
+- Java SE 25 `UUID` API — https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html — `randomUUID()`가 type 4를 반환하고 UUID 128비트 표현을 다룸을 확인했다.
+- Jakarta Persistence 3.2 `GenerationType` API — https://jakarta.ee/specifications/persistence/3.2/apidocs/jakarta.persistence/jakarta/persistence/generationtype.html — `IDENTITY`, `SEQUENCE`, `UUID`, `AUTO`의 표준 계약과 지원 타입을 확인했다.
+- ULID canonical specification — https://github.com/ulid/spec — 48비트 millisecond timestamp, 80비트 randomness, 26자 Base32 표현과 monotonic 옵션을 확인했다.
+- Twitter archived Snowflake repository — https://github.com/twitter-archive/snowflake — Snowflake가 고규모 분산 ID 생성 서비스였고 초기 구현과 현재 상태가 다름을 확인했다.
+- Twitter Snowflake `IdWorker.scala` (2010 tag) — https://github.com/twitter-archive/snowflake/blob/snowflake-2010/src/main/scala/com/twitter/service/snowflake/IdWorker.scala — timestamp·datacenter·worker·sequence 비트 배치와 clock rollback 거부 로직을 확인했다.
+
+다른 문서 주제: DB 인덱스 상세는 → D10 참조, JPA 매핑 기본은 → P20 참조.
