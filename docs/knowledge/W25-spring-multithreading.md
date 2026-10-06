@@ -1,0 +1,351 @@
+# W25. 스프링은 왜 멀티스레드인가 — 요청마다 스레드, 공유되는 싱글턴 빈
+
+> Spring MVC의 동기 요청은 보통 Tomcat 작업 스레드 하나가 컨트롤러부터 응답까지 맡는다.
+> 그 스레드들은 기본 싱글턴 빈을 동시에 호출하므로, 요청별 데이터를 빈 필드에 보관하면 사용자 간 값이 섞일 수 있다.
+> 기본 선택은 “싱글턴 서비스 + 불변 의존성 + 메서드 지역 변수”; 작업 스레드 수와 DB 커넥션 풀은 별개로 조정한다.
+
+## 1. 질문
+
+신입이 다음과 같은 장면을 만나면 “스프링은 요청마다 객체를 만드는가?”라는 질문이 생긴다.
+
+1. `http-nio-8080-exec-*`가 동시에 보이는데 여러 요청이 한 `@Service`를 쓴다고 한다.
+2. 부하 중 응답 이름·조회 조건이 다른 사용자 값으로 바뀐다.
+3. Tomcat 스레드를 늘렸는데 DB 대기와 타임아웃이 오히려 늘었다.
+
+범위는 Boot 4.1의 동기 MVC + Tomcat이다. WebFlux·비동기·스레드 상세는 W14, J10/J11을 참조한다.
+
+## 2. 짧은 답
+
+- Spring MVC는 여러 요청을 동시에 처리하려고 서블릿 컨테이너의 작업 스레드 풀을 사용한다.
+- 동기 요청 하나는 보통 작업 스레드 하나에서 필터·컨트롤러·서비스·DB 호출·응답 반환을 이어간다.
+- Spring `singleton`은 “요청마다 하나”가 아니라 컨테이너의 해당 빈 정의마다 기본 인스턴스 하나다.
+- 그래서 여러 요청 스레드가 같은 서비스 객체의 메서드에 동시에 들어온다. 싱글턴 자체는 스레드 안전성을 보장하지 않는다.
+- **기본값으로 추천:** 서비스는 무상태로 두고, 요청별 값은 메서드 인자와 지역 변수로 전달한다. 저장해야 할 상태는 DB 등 요청 간 공유가 명시된 저장소에 둔다.
+- Tomcat 작업 스레드, `@Async` 실행기, 스케줄러, HikariCP DB 커넥션 풀은 서로 다른 자원 풀이다.
+- 대기·타임아웃은 스레드 덤프와 풀 지표로 어느 단계가 막혔는지 먼저 확인한 다음 그 자원을 조정한다.
+
+## 3. 왜 그런가 — 원리
+
+### 프로세스 하나 안에서 요청 스레드가 나뉜다
+
+JVM 프로세스 하나 안에는 각자 실행 흐름과 스택을 가진 여러 Java 스레드가 있다. 같은 객체를 참조하면 힙 필드는 공유한다. OS 수준 설명은 D14, 동기화는 J10을 참조한다.
+
+동기 서블릿 요청의 경로를 단순화하면 다음과 같다.
+
+```mermaid
+flowchart LR
+    C["클라이언트"] --> A["Acceptor: 연결 수락"]
+    A --> P["Poller: 소켓 I/O 준비 감시"]
+    P --> E["Tomcat 작업 스레드: 요청 처리"]
+    E --> F["필터와 DispatcherServlet"]
+    F --> CT["Controller"]
+    CT --> S["공유 싱글턴 Service"]
+    S --> H["HikariCP: 커넥션 대여"]
+    H --> DB["DB 질의"]
+    DB --> S
+    S --> CT
+    CT --> E
+    E --> C
+```
+
+Tomcat NIO의 Acceptor는 연결을 받고 Poller는 소켓 I/O 준비 상태를 감시한다. 이들은 비즈니스 로직을 실행하지 않는다. 준비된 연결은 Executor 작업 스레드에서 필터·`DispatcherServlet`·컨트롤러·서비스를 거친다. 동기 MVC에서 JDBC를 기다리는 동안에도 작업 스레드는 점유된다.
+
+`practice/starter`(Boot 4.1.1, Tomcat)에 12건을 동시에 요청했을 때 Hibernate SQL 로그에는 `http-nio-8080-exec-1..12`가 각각 기록됐다. 같은 시각 덤프에는 Acceptor·Poller 각 1개와 Hikari `housekeeper`, `connection-adder`가 별도 스레드로 보였다. 이는 SQL 호출도 요청 worker 흐름에서 수행됐음을 보여주는 로컬 실측이지, 최대 동시성이나 성능 수치는 아니다.
+
+Spring Boot 4.1의 `server.tomcat.threads.max` 기본값은 **200**, `server.tomcat.threads.min-spare`는 **10**이다. `server.tomcat.threads.max`는 가상 스레드가 켜져 있으면 적용되지 않는다는 조건도 Boot 속성 문서에 명시돼 있다. Tomcat 풀의 max는 동시에 일할 작업 스레드 수의 상한이지, 데이터베이스 동시 쿼리 수가 아니다. Boot 속성 문서는 backing queue 용량 속성도 따로 제공하므로, worker가 모두 바쁘면 설정과 부하에 따라 처리가 큐에서 기다린다. 실제 거부 전에 대기 시간이 길어져 클라이언트·프록시 타임아웃으로 보일 수 있다.
+
+### 싱글턴은 한 객체를 공유한다
+
+빈 스코프 표에서 `singleton`은 기본 스코프이며 Spring IoC 컨테이너마다 빈 정의 하나에 객체 인스턴스 하나를 둔다. 같은 컨테이너에 들어온 요청들이 같은 컨트롤러·서비스 객체를 호출한다. 서버를 여러 인스턴스로 띄우면 인스턴스마다 컨테이너와 싱글턴 객체가 따로 생긴다. 따라서 “싱글턴”은 클러스터 전체에서 공유하는 전역 객체라는 뜻도 아니다.
+
+싱글턴 서비스에 요청 상태를 넣으면 사용자 간 누출이 된다.
+
+```text
+요청 Alice: service.currentName = "Alice"
+요청 Bob:   service.currentName = "Bob"
+요청 Alice: service.currentName을 읽어 응답 → "Bob"
+```
+
+문제의 핵심은 싱글턴의 수명 그 자체가 아니라 **요청마다 달라야 하는 가변 데이터를 공유 객체의 필드로 저장한 것**이다. 반대로 `private final ProductRepository repository`처럼 생성 시 주입되고 바뀌지 않는 참조는 요청 사이에 덮어쓰는 데이터가 아니다. 그렇더라도 참조 대상 repository가 내부에 가변 상태를 갖는다면 그 대상의 동시성은 별도로 살펴야 한다. `final`은 참조 재대입을 막을 뿐, 참조된 모든 객체를 자동으로 불변·스레드 안전하게 만들지는 않는다.
+
+### 풀은 서로 다른 단계의 용량이다
+
+Tomcat worker는 요청을 처리하고 HikariCP는 JDBC 커넥션을 대여한다. 커넥션이 10개일 때 DB를 요구하는 동시 요청 100개 중 최대 10개만 바로 질의하고, 나머지는 대기하면서 Servlet 스레드를 점유한다. worker만 늘리면 DB 처리량은 그대로인데 대기 요청이 늘 수 있다. HikariCP도 풀 크기를 무조건 키우는 것이 성능 향상을 보장하지 않는다고 설명한다.
+
+### ThreadLocal은 스레드별 칸이지 요청별 저장소가 아니다
+
+`ThreadLocal<T>`은 스레드마다 별도 값을 제공한다. Spring 트랜잭션은 `TransactionSynchronizationManager`로 JDBC 자원을 현재 스레드에 바인딩한다. Spring Security의 `SecurityContextHolder`는 인증 문맥을 제공하고, 전통적인 Servlet 설정은 스레드 로컬 전략을 쓴다. 로깅 MDC에도 요청 ID 등을 넣는다.
+
+Tomcat은 worker를 재사용하므로 직접 넣은 값은 요청 종료 때 `try/finally`로 `remove()` 해야 다음 요청에 새지 않는다. 프레임워크가 관리하는 문맥은 정리 경로를 제공한다. `@Async`와 스케줄러는 다른 스레드에서 실행되므로 트랜잭션·인증 정보가 자동으로 넘어온다고 가정하지 않는다. 보안 문맥은 명시적 executor 래퍼 등으로 전달하고, 트랜잭션은 비동기 경계에서 새로 설계한다.
+
+## 4. 선택지 비교
+
+| 선택지 | 어떻게 동작 | 장점 | 단점 | 언제 쓰나 | 국내 실무에서 흔한가 |
+|---|---|---|---|---|---|
+| Tomcat 플랫폼 작업 스레드 + 동기 MVC | 요청 처리 스레드가 컨트롤러부터 동기 응답까지 실행 | 호출 흐름이 단순하고 블로킹 JDBC와 잘 맞음 | 블로킹 중에도 작업 스레드를 점유 | 일반적인 Spring MVC·JPA 서비스의 기본 | 제공된 Boot/Tomcat 실측은 이 구성. 국내 전체 빈도 통계는 확인하지 않음 |
+| 싱글턴 무상태 서비스 | 한 서비스 객체를 공유하되 요청 데이터는 인자·지역 변수에만 둠 | 객체 생성·주입이 단순하고 동시 요청을 직렬화하지 않음 | 상태를 필드에 보관하는 습관과 혼동하면 버그 | 기본 추천. 대부분의 계산·조회 서비스 | Spring singleton이 기본 스코프라는 공식 근거. 국내 빈도 수치 미확인 |
+| 요청 스코프 빈 | HTTP 요청별 대상 인스턴스를 만들고 주입 지점에는 scoped proxy를 둘 수 있음 | 요청 단위 상태를 객체로 묶기 편함 | 웹 요청에 생명주기가 결합되고 비동기·테스트에서 복잡 | 요청 컨텍스트 객체가 여러 컴포넌트에 필요할 때 제한적으로 | 빈도 통계 미확인 |
+| 동기화된 싱글턴 상태 | `synchronized` 등으로 공유 필드 접근을 한 번에 하나씩 처리 | 모든 호출자가 같은 잠금을 지키면 필드 경쟁을 막음 | 병렬 처리를 직렬화, 잠금 범위가 커지면 처리량 저하·교착 위험 | 공유 상태가 정말 도메인 요구이고 원자적 구간을 작게 잡을 수 있을 때 | 문제 해결 기본값으로 권하지 않음. 통계 미확인 |
+| `ThreadLocal` 요청 문맥 | 작업 스레드별 슬롯에 값을 기록·조회 | 메서드 인자를 바꾸기 어려운 인프라 문맥에 편리 | 풀 스레드 재사용 누출, 다른 스레드로 문맥 자동 전달 안 됨 | 트랜잭션·인증·로깅 등 프레임워크 문맥. 직접 업무 데이터를 담는 용도는 피함 | 프레임워크 사용 근거는 공식 문서에 있음. 국내 빈도 통계 미확인 |
+| `@Async` / 스케줄러 | 별도 executor 또는 scheduler 스레드 풀에서 실행 | 응답 경로와 작업을 분리하거나 주기 작업 수행 | 예외·재시도·문맥 전달·풀 포화를 별도로 설계 | 메일 발송 등 요청 응답에 묶이지 않아도 되는 일, 예약 작업 | 사용 빈도 통계 미확인 |
+
+가상 스레드는 Java 21에서 정식화됐다. DB 용량을 늘리는 기능은 아니며 자세한 선택은 J12·S07을 참조한다.
+
+## 5. 코드로 보기
+
+### 5.1 공유 싱글턴 필드에서 요청 상태가 섞이는 순수 Java 재현
+
+실제 서비스에서 요청별 이름을 필드에 보관하는 잘못된 형태다. 두 요청의 순서를 래치로 고정하여 Alice가 자기 이름을 쓴 뒤 Bob이 덮어쓰고, Alice가 다시 필드를 읽게 했다. 래치가 스레드 순서를 정하므로 출력은 재현 가능하다.
+
+```java
+import java.util.concurrent.CountDownLatch;
+
+public class SingletonLeakDemo {
+    static final class UnsafeGreetingService {
+        private String currentName;
+
+        String greet(String name, CountDownLatch aliceStored,
+                     CountDownLatch bobStored) {
+            if (name.equals("Alice")) {
+                currentName = name;
+                aliceStored.countDown();
+                await(bobStored);
+            } else {
+                await(aliceStored);
+                currentName = name;
+                bobStored.countDown();
+            }
+            return "안녕하세요, " + currentName;
+        }
+
+        private static void await(CountDownLatch latch) {
+            try {
+                latch.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        UnsafeGreetingService service = new UnsafeGreetingService();
+        CountDownLatch aliceStored = new CountDownLatch(1);
+        CountDownLatch bobStored = new CountDownLatch(1);
+        String[] results = new String[2];
+        Thread alice = new Thread(() -> results[0] =
+                service.greet("Alice", aliceStored, bobStored));
+        Thread bob = new Thread(() -> results[1] =
+                service.greet("Bob", aliceStored, bobStored));
+        alice.start();
+        bob.start();
+        alice.join();
+        bob.join();
+        System.out.println("Alice 요청 결과: " + results[0]);
+        System.out.println("Bob 요청 결과: " + results[1]);
+    }
+}
+```
+
+JDK 21 실행 결과:
+
+```text
+Alice 요청 결과: 안녕하세요, Bob
+Bob 요청 결과: 안녕하세요, Bob
+```
+
+래치로 순서를 정해도 요청별 값과 공유 필드의 의미가 달라 Alice 응답이 잘못된다. 실제 코드는 락보다 요청 상태를 필드에서 제거해야 한다.
+
+### 5.2 기본 추천: 싱글턴 서비스는 입력을 받아 계산한다 (미실행)
+
+아래 컨트롤러와 서비스는 기본 싱글턴이어도 요청 데이터를 메서드 인자와 지역 변수에만 둔다. Boot 4.1 / Framework 7의 Spring MVC API를 사용한다.
+
+```java
+import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+class GreetingController {
+    private final GreetingService greetingService;
+
+    GreetingController(GreetingService greetingService) {
+        this.greetingService = greetingService;
+    }
+
+    @GetMapping("/greet/{name}")
+    String greet(@PathVariable String name) {
+        return greetingService.greet(name);
+    }
+}
+
+@Service
+class GreetingService {
+    String greet(String name) {
+        String normalizedName = name.trim();
+        return "안녕하세요, " + normalizedName;
+    }
+}
+```
+
+`normalizedName`은 호출마다 각 스택 프레임에 생기는 지역 변수라 두 요청이 서로 덮어쓰지 않는다. 참조 변수와 객체의 메모리 모델은 J10의 범위다. 여기서의 실무 규칙은 “요청별 값을 공유 필드에 두지 않는다”는 것이다.
+
+### 5.3 요청 상태를 객체로 묶어야 할 때: request scope (미실행)
+
+상태가 꼭 필요하고 하나의 HTTP 요청 안에서 여러 컴포넌트가 써야 한다면 request scope를 선택할 수 있다. `@RequestScope`의 프록시를 싱글턴 컨트롤러가 주입받아도, 실제 대상은 요청별로 연결된다.
+
+```java
+import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.annotation.RequestScope;
+
+@Component
+@RequestScope
+class GreetingRequest {
+    private String name;
+
+    void setName(String name) {
+        this.name = name;
+    }
+
+    String render() {
+        return "안녕하세요, " + name;
+    }
+}
+
+@RestController
+class ScopedGreetingController {
+    private final GreetingRequest greetingRequest;
+
+    ScopedGreetingController(GreetingRequest greetingRequest) {
+        this.greetingRequest = greetingRequest;
+    }
+
+    @GetMapping("/scoped-greet/{name}")
+    String greet(@PathVariable String name) {
+        greetingRequest.setName(name);
+        return greetingRequest.render();
+    }
+}
+```
+
+요청 스코프는 객체 수명을 요청과 맞출 뿐, 같은 요청 내 병렬 접근이나 비동기 스레드의 문맥 전달을 보장하지 않는다. 문자열 하나라면 앞의 무상태 서비스가 단순하다.
+
+### 5.4 별도 스레드로 넘기는 작업은 executor를 명시한다 (미실행)
+
+메일처럼 HTTP 응답이 끝난 뒤 처리해도 되는 일은 별도 실행기로 분리할 수 있다. 크기와 큐는 환경 측정에 맞춰 정하는 예시값이다. 다음 설정은 executor를 코드에 드러내며, 트랜잭션·인증 문맥의 자동 전달을 뜻하지 않는다.
+
+```java
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.stereotype.Service;
+
+@Configuration
+@EnableAsync
+class BackgroundConfiguration {
+    @Bean("backgroundExecutor")
+    Executor backgroundExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(16);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("background-");
+        return executor;
+    }
+}
+
+@Service
+class MailService {
+    @Async("backgroundExecutor")
+    public CompletableFuture<Void> send(String address) {
+        // 메일 전송 호출
+        return CompletableFuture.completedFuture(null);
+    }
+}
+```
+
+기본 proxy 모드의 `@Async`는 같은 클래스 내부의 `this.send(...)` 호출을 가로채지 못한다. `@Scheduled`는 scheduler에서 실행된다. 비동기 메서드의 DB 작업은 별도 트랜잭션으로 설계한다.
+
+## 6. 실무에서는 실제로
+
+- **신규 서비스:** 무상태 싱글턴을 기본으로 두고 Tomcat busy, Hikari pending, DB 부하를 같이 본다. 백그라운드 일만 제한된 executor나 브로커로 분리한다.
+- **레거시:** 서비스 필드를 의존성·설정·캐시·요청 데이터로 분류하고 요청 값은 인자나 지역 변수로 옮긴다.
+- **SI·금융 등:** 트랜잭션 경계를 유지하며 덤프·풀 지표로 병목을 찾는다. 풀 조정이나 scope 전환은 endpoint 단위로 검증한다.
+- **스타트업·신규 API:** 결과를 기다릴 필요 없는 작업만 비동기로 보내고 재시도·중복·종료 처리를 정한다. 주문·결제를 fire-and-forget하면 유실될 수 있다.
+- **혼합·마이그레이션:** HTTP는 동기, 메일은 `@Async`/브로커, 집계는 `@Scheduled`로 나눌 수 있다. 공유 필드 제거 후 문맥 정리와 풀 제한을 검증한다. 가상 스레드는 J12·S07 참조.
+
+## 7. 흔한 오해와 실수
+
+1. **오해: 싱글턴이면 요청을 직렬 처리한다.** → 스코프는 객체 수명이지 호출 잠금이 아니다. → 여러 요청에 노출된 가변 필드를 제거한다.
+2. **증상: 다른 사용자의 이름·검색 조건이 응답에 나온다.** → 요청별 값을 서비스 필드에 저장했다. → 인자·지역 변수로 옮기고 동시 요청 로그로 추적한다.
+3. **오해: `final`이면 서비스 전체가 안전하다.** → final은 참조 재대입만 막고 내부 객체의 동시성을 보장하지 않는다. → 의존성 계약과 공유 컬렉션의 동시 접근을 확인한다.
+4. **증상: exec 스레드가 모두 바쁘고 요청이 늦다.** → DB·외부 API·락 대기도 동기 worker를 점유한다. → `/actuator/threaddump` 스택과 Hikari pending, DB·외부 호출 시간을 함께 본다.
+5. **오해: Tomcat max를 올리면 DB 처리량이 오른다.** → DB가 먼저 포화면 대기만 늘어난다. → Tomcat busy, Hikari active/pending, DB 부하를 함께 재고 조정한다.
+6. **증상: 다음 요청에 이전 ID가 찍히거나 `@Async`가 문맥을 잃는다.** → 스레드 풀은 재사용되고 다른 스레드로 ThreadLocal이 자동 전달되지 않는다. → 직접 값은 `try/finally`에서 지우고, 필요한 보안 전달과 비동기 트랜잭션을 명시한다.
+7. **증상: `@Async` 호출이 동기로 실행된다.** → 같은 객체 내부 호출이 기본 proxy를 우회했다. → 별도 빈의 프록시를 통해 호출하고 Future 예외를 확인한다.
+
+## 8. 자가점검 Q&A (면접 대비)
+
+### Q1. Spring 싱글턴 서비스가 동시 요청을 처리할 수 있는 이유는?
+
+컨테이너가 기본 서비스 인스턴스 하나를 만들지만, 여러 Tomcat worker thread가 그 객체의 메서드를 동시에 호출할 수 있다. 요청 데이터가 각 메서드 인자와 호출별 지역 변수에만 있으면 요청끼리 덮어쓸 공유 상태가 없다. 싱글턴이라는 사실 자체는 동기화를 제공하지 않는다.
+
+**꼬리질문:** 서비스에 필드로 둬도 되는 것은? — 생성 시 주입되고 재대입되지 않는 의존성 참조나 불변 설정은 보통 가능하다. 다만 참조 대상이 thread-safe인지 별도 확인한다.
+
+### Q2. 한 HTTP 요청은 항상 처음부터 끝까지 같은 스레드인가?
+
+동기 Spring MVC 처리에서는 일반적으로 하나의 Tomcat 작업 스레드가 요청 처리를 맡고, 블로킹 DB 호출을 기다리는 동안에도 그 스레드를 점유한다. Servlet async, 비동기 dispatch, 애플리케이션이 시작한 `@Async` 작업은 실행 흐름이나 스레드를 바꿀 수 있다. 따라서 “항상”이라고 답하기보다는 동기 요청 경로의 기본 모델이라고 설명한다.
+
+**꼬리질문:** Acceptor와 Poller가 컨트롤러를 처리하는가? — 아니다. 연결 수락과 I/O 준비 감시 역할이며, 요청 로직은 executor 작업 스레드가 수행한다.
+
+### Q3. 스레드 덤프에서 `http-nio-8080-exec-*`가 200개 바쁘면 무엇부터 볼까?
+
+덤프에서 각 스레드의 스택을 보고 JDBC 커넥션 획득, SQL, 외부 HTTP, 모니터 락 중 어디서 대기하는지 분류한다. 동시에 Hikari active/pending, DB 지연·세션, 외부 호출 지표를 비교한다. 단순히 `server.tomcat.threads.max`부터 키우면 대기 중 요청만 늘어날 수 있다.
+
+**꼬리질문:** 200이 Boot 기본값인가? — Boot 4.1 속성 문서 기준 `server.tomcat.threads.max`는 200이다. 가상 스레드 활성화 시 이 설정은 적용되지 않는다.
+
+### Q4. `private final Repository repository`는 왜 괜찮다고 하나?
+
+final 참조는 생성 이후 다른 객체로 바뀌지 않으므로 요청별로 값을 덮어쓰는 필드와 다르다. 보통 데이터는 메서드 인자로 들어오고 지역 변수로 처리한다. 다만 repository가 참조하는 사용자 정의 객체가 가변 공유 상태를 갖는다면 그 객체의 안전성은 별도로 확인한다.
+
+**꼬리질문:** 그럼 final 객체는 무조건 thread-safe인가? — 아니다. final은 참조 대입을 고정할 뿐, 내부 상태 변경을 막지 않는다.
+
+### Q5. `ThreadLocal`은 요청별 객체를 만들어 주는가?
+
+아니다. 각 스레드에 별도 값을 제공한다. 요청이 끝나도 worker thread는 풀에 남아 다음 요청에 재사용될 수 있어 직접 넣은 값은 반드시 지워야 한다. 요청이 다른 executor로 이동하면 원 스레드의 값은 자동 전달되지 않는다.
+
+**꼬리질문:** Spring이 ThreadLocal을 사용하는 이유는? — 트랜잭션 자원이나 보안 문맥처럼 호출 계층에 파라미터를 매번 추가하지 않고 현재 실행 흐름에서 조회해야 하는 인프라 상태를 묶기 편하다.
+
+### Q6. Tomcat worker 수와 Hikari 커넥션 수는 어떻게 맞추나?
+
+같은 숫자로 맞추는 규칙은 없다. worker는 요청 처리 동시성, 커넥션 풀은 DB에 실제 연결할 수 있는 동시 작업량을 제한한다. DB가 느리거나 커넥션이 적으면 worker가 커넥션 대기 상태로 오래 머물 수 있다.
+
+**꼬리질문:** 두 풀 중 하나만 늘려도 되는 상황은? — 병목이 확인된 풀을 조정하되 DB CPU·쿼리 용량을 넘지 않는지 부하 테스트로 확인한다. Hikari 가이드도 커넥션을 크게 잡는 것이 항상 빠른 것은 아니라고 설명한다.
+
+### Q7. `@Async`로 실행한 작업은 호출한 트랜잭션에 포함되는가?
+
+기본적으로 다른 스레드에서 실행되므로 호출 스레드에 ThreadLocal로 연결된 트랜잭션 자원이 공유되지 않는다. 비동기 메서드에서 필요한 DB 변경은 독립된 트랜잭션 경계를 정하고, 실패·재시도·중복 처리까지 설계한다. 인증 문맥도 자동 전달을 전제하지 않는다.
+
+**꼬리질문:** 같은 클래스에서 `this.asyncMethod()`를 부르면? — 기본 proxy 모드의 `@Async`는 프록시를 통과하지 않아 비동기로 전환되지 않는다.
+
+## 9. 참고문헌
+
+- Spring Boot Common Application Properties — https://docs.spring.io/spring-boot/appendix/application-properties/index.html — Tomcat worker 기본값과 가상 스레드 조건.
+- Apache Tomcat 11 Executor — https://tomcat.apache.org/tomcat-11.0-doc/config/executor.html — executor max/min 설정.
+- Spring Framework Bean Scopes — https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html — singleton과 request scope.
+- Apache Tomcat NioEndpoint API — https://tomcat.apache.org/tomcat-11.0-doc/api/org/apache/tomcat/util/net/NioEndpoint.html — Poller와 SocketProcessor 역할.
+- Spring Framework `TransactionSynchronizationManager` — https://docs.spring.io/spring-framework/docs/7.0.9/javadoc-api/org/springframework/transaction/support/TransactionSynchronizationManager.html — JDBC 커넥션 등 리소스를 thread-bound로 관리하는 설명을 확인했다.
+- Spring Security 7.1.1 `SecurityContextHolder` API — https://docs.spring.io/spring-security/reference/api/java/org/springframework/security/core/context/SecurityContextHolder.html — 기본 전략이 `MODE_THREADLOCAL`임을 확인했다.
+- Spring Framework Task Execution and Scheduling — https://docs.spring.io/spring-framework/reference/integration/scheduling.html — 별도 실행기와 proxy 규칙.
+- Java SE 25 `ThreadLocal` — https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/ThreadLocal.html — 스레드마다 독립 값이 제공되는 API 정의를 확인했다.
+- Logback Mapped Diagnostic Context — https://logback.qos.ch/manual/mdc.html — 동시 요청의 로그 문맥 구분을 위한 MDC 설명을 확인했다.
+- HikariCP About Pool Sizing — https://github.com/brettwooldridge/HikariCP/wiki/About-Pool-Sizing — DB 연결 풀 크기를 무조건 늘리면 안 되는 이유를 확인했다.
+- The Java Tutorials: Concurrency — https://docs.oracle.com/javase/tutorial/essential/concurrency/ — 스레드·동기화·스레드 풀의 기초 개요를 확인했다. 문서는 JDK 8 시대 자료임을 명시한다.

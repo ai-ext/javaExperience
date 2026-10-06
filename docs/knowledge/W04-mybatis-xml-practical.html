@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W04. MyBatis XML 쿼리 실무 — mapper·동적 SQL·#{}와 ${}</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
+<main>
+
+<h1 id="w04-mybatis-xml-쿼리-실무--mapper동적-sql와-"><a class="anchor" href="#w04-mybatis-xml-쿼리-실무--mapper동적-sql와-" aria-hidden="true">#</a>W04. MyBatis XML 쿼리 실무 — mapper·동적 SQL·#{}와 ${}</h1>
+<blockquote>
+<p>3줄 요약 — SQL 값은 #{}로 바인딩하고, 문법 조각은 검증된 값만 ${}로 치환한다.
+조건·조인·관계 매핑에는 XML이 리뷰하기 쉽다.
+기본은 Boot 4.1, Starter 4.1.0, Mapper XML, 서비스 @Transactional이다.</p>
+</blockquote>
+<h2 id="1-질문"><a class="anchor" href="#1-질문" aria-hidden="true">#</a>1. 질문</h2>
+<ol>
+<li>Mapper 메서드에 구현이 없다. XML의 namespace와 id가 Java 인터페이스와 어떻게 연결되는가?</li>
+<li>선택 조건을 문자열로 붙였더니 WHERE AND와 끝 쉼표가 생긴다. 동적 태그는 SQL 모양을 어떻게 정리하며 조건이 비면 어떻게 되는가?</li>
+<li>ORDER BY의 컬럼은 왜 값처럼 바인딩할 수 없을까? 문자열 치환은 어떤 검증 뒤에 허용해야 하는가?</li>
+</ol>
+<h2 id="2-짧은-답"><a class="anchor" href="#2-짧은-답" aria-hidden="true">#</a>2. 짧은 답</h2>
+<ul>
+<li>SQL 값은 #{}가 기본이다. SQL 문법 요소만 동적 선택하고 허용 목록으로 제한한다.</li>
+<li>단순 SQL은 annotation, 조건·조인·재사용 조각이 커지면 XML을 기본으로 한다.</li>
+<li>단순 행은 resultType, 관계 매핑은 resultMap이다.</li>
+<li>한 DB는 LIMIT/OFFSET, 다중 방언이나 팀 표준이면 PageHelper를 검토한다.</li>
+<li>Boot 4.1 호환 Starter는 4.1.0이며 Mapper는 @MybatisTest로 검증한다.</li>
+</ul>
+<h2 id="3-왜-그런가--원리"><a class="anchor" href="#3-왜-그런가--원리" aria-hidden="true">#</a>3. 왜 그런가 — 원리</h2>
+<h3 id="mapper-메서드와-xml의-연결"><a class="anchor" href="#mapper-메서드와-xml의-연결" aria-hidden="true">#</a>Mapper 메서드와 XML의 연결</h3>
+<p>Starter는 DataSource를 감지해 SqlSessionFactory와 SqlSessionTemplate을 만들고 Mapper 인터페이스를 Spring 빈으로 등록한다. 기본 스캔은 @Mapper를 찾고 직접 범위를 정하면 @MapperScan을 쓴다. Mapper 프록시가 메서드 호출을 MyBatis statement 실행으로 연결한다.</p>
+<p>일반적인 statement 키는 인터페이스의 완전한 이름 + 메서드 id다. com.example.book.BookMapper.findById라면 XML의 namespace는 com.example.book.BookMapper, id는 findById여야 한다. XML 파일은 mapper-locations에 포함해야 한다.</p>
+<pre class="mermaid">flowchart LR
+  A[&quot;서비스 호출&quot;] --&gt; B[&quot;Mapper 프록시&quot;]
+  B --&gt; C[&quot;namespace + id 탐색&quot;]
+  C --&gt; D[&quot;XML 동적 SQL 구성&quot;]
+  D --&gt; E[&quot;#{값} 바인딩&quot;]
+  E --&gt; F[&quot;JDBC 드라이버와 DB&quot;]
+  F --&gt; G[&quot;resultType 또는 resultMap&quot;]</pre>
+<p>XML은 SQL 중심 리뷰가 쉽지만 경로·이름 규칙이 추가된다. annotation은 단순 SQL을 찾기 쉽지만 복잡한 <script>는 읽기 어렵다. 양쪽은 같은 statement 엔진을 쓰므로 근거 없이 속도 차이를 단정하지 않는다.</p>
+<h3 id="와-는-안전성-모델이-다르다"><a class="anchor" href="#와-는-안전성-모델이-다르다" aria-hidden="true">#</a>#{}와 ${}는 안전성 모델이 다르다</h3>
+<p>#{status}는 값을 SQL 문자열에 이어 붙이지 않는다. MyBatis는 PreparedStatement의 ? 표식을 만들고 JDBC 드라이버에 실제 값을 별도로 전달한다. DB는 값과 SQL 문법을 구분하므로 입력이 따옴표를 닫거나 OR 1=1을 실행하지 못한다. 값 비교·검색어·삽입·수정 값에는 #{}를 쓴다.</p>
+<p>${column}은 문자열을 SQL에 그대로 삽입한다. 파라미터 자리는 값에만 쓸 수 있어 ORDER BY ?에 컬럼명을 넣어도 식별자로 동작하지 않는다. 동적 식별자가 필요한 때만 문자열 치환이 필요하다. 입력 안전성은 MyBatis가 보장하지 않는다. name; DROP TABLE ...처럼 SQL 텍스트 자체를 바꿀 수 있다. 이스케이프·금칙어 차단 대신 enum이나 고정 Map으로 허용 이름을 열거한다.</p>
+<h3 id="동적-태그가-줄이는-것과-줄이지-않는-것"><a class="anchor" href="#동적-태그가-줄이는-것과-줄이지-않는-것" aria-hidden="true">#</a>동적 태그가 줄이는 것과 줄이지 않는 것</h3>
+<p>OGNL로 <if> 조건, <choose> 분기, <where>의 WHERE·선행 AND/OR, <set>의 SET·끝 쉼표, <trim> 접두·접미, <foreach> 목록(IN) 생성을 제어한다.</p>
+<p>태그는 SQL 모양을 정리할 뿐 업무 안전 조건을 강제하지 않는다. 검색 조건이 모두 빠지면 WHERE가 없어져 전체 조회가 될 수 있다. 빈 ID 목록도 결과 없음인지 필터 없음인지 호출 정책이 필요하다. 삭제·수정은 서비스에서 필수 조건과 빈 목록을 검사한다.</p>
+<h3 id="결과-집합을-객체-관계로-바꾸기"><a class="anchor" href="#결과-집합을-객체-관계로-바꾸기" aria-hidden="true">#</a>결과 집합을 객체 관계로 바꾸기</h3>
+<p>resultType은 행의 자동 매핑이다. map-underscore-to-camel-case=true면 book_title과 bookTitle을 연결하며 MyBatis 기본값은 false다.</p>
+<p>조인 결과에서 부모 행이 자식 수만큼 반복되면 resultType은 그 행을 객체 그래프로 접지 않는다. resultMap으로 컬럼과 프로퍼티를 연결한다. <association>은 단일 객체, <collection>은 목록이다. 부모·자식 <id>를 지정하면 반복 행에서 동일 객체를 식별한다. 컬럼 alias로 id/name 충돌을 구분한다.</p>
+<h3 id="spring-트랜잭션이-mapper를-감싸는-이유"><a class="anchor" href="#spring-트랜잭션이-mapper를-감싸는-이유" aria-hidden="true">#</a>Spring 트랜잭션이 Mapper를 감싸는 이유</h3>
+<p>SqlSessionTemplate은 Spring 트랜잭션에 참여한다. 원자적 Mapper 호출은 서비스의 @Transactional 경계에 둔다. self-invocation은 AOP 프록시를 거치지 않아 적용되지 않을 수 있다.</p>
+<h2 id="4-선택지-비교"><a class="anchor" href="#4-선택지-비교" aria-hidden="true">#</a>4. 선택지 비교</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>선택지</th>
+<th>어떻게 동작</th>
+<th>장점</th>
+<th>단점</th>
+<th>언제 쓰나</th>
+<th>국내 실무에서 흔한가(근거 있으면)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Mapper XML</td>
+<td>메서드와 namespace/id statement 연결</td>
+<td>동적 SQL·조인·resultMap을 SQL 중심으로 리뷰</td>
+<td>경로 오타가 런타임 오류가 될 수 있음</td>
+<td>검색, 복합 조인, 공통 SQL</td>
+<td>국내 통계 미확인</td>
+</tr>
+<tr>
+<td>Mapper annotation</td>
+<td>@Select 등으로 인터페이스에 SQL 작성</td>
+<td>단순 문장과 메서드가 가까움</td>
+<td>복잡 <script>는 문자열 안에서 읽기 어려움</td>
+<td>작은 CRUD, 고정 조건</td>
+<td>국내 통계 미확인</td>
+</tr>
+<tr>
+<td>#{} 바인딩</td>
+<td>PreparedStatement 값 파라미터</td>
+<td>데이터와 SQL 문법 분리</td>
+<td>식별자 변경 불가</td>
+<td>거의 모든 입력값</td>
+<td>공식 기본 방식</td>
+</tr>
+<tr>
+<td>${} 치환</td>
+<td>문자열을 SQL 텍스트에 삽입</td>
+<td>동적 컬럼·테이블 지원</td>
+<td>외부 입력은 인젝션 위험</td>
+<td>허용 목록 정렬 키</td>
+<td>사용률 미확인</td>
+</tr>
+<tr>
+<td>resultType/resultMap</td>
+<td>자동 이름 매핑/선언형 관계 매핑</td>
+<td>간결/복합 관계가 명확</td>
+<td>resultMap 작성량과 오타 가능성</td>
+<td>단순 행/조인 그래프</td>
+<td>국내 통계 미확인</td>
+</tr>
+<tr>
+<td>LIMIT/OFFSET/PageHelper</td>
+<td>직접 DB 구문/방언 플러그인</td>
+<td>SQL 투명/DB 방언 공통화</td>
+<td>DB 종속/플러그인 설정 필요</td>
+<td>한 DB/다중 방언 표준</td>
+<td>국내 통계 미확인</td>
+</tr>
+</tbody></table></div>
+<p><strong>기본값 추천:</strong> 신규 Boot 4.1 모듈은 Mapper 인터페이스 + XML, 값은 #{}, 단일 테이블은 resultType, 조인 그래프는 resultMap, 한 DB 페이징은 LIMIT/OFFSET으로 시작한다. 팀에 통일된 annotation이나 PageHelper 규칙이 있으면 따른다. 같은 SQL을 XML과 annotation에 중복 정의하지 않는다.</p>
+<h2 id="5-코드로-보기"><a class="anchor" href="#5-코드로-보기" aria-hidden="true">#</a>5. 코드로 보기</h2>
+<p>Spring Boot 4.1.1, Java 25, Starter 4.1.0 기준이다. 실행하지 않아 Spring 예제는 **(미실행)**이며 드라이버·DDL은 DB에 맞춘다.</p>
+<h3 id="51-mapper-인터페이스--xml-crud-미실행"><a class="anchor" href="#51-mapper-인터페이스--xml-crud-미실행" aria-hidden="true">#</a>5.1 Mapper 인터페이스 ↔ XML CRUD (미실행)</h3>
+<pre><code class="language-xml">&lt;!-- pom.xml --&gt;
+&lt;dependency&gt;
+  &lt;groupId&gt;org.mybatis.spring.boot&lt;/groupId&gt;
+  &lt;artifactId&gt;mybatis-spring-boot-starter&lt;/artifactId&gt;
+  &lt;version&gt;4.1.0&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+<pre><code class="language-properties"># application.properties
+mybatis.mapper-locations=classpath*:/mapper/**/*.xml
+mybatis.type-aliases-package=com.example.book.domain
+mybatis.configuration.map-underscore-to-camel-case=true
+# 개발 프로필에서만
+logging.level.com.example.book.mapper=DEBUG</code></pre>
+<pre><code class="language-java">package com.example.book.mapper;
+import com.example.book.domain.Book;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+@Mapper
+public interface BookMapper {
+    Book findById(@Param(&quot;id&quot;) long id);
+    int insert(Book book);
+    int update(Book book);
+    int deleteById(@Param(&quot;id&quot;) long id);
+}</code></pre>
+<pre><code class="language-java">package com.example.book.domain;
+public class Book {
+    private Long id;
+    private String title;
+    public Book() {}
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+}</code></pre>
+<pre><code class="language-xml">&lt;!-- src/main/resources/mapper/BookMapper.xml --&gt;
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot;
+  &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;com.example.book.mapper.BookMapper&quot;&gt;
+  &lt;select id=&quot;findById&quot; resultType=&quot;Book&quot;&gt;
+    SELECT id, title FROM book WHERE id = #{id}
+  &lt;/select&gt;
+  &lt;insert id=&quot;insert&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+    INSERT INTO book (title) VALUES (#{title})
+  &lt;/insert&gt;
+  &lt;update id=&quot;update&quot;&gt;
+    UPDATE book SET title = #{title} WHERE id = #{id}
+  &lt;/update&gt;
+  &lt;delete id=&quot;deleteById&quot;&gt;
+    DELETE FROM book WHERE id = #{id}
+  &lt;/delete&gt;
+&lt;/mapper&gt;</code></pre>
+<pre><code class="language-java">package com.example.book.service;
+import com.example.book.domain.Book;
+import com.example.book.mapper.BookMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+@Service
+public class BookService {
+    private final BookMapper mapper;
+    public BookService(BookMapper mapper) { this.mapper = mapper; }
+    @Transactional
+    public Book create(String title) {
+        Book book = new Book();
+        book.setTitle(title);
+        mapper.insert(book);
+        return book;
+    }
+}</code></pre>
+<p>호환 JDBC 드라이버면 useGeneratedKeys가 키를 keyProperty에 넣는다. 미지원 DB는 selectKey 등을 쓴다. 저장 건수와 ID 반환은 통합 테스트로 확인한다.</p>
+<h3 id="52-같은-검색-xml-동적-sql과-annotation-미실행"><a class="anchor" href="#52-같은-검색-xml-동적-sql과-annotation-미실행" aria-hidden="true">#</a>5.2 같은 검색: XML 동적 SQL과 annotation (미실행)</h3>
+<p>두 방식은 상태·최소 ID로 최근순 조회를 한다. 한 방식만 둔다. text block은 Java 15에 정식화됐다(JEP 378).</p>
+<pre><code class="language-java">package com.example.book.mapper;
+import com.example.book.domain.Book;
+import java.util.List;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+@Mapper
+public interface BookXmlSearchMapper {
+    List&lt;Book&gt; search(@Param(&quot;status&quot;) String status,
+                      @Param(&quot;minId&quot;) Long minId,
+                      @Param(&quot;limit&quot;) int limit,
+                      @Param(&quot;offset&quot;) int offset);
+    @Select(&quot;&quot;&quot;
+        SELECT id, title FROM book
+        ORDER BY ${sortColumn} ${direction}
+        LIMIT #{limit} OFFSET #{offset}
+        &quot;&quot;&quot;)
+    List&lt;Book&gt; page(@Param(&quot;sortColumn&quot;) String sortColumn,
+                    @Param(&quot;direction&quot;) String direction,
+                    @Param(&quot;limit&quot;) int limit,
+                    @Param(&quot;offset&quot;) int offset);
+}</code></pre>
+<pre><code class="language-xml">&lt;mapper namespace=&quot;com.example.book.mapper.BookXmlSearchMapper&quot;&gt;
+&lt;select id=&quot;search&quot; resultType=&quot;Book&quot;&gt;
+  SELECT id, title FROM book
+  &lt;where&gt;
+    &lt;if test=&quot;status != null and status != ''&quot;&gt;
+      AND status = #{status}
+    &lt;/if&gt;
+    &lt;if test=&quot;minId != null&quot;&gt;
+      AND id &amp;gt;= #{minId}
+    &lt;/if&gt;
+  &lt;/where&gt;
+  ORDER BY id DESC
+  LIMIT #{limit} OFFSET #{offset}
+&lt;/select&gt;
+&lt;/mapper&gt;</code></pre>
+<p>빈 조건의 의미를 정하고 limit 상한과 offset 음수·overflow를 검사한다. 문법은 MySQL 호환이다.</p>
+<pre><code class="language-java">package com.example.book.mapper;
+import com.example.book.domain.Book;
+import java.util.List;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+@Mapper
+public interface BookSearchMapper {
+    @Select(&quot;&quot;&quot;
+        &lt;script&gt;
+        SELECT id, title FROM book
+        &lt;where&gt;
+          &lt;if test='status != null and status != &quot;&quot;'&gt;
+            AND status = #{status}
+          &lt;/if&gt;
+          &lt;if test='minId != null'&gt;
+            AND id &amp;gt;= #{minId}
+          &lt;/if&gt;
+        &lt;/where&gt;
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+        &lt;/script&gt;
+        &quot;&quot;&quot;)
+    List&lt;Book&gt; search(@Param(&quot;status&quot;) String status,
+                      @Param(&quot;minId&quot;) Long minId,
+                      @Param(&quot;limit&quot;) int limit,
+                      @Param(&quot;offset&quot;) int offset);
+}</code></pre>
+<p><strong>정렬 컬럼 선택:</strong> (앞의 Mapper page 메서드, 미실행)</p>
+<p>컬럼은 바인딩 값이 아니므로 enum의 고정 이름만 전달한다. 앞의 Mapper에 있는 page 메서드를 쓰고 서비스에서 원문 입력을 제한한다.</p>
+<pre><code class="language-java">package com.example.book.service;
+import com.example.book.domain.Book;
+import com.example.book.mapper.BookXmlSearchMapper;
+import java.util.List;
+import org.springframework.stereotype.Service;
+@Service
+public class BookSortService {
+    enum SortKey {
+        NEWEST(&quot;created_at&quot;), TITLE(&quot;title&quot;);
+        final String column;
+        SortKey(String column) { this.column = column; }
+    }
+    enum Direction { ASC, DESC }
+    private final BookXmlSearchMapper mapper;
+    public BookSortService(BookXmlSearchMapper mapper) { this.mapper = mapper; }
+    public List&lt;Book&gt; page(String sort, String direction, int limit, int offset) {
+        SortKey key = SortKey.valueOf(sort.toUpperCase());
+        Direction dir = Direction.valueOf(direction.toUpperCase());
+        return mapper.page(key.column, dir.name(),
+                Math.min(100, Math.max(1, limit)), Math.max(0, offset));
+    }
+}</code></pre>
+<p>valueOf 실패는 입력 오류로 처리한다. DB에 없는 컬럼은 목록에 넣지 않고 방향도 ASC/DESC로 제한한다.</p>
+<h3 id="53-조인-결과를-resultmap으로-만들기-미실행"><a class="anchor" href="#53-조인-결과를-resultmap으로-만들기-미실행" aria-hidden="true">#</a>5.3 조인 결과를 resultMap으로 만들기 (미실행)</h3>
+<p>책 한 권에 저자가 한 명, 리뷰가 여러 개다. 조인 행이 반복되므로 alias와 부모·자식 ID를 구분한다.</p>
+<pre><code class="language-java">package com.example.book.mapper;
+import java.util.Map;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+@Mapper
+public interface BookDetailMapper {
+    Map&lt;String, Object&gt; findDetail(@Param(&quot;id&quot;) long id);
+}</code></pre>
+<pre><code class="language-xml">&lt;mapper namespace=&quot;com.example.book.mapper.BookDetailMapper&quot;&gt;
+&lt;resultMap id=&quot;bookDetailMap&quot; type=&quot;map&quot;&gt;
+  &lt;id property=&quot;id&quot; column=&quot;book_id&quot;/&gt;
+  &lt;result property=&quot;title&quot; column=&quot;book_title&quot;/&gt;
+  &lt;association property=&quot;author&quot; javaType=&quot;map&quot;&gt;
+    &lt;id property=&quot;id&quot; column=&quot;author_id&quot;/&gt;
+    &lt;result property=&quot;name&quot; column=&quot;author_name&quot;/&gt;
+  &lt;/association&gt;
+  &lt;collection property=&quot;reviews&quot; ofType=&quot;map&quot;&gt;
+    &lt;id property=&quot;id&quot; column=&quot;review_id&quot;/&gt;
+    &lt;result property=&quot;body&quot; column=&quot;review_body&quot;/&gt;
+  &lt;/collection&gt;
+&lt;/resultMap&gt;
+&lt;select id=&quot;findDetail&quot; resultMap=&quot;bookDetailMap&quot;&gt;
+  SELECT b.id AS book_id, b.title AS book_title,
+         a.id AS author_id, a.name AS author_name,
+         r.id AS review_id, r.body AS review_body
+  FROM book b JOIN author a ON a.id = b.author_id
+  LEFT JOIN review r ON r.book_id = b.id
+  WHERE b.id = #{id}
+&lt;/select&gt;
+&lt;/mapper&gt;</code></pre>
+<p>예제는 Map을 썼다. 도메인 DTO를 쓰면 resultMap의 type/javaType/ofType과 getter/setter를 맞춘다. 리뷰가 없으면 review_id는 NULL이다. 중복은 alias와 <id>를 확인한다. 여러 1:N 조인은 행 수가 곱으로 늘 수 있다.</p>
+<h3 id="54-mybatistest로-mapper-검증-미실행"><a class="anchor" href="#54-mybatistest로-mapper-검증-미실행" aria-hidden="true">#</a>5.4 @MybatisTest로 Mapper 검증 (미실행)</h3>
+<p>@MybatisTest는 Mapper·SqlSession slice와 embedded DB를 띄우고 테스트 종료 시 롤백한다. 일반 서비스 빈은 로드하지 않는다.</p>
+<pre><code class="language-xml">&lt;dependency&gt;
+  &lt;groupId&gt;org.mybatis.spring.boot&lt;/groupId&gt;
+  &lt;artifactId&gt;mybatis-spring-boot-starter-test&lt;/artifactId&gt;
+  &lt;version&gt;4.1.0&lt;/version&gt;
+  &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+  &lt;groupId&gt;com.h2database&lt;/groupId&gt;
+  &lt;artifactId&gt;h2&lt;/artifactId&gt;
+  &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;</code></pre>
+<pre><code class="language-sql">-- src/test/resources/schema.sql
+CREATE TABLE book (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  title VARCHAR(200) NOT NULL,
+  status VARCHAR(20)
+);</code></pre>
+<pre><code class="language-java">package com.example.book.mapper;
+import static org.assertj.core.api.Assertions.assertThat;
+import com.example.book.domain.Book;
+import org.junit.jupiter.api.Test;
+import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
+import org.springframework.beans.factory.annotation.Autowired;
+@MybatisTest
+class BookMapperTest {
+    @Autowired BookMapper mapper;
+    @Test
+    void insertReturnsGeneratedIdAndCanBeRead() {
+        Book book = new Book();
+        book.setTitle(&quot;MyBatis XML&quot;);
+        assertThat(mapper.insert(book)).isEqualTo(1);
+        assertThat(book.getId()).isNotNull();
+        assertThat(mapper.findById(book.getId()).getTitle())
+                .isEqualTo(&quot;MyBatis XML&quot;);
+    }
+}</code></pre>
+<p>H2와 운영 DB는 페이징, 타입 변환, 예약어, 생성 키가 다를 수 있다. 기본 매핑은 slice에서, DB 고유 SQL은 운영 엔진 통합 테스트에서 확인한다. 개발 프로필에서 Mapper namespace DEBUG 로그로 SQL을 본다. 바인딩 값에 개인정보·토큰이 있을 수 있어 운영 로그의 권한과 보존 기간을 제한하고 마스킹한다. STDOUT_LOGGING은 일시 디버깅에만 쓴다.</p>
+<h2 id="6-실무에서는-실제로"><a class="anchor" href="#6-실무에서는-실제로" aria-hidden="true">#</a>6. 실무에서는 실제로</h2>
+<ul>
+<li><strong>신규 서비스</strong>: Starter 4.1.0과 Mapper XML을 기본으로 정하고 경로·namespace 규칙을 고정한다.</li>
+<li><strong>작은 도구</strong>: 단순 SQL은 annotation, 조건·조인이 늘면 XML로 옮긴다.</li>
+<li><strong>레거시</strong>: 기존 형식과 별칭 규칙을 유지하고 새 쿼리부터 기준을 적용한다.</li>
+<li><strong>SI·금융</strong>: 복잡 SQL에는 XML과 resultMap이 유리할 수 있다. 업종별 통계는 확인하지 못했으므로 변경 빈도와 리뷰 체계로 정한다.</li>
+<li><strong>스타트업</strong>: 단순 CRUD는 annotation, 복잡 SQL은 XML. <sql>/<include>는 공통 조각에만 쓴다.</li>
+<li>한 DB면 LIMIT/OFFSET, 다중 방언이나 팀 표준이면 PageHelper.</li>
+<li>접근 비교 → <a class="docref" href="W03-db-access-comparison.html">W03</a>, JPA 혼용 → <a class="docref" href="W05-jpa-vs-mybatis-strategy.html">W05</a> 참조.</li>
+</ul>
+<h2 id="7-흔한-오해와-실수"><a class="anchor" href="#7-흔한-오해와-실수" aria-hidden="true">#</a>7. 흔한 오해와 실수</h2>
+<ol>
+<li><strong>메서드 SQL은 자동 연결된다 →</strong> namespace/id를 못 찾으면 Invalid bound statement (not found). → 완전한 인터페이스 이름, XML 경로/id, 빌드 산출물을 확인한다.</li>
+<li><strong>인자 이름은 늘 XML에서 보인다 →</strong> 이름 불일치면 BindingException: Parameter 'status' not found. → 여러 인자에 @Param을 명시한다.</li>
+<li><strong>#{}는 식별자에도 쓸 수 있다 →</strong> ORDER BY #{column}은 컬럼 정렬이 아니다. → 고정 컬럼이나 허용 목록 값만 ${}로 전달한다.</li>
+<li><strong><where>가 빈 검색을 막는다 →</strong> WHERE가 생략되어 전체 조회가 될 수 있다. → 정책·최소 조건·페이지 상한을 서비스에서 정한다.</li>
+<li><strong>빈 <foreach>도 안전하다 →</strong> IN 조건이 사라지면 전체 변경 위험이 있다. → 빈 목록을 변경 쿼리에서 거부한다.</li>
+<li><strong>resultMap 관계가 null/중복 →</strong> resultType은 행 단위이고 alias/property 오타가 원인일 수 있다. → <id>/<association>/<collection>을 확인한다.</li>
+<li><strong>단일 반환형이면 결과도 한 행이다 →</strong> 여러 행이면 TooManyResultsException. → 유일 조건을 확인하고 복수 결과는 List<T>로 반환한다.</li>
+</ol>
+<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&A (면접 대비)</h2>
+<h3 id="q1-와-의-차이는"><a class="anchor" href="#q1-와-의-차이는" aria-hidden="true">#</a>Q1. #{}와 ${}의 차이는?</h3>
+<p>#{}는 PreparedStatement 값으로 전달되어 데이터와 SQL 문법을 구분한다. ${}는 문자열을 직접 치환해 식별자에만 제한한다. 일반 입력은 #{}가 기본이다.</p>
+<p><strong>꼬리질문:</strong> 정렬 컬럼은? → enum 허용 목록만 치환한다.</p>
+<h3 id="q2-invalid-bound-statement-not-found는-어떻게-찾나"><a class="anchor" href="#q2-invalid-bound-statement-not-found는-어떻게-찾나" aria-hidden="true">#</a>Q2. Invalid bound statement (not found)는 어떻게 찾나?</h3>
+<p>Mapper 메서드와 XML id, 완전한 이름과 namespace를 대조한다. mapper-locations와 빌드 리소스 포함 여부, 중복 statement와 오타를 살핀다.</p>
+<p><strong>꼬리질문:</strong> 기동 때 항상 못 잡는 이유는? → statement 탐색이 호출 때 이뤄질 수 있다.</p>
+<h3 id="q3-resulttype과-resultmap은-어떻게-고르나"><a class="anchor" href="#q3-resulttype과-resultmap은-어떻게-고르나" aria-hidden="true">#</a>Q3. resultType과 resultMap은 어떻게 고르나?</h3>
+<p>단일 행 이름 매핑은 resultType이 짧다. 조인 행을 부모·자식 그래프로 묶으려면 resultMap을 명시한다. 한 statement에서 둘을 동시에 쓰지 않는다.</p>
+<p><strong>꼬리질문:</strong> collection이 중복이면? → ID와 alias를 확인한다.</p>
+<h3 id="q4-가-해결하는-것과-못-하는-것은"><a class="anchor" href="#q4-가-해결하는-것과-못-하는-것은" aria-hidden="true">#</a>Q4. <where>가 해결하는 것과 못 하는 것은?</h3>
+<p>조건이 있을 때 WHERE와 AND/OR를 정리해 문법 실수를 줄인다. 조건이 없을 때 조회 범위는 제한하지 않는다. 정책은 서비스가 정한다.</p>
+<p><strong>꼬리질문:</strong> 한 분기만 적용하려면? → <choose>/<when>/<otherwise>를 쓴다.</p>
+<h3 id="q5-조인한-1n을-매핑하려면"><a class="anchor" href="#q5-조인한-1n을-매핑하려면" aria-hidden="true">#</a>Q5. 조인한 1:N을 매핑하려면?</h3>
+<p>부모·자식 ID와 alias를 구분한다. resultMap의 <collection>과 자식 <id>로 행을 부모 목록에 모은다. 단일 연관은 <association>이다.</p>
+<p><strong>꼬리질문:</strong> ID를 빼면? → 반복 행의 동일 객체를 판별하기 어려워 중복될 수 있다.</p>
+<h3 id="q6-transactional은-어디에-두나"><a class="anchor" href="#q6-transactional은-어디에-두나" aria-hidden="true">#</a>Q6. @Transactional은 어디에 두나?</h3>
+<p>여러 Mapper 호출이 한 업무 단위라면 서비스 경계에 둔다. Spring 프록시와 SqlSessionTemplate이 같은 DataSource 트랜잭션을 사용한다.</p>
+<p><strong>꼬리질문:</strong> 같은 클래스 내부 호출은? → self-invocation은 프록시를 건너뛴다.</p>
+<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+<ul>
+<li>MyBatis Mapper XML Files — <a href="https://mybatis.org/mybatis-3/sqlmap-xml.html" target="_blank" rel="noopener">https://mybatis.org/mybatis-3/sqlmap-xml.html</a> — statement, 동적 식별자, resultMap, 생성 키.</li>
+<li>Dynamic SQL — <a href="https://mybatis.org/mybatis-3/dynamic-sql.html" target="_blank" rel="noopener">https://mybatis.org/mybatis-3/dynamic-sql.html</a> — 동적 XML 태그</li>
+<li>MyBatis-Spring-Boot-Autoconfigure — <a href="https://mybatis.org/spring-boot-starter/mybatis-spring-boot-autoconfigure/" target="_blank" rel="noopener">https://mybatis.org/spring-boot-starter/mybatis-spring-boot-autoconfigure/</a> — 호환 표, 자동 구성, 속성.</li>
+<li>MyBatis Spring Boot Starter — <a href="https://github.com/mybatis/spring-boot-starter" target="_blank" rel="noopener">https://github.com/mybatis/spring-boot-starter</a> — Boot 4.1 호환 계열.</li>
+<li>Starter Releases — <a href="https://github.com/mybatis/spring-boot-starter/releases" target="_blank" rel="noopener">https://github.com/mybatis/spring-boot-starter/releases</a> — 4.1.0 릴리스 기록.</li>
+<li>MyBatis Test Autoconfigure — <a href="https://mybatis.org/spring-boot-starter/mybatis-spring-boot-test-autoconfigure/" target="_blank" rel="noopener">https://mybatis.org/spring-boot-starter/mybatis-spring-boot-test-autoconfigure/</a> — @MybatisTest와 롤백.</li>
+<li>MyBatis Configuration — <a href="https://mybatis.org/mybatis-3/configuration.html" target="_blank" rel="noopener">https://mybatis.org/mybatis-3/configuration.html</a> — 자동 매핑 기본값과 logging.</li>
+<li>Spring Declarative Transactions — <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative.html</a> — 선언적 트랜잭션과 AOP.</li>
+<li>PageHelper — <a href="https://github.com/pagehelper-org/Mybatis-PageHelper" target="_blank" rel="noopener">https://github.com/pagehelper-org/Mybatis-PageHelper</a> — 물리 페이징 플러그인</li>
+<li>OWASP SQL Injection Prevention — <a href="https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html" target="_blank" rel="noopener">https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html</a> — 파라미터화와 allow-list.</li>
+</ul>
+
+
+</main>
+<script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</script>
+</body>
+</html>

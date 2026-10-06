@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D04. 빌드란 무엇인가 — 소스 코드가 실행 파일·이미지가 되기까지</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
+<main>
+
+<h1 id="d04-빌드란-무엇인가--소스-코드가-실행-파일이미지가-되기까지"><a class="anchor" href="#d04-빌드란-무엇인가--소스-코드가-실행-파일이미지가-되기까지" aria-hidden="true">#</a>D04. 빌드란 무엇인가 — 소스 코드가 실행 파일·이미지가 되기까지</h1>
+<blockquote>
+<p>빌드는 코드를 컴파일하는 한 단계가 아니라, 선언된 입력을 검증하고 실행·배포 가능한 산출물로 바꾸는 자동화 과정이다.
+Gradle은 먼저 프로젝트와 태스크 그래프를 준비한 다음 필요한 태스크를 의존성 순서대로 실행한다.
+로컬과 CI의 차이는 대개 JDK·의존성·환경변수·커밋 상태·캐시 입력이 서로 다른 데서 시작한다.</p>
+</blockquote>
+<h2 id="1-큰-그림"><a class="anchor" href="#1-큰-그림" aria-hidden="true">#</a>1. 큰 그림</h2>
+<pre class="mermaid">flowchart LR
+    S[&quot;소스 코드 .java&quot;] --&gt; G[&quot;Gradle Wrapper와 빌드 설정&quot;]
+    G --&gt; D[&quot;의존성 그래프 해석과 파일 확보&quot;]
+    D --&gt; C[&quot;Java 컴파일 .class&quot;]
+    C --&gt; R[&quot;리소스 처리&quot;]
+    R --&gt; T[&quot;테스트 실행&quot;]
+    T --&gt; J[&quot;JAR 패키징&quot;]
+    J --&gt; I[&quot;선택: 컨테이너 이미지 생성&quot;]
+    I --&gt; P[&quot;선택: 레지스트리에 업로드&quot;]
+    J --&gt; X[&quot;서버에서 실행 또는 전달&quot;]
+    P --&gt; X</pre>
+<p><code>gradlew</code>와 빌드 설정이 태스크를 결정하고, Gradle은 라이브러리를 해결해 Java를 <code>.class</code>로 컴파일하고 리소스를 복사한다. 테스트 통과 뒤 클래스와 리소스를 JAR로 묶는다. 서버는 JAR을 직접 실행하거나, JAR을 넣은 컨테이너 이미지를 레지스트리에서 가져올 수 있다.</p>
+<p>“빌드 성공”이 <code>compileJava</code>, 테스트, JAR, 이미지 중 어디까지를 뜻하는지 확인한다. 이미지 생성·업로드는 선택 단계다.</p>
+<p>Gradle은 초기화로 프로젝트를 찾고, 구성으로 태스크 그래프를 만든 뒤, 실행 단계에서 선택 태스크를 처리한다.</p>
+<p>이 문서는 전체 개발 과정(<a class="docref" href="D01-dev-lifecycle-overview.html">D01</a> 참조) 가운데 소스가 검증된 산출물로 바뀌는 빌드 구간을 다룬다.</p>
+<h2 id="2-용어-사전"><a class="anchor" href="#2-용어-사전" aria-hidden="true">#</a>2. 용어 사전</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>용어</th>
+<th>한 줄 정의</th>
+<th>실무 예시</th>
+<th>헷갈리는 것과 차이</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>빌드(build)</td>
+<td>소스·설정·의존성을 처리해 검증된 산출물을 만드는 전체 절차</td>
+<td><code>./gradlew clean build</code></td>
+<td>컴파일보다 범위가 크며 테스트·패키징도 포함할 수 있다.</td>
+</tr>
+<tr>
+<td>컴파일(compile)</td>
+<td>소스 문법과 타입을 검사해 다른 표현의 코드로 변환</td>
+<td><code>compileJava</code>가 <code>.java</code>를 <code>.class</code>로 변환</td>
+<td>Java 컴파일은 JAR 포장이 아니며, <code>.class</code>는 보통 JVM에서 실행된다.</td>
+</tr>
+<tr>
+<td>태스크(task)</td>
+<td>Gradle의 실행 단위</td>
+<td><code>test</code>, <code>bootJar</code></td>
+<td><code>build</code>도 태스크이며 명령 옵션과 다르다.</td>
+</tr>
+<tr>
+<td>태스크 그래프(task graph)</td>
+<td>선택 태스크와 선행 조건을 방향으로 연결한 실행 계획</td>
+<td><code>build</code>가 <code>check</code>, <code>assemble</code>을 끌어옴</td>
+<td>텍스트로 적은 순서 목록보다 의존성에 의해 결정되는 그래프다.</td>
+</tr>
+<tr>
+<td>의존성(dependency)</td>
+<td>컴파일·테스트·실행에 필요한 외부 또는 다른 모듈</td>
+<td>Spring Boot starter</td>
+<td>소스의 <code>import</code>와 실제 JAR 파일을 함께 가리킬 수 있다.</td>
+</tr>
+<tr>
+<td>전이 의존성(transitive dependency)</td>
+<td>직접 고른 라이브러리가 다시 요구하는 라이브러리</td>
+<td>starter가 로깅·웹 관련 모듈을 가져옴</td>
+<td>직접 선언과 달리 빌드 파일에 일일이 적지 않아도 그래프에 들어온다.</td>
+</tr>
+<tr>
+<td>의존성 해석(resolution)</td>
+<td>선언과 메타데이터에서 모듈 그래프·변형·파일을 결정</td>
+<td>저장소에서 버전·플랫폼 선택</td>
+<td>그래프 결정과 실제 아티팩트 파일 확보는 구분되는 단계다.</td>
+</tr>
+<tr>
+<td>저장소(repository)</td>
+<td>플러그인·라이브러리 메타데이터를 제공하는 위치</td>
+<td>Maven Central, 사내 Maven 저장소</td>
+<td>Git 소스 저장소와 다르다.</td>
+</tr>
+<tr>
+<td>아티팩트(artifact)</td>
+<td>이름·버전으로 교환하는 파일</td>
+<td><code>demo-1.0.0.jar</code></td>
+<td>빌드 산출물과 의존성 JAR이 모두 해당한다.</td>
+</tr>
+<tr>
+<td>리소스(resource)</td>
+<td>컴파일하지 않고 실행 때 클래스패스에 두는 파일</td>
+<td><code>application.properties</code></td>
+<td><code>processResources</code>가 결과 위치로 복사한다.</td>
+</tr>
+<tr>
+<td>패키징(packaging)</td>
+<td>클래스·리소스·필요 메타데이터를 전달 가능한 단위로 묶음</td>
+<td><code>jar</code>, Spring Boot <code>bootJar</code></td>
+<td>컴파일 뒤 단계다. 컨테이너 이미지 생성과도 별도다.</td>
+</tr>
+<tr>
+<td>JAR</td>
+<td>JVM 클래스·리소스를 묶는 아카이브</td>
+<td><code>build/libs/</code>의 애플리케이션 파일</td>
+<td>모두 실행 가능한 것은 아니다. 구조는 <a class="docref" href="P05-jar-war-packaging.html">P05</a> 참조.</td>
+</tr>
+<tr>
+<td>컨테이너 이미지(image)</td>
+<td>컨테이너를 만들 때 사용할 파일시스템·설정의 패키지</td>
+<td>앱 JAR과 런타임을 포함한 이미지</td>
+<td>실행 중인 컨테이너 인스턴스와 이미지 파일은 다르다.</td>
+</tr>
+<tr>
+<td>레지스트리(registry)</td>
+<td>컨테이너 이미지를 보관하고 배포하는 서비스</td>
+<td>팀 레지스트리에 <code>team/api:1.2.0</code> 업로드</td>
+<td>Gradle 의존성 저장소와 목적·형식이 다르다.</td>
+</tr>
+<tr>
+<td>태그(tag)</td>
+<td>이미지 또는 버전을 찾기 위한 레이블</td>
+<td><code>api:1.2.0</code>, <code>api:latest</code></td>
+<td><code>latest</code>는 최신이라는 보증이 아니라 태그 이름이다.</td>
+</tr>
+<tr>
+<td>스냅샷(snapshot)</td>
+<td>최종 전의 변경 가능 버전 관례</td>
+<td><code>1.2.0-SNAPSHOT</code></td>
+<td>Gradle 태스크가 아니며 저장소 동작을 확인한다.</td>
+</tr>
+<tr>
+<td>릴리스(release)</td>
+<td>외부 사용을 위해 버전·내용을 확정해 공개한 결과</td>
+<td><code>1.2.0</code></td>
+<td>배포(deploy)는 환경에 올리는 행위도 뜻하므로 같은 단어가 아니다.</td>
+</tr>
+<tr>
+<td>시맨틱 버저닝(SemVer)</td>
+<td>호환성을 MAJOR.MINOR.PATCH로 표현하는 규칙</td>
+<td>호환 깨짐은 major 증가</td>
+<td>Gradle 버전 선택 정책과는 별개다.</td>
+</tr>
+<tr>
+<td>Wrapper</td>
+<td>프로젝트 지정 Gradle을 실행하는 스크립트·설정</td>
+<td><code>./gradlew</code></td>
+<td>전역 <code>gradle</code>과 달리 버전을 맞추지만 JDK는 별도다.</td>
+</tr>
+<tr>
+<td>빌드 캐시(build cache)</td>
+<td>입력이 같으면 태스크 출력을 재사용하는 저장소</td>
+<td>공유 캐시의 컴파일 결과</td>
+<td>현재 작업공간의 증분 빌드와 다르다.</td>
+</tr>
+<tr>
+<td>증분 빌드(incremental build)</td>
+<td>바뀐 입력에 영향을 받는 작업만 다시 실행</td>
+<td>한 파일 수정 후 일부 클래스 재컴파일</td>
+<td>원격 캐시에서 다른 빌드 출력을 가져오는 것과 다르다.</td>
+</tr>
+<tr>
+<td>재현 가능한 빌드(reproducible build)</td>
+<td>같은 입력에서 같은 결과를 얻도록 통제한 빌드</td>
+<td>고정 JDK·Gradle·의존성</td>
+<td>캐시 적중과 다르며 캐시는 재현성을 보장하지 않는다.</td>
+</tr>
+<tr>
+<td>CI 빌드</td>
+<td>커밋을 자동으로 가져와 격리 실행하는 빌드</td>
+<td>PR마다 <code>./gradlew build</code></td>
+<td>로컬과 환경 차이를 드러낸다.</td>
+</tr>
+</tbody></table></div>
+<p>SemVer는 공개 API 호환성에 의미를 부여하고, Gradle은 설정과 저장소 메타데이터로 실제 모듈 파일을 선택한다. 이미지 태그와 의존성 버전도 별개다.</p>
+<h2 id="3-단계별로-보기"><a class="anchor" href="#3-단계별로-보기" aria-hidden="true">#</a>3. 단계별로 보기</h2>
+<h3 id="31-프로젝트-준비와-그래프-구성"><a class="anchor" href="#31-프로젝트-준비와-그래프-구성" aria-hidden="true">#</a>3.1 프로젝트 준비와 그래프 구성</h3>
+<p>무엇이 일어나나: <code>./gradlew</code>가 지정 Gradle을 실행한다. 초기화 때 프로젝트를 찾고 구성 때 빌드 파일·플러그인을 평가해 태스크와 선행 관계를 등록한다. 요청 태스크에서 필요한 그래프를 고른다.</p>
+<p>누가·도구: 개발자 또는 CI, Wrapper, Gradle 플러그인, <code>settings.gradle(.kts)</code>, <code>build.gradle(.kts)</code>.</p>
+<p>입력·산출물: 커밋된 빌드 설정으로 그래프를 만든다. 이 단계에는 앱 JAR이 없다.</p>
+<p>실패 신호: 배포판 다운로드 오류는 네트워크·프록시·URL을, 플러그인 미발견이나 설정 오류는 플러그인 ID·버전·저장소를 확인한다. 이는 컴파일 실패가 아니다.</p>
+<p>초기화·구성 후 그래프가 정해진다. 실행은 선행 관계를 따르며 독립 태스크는 병렬일 수 있다.</p>
+<pre class="mermaid">flowchart TD
+    A[&quot;초기화: 프로젝트와 포함 빌드 탐색&quot;] --&gt; B[&quot;구성: 빌드 파일과 플러그인 평가&quot;]
+    B --&gt; C[&quot;요청 태스크와 선행 관계 분석&quot;]
+    C --&gt; G[&quot;태스크 그래프 확정&quot;]
+    G --&gt; D[&quot;실행 가능한 독립 태스크&quot;]
+    G --&gt; E[&quot;선행 태스크 완료를 기다리는 태스크&quot;]
+    D --&gt; F[&quot;출력 파일 또는 생략 결과&quot;]
+    E --&gt; F</pre>
+<h3 id="32-의존성-해석과-확보"><a class="anchor" href="#32-의존성-해석과-확보" aria-hidden="true">#</a>3.2 의존성 해석과 확보</h3>
+<p>무엇이 일어나나: 선언·버전 제약·메타데이터에서 모듈 그래프를 해석하고 필요한 변형과 파일을 저장소 또는 로컬 캐시에서 가져온다. 전이 의존성도 포함된다. 테스트 의존성은 테스트 태스크가 필요할 때 해결될 수 있다.</p>
+<p>누가·도구: Gradle 의존성 엔진, <code>repositories</code>, 인증 정보, 로컬 의존성 캐시.</p>
+<p>입력·산출물: 의존성 선언과 저장소 메타데이터에서 모듈 버전·변형·JAR을 고른다. 잠금 파일은 해석 버전을 기록해 선택 변화를 줄이지만 파일 무결성이나 저장소 가용성은 보장하지 않는다.</p>
+<p>실패 신호: <code>Could not resolve/find</code>, <code>401/403</code>, <code>PKIX</code>, <code>No matching variant</code>를 본다. 좌표·저장소, 네트워크·인증, 인증서, 플랫폼 변형을 점검하고 컴파일 전에 실패했는지 확인한다.</p>
+<h3 id="33-컴파일과-리소스-처리"><a class="anchor" href="#33-컴파일과-리소스-처리" aria-hidden="true">#</a>3.3 컴파일과 리소스 처리</h3>
+<p>무엇이 일어나나: <code>compileJava</code>가 <code>javac</code>로 소스·타입을 검사해 <code>.class</code>를 만든다. 클래스패스 라이브러리는 심볼 확인에 쓰인다. Toolchain과 소스 호환성 설정이 어긋나면 JDK별 API·바이트코드 문제가 생긴다. <code>processResources</code>는 설정·템플릿을 출력 디렉터리에 복사한다.</p>
+<p>누가·도구: Gradle Java 플러그인, Java Toolchain, JDK.</p>
+<p>입력·산출물: 기본 경로는 프로덕션 클래스 <code>build/classes/java/main</code>, 리소스 <code>build/resources/main</code>, 테스트 클래스 <code>build/classes/java/test</code>, 테스트 리소스 <code>build/resources/test</code>다. source set 설정으로 바뀔 수 있다.</p>
+<p>실패 신호: <code>cannot find symbol</code>, <code>incompatible types</code>, <code>invalid source release</code>와 파일·줄을 확인한다. <code>compileJava</code>/<code>compileTestJava</code>를 구분하고 JDK·클래스패스를 본다. 리소스 오류는 파일 충돌·권한·필터 설정을 본다.</p>
+<h3 id="34-테스트와-패키징"><a class="anchor" href="#34-테스트와-패키징" aria-hidden="true">#</a>3.4 테스트와 패키징</h3>
+<p>무엇이 일어나나: 테스트 코드를 컴파일한 뒤 <code>test</code>가 프레임워크를 실행한다. 실패하면 <code>build</code>가 중단될 수 있고, 통과하면 <code>jar</code> 또는 Boot 플러그인의 실행 JAR 태스크가 패키징한다.</p>
+<p>누가·도구: Gradle <code>test</code>, <code>check</code>, <code>jar</code>, Boot <code>bootJar</code>, 테스트 엔진. <code>build</code>는 검증과 조립을 모은다.</p>
+<p>입력·산출물: 보고서는 <code>build/reports/tests/test/</code>, JAR은 설정에 따라 <code>build/libs/</code>에 놓인다. 실행 JAR 파일명은 디렉터리에서 확인한다.</p>
+<p>실패 신호: 실패 테스트명과 assertion을 찾고 HTML 보고서의 예외를 본다. <code>compileTestJava</code> 실패와 실행 중 <code>test</code> 실패를 구분한다.</p>
+<p>대표 관계는 다음과 같다. 플러그인과 프로젝트 설정에 따라 실제 그래프는 다르다. <code>--dry-run</code>은 계획을 보여주지만 태스크를 실행하지 않는다.</p>
+<pre class="mermaid">flowchart LR
+    CJ[&quot;compileJava&quot;] --&gt; CL[&quot;classes&quot;]
+    PR[&quot;processResources&quot;] --&gt; CL
+    CL --&gt; JAR[&quot;jar 또는 bootJar&quot;]
+    CL --&gt; CTJ[&quot;compileTestJava&quot;]
+    PTR[&quot;processTestResources&quot;] --&gt; TC[&quot;testClasses&quot;]
+    CTJ --&gt; TC
+    TC --&gt; TEST[&quot;test&quot;]
+    TEST --&gt; CHECK[&quot;check&quot;]
+    JAR --&gt; ASM[&quot;assemble&quot;]
+    CHECK --&gt; BUILD[&quot;build&quot;]
+    ASM --&gt; BUILD</pre>
+<h3 id="35-컨테이너-이미지와-레지스트리"><a class="anchor" href="#35-컨테이너-이미지와-레지스트리" aria-hidden="true">#</a>3.5 컨테이너 이미지와 레지스트리</h3>
+<p>무엇이 일어나나: 선택 단계다. Docker 빌더가 컨텍스트·Dockerfile을 처리해 이미지를 만들고, <code>push</code>는 태그를 붙인 이미지를 레지스트리에 올린다.</p>
+<p>누가·도구: Docker CLI/BuildKit, Dockerfile, <code>.dockerignore</code>, 이미지 레지스트리. 앱 빌드 성공이 이미지 생성 성공을 뜻하지는 않는다.</p>
+<p>입력·산출물: JAR·Dockerfile·기반 이미지가 로컬 이미지를 만든다. 업로드할 때 대상 레지스트리·태그·권한을 확인한다.</p>
+<p>실패 신호: <code>failed to solve</code>는 이미지 빌드 단계, <code>unauthorized</code>/<code>denied</code>는 레지스트리 연결·인증·쓰기 권한을 확인한다.</p>
+<p>로컬과 CI의 코드 처리 경로는 다음과 같다.</p>
+<pre class="mermaid">sequenceDiagram
+    participant Dev as &quot;개발자 로컬&quot;
+    participant Git as &quot;Git 커밋&quot;
+    participant CI as &quot;CI 작업자&quot;
+    participant Repo as &quot;의존성 저장소&quot;
+    participant Reg as &quot;이미지 레지스트리&quot;
+    Dev-&gt;&gt;Dev: &quot;Wrapper와 JDK로 로컬 빌드&quot;
+    Dev-&gt;&gt;Git: &quot;변경사항 커밋과 push&quot;
+    Git-&gt;&gt;CI: &quot;동일 커밋 checkout&quot;
+    CI-&gt;&gt;Repo: &quot;플러그인·의존성 해석&quot;
+    Repo--&gt;&gt;CI: &quot;선택된 파일 반환&quot;
+    CI-&gt;&gt;CI: &quot;컴파일, 테스트, JAR 생성&quot;
+    CI-&gt;&gt;Reg: &quot;선택: 이미지 업로드&quot;
+    Reg--&gt;&gt;CI: &quot;업로드 결과와 이미지 참조&quot;</pre>
+<h3 id="36-실패-종류와-로그를-읽는-순서"><a class="anchor" href="#36-실패-종류와-로그를-읽는-순서" aria-hidden="true">#</a>3.6 실패 종류와 로그를 읽는 순서</h3>
+<p>최초 실패 태스크와 그 원인을 기준으로 분류한다. <code>BUILD FAILED</code>만 보지 않는다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>분류</th>
+<th>눈에 띄는 첫 신호</th>
+<th>먼저 확인할 것</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>설정·플러그인</td>
+<td>settings 평가 오류, 플러그인 미발견</td>
+<td>Wrapper, 플러그인 ID·버전, 저장소, 설정 파일의 구문</td>
+</tr>
+<tr>
+<td>의존성 해석</td>
+<td><code>Could not resolve/find</code>, HTTP 상태코드</td>
+<td>좌표·버전·저장소 URL·네트워크·자격 증명·변형 속성</td>
+</tr>
+<tr>
+<td>컴파일</td>
+<td><code>compileJava</code> 또는 <code>compileTestJava</code>, javac 오류 줄 번호</td>
+<td>최초 진단 줄, JDK/toolchain, 컴파일 클래스패스, 생성 코드</td>
+</tr>
+<tr>
+<td>테스트</td>
+<td><code>:test</code> 실패, 실패 테스트 이름·assertion</td>
+<td>최초 실패와 원인 예외, 보고서, CI에서만 다른 설정·시간·외부 서비스</td>
+</tr>
+<tr>
+<td>패키징</td>
+<td><code>jar</code>/<code>bootJar</code> 실패, 파일 충돌·권한</td>
+<td>입력 디렉터리, 중복 리소스, 출력 파일 경로·권한</td>
+</tr>
+<tr>
+<td>메모리</td>
+<td><code>Java heap space</code>, <code>GC overhead</code>, daemon/worker 종료</td>
+<td>어느 JVM(Gradle daemon·컴파일러·테스트)이 메모리를 쓰는지, CI 메모리 한도와 로그 앞부분</td>
+</tr>
+<tr>
+<td>이미지·업로드</td>
+<td>Docker 단계 실패, <code>unauthorized</code>/<code>denied</code></td>
+<td>이미지 빌더와 Dockerfile, 빌드 컨텍스트, 태그, 레지스트리 인증·권한</td>
+</tr>
+</tbody></table></div>
+<p>선행 <code>compileJava</code> 오류로 후속 태스크가 실패했다면 독립 오류 하나로 센다. <code>--info</code>는 단서를 늘리지만 로그 공유 전 민감한 환경값을 확인한다.</p>
+<h2 id="4-직접-해보기"><a class="anchor" href="#4-직접-해보기" aria-hidden="true">#</a>4. 직접 해보기</h2>
+<p>프로젝트 이름을 <code>demo</code>로 한 Spring Boot 4.1.1, Java 25, Gradle Wrapper 프로젝트에서 실습한다. 아래는 Boot 플러그인과 Java Toolchain 설정의 핵심이다. 의존성 버전은 Gradle BOM 지원 또는 의존성 관리 플러그인으로 맞춘다.</p>
+<pre><code class="language-kotlin">plugins {
+    java
+    id(&quot;org.springframework.boot&quot;) version &quot;4.1.1&quot;
+}
+
+group = &quot;com.example&quot;
+version = &quot;0.0.1-SNAPSHOT&quot;
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}</code></pre>
+<p>명령은 프로젝트 루트에서 실행한다. macOS/Linux 기준이며 Windows는 <code>gradlew.bat</code>를 사용한다.</p>
+<pre><code class="language-bash">java -version
+./gradlew --version
+./gradlew tasks --all
+./gradlew clean build --dry-run</code></pre>
+<p>첫 명령들로 Java·Gradle 버전과 등록된 태스크를 확인한다. <code>--dry-run</code>은 <code>clean build</code>의 실행 계획만 출력하므로 산출물을 만들지는 않는다.</p>
+<p>이제 전체 흐름을 실제로 돈다.</p>
+<pre><code class="language-bash">./gradlew clean build --info
+find build/classes build/resources build/libs build/reports/tests -type f -print</code></pre>
+<p><code>clean</code>은 이전 출력을 지운다. 성공 뒤 클래스·리소스·JAR·테스트 보고서를 확인한다. 경로는 프로젝트 설정에 따라 달라질 수 있다. 실패하면 <code>--info</code>에서 첫 실패 태스크를 찾아 3.6절 기준으로 분류한다. <code>build/</code>은 다시 만들 수 있는 출력이다.</p>
+<p>이 설정대로 <code>demo</code> 프로젝트를 만들면 Boot 실행 JAR을 다음처럼 실행한다. 다른 이름이나 버전을 택했다면 <code>build/libs/</code>에서 파일명을 확인한다.</p>
+<pre><code class="language-bash">java -jar build/libs/demo-0.0.1-SNAPSHOT.jar</code></pre>
+<p>별도 Dockerfile이 준비되어 있다면 이미지 생성과 태깅은 다음처럼 시험한다. <code>registry.example.com/team/demo</code>는 예시 주소이므로 실제 업로드에는 팀이 승인한 레지스트리와 로그인 정보가 필요하다.</p>
+<pre><code class="language-bash">docker build -t registry.example.com/team/demo:1.0.0 .
+docker image ls registry.example.com/team/demo
+docker push registry.example.com/team/demo:1.0.0</code></pre>
+<p><code>docker build</code>는 로컬 이미지 생성, <code>docker push</code>는 레지스트리 업로드다. 커밋과 릴리스 태그를 기록한다. 업로드는 선택 실습이다.</p>
+<p>이 실습에서 가장 재현성 높은 기본 선택은 커밋된 Wrapper(<code>./gradlew</code>)와 Java 25 Toolchain, 고정된 릴리스 버전 의존성을 사용하고 PR CI에서 <code>clean build</code>를 실행하는 것이다. Wrapper는 Gradle 버전을 맞추지만 JDK 선택, 의존성 그래프, 환경변수, 운영체제 차이까지 자동으로 고정하지는 않는다. 동적 버전을 쓰면 의존성 잠금을 검토하고, 빌드 캐시는 성능을 위한 옵션으로 취급한다.</p>
+<p>Gradle/Maven 빌드 파일 작성 실무 → <a class="docref" href="P08-maven-gradle-practical.html">P08</a> 참조. JAR 내부 구조 → <a class="docref" href="P05-jar-war-packaging.html">P05</a> 참조. 이미지 모범 사례·패키징 배포 → <a class="docref" href="S19-packaging-deploy.html">S19</a> 참조.</p>
+<h2 id="5-자주-하는-오해와-실수"><a class="anchor" href="#5-자주-하는-오해와-실수" aria-hidden="true">#</a>5. 자주 하는 오해와 실수</h2>
+<ol>
+<li><p><strong>“컴파일되면 빌드도 끝났다” →</strong> <code>.class</code>는 중간 산출물일 뿐이다. 테스트와 패키징은 아직 실패할 수 있다. 배포 기준이 <code>build</code> 통과인지 이미지 게시까지인지 CI 파이프라인 이름과 태스크를 확인한다.</p>
+</li>
+<li><p><strong>“<code>build</code>는 한 개의 명령 태스크만 돈다” →</strong> 생명주기 태스크가 플러그인에서 추가한 검증·조립 태스크를 그래프로 끌어온다. <code>./gradlew build --dry-run</code>으로 실제 프로젝트의 선택 흐름을 확인한다.</p>
+</li>
+<li><p><strong>“내 PC에서 성공했으니 CI도 성공한다” →</strong> 로컬 미커밋 파일, 다른 JDK, 환경변수, OS 파일명 대소문자, 캐시가 성공을 가릴 수 있다. Wrapper와 Toolchain을 사용하고 깨끗한 checkout의 CI 결과를 기준으로 삼는다.</p>
+</li>
+<li><p><strong>“버전 문자열을 적었으니 의존성도 늘 같다” →</strong> 동적 버전, 저장소 메타데이터 변경, 전이 의존성 선택은 다른 시점에 달라질 수 있다. 릴리스용 버전을 고정하고 필요한 경우 lock 파일을 커밋한다.</p>
+</li>
+<li><p><strong>“캐시를 끄면 재현 가능한 빌드가 된다” →</strong> 캐시는 동일 입력으로 태스크 출력을 재사용하는 최적화다. 입력이 흔들리거나 시스템 시각·환경변수에 결과가 의존하면 캐시와 무관하게 결과가 달라질 수 있다. 입력을 명시하고 버전·환경부터 통제한다.</p>
+</li>
+<li><p><strong>“CI에서 테스트 실패는 컴파일 오류다” →</strong> 컴파일 성공 후 테스트 assertion이나 통합 환경 문제로 실패할 수 있다. 실패 태스크가 <code>compileTestJava</code>인지 <code>test</code>인지 확인하고 테스트 보고서를 본다.</p>
+</li>
+<li><p><strong>“JAR과 컨테이너 이미지가 같은 배포물이다” →</strong> JAR은 JVM 애플리케이션 아카이브이고, 이미지에는 실행 기반 환경과 이미지 설정도 들어간다. 어느 산출물을 운영에 전달하는지 배포 계약과 태그를 확인한다.</p>
+</li>
+</ol>
+<h2 id="6-시각화-설계-메모"><a class="anchor" href="#6-시각화-설계-메모" aria-hidden="true">#</a>6. 시각화 설계 메모</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>제안</th>
+<th>목적</th>
+<th>노드·요소</th>
+<th>화살표·관계</th>
+<th>단계별 애니메이션 순서</th>
+<th>강조할 오해</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>소스에서 운영 산출물까지</td>
+<td>빌드 구간을 한눈에 배치</td>
+<td>소스, 의존성, <code>.class</code>, 테스트, JAR, 이미지, 레지스트리</td>
+<td>필수 경로와 선택 이미지 경로</td>
+<td>소스 → 테스트 → JAR → 선택 이미지</td>
+<td>컴파일은 빌드 완료가 아님. §1 연결</td>
+</tr>
+<tr>
+<td>Gradle 태스크 그래프</td>
+<td><code>build</code>의 선행 작업을 설명</td>
+<td><code>compileJava</code>, <code>classes</code>, <code>test</code>, <code>check</code>, <code>jar</code>, <code>build</code></td>
+<td>의존 방향과 병렬 작업 표시</td>
+<td><code>build</code> 선택 → 선행 태스크 표시 → 실패 시 후속 정지</td>
+<td>명령 입력 순서가 실행 순서가 아님. §3.4 연결</td>
+</tr>
+<tr>
+<td>로컬과 CI 비교</td>
+<td>환경 차이가 유입되는 위치를 찾음</td>
+<td>commit, Wrapper, JDK, lock 파일, 환경변수, 캐시</td>
+<td>공통 입력과 다른 입력을 나란히 연결</td>
+<td>같은 커밋 전달 → 환경 차이 비교 → 최초 실패 강조</td>
+<td>로컬 성공이 CI를 보장하지 않음. §3.5 연결</td>
+</tr>
+<tr>
+<td>실패 로그 분류</td>
+<td>로그에서 확인할 다음 행동을 찾음</td>
+<td>설정, 의존성, 컴파일, 테스트, 메모리, 이미지</td>
+<td>태스크·키워드에서 원인 노드로 분기</td>
+<td>첫 실패 → 유형 분류 → 보고서나 설정으로 이동</td>
+<td><code>BUILD FAILED</code>만 보면 원인 파악이 늦음. §3.6 연결</td>
+</tr>
+</tbody></table></div>
+<h2 id="7-자가점검-qa-면접-대비"><a class="anchor" href="#7-자가점검-qa-면접-대비" aria-hidden="true">#</a>7. 자가점검 Q&amp;A (면접 대비)</h2>
+<h3 id="q1-컴파일과-빌드는-어떻게-다른가"><a class="anchor" href="#q1-컴파일과-빌드는-어떻게-다른가" aria-hidden="true">#</a>Q1. 컴파일과 빌드는 어떻게 다른가?</h3>
+<p>컴파일은 소스 코드를 <code>.class</code> 같은 형식으로 바꾸는 한 작업이다. 빌드는 의존성 준비, 컴파일, 리소스 처리, 테스트, 패키징처럼 더 넓은 절차를 포함한다. 그래서 <code>compileJava</code>가 성공해도 테스트나 <code>bootJar</code>는 실패할 수 있다.</p>
+<p><strong>꼬리질문: 컴파일 성공 후 배포 파일이 없으면 어디를 볼까?</strong></p>
+<p><code>test</code>, <code>jar</code> 또는 <code>bootJar</code>가 실행됐는지와 최초 실패 태스크를 확인한다. 클래스 파일만 생긴 것은 JAR 생성 여부를 보장하지 않는다.</p>
+<h3 id="q2-gradle에서-build를-실행할-때-내부적으로-어떤-순서가-있는가"><a class="anchor" href="#q2-gradle에서-build를-실행할-때-내부적으로-어떤-순서가-있는가" aria-hidden="true">#</a>Q2. Gradle에서 <code>build</code>를 실행할 때 내부적으로 어떤 순서가 있는가?</h3>
+<p>먼저 프로젝트를 초기화하고 빌드 파일을 구성해 태스크 그래프를 결정한다. 선택된 태스크는 선행 관계에 맞춰 실행되고, 독립적인 작업은 병렬일 수 있다. 실제 순서는 그래프와 플러그인에 따라 달라진다.</p>
+<p><strong>꼬리질문: <code>build</code> 전에 <code>test</code>를 명령줄에 먼저 쓰면 항상 테스트가 먼저일까?</strong></p>
+<p>그렇지 않다. 선택된 태스크들의 의존 관계가 순서를 결정하므로 <code>--dry-run</code> 출력으로 해당 프로젝트의 계획을 본다.</p>
+<h3 id="q3-전이-의존성은-무엇이며-왜-문제가-되나"><a class="anchor" href="#q3-전이-의존성은-무엇이며-왜-문제가-되나" aria-hidden="true">#</a>Q3. 전이 의존성은 무엇이며 왜 문제가 되나?</h3>
+<p>직접 선택한 모듈이 필요로 해 함께 선택되는 라이브러리다. 선언을 줄여주지만 직접 보이지 않는 버전 충돌이나 갑작스러운 그래프 변화의 원인이 될 수 있다. 의존성 보고와 잠금 파일로 실제 선택 결과를 확인한다.</p>
+<p><strong>꼬리질문: 저장소에 JAR이 있는데도 의존성 해석이 실패할 수 있나?</strong></p>
+<p>가능하다. 메타데이터·버전·변형이 요청과 맞지 않거나 인증·저장소 설정이 잘못됐을 수 있다. Gradle은 단순 파일 검색 외에 그래프와 변형도 해석한다.</p>
+<h3 id="q4-로컬에서는-되는데-ci에서는-실패할-때-무엇을-비교할까"><a class="anchor" href="#q4-로컬에서는-되는데-ci에서는-실패할-때-무엇을-비교할까" aria-hidden="true">#</a>Q4. “로컬에서는 되는데 CI에서는 실패”할 때 무엇을 비교할까?</h3>
+<p>같은 커밋을 빌드하는지부터 확인한다. 이어 Wrapper, JDK/toolchain, 잠금 의존성, OS, 환경변수, 시크릿, 네트워크·저장소 설정을 비교한다. 로컬 캐시나 미커밋 파일 때문에 숨겨진 차이도 찾는다.</p>
+<p><strong>꼬리질문: Wrapper만 커밋하면 재현성이 확보되나?</strong></p>
+<p>아니다. Wrapper는 Gradle 배포판을 통일하지만 JDK와 의존성 선택은 별도 관리가 필요하다. 입력을 더 고정하고 깨끗한 CI 결과를 확인해야 한다.</p>
+<h3 id="q5-빌드-캐시와-증분-빌드가-같은-말인가"><a class="anchor" href="#q5-빌드-캐시와-증분-빌드가-같은-말인가" aria-hidden="true">#</a>Q5. 빌드 캐시와 증분 빌드가 같은 말인가?</h3>
+<p>아니다. 증분 빌드는 현재 작업공간에서 바뀐 입력의 영향 범위만 다시 처리하는 최적화다. 빌드 캐시는 이전 실행 출력과 현재 입력을 비교해 로컬 또는 원격 저장소에서 태스크 결과를 재사용한다. 둘 다 시간을 줄이지만 정확한 입력 정의가 전제다.</p>
+<p><strong>꼬리질문: 캐시를 비우면 비결정적인 빌드가 해결되나?</strong></p>
+<p>아니다. 시각·환경값·동적 의존성 같은 입력 자체가 달라지는 원인을 고쳐야 한다. 캐시 삭제는 원인 진단 수단일 뿐 재현성 보장은 아니다.</p>
+<h3 id="q6-jar과-컨테이너-이미지는-어떤-관계인가"><a class="anchor" href="#q6-jar과-컨테이너-이미지는-어떤-관계인가" aria-hidden="true">#</a>Q6. JAR과 컨테이너 이미지는 어떤 관계인가?</h3>
+<p>JAR은 애플리케이션 클래스와 리소스를 담은 아카이브다. 컨테이너 이미지 빌드에서는 JAR을 파일시스템에 넣고 런타임·시작 설정과 결합할 수 있다. 따라서 이미지 생성과 레지스트리 업로드는 JAR 패키징 이후의 별도 선택 단계다.</p>
+<p><strong>꼬리질문: 이미지 생성은 성공하고 업로드는 실패했다면 코드 결함일까?</strong></p>
+<p>대개 레지스트리 연결, 인증, 권한, 태그 주소 문제다. 이미지가 로컬에 존재하는지와 push 로그의 첫 실패를 분리해 본다.</p>
+<h2 id="8-참고문헌"><a class="anchor" href="#8-참고문헌" aria-hidden="true">#</a>8. 참고문헌</h2>
+<ul>
+<li>Gradle Build Lifecycle — <a href="https://docs.gradle.org/current/userguide/build_lifecycle.html" target="_blank" rel="noopener">https://docs.gradle.org/current/userguide/build_lifecycle.html</a> — 초기화·구성·실행 단계와 태스크 그래프 설명.</li>
+<li>The <code>javac</code> Command — <a href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/javac.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/25/docs/specs/man/javac.html</a> — Java 소스에서 JVM 클래스 파일을 만드는 컴파일러 동작과 출력 디렉터리 옵션.</li>
+<li>Semantic Versioning 2.0.0 — <a href="https://semver.org/" target="_blank" rel="noopener">https://semver.org/</a> — MAJOR.MINOR.PATCH와 사전 릴리스 버전의 의미.</li>
+<li>Gradle Build Cache — <a href="https://docs.gradle.org/current/userguide/build_cache.html" target="_blank" rel="noopener">https://docs.gradle.org/current/userguide/build_cache.html</a> — 입력 기반 태스크 출력 재사용과 로컬·원격 빌드 캐시.</li>
+<li>Gradle The Java Plugin — <a href="https://docs.gradle.org/current/userguide/java_plugin.html" target="_blank" rel="noopener">https://docs.gradle.org/current/userguide/java_plugin.html</a> — <code>compileJava</code>, <code>processResources</code>, <code>test</code>, <code>jar</code> 태스크와 기본 Java 출력 경로.</li>
+<li>Gradle Dependency Locking — <a href="https://docs.gradle.org/current/userguide/dependency_locking.html" target="_blank" rel="noopener">https://docs.gradle.org/current/userguide/dependency_locking.html</a> — 의존성 버전을 잠가 시간에 따른 해석 변화를 줄이는 법.</li>
+<li>Gradle Dependency Resolution — <a href="https://docs.gradle.org/current/userguide/dependency_resolution.html" target="_blank" rel="noopener">https://docs.gradle.org/current/userguide/dependency_resolution.html</a> — 그래프 해석과 아티팩트 파일 해석의 두 단계.</li>
+<li>Spring Boot Gradle Plugin Getting Started — <a href="https://docs.spring.io/spring-boot/gradle-plugin/getting-started.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/gradle-plugin/getting-started.html</a> — Boot Gradle 플러그인 4.1.1 적용 예와 Java 플러그인·의존성 관리 방식.</li>
+<li>Gradle Command-Line Interface — <a href="https://docs.gradle.org/current/userguide/command_line_interface.html" target="_blank" rel="noopener">https://docs.gradle.org/current/userguide/command_line_interface.html</a> — Wrapper 사용과 명령줄 태스크 실행·보고 기능.</li>
+<li>Docker: Build, tag, and publish an image — <a href="https://docs.docker.com/get-started/docker-concepts/building-images/build-tag-and-publish-an-image/" target="_blank" rel="noopener">https://docs.docker.com/get-started/docker-concepts/building-images/build-tag-and-publish-an-image/</a> — Dockerfile의 빌드 컨텍스트, 이미지 태깅, 레지스트리 게시.</li>
+</ul>
+
+
+</main>
+<script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</script>
+</body>
+</html>

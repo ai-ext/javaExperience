@@ -1,0 +1,287 @@
+# W22. 로컬에선 되는데 서버에선 왜 안 되나 — 환경 차이 점검
+
+> 로컬과 운영은 같은 코드라도 설정·런타임·OS·네트워크·데이터·자원 조건이 다르면 다른 프로그램처럼 동작한다.
+> 원인을 “서버 탓”으로 묶지 말고, 실패한 요청의 실행 조건을 비교해 차이를 하나씩 지운다.
+> 기본값은 운영과 같은 Java·라이브러리·주요 의존 서비스를 Docker/CI에서 재현하고, 배포별 설정은 환경 변수로 주입하는 것이다.
+
+## 1. 질문
+
+“내 컴퓨터에서는 되는데 서버에서는 안 돼요”는 대개 코드가 갑자기 달라져서가 아니다. 개발자가 무심코 의존하던 조건이 운영에는 없거나 반대로 운영에만 있기 때문이다.
+
+- IntelliJ에서는 API가 DB에 연결되는데 배포본은 시작하자마자 연결 실패한다. IDE에는 `local` 프로파일, 개발 DB 주소와 `.env`가 있었지만 실행 jar에는 활성 프로파일이 전달되지 않았을 수 있다.
+- Windows에서 읽히던 `Application.yml`이 Linux에서 `application.yml`을 찾지 못한다. 로컬 파일 시스템은 대소문자를 구분하지 않았지만 Linux는 구분한다.
+- 로컬의 작은 CSV 작업은 성공하고 운영 배치는 한글이 깨지거나 시간 집계가 하루 어긋난다. 기본 문자셋·타임존·로케일이 같다고 가정했기 쉽다.
+
+첫 대응은 서버에 설정을 더하는 일이 아니다. **실패 요청과 실행 조건을 고정하고, 성공한 로컬 실행과 비교한다.** 요청·입력·명령·산출물·프로파일·Java·사용자·외부 주소를 기록한다. 환경 변수 전체를 공유하지 말고 민감 값은 제외한다.
+
+### 원인 분류 체크리스트
+
+| 분류 | 먼저 확인할 것 | 확인 명령·방법 |
+|---|---|---|
+| 설정·프로파일·환경변수 | IDE 실행 설정과 서버 실행 옵션, 외부 설정 파일 위치, 활성 프로파일, 설정 덮어쓰기 | `printenv SPRING_PROFILES_ACTIVE`; `env | cut -d= -f1 | sort`; `java -jar app.jar --spring.profiles.active=...` |
+| Java·라이브러리 버전 | 실제 실행 JVM과 빌드 도구 JVM, 런타임 의존성 | `java -version`; `./mvnw -version`; `./gradlew -version`; Maven은 `./mvnw dependency:tree`, Gradle은 `./gradlew dependencies --configuration runtimeClasspath` |
+| OS·경로·대소문자·줄바꿈 | 절대경로/상대경로, `\`와 `/`, 파일명 대소문자, CRLF/LF, 심볼릭 링크 | `pwd`; `ls -lb`; `stat 경로`; `file 설정파일`; `git diff --check`; Linux에서 `namei -l /경로/파일` |
+| 타임존·로케일·인코딩 | JVM 기본값과 DB 세션 값, 날짜 포맷, 파일 읽기·쓰기의 charset | `date -Is`; `locale`; `java -XshowSettings:properties -version 2>&1`; PostgreSQL은 `select current_setting('TimeZone');` |
+| 네트워크·DNS·방화벽·프록시 | 프로세스가 보는 호스트명, 포트 도달성, 프록시 설정 | Linux `getent hosts db`; `nc -vz db 5432`; HTTP는 `curl -v --connect-timeout 3 https://호스트/health` |
+| 권한·실행 사용자 | 파일 소유자와 권한, 컨테이너 UID, 읽기/쓰기/실행 권한 | `id`; `umask`; `ls -l`; `namei -l /data/upload`; `docker inspect`의 `Config.User` |
+| 메모리·CPU 제한 | 호스트 여유량이 아닌 프로세스/컨테이너에 적용된 제한, OOM·스레드 대기 | `docker stats`; `docker inspect`; cgroup v2면 `cat /sys/fs/cgroup/memory.max /sys/fs/cgroup/cpu.max` |
+| 데이터 차이 | 스키마·마이그레이션 버전·인덱스·샘플 데이터·제약조건·DB 세션 | 같은 읽기 전용 진단 SQL로 DB/스키마/세션 설정 비교; 앱이 붙은 DB 주소도 확인 |
+| 동시성 | 실제 요청 수, 재시도, 중복 입력, 락·커넥션 풀 대기 | 운영 로그의 요청 ID·처리시간·DB 대기·풀 포화 지표를 함께 본다. 한 명이 한 번 실행한 결과와 비교하지 않는다. |
+| 캐시·빌드 산출물 | 오래된 클래스/JAR/컨테이너 이미지, 런타임 classpath, 복사한 설정 파일 | `git status --short`; `./gradlew clean bootJar`; `jar tf app.jar`; 이미지 태그·digest와 실행 중인 컨테이너 확인 |
+
+Windows PowerShell에서는 `Get-ChildItem Env:SPRING*`, `Get-Location`, `Get-Item 경로`, `java -version`으로 같은 정보를 본다. 명령은 환경에 따라 다르므로 운영이 Linux라면 최종 확인은 Linux 셸이나 같은 컨테이너 안에서 해야 한다.
+
+## 2. 짧은 답
+
+서버에서만 실패하면 먼저 설정값과 활성 프로파일을 비교한다. 그다음 실제 JVM·의존성, 파일 경로와 권한, 문자셋·타임존, DNS·포트, 데이터, 동시성·자원 제한, 오래된 산출물 순으로 범위를 좁힌다.
+서버의 “설정”은 코드뿐 아니라 프로세스 환경, 실행 사용자, 파일 시스템, 네트워크 정책, 컨테이너 제한까지 포함한다.
+로그에는 예외 문구뿐 아니라 빌드 ID, 애플리케이션 버전, 프로파일, 안전한 환경 지문, 요청 ID를 남겨 재현 조건을 맞춘다.
+환경 차이를 줄이는 목적은 운영을 노트북에 복제하는 것이 아니라, 실패를 만드는 차이를 작고 명시적으로 관리하는 데 있다.
+예제 기준은 Java 25, Spring Boot 4.1.1, Spring Framework 7.0.9다. **기본값 추천: Java와 주요 backing service 버전을 고정하고, Docker Compose 또는 CI에서 운영과 같은 실행 이미지를 사용한다.** 배포별 값과 비밀은 이미지/소스에 넣지 않고 환경 변수나 비밀 관리 시스템으로 주입한다.
+
+## 3. 왜 그런가 — 원리
+
+코드만 실행되는 것이 아니다. JVM과 Spring Boot가 설정을 읽고, OS가 파일·사용자·네트워크를 제공하며, DB·캐시는 데이터와 동시성 상태로 응답한다. 실행 조건 하나가 달라지면 같은 코드도 다른 값을 읽거나 실패한다.
+
+```mermaid
+flowchart TD
+    A["실패 증상과 요청 ID 고정"] --> B["실행 조건표 작성"]
+    B --> C{"어느 경계의 값이 다른가"}
+    C --> D["설정과 프로파일"]
+    C --> E["JVM과 라이브러리"]
+    C --> F["OS 경로와 권한"]
+    C --> G["DNS 네트워크 데이터"]
+    C --> H["동시성 자원과 캐시"]
+    D --> I["차이 하나만 수정해 재현"]
+    E --> I
+    F --> I
+    G --> I
+    H --> I
+    I --> J{"증상이 사라졌나"}
+    J -- "아니오" --> C
+    J -- "예" --> K["원인 기록하고 재발 방지 자동화"]
+```
+
+### 설정과 프로세스 경계
+
+Spring Boot는 설정 파일, 환경 변수, JVM 속성, `SPRING_APPLICATION_JSON`, 명령행 등을 우선순위대로 합친다. Boot 4.1 문서에서 뒤쪽 원천이 앞쪽 값을 덮으므로 환경 변수나 `--app.timeout=5s`가 파일 값을 이길 수 있다. 프로파일 파일과 외부 설정 파일 위치도 결과를 바꾼다. IDE에만 `SPRING_PROFILES_ACTIVE=local`을 넣었다면 별도 `java -jar` 실행에는 전달되지 않는다. `@PropertySource`는 refresh 때 추가돼 `logging.*`, `spring.main.*`처럼 먼저 읽히는 설정에는 늦다.
+
+모든 설정 출력은 비밀 유출 위험이 있다. 의심 속성만 확인하거나 Actuator `env`/`configprops`를 접근 제한·마스킹 뒤 사용해 값과 출처를 찾는다. IDE는 개발자 계정·JDK·VM 옵션·현재 디렉터리를 쓰지만 서버 프로세스는 별도 사용자·환경으로 뜬다. `./upload`는 프로젝트가 아니라 작업 디렉터리 기준이다. Linux는 경로 대소문자를 구분하고 파일이 있어도 상위 디렉터리 탐색 권한이 없으면 읽을 수 없다.
+
+`localhost`는 프로세스가 실행되는 호스트 자신이다. 컨테이너 앱은 보통 Compose 서비스명으로 DB를 찾고, 호스트 앱은 게시 포트로 접속한다. DNS 성공은 TCP·TLS·인증 성공을 뜻하지 않으므로 단계별로 확인한다. VPN·프록시·방화벽·인증서도 로컬과 운영이 다를 수 있다.
+
+### 기본값·데이터·자원
+
+시간·숫자 포맷과 charset 생략은 프로세스 기본값에 기대는 코드다. JEP 400에 따라 Java 18부터 표준 API 기본 charset은 UTF-8이지만 구형 JDK·콘솔·외부 라이브러리·명시 인코딩은 따로 확인한다. 파일 계약은 charset을 명시한다. `ZoneId.systemDefault()`는 시스템 시간대를 반환하므로 날짜 경계 계산이 달라질 수 있다.
+
+코드가 같아도 DB 스키마·collation·시간대·제약 조건·데이터량은 결과를 바꾼다. 작은 H2 표본은 운영 DB의 잠금과 제약을 대표하지 않고 순차 요청은 동시 수정 경합을 드러내지 않는다. 로컬 성공은 그 조건에서 통과했다는 뜻이다.
+
+Docker 이미지는 앱과 파일을 묶고 컨테이너는 실행 설정을 더한 격리 프로세스다. 같은 이미지는 JDK/라이브러리 편차를 줄이지만 DNS·비밀·데이터·커널·자원 제한을 복제하지 않는다. 제한 없는 컨테이너는 호스트 자원을 사용할 수 있으므로 필요하면 운영과 비슷한 CPU/메모리 제한을 둔다. JVM 컨테이너 인식은 → J16 참조.
+
+12-factor는 배포별 DB 주소·자격 증명·호스트명을 코드와 분리하고 개발·운영 도구 차이를 줄이라고 권한다. 모든 설정을 환경 변수에 넣기보다 변하지 않는 내부 설정과 배포별 값·비밀의 변경 경로를 구분한다.
+
+## 4. 선택지 비교
+
+| 선택지 | 어떻게 동작 | 장점 | 단점 | 언제 쓰나 | 국내 실무에서 흔한가 |
+|---|---|---|---|---|---|
+| PC 직접 설치 | 로컬 JDK·DB·캐시로 실행 | IDE 디버깅이 빠름 | 개발자별 편차 | 학습·작은 앱 | 정량 통계 미확인 |
+| 설치 스크립트·Wrapper | 스크립트와 빌드 Wrapper로 버전 고정 | 반복 설치가 쉬움 | OS·외부 서비스 차이는 남음 | Docker가 어려운 레거시 | 정량 통계 미확인 |
+| Docker Compose | 같은 이미지/서비스 정의로 실행 | 런타임·의존 서비스 공유 | 볼륨·포트·운영망은 별도 | 신규 앱·CI·DB 버전 일치 | 정량 통계 미확인 |
+| Dev Container | IDE가 정해진 컨테이너에 연결 | 온보딩·도구 고정 | 권한·IDE·자원 설정 추가 | OS가 다양한 팀 | 정량 통계 미확인 |
+| 공유 개발/스테이징 | 공용 서버/망에서 검증 | DNS·방화벽·연계 시스템 확인 | 느린 피드백·데이터 충돌 | SI·금융·사내 연계 | 정량 통계 미확인 |
+
+도구는 달라도 재현성 목표는 같다. JDK/빌드는 Wrapper와 CI로 고정하고 로컬 의존성은 Compose로 맞추며 운영망·권한 연계는 스테이징에서 검증한다.
+
+## 5. 코드로 보기
+
+### 예제 1 — 실행 지문을 남겨 비교한다
+
+아래 순수 Java 프로그램은 실행 JVM, OS, 기본 charset, 시스템 시간대, 로케일을 기록한다. 서버와 로컬의 출력을 비교할 때 예외만 복사하는 대신 이런 관측값을 같이 모으면 추측을 줄인다. 절대 경로나 전체 환경 변수·비밀을 출력하지 않는다.
+
+```java
+import java.nio.charset.Charset;
+import java.time.ZoneId;
+import java.util.Locale;
+
+public class EnvironmentFingerprint {
+    public static void main(String[] args) {
+        System.out.println("java.version=" + System.getProperty("java.version"));
+        System.out.println("os.name=" + System.getProperty("os.name"));
+        System.out.println("file.encoding=" + System.getProperty("file.encoding"));
+        System.out.println("defaultCharset=" + Charset.defaultCharset().name());
+        System.out.println("timezone=" + ZoneId.systemDefault());
+        System.out.println("locale=" + Locale.getDefault().toLanguageTag());
+    }
+}
+```
+
+실행 명령: `java _scratch/W22/EnvironmentFingerprint.java`
+
+실제 출력:
+
+```text
+java.version=21.0.6
+os.name=Mac OS X
+file.encoding=UTF-8
+defaultCharset=UTF-8
+timezone=Asia/Seoul
+locale=ko-KR
+```
+
+이 출력은 조사에 사용한 개발 머신의 한 번의 결과다. 운영도 `Asia/Seoul`이어야 한다는 뜻은 아니다. 서비스 계약에서 UTC를 쓰기로 했다면 시스템 기본값과 무관하게 `Instant`/`ZoneId.of("UTC")`를 명시하고, 사용자 지역 시간은 변환 경계에서 처리한다.
+
+### 예제 2 — 같은 설정을 파일·환경 변수·명령행으로 공급한다
+
+다음은 Boot의 타입 안전 설정 바인딩이다. `@ConfigurationPropertiesScan`이 record를 찾아 빈으로 등록한다. Boot 4.1 / Java 25 기준 API 예제이며 **미실행**이다.
+
+```java
+// Application.java
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+
+@SpringBootApplication
+@ConfigurationPropertiesScan
+public class Application {
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+}
+```
+
+```java
+// RemoteProperties.java
+import java.net.URI;
+import java.time.Duration;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
+@ConfigurationProperties("app.remote")
+public record RemoteProperties(URI baseUrl, Duration timeout) {}
+```
+
+기본값은 `application.yaml`에 둔다.
+
+```yaml
+app:
+  remote:
+    base-url: http://localhost:8081
+    timeout: 2s
+```
+
+동일한 속성은 환경 변수나 일회성 명령행 인수로 덮어쓸 수 있다.
+
+```bash
+APP_REMOTE_BASEURL=https://partner.internal APP_REMOTE_TIMEOUT=5s java -jar app.jar
+java -jar app.jar --app.remote.base-url=https://partner.internal --app.remote.timeout=5s
+```
+
+환경 변수 이름은 프로퍼티의 점을 `_`로 바꾸고 대시를 제거한 뒤 대문자로 만든다. 비밀값에는 안전한 비밀 관리 수단을 쓰고, 운영에서 명령행 전체를 프로세스 목록이나 로그에 남길 위험도 고려한다. 환경에 따라 바꾸는 값은 외부화하되, 타입 변환과 필수 값 검증을 `@ConfigurationProperties`에서 처리하면 잘못된 값으로 조용히 실행되는 문제를 줄일 수 있다.
+
+프로파일은 서비스 동작 선택이 달라질 때 쓴다. 예를 들어 `application-local.yaml`에는 로컬 개발용 기능을, 운영에는 다른 bean/기능 정책을 둘 수 있다. 프로파일 이름만으로 서버 주소가 마법처럼 바뀌지는 않는다. 파일이 실제 패키지/외부 경로에 있는지, 실행 프로세스가 `SPRING_PROFILES_ACTIVE=local`을 전달받았는지를 확인한다. 민감한 운영 자격 증명을 `application-prod.yaml`에 커밋하지 않는다.
+
+### 예제 3 — DB와 앱을 컨테이너 네트워크 안에서 재현한다
+
+아래 Compose는 앱이 `db`라는 서비스 DNS 이름으로 PostgreSQL에 접속하고, 시작 전에 DB healthcheck를 기다리는 형태다. 실제 운영과 DB 메이저 버전·설정·확장 기능을 맞추고 이미지 태그도 팀 규칙에 맞게 고정한다. `DB_USER`, `DB_PASSWORD`는 셸/비밀 저장소에서 주입하며 `.env`에 둔 비밀 파일은 저장소에 커밋하지 않는다. 예제는 Boot 4.1 애플리케이션과 함께 쓸 수 있는 Compose 설정이며 **미실행**이다.
+
+```yaml
+services:
+  app:
+    build: .
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/orders
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:?set DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 768m
+    cpus: "1.5"
+
+  db:
+    image: ${POSTGRES_IMAGE:?set a production-compatible pinned image}
+    environment:
+      POSTGRES_DB: orders
+      POSTGRES_USER: ${DB_USER:?set DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+```
+
+앱을 컨테이너 밖에서 직접 실행하면 DB 주소는 보통 `localhost:게시한포트`다. 앱도 컨테이너 안에서 실행할 때는 `db:5432`를 쓴다. 두 주소를 혼동하면 “DB가 켜져 있는데 connection refused”가 난다. 또한 `docker compose down -v`는 DB 볼륨 데이터까지 지우므로 재현용 일회성 DB인지 확인한 뒤에만 사용한다. 운영/배포 방식의 자세한 범위는 → D06, 컨테이너 JVM의 heap·CPU 인식은 → J16 참조.
+
+## 6. 실무에서는 실제로
+
+| 프로젝트 유형 | 판단과 조합 |
+|---|---|
+| 신규 서비스 | Java toolchain·Wrapper를 고정하고 Compose에 DB/캐시를 선언한다. CI도 같은 서비스로 통합 검증하며 배포별 값은 런타임에 주입한다. |
+| 레거시 | 실제 운영 JVM·설정 출처를 기록하고 현재 조건을 CI에서 재현한다. 실행 스크립트와 의존성부터 고정한 뒤 작은 단위로 바꾼다. |
+| SI·금융·온프레미스 | 승인된 망에서 DNS·인증서·방화벽·계정을 검증한다. 컨테이너가 불가하면 JDK 설치본과 실행 계약을 고정하고 승인된 비식별 데이터로 확인한다. |
+| 스타트업 | Compose로 DB/캐시를 공유하고 CI에서 clean build·통합 검증한다. 외부 API·권한·부하는 제한된 스테이징에서 확인한다. |
+
+개발자는 IDE 앱과 Compose DB를 쓰고 CI는 같은 DB 이미지로 테스트하며, 스테이징은 운영망 DNS·인증·방화벽을 확인하는 혼합이 현실적이다. 마이그레이션은 ① 버전·설정 기록 ② Wrapper/실행 스크립트 고정 ③ DB·캐시 Compose화 ④ CI 이미지 일치 ⑤ 운영망·비밀·자원 제한의 스테이징 검증 순으로 진행한다.
+
+## 7. 흔한 오해와 실수
+
+아래는 재현 때 조건 차이를 좁히는 다섯 가지 사례다.
+
+| 증상 | 원인과 확인 | 해결 |
+|---|---|---|
+| 로컬은 DB 접속, 서버는 실패 | IDE만 `local` 프로파일과 URL을 가짐. `printenv SPRING_PROFILES_ACTIVE`와 제한된 `env`/`configprops`로 활성 프로파일·실제 URL 출처를 확인한다. | 배포 실행 설정에 프로파일과 서비스 주소를 명시하고 민감값은 비밀 관리 시스템으로 주입한다. |
+| Windows에서는 설정 파일을 읽지만 Linux에서는 없음 | 이름 대소문자 또는 실행 디렉터리가 다름. 프로세스 안에서 `pwd`, `ls -lb`, `namei -l`로 경로와 권한을 확인한다. | 저장소 파일명과 참조 경로의 대소문자를 맞추고 절대/상대 경로 기준을 명시한다. |
+| CSV 글자 깨짐 또는 일자 집계 차이 | 파일 charset 또는 JVM/DB 시간대가 다름. `file`, `Charset.defaultCharset()`, `ZoneId.systemDefault()`, DB 세션 시간대를 비교한다. | 파일 charset과 시간대 계약을 지정하고 경계에서 명시적으로 변환한다. |
+| 컨테이너 앱이 켜진 DB에 연결되지 않음 | 앱 설정의 `localhost`가 DB가 아닌 자기 컨테이너를 가리킴. 앱 컨테이너 안에서 `getent hosts db`, `nc -vz db 5432`를 확인한다. | Compose 네트워크 안에서는 서비스명 `db`와 컨테이너 포트를 쓴다. |
+| 운영에서만 응답 지연/OOM | CPU·메모리 제한, 부하 또는 데이터량 차이. `docker inspect`, `docker stats`, cgroup과 풀 대기/요청 지표를 같은 시각에 비교한다. | 재현 환경에 제한과 동시 부하를 맞추고, 병목 원인에 따라 제한·풀·쿼리를 조정한다. |
+
+추가로 자주 나오는 오해는 다음과 같다.
+
+- **설정 파일이 최종값이다 →** 환경 변수·JVM 속성·명령행이 덮을 수 있다. 의심 속성의 실제 출처를 확인한다.
+- **한 요청이 성공하면 동시 요청도 안전하다 →** 경합은 중복 요청·다중 스레드 조건에서 재현한다.
+- **안 되면 캐시부터 지운다 →** 먼저 빌드 ID, JAR, 컨테이너 이미지 digest를 비교해 오래된 산출물을 확인한다.
+- **운영 환경 변수를 전부 출력한다 →** 로그가 비밀 유출 경로가 된다. 키 이름만 비교하고 값은 마스킹한다.
+
+## 8. 자가점검 Q&A (면접 대비)
+
+### Q1. 로컬에서는 DB 접속되고 운영에서는 timeout이다. 어디부터 확인하나?
+애플리케이션이 받은 JDBC URL과 활성 프로파일부터 비교한다. 앱 프로세스가 실행되는 네트워크 위치에서 DNS, TCP 포트, TLS, DB 인증을 차례로 확인한다. 로컬만 VPN에 연결되어 있거나 운영 방화벽에서 나가는 트래픽이 막힌 경우도 있다.
+꼬리질문: **`localhost`로 운영 DB를 설정해도 되나?** 보통 아니다. 서버/컨테이너 자기 자신을 가리키므로 실제 서비스 DNS와 포트를 사용한다.
+
+### Q2. `application.yaml`에 쓴 값이 런타임에 적용되지 않을 때?
+파일이 JAR 내부인지 외부인지, 외부 파일 위치와 활성 프로파일을 확인한다. Spring Boot는 여러 PropertySource를 합치며 뒤쪽 우선순위의 환경 변수·시스템 속성·명령행 옵션 등이 앞 설정을 덮는다. `env`/`configprops`를 제한된 접근으로 사용하면 실제 값과 출처를 좁힐 수 있다.
+꼬리질문: **`@PropertySource`에 `logging.level`을 두면 왜 문제인가?** 컨텍스트 refresh에 추가되므로 Spring Boot가 먼저 읽는 일부 `logging.*` 설정 적용에는 시점이 늦을 수 있다.
+
+### Q3. Docker를 쓰면 “works on my machine” 문제가 없어지나?
+이미지로 OS 사용자 공간, JDK, 파일을 고정해 호스트 설치 차이를 줄이지만 환경 전체를 같게 만들지는 않는다. DNS·방화벽·비밀·실제 데이터·커널과 CPU/메모리 제한은 별도다. Compose와 CI로 반복 가능한 로컬 경계를 만들고, 네트워크·권한·부하는 스테이징에서 확인한다.
+꼬리질문: **컨테이너에 `localhost`로 DB를 지정하면?** 앱 컨테이너 안의 loopback을 보므로 보통 DB 컨테이너에 닿지 않는다. Compose 서비스 이름을 사용한다.
+
+### Q4. 로컬에서 날짜 집계가 맞는데 서버에서 하루씩 어긋난다. 원인은?
+기본 시간대가 다른 `LocalDateTime.now()` 계산, DB 세션 시간대, UTC instant와 지역 날짜 변환이 섞였을 수 있다. JVM 기본값뿐 아니라 DB 세션과 변환 로직을 나누어 조사한다. 저장은 명확한 시간 기준으로 하고 비즈니스 지역 날짜는 명시적인 `ZoneId`로 계산한다.
+꼬리질문: **`ZoneId.systemDefault()`를 쓰면 항상 나쁜가?** 서버 시스템 시간대를 계약으로 관리하는 단순 서비스라면 가능하지만, 명시 시간대가 필요한 규칙은 `ZoneId.of(...)`로 고정해야 한다.
+
+### Q5. 개발 PC의 한글 CSV가 운영에서 깨질 때 Java 기본 인코딩부터 바꾸면 되나?
+먼저 파일이 실제로 어떤 charset으로 생성됐는지와 읽는 코드가 어떤 charset을 쓰는지 확인한다. JEP 400으로 Java 18부터 표준 API 기본 charset은 기본적으로 UTF-8이지만, 기존 파일·구형 런타임·콘솔·라이브러리의 독립 설정까지 자동 변환하지는 않는다. 파일 포맷의 계약 charset을 명시한다.
+꼬리질문: **`file.encoding=UTF-8` VM 옵션을 넣으면 해결되나?** 우연한 우회일 수 있다. 생산자와 소비자가 같은 인코딩 계약을 사용하도록 명시하는 편이 근본 해결이다.
+
+### Q6. Docker 로컬에서는 빠른데 운영에서만 timeout/OOM이 난다. 무엇이 다른가?
+호스트 자원과 컨테이너 자원 제한은 다를 수 있고, 운영은 요청 동시성·데이터량도 더 크다. 실제 컨테이너 memory/CPU 제한, JVM 상태, 커넥션 풀·스레드 대기, DB 응답을 같은 시간대 지표로 비교한다. 작은 로컬 입력 한 건은 운영의 압력 조건을 대표하지 않는다.
+꼬리질문: **Compose에도 운영과 같은 제한을 넣어야 하나?** 자원 민감 장애를 재현할 때는 가능한 범위에서 비슷한 제한을 넣고 차이를 측정한다. JVM 컨테이너 인식 상세는 → J16.
+
+### Q7. 레거시 서비스를 Docker로 옮기는 첫 단계는 무엇인가?
+새 베이스 이미지부터 바꾸지 않는다. 우선 현재 실제 Java/OS/의존 서비스 버전과 실행 명령·설정 원천을 기록해 기준선을 만든다. Wrapper와 CI에서 그 조건을 재현한 뒤, 반복 실패가 잦은 DB/캐시부터 컨테이너화하고 운영 네트워크 검증은 분리한다.
+꼬리질문: **왜 한꺼번에 다 바꾸지 않나?** 환경 차이가 한 번에 여러 개 생기면 회귀 원인을 특정하기 어렵고 기존 장애와 마이그레이션 문제를 혼동한다.
+
+## 9. 참고문헌
+
+- The Twelve-Factor App — https://12factor.net/ — 환경 간 실행 계약과 포터빌리티, 배포 간 차이를 줄이는 배경 원칙.
+- III. Config — https://12factor.net/config — 배포마다 달라지는 설정과 코드의 분리, 환경 변수 원칙.
+- X. Dev/prod parity — https://12factor.net/dev-prod-parity — 개발·스테이징·운영의 시간·인력·도구 차이를 줄이는 이유.
+- Externalized Configuration :: Spring Boot — https://docs.spring.io/spring-boot/reference/features/external-config.html — Boot 설정 원천 우선순위, 외부 파일, 프로파일, 환경 변수와 명령행 옵션.
+- What is Docker? — https://docs.docker.com/get-started/docker-overview/ — 이미지와 컨테이너의 역할, 격리와 호스트 네트워크 개념.
+- Resource constraints — https://docs.docker.com/engine/containers/resource_constraints/ — 컨테이너 메모리·CPU 제한과 기본 자원 사용 동작.
+- JEP 400: UTF-8 by Default — https://openjdk.org/jeps/400 — Java 18에서 표준 API 기본 charset을 UTF-8로 바꾼 배경과 범위.
+- ZoneId (Java SE 25 & JDK 25) — https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/time/ZoneId.html — `systemDefault()`가 시스템 기본 시간대를 제공함.
+
+배포 개념은 → D06, Linux 기초는 → D12, 컨테이너 JVM은 → J16, 문제 재현·관찰 방법은 → D05 참조.

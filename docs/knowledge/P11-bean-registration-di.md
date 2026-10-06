@@ -1,0 +1,366 @@
+# P11. 빈 등록과 의존성 주입 따라 하기 — @Component부터 private final + @RequiredArgsConstructor까지
+
+> 3줄 요약 — Spring Bean은 컨테이너에 등록되어 생성과 의존성 연결을 맡기는 객체다.  
+> 직접 작성한 클래스는 `@Component` 계열로 스캔하고, 외부 라이브러리 객체는 `@Configuration`의 `@Bean`으로 등록한다.  
+> 주입은 생성자 방식이 기본이며, `private final` 필드와 Lombok `@RequiredArgsConstructor`를 함께 쓰면 필수 의존성이 생성자로 전달된다.
+
+## 1. 한 줄로 말하면
+
+빈(Bean)은 Spring `ApplicationContext`가 정의를 읽어 생성하고 의존성을 연결해 관리하는 객체다. 객체가 필요한 구현체를 직접 `new` 하거나 전역에서 찾지 않아 구현 변경과 테스트 대체가 쉽다. 등록과 생성자 주입 규칙으로 연결 오류를 진단한다.
+
+## 2. 당장 알아야 할 것
+
+1. **등록:** 직접 작성한 클래스는 `@Component` 계열, 라이브러리 객체는 `@Configuration` + `@Bean`으로 등록한다. 기본 이름은 클래스명의 첫 글자 소문자 또는 메서드명이다. 자동 설정은 `@ConditionalOnMissingBean`으로 대체를 허용한다.
+2. **역할:** `@Component`는 일반 클래스, `@Service` 서비스, `@Repository` 저장소(예외 변환 포함), `@Controller` MVC 계층이다. JSON API에는 `@RestController`를 쓴다.
+3. **스캔:** 메인 `@SpringBootApplication` 패키지와 하위만 기본 탐색한다. 형제 패키지는 공통 상위 패키지에 메인 클래스를 두거나 스캔 범위를 명시한다.
+4. **생성자 주입:** 필수 의존성을 생성 시 전달해 `final`로 둘 수 있고 단위 테스트도 간단하다. 생성자가 하나면 `@Autowired`는 생략한다.
+5. **필드·setter 주입:** 필드는 의존성이 숨고 `final`을 쓸 수 없어 기본 선택으로 삼지 않는다. setter는 선택적이거나 재설정할 의존성에 한정한다.
+
+   | 방식 | 주입 시점 | 실무 판단 |
+   |---|---|---|
+   | 생성자 | 객체 생성 시 | 필수 의존성의 기본 선택. 불변성·테스트 용이성 |
+   | 필드 `@Autowired` | 생성 후 필드 설정 | 짧아 보여도 의존성 은닉, 단위 테스트 불편. 기존 코드 유지보수 외에는 피함 |
+   | setter `@Autowired` | 생성 후 setter 호출 | 선택적이거나 재설정 가능한 의존성일 때 제한적으로 사용 |
+
+6. **동일 타입 빈 선택:** 기본 구현은 `@Primary`, 특정 주입 인자는 `@Qualifier`, 전부 필요하면 `List<T>` 또는 `Map<String,T>`로 받는다. `@Primary`는 단일 값 주입에만 우선한다.
+
+   Lombok 생성자와 `@Qualifier`를 함께 쓰면 직접 생성자 매개변수에 지정하는 편이 명확하다.
+
+7. **설정:** 한 값은 `@Value("${app.name:catalog}")`, 묶음·타입 변환·검증은 `@ConfigurationProperties`로 받는다. Boot에서 scan 또는 `@EnableConfigurationProperties`로 등록한다.
+
+8. **확인:** `getBeanDefinitionNames()`나 `/actuator/beans`로 빈을 찾는다. `@SpringBootTest` + `@MockitoBean`은 컨텍스트 테스트, 직접 `new`는 단위 테스트에 쓴다.
+
+## 3. 따라 하기
+
+Spring 예제는 **미실행**이다. Initializr에서 Gradle Kotlin, Java 25, Boot 4.1.1, WebMVC, Actuator를 고른다.
+
+1. **프로젝트 설정** — `build.gradle.kts`
+
+   ```kotlin
+   plugins {
+       java
+       id("org.springframework.boot") version "4.1.1"
+   }
+
+   group = "com.example"
+   version = "0.0.1-SNAPSHOT"
+
+   java {
+       toolchain {
+           languageVersion = JavaLanguageVersion.of(25)
+       }
+   }
+
+   dependencies {
+       implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.1"))
+       implementation("org.springframework.boot:spring-boot-starter-webmvc")
+       implementation("org.springframework.boot:spring-boot-starter-actuator")
+
+       compileOnly("org.projectlombok:lombok")
+       annotationProcessor("org.projectlombok:lombok")
+
+       testImplementation("org.springframework.boot:spring-boot-starter-test")
+       testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+   }
+
+   tasks.withType<Test> {
+       useJUnitPlatform()
+   }
+   ```
+
+   BOM이 Spring, Lombok, 테스트 라이브러리 버전을 관리하므로 각 dependency에 별도 버전을 쓰지 않는다. Lombok은 컴파일 시점에만 필요하므로 `compileOnly`와 `annotationProcessor`를 함께 선언한다.
+
+   Maven은 Boot parent 4.1.1과 같은 starter 좌표를 쓰며 Lombok을 compiler processor에도 등록한다.
+
+   **확인 방법:** `./gradlew -version`에서 JVM이 25인지 본다.
+
+2. **애플리케이션과 설정 객체** — 메인 클래스는 다른 코드의 상위 패키지에 둔다. `src/main/java/com/example/catalog/CatalogApplication.java`
+
+   ```java
+   package com.example.catalog;
+
+   import org.springframework.boot.SpringApplication;
+   import org.springframework.boot.autoconfigure.SpringBootApplication;
+   import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+
+   @SpringBootApplication
+   @ConfigurationPropertiesScan
+   public class CatalogApplication {
+       public static void main(String[] args) {
+           SpringApplication.run(CatalogApplication.class, args);
+       }
+   }
+   ```
+
+   `src/main/java/com/example/catalog/GreetingProperties.java`
+
+   ```java
+   package com.example.catalog;
+
+   import org.springframework.boot.context.properties.ConfigurationProperties;
+
+   @ConfigurationProperties("app.greeting")
+   public record GreetingProperties(String prefix) {}
+   ```
+
+   `src/main/resources/application.yaml`
+
+   ```yaml
+   app:
+     greeting:
+       prefix: "안녕하세요,"
+   management:
+     endpoints:
+       web:
+         exposure:
+           include: "health,beans"
+   ```
+
+   **확인 방법:** `./gradlew bootRun` 시작 로그를 본다. `beans` 노출은 로컬용이다.
+
+3. **스캔 대상과 외부 객체 빈 등록** — 메인 클래스 아래의 `greeting` 패키지에 컴포넌트를 둔다. `src/main/java/com/example/catalog/greeting/GreetingRepository.java`
+
+   ```java
+   package com.example.catalog.greeting;
+
+   public interface GreetingRepository {
+       String findMessage();
+   }
+   ```
+
+   `src/main/java/com/example/catalog/greeting/InMemoryGreetingRepository.java`
+
+   ```java
+   package com.example.catalog.greeting;
+
+   import org.springframework.stereotype.Repository;
+
+   @Repository
+   public class InMemoryGreetingRepository implements GreetingRepository {
+       @Override
+       public String findMessage() {
+           return "Spring";
+       }
+   }
+   ```
+
+   `Clock`은 JDK 타입이라 그 클래스에 `@Component`를 붙일 수 없다. `src/main/java/com/example/catalog/TimeConfiguration.java`에서 `@Bean`으로 등록한다.
+
+   ```java
+   package com.example.catalog;
+
+   import java.time.Clock;
+   import org.springframework.context.annotation.Bean;
+   import org.springframework.context.annotation.Configuration;
+
+   @Configuration
+   public class TimeConfiguration {
+       @Bean
+       public Clock applicationClock() {
+           return Clock.systemUTC();
+       }
+   }
+   ```
+
+   **확인 방법:** 서비스가 `GreetingRepository`와 `Clock`을 받으면 등록 성공이다.
+
+4. **생성자 주입으로 서비스와 API 작성** — `src/main/java/com/example/catalog/greeting/GreetingService.java`
+
+   ```java
+   package com.example.catalog.greeting;
+
+   import java.time.Clock;
+   import java.time.Instant;
+   import lombok.RequiredArgsConstructor;
+   import org.springframework.stereotype.Service;
+   import com.example.catalog.GreetingProperties;
+
+   @Service
+   @RequiredArgsConstructor
+   public class GreetingService {
+       private final GreetingRepository repository;
+       private final GreetingProperties properties;
+       private final Clock applicationClock;
+
+       public String greet() {
+           return properties.prefix() + " " + repository.findMessage();
+       }
+
+       public Instant currentTime() {
+           return applicationClock.instant();
+       }
+   }
+   ```
+
+   Lombok이 단일 생성자를 만든다. `src/main/java/com/example/catalog/greeting/GreetingController.java`
+
+   ```java
+   package com.example.catalog.greeting;
+
+   import java.time.Instant;
+   import java.util.Map;
+   import lombok.RequiredArgsConstructor;
+   import org.springframework.web.bind.annotation.GetMapping;
+   import org.springframework.web.bind.annotation.RequestMapping;
+   import org.springframework.web.bind.annotation.RestController;
+
+   @RestController
+   @RequestMapping("/api")
+   @RequiredArgsConstructor
+   public class GreetingController {
+       private final GreetingService greetingService;
+
+       @GetMapping("/greeting")
+       public Map<String, String> greeting() {
+           return Map.of("message", greetingService.greet());
+       }
+
+       @GetMapping("/time")
+       public Instant time() {
+           return greetingService.currentTime();
+       }
+   }
+   ```
+
+   **확인 방법:** `curl -i http://localhost:8080/api/greeting`은 200과 `{"message":"안녕하세요, Spring"}`을 반환해야 한다(미실행, 예상값).
+
+5. **Lombok이 만드는 코드 확인** — 실제 Lombok 1.18.46 `delombok` 출력이다. `@RequiredArgsConstructor`는 미초기화 `final` 필드를 인자로 만들고 일반 가변 필드는 제외한다.
+
+   ```java
+   // delombok 출력의 생성 부분
+   public class GreetingService {
+       private final Supplier<String> greetingRepository;
+       private final Clock clock;
+       private String mutableNote;
+
+       @java.lang.SuppressWarnings("all")
+       @lombok.Generated
+       public GreetingService(final Supplier<String> greetingRepository, final Clock clock) {
+           this.greetingRepository = greetingRepository;
+           this.clock = clock;
+       }
+   }
+   ```
+
+   프로젝트에서도 타입만 달라진다. 미초기화 `@NonNull` 필드에는 null 검사도 생성되며 단순 `final`에는 검사하지 않는다.
+
+   **확인 방법:** `./gradlew clean compileJava` 성공 여부를 본다. IDE만 실패 표시하면 Lombok processor 설정을 확인한다.
+
+6. **테스트에서 주입 확인** — `src/test/java/com/example/catalog/greeting/GreetingServiceSpringTest.java`
+
+   ```java
+   package com.example.catalog.greeting;
+
+   import static org.assertj.core.api.Assertions.assertThat;
+   import static org.mockito.Mockito.when;
+
+   import org.junit.jupiter.api.Test;
+   import org.springframework.beans.factory.annotation.Autowired;
+   import org.springframework.boot.test.context.SpringBootTest;
+   import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+   @SpringBootTest
+   class GreetingServiceSpringTest {
+       @Autowired
+       GreetingService greetingService;
+
+       @MockitoBean
+       GreetingRepository repository;
+
+       @Test
+       void contextInjectsPropertiesAndMock() {
+           when(repository.findMessage()).thenReturn("테스트");
+           assertThat(greetingService.greet()).isEqualTo("안녕하세요, 테스트");
+       }
+   }
+   ```
+
+   컨테이너 없이 서비스만 확인하는 단위 테스트는 `src/test/java/com/example/catalog/greeting/GreetingServiceUnitTest.java`에서 직접 생성한다.
+
+   ```java
+   package com.example.catalog.greeting;
+
+   import static org.assertj.core.api.Assertions.assertThat;
+
+   import java.time.Clock;
+   import java.time.Instant;
+   import java.time.ZoneOffset;
+   import org.junit.jupiter.api.Test;
+   import com.example.catalog.GreetingProperties;
+
+   class GreetingServiceUnitTest {
+       @Test
+       void usesTheDependenciesPassedToConstructor() {
+           Clock fixedClock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC);
+           GreetingService service = new GreetingService(
+                   () -> "테스트", new GreetingProperties("안녕하세요,"), fixedClock);
+
+           assertThat(service.greet()).isEqualTo("안녕하세요, 테스트");
+           assertThat(service.currentTime()).isEqualTo(Instant.EPOCH);
+       }
+   }
+   ```
+
+   **확인 방법:** `./gradlew test`에서 2개 성공이 예상된다(미실행).
+
+## 4. 치트시트
+
+| 이름 | 용도 | 예시 | 주의 |
+|---|---|---|---|
+| `@Component` 계열 | 역할별 스캔 등록 | `@Service class OrderService` | 메인 패키지 하위 |
+| `@Bean` | 라이브러리 객체 등록 | `@Bean Clock clock()` | 반환 타입이 후보 타입 |
+| 생성자 주입 | 필수 의존성 전달 | `private final Store store` | 단일 생성자는 `@Autowired` 생략 |
+| `@Primary` / `@Qualifier` | 중복 구현 선택 | `@Qualifier("s3") Store store` | 기본 / 지점별 선택 |
+| Lombok | 생성자 생성 | `@RequiredArgsConstructor` | processor 설정 필요 |
+| 설정 애노테이션 | 값 바인딩 | `@Value` / `@ConfigurationProperties` | 단일 값 / 묶음 |
+| `@MockitoBean` | 테스트 컨텍스트 빈 대체 | `@MockitoBean MailSender sender` | 단위 테스트엔 불필요 |
+| 빈 목록 | 등록 상태 확인 | `getBeanDefinitionNames()` / `/actuator/beans` | Actuator 공개 금지 |
+
+## 5. 자주 나는 에러와 해결
+
+1. **`No qualifying bean of type '...Repository' available` / `NoSuchBeanDefinitionException`** → 빈 미등록 또는 기본 스캔 범위 밖이다. → 구현에 등록 애노테이션을 붙이고 메인 패키지 아래인지, 조건·프로파일이 제외하지 않았는지 확인한다.
+
+2. **`NoUniqueBeanDefinitionException: expected single matching bean but found 2`** → 같은 타입 구현이 둘 이상인데 단일 생성자 매개변수로 주입한다. → 기본 구현에 `@Primary`, 특정 인자에 `@Qualifier("stripeGateway")`를 지정한다. 여러 구현이 필요하면 `List<T>`·`Map<String,T>`를 받는다.
+
+3. **`UnsatisfiedDependencyException`** → 빈 생성 실패를 감싼 예외다. → `Caused by`의 첫 원인(누락·중복, 바인딩, 생성자 예외)을 해결한다.
+
+4. **`BeanCurrentlyInCreationException` 또는 순환 참조 오류** → 생성자 A와 B가 서로 요구한다. → 책임을 나눠 의존 방향을 단방향으로 바꾼다.
+
+5. **Lombok 생성자 누락 또는 `variable ... might not have been initialized`** → Lombok processor가 실행되지 않았다. → Gradle `compileOnly`·`annotationProcessor`와 IDE annotation processing을 확인한다. 빈 미등록 오류라면 스캔 범위도 본다.
+
+## 6. 한 단계 더
+
+컨테이너는 등록 정의와 타입·qualifier 규칙으로 의존성을 연결한다. 생성자 주입은 필수값을 생성 시 확정하고 단일 생성자는 자동 선택된다. Lombok 생성자도 컴파일 뒤 일반 Java 코드다. 통합 검증은 `@SpringBootTest`, 로직 검증은 직접 생성하는 단위 테스트를 쓴다. 컨테이너 내부·생명주기 → S01, 프록시 → S02, 생성자·Builder → P04, 애노테이션 → P03.
+
+## 7. 자가점검 Q&A (면접 대비)
+
+1. **Bean과 `new` 객체는 어떻게 다른가?** Bean은 컨테이너가 연결·관리하고, 직접 만든 객체는 호출 코드가 소유한다. 모두 Bean일 필요는 없다.  
+   **꼬리질문:** 구현체를 직접 `new` 하면? → 테스트 대역으로 바꾸기 어렵다.
+
+2. **생성자 주입이 기본인 이유는?** 필수 의존성을 생성 때 확정해 `final`로 둔다. 직접 테스트하기 쉽고 의존성이 드러난다.  
+   **꼬리질문:** 선택 의존성은? → setter나 `ObjectProvider<T>`로 표현한다.
+
+3. **단일 생성자에 `@Autowired`가 필요한가?** 아니다. Spring이 유일한 생성자를 쓴다. 여러 개면 선택을 명시한다. Lombok 생성자도 일반 생성자다.  
+   **꼬리질문:** `@RequiredArgsConstructor`에도 붙이나? → 보통 붙이지 않는다.
+
+4. **동일 타입 두 빈은 어떻게 선택하나?** 기본은 `@Primary`, 특정 지점은 매개변수 `@Qualifier`다. 모두 필요하면 `List<T>` 또는 `Map<String,T>`로 받는다.  
+   **꼬리질문:** 컬렉션에서 `@Primary`는 하나만 남기나? → 아니다. 후보 전체를 받는다.
+
+5. **빈을 못 찾을 때 어디부터 보나?** 등록 애노테이션·기본 스캔 범위·`@Profile`과 조건을 본다. `getBeanDefinitionNames()`나 `/actuator/beans`로 확인한다.  
+   **꼬리질문:** `@Bean`의 기본 이름은? → 메서드명이다.
+
+6. **`@Value`와 `@ConfigurationProperties`는 언제 쓰나?** 단일 값은 `@Value`, 여러 설정의 바인딩·검증은 `@ConfigurationProperties`가 적합하다.  
+   **꼬리질문:** 프로퍼티 record 등록은? → `@ConfigurationPropertiesScan` 또는 `@EnableConfigurationProperties`를 쓴다.
+
+## 8. 참고문헌
+
+- Classpath Scanning — https://docs.spring.io/spring-framework/reference/core/beans/classpath-scanning.html — 스테레오타입.
+- `@Bean` Annotation — https://docs.spring.io/spring-framework/reference/core/beans/java/bean-annotation.html — 빈 팩토리 메서드.
+- `@Autowired` — https://docs.spring.io/spring-framework/reference/core/beans/annotation-config/autowired.html — 단일 생성자 규칙.
+- Qualifiers / `@Primary` — https://docs.spring.io/spring-framework/reference/core/beans/annotation-config/autowired-qualifiers.html — 후보 선택.
+- `@SpringBootApplication` — https://docs.spring.io/spring-boot/reference/using/using-the-springbootapplication-annotation.html — 스캔 패키지.
+- Externalized Configuration — https://docs.spring.io/spring-boot/reference/features/external-config.html — 설정 바인딩.
+- Actuator Endpoints — https://docs.spring.io/spring-boot/reference/actuator/endpoints.html — `beans` 엔드포인트.
+- `@MockitoBean` — https://docs.spring.io/spring-framework/reference/testing/annotations/integration-spring/annotation-mockitobean.html — 테스트 컨텍스트에서 빈 교체.
+- Lombok Constructors — https://projectlombok.org/features/constructor — 필수 필드 생성 규칙.
+- Managed Dependency Coordinates — https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html — Boot BOM 버전(Lombok 1.18.46).

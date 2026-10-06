@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S06. REST API 설계와 HTTP 클라이언트</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
+<main>
+
+<h1 id="s06-rest-api-설계와-http-클라이언트"><a class="anchor" href="#s06-rest-api-설계와-http-클라이언트" aria-hidden="true">#</a>S06. REST API 설계와 HTTP 클라이언트</h1>
+<blockquote>
+<ul>
+<li>REST는 URL 모양보다 리소스와 HTTP 메서드의 의미를 일관되게 지키는 계약이다.</li>
+<li>동기 호출의 기본은 <code>RestClient</code>, 비동기·스트리밍은 <code>WebClient</code>, 선언형 경계는 HTTP Interface로 고른다.</li>
+<li>타임아웃은 연결·응답 등 각 대기 구간에 명시하고, 재시도는 멱등성과 중복 처리 계약을 확인한 뒤 적용한다.</li>
+</ul>
+</blockquote>
+<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<p>결제 <code>POST</code>가 타임아웃 났다고 그대로 재전송하면, 첫 요청은 처리됐지만 응답만 유실된 경우 주문이 중복 생성될 수 있다. 부분 업데이트를 <code>PUT</code>으로 구현하면 생략된 필드가 지워질 수 있다. 외부 API에 타임아웃이 없으면 요청 스레드와 연결 풀이 잠식된다.</p>
+<p>목록을 <code>createdAt</code>만으로 정렬하면 동시간 행이 페이지 경계에서 중복·누락될 수 있다. <code>Page</code>를 그대로 공개하면 내부 타입과 전체 건수 쿼리가 계약에 묶인다. Jackson 3 전환도 패키지·확장 API 변화뿐 아니라 JSON 호환성을 확인해야 한다.</p>
+<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>용어</th>
+<th>뜻</th>
+<th>설계 시 확인할 점</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>리소스</td>
+<td>HTTP 요청의 대상. URI로 식별한다.</td>
+<td>URL은 명사 중심으로 정하고 표현(JSON)과 리소스를 구별한다.</td>
+</tr>
+<tr>
+<td>안전성(safe)</td>
+<td>요청이 의도한 상태 변경을 하지 않는 성질</td>
+<td><code>GET</code>, <code>HEAD</code>는 읽기로 제한한다.</td>
+</tr>
+<tr>
+<td>멱등성(idempotent)</td>
+<td>반복 적용의 상태 효과가 한 번 적용과 같은 성질</td>
+<td>응답 코드가 같다는 뜻은 아니다. 재전송·재시도 판단 기준이다.</td>
+</tr>
+<tr>
+<td>표현(representation)</td>
+<td>리소스를 특정 미디어 타입으로 옮긴 데이터</td>
+<td><code>Accept</code>는 응답 형식, <code>Content-Type</code>은 요청 본문 형식이다.</td>
+</tr>
+<tr>
+<td>페이지네이션</td>
+<td>컬렉션을 여러 응답으로 분할</td>
+<td>정렬 안정성, 크기 상한, 변경 중 일관성을 정한다.</td>
+</tr>
+<tr>
+<td>API 버전</td>
+<td>요청·응답 계약의 호환 세대</td>
+<td>경로·헤더·미디어 타입 중 하나를 정해 폐기 일정을 공유한다.</td>
+</tr>
+<tr>
+<td>HTTP Interface</td>
+<td><code>@HttpExchange</code> 인터페이스를 클라이언트 프록시로 변환</td>
+<td>전송은 <code>RestClient</code> 또는 <code>WebClient</code> 어댑터가 맡는다.</td>
+</tr>
+</tbody></table></div>
+<h3 id="메서드와-상태-코드"><a class="anchor" href="#메서드와-상태-코드" aria-hidden="true">#</a>메서드와 상태 코드</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>의도</th>
+<th>권장 메서드</th>
+<th>일반적인 성공 응답</th>
+<th>의미와 주의점</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>컬렉션 조회</td>
+<td><code>GET /orders</code></td>
+<td><code>200 OK</code></td>
+<td>조회는 서버 상태를 바꾸지 않는다. 필터·정렬·페이지를 쿼리로 표현한다.</td>
+</tr>
+<tr>
+<td>단건 조회</td>
+<td><code>GET /orders/{id}</code></td>
+<td><code>200 OK</code>, 없으면 <code>404</code></td>
+<td>캐시 가능성이 있으면 표현과 캐시 헤더도 계약의 일부다.</td>
+</tr>
+<tr>
+<td>리소스 생성</td>
+<td><code>POST /orders</code></td>
+<td><code>201 Created</code>와 <code>Location</code></td>
+<td>같은 본문을 다시 보냈을 때 같은 생성 결과가 보장되는지는 별도 계약이다.</td>
+</tr>
+<tr>
+<td>전체 교체</td>
+<td><code>PUT /orders/{id}</code></td>
+<td><code>200</code> 또는 <code>204</code></td>
+<td>같은 표현을 반복 적용해도 최종 상태는 같아야 한다. 생성 허용 여부도 명시한다.</td>
+</tr>
+<tr>
+<td>부분 변경</td>
+<td><code>PATCH /orders/{id}</code></td>
+<td><code>200</code> 또는 <code>204</code></td>
+<td>패치 문서 형식과 생략·null의 의미를 정한다. 멱등성은 패치 내용에 달렸다.</td>
+</tr>
+<tr>
+<td>삭제</td>
+<td><code>DELETE /orders/{id}</code></td>
+<td><code>204</code> 또는 <code>200</code></td>
+<td>반복 DELETE의 응답 코드는 달라도 최종 삭제 상태는 같을 수 있다.</td>
+</tr>
+</tbody></table></div>
+<p><code>400</code>은 잘못된 입력, <code>401</code>/<code>403</code>은 인증/권한 문제, <code>404</code>는 부재, <code>409</code>는 상태 충돌, <code>412</code>는 조건부 요청 실패에 쓴다. 비동기 접수는 <code>202</code>, 입력 오류는 정책에 따라 <code>400</code>/<code>422</code>로 응답한다. 오류는 기계가 읽는 공통 형식으로 만든다.</p>
+<h3 id="자주-혼동하는-쌍"><a class="anchor" href="#자주-혼동하는-쌍" aria-hidden="true">#</a>자주 혼동하는 쌍</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>구분</th>
+<th>차이</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>PUT</code> vs <code>PATCH</code></td>
+<td>PUT은 대상 표현 전체를 교체한다. PATCH는 정의된 패치 형식으로 일부를 바꾼다. PATCH가 항상 비멱등인 것은 아니지만 연산에 따라 달라진다.</td>
+</tr>
+<tr>
+<td>안전성 vs 멱등성</td>
+<td>GET은 안전하고 멱등하다. PUT과 DELETE는 안전하지 않지만 멱등이다. POST는 기본적으로 어느 쪽도 보장하지 않는다.</td>
+</tr>
+<tr>
+<td>offset vs cursor</td>
+<td>offset은 임의 페이지 이동이 단순하지만 앞쪽 데이터 삽입·삭제에 따라 페이지가 밀린다. cursor는 정렬 키를 기준으로 이어 읽어 대규모·변경 중 목록에 유리하다.</td>
+</tr>
+<tr>
+<td>연결 타임아웃 vs 응답 타임아웃</td>
+<td>연결 타임아웃은 원격 연결을 맺을 때 기다리는 한도다. 응답/읽기 타임아웃은 연결 뒤 응답 데이터가 오기를 기다리는 한도다. 호출 전체 deadline은 별도 계층에서 관리할 수 있다.</td>
+</tr>
+</tbody></table></div>
+<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+<p>요청 처리에서 서버와 클라이언트의 역할은 분리된다.</p>
+<pre><code class="language-text">호출자
+  │ 메서드 + URI + 헤더 + 본문(표현)
+  ▼
+클라이언트 인코더 ── 요청 팩토리/커넥션 풀 ── 네트워크
+                                               │
+                         라우팅 ← 서버 매핑/버전 선택
+                                               │
+                         컨트롤러 → 상태·헤더·표현
+  ▲                                            │
+  └──── 응답 디코더 ← 상태 검사·오류 처리 ←─────┘</code></pre>
+<p>서버는 URI, 메서드 의미, 조건 헤더를 함께 해석한다. <code>If-Match</code>가 현재 버전과 일치할 때만 변경하고 아니면 <code>412</code>를 반환하면 동시 수정 손실을 막는다. 상태 코드는 클라이언트의 다음 행동을 알린다.</p>
+<p>Spring MVC의 <code>ApiVersionStrategy</code>는 resolver로 요청 버전을 추출하고 parser로 비교 가능한 값으로 바꿔 컨트롤러 매핑과 대조한다. 미지원 버전과 기본 설정의 누락 버전은 400이다. 버전을 선택사항으로 두거나 기본값을 지정할 수 있고, 폐기는 <code>Deprecation</code>, <code>Sunset</code>, <code>Link</code> 헤더로 알린다.</p>
+<p>Spring <code>RestClient</code>는 메서드·URI·헤더·본문을 fluent 요청으로 조립하고, terminal body/entity 변환에서 전송과 메시지 변환을 수행한다. <code>WebClient</code>는 reactive publisher 흐름과 스트리밍에 맞는다. HTTP Interface 프록시는 설정한 클라이언트 어댑터로 요청을 보낸다. 기본 URL·공통 헤더는 클라이언트에, 서비스별 정책은 호출 경계에 둔다.</p>
+<p>재시도는 타임아웃과 별개다. 타임아웃은 서버 작업 취소를 뜻하지 않는다. 멱등 메서드라도 횟수·대기 간격·총 deadline을 제한한다. POST는 idempotency key와 서버측 결과 저장 계약 없이는 자동 재시도하지 않는다.</p>
+<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+<p>예제는 Spring Boot 4.1 / Framework 7 기준이며 <strong>미실행</strong>이다. 필요 의존성은 <code>spring-boot-starter-web</code>이며, Spring Data 웹 인자 지원은 Spring Data Commons가 추가로 필요하다.</p>
+<h3 id="예제-1--명시적-페이지-계약과-입력-상한"><a class="anchor" href="#예제-1--명시적-페이지-계약과-입력-상한" aria-hidden="true">#</a>예제 1 — 명시적 페이지 계약과 입력 상한</h3>
+<p><code>Page</code> 대신 외부 계약에 필요한 필드만 DTO로 정의한다.</p>
+<pre><code class="language-java">// Spring 예제 (미실행)
+import java.util.List;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+class BookQueryController {
+    private static final int MAX_SIZE = 100;
+    private final BookService books = new BookService();
+
+    @GetMapping(&quot;/api/books&quot;)
+    BookPage list(@RequestParam(defaultValue = &quot;0&quot;) int page,
+                  @RequestParam(defaultValue = &quot;25&quot;) int size) {
+        if (page &lt; 0 || size &lt; 1 || size &gt; MAX_SIZE) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, &quot;invalid page or size&quot;);
+        }
+        return books.findPage(page, size);
+    }
+
+    record BookView(long id, String title) {}
+    record BookPage(List&lt;BookView&gt; items, int page, int size,
+                    boolean hasNext) {}
+
+    static class BookService {
+        private final List&lt;BookView&gt; all = List.of(
+                new BookView(1, &quot;Spring&quot;), new BookView(2, &quot;Java&quot;));
+
+        BookPage findPage(int page, int size) {
+            int from = (int) Math.min((long) page * size, all.size());
+            int to = Math.min(from + size, all.size());
+            return new BookPage(all.subList(from, to), page, size, to &lt; all.size());
+        }
+    }
+}</code></pre>
+<p>실서비스에서는 입력 오류를 <code>@ControllerAdvice</code>로 400에 매핑한다. 정렬 allowlist와 고유 tie-breaker를 두고, 전체 건수가 비싸면 cursor를 고려한다.</p>
+<h3 id="예제-2--framework-7-내장-api-버저닝"><a class="anchor" href="#예제-2--framework-7-내장-api-버저닝" aria-hidden="true">#</a>예제 2 — Framework 7 내장 API 버저닝</h3>
+<p>헤더 버전으로 같은 경로의 호환되지 않는 표현을 별도 핸들러로 라우팅한다.</p>
+<pre><code class="language-java">// Spring 예제 (미실행)
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.config.annotation.ApiVersionConfigurer;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+class ApiVersionConfiguration implements WebMvcConfigurer {
+    @Override
+    public void configureApiVersioning(ApiVersionConfigurer configurer) {
+        configurer.useRequestHeader(&quot;API-Version&quot;);
+    }
+}
+
+@RestController
+@RequestMapping(&quot;/orders&quot;)
+class OrderController {
+    @GetMapping(version = &quot;1.0&quot;)
+    OrderV1 getV1() {
+        return new OrderV1(&quot;order-42&quot;, &quot;PAID&quot;);
+    }
+
+    @GetMapping(version = &quot;2.0&quot;)
+    OrderV2 getV2() {
+        return new OrderV2(&quot;order-42&quot;, new Payment(&quot;PAID&quot;, &quot;card&quot;));
+    }
+
+    record OrderV1(String id, String status) {}
+    record OrderV2(String id, Payment payment) {}
+    record Payment(String status, String method) {}
+}</code></pre>
+<p><code>GET /orders</code>에 <code>API-Version: 2.0</code>을 보낸다. 헤더가 표현을 바꾸면 캐시의 <code>Vary</code>와 누락·미지원 버전을 검증한다.</p>
+<h3 id="예제-3--restclient의-연결읽기-시간-제한"><a class="anchor" href="#예제-3--restclient의-연결읽기-시간-제한" aria-hidden="true">#</a>예제 3 — RestClient의 연결·읽기 시간 제한</h3>
+<p><code>JdkClientHttpRequestFactory</code>는 JDK <code>HttpClient</code>를 사용한다. 연결과 읽기 제한은 서로 다른 구간에 적용된다.</p>
+<pre><code class="language-java">// Spring 예제 (미실행)
+import java.net.http.HttpClient;
+import java.time.Duration;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
+
+@Configuration
+class PartnerClientConfiguration {
+    @Bean
+    RestClient partnerRestClient() {
+        HttpClient jdkClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(2))
+                .build();
+
+        JdkClientHttpRequestFactory factory =
+                new JdkClientHttpRequestFactory(jdkClient);
+        factory.setReadTimeout(Duration.ofSeconds(3));
+
+        return RestClient.builder()
+                .baseUrl(&quot;https://partner.example&quot;)
+                .requestFactory(factory)
+                .defaultHeader(&quot;Accept&quot;, &quot;application/json&quot;)
+                .build();
+    }
+}</code></pre>
+<p><code>connectTimeout</code>은 연결 수립, <code>setReadTimeout</code>은 읽기 제한이다. 풀 대기와 전체 deadline까지 설정한 것은 아니므로 전송 라이브러리에 맞춰 추가 제한을 정하고 재시도 포함 총 시간은 상위 요청보다 짧게 둔다.</p>
+<p>HTTP Interface를 쓰면 같은 전송 설정을 선언형 계약 뒤에 감출 수 있다.</p>
+<pre><code class="language-java">// Spring 예제 (미실행)
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.service.annotation.GetExchange;
+import org.springframework.web.service.annotation.HttpExchange;
+
+@HttpExchange(&quot;/inventory&quot;)
+interface InventoryApi {
+    @GetExchange(&quot;/items/{sku}&quot;)
+    Item find(@PathVariable(&quot;sku&quot;) String sku);
+
+    record Item(String sku, int available) {}
+}</code></pre>
+<p>프록시는 <code>HttpServiceProxyFactory</code>와 <code>RestClientAdapter</code>로 만든다. <code>WebClient</code>는 reactive 흐름·스트리밍에 쓰고, MVC에서 습관적으로 <code>.block()</code>하면 비동기 이점을 잃는다.</p>
+<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>시기</th>
+<th>변화와 이전 방식의 한계</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Spring Framework 6.1</td>
+<td><code>RestClient</code>가 추가됐다. 기존 <code>RestTemplate</code>의 template 방식은 fluent 호출 구성에 한계가 있었다.</td>
+<td><a href="https://docs.spring.io/spring-framework/reference/integration/rest-clients.html" target="_blank" rel="noopener">REST Clients</a></td>
+</tr>
+<tr>
+<td>Spring Framework 7.0</td>
+<td>API 버저닝이 매핑·검증·폐기 안내를 제공해 앱별 요청 버전 파싱 중복을 줄였다.</td>
+<td><a href="https://docs.spring.io/spring-framework/reference/web/webmvc-versioning.html" target="_blank" rel="noopener">API Versioning</a>, <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-config/api-version.html" target="_blank" rel="noopener">설정</a></td>
+</tr>
+<tr>
+<td>Spring Framework 7.0</td>
+<td>Jackson 3가 기본이 되고 Jackson 2는 deprecated 됐다. <code>tools.jackson</code> 패키지와 새 serializer API에 맞춘 전환이 필요하다.</td>
+<td><a href="https://github.com/spring-projects/spring-framework/wiki/Spring-Framework-7.0-Release-Notes" target="_blank" rel="noopener">Framework 7.0 Release Notes</a>, <a href="https://docs.spring.io/spring-boot/reference/features/json.html" target="_blank" rel="noopener">Boot JSON</a></td>
+</tr>
+<tr>
+<td>현재 기준</td>
+<td>예제 버전은 Java 25, Boot 4.1.1, Framework 7.0.9다. Boot 4의 기본 JSON 라이브러리는 Jackson 3다.</td>
+<td>공통 브리프 기준표, <a href="https://docs.spring.io/spring-boot/reference/features/json.html" target="_blank" rel="noopener">Boot JSON</a></td>
+</tr>
+</tbody></table></div>
+<p>하위 라이브러리 버전은 공통 브리프의 Boot BOM을 따른다.</p>
+<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+<ul>
+<li><strong>기본값 추천:</strong> 새 동기 호출은 <code>RestClient</code>로 시작한다. reactive·스트리밍은 <code>WebClient</code>, 선언형 계약은 HTTP Interface로 분리한다.</li>
+<li>기존 <code>RestTemplate</code>은 변경 영역부터 옮긴다. Framework 7 문서는 이를 deprecated 처리한다.</li>
+<li>작은 목록은 offset, 크고 변동 많은 목록은 고유 정렬 키 기반 cursor/keyset을 택한다. 페이지 상한·정렬 allowlist·tie-breaker를 두고 불필요한 전체 count는 피한다.</li>
+<li>비호환 API는 버전과 폐기 일정을 제공한다. 헤더 버전은 캐시의 <code>Vary</code>를 설정한다.</li>
+<li><code>springdoc-openapi</code> 문서와 실제 오류·보안·버전별 계약을 비교한다.</li>
+<li>연결·응답·풀 대기·전체 deadline을 구분하고 목적지별 지연·타임아웃·재시도를 관측한다.</li>
+<li>재시도는 횟수·backoff/jitter·총 deadline을 제한한다. POST는 idempotency key 계약이 없으면 재시도하지 않는다.</li>
+<li>회복성 패턴(서킷브레이커)은 → <a class="docref" href="S20-spring-cloud-msa.html">S20</a> 참조.</li>
+</ul>
+<h3 id="http-캐시와-조건부-get-보강"><a class="anchor" href="#http-캐시와-조건부-get-보강" aria-hidden="true">#</a>HTTP 캐시와 조건부 GET (보강)</h3>
+<p>HTTP 캐싱은 응답의 저장 허용 여부와 저장한 표현을 다시 쓸 수 있는 시점을 <code>Cache-Control</code>로 정하고, 응답 검증자(validator)로 원본의 변경 여부를 확인하는 계약이다. API는 JSON 본문뿐 아니라 이 헤더와 304 응답까지 함께 설계해야 한다. <code>max-age=N</code>은 응답이 N초 동안 fresh 상태라는 뜻이며, <code>max-age=0</code>은 저장 금지가 아니라 저장 후 즉시 재검증이 필요하다는 뜻이다. 만료된 항목을 원본 확인 없이 쓰지 않게 하려면 <code>must-revalidate</code>도 설정한다.</p>
+<p>정책은 응답의 사용자 범위로 고른다.</p>
+<ul>
+<li><code>Cache-Control: public, max-age=60</code>은 브라우저뿐 아니라 공유 캐시(CDN·프록시)도 60초간 재사용할 수 있음을 허용한다. 익명 카탈로그처럼 사용자에 따라 내용이 달라지지 않는 표현에 쓴다. <code>public</code>은 임의로 붙이는 성능 옵션이 아니다.</li>
+<li><code>Cache-Control: private, max-age=0, must-revalidate</code>는 브라우저 같은 개인 캐시에만 저장하게 하고 매번 서버에서 유효성을 확인하게 한다. 로그인한 사용자 프로필 등 개인별 표현에 적합하다. <code>private</code>만으로 브라우저 안의 계정 전환까지 분리되는 것은 아니므로 서버는 현재 인증 주체의 표현과 검증자를 비교해야 한다.</li>
+<li><code>Cache-Control: no-store</code>는 개인·공유 캐시 모두 저장하지 말라는 지시다. 비밀 정보나 저장 자체를 피해야 하는 응답에 사용한다. <code>no-cache</code>는 저장을 막는 말이 아니라 재사용 전 검증을 요구하는 지시이므로 둘을 혼동하지 않는다.</li>
+</ul>
+<p>ETag는 선택한 표현의 버전을 나타내는 불투명한 토큰이며, 응답 값은 따옴표로 감싼다. 표현 데이터가 바뀔 때마다 바뀌는 강한 ETag(<code>&quot;profile-v42&quot;</code>)를 쓰면 바이트 단위 표현의 변경도 잡을 수 있다. 바이트가 달라도 의미상 같은 표현을 허용할 때만 약한 ETag(<code>W/&quot;profile-v42&quot;</code>)를 고려한다. Last-Modified는 수정 시각을 HTTP 날짜로 제공하는 대안이다. HTTP 날짜는 초 단위라 같은 초에 여러 번 수정되는 데이터에는 변경을 놓칠 수 있으므로 ETag가 더 정확하다.</p>
+<p>클라이언트는 저장해 둔 응답을 확인하려고 <code>If-None-Match: &quot;profile-v42&quot;</code> 또는 <code>If-Modified-Since: &lt;Last-Modified 값&gt;</code>을 보낸다. 서버가 현재 표현과 같다고 판단한 GET/HEAD에는 <code>304 Not Modified</code>와 본문 없는 응답을 돌려준다. 클라이언트는 보관 중인 본문을 재사용한다. 바뀌었다면 <code>200 OK</code>와 새 본문, 새 ETag 및 Last-Modified를 반환한다. 두 조건 헤더가 함께 오면 정확도가 더 높은 <code>If-None-Match</code>를 우선하고 <code>If-Modified-Since</code>는 무시한다. 따라서 ETag가 있으면 날짜 검증을 함께 지원해도 ETag 비교가 최종 기준이다.</p>
+<p>Spring Boot 4.1 / Spring Framework 7, Java 25 기준으로 Spring MVC 컨트롤러에서는 <code>WebRequest.checkNotModified(etag, lastModified)</code>가 두 조건 헤더를 처리하고, 변경되지 않은 GET을 304로 표시한다. 다음 예는 현재 인증 사용자의 프로필 표현 버전을 ETag로 쓰고, 그 사용자의 마지막 수정 시각도 함께 보낸다. <code>ProfileSnapshot</code>은 DTO와 표현 버전을 원자적으로 제공한다고 가정한다.</p>
+<pre><code class="language-java">@RestController
+class ProfileController {
+    private final ProfileService profiles;
+
+    ProfileController(ProfileService profiles) {
+        this.profiles = profiles;
+    }
+
+    @GetMapping(&quot;/api/me/profile&quot;)
+    ResponseEntity&lt;ProfileDto&gt; me(Authentication authentication, WebRequest request) {
+        ProfileSnapshot profile = profiles.load(authentication.getName());
+        long modified = profile.updatedAt()
+                .truncatedTo(ChronoUnit.SECONDS).toEpochMilli();
+        String etag = &quot;\&quot;profile-&quot; + profile.representationVersion() + &quot;\&quot;&quot;;
+        CacheControl policy = CacheControl.maxAge(Duration.ZERO)
+                .cachePrivate().mustRevalidate();
+
+        if (request.checkNotModified(etag, modified)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .eTag(etag).lastModified(modified)
+                    .cacheControl(policy).build();
+        }
+        return ResponseEntity.ok()
+                .eTag(etag).lastModified(modified)
+                .cacheControl(policy).body(profile.dto());
+    }
+}</code></pre>
+<p>실제 첫 응답에는 <code>Cache-Control: private, max-age=0, must-revalidate</code>, <code>ETag</code>, <code>Last-Modified</code>가 붙는다. 다음 요청은 예를 들어 <code>If-None-Match: &quot;profile-42&quot;</code>를 보내며, 서버가 여전히 같은 인증 사용자의 같은 표현 버전을 찾으면 304를 돌려준다. 조건이 맞지 않으면 전체 최신 프로필을 200으로 응답한다. Spring MVC는 <code>CacheControl.noStore()</code>도 제공하며, <code>CacheControl.maxAge(...).cachePublic()</code>은 실제로 공유 가능한 표현에만 사용한다.</p>
+<p><strong>함정:</strong> 개인 API를 <code>public</code>으로 표시하면 공유 캐시가 사용자 간에 응답을 재사용할 수 있다. 쿠키 기반 인증이라고 공유 캐시가 자동으로 모든 응답을 차단한다고 가정하지 말고, 사용자 응답에는 <code>private</code> 또는 저장 금지가 필요한 경우 <code>no-store</code>를 명시한다. <code>Vary: Cookie</code>는 쿠키 전체를 캐시 키로 만들 뿐 개인 정보 보호 정책을 대체하지 않는다. 또한 ETag를 사용자 ID가 아닌 공통 레코드 버전만으로 만들면 두 계정의 검증자가 우연히 같아져 이전 계정의 캐시 본문에 304를 허용할 수 있다. 검증자는 인증 후 선택된 표현의 실제 버전을 반영하고, 표현이 바뀌면 반드시 바뀌게 한다. 응답 변환·권한에 따라 본문이 달라진다면 그 차이도 검증자 계산에 반영한다.</p>
+<p>참고: HTTP Caching — <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-caching.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-caching.html</a>
+참고: RFC 9110: HTTP Semantics — <a href="https://www.rfc-editor.org/rfc/rfc9110.html" target="_blank" rel="noopener">https://www.rfc-editor.org/rfc/rfc9110.html</a>
+참고: RFC 9111: HTTP Caching — <a href="https://www.rfc-editor.org/rfc/rfc9111.html" target="_blank" rel="noopener">https://www.rfc-editor.org/rfc/rfc9111.html</a></p>
+<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+<ol>
+<li><strong>증상:</strong> GET이 상태를 바꾼다 → <strong>원인:</strong> 조회에 쓰기를 숨겼다 → <strong>대처:</strong> GET/HEAD는 읽기 전용으로 둔다.</li>
+<li><strong>증상:</strong> 결제·주문이 중복된다 → <strong>원인:</strong> 타임아웃 뒤 POST를 무조건 재시도했다 → <strong>대처:</strong> idempotency key와 서버의 결과 재생 계약을 둔다.</li>
+<li><strong>증상:</strong> PUT 뒤 생략된 필드가 초기화된다 → <strong>원인:</strong> 부분 DTO를 전체 교체로 처리했다 → <strong>대처:</strong> 전체 표현을 보내거나 PATCH에서 null·생략 의미를 정의한다.</li>
+<li><strong>증상:</strong> 페이지에서 중복·누락이 난다 → <strong>원인:</strong> 불안정한 정렬 또는 동시 변경이다 → <strong>대처:</strong> 고유 tie-breaker를 두고 대규모 목록은 cursor/스냅샷을 고려한다.</li>
+<li><strong>증상:</strong> 정렬 요청이 오류·예상 밖 쿼리를 만든다 → <strong>원인:</strong> 필드를 제한 없이 매핑했다 → <strong>대처:</strong> 공개 정렬 키 allowlist와 페이지 상한을 둔다.</li>
+<li><strong>증상:</strong> 느린 하위 호출이 스레드·연결을 점유한다 → <strong>원인:</strong> 타임아웃이 없거나 한 구간만 설정했다 → <strong>대처:</strong> 풀·연결·응답·전체 제한과 재시도 총 시간을 정한다.</li>
+<li><strong>증상:</strong> Jackson 전환 후 직렬화 오류·계약 차이가 난다 → <strong>원인:</strong> 패키지/API 변화나 Jackson 세대 혼용이다 → <strong>대처:</strong> <code>tools.jackson</code>과 날짜·enum·null·다형성 계약을 확인한다.</li>
+<li><strong>증상:</strong> 캐시가 다른 API 버전 응답을 돌려준다 → <strong>원인:</strong> 버전 헤더가 캐시 키에 없다 → <strong>대처:</strong> <code>Vary</code>와 CDN 키를 맞추고 폐기 정책을 문서화한다.</li>
+</ol>
+<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+<h3 id="q1-put과-patch를-어떻게-구분하며-patch는-재시도해도-안전한가"><a class="anchor" href="#q1-put과-patch를-어떻게-구분하며-patch는-재시도해도-안전한가" aria-hidden="true">#</a>Q1. PUT과 PATCH를 어떻게 구분하며, PATCH는 재시도해도 안전한가?</h3>
+<p>PUT은 전체 표현 교체라 반복 후 최종 상태가 같아야 한다. PATCH는 연산에 따라 멱등일 수도 아닐 수도 있다. 생략과 null의 의미를 정하지 않으면 부분 수정에서 데이터가 지워진다.</p>
+<p><strong>꼬리 질문:</strong> <code>PATCH {"counter": counter + 1}</code> 같은 연산은 멱등인가? → 아니다. 동일 요청 재적용마다 값이 증가하므로 조건부 버전 검사나 별도 중복 제거 계약 없이는 안전하게 재시도할 수 없다.</p>
+<h3 id="q2-putdelete가-멱등이라는-말은-응답도-똑같다는-뜻인가"><a class="anchor" href="#q2-putdelete가-멱등이라는-말은-응답도-똑같다는-뜻인가" aria-hidden="true">#</a>Q2. PUT/DELETE가 멱등이라는 말은 응답도 똑같다는 뜻인가?</h3>
+<p>아니다. 멱등성은 반복 요청의 상태 효과가 같은 성질이다. 첫 DELETE는 204, 다음은 404여도 최종 상태가 같을 수 있다.</p>
+<p><strong>꼬리 질문:</strong> 그럼 POST는 절대 재시도하면 안 되는가? → 일반적으로 자동 재시도하지 않는다. 서버가 idempotency key를 고유하게 저장하고 같은 키의 결과를 재생하는 계약이 있으면 중복 생성 위험을 통제할 수 있다.</p>
+<h3 id="q3-목록-api에서-offset과-cursor를-어떤-기준으로-선택하나"><a class="anchor" href="#q3-목록-api에서-offset과-cursor를-어떤-기준으로-선택하나" aria-hidden="true">#</a>Q3. 목록 API에서 offset과 cursor를 어떤 기준으로 선택하나?</h3>
+<p>offset은 임의 페이지 이동이 쉽고 작은 안정적 목록에 단순하다. 깊은 offset은 비싸고 데이터 변경에 페이지가 밀린다. cursor는 대규모 목록에 유리하지만 임의 이동이 어렵다.</p>
+<p><strong>꼬리 질문:</strong> <code>createdAt</code>으로만 정렬하면 무엇이 문제인가? → 같은 타임스탬프를 가진 행들의 순서가 고정되지 않아 페이지 사이에서 중복·누락이 생길 수 있다. <code>id</code>를 최종 tie-breaker로 추가한다.</p>
+<h3 id="q4-요청-타임아웃이-난-뒤-서버가-작업을-했는지-알-수-있나"><a class="anchor" href="#q4-요청-타임아웃이-난-뒤-서버가-작업을-했는지-알-수-있나" aria-hidden="true">#</a>Q4. 요청 타임아웃이 난 뒤 서버가 작업을 했는지 알 수 있나?</h3>
+<p>보통 알 수 없다. 타임아웃은 클라이언트가 더 기다리지 않는 것이지 서버 취소·롤백을 뜻하지 않는다. 작업이 이미 반영됐을 가능성까지 고려해 재시도한다.</p>
+<p><strong>꼬리 질문:</strong> 어떤 제한을 설정하나? → 풀 획득, 연결 수립, 응답 읽기, 전체 deadline을 구분하고 재시도까지 합친 시간이 상위 제한보다 짧게 둔다.</p>
+<h3 id="q5-restclient-webclient-http-interface의-선택-기준은"><a class="anchor" href="#q5-restclient-webclient-http-interface의-선택-기준은" aria-hidden="true">#</a>Q5. <code>RestClient</code>, <code>WebClient</code>, HTTP Interface의 선택 기준은?</h3>
+<p><code>RestClient</code>는 동기 호출의 기본이다. <code>WebClient</code>는 reactive 조합·스트리밍에 맞는다. HTTP Interface는 전송 방식이 아니라 두 클라이언트에 연결할 선언형 계약이다.</p>
+<p><strong>꼬리 질문:</strong> MVC 코드에서 <code>WebClient.block()</code>만 호출하면 이점이 있는가? → 호출 스레드를 막으므로 reactive 비동기 이점을 대부분 잃는다. 프로젝트의 동시성 모델에 맞는 동기 클라이언트를 쓰거나 호출 체인을 reactive로 유지한다.</p>
+<h3 id="q6-api-버저닝에서-framework-7-지원은-무엇을-자동화하나"><a class="anchor" href="#q6-api-버저닝에서-framework-7-지원은-무엇을-자동화하나" aria-hidden="true">#</a>Q6. API 버저닝에서 Framework 7 지원은 무엇을 자동화하나?</h3>
+<p>resolver가 버전을 읽고 parser가 해석해 컨트롤러 매핑과 지원 여부를 확인한다. 기본 설정은 필수 버전 누락과 미지원 버전을 400으로 처리한다. 기본값과 폐기 헤더도 설정할 수 있다.</p>
+<p><strong>꼬리 질문:</strong> 헤더 버저닝을 택하면 무엇을 놓치기 쉬운가? → 캐시가 헤더별 표현 차이를 모를 수 있다. <code>Vary: API-Version</code>과 CDN/프록시 캐시 키를 함께 설정하고 문서화한다.</p>
+<h3 id="q7-jackson-3-전환에서-소스-코드-외에-무엇을-검증해야-하나"><a class="anchor" href="#q7-jackson-3-전환에서-소스-코드-외에-무엇을-검증해야-하나" aria-hidden="true">#</a>Q7. Jackson 3 전환에서 소스 코드 외에 무엇을 검증해야 하나?</h3>
+<p>Boot 4의 기본은 Jackson 3이며 데이터 API는 <code>tools.jackson</code> 패키지다. 커스텀 serializer API와 Jackson 2 의존성 혼재를 확인하고 외부 JSON 호환성을 검증한다.</p>
+<p><strong>꼬리 질문:</strong> 어떤 계약 테스트를 두나? → null/필드 생략, 날짜·시간대, enum 이름, 알 수 없는 필드, 다형성 JSON을 대표 샘플로 직렬화·역직렬화해 기존 계약과 비교한다.</p>
+<h3 id="q8-springdoc이-openapi-문서를-생성하면-api-계약-검토는-끝나는가"><a class="anchor" href="#q8-springdoc이-openapi-문서를-생성하면-api-계약-검토는-끝나는가" aria-hidden="true">#</a>Q8. springdoc이 OpenAPI 문서를 생성하면 API 계약 검토는 끝나는가?</h3>
+<p>아니다. springdoc은 OpenAPI와 Swagger UI 생성을 돕지만 버전별 요청/응답, 오류, 인증, 제약이 실제와 맞는지 검토해야 한다. 런타임 정책은 자동 문서에서 빠질 수 있다.</p>
+<p><strong>꼬리 질문:</strong> 릴리스에서 무엇을 비교할 수 있나? → 생성된 OpenAPI 스펙을 저장해 변경분을 비교하고, 호환성 정책에 따라 제거·타입 변경·필수화 같은 breaking change를 배포 전에 차단한다.</p>
+<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+<ul>
+<li>REST Clients — <a href="https://docs.spring.io/spring-framework/reference/integration/rest-clients.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/integration/rest-clients.html</a> — <code>RestClient</code>, <code>WebClient</code>, <code>RestTemplate</code>, HTTP Service Clients의 기능과 요청/응답 변환.</li>
+<li>Spring Framework 6.1 Release Notes — <a href="https://github.com/spring-projects/spring-framework/wiki/Spring-Framework-6.1-Release-Notes" target="_blank" rel="noopener">https://github.com/spring-projects/spring-framework/wiki/Spring-Framework-6.1-Release-Notes</a> — <code>RestClient</code> 도입 세대와 동작 변경 사항.</li>
+<li>API Versioning — <a href="https://docs.spring.io/spring-framework/reference/web/webmvc-versioning.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/web/webmvc-versioning.html</a> — 버전 추출·파싱·검증과 폐기 헤더 동작.</li>
+<li>API Version 설정 — <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-config/api-version.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-config/api-version.html</a> — <code>WebMvcConfigurer</code>로 헤더 등 버전 전달 방식을 구성하는 법.</li>
+<li>Mapping Requests — <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html</a> — MVC 요청 매핑 기준.</li>
+<li>Spring Data Extensions — <a href="https://docs.spring.io/spring-data/commons/reference/repositories/core-extensions.html" target="_blank" rel="noopener">https://docs.spring.io/spring-data/commons/reference/repositories/core-extensions.html</a> — MVC에서 <code>Pageable</code>·<code>Sort</code> 인자를 해석하는 웹 지원.</li>
+<li>JSON — <a href="https://docs.spring.io/spring-boot/reference/features/json.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/features/json.html</a> — Boot의 JSON 라이브러리 통합과 Jackson 3 기본 설정.</li>
+<li>Spring Framework 7.0 Release Notes — <a href="https://github.com/spring-projects/spring-framework/wiki/Spring-Framework-7.0-Release-Notes" target="_blank" rel="noopener">https://github.com/spring-projects/spring-framework/wiki/Spring-Framework-7.0-Release-Notes</a> — Jackson 3 기본 지원과 Jackson 2 deprecated 및 마이그레이션 영향.</li>
+<li><code>JdkClientHttpRequestFactory</code> Javadoc — <a href="https://docs.spring.io/spring-framework/docs/7.0.6/javadoc-api//org/springframework/http/client/JdkClientHttpRequestFactory.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/docs/7.0.6/javadoc-api//org/springframework/http/client/JdkClientHttpRequestFactory.html</a> — JDK <code>HttpClient</code> 기반 요청 팩토리와 읽기 타임아웃 설정.</li>
+<li>Error Responses — <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-rest-exceptions.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-rest-exceptions.html</a> — Spring MVC의 <code>ProblemDetail</code> / <code>ErrorResponse</code> 지원.</li>
+<li>RFC 9110: HTTP Semantics — <a href="https://www.rfc-editor.org/rfc/rfc9110.html" target="_blank" rel="noopener">https://www.rfc-editor.org/rfc/rfc9110.html</a> — 리소스, 메서드 의미, 안전성·멱등성, 상태 코드의 HTTP 표준.</li>
+<li>RFC 9457: Problem Details for HTTP APIs — <a href="https://www.rfc-editor.org/rfc/rfc9457.html" target="_blank" rel="noopener">https://www.rfc-editor.org/rfc/rfc9457.html</a> — 기계가 읽는 표준 HTTP 오류 본문 형식.</li>
+<li>springdoc-openapi — <a href="https://springdoc.org/" target="_blank" rel="noopener">https://springdoc.org/</a> — Spring Boot 애플리케이션의 OpenAPI 3 및 Swagger UI 문서.</li>
+</ul>
+
+
+</main>
+
+</body>
+</html>

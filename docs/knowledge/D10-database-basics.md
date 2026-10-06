@@ -1,0 +1,441 @@
+# D10. DB 기초 — 백엔드 개발자가 알아야 할 관계형 데이터베이스
+
+> 관계형 DB는 표 모음이 아니라 제약조건과 트랜잭션으로 데이터를 지키는 서버다.
+> 느린 SQL은 인덱스를 무작정 추가하기 전에 실행계획과 실제 데이터 분포를 함께 봐야 한다.
+> 복제본은 읽기 분산·장애 대응 수단이고, 백업은 별도로 복구 가능성을 검증해야 한다.
+
+## 1. 큰 그림
+
+```mermaid
+flowchart LR
+    A["업무 요구사항"] --> B["데이터 모델"]
+    B --> C["테이블·키·제약조건"]
+    C --> D["DDL로 스키마 생성"]
+    D --> E["INSERT·UPDATE로 데이터 변경"]
+    E --> F["트랜잭션·락으로 동시성 제어"]
+    F --> G["SELECT·JOIN으로 조회"]
+    G --> H["실행계획·인덱스 튜닝"]
+    H --> I["커넥션 풀·복제·백업 운영"]
+    I --> J["관측·복구·다음 설계 개선"]
+    H -. "측정 결과가 설계를 되돌림" .-> B
+```
+
+“주문 저장·조회” 요구를 고객·주문 테이블과 FK로 바꾸고 DDL로 DB에 선언한다. 앱은 SQL로 행을 다루며, DB는 제약조건과 트랜잭션으로 데이터 규칙과 동시 변경을 지킨다.
+
+느린 조회는 `EXPLAIN`으로 스캔·조인 계획과 행 수 추정을 확인한다. 인덱스는 쓰기 비용과 공간을 늘린다. 운영에서는 연결 수·복제 지연·복구 시간도 함께 본다.
+
+전체 개발 과정(D01) 중 이 문서는 **데이터 모델링부터 SQL 실행·운영**까지의 기초 어휘와 흐름을 다룬다.
+
+## 2. 용어 사전
+
+| 용어 | 한 줄 정의 | 실무 예시 | 헷갈리는 것과 차이 |
+|---|---|---|---|
+| RDBMS | 관계형 데이터를 저장하고 SQL로 다루는 DB 서버 | MySQL, PostgreSQL | RDB는 데이터 모델, RDBMS는 이를 구현한 관리 시스템이라는 구분이 있다. |
+| 테이블(table) | 같은 종류의 레코드를 행과 열로 모은 논리 구조 | `orders` | 시트와 달리 동시성·제약·트랜잭션을 처리한다. |
+| 행(row, 레코드) | 한 건의 데이터 | 주문 한 건 | 컬럼(column)은 한 행 안의 속성이다. |
+| 열(column, 컬럼) | 행마다 같은 의미·타입을 갖는 속성 | `created_at TIMESTAMP` | 크기와 범위는 DB 타입에 좌우된다. |
+| 기본키(PK) | 각 행을 식별하는 키 | `order_id` | 테이블당 하나, NULL 불가. 복합 키 가능. |
+| 외래키(FK) | 다른 키를 참조하는 제약조건 | `orders.customer_id → customers.id` | 성능 인덱스 자동 생성 여부는 DB별 확인. |
+| 고유 제약(UK, UNIQUE) | 값 중복을 허용하지 않는 규칙 | 이메일 중복 가입 방지 | NULL 처리 방식은 제품별 차이가 있다. “UK니까 NULL도 하나뿐”이라고 가정하지 않는다. |
+| 자연키 / 대리키 | 업무 식별자 / DB가 만든 식별자 | 이메일 / 자동 증가 ID | 대리키가 업무 규칙을 대신하지 않는다. |
+| 제약조건(constraint) | 잘못된 값 저장을 막는 DB 규칙 | `NOT NULL`, `CHECK`, `FK` | 동시 요청에도 적용되는 최종 방어선. |
+| 인덱스(index) | 키로 행을 빨리 찾는 보조 구조 | `(customer_id, created_at)` | 쓰기 때 갱신되고 공간을 쓴다. |
+| 실행계획(plan) | 옵티마이저가 고른 스캔·조인 등의 순서 | `EXPLAIN` | 통계·설정에 따라 달라진다. |
+| 트랜잭션 | 함께 성공·실패하는 작업 단위 | 잔액 차감과 이체 내역 | Spring 규칙은 S08 참조. |
+| 격리수준 | 동시 변경의 가시성 규칙 | `READ COMMITTED` | 제품별 기본값·구현이 다르다. |
+| 락(lock) | 동시 변경을 조정하는 잠금 | 재고 행 갱신 | 비관적은 선점, 낙관적은 충돌 감지. |
+| 커넥션 풀 | 재사용 DB 연결의 제한된 묶음 | HikariCP | 전체 연결 예산 안에서 설정. |
+| 복제본(replica) | 원본 변경을 전달받는 서버 | 조회 replica | 지연이 있어 백업과 다르다. |
+| 샤딩(sharding) | 키 기준으로 데이터를 여러 DB에 분산 | 고객 ID 해시 | 복제와 달리 데이터 조각을 나눈다. |
+| 백업 / 복구 | 데이터를 별도 보관 / 실제 DB로 복원 | 덤프와 복구 훈련 | 파일 존재가 복구 가능을 뜻하진 않는다. |
+| SQL | 관계형 데이터를 정의·변경·조회하는 선언형 언어 | `SELECT`, `INSERT` | SQL은 절차대로 행을 순회하라는 명령이 아니라 원하는 결과를 선언한다. |
+
+키는 업무상 유일성(이메일 UNIQUE)과 행 식별(PK)을 구분한다. 대리키를 써도 중복 가입 방지 제약은 따로 둔다.
+
+## 3. 단계별로 보기
+
+### 3.1 모델링·스키마: 저장 규칙을 먼저 정한다
+
+“고객은 여러 주문을 갖고 주문 당시 가격을 보존한다”는 요구를 `customers`, `orders`, `order_items`와 FK로 표현한다. 주문 항목에 가격 스냅샷을 남겨 상품 가격 변경이 과거 영수증을 바꾸지 않게 한다.
+
+입력은 업무 규칙과 조회 요구, 산출물은 ERD·타입·제약 DDL이다. CHECK, NOT NULL, FK, UNIQUE는 API뿐 아니라 배치와 동시 요청의 오류도 막는다. 위반은 SQL 오류로 돌아오므로 애플리케이션은 제약 이름과 입력을 기록해 원인을 설명한다.
+
+정규화의 실무 감각은 세 단계로 기억한다.
+
+- **1NF**: 검색·검증할 여러 값을 한 셀에 포장하지 않는다. 반복 전화번호 열이나 콤마 구분 태그는 별도 관계가 적합한지 검토한다.
+- **2NF**: 복합 후보키 일부에만 종속된 속성을 분리한다. `(order_id, product_id)` 키 행에 `product_name`을 두면 상품 ID만으로 결정되어 갱신 이상이 생긴다.
+- **3NF**: 비키 속성 간 간접 종속을 줄인다. `employee_id → department_id → department_name`이면 부서명을 사원 행마다 복제할지 검토한다.
+
+“키, 전체 키, 키만”은 기억용 요약이다. 정규화는 갱신 이상을 줄이고, 반정규화는 조회를 위해 값을 중복 저장하는 대신 일관성 유지 책임을 더한다. 정규화로 시작해 측정된 병목만 반정규화한다.
+
+### 업무 문장을 ERD와 키 제약으로 바꾸기 (보강)
+
+모델링은 명사를 테이블로 옮기는 작업에서 끝나지 않는다. 같은 명사라도 식별 단위와 허용되는 연결 수를 업무 규칙에서 먼저 정해야 PK·FK·UNIQUE가 알맞게 나온다. 다음 수강 신청 요구를 단계별로 변환해 보자.
+
+> 학생은 학번으로 식별하고 이름과 이메일을 저장한다. 과목은 과목 코드로 식별한다. 한 과목은 학기마다 여러 분반으로 개설될 수 있다. 학생 한 명은 여러 개설 분반을 신청할 수 있고, 한 분반에는 여러 학생이 신청할 수 있다. 같은 학생은 같은 개설 분반에 한 번만 신청하며, 신청 시각과 상태를 보관한다.
+
+**1. 엔티티와 속성 후보를 뽑는다.** 지속해서 관리할 대상은 학생(`student`), 과목(`course`), 학기별 개설 분반(`offering`), 신청 사실(`enrollment`) 네 가지다. 이름·이메일·과목명·학기 코드·분반 번호·신청 시각·상태는 속성 후보다. “학생이 어떤 분반을 신청했는가”는 단순 속성이 아니라 양쪽 ID와 신청 자체의 속성을 가진 업무 사실이므로 연결 엔티티로 만든다. 이메일과 과목 코드는 업무상 식별에 유용하지만 변경 가능성·표기 규칙을 검토하고, 아래에서는 내부 ID를 PK로 두고 이 업무 식별자에는 UNIQUE를 건다.
+
+**2. 관계와 카디널리티를 문장으로 확인한다.** 한 과목은 0개 이상의 분반으로 개설될 수 있고 각 분반은 정확히 한 과목에 속한다(과목 1:N 분반). 학생은 0개 이상의 신청을 할 수 있고 각 신청은 정확히 한 학생을 가리킨다. 분반도 0개 이상의 신청을 받으며 각 신청은 정확히 한 분반을 가리킨다. 따라서 학생과 분반 사이의 N:M 관계를 `enrollment` 두 개의 1:N 관계로 푼다. 신청 전 학생이나 아직 수강생이 없는 분반이 존재할 수 있으므로 부모 쪽 참여는 선택(0건 이상)이다.
+
+```mermaid
+erDiagram
+    COURSE ||--o{ OFFERING : 개설
+    STUDENT ||--o{ ENROLLMENT : 신청
+    OFFERING ||--o{ ENROLLMENT : 포함
+    STUDENT {
+        bigint id PK
+        varchar campus_no UK
+        varchar email UK
+        varchar name
+    }
+    COURSE {
+        bigint id PK
+        varchar course_code UK
+        varchar title
+    }
+    OFFERING {
+        bigint id PK
+        bigint course_id FK
+        varchar term_code
+        smallint section_no
+    }
+    ENROLLMENT {
+        bigint student_id PK, FK
+        bigint offering_id PK, FK
+        timestamptz enrolled_at
+        varchar status
+    }
+```
+
+**3. 식별 규칙을 DDL에 고정한다.** 학생·과목·분반에는 대리 PK를 써 참조를 단순하고 안정적으로 유지한다. 그렇더라도 학번·과목 코드와 “같은 과목, 학기, 분반 번호의 개설은 하나”라는 업무상 중복 방지 규칙은 별도 UNIQUE로 남긴다. 신청 행은 학생 ID와 분반 ID의 조합 자체가 신청을 식별하므로 복합 PK를 쓴다. 이 PK는 같은 쌍의 중복 신청을 막고 두 FK는 존재하지 않는 학생·분반을 가리키지 못하게 한다.
+
+```sql
+-- PostgreSQL 18 예시: 키와 참조 무결성에 초점을 둔 최소 스키마
+CREATE TABLE student (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  campus_no VARCHAR(20) NOT NULL UNIQUE,
+  email VARCHAR(254) NOT NULL UNIQUE,
+  name VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE course (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  course_code VARCHAR(20) NOT NULL UNIQUE,
+  title VARCHAR(200) NOT NULL
+);
+
+CREATE TABLE offering (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  course_id BIGINT NOT NULL REFERENCES course(id),
+  term_code VARCHAR(10) NOT NULL,
+  section_no SMALLINT NOT NULL CHECK (section_no > 0),
+  UNIQUE (course_id, term_code, section_no)
+);
+
+CREATE TABLE enrollment (
+  student_id BIGINT NOT NULL REFERENCES student(id),
+  offering_id BIGINT NOT NULL REFERENCES offering(id),
+  enrolled_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  status VARCHAR(12) NOT NULL CHECK (status IN ('ENROLLED', 'DROPPED')),
+  PRIMARY KEY (student_id, offering_id)
+);
+```
+
+PK와 UNIQUE는 각각 행 식별과 업무상 중복 금지를 DB가 동시 요청에서도 보장하게 한다. FK는 부모 행이 실제로 존재하는지 보장하지만 자식 FK의 인덱스까지 항상 자동 생성한다고 가정하지 않는다. 목록·조인 조회가 잦다면 사용 패턴에 따라 `enrollment(offering_id)` 인덱스를 별도로 검토한다.
+
+**함정 — 규칙을 빠뜨리거나 키에 과한 의미를 싣지 않는다.** 이메일을 PK로 쓰면 변경 시 참조하는 모든 FK가 흔들릴 수 있고, 대리키만 두면 학번 중복을 막지 못한다. 반대로 `offering`을 course_id FK 하나로만 제한하면 과목당 개설이 하나뿐인 모델이 된다. `enrollment`에 복합 PK 대신 임의 ID만 두면 중복 신청을 허용하게 되므로 UNIQUE 조합도 선언해야 한다. 위 예시는 학생-분반 한 쌍의 신청 기록을 한 행만 보존한다는 가정이다. 철회 후 재신청 이력을 각각 남겨야 한다면 `attempt_no` 같은 업무 속성을 정의하고 `(student_id, offering_id, attempt_no)`에 UNIQUE를 두는 등 식별 규칙부터 바꾼다. 또한 PostgreSQL의 UNIQUE는 NULL의 취급에 주의해야 하므로 반드시 값이 필요한 업무 키에는 `NOT NULL`도 함께 선언한다.
+
+참고: 5.5. Constraints — https://www.postgresql.org/docs/current/ddl-constraints.html
+참고: 3.3. Foreign Keys — https://www.postgresql.org/docs/current/tutorial-fk.html
+
+### 3.2 SQL 요청: 선언한 결과를 서버가 계획한다
+
+`FROM`이 테이블을 조합하고 `WHERE`가 행을 거른다. `GROUP BY`는 집계 단위, `HAVING`은 집계 후 조건이다. INNER JOIN은 양쪽 매칭, LEFT JOIN은 왼쪽 전체를 남긴다. RIGHT/FULL은 오른쪽 또는 양쪽 비매칭도 남긴다. MySQL에는 FULL OUTER JOIN 문법이 없고 조인 조건 누락은 행 폭증을 만든다.
+
+```sql
+-- 유료 주문이 있는 고객별 주문 수와 결제 총액
+SELECT c.id, c.email, COUNT(o.id) AS order_count,
+       COALESCE(SUM(o.total_amount), 0) AS paid_total
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.id AND o.status = 'PAID'
+WHERE c.created_at >= DATE '2026-01-01'
+GROUP BY c.id, c.email
+HAVING COUNT(o.id) >= 1
+ORDER BY paid_total DESC;
+
+-- 최근 주문이 한 건이라도 있는 고객: 서브쿼리의 결과를 조건으로 사용
+SELECT c.id, c.email
+FROM customers AS c
+WHERE EXISTS (
+  SELECT 1 FROM orders AS o
+  WHERE o.customer_id = c.id
+    AND o.created_at >= TIMESTAMP '2026-09-01 00:00:00'
+);
+```
+
+LEFT JOIN 오른쪽 조건을 WHERE에 두면 NULL 행이 제거되어 INNER처럼 동작할 수 있다. 미매칭 왼쪽 행을 남기려면 결합 조건을 ON에 둔다. `COUNT(*)`와 `COUNT(o.id)`도 결과가 다르다.
+
+데이터 변경은 대상 행을 좁히고 변경 건수를 확인한다. 운영 데이터에서 `UPDATE`/`DELETE`의 WHERE를 빠뜨리면 전체 행을 바꾼다.
+
+```sql
+INSERT INTO orders (id, customer_id, status, total_amount, created_at)
+VALUES (501, 1, 'PENDING', 25000, CURRENT_TIMESTAMP);
+
+UPDATE orders
+SET status = 'PAID'
+WHERE id = 501 AND status = 'PENDING';
+
+DELETE FROM orders
+WHERE id = 501 AND status = 'CANCELLED';
+```
+
+변경 0행은 상태가 이미 바뀌었거나 ID가 잘못된 경우일 수 있다. INSERT 전 애플리케이션의 존재 확인만으로 동시 중복을 막지 못하므로 DB UNIQUE를 최종 방어선으로 둔다.
+
+### 3.3 인덱스·실행계획: 빨라졌는지 계획과 결과로 확인한다
+
+B+Tree 인덱스는 정렬된 키를 계층적으로 저장해 탐색 범위를 좁히고 리프를 따라 범위 조회·정렬을 돕는다. InnoDB 보조 인덱스는 PK를 행 위치 정보에 포함하므로 큰 PK는 공간 비용도 키운다. 세부 구조는 엔진별로 다르다.
+
+`(customer_id, created_at)`은 `customer_id = ? AND created_at >= ?`처럼 선두 컬럼부터 조건을 줄이는 데 유리하다. 날짜만 검색하면 같은 효율을 기대하기 어렵다. PostgreSQL은 선두 등가 조건과 다음 범위 조건을 핵심으로 설명한다. 쿼리·정렬·선택도·쓰기 빈도로 순서를 정한다.
+
+커버링 인덱스는 필요한 컬럼을 인덱스에서 얻어 테이블 접근을 줄인다. PostgreSQL은 `INCLUDE`에 정렬 키가 아닌 반환 컬럼을 둘 수 있다. SELECT 컬럼을 모두 넣으면 크기와 갱신 비용이 커진다.
+
+인덱스 미사용은 오류가 아닐 수 있다. 작은 테이블·낮은 선택도는 순차 스캔이 쌀 수 있다. 함수 적용, 형변환, `LIKE '%abc'`, 부정확한 통계도 원인이다. 표현식·다른 인덱스는 제품 문법과 데이터 분포를 확인한다.
+
+PostgreSQL 계획은 스캔 노드에서 조인·정렬·집계 노드로 쌓이는 트리다. `cost`, `rows`, `width`는 추정치이며 cost는 밀리초가 아니다. 실제 행 수와 추정치 차이는 통계·편향 단서다. `EXPLAIN ANALYZE`는 쿼리를 실행하므로 변경 SQL은 데이터를 바꿀 수 있다. 버퍼 정보로 I/O도 살핀다.
+
+```mermaid
+flowchart TD
+    Q["SQL과 바인드 값"] --> P["파서·분석기"]
+    P --> O["옵티마이저와 통계"]
+    O --> X["실행계획 선택"]
+    X --> S["Seq Scan 또는 Index Scan"]
+    S --> J["Join·정렬·집계 노드"]
+    J --> R["결과 행 반환"]
+    X -. "EXPLAIN은 선택한 계획 표시" .-> E["추정 비용·행 수"]
+    S -. "EXPLAIN ANALYZE는 실제 수행" .-> A["실제 시간·행 수·버퍼"]
+```
+
+### 3.4 트랜잭션·락: 동시 요청의 정합성을 지킨다
+
+ACID는 원자성·일관성·격리성·지속성이다. DB 경계의 성질이므로 외부 결제 API까지 자동으로 묶어주지 않는다.
+
+격리수준은 동시 변경의 가시성 규칙이다. dirty read는 미커밋 값, non-repeatable read는 재조회 값 변경, phantom은 검색 행 집합의 변경이다. PostgreSQL 기본 `READ COMMITTED`는 문장별 스냅샷, InnoDB 기본 `REPEATABLE READ`는 트랜잭션 첫 읽기 스냅샷을 쓴다. InnoDB 범위 잠금은 갭/next-key 락을 쓸 수 있어 이름만으로 동작을 비교하면 안 된다. Spring 트랜잭션은 S08 참조.
+
+```mermaid
+sequenceDiagram
+    participant A as "요청 A"
+    participant DB as "관계형 DB"
+    participant B as "요청 B"
+    A->>DB: "BEGIN, 재고 행 조회"
+    B->>DB: "BEGIN, 같은 재고 행 조회"
+    A->>DB: "재고 차감 UPDATE, 행 락"
+    B->>DB: "같은 행 UPDATE 시도"
+    Note over B,DB: "A의 커밋 또는 롤백까지 대기할 수 있음"
+    A->>DB: "COMMIT"
+    DB-->>B: "락 획득 또는 재시도 가능한 충돌 반환"
+    B->>DB: "조건 재검증 후 COMMIT 또는 ROLLBACK"
+```
+
+락 범위는 제품·연산에 따라 다르다. A가 1번을 잡고 2번을 기다리며 B가 2번을 잡고 1번을 기다리면 순환 대기다. DB는 한 트랜잭션을 롤백해 해소한다. 재시도 가능 작업인지 구분하고 잠금 순서를 통일하며 트랜잭션을 짧게 둔다. 외부 HTTP 호출도 경계 밖에 둔다.
+
+### 3.5 연결·운영: 요청량은 결국 DB 자원으로 모인다
+
+요청은 풀에서 연결을 빌려 SQL을 보내고 반납한다. 풀이 작으면 대기하고 크면 DB 연결 한도를 잠식한다. `풀 최대값 × 인스턴스 수`에 배치·관리 연결 몫을 더해 예산을 정하고 DB 부하와 풀 대기시간을 함께 본다.
+
+복제본은 분석·읽기 분산에 쓸 수 있지만 지연 때문에 쓰기 직후 오래된 값을 돌려줄 수 있다. 최신 읽기는 primary 등 일관성 전략을 둔다. 비동기 복제는 장애 시 미전파 변경도 고려한다. 오삭제도 복제되므로 백업이 아니다.
+
+샤딩은 저장·쓰기를 나누지만 교차 샤드 JOIN, 전역 집계, 재분배와 복구가 어려워진다. 단일 DB·인덱스·읽기 복제로 부족함을 측정한 뒤 검토한다. 백업은 복구 훈련으로 RPO(허용 손실)와 RTO(복구 시간)를 확인한다.
+
+### 3.6 NoSQL과 제품 선택: 데이터 접근 패턴을 먼저 본다
+
+| 유형 | 잘 맞는 데이터·접근 패턴 | 대표 사례와 주의점 |
+|---|---|---|
+| 키-값 | 키 하나로 읽고 쓰는 세션, 캐시, 만료 데이터 | Redis 계열. 임의 조건 검색·복잡한 관계 조인이 주 요구면 불편하다. |
+| 문서형 | 구조가 자주 달라지는 중첩 문서, 문서 단위 조회 | MongoDB 계열. 중복된 하위 문서의 갱신 일관성·문서 크기·관계 질의를 검토한다. |
+| 컬럼 패밀리 / 와이드 컬럼 | 대규모 분산 쓰기, 파티션 키 중심의 조회 | Cassandra 계열. 관계형 SQL처럼 임의 조인하려는 모델이 아니다. 쿼리 패턴에 맞춰 테이블을 설계한다. |
+| 그래프 | 노드 간 다단계 연결 탐색 | Neo4j 계열. 추천·경로 탐색처럼 관계 자체가 핵심인 문제에 적합하다. |
+
+NoSQL 선택 기준은 규모나 JSON 사용 여부가 아니다. 관계·제약·조인이 핵심이면 RDB에서 시작하고, 분산 쓰기·문서 유연성·그래프 순회가 요구될 때 해당 모델을 고른다. MySQL과 PostgreSQL은 타입·인덱스·운영뿐 아니라 기본 격리수준도 다르다(`READ COMMITTED` 대 InnoDB `REPEATABLE READ`). 대상 버전 동작을 확인한다.
+
+## 4. 직접 해보기
+
+로컬 Docker에서 PostgreSQL 18과 MySQL 8.4를 띄운다. 포트 충돌은 호스트 포트를 바꿔 해결한다. 비밀번호는 개발 전용이다.
+
+```sh
+docker run --name d10-postgres \
+  -e POSTGRES_PASSWORD=localpass -e POSTGRES_DB=shop \
+  -p 5432:5432 -d postgres:18
+
+docker run --name d10-mysql \
+  -e MYSQL_ROOT_PASSWORD=localpass -e MYSQL_DATABASE=shop \
+  -p 3306:3306 -d mysql:8.4
+
+docker ps --filter name=d10-
+```
+
+PostgreSQL에 SQL을 입력한다.
+
+```sh
+docker exec -i d10-postgres psql -U postgres -d shop <<'SQL'
+CREATE TABLE customers (
+  id BIGINT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE orders (
+  id BIGINT PRIMARY KEY,
+  customer_id BIGINT NOT NULL REFERENCES customers(id),
+  status TEXT NOT NULL CHECK (status IN ('PENDING', 'PAID', 'CANCELLED')),
+  total_amount NUMERIC(12, 2) NOT NULL CHECK (total_amount >= 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO customers (id, email) VALUES (1, 'ada@example.test');
+INSERT INTO orders (id, customer_id, status, total_amount)
+VALUES (10, 1, 'PAID', 125.00);
+CREATE INDEX orders_customer_created_idx ON orders (customer_id, created_at);
+EXPLAIN SELECT id, status FROM orders
+WHERE customer_id = 1 AND created_at >= CURRENT_DATE - INTERVAL '7 days';
+SQL
+```
+
+계획의 `Seq Scan`/`Index Scan`과 추정·실제 행 수, 시간을 기록한다. 작은 테이블은 Seq Scan이 더 쌀 수 있다. `EXPLAIN ANALYZE`는 실제 실행하므로 변경 SQL에 붙이지 않는다.
+
+```sh
+docker exec -it d10-mysql mysql -uroot -plocalpass shop
+```
+
+```sql
+CREATE TABLE orders (
+  id BIGINT PRIMARY KEY, customer_id BIGINT NOT NULL,
+  status VARCHAR(16) NOT NULL, total_amount DECIMAL(12,2) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX orders_customer_created_idx ON orders (customer_id, created_at);
+EXPLAIN SELECT id, status FROM orders
+WHERE customer_id = 1 AND created_at >= CURRENT_DATE - INTERVAL 7 DAY;
+```
+
+
+Boot 4.1.1 / Java 25 / Gradle에서 JDBC 연결에 필요한 설정 예시다 (미실행).
+
+```kotlin
+// build.gradle.kts — 설정 예시 (미실행)
+plugins {
+    java
+    id("org.springframework.boot") version "4.1.1"
+}
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(25) }
+}
+
+dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-jdbc")
+    runtimeOnly("org.postgresql:postgresql") // 또는 MySQL 드라이버
+}
+```
+
+```properties
+# application.properties — 로컬 예시 (미실행)
+spring.datasource.url=jdbc:postgresql://localhost:5432/shop
+spring.datasource.username=postgres
+spring.datasource.password=localpass
+```
+
+종료는 `docker stop d10-postgres d10-mysql`로 한다.
+
+## 5. 자주 하는 오해와 실수
+
+1. **“FK를 선언했으니 JOIN도 빠르다” →** FK는 참조 무결성 규칙이다. 조인 성능은 자식 키의 인덱스, 데이터 분포, 결과 행 수와 실행계획에 좌우된다. → 양쪽 조인 컬럼과 실제 계획을 확인하고, 자주 쓰는 FK 경로에는 필요한 인덱스를 명시적으로 검토한다.
+2. **“인덱스가 있으면 무조건 탄다” →** 전체 행 대부분을 읽거나 테이블이 작으면 Seq Scan이 더 저렴하다. → `EXPLAIN`의 선택 이유와 추정 행 수를 읽고, 실제 분포로 확인한다.
+3. **“복합 인덱스는 컬럼만 들어 있으면 순서는 상관없다” →** 선두 컬럼을 건너뛴 조건은 인덱스 범위를 충분히 좁히지 못할 수 있다. → WHERE·ORDER BY 패턴의 등가/범위 조건을 모아 선두 컬럼을 설계하고 실제 계획으로 검증한다.
+4. **“복제본이 있으니 백업은 생략해도 된다” →** 잘못된 삭제와 논리 오류도 복제된다. → 독립 백업과 복구 리허설을 운영한다.
+5. **“풀 크기를 키우면 DB 처리량이 늘어난다” →** 지나친 연결은 CPU·락·메모리 비용을 키운다. → 전체 연결 예산과 풀 대기시간으로 조정한다.
+
+## 6. 시각화 설계 메모
+
+1. **요구→스키마** [목적 | 제약이 데이터 오류를 막는 과정 | 요소 | ERD, PK/FK/UNIQUE, DDL | 관계 | 요구→모델→저장 성공/거부 | 애니메이션 | 유효 행은 통과, 잘못된 FK·중복은 거부 | 오해 | 앱 검증만으로 충분]. 1절 흐름도에 대응한다.
+2. **SQL 계획 트리** [목적 | 데이터·통계에 따른 계획 변화를 설명 | 요소 | Seq/Index Scan, Join, 추정·실제 행 수 | 관계 | 자식 노드 결과가 부모로 전달 | 애니메이션 | 선택도·인덱스 변경에 따라 계획 갱신 | 오해 | 인덱스면 무조건 빠름]. 3.3 흐름도에 대응한다.
+3. **동시 재고 차감** [목적 | 락 대기·데드락을 설명 | 요소 | 두 요청, 행, 트랜잭션 | 관계 | 같은 행은 대기, 반대 잠금 순서는 순환 | 애니메이션 | 동시 UPDATE 후 대기 또는 롤백 표시 | 오해 | 트랜잭션이면 동시 요청도 모두 성공]. 3.4 시퀀스에 대응한다.
+4. **운영 경로** [목적 | 요청에서 DB·복제·백업까지 추적 | 요소 | 요청, 풀, primary, replica, 백업 | 관계 | 쓰기는 primary, 복제와 독립 백업은 별도 | 애니메이션 | 풀 고갈·복제 지연·장애를 켜고 지표 표시 | 오해 | replica는 백업이며 연결 증가는 언제나 해결]. 1절 흐름도에 대응한다.
+
+## 7. 자가점검 Q&A (면접 대비)
+
+**Q1. 이메일을 PK로 쓰지 않고 대리키를 둘 이유는 무엇인가?**
+
+이메일은 바뀔 수 있고 개인정보라 FK로 퍼뜨리기 부담스럽다. 대리키는 안정된 참조값이지만 이메일 중복 규칙은 별도 UNIQUE로 지켜야 한다.
+
+꼬리질문: **대리키만 두면 중복 이메일이 가능한가?**
+
+가능하다. 이메일 컬럼에도 `NOT NULL`과 `UNIQUE`가 필요하다.
+
+**Q2. LEFT JOIN 뒤 WHERE 조건이 결과를 바꾸는 이유는?**
+
+오른쪽 미매칭 열은 NULL이다. `WHERE right.status = 'PAID'`는 해당 행을 지우므로, 왼쪽을 보존하려면 오른쪽 제한을 JOIN의 `ON`에 둔다.
+
+꼬리질문: **주문 없는 고객도 남기고 유료 주문만 합산하려면?**
+
+`ON ... AND status='PAID'`로 제한하고 `COUNT(order.id)`로 센다.
+
+**Q3. `(customer_id, created_at)` 인덱스가 있는데 날짜 조건만으로 검색하면 왜 기대만큼 빠르지 않을 수 있나?**
+
+B+Tree는 선두 컬럼부터 범위를 좁히기 쉽다. 날짜만 조회하면 많은 인덱스 영역을 읽을 수 있고 skip scan도 항상 이득인 것은 아니다.
+
+꼬리질문: **그럼 인덱스 순서는 어떻게 정하는가?**
+
+등가·범위 조건, 정렬, 선택도, 쓰기 비용을 보고 정한 뒤 계획과 데이터로 검증한다.
+
+**Q4. EXPLAIN에서 Seq Scan을 보면 인덱스가 잘못된 것인가?**
+
+아니다. 작은 테이블이나 많은 결과는 순차 스캔이 쌀 수 있다. 추정·실제 행 수와 비용·버퍼를 비교한다.
+
+꼬리질문: **추정 행 수와 실제 행 수가 크게 다르면 무엇을 보나?**
+
+통계 최신성, 값 편향, 함수·형변환 조건을 보고 통계나 인덱스를 조정해 다시 측정한다.
+
+**Q5. MySQL과 PostgreSQL에서 같은 격리수준 이름을 쓰면 같은 동작인가?**
+
+아니다. PostgreSQL 기본은 `READ COMMITTED`, InnoDB는 `REPEATABLE READ`이며 스냅샷·범위 락 동작도 다르다.
+
+꼬리질문: **새 요청 직후 조회가 이전 값을 반환한다면 무엇을 의심할까?**
+
+비동기 replica 지연을 확인하고, 최신 읽기는 primary 경로 등으로 보장한다.
+
+**Q6. 데드락이 나면 DB 장애인가? 애플리케이션은 어떻게 해야 하나?**
+
+데드락은 락 대기의 순환이고 DB는 한 트랜잭션을 롤백해 푼다. 트랜잭션을 짧게, 락 순서를 일정하게 하고 재시도 가능한 작업만 제한적으로 재시도한다.
+
+꼬리질문: **왜 외부 API 호출을 트랜잭션 안에 넣는 것이 위험한가?**
+
+DB 연결·락을 오래 점유하고 외부 성공과 DB 롤백은 하나로 묶이지 않는다. 보상 등 별도 설계가 필요하다.
+
+**Q7. 커넥션 풀 최대 크기를 앱마다 100으로 늘려도 괜찮은가?**
+
+전체 인스턴스·배치 연결이 DB 한도 안이어야 한다. 과한 연결은 CPU·메모리·락 경합을 키우므로 풀 대기와 DB 사용률로 조정한다.
+
+꼬리질문: **풀 대기시간이 길면 우선 풀을 키울까?**
+
+느린 쿼리·락 대기·누수와 DB 포화를 먼저 본다. DB 병목이면 더 열수록 악화한다.
+
+**Q8. 읽기 replica를 두면 백업까지 해결되는가?**
+
+아니다. 오삭제도 replica로 전파된다. 독립 백업과 복구 훈련으로 RPO/RTO를 검증한다.
+
+꼬리질문: **샤딩과 복제의 차이는?**
+
+복제는 같은 데이터 사본, 샤딩은 데이터 조각을 나눈다. 샤딩은 교차 조회와 재분배가 복잡하다.
+
+## 8. 참고문헌
+
+- MySQL 8.4 Reference Manual — Optimization and Indexes — https://dev.mysql.com/doc/refman/8.4/en/optimization-indexes.html — 인덱스가 WHERE 검색을 돕는 방식과 인덱스가 추가하는 공간·쓰기 비용을 확인했다. (브라우저 본문 확인)
+- MySQL 8.4 Reference Manual — InnoDB Transaction Isolation Levels — https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html — InnoDB 기본 격리수준, 일관 읽기와 범위 잠금의 차이를 확인했다. (브라우저 본문 확인)
+- PostgreSQL 18 Documentation — 14.1 Using EXPLAIN — https://www.postgresql.org/docs/current/using-explain.html — 계획 트리, 비용·행 수 추정과 `EXPLAIN ANALYZE` 주의점을 확인했다.
+- PostgreSQL 18 Documentation — 5.5 Constraints — https://www.postgresql.org/docs/current/ddl-constraints.html — CHECK·NOT NULL·UNIQUE·PK·FK 제약을 정의하는 목적과 오류 동작을 확인했다.
+- PostgreSQL 18 Documentation — 7.2 Table Expressions — https://www.postgresql.org/docs/current/queries-table-expressions.html — FROM·JOIN·WHERE·GROUP BY·HAVING의 관계식 흐름을 확인했다.
+- PostgreSQL 18 Documentation — 11.3 Multicolumn Indexes — https://www.postgresql.org/docs/current/indexes-multicolumn.html — B-tree 복합 인덱스에서 선두 컬럼 등가 조건과 다음 범위 조건의 역할을 확인했다.
+- PostgreSQL 18 Documentation — 13.2 Transaction Isolation — https://www.postgresql.org/docs/current/transaction-iso.html — 격리수준별 현상 정의와 PostgreSQL 기본 동작을 확인했다.
+- PostgreSQL 18 Documentation — 25.1 SQL Dump — https://www.postgresql.org/docs/current/backup-dump.html — `pg_dump` 논리 백업과 복원 가능한 덤프를 확인했다.
+- PostgreSQL 18 Documentation — 26 High Availability, Load Balancing, and Replication — https://www.postgresql.org/docs/current/high-availability.html — 읽기 서버 결합과 쓰기 전파 동기화의 어려움을 확인했다.
+- Use The Index, Luke! — SQL Indexing and Tuning e-Book — https://use-the-index-luke.com/ — B-Tree, 리프, 복합 인덱스, 함수 조건, 과잉 인덱스 등 인덱스 설계 어휘를 확인했다.
