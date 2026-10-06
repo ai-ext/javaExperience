@@ -36,7 +36,7 @@ API 하나를 처음부터 끝까지 만든다. 1장에서는 `POST /api/posts`(
 - 남이 쓴 글 3개(id 1~3)가 있다 — 좋아요·댓글 장에서 쓴다. 여러분이 만드는 글은 id 4부터 붙는다.
 - 태그 8개: `java`, `spring`, `jpa`, `mysql`, `docker`, `테스트`, `회고`, `질문`
 - 토큰 테이블은 `api_token`. 로그인·토큰 발급 기능은 만들지 않고, 미리 발급된 토큰을 쓴다고 가정한다.
-- 스키마 전체: [`docker/mysql/sql/schema.sql`](../docker/mysql/sql/schema.sql) · 데이터: [`scenario-seed.sql`](../docker/mysql/sql/scenario-seed.sql)
+- 테이블 구조와 데이터는 dump 파일 [`docker/mysql/init/01-community.sql`](../docker/mysql/init/01-community.sql)에 있다. 눈으로 보려면 CloudBeaver(`http://localhost:8979`, `cbadmin` / `Admin1234`)의 `community (시나리오)` 연결을 연다.
 
 ## 목차
 

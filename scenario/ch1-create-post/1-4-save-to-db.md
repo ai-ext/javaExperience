@@ -44,7 +44,7 @@
 
 **지켜야 할 것**
 
-- `application.yml`이 `ddl-auto: validate`라서 엔티티가 테이블과 다르면 서버가 뜨지 않는다. 테이블을 바꾸지 말고 엔티티를 테이블에 맞춘다. 테이블은 [`schema.sql`](../../docker/mysql/sql/schema.sql)과 DBeaver로 확인할 수 있다.
+- `application.yml`이 `ddl-auto: validate`라서 엔티티가 테이블과 다르면 서버가 뜨지 않는다. 테이블을 바꾸지 말고 엔티티를 테이블에 맞춘다. 테이블은 CloudBeaver(`http://localhost:8979`)의 `community (시나리오)` 연결이나 dump 파일 [`01-community.sql`](../../docker/mysql/init/01-community.sql)의 `CREATE TABLE`로 확인한다.
 - 없는 `boardSlug`가 오면 어떻게 할지는 이 단계에서 채점하지 않는다(1-5).
 
 ## 직접 확인
