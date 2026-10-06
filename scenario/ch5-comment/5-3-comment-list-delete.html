@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5-3. 댓글 목록과 삭제</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 5장. 댓글·답글 › 5-3</p>
+<h1 id="5-3-댓글-목록과-삭제"><a class="anchor" href="#5-3-댓글-목록과-삭제" aria-hidden="true">#</a>5-3. 댓글 목록과 삭제</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<blockquote>
+<p>&quot;글 아래에 댓글을 보여 주세요. 답글은 그 댓글 아래에요. 댓글을 지웠는데 답글이 달려 있으면 대화가 끊겨 보이니까 &#39;삭제된 댓글입니다&#39;로 자리만 남겨 주세요.&quot;</p>
+</blockquote>
+<p>댓글을 <strong>트리 모양</strong>(최상위 → 답글)으로 조립하고, 삭제·차단 규칙에 따라 무엇을 보여 줄지 정한다.</p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<p><strong>목록</strong> — <code>GET /api/posts/{postId}/comments</code></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>인증</td>
+<td>필요 없음(토큰이 있으면 그 회원 기준 — 2-3과 같은 방식)</td>
+</tr>
+<tr>
+<td>글</td>
+<td>2-3 규칙상 볼 수 없는 글이면 <code>404</code></td>
+</tr>
+<tr>
+<td>정렬</td>
+<td>최상위 댓글은 작성 순(<code>created_at</code>, <code>id</code> 오름차순), 답글도 작성 순</td>
+</tr>
+<tr>
+<td>지운 최상위 댓글</td>
+<td>살아 있는 답글이 있으면 <code>deleted: true</code>, <code>content: &quot;삭제된 댓글입니다&quot;</code>, <code>author: null</code>로 <strong>자리를 남긴다</strong>. 답글이 없으면 목록에서 뺀다</td>
+</tr>
+<tr>
+<td>지운 답글</td>
+<td>뺀다</td>
+</tr>
+<tr>
+<td>차단</td>
+<td>보는 사람과 차단 관계인 회원의 댓글은 뺀다(최상위면 그 아래 답글까지)</td>
+</tr>
+</tbody></table></div>
+<pre><code class="language-json">[
+  { &quot;id&quot;: 1, &quot;author&quot;: { &quot;id&quot;: 4, &quot;nickname&quot;: &quot;박디비&quot; }, &quot;content&quot;: &quot;트랜잭션은 서비스 메서드에 거는 게 기본이에요.&quot;,
+    &quot;createdAt&quot;: &quot;2026-09-25T09:00:00&quot;, &quot;deleted&quot;: false,
+    &quot;replies&quot;: [ { &quot;id&quot;: 2, &quot;author&quot;: { &quot;id&quot;: 3, &quot;nickname&quot;: &quot;이스프링&quot; }, &quot;content&quot;: &quot;감사합니다! ...&quot;, &quot;createdAt&quot;: &quot;2026-09-25T10:00:00&quot; } ] },
+  { &quot;id&quot;: 4, &quot;author&quot;: null, &quot;content&quot;: &quot;삭제된 댓글입니다&quot;, &quot;createdAt&quot;: &quot;2026-09-25T12:00:00&quot;, &quot;deleted&quot;: true,
+    &quot;replies&quot;: [ { &quot;id&quot;: 5, &quot;author&quot;: { &quot;id&quot;: 4, &quot;nickname&quot;: &quot;박디비&quot; }, &quot;content&quot;: &quot;어떤 질문이었나요?&quot;, &quot;createdAt&quot;: &quot;2026-09-25T13:00:00&quot; } ] }
+]</code></pre>
+<p><strong>삭제</strong> — <code>DELETE /api/comments/{id}</code></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>인증·권한</td>
+<td>필요. 댓글 작성자만(아니면 <code>403</code>)</td>
+</tr>
+<tr>
+<td>저장</td>
+<td><code>comment.deleted_at</code>에 지금 시각(soft delete), <code>post.comment_count</code> 1 감소</td>
+</tr>
+<tr>
+<td>응답</td>
+<td><code>204</code></td>
+</tr>
+<tr>
+<td>없거나 이미 지운 댓글</td>
+<td><code>404</code></td>
+</tr>
+</tbody></table></div>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<p>11번 글의 시드 댓글: 1(최상위, 박디비) ← 2(답글) · 3(최상위, <strong>한차단</strong> — 김자바와 차단 관계) · 4(최상위, <strong>지움</strong>) ← 5(답글) · 6(최상위, 지움, 답글 없음).</p>
+<pre><code class="language-bash">BASE=http://localhost:8080
+K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'
+tree() { python3 -c 'import sys,json; print([(c[&quot;id&quot;], c[&quot;deleted&quot;], [r[&quot;id&quot;] for r in c[&quot;replies&quot;]]) for c in json.load(sys.stdin)])'; }
+jid() { python3 -c 'import sys,json; print(json.load(sys.stdin)[&quot;id&quot;])'; }
+
+curl -s &quot;$BASE/api/posts/11/comments&quot; | tree                 # N1 비로그인
+curl -s -H &quot;$K&quot; &quot;$BASE/api/posts/11/comments&quot; | tree         # N2 김자바
+curl -i -H &quot;$K&quot; &quot;$BASE/api/posts/9/comments&quot;                 # N3 볼 수 없는 글
+
+CID=$(curl -s -X POST &quot;$BASE/api/posts/3/comments&quot; -H &quot;$K&quot; -H 'Content-Type: application/json' -d '{&quot;content&quot;:&quot;[채점] 지울 댓글&quot;}' | jid)   # N4
+curl -i -X DELETE &quot;$BASE/api/comments/$CID&quot; -H &quot;$L&quot;          # N5 남의 댓글
+curl -i -X DELETE &quot;$BASE/api/comments/$CID&quot; -H &quot;$K&quot;          # N6 작성자
+curl -i -X DELETE &quot;$BASE/api/comments/$CID&quot; -H &quot;$K&quot;          # N7 다시</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용). 5-2 채점에서 1번 댓글에 김자바의 답글이 더 달려 있을 수 있다 — 그래도 아래 기대는 같다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>N1</td>
+<td><code>200</code>. 최상위 id 순서 <code>1, 3, 4</code>. 1번의 답글 첫 항목은 2번. 4번은 <code>deleted</code>=true, <code>content</code>=<code>삭제된 댓글입니다</code>, <code>author</code>=null, 답글 [5]. 6번은 없다</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>N2</td>
+<td><code>200</code>. 최상위 id 순서 <code>1, 4</code> — 3번(한차단)이 빠진다</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>N3</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>D1</td>
+<td>N4 <strong>전</strong> <code>SELECT comment_count FROM post WHERE id = 3</code></td>
+<td>값 c를 기억</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>N4 / N5 / N6 / N7</td>
+<td><code>201</code> / <code>403</code> / <code>204</code> / <code>404</code></td>
+</tr>
+<tr>
+<td>D2</td>
+<td>N7 뒤 같은 쿼리</td>
+<td>c — 달았다 지웠으니 원래대로</td>
+</tr>
+<tr>
+<td>D3</td>
+<td><code>SELECT deleted_at IS NOT NULL FROM comment WHERE id = {N4 응답 id}</code></td>
+<td><code>1</code> — 행은 남아 있다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>쿼리 수</td>
+<td>댓글을 한두 번의 쿼리로 읽어서 메모리에서 트리로 조립한다. 댓글마다 답글을 따로 조회하지 않는다(N+1)</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>표시 규칙</td>
+<td>자리 남기기·빼기·차단 규칙이 한 곳에 모여 있고 테스트하기 쉽다(엔티티 → 트리 DTO 변환 함수)</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>삭제 권한</td>
+<td>작성자 확인이 서비스에 있다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>숫자</td>
+<td>삭제 시 <code>comment_count</code> 감소가 같은 트랜잭션이다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/S09-jpa-hibernate.html#lazy와-n1">S09 — LAZY와 N+1</a> — 트리를 만들다 생기는 N+1</li>
+<li><a href="../../docs/knowledge/W09-why-dto.html">W09 DTO는 왜 쓰나</a> — 저장 모양(평평한 행)과 응답 모양(트리)이 다르다</li>
+<li><a href="../../docs/knowledge/D11-web-security-basics.html#32-인증과-인가-신원-확인-후-객체까지-확인">D11 — 인증과 인가</a></li>
+<li><a href="../../docs/knowledge/J25-data-structures-map.html">J25 자료구조 지도</a> — <code>Map&lt;Long, List&lt;…&gt;&gt;</code>로 묶기</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 — 트리 조립</summary>
+
+<p>그 글의 댓글을 작성자와 함께 한 번에 읽는다(<code>join fetch c.member</code>). <code>Map&lt;Long, List&lt;Comment&gt;&gt; repliesByParent</code>로 답글을 부모 id별로 묶은 뒤, 최상위 댓글을 돌면서 규칙(지움·차단)에 따라 DTO를 만든다. &quot;살아 있는 답글이 있나&quot;는 차단으로 빠진 답글을 제외하고 센다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="../ch6-bookmark/6-1-bookmark.html">6-1. 북마크 추가·삭제</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 5-3. 댓글 목록과 삭제\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch5-comment/5-3-comment-list-delete.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라. \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="5-2-reply.html">← 이전 5-2. 답글(1단계까지)</a><a href="../ch6-bookmark/6-1-bookmark.html">다음 → 6-1. 북마크 추가·삭제</a></nav>
+</main>
+
+</body>
+</html>

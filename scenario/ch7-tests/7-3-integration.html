@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>7-3. 통합 테스트 — Testcontainers</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 7장. 테스트로 지키기 › 7-3</p>
+<h1 id="7-3-통합-테스트--testcontainers"><a class="anchor" href="#7-3-통합-테스트--testcontainers" aria-hidden="true">#</a>7-3. 통합 테스트 — Testcontainers</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p>슬라이스·단위 테스트는 빠르지만 &quot;진짜로 붙였을 때&quot;는 확인하지 못한다. 엔티티 매핑, 실제 SQL, 트랜잭션, 인증 부품이 함께 돌 때만 보이는 문제가 있다. 마지막으로 <strong>진짜 MySQL(Testcontainers) 위에서 사용자 흐름 하나를 처음부터 끝까지</strong> 돌린다.</p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<p>테스트 클래스 <strong><code>PostFlowIntegrationTest</code></strong> (이름 그대로) — <code>@SpringBootTest</code> + <code>@AutoConfigureMockMvc</code></p>
+<p>흐름(한 테스트 메서드 또는 단계별 메서드):</p>
+<ol>
+<li>김자바(<code>tok-kimjava</code>)가 <code>dev</code> 게시판에 글을 쓴다 → <code>201</code></li>
+<li>비로그인으로 그 글 상세 → <code>200</code></li>
+<li>이스프링(<code>tok-lee</code>)이 좋아요 → <code>likeCount</code> 1</li>
+<li>이스프링이 댓글 → <code>201</code></li>
+<li>상세에서 <code>likeCount</code>=1, <code>commentCount</code>=1</li>
+<li>김자바가 글을 지운다 → <code>204</code></li>
+<li>상세 → <code>404</code>, 이스프링이 다시 좋아요 → <code>404</code></li>
+</ol>
+<p>추가로 하나 더: <strong>시드 데이터 규칙 확인</strong> — 비로그인으로 <code>GET /api/boards/free/posts?size=20</code>의 id 순서가 <code>21~12, 9, 5, 4</code>인지(2-3).</p>
+<ul>
+<li>테스트 프로파일은 이미 Testcontainers MySQL에 시나리오 dump를 넣는다(<code>application-test.yml</code>). 따로 설정할 것은 없다.</li>
+<li>테스트끼리 순서에 기대지 않는다. 각 테스트가 자기 데이터를 만들어 쓴다.</li>
+</ul>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">./gradlew test --tests '*PostFlowIntegrationTest'
+./gradlew test        # 전체 — 지금까지 만든 테스트가 모두 통과해야 한다</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>T = 테스트 실행(필수), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>T1</td>
+<td><code>./gradlew test --tests &#39;*PostFlowIntegrationTest&#39;</code></td>
+<td>통과</td>
+</tr>
+<tr>
+<td>T2</td>
+<td><code>./gradlew test</code></td>
+<td>전체 통과(2-4·4-2·7-1·7-2 테스트 포함)</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>흐름</td>
+<td>위 1~7과 시드 데이터 확인이 모두 있다. 앞 단계 응답의 id를 다음 단계에 이어 쓴다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>진짜로 붙였나</td>
+<td>서비스·리포지토리를 mock으로 바꾸지 않았다. 실제 MySQL에서 돈다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>트랜잭션 함정</td>
+<td>테스트 클래스에 <code>@Transactional</code>을 붙였다면, 그것 때문에 커밋 후에만 생기는 문제(동시성·커밋 뒤 동작)가 가려진다는 것을 알고 선택했다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>독립성</td>
+<td>다른 테스트가 만든 데이터에 기대지 않는다. 같은 테스트를 두 번 돌려도 통과한다</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>속도</td>
+<td>컨텍스트가 테스트 클래스마다 새로 뜨지 않게 설정을 맞췄다(<code>@MockitoBean</code> 남발·서로 다른 프로퍼티 조합은 컨텍스트 캐시를 깨뜨린다)</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/V04-test-db-strategy.html">V04 테스트 DB 전략</a> — H2 대신 진짜 MySQL을 쓰는 이유</li>
+<li><a href="../../docs/knowledge/V04-test-db-strategy.html#4단계--transactional-함정을-재현">V04 — <code>@Transactional</code> 함정을 재현</a></li>
+<li><a href="../../docs/knowledge/S18-spring-testing.html#컨텍스트-캐시-키">S18 — 컨텍스트 캐시 키</a></li>
+<li><a href="../../docs/knowledge/V06-testing-at-work.html">V06 현업 테스트 실무</a> — 레거시에 테스트 붙이기, CI</li>
+<li><a href="../../docs/knowledge/V01-what-and-how-to-test.html#22-검증할-계약에-맞춰-범위를-정한다">V01 — 검증할 계약에 맞춰 범위를 정한다</a></li>
+</ul>
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p>끝. 여기까지 왔다면 API 하나를 만들고(1장) 읽고(2장) 고치고(3장) 반응을 붙이고(4·5·6장) 테스트로 지키는(7장) 백엔드의 한 바퀴를 돌았다. 더 연습하려면 <a href="../../practice/MISSIONS.html">학습용 미션</a> — 함정이 섞인 많은 데이터로 쿼리를 짜 본다.</p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 7-3. 통합 테스트 — Testcontainers\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch7-tests/7-3-integration.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라. \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="7-2-service-unit.html">← 이전 7-2. 서비스 단위 테스트 — mock과 spy</a><span></span></nav>
+</main>
+
+</body>
+</html>

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>7-2. 서비스 단위 테스트 — mock과 spy</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 7장. 테스트로 지키기 › 7-2</p>
+<h1 id="7-2-서비스-단위-테스트--mock과-spy"><a class="anchor" href="#7-2-서비스-단위-테스트--mock과-spy" aria-hidden="true">#</a>7-2. 서비스 단위 테스트 — mock과 spy</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p>업무 규칙은 서비스에 모여 있다. &quot;내 글엔 좋아요 금지&quot;, &quot;이미 좋아요면 아무것도 안 함&quot;, &quot;볼 수 없는 글은 404&quot; 같은 것들이다. 이 규칙들을 <strong>Spring도 DB도 없이</strong> 순수 자바 단위 테스트로 빠르게 고정한다.</p>
+<p>이때 협력 객체를 다루는 두 방법을 구분해 쓴다.</p>
+<ul>
+<li><strong>mock</strong>: 전부 가짜. 리포지토리처럼 &quot;이번 테스트에서 이런 값을 돌려줘&quot;만 정한다.</li>
+<li><strong>spy</strong>: 실물을 감싼다. 진짜 로직은 그대로 돌리면서 &quot;몇 번, 무엇으로 불렸나&quot;를 확인한다.</li>
+</ul>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<p>테스트 클래스 <strong><code>LikeServiceTest</code></strong> (이름 그대로) — 4장의 좋아요 서비스를 대상으로</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>시나리오</th>
+<th>확인</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>내 글에 좋아요</td>
+<td>정해 둔 예외가 난다. 저장·숫자 증가가 <strong>호출되지 않았다</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>아직 안 누른 글에 좋아요</td>
+<td>좋아요 저장 1번, 숫자 증가 1번. 저장된 <code>PostLike</code>의 글·회원을 <code>ArgumentCaptor</code>로 꺼내 확인</td>
+</tr>
+<tr>
+<td>3</td>
+<td>이미 누른 글에 또 좋아요</td>
+<td>저장도 증가도 <strong>없다</strong>(멱등)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>안 누른 글에 취소</td>
+<td>삭제도 감소도 <strong>없다</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td>볼 수 없는 글</td>
+<td>&quot;볼 수 있나&quot; 규칙(2-3의 규칙 클래스 등)을 <strong>spy</strong>로 감싸 실제 판정을 쓰게 하고, 한 번 호출됐는지와 결과(404 예외)를 확인한다</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li><code>@ExtendWith(MockitoExtension.class)</code> — Spring 컨텍스트를 띄우지 않는다.</li>
+<li>리포지토리는 <code>@Mock</code>, 테스트 대상 서비스는 생성자로 직접 만들거나 <code>@InjectMocks</code>.</li>
+<li>시간이 필요하면 <code>Clock.fixed(...)</code>를 넣는다.</li>
+</ul>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">./gradlew test --tests '*LikeServiceTest'</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>T = 테스트 실행(필수), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>T1</td>
+<td><code>./gradlew test --tests &#39;*LikeServiceTest&#39;</code></td>
+<td>통과, 테스트 5개 이상</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>범위</td>
+<td><code>@SpringBootTest</code>·<code>@WebMvcTest</code>가 없는 순수 단위 테스트다. 실행이 1초 안팎이다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>mock</td>
+<td>리포지토리는 mock이고, 각 테스트가 필요한 상호작용만 준비한다(쓰지 않는 stubbing이 없다 — Mockito strict stubs에 걸리지 않는다)</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>spy</td>
+<td>5번에서 spy를 <strong>왜</strong> 썼는지가 분명하다(실제 규칙을 돌리되 호출을 확인). mock으로 충분한 곳에 spy를 쓰지 않았다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>부정 검증</td>
+<td>1·3·4번에서 &quot;일어나지 않아야 할 일&quot;을 <code>verify(..., never())</code>로 확인한다</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>캡처</td>
+<td>2번에서 <code>ArgumentCaptor</code>로 저장된 값을 꺼내 확인한다</td>
+</tr>
+<tr>
+<td>R6</td>
+<td>설계 피드백</td>
+<td>서비스가 테스트하기 어렵다면(정적 호출·<code>new</code>로 만든 협력 객체·<code>LocalDateTime.now()</code> 직접 호출) 그 지점을 짚는다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/V03-mocking-in-practice.html#22-다섯-더블은-목적이-다르다">V03 mock 실전 — 다섯 더블은 목적이 다르다</a></li>
+<li><a href="../../docs/knowledge/V03-mocking-in-practice.html#221-spy는-실물의-일부-동작을-보존한다-보강">V03 — spy는 실물의 일부 동작을 보존한다</a></li>
+<li><a href="../../docs/knowledge/V03-mocking-in-practice.html#27-시간과-난수는-작은-의존성으로-넣는다">V03 — 시간과 난수는 작은 의존성으로 넣는다</a></li>
+<li><a href="../../docs/knowledge/J19-testing-junit.html#예제-2--mock과-argumentcaptor로-외부-효과-검증">J19 — mock과 ArgumentCaptor로 외부 효과 검증</a></li>
+<li><a href="../../docs/knowledge/W12-why-interfaces.html">W12 인터페이스는 왜 만드나</a> — 테스트하려고 인터페이스가 꼭 필요한가</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 — spy 만들기</summary>
+
+<p><code>PostAccessPolicy policy = spy(new PostAccessPolicy(followRepository, blockRepository));</code>처럼 실물을 만든 뒤 감싼다(그 안의 리포지토리는 mock). 그러면 <code>policy.canView(...)</code>는 진짜 규칙대로 판정하고, 테스트 끝에 <code>verify(policy).canView(viewer, post)</code>로 호출을 확인할 수 있다. spy의 메서드를 바꾸고 싶으면 <code>doReturn(...).when(policy).canView(...)</code> 형태를 쓴다(<code>when(policy.canView(...))</code>는 진짜 메서드를 한 번 실행한다).</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="7-3-integration.html">7-3. 통합 테스트 — Testcontainers</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 7-2. 서비스 단위 테스트 — mock과 spy\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch7-tests/7-2-service-unit.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라. \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="7-1-controller-slice.html">← 이전 7-1. 컨트롤러 슬라이스 테스트</a><a href="7-3-integration.html">다음 → 7-3. 통합 테스트 — Testcontainers</a></nav>
+</main>
+
+</body>
+</html>

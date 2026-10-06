@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2-2. 게시판 목록과 페이징</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 2장. 게시글 조회 — GET /api/posts › 2-2</p>
+<h1 id="2-2-게시판-목록과-페이징"><a class="anchor" href="#2-2-게시판-목록과-페이징" aria-hidden="true">#</a>2-2. 게시판 목록과 페이징</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<blockquote>
+<p>&quot;게시판 들어가면 최신 글부터 10개씩 보여 주고, 아래에 페이지 번호를 붙일 거예요. 전체 몇 개인지도 알려 주세요.&quot;</p>
+</blockquote>
+<p>글이 수천 개여도 한 번에 다 보내지 않는다. <strong>한 페이지만 잘라서</strong> 보내고, 전체 건수와 다음 페이지가 있는지를 같이 알려 준다.</p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>메서드·경로</td>
+<td><code>GET /api/boards/{slug}/posts?page=0&amp;size=10</code></td>
+</tr>
+<tr>
+<td>인증</td>
+<td>필요 없음</td>
+</tr>
+<tr>
+<td>대상</td>
+<td>그 게시판에서 <code>status = &#39;PUBLISHED&#39;</code>이고 삭제되지 않은(<code>deleted_at IS NULL</code>) 글. 공개 범위·차단은 2-3에서</td>
+</tr>
+<tr>
+<td>정렬</td>
+<td><code>published_at</code> 최신순, 같으면 <code>id</code> 큰 순</td>
+</tr>
+<tr>
+<td><code>page</code></td>
+<td>0부터. 생략하면 0. 음수면 <code>400</code></td>
+</tr>
+<tr>
+<td><code>size</code></td>
+<td>생략하면 10. 1~50만 허용, 밖이면 <code>400</code></td>
+</tr>
+<tr>
+<td>없는 게시판</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>응답</td>
+<td>아래 JSON — <strong>목록에는 본문(<code>content</code>)을 넣지 않는다</strong></td>
+</tr>
+</tbody></table></div>
+<pre><code class="language-json">{
+  &quot;items&quot;: [
+    {
+      &quot;id&quot;: 21,
+      &quot;title&quot;: &quot;자유글 10&quot;,
+      &quot;author&quot;: { &quot;id&quot;: 4, &quot;nickname&quot;: &quot;박디비&quot; },
+      &quot;tags&quot;: [&quot;mysql&quot;],
+      &quot;likeCount&quot;: 0,
+      &quot;commentCount&quot;: 0,
+      &quot;viewCount&quot;: 10,
+      &quot;publishedAt&quot;: &quot;2026-10-04T09:00:00&quot;
+    }
+  ],
+  &quot;page&quot;: 0,
+  &quot;size&quot;: 5,
+  &quot;totalElements&quot;: 14,
+  &quot;totalPages&quot;: 3,
+  &quot;hasNext&quot;: true
+}</code></pre>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<p><code>free</code>(자유) 게시판으로 확인한다. 채점은 이 게시판의 시드 글로 하므로, <strong><code>free</code>에 직접 글을 쓰면 기대값이 달라진다</strong>(그럴 땐 DB 초기화).</p>
+<pre><code class="language-bash">BASE=http://localhost:8080
+
+curl -s &quot;$BASE/api/boards/free/posts?page=0&amp;size=5&quot;      # L1
+curl -s &quot;$BASE/api/boards/free/posts?page=2&amp;size=5&quot;      # L2
+curl -i &quot;$BASE/api/boards/free/posts?size=51&quot;            # L3
+curl -i &quot;$BASE/api/boards/free/posts?page=-1&quot;            # L4
+curl -i &quot;$BASE/api/boards/nope/posts&quot;                    # L5</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>L1</td>
+<td><code>200</code>. <code>items</code>의 id 순서 = <code>21, 20, 19, 18, 17</code>. <code>totalElements</code>=14, <code>totalPages</code>=3, <code>hasNext</code>=true, <code>page</code>=0, <code>size</code>=5</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>L1</td>
+<td>각 항목에 <code>id</code>·<code>title</code>·<code>author</code>(id·nickname)·<code>tags</code>·<code>likeCount</code>·<code>commentCount</code>·<code>viewCount</code>·<code>publishedAt</code>가 있고 <strong><code>content</code>가 없다</strong>. id 21의 <code>tags</code>=[<code>mysql</code>], id 20의 <code>tags</code>=[<code>java</code>]</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>L2</td>
+<td><code>200</code>. id 순서 = <code>9, 6, 5, 4</code>, <code>hasNext</code>=false</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>L3</td>
+<td><code>400</code></td>
+</tr>
+<tr>
+<td>C5</td>
+<td>L4</td>
+<td><code>400</code></td>
+</tr>
+<tr>
+<td>C6</td>
+<td>L5</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>R1</td>
+<td>페이징</td>
+<td><code>Pageable</code>/<code>PageRequest</code>(또는 직접 LIMIT·OFFSET)와 정렬 조건이 분명하다. 동률 정렬(<code>id</code>)까지 넣었다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>건수</td>
+<td>전체 건수를 구하는 쿼리가 따로 있다는 것을 알고 있다(로그로 확인)</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>응답 모양</td>
+<td>목록 전용 DTO를 쓴다. <code>Page</code> 객체를 그대로 직렬화하지 않는다(응답 모양이 라이브러리에 묶인다)</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>입력 검증</td>
+<td><code>page</code>·<code>size</code> 범위를 서버가 검사한다</td>
+</tr>
+</tbody></table></div>
+<p>7·8·10번은 임시저장·삭제·숨김이라 빠지고, 6번(팔로워 공개)·9번(차단 확인용)은 이 단계에서는 보이는 게 맞다.</p>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/W15-paging-offset-vs-cursor.html">W15 페이징 — OFFSET vs 커서</a> — 지금은 OFFSET, 4-3에서 커서</li>
+<li><a href="../../docs/knowledge/W15-paging-offset-vs-cursor.html#총-건수는-별도-질문이다">W15 — 총 건수는 별도 질문이다</a></li>
+<li><a href="../../docs/knowledge/S10-spring-data-query.html#페이징은-정렬과-건수-계산의-계약이다">S10 — 페이징은 정렬과 건수 계산의 계약이다</a></li>
+<li><a href="../../docs/knowledge/W09-why-dto.html">W09 DTO는 왜 쓰나</a></li>
+<li><a href="../../docs/knowledge/W10-where-to-validate.html">W10 검증은 어디서 하나</a> — 쿼리 파라미터 검증</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 리포지토리</summary>
+
+<p><code>Page&lt;Post&gt; findByBoardAndStatusAndDeletedAtIsNull(Board board, PostStatus status, Pageable pageable)</code> 같은 파생 쿼리와 <code>PageRequest.of(page, size, Sort.by(DESC, &quot;publishedAt&quot;).and(Sort.by(DESC, &quot;id&quot;)))</code>로 시작할 수 있다. 결과 <code>Page</code>에서 <code>getTotalElements()</code>, <code>getTotalPages()</code>, <code>hasNext()</code>를 꺼내 DTO에 담는다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 파라미터 검증</summary>
+
+<p><code>@RequestParam(defaultValue = &quot;10&quot;) @Min(1) @Max(50) int size</code>처럼 쓰고 컨트롤러에 <code>@Validated</code>를 붙이면 범위 밖 값이 예외가 된다. 그 예외(<code>HandlerMethodValidationException</code> 등)도 Advice에서 400으로 바꾼다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="2-3-visibility.html">2-3. 볼 수 있는 글만</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 2-2. 게시판 목록과 페이징\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch2-read-post/2-2-board-list.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라. \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="2-1-get-one.html">← 이전 2-1. 단건 조회와 404</a><a href="2-3-visibility.html">다음 → 2-3. 볼 수 있는 글만 — 임시저장·삭제·숨김·팔로워·차단</a></nav>
+</main>
+
+</body>
+</html>
