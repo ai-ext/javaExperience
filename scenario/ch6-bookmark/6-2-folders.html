@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>6-2. 폴더 — 최대 10개, 이름 중복 불가</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 6장. 북마크(즐겨찾기) › 6-2</p>
+<h1 id="6-2-폴더--최대-10개-이름-중복-불가"><a class="anchor" href="#6-2-폴더--최대-10개-이름-중복-불가" aria-hidden="true">#</a>6-2. 폴더 — 최대 10개, 이름 중복 불가</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<blockquote>
+<p>&quot;북마크를 폴더로 정리하고 싶어요. 폴더는 10개까지, 같은 이름은 못 만들게요. 폴더를 지우면 안에 있던 북마크는 지우지 말고 기본 폴더로 옮겨 주세요.&quot;</p>
+</blockquote>
+<p>규칙이 여럿인 작은 CRUD다. <strong>한도·중복·소유자 확인</strong>을 각각 어디서 어떻게 막을지가 핵심이다.</p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>메서드·경로</th>
+<th>의미</th>
+<th>성공 응답</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GET /api/me/bookmark-folders</code></td>
+<td>내 폴더 목록(만든 순)</td>
+<td><code>200</code> <code>[ { &quot;id&quot;: 11, &quot;name&quot;: &quot;스프링 공부&quot;, &quot;bookmarkCount&quot;: 2 } ]</code></td>
+</tr>
+<tr>
+<td><code>POST /api/me/bookmark-folders</code></td>
+<td>만들기 <code>{ &quot;name&quot;: &quot;...&quot; }</code></td>
+<td><code>201</code>, <code>Location: /api/me/bookmark-folders/{id}</code>, <code>{ &quot;id&quot;, &quot;name&quot; }</code></td>
+</tr>
+<tr>
+<td><code>PATCH /api/me/bookmark-folders/{id}</code></td>
+<td>이름 바꾸기 <code>{ &quot;name&quot;: &quot;...&quot; }</code></td>
+<td><code>200</code> <code>{ &quot;id&quot;, &quot;name&quot; }</code></td>
+</tr>
+<tr>
+<td><code>DELETE /api/me/bookmark-folders/{id}</code></td>
+<td>지우기 — 안의 북마크는 기본 폴더(<code>folder_id = NULL</code>)로 옮긴다</td>
+<td><code>204</code></td>
+</tr>
+<tr>
+<td><code>PATCH /api/me/bookmarks/{bookmarkId}</code></td>
+<td>북마크를 다른 폴더로 <code>{ &quot;folderId&quot;: 12 }</code>(<code>null</code>이면 기본 폴더)</td>
+<td><code>200</code> 6-1의 JSON</td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상황</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>이름이 비었거나 50자 초과(앞뒤 공백은 잘라서 판단)</td>
+<td><code>400</code></td>
+</tr>
+<tr>
+<td>내 폴더 중 같은 이름이 이미 있음</td>
+<td><code>409</code></td>
+</tr>
+<tr>
+<td>폴더가 이미 10개인데 또 만들기</td>
+<td><code>400</code></td>
+</tr>
+<tr>
+<td>남의 폴더·남의 북마크, 없는 id</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>토큰 없음</td>
+<td><code>401</code></td>
+</tr>
+</tbody></table></div>
+<p>모든 API에 토큰이 필요하다.</p>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<p>이스프링은 폴더 2개(&quot;스프링 공부&quot; 11번·&quot;나중에 읽기&quot; 12번), 박디비는 폴더 10개(한도)를 가지고 있다.</p>
+<pre><code class="language-bash">BASE=http://localhost:8080
+K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; P='Authorization: Bearer tok-park'
+J='Content-Type: application/json'
+jid() { python3 -c 'import sys,json; print(json.load(sys.stdin)[&quot;'&quot;${1:-id}&quot;'&quot;])'; }
+NAME=&quot;[채점] 폴더 $(date +%H%M%S)&quot;
+
+curl -s -H &quot;$L&quot; &quot;$BASE/api/me/bookmark-folders&quot;; echo                                                     # F1
+curl -i -X POST &quot;$BASE/api/me/bookmark-folders&quot; -H &quot;$P&quot; -H &quot;$J&quot; -d '{&quot;name&quot;:&quot;[채점] 열한 번째&quot;}'           # F2 한도
+FID=$(curl -s -X POST &quot;$BASE/api/me/bookmark-folders&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d &quot;{\&quot;name\&quot;:\&quot;$NAME\&quot;}&quot; | jid)     # F3
+curl -i -X POST &quot;$BASE/api/me/bookmark-folders&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d &quot;{\&quot;name\&quot;:\&quot;$NAME\&quot;}&quot;                 # F4 같은 이름
+curl -i -X PATCH &quot;$BASE/api/me/bookmark-folders/11&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{&quot;name&quot;:&quot;[채점] 남의 폴더&quot;}'      # F5
+BID=$(curl -s -X PUT &quot;$BASE/api/posts/3/bookmark&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{}' | jid bookmarkId)               # F6
+curl -s -X PATCH &quot;$BASE/api/me/bookmarks/$BID&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d &quot;{\&quot;folderId\&quot;:$FID}&quot;; echo             # F7 폴더로 옮기기
+curl -i -X DELETE &quot;$BASE/api/me/bookmark-folders/$FID&quot; -H &quot;$K&quot;                                            # F8 폴더 지우기
+curl -i -X PATCH &quot;$BASE/api/me/bookmarks/1&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{&quot;folderId&quot;:null}'                        # F9 남의 북마크</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용). <code>{FID}</code>·<code>{BID}</code>는 F3·F6 응답의 id다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>F1</td>
+<td><code>200</code>, <code>[{11, &quot;스프링 공부&quot;, 2}, {12, &quot;나중에 읽기&quot;, 2}]</code> 순서</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>F2</td>
+<td><code>400</code> — 박디비는 이미 10개</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>F3 / F4</td>
+<td><code>201</code>(<code>Location</code> 있음) / <code>409</code></td>
+</tr>
+<tr>
+<td>C4</td>
+<td>F5</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>C5</td>
+<td>F7</td>
+<td><code>200</code>, <code>folderId</code>={FID}</td>
+</tr>
+<tr>
+<td>C6</td>
+<td>F8</td>
+<td><code>204</code></td>
+</tr>
+<tr>
+<td>D1</td>
+<td>F8 뒤 <code>SELECT folder_id FROM bookmark WHERE id = {BID}</code></td>
+<td><code>NULL</code> — 기본 폴더로 옮겨졌다</td>
+</tr>
+<tr>
+<td>D2</td>
+<td>F8 뒤 <code>SELECT COUNT(*) FROM bookmark_folder WHERE id = {FID}</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td>C7</td>
+<td>F9</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>D3</td>
+<td><code>SELECT COUNT(*) FROM bookmark_folder WHERE member_id = 4</code></td>
+<td><code>10</code> — 한도 초과 요청이 아무것도 만들지 않았다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>중복 이름</td>
+<td>서비스에서 먼저 확인하더라도, 동시에 두 요청이 오면 DB의 UNIQUE(<code>member_id, name</code>)가 막는다는 것을 알고 그 예외를 409로 바꾼다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>한도</td>
+<td>&quot;10개 이하&quot; 확인 위치와 한계(동시에 두 개를 만들면 11개가 될 수 있다)를 설명할 수 있다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>폴더 삭제</td>
+<td>북마크 옮기기와 폴더 삭제가 한 트랜잭션이다. 옮기기는 북마크마다가 아니라 UPDATE 한 번으로 한다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>소유자</td>
+<td>모든 폴더·북마크 조회가 &quot;내 것&quot; 조건을 포함한다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/W10-where-to-validate.html#53-서비스와-db-안내-검사와-최종-고유성">W10 — 서비스와 DB: 안내 검사와 최종 고유성</a> — 409를 어디서 만드나</li>
+<li><a href="../../docs/knowledge/W10-where-to-validate.html#중복-검사와-경쟁-조건">W10 — 중복 검사와 경쟁 조건</a></li>
+<li><a href="../../docs/knowledge/D11-web-security-basics.html#41-안전한-sql-바인딩과-idor-방어를-먼저-설계하기">D11 — IDOR 방어</a></li>
+<li><a href="../../docs/knowledge/W08-where-to-handle-exceptions.html">W08 예외는 어디서 잡나</a> — <code>DataIntegrityViolationException</code>을 409로</li>
+</ul>
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="6-3-my-bookmarks.html">6-3. 내 북마크 목록</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 6-2. 폴더 — 최대 10개, 이름 중복 불가\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch6-bookmark/6-2-folders.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라. \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="6-1-bookmark.html">← 이전 6-1. 북마크 추가·삭제</a><a href="6-3-my-bookmarks.html">다음 → 6-3. 내 북마크 목록</a></nav>
+</main>
+
+</body>
+</html>

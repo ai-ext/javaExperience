@@ -10,7 +10,7 @@
 
 ```json
 {
-  "id": 4,
+  "id": 22,
   "boardSlug": "dev",
   "title": "[채점] DB 저장",
   "content": "Spring Boot로 만든 첫 게시글입니다.",
@@ -21,7 +21,7 @@
 }
 ```
 
-- `id` — DB가 붙인 번호(AUTO_INCREMENT). 시드에 글이 3개 있어서 처음 만든 글은 4 이상이다
+- `id` — DB가 붙인 번호(AUTO_INCREMENT). 시드에 글이 21개 있어서 처음 만든 글은 22 이상이다
 - 상태 `201`, `Location: /api/posts/{id}`는 그대로
 
 **저장 규칙** — `post` 한 행 + 태그 연결
@@ -67,7 +67,7 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 
 | # | 확인 방법 | 기대 |
 |---|---|---|
-| C1 | 요청 A' | 상태 `201`, `Location`이 `/api/posts/{id}`로 끝나고 `id`가 3보다 크다 |
+| C1 | 요청 A' | 상태 `201`, `Location`이 `/api/posts/{id}`로 끝나고 `id`가 21보다 크다 |
 | C2 | 요청 A' | 본문 8개 필드. `author.id` = `2`, `author.nickname` = `김자바`, `tags` = `["spring","채점태그"]`(순서 무관) |
 | C3 | 요청 A'를 한 번 더 | 상태 `201`, `id`가 C1보다 크다 |
 | D1 | `SELECT board_id, author_id, status, visibility, published_at IS NOT NULL AS published, like_count, comment_count FROM post WHERE id = {id}` | `2, 2, PUBLISHED, PUBLIC, 1, 0, 0` |

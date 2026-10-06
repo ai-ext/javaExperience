@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3-2. 삭제 — soft delete</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 3장. 게시글 수정·삭제 › 3-2</p>
+<h1 id="3-2-삭제--soft-delete"><a class="anchor" href="#3-2-삭제--soft-delete" aria-hidden="true">#</a>3-2. 삭제 — soft delete</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<blockquote>
+<p>&quot;삭제 버튼 누르면 글이 없어져야 해요. 근데 운영팀이 신고 처리하려면 지운 글도 남아 있어야 한대요.&quot;</p>
+</blockquote>
+<p>행을 진짜로 지우지 않고 <strong>&quot;지웠다&quot;는 표시만 남긴다</strong>(soft delete). 그러면 사용자에게는 사라진 것처럼 보이고, 운영팀은 기록을 볼 수 있다. 달려 있던 좋아요·댓글 행도 그대로 남는다.</p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>메서드·경로</td>
+<td><code>DELETE /api/posts/{id}</code></td>
+</tr>
+<tr>
+<td>인증</td>
+<td>필요</td>
+</tr>
+<tr>
+<td>지울 수 있는 사람</td>
+<td>작성자, 또는 운영자(<code>ADMIN</code>)</td>
+</tr>
+<tr>
+<td>응답</td>
+<td><code>204 No Content</code>(본문 없음)</td>
+</tr>
+<tr>
+<td>저장</td>
+<td><code>post.deleted_at</code>에 지금 시각. 행·좋아요·댓글·태그 연결은 지우지 않는다</td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상황</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>없는 글, 이미 지운 글, 볼 수 없는 글</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>작성자도 운영자도 아님</td>
+<td><code>403</code></td>
+</tr>
+</tbody></table></div>
+<p>지운 뒤에는 상세(<code>GET</code>)·수정(<code>PATCH</code>)·다시 삭제가 모두 <code>404</code>이고, 목록에서도 빠진다(2-3 규칙 1번).</p>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; A='Authorization: Bearer tok-admin'
+jid() { python3 -c 'import sys,json; print(json.load(sys.stdin)[&quot;id&quot;])'; }
+mk() { curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$1&quot; -H 'Content-Type: application/json' \
+  -d &quot;{\&quot;boardSlug\&quot;:\&quot;dev\&quot;,\&quot;title\&quot;:\&quot;$2\&quot;,\&quot;content\&quot;:\&quot;삭제 확인용\&quot;,\&quot;tags\&quot;:[],\&quot;visibility\&quot;:\&quot;PUBLIC\&quot;}&quot; | jid; }
+
+Y=$(mk &quot;$K&quot; '[채점] 삭제용'); echo &quot;Y=$Y&quot;                                         # S0
+curl -i -X DELETE &quot;$BASE/api/posts/$Y&quot; -H &quot;$L&quot;                                     # S1 남의 글
+curl -i -X DELETE &quot;$BASE/api/posts/$Y&quot; -H &quot;$K&quot;                                     # S2 작성자
+curl -i &quot;$BASE/api/posts/$Y&quot;                                                       # S3 지운 뒤 조회
+curl -i -X DELETE &quot;$BASE/api/posts/$Y&quot; -H &quot;$K&quot;                                     # S4 다시 삭제
+curl -s &quot;$BASE/api/boards/dev/posts?size=50&quot; | python3 -c &quot;import sys,json; print($Y in [i['id'] for i in json.load(sys.stdin)['items']])&quot;   # S5 목록에 있나
+Z=$(mk &quot;$L&quot; '[채점] 운영자가 지울 글'); echo &quot;Z=$Z&quot;
+curl -i -X DELETE &quot;$BASE/api/posts/$Z&quot; -H &quot;$A&quot;                                     # S6 운영자</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용). <code>{Y}</code>·<code>{Z}</code>는 직접 확인에서 만든 글의 id다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>S0</td>
+<td><code>201</code></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>S1</td>
+<td><code>403</code></td>
+</tr>
+<tr>
+<td>C3</td>
+<td>S2</td>
+<td><code>204</code>, 본문 없음</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>S3</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>C5</td>
+<td>S4</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>C6</td>
+<td>S5</td>
+<td><code>False</code> — 목록에 없다</td>
+</tr>
+<tr>
+<td>C7</td>
+<td>S6(운영자가 이스프링 글 삭제)</td>
+<td><code>204</code></td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT deleted_at IS NOT NULL, title FROM post WHERE id = {Y}</code></td>
+<td><code>1</code>, <code>[채점] 삭제용</code> — 행이 남아 있다</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT deleted_at IS NOT NULL FROM post WHERE id = {Z}</code></td>
+<td><code>1</code></td>
+</tr>
+<tr>
+<td>R1</td>
+<td>지운 글 거르기</td>
+<td><code>deleted_at IS NULL</code> 조건을 모든 조회에 빠짐없이 건다(상세·목록·수정·좋아요…). 빠뜨리기 쉬운 곳을 한 곳(2-3 규칙 클래스, 또는 <code>@SQLRestriction</code> 등)으로 모았다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>권한</td>
+<td>&quot;작성자 또는 운영자&quot; 판단이 서비스에 있다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>두 번째 삭제</td>
+<td>두 번째 삭제를 404로 한 이유(이미 없는 자원)를 설명할 수 있다. 204로 하는 설계도 있다는 것을 안다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>연관 데이터</td>
+<td>좋아요·댓글을 같이 지우지 않았다(cascade 삭제나 <code>orphanRemoval</code>로 날아가지 않는다)</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/P20-jpa-entity-mapping.html#25-cascade-orphanremoval-다대다">P20 — cascade, orphanRemoval, 다대다</a> — 같이 지워지면 안 되는 것</li>
+<li><a href="../../docs/knowledge/S09-jpa-hibernate.html">S09 JPA·Hibernate</a></li>
+<li><a href="../../docs/knowledge/W08-where-to-handle-exceptions.html">W08 예외는 어디서 잡나</a></li>
+<li><a href="../../docs/knowledge/R07-backup-restore.html">R07 백업과 복원</a> — &quot;지운 데이터&quot;를 남겨 두는 다른 이유</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 — 엔티티에 삭제 메서드</summary>
+
+<p><code>post.delete(now)</code>가 <code>deletedAt</code>을 채우게 하고, 리포지토리의 <code>delete()</code>는 쓰지 않는다. 지운 글을 거르는 조건은 2-3의 규칙 클래스에 이미 있다면 상세·목록은 자동으로 따라온다. 수정(<code>PATCH</code>)·좋아요처럼 &quot;글을 찾는&quot; 다른 경로도 같은 조회 메서드를 쓰게 한다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="../ch4-like/4-1-like-toggle.html">4-1. 좋아요·취소(멱등)</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 3-2. 삭제 — soft delete\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch3-update-delete/3-2-soft-delete.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라. \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="3-1-patch.html">← 이전 3-1. 부분 수정(PATCH)과 본인 확인</a><a href="../ch4-like/4-1-like-toggle.html">다음 → 4-1. 좋아요·취소(멱등)</a></nav>
+</main>
+
+</body>
+</html>

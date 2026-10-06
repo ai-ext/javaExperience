@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2-4. 쿼리 수 줄이기(N+1)</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 2장. 게시글 조회 — GET /api/posts › 2-4</p>
+<h1 id="2-4-쿼리-수-줄이기n1"><a class="anchor" href="#2-4-쿼리-수-줄이기n1" aria-hidden="true">#</a>2-4. 쿼리 수 줄이기(N+1)</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p>목록 API를 호출하고 SQL 로그(<code>org.hibernate.SQL: debug</code>)를 보면 글 목록을 한 번 가져온 뒤 <strong>글마다</strong> 작성자 조회·태그 조회가 따로 나간다. 20개를 보여 주면 40번 넘게 DB에 다녀온다. 사용자가 늘면 DB가 먼저 버티지 못한다.</p>
+<p><strong>응답은 그대로 두고, 한 번 호출에 나가는 SQL 수를 페이지 크기와 상관없이 일정하게</strong> 만든다. 그리고 그 사실을 테스트로 고정한다(다시 늘어나면 테스트가 깨지게).</p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<ol>
+<li>2-3의 게시판 목록 API를 고쳐 SQL 문장 수를 줄인다.<ul>
+<li>기준: <code>size=5</code>와 <code>size=20</code>의 문장 수가 <strong>같고</strong>, <strong>5개 이하</strong>다(목록·건수·태그 등).</li>
+<li>보는 사람 확인용 서브쿼리는 목록 쿼리 안에 들어가므로 따로 세지 않는다.</li>
+</ul>
+</li>
+<li>테스트 클래스 <strong><code>PostListQueryCountTest</code></strong> 를 만든다(이름 그대로 — 채점에서 이 이름으로 실행한다).<ul>
+<li><code>@SpringBootTest</code> + MockMvc로 <code>GET /api/boards/free/posts?size=5</code>와 <code>size=20</code>을 호출한다.</li>
+<li>Hibernate가 실행한 SQL 문장 수를 세서 위 기준을 단언한다.</li>
+<li>테스트 DB에는 시나리오 데이터(<code>free</code> 게시판 글 13~14개)가 이미 들어 있다.</li>
+</ul>
+</li>
+</ol>
+<p>응답 JSON은 2-3과 완전히 같아야 한다.</p>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+curl -s &quot;$BASE/api/boards/free/posts?size=20&quot; &gt; /dev/null   # 앱 로그에서 SQL 줄 수를 세 본다
+./gradlew test --tests '*PostListQueryCountTest'</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), T = 테스트 실행(필수), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td><code>curl -s &quot;$BASE/api/boards/free/posts?size=20&quot;</code></td>
+<td><code>200</code>, id 순서 <code>21~12, 9, 5, 4</code>(13개). 각 항목의 <code>author</code>·<code>tags</code>가 2-2와 같다(예: 21번 <code>tags</code>=[<code>mysql</code>], 작성자 박디비)</td>
+</tr>
+<tr>
+<td>T1</td>
+<td><code>./gradlew test --tests &#39;*PostListQueryCountTest&#39;</code></td>
+<td>통과</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>측정 방법</td>
+<td>테스트가 실제 SQL 수를 센다(Hibernate <code>Statistics</code>의 <code>getPrepareStatementCount()</code>, 또는 datasource-proxy 같은 도구). 호출 전에 카운트를 초기화한다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>기준 단언</td>
+<td><code>size=5</code>와 <code>size=20</code>의 문장 수가 같다는 것과 상한(5 이하)을 둘 다 단언한다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>해결 방식</td>
+<td>fetch join·<code>@BatchSize</code>/<code>default_batch_fetch_size</code>·DTO 조회+태그 IN 조회 중 무엇을 썼는지, <strong>컬렉션(태그) fetch join + 페이징</strong>을 함께 쓰지 않았는지(메모리 페이징 경고 <code>HHH90003004</code>)</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>응답 불변</td>
+<td>쿼리를 바꾸면서 응답 모양·정렬·필터(2-3 규칙)가 바뀌지 않았다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/S09-jpa-hibernate.html#lazy와-n1">S09 — LAZY와 N+1</a></li>
+<li><a href="../../docs/knowledge/P20-jpa-entity-mapping.html">P20 JPA 엔티티·연관관계 매핑</a></li>
+<li><a href="../../docs/knowledge/W03-db-access-comparison.html">W03 DB 접근 방식 총비교</a> — 엔티티 조회 vs DTO 조회</li>
+<li><a href="../../docs/knowledge/V04-test-db-strategy.html">V04 테스트 DB 전략</a> — 실제 MySQL로 테스트하는 이유</li>
+<li><a href="../../docs/knowledge/S18-spring-testing.html">S18 Spring Boot 테스트</a></li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — SQL 세기</summary>
+
+<p>테스트에 <code>@TestPropertySource(properties = &quot;spring.jpa.properties.hibernate.generate_statistics=true&quot;)</code>를 붙이고, <code>EntityManagerFactory</code>를 주입받아 <code>emf.unwrap(SessionFactory.class).getStatistics()</code>를 얻는다. 호출 직전 <code>statistics.clear()</code>, 호출 뒤 <code>statistics.getPrepareStatementCount()</code>.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 가장 쉬운 해결</summary>
+
+<p>작성자(<code>@ManyToOne</code>)는 목록 쿼리에 <code>join fetch</code>로 붙이고, 태그(컬렉션)는 <code>spring.jpa.properties.hibernate.default_batch_fetch_size: 100</code>으로 IN 쿼리 한 번에 가져오게 한다. 태그를 fetch join하면 페이징이 메모리에서 일어난다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="../ch3-update-delete/3-1-patch.html">3-1. 부분 수정(PATCH)과 본인 확인</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 2-4. 쿼리 수 줄이기(N+1)\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch2-read-post/2-4-n-plus-1.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라. \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="2-3-visibility.html">← 이전 2-3. 볼 수 있는 글만 — 임시저장·삭제·숨김·팔로워·차단</a><a href="../ch3-update-delete/3-1-patch.html">다음 → 3-1. 부분 수정(PATCH)과 본인 확인</a></nav>
+</main>
+
+</body>
+</html>

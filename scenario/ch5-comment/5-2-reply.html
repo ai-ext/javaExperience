@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5-2. 답글(1단계까지)</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 5장. 댓글·답글 › 5-2</p>
+<h1 id="5-2-답글1단계까지"><a class="anchor" href="#5-2-답글1단계까지" aria-hidden="true">#</a>5-2. 답글(1단계까지)</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<blockquote>
+<p>&quot;댓글에 답글을 달 수 있게 해 주세요. 근데 답글의 답글은 안 돼요. 화면이 계속 오른쪽으로 밀려서요.&quot;</p>
+</blockquote>
+<p>같은 API에 <code>parentId</code>를 받는다. 부모가 <strong>같은 글의, 최상위, 지워지지 않은 댓글</strong>인지 확인해야 한다.</p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>메서드·경로</td>
+<td><code>POST /api/posts/{postId}/comments</code>(5-1과 같다)</td>
+</tr>
+<tr>
+<td>요청</td>
+<td><code>{ &quot;content&quot;: &quot;...&quot;, &quot;parentId&quot;: 1 }</code> — <code>parentId</code>가 없으면 5-1처럼 최상위 댓글</td>
+</tr>
+<tr>
+<td>응답</td>
+<td><code>201</code>, 5-1과 같은 JSON에 <code>parentId</code>가 채워진다</td>
+</tr>
+<tr>
+<td><code>comment_count</code></td>
+<td>답글도 1 증가</td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>부모(<code>parentId</code>) 상황</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>없는 댓글 id</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>다른 글의 댓글</td>
+<td><code>400</code></td>
+</tr>
+<tr>
+<td>답글(부모가 또 부모를 가짐)</td>
+<td><code>400</code></td>
+</tr>
+<tr>
+<td>지워진 댓글</td>
+<td><code>400</code></td>
+</tr>
+</tbody></table></div>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<p>11번 글(이스프링의 &quot;트랜잭션은 어디에 거나요?&quot;)에는 시드 댓글이 있다: 1번(최상위), 2번(1번의 답글), 6번(지워진 최상위).</p>
+<pre><code class="language-bash">BASE=http://localhost:8080
+K='Authorization: Bearer tok-kimjava'
+post() { curl -s -i -X POST &quot;$BASE/api/posts/$1/comments&quot; -H &quot;$K&quot; -H 'Content-Type: application/json' -d &quot;$2&quot;; echo; echo ----; }
+
+post 11 '{&quot;content&quot;:&quot;[채점] 답글&quot;,&quot;parentId&quot;:1}'          # Q1
+post 11 '{&quot;content&quot;:&quot;[채점] 답글의 답글&quot;,&quot;parentId&quot;:2}'   # Q2
+post 11 '{&quot;content&quot;:&quot;[채점] 지운 댓글에&quot;,&quot;parentId&quot;:6}'   # Q3
+post 3  '{&quot;content&quot;:&quot;[채점] 다른 글 부모&quot;,&quot;parentId&quot;:1}'  # Q4
+post 11 '{&quot;content&quot;:&quot;[채점] 없는 부모&quot;,&quot;parentId&quot;:999999}' # Q5</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>D1</td>
+<td>Q1 <strong>전</strong> <code>SELECT comment_count FROM post WHERE id = 11</code></td>
+<td>값 c를 기억</td>
+</tr>
+<tr>
+<td>C1</td>
+<td>Q1</td>
+<td><code>201</code>, <code>parentId</code>=1, <code>postId</code>=11</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>Q2 / Q3 / Q4</td>
+<td><code>400</code> / <code>400</code> / <code>400</code></td>
+</tr>
+<tr>
+<td>C3</td>
+<td>Q5</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>D2</td>
+<td>Q5까지 끝난 뒤 같은 쿼리</td>
+<td>c+1</td>
+</tr>
+<tr>
+<td>D3</td>
+<td><code>SELECT parent_id FROM comment WHERE id = {Q1 응답 id}</code></td>
+<td><code>1</code></td>
+</tr>
+<tr>
+<td>R1</td>
+<td>부모 검증</td>
+<td>세 조건(같은 글·최상위·안 지워짐)을 서비스에서 확인하고, 실패를 의미 있는 예외로 던진다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>자기 참조</td>
+<td><code>Comment.parent</code>가 <code>@ManyToOne(LAZY)</code> 자기 참조다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>400과 404</td>
+<td>&quot;부모가 없다&quot;(404)와 &quot;부모가 규칙에 안 맞다&quot;(400)를 나눈 이유를 설명할 수 있다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/P20-jpa-entity-mapping.html">P20 JPA 엔티티·연관관계 매핑</a></li>
+<li><a href="../../docs/knowledge/W10-where-to-validate.html#53-서비스와-db-안내-검사와-최종-고유성">W10 — 서비스와 DB: 안내 검사와 최종 고유성</a> — 어떤 검사를 어디에 둘까</li>
+<li><a href="../../docs/knowledge/W08-where-to-handle-exceptions.html">W08 예외는 어디서 잡나</a></li>
+</ul>
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="5-3-comment-list-delete.html">5-3. 댓글 목록과 삭제</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 5-2. 답글(1단계까지)\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch5-comment/5-2-reply.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라. \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="5-1-create-comment.html">← 이전 5-1. 댓글 작성</a><a href="5-3-comment-list-delete.html">다음 → 5-3. 댓글 목록과 삭제</a></nav>
+</main>
+
+</body>
+</html>
