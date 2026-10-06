@@ -4,7 +4,7 @@ API 하나를 처음부터 끝까지 만든다. 1장에서는 `POST /api/posts`(
 
 ## 진행 방법
 
-1. **준비** — 레포 루트에서 `docker compose up -d --build`로 DB를 띄우고, IntelliJ에서 `Main`을 실행한다([README의 "실행"](../README.md#실행)).
+1. **준비** — 레포 루트에서 `docker compose up -d`로 DB를 띄우고, IntelliJ에서 `Main`을 실행한다([README의 "실행"](../README.md#실행)).
 2. **단계 페이지를 읽는다** — 상황, 만들 것(요청·응답 명세), 채점 기준, 필요한 지식 링크가 있다.
 3. **만든다** — 막히면 "필요한 지식"의 문서를 먼저 보고, 그래도 막히면 페이지 아래 힌트를 연다.
 4. **직접 확인한다** — 페이지의 curl 명령(또는 IntelliJ HTTP Client)으로 호출해 본다.
@@ -14,7 +14,7 @@ API 하나를 처음부터 끝까지 만든다. 1장에서는 `POST /api/posts`(
 > **채점은 그 단계의 계약만 본다.** 1-1은 `success`, 1-2부터는 JSON을 돌려주는 것처럼 단계마다 응답이 바뀐다. 다음 단계로 넘어가면 이전 단계의 채점은 실패하는 게 정상이다.
 
 - **작업 브랜치** — 각자 자기 브랜치에서 한다(예: `git switch -c hyemin/ch1`). 단계마다 커밋해 두면 diff로 "무엇이 바뀌었나"를 볼 수 있다. `main`에는 직접 push하지 않는다.
-- **채점이 만드는 데이터** — 결과 테스트는 실제로 글을 만든다. 제목이 `[채점]`으로 시작하는 글이 그것이다. DB를 처음 상태로 돌리려면 `docker compose down -v && docker compose up -d --build`.
+- **채점이 만드는 데이터** — 결과 테스트는 실제로 글을 만든다. 제목이 `[채점]`으로 시작하는 글이 그것이다. DB를 처음 상태로 돌리려면 `docker compose down -v && docker compose up -d`.
 
 ## 시나리오 데이터 (`community` DB)
 
@@ -36,7 +36,7 @@ API 하나를 처음부터 끝까지 만든다. 1장에서는 `POST /api/posts`(
 - 남이 쓴 글 3개(id 1~3)가 있다 — 좋아요·댓글 장에서 쓴다. 여러분이 만드는 글은 id 4부터 붙는다.
 - 태그 8개: `java`, `spring`, `jpa`, `mysql`, `docker`, `테스트`, `회고`, `질문`
 - 토큰 테이블은 `api_token`. 로그인·토큰 발급 기능은 만들지 않고, 미리 발급된 토큰을 쓴다고 가정한다.
-- 테이블 구조와 데이터는 dump 파일 [`docker/mysql/init/01-community.sql`](../docker/mysql/init/01-community.sql)에 있다. 눈으로 보려면 CloudBeaver(`http://localhost:8979`, `cbadmin` / `Admin1234`)의 `community (시나리오)` 연결을 연다.
+- 테이블 구조와 데이터는 dump 파일 [`docker/mysql/init/01-community.sql`](../docker/mysql/init/01-community.sql)에 있다. 눈으로 보려면 CloudBeaver(`http://localhost:8978`, `cbadmin` / `Admin1234`)의 `community (시나리오)` 연결을 연다.
 
 ## 목차
 

@@ -6,15 +6,15 @@
 ## 실행
 
 ```bash
-docker compose up -d --build          # MySQL 8.4 (localhost:13308, 계정 community/community, 이 트랙은 DB practice)
+docker compose up -d          # MySQL 8.4 (localhost:13308, 계정 community/community, 이 트랙은 DB practice)
 ./gradlew bootRun --args='--spring.profiles.active=practice'   # IntelliJ: Run 설정 Active profiles에 practice
-docker compose down -v && docker compose up -d --build   # 데이터를 처음 상태로(community·practice 둘 다)
+docker compose down -v && docker compose up -d   # 데이터를 처음 상태로(community·practice 둘 다)
 ```
 
 - 테스트(`./gradlew test`)는 compose DB를 쓰지 않는다. Testcontainers가 일회용 MySQL을 띄운다(Docker 필요, `src/test/resources/application-test.yml`). 기본은 시나리오용 dump(`01-community.sql`)를 넣으므로, 이 트랙의 정답 확인값으로 테스트하려면 그 테스트에서 `spring.sql.init.schema-locations`를 `file:docker/mysql/init/02-practice.sql`로 바꾸고 DB 이름을 `practice`로 맞춘다(예: `@TestPropertySource`).
 - IntelliJ에서 테스트를 돌릴 때 Gradle로 실행되게 두면(기본값) 위 설정이 그대로 적용된다.
 - 데이터는 dump 파일 `docker/mysql/init/02-practice.sql`이다(테이블 12개, 시나리오와 같은 구조). 실습하다 바꾼 상태를 남기려면 `./docker/mysql/dump.sh`(→ `docker/mysql/backup/`).
-- CloudBeaver(`http://localhost:8979`, `cbadmin` / `Admin1234`)의 `practice (학습용)` 연결로 먼저 둘러보자.
+- CloudBeaver(`http://localhost:8978`, `cbadmin` / `Admin1234`)의 `practice (학습용)` 연결로 먼저 둘러보자.
 
 ## 데이터 한눈에
 
