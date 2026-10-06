@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1-4. DB에 저장하기 — JPA</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 1장. 게시글 작성 — POST /api/posts › 1-4</p>
+<h1 id="1-4-db에-저장하기--jpa"><a class="anchor" href="#1-4-db에-저장하기--jpa" aria-hidden="true">#</a>1-4. DB에 저장하기 — JPA</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p>서버를 다시 켜면 글이 전부 사라진다. 이제 진짜 DB(<code>community</code>)의 <code>post</code> 테이블에 저장한다. 로그인은 아직 없으니 <strong>작성자는 김자바(회원 id 2)로 고정</strong>한다(1-6에서 토큰으로 바꾼다).</p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<p><strong>API</strong> — 요청은 그대로, 응답에 <code>author</code>가 추가된다(8개 필드).</p>
+<pre><code class="language-json">{
+  &quot;id&quot;: 4,
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] DB 저장&quot;,
+  &quot;content&quot;: &quot;Spring Boot로 만든 첫 게시글입니다.&quot;,
+  &quot;tags&quot;: [&quot;spring&quot;, &quot;채점태그&quot;],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;,
+  &quot;author&quot;: { &quot;id&quot;: 2, &quot;nickname&quot;: &quot;김자바&quot; },
+  &quot;createdAt&quot;: &quot;2026-10-06T17:30:00&quot;
+}</code></pre>
+<ul>
+<li><code>id</code> — DB가 붙인 번호(AUTO_INCREMENT). 시드에 글이 3개 있어서 처음 만든 글은 4 이상이다</li>
+<li>상태 <code>201</code>, <code>Location: /api/posts/{id}</code>는 그대로</li>
+</ul>
+<p><strong>저장 규칙</strong> — <code>post</code> 한 행 + 태그 연결</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>컬럼</th>
+<th>값</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>board_id</code></td>
+<td><code>boardSlug</code>에 해당하는 <code>board.id</code>(<code>dev</code> → 2)</td>
+</tr>
+<tr>
+<td><code>author_id</code></td>
+<td><code>2</code>(고정)</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>PUBLISHED</code></td>
+</tr>
+<tr>
+<td><code>visibility</code></td>
+<td>요청 값</td>
+</tr>
+<tr>
+<td><code>published_at</code>, <code>created_at</code>, <code>updated_at</code></td>
+<td>지금 시각(셋 다 같아도 된다)</td>
+</tr>
+<tr>
+<td><code>view_count</code>, <code>like_count</code>, <code>comment_count</code></td>
+<td><code>0</code></td>
+</tr>
+</tbody></table></div>
+<p>태그는 이렇게 처리한다.</p>
+<ul>
+<li>이미 있는 이름(예: <code>spring</code>)은 그 태그를 연결한다.</li>
+<li>없는 이름은 <code>tag</code>에 새로 만든 뒤 연결한다.</li>
+<li>같은 이름이 요청에 두 번 와도 한 번만 연결한다.</li>
+<li>연결 테이블은 <code>post_tag</code>(복합 기본키)다.</li>
+</ul>
+<p><strong>지켜야 할 것</strong></p>
+<ul>
+<li><code>application.yml</code>이 <code>ddl-auto: validate</code>라서 엔티티가 테이블과 다르면 서버가 뜨지 않는다. 테이블을 바꾸지 말고 엔티티를 테이블에 맞춘다. 테이블은 <a href="../../docker/mysql/sql/schema.sql"><code>schema.sql</code></a>과 DBeaver로 확인할 수 있다.</li>
+<li>없는 <code>boardSlug</code>가 오면 어떻게 할지는 이 단계에서 채점하지 않는다(1-5).</li>
+</ul>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+
+# 요청 A' — 새 태그 '채점태그' 포함
+curl -i -X POST &quot;$BASE/api/posts&quot; -H 'Content-Type: application/json' \
+  -d '{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[채점] DB 저장&quot;,&quot;content&quot;:&quot;Spring Boot로 만든 첫 게시글입니다.&quot;,&quot;tags&quot;:[&quot;spring&quot;,&quot;채점태그&quot;],&quot;visibility&quot;:&quot;PUBLIC&quot;}'
+
+# DB 확인(레포 루트에서)
+docker compose exec -T mysql mysql -ucommunity -pcommunity community \
+  -e &quot;SELECT id, board_id, author_id, status, title FROM post ORDER BY id DESC LIMIT 3&quot;</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용). <code>{id}</code>는 C1 응답의 <code>id</code>다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 A&#39;</td>
+<td>상태 <code>201</code>, <code>Location</code>이 <code>/api/posts/{id}</code>로 끝나고 <code>id</code>가 3보다 크다</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 A&#39;</td>
+<td>본문 8개 필드. <code>author.id</code> = <code>2</code>, <code>author.nickname</code> = <code>김자바</code>, <code>tags</code> = <code>[&quot;spring&quot;,&quot;채점태그&quot;]</code>(순서 무관)</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 A&#39;를 한 번 더</td>
+<td>상태 <code>201</code>, <code>id</code>가 C1보다 크다</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT board_id, author_id, status, visibility, published_at IS NOT NULL AS published, like_count, comment_count FROM post WHERE id = {id}</code></td>
+<td><code>2, 2, PUBLISHED, PUBLIC, 1, 0, 0</code></td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT t.name FROM post_tag pt JOIN tag t ON t.id = pt.tag_id WHERE pt.post_id = {id} ORDER BY t.name</code></td>
+<td>2행: <code>spring</code>, <code>채점태그</code></td>
+</tr>
+<tr>
+<td>D3</td>
+<td><code>SELECT COUNT(*) FROM tag WHERE name = &#39;채점태그&#39;</code></td>
+<td><code>1</code> — 요청을 여러 번 보내도 태그는 하나</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>엔티티</td>
+<td><code>post</code> 테이블에 맞는 엔티티. 게시판·작성자는 <code>@ManyToOne(fetch = LAZY)</code> 연관관계(또는 id 필드)로, 컬럼 이름·타입이 테이블과 맞는다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>트랜잭션</td>
+<td>글과 태그 저장이 한 트랜잭션(서비스 메서드의 <code>@Transactional</code>). 중간에 실패하면 둘 다 저장되지 않는다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>응답</td>
+<td>엔티티를 그대로 응답하지 않고 DTO로 바꾼다(지연 로딩·순환 참조 문제를 피한다)</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>태그</td>
+<td>이름으로 찾고 없을 때만 만든다. 요청 안의 중복을 제거한다</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>교체 범위</td>
+<td>1-3의 구조 덕분에 바뀐 곳이 주로 저장소·엔티티이고, 컨트롤러는 거의 그대로다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/P19-mysql-jpa-setup.html">P19 MySQL 연결과 JPA 설정</a> — 연결 설정과 <code>ddl-auto</code> 정책</li>
+<li><a href="../../docs/knowledge/P19-mysql-jpa-setup.html#24-ddl-auto는-환경별-정책이다">P19 — <code>ddl-auto</code>는 환경별 정책이다</a></li>
+<li><a href="../../docs/knowledge/P20-jpa-entity-mapping.html">P20 JPA 엔티티·연관관계 매핑</a> — 엔티티 만들기</li>
+<li><a href="../../docs/knowledge/P20-jpa-entity-mapping.html#24-연관관계의-주인">P20 — 연관관계의 주인</a></li>
+<li><a href="../../docs/knowledge/P20-jpa-entity-mapping.html#25-cascade-orphanremoval-다대다">P20 — cascade, orphanRemoval, 다대다</a> — <code>post_tag</code>를 어떻게 매핑할까</li>
+<li><a href="../../docs/knowledge/W11-why-tx-in-service.html">W11 트랜잭션은 왜 서비스 계층에 거나</a></li>
+<li><a href="../../docs/knowledge/W03-db-access-comparison.html">W03 DB 접근 방식 총비교</a> — JPA가 하는 일과 안 하는 일</li>
+<li><a href="../../docs/knowledge/R08-app-to-db-connection.html">R08 앱 서버와 DB 서버는 어떻게 연결되나</a> — 연결이 안 될 때</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 엔티티 시작점</summary>
+
+<p><code>@Entity @Table(name = &quot;post&quot;)</code> 클래스에 <code>@Id @GeneratedValue(strategy = GenerationType.IDENTITY) Long id</code>. 문자열 상태는 <code>@Enumerated(EnumType.STRING)</code>. 컬럼 이름이 다르면 <code>@Column(name = &quot;...&quot;)</code>. 서버가 안 뜨면 로그에서 <code>Schema-validation:</code>으로 시작하는 줄을 찾는다 — 어떤 컬럼이 안 맞는지 알려 준다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 게시판·작성자 찾기</summary>
+
+<p><code>BoardRepository.findBySlug(String slug)</code>와 <code>MemberRepository</code>(또는 <code>getReferenceById(2L)</code>)를 쓴다. Spring Data JPA 리포지토리는 인터페이스만 만들면 구현을 Spring이 만든다.</p>
+</details>
+
+<details>
+<summary>힌트 3 — 태그</summary>
+
+<p><code>post_tag</code>는 컬럼이 두 개뿐인 연결 테이블이라 <code>@ManyToMany</code> + <code>@JoinTable(name = &quot;post_tag&quot;, ...)</code>로 매핑할 수 있다. 태그는 <code>TagRepository.findByName</code>으로 찾고 없으면 <code>save</code>한다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="1-5-validation.html">1-5. 입력 검증과 에러 응답</a> — 잘못된 요청을 저장 전에 막는다.</p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 1-4. DB에 저장하기 — JPA\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch1-create-post/1-4-save-to-db.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라.\n5. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n6. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="1-3-service-layer.html">← 이전 1-3. 서비스·저장소로 나누기</a><a href="1-5-validation.html">다음 → 1-5. 입력 검증과 에러 응답</a></nav>
+</main>
+
+</body>
+</html>

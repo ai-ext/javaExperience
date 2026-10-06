@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1-5. 입력 검증과 에러 응답</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 1장. 게시글 작성 — POST /api/posts › 1-5</p>
+<h1 id="1-5-입력-검증과-에러-응답"><a class="anchor" href="#1-5-입력-검증과-에러-응답" aria-hidden="true">#</a>1-5. 입력 검증과 에러 응답</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p>프론트 화면이 빈 제목을 막아 줘도, API는 curl·Postman·다른 서비스 누구나 호출할 수 있다. 지금은 빈 제목도, 없는 게시판도 그대로 들어오거나 500이 난다.</p>
+<p><strong>잘못된 요청은 저장 전에 막고, 무엇이 왜 틀렸는지 정해진 형식으로 알려 준다.</strong></p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<p><strong>입력 규칙</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>규칙</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>boardSlug</code></td>
+<td>필수</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>필수, 공백만 있으면 안 됨, 200자 이하</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td>필수, 공백만 있으면 안 됨</td>
+</tr>
+<tr>
+<td><code>tags</code></td>
+<td>없어도 됨(<code>null</code>이나 <code>[]</code>). 있으면 최대 5개, 각 이름 1~30자</td>
+</tr>
+<tr>
+<td><code>visibility</code></td>
+<td><code>PUBLIC</code> 또는 <code>FOLLOWERS</code>. <strong>생략하면 <code>PUBLIC</code></strong></td>
+</tr>
+</tbody></table></div>
+<p><strong>게시판 규칙</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상황</th>
+<th>상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>없는 <code>boardSlug</code></td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>글쓰기가 운영자 전용인 게시판(<code>board.write_role = &#39;ADMIN&#39;</code>, 예: <code>notice</code>)에 일반 회원(지금은 작성자 고정 = 김자바)이 쓴다</td>
+<td><code>403</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>에러 응답 형식</strong> — 모든 에러(400·403·404)에 공통이다. 표준 형식인 RFC 9457 Problem Details를 쓴다.</p>
+<ul>
+<li><code>Content-Type: application/problem+json</code></li>
+<li>본문에 <code>status</code>(숫자)와 사람이 읽을 <code>detail</code>을 담는다.</li>
+<li>400(입력 오류)이면 <code>errors</code> 배열에 <strong>틀린 필드를 모두</strong> 담는다. 첫 번째 필드만 담으면 안 된다.</li>
+</ul>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;about:blank&quot;,
+  &quot;title&quot;: &quot;Bad Request&quot;,
+  &quot;status&quot;: 400,
+  &quot;detail&quot;: &quot;입력값이 올바르지 않습니다.&quot;,
+  &quot;instance&quot;: &quot;/api/posts&quot;,
+  &quot;errors&quot;: [
+    { &quot;field&quot;: &quot;content&quot;, &quot;message&quot;: &quot;본문을 입력해 주세요.&quot; },
+    { &quot;field&quot;: &quot;tags&quot;, &quot;message&quot;: &quot;태그는 5개까지입니다.&quot; }
+  ]
+}</code></pre>
+<p>검증에 실패한 요청은 아무것도 저장하지 않는다(글도, 새 태그도).</p>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+post() { curl -s -i -X POST &quot;$BASE/api/posts&quot; -H 'Content-Type: application/json' -d &quot;$1&quot;; echo; echo ----; }
+
+# V1 — 빈 제목
+post '{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;&quot;,&quot;content&quot;:&quot;본문&quot;,&quot;tags&quot;:[],&quot;visibility&quot;:&quot;PUBLIC&quot;}'
+# V2 — 제목 201자('[채점] 검증-실패-' 11자 + 0 190개)
+T=&quot;[채점] 검증-실패-$(printf '%0190d' 0)&quot;
+post &quot;{\&quot;boardSlug\&quot;:\&quot;dev\&quot;,\&quot;title\&quot;:\&quot;$T\&quot;,\&quot;content\&quot;:\&quot;본문\&quot;,\&quot;tags\&quot;:[],\&quot;visibility\&quot;:\&quot;PUBLIC\&quot;}&quot;
+# V3 — 공백 본문 + 태그 6개
+post '{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[채점] 검증-실패-본문태그&quot;,&quot;content&quot;:&quot;   &quot;,&quot;tags&quot;:[&quot;a&quot;,&quot;b&quot;,&quot;c&quot;,&quot;d&quot;,&quot;e&quot;,&quot;f&quot;],&quot;visibility&quot;:&quot;PUBLIC&quot;}'
+# V4 — 없는 공개 범위
+post '{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[채점] 검증-실패-공개범위&quot;,&quot;content&quot;:&quot;본문&quot;,&quot;tags&quot;:[],&quot;visibility&quot;:&quot;SECRET&quot;}'
+# V5 — 공개 범위 생략(통과해야 한다)
+post '{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[채점] 검증-통과&quot;,&quot;content&quot;:&quot;본문&quot;,&quot;tags&quot;:[&quot;spring&quot;]}'
+# V6 — 없는 게시판
+post '{&quot;boardSlug&quot;:&quot;nope&quot;,&quot;title&quot;:&quot;[채점] 검증-실패-게시판&quot;,&quot;content&quot;:&quot;본문&quot;,&quot;tags&quot;:[],&quot;visibility&quot;:&quot;PUBLIC&quot;}'
+# V7 — 운영자 전용 게시판
+post '{&quot;boardSlug&quot;:&quot;notice&quot;,&quot;title&quot;:&quot;[채점] 검증-실패-공지&quot;,&quot;content&quot;:&quot;본문&quot;,&quot;tags&quot;:[],&quot;visibility&quot;:&quot;PUBLIC&quot;}'</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용). 요청은 위 V1~V7을 그대로 쓴다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>V1</td>
+<td><code>400</code>, <code>Content-Type: application/problem+json</code>, <code>errors</code>에 <code>field</code>가 <code>title</code>인 항목</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>V2</td>
+<td><code>400</code>, <code>errors</code>에 <code>title</code></td>
+</tr>
+<tr>
+<td>C3</td>
+<td>V3</td>
+<td><code>400</code>, <code>errors</code>에 <code>content</code>와 <code>tags</code>가 <strong>둘 다</strong> 있다</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>V4</td>
+<td><code>400</code>, <code>Content-Type: application/problem+json</code>(<code>errors</code>는 없어도 된다)</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>V5</td>
+<td><code>201</code>, 응답 <code>visibility</code> = <code>PUBLIC</code></td>
+</tr>
+<tr>
+<td>C6</td>
+<td>V6</td>
+<td><code>404</code>, <code>Content-Type: application/problem+json</code>, <code>detail</code>이 있다</td>
+</tr>
+<tr>
+<td>C7</td>
+<td>V7</td>
+<td><code>403</code>, <code>Content-Type: application/problem+json</code>, <code>detail</code>이 있다</td>
+</tr>
+<tr>
+<td>C8</td>
+<td>아무 오류 응답</td>
+<td>본문 <code>status</code> 값이 응답 상태 코드와 같다. 스택 트레이스·예외 클래스 이름이 보이지 않는다</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT COUNT(*) FROM post WHERE title LIKE &#39;[채점] 검증-실패%&#39;</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT COUNT(*) FROM tag WHERE name IN (&#39;a&#39;,&#39;b&#39;,&#39;c&#39;,&#39;d&#39;,&#39;e&#39;,&#39;f&#39;)</code></td>
+<td><code>0</code> — 실패한 요청이 태그를 만들지 않았다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>입력 검증</td>
+<td>요청 DTO에 Bean Validation 애노테이션(<code>@NotBlank</code>, <code>@Size</code> 등) + 컨트롤러에 <code>@Valid</code></td>
+</tr>
+<tr>
+<td>R2</td>
+<td>에러 응답</td>
+<td><code>@RestControllerAdvice</code> 한 곳에서 <code>ProblemDetail</code>로 만든다. 컨트롤러마다 <code>try-catch</code>가 없다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>업무 오류</td>
+<td>게시판 없음·권한 없음은 서비스가 판단하고, 의미가 드러나는 예외(예: <code>BoardNotFoundException</code>)로 던진다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>순서</td>
+<td>검증·게시판 확인이 저장보다 먼저이거나, 같은 트랜잭션이라 실패 시 함께 롤백된다</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>기본값</td>
+<td><code>visibility</code> 생략 → <code>PUBLIC</code>을 한 곳(DTO 또는 서비스)에서 정한다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/W10-where-to-validate.html">W10 검증은 어디서 하나</a> — 프론트에서 막아도 서버가 또 검사하는 이유</li>
+<li><a href="../../docs/knowledge/W10-where-to-validate.html#52-서버-dto-제약과-검증-오류-응답">W10 — 서버: DTO 제약과 검증 오류 응답</a></li>
+<li><a href="../../docs/knowledge/W08-where-to-handle-exceptions.html">W08 예외는 어디서 잡나</a> — 컨트롤러별 처리와 전역 Advice</li>
+<li><a href="../../docs/knowledge/P03-annotations-cheatsheet.html#24-요청-검증">P03 — 요청 검증</a> · <a href="../../docs/knowledge/P03-annotations-cheatsheet.html#25-예외-응답">예외 응답</a></li>
+<li><a href="../../docs/knowledge/S05-mvc-request-flow.html#q5-rfc-9457-응답에-problemdetail과-전역-advice를-어떻게-쓰는가">S05 — RFC 9457 응답에 ProblemDetail과 전역 Advice를 어떻게 쓰나</a></li>
+<li><a href="../../docs/knowledge/P16-json-jackson-practical.html#27-enum은-이름과-표시값을-분리한다">P16 — Enum은 이름과 표시값을 분리한다</a> — V4가 어디서 실패하는지</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 어떤 예외가 나나</summary>
+
+<p><code>@Valid</code> 검증에 실패하면 <code>MethodArgumentNotValidException</code>, JSON을 객체로 못 바꾸면(V4의 <code>SECRET</code>처럼 enum에 없는 값, 깨진 JSON) <code>HttpMessageNotReadableException</code>이 난다. 서로 다른 예외라 Advice에서 각각 처리한다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — problem+json</summary>
+
+<p><code>ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;...&quot;)</code>로 만들고 <code>setProperty(&quot;errors&quot;, 목록)</code>. <code>@ExceptionHandler</code> 메서드가 <code>ProblemDetail</code>을 반환하면 Spring이 <code>application/problem+json</code>으로 내보낸다. <code>ResponseEntityExceptionHandler</code>를 상속하는 방법도 있다.</p>
+</details>
+
+<details>
+<summary>힌트 3 — 403과 404</summary>
+
+<p><code>board.write_role</code>이 <code>ADMIN</code>인데 작성자 <code>member.role</code>이 <code>ADMIN</code>이 아니면 403. 이 판단은 서비스에서 하고, 예외 → 상태 코드 매핑은 Advice에서 한다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="1-6-token-auth.html">1-6. 토큰으로 작성자 정하기</a> — 고정된 작성자(김자바)를 요청한 사람으로 바꾼다.</p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 1-5. 입력 검증과 에러 응답\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch1-create-post/1-5-validation.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라.\n5. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n6. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="1-4-save-to-db.html">← 이전 1-4. DB에 저장하기 — JPA</a><a href="1-6-token-auth.html">다음 → 1-6. 토큰으로 작성자 정하기</a></nav>
+</main>
+
+</body>
+</html>
