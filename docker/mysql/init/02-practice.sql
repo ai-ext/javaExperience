@@ -20,8 +20,38 @@ CREATE TABLE `api_token` (
   UNIQUE KEY `uk_api_token` (`token`),
   KEY `fk_api_token_member` (`member_id`),
   CONSTRAINT `fk_api_token_member` FOREIGN KEY (`member_id`) REFERENCES `member` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='API 토큰 — 로그인 기능 대신 미리 발급해 둔 토큰. 요청 헤더 Authorization: Bearer <token>';
+) ENGINE=InnoDB AUTO_INCREMENT=31 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='API 토큰 — 로그인 기능 대신 미리 발급해 둔 토큰. 요청 헤더 Authorization: Bearer <token>';
 /*!40101 SET character_set_client = @saved_cs_client */;
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (1,'tok-p01',1,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (2,'tok-p02',2,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (3,'tok-p03',3,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (4,'tok-p04',4,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (5,'tok-p05',5,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (6,'tok-p06',6,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (7,'tok-p07',7,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (8,'tok-p08',8,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (9,'tok-p09',9,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (10,'tok-p10',10,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (11,'tok-p11',11,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (12,'tok-p12',12,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (13,'tok-p13',13,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (14,'tok-p14',14,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (15,'tok-p15',15,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (16,'tok-p16',16,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (17,'tok-p17',17,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (18,'tok-p18',18,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (19,'tok-p19',19,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (20,'tok-p20',20,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (21,'tok-p21',21,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (22,'tok-p22',22,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (23,'tok-p23',23,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (24,'tok-p24',24,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (25,'tok-p25',25,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (26,'tok-p26',26,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (27,'tok-p27',27,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (28,'tok-p28',28,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (29,'tok-p29',29,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (30,'tok-p30',30,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `board` (
