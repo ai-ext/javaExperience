@@ -53,6 +53,15 @@ API 하나를 처음부터 끝까지 만든다. 1장에서는 `POST /api/posts`(
 - 태그 8개: `java`, `spring`, `jpa`, `mysql`, `docker`, `테스트`, `회고`, `질문`
 - 테이블 구조와 데이터는 dump 파일 [`docker/mysql/init/01-community.sql`](../docker/mysql/init/01-community.sql)에 있다. 눈으로 보려면 CloudBeaver(`http://localhost:8978`, `cbadmin` / `Admin1234`)의 `community (시나리오)` 연결을 연다.
 
+## 8·9장은 학습용 데이터(`practice` DB)
+
+8장(쿼리 심화)과 9장(스키마 변경)은 데이터가 많은 학습용 DB로 한다 — 회원 30·글 145·좋아요 568에 일부러 숫자가 어긋난 글, 삭제·숨김 글 등이 섞여 있다([학습용 미션](../practice/MISSIONS.md)의 "데이터에 숨겨 둔 함정").
+
+- 앱 실행: `./gradlew bootRun --args='--spring.profiles.active=practice'` (IntelliJ: Active profiles에 `practice`)
+- 토큰: `tok-p01` ~ `tok-p30` — 번호가 회원 id다. 회원 1이 운영자(`ADMIN`), 28은 정지, 29는 탈퇴
+- "지금 시각"은 `2026-10-05 00:00`으로 고정한다(`application-practice.yml`의 `app.fixed-now`, 8-2에서 `Clock` 빈으로 연결)
+- 결과 테스트 프롬프트도 이 장에서는 `practice` DB를 조회한다
+
 ## 목차
 
 <!-- toc:start — tools/site/build.mjs가 scenario.json으로 다시 쓴다. 직접 고치지 마라 -->
@@ -114,4 +123,24 @@ API 하나를 처음부터 끝까지 만든다. 1장에서는 `POST /api/posts`(
 - [7-1. 컨트롤러 슬라이스 테스트](ch7-tests/7-1-controller-slice.md)
 - [7-2. 서비스 단위 테스트 — mock과 spy](ch7-tests/7-2-service-unit.md)
 - [7-3. 통합 테스트 — Testcontainers](ch7-tests/7-3-integration.md)
+
+### 8장. 쿼리 심화 — 학습용 데이터(practice)
+
+글 145·좋아요 568에 함정이 섞인 학습용 DB로, SQL을 먼저 짜고 API로 옮긴다. 집계·랭킹·관계·조합 검색·정합성 배치.
+
+- [8-1. 회원별 활동 요약 — LEFT JOIN과 집계](ch8-query-deep/8-1-activity-summary.md)
+- [8-2. 최근 N일 인기글 랭킹 — 조건부 집계와 고정 시계](ch8-query-deep/8-2-popular-ranking.md)
+- [8-3. 관계 쿼리 — 맞팔·맞팔 추천·친구의 친구](ch8-query-deep/8-3-relations.md)
+- [8-4. 조합 검색 — 동적 쿼리](ch8-query-deep/8-4-dynamic-search.md)
+- [8-5. 정합성 배치 — 어긋난 숫자 찾아 고치기](ch8-query-deep/8-5-recount-batch.md)
+
+### 9장. 스키마 변경 — 데이터가 이미 있을 때
+
+운영 중인 DB를 가정하고 Flyway로 스키마를 바꾼다. 인덱스, 컬럼 추가와 백필, 새 테이블, 서비스를 멈추지 않는 이름 변경.
+
+- [9-1. Flyway 도입 — 지금 스키마를 기준선으로](ch9-schema-change/9-1-flyway.md)
+- [9-2. 인덱스와 실행 계획](ch9-schema-change/9-2-index-explain.md)
+- [9-3. 컬럼 추가와 백필](ch9-schema-change/9-3-add-column-backfill.md)
+- [9-4. 새 테이블과 API — 알림](ch9-schema-change/9-4-notifications.md)
+- [9-5. 서비스를 멈추지 않는 이름 변경 — expand와 contract](ch9-schema-change/9-5-expand-contract.md)
 <!-- toc:end -->
