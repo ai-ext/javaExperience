@@ -1,0 +1,33 @@
+-- 이미 DB를 띄워 둔 학습자용 — 학습용 DB(practice)에 8·9장 토큰 30개만 추가한다(있으면 건너뜀).
+-- 새로 clone했거나 'docker compose down -v'로 처음부터 띄우면 init 덤프에 이미 들어 있어 필요 없다.
+-- 실행: docker compose exec -T mysql mysql -uroot -proot practice < docker/mysql/upgrade/01-practice-tokens.sql
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (1,'tok-p01',1,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (2,'tok-p02',2,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (3,'tok-p03',3,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (4,'tok-p04',4,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (5,'tok-p05',5,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (6,'tok-p06',6,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (7,'tok-p07',7,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (8,'tok-p08',8,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (9,'tok-p09',9,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (10,'tok-p10',10,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (11,'tok-p11',11,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (12,'tok-p12',12,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (13,'tok-p13',13,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (14,'tok-p14',14,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (15,'tok-p15',15,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (16,'tok-p16',16,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (17,'tok-p17',17,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (18,'tok-p18',18,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (19,'tok-p19',19,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (20,'tok-p20',20,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (21,'tok-p21',21,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (22,'tok-p22',22,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (23,'tok-p23',23,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (24,'tok-p24',24,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (25,'tok-p25',25,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (26,'tok-p26',26,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (27,'tok-p27',27,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (28,'tok-p28',28,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (29,'tok-p29',29,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
+INSERT IGNORE INTO `api_token` (`id`, `token`, `member_id`, `expires_at`, `revoked_at`, `created_at`) VALUES (30,'tok-p30',30,'2099-12-31 23:59:59',NULL,'2026-09-01 00:00:00');
