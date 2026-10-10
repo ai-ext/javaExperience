@@ -11,16 +11,16 @@ public class ListResponseDto {
     public String title;
     public String content;
     public String visibility;
-    public boolean like;
+    public Boolean heart;
     public List<String> tags;
 
-    public ListResponseDto(int id, String boardSlug, String title, String content, String visibility, boolean like){
+    public ListResponseDto(int id, String boardSlug, String title, String content, String visibility, Boolean heart){
         this.id =id;
         this.boardSlug =boardSlug;
         this.title =title;
         this.content =content;
         this.visibility =visibility;
-        this.like =like;
+        this.heart =heart;
 
     }
 
@@ -32,7 +32,7 @@ public class ListResponseDto {
         this.tags=postEntity.getTags();
         this.visibility=postEntity.getVisibility();
         this.tags=postEntity.getTags();
-        this.like=postEntity.getLike();
+        this.heart =postEntity.getLike();
 
     }
 }
