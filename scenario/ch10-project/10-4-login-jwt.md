@@ -258,9 +258,9 @@ String subject = Jwts.parser().verifyWith(key).build()
 
 ## 직접 확인
 
+API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 요청은 아래 실행 패널에서 순서대로 보낸다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
+
 ```bash
-BASE=http://localhost:8080
-login() { curl -s -i -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' -d "$1"; echo; echo ----; }
 
 login '{"email":"kim@example.com","password":"password1234"}'        # L 로그인
 login '{"email":"kim@example.com","password":"wrong-pass"}'          # W 틀린 비밀번호
@@ -269,18 +269,12 @@ login '{"email":" KIM@Example.com ","password":"password1234"}'     # K 대소�
 login '{"email":"kim@example.com"}'                                  # V 비밀번호 빠짐
 login '{"email":"kim@example.com","password":"가가가가가가가가가가가가가가가가가가가가가가가가가"}'  # P 한글 25자(75바이트)
 
-TOKEN=$(curl -s -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' \
-  -d '{"email":"kim@example.com","password":"password1234"}' | sed -E 's/.*"accessToken":"([^"]+)".*/\1/')
-curl -s -i "$BASE/api/v1/users/me" -H "Authorization: Bearer $TOKEN"; echo   # M 내 정보
-curl -s -i "$BASE/api/v1/users/me"; echo                                     # M0 헤더 없음
-curl -s -i "$BASE/api/v1/users/me" -H 'Authorization: Token abc'; echo      # M1 Bearer 아님
 
 # M5 — preflight(브라우저가 Authorization을 싣기 전에 묻는 요청)는 토큰 없이도 통과해야 한다
-curl -i -X OPTIONS "$BASE/api/v1/users/me" -H 'Origin: http://localhost:3000' \
-  -H 'Access-Control-Request-Method: GET' -H 'Access-Control-Request-Headers: authorization'
+
 ```
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. M2(서명 틀림)는 다른 키로, M3(만료)는 예시 키로 미리 서명해 둔 토큰이다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. M2(서명 틀림)는 다른 키로, M3(만료)는 예시 키로 미리 서명해 둔 토큰이다.
 
 ```check
 {
@@ -352,7 +346,7 @@ curl -i -X OPTIONS "$BASE/api/v1/users/me" -H 'Origin: http://localhost:3000' \
     },
     {
       "id": "C8",
-      "manual": "preflight — 브라우저 코드는 OPTIONS 요청을 직접 못 만든다. 위 요청 M5(curl)가 토큰 없이 200이고 Access-Control-Allow-Headers에 authorization이 있는지 본다(401이면 인터셉터가 preflight를 막은 것)"
+      "manual": "preflight — 브라우저 코드는 OPTIONS 요청을 직접 못 만든다. Postman 요청 M5가 토큰 없이 200이고 Access-Control-Allow-Headers에 authorization이 있는지 본다(401이면 인터셉터가 preflight를 막은 것)"
     },
     { "id": "C9", "request": "P", "expect": { "status": 401, "json": [{ "path": "$.code", "equals": "UNAUTHORIZED" }, { "path": "$.message", "equals": "{{W.body.message}}" }] } },
     {"id": "C10", "all": [{"request": "V1", "expect": {"status": 400, "json": [{"path": "$.errors[*].field", "contains": "email"}, {"path": "$.code", "equals": "VALIDATION_FAILED"}]}}, {"request": "V1", "expect": {"status": 400, "json": [{"path": "$.errors[*].field", "contains": "password"}, {"path": "$.code", "equals": "VALIDATION_FAILED"}]}}, {"request": "V2", "expect": {"status": 400, "json": [{"path": "$.errors[*].field", "contains": "email"}, {"path": "$.code", "equals": "VALIDATION_FAILED"}]}}, {"request": "V2", "expect": {"status": 400, "json": [{"path": "$.errors[*].field", "contains": "password"}, {"path": "$.code", "equals": "VALIDATION_FAILED"}]}}, {"request": "V3", "expect": {"status": 400, "json": [{"path": "$.errors[*].field", "contains": "email"}, {"path": "$.code", "equals": "VALIDATION_FAILED"}]}}, {"request": "V4", "expect": {"status": 400, "json": [{"path": "$.errors[*].field", "contains": "password"}, {"path": "$.code", "equals": "VALIDATION_FAILED"}]}}]},
@@ -374,7 +368,7 @@ C = HTTP 확인(필수), R = 코드 리뷰(피드백용).
 | C5 | 요청 M | `200`, `data` = `{id: 1, email: kim@example.com, nickname: 김자바}`, 해시 없음 |
 | C6 | 요청 M0 | `401 UNAUTHORIZED`, `WWW-Authenticate: Bearer`, `errors`=`[]`, `data`=`null` |
 | C7 | 요청 M1~M4 | 모두 `401 UNAUTHORIZED` — Bearer 아님·서명 틀림·만료·모양 깨짐 |
-| C8 | 요청 M5 (curl) | 토큰 없는 preflight가 `200`, `Access-Control-Allow-Headers`에 `authorization` |
+| C8 | Postman 수동 OPTIONS 요청 M5 | 토큰 없는 preflight가 `200`, `Access-Control-Allow-Headers`에 `authorization` |
 | C9 | 요청 P | `401 UNAUTHORIZED`, `message`가 요청 W와 같다 — 72바이트를 넘는 비밀번호도 틀린 비밀번호다. `500`이면 로그인에서 `encode`를 부르고 있다 |
 | C10 | V1 / V2 / V3 / V4 | 빈 객체·둘 다 빈 문자열은 `errors`에 `email`·`password` 둘 다, 이메일 `null`은 `email`, 비밀번호 공백만은 `password` — 모두 `400 VALIDATION_FAILED`(`401`·`500`이 아니다) |
 | C11 | V5 / V6 | 깨진 JSON·비밀번호 자리에 배열 → `400 BAD_JSON` |

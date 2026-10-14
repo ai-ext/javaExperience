@@ -1391,24 +1391,9 @@ public class RecentViewService {
 
 김자바의 기록을 비우고 12·13·14·12번을 연다. 9번(나를 차단한 회원의 글)은 404라 남지 않는다. 이스프링이 글을 하나 쓰고, 김자바가 본 뒤, 이스프링이 지운다.
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; J='Content-Type: application/json'
-ids() { python3 -c 'import sys,json; print([i["postId"] for i in json.load(sys.stdin)["items"]])'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-curl -s -o /dev/null -X DELETE "$BASE/api/me/recent-posts" -H "$K"                          # H0 처음 상태로
-for p in 12 13 14 12 9; do curl -s -o /dev/null -w "$p:%{http_code} " "$BASE/api/posts/$p" -H "$K"; done; echo   # H1~H5
-curl -s "$BASE/api/me/recent-posts" -H "$K" | ids                                            # H6 [12, 14, 13]
-W=$(curl -s -X POST "$BASE/api/posts" -H "$L" -H "$J" -d '{"boardSlug":"free","title":"[채점] 곧 지울 글","content":"최근 본 글 확인용"}' | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')   # H7
-curl -s -o /dev/null "$BASE/api/posts/$W" -H "$K"                                            # H8
-curl -s "$BASE/api/me/recent-posts?size=1" -H "$K" | ids                                     # H9 [W]
-curl -s -o /dev/null -X DELETE "$BASE/api/posts/$W" -H "$L"                                  # H10
-curl -s "$BASE/api/me/recent-posts" -H "$K" | ids                                            # H11 [12, 14, 13]
-curl -i "$BASE/api/me/recent-posts?size=21" -H "$K"                                          # H14b 400
-curl -i "$BASE/api/me/recent-posts"                                                          # H15 401
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

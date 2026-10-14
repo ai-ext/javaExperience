@@ -360,23 +360,9 @@ if (!comment.getMember().getId().equals(loginMember.id())) {
 
 11번 글의 시드 댓글: 1(최상위, 박디비) ← 2(답글) · 3(최상위, **한차단** — 김자바와 차단 관계) · 4(최상위, **지움**) ← 5(답글) · 6(최상위, 지움, 답글 없음).
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'
-tree() { python3 -c 'import sys,json; print([(c["id"], c["deleted"], [r["id"] for r in c["replies"]]) for c in json.load(sys.stdin)])'; }
-jid() { python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-curl -s "$BASE/api/posts/11/comments" | tree                 # N1 비로그인
-curl -s -H "$K" "$BASE/api/posts/11/comments" | tree         # N2 김자바
-curl -i -H "$K" "$BASE/api/posts/9/comments"                 # N3 볼 수 없는 글
-
-CID=$(curl -s -X POST "$BASE/api/posts/3/comments" -H "$K" -H 'Content-Type: application/json' -d '{"content":"[채점] 지울 댓글"}' | jid)   # N4
-curl -i -X DELETE "$BASE/api/comments/$CID" -H "$L"          # N5 남의 댓글
-curl -i -X DELETE "$BASE/api/comments/$CID" -H "$K"          # N6 작성자
-curl -i -X DELETE "$BASE/api/comments/$CID" -H "$K"          # N7 다시
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

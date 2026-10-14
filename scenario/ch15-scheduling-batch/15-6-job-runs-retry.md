@@ -2493,16 +2493,7 @@ public class JobRunController {
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-A='Authorization: Bearer tok-p01'
-curl -s "$BASE/api/admin/jobs/runs?job=weekly-ranking" -H "$A" | python3 -m json.tool          # J1
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/rankings/weekly?weekStart=2026-09-14"     # 아직 404
-curl -s -X POST "$BASE/api/admin/jobs/weekly-ranking/retry-failed" -H "$A"; echo              # J2
-curl -s -X POST "$BASE/api/admin/jobs/weekly-ranking/retry-failed" -H "$A"; echo              # J3 한 번 더
-curl -s "$BASE/api/rankings/weekly?weekStart=2026-09-14" | python3 -c 'import sys,json; print([i["postId"] for i in json.load(sys.stdin)["items"]])'   # J4
-curl -s -X POST "$BASE/api/admin/jobs/hall-of-fame/retry-failed" -H "$A"; echo               # J5 이미 성공한 날
-```
+API 서버 주소는 페이지 상단 공통 입력에서 설정한다. J1~J20은 실행 패널에서 보낸다. DB 잠금 실습은 트랜잭션을 연 채 실행 패널의 J21 요청을 단독 실행하고 `500` 응답을 확인한 뒤 `ROLLBACK`한다. Postman 설정은 접어서 확인할 수 있다.
 
 **실패를 직접 만들어 보기(선택).** 9-2·4-2에서 본 잠금을 이용한다. DB 클라이언트에서 아래를 실행해 9/7 주 1위 자리를 잡아 둔다.
 
@@ -2512,7 +2503,7 @@ curl -s -X POST "$BASE/api/admin/jobs/hall-of-fame/retry-failed" -H "$A"; echo  
 START TRANSACTION;
 INSERT INTO weekly_ranking (week_start, ranking, post_id, title, score, likes, comments, created_at)
 VALUES ('2026-09-07', 1, 1, '잠금 연습', 0, 0, 0, NOW());
--- 여기서 멈춘 채로: curl -X POST "$BASE/api/admin/jobs/weekly-ranking/run?date=2026-09-14" -H "$A"
+-- 여기서 멈춘 채로: 실행 패널 J21을 단독 실행한다(POST /api/admin/jobs/weekly-ranking/run?date=2026-09-14)
 ROLLBACK;
 ```
 
@@ -2522,7 +2513,7 @@ ROLLBACK;
 
 **동시 재실행.** 실패 기록이 남은 상태에서 운영자 요청 두 개를 동시에 보내면 응답의 `retried`는 합쳐서 해당 날짜 한 건이고 `job_run`에도 `RETRY` 한 줄만 생겨야 한다. 다시 한 번 요청하면 빈 배열이다. 재실행 응답의 `runId`는 바로 그 `RETRY` 행의 ID여야 한다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {
@@ -2697,6 +2688,15 @@ ROLLBACK;
       "title": "status 공백",
       "method": "GET",
       "path": "/api/admin/jobs/runs?status=%20",
+      "headers": {
+        "Authorization": "Bearer tok-p01"
+      }
+    },
+    {
+      "id": "J21",
+      "title": "DB 잠금 실습 — 9/14 주간 랭킹 실행",
+      "method": "POST",
+      "path": "/api/admin/jobs/weekly-ranking/run?date=2026-09-14",
       "headers": {
         "Authorization": "Bearer tok-p01"
       }
@@ -3026,6 +3026,10 @@ ROLLBACK;
           }
         }
       ]
+    },
+    {
+      "id": "C10",
+      "manual": "weekly_ranking 잠금 실습에서 J21을 실행하면 잠금 대기 뒤 500으로 실패하고, job_run에 FAILED 기록이 남는다. 잠금 해제 뒤 J2/J3 재시도로 같은 기준 시각이 성공하는지 확인한다."
     }
   ]
 }

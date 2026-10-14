@@ -304,39 +304,9 @@
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-post() { curl -s -i -X POST "$BASE/api/posts" -H 'Content-Type: application/json' -d "$1"; echo; echo ----; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-# V1 — 빈 제목
-post '{"boardSlug":"dev","title":"","content":"본문","tags":[],"visibility":"PUBLIC"}'
-# V2 — 제목 201자('[채점] 검증-실패-' 11자 + 0 190개)
-T="[채점] 검증-실패-$(printf '%0190d' 0)"
-post "{\"boardSlug\":\"dev\",\"title\":\"$T\",\"content\":\"본문\",\"tags\":[],\"visibility\":\"PUBLIC\"}"
-# V3 — 공백 본문 + 태그 6개
-post '{"boardSlug":"dev","title":"[채점] 검증-실패-본문태그","content":"   ","tags":["a","b","c","d","e","f"],"visibility":"PUBLIC"}'
-# V4 — 없는 공개 범위
-post '{"boardSlug":"dev","title":"[채점] 검증-실패-공개범위","content":"본문","tags":[],"visibility":"SECRET"}'
-# V5 — 공개 범위 생략(통과해야 한다)
-post '{"boardSlug":"dev","title":"[채점] 검증-통과","content":"본문","tags":["spring"]}'
-# V6 — 없는 게시판
-post '{"boardSlug":"nope","title":"[채점] 검증-실패-게시판","content":"본문","tags":[],"visibility":"PUBLIC"}'
-# V7 — 운영자 전용 게시판
-post '{"boardSlug":"notice","title":"[채점] 검증-실패-공지","content":"본문","tags":[],"visibility":"PUBLIC"}'
-# V8 — 제목 없음(null)
-post '{"boardSlug":"dev","title":null,"content":"본문","tags":[],"visibility":"PUBLIC"}'
-# V9 — 경계값 바로 안쪽(통과해야 한다): 제목 정확히 200자 + 태그 정확히 5개 + 태그 하나는 정확히 30자
-T="[채점] 검증-경계-$(printf '%0189d' 0)"
-post "{\"boardSlug\":\"dev\",\"title\":\"$T\",\"content\":\"본\",\"tags\":[\"spring\",\"jpa\",\"java\",\"mysql\",\"[채점]경계-xxxxxxxxxxxxxxxxxxxxxxx\"],\"visibility\":\"PUBLIC\"}"
-# V10 — 하한 바로 안쪽(통과해야 한다): 제목 1자
-post '{"boardSlug":"dev","title":"가","content":"본문","tags":[],"visibility":"PUBLIC"}'
-# V11 — null 태그 이름은 저장 전에 거절한다.
-post '{"boardSlug":"dev","title":"[채점] 검증-실패-null태그","content":"본문","tags":[null],"visibility":"PUBLIC"}'
-# V12 — DB가 같은 태그로 취급하는 대소문자 입력은 저장된 이름 하나로 응답한다.
-post '{"boardSlug":"dev","title":"[채점] 검증-태그대소문자","content":"본문","tags":["spring","Spring"],"visibility":"PUBLIC"}'
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

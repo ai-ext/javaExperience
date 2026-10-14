@@ -2043,24 +2043,9 @@ public class SeriesService {
 
 이스프링의 글 12·6(팔로워 공개)·14로 시리즈를 만든다. 김자바는 이스프링을 팔로우하고 있어서 6번이 보이고, 비로그인에게는 안 보인다. 다시 실행하면 새 시리즈를 만들고 같은 글을 그쪽으로 옮긴다.
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; J='Content-Type: application/json'
-jid() { python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-SID=$(curl -s -X POST "$BASE/api/series" -H "$L" -H "$J" -d '{"title":"[채점] JPA 연재"}' | jid)       # S1
-curl -i -X POST "$BASE/api/series" -H "$L" -H "$J" -d '{"title":"가"}'                                  # S1e 1자 → 400
-curl -i -X POST "$BASE/api/series" -H "$L" -H "$J" -d '{"title":null}'                                  # S1b → 400
-for p in 12 6 14; do curl -s -o /dev/null -X PUT "$BASE/api/series/$SID/posts/$p" -H "$L"; done          # S2~S4
-curl -i -X PUT "$BASE/api/series/$SID/posts/3" -H "$L"                                                  # S6 남의 글 → 403
-curl -s "$BASE/api/series/$SID"; echo                                                                   # S7 [12, 14]
-curl -s "$BASE/api/series/$SID" -H "$K"; echo                                                           # S8 [12, 6, 14]
-curl -s "$BASE/api/posts/12/series"; echo                                                               # S9 next=14
-curl -s "$BASE/api/posts/12/series" -H "$K"; echo                                                       # S10 next=6
-curl -i "$BASE/api/posts/3/series"                                                                      # S14 204
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

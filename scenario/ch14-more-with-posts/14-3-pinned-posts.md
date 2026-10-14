@@ -1520,43 +1520,13 @@ public class PinService {
 
 자유 게시판(`free`)에서 운영자가 14·12·9번을 차례로 고정한다. 9번은 한차단의 글이라 김자바에게는 안 보인다. 먼저 9번 글을 공개 상태로 복구하고 기존 고정을 풀어 반복 실행할 수 있게 한다.
 
-```bash
-BASE=http://localhost:8080
-A='Authorization: Bearer tok-admin'; K='Authorization: Bearer tok-kimjava'
-PIN="$BASE/api/boards/free/pinned-posts"
-ids() { python3 -c 'import sys,json; print([p["id"] for p in json.load(sys.stdin)])'; }
-
-curl -s -X PATCH "$BASE/api/admin/posts/9/status" -H "$A" -H 'Content-Type: application/json' -d '{"status":"PUBLISHED"}' > /dev/null  # N0e
-for p in 14 12 9 15; do curl -s -o /dev/null -X DELETE "$PIN/$p" -H "$A"; done   # N0a~N0d 처음 상태로
-curl -i -X PUT "$PIN/2" -H "$A"                       # N1 다른 게시판의 글 → 400
-curl -i -X PUT "$PIN/6" -H "$A"                       # N2 팔로워 공개 → 400
-curl -i -X PUT "$PIN/8" -H "$A"                       # N2d 삭제된 글 → 404
-curl -i -X PUT "$PIN/abc" -H "$A"                     # N2f 문자 → 400
-curl -i -X PUT "$PIN/14" -H "$K"                      # N3 운영자 아님 → 403
-curl -s -X PUT "$PIN/14" -H "$A" | ids                # N4 [14]
-curl -s -X PUT "$PIN/12" -H "$A" | ids                # N5 [14, 12]
-curl -s -X PUT "$PIN/9" -H "$A" | ids                 # N6 [14, 12, 9]
-curl -i -X PUT "$PIN/15" -H "$A"                      # N7 넷째 → 400
-curl -s "$PIN" | ids                                  # N9 비로그인 [14, 12, 9]
-curl -s "$PIN" -H "$K" | ids                          # N10 김자바 [14, 12]
-curl -i -X DELETE "$PIN/12" -H "$A"                   # N11 204
-curl -s "$PIN" | ids                                  # N12 [14, 9]
-curl -s -X PATCH "$BASE/api/admin/posts/9/status" -H "$A" -H 'Content-Type: application/json' -d '{"status":"HIDDEN"}' > /dev/null  # N13
-curl -s "$PIN" -H "$A" | ids                          # N14 운영자도 [14]
-curl -s -X PATCH "$BASE/api/admin/posts/9/status" -H "$A" -H 'Content-Type: application/json' -d '{"status":"PUBLISHED"}' > /dev/null  # N15
-curl -s "$PIN" -H "$A" | ids                          # N16 [14, 9]
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 동시 첫 고정도 확인한다. 12번 글을 해제한 상태에서 같은 글을 두 요청이 동시에 고정해도 두 응답이 모두 `200`이고 DB 행은 하나여야 한다. 한도 검사는 동시의 **서로 다른 글**까지 3개로 묶는 잠금이 아니므로 그 경쟁은 이 단계의 범위 밖이다.
 
-```bash
-curl -s -o /dev/null -X DELETE "$PIN/12" -H "$A"
-seq 2 | xargs -P2 -I{} sh -c 'curl -s -o /dev/null -w "%{http_code}\n" -X PUT "$1/12" -H "$2"' sh "$PIN" "$A"
-# 위 출력 200 두 줄. SELECT COUNT(*) FROM board_pin WHERE post_id = 12 → 1
-curl -s -o /dev/null -X DELETE "$PIN/12" -H "$A"
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

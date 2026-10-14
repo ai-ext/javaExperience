@@ -115,12 +115,7 @@ public ResponseEntity<List<TagResponse>> listTags(@PathVariable Long postId) {
 
 먼저 기존 공개 글(기본 데이터의 ID `2`)에 태그가 있는지 화면과 DB에서 확인한다. 빈 목록 응답도 확인하려면 1-3의 글 생성 API로 공개 글을 하나 만들 때 `tags: []`를 보내고, 응답의 `id`를 아래 실행 요청의 `{{taglessPostId}}` 자리에 바꿔 넣은 뒤 전체 실행한다.
 
-```bash
-BASE=http://localhost:8080
-curl -i "$BASE/api/posts/2/tags"
-curl -i "$BASE/api/posts/{{taglessPostId}}/tags"
-curl -i "$BASE/api/posts/999999/tags"
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 실제 DB에서 글 ID 2의 태그는 `post_tag`와 `tag`를 JOIN해 확인한다. 태그 없는 공개 글을 하나 만들고 그 글의 ID로 다시 요청하면 `[]`가 나와야 한다.
 

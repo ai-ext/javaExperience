@@ -1723,31 +1723,16 @@ public class PostRateLimiter {
 
 회원 12(`tok-c06`)가 연달아 쓴다. 끝에서 만든 글을 모두 지운다.
 
-```bash
-BASE=http://localhost:8080
-C6='Authorization: Bearer tok-c06'; J='Content-Type: application/json'
-B='{"boardSlug":"free","title":"[채점] 도배 확인","content":"1분 안에 여러 번 쓰기"}'
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-IDS=()
-for i in 1 2 3 4 5 6; do
-  out=$(curl -s -D /tmp/h -X POST "$BASE/api/posts" -H "$C6" -H "$J" -d "$B")
-  echo "#$i $(head -1 /tmp/h | tr -d '\r') $(grep -i '^retry-after' /tmp/h | tr -d '\r')"
-  IDS+=($(echo "$out" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("id",""))'))
-done                                                              # #1~#5 201, #6 429 + Retry-After
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/posts/2" -H "$C6"                    # 읽기 200
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/posts" -H "$C6" -H "$J" -d '{"boardSlug":"free","content":"제목 없음"}'   # 400(429보다 먼저)
-for id in "${IDS[@]}"; do curl -s -o /dev/null -X DELETE "$BASE/api/posts/$id" -H "$C6"; done   # 뒷정리
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/posts" -H "$C6" -H "$J" -d "$B"   # 지운 글은 세지 않으므로 다시 201(이 글도 지운다)
-```
+1분을 기다려 풀리는 것은 직접 보면 된다. 실행 패널의 P 요청을 다시 보내 #6이 `429`인 것을 확인하고, 응답의 `Retry-After`초만큼 기다린 뒤 다시 쓰면 `201`이다.
 
-1분을 기다려 풀리는 것은 직접 보면 된다. 위 `for` 루프를 다시 돌려 #6이 `429`인 것을 확인하고, `Retry-After`초만큼 기다린 뒤 다시 쓰면 `201`이다.
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 끝에서 만든 글을 모두 지우므로(지운 글은 세지 않는다) 바로 다시 눌러도 같은 결과다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 끝에서 만든 글을 모두 지우므로(지운 글은 세지 않는다) 바로 다시 눌러도 같은 결과다.
 
 ```check
 {
   "requests": [
-    {"id": "P", "title": "회원 12가 연달아 6번 글쓰기", "method": "POST", "path": "/api/posts", "headers": {"Authorization": "Bearer tok-c06", "Origin": "http://localhost:3000"}, "body": {"boardSlug": "free", "title": "[채점] 도배 확인", "content": "1분 안에 여러 번 쓰기"}, "repeat": 6},
+    {"id": "P", "title": "회원 12가 연달아 6번 글쓰기", "method": "POST", "path": "/api/posts", "headers": {"Authorization": "Bearer tok-c06"}, "body": {"boardSlug": "free", "title": "[채점] 도배 확인", "content": "1분 안에 여러 번 쓰기"}, "repeat": 6},
     {"id": "O", "title": "다른 회원(13)의 글쓰기", "method": "POST", "path": "/api/posts", "headers": {"Authorization": "Bearer tok-c07"}, "body": {"boardSlug": "free", "title": "[채점] 도배 확인 — 다른 회원", "content": "영향 없음"}},
     {"id": "V", "title": "회원 12의 잘못된 글(제목 없음)", "method": "POST", "path": "/api/posts", "headers": {"Authorization": "Bearer tok-c06"}, "body": {"boardSlug": "free", "content": "제목 없음"}},
     {"id": "VI", "title": "제한 중 잘못된 이미지 ID", "method": "POST", "path": "/api/posts", "headers": {"Authorization": "Bearer tok-c06"}, "body": {"boardSlug": "free", "title": "[채점] 도배 확인", "content": "잘못된 이미지", "imageIds": ["문자"]}},

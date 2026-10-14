@@ -250,14 +250,9 @@ public class ConfigController {
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-# 요청 A — 설정 값 보기
-curl -i "$BASE/api/start/config"
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

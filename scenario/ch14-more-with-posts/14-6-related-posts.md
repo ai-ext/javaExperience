@@ -1557,22 +1557,9 @@ public class PostQueryService {
 
 이번 실행에서만 쓰는 태그 두 개(`관련a-N`·`관련b-N`, N은 그때의 질문 게시판 글 수)로 글 세 개를 만든다 — 다른 단계나 이전 실행에서 만든 글이 결과에 섞이지 않게. 이스프링의 기준 글(a·b), 한차단의 글(a·b, 2개 겹침), 동시성01의 글(a, 1개 겹침). 한차단은 김자바를 차단했으므로 김자바에게는 한차단의 글이 빠진다.
 
-```bash
-BASE=http://localhost:8080
-J='Content-Type: application/json'
-N=$(curl -s "$BASE/api/boards/qna/posts?size=1" | python3 -c 'import sys,json; print(json.load(sys.stdin)["totalElements"])')   # F0
-mk() { curl -s -X POST "$BASE/api/posts" -H "Authorization: Bearer $1" -H "$J" -d "{\"boardSlug\":\"qna\",\"title\":\"[채점] $2\",\"content\":\"관련 글 추천 확인용\",\"tags\":$3}" | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'; }
-A=$(mk tok-lee "관련 글 기준" "[\"관련a-$N\",\"관련b-$N\"]")          # K1
-B=$(mk tok-han "관련 글 둘 겹침" "[\"관련a-$N\",\"관련b-$N\"]")        # K2
-C=$(mk tok-c01 "관련 글 하나 겹침" "[\"관련a-$N\"]")                   # K3
-curl -s "$BASE/api/posts/$A/related"; echo                                         # K4 [B(2), C(1)]
-curl -s "$BASE/api/posts/$A/related" -H 'Authorization: Bearer tok-kimjava'; echo  # K5 [C]
-curl -s "$BASE/api/posts/11/related?size=10"; echo                                 # 시드 데이터: 5·3·2(각 1개) — 다른 단계에서 spring 태그 글을 만들었다면 그 글도 보인다
-curl -i "$BASE/api/posts/$A/related?size=11"                                       # K9b 400
-curl -i "$BASE/api/posts/$A/related?size="                                         # K9d 400
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

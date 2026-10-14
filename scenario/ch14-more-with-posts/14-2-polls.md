@@ -1617,31 +1617,9 @@ public class PollService {
 
 이스프링이 자유 게시판에 글을 하나 쓰고(다시 실행할 때마다 새 글) 투표를 붙인다. 김자바·박디비·이스프링이 투표한다.
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; P='Authorization: Bearer tok-park'; J='Content-Type: application/json'
-jget() { python3 -c 'import sys,json; d=json.load(sys.stdin); print(eval("d"+sys.argv[1]))' "$1"; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-PID=$(curl -s -X POST "$BASE/api/posts" -H "$L" -H "$J" -d '{"boardSlug":"free","title":"[채점] 점심 투표","content":"점심 메뉴를 골라 주세요."}' | jget '["id"]')   # V1
-POLL=$(curl -s -X POST "$BASE/api/posts/$PID/poll" -H "$L" -H "$J" -d '{"question":"점심 뭐 먹을까요?","options":["김밥","라면","돈가스"]}'); echo "$POLL"   # V2
-O1=$(echo "$POLL" | jget '["options"][0]["id"]'); O2=$(echo "$POLL" | jget '["options"][1]["id"]')
-curl -i -X POST "$BASE/api/posts/$PID/poll" -H "$L" -H "$J" -d '{"question":"또","options":["가","나"]}'          # V3 409
-curl -i -X POST "$BASE/api/posts/$PID/poll" -H "$K" -H "$J" -d '{"question":"남의 글","options":["가","나"]}'     # V4 403
-curl -i -X POST "$BASE/api/posts/$PID/poll" -H "$L" -H "$J" -d '{"question":"   ","options":["가","나"]}'      # V5c 400 question
-curl -i -X POST "$BASE/api/posts/$PID/poll" -H "$L" -H "$J" -d '{"question":"하나","options":["가"]}'            # V5g 400 options
-curl -i -X POST "$BASE/api/posts/$PID/poll" -H "$L" -H "$J" -d '{"question":null,"options":null}'               # V5l 400 둘 다
-curl -i -X POST "$BASE/api/posts/$PID/poll" -H "$L" -H "$J" -d '{"question":"겹침","options":["가","가 "]}'      # V6 400
-curl -s -X POST "$BASE/api/posts/$PID/poll/votes" -H "$K" -H "$J" -d "{\"optionId\":$O1}"; echo                  # V7
-curl -i -X POST "$BASE/api/posts/$PID/poll/votes" -H "$K" -H "$J" -d "{\"optionId\":$O2}"                        # V8 409
-curl -s -X POST "$BASE/api/posts/$PID/poll/votes" -H "$P" -H "$J" -d "{\"optionId\":$O1}" > /dev/null             # V9
-curl -s -X POST "$BASE/api/posts/$PID/poll/votes" -H "$L" -H "$J" -d "{\"optionId\":$O2}" > /dev/null             # V10
-curl -s "$BASE/api/posts/$PID/poll"; echo                                                                          # V11 비로그인
-curl -i -X POST "$BASE/api/posts/$PID/poll/votes" -H 'Authorization: Bearer tok-c01' -H "$J" -d '{"optionId":0}'      # V13 400
-curl -i -X POST "$BASE/api/posts/$PID/poll/votes" -H 'Authorization: Bearer tok-c01' -H "$J" -d '{"optionId":"abc"}'  # V13c 400
-curl -i "$BASE/api/posts/12/poll"                                                                                 # V14 404
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

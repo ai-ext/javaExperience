@@ -241,23 +241,7 @@ for (Comment c : flat) {
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-tok() { curl -s -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' \
-  -d "{\"email\":\"$1@example.com\",\"password\":\"password1234\"}" | sed -E 's/.*"accessToken":"([^"]+)".*/\1/'; }
-KIM=$(tok kim); LEE=$(tok lee)
-
-curl -s "$BASE/api/v1/posts/1"; echo                                  # A 비로그인 상세(트리)
-curl -s "$BASE/api/v1/posts/1"; echo                                  # B 다시 — viewCount +1
-curl -s "$BASE/api/v1/posts/11" -H "Authorization: Bearer $KIM"; echo   # K 김자바가 좋아요한 글
-curl -s "$BASE/api/v1/posts/12" -H "Authorization: Bearer $KIM"; echo   # K2 안 누른 글
-curl -s -i "$BASE/api/v1/posts/24"; echo                                # P1 비공개 — 비로그인
-curl -s -i "$BASE/api/v1/posts/24" -H "Authorization: Bearer $LEE"; echo  # P2 비공개 — 남
-curl -s -i "$BASE/api/v1/posts/24" -H "Authorization: Bearer $KIM"; echo  # P3 비공개 — 작성자
-curl -s -i "$BASE/api/v1/posts/25"; echo                                # D 삭제된 글
-curl -s -i "$BASE/api/v1/posts/999999"; echo                            # X 없는 글
-curl -s -i "$BASE/api/v1/posts/abc"; echo                               # T 숫자 아님
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 **쿼리 수 세기** — `application.yml`에 SQL 로그를 켜고 요청 A를 보낸 뒤, 로그에서 `org.hibernate.SQL` 줄을 센다.
 
@@ -267,7 +251,7 @@ logging:
     org.hibernate.SQL: debug
 ```
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

@@ -318,16 +318,9 @@ MyBatis 대체 앱에서는 `MyBatisBookmarkService`가 `BookmarkRequest.memo()`
 
 학습용 DB에는 메모가 있는 북마크가 51개 있다. 9번 북마크(회원 10)의 메모는 `예제 따라 해 보기`.
 
-```bash
-BASE=http://localhost:8080
-T='Authorization: Bearer tok-p10'; J='Content-Type: application/json'
-curl -s -H "$T" "$BASE/api/me/bookmarks?size=100" | python3 -c 'import sys,json; print([(i["bookmarkId"], i["memo"]) for i in json.load(sys.stdin)["items"] if i["bookmarkId"] == 9])'   # Q1
-curl -s -o /dev/null -w '%{http_code}\n' -X PUT "$BASE/api/posts/2/bookmark" -H "$T" -H "$J" -d "{\"memo\":\"[채점] 경계-$(printf '노%.0s' $(seq 1 193))\"}"   # V1 201자 → 400
-curl -s -o /dev/null -w '%{http_code}\n' -X PUT "$BASE/api/posts/2/bookmark" -H "$T" -H "$J" -d "{\"memo\":\"[채점] 경계-$(printf '노%.0s' $(seq 1 192))\"}"   # V2 200자 → 200
-curl -s -X PUT "$BASE/api/posts/2/bookmark" -H "$T" -H "$J" -d '{"memo":"[채점] 이름 변경 뒤"}'; echo                                                                    # Q2
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

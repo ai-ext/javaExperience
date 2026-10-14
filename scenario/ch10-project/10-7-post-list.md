@@ -163,28 +163,9 @@
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-KIM=$(curl -s -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' \
-  -d '{"email":"kim@example.com","password":"password1234"}' | sed -E 's/.*"accessToken":"([^"]+)".*/\1/')
-get() { curl -s -G "$BASE/api/v1/posts" "$@"; echo; echo ----; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-get -d tag=mybatis -d size=2                       # A 태그 + 페이지 0
-get -d tag=mybatis -d size=2 -d page=1             # B 페이지 1
-get -d sort=popular -d size=3                      # C 인기순
-get -d tag=mybatis -d size=2 --data-urlencode cursor=   # D 커서 처음
-get -d tag=mybatis -d size=2 -d cursor=17          # E 커서 다음(D의 nextCursor)
-get --data-urlencode q=트랜잭션                     # F 제목 검색
-get --data-urlencode tag=회고                       # G 비로그인
-get --data-urlencode tag=회고 -H "Authorization: Bearer $KIM"   # H 김자바 — 내 비공개 글 포함
-get -d sort=popular --data-urlencode cursor=       # I 인기순 + 커서
-get -d size=51                                     # J size 범위
-get -d sort=oldest                                 # K 잘못된 sort
-get -d size=abc                                    # Z 숫자 아님
-get -d size=5                                      # N 최신순 기본
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 시드 데이터(태그 `mybatis`·`회고`, 제목 "트랜잭션", 좋아요 3개짜리 글)에 기대므로, 다른 단계의 채점이 만든 글(`[채점]`)이 섞여도 결과가 같다. 시드 글에 직접 좋아요를 누르거나 태그를 붙였다면 `docker compose down -v && docker compose up -d`으로 되돌린다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 시드 데이터(태그 `mybatis`·`회고`, 제목 "트랜잭션", 좋아요 3개짜리 글)에 기대므로, 다른 단계의 채점이 만든 글(`[채점]`)이 섞여도 결과가 같다. 시드 글에 직접 좋아요를 누르거나 태그를 붙였다면 `docker compose down -v && docker compose up -d`으로 되돌린다.
 
 ```check
 {

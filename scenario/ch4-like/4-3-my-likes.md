@@ -255,22 +255,9 @@ LIMIT #{limit}
 
 박디비(`tok-park`)로 확인한다. 박디비는 시드에서 글 8개에 좋아요를 눌렀고, 그중 6번(팔로워 공개 — 박디비는 팔로워가 아님)과 8번(삭제됨)은 지금 볼 수 없다.
 
-```bash
-BASE=http://localhost:8080
-P='Authorization: Bearer tok-park'
-show() { python3 -c 'import sys,json; d=json.load(sys.stdin); print([i["postId"] for i in d["items"]], d["nextCursor"])'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-curl -s -H "$P" "$BASE/api/me/likes?size=3" | show                     # M1
-NEXT=$(curl -s -H "$P" "$BASE/api/me/likes?size=3" | python3 -c 'import sys,json; print(json.load(sys.stdin)["nextCursor"])')
-curl -s -H "$P" "$BASE/api/me/likes?size=3&cursor=$NEXT" | show         # M2
-curl -s -H "$P" "$BASE/api/me/likes?size=20" | show                    # M3
-curl -i "$BASE/api/me/likes"                                            # M4 토큰 없음
-curl -i -H "$P" "$BASE/api/me/likes?size=0"                            # M5
-curl -i -H "$P" "$BASE/api/me/likes?cursor=bogus"                      # M6 잘못된 커서
-curl -i -H "$P" "$BASE/api/me/likes?cursor="                           # M7 빈 커서
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

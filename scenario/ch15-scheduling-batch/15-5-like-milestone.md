@@ -1456,18 +1456,9 @@ public class LikeMilestoneService {
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-A='Authorization: Bearer tok-p01'; E='Authorization: Bearer tok-p08'
-curl -s -X POST "$BASE/api/admin/jobs/like-milestone/run" -H "$A"; echo     # M1
-curl -s -X PUT "$BASE/api/posts/140/like" -H "$E"; echo                      # M2 9 → 10
-curl -s -X POST "$BASE/api/admin/jobs/like-milestone/run" -H "$A"; echo     # M3
-curl -s -X DELETE "$BASE/api/posts/140/like" -H "$E" > /dev/null; curl -s -X PUT "$BASE/api/posts/140/like" -H "$E"; echo   # M4·M5
-curl -s -X POST "$BASE/api/admin/jobs/like-milestone/run" -H "$A"; echo     # M6
-curl -s "$BASE/api/me/notifications?type=LIKE_MILESTONE" -H 'Authorization: Bearer tok-p09'; echo   # M7
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

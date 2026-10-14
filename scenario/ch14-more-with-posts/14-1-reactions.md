@@ -705,29 +705,9 @@ public class ReactionService {
 
 13번 글(박디비의 "자유글 02")에 김자바와 이스프링이 공감한다. 처음 두 줄은 다시 실행해도 같은 결과가 나오게 둘의 공감을 지운다.
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; J='Content-Type: application/json'
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-curl -s -X DELETE "$BASE/api/posts/13/reaction" -H "$K" > /dev/null                      # E0 처음 상태로
-curl -s -X DELETE "$BASE/api/posts/13/reaction" -H "$L" > /dev/null                      # E0b
-curl -s -X PUT "$BASE/api/posts/13/reaction" -H "$K" -H "$J" -d '{"kind":"HEART"}'; echo  # E1
-curl -s -X PUT "$BASE/api/posts/13/reaction" -H "$L" -H "$J" -d '{"kind":"HEART"}'; echo  # E2
-curl -s -X PUT "$BASE/api/posts/13/reaction" -H "$K" -H "$J" -d '{"kind":"LAUGH"}'; echo  # E3 바꾸기
-curl -s -X PUT "$BASE/api/posts/13/reaction" -H "$K" -H "$J" -d '{"kind":"LAUGH"}'; echo  # E4 또
-curl -s "$BASE/api/posts/13/reactions"; echo                                             # E5 비로그인
-curl -i -X PUT "$BASE/api/posts/13/reaction" -H "$K" -H "$J" -d '{"kind":"ANGRY"}'        # E6 없는 종류
-curl -i -X PUT "$BASE/api/posts/13/reaction" -H "$K" -H "$J" -d '{"kind":null}'           # E6d null
-curl -i -X PUT "$BASE/api/posts/13/reaction" -H "$K" -H "$J" -d '{"kind":123}'            # E7b 숫자
-curl -i -X PUT "$BASE/api/posts/999999/reaction" -H "$K" -H "$J" -d '{"kind":"SAD"}'      # E8b 없는 글
-curl -i -X PUT "$BASE/api/posts/9/reaction" -H "$K" -H "$J" -d '{"kind":"HEART"}'         # E8 차단한 회원의 글
-curl -i -X PUT "$BASE/api/posts/13/reaction" -H "$J" -d '{"kind":"HEART"}'                # E9 토큰 없음
-curl -s -X DELETE "$BASE/api/posts/13/reaction" -H "$L"; echo                            # E10 취소
-curl -s -X PUT "$BASE/api/posts/12/reaction" -H 'Authorization: Bearer tok-c01' -H "$J" -d '{"kind":"THUMBS_UP"}'; echo   # E11
-curl -s -X PUT "$BASE/api/posts/12/reaction" -H 'Authorization: Bearer tok-c02' -H "$J" -d '{"kind":"SAD"}'; echo         # E12
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

@@ -301,7 +301,7 @@ studymate 화면의 실행 칸은 **브라우저가** 내 서버로 직접 요�
 | `allowedOriginPatterns` | `http://localhost:[*]`, `http://127.0.0.1:[*]` | studymate가 지금 뜨는 곳(로컬 `http://localhost:3000`). `[*]`라 포트가 바뀌어도 된다. **studymate를 배포하면 그 주소를 여기에 추가한다** |
 | `allowedMethods` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS` | 기본값은 `GET`·`HEAD`·`POST`뿐이다. 그대로 두면 3-1의 `PATCH`, 3-2의 `DELETE`가 preflight에서 막힌다 |
 | `allowedHeaders` | `Content-Type`, `Authorization`, `X-Client` | 앞 단계 `/api/echo`의 `X-Client` 허용을 유지하고, 글 API의 `Content-Type`·`Authorization`을 추가한다(`Authorization`은 1-6부터) |
-| `exposedHeaders` | `Location`, `WWW-Authenticate` | 기본값은 없음. 브라우저 코드는 노출된 응답 헤더만 읽는다. 빼면 1-2의 `Location`, 1-6의 `WWW-Authenticate` 확인이 **브라우저에서만** 실패한다(curl은 통과) |
+| `exposedHeaders` | `Location`, `WWW-Authenticate` | 기본값은 없음. 브라우저 코드는 노출된 응답 헤더만 읽는다. 빼면 1-2의 `Location`, 1-6의 `WWW-Authenticate` 확인이 **브라우저에서만** 실패한다(Postman은 헤더를 읽을 수 있다) |
 
 기본값은 Spring Framework 7.0(Spring Boot 4.1)의 `addMapping` 기준이다.
 
@@ -310,36 +310,21 @@ studymate 화면의 실행 칸은 **브라우저가** 내 서버로 직접 요�
 - **출처(origin)** 는 프로토콜·호스트·포트 묶음이다. studymate 화면(`http://localhost:3000`)과 내 서버(`http://localhost:8080`)는 포트가 달라 **다른 출처**다.
 - 브라우저는 **같은 출처 정책**으로, 다른 출처의 응답을 페이지의 코드가 읽지 못하게 막는다. 서버가 응답 헤더 `Access-Control-Allow-Origin`으로 그 출처를 허락해야 읽힌다. 이 허락 규칙이 CORS다.
 - JSON 본문(`Content-Type: application/json`), `Authorization` 헤더, `PUT`·`PATCH`·`DELETE`가 들어간 요청은 "단순 요청"이 아니다. 브라우저는 본 요청 전에 `OPTIONS` 요청(**preflight**)으로 "이 출처에서 이 메서드·헤더로 보내도 되나"를 먼저 묻고, 허락이 없으면 본 요청을 **아예 보내지 않는다**. 요청 A도 JSON이라 preflight를 거친다.
-- curl·IntelliJ HTTP Client는 브라우저가 아니라 CORS를 검사하지 않는다. 그래서 "curl로는 되는데 버튼만 실패"가 생긴다.
+- Postman·IntelliJ HTTP Client는 브라우저가 아니라 CORS를 검사하지 않는다. 그래서 "curl로는 되는데 버튼만 실패"가 생긴다.
 - CORS는 보안 장치(로그인·권한 검사)가 아니다. 브라우저가 응답을 코드에 보여 줄지 정할 뿐이다.
 - **1-6에서 인터셉터로 토큰을 확인하게 되면** preflight `OPTIONS`도 그 인터셉터를 지나는데, 토큰 없이 온다. 인터셉터가 막으면(401·500) 브라우저의 요청이 전부 CORS로 실패한다. 인터셉터 맨 앞에서 `CorsUtils.isPreFlightRequest(request)`면 `true`를 돌려 통과시킨다.
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080   # 서버 주소가 다르면 여기만 바꾼다
+API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 요청은 아래 실행 패널에서 순서대로 보낸다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-# 요청 A — 정상 요청
-curl -i -X POST "$BASE/api/posts" -H 'Content-Type: application/json' \
-  -d '{"boardSlug":"dev","title":"[채점] 첫 게시글","content":"Spring Boot로 만든 첫 게시글입니다.","tags":["spring","jpa"],"visibility":"PUBLIC"}'
 
-# 요청 B — 깨진 JSON(닫는 괄호 없음)
-curl -i -X POST "$BASE/api/posts" -H 'Content-Type: application/json' -d '{"title": "[채점] 깨짐"'
-
-# 요청 C — CORS preflight(브라우저가 PATCH 전에 먼저 보내는 요청을 흉내)
-curl -i -X OPTIONS "$BASE/api/posts" -H 'Origin: http://localhost:3000' \
-  -H 'Access-Control-Request-Method: PATCH' -H 'Access-Control-Request-Headers: content-type,authorization'
-
-# 요청 D — 요청 A에 Origin을 붙여(브라우저가 보내는 모양) 응답의 CORS 헤더 보기
-curl -i -X POST "$BASE/api/posts" -H 'Origin: http://localhost:3000' -H 'Content-Type: application/json' \
-  -d '{"boardSlug":"dev","title":"[채점] 첫 게시글","content":"Spring Boot로 만든 첫 게시글입니다.","tags":["spring","jpa"],"visibility":"PUBLIC"}'
-```
 
 브라우저로 확인 — 위쪽 **내 서버 주소**가 앱 주소와 같은지 보고 아래 실행 칸의 [전체 실행]을 누른다. C1·C2가 통과하면 브라우저에서도 CORS가 열린 것이다(요청 A는 preflight를 거친다).
 
-"CORS로 막혔어요"가 뜨면 [CORS 열기](#cors-열기)를 다시 본다. 개발자 도구(F12) → Network 탭에서 `OPTIONS /api/posts`(preflight)와 `POST /api/posts` 두 줄, 응답 헤더의 `Access-Control-Allow-Origin`을 볼 수 있다. C3·C4는 브라우저가 대신 보낼 수 없는 요청이라(코드는 `Origin` 헤더를 못 바꾼다) 위 curl로 확인한다.
+"CORS로 막혔어요"가 뜨면 [CORS 열기](#cors-열기)를 다시 본다. 개발자 도구(F12) → Network 탭에서 `OPTIONS /api/posts`(preflight)와 `POST /api/posts` 두 줄, 응답 헤더의 `Access-Control-Allow-Origin`을 볼 수 있다. C3·C4는 브라우저가 대신 보낼 수 없는 요청이라(코드는 `Origin` 헤더를 못 바꾼다) Postman에서 Origin과 preflight 헤더를 지정해 확인한다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {
@@ -391,11 +376,11 @@ curl -i -X POST "$BASE/api/posts" -H 'Origin: http://localhost:3000' -H 'Content
     },
     {
       "id": "C3",
-      "manual": "CORS preflight — 브라우저 코드는 Origin·Access-Control-Request-Method를 직접 못 붙인다. 위 요청 C(curl)로 200, Access-Control-Allow-Origin: http://localhost:3000, Allow-Methods에 PATCH, Allow-Headers에 authorization이 있는지 본다"
+      "manual": "CORS preflight — 브라우저 코드는 Origin·Access-Control-Request-Method를 직접 못 붙인다. Postman 요청 C로 200, Access-Control-Allow-Origin: http://localhost:3000, Allow-Methods에 PATCH, Allow-Headers에 authorization이 있는지 본다"
     },
     {
       "id": "C4",
-      "manual": "노출 헤더 — 브라우저 코드는 Access-Control-* 응답 헤더를 못 읽는다. 위 요청 D(curl)로 Access-Control-Allow-Origin: http://localhost:3000, Access-Control-Expose-Headers에 Location·WWW-Authenticate가 있는지 본다"
+      "manual": "노출 헤더 — 브라우저 코드는 Access-Control-* 응답 헤더를 못 읽는다. Postman 요청 D로 Access-Control-Allow-Origin: http://localhost:3000, Access-Control-Expose-Headers에 Location·WWW-Authenticate가 있는지 본다"
     }
   ]
 }

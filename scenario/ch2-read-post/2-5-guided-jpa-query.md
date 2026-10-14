@@ -192,15 +192,7 @@ public class PostHeadlineRow {
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-curl -i "$BASE/api/members/3/posts?board=dev"       # 시드 글 2 포함, 이전 실습 글도 가능
-curl -i "$BASE/api/members/4/posts?board=dev"       # []
-curl -i "$BASE/api/members/999999/posts?board=dev"  # 404 회원 없음
-curl -i "$BASE/api/members/3/posts?board=nope"      # 404 게시판 없음
-curl -i "$BASE/api/members/abc/posts?board=dev"     # 400 id 형식
-curl -i "$BASE/api/members/3/posts"               # 400 board 누락
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 ```check
 {

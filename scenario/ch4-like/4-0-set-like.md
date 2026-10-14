@@ -128,14 +128,7 @@ MyBatis 대체 구현은 `PostVisibilityMapper.findVisibleDetail`로 볼 수 있
 
 시드의 글 3은 박디비의 공개 글이고, 김자바의 좋아요가 없다. 반복 실행 전 4-1에서 만들 DELETE로 정리하거나 다른 본인 테스트 글을 사용한다. `likeCount`의 절대값은 이전 실습에 따라 바뀔 수 있으니 두 PUT 사이 값이 **같은지** 확인한다.
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'
-curl -i -X PUT "$BASE/api/posts/3/like" -H "$K"
-curl -i -X PUT "$BASE/api/posts/3/like" -H "$K"
-curl -i -X PUT "$BASE/api/posts/999999/like" -H "$K"
-curl -i -X PUT "$BASE/api/posts/3/like"
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 ```check
 {

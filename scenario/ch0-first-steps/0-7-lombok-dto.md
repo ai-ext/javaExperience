@@ -110,13 +110,9 @@ public ProfileResponse profile(@Valid @RequestBody ProfileRequest request) {
 
 ```bash
 ./gradlew compileJava
-BASE=http://localhost:8080
-curl -i -X POST "$BASE/api/start/profile" -H 'Content-Type: application/json' -d '{"name":"김자바","age":20}'
-curl -i -X POST "$BASE/api/start/profile" -H 'Content-Type: application/json' -d '{"name":"이프론","age":15}'
-curl -i -X POST "$BASE/api/start/profile" -H 'Content-Type: application/json' -d '{"name":" ","age":20}'
-curl -i -X POST "$BASE/api/start/profile" -H 'Content-Type: application/json' -d '{"name":"김자바"}'
-curl -i -X POST "$BASE/api/start/profile" -H 'Content-Type: application/json' -d '{"name":"김자바","age":151}'
 ```
+
+API 서버 주소는 페이지 상단 공통 입력에서 설정하고, A~E 요청은 실행 패널에서 보낸다. Postman 설정은 접어서 확인할 수 있다.
 
 ```check
 {

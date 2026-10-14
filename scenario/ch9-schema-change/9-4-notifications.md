@@ -316,27 +316,18 @@ public void onPostLiked(PostLikedEvent event) {
 
 학습용 DB의 12번 글은 회원 2가 썼다. 회원 3(`tok-p03`)이 좋아요와 댓글을 단다.
 
-```bash
-BASE=http://localhost:8080
-A='Authorization: Bearer tok-p02'; B='Authorization: Bearer tok-p03'; C='Authorization: Bearer tok-p05'; J='Content-Type: application/json'
-cnt() { docker compose exec -T mysql mysql -ucommunity -pcommunity practice -N -e "SELECT COUNT(*) FROM notification WHERE member_id = 2" 2>/dev/null; }
+알림 행 수는 DB에서 비교한다. 먼저 아래 SQL로 현재 수를 기록하고, 실행 패널에서 Y0~Y3을 순서대로 보낸 뒤 같은 SQL을 다시 실행한다. Y1은 알림을 추가하고 Y2는 중복 알림을 만들지 않으며 Y3은 댓글 알림을 추가해야 한다. 나머지 Y4~Y7·V1~V2 요청은 실행 패널에서 확인한다. API 주소는 페이지 상단 공통 입력을 사용하고 Postman 설정은 접어서 확인할 수 있다.
 
-curl -s -X DELETE "$BASE/api/posts/12/like" -H "$B" > /dev/null      # Y0 처음 상태로
-cnt                                                                   # 전
-curl -s -X PUT "$BASE/api/posts/12/like" -H "$B"; echo               # Y1 좋아요 → 알림 1
-curl -s -X PUT "$BASE/api/posts/12/like" -H "$B"; echo               # Y2 또 → 알림 없음
-curl -s -X POST "$BASE/api/posts/12/comments" -H "$B" -H "$J" -d '{"content":"[채점] 알림 확인 댓글"}'; echo   # Y3 댓글 → 알림 1
-cnt                                                                   # 후
-curl -s -H "$A" "$BASE/api/me/notifications?size=2"; echo            # Y4
-NID=$(curl -s -H "$A" "$BASE/api/me/notifications?size=1" | python3 -c 'import sys,json; print(json.load(sys.stdin)["items"][0]["id"])')
-curl -i -X PATCH "$BASE/api/me/notifications/$NID/read" -H "$C"      # Y5 남의 알림
-curl -i -X PATCH "$BASE/api/me/notifications/$NID/read" -H "$A"      # Y6 내 알림
-curl -s -H "$A" "$BASE/api/me/notifications?unreadOnly=true&size=50" | python3 -c "import sys,json; print($NID in [i['id'] for i in json.load(sys.stdin)['items']])"   # Y7
-curl -s -o /dev/null -w '%{http_code}\n' -X PATCH "$BASE/api/me/notifications/abc/read" -H "$A"      # V1 400
-curl -s -o /dev/null -w '%{http_code}\n' -X PATCH "$BASE/api/me/notifications/999999/read" -H "$A"   # V2 404
+API 서버 주소는 페이지 상단 공통 입력에서 설정한다. 먼저 아래 SQL로 현재 수를 기록하고, 실행 패널에서 Y0~Y3을 순서대로 보낸 뒤 같은 SQL을 다시 실행한다. Y1은 알림을 추가하고 Y2는 중복 알림을 만들지 않으며 Y3은 댓글 알림을 추가해야 한다. 나머지 Y4~Y7·V1~V2 요청은 실행 패널에서 확인한다. Postman 설정은 접어서 볼 수 있다.
+
+```bash
+cnt() { docker compose exec -T mysql mysql -ucommunity -pcommunity practice -N -e "SELECT COUNT(*) FROM notification WHERE member_id = 2" 2>/dev/null; }
+cnt  # Y0~Y3 요청 전
+# 실행 패널에서 Y0~Y3을 순서대로 보낸 다음 다시 실행한다.
+cnt  # 요청 후
 ```
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

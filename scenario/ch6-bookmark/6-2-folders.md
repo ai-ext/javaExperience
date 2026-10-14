@@ -363,35 +363,9 @@ MyBatis 대체 코드 토글의 `MyBatisBookmarkFolderService`와 Mapper XML을 
 
 이스프링은 폴더 2개("스프링 공부" 11번·"나중에 읽기" 12번), 박디비는 폴더 10개(한도)를 가지고 있다.
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; P='Authorization: Bearer tok-park'
-J='Content-Type: application/json'
-jid() { python3 -c 'import sys,json; print(json.load(sys.stdin)["'"${1:-id}"'"])'; }
-NAME="[채점] 폴더 $(date +%H%M%S)"
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-curl -s -H "$L" "$BASE/api/me/bookmark-folders"; echo                                                     # F1
-curl -i -X POST "$BASE/api/me/bookmark-folders" -H "$P" -H "$J" -d '{"name":"[채점] 열한 번째"}'           # F2 한도
-FID=$(curl -s -X POST "$BASE/api/me/bookmark-folders" -H "$K" -H "$J" -d "{\"name\":\"$NAME\"}" | jid)     # F3
-curl -i -X POST "$BASE/api/me/bookmark-folders" -H "$K" -H "$J" -d "{\"name\":\"$NAME\"}"                 # F4 같은 이름
-curl -i -X PATCH "$BASE/api/me/bookmark-folders/11" -H "$K" -H "$J" -d '{"name":"[채점] 남의 폴더"}'      # F5
-BID=$(curl -s -X PUT "$BASE/api/posts/3/bookmark" -H "$K" -H "$J" -d '{}' | jid bookmarkId)               # F6
-curl -s -X PATCH "$BASE/api/me/bookmarks/$BID" -H "$K" -H "$J" -d "{\"folderId\":$FID}"; echo             # F7 폴더로 옮기기
-curl -i -X DELETE "$BASE/api/me/bookmark-folders/$FID" -H "$K"                                            # F8 폴더 지우기
-curl -i -X PATCH "$BASE/api/me/bookmarks/1" -H "$K" -H "$J" -d '{"folderId":null}'                        # F9 남의 북마크
-
-# 잘못된 입력 — 500이 아니다
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/me/bookmark-folders" -H "$K" -H "$J" -d '{"name":"   "}'      # V4 400
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/me/bookmark-folders" -H "$K" -H "$J" -d '{"name":null}'       # V2 400
-N50="[채점]$(printf '폴%.0s' $(seq 1 46))"   # 정확히 50자
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/me/bookmark-folders" -H "$K" -H "$J" -d "{\"name\":\"${N50}x\"}"   # V5 51자 400
-B1=$(curl -s -X POST "$BASE/api/me/bookmark-folders" -H "$K" -H "$J" -d "{\"name\":\"  $N50  \"}" | jid)               # B1 201
-curl -s -o /dev/null -w '%{http_code}\n' -X PATCH "$BASE/api/me/bookmark-folders/$B1" -H "$K" -H "$J" -d '{"name":"   "}'  # V7 400
-curl -s -o /dev/null -w '%{http_code}\n' -X PATCH "$BASE/api/me/bookmarks/$BID" -H "$K" -H "$J" -d '{"folderId":"abc"}'   # V12 400
-curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "$BASE/api/me/bookmark-folders/$B1" -H "$K"                              # B2 204
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

@@ -869,24 +869,9 @@ REQUIRES_NEW 트랜잭션은 JPA 방식과 같다. UNIQUE 인덱스와 ON DUPLIC
 
 15번 글은 회원 2의 **팔로워 공개** 글이다. 회원 3·4·8은 회원 2를 팔로우하고, 회원 6은 팔로우하지 않는다. 회원 14는 회원 3을 차단했다. 회원 29는 탈퇴했다.
 
-```bash
-BASE=http://localhost:8080
-J='Content-Type: application/json'
-tok() { echo "Authorization: Bearer tok-p$1"; }
-top() { curl -s -H "$(tok $1)" "$BASE/api/me/notifications?size=${2:-1}" | python3 -c 'import sys,json; print([(i["type"], i["actor"]["id"], i["postId"], i["commentId"]) for i in json.load(sys.stdin)["items"]])'; }
-TEXT='[채점] 멘션 확인 @스프링요정 @스프링요정 @코딩하는고양이 @리팩토링중독 @밤샘개발자 @자바초보탈출 @떠난개발자 @디버깅중님 봐 주세요'
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-CID=$(curl -s -X POST "$BASE/api/posts/15/comments" -H "$(tok 03)" -H "$J" -d "{\"content\":\"$TEXT\"}" | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'); echo $CID   # K
-top 04 2      # N4 — 스프링요정: MENTION 하나
-top 02 2      # N2 — 글 작성자: COMMENT 하나
-top 14 20; top 06 20; top 08 20       # 차단·못 보는 사람·"님" 붙임 — 이 댓글 알림 없음
-curl -s -X PATCH "$BASE/api/comments/$CID" -H "$(tok 03)" -H "$J" -d "{\"content\":\"${TEXT/@디버깅중님/@디버깅중 님}\"}"; echo   # E
-top 08 1      # N8 — 디버깅중: 이제 MENTION
-top 04 1      # 스프링요정: 새 알림 없음(N4와 같은 알림이 맨 위)
-curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "$BASE/api/comments/$CID" -H "$(tok 03)"   # 뒷정리
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 실행할 때마다 새 댓글을 만들고 멘션 제거·재추가를 거쳐 마지막에 지운다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 실행할 때마다 새 댓글을 만들고 멘션 제거·재추가를 거쳐 마지막에 지운다.
 
 ```check
 {

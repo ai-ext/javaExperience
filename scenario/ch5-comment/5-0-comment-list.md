@@ -159,13 +159,7 @@ public class CommentRow {
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-curl -i "$BASE/api/posts/11/comments"               # 최상위 1·3
-curl -i "$BASE/api/posts/3/comments"                # []
-curl -i "$BASE/api/posts/999999/comments"           # 404
-curl -i -H 'Authorization: Bearer tok-kimjava' "$BASE/api/posts/9/comments"  # 404, 볼 수 없는 글
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 ```check
 {

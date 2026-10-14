@@ -294,23 +294,9 @@ LIMIT #{limit}
 
 이스프링(`tok-lee`)의 시드 북마크 6개 중 10번(운영자 숨김)과 8번(삭제됨)은 지금 볼 수 없다.
 
-```bash
-BASE=http://localhost:8080
-L='Authorization: Bearer tok-lee'
-show() { python3 -c 'import sys,json; d=json.load(sys.stdin); print([(i["bookmarkId"], i["postId"], i["available"]) for i in d["items"]], d["nextCursor"])'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-curl -s -H "$L" "$BASE/api/me/bookmarks?size=20" | show                 # K1 전체
-curl -s -H "$L" "$BASE/api/me/bookmarks?folder=11" | show                # K2
-curl -s -H "$L" "$BASE/api/me/bookmarks?folder=12" | show                # K3
-curl -s -H "$L" "$BASE/api/me/bookmarks?folder=default" | show           # K4
-curl -s -H "$L" "$BASE/api/me/bookmarks?size=4" | show                   # K5
-NEXT=$(curl -s -H "$L" "$BASE/api/me/bookmarks?size=4" | python3 -c 'import sys,json; print(json.load(sys.stdin)["nextCursor"])')
-curl -s -H "$L" "$BASE/api/me/bookmarks?size=4&cursor=$NEXT" | show      # K6
-curl -i -H "$L" "$BASE/api/me/bookmarks?folder=1"                        # K7 박디비의 폴더
-curl -i "$BASE/api/me/bookmarks"                                         # K8 토큰 없음
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

@@ -703,21 +703,9 @@ public class SelfFollowNotAllowedException extends RuntimeException {
 
 회원 2(`tok-p02`)가 회원 6을 팔로우한다(처음에는 안 하고 있다). 회원 7은 회원 2를 차단했고, 회원 29는 탈퇴했다.
 
-```bash
-BASE=http://localhost:8080
-A='Authorization: Bearer tok-p02'
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-curl -s -X DELETE "$BASE/api/members/6/follow" -H "$A"; echo     # F0 처음 상태로 — followerCount n
-curl -s -X PUT "$BASE/api/members/6/follow" -H "$A"; echo        # F1 → true, n+1
-curl -s -X PUT "$BASE/api/members/6/follow" -H "$A"; echo        # F2 → 그대로
-for i in 1 2 3 4 5; do curl -s -X PUT "$BASE/api/members/6/follow" -H "$A" & done; wait; echo   # FC 동시 5번 — 다섯 응답이 같아야 한다
-curl -s -X DELETE "$BASE/api/members/6/follow" -H "$A"; echo     # F3 → false, n
-curl -s -X DELETE "$BASE/api/members/6/follow" -H "$A"; echo     # F4 → 그대로
-for p in 2 7 29 99999999 0 abc; do curl -s -o /dev/null -w "PUT $p → %{http_code}\n" -X PUT "$BASE/api/members/$p/follow" -H "$A"; done   # 400 403 404 404 404 400
-curl -s -o /dev/null -w "DELETE 7 → %{http_code}\n" -X DELETE "$BASE/api/members/7/follow" -H "$A"   # 200
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 끝에서 언팔로우하므로 몇 번을 눌러도 같은 결과다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 끝에서 언팔로우하므로 몇 번을 눌러도 같은 결과다.
 
 ```check
 {

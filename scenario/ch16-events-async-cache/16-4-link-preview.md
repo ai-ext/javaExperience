@@ -2615,24 +2615,16 @@ public class PostLinkRow {
 
 ## 직접 확인
 
+가짜 사이트와 글 요청은 실행 패널에서 보낸다. X1은 잘못된 주소, F는 빠른 링크, S는 2초 제한보다 오래 걸리는 링크다. 패널의 응답 시간과 `Server-Timing`을 비교하고, 아래 SQL로 저장된 링크 제목을 확인한다. API 주소는 페이지 상단 공통 입력을 사용하고 Postman 설정은 접어서 확인할 수 있다.
+
 ```bash
-BASE=http://localhost:8080; J='Content-Type: application/json'
 sql() { docker compose exec -T mysql mysql -ucommunity -pcommunity practice -N -e "$1" 2>/dev/null; }
-
-curl -s "$BASE/fake-site/page?title=hello&delay=0"; echo                     # 가짜 사이트가 HTML을 주는지
-curl -s -X POST "$BASE/api/posts" -H 'Authorization: Bearer tok-p21' -H "$J" \
-  -d '{"boardSlug":"free","title":"[채점] 16-4 잘못된 링크","content":"x","linkUrl":"ftp://example.com/a"}'; echo   # 400 linkUrl
-
-time curl -s -D - -X POST "$BASE/api/posts" -H 'Authorization: Bearer tok-p08' -H "$J" \
-  -d "{\"boardSlug\":\"free\",\"title\":\"[채점] 16-4 빠른 링크\",\"content\":\"x\",\"linkUrl\":\"$BASE/fake-site/page?title=spring-cache-guide&delay=0\"}" | grep -i -E 'server-timing|"link"'
-time curl -s -D - -X POST "$BASE/api/posts" -H 'Authorization: Bearer tok-p09' -H "$J" \
-  -d "{\"boardSlug\":\"free\",\"title\":\"[채점] 16-4 느린 링크\",\"content\":\"x\",\"linkUrl\":\"$BASE/fake-site/page?title=slow-page&delay=3000\"}" | grep -i -E 'server-timing|"link"'
 sql "SELECT id, link_title, LEFT(link_url, 60) FROM post WHERE title LIKE '[채점] 16-4%' ORDER BY id DESC LIMIT 2"
 ```
 
 느린 쪽의 `time`이 3초가 아니라 2초 남짓인지 본다. 앱 로그에는 `링크 미리보기 실패 url=... — I/O error ... Read timed out` 한 줄이 남는다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 실행할 때마다 회원 21·8·9·10의 글이 하나씩 늘어난다(회원 21은 팔로워가 없다 — 12-5 피드가 정확한 글 목록을 보는 회원 6이 7을 팔로우하므로, 회원 7로 글을 쓰면 12-5를 다시 돌릴 때 피드가 달라진다). S 요청은 약 2초 걸린다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 실행할 때마다 회원 21·8·9·10의 글이 하나씩 늘어난다(회원 21은 팔로워가 없다 — 12-5 피드가 정확한 글 목록을 보는 회원 6이 7을 팔로우하므로, 회원 7로 글을 쓰면 12-5를 다시 돌릴 때 피드가 달라진다). S 요청은 약 2초 걸린다.
 
 ```check
 {
@@ -2642,6 +2634,12 @@ sql "SELECT id, link_title, LEFT(link_url, 60) FROM post WHERE title LIKE '[채�
       "title": "이 서버 주소",
       "method": "GET",
       "path": "/fake-site/base"
+    },
+    {
+      "id": "W0",
+      "title": "가짜 사이트가 HTML을 돌려주는지",
+      "method": "GET",
+      "path": "/fake-site/page?title=hello&delay=0"
     },
     {
       "id": "X1",
@@ -2945,6 +2943,10 @@ sql "SELECT id, link_title, LEFT(link_url, 60) FROM post WHERE title LIKE '[채�
           }
         }
       ]
+    },
+    {
+      "id": "C6",
+      "manual": "W0 응답 본문이 HTML이고 title이 hello인 것을 확인한다."
     }
   ]
 }

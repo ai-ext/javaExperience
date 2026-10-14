@@ -525,25 +525,9 @@ public class NotificationService {
 
 회원 4의 1번 글에 회원 5·6·7이 차례로 좋아요를 눌러 알림 3개를 만든다(먼저 취소해서 "새로" 누른 것이 되게 한다). 끝에서 좋아요를 다시 취소해 처음 상태로 돌린다.
 
-```bash
-BASE=http://localhost:8080
-tok() { echo "Authorization: Bearer tok-p$1"; }
-ids() { python3 -c 'import sys,json; d=json.load(sys.stdin); print([(i["id"], i["actor"]["id"]) for i in d["items"]], d.get("nextCursor"))'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-for m in 05 06 07; do curl -s -o /dev/null -X DELETE "$BASE/api/posts/1/like" -H "$(tok $m)"; done   # 처음 상태로
-for m in 05 06 07; do curl -s -o /dev/null -X PUT "$BASE/api/posts/1/like" -H "$(tok $m)"; done      # 알림 3개
-curl -s "$BASE/api/me/notifications/unread-count" -H "$(tok 04)"; echo                            # U0
-curl -s "$BASE/api/me/notifications?size=2" -H "$(tok 04)" | ids                                   # A — 7, 6 + 커서
-curl -s "$BASE/api/me/notifications?size=2&cursor=<A의 nextCursor>" -H "$(tok 04)" | ids           # B — 5부터
-curl -s -X POST "$BASE/api/me/notifications/read-all" -H "$(tok 04)"; echo                         # RA
-curl -s "$BASE/api/me/notifications/unread-count" -H "$(tok 04)"; echo                            # U1 → 0
-curl -s -X POST "$BASE/api/me/notifications/read-all" -H "$(tok 04)"; echo                         # RA2 → 0
-for q in 'size=0' 'size=101' 'size=abc' 'size=' 'unreadOnly=maybe' 'unreadOnly=1' 'unreadOnly=yes' 'unreadOnly=on' 'unreadOnly=' 'cursor=abc' 'cursor='; do
-  curl -s -o /dev/null -w "$q → %{http_code}\n" "$BASE/api/me/notifications?$q" -H "$(tok 04)"; done   # 모두 400
-for m in 05 06 07; do curl -s -o /dev/null -X DELETE "$BASE/api/posts/1/like" -H "$(tok $m)"; done   # 뒷정리
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 끝에서 좋아요를 취소하므로 몇 번을 눌러도 같은 결과다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 끝에서 좋아요를 취소하므로 몇 번을 눌러도 같은 결과다.
 
 ```check
 {

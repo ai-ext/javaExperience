@@ -320,48 +320,9 @@ List<MyDraftRow> findMyDrafts(@Param("authorId") Long authorId);
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; J='Content-Type: application/json'
-jid() { python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-D=$(curl -s -X POST "$BASE/api/posts" -H "$K" -H "$J" \
-  -d '{"boardSlug":"free","title":"[채점] 임시저장 글","content":"쓰는 중","status":"DRAFT"}' | tee /dev/stderr | jid); echo; echo "D=$D"   # P0
-curl -i "$BASE/api/posts/$D"                                                  # P1 비로그인 상세
-curl -s "$BASE/api/boards/free/posts?size=50" | python3 -c "import sys,json; print($D in [i['id'] for i in json.load(sys.stdin)['items']])"   # P2
-curl -s "$BASE/api/me/drafts" -H "$K"; echo                                   # P3
-curl -i -X POST "$BASE/api/posts/$D/publish" -H "$L"                          # P4 남이 발행
-curl -s -X POST "$BASE/api/posts/$D/publish" -H "$K"; echo                    # P5 발행
-curl -i -X POST "$BASE/api/posts/$D/publish" -H "$K"                          # P6 또 발행
-curl -s "$BASE/api/boards/free/posts?size=1"; echo                            # P7 목록 맨 위
-curl -s "$BASE/api/me/drafts" -H "$K"; echo                                   # P8
-curl -i -X POST "$BASE/api/posts/2/publish" -H "$K"                           # P9 남의 공개 글
-curl -i -X POST "$BASE/api/posts" -H "$K" -H "$J" \
-  -d '{"boardSlug":"free","title":"[채점] 잘못된 상태","content":"x","status":"SECRET"}'   # P10
-curl -i "$BASE/api/me/drafts"                                                 # P11 토큰 없음
-# 잘못된 입력 — 모두 400(또는 404), 500이 아니어야 한다
-for body in '{"boardSlug":"free","title":"[채점] x","content":"x","status":""}' \
-            '{"boardSlug":"free","title":"[채점] x","content":"x","status":"draft"}' \
-            '{"boardSlug":"free","title":"","content":"x","status":"X"}' \
-            '{"boardSlug":"free","title":"[채점] x","content":"x","status":1}'; do
-  curl -s -X POST "$BASE/api/posts" -H "$K" -H "$J" -d "$body"; echo                # P12~P15
-done
-# P16·P17(글이 실제로 생기는 경계값)은 다른 회원(동시성11)으로 쓴다 — 13-5 도배 방지(1분에 5개)를 만든 뒤에도
-# 이 확인을 연달아 눌러 한 회원의 글이 1분 안에 5개를 넘지 않게
-C11='Authorization: Bearer tok-c11'
-curl -s -X POST "$BASE/api/posts" -H "$C11" -H "$J" -d '{"boardSlug":"free","title":"[채점] 상태 생략","content":"x","status":null}'; echo   # P16 null = 기본값
-T200=$(python3 -c 'print("가나다라마바사아자차"*20)')
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/posts" -H "$C11" -H "$J" -d "{\"boardSlug\":\"free\",\"title\":\"$T200\",\"content\":\"x\",\"status\":\"DRAFT\"}"    # P17 200자 → 201
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/posts" -H "$K" -H "$J" -d "{\"boardSlug\":\"free\",\"title\":\"${T200}가\",\"content\":\"x\",\"status\":\"DRAFT\"}"  # P18 201자 → 400
-curl -i -X POST "$BASE/api/posts/99999999/publish" -H "$K"                    # P19 없는 글
-curl -i -X POST "$BASE/api/posts/abc/publish" -H "$K"                         # P20 숫자가 아닌 id
-# 형식이 아예 틀린 값 — 400 + errors에 필드 이름(공통 예외 처리기)
-curl -s -X POST "$BASE/api/posts" -H "$K" -H "$J" -d '{"boardSlug":"free","title":"[채점] 형식","content":"x","tags":"java"}'; echo     # F1 → tags
-curl -s -X POST "$BASE/api/posts" -H "$K" -H "$J" -d '{"boardSlug":"free","title":"[채점] 형식","content":"x","status":["DRAFT"]}'; echo   # F2 → status
-curl -s -X POST "$BASE/api/posts/abc/publish" -H "$K"; echo                                                                                # P20 → id
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들어 확인하므로 몇 번을 눌러도 같은 결과다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들어 확인하므로 몇 번을 눌러도 같은 결과다.
 
 ```check
 {

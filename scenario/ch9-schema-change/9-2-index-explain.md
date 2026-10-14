@@ -260,11 +260,7 @@ LIMIT #{limit}
 
 ## 직접 확인
 
-```bash
-./gradlew bootRun --args='--spring.profiles.active=practice'      # V2 적용
-docker compose exec -T mysql mysql -ucommunity -pcommunity practice -e "EXPLAIN SELECT l.id FROM post_like l WHERE l.member_id = 12 ORDER BY l.created_at DESC, l.id DESC LIMIT 11"
-curl -s -H 'Authorization: Bearer tok-p12' "http://localhost:8080/api/me/likes?size=5" | python3 -c 'import sys,json; print([i["postId"] for i in json.load(sys.stdin)["items"]])'
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 단일 테이블 계획만으로 실제 API의 성능을 판정하지 않는다. 첫 페이지의 JOIN·가시성 조건을 포함한 실행 계획도 본다(회원 12, `size=5`라 `LIMIT 6`).
 
@@ -286,7 +282,7 @@ WHERE l.member_id = 12
 ORDER BY l.created_at DESC, l.id DESC LIMIT 6;
 ```
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

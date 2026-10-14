@@ -2395,20 +2395,9 @@ public class ScheduledPublishService {
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-A='Authorization: Bearer tok-p01'; P='Authorization: Bearer tok-p02'; J='Content-Type: application/json'
-jid() { python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'; }
-X=$(curl -s -X POST "$BASE/api/posts" -H "$P" -H "$J" -d '{"boardSlug":"free","title":"[채점] 예약 09:00","content":"예약","tags":[],"publishAt":"2026-10-05T09:00:00"}' | jid); echo "X=$X"   # P1
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/posts/$X"                                          # P4 비로그인 404
-curl -s -X POST "$BASE/api/admin/jobs/scheduled-publish/run?at=2026-10-05T08:59:59" -H "$A"; echo     # P7 아직
-curl -s -X POST "$BASE/api/admin/jobs/scheduled-publish/run?at=2026-10-05T09:00:00" -H "$A"; echo     # P8 발행
-curl -s -X POST "$BASE/api/admin/jobs/scheduled-publish/run?at=2026-10-05T09:00:00" -H "$A"; echo     # P9 한 번 더
-curl -s "$BASE/api/posts/$X" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d["status"], d["publishedAt"])'   # P10
-curl -s -X POST "$BASE/api/posts" -H "$P" -H "$J" -d '{"boardSlug":"free","title":"t","content":"c","tags":[],"publishAt":"2026-10-05T00:00:00"}'; echo   # P12 지금
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 확인할 때마다 예약 글 3개가 새로 생기고, 이 중 2개(00:00:01·09:00)는 그 자리에서 발행된다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 확인할 때마다 예약 글 3개가 새로 생기고, 이 중 2개(00:00:01·09:00)는 그 자리에서 발행된다.
 
 ```check
 {

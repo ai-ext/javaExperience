@@ -644,27 +644,11 @@ public class PostStatusConflictException extends RuntimeException {
 
 회원 7(`tok-c01`, 동시성01)을 잠깐 모더레이터로 만들었다가 끝에서 되돌린다. 글 12는 이스프링의 공개 글이다. 글 7은 임시저장, 글 8은 삭제된 글이다.
 
-```bash
-BASE=http://localhost:8080
-AD='Authorization: Bearer tok-admin'; MO='Authorization: Bearer tok-c01'; J='Content-Type: application/json'
-
-curl -s -X PATCH "$BASE/api/admin/members/7/role" -H "$AD" -H "$J" -d '{"role":"MODERATOR"}'; echo   # G
-curl -s -X PATCH "$BASE/api/admin/posts/12/status" -H "$MO" -H "$J" -d '{"status":"HIDDEN"}'; echo   # H — hiddenBy 7
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/posts/12"                                        # V1 404
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/posts/12" -H "$MO"                               # V2 200
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/admin/recount" -H "$MO"                  # P1 403
-for b in '{}' '{"status":"DRAFT"}' 'status=HIDDEN'; do curl -s -o /dev/null -w "$b → %{http_code}\n" -X PATCH "$BASE/api/admin/posts/12/status" -H "$MO" -H "$J" -d "$b"; done   # 모두 400
-curl -s -o /dev/null -w '%{http_code}\n' -X PATCH "$BASE/api/admin/posts/7/status" -H "$MO" -H "$J" -d '{"status":"HIDDEN"}'   # S7 409
-curl -s -o /dev/null -w '%{http_code}\n' -X PATCH "$BASE/api/admin/members/8/role" -H "$AD" -H "$J" -d '{"role":"ADMIN"}'       # RA 400
-curl -s -o /dev/null -w '%{http_code}\n' -X PATCH "$BASE/api/admin/members/1/role" -H "$AD" -H "$J" -d '{"role":"USER"}'        # RM 409
-curl -s -X PATCH "$BASE/api/admin/posts/12/status" -H "$MO" -H "$J" -d '{"status":"PUBLISHED"}'; echo   # R 복구
-curl -s -X PATCH "$BASE/api/admin/members/7/role" -H "$AD" -H "$J" -d '{"role":"USER"}'; echo        # Z 되돌리기
-curl -s -o /dev/null -w '%{http_code}\n' -X PATCH "$BASE/api/admin/posts/12/status" -H "$MO" -H "$J" -d '{"status":"HIDDEN"}'   # ZH 403 — 바로 반영
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 동시 숨김도 따로 확인한다. 회원 7을 `MODERATOR`로 만든 뒤 글 12를 `PUBLISHED`로 복구하고, `tok-admin`과 `tok-c01`로 `HIDDEN` 요청을 동시에 보낸다. 두 응답의 `hiddenBy`·`hiddenAt`이 같고 DB에도 첫 기록 하나만 남아야 한다. 끝에는 글을 복구하고 회원 7을 `USER`로 되돌린다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 끝에서 글 12를 복구하고 회원 7을 USER로 되돌리므로 몇 번을 눌러도 같은 결과다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 끝에서 글 12를 복구하고 회원 7을 USER로 되돌리므로 몇 번을 눌러도 같은 결과다.
 
 ```check
 {

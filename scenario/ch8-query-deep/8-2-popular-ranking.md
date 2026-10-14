@@ -271,18 +271,9 @@ public Clock clock(@Value("${app.fixed-now:}") String fixedNow) {
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-top() { python3 -c 'import sys,json; print([(r["postId"], r["score"], r["likes"], r["comments"]) for r in json.load(sys.stdin)])'; }
-curl -s "$BASE/api/posts/popular?days=7&limit=5" | top       # H1
-curl -s "$BASE/api/posts/popular?days=30&limit=3" | top      # H2
-curl -s "$BASE/api/posts/popular?days=7&limit=50" | python3 -c 'import sys,json; print(len(json.load(sys.stdin)))'   # H3
-curl -i "$BASE/api/posts/popular?days=31"                   # H4
-curl -i "$BASE/api/posts/popular?days="                     # H5
-curl -i "$BASE/api/posts/popular?limit="                    # H6
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

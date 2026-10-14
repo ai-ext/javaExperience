@@ -448,33 +448,9 @@ Mapper가 행을 바꾼 뒤에는 `EntityManager.refresh(comment)`로 JPA가 관
 
 학습용 DB의 32번 글(회원 2의 글, 댓글 없음)에 회원 3(`tok-p03`)이 댓글을 달고 고친다.
 
-```bash
-BASE=http://localhost:8080
-A='Authorization: Bearer tok-p03'; B='Authorization: Bearer tok-p04'; J='Content-Type: application/json'
-jid() { python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-CID=$(curl -s -X POST "$BASE/api/posts/32/comments" -H "$A" -H "$J" -d '{"content":"[채점] 수정 전 댓글"}' | jid); echo $CID   # K
-curl -s -X PATCH "$BASE/api/comments/$CID" -H "$A" -H "$J" -d '{"content":"[채점] 수정 전 댓글"}'; echo   # S 같은 내용 → edited false
-curl -s -X PATCH "$BASE/api/comments/$CID" -H "$A" -H "$J" -d "{\"content\":\"$(python3 -c 'print("가"*1000)')\"}" | head -c 80; echo   # VM 정확히 1000자 → 200
-curl -s -X PATCH "$BASE/api/comments/$CID" -H "$A" -H "$J" -d '{"content":"[채점] 수정한 댓글"}'; echo     # E 고침 → edited true
-curl -s "$BASE/api/posts/32/comments"; echo                                                                 # L 목록
-curl -i -X PATCH "$BASE/api/comments/$CID" -H "$B" -H "$J" -d '{"content":"남이 바꿈"}'                     # F 남의 댓글
-curl -i -X PATCH "$BASE/api/comments/$CID" -H "$A" -H "$J" -d '{}'                                         # V0 content 없음
-curl -i -X PATCH "$BASE/api/comments/$CID" -H "$A" -H "$J" -d '{"content":null}'                           # VN null
-curl -i -X PATCH "$BASE/api/comments/$CID" -H "$A" -H "$J" -d '{"content":""}'                             # VE 빈 문자열
-curl -i -X PATCH "$BASE/api/comments/$CID" -H "$A" -H "$J" -d '{"content":"   "}'                          # V 공백만
-curl -i -X PATCH "$BASE/api/comments/$CID" -H "$A" -H "$J" -d "{\"content\":\"$(python3 -c 'print("가"*1001)')\"}"   # VL 1001자
-curl -i -X PATCH "$BASE/api/comments/$CID" -H "$A" -H "$J" -d '{"content":123}'   # VT 숫자 타입 → 400
-curl -i -X PATCH "$BASE/api/comments/$CID" -H "$A" -H "$J" -d '{"content":["x"]}' # VA 배열 타입 → 400
-curl -i -X PATCH "$BASE/api/comments/$CID" -H "$A" -H "$J" -d 'content=abc'                                # VB JSON 아님
-curl -i -X PATCH "$BASE/api/comments/abc" -H "$A" -H "$J" -d '{"content":"x"}'                             # VI 경로가 숫자 아님
-curl -i -X PATCH "$BASE/api/comments/99999999" -H "$A" -H "$J" -d '{"content":"x"}'                        # VX 없는 댓글
-curl -i -X DELETE "$BASE/api/comments/$CID" -H "$A"                                                         # D 지우기(뒷정리)
-curl -i -X PATCH "$BASE/api/comments/$CID" -H "$A" -H "$J" -d '{"content":"지운 뒤"}'                       # G 지운 댓글
-curl -i -X PATCH "$BASE/api/comments/$CID" -H "$J" -d '{"content":"토큰 없음"}'                              # N
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 마지막에 만든 댓글을 지우므로 몇 번을 눌러도 같은 결과다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 마지막에 만든 댓글을 지우므로 몇 번을 눌러도 같은 결과다.
 
 ```check
 {

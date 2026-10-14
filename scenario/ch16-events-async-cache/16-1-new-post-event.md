@@ -1854,28 +1854,18 @@ public interface NotificationWriteMapper {
 
 학습용 DB의 회원 4(스프링요정, `tok-p04`)는 팔로워가 17명이다. 그중 회원 28은 정지 회원이다. 회원 2(`tok-p02`)는 팔로워고 회원 6(`tok-p06`)은 팔로워가 아니다.
 
+API 요청 P/F/O/X1/R은 실행 패널에서 보낸다. 롤백 확인은 SQL 카운트를 먼저 기록하고 실행 패널에서 R 요청을 단독 실행한 다음 카운트를 다시 확인한다. 나머지 알림 흐름은 패널의 P/F/O 요청으로 확인한다. API 주소는 페이지 상단 공통 입력을 사용하고 Postman 설정은 접어서 확인할 수 있다.
+
 ```bash
-BASE=http://localhost:8080
-W='Authorization: Bearer tok-p04'; J='Content-Type: application/json'
 sql() { docker compose exec -T mysql mysql -ucommunity -pcommunity practice -N -e "$1" 2>/dev/null; }
-
-curl -s -X POST "$BASE/api/posts" -H "$W" -H "$J" \
-  -d '{"boardSlug":"free","title":"[채점] 16-1 새 글 알림","content":"팔로워에게 알림이 가는지 본다","tags":["java","spring","jpa","mysql","test"]}'; echo   # P
-curl -s -H 'Authorization: Bearer tok-p02' "$BASE/api/me/notifications?size=1"; echo                         # F 팔로워
-curl -s -H 'Authorization: Bearer tok-p06' "$BASE/api/me/notifications?size=1"; echo                         # O 팔로워 아님
-
-curl -s -X POST "$BASE/api/posts" -H "$W" -H "$J" \
-  -d '{"boardSlug":"free","title":"   ","content":"잘못된 입력","visibility":"SECRET"}'; echo                  # X1 → 400, errors에 title·visibility
-
-sql "SELECT COUNT(*) FROM notification WHERE type = 'NEW_POST' AND actor_id = 4"                              # 롤백 실험 전
-curl -s -X POST "$BASE/api/posts" -H "$W" -H "$J" \
-  -d '{"boardSlug":"free","title":"[채점] 16-1 롤백 실험","content":"저장 뒤 실패","tags":["rollback-test"]}'; echo   # R
-sql "SELECT COUNT(*) FROM notification WHERE type = 'NEW_POST' AND actor_id = 4"                              # 롤백 실험 후 — 같아야 한다
+sql "SELECT COUNT(*) FROM notification WHERE type = 'NEW_POST' AND actor_id = 4"  # 롤백 실험 전
+# 실행 패널에서 지정한 요청을 단독 실행한 뒤 다시 실행한다.
+sql "SELECT COUNT(*) FROM notification WHERE type = 'NEW_POST' AND actor_id = 4"  # 롤백 실험 후 — 같아야 한다
 ```
 
 앱 로그에서 순서도 본다. `INSERT INTO post` → (커밋) → `INSERT INTO notification ... SELECT` 순서로 찍힌다. 롤백 실험(R)에서는 `INSERT INTO post`만 있고 알림 INSERT가 없다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 실행할 때마다 회원 4의 글이 하나 늘어난다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 실행할 때마다 회원 4의 글이 하나 늘어난다.
 
 ```check
 {

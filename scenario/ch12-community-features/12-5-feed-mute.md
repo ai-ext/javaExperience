@@ -525,23 +525,9 @@ CREATE TABLE member_mute (
 
 회원 6(`tok-p06`)은 회원 7만 팔로우한다. 회원 6의 글은 145(공개)·91(팔로워 공개)·83(임시저장), 회원 7의 글은 101·44다.
 
-```bash
-BASE=http://localhost:8080
-H='Authorization: Bearer tok-p06'
-ids() { python3 -c 'import sys,json; d=json.load(sys.stdin); print([i["id"] for i in d["items"]], d["nextCursor"])'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-curl -s -X DELETE "$BASE/api/members/7/mute" -H "$H"; echo           # 처음 상태로
-curl -s "$BASE/api/me/feed?size=2" -H "$H" | ids                       # A1 [145, 101] + 커서
-curl -s "$BASE/api/me/feed?size=2&cursor=<A1의 nextCursor>" -H "$H" | ids   # A2 [91, 44] None
-curl -s -X PUT "$BASE/api/members/7/mute" -H "$H"; echo              # M 뮤트
-curl -s "$BASE/api/me/feed" -H "$H" | ids                              # B [145, 91] — 7의 글이 빠짐
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/posts/44" -H "$H"   # D 200 — 상세는 그대로
-curl -s -X DELETE "$BASE/api/members/7/mute" -H "$H"; echo           # U 다시 보기
-curl -s "$BASE/api/me/feed" -H "$H" | ids                              # C [145, 101, 91, 44]
-for q in 'size=0' 'size=51' 'size=abc' 'cursor=abc'; do curl -s -o /dev/null -w "$q → %{http_code}\n" "$BASE/api/me/feed?$q" -H "$H"; done   # 모두 400
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 끝에서 뮤트를 풀므로 몇 번을 눌러도 같은 결과다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 끝에서 뮤트를 풀므로 몇 번을 눌러도 같은 결과다.
 
 ```check
 {

@@ -618,35 +618,9 @@ CREATE TABLE post_revision (
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080; J='Content-Type: application/json'; K='Authorization: Bearer tok-kimjava'
-P=$(curl -s -X POST "$BASE/api/posts" -H "$K" -H "$J" \
-  -d '{"boardSlug":"free","title":"[채점] 이력 원본","content":"처음 본문","tags":["java"]}' | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'); echo "P=$P"   # H0
-pt() { curl -s -o /dev/null -w '%{http_code}\n' -X PATCH "$BASE/api/posts/$P" -H "$K" -H "$J" -d "$1"; }
-pt '{"title":"[채점] 이력 제목 수정"}'                       # H1 → 200, 이력 1
-pt '{"title":"[채점] 이력 제목 수정"}'                       # H2 같은 값 → 200, 이력 그대로
-pt '{"content":"고친 본문","tags":["spring","java"]}'        # H3 → 200, 이력 2
-pt '{}'                                                     # H4 → 200, 이력 그대로
-# 잘못된 값 — 모두 400, 아무것도 안 바뀌고 이력도 안 생긴다
-curl -s -X PATCH "$BASE/api/posts/$P" -H "$K" -H "$J" -d '{"title":"","visibility":"SECRET"}'; echo     # X1 두 필드 모두 errors에
-T201=$(python3 -c 'print("가"*201)'); pt "{\"title\":\"$T201\"}"                                          # X2 201자
-pt '{"tags":["a","b","c","d","e","f"]}'                     # X3 태그 6개
-pt '{"content":"   "}'                                      # X4 공백만
-pt '{"tags":[""]}'                                          # X5 빈 태그 이름
-pt '{"tags":"java"}'                                        # X6 배열이 아님
-pt '{"tags":[null]}'                                        # X7 null 원소
-pt '{"title":123,"tags":[123]}'                           # X8 숫자 타입 둘 다 errors에
-pt '{"title":"","tags":"java"}'                            # X9 값·타입 오류 둘 다 errors에
-curl -s "$BASE/api/posts/$P/revisions" -H "$K"; echo         # L1 이력 2개
-T200=$(python3 -c 'print("가"*200)'); pt "{\"title\":\"$T200\"}"   # B1 정확히 200자 → 200, 이력 3
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/posts/$P/revisions" -H 'Authorization: Bearer tok-lee'    # L2 → 403
-curl -s "$BASE/api/posts/$P/revisions" -H 'Authorization: Bearer tok-admin'; echo                                  # L3 운영자 → 이력 3개
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/posts/$P/revisions"                                            # L4 → 401
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/posts/99999999/revisions" -H "$K"                              # L5 → 404
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/posts/abc/revisions" -H "$K"                                   # L6 → 400
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들어 고치므로 몇 번을 눌러도 같은 결과다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들어 고치므로 몇 번을 눌러도 같은 결과다.
 
 ```check
 {

@@ -307,33 +307,18 @@ MyBatis로 구현한다면 `CommentRepository.save`와 댓글 수 증가 쿼리�
 
 ## 직접 확인
 
+API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 요청은 아래 실행 패널에서 순서대로 보낸다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
+
 ```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'
 cc() { docker compose exec -T mysql mysql -ucommunity -pcommunity community -N -e "SELECT comment_count FROM post WHERE id = $1" 2>/dev/null; }
 
 cc 3                                                                                                   # 전
-curl -i -X POST "$BASE/api/posts/3/comments" -H "$K" -H 'Content-Type: application/json' -d '{"content":"[채점] 댓글"}'    # W1
 cc 3                                                                                                   # 후
-curl -i -X POST "$BASE/api/posts/3/comments" -H "$K" -H 'Content-Type: application/json' -d '{"content":"   "}'            # W2
-LONG=$(printf 'a%.0s' $(seq 1 1001))
-curl -i -X POST "$BASE/api/posts/3/comments" -H "$K" -H 'Content-Type: application/json' -d "{\"content\":\"$LONG\"}"      # W3
-curl -i -X POST "$BASE/api/posts/9/comments" -H "$K" -H 'Content-Type: application/json' -d '{"content":"[채점] 차단"}'     # W4
-curl -i -X POST "$BASE/api/posts/8/comments" -H "$K" -H 'Content-Type: application/json' -d '{"content":"[채점] 삭제글"}'   # W5
-curl -i -X POST "$BASE/api/posts/3/comments" -H 'Content-Type: application/json' -d '{"content":"[채점] 토큰 없음"}'        # W6
 
-# 잘못된 입력 — 모두 400(500이 아니다)
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/posts/3/comments" -H "$K" -H 'Content-Type: application/json' -d '{}'                 # V1
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/posts/3/comments" -H "$K" -H 'Content-Type: application/json' -d '{"content":null}'   # V2
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/posts/3/comments" -H "$K" -H 'Content-Type: application/json' -d '{"content":""}'     # V3
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/posts/3/comments" -H "$K" -H 'Content-Type: application/json' -d '{"content":'        # V4
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/posts/abc/comments" -H "$K" -H 'Content-Type: application/json' -d '{"content":"x"}' # V5
-# 경계 바로 안쪽 — 정확히 1000자는 201
-B="[채점] 경계-$(printf '가%.0s' $(seq 1 992))"
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/posts/3/comments" -H "$K" -H 'Content-Type: application/json' -d "{\"content\":\"$B\"}"  # B1
+
 ```
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

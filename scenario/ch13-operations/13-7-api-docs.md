@@ -607,25 +607,13 @@ public class CorsConfig implements WebMvcConfigurer {
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-curl -s "$BASE/v3/api-docs/public" | python3 -c '
-import sys, json
-d = json.load(sys.stdin); p = d["paths"]
-print(d["openapi"], d["info"]["title"], len(p), "paths")
-print(p["/api/reports"]["post"]["summary"], list(p["/api/reports"]["post"]["responses"]))
-print([x["name"] for x in p["/api/me/notifications"]["get"]["parameters"]])   # me가 없어야 한다
-print([k for k in p if k.startswith("/api/admin")])                              # [] — 운영 API 없음
-'
-curl -s "$BASE/v3/api-docs/admin" | python3 -c 'import sys,json; print(sorted(json.load(sys.stdin)["paths"]))'
-curl -s -o /dev/null -w '%{http_code} %{content_type}\n' "$BASE/swagger-ui/index.html"
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 브라우저로 `http://localhost:8080/swagger-ui/index.html`을 연다. 위쪽 "Select a definition"에서 `public`·`admin`을 바꿔 본다. [Authorize]에 `tok-kimjava`를 넣고 `GET /api/me/notifications`를 [Try it out] → [Execute]로 호출해 본다.
 
 운영 프로파일 확인: `bootRun --args='--spring.profiles.active=prod --server.port=8081'`로 별도 포트에 띄우고 `/v3/api-docs/public`, `/v3/api-docs/admin`, `/swagger-ui/index.html`이 모두 `404`인지 확인한다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 읽기만 하므로 몇 번을 눌러도 같은 결과다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 읽기만 하므로 몇 번을 눌러도 같은 결과다.
 
 ```check
 {
@@ -807,7 +795,7 @@ curl -s -o /dev/null -w '%{http_code} %{content_type}\n' "$BASE/swagger-ui/index
     },
     {
       "id": "C5",
-      "manual": "운영 프로파일을 별도 포트로 실행해 /v3/api-docs/public, /v3/api-docs/admin, /swagger-ui/index.html이 모두 404인지 확인한다. Swagger UI의 [Authorize]에 tok-kimjava를 입력한 후 GET /api/me/notifications?size=20을 [Try it out]으로 실행해 curl에 Authorization: Bearer tok-kimjava가 있고 응답이 200인지 확인한다."
+      "manual": "운영 프로파일을 별도 포트로 실행해 /v3/api-docs/public, /v3/api-docs/admin, /swagger-ui/index.html이 모두 404인지 확인한다. Swagger UI의 [Authorize]에 tok-kimjava를 입력한 후 GET /api/me/notifications?size=20을 [Try it out]으로 실행해 요청에 Authorization: Bearer tok-kimjava가 있고 응답이 200인지 확인한다."
     }
   ]
 }

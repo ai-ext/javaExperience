@@ -105,6 +105,7 @@ function render(abs) {
   const links = []; // {href, target, hash}
   const seen = new Map();
   let hasMermaid = false;
+  let requestBlockCount = 0;
   const marked = new Marked({ gfm: true });
   marked.use({
     renderer: {
@@ -118,7 +119,7 @@ function render(abs) {
         return `<h${depth} id="${escapeHtml(id)}"><a class="anchor" href="#${escapeHtml(id)}" aria-hidden="true">#</a>${html}</h${depth}>\n`;
       },
       code({ text, lang }) {
-        if ((lang || '').trim() === 'check') return renderRequests(text);
+        if ((lang || '').trim() === 'check') return renderRequests(text, ++requestBlockCount, abs);
         if ((lang || '').trim() === 'manual-command') return `<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>${escapeHtml(text)}</code></pre></details>\n`;
         if ((lang || '').trim() === 'screen') return renderScreen(text);
         if ((lang || '').trim() === 'mermaid') {
@@ -143,11 +144,10 @@ function render(abs) {
   const level = LEVEL_BY_ABS.get(abs);
   let source = level ? withImplementationCode(read(abs), ROOT, level.id, abs) : read(abs);
   if (level) {
-    if (!/```check\s/.test(source)) {
-      const legacy = legacyCurlRequest(source);
-      if (legacy) source = source.replace(/(## 직접 확인[\s\S]*?)(?=\n## |$)/, (section) => `${section}\n\n\`\`\`check\n${JSON.stringify({ requests: [legacy] }, null, 2)}\n\`\`\``);
-    }
-    // 실행 요청은 check 블록의 버튼으로 제공하고, 원래 curl은 접어서 정확한 원문을 보존한다.
+    // HTTP 요청은 check 블록의 버튼으로 명시한다. 직접 확인에 curl이 남으면 중복 안내가 다시 생긴다.
+    const directCheck = source.match(/## 직접 확인([\s\S]*?)(?=\n## |$)/)?.[1] || '';
+    if (/\bcurl\b/.test(directCheck)) throw new Error(`${rel(abs)}: 직접 확인의 curl을 check 요청으로 옮겨야 한다`);
+    // DB 조회와 빌드처럼 브라우저에서 할 수 없는 터미널 명령만 접어 둔다.
     source = source.replace(/(## 직접 확인[\s\S]*?)(?=\n## |$)/, (section) => section.replace(/```(?:bash|sh|shell)\n([\s\S]*?)\n```/g, '```manual-command\n$1\n```'));
   }
   let html = marked.parse(source);
@@ -169,27 +169,6 @@ function collapseSection(html, headingText, summary) {
   const next = headings.find((match) => match.index > start);
   const end = next?.index ?? html.length;
   return `${html.slice(0, start)}<details class="catalog-data"><summary>${summary}</summary>${html.slice(start, end)}</details>${html.slice(end)}`;
-}
-
-function legacyCurlRequest(markdown) {
-  const section = markdown.match(/## 직접 확인([\s\S]*?)(?=\n## |$)/)?.[1] || '';
-  const lines = section.split('\n');
-  const start = lines.findIndex((line) => /\bcurl\b/.test(line));
-  let command = start < 0 ? '' : lines[start].trim();
-  for (let index = start; index >= 0 && command.endsWith('\\') && index + 1 < lines.length;) {
-    command = `${command.slice(0, -1)} ${lines[++index].trim()}`;
-  }
-  if (!command) return null;
-  const url = command.match(/["']\$BASE([^"']*)["']/)?.[1];
-  if (!url) return null;
-  const method = command.match(/(?:-X|--request)\s+([A-Z]+)/)?.[1] || (/-d\s/.test(command) ? 'POST' : 'GET');
-  const headers = {};
-  for (const match of command.matchAll(/-H\s+'([^']+)'/g)) {
-    const colon = match[1].indexOf(':');
-    if (colon > 0) headers[match[1].slice(0, colon).trim()] = match[1].slice(colon + 1).trim();
-  }
-  const body = command.match(/(?:-d|--data-raw)\s+'([^']*)'/)?.[1];
-  return { id: 'HTTP', title: '직접 확인 요청', method, path: url, headers, ...(body === undefined ? {} : { body }) };
 }
 
 // 본문 텍스트의 "P19" 같은 문서 ID를 공부자료 링크로 바꾼다(코드·링크·제목 안은 건드리지 않는다)
@@ -308,14 +287,14 @@ function page({ abs, title, body, hasMermaid }) {
     const stageNote = !stageMap && NON_API_STAGE_NOTES[lv.id]
       ? `<section class="api-map-stage"><h3>이 단계의 작업 위치</h3><p class="api-map-stage-note">${escapeHtml(NON_API_STAGE_NOTES[lv.id])}</p></section>`
       : '';
-    body = requestPageTools() + stageMap + stageNote + `<p class="api-map-link"><a href="${up('scenario/README.html')}#api-map-title">전체 API 구조도 보기</a></p>` + body + graderPanel(lv);
+    body = requestPageTools(body.includes('class="api-practice"')) + stageMap + stageNote + `<p class="api-map-link"><a href="${up('scenario/README.html')}#api-map-title">전체 API 구조도 보기</a></p>` + body + graderPanel(lv);
   }
   if (lab) {
     crumbs = `<p class="crumbs"><a href="${up('scenario/README.html')}">시나리오</a> › 쿼리 설계 연습 › ${escapeHtml(lab.id)}</p>`;
     const exerciseCount = [...read(abs).matchAll(/^### Q\d+\./gm)].length;
     const stageMap = renderStage(API_ARCHITECTURE, lab.id, levelHref, exerciseCount);
     if (!stageMap) throw new Error(`${lab.id} 랩의 API 구조도 매핑이 없다`);
-    body = requestPageTools() + stageMap + `<p class="api-map-link"><a href="${up('scenario/README.html')}#api-map-title">전체 API 구조도 보기</a></p>` + body;
+    body = requestPageTools(body.includes('class="api-practice"')) + stageMap + `<p class="api-map-link"><a href="${up('scenario/README.html')}#api-map-title">전체 API 구조도 보기</a></p>` + body;
   }
   if (abs === path.join(ROOT, 'scenario/README.md')) {
     const filter = `<nav class="difficulty-filter" aria-label="시나리오 난이도">
@@ -367,14 +346,16 @@ ${lv || lab ? `<script src="${assetUrl('tools/site/scenario-runner.js', path.dir
 `;
 }
 
-function renderRequests(text) {
+function renderRequests(text, blockNumber, abs) {
   let data;
-  try { data = JSON.parse(text); } catch (error) { throw new Error(`check 블록 JSON 오류: ${error.message}`); }
+  try { data = JSON.parse(text); } catch (error) { throw new Error(`${rel(abs)} check 블록 JSON 오류: ${error.message}`); }
   const requests = Array.isArray(data) ? data : data.requests;
   if (!Array.isArray(requests)) return `<pre><code>${escapeHtml(text)}</code></pre>`;
   const checks = data.checks || [];
   const requestIds = new Set(requests.map((request) => request.id));
   const cards = requests.map((request, index) => {
+    const cardId = `browser-request-${blockNumber}-${index + 1}`;
+    const statusId = `request-status-${blockNumber}-${index + 1}`;
     const expect = checks.filter((check) => check.request === request.id || check.all?.some((item) => item.request === request.id))
       .map((check) => `${check.id}: ${JSON.stringify(check.expect || check.all?.find((item) => item.request === request.id)?.expect || {})}`).join('\n');
     const refs = new Set(`${request.path || ''} ${typeof request.body === 'string' ? request.body : JSON.stringify(request.body ?? '')}`.match(/\{\{([^}]+)\}\}/g) || []);
@@ -401,13 +382,19 @@ function renderRequests(text) {
     const mode = request.concurrent ? `동시 요청 ${request.concurrent.count}개` : request.repeat ? `같은 요청 ${request.repeat}회 순차 전송` : '';
     const variableInputs = variables.length || groupedInputs ? `<div class="request-variables">${groupedInputs}${variables.filter((v) => !v.response && !v.grouped).map((v) => `<label>${escapeHtml(v.name)} <input class="request-variable" data-ref="${escapeHtml(v.ref)}" autocomplete="off"></label>`).join('')}<p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div>` : '';
     const expected = expect || '직접 확인 절의 기대 결과를 참고하세요.';
-    return `<article class="api-request" data-request-id="${escapeHtml(request.id)}" data-method="${escapeHtml(request.method)}" data-request-index="${index}" data-concurrent-count="${String(request.concurrent?.count || 0)}" data-concurrent-vars="${escapeHtml(JSON.stringify(clientConcurrentVars))}" data-repeat="${String(request.repeat || 0)}"><header class="request-card-head"><div><p class="request-method">${escapeHtml(request.method)}${mode ? ` · ${escapeHtml(mode)}` : ''}</p><h4>${escapeHtml(request.id)} · ${escapeHtml(request.title || '요청')}</h4></div><span class="request-number">요청 ${index + 1}</span></header><div class="request-editor"><label>경로 <input class="request-path" value="${escapeHtml(request.path || '')}" autocomplete="off" spellcheck="false"></label>${variableInputs}<div class="request-fields">${headerInputs}</div>${bodyInput}<div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-${index}">${escapeHtml(request.method)} ${mode ? escapeHtml(mode) : '요청 보내기'}</button><p id="request-status-${index}" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>${escapeHtml(request.method)}</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>${escapeHtml(JSON.stringify(request.headers || {}, null, 2))}</pre></dd><dt>Raw body</dt><dd><pre>${request.body === undefined ? '(본문 없음)' : escapeTextarea(bodyText)}</pre></dd><dt>Expected result</dt><dd><pre>${escapeHtml(expected)}</pre></dd></dl></details></article>`;
+    return `<article id="${cardId}" class="api-request" data-request-id="${escapeHtml(request.id)}" data-method="${escapeHtml(request.method)}" data-request-index="${index}" data-concurrent-count="${String(request.concurrent?.count || 0)}" data-concurrent-vars="${escapeHtml(JSON.stringify(clientConcurrentVars))}" data-repeat="${String(request.repeat || 0)}"><header class="request-card-head"><div><p class="request-method">${escapeHtml(request.method)} · ${escapeHtml(request.id)}${mode ? ` · ${escapeHtml(mode)}` : ''}</p><h4>${escapeHtml(request.title || '요청')}</h4></div><span class="request-number">요청 ${index + 1}</span></header><div class="request-editor"><label>경로 <input class="request-path" value="${escapeHtml(request.path || '')}" autocomplete="off" spellcheck="false"></label>${variableInputs}<div class="request-fields">${headerInputs}</div>${bodyInput}<div class="request-actions"><button type="button" class="send-request" aria-describedby="${statusId}">${escapeHtml(request.method)} ${mode ? escapeHtml(mode) : '요청 보내기'}</button><p id="${statusId}" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>${escapeHtml(request.method)}</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>${escapeHtml(JSON.stringify(request.headers || {}, null, 2))}</pre></dd><dt>Raw body</dt><dd><pre>${request.body === undefined ? '(본문 없음)' : escapeTextarea(bodyText)}</pre></dd><dt>Expected result</dt><dd><pre>${escapeHtml(expected)}</pre></dd></dl></details></article>`;
   }).join('');
-  return `<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list">${cards}</div></section>`;
+  const steps = requests.map((request, index) => `<li data-method="${escapeHtml(request.method)}"><a href="#browser-request-${blockNumber}-${index + 1}"><span class="request-step-number">${index + 1}</span><span class="request-step-content"><span class="request-step-method">${escapeHtml(request.method)} · ${escapeHtml(request.id)}</span><span class="request-step-title">${escapeHtml(request.title || '요청')}</span></span></a></li>`).join('');
+  const methodCounts = [...new Set(requests.map((request) => request.method))]
+    .map((method) => `${method} ${requests.filter((request) => request.method === method).length}`).join(' · ');
+  const stepsNav = requests.length > 8
+    ? `<details class="request-steps"><summary>요청 순서 보기 <span>${escapeHtml(methodCounts)}</span></summary><nav aria-label="요청 실행 순서"><ol>${steps}</ol></nav></details>`
+    : `<nav class="request-steps" aria-label="요청 실행 순서"><ol>${steps}</ol></nav>`;
+  return `<section id="browser-requests-${blockNumber}" class="api-practice" aria-label="HTTP 요청 실행"><div class="request-panel-heading"><div><p class="request-eyebrow">직접 확인 · ${requests.length}개 요청</p><h3>브라우저에서 요청 보내기</h3></div><p>위 서버 주소를 확인하고 순서대로 실행하세요. 토큰은 입력 후에도 저장하지 않습니다.</p></div>${stepsNav}<div class="api-request-list">${cards}</div></section>`;
 }
 
-function requestPageTools() {
-  return `<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section>`;
+function requestPageTools(hasRequests) {
+  return `<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><div class="server-url-help"><p>요청은 브라우저에서 전송됩니다. 서버의 CORS 설정에 이 페이지 출처가 허용되어 있어야 합니다.</p>${hasRequests ? '<a href="#browser-requests-1">이 단계의 요청으로 이동 ↓</a>' : ''}</div></section>`;
 }
 
 // ---------------------------------------------------------------- 실행

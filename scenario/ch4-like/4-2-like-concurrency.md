@@ -249,19 +249,18 @@ int incrementLikeCount(@Param("id") Long id);
 
 ## 직접 확인
 
+API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 요청은 아래 실행 패널에서 순서대로 보낸다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
+
 ```bash
-BASE=http://localhost:8080
 # 20명이 동시에 좋아요
-for i in $(seq -w 1 20); do curl -s -o /dev/null -w '%{http_code}\n' -X PUT "$BASE/api/posts/16/like" -H "Authorization: Bearer tok-c$i" & done; wait     # P1
 # 같은 사람이 동시에 5번
-for i in 1 2 3 4 5; do curl -s -o /dev/null -w '%{http_code}\n' -X PUT "$BASE/api/posts/16/like" -H 'Authorization: Bearer tok-c01' & done; wait      # P2
 # 20명이 동시에 취소
-for i in $(seq -w 1 20); do curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "$BASE/api/posts/16/like" -H "Authorization: Bearer tok-c$i" & done; wait  # P3
 
 ./gradlew test --tests '*LikeConcurrencyTest'                                                                                                              # P4
+
 ```
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

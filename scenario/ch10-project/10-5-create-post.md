@@ -230,31 +230,9 @@ public enum Visibility {
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-TOKEN=$(curl -s -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' \
-  -d '{"email":"kim@example.com","password":"password1234"}' | sed -E 's/.*"accessToken":"([^"]+)".*/\1/')
-post() { curl -s -i -X POST "$BASE/api/v1/posts" -H 'Content-Type: application/json' "$@"; echo; echo ----; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-post -H "Authorization: Bearer $TOKEN" \
-  -d '{"title":"  [채점] 10-5 첫 글  ","content":"JPA로 저장한 글","tags":["API","api"," Check "],"authorId":3}'   # P 정상(authorId 무시)
-post -H "Authorization: Bearer $TOKEN" -d '{"title":"[채점] 10-5 비공개","visibility":"PRIVATE"}'          # R 비공개·태그 없음
-post -d '{"title":"[채점] 10-5 익명"}'                                                                   # N 토큰 없음
-post -d '{"title":'                                                                                    # NJ 토큰 없음 + 깨진 본문
-post -H "Authorization: Bearer $TOKEN" \
-  -d '{"title":"  abc  ","tags":["a","b","c","d","e","f"],"visibility":"SECRET"}'                    # V 제목·개수·공개 범위
-post -H "Authorization: Bearer $TOKEN" -d '{"title":"[채점] 10-5 태그 길이","tags":["  ","123456789012345678901"]}'   # V2 태그 원소
-post -H "Authorization: Bearer $TOKEN" -d '{}'                                                         # V3 제목 없음
-post -H "Authorization: Bearer $TOKEN" -d '{"title":'                                                  # J 깨진 JSON
-
-# 잘못된 입력 — 500이 아니다
-post -H "Authorization: Bearer $TOKEN" -d '{"title":"    "}'                       # V5 400 title
-post -H "Authorization: Bearer $TOKEN" -d '{"title":"[채점] 10-5 태그 null","tags":[null]}'   # V7 400 tags[0]
-post -H "Authorization: Bearer $TOKEN" -d '{"title":"[채점] 10-5 태그 문자열","tags":"spring"}' # V8 400 BAD_JSON
-post -H "Authorization: Bearer $TOKEN" -d '{"title":"  다섯글자다  ","tags":["a","b","c","d","tttttttttttttttttttt"]}'  # B1 201
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 실행할 때마다 글이 2개씩 늘어난다(제목이 `[채점]`으로 시작).
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 실행할 때마다 글이 2개씩 늘어난다(제목이 `[채점]`으로 시작).
 
 ```check
 {

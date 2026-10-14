@@ -624,29 +624,9 @@ public @interface DetailRequiredForEtc {
 
 글 12는 회원 2의 글, 댓글 20은 그 글에 회원 24가 단 댓글이다. 글 99는 숨김, 글 42는 삭제됨, 댓글 69는 삭제됨.
 
-```bash
-BASE=http://localhost:8080
-A='Authorization: Bearer tok-p03'; J='Content-Type: application/json'
-rep() { curl -s -w ' → %{http_code}\n' -X POST "$BASE/api/reports" -H "${2:-$A}" -H "$J" -d "$1"; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-rep '{"targetType":"POST","targetId":12,"reason":"SPAM"}'              # R1 201(처음) — 두 번째부터 409
-rep '{"targetType":"POST","targetId":12,"reason":"SPAM"}'              # R2 409
-rep '{"targetType":"COMMENT","targetId":20,"reason":"ABUSE"}'          # RC 201
-for i in 1 2 3; do rep '{"targetType":"POST","targetId":13,"reason":"SPAM"}' 'Authorization: Bearer tok-p05' & done; wait   # CC 동시 3번 — 201 하나, 409 둘(500 없음)
-rep '{}'                                                               # E0 400 — errors에 targetType·targetId·reason
-rep '{"targetType":"USER","targetId":12,"reason":"SPAM"}'              # ET 400
-rep '{"targetType":"POST","targetId":0,"reason":"SPAM"}'               # EZ 400
-rep '{"targetType":"POST","targetId":"abc","reason":"SPAM"}'           # EX 400
-rep '{"targetType":"POST","targetId":12,"reason":"HATE"}'              # ER 400
-rep '{"targetType":"POST","targetId":12,"reason":"ETC"}'               # EE 400 — errors에 detail
-rep "{\"targetType\":\"POST\",\"targetId\":12,\"reason\":\"ETC\",\"detail\":\"$(python3 -c 'print("가"*501)')\"}"   # EL 400
-rep "{\"targetType\":\"POST\",\"targetId\":145,\"reason\":\"ETC\",\"detail\":\"$(python3 -c 'print("가"*500)')\"}" 'Authorization: Bearer tok-p07'   # RM 201(정확히 500자)
-rep '{"targetType":"POST","targetId":99,"reason":"SPAM"}'              # TH 404 숨김 글
-rep '{"targetType":"COMMENT","targetId":69,"reason":"SPAM"}'           # TC 404 삭제된 댓글
-rep '{"targetType":"POST","targetId":12,"reason":"SPAM"}' 'Authorization: Bearer tok-p02'   # TS 400 내 글
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 신고는 지우는 API가 없어서 두 번째 실행부터는 성공 요청이 `409`로 바뀐다 — 채점 기준이 두 경우를 모두 받는다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 신고는 지우는 API가 없어서 두 번째 실행부터는 성공 요청이 `409`로 바뀐다 — 채점 기준이 두 경우를 모두 받는다.
 
 ```check
 {

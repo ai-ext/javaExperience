@@ -227,41 +227,9 @@ ORDER BY deleted_at DESC, id DESC;
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080; J='Content-Type: application/json'
-K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; A='Authorization: Bearer tok-admin'
-mk() { curl -s -X POST "$BASE/api/posts" -H "$K" -H "$J" -d "{\"boardSlug\":\"free\",\"title\":\"$1\",\"content\":\"x\"}" | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-T=$(mk '[채점] 휴지통'); echo "T=$T"                                  # R0
-curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "$BASE/api/posts/$T" -H "$K"   # R1 내가 지움 → 204
-curl -s "$BASE/api/me/trash" -H "$K"; echo                             # R2
-curl -i -X POST "$BASE/api/posts/$T/restore" -H "$L"                   # R3 남이 복구 → 404
-curl -s -X POST "$BASE/api/posts/$T/restore" -H "$K"; echo             # R4 복구 → 200
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/posts/$T"           # R5 비로그인 상세 → 200
-curl -i -X POST "$BASE/api/posts/$T/restore" -H "$K"                   # R6 또 복구 → 409
-Z=$(mk '[채점] 운영자가 지울 글'); echo "Z=$Z"
-curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "$BASE/api/posts/$Z" -H "$A"   # R7 운영자가 지움
-curl -i -X POST "$BASE/api/posts/$Z/restore" -H "$K"                   # R8 → 403
-curl -i -X POST "$BASE/api/posts/8/restore" -H "$L"                    # R9 V22 전에 지운 글 → 403
-curl -i -X POST "$BASE/api/posts/99999999/restore" -H "$K"             # R10 없는 글 → 404
-curl -i -X POST "$BASE/api/posts/abc/restore" -H "$K"                  # R11 숫자 아님 → 400
-curl -i -X POST "$BASE/api/posts/-1/restore" -H "$K"                   # R11B 음수 → 400(errors.id)
-curl -i -X POST "$BASE/api/posts/0/restore" -H "$K"                    # R11C 0 → 400(errors.id)
-curl -i "$BASE/api/me/trash"                                           # R12 토큰 없음 → 401
-
-# C9 수동 필수 확인 — 시각을 되돌릴 수 없으니 실습 DB에서 지운 시각을 31일 전으로 바꿔 본다
-E=$(mk '[채점] 오래전에 지운 글'); curl -s -o /dev/null -X DELETE "$BASE/api/posts/$E" -H "$K"
-docker compose exec -T mysql mysql -ucommunity -pcommunity community -e "UPDATE post SET deleted_at = NOW() - INTERVAL 31 DAY WHERE id = $E" 2>/dev/null
-curl -i -X POST "$BASE/api/posts/$E/restore" -H "$K"                   # R13 → 410
-curl -s "$BASE/api/me/trash" -H "$K"; echo                             # R14 휴지통에도 없다
-
-# C10 동시 복구: 새 글을 지우고 같은 글의 복구 요청 10개를 동시에 보낸다.
-P=$(mk '[채점] 동시 복구'); curl -s -o /dev/null -X DELETE "$BASE/api/posts/$P" -H "$K"
-for i in {1..10}; do curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/posts/$P/restore" -H "$K" & done
-wait   # 200 한 번, 409 아홉 번. DB의 deleted_at·deleted_by는 둘 다 NULL
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들어 지우고 되살리므로 몇 번을 눌러도 같은 결과다(8번 글은 403만 확인하고 바꾸지 않는다).
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들어 지우고 되살리므로 몇 번을 눌러도 같은 결과다(8번 글은 403만 확인하고 바꾸지 않는다).
 
 ```check
 {

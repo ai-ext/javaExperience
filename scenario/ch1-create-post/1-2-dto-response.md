@@ -562,22 +562,7 @@ XML의 `#{...}`는 값을 SQL 문자열에 이어 붙이지 않고 바인딩한�
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-
-# 요청 A — 정상 요청(두 번 보내서 id가 늘어나는지 본다)
-curl -i -X POST "$BASE/api/posts" -H 'Content-Type: application/json' \
-  -d '{"boardSlug":"dev","title":"[채점] 첫 게시글","content":"Spring Boot로 만든 첫 게시글입니다.","tags":["spring","jpa"],"visibility":"PUBLIC"}'
-
-# 요청 B — 깨진 JSON
-curl -i -X POST "$BASE/api/posts" -H 'Content-Type: application/json' -d '{"title": "[채점] 깨짐"'
-
-# 관찰 O1~O5 — 잘못된 입력. 지금 무엇이 나오는지 본다(채점하지 않는다)
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/posts" -H 'Content-Type: application/json' \
-  -d '{"boardSlug":"dev","title":null,"content":"본문","tags":[],"visibility":"PUBLIC"}'
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/posts" -H 'Content-Type: application/json' \
-  -d '{"boardSlug":"dev","title":"   ","content":"","tags":[],"visibility":"PUBLIC"}'
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청 A를 두 번 보내 `id`가 증가하는지 확인하고, 요청 B와 관찰 요청 O1~O5의 응답도 살펴본다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 **DB에서 확인** — 응답이 `201`이어도 정말 저장됐는지는 DB를 봐야 안다. 방금 저장된 행을 본다.
 
@@ -590,7 +575,7 @@ studymate의 **'DB에서 확인'**으로 봐도 된다. 방금 저장된 행이 
 
 서버를 껐다 켠 뒤 요청 A를 한 번 더 보내면 `id`가 1로 돌아가지 않고 이어진다. 번호를 DB가 세기 때문이다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 관찰 요청(O1~O5)을 먼저 보내고 정상 요청 A를 나중에 보내므로, 실행 뒤 `ORDER BY id DESC LIMIT 1`로 보이는 행은 A의 두 번째 글이다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 관찰 요청(O1~O5)을 먼저 보내고 정상 요청 A를 나중에 보내므로, 실행 뒤 `ORDER BY id DESC LIMIT 1`로 보이는 행은 A의 두 번째 글이다.
 
 ```check
 {

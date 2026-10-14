@@ -248,33 +248,9 @@ void linkTag(@Param("postId") Long postId, @Param("tagId") Long tagId);
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-tok() { curl -s -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' \
-  -d "{\"email\":\"$1@example.com\",\"password\":\"password1234\"}" | sed -E 's/.*"accessToken":"([^"]+)".*/\1/'; }
-KIM=$(tok kim); LEE=$(tok lee)
-ID=$(curl -s -X POST "$BASE/api/v1/posts" -H "Authorization: Bearer $KIM" -H 'Content-Type: application/json' \
-  -d '{"title":"[채점] 10-8 수정 전","content":"원래 본문","tags":["before"]}' | sed -E 's/.*"data":\{"id":([0-9]+).*/\1/')
-put() { curl -s -i -X PUT "$BASE/api/v1/posts/$1" -H 'Content-Type: application/json' "${@:2}"; echo; echo ----; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-put $ID -H "Authorization: Bearer $KIM" -d '{"title":"[채점] 10-8 수정 후","tags":["After","after2"]}'   # U 전체 교체
-put $ID -H "Authorization: Bearer $LEE" -d '{"title":"[채점] 남이 수정"}'                                # F 남의 글
-put $ID -d '{"title":"[채점] 토큰 없음"}'                                                               # N 토큰 없음
-put $ID -H "Authorization: Bearer $KIM" -d '{"title":"abc"}'                                           # V 규칙 위반
-put 24 -H "Authorization: Bearer $LEE" -d '{"title":"[채점] 남의 비공개"}'                               # PV 남의 비공개
-curl -s -i -X DELETE "$BASE/api/v1/posts/$ID" -H "Authorization: Bearer $LEE"; echo                   # D1 남이 삭제
-curl -s -i -X DELETE "$BASE/api/v1/posts/$ID" -H "Authorization: Bearer $KIM"; echo                   # D 삭제
-curl -s -i "$BASE/api/v1/posts/$ID"; echo                                                             # D2 삭제 뒤 상세
-curl -s -i -X DELETE "$BASE/api/v1/posts/$ID" -H "Authorization: Bearer $KIM"; echo                   # D3 다시 삭제
-
-# 잘못된 입력 — 500이 아니다(삭제 D 전에 보낸다)
-put $ID -H "Authorization: Bearer $KIM" -d '{}'                                         # V1 400 title
-put $ID -H "Authorization: Bearer $KIM" -d '{"title":"[채점] 10-8 공개 범위","visibility":"SECRET"}'   # V3 400 visibility
-put abc -H "Authorization: Bearer $KIM" -d '{"title":"[채점] 10-8 숫자 아님"}'           # V6 400 postId
-put $ID -H "Authorization: Bearer $KIM" -d '{"title":"  다섯글자다  "}'                  # B1 200
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들어 그 글로만 확인한다(그 글은 마지막에 삭제된다).
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들어 그 글로만 확인한다(그 글은 마지막에 삭제된다).
 
 ```check
 {

@@ -341,28 +341,9 @@ public interface PublicPostMapper {
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-get() { curl -s -o /dev/null -w "%{http_code}\n" "$@"; }
-K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; P='Authorization: Bearer tok-park'
-H='Authorization: Bearer tok-han';    A='Authorization: Bearer tok-admin'
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-# 상세 — 상태 코드만
-get "$BASE/api/posts/6"; get -H "$K" "$BASE/api/posts/6"; get -H "$P" "$BASE/api/posts/6"; get -H "$L" "$BASE/api/posts/6"   # V1
-get -H "$P" "$BASE/api/posts/7"; get -H "$K" "$BASE/api/posts/7"; get "$BASE/api/posts/7"                                     # V2
-get -H "$L" "$BASE/api/posts/8"; get "$BASE/api/posts/8"                                                                         # V3
-get "$BASE/api/posts/9"; get -H "$K" "$BASE/api/posts/9"; get -H "$H" "$BASE/api/posts/9"                                     # V4
-get -H "$A" "$BASE/api/posts/10"; get -H "$P" "$BASE/api/posts/10"                                                              # V5
-get -H 'Authorization: Bearer no-such-token' "$BASE/api/posts/2"                                                                 # V6
-
-# 목록 — id만 뽑아 보기
-ids() { python3 -c 'import sys,json; print([i["id"] for i in json.load(sys.stdin)["items"]])'; }
-curl -s "$BASE/api/boards/free/posts?size=20" | ids              # V7 비로그인
-curl -s -H "$K" "$BASE/api/boards/free/posts?size=20" | ids      # V8 김자바
-curl -s -H "$P" "$BASE/api/boards/free/posts?size=20" | ids      # V9 박디비
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

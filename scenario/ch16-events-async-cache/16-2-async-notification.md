@@ -1597,26 +1597,21 @@ public interface NotificationWriteMapper {
 
 회원 3(`tok-p03`)은 팔로워 16명 중 15명이 활동 중이다(회원 28은 정지). 그중 회원 26의 푸시가 실패하게 한다. 회원 1(`tok-p01`)은 운영자다.
 
+가짜 푸시 설정과 게시글 요청은 실행 패널의 T4와 P를 순서대로 보낸다. P 직후 SQL 집계를 확인하고 4초 뒤 다시 확인한다. 이때 `NULL`이 `SENT 14, FAILED 1`로 바뀌어야 한다. API 주소는 페이지 상단 공통 입력을 사용하고 Postman 설정은 접어서 확인할 수 있다.
+
 ```bash
-BASE=http://localhost:8080
-ADMIN='Authorization: Bearer tok-p01'; J='Content-Type: application/json'
 sql() { docker compose exec -T mysql mysql -ucommunity -pcommunity practice -N -e "$1" 2>/dev/null; }
-
-curl -s -X PUT "$BASE/api/admin/fake-push" -H "$ADMIN" -H "$J" -d '{"delayMs":-1}'; echo                    # 400 delayMs
-curl -s -X PUT "$BASE/api/admin/fake-push" -H "$ADMIN" -H "$J" -d '{"delayMs":150,"failMemberIds":[26]}'; echo
-
-curl -s -D - -o /dev/null -X POST "$BASE/api/posts" -H 'Authorization: Bearer tok-p03' -H "$J" \
-  -d '{"boardSlug":"free","title":"[채점] 16-2 비동기 알림","content":"푸시를 기다리지 않는다"}' | grep -i -E '^HTTP|server-timing|location'
-sql "SELECT push_status, COUNT(*) FROM notification WHERE post_id = (SELECT MAX(id) FROM post) GROUP BY push_status"   # 바로 — NULL이 섞여 있다
+sql "SELECT push_status, COUNT(*) FROM notification WHERE post_id = (SELECT MAX(id) FROM post) GROUP BY push_status"  # P 직후 — NULL이 섞여 있다
+# 실행 패널에서 지정한 요청을 단독 실행한 뒤 다시 실행한다.
 sleep 4
-sql "SELECT push_status, COUNT(*) FROM notification WHERE post_id = (SELECT MAX(id) FROM post) GROUP BY push_status"   # 몇 초 뒤 — SENT 14, FAILED 1
+sql "SELECT push_status, COUNT(*) FROM notification WHERE post_id = (SELECT MAX(id) FROM post) GROUP BY push_status"  # 몇 초 뒤 — SENT 14, FAILED 1
 ```
 
 앱 로그를 보면 `푸시 실패 ... memberId=26`과 `새 글 알림 15건(푸시 실패 1건)`이 요청 스레드(`http-nio-…-exec-…`)가 아니라 `notify-1`에서 찍힌다.
 
 **전후 비교** — `@Async`를 붙이기 전(동기)에 같은 설정으로 글을 쓰면 `Server-Timing`이 `2000`을 넘는다(15명 × 150ms에 결과 기록까지 — 정답 구현에서 `@Async`를 빼고 알림 저장을 `REQUIRES_NEW`로 바꿔 재 보니 2973·5589). 붙인 뒤에는 수십 ms다. 아래 실행 칸의 P 줄 옆에도 걸린 시간(ms)이 보인다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 실행하면 가짜 푸시 설정이 지연 150ms·회원 26 실패로 바뀐 채 남는다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 실행하면 가짜 푸시 설정이 지연 150ms·회원 26 실패로 바뀐 채 남는다.
 
 ```check
 {
@@ -1962,7 +1957,7 @@ public class AsyncConfig {
 <details>
 <summary>힌트 3 — Server-Timing이 실행 칸에서 안 보인다</summary>
 
-curl에는 보이는데 브라우저 실행 칸에서만 "없음"이면 CORS다. 브라우저는 `exposedHeaders`에 없는 응답 헤더를 스크립트에 보여 주지 않는다. `CorsConfig`의 `exposedHeaders(...)`에 `"Server-Timing"`을 더한다.
+Postman에는 보이는데 브라우저 실행 칸에서만 "없음"이면 CORS다. 브라우저는 `exposedHeaders`에 없는 응답 헤더를 스크립트에 보여 주지 않는다. `CorsConfig`의 `exposedHeaders(...)`에 `"Server-Timing"`을 더한다.
 </details>
 
 ## 다음 단계

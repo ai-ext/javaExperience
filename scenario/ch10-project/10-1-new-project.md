@@ -630,16 +630,7 @@ registry.addMapping("/api/**")
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-
-# 요청 H — 헬스 체크
-curl -i "$BASE/api/v1/health"
-
-# 요청 O — CORS preflight(브라우저가 PUT 전에 보내는 사전 요청 흉내)
-curl -i -X OPTIONS "$BASE/api/v1/health" -H 'Origin: http://localhost:3000' \
-  -H 'Access-Control-Request-Method: PUT' -H 'Access-Control-Request-Headers: content-type,authorization'
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 DB도 터미널에서 직접 본다(javaExperience MySQL 컨테이너 이름이 다르면 `docker ps`로 찾는다).
 
@@ -648,7 +639,7 @@ docker compose exec -T mysql mysql -ucommunity -pcommunity project \
   -e "SELECT version, description, success FROM flyway_schema_history; SELECT id, email, nickname FROM users;"
 ```
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {
@@ -674,7 +665,7 @@ docker compose exec -T mysql mysql -ucommunity -pcommunity project \
     },
     {
       "id": "C2",
-      "manual": "CORS preflight — 브라우저 코드는 Origin·Access-Control-Request-* 헤더를 직접 못 붙인다. 위 요청 O(curl)로 200, Access-Control-Allow-Origin: http://localhost:3000, Allow-Methods에 PUT, Allow-Headers에 authorization이 있는지 본다"
+      "manual": "CORS preflight — 브라우저 코드는 Origin·Access-Control-Request-* 헤더를 직접 못 붙인다. Postman 요청 O로 200, Access-Control-Allow-Origin: http://localhost:3000, Allow-Methods에 PUT, Allow-Headers에 authorization이 있는지 본다"
     }
   ]
 }
@@ -689,7 +680,7 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 | # | 확인 방법 | 기대 |
 |---|---|---|
 | C1 | 요청 H | 상태 `200`, `up`=`true`, `database`=`project`, `users` ≥ 3, `posts` ≥ 25, `comments` ≥ 40, `likes`는 숫자. 아직 공통 틀(`status`) 없음 |
-| C2 | 요청 O (curl) | 상태 `200`, `Access-Control-Allow-Origin: http://localhost:3000`, `Access-Control-Allow-Methods`에 `PUT`, `Access-Control-Allow-Headers`에 `authorization` |
+| C2 | Postman 수동 OPTIONS 요청 O | 상태 `200`, `Access-Control-Allow-Origin: http://localhost:3000`, `Access-Control-Allow-Methods`에 `PUT`, `Access-Control-Allow-Headers`에 `authorization` |
 | D1 | `SELECT version, success FROM flyway_schema_history` | `1`, `1` 한 줄 |
 | D2 | `SELECT COUNT(*) FROM users; SELECT COUNT(*) FROM posts; SELECT COUNT(*) FROM comments; SELECT COUNT(*) FROM post_likes` | `3`·`25`·`40`·`30`(채점 전 다른 단계를 돌렸다면 그 이상) |
 | R1 | 설정 | `ddl-auto`가 `validate`(또는 `none`)다 — Hibernate가 스키마를 만들지 않는다 |
@@ -752,7 +743,7 @@ Caused by: org.springframework.beans.factory.BeanCreationException: Error creati
 - 읽는 법: Flyway는 실행한 파일의 **체크섬(내용 지문)** 을 기록해 둔다. 기록(`Applied to database`)과 지금 파일(`Resolved locally`)이 다르면 "누가 이미 실행한 이력을 고쳤다"로 보고 멈춘다. 운영 DB에서는 이게 안전장치다.
 - 고치기: V1을 원래대로 되돌린다. 바꾸고 싶은 내용은 `V2__add_docker_tag.sql`처럼 **새 파일**로 만든다. 실습 DB라 처음부터 다시 하고 싶으면 `docker compose down -v && docker compose up -d`을 실행한다.
 
-### ④ CorsConfig를 지운다 → 버튼만 실패, curl은 성공
+### ④ CorsConfig를 지운다 → 버튼만 실패, Postman은 응답 확인
 
 `CorsConfig.java`를 지우고 다시 띄운 뒤 요청 O를 보낸다.
 
@@ -762,7 +753,7 @@ Allow: GET, HEAD, POST, PUT, DELETE, OPTIONS, PATCH
 Content-Length: 0
 ```
 
-`Access-Control-Allow-Origin`이 없다. 그래서 브라우저가 본 요청을 보내지 않고, 실행 칸에 "CORS로 막혔어요"가 뜬다. curl은 CORS를 검사하지 않아서 요청 H를 그대로 받는다.
+`Access-Control-Allow-Origin`이 없다. 그래서 브라우저가 본 요청을 보내지 않고, 실행 칸에 "CORS로 막혔어요"가 뜬다. Postman은 브라우저의 CORS 정책을 적용하지 않아 요청 H의 응답을 그대로 보여 준다.
 
 ## 필요한 지식
 

@@ -307,26 +307,9 @@ MyBatis 대체 코드에서는 `MyBatisCommentMapper.findParent(parentId)`가 `c
 
 11번 글(이스프링의 "트랜잭션은 어디에 거나요?")에는 시드 댓글이 있다: 1번(최상위), 2번(1번의 답글), 6번(지워진 최상위).
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'
-post() { curl -s -i -X POST "$BASE/api/posts/$1/comments" -H "$K" -H 'Content-Type: application/json' -d "$2"; echo; echo ----; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-post 11 '{"content":"[채점] 답글","parentId":1}'          # Q1
-post 11 '{"content":"[채점] 답글의 답글","parentId":2}'   # Q2
-post 11 '{"content":"[채점] 지운 댓글에","parentId":6}'   # Q3
-post 3  '{"content":"[채점] 다른 글 부모","parentId":1}'  # Q4
-post 11 '{"content":"[채점] 없는 부모","parentId":999999}' # Q5
-
-# 잘못된 입력 — 500이 아니다
-post 11 '{"content":"[채점] 숫자 아닌 부모","parentId":"abc"}'  # V1 400
-post 11 '{"content":"[채점] 음수 부모","parentId":-1}'          # V2 404
-post 11 '{"content":"   ","parentId":1}'                       # V3 400
-post 3  '{"content":"[채점] 부모 null","parentId":null}'         # B1 201 최상위
-post 11 '{"content":"[채점] 관찰-소수 부모","parentId":1.5}'     # O1 관찰
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

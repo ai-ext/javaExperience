@@ -181,7 +181,7 @@
 |---|---|
 | 계산 시각을 함께 캐시 | 서비스가 `PopularSnapshot(items, loadedAtNanos)`를 돌려준다. `loadedAtNanos`는 계산한 순간의 `System.nanoTime()`이다 |
 | 컨트롤러에서 판정 | 메서드 시작에서 `started = System.nanoTime()`을 잰다. 받은 스냅샷의 `loadedAtNanos < started`면 이번 요청 전에 계산된 것이니 `HIT`, 아니면 `MISS`. 헤더 `X-Cache`로 내보낸다 |
-| CORS | `CorsConfig`의 `exposedHeaders`에 `"X-Cache"`를 더한다. 빠뜨리면 curl에는 보여도 브라우저 실행 칸에서는 "없음"이다 |
+| CORS | `CorsConfig`의 `exposedHeaders`에 `"X-Cache"`를 더한다. 빠뜨리면 Postman 응답에는 보여도 브라우저 실행 칸에서는 "없음"이다 |
 
 **무효화** — 성공했을 때만 비운다(`@CacheEvict` 기본값). 잘못된 입력으로 400이 난 수정은 캐시를 건드리지 않는다.
 
@@ -1707,24 +1707,11 @@ public class PopularPostRow {
 
 학습용 DB에서 8-2 인기글 3위인 144번 글은 회원 5(`tok-p05`)가 썼다.
 
-```bash
-BASE=http://localhost:8080
-P5='Authorization: Bearer tok-p05'; J='Content-Type: application/json'
-pop() { curl -s -D - -o /dev/null "$BASE/api/posts/popular?days=7&limit=10" | grep -i x-cache; }
-has144() { curl -s "$BASE/api/posts/popular?days=7&limit=10" | grep -o '"postId":144' || echo '144 없음'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-pop; pop                                                                    # MISS, HIT (60초 안에 다시 부르면 HIT)
-curl -s -X PATCH "$BASE/api/posts/144" -H "$P5" -H "$J" -d '{"visibility":"SECRET"}'; echo   # 400 — 캐시는 그대로
-pop                                                                         # HIT
-curl -s -o /dev/null -w '%{http_code}\n' -X PATCH "$BASE/api/posts/144" -H "$P5" -H "$J" -d '{"visibility":"FOLLOWERS"}'
-pop; has144                                                                 # MISS, 144 없음
-curl -s -o /dev/null -w '%{http_code}\n' -X PATCH "$BASE/api/posts/144" -H "$P5" -H "$J" -d '{"visibility":"PUBLIC"}'   # 되돌리기
-curl -s -D - -o /dev/null -H 'Origin: http://localhost:3000' "$BASE/api/posts/popular?days=7&limit=10" | grep -i expose   # X-Cache가 들어 있어야 한다
-```
+앱 로그에서 `SELECT p.id AS postId` 로 시작하는 인기글 SQL이 **`MISS`일 때만** 찍히는지 본다. `HIT`일 때는 SQL이 한 줄도 없다. X 요청은 브라우저 페이지의 실제 Origin으로 전송되며, 브라우저 패널에서는 Origin 값을 직접 바꿀 수 없다. 다른 Origin을 시험할 때는 접힌 Postman 설정에서 `Origin: http://localhost:3000`을 지정하고 응답의 `X-Cache` 노출 여부를 확인한다.
 
-앱 로그에서 `SELECT p.id AS postId` 로 시작하는 인기글 SQL이 **`MISS`일 때만** 찍히는지 본다. `HIT`일 때는 SQL이 한 줄도 없다.
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 144번은 제목을 200자로 바꿨다가(B1) 원래 제목으로 되돌리고(B2), 숨겼다가(H) 다시 전체 공개로(U) 되돌린다. 중간에 끊기면 144번 제목·공개 범위가 바뀐 채 남을 수 있으니 한 번 더 실행한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 144번은 제목을 200자로 바꿨다가(B1) 원래 제목으로 되돌리고(B2), 숨겼다가(H) 다시 전체 공개로(U) 되돌린다. 중간에 끊기면 144번 제목·공개 범위가 바뀐 채 남을 수 있으니 한 번 더 실행한다.
 
 ```check
 {
@@ -1764,7 +1751,9 @@ curl -s -D - -o /dev/null -H 'Origin: http://localhost:3000' "$BASE/api/posts/po
       "title": "발행 대상 없는 예약 배치",
       "method": "POST",
       "path": "/api/admin/jobs/scheduled-publish/run?at=2026-10-05T00:00:00",
-      "headers": {"Authorization": "Bearer tok-p01"}
+      "headers": {
+        "Authorization": "Bearer tok-p01"
+      }
     },
     {
       "id": "Y2B",
@@ -1911,6 +1900,12 @@ curl -s -D - -o /dev/null -H 'Origin: http://localhost:3000' "$BASE/api/posts/po
       "title": "되돌린 직후 인기글",
       "method": "GET",
       "path": "/api/posts/popular?days=7&limit=10"
+    },
+    {
+      "id": "X",
+      "title": "CORS에서 X-Cache 노출 확인",
+      "method": "GET",
+      "path": "/api/posts/popular?days=7&limit=10"
     }
   ],
   "checks": [
@@ -1956,8 +1951,35 @@ curl -s -D - -o /dev/null -H 'Origin: http://localhost:3000' "$BASE/api/posts/po
     {
       "id": "C7",
       "all": [
-        {"request": "Z", "expect": {"status": 200, "json": [{"path": "$.published", "length": 0}]}},
-        {"request": "Y2B", "expect": {"status": 200, "headers": {"X-Cache": {"equals": "HIT"}}, "json": [{"path": "$[*].postId", "contains": 144}]}}
+        {
+          "request": "Z",
+          "expect": {
+            "status": 200,
+            "json": [
+              {
+                "path": "$.published",
+                "length": 0
+              }
+            ]
+          }
+        },
+        {
+          "request": "Y2B",
+          "expect": {
+            "status": 200,
+            "headers": {
+              "X-Cache": {
+                "equals": "HIT"
+              }
+            },
+            "json": [
+              {
+                "path": "$[*].postId",
+                "contains": 144
+              }
+            ]
+          }
+        }
       ]
     },
     {
@@ -2015,7 +2037,11 @@ curl -s -D - -o /dev/null -H 'Origin: http://localhost:3000' "$BASE/api/posts/po
           "request": "Y3",
           "expect": {
             "status": 200,
-            "headers": {"X-Cache": {"equals": "HIT"}},
+            "headers": {
+              "X-Cache": {
+                "equals": "HIT"
+              }
+            },
             "json": [
               {
                 "path": "$[*].postId",

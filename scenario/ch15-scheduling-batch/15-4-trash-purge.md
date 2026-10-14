@@ -1123,37 +1123,33 @@ public class TrashPurgeService {
 
 ## 직접 확인
 
+API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 요청은 아래 실행 패널에서 순서대로 보낸다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
+
 ```bash
-BASE=http://localhost:8080
-A='Authorization: Bearer tok-p01'
-curl -s -X POST "$BASE/api/admin/jobs/trash-purge/run" -H "$A" | python3 -m json.tool   # T1
-curl -s -X POST "$BASE/api/admin/jobs/trash-purge/run" -H "$A"; echo                    # T2 한 번 더
 grep '휴지통 비우기' app.log    # 청크마다 한 줄씩(로그 파일 위치는 실행 방법에 따라)
+
 ```
 
-11·14장을 했다면 자식 표가 모두 붙은 글로 한 번 더 본다(C6 수동). 시드 글에는 이미지·공감·투표 같은 자식이 없어서 위 확인만으로는 빠진 표를 못 잡는다.
+### Postman 이미지 준비
 
-```bash
-AU='Authorization: Bearer tok-p03'; OT='Authorization: Bearer tok-p05'; J='Content-Type: application/json'
-jid() { python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'; }
-printf 'GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;' > dot.gif
-IMG=$(curl -s -X POST "$BASE/api/images" -H "$AU" -F "file=@dot.gif" | jid)                                   # 11-2 이미지
-X=$(curl -s -X POST "$BASE/api/posts" -H "$AU" -H "$J" -d "{\"boardSlug\":\"free\",\"title\":\"자식 많은 글\",\"content\":\"x\",\"imageIds\":[$IMG]}" | jid)
-curl -s -o /dev/null "$BASE/api/posts/$X" -H "$OT"                                                             # 11-3 조회 기록·14-5 최근 본 글
-curl -s -o /dev/null -X PATCH "$BASE/api/posts/$X" -H "$AU" -H "$J" -d '{"title":"자식 많은 글 고침"}'          # 11-6 수정 이력
-curl -s -o /dev/null -X PUT "$BASE/api/posts/$X/reaction" -H "$OT" -H "$J" -d '{"kind":"HEART"}'                # 14-1 공감
-O=$(curl -s -X POST "$BASE/api/posts/$X/poll" -H "$AU" -H "$J" -d '{"question":"어느 쪽?","options":["가","나"]}' | python3 -c 'import sys,json; print(json.load(sys.stdin)["options"][0]["id"])')
-curl -s -o /dev/null -X POST "$BASE/api/posts/$X/poll/votes" -H "$OT" -H "$J" -d "{\"optionId\":$O}"          # 14-2 투표
-curl -s -o /dev/null -X PUT "$BASE/api/boards/free/pinned-posts/$X" -H "$A"                                     # 14-3 고정
-S=$(curl -s -X POST "$BASE/api/series" -H "$AU" -H "$J" -d '{"title":"자식 시리즈"}' | jid)
-curl -s -o /dev/null -X PUT "$BASE/api/series/$S/posts/$X" -H "$AU"                                             # 14-4 시리즈
-curl -s -o /dev/null -X DELETE "$BASE/api/posts/$X" -H "$AU"
-# 지운 지 30일이 지난 것처럼 — DB에서 deleted_at만 당긴다(SQL 클라이언트에서)
-#   UPDATE post SET deleted_at = '2026-08-01 00:00:00' WHERE id = <X>;
-curl -s -X POST "$BASE/api/admin/jobs/trash-purge/run" -H "$A"; echo     # 200, deleted에 images·views·revisions·reactions·pollVotes·pollOptions·polls·pins·seriesLinks·recentViews가 1 이상
-```
+<details>
+<summary>이미지 업로드 · Postman 설정</summary>
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+- URL: 상단 API 서버 주소 + `/api/images`
+- Method: `POST`
+- Authorization: Bearer `tok-p03`
+- Body: `form-data`에서 `file` 키를 File로 선택하고 1×1 GIF 파일(`dot.gif`)을 지정한다. `Content-Type`은 Postman이 multipart boundary를 포함해 설정하도록 직접 지정하지 않는다.
+- 응답의 이미지 `id`를 기록한다.
+
+</details>
+
+### 패널 실행 순서
+
+1. S1–S9를 차례로 보내 자식 글, 조회, 수정 이력, 공감, 투표, 고정, 시리즈를 만든다. 이후 요청은 앞선 응답 id를 사용한다.
+2. 위 Postman 설정으로 이미지를 업로드한다. S11 요청을 열고 본문의 `imageIds: []`를 업로드 응답 id를 넣은 숫자 배열로 바꾼 뒤 보낸다. 글 id는 S11 응답에 저장된다.
+3. S10과 S12를 보내 두 글을 삭제한다.
+4. SQL 클라이언트에서 `UPDATE post SET deleted_at = '2026-08-01 00:00:00' WHERE id IN (<S1 응답 id>, <S11 응답 id>)`를 실행한다. 삭제 뒤 날짜를 갱신해야 30일 지난 대상으로 남는다.
+5. T11로 휴지통을 비우고 `deleted.images`, `views`, `revisions`, `reactions`, `pollVotes`, `pollOptions`, `polls`, `pins`, `seriesLinks`, `recentViews`가 각각 1 이상인지 확인한다.
 
 ```check
 {
@@ -1243,6 +1239,153 @@ curl -s -X POST "$BASE/api/admin/jobs/trash-purge/run" -H "$A"; echo     # 200, 
       "path": "/api/me/bookmarks?size=100",
       "headers": {
         "Authorization": "Bearer tok-p03"
+      }
+    },
+    {
+      "id": "S1",
+      "title": "자식 글 만들기",
+      "method": "POST",
+      "path": "/api/posts",
+      "headers": {
+        "Authorization": "Bearer tok-p03"
+      },
+      "body": {
+        "boardSlug": "free",
+        "title": "자식 많은 글",
+        "content": "x"
+      }
+    },
+    {
+      "id": "S2",
+      "title": "조회 기록 만들기",
+      "method": "GET",
+      "path": "/api/posts/{{S1.body.id}}",
+      "headers": {
+        "Authorization": "Bearer tok-p05"
+      }
+    },
+    {
+      "id": "S3",
+      "title": "수정 이력 만들기",
+      "method": "PATCH",
+      "path": "/api/posts/{{S1.body.id}}",
+      "headers": {
+        "Authorization": "Bearer tok-p03"
+      },
+      "body": {
+        "title": "자식 많은 글 고침"
+      }
+    },
+    {
+      "id": "S4",
+      "title": "공감 만들기",
+      "method": "PUT",
+      "path": "/api/posts/{{S1.body.id}}/reaction",
+      "headers": {
+        "Authorization": "Bearer tok-p05"
+      },
+      "body": {
+        "kind": "HEART"
+      }
+    },
+    {
+      "id": "S5",
+      "title": "투표 만들기",
+      "method": "POST",
+      "path": "/api/posts/{{S1.body.id}}/poll",
+      "headers": {
+        "Authorization": "Bearer tok-p03"
+      },
+      "body": {
+        "question": "어느 쪽?",
+        "options": [
+          "가",
+          "나"
+        ]
+      }
+    },
+    {
+      "id": "S6",
+      "title": "투표하기",
+      "method": "POST",
+      "path": "/api/posts/{{S1.body.id}}/poll/votes",
+      "headers": {
+        "Authorization": "Bearer tok-p05"
+      },
+      "body": {
+        "optionId": "{{S5.body.options[0].id}}"
+      }
+    },
+    {
+      "id": "S7",
+      "title": "글 고정하기",
+      "method": "PUT",
+      "path": "/api/boards/free/pinned-posts/{{S1.body.id}}",
+      "headers": {
+        "Authorization": "Bearer tok-p01"
+      }
+    },
+    {
+      "id": "S8",
+      "title": "시리즈 만들기",
+      "method": "POST",
+      "path": "/api/series",
+      "headers": {
+        "Authorization": "Bearer tok-p03"
+      },
+      "body": {
+        "title": "자식 시리즈"
+      }
+    },
+    {
+      "id": "S9",
+      "title": "시리즈에 글 연결",
+      "method": "PUT",
+      "path": "/api/series/{{S8.body.id}}/posts/{{S1.body.id}}",
+      "headers": {
+        "Authorization": "Bearer tok-p03"
+      }
+    },
+    {
+      "id": "S11",
+      "title": "업로드한 이미지 붙인 정리 대상 글",
+      "method": "POST",
+      "path": "/api/posts",
+      "headers": {
+        "Authorization": "Bearer tok-p03"
+      },
+      "body": {
+        "boardSlug": "free",
+        "title": "자식 이미지 글",
+        "content": "x",
+        "imageIds": []
+      }
+    },
+    {
+      "id": "S10",
+      "title": "자식 글 삭제하기",
+      "method": "DELETE",
+      "path": "/api/posts/{{S1.body.id}}",
+      "headers": {
+        "Authorization": "Bearer tok-p03"
+      }
+    },
+    {
+      "id": "S12",
+      "title": "이미지 글 삭제",
+      "method": "DELETE",
+      "path": "/api/posts/{{S11.body.id}}",
+      "headers": {
+        "Authorization": "Bearer tok-p03"
+      }
+    },
+    {
+      "id": "T11",
+      "title": "자식 데이터 휴지통 비우기",
+      "method": "POST",
+      "path": "/api/admin/jobs/trash-purge/run",
+      "headers": {
+        "Authorization": "Bearer tok-p01"
       }
     }
   ],
@@ -1448,7 +1591,7 @@ curl -s -X POST "$BASE/api/admin/jobs/trash-purge/run" -H "$A"; echo     # 200, 
     },
     {
       "id": "C6",
-      "manual": "11·14장 자식 표(이미지·조회 기록·수정 이력·공감·투표·고정·시리즈·최근 본 글)가 모두 붙은 글을 지우고 30일 전으로 당긴 뒤 비우기 — 직접 확인의 두 번째 스크립트. 시드 글에는 이런 자식이 없어서 실행 칸으로는 못 본다"
+      "manual": "C6 수동 — S1–S9로 글과 조회·수정 이력·공감·투표·고정·시리즈를 준비한다. Postman에서 이미지를 업로드한 뒤 S11 요청 본문에서 imageIds의 빈 배열을 업로드 응답 id가 든 숫자 배열로 바꾸고 전송한다. S10과 S12로 두 글을 삭제한 뒤 SQL에서 S1·S11의 deleted_at을 모두 2026-08-01로 갱신하고 T11을 실행한다. deleted.images·views·revisions·reactions·pollVotes·pollOptions·polls·pins·seriesLinks·recentViews가 각각 1 이상인지 본다."
     }
   ]
 }

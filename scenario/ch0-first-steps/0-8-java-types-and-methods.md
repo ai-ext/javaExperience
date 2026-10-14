@@ -120,8 +120,9 @@ primitive와 reference 타입이 응답 필드에 어떻게 쓰였는지 확인�
 
 ~~~bash
 ./gradlew compileJava
-curl -i http://localhost:8080/api/start/summary
 ~~~
+
+API 서버 주소는 페이지 상단 공통 입력에서 설정하고, 요약 요청은 아래 실행 패널에서 보낸다. Postman 설정은 접어서 확인할 수 있다.
 
 ```check
 {

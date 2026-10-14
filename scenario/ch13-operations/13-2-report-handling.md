@@ -705,25 +705,9 @@ public enum Role {
 
 회원 7(`tok-c01`)이 글과 댓글을 새로 쓰고, 회원 8·9·10이 신고한다. 운영자가 글은 숨기기로, 댓글은 기각으로 처리한다. 끝에서 글을 복구한 뒤 지운다.
 
-```bash
-BASE=http://localhost:8080
-AD='Authorization: Bearer tok-admin'; J='Content-Type: application/json'
-tok() { echo "Authorization: Bearer tok-c$1"; }
-jid() { python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-P=$(curl -s -X POST "$BASE/api/posts" -H "$(tok 01)" -H "$J" -d '{"boardSlug":"free","title":"[채점] 신고 처리 확인 글","content":"끝에서 지우는 글"}' | jid)
-K=$(curl -s -X POST "$BASE/api/posts/$P/comments" -H "$(tok 01)" -H "$J" -d '{"content":"[채점] 신고될 댓글"}' | jid)
-curl -s -X POST "$BASE/api/reports" -H "$(tok 02)" -H "$J" -d "{\"targetType\":\"POST\",\"targetId\":$P,\"reason\":\"SPAM\"}" > /dev/null
-curl -s -X POST "$BASE/api/reports" -H "$(tok 03)" -H "$J" -d "{\"targetType\":\"POST\",\"targetId\":$P,\"reason\":\"ABUSE\"}" > /dev/null
-curl -s -X POST "$BASE/api/reports" -H "$(tok 04)" -H "$J" -d "{\"targetType\":\"COMMENT\",\"targetId\":$K,\"reason\":\"ETC\",\"detail\":\"[채점] 욕설\"}" > /dev/null
-curl -s "$BASE/api/admin/reports?size=5" -H "$AD"; echo                                                                 # L 묶음
-curl -s -X POST "$BASE/api/admin/reports/resolve" -H "$AD" -H "$J" -d "{\"targetType\":\"POST\",\"targetId\":$P,\"action\":\"HIDE\"}"; echo     # H
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/admin/reports/resolve" -H "$AD" -H "$J" -d "{\"targetType\":\"POST\",\"targetId\":$P,\"action\":\"REJECT\"}"   # H2 409
-curl -s -X POST "$BASE/api/admin/reports/resolve" -H "$AD" -H "$J" -d "{\"targetType\":\"COMMENT\",\"targetId\":$K,\"action\":\"REJECT\"}"; echo  # J
-curl -s -X PATCH "$BASE/api/admin/posts/$P/status" -H "$AD" -H "$J" -d '{"status":"PUBLISHED"}' > /dev/null; curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "$BASE/api/posts/$P" -H "$(tok 01)"   # 뒷정리
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 실행할 때마다 새 글·댓글을 만들고 끝에서 지우므로 몇 번을 눌러도 같은 결과다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 실행할 때마다 새 글·댓글을 만들고 끝에서 지우므로 몇 번을 눌러도 같은 결과다.
 
 ```check
 {

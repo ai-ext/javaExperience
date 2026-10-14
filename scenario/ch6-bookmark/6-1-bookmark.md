@@ -383,34 +383,9 @@ MyBatis의 `findBookmark`도 `FOR UPDATE`로 현재 행을 읽고, `findOwnedFol
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'
-bm() {   # bm <메서드> <글 id> [본문]
-  if [ -n "$3" ]; then curl -s -i -X "$1" "$BASE/api/posts/$2/bookmark" -H "$K" -H 'Content-Type: application/json' -d "$3"
-  else curl -s -i -X "$1" "$BASE/api/posts/$2/bookmark" -H "$K"; fi
-  echo; echo ----
-}
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-bm DELETE 2                                       # B0 처음 상태로
-bm PUT 2 '{}'                                     # B1
-bm PUT 2 '{"memo":"[채점] 메모"}'                  # B2
-bm PUT 2 '{"folderId":11}'                        # B3 이스프링의 폴더
-bm PUT 9 '{}'                                     # B4 김자바를 차단한 회원의 글
-bm DELETE 2                                       # B5
-bm DELETE 2                                       # B6 한 번 더
-curl -i -X PUT "$BASE/api/posts/2/bookmark" -H 'Content-Type: application/json' -d '{}'   # B7 토큰 없음
-
-# 잘못된 입력 — 500이 아니다(B4 뒤, B5 전에)
-bm PUT 2 "{\"memo\":\"[채점] 경계-$(printf '메%.0s' $(seq 1 193))\"}"   # V1 메모 201자 → 400
-bm PUT 2 '{"folderId":"abc"}'                  # V2 400
-bm PUT 2 '{"folderId":999999}'                   # V3 404
-bm PUT 2 '{"memo":'                              # V4 400
-bm PUT abc '{}'                                   # V5 400
-bm PUT 2 "{\"memo\":\"[채점] 경계-$(printf '메%.0s' $(seq 1 192))\"}"   # V6 메모 200자 → 200
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

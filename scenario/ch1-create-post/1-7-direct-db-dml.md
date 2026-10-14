@@ -86,13 +86,46 @@ SELECT id, title FROM post WHERE id = 22;
 
 먼저 API로 글을 하나 만든다. 1-5의 제목·본문 길이 규칙에 맞춰 내용을 조정하고, 응답의 `id`를 기록한다. SQL 예시의 `22`는 **내 응답 id로 바꿔야 한다**. 시드에 글 21개가 있어 초기 상태에서는 22 이상이지만 채점 뒤에는 달라진다.
 
-```bash
-BASE=http://localhost:8080
-curl -i -X POST "$BASE/api/posts" -H 'Authorization: Bearer tok-kimjava' \
-  -H 'Content-Type: application/json' \
-  -d '{"boardSlug":"dev","title":"[DB실습] 처음 제목","content":"SQL로 행을 확인하고 트랜잭션을 연습합니다.","tags":["java"],"visibility":"PUBLIC"}'
-```
+API 서버 주소는 페이지 상단 공통 입력에서 설정한다. 실행 패널의 A 요청을 보내고 응답 `id`를 SQL의 `22` 자리에 기록한다. Postman 설정은 접어서 확인할 수 있다.
 
+
+버튼으로 확인 — 아래 실행 패널에서 글을 만들고 응답의 `id`를 기록한다.
+
+```check
+{
+  "requests": [
+    {
+      "id": "A",
+      "title": "SQL 실습용 글 만들기",
+      "method": "POST",
+      "path": "/api/posts",
+      "headers": {
+        "Authorization": "Bearer tok-kimjava"
+      },
+      "body": {
+        "boardSlug": "dev",
+        "title": "[DB실습] 처음 제목",
+        "content": "SQL로 행을 확인하고 트랜잭션을 연습합니다.",
+        "tags": ["java"],
+        "visibility": "PUBLIC"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "C1",
+      "request": "A",
+      "expect": {
+        "status": 201,
+        "json": [
+          {"path": "$.title", "equals": "[DB실습] 처음 제목"},
+          {"path": "$.boardSlug", "equals": "dev"}
+        ]
+      }
+    }
+  ]
+}
+```
 CloudBeaver에서 `community` 연결을 열거나 MySQL CLI로 접속한다. 아래는 **완성된 3테이블 JOIN 예시**다. 먼저 실행해 `nickname='김자바'`, `slug='dev'`, 응답의 제목을 확인한다.
 
 ```sql

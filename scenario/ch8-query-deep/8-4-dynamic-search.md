@@ -377,28 +377,9 @@ LocalDateTime toExclusive = to == null || to.equals(LocalDate.of(9999, 12, 31))
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-s() { curl -s "$@" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d["totalElements"], [i["id"] for i in d["items"]][:5])'; }
-s "$BASE/api/posts/search?tag=jpa&size=5"                                      # Z1
-s "$BASE/api/posts/search?board=qna&tag=spring&size=5"                         # Z2
-s "$BASE/api/posts/search?author=2&from=2026-09-01&to=2026-09-30"              # Z3
-s "$BASE/api/posts/search?q=n%2B1&size=5"                                      # Z4 (n+1, 소문자)
-s "$BASE/api/posts/search?size=5"                                              # Z5 조건 없음
-s "$BASE/api/posts/search?board=dev&q=%ED%8A%B8%EB%9E%9C%EC%9E%AD%EC%85%98&from=2026-08-01"   # Z6 (q=트랜잭션)
-s -H 'Authorization: Bearer tok-p07' "$BASE/api/posts/search?author=2"          # Z7 회원 7은 회원 2를 차단
-s "$BASE/api/posts/search?tag=no-such-tag"                                     # Z8
-curl -i "$BASE/api/posts/search?from=2026-10-01&to=2026-09-01"                # Z9
-s "$BASE/api/posts/search?page=85899346&size=50"                               # Z10
-s "$BASE/api/posts/search?page=2147483647&size=50"                             # Z11
-s "$BASE/api/posts/search?board=no-such-board&page=2147483647&size=50"         # Z12
-s "$BASE/api/posts/search?tag=%20%20%20&size=5"                               # Z13
-s "$BASE/api/posts/search?to=9999-12-31"                                     # Z14
-s "$BASE/api/posts/search?from=9999-12-31&to=9999-12-31"                     # Z15
-curl -i "$BASE/api/posts/search?board=no-such-board&to=0999-12-31"           # Z16
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

@@ -152,15 +152,7 @@ MyBatis라면 `UPDATE post`와 `DELETE/INSERT post_tag`를 같은 `@Transactiona
 
 먼저 내 글을 만든 뒤 응답 `id`를 아래 `X`에 넣는다. 3-1의 PATCH와 비교할 때는 별도 글을 만들어 원래 본문·태그가 어떻게 달라지는지 본다.
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'
-L='Authorization: Bearer tok-lee'
-X=$(curl -s -X POST "$BASE/api/posts" -H "$K" -H 'Content-Type: application/json' -d '{"boardSlug":"dev","title":"[PUT실습] 이전 제목","content":"이전 본문","tags":["spring"],"visibility":"FOLLOWERS"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
-curl -i -X PUT "$BASE/api/posts/$X" -H "$K" -H 'Content-Type: application/json' -d '{"title":"[PUT실습] 새 제목","content":"수정한 본문","tags":["java"],"visibility":"PUBLIC"}'
-curl -i -X PUT "$BASE/api/posts/$X" -H "$K" -H 'Content-Type: application/json' -d '{"title":"제목만"}'
-curl -i -X PUT "$BASE/api/posts/$X" -H "$L" -H 'Content-Type: application/json' -d '{"title":"남의 수정","content":"본문"}'
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 ```check
 {

@@ -226,13 +226,13 @@
 
 ## 직접 확인
 
+앱 로그에서 SQL 줄 수는 실행 패널의 Q 요청으로 관찰한다. API 주소는 페이지 상단 공통 입력을 사용하고, Postman 설정은 접어서 확인할 수 있다.
+
 ```bash
-BASE=http://localhost:8080
-curl -s "$BASE/api/boards/free/posts?size=20" > /dev/null   # 앱 로그에서 SQL 줄 수를 세 본다
 ./gradlew test --tests '*PostListQueryCountTest'
 ```
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {
@@ -310,7 +310,7 @@ C = HTTP 확인(필수), T = 테스트 실행(필수), R = 코드 리뷰(피드�
 
 | # | 확인 방법 | 기대 |
 |---|---|---|
-| C1 | `curl -s "$BASE/api/boards/free/posts?size=20"` | `200`, id 순서 `21~12, 9, 5, 4`(13개). 각 항목의 `author`·`tags`가 2-2와 같다(예: 21번 `tags`=[`mysql`], 작성자 박디비) |
+| C1 | 요청 Q | `200`, id 순서 `21~12, 9, 5, 4`(13개). 각 항목의 `author`·`tags`가 2-2와 같다(예: 21번 `tags`=[`mysql`], 작성자 박디비) |
 | T1 | `./gradlew test --tests '*PostListQueryCountTest'` | 통과 |
 | R1 | 측정 방법 | 테스트가 실제 SQL 수를 센다(Hibernate `Statistics`의 `getPrepareStatementCount()`, 또는 datasource-proxy 같은 도구). 호출 전에 카운트를 초기화한다 |
 | R2 | 기준 단언 | `size=20`의 문장 수가 `size=5` 이하라는 것(글 수에 비례하지 않음)과 상한(5 이하)을 둘 다 단언한다 |

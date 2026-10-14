@@ -241,23 +241,9 @@ MyBatis가 맡는 게시판 목록·검색과 PATCH·PUT은 다음 Mapper를 쓴
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-P='Authorization: Bearer tok-p02'; J='Content-Type: application/json'
-jid() { python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'; }
-BODY=$(python3 -c 'print("가" * 150)')
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-curl -s "$BASE/api/boards/dev/posts?size=3" | python3 -c 'import sys,json; print([(i["id"], len(i["excerpt"])) for i in json.load(sys.stdin)["items"]])'   # A1
-X=$(curl -s -X POST "$BASE/api/posts" -H "$P" -H "$J" -d "{\"boardSlug\":\"dev\",\"title\":\"[채점] 요약 확인\",\"content\":\"$BODY\",\"tags\":[]}" | jid); echo "X=$X"   # A2
-curl -s -X PATCH "$BASE/api/posts/$X" -H "$P" -H "$J" -d '{"content":"짧게 바꾼 본문"}' > /dev/null                                                              # A3
-
-# 잘못된 입력 — 요약 계산이 null을 다루나
-curl -s -o /dev/null -w '%{http_code}\n' -X PATCH "$BASE/api/posts/$X" -H "$P" -H "$J" -d '{"content":null}'    # V1 200(그대로)
-curl -s -o /dev/null -w '%{http_code}\n' -X PATCH "$BASE/api/posts/$X" -H "$P" -H "$J" -d '{"content":"   "}'  # V2 400
-curl -s "$BASE/api/boards/dev/posts?size=1" | python3 -c 'import sys,json; i=json.load(sys.stdin)["items"][0]; print(i["id"], i["excerpt"])'   # V3 요약 그대로
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

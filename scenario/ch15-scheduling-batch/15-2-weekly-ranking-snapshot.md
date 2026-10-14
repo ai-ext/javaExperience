@@ -1594,19 +1594,9 @@ public class WeeklyRankingService {
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-A='Authorization: Bearer tok-p01'
-show() { python3 -c 'import sys,json; d=json.load(sys.stdin); print(d["weekStart"], d["created"], [(i["rank"], i["postId"], i["score"]) for i in d["items"]])'; }
-curl -s -X POST "$BASE/api/admin/jobs/weekly-ranking/run?date=2026-10-05" -H "$A" | show   # W1
-curl -s -X POST "$BASE/api/admin/jobs/weekly-ranking/run?date=2026-10-05" -H "$A" | show   # W2 같은 주 한 번 더
-curl -s -X POST "$BASE/api/admin/jobs/weekly-ranking/run?date=2026-09-28" -H "$A" | show   # W3
-curl -s "$BASE/api/rankings/weekly?weekStart=2026-09-21" | show                             # W4
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/rankings/weekly?weekStart=2026-01-05"  # W5
-curl -s -X POST "$BASE/api/admin/jobs/weekly-ranking/run?date=2026-10-01" -H "$A"; echo     # W6 목요일
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

@@ -157,13 +157,7 @@ JPA의 `BookmarkRepository.insertIfAbsent`는 native SQL `INSERT ... ON DUPLICAT
 
 시드의 글 2는 이스프링의 공개 글이며 김자바의 북마크 행이 없다. 다른 회원의 11번 폴더는 선택할 수 없다. 이전 실습으로 북마크가 있으면 6-1의 DELETE로 지우고 시작한다.
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'
-curl -i -X PUT "$BASE/api/posts/2/bookmark" -H "$K" -H 'Content-Type: application/json' -d '{"memo":"[북마크실습] 복습"}'
-curl -i -X PUT "$BASE/api/posts/2/bookmark" -H "$K" -H 'Content-Type: application/json' -d '{"memo":"[북마크실습] 복습"}'
-curl -i -X PUT "$BASE/api/posts/2/bookmark" -H "$K" -H 'Content-Type: application/json' -d '{"folderId":11}'
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 ```check
 {

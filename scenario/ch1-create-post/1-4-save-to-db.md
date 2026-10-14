@@ -531,26 +531,22 @@ JPA는 DB 행을 객체로 만들 때 인자 없는 생성자로 빈 객체부�
 
 ## 직접 확인
 
+API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 요청은 아래 실행 패널에서 순서대로 보낸다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
+
 ```bash
-BASE=http://localhost:8080
 
-# 요청 A' — 새 태그 '채점태그' 포함
-curl -i -X POST "$BASE/api/posts" -H 'Content-Type: application/json' \
-  -d '{"boardSlug":"dev","title":"[채점] DB 저장","content":"Spring Boot로 만든 첫 게시글입니다.","tags":["spring","채점태그"],"visibility":"PUBLIC"}'
 
-# 관찰 O1 — 공개 범위 생략(채점 안 함)
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/api/posts" -H 'Content-Type: application/json' \
-  -d '{"boardSlug":"dev","title":"[채점] 관찰-공개범위 생략","content":"본문","tags":[]}'
 
 # DB 확인 — 방금 행의 모든 컬럼
 docker compose exec -T mysql mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community -e "
 SELECT id, board_id, author_id, status, visibility, published_at, view_count, like_count, comment_count, created_at, updated_at, deleted_at
 FROM post ORDER BY id DESC LIMIT 1;"
+
 ```
 
 CloudBeaver의 `community` 연결으로 방금 저장된 행을 봐도 된다. 1-3 때와 달리 `published_at`이 채워져 있어야 한다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 관찰 요청 O1을 먼저 보낸다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 관찰 요청 O1을 먼저 보낸다.
 
 ```check
 {

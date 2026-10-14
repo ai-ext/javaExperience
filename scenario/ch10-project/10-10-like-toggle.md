@@ -423,19 +423,7 @@ int findCount(Long postId);
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-KIM=$(curl -s -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' \
-  -d '{"email":"kim@example.com","password":"password1234"}' | sed -E 's/.*"accessToken":"([^"]+)".*/\1/')
-ID=$(curl -s -X POST "$BASE/api/v1/posts" -H "Authorization: Bearer $KIM" -H 'Content-Type: application/json' \
-  -d '{"title":"[채점] 10-10 좋아요용 글"}' | sed -E 's/.*"data":\{"id":([0-9]+).*/\1/')
-
-curl -s -X POST "$BASE/api/v1/posts/$ID/like" -H "Authorization: Bearer $KIM"; echo   # T1 좋아요
-curl -s "$BASE/api/v1/posts/$ID" -H "Authorization: Bearer $KIM"; echo              # G1 상세 liked=true
-curl -s -X POST "$BASE/api/v1/posts/$ID/like" -H "Authorization: Bearer $KIM"; echo   # T2 취소
-curl -s -i -X POST "$BASE/api/v1/posts/$ID/like"; echo                               # N 토큰 없음
-curl -s -i -X POST "$BASE/api/v1/posts/999999/like" -H "Authorization: Bearer $KIM"; echo  # X 없는 글
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 DB의 두 숫자가 맞는지 본다.
 
@@ -447,35 +435,244 @@ FROM posts p WHERE p.like_count <> (SELECT COUNT(*) FROM post_likes l WHERE l.po
 
 결과가 비어 있어야 한다(어긋난 글이 없다).
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들고, 두 번 눌러 0으로 돌려놓는다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들고, 두 번 눌러 0으로 돌려놓는다.
 
 ```check
 {
   "requests": [
-    { "id": "L", "title": "로그인(김자바)", "method": "POST", "path": "/api/v1/auth/login", "body": { "email": "kim@example.com", "password": "password1234" } },
-    { "id": "M", "title": "로그인(이스프링)", "method": "POST", "path": "/api/v1/auth/login", "body": { "email": "lee@example.com", "password": "password1234" } },
-    { "id": "P", "title": "좋아요용 글 만들기", "method": "POST", "path": "/api/v1/posts", "headers": { "Authorization": "Bearer {{L.body.data.accessToken}}" }, "body": { "title": "[채점] 10-10 좋아요용 글" } },
-    { "id": "T1", "title": "좋아요", "method": "POST", "path": "/api/v1/posts/{{P.body.data.id}}/like", "headers": { "Authorization": "Bearer {{L.body.data.accessToken}}" } },
-    { "id": "G1", "title": "상세 — 누른 뒤", "method": "GET", "path": "/api/v1/posts/{{P.body.data.id}}", "headers": { "Authorization": "Bearer {{L.body.data.accessToken}}" } },
-    { "id": "T2", "title": "다시 누르기(취소)", "method": "POST", "path": "/api/v1/posts/{{P.body.data.id}}/like", "headers": { "Authorization": "Bearer {{L.body.data.accessToken}}" } },
-    { "id": "G2", "title": "상세 — 취소 뒤", "method": "GET", "path": "/api/v1/posts/{{P.body.data.id}}", "headers": { "Authorization": "Bearer {{L.body.data.accessToken}}" } },
-    { "id": "N", "title": "토큰 없음", "method": "POST", "path": "/api/v1/posts/{{P.body.data.id}}/like" },
-    { "id": "X", "title": "없는 글", "method": "POST", "path": "/api/v1/posts/999999/like", "headers": { "Authorization": "Bearer {{L.body.data.accessToken}}" } },
-    { "id": "PV", "title": "남의 비공개 글(24)", "method": "POST", "path": "/api/v1/posts/24/like", "headers": { "Authorization": "Bearer {{M.body.data.accessToken}}" } },
-    {"id": "V1", "title": "경로 id가 숫자가 아님", "method": "POST", "path": "/api/v1/posts/abc/like", "headers": {"Authorization": "Bearer {{L.body.data.accessToken}}"}},
-    {"id": "V2", "title": "경로 id가 Long 범위를 넘음", "method": "POST", "path": "/api/v1/posts/99999999999999999999/like", "headers": {"Authorization": "Bearer {{L.body.data.accessToken}}"}}
+    {
+      "id": "L",
+      "title": "로그인(김자바)",
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "body": {
+        "email": "kim@example.com",
+        "password": "password1234"
+      }
+    },
+    {
+      "id": "M",
+      "title": "로그인(이스프링)",
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "body": {
+        "email": "lee@example.com",
+        "password": "password1234"
+      }
+    },
+    {
+      "id": "P",
+      "title": "좋아요용 글 만들기",
+      "method": "POST",
+      "path": "/api/v1/posts",
+      "headers": {
+        "Authorization": "Bearer {{L.body.data.accessToken}}"
+      },
+      "body": {
+        "title": "[채점] 10-10 좋아요용 글"
+      }
+    },
+    {
+      "id": "T1",
+      "title": "좋아요",
+      "method": "POST",
+      "path": "/api/v1/posts/{{P.body.data.id}}/like",
+      "headers": {
+        "Authorization": "Bearer {{L.body.data.accessToken}}"
+      }
+    },
+    {
+      "id": "G1",
+      "title": "상세 — 누른 뒤",
+      "method": "GET",
+      "path": "/api/v1/posts/{{P.body.data.id}}",
+      "headers": {
+        "Authorization": "Bearer {{L.body.data.accessToken}}"
+      }
+    },
+    {
+      "id": "T2",
+      "title": "다시 누르기(취소)",
+      "method": "POST",
+      "path": "/api/v1/posts/{{P.body.data.id}}/like",
+      "headers": {
+        "Authorization": "Bearer {{L.body.data.accessToken}}"
+      }
+    },
+    {
+      "id": "G2",
+      "title": "상세 — 취소 뒤",
+      "method": "GET",
+      "path": "/api/v1/posts/{{P.body.data.id}}",
+      "headers": {
+        "Authorization": "Bearer {{L.body.data.accessToken}}"
+      }
+    },
+    {
+      "id": "N",
+      "title": "토큰 없음",
+      "method": "POST",
+      "path": "/api/v1/posts/{{P.body.data.id}}/like"
+    },
+    {
+      "id": "X",
+      "title": "없는 글",
+      "method": "POST",
+      "path": "/api/v1/posts/999999/like",
+      "headers": {
+        "Authorization": "Bearer {{L.body.data.accessToken}}"
+      }
+    },
+    {
+      "id": "PV",
+      "title": "남의 비공개 글(24)",
+      "method": "POST",
+      "path": "/api/v1/posts/24/like",
+      "headers": {
+        "Authorization": "Bearer {{M.body.data.accessToken}}"
+      }
+    },
+    {
+      "id": "V1",
+      "title": "경로 id가 숫자가 아님",
+      "method": "POST",
+      "path": "/api/v1/posts/abc/like",
+      "headers": {
+        "Authorization": "Bearer {{L.body.data.accessToken}}"
+      }
+    },
+    {
+      "id": "V2",
+      "title": "경로 id가 Long 범위를 넘음",
+      "method": "POST",
+      "path": "/api/v1/posts/99999999999999999999/like",
+      "headers": {
+        "Authorization": "Bearer {{L.body.data.accessToken}}"
+      }
+    },
+    {
+      "id": "RACE",
+      "title": "동일 토큰으로 동시에 토글(경쟁 조건 재현)",
+      "method": "POST",
+      "path": "/api/v1/posts/{{P.body.data.id}}/like",
+      "headers": {
+        "Authorization": "Bearer {{L.body.data.accessToken}}"
+      },
+      "concurrent": {
+        "count": 2
+      }
+    }
   ],
   "checks": [
-    { "id": "C1", "request": "T1", "expect": { "status": 200, "json": [{ "path": "$.status", "equals": 200 }, { "path": "$.data", "equals": { "liked": true, "likeCount": 1 } }] } },
-    { "id": "C2", "request": "G1", "expect": { "status": 200, "json": [{ "path": "$.data.liked", "equals": true }, { "path": "$.data.likeCount", "equals": 1 }] } },
-    { "id": "C3", "request": "T2", "expect": { "status": 200, "json": [{ "path": "$.data", "equals": { "liked": false, "likeCount": 0 } }] } },
-    { "id": "C4", "request": "G2", "expect": { "status": 200, "json": [{ "path": "$.data.liked", "equals": false }, { "path": "$.data.likeCount", "equals": 0 }] } },
+    {
+      "id": "C1",
+      "request": "T1",
+      "expect": {
+        "status": 200,
+        "json": [
+          {
+            "path": "$.status",
+            "equals": 200
+          },
+          {
+            "path": "$.data",
+            "equals": {
+              "liked": true,
+              "likeCount": 1
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "C2",
+      "request": "G1",
+      "expect": {
+        "status": 200,
+        "json": [
+          {
+            "path": "$.data.liked",
+            "equals": true
+          },
+          {
+            "path": "$.data.likeCount",
+            "equals": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "C3",
+      "request": "T2",
+      "expect": {
+        "status": 200,
+        "json": [
+          {
+            "path": "$.data",
+            "equals": {
+              "liked": false,
+              "likeCount": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "C4",
+      "request": "G2",
+      "expect": {
+        "status": 200,
+        "json": [
+          {
+            "path": "$.data.liked",
+            "equals": false
+          },
+          {
+            "path": "$.data.likeCount",
+            "equals": 0
+          }
+        ]
+      }
+    },
     {
       "id": "C5",
       "all": [
-        { "request": "N", "expect": { "status": 401, "json": [{ "path": "$.code", "equals": "UNAUTHORIZED" }] } },
-        { "request": "X", "expect": { "status": 404, "json": [{ "path": "$.code", "equals": "NOT_FOUND" }] } },
-        { "request": "PV", "expect": { "status": 404, "json": [{ "path": "$.code", "equals": "NOT_FOUND" }] } }
+        {
+          "request": "N",
+          "expect": {
+            "status": 401,
+            "json": [
+              {
+                "path": "$.code",
+                "equals": "UNAUTHORIZED"
+              }
+            ]
+          }
+        },
+        {
+          "request": "X",
+          "expect": {
+            "status": 404,
+            "json": [
+              {
+                "path": "$.code",
+                "equals": "NOT_FOUND"
+              }
+            ]
+          }
+        },
+        {
+          "request": "PV",
+          "expect": {
+            "status": 404,
+            "json": [
+              {
+                "path": "$.code",
+                "equals": "NOT_FOUND"
+              }
+            ]
+          }
+        }
       ]
     },
     {
@@ -514,6 +711,10 @@ FROM posts p WHERE p.like_count <> (SELECT COUNT(*) FROM post_likes l WHERE l.po
           }
         }
       ]
+    },
+    {
+      "id": "C7",
+      "manual": "경쟁 조건 관찰 — RACE를 실행하고 두 응답을 비교한다. 잠금이 없는 구현에서는 한 요청이 500이 될 수 있고, 데이터베이스 기본 키가 중복 저장을 막는다. 재현 결과는 스케줄링에 따라 달라질 수 있다."
     }
   ]
 }
@@ -531,6 +732,7 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 | C4 | 요청 G2 | 상세의 `liked`=`false`, `likeCount`=`0` |
 | C5 | 요청 N·X·PV | 토큰 없음 `401`, 없는 글·남의 비공개 글 `404` |
 | C6 | V1 / V2 | 경로 `abc`, `99999999999999999999`(Long 초과) 모두 `400 VALIDATION_FAILED`, `errors`에 `postId` — `500`이 아니다 |
+| C7 | 요청 RACE | 같은 토큰의 동시 요청 결과를 관찰한다. 경쟁 조건이 재현되면 한 응답이 `500`일 수 있다 |
 | D1 | 위 "두 숫자" 쿼리 | 결과 0행 — 모든 글의 `like_count`가 `post_likes` 행 수와 같다 |
 | R1 | 트랜잭션 | 좋아요 행 변경과 `like_count` 변경이 한 `@Transactional` 메서드 안에 있다 |
 | R2 | 숫자 갱신 | `like_count`를 엔티티에서 읽고 더해 저장하지 않고 `UPDATE ... + :delta` |
@@ -583,11 +785,7 @@ Caused by: java.lang.IllegalArgumentException: This class [class org.example.boa
 
 ### ③ 같은 글에 두 번을 **동시에** 보낸다 → 한쪽이 500
 
-망가뜨린 것은 없다. 정답 코드 그대로 두고, 같은 토큰으로 두 요청을 동시에 보낸다.
-
-```bash
-for i in 1 2; do curl -s -X POST "$BASE/api/v1/posts/$ID/like" -H "Authorization: Bearer $KIM" & done; wait; echo
-```
+망가뜨린 것은 없다. 정답 코드 그대로 두고 실행 패널의 RACE 요청을 보낸다. 이 요청은 같은 토큰으로 두 호출을 동시에 보낸다.
 
 ```text
 {"status":200,"message":"OK","data":{"liked":true,"likeCount":1}}{"status":500,"message":"서버 오류가 발생했습니다.","code":"INTERNAL_ERROR","errors":[],"data":null}

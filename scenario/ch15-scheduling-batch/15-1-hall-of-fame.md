@@ -1572,19 +1572,9 @@ public class HallOfFameService {
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-A='Authorization: Bearer tok-p01'
-ids() { python3 -c 'import sys,json; d=json.load(sys.stdin); print([(i["postId"], i["likes"]) for i in d["added"]])'; }
-curl -s -X POST "$BASE/api/admin/jobs/hall-of-fame/run?date=2026-10-04" -H "$A" | ids     # H1
-curl -s -X POST "$BASE/api/admin/jobs/hall-of-fame/run?date=2026-10-05" -H "$A" | ids     # H2
-curl -s -X POST "$BASE/api/admin/jobs/hall-of-fame/run?date=2026-10-05" -H "$A" | ids     # H3 한 번 더
-curl -s "$BASE/api/hall-of-fame" | python3 -c 'import sys,json; print([i["postId"] for i in json.load(sys.stdin)])'   # H4
-curl -s -X POST "$BASE/api/admin/jobs/hall-of-fame/run?date=2026-10-06" -H "$A"; echo        # H5 미래
-curl -s -X POST "$BASE/api/admin/jobs/hall-of-fame/run?date=abc" -H "$A"; echo               # H7 형식
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

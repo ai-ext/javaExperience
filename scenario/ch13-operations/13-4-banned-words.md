@@ -1306,22 +1306,9 @@ public enum Role {
 
 회원 11(`tok-c05`, 동시성05)이 글·댓글을 쓴다. 운영자가 `도박사이트`를 더했다가 끝에서 지운다.
 
-```bash
-BASE=http://localhost:8080
-AD='Authorization: Bearer tok-admin'; C5='Authorization: Bearer tok-c05'; J='Content-Type: application/json'
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-WID=$(curl -s -X POST "$BASE/api/admin/banned-words" -H "$AD" -H "$J" -d '{"word":"도박사이트","action":"BLOCK"}' | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'); echo $WID   # A1
-curl -s -X POST "$BASE/api/posts" -H "$C5" -H "$J" -d '{"boardSlug":"free","title":"[채점] 홍보","content":"도 박 사 이 트 놀러 오세요"}'; echo   # B2 400
-curl -s -X POST "$BASE/api/posts" -H "$C5" -H "$J" -d '{"boardSlug":"free","title":"바카라 후기","content":"토토사이트 추천"}'; echo       # B3 400 — errors 둘
-CID=$(curl -s -X POST "$BASE/api/posts/2/comments" -H "$C5" -H "$J" -d '{"content":"[채점] 너 정말 바보 같아"}' | tee /dev/stderr | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')   # M1 — ** 로 가려짐
-curl -s -X PATCH "$BASE/api/comments/$CID" -H "$C5" -H "$J" -d '{"content":"[채점] 바카라"}'; echo                                        # M3 400 — 수정도 막힌다
-for b in '{}' '{"word":"뷁","action":"BLOCK"}' '{"word":"도박 사이트","action":"BLOCK"}' '{"word":"뷁뷁","action":"HIDE"}'; do
-  curl -s -o /dev/null -w "$b → %{http_code}\n" -X POST "$BASE/api/admin/banned-words" -H "$AD" -H "$J" -d "$b"; done                  # 모두 400
-curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "$BASE/api/admin/banned-words/$WID" -H "$AD"                                         # DA 204
-curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "$BASE/api/comments/$CID" -H "$C5"                                                   # 뒷정리
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 더한 금칙어와 만든 댓글을 끝에서 지우므로 몇 번을 눌러도 같은 결과다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 더한 금칙어와 만든 댓글을 끝에서 지우므로 몇 번을 눌러도 같은 결과다.
 
 ```check
 {

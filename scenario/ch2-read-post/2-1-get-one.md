@@ -248,16 +248,9 @@ G1·G2를 두 번 실행해 응답과 DB의 조회수가 각각 1씩 증가하�
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-curl -i "$BASE/api/posts/2"          # G1 — 두 번 호출해 viewCount가 1씩 오르는지 본다
-curl -i "$BASE/api/posts/2"          # G2
-curl -i "$BASE/api/posts/999999"     # G3 — 없는 글
-curl -i "$BASE/api/posts/abc"        # G4 — 숫자가 아닌 id
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

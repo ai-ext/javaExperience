@@ -353,37 +353,23 @@ public void save(String storedName, byte[] bytes) {
 
 ## 직접 확인
 
+API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 요청은 아래 실행 패널에서 순서대로 보낸다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
+
 ```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; J='Content-Type: application/json'
 jget() { python3 -c "import sys,json; print(json.load(sys.stdin)['$1'])"; }
 
 printf 'GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;' > dot.gif   # 1×1 GIF
 echo hello > fake.png
 head -c 1200000 /dev/urandom > big.gif                                  # 1.2MB
 
-curl -s -X POST "$BASE/api/images" -H "$K" -F "file=@dot.gif" | tee up.json; echo     # I0 (-F가 multipart로 보낸다)
 F=$(jget fileName < up.json); IMG=$(jget id < up.json)
-curl -s -D - -o got.gif "$BASE/api/images/$F" | grep -i content-type; cmp dot.gif got.gif && echo 같은파일   # I1
-curl -i -X POST "$BASE/api/images" -H "$K" -F "file=@fake.png;type=image/png"        # I2
-curl -i -X POST "$BASE/api/images" -F "file=@dot.gif"                                # I3 토큰 없음
-curl -i -X POST "$BASE/api/images" -H "$K" -F "file=@big.gif"                        # I4 1MB 초과
-P=$(curl -s -X POST "$BASE/api/posts" -H "$K" -H "$J" \
-  -d "{\"boardSlug\":\"free\",\"title\":\"[채점] 사진 글\",\"content\":\"사진 첨부\",\"imageIds\":[$IMG]}" | jget id); echo "P=$P"   # I5
-curl -s "$BASE/api/posts/$P"; echo                                                   # I6
-curl -i -X POST "$BASE/api/posts" -H "$K" -H "$J" \
-  -d "{\"boardSlug\":\"free\",\"title\":\"[채점] 같은 사진 또\",\"content\":\"x\",\"imageIds\":[$IMG]}"   # I7 이미 붙은 이미지
-# 잘못된 입력 — 모두 400(또는 415), 500이 아니어야 한다
-: > empty.gif; curl -s -X POST "$BASE/api/images" -H "$K" -F "file=@empty.gif"; echo                # E1 0바이트
-curl -s -X POST "$BASE/api/images" -H "$K" -H "$J" -d '{"file":"dot.gif"}'; echo                       # E2 JSON으로 보냄
 for ids in '[null]' '["abc"]' '[99999999]' '[1,2,3,4,5,6,7,8,9,10,11]'; do
-  curl -s -X POST "$BASE/api/posts" -H "$K" -H "$J" -d "{\"boardSlug\":\"free\",\"title\":\"[채점] 잘못된 이미지\",\"content\":\"x\",\"imageIds\":$ids}"; echo   # E3~E6
 done
+
 ```
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 실행 칸은 파일을 고를 수 없어서 `multipart/form-data` 본문을 글자로 직접 적어 보낸다(경계 `jx11`, 줄바꿈은 `\r\n`).
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 실행 칸은 파일을 고를 수 없어서 `multipart/form-data` 본문을 글자로 직접 적어 보낸다(경계 `jx11`, 줄바꿈은 `\r\n`).
 
-그래서 올리는 파일은 글자로만 된 작은 GIF 조각(`GIF89a…`)이다 — 형식 판정이 앞 바이트만 보므로 충분하다. 1MB 초과(C9)는 본문에 1MB를 적을 수 없어 위 curl(I4)로 직접 본다.
 
 ```check
 {
@@ -551,7 +537,6 @@ done
         { "request": "J1", "expect": { "status": 400, "json": [{ "path": "$.errors[0].field", "equals": "imageIds" }] } }
       ]
     },
-    { "id": "C9", "manual": "1MB를 넘는 파일은 실행 칸 본문에 적을 수 없다 — 직접 확인의 I4(curl -F file=@big.gif)가 413인지 본다" },
     { "id": "C10", "request": "E1", "expect": { "status": 400 } },
     {
       "id": "C11",
@@ -590,8 +575,8 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 | C6 | I5 / I6 | `201` / 상세 `images`가 1개, 그 `id`·`url`이 I0과 같다 |
 | C7 | I7(이미 붙은 이미지) | `400`, `errors[0].field`=`imageIds` |
 | C8 | J0 / J1(이스프링이 김자바의 이미지를 붙임) | `201` / `400`, `errors[0].field`=`imageIds` |
-| C9 | I4(1.2MB) | `413` — 수동(curl) |
-| C10 | E1(0바이트) | `400` — 500이 아니다. JSON으로 보내는 E2(`415`)는 직접 확인의 curl로 본다(이 415는 컨트롤러를 고르기 전에 나서 CORS 헤더가 붙지 않아, 브라우저 실행 칸에서는 응답을 읽을 수 없다) |
+| C9 | I4(1.2MB) | `413` — 수동(Postman) |
+| C10 | E1(0바이트) | `400` — 500이 아니다. JSON으로 보내는 E2(`415`)는 Postman에서 JSON 본문으로 보내 본다(이 415는 컨트롤러를 고르기 전에 나서 CORS 헤더가 붙지 않아, 브라우저 실행 칸에서는 응답을 읽을 수 없다) |
 | C11 | E3~E6(`imageIds`가 `[null]`·`["abc"]`·없는 id·11개) | 모두 `400`(`["abc"]`는 형식 오류라 `errors`에 `imageIds[0]`(11-1 공통 처리기), 나머지는 `errors[0].field`가 `imageIds`로 시작) |
 | C12 | K(10장 올리기) / K10 / K11 / K0 | 경계 안쪽: 정확히 10장 붙인 글 `201`, 상세 `images` 10개(올린 순서) / `imageIds: []`도 `201` |
 | C13 | T0 / E7 / E8 | 미연결 이미지 업로드 `201`; 그 ID를 문자열(`"7"`)·소수(`7.5`)로 보낸 글은 각각 `400` + `errors`의 `imageIds[0]` — Jackson의 Long 자동 변환을 허용하지 않는다 |

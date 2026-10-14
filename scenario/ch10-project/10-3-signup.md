@@ -622,25 +622,7 @@ return value == null || value.getBytes(StandardCharsets.UTF_8).length <= max;
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-post() { curl -s -i -X POST "$BASE/api/v1/users" -H 'Content-Type: application/json' "$@"; echo; echo ----; }
-
-post -d '{"email":"check-10-3@example.com","password":"password1234","nickname":"채점용"}'      # A 가입(두 번째부터는 409)
-post -d '{"email":"check-10-3@example.com","password":"password1234","nickname":"채점용"}'      # B 같은 이메일
-post -d '{"email":" Check-10-3@Example.COM ","password":"password1234","nickname":"채점용"}'    # C 대소문자·공백만 다름
-post -d '{"email":"not-an-email","password":"short","nickname":"a"}'                         # V 규칙 위반 셋
-post -d '{}'                                                                                 # E 빈 객체
-post -d '{"email":'                                                                          # J 깨진 JSON
-post -d '{"email":"check-10-3-long@example.com","password":"가가가가가가가가가가가가가가가가가가가가가가가가가","nickname":"채점용"}'  # K 한글 25자(75바이트)
-
-# 잘못된 입력 — 모두 400(500이 아니다)
-post -d '{"email":null,"password":null,"nickname":null}'                                   # V1
-post -d '{"email":"","password":"","nickname":""}'                                     # V2
-post -d '{"email":"check-10-3-v5@example.com","password":"aaaaaaa","nickname":"  둘  "}'  # V5 7자·다듬으면 1자
-post -d '{"email":["check-10-3@example.com"],"password":"password1234","nickname":"채점용"}'  # V6 BAD_JSON
-post -d '{"email":"check-10-3-b1@example.com","password":"aaaaaaaa","nickname":"  닉네  "}'  # B1 경계 안쪽(처음 201, 다시 409)
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 DB에서 해시를 본다.
 
@@ -649,7 +631,7 @@ docker compose exec -T mysql mysql -ucommunity -pcommunity project \
   -e "SELECT id, email, LEFT(password_hash, 7) AS head, LENGTH(password_hash) AS len FROM users WHERE email = 'check-10-3@example.com';"
 ```
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 요청 A는 처음 실행이면 201, 다시 실행하면 이미 가입돼 있어 409다. 둘 다 통과로 본다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 요청 A는 처음 실행이면 201, 다시 실행하면 이미 가입돼 있어 409다. 둘 다 통과로 본다.
 
 ```check
 {

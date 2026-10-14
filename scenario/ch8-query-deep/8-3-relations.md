@@ -251,18 +251,9 @@ MyBatis에서는 `SuggestionRow`를 setter가 있는 결과 클래스로 바꾸�
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-curl -s "$BASE/api/members/2/mutuals"; echo                                                   # F1
-curl -s "$BASE/api/members/4/mutuals"; echo                                                   # F2
-curl -s -H 'Authorization: Bearer tok-p02' "$BASE/api/me/follow-back"; echo                  # F3
-curl -s -H 'Authorization: Bearer tok-p07' "$BASE/api/me/suggestions?limit=5" | python3 -c 'import sys,json; print([(r["memberId"], r["mutualCount"]) for r in json.load(sys.stdin)])'   # F4
-curl -s -H 'Authorization: Bearer tok-p10' "$BASE/api/me/suggestions?limit=3" | python3 -c 'import sys,json; print([(r["memberId"], r["mutualCount"]) for r in json.load(sys.stdin)])'   # F5
-curl -i "$BASE/api/me/follow-back"                                                           # F6
-curl -i -H 'Authorization: Bearer tok-p07' "$BASE/api/me/suggestions?limit="               # F7
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

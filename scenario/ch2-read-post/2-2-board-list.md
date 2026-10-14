@@ -240,17 +240,9 @@ Service는 COUNT로 `totalElements`·`totalPages`·`hasNext`를 계산한다. �
 
 `free`(자유) 게시판으로 확인한다. 채점은 이 게시판의 시드 글로 하므로, **`free`에 직접 글을 쓰면 기대값이 달라진다**(그럴 땐 DB 초기화).
 
-```bash
-BASE=http://localhost:8080
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-curl -s "$BASE/api/boards/free/posts?page=0&size=5"      # L1
-curl -s "$BASE/api/boards/free/posts?page=2&size=5"      # L2
-curl -i "$BASE/api/boards/free/posts?size=51"            # L3
-curl -i "$BASE/api/boards/free/posts?page=-1"            # L4
-curl -i "$BASE/api/boards/nope/posts"                    # L5
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

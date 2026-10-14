@@ -1532,28 +1532,9 @@ public class FolderShareService {
 
 김자바가 폴더를 하나 만들고 6번(이스프링의 팔로워 공개 글 — 김자바는 팔로우 중이라 북마크할 수 있다)과 12번을 넣는다. 비로그인으로 링크를 열면 12번만, 6번의 작성자인 이스프링으로 열면 둘 다 보인다. 마지막에 폴더를 지워 정리한다.
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'; J='Content-Type: application/json'
-jget() { python3 -c 'import sys,json; print(json.load(sys.stdin)[sys.argv[1]])' "$1"; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-FID=$(curl -s -X POST "$BASE/api/me/bookmark-folders" -H "$K" -H "$J" -d "{\"name\":\"[채점] 공유 $(date +%H%M%S)\"}" | jget id)   # F1
-curl -s -o /dev/null -X PUT "$BASE/api/posts/6/bookmark" -H "$K" -H "$J" -d "{\"folderId\":$FID}"                    # B1
-curl -s -o /dev/null -X PUT "$BASE/api/posts/12/bookmark" -H "$K" -H "$J" -d "{\"folderId\":$FID,\"memo\":\"비밀 메모\"}"   # B2
-T1=$(curl -s -X POST "$BASE/api/me/bookmark-folders/$FID/share" -H "$K" | jget shareToken)                            # S1
-curl -s "$BASE/api/shared/folders/$T1"; echo                                         # S2 비로그인 — 12만, 메모 없음
-curl -s "$BASE/api/shared/folders/$T1" -H 'Authorization: Bearer tok-lee'; echo     # S3 이스프링 — 12·6
-T2=$(curl -s -X POST "$BASE/api/me/bookmark-folders/$FID/share" -H "$K" -H "$J" -d '{"expiresInDays":7}' | jget shareToken)   # S4
-curl -i "$BASE/api/shared/folders/$T1"                                               # S5 옛 링크 404
-curl -i -X POST "$BASE/api/me/bookmark-folders/$FID/share" -H "$K" -H "$J" -d '{"expiresInDays":31}'   # S7b 400
-curl -i -X POST "$BASE/api/me/bookmark-folders/$FID/share" -H "$K" -H "$J" -d '{"expiresInDays":"7"}'  # S7f 400
-curl -i -X POST "$BASE/api/me/bookmark-folders/$FID/share" -H 'Authorization: Bearer tok-lee'          # S9 남의 폴더 404
-curl -i -X DELETE "$BASE/api/me/bookmark-folders/$FID/share" -H "$K"                 # S10 204
-curl -i "$BASE/api/shared/folders/$T2"                                               # 404
-curl -s -o /dev/null -X DELETE "$BASE/api/me/bookmark-folders/$FID" -H "$K"          # S13 정리
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

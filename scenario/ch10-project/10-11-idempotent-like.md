@@ -244,26 +244,9 @@ MyBatis에서는 `LikeMapper.xml`의 `SELECT ... FOR UPDATE`로 글을 먼저 �
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-KIM=$(curl -s -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' \
-  -d '{"email":"kim@example.com","password":"password1234"}' | sed -E 's/.*"accessToken":"([^"]+)".*/\1/')
-ID=$(curl -s -X POST "$BASE/api/v1/posts" -H "Authorization: Bearer $KIM" -H 'Content-Type: application/json' \
-  -d '{"title":"[채점] 10-11 멱등"}' | sed -E 's/.*"data":\{"id":([0-9]+).*/\1/')
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-# 토글을 동시에 두 번 — 실행할 때마다 결과가 다를 수 있다
-for i in 1 2; do curl -s -X POST "$BASE/api/v1/posts/$ID/like" -H "Authorization: Bearer $KIM" & done; wait; echo
-
-# PUT 10번 동시에 — 모두 200, likeCount 1이어야 한다
-for i in $(seq 10); do curl -s -o /dev/null -w '%{http_code} ' -X PUT "$BASE/api/v2/posts/$ID/like" -H "Authorization: Bearer $KIM" & done; wait; echo
-curl -s "$BASE/api/v1/posts/$ID" -H "Authorization: Bearer $KIM"; echo
-
-# DELETE 두 번 — 둘 다 200, liked false
-curl -s -X DELETE "$BASE/api/v2/posts/$ID/like" -H "Authorization: Bearer $KIM"; echo
-curl -s -X DELETE "$BASE/api/v2/posts/$ID/like" -H "Authorization: Bearer $KIM"; echo
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 요청 T는 토글 두 개를 **동시에** 보낸다. 결과가 실행마다 다를 수 있어서 자동 채점하지 않고 눈으로 본다(C1). 확인용 글은 매번 새로 만든다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 요청 T는 토글 두 개를 **동시에** 보낸다. 결과가 실행마다 다를 수 있어서 자동 채점하지 않고 눈으로 본다(C1). 확인용 글은 매번 새로 만든다.
 
 ```check
 {

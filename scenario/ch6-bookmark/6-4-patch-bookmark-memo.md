@@ -172,14 +172,7 @@ MyBatis 대체 구현 토글의 `BookmarkController.java`, `BookmarkMemoPatchReq
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'
-curl -i -X PUT "$BASE/api/posts/2/bookmark" -H "$K" -H 'Content-Type: application/json' -d '{"memo":"처음 메모"}'
-curl -i -X PATCH "$BASE/api/posts/2/bookmark" -H "$K" -H 'Content-Type: application/json' -d '{}'
-curl -i -X PATCH "$BASE/api/posts/2/bookmark" -H "$K" -H 'Content-Type: application/json' -d '{"memo":null}'
-curl -i -X PATCH "$BASE/api/posts/2/bookmark" -H "$K" -H 'Content-Type: application/json' -d '{"memo":"다시 읽기"}'
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 ```check
 {

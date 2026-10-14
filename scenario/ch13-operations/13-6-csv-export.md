@@ -529,22 +529,16 @@ public class ReportCsvService {
 
 회원 11(`tok-c05`)이 쉼표·따옴표, `=`, 탭, 전각 `＝`로 시작하는 상세로 각각 신고한 뒤, 운영자가 내려받는다.
 
-```bash
-BASE=http://localhost:8080
-AD='Authorization: Bearer tok-admin'; C5='Authorization: Bearer tok-c05'; J='Content-Type: application/json'
+API 서버 주소는 페이지 상단 공통 입력에서 설정한다. 실행 패널에서 R1~R4 신고와 E/ES/ER/EX/P1/P2 내보내기 요청을 보낸다. CSV 파일이 필요하면 Postman 설정을 접어 열고 E 요청의 응답을 `reports.csv`로 저장한다. 브라우저 실행 패널의 Origin은 페이지 출처가 자동으로 들어가며, Postman에서 CORS 노출 헤더를 재현할 때는 `Origin: http://localhost:3000`을 직접 설정한다.
 
-curl -s -X POST "$BASE/api/reports" -H "$C5" -H "$J" -d '{"targetType":"POST","targetId":2,"reason":"ETC","detail":"광고, \"무료\" 쿠폰"}'; echo   # 처음 201, 다시 하면 409
-curl -s -X POST "$BASE/api/reports" -H "$C5" -H "$J" -d '{"targetType":"POST","targetId":3,"reason":"ETC","detail":"=1+1 계산해 보세요"}'; echo
-curl -s -D - -o reports.csv "$BASE/api/admin/reports/export" -H "$AD" | grep -i '^content-'   # 헤더
+```bash
 head -c 3 reports.csv | xxd          # ef bb bf — BOM
-grep '쿠폰\|1+1' reports.csv         # "광고, ""무료"" 쿠폰" / '=1+1 계산해 보세요
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/admin/reports/export?status=DONE" -H "$AD"   # 400
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/admin/reports/export" -H 'Authorization: Bearer tok-kimjava'   # 403
+grep '쿠폰\|1+1' reports.csv         # CSV 이스케이프와 수식 보호
 ```
 
 `reports.csv`를 엑셀(또는 Numbers)로 열어 한글과 칸이 그대로인지, `=1+1`이 계산되지 않고 글자로 보이는지 확인한다. BOM을 빼고 만든 파일과 나란히 열어 보면 차이가 바로 보인다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 신고는 지우는 API가 없어 두 번째부터 `409`지만 CSV 내용은 같다. 두 번째 신고는 기각하여 상태 필터가 실제로 다른 행을 내보내는지 확인한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 신고는 지우는 API가 없어 두 번째부터 `409`지만 CSV 내용은 같다. 두 번째 신고는 기각하여 상태 필터가 실제로 다른 행을 내보내는지 확인한다.
 
 ```check
 {
@@ -629,8 +623,7 @@ curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/admin/reports/export" -H 'Au
       "method": "GET",
       "path": "/api/admin/reports/export",
       "headers": {
-        "Authorization": "Bearer tok-admin",
-        "Origin": "http://localhost:3000"
+        "Authorization": "Bearer tok-admin"
       }
     },
     {
@@ -850,7 +843,7 @@ curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/admin/reports/export" -H 'Au
     },
     {
       "id": "C4",
-      "manual": "BOM — 브라우저·Node의 fetch는 본문을 읽으면서 맨 앞 BOM을 지우므로 버튼으로 볼 수 없다. 터미널에서 curl -s -H 'Authorization: Bearer tok-admin' http://localhost:8080/api/admin/reports/export | head -c 3 | xxd 의 첫 바이트가 ef bb bf인지 본다"
+      "manual": "BOM — 브라우저 실행 패널의 텍스트 응답은 본문을 읽으면서 맨 앞 BOM을 지울 수 있다. Postman에서 E 요청 응답을 `reports.csv`로 저장하고 터미널에서 첫 바이트가 `ef bb bf`인지 확인한다"
     }
   ]
 }
@@ -865,7 +858,7 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 | C1 | R1~R4 / E | 신고 `201` 또는 `409` / `200`, `Content-Type`이 `text/csv;charset=UTF-8`, `Content-Disposition`이 `attachment`이고 `filename*=UTF-8''%EC%8B%A0%EA%B3%A0%EB%82%B4%EC%97%AD-`(= "신고내역-")를 담는다, 본문에 한글 머리글 |
 | C2 | E | 쉼표·따옴표 든 상세가 `"광고, ""무료"" 쿠폰"`로, `=`로 시작하는 상세가 `'=1+1 계산해 보세요`로 들어 있고 탭으로 시작한 입력은 신고 저장 단계의 `strip()`으로 탭이 제거되어 `'=1+1`로, 전각 `＝1+1`은 `'＝1+1`로 보호되고 `,=1+1`(그대로 든 수식)은 없다 |
 | C3 | H / ES / ER / EX / P1 / P2 | 두 번째 신고를 기각한 뒤 `status=PENDING`에는 첫 번째만, `status=REJECTED`에는 두 번째만 포함 / 없는 `status` `400` / 일반 회원 `403` / 토큰 없음 `401` |
-| C4 | 수동 — `curl … \| head -c 3 \| xxd` | 첫 3바이트가 `ef bb bf`(BOM). 버튼 실행기는 fetch가 본문을 읽으며 BOM을 지워 볼 수 없다 |
+| C4 | 수동 — Postman에서 E 응답을 `reports.csv`로 저장한 뒤 `head -c 3 reports.csv | xxd` | 첫 3바이트가 `ef bb bf`(BOM). 버튼 실행기는 fetch가 본문을 읽으며 BOM을 지워 볼 수 있다 |
 | D1 | `SELECT COUNT(*) FROM report` | 내려받은 파일의 행 수(머리글 제외)와 같다 — `status` 없이 받으면 전부 |
 | R1 | 인코딩 | 문자열을 `UTF-8` 바이트로 만들고 BOM을 맨 앞에 넣었다. `Content-Type`의 `charset`과 실제 바이트 인코딩이 같다 |
 | R2 | 셀 이스케이프 | 사람이 쓴 값(상세·닉네임)만 따옴표 규칙·주입 막기를 거친다. 문자열을 `,`로 단순히 이어 붙이면 어떤 입력에서 칸이 밀리는지 말할 수 있다 |

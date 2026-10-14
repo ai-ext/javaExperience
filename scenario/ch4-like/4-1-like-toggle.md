@@ -329,26 +329,9 @@ MyBatis 경로도 `MyBatisLikeService`의 `@Transactional` 안에서 가시성·
 
 김자바(`tok-kimjava`)가 박디비의 3번 글에 누른다. 처음 상태가 어떻든 같은 결과가 나오도록 **취소부터** 한다.
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; C='Authorization: Bearer tok-choi'
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-curl -s -X DELETE "$BASE/api/posts/3/like" -H "$K"; echo     # K0 처음 상태로
-curl -s -X PUT    "$BASE/api/posts/3/like" -H "$K"; echo     # K1
-curl -s -X PUT    "$BASE/api/posts/3/like" -H "$K"; echo     # K2 한 번 더
-curl -s -X DELETE "$BASE/api/posts/3/like" -H "$K"; echo     # K3
-curl -s -X DELETE "$BASE/api/posts/3/like" -H "$K"; echo     # K4 한 번 더
-curl -i -X PUT "$BASE/api/posts/2/like" -H "$L"              # K5 이스프링이 자기 글(2번)에
-curl -i -X PUT "$BASE/api/posts/9/like" -H "$K"              # K6 김자바를 차단한 회원의 글
-curl -i -X PUT "$BASE/api/posts/7/like" -H "$K"              # K7 남의 임시저장 글
-curl -i -X PUT "$BASE/api/posts/3/like"                      # K8 토큰 없음
-curl -i -X PUT "$BASE/api/posts/3/like" -H "$C"              # K9 정지 회원
-curl -s -o /dev/null -w '%{http_code}\n' -X PUT    "$BASE/api/posts/abc/like" -H "$K"      # V1 400
-curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "$BASE/api/posts/abc/like" -H "$K"      # V2 400
-curl -s -o /dev/null -w '%{http_code}\n' -X PUT    "$BASE/api/posts/999999/like" -H "$K"   # V3 404
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

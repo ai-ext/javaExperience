@@ -233,29 +233,9 @@ Integer findViewCountById(Long id);
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080; J='Content-Type: application/json'
-vc() { python3 -c 'import sys,json; print(json.load(sys.stdin)["viewCount"])'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-V=$(curl -s -X POST "$BASE/api/posts" -H 'Authorization: Bearer tok-lee' -H "$J" \
-  -d '{"boardSlug":"free","title":"[채점] 조회수 확인","content":"x"}' | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'); echo "V=$V"   # W0 이스프링의 새 글
-curl -s "$BASE/api/posts/$V" -H 'Authorization: Bearer tok-kimjava' | vc   # W1 김자바 처음 → 1
-curl -s "$BASE/api/posts/$V" -H 'Authorization: Bearer tok-kimjava' | vc   # W2 김자바 또 → 1
-curl -s "$BASE/api/posts/$V" -H 'Authorization: Bearer tok-park'    | vc   # W3 박디비 처음 → 2
-curl -s "$BASE/api/posts/$V"                                        | vc   # W4 비로그인 → 3
-curl -s "$BASE/api/posts/$V"                                        | vc   # W5 비로그인 또 → 4
-curl -s "$BASE/api/posts/$V" -H 'Authorization: Bearer tok-lee'     | vc   # W6 작성자 → 4
-curl -s "$BASE/api/boards/free/posts?size=1"; echo                         # W7 목록의 viewCount
-
-# C8 동시성: 별도 새 글을 만든 뒤 같은 회원 토큰으로 10번 동시에 읽는다.
-R=$(curl -s -X POST "$BASE/api/posts" -H 'Authorization: Bearer tok-lee' -H "$J" \
-  -d '{"boardSlug":"free","title":"[채점] 동시 조회","content":"x"}' | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
-seq 1 10 | xargs -P 10 -I '{}' curl -s -o /dev/null -w '%{http_code}\n' \
-  -H 'Authorization: Bearer tok-kimjava' "$BASE/api/posts/$R"
-# DB에서 SELECT view_count FROM post WHERE id=$R; 와 post_view의 회원·글·오늘 행 수를 확인한다.
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들어 확인하므로 몇 번을 눌러도 같은 결과다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들어 확인하므로 몇 번을 눌러도 같은 결과다.
 
 ```check
 {

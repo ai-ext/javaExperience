@@ -330,28 +330,9 @@ sequenceDiagram
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-BODY='{"boardSlug":"dev","title":"[채점] 토큰","content":"토큰으로 쓴 글","tags":["spring"],"visibility":"PUBLIC"}'
-post() { curl -s -i -X POST "$BASE/api/posts" -H 'Content-Type: application/json' "$@"; echo; echo ----; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-post -H 'Authorization: Bearer tok-lee' -d "$BODY"                                   # T1 정상(이스프링)
-post -H 'Authorization: Bearer tok-kimjava' \
-  -d '{"boardSlug":"dev","title":"[채점] 토큰-작성자위조","content":"본문","tags":[],"visibility":"PUBLIC","authorId":1}'   # T2 authorId 무시
-post -d "$BODY"                                                                       # T3 헤더 없음
-post -H 'Authorization: tok-kimjava' -d "$BODY"                                       # T4 Bearer 없음
-post -H 'Authorization: Bearer no-such-token' -d "$BODY"                              # T5 없는 토큰
-post -H 'Authorization: Bearer tok-kimjava-old' -d "$BODY"                            # T6 만료
-post -H 'Authorization: Bearer tok-kimjava-revoked' -d "$BODY"                        # T7 폐기
-post -H 'Authorization: Bearer tok-choi' -d "$BODY"                                   # T8 정지 회원
-post -d '{"title": "[채점] 깨짐"'                                                       # T9 깨진 본문 + 헤더 없음
-post -H 'Authorization: Bearer tok-admin' \
-  -d '{"boardSlug":"notice","title":"[채점] 토큰-공지","content":"공지","tags":[],"visibility":"PUBLIC"}'           # T10 운영자 공지
-post -H 'Authorization: Bearer tok-kimjava' \
-  -d '{"boardSlug":"notice","title":"[채점] 토큰-공지-실패","content":"공지","tags":[],"visibility":"PUBLIC"}'      # T11 일반 회원 공지
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

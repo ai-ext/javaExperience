@@ -179,7 +179,7 @@ public class EchoController {
 
 ### 요청 글과 한 줄씩 맞춰 보기
 
-아래 [직접 확인](#직접-확인)의 요청 A가 서버에 도착한 모양이다. curl이 알아서 붙이는 `Host`·`User-Agent` 같은 머리글은 빼고 주요 줄만 옮겼다.
+아래 [직접 확인](#직접-확인)의 요청 A가 서버에 도착한 모양이다. HTTP 클라이언트가 자동으로 붙이는 `Host`·`User-Agent` 같은 머리글은 빼고 주요 줄만 옮겼다.
 
 ```text
 POST /api/start/echo/7?q=spring       ← @PostMapping · ① 경로의 7 · ② 쿼리 q
@@ -189,7 +189,7 @@ X-Client: studymate                   ← ③ 헤더 → @RequestHeader("X-Clien
 {"title":"첫 요청","tags":["java","spring"],"extra":"덤"}   ← ④ 본문 → @RequestBody
 ```
 
-| 자리 | curl에서 | Spring에서 | 없으면 |
+| 자리 | HTTP 요청에서 | Spring에서 | 없으면 |
 |---|---|---|---|
 | ① 경로 | URL 안 `/echo/7` | `@PathVariable Long id` + 경로의 `{id}` | 다른 주소라 404 |
 | ② 쿼리 | `?q=spring` | `@RequestParam String q` | 400(필수일 때) |
@@ -232,29 +232,9 @@ X-Client: studymate                   ← ③ 헤더 → @RequestHeader("X-Clien
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-# 요청 A — Map으로 받기
-curl -i -X POST "$BASE/api/start/echo/7?q=spring" \
-  -H 'Content-Type: application/json' -H 'X-Client: studymate' \
-  -d '{"title":"첫 요청","tags":["java","spring"],"extra":"덤"}'
-
-# 요청 B — DTO로 받기(같은 본문)
-curl -i -X POST "$BASE/api/start/echo/7/dto?q=spring" \
-  -H 'Content-Type: application/json' -H 'X-Client: studymate' \
-  -d '{"title":"첫 요청","tags":["java","spring"],"extra":"덤"}'
-
-# 요청 C — 쿼리 q 없이
-curl -i -X POST "$BASE/api/start/echo/7" \
-  -H 'Content-Type: application/json' -H 'X-Client: studymate' -d '{"title":"첫 요청"}'
-
-# 요청 D — 본문 형식을 text/plain으로
-curl -i -X POST "$BASE/api/start/echo/7?q=spring" \
-  -H 'Content-Type: text/plain' -H 'X-Client: studymate' -d '{"title":"첫 요청"}'
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {
@@ -357,7 +337,7 @@ WARN ... .w.s.m.s.DefaultHandlerExceptionResolver : Resolved [org.springframewor
 
 ### ② Content-Type을 빼고 보낸다 → 415
 
-curl에서 `-H 'Content-Type: application/json'`을 빼고 `-d`만 쓰면 curl이 `application/x-www-form-urlencoded`(HTML 폼 형식)로 보낸다.
+Postman에서 `Content-Type: application/json`을 지정하지 않고 폼 본문을 선택하면 `application/x-www-form-urlencoded`(HTML 폼 형식)로 보낼 수 있다.
 
 ```text
 WARN ... .w.s.m.s.DefaultHandlerExceptionResolver : Resolved [org.springframework.web.HttpMediaTypeNotSupportedException: Content-Type 'application/x-www-form-urlencoded;charset=UTF-8' is not supported]
@@ -397,16 +377,21 @@ WARN ... Resolved [org.springframework.web.method.annotation.MethodArgumentTypeM
 WARN ... Resolved [org.springframework.http.converter.HttpMessageNotReadableException: JSON parse error: Unexpected end-of-input: expected close marker for Object (start marker at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); byte offset: #UNKNOWN])]
 ```
 
-`Source: REDACTED`는 Jackson 3가 보안상 본문 내용을 로그에 싣지 않는다는 표시다. 무엇을 보냈는지는 보낸 쪽(curl 명령)에서 확인한다.
+`Source: REDACTED`는 Jackson 3가 보안상 본문 내용을 로그에 싣지 않는다는 표시다. 무엇을 보냈는지는 실행 패널의 요청 본문에서 확인한다.
 
-### ⑦ CORS 설정에서 `X-Client`를 뺀다 → 버튼만 실패, curl은 성공
+### ⑦ CORS 설정에서 `X-Client`를 뺀다 → 브라우저 요청은 실패
 
-`CorsConfig`의 `.allowedHeaders(...)`에서 `"X-Client"`를 지우고 다시 띄운다. 실행 칸의 버튼을 누르면 "CORS로 막혔어요"가 뜬다. curl은 그대로 통과한다. 브라우저가 보내는 사전 질문(preflight)을 curl로 흉내 내 보면 이유가 보인다.
+`CorsConfig`의 `.allowedHeaders(...)`에서 `"X-Client"`를 지우고 다시 띄운다. 실행 패널의 브라우저 요청은 "CORS로 막혔어요"로 실패한다. preflight 헤더는 브라우저가 관리하므로 아래 Postman 절차로 OPTIONS 응답을 직접 살펴본다.
 
-```bash
-curl -i -X OPTIONS "$BASE/api/start/echo/7?q=spring" -H 'Origin: http://localhost:3000' \
-  -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: content-type,x-client'
-```
+<details>
+<summary>Postman 설정 · OPTIONS preflight</summary>
+
+- URL: 상단 API 서버 주소 + `/api/start/echo/7?q=spring`
+- Method: `OPTIONS`
+- Headers: `Origin: http://localhost:3000`, `Access-Control-Request-Method: POST`, `Access-Control-Request-Headers: content-type,x-client`
+- Postman에서는 CORS 검사를 하지 않으므로 서버가 돌려준 헤더를 직접 비교한다.
+
+</details>
 
 ```text
 HTTP/1.1 200
@@ -440,9 +425,9 @@ Access-Control-Allow-Headers: content-type
 </details>
 
 <details>
-<summary>힌트 3 — 버튼은 실패하고 curl은 성공</summary>
+<summary>힌트 3 — 버튼 요청은 CORS에서 막힌다</summary>
 
-`CorsConfig`의 `allowedHeaders`에 `"X-Client"`가 있는지, 바꾼 뒤 앱을 다시 띄웠는지 본다.
+`CorsConfig`의 `allowedHeaders`에 `"X-Client"`가 있는지, 바꾼 뒤 앱을 다시 띄웠는지 본다. Postman에서 OPTIONS 요청의 `Access-Control-Allow-Headers`에도 `x-client`가 있는지 확인한다.
 </details>
 
 ## 다음 단계

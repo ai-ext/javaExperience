@@ -765,25 +765,9 @@ class MemberSuspensionTest {
 
 회원 9(`tok-c03`, 동시성03)를 정지했다가 끝에서 푼다.
 
-```bash
-BASE=http://localhost:8080
-AD='Authorization: Bearer tok-admin'; C3='Authorization: Bearer tok-c03'; J='Content-Type: application/json'
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-curl -s -X PUT "$BASE/api/admin/members/9/suspension" -H "$AD" -H "$J" -d '{"days":3,"reason":"[채점] 도배 경고"}'; echo     # S
-curl -s -X POST "$BASE/api/posts" -H "$C3" -H "$J" -d '{"boardSlug":"free","title":"[채점] 정지 중 글","content":"x"}'; echo   # W1 403 + suspendedUntil
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/posts/2" -H "$C3"                                                          # G1 200
-for b in '{}' '{"days":0,"reason":"[채점] 사유"}' '{"days":31,"reason":"[채점] 사유"}' '{"days":3,"reason":"가"}'; do
-  curl -s -o /dev/null -w "$b → %{http_code}\n" -X PUT "$BASE/api/admin/members/9/suspension" -H "$AD" -H "$J" -d "$b"; done   # 모두 400
-curl -s -o /dev/null -w '%{http_code}\n' -X PUT "$BASE/api/admin/members/1/suspension" -H "$AD" -H "$J" -d '{"days":3,"reason":"[채점] 사유"}'   # TA 409
-
-# "저절로 풀린다"를 눈으로 — 내 DB에서만, 끝 시각을 과거로 돌려 본다(채점 D 항목이 아니라 실험)
-docker compose exec -T mysql mysql -ucommunity -pcommunity community -e "UPDATE member SET suspended_until = NOW() - INTERVAL 1 MINUTE WHERE id = 9"
-curl -s -o /dev/null -w '%{http_code}\n' -X PUT "$BASE/api/posts/2/like" -H "$C3"                                                # 200 — 풀렸다
-curl -s -o /dev/null -X DELETE "$BASE/api/posts/2/like" -H "$C3"
-curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "$BASE/api/admin/members/9/suspension" -H "$AD"                              # 204
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 끝에서 정지를 풀고 만든 글을 지우므로 몇 번을 눌러도 같은 결과다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 끝에서 정지를 풀고 만든 글을 지우므로 몇 번을 눌러도 같은 결과다.
 
 ```check
 {

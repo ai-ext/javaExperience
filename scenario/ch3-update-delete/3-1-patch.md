@@ -261,39 +261,9 @@ MyBatis 대체 구현의 `PostPatchMyBatisService`는 JPA 서비스와 같은 �
 
 채점용 글을 하나 만든 뒤(`dev` 게시판) 고친다.
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'
-jid() { python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-X=$(curl -s -X POST "$BASE/api/posts" -H "$K" -H 'Content-Type: application/json' \
-  -d '{"boardSlug":"dev","title":"[채점] 수정 전","content":"수정 전 본문","tags":["spring","jpa"],"visibility":"PUBLIC"}' | jid)
-echo "X=$X"                                                                                                   # E0
-
-curl -i -X PATCH "$BASE/api/posts/$X" -H "$K" -H 'Content-Type: application/json' -d '{"title":"[채점] 수정 후"}'     # E1
-curl -i -X PATCH "$BASE/api/posts/$X" -H "$K" -H 'Content-Type: application/json' -d '{"tags":[]}'                 # E2
-curl -i -X PATCH "$BASE/api/posts/$X" -H "$K" -H 'Content-Type: application/json' -d '{"title":"   "}'             # E3
-curl -i -X PATCH "$BASE/api/posts/$X" -H "$L" -H 'Content-Type: application/json' -d '{"title":"[채점] 남의 수정"}'   # E4
-curl -i -X PATCH "$BASE/api/posts/$X" -H 'Content-Type: application/json' -d '{"title":"[채점] 토큰 없음"}'           # E5
-curl -i -X PATCH "$BASE/api/posts/8" -H "$L" -H 'Content-Type: application/json' -d '{"title":"[채점] 지운 글"}'      # E6
-curl -i -X PATCH "$BASE/api/posts/999999" -H "$K" -H 'Content-Type: application/json' -d '{"title":"[채점] 없는 글"}' # E7
-
-# 잘못된 입력 — 모두 400이어야 한다(500이 아니다)
-p() { curl -s -o /dev/null -w "%{http_code}\n" -X PATCH "$BASE/api/posts/$1" -H "$K" -H 'Content-Type: application/json' -d "$2"; }
-p $X '{"title":"[채점] 경계-'$(printf '%0193d' 0)'"}'   # V1 제목 201자
-p $X '{"content":""}'                                  # V2
-p $X '{"tags":["a","b","c","d","e","f"]}'             # V3
-p $X "{\"tags\":[\"$(printf 'x%.0s' $(seq 31))\"]}"          # V4 태그 이름 31자
-p $X '{"tags":[""]}'                                    # V5
-p $X '{"tags":[" "]}'                                   # V10
-p $X '{"visibility":"SECRET"}'                          # V6
-p $X '{"tags":"spring"}'                                # V7
-p $X '{"title":'                                        # V8 깨진 JSON
-p abc '{"title":"[채점] 숫자 아님"}'                    # V9
-# 경계 바로 안쪽(B0~B3)은 check 블록 참고 — 새 글에 제목 200자·태그 5개, 제목 1자, null(그대로)
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

@@ -646,22 +646,21 @@ O2의 201자 제목에서는 태그 INSERT 뒤 글 INSERT가 실패한다. 서�
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
+API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 요청은 아래 실행 패널에서 순서대로 보낸다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-# 요청 A — 태그 포함(같은 태그 spring을 두 번). 두 번 보낸다
-curl -i -X POST "$BASE/api/posts" -H 'Content-Type: application/json' \
-  -d '{"boardSlug":"dev","title":"[채점] 태그 저장","content":"Spring Boot로 만든 첫 게시글입니다.","tags":["spring","채점태그","spring"],"visibility":"PUBLIC"}'
+```bash
+
 
 # DB 확인 — 방금 글의 태그, 채점태그 개수
 docker compose exec -T mysql mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community -e "
 SELECT t.name FROM post_tag pt JOIN tag t ON t.id = pt.tag_id WHERE pt.post_id = (SELECT MAX(id) FROM post) ORDER BY t.name;
 SELECT COUNT(*) FROM tag WHERE name = '채점태그';"
+
 ```
 
 CloudBeaver의 `community` 연결으로 `post_tag`를 열어 봐도 된다. 방금 글의 id로 두 행이 보인다.
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 관찰 요청(O1·O2)을 먼저 보낸다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 관찰 요청(O1·O2)을 먼저 보낸다.
 
 ```check
 {

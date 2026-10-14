@@ -216,36 +216,9 @@ public ProblemDetail handleInvalidParameters(InvalidParametersException ex, Http
 
 검색어가 다른 글과 겹치지 않게, 먼저 만든 글의 id로 **이번에만 쓰는 단어** `zq<id>x`를 만든다.
 
-```bash
-BASE=http://localhost:8080; J='Content-Type: application/json'; K='Authorization: Bearer tok-kimjava'
-mk() { curl -s -X POST "$BASE/api/posts" -H "Authorization: Bearer $1" -H "$J" -d "$2" | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'; }
-show() { python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("totalElements"), [i["id"] for i in d.get("items", [])], d.get("errors", ""))'; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-N=$(mk tok-c14 '{"boardSlug":"free","title":"[채점] 검색 기준점","content":"x"}'); T="zq${N}x"; echo "T=$T"        # S0
-A=$(mk tok-c14 "{\"boardSlug\":\"free\",\"title\":\"[채점] $T 트랜잭션 정리\",\"content\":\"제목에만 있다\"}")       # SA
-B=$(mk tok-c15 "{\"boardSlug\":\"free\",\"title\":\"[채점] 본문 검색\",\"content\":\"본문에 $T 트랜잭션 이야기\"}")    # SB
-C=$(mk tok-lee "{\"boardSlug\":\"free\",\"title\":\"[채점] $T 팔로워 공개\",\"content\":\"x\",\"visibility\":\"FOLLOWERS\"}")   # SC
-D=$(mk tok-kimjava "{\"boardSlug\":\"free\",\"title\":\"[채점] $T 임시저장\",\"content\":\"x\",\"status\":\"DRAFT\"}")      # SD
-echo "A=$A B=$B C=$C D=$D"
-curl -s "$BASE/api/search/posts?q=$T" | show                                   # Q1 비로그인 → 2 [B, A]
-curl -s "$BASE/api/search/posts?q=$T&in=title" | show                          # Q2 → 1 [A]
-curl -s "$BASE/api/search/posts?q=$T&in=content" | show                        # Q3 → 1 [B]
-curl -s "$BASE/api/search/posts?q=$T" -H "$K" | show                           # Q4 김자바(이스프링 팔로워) → 3
-curl -s "$BASE/api/search/posts?q=$T%20%EC%A0%95%EB%A6%AC" | show               # Q5 "T 정리" → 1 [A]
-curl -s "$BASE/api/search/posts?q=%EC%9D%B4%EC%8A%A4%ED%94%84%EB%A7%81%20$T" -H "$K" | show   # Q6 "이스프링 T" → 1 [C]
-curl -s "$BASE/api/search/posts?q=$T%25" | show                                # Q7 "T%" → 0
-curl -s "$BASE/api/search/posts?q=zq${N}_" | show                              # Q8 "zq<id>_" → 0
-# 잘못된 파라미터 — 모두 400, 500이 아니어야 한다
-for qs in '' 'q=a' 'q=%20%20%20' "q=$(printf 'a%.0s' {1..51})" 'q=a%20b%20c%20d%20e%20f' 'q=ab&in=foo' 'q=a&in=foo' 'q=ab&page=-1&size=0' 'q=ab&size=51' 'q=ab&size=abc'; do
-  printf '%-30s ' "$qs"; curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/search/posts?$qs"      # X1~X10
-done
-curl -s "$BASE/api/search/posts?q=a&in=foo" | show                             # X7 errors에 q와 in 둘 다
-curl -s "$BASE/api/search/posts?q=a&in=foo&page=abc&size=nope" | show           # X11 네 필드 오류를 한 번에 수집
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/search/posts?q=zq"          # Y1 정확히 2자 → 200
-curl -s -o /dev/null -w '%{http_code}\n' "$BASE/api/search/posts?q=$(printf 'a%.0s' {1..50})&size=50"   # Y2 정확히 50자, size=50 → 200
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글과 새 검색 단어를 만들어 확인하므로 몇 번을 눌러도 같은 결과다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글과 새 검색 단어를 만들어 확인하므로 몇 번을 눌러도 같은 결과다.
 
 ```check
 {

@@ -300,30 +300,9 @@ int softDelete(@Param("commentId") Long commentId, @Param("deletedAt") LocalDate
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-tok() { curl -s -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' \
-  -d "{\"email\":\"$1@example.com\",\"password\":\"password1234\"}" | sed -E 's/.*"accessToken":"([^"]+)".*/\1/'; }
-KIM=$(tok kim); LEE=$(tok lee)
-POST=$(curl -s -X POST "$BASE/api/v1/posts" -H "Authorization: Bearer $KIM" -H 'Content-Type: application/json' \
-  -d '{"title":"[채점] 10-9 댓글용 글"}' | sed -E 's/.*"data":\{"id":([0-9]+).*/\1/')
-cm() { curl -s -i -X POST "$BASE/api/v1/posts/$1/comments" -H 'Content-Type: application/json' "${@:2}"; echo; echo ----; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-cm $POST -H "Authorization: Bearer $LEE" -d '{"content":"[채점] 첫 댓글"}'                    # C 최상위 — 응답 id를 아래 C_ID로
-C_ID=41   # ← 위 응답의 data.id
-cm $POST -H "Authorization: Bearer $KIM" -d "{\"content\":\"[채점] 답글\",\"parentId\":$C_ID}"   # R 답글 — 응답 id를 R_ID로
-R_ID=42
-cm $POST -H "Authorization: Bearer $LEE" -d "{\"content\":\"답글의 답글\",\"parentId\":$R_ID}"    # RR 400
-cm $POST -H "Authorization: Bearer $LEE" -d '{"content":"다른 글 댓글이 부모","parentId":9}'       # XP 400
-cm $POST -H "Authorization: Bearer $LEE" -d '{"content":"   "}'                               # E 400
-cm 24 -H "Authorization: Bearer $LEE" -d '{"content":"남의 비공개 글"}'                           # PV 404
-curl -s "$BASE/api/v1/posts/$POST/comments"; echo                                             # G 트리
-curl -s -i -X DELETE "$BASE/api/v1/comments/$C_ID" -H "Authorization: Bearer $KIM"; echo     # D1 남이 삭제 403
-curl -s -i -X DELETE "$BASE/api/v1/comments/$C_ID" -H "Authorization: Bearer $LEE"; echo     # D 삭제
-curl -s "$BASE/api/v1/posts/$POST/comments"; echo                                             # G2 자리만 남음
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들어 그 글에만 댓글을 단다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들어 그 글에만 댓글을 단다.
 
 ```check
 {

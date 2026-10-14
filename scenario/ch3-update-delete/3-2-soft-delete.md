@@ -243,24 +243,9 @@ SELECT COUNT(*) FROM comment WHERE post_id = @post_id;
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; A='Authorization: Bearer tok-admin'
-jid() { python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])'; }
-mk() { curl -s -X POST "$BASE/api/posts" -H "$1" -H 'Content-Type: application/json' \
-  -d "{\"boardSlug\":\"dev\",\"title\":\"$2\",\"content\":\"삭제 확인용\",\"tags\":[],\"visibility\":\"PUBLIC\"}" | jid; }
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
-Y=$(mk "$K" '[채점] 삭제용'); echo "Y=$Y"                                         # S0
-curl -i -X DELETE "$BASE/api/posts/$Y" -H "$L"                                     # S1 남의 글
-curl -i -X DELETE "$BASE/api/posts/$Y" -H "$K"                                     # S2 작성자
-curl -i "$BASE/api/posts/$Y"                                                       # S3 지운 뒤 조회
-curl -i -X DELETE "$BASE/api/posts/$Y" -H "$K"                                     # S4 다시 삭제
-curl -s "$BASE/api/boards/dev/posts?size=50" | python3 -c "import sys,json; print($Y in [i['id'] for i in json.load(sys.stdin)['items']])"   # S5 목록에 있나
-Z=$(mk "$L" '[채점] 운영자가 지울 글'); echo "Z=$Z"
-curl -i -X DELETE "$BASE/api/posts/$Z" -H "$A"                                     # S6 운영자
-```
-
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
 
 ```check
 {

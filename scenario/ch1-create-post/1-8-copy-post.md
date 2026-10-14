@@ -146,13 +146,7 @@ SQL 로그에서 새 `post` 한 행과 `copyTags=true`일 때의 `post_tag` 연�
 
 시드 글 2에는 `spring`, `jpa` 태그가 있다. 같은 원본을 두 번 복사해 한 글에는 태그를 두고 다른 글에는 비워 둔다. 새 글 ID는 매번 달라지므로 응답에서 읽는다.
 
-```bash
-BASE=http://localhost:8080
-K='Authorization: Bearer tok-kimjava'
-curl -i -X POST "$BASE/api/posts/2/copies?copyTags=true" -H "$K" -H 'Content-Type: application/json' -d '{"title":"[복사실습] 태그 있음"}'
-curl -i -X POST "$BASE/api/posts/2/copies?copyTags=false" -H "$K" -H 'Content-Type: application/json' -d '{"title":"[복사실습] 태그 없음"}'
-curl -i -X POST "$BASE/api/posts/2/copies?copyTags=maybe" -H "$K" -H 'Content-Type: application/json' -d '{"title":"잘못된 옵션"}'
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 ```check
 {

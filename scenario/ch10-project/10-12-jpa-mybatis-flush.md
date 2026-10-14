@@ -298,18 +298,7 @@ mybatis:
 
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-KIM=$(curl -s -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' \
-  -d '{"email":"kim@example.com","password":"password1234"}' | sed -E 's/.*"accessToken":"([^"]+)".*/\1/')
-
-curl -s -X POST "$BASE/api/v1/posts" -H "Authorization: Bearer $KIM" -H 'Content-Type: application/json' \
-  -d '{"title":"[채점] 10-12 작성","tags":["Flush","check"]}'; echo                 # P — listItem.tags가 [check, flush]인가
-ID=…   # 위 응답의 data.id
-curl -s -X PUT "$BASE/api/v1/posts/$ID" -H "Authorization: Bearer $KIM" -H 'Content-Type: application/json' \
-  -d '{"title":"[채점] 10-12 수정 후","tags":["after"],"visibility":"PRIVATE"}'; echo   # U — listItem이 새 값인가
-curl -s -G "$BASE/api/v1/posts" --data-urlencode 'q=10-12 수정 후' -H "Authorization: Bearer $KIM"; echo   # 목록 첫 줄과 비교
-```
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 SQL 순서를 직접 보려면 `application.yml`에 둔다.
 
@@ -320,7 +309,7 @@ logging:
     org.example.board.post.PostQueryMapper: debug   # MyBatis 매퍼의 SQL(==> Preparing)
 ```
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 요청 I는 수정한 글을 목록 API로 다시 읽어 `listItem`과 통째로 비교한다(상세 G보다 먼저 — 상세를 열면 조회수가 올라 달라진다). 수정한 글은 비공개라 김자바의 목록에만 나온다.
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 요청 I는 수정한 글을 목록 API로 다시 읽어 `listItem`과 통째로 비교한다(상세 G보다 먼저 — 상세를 열면 조회수가 올라 달라진다). 수정한 글은 비공개라 김자바의 목록에만 나온다.
 
 ```check
 {
