@@ -22,6 +22,11 @@
     baseInput.addEventListener('input', () => document.querySelectorAll('.api-request').forEach(updateUrl));
     updateUrl(article);
 
+    const setStatus = (message, state = 'ready') => {
+      status.textContent = message;
+      status.dataset.state = state;
+    };
+
     button.addEventListener('click', async () => {
       const method = article.dataset.method;
       const requestPath = article.querySelector('.request-path').value;
@@ -41,7 +46,7 @@
         return [name, sensitive ? (supplied?.[index] || '') : (supplied?.[index] ?? values[index] ?? values[0] ?? '')];
       })));
       if (concurrentCount && Object.keys(defaults).some((name) => /token|auth|^tok$/i.test(name) && contexts.some((context) => !context[name]))) {
-        status.textContent = `동시 요청 ${count}개의 토큰을 한 줄에 하나씩 직접 입력하세요.`;
+        setStatus(`동시 요청 ${count}개의 토큰을 한 줄에 하나씩 직접 입력하세요.`, 'error');
         return;
       }
 
@@ -131,7 +136,9 @@
       };
 
       button.disabled = true;
-      status.textContent = concurrentCount ? `${count}개 요청을 동시에 보내는 중…` : repeatCount ? `${count}개 요청을 순서대로 보내는 중…` : '요청 보내는 중…';
+      button.setAttribute('aria-busy', 'true');
+      article.dataset.state = 'loading';
+      setStatus(concurrentCount ? `${count}개 요청을 동시에 보내는 중…` : repeatCount ? `${count}개 요청을 순서대로 보내는 중…` : '요청 보내는 중…', 'loading');
       response.hidden = true;
       const requestId = article.dataset.requestId;
       responses.delete(requestId);
@@ -169,14 +176,17 @@
         article.querySelector('.response-body').textContent = results.length === 1 ? last.body : JSON.stringify(results.map(({ status: code, body }) => ({ status: code, body })), null, 2);
         response.hidden = false;
         response.open = true;
-        status.textContent = `${results.length}개 요청 응답을 받았습니다. 후속 요청은 마지막 응답을 참조할 수 있습니다.`;
+        article.dataset.state = 'success';
+        setStatus(`${results.length}개 요청 응답을 받았습니다. 후속 요청은 마지막 응답을 참조할 수 있습니다.`, 'success');
       } catch (error) {
-        status.textContent = error.message.startsWith('먼저 값을 준비하세요:')
+        article.dataset.state = 'error';
+        setStatus(error.message.startsWith('먼저 값을 준비하세요:')
           ? error.message
-          : `네트워크 오류: ${error.message}. 서버 실행 주소와 CORS 허용 출처를 확인하세요.`;
+          : `네트워크 오류: ${error.message}. 서버 실행 주소와 CORS 허용 출처를 확인하세요.`, 'error');
         response.hidden = true;
       } finally {
         button.disabled = false;
+        button.removeAttribute('aria-busy');
       }
     });
   });

@@ -191,4 +191,4 @@ DB에서 `SELECT p.id,p.title,p.author_id,p.board_id,p.content FROM post p WHERE
 
 ## 다음 단계
 
-[2-1. 단건 조회](../ch2-read-post/2-1-get-one.md) — 복사한 글의 새 ID로 상세를 읽는다.
+[1-9. 글의 태그 목록 조회](1-9-list-post-tags.md) — 응답 타입에 쓰이는 제네릭과 Stream 변환을 연습한다.

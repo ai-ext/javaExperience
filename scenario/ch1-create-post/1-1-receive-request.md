@@ -244,6 +244,8 @@
 
 ## 구현 가이드
 
+> **Service 코드는 이 단계에 아직 없습니다.** 1-1은 요청을 받는 `Controller`와 요청 `DTO`만 만들어 흐름의 입구를 익히는 단계입니다. 컨트롤러가 `Repository`를 직접 부르는 1-2를 거친 뒤, 실제 `PostService` 클래스와 `@Transactional` 코드는 [1-3. 서비스로 나누기](1-3-service-layer.md)에서 처음 구현합니다. 지금 Service 구현을 먼저 보고 싶다면 [1-3 구현 가이드 — Service 코드](1-3-service-layer.md#구현-가이드)로 바로 이동하세요.
+
 지금은 저장하지 않는다. JSON을 DTO로 받고 `success`를 돌려주는 가장 작은 API부터 만든다.
 
 <details>

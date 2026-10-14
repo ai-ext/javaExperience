@@ -8,6 +8,7 @@
 // 실행: cd tools/site && npm install && npm run build
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Marked } from 'marked';
 import { renderScreen, withImplementationCode } from './scenario-content.mjs';
@@ -15,6 +16,11 @@ import { renderScreen, withImplementationCode } from './scenario-content.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const rel = (p) => path.relative(ROOT, p).split(path.sep).join('/');
 const read = (p) => fs.readFileSync(p, 'utf8');
+const assetUrl = (p, fromDir) => {
+  const digest = createHash('sha256').update(fs.readFileSync(path.join(ROOT, p))).digest('hex').slice(0, 12);
+  const relative = path.relative(fromDir, path.join(ROOT, p)).split(path.sep).join('/');
+  return `${relative}?v=${digest}`;
+};
 const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const escapeTextarea = (s) => escapeHtml(s).replace(/\r/g, '&#13;').replace(/[ \t]+(?=\n|$)/gm, (trailing) => [...trailing].map((char) => char === '\t' ? '&#9;' : '&#32;').join(''));
 const stripTags = (h) => h.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
@@ -293,7 +299,8 @@ mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</sc
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
-<link rel="stylesheet" href="${up('tools/site/site.css')}">
+<link rel="stylesheet" href="${assetUrl('tools/site/site.css', path.dirname(abs))}">
+<script src="${assetUrl('tools/site/syntax-highlight.js', path.dirname(abs))}" defer></script>
 </head>
 <body>
 <header class="topbar"><a href="${up('README.html')}">javaExperience</a><a href="${up('scenario/README.html')}">시나리오</a><a href="${up('practice/MISSIONS.html')}">학습용 미션</a><a href="${up('docs/knowledge/README.html')}">공부자료</a></header>
@@ -303,7 +310,7 @@ ${body}
 ${pager}
 </main>
 ${mermaid}
-${lv ? `<script src="${up('tools/site/scenario-runner.js')}" defer></script><script src="${up('tools/site/scenario-snapshots.js')}" defer></script>` : ''}
+${lv ? `<script src="${assetUrl('tools/site/scenario-runner.js', path.dirname(abs))}" defer></script><script src="${assetUrl('tools/site/scenario-snapshots.js', path.dirname(abs))}" defer></script>` : ''}
 </body>
 </html>
 `;
@@ -343,7 +350,7 @@ function renderRequests(text) {
     const mode = request.concurrent ? `동시 요청 ${request.concurrent.count}개` : request.repeat ? `같은 요청 ${request.repeat}회 순차 전송` : '';
     const variableInputs = variables.length || groupedInputs ? `<div class="request-variables">${groupedInputs}${variables.filter((v) => !v.response && !v.grouped).map((v) => `<label>${escapeHtml(v.name)} <input class="request-variable" data-ref="${escapeHtml(v.ref)}" autocomplete="off"></label>`).join('')}<p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div>` : '';
     const expected = expect || '직접 확인 절의 기대 결과를 참고하세요.';
-    return `<article class="api-request" data-request-id="${escapeHtml(request.id)}" data-method="${escapeHtml(request.method)}" data-request-index="${index}" data-concurrent-count="${String(request.concurrent?.count || 0)}" data-concurrent-vars="${escapeHtml(JSON.stringify(clientConcurrentVars))}" data-repeat="${String(request.repeat || 0)}"><h4>${escapeHtml(request.id)} · ${escapeHtml(request.title || '요청')}</h4><p class="request-method">${escapeHtml(request.method)}${mode ? ` · ${escapeHtml(mode)}` : ''}</p><label>경로 <input class="request-path" value="${escapeHtml(request.path || '')}" autocomplete="off"></label>${variableInputs}<div class="request-fields">${headerInputs}</div>${bodyInput}<button type="button" class="send-request">${escapeHtml(request.method)} ${mode ? escapeHtml(mode) : '요청 보내기'}</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>${escapeHtml(request.method)}</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>${escapeHtml(JSON.stringify(request.headers || {}, null, 2))}</pre></dd><dt>Raw body</dt><dd><pre>${request.body === undefined ? '(본문 없음)' : escapeTextarea(bodyText)}</pre></dd><dt>Expected result</dt><dd><pre>${escapeHtml(expected)}</pre></dd></dl></details></article>`;
+    return `<article class="api-request" data-request-id="${escapeHtml(request.id)}" data-method="${escapeHtml(request.method)}" data-request-index="${index}" data-concurrent-count="${String(request.concurrent?.count || 0)}" data-concurrent-vars="${escapeHtml(JSON.stringify(clientConcurrentVars))}" data-repeat="${String(request.repeat || 0)}"><header class="request-card-head"><div><p class="request-method">${escapeHtml(request.method)}${mode ? ` · ${escapeHtml(mode)}` : ''}</p><h4>${escapeHtml(request.id)} · ${escapeHtml(request.title || '요청')}</h4></div><span class="request-number">요청 ${index + 1}</span></header><div class="request-editor"><label>경로 <input class="request-path" value="${escapeHtml(request.path || '')}" autocomplete="off" spellcheck="false"></label>${variableInputs}<div class="request-fields">${headerInputs}</div>${bodyInput}<div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-${index}">${escapeHtml(request.method)} ${mode ? escapeHtml(mode) : '요청 보내기'}</button><p id="request-status-${index}" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>${escapeHtml(request.method)}</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>${escapeHtml(JSON.stringify(request.headers || {}, null, 2))}</pre></dd><dt>Raw body</dt><dd><pre>${request.body === undefined ? '(본문 없음)' : escapeTextarea(bodyText)}</pre></dd><dt>Expected result</dt><dd><pre>${escapeHtml(expected)}</pre></dd></dl></details></article>`;
   }).join('');
   return `<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list">${cards}</div></section>`;
 }

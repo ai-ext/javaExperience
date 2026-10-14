@@ -1,10 +1,10 @@
 # javaExperience
 
-Spring Boot 백엔드를 **직접 만들면서** 배우는 공개 실습 레포다. 게시판 API 100단계를 이어서 만들고, Codex 또는 Claude Code로 단계별 채점과 피드백을 받을 수 있다. 시나리오와 HTML은 GitHub 로그인 없이 읽거나 다운로드할 수 있다.
+Spring Boot 백엔드를 **직접 만들면서** 배우는 공개 실습 레포다. 게시판 API 101단계를 이어서 만들고, Codex 또는 Claude Code로 단계별 채점과 피드백을 받을 수 있다. 시나리오와 HTML은 GitHub 로그인 없이 읽거나 다운로드할 수 있다.
 
 | 폴더 | 내용 |
 |---|---|
-| [`scenario/`](scenario/README.md) | **따라 만들기 시나리오** — 100단계 요구사항·난이도·역할별 전체 코드 접기, 쿼리 연습 18개. 여기서 시작한다 |
+| [`scenario/`](scenario/README.md) | **따라 만들기 시나리오** — 101단계 요구사항·난이도·역할별 전체 코드 접기, 쿼리 연습 18개. 여기서 시작한다 |
 | [`practice/`](practice/MISSIONS.md) | 학습용 미션 — 함정이 섞인 많은 데이터(`practice` DB)로 조회·쿼리 연습 |
 | [`docs/knowledge/`](docs/knowledge/README.md) | 공부자료 133개 — 단계마다 "필요한 지식"으로 링크된다 |
 | `docker/` | 실습 DB(MySQL 8.4) 초기 데이터 dump(`mysql/init/`)와 CloudBeaver(웹 DBeaver) 설정 |
@@ -24,9 +24,13 @@ docker compose up -d        # DB와 CloudBeaver 띄우기(처음 한 번은 1~2�
 
 1. IntelliJ로 폴더를 열고(Gradle 프로젝트로 가져오기), `org.example.Main`을 실행한다.
 2. 브라우저로 `http://localhost:8080/hello` → `hello`가 보이면 준비 끝.
-3. 파일 탐색기에서 **`scenario/README.html`** 을 브라우저로 연다. 백엔드가 처음이면 0-1, 이미 Java 기본기를 알면 1-1부터 시작한다. GitHub에서는 `scenario/README.md`를 바로 읽을 수 있다.
+3. 아래 명령으로 문서 서버를 켜고 브라우저에서 `http://127.0.0.1:8765/scenario/README.html`을 연다. 백엔드가 처음이면 0-1, 이미 Java 기본기를 알면 1-1부터 시작한다. GitHub에서는 `scenario/README.md`를 바로 읽을 수 있다.
 
-`scenario/README.html`은 정적 파일이라 studymate 로그인이나 웹 서버가 필요 없다. 페이지의 화면 흐름과 코드 토글을 보고, API 호출은 curl·IntelliJ HTTP Client로 직접 해 본다. `community`·`practice`·10장 `project` DB는 서로 다른 데이터이므로 DB를 바꿀 때 이전 단계의 글 ID를 재사용하지 않는다.
+```bash
+python3 -m http.server 8765 --bind 127.0.0.1
+```
+
+문서 서버는 정적 HTML과 단계별 전체 코드 파일을 제공한다. 페이지의 화면 흐름과 코드 토글을 본 뒤 서버 주소를 입력하고 요청 버튼으로 API를 호출할 수 있다. `community`·`practice`·10장 `project` DB는 서로 다른 데이터이므로 DB를 바꿀 때 이전 단계의 글 ID를 재사용하지 않는다.
 
 ## 실행
 
