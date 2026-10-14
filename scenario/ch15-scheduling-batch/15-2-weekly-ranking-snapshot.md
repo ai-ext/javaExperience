@@ -1256,7 +1256,9 @@ public record WeeklyRankingItem(int rank, Long postId, String title, int score, 
 
 ### MyBatis 대안 — 지난 7일 집계와 랭킹 스냅샷
 
-`weekly_ranking_run`의 PK와 `INSERT IGNORE`가 빈 주까지 계산 완료를 남기고 수동·예약 동시 실행을 선행 게이트에서 조정한다. `WeeklyRankingMapper`는 좋아요·댓글을 각각 `[from, to)`에 집계한다. 저장된 제목·점수·순위를 다시 조회하고, 후보 0건이어도 첫 실행은 `created=true`, 재실행은 `false`, 조회는 빈 목록 200이다. Controller·Scheduler·Flyway V61·응답 DTO는 공통 코드를 쓴다.
+`weekly_ranking_run`의 PK와 `INSERT IGNORE`가 빈 주까지 계산 완료를 남기고 수동·예약 동시 실행을 선행 게이트에서 조정한다. `WeeklyRankingMapper`는 좋아요·댓글을 각각 `[from, to)`에 집계한다.
+
+저장된 제목·점수·순위를 다시 조회하고, 후보 0건이어도 첫 실행은 `created=true`, 재실행은 `false`, 조회는 빈 목록 200이다. Controller·Scheduler·Flyway V61·응답 DTO는 공통 코드를 쓴다.
 
 <details>
 <summary>MyBatis / 설정 — build.gradle</summary>

@@ -62,7 +62,9 @@ switch는 기본적으로 null에서 예외를 던지며, 패턴 switch도 `case
 
 ### 3.3 데이터 선언은 계층과 상태의 의도를 드러낸다
 
-`record UserId(String value)`의 헤더는 상태 계약이다. 컴파일러가 final 컴포넌트 필드, `value()` 접근자, canonical constructor, 값 기반 `equals`·`hashCode`·`toString`을 제공한다. compact constructor에서 매개변수를 검증·정규화하고 끝에서 필드에 반영한다. record는 명목 타입이며 얕은 불변성만 제공하므로 `List`·배열 내용은 별도 방어 없이는 바뀐다. (JEP 395)
+`record UserId(String value)`의 헤더는 상태 계약이다. 컴파일러가 final 컴포넌트 필드, `value()` 접근자, canonical constructor, 값 기반 `equals`·`hashCode`·`toString`을 제공한다.
+
+compact constructor에서 매개변수를 검증·정규화하고 끝에서 필드에 반영한다. record는 명목 타입이며 얕은 불변성만 제공하므로 `List`·배열 내용은 별도 방어 없이는 바뀐다. (JEP 395)
 
 sealed 타입은 직접 하위 타입을 제한한다. 각 하위 타입은 `final`, `sealed`, `non-sealed` 중 하나여야 한다. 친구 접근 제어를 만들지는 않으며 named module/unnamed module의 패키지 규칙도 따른다. 닫힌 집합은 pattern switch 완전성 분석에 쓰인다. (JEP 409)
 
@@ -234,18 +236,23 @@ void main() {
 ## 8. 자가점검 Q&A (면접 대비)
 
 **Q1. `var`는 컴파일 후에도 변수 타입을 없애는가?**  
-아니다. 초기화식으로 컴파일 시 타입을 추론할 뿐, 바이트코드에는 확정된 정적 타입이 반영된다.  
+아니다. 초기화식으로 컴파일 시 타입을 추론할 뿐, 바이트코드에는 확정된 정적 타입이 반영된다.
+
 필드·매개변수·반환 타입에는 쓸 수 없으며 초기화식도 필요하다.  
-**꼬리질문:** `var x = new ArrayList<String>()`은 `List<String>`인가? → 아니다. 선언 타입은 `ArrayList<String>`이므로 추상 계약을 표현하려면 `List<String> x = ...`라고 쓴다.
+**꼬리질문:** `var x = new ArrayList<String>()`은 `List<String>`인가?
+
+→ 아니다. 선언 타입은 `ArrayList<String>`이므로 추상 계약을 표현하려면 `List<String> x = ...`라고 쓴다.
 
 **Q2. switch expression에서 `break`와 `yield`는 어떻게 다른가?**  
 화살표 규칙은 값 식을 바로 반환하고, 여러 문장 블록에서는 `yield 값`으로 switch 식에 값을 전달한다.  
-`break`는 기존 제어 흐름을 빠져나오는 의미이며 값을 반환하지 않는다.  
+`break`는 기존 제어 흐름을 빠져나오는 의미이며 값을 반환하지 않는다.
+
 **꼬리질문:** `case A: ...`를 switch 식에서 쓸 수 있는가? → 가능하지만 기존 fall-through 의미가 적용되며, 값을 내는 모든 경로가 완전해야 한다.
 
 **Q3. sealed 타입에서 switch에 `default`가 없어도 되는 이유는?**  
 허용 하위 타입 목록이 닫혀 있어 컴파일러가 다룰 수 있는 타입 집합을 분석하기 때문이다.  
-모든 분기를 적으면 향후 하위 타입 추가 후 재컴파일 시 누락을 발견한다.  
+모든 분기를 적으면 향후 하위 타입 추가 후 재컴파일 시 누락을 발견한다.
+
 **꼬리질문:** sealed 타입이 모든 구현을 한 파일에 둬야 하는가? → 아니며 named module/패키지 규칙 안에서 `permits`에 선언하고 각 하위 타입의 최종성 규칙을 지켜야 한다.
 
 **Q4. record는 불변 객체라고 단정할 수 있는가?**  
@@ -254,18 +261,26 @@ void main() {
 **꼬리질문:** record는 기존 클래스를 상속할 수 있는가? → 아니다. record는 `java.lang.Record`를 직접 상속하는 final 클래스이며 인터페이스는 구현할 수 있다.
 
 **Q5. record pattern은 타입 패턴과 무엇이 다른가?**  
-`CardPayment c`는 타입 검사와 변수 바인딩을 한다. `CardPayment(var id, var amount)`는 record 타입 확인과 컴포넌트 분해까지 한다.  
+`CardPayment c`는 타입 검사와 변수 바인딩을 한다. `CardPayment(var id, var amount)`는 record 타입 확인과 컴포넌트 분해까지 한다.
+
 중첩 패턴으로 데이터 구조를 직접 표현할 수 있다.  
 **꼬리질문:** null record 값도 분해되는가? → null은 패턴과 일치하지 않으므로 null 정책을 별도 분기로 처리해야 한다.
 
 **Q6. `case null`이 없으면 패턴 switch가 null-safe한가?**  
-아니다. switch의 일반적인 null 동작은 예외다. 패턴 switch는 `case null`을 넣어 명시적으로 정책을 정할 수 있다.  
+아니다. switch의 일반적인 null 동작은 예외다.
+
+패턴 switch는 `case null`을 넣어 명시적으로 정책을 정할 수 있다.
 입력 검증이 앞서서 null이 불가능하다는 계약이라면 그 경계를 코드로 보장해야 한다.  
-**꼬리질문:** `default`가 null까지 잡는가? → 아니다. null을 처리하려면 `case null`을 명시해야 한다.
+**꼬리질문:** `default`가 null까지 잡는가?
+
+→ 아니다. null을 처리하려면 `case null`을 명시해야 한다.
 
 **Q7. Java 25를 설치하면 Java 25 문법으로 컴파일되는가?**  
-아니다. 빌드의 `--release` 또는 소스 버전 설정이 언어 기능을 제한한다. 런타임 배포 버전도 별개로 맞춰야 한다.  
-특히 Java 25 기능을 사용하면 Java 21 기준으로 설정한 CI·서비스에서 컴파일하거나 실행할 수 없다.  
+아니다. 빌드의 `--release` 또는 소스 버전 설정이 언어 기능을 제한한다.
+
+런타임 배포 버전도 별개로 맞춰야 한다.
+특히 Java 25 기능을 사용하면 Java 21 기준으로 설정한 CI·서비스에서 컴파일하거나 실행할 수 없다.
+
 **꼬리질문:** preview 기능을 써도 되는가? → 시험 기능임을 감수하고 동일 JDK 버전으로 `--enable-preview`를 컴파일·실행하는 경우에만 제한적으로 선택한다.
 
 ## 9. 참고문헌

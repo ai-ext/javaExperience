@@ -91,11 +91,15 @@ dependencies {
 
 ### 2.7 리팩토링은 텍스트 치환이 아니라 심볼 변경이다
 
-커서가 클래스·메서드·변수에 있을 때 `Shift+F6` Rename을 사용하면 참조와 문자열을 구분해 바꾼다. `Extract Method`(`⌘⌥M`/`Ctrl+Alt+M`), `Introduce Variable`(`⌘⌥V`/`Ctrl+Alt+V`), `Change Signature`(`Ctrl+F6`), `Inline`(`⌘⌥N`/`Ctrl+Alt+N`)도 같은 원칙이다. 적용 전 Preview에서 변경 사용처와 충돌을 확인한다. 단순 Find/Replace로 메서드명을 바꾸면 주석·문자열은 바뀌고 다른 패키지의 동일 이름은 놓친다.
+커서가 클래스·메서드·변수에 있을 때 `Shift+F6` Rename을 사용하면 참조와 문자열을 구분해 바꾼다. `Extract Method`(`⌘⌥M`/`Ctrl+Alt+M`), `Introduce Variable`(`⌘⌥V`/`Ctrl+Alt+V`), `Change Signature`(`Ctrl+F6`), `Inline`(`⌘⌥N`/`Ctrl+Alt+N`)도 같은 원칙이다.
+
+적용 전 Preview에서 변경 사용처와 충돌을 확인한다. 단순 Find/Replace로 메서드명을 바꾸면 주석·문자열은 바뀌고 다른 패키지의 동일 이름은 놓친다.
 
 ### 2.8 디버거는 “멈춤 → 상태 관찰 → 한 단계 실행” 순서다
 
-줄 왼쪽 여백을 눌러 breakpoint를 만들고 `Debug`로 실행한다. 조건 breakpoint에는 `order.getStatus() == FAILED`처럼 실제로 멈출 조건을 넣고, 로그만 보고 싶다면 로그 breakpoint를 쓴다. 멈춘 뒤 Variables, Watches, Evaluate Expression을 사용한다. `Step Over`는 현재 줄의 다음으로, `Step Into`는 호출 내부로, `Step Out`은 현재 메서드 밖으로 이동한다. 예외가 catch되어 사라지는 문제는 Exception Breakpoint를 예외 타입에 걸어 catch 이전 지점에서 멈춘다.
+줄 왼쪽 여백을 눌러 breakpoint를 만들고 `Debug`로 실행한다. 조건 breakpoint에는 `order.getStatus() == FAILED`처럼 실제로 멈출 조건을 넣고, 로그만 보고 싶다면 로그 breakpoint를 쓴다. 멈춘 뒤 Variables, Watches, Evaluate Expression을 사용한다.
+
+`Step Over`는 현재 줄의 다음으로, `Step Into`는 호출 내부로, `Step Out`은 현재 메서드 밖으로 이동한다. 예외가 catch되어 사라지는 문제는 Exception Breakpoint를 예외 타입에 걸어 catch 이전 지점에서 멈춘다.
 
 ### 2.9 HTTP Client로 API 호출을 프로젝트와 함께 보관한다
 

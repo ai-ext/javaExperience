@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>W12. 인터페이스는 왜 만드나 — DI·테스트, 그리고 과잉 추상화</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -36,16 +36,20 @@
 <p>의존성 주입(DI)은 이 객체 그래프를 조립하는 방식이다. Fowler의 설명에서 핵심은 구성(configuration)과 사용(use)을 분리하는 것이며, 추상 타입만을 강제하는 규칙은 아니다. 생성자 매개변수 타입이 구체 클래스여도 컨테이너는 해당 타입의 빈을 찾아 전달할 수 있다. 인터페이스가 주는 것은 DI 가능성이 아니라 구현을 바꿀 수 있는 호출 경계다.</p>
 <p>구현이 하나여도 인터페이스가 유용할 수 있다. 예컨대 서비스 도메인은 외부 결제 SDK를 직접 알지 않고 <code>PaymentPort</code>만 호출한다. 공급자 교체, 오류 매핑, 재시도 정책, 테스트 대역을 애플리케이션 코드 바깥 어댑터로 격리한다. 반대로 <code>OrderService</code>의 인터페이스가 구현 클래스 이름만 지우고 메서드·수명주기·변경 이유를 똑같이 공유한다면 실질적 경계가 아니다.</p>
 <h3 id="spring의-프록시와-인터페이스는-별개"><a class="anchor" href="#spring의-프록시와-인터페이스는-별개" aria-hidden="true">#</a>Spring의 프록시와 인터페이스는 별개</h3>
-<p>Spring AOP는 호출을 가로채는 프록시를 사용한다. Framework 문서는 대상이 인터페이스를 구현하면 JDK 동적 프록시를, 구현 인터페이스가 없으면 대상 클래스를 상속한 CGLIB 프록시를 사용할 수 있다고 설명한다. Spring Boot를 포함한 전체 설정의 기본 프록시 종류는 환경·설정에 따라 달라질 수 있다. Framework 7 문서에는 전역 기본값을 재정의하는 <code>@Proxyable(INTERFACES)</code>와 <code>@Proxyable(TARGET_CLASS)</code>도 나온다.</p>
+<p>Spring AOP는 호출을 가로채는 프록시를 사용한다. Framework 문서는 대상이 인터페이스를 구현하면 JDK 동적 프록시를, 구현 인터페이스가 없으면 대상 클래스를 상속한 CGLIB 프록시를 사용할 수 있다고 설명한다.</p>
+<p>Spring Boot를 포함한 전체 설정의 기본 프록시 종류는 환경·설정에 따라 달라질 수 있다. Framework 7 문서에는 전역 기본값을 재정의하는 <code>@Proxyable(INTERFACES)</code>와 <code>@Proxyable(TARGET_CLASS)</code>도 나온다.</p>
 <pre class="mermaid">flowchart LR
     C[&quot;호출자&quot;] --&gt; I[&quot;계약 타입&quot;]
     I --&gt; A[&quot;업체 A 어댑터&quot;]
     I --&gt; B[&quot;테스트 대역 또는 업체 B&quot;]
     C -. &quot;계약이 필요 없으면&quot; .-&gt; S[&quot;단일 구체 서비스&quot;]
     S --&gt; P[&quot;Spring 컨테이너가 생성자에 전달&quot;]</pre>
-<p>JDK 프록시는 인터페이스 메서드로 노출된다. 애플리케이션이 구체 클래스만 주입받도록 짰는데 실제 빈이 JDK 프록시라면 타입 할당이 맞지 않아 주입 오류가 날 수 있다. CGLIB는 하위 클래스로 메서드를 가로채므로 <code>final</code> 클래스는 상속할 수 없고, <code>final</code>·<code>private</code> 메서드는 재정의할 수 없다. 따라서 인터페이스를 AOP 편의만을 위해 무조건 늘리는 것도, 모든 프록시가 클래스 기반이라고 가정하는 것도 틀리다. 어떤 빈이 프록시되는지와 프로젝트의 설정을 함께 확인해야 한다. 자기 호출이 프록시를 우회하는 문제는 → <a class="docref" href="S02-aop-proxy.html">S02</a> 참조.</p>
-<p>테스트에서는 한 단계 더 분리해서 생각한다. 순수 단위 테스트는 생성자로 필요한 협력 객체를 직접 전달한다. Mockito의 <code>mock(SomeClass.class)</code>도 사용할 수 있어 테스트 가능성은 인터페이스 보유 여부에 달리지 않는다. Spring 컨텍스트 테스트는 <code>@MockitoBean</code>으로 해당 타입의 빈을 목으로 교체한다. 목을 만들 수 있다는 것과 그 테스트가 유용하다는 것은 다르다. 실제 DB·HTTP 직렬화·트랜잭션이 중요한 동작이면 목 테스트만으로 검증되지 않는다.</p>
-<p>인터페이스를 하나 추가할 때 생기는 비용도 구체적이다. 호출 경로가 한 단계 늘고, 계약과 구현을 오가며 읽어야 한다. 여러 구현체가 생기면 <code>@Primary</code>, <code>@Qualifier</code> 또는 명시적 설정이 필요하고 선택 누락은 컨텍스트 시작 오류가 된다. 의미 없는 <code>FooService</code>/<code>FooServiceImpl</code>은 교체 능력을 주지 않으면서 탐색·리네임 비용을 만든다. 추상화는 무료 옵션이 아니라, 바뀔 가능성과 경계의 안정성에 투자하는 결정이다.</p>
+<p>JDK 프록시는 인터페이스 메서드로 노출된다. 애플리케이션이 구체 클래스만 주입받도록 짰는데 실제 빈이 JDK 프록시라면 타입 할당이 맞지 않아 주입 오류가 날 수 있다. CGLIB는 하위 클래스로 메서드를 가로채므로 <code>final</code> 클래스는 상속할 수 없고, <code>final</code>·<code>private</code> 메서드는 재정의할 수 없다.</p>
+<p>따라서 인터페이스를 AOP 편의만을 위해 무조건 늘리는 것도, 모든 프록시가 클래스 기반이라고 가정하는 것도 틀리다. 어떤 빈이 프록시되는지와 프로젝트의 설정을 함께 확인해야 한다. 자기 호출이 프록시를 우회하는 문제는 → <a class="docref" href="S02-aop-proxy.html">S02</a> 참조.</p>
+<p>테스트에서는 한 단계 더 분리해서 생각한다. 순수 단위 테스트는 생성자로 필요한 협력 객체를 직접 전달한다. Mockito의 <code>mock(SomeClass.class)</code>도 사용할 수 있어 테스트 가능성은 인터페이스 보유 여부에 달리지 않는다.</p>
+<p>Spring 컨텍스트 테스트는 <code>@MockitoBean</code>으로 해당 타입의 빈을 목으로 교체한다. 목을 만들 수 있다는 것과 그 테스트가 유용하다는 것은 다르다. 실제 DB·HTTP 직렬화·트랜잭션이 중요한 동작이면 목 테스트만으로 검증되지 않는다.</p>
+<p>인터페이스를 하나 추가할 때 생기는 비용도 구체적이다. 호출 경로가 한 단계 늘고, 계약과 구현을 오가며 읽어야 한다. 여러 구현체가 생기면 <code>@Primary</code>, <code>@Qualifier</code> 또는 명시적 설정이 필요하고 선택 누락은 컨텍스트 시작 오류가 된다.</p>
+<p>의미 없는 <code>FooService</code>/<code>FooServiceImpl</code>은 교체 능력을 주지 않으면서 탐색·리네임 비용을 만든다. 추상화는 무료 옵션이 아니라, 바뀔 가능성과 경계의 안정성에 투자하는 결정이다.</p>
 <h2 id="4-선택지-비교"><a class="anchor" href="#4-선택지-비교" aria-hidden="true">#</a>4. 선택지 비교</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -173,7 +177,8 @@ class CheckoutService {
         return shippingQuote.quote(zone, weightKg);
     }
 }</code></pre>
-<p>업체 어댑터를 하나 더 <code>@Component</code>로 등록하면 자동 선택이 아니라 주입 모호성이 생긴다. 실제 선택이 필요할 때만 <code>@Qualifier</code>로 생성자 매개변수에 이름을 지정하거나 <code>@Primary</code>·조건부 설정을 둔다. 복수 구현이 없고 공급자 경계도 없다면 구체 클래스로 받아도 Spring DI는 동작한다. 이 구체 협력자도 Mockito로 목 처리할 수 있다. 기준 의존성표의 Mockito는 5.23.0이며, 아래 코드는 JUnit Jupiter와 Mockito가 테스트 의존성에 있다는 전제에서 <strong>미실행</strong>이다.</p>
+<p>업체 어댑터를 하나 더 <code>@Component</code>로 등록하면 자동 선택이 아니라 주입 모호성이 생긴다. 실제 선택이 필요할 때만 <code>@Qualifier</code>로 생성자 매개변수에 이름을 지정하거나 <code>@Primary</code>·조건부 설정을 둔다. 복수 구현이 없고 공급자 경계도 없다면 구체 클래스로 받아도 Spring DI는 동작한다.</p>
+<p>이 구체 협력자도 Mockito로 목 처리할 수 있다. 기준 의존성표의 Mockito는 5.23.0이며, 아래 코드는 JUnit Jupiter와 Mockito가 테스트 의존성에 있다는 전제에서 <strong>미실행</strong>이다.</p>
 <pre><code class="language-java">import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.springframework.stereotype.Component;

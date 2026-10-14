@@ -236,9 +236,13 @@
 <details>
 <summary>MyBatis — 상세 SELECT와 조회수 UPDATE</summary>
 
-아래 **MyBatis 대체 구현 코드**의 7개 파일을 이 단계 전체 소스에 적용한다. `PostReadMapper.findDetail`은 `post`·`board`·`member`를 JOIN해 상세 응답에 필요한 열을 `PostDetailRow`로 읽는다. 결과가 없으면 기존 `PostNotFoundException`으로 `404`를 돌린다. 태그는 `post_tag`·`tag` JOIN으로 읽어 `PostDetailResponse`에 넣는다. `#{id}`는 요청 ID를 바인딩하므로 SQL 문자열에 직접 이어 붙이지 않는다.
+아래 **MyBatis 대체 구현 코드**의 7개 파일을 이 단계 전체 소스에 적용한다. `PostReadMapper.findDetail`은 `post`·`board`·`member`를 JOIN해 상세 응답에 필요한 열을 `PostDetailRow`로 읽는다.
 
-`PostQueryService.getDetail`의 `@Transactional` 안에서 `UPDATE post SET view_count = view_count + 1 WHERE id = #{id}`를 실행하고, 응답 `viewCount`는 조회 직전 값에 1을 더한다. JPA의 변경 감지와 달리 MyBatis는 UPDATE를 명시적으로 쓴다. G1·G2를 두 번 실행해 응답과 DB의 조회수가 각각 1씩 증가하는지 D1/D2로 확인한다. 이 단계에는 아직 2-3의 공개·차단 조건을 추가하지 않는다.
+결과가 없으면 기존 `PostNotFoundException`으로 `404`를 돌린다. 태그는 `post_tag`·`tag` JOIN으로 읽어 `PostDetailResponse`에 넣는다. `#{id}`는 요청 ID를 바인딩하므로 SQL 문자열에 직접 이어 붙이지 않는다.
+
+`PostQueryService.getDetail`의 `@Transactional` 안에서 `UPDATE post SET view_count = view_count + 1 WHERE id = #{id}`를 실행하고, 응답 `viewCount`는 조회 직전 값에 1을 더한다. JPA의 변경 감지와 달리 MyBatis는 UPDATE를 명시적으로 쓴다.
+
+G1·G2를 두 번 실행해 응답과 DB의 조회수가 각각 1씩 증가하는지 D1/D2로 확인한다. 이 단계에는 아직 2-3의 공개·차단 조건을 추가하지 않는다.
 
 </details>
 

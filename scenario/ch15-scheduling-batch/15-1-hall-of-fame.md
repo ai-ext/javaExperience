@@ -323,7 +323,9 @@
 | `date`(실행) | 아니오 | 생략·빈 값·공백이면 오늘 | 오늘(Clock 기준)까지. **미래 날짜는 400** — 그날 좋아요가 아직 다 모이지 않았다 | `yyyy-MM-dd`. `2026-1-5`·`2026-02-30`·`abc`는 400 | 오늘 | `400`, `errors[].field = "date"` |
 | `size`(목록) | 아니오 | 생략하면 20, 빈 값·공백은 오류 | 1~100 | 정수 | 20 | `400`, `errors[].field = "size"` |
 
-`@RequestParam LocalDate`의 형식 오류는 컨트롤러에 들어오기 전에 `MethodArgumentTypeMismatchException`으로 터지므로 공통 처리기가 `errors`에 `date`를 담는다. `size`는 생략과 빈 문자열을 구별하기 위해 원문 `String`으로 받고 1~100 정수만 파싱한다. 범위 밖·빈 값·정수 초과는 `InvalidJobParameterException`으로 `400`과 `errors[].field = "size"`를 만든다. 다른 컨트롤러의 `@Min`·`@Max` 위반에 쓰는 `HandlerMethodValidationException` 공통 처리도 이 단계에서 추가한다.
+`@RequestParam LocalDate`의 형식 오류는 컨트롤러에 들어오기 전에 `MethodArgumentTypeMismatchException`으로 터지므로 공통 처리기가 `errors`에 `date`를 담는다. `size`는 생략과 빈 문자열을 구별하기 위해 원문 `String`으로 받고 1~100 정수만 파싱한다.
+
+범위 밖·빈 값·정수 초과는 `InvalidJobParameterException`으로 `400`과 `errors[].field = "size"`를 만든다. 다른 컨트롤러의 `@Min`·`@Max` 위반에 쓰는 `HandlerMethodValidationException` 공통 처리도 이 단계에서 추가한다.
 
 ## 구현 가이드
 

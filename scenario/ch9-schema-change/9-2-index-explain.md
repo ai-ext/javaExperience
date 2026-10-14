@@ -223,7 +223,11 @@ List<MyLikeRow> page = hasNext ? rows.subList(0, size) : rows;
 <details>
 <summary>JPA / 실제 Repository SQL</summary>
 
-`PostLikeRepository.java`의 조회를 native SQL로 바꾼다. 단일 테이블 `EXPLAIN`만 확인하면 실제 JOIN에서 MySQL이 `post`부터 읽고 정렬할 수 있다. 좋아요 관계는 복합 인덱스로, 이어지는 글은 기본키로 읽게 지정한다. 양방향 차단은 각각의 `NOT EXISTS`로 검사해 `(blocker_id, blocked_id)` 인덱스를 쓴다. `MyLikeRow.java`에는 필요한 열만 담는다. 공개·팔로우·차단·커서 조건은 Repository 전문에서 확인한다.
+`PostLikeRepository.java`의 조회를 native SQL로 바꾼다. 단일 테이블 `EXPLAIN`만 확인하면 실제 JOIN에서 MySQL이 `post`부터 읽고 정렬할 수 있다.
+
+좋아요 관계는 복합 인덱스로, 이어지는 글은 기본키로 읽게 지정한다. 양방향 차단은 각각의 `NOT EXISTS`로 검사해 `(blocker_id, blocked_id)` 인덱스를 쓴다.
+
+`MyLikeRow.java`에는 필요한 열만 담는다. 공개·팔로우·차단·커서 조건은 Repository 전문에서 확인한다.
 
 ```sql
 -- findMyLikes 실제 SQL 중 인덱스·JOIN 순서와 관련된 부분

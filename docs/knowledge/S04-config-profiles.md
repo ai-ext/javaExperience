@@ -78,13 +78,17 @@ JAR 안 application.properties / application.yml
 
 ### 3.3 프로파일 이름은 “실행 모드”가 아니라 조합 키다
 
-시작할 때 `spring.profiles.active`가 프로파일을 정하고, 지정이 없으면 `default`가 활성화된다. `spring.profiles.default=none`으로 기본 프로파일을 없앨 수 있으며, 커맨드라인 `--spring.profiles.active=prod`는 파일 설정을 덮는다. 활성화 후 `application-prod.yml`이 읽힌다. `spring.config.activate.on-profile=prod`는 한 파일의 문서 조건이고 `@Profile("prod")`는 빈 등록 조건이다.
+시작할 때 `spring.profiles.active`가 프로파일을 정하고, 지정이 없으면 `default`가 활성화된다. `spring.profiles.default=none`으로 기본 프로파일을 없앨 수 있으며, 커맨드라인 `--spring.profiles.active=prod`는 파일 설정을 덮는다.
+
+활성화 후 `application-prod.yml`이 읽힌다. `spring.config.activate.on-profile=prod`는 한 파일의 문서 조건이고 `@Profile("prod")`는 빈 등록 조건이다.
 
 `production` 그룹에 `proddb`, `prodmq`를 선언하면 그룹을 켰을 때 구성원도 함께 켜진다. `spring.profiles.active`, `default`, `include`, `group`은 프로파일 선택 전에 읽어야 하므로 프로파일별 파일이나 조건부 문서 안에 선언할 수 없다.
 
 ### 3.4 설정 바인딩은 이름을 정규화하고 타입을 변환한다
 
-등록된 `@ConfigurationProperties("payment.client")`는 Binder가 Environment에서 접두사 속성을 찾아 타입에 맞게 채운다. `connect-timeout`은 Java의 `connectTimeout`에 바인딩된다. 환경변수는 점을 `_`로, 이름을 대문자로 바꾸고 하이픈을 제거한다. 예: `my.service.remote-address` → `MY_SERVICE_REMOTEADDRESS`; 목록 인덱스는 밑줄로 감싼 숫자를 쓴다.
+등록된 `@ConfigurationProperties("payment.client")`는 Binder가 Environment에서 접두사 속성을 찾아 타입에 맞게 채운다. `connect-timeout`은 Java의 `connectTimeout`에 바인딩된다.
+
+환경변수는 점을 `_`로, 이름을 대문자로 바꾸고 하이픈을 제거한다. 예: `my.service.remote-address` → `MY_SERVICE_REMOTEADDRESS`; 목록 인덱스는 밑줄로 감싼 숫자를 쓴다.
 
 이 규칙이 relaxed binding이다. 접두사와 파일 키는 소문자 kebab-case로 통일한다. 기간 같은 값은 타입 변환을 활용해 수기 단위 계산을 피한다. 목록은 더 높은 우선순위에서 항목별 병합되지 않고 전체 교체되므로 프로파일별 완성 목록 또는 Map을 사용한다.
 

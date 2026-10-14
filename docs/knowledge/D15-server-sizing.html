@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>D15. 서버 사양은 어떻게 정하나 — CPU·메모리·디스크·네트워크를 숫자로 잡는 법</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -257,14 +257,18 @@
 <p>JDK 25 <code>java</code> 문서에서 <code>-XX:MaxRAMPercentage</code> 기본값은 **25%**다. JVM이 산정한 가용 최대 RAM 기준의 힙 상한 비율이며 컨테이너 전체 메모리 한도가 아니다. 2 GiB를 JVM이 가용 RAM으로 인식하면 25%는 약 0.5 GiB, 60%는 약 1.2 GiB의 힙 상한 계산으로 이어진다. 나머지 공간도 네이티브 사용량을 재 확인해야 한다.</p>
 <p>힙을 컨테이너 한도에 맞춰 <code>-Xmx</code>로 꽉 채우면 스레드 스택·direct buffer·메타스페이스 등이 들어갈 공간이 사라진다. 힙 사용률이 낮은데도 <code>OOMKilled</code>가 날 수 있는 이유다. <code>-XX:MaxRAMPercentage</code>나 <code>-Xmx</code> 하나만으로 전체 메모리가 보장되지 않는다. 메모리 압박 시 GC 시간과 컨테이너 종료 원인을 같이 본다. JVM 및 OS 영역의 세부는 <a class="docref" href="J16-jvm-in-containers.html">J16</a>·<a class="docref" href="D14-os-basics-backend.html">D14</a>를 참조한다.</p>
 <h3 id="34-db-메모리와-저장장치를-정한다"><a class="anchor" href="#34-db-메모리와-저장장치를-정한다" aria-hidden="true">#</a>3.4 DB 메모리와 저장장치를 정한다</h3>
-<p>InnoDB 버퍼 풀은 접근한 테이블·인덱스 페이지를 메모리에 캐시한다. 운영 DB의 총 용량보다 반복 사용되는 working set이 얼마나 큰지가 캐시 적중에 더 직접적이다. MySQL 8.4 문서는 전용 서버에서 물리 메모리의 최대 80%를 버퍼 풀에 할당하는 경우가 있다고 설명하고, <code>--innodb-dedicated-server</code> 자동 설정은 감지 RAM 1GB 미만에서 128MB(기본값), 1<del>4GB에서 50%, 4GB 초과에서 75%로 계산한다. 이는 해당 옵션을 켠 전용 서버의 동작이다. 일반적인 모든 MySQL 인스턴스에 75</del>80%를 기계적으로 적용하지 말고 <code>SELECT @@GLOBAL.innodb_buffer_pool_size;</code>로 실행값을 확인한다. 공유 호스트에서는 특히 OS와 다른 프로세스의 메모리를 남겨야 한다.</p>
+<p>InnoDB 버퍼 풀은 접근한 테이블·인덱스 페이지를 메모리에 캐시한다. 운영 DB의 총 용량보다 반복 사용되는 working set이 얼마나 큰지가 캐시 적중에 더 직접적이다. MySQL 8.4 문서는 전용 서버에서 물리 메모리의 최대 80%를 버퍼 풀에 할당하는 경우가 있다고 설명하고, <code>--innodb-dedicated-server</code> 자동 설정은 감지 RAM 1GB 미만에서 128MB(기본값), 1~4GB에서 50%, 4GB 초과에서 75%로 계산한다.</p>
+<p>이는 해당 옵션을 켠 전용 서버의 동작이다. 일반적인 모든 MySQL 인스턴스에 75~80%를 기계적으로 적용하지 말고 <code>SELECT @@GLOBAL.innodb_buffer_pool_size;</code>로 실행값을 확인한다. 공유 호스트에서는 특히 OS와 다른 프로세스의 메모리를 남겨야 한다.</p>
 <p>디스크 용량은 최소 다음 항목을 분리해서 계산한다.</p>
 <p><code>요구 용량 = 데이터 + 인덱스 + redo/binlog·임시 공간의 피크 + 보존할 백업 + 기간 내 증가분 + 운영 여유</code></p>
-<p>백업이 별도 스토리지에 있으면 DB 볼륨에 중복 산입하지 않는다. 증가율은 관측 기간과 기준일을 적는다(백업·복구는 <a class="docref" href="R07-backup-restore.html">R07</a> 참조). 용량과 성능도 별개다. 랜덤 I/O가 많은 DB는 IOPS, 큰 블록을 연속 읽고 쓰는 작업은 처리량이 먼저 병목일 수 있다. 대략 <code>IOPS × 평균 I/O 크기 ≈ 처리량</code>이므로 둘 다 필요한 워크로드에서는 작은 랜덤 I/O와 큰 순차 I/O를 따로 측정한다. AWS EBS gp3는 볼륨 크기와 별도로 IOPS·처리량 설정을 확인하는 유형이다. 스토리지 성능이 부족한데 용량만 키우는 변경은 해결이 아닐 수 있다.</p>
+<p>백업이 별도 스토리지에 있으면 DB 볼륨에 중복 산입하지 않는다. 증가율은 관측 기간과 기준일을 적는다(백업·복구는 <a class="docref" href="R07-backup-restore.html">R07</a> 참조). 용량과 성능도 별개다.</p>
+<p>랜덤 I/O가 많은 DB는 IOPS, 큰 블록을 연속 읽고 쓰는 작업은 처리량이 먼저 병목일 수 있다. 대략 <code>IOPS × 평균 I/O 크기 ≈ 처리량</code>이므로 둘 다 필요한 워크로드에서는 작은 랜덤 I/O와 큰 순차 I/O를 따로 측정한다.</p>
+<p>AWS EBS gp3는 볼륨 크기와 별도로 IOPS·처리량 설정을 확인하는 유형이다. 스토리지 성능이 부족한데 용량만 키우는 변경은 해결이 아닐 수 있다.</p>
 <h3 id="35-부하-측정값으로-서버-수를-산출한다"><a class="anchor" href="#35-부하-측정값으로-서버-수를-산출한다" aria-hidden="true">#</a>3.5 부하 측정값으로 서버 수를 산출한다</h3>
 <p>요청량을 올려 SLO를 지키는 지속 처리량 <code>C</code>를 찾는다. 평균 CPU 외 p95/p99, 오류율, GC, 메모리, DB 지연을 함께 본다. 부하 발생기를 분리하고 워밍업과 안정 상태를 구분한다.</p>
 <p><code>필요 인스턴스 수 = ceil(피크 RPS × 여유 계수 ÷ 검증된 인스턴스당 지속 RPS)</code></p>
-<p>예를 들어 <strong>가정치</strong>로, 한 앱 인스턴스가 지연 목표를 지키면서 160 RPS를 처리했고 피크 예상이 500 RPS라고 하자. 25% 용량 여유를 두면 <code>ceil(500 × 1.25 / 160) = 4대</code>다. 이때 인스턴스 네 대의 명목 합계는 640 RPS여서 계획 피크 500 RPS에 28%의 여유가 있다. 한 대 장애 중에도 500 RPS를 감당해야 한다면 세 대 합계 480 RPS로 모자라므로 5대로 잡는다. 숫자 160은 벤치마크 결과가 아니라 예시 입력이며, 실제 값은 동일한 앱 버전·요청 혼합·DB 조건에서 측정해야 한다.</p>
+<p>예를 들어 <strong>가정치</strong>로, 한 앱 인스턴스가 지연 목표를 지키면서 160 RPS를 처리했고 피크 예상이 500 RPS라고 하자. 25% 용량 여유를 두면 <code>ceil(500 × 1.25 / 160) = 4대</code>다. 이때 인스턴스 네 대의 명목 합계는 640 RPS여서 계획 피크 500 RPS에 28%의 여유가 있다.</p>
+<p>한 대 장애 중에도 500 RPS를 감당해야 한다면 세 대 합계 480 RPS로 모자라므로 5대로 잡는다. 숫자 160은 벤치마크 결과가 아니라 예시 입력이며, 실제 값은 동일한 앱 버전·요청 혼합·DB 조건에서 측정해야 한다.</p>
 <p>CPU 목표 사용률은 “평균 60%” 같은 단일 숫자로 정하지 않는다. 피크·장애·확장 지연에도 SLO를 지킬 헤드룸을 검증한다. 높은 순간 CPU가 항상 장애는 아니며, 낮은 평균 CPU에서도 직렬 작업이나 DB 대기가 병목일 수 있다. 앱 자동 확장은 DB 쓰기 용량을 늘려주지 않는다.</p>
 <p><strong>측정 흐름</strong>은 다음과 같다.</p>
 <pre class="mermaid">sequenceDiagram
@@ -282,7 +286,8 @@
     Obs--&gt;&gt;Dev: 같은 시간축의 자원·SLO 곡선 제공
     Dev-&gt;&gt;K6: 병목 또는 SLO 한계가 보이면 단계 조정</pre>
 <h3 id="36-클라우드-사양-이름을-해석한다"><a class="anchor" href="#36-클라우드-사양-이름을-해석한다" aria-hidden="true">#</a>3.6 클라우드 사양 이름을 해석한다</h3>
-<p>EC2 이름은 보통 패밀리(계열)·세대·옵션 뒤에 점과 크기가 붙는다. 예를 들어 <code>m7g.large</code>의 <code>m</code>은 범용 계열, <code>7</code>은 세대, <code>g</code>는 Graviton 옵션, <code>large</code>는 크기다. AWS 문서상 <code>c</code>는 연산 최적화, <code>r</code>은 메모리 최적화, <code>t</code>는 버스터블 계열이다. T 계열은 기준 CPU 성능을 두고 크레딧에 따라 기준을 넘겨 쓰므로 지속적인 CPU 부하가 있는 서비스는 CPU 크레딧 잔량·소진 동작과 장시간 부하를 확인한다.</p>
+<p>EC2 이름은 보통 패밀리(계열)·세대·옵션 뒤에 점과 크기가 붙는다. 예를 들어 <code>m7g.large</code>의 <code>m</code>은 범용 계열, <code>7</code>은 세대, <code>g</code>는 Graviton 옵션, <code>large</code>는 크기다.</p>
+<p>AWS 문서상 <code>c</code>는 연산 최적화, <code>r</code>은 메모리 최적화, <code>t</code>는 버스터블 계열이다. T 계열은 기준 CPU 성능을 두고 크레딧에 따라 기준을 넘겨 쓰므로 지속적인 CPU 부하가 있는 서비스는 CPU 크레딧 잔량·소진 동작과 장시간 부하를 확인한다.</p>
 <p>RDS 클래스도 CPU와 메모리 용량을 정하는 타입·크기 조합이다(예: <code>db.r6g.2xlarge</code>). 앱 서버 인스턴스 이름만 보고 DB 자원 비율을 추측하지 않는다. EBS gp3는 용량, IOPS, 처리량을 별도 축으로 확인한다. AWS 공식 사양과 해당 리전·연결 구성에서 가능한 조합을 가격 계산기와 함께 검토한다. 사양을 말할 때 가격 숫자는 문서에 박제하지 말고 공식 가격 계산기로 산정한다.</p>
 <p>온프렘은 구매·교체 기간을 고려해 예상 피크를 선확보한다. 클라우드는 작게 시작할 수 있지만 증설 소요·쿼터·비용을 계획한다(<a class="docref" href="D07-onprem-vs-cloud.html">D07</a> 참조).</p>
 <h2 id="4-직접-해보기"><a class="anchor" href="#4-직접-해보기" aria-hidden="true">#</a>4. 직접 해보기</h2>

@@ -224,8 +224,9 @@ T = 테스트 실행(필수), R = 코드 리뷰(피드백용).
 <details>
 <summary>힌트 — Boot 4의 패키지</summary>
 
-`org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest`(Boot 4에서 위치가 바뀌었다)와 `org.springframework.test.context.bean.override.mockito.MockitoBean`. 의존성 `spring-boot-starter-webmvc-test`는 이미 `build.gradle`에 있다. 요청은 `mockMvc.perform(post("/api/posts").header("Authorization", "Bearer tok-kimjava").contentType(APPLICATION_JSON).content(json))`.
-</details>
+`org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest`(Boot 4에서 위치가 바뀌었다)와 `org.springframework.test.context.bean.override.mockito.MockitoBean`. 의존성 `spring-boot-starter-webmvc-test`는 이미 `build.gradle`에 있다.
+
+요청은 `mockMvc.perform(post("/api/posts").header("Authorization", "Bearer tok-kimjava").contentType(APPLICATION_JSON).content(json))`. </details>
 
 ## 다음 단계
 

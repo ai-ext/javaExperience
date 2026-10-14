@@ -8,7 +8,9 @@
 
 신입 개발자가 예외 처리를 고민하는 장면은 익숙하다. `repository.save()`가 DB 제약조건 위반으로 실패했는데 Controller에서 `try-catch`해 문자열을 돌려주면 되는가? Service에서 `Exception`을 잡고 `null`을 반환해도 되는가? 같은 404 처리 코드를 컨트롤러마다 복사해야 하는가?
 
-잘못된 위치에 둔 catch는 실제 버그가 된다. 주문 저장 오류를 Service가 잡고 성공처럼 반환하면 호출자는 주문이 만들어진 줄 안다. 체크 예외가 트랜잭션 메서드 밖으로 나왔는데 기본 롤백 규칙에 맞지 않아 데이터 변경이 커밋될 수 있다. 로그를 Controller·Service·Repository에서 모두 찍으면 세 줄의 `ERROR`에 원래 원인이 묻힌다. 반대로 SQL과 내부 클래스 이름을 응답에 넣으면 DB 구조와 경로가 노출된다.
+잘못된 위치에 둔 catch는 실제 버그가 된다. 주문 저장 오류를 Service가 잡고 성공처럼 반환하면 호출자는 주문이 만들어진 줄 안다. 체크 예외가 트랜잭션 메서드 밖으로 나왔는데 기본 롤백 규칙에 맞지 않아 데이터 변경이 커밋될 수 있다.
+
+로그를 Controller·Service·Repository에서 모두 찍으면 세 줄의 `ERROR`에 원래 원인이 묻힌다. 반대로 SQL과 내부 클래스 이름을 응답에 넣으면 DB 구조와 경로가 노출된다.
 
 따라서 핵심 질문은 “어느 계층에 catch 문을 쓸까?”가 아니다. **어느 코드가 원인을 판별하고 복구할 정보와 권한을 갖는가? 어디서 업무 의미나 HTTP 표현으로 변환할 것인가?** 잡아서 출력하거나 실패를 감추는 것은 처리가 아니다.
 
@@ -55,7 +57,9 @@ Spring MVC의 `@ExceptionHandler`는 `DispatcherServlet`의 `HandlerExceptionRes
 
 ### 트랜잭션이 예외를 보는 방식
 
-선언적 트랜잭션은 프록시 경계에서 대상 메서드가 예외로 끝났는지 보고 롤백 규칙을 판단한다. Spring 기본값은 `RuntimeException`과 `Error`에서 롤백하고 체크 예외에서는 자동 롤백하지 않는다. 체크 예외도 롤백하려면 `rollbackFor`를 선언한다. Service 내부에서 예외를 잡아 정상 반환하면 인터셉터는 성공으로 볼 수 있다. 단, 내부 트랜잭션 프록시가 이미 rollback-only로 표시했다면 바깥에서 예외를 삼켜도 커밋 시 `UnexpectedRollbackException`이 날 수 있다.
+선언적 트랜잭션은 프록시 경계에서 대상 메서드가 예외로 끝났는지 보고 롤백 규칙을 판단한다. Spring 기본값은 `RuntimeException`과 `Error`에서 롤백하고 체크 예외에서는 자동 롤백하지 않는다. 체크 예외도 롤백하려면 `rollbackFor`를 선언한다.
+
+Service 내부에서 예외를 잡아 정상 반환하면 인터셉터는 성공으로 볼 수 있다. 단, 내부 트랜잭션 프록시가 이미 rollback-only로 표시했다면 바깥에서 예외를 삼켜도 커밋 시 `UnexpectedRollbackException`이 날 수 있다.
 
 ## 4. 선택지 비교
 
@@ -221,7 +225,9 @@ public final class ApiProblems {
 }
 ```
 
-`ProblemDetail.status`가 HTTP 상태를 정하고, `instance`가 비어 있으면 현재 URL 경로가 설정된다. `properties`의 `code`는 JSON의 추가 최상위 필드가 된다. 클라이언트는 문구 대신 `ORDER_NOT_FOUND`로 분기한다. 예외 메시지, SQL, 스택, 파일 경로, 토큰은 응답에 복사하지 않는다. Spring MVC 내장 파싱 오류까지 같은 형식으로 바꾸려면 `ResponseEntityExceptionHandler` 확장을 검토한다. Boot의 `spring.mvc.problemdetails.enabled` 자동 처리와 직접 정의한 Advice가 겹치면 `@Order`를 확인한다.
+`ProblemDetail.status`가 HTTP 상태를 정하고, `instance`가 비어 있으면 현재 URL 경로가 설정된다. `properties`의 `code`는 JSON의 추가 최상위 필드가 된다. 클라이언트는 문구 대신 `ORDER_NOT_FOUND`로 분기한다.
+
+예외 메시지, SQL, 스택, 파일 경로, 토큰은 응답에 복사하지 않는다. Spring MVC 내장 파싱 오류까지 같은 형식으로 바꾸려면 `ResponseEntityExceptionHandler` 확장을 검토한다. Boot의 `spring.mvc.problemdetails.enabled` 자동 처리와 직접 정의한 Advice가 겹치면 `@Order`를 확인한다.
 
 ### 기술 예외를 도메인 예외로 변환
 

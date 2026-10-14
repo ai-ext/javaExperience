@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>1-2. DB에 저장하고 201로 응답 — JPA 첫걸음</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
@@ -78,7 +78,8 @@ public record PostResponse(
         LocalDateTime createdAt
 ) {
 }</code></pre>
-<p>record는 구성 요소, 생성자, 접근자, <code>equals</code>·<code>hashCode</code>·<code>toString</code>을 만들어 주며, 구성 요소 참조를 다시 대입할 수 없게 하는 얕은 불변 데이터 표현이다. <code>List</code> 구성 요소를 둬도 그 목록 내부가 자동으로 불변이 되지는 않는다. 응답 DTO처럼 값을 담아 전달할 때 보일러플레이트가 적어 실무에서 편리하다. 우선 class 버전으로 필드와 생성자 관계를 익힌 뒤 record를 선택할 수 있다. 이 단계의 전체 답안 토글은 class 버전을 기준으로 한다.</p>
+<p>record는 구성 요소, 생성자, 접근자, <code>equals</code>·<code>hashCode</code>·<code>toString</code>을 만들어 주며, 구성 요소 참조를 다시 대입할 수 없게 하는 얕은 불변 데이터 표현이다. <code>List</code> 구성 요소를 둬도 그 목록 내부가 자동으로 불변이 되지는 않는다.</p>
+<p>응답 DTO처럼 값을 담아 전달할 때 보일러플레이트가 적어 실무에서 편리하다. 우선 class 버전으로 필드와 생성자 관계를 익힌 뒤 record를 선택할 수 있다. 이 단계의 전체 답안 토글은 class 버전을 기준으로 한다.</p>
 <h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
 <p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름의 단계를 누르면 관련된 화면 요소가 강조된다.</p>
 <section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>글쓰기 → DB에 한 행 → 새 글 화면으로 이동</h3><p>글이 post 테이블의 한 행이 된다. 응답의 id는 DB가 붙인 번호(AUTO_INCREMENT)라서 서버를 다시 켜도 이어진다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>새 글 쓰기</strong><span>김자바</span></div><div class="screen-widget screen-select"><strong>게시판</strong><span>개발</span></div><div class="screen-widget screen-field"><strong>제목</strong><span>[채점] 첫 게시글</span></div><div class="screen-widget screen-field"><strong>본문</strong><span>Spring Boot로 만든 첫 게시글입니다.</span></div><div class="screen-widget screen-select"><strong>공개 범위</strong><span>전체 공개</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>저장 · 취소</span></div><div class="screen-widget screen-text"><strong>text</strong><span>[채점] 첫 게시글</span></div><div class="screen-widget screen-text"><strong>text</strong><span>#22 · 방금 전 · 개발</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>글을 올렸어요</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>저장 → 새 글로 이동</summary><ol><li><span class="flow-kind">사용자</span><p>[저장]을 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts</p><dl><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>{
@@ -483,8 +484,10 @@ Reason: Failed to determine a suitable driver class</code></pre>
 <details>
 <summary>MyBatis — 같은 POST를 Mapper SQL로 구현하기</summary>
 
-<p>아래 <strong>MyBatis 대체 구현 코드</strong>의 7개 파일을 이 단계 전체 소스에 적용한다. <code>build.gradle</code>에 MyBatis starter를 추가하고 <code>application.yml</code>에서 XML 위치와 snake_case→camelCase 매핑을 설정한다. <code>PostController</code>는 <code>PostCreationMapper.findBoardBySlug</code>로 <code>board.id</code>와 <code>slug</code>를 읽고, <code>PostInsert</code>에 고정 작성자 2와 요청 필드·서버 시각을 담아 <code>insertPost</code>를 부른다. <code>BoardWriteRow</code>는 조회 결과, <code>PostInsert</code>는 SQL 입력 객체다.</p>
-<p>XML의 <code>#{...}</code>는 값을 SQL 문자열에 이어 붙이지 않고 바인딩한다. <code>useGeneratedKeys=&quot;true&quot;</code>와 <code>keyProperty=&quot;id&quot;</code>가 DB의 AUTO_INCREMENT 값을 <code>PostInsert.id</code>에 채운 뒤, 컨트롤러가 그 번호로 <code>201</code>과 <code>Location</code>을 만든다. 이 단계의 INSERT는 엔티티가 알던 7개 컬럼만 적으므로 <code>status</code>·카운트는 DB 기본값, <code>published_at</code>은 <code>NULL</code>이다. D1과 함께 <code>published_at</code>도 조회해 1-4와 비교한다. 선행 JPA 클래스는 코드 비교를 위해 남지만 이 POST 요청의 조회·저장은 Mapper를 통한다.</p>
+<p>아래 <strong>MyBatis 대체 구현 코드</strong>의 7개 파일을 이 단계 전체 소스에 적용한다. <code>build.gradle</code>에 MyBatis starter를 추가하고 <code>application.yml</code>에서 XML 위치와 snake_case→camelCase 매핑을 설정한다.</p>
+<p><code>PostController</code>는 <code>PostCreationMapper.findBoardBySlug</code>로 <code>board.id</code>와 <code>slug</code>를 읽고, <code>PostInsert</code>에 고정 작성자 2와 요청 필드·서버 시각을 담아 <code>insertPost</code>를 부른다. <code>BoardWriteRow</code>는 조회 결과, <code>PostInsert</code>는 SQL 입력 객체다.</p>
+<p>XML의 <code>#{...}</code>는 값을 SQL 문자열에 이어 붙이지 않고 바인딩한다. <code>useGeneratedKeys=&quot;true&quot;</code>와 <code>keyProperty=&quot;id&quot;</code>가 DB의 AUTO_INCREMENT 값을 <code>PostInsert.id</code>에 채운 뒤, 컨트롤러가 그 번호로 <code>201</code>과 <code>Location</code>을 만든다.</p>
+<p>이 단계의 INSERT는 엔티티가 알던 7개 컬럼만 적으므로 <code>status</code>·카운트는 DB 기본값, <code>published_at</code>은 <code>NULL</code>이다. D1과 함께 <code>published_at</code>도 조회해 1-4와 비교한다. 선행 JPA 클래스는 코드 비교를 위해 남지만 이 POST 요청의 조회·저장은 Mapper를 통한다.</p>
 </details>
 
 <h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
@@ -1112,9 +1115,8 @@ SELECT id, board_id, author_id, title, visibility, status, published_at, created
 <details>
 <summary>힌트 1 — 게시판 찾기</summary>
 
-<p><code>Board</code> 엔티티(<code>board</code> 테이블)와 <code>BoardRepository extends JpaRepository&lt;Board, Long&gt;</code>를 만들고 <code>Optional&lt;Board&gt; findBySlug(String slug)</code>를 선언한다. 구현은 Spring Data JPA가 메서드 이름을 읽어 만든다. 컨트롤러에서 <code>boardRepository.findBySlug(request.boardSlug()).orElseThrow(...)</code>.</p>
-</details>
-
+<p><code>Board</code> 엔티티(<code>board</code> 테이블)와 <code>BoardRepository extends JpaRepository&lt;Board, Long&gt;</code>를 만들고 <code>Optional&lt;Board&gt; findBySlug(String slug)</code>를 선언한다. 구현은 Spring Data JPA가 메서드 이름을 읽어 만든다.</p>
+<p>컨트롤러에서 <code>boardRepository.findBySlug(request.boardSlug()).orElseThrow(...)</code>. </details></p>
 <details>
 <summary>힌트 2 — 저장소를 컨트롤러에 받기</summary>
 
@@ -1130,9 +1132,8 @@ SELECT id, board_id, author_id, title, visibility, status, published_at, created
 <details>
 <summary>힌트 4 — 서버가 안 뜰 때</summary>
 
-<p>로그에서 <code>Schema validation:</code>이 들어간 줄을 찾는다(Hibernate 7 표기 — 하이픈 없음). 엔티티의 테이블·컬럼 이름이 실제 테이블과 다르다는 뜻이다. 테이블은 CloudBeaver(<code>http://localhost:8978</code>)의 <code>community (Java 시나리오)</code> 연결이나 dump 파일 <a href="../../docker/mysql/init/01-community.sql"><code>01-community.sql</code></a>의 <code>CREATE TABLE</code>로 확인한다.</p>
-</details>
-
+<p>로그에서 <code>Schema validation:</code>이 들어간 줄을 찾는다(Hibernate 7 표기 — 하이픈 없음). 엔티티의 테이블·컬럼 이름이 실제 테이블과 다르다는 뜻이다.</p>
+<p>테이블은 CloudBeaver(<code>http://localhost:8978</code>)의 <code>community (Java 시나리오)</code> 연결이나 dump 파일 <a href="../../docker/mysql/init/01-community.sql"><code>01-community.sql</code></a>의 <code>CREATE TABLE</code>로 확인한다. </details></p>
 <h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
 <p><a href="1-3-service-layer.html">1-3. 서비스로 나누기</a> — 태그까지 저장하려면 저장소가 셋으로 늘고, 저장이 중간에 실패해도 반쪽이 남지 않아야 한다. 그 일을 서비스와 트랜잭션에 맡긴다.</p>
 

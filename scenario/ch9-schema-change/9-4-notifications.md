@@ -6,7 +6,9 @@
 
 > "내 글에 좋아요나 댓글이 달리면 알림을 주세요. 안 읽은 알림 개수도 보여 주고, 누르면 읽음 처리요."
 
-새 기능에는 새 테이블이 필요하다. 테이블을 마이그레이션으로 만들고, **기존 기능(좋아요·댓글)이 성공할 때 알림이 함께 생기게** 연결한다. 기존 기능을 건드리는 일이라 같은 알림이 두 번 생기면 안 된다. 이 단계는 알림을 좋아요·댓글과 **같은 트랜잭션에서 함께 저장**하는 것까지다 — 그래서 알림 저장이 실패하면 좋아요도 함께 되돌려진다. "알림이 실패해도 좋아요는 성공"으로 떼어 내는 일(커밋 뒤 이벤트·별도 트랜잭션·재시도)은 R1에서 차이를 설명하는 데까지만 보고, 구현은 다음 과제로 남긴다.
+새 기능에는 새 테이블이 필요하다. 테이블을 마이그레이션으로 만들고, **기존 기능(좋아요·댓글)이 성공할 때 알림이 함께 생기게** 연결한다.
+
+기존 기능을 건드리는 일이라 같은 알림이 두 번 생기면 안 된다. 이 단계는 알림을 좋아요·댓글과 **같은 트랜잭션에서 함께 저장**하는 것까지다 — 그래서 알림 저장이 실패하면 좋아요도 함께 되돌려진다. "알림이 실패해도 좋아요는 성공"으로 떼어 내는 일(커밋 뒤 이벤트·별도 트랜잭션·재시도)은 R1에서 차이를 설명하는 데까지만 보고, 구현은 다음 과제로 남긴다.
 
 ## 화면 시나리오
 
@@ -226,7 +228,9 @@ public NotificationListResponse list(@RequestParam(defaultValue = "false") boole
 <details>
 <summary>Service — 처리 순서</summary>
 
-`LikeService`는 `INSERT IGNORE`가 실제 새 좋아요일 때만 이벤트를 발행한다. `CommentService`는 댓글 저장·개수 증가 뒤 이벤트를 발행한다. `NotificationEventListener`의 `@EventListener`가 즉시 실행되고 `NotificationService.notifyLike/notifyComment`의 `Propagation.MANDATORY`가 기존 트랜잭션을 요구한다. 리스너가 예외를 삼키지 않으므로 알림 저장 실패 시 원래 작업도 롤백된다.
+`LikeService`는 `INSERT IGNORE`가 실제 새 좋아요일 때만 이벤트를 발행한다. `CommentService`는 댓글 저장·개수 증가 뒤 이벤트를 발행한다.
+
+`NotificationEventListener`의 `@EventListener`가 즉시 실행되고 `NotificationService.notifyLike/notifyComment`의 `Propagation.MANDATORY`가 기존 트랜잭션을 요구한다. 리스너가 예외를 삼키지 않으므로 알림 저장 실패 시 원래 작업도 롤백된다.
 
 ```java
 if (inserted > 0) {
@@ -247,7 +251,9 @@ if (inserted > 0) {
 <details>
 <summary>MyBatis Mapper — 알림 저장·목록·읽음</summary>
 
-`MyBatisNotificationMapper.java`와 `MyBatisNotificationMapper.xml`은 알림 테이블을 직접 읽고 쓴다. `MyBatisLikeService`와 `MyBatisCommentService`는 관계 행이 새로 생겼을 때만 동기 이벤트를 발행한다. `NotificationService`가 Mapper로 `member_id`를 제한한 목록·미읽음 개수·소유자 확인 후 읽음 처리를 실행한다. 알림 생성의 예외가 원래 트랜잭션으로 전파되는지 확인한다. 이 대체 앱의 일부 선행 글 작성 기능은 JPA 경로를 계속 사용한다.
+`MyBatisNotificationMapper.java`와 `MyBatisNotificationMapper.xml`은 알림 테이블을 직접 읽고 쓴다. `MyBatisLikeService`와 `MyBatisCommentService`는 관계 행이 새로 생겼을 때만 동기 이벤트를 발행한다.
+
+`NotificationService`가 Mapper로 `member_id`를 제한한 목록·미읽음 개수·소유자 확인 후 읽음 처리를 실행한다. 알림 생성의 예외가 원래 트랜잭션으로 전파되는지 확인한다. 이 대체 앱의 일부 선행 글 작성 기능은 JPA 경로를 계속 사용한다.
 
 ```xml
 <select id="findMine" resultType="org.example.notification.NotificationRow">

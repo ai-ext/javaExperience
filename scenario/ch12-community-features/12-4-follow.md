@@ -810,8 +810,7 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 <details>
 <summary>힌트 1 — 흐름</summary>
 
-`FollowRepository`에 `@Modifying @Query(nativeQuery = true)`로 `INSERT IGNORE INTO follow (follower_id, followee_id, created_at) VALUES (…)`와 JPQL `DELETE FROM Follow f WHERE f.follower.id = :a AND f.followee.id = :b`, 그리고 `countByFollowee_Id`. 서비스: 자기 자신 확인 → `memberRepository.findById` + 탈퇴 걸러 404 → `blockPolicy.isBlockedEitherWay` → 넣기/지우기 → `COUNT`.
-</details>
+`FollowRepository`에 `@Modifying @Query(nativeQuery = true)`로 `INSERT IGNORE INTO follow (follower_id, followee_id, created_at) VALUES (…)`와 JPQL `DELETE FROM Follow f WHERE f.follower.id = :a AND f.followee.id = :b`, 그리고 `countByFollowee_Id`. 서비스: 자기 자신 확인 → `memberRepository.findById` + 탈퇴 걸러 404 → `blockPolicy.isBlockedEitherWay` → 넣기/지우기 → `COUNT`. </details>
 
 <details>
 <summary>힌트 2 — 동시 요청의 숫자가 다르다</summary>

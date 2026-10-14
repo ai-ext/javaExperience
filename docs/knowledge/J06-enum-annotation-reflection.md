@@ -111,7 +111,9 @@ reflection은 설정 바인딩·직렬화·의존성 연결처럼 대상 멤버�
 
 `VarHandle`은 정적·객체 필드와 배열 원소 같은 변수를 다룬다. `get`, `set`, `getVolatile`, `compareAndSet` 등의 가시성·원자성 의미가 다르므로 JMM 보장을 이해한 저수준 코드에만 쓴다. 예제의 CAS 계열 호출은 단일 스레드에서 API 모양만 보여 준다.
 
-JDK 프록시는 지정한 인터페이스를 구현하며 `InvocationHandler`에 proxy·`Method`·인수 배열을 넘긴다. 무인수 메서드의 인수는 `null`, primitive는 래퍼로 전달된다. 반환값과 `equals`·`hashCode`·`toString`을 명시적으로 처리한다. `Method.invoke()`로 위임하면 `InvocationTargetException`의 원인을 꺼내 예외 계약을 보존한다. Spring AOP 프록시 방식은 → S02 참조.
+JDK 프록시는 지정한 인터페이스를 구현하며 `InvocationHandler`에 proxy·`Method`·인수 배열을 넘긴다. 무인수 메서드의 인수는 `null`, primitive는 래퍼로 전달된다. 반환값과 `equals`·`hashCode`·`toString`을 명시적으로 처리한다.
+
+`Method.invoke()`로 위임하면 `InvocationTargetException`의 원인을 꺼내 예외 계약을 보존한다. Spring AOP 프록시 방식은 → S02 참조.
 
 reflection은 “항상 느리고 MethodHandle은 항상 빠르다”가 아니다. JEP 416은 JDK 18부터 `Method`, `Constructor`, `Field`를 method handles 기반으로 재구현했다. 성능은 메타데이터의 상수화, 호출 빈도, 워밍업, JIT, 인수 형태에 좌우된다. 설정 단계에서 메타데이터를 캐시하고, 핫 경로는 프로파일링 후 바꾼다. 정적 호출을 불필요하게 reflection으로 바꾸지 않는다.
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S09. JPA·Hibernate</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,8 +18,10 @@
 기본 추천은 짧은 <code>@Transactional</code> 서비스, LAZY 연관관계, 요청별 fetch 계획, <code>@Version</code> 낙관적 락이며 OSIV는 끈다.</p>
 </blockquote>
 <h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
-<p>운영에서 흔한 장애는 <code>findAll()</code> 한 번이 아니라 그 다음 줄에서 시작한다. 주문 100건을 읽고 각 주문의 고객·항목을 순회했더니 SQL이 1+100+100번 나가 커넥션 풀이 잠기는 것이 N+1이다. 반대로 모든 연관관계를 EAGER로 바꾸면 목록 화면에서 필요 없는 테이블까지 한꺼번에 조인해 결과 행이 폭증한다. <code>@Transactional</code>이 끝난 뒤 LAZY 필드를 응답 DTO 변환 중 읽으면 <code>LazyInitializationException</code>이 난다. OSIV가 이를 가려 주면 HTTP 응답을 만드는 동안 DB를 다시 조회해 응답 지연이 커지고, 이미 끝난 업무 트랜잭션 뒤에 데이터가 추가 로딩되는 혼란이 생긴다.</p>
-<p>또 다른 실수는 <code>entity.setStatus(...)</code> 뒤에 <code>save()</code>를 매번 호출해야 저장된다고 생각하는 것이다. 관리 상태 엔티티는 변경 감지 대상이므로 트랜잭션 커밋 시 반영된다. 반대로 <code>flush()</code>가 커밋이라고 착각하면 아직 롤백 가능한 SQL 전송 시점과 실제 트랜잭션 확정 시점을 혼동한다. 양방향 연관관계에서 반대편 컬렉션만 고치면 DB FK가 바뀌지 않는다. 두 사용자가 같은 재고를 수정할 때 버전 칼럼이 없으면 마지막 커밋이 앞선 수정을 조용히 덮어쓸 수 있다.</p>
+<p>운영에서 흔한 장애는 <code>findAll()</code> 한 번이 아니라 그 다음 줄에서 시작한다. 주문 100건을 읽고 각 주문의 고객·항목을 순회했더니 SQL이 1+100+100번 나가 커넥션 풀이 잠기는 것이 N+1이다. 반대로 모든 연관관계를 EAGER로 바꾸면 목록 화면에서 필요 없는 테이블까지 한꺼번에 조인해 결과 행이 폭증한다.</p>
+<p><code>@Transactional</code>이 끝난 뒤 LAZY 필드를 응답 DTO 변환 중 읽으면 <code>LazyInitializationException</code>이 난다. OSIV가 이를 가려 주면 HTTP 응답을 만드는 동안 DB를 다시 조회해 응답 지연이 커지고, 이미 끝난 업무 트랜잭션 뒤에 데이터가 추가 로딩되는 혼란이 생긴다.</p>
+<p>또 다른 실수는 <code>entity.setStatus(...)</code> 뒤에 <code>save()</code>를 매번 호출해야 저장된다고 생각하는 것이다. 관리 상태 엔티티는 변경 감지 대상이므로 트랜잭션 커밋 시 반영된다. 반대로 <code>flush()</code>가 커밋이라고 착각하면 아직 롤백 가능한 SQL 전송 시점과 실제 트랜잭션 확정 시점을 혼동한다.</p>
+<p>양방향 연관관계에서 반대편 컬렉션만 고치면 DB FK가 바뀌지 않는다. 두 사용자가 같은 재고를 수정할 때 버전 칼럼이 없으면 마지막 커밋이 앞선 수정을 조용히 덮어쓸 수 있다.</p>
 <p>이 문서는 엔티티 수명주기와 Hibernate 동작을 실무 관점에서 다룬다. Spring Data 리포지토리와 쿼리 도구 비교는 → <a class="docref" href="S10-spring-data-query.html">S10</a> 참조. 트랜잭션 프록시·전파 속성은 → <a class="docref" href="S08-transactions.html">S08</a> 참조.</p>
 <h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
 <div class="table-wrap"><table>

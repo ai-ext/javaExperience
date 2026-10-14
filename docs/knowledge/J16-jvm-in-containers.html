@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J16. 컨테이너 환경의 JVM</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -110,7 +110,8 @@ CDS/AOT 캐시는 HotSpot의 시작·워밍업을 줄이고, CRaC는 실행 중�
                       + thread stack + direct/native + 매핑 페이지 + 피크 여유</code></pre>
 <p>이는 정확한 덧셈식이 아니다. 일부 페이지는 공유되고 주소 공간 예약은 곧바로 RSS가 되지 않는다. 힙 상한을 정한 뒤 cgroup 사용량·RSS·NMT로 안전 여유를 확인한다.</p>
 <h3 id="33-cpu-quota와-activeprocessorcount"><a class="anchor" href="#33-cpu-quota와-activeprocessorcount" aria-hidden="true">#</a>3.3 CPU quota와 <code>ActiveProcessorCount</code></h3>
-<p>CPU quota는 주기별 CPU 실행 시간을 제한한다. 0.5 CPU는 코어 절반을 따로 배정한다기보다 스레드들이 경쟁해도 평균 실행 시간이 제한된다는 뜻이다. <code>ActiveProcessorCount=N</code>은 GC와 ForkJoinPool 같은 JVM 풀 크기 산정에 쓸 CPU 수를 강제한다. <code>UseContainerSupport</code>가 꺼져 있어도 적용되지만 quota·affinity를 변경하거나 앱 스레드를 제한하지 않는다. quota와 감지값이 다를 때만 조정하고 throttling과 지연시간을 함께 본다.</p>
+<p>CPU quota는 주기별 CPU 실행 시간을 제한한다. 0.5 CPU는 코어 절반을 따로 배정한다기보다 스레드들이 경쟁해도 평균 실행 시간이 제한된다는 뜻이다. <code>ActiveProcessorCount=N</code>은 GC와 ForkJoinPool 같은 JVM 풀 크기 산정에 쓸 CPU 수를 강제한다.</p>
+<p><code>UseContainerSupport</code>가 꺼져 있어도 적용되지만 quota·affinity를 변경하거나 앱 스레드를 제한하지 않는다. quota와 감지값이 다를 때만 조정하고 throttling과 지연시간을 함께 본다.</p>
 <h3 id="34-힙-네이티브-메모리-rss와-nmt"><a class="anchor" href="#34-힙-네이티브-메모리-rss와-nmt" aria-hidden="true">#</a>3.4 힙, 네이티브 메모리, RSS와 NMT</h3>
 <p>힙 그래프가 평평해도 RSS가 증가할 수 있다. RSS는 상주 중인 힙 페이지뿐 아니라 스택, Metaspace, 코드 캐시, GC 구조, direct buffer, JNI 및 라이브러리·파일 매핑도 포함할 수 있다. 공유 CDS 페이지는 프로세스별 RSS를 단순 합산하면 중복 계산될 수 있다.</p>
 <p>NMT는 HotSpot 내부 메모리를 <code>summary</code>(하위 시스템) 또는 <code>detail</code>(호출 위치)로 추적한다. 기본 꺼짐이며 Java 25 문서는 활성화 오버헤드를 5~10%로 기재한다. 제3자 native 코드, JDK 라이브러리와 CDS 아카이브 메모리 일부는 완전하게 추적하지 않는다. NMT committed와 RSS는 다른 관측값이므로 차이를 곧바로 누수로 단정할 수 없다.</p>
@@ -156,7 +157,8 @@ java -XX:AOTCache=orders.aot -jar orders.jar</code></pre>
 <p>AOT cache를 써도 HotSpot은 계속 실행된다. JEP 483 초기 범위는 JDK 내장 class loader가 classpath·module path·JDK에서 읽는 클래스이며 사용자 정의 class loader 클래스는 제외한다. 학습과 운영의 앱·JDK 구성이 다르면 캐시를 다시 만들고, 학습 중 외부 부작용이 발생하지 않도록 격리한다.</p>
 <h3 id="37-crac와-native-image"><a class="anchor" href="#37-crac와-native-image" aria-hidden="true">#</a>3.7 CRaC와 Native Image</h3>
 <p>CRaC는 준비된 JVM 상태를 체크포인트하고 복원해 시작·워밍업을 줄인다. 파일과 소켓 등 외부 자원은 체크포인트 전 닫고 복원 뒤 다시 획득하도록 조정한다. JDK 배포판·체크포인트 엔진 지원은 환경별로 검증해야 한다.</p>
-<p>Native Image는 빌드 시 정적 reachability 분석으로 필요한 코드와 리소스를 찾아 OS별 네이티브 바이너리로 만든다. 리플렉션·프록시·동적 리소스는 분석에 잡히지 않을 수 있어 metadata가 필요하다. 빌드 시 초기화가 환경설정·비밀을 고정하지 않게 주의한다. 실행 때 HotSpot은 뜨지 않지만 GraalVM 런타임, Java heap과 GC는 남는다. HotSpot 플래그·NMT를 그대로 적용하면 안 된다. GraalVM 문서상 기본 GC는 저메모리 지향 Serial이다.</p>
+<p>Native Image는 빌드 시 정적 reachability 분석으로 필요한 코드와 리소스를 찾아 OS별 네이티브 바이너리로 만든다. 리플렉션·프록시·동적 리소스는 분석에 잡히지 않을 수 있어 metadata가 필요하다. 빌드 시 초기화가 환경설정·비밀을 고정하지 않게 주의한다.</p>
+<p>실행 때 HotSpot은 뜨지 않지만 GraalVM 런타임, Java heap과 GC는 남는다. HotSpot 플래그·NMT를 그대로 적용하면 안 된다. GraalVM 문서상 기본 GC는 저메모리 지향 Serial이다.</p>
 <h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
 <p>다음 두 순수 Java 예제는 <code>Runtime.availableProcessors()</code>와 JVM 관리 인터페이스의 최대 힙을 읽는다. 컨테이너에서 실행하면 JVM이 인식한 값을 확인할 수 있다. 두 파일 모두 지정 JDK 21로 실제 실행했다. 두 번째 예제의 <code>MEMORY_LIMIT_BYTES</code>는 cgroup을 자동 읽는 값이 아니라 예산 계산을 보여주기 위해 입력한 가상 한도다.</p>
 <h3 id="예제-1--jvm이-인식한-cpu와-최대-힙"><a class="anchor" href="#예제-1--jvm이-인식한-cpu와-최대-힙" aria-hidden="true">#</a>예제 1 — JVM이 인식한 CPU와 최대 힙</h3>

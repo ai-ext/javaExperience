@@ -25,7 +25,9 @@
 
 ### `PlatformTransactionManager`의 역할
 
-`getTransaction(TransactionDefinition)`은 기존 상태를 얻거나 새 트랜잭션을 시작하고, `commit`·`rollback`이 완료한다. 애플리케이션은 보통 애노테이션이나 `TransactionTemplate`을 쓰며, 공통 전파·동기화 처리는 `AbstractPlatformTransactionManager`, 자원 처리는 JDBC·JPA·JTA별 구현체가 맡는다. 지원하지 않는 옵션은 거부될 수 있고 `ISOLATION_DEFAULT`는 기반 저장소 기본값이다. JPA 영속성 컨텍스트는 → S09 참조.
+`getTransaction(TransactionDefinition)`은 기존 상태를 얻거나 새 트랜잭션을 시작하고, `commit`·`rollback`이 완료한다. 애플리케이션은 보통 애노테이션이나 `TransactionTemplate`을 쓰며, 공통 전파·동기화 처리는 `AbstractPlatformTransactionManager`, 자원 처리는 JDBC·JPA·JTA별 구현체가 맡는다.
+
+지원하지 않는 옵션은 거부될 수 있고 `ISOLATION_DEFAULT`는 기반 저장소 기본값이다. JPA 영속성 컨텍스트는 → S09 참조.
 
 ### 전파 7종
 
@@ -39,7 +41,9 @@
 | `NOT_SUPPORTED` | 바깥 트랜잭션을 보류하고 트랜잭션 없이 실행 | 트랜잭션 없이 실행 | 트랜잭션이 필요 없는 느린 작업을 분리할 때. 보류·재개 의미는 관리자에 좌우된다. |
 | `NEVER` | 예외 | 트랜잭션 없이 실행 | 트랜잭션 안에서 호출되면 안 되는 경계를 검증할 때 쓴다. |
 
-`REQUIRED`는 서비스-저장소 호출의 기본 선택이다. 안쪽이 rollback-only를 표시하면 같은 물리 트랜잭션을 쓰는 바깥 커밋도 실패하며 `UnexpectedRollbackException`이 발생한다. `REQUIRES_NEW`는 보류된 바깥 커넥션 외에 새 커넥션을 요구하므로 풀을 동시 스레드 수보다 최소 하나 크게 잡는 등 고갈을 고려한다. `NESTED`는 한 물리 트랜잭션의 savepoint 롤백이고 `REQUIRES_NEW`는 독립 커밋이다. 전자는 JDBC 매니저·드라이버의 savepoint 지원을 확인한다.
+`REQUIRED`는 서비스-저장소 호출의 기본 선택이다. 안쪽이 rollback-only를 표시하면 같은 물리 트랜잭션을 쓰는 바깥 커밋도 실패하며 `UnexpectedRollbackException`이 발생한다. `REQUIRES_NEW`는 보류된 바깥 커넥션 외에 새 커넥션을 요구하므로 풀을 동시 스레드 수보다 최소 하나 크게 잡는 등 고갈을 고려한다.
+
+`NESTED`는 한 물리 트랜잭션의 savepoint 롤백이고 `REQUIRES_NEW`는 독립 커밋이다. 전자는 JDBC 매니저·드라이버의 savepoint 지원을 확인한다.
 
 ### 격리수준과 동시성 이상
 
@@ -95,7 +99,9 @@ TransactionInterceptor ── @Transactional 메타데이터 읽기
 커넥션 등 자원 정리, 보류한 트랜잭션이 있으면 재개
 ```
 
-애노테이션은 설정 메타데이터다. `TransactionInterceptor`가 호출을 감싸 매니저에 경계를 요청한다. JDBC 트랜잭션 자원은 보통 현재 스레드에 묶이므로 새 스레드로 전파되지 않으며, 리액티브 작업은 Reactor Context를 따른다. 기본 롤백 대상은 `RuntimeException`과 `Error`; checked 예외를 내부에서 잡아 정상 반환하면 인터셉터는 롤백할 근거가 없으므로 필요 시 rollback-only를 표시한다.
+애노테이션은 설정 메타데이터다. `TransactionInterceptor`가 호출을 감싸 매니저에 경계를 요청한다.
+
+JDBC 트랜잭션 자원은 보통 현재 스레드에 묶이므로 새 스레드로 전파되지 않으며, 리액티브 작업은 Reactor Context를 따른다. 기본 롤백 대상은 `RuntimeException`과 `Error`; checked 예외를 내부에서 잡아 정상 반환하면 인터셉터는 롤백할 근거가 없으므로 필요 시 rollback-only를 표시한다.
 
 ### 전파는 호출 경계와 물리 자원을 나눈다
 
@@ -103,13 +109,19 @@ TransactionInterceptor ── @Transactional 메타데이터 읽기
 
 ### 롤백 규칙 매칭
 
-기본 동작은 `RuntimeException`과 `Error` 롤백, checked 예외 커밋이다. 따라서 업무 실패를 checked 예외로 표현한다면 `rollbackFor = DomainException.class`처럼 타입을 구체적으로 선언한다. 반대로 특정 예외여도 커밋해야 한다면 `noRollbackFor`를 사용한다. 충돌하는 규칙이 있을 때는 예외 계층에서 더 구체적으로 일치하는 규칙을 의도해야 하며, 이름 일부를 포함하는 문자열 규칙은 유사 접미사나 중첩 예외까지 맞을 수 있어 피하는 편이 안전하다.
+기본 동작은 `RuntimeException`과 `Error` 롤백, checked 예외 커밋이다. 따라서 업무 실패를 checked 예외로 표현한다면 `rollbackFor = DomainException.class`처럼 타입을 구체적으로 선언한다.
 
-Spring Framework 6.2부터 `@EnableTransactionManagement(rollbackOn = RollbackOn.ALL_EXCEPTIONS)`로 애플리케이션의 기본 정책을 모든 예외 롤백으로 바꿀 수 있다. 설정한 기본 정책보다 개별 트랜잭션의 명시적인 규칙이 우선한다. Kotlin은 checked 예외 강제가 없으므로 checked 예외에 의존하지 않는 전역 정책이 특히 유용하다. 한편 비동기 `Future`/`CompletableFuture`는 원래 메서드가 반환할 당시 이미 예외 완료 상태인 경우 롤백과 연결될 수 있지만, 반환 후 나중에 실패하는 비동기 작업까지 원래 DB 트랜잭션이 기다려 보장하지 않는다.
+반대로 특정 예외여도 커밋해야 한다면 `noRollbackFor`를 사용한다. 충돌하는 규칙이 있을 때는 예외 계층에서 더 구체적으로 일치하는 규칙을 의도해야 하며, 이름 일부를 포함하는 문자열 규칙은 유사 접미사나 중첩 예외까지 맞을 수 있어 피하는 편이 안전하다.
+
+Spring Framework 6.2부터 `@EnableTransactionManagement(rollbackOn = RollbackOn.ALL_EXCEPTIONS)`로 애플리케이션의 기본 정책을 모든 예외 롤백으로 바꿀 수 있다. 설정한 기본 정책보다 개별 트랜잭션의 명시적인 규칙이 우선한다.
+
+Kotlin은 checked 예외 강제가 없으므로 checked 예외에 의존하지 않는 전역 정책이 특히 유용하다. 한편 비동기 `Future`/`CompletableFuture`는 원래 메서드가 반환할 당시 이미 예외 완료 상태인 경우 롤백과 연결될 수 있지만, 반환 후 나중에 실패하는 비동기 작업까지 원래 DB 트랜잭션이 기다려 보장하지 않는다.
 
 ### 이벤트와 커밋의 관계
 
-`@TransactionalEventListener`는 Spring 애플리케이션 이벤트를 트랜잭션 단계에 묶는다. 기본 `AFTER_COMMIT`은 DB 커밋이 성공한 뒤 처리하고, `BEFORE_COMMIT`, `AFTER_ROLLBACK`, `AFTER_COMPLETION`도 선택할 수 있다. 트랜잭션이 없으면 기본적으로 리스너를 호출하지 않으며, 일반 이벤트처럼 실행하려는 특수 상황에서만 `fallbackExecution=true`를 쓴다. 이는 프로세스 안에서 커밋 여부와 후처리 시점을 맞추는 기능이지, 브로커까지 원자적 전달을 보장하는 큐가 아니다.
+`@TransactionalEventListener`는 Spring 애플리케이션 이벤트를 트랜잭션 단계에 묶는다. 기본 `AFTER_COMMIT`은 DB 커밋이 성공한 뒤 처리하고, `BEFORE_COMMIT`, `AFTER_ROLLBACK`, `AFTER_COMPLETION`도 선택할 수 있다.
+
+트랜잭션이 없으면 기본적으로 리스너를 호출하지 않으며, 일반 이벤트처럼 실행하려는 특수 상황에서만 `fallbackExecution=true`를 쓴다. 이는 프로세스 안에서 커밋 여부와 후처리 시점을 맞추는 기능이지, 브로커까지 원자적 전달을 보장하는 큐가 아니다.
 
 ## 4. 코드로 확인
 
@@ -271,7 +283,8 @@ CREATE TABLE outbox_event (
 
 ### Q1. `PlatformTransactionManager`와 `@Transactional`의 관계는?
 
-`@Transactional`은 속성 메타데이터고, `PlatformTransactionManager`는 명령형 자원에서 실제 경계를 만든다. 인터셉터가 속성을 읽고 `getTransaction`, `commit`, `rollback`을 호출한다. 매니저가 관리하지 않는 메시지 브로커까지 자동으로 하나의 DB 트랜잭션이 되지는 않는다.  
+`@Transactional`은 속성 메타데이터고, `PlatformTransactionManager`는 명령형 자원에서 실제 경계를 만든다. 인터셉터가 속성을 읽고 `getTransaction`, `commit`, `rollback`을 호출한다. 매니저가 관리하지 않는 메시지 브로커까지 자동으로 하나의 DB 트랜잭션이 되지는 않는다.
+
 꼬리질문: 리액티브에서는 무엇이 다른가? **Reactor Context를 쓰는 `ReactiveTransactionManager`를 사용하며 ThreadLocal 트랜잭션과 구분한다.**
 
 ### Q2. 내부 `REQUIRED` 메서드가 rollback-only가 되면 왜 바깥 커밋에서 예외가 나는가?
@@ -286,7 +299,8 @@ CREATE TABLE outbox_event (
 
 ### Q4. checked 예외를 던졌는데 롤백되지 않는 이유와 해결책은?
 
-Spring 기본 규칙이 `RuntimeException` 및 `Error`에 롤백하고 checked 예외에는 커밋하는 정책이기 때문이다. 업무 실패 checked 예외에 `rollbackFor = SomeException.class`를 선언한다. Spring 6.2 이상에서는 전역 기본을 `ALL_EXCEPTIONS`로 바꿀 수도 있다.  
+Spring 기본 규칙이 `RuntimeException` 및 `Error`에 롤백하고 checked 예외에는 커밋하는 정책이기 때문이다. 업무 실패 checked 예외에 `rollbackFor = SomeException.class`를 선언한다. Spring 6.2 이상에서는 전역 기본을 `ALL_EXCEPTIONS`로 바꿀 수도 있다.
+
 꼬리질문: 예외 이름 패턴 대신 타입을 권하는 이유는? **부분 문자열 매칭이라 유사한 이름이나 중첩 예외까지 뜻밖에 일치할 수 있다.**
 
 ### Q5. `isolation=SERIALIZABLE`이면 재시도 코드는 필요 없는가?

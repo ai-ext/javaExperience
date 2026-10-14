@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J09. Stream API</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -19,7 +19,8 @@
 </blockquote>
 <h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
 <p>배치에 <code>.parallel()</code>을 덧붙였더니 DB 호출이 한꺼번에 몰려 풀이 막히고, 요청별 <code>ThreadLocal</code> 정보가 사라질 수 있다. <code>ArrayList</code>를 <code>reduce</code>에서 수정하거나 순서 의존 누산기를 병렬화하면 결과도 달라진다. <code>toMap</code>은 중복 키에서 기본 수집기가 예외를 내며, <code>peek</code> 로그는 최적화로 생략될 수 있다.</p>
-<p>Stream API를 단순히 “람다로 컬렉션을 도는 문법”으로 보면 이런 문제를 놓친다. 스트림은 값을 저장하지 않고 계산을 기술한다. 구현은 필요한 값만 읽거나, 여러 단계를 한 번에 수행하거나, 순차 연산을 생략할 수도 있다. 병렬 모드에서는 입력을 분할해 여러 스레드에서 실행하고 부분 결과를 결합한다. 따라서 순서, 부수 효과, 연산의 결합 가능성, 소스의 분할 특성이 모두 결과와 성능에 영향을 준다. 람다와 함수형 인터페이스의 원리는 → <a class="docref" href="J08-lambda-functional.html">J08</a> 참조.</p>
+<p>Stream API를 단순히 “람다로 컬렉션을 도는 문법”으로 보면 이런 문제를 놓친다. 스트림은 값을 저장하지 않고 계산을 기술한다. 구현은 필요한 값만 읽거나, 여러 단계를 한 번에 수행하거나, 순차 연산을 생략할 수도 있다.</p>
+<p>병렬 모드에서는 입력을 분할해 여러 스레드에서 실행하고 부분 결과를 결합한다. 따라서 순서, 부수 효과, 연산의 결합 가능성, 소스의 분할 특성이 모두 결과와 성능에 영향을 준다. 람다와 함수형 인터페이스의 원리는 → <a class="docref" href="J08-lambda-functional.html">J08</a> 참조.</p>
 <h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
 <p>스트림은 소스의 원소를 파이프라인에 전달하는 1회성 계산 객체다. <code>Collection</code>처럼 원소를 보관하거나 인덱스로 조회하지 않는다. 소스는 컬렉션·배열·생성 함수·I/O 등일 수 있다.</p>
 <div class="table-wrap"><table>
@@ -74,7 +75,8 @@
 <p><strong>중간 연산과 최종 연산:</strong> <code>map</code>·<code>filter</code>만 호출하면 계산되지 않는다. 최종 연산 하나가 스트림을 소비하고, 재사용하려면 <code>Supplier&lt;Stream&lt;T&gt;&gt;</code> 등으로 새 스트림을 만든다. <code>findFirst</code>, <code>anyMatch</code>, <code>limit</code>은 결과가 확정되면 입력을 더 읽지 않을 수 있다.</p>
 <p><strong>지연 평가와 단락:</strong> 전자는 연산 시점, 후자는 처리량의 특성이다. <code>iterate(...).filter(...).findFirst()</code>는 첫 일치 값에서 멈출 수 있지만 무한 입력에 <code>sorted()</code>를 먼저 적용하면 입력 끝을 알 수 없어 완료하지 못한다.</p>
 <p><strong><code>map</code>과 <code>flatMap</code>:</strong> <code>map</code>은 원소 하나를 결과 하나로 바꾼다. <code>flatMap</code>은 원소 하나를 하위 스트림으로 바꾼 다음 하위 스트림들을 이어 붙인다. <code>List&lt;List&lt;T&gt;&gt;</code>를 평탄화하거나 주문별 품목을 한 줄의 품목 흐름으로 만드는 데 적합하다. 하위 결과가 없으면 빈 스트림을 반환하면 된다.</p>
-<p><strong><code>groupingBy</code>, <code>partitioningBy</code>, <code>toMap</code>:</strong> <code>groupingBy(classifier)</code>는 분류 키마다 원소 목록을 만든다. downstream <code>Collector</code>를 붙이면 목록 대신 합계·개수·최댓값 등을 그룹별로 바로 계산한다. <code>partitioningBy(predicate)</code>는 분류 키가 <code>true</code>와 <code>false</code>뿐인 두 갈래 분할이다. <code>toMap(keyMapper, valueMapper)</code>은 키가 유일하다고 가정한다. 중복 키가 허용되면 병합 함수가 있는 오버로드를 사용하고, 더 구체적인 맵이 필요하면 맵 공급자도 지정한다.</p>
+<p><strong><code>groupingBy</code>, <code>partitioningBy</code>, <code>toMap</code>:</strong> <code>groupingBy(classifier)</code>는 분류 키마다 원소 목록을 만든다. downstream <code>Collector</code>를 붙이면 목록 대신 합계·개수·최댓값 등을 그룹별로 바로 계산한다. <code>partitioningBy(predicate)</code>는 분류 키가 <code>true</code>와 <code>false</code>뿐인 두 갈래 분할이다.</p>
+<p><code>toMap(keyMapper, valueMapper)</code>은 키가 유일하다고 가정한다. 중복 키가 허용되면 병합 함수가 있는 오버로드를 사용하고, 더 구체적인 맵이 필요하면 맵 공급자도 지정한다.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -99,8 +101,10 @@
 <td>SKU별 재고 합계; 중복 정책을 병합 함수로 결정</td>
 </tr>
 </tbody></table></div>
-<p><strong><code>reduce</code>와 <code>collect</code>:</strong> <code>reduce</code>는 불변 값의 누적 결과(합계·곱 등)를 만든다. 병렬 reduction은 임의의 묶음 순서로 계산될 수 있으므로 누산 연산은 결합법칙을 만족해야 하며 항등값도 맞아야 한다. <code>collect</code>는 컬렉션처럼 변경 가능한 컨테이너를 만들고, 분할 처리 시 각 부분 컨테이너를 결합하는 용도다. 여러 스레드가 같은 <code>ArrayList</code>를 공유하도록 <code>reduce</code>하지 말고 <code>collect(Collectors.toList())</code>처럼 Collector의 생성·누적·결합 계약을 사용한다.</p>
-<p><strong>원시 스트림:</strong> <code>IntStream</code>, <code>LongStream</code>, <code>DoubleStream</code>은 기본형 특화 스트림이다. <code>mapToInt</code>, <code>sum</code>, <code>average</code>, <code>summaryStatistics</code>는 <code>Integer</code> 등의 박싱과 언박싱을 줄이고 수치 연산을 직접 표현한다. <code>Stream&lt;T&gt;</code>에는 객체 참조, 원시 특화 스트림에는 해당 숫자형이 흐른다. Java는 <code>boolean</code>이나 <code>char</code>용 특화 스트림은 제공하지 않는다.</p>
+<p><strong><code>reduce</code>와 <code>collect</code>:</strong> <code>reduce</code>는 불변 값의 누적 결과(합계·곱 등)를 만든다. 병렬 reduction은 임의의 묶음 순서로 계산될 수 있으므로 누산 연산은 결합법칙을 만족해야 하며 항등값도 맞아야 한다.</p>
+<p><code>collect</code>는 컬렉션처럼 변경 가능한 컨테이너를 만들고, 분할 처리 시 각 부분 컨테이너를 결합하는 용도다. 여러 스레드가 같은 <code>ArrayList</code>를 공유하도록 <code>reduce</code>하지 말고 <code>collect(Collectors.toList())</code>처럼 Collector의 생성·누적·결합 계약을 사용한다.</p>
+<p><strong>원시 스트림:</strong> <code>IntStream</code>, <code>LongStream</code>, <code>DoubleStream</code>은 기본형 특화 스트림이다. <code>mapToInt</code>, <code>sum</code>, <code>average</code>, <code>summaryStatistics</code>는 <code>Integer</code> 등의 박싱과 언박싱을 줄이고 수치 연산을 직접 표현한다.</p>
+<p><code>Stream&lt;T&gt;</code>에는 객체 참조, 원시 특화 스트림에는 해당 숫자형이 흐른다. Java는 <code>boolean</code>이나 <code>char</code>용 특화 스트림은 제공하지 않는다.</p>
 <h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
 <h3 id="파이프라인은-어떻게-실행되나"><a class="anchor" href="#파이프라인은-어떻게-실행되나" aria-hidden="true">#</a>파이프라인은 어떻게 실행되나</h3>
 <pre><code class="language-text">소스(Collection / 배열 / 생성기 / I/O)
@@ -134,7 +138,8 @@
                        최종 결과 조립</code></pre>
 <p><code>parallel()</code>은 입력을 나눠 처리할 수 있게 한다. <code>Spliterator.trySplit()</code>이 균형 있게 입력을 쪼개야 하며, 원소당 일이 작으면 작업·스케줄링·결합 비용이 이득보다 클 수 있다. JEP 107도 기존 코드를 일괄 병렬화하는 것을 목표로 하지 않았다.</p>
 <p>병렬 reduction은 분할별 부분 결과를 combiner로 합친다. 합계에는 자연스럽지만 순서 의존 연산에는 맞지 않을 수 있다. Collector의 <code>CONCURRENT</code> 특성이 없으면 작업들이 한 가변 컨테이너를 함께 갱신한다고 가정하지 않는다. <code>forEach</code>는 순서를 보장하지 않으므로 순서가 계약이면 <code>forEachOrdered</code>나 순차 처리를 쓴다.</p>
-<p>OpenJDK의 일반적인 병렬 Stream은 <code>ForkJoinPool</code> 공용 풀을 활용한다. 다른 Fork/Join 작업과 경쟁하며, 블로킹 I/O가 끼어도 워커 확장이 보장되지 않는다. JDBC·HTTP 호출을 넣지 말고, 트랜잭션·MDC·보안 문맥 등 <code>ThreadLocal</code> 상태의 전파도 가정하지 않는다. Stream API에는 실행기를 지정하는 메서드가 없으므로, 사용자 풀에 제출해 병렬 Stream을 실행하는 관행은 구현 의존으로 취급하고 계약으로 삼지 않는다.</p>
+<p>OpenJDK의 일반적인 병렬 Stream은 <code>ForkJoinPool</code> 공용 풀을 활용한다. 다른 Fork/Join 작업과 경쟁하며, 블로킹 I/O가 끼어도 워커 확장이 보장되지 않는다.</p>
+<p>JDBC·HTTP 호출을 넣지 말고, 트랜잭션·MDC·보안 문맥 등 <code>ThreadLocal</code> 상태의 전파도 가정하지 않는다. Stream API에는 실행기를 지정하는 메서드가 없으므로, 사용자 풀에 제출해 병렬 Stream을 실행하는 관행은 구현 의존으로 취급하고 계약으로 삼지 않는다.</p>
 <h3 id="stream-gatherers-jep-485"><a class="anchor" href="#stream-gatherers-jep-485" aria-hidden="true">#</a>Stream Gatherers (JEP 485)</h3>
 <p>Java 24에서 정식화된 Gatherers는 사용자 정의 <strong>중간 연산</strong>을 구성하는 API다. 기존 <code>map</code>, <code>filter</code>, <code>flatMap</code>만으로 어색했던 고정/슬라이딩 윈도, 연속 중복 제거, 누적 스캔 등을 <code>gather(gatherer)</code>로 파이프라인에 넣는다. 최종 연산인 <code>collect</code>와 역할이 다르다.</p>
 <p>Gatherer는 타입 <code>T</code>·<code>A</code>·<code>R</code>와 상태 초기화 <code>initializer</code>, 입력 통합 <code>integrator</code>, 부분 상태 결합 <code>combiner</code>, 종료 처리 <code>finisher</code>로 정의된다. 의미를 보존하는 combiner가 있을 때만 병렬화하고, 순서가 본질이면 순차 Gatherer를 쓴다.</p>

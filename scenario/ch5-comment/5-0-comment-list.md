@@ -42,7 +42,9 @@
 | 빈 상태 | 글은 있지만 댓글이 없으면 `200 []`. 글이 없거나 2-3 규칙상 볼 수 없으면 `404`. 경로 ID 형식 오류는 `400`. |
 | DB | `comment.post_id → post.id`, `comment.member_id → member.id`. `parent_id IS NULL`·`deleted_at IS NULL`을 DB 조건으로 적용한다. |
 
-Controller는 경로 ID를 받고 응답 DTO 배열을 반환한다. Service는 먼저 글이 보이는지 확인한다. Repository에서는 글의 댓글 전체를 불러 Java에서 거르지 말고 조건과 정렬을 쿼리에 둔다. 예를 들어 `findByPostIdAndParentIdIsNullAndDeletedAtIsNullOrderByCreatedAtAscIdAsc`에서 시작할 수 있다. 작성자 이름을 DTO로 만드는 과정에서 댓글마다 회원 SELECT가 추가되면 `JOIN FETCH c.member` 또는 DTO 조회로 줄인다.
+Controller는 경로 ID를 받고 응답 DTO 배열을 반환한다. Service는 먼저 글이 보이는지 확인한다.
+
+Repository에서는 글의 댓글 전체를 불러 Java에서 거르지 말고 조건과 정렬을 쿼리에 둔다. 예를 들어 `findByPostIdAndParentIdIsNullAndDeletedAtIsNullOrderByCreatedAtAscIdAsc`에서 시작할 수 있다. 작성자 이름을 DTO로 만드는 과정에서 댓글마다 회원 SELECT가 추가되면 `JOIN FETCH c.member` 또는 DTO 조회로 줄인다.
 
 시드의 11번 글은 최상위 댓글 1·3이 살아 있다. 2·5는 답글이고 4·6은 삭제돼서 이번 결과에는 없다. 3번 글은 댓글이 없어 `[]`다. **5-3에 도달하면** 같은 URL에 `replies`와 삭제 자리 표시, 차단 회원 필터를 추가한다. 지금의 응답 DTO에 없는 정보를 빈 배열로 꾸며 내지 않는다.
 
@@ -149,7 +151,9 @@ public class CommentRow {
 }
 ```
 
-이 클래스는 `org.example.comment` 패키지에 둔다. Mapper가 채운 행을 `MyBatisCommentQueryService`에서 `CommentAuthorResponse`와 `CommentResponse`로 바꾼다. 글 가시성은 `PostVisibilityMapper.findVisibleDetail`로 먼저 확인한다. 실행 가능한 Controller·Service·Mapper Java/XML과 테스트 전문은 아래 MyBatis 역할별 코드 접기에 있다.
+이 클래스는 `org.example.comment` 패키지에 둔다. Mapper가 채운 행을 `MyBatisCommentQueryService`에서 `CommentAuthorResponse`와 `CommentResponse`로 바꾼다.
+
+글 가시성은 `PostVisibilityMapper.findVisibleDetail`로 먼저 확인한다. 실행 가능한 Controller·Service·Mapper Java/XML과 테스트 전문은 아래 MyBatis 역할별 코드 접기에 있다.
 
 </details>
 

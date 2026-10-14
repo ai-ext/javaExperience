@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S02. AOP와 프록시</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -118,7 +118,8 @@ BeanPostProcessor / 자동 프록시 생성기
 <p>프록시는 보통 target을 대체해 업무 코드를 복제하는 객체가 아니다. 호출을 받아 interceptor/advice를 실행한 뒤 실제 메서드를 호출한다. Spring AOP의 pointcut은 결국 프록시가 관찰할 수 있는 메서드 실행을 고른다. 객체가 컨테이너 밖에서 <code>new</code>로 만들어졌거나, 호출 경로가 프록시 참조를 지나지 않으면 자동으로 조언을 적용할 지점이 없다.</p>
 <h3 id="jdk-동적-프록시와-cglib"><a class="anchor" href="#jdk-동적-프록시와-cglib" aria-hidden="true">#</a>JDK 동적 프록시와 CGLIB</h3>
 <p>JDK 프록시는 지정한 인터페이스들을 구현하는 런타임 클래스를 만들고, 인터페이스 메서드 호출을 <code>InvocationHandler.invoke</code>로 전달한다. 그래서 호출 가능한 타입의 기준은 프록시가 구현한 인터페이스다. Framework의 기본 규칙은 인터페이스가 있으면 JDK 프록시, 없으면 CGLIB다. 단, 전역 설정이 프록시 종류를 강제할 수 있고 Spring Boot는 CGLIB를 기본으로 활성화한다.</p>
-<p>CGLIB는 target 클래스의 하위 클래스를 런타임에 만들어 오버라이드 가능한 메서드를 가로챈다. 클래스 자체가 <code>final</code>이면 상속할 수 없다. <code>final</code> 메서드는 재정의할 수 없고 <code>private</code> 메서드는 하위 클래스에서 재정의할 수 없으므로 조언 대상이 될 수 없다. 부모 클래스의 다른 패키지에 선언된 package-private 메서드처럼 하위 클래스에서 사실상 접근할 수 없는 메서드도 대상이 아니다. Boot 기본값이 CGLIB라고 해서 모든 메서드에 AOP가 붙는 것은 아니다.</p>
+<p>CGLIB는 target 클래스의 하위 클래스를 런타임에 만들어 오버라이드 가능한 메서드를 가로챈다. 클래스 자체가 <code>final</code>이면 상속할 수 없다. <code>final</code> 메서드는 재정의할 수 없고 <code>private</code> 메서드는 하위 클래스에서 재정의할 수 없으므로 조언 대상이 될 수 없다.</p>
+<p>부모 클래스의 다른 패키지에 선언된 package-private 메서드처럼 하위 클래스에서 사실상 접근할 수 없는 메서드도 대상이 아니다. Boot 기본값이 CGLIB라고 해서 모든 메서드에 AOP가 붙는 것은 아니다.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -157,7 +158,8 @@ target.methodA 안에서 this.methodB() 호출
 <p><code>methodA()</code>가 프록시를 통해 호출되어 조언을 받아도, 그 안의 <code>this.methodB()</code>에서 <code>this</code>는 target 객체 자신이다. target 내부에서 프록시 참조를 다시 조회하지 않으므로 <code>methodB()</code>는 advice 체인 밖에서 직접 실행된다. 이 원리는 CGLIB를 쓰는지 JDK 프록시를 쓰는지와 무관하다. 프록시 구현 종류를 바꾸는 것만으로 self-invocation은 해결되지 않는다.</p>
 <p>기본 해결책은 조언을 받아야 하는 동작을 별도 Spring 빈으로 옮겨 빈 간 호출이 프록시 경계를 지나게 하는 것이다. 구조상 분리가 불가능하다면 자기 자신 프록시 참조를 주입하거나 <code>AopContext.currentProxy()</code>를 쓸 수 있지만, 순환 의존·프록시 결합·<code>exposeProxy</code> 설정 등 복잡성이 따라온다. 내부 호출 자체까지 위빙해야 하는 요구라면 AspectJ 위빙을 검토한다.</p>
 <h3 id="advice-순서"><a class="anchor" href="#advice-순서" aria-hidden="true">#</a>Advice 순서</h3>
-<p>서로 다른 aspect의 우선순위는 <code>@Order</code> 또는 <code>Ordered</code>로 정할 수 있다. 숫자가 낮을수록 우선순위가 높다. 중첩된 <code>@Around</code> advice라면 우선순위가 높은 aspect가 바깥에서 먼저 진입하고, <code>proceed()</code> 이후에는 역순으로 빠져나온다. <code>@Order</code>는 빈 생성 순서를 지정하지 않는다. 같은 aspect 안에 선언한 여러 advice 메서드의 실행 순서에도 의존하지 말고 순서 제어가 필요하면 aspect를 나누어 각각 순서를 지정한다.</p>
+<p>서로 다른 aspect의 우선순위는 <code>@Order</code> 또는 <code>Ordered</code>로 정할 수 있다. 숫자가 낮을수록 우선순위가 높다. 중첩된 <code>@Around</code> advice라면 우선순위가 높은 aspect가 바깥에서 먼저 진입하고, <code>proceed()</code> 이후에는 역순으로 빠져나온다.</p>
+<p><code>@Order</code>는 빈 생성 순서를 지정하지 않는다. 같은 aspect 안에 선언한 여러 advice 메서드의 실행 순서에도 의존하지 말고 순서 제어가 필요하면 aspect를 나누어 각각 순서를 지정한다.</p>
 <h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
 <h3 id="예제-1--jdk-프록시의-호출-위임-순수-java-실행-완료"><a class="anchor" href="#예제-1--jdk-프록시의-호출-위임-순수-java-실행-완료" aria-hidden="true">#</a>예제 1 — JDK 프록시의 호출 위임 (순수 Java, 실행 완료)</h3>
 <p>다음 프로그램은 인터페이스 호출이 <code>InvocationHandler</code>로 전달되는 구조를 보인다. Spring은 이 기본 프록시 앞뒤에 advisor 판정과 interceptor 체인을 추가한다.</p>

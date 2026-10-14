@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>1-6. 토큰으로 작성자 정하기</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
@@ -133,7 +133,10 @@
 <details>
 <summary>MyBatis — 토큰 조회와 글·태그 저장 대체 경로</summary>
 
-<p>아래 <strong>MyBatis 대체 구현 코드</strong> 접기를 선택해 기본 JPA 스냅샷에 15개 파일 변경을 적용한다. <code>AuthTokenMapper.xml</code>은 <code>api_token</code>과 <code>member</code>를 JOIN해 만료·폐기·회원 상태를 한 번에 읽는다. 토큰 원문은 결과 DTO와 로그에 싣지 않는다. <code>PostCreationMapper.xml</code>은 게시판의 <code>write_role</code>과 인증된 작성자를 조회하고, <code>post</code> INSERT의 생성 키로 <code>tag</code>와 <code>post_tag</code>를 연결한다. 태그 ID와 DB에 저장된 이름으로 중복 연결을 막고 응답을 만든다. <code>PostService</code>의 <code>@Transactional</code>이 글·태그 저장을 한 트랜잭션으로 묶는다. <code>PostController</code>는 요청의 <code>authorId</code>를 읽지 않고 인터셉터가 확인한 회원 ID만 전달한다. JPA와 MyBatis 양쪽에서 T1~T11 및 D1·D2를 같은 계약으로 확인한다.</p>
+<p>아래 <strong>MyBatis 대체 구현 코드</strong> 접기를 선택해 기본 JPA 스냅샷에 15개 파일 변경을 적용한다. <code>AuthTokenMapper.xml</code>은 <code>api_token</code>과 <code>member</code>를 JOIN해 만료·폐기·회원 상태를 한 번에 읽는다.</p>
+<p>토큰 원문은 결과 DTO와 로그에 싣지 않는다. <code>PostCreationMapper.xml</code>은 게시판의 <code>write_role</code>과 인증된 작성자를 조회하고, <code>post</code> INSERT의 생성 키로 <code>tag</code>와 <code>post_tag</code>를 연결한다.</p>
+<p>태그 ID와 DB에 저장된 이름으로 중복 연결을 막고 응답을 만든다. <code>PostService</code>의 <code>@Transactional</code>이 글·태그 저장을 한 트랜잭션으로 묶는다.</p>
+<p><code>PostController</code>는 요청의 <code>authorId</code>를 읽지 않고 인터셉터가 확인한 회원 ID만 전달한다. JPA와 MyBatis 양쪽에서 T1~T11 및 D1·D2를 같은 계약으로 확인한다.</p>
 </details>
 
 <details>
@@ -151,7 +154,8 @@
 <details>
 <summary>설정·보조 코드</summary>
 
-<p><code>AuthenticatedMember.java</code>, <code>ClockConfig.java</code>, <code>LoginMember.java</code>, <code>LoginMemberArgumentResolver.java</code>, <code>WebMvcConfig.java</code>, <code>application.yml</code>. 이 파일에서 바뀐 설정·보조 타입이 서버 흐름의 어느 단계에 필요한지 확인한다. 변경된 메서드: <code>clock</code>, <code>supportsParameter</code>, <code>resolveArgument</code>, <code>addInterceptors</code>. <code>application.yml</code>의 <code>org.hibernate.orm.jdbc.bind</code>는 <code>info</code>로 낮춰 토큰 조회 바인딩 값이 로그에 남지 않게 한다.</p>
+<p><code>AuthenticatedMember.java</code>, <code>ClockConfig.java</code>, <code>LoginMember.java</code>, <code>LoginMemberArgumentResolver.java</code>, <code>WebMvcConfig.java</code>, <code>application.yml</code>. 이 파일에서 바뀐 설정·보조 타입이 서버 흐름의 어느 단계에 필요한지 확인한다.</p>
+<p>변경된 메서드: <code>clock</code>, <code>supportsParameter</code>, <code>resolveArgument</code>, <code>addInterceptors</code>. <code>application.yml</code>의 <code>org.hibernate.orm.jdbc.bind</code>는 <code>info</code>로 낮춰 토큰 조회 바인딩 값이 로그에 남지 않게 한다.</p>
 </details>
 
 <h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
@@ -1339,9 +1343,9 @@ post -H 'Authorization: Bearer tok-kimjava' \
 <details>
 <summary>힌트 1 — 어디서 확인할까</summary>
 
-<p><code>HandlerInterceptor</code>의 <code>preHandle</code>은 컨트롤러 메서드의 매개변수(<code>@RequestBody</code>)를 만들기 <strong>전에</strong> 실행된다. 그래서 C9(깨진 본문 + 토큰 없음 → 401)를 맞추기 쉽다. 확인한 회원은 <code>request.setAttribute(...)</code>로 넘긴다. <code>/api/**</code>에 적용하되 0장의 공개 실습 API <code>/api/start/**</code>는 <code>excludePathPatterns</code>로 뺀다(<code>WebMvcConfigurer.addInterceptors</code>). <code>/hello</code>도 <code>/api/**</code> 밖이라 대상이 아니다. 2-1부터는 로그인 없이 보는 GET이 생기므로, &quot;GET이고 <code>Authorization</code> 헤더가 없으면 통과&quot;를 지금 넣어 두거나 2-1에서 고친다(헤더가 <strong>있는데</strong> 틀리면 GET이라도 401).</p>
-</details>
-
+<p><code>HandlerInterceptor</code>의 <code>preHandle</code>은 컨트롤러 메서드의 매개변수(<code>@RequestBody</code>)를 만들기 <strong>전에</strong> 실행된다. 그래서 C9(깨진 본문 + 토큰 없음 → 401)를 맞추기 쉽다.</p>
+<p>확인한 회원은 <code>request.setAttribute(...)</code>로 넘긴다. <code>/api/**</code>에 적용하되 0장의 공개 실습 API <code>/api/start/**</code>는 <code>excludePathPatterns</code>로 뺀다(<code>WebMvcConfigurer.addInterceptors</code>).</p>
+<p><code>/hello</code>도 <code>/api/**</code> 밖이라 대상이 아니다. 2-1부터는 로그인 없이 보는 GET이 생기므로, &quot;GET이고 <code>Authorization</code> 헤더가 없으면 통과&quot;를 지금 넣어 두거나 2-1에서 고친다(헤더가 <strong>있는데</strong> 틀리면 GET이라도 401). </details></p>
 <details>
 <summary>힌트 2 — 컨트롤러에서 회원 받기</summary>
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>6-5. 내가 표시한 글 — 좋아요·북마크 조건 조합</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
@@ -53,7 +53,8 @@
 <details>
 <summary>Controller — 두 필터와 페이지 입력 검증</summary>
 
-<p>두 필터를 <code>required=false</code> 문자열로 받아 생략(<code>null</code>)과 빈 값(<code>&quot;&quot;</code>)을 구별한다. 정확히 <code>true</code>/<code>false</code>인지 확인한다. Spring의 boolean 자동 변환은 <code>yes</code>·<code>1</code>도 받을 수 있고 <code>defaultValue</code>는 빈 값을 생략처럼 처리하므로, 여기서는 요청 형식 오류를 명시적으로 <code>400</code>으로 처리한다. <code>page</code>·<code>size</code>도 문자열로 받아 생략일 때만 기본값 0·20을 적용하고, 빈 값·숫자 외 문자열·범위 밖 값은 <code>400</code>이다. 회원 ID는 요청에 받지 않는다.</p>
+<p>두 필터를 <code>required=false</code> 문자열로 받아 생략(<code>null</code>)과 빈 값(<code>&quot;&quot;</code>)을 구별한다. 정확히 <code>true</code>/<code>false</code>인지 확인한다.</p>
+<p>Spring의 boolean 자동 변환은 <code>yes</code>·<code>1</code>도 받을 수 있고 <code>defaultValue</code>는 빈 값을 생략처럼 처리하므로, 여기서는 요청 형식 오류를 명시적으로 <code>400</code>으로 처리한다. <code>page</code>·<code>size</code>도 문자열로 받아 생략일 때만 기본값 0·20을 적용하고, 빈 값·숫자 외 문자열·범위 밖 값은 <code>400</code>이다. 회원 ID는 요청에 받지 않는다.</p>
 <pre><code class="language-java">@GetMapping(&quot;/api/me/posts&quot;)
 public MarkedPostPageResponse markedPosts(
         @RequestParam(required = false) String liked,
@@ -131,8 +132,10 @@ WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NUL
   AND l.id IS NOT NULL AND bm.id IS NOT NULL
 ORDER BY p.id DESC
 LIMIT 20 OFFSET 0;</code></pre>
-<p>다음 순서로 직접 바꾼다. ① <code>AND bm.id IS NOT NULL</code>만 빼서 좋아요 목록, ② <code>AND l.id IS NOT NULL</code>만 빼서 북마크 목록, ③ 두 줄 대신 <code>AND (l.id IS NOT NULL OR bm.id IS NOT NULL)</code>을 넣어 전체 표시 목록을 만든다. <code>COUNT(*)</code> 쿼리도 <code>LIMIT/OFFSET</code>만 빼고 <strong>같은 WHERE</strong>를 써야 <code>totalElements</code>가 맞는다. 관계가 없는 글까지 읽은 뒤 Java에서 거르면 페이지가 20개보다 적게 차는 오류가 생긴다.</p>
-<p>JPA에서는 <code>Post</code>의 <code>likes</code> 컬렉션을 새로 만들 필요가 없다. <code>PostLike</code>와 <code>Bookmark</code>에 이미 <code>post</code>·<code>member</code> 연관 필드가 있으므로 <code>EXISTS</code> 서브쿼리로 <code>Post</code> 페이지를 직접 읽는다. <code>@EntityGraph(attributePaths = {&quot;author&quot;, &quot;board&quot;})</code>로 응답에 필요한 두 관계를 함께 읽는다. 다음 세 조건을 모두 <code>WHERE</code>에 넣고, 공개·미삭제·차단 제외 조건까지 같은 <code>countQuery</code>에 복사한다.</p>
+<p>다음 순서로 직접 바꾼다. ① <code>AND bm.id IS NOT NULL</code>만 빼서 좋아요 목록, ② <code>AND l.id IS NOT NULL</code>만 빼서 북마크 목록, ③ 두 줄 대신 <code>AND (l.id IS NOT NULL OR bm.id IS NOT NULL)</code>을 넣어 전체 표시 목록을 만든다.</p>
+<p><code>COUNT(*)</code> 쿼리도 <code>LIMIT/OFFSET</code>만 빼고 <strong>같은 WHERE</strong>를 써야 <code>totalElements</code>가 맞는다. 관계가 없는 글까지 읽은 뒤 Java에서 거르면 페이지가 20개보다 적게 차는 오류가 생긴다.</p>
+<p>JPA에서는 <code>Post</code>의 <code>likes</code> 컬렉션을 새로 만들 필요가 없다. <code>PostLike</code>와 <code>Bookmark</code>에 이미 <code>post</code>·<code>member</code> 연관 필드가 있으므로 <code>EXISTS</code> 서브쿼리로 <code>Post</code> 페이지를 직접 읽는다.</p>
+<p><code>@EntityGraph(attributePaths = {&quot;author&quot;, &quot;board&quot;})</code>로 응답에 필요한 두 관계를 함께 읽는다. 다음 세 조건을 모두 <code>WHERE</code>에 넣고, 공개·미삭제·차단 제외 조건까지 같은 <code>countQuery</code>에 복사한다.</p>
 <pre><code class="language-java">AND (:liked = false OR EXISTS (SELECT 1 FROM PostLike l
     WHERE l.member.id = :memberId AND l.post = p))
 AND (:bookmarked = false OR EXISTS (SELECT 1 FROM Bookmark bm

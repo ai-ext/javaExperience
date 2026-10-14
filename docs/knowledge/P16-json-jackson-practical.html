@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>P16. JSON·Jackson 실무 — 요청/응답 직렬화에서 막히는 것들</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -38,7 +38,8 @@ class MemberController {
 }</code></pre>
 <p>클라이언트는 <code>{&quot;name&quot;:&quot;Kim&quot;,&quot;email&quot;:&quot;kim@example.com&quot;}</code>을 보내고 Jackson은 record의 canonical constructor를 호출한다. 반환 record는 JSON 객체로 쓰인다. 응답 DTO에는 DB 엔티티의 내부 필드가 없으므로 API 계약과 저장 모델의 변경도 분리된다.</p>
 <h3 id="22-requestbody가-동작하는-지점"><a class="anchor" href="#22-requestbody가-동작하는-지점" aria-hidden="true">#</a>2.2 <code>@RequestBody</code>가 동작하는 지점</h3>
-<p><code>@RequestBody</code>는 Jackson 호출 자체가 아니다. <code>RequestMappingHandlerAdapter</code>가 요청의 <code>Content-Type</code>과 대상 Java 타입을 보고 등록된 <code>HttpMessageConverter</code>를 선택한다. JSON이면 Jackson 기반 converter가 body의 <code>InputStream</code>을 DTO로 읽는다. 메서드 반환값에 <code>@ResponseBody</code>가 있거나 컨트롤러가 <code>@RestController</code>이면 같은 계열의 converter가 반환 객체를 JSON으로 쓴다.</p>
+<p><code>@RequestBody</code>는 Jackson 호출 자체가 아니다. <code>RequestMappingHandlerAdapter</code>가 요청의 <code>Content-Type</code>과 대상 Java 타입을 보고 등록된 <code>HttpMessageConverter</code>를 선택한다.</p>
+<p>JSON이면 Jackson 기반 converter가 body의 <code>InputStream</code>을 DTO로 읽는다. 메서드 반환값에 <code>@ResponseBody</code>가 있거나 컨트롤러가 <code>@RestController</code>이면 같은 계열의 converter가 반환 객체를 JSON으로 쓴다.</p>
 <p>따라서 다음 세 가지가 맞아야 한다.</p>
 <pre><code class="language-http">Content-Type: application/json
 Accept: application/json</code></pre>
@@ -267,7 +268,8 @@ public class MapperExample {
 </li>
 </ol>
 <h2 id="6-한-단계-더"><a class="anchor" href="#6-한-단계-더" aria-hidden="true">#</a>6. 한 단계 더</h2>
-<p>변환 흐름은 <code>HTTP bytes → Content-Type 협상 → HttpMessageConverter → JsonMapper → DTO 생성</code>이고 응답은 역순이다. mapper는 getter·constructor·record metadata를 보고 프로퍼티를 결정한다. Jackson 3는 Java 17 기준, <code>tools.jackson</code> 패키지, 2.x와 비호환인 API를 택했다. Boot 4는 이를 자동 구성하고 Jackson 2는 마이그레이션용으로만 둔다.</p>
+<p>변환 흐름은 <code>HTTP bytes → Content-Type 협상 → HttpMessageConverter → JsonMapper → DTO 생성</code>이고 응답은 역순이다. mapper는 getter·constructor·record metadata를 보고 프로퍼티를 결정한다.</p>
+<p>Jackson 3는 Java 17 기준, <code>tools.jackson</code> 패키지, 2.x와 비호환인 API를 택했다. Boot 4는 이를 자동 구성하고 Jackson 2는 마이그레이션용으로만 둔다.</p>
 <p>심화는 MVC 요청 흐름 → <a class="docref" href="S05-mvc-request-flow.html">S05</a>, REST 계약 → <a class="docref" href="S06-rest-api-clients.html">S06</a>, 엔티티·지연 로딩 → <a class="docref" href="S09-jpa-hibernate.html">S09</a>, Boot 자동 구성 → <a class="docref" href="S03-boot-autoconfig.html">S03</a>을 참조한다.</p>
 <h2 id="7-자가점검-qa-면접-대비"><a class="anchor" href="#7-자가점검-qa-면접-대비" aria-hidden="true">#</a>7. 자가점검 Q&amp;A (면접 대비)</h2>
 <h3 id="q1-requestbody가-바로-jackson을-호출하나"><a class="anchor" href="#q1-requestbody가-바로-jackson을-호출하나" aria-hidden="true">#</a>Q1. <code>@RequestBody</code>가 바로 Jackson을 호출하나?</h3>
@@ -279,7 +281,8 @@ public class MapperExample {
 <h3 id="q4-unknown-property를-전역에서-무시하면-편하지-않나"><a class="anchor" href="#q4-unknown-property를-전역에서-무시하면-편하지-않나" aria-hidden="true">#</a>Q4. unknown property를 전역에서 무시하면 편하지 않나?</h3>
 <p>새 필드를 무시하면 호환성은 좋아지지만 오타도 놓친다. 기본은 strict로 두고 webhook DTO에만 <code>ignoreUnknown</code>을 적용하며 필수 필드는 계속 검증한다.<br>꼬리질문: 새 응답 필드는 항상 breaking change인가? 대체로 아니지만 요청 strictness와 필수 여부에 따라 달라져 계약 테스트가 필요하다.</p>
 <h3 id="q5-getter가-없고-기본-생성자도-없는-클래스는-어떻게-읽나"><a class="anchor" href="#q5-getter가-없고-기본-생성자도-없는-클래스는-어떻게-읽나" aria-hidden="true">#</a>Q5. getter가 없고 기본 생성자도 없는 클래스는 어떻게 읽나?</h3>
-<p>Jackson이 사용할 creator를 명시한다. record는 canonical constructor가 있어 간단하고, 일반 불변 클래스는 <code>@JsonCreator</code>와 <code>@JsonProperty</code>를 사용한다. private 필드 자동 접근을 전역으로 열지 않는다.<br>꼬리질문: setter를 만들면 해결되지 않나?<br>가능하지만 mutable 객체가 된다. 입력 검증과 불변성을 constructor 경계에서 보장할 수 있으면 creator가 더 명확하다.</p>
+<p>Jackson이 사용할 creator를 명시한다. record는 canonical constructor가 있어 간단하고, 일반 불변 클래스는 <code>@JsonCreator</code>와 <code>@JsonProperty</code>를 사용한다. private 필드 자동 접근을 전역으로 열지 않는다.</p>
+<p>꼬리질문: setter를 만들면 해결되지 않나?<br>가능하지만 mutable 객체가 된다. 입력 검증과 불변성을 constructor 경계에서 보장할 수 있으면 creator가 더 명확하다.</p>
 <h3 id="q6-응답-json-필드-순서가-바뀌면-api가-깨지나"><a class="anchor" href="#q6-응답-json-필드-순서가-바뀌면-api가-깨지나" aria-hidden="true">#</a>Q6. 응답 JSON 필드 순서가 바뀌면 API가 깨지나?</h3>
 <p>JSON 객체의 의미는 이름-값 매핑이므로 정상적인 클라이언트는 순서에 의존하지 않아야 한다. 스냅샷 테스트가 문자열 전체를 비교해 순서 변경을 실패로 만들면 구조 비교나 계약 테스트로 바꾼다. 단, 배열 순서는 의미가 있으므로 정렬 정책을 명시한다.<br>꼬리질문: <code>@JsonPropertyOrder</code>는 언제 쓰나?<br>사람이 읽는 문서나 서명/해시처럼 순서가 계약인 특수한 경우에만 쓰며 일반 API의 안정성 도구로 오해하지 않는다.</p>
 <h2 id="8-참고문헌"><a class="anchor" href="#8-참고문헌" aria-hidden="true">#</a>8. 참고문헌</h2>

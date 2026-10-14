@@ -508,7 +508,9 @@ public class CorsConfig implements WebMvcConfigurer {
 }
 ```
 
-1-1의 [CORS 열기](../ch1-create-post/1-1-receive-request.md#cors-열기)와 같다. 왜 필요한지는 [F3](../../lessons/F3-cors.md)에 있다. 짧게 정리하면 이렇다. 브라우저 화면(`localhost:3000`)과 내 서버(`localhost:8080`)는 출처가 달라서, 서버가 허락해야 브라우저가 응답을 화면 코드에 넘겨준다. `PUT`·`DELETE`와 `Authorization` 헤더는 10-4 이후에 쓰지만 지금 같이 열어 둔다.
+1-1의 [CORS 열기](../ch1-create-post/1-1-receive-request.md#cors-열기)와 같다. 왜 필요한지는 [F3](../../lessons/F3-cors.md)에 있다.
+
+짧게 정리하면 이렇다. 브라우저 화면(`localhost:3000`)과 내 서버(`localhost:8080`)는 출처가 달라서, 서버가 허락해야 브라우저가 응답을 화면 코드에 넘겨준다. `PUT`·`DELETE`와 `Authorization` 헤더는 10-4 이후에 쓰지만 지금 같이 열어 둔다.
 
 ### HealthController
 
@@ -710,7 +712,8 @@ Caused by: org.springframework.beans.factory.BeanCreationException: Error creati
 Caused by: java.sql.SQLSyntaxErrorException: Access denied for user 'community'@'%' to database 'projet'
 ```
 
-- 읽는 법: 맨 아래 `Caused by`가 진짜 원인이다. **없는 DB인데 "Access denied"(권한 없음)** 가 나온다. 실습 계정은 권한을 받은 DB 말고는 있든 없든 "권한 없음"으로 답한다. `docker compose exec -T mysql mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS project"`를 한 번도 안 돌려 `project` 권한이 없을 때도 이 모양이다.
+- 읽는 법: 맨 아래 `Caused by`가 진짜 원인이다. **없는 DB인데 "Access denied"(권한 없음)** 가 나온다.
+  실습 계정은 권한을 받은 DB 말고는 있든 없든 "권한 없음"으로 답한다. `docker compose exec -T mysql mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS project"`를 한 번도 안 돌려 `project` 권한이 없을 때도 이 모양이다.
 - 권한은 있는데 DB만 없으면(`--drop` 뒤 등) 원인 줄이 `java.sql.SQLSyntaxErrorException: Unknown database 'project'`로 바뀐다.
 - 고치기: URL의 DB 이름을 확인한다. 맞으면 javaExperience 레포에서 `docker compose exec -T mysql mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS project; GRANT ALL PRIVILEGES ON project.* TO 'community'@'%';"`를 실행한다.
 
@@ -784,8 +787,9 @@ Content-Length: 0
 <details>
 <summary>힌트 2 — 앱이 Flyway에서 멈춘다</summary>
 
-로그 맨 아래 `Caused by`를 읽는다. `Access denied ... to database`면 DB 이름이나 `docker compose exec -T mysql mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS project"`를 확인한다(①). `checksum mismatch`면 V1을 고친 것이다(③). `Communications link failure`면 MySQL 컨테이너가 안 떠 있다(`docker ps`로 `javaExperience mysql`을 확인한다).
-</details>
+로그 맨 아래 `Caused by`를 읽는다. `Access denied ... to database`면 DB 이름이나 `docker compose exec -T mysql mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS project"`를 확인한다(①).
+
+`checksum mismatch`면 V1을 고친 것이다(③). `Communications link failure`면 MySQL 컨테이너가 안 떠 있다(`docker ps`로 `javaExperience mysql`을 확인한다). </details>
 
 <details>
 <summary>힌트 3 — 헬스 체크 숫자가 0이다</summary>

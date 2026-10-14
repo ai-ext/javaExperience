@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>W09. DTO는 왜 쓰나 — 엔티티를 그대로 반환하면 생기는 일</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -49,7 +49,8 @@
     Controller--&gt;&gt;Converter: &quot;객체 반환값&quot;
     Converter-&gt;&gt;DB: &quot;엔티티 getter가 지연 연관을 읽으면 추가 SQL&quot;
     Converter--&gt;&gt;Client: &quot;직렬화된 JSON 또는 오류&quot;</pre>
-<p><strong>생명주기 문제.</strong> JPA 지연 연관은 영속성 컨텍스트가 닫힌 뒤 초기화하려 하면 실패한다. Spring Boot의 spring.jpa.open-in-view 설정은 요청 처리 전체에 EntityManager를 바인딩하는 인터셉터를 등록한다. 켜져 있으면 직렬화 시점에도 조회가 가능해 예외가 잠복하는 대신 변환 단계에서 쿼리가 실행되어 위치와 개수가 잘 보이지 않는다. Hibernate는 필요한 연관을 컨텍스트가 닫히기 전에 조회하라고 안내한다. hibernate.enable_lazy_load_no_trans는 기본 비활성화이며 안전하지 않은 설정이다. OSIV나 전역 eager 변경보다 유스케이스에 맞는 조회 범위를 명시한다.</p>
+<p><strong>생명주기 문제.</strong> JPA 지연 연관은 영속성 컨텍스트가 닫힌 뒤 초기화하려 하면 실패한다. Spring Boot의 spring.jpa.open-in-view 설정은 요청 처리 전체에 EntityManager를 바인딩하는 인터셉터를 등록한다. 켜져 있으면 직렬화 시점에도 조회가 가능해 예외가 잠복하는 대신 변환 단계에서 쿼리가 실행되어 위치와 개수가 잘 보이지 않는다.</p>
+<p>Hibernate는 필요한 연관을 컨텍스트가 닫히기 전에 조회하라고 안내한다. hibernate.enable_lazy_load_no_trans는 기본 비활성화이며 안전하지 않은 설정이다. OSIV나 전역 eager 변경보다 유스케이스에 맞는 조회 범위를 명시한다.</p>
 <p><strong>객체 그래프와 계약 문제.</strong> 엔티티 연관관계는 객체 탐색과 DB 관계를 표현하지만 HTTP 응답은 클라이언트가 소비할 문서다. 양방향 탐색은 순환할 수 있고 내부 필드도 같은 객체에 있다. @JsonIgnore로 특정 API 문제를 엔티티에 막으면 직렬화 정책이 영속성 모델에 스며든다. DTO는 응답 필드를 API 경계에 고정해 엔티티 필드 추가가 자동 공개되지 않게 한다.</p>
 <p><strong>쿼리 비용 문제.</strong> 주문 50개를 읽은 뒤 고객·항목을 직렬화하며 별도 조회하면 N+1이 된다. 반대로 큰 그래프를 전부 eager로 가져오면 쓰지 않는 데이터와 조인 중복이 늘 수 있다. DTO도 쿼리 비용을 정해주지 않는다. fetch join, 명시적 fetch plan, DTO 프로젝션 중 화면에 맞는 조회를 고른다.</p>
 <p>저장 스키마와 공개 계약의 변경 주기도 다르다. DB 컬럼 정규화나 내부 관리 필드 도입은 API 버전 변경과 같은 일이 아니다. 별도 응답 DTO를 두면 이름 변경·필드 제거·계산 필드·버전 호환성을 API 쪽에서 관리한다.</p>
@@ -249,7 +250,8 @@ package example.order;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface OrderRepository extends JpaRepository&lt;OrderEntity, Long&gt; {}</code></pre>
-<p>코드에서 OrderRepository는 JpaRepository&lt;OrderEntity, Long&gt;을 상속한다. 응답 JSON은 customer와 items에 접근하면서 지연 조회를 일으킬 수 있고, 항목의 order를 따라가면 순환할 수 있다. CustomerEntity.email과 internalMemo도 같은 직렬화 대상으로 보일 수 있다. 실제로 노출될 필드는 serializer 설정 및 연관 상태에 따라 다르므로, “현재 JSON에서 안 보인다”는 사실은 보안 경계가 아니다.</p>
+<p>코드에서 OrderRepository는 JpaRepository&lt;OrderEntity, Long&gt;을 상속한다. 응답 JSON은 customer와 items에 접근하면서 지연 조회를 일으킬 수 있고, 항목의 order를 따라가면 순환할 수 있다.</p>
+<p>CustomerEntity.email과 internalMemo도 같은 직렬화 대상으로 보일 수 있다. 실제로 노출될 필드는 serializer 설정 및 연관 상태에 따라 다르므로, “현재 JSON에서 안 보인다”는 사실은 보안 경계가 아니다.</p>
 <p><strong>선택 A — 직접 매핑.</strong> 전송할 필드와 조합 로직이 한 곳에서 명확하다. 짧은 필드 목록에는 가장 단순한 방법이다.</p>
 <pre><code class="language-java">// OrderSummary.java
 package example.order;
@@ -326,12 +328,23 @@ public interface OrderSummaryRepository
 <li><strong>“record DTO는 완전히 불변이다.”</strong> record의 참조 필드는 재할당되지 않지만, 그 안의 List나 객체가 변할 수 있다. 외부에 불변 계약이 필요하면 복사·불변 컬렉션을 고려한다.</li>
 </ol>
 <h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
-<p><strong>Q1. 엔티티를 JSON으로 반환할 때 운영에서만 실패할 수 있는 이유는?</strong><br>JSON 변환은 Controller가 반환한 뒤 getter를 따라가며 진행된다. 이때 지연 필드가 초기화되지 않았다면 영속성 컨텍스트가 닫힌 상태에서 예외가 난다. 요청 범위 EntityManager가 열려 있으면 반대로 변환 중 SQL이 실행되어 느려질 수 있다.<br>꼬리질문: 어디서 고칠까?<br>답: 필요한 데이터와 트랜잭션 범위를 정하고, DTO 또는 projection으로 API 응답을 구성한다.</p>
-<p><strong>Q2. 응답 DTO와 JPA 프로젝션은 같은 것인가?</strong><br>응답 DTO는 외부로 전달할 데이터 계약이고, 프로젝션은 조회 결과의 필드 집합을 제한하는 방식이다. 같은 DTO 클래스를 repository projection 결과로 쓸 수 있다. 모든 DTO가 쿼리 projection인 것은 아니다.<br>꼬리질문: 목록 API에서 projection을 고려할 이유는?<br>답: 엔티티 그래프 대신 응답에 필요한 값만 조회해 불필요한 로딩을 줄일 수 있다.</p>
+<p><strong>Q1. 엔티티를 JSON으로 반환할 때 운영에서만 실패할 수 있는 이유는?</strong><br>JSON 변환은 Controller가 반환한 뒤 getter를 따라가며 진행된다. 이때 지연 필드가 초기화되지 않았다면 영속성 컨텍스트가 닫힌 상태에서 예외가 난다.</p>
+<p>요청 범위 EntityManager가 열려 있으면 반대로 변환 중 SQL이 실행되어 느려질 수 있다.
+꼬리질문: 어디서 고칠까?<br>답: 필요한 데이터와 트랜잭션 범위를 정하고, DTO 또는 projection으로 API 응답을 구성한다.</p>
+<p><strong>Q2. 응답 DTO와 JPA 프로젝션은 같은 것인가?</strong><br>응답 DTO는 외부로 전달할 데이터 계약이고, 프로젝션은 조회 결과의 필드 집합을 제한하는 방식이다. 같은 DTO 클래스를 repository projection 결과로 쓸 수 있다.</p>
+<p>모든 DTO가 쿼리 projection인 것은 아니다.
+꼬리질문: 목록 API에서 projection을 고려할 이유는?<br>답: 엔티티 그래프 대신 응답에 필요한 값만 조회해 불필요한 로딩을 줄일 수 있다.</p>
 <p><strong>Q3. DTO를 써도 N+1이 발생하는 예를 들어라.</strong><br>주문 엔티티 목록을 읽고 각 주문을 MapStruct 또는 수동 mapper로 변환하면서 customer.name을 읽으면 주문 수만큼 고객을 조회할 수 있다. 변환 라이브러리는 쿼리 계획을 만들지 않는다.<br>꼬리질문: 대안은?<br>답: DTO projection, fetch join, batch fetch 등으로 목록 전체의 조회 계획을 먼저 정한다.</p>
-<p><strong>Q4. 변환을 Controller와 Service 중 어디에 두나?</strong><br>HTTP에 가까운 이름 변경·응답 조립은 Controller가 적절할 수 있다. 트랜잭션 안에서 엔티티 상태와 관계를 해석하거나 유스케이스 규칙을 적용한다면 Service/조회 컴포넌트가 낫다. 핵심은 Controller가 응답 생성 중 DB를 건드리지 않게 하는 것이다.<br>꼬리질문: 어떤 선택을 기본으로 권하나?<br>답: 단순 mapping은 API 경계에 가깝게, 쿼리 최적화가 필요한 읽기 응답은 조회 계층에서 완성한다.</p>
-<p><strong>Q5. 수동 매핑, MapStruct, ModelMapper 중 무엇을 고르나?</strong><br>필드가 적으면 수동 또는 정적 팩토리가 가장 투명하다. 반복 타입이 많으면 컴파일 시 구현을 만드는 MapStruct가 매핑 코드를 일관되게 관리하기 쉽다. 런타임 이름 매칭은 편하지만 숨은 규칙과 잘못된 필드 연결 위험을 감수해야 한다.<br>꼬리질문: MapStruct가 DTO 설계를 대신하나?<br>답: 아니다. 어느 필드를 공개할지와 쿼리를 어떻게 할지는 개발자가 결정한다.</p>
-<p><strong>Q6. API별 DTO를 만들면 DTO 남발인가?</strong><br>외부 입력 필드와 출력 필드의 보안·버전 요구가 다르면 별도 타입이 분리 이유를 갖는다. 단순히 Controller/Service/Repository마다 동일한 필드를 복제하는 건 변환만 늘린다. 타입의 변경 이유가 다른지 기준으로 판단한다.<br>꼬리질문: 요청 DTO와 엔티티를 분리하면 얻는 안전성은?<br>답: 사용자가 제출 가능한 값의 목록을 제한해 내부 상태나 권한 필드가 자동 바인딩되는 것을 막는다.</p>
+<p><strong>Q4. 변환을 Controller와 Service 중 어디에 두나?</strong><br>HTTP에 가까운 이름 변경·응답 조립은 Controller가 적절할 수 있다. 트랜잭션 안에서 엔티티 상태와 관계를 해석하거나 유스케이스 규칙을 적용한다면 Service/조회 컴포넌트가 낫다.</p>
+<p>핵심은 Controller가 응답 생성 중 DB를 건드리지 않게 하는 것이다.
+꼬리질문: 어떤 선택을 기본으로 권하나?<br>답: 단순 mapping은 API 경계에 가깝게, 쿼리 최적화가 필요한 읽기 응답은 조회 계층에서 완성한다.</p>
+<p><strong>Q5. 수동 매핑, MapStruct, ModelMapper 중 무엇을 고르나?</strong><br>필드가 적으면 수동 또는 정적 팩토리가 가장 투명하다. 반복 타입이 많으면 컴파일 시 구현을 만드는 MapStruct가 매핑 코드를 일관되게 관리하기 쉽다.</p>
+<p>런타임 이름 매칭은 편하지만 숨은 규칙과 잘못된 필드 연결 위험을 감수해야 한다.
+꼬리질문: MapStruct가 DTO 설계를 대신하나?</p>
+<p>답: 아니다. 어느 필드를 공개할지와 쿼리를 어떻게 할지는 개발자가 결정한다.</p>
+<p><strong>Q6. API별 DTO를 만들면 DTO 남발인가?</strong><br>외부 입력 필드와 출력 필드의 보안·버전 요구가 다르면 별도 타입이 분리 이유를 갖는다. 단순히 Controller/Service/Repository마다 동일한 필드를 복제하는 건 변환만 늘린다.</p>
+<p>타입의 변경 이유가 다른지 기준으로 판단한다.
+꼬리질문: 요청 DTO와 엔티티를 분리하면 얻는 안전성은?<br>답: 사용자가 제출 가능한 값의 목록을 제한해 내부 상태나 권한 필드가 자동 바인딩되는 것을 막는다.</p>
 <h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
 <ul>
 <li>Projections :: Spring Data JPA — <a href="https://docs.spring.io/spring-data/jpa/reference/repositories/projections.html" target="_blank" rel="noopener">https://docs.spring.io/spring-data/jpa/reference/repositories/projections.html</a> — 인터페이스·클래스 기반 프로젝션, 동적 프로젝션과 JPQL DTO 쿼리 규칙.</li>

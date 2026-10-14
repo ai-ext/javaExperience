@@ -24,7 +24,9 @@
 
 ## 3. 왜 그런가 — 원리
 
-Lombok을 `@Getter` 한 줄짜리 런타임 라이브러리라고 생각하면 잘못된 의존성을 만든다. 주요 애노테이션은 Java 소스를 컴파일할 때 처리된다. Lombok은 일반 annotation processor로 발견되지만 단순히 새 `.java` 파일을 생성하는 방식에 그치지 않고, `javac` 또는 Eclipse 컴파일러가 쓰는 구문 트리(AST)에 멤버를 추가하거나 수정한다. 이후 컴파일러가 그 메서드들을 포함한 클래스 파일을 만든다. 실행 시점의 호출은 보통 `getName()`이라는 평범한 바이트코드 호출이다.
+Lombok을 `@Getter` 한 줄짜리 런타임 라이브러리라고 생각하면 잘못된 의존성을 만든다. 주요 애노테이션은 Java 소스를 컴파일할 때 처리된다. Lombok은 일반 annotation processor로 발견되지만 단순히 새 `.java` 파일을 생성하는 방식에 그치지 않고, `javac` 또는 Eclipse 컴파일러가 쓰는 구문 트리(AST)에 멤버를 추가하거나 수정한다.
+
+이후 컴파일러가 그 메서드들을 포함한 클래스 파일을 만든다. 실행 시점의 호출은 보통 `getName()`이라는 평범한 바이트코드 호출이다.
 
 ```mermaid
 flowchart LR
@@ -35,13 +37,21 @@ flowchart LR
     F[IDE 플러그인 또는 delombok] -. 편집 화면 보완 .-> A
 ```
 
-`javac`는 classpath에서 `META-INF/services/javax.annotation.processing.Processor`를 찾아 processor를 로드한다. Lombok은 숨김용 진입점과 자체 class loader를 둬 개발 의존성이 일반 타입 자동완성에 섞이지 않도록 하고, 컴파일러 종류에 따라 `javac`용 또는 Eclipse 컴파일러용 경로를 선택한다. 이 구조가 편리함과 호환 비용의 양쪽 원인이다. Java 소스 문법을 처리하는 공통 규약만 쓰는 것이 아니라 컴파일러 내부 트리에 기대는 부분이 있어 새 JDK가 내부 구현을 바꾸면 Lombok도 맞춰 배포해야 한다.
+`javac`는 classpath에서 `META-INF/services/javax.annotation.processing.Processor`를 찾아 processor를 로드한다. Lombok은 숨김용 진입점과 자체 class loader를 둬 개발 의존성이 일반 타입 자동완성에 섞이지 않도록 하고, 컴파일러 종류에 따라 `javac`용 또는 Eclipse 컴파일러용 경로를 선택한다.
 
-애플리케이션이 Lombok을 런타임에서 실행하는 것은 일반적인 사용 방식이 아니다. Gradle에서는 보통 `compileOnly`와 `annotationProcessor`를 분리하고 테스트에서 생성 코드가 필요하면 각각 테스트 구성도 둔다. Maven에서는 `provided`와 compiler annotation processor 설정을 팀의 빌드 방식에 맞춘다. JPMS 모듈이라면 Lombok 문서의 `requires static lombok;`처럼 컴파일 전용 의존성을 표현할 수 있다. 중요 포인트는 IDE가 코드를 보여주는 기능과 빌드가 실제로 annotation processor를 실행하는 기능은 서로 다르다는 점이다.
+이 구조가 편리함과 호환 비용의 양쪽 원인이다. Java 소스 문법을 처리하는 공통 규약만 쓰는 것이 아니라 컴파일러 내부 트리에 기대는 부분이 있어 새 JDK가 내부 구현을 바꾸면 Lombok도 맞춰 배포해야 한다.
 
-무엇이 생성되는지는 애노테이션 조합으로 구체화된다. `@Data`는 `@ToString`, `@EqualsAndHashCode`, 전체 필드 getter, 비-final 필드 setter, `@RequiredArgsConstructor`의 묶음이다. 즉 “보일러플레이트를 줄인다”는 선언은 동시에 “모든 필드의 공개 변경 방법, 값 비교 범위, 로그 표현”을 한꺼번에 기본값에 맡긴다는 뜻이다. 동작이 필요하면 `@Getter`처럼 범위가 작은 도구를 고르고, 원치 않는 멤버는 `AccessLevel.NONE`, `@ToString.Exclude`, `@EqualsAndHashCode.Exclude` 등으로 명시한다.
+애플리케이션이 Lombok을 런타임에서 실행하는 것은 일반적인 사용 방식이 아니다. Gradle에서는 보통 `compileOnly`와 `annotationProcessor`를 분리하고 테스트에서 생성 코드가 필요하면 각각 테스트 구성도 둔다. Maven에서는 `provided`와 compiler annotation processor 설정을 팀의 빌드 방식에 맞춘다.
 
-record는 다른 층의 기능이다. JEP 395로 Java 16에서 정식화됐고, 데이터 운반을 위한 언어 구성으로 생성자·접근자·`equals()`·`hashCode()`·`toString()`을 컴파일러가 규칙에 따라 제공한다. component는 final이며 접근자는 `getName()`이 아닌 `name()` 형태다. 얕은 불변성이지 component가 가리키는 컬렉션까지 자동으로 불변이 되는 것은 아니다. record는 상속 기반 프록시가 필요한 JPA 엔티티의 대체물이 아니다.
+JPMS 모듈이라면 Lombok 문서의 `requires static lombok;`처럼 컴파일 전용 의존성을 표현할 수 있다. 중요 포인트는 IDE가 코드를 보여주는 기능과 빌드가 실제로 annotation processor를 실행하는 기능은 서로 다르다는 점이다.
+
+무엇이 생성되는지는 애노테이션 조합으로 구체화된다. `@Data`는 `@ToString`, `@EqualsAndHashCode`, 전체 필드 getter, 비-final 필드 setter, `@RequiredArgsConstructor`의 묶음이다.
+
+즉 “보일러플레이트를 줄인다”는 선언은 동시에 “모든 필드의 공개 변경 방법, 값 비교 범위, 로그 표현”을 한꺼번에 기본값에 맡긴다는 뜻이다. 동작이 필요하면 `@Getter`처럼 범위가 작은 도구를 고르고, 원치 않는 멤버는 `AccessLevel.NONE`, `@ToString.Exclude`, `@EqualsAndHashCode.Exclude` 등으로 명시한다.
+
+record는 다른 층의 기능이다. JEP 395로 Java 16에서 정식화됐고, 데이터 운반을 위한 언어 구성으로 생성자·접근자·`equals()`·`hashCode()`·`toString()`을 컴파일러가 규칙에 따라 제공한다. component는 final이며 접근자는 `getName()`이 아닌 `name()` 형태다.
+
+얕은 불변성이지 component가 가리키는 컬렉션까지 자동으로 불변이 되는 것은 아니다. record는 상속 기반 프록시가 필요한 JPA 엔티티의 대체물이 아니다.
 
 ## 4. 선택지 비교
 
@@ -148,7 +158,9 @@ public class JobOptions {
 }
 ```
 
-`JobOptions.builder().build()`는 `@Builder.Default`가 있어야 3초를 사용한다. 해당 어노테이션 없이 클래스 수준 빌더를 만들면 빌더의 미설정 필드값(참조형이면 `null`, primitive면 0/false)이 들어갈 수 있다. 반대로 `timeout(null)`을 명시하면 “미설정”이 아니므로 기본값을 쓰지 않는다. 불변식을 검증해야 한다면 생성자 또는 정적 팩토리에 `@Builder`를 붙이고 그곳에서 검사하는 편이 분명하다. Lombok 의존성과 annotation processor 설정 없이는 미실행이다.
+`JobOptions.builder().build()`는 `@Builder.Default`가 있어야 3초를 사용한다. 해당 어노테이션 없이 클래스 수준 빌더를 만들면 빌더의 미설정 필드값(참조형이면 `null`, primitive면 0/false)이 들어갈 수 있다. 반대로 `timeout(null)`을 명시하면 “미설정”이 아니므로 기본값을 쓰지 않는다.
+
+불변식을 검증해야 한다면 생성자 또는 정적 팩토리에 `@Builder`를 붙이고 그곳에서 검사하는 편이 분명하다. Lombok 의존성과 annotation processor 설정 없이는 미실행이다.
 
 ### 5.3 엔티티에서 좁게 사용 — Spring Boot 4.1 / JPA, 미실행
 
@@ -198,9 +210,13 @@ public class PurchaseOrder {
 
 **스타트업 또는 Kotlin 신규 서비스:** Java 코드에 Lombok을 이미 썼다면 팀원이 생성 규칙과 IDE 설정을 공유하고 한 버전으로 정렬한다. Kotlin을 선택한 서비스는 data class를 언어 기능으로 사용하되, 모든 도메인 객체를 data class로 만들지는 않는다. 값 비교와 `copy()`가 상태 변경 가능성 및 민감 데이터 노출에 맞는지 확인한다.
 
-**점진적 마이그레이션:** DTO부터 `@Data`를 `record` 또는 명시적 불변 타입으로 바꾸고, 엔티티는 setter를 업무 메서드로 바꾸며 동등성을 따로 검토한다. `@AllArgsConstructor` 호출부는 매개변수 순서에 의존하지 않도록 정적 팩토리나 builder로 옮긴다. Java 업그레이드에서는 IDE 플러그인만 최신으로 해서는 충분하지 않다. 빌드에 실제 쓰이는 Lombok 버전, `javac` 버전, processor 설정, CI의 컴파일 결과를 한 묶음으로 점검한다.
+**점진적 마이그레이션:** DTO부터 `@Data`를 `record` 또는 명시적 불변 타입으로 바꾸고, 엔티티는 setter를 업무 메서드로 바꾸며 동등성을 따로 검토한다. `@AllArgsConstructor` 호출부는 매개변수 순서에 의존하지 않도록 정적 팩토리나 builder로 옮긴다.
 
-기준 버전은 Java 25, Spring Boot 4.1.1이다. Boot 4.1.1 의존성 좌표표가 관리하는 Lombok은 1.18.46이다. 별도 버전으로 올릴 때는 팀이 최신이라고 부르는 버전만 좇지 말고 Boot의 테스트 조합과 플러그인 호환을 확인한다. Lombok changelog는 1.18.46에서 JDK 26 지원, 1.18.48에서 JDK 27 지원을 기록한다. 컴파일러 내부에 결합된 도구는 JDK 업그레이드 시점마다 호환 릴리스가 생기는지 확인해야 한다.
+Java 업그레이드에서는 IDE 플러그인만 최신으로 해서는 충분하지 않다. 빌드에 실제 쓰이는 Lombok 버전, `javac` 버전, processor 설정, CI의 컴파일 결과를 한 묶음으로 점검한다.
+
+기준 버전은 Java 25, Spring Boot 4.1.1이다. Boot 4.1.1 의존성 좌표표가 관리하는 Lombok은 1.18.46이다. 별도 버전으로 올릴 때는 팀이 최신이라고 부르는 버전만 좇지 말고 Boot의 테스트 조합과 플러그인 호환을 확인한다.
+
+Lombok changelog는 1.18.46에서 JDK 26 지원, 1.18.48에서 JDK 27 지원을 기록한다. 컴파일러 내부에 결합된 도구는 JDK 업그레이드 시점마다 호환 릴리스가 생기는지 확인해야 한다.
 
 ## 7. 흔한 오해와 실수
 

@@ -120,7 +120,9 @@ services:
 
 ### 2.8 Spring Boot의 Docker Compose 지원과 Testcontainers는 목적이 다르다
 
-Spring Boot 4.1은 `spring-boot-docker-compose`를 `developmentOnly`로 추가하면 Compose 파일을 발견하고 서비스 연결 정보를 처리한다. 이미 서비스가 실행 중이면 다시 올리지 않는다. 공식 문서 기준 최소 Compose 버전은 2.2.0이다. Testcontainers는 테스트 수명주기에 맞춰 컨테이너를 시작하므로, 공유 로컬 DB는 Compose, 테스트별 격리는 Testcontainers를 선택한다.
+Spring Boot 4.1은 `spring-boot-docker-compose`를 `developmentOnly`로 추가하면 Compose 파일을 발견하고 서비스 연결 정보를 처리한다. 이미 서비스가 실행 중이면 다시 올리지 않는다.
+
+공식 문서 기준 최소 Compose 버전은 2.2.0이다. Testcontainers는 테스트 수명주기에 맞춰 컨테이너를 시작하므로, 공유 로컬 DB는 Compose, 테스트별 격리는 Testcontainers를 선택한다.
 
 ## 3. 따라 하기
 

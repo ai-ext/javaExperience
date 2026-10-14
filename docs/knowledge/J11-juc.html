@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J11. java.util.concurrent</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -105,19 +105,23 @@ Java 25에서는 <code>CompletableFuture</code>의 기본 비동기 실행 규�
   queue.offer 성공? ─예→ 큐에서 대기
        아니오 ↓
 worker &lt; max? ─예→ worker 추가 / 아니오→ reject</code></pre>
-<p>무한 <code>LinkedBlockingQueue</code>는 코어 스레드가 바쁜 동안 계속 쌓이므로 <code>maximumPoolSize</code>가 사실상 작동하지 않고, 장기 과부하가 메모리 고갈과 긴 대기로 바뀐다. <code>ArrayBlockingQueue</code>는 백로그 크기를 제한하고, <code>SynchronousQueue</code>는 저장하지 않고 작업자에게 넘긴다. <code>AbortPolicy</code>는 예외로 실패를 알리고, <code>CallerRunsPolicy</code>는 풀 종료 전 제출 스레드가 작업해 입력을 늦춘다. 후자는 요청 스레드 지연이나 잠금 내 실행을 만들 수 있다. <code>DiscardPolicy</code>/<code>DiscardOldestPolicy</code>는 버려진 작업의 <code>Future</code>를 영원히 미완료로 둘 수 있어 완료를 기다리는 업무에는 피한다.</p>
+<p>무한 <code>LinkedBlockingQueue</code>는 코어 스레드가 바쁜 동안 계속 쌓이므로 <code>maximumPoolSize</code>가 사실상 작동하지 않고, 장기 과부하가 메모리 고갈과 긴 대기로 바뀐다. <code>ArrayBlockingQueue</code>는 백로그 크기를 제한하고, <code>SynchronousQueue</code>는 저장하지 않고 작업자에게 넘긴다. <code>AbortPolicy</code>는 예외로 실패를 알리고, <code>CallerRunsPolicy</code>는 풀 종료 전 제출 스레드가 작업해 입력을 늦춘다.</p>
+<p>후자는 요청 스레드 지연이나 잠금 내 실행을 만들 수 있다. <code>DiscardPolicy</code>/<code>DiscardOldestPolicy</code>는 버려진 작업의 <code>Future</code>를 영원히 미완료로 둘 수 있어 완료를 기다리는 업무에는 피한다.</p>
 <p><code>shutdown()</code>은 새 작업을 거부하고 제출된 작업을 끝낸 뒤 종료한다. <code>shutdownNow()</code>는 대기 작업을 반환하고 실행 중 작업에는 interrupt를 요청할 뿐, 강제 종료하지 않는다. 종료 대기와 interrupt 협력을 작업 코드까지 설계한다.</p>
 <h3 id="future와-completablefuture-실행-위치와-실패-흐름"><a class="anchor" href="#future와-completablefuture-실행-위치와-실패-흐름" aria-hidden="true">#</a>Future와 <code>CompletableFuture</code>: 실행 위치와 실패 흐름</h3>
 <p><code>Future.get()</code>은 블로킹하고, 작업 실패를 <code>ExecutionException</code>으로 전달한다. <code>cancel(true)</code>도 interrupt 요청이지 코드 강제 종료가 아니다. <code>CompletableFuture</code>의 비-async 단계는 선행 완료 스레드 또는 완료 메서드의 호출자에서 실행될 수 있다. <code>*Async</code>에 실행기를 주지 않으면 Java 25에서는 common pool을 사용한다.</p>
 <pre><code class="language-text">supplyAsync → thenApply(값 변환) → thenCompose(비동기 결과 평탄화)
       └─ 실패 → exceptionally(복구) / handle(변환) / whenComplete(관찰)</code></pre>
-<p><code>thenApply</code> 함수가 다른 Future를 반환하면 중첩되므로 비동기 다음 단계에는 <code>thenCompose</code>를 쓴다. <code>exceptionally</code>는 실패를 값으로 복구하고, <code>handle</code>은 성공·실패 양쪽을 새 값으로 바꾸며, <code>whenComplete</code>는 결과를 관찰한다. <code>join()</code>은 unchecked <code>CompletionException</code>, <code>get()</code>은 <code>ExecutionException</code>과 <code>InterruptedException</code>을 노출한다. <code>allOf()</code>는 완료 장벽이며 결과 컬렉션은 반환하지 않는다.</p>
+<p><code>thenApply</code> 함수가 다른 Future를 반환하면 중첩되므로 비동기 다음 단계에는 <code>thenCompose</code>를 쓴다. <code>exceptionally</code>는 실패를 값으로 복구하고, <code>handle</code>은 성공·실패 양쪽을 새 값으로 바꾸며, <code>whenComplete</code>는 결과를 관찰한다.</p>
+<p><code>join()</code>은 unchecked <code>CompletionException</code>, <code>get()</code>은 <code>ExecutionException</code>과 <code>InterruptedException</code>을 노출한다. <code>allOf()</code>는 완료 장벽이며 결과 컬렉션은 반환하지 않는다.</p>
 <h3 id="잠금-cas-고경합-카운터"><a class="anchor" href="#잠금-cas-고경합-카운터" aria-hidden="true">#</a>잠금, CAS, 고경합 카운터</h3>
 <p><code>synchronized</code>는 모니터 진입·탈출로 잠금을 자동 반납한다. <code>ReentrantLock</code>은 <code>tryLock</code>, 시간 제한·인터럽트 대기, 여러 <code>Condition</code>이 필요할 때 쓰되 <code>unlock()</code>을 <code>finally</code>에서 보장한다. 공정 모드는 대기 순서를 고려하지만 처리량을 낮출 수 있고, 무인자 <code>tryLock()</code>은 공정 설정에서도 대기자를 앞지를 수 있다.</p>
 <p><code>ReadWriteLock</code>은 읽기 공유·쓰기 배타 방식이다. <code>ReentrantReadWriteLock</code>은 쓰기 잠금에서 읽기로 내려갈 수 있지만 읽기에서 쓰기로 승격할 수 없다. <code>StampedLock</code>은 낙관 stamp로 읽은 값을 먼저 복사한 뒤 <code>validate()</code>하고, 실패하면 읽기 잠금으로 재조회한다. 재진입 불가이므로 보호된 코드에서 같은 잠금을 다시 요구하면 멈출 수 있다.</p>
 <p>CAS는 “현재 값이 예상값과 같을 때 교체”를 원자적으로 한다. 재시도 경합과 ABA(A→B→A로 돌아와 비교가 통과하는 현상)를 고려한다. 여러 원자 변수로 나눈 상태 전체가 원자적인 것은 아니다. <code>LongAdder</code>는 고경합 업데이트를 여러 셀로 분산하지만 <code>sum()</code>은 단일 시점의 원자 스냅샷이 아니다. 통계에는 적합하고 잔액 검사·고유 번호 같은 제어에는 부적합하다.</p>
 <h3 id="concurrenthashmap-큐와-조정-도구"><a class="anchor" href="#concurrenthashmap-큐와-조정-도구" aria-hidden="true">#</a><code>ConcurrentHashMap</code>, 큐와 조정 도구</h3>
-<p>Java 8 이후 <code>ConcurrentHashMap</code>은 segment 대신 power-of-two bin 테이블을 사용한다. 빈 bin 삽입에는 CAS를 쓰고 충돌 bin은 선두 노드 중심으로 갱신한다. 조회는 테이블 전체 잠금을 요구하지 않는다. 긴 충돌 bin은 트리화하고, resize 중 <code>MOVED</code> forwarding node를 두어 작업자들이 bin 이동에 참여할 수 있다. 따라서 동시 갱신 중 <code>size()</code>·순회는 전체 원자 스냅샷이 아니다. <code>computeIfAbsent</code>/<code>merge</code>는 키 단위 복합 갱신을 원자화하지만 매핑 함수에 느린 I/O나 같은 맵의 재귀 갱신을 넣지 않는다. null 키·값은 허용되지 않는다.</p>
+<p>Java 8 이후 <code>ConcurrentHashMap</code>은 segment 대신 power-of-two bin 테이블을 사용한다. 빈 bin 삽입에는 CAS를 쓰고 충돌 bin은 선두 노드 중심으로 갱신한다. 조회는 테이블 전체 잠금을 요구하지 않는다.</p>
+<p>긴 충돌 bin은 트리화하고, resize 중 <code>MOVED</code> forwarding node를 두어 작업자들이 bin 이동에 참여할 수 있다. 따라서 동시 갱신 중 <code>size()</code>·순회는 전체 원자 스냅샷이 아니다.</p>
+<p><code>computeIfAbsent</code>/<code>merge</code>는 키 단위 복합 갱신을 원자화하지만 매핑 함수에 느린 I/O나 같은 맵의 재귀 갱신을 넣지 않는다. null 키·값은 허용되지 않는다.</p>
 <p><code>BlockingQueue.put/take</code>는 가득 참·비어 있음에서 기다리고, <code>offer/poll</code>은 즉시 또는 제한 시간 내 결과를 준다. 큐 삽입 전 생산자의 동작은 다른 스레드의 해당 원소 접근 이후와 happens-before 관계를 가진다.</p>
 <div class="table-wrap"><table>
 <thead>

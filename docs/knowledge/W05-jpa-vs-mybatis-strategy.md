@@ -13,10 +13,12 @@
 ## 2. 짧은 답
 
 JPA는 엔티티를 영속성 컨텍스트가 추적하고, 변경을 트랜잭션의 flush 시점에 SQL로 동기화한다.  
-MyBatis는 개발자가 SQL을 작성하고 그 결과 행을 지정한 객체로 매핑한다. 객체 변경을 추적하지 않는다.  
+MyBatis는 개발자가 SQL을 작성하고 그 결과 행을 지정한 객체로 매핑한다. 객체 변경을 추적하지 않는다.
+
 도메인 규칙과 연관 객체 변경이 중심이면 JPA를 기본값으로 삼아라.  
 집계·통계·검색 화면처럼 SQL 모양과 실행 계획이 중심이면 MyBatis 또는 `JdbcClient`를 써라.  
-둘을 섞을 때는 같은 DB 연결과 Spring 트랜잭션 안에서도 flush 순서와 영속성 컨텍스트 캐시를 관리해야 한다.  
+둘을 섞을 때는 같은 DB 연결과 Spring 트랜잭션 안에서도 flush 순서와 영속성 컨텍스트 캐시를 관리해야 한다.
+
 새 프로젝트라면 JPA로 핵심 쓰기를 시작하고, 관측된 복잡한 조회만 별도 mapper로 옮기는 방식을 추천한다.  
 전 팀이 JPA여야 한다거나 MyBatis가 본질적으로 빠르다는 규칙은 없다.
 
@@ -24,11 +26,17 @@ MyBatis는 개발자가 SQL을 작성하고 그 결과 행을 지정한 객체�
 
 ### 두 추상화가 보관하는 정보
 
-JPA는 Jakarta Persistence 표준이다. Spring Data JPA는 그 위에서 `Repository` 인터페이스와 쿼리 메서드 같은 접근법을 제공하고, Boot 4.1의 일반적인 구성은 Hibernate ORM을 JPA provider로 사용한다. 그러므로 “JPA와 Hibernate”는 독립된 두 선택지라기보다 표준 계약과 구현체의 관계다. 예제 기준은 Spring Boot 4.1.1, Spring Data JPA 4.1.1, Spring Framework 7.0.x다. Hibernate ORM은 공통 기준표의 7.4.5.Final이다.
+JPA는 Jakarta Persistence 표준이다. Spring Data JPA는 그 위에서 `Repository` 인터페이스와 쿼리 메서드 같은 접근법을 제공하고, Boot 4.1의 일반적인 구성은 Hibernate ORM을 JPA provider로 사용한다. 그러므로 “JPA와 Hibernate”는 독립된 두 선택지라기보다 표준 계약과 구현체의 관계다.
 
-JPA의 중심에는 현재 트랜잭션에서 관리되는 엔티티 집합, 즉 영속성 컨텍스트가 있다. `find()`로 가져온 엔티티는 그 컨텍스트 안에서 관리된다. 코드가 필드를 바꾸면 provider는 변경 전후 상태를 추적하고 flush 때 SQL을 낸다. 새 엔티티는 `persist()`로 관리 대상에 넣으며, Spring Data의 `save()`는 새 엔티티인지 판단해 `persist()` 또는 `merge()`를 호출한다. 이미 관리 중인 객체는 트랜잭션 안에서 변경하면 되므로, `save()`를 다시 부르는 것이 JPA의 변경 감지에 필수는 아니다. 그렇다고 팀의 Repository 규약에서 save 호출을 요구하는지까지 무시하라는 뜻은 아니다.
+예제 기준은 Spring Boot 4.1.1, Spring Data JPA 4.1.1, Spring Framework 7.0.x다. Hibernate ORM은 공통 기준표의 7.4.5.Final이다.
 
-MyBatis의 중심에는 statement ID와 SQL, 입력 파라미터, 결과 매핑이 있다. mapper 메서드를 호출하면 등록된 statement가 실행되고 행이 DTO나 POJO로 만들어져 돌아온다. 반환 DTO의 필드를 바꿔도 데이터베이스에 반영되지 않는다. 변경하려면 `UPDATE` mapper를 다시 호출해야 한다. `#{value}`는 PreparedStatement 파라미터 바인딩이고, `${value}`는 SQL 문자열 치환이므로 사용자 입력에 문자열 치환을 적용하면 SQL injection을 만들 수 있다.
+JPA의 중심에는 현재 트랜잭션에서 관리되는 엔티티 집합, 즉 영속성 컨텍스트가 있다. `find()`로 가져온 엔티티는 그 컨텍스트 안에서 관리된다. 코드가 필드를 바꾸면 provider는 변경 전후 상태를 추적하고 flush 때 SQL을 낸다.
+
+새 엔티티는 `persist()`로 관리 대상에 넣으며, Spring Data의 `save()`는 새 엔티티인지 판단해 `persist()` 또는 `merge()`를 호출한다. 이미 관리 중인 객체는 트랜잭션 안에서 변경하면 되므로, `save()`를 다시 부르는 것이 JPA의 변경 감지에 필수는 아니다. 그렇다고 팀의 Repository 규약에서 save 호출을 요구하는지까지 무시하라는 뜻은 아니다.
+
+MyBatis의 중심에는 statement ID와 SQL, 입력 파라미터, 결과 매핑이 있다. mapper 메서드를 호출하면 등록된 statement가 실행되고 행이 DTO나 POJO로 만들어져 돌아온다. 반환 DTO의 필드를 바꿔도 데이터베이스에 반영되지 않는다.
+
+변경하려면 `UPDATE` mapper를 다시 호출해야 한다. `#{value}`는 PreparedStatement 파라미터 바인딩이고, `${value}`는 SQL 문자열 치환이므로 사용자 입력에 문자열 치환을 적용하면 SQL injection을 만들 수 있다.
 
 ### 요청이 DB에 닿는 순서
 
@@ -51,11 +59,17 @@ sequenceDiagram
     S->>DB: "commit"
 ```
 
-`@Transactional` 메서드가 시작될 때 트랜잭션이 열리고, JPA 엔티티는 이 범위의 영속성 컨텍스트에서 관리된다. 메서드가 끝날 때 provider는 보통 commit 전에 flush한다. flush는 commit과 다르다. flush는 현재 변경을 SQL로 DB에 전달하고 제약조건 오류가 그 시점에 날 수 있게 하지만, 아직 트랜잭션은 rollback 가능하다. Hibernate `AUTO` flush 모드는 commit 시뿐 아니라 쿼리가 변경 상태를 stale하게 볼 수 있는 경우에도 쿼리 전에 flush할 수 있다. `save()` 호출 즉시 SQL이 실행된다고 가정하면 디버깅 로그와 장애 시점이 어긋난다.
+`@Transactional` 메서드가 시작될 때 트랜잭션이 열리고, JPA 엔티티는 이 범위의 영속성 컨텍스트에서 관리된다. 메서드가 끝날 때 provider는 보통 commit 전에 flush한다. flush는 commit과 다르다.
 
-반대로 MyBatis 호출은 호출한 시점에 mapper SQL이 실행된다. 다만 SQL 실행과 트랜잭션 commit은 별개다. Spring이 관리하는 MyBatis mapper는 Spring 트랜잭션에 참여할 수 있으며, transaction manager가 사용하는 `DataSource`와 `SqlSessionFactory`에 연결된 `DataSource`가 같아야 한다. JPA와 MyBatis를 한 트랜잭션으로 섞을 때도 두 접근이 동일한 DB 리소스와 호환되는 Spring transaction manager에 묶였는지 설정으로 확인해야 한다. 메서드에 `@Transactional`만 붙이면 서로 다른 DB나 서로 다른 transaction manager까지 원자적으로 묶이는 것은 아니다.
+flush는 현재 변경을 SQL로 DB에 전달하고 제약조건 오류가 그 시점에 날 수 있게 하지만, 아직 트랜잭션은 rollback 가능하다. Hibernate `AUTO` flush 모드는 commit 시뿐 아니라 쿼리가 변경 상태를 stale하게 볼 수 있는 경우에도 쿼리 전에 flush할 수 있다. `save()` 호출 즉시 SQL이 실행된다고 가정하면 디버깅 로그와 장애 시점이 어긋난다.
 
-JPA와 MyBatis가 한 DB 트랜잭션을 공유해도 메모리 상태가 하나가 되지는 않는다. JPA로 엔티티를 수정했지만 아직 flush하지 않았다면 MyBatis SELECT는 DB에 전달되지 않은 값을 보지 못한다. 반대로 MyBatis UPDATE는 DB를 바꿔도 JPA 영속성 컨텍스트에 이미 들어 있는 같은 엔티티 객체는 오래된 값을 유지할 수 있다. JPA가 나중에 flush하면서 오래된 값으로 덮어쓸 수도 있다. 순서가 필요한 읽기 전에는 `EntityManager.flush()`를 고려하고, mapper가 관리 엔티티의 같은 행을 수정한 뒤에는 상황에 따라 `refresh()` 또는 `clear()`로 컨텍스트를 동기화해야 한다. 더 안전한 기본선은 한 aggregate의 쓰기 소유자를 하나로 두는 것이다.
+반대로 MyBatis 호출은 호출한 시점에 mapper SQL이 실행된다. 다만 SQL 실행과 트랜잭션 commit은 별개다. Spring이 관리하는 MyBatis mapper는 Spring 트랜잭션에 참여할 수 있으며, transaction manager가 사용하는 `DataSource`와 `SqlSessionFactory`에 연결된 `DataSource`가 같아야 한다.
+
+JPA와 MyBatis를 한 트랜잭션으로 섞을 때도 두 접근이 동일한 DB 리소스와 호환되는 Spring transaction manager에 묶였는지 설정으로 확인해야 한다. 메서드에 `@Transactional`만 붙이면 서로 다른 DB나 서로 다른 transaction manager까지 원자적으로 묶이는 것은 아니다.
+
+JPA와 MyBatis가 한 DB 트랜잭션을 공유해도 메모리 상태가 하나가 되지는 않는다. JPA로 엔티티를 수정했지만 아직 flush하지 않았다면 MyBatis SELECT는 DB에 전달되지 않은 값을 보지 못한다. 반대로 MyBatis UPDATE는 DB를 바꿔도 JPA 영속성 컨텍스트에 이미 들어 있는 같은 엔티티 객체는 오래된 값을 유지할 수 있다.
+
+JPA가 나중에 flush하면서 오래된 값으로 덮어쓸 수도 있다. 순서가 필요한 읽기 전에는 `EntityManager.flush()`를 고려하고, mapper가 관리 엔티티의 같은 행을 수정한 뒤에는 상황에 따라 `refresh()` 또는 `clear()`로 컨텍스트를 동기화해야 한다. 더 안전한 기본선은 한 aggregate의 쓰기 소유자를 하나로 두는 것이다.
 
 JPA는 상태 추적을, MyBatis는 SQL 통제를 제공한다. 양쪽 모두 인덱스·조인·round trip·잠금이 성능을 좌우하므로 어느 쪽이 본질적으로 빠르다고 할 수 없다.
 
@@ -71,7 +85,11 @@ JPA는 상태 추적을, MyBatis는 SQL 통제를 제공한다. 양쪽 모두 �
 
 국내 실무의 업종별 사용률을 비교할 신뢰 자료는 확인하지 못했다. SI·금융·공공에서 SQL 통제가, 제품 팀에서 도메인 모델 투자가 유리하다는 말은 선택 논리이지 보급률 통계가 아니다. 발주 표준·기존 코드·DB 운영권을 확인하라.
 
-기준 이름도 구분하자. JPA는 표준, Spring Data JPA는 Repository 편의 계층, Hibernate는 provider, MyBatis는 SQL mapper다. SQL을 직접 쓰는 선택지는 MyBatis만 있는 것도 아니다. Spring Framework 7.0.9의 `JdbcClient`는 named/positional parameter를 지원하는 JDBC facade이며, 복잡한 처리는 `JdbcTemplate` 계열로 내려갈 수 있다. Spring Data JPA 4.1.1과 MyBatis 3 문서는 현재 공식 사이트에서 확인했다. MyBatis Spring Boot starter 사이트는 4.0.0을 표시한다. starter 릴리스가 Boot 버전과 어떻게 호환되는지는 실제 프로젝트의 공식 호환표와 의존성 BOM으로 확인해야 한다.
+기준 이름도 구분하자. JPA는 표준, Spring Data JPA는 Repository 편의 계층, Hibernate는 provider, MyBatis는 SQL mapper다. SQL을 직접 쓰는 선택지는 MyBatis만 있는 것도 아니다.
+
+Spring Framework 7.0.9의 `JdbcClient`는 named/positional parameter를 지원하는 JDBC facade이며, 복잡한 처리는 `JdbcTemplate` 계열로 내려갈 수 있다. Spring Data JPA 4.1.1과 MyBatis 3 문서는 현재 공식 사이트에서 확인했다.
+
+MyBatis Spring Boot starter 사이트는 4.0.0을 표시한다. starter 릴리스가 Boot 버전과 어떻게 호환되는지는 실제 프로젝트의 공식 호환표와 의존성 BOM으로 확인해야 한다.
 
 ## 5. 코드로 보기
 
@@ -226,11 +244,15 @@ public interface ProductMapper {
 
 ### 신규 서비스
 
-핵심 개념과 불변식이 계속 바뀌고 여러 연관 객체를 한 규칙으로 갱신한다면 JPA를 기본으로 둔다. Repository에는 aggregate 단위 조회와 변경을 두고, API 응답용 목록 DTO가 필요한 경우 처음에는 JPQL projection으로 풀어 본다. 복잡한 보고서 SQL이 생겼다고 모든 접근을 MyBatis로 바꾸지 말고 그 조회 한두 개를 분리한다. 팀이 SQL 중심이고 도메인 규칙이 단순한 CRUD 위주라면 신규 서비스라도 MyBatis를 기본으로 선택하는 것이 더 단순할 수 있다.
+핵심 개념과 불변식이 계속 바뀌고 여러 연관 객체를 한 규칙으로 갱신한다면 JPA를 기본으로 둔다. Repository에는 aggregate 단위 조회와 변경을 두고, API 응답용 목록 DTO가 필요한 경우 처음에는 JPQL projection으로 풀어 본다.
+
+복잡한 보고서 SQL이 생겼다고 모든 접근을 MyBatis로 바꾸지 말고 그 조회 한두 개를 분리한다. 팀이 SQL 중심이고 도메인 규칙이 단순한 CRUD 위주라면 신규 서비스라도 MyBatis를 기본으로 선택하는 것이 더 단순할 수 있다.
 
 ### 레거시 전환
 
-이미 MyBatis가 있고 스키마 변경 권한이 제한적이면 mapper를 유지하는 편이 대개 변경 위험을 줄인다. 모든 SQL을 JPA로 옮기는 프로젝트를 목표로 삼지 말고 다음 기능 또는 독립 aggregate 하나를 시범 전환한다. 테이블·트랜잭션 경계를 기록하고, 어떤 애플리케이션 경로가 쓰기를 소유하는지 정한 뒤 전환한다. 옛 mapper와 새 JPA가 동일 row를 계속 양방향 쓰지 않게 한다. 결과 비교가 필요하면 일정 기간 읽기 결과를 shadow 비교하되, 요청마다 양쪽에 쓰는 dual-write를 기본 방식으로 삼지 않는다.
+이미 MyBatis가 있고 스키마 변경 권한이 제한적이면 mapper를 유지하는 편이 대개 변경 위험을 줄인다. 모든 SQL을 JPA로 옮기는 프로젝트를 목표로 삼지 말고 다음 기능 또는 독립 aggregate 하나를 시범 전환한다. 테이블·트랜잭션 경계를 기록하고, 어떤 애플리케이션 경로가 쓰기를 소유하는지 정한 뒤 전환한다.
+
+옛 mapper와 새 JPA가 동일 row를 계속 양방향 쓰지 않게 한다. 결과 비교가 필요하면 일정 기간 읽기 결과를 shadow 비교하되, 요청마다 양쪽에 쓰는 dual-write를 기본 방식으로 삼지 않는다.
 
 ### SI·금융·공공 성격의 프로젝트
 
@@ -267,7 +289,8 @@ SQL 승인, DB 객체 통제, 벤더 고유 함수, 표준 산출물이 요구�
 
 JPA는 엔티티 상태와 관계를 관리하는 영속성 모델이고, MyBatis는 SQL 실행과 행-객체 매핑을 제공하는 SQL mapper다.  
 JPA는 변경을 추적해 flush 때 SQL로 만들며, MyBatis는 명시한 statement를 호출할 때 실행한다.  
-그러므로 핵심 차이는 애노테이션 수나 SQL 작성량보다 상태 추적의 유무다.  
+그러므로 핵심 차이는 애노테이션 수나 SQL 작성량보다 상태 추적의 유무다.
+
 **꼬리 질문: JPA를 써도 SQL을 공부해야 하나?** 그렇다. 실제 SQL과 실행 계획이 성능과 잠금 동작을 결정한다.
 
 ### Q2. 엔티티 필드를 바꿨는데 `save()`가 없어도 DB에 저장되는 이유는?
@@ -281,13 +304,15 @@ JPA는 변경을 추적해 flush 때 SQL로 만들며, MyBatis는 명시한 stat
 
 보고서 쿼리는 여러 테이블 집계, vendor 함수, 윈도 함수, 조건별 projection처럼 SQL 형태 자체가 요구사항일 수 있다.  
 MyBatis는 SQL과 반환 열을 직접 보여 주므로 DBA와 쿼리 단위 리뷰를 하기 쉽다.  
-JPA native query나 JPQL projection도 가능하므로 복잡해졌다는 이유만으로 전체 도구를 바꿀 필요는 없다.  
+JPA native query나 JPQL projection도 가능하므로 복잡해졌다는 이유만으로 전체 도구를 바꿀 필요는 없다.
+
 **꼬리 질문: JPA가 통계에 부적합한가?** 아니다. 요구 SQL과 유지보수 비용에 따라 query별로 판단한다.
 
 ### Q4. JPA와 MyBatis를 같은 서비스에서 호출하면 한 트랜잭션인가?
 
 두 접근이 같은 DB 리소스와 같은 Spring 트랜잭션 관리에 참여하도록 설정되면 가능하다.  
-MyBatis-Spring은 Spring 관리 트랜잭션을 지원하지만 manager가 쓰는 DataSource와 mapper factory의 DataSource가 같아야 한다.  
+MyBatis-Spring은 Spring 관리 트랜잭션을 지원하지만 manager가 쓰는 DataSource와 mapper factory의 DataSource가 같아야 한다.
+
 서로 다른 DB나 manager를 단순한 `@Transactional` 하나가 자동으로 묶어 주지는 않는다.  
 **꼬리 질문: 그럼 JPA 변경 직후 mapper 조회 결과는?** 조회 전에 flush하지 않았다면 아직 이전 DB 값을 볼 수 있다.
 

@@ -1027,7 +1027,9 @@ public class InvalidPinException extends RuntimeException {
 
 ### MyBatis 대안 — 고정 행은 Mapper, 글은 배치 조회
 
-고정 행의 존재·개수·삽입·삭제·순서는 MyBatis `PinMapper`가 처리한다. 목록에서는 고정 글 ID를 Mapper로 읽은 뒤 기존 JPA `PostRepository`가 **한 번에** 글·작성자를 가져온다. 이렇게 하면 기존 `PostAccessPolicy.viewableBy`의 차단·공개 규칙을 그대로 쓰면서, 글마다 조회하는 N+1을 피한다. 이 대안은 혼합 경로이며, 글 조회까지 MyBatis로 옮길 때는 같은 접근 정책을 별도 DTO에 적용하도록 설계해야 한다.
+고정 행의 존재·개수·삽입·삭제·순서는 MyBatis `PinMapper`가 처리한다. 목록에서는 고정 글 ID를 Mapper로 읽은 뒤 기존 JPA `PostRepository`가 **한 번에** 글·작성자를 가져온다.
+
+이렇게 하면 기존 `PostAccessPolicy.viewableBy`의 차단·공개 규칙을 그대로 쓰면서, 글마다 조회하는 N+1을 피한다. 이 대안은 혼합 경로이며, 글 조회까지 MyBatis로 옮길 때는 같은 접근 정책을 별도 DTO에 적용하도록 설계해야 한다.
 
 <details>
 <summary>MyBatis / 설정 — 의존성·XML 로딩</summary>

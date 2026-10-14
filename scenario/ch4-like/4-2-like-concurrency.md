@@ -411,8 +411,9 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), T = 테스트 실행(
 
 리포지토리에 `@Modifying @Query("update Post p set p.likeCount = p.likeCount + 1 where p.id = :id")`. 이 쿼리는 영속성 컨텍스트를 거치지 않으므로, 응답에 줄 최신 값은 다시 조회하거나 `clearAutomatically = true`를 쓴다.
 
-서로 다른 회원 20명이 동시에 누르면 MySQL이 `post_like` 유니크 인덱스 삽입과 `post` 행 갱신 사이에서 **교착 상태**를 감지해 일부 트랜잭션을 되돌릴 수 있다(`Deadlock found ... try restarting transaction` → Spring의 `ConcurrencyFailureException`, 실측 20건 중 8건). 원자적 UPDATE만으로는 이걸 막지 못한다 — 트랜잭션 **밖**에서 짧게(예: 3번, 수십 ms 간격) 다시 시도한다. 재시도는 같은 트랜잭션 안에서 하면 안 된다(이미 롤백 표시가 붙었다).
-</details>
+서로 다른 회원 20명이 동시에 누르면 MySQL이 `post_like` 유니크 인덱스 삽입과 `post` 행 갱신 사이에서 **교착 상태**를 감지해 일부 트랜잭션을 되돌릴 수 있다(`Deadlock found ... try restarting transaction` → Spring의 `ConcurrencyFailureException`, 실측 20건 중 8건). 원자적 UPDATE만으로는 이걸 막지 못한다 — 트랜잭션 **밖**에서 짧게(예: 3번, 수십 ms 간격) 다시 시도한다.
+
+재시도는 같은 트랜잭션 안에서 하면 안 된다(이미 롤백 표시가 붙었다). </details>
 
 <details>
 <summary>힌트 2 — 테스트 뼈대</summary>

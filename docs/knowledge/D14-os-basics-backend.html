@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>D14. 백엔드 개발자를 위한 운영체제 기초 — 프로세스·스레드·메모리·I/O</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -236,7 +236,8 @@ JVM과 Spring도 이 흐름 위에 있으므로, 장애 때 Java 로그와 <code
 </tbody></table></div>
 <h2 id="3-단계별로-보기"><a class="anchor" href="#3-단계별로-보기" aria-hidden="true">#</a>3. 단계별로 보기</h2>
 <h3 id="31-실행-프로그램에서-프로세스로"><a class="anchor" href="#31-실행-프로그램에서-프로세스로" aria-hidden="true">#</a>3.1 실행: 프로그램에서 프로세스로</h3>
-<p>쉘이 <code>java -jar app.jar</code>를 실행하면 런처가 JVM 프로세스를 만들고, JVM은 자신의 가상 주소 공간에 코드, 클래스 메타데이터, Java heap, 스레드 스택, native 라이브러리와 mmap 영역을 배치한다. Linux <code>fork()</code>는 호출 프로세스를 복제한 자식 프로세스를 만들며 부모와 자식의 주소 공간은 분리된다. 구현은 처음부터 모든 RAM을 복사하기보다 copy-on-write 페이지를 공유하고, 한쪽이 쓰는 시점에 페이지를 분리하는 방식으로 복제 비용을 늦춘다. <code>fork()</code> 후 자식이 <code>execve()</code>를 호출하면 실행 이미지를 다른 프로그램으로 바꾼다.</p>
+<p>쉘이 <code>java -jar app.jar</code>를 실행하면 런처가 JVM 프로세스를 만들고, JVM은 자신의 가상 주소 공간에 코드, 클래스 메타데이터, Java heap, 스레드 스택, native 라이브러리와 mmap 영역을 배치한다. Linux <code>fork()</code>는 호출 프로세스를 복제한 자식 프로세스를 만들며 부모와 자식의 주소 공간은 분리된다.</p>
+<p>구현은 처음부터 모든 RAM을 복사하기보다 copy-on-write 페이지를 공유하고, 한쪽이 쓰는 시점에 페이지를 분리하는 방식으로 복제 비용을 늦춘다. <code>fork()</code> 후 자식이 <code>execve()</code>를 호출하면 실행 이미지를 다른 프로그램으로 바꾼다.</p>
 <p>Java 프로세스의 RSS에는 heap 외에 플랫폼 스레드 스택, Metaspace, JIT 코드 캐시, direct buffer, native allocator, 파일 매핑과 소켓 버퍼도 포함된다. 그래서 <code>-Xmx</code>를 컨테이너 제한과 같게 잡으면 native 여유가 사라질 수 있다.</p>
 <h3 id="32-실행-스레드와-스케줄링"><a class="anchor" href="#32-실행-스레드와-스케줄링" aria-hidden="true">#</a>3.2 실행: 스레드와 스케줄링</h3>
 <pre class="mermaid">sequenceDiagram
@@ -249,7 +250,8 @@ JVM과 Spring도 이 흐름 위에 있으므로, 장애 때 Java 로그와 <code
     S-&gt;&gt;C: 한 스레드에 time slice 배분
     C--&gt;&gt;S: I/O 대기 또는 time slice 만료
     S-&gt;&gt;C: 다른 runnable 스레드로 context switch</pre>
-<p>스레드마다 호출 프레임과 지역 변수를 위한 스택이 있으므로 프로세스의 메모리와 공유 객체는 보통 힙·static 영역을 통해 공유된다. 스케줄러는 runnable 스레드 중 하나를 코어에 올린다. runnable 수가 코어 수를 넘으면 모두가 동시에 빨라지는 것이 아니라 대기열, 캐시 손실, context switch가 늘어난다. 반대로 I/O 대기 스레드는 CPU를 계속 차지하지 않으므로, “스레드 수가 CPU 코어 수보다 많다”만으로 문제라고 단정할 수 없다. CPU-bound 작업과 I/O-bound 작업을 구분해야 한다.</p>
+<p>스레드마다 호출 프레임과 지역 변수를 위한 스택이 있으므로 프로세스의 메모리와 공유 객체는 보통 힙·static 영역을 통해 공유된다. 스케줄러는 runnable 스레드 중 하나를 코어에 올린다. runnable 수가 코어 수를 넘으면 모두가 동시에 빨라지는 것이 아니라 대기열, 캐시 손실, context switch가 늘어난다.</p>
+<p>반대로 I/O 대기 스레드는 CPU를 계속 차지하지 않으므로, “스레드 수가 CPU 코어 수보다 많다”만으로 문제라고 단정할 수 없다. CPU-bound 작업과 I/O-bound 작업을 구분해야 한다.</p>
 <p>동시성은 I/O 대기 중 다른 작업을 진행하는 구조이고, 병렬성은 여러 코어의 실제 동시 계산이다. 비동기 I/O가 CPU 계산을 병렬화하지는 않는다. 공유 상태와 메모리 가시성은 JMM 주제(<a class="docref" href="J10-jmm-threads.html">J10</a>)로 이어진다.</p>
 <h3 id="33-메모리-주소에서-페이지까지"><a class="anchor" href="#33-메모리-주소에서-페이지까지" aria-hidden="true">#</a>3.3 메모리: 주소에서 페이지까지</h3>
 <pre class="mermaid">flowchart TD
@@ -261,7 +263,8 @@ JVM과 Spring도 이 흐름 위에 있으므로, 장애 때 Java 로그와 <code
     F --&gt; G[&quot;파일/스왑에서 읽거나 새 페이지 할당&quot;]
     G --&gt; E</pre>
 <p>프로세스는 가상 주소를 사용하고 MMU와 페이지 테이블이 이를 물리 프레임으로 번역한다. 새로 할당했지만 아직 접근하지 않은 메모리는 demand paging으로 실제 페이지가 필요할 때 준비될 수 있다. <code>mmap</code> 파일도 페이지 단위로 로드된다. Linux 메모리 관리 문서는 이를 같은 subsystem의 책임으로 설명한다.</p>
-<p>메모리 압박에는 여러 얼굴이 있다. JVM heap이 가득 차면 GC 후에도 공간이 없어 <code>OutOfMemoryError</code>가 발생할 수 있다. 반면 cgroup의 memory limit을 넘거나 시스템 전체 여유가 없어지면 커널 OOM 처리로 프로세스가 SIGKILL될 수 있다. 전자는 애플리케이션이 예외를 기록할 기회가 있지만 후자는 종료 코드 137, 컨테이너 이벤트, 커널 로그로 나타날 수 있다. swap이 심하면 프로세스가 죽기 전에도 page fault와 swap-in 지연으로 latency가 급증한다.</p>
+<p>메모리 압박에는 여러 얼굴이 있다. JVM heap이 가득 차면 GC 후에도 공간이 없어 <code>OutOfMemoryError</code>가 발생할 수 있다. 반면 cgroup의 memory limit을 넘거나 시스템 전체 여유가 없어지면 커널 OOM 처리로 프로세스가 SIGKILL될 수 있다.</p>
+<p>전자는 애플리케이션이 예외를 기록할 기회가 있지만 후자는 종료 코드 137, 컨테이너 이벤트, 커널 로그로 나타날 수 있다. swap이 심하면 프로세스가 죽기 전에도 page fault와 swap-in 지연으로 latency가 급증한다.</p>
 <h3 id="34-io-시스템-콜부터-이벤트루프까지"><a class="anchor" href="#34-io-시스템-콜부터-이벤트루프까지" aria-hidden="true">#</a>3.4 I/O: 시스템 콜부터 이벤트루프까지</h3>
 <pre class="mermaid">sequenceDiagram
     participant T as 요청 스레드/이벤트루프
@@ -280,9 +283,12 @@ JVM과 Spring도 이 흐름 위에 있으므로, 장애 때 Java 로그와 <code
         N--&gt;&gt;K: FD를 ready list에 등록
         T-&gt;&gt;K: epoll_wait로 여러 FD 확인
     end</pre>
-<p>블로킹 <code>read</code>는 호출 스레드를 재우고, 데이터가 준비되면 커널이 깨운다. 연결 수가 많고 각 연결이 대부분 기다리는 서버는 연결마다 전용 플랫폼 스레드를 두면 스레드 스택과 스케줄링 비용이 커진다. <code>select</code>·<code>poll</code>·<code>epoll</code>은 한 실행 흐름이 여러 FD의 “지금 읽거나 쓸 수 있는가”를 감시하는 I/O 멀티플렉싱이다. <code>select(2)</code>는 FD 번호가 1024 미만이어야 한다는 제한이 있어 현대 애플리케이션에는 <code>poll</code>·<code>epoll</code>이 권장된다.</p>
-<p><code>epoll</code> 인스턴스는 관심 목록(interest list)과 준비 목록(ready list)을 커널에 둔다. <code>epoll_ctl</code>로 감시할 FD를 등록하고 <code>epoll_wait</code>로 준비된 항목을 받는다. level-triggered는 아직 읽을 데이터가 남아 있으면 계속 준비로 보고, edge-triggered는 상태 변화 때만 알린다. edge-triggered에서는 non-blocking FD를 사용하고 <code>read</code>/<code>write</code>가 <code>EAGAIN</code>을 반환할 때까지 처리해야 한다. 일부만 읽고 다시 기다리면 남은 데이터가 있어도 새 이벤트가 오지 않아 연결이 멈출 수 있다.</p>
-<p>Spring Boot servlet 애플리케이션은 기본적으로 embedded Tomcat을 포함하고, WebFlux는 Reactor Netty를 포함한다. Tomcat 모델에서는 작업 스레드가 요청 코드의 블로킹 I/O 동안 기다리는 것이 자연스럽다. Netty 이벤트루프 모델에서는 이벤트루프가 짧은 작업만 처리하고, JDBC·파일 읽기 같은 블로킹 작업을 이벤트루프에서 실행하면 같은 루프의 여러 연결이 함께 지연된다. virtual thread는 Java 21에서 정식화된 JEP 444 기능으로, 블로킹 I/O 때 Java 실행을 suspend하여 carrier OS 스레드를 다른 virtual thread에 양보한다. 그래도 CPU-bound 코드를 더 빨리 만들거나 DB 커넥션 풀의 한도를 없애지는 않는다.</p>
+<p>블로킹 <code>read</code>는 호출 스레드를 재우고, 데이터가 준비되면 커널이 깨운다. 연결 수가 많고 각 연결이 대부분 기다리는 서버는 연결마다 전용 플랫폼 스레드를 두면 스레드 스택과 스케줄링 비용이 커진다.</p>
+<p><code>select</code>·<code>poll</code>·<code>epoll</code>은 한 실행 흐름이 여러 FD의 “지금 읽거나 쓸 수 있는가”를 감시하는 I/O 멀티플렉싱이다. <code>select(2)</code>는 FD 번호가 1024 미만이어야 한다는 제한이 있어 현대 애플리케이션에는 <code>poll</code>·<code>epoll</code>이 권장된다.</p>
+<p><code>epoll</code> 인스턴스는 관심 목록(interest list)과 준비 목록(ready list)을 커널에 둔다. <code>epoll_ctl</code>로 감시할 FD를 등록하고 <code>epoll_wait</code>로 준비된 항목을 받는다. level-triggered는 아직 읽을 데이터가 남아 있으면 계속 준비로 보고, edge-triggered는 상태 변화 때만 알린다.</p>
+<p>edge-triggered에서는 non-blocking FD를 사용하고 <code>read</code>/<code>write</code>가 <code>EAGAIN</code>을 반환할 때까지 처리해야 한다. 일부만 읽고 다시 기다리면 남은 데이터가 있어도 새 이벤트가 오지 않아 연결이 멈출 수 있다.</p>
+<p>Spring Boot servlet 애플리케이션은 기본적으로 embedded Tomcat을 포함하고, WebFlux는 Reactor Netty를 포함한다. Tomcat 모델에서는 작업 스레드가 요청 코드의 블로킹 I/O 동안 기다리는 것이 자연스럽다. Netty 이벤트루프 모델에서는 이벤트루프가 짧은 작업만 처리하고, JDBC·파일 읽기 같은 블로킹 작업을 이벤트루프에서 실행하면 같은 루프의 여러 연결이 함께 지연된다.</p>
+<p>virtual thread는 Java 21에서 정식화된 JEP 444 기능으로, 블로킹 I/O 때 Java 실행을 suspend하여 carrier OS 스레드를 다른 virtual thread에 양보한다. 그래도 CPU-bound 코드를 더 빨리 만들거나 DB 커넥션 풀의 한도를 없애지는 않는다.</p>
 <h2 id="4-직접-해보기"><a class="anchor" href="#4-직접-해보기" aria-hidden="true">#</a>4. 직접 해보기</h2>
 <h3 id="41-java에서-플랫폼-스레드virtual-thread파일-io-확인"><a class="anchor" href="#41-java에서-플랫폼-스레드virtual-thread파일-io-확인" aria-hidden="true">#</a>4.1 Java에서 플랫폼 스레드·virtual thread·파일 I/O 확인</h3>
 <p>아래 예제는 JDK 21에서도 실행 가능하고, Java 25 기준에서도 같은 API를 쓸 수 있다. virtual thread는 JEP 444(Java 21)로 정식화되었다. 예제는 스레드 종류를 구분하고, 파일 읽기라는 I/O를 실행한다.</p>
@@ -336,7 +342,8 @@ lsof -p &lt;PID&gt; | head -n 30
 ss -tanp | grep &lt;PID&gt;</code></pre>
 <p>권한이 부족하면 <code>/proc/&lt;PID&gt;/fd</code>와 connection pool metric을 먼저 본다. FD 한도 증가는 누수 은폐가 될 수 있으므로, 증가하는 소켓·파일과 close 보장부터 확인한다.</p>
 <h3 id="44-spring-boot-41에서-연결하기"><a class="anchor" href="#44-spring-boot-41에서-연결하기" aria-hidden="true">#</a>4.4 Spring Boot 4.1에서 연결하기</h3>
-<p>Spring MVC는 <code>spring-boot-starter-webmvc</code>와 embedded Tomcat을, WebFlux는 <code>spring-boot-starter-webflux</code>와 Reactor Netty를 기본 조합으로 사용한다. Boot 4.1.1·Java 25 Gradle에서 <code>jps -lv</code>, <code>jcmd &lt;PID&gt; Thread.print</code>, <code>curl http://localhost:8080/</code>를 확인한다. 컨트롤러의 <code>Thread.sleep(5000)</code>은 Tomcat 스레드 점유를 보여준다. WebFlux 이벤트루프의 JDBC·파일 I/O는 여러 연결을 지연시키므로 실험 후 제거한다.</p>
+<p>Spring MVC는 <code>spring-boot-starter-webmvc</code>와 embedded Tomcat을, WebFlux는 <code>spring-boot-starter-webflux</code>와 Reactor Netty를 기본 조합으로 사용한다. Boot 4.1.1·Java 25 Gradle에서 <code>jps -lv</code>, <code>jcmd &lt;PID&gt; Thread.print</code>, <code>curl http://localhost:8080/</code>를 확인한다.</p>
+<p>컨트롤러의 <code>Thread.sleep(5000)</code>은 Tomcat 스레드 점유를 보여준다. WebFlux 이벤트루프의 JDBC·파일 I/O는 여러 연결을 지연시키므로 실험 후 제거한다.</p>
 <h2 id="5-자주-하는-오해와-실수"><a class="anchor" href="#5-자주-하는-오해와-실수" aria-hidden="true">#</a>5. 자주 하는 오해와 실수</h2>
 <ol>
 <li><p><strong>“프로세스 메모리 = <code>-Xmx</code>” →</strong> <code>-Xmx</code>는 Java heap 상한일 뿐이다. 스레드 스택, Metaspace, direct memory, native library, mmap과 페이지가 더해져 컨테이너 OOM이 날 수 있다. <strong>대처:</strong> heap과 RSS를 함께 보고 cgroup limit 아래에 native 여유를 남긴다.</p>

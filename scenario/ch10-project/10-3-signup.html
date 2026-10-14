@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>10-3. 회원 가입 — BCrypt 해시와 이메일 중복 409</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
@@ -36,7 +36,8 @@
 <li><strong>비밀번호는 원문으로 저장하지 않는다.</strong> DB가 새도 원래 비밀번호를 알 수 없게 BCrypt 해시만 저장한다. 로그인(10-4)은 해시끼리 비교한다.</li>
 <li><strong>같은 이메일로 두 번 가입하지 못한다</strong> → 409 <code>DUPLICATE</code>. <code>Kim@Example.com</code>과 <code>kim@example.com</code>은 같은 주소로 본다. 받은 이메일은 앞뒤 공백을 떼고 소문자로 바꿔 저장한다.</li>
 <li><strong>입력이 틀리면 10-2의 400 틀로 답한다</strong> → 필드별 <code>errors</code>.</li>
-<li><strong>비밀번호는 글자 수와 바이트 수를 둘 다 본다.</strong> 8~64자이면서 UTF-8로 72바이트 이하. BCrypt는 72바이트를 넘는 입력을 해시하지 못하고 예외를 던진다. 글자 수만 보면 한글 25자(75바이트)가 검증을 통과해 <code>500</code>이 된다. 넘으면 400 <code>VALIDATION_FAILED</code>(<code>field</code>: <code>password</code>)로 막는다. 왜 72바이트인지는 <a href="../../lessons/F4-password-storage.html">F4</a>에 있다.</li>
+<li><strong>비밀번호는 글자 수와 바이트 수를 둘 다 본다.</strong> 8~64자이면서 UTF-8로 72바이트 이하. BCrypt는 72바이트를 넘는 입력을 해시하지 못하고 예외를 던진다.
+  글자 수만 보면 한글 25자(75바이트)가 검증을 통과해 <code>500</code>이 된다. 넘으면 400 <code>VALIDATION_FAILED</code>(<code>field</code>: <code>password</code>)로 막는다. 왜 72바이트인지는 <a href="../../lessons/F4-password-storage.html">F4</a>에 있다.</li>
 </ol>
 <p>엔티티·저장소·서비스·컨트롤러를 한 번에 만든다. 계층을 나누는 이유는 <a href="../../lessons/E1-why-layers.html">E1</a>, JPA가 무엇인지는 <a href="../../lessons/E3-what-is-jpa.html">E3</a>에 있다.</p>
 <h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
@@ -665,7 +666,8 @@ public UserResponse signup(SignupRequest request) {
     INSERT INTO users (email, password_hash, nickname, created_at)
     VALUES (#{email}, #{passwordHash}, #{nickname}, #{createdAt})
 &lt;/insert&gt;</code></pre>
-<p><code>#{email}</code>은 문자열을 SQL에 이어 붙이지 않고 바인딩한다. INSERT가 만든 id는 <code>useGeneratedKeys</code>로 <code>User.id</code>에 채워져 <code>Location</code>과 응답 DTO에 쓰인다. Service에서는 먼저 <code>existsByEmail</code>로 확인하고, 그 사이 같은 이메일이 들어오면 DB의 <code>UNIQUE</code> 위반을 <code>DuplicateKeyException</code>으로 받아 409 <code>DUPLICATE</code>로 바꾼다. <code>@Transactional</code>과 BCrypt 해시는 JPA 경로와 동일하다.</p>
+<p><code>#{email}</code>은 문자열을 SQL에 이어 붙이지 않고 바인딩한다. INSERT가 만든 id는 <code>useGeneratedKeys</code>로 <code>User.id</code>에 채워져 <code>Location</code>과 응답 DTO에 쓰인다.</p>
+<p>Service에서는 먼저 <code>existsByEmail</code>로 확인하고, 그 사이 같은 이메일이 들어오면 DB의 <code>UNIQUE</code> 위반을 <code>DuplicateKeyException</code>으로 받아 409 <code>DUPLICATE</code>로 바꾼다. <code>@Transactional</code>과 BCrypt 해시는 JPA 경로와 동일하다.</p>
 </details>
 
 <details>

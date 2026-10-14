@@ -151,7 +151,9 @@
 <details>
 <summary>Controller — HTTP 연결</summary>
 
-`SeriesController.java`. 매핑과 메서드의 입력·응답을 위 **만들 것**의 HTTP 계약과 대조한다. 이번 단계 매핑: `@PostMapping("/api/series")`, `@GetMapping("/api/series/{seriesId}")`, `@PutMapping("/api/series/{seriesId}/posts/{postId}")`. 변경된 메서드: `create`, `get`, `addPost`, `removePost`.
+`SeriesController.java`. 매핑과 메서드의 입력·응답을 위 **만들 것**의 HTTP 계약과 대조한다.
+
+이번 단계 매핑: `@PostMapping("/api/series")`, `@GetMapping("/api/series/{seriesId}")`, `@PutMapping("/api/series/{seriesId}/posts/{postId}")`. 변경된 메서드: `create`, `get`, `addPost`, `removePost`.
 
 `src/main/java/org/example/series/SeriesController.java`
 
@@ -1277,7 +1279,9 @@ public class SeriesNotFoundException extends RuntimeException {
 
 ### MyBatis 대안 — 시리즈 행·연결 행을 SQL로 다루기
 
-시리즈 생성·소유권 잠금·끝 순서 계산·글 이동은 `SeriesMapper`의 SQL로 처리한다. 글과 작성자는 ID 목록으로 한 번에 가져와 기존 `PostAccessPolicy`를 적용한다. 동일 시리즈의 순서 경쟁은 `series FOR UPDATE`, 같은 글의 이동 경쟁은 `post FOR UPDATE`와 `series_post FOR UPDATE`로 직렬화한다. JPA와 MyBatis가 같은 DataSource/트랜잭션을 쓴다. 아래 접기를 역할별로 열어 실제 코드를 비교한다.
+시리즈 생성·소유권 잠금·끝 순서 계산·글 이동은 `SeriesMapper`의 SQL로 처리한다. 글과 작성자는 ID 목록으로 한 번에 가져와 기존 `PostAccessPolicy`를 적용한다.
+
+동일 시리즈의 순서 경쟁은 `series FOR UPDATE`, 같은 글의 이동 경쟁은 `post FOR UPDATE`와 `series_post FOR UPDATE`로 직렬화한다. JPA와 MyBatis가 같은 DataSource/트랜잭션을 쓴다. 아래 접기를 역할별로 열어 실제 코드를 비교한다.
 
 <details>
 <summary>MyBatis / 설정 — build.gradle</summary>
@@ -3129,8 +3133,9 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 <details>
 <summary>힌트 1 — 이전/다음 찾기</summary>
 
-시리즈의 글을 `ORDER BY position`으로 글·작성자까지 한 번에 읽고(fetch join), `accessPolicy.viewableBy(viewer)`로 거른 목록에서 내 글의 위치 `i`를 찾는다. `prev`는 `i - 1`, `next`는 `i + 1`(범위 밖이면 `null`). 시리즈가 아주 길다면(수백 편) `WHERE series_id = ? AND position < ? ORDER BY position DESC LIMIT 1` 같은 이웃 쿼리를 생각할 수 있지만, 그때도 "볼 수 없는 글 건너뛰기"를 SQL로 옮겨야 한다.
-</details>
+시리즈의 글을 `ORDER BY position`으로 글·작성자까지 한 번에 읽고(fetch join), `accessPolicy.viewableBy(viewer)`로 거른 목록에서 내 글의 위치 `i`를 찾는다. `prev`는 `i - 1`, `next`는 `i + 1`(범위 밖이면 `null`).
+
+시리즈가 아주 길다면(수백 편) `WHERE series_id = ? AND position < ? ORDER BY position DESC LIMIT 1` 같은 이웃 쿼리를 생각할 수 있지만, 그때도 "볼 수 없는 글 건너뛰기"를 SQL로 옮겨야 한다. </details>
 
 <details>
 <summary>힌트 2 — 옮기기에서 UNIQUE 위반이 날 때</summary>

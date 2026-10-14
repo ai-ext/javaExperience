@@ -6,7 +6,11 @@
 
 > "지난 9월 21일 월요일에 주간 랭킹 배치가 DB 잠금 때문에 실패했는데 아무도 몰랐어요. 그래서 9/14 주 랭킹이 비어 있어요. 배치가 언제 돌았고, 몇 건 처리했고, 실패했으면 왜 실패했는지 남겨 주세요. 실패한 날만 골라서 다시 돌리는 버튼도요."
 
-지금까지 만든 배치 다섯 개는 로그만 남긴다. 로그는 서버를 재시작하면 찾기 어렵고, "어느 날 몫이 아직 안 됐나"를 묻기도 어렵다. 그래서 실행마다 **표에 한 행**을 남긴다. 기준일(`run_date`, 어느 날 몫인가)이 있기 때문에 "마지막 실행이 실패로 끝난 날"을 SQL로 찾을 수 있다. 다시 돌릴 때는 그 기준일로 같은 배치를 돌린다. 15-1~15-5에서 모든 배치가 기준일을 받고, 같은 날 두 번 돌아도 결과가 같게(멱등) 만들어 둔 것이 여기서 쓰인다. 재실행이 안전하려면 배치가 멱등이어야 한다.
+지금까지 만든 배치 다섯 개는 로그만 남긴다. 로그는 서버를 재시작하면 찾기 어렵고, "어느 날 몫이 아직 안 됐나"를 묻기도 어렵다.
+
+그래서 실행마다 **표에 한 행**을 남긴다. 기준일(`run_date`, 어느 날 몫인가)이 있기 때문에 "마지막 실행이 실패로 끝난 날"을 SQL로 찾을 수 있다.
+
+다시 돌릴 때는 그 기준일로 같은 배치를 돌린다. 15-1~15-5에서 모든 배치가 기준일을 받고, 같은 날 두 번 돌아도 결과가 같게(멱등) 만들어 둔 것이 여기서 쓰인다. 재실행이 안전하려면 배치가 멱등이어야 한다.
 
 학습용 DB에는 이 단계 시드로 지난 운영 기록 세 줄이 들어간다.
 
@@ -673,7 +677,9 @@ INSERT INTO job_run (job_name, run_date, trigger_type, status, processed, error_
 <details>
 <summary>Scheduler — 실행 시점</summary>
 
-`HallOfFameScheduler.java`, `JobCatalog.java`, `JobLauncher.java`, `JobNotFoundException.java`, `JobRun.java`, `JobRunController.java`, `JobRunner.java`, `JobRunRepository.java`, `JobRunResponse.java` 외 4개. 실행 주기와 대상 선택·재실행 조건을 시나리오와 대조한다. 이번 단계 매핑: `@GetMapping("/api/admin/jobs/runs")`, `@PostMapping("/api/admin/jobs/{job}/retry-failed")`. 변경된 메서드: `names`, `exists`, `get`, `launch`.
+`HallOfFameScheduler.java`, `JobCatalog.java`, `JobLauncher.java`, `JobNotFoundException.java`, `JobRun.java`, `JobRunController.java`, `JobRunner.java`, `JobRunRepository.java`, `JobRunResponse.java` 외 4개. 실행 주기와 대상 선택·재실행 조건을 시나리오와 대조한다.
+
+이번 단계 매핑: `@GetMapping("/api/admin/jobs/runs")`, `@PostMapping("/api/admin/jobs/{job}/retry-failed")`. 변경된 메서드: `names`, `exists`, `get`, `launch`.
 
 `src/main/java/org/example/batch/HallOfFameScheduler.java`
 
@@ -2498,7 +2504,9 @@ curl -s "$BASE/api/rankings/weekly?weekStart=2026-09-14" | python3 -c 'import sy
 curl -s -X POST "$BASE/api/admin/jobs/hall-of-fame/retry-failed" -H "$A"; echo               # J5 이미 성공한 날
 ```
 
-**실패를 직접 만들어 보기(선택).** 9-2·4-2에서 본 잠금을 이용한다. DB 클라이언트에서 아래를 실행해 9/7 주 1위 자리를 잡아 둔다. 그 상태에서 주간 랭킹을 2026-09-14로 수동 실행하면, 약 50초(`innodb_lock_wait_timeout`) 뒤 `500`이 오고 기록에 `FAILED`·`CannotAcquireLockException`이 남는다. `ROLLBACK` 뒤에 `retry-failed`를 누르면 그 날만 다시 돈다.
+**실패를 직접 만들어 보기(선택).** 9-2·4-2에서 본 잠금을 이용한다. DB 클라이언트에서 아래를 실행해 9/7 주 1위 자리를 잡아 둔다.
+
+그 상태에서 주간 랭킹을 2026-09-14로 수동 실행하면, 약 50초(`innodb_lock_wait_timeout`) 뒤 `500`이 오고 기록에 `FAILED`·`CannotAcquireLockException`이 남는다. `ROLLBACK` 뒤에 `retry-failed`를 누르면 그 날만 다시 돈다.
 
 ```sql
 START TRANSACTION;
@@ -2508,7 +2516,9 @@ VALUES ('2026-09-07', 1, 1, '잠금 연습', 0, 0, 0, NOW());
 ROLLBACK;
 ```
 
-**예약 발행의 기준 시각 복구.** 회원 2로 `publishAt=2026-10-06T08:00:00`인 예약 글을 만든다. DB 클라이언트에서 그 글을 `SELECT ... FOR UPDATE`로 잠근 채 운영자가 `POST /api/admin/jobs/scheduled-publish/run?at=2026-10-06T09:00:00`을 호출하면 잠금 대기 후 실패한다. 잠금을 풀고 `POST /api/admin/jobs/scheduled-publish/retry-failed`를 호출한다. `job_run.reference_at`은 실패·재실행 모두 `2026-10-06 09:00:00`이고 글은 `PUBLISHED`가 되어야 한다. 고정 시계의 현재 시각(2026-10-05)으로 다시 돌려 0건 성공으로 닫으면 실패다.
+**예약 발행의 기준 시각 복구.** 회원 2로 `publishAt=2026-10-06T08:00:00`인 예약 글을 만든다. DB 클라이언트에서 그 글을 `SELECT ... FOR UPDATE`로 잠근 채 운영자가 `POST /api/admin/jobs/scheduled-publish/run?at=2026-10-06T09:00:00`을 호출하면 잠금 대기 후 실패한다.
+
+잠금을 풀고 `POST /api/admin/jobs/scheduled-publish/retry-failed`를 호출한다. `job_run.reference_at`은 실패·재실행 모두 `2026-10-06 09:00:00`이고 글은 `PUBLISHED`가 되어야 한다. 고정 시계의 현재 시각(2026-10-05)으로 다시 돌려 0건 성공으로 닫으면 실패다.
 
 **동시 재실행.** 실패 기록이 남은 상태에서 운영자 요청 두 개를 동시에 보내면 응답의 `retried`는 합쳐서 해당 날짜 한 건이고 `job_run`에도 `RETRY` 한 줄만 생겨야 한다. 다시 한 번 요청하면 빈 배열이다. 재실행 응답의 `runId`는 바로 그 `RETRY` 행의 ID여야 한다.
 
@@ -3086,8 +3096,11 @@ public <T> T run(String job, LocalDate runDate, String trigger, Supplier<T> work
 <details>
 <summary>더 깊이 — 서버가 여러 대라면, Spring Batch라면</summary>
 
-이 장의 재실행 버튼은 MySQL 연결 잠금으로 중복 요청을 막는다. 예약 스케줄러 자체가 여러 서버에서 동시에 시작되는 문제는 별개다. 보통 분산 락(ShedLock 등)으로 한 대만 돌게 한다. 매분·10분 배치는 0건 성공의 기록을 생략하므로 본문 실행 중 프로세스가 종료되면 그 실행 기록도 남지 않을 수 있다. 그런 종료까지 추적하려면 먼저 RUNNING을 저장하고 오래된 실행을 복구하는 정책이 필요하다. Spring Batch를 쓰면 이 단계의 `job_run` 역할을 `JobRepository`(BATCH_JOB_EXECUTION 등)가 한다.
-</details>
+이 장의 재실행 버튼은 MySQL 연결 잠금으로 중복 요청을 막는다. 예약 스케줄러 자체가 여러 서버에서 동시에 시작되는 문제는 별개다.
+
+보통 분산 락(ShedLock 등)으로 한 대만 돌게 한다. 매분·10분 배치는 0건 성공의 기록을 생략하므로 본문 실행 중 프로세스가 종료되면 그 실행 기록도 남지 않을 수 있다.
+
+그런 종료까지 추적하려면 먼저 RUNNING을 저장하고 오래된 실행을 복구하는 정책이 필요하다. Spring Batch를 쓰면 이 단계의 `job_run` 역할을 `JobRepository`(BATCH_JOB_EXECUTION 등)가 한다. </details>
 
 ## 다음 단계
 

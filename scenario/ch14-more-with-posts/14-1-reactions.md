@@ -148,7 +148,9 @@
 
 **먼저 위 계약을 직접 구현한 뒤**, 필요한 역할을 펼쳐 실제 실행한 파일 전문과 비교한다. JPA는 엔티티 변경 감지로 종류를 바꾸고, MyBatis는 `(post_id, member_id)` 고유키에 대한 UPSERT로 삽입·변경을 한 문장에 처리한다. 두 경로 모두 글 접근 정책과 DTO·Controller·Flyway 스키마는 같다. `created_at`은 처음 공감한 시각이므로 MyBatis의 중복 키 갱신에서는 바꾸지 않는다.
 
-MyBatis 대안을 실행할 때 `build.gradle`의 `dependencies`에 `implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'`을 추가한다. 아래 MyBatis `ReactionService`가 JPA 버전을 **대체**하고, `ReactionMapper`·`ReactionCount`·XML을 추가한다. 글 조회·접근 정책은 기존 JPA `PostRepository`와 `PostAccessPolicy`를 재사용한다. MyBatis 대안은 공감 테이블의 조회·저장을 담당한다.
+MyBatis 대안을 실행할 때 `build.gradle`의 `dependencies`에 `implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'`을 추가한다. 아래 MyBatis `ReactionService`가 JPA 버전을 **대체**하고, `ReactionMapper`·`ReactionCount`·XML을 추가한다.
+
+글 조회·접근 정책은 기존 JPA `PostRepository`와 `PostAccessPolicy`를 재사용한다. MyBatis 대안은 공감 테이블의 조회·저장을 담당한다.
 
 이 단계의 C 기준은 순차 요청이다. JPA 예시의 최초 공감은 `SELECT` 후 `INSERT`하므로 같은 회원·글의 **최초 PUT 두 건이 동시에 오면** 고유키 충돌로 한 요청이 실패할 수 있다. 동시 최초 요청까지 200으로 보장하려면 원자적 UPSERT나 잠금·재시도 정책을 별도로 설계해야 한다. 아래 MyBatis 대안은 고유키 기반 UPSERT를 사용한다.
 
@@ -1350,8 +1352,9 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 <details>
 <summary>힌트 1 — 바꾸기와 만들기를 한 메서드로</summary>
 
-`findByPost_IdAndMember_Id(postId, memberId)`로 내 행을 찾는다. 있으면 엔티티의 `changeKind(kind)`(같은 종류면 아무것도 안 함)를 부르고, 없으면 `save(new PostReaction(...))`. 트랜잭션 안에서 엔티티 값만 바꾸면 커밋 때 UPDATE가 나간다(변경 감지). 이어서 개수를 세는 쿼리를 실행하기 전에 Hibernate가 바뀐 값을 먼저 DB에 반영(flush)하므로 개수에 바로 반영된다.
-</details>
+`findByPost_IdAndMember_Id(postId, memberId)`로 내 행을 찾는다. 있으면 엔티티의 `changeKind(kind)`(같은 종류면 아무것도 안 함)를 부르고, 없으면 `save(new PostReaction(...))`.
+
+트랜잭션 안에서 엔티티 값만 바꾸면 커밋 때 UPDATE가 나간다(변경 감지). 이어서 개수를 세는 쿼리를 실행하기 전에 Hibernate가 바뀐 값을 먼저 DB에 반영(flush)하므로 개수에 바로 반영된다. </details>
 
 <details>
 <summary>힌트 2 — 종류별 개수</summary>

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>V06. 현업 테스트 실무 — 레거시에 테스트 붙이기, 버그 재현, CI, 커버리지</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -36,7 +36,8 @@ CI는 테스트 결과와 실패 보고서를 남기고, 커버리지는 품질 
 <h3 id="1단계-현재-동작과-테스트-경계-확인"><a class="anchor" href="#1단계-현재-동작과-테스트-경계-확인" aria-hidden="true">#</a>1단계: 현재 동작과 테스트 경계 확인</h3>
 <pre><code>cd practice/starter
 rg --files src/main src/test</code></pre>
-<p>실제 파일은 ProductServiceUnitTest.java, ProductControllerTest.java, ProductRepositoryTest.java, ProductApiIntegrationTest.java, ProductMySqlIntegrationTest.java다. ProductServiceUnitTest는 Repository를 mock으로 대체하고 서비스를 직접 생성해 매핑·예외·페이징 위임을 확인한다. 리팩터링 전 현재 응답·예외·경계값을 요구사항과 대조한다. 현재 동작이 잘못됐다면 그 동작을 정답으로 고정하지 말고 의도된 결과를 회귀 테스트에 둔다. 확인 방법: rg 결과에서 계층별 테스트 파일과 대상 메서드가 있는지 확인한다.</p>
+<p>실제 파일은 ProductServiceUnitTest.java, ProductControllerTest.java, ProductRepositoryTest.java, ProductApiIntegrationTest.java, ProductMySqlIntegrationTest.java다. ProductServiceUnitTest는 Repository를 mock으로 대체하고 서비스를 직접 생성해 매핑·예외·페이징 위임을 확인한다. 리팩터링 전 현재 응답·예외·경계값을 요구사항과 대조한다.</p>
+<p>현재 동작이 잘못됐다면 그 동작을 정답으로 고정하지 말고 의도된 결과를 회귀 테스트에 둔다. 확인 방법: rg 결과에서 계층별 테스트 파일과 대상 메서드가 있는지 확인한다.</p>
 <h3 id="2단계-버그-조건을-테스트로-먼저-재현"><a class="anchor" href="#2단계-버그-조건을-테스트로-먼저-재현" aria-hidden="true">#</a>2단계: 버그 조건을 테스트로 먼저 재현</h3>
 <p>저장소 테스트는 실제 MySQL Testcontainers와 연습 스키마를 사용한다. ProductRepositoryTest가 이미 확인하는 핵심 회귀 조건은 삭제 시각이 있는 상품 ID 80을 조회 결과에서 제외하는 것이다. 이를 깨뜨리는 쿼리 변경이 PR에 들어왔다고 가정하고 아래 테스트부터 실행한다. 쿼리가 잘못되어 삭제 상품을 포함하면 assertion이 실패한다.</p>
 <pre><code class="language-java">package com.example.practice.product;
@@ -84,7 +85,8 @@ class ProductRepositoryTest {
         assertThat(page.getTotalPages()).isEqualTo(8);
     }
 }</code></pre>
-<p>이 코드도 미실행이다. 현재 저장소에는 같은 테스트 클래스가 이미 있고, 실제 클래스는 PageRequest와 Page import를 별도로 둔다. 파일을 새로 만들 때는 중복 클래스를 만들지 말고 기존 메서드에 실패 조건을 추가한다. Boot 4에서 DataJpaTest는 org.springframework.boot.data.jpa.test.autoconfigure 패키지다. 이 슬라이스의 기본 DB 치환 동작은 Testcontainers를 쓰는 경우 @AutoConfigureTestDatabase(replace = NONE)으로 분명히 바꾼다.</p>
+<p>이 코드도 미실행이다. 현재 저장소에는 같은 테스트 클래스가 이미 있고, 실제 클래스는 PageRequest와 Page import를 별도로 둔다. 파일을 새로 만들 때는 중복 클래스를 만들지 말고 기존 메서드에 실패 조건을 추가한다.</p>
+<p>Boot 4에서 DataJpaTest는 org.springframework.boot.data.jpa.test.autoconfigure 패키지다. 이 슬라이스의 기본 DB 치환 동작은 Testcontainers를 쓰는 경우 @AutoConfigureTestDatabase(replace = NONE)으로 분명히 바꾼다.</p>
 <p>테스트를 먼저 추가하고 재현할 때 확인할 명령은 다음과 같다.</p>
 <pre><code>./gradlew test --tests 'com.example.practice.product.ProductRepositoryTest.derivedFinderExcludesSoftDeletedProduct'
 ./gradlew test --tests 'com.example.practice.product.ProductRepositoryTest'
@@ -127,7 +129,8 @@ class ProductControllerRegressionTest {
                 .andExpect(jsonPath(&quot;$.detail&quot;).value(&quot;Product 999 was not found&quot;));
     }
 }</code></pre>
-<p>새 파일로 추가한다면 이름에 맞춰 클래스도 ProductControllerRegressionTest로 둔다. 현재 저장소는 같은 API 단언을 ProductControllerTest와 ProductControllerSliceTest에 이미 가지고 있다. Boot 4의 WebMvcTest와 AutoConfigureMockMvc 패키지는 org.springframework.boot.webmvc.test.autoconfigure다. Boot 3 import를 복사하지 않는다. 확인 방법: ./gradlew test --tests &#39;com.example.practice.product.ProductControllerTest&#39; 실행 후 404와 ProblemDetail 필드를 확인한다. 실제 DB까지 필요한 경우에만 @SpringBootTest와 Testcontainers를 쓴다.</p>
+<p>새 파일로 추가한다면 이름에 맞춰 클래스도 ProductControllerRegressionTest로 둔다. 현재 저장소는 같은 API 단언을 ProductControllerTest와 ProductControllerSliceTest에 이미 가지고 있다. Boot 4의 WebMvcTest와 AutoConfigureMockMvc 패키지는 org.springframework.boot.webmvc.test.autoconfigure다.</p>
+<p>Boot 3 import를 복사하지 않는다. 확인 방법: ./gradlew test --tests &#39;com.example.practice.product.ProductControllerTest&#39; 실행 후 404와 ProblemDetail 필드를 확인한다. 실제 DB까지 필요한 경우에만 @SpringBootTest와 Testcontainers를 쓴다.</p>
 <h3 id="4단계-ci에서-실행하고-실패-보고서-보관"><a class="anchor" href="#4단계-ci에서-실행하고-실패-보고서-보관" aria-hidden="true">#</a>4단계: CI에서 실행하고 실패 보고서 보관</h3>
 <p>저장소 루트의 .github/workflows/test.yml에 둘 수 있는 예시다. starter의 Gradle toolchain이 현재 Java 21이므로 같은 버전으로 맞췄다. toolchain을 25로 올릴 때는 CI의 java-version도 함께 맞춘다.</p>
 <pre><code class="language-yaml">name: test

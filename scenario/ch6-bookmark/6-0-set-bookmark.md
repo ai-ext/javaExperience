@@ -39,7 +39,9 @@
 | 실패 | 토큰 없음 `401`; 없는/볼 수 없는/미발행 글 `404`; 다른 회원 폴더나 없는 폴더 `404`; 메모 201자·잘못된 타입 `400`. |
 | DB | `bookmark`의 `UNIQUE(member_id, post_id)`를 확인한다. `folder_id`가 있으면 `bookmark_folder.member_id`도 토큰 회원과 같아야 한다. |
 
-Controller는 경로 ID와 `@RequestBody` 요청 DTO를 받고 북마크 응답 DTO를 돌려준다. 본문이 없는 요청은 `{}`와 같이 처리한다. Service는 먼저 글 가시성을 확인한 뒤 **폴더 ID만 찾지 말고 회원 ID까지 조건**으로 조회한다. 폴더 검증에 실패하면 북마크 행을 새로 만들지 않는다. 이미 저장돼 있으면 이번 단계에서는 같은 값의 반복 PUT을 처리하고, 보내는 값으로 메모·폴더를 바꾸는 upsert는 6-1에서 완성한다.
+Controller는 경로 ID와 `@RequestBody` 요청 DTO를 받고 북마크 응답 DTO를 돌려준다. 본문이 없는 요청은 `{}`와 같이 처리한다.
+
+Service는 먼저 글 가시성을 확인한 뒤 **폴더 ID만 찾지 말고 회원 ID까지 조건**으로 조회한다. 폴더 검증에 실패하면 북마크 행을 새로 만들지 않는다. 이미 저장돼 있으면 이번 단계에서는 같은 값의 반복 PUT을 처리하고, 보내는 값으로 메모·폴더를 바꾸는 upsert는 6-1에서 완성한다.
 
 좋아요와 달리 내 글 저장은 허용된다. 좋아요의 `like_count`처럼 `post`의 숫자 열을 변경하지 않는다. 저장한 글을 나중에 읽을 때 글이 삭제될 수 있으므로 북마크 행을 어떻게 표시할지는 6-3에서 다룬다.
 
@@ -122,7 +124,9 @@ FROM bookmark bm WHERE bm.member_id = 2 AND bm.post_id = 2;
 SELECT id, member_id FROM bookmark_folder WHERE id = 11;
 ```
 
-JPA의 `BookmarkRepository.insertIfAbsent`는 native SQL `INSERT ... ON DUPLICATE KEY UPDATE id = id`로 동시에 온 반복 PUT을 한 행으로 합친다. `findCurrentForUpdate`는 같은 회원·글 조건으로 현재 행을 읽는다. `BookmarkFolderRepository.findByIdAndMember_Id`는 폴더 ID와 소유자를 함께 확인한다. DB의 `UNIQUE(member_id, post_id)`가 중복을 막는다.
+JPA의 `BookmarkRepository.insertIfAbsent`는 native SQL `INSERT ... ON DUPLICATE KEY UPDATE id = id`로 동시에 온 반복 PUT을 한 행으로 합친다. `findCurrentForUpdate`는 같은 회원·글 조건으로 현재 행을 읽는다.
+
+`BookmarkFolderRepository.findByIdAndMember_Id`는 폴더 ID와 소유자를 함께 확인한다. DB의 `UNIQUE(member_id, post_id)`가 중복을 막는다.
 
 </details>
 
@@ -143,7 +147,9 @@ JPA의 `BookmarkRepository.insertIfAbsent`는 native SQL `INSERT ... ON DUPLICAT
 </insert>
 ```
 
-같은 키로 다시 요청하면 기존 행의 메모·폴더를 바꾸지 않는다. `MyBatisBookmarkService`는 글 가시성·발행 상태와 입력 타입을 확인하고, 폴더 소유권 검사를 통과한 뒤 INSERT와 `findBookmark`를 한 트랜잭션에서 실행한다. `findBookmark` SQL 끝의 `FOR UPDATE`로 충돌 뒤에도 현재 행을 읽는다. 아래 **MyBatis 대체 구현 코드** 접기에서 Controller·Service·Mapper·XML 전문을 비교할 수 있다.
+같은 키로 다시 요청하면 기존 행의 메모·폴더를 바꾸지 않는다. `MyBatisBookmarkService`는 글 가시성·발행 상태와 입력 타입을 확인하고, 폴더 소유권 검사를 통과한 뒤 INSERT와 `findBookmark`를 한 트랜잭션에서 실행한다.
+
+`findBookmark` SQL 끝의 `FOR UPDATE`로 충돌 뒤에도 현재 행을 읽는다. 아래 **MyBatis 대체 구현 코드** 접기에서 Controller·Service·Mapper·XML 전문을 비교할 수 있다.
 
 </details>
 

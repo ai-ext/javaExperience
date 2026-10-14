@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>10-6. 게시글 상세 — 조회수·작성자·태그·댓글을 한 번에, N+1 없이</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
@@ -128,7 +128,8 @@ WHERE c.post_id = 1 ORDER BY c.created_at, c.id;</dd><dt>note</dt><dd>댓글이 
 <ul>
 <li><strong>N+1이 생기는 자리.</strong> 댓글 목록을 <code>findByPostId</code>로 읽고 응답을 만들며 <code>comment.getAuthor().getNickname()</code>을 부르면, 작성자가 <code>LAZY</code>라 <strong>댓글마다</strong> <code>SELECT ... FROM users</code>가 나간다. 댓글 6개면 1 + 6번이다. 해결은 &quot;필요한 것을 처음 쿼리에서 같이 가져오기&quot;다. JPQL의 <code>join fetch</code>를 쓴다.</li>
 <li><strong>컬렉션 두 개를 한 번에 fetch join하지 않는다.</strong> 글 + 태그 + 댓글을 한 JPQL에 모두 <code>join fetch</code>하면 행이 곱으로 불어난다(태그 2 × 댓글 6 = 12행). 컬렉션이 둘 이상이면 Hibernate가 거부하기도 한다(<code>MultipleBagFetchException</code>). 글·작성자·태그 한 쿼리, 댓글·작성자 한 쿼리로 나눈다.</li>
-<li><strong>조회수는 &quot;읽고 +1 해서 저장&quot;하지 않는다.</strong> 엔티티의 <code>viewCount</code>를 +1 하고 변경 감지에 맡기면, 동시에 두 명이 열 때 둘 다 10을 읽고 11을 쓴다. <code>UPDATE posts SET view_count = view_count + 1</code>을 DB에서 바로 실행한다(<code>@Modifying @Query</code>). 응답에는 읽었던 값 + 1을 싣는다. 두 요청이 동시에 10을 읽으면 각 응답은 11일 수 있지만 DB의 최종 값은 12다. 응답 값은 <strong>이 요청의 증가를 반영한 값</strong>이며, 동시 요청까지 포함한 최신 합계를 보장하지 않는다.</li>
+<li><strong>조회수는 &quot;읽고 +1 해서 저장&quot;하지 않는다.</strong> 엔티티의 <code>viewCount</code>를 +1 하고 변경 감지에 맡기면, 동시에 두 명이 열 때 둘 다 10을 읽고 11을 쓴다. <code>UPDATE posts SET view_count = view_count + 1</code>을 DB에서 바로 실행한다(<code>@Modifying @Query</code>).
+응답에는 읽었던 값 + 1을 싣는다. 두 요청이 동시에 10을 읽으면 각 응답은 11일 수 있지만 DB의 최종 값은 12다. 응답 값은 <strong>이 요청의 증가를 반영한 값</strong>이며, 동시 요청까지 포함한 최신 합계를 보장하지 않는다.</li>
 <li><strong>트리는 메모리에서.</strong> 댓글을 시간순 평평한 목록으로 한 번에 읽고, 자바에서 <code>parent_id</code>별로 묶어 트리를 만든다. 부모 댓글마다 답글을 다시 조회하면 그게 또 N+1이다.</li>
 <li><strong>남의 비공개는 404.</strong> 403(&quot;권한 없음&quot;)은 &quot;그 글이 있다&quot;를 알려 준다. 접근 규칙은 <a href="../../lessons/G2-access-rules-in-one-place.html">G2</a>처럼 한곳에 모아 두면 10-8·10-9에서 다시 쓴다.</li>
 </ul>

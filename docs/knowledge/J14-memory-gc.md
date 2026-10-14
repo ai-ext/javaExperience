@@ -6,7 +6,9 @@
 
 ## 1. 왜 알아야 하나
 
-`-Xmx`를 크게 했는데도 프로세스가 컨테이너 메모리 제한을 넘거나, `OutOfMemoryError: Direct buffer memory`가 나는 사례가 있다. 이때 힙만 보면 원인을 놓친다. 클래스 메타데이터, JIT 코드, 스레드 스택, direct buffer payload도 프로세스 메모리를 쓴다. 반대로 `GC overhead limit exceeded`나 잦은 Full GC에서 무조건 `-Xmx`를 올리면, 객체를 계속 붙잡는 캐시·리스너 누수는 그대로 둔 채 장애 시점만 늦출 수 있다.
+`-Xmx`를 크게 했는데도 프로세스가 컨테이너 메모리 제한을 넘거나, `OutOfMemoryError: Direct buffer memory`가 나는 사례가 있다. 이때 힙만 보면 원인을 놓친다.
+
+클래스 메타데이터, JIT 코드, 스레드 스택, direct buffer payload도 프로세스 메모리를 쓴다. 반대로 `GC overhead limit exceeded`나 잦은 Full GC에서 무조건 `-Xmx`를 올리면, 객체를 계속 붙잡는 캐시·리스너 누수는 그대로 둔 채 장애 시점만 늦출 수 있다.
 
 GC 로그의 `before -> after`를 보면 단기 할당과 장기 생존 객체 증가를 구분할 수 있다. G1의 pause target은 보증이 아니며, ZGC·Shenandoah도 CPU와 메모리 여유가 부족하면 할당이 정체되거나 처리량이 떨어진다.
 

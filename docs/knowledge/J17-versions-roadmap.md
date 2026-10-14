@@ -6,9 +6,13 @@
 
 ## 1. 왜 알아야 하나
 
-운영 중인 서비스가 Java 8에서 Java 17로 올라간 뒤 갑자기 시작하지 않는 경우가 있다. `sun.misc`가 아닌 내부 JDK 클래스에 리플렉션으로 접근하던 라이브러리가 Java 17의 강한 캡슐화에 막혔기 때문이다. Java 11에서는 Java EE와 CORBA 모듈이 JDK에서 빠졌고, Java 17에서는 RMI Activation과 실험적 AOT/JIT 컴파일러가 제거됐다. “바이트코드 버전만 올리면 된다”는 마이그레이션 계획이 깨지는 지점이다.
+운영 중인 서비스가 Java 8에서 Java 17로 올라간 뒤 갑자기 시작하지 않는 경우가 있다. `sun.misc`가 아닌 내부 JDK 클래스에 리플렉션으로 접근하던 라이브러리가 Java 17의 강한 캡슐화에 막혔기 때문이다.
 
-반대로 오래된 버전에 머물러도 비용이 생긴다. Java 17은 기능적으로 안정적이어도 공급자별 지원 종료일이 다르고, 보안 패치·컨테이너 베이스 이미지·프레임워크의 최소 JDK 요구사항이 먼저 바뀐다. 기준일의 Oracle 표만 보더라도 Oracle JDK 17의 Premier Support 종료는 2026-09-30, 21은 2028-09-30, 25는 2030-09-30이다. 같은 “Java 17”이라도 Corretto, Temurin, Zulu의 지원 종료일은 동일하다고 가정하면 안 된다.
+Java 11에서는 Java EE와 CORBA 모듈이 JDK에서 빠졌고, Java 17에서는 RMI Activation과 실험적 AOT/JIT 컴파일러가 제거됐다. “바이트코드 버전만 올리면 된다”는 마이그레이션 계획이 깨지는 지점이다.
+
+반대로 오래된 버전에 머물러도 비용이 생긴다. Java 17은 기능적으로 안정적이어도 공급자별 지원 종료일이 다르고, 보안 패치·컨테이너 베이스 이미지·프레임워크의 최소 JDK 요구사항이 먼저 바뀐다.
+
+기준일의 Oracle 표만 보더라도 Oracle JDK 17의 Premier Support 종료는 2026-09-30, 21은 2028-09-30, 25는 2030-09-30이다. 같은 “Java 17”이라도 Corretto, Temurin, Zulu의 지원 종료일은 동일하다고 가정하면 안 된다.
 
 면접에서도 LTS를 “장기 지원되는 특별한 언어 버전”이라고만 답하면 부족하다. LTS는 Java 사양의 별도 종류가 아니라 공급자들이 장기 유지보수를 약속하는 릴리스 라벨이다. 기능 릴리스는 6개월마다 나오며, LTS가 아닌 26·27은 운영에 선택할 수 없는 버전이라는 뜻이 아니라 짧은 수명과 마이그레이션 비용을 감수하고 최신 기능을 검증하는 버전이라는 뜻이다.
 
@@ -57,7 +61,9 @@ Oracle 지원 로드맵은 Java 10 이후 6개월 주기, OpenJDK 17 이후 2년
 
 JEP가 제안되면 구현이 곧바로 영구 표준이 되는 것이 아니다. Preview 언어 기능은 `javac --enable-preview --release N`으로 시험하고, 실행도 같은 계열의 `java --enable-preview`가 필요하다. Incubator API는 모듈 경로와 `--add-modules`가 필요할 수 있다. 최종화된 기능만 장기 소스 계약으로 취급해야 한다.
 
-예를 들어 Java 21의 Virtual Threads(JEP 444), Sequenced Collections(JEP 431), Record Patterns(JEP 440), Pattern Matching for `switch`(JEP 441)는 정식 기능이다. 반면 Structured Concurrency(JEP 453), Scoped Values(JEP 446)는 당시 Preview였다. Java 25의 Scoped Values(JEP 506)는 정식화됐지만 Structured Concurrency(JEP 505)는 여전히 Preview다. 같은 이름의 기능이라도 “언제 처음 나왔는가”와 “언제 최종화됐는가”를 구분해야 한다.
+예를 들어 Java 21의 Virtual Threads(JEP 444), Sequenced Collections(JEP 431), Record Patterns(JEP 440), Pattern Matching for `switch`(JEP 441)는 정식 기능이다. 반면 Structured Concurrency(JEP 453), Scoped Values(JEP 446)는 당시 Preview였다.
+
+Java 25의 Scoped Values(JEP 506)는 정식화됐지만 Structured Concurrency(JEP 505)는 여전히 Preview다. 같은 이름의 기능이라도 “언제 처음 나왔는가”와 “언제 최종화됐는가”를 구분해야 한다.
 
 ### 3.3 호환성은 여러 층이다
 
@@ -70,7 +76,9 @@ JEP가 제안되면 구현이 곧바로 영구 표준이 되는 것이 아니다
 
 새 JDK의 JVM은 보통 이전 class 파일을 읽지만, 반대 방향은 안 된다. `--release`는 현재 JDK에 존재하는 API를 실수로 사용하면서 낮은 바이트코드만 생성하는 문제를 줄인다. 그러나 `jdeps`가 찾지 못하는 리플렉션 문자열, 서비스 로더, JNI, 실행 시 생성되는 클래스까지 자동으로 보장하지는 않는다.
 
-Java 17의 JEP 403은 JDK 내부 요소를 강하게 캡슐화했다. 과거의 `--illegal-access` 완화에 기대던 라이브러리는 표준 API로 바꾸거나, 모듈별 `--add-opens`를 임시로 사용해야 한다. 임시 옵션은 원인 해결이 아니라 호환성 유예다. Java 11의 Java EE/CORBA 모듈 제거처럼 컴파일 단계에서 드러나는 변화도 있지만, JEP 407의 RMI Activation 제거처럼 특정 기능을 실제로 호출할 때만 드러나는 변화도 있다.
+Java 17의 JEP 403은 JDK 내부 요소를 강하게 캡슐화했다. 과거의 `--illegal-access` 완화에 기대던 라이브러리는 표준 API로 바꾸거나, 모듈별 `--add-opens`를 임시로 사용해야 한다.
+
+임시 옵션은 원인 해결이 아니라 호환성 유예다. Java 11의 Java EE/CORBA 모듈 제거처럼 컴파일 단계에서 드러나는 변화도 있지만, JEP 407의 RMI Activation 제거처럼 특정 기능을 실제로 호출할 때만 드러나는 변화도 있다.
 
 ## 4. 코드로 확인
 

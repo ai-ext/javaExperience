@@ -378,8 +378,9 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 <details>
 <summary>힌트 1 — 지운 사람 남기기</summary>
 
-`Post.delete(LocalDateTime now)`를 `delete(LocalDateTime now, Long deletedBy)`로 바꾸고 `PostService.delete()`에서 로그인 회원 id를 넘긴다. 엔티티에는 `@Column(name = "deleted_by") private Long deletedBy;`면 충분하다(회원 엔티티를 거쳐 읽을 일이 없다). `restore()`는 `deletedAt`·`deletedBy`만 `null`로.
-</details>
+`Post.delete(LocalDateTime now)`를 `delete(LocalDateTime now, Long deletedBy)`로 바꾸고 `PostService.delete()`에서 로그인 회원 id를 넘긴다. 엔티티에는 `@Column(name = "deleted_by") private Long deletedBy;`면 충분하다(회원 엔티티를 거쳐 읽을 일이 없다).
+
+`restore()`는 `deletedAt`·`deletedBy`만 `null`로. </details>
 
 <details>
 <summary>힌트 2 — 휴지통 쿼리와 복구 순서</summary>
@@ -394,8 +395,9 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 List<Post> findMyTrash(@Param("memberId") Long memberId, @Param("since") LocalDateTime since);
 ```
 
-`since` = `LocalDateTime.now(clock).minusDays(30)`. 복구는 `findById` → 작성자 아니면 404 → `deletedAt == null`이면 409 → `!내 id.equals(deletedBy)`면 403(`deletedBy`가 `null`이어도 여기서 걸린다) → `deletedAt.plusDays(30).isBefore(now)`면 410(`HttpStatus.GONE`). 예외마다 `ApiExceptionHandler`에 상태 코드를 등록한다.
-</details>
+`since` = `LocalDateTime.now(clock).minusDays(30)`. 복구는 `findById` → 작성자 아니면 404 → `deletedAt == null`이면 409 → `!내 id.equals(deletedBy)`면 403(`deletedBy`가 `null`이어도 여기서 걸린다) → `deletedAt.plusDays(30).isBefore(now)`면 410(`HttpStatus.GONE`).
+
+예외마다 `ApiExceptionHandler`에 상태 코드를 등록한다. </details>
 
 ## 다음 단계
 

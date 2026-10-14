@@ -79,7 +79,9 @@
 
 ## 만들 것
 
-**V40** — `db/migration/V40__member_role_moderator.sql`: `member.role` CHECK를 `'USER', 'MODERATOR', 'ADMIN'`으로(`DROP CHECK ck_member_role` 뒤 다시 만든다). 누구를 모더레이터로 할지는 마이그레이션에 넣지 않는다. 마이그레이션은 community·practice 두 DB에 똑같이 돌고 회원 id가 서로 다르다. 역할은 아래 API로 준다.
+**V40** — `db/migration/V40__member_role_moderator.sql`: `member.role` CHECK를 `'USER', 'MODERATOR', 'ADMIN'`으로(`DROP CHECK ck_member_role` 뒤 다시 만든다). 누구를 모더레이터로 할지는 마이그레이션에 넣지 않는다.
+
+마이그레이션은 community·practice 두 DB에 똑같이 돌고 회원 id가 서로 다르다. 역할은 아래 API로 준다.
 
 **V41** — `db/migration/V41__post_hidden_by.sql`
 
@@ -758,10 +760,13 @@ return true;
 <details>
 <summary>힌트 2 — 숨김 기록</summary>
 
-`Post`에 `hiddenAt`과 `@ManyToOne(fetch = LAZY) @JoinColumn(name = "hidden_by") Member hiddenBy`를 두고, `hide(Member by, LocalDateTime now)`는 이미 `HIDDEN`이면 아무것도 하지 않는다. `unhide()`는 상태를 `PUBLISHED`로, 두 숨김 기록을 `null`로. 임시저장이면 두 메서드 모두 예외(→ 409). 삭제 글의 `deletedAt`·`deletedBy`를 비우는 11-5의 `restore()`와 구분한다.
+`Post`에 `hiddenAt`과 `@ManyToOne(fetch = LAZY) @JoinColumn(name = "hidden_by") Member hiddenBy`를 두고, `hide(Member by, LocalDateTime now)`는 이미 `HIDDEN`이면 아무것도 하지 않는다. `unhide()`는 상태를 `PUBLISHED`로, 두 숨김 기록을 `null`로.
 
-H2의 `hiddenAt`이 H와 1초쯤 다르게 나오면 소수 초 문제다. `LocalDateTime.now()`는 `15:41:11.511819`처럼 마이크로초까지 갖는데 `DATETIME` 컬럼은 초 단위라, MySQL이 **반올림해서** `15:41:12`로 저장한다. 첫 응답은 메모리 값, 두 번째 응답은 DB 값이라 서로 다르다(정답 구현을 처음 만들 때 실제로 이렇게 실패했다). 저장 전에 `LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)`로 자른다.
-</details>
+임시저장이면 두 메서드 모두 예외(→ 409). 삭제 글의 `deletedAt`·`deletedBy`를 비우는 11-5의 `restore()`와 구분한다.
+
+H2의 `hiddenAt`이 H와 1초쯤 다르게 나오면 소수 초 문제다. `LocalDateTime.now()`는 `15:41:11.511819`처럼 마이크로초까지 갖는데 `DATETIME` 컬럼은 초 단위라, MySQL이 **반올림해서** `15:41:12`로 저장한다.
+
+첫 응답은 메모리 값, 두 번째 응답은 DB 값이라 서로 다르다(정답 구현을 처음 만들 때 실제로 이렇게 실패했다). 저장 전에 `LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)`로 자른다. </details>
 
 ## 다음 단계
 

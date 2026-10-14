@@ -193,7 +193,11 @@
 | 15-3 예약 발행 배치 | 실제 발행이 1건 이상이고 커밋됐을 때만 비운다. 매분 실행되는 0건 배치가 캐시를 비우면 60초 재사용이 깨진다 |
 | 좋아요·댓글 | 비우지 않는다 — 점수는 60초 늦게 반영돼도 된다(TTL에 맡김) |
 
-숨김·삭제가 커밋되기 직전, 다른 GET이 옛 공개 글을 읽고 커밋 뒤에 캐시에 채울 수도 있다. 그래서 변경 서비스는 성공 경로에서 `PopularCacheVersion.invalidateAfterCommit()`을 등록한다. 커밋 뒤 세대가 증가하면 그 GET이 이전 세대 키에 옛 글을 넣어도 이후 조회는 새 세대 키를 사용한다. 캐시도 함께 비워 메모리를 회수한다. 예약 발행 0건과 롤백은 세대를 바꾸지 않는다. 이 방법은 **한 JVM** 안의 동시 요청을 다룬다.
+숨김·삭제가 커밋되기 직전, 다른 GET이 옛 공개 글을 읽고 커밋 뒤에 캐시에 채울 수도 있다. 그래서 변경 서비스는 성공 경로에서 `PopularCacheVersion.invalidateAfterCommit()`을 등록한다.
+
+커밋 뒤 세대가 증가하면 그 GET이 이전 세대 키에 옛 글을 넣어도 이후 조회는 새 세대 키를 사용한다. 캐시도 함께 비워 메모리를 회수한다.
+
+예약 발행 0건과 롤백은 세대를 바꾸지 않는다. 이 방법은 **한 JVM** 안의 동시 요청을 다룬다.
 
 **입력 규칙** — 무효화를 일으키는 `PATCH /api/posts/{id}`. 3-1 규칙 그대로다.
 
@@ -274,7 +278,9 @@ public class PopularPostController {
 <details>
 <summary>Service — 처리 순서</summary>
 
-`PopularPostService.java`의 `popular`에 `@Cacheable`을 붙여 같은 `(days, limit, 세대)` 조회를 60초 재사용한다. `PostService.java`·`ModerationService.java`·`ReportHandlingService.java`는 해당 글 변경 성공 시 `@CacheEvict`로 비우고, 커밋 뒤 세대도 올린다. 매분 실행되는 `ScheduledPublishService.java`는 실제 발행이 있을 때만 커밋 뒤 세대를 올리고 캐시를 비운다. 각 쓰기 메서드의 트랜잭션 경계와 무효화 시점을 아래 코드에서 확인한다.
+`PopularPostService.java`의 `popular`에 `@Cacheable`을 붙여 같은 `(days, limit, 세대)` 조회를 60초 재사용한다. `PostService.java`·`ModerationService.java`·`ReportHandlingService.java`는 해당 글 변경 성공 시 `@CacheEvict`로 비우고, 커밋 뒤 세대도 올린다.
+
+매분 실행되는 `ScheduledPublishService.java`는 실제 발행이 있을 때만 커밋 뒤 세대를 올리고 캐시를 비운다. 각 쓰기 메서드의 트랜잭션 경계와 무효화 시점을 아래 코드에서 확인한다.
 
 `src/main/java/org/example/post/PopularPostService.java`
 

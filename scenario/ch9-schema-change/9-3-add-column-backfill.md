@@ -228,7 +228,9 @@ ALTER TABLE post MODIFY COLUMN excerpt VARCHAR(120) NOT NULL;
 <details>
 <summary>MyBatis Mapper — 조회와 본문 수정</summary>
 
-이 단계의 MyBatis 대체 앱은 글 작성 `POST`와 복사 `POST /{sourceId}/copies`에 기존 JPA `PostService`를 사용한다. 생성자의 `excerptOf`가 작성 시 요약을 계산한다. MyBatis가 맡는 게시판 목록·검색과 PATCH·PUT은 다음 Mapper를 쓴다. `PostVisibilityMapper.xml`의 목록·검색 `SELECT`에는 `p.excerpt`를 넣고 `p.content`는 넣지 않는다. `PostReplaceMapper.xml`은 PATCH와 PUT에서 같은 SQL 조각을 사용하며, PATCH의 `content: null`은 그 조각을 실행하지 않는다.
+이 단계의 MyBatis 대체 앱은 글 작성 `POST`와 복사 `POST /{sourceId}/copies`에 기존 JPA `PostService`를 사용한다. 생성자의 `excerptOf`가 작성 시 요약을 계산한다.
+
+MyBatis가 맡는 게시판 목록·검색과 PATCH·PUT은 다음 Mapper를 쓴다. `PostVisibilityMapper.xml`의 목록·검색 `SELECT`에는 `p.excerpt`를 넣고 `p.content`는 넣지 않는다. `PostReplaceMapper.xml`은 PATCH와 PUT에서 같은 SQL 조각을 사용하며, PATCH의 `content: null`은 그 조각을 실행하지 않는다.
 
 ```xml
 <sql id="contentAndExcerpt">content = #{content}, excerpt = LEFT(#{content}, 100),</sql>

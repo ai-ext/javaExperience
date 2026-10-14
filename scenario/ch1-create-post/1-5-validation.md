@@ -280,7 +280,11 @@
 <details>
 <summary>MyBatis — 같은 검증·저장 계약의 대체 구현</summary>
 
-아래 **MyBatis 대체 구현 코드** 접기의 10개 파일을 기본 JPA 스냅샷에 적용한다. `PostCreateRequest`와 `ApiExceptionHandler`는 그대로 사용하므로 V1~V12의 검증·ProblemDetail 응답도 같다. `PostCreationMapper.xml`이 게시판·고정 작성자(회원 2번)를 조회하고 글·태그·연결 행을 INSERT한다. 태그는 DB에서 읽은 ID와 이름으로 중복을 판단하고 응답을 구성하므로 `spring`과 `Spring`을 함께 보내도 연결 행은 하나이며 응답 이름은 저장된 `spring`이다. `PostService`의 `@Transactional`은 여러 INSERT를 한 트랜잭션으로 묶고, 게시판 권한을 저장 전에 검사한다. `PostController`는 MyBatis 서비스가 돌려준 응답 DTO로 `201`과 `Location`을 만든다. JPA와 MyBatis 양쪽에서 C1~C12와 실패 글·태그 무저장을 대조한다.
+아래 **MyBatis 대체 구현 코드** 접기의 10개 파일을 기본 JPA 스냅샷에 적용한다. `PostCreateRequest`와 `ApiExceptionHandler`는 그대로 사용하므로 V1~V12의 검증·ProblemDetail 응답도 같다.
+
+`PostCreationMapper.xml`이 게시판·고정 작성자(회원 2번)를 조회하고 글·태그·연결 행을 INSERT한다. 태그는 DB에서 읽은 ID와 이름으로 중복을 판단하고 응답을 구성하므로 `spring`과 `Spring`을 함께 보내도 연결 행은 하나이며 응답 이름은 저장된 `spring`이다.
+
+`PostService`의 `@Transactional`은 여러 INSERT를 한 트랜잭션으로 묶고, 게시판 권한을 저장 전에 검사한다. `PostController`는 MyBatis 서비스가 돌려준 응답 DTO로 `201`과 `Location`을 만든다. JPA와 MyBatis 양쪽에서 C1~C12와 실패 글·태그 무저장을 대조한다.
 
 </details>
 

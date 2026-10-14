@@ -455,7 +455,9 @@ org.hibernate.LazyInitializationException: Could not initialize proxy [org.examp
 	at org.example.post.PostService.create(PostService.java:56) ~[main/:na]
 ```
 
-`getReferenceById(2L)`로 받은 작성자는 아직 DB에서 안 읽은 대리 객체(proxy)다. 닉네임을 처음 읽을 때 DB에 가야 하는데, 트랜잭션이 없으니 연결(세션)이 이미 닫혀 있다. `@Transactional`은 두고 서비스의 "미리 읽어 두기" 두 줄(`saved.getAuthor().getNickname();` 등)만 지워도 같은 에러가 **컨트롤러**(`PostController.toResponse`)에서 난다. 고치는 법 — 서비스 메서드에 `@Transactional`을 붙이고, 응답에 필요한 값은 그 안에서 읽어 둔다. → [에러 도감: 지연 로딩 — no session](../../errors.md#지연-로딩--no-session)
+`getReferenceById(2L)`로 받은 작성자는 아직 DB에서 안 읽은 대리 객체(proxy)다. 닉네임을 처음 읽을 때 DB에 가야 하는데, 트랜잭션이 없으니 연결(세션)이 이미 닫혀 있다.
+
+`@Transactional`은 두고 서비스의 "미리 읽어 두기" 두 줄(`saved.getAuthor().getNickname();` 등)만 지워도 같은 에러가 **컨트롤러**(`PostController.toResponse`)에서 난다. 고치는 법 — 서비스 메서드에 `@Transactional`을 붙이고, 응답에 필요한 값은 그 안에서 읽어 둔다. → [에러 도감: 지연 로딩 — no session](../../errors.md#지연-로딩--no-session)
 
 **7. 엔티티의 기본 생성자를 지운다** — `Tag`에서 `protected Tag() {}`를 지운다.
 
@@ -465,7 +467,11 @@ org.hibernate.InstantiationException: No default constructor for entity 'org.exa
 	at org.example.post.PostService.create(PostService.java:48) ~[main/:na]
 ```
 
-서버는 뜬다. 이미 있는 태그(`spring`)를 `findByName`으로 **읽어 올 때** `500`이 난다. JPA는 DB 행을 객체로 만들 때 인자 없는 생성자로 빈 객체부터 만들기 때문이다. 같은 줄을 `Post`에서 지우면 이 단계의 저장은 `201`로 성공한다. 글을 읽어 오는 2장에서 터진다. 고치는 법 — 엔티티마다 `protected` 기본 생성자를 둔다. → [에러 도감: 엔티티 기본 생성자 없음](../../errors.md#엔티티-기본-생성자-없음)
+서버는 뜬다. 이미 있는 태그(`spring`)를 `findByName`으로 **읽어 올 때** `500`이 난다.
+
+JPA는 DB 행을 객체로 만들 때 인자 없는 생성자로 빈 객체부터 만들기 때문이다. 같은 줄을 `Post`에서 지우면 이 단계의 저장은 `201`로 성공한다.
+
+글을 읽어 오는 2장에서 터진다. 고치는 법 — 엔티티마다 `protected` 기본 생성자를 둔다. → [에러 도감: 엔티티 기본 생성자 없음](../../errors.md#엔티티-기본-생성자-없음)
 
 ## 구현 가이드
 
@@ -517,7 +523,9 @@ org.hibernate.InstantiationException: No default constructor for entity 'org.exa
 
 아래 **MyBatis 대체 구현 코드**의 10개 파일을 이 단계 전체 소스에 적용한다. `PostService`가 Mapper로 게시판과 회원 2의 `id`·`nickname`을 조회한다. JPA의 지연 로딩 대신 필요한 회원 값을 `AuthorWriteRow`에 먼저 읽고, 서비스가 `AuthorResponse`를 만들어 컨트롤러에 돌려준다. 이 단계에는 1-5의 게시판 쓰기 권한·입력 검증 규칙을 앞당겨 적용하지 않는다.
 
-`PostCreationMapper.xml`의 `insertPost`에는 post의 13개 컬럼을 모두 적는다. `status='PUBLISHED'`, 세 카운트 `0`, `published_at`·`created_at`·`updated_at`에 같은 `#{now}`, `deleted_at=NULL`을 대조한다. 요청에서 `visibility`를 빼면 `#{visibility}`가 `NULL`로 바인딩되어 DB의 `DEFAULT 'PUBLIC'`이 적용되지 않고 O1은 `500`이다. JPA와 MyBatis 모두 D1~D3에서 저장 행·태그·중복 방지를 확인한다. 태그·글·연결 행은 서비스의 `@Transactional` 안에서 저장한다.
+`PostCreationMapper.xml`의 `insertPost`에는 post의 13개 컬럼을 모두 적는다. `status='PUBLISHED'`, 세 카운트 `0`, `published_at`·`created_at`·`updated_at`에 같은 `#{now}`, `deleted_at=NULL`을 대조한다.
+
+요청에서 `visibility`를 빼면 `#{visibility}`가 `NULL`로 바인딩되어 DB의 `DEFAULT 'PUBLIC'`이 적용되지 않고 O1은 `500`이다. JPA와 MyBatis 모두 D1~D3에서 저장 행·태그·중복 방지를 확인한다. 태그·글·연결 행은 서비스의 `@Transactional` 안에서 저장한다.
 
 </details>
 

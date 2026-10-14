@@ -173,7 +173,9 @@ JPA 단계 코드에서 MyBatis로 바뀌는 12개 파일은 전체 코드 접�
 </select>
 ```
 
-`PostHeadlineRow`에는 조회 열에 대응하는 public 필드를 두고, `map-underscore-to-camel-case`로 별칭을 연결한다. Mapper 결과를 위 응답 DTO로 변환한다. 회원·게시판 존재 확인과 `404`/빈 배열 구분은 JPA 방식과 동일하게 Service에서 처리한다. 이 단계의 MyBatis 대체 구현에는 `build.gradle` 의존성, `application.yml` 설정, Mapper XML이 모두 포함되어 있다.
+`PostHeadlineRow`에는 조회 열에 대응하는 public 필드를 두고, `map-underscore-to-camel-case`로 별칭을 연결한다. Mapper 결과를 위 응답 DTO로 변환한다.
+
+회원·게시판 존재 확인과 `404`/빈 배열 구분은 JPA 방식과 동일하게 Service에서 처리한다. 이 단계의 MyBatis 대체 구현에는 `build.gradle` 의존성, `application.yml` 설정, Mapper XML이 모두 포함되어 있다.
 
 ```java
 public class PostHeadlineRow {

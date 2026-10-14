@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>W15. 페이징 — OFFSET vs 커서(키셋), 무엇을 언제</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -33,13 +33,16 @@
 </ul>
 <h2 id="3-왜-그런가--원리"><a class="anchor" href="#3-왜-그런가--원리" aria-hidden="true">#</a>3. 왜 그런가 — 원리</h2>
 <h3 id="offset은-위치-번호를-알아내기-위해-앞부분을-지나간다"><a class="anchor" href="#offset은-위치-번호를-알아내기-위해-앞부분을-지나간다" aria-hidden="true">#</a>OFFSET은 위치 번호를 알아내기 위해 앞부분을 지나간다</h3>
-<p>SQL의 <code>OFFSET n</code>은 “이전 요청에서 어느 행까지 받았는가”라는 정보를 주지 않고 “정렬 결과의 처음부터 n개를 버려라”는 숫자만 준다. DB가 B-tree 인덱스 순서로 읽더라도 앞의 엔트리를 따라가며 버려야 한다. <code>LIMIT 50 OFFSET 500000</code>의 반환량은 50개지만 읽기 작업은 대략 앞선 500,000개와 반환분까지 영향을 받는다. 실제 row lookup·정렬·필터 비용은 인덱스와 쿼리 계획에 따라 달라지므로 고정된 배수나 시간으로 단정하지 않는다.</p>
+<p>SQL의 <code>OFFSET n</code>은 “이전 요청에서 어느 행까지 받았는가”라는 정보를 주지 않고 “정렬 결과의 처음부터 n개를 버려라”는 숫자만 준다. DB가 B-tree 인덱스 순서로 읽더라도 앞의 엔트리를 따라가며 버려야 한다.</p>
+<p><code>LIMIT 50 OFFSET 500000</code>의 반환량은 50개지만 읽기 작업은 대략 앞선 500,000개와 반환분까지 영향을 받는다. 실제 row lookup·정렬·필터 비용은 인덱스와 쿼리 계획에 따라 달라지므로 고정된 배수나 시간으로 단정하지 않는다.</p>
 <p><code>ORDER BY</code>가 인덱스를 타면 정렬 전체를 매번 메모리에 만들 필요가 없어 비용을 낮출 수 있다. 하지만 정렬 인덱스를 사용한다고 OFFSET이 “500,000번째로 바로 점프”하는 것은 아니다. 정렬 키 경계를 받는 키셋 쿼리는 반대로 인덱스에서 그 값에 가까운 위치를 찾고 필요한 수만 읽도록 계획할 수 있다. 단, 필터와 정렬에 맞는 인덱스가 없거나 옵티마이저가 다른 계획을 고르면 키셋 쿼리도 느릴 수 있다.</p>
 <h3 id="mysql에서-실제-계획을-비교한다"><a class="anchor" href="#mysql에서-실제-계획을-비교한다" aria-hidden="true">#</a>MySQL에서 실제 계획을 비교한다</h3>
-<p>§5의 실습처럼 같은 필터·정렬을 둔 깊은 OFFSET 쿼리와 커서 경계 쿼리를 <code>EXPLAIN ANALYZE</code>로 비교한다. MySQL 8.4에서 <code>EXPLAIN</code>은 옵티마이저 계획을, <code>EXPLAIN ANALYZE</code>는 실제 실행과 iterator별 추정/실제 행 수·시간을 보여준다. 추정 <code>rows</code>만 보지 말고 실제 iterator와 선택된 인덱스를 본다. <code>EXPLAIN ANALYZE</code>는 SELECT를 실행하므로 큰 운영 쿼리를 무심코 실행하지 않는다. 필터·정렬 컬럼에 맞는 인덱스가 쓰이는지 확인하되, 이는 측정값을 대신하지 않는다.</p>
+<p>§5의 실습처럼 같은 필터·정렬을 둔 깊은 OFFSET 쿼리와 커서 경계 쿼리를 <code>EXPLAIN ANALYZE</code>로 비교한다. MySQL 8.4에서 <code>EXPLAIN</code>은 옵티마이저 계획을, <code>EXPLAIN ANALYZE</code>는 실제 실행과 iterator별 추정/실제 행 수·시간을 보여준다. 추정 <code>rows</code>만 보지 말고 실제 iterator와 선택된 인덱스를 본다.</p>
+<p><code>EXPLAIN ANALYZE</code>는 SELECT를 실행하므로 큰 운영 쿼리를 무심코 실행하지 않는다. 필터·정렬 컬럼에 맞는 인덱스가 쓰이는지 확인하되, 이는 측정값을 대신하지 않는다.</p>
 <h3 id="커서-경계는-완전한-정렬-순서여야-한다"><a class="anchor" href="#커서-경계는-완전한-정렬-순서여야-한다" aria-hidden="true">#</a>커서 경계는 완전한 정렬 순서여야 한다</h3>
 <p><code>ORDER BY published_at DESC</code>만 지정하면 같은 시각의 행들 사이 순서는 보장되지 않는다. 페이지 크기나 실행 계획에 따라 동률 행의 순서가 바뀌어 중복 또는 누락이 생길 수 있다. 유일한 순서를 만들려면 <code>ORDER BY published_at DESC, id DESC</code>처럼 유일 키를 마지막에 붙인다. 커서에도 두 값을 모두 담는다.</p>
-<p>동일 방향의 복합 정렬에서 다음 페이지는 사전식 비교다. 내림차순 둘이라면 <code>(published_at, id)</code>가 마지막 키보다 작은 행, 즉 <code>published_at &lt; lastPublishedAt OR (published_at = lastPublishedAt AND id &lt; lastId)</code>를 찾는다. 정렬 방향이 섞이면 각 비교 부호도 해당 컬럼 방향에 맞춰 바뀐다. 예컨대 <code>published_at DESC, id ASC</code>라면 <code>published_at</code>은 <code>&lt;</code>, 같은 시각 안의 <code>id</code>는 <code>&gt;</code>여야 한다. 커서 조건을 정렬 순서와 한 글자라도 다르게 쓰면 경계에서 행이 빠지거나 반복된다.</p>
+<p>동일 방향의 복합 정렬에서 다음 페이지는 사전식 비교다. 내림차순 둘이라면 <code>(published_at, id)</code>가 마지막 키보다 작은 행, 즉 <code>published_at &lt; lastPublishedAt OR (published_at = lastPublishedAt AND id &lt; lastId)</code>를 찾는다. 정렬 방향이 섞이면 각 비교 부호도 해당 컬럼 방향에 맞춰 바뀐다.</p>
+<p>예컨대 <code>published_at DESC, id ASC</code>라면 <code>published_at</code>은 <code>&lt;</code>, 같은 시각 안의 <code>id</code>는 <code>&gt;</code>여야 한다. 커서 조건을 정렬 순서와 한 글자라도 다르게 쓰면 경계에서 행이 빠지거나 반복된다.</p>
 <p>커서 정렬 키는 가능하면 불변·비NULL 값으로 잡는다. NULL 비교는 UNKNOWN이 될 수 있고 정렬 키 갱신은 행을 커서 경계 너머로 옮긴다. nullable 정렬이 필수면 NULL 순서까지 비교식·인덱스·계획에 반영한다.</p>
 <h3 id="offset과-키셋의-동시성-차이는-스냅샷과-다르다"><a class="anchor" href="#offset과-키셋의-동시성-차이는-스냅샷과-다르다" aria-hidden="true">#</a>OFFSET과 키셋의 동시성 차이는 스냅샷과 다르다</h3>
 <p>내림차순 최신 목록에서 첫 페이지 50개를 받은 뒤 새 글이 맨 앞에 들어오면 이전 50번째 글은 현재 51번째가 된다. 다음 호출이 <code>OFFSET 50</code>이면 그 글을 다시 포함한다. 커서는 마지막 글의 키 아래에서 시작하므로 새 글이 경계보다 앞에 들어온 것만으로 이미 본 행이 한 칸 밀려 재등장하지 않는다. 중간 삭제도 OFFSET의 위치를 이동시키지만 커서는 값의 경계를 기준으로 하므로 남은 행의 위치가 달라지지 않는다.</p>
@@ -53,7 +56,8 @@
   F --&gt; G[&quot;다음 요청 — 키보다 뒤의 범위 검색&quot;]
   G --&gt; H[&quot;인덱스 경계에서 다음 50개&quot;]</pre>
 <h3 id="총-건수는-별도-질문이다"><a class="anchor" href="#총-건수는-별도-질문이다" aria-hidden="true">#</a>총 건수는 별도 질문이다</h3>
-<p><code>Page&lt;T&gt;</code>는 전체 페이지 수·전체 결과 수를 제공해야 하므로 콘텐츠 조회 외에 총 건수 계산이 필요해질 수 있다. 필터 조건이 복잡하거나 대상이 크면 <code>COUNT</code>가 본문 쿼리와 별도의 비용이 된다. 반면 <code>Slice&lt;T&gt;</code>는 다음 조각이 있는지만 나타내고 <code>Window&lt;T&gt;</code>는 이어갈 위치를 제공하므로 “몇 건 남았나?”를 답하려 하지 않는다. 전체 수가 제품 요구가 아니면 매 요청마다 정확한 total을 계산하지 않는 편이 낫다. 통계 캐시나 근사 수를 보여줄 수는 있지만, 그것은 정확한 <code>Page.getTotalElements()</code>와 다른 계약이다.</p>
+<p><code>Page&lt;T&gt;</code>는 전체 페이지 수·전체 결과 수를 제공해야 하므로 콘텐츠 조회 외에 총 건수 계산이 필요해질 수 있다. 필터 조건이 복잡하거나 대상이 크면 <code>COUNT</code>가 본문 쿼리와 별도의 비용이 된다. 반면 <code>Slice&lt;T&gt;</code>는 다음 조각이 있는지만 나타내고 <code>Window&lt;T&gt;</code>는 이어갈 위치를 제공하므로 “몇 건 남았나?”를 답하려 하지 않는다.</p>
+<p>전체 수가 제품 요구가 아니면 매 요청마다 정확한 total을 계산하지 않는 편이 낫다. 통계 캐시나 근사 수를 보여줄 수는 있지만, 그것은 정확한 <code>Page.getTotalElements()</code>와 다른 계약이다.</p>
 <h2 id="4-선택지-비교"><a class="anchor" href="#4-선택지-비교" aria-hidden="true">#</a>4. 선택지 비교</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -107,7 +111,8 @@
 <td>제품별 차이가 커 국내 빈도는 확인하지 못했다</td>
 </tr>
 </tbody></table></div>
-<p><code>Page</code>/<code>Slice</code>와 <code>Window</code>는 타입 비교이고, OFFSET과 키셋은 DB를 이어 읽는 위치 전략이다. <code>Window</code>를 쓴다고 자동으로 키셋이 되는 것이 아니다. <code>ScrollPosition.offset()</code>은 offset 스크롤, <code>ScrollPosition.keyset()</code>은 키셋 스크롤 시작 위치다. UI도 방식 선택의 힌트일 뿐 강제 규칙은 아니다. 번호 페이지는 임의 위치에 적합하고 무한 스크롤은 보통 커서와 잘 맞지만, “더 보기” 버튼을 OFFSET으로 구현하거나 작은 목록을 커서로 읽는 것도 가능하다.</p>
+<p><code>Page</code>/<code>Slice</code>와 <code>Window</code>는 타입 비교이고, OFFSET과 키셋은 DB를 이어 읽는 위치 전략이다. <code>Window</code>를 쓴다고 자동으로 키셋이 되는 것이 아니다. <code>ScrollPosition.offset()</code>은 offset 스크롤, <code>ScrollPosition.keyset()</code>은 키셋 스크롤 시작 위치다.</p>
+<p>UI도 방식 선택의 힌트일 뿐 강제 규칙은 아니다. 번호 페이지는 임의 위치에 적합하고 무한 스크롤은 보통 커서와 잘 맞지만, “더 보기” 버튼을 OFFSET으로 구현하거나 작은 목록을 커서로 읽는 것도 가능하다.</p>
 <h2 id="5-코드로-보기"><a class="anchor" href="#5-코드로-보기" aria-hidden="true">#</a>5. 코드로 보기</h2>
 <p>아래 실습은 같은 필터·정렬의 깊은 offset과 경계 조건 조회를 비교한다. 실제 비용은 데이터 분포와 인덱스에서 측정한다. 테넌트 필터가 있다면 해당 조건도 인덱스에 반영하고, 실행 계획에서 인덱스가 선택됐는지 확인한다.</p>
 <pre><code class="language-sql">-- 첫 페이지: OFFSET 방식
@@ -190,7 +195,8 @@ class ArticlePagingExample {
         // DTO 변환 또는 호출자에게 전달
     }
 }</code></pre>
-<p><code>findSliceByStatus</code>라는 파생 쿼리 이름은 반환형만으로도 슬라이스 처리 의도를 보여준다. 첫 번째 Window 위치로 <code>ScrollPosition.keyset()</code>을 전달하고, 다음 요청은 직전 Window의 마지막 요소에서 얻는다. <code>ScrollPosition.offset()</code>을 전달하면 같은 <code>Window</code> 메서드라도 offset 기반 스크롤이 된다. 실제 공개 API에서는 Spring 내부 객체를 그대로 직렬화하기보다 필요한 정렬 키를 토큰으로 인코딩한다.</p>
+<p><code>findSliceByStatus</code>라는 파생 쿼리 이름은 반환형만으로도 슬라이스 처리 의도를 보여준다. 첫 번째 Window 위치로 <code>ScrollPosition.keyset()</code>을 전달하고, 다음 요청은 직전 Window의 마지막 요소에서 얻는다.</p>
+<p><code>ScrollPosition.offset()</code>을 전달하면 같은 <code>Window</code> 메서드라도 offset 기반 스크롤이 된다. 실제 공개 API에서는 Spring 내부 객체를 그대로 직렬화하기보다 필요한 정렬 키를 토큰으로 인코딩한다.</p>
 <p><code>nextCursor</code>는 마지막 반환 행의 정렬 키로 만들고 마지막 창이면 <code>null</code>로 둔다.</p>
 <pre><code class="language-json">{
   &quot;items&quot;: [{ &quot;id&quot;: 700000, &quot;publishedAt&quot;: &quot;2026-09-01T12:00:00Z&quot; }],
@@ -206,7 +212,8 @@ class ArticlePagingExample {
 <li><strong>혼합 패턴:</strong> 같은 테이블이라도 내부 관리자 endpoint는 Page, 사용자 홈 피드는 cursor, 배치 처리는 ID 범위나 Spring <code>Window</code>로 나눌 수 있다. 응답 타입을 모든 사용처에 하나로 강제하지 않는다.</li>
 <li><strong>마이그레이션 순서:</strong> 실제 느린 구간을 확인하고 → 안정 정렬과 인덱스를 마련하고 → 새 cursor endpoint에서 경계·hasNext·필터 검증을 만들고 → 동시 삽입/삭제/동률 데이터로 회귀 확인하고 → 클라이언트 전환 후 기존 주소를 종료한다. 기준 시점 일관성이 필요하면 이 목록과 별도 요구사항으로 합의한다.</li>
 </ul>
-<p>버전 기준은 이 문서의 공통 규칙을 따른다. Boot 4.1.1이 관리하는 Spring Data JPA 4.1.1 기준으로 예제를 썼다. 참고로 Spring Data JPA 3.1.1 레퍼런스에도 대량 결과를 조각 단위로 읽는 Scrolling이 등장하며, 현재 4.1 레퍼런스는 <code>Window&lt;T&gt;</code>와 <code>ScrollPosition</code>의 offset/keyset 방식을 설명한다. 따라서 기존 <code>Pageable</code>을 폐기해야 하는 변화가 아니라, 번호 페이지와 순차 스크롤 중 요구에 맞는 계약을 고를 수 있는 확장으로 이해한다. Java 언어의 특정 최신 문법에는 의존하지 않는다.</p>
+<p>버전 기준은 이 문서의 공통 규칙을 따른다. Boot 4.1.1이 관리하는 Spring Data JPA 4.1.1 기준으로 예제를 썼다. 참고로 Spring Data JPA 3.1.1 레퍼런스에도 대량 결과를 조각 단위로 읽는 Scrolling이 등장하며, 현재 4.1 레퍼런스는 <code>Window&lt;T&gt;</code>와 <code>ScrollPosition</code>의 offset/keyset 방식을 설명한다.</p>
+<p>따라서 기존 <code>Pageable</code>을 폐기해야 하는 변화가 아니라, 번호 페이지와 순차 스크롤 중 요구에 맞는 계약을 고를 수 있는 확장으로 이해한다. Java 언어의 특정 최신 문법에는 의존하지 않는다.</p>
 <p>DB 인덱스 설계 상세는 → <a class="docref" href="D10-database-basics.html">D10</a> 참조. Spring Data 전반은 → <a class="docref" href="S10-spring-data-query.html">S10</a> 참조.</p>
 <h2 id="7-흔한-오해와-실수"><a class="anchor" href="#7-흔한-오해와-실수" aria-hidden="true">#</a>7. 흔한 오해와 실수</h2>
 <ol>

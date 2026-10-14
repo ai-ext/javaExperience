@@ -77,7 +77,9 @@ public record PostResponse(
 }
 ~~~
 
-record는 구성 요소, 생성자, 접근자, `equals`·`hashCode`·`toString`을 만들어 주며, 구성 요소 참조를 다시 대입할 수 없게 하는 얕은 불변 데이터 표현이다. `List` 구성 요소를 둬도 그 목록 내부가 자동으로 불변이 되지는 않는다. 응답 DTO처럼 값을 담아 전달할 때 보일러플레이트가 적어 실무에서 편리하다. 우선 class 버전으로 필드와 생성자 관계를 익힌 뒤 record를 선택할 수 있다. 이 단계의 전체 답안 토글은 class 버전을 기준으로 한다.
+record는 구성 요소, 생성자, 접근자, `equals`·`hashCode`·`toString`을 만들어 주며, 구성 요소 참조를 다시 대입할 수 없게 하는 얕은 불변 데이터 표현이다. `List` 구성 요소를 둬도 그 목록 내부가 자동으로 불변이 되지는 않는다.
+
+응답 DTO처럼 값을 담아 전달할 때 보일러플레이트가 적어 실무에서 편리하다. 우선 class 버전으로 필드와 생성자 관계를 익힌 뒤 record를 선택할 수 있다. 이 단계의 전체 답안 토글은 class 버전을 기준으로 한다.
 
 ## 화면 시나리오
 
@@ -548,9 +550,13 @@ Caused by: java.lang.ClassNotFoundException: com.mysql.cj.jdbc.Driver
 <details>
 <summary>MyBatis — 같은 POST를 Mapper SQL로 구현하기</summary>
 
-아래 **MyBatis 대체 구현 코드**의 7개 파일을 이 단계 전체 소스에 적용한다. `build.gradle`에 MyBatis starter를 추가하고 `application.yml`에서 XML 위치와 snake_case→camelCase 매핑을 설정한다. `PostController`는 `PostCreationMapper.findBoardBySlug`로 `board.id`와 `slug`를 읽고, `PostInsert`에 고정 작성자 2와 요청 필드·서버 시각을 담아 `insertPost`를 부른다. `BoardWriteRow`는 조회 결과, `PostInsert`는 SQL 입력 객체다.
+아래 **MyBatis 대체 구현 코드**의 7개 파일을 이 단계 전체 소스에 적용한다. `build.gradle`에 MyBatis starter를 추가하고 `application.yml`에서 XML 위치와 snake_case→camelCase 매핑을 설정한다.
 
-XML의 `#{...}`는 값을 SQL 문자열에 이어 붙이지 않고 바인딩한다. `useGeneratedKeys="true"`와 `keyProperty="id"`가 DB의 AUTO_INCREMENT 값을 `PostInsert.id`에 채운 뒤, 컨트롤러가 그 번호로 `201`과 `Location`을 만든다. 이 단계의 INSERT는 엔티티가 알던 7개 컬럼만 적으므로 `status`·카운트는 DB 기본값, `published_at`은 `NULL`이다. D1과 함께 `published_at`도 조회해 1-4와 비교한다. 선행 JPA 클래스는 코드 비교를 위해 남지만 이 POST 요청의 조회·저장은 Mapper를 통한다.
+`PostController`는 `PostCreationMapper.findBoardBySlug`로 `board.id`와 `slug`를 읽고, `PostInsert`에 고정 작성자 2와 요청 필드·서버 시각을 담아 `insertPost`를 부른다. `BoardWriteRow`는 조회 결과, `PostInsert`는 SQL 입력 객체다.
+
+XML의 `#{...}`는 값을 SQL 문자열에 이어 붙이지 않고 바인딩한다. `useGeneratedKeys="true"`와 `keyProperty="id"`가 DB의 AUTO_INCREMENT 값을 `PostInsert.id`에 채운 뒤, 컨트롤러가 그 번호로 `201`과 `Location`을 만든다.
+
+이 단계의 INSERT는 엔티티가 알던 7개 컬럼만 적으므로 `status`·카운트는 DB 기본값, `published_at`은 `NULL`이다. D1과 함께 `published_at`도 조회해 1-4와 비교한다. 선행 JPA 클래스는 코드 비교를 위해 남지만 이 POST 요청의 조회·저장은 Mapper를 통한다.
 
 </details>
 
@@ -825,8 +831,9 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 <details>
 <summary>힌트 1 — 게시판 찾기</summary>
 
-`Board` 엔티티(`board` 테이블)와 `BoardRepository extends JpaRepository<Board, Long>`를 만들고 `Optional<Board> findBySlug(String slug)`를 선언한다. 구현은 Spring Data JPA가 메서드 이름을 읽어 만든다. 컨트롤러에서 `boardRepository.findBySlug(request.boardSlug()).orElseThrow(...)`.
-</details>
+`Board` 엔티티(`board` 테이블)와 `BoardRepository extends JpaRepository<Board, Long>`를 만들고 `Optional<Board> findBySlug(String slug)`를 선언한다. 구현은 Spring Data JPA가 메서드 이름을 읽어 만든다.
+
+컨트롤러에서 `boardRepository.findBySlug(request.boardSlug()).orElseThrow(...)`. </details>
 
 <details>
 <summary>힌트 2 — 저장소를 컨트롤러에 받기</summary>
@@ -843,8 +850,9 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 <details>
 <summary>힌트 4 — 서버가 안 뜰 때</summary>
 
-로그에서 `Schema validation:`이 들어간 줄을 찾는다(Hibernate 7 표기 — 하이픈 없음). 엔티티의 테이블·컬럼 이름이 실제 테이블과 다르다는 뜻이다. 테이블은 CloudBeaver(`http://localhost:8978`)의 `community (Java 시나리오)` 연결이나 dump 파일 [`01-community.sql`](../../docker/mysql/init/01-community.sql)의 `CREATE TABLE`로 확인한다.
-</details>
+로그에서 `Schema validation:`이 들어간 줄을 찾는다(Hibernate 7 표기 — 하이픈 없음). 엔티티의 테이블·컬럼 이름이 실제 테이블과 다르다는 뜻이다.
+
+테이블은 CloudBeaver(`http://localhost:8978`)의 `community (Java 시나리오)` 연결이나 dump 파일 [`01-community.sql`](../../docker/mysql/init/01-community.sql)의 `CREATE TABLE`로 확인한다. </details>
 
 ## 다음 단계
 

@@ -226,9 +226,13 @@
 <details>
 <summary>MyBatis — 페이지 SELECT·COUNT·태그 일괄 조회</summary>
 
-아래 **MyBatis 대체 구현 코드**의 8개 파일을 이 단계 전체 소스에 적용한다. 2-1의 상세 SELECT·조회수 UPDATE는 유지하고, `PostReadMapper`에 게시판 ID 조회와 목록·COUNT SQL을 더한다. `findPublishedByBoard`와 `countPublishedByBoard`는 둘 다 `board_id`·`status='PUBLISHED'`·`deleted_at IS NULL` 조건을 써야 총 건수와 페이지 항목이 맞는다. `ORDER BY published_at DESC, id DESC`로 동률 순서를 고정하고, `LIMIT #{limit} OFFSET #{offset}`으로 페이지를 자른다. `#{...}`는 숫자를 바인딩한다.
+아래 **MyBatis 대체 구현 코드**의 8개 파일을 이 단계 전체 소스에 적용한다. 2-1의 상세 SELECT·조회수 UPDATE는 유지하고, `PostReadMapper`에 게시판 ID 조회와 목록·COUNT SQL을 더한다.
 
-목록 SQL 결과는 `PostListRow`에 담고, 페이지에 나온 글 ID만 모아 태그를 **한 번** 더 조회해 `PostListItemResponse`로 변환한다. `content`는 목록 SELECT와 DTO에 넣지 않는다. Service는 COUNT로 `totalElements`·`totalPages`·`hasNext`를 계산한다. 이 단계는 아직 2-3의 팔로우·차단 조건을 적용하지 않으므로 6번·9번 글이 보여야 한다. JPA와 MyBatis 양쪽에서 L1~L5의 글 순서·14건/3페이지·잘못된 입력 오류를 대조한다.
+`findPublishedByBoard`와 `countPublishedByBoard`는 둘 다 `board_id`·`status='PUBLISHED'`·`deleted_at IS NULL` 조건을 써야 총 건수와 페이지 항목이 맞는다. `ORDER BY published_at DESC, id DESC`로 동률 순서를 고정하고, `LIMIT #{limit} OFFSET #{offset}`으로 페이지를 자른다. `#{...}`는 숫자를 바인딩한다.
+
+목록 SQL 결과는 `PostListRow`에 담고, 페이지에 나온 글 ID만 모아 태그를 **한 번** 더 조회해 `PostListItemResponse`로 변환한다. `content`는 목록 SELECT와 DTO에 넣지 않는다.
+
+Service는 COUNT로 `totalElements`·`totalPages`·`hasNext`를 계산한다. 이 단계는 아직 2-3의 팔로우·차단 조건을 적용하지 않으므로 6번·9번 글이 보여야 한다. JPA와 MyBatis 양쪽에서 L1~L5의 글 순서·14건/3페이지·잘못된 입력 오류를 대조한다.
 
 </details>
 
@@ -462,14 +466,14 @@ C = HTTP 확인(필수), R = 코드 리뷰(피드백용).
 <details>
 <summary>힌트 1 — 리포지토리</summary>
 
-`Page<Post> findByBoardAndStatusAndDeletedAtIsNull(Board board, PostStatus status, Pageable pageable)` 같은 파생 쿼리와 `PageRequest.of(page, size, Sort.by(DESC, "publishedAt").and(Sort.by(DESC, "id")))`로 시작할 수 있다. 결과 `Page`에서 `getTotalElements()`, `getTotalPages()`, `hasNext()`를 꺼내 DTO에 담는다.
-</details>
+`Page<Post> findByBoardAndStatusAndDeletedAtIsNull(Board board, PostStatus status, Pageable pageable)` 같은 파생 쿼리와 `PageRequest.of(page, size, Sort.by(DESC, "publishedAt").and(Sort.by(DESC, "id")))`로 시작할 수 있다. 결과 `Page`에서 `getTotalElements()`, `getTotalPages()`, `hasNext()`를 꺼내 DTO에 담는다. </details>
 
 <details>
 <summary>힌트 2 — 파라미터 검증</summary>
 
-`@RequestParam(defaultValue = "10") @Min(1) @Max(50) int size`처럼 제약만 붙이면 Spring MVC가 스스로 검사해 범위 밖 값에 `HandlerMethodValidationException`을 던진다. 그 예외도 Advice에서 400으로 바꾼다. 컨트롤러에 `@Validated`는 **붙이지 않는다** — 붙이면 옛 방식(AOP `MethodValidationInterceptor`)이 먼저 끼어들어 `ConstraintViolationException`이 그대로 500이 된다(Boot 4.1에서 실측).
-</details>
+`@RequestParam(defaultValue = "10") @Min(1) @Max(50) int size`처럼 제약만 붙이면 Spring MVC가 스스로 검사해 범위 밖 값에 `HandlerMethodValidationException`을 던진다. 그 예외도 Advice에서 400으로 바꾼다.
+
+컨트롤러에 `@Validated`는 **붙이지 않는다** — 붙이면 옛 방식(AOP `MethodValidationInterceptor`)이 먼저 끼어들어 `ConstraintViolationException`이 그대로 500이 된다(Boot 4.1에서 실측). </details>
 
 ## 다음 단계
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>P25. 외부 API 연동 실무 — RestClient·HTTP Interface</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -22,7 +22,8 @@ HTTP Interface는 반복되는 URL·직렬화 코드를 Java 인터페이스로 
 <p>이 경계에서 타임아웃을 생략하면 스레드가 외부 서버를 기다리며 고갈된다. 상태 코드를 예외로 바꾸지 않으면 500 응답을 정상 DTO로 처리할 수 있고, 모든 예외를 재시도하면 결제·주문 같은 비멱등 요청이 중복 실행된다.</p>
 <h2 id="2-당장-알아야-할-것"><a class="anchor" href="#2-당장-알아야-할-것" aria-hidden="true">#</a>2. 당장 알아야 할 것</h2>
 <h3 id="21-클라이언트-선택"><a class="anchor" href="#21-클라이언트-선택" aria-hidden="true">#</a>2.1 클라이언트 선택</h3>
-<p>일반 Spring MVC의 동기 호출은 <code>RestClient</code>, WebFlux에서 끝까지 논블로킹인 흐름은 <code>WebClient</code>를 쓴다. 선언적 endpoint가 많으면 HTTP Interface를 고려하고, 기존 OpenFeign 조직은 팀 표준을 유지한다. WebFlux에서 <code>RestClient</code>를 직접 호출하거나 WebClient를 매번 <code>.block()</code>하면 각각 이벤트 루프를 막거나 논블로킹 이점을 잃는다. <code>RestTemplate</code>은 기존 코드 유지보수에만 두고 새 코드는 <code>RestClient</code> 기준으로 작성한다.</p>
+<p>일반 Spring MVC의 동기 호출은 <code>RestClient</code>, WebFlux에서 끝까지 논블로킹인 흐름은 <code>WebClient</code>를 쓴다. 선언적 endpoint가 많으면 HTTP Interface를 고려하고, 기존 OpenFeign 조직은 팀 표준을 유지한다.</p>
+<p>WebFlux에서 <code>RestClient</code>를 직접 호출하거나 WebClient를 매번 <code>.block()</code>하면 각각 이벤트 루프를 막거나 논블로킹 이점을 잃는다. <code>RestTemplate</code>은 기존 코드 유지보수에만 두고 새 코드는 <code>RestClient</code> 기준으로 작성한다.</p>
 <h3 id="22-의존성과-설정"><a class="anchor" href="#22-의존성과-설정" aria-hidden="true">#</a>2.2 의존성과 설정</h3>
 <p>Boot BOM이 관리하는 의존성에는 버전을 직접 쓰지 않는다. Boot 4.1의 Gradle Kotlin DSL 최소 설정은 다음과 같다.</p>
 <p><code>build.gradle.kts</code></p>
@@ -88,7 +89,8 @@ public class PartnerClientConfig {
                 .build();
     }
 }</code></pre>
-<p><code>connectTimeout</code>은 TCP 연결을 기다리는 시간이고 <code>readTimeout</code>은 연결 후 응답 바이트를 기다리는 시간이다. 둘 중 하나만 설정하면 다른 단계에서 무한 대기가 남는다. Java 25의 JDK <code>HttpClient</code>를 쓰기 싫다면 <code>HttpComponentsClientHttpRequestFactory</code>를 선택하고 Apache HttpClient의 connection/request/response timeout을 명시한다. 기본 요청 팩토리의 구체 구현과 버전별 지원 여부를 가정하지 말고, 사용 중인 Spring Boot 문서와 Javadoc에서 확인한다.</p>
+<p><code>connectTimeout</code>은 TCP 연결을 기다리는 시간이고 <code>readTimeout</code>은 연결 후 응답 바이트를 기다리는 시간이다. 둘 중 하나만 설정하면 다른 단계에서 무한 대기가 남는다.</p>
+<p>Java 25의 JDK <code>HttpClient</code>를 쓰기 싫다면 <code>HttpComponentsClientHttpRequestFactory</code>를 선택하고 Apache HttpClient의 connection/request/response timeout을 명시한다. 기본 요청 팩토리의 구체 구현과 버전별 지원 여부를 가정하지 말고, 사용 중인 Spring Boot 문서와 Javadoc에서 확인한다.</p>
 <h3 id="24-get-post-dto-상태-코드"><a class="anchor" href="#24-get-post-dto-상태-코드" aria-hidden="true">#</a>2.4 GET, POST, DTO, 상태 코드</h3>
 <pre><code class="language-java">package example.client;
 
@@ -137,7 +139,8 @@ class PartnerBadRequestException extends RuntimeException {
 class PartnerUnavailableException extends RuntimeException {
     PartnerUnavailableException(int status) { super(&quot;partner 5xx: &quot; + status); }
 }</code></pre>
-<p><code>retrieve()</code> 뒤에 최종 연산인 <code>body</code>, <code>toEntity</code>, <code>toBodilessEntity</code> 등을 호출해야 실제 응답을 소비한다. 일치하는 <code>onStatus</code>가 없으면 400 이상은 <code>RestClientResponseException</code> 계열로 변환된다. 호출부에서 <code>try { ... } catch (Exception e) { return null; }</code>처럼 뭉뚱그리지 말고, 재시도 가능한 장애·업무상 4xx·영구 실패를 구분한다. 헤더까지 필요하면 <code>toEntity(Product.class)</code>로 받는다.</p>
+<p><code>retrieve()</code> 뒤에 최종 연산인 <code>body</code>, <code>toEntity</code>, <code>toBodilessEntity</code> 등을 호출해야 실제 응답을 소비한다. 일치하는 <code>onStatus</code>가 없으면 400 이상은 <code>RestClientResponseException</code> 계열로 변환된다.</p>
+<p>호출부에서 <code>try { ... } catch (Exception e) { return null; }</code>처럼 뭉뚱그리지 말고, 재시도 가능한 장애·업무상 4xx·영구 실패를 구분한다. 헤더까지 필요하면 <code>toEntity(Product.class)</code>로 받는다.</p>
 <h3 id="25-http-interface"><a class="anchor" href="#25-http-interface" aria-hidden="true">#</a>2.5 HTTP Interface</h3>
 <pre><code class="language-java">package example.client;
 
@@ -162,11 +165,13 @@ class ProductApiConfig {
         return factory.createClient(ProductApi.class);
     }
 }</code></pre>
-<p>Spring Boot 4.1에서는 HTTP Service Client 자동 구성과 <code>@ImportHttpServices</code> 계열 등록을 사용할 수 있지만, 인터페이스를 만들었다고 모든 빈이 저절로 생기는 것은 아니다. 프로젝트의 Boot 4.1 reference에서 자동 구성 방식과 그룹별 <code>RestClient</code> 설정을 확인하고, 단순하고 예측 가능한 앱은 위 수동 등록을 기본으로 둔다. 자동 구성을 쓸 때도 <code>baseUrl</code>, 인증 헤더, 타임아웃, 어떤 요청 팩토리인지 테스트로 고정한다. HTTP Interface는 메서드 선언을 줄여 줄 뿐, 오류 변환·재시도·관측 정책을 대신 결정하지 않는다.</p>
+<p>Spring Boot 4.1에서는 HTTP Service Client 자동 구성과 <code>@ImportHttpServices</code> 계열 등록을 사용할 수 있지만, 인터페이스를 만들었다고 모든 빈이 저절로 생기는 것은 아니다. 프로젝트의 Boot 4.1 reference에서 자동 구성 방식과 그룹별 <code>RestClient</code> 설정을 확인하고, 단순하고 예측 가능한 앱은 위 수동 등록을 기본으로 둔다.</p>
+<p>자동 구성을 쓸 때도 <code>baseUrl</code>, 인증 헤더, 타임아웃, 어떤 요청 팩토리인지 테스트로 고정한다. HTTP Interface는 메서드 선언을 줄여 줄 뿐, 오류 변환·재시도·관측 정책을 대신 결정하지 않는다.</p>
 <h3 id="26-인증과-로깅"><a class="anchor" href="#26-인증과-로깅" aria-hidden="true">#</a>2.6 인증과 로깅</h3>
 <p>API 키는 <code>.defaultHeader</code>, 만료되는 Bearer 토큰은 요청 시점에 토큰을 조회하는 <code>ClientHttpRequestInterceptor</code>로 넣는다. URL·method·status·소요 시간만 기록하고 <code>Authorization</code>, <code>Cookie</code>, API 키, 전체 body는 마스킹한다. body를 먼저 소비하면 DTO 변환이 실패하므로 운영 기본값은 메타데이터다.</p>
 <h3 id="27-재시도와-멱등성"><a class="anchor" href="#27-재시도와-멱등성" aria-hidden="true">#</a>2.7 재시도와 멱등성</h3>
-<p>재시도는 연결 실패·일시적 503·429처럼 일시적이고 재시도 가능한 경우에만 짧은 지수 백오프와 최대 횟수를 둔다. POST 결제처럼 서버가 처리했지만 응답만 유실된 상황에서는 클라이언트가 실패를 보았어도 이미 성공했을 수 있다. <code>Idempotency-Key</code>를 서버가 지원할 때 같은 키로 재시도하고, 지원하지 않으면 자동 재시도하지 않는다. Spring Retry 또는 Resilience4j를 도입할 수 있지만 이 문서의 기본 추천은 “멱등 GET만 2~3회, 쓰기 요청은 명시적 정책 없이는 0회”다.</p>
+<p>재시도는 연결 실패·일시적 503·429처럼 일시적이고 재시도 가능한 경우에만 짧은 지수 백오프와 최대 횟수를 둔다. POST 결제처럼 서버가 처리했지만 응답만 유실된 상황에서는 클라이언트가 실패를 보았어도 이미 성공했을 수 있다.</p>
+<p><code>Idempotency-Key</code>를 서버가 지원할 때 같은 키로 재시도하고, 지원하지 않으면 자동 재시도하지 않는다. Spring Retry 또는 Resilience4j를 도입할 수 있지만 이 문서의 기본 추천은 “멱등 GET만 2~3회, 쓰기 요청은 명시적 정책 없이는 0회”다.</p>
 <h2 id="3-따라-하기"><a class="anchor" href="#3-따라-하기" aria-hidden="true">#</a>3. 따라 하기</h2>
 <h3 id="31-실제-로컬-서버-띄우기"><a class="anchor" href="#31-실제-로컬-서버-띄우기" aria-hidden="true">#</a>3.1 실제 로컬 서버 띄우기</h3>
 <p>프로젝트 루트에 다음 파일을 만든다.</p>
@@ -296,7 +301,8 @@ class PartnerClientTest {
 </li>
 </ol>
 <h2 id="6-한-단계-더"><a class="anchor" href="#6-한-단계-더" aria-hidden="true">#</a>6. 한 단계 더</h2>
-<p>요청은 <code>RestClient</code>의 fluent builder에서 URI·헤더·body를 만들고, 요청 팩토리가 실제 TCP/TLS를 수행하며, message converter가 JSON과 DTO를 변환한다. <code>retrieve()</code>는 상태 처리 규칙을 적용하고 최종 연산이 응답을 읽는다. HTTP Interface는 이 호출부를 프록시 생성 단계로 옮길 뿐 같은 요청 팩토리와 converter를 사용한다. 따라서 HTTP Interface로 바꿔도 timeout·인증·관측·재시도 정책은 그대로 검증해야 한다.</p>
+<p>요청은 <code>RestClient</code>의 fluent builder에서 URI·헤더·body를 만들고, 요청 팩토리가 실제 TCP/TLS를 수행하며, message converter가 JSON과 DTO를 변환한다. <code>retrieve()</code>는 상태 처리 규칙을 적용하고 최종 연산이 응답을 읽는다.</p>
+<p>HTTP Interface는 이 호출부를 프록시 생성 단계로 옮길 뿐 같은 요청 팩토리와 converter를 사용한다. 따라서 HTTP Interface로 바꿔도 timeout·인증·관측·재시도 정책은 그대로 검증해야 한다.</p>
 <p>외부 API의 설계·리소스 모델 비교는 → <a class="docref" href="S06-rest-api-clients.html">S06</a>, 장애 격리·bulkhead·circuit breaker는 → <a class="docref" href="S20-spring-cloud-msa.html">S20</a>, Jackson의 상세 변환 규칙은 → <a class="docref" href="P16-json-jackson-practical.html">P16</a> 참조. 이 문서에서는 그 주제를 다시 설명하지 않는다.</p>
 <h2 id="7-자가점검-qa-면접-대비"><a class="anchor" href="#7-자가점검-qa-면접-대비" aria-hidden="true">#</a>7. 자가점검 Q&amp;A (면접 대비)</h2>
 <h3 id="q1-mvc-애플리케이션에서-restclient와-webclient-중-무엇을-고르는가"><a class="anchor" href="#q1-mvc-애플리케이션에서-restclient와-webclient-중-무엇을-고르는가" aria-hidden="true">#</a>Q1. MVC 애플리케이션에서 <code>RestClient</code>와 <code>WebClient</code> 중 무엇을 고르는가?</h3>

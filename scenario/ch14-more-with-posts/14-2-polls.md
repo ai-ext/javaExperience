@@ -1319,7 +1319,9 @@ public class PollNotFoundException extends RuntimeException {
 
 ### MyBatis 대안
 
-아래 코드는 투표·선택지·표 테이블의 JPA `PollService`를 MyBatis 버전으로 교체한다. 글의 조회·작성자·차단 정책은 앞 단계의 `PostRepository`/`PostAccessPolicy`를 그대로 쓴다. `PollController`·요청/응답 DTO·Flyway V51도 같다. `poll` INSERT의 generated key를 받아 같은 트랜잭션에서 선택지를 저장하고, `poll_vote`의 `UNIQUE(poll_id, member_id)`가 동시 중복 표를 막는다.
+아래 코드는 투표·선택지·표 테이블의 JPA `PollService`를 MyBatis 버전으로 교체한다. 글의 조회·작성자·차단 정책은 앞 단계의 `PostRepository`/`PostAccessPolicy`를 그대로 쓴다.
+
+`PollController`·요청/응답 DTO·Flyway V51도 같다. `poll` INSERT의 generated key를 받아 같은 트랜잭션에서 선택지를 저장하고, `poll_vote`의 `UNIQUE(poll_id, member_id)`가 동시 중복 표를 막는다.
 
 <details>
 <summary>MyBatis / 설정 — 의존성·XML 로딩</summary>

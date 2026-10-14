@@ -6,7 +6,11 @@
 |---|---|---|---|
 | `GET /api/v1/posts?sort=latest\|popular&page=&size=` · `?cursor=&size=` · `&tag=&q=` | `PUBLIC`만(로그인하면 내 `PRIVATE`도). `size` 1~50, 기본 20. `q`는 제목 검색. 인기순 = 좋아요 수 내림차순 → 같으면 id 내림차순, 최신순 = id 내림차순. 커서는 최신순만 | 200 페이지 또는 커서 | 400(size 범위·잘못된 sort·인기순+커서) |
 
-목록 API는 조건이 많다. 정렬 둘, 페이지 방식 둘, 태그·검색어는 있을 수도 없을 수도 있고, 로그인 여부에 따라 보이는 글도 달라진다. 이 단계는 10-5·10-6과 같은 **JPA**로 만든다. 조건은 JPQL `@Query` 하나에 쓰고, 페이지·정렬은 Spring Data의 `Pageable`에 맡긴다. 같은 목록을 SQL을 직접 쓰는 **MyBatis** 동적 SQL로 짜 보는 것은 맨 아래 [선택 칸](#선택--같은-목록을-mybatis로-짜-보기)이다. 채점(check)은 같아서 어느 쪽으로 짜도 통과한다.
+목록 API는 조건이 많다. 정렬 둘, 페이지 방식 둘, 태그·검색어는 있을 수도 없을 수도 있고, 로그인 여부에 따라 보이는 글도 달라진다.
+
+이 단계는 10-5·10-6과 같은 **JPA**로 만든다. 조건은 JPQL `@Query` 하나에 쓰고, 페이지·정렬은 Spring Data의 `Pageable`에 맡긴다.
+
+같은 목록을 SQL을 직접 쓰는 **MyBatis** 동적 SQL로 짜 보는 것은 맨 아래 [선택 칸](#선택--같은-목록을-mybatis로-짜-보기)이다. 채점(check)은 같아서 어느 쪽으로 짜도 통과한다.
 
 명세서가 정한 응답은 두 모양이다.
 
@@ -15,7 +19,11 @@
 { "items": [ … ], "nextCursor": "17" }
 ```
 
-**페이지와 커서는 무엇이 다른가.** 페이지 방식(`page=3`)은 "앞에서 60개 건너뛰고 20개"다. 그 사이 새 글이 생기면 경계가 밀려 같은 글을 두 번 보거나 하나를 놓친다. 커서 방식은 "마지막으로 본 글(id 17)보다 오래된 것부터 20개"라 새 글이 생겨도 밀리지 않는다. 무한 스크롤에 쓴다. 그런데 **인기순에서는 커서가 깨진다.** 좋아요 수가 바뀌면 순서 자체가 바뀌어서 "이 글 다음"이 의미를 잃는다. 그래서 명세서는 인기순 + 커서를 400으로 막았다.
+**페이지와 커서는 무엇이 다른가.** 페이지 방식(`page=3`)은 "앞에서 60개 건너뛰고 20개"다. 그 사이 새 글이 생기면 경계가 밀려 같은 글을 두 번 보거나 하나를 놓친다.
+
+커서 방식은 "마지막으로 본 글(id 17)보다 오래된 것부터 20개"라 새 글이 생겨도 밀리지 않는다. 무한 스크롤에 쓴다.
+
+그런데 **인기순에서는 커서가 깨진다.** 좋아요 수가 바뀌면 순서 자체가 바뀌어서 "이 글 다음"이 의미를 잃는다. 그래서 명세서는 인기순 + 커서를 400으로 막았다.
 
 ## 화면 시나리오
 
@@ -92,7 +100,8 @@
 
 ## 설계 포인트
 
-- **정렬은 사용자가 보낸 문자열로 만들지 않는다.** `Sort.by(query.sort())`는 아무 속성 이름이나 받는다 — 엔티티 필드 이름이 그대로 바깥 입력이 되고, 없는 이름이면 Spring Data가 `PropertyReferenceException`을 던진다. JPQL에 `"order by " + sort`로 이어 붙이면 SQL 주입과 같은 문제가 된다(JPQL 주입). **정해 둔 `Sort` 둘 중에서 고른다**: 최신순 `Sort.by(desc("id"))`, 인기순 `Sort.by(desc("likeCount"), desc("id"))`. 값은 항상 `:tag`처럼 바인딩으로 넣는다.
+- **정렬은 사용자가 보낸 문자열로 만들지 않는다.** `Sort.by(query.sort())`는 아무 속성 이름이나 받는다 — 엔티티 필드 이름이 그대로 바깥 입력이 되고, 없는 이름이면 Spring Data가 `PropertyReferenceException`을 던진다. JPQL에 `"order by " + sort`로 이어 붙이면 SQL 주입과 같은 문제가 된다(JPQL 주입).
+  **정해 둔 `Sort` 둘 중에서 고른다**: 최신순 `Sort.by(desc("id"))`, 인기순 `Sort.by(desc("likeCount"), desc("id"))`. 값은 항상 `:tag`처럼 바인딩으로 넣는다.
 - **있을 수도 없을 수도 있는 조건은 `(:tag is null or ...)`로.** JPQL은 문자열 하나라 조건을 붙였다 뗐다 할 수 없다. 값이 `null`이면 앞쪽이 참이 되어 그 조건이 빠진 것과 같다. 조건이 더 늘어나 이 모양이 버거워지면 Specification·Querydsl을 쓰거나, SQL을 직접 쓰는 MyBatis로 간다(아래 선택 칸).
 - **같은 조건을 두 번 쓰지 않는다.** 반환 타입이 `Page`면 Spring Data가 같은 JPQL에서 `select count(*)` 쿼리를 만들어 `totalElements`를 채운다. 커서 쿼리는 조건 문자열 상수(`VISIBLE`) 뒤에 `and (:cursorId is null or p.id < :cursorId)`만 이어 붙인다. 실측: 첫 페이지 결과가 `size`보다 적으면 개수가 이미 확정이라 count 쿼리를 생략한다.
 - **"다음이 있나"는 하나 더 읽어서.** 커서는 반환 타입을 `Slice`로 하고 `PageRequest.of(0, size, 최신순)`을 넘긴다. Spring Data가 `size + 1`개를 읽어 남으면 `hasNext()`가 참이다. 개수 쿼리는 없다. 어디서부터인지는 페이지 번호가 아니라 `id < :cursorId`가 정한다(keyset).
@@ -359,8 +368,9 @@ Slice<Post> findVisibleBefore(Long loginUserId, String tag, String q, Long curso
 List<PostTagRow> findTagsByPostIds(List<Long> postIds);
 ```
 
-`PostTagRow`는 `record PostTagRow(Long postId, String name)`. `select new`는 결과를 엔티티가 아닌 record로 바로 받는다(전체 이름을 쓴다). `Collectors.groupingBy(PostTagRow::postId, mapping(PostTagRow::name, toList()))`로 글 id별로 묶는다. 페이지가 비었으면 이 쿼리를 부르지 않는다(`in ()`).
-</details>
+`PostTagRow`는 `record PostTagRow(Long postId, String name)`. `select new`는 결과를 엔티티가 아닌 record로 바로 받는다(전체 이름을 쓴다).
+
+`Collectors.groupingBy(PostTagRow::postId, mapping(PostTagRow::name, toList()))`로 글 id별로 묶는다. 페이지가 비었으면 이 쿼리를 부르지 않는다(`in ()`). </details>
 
 <details>
 <summary>힌트 5 — 컨트롤러 반환 타입</summary>
@@ -370,7 +380,9 @@ List<PostTagRow> findTagsByPostIds(List<Long> postIds);
 
 ## 선택 — 같은 목록을 MyBatis로 짜 보기
 
-JPA로 끝냈다면 여기는 건너뛰어도 된다. 조건이 많은 조회를 SQL로 직접 쓰는 방식을 익히고 싶을 때, 같은 API를 **MyBatis 동적 SQL**로 다시 짠다. 아래 **MyBatis 대체 구현 코드** 접기에 Mapper·XML·Service·DTO·설정의 파일 전문이 있다. 격리된 `project` DB에서 이 대체 구현을 컴파일하고 위 실행 칸 C1~C9를 모두 통과시켰다. 먼저 [E5 MyBatis 첫걸음](../../lessons/E5-mybatis-first-steps.md)을 읽고, XML 문법은 [W04 MyBatis XML 실무](../../docs/knowledge/W04-mybatis-xml-practical.md), 둘을 어떻게 나눠 쓰는지는 [W05](../../docs/knowledge/W05-jpa-vs-mybatis-strategy.md)를 본다.
+JPA로 끝냈다면 여기는 건너뛰어도 된다. 조건이 많은 조회를 SQL로 직접 쓰는 방식을 익히고 싶을 때, 같은 API를 **MyBatis 동적 SQL**로 다시 짠다.
+
+아래 **MyBatis 대체 구현 코드** 접기에 Mapper·XML·Service·DTO·설정의 파일 전문이 있다. 격리된 `project` DB에서 이 대체 구현을 컴파일하고 위 실행 칸 C1~C9를 모두 통과시켰다. 먼저 [E5 MyBatis 첫걸음](../../lessons/E5-mybatis-first-steps.md)을 읽고, XML 문법은 [W04 MyBatis XML 실무](../../docs/knowledge/W04-mybatis-xml-practical.md), 둘을 어떻게 나눠 쓰는지는 [W05](../../docs/knowledge/W05-jpa-vs-mybatis-strategy.md)를 본다.
 
 **의존성 추가** — MyBatis는 이때 처음 넣는다(10-12를 할 때도 같다). Boot BOM에 없어서 버전을 직접 적는다(4.1.x가 Boot 4.1용).
 

@@ -40,7 +40,9 @@
 
 ### `@SpringBootApplication`은 세 역할을 묶는다
 
-Boot 4.1.1 API의 선언을 풀면 `@SpringBootApplication`은 `@SpringBootConfiguration`, `@EnableAutoConfiguration`, `@ComponentScan`을 포함한다. 실제 `@ComponentScan`에는 테스트용 `TypeExcludeFilter`도 지정돼 있다. 기본 컴포넌트 탐색 기준 패키지는 애노테이션이 붙은 클래스의 패키지다. `@EnableAutoConfiguration`은 `AutoConfigurationImportSelector`를 통해 자동 구성 후보 선택을 시작한다.
+Boot 4.1.1 API의 선언을 풀면 `@SpringBootApplication`은 `@SpringBootConfiguration`, `@EnableAutoConfiguration`, `@ComponentScan`을 포함한다. 실제 `@ComponentScan`에는 테스트용 `TypeExcludeFilter`도 지정돼 있다.
+
+기본 컴포넌트 탐색 기준 패키지는 애노테이션이 붙은 클래스의 패키지다. `@EnableAutoConfiguration`은 `AutoConfigurationImportSelector`를 통해 자동 구성 후보 선택을 시작한다.
 
 ### 후보 검색부터 빈 생성까지
 
@@ -61,11 +63,15 @@ SpringApplication.run(Main.class, args)
   └─ ApplicationReadyEvent → 요청 수신 준비 완료
 ```
 
-Boot API는 `AutoConfigurationImportSelector`를 `DeferredImportSelector`로 설명하고, `@AutoConfiguration`은 `ImportCandidates`를 이용해 발견된다고 명시한다. 따라서 자동 구성은 애플리케이션 패키지를 훑다가 우연히 찾는 게 아니다. Boot가 JAR들에 있는 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`를 모아 후보로 삼는다. 같은 리소스를 여러 라이브러리가 제공할 수 있으므로 패키징 시 리소스 병합 규칙도 중요하다.
+Boot API는 `AutoConfigurationImportSelector`를 `DeferredImportSelector`로 설명하고, `@AutoConfiguration`은 `ImportCandidates`를 이용해 발견된다고 명시한다. 따라서 자동 구성은 애플리케이션 패키지를 훑다가 우연히 찾는 게 아니다.
+
+Boot가 JAR들에 있는 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`를 모아 후보로 삼는다. 같은 리소스를 여러 라이브러리가 제공할 수 있으므로 패키징 시 리소스 병합 규칙도 중요하다.
 
 후보는 제외 설정과 각 `@Conditional*`를 거쳐 적용 여부가 정해진다. 조건은 classpath, `Environment`, 현재 빈 정의를 검사하며 일치한 구성만 빈 정의를 등록한다. 자동 구성은 보통 `@Configuration(proxyBeanMethods = false)`다.
 
-`@ConditionalOnMissingBean`이 사용자 빈을 존중하는 이유는 자동 구성 해석이 사용자 구성 정의 뒤에 지연 선택되도록 되어 있기 때문이다. 그래도 이 조건은 **지금까지 처리된 정의**를 기준으로 평가된다. Boot 문서는 빈 조건을 자동 구성 클래스에 두는 방식을 권한다. `@Bean` 메서드 각각에 조건을 복잡하게 흩뜨리면 다른 자동 구성 처리 순서에 따라 의도와 달라질 수 있다. `@AutoConfiguration(after = ...)`는 구성 정의를 어느 순서로 처리할지 정할 뿐, 빈 생성 순서를 직접 지정하지 않는다. 실제 생성은 의존 관계와 `@DependsOn` 등에 따른다.
+`@ConditionalOnMissingBean`이 사용자 빈을 존중하는 이유는 자동 구성 해석이 사용자 구성 정의 뒤에 지연 선택되도록 되어 있기 때문이다. 그래도 이 조건은 **지금까지 처리된 정의**를 기준으로 평가된다. Boot 문서는 빈 조건을 자동 구성 클래스에 두는 방식을 권한다.
+
+`@Bean` 메서드 각각에 조건을 복잡하게 흩뜨리면 다른 자동 구성 처리 순서에 따라 의도와 달라질 수 있다. `@AutoConfiguration(after = ...)`는 구성 정의를 어느 순서로 처리할지 정할 뿐, 빈 생성 순서를 직접 지정하지 않는다. 실제 생성은 의존 관계와 `@DependsOn` 등에 따른다.
 
 ### 조건 애노테이션 선택
 
@@ -104,9 +110,13 @@ SpringApplication 시작
   → run() 반환
 ```
 
-`ApplicationStartedEvent`는 refresh 뒤이지만 runner보다 먼저다. 이 시점의 리스너는 runner가 채울 캐시나 검증 결과를 사용할 수 없다. runner가 모두 끝난 뒤 `ApplicationReadyEvent`가 발행되고, 이어 readiness가 `ACCEPTING_TRAFFIC`으로 바뀐다. 따라서 runner가 오래 걸리는 동안 프로세스와 웹 서버가 떠 있어도 정상적으로 준비됐다는 뜻은 아니다. Actuator readiness probe를 사용하는 배포 환경은 이 상태를 보고 트래픽을 보류할 수 있다. `WebServerInitializedEvent`와 `ContextRefreshedEvent`는 refresh 과정 중, `ApplicationStartedEvent` 전에 발생한다.
+`ApplicationStartedEvent`는 refresh 뒤이지만 runner보다 먼저다. 이 시점의 리스너는 runner가 채울 캐시나 검증 결과를 사용할 수 없다. runner가 모두 끝난 뒤 `ApplicationReadyEvent`가 발행되고, 이어 readiness가 `ACCEPTING_TRAFFIC`으로 바뀐다.
 
-두 runner는 실행 시점은 같고 인자 형태가 다르다. `ApplicationRunner`는 옵션을 해석한 `ApplicationArguments`를 받으므로 `--mode=warmup input.csv`에서 `mode`의 값과 위치 인자 `input.csv`를 따로 읽는다. `CommandLineRunner`는 원래 전달된 문자열 배열 전체를 받는다. 예를 들어 아래 코드는 필수 데이터 준비를 먼저 실행하고, 그 다음 원시 인자를 출력한다. `@Order`의 숫자가 낮은 runner부터 호출된다.
+따라서 runner가 오래 걸리는 동안 프로세스와 웹 서버가 떠 있어도 정상적으로 준비됐다는 뜻은 아니다. Actuator readiness probe를 사용하는 배포 환경은 이 상태를 보고 트래픽을 보류할 수 있다. `WebServerInitializedEvent`와 `ContextRefreshedEvent`는 refresh 과정 중, `ApplicationStartedEvent` 전에 발생한다.
+
+두 runner는 실행 시점은 같고 인자 형태가 다르다. `ApplicationRunner`는 옵션을 해석한 `ApplicationArguments`를 받으므로 `--mode=warmup input.csv`에서 `mode`의 값과 위치 인자 `input.csv`를 따로 읽는다. `CommandLineRunner`는 원래 전달된 문자열 배열 전체를 받는다.
+
+예를 들어 아래 코드는 필수 데이터 준비를 먼저 실행하고, 그 다음 원시 인자를 출력한다. `@Order`의 숫자가 낮은 runner부터 호출된다.
 
 ```java
 // Spring Boot 4.1 / Java 25
@@ -141,9 +151,13 @@ class StartupTasks {
 }
 ```
 
-`--mode=warmup input.csv`로 실행하면 첫 runner는 `mode=[warmup]`, `files=[input.csv]`로 해석하고 두 번째는 원래 토큰 배열을 본다. 옵션이 없을 수 있으므로 `getOptionValues` 결과를 필수 값처럼 바로 역참조하지 말고 기본값이나 검증을 둔다. `@Order`는 runner 호출 순서만 정한다. 빈 생성 순서나 `@PostConstruct` 순서를 지정하지 않으며, 두 runner 사이의 의존성은 가능하면 메서드 안에서 직접 순서를 보장하거나 한 작업으로 묶는다.
+`--mode=warmup input.csv`로 실행하면 첫 runner는 `mode=[warmup]`, `files=[input.csv]`로 해석하고 두 번째는 원래 토큰 배열을 본다. 옵션이 없을 수 있으므로 `getOptionValues` 결과를 필수 값처럼 바로 역참조하지 말고 기본값이나 검증을 둔다.
 
-runner가 예외를 밖으로 던지면 시작 과정이 실패한다. 이 경우 `ApplicationFailedEvent`가 진단에 쓰이고 정상적인 `ApplicationReadyEvent` 및 `ACCEPTING_TRAFFIC` 전이는 일어나지 않는다. 필수 마이그레이션·설정 검증처럼 성공 전에는 요청을 처리하면 안 되는 작업은 동기 runner에 두면 준비 상태가 자연스럽게 보호된다. 다만 긴 네트워크 호출은 제한 시간과 재시도 정책을 정하고, 재기동 때 안전하게 다시 실행되도록 멱등성을 확보해야 한다. 실패를 잡아 로그만 남기면 Boot는 정상 기동으로 판단해 준비 상태를 열 수 있으니, 필수 작업의 실패를 삼키지 않는다.
+`@Order`는 runner 호출 순서만 정한다. 빈 생성 순서나 `@PostConstruct` 순서를 지정하지 않으며, 두 runner 사이의 의존성은 가능하면 메서드 안에서 직접 순서를 보장하거나 한 작업으로 묶는다.
+
+runner가 예외를 밖으로 던지면 시작 과정이 실패한다. 이 경우 `ApplicationFailedEvent`가 진단에 쓰이고 정상적인 `ApplicationReadyEvent` 및 `ACCEPTING_TRAFFIC` 전이는 일어나지 않는다. 필수 마이그레이션·설정 검증처럼 성공 전에는 요청을 처리하면 안 되는 작업은 동기 runner에 두면 준비 상태가 자연스럽게 보호된다.
+
+다만 긴 네트워크 호출은 제한 시간과 재시도 정책을 정하고, 재기동 때 안전하게 다시 실행되도록 멱등성을 확보해야 한다. 실패를 잡아 로그만 남기면 Boot는 정상 기동으로 판단해 준비 상태를 열 수 있으니, 필수 작업의 실패를 삼키지 않는다.
 
 초기화가 무거울 때는 요청 처리 필요성으로 실행 방식을 고른다.
 
@@ -170,7 +184,9 @@ ApplicationRunner rebuildSearchIndex(SearchIndex index, TaskExecutor executor) {
 
 비동기 분기는 부분 색인이어도 서비스할 수 있을 때만 쓴다. 검색 요청이 완성된 색인을 요구한다면 readiness health check에서 완료 여부를 검사하거나 색인 구축을 별도 배포 단계로 옮긴다. 비동기 작업 예외는 runner 밖에서 발생하므로 별도 로깅·재시도·상태 노출이 필요하다.
 
-예를 들어 매 요청에 필요한 기준 데이터는 첫 방식으로 로드하고, 선택적인 검색 색인은 작업 큐나 별도 작업자로 갱신한다. 비동기화를 택하면서 `ApplicationReadyEvent` 리스너 안에서 긴 작업을 직접 돌리면 이벤트 리스너가 기본적으로 같은 스레드에서 실행되어 readiness 전이를 지연시킬 수 있다. `@PostConstruct`도 refresh 중 빈 초기화에 묶이므로 장시간 작업 위치로 쓰지 않는다. 지연 초기화는 빈 생성 시점을 늦출 뿐 작업 큐나 readiness 정책을 대신하지 않고, 설정 오류 발견을 첫 요청까지 미룰 수 있다.
+예를 들어 매 요청에 필요한 기준 데이터는 첫 방식으로 로드하고, 선택적인 검색 색인은 작업 큐나 별도 작업자로 갱신한다. 비동기화를 택하면서 `ApplicationReadyEvent` 리스너 안에서 긴 작업을 직접 돌리면 이벤트 리스너가 기본적으로 같은 스레드에서 실행되어 readiness 전이를 지연시킬 수 있다.
+
+`@PostConstruct`도 refresh 중 빈 초기화에 묶이므로 장시간 작업 위치로 쓰지 않는다. 지연 초기화는 빈 생성 시점을 늦출 뿐 작업 큐나 readiness 정책을 대신하지 않고, 설정 오류 발견을 첫 요청까지 미룰 수 있다.
 
 함정은 “프로세스가 떠 있음”, “컨텍스트가 refresh 됨”, “트래픽을 받아도 됨”을 같은 상태로 보는 것이다. 시작 이벤트에서 runner 완료를 가정하지 말고, 준비 전에도 안전한 경로만 열어 두며, runner 예외와 비동기 초기화 실패가 readiness에 어떻게 반영되는지 함께 설계한다.
 
@@ -195,7 +211,9 @@ public class ShopApplication {
 }
 ```
 
-여기서 제외하면 `DataSourceAutoConfiguration` 전체가 적용되지 않는다. 데이터베이스 자동 구성이 실패한다고 무조건 제외하지 말고, 조건 리포트와 실패 메시지로 빠진 조건을 먼저 찾는다. 제외 후에는 Boot가 제공하던 데이터소스 기본값도 사라진다. 클래스가 현재 classpath에 없을 수 있는 합성 애노테이션에서는 `excludeName`을 쓴다. `scanBasePackages`를 지정하는 경우는 `@Component` 검색만 늘리는 설정이라는 점을 유의한다.
+여기서 제외하면 `DataSourceAutoConfiguration` 전체가 적용되지 않는다. 데이터베이스 자동 구성이 실패한다고 무조건 제외하지 말고, 조건 리포트와 실패 메시지로 빠진 조건을 먼저 찾는다. 제외 후에는 Boot가 제공하던 데이터소스 기본값도 사라진다.
+
+클래스가 현재 classpath에 없을 수 있는 합성 애노테이션에서는 `excludeName`을 쓴다. `scanBasePackages`를 지정하는 경우는 `@Component` 검색만 늘리는 설정이라는 점을 유의한다.
 
 ### 예제 2: 라이브러리 기본 빈과 사용자 대체 허용 (미실행)
 

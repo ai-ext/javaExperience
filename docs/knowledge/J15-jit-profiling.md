@@ -59,19 +59,23 @@ C2 컴파일 ── 인라이닝·가드·루프 최적화 등
              deoptimization ── 인터프리터/재컴파일 경로로 복구
 ```
 
-JIT는 프로그램 전체를 한 번에 기계어로 바꾸지 않는다. HotSpot은 실행 빈도와 프로파일을 보고 가치가 있는 메서드부터 컴파일한다. Tiered compilation에서는 C1이 비교적 빠르게 코드를 만들면서 타입·분기 정보를 보강하고, 더 뜨거운 메서드는 C2의 분석 대상이 된다. 이 방식은 인터프리터만 쓰는 경우보다 긴 실행의 성능을 얻으면서도, C2 컴파일이 모든 메서드에 드는 비용을 줄인다. 계층 컴파일은 Java 7부터 HotSpot에 들어왔다.[1]
+JIT는 프로그램 전체를 한 번에 기계어로 바꾸지 않는다. HotSpot은 실행 빈도와 프로파일을 보고 가치가 있는 메서드부터 컴파일한다. Tiered compilation에서는 C1이 비교적 빠르게 코드를 만들면서 타입·분기 정보를 보강하고, 더 뜨거운 메서드는 C2의 분석 대상이 된다.
+
+이 방식은 인터프리터만 쓰는 경우보다 긴 실행의 성능을 얻으면서도, C2 컴파일이 모든 메서드에 드는 비용을 줄인다. 계층 컴파일은 Java 7부터 HotSpot에 들어왔다.[1]
 
 인라이닝은 호출 비용을 줄일 뿐 아니라 호출자와 피호출자의 상수 전파·죽은 코드 제거를 열어준다. 호출 타입이 안정적이면 컴파일러가 인라인과 가드를 선택할 수 있고, 타입이 다양하거나 코드가 커지면 보류한다. `private`/`final` 여부만으로 결정되지 않는다.
 
 탈출분석은 객체 참조가 분석 범위를 벗어나는지 본다. 안전하고 코드 형태가 허용되면 객체를 필드 값으로 스칼라 치환해 힙 할당을 피하거나 락을 제거할 수 있다. “객체가 무조건 스택에 할당된다”는 보장은 아니다. JVM 최적화 결과이므로 실제 할당은 프로파일러로 확인한다.[1]
 
-C2는 관측된 수신 타입이 하나라는 이유로 가상 호출을 직접 호출로 바꾸는 식의 추측을 할 수 있다. 실행 도중 예상하지 못한 타입이 들어오면 가드를 통과하지 못하거나 의존 관계가 무효화되어 deoptimization할 수 있다. 런타임은 최적화 프레임의 값을 복원할 수 있도록 상태 정보를 남기므로 자바 의미와 예외·부수효과는 유지된다. deoptimization 한 번은 정상적인 적응 동작이다. 같은 메서드가 반복적으로 무효화·재컴파일되면 입력 타입이 흔들리는지, 코드 캐시·컴파일 큐가 압박받는지 확인한다.
+C2는 관측된 수신 타입이 하나라는 이유로 가상 호출을 직접 호출로 바꾸는 식의 추측을 할 수 있다. 실행 도중 예상하지 못한 타입이 들어오면 가드를 통과하지 못하거나 의존 관계가 무효화되어 deoptimization할 수 있다. 런타임은 최적화 프레임의 값을 복원할 수 있도록 상태 정보를 남기므로 자바 의미와 예외·부수효과는 유지된다.
+
+deoptimization 한 번은 정상적인 적응 동작이다. 같은 메서드가 반복적으로 무효화·재컴파일되면 입력 타입이 흔들리는지, 코드 캐시·컴파일 큐가 압박받는지 확인한다.
 
 ### 측정과 관측은 서로 다른 질문에 답한다
 
 - JMH는 “이 연산 A와 B의 차이가 이 JVM·CPU·입력 조건에서 반복 측정해도 유지되는가?”를 묻는다. 포크별 실행 프로세스와 워밍업·측정 반복을 분리해, 같은 프로세스에서 누적된 JIT 상태가 한 후보만 유리하게 만드는 일을 줄인다.
 - JFR은 “운영의 특정 60초 동안 CPU 표본, 할당, 락, 스레드, GC 등의 이벤트가 어떤 순서·빈도로 발생했나?”를 기록한다. JEP 328은 JFR을 HotSpot/JVM 문제 해결용 저오버헤드 이벤트 수집기로 JDK 11에 제공했고, 이벤트 설정·필터링·파일 기록을 설계 목표로 삼았다. JEP의 성능 목표 수치는 특정 벤치마크에서의 목표이지 모든 서비스의 무오버헤드 보장이 아니다.[6]
-[9] async-profiler는 “CPU 또는 할당 표본의 스택 비중은 어디에 모이는가?”를 본다. 전통적인 safepoint 표본화의 편향을 피하려는 설계이고, Java 외의 GC/JIT 스레드 및 네이티브 프레임도 관찰할 수 있다. 샘플은 통계 추정치다. 짧은 실행이나 표본 수가 적은 결과의 작은 비율 차이를 확정적 병목으로 읽지 않는다.[9]
+- [9] async-profiler는 “CPU 또는 할당 표본의 스택 비중은 어디에 모이는가?”를 본다. 전통적인 safepoint 표본화의 편향을 피하려는 설계이고, Java 외의 GC/JIT 스레드 및 네이티브 프레임도 관찰할 수 있다. 샘플은 통계 추정치다. 짧은 실행이나 표본 수가 적은 결과의 작은 비율 차이를 확정적 병목으로 읽지 않는다.[9]
 
 ## 4. 코드로 확인
 
@@ -147,7 +151,9 @@ public class SumBenchmark {
 }
 ```
 
-아키타입이 만든 프로젝트 루트에서 `mvn clean verify`로 벤치마크 JAR를 만들고, `java -jar target/benchmarks.jar SumBenchmark -wi 5 -i 8 -f 2`처럼 실행한다. 여기서 워밍업 5회·측정 8회·포크 2개는 예시 설정이지 보편적인 정답이 아니다. 실제 연산량, 실행 시간, JVM 옵션을 맞추고 입력 자료형도 대표적으로 구성한다. 보고서에는 score 단위, error 또는 confidence interval, 워밍업·측정 횟수, 포크 수, JDK·CPU·OS, GC 설정, 입력 크기를 함께 적는다.
+아키타입이 만든 프로젝트 루트에서 `mvn clean verify`로 벤치마크 JAR를 만들고, `java -jar target/benchmarks.jar SumBenchmark -wi 5 -i 8 -f 2`처럼 실행한다. 여기서 워밍업 5회·측정 8회·포크 2개는 예시 설정이지 보편적인 정답이 아니다.
+
+실제 연산량, 실행 시간, JVM 옵션을 맞추고 입력 자료형도 대표적으로 구성한다. 보고서에는 score 단위, error 또는 confidence interval, 워밍업·측정 횟수, 포크 수, JDK·CPU·OS, GC 설정, 입력 크기를 함께 적는다.
 
 큰 반복문은 호출 단위 분포를 가리거나 루프 최적화를 유발할 수 있다. 결과를 무시하면 dead-code elimination, 상수 입력은 constant folding 대상이 된다. JMH 하네스를 따르고 반환하기 어려운 값만 `Blackhole`로 소비한다.[5]
 
@@ -288,14 +294,14 @@ CPU flame graph보다 먼저 여러 시점의 thread dump와 JFR의 스레드·�
 
 ## 9. 참고문헌
 
-[1] Java HotSpot Virtual Machine Performance Enhancements — https://docs.oracle.com/en/java/javase/25/vm/java-hotspot-virtual-machine-performance-enhancements.html — tiered compilation과 HotSpot 최적화 주제 안내.
-[2] The java Command (Java SE 25) — https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html — JIT·code cache 진단 옵션 참고.
-[3] JEP 165: Compiler Control — https://openjdk.org/jeps/165 — 메서드별 compiler directive와 런타임 컴파일 제어.
-[4] OpenJDK: JMH — https://openjdk.org/projects/code-tools/jmh/ — JMH의 목적과 프로젝트 링크.
-[5] JMH README — https://github.com/openjdk/jmh/blob/master/README.md — Maven 독립 프로젝트와 annotation processor 기반 사용 권고.
-[6] JEP 328: Flight Recorder — https://openjdk.org/jeps/328 — JFR의 JDK 11 도입 배경, 이벤트 기록·필터링 설계.
-[7] Recording (Java SE 25) — https://docs.oracle.com/en/java/javase/25/docs/api/jdk.jfr/jdk/jfr/Recording.html — JFR 기록의 설정·시작·정지·파일 덤프 API.
-[8] The jcmd Command (Java SE 25) — https://docs.oracle.com/en/java/javase/25/docs/specs/man/jcmd.html — JVM 프로세스 진단 명령 실행 및 대상 권한 조건.
-[9] async-profiler — https://github.com/async-profiler/async-profiler — CPU·할당·락 등 샘플링과 flame graph 사용 예.
-[10] The jstack Command (Java SE 25) — https://docs.oracle.com/en/java/javase/25/docs/specs/man/jstack.html — Java 스레드 스택 및 락 상세 출력; 실험적·비지원 상태.
-[11] The jmap Command (Java SE 25) — https://docs.oracle.com/en/java/javase/25/docs/specs/man/jmap.html — 힙 히스토그램·덤프 옵션; 실험적·비지원 상태.
+- [1] Java HotSpot Virtual Machine Performance Enhancements — https://docs.oracle.com/en/java/javase/25/vm/java-hotspot-virtual-machine-performance-enhancements.html — tiered compilation과 HotSpot 최적화 주제 안내.
+- [2] The java Command (Java SE 25) — https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html — JIT·code cache 진단 옵션 참고.
+- [3] JEP 165: Compiler Control — https://openjdk.org/jeps/165 — 메서드별 compiler directive와 런타임 컴파일 제어.
+- [4] OpenJDK: JMH — https://openjdk.org/projects/code-tools/jmh/ — JMH의 목적과 프로젝트 링크.
+- [5] JMH README — https://github.com/openjdk/jmh/blob/master/README.md — Maven 독립 프로젝트와 annotation processor 기반 사용 권고.
+- [6] JEP 328: Flight Recorder — https://openjdk.org/jeps/328 — JFR의 JDK 11 도입 배경, 이벤트 기록·필터링 설계.
+- [7] Recording (Java SE 25) — https://docs.oracle.com/en/java/javase/25/docs/api/jdk.jfr/jdk/jfr/Recording.html — JFR 기록의 설정·시작·정지·파일 덤프 API.
+- [8] The jcmd Command (Java SE 25) — https://docs.oracle.com/en/java/javase/25/docs/specs/man/jcmd.html — JVM 프로세스 진단 명령 실행 및 대상 권한 조건.
+- [9] async-profiler — https://github.com/async-profiler/async-profiler — CPU·할당·락 등 샘플링과 flame graph 사용 예.
+- [10] The jstack Command (Java SE 25) — https://docs.oracle.com/en/java/javase/25/docs/specs/man/jstack.html — Java 스레드 스택 및 락 상세 출력; 실험적·비지원 상태.
+- [11] The jmap Command (Java SE 25) — https://docs.oracle.com/en/java/javase/25/docs/specs/man/jmap.html — 힙 히스토그램·덤프 옵션; 실험적·비지원 상태.

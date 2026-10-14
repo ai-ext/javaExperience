@@ -6,7 +6,9 @@
 
 ## 1. 한 줄로 말하면
 
-Redis는 메모리 중심의 key-value/data-structure 서버다. 캐시·세션·카운터·간단한 큐·랭킹처럼 빠른 조회와 자료형 연산이 필요한 곳에 쓴다. Spring Boot의 `spring-boot-starter-data-redis`는 Spring Data Redis와 클라이언트를 자동 구성하며 기본 클라이언트는 Lettuce다. Redis는 주문·결제의 최종 원장을 대체하는 저장소가 아니라, 데이터의 수명·복구·일관성 정책을 함께 설계해야 하는 별도 컴포넌트다.
+Redis는 메모리 중심의 key-value/data-structure 서버다. 캐시·세션·카운터·간단한 큐·랭킹처럼 빠른 조회와 자료형 연산이 필요한 곳에 쓴다.
+
+Spring Boot의 `spring-boot-starter-data-redis`는 Spring Data Redis와 클라이언트를 자동 구성하며 기본 클라이언트는 Lettuce다. Redis는 주문·결제의 최종 원장을 대체하는 저장소가 아니라, 데이터의 수명·복구·일관성 정책을 함께 설계해야 하는 별도 컴포넌트다.
 
 ## 2. 당장 알아야 할 것
 

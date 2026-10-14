@@ -214,9 +214,13 @@
 <details>
 <summary>MyBatis — 페이지 크기가 늘어도 SELECT 수를 고정하기</summary>
 
-아래 **MyBatis 대체 구현 코드**의 11개 파일을 이 단계 전체 소스에 적용한다. 2-3의 조회 권한 조건은 `PostVisibilityMapper.xml`의 목록·COUNT 공통 조건으로 유지한다. 목록 SQL에서 작성자를 JOIN해 한 번에 읽고, 페이지에 나온 글 ID를 모아 `post_tag`·`tag`를 `IN` 쿼리 한 번으로 읽는다. Mapper 실행 순서는 게시판 ID, 목록, COUNT, 태그로 페이지 크기와 관계없이 SELECT 4개다. 글마다 작성자·태그를 다시 읽는 N+1 루프는 없다.
+아래 **MyBatis 대체 구현 코드**의 11개 파일을 이 단계 전체 소스에 적용한다. 2-3의 조회 권한 조건은 `PostVisibilityMapper.xml`의 목록·COUNT 공통 조건으로 유지한다.
 
-기본 JPA 테스트의 Hibernate `Statistics`는 MyBatis SQL을 세지 못한다. 대체 코드의 `MyBatisStatementCounter`는 MyBatis `Executor.query`를 가로채 요청 스레드의 SELECT 호출 수를 세고, `PostListQueryCountTest`가 `size=5`와 `size=20`에서 **실제로 0보다 큰 수**인지, 두 수가 같은지, 5개 이하인지 검사한다. 격리 테스트 DB에서는 두 크기 모두 4개였다. JPA·MyBatis 양쪽의 C1 응답과 2-3 접근 조건도 대조한다.
+목록 SQL에서 작성자를 JOIN해 한 번에 읽고, 페이지에 나온 글 ID를 모아 `post_tag`·`tag`를 `IN` 쿼리 한 번으로 읽는다. Mapper 실행 순서는 게시판 ID, 목록, COUNT, 태그로 페이지 크기와 관계없이 SELECT 4개다. 글마다 작성자·태그를 다시 읽는 N+1 루프는 없다.
+
+기본 JPA 테스트의 Hibernate `Statistics`는 MyBatis SQL을 세지 못한다. 대체 코드의 `MyBatisStatementCounter`는 MyBatis `Executor.query`를 가로채 요청 스레드의 SELECT 호출 수를 세고, `PostListQueryCountTest`가 `size=5`와 `size=20`에서 **실제로 0보다 큰 수**인지, 두 수가 같은지, 5개 이하인지 검사한다.
+
+격리 테스트 DB에서는 두 크기 모두 4개였다. JPA·MyBatis 양쪽의 C1 응답과 2-3 접근 조건도 대조한다.
 
 </details>
 
@@ -326,8 +330,9 @@ C = HTTP 확인(필수), T = 테스트 실행(필수), R = 코드 리뷰(피드�
 <details>
 <summary>힌트 1 — SQL 세기</summary>
 
-`src/test/resources/application-test.yml`에 `spring.jpa.properties.hibernate.generate_statistics: true`를 켠다. 테스트 클래스에 `@TestPropertySource`로 따로 켜면 스프링 컨텍스트가 하나 더 생기고, 같은 테스트 DB에 스키마 초기화가 다시 돌아 "Table already exists"로 실패한다. 그다음 `EntityManagerFactory`를 주입받아 `emf.unwrap(SessionFactory.class).getStatistics()`를 얻는다. 호출 직전 `statistics.clear()`, 호출 뒤 `statistics.getPrepareStatementCount()`.
-</details>
+`src/test/resources/application-test.yml`에 `spring.jpa.properties.hibernate.generate_statistics: true`를 켠다. 테스트 클래스에 `@TestPropertySource`로 따로 켜면 스프링 컨텍스트가 하나 더 생기고, 같은 테스트 DB에 스키마 초기화가 다시 돌아 "Table already exists"로 실패한다.
+
+그다음 `EntityManagerFactory`를 주입받아 `emf.unwrap(SessionFactory.class).getStatistics()`를 얻는다. 호출 직전 `statistics.clear()`, 호출 뒤 `statistics.getPrepareStatementCount()`. </details>
 
 <details>
 <summary>힌트 2 — 가장 쉬운 해결</summary>

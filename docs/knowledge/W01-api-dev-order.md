@@ -48,7 +48,9 @@ flowchart TD
     H -. "모순 발견 시 작은 폭으로 수정" .-> B
 ```
 
-이 흐름은 워터폴이 아니다. 설계는 앞에서 하되 코드는 기능별로 연결한다. Spring MVC는 요청을 라우팅하고, `@RequestBody`는 `HttpMessageConverter`로 변환되며 `@Valid` 오류는 기본 400이 된다. Controller는 HTTP 경계이므로 데이터 모델과 정책의 유일한 출발점일 필요가 없다. ([MVC](https://docs.spring.io/spring-framework/reference/web/webmvc.html), [요청 본문](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/requestbody.html), [검증](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-validation.html))
+이 흐름은 워터폴이 아니다. 설계는 앞에서 하되 코드는 기능별로 연결한다.
+
+Spring MVC는 요청을 라우팅하고, `@RequestBody`는 `HttpMessageConverter`로 변환되며 `@Valid` 오류는 기본 400이 된다. Controller는 HTTP 경계이므로 데이터 모델과 정책의 유일한 출발점일 필요가 없다. ([MVC](https://docs.spring.io/spring-framework/reference/web/webmvc.html), [요청 본문](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/requestbody.html), [검증](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-validation.html))
 
 서비스 계층은 여러 인터페이스가 같은 업무 동작을 호출할 때 규칙·응답 조정을 중복하지 않게 한다. `@Transactional`은 Spring의 선언적 경계이므로 HTTP 메서드보다 업무 동작을 수행하는 서비스에 두면 의도가 명확하다. 여러 HTTP 요청이나 외부 시스템까지 자동 원자화하지는 않는다. ([Service Layer](https://martinfowler.com/eaaCatalog/serviceLayer.html), [@Transactional](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html))
 

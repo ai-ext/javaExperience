@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>R03. 스키마와 테이블 설계 — 데이터 타입, VARCHAR(255)의 의미, PK·FK·제약</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -205,14 +205,30 @@ SELECT id, price FROM product WHERE id = 1;</code></pre>
 <li><strong><code>Column &#39;member_id&#39; cannot be null</code> / <code>Field ... doesn&#39;t have a default value</code> →</strong> 필수값이 누락됐다. <strong>해결:</strong> 선택 사항인지 확인해 nullable/default 규칙을 정하고, 임의 기본값으로 오류를 숨기지 않는다.</li>
 </ol>
 <h2 id="6-한-단계-더"><a class="anchor" href="#6-한-단계-더" aria-hidden="true">#</a>6. 한 단계 더</h2>
-<p>스키마는 DB가 지킬 데이터 계약이다. 앱 검증은 빠른 오류를 주고, DB 제약은 배치·관리 스크립트·동시 요청을 포함한 모든 쓰기 경로를 막는다. 타입 범위와 도메인 유효 범위는 다르므로 CHECK 필요성을 판단한다. 대형 <code>ALTER</code>는 작업에 따라 테이블을 재구성하거나 메타데이터 락을 기다릴 수 있어 행 수·알고리즘·락을 사전 검토한다. FK를 빼면 참조 검사를 다른 곳에서 구현·감시해야 한다. 다음 주제는 SQL 조작 → <a class="docref" href="R04-sql-crud-join.html">R04</a>, 인덱스 → <a class="docref" href="R05-index-btree.html">R05</a>, ERD 모델링 → <a class="docref" href="D10-database-basics.html">D10</a>, JPA 매핑 → <a class="docref" href="P20-jpa-entity-mapping.html">P20</a> 참조.</p>
+<p>스키마는 DB가 지킬 데이터 계약이다. 앱 검증은 빠른 오류를 주고, DB 제약은 배치·관리 스크립트·동시 요청을 포함한 모든 쓰기 경로를 막는다. 타입 범위와 도메인 유효 범위는 다르므로 CHECK 필요성을 판단한다.</p>
+<p>대형 <code>ALTER</code>는 작업에 따라 테이블을 재구성하거나 메타데이터 락을 기다릴 수 있어 행 수·알고리즘·락을 사전 검토한다. FK를 빼면 참조 검사를 다른 곳에서 구현·감시해야 한다. 다음 주제는 SQL 조작 → <a class="docref" href="R04-sql-crud-join.html">R04</a>, 인덱스 → <a class="docref" href="R05-index-btree.html">R05</a>, ERD 모델링 → <a class="docref" href="D10-database-basics.html">D10</a>, JPA 매핑 → <a class="docref" href="P20-jpa-entity-mapping.html">P20</a> 참조.</p>
 <h2 id="7-자가점검-qa-면접-대비"><a class="anchor" href="#7-자가점검-qa-면접-대비" aria-hidden="true">#</a>7. 자가점검 Q&amp;A (면접 대비)</h2>
-<p><strong>Q1. <code>VARCHAR(255)</code>면 255바이트를 저장하는가? 왜 관습처럼 보이나?</strong><br>아니다. MySQL은 최대 255문자를 허용하고 실제 바이트 수는 문자셋에 달렸다. <code>utf8mb4</code>에서는 255자에 최대 1,020바이트가 필요해 길이 접두사는 2바이트다. 255바이트 접두사 경계가 단일 바이트 문자셋 시절 관습에 영향을 줬지만, 현대 설계에서 특별한 최적 길이라는 뜻은 아니다.<br><strong>꼬리질문:</strong> <code>VARCHAR(255)</code>는 행마다 1,020바이트를 차지하나? <strong>답:</strong> 실제 값 크기와 접두사가 저장되며, 선언 크기는 최대 행·인덱스 계산과 임시 테이블 처리에 영향을 줄 수 있다.</p>
-<p><strong>Q2. 가격에 <code>DOUBLE</code> 대신 <code>DECIMAL</code>을 쓰는 이유는?</strong><br><code>DOUBLE</code>은 이진 부동소수점 근삿값이라 십진 소수를 모두 정확히 표현하지 못한다. 덧셈·비교·분배를 반복하면 반올림 오차가 업무 결과에 남을 수 있다. <code>DECIMAL(p,s)</code>는 십진 자릿수를 고정해 그 값을 정확히 표현한다.<br><strong>꼬리질문:</strong> 센서 측정값은 무조건 <code>DECIMAL</code>인가? <strong>답:</strong> 오차가 허용되고 범위·성능상 이점이 필요하면 <code>FLOAT</code>·<code>DOUBLE</code>을 쓸 수 있다. 정확도가 요구되는 단위·허용 오차를 먼저 정한다.</p>
-<p><strong>Q3. 자연키와 대리키 중 무엇을 PK로 둘까?</strong><br>자연키는 이메일·주문번호처럼 도메인 의미를 가진다. 값이 바뀌거나 외부 규칙에 종속되면 FK로 전파할 변경 비용과 민감 정보 노출이 생긴다. 보통 불변성이 높은 대리키를 PK로 쓰고, 자연키의 유일성은 별도 UNIQUE로 보장한다.<br><strong>꼬리질문:</strong> 그러면 주문번호에 제약이 없어도 되는가? <strong>답:</strong> 아니다. 외부 계약상 유일해야 하면 <code>UNIQUE NOT NULL</code>을 둔다. PK와 업무 유일성은 서로 다른 요구다.</p>
-<p><strong>Q4. FK를 쓰지 않는 팀이 있다면 설계가 잘못된 것인가?</strong><br>항상 그렇지는 않다. 샤딩·서비스별 데이터 소유권·고속 대량 적재에서는 DB FK가 운영 경계와 맞지 않을 수 있다. 이 경우 애플리케이션·배치·정합성 감시가 참조 무결성을 대신해야 한다. 그 책임과 고아 행 복구 절차가 없다면 FK 제거는 데이터 정합성을 약화시킨다.<br><strong>꼬리질문:</strong> 사전 조회로 경쟁 삽입을 막나? <strong>답:</strong> 조회와 쓰기 사이에 값이 바뀔 수 있어 DB 제약이 필요하다.</p>
-<p><strong>Q5. <code>CHECK (price &gt;= 0)</code>인데 NULL이 들어갈 수 있는가?</strong><br>가능하다. 비교 결과가 <code>UNKNOWN</code>인 NULL 행은 MySQL CHECK 위반으로 처리되지 않는다. 필수 가격이면 <code>NOT NULL</code>을 추가하고, <code>CHECK</code>로 음수만 금지한다. MySQL 8.0.16부터 CHECK가 적용되므로 이전 버전 동작과 혼동하지 않는다.<br><strong>꼬리질문:</strong> API 검증이 있으면 CHECK는 불필요한가? <strong>답:</strong> 아니다. 모든 쓰기 경로를 보호한다.</p>
-<p><strong>Q6. <code>ON DELETE CASCADE</code>는 언제 선택하나?</strong><br>부모가 없어질 때 자식도 도메인상 함께 사라져야 하고, 그 전파 범위가 좁고 예측 가능할 때 쓴다. 주문·결제·포인트처럼 보존해야 하는 이력에는 보통 삭제를 거부하거나 별도 상태 전이를 쓴다. <code>SET NULL</code>을 선택하면 FK 열이 NULL을 허용해야 한다.<br><strong>꼬리질문:</strong> 기본 FK 동작은 무엇인가? <strong>답:</strong> MySQL InnoDB는 자식이 참조 중인 부모 삭제·키 변경을 거부한다(<code>RESTRICT</code>와 <code>NO ACTION</code>은 동등).</p>
+<p><strong>Q1. <code>VARCHAR(255)</code>면 255바이트를 저장하는가? 왜 관습처럼 보이나?</strong><br>아니다.</p>
+<p>MySQL은 최대 255문자를 허용하고 실제 바이트 수는 문자셋에 달렸다. <code>utf8mb4</code>에서는 255자에 최대 1,020바이트가 필요해 길이 접두사는 2바이트다. 255바이트 접두사 경계가 단일 바이트 문자셋 시절 관습에 영향을 줬지만, 현대 설계에서 특별한 최적 길이라는 뜻은 아니다.</p>
+<p><strong>꼬리질문:</strong> <code>VARCHAR(255)</code>는 행마다 1,020바이트를 차지하나? <strong>답:</strong> 실제 값 크기와 접두사가 저장되며, 선언 크기는 최대 행·인덱스 계산과 임시 테이블 처리에 영향을 줄 수 있다.</p>
+<p><strong>Q2. 가격에 <code>DOUBLE</code> 대신 <code>DECIMAL</code>을 쓰는 이유는?</strong><br><code>DOUBLE</code>은 이진 부동소수점 근삿값이라 십진 소수를 모두 정확히 표현하지 못한다. 덧셈·비교·분배를 반복하면 반올림 오차가 업무 결과에 남을 수 있다.</p>
+<p><code>DECIMAL(p,s)</code>는 십진 자릿수를 고정해 그 값을 정확히 표현한다.
+<strong>꼬리질문:</strong> 센서 측정값은 무조건 <code>DECIMAL</code>인가?</p>
+<p><strong>답:</strong> 오차가 허용되고 범위·성능상 이점이 필요하면 <code>FLOAT</code>·<code>DOUBLE</code>을 쓸 수 있다. 정확도가 요구되는 단위·허용 오차를 먼저 정한다.</p>
+<p><strong>Q3. 자연키와 대리키 중 무엇을 PK로 둘까?</strong><br>자연키는 이메일·주문번호처럼 도메인 의미를 가진다. 값이 바뀌거나 외부 규칙에 종속되면 FK로 전파할 변경 비용과 민감 정보 노출이 생긴다.</p>
+<p>보통 불변성이 높은 대리키를 PK로 쓰고, 자연키의 유일성은 별도 UNIQUE로 보장한다.
+<strong>꼬리질문:</strong> 그러면 주문번호에 제약이 없어도 되는가? <strong>답:</strong> 아니다.</p>
+<p>외부 계약상 유일해야 하면 <code>UNIQUE NOT NULL</code>을 둔다. PK와 업무 유일성은 서로 다른 요구다.</p>
+<p><strong>Q4. FK를 쓰지 않는 팀이 있다면 설계가 잘못된 것인가?</strong><br>항상 그렇지는 않다. 샤딩·서비스별 데이터 소유권·고속 대량 적재에서는 DB FK가 운영 경계와 맞지 않을 수 있다.</p>
+<p>이 경우 애플리케이션·배치·정합성 감시가 참조 무결성을 대신해야 한다. 그 책임과 고아 행 복구 절차가 없다면 FK 제거는 데이터 정합성을 약화시킨다.</p>
+<p><strong>꼬리질문:</strong> 사전 조회로 경쟁 삽입을 막나? <strong>답:</strong> 조회와 쓰기 사이에 값이 바뀔 수 있어 DB 제약이 필요하다.</p>
+<p><strong>Q5. <code>CHECK (price &gt;= 0)</code>인데 NULL이 들어갈 수 있는가?</strong><br>가능하다. 비교 결과가 <code>UNKNOWN</code>인 NULL 행은 MySQL CHECK 위반으로 처리되지 않는다.</p>
+<p>필수 가격이면 <code>NOT NULL</code>을 추가하고, <code>CHECK</code>로 음수만 금지한다. MySQL 8.0.16부터 CHECK가 적용되므로 이전 버전 동작과 혼동하지 않는다.
+<strong>꼬리질문:</strong> API 검증이 있으면 CHECK는 불필요한가?</p>
+<p><strong>답:</strong> 아니다. 모든 쓰기 경로를 보호한다.</p>
+<p><strong>Q6. <code>ON DELETE CASCADE</code>는 언제 선택하나?</strong><br>부모가 없어질 때 자식도 도메인상 함께 사라져야 하고, 그 전파 범위가 좁고 예측 가능할 때 쓴다. 주문·결제·포인트처럼 보존해야 하는 이력에는 보통 삭제를 거부하거나 별도 상태 전이를 쓴다.</p>
+<p><code>SET NULL</code>을 선택하면 FK 열이 NULL을 허용해야 한다.
+<strong>꼬리질문:</strong> 기본 FK 동작은 무엇인가? <strong>답:</strong> MySQL InnoDB는 자식이 참조 중인 부모 삭제·키 변경을 거부한다(<code>RESTRICT</code>와 <code>NO ACTION</code>은 동등).</p>
 <h2 id="8-참고문헌"><a class="anchor" href="#8-참고문헌" aria-hidden="true">#</a>8. 참고문헌</h2>
 <ul>
 <li>MySQL 8.4 Reference Manual — The JSON Data Type — <a href="https://dev.mysql.com/doc/refman/8.4/en/json.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.4/en/json.html</a> — JSON 검증과 내부 저장 형식.</li>

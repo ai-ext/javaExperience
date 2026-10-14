@@ -250,7 +250,9 @@ public static void main(java.lang.String[]);
  19: invokedynamic #46,  0  // InvokeDynamic #0:run:()Ljava/lang/Runnable;
 ```
 
-`virtualCall`의 정적 매개변수 타입은 `Animal`이지만 실제 수신 객체는 `Dog`여서 `Dog.sound`가 출력된다. `Runnable` 구현 클래스의 이름을 직접 적지 않았어도 컴파일러가 람다 호출 지점을 `invokedynamic`으로 만들었다. 상수 풀의 bootstrap method와 메서드 핸들 정보는 `javap -v`로 더 확인할 수 있다. `new Dog()`와 `Object.<init>`에는 `invokespecial`, `staticCall()`에는 `invokestatic`이 보인다.
+`virtualCall`의 정적 매개변수 타입은 `Animal`이지만 실제 수신 객체는 `Dog`여서 `Dog.sound`가 출력된다. `Runnable` 구현 클래스의 이름을 직접 적지 않았어도 컴파일러가 람다 호출 지점을 `invokedynamic`으로 만들었다.
+
+상수 풀의 bootstrap method와 메서드 핸들 정보는 `javap -v`로 더 확인할 수 있다. `new Dog()`와 `Object.<init>`에는 `invokespecial`, `staticCall()`에는 `invokestatic`이 보인다.
 
 ### 예제 2 — 바이너리 이름이 같아도 로더가 다르면 다른 타입
 

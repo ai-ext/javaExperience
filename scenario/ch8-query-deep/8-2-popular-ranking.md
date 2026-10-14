@@ -463,8 +463,7 @@ C = HTTP 확인(필수), R = 코드 리뷰(피드백용). 항목은 (postId, sco
 <details>
 <summary>힌트 — Clock 빈</summary>
 
-`@Bean Clock clock(@Value("${app.fixed-now:}") String fixedNow)`에서 값이 비어 있으면 `Clock.system(ZoneId.of("Asia/Seoul"))`, 있으면 `Clock.fixed(LocalDateTime.parse(fixedNow).atZone(ZoneId.of("Asia/Seoul")).toInstant(), ZoneId.of("Asia/Seoul"))`. 서비스는 `LocalDateTime.now(clock)`을 쓴다.
-</details>
+`@Bean Clock clock(@Value("${app.fixed-now:}") String fixedNow)`에서 값이 비어 있으면 `Clock.system(ZoneId.of("Asia/Seoul"))`, 있으면 `Clock.fixed(LocalDateTime.parse(fixedNow).atZone(ZoneId.of("Asia/Seoul")).toInstant(), ZoneId.of("Asia/Seoul"))`. 서비스는 `LocalDateTime.now(clock)`을 쓴다. </details>
 
 ## 다음 단계
 

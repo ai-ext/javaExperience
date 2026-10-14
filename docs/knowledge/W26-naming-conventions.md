@@ -53,7 +53,9 @@ Oracle 문서는 1999년 개정·비유지 상태이므로 역사적 관례로 �
 
 ### 이름을 경계에서 바꾸는 이유
 
-저장 방식과 전송 형식은 표기가 다르다. MyBatis의 `mapUnderscoreToCamelCase`는 `A_COLUMN`을 `aColumn`으로 자동 매핑하며 기본값은 `false`다. Spring Boot는 여러 설정 소스를 받으므로 canonical kebab-case와 환경 변수 표기를 구분한다. Jackson 3의 `PropertyNamingStrategies`에는 `LOWER_CAMEL_CASE`, `SNAKE_CASE`가 있다. 변환은 경계에서 선언하고 외부 계약은 임의 변경하지 않는다.
+저장 방식과 전송 형식은 표기가 다르다. MyBatis의 `mapUnderscoreToCamelCase`는 `A_COLUMN`을 `aColumn`으로 자동 매핑하며 기본값은 `false`다. Spring Boot는 여러 설정 소스를 받으므로 canonical kebab-case와 환경 변수 표기를 구분한다.
+
+Jackson 3의 `PropertyNamingStrategies`에는 `LOWER_CAMEL_CASE`, `SNAKE_CASE`가 있다. 변환은 경계에서 선언하고 외부 계약은 임의 변경하지 않는다.
 
 ```mermaid
 flowchart LR
@@ -78,7 +80,9 @@ flowchart LR
 
 한 코드베이스에서 `OrderServiceImpl`, `PaymentServiceDefault`, `UserServiceV2`를 섞으면 이름으로 구현을 찾기 어렵다. 새 구현에는 `Jpa`, `Remote`, `Cached`처럼 차이를 드러내고 주입 대상도 명시한다.
 
-`find/get/fetch`에는 Java 표준 의미가 없다. 팀 규약으로 `find`는 부재 가능한 조회, `get`은 접근자·필수 값, `fetch`는 비용 있는 로드에 쓰도록 정할 수 있다. 합의하지 않았다면 기존 코드와 맞춘다. 메서드는 동사로 시작하고, `is/has/can`은 boolean 질의, `create/save/update/delete`는 작업 이름으로 쓴다. 반환값과 부재 시 정책은 이름만으로 정해지지 않으므로 계약을 함께 고정한다.
+`find/get/fetch`에는 Java 표준 의미가 없다. 팀 규약으로 `find`는 부재 가능한 조회, `get`은 접근자·필수 값, `fetch`는 비용 있는 로드에 쓰도록 정할 수 있다. 합의하지 않았다면 기존 코드와 맞춘다.
+
+메서드는 동사로 시작하고, `is/has/can`은 boolean 질의, `create/save/update/delete`는 작업 이름으로 쓴다. 반환값과 부재 시 정책은 이름만으로 정해지지 않으므로 계약을 함께 고정한다.
 
 ## 5. 코드로 보기
 

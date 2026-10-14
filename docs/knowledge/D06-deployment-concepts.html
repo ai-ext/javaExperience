@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>D06. 배포란 무엇인가 — 환경·방식·무중단 배포·롤백</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -246,7 +246,8 @@
 </tbody></table></div>
 <p>운영 방식은 순서대로 대체되지 않는다. JAR + systemd, VM의 Docker, PaaS가 함께 쓰이며 선택은 배포 빈도·서비스 수·당직 역량·비용에 달렸다. 이미지와 Kubernetes 설정은 <a class="docref" href="S19-packaging-deploy.html">S19</a> 참조.</p>
 <h3 id="33-prod로-전환하고-상태를-판단한다"><a class="anchor" href="#33-prod로-전환하고-상태를-판단한다" aria-hidden="true">#</a>3.3 prod로 전환하고 상태를 판단한다</h3>
-<p>새 버전을 실행했다고 곧바로 트래픽을 보내지 않는다. 앱이 초기화되고 의존성 연결을 마쳤는지 확인한 뒤 준비된 인스턴스만 요청을 받게 한다. 교체될 구 버전에는 종료 신호를 보내고, 새 연결을 거절하면서 진행 중 요청이 끝날 시간을 준다. Spring Boot의 내장 웹 서버는 graceful shutdown을 지원하고, <code>spring.lifecycle.timeout-per-shutdown-phase</code>로 종료 단계 제한 시간을 지정할 수 있다. 바깥의 플랫폼·서비스 관리자도 종료 대기 시간을 허용해야 앱 내부 대기 전에 프로세스를 강제 종료하지 않는다.</p>
+<p>새 버전을 실행했다고 곧바로 트래픽을 보내지 않는다. 앱이 초기화되고 의존성 연결을 마쳤는지 확인한 뒤 준비된 인스턴스만 요청을 받게 한다. 교체될 구 버전에는 종료 신호를 보내고, 새 연결을 거절하면서 진행 중 요청이 끝날 시간을 준다.</p>
+<p>Spring Boot의 내장 웹 서버는 graceful shutdown을 지원하고, <code>spring.lifecycle.timeout-per-shutdown-phase</code>로 종료 단계 제한 시간을 지정할 수 있다. 바깥의 플랫폼·서비스 관리자도 종료 대기 시간을 허용해야 앱 내부 대기 전에 프로세스를 강제 종료하지 않는다.</p>
 <p>무중단을 기대하려면 한 인스턴스가 교체될 동안 나머지가 트래픽을 처리할 여유가 있어야 한다. readiness 확인 없이 새 인스턴스로 바로 보내면 초기화 중 오류가 난다. 반대로 readiness가 영원히 실패하면 배포가 멈춘다. liveness가 일시적인 DB 장애까지 앱 재시작으로 해결하려 하면 재시작 폭풍이 날 수 있다. 인스턴스 건강 신호는 배포 제어의 입력이지, 외부 사용자의 핵심 경로까지 모두 검증했다는 증명은 아니다.</p>
 <h3 id="34-무중단점진-배포-전략"><a class="anchor" href="#34-무중단점진-배포-전략" aria-hidden="true">#</a>3.4 무중단·점진 배포 전략</h3>
 <div class="table-wrap"><table>
@@ -316,7 +317,8 @@
     F --&gt; G[&quot;옛 컬럼 제거는 후속 변경&quot;]
     C --&gt; H[&quot;문제 시 호환 앱으로 롤백&quot;]
     D --&gt; H</pre>
-<p>예를 들어 <code>full_name</code>을 <code>given_name</code>·<code>family_name</code>으로 나눈다고 하자. 첫 배포에서 새 컬럼을 추가하고 예전 앱도 새 스키마에서 계속 동작하게 한다. 다음 버전은 필요 기간 동안 새 값을 기록하면서 읽기 전환·데이터 backfill을 검증한다. 모든 앱과 배치가 옛 컬럼을 더 이상 쓰지 않는 걸 확인한 뒤, 나중 배포에서 컬럼을 제거한다. 중간 버전에서 오류가 나도 이전 앱이 스키마를 읽을 수 있으므로 복귀 경로가 남는다.</p>
+<p>예를 들어 <code>full_name</code>을 <code>given_name</code>·<code>family_name</code>으로 나눈다고 하자. 첫 배포에서 새 컬럼을 추가하고 예전 앱도 새 스키마에서 계속 동작하게 한다. 다음 버전은 필요 기간 동안 새 값을 기록하면서 읽기 전환·데이터 backfill을 검증한다.</p>
+<p>모든 앱과 배치가 옛 컬럼을 더 이상 쓰지 않는 걸 확인한 뒤, 나중 배포에서 컬럼을 제거한다. 중간 버전에서 오류가 나도 이전 앱이 스키마를 읽을 수 있으므로 복귀 경로가 남는다.</p>
 <p>컬럼 삭제와 이름 변경을 앱 릴리스와 한 번에 묶으면 “앱 롤백은 성공했는데 DB 때문에 구버전이 시작되지 않음”이 발생할 수 있다. 대용량 테이블의 backfill은 트랜잭션 잠금·부하·재시작 가능성을 따져 작은 배치로 처리한다. 마이그레이션 스크립트가 한 번 실행되면 되돌리는 SQL이 존재해도 데이터를 원래대로 복원한다는 보장은 없다. 자동화 파이프라인 안에 마이그레이션을 넣는 절차는 <a class="docref" href="D08-cicd-collaboration.html">D08</a>에서 다룬다.</p>
 <h2 id="4-직접-해보기"><a class="anchor" href="#4-직접-해보기" aria-hidden="true">#</a>4. 직접 해보기</h2>
 <p>클라우드 계정 없이 로컬에서 “외부 설정 → 산출물 실행 → 헬스 확인 → 종료”를 관찰한다. 기준은 Java 25, Spring Boot 4.1.x, Gradle 프로젝트다. 아래 실습은 문서 작성 중 미실행이며, 이미 생성된 Boot 앱을 전제로 한다. 이미지·probe 매니페스트는 <a class="docref" href="S19-packaging-deploy.html">S19</a> 참조.</p>
@@ -347,7 +349,8 @@ ls -l build/libs</code></pre>
 </ol>
 <pre><code class="language-bash">curl -i http://localhost:8080/actuator/health</code></pre>
 <p>응답이 <code>UP</code>이면 앱이 보고하는 상태가 정상인 것이다. 이것만으로 인증·주문·DB 쓰기 등 모든 기능이 정상임을 증명하지는 않는다. 이어서 실행 중인 터미널에서 <code>Ctrl-C</code>로 정상 종료를 요청하고, 진행 중 요청이 어떻게 마무리되는지 관찰한다. IDE의 정지 버튼은 <code>SIGTERM</code>을 보내지 않을 수 있으므로 graceful shutdown 관찰에는 터미널에서의 종료 신호를 사용한다.</p>
-<p>환경별로는 같은 JAR를 다시 빌드하지 말고 <code>SPRING_PROFILES_ACTIVE=stg</code>처럼 프로파일과 외부 설정을 바꿔 실행해 본다. DB 주소나 키를 <code>application-prod.yaml</code>에 평문으로 커밋하지 않는다. 배포 방식 실습을 확장하려면 이 앱을 서비스 매니저 단위로 등록하거나 컨테이너 런타임·PaaS에 올릴 수 있지만, 이는 선택 과제이며 실제 계정·리소스 비용이 발생할 수 있다. 서비스 단위·이미지 빌드·클러스터 배포 설정은 각각 운영체제 및 플랫폼 문서를 확인한다.</p>
+<p>환경별로는 같은 JAR를 다시 빌드하지 말고 <code>SPRING_PROFILES_ACTIVE=stg</code>처럼 프로파일과 외부 설정을 바꿔 실행해 본다. DB 주소나 키를 <code>application-prod.yaml</code>에 평문으로 커밋하지 않는다.</p>
+<p>배포 방식 실습을 확장하려면 이 앱을 서비스 매니저 단위로 등록하거나 컨테이너 런타임·PaaS에 올릴 수 있지만, 이는 선택 과제이며 실제 계정·리소스 비용이 발생할 수 있다. 서비스 단위·이미지 빌드·클러스터 배포 설정은 각각 운영체제 및 플랫폼 문서를 확인한다.</p>
 <h2 id="5-자주-하는-오해와-실수"><a class="anchor" href="#5-자주-하는-오해와-실수" aria-hidden="true">#</a>5. 자주 하는 오해와 실수</h2>
 <ol>
 <li><strong>“배포했으니 고객도 새 기능을 본다” →</strong> 서버 반영과 공개는 다를 수 있다. 기능 플래그·라우팅·권한에 따라 코드는 실행 중이어도 사용자에게 감춰져 있다. 배포 완료와 기능 공개 이벤트를 별도로 기록한다.</li>

@@ -43,7 +43,11 @@
 | 성공 | `201`, `Location: /api/posts/{newId}`, 1-2의 생성 응답 DTO. 원본 ID와 새 ID는 달라야 한다. |
 | 실패 | 제목 누락/공백·`copyTags` 형식 오류 `400`; 토큰 없음 `401`; 공지처럼 새 작성자에게 쓰기 권한이 없는 게시판 `403`; 원본이 없거나 비공개·미발행·삭제됨 `404`. |
 
-Controller는 `@PathVariable Long sourceId`, `@RequestParam(defaultValue="false") boolean copyTags`, `@Valid @RequestBody CopyPostRequest`를 받는다. `CopyPostRequest`에는 제목만 둔다. Service는 원본을 읽어 `status=PUBLISHED`, `visibility=PUBLIC`, `deletedAt=null`을 확인하고 **1-6의 게시판 쓰기 권한**도 다시 적용한 뒤 새 `Post`를 만든다. 원본을 그대로 `save()`하면 ID와 작성자까지 재사용되므로 **새 엔티티**에 복사할 필드만 채운다. `@Transactional` 안에서 새 글과 태그 연결을 저장한다. 생성 응답 DTO의 author는 원본 작성자가 아닌 토큰 회원이다.
+Controller는 `@PathVariable Long sourceId`, `@RequestParam(defaultValue="false") boolean copyTags`, `@Valid @RequestBody CopyPostRequest`를 받는다. `CopyPostRequest`에는 제목만 둔다.
+
+Service는 원본을 읽어 `status=PUBLISHED`, `visibility=PUBLIC`, `deletedAt=null`을 확인하고 **1-6의 게시판 쓰기 권한**도 다시 적용한 뒤 새 `Post`를 만든다. 원본을 그대로 `save()`하면 ID와 작성자까지 재사용되므로 **새 엔티티**에 복사할 필드만 채운다.
+
+`@Transactional` 안에서 새 글과 태그 연결을 저장한다. 생성 응답 DTO의 author는 원본 작성자가 아닌 토큰 회원이다.
 
 2-3에서 팔로워·차단에 따른 조회 권한을 배운다. 이 단계에서는 **누구나 볼 수 있는 PUBLIC 원본만** 복사 가능하게 하여 조건을 단순하게 시작한다. 이후 더 넓은 복사 권한을 만들 때 2-3의 접근 규칙을 재사용한다.
 
@@ -130,7 +134,9 @@ SQL 로그에서 새 `post` 한 행과 `copyTags=true`일 때의 `post_tag` 연�
 
 아래 **MyBatis 대체 구현 코드**의 16개 파일을 이 단계 전체 소스에 적용한다. 1-6의 토큰 조회·일반 글 생성 Mapper 경로도 함께 포함한다. Controller는 `sourceId`(경로), `copyTags`(쿼리), `CopyPostRequest.title`(본문), 작성자 ID(토큰)를 각각 서비스로 넘긴다.
 
-`findCopySourceById`는 `post`와 `board`를 JOIN해 공개 상태·삭제 여부·본문·게시판 쓰기 역할을 `CopySourceRow`로 읽는다. 없거나 `PUBLISHED`/`PUBLIC`이 아니거나 삭제된 원본은 `404`, 작성자의 게시판 쓰기 권한이 없으면 `403`이다. 새 `PostInsert`에는 원본의 `boardId`·`content`, 요청의 새 제목, 토큰 회원 ID, 새 시각을 담는다. `insertPost`의 `useGeneratedKeys`가 돌려준 **새 ID**로만 연결 행을 만든다. 원본 행은 UPDATE하지 않는다.
+`findCopySourceById`는 `post`와 `board`를 JOIN해 공개 상태·삭제 여부·본문·게시판 쓰기 역할을 `CopySourceRow`로 읽는다. 없거나 `PUBLISHED`/`PUBLIC`이 아니거나 삭제된 원본은 `404`, 작성자의 게시판 쓰기 권한이 없으면 `403`이다.
+
+새 `PostInsert`에는 원본의 `boardId`·`content`, 요청의 새 제목, 토큰 회원 ID, 새 시각을 담는다. `insertPost`의 `useGeneratedKeys`가 돌려준 **새 ID**로만 연결 행을 만든다. 원본 행은 UPDATE하지 않는다.
 
 `copyTags=true`일 때만 `findTagsByPostId`로 원본의 태그 ID·DB 저장 이름을 읽고 새 글의 `post_tag`에 연결한다. `false`면 태그 조회·연결을 건너뛴다. 서비스 `@Transactional` 안에서 새 글과 연결을 함께 저장하므로 중간 SQL 실패 시 둘 다 되돌아간다. JPA와 MyBatis 각각 C1~C7, D1에서 새 글 두 행의 작성자·본문·태그 수와 원본 불변을 대조한다.
 

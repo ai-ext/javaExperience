@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>1-8. 기존 글 복사 생성 — 경로·쿼리·본문을 함께</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
@@ -52,7 +52,9 @@
 <td>제목 누락/공백·<code>copyTags</code> 형식 오류 <code>400</code>; 토큰 없음 <code>401</code>; 공지처럼 새 작성자에게 쓰기 권한이 없는 게시판 <code>403</code>; 원본이 없거나 비공개·미발행·삭제됨 <code>404</code>.</td>
 </tr>
 </tbody></table></div>
-<p>Controller는 <code>@PathVariable Long sourceId</code>, <code>@RequestParam(defaultValue=&quot;false&quot;) boolean copyTags</code>, <code>@Valid @RequestBody CopyPostRequest</code>를 받는다. <code>CopyPostRequest</code>에는 제목만 둔다. Service는 원본을 읽어 <code>status=PUBLISHED</code>, <code>visibility=PUBLIC</code>, <code>deletedAt=null</code>을 확인하고 <strong>1-6의 게시판 쓰기 권한</strong>도 다시 적용한 뒤 새 <code>Post</code>를 만든다. 원본을 그대로 <code>save()</code>하면 ID와 작성자까지 재사용되므로 <strong>새 엔티티</strong>에 복사할 필드만 채운다. <code>@Transactional</code> 안에서 새 글과 태그 연결을 저장한다. 생성 응답 DTO의 author는 원본 작성자가 아닌 토큰 회원이다.</p>
+<p>Controller는 <code>@PathVariable Long sourceId</code>, <code>@RequestParam(defaultValue=&quot;false&quot;) boolean copyTags</code>, <code>@Valid @RequestBody CopyPostRequest</code>를 받는다. <code>CopyPostRequest</code>에는 제목만 둔다.</p>
+<p>Service는 원본을 읽어 <code>status=PUBLISHED</code>, <code>visibility=PUBLIC</code>, <code>deletedAt=null</code>을 확인하고 <strong>1-6의 게시판 쓰기 권한</strong>도 다시 적용한 뒤 새 <code>Post</code>를 만든다. 원본을 그대로 <code>save()</code>하면 ID와 작성자까지 재사용되므로 <strong>새 엔티티</strong>에 복사할 필드만 채운다.</p>
+<p><code>@Transactional</code> 안에서 새 글과 태그 연결을 저장한다. 생성 응답 DTO의 author는 원본 작성자가 아닌 토큰 회원이다.</p>
 <p>2-3에서 팔로워·차단에 따른 조회 권한을 배운다. 이 단계에서는 <strong>누구나 볼 수 있는 PUBLIC 원본만</strong> 복사 가능하게 하여 조건을 단순하게 시작한다. 이후 더 넓은 복사 권한을 만들 때 2-3의 접근 규칙을 재사용한다.</p>
 <h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
 <p>원본을 읽어 새 글을 만드는 순서로 작업한다. 처음에는 <code>copyTags=false</code>로 글 한 행을 만들고, 그다음 태그 연결을 같은 트랜잭션에 붙인다.</p>
@@ -114,7 +116,8 @@ Post saved = postRepository.save(copied);</code></pre>
 <summary>MyBatis — 공개 원본을 읽고 새 글·태그 연결을 저장하기</summary>
 
 <p>아래 <strong>MyBatis 대체 구현 코드</strong>의 16개 파일을 이 단계 전체 소스에 적용한다. 1-6의 토큰 조회·일반 글 생성 Mapper 경로도 함께 포함한다. Controller는 <code>sourceId</code>(경로), <code>copyTags</code>(쿼리), <code>CopyPostRequest.title</code>(본문), 작성자 ID(토큰)를 각각 서비스로 넘긴다.</p>
-<p><code>findCopySourceById</code>는 <code>post</code>와 <code>board</code>를 JOIN해 공개 상태·삭제 여부·본문·게시판 쓰기 역할을 <code>CopySourceRow</code>로 읽는다. 없거나 <code>PUBLISHED</code>/<code>PUBLIC</code>이 아니거나 삭제된 원본은 <code>404</code>, 작성자의 게시판 쓰기 권한이 없으면 <code>403</code>이다. 새 <code>PostInsert</code>에는 원본의 <code>boardId</code>·<code>content</code>, 요청의 새 제목, 토큰 회원 ID, 새 시각을 담는다. <code>insertPost</code>의 <code>useGeneratedKeys</code>가 돌려준 <strong>새 ID</strong>로만 연결 행을 만든다. 원본 행은 UPDATE하지 않는다.</p>
+<p><code>findCopySourceById</code>는 <code>post</code>와 <code>board</code>를 JOIN해 공개 상태·삭제 여부·본문·게시판 쓰기 역할을 <code>CopySourceRow</code>로 읽는다. 없거나 <code>PUBLISHED</code>/<code>PUBLIC</code>이 아니거나 삭제된 원본은 <code>404</code>, 작성자의 게시판 쓰기 권한이 없으면 <code>403</code>이다.</p>
+<p>새 <code>PostInsert</code>에는 원본의 <code>boardId</code>·<code>content</code>, 요청의 새 제목, 토큰 회원 ID, 새 시각을 담는다. <code>insertPost</code>의 <code>useGeneratedKeys</code>가 돌려준 <strong>새 ID</strong>로만 연결 행을 만든다. 원본 행은 UPDATE하지 않는다.</p>
 <p><code>copyTags=true</code>일 때만 <code>findTagsByPostId</code>로 원본의 태그 ID·DB 저장 이름을 읽고 새 글의 <code>post_tag</code>에 연결한다. <code>false</code>면 태그 조회·연결을 건너뛴다. 서비스 <code>@Transactional</code> 안에서 새 글과 연결을 함께 저장하므로 중간 SQL 실패 시 둘 다 되돌아간다. JPA와 MyBatis 각각 C1~C7, D1에서 새 글 두 행의 작성자·본문·태그 수와 원본 불변을 대조한다.</p>
 </details>
 

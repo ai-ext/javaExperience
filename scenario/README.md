@@ -257,7 +257,9 @@ PUT 전체 교체와 PATCH 부분 수정 뒤 본인 글을 지운다. 지운 글
 
 ## 쿼리 설계 18개 연습
 
-기존 게시판 기능으로 만든 데이터를 같은 ID로 계속 조회하고 검색한다. [L12: 파생 쿼리·MyBatis 8개](labs/l12-query-methods/README.md) → [L13: `@Query`·동적 SQL 6개](labs/l13-declared-queries/README.md) → [L14: QueryDSL 4개](labs/l14-querydsl-extension/README.md) 순서다. 각 Q 시나리오에 Controller·Service·DTO·Repository·Mapper 코드 접기가 있다. 이 연습용 완성 프로젝트는 `python3 tools/materialize-query-practice.py --output /tmp/query-practice`로 별도 폴더에 복원할 수 있다.
+기존 게시판 기능으로 만든 데이터를 같은 ID로 계속 조회하고 검색한다. [L12: 파생 쿼리·MyBatis 8개](labs/l12-query-methods/README.md) → [L13: `@Query`·동적 SQL 6개](labs/l13-declared-queries/README.md) → [L14: QueryDSL 4개](labs/l14-querydsl-extension/README.md) 순서다.
+
+각 Q 시나리오에 Controller·Service·DTO·Repository·Mapper 코드 접기가 있다. 이 연습용 완성 프로젝트는 `python3 tools/materialize-query-practice.py --output /tmp/query-practice`로 별도 폴더에 복원할 수 있다.
 
 
 

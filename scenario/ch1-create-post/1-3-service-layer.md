@@ -582,7 +582,9 @@ SELECT id, name FROM tag WHERE name = '[채점]롤백태그';"
 | `@Transactional` 있음(정답) | `500` | 없음(0행) — 글 저장이 실패하자 태그 `INSERT`도 되돌려졌다 |
 | `@Transactional` 지움 | `500` | **1행 남음** — 글은 없는데 태그만 생겼다 |
 
-트랜잭션이 없으면 저장소 메서드 하나하나가 따로 `COMMIT`된다. 태그 `INSERT`는 이미 확정된 뒤에 글 `INSERT`가 실패한 것이다. 고치는 법 — 서비스 메서드에 `@Transactional`을 되돌린다. 남은 태그는 `docker compose down -v && docker compose up -d`(javaExperience 레포 루트)으로 지운다. → [G3 첫 트랜잭션](../../lessons/G3-first-transaction.md)
+트랜잭션이 없으면 저장소 메서드 하나하나가 따로 `COMMIT`된다. 태그 `INSERT`는 이미 확정된 뒤에 글 `INSERT`가 실패한 것이다.
+
+고치는 법 — 서비스 메서드에 `@Transactional`을 되돌린다. 남은 태그는 `docker compose down -v && docker compose up -d`(javaExperience 레포 루트)으로 지운다. → [G3 첫 트랜잭션](../../lessons/G3-first-transaction.md)
 
 ## 구현 가이드
 
@@ -634,7 +636,9 @@ SELECT id, name FROM tag WHERE name = '[채점]롤백태그';"
 
 아래 **MyBatis 대체 구현 코드**의 9개 파일을 이 단계 전체 소스에 적용한다. Controller는 HTTP와 `Location`만 맡고 `PostService.create`가 `@Transactional` 안에서 `findBoardBySlug`, 태그 조회·삽입, 글 삽입, `post_tag` 연결을 순서대로 실행한다. `PostCreationMapper.java`의 메서드와 `PostCreationMapper.xml`의 같은 `id`를 짝지어 본다.
 
-`spring`처럼 요청에 두 번 나온 이름은 먼저 제거한다. DB가 대소문자 차이를 같은 태그로 볼 수도 있으므로 `findTagByName`이 돌려준 **태그 ID**로도 중복을 제거한다. 응답에는 요청 철자 대신 DB에 저장된 `TagWriteRow.name`을 넣는다. `useGeneratedKeys`가 채운 글 ID로 `post_tag`를 INSERT한다. 이 단계의 글 INSERT는 여전히 일부 컬럼만 적고 `status`·카운트는 DB 기본값에 맡긴다.
+`spring`처럼 요청에 두 번 나온 이름은 먼저 제거한다. DB가 대소문자 차이를 같은 태그로 볼 수도 있으므로 `findTagByName`이 돌려준 **태그 ID**로도 중복을 제거한다.
+
+응답에는 요청 철자 대신 DB에 저장된 `TagWriteRow.name`을 넣는다. `useGeneratedKeys`가 채운 글 ID로 `post_tag`를 INSERT한다. 이 단계의 글 INSERT는 여전히 일부 컬럼만 적고 `status`·카운트는 DB 기본값에 맡긴다.
 
 O2의 201자 제목에서는 태그 INSERT 뒤 글 INSERT가 실패한다. 서비스의 `@Transactional` 때문에 먼저 넣은 `[채점]롤백태그`도 되돌려져 D3가 0이어야 한다. JPA 경로와 MyBatis 경로에 같은 O2·D3를 실행해 본다.
 

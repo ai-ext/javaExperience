@@ -104,7 +104,9 @@
 <details>
 <summary>Controller — HTTP 연결</summary>
 
-`CommentController.java`. 매핑과 메서드의 입력·응답을 위 **만들 것**의 HTTP 계약과 대조한다. 이번 단계 매핑: `@PostMapping("/api/v1/posts/{postId}/comments")`, `@GetMapping("/api/v1/posts/{postId}/comments")`, `@DeleteMapping("/api/v1/comments/{commentId}")`. 변경된 메서드: `create`, `list`, `delete`.
+`CommentController.java`. 매핑과 메서드의 입력·응답을 위 **만들 것**의 HTTP 계약과 대조한다.
+
+이번 단계 매핑: `@PostMapping("/api/v1/posts/{postId}/comments")`, `@GetMapping("/api/v1/posts/{postId}/comments")`, `@DeleteMapping("/api/v1/comments/{commentId}")`. 변경된 메서드: `create`, `list`, `delete`.
 
 ```java
 @PostMapping("/api/v1/posts/{postId}/comments")

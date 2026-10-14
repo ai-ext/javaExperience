@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>W07. 왜 System.out.println 대신 로거(SLF4J)를 쓰나</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -37,7 +37,8 @@
 <p>로거 호출은 이벤트를 만들고, 구현체가 logger 이름과 레벨로 필터링한 뒤 appender로 출력한다. 콘솔·파일·원격 전송을 설정하고 코드와 운영 설정을 나누면 배포 설정으로 특정 패키지 DEBUG를 켜고 끌 수 있다. 활성 로그도 포맷·직렬화·I/O 비용이 있으며 동기 appender는 느린 목적지를 기다릴 수 있다.</p>
 <h3 id="파사드와-구현체가-분리되는-이유"><a class="anchor" href="#파사드와-구현체가-분리되는-이유" aria-hidden="true">#</a>파사드와 구현체가 분리되는 이유</h3>
 <p>SLF4J API는 <code>Logger</code>와 <code>LoggerFactory</code>를 제공하고, 실제 구현체가 이벤트 처리와 출력을 맡는다. 라이브러리 작성자가 특정 구현체에 직접 묶이지 않도록 한 경계다. Logback은 SLF4J를 네이티브 지원하며, 그 내부에는 Logger, Appender, Layout이 있다. Logger는 이름 계층과 레벨, Appender는 어디로 보낼지, Layout은 어떻게 표현할지를 맡는다.</p>
-<p>Spring Boot는 자체 내부 로깅에 Commons Logging을 쓰면서 구현체 선택은 열어 둔다. starter를 사용하면 기본적으로 Logback이 선택되고, JUL·Commons Logging·Log4j·SLF4J를 사용하는 의존 라이브러리의 로깅도 적절한 경로로 연결된다. 따라서 Boot 앱에서 보통 필요한 의존성은 starter가 고른 기본값이며, 프로젝트 코드에서는 SLF4J API만 사용한다. SLF4J API jar만 있고 provider가 없거나 1.x용 binding과 2.x API가 뒤섞이면 정상 출력 대신 NOP 경고가 날 수 있다.</p>
+<p>Spring Boot는 자체 내부 로깅에 Commons Logging을 쓰면서 구현체 선택은 열어 둔다. starter를 사용하면 기본적으로 Logback이 선택되고, JUL·Commons Logging·Log4j·SLF4J를 사용하는 의존 라이브러리의 로깅도 적절한 경로로 연결된다.</p>
+<p>따라서 Boot 앱에서 보통 필요한 의존성은 starter가 고른 기본값이며, 프로젝트 코드에서는 SLF4J API만 사용한다. SLF4J API jar만 있고 provider가 없거나 1.x용 binding과 2.x API가 뒤섞이면 정상 출력 대신 NOP 경고가 날 수 있다.</p>
 <h3 id="로그-레벨은-운영-시점의-선택-스위치다"><a class="anchor" href="#로그-레벨은-운영-시점의-선택-스위치다" aria-hidden="true">#</a>로그 레벨은 운영 시점의 선택 스위치다</h3>
 <p>각 logger에는 유효 레벨이 있다. 임계값이 INFO라면 ERROR·WARN·INFO 이벤트는 통과하고 DEBUG·TRACE는 걸러진다. 패키지별 레벨을 상속시키는 이름 계층 덕분에 애플리케이션 전체는 INFO로 둔 채 한 모듈만 DEBUG로 관찰할 수 있다. println 문자열에는 이 정책이 없으므로 배포 후 코드를 바꾸지 않고 일부 내용을 켜거나 끌 수 없다.</p>
 <p>레벨 기준은 팀이 합의한다. ERROR는 조치가 필요한 최종 실패, WARN은 재시도·대체 경로 등 확인할 이상 상태, INFO는 주요 시작·종료·상태 전환, DEBUG는 진단 정보, TRACE는 세밀한 단계 정보다. 모든 요청 본문을 INFO로 남기면 비용과 개인정보 위험이 커진다.</p>
@@ -52,13 +53,17 @@
   F --&gt; G
   G --&gt; H[&quot;수집기·중앙 저장소&quot;]
   H --&gt; I[&quot;검색·대시보드·알림&quot;]</pre>
-<p>Spring Boot의 기본 로그 형식 예에는 시각, 레벨, 프로세스 ID, 애플리케이션 이름(설정했을 때), 스레드, logger 이름이 포함된다. 파일 출력도 설정할 수 있지만, 애플리케이션이 로그를 중앙에서 검색 가능하게 만드는 일까지 자동 수행하지는 않는다. 운영 환경에서 표준 출력은 런타임이 수집할 수 있게 하고, 에이전트나 플랫폼이 이를 수집·보관·인덱싱해야 검색과 알림이 된다. 애플리케이션, 컨테이너, 수집기 중 어디서 중복 수집·회전을 담당하는지 정하지 않으면 로그가 중복되거나 사라진다.</p>
+<p>Spring Boot의 기본 로그 형식 예에는 시각, 레벨, 프로세스 ID, 애플리케이션 이름(설정했을 때), 스레드, logger 이름이 포함된다. 파일 출력도 설정할 수 있지만, 애플리케이션이 로그를 중앙에서 검색 가능하게 만드는 일까지 자동 수행하지는 않는다.</p>
+<p>운영 환경에서 표준 출력은 런타임이 수집할 수 있게 하고, 에이전트나 플랫폼이 이를 수집·보관·인덱싱해야 검색과 알림이 된다. 애플리케이션, 컨테이너, 수집기 중 어디서 중복 수집·회전을 담당하는지 정하지 않으면 로그가 중복되거나 사라진다.</p>
 <h3 id="자리표시자와-예외는-이벤트의-비용정보를-바꾼다"><a class="anchor" href="#자리표시자와-예외는-이벤트의-비용정보를-바꾼다" aria-hidden="true">#</a>자리표시자와 예외는 이벤트의 비용·정보를 바꾼다</h3>
-<p><code>logger.debug(&quot;order=&quot; + order)</code>는 DEBUG가 꺼져도 연결 연산과 <code>toString()</code>이 먼저 일어난다. <code>logger.debug(&quot;order={}&quot;, order)</code>는 레벨이 비활성일 때 메시지 조립을 피할 수 있다. 다만 <code>logger.debug(&quot;order={}&quot;, expensiveSnapshot(order))</code>의 메서드 호출은 여전히 먼저 실행된다. 비싼 진단 값을 만드는 코드는 레벨을 확인하거나 SLF4J 2의 지연 argument 기능을 고려하되, 로그 때문에 더 복잡한 본 경로를 만들지 않는다.</p>
+<p><code>logger.debug(&quot;order=&quot; + order)</code>는 DEBUG가 꺼져도 연결 연산과 <code>toString()</code>이 먼저 일어난다. <code>logger.debug(&quot;order={}&quot;, order)</code>는 레벨이 비활성일 때 메시지 조립을 피할 수 있다.</p>
+<p>다만 <code>logger.debug(&quot;order={}&quot;, expensiveSnapshot(order))</code>의 메서드 호출은 여전히 먼저 실행된다. 비싼 진단 값을 만드는 코드는 레벨을 확인하거나 SLF4J 2의 지연 argument 기능을 고려하되, 로그 때문에 더 복잡한 본 경로를 만들지 않는다.</p>
 <p>예외 객체를 <code>logger.error(&quot;결제 승인 실패 orderId={}&quot;, orderId, ex)</code>처럼 전달해야 구현체가 타입·메시지·원인 체인의 스택 추적을 출력할 수 있다. <code>ex.getMessage()</code> 문자열만 남기면 호출 경로가 사라진다. 같은 예외를 컨트롤러·서비스·리포지토리마다 각각 ERROR로 남기면 한 실패가 여러 번 기록되어 알림과 검색이 오염된다. 예외를 처리해 의미를 더하는 경계 한 곳에서 기록하는 편이 낫다.</p>
 <h3 id="mdc와-json은-검색-문맥을-만든다"><a class="anchor" href="#mdc와-json은-검색-문맥을-만든다" aria-hidden="true">#</a>MDC와 JSON은 검색 문맥을 만든다</h3>
-<p>MDC(Mapped Diagnostic Context)는 현재 실행 흐름의 문맥 키·값을 logger가 이벤트에 붙이도록 하는 SLF4J API다. 웹 요청 입구에서 requestId를 넣으면 그 요청에서 나온 여러 줄을 같은 키로 찾을 수 있다. Logback의 MDC는 스레드별 문맥이므로 요청이 끝날 때 <code>remove</code>하지 않으면 재사용 스레드에서 다음 요청 로그에 값이 새어 나갈 수 있다. 비동기 실행·스레드 풀·리액티브 전환은 자동으로 전달된다고 가정하지 말고 복사/복원하거나 프레임워크의 관측성 문맥 전파 기능을 사용한다.</p>
-<p>구조화 로그는 <code>&quot;level&quot;:&quot;WARN&quot;</code>, <code>&quot;orderId&quot;:&quot;A-1042&quot;</code>, <code>&quot;requestId&quot;:&quot;...&quot;</code> 같은 필드를 가진 JSON 이벤트다. 자유 문장만 남기는 것보다 수집기가 필드별 검색과 집계를 하기 쉽다. Spring Boot는 콘솔·파일의 구조화 출력 형식을 설정할 수 있다. 단, 값이 JSON으로 잘 escape된다고 로그 내용이 안전해지는 것은 아니다. 비밀번호, 인증 토큰, 세션 ID, 카드 보안정보, 필요 이상의 개인정보는 처음부터 넣지 않는다. CWE-532는 로그 파일에 민감정보를 삽입하는 문제를 별도 취약점으로 분류한다.</p>
+<p>MDC(Mapped Diagnostic Context)는 현재 실행 흐름의 문맥 키·값을 logger가 이벤트에 붙이도록 하는 SLF4J API다. 웹 요청 입구에서 requestId를 넣으면 그 요청에서 나온 여러 줄을 같은 키로 찾을 수 있다.</p>
+<p>Logback의 MDC는 스레드별 문맥이므로 요청이 끝날 때 <code>remove</code>하지 않으면 재사용 스레드에서 다음 요청 로그에 값이 새어 나갈 수 있다. 비동기 실행·스레드 풀·리액티브 전환은 자동으로 전달된다고 가정하지 말고 복사/복원하거나 프레임워크의 관측성 문맥 전파 기능을 사용한다.</p>
+<p>구조화 로그는 <code>&quot;level&quot;:&quot;WARN&quot;</code>, <code>&quot;orderId&quot;:&quot;A-1042&quot;</code>, <code>&quot;requestId&quot;:&quot;...&quot;</code> 같은 필드를 가진 JSON 이벤트다. 자유 문장만 남기는 것보다 수집기가 필드별 검색과 집계를 하기 쉽다. Spring Boot는 콘솔·파일의 구조화 출력 형식을 설정할 수 있다.</p>
+<p>단, 값이 JSON으로 잘 escape된다고 로그 내용이 안전해지는 것은 아니다. 비밀번호, 인증 토큰, 세션 ID, 카드 보안정보, 필요 이상의 개인정보는 처음부터 넣지 않는다. CWE-532는 로그 파일에 민감정보를 삽입하는 문제를 별도 취약점으로 분류한다.</p>
 <h2 id="4-선택지-비교"><a class="anchor" href="#4-선택지-비교" aria-hidden="true">#</a>4. 선택지 비교</h2>
 <div class="table-wrap"><table>
 <thead>

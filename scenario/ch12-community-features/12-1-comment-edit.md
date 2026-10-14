@@ -965,8 +965,9 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 <details>
 <summary>힌트 1 — 엔티티 메서드</summary>
 
-`Comment`에 `editedAt` 필드와 `edit(String newContent, LocalDateTime now)`를 둔다. 내용이 같으면 아무것도 하지 않고, 다르면 `content`·`editedAt`·`updatedAt`을 바꾼다. 서비스는 `findById` → 지웠으면 404 → `PostAccessPolicy.canView(나, 댓글의 글)`이 아니면 404 → 작성자가 아니면 403 → `edit(...)`. 저장 호출은 필요 없다(변경 감지).
-</details>
+`Comment`에 `editedAt` 필드와 `edit(String newContent, LocalDateTime now)`를 둔다. 내용이 같으면 아무것도 하지 않고, 다르면 `content`·`editedAt`·`updatedAt`을 바꾼다.
+
+서비스는 `findById` → 지웠으면 404 → `PostAccessPolicy.canView(나, 댓글의 글)`이 아니면 404 → 작성자가 아니면 403 → `edit(...)`. 저장 호출은 필요 없다(변경 감지). </details>
 
 <details>
 <summary>힌트 2 — LazyInitializationException</summary>

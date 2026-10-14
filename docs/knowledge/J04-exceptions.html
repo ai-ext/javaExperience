@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J04. 예외 처리</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -19,9 +19,11 @@
 </blockquote>
 <h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
 <p>파일을 쓰던 중 본문에서 <code>IOException</code>이 났는데 <code>finally</code>의 <code>close()</code>가 또 예외를 던지면, 잘못 작성된 정리 코드는 처음 쓰기 실패를 덮어써서 로그에 닫기 실패만 남길 수 있다. 원인을 찾는 데 필요한 가장 중요한 정보가 사라진다. <code>try-with-resources</code>는 본문 실패를 주 예외로 유지하고 닫기 실패를 suppressed 목록에 붙인다.</p>
-<p>또 다른 사고는 계층 사이에서 예외를 바꾸며 원인을 버리는 것이다. 저장소 계층의 <code>SQLException</code>을 서비스 예외로 바꿀 때 <code>new ServiceException(e.getMessage())</code>만 던지면 DB 드라이버와 호출 경로가 담긴 원인 체인이 사라진다. 반대로 모든 예외를 <code>catch (Exception)</code>으로 잡아 <code>null</code>을 반환하면 호출자는 실패와 정상적인 “값 없음”을 구분하지 못한다. 예외 타입과 체인은 로그 장식이 아니라 복구·관측·API 경계의 계약이다.</p>
+<p>또 다른 사고는 계층 사이에서 예외를 바꾸며 원인을 버리는 것이다. 저장소 계층의 <code>SQLException</code>을 서비스 예외로 바꿀 때 <code>new ServiceException(e.getMessage())</code>만 던지면 DB 드라이버와 호출 경로가 담긴 원인 체인이 사라진다.</p>
+<p>반대로 모든 예외를 <code>catch (Exception)</code>으로 잡아 <code>null</code>을 반환하면 호출자는 실패와 정상적인 “값 없음”을 구분하지 못한다. 예외 타입과 체인은 로그 장식이 아니라 복구·관측·API 경계의 계약이다.</p>
 <h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
-<p>모든 던질 수 있는 객체는 <code>Throwable</code> 하위 타입이다. 표준 계층은 <code>Object → Throwable → Error / Exception</code>이고, <code>RuntimeException</code>은 <code>Exception</code>의 하위 타입이다. JVM도 배열 범위 오류 같은 런타임 실패를 <code>Throwable</code> 하위 객체로 표현한다. JLS는 예외를 발생 지점에서 프로그램이 지정한 포착 지점으로 제어를 옮기는 비지역 제어 이동으로 정의한다.[JLS 11.1, 11.3]</p>
+<p>모든 던질 수 있는 객체는 <code>Throwable</code> 하위 타입이다. 표준 계층은 <code>Object → Throwable → Error / Exception</code>이고, <code>RuntimeException</code>은 <code>Exception</code>의 하위 타입이다.</p>
+<p>JVM도 배열 범위 오류 같은 런타임 실패를 <code>Throwable</code> 하위 객체로 표현한다. JLS는 예외를 발생 지점에서 프로그램이 지정한 포착 지점으로 제어를 옮기는 비지역 제어 이동으로 정의한다.[JLS 11.1, 11.3]</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -66,7 +68,8 @@
 <td>실패가 만들어진 경로를 보여 주며 예외 객체 생성 비용의 일부가 된다.</td>
 </tr>
 </tbody></table></div>
-<p>컴파일러는 타입 계층과 메서드 선언을 바탕으로 표현식·문장이 던질 수 있는 checked 타입을 분석한다. <code>Throwable</code> 자체와 <code>IOException</code>은 checked지만 <code>RuntimeException</code>, <code>NullPointerException</code>, <code>Error</code>는 unchecked다. 호출자는 checked 예외를 처리하거나 자신도 <code>throws</code>로 노출해야 한다. 이는 누락을 줄이는 대신 예외를 API 시그니처에 전파한다.[JLS 11.2; <code>Throwable</code> API]</p>
+<p>컴파일러는 타입 계층과 메서드 선언을 바탕으로 표현식·문장이 던질 수 있는 checked 타입을 분석한다. <code>Throwable</code> 자체와 <code>IOException</code>은 checked지만 <code>RuntimeException</code>, <code>NullPointerException</code>, <code>Error</code>는 unchecked다.</p>
+<p>호출자는 checked 예외를 처리하거나 자신도 <code>throws</code>로 노출해야 한다. 이는 누락을 줄이는 대신 예외를 API 시그니처에 전파한다.[JLS 11.2; <code>Throwable</code> API]</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -311,7 +314,8 @@ IOException: read failed</code></pre>
 <p>호출자가 상황을 이해하고 대체 입력·재시도·사용자 안내 같은 복구 결정을 할 수 있을 때 유용하다. 호출자에게 처리를 강제하는 대신 예외 선언이 API 표면에 전파된다. 따라서 “모든 실패를 checked로 만들면 안전하다”는 결론은 틀리며 복구 주체와 계층 간 계약을 함께 봐야 한다. 복구가 불가능한 내부 실패까지 checked로 강제하면 무의미한 catch가 생긴다.</p>
 <p><strong>꼬리질문:</strong> 반대로 checked 예외가 API를 바꾸기 어렵게 만드는 이유는? → 호출자가 catch 또는 선언을 해야 하므로 새 예외를 추가하면 호출 계층 코드도 함께 수정될 수 있다.</p>
 <h3 id="q3-catch-exception은-error도-잡는가-catch-throwable은"><a class="anchor" href="#q3-catch-exception은-error도-잡는가-catch-throwable은" aria-hidden="true">#</a>Q3. <code>catch (Exception)</code>은 <code>Error</code>도 잡는가? <code>catch (Throwable)</code>은?</h3>
-<p><code>Exception</code>과 <code>Error</code>는 <code>Throwable</code>의 형제 갈래이므로 <code>catch (Exception)</code>은 <code>Error</code>를 잡지 않는다. <code>catch (Throwable)</code>은 두 갈래를 모두 포착한다. <code>Error</code>는 보통 애플리케이션이 안전하게 복구할 수 없으므로, 경계에서 특별한 목적 없이 <code>Throwable</code>을 잡아 계속 실행하면 상태 악화를 숨길 수 있다. JVM 종료·프로세스 중단에 대한 안전장치로 catch 블록을 오해하지 않는다.</p>
+<p><code>Exception</code>과 <code>Error</code>는 <code>Throwable</code>의 형제 갈래이므로 <code>catch (Exception)</code>은 <code>Error</code>를 잡지 않는다. <code>catch (Throwable)</code>은 두 갈래를 모두 포착한다.</p>
+<p><code>Error</code>는 보통 애플리케이션이 안전하게 복구할 수 없으므로, 경계에서 특별한 목적 없이 <code>Throwable</code>을 잡아 계속 실행하면 상태 악화를 숨길 수 있다. JVM 종료·프로세스 중단에 대한 안전장치로 catch 블록을 오해하지 않는다.</p>
 <p><strong>꼬리질문:</strong> <code>finally</code>는 무슨 일이 있어도 실행되나? → 정상적인 제어 이탈에 대해 실행되지만 JVM 강제 종료나 프로세스 종료에서는 보장되지 않는다.</p>
 <h3 id="q4-twr에서-본문과-close가-모두-예외를-던지면-어떤-예외가-바깥으로-나가는가"><a class="anchor" href="#q4-twr에서-본문과-close가-모두-예외를-던지면-어떤-예외가-바깥으로-나가는가" aria-hidden="true">#</a>Q4. TWR에서 본문과 <code>close()</code>가 모두 예외를 던지면 어떤 예외가 바깥으로 나가는가?</h3>
 <p>본문의 예외가 주 예외로 전파된다. <code>close()</code>에서 난 예외는 주 예외의 <code>getSuppressed()</code> 목록에 추가된다. 자원이 여러 개면 선언 역순으로 닫으며 닫기 실패도 그 순서로 보존된다. 본문이 정상 종료했다면 닫기 실패가 주 예외가 된다.</p>

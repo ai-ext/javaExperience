@@ -185,7 +185,9 @@ curl -i -X PUT "$BASE/api/posts/$X" -H "$L" -H 'Content-Type: application/json' 
 }
 ```
 
-자동 확인의 U는 `visibility`를 일부러 생략해, 처음 `FOLLOWERS`였던 글이 기본값 `PUBLIC`이 되는지도 확인한다. 그래서 U 뒤 이스프링은 글을 볼 수 있지만 작성자가 아니므로 F에서 `403`을 받는다. DB에서도 `SELECT title, content, visibility FROM post WHERE id = {X}`와 `SELECT t.name FROM post_tag pt JOIN tag t ON t.id=pt.tag_id WHERE pt.post_id={X}`를 실행한다. `V` 뒤에도 새 제목과 `java` 태그가 남아야 한다. 조회에는 **실제 응답 id**를 넣는다.
+자동 확인의 U는 `visibility`를 일부러 생략해, 처음 `FOLLOWERS`였던 글이 기본값 `PUBLIC`이 되는지도 확인한다. 그래서 U 뒤 이스프링은 글을 볼 수 있지만 작성자가 아니므로 F에서 `403`을 받는다.
+
+DB에서도 `SELECT title, content, visibility FROM post WHERE id = {X}`와 `SELECT t.name FROM post_tag pt JOIN tag t ON t.id=pt.tag_id WHERE pt.post_id={X}`를 실행한다. `V` 뒤에도 새 제목과 `java` 태그가 남아야 한다. 조회에는 **실제 응답 id**를 넣는다.
 
 ## 채점 기준
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>W23. 캐시와 인메모리 — 무엇이고, 왜 빠르고, 왜 쓰나</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -97,7 +97,8 @@
     A--&gt;&gt;C: &quot;결과 반환&quot;
   end</pre>
 <p>캐시 히트(hit)는 키가 있어 원본을 다시 조회하지 않은 경우고, 미스(miss)는 값이 없어 원본을 읽은 경우다. 히트율은 <code>히트 수 ÷ 전체 조회 수</code>다. 높아도 히트 경로의 캐시·직렬화 비용이 크거나 원본이 가벼우면 이득은 작다.</p>
-<p>예를 들어 단순한 교육용 가정으로 원본 호출이 10ms, 앱 캐시 히트가 0.1ms이고 히트율이 90%라 하자. 미스가 원본 호출 시간을 전부 포함할 때 평균 지연의 근삿값은 <code>0.9 × 0.1ms + 0.1 × 10ms = 1.09ms</code>다. 같은 가정 아래 캐시가 없을 때 10ms이므로 약 9.2배 낮다. 원본 호출 수는 이상적으로 조회 100회당 약 10회로 줄어든다. 이는 설명을 위한 가정값이지 벤치마크 결과가 아니다. 실제로는 부하에 따른 DB 지연, 캐시 미스의 부가 비용, 만료와 퇴거, 동시 요청이 이득을 바꾼다.</p>
+<p>예를 들어 단순한 교육용 가정으로 원본 호출이 10ms, 앱 캐시 히트가 0.1ms이고 히트율이 90%라 하자. 미스가 원본 호출 시간을 전부 포함할 때 평균 지연의 근삿값은 <code>0.9 × 0.1ms + 0.1 × 10ms = 1.09ms</code>다. 같은 가정 아래 캐시가 없을 때 10ms이므로 약 9.2배 낮다.</p>
+<p>원본 호출 수는 이상적으로 조회 100회당 약 10회로 줄어든다. 이는 설명을 위한 가정값이지 벤치마크 결과가 아니다. 실제로는 부하에 따른 DB 지연, 캐시 미스의 부가 비용, 만료와 퇴거, 동시 요청이 이득을 바꾼다.</p>
 <p>인기 상품이나 공통 설정처럼 일부 키가 반복되면 최근성·빈도 지역성이 생긴다. 캐시는 그 구간의 원본 왕복과 계산을 줄인다. 매번 다른 키를 한 번만 읽는다면 저장·퇴거 비용이 이득보다 클 수 있다.</p>
 <h3 id="생명주기와-정합성"><a class="anchor" href="#생명주기와-정합성" aria-hidden="true">#</a>생명주기와 정합성</h3>
 <p>JVM 내부 <code>Map</code>과 Caffeine은 프로세스 힙에 있다. 두 인스턴스는 힙을 공유하지 않으며, 프로세스가 내려가면 캐시도 사라진다. 재시작 직후에는 DB 부하가 일시적으로 늘 수 있다.</p>
@@ -233,7 +234,8 @@ record Book(long id, String title) {}</code></pre>
 <pre><code class="language-text">Book[id=1, title=책 1]
 Book[id=1, title=책 1]
 원본 호출=1</code></pre>
-<p>실제 예제의 로더는 대체 가능한 데이터 소스 구현이라 DB 드라이버에 의존하지 않도록 했다. 이 패턴을 운영용 캐시로 쓰려면 <code>cache</code>에 상한과 만료가 없다는 점을 직접 해결해야 한다. 원본에서 없는 키를 <code>null</code>로 반환하면 값이 저장되지 않아 매번 로더가 실행될 수 있고, 맵에 넣은 가변 객체를 다른 코드가 수정하면 사본의 의미도 깨진다. 맵 API의 동시성 기본 보장은 구현체마다 다르며 <code>ConcurrentHashMap</code>의 <code>computeIfAbsent</code> 동작을 모든 <code>Map</code> 구현으로 일반화하면 안 된다.</p>
+<p>실제 예제의 로더는 대체 가능한 데이터 소스 구현이라 DB 드라이버에 의존하지 않도록 했다. 이 패턴을 운영용 캐시로 쓰려면 <code>cache</code>에 상한과 만료가 없다는 점을 직접 해결해야 한다.</p>
+<p>원본에서 없는 키를 <code>null</code>로 반환하면 값이 저장되지 않아 매번 로더가 실행될 수 있고, 맵에 넣은 가변 객체를 다른 코드가 수정하면 사본의 의미도 깨진다. 맵 API의 동시성 기본 보장은 구현체마다 다르며 <code>ConcurrentHashMap</code>의 <code>computeIfAbsent</code> 동작을 모든 <code>Map</code> 구현으로 일반화하면 안 된다.</p>
 <p>Caffeine을 쓰면 로컬 저장소를 유지하면서 용량과 수명을 정책으로 지정할 수 있다.</p>
 <pre><code class="language-java">import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -282,7 +284,8 @@ class BookService {
 interface BookRepository {
     Book findById(long id);
 }</code></pre>
-<p>이 코드는 저장소 빈과 <code>CacheManager</code>가 주입되는 기존 Spring 애플리케이션 예제이며 <code>(미실행)</code>이다. <code>CacheManager</code>를 Caffeine 기반으로 구성하면 프로세스 로컬 캐시가 되고, Redis 기반으로 구성하면 여러 앱 인스턴스가 공유 가능한 캐시가 된다. provider 변경 시 직렬화 형식, 키 규칙, TTL, 장애 시 동작을 정해야 한다. Spring은 <code>@Cacheable</code>로 저장하고, <code>@CacheEvict</code>로 제거하고, <code>@CachePut</code>으로 갱신하는 선언 방식을 제공한다.</p>
+<p>이 코드는 저장소 빈과 <code>CacheManager</code>가 주입되는 기존 Spring 애플리케이션 예제이며 <code>(미실행)</code>이다. <code>CacheManager</code>를 Caffeine 기반으로 구성하면 프로세스 로컬 캐시가 되고, Redis 기반으로 구성하면 여러 앱 인스턴스가 공유 가능한 캐시가 된다.</p>
+<p>provider 변경 시 직렬화 형식, 키 규칙, TTL, 장애 시 동작을 정해야 한다. Spring은 <code>@Cacheable</code>로 저장하고, <code>@CacheEvict</code>로 제거하고, <code>@CachePut</code>으로 갱신하는 선언 방식을 제공한다.</p>
 <p>H2를 선택할 때는 <code>jdbc:h2:mem:books</code>처럼 JDBC URL이 메모리 DB를 만드는지 본다. 이는 관계형 DB이지 캐시 provider가 아니며, 여러 앱 노드가 자동 공유하지 않는다. 테스트 DB인지 원본 앞의 캐시인지 역할을 구분한다.</p>
 <h2 id="6-실무에서는-실제로"><a class="anchor" href="#6-실무에서는-실제로" aria-hidden="true">#</a>6. 실무에서는 실제로</h2>
 <p>먼저 지연 원인과 반복 조회의 키 분포를 측정한다. 키가 매번 다르거나 쓰기가 잦으면 캐시가 맞지 않을 수 있다.</p>

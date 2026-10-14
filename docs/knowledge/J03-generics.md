@@ -6,7 +6,11 @@
 
 ## 1. 왜 알아야 하나
 
-`List`에 여러 종류의 객체를 넣고 나중에 캐스팅하는 코드는 잘못된 값이 들어온 지점과 `ClassCastException`이 난 지점이 멀다. API 호출부에서 한참 뒤 장애가 나고 원인은 예전 raw type 대입일 수 있다. `List<String>`처럼 정확히 선언하면 컴파일러가 잘못된 삽입을 그 자리에서 거부한다. 실무에서 자주 헷갈리는 것은 제네릭 타입 사이의 하위 타입 관계다. `Integer extends Number`라는 사실만 보고 `List<Integer>`를 `List<Number>`에 대입하면 컴파일 오류가 난다. 억지 캐스트로 우회하면 호출자가 `Double`을 넣을 수 있어 원래 `Integer` 전용 참조의 불변식이 깨진다. 이때 입력·출력 방향을 나타내는 와일드카드가 필요하다.
+`List`에 여러 종류의 객체를 넣고 나중에 캐스팅하는 코드는 잘못된 값이 들어온 지점과 `ClassCastException`이 난 지점이 멀다. API 호출부에서 한참 뒤 장애가 나고 원인은 예전 raw type 대입일 수 있다. `List<String>`처럼 정확히 선언하면 컴파일러가 잘못된 삽입을 그 자리에서 거부한다.
+
+실무에서 자주 헷갈리는 것은 제네릭 타입 사이의 하위 타입 관계다. `Integer extends Number`라는 사실만 보고 `List<Integer>`를 `List<Number>`에 대입하면 컴파일 오류가 난다.
+
+억지 캐스트로 우회하면 호출자가 `Double`을 넣을 수 있어 원래 `Integer` 전용 참조의 불변식이 깨진다. 이때 입력·출력 방향을 나타내는 와일드카드가 필요하다.
 
 소거 뒤에도 컴파일러는 사용 지점에 캐스트와 브리지를 넣어 정적 타입과 동적 디스패치를 유지한다. raw type이나 배열 별칭이 검사를 우회하면 예외가 늦게 발생한다.[6][7]
 
@@ -32,7 +36,9 @@
 
 일반 클래스는 `Integer`가 `Number`의 하위 타입이면 `Integer`를 `Number` 변수에 대입할 수 있다. 제네릭은 기본적으로 불공변이다. `List<Integer>`와 `List<Number>`는 서로의 하위 타입이 아니다. `List<Number>`를 받는 코드는 `Double`도 추가할 수 있으므로 두 참조가 같은 리스트를 가리키게 허용하면 타입 불변식이 깨진다.[5][10]
 
-`List<? extends Number>`는 “어떤 한 타입 `CAP`의 리스트이며 `CAP extends Number`”라는 뜻이다. 호출자는 `CAP`을 모르므로 `Number`로 읽을 수 있지만, 일반 값을 추가할 수 없다(`null`은 모든 참조 타입에 대입 가능). `List<? super Integer>`는 미상 타입 `CAP`에 `Integer`가 대입 가능하다는 뜻이다. `Integer`를 넣을 수 있고 꺼낼 때 보장되는 것은 `Object`뿐이다.[4][5]
+`List<? extends Number>`는 “어떤 한 타입 `CAP`의 리스트이며 `CAP extends Number`”라는 뜻이다. 호출자는 `CAP`을 모르므로 `Number`로 읽을 수 있지만, 일반 값을 추가할 수 없다(`null`은 모든 참조 타입에 대입 가능).
+
+`List<? super Integer>`는 미상 타입 `CAP`에 `Integer`가 대입 가능하다는 뜻이다. `Integer`를 넣을 수 있고 꺼낼 때 보장되는 것은 `Object`뿐이다.[4][5]
 
 | 타입 | 읽기 | 쓰기 | 용도 |
 |---|---|---|---|
@@ -52,7 +58,9 @@ PECS는 “Producer Extends, Consumer Super”다. `copy(List<? extends T> src, 
 | 실패 시점 | 대입은 통과해도 `ArrayStoreException` 가능 | 보통 컴파일 단계, raw 경계를 넘으면 나중의 캐스트 실패 |
 | 생성 | `new String[4]` | `new List<String>[4]` 금지, `new List<?>[4]` 허용 |
 
-`Number[] a = new Integer[1]`은 공변성 때문에 컴파일되지만 `a[0] = 1.5`는 런타임 검사에서 실패한다. `List<Integer>[]`는 런타임에 `<Integer>`를 확인할 수 없어 직접 만들지 못한다. `List<?>`는 reifiable하므로 배열 컴포넌트로 허용된다. unchecked 캐스트·별칭으로 `List<String>[]`처럼 가장하면 다른 종류의 리스트가 들어가고 읽을 때 `String` 캐스트에서 실패한다.[8][9][10]
+`Number[] a = new Integer[1]`은 공변성 때문에 컴파일되지만 `a[0] = 1.5`는 런타임 검사에서 실패한다. `List<Integer>[]`는 런타임에 `<Integer>`를 확인할 수 없어 직접 만들지 못한다.
+
+`List<?>`는 reifiable하므로 배열 컴포넌트로 허용된다. unchecked 캐스트·별칭으로 `List<String>[]`처럼 가장하면 다른 종류의 리스트가 들어가고 읽을 때 `String` 캐스트에서 실패한다.[8][9][10]
 
 ### raw type과 `List<?>`
 
@@ -73,11 +81,17 @@ Base<T>.put(T)          상속·오버라이드 관계 분석      →     bridg
 
 JLS §4.6에서 타입 변수의 소거는 가장 왼쪽 경계의 소거이고, 경계가 없으면 `Object`다. 따라서 `<T>`의 `T`는 `Object`, `<T extends Number>`의 `T`는 `Number`, `<T extends Number & Comparable<T>>`의 소거도 첫 경계인 `Number`다. 클래스 경계가 있으면 첫 번째에 둔다. 컴파일러가 삽입한 캐스트는 호출자에게 정적 타입을 복원한다.[6][10]
 
-`Node<T>.setData(T)`는 `Node.setData(Object)`로 소거된다. `MyNode extends Node<Integer>`가 정의한 메서드는 `setData(Integer)`다. 소거된 상위 서명과 다르면 raw `Node` 참조의 가상 호출이 하위 구현에 도달하지 않는다. 컴파일러는 `MyNode.setData(Object)` 브리지를 합성하고 `Integer`로 캐스팅한 뒤 실제 메서드를 부른다. raw 참조가 문자열을 넘기면 브리지 캐스트에서 실패한다. 브리지는 소스에 선언하지 않은 synthetic 메서드다. 리플렉션에서는 `isBridge()`·`isSynthetic()`으로 구별할 수 있다.[7]
+`Node<T>.setData(T)`는 `Node.setData(Object)`로 소거된다. `MyNode extends Node<Integer>`가 정의한 메서드는 `setData(Integer)`다. 소거된 상위 서명과 다르면 raw `Node` 참조의 가상 호출이 하위 구현에 도달하지 않는다.
+
+컴파일러는 `MyNode.setData(Object)` 브리지를 합성하고 `Integer`로 캐스팅한 뒤 실제 메서드를 부른다. raw 참조가 문자열을 넘기면 브리지 캐스트에서 실패한다.
+
+브리지는 소스에 선언하지 않은 synthetic 메서드다. 리플렉션에서는 `isBridge()`·`isSynthetic()`으로 구별할 수 있다.[7]
 
 제네릭 메서드의 `<T>`는 클래스 타입 매개변수와 별개 스코프다. `static <T> T identity(T value)`의 `T`는 인자 타입과 목표 타입을 바탕으로 호출마다 추론한다. 모호하거나 제약을 만족시키지 못하면 `Util.<String>identity(x)`처럼 타입 인자를 명시한다. Java 8 JEP 101은 메서드 인자 문맥과 연결 호출의 타입 추론을 개선했다.[2][14]
 
-소거 때문에 `new T()`, `T.class`, `instanceof List<String>`, `new List<String>[n]`은 허용되지 않는다. `T`의 구체 런타임 클래스나 타입 인자를 알 수 없기 때문이다. `Class<T>`는 `String.class` 같은 토큰이지 `List<String>.class`는 아니다. 전체 구조에는 `Type`/`ParameterizedType` 토큰을 쓴다. `new TypeRef<List<String>>() {}`의 익명 하위 클래스 서명을 `getGenericSuperclass()`로 읽는 방식이며 소거된 변수 `T`의 인자를 복원하지는 못한다.[9][10]
+소거 때문에 `new T()`, `T.class`, `instanceof List<String>`, `new List<String>[n]`은 허용되지 않는다. `T`의 구체 런타임 클래스나 타입 인자를 알 수 없기 때문이다. `Class<T>`는 `String.class` 같은 토큰이지 `List<String>.class`는 아니다.
+
+전체 구조에는 `Type`/`ParameterizedType` 토큰을 쓴다. `new TypeRef<List<String>>() {}`의 익명 하위 클래스 서명을 `getGenericSuperclass()`로 읽는 방식이며 소거된 변수 `T`의 인자를 복원하지는 못한다.[9][10]
 
 ## 4. 코드로 확인
 

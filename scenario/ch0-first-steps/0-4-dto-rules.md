@@ -294,11 +294,13 @@ tools.jackson.databind.exc.InvalidDefinitionException: Cannot construct instance
 	... (Jackson·Spring·Tomcat 줄이 수십 줄 이어진다)
 ```
 
-- **어디를 보나**: `with root cause` 다음 빈 줄 아래의 예외 줄이다. `ProfileController$ProfileRequest`는 "`ProfileController` 안의 `ProfileRequest`"이고, `non-static inner classes`가 원인을 말해 준다. 이 에러는 **내 메서드가 불리기 전에** 나서 아래 `at` 줄에 `org.example`이 하나도 없다. 그래서 메시지 속 **클래스 이름**으로 찾아간다.
+- **어디를 보나**: `with root cause` 다음 빈 줄 아래의 예외 줄이다. `ProfileController$ProfileRequest`는 "`ProfileController` 안의 `ProfileRequest`"이고, `non-static inner classes`가 원인을 말해 준다.
+  이 에러는 **내 메서드가 불리기 전에** 나서 아래 `at` 줄에 `org.example`이 하나도 없다. 그래서 메시지 속 **클래스 이름**으로 찾아간다.
 - **왜 500인가**: 요청 JSON은 멀쩡하다. 서버의 DTO 정의가 잘못됐다(`Type definition error`). 그래서 4xx가 아니라 5xx다. 앞의 0-3 에러들과 달리 `ERROR` 줄 + 긴 스택트레이스로 남는다.
 - **"기본 생성자가 없다"고 읽히는 이유**: 빈 괄호 생성자는 있다. 하지만 안쪽 클래스라 바깥 객체를 받는 숨은 매개변수가 붙어서, Jackson이 보기에는 진짜 "인자 없는 생성자"가 아니다.
 - **고치기**: `static`을 붙이거나, record로 바꾸거나, 별도 파일(`ProfileRequest.java`)로 뺀다.
-- **Jackson 3에서 달라진 점**: 문장은 Jackson 2.18과 **같다**("can only by instantiated"의 오타까지 같다). 다른 것은 두 가지다. 패키지가 `com.fasterxml.jackson.databind`에서 `tools.jackson.databind`로 바뀌었고, 위치가 `line: 1, column: 2`가 아니라 `byte offset: #1`로 나온다. 검색할 때는 패키지 이름을 빼고 문장으로 찾는다.
+- **Jackson 3에서 달라진 점**: 문장은 Jackson 2.18과 **같다**("can only by instantiated"의 오타까지 같다). 다른 것은 두 가지다.
+  패키지가 `com.fasterxml.jackson.databind`에서 `tools.jackson.databind`로 바뀌었고, 위치가 `line: 1, column: 2`가 아니라 `byte offset: #1`로 나온다. 검색할 때는 패키지 이름을 빼고 문장으로 찾는다.
 
 ### ② getter 없는 응답 클래스 → 200인데 `{}`
 
@@ -339,7 +341,8 @@ WARN ... Resolved [org.springframework.http.converter.HttpMessageNotReadableExce
 
 `"age": null`로 보내도 같은 줄이 나온다.
 
-- **Jackson 3에서 달라진 점**: Jackson 2는 같은 record에 `age`를 `0`으로 채우고 넘어갔다(2.18.2 단독 실측: `Rec[name=김자바, age=0]`). Jackson 3는 기본값으로 **거절**한다. 없어도 되는 값이면 `Integer age`(null 가능)로 선언하고 코드에서 `null`을 처리한다. 위 [static 클래스 + setter](#record-대신-static-클래스로-쓴다면) 모양은 Jackson 3에서도 setter가 안 불려 `0`이 된다.
+- **Jackson 3에서 달라진 점**: Jackson 2는 같은 record에 `age`를 `0`으로 채우고 넘어갔다(2.18.2 단독 실측: `Rec[name=김자바, age=0]`). Jackson 3는 기본값으로 **거절**한다.
+  없어도 되는 값이면 `Integer age`(null 가능)로 선언하고 코드에서 `null`을 처리한다. 위 [static 클래스 + setter](#record-대신-static-클래스로-쓴다면) 모양은 Jackson 3에서도 setter가 안 불려 `0`이 된다.
 
 ### ④ 나이에 글자 → 400 (요청 C)
 
@@ -351,7 +354,9 @@ WARN ... Resolved [org.springframework.http.converter.HttpMessageNotReadableExce
 
 ### ⑤ (참고) 생성자만 있고 기본 생성자가 없는 static 클래스
 
-`public static class ProfileRequest`에 `public ProfileRequest(String name, int age)` 생성자와 getter만 두고 setter와 빈 생성자는 없앤다. 이 레포에서는 **에러 없이 동작한다**(실측). Gradle(Spring Boot 플러그인)이 생성자 매개변수 이름을 클래스 파일에 남기기 때문이다(`-parameters`). Jackson 3는 그 이름(`name`, `age`)을 JSON 키와 맞춰 생성자를 부른다.
+`public static class ProfileRequest`에 `public ProfileRequest(String name, int age)` 생성자와 getter만 두고 setter와 빈 생성자는 없앤다. 이 레포에서는 **에러 없이 동작한다**(실측).
+
+Gradle(Spring Boot 플러그인)이 생성자 매개변수 이름을 클래스 파일에 남기기 때문이다(`-parameters`). Jackson 3는 그 이름(`name`, `age`)을 JSON 키와 맞춰 생성자를 부른다.
 
 매개변수 이름이 남지 않게 컴파일되면(`-parameters` 없이) 이렇게 실패한다(Jackson 3.1.5 단독 실측).
 

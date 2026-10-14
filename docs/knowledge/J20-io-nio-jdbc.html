@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J20. I/O·NIO·HttpClient·JDBC 기초</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -114,7 +114,8 @@ JDBC 입력값은 <code>PreparedStatement</code> 바인딩으로 SQL 문법과 �
          → InputStreamReader(CharsetDecoder) → [선택] BufferedReader → 앱</code></pre>
 <p><code>read(byte[])</code>는 배열을 항상 가득 채우지 않는다. 네트워크는 일부 바이트만 도착할 수 있으므로 길이·구분자·EOF를 기준으로 반복한다. <code>available()</code>은 즉시 읽을 수 있는 양이지 입력 전체 길이가 아니다. <code>InputStreamReader</code>는 지정한 문자셋으로 바이트를 디코딩하므로 UTF-8처럼 인코딩을 명시한다. 전체 계층은 바깥 Reader를 <code>try-with-resources</code>로 닫아 함께 정리한다.</p>
 <h3 id="32-path와-files"><a class="anchor" href="#32-path와-files" aria-hidden="true">#</a>3.2 <code>Path</code>와 <code>Files</code></h3>
-<p><code>Path</code>는 파일 시스템 제공자가 해석할 위치이고, 파일을 연 자원이 아니다. <code>Files</code>가 실제 연산을 제공자에 위임한다. 크기가 작은 설정은 <code>readString</code>이 편하지만 큰 입력은 <code>newBufferedReader</code> 등으로 순차 처리한다. <code>Files.lines</code>·<code>walk</code>는 지연 스트림이므로 닫는다. <code>exists</code> 검사와 실제 열기 사이에 파일이 바뀔 수 있고, <code>ATOMIC_MOVE</code>도 제공자가 지원하지 않으면 실패할 수 있다.</p>
+<p><code>Path</code>는 파일 시스템 제공자가 해석할 위치이고, 파일을 연 자원이 아니다. <code>Files</code>가 실제 연산을 제공자에 위임한다. 크기가 작은 설정은 <code>readString</code>이 편하지만 큰 입력은 <code>newBufferedReader</code> 등으로 순차 처리한다.</p>
+<p><code>Files.lines</code>·<code>walk</code>는 지연 스트림이므로 닫는다. <code>exists</code> 검사와 실제 열기 사이에 파일이 바뀔 수 있고, <code>ATOMIC_MOVE</code>도 제공자가 지원하지 않으면 실패할 수 있다.</p>
 <h3 id="33-nio의-버퍼채널셀렉터"><a class="anchor" href="#33-nio의-버퍼채널셀렉터" aria-hidden="true">#</a>3.3 NIO의 버퍼·채널·셀렉터</h3>
 <p>버퍼는 <code>0 ≤ mark ≤ position ≤ limit ≤ capacity</code>를 지킨다. 쓰기 뒤 <code>flip()</code>은 <code>limit=position</code>, <code>position=0</code>으로 바꿔 방금 기록한 범위를 읽게 한다. <code>clear()</code>는 내용이 아니라 상태를 초기화하고, <code>compact()</code>는 아직 안 읽은 바이트를 앞에 옮겨 다음 쓰기를 준비한다.</p>
 <p>논블로킹 채널은 읽을 것이 없을 때 0을 반환할 수 있고, <code>write</code>도 일부만 보낼 수 있다. 이벤트 루프는 남은 버퍼를 연결별로 보존한다. <code>Selector</code>는 준비된 채널을 모으므로 연결마다 스레드를 대기시키지 않아도 되지만, <code>select()</code>는 준비 이벤트까지 호출 스레드를 재운다.</p>
@@ -127,7 +128,8 @@ JDBC 입력값은 <code>PreparedStatement</code> 바인딩으로 SQL 문법과 �
        연결별 버퍼·상태 갱신 → 반복</code></pre>
 <p>선택된 키는 <code>selectedKeys()</code>에서 처리 뒤 제거한다. <code>write</code>할 데이터가 없는데 <code>OP_WRITE</code>를 계속 구독하면 대부분 즉시 준비 상태라 루프가 바쁘게 돌 수 있다. 보낼 데이터가 남을 때만 쓰기를 구독한다. <code>Selector</code>는 소켓용이며 모든 파일 I/O에 쓸 수 있는 도구는 아니다. 직접 버퍼는 할당·회수 비용도 있으므로 측정 없이 기본으로 쓰지 않는다.</p>
 <h3 id="34-httpclient-요청-흐름"><a class="anchor" href="#34-httpclient-요청-흐름" aria-hidden="true">#</a>3.4 <code>HttpClient</code> 요청 흐름</h3>
-<p>클라이언트 빌더에서 타임아웃·프록시 등을 정하고 여러 요청에 재사용한다. 요청에는 URI·메서드·헤더·본문 게시자를 담고, 전송 시 응답 본문을 받을 <code>BodyHandler</code>를 선택한다. <code>send</code>는 호출이 응답을 기다리고, <code>sendAsync</code>는 <code>CompletableFuture&lt;HttpResponse&lt;T&gt;&gt;</code>를 반환한다. <code>ofString()</code>은 본문 전체를 메모리에 담는다. 큰 응답은 파일·스트림 소비를 선택하고 스트림을 닫는다. 연결 타임아웃과 전체 요청 제한은 다른 대기 구간을 제어한다.</p>
+<p>클라이언트 빌더에서 타임아웃·프록시 등을 정하고 여러 요청에 재사용한다. 요청에는 URI·메서드·헤더·본문 게시자를 담고, 전송 시 응답 본문을 받을 <code>BodyHandler</code>를 선택한다. <code>send</code>는 호출이 응답을 기다리고, <code>sendAsync</code>는 <code>CompletableFuture&lt;HttpResponse&lt;T&gt;&gt;</code>를 반환한다.</p>
+<p><code>ofString()</code>은 본문 전체를 메모리에 담는다. 큰 응답은 파일·스트림 소비를 선택하고 스트림을 닫는다. 연결 타임아웃과 전체 요청 제한은 다른 대기 구간을 제어한다.</p>
 <h3 id="35-jdbc와-풀"><a class="anchor" href="#35-jdbc와-풀" aria-hidden="true">#</a>3.5 JDBC와 풀</h3>
 <pre><code class="language-text">DataSource에서 연결 대여 → Connection.prepareStatement(SQL ?)
  → setX(index, 값) → 실행 → ResultSet 순회 → close로 반환</code></pre>

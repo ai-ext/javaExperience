@@ -236,7 +236,9 @@
 <details>
 <summary>MyBatis / Mapper — 보낸 필드만 UPDATE하기</summary>
 
-MyBatis 대체 구현의 `PostPatchMyBatisService`는 JPA 서비스와 같은 순서로 `findVisibleDetail`의 404와 작성자 403을 확인한다. `PostUpdateRequest`에서 값이 `null`인 필드는 SQL의 `<if>`에서 제외한다. `tags`가 `null`이면 `post_tag`를 건드리지 않고, 빈 배열이면 기존 연결을 모두 삭제한다. Service에 `@Transactional`을 두어 태그 행과 글 수정을 한 번에 처리한다.
+MyBatis 대체 구현의 `PostPatchMyBatisService`는 JPA 서비스와 같은 순서로 `findVisibleDetail`의 404와 작성자 403을 확인한다. `PostUpdateRequest`에서 값이 `null`인 필드는 SQL의 `<if>`에서 제외한다.
+
+`tags`가 `null`이면 `post_tag`를 건드리지 않고, 빈 배열이면 기존 연결을 모두 삭제한다. Service에 `@Transactional`을 두어 태그 행과 글 수정을 한 번에 처리한다.
 
 ```xml
 <update id="patchPost">
@@ -926,8 +928,7 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 <details>
 <summary>힌트 1 — 보낸 필드만</summary>
 
-수정 DTO를 `record PostUpdateRequest(String title, String content, List<String> tags, Visibility visibility)`로 두고, 서비스에서 `if (req.title() != null) post.changeTitle(req.title());`처럼 `null`이 아닐 때만 바꾼다. 엔티티에 setter 대신 의미 있는 변경 메서드를 두면 규칙(빈 제목 금지)도 그 안에 넣을 수 있다.
-</details>
+수정 DTO를 `record PostUpdateRequest(String title, String content, List<String> tags, Visibility visibility)`로 두고, 서비스에서 `if (req.title() != null) post.changeTitle(req.title());`처럼 `null`이 아닐 때만 바꾼다. 엔티티에 setter 대신 의미 있는 변경 메서드를 두면 규칙(빈 제목 금지)도 그 안에 넣을 수 있다. </details>
 
 <details>
 <summary>힌트 2 — 404와 403 순서</summary>

@@ -515,7 +515,11 @@ CREATE TABLE report (
 <details>
 <summary>예외 처리 — 실패 응답</summary>
 
-`ApiExceptionHandler.java`, `DuplicateReportException.java`, `ReportTargetNotFoundException.java`, `SelfReportNotAllowedException.java`. 예외가 어떤 HTTP 상태와 오류 본문으로 바뀌는지 실패 계약과 대조한다. 변경된 메서드: `handleReportTargetNotFound`, `handleSelfReport`, `handleDuplicateReport`.
+`ApiExceptionHandler.java`, `DuplicateReportException.java`, `ReportTargetNotFoundException.java`, `SelfReportNotAllowedException.java`.
+
+예외가 어떤 HTTP 상태와 오류 본문으로 바뀌는지 실패 계약과 대조한다.
+
+변경된 메서드: `handleReportTargetNotFound`, `handleSelfReport`, `handleDuplicateReport`.
 
 
 ```java
@@ -587,7 +591,11 @@ public @interface DetailRequiredForEtc {
 <details>
 <summary>MyBatis Mapper — 신고 중복 확인·저장 SQL 대체 구현</summary>
 
-정답의 **MyBatis 대체 구현 코드** 토글에서 `ReportCommandMapper.java`·`ReportCommandMapper.xml`·`ReportInsert.java`·교체한 `ReportService.java` 전문을 볼 수 있다. 대상 글·댓글의 공개 범위는 공통 JPA 조회를 재사용하며, 신고 행 조회·저장은 MyBatis로 실행한다. 중복을 먼저 확인해 409를 주고, 동시 요청은 DB UNIQUE와 `DataIntegrityViolationException` 변환으로 막는다.
+정답의 **MyBatis 대체 구현 코드** 토글에서 `ReportCommandMapper.java`·`ReportCommandMapper.xml`·`ReportInsert.java`·교체한 `ReportService.java` 전문을 볼 수 있다.
+
+대상 글·댓글의 공개 범위는 공통 JPA 조회를 재사용하며, 신고 행 조회·저장은 MyBatis로 실행한다.
+
+중복을 먼저 확인해 409를 주고, 동시 요청은 DB UNIQUE와 `DataIntegrityViolationException` 변환으로 막는다.
 
 
 ```xml

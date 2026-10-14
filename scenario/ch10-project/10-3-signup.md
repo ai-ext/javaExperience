@@ -13,7 +13,8 @@
 1. **비밀번호는 원문으로 저장하지 않는다.** DB가 새도 원래 비밀번호를 알 수 없게 BCrypt 해시만 저장한다. 로그인(10-4)은 해시끼리 비교한다.
 2. **같은 이메일로 두 번 가입하지 못한다** → 409 `DUPLICATE`. `Kim@Example.com`과 `kim@example.com`은 같은 주소로 본다. 받은 이메일은 앞뒤 공백을 떼고 소문자로 바꿔 저장한다.
 3. **입력이 틀리면 10-2의 400 틀로 답한다** → 필드별 `errors`.
-4. **비밀번호는 글자 수와 바이트 수를 둘 다 본다.** 8~64자이면서 UTF-8로 72바이트 이하. BCrypt는 72바이트를 넘는 입력을 해시하지 못하고 예외를 던진다. 글자 수만 보면 한글 25자(75바이트)가 검증을 통과해 `500`이 된다. 넘으면 400 `VALIDATION_FAILED`(`field`: `password`)로 막는다. 왜 72바이트인지는 [F4](../../lessons/F4-password-storage.md)에 있다.
+4. **비밀번호는 글자 수와 바이트 수를 둘 다 본다.** 8~64자이면서 UTF-8로 72바이트 이하. BCrypt는 72바이트를 넘는 입력을 해시하지 못하고 예외를 던진다.
+  글자 수만 보면 한글 25자(75바이트)가 검증을 통과해 `500`이 된다. 넘으면 400 `VALIDATION_FAILED`(`field`: `password`)로 막는다. 왜 72바이트인지는 [F4](../../lessons/F4-password-storage.md)에 있다.
 
 엔티티·저장소·서비스·컨트롤러를 한 번에 만든다. 계층을 나누는 이유는 [E1](../../lessons/E1-why-layers.md), JPA가 무엇인지는 [E3](../../lessons/E3-what-is-jpa.md)에 있다.
 
@@ -564,7 +565,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 </insert>
 ```
 
-`#{email}`은 문자열을 SQL에 이어 붙이지 않고 바인딩한다. INSERT가 만든 id는 `useGeneratedKeys`로 `User.id`에 채워져 `Location`과 응답 DTO에 쓰인다. Service에서는 먼저 `existsByEmail`로 확인하고, 그 사이 같은 이메일이 들어오면 DB의 `UNIQUE` 위반을 `DuplicateKeyException`으로 받아 409 `DUPLICATE`로 바꾼다. `@Transactional`과 BCrypt 해시는 JPA 경로와 동일하다.
+`#{email}`은 문자열을 SQL에 이어 붙이지 않고 바인딩한다. INSERT가 만든 id는 `useGeneratedKeys`로 `User.id`에 채워져 `Location`과 응답 DTO에 쓰인다.
+
+Service에서는 먼저 `existsByEmail`로 확인하고, 그 사이 같은 이메일이 들어오면 DB의 `UNIQUE` 위반을 `DuplicateKeyException`으로 받아 409 `DUPLICATE`로 바꾼다. `@Transactional`과 BCrypt 해시는 JPA 경로와 동일하다.
 
 </details>
 

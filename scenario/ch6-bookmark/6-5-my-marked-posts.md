@@ -46,7 +46,9 @@
 <details>
 <summary>Controller — 두 필터와 페이지 입력 검증</summary>
 
-두 필터를 `required=false` 문자열로 받아 생략(`null`)과 빈 값(`""`)을 구별한다. 정확히 `true`/`false`인지 확인한다. Spring의 boolean 자동 변환은 `yes`·`1`도 받을 수 있고 `defaultValue`는 빈 값을 생략처럼 처리하므로, 여기서는 요청 형식 오류를 명시적으로 `400`으로 처리한다. `page`·`size`도 문자열로 받아 생략일 때만 기본값 0·20을 적용하고, 빈 값·숫자 외 문자열·범위 밖 값은 `400`이다. 회원 ID는 요청에 받지 않는다.
+두 필터를 `required=false` 문자열로 받아 생략(`null`)과 빈 값(`""`)을 구별한다. 정확히 `true`/`false`인지 확인한다.
+
+Spring의 boolean 자동 변환은 `yes`·`1`도 받을 수 있고 `defaultValue`는 빈 값을 생략처럼 처리하므로, 여기서는 요청 형식 오류를 명시적으로 `400`으로 처리한다. `page`·`size`도 문자열로 받아 생략일 때만 기본값 0·20을 적용하고, 빈 값·숫자 외 문자열·범위 밖 값은 `400`이다. 회원 ID는 요청에 받지 않는다.
 
 ```java
 @GetMapping("/api/me/posts")
@@ -144,9 +146,13 @@ ORDER BY p.id DESC
 LIMIT 20 OFFSET 0;
 ```
 
-다음 순서로 직접 바꾼다. ① `AND bm.id IS NOT NULL`만 빼서 좋아요 목록, ② `AND l.id IS NOT NULL`만 빼서 북마크 목록, ③ 두 줄 대신 `AND (l.id IS NOT NULL OR bm.id IS NOT NULL)`을 넣어 전체 표시 목록을 만든다. `COUNT(*)` 쿼리도 `LIMIT/OFFSET`만 빼고 **같은 WHERE**를 써야 `totalElements`가 맞는다. 관계가 없는 글까지 읽은 뒤 Java에서 거르면 페이지가 20개보다 적게 차는 오류가 생긴다.
+다음 순서로 직접 바꾼다. ① `AND bm.id IS NOT NULL`만 빼서 좋아요 목록, ② `AND l.id IS NOT NULL`만 빼서 북마크 목록, ③ 두 줄 대신 `AND (l.id IS NOT NULL OR bm.id IS NOT NULL)`을 넣어 전체 표시 목록을 만든다.
 
-JPA에서는 `Post`의 `likes` 컬렉션을 새로 만들 필요가 없다. `PostLike`와 `Bookmark`에 이미 `post`·`member` 연관 필드가 있으므로 `EXISTS` 서브쿼리로 `Post` 페이지를 직접 읽는다. `@EntityGraph(attributePaths = {"author", "board"})`로 응답에 필요한 두 관계를 함께 읽는다. 다음 세 조건을 모두 `WHERE`에 넣고, 공개·미삭제·차단 제외 조건까지 같은 `countQuery`에 복사한다.
+`COUNT(*)` 쿼리도 `LIMIT/OFFSET`만 빼고 **같은 WHERE**를 써야 `totalElements`가 맞는다. 관계가 없는 글까지 읽은 뒤 Java에서 거르면 페이지가 20개보다 적게 차는 오류가 생긴다.
+
+JPA에서는 `Post`의 `likes` 컬렉션을 새로 만들 필요가 없다. `PostLike`와 `Bookmark`에 이미 `post`·`member` 연관 필드가 있으므로 `EXISTS` 서브쿼리로 `Post` 페이지를 직접 읽는다.
+
+`@EntityGraph(attributePaths = {"author", "board"})`로 응답에 필요한 두 관계를 함께 읽는다. 다음 세 조건을 모두 `WHERE`에 넣고, 공개·미삭제·차단 제외 조건까지 같은 `countQuery`에 복사한다.
 
 ```java
 AND (:liked = false OR EXISTS (SELECT 1 FROM PostLike l

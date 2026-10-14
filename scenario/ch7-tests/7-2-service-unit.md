@@ -215,8 +215,9 @@ T = 테스트 실행(필수), R = 코드 리뷰(피드백용).
 <details>
 <summary>힌트 — spy 만들기</summary>
 
-`PostAccessPolicy policy = spy(new PostAccessPolicy(followRepository, blockPolicy));`처럼 실물을 만든 뒤 감싼다(그 안의 협력 객체는 mock). 그러면 `policy.canView(...)`는 진짜 규칙대로 판정하고, 테스트 끝에 `verify(policy).canView(viewer, post)`로 호출을 확인할 수 있다. spy의 메서드를 바꾸고 싶으면 `doReturn(...).when(policy).canView(...)` 형태를 쓴다(`when(policy.canView(...))`는 진짜 메서드를 한 번 실행한다).
-</details>
+`PostAccessPolicy policy = spy(new PostAccessPolicy(followRepository, blockPolicy));`처럼 실물을 만든 뒤 감싼다(그 안의 협력 객체는 mock). 그러면 `policy.canView(...)`는 진짜 규칙대로 판정하고, 테스트 끝에 `verify(policy).canView(viewer, post)`로 호출을 확인할 수 있다.
+
+spy의 메서드를 바꾸고 싶으면 `doReturn(...).when(policy).canView(...)` 형태를 쓴다(`when(policy.canView(...))`는 진짜 메서드를 한 번 실행한다). </details>
 
 ## 다음 단계
 

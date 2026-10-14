@@ -283,7 +283,9 @@ public ProblemDetail handlePostNotDraft(PostNotDraftException ex, HttpServletReq
 <details>
 <summary>MyBatis Mapper — 임시저장·발행 SQL</summary>
 
-**MyBatis 대체 코드** 토글은 이 단계에서 추가한 임시저장·발행 경로를 Mapper로 실행한다. 선행 단계의 JPA 읽기·일반 글쓰기는 유지하며, 임시저장 INSERT의 새 id를 받아 글을 반환하고 `post_tag` 연결은 기존 JPA 트랜잭션에서 저장한다. 발행 전에 `SELECT ... FOR UPDATE`로 글 행을 잠근 뒤 404→403→409를 검사한다. 발행 UPDATE도 `status='DRAFT'`를 조건에 넣고 영향 행 수가 0이면 롤백한다. 임시저장 목록은 게시판을 JOIN해 한 번에 읽는다.
+**MyBatis 대체 코드** 토글은 이 단계에서 추가한 임시저장·발행 경로를 Mapper로 실행한다. 선행 단계의 JPA 읽기·일반 글쓰기는 유지하며, 임시저장 INSERT의 새 id를 받아 글을 반환하고 `post_tag` 연결은 기존 JPA 트랜잭션에서 저장한다.
+
+발행 전에 `SELECT ... FOR UPDATE`로 글 행을 잠근 뒤 404→403→409를 검사한다. 발행 UPDATE도 `status='DRAFT'`를 조건에 넣고 영향 행 수가 0이면 롤백한다. 임시저장 목록은 게시판을 JOIN해 한 번에 읽는다.
 
 ```java
 int insertDraft(DraftInsertRow row);
@@ -559,8 +561,9 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 <details>
 <summary>힌트 2 — 발행 서비스</summary>
 
-3-1의 `patch()`와 모양이 같다. `findById` → `accessPolicy.canView(...)`가 거짓이면 404 → 작성자가 아니면 403 → `"DRAFT"`가 아니면 409용 예외 → `post.publish(LocalDateTime.now())`. 409용 예외를 새로 만들고 `ApiExceptionHandler`에 `HttpStatus.CONFLICT`로 등록한다. `@Transactional` 안이라 `save()`를 부르지 않아도 커밋 때 UPDATE가 나간다.
-</details>
+3-1의 `patch()`와 모양이 같다. `findById` → `accessPolicy.canView(...)`가 거짓이면 404 → 작성자가 아니면 403 → `"DRAFT"`가 아니면 409용 예외 → `post.publish(LocalDateTime.now())`.
+
+409용 예외를 새로 만들고 `ApiExceptionHandler`에 `HttpStatus.CONFLICT`로 등록한다. `@Transactional` 안이라 `save()`를 부르지 않아도 커밋 때 UPDATE가 나간다. </details>
 
 <details>
 <summary>힌트 3 — 내 임시저장 글 쿼리</summary>

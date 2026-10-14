@@ -843,7 +843,9 @@ class MentionsTest {
 <details>
 <summary>MyBatis Mapper — 멘션 후보와 알림 저장</summary>
 
-정답의 **MyBatis 대체 구현 코드**에는 MentionMapper.java·MentionTargetRow.java·MentionMapper.xml·수정된 NotificationService.java의 전문이 있다. 닉네임 후보를 IN으로 한 번 조회하고, 공통 BlockPolicy·PostAccessPolicy가 허용한 회원에게만 MENTION 행을 삽입한다. REQUIRES_NEW 트랜잭션은 JPA 방식과 같다. UNIQUE 인덱스와 ON DUPLICATE KEY는 같은 댓글·수신자의 재알림을 막는다.
+정답의 **MyBatis 대체 구현 코드**에는 MentionMapper.java·MentionTargetRow.java·MentionMapper.xml·수정된 NotificationService.java의 전문이 있다. 닉네임 후보를 IN으로 한 번 조회하고, 공통 BlockPolicy·PostAccessPolicy가 허용한 회원에게만 MENTION 행을 삽입한다.
+
+REQUIRES_NEW 트랜잭션은 JPA 방식과 같다. UNIQUE 인덱스와 ON DUPLICATE KEY는 같은 댓글·수신자의 재알림을 막는다.
 
 ```xml
 <select id="findByNicknames" resultType="org.example.notification.MentionTargetRow">
@@ -1251,8 +1253,7 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 <details>
 <summary>힌트 2 — 받는 사람 고르기</summary>
 
-9-4의 `CommentCreatedEvent`처럼 `CommentMentionedEvent(postId, commentId, actorId, nicknames)`를 발행하고, 알림 서비스에서 `memberRepository.findByNicknameIn(nicknames)` → 회원마다 상태·자기 자신·글 작성자·`blockPolicy.isBlockedEitherWay` 확인 → `new AuthenticatedMember(회원 id, 닉네임, 역할)`로 `accessPolicy.canView(그 회원, 글)` → 저장.
-</details>
+9-4의 `CommentCreatedEvent`처럼 `CommentMentionedEvent(postId, commentId, actorId, nicknames)`를 발행하고, 알림 서비스에서 `memberRepository.findByNicknameIn(nicknames)` → 회원마다 상태·자기 자신·글 작성자·`blockPolicy.isBlockedEitherWay` 확인 → `new AuthenticatedMember(회원 id, 닉네임, 역할)`로 `accessPolicy.canView(그 회원, 글)` → 저장. </details>
 
 ## 다음 단계
 

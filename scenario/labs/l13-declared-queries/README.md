@@ -4,13 +4,48 @@
 
 ## 상황과 개념
 
-L12와 같은 게시글 id를 이어 사용합니다. JPQL은 Post/p.board 같은 Java 이름, SQL은 post/board_id 같은 DB 이름을 씁니다. 선택 조건은 바인딩하고 임의 입력을 SQL에 이어 붙이지 않습니다. [Spring Data @Query](https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html) · [MyBatis 동적 SQL](https://mybatis.org/mybatis-3/dynamic-sql.html).
+- **데이터:** L12에서 만든 게시글 id를 이어서 사용합니다.
+- **JPQL 이름:** `Post`, `p.board`처럼 Java 엔티티와 속성 이름을 씁니다.
+- **SQL 이름:** `post`, `board_id`처럼 테이블과 컬럼 이름을 씁니다.
+- **조건 전달:** 선택 조건은 바인딩합니다. 사용자 입력을 SQL 문자열에 직접 이어 붙이지 않습니다.
+
+참고 문서: [Spring Data @Query](https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html) · [MyBatis 동적 SQL](https://mybatis.org/mybatis-3/dynamic-sql.html).
 
 ## 실행 준비
 
-저장소 루트에서 `python3 tools/materialize-query-practice.py --output /tmp/query-practice --through l13-declared-queries`를 실행합니다. 처음 L12를 적용할 때 출력 디렉터리는 비어 있어야 합니다. 이후 L13·L14에서 같은 경로로 명령을 다시 실행하면 다음 overlay만 적용됩니다. Java 21로 복원 폴더에서 `./gradlew bootRun --args="--spring.profiles.active=practice"`를 실행합니다. DB 접속은 SPRING_DATASOURCE_URL/SPRING_DATASOURCE_USERNAME/SPRING_DATASOURCE_PASSWORD 환경변수로 조정합니다. L13은 L12 위에, L14는 L12와 L13 위에 적용됩니다.
+1. **복원 폴더 만들기:** 저장소 루트에서 다음 명령을 실행합니다.
 
-기존 POST /api/posts에 작성자 토큰과 `{"boardSlug":"dev","title":"쿼리 연습 JPA","content":"본문","tags":["spring"],"visibility":"PUBLIC"}`를 보내 201 응답의 id를 받으세요. 같은 DB에서 이 id를 아래 {id}로 사용합니다. 새 API는 공개 데이터 비교용이며 개인별 권한은 기존 API에서 확인합니다.
+   ```bash
+   python3 tools/materialize-query-practice.py --output /tmp/query-practice --through l13-declared-queries
+   ```
+
+   L12를 처음 적용할 때 `/tmp/query-practice`는 비어 있어야 합니다. L13·L14로 진행할 때는 각 실습의 `--through` 값을 해당 lab 이름으로 바꿔 같은 출력 경로에 다시 실행합니다. 적용 순서는 L12 → L13 → L14입니다.
+
+2. **서버 실행:** Java 21을 사용해 복원 폴더에서 실행합니다.
+
+   ```bash
+   ./gradlew bootRun --args="--spring.profiles.active=practice"
+   ```
+
+3. **DB 접속 설정:** 필요하면 다음 환경변수로 접속 정보를 지정합니다.
+
+   - `SPRING_DATASOURCE_URL`
+   - `SPRING_DATASOURCE_USERNAME`
+   - `SPRING_DATASOURCE_PASSWORD`
+
+4. **연습 게시글 준비:** 기존 `POST /api/posts`에 작성자 토큰과 아래 JSON을 보내고, 201 응답의 `id`를 기록합니다.
+
+   ```json
+   {
+     "boardSlug": "dev",
+     "title": "쿼리 연습 JPA",
+     "content": "본문",
+     "tags": ["spring"],
+     "visibility": "PUBLIC"
+   }
+   ```
+
+   이후 같은 DB에서 응답의 `id`를 경로의 `{id}`에 사용합니다. 새 API는 공개 데이터를 비교합니다. 개인별 권한은 기존 API에서 확인합니다.
 
 ## 순서대로 구현할 시나리오
 

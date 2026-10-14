@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S08. 트랜잭션 관리</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -60,7 +60,8 @@
 </tr>
 </tbody></table></div>
 <h3 id="platformtransactionmanager의-역할"><a class="anchor" href="#platformtransactionmanager의-역할" aria-hidden="true">#</a><code>PlatformTransactionManager</code>의 역할</h3>
-<p><code>getTransaction(TransactionDefinition)</code>은 기존 상태를 얻거나 새 트랜잭션을 시작하고, <code>commit</code>·<code>rollback</code>이 완료한다. 애플리케이션은 보통 애노테이션이나 <code>TransactionTemplate</code>을 쓰며, 공통 전파·동기화 처리는 <code>AbstractPlatformTransactionManager</code>, 자원 처리는 JDBC·JPA·JTA별 구현체가 맡는다. 지원하지 않는 옵션은 거부될 수 있고 <code>ISOLATION_DEFAULT</code>는 기반 저장소 기본값이다. JPA 영속성 컨텍스트는 → <a class="docref" href="S09-jpa-hibernate.html">S09</a> 참조.</p>
+<p><code>getTransaction(TransactionDefinition)</code>은 기존 상태를 얻거나 새 트랜잭션을 시작하고, <code>commit</code>·<code>rollback</code>이 완료한다. 애플리케이션은 보통 애노테이션이나 <code>TransactionTemplate</code>을 쓰며, 공통 전파·동기화 처리는 <code>AbstractPlatformTransactionManager</code>, 자원 처리는 JDBC·JPA·JTA별 구현체가 맡는다.</p>
+<p>지원하지 않는 옵션은 거부될 수 있고 <code>ISOLATION_DEFAULT</code>는 기반 저장소 기본값이다. JPA 영속성 컨텍스트는 → <a class="docref" href="S09-jpa-hibernate.html">S09</a> 참조.</p>
 <h3 id="전파-7종"><a class="anchor" href="#전파-7종" aria-hidden="true">#</a>전파 7종</h3>
 <div class="table-wrap"><table>
 <thead>
@@ -114,7 +115,8 @@
 <td>트랜잭션 안에서 호출되면 안 되는 경계를 검증할 때 쓴다.</td>
 </tr>
 </tbody></table></div>
-<p><code>REQUIRED</code>는 서비스-저장소 호출의 기본 선택이다. 안쪽이 rollback-only를 표시하면 같은 물리 트랜잭션을 쓰는 바깥 커밋도 실패하며 <code>UnexpectedRollbackException</code>이 발생한다. <code>REQUIRES_NEW</code>는 보류된 바깥 커넥션 외에 새 커넥션을 요구하므로 풀을 동시 스레드 수보다 최소 하나 크게 잡는 등 고갈을 고려한다. <code>NESTED</code>는 한 물리 트랜잭션의 savepoint 롤백이고 <code>REQUIRES_NEW</code>는 독립 커밋이다. 전자는 JDBC 매니저·드라이버의 savepoint 지원을 확인한다.</p>
+<p><code>REQUIRED</code>는 서비스-저장소 호출의 기본 선택이다. 안쪽이 rollback-only를 표시하면 같은 물리 트랜잭션을 쓰는 바깥 커밋도 실패하며 <code>UnexpectedRollbackException</code>이 발생한다. <code>REQUIRES_NEW</code>는 보류된 바깥 커넥션 외에 새 커넥션을 요구하므로 풀을 동시 스레드 수보다 최소 하나 크게 잡는 등 고갈을 고려한다.</p>
+<p><code>NESTED</code>는 한 물리 트랜잭션의 savepoint 롤백이고 <code>REQUIRES_NEW</code>는 독립 커밋이다. 전자는 JDBC 매니저·드라이버의 savepoint 지원을 확인한다.</p>
 <h3 id="격리수준과-동시성-이상"><a class="anchor" href="#격리수준과-동시성-이상" aria-hidden="true">#</a>격리수준과 동시성 이상</h3>
 <div class="table-wrap"><table>
 <thead>
@@ -209,14 +211,18 @@ TransactionInterceptor ── @Transactional 메타데이터 읽기
        (rollback-only도 최종 커밋 시 반영)
   ▼
 커넥션 등 자원 정리, 보류한 트랜잭션이 있으면 재개</code></pre>
-<p>애노테이션은 설정 메타데이터다. <code>TransactionInterceptor</code>가 호출을 감싸 매니저에 경계를 요청한다. JDBC 트랜잭션 자원은 보통 현재 스레드에 묶이므로 새 스레드로 전파되지 않으며, 리액티브 작업은 Reactor Context를 따른다. 기본 롤백 대상은 <code>RuntimeException</code>과 <code>Error</code>; checked 예외를 내부에서 잡아 정상 반환하면 인터셉터는 롤백할 근거가 없으므로 필요 시 rollback-only를 표시한다.</p>
+<p>애노테이션은 설정 메타데이터다. <code>TransactionInterceptor</code>가 호출을 감싸 매니저에 경계를 요청한다.</p>
+<p>JDBC 트랜잭션 자원은 보통 현재 스레드에 묶이므로 새 스레드로 전파되지 않으며, 리액티브 작업은 Reactor Context를 따른다. 기본 롤백 대상은 <code>RuntimeException</code>과 <code>Error</code>; checked 예외를 내부에서 잡아 정상 반환하면 인터셉터는 롤백할 근거가 없으므로 필요 시 rollback-only를 표시한다.</p>
 <h3 id="전파는-호출-경계와-물리-자원을-나눈다"><a class="anchor" href="#전파는-호출-경계와-물리-자원을-나눈다" aria-hidden="true">#</a>전파는 호출 경계와 물리 자원을 나눈다</h3>
 <p>전파는 논리 호출 범위를 기존 자원에 참여시키거나 보류·분리한다. 격리수준과 timeout은 새 물리 트랜잭션에서만 설정된다. 기존 트랜잭션 참여 시 내부 설정은 기본적으로 무시되며, 불일치를 오류로 만들려면 <code>validateExistingTransaction</code>을 켠다.</p>
 <h3 id="롤백-규칙-매칭"><a class="anchor" href="#롤백-규칙-매칭" aria-hidden="true">#</a>롤백 규칙 매칭</h3>
-<p>기본 동작은 <code>RuntimeException</code>과 <code>Error</code> 롤백, checked 예외 커밋이다. 따라서 업무 실패를 checked 예외로 표현한다면 <code>rollbackFor = DomainException.class</code>처럼 타입을 구체적으로 선언한다. 반대로 특정 예외여도 커밋해야 한다면 <code>noRollbackFor</code>를 사용한다. 충돌하는 규칙이 있을 때는 예외 계층에서 더 구체적으로 일치하는 규칙을 의도해야 하며, 이름 일부를 포함하는 문자열 규칙은 유사 접미사나 중첩 예외까지 맞을 수 있어 피하는 편이 안전하다.</p>
-<p>Spring Framework 6.2부터 <code>@EnableTransactionManagement(rollbackOn = RollbackOn.ALL_EXCEPTIONS)</code>로 애플리케이션의 기본 정책을 모든 예외 롤백으로 바꿀 수 있다. 설정한 기본 정책보다 개별 트랜잭션의 명시적인 규칙이 우선한다. Kotlin은 checked 예외 강제가 없으므로 checked 예외에 의존하지 않는 전역 정책이 특히 유용하다. 한편 비동기 <code>Future</code>/<code>CompletableFuture</code>는 원래 메서드가 반환할 당시 이미 예외 완료 상태인 경우 롤백과 연결될 수 있지만, 반환 후 나중에 실패하는 비동기 작업까지 원래 DB 트랜잭션이 기다려 보장하지 않는다.</p>
+<p>기본 동작은 <code>RuntimeException</code>과 <code>Error</code> 롤백, checked 예외 커밋이다. 따라서 업무 실패를 checked 예외로 표현한다면 <code>rollbackFor = DomainException.class</code>처럼 타입을 구체적으로 선언한다.</p>
+<p>반대로 특정 예외여도 커밋해야 한다면 <code>noRollbackFor</code>를 사용한다. 충돌하는 규칙이 있을 때는 예외 계층에서 더 구체적으로 일치하는 규칙을 의도해야 하며, 이름 일부를 포함하는 문자열 규칙은 유사 접미사나 중첩 예외까지 맞을 수 있어 피하는 편이 안전하다.</p>
+<p>Spring Framework 6.2부터 <code>@EnableTransactionManagement(rollbackOn = RollbackOn.ALL_EXCEPTIONS)</code>로 애플리케이션의 기본 정책을 모든 예외 롤백으로 바꿀 수 있다. 설정한 기본 정책보다 개별 트랜잭션의 명시적인 규칙이 우선한다.</p>
+<p>Kotlin은 checked 예외 강제가 없으므로 checked 예외에 의존하지 않는 전역 정책이 특히 유용하다. 한편 비동기 <code>Future</code>/<code>CompletableFuture</code>는 원래 메서드가 반환할 당시 이미 예외 완료 상태인 경우 롤백과 연결될 수 있지만, 반환 후 나중에 실패하는 비동기 작업까지 원래 DB 트랜잭션이 기다려 보장하지 않는다.</p>
 <h3 id="이벤트와-커밋의-관계"><a class="anchor" href="#이벤트와-커밋의-관계" aria-hidden="true">#</a>이벤트와 커밋의 관계</h3>
-<p><code>@TransactionalEventListener</code>는 Spring 애플리케이션 이벤트를 트랜잭션 단계에 묶는다. 기본 <code>AFTER_COMMIT</code>은 DB 커밋이 성공한 뒤 처리하고, <code>BEFORE_COMMIT</code>, <code>AFTER_ROLLBACK</code>, <code>AFTER_COMPLETION</code>도 선택할 수 있다. 트랜잭션이 없으면 기본적으로 리스너를 호출하지 않으며, 일반 이벤트처럼 실행하려는 특수 상황에서만 <code>fallbackExecution=true</code>를 쓴다. 이는 프로세스 안에서 커밋 여부와 후처리 시점을 맞추는 기능이지, 브로커까지 원자적 전달을 보장하는 큐가 아니다.</p>
+<p><code>@TransactionalEventListener</code>는 Spring 애플리케이션 이벤트를 트랜잭션 단계에 묶는다. 기본 <code>AFTER_COMMIT</code>은 DB 커밋이 성공한 뒤 처리하고, <code>BEFORE_COMMIT</code>, <code>AFTER_ROLLBACK</code>, <code>AFTER_COMPLETION</code>도 선택할 수 있다.</p>
+<p>트랜잭션이 없으면 기본적으로 리스너를 호출하지 않으며, 일반 이벤트처럼 실행하려는 특수 상황에서만 <code>fallbackExecution=true</code>를 쓴다. 이는 프로세스 안에서 커밋 여부와 후처리 시점을 맞추는 기능이지, 브로커까지 원자적 전달을 보장하는 큐가 아니다.</p>
 <h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
 <h3 id="예제-1--서비스-경계와-checked-예외-롤백"><a class="anchor" href="#예제-1--서비스-경계와-checked-예외-롤백" aria-hidden="true">#</a>예제 1 — 서비스 경계와 checked 예외 롤백</h3>
 <p>Spring 7 API 예제다. 저장소 구현·컨테이너·DB 구성에 연결해야 한다. <strong>(미실행: Spring 컨테이너 및 DB 구성 필요)</strong></p>
@@ -371,13 +377,15 @@ class OrderNotificationListener {
 </ol>
 <h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
 <h3 id="q1-platformtransactionmanager와-transactional의-관계는"><a class="anchor" href="#q1-platformtransactionmanager와-transactional의-관계는" aria-hidden="true">#</a>Q1. <code>PlatformTransactionManager</code>와 <code>@Transactional</code>의 관계는?</h3>
-<p><code>@Transactional</code>은 속성 메타데이터고, <code>PlatformTransactionManager</code>는 명령형 자원에서 실제 경계를 만든다. 인터셉터가 속성을 읽고 <code>getTransaction</code>, <code>commit</code>, <code>rollback</code>을 호출한다. 매니저가 관리하지 않는 메시지 브로커까지 자동으로 하나의 DB 트랜잭션이 되지는 않는다.<br>꼬리질문: 리액티브에서는 무엇이 다른가? <strong>Reactor Context를 쓰는 <code>ReactiveTransactionManager</code>를 사용하며 ThreadLocal 트랜잭션과 구분한다.</strong></p>
+<p><code>@Transactional</code>은 속성 메타데이터고, <code>PlatformTransactionManager</code>는 명령형 자원에서 실제 경계를 만든다. 인터셉터가 속성을 읽고 <code>getTransaction</code>, <code>commit</code>, <code>rollback</code>을 호출한다. 매니저가 관리하지 않는 메시지 브로커까지 자동으로 하나의 DB 트랜잭션이 되지는 않는다.</p>
+<p>꼬리질문: 리액티브에서는 무엇이 다른가? <strong>Reactor Context를 쓰는 <code>ReactiveTransactionManager</code>를 사용하며 ThreadLocal 트랜잭션과 구분한다.</strong></p>
 <h3 id="q2-내부-required-메서드가-rollback-only가-되면-왜-바깥-커밋에서-예외가-나는가"><a class="anchor" href="#q2-내부-required-메서드가-rollback-only가-되면-왜-바깥-커밋에서-예외가-나는가" aria-hidden="true">#</a>Q2. 내부 <code>REQUIRED</code> 메서드가 rollback-only가 되면 왜 바깥 커밋에서 예외가 나는가?</h3>
 <p>둘은 논리 호출 범위는 달라도 같은 물리 트랜잭션에 참여한다. 안쪽 범위의 실패를 바깥이 예외 처리했다고 실제 자원 트랜잭션이 커밋 가능 상태로 돌아오는 것은 아니다. 바깥 호출자가 성공으로 오해하지 않도록 <code>UnexpectedRollbackException</code>으로 롤백 사실을 알린다.<br>꼬리질문: 둘 중 하나만 롤백하려면? <strong>JDBC savepoint 기반 <code>NESTED</code>를 검토하되 자원 지원을 확인한다.</strong></p>
 <h3 id="q3-requires_new-대신-nested를-선택할-수-있는-상황은"><a class="anchor" href="#q3-requires_new-대신-nested를-선택할-수-있는-상황은" aria-hidden="true">#</a>Q3. <code>REQUIRES_NEW</code> 대신 <code>NESTED</code>를 선택할 수 있는 상황은?</h3>
 <p>안쪽 작업 일부를 되돌려도 바깥 물리 트랜잭션을 계속 커밋해야 한다면 savepoint를 제공하는 <code>NESTED</code>가 맞을 수 있다. <code>REQUIRES_NEW</code>는 물리 트랜잭션이 독립이라 안쪽이 커밋한 뒤 바깥이 실패해도 안쪽 데이터가 남는다. 독립 커넥션이 필요해 풀 압박도 커진다.<br>꼬리질문: JPA에서 <code>NESTED</code>가 항상 동작하는가? <strong>아니다. 매니저·드라이버의 savepoint 지원에 의존한다.</strong></p>
 <h3 id="q4-checked-예외를-던졌는데-롤백되지-않는-이유와-해결책은"><a class="anchor" href="#q4-checked-예외를-던졌는데-롤백되지-않는-이유와-해결책은" aria-hidden="true">#</a>Q4. checked 예외를 던졌는데 롤백되지 않는 이유와 해결책은?</h3>
-<p>Spring 기본 규칙이 <code>RuntimeException</code> 및 <code>Error</code>에 롤백하고 checked 예외에는 커밋하는 정책이기 때문이다. 업무 실패 checked 예외에 <code>rollbackFor = SomeException.class</code>를 선언한다. Spring 6.2 이상에서는 전역 기본을 <code>ALL_EXCEPTIONS</code>로 바꿀 수도 있다.<br>꼬리질문: 예외 이름 패턴 대신 타입을 권하는 이유는? <strong>부분 문자열 매칭이라 유사한 이름이나 중첩 예외까지 뜻밖에 일치할 수 있다.</strong></p>
+<p>Spring 기본 규칙이 <code>RuntimeException</code> 및 <code>Error</code>에 롤백하고 checked 예외에는 커밋하는 정책이기 때문이다. 업무 실패 checked 예외에 <code>rollbackFor = SomeException.class</code>를 선언한다. Spring 6.2 이상에서는 전역 기본을 <code>ALL_EXCEPTIONS</code>로 바꿀 수도 있다.</p>
+<p>꼬리질문: 예외 이름 패턴 대신 타입을 권하는 이유는? <strong>부분 문자열 매칭이라 유사한 이름이나 중첩 예외까지 뜻밖에 일치할 수 있다.</strong></p>
 <h3 id="q5-isolationserializable이면-재시도-코드는-필요-없는가"><a class="anchor" href="#q5-isolationserializable이면-재시도-코드는-필요-없는가" aria-hidden="true">#</a>Q5. <code>isolation=SERIALIZABLE</code>이면 재시도 코드는 필요 없는가?</h3>
 <p>아니다. 직렬화 결과를 보장하기 위해 DB가 충돌하는 트랜잭션을 실패시키는 구현이 흔하다. 실패를 전체 업무 단위에서 재시도할 수 있도록 멱등성, 최대 재시도, backoff를 준비해야 한다. 또 격리수준은 새 물리 트랜잭션에만 적용되는지 확인한다.<br>꼬리질문: Spring의 <code>ISOLATION_DEFAULT</code>는 항상 <code>READ_COMMITTED</code>인가? <strong>아니다. 기반 데이터베이스의 기본 격리수준을 따른다.</strong></p>
 <h3 id="q6-transactionaleventlistenerafter_commit와-아웃박스의-차이는"><a class="anchor" href="#q6-transactionaleventlistenerafter_commit와-아웃박스의-차이는" aria-hidden="true">#</a>Q6. <code>@TransactionalEventListener(AFTER_COMMIT)</code>와 아웃박스의 차이는?</h3>

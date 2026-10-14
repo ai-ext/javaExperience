@@ -291,7 +291,9 @@ public record PostCreateRequest(
 
 ## CORS 열기
 
-studymate 화면의 실행 칸은 **브라우저가** 내 서버로 직접 요청을 보낸다. 그러려면 서버가 "이 출처에서 오는 요청은 읽어도 된다"고 허락해야 한다. 0장에서 `CorsConfig`를 이미 만들었다면 그대로 둔다(0-3용 `X-Client` 헤더가 하나 더 들어 있다). `org.example` 아래 설정용 클래스 하나(예: `org.example.config.CorsConfig`)에서 `WebMvcConfigurer`를 구현하고 `addCorsMappings`를 재정의한다.
+studymate 화면의 실행 칸은 **브라우저가** 내 서버로 직접 요청을 보낸다. 그러려면 서버가 "이 출처에서 오는 요청은 읽어도 된다"고 허락해야 한다.
+
+0장에서 `CorsConfig`를 이미 만들었다면 그대로 둔다(0-3용 `X-Client` 헤더가 하나 더 들어 있다). `org.example` 아래 설정용 클래스 하나(예: `org.example.config.CorsConfig`)에서 `WebMvcConfigurer`를 구현하고 `addCorsMappings`를 재정의한다.
 
 | 설정 | 값 | 이유 |
 |---|---|---|
@@ -333,7 +335,9 @@ curl -i -X POST "$BASE/api/posts" -H 'Origin: http://localhost:3000' -H 'Content
   -d '{"boardSlug":"dev","title":"[채점] 첫 게시글","content":"Spring Boot로 만든 첫 게시글입니다.","tags":["spring","jpa"],"visibility":"PUBLIC"}'
 ```
 
-브라우저로 확인 — 위쪽 **내 서버 주소**가 앱 주소와 같은지 보고 아래 실행 칸의 [전체 실행]을 누른다. C1·C2가 통과하면 브라우저에서도 CORS가 열린 것이다(요청 A는 preflight를 거친다). "CORS로 막혔어요"가 뜨면 [CORS 열기](#cors-열기)를 다시 본다. 개발자 도구(F12) → Network 탭에서 `OPTIONS /api/posts`(preflight)와 `POST /api/posts` 두 줄, 응답 헤더의 `Access-Control-Allow-Origin`을 볼 수 있다. C3·C4는 브라우저가 대신 보낼 수 없는 요청이라(코드는 `Origin` 헤더를 못 바꾼다) 위 curl로 확인한다.
+브라우저로 확인 — 위쪽 **내 서버 주소**가 앱 주소와 같은지 보고 아래 실행 칸의 [전체 실행]을 누른다. C1·C2가 통과하면 브라우저에서도 CORS가 열린 것이다(요청 A는 preflight를 거친다).
+
+"CORS로 막혔어요"가 뜨면 [CORS 열기](#cors-열기)를 다시 본다. 개발자 도구(F12) → Network 탭에서 `OPTIONS /api/posts`(preflight)와 `POST /api/posts` 두 줄, 응답 헤더의 `Access-Control-Allow-Origin`을 볼 수 있다. C3·C4는 브라우저가 대신 보낼 수 없는 요청이라(코드는 `Origin` 헤더를 못 바꾼다) 위 curl로 확인한다.
 
 버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
 

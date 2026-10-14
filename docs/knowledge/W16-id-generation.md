@@ -26,7 +26,9 @@
 
 ### 생성 위치가 생명주기와 배치를 결정한다
 
-키가 DB에서 나오는지 애플리케이션에서 나오는지가 ORM의 INSERT 시점을 바꾼다. `IDENTITY`는 INSERT를 실행하고 결과 키를 받아야 엔티티 ID가 정해진다. Hibernate는 여러 INSERT를 키를 모르는 채 JDBC batch로 보내기 어렵다. 반면 `SEQUENCE`는 INSERT 전에 `next value`를 확보할 수 있고, UUID·Snowflake도 엔티티를 DB에 보내기 전에 값이 있으므로 여러 INSERT를 모아 보낼 여지가 있다. 실제 배치 여부는 드라이버, 트랜잭션, 매핑, Hibernate 설정과 DB가 함께 결정한다.
+키가 DB에서 나오는지 애플리케이션에서 나오는지가 ORM의 INSERT 시점을 바꾼다. `IDENTITY`는 INSERT를 실행하고 결과 키를 받아야 엔티티 ID가 정해진다. Hibernate는 여러 INSERT를 키를 모르는 채 JDBC batch로 보내기 어렵다.
+
+반면 `SEQUENCE`는 INSERT 전에 `next value`를 확보할 수 있고, UUID·Snowflake도 엔티티를 DB에 보내기 전에 값이 있으므로 여러 INSERT를 모아 보낼 여지가 있다. 실제 배치 여부는 드라이버, 트랜잭션, 매핑, Hibernate 설정과 DB가 함께 결정한다.
 
 ```mermaid
 flowchart TD
@@ -54,7 +56,9 @@ UUIDv7은 Unix millisecond timestamp를 앞에 두고 난수 또는 선택적인
 
 UUIDv4에는 122비트, UUIDv7에는 74비트, ULID에는 80비트 난수 영역이 있다. 충돌 가능성이 매우 낮아도 0은 아니므로 PK/UNIQUE 제약은 유지한다.
 
-Snowflake 계열은 보통 64비트 부호 있는 정수에 시각, 노드 식별자, 같은 시간 단위 안의 sequence를 붙인다. Twitter의 2010 구현은 부호 비트 1개를 남기고 41비트 시간, 데이터센터 5비트, 워커 5비트, sequence 12비트를 사용했다. 이 배치에서는 밀리초당 한 워커에서 4096개 값을 만들 수 있지만, 이를 넘으면 다음 밀리초를 기다려야 한다. 워커 번호 중복은 충돌을 만들고, 서버 시계가 마지막 생성 시각보다 뒤로 가면 구현은 거부하거나 보정해야 한다. 따라서 Snowflake의 “유일성”은 노드 ID 할당과 시계 정책이 올바르다는 운영 조건에 기대고 있다.
+Snowflake 계열은 보통 64비트 부호 있는 정수에 시각, 노드 식별자, 같은 시간 단위 안의 sequence를 붙인다. Twitter의 2010 구현은 부호 비트 1개를 남기고 41비트 시간, 데이터센터 5비트, 워커 5비트, sequence 12비트를 사용했다. 이 배치에서는 밀리초당 한 워커에서 4096개 값을 만들 수 있지만, 이를 넘으면 다음 밀리초를 기다려야 한다.
+
+워커 번호 중복은 충돌을 만들고, 서버 시계가 마지막 생성 시각보다 뒤로 가면 구현은 거부하거나 보정해야 한다. 따라서 Snowflake의 “유일성”은 노드 ID 할당과 시계 정책이 올바르다는 운영 조건에 기대고 있다.
 
 어떤 방식도 생성 시각을 커밋 순서로 바꾸지는 않는다. 트랜잭션 A가 작은 ID를 먼저 받고 오래 열린 동안 트랜잭션 B가 큰 ID를 받고 먼저 커밋할 수 있다. 롤백, 시간 동기화 차이, 같은 밀리초 난수도 있으므로 ID 정렬을 업무 이벤트의 정확한 순서로 쓰지 않는다.
 
@@ -120,7 +124,9 @@ class UuidPayment {
 
 Spring Boot 4.1 / Jakarta Persistence 코드 **(미실행)**. 첫 두 클래스는 Long PK, 셋째는 UUID PK다. `SEQUENCE`는 IDENTITY와 달리 INSERT 전에 ID를 알아 JDBC batch 조건에 유리하다. MySQL UUID 컬럼은 migration으로 `BINARY(16)`처럼 저장 폭을 명시하고, 자동 스키마 생성 결과와 비교한다.
 
-다음 순수 Java 예제는 Java 21에서 실행했다. Java 25의 `UUID.randomUUID()`도 UUIDv4를 만든다. UUIDv7 부분은 Java의 공개 `UUID(long, long)` 생성자를 이용해 RFC 비트 레이아웃을 조립한다. same-millisecond 순서 보정은 하지 않아 UUIDv7의 시간 필드만 제공한다. Snowflake는 Twitter 계열 41/5/5/12 비트 배치를 간단히 구현한다. 실제 배포에서는 worker/datacenter ID를 설정으로 받고 중복 배정을 막아야 한다.
+다음 순수 Java 예제는 Java 21에서 실행했다. Java 25의 `UUID.randomUUID()`도 UUIDv4를 만든다. UUIDv7 부분은 Java의 공개 `UUID(long, long)` 생성자를 이용해 RFC 비트 레이아웃을 조립한다.
+
+same-millisecond 순서 보정은 하지 않아 UUIDv7의 시간 필드만 제공한다. Snowflake는 Twitter 계열 41/5/5/12 비트 배치를 간단히 구현한다. 실제 배포에서는 worker/datacenter ID를 설정으로 받고 중복 배정을 막아야 한다.
 
 ```java
 import java.security.SecureRandom;

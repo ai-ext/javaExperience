@@ -8,11 +8,15 @@
 
 파일을 쓰던 중 본문에서 `IOException`이 났는데 `finally`의 `close()`가 또 예외를 던지면, 잘못 작성된 정리 코드는 처음 쓰기 실패를 덮어써서 로그에 닫기 실패만 남길 수 있다. 원인을 찾는 데 필요한 가장 중요한 정보가 사라진다. `try-with-resources`는 본문 실패를 주 예외로 유지하고 닫기 실패를 suppressed 목록에 붙인다.
 
-또 다른 사고는 계층 사이에서 예외를 바꾸며 원인을 버리는 것이다. 저장소 계층의 `SQLException`을 서비스 예외로 바꿀 때 `new ServiceException(e.getMessage())`만 던지면 DB 드라이버와 호출 경로가 담긴 원인 체인이 사라진다. 반대로 모든 예외를 `catch (Exception)`으로 잡아 `null`을 반환하면 호출자는 실패와 정상적인 “값 없음”을 구분하지 못한다. 예외 타입과 체인은 로그 장식이 아니라 복구·관측·API 경계의 계약이다.
+또 다른 사고는 계층 사이에서 예외를 바꾸며 원인을 버리는 것이다. 저장소 계층의 `SQLException`을 서비스 예외로 바꿀 때 `new ServiceException(e.getMessage())`만 던지면 DB 드라이버와 호출 경로가 담긴 원인 체인이 사라진다.
+
+반대로 모든 예외를 `catch (Exception)`으로 잡아 `null`을 반환하면 호출자는 실패와 정상적인 “값 없음”을 구분하지 못한다. 예외 타입과 체인은 로그 장식이 아니라 복구·관측·API 경계의 계약이다.
 
 ## 2. 핵심 개념
 
-모든 던질 수 있는 객체는 `Throwable` 하위 타입이다. 표준 계층은 `Object → Throwable → Error / Exception`이고, `RuntimeException`은 `Exception`의 하위 타입이다. JVM도 배열 범위 오류 같은 런타임 실패를 `Throwable` 하위 객체로 표현한다. JLS는 예외를 발생 지점에서 프로그램이 지정한 포착 지점으로 제어를 옮기는 비지역 제어 이동으로 정의한다.[JLS 11.1, 11.3]
+모든 던질 수 있는 객체는 `Throwable` 하위 타입이다. 표준 계층은 `Object → Throwable → Error / Exception`이고, `RuntimeException`은 `Exception`의 하위 타입이다.
+
+JVM도 배열 범위 오류 같은 런타임 실패를 `Throwable` 하위 객체로 표현한다. JLS는 예외를 발생 지점에서 프로그램이 지정한 포착 지점으로 제어를 옮기는 비지역 제어 이동으로 정의한다.[JLS 11.1, 11.3]
 
 | 용어 | 뜻 | 설계상 의미 |
 |---|---|---|
@@ -24,7 +28,9 @@
 | suppressed exception | 주 실패와 별도로 정리 과정에서 발생했지만 함께 보존한 예외 | 자원 닫기 실패처럼 주 실패를 대체하면 안 되는 예외를 기록한다. |
 | stack trace | `Throwable`이 생성될 때의 스레드 호출 스택 정보 | 실패가 만들어진 경로를 보여 주며 예외 객체 생성 비용의 일부가 된다. |
 
-컴파일러는 타입 계층과 메서드 선언을 바탕으로 표현식·문장이 던질 수 있는 checked 타입을 분석한다. `Throwable` 자체와 `IOException`은 checked지만 `RuntimeException`, `NullPointerException`, `Error`는 unchecked다. 호출자는 checked 예외를 처리하거나 자신도 `throws`로 노출해야 한다. 이는 누락을 줄이는 대신 예외를 API 시그니처에 전파한다.[JLS 11.2; `Throwable` API]
+컴파일러는 타입 계층과 메서드 선언을 바탕으로 표현식·문장이 던질 수 있는 checked 타입을 분석한다. `Throwable` 자체와 `IOException`은 checked지만 `RuntimeException`, `NullPointerException`, `Error`는 unchecked다.
+
+호출자는 checked 예외를 처리하거나 자신도 `throws`로 노출해야 한다. 이는 누락을 줄이는 대신 예외를 API 시그니처에 전파한다.[JLS 11.2; `Throwable` API]
 
 | 구분 | checked (`IOException`) | unchecked (`IllegalArgumentException`) |
 |---|---|---|
@@ -291,7 +297,9 @@ Spring MVC 응답 예외 변환은 → S05 참조. 트랜잭션 롤백 규칙은
 
 ### Q3. `catch (Exception)`은 `Error`도 잡는가? `catch (Throwable)`은?
 
-`Exception`과 `Error`는 `Throwable`의 형제 갈래이므로 `catch (Exception)`은 `Error`를 잡지 않는다. `catch (Throwable)`은 두 갈래를 모두 포착한다. `Error`는 보통 애플리케이션이 안전하게 복구할 수 없으므로, 경계에서 특별한 목적 없이 `Throwable`을 잡아 계속 실행하면 상태 악화를 숨길 수 있다. JVM 종료·프로세스 중단에 대한 안전장치로 catch 블록을 오해하지 않는다.
+`Exception`과 `Error`는 `Throwable`의 형제 갈래이므로 `catch (Exception)`은 `Error`를 잡지 않는다. `catch (Throwable)`은 두 갈래를 모두 포착한다.
+
+`Error`는 보통 애플리케이션이 안전하게 복구할 수 없으므로, 경계에서 특별한 목적 없이 `Throwable`을 잡아 계속 실행하면 상태 악화를 숨길 수 있다. JVM 종료·프로세스 중단에 대한 안전장치로 catch 블록을 오해하지 않는다.
 
 **꼬리질문:** `finally`는 무슨 일이 있어도 실행되나? → 정상적인 제어 이탈에 대해 실행되지만 JVM 강제 종료나 프로세스 종료에서는 보장되지 않는다.
 

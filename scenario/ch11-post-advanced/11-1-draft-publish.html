@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>11-1. 임시저장했다가 발행하기</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
@@ -316,7 +316,8 @@ public ProblemDetail handlePostNotDraft(PostNotDraftException ex, HttpServletReq
 <details>
 <summary>MyBatis Mapper — 임시저장·발행 SQL</summary>
 
-<p><strong>MyBatis 대체 코드</strong> 토글은 이 단계에서 추가한 임시저장·발행 경로를 Mapper로 실행한다. 선행 단계의 JPA 읽기·일반 글쓰기는 유지하며, 임시저장 INSERT의 새 id를 받아 글을 반환하고 <code>post_tag</code> 연결은 기존 JPA 트랜잭션에서 저장한다. 발행 전에 <code>SELECT ... FOR UPDATE</code>로 글 행을 잠근 뒤 404→403→409를 검사한다. 발행 UPDATE도 <code>status=&#39;DRAFT&#39;</code>를 조건에 넣고 영향 행 수가 0이면 롤백한다. 임시저장 목록은 게시판을 JOIN해 한 번에 읽는다.</p>
+<p><strong>MyBatis 대체 코드</strong> 토글은 이 단계에서 추가한 임시저장·발행 경로를 Mapper로 실행한다. 선행 단계의 JPA 읽기·일반 글쓰기는 유지하며, 임시저장 INSERT의 새 id를 받아 글을 반환하고 <code>post_tag</code> 연결은 기존 JPA 트랜잭션에서 저장한다.</p>
+<p>발행 전에 <code>SELECT ... FOR UPDATE</code>로 글 행을 잠근 뒤 404→403→409를 검사한다. 발행 UPDATE도 <code>status=&#39;DRAFT&#39;</code>를 조건에 넣고 영향 행 수가 0이면 롤백한다. 임시저장 목록은 게시판을 JOIN해 한 번에 읽는다.</p>
 <pre><code class="language-java">int insertDraft(DraftInsertRow row);
 Long lockPost(@Param(&quot;id&quot;) Long id);
 int publish(@Param(&quot;id&quot;) Long id, @Param(&quot;now&quot;) LocalDateTime now);
@@ -2531,9 +2532,8 @@ C15: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[
 <details>
 <summary>힌트 2 — 발행 서비스</summary>
 
-<p>3-1의 <code>patch()</code>와 모양이 같다. <code>findById</code> → <code>accessPolicy.canView(...)</code>가 거짓이면 404 → 작성자가 아니면 403 → <code>&quot;DRAFT&quot;</code>가 아니면 409용 예외 → <code>post.publish(LocalDateTime.now())</code>. 409용 예외를 새로 만들고 <code>ApiExceptionHandler</code>에 <code>HttpStatus.CONFLICT</code>로 등록한다. <code>@Transactional</code> 안이라 <code>save()</code>를 부르지 않아도 커밋 때 UPDATE가 나간다.</p>
-</details>
-
+<p>3-1의 <code>patch()</code>와 모양이 같다. <code>findById</code> → <code>accessPolicy.canView(...)</code>가 거짓이면 404 → 작성자가 아니면 403 → <code>&quot;DRAFT&quot;</code>가 아니면 409용 예외 → <code>post.publish(LocalDateTime.now())</code>.</p>
+<p>409용 예외를 새로 만들고 <code>ApiExceptionHandler</code>에 <code>HttpStatus.CONFLICT</code>로 등록한다. <code>@Transactional</code> 안이라 <code>save()</code>를 부르지 않아도 커밋 때 UPDATE가 나간다. </details></p>
 <details>
 <summary>힌트 3 — 내 임시저장 글 쿼리</summary>
 

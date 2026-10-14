@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>10-12. JPA로 쓰고 같은 트랜잭션에서 MyBatis로 읽기 — flush (선택)</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
@@ -178,7 +178,8 @@ select count(*) from post_likes where post_id = ? and user_id = ?   ← (좋아�
 <p>변경 감지는 엔티티의 값만 바꿔 두고, UPDATE는 flush 때 만든다. 로그를 보면 UPDATE가 <strong>JPA 네이티브 쿼리(<code>countLike</code>) 바로 앞에서</strong> 나갔다. Hibernate는 자기가 실행하는 쿼리 앞에서는 결과가 틀리지 않게 알아서 flush한다(auto flush). <strong>MyBatis 쿼리는 Hibernate가 모르는 쿼리라 그 앞에서는 flush하지 않는다.</strong></p>
 <p>함정이 하나 더 있다. MyBatis 조회를 우연히 <code>countLike</code> <strong>뒤에</strong> 두면 flush 없이도 맞게 나온다. 순서를 바꾸는 순간 깨지는 코드다. 필요한 곳에 <code>flush()</code>를 직접 적는다.</p>
 <h3 id="③-flush하면-왜-보이나--같은-커넥션"><a class="anchor" href="#③-flush하면-왜-보이나--같은-커넥션" aria-hidden="true">#</a>③ flush하면 왜 보이나 — 같은 커넥션</h3>
-<p><code>flush()</code>는 SQL을 DB로 보낼 뿐 <strong>커밋하지 않는다.</strong> 커밋 전의 변경은 원래 다른 커넥션에서 안 보인다. 그런데도 MyBatis가 새 값을 읽는다는 것은 <strong>MyBatis가 JPA와 같은 트랜잭션·같은 커넥션을 쓰고 있다</strong>는 뜻이다. <code>@Transactional</code>(JPA 트랜잭션 관리자)이 연 커넥션을 MyBatis-Spring이 그대로 받아 쓴다. 그래서 둘을 섞으려면 반드시 <strong>같은 <code>@Transactional</code> 메서드 안</strong>에서 부른다.</p>
+<p><code>flush()</code>는 SQL을 DB로 보낼 뿐 <strong>커밋하지 않는다.</strong> 커밋 전의 변경은 원래 다른 커넥션에서 안 보인다. 그런데도 MyBatis가 새 값을 읽는다는 것은 <strong>MyBatis가 JPA와 같은 트랜잭션·같은 커넥션을 쓰고 있다</strong>는 뜻이다.</p>
+<p><code>@Transactional</code>(JPA 트랜잭션 관리자)이 연 커넥션을 MyBatis-Spring이 그대로 받아 쓴다. 그래서 둘을 섞으려면 반드시 <strong>같은 <code>@Transactional</code> 메서드 안</strong>에서 부른다.</p>
 <h3 id="④-그래도-옛-값--mybatis-1차-캐시"><a class="anchor" href="#④-그래도-옛-값--mybatis-1차-캐시" aria-hidden="true">#</a>④ 그래도 옛 값 — MyBatis 1차 캐시</h3>
 <p>수정 메서드 <strong>앞부분</strong>에서 같은 MyBatis 쿼리로 &quot;수정 전 카드&quot;를 한 번 읽고, 변경 → flush → 다시 읽어 보았다.</p>
 <pre><code class="language-text">data.title           [채점] 10-12 수정 후
@@ -891,9 +892,8 @@ curl -s -G &quot;$BASE/api/v1/posts&quot; --data-urlencode 'q=10-12 수정 후' 
     &lt;include refid=&quot;columns&quot;/&gt;
     WHERE p.id = #{id}
 &lt;/select&gt;</code></pre>
-<p>태그는 <code>SELECT pt.post_id, t.name FROM post_tags pt JOIN tags t ON t.id = pt.tag_id WHERE pt.post_id IN &lt;foreach …&gt;#{id}&lt;/foreach&gt; ORDER BY t.name</code>. 목록 서비스에 <code>listItem(Long postId)</code>를 두고, 행 하나와 그 글의 태그로 항목 하나를 만든다. 태그도 <strong>MyBatis로</strong> 읽어야 한다 — JPA 쿼리로 읽으면 그 앞에서 Hibernate가 auto flush해 버려 아래 ①을 재현할 수 없다.</p>
-</details>
-
+<p>태그는 <code>SELECT pt.post_id, t.name FROM post_tags pt JOIN tags t ON t.id = pt.tag_id WHERE pt.post_id IN &lt;foreach …&gt;#{id}&lt;/foreach&gt; ORDER BY t.name</code>. 목록 서비스에 <code>listItem(Long postId)</code>를 두고, 행 하나와 그 글의 태그로 항목 하나를 만든다.</p>
+<p>태그도 <strong>MyBatis로</strong> 읽어야 한다 — JPA 쿼리로 읽으면 그 앞에서 Hibernate가 auto flush해 버려 아래 ①을 재현할 수 없다. </details></p>
 <details>
 <summary>힌트 2 — 서비스에서의 순서</summary>
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S21. Spring Boot 3→4·Framework 7 변화와 마이그레이션</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -127,7 +127,8 @@
 </tbody></table></div>
 <h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
 <h3 id="31-업그레이드는-하나의-dependency-graph-재해결이다"><a class="anchor" href="#31-업그레이드는-하나의-dependency-graph-재해결이다" aria-hidden="true">#</a>3.1 업그레이드는 하나의 dependency graph 재해결이다</h3>
-<p>Boot starter는 단순한 편의 dependency가 아니라 관리되는 버전 집합의 진입점이다. 4.0은 큰 jar 몇 개 대신 더 작은 focused module을 제공하고 starter 구성을 정리했다. 따라서 직접 <code>spring-boot-autoconfigure</code>나 제3자 라이브러리만 추가하던 애플리케이션은 “예전에는 전이 의존성으로 우연히 되던 기능”을 잃는다. 직접 관리하는 프로젝트라면 <code>spring-framework 7.x</code>, Servlet 6.1, JPA 3.2, Hibernate ORM 7.1/7.2, Validation 3.1, Netty 4.2, JUnit 6 호환성을 함께 맞춘다.</p>
+<p>Boot starter는 단순한 편의 dependency가 아니라 관리되는 버전 집합의 진입점이다. 4.0은 큰 jar 몇 개 대신 더 작은 focused module을 제공하고 starter 구성을 정리했다.</p>
+<p>따라서 직접 <code>spring-boot-autoconfigure</code>나 제3자 라이브러리만 추가하던 애플리케이션은 “예전에는 전이 의존성으로 우연히 되던 기능”을 잃는다. 직접 관리하는 프로젝트라면 <code>spring-framework 7.x</code>, Servlet 6.1, JPA 3.2, Hibernate ORM 7.1/7.2, Validation 3.1, Netty 4.2, JUnit 6 호환성을 함께 맞춘다.</p>
 <pre class="mermaid">flowchart LR
     A[Boot 3.5 최신화] --&gt; B[deprecated/API 사용 제거]
     B --&gt; C[Boot 4 BOM 재해결]
@@ -138,11 +139,14 @@
     G --&gt; H[통합/Native/운영 smoke test]</pre>
 <p>메이저 버전에서 이 순서를 지키는 이유는 실패 원인을 분리하기 위해서다. 3.5에서 deprecated를 없애지 않고 4.0으로 올리면 “이번 변경”과 “예정된 제거”가 한 로그에 섞인다. 직접 고정한 Spring Cloud나 Hibernate 버전을 조사하지 않으면 외부 플랫폼 조합 문제를 Boot 탓으로 오인한다.</p>
 <h3 id="32-jspecify-null-safety는-runtime-검사가-아니라-계약의-이동이다"><a class="anchor" href="#32-jspecify-null-safety는-runtime-검사가-아니라-계약의-이동이다" aria-hidden="true">#</a>3.2 JSpecify null-safety는 runtime 검사가 아니라 계약의 이동이다</h3>
-<p>Framework 7 소스는 JSpecify annotation으로 API·필드·type usage의 nullability를 표시하고 빌드에서 NullAway로 일관성을 검사한다. Java 컴파일러 자체가 null을 타입으로 표현하지는 않으므로 annotation만 붙였다고 런타임 NPE가 자동으로 사라지는 것은 아니다. IDE 또는 NullAway 같은 checker가 호출자 코드를 분석해 경고/실패를 내는 구조다. Kotlin에서는 JSpecify가 Kotlin null-safety로 번역된다.</p>
+<p>Framework 7 소스는 JSpecify annotation으로 API·필드·type usage의 nullability를 표시하고 빌드에서 NullAway로 일관성을 검사한다. Java 컴파일러 자체가 null을 타입으로 표현하지는 않으므로 annotation만 붙였다고 런타임 NPE가 자동으로 사라지는 것은 아니다.</p>
+<p>IDE 또는 NullAway 같은 checker가 호출자 코드를 분석해 경고/실패를 내는 구조다. Kotlin에서는 JSpecify가 Kotlin null-safety로 번역된다.</p>
 <p>기본은 <code>@NullMarked</code> 범위 안에서 non-null이고, 실제 null 가능 값만 <code>@Nullable</code>로 표시한다. 이 변화는 애플리케이션 API를 즉시 전부 annotate하라는 뜻이 아니다. 우선 Framework 7로 바꾼 뒤 IDE 경고가 늘어난 지점을 계약 위반으로 분류하고, 공용 라이브러리부터 <code>package-info.java</code>와 checker를 도입한다.</p>
 <h3 id="33-httpheaders와-http-interface의-설계-차이"><a class="anchor" href="#33-httpheaders와-http-interface의-설계-차이" aria-hidden="true">#</a>3.3 HttpHeaders와 HTTP interface의 설계 차이</h3>
-<p>헤더 이름은 대소문자를 무시하고 같은 이름에 여러 값이 올 수 있다. 일반 Map의 <code>equals</code>, <code>put</code>, key iteration을 그대로 적용하면 서버의 의미와 맞지 않는다. Framework 7은 이 현실을 반영해 <code>HttpHeaders</code>가 <code>MultiValueMap</code> 계약을 상속하지 않게 했고, 기존 map-style 접근을 위한 일부 fallback을 deprecated로 남겼다. 헤더 유틸리티는 <code>set</code>, <code>add</code>, <code>getFirst</code>, <code>headerNames</code> 같은 헤더 전용 연산으로 옮긴다.</p>
-<p>HTTP interface는 <code>@HttpExchange</code>가 붙은 Java interface를 읽고 Spring이 proxy를 만든다. 메서드의 <code>@GetExchange</code>, <code>@PostExchange</code>, <code>@RequestBody</code> 메타데이터가 요청 method·URL·body로 변환되고, 실제 transport는 동기/비동기 client 설정에 위임된다. Boot 4는 여기에 auto-configuration과 properties를 제공하므로 client마다 수동 proxy factory를 중복 생성하지 않아도 된다. 다만 interface가 곧 resilience 계층은 아니다. timeout, retry, circuit breaker, idempotency는 별도로 설계한다.</p>
+<p>헤더 이름은 대소문자를 무시하고 같은 이름에 여러 값이 올 수 있다. 일반 Map의 <code>equals</code>, <code>put</code>, key iteration을 그대로 적용하면 서버의 의미와 맞지 않는다.</p>
+<p>Framework 7은 이 현실을 반영해 <code>HttpHeaders</code>가 <code>MultiValueMap</code> 계약을 상속하지 않게 했고, 기존 map-style 접근을 위한 일부 fallback을 deprecated로 남겼다. 헤더 유틸리티는 <code>set</code>, <code>add</code>, <code>getFirst</code>, <code>headerNames</code> 같은 헤더 전용 연산으로 옮긴다.</p>
+<p>HTTP interface는 <code>@HttpExchange</code>가 붙은 Java interface를 읽고 Spring이 proxy를 만든다. 메서드의 <code>@GetExchange</code>, <code>@PostExchange</code>, <code>@RequestBody</code> 메타데이터가 요청 method·URL·body로 변환되고, 실제 transport는 동기/비동기 client 설정에 위임된다. Boot 4는 여기에 auto-configuration과 properties를 제공하므로 client마다 수동 proxy factory를 중복 생성하지 않아도 된다.</p>
+<p>다만 interface가 곧 resilience 계층은 아니다. timeout, retry, circuit breaker, idempotency는 별도로 설계한다.</p>
 <h3 id="34-api-versioning의-분리된-책임"><a class="anchor" href="#34-api-versioning의-분리된-책임" aria-hidden="true">#</a>3.4 API Versioning의 분리된 책임</h3>
 <p>요청에 버전을 전달하는 위치는 header, query parameter, media type, URL 등 여러 가지다. Framework의 API Versioning은 “어느 위치에서 읽을지”와 “문자열을 어떤 버전으로 해석할지”를 <code>ApiVersionResolver</code>, <code>ApiVersionParser</code>, <code>ApiVersionDeprecationHandler</code>로 나눈다. Boot 4는 MVC와 WebFlux에 각각 <code>spring.mvc.apiversion.*</code>, <code>spring.webflux.apiversion.*</code> 설정과 auto-configuration을 제공한다.</p>
 <p>controller가 <code>if (version == ...)</code>로 프로토콜 parsing까지 떠안지 않는 것이 핵심이다. resolver는 후보를 찾고 parser는 정규화하며 deprecation handler는 sunset 경고·거부 정책을 담당한다. 버전 전략을 정한 뒤 두 stack을 별도로 검증한다.</p>

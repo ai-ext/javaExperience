@@ -48,9 +48,13 @@ flowchart LR
 | 서비스 계층 | 재고·예약 가능 여부, 상태 전이, 소유권·역할, 교차 필드 업무 규칙 | 동시에 들어온 요청 사이의 원자적 데이터 무결성만으로는 부족 |
 | DB | `NOT NULL`, `UNIQUE`, `CHECK`, `FOREIGN KEY`, 컬럼 길이 등 저장 규칙 | 사용자가 읽을 메시지, UI 동작, 호출자별 업무 흐름 |
 
-Bean Validation은 어노테이션 기반 제약 메타데이터와 검증 API를 제공한다. Spring의 `LocalValidatorFactoryBean`은 Jakarta Validator를 Spring Validator에 연결하고, 사용자 정의 `ConstraintValidator`도 Spring 의존성 주입을 이용하게 한다. 그래서 `@NotBlank`, `@Size`처럼 필드 자체에 붙는 반복 규칙을 컨트롤러마다 수동 `if`로 복제하지 않아도 된다. 그래도 “허용된 상태 전이인가?”는 DTO의 문자열 제약만으로 결정되지 않는다. [Spring Framework Reference](https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html)
+Bean Validation은 어노테이션 기반 제약 메타데이터와 검증 API를 제공한다. Spring의 `LocalValidatorFactoryBean`은 Jakarta Validator를 Spring Validator에 연결하고, 사용자 정의 `ConstraintValidator`도 Spring 의존성 주입을 이용하게 한다.
 
-규칙의 위치는 **판단에 필요한 정보**로 정한다. 값 모양은 DTO, 다른 레코드·현재 시각·업무 상태는 서비스, 모든 쓰기 경로에서 유지할 데이터 조건은 DB에 둔다. OWASP는 문법(syntax)과 의미(semantics)를 구분하며, 입력 검증은 SQL 파라미터화·출력 인코딩·권한 확인을 대신하지 않는다고 설명한다. 유효한 계정 번호가 접근 권한을 뜻하지는 않는다. [OWASP Input Validation Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html)
+그래서 `@NotBlank`, `@Size`처럼 필드 자체에 붙는 반복 규칙을 컨트롤러마다 수동 `if`로 복제하지 않아도 된다. 그래도 “허용된 상태 전이인가?”는 DTO의 문자열 제약만으로 결정되지 않는다. [Spring Framework Reference](https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html)
+
+규칙의 위치는 **판단에 필요한 정보**로 정한다. 값 모양은 DTO, 다른 레코드·현재 시각·업무 상태는 서비스, 모든 쓰기 경로에서 유지할 데이터 조건은 DB에 둔다.
+
+OWASP는 문법(syntax)과 의미(semantics)를 구분하며, 입력 검증은 SQL 파라미터화·출력 인코딩·권한 확인을 대신하지 않는다고 설명한다. 유효한 계정 번호가 접근 권한을 뜻하지는 않는다. [OWASP Input Validation Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html)
 
 ### 중복 검사와 경쟁 조건
 
@@ -63,7 +67,9 @@ Bean Validation은 어노테이션 기반 제약 메타데이터와 검증 API�
 요청 B: INSERT → 성공 또는 UNIQUE 위반
 ```
 
-고유성이 필수라면 DB에 `UNIQUE`가 없을 때 두 INSERT가 모두 성공할 수 있다. 애플리케이션 인스턴스를 두 개 띄우면 각 인스턴스의 메모리 잠금도 서로를 막지 않는다. PostgreSQL 문서는 제약을 위반하는 값을 저장하려 하면 오류가 발생하며, `UNIQUE`는 중복 행을 막는다고 설명한다. DB 제약을 최종 수문장으로 두면 트랜잭션 경쟁에서도 잘못된 상태가 영속화되지 않는다. [PostgreSQL Constraints](https://www.postgresql.org/docs/current/ddl-constraints.html)
+고유성이 필수라면 DB에 `UNIQUE`가 없을 때 두 INSERT가 모두 성공할 수 있다. 애플리케이션 인스턴스를 두 개 띄우면 각 인스턴스의 메모리 잠금도 서로를 막지 않는다.
+
+PostgreSQL 문서는 제약을 위반하는 값을 저장하려 하면 오류가 발생하며, `UNIQUE`는 중복 행을 막는다고 설명한다. DB 제약을 최종 수문장으로 두면 트랜잭션 경쟁에서도 잘못된 상태가 영속화되지 않는다. [PostgreSQL Constraints](https://www.postgresql.org/docs/current/ddl-constraints.html)
 
 서비스의 `existsByEmail`은 흔한 중복을 미리 안내하는 데 쓸 수 있다. 빠른 실패일 뿐 무결성 보장은 아니다. DB가 거절한 결과도 일관된 HTTP 오류로 변환한다.
 
@@ -139,7 +145,9 @@ class SignupController {
 }
 ```
 
-요청 DTO는 `@Valid`로 검사한다. Jakarta Validation 그룹은 제약의 부분집합이며 기본 그룹은 `Default`다. 등록·수정 규칙이 다르면 대개 DTO를 분리한다. 같은 모델을 공유하면서 일부 제약만 선택할 때 그룹을 고려한다. [Jakarta Validation 3.1 Groups API](https://jakarta.ee/specifications/bean-validation/3.1/apidocs/jakarta/validation/groups/package-summary)
+요청 DTO는 `@Valid`로 검사한다. Jakarta Validation 그룹은 제약의 부분집합이며 기본 그룹은 `Default`다.
+
+등록·수정 규칙이 다르면 대개 DTO를 분리한다. 같은 모델을 공유하면서 일부 제약만 선택할 때 그룹을 고려한다. [Jakarta Validation 3.1 Groups API](https://jakarta.ee/specifications/bean-validation/3.1/apidocs/jakarta/validation/groups/package-summary)
 
 오류 응답은 구현 예외나 Java 클래스명을 외부에 그대로 내보내지 말고, 클라이언트가 필드별 오류를 처리할 안정된 계약으로 만든다. Spring MVC는 RFC 9457 형식의 `ProblemDetail`을 지원한다. 아래 핸들러는 필드명과 메시지만 노출하고 거절한 입력값은 응답에 넣지 않는다. `(미실행)`
 
@@ -267,7 +275,9 @@ ALTER TABLE users
 
 기존 중복은 제약 추가 전에 정리한다. 특정 UNIQUE 위반만 분류해 `409 Conflict`로 바꾼다. 모든 무결성 예외를 이메일 중복으로 매핑하면 `NOT NULL`이나 외래 키 오류를 숨긴다.
 
-재고는 `SELECT stock > 0` 이후 차감하면 경쟁 조건이 생길 수 있다. DB에서 `UPDATE inventory SET stock = stock - 1 WHERE id = ? AND stock > 0`처럼 조건과 차감을 한 문장으로 수행하고 영향받은 행 수가 0이면 품절로 판단하면 검사와 쓰기의 간격을 좁힐 수 있다. 복잡한 예약은 락·버전 컬럼 등 전략이 필요하다. DTO나 `CHECK (stock >= 0)`만으로 상태 변경 경쟁을 해결하지 못한다.
+재고는 `SELECT stock > 0` 이후 차감하면 경쟁 조건이 생길 수 있다. DB에서 `UPDATE inventory SET stock = stock - 1 WHERE id = ? AND stock > 0`처럼 조건과 차감을 한 문장으로 수행하고 영향받은 행 수가 0이면 품절로 판단하면 검사와 쓰기의 간격을 좁힐 수 있다.
+
+복잡한 예약은 락·버전 컬럼 등 전략이 필요하다. DTO나 `CHECK (stock >= 0)`만으로 상태 변경 경쟁을 해결하지 못한다.
 
 ## 6. 실무에서는 실제로
 

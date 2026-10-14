@@ -82,7 +82,9 @@ A0에서는 코드를 "이렇게 쓴다"로만 따라 쳤다. 이제 그 코드�
 
 ### 준비
 
-**① DB가 떠 있는지 본다.** 실습 레포에는 DB를 쓰는 라이브러리(JPA)가 이미 들어 있다. 그래서 0장처럼 DB를 안 쓰는 코드만 있어도, DB가 꺼져 있으면 앱이 아예 뜨지 않는다. 실습 DB는 javaExperience MySQL(`localhost:13308`) 안에 있다([시작하기](../../README.md)에서 `application.yml`을 이 DB로 맞췄다). javaExperience DB 컨테이너가 떠 있으면 된다.
+**① DB가 떠 있는지 본다.** 실습 레포에는 DB를 쓰는 라이브러리(JPA)가 이미 들어 있다. 그래서 0장처럼 DB를 안 쓰는 코드만 있어도, DB가 꺼져 있으면 앱이 아예 뜨지 않는다.
+
+실습 DB는 javaExperience MySQL(`localhost:13308`) 안에 있다([시작하기](../../README.md)에서 `application.yml`을 이 DB로 맞췄다). javaExperience DB 컨테이너가 떠 있으면 된다.
 
 ```bash
 docker compose ps mysql   # STATUS가 Up … (healthy)면 준비 끝
@@ -96,7 +98,11 @@ Caused by: org.hibernate.HibernateException: Unable to determine Dialect without
 
 그보다 위쪽 `WARN` 줄에는 `Communications link failure`, `Caused by: java.net.ConnectException: Connection refused`가 보인다. "DB에 연결하지 못했다"는 뜻이다.
 
-**② CORS 설정을 넣는다.** 이 페이지 아래쪽의 실행 칸(버튼)은 **브라우저가** 내 서버로 요청을 보낸다. 브라우저 화면과 내 서버는 출처(포트)가 다르다. 그래서 서버가 허락해 주지 않으면 브라우저가 응답을 막는다. 아래 파일을 그대로 붙여 넣는다. 어떻게 동작하는지는 1-1의 [CORS 열기](../ch1-create-post/1-1-receive-request.md#cors-열기)에서 자세히 본다. 0-3에서 쓸 `X-Client` 헤더도 미리 허락해 둔다. 1-1에 갔을 때 이 파일이 있으면 그대로 둔다.
+**② CORS 설정을 넣는다.** 이 페이지 아래쪽의 실행 칸(버튼)은 **브라우저가** 내 서버로 요청을 보낸다. 브라우저 화면과 내 서버는 출처(포트)가 다르다.
+
+그래서 서버가 허락해 주지 않으면 브라우저가 응답을 막는다. 아래 파일을 그대로 붙여 넣는다.
+
+어떻게 동작하는지는 1-1의 [CORS 열기](../ch1-create-post/1-1-receive-request.md#cors-열기)에서 자세히 본다. 0-3에서 쓸 `X-Client` 헤더도 미리 허락해 둔다. 1-1에 갔을 때 이 파일이 있으면 그대로 둔다.
 
 `src/main/java/org/example/config/CorsConfig.java`
 

@@ -75,7 +75,9 @@ ORDER BY id
 LIMIT 3;
 ```
 
-**확인 방법 (예상)**: `SHOW TABLES`에 `member`, `product`, `orders`, `order_item`, `payment` 등이 나온다. `member`에는 `id`, `login_id`, `name`, `email`, `phone`, `member_status`, `deleted_at`, `created_at`, `updated_at` 열이 있다. 마지막 SELECT의 실제 행 값은 시드 데이터에서 온다. 이 쿼리들은 DB를 변경하지 않는다.
+**확인 방법 (예상)**: `SHOW TABLES`에 `member`, `product`, `orders`, `order_item`, `payment` 등이 나온다. `member`에는 `id`, `login_id`, `name`, `email`, `phone`, `member_status`, `deleted_at`, `created_at`, `updated_at` 열이 있다.
+
+마지막 SELECT의 실제 행 값은 시드 데이터에서 온다. 이 쿼리들은 DB를 변경하지 않는다.
 
 ### 단계 3 — MySQL에서 DATABASE와 SCHEMA 확인
 
@@ -208,7 +210,11 @@ Maven에서는 `org.springframework.boot:spring-boot-starter-jdbc`와 `com.mysql
 
 ## 6. 한 단계 더
 
-클라이언트는 서버의 TCP 주소로 연결하고 인증이 끝나면 세션 안에서 SQL을 보낸다. PostgreSQL은 공식 구조 설명에서 접속을 관리하는 서버 프로세스와 클라이언트별 서버 프로세스를 구분한다. MySQL 서버는 다중 스레드 SQL 서버이며, SQL 요청은 파싱·실행 단계를 거쳐 선택된 스토리지 엔진으로 내려간다. InnoDB는 테이블·인덱스 페이지를 buffer pool에 캐시하고, 수정 기록은 redo log에 남겨 장애 복구에 활용한다. 버퍼에 페이지가 없으면 디스크에서 읽고, 변경된 페이지는 테이블스페이스 파일에 반영된다. 서버 메모리·스토리지·접속 포트는 애플리케이션 JVM 메모리와 별도 자원이다.  
+클라이언트는 서버의 TCP 주소로 연결하고 인증이 끝나면 세션 안에서 SQL을 보낸다. PostgreSQL은 공식 구조 설명에서 접속을 관리하는 서버 프로세스와 클라이언트별 서버 프로세스를 구분한다. MySQL 서버는 다중 스레드 SQL 서버이며, SQL 요청은 파싱·실행 단계를 거쳐 선택된 스토리지 엔진으로 내려간다.
+
+InnoDB는 테이블·인덱스 페이지를 buffer pool에 캐시하고, 수정 기록은 redo log에 남겨 장애 복구에 활용한다. 버퍼에 페이지가 없으면 디스크에서 읽고, 변경된 페이지는 테이블스페이스 파일에 반영된다.
+
+서버 메모리·스토리지·접속 포트는 애플리케이션 JVM 메모리와 별도 자원이다.
 관계형과 NoSQL 선택은 → R02, 테이블·타입·제약은 → R03, SQL·트랜잭션은 → R04, DBeaver 같은 도구는 → R06, Spring Boot 연결 설정은 → P19.
 
 ## 7. 자가점검 Q&A (면접 대비)
@@ -225,8 +231,12 @@ DBMS는 데이터 관리 프로그램이다. DB 서버는 클라이언트 접속
 
 ### Q3. MySQL의 `CREATE SCHEMA`는 PostgreSQL과 같은가?
 
-아니다. MySQL에서 `CREATE SCHEMA`는 database 생성의 동의어다. PostgreSQL에서는 현재 database 안에 schema를 만든다. 이식성 있는 스크립트는 이 계층 차이를 처리해야 한다.  
-**꼬리질문:** MySQL `USE x`와 PostgreSQL `SET search_path TO x`는 같은가? **답:** 아니다. `USE`는 MySQL database를 선택하고, `search_path`는 PostgreSQL 현재 database 안에서 이름을 찾을 schema 순서를 정한다.
+아니다. MySQL에서 `CREATE SCHEMA`는 database 생성의 동의어다. PostgreSQL에서는 현재 database 안에 schema를 만든다.
+
+이식성 있는 스크립트는 이 계층 차이를 처리해야 한다.
+**꼬리질문:** MySQL `USE x`와 PostgreSQL `SET search_path TO x`는 같은가?
+
+**답:** 아니다. `USE`는 MySQL database를 선택하고, `search_path`는 PostgreSQL 현재 database 안에서 이름을 찾을 schema 순서를 정한다.
 
 ### Q4. Spring Boot가 DB 서버인가, 클라이언트인가?
 

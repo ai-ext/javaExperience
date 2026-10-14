@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>R07. 백업과 복원 — DB와 서버에서 각각 무엇을, 어떻게 지키나</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -249,14 +249,17 @@ CHECKSUM TABLE
 </li>
 </ol>
 <h2 id="6-한-단계-더"><a class="anchor" href="#6-한-단계-더" aria-hidden="true">#</a>6. 한 단계 더</h2>
-<p>전체 백업은 복구의 기준점이고, binlog/WAL은 기준점 이후의 변경을 복원해 RPO를 줄인다. 증분 백업은 저장·전송량을 아끼지만 이전 백업에 대한 의존성과 복원 단계를 늘린다. DB 스냅샷을 VM 스냅샷으로 대체하지 말고, DB·머신·애플리케이션 자산마다 소유자·보관기간·암호화·복구 명령을 적는다. 복원은 새 환경에서 먼저 수행하고, 행 수·체크섬·업무 쿼리·애플리케이션 연결을 확인한 뒤 전환한다. 복구 훈련 결과로 실제 RPO/RTO를 재고 목표보다 느리면 백업 주기나 물리 복구 방식을 바꾼다.</p>
+<p>전체 백업은 복구의 기준점이고, binlog/WAL은 기준점 이후의 변경을 복원해 RPO를 줄인다. 증분 백업은 저장·전송량을 아끼지만 이전 백업에 대한 의존성과 복원 단계를 늘린다. DB 스냅샷을 VM 스냅샷으로 대체하지 말고, DB·머신·애플리케이션 자산마다 소유자·보관기간·암호화·복구 명령을 적는다.</p>
+<p>복원은 새 환경에서 먼저 수행하고, 행 수·체크섬·업무 쿼리·애플리케이션 연결을 확인한 뒤 전환한다. 복구 훈련 결과로 실제 RPO/RTO를 재고 목표보다 느리면 백업 주기나 물리 복구 방식을 바꾼다.</p>
 <p>운영 장애 대응 → <a class="docref" href="D09-operations-observability.html">D09</a> 참조 · 배포 롤백 → <a class="docref" href="D06-deployment-concepts.html">D06</a> 참조 · 리눅스 명령 → <a class="docref" href="D12-linux-terminal-basics.html">D12</a> 참조 · DB 서버 개념 → <a class="docref" href="R01-what-is-db-server.html">R01</a> 참조.</p>
 <h2 id="7-자가점검-qa-면접-대비"><a class="anchor" href="#7-자가점검-qa-면접-대비" aria-hidden="true">#</a>7. 자가점검 Q&amp;A (면접 대비)</h2>
 <p><strong>Q1. RPO와 RTO는 무엇이 다르고 백업 주기와 어떤 관계인가?</strong><br>RPO는 허용하는 데이터 손실 구간이고 RTO는 복구 허용 시간이다. 일일 덤프만 있다면 RPO도 거의 하루가 될 수 있다. RTO는 파일 크기만이 아니라 복원·검증·전환 시간을 재야 한다.<br><strong>꼬리질문: RPO 10분이면 10분마다 전체 덤프를 해야 하나?</strong><br>아니다. 전체 기준 백업 뒤 binlog/WAL을 이어 보관하고 목표 시각까지 재생한다.</p>
 <p><strong>Q2. 복제본이나 다중 AZ가 있으면 백업을 없애도 되나?</strong><br>안 된다. 복제는 가용성·읽기 분산을 돕지만 잘못된 <code>DELETE</code>도 복제될 수 있다. 백업은 과거 복구 지점을 제공하므로 목적이 다르다.<br><strong>꼬리질문: 복제 지연으로 삭제 전 행이 남아 있으면 복구하면 되나?</strong><br>임시 조회는 가능해도 삭제가 전파되면 사라진다. 보존된 백업/PITR을 쓴다.</p>
 <p><strong>Q3. <code>--single-transaction</code>이 일관성을 주는 조건과 한계는?</strong><br>InnoDB의 일관된 읽기로 덤프 시작 시점의 스냅샷을 읽는다. DML을 받으며 덤프할 수 있지만 MyISAM에는 같은 보장이 없다. 덤프 중 DDL도 피해야 한다.<br><strong>꼬리질문: <code>--lock-tables</code>를 같이 켜면 되나?</strong><br>두 옵션은 상호 배타적이다. 엔진과 쓰기 허용 조건에 맞춰 하나를 선택한다.</p>
 <p><strong>Q4. <code>mysqldump</code>와 물리 스냅샷 중 무엇을 고르나?</strong><br>작고 이동·검토가 잦은 DB는 논리 덤프가 편하다. 대용량을 빨리 복원해야 하면 물리 백업이 유리하지만 엔진·버전·일관성 절차를 맞춘다. DB 백업은 앱 파일을 포함하지 않는다.<br><strong>꼬리질문: RDS 스냅샷이면 VM의 앱 파일도 복구되나?</strong><br>아니다. DB, VM, 앱 자산은 백업 범위를 각각 둔다.</p>
-<p><strong>Q5. MySQL과 PostgreSQL의 PITR에 필요한 것은?</strong><br>MySQL은 전체 기준 백업과 이후 binlog, PostgreSQL은 물리 base backup과 연속 WAL 아카이브가 필요하다. 로그를 목표 시각까지만 재생한다. <code>pg_dump</code>는 PostgreSQL 논리 백업이므로 이 물리 PITR 경로와 다르다.<br><strong>꼬리질문: <code>--single-transaction</code>만으로 MySQL PITR이 되나?</strong><br>아니다. 그 옵션은 덤프 일관성 옵션이며, 뒤의 binlog 보관·재생이 따로 필요하다.</p>
+<p><strong>Q5. MySQL과 PostgreSQL의 PITR에 필요한 것은?</strong><br>MySQL은 전체 기준 백업과 이후 binlog, PostgreSQL은 물리 base backup과 연속 WAL 아카이브가 필요하다. 로그를 목표 시각까지만 재생한다.</p>
+<p><code>pg_dump</code>는 PostgreSQL 논리 백업이므로 이 물리 PITR 경로와 다르다.
+<strong>꼬리질문: <code>--single-transaction</code>만으로 MySQL PITR이 되나?</strong><br>아니다. 그 옵션은 덤프 일관성 옵션이며, 뒤의 binlog 보관·재생이 따로 필요하다.</p>
 <p><strong>Q6. 해시가 맞으면 복원 검증은 끝났나?</strong><br>아니다. 해시는 파일 바이트의 변화를 찾지만 데이터의 업무 정확성을 증명하지 않는다. 행 수·체크섬·관계·대표 조회·헬스체크를 확인하고 복구 훈련으로 실제 RPO/RTO를 잰다.<br><strong>꼬리질문: 운영 DB에 직접 복원하면 더 빠르지 않나?</strong><br>새 DB에서 검증한 뒤 전환해야 손상된 원본을 덮지 않고 선택지를 보존한다.</p>
 <h2 id="8-참고문헌"><a class="anchor" href="#8-참고문헌" aria-hidden="true">#</a>8. 참고문헌</h2>
 <ul>

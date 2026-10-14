@@ -1436,8 +1436,9 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 <details>
 <summary>힌트 1 — 검사 부품</summary>
 
-`apply(Map<String, String> fields)` 하나로 만든다. 값이 `null`인 필드는 건너뛰고, BLOCK 단어는 `값.replaceAll("\\s+", "").toLowerCase()`에 `단어.toLowerCase()`가 들어 있는지 본다. 걸린 필드를 모두 모아 예외를 던지고, 전역 핸들러가 `errors` 목록으로 만든다. 걸린 게 없으면 MASK 단어를 `Pattern.compile(Pattern.quote(단어), CASE_INSENSITIVE).matcher(값).replaceAll(r -> "*".repeat(r.group().length()))`로 바꾼 값을 돌려준다.
-</details>
+`apply(Map<String, String> fields)` 하나로 만든다. 값이 `null`인 필드는 건너뛰고, BLOCK 단어는 `값.replaceAll("\\s+", "").toLowerCase()`에 `단어.toLowerCase()`가 들어 있는지 본다.
+
+걸린 필드를 모두 모아 예외를 던지고, 전역 핸들러가 `errors` 목록으로 만든다. 걸린 게 없으면 MASK 단어를 `Pattern.compile(Pattern.quote(단어), CASE_INSENSITIVE).matcher(값).replaceAll(r -> "*".repeat(r.group().length()))`로 바꾼 값을 돌려준다. </details>
 
 <details>
 <summary>힌트 2 — 글 수정에서 빠지기 쉬운 것</summary>

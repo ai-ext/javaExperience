@@ -35,7 +35,9 @@
 
 ### 1단계 — 의존성 확인
 
-기준 버전은 Java 25 / Boot 4.1.1이다. 연습 프로젝트는 현재 JDK 21 toolchain이므로 이 문서 코드는 21에서도 실행 가능한 문법을 쓴다. `practice/starter/build.gradle.kts`에 아래 테스트 의존성이 이미 있다. Maven은 Boot parent/BOM 아래 같은 artifact(`spring-boot-starter-test`, `spring-boot-starter-data-jpa-test`, `spring-boot-testcontainers`, `testcontainers-mysql`, `testcontainers-junit-jupiter`)를 `<scope>test</scope>`로 선언하고 버전은 생략한다.
+기준 버전은 Java 25 / Boot 4.1.1이다. 연습 프로젝트는 현재 JDK 21 toolchain이므로 이 문서 코드는 21에서도 실행 가능한 문법을 쓴다.
+
+`practice/starter/build.gradle.kts`에 아래 테스트 의존성이 이미 있다. Maven은 Boot parent/BOM 아래 같은 artifact(`spring-boot-starter-test`, `spring-boot-starter-data-jpa-test`, `spring-boot-testcontainers`, `testcontainers-mysql`, `testcontainers-junit-jupiter`)를 `<scope>test</scope>`로 선언하고 버전은 생략한다.
 
 ```kotlin
 testImplementation("org.springframework.boot:spring-boot-starter-test")
@@ -202,7 +204,9 @@ POST 경로·요청·ID는 실제 쓰기 API에 맞춘다. 연습 상품 API는 
 
 ## 6. 한 단계 더
 
-테스트 트랜잭션은 현재 스레드에 바인딩된다. Spring 서비스의 `REQUIRED`는 대개 참여하지만 `REQUIRES_NEW`, 비동기 작업, 다른 스레드의 HTTP 요청은 같은 트랜잭션이 아니다. context 캐시는 Spring 설정 재사용이지 데이터 정리 기능이 아니다. 느리면 먼저 컨테이너·SQL seed·context 중 비용이 큰 구간을 찾고 수명을 조정한다. Testcontainers reusable은 테스트 뒤에도 남는 실험 기능이다.
+테스트 트랜잭션은 현재 스레드에 바인딩된다. Spring 서비스의 `REQUIRED`는 대개 참여하지만 `REQUIRES_NEW`, 비동기 작업, 다른 스레드의 HTTP 요청은 같은 트랜잭션이 아니다. context 캐시는 Spring 설정 재사용이지 데이터 정리 기능이 아니다.
+
+느리면 먼저 컨테이너·SQL seed·context 중 비용이 큰 구간을 찾고 수명을 조정한다. Testcontainers reusable은 테스트 뒤에도 남는 실험 기능이다.
 
 Boot 3.1 릴리스에서 Testcontainers 의존성 관리가 포함됐고, Boot 4.1의 `DataJpaTest`는 `org.springframework.boot.data.jpa.test.autoconfigure`에 있으며 API 문서상 4.0.0부터 제공된다. Boot 4 프로젝트는 해당 테스트 모듈을 의존성에 포함한다.
 

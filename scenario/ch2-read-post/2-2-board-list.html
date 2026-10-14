@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>2-2. 게시판 목록과 페이징</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
@@ -136,8 +136,10 @@
 <details>
 <summary>MyBatis — 페이지 SELECT·COUNT·태그 일괄 조회</summary>
 
-<p>아래 <strong>MyBatis 대체 구현 코드</strong>의 8개 파일을 이 단계 전체 소스에 적용한다. 2-1의 상세 SELECT·조회수 UPDATE는 유지하고, <code>PostReadMapper</code>에 게시판 ID 조회와 목록·COUNT SQL을 더한다. <code>findPublishedByBoard</code>와 <code>countPublishedByBoard</code>는 둘 다 <code>board_id</code>·<code>status=&#39;PUBLISHED&#39;</code>·<code>deleted_at IS NULL</code> 조건을 써야 총 건수와 페이지 항목이 맞는다. <code>ORDER BY published_at DESC, id DESC</code>로 동률 순서를 고정하고, <code>LIMIT #{limit} OFFSET #{offset}</code>으로 페이지를 자른다. <code>#{...}</code>는 숫자를 바인딩한다.</p>
-<p>목록 SQL 결과는 <code>PostListRow</code>에 담고, 페이지에 나온 글 ID만 모아 태그를 <strong>한 번</strong> 더 조회해 <code>PostListItemResponse</code>로 변환한다. <code>content</code>는 목록 SELECT와 DTO에 넣지 않는다. Service는 COUNT로 <code>totalElements</code>·<code>totalPages</code>·<code>hasNext</code>를 계산한다. 이 단계는 아직 2-3의 팔로우·차단 조건을 적용하지 않으므로 6번·9번 글이 보여야 한다. JPA와 MyBatis 양쪽에서 L1~L5의 글 순서·14건/3페이지·잘못된 입력 오류를 대조한다.</p>
+<p>아래 <strong>MyBatis 대체 구현 코드</strong>의 8개 파일을 이 단계 전체 소스에 적용한다. 2-1의 상세 SELECT·조회수 UPDATE는 유지하고, <code>PostReadMapper</code>에 게시판 ID 조회와 목록·COUNT SQL을 더한다.</p>
+<p><code>findPublishedByBoard</code>와 <code>countPublishedByBoard</code>는 둘 다 <code>board_id</code>·<code>status=&#39;PUBLISHED&#39;</code>·<code>deleted_at IS NULL</code> 조건을 써야 총 건수와 페이지 항목이 맞는다. <code>ORDER BY published_at DESC, id DESC</code>로 동률 순서를 고정하고, <code>LIMIT #{limit} OFFSET #{offset}</code>으로 페이지를 자른다. <code>#{...}</code>는 숫자를 바인딩한다.</p>
+<p>목록 SQL 결과는 <code>PostListRow</code>에 담고, 페이지에 나온 글 ID만 모아 태그를 <strong>한 번</strong> 더 조회해 <code>PostListItemResponse</code>로 변환한다. <code>content</code>는 목록 SELECT와 DTO에 넣지 않는다.</p>
+<p>Service는 COUNT로 <code>totalElements</code>·<code>totalPages</code>·<code>hasNext</code>를 계산한다. 이 단계는 아직 2-3의 팔로우·차단 조건을 적용하지 않으므로 6번·9번 글이 보여야 한다. JPA와 MyBatis 양쪽에서 L1~L5의 글 순서·14건/3페이지·잘못된 입력 오류를 대조한다.</p>
 </details>
 
 <h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
@@ -613,15 +615,12 @@ C2: {&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;length&
 <details>
 <summary>힌트 1 — 리포지토리</summary>
 
-<p><code>Page&lt;Post&gt; findByBoardAndStatusAndDeletedAtIsNull(Board board, PostStatus status, Pageable pageable)</code> 같은 파생 쿼리와 <code>PageRequest.of(page, size, Sort.by(DESC, &quot;publishedAt&quot;).and(Sort.by(DESC, &quot;id&quot;)))</code>로 시작할 수 있다. 결과 <code>Page</code>에서 <code>getTotalElements()</code>, <code>getTotalPages()</code>, <code>hasNext()</code>를 꺼내 DTO에 담는다.</p>
-</details>
-
+<p><code>Page&lt;Post&gt; findByBoardAndStatusAndDeletedAtIsNull(Board board, PostStatus status, Pageable pageable)</code> 같은 파생 쿼리와 <code>PageRequest.of(page, size, Sort.by(DESC, &quot;publishedAt&quot;).and(Sort.by(DESC, &quot;id&quot;)))</code>로 시작할 수 있다. 결과 <code>Page</code>에서 <code>getTotalElements()</code>, <code>getTotalPages()</code>, <code>hasNext()</code>를 꺼내 DTO에 담는다. </details></p>
 <details>
 <summary>힌트 2 — 파라미터 검증</summary>
 
-<p><code>@RequestParam(defaultValue = &quot;10&quot;) @Min(1) @Max(50) int size</code>처럼 제약만 붙이면 Spring MVC가 스스로 검사해 범위 밖 값에 <code>HandlerMethodValidationException</code>을 던진다. 그 예외도 Advice에서 400으로 바꾼다. 컨트롤러에 <code>@Validated</code>는 <strong>붙이지 않는다</strong> — 붙이면 옛 방식(AOP <code>MethodValidationInterceptor</code>)이 먼저 끼어들어 <code>ConstraintViolationException</code>이 그대로 500이 된다(Boot 4.1에서 실측).</p>
-</details>
-
+<p><code>@RequestParam(defaultValue = &quot;10&quot;) @Min(1) @Max(50) int size</code>처럼 제약만 붙이면 Spring MVC가 스스로 검사해 범위 밖 값에 <code>HandlerMethodValidationException</code>을 던진다. 그 예외도 Advice에서 400으로 바꾼다.</p>
+<p>컨트롤러에 <code>@Validated</code>는 <strong>붙이지 않는다</strong> — 붙이면 옛 방식(AOP <code>MethodValidationInterceptor</code>)이 먼저 끼어들어 <code>ConstraintViolationException</code>이 그대로 500이 된다(Boot 4.1에서 실측). </details></p>
 <h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
 <p><a href="2-3-visibility.html">2-3. 볼 수 있는 글만</a></p>
 

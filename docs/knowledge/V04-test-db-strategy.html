@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>V04. 테스트 DB 전략 — H2 vs Testcontainers, 데이터 준비, @Transactional의 함정</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -73,7 +73,8 @@ Spring Boot 4.1의 <code>@DataJpaTest</code>는 기본적으로 임베디드 DB�
 </ol>
 <h2 id="3-따라-하기"><a class="anchor" href="#3-따라-하기" aria-hidden="true">#</a>3. 따라 하기</h2>
 <h3 id="1단계--의존성-확인"><a class="anchor" href="#1단계--의존성-확인" aria-hidden="true">#</a>1단계 — 의존성 확인</h3>
-<p>기준 버전은 Java 25 / Boot 4.1.1이다. 연습 프로젝트는 현재 JDK 21 toolchain이므로 이 문서 코드는 21에서도 실행 가능한 문법을 쓴다. <code>practice/starter/build.gradle.kts</code>에 아래 테스트 의존성이 이미 있다. Maven은 Boot parent/BOM 아래 같은 artifact(<code>spring-boot-starter-test</code>, <code>spring-boot-starter-data-jpa-test</code>, <code>spring-boot-testcontainers</code>, <code>testcontainers-mysql</code>, <code>testcontainers-junit-jupiter</code>)를 <code>&lt;scope&gt;test&lt;/scope&gt;</code>로 선언하고 버전은 생략한다.</p>
+<p>기준 버전은 Java 25 / Boot 4.1.1이다. 연습 프로젝트는 현재 JDK 21 toolchain이므로 이 문서 코드는 21에서도 실행 가능한 문법을 쓴다.</p>
+<p><code>practice/starter/build.gradle.kts</code>에 아래 테스트 의존성이 이미 있다. Maven은 Boot parent/BOM 아래 같은 artifact(<code>spring-boot-starter-test</code>, <code>spring-boot-starter-data-jpa-test</code>, <code>spring-boot-testcontainers</code>, <code>testcontainers-mysql</code>, <code>testcontainers-junit-jupiter</code>)를 <code>&lt;scope&gt;test&lt;/scope&gt;</code>로 선언하고 버전은 생략한다.</p>
 <pre><code class="language-kotlin">testImplementation(&quot;org.springframework.boot:spring-boot-starter-test&quot;)
 testImplementation(&quot;org.springframework.boot:spring-boot-starter-data-jpa-test&quot;)
 testImplementation(&quot;org.springframework.boot:spring-boot-testcontainers&quot;)
@@ -239,7 +240,8 @@ class OrderHttpTest {
 <li><strong>H2 통과·MySQL 실패</strong> → 방언·함수·collation·락 차이 → 운영 엔진 Testcontainers로 최소 재현 SQL을 검증한다. H2 모드를 더 붙여 실제 엔진 동작이라고 간주하지 않는다.</li>
 </ol>
 <h2 id="6-한-단계-더"><a class="anchor" href="#6-한-단계-더" aria-hidden="true">#</a>6. 한 단계 더</h2>
-<p>테스트 트랜잭션은 현재 스레드에 바인딩된다. Spring 서비스의 <code>REQUIRED</code>는 대개 참여하지만 <code>REQUIRES_NEW</code>, 비동기 작업, 다른 스레드의 HTTP 요청은 같은 트랜잭션이 아니다. context 캐시는 Spring 설정 재사용이지 데이터 정리 기능이 아니다. 느리면 먼저 컨테이너·SQL seed·context 중 비용이 큰 구간을 찾고 수명을 조정한다. Testcontainers reusable은 테스트 뒤에도 남는 실험 기능이다.</p>
+<p>테스트 트랜잭션은 현재 스레드에 바인딩된다. Spring 서비스의 <code>REQUIRED</code>는 대개 참여하지만 <code>REQUIRES_NEW</code>, 비동기 작업, 다른 스레드의 HTTP 요청은 같은 트랜잭션이 아니다. context 캐시는 Spring 설정 재사용이지 데이터 정리 기능이 아니다.</p>
+<p>느리면 먼저 컨테이너·SQL seed·context 중 비용이 큰 구간을 찾고 수명을 조정한다. Testcontainers reusable은 테스트 뒤에도 남는 실험 기능이다.</p>
 <p>Boot 3.1 릴리스에서 Testcontainers 의존성 관리가 포함됐고, Boot 4.1의 <code>DataJpaTest</code>는 <code>org.springframework.boot.data.jpa.test.autoconfigure</code>에 있으며 API 문서상 4.0.0부터 제공된다. Boot 4 프로젝트는 해당 테스트 모듈을 의존성에 포함한다.</p>
 <p>JPA 원리 → <a class="docref" href="S09-jpa-hibernate.html">S09</a> 참조. 트랜잭션 → <a class="docref" href="S08-transactions.html">S08</a> 참조. 계층별 테스트 → <a class="docref" href="V02-layered-tests-handson.html">V02</a> 참조.</p>
 <h2 id="7-자가점검-qa-면접-대비"><a class="anchor" href="#7-자가점검-qa-면접-대비" aria-hidden="true">#</a>7. 자가점검 Q&amp;A (면접 대비)</h2>

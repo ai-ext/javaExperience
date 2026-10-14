@@ -394,7 +394,9 @@ int findLikeCount(Long id);
 <details>
 <summary>MyBatis Mapper — 좋아요 행과 숫자 SQL</summary>
 
-`LikeService`가 글을 확인하고 `post_likes` 존재 여부에 따라 INSERT/DELETE와 카운터 UPDATE를 한 트랜잭션에서 호출한다. 동시 토글의 한계는 아래 망가뜨리기 ③에서 확인하고 10-11에서 멱등 API와 잠금을 배운다. DELETE가 0행이면 다른 요청이 먼저 취소한 것이므로 예외를 던져 카운터 감소를 막는다. 관계 변경 뒤 조건부 카운터 UPDATE가 0행이면 404를 던져 트랜잭션 전체를 롤백한다. 전체 Java/XML은 **MyBatis 대체 코드** 토글을 펼쳐 확인한다.
+`LikeService`가 글을 확인하고 `post_likes` 존재 여부에 따라 INSERT/DELETE와 카운터 UPDATE를 한 트랜잭션에서 호출한다. 동시 토글의 한계는 아래 망가뜨리기 ③에서 확인하고 10-11에서 멱등 API와 잠금을 배운다.
+
+DELETE가 0행이면 다른 요청이 먼저 취소한 것이므로 예외를 던져 카운터 감소를 막는다. 관계 변경 뒤 조건부 카운터 UPDATE가 0행이면 404를 던져 트랜잭션 전체를 롤백한다. 전체 Java/XML은 **MyBatis 대체 코드** 토글을 펼쳐 확인한다.
 
 ```java
 LikePostRow findVisiblePost(Long postId);

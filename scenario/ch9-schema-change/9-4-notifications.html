@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>9-4. 새 테이블과 API — 알림</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
@@ -20,7 +20,8 @@
 <blockquote>
 <p>&quot;내 글에 좋아요나 댓글이 달리면 알림을 주세요. 안 읽은 알림 개수도 보여 주고, 누르면 읽음 처리요.&quot;</p>
 </blockquote>
-<p>새 기능에는 새 테이블이 필요하다. 테이블을 마이그레이션으로 만들고, <strong>기존 기능(좋아요·댓글)이 성공할 때 알림이 함께 생기게</strong> 연결한다. 기존 기능을 건드리는 일이라 같은 알림이 두 번 생기면 안 된다. 이 단계는 알림을 좋아요·댓글과 <strong>같은 트랜잭션에서 함께 저장</strong>하는 것까지다 — 그래서 알림 저장이 실패하면 좋아요도 함께 되돌려진다. &quot;알림이 실패해도 좋아요는 성공&quot;으로 떼어 내는 일(커밋 뒤 이벤트·별도 트랜잭션·재시도)은 R1에서 차이를 설명하는 데까지만 보고, 구현은 다음 과제로 남긴다.</p>
+<p>새 기능에는 새 테이블이 필요하다. 테이블을 마이그레이션으로 만들고, <strong>기존 기능(좋아요·댓글)이 성공할 때 알림이 함께 생기게</strong> 연결한다.</p>
+<p>기존 기능을 건드리는 일이라 같은 알림이 두 번 생기면 안 된다. 이 단계는 알림을 좋아요·댓글과 <strong>같은 트랜잭션에서 함께 저장</strong>하는 것까지다 — 그래서 알림 저장이 실패하면 좋아요도 함께 되돌려진다. &quot;알림이 실패해도 좋아요는 성공&quot;으로 떼어 내는 일(커밋 뒤 이벤트·별도 트랜잭션·재시도)은 R1에서 차이를 설명하는 데까지만 보고, 구현은 다음 과제로 남긴다.</p>
 <h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
 <p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
 <section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>알림</h3><p>새 테이블(notification) + API. 좋아요·댓글이 '새로' 생길 때만 알림을 만든다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>알림</strong><span>코딩하는고양이 · 🔔 2</span></div><div class="screen-widget screen-list"><strong>list</strong><span>자바초보탈출님이 댓글을 남겼어요 · 자바초보탈출님이 좋아요를 눌렀어요</span></div><div class="screen-widget screen-stats"><strong>stats</strong><span>안 읽은 알림</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>남이 내 글에 좋아요</summary><ol><li><span class="flow-kind">사용자</span><p>회원 3이 회원 2의 글(12번)에 하트를 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>PUT /api/posts/12/like</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-p03</dd></dl></li><li><span class="flow-kind">서버</span><p>좋아요가 새로 생김 → 같은 트랜잭션의 동기 이벤트 리스너에서 알림 저장. 이미 좋아요였으면 알림도 없다</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>INSERT INTO post_like ...; INSERT INTO notification (member_id, actor_id, type, post_id, created_at) VALUES (2, 3, 'LIKE', 12, NOW())</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>{&quot;liked&quot;: true, ...}</dd></dl></li><li><span class="flow-kind">화면</span><p>회원 2의 종에 숫자가 붙는다</p></li></ol></details><details class="scenario-flow"><summary>알림 열고 읽기</summary><ol><li><span class="flow-kind">사용자</span><p>회원 2가 종을 눌러 알림을 열고 하나를 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/me/notifications?size=20</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-p02</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT ... FROM notification WHERE member_id = 2 ORDER BY created_at DESC, id DESC LIMIT 20; SELECT COUNT(*) FROM notification WHERE member_id = 2 AND read_at IS NULL</dd><dt>note</dt><dd>(member_id, read_at, created_at, id) 인덱스</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>{&quot;items&quot;: [{&quot;type&quot;: &quot;COMMENT&quot;, ...}, {&quot;type&quot;: &quot;LIKE&quot;, ...}], &quot;unreadCount&quot;: 2}</dd></dl></li><li><span class="flow-kind">HTTP 요청</span><p>PATCH /api/me/notifications/31/read</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-p02</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>204</dd></dl></li><li><span class="flow-kind">화면</span><p>읽은 알림은 '안 읽음' 표시가 빠지고 숫자가 줄어든다</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
@@ -176,7 +177,8 @@ public NotificationListResponse list(@RequestParam(defaultValue = &quot;false&qu
 <details>
 <summary>Service — 처리 순서</summary>
 
-<p><code>LikeService</code>는 <code>INSERT IGNORE</code>가 실제 새 좋아요일 때만 이벤트를 발행한다. <code>CommentService</code>는 댓글 저장·개수 증가 뒤 이벤트를 발행한다. <code>NotificationEventListener</code>의 <code>@EventListener</code>가 즉시 실행되고 <code>NotificationService.notifyLike/notifyComment</code>의 <code>Propagation.MANDATORY</code>가 기존 트랜잭션을 요구한다. 리스너가 예외를 삼키지 않으므로 알림 저장 실패 시 원래 작업도 롤백된다.</p>
+<p><code>LikeService</code>는 <code>INSERT IGNORE</code>가 실제 새 좋아요일 때만 이벤트를 발행한다. <code>CommentService</code>는 댓글 저장·개수 증가 뒤 이벤트를 발행한다.</p>
+<p><code>NotificationEventListener</code>의 <code>@EventListener</code>가 즉시 실행되고 <code>NotificationService.notifyLike/notifyComment</code>의 <code>Propagation.MANDATORY</code>가 기존 트랜잭션을 요구한다. 리스너가 예외를 삼키지 않으므로 알림 저장 실패 시 원래 작업도 롤백된다.</p>
 <pre><code class="language-java">if (inserted &gt; 0) {
     postRepository.incrementLikeCount(postId);
     eventPublisher.publishEvent(new PostLikedEvent(postId, loginMember.id()));
@@ -192,7 +194,8 @@ public NotificationListResponse list(@RequestParam(defaultValue = &quot;false&qu
 <details>
 <summary>MyBatis Mapper — 알림 저장·목록·읽음</summary>
 
-<p><code>MyBatisNotificationMapper.java</code>와 <code>MyBatisNotificationMapper.xml</code>은 알림 테이블을 직접 읽고 쓴다. <code>MyBatisLikeService</code>와 <code>MyBatisCommentService</code>는 관계 행이 새로 생겼을 때만 동기 이벤트를 발행한다. <code>NotificationService</code>가 Mapper로 <code>member_id</code>를 제한한 목록·미읽음 개수·소유자 확인 후 읽음 처리를 실행한다. 알림 생성의 예외가 원래 트랜잭션으로 전파되는지 확인한다. 이 대체 앱의 일부 선행 글 작성 기능은 JPA 경로를 계속 사용한다.</p>
+<p><code>MyBatisNotificationMapper.java</code>와 <code>MyBatisNotificationMapper.xml</code>은 알림 테이블을 직접 읽고 쓴다. <code>MyBatisLikeService</code>와 <code>MyBatisCommentService</code>는 관계 행이 새로 생겼을 때만 동기 이벤트를 발행한다.</p>
+<p><code>NotificationService</code>가 Mapper로 <code>member_id</code>를 제한한 목록·미읽음 개수·소유자 확인 후 읽음 처리를 실행한다. 알림 생성의 예외가 원래 트랜잭션으로 전파되는지 확인한다. 이 대체 앱의 일부 선행 글 작성 기능은 JPA 경로를 계속 사용한다.</p>
 <pre><code class="language-xml">&lt;select id=&quot;findMine&quot; resultType=&quot;org.example.notification.NotificationRow&quot;&gt;
     SELECT n.id, n.type, a.id AS actorId, a.nickname AS actorNickname,
            n.post_id AS postId, n.comment_id AS commentId,

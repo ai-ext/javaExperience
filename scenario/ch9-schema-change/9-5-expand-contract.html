@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>9-5. 서비스를 멈추지 않는 이름 변경 — expand와 contract</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
@@ -58,9 +58,11 @@
 <td>없음 — (a) 전에 지우면 아직 <code>memo</code>에 쓰는 서버가 실패한다</td>
 </tr>
 </tbody></table></div>
-<p>왜 3의 조건이 <code>note IS NULL</code>이 아닌가: V5가 이미 <code>note</code>를 채웠기 때문에, 그 뒤 옛 서버가 <code>memo</code>를 <strong>고친</strong> 행은 <code>note</code>가 null이 아니라 옛 값이다. <code>note IS NULL</code>로는 그 행을 못 잡고, 2에서 읽기를 <code>note</code>로 먼저 바꿨다면 사용자는 고치기 전 메모를 보게 된다. <code>&lt;=&gt;</code>는 null까지 같다고 보는 비교다. 그리고 <code>CAST(… AS BINARY)</code>로 <strong>바이트 그대로</strong> 비교한다 — 이 테이블의 기본 비교 규칙(<code>utf8mb4_0900_ai_ci</code>)은 대소문자·악센트를 무시해서 <code>&#39;ABC&#39; &lt;=&gt; &#39;abc&#39;</code>가 참이다. 그냥 비교하면 옛 서버가 <code>ABC</code>를 <code>abc</code>로만 고친 행을 놓쳐, DROP 뒤 그 수정이 사라진다(실측).</p>
+<p>왜 3의 조건이 <code>note IS NULL</code>이 아닌가: V5가 이미 <code>note</code>를 채웠기 때문에, 그 뒤 옛 서버가 <code>memo</code>를 <strong>고친</strong> 행은 <code>note</code>가 null이 아니라 옛 값이다. <code>note IS NULL</code>로는 그 행을 못 잡고, 2에서 읽기를 <code>note</code>로 먼저 바꿨다면 사용자는 고치기 전 메모를 보게 된다.</p>
+<p><code>&lt;=&gt;</code>는 null까지 같다고 보는 비교다. 그리고 <code>CAST(… AS BINARY)</code>로 <strong>바이트 그대로</strong> 비교한다 — 이 테이블의 기본 비교 규칙(<code>utf8mb4_0900_ai_ci</code>)은 대소문자·악센트를 무시해서 <code>&#39;ABC&#39; &lt;=&gt; &#39;abc&#39;</code>가 참이다. 그냥 비교하면 옛 서버가 <code>ABC</code>를 <code>abc</code>로만 고친 행을 놓쳐, DROP 뒤 그 수정이 사라진다(실측).</p>
 <p>실제 여러 대 배포라면 3과 4는 서로 다른 배포다(맞추기 마이그레이션 → 지우기 마이그레이션). 실습은 서버가 한 대라 3의 UPDATE와 4의 DROP을 <code>V6__drop_bookmark_memo.sql</code> 한 파일에 <strong>UPDATE 먼저</strong> 넣고, 그 V6과 함께 <code>memo</code> 매핑을 지운 코드를 띄운다(서버가 한 대면 4-(a)와 (b)가 같은 순간이다). 다만 <strong>V5와 V6은 반드시 따로</strong>(한 파일에 합치지 않는다) 두고, 2의 코드가 V6 전에도 동작하게 만든다.</p>
-<p><strong>여러 서버의 운영 배포에는 이 실습용 최종 artifact를 그대로 첫 서버에 올리지 않는다.</strong> 여기에 V6이 들어 있어 Flyway가 첫 서버 기동 때 <code>memo</code>를 삭제하고, 남은 중간 서버가 실패하기 때문이다. 운영에서는 (1) V5만 적용 → (2) <code>memo</code> 읽기·양쪽 쓰기 코드를 모든 서버에 배포 → (3) 마지막 옛 서버가 사라진 뒤 <code>note = memo</code> 맞추기 마이그레이션을 <strong>별도 버전</strong>으로 적용 → (4) <code>note</code> 읽기·양쪽 쓰기 코드를 모든 서버에 배포 → (5) <code>note</code>만 읽고 쓰는 코드를 모든 서버에 배포 → (6) 마지막에 <code>DROP memo</code>만 담은 마이그레이션을 적용한다. 5의 서버가 이미 <code>note</code>만 고쳤다면 6에서 <code>note = memo</code>를 다시 실행하면 안 된다. 실습용 V6의 UPDATE와 DROP은 운영 마이그레이션 두 파일로 나눠야 한다.</p>
+<p><strong>여러 서버의 운영 배포에는 이 실습용 최종 artifact를 그대로 첫 서버에 올리지 않는다.</strong> 여기에 V6이 들어 있어 Flyway가 첫 서버 기동 때 <code>memo</code>를 삭제하고, 남은 중간 서버가 실패하기 때문이다. 운영에서는 (1) V5만 적용 → (2) <code>memo</code> 읽기·양쪽 쓰기 코드를 모든 서버에 배포 → (3) 마지막 옛 서버가 사라진 뒤 <code>note = memo</code> 맞추기 마이그레이션을 <strong>별도 버전</strong>으로 적용 → (4) <code>note</code> 읽기·양쪽 쓰기 코드를 모든 서버에 배포 → (5) <code>note</code>만 읽고 쓰는 코드를 모든 서버에 배포 → (6) 마지막에 <code>DROP memo</code>만 담은 마이그레이션을 적용한다.</p>
+<p>5의 서버가 이미 <code>note</code>만 고쳤다면 6에서 <code>note = memo</code>를 다시 실행하면 안 된다. 실습용 V6의 UPDATE와 DROP은 운영 마이그레이션 두 파일로 나눠야 한다.</p>
 <ul>
 <li>API(6-1·6-3)의 JSON 필드 이름은 계속 <code>memo</code>다.</li>
 </ul>
@@ -158,7 +160,9 @@ UPDATE bookmark SET note = memo;
 UPDATE bookmark SET note = memo
 WHERE NOT (CAST(note AS BINARY) &lt;=&gt; CAST(memo AS BINARY));
 ALTER TABLE bookmark DROP COLUMN memo;</code></pre>
-<p>실제 여러 서버에 배포할 때는 V5 뒤 <strong>중간 버전</strong>을 먼저 배포한다. 중간 버전은 <code>memo</code>를 읽고 <code>memo</code>·<code>note</code>에 함께 쓴다. <code>Bookmark</code>에는 두 필드를 매핑하고, <code>changeMemo</code>는 둘 다 갱신하며, 응답은 아직 <code>getMemo()</code>로 만든다. native upsert와 PATCH처럼 엔티티 변경을 거치지 않는 경로도 모두 양쪽에 쓴다. 위 운영 순서대로 마지막 옛 서버가 사라진 뒤 값을 맞추고 <code>note</code> 읽기·양쪽 쓰기 버전을 거쳐 최종 <code>note</code> 전용 버전으로 간다. 실습의 최종 답안은 V6 뒤 소스이므로 중간 버전의 Java 파일은 별도 코드 접기에 보인다.</p>
+<p>실제 여러 서버에 배포할 때는 V5 뒤 <strong>중간 버전</strong>을 먼저 배포한다. 중간 버전은 <code>memo</code>를 읽고 <code>memo</code>·<code>note</code>에 함께 쓴다.</p>
+<p><code>Bookmark</code>에는 두 필드를 매핑하고, <code>changeMemo</code>는 둘 다 갱신하며, 응답은 아직 <code>getMemo()</code>로 만든다. native upsert와 PATCH처럼 엔티티 변경을 거치지 않는 경로도 모두 양쪽에 쓴다.</p>
+<p>위 운영 순서대로 마지막 옛 서버가 사라진 뒤 값을 맞추고 <code>note</code> 읽기·양쪽 쓰기 버전을 거쳐 최종 <code>note</code> 전용 버전으로 간다. 실습의 최종 답안은 V6 뒤 소스이므로 중간 버전의 Java 파일은 별도 코드 접기에 보인다.</p>
 <pre><code class="language-sql">-- 중간 버전의 양쪽 쓰기: 읽기는 여전히 memo
 INSERT INTO bookmark(member_id, post_id, folder_id, memo, note, created_at, updated_at)
 VALUES (:memberId, :postId, :folderId, :memo, :memo, NOW(), NOW())

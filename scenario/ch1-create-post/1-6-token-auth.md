@@ -295,7 +295,13 @@ sequenceDiagram
 <details>
 <summary>MyBatis — 토큰 조회와 글·태그 저장 대체 경로</summary>
 
-아래 **MyBatis 대체 구현 코드** 접기를 선택해 기본 JPA 스냅샷에 15개 파일 변경을 적용한다. `AuthTokenMapper.xml`은 `api_token`과 `member`를 JOIN해 만료·폐기·회원 상태를 한 번에 읽는다. 토큰 원문은 결과 DTO와 로그에 싣지 않는다. `PostCreationMapper.xml`은 게시판의 `write_role`과 인증된 작성자를 조회하고, `post` INSERT의 생성 키로 `tag`와 `post_tag`를 연결한다. 태그 ID와 DB에 저장된 이름으로 중복 연결을 막고 응답을 만든다. `PostService`의 `@Transactional`이 글·태그 저장을 한 트랜잭션으로 묶는다. `PostController`는 요청의 `authorId`를 읽지 않고 인터셉터가 확인한 회원 ID만 전달한다. JPA와 MyBatis 양쪽에서 T1~T11 및 D1·D2를 같은 계약으로 확인한다.
+아래 **MyBatis 대체 구현 코드** 접기를 선택해 기본 JPA 스냅샷에 15개 파일 변경을 적용한다. `AuthTokenMapper.xml`은 `api_token`과 `member`를 JOIN해 만료·폐기·회원 상태를 한 번에 읽는다.
+
+토큰 원문은 결과 DTO와 로그에 싣지 않는다. `PostCreationMapper.xml`은 게시판의 `write_role`과 인증된 작성자를 조회하고, `post` INSERT의 생성 키로 `tag`와 `post_tag`를 연결한다.
+
+태그 ID와 DB에 저장된 이름으로 중복 연결을 막고 응답을 만든다. `PostService`의 `@Transactional`이 글·태그 저장을 한 트랜잭션으로 묶는다.
+
+`PostController`는 요청의 `authorId`를 읽지 않고 인터셉터가 확인한 회원 ID만 전달한다. JPA와 MyBatis 양쪽에서 T1~T11 및 D1·D2를 같은 계약으로 확인한다.
 
 </details>
 
@@ -316,7 +322,9 @@ sequenceDiagram
 <details>
 <summary>설정·보조 코드</summary>
 
-`AuthenticatedMember.java`, `ClockConfig.java`, `LoginMember.java`, `LoginMemberArgumentResolver.java`, `WebMvcConfig.java`, `application.yml`. 이 파일에서 바뀐 설정·보조 타입이 서버 흐름의 어느 단계에 필요한지 확인한다. 변경된 메서드: `clock`, `supportsParameter`, `resolveArgument`, `addInterceptors`. `application.yml`의 `org.hibernate.orm.jdbc.bind`는 `info`로 낮춰 토큰 조회 바인딩 값이 로그에 남지 않게 한다.
+`AuthenticatedMember.java`, `ClockConfig.java`, `LoginMember.java`, `LoginMemberArgumentResolver.java`, `WebMvcConfig.java`, `application.yml`. 이 파일에서 바뀐 설정·보조 타입이 서버 흐름의 어느 단계에 필요한지 확인한다.
+
+변경된 메서드: `clock`, `supportsParameter`, `resolveArgument`, `addInterceptors`. `application.yml`의 `org.hibernate.orm.jdbc.bind`는 `info`로 낮춰 토큰 조회 바인딩 값이 로그에 남지 않게 한다.
 
 </details>
 
@@ -689,8 +697,11 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 <details>
 <summary>힌트 1 — 어디서 확인할까</summary>
 
-`HandlerInterceptor`의 `preHandle`은 컨트롤러 메서드의 매개변수(`@RequestBody`)를 만들기 **전에** 실행된다. 그래서 C9(깨진 본문 + 토큰 없음 → 401)를 맞추기 쉽다. 확인한 회원은 `request.setAttribute(...)`로 넘긴다. `/api/**`에 적용하되 0장의 공개 실습 API `/api/start/**`는 `excludePathPatterns`로 뺀다(`WebMvcConfigurer.addInterceptors`). `/hello`도 `/api/**` 밖이라 대상이 아니다. 2-1부터는 로그인 없이 보는 GET이 생기므로, "GET이고 `Authorization` 헤더가 없으면 통과"를 지금 넣어 두거나 2-1에서 고친다(헤더가 **있는데** 틀리면 GET이라도 401).
-</details>
+`HandlerInterceptor`의 `preHandle`은 컨트롤러 메서드의 매개변수(`@RequestBody`)를 만들기 **전에** 실행된다. 그래서 C9(깨진 본문 + 토큰 없음 → 401)를 맞추기 쉽다.
+
+확인한 회원은 `request.setAttribute(...)`로 넘긴다. `/api/**`에 적용하되 0장의 공개 실습 API `/api/start/**`는 `excludePathPatterns`로 뺀다(`WebMvcConfigurer.addInterceptors`).
+
+`/hello`도 `/api/**` 밖이라 대상이 아니다. 2-1부터는 로그인 없이 보는 GET이 생기므로, "GET이고 `Authorization` 헤더가 없으면 통과"를 지금 넣어 두거나 2-1에서 고친다(헤더가 **있는데** 틀리면 GET이라도 401). </details>
 
 <details>
 <summary>힌트 2 — 컨트롤러에서 회원 받기</summary>

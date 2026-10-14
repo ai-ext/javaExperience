@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>10-11. 토글의 문제 — 멱등 PUT/DELETE를 v2로 나란히</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
@@ -143,7 +143,8 @@ update posts p1_0 set like_count=(p1_0.like_count+1) where p1_0.id=39
 <li>(2)는 이제 <code>UPDATE posts ... like_count + 1</code>을 하려고 <code>posts(39)</code>에 X락이 필요하다. (1)의 S락 때문에 기다린다.</li>
 <li>서로가 서로를 기다린다. MySQL이 (1)을 되돌린다 → 500.</li>
 </ol>
-<p><strong>고치는 법 — 부모 행을 먼저 잠근다.</strong> 글을 확인할 때 <code>SELECT ... FOR UPDATE</code>로 읽는다(JPA: <code>@Lock(LockModeType.PESSIMISTIC_WRITE)</code>). 같은 글에 대한 좋아요 요청은 이 줄에서 한 줄로 서고, 앞 요청이 커밋한 뒤에 다음 요청이 <code>INSERT IGNORE</code>를 한다. 그러면 0행이 나오고 숫자는 그대로다. 실측으로 <code>PUT</code> 10개가 동시에 와도 모두 200, <code>likeCount</code> 1이었다.</p>
+<p><strong>고치는 법 — 부모 행을 먼저 잠근다.</strong> 글을 확인할 때 <code>SELECT ... FOR UPDATE</code>로 읽는다(JPA: <code>@Lock(LockModeType.PESSIMISTIC_WRITE)</code>). 같은 글에 대한 좋아요 요청은 이 줄에서 한 줄로 서고, 앞 요청이 커밋한 뒤에 다음 요청이 <code>INSERT IGNORE</code>를 한다.</p>
+<p>그러면 0행이 나오고 숫자는 그대로다. 실측으로 <code>PUT</code> 10개가 동시에 와도 모두 200, <code>likeCount</code> 1이었다.</p>
 <ul>
 <li>대가: 같은 글의 좋아요가 줄을 선다. 인기 글 하나에 초당 수천 번이 몰리는 서비스라면 다른 설계(숫자를 따로 모아 나중에 반영 등)를 쓴다. 이 게시판 규모에서는 충분하다.</li>
 <li>다른 선택지: 데드락이 나면 트랜잭션을 처음부터 <strong>재시도</strong>한다. MySQL 메시지도 &quot;try restarting transaction&quot;이라고 말한다. 재시도 코드가 늘고, 멱등이라서 가능한 방법이다.</li>
@@ -1737,7 +1738,8 @@ public ApiResponse&lt;LikeResponse&gt; unlike(@LoginUser Long userId, @PathVaria
 </details>
 
 <h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
-<p>여기까지가 명세서 프로젝트의 필수 단계다. <a href="10-12-jpa-mybatis-flush.html">10-12. JPA로 쓰고 MyBatis로 바로 읽기 (선택)</a> — JPA와 MyBatis를 한 프로젝트에서 같이 쓸 때만 해당한다. 한 트랜잭션에서 두 기술을 섞으면 &quot;방금 쓴 것이 안 보이는&quot; 순간이 있다. 언제 보이고 언제 안 보이는지 직접 재현한다. 건너뛴다면 다음은 Java 탭의 티켓이다 — 실무에서 들어오는 요청 하나를 받아 이미 있는 코드를 고친다.</p>
+<p>여기까지가 명세서 프로젝트의 필수 단계다. <a href="10-12-jpa-mybatis-flush.html">10-12. JPA로 쓰고 MyBatis로 바로 읽기 (선택)</a> — JPA와 MyBatis를 한 프로젝트에서 같이 쓸 때만 해당한다.</p>
+<p>한 트랜잭션에서 두 기술을 섞으면 &quot;방금 쓴 것이 안 보이는&quot; 순간이 있다. 언제 보이고 언제 안 보이는지 직접 재현한다. 건너뛴다면 다음은 Java 탭의 티켓이다 — 실무에서 들어오는 요청 하나를 받아 이미 있는 코드를 고친다.</p>
 
 <section class="grader" id="result-test">
   <h2>결과 테스트 프롬프트</h2>

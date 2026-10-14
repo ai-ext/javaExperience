@@ -35,8 +35,10 @@ Windows PowerShell에서는 `Get-ChildItem Env:SPRING*`, `Get-Location`, `Get-It
 
 서버에서만 실패하면 먼저 설정값과 활성 프로파일을 비교한다. 그다음 실제 JVM·의존성, 파일 경로와 권한, 문자셋·타임존, DNS·포트, 데이터, 동시성·자원 제한, 오래된 산출물 순으로 범위를 좁힌다.
 서버의 “설정”은 코드뿐 아니라 프로세스 환경, 실행 사용자, 파일 시스템, 네트워크 정책, 컨테이너 제한까지 포함한다.
+
 로그에는 예외 문구뿐 아니라 빌드 ID, 애플리케이션 버전, 프로파일, 안전한 환경 지문, 요청 ID를 남겨 재현 조건을 맞춘다.
 환경 차이를 줄이는 목적은 운영을 노트북에 복제하는 것이 아니라, 실패를 만드는 차이를 작고 명시적으로 관리하는 데 있다.
+
 예제 기준은 Java 25, Spring Boot 4.1.1, Spring Framework 7.0.9다. **기본값 추천: Java와 주요 backing service 버전을 고정하고, Docker Compose 또는 CI에서 운영과 같은 실행 이미지를 사용한다.** 배포별 값과 비밀은 이미지/소스에 넣지 않고 환경 변수나 비밀 관리 시스템으로 주입한다.
 
 ## 3. 왜 그런가 — 원리
@@ -64,7 +66,9 @@ flowchart TD
 
 ### 설정과 프로세스 경계
 
-Spring Boot는 설정 파일, 환경 변수, JVM 속성, `SPRING_APPLICATION_JSON`, 명령행 등을 우선순위대로 합친다. Boot 4.1 문서에서 뒤쪽 원천이 앞쪽 값을 덮으므로 환경 변수나 `--app.timeout=5s`가 파일 값을 이길 수 있다. 프로파일 파일과 외부 설정 파일 위치도 결과를 바꾼다. IDE에만 `SPRING_PROFILES_ACTIVE=local`을 넣었다면 별도 `java -jar` 실행에는 전달되지 않는다. `@PropertySource`는 refresh 때 추가돼 `logging.*`, `spring.main.*`처럼 먼저 읽히는 설정에는 늦다.
+Spring Boot는 설정 파일, 환경 변수, JVM 속성, `SPRING_APPLICATION_JSON`, 명령행 등을 우선순위대로 합친다. Boot 4.1 문서에서 뒤쪽 원천이 앞쪽 값을 덮으므로 환경 변수나 `--app.timeout=5s`가 파일 값을 이길 수 있다. 프로파일 파일과 외부 설정 파일 위치도 결과를 바꾼다.
+
+IDE에만 `SPRING_PROFILES_ACTIVE=local`을 넣었다면 별도 `java -jar` 실행에는 전달되지 않는다. `@PropertySource`는 refresh 때 추가돼 `logging.*`, `spring.main.*`처럼 먼저 읽히는 설정에는 늦다.
 
 모든 설정 출력은 비밀 유출 위험이 있다. 의심 속성만 확인하거나 Actuator `env`/`configprops`를 접근 제한·마스킹 뒤 사용해 값과 출처를 찾는다. IDE는 개발자 계정·JDK·VM 옵션·현재 디렉터리를 쓰지만 서버 프로세스는 별도 사용자·환경으로 뜬다. `./upload`는 프로젝트가 아니라 작업 디렉터리 기준이다. Linux는 경로 대소문자를 구분하고 파일이 있어도 상위 디렉터리 탐색 권한이 없으면 읽을 수 없다.
 
@@ -177,11 +181,15 @@ java -jar app.jar --app.remote.base-url=https://partner.internal --app.remote.ti
 
 환경 변수 이름은 프로퍼티의 점을 `_`로 바꾸고 대시를 제거한 뒤 대문자로 만든다. 비밀값에는 안전한 비밀 관리 수단을 쓰고, 운영에서 명령행 전체를 프로세스 목록이나 로그에 남길 위험도 고려한다. 환경에 따라 바꾸는 값은 외부화하되, 타입 변환과 필수 값 검증을 `@ConfigurationProperties`에서 처리하면 잘못된 값으로 조용히 실행되는 문제를 줄일 수 있다.
 
-프로파일은 서비스 동작 선택이 달라질 때 쓴다. 예를 들어 `application-local.yaml`에는 로컬 개발용 기능을, 운영에는 다른 bean/기능 정책을 둘 수 있다. 프로파일 이름만으로 서버 주소가 마법처럼 바뀌지는 않는다. 파일이 실제 패키지/외부 경로에 있는지, 실행 프로세스가 `SPRING_PROFILES_ACTIVE=local`을 전달받았는지를 확인한다. 민감한 운영 자격 증명을 `application-prod.yaml`에 커밋하지 않는다.
+프로파일은 서비스 동작 선택이 달라질 때 쓴다. 예를 들어 `application-local.yaml`에는 로컬 개발용 기능을, 운영에는 다른 bean/기능 정책을 둘 수 있다. 프로파일 이름만으로 서버 주소가 마법처럼 바뀌지는 않는다.
+
+파일이 실제 패키지/외부 경로에 있는지, 실행 프로세스가 `SPRING_PROFILES_ACTIVE=local`을 전달받았는지를 확인한다. 민감한 운영 자격 증명을 `application-prod.yaml`에 커밋하지 않는다.
 
 ### 예제 3 — DB와 앱을 컨테이너 네트워크 안에서 재현한다
 
-아래 Compose는 앱이 `db`라는 서비스 DNS 이름으로 PostgreSQL에 접속하고, 시작 전에 DB healthcheck를 기다리는 형태다. 실제 운영과 DB 메이저 버전·설정·확장 기능을 맞추고 이미지 태그도 팀 규칙에 맞게 고정한다. `DB_USER`, `DB_PASSWORD`는 셸/비밀 저장소에서 주입하며 `.env`에 둔 비밀 파일은 저장소에 커밋하지 않는다. 예제는 Boot 4.1 애플리케이션과 함께 쓸 수 있는 Compose 설정이며 **미실행**이다.
+아래 Compose는 앱이 `db`라는 서비스 DNS 이름으로 PostgreSQL에 접속하고, 시작 전에 DB healthcheck를 기다리는 형태다. 실제 운영과 DB 메이저 버전·설정·확장 기능을 맞추고 이미지 태그도 팀 규칙에 맞게 고정한다.
+
+`DB_USER`, `DB_PASSWORD`는 셸/비밀 저장소에서 주입하며 `.env`에 둔 비밀 파일은 저장소에 커밋하지 않는다. 예제는 Boot 4.1 애플리케이션과 함께 쓸 수 있는 Compose 설정이며 **미실행**이다.
 
 ```yaml
 services:
@@ -211,7 +219,9 @@ services:
       retries: 10
 ```
 
-앱을 컨테이너 밖에서 직접 실행하면 DB 주소는 보통 `localhost:게시한포트`다. 앱도 컨테이너 안에서 실행할 때는 `db:5432`를 쓴다. 두 주소를 혼동하면 “DB가 켜져 있는데 connection refused”가 난다. 또한 `docker compose down -v`는 DB 볼륨 데이터까지 지우므로 재현용 일회성 DB인지 확인한 뒤에만 사용한다. 운영/배포 방식의 자세한 범위는 → D06, 컨테이너 JVM의 heap·CPU 인식은 → J16 참조.
+앱을 컨테이너 밖에서 직접 실행하면 DB 주소는 보통 `localhost:게시한포트`다. 앱도 컨테이너 안에서 실행할 때는 `db:5432`를 쓴다. 두 주소를 혼동하면 “DB가 켜져 있는데 connection refused”가 난다.
+
+또한 `docker compose down -v`는 DB 볼륨 데이터까지 지우므로 재현용 일회성 DB인지 확인한 뒤에만 사용한다. 운영/배포 방식의 자세한 범위는 → D06, 컨테이너 JVM의 heap·CPU 인식은 → J16 참조.
 
 ## 6. 실무에서는 실제로
 

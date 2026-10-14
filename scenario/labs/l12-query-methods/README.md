@@ -4,13 +4,52 @@
 
 ## 상황과 개념
 
-Spring Data의 findBy 뒤는 Post의 Java 속성(id/deletedAt/hiddenAt/status/visibility)과 IsNull·And 키워드를 분석합니다. Board_Slug는 board.slug 연관 경로입니다. 이 프로젝트에 hide boolean은 없으므로 HiddenAtIsNull을 씁니다. MyBatis는 함수 이름을 분석하지 않고 XML SQL을 실행합니다. [Spring Data 공식 문서](https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html) · [속성 경로](https://docs.spring.io/spring-data/commons/reference/repositories/query-methods-details.html) · [MyBatis 매퍼](https://mybatis.org/mybatis-3/sqlmap-xml.html).
+- **Spring Data 파생 메서드:** `findBy` 뒤의 이름을 `Post`의 Java 속성(`id`, `deletedAt`, `hiddenAt`, `status`, `visibility`)과 `IsNull`, `And` 키워드로 해석합니다.
+- **연관 경로:** `Board_Slug`는 `board.slug`를 가리킵니다.
+- **숨김 조건:** 프로젝트에는 `hide` boolean 속성이 없습니다. 숨김 여부는 `HiddenAtIsNull`로 조회합니다.
+- **MyBatis:** 메서드 이름을 분석하지 않고 매퍼 XML에 작성한 SQL을 실행합니다.
+
+참고 문서:
+
+- [Spring Data JPA 쿼리 메서드](https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html)
+- [Spring Data 속성 경로](https://docs.spring.io/spring-data/commons/reference/repositories/query-methods-details.html)
+- [MyBatis 매퍼 XML](https://mybatis.org/mybatis-3/sqlmap-xml.html)
 
 ## 실행 준비
 
-저장소 루트에서 `python3 tools/materialize-query-practice.py --output /tmp/query-practice --through l12-query-methods`를 실행합니다. 처음 L12를 적용할 때 출력 디렉터리는 비어 있어야 합니다. 이후 L13·L14에서 같은 경로로 명령을 다시 실행하면 다음 overlay만 적용됩니다. Java 21로 복원 폴더에서 `./gradlew bootRun --args="--spring.profiles.active=practice"`를 실행합니다. DB 접속은 SPRING_DATASOURCE_URL/SPRING_DATASOURCE_USERNAME/SPRING_DATASOURCE_PASSWORD 환경변수로 조정합니다. L13은 L12 위에, L14는 L12와 L13 위에 적용됩니다.
+1. **복원 폴더 만들기:** 저장소 루트에서 다음 명령을 실행합니다.
 
-기존 POST /api/posts에 작성자 토큰과 `{"boardSlug":"dev","title":"쿼리 연습 JPA","content":"본문","tags":["spring"],"visibility":"PUBLIC"}`를 보내 201 응답의 id를 받으세요. 같은 DB에서 이 id를 아래 {id}로 사용합니다. 새 API는 공개 데이터 비교용이며 개인별 권한은 기존 API에서 확인합니다.
+   ```bash
+   python3 tools/materialize-query-practice.py --output /tmp/query-practice --through l12-query-methods
+   ```
+
+   L12를 처음 적용할 때 `/tmp/query-practice`는 비어 있어야 합니다. L13·L14로 진행할 때는 각 실습의 `--through` 값을 해당 lab 이름으로 바꿔 같은 출력 경로에 다시 실행합니다. 적용 순서는 L12 → L13 → L14입니다.
+
+2. **서버 실행:** Java 21을 사용해 복원 폴더에서 실행합니다.
+
+   ```bash
+   ./gradlew bootRun --args="--spring.profiles.active=practice"
+   ```
+
+3. **DB 접속 설정:** 필요하면 다음 환경변수로 접속 정보를 지정합니다.
+
+   - `SPRING_DATASOURCE_URL`
+   - `SPRING_DATASOURCE_USERNAME`
+   - `SPRING_DATASOURCE_PASSWORD`
+
+4. **연습 게시글 준비:** 기존 `POST /api/posts`에 작성자 토큰과 아래 JSON을 보내고, 201 응답의 `id`를 기록합니다.
+
+   ```json
+   {
+     "boardSlug": "dev",
+     "title": "쿼리 연습 JPA",
+     "content": "본문",
+     "tags": ["spring"],
+     "visibility": "PUBLIC"
+   }
+   ```
+
+   이후 같은 DB에서 응답의 `id`를 경로의 `{id}`에 사용합니다. 새 API는 공개 데이터를 비교합니다. 개인별 권한은 기존 API에서 확인합니다.
 
 ## 순서대로 구현할 시나리오
 

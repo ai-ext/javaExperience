@@ -111,7 +111,9 @@ app:
 - **`GET`은 비로그인 통과, 나머지는 막기.** 목록·상세는 비로그인도 보지만, 로그인하면 결과가 달라진다(내 비공개 글, "내가 좋아요했나"). 그래서 `GET`에서 헤더가 없으면 그냥 통과시키고, `@LoginUser(required = false)`가 `null`을 받는다. `GET /users/me`처럼 로그인이 필수인 `GET`은 매개변수 해석기가 401을 던진다.
 - **헤더는 있는데 틀린 토큰은 `GET`이어도 401.** "토큰을 보냈는데 무시당함"보다 "토큰이 틀렸다"를 알려 주는 편이 프론트가 고치기 쉽다.
 - **로그인 실패 문구를 하나로.** "없는 이메일입니다"와 "비밀번호가 틀렸습니다"를 나누면 남의 가입 여부를 캐낼 수 있다.
-- **로그인에는 가입의 72바이트 규칙을 걸지 않는다.** 10-3에서 막은 것은 `encode`가 72바이트를 넘으면 예외를 던지기 때문이다. 로그인의 `matches`는 예외 없이 앞 72바이트만 비교해 500이 나지 않는다([F4](../../lessons/F4-password-storage.md)). 가입이 72바이트를 넘는 비밀번호를 받지 않으니, 그런 입력은 틀린 비밀번호와 똑같이 401로 답하면 된다. 규칙은 비밀번호를 **정할 때**(가입) 검사한다 — 규칙이 바뀌어도 예전 규칙으로 가입한 회원은 로그인할 수 있어야 한다. 단, 정확히 72바이트(한글 24자)로 가입한 회원은 뒤에 무엇을 붙여도 로그인된다. 앞 72바이트를 모두 알아야 하니 구멍은 아니다.
+- **로그인에는 가입의 72바이트 규칙을 걸지 않는다.** 10-3에서 막은 것은 `encode`가 72바이트를 넘으면 예외를 던지기 때문이다. 로그인의 `matches`는 예외 없이 앞 72바이트만 비교해 500이 나지 않는다([F4](../../lessons/F4-password-storage.md)).
+  가입이 72바이트를 넘는 비밀번호를 받지 않으니, 그런 입력은 틀린 비밀번호와 똑같이 401로 답하면 된다. 규칙은 비밀번호를 **정할 때**(가입) 검사한다 — 규칙이 바뀌어도 예전 규칙으로 가입한 회원은 로그인할 수 있어야 한다.
+  단, 정확히 72바이트(한글 24자)로 가입한 회원은 뒤에 무엇을 붙여도 로그인된다. 앞 72바이트를 모두 알아야 하니 구멍은 아니다.
 
 ## 구현 가이드
 
@@ -468,8 +470,11 @@ public boolean preHandle(HttpServletRequest request, HttpServletResponse respons
 <details>
 <summary>더 깊이 — Spring Security로 옮긴다면</summary>
 
-같은 일을 Security에서는 `SecurityFilterChain` + `OncePerRequestFilter`(JWT 필터)로 한다. 인터셉터보다 앞(서블릿 필터)에서 돌고, `@AuthenticationPrincipal`이 `@LoginUser` 역할을 한다. 401·403 응답 모양은 `AuthenticationEntryPoint`·`AccessDeniedHandler`로 맞춘다. 실무 코드에서 이 이름들을 보면 이 단계에서 만든 것의 자리라고 생각하면 된다. 이 장은 Security 없이 끝까지 간다.
-</details>
+같은 일을 Security에서는 `SecurityFilterChain` + `OncePerRequestFilter`(JWT 필터)로 한다. 인터셉터보다 앞(서블릿 필터)에서 돌고, `@AuthenticationPrincipal`이 `@LoginUser` 역할을 한다.
+
+401·403 응답 모양은 `AuthenticationEntryPoint`·`AccessDeniedHandler`로 맞춘다. 실무 코드에서 이 이름들을 보면 이 단계에서 만든 것의 자리라고 생각하면 된다.
+
+이 장은 Security 없이 끝까지 간다. </details>
 
 ## 다음 단계
 

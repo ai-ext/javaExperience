@@ -38,7 +38,9 @@
 3. 실행기는 작업을 시작·대기·거부한다. 큐 용량과 거부 정책에 따라 과부하 시 예외, 호출 스레드 실행, 대기가 발생한다.
 4. Future 반환은 호출자가 결과·예외를 관찰하게 한다. `void` 예외는 호출자에게 돌아오지 않으므로 `AsyncUncaughtExceptionHandler`나 내부 로깅이 필요하다.
 
-Spring의 `TaskExecutor`는 JDK `Executor`와 실행 환경 차이를 감춘다. `SyncTaskExecutor`는 동기 실행, `SimpleAsyncTaskExecutor`는 스레드를 재사용하는 풀이 아니다. 풀을 원하면 `ThreadPoolTaskExecutor`처럼 용량을 드러내는 구현을 쓴다. [1] Boot 4.1은 사용자 `Executor`가 없으면 `AsyncTaskExecutor`를 구성한다. Virtual Thread 설정에 따라 구현이 달라지며, MVC·WebFlux 통합에는 `applicationTaskExecutor` 이름이 요구될 수 있다. [2]
+Spring의 `TaskExecutor`는 JDK `Executor`와 실행 환경 차이를 감춘다. `SyncTaskExecutor`는 동기 실행, `SimpleAsyncTaskExecutor`는 스레드를 재사용하는 풀이 아니다.
+
+풀을 원하면 `ThreadPoolTaskExecutor`처럼 용량을 드러내는 구현을 쓴다. [1] Boot 4.1은 사용자 `Executor`가 없으면 `AsyncTaskExecutor`를 구성한다. Virtual Thread 설정에 따라 구현이 달라지며, MVC·WebFlux 통합에는 `applicationTaskExecutor` 이름이 요구될 수 있다. [2]
 
 호출 스레드의 트랜잭션·`ThreadLocal` 보안 주체·MDC가 작업 스레드에 자동 전달된다고 가정하지 않는다. 필요한 값은 인자로 넘기고, 트랜잭션은 작업 경계에서 별도로 연다.
 
@@ -69,7 +71,9 @@ StepExecution → read → process → write → chunk commit / checkpoint
 
 Chunk는 정한 건수 단위로 읽고 가공해 기록한 뒤 트랜잭션을 커밋한다. 재시작은 JobRepository만으로 충분하지 않다. Reader가 진행 위치를 저장·복원하고, 저장소 메타데이터도 재기동 후 남아야 한다. DB 롤백은 이미 성공한 외부 HTTP·파일·메일을 취소하지 않으므로 멱등 키나 중복 제거도 필요하다.
 
-Spring Batch 6은 공통 인프라 설정과 저장소별 설정을 분리했다. 공식 변경 문서는 `@EnableBatchProcessing`이 JDBC에만 묶이지 않으며 JDBC·Mongo 저장소용 전용 애노테이션을 소개한다. 새 chunk 구현·동시성 모델, 실패 실행 복구, graceful shutdown, JFR 관측성, local chunking·remote step도 변경 목록에 포함한다. 운영 재시작이 필요하면 resourceless 인프라와 내구성 저장소를 구분해 선택한다. [4]
+Spring Batch 6은 공통 인프라 설정과 저장소별 설정을 분리했다. 공식 변경 문서는 `@EnableBatchProcessing`이 JDBC에만 묶이지 않으며 JDBC·Mongo 저장소용 전용 애노테이션을 소개한다.
+
+새 chunk 구현·동시성 모델, 실패 실행 복구, graceful shutdown, JFR 관측성, local chunking·remote step도 변경 목록에 포함한다. 운영 재시작이 필요하면 resourceless 인프라와 내구성 저장소를 구분해 선택한다. [4]
 
 ## 4. 코드로 확인
 

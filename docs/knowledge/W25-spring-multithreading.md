@@ -52,7 +52,9 @@ Tomcat NIO의 Acceptor는 연결을 받고 Poller는 소켓 I/O 준비 상태를
 
 `practice/starter`(Boot 4.1.1, Tomcat)에 12건을 동시에 요청했을 때 Hibernate SQL 로그에는 `http-nio-8080-exec-1..12`가 각각 기록됐다. 같은 시각 덤프에는 Acceptor·Poller 각 1개와 Hikari `housekeeper`, `connection-adder`가 별도 스레드로 보였다. 이는 SQL 호출도 요청 worker 흐름에서 수행됐음을 보여주는 로컬 실측이지, 최대 동시성이나 성능 수치는 아니다.
 
-Spring Boot 4.1의 `server.tomcat.threads.max` 기본값은 **200**, `server.tomcat.threads.min-spare`는 **10**이다. `server.tomcat.threads.max`는 가상 스레드가 켜져 있으면 적용되지 않는다는 조건도 Boot 속성 문서에 명시돼 있다. Tomcat 풀의 max는 동시에 일할 작업 스레드 수의 상한이지, 데이터베이스 동시 쿼리 수가 아니다. Boot 속성 문서는 backing queue 용량 속성도 따로 제공하므로, worker가 모두 바쁘면 설정과 부하에 따라 처리가 큐에서 기다린다. 실제 거부 전에 대기 시간이 길어져 클라이언트·프록시 타임아웃으로 보일 수 있다.
+Spring Boot 4.1의 `server.tomcat.threads.max` 기본값은 **200**, `server.tomcat.threads.min-spare`는 **10**이다. `server.tomcat.threads.max`는 가상 스레드가 켜져 있으면 적용되지 않는다는 조건도 Boot 속성 문서에 명시돼 있다. Tomcat 풀의 max는 동시에 일할 작업 스레드 수의 상한이지, 데이터베이스 동시 쿼리 수가 아니다.
+
+Boot 속성 문서는 backing queue 용량 속성도 따로 제공하므로, worker가 모두 바쁘면 설정과 부하에 따라 처리가 큐에서 기다린다. 실제 거부 전에 대기 시간이 길어져 클라이언트·프록시 타임아웃으로 보일 수 있다.
 
 ### 싱글턴은 한 객체를 공유한다
 
@@ -66,7 +68,9 @@ Spring Boot 4.1의 `server.tomcat.threads.max` 기본값은 **200**, `server.tom
 요청 Alice: service.currentName을 읽어 응답 → "Bob"
 ```
 
-문제의 핵심은 싱글턴의 수명 그 자체가 아니라 **요청마다 달라야 하는 가변 데이터를 공유 객체의 필드로 저장한 것**이다. 반대로 `private final ProductRepository repository`처럼 생성 시 주입되고 바뀌지 않는 참조는 요청 사이에 덮어쓰는 데이터가 아니다. 그렇더라도 참조 대상 repository가 내부에 가변 상태를 갖는다면 그 대상의 동시성은 별도로 살펴야 한다. `final`은 참조 재대입을 막을 뿐, 참조된 모든 객체를 자동으로 불변·스레드 안전하게 만들지는 않는다.
+문제의 핵심은 싱글턴의 수명 그 자체가 아니라 **요청마다 달라야 하는 가변 데이터를 공유 객체의 필드로 저장한 것**이다. 반대로 `private final ProductRepository repository`처럼 생성 시 주입되고 바뀌지 않는 참조는 요청 사이에 덮어쓰는 데이터가 아니다.
+
+그렇더라도 참조 대상 repository가 내부에 가변 상태를 갖는다면 그 대상의 동시성은 별도로 살펴야 한다. `final`은 참조 재대입을 막을 뿐, 참조된 모든 객체를 자동으로 불변·스레드 안전하게 만들지는 않는다.
 
 ### 풀은 서로 다른 단계의 용량이다
 

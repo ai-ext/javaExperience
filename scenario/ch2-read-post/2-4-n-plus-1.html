@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>2-4. 쿼리 수 줄이기(N+1)</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
@@ -75,8 +75,10 @@ select ... from post_tag ... where post_id in (?, ?, …)</span></div></div></di
 <details>
 <summary>MyBatis — 페이지 크기가 늘어도 SELECT 수를 고정하기</summary>
 
-<p>아래 <strong>MyBatis 대체 구현 코드</strong>의 11개 파일을 이 단계 전체 소스에 적용한다. 2-3의 조회 권한 조건은 <code>PostVisibilityMapper.xml</code>의 목록·COUNT 공통 조건으로 유지한다. 목록 SQL에서 작성자를 JOIN해 한 번에 읽고, 페이지에 나온 글 ID를 모아 <code>post_tag</code>·<code>tag</code>를 <code>IN</code> 쿼리 한 번으로 읽는다. Mapper 실행 순서는 게시판 ID, 목록, COUNT, 태그로 페이지 크기와 관계없이 SELECT 4개다. 글마다 작성자·태그를 다시 읽는 N+1 루프는 없다.</p>
-<p>기본 JPA 테스트의 Hibernate <code>Statistics</code>는 MyBatis SQL을 세지 못한다. 대체 코드의 <code>MyBatisStatementCounter</code>는 MyBatis <code>Executor.query</code>를 가로채 요청 스레드의 SELECT 호출 수를 세고, <code>PostListQueryCountTest</code>가 <code>size=5</code>와 <code>size=20</code>에서 <strong>실제로 0보다 큰 수</strong>인지, 두 수가 같은지, 5개 이하인지 검사한다. 격리 테스트 DB에서는 두 크기 모두 4개였다. JPA·MyBatis 양쪽의 C1 응답과 2-3 접근 조건도 대조한다.</p>
+<p>아래 <strong>MyBatis 대체 구현 코드</strong>의 11개 파일을 이 단계 전체 소스에 적용한다. 2-3의 조회 권한 조건은 <code>PostVisibilityMapper.xml</code>의 목록·COUNT 공통 조건으로 유지한다.</p>
+<p>목록 SQL에서 작성자를 JOIN해 한 번에 읽고, 페이지에 나온 글 ID를 모아 <code>post_tag</code>·<code>tag</code>를 <code>IN</code> 쿼리 한 번으로 읽는다. Mapper 실행 순서는 게시판 ID, 목록, COUNT, 태그로 페이지 크기와 관계없이 SELECT 4개다. 글마다 작성자·태그를 다시 읽는 N+1 루프는 없다.</p>
+<p>기본 JPA 테스트의 Hibernate <code>Statistics</code>는 MyBatis SQL을 세지 못한다. 대체 코드의 <code>MyBatisStatementCounter</code>는 MyBatis <code>Executor.query</code>를 가로채 요청 스레드의 SELECT 호출 수를 세고, <code>PostListQueryCountTest</code>가 <code>size=5</code>와 <code>size=20</code>에서 <strong>실제로 0보다 큰 수</strong>인지, 두 수가 같은지, 5개 이하인지 검사한다.</p>
+<p>격리 테스트 DB에서는 두 크기 모두 4개였다. JPA·MyBatis 양쪽의 C1 응답과 2-3 접근 조건도 대조한다.</p>
 </details>
 
 <h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
@@ -768,9 +770,8 @@ curl -s &quot;$BASE/api/boards/free/posts?size=20&quot; &gt; /dev/null   # 앱 �
 <details>
 <summary>힌트 1 — SQL 세기</summary>
 
-<p><code>src/test/resources/application-test.yml</code>에 <code>spring.jpa.properties.hibernate.generate_statistics: true</code>를 켠다. 테스트 클래스에 <code>@TestPropertySource</code>로 따로 켜면 스프링 컨텍스트가 하나 더 생기고, 같은 테스트 DB에 스키마 초기화가 다시 돌아 &quot;Table already exists&quot;로 실패한다. 그다음 <code>EntityManagerFactory</code>를 주입받아 <code>emf.unwrap(SessionFactory.class).getStatistics()</code>를 얻는다. 호출 직전 <code>statistics.clear()</code>, 호출 뒤 <code>statistics.getPrepareStatementCount()</code>.</p>
-</details>
-
+<p><code>src/test/resources/application-test.yml</code>에 <code>spring.jpa.properties.hibernate.generate_statistics: true</code>를 켠다. 테스트 클래스에 <code>@TestPropertySource</code>로 따로 켜면 스프링 컨텍스트가 하나 더 생기고, 같은 테스트 DB에 스키마 초기화가 다시 돌아 &quot;Table already exists&quot;로 실패한다.</p>
+<p>그다음 <code>EntityManagerFactory</code>를 주입받아 <code>emf.unwrap(SessionFactory.class).getStatistics()</code>를 얻는다. 호출 직전 <code>statistics.clear()</code>, 호출 뒤 <code>statistics.getPrepareStatementCount()</code>. </details></p>
 <details>
 <summary>힌트 2 — 가장 쉬운 해결</summary>
 

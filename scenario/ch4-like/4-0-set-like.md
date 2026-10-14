@@ -40,7 +40,9 @@
 | 실패 | 내 글 `400`, 토큰 없음 `401`, 정지 회원 `403`, 없는·볼 수 없는·미발행 글 `404`. 경로 ID 형식 오류는 `400`. |
 | DB | `post_like(post_id, member_id)`에 최대 한 행. 새 행을 넣었을 때만 `post.like_count`를 1 늘린다. |
 
-`post_like`에는 `UNIQUE(post_id, member_id)`가 있다. Controller는 경로 ID만 받고, Service는 2-3의 읽기 권한과 작성자 여부를 확인한다. Repository의 `existsByPostIdAndMemberId` 같은 조회로 현재 상태를 확인하되, **존재 확인과 두 쓰기를 한 트랜잭션**에 둔다. 요청 둘이 동시에 도착하는 문제는 4-2에서 다룬다. 응답은 엔티티가 아니라 `postId`·`liked`·`likeCount`만 가진 DTO다.
+`post_like`에는 `UNIQUE(post_id, member_id)`가 있다. Controller는 경로 ID만 받고, Service는 2-3의 읽기 권한과 작성자 여부를 확인한다.
+
+Repository의 `existsByPostIdAndMemberId` 같은 조회로 현재 상태를 확인하되, **존재 확인과 두 쓰기를 한 트랜잭션**에 둔다. 요청 둘이 동시에 도착하는 문제는 4-2에서 다룬다. 응답은 엔티티가 아니라 `postId`·`liked`·`likeCount`만 가진 DTO다.
 
 ## 구현 가이드
 

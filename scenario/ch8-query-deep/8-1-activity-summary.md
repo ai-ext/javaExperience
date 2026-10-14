@@ -257,7 +257,11 @@ public List<MemberActivityResponse> memberActivity() {
 }
 ```
 
-MyBatis로 풀 때는 같은 SQL을 `MyBatisStatsMapper.xml`의 `<select>`에 넣고 `MyBatisStatsMapper.findMemberActivity()` 한 번만 호출한다. Java `MemberActivityRow`에는 기본 생성자와 setter를 두고 `map-underscore-to-camel-case`로 `likes_received`를 `likesReceived`에 매핑한다. **MyBatis / Mapper** 코드 접기에서 Java·XML·Service의 전체 대체 구현을 확인한다.
+MyBatis로 풀 때는 같은 SQL을 `MyBatisStatsMapper.xml`의 `<select>`에 넣고 `MyBatisStatsMapper.findMemberActivity()` 한 번만 호출한다.
+
+Java `MemberActivityRow`에는 기본 생성자와 setter를 두고 `map-underscore-to-camel-case`로 `likes_received`를 `likesReceived`에 매핑한다.
+
+**MyBatis / Mapper** 코드 접기에서 Java·XML·Service의 전체 대체 구현을 확인한다.
 
 </details>
 

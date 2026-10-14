@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>W02. 왜 Controller·Service·Repository로 나누나 — 안 나누면 생기는 일</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -52,8 +52,10 @@
 <p>응답 타입을 Service까지 전달하면 업무 코드가 HTTP 표현에 묶인다. ORM 엔티티를 그대로 노출하면 DB 변경이 API 변경으로 번질 수 있다. 요청·응답을 유스케이스 입력·결과로 변환하고 저장소 세부사항을 Service 뒤에 두면 각 계약이 독립적으로 바뀔 여지가 생긴다. 변환 비용은 있지만 파급 감소가 이를 상쇄하는 경우에 둔다.</p>
 <p>분리는 공짜가 아니다. 파일과 호출 경로가 늘어난다. 단순 유스케이스에 계층·Facade·Manager를 겹치면 탐색 비용이 이득을 앞선다. 재사용·조율·트랜잭션·독립 테스트 중 얻는 이득이 분명할 때 둔다.</p>
 <h3 id="트랜잭션과-프록시"><a class="anchor" href="#트랜잭션과-프록시" aria-hidden="true">#</a>트랜잭션과 프록시</h3>
-<p>여러 Repository 호출을 하나의 업무 작업으로 묶을 때 Service 메서드는 자연스러운 트랜잭션 경계가 된다. 예를 들어 주문을 저장하고 쿠폰 사용을 기록하는 흐름을 Service에 모으면 “둘 다 성공하거나 실패해야 한다”는 의도를 코드 위치와 함께 표현할 수 있다. Spring의 선언적 트랜잭션은 <code>@Transactional</code>로 선언하며, Spring AOP는 대상 객체 앞에 프록시를 둬 호출을 가로채는 방식으로 AOP를 적용한다. 그러므로 어노테이션이 붙은 곳만 보는 것으로 끝내지 말고 실제 호출이 Spring 빈 경계를 통과하는지도 생각해야 한다.</p>
-<p>인터페이스는 JDK 동적 프록시의 자연스러운 계약이었다. Java <code>Proxy</code>는 지정한 인터페이스를 구현하는 객체를 만들고 호출을 <code>InvocationHandler</code>에 전달한다. Spring은 인터페이스가 있으면 JDK 프록시를, 없으면 CGLIB 서브클래스를 쓸 수 있다. 그러므로 모든 Service에 인터페이스가 필요하다는 주장은 현재 Spring에는 맞지 않는다. 과거 프록시 제약은 인터페이스 선호의 한 배경일 수 있지만, 계약·원격 호출·테스트 경계도 작용했으므로 관행의 단일 기원으로 단정하지 않는다.</p>
+<p>여러 Repository 호출을 하나의 업무 작업으로 묶을 때 Service 메서드는 자연스러운 트랜잭션 경계가 된다. 예를 들어 주문을 저장하고 쿠폰 사용을 기록하는 흐름을 Service에 모으면 “둘 다 성공하거나 실패해야 한다”는 의도를 코드 위치와 함께 표현할 수 있다.</p>
+<p>Spring의 선언적 트랜잭션은 <code>@Transactional</code>로 선언하며, Spring AOP는 대상 객체 앞에 프록시를 둬 호출을 가로채는 방식으로 AOP를 적용한다. 그러므로 어노테이션이 붙은 곳만 보는 것으로 끝내지 말고 실제 호출이 Spring 빈 경계를 통과하는지도 생각해야 한다.</p>
+<p>인터페이스는 JDK 동적 프록시의 자연스러운 계약이었다. Java <code>Proxy</code>는 지정한 인터페이스를 구현하는 객체를 만들고 호출을 <code>InvocationHandler</code>에 전달한다. Spring은 인터페이스가 있으면 JDK 프록시를, 없으면 CGLIB 서브클래스를 쓸 수 있다.</p>
+<p>그러므로 모든 Service에 인터페이스가 필요하다는 주장은 현재 Spring에는 맞지 않는다. 과거 프록시 제약은 인터페이스 선호의 한 배경일 수 있지만, 계약·원격 호출·테스트 경계도 작용했으므로 관행의 단일 기원으로 단정하지 않는다.</p>
 <h3 id="무엇을-테스트하기-쉬워지는가"><a class="anchor" href="#무엇을-테스트하기-쉬워지는가" aria-hidden="true">#</a>무엇을 테스트하기 쉬워지는가</h3>
 <p>경계를 나누면 테스트 목적도 나뉜다. Controller는 HTTP 입출력, Service는 규칙과 작업 조합, Repository는 쿼리·매핑을 확인한다. Spring Boot는 <code>@SpringBootTest</code> 외에 특정 계층을 위한 애너테이션을 제공한다. <code>MockMvc</code>는 실제 서버 없이 Spring MVC 요청 처리를 시험하므로 실패를 좁은 범위에서 재현할 수 있다.</p>
 <h2 id="4-선택지-비교"><a class="anchor" href="#4-선택지-비교" aria-hidden="true">#</a>4. 선택지 비교</h2>

@@ -162,7 +162,9 @@ select count(*) from post_likes where post_id = ? and user_id = ?   ← (좋아�
 
 ### ③ flush하면 왜 보이나 — 같은 커넥션
 
-`flush()`는 SQL을 DB로 보낼 뿐 **커밋하지 않는다.** 커밋 전의 변경은 원래 다른 커넥션에서 안 보인다. 그런데도 MyBatis가 새 값을 읽는다는 것은 **MyBatis가 JPA와 같은 트랜잭션·같은 커넥션을 쓰고 있다**는 뜻이다. `@Transactional`(JPA 트랜잭션 관리자)이 연 커넥션을 MyBatis-Spring이 그대로 받아 쓴다. 그래서 둘을 섞으려면 반드시 **같은 `@Transactional` 메서드 안**에서 부른다.
+`flush()`는 SQL을 DB로 보낼 뿐 **커밋하지 않는다.** 커밋 전의 변경은 원래 다른 커넥션에서 안 보인다. 그런데도 MyBatis가 새 값을 읽는다는 것은 **MyBatis가 JPA와 같은 트랜잭션·같은 커넥션을 쓰고 있다**는 뜻이다.
+
+`@Transactional`(JPA 트랜잭션 관리자)이 연 커넥션을 MyBatis-Spring이 그대로 받아 쓴다. 그래서 둘을 섞으려면 반드시 **같은 `@Transactional` 메서드 안**에서 부른다.
 
 ### ④ 그래도 옛 값 — MyBatis 1차 캐시
 
@@ -495,8 +497,9 @@ C = HTTP 확인(필수), R = 코드 리뷰(피드백용).
 </select>
 ```
 
-태그는 `SELECT pt.post_id, t.name FROM post_tags pt JOIN tags t ON t.id = pt.tag_id WHERE pt.post_id IN <foreach …>#{id}</foreach> ORDER BY t.name`. 목록 서비스에 `listItem(Long postId)`를 두고, 행 하나와 그 글의 태그로 항목 하나를 만든다. 태그도 **MyBatis로** 읽어야 한다 — JPA 쿼리로 읽으면 그 앞에서 Hibernate가 auto flush해 버려 아래 ①을 재현할 수 없다.
-</details>
+태그는 `SELECT pt.post_id, t.name FROM post_tags pt JOIN tags t ON t.id = pt.tag_id WHERE pt.post_id IN <foreach …>#{id}</foreach> ORDER BY t.name`. 목록 서비스에 `listItem(Long postId)`를 두고, 행 하나와 그 글의 태그로 항목 하나를 만든다.
+
+태그도 **MyBatis로** 읽어야 한다 — JPA 쿼리로 읽으면 그 앞에서 Hibernate가 auto flush해 버려 아래 ①을 재현할 수 없다. </details>
 
 <details>
 <summary>힌트 2 — 서비스에서의 순서</summary>

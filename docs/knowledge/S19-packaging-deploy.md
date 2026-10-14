@@ -37,7 +37,9 @@ JAR 하나만 넣으면 앱 코드가 바뀔 때 의존성 Docker layer까지 �
 
 ### 3.1 실행 가능 JAR는 어떻게 시작되는가
 
-플러그인은 애플리케이션과 의존성 외에 Boot loader를 포함하고 manifest에 실행 진입점을 기록한다. 보통 `BOOT-INF/classes`는 앱 클래스, `BOOT-INF/lib`는 의존성, `BOOT-INF/layers.idx`는 계층 정의다. manifest의 `Main-Class`는 Boot launcher이고 실제 진입점은 `Start-Class`다. `java -jar`가 launcher를 실행하면 loader가 중첩 의존성을 읽어 앱 main을 호출한다. 따라서 이를 `java -cp app.jar Main`으로 대체하면 nested JAR 의존성이 classpath에 풀리지 않는다.
+플러그인은 애플리케이션과 의존성 외에 Boot loader를 포함하고 manifest에 실행 진입점을 기록한다. 보통 `BOOT-INF/classes`는 앱 클래스, `BOOT-INF/lib`는 의존성, `BOOT-INF/layers.idx`는 계층 정의다. manifest의 `Main-Class`는 Boot launcher이고 실제 진입점은 `Start-Class`다.
+
+`java -jar`가 launcher를 실행하면 loader가 중첩 의존성을 읽어 앱 main을 호출한다. 따라서 이를 `java -cp app.jar Main`으로 대체하면 nested JAR 의존성이 classpath에 풀리지 않는다.
 
 중첩 JAR 실행은 편리하지만 작은 시작 비용이 있다. Boot는 외부 `lib/` 디렉터리를 사용하는 추출 레이아웃을 효율적이고 AOT cache/CDS에 친화적인 방법으로 안내한다. `java -Djarmode=tools -jar app.jar extract --layers`는 앱 대신 JAR를 계층별로 푼다. 추출은 이미지 빌드 때 하고, 컨테이너 시작 시 반복하지 않는다.
 
@@ -67,11 +69,15 @@ Maven/Gradle 패키징
                         registry push → Kubernetes 배포
 ```
 
-Dockerfile은 builder와 최종 runtime을 명시하고, runtime에는 필요한 JRE·추출 결과만 둔다. 비루트 `USER`, 고정된 기반 이미지, `.git`·비밀 파일 제외를 기본으로 한다. Buildpacks는 Maven·Gradle에서 builder를 호출해 앱 종류를 감지하고 이미지를 조립한다. Docker 호환 데몬·인증·builder는 여전히 필요하다. Paketo는 `layers.idx` 사용자 정의를 반영하지만 리소스의 수정 시각을 조작할 수 있으므로 앱이 원래 `last modified` 값에 의존하지 않는지 확인한다.
+Dockerfile은 builder와 최종 runtime을 명시하고, runtime에는 필요한 JRE·추출 결과만 둔다. 비루트 `USER`, 고정된 기반 이미지, `.git`·비밀 파일 제외를 기본으로 한다. Buildpacks는 Maven·Gradle에서 builder를 호출해 앱 종류를 감지하고 이미지를 조립한다.
+
+Docker 호환 데몬·인증·builder는 여전히 필요하다. Paketo는 `layers.idx` 사용자 정의를 반영하지만 리소스의 수정 시각을 조작할 수 있으므로 앱이 원래 `last modified` 값에 의존하지 않는지 확인한다.
 
 ### 3.3 AOT·Native Image·CDS/AOT cache의 차이
 
-Spring AOT는 컨텍스트를 분석해 코드와 힌트를 만들고 Native Image는 이를 GraalVM 정적 분석과 결합해 실행 파일로 만든다. 리플렉션·직렬화·리소스·동적 프록시는 분석이 놓칠 수 있어 metadata가 필요하다. Boot가 일부 힌트를 자동 생성하지만 직접 리플렉션하는 코드는 `RuntimeHintsRegistrar`, `@ImportRuntimeHints`, `@RegisterReflectionForBinding` 등을 검토한다. 추적 에이전트는 관찰한 경로의 후보를 만들 뿐 미실행 코드를 증명하지 않는다.
+Spring AOT는 컨텍스트를 분석해 코드와 힌트를 만들고 Native Image는 이를 GraalVM 정적 분석과 결합해 실행 파일로 만든다. 리플렉션·직렬화·리소스·동적 프록시는 분석이 놓칠 수 있어 metadata가 필요하다.
+
+Boot가 일부 힌트를 자동 생성하지만 직접 리플렉션하는 코드는 `RuntimeHintsRegistrar`, `@ImportRuntimeHints`, `@RegisterReflectionForBinding` 등을 검토한다. 추적 에이전트는 관찰한 경로의 후보를 만들 뿐 미실행 코드를 증명하지 않는다.
 
 AOT 분석은 빌드 프로필·조건에 영향을 받으므로 런타임에 새 프로필로 빈 구성을 바꾸는 일반 JVM 방식과 다를 수 있다. 실제 배포 설정으로 검증한다. Native 빌드는 시간·메모리 비용이 더 들며 결과물도 대상 OS·CPU·libc에 맞춰야 한다.
 
@@ -81,7 +87,9 @@ CDS와 JVM AOT cache는 JVM용 캐시이고 Native Image는 별도 바이너리�
 
 Boot는 내장 Tomcat·Jetty·Reactor Netty의 graceful shutdown을 기본 활성화한다. 컨텍스트 종료 초기에 서버가 새 요청을 멈추고 진행 중 요청에 시간을 준다. `spring.lifecycle.timeout-per-shutdown-phase`는 종료 단계 제한이며 앱 자체 스레드·스케줄러·소비자는 별도 lifecycle로 닫아야 한다.
 
-Kubernetes는 종료 신호 후 `terminationGracePeriodSeconds`가 지나면 프로세스를 강제 종료한다. 이 값은 앱의 종료 timeout보다 길게 두고 endpoint 갱신·sidecar 등에도 여유를 둔다. Startup 성공 전에는 다른 probe가 대기한다. Liveness 실패는 재시작, readiness 실패는 서비스 endpoint에서 제외를 뜻한다. DB 장애를 liveness에 연결하면 재시작 폭주가 날 수 있다. Actuator probe 상세는 S16 참조.
+Kubernetes는 종료 신호 후 `terminationGracePeriodSeconds`가 지나면 프로세스를 강제 종료한다. 이 값은 앱의 종료 timeout보다 길게 두고 endpoint 갱신·sidecar 등에도 여유를 둔다. Startup 성공 전에는 다른 probe가 대기한다.
+
+Liveness 실패는 재시작, readiness 실패는 서비스 endpoint에서 제외를 뜻한다. DB 장애를 liveness에 연결하면 재시작 폭주가 날 수 있다. Actuator probe 상세는 S16 참조.
 
 ## 4. 코드로 확인
 

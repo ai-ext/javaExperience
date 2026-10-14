@@ -294,7 +294,9 @@ List<Post> findViewableByBoard(@Param("board") Board board,
 long countViewableByBoard(@Param("board") Board board, @Param("viewerId") Long viewerId);
 ```
 
-목록과 COUNT의 `WHERE`가 한 글자라도 다르게 진화하면 화면의 `totalElements`가 어긋난다. 차단 조건은 양방향이고, `:viewerId IS NULL`일 때는 비로그인 공개 글을 통과시킨다. `Pageable`의 정렬을 쓰거나 JPQL의 `ORDER BY`를 쓰되, 최종 순서는 `publishedAt DESC, id DESC`다. [접근 규칙 강의](../../lessons/G2-access-rules-in-one-place.md)와 채점 R1·R2를 대조한다.
+목록과 COUNT의 `WHERE`가 한 글자라도 다르게 진화하면 화면의 `totalElements`가 어긋난다. 차단 조건은 양방향이고, `:viewerId IS NULL`일 때는 비로그인 공개 글을 통과시킨다.
+
+`Pageable`의 정렬을 쓰거나 JPQL의 `ORDER BY`를 쓰되, 최종 순서는 `publishedAt DESC, id DESC`다. [접근 규칙 강의](../../lessons/G2-access-rules-in-one-place.md)와 채점 R1·R2를 대조한다.
 
 </details>
 
@@ -753,8 +755,9 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 <details>
 <summary>힌트 1 — 상세와 목록에 같은 규칙</summary>
 
-상세: `policy.canView(viewer, post)`를 자바로 판정한다. 목록: 같은 규칙을 WHERE 조건으로 옮긴다 — `status = PUBLISHED`, `(visibility = PUBLIC OR author = :viewer OR EXISTS(팔로우))`, `NOT EXISTS(차단)`. JPQL이면 `EXISTS (SELECT 1 FROM Follow f WHERE ...)`, QueryDSL이면 `JPAExpressions`로 서브쿼리를 만든다. 규칙을 바꿀 때 두 곳을 같이 고치도록 같은 클래스 옆에 둔다.
-</details>
+상세: `policy.canView(viewer, post)`를 자바로 판정한다. 목록: 같은 규칙을 WHERE 조건으로 옮긴다 — `status = PUBLISHED`, `(visibility = PUBLIC OR author = :viewer OR EXISTS(팔로우))`, `NOT EXISTS(차단)`.
+
+JPQL이면 `EXISTS (SELECT 1 FROM Follow f WHERE ...)`, QueryDSL이면 `JPAExpressions`로 서브쿼리를 만든다. 규칙을 바꿀 때 두 곳을 같이 고치도록 같은 클래스 옆에 둔다. </details>
 
 <details>
 <summary>힌트 2 — 비로그인</summary>

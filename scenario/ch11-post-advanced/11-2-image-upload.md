@@ -155,7 +155,9 @@
 <details>
 <summary>Controller — HTTP 연결</summary>
 
-`ImageController.java`, `PostController.java`. 매핑과 메서드의 입력·응답을 위 **만들 것**의 HTTP 계약과 대조한다. 이번 단계 매핑: `@PostMapping(value = "/api/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)`, `@GetMapping("/api/images/{fileName}")`. 변경된 메서드: `upload`, `download`.
+`ImageController.java`, `PostController.java`. 매핑과 메서드의 입력·응답을 위 **만들 것**의 HTTP 계약과 대조한다.
+
+이번 단계 매핑: `@PostMapping(value = "/api/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)`, `@GetMapping("/api/images/{fileName}")`. 변경된 메서드: `upload`, `download`.
 
 ```java
 @PostMapping(value = "/api/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -379,7 +381,9 @@ for ids in '[null]' '["abc"]' '[99999999]' '[1,2,3,4,5,6,7,8,9,10,11]'; do
 done
 ```
 
-버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 실행 칸은 파일을 고를 수 없어서 `multipart/form-data` 본문을 글자로 직접 적어 보낸다(경계 `jx11`, 줄바꿈은 `\r\n`). 그래서 올리는 파일은 글자로만 된 작은 GIF 조각(`GIF89a…`)이다 — 형식 판정이 앞 바이트만 보므로 충분하다. 1MB 초과(C9)는 본문에 1MB를 적을 수 없어 위 curl(I4)로 직접 본다.
+버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 실행 칸은 파일을 고를 수 없어서 `multipart/form-data` 본문을 글자로 직접 적어 보낸다(경계 `jx11`, 줄바꿈은 `\r\n`).
+
+그래서 올리는 파일은 글자로만 된 작은 GIF 조각(`GIF89a…`)이다 — 형식 판정이 앞 바이트만 보므로 충분하다. 1MB 초과(C9)는 본문에 1MB를 적을 수 없어 위 curl(I4)로 직접 본다.
 
 ```check
 {
@@ -645,8 +649,9 @@ spring:
 <details>
 <summary>힌트 3 — 글에 연결</summary>
 
-`PostImage`에 `@ManyToOne Post post`(nullable)를 두고, `PostService.create()`에서 글을 `save`한 뒤 `postImageRepository.findAllById(ids)`로 읽어 "개수가 같은가, 모두 `uploader`가 나인가, 모두 `post == null`인가"를 본다. 하나라도 아니면 3-1에서 만든 `InvalidPostFieldException("imageIds", …)`를 던진다 — 같은 트랜잭션이라 방금 저장한 글도 롤백된다. 상세 응답은 `Post`에 `@OneToMany(mappedBy = "post") @OrderBy("id")`를 두거나 `findByPostIdOrderById`로 따로 읽는다(트랜잭션 안에서).
-</details>
+`PostImage`에 `@ManyToOne Post post`(nullable)를 두고, `PostService.create()`에서 글을 `save`한 뒤 `postImageRepository.findAllById(ids)`로 읽어 "개수가 같은가, 모두 `uploader`가 나인가, 모두 `post == null`인가"를 본다. 하나라도 아니면 3-1에서 만든 `InvalidPostFieldException("imageIds", …)`를 던진다 — 같은 트랜잭션이라 방금 저장한 글도 롤백된다.
+
+상세 응답은 `Post`에 `@OneToMany(mappedBy = "post") @OrderBy("id")`를 두거나 `findByPostIdOrderById`로 따로 읽는다(트랜잭션 안에서). </details>
 
 ## 다음 단계
 

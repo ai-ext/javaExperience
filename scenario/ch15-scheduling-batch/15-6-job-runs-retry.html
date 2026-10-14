@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>15-6. 배치 실행 기록과 다시 돌리기</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=8835413caeb2">
+<link rel="stylesheet" href="../../tools/site/site.css?v=249900e0ad28">
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
@@ -20,7 +20,9 @@
 <blockquote>
 <p>&quot;지난 9월 21일 월요일에 주간 랭킹 배치가 DB 잠금 때문에 실패했는데 아무도 몰랐어요. 그래서 9/14 주 랭킹이 비어 있어요. 배치가 언제 돌았고, 몇 건 처리했고, 실패했으면 왜 실패했는지 남겨 주세요. 실패한 날만 골라서 다시 돌리는 버튼도요.&quot;</p>
 </blockquote>
-<p>지금까지 만든 배치 다섯 개는 로그만 남긴다. 로그는 서버를 재시작하면 찾기 어렵고, &quot;어느 날 몫이 아직 안 됐나&quot;를 묻기도 어렵다. 그래서 실행마다 <strong>표에 한 행</strong>을 남긴다. 기준일(<code>run_date</code>, 어느 날 몫인가)이 있기 때문에 &quot;마지막 실행이 실패로 끝난 날&quot;을 SQL로 찾을 수 있다. 다시 돌릴 때는 그 기준일로 같은 배치를 돌린다. 15-1~15-5에서 모든 배치가 기준일을 받고, 같은 날 두 번 돌아도 결과가 같게(멱등) 만들어 둔 것이 여기서 쓰인다. 재실행이 안전하려면 배치가 멱등이어야 한다.</p>
+<p>지금까지 만든 배치 다섯 개는 로그만 남긴다. 로그는 서버를 재시작하면 찾기 어렵고, &quot;어느 날 몫이 아직 안 됐나&quot;를 묻기도 어렵다.</p>
+<p>그래서 실행마다 <strong>표에 한 행</strong>을 남긴다. 기준일(<code>run_date</code>, 어느 날 몫인가)이 있기 때문에 &quot;마지막 실행이 실패로 끝난 날&quot;을 SQL로 찾을 수 있다.</p>
+<p>다시 돌릴 때는 그 기준일로 같은 배치를 돌린다. 15-1~15-5에서 모든 배치가 기준일을 받고, 같은 날 두 번 돌아도 결과가 같게(멱등) 만들어 둔 것이 여기서 쓰인다. 재실행이 안전하려면 배치가 멱등이어야 한다.</p>
 <p>학습용 DB에는 이 단계 시드로 지난 운영 기록 세 줄이 들어간다.</p>
 <div class="table-wrap"><table>
 <thead>
@@ -587,7 +589,8 @@ INSERT INTO job_run (job_name, run_date, trigger_type, status, processed, error_
 <details>
 <summary>Scheduler — 실행 시점</summary>
 
-<p><code>HallOfFameScheduler.java</code>, <code>JobCatalog.java</code>, <code>JobLauncher.java</code>, <code>JobNotFoundException.java</code>, <code>JobRun.java</code>, <code>JobRunController.java</code>, <code>JobRunner.java</code>, <code>JobRunRepository.java</code>, <code>JobRunResponse.java</code> 외 4개. 실행 주기와 대상 선택·재실행 조건을 시나리오와 대조한다. 이번 단계 매핑: <code>@GetMapping(&quot;/api/admin/jobs/runs&quot;)</code>, <code>@PostMapping(&quot;/api/admin/jobs/{job}/retry-failed&quot;)</code>. 변경된 메서드: <code>names</code>, <code>exists</code>, <code>get</code>, <code>launch</code>.</p>
+<p><code>HallOfFameScheduler.java</code>, <code>JobCatalog.java</code>, <code>JobLauncher.java</code>, <code>JobNotFoundException.java</code>, <code>JobRun.java</code>, <code>JobRunController.java</code>, <code>JobRunner.java</code>, <code>JobRunRepository.java</code>, <code>JobRunResponse.java</code> 외 4개. 실행 주기와 대상 선택·재실행 조건을 시나리오와 대조한다.</p>
+<p>이번 단계 매핑: <code>@GetMapping(&quot;/api/admin/jobs/runs&quot;)</code>, <code>@PostMapping(&quot;/api/admin/jobs/{job}/retry-failed&quot;)</code>. 변경된 메서드: <code>names</code>, <code>exists</code>, <code>get</code>, <code>launch</code>.</p>
 <p><code>src/main/java/org/example/batch/HallOfFameScheduler.java</code></p>
 <pre><code class="language-java">package org.example.batch;
 
@@ -4248,13 +4251,15 @@ curl -s -X POST &quot;$BASE/api/admin/jobs/weekly-ranking/retry-failed&quot; -H 
 curl -s -X POST &quot;$BASE/api/admin/jobs/weekly-ranking/retry-failed&quot; -H &quot;$A&quot;; echo              # J3 한 번 더
 curl -s &quot;$BASE/api/rankings/weekly?weekStart=2026-09-14&quot; | python3 -c 'import sys,json; print([i[&quot;postId&quot;] for i in json.load(sys.stdin)[&quot;items&quot;]])'   # J4
 curl -s -X POST &quot;$BASE/api/admin/jobs/hall-of-fame/retry-failed&quot; -H &quot;$A&quot;; echo               # J5 이미 성공한 날</code></pre></details>
-<p><strong>실패를 직접 만들어 보기(선택).</strong> 9-2·4-2에서 본 잠금을 이용한다. DB 클라이언트에서 아래를 실행해 9/7 주 1위 자리를 잡아 둔다. 그 상태에서 주간 랭킹을 2026-09-14로 수동 실행하면, 약 50초(<code>innodb_lock_wait_timeout</code>) 뒤 <code>500</code>이 오고 기록에 <code>FAILED</code>·<code>CannotAcquireLockException</code>이 남는다. <code>ROLLBACK</code> 뒤에 <code>retry-failed</code>를 누르면 그 날만 다시 돈다.</p>
+<p><strong>실패를 직접 만들어 보기(선택).</strong> 9-2·4-2에서 본 잠금을 이용한다. DB 클라이언트에서 아래를 실행해 9/7 주 1위 자리를 잡아 둔다.</p>
+<p>그 상태에서 주간 랭킹을 2026-09-14로 수동 실행하면, 약 50초(<code>innodb_lock_wait_timeout</code>) 뒤 <code>500</code>이 오고 기록에 <code>FAILED</code>·<code>CannotAcquireLockException</code>이 남는다. <code>ROLLBACK</code> 뒤에 <code>retry-failed</code>를 누르면 그 날만 다시 돈다.</p>
 <pre><code class="language-sql">START TRANSACTION;
 INSERT INTO weekly_ranking (week_start, ranking, post_id, title, score, likes, comments, created_at)
 VALUES ('2026-09-07', 1, 1, '잠금 연습', 0, 0, 0, NOW());
 -- 여기서 멈춘 채로: curl -X POST &quot;$BASE/api/admin/jobs/weekly-ranking/run?date=2026-09-14&quot; -H &quot;$A&quot;
 ROLLBACK;</code></pre>
-<p><strong>예약 발행의 기준 시각 복구.</strong> 회원 2로 <code>publishAt=2026-10-06T08:00:00</code>인 예약 글을 만든다. DB 클라이언트에서 그 글을 <code>SELECT ... FOR UPDATE</code>로 잠근 채 운영자가 <code>POST /api/admin/jobs/scheduled-publish/run?at=2026-10-06T09:00:00</code>을 호출하면 잠금 대기 후 실패한다. 잠금을 풀고 <code>POST /api/admin/jobs/scheduled-publish/retry-failed</code>를 호출한다. <code>job_run.reference_at</code>은 실패·재실행 모두 <code>2026-10-06 09:00:00</code>이고 글은 <code>PUBLISHED</code>가 되어야 한다. 고정 시계의 현재 시각(2026-10-05)으로 다시 돌려 0건 성공으로 닫으면 실패다.</p>
+<p><strong>예약 발행의 기준 시각 복구.</strong> 회원 2로 <code>publishAt=2026-10-06T08:00:00</code>인 예약 글을 만든다. DB 클라이언트에서 그 글을 <code>SELECT ... FOR UPDATE</code>로 잠근 채 운영자가 <code>POST /api/admin/jobs/scheduled-publish/run?at=2026-10-06T09:00:00</code>을 호출하면 잠금 대기 후 실패한다.</p>
+<p>잠금을 풀고 <code>POST /api/admin/jobs/scheduled-publish/retry-failed</code>를 호출한다. <code>job_run.reference_at</code>은 실패·재실행 모두 <code>2026-10-06 09:00:00</code>이고 글은 <code>PUBLISHED</code>가 되어야 한다. 고정 시계의 현재 시각(2026-10-05)으로 다시 돌려 0건 성공으로 닫으면 실패다.</p>
 <p><strong>동시 재실행.</strong> 실패 기록이 남은 상태에서 운영자 요청 두 개를 동시에 보내면 응답의 <code>retried</code>는 합쳐서 해당 날짜 한 건이고 <code>job_run</code>에도 <code>RETRY</code> 한 줄만 생겨야 한다. 다시 한 번 요청하면 빈 배열이다. 재실행 응답의 <code>runId</code>는 바로 그 <code>RETRY</code> 행의 ID여야 한다.</p>
 <p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.</p>
 <section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="J1" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET</p><h4>J1 · 실패 기록 보기</h4></div><span class="request-number">요청 1</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/admin/jobs/runs?job=weekly-ranking&amp;status=FAILED" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p01" value="Bearer tok-p01" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-0">GET 요청 보내기</button><p id="request-status-0" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
@@ -4430,9 +4435,9 @@ ROLLBACK;</code></pre>
 <details>
 <summary>더 깊이 — 서버가 여러 대라면, Spring Batch라면</summary>
 
-<p>이 장의 재실행 버튼은 MySQL 연결 잠금으로 중복 요청을 막는다. 예약 스케줄러 자체가 여러 서버에서 동시에 시작되는 문제는 별개다. 보통 분산 락(ShedLock 등)으로 한 대만 돌게 한다. 매분·10분 배치는 0건 성공의 기록을 생략하므로 본문 실행 중 프로세스가 종료되면 그 실행 기록도 남지 않을 수 있다. 그런 종료까지 추적하려면 먼저 RUNNING을 저장하고 오래된 실행을 복구하는 정책이 필요하다. Spring Batch를 쓰면 이 단계의 <code>job_run</code> 역할을 <code>JobRepository</code>(BATCH_JOB_EXECUTION 등)가 한다.</p>
-</details>
-
+<p>이 장의 재실행 버튼은 MySQL 연결 잠금으로 중복 요청을 막는다. 예약 스케줄러 자체가 여러 서버에서 동시에 시작되는 문제는 별개다.</p>
+<p>보통 분산 락(ShedLock 등)으로 한 대만 돌게 한다. 매분·10분 배치는 0건 성공의 기록을 생략하므로 본문 실행 중 프로세스가 종료되면 그 실행 기록도 남지 않을 수 있다.</p>
+<p>그런 종료까지 추적하려면 먼저 RUNNING을 저장하고 오래된 실행을 복구하는 정책이 필요하다. Spring Batch를 쓰면 이 단계의 <code>job_run</code> 역할을 <code>JobRepository</code>(BATCH_JOB_EXECUTION 등)가 한다. </details></p>
 <h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
 <p>15장 끝. 16장 — 이벤트·비동기·캐시·외부 호출(같은 <code>practice</code> 프로파일): <a href="../ch16-events-async-cache/16-1-new-post-event.html">16-1. 새 글 알림 — 커밋된 뒤에만 보내기</a></p>
 

@@ -127,7 +127,9 @@
 <details>
 <summary>Controller — HTTP 연결</summary>
 
-`FolderShareController.java`. 매핑과 메서드의 입력·응답을 위 **만들 것**의 HTTP 계약과 대조한다. 이번 단계 매핑: `@PostMapping("/api/me/bookmark-folders/{id}/share")`, `@DeleteMapping("/api/me/bookmark-folders/{id}/share")`, `@GetMapping("/api/shared/folders/{token}")`. 변경된 메서드: `share`, `unshare`, `open`.
+`FolderShareController.java`. 매핑과 메서드의 입력·응답을 위 **만들 것**의 HTTP 계약과 대조한다.
+
+이번 단계 매핑: `@PostMapping("/api/me/bookmark-folders/{id}/share")`, `@DeleteMapping("/api/me/bookmark-folders/{id}/share")`, `@GetMapping("/api/shared/folders/{token}")`. 변경된 메서드: `share`, `unshare`, `open`.
 
 `src/main/java/org/example/bookmark/FolderShareController.java`
 

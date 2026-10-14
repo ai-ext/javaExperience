@@ -265,7 +265,9 @@ private long version;
 
 ### 3.5 동시 요청 테스트
 
-Spring 통합 테스트에서는 `CountDownLatch`로 100개 작업을 동시에 시작하고 `ExecutorService`로 HTTP 또는 서비스 호출을 한다. 검증값은 “성공 횟수 + 초기 재고 = 최종 재고”와 “성공 횟수 ≤ 초기 재고”다. 서비스 메서드를 단위 테스트로 순차 호출하는 것만으로는 경쟁 상태를 검출하지 못한다. 테스트 DB가 실제 운영 DB와 다른 락·격리 동작을 가지면 Testcontainers로 같은 MySQL 계열을 사용한다.
+Spring 통합 테스트에서는 `CountDownLatch`로 100개 작업을 동시에 시작하고 `ExecutorService`로 HTTP 또는 서비스 호출을 한다. 검증값은 “성공 횟수 + 초기 재고 = 최종 재고”와 “성공 횟수 ≤ 초기 재고”다.
+
+서비스 메서드를 단위 테스트로 순차 호출하는 것만으로는 경쟁 상태를 검출하지 못한다. 테스트 DB가 실제 운영 DB와 다른 락·격리 동작을 가지면 Testcontainers로 같은 MySQL 계열을 사용한다.
 
 ## 4. 치트시트
 
