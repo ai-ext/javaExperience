@@ -98,7 +98,7 @@ export function renderCatalog(catalog, levelHrefFn) {
 }
 
 /** 특정 시나리오 단계에 연결된 API를 렌더링한다. */
-export function renderStage(catalog, id, levelHrefFn) {
+export function renderStage(catalog, id, levelHrefFn, exerciseCount = 0) {
   const routes = [];
   for (const project of asList(catalog?.projects)) {
     for (const route of asList(project.routes)) {
@@ -107,5 +107,16 @@ export function renderStage(catalog, id, levelHrefFn) {
     }
   }
   if (!routes.length) return '';
-  return `<section class="api-map-stage" aria-label="이 단계의 API"><h3>이 단계에서 연결되는 API</h3><p class="api-map-stage-note">아래 역할과 파일은 완성 코드 기준입니다. 지금 단계에서 만들 범위는 본문의 ‘만들 것’과 ‘구현 가이드’를 따르세요.</p>${routes.map(({ project, route }, index) => `<p class="api-map-stage-project"><strong>${esc(project.label || project.id)}</strong></p>${routeMarkup(route, `${project.id || 'project'}-stage-${id}`, index, levelHrefFn)}`).join('')}</section>`;
+  const exerciseNote = exerciseCount
+    ? `<p class="api-map-stage-note">이 랩의 Q 과제 ${exerciseCount}개는 고유 HTTP 경로 ${routes.length}개를 조건·엔진을 바꿔 재사용합니다. 각 과제의 요청 조건과 역할별 구현 코드는 아래 Q 섹션에서 확인하세요.</p>`
+    : '';
+  let previousProject = null;
+  const routeList = routes.map(({ project, route }, index) => {
+    const projectLabel = project.id !== previousProject
+      ? `<p class="api-map-stage-project"><strong>${esc(project.label || project.id)}</strong></p>`
+      : '';
+    previousProject = project.id;
+    return projectLabel + routeMarkup(route, `${project.id || 'project'}-stage-${id}`, index, levelHrefFn);
+  }).join('');
+  return `<section class="api-map-stage" aria-label="이 단계의 API"><h3>이 단계에서 연결되는 API</h3>${exerciseNote}<p class="api-map-stage-note">아래 역할과 파일은 완성 코드 기준입니다. 이번 단계의 작업 범위는 본문의 요구사항과 구현 가이드를 따르세요.</p>${routeList}</section>`;
 }

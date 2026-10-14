@@ -191,6 +191,12 @@ for(const [id, controllerPath] of [
   const serviceSrc=service&&sourceFiles.has(`${service}.java`)?fs.readFileSync(path.join(codeDir,`${service}.java`),'utf8'):'';
   const repositories=[...serviceSrc.matchAll(/private\s+final\s+(\w+Repository)\s+\w+/g)].map(match=>`${match[1]}.java`).filter(file=>sourceFiles.has(file));
   const mappers=[...serviceSrc.matchAll(/private\s+final\s+(\w+Mapper)\s+\w+/g)].map(match=>`${match[1]}.java`).filter(file=>sourceFiles.has(file));
+  const mapperDir=path.join(root,controllerPath.split('/code/')[0],'code/src/main/resources/mapper');
+  const mapperXml=mappers.map(file=>file.replace(/\.java$/,'.xml')).filter(file=>fs.existsSync(path.join(mapperDir,file)));
+  const entity=id==='L13'?['Post.java (16-4 본편)','Board.java (16-4 본편)']:['Post.java (16-4 본편)'];
+  const notes=id==='L14'
+    ? 'QueryDSL이 JPA 쿼리를 조립하고 Hibernate가 MySQL SQL로 변환한다.'
+    : 'engine=jpa는 Repository/JPA를, engine=mybatis는 Mapper/XML SQL을 사용한다. 한 요청에서 두 경로를 동시에 실행하지 않는다.';
   const base=src.match(/@RequestMapping\s*\(([^)]*)\)/)?.[1]??'';
   const basePath=(base.match(/"([^"]+)"/)??[])[1]??'';
   const methods=[...src.matchAll(/@(GetMapping|PostMapping|PutMapping|PatchMapping|DeleteMapping|RequestMapping)\s*(?:\(([^)]*)\))?\s*public\s+[\w.$<>?, \[\]]+\s+(\w+)\s*\(/g)];
@@ -198,8 +204,8 @@ for(const [id, controllerPath] of [
     const verb={GetMapping:'GET',PostMapping:'POST',PutMapping:'PUT',PatchMapping:'PATCH',DeleteMapping:'DELETE'}[m[1]]??'GET';
     const suffix=(m[2]?.match(/"([^"]*)"/)??[])[1]??'';
     const returnType=m[0].match(/public\s+([\w.$<>?, \[\]]+)\s+\w+\s*\(/)?.[1]??'';
-    const responseDto=[...returnType.matchAll(/\b[A-Z]\w+\b/g)].map(match=>match[0]).filter(name=>sourceFiles.has(`${name}.java`));
-    labRoutes.push({method:verb,path:norm(`${basePath}/${suffix}`),feature:`${id} 쿼리 연습`,firstStage:id,stages:[id],controller:[path.posix.basename(controllerPath)],service:service?[`${service}.java`]:[],repository:repositories,mapper:mappers,requestDto:[],responseDto,entity:[],db:[]});
+    const responseDto=[...returnType.matchAll(/\b[A-Z]\w+\b/g)].map(match=>`${match[0]}.java`).filter(file=>sourceFiles.has(file));
+    labRoutes.push({method:verb,path:norm(`${basePath}/${suffix}`),feature:`${id} 쿼리 연습`,firstStage:id,stages:[id],notes,controller:[path.posix.basename(controllerPath)],service:service?[`${service}.java`]:[],repository:repositories,mapper:mappers,requestDto:[],responseDto,entity,db:[...mapperXml,'MySQL · practice DB']});
   }
 }
 projects.push({id:'query-practice',label:'쿼리 설계 연습 프로젝트',description:'L12·L13·L14 query-practice 실습 코드. 엔진 경로 변수는 공통 URL로 유지.',methods:Object.fromEntries(methodOrder.map(m=>[m,labRoutes.filter(r=>r.method===m).length]).filter(([,n])=>n)),routes:labRoutes.sort((a,b)=>a.path.localeCompare(b.path,'en'))});

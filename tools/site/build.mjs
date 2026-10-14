@@ -61,7 +61,14 @@ for (const ch of CHAPTERS) {
   }
 }
 const LEVEL_BY_ABS = new Map(LEVELS.map((l, i) => [l.abs, { ...l, index: i }]));
-const LEVEL_BY_ID = new Map(LEVELS.map((level) => [level.id, level]));
+const LABS = fs.readdirSync(path.join(ROOT, 'scenario/labs'), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => path.join(ROOT, 'scenario/labs', entry.name, 'README.md'))
+  .filter((abs) => fs.existsSync(abs))
+  .map((abs) => ({ abs, id: read(abs).match(/^# (L\d+)\./m)?.[1] }))
+  .filter((lab) => lab.id);
+const LAB_BY_ABS = new Map(LABS.map((lab) => [lab.abs, lab]));
+const STAGE_BY_ID = new Map([...LEVELS, ...LABS].map((stage) => [stage.id, stage]));
 const NON_API_STAGE_NOTES = {
   '1-7': 'DBeaver 또는 SQL 클라이언트가 MySQL에 직접 접속해 여러 테이블과 트랜잭션을 확인하는 단계입니다.',
   '7-1': 'Controller 테스트가 기존 HTTP 요청·응답 계약을 확인하는 단계입니다.',
@@ -282,10 +289,11 @@ function graderPanel(lv) {
 function page({ abs, title, body, hasMermaid }) {
   const up = (p) => path.relative(path.dirname(abs), path.join(ROOT, p)).split(path.sep).join('/') || '.';
   const levelHref = (id) => {
-    const target = LEVEL_BY_ID.get(id)?.abs;
+    const target = STAGE_BY_ID.get(id)?.abs;
     return target ? path.relative(path.dirname(abs), target).split(path.sep).join('/').replace(/\.md$/, '.html') : null;
   };
   const lv = LEVEL_BY_ABS.get(abs);
+  const lab = LAB_BY_ABS.get(abs);
   let crumbs = '';
   let pager = '';
   if (lv) {
@@ -301,6 +309,13 @@ function page({ abs, title, body, hasMermaid }) {
       ? `<section class="api-map-stage"><h3>이 단계의 작업 위치</h3><p class="api-map-stage-note">${escapeHtml(NON_API_STAGE_NOTES[lv.id])}</p></section>`
       : '';
     body = requestPageTools() + stageMap + stageNote + `<p class="api-map-link"><a href="${up('scenario/README.html')}#api-map-title">전체 API 구조도 보기</a></p>` + body + graderPanel(lv);
+  }
+  if (lab) {
+    crumbs = `<p class="crumbs"><a href="${up('scenario/README.html')}">시나리오</a> › 쿼리 설계 연습 › ${escapeHtml(lab.id)}</p>`;
+    const exerciseCount = [...read(abs).matchAll(/^### Q\d+\./gm)].length;
+    const stageMap = renderStage(API_ARCHITECTURE, lab.id, levelHref, exerciseCount);
+    if (!stageMap) throw new Error(`${lab.id} 랩의 API 구조도 매핑이 없다`);
+    body = requestPageTools() + stageMap + `<p class="api-map-link"><a href="${up('scenario/README.html')}#api-map-title">전체 API 구조도 보기</a></p>` + body;
   }
   if (abs === path.join(ROOT, 'scenario/README.md')) {
     const filter = `<nav class="difficulty-filter" aria-label="시나리오 난이도">
@@ -336,7 +351,7 @@ mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</sc
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <link rel="stylesheet" href="${assetUrl('tools/site/site.css', path.dirname(abs))}">
-${lv || abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/api-architecture.css', path.dirname(abs))}">\n` : ''}<script src="${assetUrl('tools/site/syntax-highlight.js', path.dirname(abs))}" defer></script>
+${lv || lab || abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/api-architecture.css', path.dirname(abs))}">\n` : ''}<script src="${assetUrl('tools/site/syntax-highlight.js', path.dirname(abs))}" defer></script>
 </head>
 <body>
 <header class="topbar"><a href="${up('README.html')}">javaExperience</a><a href="${up('scenario/README.html')}">시나리오</a><a href="${up('practice/MISSIONS.html')}">학습용 미션</a><a href="${up('docs/knowledge/README.html')}">공부자료</a></header>
@@ -346,7 +361,7 @@ ${body}
 ${pager}
 </main>
 ${mermaid}
-${lv ? `<script src="${assetUrl('tools/site/scenario-runner.js', path.dirname(abs))}" defer></script><script src="${assetUrl('tools/site/scenario-snapshots.js', path.dirname(abs))}" defer></script>` : ''}
+${lv || lab ? `<script src="${assetUrl('tools/site/scenario-runner.js', path.dirname(abs))}" defer></script>` : ''}${lv ? `<script src="${assetUrl('tools/site/scenario-snapshots.js', path.dirname(abs))}" defer></script>` : ''}
 </body>
 </html>
 `;
