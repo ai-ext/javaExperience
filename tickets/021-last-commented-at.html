@@ -8,7 +8,7 @@
 <script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
-<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
 <main>
 
 <h1 id="t-021-글에-마지막-댓글-시각--컬럼-추가와-다른-테이블에서-백필"><a class="anchor" href="#t-021-글에-마지막-댓글-시각--컬럼-추가와-다른-테이블에서-백필" aria-hidden="true">#</a>T-021. 글에 &quot;마지막 댓글 시각&quot; — 컬럼 추가와 다른 테이블에서 백필</h1>
@@ -33,7 +33,73 @@
 <li>글 응답 DTO가 여러 개다. 이번에 넣을 곳은 상세와 목록(검색 포함)이다.</li>
 </ul>
 <h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
-<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>질문 게시판 — 카드의 마지막 댓글</h3><p>카드마다 마지막 댓글 시각을 보여 준다. 댓글이 지워지면 그 전 댓글 시각으로 돌아간다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>자유 게시판</strong><span>리액트에서왔어요(회원 7)</span></div><div class="screen-widget screen-list"><strong>list</strong><span>글 97 · 글 100 · 글 138</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>댓글 달기 · 내 댓글 삭제</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>댓글 달기 → 시각이 바뀐다</summary><ol><li><span class="flow-kind">사용자</span><p>글 97에 댓글을 단다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts/97/comments</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-p07 · Content-Type: application/json</dd><dt>body</dt><dd>{&quot;content&quot;: &quot;[T-021] 아직 궁금해요&quot;}</dd></dl></li><li><span class="flow-kind">서버</span><p>댓글 저장 + comment_count + 1 + 마지막 댓글 시각 갱신을 한 트랜잭션에서</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>UPDATE post SET last_commented_at = ? WHERE id = 97 AND (last_commented_at IS NULL OR last_commented_at &lt; ?)</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>201</dd><dt>body</dt><dd>{&quot;id&quot;: 352, …}</dd></dl></li><li><span class="flow-kind">화면</span><p>카드의 '마지막 댓글'이 방금으로 바뀐다</p></li></ol></details><details class="scenario-flow"><summary>가장 최근 댓글 삭제 → 그 전 시각으로</summary><ol><li><span class="flow-kind">사용자</span><p>방금 단 댓글을 지운다</p></li><li><span class="flow-kind">HTTP 요청</span><p>DELETE /api/comments/352</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-p07</dd></dl></li><li><span class="flow-kind">서버</span><p>지운 댓글이 마지막이었을 수 있으니 살아 있는 댓글의 최댓값으로 다시 계산한다</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>UPDATE post SET last_commented_at = (SELECT MAX(created_at) FROM comment WHERE post_id = 97 AND deleted_at IS NULL) WHERE id = 97</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>204</dd></dl></li><li><span class="flow-kind">화면</span><p>다시 '09-12 20:52'</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>화면 미리보기</span><span class="mockup-live"><i></i> 예시</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">화면 상태</span><h3>질문 게시판 — 카드의 마지막 댓글</h3><p>카드마다 마지막 댓글 시각을 보여 준다. 댓글이 지워지면 그 전 댓글 시각으로 돌아간다.</p></div></div><div class="mock-screen" aria-label="질문 게시판 — 카드의 마지막 댓글 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>자유 게시판</strong><span>리액트에서왔어요(회원 7)</span></header><div class="mock-list" data-screen-id="posts"><div class="mock-list-item" data-screen-id="p-97"><span>글 97</span><strong></strong></div><div class="mock-list-item" data-screen-id="p-100"><span>글 100</span><strong></strong></div><div class="mock-list-item" data-screen-id="p-138"><span>글 138</span><strong></strong></div></div><div class="mock-actions" data-screen-id="buttons"><span class="mock-button mock-primary" data-screen-id="comment">댓글 달기</span><span class="mock-button mock-danger" data-screen-id="delete">내 댓글 삭제</span></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">요청의 여정</span><h4>단계를 선택해 경로 따라가기</h4></div><span class="flow-hint">빛의 이동은 이 시나리오에 적힌 예상 계층을 보여줍니다. 응답 상태는 실제 브라우저 요청 결과입니다.</span></div><div class="flow-track" aria-label="요청 처리 경로"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>React / 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="controller" data-index="2"><span class="flow-node-number">3</span>Controller</span><span class="flow-node" data-node="mysql" data-index="3"><span class="flow-node-number">4</span>MySQL</span><span class="flow-node" data-node="response" data-index="4"><span class="flow-node-number">5</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="5"><span class="flow-node-number">6</span>응답 반영</span></div><aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside><p class="flow-selection-status" role="status" aria-live="polite">흐름의 한 단계를 선택하면 관련 경로를 표시합니다.</p><div class="scenario-flows"><details class="scenario-flow" open><summary>댓글 달기 → 시각이 바뀐다<span class="scenario-flow-count">6단계</span></summary><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="comment" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-step-text">글 97에 댓글을 단다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/posts/97/comments" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/posts/97/comments</code></span><span class="flow-step-text">POST /api/posts/97/comments</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-p07 · Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;content&quot;: &quot;[T-021] 아직 궁금해요&quot;}</pre></details></li><li><button type="button" class="flow-step" data-node="controller" data-nodes="controller" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">댓글 저장 + comment_count + 1 + 마지막 댓글 시각 갱신을 한 트랜잭션에서</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-step-text"></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> UPDATE post SET last_commented_at = ? WHERE id = 97 AND (last_commented_at IS NULL OR last_commented_at &lt; ?)</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-step-text"></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 201</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;id&quot;: 352, …}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="p-97" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-step-text">카드의 '마지막 댓글'이 방금으로 바뀐다</span></button></li></ol></details><details class="scenario-flow"><summary>가장 최근 댓글 삭제 → 그 전 시각으로<span class="scenario-flow-count">6단계</span></summary><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="delete" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-step-text">방금 단 댓글을 지운다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="DELETE" data-path="/api/comments/352" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-delete">DELETE</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/comments/352</code></span><span class="flow-step-text">DELETE /api/comments/352</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-p07</span></span></button></li><li><button type="button" class="flow-step" data-node="controller" data-nodes="controller" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">지운 댓글이 마지막이었을 수 있으니 살아 있는 댓글의 최댓값으로 다시 계산한다</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-step-text"></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> UPDATE post SET last_commented_at = (SELECT MAX(created_at) FROM comment WHERE post_id = 97 AND deleted_at IS NULL) WHERE id = 97</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-step-text"></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 204</span></span></button></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="p-97" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-step-text">다시 '09-12 20:52'</span></button></li></ol></details></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: 'React / 화면', request: 'HTTP 요청', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').open = true;
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = labels[selected] + ' 단계 · ' + button.querySelector('.flow-step-text').textContent.trim();
+    }));
+  }
+})();
+</script><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
 <div class="table-wrap"><table>
 <thead>
 <tr>

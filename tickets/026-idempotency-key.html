@@ -8,7 +8,7 @@
 <script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
-<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
 <main>
 
 <h1 id="t-026-재시도하면-글이-두-번-올라간다--idempotency-key"><a class="anchor" href="#t-026-재시도하면-글이-두-번-올라간다--idempotency-key" aria-hidden="true">#</a>T-026. 재시도하면 글이 두 번 올라간다 — Idempotency-Key</h1>
@@ -31,7 +31,73 @@
 <h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
 <p>고급 티켓이라 실마리는 없다. 동시에 같은 키가 오는 경우를 먼저 손으로 재현할 방법(아래 <code>xargs -P 5</code>)을 갖춰 두고 시작한다.</p>
 <h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
-<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>글쓰기 — 응답을 못 받은 앱의 재시도</h3><p>앱이 같은 키로 다시 보낸다. 서버는 처음 만든 글을 돌려주고, 글은 하나만 남는다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>글쓰기</strong><span>김자바(회원 2)</span></div><div class="screen-widget screen-field"><strong>제목</strong><span>출근길에 쓴 글</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>등록</span></div><div class="screen-widget screen-list"><strong>자유 게시판</strong><span>출근길에 쓴 글</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>첫 요청 — 응답이 중간에 끊긴다</summary><ol><li><span class="flow-kind">사용자</span><p>등록을 누른다 — 앱이 키를 만든다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-kimjava · Idempotency-Key: 6f1c-… · Content-Type: application/json</dd><dt>body</dt><dd>{&quot;boardSlug&quot;: &quot;free&quot;, &quot;title&quot;: &quot;출근길에 쓴 글&quot;, &quot;content&quot;: &quot;…&quot;}</dd></dl></li><li><span class="flow-kind">서버</span><p>이 회원의 이 키는 처음 — 글을 만들고 키에 글 id를 묶어 같은 트랜잭션으로 커밋</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>201</dd><dt>headers</dt><dd>Location: /api/posts/31 · Idempotent-Replayed: false</dd><dt>body</dt><dd>{&quot;id&quot;: 31, …}</dd></dl></li><li><span class="flow-kind">화면</span><p>(응답이 앱까지 못 왔다) 로딩이 계속 돈다</p></li></ol></details><details class="scenario-flow"><summary>재시도 — 같은 키</summary><ol><li><span class="flow-kind">사용자</span><p>앱이 자동으로 같은 요청·같은 키를 다시 보낸다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-kimjava · Idempotency-Key: 6f1c-… · Content-Type: application/json</dd><dt>body</dt><dd>{&quot;boardSlug&quot;: &quot;free&quot;, &quot;title&quot;: &quot;출근길에 쓴 글&quot;, &quot;content&quot;: &quot;…&quot;}</dd></dl></li><li><span class="flow-kind">서버</span><p>이미 있는 키 — 내용이 같은지 확인하고, 새로 만들지 않고 글 31을 돌려준다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>201</dd><dt>headers</dt><dd>Location: /api/posts/31 · Idempotent-Replayed: true</dd><dt>body</dt><dd>{&quot;id&quot;: 31, …}</dd></dl></li><li><span class="flow-kind">화면</span><p>목록에 글은 하나</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>화면 미리보기</span><span class="mockup-live"><i></i> 예시</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">화면 상태</span><h3>글쓰기 — 응답을 못 받은 앱의 재시도</h3><p>앱이 같은 키로 다시 보낸다. 서버는 처음 만든 글을 돌려주고, 글은 하나만 남는다.</p></div></div><div class="mock-screen" aria-label="글쓰기 — 응답을 못 받은 앱의 재시도 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>글쓰기</strong><span>김자바(회원 2)</span></header><div class="mock-control screen-field" data-screen-id="title"><label>제목</label><div class="mock-field">출근길에 쓴 글</div></div><div class="mock-actions" data-screen-id="buttons"><span class="mock-button mock-primary" data-screen-id="submit">등록</span></div><div class="mock-list" data-screen-id="posts"><span class="screen-widget-label">자유 게시판</span><div class="mock-list-item" data-screen-id="p-new"><span>출근길에 쓴 글</span><strong></strong></div></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">요청의 여정</span><h4>단계를 선택해 경로 따라가기</h4></div><span class="flow-hint">빛의 이동은 이 시나리오에 적힌 예상 계층을 보여줍니다. 응답 상태는 실제 브라우저 요청 결과입니다.</span></div><div class="flow-track" aria-label="요청 처리 경로"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>React / 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="controller" data-index="2"><span class="flow-node-number">3</span>Controller</span><span class="flow-node" data-node="response" data-index="3"><span class="flow-node-number">4</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="4"><span class="flow-node-number">5</span>응답 반영</span></div><p class="flow-selection-status" role="status" aria-live="polite">흐름의 한 단계를 선택하면 관련 경로를 표시합니다.</p><div class="scenario-flows"><details class="scenario-flow" open><summary>첫 요청 — 응답이 중간에 끊긴다<span class="scenario-flow-count">5단계</span></summary><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="submit" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-step-text">등록을 누른다 — 앱이 키를 만든다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/posts" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/posts</code></span><span class="flow-step-text">POST /api/posts</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-kimjava · Idempotency-Key: 6f1c-… · Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;boardSlug&quot;: &quot;free&quot;, &quot;title&quot;: &quot;출근길에 쓴 글&quot;, &quot;content&quot;: &quot;…&quot;}</pre></details></li><li><button type="button" class="flow-step" data-node="controller" data-nodes="controller" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">이 회원의 이 키는 처음 — 글을 만들고 키에 글 id를 묶어 같은 트랜잭션으로 커밋</span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-step-text"></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 201</span><span class="flow-step-detail"><b>headers</b> Location: /api/posts/31 · Idempotent-Replayed: false</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;id&quot;: 31, …}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="submit" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-step-text">(응답이 앱까지 못 왔다) 로딩이 계속 돈다</span></button></li></ol></details><details class="scenario-flow"><summary>재시도 — 같은 키<span class="scenario-flow-count">5단계</span></summary><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="submit" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-step-text">앱이 자동으로 같은 요청·같은 키를 다시 보낸다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/posts" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/posts</code></span><span class="flow-step-text">POST /api/posts</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-kimjava · Idempotency-Key: 6f1c-… · Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;boardSlug&quot;: &quot;free&quot;, &quot;title&quot;: &quot;출근길에 쓴 글&quot;, &quot;content&quot;: &quot;…&quot;}</pre></details></li><li><button type="button" class="flow-step" data-node="controller" data-nodes="controller" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">이미 있는 키 — 내용이 같은지 확인하고, 새로 만들지 않고 글 31을 돌려준다</span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-step-text"></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 201</span><span class="flow-step-detail"><b>headers</b> Location: /api/posts/31 · Idempotent-Replayed: true</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;id&quot;: 31, …}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="p-new" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-step-text">목록에 글은 하나</span></button></li></ol></details></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: 'React / 화면', request: 'HTTP 요청', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').open = true;
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = labels[selected] + ' 단계 · ' + button.querySelector('.flow-step-text').textContent.trim();
+    }));
+  }
+})();
+</script><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
 <div class="table-wrap"><table>
 <thead>
 <tr>

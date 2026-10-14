@@ -31,7 +31,7 @@
 - [1-3. 서비스로 나누기 — 태그까지 한 트랜잭션으로 · 기초](ch1-create-post/1-3-service-layer.md)
 - [1-4. 엔티티와 테이블 정확히 맞추기 — 컬럼·NOT NULL·기본값 · 기초](ch1-create-post/1-4-save-to-db.md)
 - [1-5. 입력 검증과 에러 응답 · 기초](ch1-create-post/1-5-validation.md)
-- [1-6. 토큰으로 작성자 정하기 · 기초](ch1-create-post/1-6-token-auth.md)
+- [1-6. 토큰으로 작성자 정하기 · 중급](ch1-create-post/1-6-token-auth.md)
 - [1-7. DB 직접 조작 — 여러 테이블과 트랜잭션 · 중급](ch1-create-post/1-7-direct-db-dml.md)
 - [1-8. 기존 글 복사 생성 — 경로·쿼리·본문을 함께 · 중급](ch1-create-post/1-8-copy-post.md)
 - [1-9. 글의 태그 목록 조회 — 제네릭과 Stream · 중급](ch1-create-post/1-9-list-post-tags.md)

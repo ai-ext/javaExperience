@@ -8,7 +8,7 @@
 <script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
-<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
 <main>
 
 <h1 id="t-019-댓글-목록-n1--로그인하면-쿼리가-댓글-수만큼"><a class="anchor" href="#t-019-댓글-목록-n1--로그인하면-쿼리가-댓글-수만큼" aria-hidden="true">#</a>T-019. 댓글 목록 N+1 — 로그인하면 쿼리가 댓글 수만큼</h1>
@@ -32,11 +32,77 @@
 <li>SQL 수를 세는 테스트도 이미 하나 있다(목록 API용). 같은 방법을 쓴다.</li>
 </ul>
 <h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
-<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>글 상세 — 댓글</h3><p>로그인한 사람이 댓글을 연다. 화면은 그대로, 서버가 DB에 묻는 횟수만 줄어든다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>글 97</strong><span>리액트에서왔어요(회원 7)</span></div><div class="screen-widget screen-list"><strong>댓글 5</strong><span>좋은 글 감사합니다! · 예제 코드도 볼 수 있을까요? · …</span></div><div class="screen-widget screen-code"><strong>앱 로그(요청 한 번)</strong><span>select … from api_token …
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>화면 미리보기</span><span class="mockup-live"><i></i> 예시</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">화면 상태</span><h3>글 상세 — 댓글</h3><p>로그인한 사람이 댓글을 연다. 화면은 그대로, 서버가 DB에 묻는 횟수만 줄어든다.</p></div></div><div class="mock-screen" aria-label="글 상세 — 댓글 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>글 97</strong><span>리액트에서왔어요(회원 7)</span></header><div class="mock-list" data-screen-id="comments"><span class="screen-widget-label">댓글 5</span><div class="mock-list-item" data-screen-id="c-179"><span>좋은 글 감사합니다!</span><strong></strong></div><div class="mock-list-item" data-screen-id="c-194"><span>예제 코드도 볼 수 있을까요?</span><strong></strong></div><div class="mock-list-item" data-screen-id="c-215"><span>…</span><strong></strong></div></div><div class="mock-code" data-screen-id="log"><span class="screen-widget-label">앱 로그(요청 한 번)</span><pre>select … from api_token …
 select … from post …
 select … from comment … join member …
 select … from member_block … where blocker_id=? and blocked_id=?   ← 댓글마다 2번씩
-…(총 20개)</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>지금 — 댓글마다 차단 확인</summary><ol><li><span class="flow-kind">사용자</span><p>회원 7이 글 97의 댓글을 연다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/posts/97/comments</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-p07</dd></dl></li><li><span class="flow-kind">서버</span><p>댓글은 한 번에 읽지만, 트리를 조립하면서 최상위·답글마다 '이 작성자와 차단 관계인가'를 양방향으로 DB에 묻는다</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT … FROM member_block WHERE blocker_id = 7 AND blocked_id = ?  -- 댓글마다 × 2</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>[{&quot;id&quot;: 179, …}, {&quot;id&quot;: 194, …}, {&quot;id&quot;: 202, …}, {&quot;id&quot;: 215, …, &quot;replies&quot;: [{&quot;id&quot;: 246, …}]}, {&quot;id&quot;: 221, …, &quot;replies&quot;: [{&quot;id&quot;: 253, …}]}]</dd></dl></li><li><span class="flow-kind">화면</span><p>회원 2의 댓글(172)은 안 보인다 — 결과는 맞지만 SQL이 20개</p></li></ol></details><details class="scenario-flow"><summary>고친 뒤 — 차단 목록을 한 번에</summary><ol><li><span class="flow-kind">사용자</span><p>같은 화면을 연다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/posts/97/comments</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-p07</dd></dl></li><li><span class="flow-kind">서버</span><p>나와 차단 관계인 회원 id를 한 번에 읽어 Set으로 들고 메모리에서 판정한다</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT CASE WHEN blocker_id = 7 THEN blocked_id ELSE blocker_id END FROM member_block WHERE blocker_id = 7 OR blocked_id = 7</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>(같은 응답)</dd></dl></li><li><span class="flow-kind">화면</span><p>같은 화면, SQL 6개 이하</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+…(총 20개)</pre></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">요청의 여정</span><h4>단계를 선택해 경로 따라가기</h4></div><span class="flow-hint">빛의 이동은 이 시나리오에 적힌 예상 계층을 보여줍니다. 응답 상태는 실제 브라우저 요청 결과입니다.</span></div><div class="flow-track" aria-label="요청 처리 경로"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>React / 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="controller" data-index="2"><span class="flow-node-number">3</span>Controller</span><span class="flow-node" data-node="mysql" data-index="3"><span class="flow-node-number">4</span>MySQL</span><span class="flow-node" data-node="response" data-index="4"><span class="flow-node-number">5</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="5"><span class="flow-node-number">6</span>응답 반영</span></div><aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside><p class="flow-selection-status" role="status" aria-live="polite">흐름의 한 단계를 선택하면 관련 경로를 표시합니다.</p><div class="scenario-flows"><details class="scenario-flow" open><summary>지금 — 댓글마다 차단 확인<span class="scenario-flow-count">6단계</span></summary><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="comments" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-step-text">회원 7이 글 97의 댓글을 연다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="GET" data-path="/api/posts/97/comments" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-get">GET</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/posts/97/comments</code></span><span class="flow-step-text">GET /api/posts/97/comments</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-p07</span></span></button></li><li><button type="button" class="flow-step" data-node="controller" data-nodes="controller" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">댓글은 한 번에 읽지만, 트리를 조립하면서 최상위·답글마다 '이 작성자와 차단 관계인가'를 양방향으로 DB에 묻는다</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-step-text"></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> SELECT … FROM member_block WHERE blocker_id = 7 AND blocked_id = ?  -- 댓글마다 × 2</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-step-text"></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>[{&quot;id&quot;: 179, …}, {&quot;id&quot;: 194, …}, {&quot;id&quot;: 202, …}, {&quot;id&quot;: 215, …, &quot;replies&quot;: [{&quot;id&quot;: 246, …}]}, {&quot;id&quot;: 221, …, &quot;replies&quot;: [{&quot;id&quot;: 253, …}]}]</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="comments|log" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-step-text">회원 2의 댓글(172)은 안 보인다 — 결과는 맞지만 SQL이 20개</span></button></li></ol></details><details class="scenario-flow"><summary>고친 뒤 — 차단 목록을 한 번에<span class="scenario-flow-count">6단계</span></summary><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="comments" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-step-text">같은 화면을 연다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="GET" data-path="/api/posts/97/comments" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-get">GET</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/posts/97/comments</code></span><span class="flow-step-text">GET /api/posts/97/comments</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-p07</span></span></button></li><li><button type="button" class="flow-step" data-node="controller" data-nodes="controller" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">나와 차단 관계인 회원 id를 한 번에 읽어 Set으로 들고 메모리에서 판정한다</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-step-text"></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> SELECT CASE WHEN blocker_id = 7 THEN blocked_id ELSE blocker_id END FROM member_block WHERE blocker_id = 7 OR blocked_id = 7</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-step-text"></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>(같은 응답)</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="comments" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-step-text">같은 화면, SQL 6개 이하</span></button></li></ol></details></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: 'React / 화면', request: 'HTTP 요청', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').open = true;
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = labels[selected] + ' 단계 · ' + button.querySelector('.flow-step-text').textContent.trim();
+    }));
+  }
+})();
+</script><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
 <div class="table-wrap"><table>
 <thead>
 <tr>

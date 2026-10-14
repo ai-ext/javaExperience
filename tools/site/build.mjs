@@ -15,7 +15,10 @@ import { renderScreen, withImplementationCode } from './scenario-content.mjs';
 import { renderCatalog, renderStage } from './api-architecture-view.mjs';
 import { renderLearningJourney } from './learning-journey.mjs';
 import { renderKnowledgeVisual } from './knowledge-visual.mjs';
+import { renderKnowledgePageVisual } from './knowledge-page-visual.mjs';
 import { renderMissionVisual } from './mission-visual.mjs';
+import { renderMissionDetails } from './mission-detail-visual.mjs';
+import { renderHomeVisual } from './home-visual.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const rel = (p) => path.relative(ROOT, p).split(path.sep).join('/');
@@ -124,7 +127,7 @@ function render(abs) {
       code({ text, lang }) {
         if ((lang || '').trim() === 'check') return renderRequests(text, ++requestBlockCount, abs);
         if ((lang || '').trim() === 'manual-command') return `<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>${escapeHtml(text)}</code></pre></details>\n`;
-        if ((lang || '').trim() === 'screen') return renderScreen(text);
+        if ((lang || '').trim() === 'screen') return renderScreen(text, { stageId: LEVEL_BY_ABS.get(abs)?.id });
         if ((lang || '').trim() === 'mermaid') {
           hasMermaid = true;
           return `<pre class="mermaid">${escapeHtml(text)}</pre>\n`;
@@ -172,6 +175,17 @@ function collapseSection(html, headingText, summary) {
   const next = headings.find((match) => match.index > start);
   const end = next?.index ?? html.length;
   return `${html.slice(0, start)}<details class="catalog-data"><summary>${summary}</summary>${html.slice(start, end)}</details>${html.slice(end)}`;
+}
+
+function leadWithVisualScenario(html, stageId) {
+  const titleEnd = html.indexOf('</h1>') + 5;
+  const visualStart = html.indexOf('<h2 id="화면-시나리오"', titleEnd);
+  const visualEnd = html.indexOf('<h2', visualStart + 4);
+  if (titleEnd < 5 || visualStart < titleEnd || visualEnd < visualStart) {
+    throw new Error(`${stageId}: 화면 시나리오 구간을 찾지 못했다`);
+  }
+  return html.slice(0, titleEnd) + html.slice(visualStart, visualEnd)
+    + html.slice(titleEnd, visualStart) + html.slice(visualEnd);
 }
 
 // 본문 텍스트의 "P19" 같은 문서 ID를 공부자료 링크로 바꾼다(코드·링크·제목 안은 건드리지 않는다)
@@ -290,7 +304,16 @@ function page({ abs, title, body, hasMermaid }) {
     const stageNote = !stageMap && NON_API_STAGE_NOTES[lv.id]
       ? `<section class="api-map-stage"><h3>이 단계의 작업 위치</h3><p class="api-map-stage-note">${escapeHtml(NON_API_STAGE_NOTES[lv.id])}</p></section>`
       : '';
-    body = requestPageTools(body.includes('class="api-practice"')) + stageMap + stageNote + `<p class="api-map-link"><a href="${up('scenario/README.html')}#api-map-title">전체 API 구조도 보기</a></p>` + body + graderPanel(lv);
+    body = leadWithVisualScenario(body, lv.id);
+    const situationStart = body.indexOf('<h2 id="상황"');
+    if (situationStart < 0) throw new Error(`${lv.id}: 상황 구간이 없다`);
+    body = body.slice(0, situationStart) + stageMap + stageNote
+      + `<p class="api-map-link"><a href="${up('scenario/README.html')}#api-map-title">전체 API 구조도 보기</a></p>`
+      + body.slice(situationStart);
+    const directCheck = body.indexOf('<h2 id="직접-확인"');
+    if (directCheck < 0) throw new Error(`${lv.id}: 직접 확인 구간이 없다`);
+    body = body.slice(0, directCheck) + requestPageTools(body.includes('class="api-practice"'))
+      + body.slice(directCheck) + graderPanel(lv);
   }
   if (lab) {
     crumbs = `<p class="crumbs"><a href="${up('scenario/README.html')}">시나리오</a> › 쿼리 설계 연습 › ${escapeHtml(lab.id)}</p>`;
@@ -300,31 +323,16 @@ function page({ abs, title, body, hasMermaid }) {
     body = requestPageTools(body.includes('class="api-practice"')) + stageMap + `<p class="api-map-link"><a href="${up('scenario/README.html')}#api-map-title">전체 API 구조도 보기</a></p>` + body;
   }
   if (abs === path.join(ROOT, 'scenario/README.md')) {
-    const filter = `<nav class="difficulty-filter" aria-label="시나리오 난이도">
-      <button type="button" data-grade="all" aria-pressed="true">전체</button>
-      <button type="button" data-grade="기초" aria-pressed="false">기초</button>
-      <button type="button" data-grade="중급" aria-pressed="false">중급</button>
-      <button type="button" data-grade="고급" aria-pressed="false">고급</button>
-    </nav>`;
     const titleEnd = body.indexOf('</h1>') + '</h1>'.length;
     const tocStart = body.indexOf('<h2 id="목차"');
-    if (titleEnd < 5 || tocStart < titleEnd) throw new Error('scenario/README.md에 제목 또는 목차가 없다');
+    const tocEnd = body.indexOf('<h2 id="진행-방법"', tocStart);
+    if (titleEnd < 5 || tocStart < titleEnd || tocEnd < tocStart) throw new Error('scenario/README.md에 제목 또는 목차가 없다');
     body = body.slice(0, titleEnd) + renderLearningJourney(MANIFEST, API_ARCHITECTURE, levelHref)
       + '<details class="journey-intro"><summary>저장소 소개 · 시작 방법 보기</summary>'
       + body.slice(titleEnd, tocStart) + '</details>'
-      + renderCatalog(API_ARCHITECTURE, levelHref) + filter + body.slice(tocStart) + `<script>
-(() => {
-  const buttons = [...document.querySelectorAll('[data-grade]')];
-  const entries = [...document.querySelectorAll('main li')].map((item) => ({
-    item, grade: item.textContent.trim().match(/ · (기초|중급|고급)$/)?.[1] || null,
-  })).filter((entry) => entry.grade);
-  for (const button of buttons) button.addEventListener('click', () => {
-    const grade = button.dataset.grade;
-    for (const entry of entries) entry.item.hidden = grade !== 'all' && entry.grade !== grade;
-    for (const other of buttons) other.setAttribute('aria-pressed', String(other === button));
-  });
-})();
-</script>`;
+      + renderCatalog(API_ARCHITECTURE, levelHref)
+      + '<details class="legacy-toc"><summary>전체 단계 텍스트 목차 보기</summary>'
+      + body.slice(tocStart, tocEnd) + '</details>' + body.slice(tocEnd);
   }
   if (abs === path.join(ROOT, 'docs/knowledge/README.md')) {
     const firstSection = body.search(/<h2\b/);
@@ -333,6 +341,10 @@ function page({ abs, title, body, hasMermaid }) {
       + '<details class="knowledge-original-index"><summary>기존 문서 전체 표 보기</summary>'
       + body.slice(firstSection) + '</details>';
   }
+  if (abs.startsWith(`${DOC_DIR}${path.sep}`) && path.basename(abs).match(/^[A-Z]\d{2}-.*\.md$/)) {
+    const titleEnd = body.indexOf('</h1>') + '</h1>'.length;
+    if (titleEnd > 5) body = body.slice(0, titleEnd) + renderKnowledgePageVisual(abs, body) + body.slice(titleEnd);
+  }
   if (abs === path.join(ROOT, 'practice/MISSIONS.md')) {
     const firstSection = body.search(/<h2\b/);
     const missionSection = body.indexOf('<h2 id="미션"');
@@ -340,7 +352,9 @@ function page({ abs, title, body, hasMermaid }) {
     body = body.slice(0, firstSection) + renderMissionVisual(ROOT, abs)
       + '<details class="mission-setup"><summary>실행 준비 · 데이터 · 공통 업무 규칙 펼치기</summary>'
       + body.slice(firstSection, missionSection) + '</details>' + body.slice(missionSection);
+    body = renderMissionDetails(ROOT, abs, body);
   }
+  if (abs === path.join(ROOT, 'README.md')) body = renderHomeVisual(ROOT, abs, body);
   const mermaid = hasMermaid
     ? `<script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
 const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
@@ -353,10 +367,10 @@ mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</sc
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <link rel="stylesheet" href="${assetUrl('tools/site/site.css', path.dirname(abs))}">
-${lv || lab || abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/api-architecture.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/learning-journey.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'docs/knowledge/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/knowledge-visual.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'practice/MISSIONS.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/mission-visual.css', path.dirname(abs))}">\n` : ''}<script src="${assetUrl('tools/site/syntax-highlight.js', path.dirname(abs))}" defer></script>
+${lv || lab || abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/api-architecture.css', path.dirname(abs))}">\n` : ''}${lv ? `<link rel="stylesheet" href="${assetUrl('tools/site/scenario-visual.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/learning-journey.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'docs/knowledge/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/knowledge-visual.css', path.dirname(abs))}">\n` : ''}${abs.startsWith(`${DOC_DIR}${path.sep}`) && path.basename(abs).match(/^[A-Z]\d{2}-.*\.md$/) ? `<link rel="stylesheet" href="${assetUrl('tools/site/knowledge-page-visual.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'practice/MISSIONS.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/mission-visual.css', path.dirname(abs))}">\n<link rel="stylesheet" href="${assetUrl('tools/site/mission-detail-visual.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/home-visual.css', path.dirname(abs))}">\n` : ''}<script src="${assetUrl('tools/site/syntax-highlight.js', path.dirname(abs))}" defer></script>
 </head>
 <body>
-<header class="topbar"><a href="${up('README.html')}">javaExperience</a><a href="${up('scenario/README.html')}">시나리오</a><a href="${up('practice/MISSIONS.html')}">학습용 미션</a><a href="${up('docs/knowledge/README.html')}">공부자료</a></header>
+<header class="topbar"><a href="${up('index.html')}">javaExperience</a><a href="${up('scenario/README.html')}">시나리오</a><a href="${up('practice/MISSIONS.html')}">학습용 미션</a><a href="${up('docs/knowledge/README.html')}">공부자료</a></header>
 <main>
 ${crumbs}
 ${body}
@@ -443,4 +457,5 @@ for (const [f, r] of results) {
   const title = (read(f).match(/^# (.+)$/m)?.[1] ?? path.basename(f)).replace(/[`*]/g, '');
   fs.writeFileSync(f.replace(/\.md$/, '.html'), page({ abs: f, title, body: r.html, hasMermaid: r.hasMermaid }));
 }
+fs.copyFileSync(path.join(ROOT, 'README.html'), path.join(ROOT, 'index.html'));
 console.log(`HTML ${results.size}개 생성 · 시나리오 단계 ${LEVELS.length}개 · 링크 오류 0`);

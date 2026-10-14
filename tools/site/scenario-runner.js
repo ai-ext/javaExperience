@@ -3,6 +3,9 @@
   if (!baseInput) return;
   const responses = new Map();
   const baseUrl = () => baseInput.value.trim().replace(/\/+$/, '');
+  const reportFlow = (phase, method, path, details = {}) => document.dispatchEvent(new CustomEvent('scenario:request', {
+    detail: { phase, method, path, ...details },
+  }));
   function updateUrl(article) {
     article.querySelector('.postman-url').textContent = `${baseUrl()}${article.querySelector('.request-path').value}`;
   }
@@ -128,6 +131,7 @@
         let parsed;
         try { parsed = JSON.parse(text); } catch {}
         return {
+          statusCode: result.status,
           status: `${result.status} ${result.statusText}`,
           url,
           headers: [...result.headers.entries()].map(([key, value]) => `${key}: ${value}`).join('\n'),
@@ -140,6 +144,7 @@
       article.dataset.state = 'loading';
       setStatus(concurrentCount ? `${count}개 요청을 동시에 보내는 중…` : repeatCount ? `${count}개 요청을 순서대로 보내는 중…` : '요청 보내는 중…', 'loading');
       response.hidden = true;
+      reportFlow('start', method, requestPath);
       const requestId = article.dataset.requestId;
       responses.delete(requestId);
       for (let index = 1; index <= count; index++) responses.delete(`${requestId}#${index}`);
@@ -176,14 +181,24 @@
         article.querySelector('.response-body').textContent = results.length === 1 ? last.body : JSON.stringify(results.map(({ status: code, body }) => ({ status: code, body })), null, 2);
         response.hidden = false;
         response.open = true;
-        article.dataset.state = 'success';
-        setStatus(`${results.length}개 요청 응답을 받았습니다. 후속 요청은 마지막 응답을 참조할 수 있습니다.`, 'success');
+        const httpError = results.some((item) => item.statusCode >= 400);
+        article.dataset.state = httpError ? 'error' : 'success';
+        setStatus(httpError
+          ? `${results.length}개 응답을 받았지만 HTTP 오류가 있습니다. 아래 상태와 본문을 확인하세요.`
+          : `${results.length}개 요청 응답을 받았습니다. 후속 요청은 마지막 응답을 참조할 수 있습니다.`,
+        httpError ? 'error' : 'success');
+        reportFlow(httpError ? 'http-error' : 'success', method, requestPath, {
+          status: last.status,
+          statusCode: last.statusCode,
+          failedCount: results.filter((item) => item.statusCode >= 400).length,
+        });
       } catch (error) {
         article.dataset.state = 'error';
         setStatus(error.message.startsWith('먼저 값을 준비하세요:')
           ? error.message
           : `네트워크 오류: ${error.message}. 서버 실행 주소와 CORS 허용 출처를 확인하세요.`, 'error');
         response.hidden = true;
+        reportFlow('error', method, requestPath, { message: error.message });
       } finally {
         button.disabled = false;
         button.removeAttribute('aria-busy');
