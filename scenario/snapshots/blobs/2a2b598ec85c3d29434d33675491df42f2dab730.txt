@@ -1,0 +1,38 @@
+package org.example.batch;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Clock;
+import java.time.LocalDate;
+
+@RestController
+public class WeeklyRankingController {
+
+    private final WeeklyRankingService weeklyRankingService;
+    private final Clock clock;
+
+    public WeeklyRankingController(WeeklyRankingService weeklyRankingService, Clock clock) {
+        this.weeklyRankingService = weeklyRankingService;
+        this.clock = clock;
+    }
+
+    // date = 배치가 도는 월요일. 그 전 7일(지난주 월~일)을 집계한다.
+    @PostMapping("/api/admin/jobs/weekly-ranking/run")
+    public WeeklyRankingResponse run(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                     @LoginMember AuthenticatedMember me) {
+        AdminGuard.requireAdmin(me);
+        return weeklyRankingService.run(JobDates.resolve(date, clock));
+    }
+
+    // weekStart = 랭킹 주의 시작(월요일). 없으면 404 — 스냅샷이 없는 주를 그 자리에서 계산해 주지 않는다.
+    @GetMapping("/api/rankings/weekly")
+    public WeeklyRankingResponse get(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart) {
+        return weeklyRankingService.get(weekStart);
+    }
+}

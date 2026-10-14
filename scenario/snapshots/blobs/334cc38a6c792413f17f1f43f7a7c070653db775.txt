@@ -1,0 +1,27 @@
+package org.example.reaction;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface PostReactionRepository extends JpaRepository<PostReaction, Long> {
+
+    Optional<PostReaction> findByPost_IdAndMember_Id(Long postId, Long memberId);
+
+    @Modifying
+    @Query("DELETE FROM PostReaction r WHERE r.post.id = :postId AND r.member.id = :memberId")
+    int deleteMine(@Param("postId") Long postId, @Param("memberId") Long memberId);
+
+    // 종류별 개수 — 공감이 하나도 없는 종류는 결과에 없다(0 채우기는 서비스에서)
+    @Query(nativeQuery = true, value = """
+            SELECT kind AS kind, COUNT(*) AS cnt
+              FROM post_reaction
+             WHERE post_id = :postId
+             GROUP BY kind
+            """)
+    List<ReactionCountRow> countByKind(@Param("postId") Long postId);
+}

@@ -1,0 +1,41 @@
+package org.example.report;
+
+import jakarta.validation.Validator;
+import org.example.post.InvalidParametersException;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import tools.jackson.databind.JsonNode;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+@RestController
+public class ReportController {
+
+    private final ReportService reportService;
+    private final Validator validator;
+
+    public ReportController(ReportService reportService, Validator validator) {
+        this.reportService = reportService;
+        this.validator = validator;
+    }
+
+    // POST라 토큰 없음은 인터셉터가 401로 막는다
+    @PostMapping("/api/reports")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ReportResponse report(@LoginMember AuthenticatedMember me, @RequestBody JsonNode body) {
+        ReportRequest.Parsed parsed = ReportRequest.parse(body);
+        ReportRequest request = parsed.request();
+        Map<String, String> errors = new LinkedHashMap<>(parsed.errors());
+        validator.validate(request).forEach(v -> errors.putIfAbsent(v.getPropertyPath().toString(), v.getMessage()));
+        if (!errors.isEmpty()) {
+            throw new InvalidParametersException(errors);
+        }
+        return reportService.report(me, request);
+    }
+}

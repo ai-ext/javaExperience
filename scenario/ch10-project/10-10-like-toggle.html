@@ -1,0 +1,1882 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10-10. 좋아요 토글</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 10장. 명세서 프로젝트 — 게시판 API v1(/api/v1) › 10-10</p><p class="level-tags"><span>중급</span><span>별도 명세서 프로젝트</span><span>DB project</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="10-10-좋아요-토글"><a class="anchor" href="#10-10-좋아요-토글" aria-hidden="true">#</a>10-10. 좋아요 토글</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>API</th>
+<th>규칙</th>
+<th>성공</th>
+<th>실패</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>POST /api/v1/posts/{postId}/like</code></td>
+<td>토글: 없으면 생성, 있으면 취소. 응답 <code>{liked, likeCount}</code></td>
+<td>200</td>
+<td>401, 404</td>
+</tr>
+</tbody></table></div>
+<p>하트 버튼 하나다. 누르면 좋아요, 다시 누르면 취소다. 서버는 두 곳을 함께 바꾼다.</p>
+<ul>
+<li><code>post_likes</code>에 (글, 회원) 행을 넣거나 지운다. 기본 키가 두 컬럼이라 한 사람이 한 글에 두 번 들어갈 수 없다.</li>
+<li><code>posts.like_count</code>를 1 올리거나 내린다. 목록의 인기순(10-7)이 이 숫자로 정렬한다.</li>
+</ul>
+<p>두 곳이 <strong>함께</strong> 바뀌어야 한다. 하나만 바뀌면 &quot;좋아요 행은 없는데 숫자는 1&quot; 같은 어긋남이 남는다(아래 망가뜨리기 ①에서 직접 만든다). 그래서 한 트랜잭션으로 묶는다.</p>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>글 상세의 하트 버튼</h3><p>하트를 누를 때마다 좋아요와 취소가 번갈아 된다. 응답의 liked·likeCount로 버튼과 숫자를 바꾼다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>[채점] 10-10 좋아요용 글</strong><span>김자바</span></div><div class="screen-widget screen-stats"><strong>stats</strong><span>좋아요</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>♡ 좋아요</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>로그인이 필요해요</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>처음 누르기</summary><ol><li><span class="flow-kind">사용자</span><p>♡를 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/v1/posts/29/like</p><dl><dt>headers</dt><dd>Authorization: Bearer (김자바)</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT ... FROM post_likes WHERE post_id = 29 AND user_id = 1;   -- 없음
+INSERT INTO post_likes (post_id, user_id, created_at) VALUES (29, 1, NOW());
+UPDATE posts SET like_count = like_count + 1 WHERE id = 29;
+SELECT like_count FROM posts WHERE id = 29;</dd><dt>note</dt><dd>한 트랜잭션 — 중간에 실패하면 모두 되돌린다</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{
+  &quot;status&quot;: 200,
+  &quot;message&quot;: &quot;OK&quot;,
+  &quot;data&quot;: { &quot;liked&quot;: true, &quot;likeCount&quot;: 1 }
+}</dd></dl></li><li><span class="flow-kind">화면</span><p>버튼이 ♥로, 숫자가 1로</p></li></ol></details><details class="scenario-flow"><summary>다시 누르기(취소)</summary><ol><li><span class="flow-kind">사용자</span><p>♥를 다시 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/v1/posts/29/like</p><dl><dt>headers</dt><dd>Authorization: Bearer (김자바)</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>DELETE FROM post_likes WHERE post_id = 29 AND user_id = 1;
+UPDATE posts SET like_count = like_count - 1 WHERE id = 29;</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{
+  &quot;status&quot;: 200,
+  &quot;message&quot;: &quot;OK&quot;,
+  &quot;data&quot;: { &quot;liked&quot;: false, &quot;likeCount&quot;: 0 }
+}</dd></dl></li><li><span class="flow-kind">화면</span><p>버튼이 ♡로, 숫자가 0으로</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>엔티티</td>
+<td><code>PostLike</code>(<code>post_likes</code>) — 기본 키가 <code>(post_id, user_id)</code> 두 컬럼. 키 타입 <code>PostLikeId</code>를 따로 만들어 <code>@IdClass</code>로 연결</td>
+</tr>
+<tr>
+<td>메서드·경로</td>
+<td><code>POST /api/v1/posts/{postId}/like</code>, 로그인 필수</td>
+</tr>
+<tr>
+<td>동작</td>
+<td>글 확인(없음·삭제·남의 비공개 404) → 좋아요가 있으면 지우고 <code>like_count - 1</code>, 없으면 만들고 <code>like_count + 1</code></td>
+</tr>
+<tr>
+<td><code>like_count</code></td>
+<td>엔티티 값을 바꾸지 않고 <code>UPDATE posts SET like_count = like_count + :delta</code>로 DB에서 바로</td>
+</tr>
+<tr>
+<td>응답</td>
+<td><code>200</code>, <code>data</code> = <code>{liked, likeCount}</code> — <code>likeCount</code>는 바꾼 뒤 DB의 값</td>
+</tr>
+<tr>
+<td>실패</td>
+<td>토큰 없음 401, 글 없음·삭제·남의 비공개 404</td>
+</tr>
+</tbody></table></div>
+<p><strong>필드 규칙</strong> — 본문이 없는 API라 입력은 경로의 글 id 하나다. 잘못된 입력은 <code>500</code>이 나면 안 된다</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>필수</th>
+<th>null·빈 값</th>
+<th>길이·범위</th>
+<th>형식</th>
+<th>기본값</th>
+<th>틀렸을 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>{postId}</code>(경로)</td>
+<td>필수</td>
+<td>—</td>
+<td><code>Long</code> 범위</td>
+<td>숫자</td>
+<td>—</td>
+<td>숫자가 아니거나 <code>Long</code>을 넘으면 <code>400 VALIDATION_FAILED</code>(<code>errors</code>에 <code>postId</code>), 없는 글 <code>404</code></td>
+</tr>
+</tbody></table></div>
+<h2 id="따라-치기"><a class="anchor" href="#따라-치기" aria-hidden="true">#</a>따라 치기</h2>
+<p>모두 <code>org.example.board.like</code> 패키지(새로 만든다). <code>PostRepository</code>에는 두 메서드를 더한다.</p>
+<h3 id="postlikeid--두-컬럼짜리-키"><a class="anchor" href="#postlikeid--두-컬럼짜리-키" aria-hidden="true">#</a>PostLikeId — 두 컬럼짜리 키</h3>
+<p><code>src/main/java/org/example/board/like/PostLikeId.java</code></p>
+<pre><code class="language-java">package org.example.board.like;
+
+import java.io.Serializable;
+
+// post_likes의 기본 키가 (post_id, user_id) 두 컬럼이라 키를 담을 타입이 따로 필요하다
+public record PostLikeId(Long postId, Long userId) implements Serializable {
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>public record PostLikeId(Long postId, Long userId)</code></td>
+<td>키를 이루는 두 값. 이름과 타입이 엔티티의 <code>@Id</code> 필드와 같아야 한다</td>
+</tr>
+<tr>
+<td><code>implements Serializable</code></td>
+<td>JPA 명세가 키 클래스에 요구한다(키 값을 직렬화할 수 있어야 한다). record는 <code>equals</code>·<code>hashCode</code>를 값으로 만들어 주므로 키로 쓰기 좋다</td>
+</tr>
+</tbody></table></div>
+<h3 id="postlike--엔티티"><a class="anchor" href="#postlike--엔티티" aria-hidden="true">#</a>PostLike — 엔티티</h3>
+<p><code>src/main/java/org/example/board/like/PostLike.java</code></p>
+<pre><code class="language-java">package org.example.board.like;
+
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.IdClass;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = &quot;post_likes&quot;)
+@IdClass(PostLikeId.class)
+public class PostLike {
+
+    @Id
+    @Column(name = &quot;post_id&quot;)
+    private Long postId;
+
+    @Id
+    @Column(name = &quot;user_id&quot;)
+    private Long userId;
+
+    @Column(name = &quot;created_at&quot;, nullable = false)
+    private LocalDateTime createdAt;
+
+    protected PostLike() {
+    }
+
+    public PostLike(Long postId, Long userId) {
+        this.postId = postId;
+        this.userId = userId;
+        this.createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@IdClass(PostLikeId.class)</code></td>
+<td>&quot;이 엔티티의 키는 <code>PostLikeId</code> 모양&quot;이라고 알린다</td>
+</tr>
+<tr>
+<td><code>@Id</code> 두 번</td>
+<td><code>postId</code>·<code>userId</code>가 함께 기본 키다. 연관관계(<code>@ManyToOne Post</code>) 대신 id 값만 들고 있다 — 좋아요는 &quot;누가 어느 글에&quot;만 알면 되고, 글·회원 객체를 따라갈 일이 없다</td>
+</tr>
+<tr>
+<td><code>protected PostLike() { }</code></td>
+<td>JPA용 빈 생성자</td>
+</tr>
+</tbody></table></div>
+<h3 id="postlikerepository"><a class="anchor" href="#postlikerepository" aria-hidden="true">#</a>PostLikeRepository</h3>
+<p><code>src/main/java/org/example/board/like/PostLikeRepository.java</code></p>
+<pre><code class="language-java">package org.example.board.like;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface PostLikeRepository extends JpaRepository&lt;PostLike, PostLikeId&gt; {
+}</code></pre>
+<p><code>JpaRepository&lt;PostLike, PostLikeId&gt;</code> — 두 번째 타입 인자가 키 타입이다. <code>existsById(new PostLikeId(postId, userId))</code>, <code>deleteById(...)</code>를 그대로 쓴다.</p>
+<h3 id="postrepository--두-메서드-추가"><a class="anchor" href="#postrepository--두-메서드-추가" aria-hidden="true">#</a>PostRepository — 두 메서드 추가</h3>
+<p><code>src/main/java/org/example/board/post/PostRepository.java</code>에 더한다.</p>
+<pre><code class="language-java">    // 좋아요 수도 DB에서 바로 더하고 뺀다
+    @Modifying
+    @Query(&quot;update Post p set p.likeCount = p.likeCount + :delta where p.id = :id &quot;
+            + &quot;and p.deletedAt is null and (p.visibility = :publicVisibility or p.author.id = :userId)&quot;)
+    int changeLikeCount(Long id, Long userId, Visibility publicVisibility, int delta);
+
+    @Query(&quot;select p.likeCount from Post p where p.id = :id&quot;)
+    int findLikeCount(Long id);</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@Modifying</code></td>
+<td>SELECT가 아니라 UPDATE·DELETE를 실행하는 쿼리라는 표시. 반환값 <code>int</code>는 바뀐 행 수</td>
+</tr>
+<tr>
+<td><code>p.likeCount + :delta</code></td>
+<td>DB가 한 문장 안에서 더한다. 쓰는 순간에도 글이 삭제되지 않았고 이 사용자가 볼 수 있는지 조건에 넣어 확인한다. 0행이면 관계 변경도 롤백한다</td>
+</tr>
+<tr>
+<td><code>select p.likeCount ...</code></td>
+<td>바꾼 뒤의 숫자를 DB에서 다시 읽는다. 앞에서 읽어 둔 <code>Post</code> 엔티티의 <code>likeCount</code>는 벌크 UPDATE가 바꿔 주지 않아 옛 값이다</td>
+</tr>
+</tbody></table></div>
+<h3 id="likeresponse"><a class="anchor" href="#likeresponse" aria-hidden="true">#</a>LikeResponse</h3>
+<p><code>src/main/java/org/example/board/like/LikeResponse.java</code></p>
+<pre><code class="language-java">package org.example.board.like;
+
+public record LikeResponse(boolean liked, int likeCount) {
+}</code></pre>
+<h3 id="likeservice"><a class="anchor" href="#likeservice" aria-hidden="true">#</a>LikeService</h3>
+<p><code>src/main/java/org/example/board/like/LikeService.java</code></p>
+<pre><code class="language-java">package org.example.board.like;
+
+import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.post.Post;
+import org.example.board.post.PostRepository;
+import org.example.board.post.Visibility;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class LikeService {
+
+    private final PostLikeRepository postLikeRepository;
+    private final PostRepository postRepository;
+
+    public LikeService(PostLikeRepository postLikeRepository, PostRepository postRepository) {
+        this.postLikeRepository = postLikeRepository;
+        this.postRepository = postRepository;
+    }
+
+    // 토글: 없으면 만들고, 있으면 지운다. like_count도 함께(한 트랜잭션)
+    @Transactional
+    public LikeResponse toggle(Long userId, Long postId) {
+        findVisiblePost(postId, userId);
+        PostLikeId id = new PostLikeId(postId, userId);
+        boolean liked;
+        if (postLikeRepository.existsById(id)) {
+            postLikeRepository.deleteById(id);
+            if (postRepository.changeLikeCount(postId, userId, Visibility.PUBLIC, -1) == 0)
+                throw new ApiException(ErrorCode.NOT_FOUND, &quot;게시글을 찾을 수 없습니다.&quot;);
+            liked = false;
+        } else {
+            postLikeRepository.save(new PostLike(postId, userId));
+            if (postRepository.changeLikeCount(postId, userId, Visibility.PUBLIC, 1) == 0)
+                throw new ApiException(ErrorCode.NOT_FOUND, &quot;게시글을 찾을 수 없습니다.&quot;);
+            liked = true;
+        }
+        return new LikeResponse(liked, postRepository.findLikeCount(postId));
+    }
+
+    private Post findVisiblePost(Long postId, Long userId) {
+        Post post = postRepository.findByIdAndDeletedAtIsNull(postId)
+                .orElseThrow(() -&gt; new ApiException(ErrorCode.NOT_FOUND, &quot;게시글을 찾을 수 없습니다.&quot;));
+        if (post.getVisibility() == Visibility.PRIVATE &amp;&amp; !post.getAuthor().getId().equals(userId)) {
+            throw new ApiException(ErrorCode.NOT_FOUND, &quot;게시글을 찾을 수 없습니다.&quot;);
+        }
+        return post;
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@Transactional</code></td>
+<td>좋아요 행과 <code>like_count</code>를 <strong>함께</strong> 바꾸거나 함께 되돌린다. <code>@Modifying</code> 쿼리는 트랜잭션이 없으면 실행조차 안 된다(망가뜨리기 ①)</td>
+</tr>
+<tr>
+<td><code>findVisiblePost(postId, userId)</code></td>
+<td>글이 없음·삭제·남의 비공개면 404. 10-9의 댓글과 같은 규칙</td>
+</tr>
+<tr>
+<td><code>if (postLikeRepository.existsById(id))</code></td>
+<td>있으면 → 지우고 −1, 없으면 → 만들고 +1. 이것이 <strong>토글</strong></td>
+</tr>
+<tr>
+<td><code>postLikeRepository.save(new PostLike(postId, userId))</code></td>
+<td>키를 우리가 정해서 넣는 엔티티라, Spring Data는 &quot;새 것인지&quot; 몰라 SELECT로 한 번 확인한 뒤 INSERT한다</td>
+</tr>
+</tbody></table></div>
+<h3 id="likecontroller"><a class="anchor" href="#likecontroller" aria-hidden="true">#</a>LikeController</h3>
+<p><code>src/main/java/org/example/board/like/LikeController.java</code></p>
+<pre><code class="language-java">package org.example.board.like;
+
+import org.example.board.auth.LoginUser;
+import org.example.board.common.ApiResponse;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class LikeController {
+
+    private final LikeService likeService;
+
+    public LikeController(LikeService likeService) {
+        this.likeService = likeService;
+    }
+
+    @PostMapping(&quot;/api/v1/posts/{postId}/like&quot;)
+    public ApiResponse&lt;LikeResponse&gt; toggle(@LoginUser Long userId, @PathVariable Long postId) {
+        return ApiResponse.ok(likeService.toggle(userId, postId));
+    }
+}</code></pre>
+<p>경로에 동사(<code>/like</code>)가 있지만 메서드는 <code>POST</code>다. &quot;토글&quot;은 상태를 정하는 게 아니라 <strong>동작</strong>이라 이렇게 생겼다. 이 모양의 약점은 10-11에서 다룬다.</p>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>이 단계의 화면·DB 흐름을 아래 참조 파일과 연결한다. 요구 계약을 먼저 구현하고, 필요한 파일 역할만 펼쳐 전체 코드와 비교한다.</p>
+<p>구현 순서에서 확인할 흐름:</p>
+<ul>
+<li>한 트랜잭션 — 중간에 실패하면 모두 되돌린다</li>
+</ul>
+<details>
+<summary>Controller</summary>
+
+<p><code>LikeController.java</code>: HTTP 매핑과 입력·응답을 <strong>만들 것</strong>의 계약과 대조한다.</p>
+<pre><code class="language-java">@PostMapping(&quot;/api/v1/posts/{postId}/like&quot;)
+public ApiResponse&lt;LikeResponse&gt; toggle(@LoginUser Long userId, @PathVariable Long postId) {
+    return ApiResponse.ok(likeService.toggle(userId, postId));
+}</code></pre>
+</details>
+
+<details>
+<summary>DTO / 결과 행</summary>
+
+<p><code>LikeResponse.java</code>: 필드 이름·타입을 요청·응답 예시와 대조한다.</p>
+<pre><code class="language-java">public record LikeResponse(boolean liked, int likeCount) { }</code></pre>
+</details>
+
+<details>
+<summary>Service</summary>
+
+<p><code>LikeService.java</code>: 조회·검증·상태 변경의 순서를 화면 흐름과 대조한다.</p>
+<pre><code class="language-java">@Transactional
+public LikeResponse toggle(Long userId, Long postId) {
+    findVisiblePost(postId, userId); // 공개 범위·삭제 여부를 확인한다.
+    PostLikeId id = new PostLikeId(postId, userId);
+    boolean liked;
+    if (postLikeRepository.existsById(id)) {
+        postLikeRepository.deleteById(id);
+        if (postRepository.changeLikeCount(postId, userId, Visibility.PUBLIC, -1) == 0)
+            throw new ApiException(ErrorCode.NOT_FOUND, &quot;게시글을 찾을 수 없습니다.&quot;);
+        liked = false;
+    } else {
+        postLikeRepository.save(new PostLike(postId, userId));
+        if (postRepository.changeLikeCount(postId, userId, Visibility.PUBLIC, 1) == 0)
+            throw new ApiException(ErrorCode.NOT_FOUND, &quot;게시글을 찾을 수 없습니다.&quot;);
+        liked = true;
+    }
+    return new LikeResponse(liked, postRepository.findLikeCount(postId));
+}</code></pre>
+</details>
+
+<details>
+<summary>Entity</summary>
+
+<p><code>PostLike.java</code>: 컬럼·관계 매핑을 DB 테이블과 대조한다.</p>
+<pre><code class="language-java">@Entity
+@Table(name = &quot;post_likes&quot;)
+@IdClass(PostLikeId.class)
+public class PostLike {
+    @Id @Column(name = &quot;post_id&quot;) private Long postId;
+    @Id @Column(name = &quot;user_id&quot;) private Long userId;
+    @Column(name = &quot;created_at&quot;, nullable = false) private LocalDateTime createdAt;
+}</code></pre>
+</details>
+
+<details>
+<summary>설정·보조 코드</summary>
+
+<p><code>PostLikeId.java</code>: 이 파일의 변경이 화면 흐름에 필요한 위치를 확인한다.</p>
+<pre><code class="language-java">public record PostLikeId(Long postId, Long userId) implements Serializable { }</code></pre>
+</details>
+
+<details>
+<summary>JPA / Repository</summary>
+
+<p><code>PostLikeRepository.java</code>, <code>PostRepository.java</code>: JPA 조회 조건을 DB 예시와 대조한다.</p>
+<pre><code class="language-java">public interface PostLikeRepository extends JpaRepository&lt;PostLike, PostLikeId&gt; { }
+
+@Modifying
+@Query(&quot;update Post p set p.likeCount = p.likeCount + :delta where p.id = :id &quot;
+        + &quot;and p.deletedAt is null and (p.visibility = :publicVisibility or p.author.id = :userId)&quot;)
+int changeLikeCount(Long id, Long userId, Visibility publicVisibility, int delta);
+
+@Query(&quot;select p.likeCount from Post p where p.id = :id&quot;)
+int findLikeCount(Long id);</code></pre>
+</details>
+
+<details>
+<summary>MyBatis Mapper — 좋아요 행과 숫자 SQL</summary>
+
+<p><code>LikeService</code>가 글을 확인하고 <code>post_likes</code> 존재 여부에 따라 INSERT/DELETE와 카운터 UPDATE를 한 트랜잭션에서 호출한다. 동시 토글의 한계는 아래 망가뜨리기 ③에서 확인하고 10-11에서 멱등 API와 잠금을 배운다. DELETE가 0행이면 다른 요청이 먼저 취소한 것이므로 예외를 던져 카운터 감소를 막는다. 관계 변경 뒤 조건부 카운터 UPDATE가 0행이면 404를 던져 트랜잭션 전체를 롤백한다. 전체 Java/XML은 <strong>MyBatis 대체 코드</strong> 토글을 펼쳐 확인한다.</p>
+<pre><code class="language-java">LikePostRow findVisiblePost(Long postId);
+boolean exists(@Param(&quot;postId&quot;) Long postId, @Param(&quot;userId&quot;) Long userId);
+void insert(@Param(&quot;postId&quot;) Long postId, @Param(&quot;userId&quot;) Long userId);
+int delete(@Param(&quot;postId&quot;) Long postId, @Param(&quot;userId&quot;) Long userId);
+int changeCount(@Param(&quot;postId&quot;) Long postId, @Param(&quot;userId&quot;) Long userId, @Param(&quot;delta&quot;) int delta);
+int findCount(Long postId);</code></pre>
+<pre><code class="language-xml">&lt;select id=&quot;findVisiblePost&quot; resultType=&quot;org.example.board.like.LikePostRow&quot;&gt;
+  SELECT p.id, p.author_id AS authorId, p.visibility
+  FROM posts p WHERE p.id = #{postId} AND p.deleted_at IS NULL
+&lt;/select&gt;
+&lt;update id=&quot;changeCount&quot;&gt;
+  UPDATE posts SET like_count = like_count + #{delta}
+  WHERE id = #{postId} AND deleted_at IS NULL
+    AND (visibility = 'PUBLIC' OR author_id = #{userId})
+&lt;/update&gt;</code></pre>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/board/like/LikeController.java</summary><pre><code>package org.example.board.like;
+
+<p>import org.example.board.auth.LoginUser;
+import org.example.board.common.ApiResponse;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>@RestController
+public class LikeController {</p>
+<pre><code>private final LikeService likeService;
+
+public LikeController(LikeService likeService) {
+    this.likeService = likeService;
+}
+
+@PostMapping(&amp;quot;/api/v1/posts/{postId}/like&amp;quot;)
+public ApiResponse&amp;lt;LikeResponse&amp;gt; toggle(@LoginUser Long userId, @PathVariable Long postId) {
+    return ApiResponse.ok(likeService.toggle(userId, postId));
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/like/LikeResponse.java</summary><pre><code>package org.example.board.like;
+
+<p>public record LikeResponse(boolean liked, int likeCount) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/like/LikeService.java</summary><pre><code>package org.example.board.like;
+
+<p>import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.post.Post;
+import org.example.board.post.PostRepository;
+import org.example.board.post.Visibility;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>@Service
+public class LikeService {</p>
+<pre><code>private final PostLikeRepository postLikeRepository;
+private final PostRepository postRepository;
+
+public LikeService(PostLikeRepository postLikeRepository, PostRepository postRepository) {
+    this.postLikeRepository = postLikeRepository;
+    this.postRepository = postRepository;
+}
+
+// 토글: 없으면 만들고, 있으면 지운다. like_count도 함께(한 트랜잭션)
+@Transactional
+public LikeResponse toggle(Long userId, Long postId) {
+    findVisiblePost(postId, userId);
+    PostLikeId id = new PostLikeId(postId, userId);
+    boolean liked;
+    if (postLikeRepository.existsById(id)) {
+        postLikeRepository.deleteById(id);
+        if (postRepository.changeLikeCount(postId, userId, Visibility.PUBLIC, -1) == 0)
+            throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+        liked = false;
+    } else {
+        postLikeRepository.save(new PostLike(postId, userId));
+        if (postRepository.changeLikeCount(postId, userId, Visibility.PUBLIC, 1) == 0)
+            throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+        liked = true;
+    }
+    return new LikeResponse(liked, postRepository.findLikeCount(postId));
+}
+
+private Post findVisiblePost(Long postId, Long userId) {
+    Post post = postRepository.findByIdAndDeletedAtIsNull(postId)
+            .orElseThrow(() -&amp;gt; new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;));
+    if (post.getVisibility() == Visibility.PRIVATE &amp;amp;&amp;amp; !post.getAuthor().getId().equals(userId)) {
+        throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+    }
+    return post;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Entity — src/main/java/org/example/board/like/PostLike.java</summary><pre><code>package org.example.board.like;
+
+<p>import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;</p>
+<p>import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.IdClass;
+import jakarta.persistence.Table;</p>
+<p>@Entity
+@Table(name = &quot;post_likes&quot;)
+@IdClass(PostLikeId.class)
+public class PostLike {</p>
+<pre><code>@Id
+@Column(name = &amp;quot;post_id&amp;quot;)
+private Long postId;
+
+@Id
+@Column(name = &amp;quot;user_id&amp;quot;)
+private Long userId;
+
+@Column(name = &amp;quot;created_at&amp;quot;, nullable = false)
+private LocalDateTime createdAt;
+
+protected PostLike() {
+}
+
+public PostLike(Long postId, Long userId) {
+    this.postId = postId;
+    this.userId = userId;
+    this.createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/like/PostLikeId.java</summary><pre><code>package org.example.board.like;
+
+<p>import java.io.Serializable;</p>
+<p>// post_likes의 기본 키가 (post_id, user_id) 두 컬럼이라 키를 담을 타입이 따로 필요하다
+public record PostLikeId(Long postId, Long userId) implements Serializable {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/like/PostLikeRepository.java</summary><pre><code>package org.example.board.like;
+
+<p>import org.springframework.data.jpa.repository.JpaRepository;</p>
+<p>public interface PostLikeRepository extends JpaRepository&lt;PostLike, PostLikeId&gt; {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/post/PostRepository.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.util.Optional;</p>
+<p>import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;</p>
+<p>public interface PostRepository extends JpaRepository&lt;Post, Long&gt; {</p>
+<pre><code>// 상세 한 번에: 글 + 작성자 + 태그(삭제된 글은 없는 것으로)
+@Query(&amp;quot;select distinct p from Post p join fetch p.author left join fetch p.tags where p.id = :id and p.deletedAt is null&amp;quot;)
+Optional&amp;lt;Post&amp;gt; findDetailById(Long id);
+
+Optional&amp;lt;Post&amp;gt; findByIdAndDeletedAtIsNull(Long id);
+
+// 조회수는 읽고-더하고-쓰지 않고 DB에서 한 번에 +1(동시에 읽어도 숫자를 잃지 않는다)
+@Modifying
+@Query(&amp;quot;update Post p set p.viewCount = p.viewCount + 1 where p.id = :id&amp;quot;)
+int increaseViewCount(Long id);
+
+// 좋아요 수도 DB에서 바로 더하고 뺀다
+@Modifying
+@Query(&amp;quot;update Post p set p.likeCount = p.likeCount + :delta where p.id = :id &amp;quot;
+        + &amp;quot;and p.deletedAt is null and (p.visibility = :publicVisibility or p.author.id = :userId)&amp;quot;)
+int changeLikeCount(Long id, Long userId, Visibility publicVisibility, int delta);
+
+@Query(&amp;quot;select p.likeCount from Post p where p.id = :id&amp;quot;)
+int findLikeCount(Long id);
+
+@Query(value = &amp;quot;select count(*) from post_likes where post_id = :postId and user_id = :userId&amp;quot;, nativeQuery = true)
+long countLike(Long postId, Long userId);</code></pre>
+<p>}
+</code></pre></details></p>
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/10-10.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="mybatis-대체-구현-코드"><a class="anchor" href="#mybatis-대체-구현-코드" aria-hidden="true">#</a>MyBatis 대체 구현 코드</h2>
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+<p>group = &#39;org.example&#39;
+version = &#39;0.0.1-SNAPSHOT&#39;</p>
+<p>java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}</p>
+<p>repositories {
+    mavenCentral()
+}</p>
+<p>dependencies {
+    // start.spring.io에서 고른 것: Spring Web · Spring Data JPA · Validation · MySQL Driver · Flyway Migration
+    implementation &#39;org.springframework.boot:spring-boot-starter-webmvc&#39;
+    implementation &#39;org.springframework.boot:spring-boot-starter-data-jpa&#39;
+    implementation &#39;org.springframework.boot:spring-boot-starter-validation&#39;
+    implementation &#39;org.springframework.boot:spring-boot-starter-flyway&#39;
+    implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;
+    // 10-3 비밀번호 해시(BCrypt) — Spring Security 전체가 아니라 암호화 모듈만
+    implementation &#39;org.springframework.security:spring-security-crypto&#39;
+    // 10-4 JWT 발급·검증(jjwt) — api는 컴파일에, 구현·JSON 처리는 실행할 때만
+    implementation &#39;io.jsonwebtoken:jjwt-api:0.13.0&#39;
+    runtimeOnly &#39;io.jsonwebtoken:jjwt-impl:0.13.0&#39;
+    runtimeOnly &#39;io.jsonwebtoken:jjwt-jackson:0.13.0&#39;
+    runtimeOnly &#39;com.mysql:mysql-connector-j&#39;
+    runtimeOnly &#39;org.flywaydb:flyway-mysql&#39;</p>
+<pre><code>testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'</code></pre>
+<p>}</p>
+<p>tasks.named(&#39;test&#39;) {
+    useJUnitPlatform()
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/auth/AuthService.java</summary><pre><code>package org.example.board.auth;
+
+<p>import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.user.User;
+import org.example.board.user.UserMapper;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>@Service
+public class AuthService {</p>
+<pre><code>// 없는 이메일과 틀린 비밀번호를 같은 문구로 — 어느 이메일이 가입돼 있는지 흘리지 않는다
+private static final String LOGIN_FAILED = &amp;quot;이메일 또는 비밀번호가 올바르지 않습니다.&amp;quot;;
+
+private final UserMapper userMapper;
+private final PasswordEncoder passwordEncoder;
+private final JwtProvider jwtProvider;
+
+public AuthService(UserMapper userMapper, PasswordEncoder passwordEncoder, JwtProvider jwtProvider) {
+    this.userMapper = userMapper;
+    this.passwordEncoder = passwordEncoder;
+    this.jwtProvider = jwtProvider;
+}
+
+@Transactional(readOnly = true)
+public TokenResponse login(LoginRequest request) {
+    User user = userMapper.findByEmail(request.email());
+    if (user == null) throw new ApiException(ErrorCode.UNAUTHORIZED, LOGIN_FAILED);
+    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        throw new ApiException(ErrorCode.UNAUTHORIZED, LOGIN_FAILED);
+    }
+    return new TokenResponse(jwtProvider.issue(user.getId()), jwtProvider.validitySeconds());
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/comment/Comment.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/comment/CommentCreatedResponse.java</summary><pre><code>package org.example.board.comment;
+
+<p>import java.time.LocalDateTime;
+import org.example.board.post.AuthorResponse;
+import org.example.board.user.User;</p>
+<p>public record CommentCreatedResponse(Long id, Long postId, Long parentId, String content, AuthorResponse author,
+                                     LocalDateTime createdAt) {
+    static CommentCreatedResponse of(CommentWriteRow row, User author) {
+        return new CommentCreatedResponse(row.id, row.postId, row.parentId, row.content,
+                AuthorResponse.from(author), row.createdAt);
+    }
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/board/comment/CommentMapper.java</summary><pre><code>package org.example.board.comment;
+
+<p>import java.time.LocalDateTime;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>@Mapper
+public interface CommentMapper {
+    Long lockActivePost(Long postId);
+    CommentWriteRow findParent(Long parentId);
+    Long findPostIdByCommentId(Long commentId);
+    void insert(CommentWriteRow comment);
+    CommentWriteRow findActiveById(Long commentId);
+    int softDelete(@Param(&quot;commentId&quot;) Long commentId, @Param(&quot;deletedAt&quot;) LocalDateTime deletedAt);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/comment/CommentRepository.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/comment/CommentResponse.java</summary><pre><code>package org.example.board.comment;
+
+<p>import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>import com.fasterxml.jackson.annotation.JsonInclude;
+import org.example.board.post.AuthorResponse;</p>
+<p>// 최상위 댓글은 replies(답글 목록)를 가진다. 답글에는 replies가 없다
+public record CommentResponse(
+        Long id,
+        String content,
+        AuthorResponse author,
+        boolean deleted,
+        LocalDateTime createdAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) List&lt;CommentResponse&gt; replies) {</p>
+<pre><code>static final String DELETED_CONTENT = &amp;quot;삭제된 댓글입니다&amp;quot;;
+
+static CommentResponse reply(CommentRow c) {
+    return new CommentResponse(c.id, c.content, new AuthorResponse(c.authorId, c.authorNickname), false,
+            c.createdAt, null);
+}
+
+static CommentResponse top(CommentRow c, List&amp;lt;CommentResponse&amp;gt; replies) {
+    if (c.deletedAt != null) {
+        // 지운 부모는 내용·작성자를 숨기고 자리만 남긴다(답글이 고아가 되지 않게)
+        return new CommentResponse(c.id, DELETED_CONTENT, null, true, c.createdAt, replies);
+    }
+    return new CommentResponse(c.id, c.content, new AuthorResponse(c.authorId, c.authorNickname), false,
+            c.createdAt, replies);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/comment/CommentRow.java</summary><pre><code>package org.example.board.comment;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 댓글·작성자 JOIN의 한 행. parentId로 메모리에서 답글을 묶는다.
+public class CommentRow {
+    public Long id;
+    public Long parentId;
+    public String content;
+    public Long authorId;
+    public String authorNickname;
+    public LocalDateTime createdAt;
+    public LocalDateTime deletedAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/comment/CommentService.java</summary><pre><code>package org.example.board.comment;
+
+<p>import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.List;</p>
+<p>import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.post.PostDetailRow;
+import org.example.board.post.PostMapper;
+import org.example.board.user.User;
+import org.example.board.user.UserMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>@Service
+public class CommentService {
+    private final CommentMapper commentMapper;
+    private final PostMapper postMapper;
+    private final UserMapper userMapper;</p>
+<pre><code>public CommentService(CommentMapper commentMapper, PostMapper postMapper, UserMapper userMapper) {
+    this.commentMapper = commentMapper;
+    this.postMapper = postMapper;
+    this.userMapper = userMapper;
+}
+
+@Transactional
+public CommentCreatedResponse create(Long userId, Long postId, CommentRequest request) {
+    // 같은 글의 삭제·공개 범위 변경과 댓글 작성을 한 행 잠금으로 직렬화한다.
+    if (commentMapper.lockActivePost(postId) == null)
+        throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+    findVisiblePost(postId, userId);
+    User author = userMapper.findById(userId);
+    if (author == null) throw new ApiException(ErrorCode.UNAUTHORIZED);
+    if (request.parentId() != null) {
+        CommentWriteRow parent = commentMapper.findParent(request.parentId());
+        if (parent == null || !postId.equals(parent.postId) || parent.parentId != null)
+            throw ApiException.invalid(&amp;quot;parentId&amp;quot;, &amp;quot;답글은 같은 글의 최상위 댓글에만 달 수 있습니다.&amp;quot;);
+    }
+    CommentWriteRow comment = new CommentWriteRow();
+    comment.postId = postId;
+    comment.authorId = userId;
+    comment.parentId = request.parentId();
+    comment.content = request.content();
+    comment.createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+    commentMapper.insert(comment);
+    return CommentCreatedResponse.of(comment, author);
+}
+
+@Transactional(readOnly = true)
+public List&amp;lt;CommentResponse&amp;gt; list(Long postId, Long loginUserId) {
+    findVisiblePost(postId, loginUserId);
+    return CommentTree.build(postMapper.findCommentRows(postId));
+}
+
+@Transactional
+public void delete(Long userId, Long commentId) {
+    Long postId = commentMapper.findPostIdByCommentId(commentId);
+    if (postId == null) throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;댓글을 찾을 수 없습니다.&amp;quot;);
+    if (commentMapper.lockActivePost(postId) == null)
+        throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;댓글을 찾을 수 없습니다.&amp;quot;);
+    CommentWriteRow comment = commentMapper.findActiveById(commentId);
+    if (comment == null) throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;댓글을 찾을 수 없습니다.&amp;quot;);
+    if (!comment.authorId.equals(userId))
+        throw new ApiException(ErrorCode.FORBIDDEN, &amp;quot;작성자만 삭제할 수 있습니다.&amp;quot;);
+    if (commentMapper.softDelete(commentId, LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS)) == 0)
+        throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;댓글을 찾을 수 없습니다.&amp;quot;);
+}
+
+private void findVisiblePost(Long postId, Long loginUserId) {
+    List&amp;lt;PostDetailRow&amp;gt; rows = postMapper.findDetailRows(postId);
+    if (rows.isEmpty()) throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+    PostDetailRow first = rows.get(0);
+    if (&amp;quot;PRIVATE&amp;quot;.equals(first.visibility) &amp;amp;&amp;amp; !first.authorId.equals(loginUserId))
+        throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/comment/CommentTree.java</summary><pre><code>package org.example.board.comment;
+
+<p>import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;</p>
+<p>// 평평한 댓글 목록(시간순) → 최상위 + replies 트리
+public final class CommentTree {</p>
+<pre><code>private CommentTree() {
+}
+
+public static List&amp;lt;CommentResponse&amp;gt; build(List&amp;lt;CommentRow&amp;gt; flat) {
+    Map&amp;lt;Long, List&amp;lt;CommentResponse&amp;gt;&amp;gt; repliesByParent = new LinkedHashMap&amp;lt;&amp;gt;();
+    for (CommentRow c : flat) {
+        if (c.parentId != null &amp;amp;&amp;amp; c.deletedAt == null) {
+            repliesByParent.computeIfAbsent(c.parentId, k -&amp;gt; new ArrayList&amp;lt;&amp;gt;()).add(CommentResponse.reply(c));
+        }
+    }
+    List&amp;lt;CommentResponse&amp;gt; result = new ArrayList&amp;lt;&amp;gt;();
+    for (CommentRow c : flat) {
+        if (c.parentId != null) {
+            continue;
+        }
+        List&amp;lt;CommentResponse&amp;gt; replies = repliesByParent.getOrDefault(c.id, List.of());
+        // 지운 댓글에 살아 있는 답글이 없으면 자리도 남기지 않는다
+        if (c.deletedAt != null &amp;amp;&amp;amp; replies.isEmpty()) {
+            continue;
+        }
+        result.add(CommentResponse.top(c, replies));
+    }
+    return result;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/comment/CommentWriteRow.java</summary><pre><code>package org.example.board.comment;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// MyBatis가 댓글 쓰기·권한 확인에서 사용하는 한 행.
+public class CommentWriteRow {
+    public Long id;
+    public Long postId;
+    public Long authorId;
+    public Long parentId;
+    public String content;
+    public LocalDateTime createdAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/board/like/LikeMapper.java</summary><pre><code>package org.example.board.like;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>@Mapper
+public interface LikeMapper {
+    LikePostRow findVisiblePost(Long postId);
+    boolean exists(@Param(&quot;postId&quot;) Long postId, @Param(&quot;userId&quot;) Long userId);
+    void insert(@Param(&quot;postId&quot;) Long postId, @Param(&quot;userId&quot;) Long userId);
+    int delete(@Param(&quot;postId&quot;) Long postId, @Param(&quot;userId&quot;) Long userId);
+    int changeCount(@Param(&quot;postId&quot;) Long postId, @Param(&quot;userId&quot;) Long userId, @Param(&quot;delta&quot;) int delta);
+    int findCount(Long postId);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/like/LikePostRow.java</summary><pre><code>package org.example.board.like;
+
+<p>public class LikePostRow {
+    public Long id;
+    public Long authorId;
+    public String visibility;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/like/LikeService.java</summary><pre><code>package org.example.board.like;
+
+<p>import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>@Service
+public class LikeService {
+    private final LikeMapper mapper;</p>
+<pre><code>public LikeService(LikeMapper mapper) {
+    this.mapper = mapper;
+}
+
+// 토글은 의도적으로 동시 재시도에 약하다. 다음 단계의 멱등 API에서 글 행 잠금을 도입한다.
+@Transactional
+public LikeResponse toggle(Long userId, Long postId) {
+    LikePostRow post = mapper.findVisiblePost(postId);
+    if (post == null || (&amp;quot;PRIVATE&amp;quot;.equals(post.visibility) &amp;amp;&amp;amp; !post.authorId.equals(userId)))
+        throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+    boolean liked;
+    if (mapper.exists(postId, userId)) {
+        if (mapper.delete(postId, userId) == 0)
+            throw new IllegalStateException(&amp;quot;좋아요가 동시에 취소되어 토글을 완료할 수 없습니다.&amp;quot;);
+        if (mapper.changeCount(postId, userId, -1) == 0)
+            throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+        liked = false;
+    } else {
+        mapper.insert(postId, userId);
+        if (mapper.changeCount(postId, userId, 1) == 0)
+            throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+        liked = true;
+    }
+    return new LikeResponse(liked, mapper.findCount(postId));
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/like/PostLike.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/like/PostLikeId.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/like/PostLikeRepository.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/post/Post.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashSet;
+import java.util.Set;</p>
+<p>import org.example.board.user.User;</p>
+<p>public class Post {</p>
+<pre><code>private Long id;
+
+private User author;
+
+private String title;
+
+private String content;
+
+private Visibility visibility;
+
+private int viewCount;
+
+private int likeCount;
+
+// MyBatis 경로에서는 Service가 post_tags INSERT를 명시적으로 수행한다.
+private Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+
+private LocalDateTime createdAt;
+
+private LocalDateTime updatedAt;
+
+private LocalDateTime deletedAt;
+
+public Post() {
+}
+
+public Post(User author, String title, String content, Visibility visibility, Set&amp;lt;Tag&amp;gt; tags) {
+    this.author = author;
+    this.title = title;
+    this.content = content;
+    this.visibility = visibility;
+    this.tags.addAll(tags);
+    this.createdAt = now();
+    this.updatedAt = this.createdAt;
+}
+
+private static LocalDateTime now() {
+    return LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+}
+
+public Long getId() {
+    return id;
+}
+
+public void setId(Long id) {
+    this.id = id;
+}
+
+public User getAuthor() {
+    return author;
+}
+
+public String getTitle() {
+    return title;
+}
+
+public String getContent() {
+    return content;
+}
+
+public Visibility getVisibility() {
+    return visibility;
+}
+
+public int getViewCount() {
+    return viewCount;
+}
+
+public int getLikeCount() {
+    return likeCount;
+}
+
+public Set&amp;lt;Tag&amp;gt; getTags() {
+    return tags;
+}
+
+public LocalDateTime getCreatedAt() {
+    return createdAt;
+}
+
+public LocalDateTime getUpdatedAt() {
+    return updatedAt;
+}
+
+public LocalDateTime getDeletedAt() {
+    return deletedAt;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/post/PostDetailRow.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 글·작성자·태그 LEFT JOIN 결과의 평평한 한 행. 태그 하나마다 글 필드가 반복된다.
+public class PostDetailRow {
+    public Long id;
+    public String title;
+    public String content;
+    public String visibility;
+    public int viewCount;
+    public int likeCount;
+    public Long authorId;
+    public String authorNickname;
+    public Long tagId;
+    public String tagName;
+    public LocalDateTime createdAt;
+    public LocalDateTime updatedAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/post/PostListItemResponse.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>public record PostListItemResponse(
+        Long id,
+        String title,
+        String visibility,
+        int viewCount,
+        int likeCount,
+        AuthorResponse author,
+        List&lt;String&gt; tags,
+        LocalDateTime createdAt) {</p>
+<pre><code>static PostListItemResponse of(Post post, List&amp;lt;String&amp;gt; tags) {
+    return new PostListItemResponse(post.getId(), post.getTitle(), post.getVisibility().name(), post.getViewCount(),
+            post.getLikeCount(), AuthorResponse.from(post.getAuthor()), tags, post.getCreatedAt());
+}
+
+static PostListItemResponse of(PostListRow row, List&amp;lt;String&amp;gt; tags) {
+    return new PostListItemResponse(row.id, row.title, row.visibility, row.viewCount, row.likeCount,
+            new AuthorResponse(row.authorId, row.authorNickname), tags, row.createdAt);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/post/PostListRow.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 목록 SQL의 평평한 한 행. author는 응답 DTO에서 다시 중첩한다.
+public class PostListRow {
+    public Long id;
+    public String title;
+    public String visibility;
+    public int viewCount;
+    public int likeCount;
+    public Long authorId;
+    public String authorNickname;
+    public LocalDateTime createdAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/board/post/PostMapper.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.util.List;</p>
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.example.board.comment.CommentRow;</p>
+<p>@Mapper
+public interface PostMapper {
+    void insertPost(Post post);
+    Tag findTagByName(String name);
+    void insertTag(Tag tag);
+    void linkTag(@Param(&quot;postId&quot;) Long postId, @Param(&quot;tagId&quot;) Long tagId);</p>
+<pre><code>List&amp;lt;PostDetailRow&amp;gt; findDetailRows(Long postId);
+int increaseViewCount(Long postId);
+long countLike(@Param(&amp;quot;postId&amp;quot;) Long postId, @Param(&amp;quot;userId&amp;quot;) Long userId);
+List&amp;lt;CommentRow&amp;gt; findCommentRows(Long postId);
+int updatePost(@Param(&amp;quot;postId&amp;quot;) Long postId, @Param(&amp;quot;title&amp;quot;) String title,
+               @Param(&amp;quot;content&amp;quot;) String content, @Param(&amp;quot;visibility&amp;quot;) String visibility,
+               @Param(&amp;quot;updatedAt&amp;quot;) java.time.LocalDateTime updatedAt);
+int softDelete(@Param(&amp;quot;postId&amp;quot;) Long postId, @Param(&amp;quot;deletedAt&amp;quot;) java.time.LocalDateTime deletedAt);
+void unlinkTags(Long postId);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/board/post/PostQueryMapper.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.util.List;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>@Mapper
+public interface PostQueryMapper {
+    List&lt;PostListRow&gt; findPage(@Param(&quot;cond&quot;) PostListQuery cond, @Param(&quot;loginUserId&quot;) Long loginUserId,
+            @Param(&quot;offset&quot;) long offset);</p>
+<pre><code>long count(@Param(&amp;quot;cond&amp;quot;) PostListQuery cond, @Param(&amp;quot;loginUserId&amp;quot;) Long loginUserId);
+
+List&amp;lt;PostListRow&amp;gt; findAfterCursor(@Param(&amp;quot;cond&amp;quot;) PostListQuery cond, @Param(&amp;quot;loginUserId&amp;quot;) Long loginUserId,
+        @Param(&amp;quot;cursorId&amp;quot;) Long cursorId, @Param(&amp;quot;limit&amp;quot;) int limit);
+
+List&amp;lt;PostTagRow&amp;gt; findTagsByPostIds(@Param(&amp;quot;postIds&amp;quot;) List&amp;lt;Long&amp;gt; postIds);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/post/PostQueryRepository.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/post/PostQueryService.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;</p>
+<p>import org.example.board.common.ApiException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>// 게시글 목록·검색 — MyBatis 동적 SQL
+@Service
+public class PostQueryService {
+    private final PostQueryMapper mapper;</p>
+<pre><code>public PostQueryService(PostQueryMapper mapper) {
+    this.mapper = mapper;
+}
+
+@Transactional(readOnly = true)
+public Object list(PostListQuery query, Long loginUserId) {
+    if (query.cursorMode()) {
+        return cursorList(query, loginUserId);
+    }
+    int page = query.page() == null ? 0 : query.page();
+    long offset = (long) page * query.size();
+    List&amp;lt;PostListRow&amp;gt; rows = mapper.findPage(query, loginUserId, offset);
+    long total = mapper.count(query, loginUserId);
+    return new PageResponse&amp;lt;&amp;gt;(withTags(rows), page, query.size(), total, offset + rows.size() &amp;lt; total);
+}
+
+private CursorResponse&amp;lt;PostListItemResponse&amp;gt; cursorList(PostListQuery query, Long loginUserId) {
+    // 인기순은 좋아요가 바뀌면 순서가 흔들려 커서가 글을 빠뜨리거나 두 번 준다 — 최신순만 허락한다
+    if (&amp;quot;popular&amp;quot;.equals(query.sort())) {
+        throw ApiException.invalid(&amp;quot;cursor&amp;quot;, &amp;quot;커서 페이징은 최신순(latest)에서만 쓸 수 있습니다.&amp;quot;);
+    }
+    if (query.page() != null) {
+        throw ApiException.invalid(&amp;quot;page&amp;quot;, &amp;quot;page와 cursor는 함께 쓸 수 없습니다.&amp;quot;);
+    }
+    Long cursorId = parseCursor(query.cursor());
+    // size + 1행으로 다음 페이지 존재 여부를 판단한다.
+    List&amp;lt;PostListRow&amp;gt; rows = mapper.findAfterCursor(query, loginUserId, cursorId, query.size() + 1);
+    boolean hasNext = rows.size() &amp;gt; query.size();
+    List&amp;lt;PostListRow&amp;gt; page = hasNext ? rows.subList(0, query.size()) : rows;
+    String next = hasNext ? String.valueOf(page.get(page.size() - 1).id) : null;
+    return new CursorResponse&amp;lt;&amp;gt;(withTags(page), next);
+}
+
+private Long parseCursor(String cursor) {
+    if (cursor.isBlank()) {
+        return null;
+    }
+    try {
+        return Long.valueOf(cursor);
+    } catch (NumberFormatException e) {
+        throw ApiException.invalid(&amp;quot;cursor&amp;quot;, &amp;quot;커서 값이 올바르지 않습니다.&amp;quot;);
+    }
+}
+
+// 글과 태그를 JOIN한 채 페이징하지 않는다 — 이번 페이지 글들의 태그를 IN 한 번으로 읽는다.
+private List&amp;lt;PostListItemResponse&amp;gt; withTags(List&amp;lt;PostListRow&amp;gt; rows) {
+    if (rows.isEmpty()) {
+        return List.of();
+    }
+    Map&amp;lt;Long, List&amp;lt;String&amp;gt;&amp;gt; tagsByPost = mapper.findTagsByPostIds(rows.stream().map(row -&amp;gt; row.id).toList())
+            .stream()
+            .collect(Collectors.groupingBy(PostTagRow::postId, Collectors.mapping(PostTagRow::name, Collectors.toList())));
+    return rows.stream()
+            .map(row -&amp;gt; PostListItemResponse.of(row, tagsByPost.getOrDefault(row.id, List.of())))
+            .toList();
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/post/PostRepository.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/post/PostService.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;</p>
+<p>import org.example.board.comment.CommentTree;
+import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.user.User;
+import org.example.board.user.UserMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>// 게시글 쓰기 — MyBatis: SQL을 Mapper에 명시하고 트랜잭션을 Service에서 묶는다.
+@Service
+public class PostService {
+    private final PostMapper postMapper;
+    private final UserMapper userMapper;</p>
+<pre><code>public PostService(PostMapper postMapper, UserMapper userMapper) {
+    this.postMapper = postMapper;
+    this.userMapper = userMapper;
+}
+
+@Transactional
+public PostDetailResponse create(Long userId, PostRequest request) {
+    User author = userMapper.findById(userId);
+    if (author == null) throw new ApiException(ErrorCode.UNAUTHORIZED);
+    Set&amp;lt;Tag&amp;gt; tags = findOrCreateTags(request.tags());
+    Post post = new Post(author, request.title(), request.content(),
+            Visibility.valueOf(request.visibility()), tags);
+    postMapper.insertPost(post);
+    for (Tag tag : tags) postMapper.linkTag(post.getId(), tag.getId());
+    return PostDetailResponse.of(post, post.getViewCount(), false, List.of());
+}
+
+@Transactional
+public PostDetailResponse detail(Long postId, Long loginUserId) {
+    List&amp;lt;PostDetailRow&amp;gt; rows = findVisibleRows(postId, loginUserId);
+    postMapper.increaseViewCount(postId);
+    boolean liked = loginUserId != null &amp;amp;&amp;amp; postMapper.countLike(postId, loginUserId) &amp;gt; 0;
+    return response(rows, rows.get(0).viewCount + 1, liked, postId);
+}
+
+@Transactional
+public PostDetailResponse update(Long userId, Long postId, PostRequest request) {
+    findWritable(userId, postId, &amp;quot;작성자만 수정할 수 있습니다.&amp;quot;);
+    LocalDateTime updatedAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+    if (postMapper.updatePost(postId, request.title(), request.content(), request.visibility(), updatedAt) == 0)
+        throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+    postMapper.unlinkTags(postId);
+    for (Tag tag : findOrCreateTags(request.tags())) postMapper.linkTag(postId, tag.getId());
+    List&amp;lt;PostDetailRow&amp;gt; rows = postMapper.findDetailRows(postId);
+    boolean liked = postMapper.countLike(postId, userId) &amp;gt; 0;
+    return response(rows, rows.get(0).viewCount, liked, postId);
+}
+
+@Transactional
+public void delete(Long userId, Long postId) {
+    findWritable(userId, postId, &amp;quot;작성자만 삭제할 수 있습니다.&amp;quot;);
+    if (postMapper.softDelete(postId, LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS)) == 0)
+        throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+}
+
+private void findWritable(Long userId, Long postId, String message) {
+    List&amp;lt;PostDetailRow&amp;gt; rows = findVisibleRows(postId, userId);
+    if (!rows.get(0).authorId.equals(userId)) throw new ApiException(ErrorCode.FORBIDDEN, message);
+}
+
+private List&amp;lt;PostDetailRow&amp;gt; findVisibleRows(Long postId, Long loginUserId) {
+    List&amp;lt;PostDetailRow&amp;gt; rows = postMapper.findDetailRows(postId);
+    if (rows.isEmpty()) throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+    PostDetailRow first = rows.get(0);
+    if (&amp;quot;PRIVATE&amp;quot;.equals(first.visibility) &amp;amp;&amp;amp; !first.authorId.equals(loginUserId))
+        throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+    return rows;
+}
+
+private PostDetailResponse response(List&amp;lt;PostDetailRow&amp;gt; rows, int viewCount, boolean liked, Long postId) {
+    PostDetailRow first = rows.get(0);
+    List&amp;lt;String&amp;gt; tags = new ArrayList&amp;lt;&amp;gt;();
+    for (PostDetailRow row : rows) if (row.tagName != null) tags.add(row.tagName);
+    return new PostDetailResponse(first.id, first.title, first.content,
+            Visibility.valueOf(first.visibility), viewCount, first.likeCount,
+            liked, new AuthorResponse(first.authorId, first.authorNickname), tags,
+            CommentTree.build(postMapper.findCommentRows(postId)), first.createdAt, first.updatedAt);
+}
+
+private Set&amp;lt;Tag&amp;gt; findOrCreateTags(List&amp;lt;String&amp;gt; names) {
+    Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+    for (String name : names) {
+        Tag tag = postMapper.findTagByName(name);
+        if (tag == null) {
+            tag = new Tag(name);
+            postMapper.insertTag(tag);
+        }
+        tags.add(tag);
+    }
+    return tags;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/post/Tag.java</summary><pre><code>package org.example.board.post;
+
+<p>public class Tag {
+    private Long id;
+    private String name;</p>
+<pre><code>public Tag() {
+    // MyBatis 조회 결과용 생성자
+}
+
+public Tag(String name) {
+    this.name = name;
+}
+
+public Long getId() {
+    return id;
+}
+
+public void setId(Long id) {
+    this.id = id;
+}
+
+public String getName() {
+    return name;
+}
+
+public void setName(String name) {
+    this.name = name;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/post/TagRepository.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/user/User.java</summary><pre><code>package org.example.board.user;
+
+<p>import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;</p>
+<p>public class User {</p>
+<pre><code>private Long id;
+
+private String email;
+
+private String passwordHash;
+
+private String nickname;
+
+private LocalDateTime createdAt;
+
+public User() {
+    // MyBatis가 SELECT 결과를 매핑할 때 사용한다.
+}
+
+public User(String email, String passwordHash, String nickname) {
+    this.email = email;
+    this.passwordHash = passwordHash;
+    this.nickname = nickname;
+    this.createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+}
+
+public Long getId() {
+    return id;
+}
+
+public void setId(Long id) {
+    this.id = id;
+}
+
+public String getEmail() {
+    return email;
+}
+
+public void setEmail(String email) {
+    this.email = email;
+}
+
+public String getPasswordHash() {
+    return passwordHash;
+}
+
+public void setPasswordHash(String passwordHash) {
+    this.passwordHash = passwordHash;
+}
+
+public String getNickname() {
+    return nickname;
+}
+
+public void setNickname(String nickname) {
+    this.nickname = nickname;
+}
+
+public LocalDateTime getCreatedAt() {
+    return createdAt;
+}
+
+public void setCreatedAt(LocalDateTime createdAt) {
+    this.createdAt = createdAt;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/board/user/UserMapper.java</summary><pre><code>package org.example.board.user;
+
+<p>import org.apache.ibatis.annotations.Mapper;</p>
+<p>@Mapper
+public interface UserMapper {
+    boolean existsByEmail(String email);
+    User findByEmail(String email);
+    User findById(Long id);
+    void insert(User user);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/user/UserRepository.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/user/UserService.java</summary><pre><code>package org.example.board.user;
+
+<p>import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>@Service
+public class UserService {</p>
+<pre><code>private final UserMapper userMapper;
+private final PasswordEncoder passwordEncoder;
+
+public UserService(UserMapper userMapper, PasswordEncoder passwordEncoder) {
+    this.userMapper = userMapper;
+    this.passwordEncoder = passwordEncoder;
+}
+
+@Transactional
+public UserResponse signup(SignupRequest request) {
+    if (userMapper.existsByEmail(request.email())) {
+        throw new ApiException(ErrorCode.DUPLICATE, &amp;quot;이미 가입된 이메일입니다.&amp;quot;);
+    }
+    User user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname());
+    try {
+        userMapper.insert(user);
+    } catch (DuplicateKeyException e) {
+        // 확인과 저장 사이에 같은 이메일이 먼저 들어간 경우 — DB의 UNIQUE가 마지막 방어선이다
+        throw new ApiException(ErrorCode.DUPLICATE, &amp;quot;이미 가입된 이메일입니다.&amp;quot;);
+    }
+    return UserResponse.from(user);
+}
+
+@Transactional(readOnly = true)
+public UserResponse me(Long userId) {
+    // 토큰은 맞는데 회원이 없다(DB를 되돌린 뒤 옛 토큰 등) — 로그인부터 다시
+    User user = userMapper.findById(userId);
+    if (user == null) throw new ApiException(ErrorCode.UNAUTHORIZED);
+    return UserResponse.from(user);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: board-api
+  datasource:
+    # javaExperience MySQL(호스트 3306)의 project DB. 빈 DB면 Flyway가 V1으로 테이블·시드를 만든다
+    url: jdbc:mysql://localhost:13308/project?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  jpa:
+    hibernate:
+      # 스키마는 Flyway만 만든다. 엔티티가 테이블과 다르면 기동이 실패한다
+      ddl-auto: validate
+    open-in-view: false
+
+<p>app:
+  jwt:
+    # 예시용 비밀키 — 실제 서비스에서는 코드·저장소에 두지 않고 환경 변수 등으로 주입한다. HS256은 32바이트 이상
+    secret: board-api-example-secret-key-change-me-0123456789
+    validity-seconds: 3600
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/CommentMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.board.comment.CommentMapper&quot;&gt;
+    &lt;select id=&quot;lockActivePost&quot; resultType=&quot;long&quot;&gt;
+        SELECT id FROM posts WHERE id = #{postId} AND deleted_at IS NULL FOR UPDATE
+    &lt;/select&gt;
+    &lt;select id=&quot;findParent&quot; resultType=&quot;org.example.board.comment.CommentWriteRow&quot;&gt;
+        SELECT id, post_id AS postId, author_id AS authorId, parent_id AS parentId,
+               content, created_at AS createdAt
+        FROM comments WHERE id = #{parentId} AND deleted_at IS NULL FOR UPDATE
+    &lt;/select&gt;
+    &lt;select id=&quot;findPostIdByCommentId&quot; resultType=&quot;long&quot;&gt;
+        SELECT post_id FROM comments WHERE id = #{commentId}
+    &lt;/select&gt;
+    &lt;insert id=&quot;insert&quot; parameterType=&quot;org.example.board.comment.CommentWriteRow&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+        INSERT INTO comments (post_id, author_id, parent_id, content, created_at, deleted_at)
+        VALUES (#{postId}, #{authorId}, #{parentId}, #{content}, #{createdAt}, NULL)
+    &lt;/insert&gt;
+    &lt;select id=&quot;findActiveById&quot; resultType=&quot;org.example.board.comment.CommentWriteRow&quot;&gt;
+        SELECT c.id, c.post_id AS postId, c.author_id AS authorId, c.parent_id AS parentId,
+               c.content, c.created_at AS createdAt
+        FROM comments c JOIN posts p ON p.id = c.post_id
+        WHERE c.id = #{commentId} AND c.deleted_at IS NULL AND p.deleted_at IS NULL FOR UPDATE
+    &lt;/select&gt;
+    &lt;update id=&quot;softDelete&quot;&gt;
+        UPDATE comments SET deleted_at = #{deletedAt}
+        WHERE id = #{commentId} AND deleted_at IS NULL
+          AND EXISTS (SELECT 1 FROM posts WHERE id = comments.post_id AND deleted_at IS NULL)
+    &lt;/update&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/LikeMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.board.like.LikeMapper&quot;&gt;
+    &lt;select id=&quot;findVisiblePost&quot; resultType=&quot;org.example.board.like.LikePostRow&quot;&gt;
+        SELECT p.id, p.author_id AS authorId, p.visibility
+        FROM posts p WHERE p.id = #{postId} AND p.deleted_at IS NULL
+    &lt;/select&gt;
+    &lt;select id=&quot;exists&quot; resultType=&quot;boolean&quot;&gt;
+        SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = #{postId} AND user_id = #{userId})
+    &lt;/select&gt;
+    &lt;insert id=&quot;insert&quot;&gt;
+        INSERT INTO post_likes (post_id, user_id, created_at) VALUES (#{postId}, #{userId}, NOW())
+    &lt;/insert&gt;
+    &lt;delete id=&quot;delete&quot;&gt;
+        DELETE FROM post_likes WHERE post_id = #{postId} AND user_id = #{userId}
+    &lt;/delete&gt;
+    &lt;update id=&quot;changeCount&quot;&gt;
+        UPDATE posts SET like_count = like_count + #{delta}
+        WHERE id = #{postId} AND deleted_at IS NULL
+          AND (visibility = 'PUBLIC' OR author_id = #{userId})
+    &lt;/update&gt;
+    &lt;select id=&quot;findCount&quot; resultType=&quot;int&quot;&gt;
+        SELECT like_count FROM posts WHERE id = #{postId}
+    &lt;/select&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/PostMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.board.post.PostMapper&quot;&gt;
+    &lt;insert id=&quot;insertPost&quot; parameterType=&quot;org.example.board.post.Post&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+        INSERT INTO posts (author_id, title, content, visibility, view_count, like_count, created_at, updated_at, deleted_at)
+        VALUES (#{author.id}, #{title}, #{content}, #{visibility}, 0, 0, #{createdAt}, #{updatedAt}, NULL)
+    &lt;/insert&gt;
+    &lt;select id=&quot;findTagByName&quot; resultType=&quot;org.example.board.post.Tag&quot;&gt;
+        SELECT id, name FROM tags WHERE name = #{name}
+    &lt;/select&gt;
+    &lt;insert id=&quot;insertTag&quot; parameterType=&quot;org.example.board.post.Tag&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+        INSERT INTO tags (name) VALUES (#{name})
+    &lt;/insert&gt;
+    &lt;insert id=&quot;linkTag&quot;&gt;
+        INSERT INTO post_tags (post_id, tag_id) VALUES (#{postId}, #{tagId})
+    &lt;/insert&gt;
+    &lt;select id=&quot;findDetailRows&quot; resultType=&quot;org.example.board.post.PostDetailRow&quot;&gt;
+        SELECT p.id, p.title, p.content, p.visibility,
+               p.view_count AS viewCount, p.like_count AS likeCount,
+               p.created_at AS createdAt, p.updated_at AS updatedAt,
+               a.id AS authorId, a.nickname AS authorNickname,
+               t.id AS tagId, t.name AS tagName
+        FROM posts p
+        JOIN users a ON a.id = p.author_id
+        LEFT JOIN post_tags pt ON pt.post_id = p.id
+        LEFT JOIN tags t ON t.id = pt.tag_id
+        WHERE p.id = #{postId} AND p.deleted_at IS NULL
+        ORDER BY t.name
+    &lt;/select&gt;
+    &lt;update id=&quot;increaseViewCount&quot;&gt;
+        UPDATE posts SET view_count = view_count + 1 WHERE id = #{postId}
+    &lt;/update&gt;
+    &lt;select id=&quot;countLike&quot; resultType=&quot;long&quot;&gt;
+        SELECT COUNT(*) FROM post_likes WHERE post_id = #{postId} AND user_id = #{userId}
+    &lt;/select&gt;
+    &lt;select id=&quot;findCommentRows&quot; resultType=&quot;org.example.board.comment.CommentRow&quot;&gt;
+        SELECT c.id, c.parent_id AS parentId, c.content, c.created_at AS createdAt,
+               c.deleted_at AS deletedAt, a.id AS authorId, a.nickname AS authorNickname
+        FROM comments c JOIN users a ON a.id = c.author_id
+        WHERE c.post_id = #{postId}
+        ORDER BY c.created_at, c.id
+    &lt;/select&gt;
+    &lt;update id=&quot;updatePost&quot;&gt;
+        UPDATE posts SET title = #{title}, content = #{content}, visibility = #{visibility}, updated_at = #{updatedAt}
+        WHERE id = #{postId} AND deleted_at IS NULL
+    &lt;/update&gt;
+    &lt;update id=&quot;softDelete&quot;&gt;
+        UPDATE posts SET deleted_at = #{deletedAt} WHERE id = #{postId} AND deleted_at IS NULL
+    &lt;/update&gt;
+    &lt;delete id=&quot;unlinkTags&quot;&gt;
+        DELETE FROM post_tags WHERE post_id = #{postId}
+    &lt;/delete&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/PostQueryMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.board.post.PostQueryMapper&quot;&gt;
+    &lt;sql id=&quot;columns&quot;&gt;
+        p.id, p.title, p.visibility, p.view_count, p.like_count, p.created_at,
+        u.id AS author_id, u.nickname AS author_nickname
+    &lt;/sql&gt;
+
+<pre><code>&amp;lt;sql id=&amp;quot;visibleWhere&amp;quot;&amp;gt;
+    p.deleted_at IS NULL
+    AND (p.visibility = 'PUBLIC'
+    &amp;lt;if test=&amp;quot;loginUserId != null&amp;quot;&amp;gt;OR p.author_id = #{loginUserId}&amp;lt;/if&amp;gt;)
+    &amp;lt;if test=&amp;quot;cond.tag != null&amp;quot;&amp;gt;
+        AND EXISTS (SELECT 1 FROM post_tags pt JOIN tags t ON t.id = pt.tag_id
+                    WHERE pt.post_id = p.id AND t.name = #{cond.tag})
+    &amp;lt;/if&amp;gt;
+    &amp;lt;if test=&amp;quot;cond.q != null&amp;quot;&amp;gt;AND p.title LIKE CONCAT('%', #{cond.q}, '%')&amp;lt;/if&amp;gt;
+&amp;lt;/sql&amp;gt;
+
+&amp;lt;sql id=&amp;quot;sortOrder&amp;quot;&amp;gt;
+    &amp;lt;choose&amp;gt;
+        &amp;lt;when test=&amp;quot;cond.sort == 'popular'&amp;quot;&amp;gt;ORDER BY p.like_count DESC, p.id DESC&amp;lt;/when&amp;gt;
+        &amp;lt;otherwise&amp;gt;ORDER BY p.id DESC&amp;lt;/otherwise&amp;gt;
+    &amp;lt;/choose&amp;gt;
+&amp;lt;/sql&amp;gt;
+
+&amp;lt;select id=&amp;quot;findPage&amp;quot; resultType=&amp;quot;org.example.board.post.PostListRow&amp;quot;&amp;gt;
+    SELECT &amp;lt;include refid=&amp;quot;columns&amp;quot;/&amp;gt;
+    FROM posts p JOIN users u ON u.id = p.author_id
+    &amp;lt;where&amp;gt;&amp;lt;include refid=&amp;quot;visibleWhere&amp;quot;/&amp;gt;&amp;lt;/where&amp;gt;
+    &amp;lt;include refid=&amp;quot;sortOrder&amp;quot;/&amp;gt;
+    LIMIT #{cond.size} OFFSET #{offset}
+&amp;lt;/select&amp;gt;
+
+&amp;lt;select id=&amp;quot;count&amp;quot; resultType=&amp;quot;long&amp;quot;&amp;gt;
+    SELECT COUNT(*) FROM posts p
+    &amp;lt;where&amp;gt;&amp;lt;include refid=&amp;quot;visibleWhere&amp;quot;/&amp;gt;&amp;lt;/where&amp;gt;
+&amp;lt;/select&amp;gt;
+
+&amp;lt;select id=&amp;quot;findAfterCursor&amp;quot; resultType=&amp;quot;org.example.board.post.PostListRow&amp;quot;&amp;gt;
+    SELECT &amp;lt;include refid=&amp;quot;columns&amp;quot;/&amp;gt;
+    FROM posts p JOIN users u ON u.id = p.author_id
+    &amp;lt;where&amp;gt;
+        &amp;lt;include refid=&amp;quot;visibleWhere&amp;quot;/&amp;gt;
+        &amp;lt;if test=&amp;quot;cursorId != null&amp;quot;&amp;gt;AND p.id &amp;amp;lt; #{cursorId}&amp;lt;/if&amp;gt;
+    &amp;lt;/where&amp;gt;
+    ORDER BY p.id DESC
+    LIMIT #{limit}
+&amp;lt;/select&amp;gt;
+
+&amp;lt;select id=&amp;quot;findTagsByPostIds&amp;quot; resultType=&amp;quot;org.example.board.post.PostTagRow&amp;quot;&amp;gt;
+    SELECT pt.post_id AS postId, t.name
+    FROM post_tags pt JOIN tags t ON t.id = pt.tag_id
+    WHERE pt.post_id IN
+    &amp;lt;foreach collection=&amp;quot;postIds&amp;quot; item=&amp;quot;id&amp;quot; open=&amp;quot;(&amp;quot; separator=&amp;quot;,&amp;quot; close=&amp;quot;)&amp;quot;&amp;gt;#{id}&amp;lt;/foreach&amp;gt;
+    ORDER BY t.name
+&amp;lt;/select&amp;gt;</code></pre>
+<p>&lt;/mapper&gt;
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/UserMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.board.user.UserMapper&quot;&gt;
+    &lt;select id=&quot;existsByEmail&quot; resultType=&quot;boolean&quot;&gt;
+        SELECT EXISTS(SELECT 1 FROM users WHERE email = #{email})
+    &lt;/select&gt;
+    &lt;select id=&quot;findByEmail&quot; resultType=&quot;org.example.board.user.User&quot;&gt;
+        SELECT id, email, password_hash, nickname, created_at
+        FROM users WHERE email = #{email}
+    &lt;/select&gt;
+    &lt;select id=&quot;findById&quot; resultType=&quot;org.example.board.user.User&quot;&gt;
+        SELECT id, email, password_hash, nickname, created_at
+        FROM users WHERE id = #{id}
+    &lt;/select&gt;
+    &lt;insert id=&quot;insert&quot; parameterType=&quot;org.example.board.user.User&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+        INSERT INTO users (email, password_hash, nickname, created_at)
+        VALUES (#{email}, #{passwordHash}, #{nickname}, #{createdAt})
+    &lt;/insert&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080
+KIM=$(curl -s -X POST &quot;$BASE/api/v1/auth/login&quot; -H 'Content-Type: application/json' \
+  -d '{&quot;email&quot;:&quot;kim@example.com&quot;,&quot;password&quot;:&quot;password1234&quot;}' | sed -E 's/.*&quot;accessToken&quot;:&quot;([^&quot;]+)&quot;.*/\1/')
+ID=$(curl -s -X POST &quot;$BASE/api/v1/posts&quot; -H &quot;Authorization: Bearer $KIM&quot; -H 'Content-Type: application/json' \
+  -d '{&quot;title&quot;:&quot;[채점] 10-10 좋아요용 글&quot;}' | sed -E 's/.*&quot;data&quot;:\{&quot;id&quot;:([0-9]+).*/\1/')
+
+curl -s -X POST &quot;$BASE/api/v1/posts/$ID/like&quot; -H &quot;Authorization: Bearer $KIM&quot;; echo   # T1 좋아요
+curl -s &quot;$BASE/api/v1/posts/$ID&quot; -H &quot;Authorization: Bearer $KIM&quot;; echo              # G1 상세 liked=true
+curl -s -X POST &quot;$BASE/api/v1/posts/$ID/like&quot; -H &quot;Authorization: Bearer $KIM&quot;; echo   # T2 취소
+curl -s -i -X POST &quot;$BASE/api/v1/posts/$ID/like&quot;; echo                               # N 토큰 없음
+curl -s -i -X POST &quot;$BASE/api/v1/posts/999999/like&quot; -H &quot;Authorization: Bearer $KIM&quot;; echo  # X 없는 글</code></pre></details>
+<p>DB의 두 숫자가 맞는지 본다.</p>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>docker compose exec -T mysql mysql -ucommunity -pcommunity project -e &quot;
+SELECT p.id, p.like_count, (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id) AS rows_
+FROM posts p WHERE p.like_count &lt;&gt; (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id);&quot;</code></pre></details>
+<p>결과가 비어 있어야 한다(어긋난 글이 없다).</p>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들고, 두 번 눌러 0으로 돌려놓는다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="L" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>L · 로그인(김자바)</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="M" data-method="POST" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>M · 로그인(이스프링)</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;lee@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;lee@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="P" data-method="POST" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>P · 좋아요용 글 만들기</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;title&quot;: &quot;[채점] 10-10 좋아요용 글&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;title&quot;: &quot;[채점] 10-10 좋아요용 글&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="T1" data-method="POST" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T1 · 좋아요</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/posts/{{P.body.data.id}}/like" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.status&quot;,&quot;equals&quot;:200},{&quot;path&quot;:&quot;$.data&quot;,&quot;equals&quot;:{&quot;liked&quot;:true,&quot;likeCount&quot;:1}}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="G1" data-method="GET" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>G1 · 상세 — 누른 뒤</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/posts/{{P.body.data.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.liked&quot;,&quot;equals&quot;:true},{&quot;path&quot;:&quot;$.data.likeCount&quot;,&quot;equals&quot;:1}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="T2" data-method="POST" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T2 · 다시 누르기(취소)</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/posts/{{P.body.data.id}}/like" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data&quot;,&quot;equals&quot;:{&quot;liked&quot;:false,&quot;likeCount&quot;:0}}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="G2" data-method="GET" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>G2 · 상세 — 취소 뒤</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/posts/{{P.body.data.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.liked&quot;,&quot;equals&quot;:false},{&quot;path&quot;:&quot;$.data.likeCount&quot;,&quot;equals&quot;:0}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="N" data-method="POST" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>N · 토큰 없음</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/posts/{{P.body.data.id}}/like" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:401,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;UNAUTHORIZED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="X" data-method="POST" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>X · 없는 글</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/posts/999999/like" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:404,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;NOT_FOUND&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="PV" data-method="POST" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>PV · 남의 비공개 글(24)</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/posts/24/like" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{M.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{M.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:404,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;NOT_FOUND&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="V1" data-method="POST" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>V1 · 경로 id가 숫자가 아님</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/posts/abc/like" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;postId&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="V2" data-method="POST" data-request-index="11" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>V2 · 경로 id가 Long 범위를 넘음</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/posts/99999999999999999999/like" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;postId&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 T1</td>
+<td><code>200</code>, <code>data</code> = <code>{liked: true, likeCount: 1}</code></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 G1</td>
+<td>상세의 <code>liked</code>=<code>true</code>, <code>likeCount</code>=<code>1</code></td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 T2</td>
+<td><code>200</code>, <code>data</code> = <code>{liked: false, likeCount: 0}</code></td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 G2</td>
+<td>상세의 <code>liked</code>=<code>false</code>, <code>likeCount</code>=<code>0</code></td>
+</tr>
+<tr>
+<td>C5</td>
+<td>요청 N·X·PV</td>
+<td>토큰 없음 <code>401</code>, 없는 글·남의 비공개 글 <code>404</code></td>
+</tr>
+<tr>
+<td>C6</td>
+<td>V1 / V2</td>
+<td>경로 <code>abc</code>, <code>99999999999999999999</code>(Long 초과) 모두 <code>400 VALIDATION_FAILED</code>, <code>errors</code>에 <code>postId</code> — <code>500</code>이 아니다</td>
+</tr>
+<tr>
+<td>D1</td>
+<td>위 &quot;두 숫자&quot; 쿼리</td>
+<td>결과 0행 — 모든 글의 <code>like_count</code>가 <code>post_likes</code> 행 수와 같다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>트랜잭션</td>
+<td>좋아요 행 변경과 <code>like_count</code> 변경이 한 <code>@Transactional</code> 메서드 안에 있다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>숫자 갱신</td>
+<td><code>like_count</code>를 엔티티에서 읽고 더해 저장하지 않고 <code>UPDATE ... + :delta</code></td>
+</tr>
+</tbody></table></div>
+<h2 id="일부러-망가뜨리기"><a class="anchor" href="#일부러-망가뜨리기" aria-hidden="true">#</a>일부러 망가뜨리기</h2>
+<p>하나씩 바꾸고 다시 띄운 뒤 요청을 보낸다. 끝나면 되돌린다. 모두 Boot 4.1.1(Hibernate 7.4)에서 재현했다.</p>
+<h3 id="①-transactional을-지운다--500-그리고-숫자가-어긋난다"><a class="anchor" href="#①-transactional을-지운다--500-그리고-숫자가-어긋난다" aria-hidden="true">#</a>① <code>@Transactional</code>을 지운다 → 500, 그리고 숫자가 어긋난다</h3>
+<p><code>LikeService.toggle</code>의 <code>@Transactional</code>을 지우고, <strong>이미 좋아요를 누른</strong> 글에 요청을 보낸다.</p>
+<pre><code class="language-text">{&quot;status&quot;:500,&quot;message&quot;:&quot;서버 오류가 발생했습니다.&quot;,&quot;code&quot;:&quot;INTERNAL_ERROR&quot;,&quot;errors&quot;:[],&quot;data&quot;:null}</code></pre>
+<p>로그:</p>
+<pre><code class="language-text">org.springframework.dao.InvalidDataAccessApiUsageException: No active transaction for update or delete query
+...
+Caused by: jakarta.persistence.TransactionRequiredException: No active transaction for update or delete query</code></pre>
+<p>그 글의 두 숫자를 본다.</p>
+<pre><code class="language-bash">docker compose exec -T mysql mysql -ucommunity -pcommunity project \
+  -e &quot;SELECT (SELECT COUNT(*) FROM post_likes WHERE post_id = &lt;글 id&gt;) AS likes_rows, like_count FROM posts WHERE id = &lt;글 id&gt;;&quot;</code></pre>
+<pre><code class="language-text">likes_rows	like_count
+0	1</code></pre>
+<ul>
+<li>읽는 법: <code>existsById</code>·<code>deleteById</code>는 Spring Data가 <strong>각자</strong> 작은 트랜잭션을 열어 실행하고 바로 커밋한다. 그래서 좋아요 행은 지워졌다. 그다음 <code>@Modifying</code> 쿼리는 트랜잭션이 없어서 실행을 거부했다. 결과는 500인데 <strong>절반만 반영됐다</strong>. 행은 0개인데 숫자는 1이다.</li>
+<li>고치기: <code>@Transactional</code>을 되돌린다. 어긋난 숫자는 <code>UPDATE posts SET like_count = (SELECT COUNT(*) FROM post_likes WHERE post_id = posts.id) WHERE id = &lt;글 id&gt;</code>로 맞춘다(실습 DB라면 <code>--reset</code>).</li>
+</ul>
+<h3 id="②-idclass를-지운다--앱이-뜨지-않는다"><a class="anchor" href="#②-idclass를-지운다--앱이-뜨지-않는다" aria-hidden="true">#</a>② <code>@IdClass</code>를 지운다 → 앱이 뜨지 않는다</h3>
+<pre><code class="language-text">Caused by: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'postLikeRepository' defined in org.example.board.like.PostLikeRepository defined in @EnableJpaRepositories declared on DataJpaRepositoriesRegistrar.EnableJpaRepositoriesConfiguration: This class [class org.example.board.like.PostLike] does not define an IdClass
+...
+Caused by: java.lang.IllegalArgumentException: This class [class org.example.board.like.PostLike] does not define an IdClass</code></pre>
+<ul>
+<li>읽는 법: <code>@Id</code>가 둘인데 키 타입을 알려 주지 않았다. 저장소(<code>JpaRepository&lt;PostLike, PostLikeId&gt;</code>)를 만들다가 &quot;이 엔티티의 키 클래스가 뭐냐&quot;에서 멈췄다.</li>
+<li>고치기: <code>@IdClass(PostLikeId.class)</code>를 되돌린다.</li>
+</ul>
+<h3 id="③-같은-글에-두-번을-동시에-보낸다--한쪽이-500"><a class="anchor" href="#③-같은-글에-두-번을-동시에-보낸다--한쪽이-500" aria-hidden="true">#</a>③ 같은 글에 두 번을 <strong>동시에</strong> 보낸다 → 한쪽이 500</h3>
+<p>망가뜨린 것은 없다. 정답 코드 그대로 두고, 같은 토큰으로 두 요청을 동시에 보낸다.</p>
+<pre><code class="language-bash">for i in 1 2; do curl -s -X POST &quot;$BASE/api/v1/posts/$ID/like&quot; -H &quot;Authorization: Bearer $KIM&quot; &amp; done; wait; echo</code></pre>
+<pre><code class="language-text">{&quot;status&quot;:200,&quot;message&quot;:&quot;OK&quot;,&quot;data&quot;:{&quot;liked&quot;:true,&quot;likeCount&quot;:1}}{&quot;status&quot;:500,&quot;message&quot;:&quot;서버 오류가 발생했습니다.&quot;,&quot;code&quot;:&quot;INTERNAL_ERROR&quot;,&quot;errors&quot;:[],&quot;data&quot;:null}</code></pre>
+<p>로그:</p>
+<pre><code class="language-text">WARN ... org.hibernate.orm.jdbc.error : Duplicate entry '29-1' for key 'post_likes.PRIMARY'</code></pre>
+<p>두 요청이 모두 &quot;아직 없다&quot;를 보고 둘 다 INSERT했다. 기본 키가 두 번째를 막았다. 더블클릭 한 번이면 생기는 일이다. 다음 단계에서 이 문제를 고친다.</p>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../lessons/G3-first-transaction.html">G3 트랜잭션 첫 만남</a> — 둘 이상 쓰면 한 트랜잭션</li>
+<li><a href="../../lessons/H1-concurrency-taste.html">H1 동시성 맛보기</a> — 두 요청이 동시에 오면</li>
+<li><a href="../../lessons/B4-record-getter-immutable.html">B4 record·getter·불변</a> — record의 <code>equals</code>·<code>hashCode</code></li>
+<li><a href="../../docs/knowledge/P20-jpa-entity-mapping.html">P20 JPA 엔티티 매핑</a> — 복합 키 <code>@IdClass</code></li>
+<li><a href="../ch4-like/4-1-like-toggle.html">4-1. 좋아요 토글</a> — 1~9장의 같은 기능(다른 API 모양)</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 저장소를 만들 때 키 타입</summary>
+
+<p><code>JpaRepository&lt;엔티티, 키 타입&gt;</code>의 키 타입은 <code>@IdClass</code>에 적은 클래스다. <code>Long</code>이 아니다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 응답의 likeCount가 늘 옛 값이다</summary>
+
+<p><code>findVisiblePost</code>로 읽은 <code>Post</code> 엔티티의 <code>getLikeCount()</code>를 응답에 쓰면, 벌크 UPDATE 전에 읽은 값이 나온다. 바꾼 뒤 <code>select p.likeCount ...</code>로 DB에서 다시 읽는다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="10-11-idempotent-like.html">10-11. 토글의 문제와 멱등 API</a> — 망가뜨리기 ③처럼 동시·재시도에 약한 토글 옆에, 몇 번을 보내도 결과가 같은 <code>PUT</code>·<code>DELETE</code>를 v2로 연다.</p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 10-10. 좋아요 토글\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch10-project/10-10-like-toggle.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity project -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="10-9-comments.html">← 이전 10-9. 댓글 — 작성·목록(답글 트리)·삭제</a><a href="10-11-idempotent-like.html">다음 → 10-11. 토글의 문제 — 멱등 PUT/DELETE를 v2로 나란히</a></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
+</body>
+</html>

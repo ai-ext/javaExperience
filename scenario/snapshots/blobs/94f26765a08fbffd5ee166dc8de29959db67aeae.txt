@@ -1,0 +1,77 @@
+package org.example.comment;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.member.Member;
+import org.example.member.MemberRepository;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+
+@Service
+public class CommentService {
+
+    private static final String PUBLISHED = "PUBLISHED";
+
+    private final CommentRepository commentRepository;
+    private final PostRepository postRepository;
+    private final MemberRepository memberRepository;
+    private final PostAccessPolicy accessPolicy;
+
+    public CommentService(CommentRepository commentRepository, PostRepository postRepository,
+                           MemberRepository memberRepository, PostAccessPolicy accessPolicy) {
+        this.commentRepository = commentRepository;
+        this.postRepository = postRepository;
+        this.memberRepository = memberRepository;
+        this.accessPolicy = accessPolicy;
+    }
+
+    // 댓글 저장과 comment_count 증가를 한 트랜잭션으로 묶는다 — 둘 중 하나만 반영되면 숫자가 틀어진다
+    @Transactional
+    public Comment create(Long postId, AuthenticatedMember loginMember, CommentCreateRequest request) {
+        Post post = findCommentablePost(postId, loginMember);
+        Comment parent = resolveParent(postId, request.parentId());
+
+        Member author = memberRepository.getReferenceById(loginMember.id());
+        Comment saved = commentRepository.save(new Comment(post, author, parent, request.content(), LocalDateTime.now()));
+        postRepository.incrementCommentCount(postId);
+
+        // 트랜잭션 안에서 지연 로딩 연관을 미리 읽어 둔다(컨트롤러가 세션 밖에서 DTO를 만든다)
+        saved.getMember().getNickname();
+        return saved;
+    }
+
+    // 볼 수 있는 PUBLISHED 글인가 — 아니면 404(4-1 LikeService.findLikeablePost와 같은 규칙)
+    private Post findCommentablePost(Long postId, AuthenticatedMember loginMember) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(loginMember, post) || !PUBLISHED.equals(post.getStatus())) {
+            throw new PostNotFoundException();
+        }
+        return post;
+    }
+
+    // 부모 댓글 검증 — 같은 글의, 최상위, 지워지지 않은 댓글이어야 한다.
+    // 부모가 없으면 404(CommentNotFoundException), 있는데 규칙에 안 맞으면 400(InvalidParentCommentException).
+    private Comment resolveParent(Long postId, Long parentId) {
+        if (parentId == null) {
+            return null;
+        }
+        Comment parent = commentRepository.findById(parentId)
+                .orElseThrow(CommentNotFoundException::new);
+        if (!parent.getPost().getId().equals(postId)) {
+            throw new InvalidParentCommentException("다른 글의 댓글에는 답글을 달 수 없습니다.");
+        }
+        if (parent.getParent() != null) {
+            throw new InvalidParentCommentException("답글에는 답글을 달 수 없습니다.");
+        }
+        if (parent.getDeletedAt() != null) {
+            throw new InvalidParentCommentException("지워진 댓글에는 답글을 달 수 없습니다.");
+        }
+        return parent;
+    }
+}

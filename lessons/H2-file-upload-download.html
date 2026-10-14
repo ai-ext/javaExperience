@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H2. 파일 업로드·다운로드 — multipart, 저장 이름, 받는 이름</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="h2-파일-업로드다운로드--multipart-저장-이름-받는-이름"><a class="anchor" href="#h2-파일-업로드다운로드--multipart-저장-이름-받는-이름" aria-hidden="true">#</a>H2. 파일 업로드·다운로드 — multipart, 저장 이름, 받는 이름</h1>
+<blockquote>
+<p>개념 레슨 · 35분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>지금까지 요청 본문은 전부 JSON이었다. 사진은 JSON에 못 담는다(바이트 덩어리라서). 파일은 **<code>multipart/form-data</code>**로 보낸다. 본문을 경계 문자열(boundary)로 잘라 &quot;파트&quot;를 여러 개 담는 형식이다. 파트마다 이름, 파일 이름, 형식이 붙는다.</p>
+<pre><code class="language-text">POST /h2/images HTTP/1.1
+Content-Type: multipart/form-data; boundary=demo-123
+
+--demo-123
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;dot.png&quot;
+Content-Type: image/png
+
+(여기에 파일 바이트)
+--demo-123--</code></pre>
+<p>curl은 <code>-F</code>로 이 본문을 만들어 준다. <code>-F &#39;file=@dot.png&#39;</code>는 &quot;이름이 <code>file</code>인 파트에 <code>dot.png</code> 파일 내용을 담아라&quot;다. Spring에서는 그 파트를 <code>MultipartFile</code>로 받는다.</p>
+<pre><code class="language-java">@PostMapping(&quot;/h2/images&quot;)
+public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; upload(@RequestParam(&quot;file&quot;) MultipartFile file) { … }</code></pre>
+<p>파일을 받는 코드는 이게 전부다. 어려운 건 <strong>무엇을 믿느냐</strong>다. 파트에 붙어 오는 정보는 전부 보낸 쪽이 적은 것이다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>파트에 붙어 오는 것</th>
+<th><code>MultipartFile</code>에서</th>
+<th>믿어도 되나</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>파일 이름 <code>filename=&quot;…&quot;</code></td>
+<td><code>getOriginalFilename()</code></td>
+<td><strong>아니다.</strong> <code>../evil.png</code>도 그대로 온다</td>
+</tr>
+<tr>
+<td>형식 <code>Content-Type: image/png</code></td>
+<td><code>getContentType()</code></td>
+<td><strong>아니다.</strong> 텍스트 파일에 <code>image/png</code>를 붙일 수 있다</td>
+</tr>
+<tr>
+<td>파일 바이트</td>
+<td><code>getInputStream()</code></td>
+<td>실제로 받은 것. 앞 몇 바이트(서명)로 형식을 판정한다</td>
+</tr>
+<tr>
+<td>크기</td>
+<td><code>getSize()</code></td>
+<td>실제 크기. 단 이 값을 볼 때는 <strong>이미 다 받은 뒤</strong>다</td>
+</tr>
+</tbody></table></div>
+<p>그래서 규칙이 셋 나온다.</p>
+<ol>
+<li><strong>크기는 컨트롤러에 오기 전에 막는다.</strong> <code>spring.servlet.multipart.max-file-size</code>(파일 하나, 기본 1MB)와 <code>max-request-size</code>(요청 전체, 기본 10MB).</li>
+<li><strong>저장 이름은 서버가 짓는다.</strong> UUID 같은 이름으로 저장하고, 원래 이름은 DB에 &quot;표시용&quot;으로만 둔다. 형식은 파일 앞 바이트로 판정한다.</li>
+<li><strong>내려줄 때 원래 이름은 <code>Content-Disposition</code> 헤더로 알려 준다.</strong> 한글 이름은 <code>filename*=UTF-8&#39;&#39;…</code> 형식이다.</li>
+</ol>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<p>이 레슨을 쓰면서 작은 Spring Boot 4.1 앱(포트 <code>18300</code>)을 만들어 실제로 보냈다. 아래 출력은 전부 그 실행 결과다.</p>
+<h3 id="올리기--서버가-이름을-짓는다"><a class="anchor" href="#올리기--서버가-이름을-짓는다" aria-hidden="true">#</a>올리기 — 서버가 이름을 짓는다</h3>
+<pre><code class="language-java">private static final Path ROOT = Path.of(&quot;uploads&quot;).toAbsolutePath().normalize();
+
+@PostMapping(&quot;/h2/images&quot;)
+public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; upload(@RequestParam(&quot;file&quot;) MultipartFile file) throws IOException {
+    if (file.isEmpty()) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;빈 파일&quot;);
+    }
+    String ext;
+    try (InputStream in = file.getInputStream()) {
+        ext = imageExtension(in.readNBytes(8));          // 앞 8바이트만 본다
+    }
+    String storedName = UUID.randomUUID().toString().replace(&quot;-&quot;, &quot;&quot;) + ext;
+    Files.createDirectories(ROOT);
+    file.transferTo(ROOT.resolve(storedName));
+    originalNames.put(storedName, String.valueOf(file.getOriginalFilename()));   // 실제로는 DB 한 행
+    return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+            &quot;fileName&quot;, storedName,
+            &quot;originalName&quot;, String.valueOf(file.getOriginalFilename()),
+            &quot;browserSaidType&quot;, String.valueOf(file.getContentType()),
+            &quot;size&quot;, file.getSize()));
+}
+
+static String imageExtension(byte[] head) {
+    byte[] png = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+    if (Arrays.equals(head, png)) return &quot;.png&quot;;
+    if (head.length &gt;= 3 &amp;&amp; (head[0] &amp; 0xFF) == 0xFF &amp;&amp; (head[1] &amp; 0xFF) == 0xD8 &amp;&amp; (head[2] &amp; 0xFF) == 0xFF) {
+        return &quot;.jpg&quot;;
+    }
+    throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, &quot;PNG·JPEG만 올릴 수 있습니다&quot;);
+}</code></pre>
+<ul>
+<li>PNG 파일은 항상 <code>89 50 4E 47 0D 0A 1A 0A</code> 8바이트로 시작하고, JPEG는 <code>FF D8 FF</code>로 시작한다. 이걸 <strong>파일 서명</strong>(매직 넘버)이라고 한다.</li>
+<li><code>transferTo</code>는 받은 파일을 그 경로로 옮겨 저장한다.</li>
+</ul>
+<pre><code class="language-text">$ B=http://localhost:18300
+$ curl -s -w '\n%{http_code}\n' -F 'file=@산책사진.png' $B/h2/images
+{&quot;browserSaidType&quot;:&quot;image/png&quot;,&quot;size&quot;:108,&quot;fileName&quot;:&quot;8219b586e8104515a8c0eaa9ca8a8551.png&quot;,&quot;originalName&quot;:&quot;산책사진.png&quot;}
+201</code></pre>
+<p>디스크에는 <code>uploads/8219b586…a8551.png</code>로 저장됐다. 같은 이름의 사진을 두 사람이 올려도 덮어쓰지 않는다.</p>
+<h3 id="너무-큰-파일--컨트롤러에-오기-전에-413"><a class="anchor" href="#너무-큰-파일--컨트롤러에-오기-전에-413" aria-hidden="true">#</a>너무 큰 파일 — 컨트롤러에 오기 전에 413</h3>
+<p>아무 설정 없이(기본 1MB) 1.2MB 파일을 보냈다.</p>
+<pre><code class="language-text">$ curl -s -i -F 'file=@big12.png' $B/h2/images
+HTTP/1.1 100
+
+HTTP/1.1 413
+Content-Length: 0
+Date: Sat, 10 Oct 2026 06:56:54 GMT
+Connection: close</code></pre>
+<pre><code class="language-text">WARN … .w.s.m.s.DefaultHandlerExceptionResolver : Resolved [org.springframework.web.multipart.MaxUploadSizeExceededException: Maximum upload size exceeded]</code></pre>
+<ul>
+<li>상태는 <strong>413</strong>(Content Too Large)이고 <strong>본문이 비어 있다</strong>. 서버는 연결도 끊는다(<code>Connection: close</code>).</li>
+<li>예외는 <code>MaxUploadSizeExceededException</code>이다. Spring이 요청을 컨트롤러에 넘기기 <strong>전</strong>, multipart를 풀다가 던졌다. 그래서 컨트롤러의 어떤 코드도 돌지 않았고 <code>uploads</code>에 아무것도 생기지 않았다. 5MB, 30MB 파일도 똑같이 413이었다.</li>
+</ul>
+<p>한도를 바꿔서도 해 봤다(<code>max-file-size=2MB</code>, <code>max-request-size=3MB</code>).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>보낸 것</th>
+<th>결과</th>
+<th>걸린 한도</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1.2MB 파일 하나</td>
+<td><code>201</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>1.2MB 파일 셋을 한 요청에(<code>-F file=@… -F a=@… -F b=@…</code>)</td>
+<td><code>413</code></td>
+<td>요청 전체 3MB</td>
+</tr>
+<tr>
+<td>5MB 파일 하나</td>
+<td><code>413</code></td>
+<td>파일 하나 2MB</td>
+</tr>
+</tbody></table></div>
+<p>빈 본문 대신 사용자에게 보여 줄 메시지를 주려면 전역 핸들러에서 이 예외를 잡는다.</p>
+<pre><code class="language-java">@RestControllerAdvice
+public class UploadErrors {
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.CONTENT_TOO_LARGE)
+    public Map&lt;String, String&gt; tooLarge(MaxUploadSizeExceededException e) {
+        return Map.of(&quot;message&quot;, &quot;사진은 1MB까지 올릴 수 있어요&quot;);
+    }
+}</code></pre>
+<pre><code class="language-text">HTTP/1.1 413
+Content-Type: application/json
+Content-Length: 54
+Connection: close
+
+{&quot;message&quot;:&quot;사진은 1MB까지 올릴 수 있어요&quot;}</code></pre>
+<h3 id="이미지가-아닌-것--415와-400"><a class="anchor" href="#이미지가-아닌-것--415와-400" aria-hidden="true">#</a>이미지가 아닌 것 — 415와 400</h3>
+<pre><code class="language-text">$ echo 'hello' &gt; fake.png
+$ curl -s -w '\n%{http_code}\n' -F 'file=@fake.png;type=image/png' $B/h2/images
+{&quot;timestamp&quot;:&quot;2026-10-10T06:56:42.189Z&quot;,&quot;status&quot;:415,&quot;error&quot;:&quot;Unsupported Media Type&quot;,&quot;path&quot;:&quot;/h2/images&quot;}
+415
+$ : &gt; empty.png
+$ curl -s -o /dev/null -w '%{http_code}\n' -F 'file=@empty.png' $B/h2/images
+400
+$ curl -s -o /dev/null -w '%{http_code}\n' -F 'note=hi' $B/h2/images
+400</code></pre>
+<ul>
+<li><code>;type=image/png</code>는 curl에게 &quot;이 파트의 <code>Content-Type</code>을 <code>image/png</code>로 적어라&quot;다. 이름도 <code>.png</code>, 형식도 <code>image/png</code>지만 앞 바이트가 <code>hello</code>라서 415다.</li>
+<li>0바이트 파일은 <code>isEmpty()</code>에 걸려 400. <code>file</code> 파트가 아예 없으면 Spring이 <code>MissingServletRequestPartException: Required part &#39;file&#39; is not present.</code>를 로그에 남기고 400을 준다.</li>
+</ul>
+<h3 id="내려받기--한글-이름은-filename"><a class="anchor" href="#내려받기--한글-이름은-filename" aria-hidden="true">#</a>내려받기 — 한글 이름은 <code>filename*</code></h3>
+<pre><code class="language-java">@GetMapping(&quot;/h2/images/{fileName}&quot;)
+public ResponseEntity&lt;Resource&gt; download(@PathVariable String fileName) {
+    if (!STORED_NAME.matcher(fileName).matches()) {          // [0-9a-f]{32}\.(png|jpg) 모양만
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+    Path path = ROOT.resolve(fileName).normalize();
+    if (!path.startsWith(ROOT) || !Files.isRegularFile(path)) {
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+    ContentDisposition cd = ContentDisposition.attachment()
+            .filename(originalNames.getOrDefault(fileName, fileName), StandardCharsets.UTF_8)
+            .build();
+    return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .header(HttpHeaders.CONTENT_DISPOSITION, cd.toString())
+            .body(new FileSystemResource(path));
+}</code></pre>
+<pre><code class="language-text">$ curl -s -D - -o /dev/null $B/h2/images/8219b586e8104515a8c0eaa9ca8a8551.png
+HTTP/1.1 200
+Content-Disposition: attachment; filename=&quot;___________.png&quot;; filename*=UTF-8''%EC%82%B0%EC%B1%85%EC%82%AC%EC%A7%84.png
+Content-Type: application/octet-stream
+Content-Length: 108</code></pre>
+<ul>
+<li><code>attachment</code>는 &quot;화면에 띄우지 말고 파일로 저장하라&quot;는 뜻이다.</li>
+<li><code>filename*=UTF-8&#39;&#39;…</code>가 진짜 이름이다. <code>%EC%82%B0</code>이 <code>산</code>의 UTF-8 세 바이트다.</li>
+<li>Spring은 <code>filename*</code>를 못 읽는 옛 프로그램을 위해 <code>filename=&quot;___________.png&quot;</code>도 같이 넣었다. 한글 자리가 밑줄로 바뀐 대체 이름이다. 둘 다 있으면 <code>filename*</code>를 아는 프로그램은 <code>filename*</code>를 쓴다(RFC 6266).</li>
+<li><strong>curl은 <code>filename*</code>를 쓰지 않았다.</strong> <code>curl -OJ</code>(헤더의 이름으로 저장)로 받았더니 <code>___________.png</code>로 저장됐다. 한글 이름이 제대로 보이는지는 브라우저로 확인한다.</li>
+</ul>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>15분. 0~9장에서 만든 앱(Boot 4.1)에 위 <code>upload</code>·<code>download</code>·<code>imageExtension</code>을 담은 <code>ImageController</code>를 하나 만든다. <code>STORED_NAME</code>은 <code>Pattern.compile(&quot;[0-9a-f]{32}\\.(png|jpg)&quot;)</code>, <code>originalNames</code>는 <code>new ConcurrentHashMap&lt;String, String&gt;()</code>이다. <code>uploads</code> 폴더는 프로젝트 폴더 안에 생긴다(<code>.gitignore</code>에 넣어 둔다).</p>
+<p><strong>1. 시험 파일을 만든다.</strong> 진짜 PNG 대신 PNG 서명 8바이트 + 아무 바이트로 만든다.</p>
+<pre><code class="language-bash">printf '\x89PNG\r\n\x1a\n' &gt; dot.png; head -c 100 /dev/urandom &gt;&gt; dot.png
+cp dot.png 산책사진.png
+printf '\x89PNG\r\n\x1a\n' &gt; big12.png; head -c 1250000 /dev/urandom &gt;&gt; big12.png
+echo 'hello' &gt; fake.png
+xxd dot.png | head -1      # 89504e47 0d0a1a0a 로 시작하는지</code></pre>
+<p><strong>2. 올리고 받는다.</strong> 예시의 curl을 그대로 친다. 표가 맞으면 된다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>보낸 것</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>dot.png</code> · <code>산책사진.png</code></td>
+<td><code>201</code>, <code>fileName</code>이 32자 16진수<code>.png</code></td>
+</tr>
+<tr>
+<td><code>big12.png</code></td>
+<td><code>413</code>, 본문 없음</td>
+</tr>
+<tr>
+<td><code>fake.png;type=image/png</code></td>
+<td><code>415</code></td>
+</tr>
+<tr>
+<td><code>file</code> 파트 없음</td>
+<td><code>400</code></td>
+</tr>
+<tr>
+<td>받기 <code>-D -</code></td>
+<td><code>filename*=UTF-8&#39;&#39;%EC%82%B0…</code></td>
+</tr>
+<tr>
+<td>받기 <code>/h2/images/secret.txt</code></td>
+<td><code>404</code> (이름 모양이 다르다)</td>
+</tr>
+</tbody></table></div>
+<p><strong>3. 한도를 바꿔 본다.</strong> <code>application.yml</code>에 넣고 다시 켠다.</p>
+<pre><code class="language-yaml">spring:
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB</code></pre>
+<p><code>big12.png</code>가 <code>201</code>로 바뀌고, 셋을 한 번에 보내면 <code>413</code>인지 본다.</p>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p><strong>1. 보낸 이름으로 저장하기.</strong> 이렇게 쓰고 싶어진다.</p>
+<pre><code class="language-java">@PostMapping(&quot;/h2/naive&quot;)
+public Map&lt;String, String&gt; naiveUpload(@RequestParam(&quot;file&quot;) MultipartFile file) throws IOException {
+    Path target = ROOT.resolve(file.getOriginalFilename());
+    file.transferTo(target);
+    return Map.of(&quot;originalName&quot;, String.valueOf(file.getOriginalFilename()),
+            &quot;savedTo&quot;, target.normalize().toString());
+}</code></pre>
+<p>curl은 <code>;filename=</code>으로 파트의 파일 이름을 마음대로 적을 수 있다.</p>
+<pre><code class="language-text">$ curl -s -F 'file=@dot.png;filename=../evil.png' $B/h2/naive
+{&quot;originalName&quot;:&quot;../evil.png&quot;,&quot;savedTo&quot;:&quot;/…/lessons-h2349/evil.png&quot;}</code></pre>
+<p><code>getOriginalFilename()</code>은 <code>../evil.png</code>를 <strong>그대로</strong> 돌려줬고, 파일은 <code>uploads</code> <strong>바깥</strong>(한 단계 위)에 저장됐다. <code>../</code>를 더 붙이면 더 위로 간다. 같은 이름을 올리면 남의 파일을 덮어쓴다. 안전한 <code>/h2/images</code>에 같은 요청을 보내면 <code>201</code>에 <code>fileName</code>은 UUID, <code>originalName</code>만 <code>../evil.png</code>다. 원래 이름은 표시용 데이터로만 남는다.</p>
+<p><strong>2. 받을 때 경로를 그대로 붙이기.</strong></p>
+<pre><code class="language-java">@GetMapping(&quot;/h2/naive&quot;)
+public ResponseEntity&lt;Resource&gt; naiveDownload(@RequestParam String name) {
+    return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN)
+            .body(new FileSystemResource(ROOT.resolve(name)));
+}</code></pre>
+<pre><code class="language-text">$ echo '이건 비밀' &gt; secret.txt      # uploads 바깥(프로젝트 폴더)
+$ curl -s &quot;$B/h2/naive?name=../secret.txt&quot;
+이건 비밀</code></pre>
+<p><code>uploads</code> 밖의 파일이 그대로 나갔다. 경로 변수(<code>/h2/images/..%2Fsecret.txt</code>)로 같은 짓을 하면 톰캣이 먼저 <code>400</code>(HTML 에러 페이지)으로 막았다. 하지만 위처럼 쿼리 파라미터로 받으면 아무도 막아 주지 않는다. 그래서 받는 쪽도 <strong>서버가 지은 이름 모양</strong>(<code>[0-9a-f]{32}\.png</code>)만 받고, <code>normalize()</code> 후 <code>startsWith(ROOT)</code>로 한 번 더 확인한다.</p>
+<p><strong>3. <code>getContentType()</code>만 믿기.</strong> <code>getContentType()</code>만 돌려주는 엔드포인트에 <code>fake.png</code>(내용 <code>hello</code>)를 보냈다. <code>;type=image/png</code>를 붙여도, 안 붙여도(curl이 확장자 <code>.png</code>를 보고 적는다) 결과는 <code>{&quot;getContentType&quot;:&quot;image/png&quot;}</code>였다. 형식 검사를 <code>file.getContentType().startsWith(&quot;image/&quot;)</code>로 하면 <code>hello</code>가 이미지로 저장된다.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> <code>max-file-size</code>의 기본값과, 그걸 넘는 파일을 보냈을 때 Boot 4.1 기본 응답은?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>1MB, 상태 <code>413</code>에 빈 본문.</strong> <code>MaxUploadSizeExceededException</code>이 컨트롤러에 오기 전에 나고, <code>DefaultHandlerExceptionResolver</code>가 413으로 바꾼다. 메시지를 주려면 <code>@ExceptionHandler</code>로 잡는다.</p>
+</details>
+
+<p><strong>2.</strong> <code>max-file-size: 5MB</code>만 바꾸고 4MB 사진 세 장을 한 요청에 올렸다. 결과는? 왜?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong><code>413</code>.</strong> 파일 하나는 5MB 안이지만 요청 전체가 12MB라 <code>max-request-size</code>(기본 10MB)에 걸린다. 실제로 <code>max-file-size=5MB</code>만 주고 켜서 4MB 하나는 <code>201</code>, 셋은 <code>413</code>이었다. 두 한도를 같이 정한다.</p>
+</details>
+
+<p><strong>3.</strong> 컨트롤러에서 <code>if (file.getSize() &gt; 1_048_576) throw …</code>로 크기를 막으면 뭐가 아쉬운가?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>getSize()</code>를 볼 때는 <strong>이미 파일을 다 받은 뒤</strong>다. 큰 파일이 들어오는 동안 서버가 그만큼 받아 둔다. <code>max-file-size</code>는 multipart를 푸는 단계에서 끊는다.</p>
+</details>
+
+<p><strong>4.</strong> 사용자가 보낸 파일 이름이 <code>../../app.yml</code>이다. <code>uploads.resolve(이름)</code>에 저장하면 무슨 일이 생기나? 어떻게 바꾸나?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>uploads</code> 밖, 두 단계 위에 <code>app.yml</code>이 저장된다(덮어쓸 수도 있다). <code>getOriginalFilename()</code>은 보낸 문자열을 그대로 준다. 저장 이름은 <strong>서버가 UUID로 짓고</strong>, 원래 이름은 DB에 표시용으로만 둔다.</p>
+</details>
+
+<p><strong>5.</strong> 다운로드 응답에 <code>filename=&quot;___________.png&quot;; filename*=UTF-8&#39;&#39;%EC%82%B0…</code>가 같이 있다. 왜 둘인가? curl <code>-OJ</code>는 어느 쪽으로 저장했나?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>filename*</code>가 UTF-8 진짜 이름, <code>filename</code>은 <code>filename*</code>를 모르는 프로그램을 위한 ASCII 대체 이름이다. 둘 다 있으면 <code>filename*</code>를 아는 쪽은 그걸 쓴다. 이 실험에서 <strong>curl은 <code>filename</code></strong>(밑줄 이름)으로 저장했다. 한글 이름 확인은 브라우저로 한다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/P17-file-upload-storage.html">P17 파일 업로드·다운로드와 외부 스토리지</a> — 저장 이름과 표시 이름, 권한 확인, S3·presigned URL</li>
+<li><a href="./A2-http-anatomy.html">A2 HTTP 요청·응답 뜯어보기</a> — <code>Content-Type</code>과 본문 형식</li>
+<li><a href="./F1-validation-errors.html">F1 검증과 에러 응답</a> — 413·415도 같은 에러 모양으로 맞추기</li>
+<li>Spring Framework — Multipart: <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/multipart-forms.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/multipart-forms.html</a></li>
+<li>Spring Boot 4.1.1 API — <code>MultipartProperties</code>(기본 1MB·10MB): <a href="https://docs.spring.io/spring-boot/api/java/org/springframework/boot/servlet/autoconfigure/MultipartProperties.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/api/java/org/springframework/boot/servlet/autoconfigure/MultipartProperties.html</a></li>
+<li>Spring Framework 7 API — <code>MaxUploadSizeExceededException</code>: <a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/multipart/MaxUploadSizeExceededException.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/multipart/MaxUploadSizeExceededException.html</a></li>
+<li>Spring Framework 7 API — <code>ContentDisposition</code>: <a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/http/ContentDisposition.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/http/ContentDisposition.html</a></li>
+<li>OWASP File Upload Cheat Sheet — 이름은 서버가 짓기, 웹 루트 밖 저장, 서명 검사의 한계: <a href="https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html" target="_blank" rel="noopener">https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html</a></li>
+<li>RFC 6266(<code>Content-Disposition</code>) · RFC 8187(<code>filename*</code> 인코딩): <a href="https://datatracker.ietf.org/doc/html/rfc6266" target="_blank" rel="noopener">https://datatracker.ietf.org/doc/html/rfc6266</a> · <a href="https://www.rfc-editor.org/rfc/rfc8187.html" target="_blank" rel="noopener">https://www.rfc-editor.org/rfc/rfc8187.html</a></li>
+</ul>
+<p>서명 8바이트가 맞아도 &quot;안전한 이미지&quot;라는 뜻은 아니다. 실서비스는 이미지 라이브러리로 열어 보기, 다시 인코딩하기, 악성코드 검사를 겹친다(OWASP). 그리고 UUID 이름을 안다고 아무나 받게 두면 안 된다. 비공개 파일은 받을 때마다 권한을 확인한다.</p>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li>실습: <a href="../scenario/ch11-post-advanced/11-2-image-upload.html">11-2. 글에 이미지 첨부</a> — 오늘 만든 올리기·받기를 <code>post_image</code> 테이블과 엮는다. GIF·WebP 서명도 받고, 1MB 초과는 413, 서버가 지은 이름 모양이 아니면 404다.</li>
+<li>CSV 파일로 내려주기는 <a href="./H9-csv-and-time.html">H9. CSV 내려받기와 시간 다루기</a>에서 같은 <code>Content-Disposition</code>을 다시 쓴다.</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

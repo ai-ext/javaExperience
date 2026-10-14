@@ -9,8 +9,8 @@
 <body>
 <header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
 <main>
-<p class="crumbs"><a href="../README.html">시나리오</a> › 7장. 테스트로 지키기 › 7-2</p>
-<h1 id="7-2-서비스-단위-테스트--mock과-spy"><a class="anchor" href="#7-2-서비스-단위-테스트--mock과-spy" aria-hidden="true">#</a>7-2. 서비스 단위 테스트 — mock과 spy</h1>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 7장. 테스트로 지키기 › 7-2</p><p class="level-tags"><span>중급</span><span>게시판 본편</span><span>DB community</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="7-2-서비스-단위-테스트--mock과-spy"><a class="anchor" href="#7-2-서비스-단위-테스트--mock과-spy" aria-hidden="true">#</a>7-2. 서비스 단위 테스트 — mock과 spy</h1>
 <h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
 <p>업무 규칙은 서비스에 모여 있다. &quot;내 글엔 좋아요 금지&quot;, &quot;이미 좋아요면 아무것도 안 함&quot;, &quot;볼 수 없는 글은 404&quot; 같은 것들이다. 이 규칙들을 <strong>Spring도 DB도 없이</strong> 순수 자바 단위 테스트로 빠르게 고정한다.</p>
 <p>이때 협력 객체를 다루는 두 방법을 구분해 쓴다.</p>
@@ -18,7 +18,13 @@
 <li><strong>mock</strong>: 전부 가짜. 리포지토리처럼 &quot;이번 테스트에서 이런 값을 돌려줘&quot;만 정한다.</li>
 <li><strong>spy</strong>: 실물을 감싼다. 진짜 로직은 그대로 돌리면서 &quot;몇 번, 무엇으로 불렸나&quot;를 확인한다.</li>
 </ul>
-<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>서비스 단위 테스트</h3><p>Spring도 DB도 없이 서비스 규칙만 순수 자바로 시험한다. 리포지토리는 mock, 규칙 클래스는 spy.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>IntelliJ — LikeServiceTest</strong><span></span></div><div class="screen-widget screen-code"><strong>실행</strong><span>./gradlew test --tests org.example.like.LikeServiceTest</span></div><div class="screen-widget screen-code"><strong>결과</strong><span>LikeServiceTest &gt; 내 글에 좋아요하면 예외, 저장 없음() PASSED
+LikeServiceTest &gt; 새 좋아요는 저장 1번·숫자 +1() PASSED
+LikeServiceTest &gt; 이미 좋아요면 아무것도 안 함() PASSED
+LikeServiceTest &gt; 안 누른 글 취소는 아무것도 안 함() PASSED
+LikeServiceTest &gt; 볼 수 없는 글은 실제 규칙(spy)으로 404() PASSED</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>이 테스트가 지키는 요청 — 내 글에 좋아요</summary><ol><li><span class="flow-kind">사용자</span><p>테스트를 실행한다</p></li><li><span class="flow-kind">HTTP 요청</span><p>PUT /api/posts/12/like</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-kimjava</dd></dl></li><li><span class="flow-kind">서버</span><p>테스트에서는 HTTP 없이 likeService.like(12, me)를 직접 부른다. postRepository는 @Mock — '12번 글의 작성자는 me'를 돌려주게 정한다</p></li><li><span class="flow-kind">서버</span><p>예외가 났는지 + verify(postLikeRepository, never()).insertIgnore(anyLong(), anyLong()) — INSERT 시도도 없었는지 본다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>400</dd></dl></li><li><span class="flow-kind">화면</span><p>실제 요청이었다면 400 — 테스트는 1초 안에 끝난다</p></li></ol></details><details class="scenario-flow"><summary>볼 수 없는 글 — spy</summary><ol><li><span class="flow-kind">사용자</span><p>spy 테스트</p></li><li><span class="flow-kind">HTTP 요청</span><p>PUT /api/posts/7/like</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-kimjava</dd></dl></li><li><span class="flow-kind">서버</span><p>PostAccessPolicy를 spy로 감싸 진짜 규칙대로 판정하게 하고, verify(policy).canView(...)로 한 번 불렸는지 확인한다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>404</dd></dl></li><li><span class="flow-kind">화면</span><p>통과</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
 <p>테스트 클래스 <strong><code>LikeServiceTest</code></strong> (이름 그대로) — 4장의 좋아요 서비스를 대상으로</p>
 <div class="table-wrap"><table>
 <thead>
@@ -36,17 +42,17 @@
 <tr>
 <td>2</td>
 <td>아직 안 누른 글에 좋아요</td>
-<td>좋아요 저장 1번, 숫자 증가 1번. 저장된 <code>PostLike</code>의 글·회원을 <code>ArgumentCaptor</code>로 꺼내 확인</td>
+<td><code>insertIgnore</code>가 1행을 반환하고 숫자 증가 1번. 전달한 글·회원 ID를 <code>ArgumentCaptor</code>로 꺼내 확인</td>
 </tr>
 <tr>
 <td>3</td>
 <td>이미 누른 글에 또 좋아요</td>
-<td>저장도 증가도 <strong>없다</strong>(멱등)</td>
+<td><code>INSERT IGNORE</code>는 0행을 반환하고 좋아요 숫자 증가는 <strong>없다</strong>(멱등)</td>
 </tr>
 <tr>
 <td>4</td>
 <td>안 누른 글에 취소</td>
-<td>삭제도 감소도 <strong>없다</strong></td>
+<td>DELETE는 0행을 반환하고 좋아요 숫자 감소는 <strong>없다</strong></td>
 </tr>
 <tr>
 <td>5</td>
@@ -54,13 +60,210 @@
 <td>&quot;볼 수 있나&quot; 규칙(2-3의 규칙 클래스 등)을 <strong>spy</strong>로 감싸 실제 판정을 쓰게 하고, 한 번 호출됐는지와 결과(404 예외)를 확인한다</td>
 </tr>
 </tbody></table></div>
+<p>4-2에서 <code>INSERT IGNORE</code>로 바꿨으므로 <code>PostLike</code> 엔티티 저장은 없다. 2번에서는 insert 메서드에 넘어간 글·회원 ID를 캡처하고, 3번에서는 insert가 0행을 돌려주면 숫자 증가가 <strong>없다</strong>는 것을 확인한다.</p>
 <ul>
 <li><code>@ExtendWith(MockitoExtension.class)</code> — Spring 컨텍스트를 띄우지 않는다.</li>
 <li>리포지토리는 <code>@Mock</code>, 테스트 대상 서비스는 생성자로 직접 만들거나 <code>@InjectMocks</code>.</li>
 <li>시간이 필요하면 <code>Clock.fixed(...)</code>를 넣는다.</li>
 </ul>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 <strong>만들 것</strong>의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</p>
+<p>이 단계의 처리 흐름:</p>
+<ul>
+<li>테스트에서는 HTTP 없이 likeService.like(12, me)를 직접 부른다. postRepository는 @Mock — &#39;12번 글의 작성자는 me&#39;를 돌려주게 정한다</li>
+<li>예외가 났는지 + verify(postLikeRepository, never()).insertIgnore(anyLong(), anyLong()) — INSERT 시도도 없었는지 본다</li>
+<li>PostAccessPolicy를 spy로 감싸 진짜 규칙대로 판정하게 하고, verify(policy).canView(...)로 한 번 불렸는지 확인한다</li>
+</ul>
+<details>
+<summary>테스트 — 계약 확인</summary>
+
+<p><code>LikeServiceTest.java</code>에서 Spring 컨텍스트 없이 Mockito가 리포지토리를 만들고, 서비스는 생성자로 직접 만든다. <code>@Spy</code>를 모든 테스트에 넣지 않는다. 다섯 번째 테스트에서만 실제 <code>PostAccessPolicy</code>를 <code>spy(...)</code>로 감싼다.</p>
+<pre><code class="language-java">@ExtendWith(MockitoExtension.class)
+class LikeServiceTest {
+    @Mock PostRepository postRepository;
+    @Mock PostLikeRepository postLikeRepository;
+    @Mock PostAccessPolicy accessPolicy;
+    @Mock PlatformTransactionManager transactionManager;
+
+    LikeService likeService;
+
+    @BeforeEach
+    void setUp() {
+        likeService = new LikeService(postRepository, postLikeRepository,
+                accessPolicy, transactionManager);
+    }
+}</code></pre>
+<p>4-2의 실제 저장은 <code>INSERT IGNORE</code>다. 성공 시 넘어간 두 ID와 숫자 증가를 확인하고, 이미 있으면 0행·숫자 증가 없음으로 검증한다.</p>
+<pre><code class="language-java">given(postLikeRepository.insertIgnore(POST_ID, KIMJAVA.id())).willReturn(1);
+LikeResponse response = likeService.like(POST_ID, KIMJAVA);
+ArgumentCaptor&lt;Long&gt; postId = ArgumentCaptor.forClass(Long.class);
+ArgumentCaptor&lt;Long&gt; memberId = ArgumentCaptor.forClass(Long.class);
+verify(postLikeRepository).insertIgnore(postId.capture(), memberId.capture());
+assertThat(postId.getValue()).isEqualTo(POST_ID);
+assertThat(memberId.getValue()).isEqualTo(KIMJAVA.id());
+verify(postRepository).incrementLikeCount(POST_ID);</code></pre>
+<p>이 코드는 각 테스트의 사전 설정을 생략한 핵심 부분이다. 예외·멱등·취소·spy 설정까지 실행 가능한 전문은 아래 <strong>테스트</strong> 코드 접기에서 확인한다.</p>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>테스트 — src/test/java/org/example/like/LikeServiceTest.java</summary><pre><code>package org.example.like;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.member.Member;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.example.social.BlockPolicy;
+import org.example.social.FollowRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;</p>
+<p>import java.util.Optional;</p>
+<p>import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;</p>
+<p>// 7-2: 좋아요 규칙을 Spring·DB 없이 순수 단위 테스트로 고정한다(MockitoExtension — strict stubs).
+// 리포지토리·&quot;볼 수 있나&quot; 정책은 mock, 5번만 정책을 spy로 감싸 실제 판정을 돌린다.
+//
+// 참고(설계 피드백): 4-2에서 좋아요 저장을 save(PostLike)가 아니라 INSERT IGNORE(insertIgnore)로 바꿨기
+// 때문에 &quot;저장된 PostLike&quot;라는 객체가 없다 — 2번은 insertIgnore에 넘어간 (글 id, 회원 id)를 캡처하고,
+// 3번 &quot;저장 없음&quot;은 &quot;insert 시도는 하되 0행이라 숫자를 올리지 않음&quot;으로 확인한다.
+// TransactionTemplate은 mock PlatformTransactionManager로 돌린다(getTransaction/commit이 아무것도 안 함).
+@ExtendWith(MockitoExtension.class)
+class LikeServiceTest {</p>
+<pre><code>private static final Long POST_ID = 3L;
+private static final AuthenticatedMember KIMJAVA = new AuthenticatedMember(2L, &amp;quot;김자바&amp;quot;, &amp;quot;USER&amp;quot;);
+
+@Mock
+PostRepository postRepository;
+
+@Mock
+PostLikeRepository postLikeRepository;
+
+@Mock
+PostAccessPolicy accessPolicy;
+
+@Mock
+PlatformTransactionManager transactionManager;
+
+LikeService likeService;
+
+@BeforeEach
+void setUp() {
+    likeService = new LikeService(postRepository, postLikeRepository, accessPolicy, transactionManager);
+}
+
+@Test
+void 내_글에_좋아요하면_예외이고_저장도_증가도_하지_않는다() {
+    Post myPost = publishedPostBy(KIMJAVA.id());
+    given(postRepository.findById(POST_ID)).willReturn(Optional.of(myPost));
+    given(accessPolicy.canView(KIMJAVA, myPost)).willReturn(true);
+
+    assertThatThrownBy(() -&amp;gt; likeService.like(POST_ID, KIMJAVA))
+            .isInstanceOf(SelfLikeNotAllowedException.class);
+
+    verify(postLikeRepository, never()).insertIgnore(anyLong(), anyLong());
+    verify(postRepository, never()).incrementLikeCount(anyLong());
+}
+
+@Test
+void 안_누른_글에_좋아요하면_한_번_저장하고_숫자를_한_번_올린다() {
+    Post post = publishedPostBy(4L);
+    given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
+    given(accessPolicy.canView(KIMJAVA, post)).willReturn(true);
+    given(postLikeRepository.insertIgnore(POST_ID, KIMJAVA.id())).willReturn(1);
+    given(postRepository.findLikeCountById(POST_ID)).willReturn(1);
+
+    LikeResponse response = likeService.like(POST_ID, KIMJAVA);
+
+    ArgumentCaptor&amp;lt;Long&amp;gt; postId = ArgumentCaptor.forClass(Long.class);
+    ArgumentCaptor&amp;lt;Long&amp;gt; memberId = ArgumentCaptor.forClass(Long.class);
+    verify(postLikeRepository, times(1)).insertIgnore(postId.capture(), memberId.capture());
+    assertThat(postId.getValue()).isEqualTo(POST_ID);
+    assertThat(memberId.getValue()).isEqualTo(KIMJAVA.id());
+    verify(postRepository, times(1)).incrementLikeCount(POST_ID);
+    assertThat(response).isEqualTo(new LikeResponse(POST_ID, true, 1));
+}
+
+@Test
+void 이미_누른_글에_또_좋아요하면_숫자를_올리지_않는다() {
+    Post post = publishedPostBy(4L);
+    given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
+    given(accessPolicy.canView(KIMJAVA, post)).willReturn(true);
+    given(postLikeRepository.insertIgnore(POST_ID, KIMJAVA.id())).willReturn(0); // UNIQUE 때문에 0행
+    given(postRepository.findLikeCountById(POST_ID)).willReturn(1);
+
+    LikeResponse response = likeService.like(POST_ID, KIMJAVA);
+
+    verify(postRepository, never()).incrementLikeCount(anyLong());
+    assertThat(response).isEqualTo(new LikeResponse(POST_ID, true, 1));
+}
+
+@Test
+void 안_누른_글에_취소하면_숫자를_내리지_않는다() {
+    Post post = mock(Post.class);
+    given(post.getStatus()).willReturn(&amp;quot;PUBLISHED&amp;quot;);
+    given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
+    given(accessPolicy.canView(KIMJAVA, post)).willReturn(true);
+    given(postLikeRepository.deleteByPost_IdAndMember_Id(POST_ID, KIMJAVA.id())).willReturn(0L);
+    given(postRepository.findLikeCountById(POST_ID)).willReturn(0);
+
+    LikeResponse response = likeService.unlike(POST_ID, KIMJAVA);
+
+    verify(postRepository, never()).decrementLikeCount(anyLong());
+    assertThat(response).isEqualTo(new LikeResponse(POST_ID, false, 0));
+}
+
+// spy를 쓰는 이유: &amp;quot;볼 수 있나&amp;quot;는 결과를 지어내지(mock) 않고 2-3의 실제 규칙으로 판정하게 하면서,
+// 서비스가 그 규칙을 정말 한 번 물어봤는지도 확인하고 싶어서다.
+@Test
+void 볼_수_없는_글이면_실제_규칙으로_판정해_404이고_저장하지_않는다() {
+    PostAccessPolicy realPolicy = spy(new PostAccessPolicy(mock(FollowRepository.class), mock(BlockPolicy.class)));
+    LikeService service = new LikeService(postRepository, postLikeRepository, realPolicy, transactionManager);
+
+    Post othersDraft = mock(Post.class); // 남(99번)의 임시저장 글 — 작성자만 볼 수 있다
+    Member author = mock(Member.class);
+    given(author.getId()).willReturn(99L);
+    given(othersDraft.getAuthor()).willReturn(author);
+    given(othersDraft.getStatus()).willReturn(&amp;quot;DRAFT&amp;quot;);
+    given(postRepository.findById(POST_ID)).willReturn(Optional.of(othersDraft));
+
+    assertThatThrownBy(() -&amp;gt; service.like(POST_ID, KIMJAVA))
+            .isInstanceOf(PostNotFoundException.class);
+
+    verify(realPolicy, times(1)).canView(KIMJAVA, othersDraft);
+    verify(postLikeRepository, never()).insertIgnore(anyLong(), anyLong());
+}
+
+private Post publishedPostBy(Long authorId) {
+    Member author = mock(Member.class);
+    given(author.getId()).willReturn(authorId);
+    Post post = mock(Post.class);
+    given(post.getAuthor()).willReturn(author);
+    given(post.getStatus()).willReturn(&amp;quot;PUBLISHED&amp;quot;);
+    return post;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/7-2.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
 <h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
-<pre><code class="language-bash">./gradlew test --tests '*LikeServiceTest'</code></pre>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>./gradlew test --tests org.example.like.LikeServiceTest</code></pre></details>
 <h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
 <p>T = 테스트 실행(필수), R = 코드 리뷰(피드백용).</p>
 <div class="table-wrap"><table>
@@ -73,7 +276,7 @@
 </thead>
 <tbody><tr>
 <td>T1</td>
-<td><code>./gradlew test --tests &#39;*LikeServiceTest&#39;</code></td>
+<td><code>./gradlew test --tests org.example.like.LikeServiceTest</code></td>
 <td>통과, 테스트 5개 이상</td>
 </tr>
 <tr>
@@ -119,7 +322,7 @@
 <details>
 <summary>힌트 — spy 만들기</summary>
 
-<p><code>PostAccessPolicy policy = spy(new PostAccessPolicy(followRepository, blockRepository));</code>처럼 실물을 만든 뒤 감싼다(그 안의 리포지토리는 mock). 그러면 <code>policy.canView(...)</code>는 진짜 규칙대로 판정하고, 테스트 끝에 <code>verify(policy).canView(viewer, post)</code>로 호출을 확인할 수 있다. spy의 메서드를 바꾸고 싶으면 <code>doReturn(...).when(policy).canView(...)</code> 형태를 쓴다(<code>when(policy.canView(...))</code>는 진짜 메서드를 한 번 실행한다).</p>
+<p><code>PostAccessPolicy policy = spy(new PostAccessPolicy(followRepository, blockPolicy));</code>처럼 실물을 만든 뒤 감싼다(그 안의 협력 객체는 mock). 그러면 <code>policy.canView(...)</code>는 진짜 규칙대로 판정하고, 테스트 끝에 <code>verify(policy).canView(viewer, post)</code>로 호출을 확인할 수 있다. spy의 메서드를 바꾸고 싶으면 <code>doReturn(...).when(policy).canView(...)</code> 형태를 쓴다(<code>when(policy.canView(...))</code>는 진짜 메서드를 한 번 실행한다).</p>
 </details>
 
 <h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
@@ -127,47 +330,46 @@
 
 <section class="grader" id="result-test">
   <h2>결과 테스트 프롬프트</h2>
-  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
   <div class="grader-inputs">
-    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
-    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
   </div>
   <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
   <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
-  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 7-2. 서비스 단위 테스트 — mock과 spy\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch7-tests/7-2-service-unit.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 7-2. 서비스 단위 테스트 — mock과 spy\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch7-tests/7-2-service-unit.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
 </section>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
   const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
   const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
                   set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
   $('repo').value = store.get('jx.repo');
-  $('base').value = store.get('jx.base');
   function fill() {
     const repo = $('repo').value.trim();
-    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
     $('prompt').value = tpl
-      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
       .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
       .replaceAll('{{BASE}}', base);
     store.set('jx.repo', repo);
-    store.set('jx.base', $('base').value.trim());
   }
   $('repo').addEventListener('input', fill);
-  $('base').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
   fill();
   $('copy').addEventListener('click', async () => {
     const text = $('prompt').value;
     let ok = false;
     try { await navigator.clipboard.writeText(text); ok = true; } catch {}
     if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
-    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
   });
 })();
 </script>
 <nav class="pager"><a href="7-1-controller-slice.html">← 이전 7-1. 컨트롤러 슬라이스 테스트</a><a href="7-3-integration.html">다음 → 7-3. 통합 테스트 — Testcontainers</a></nav>
 </main>
 
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
 </body>
 </html>

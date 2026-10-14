@@ -1,0 +1,31 @@
+package org.example.poll;
+
+import jakarta.validation.constraints.NotNull;
+import org.example.post.InvalidParametersException;
+import tools.jackson.databind.JsonNode;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+// 정수 JSON만 받는다. "1"이나 1.2를 Long으로 자동 변환하지 않는다.
+public record VoteRequest(@NotNull(message = "선택지를 골라 주세요.") Long optionId) {
+    public static Parsed parse(JsonNode body) {
+        if (body == null || !body.isObject()) {
+            throw new InvalidParametersException(Map.of("body", "JSON 객체가 필요합니다."));
+        }
+        Map<String, String> errors = new LinkedHashMap<>();
+        JsonNode value = body.get("optionId");
+        Long optionId = null;
+        if (value != null && !value.isNull()) {
+            if (!value.isIntegralNumber() || !value.canConvertToLong()) {
+                errors.put("optionId", "optionId는 정수여야 합니다.");
+            } else {
+                optionId = value.longValue();
+            }
+        }
+        return new Parsed(new VoteRequest(optionId), Map.copyOf(errors));
+    }
+
+    public record Parsed(VoteRequest request, Map<String, String> errors) {
+    }
+}

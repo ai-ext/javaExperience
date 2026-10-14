@@ -1,0 +1,48 @@
+{
+  "id": "1-2",
+  "source": "MyBatis 대체 구현 — 1-2 단계의 게시판 조회·글 INSERT",
+  "files": [
+    {
+      "path": "build.gradle",
+      "status": "modified",
+      "content": "plugins {\n    id 'java'\n    // bootRun / bootJar 태스크 제공 + 실행 가능한 fat jar 패키징\n    id 'org.springframework.boot' version '4.1.1'\n    // Boot BOM을 적용해서 아래 의존성들의 버전을 생략할 수 있게 해줌\n    id 'io.spring.dependency-management' version '1.1.7'\n}\n\ngroup = 'org.example'\nversion = '1.0-SNAPSHOT'\n\njava {\n    toolchain {\n        // 컴파일·실행 JDK를 고정 (Boot 4는 Java 17 이상 필요, 로컬에 설치된 21 사용)\n        languageVersion = JavaLanguageVersion.of(21)\n    }\n}\n\nrepositories {\n    mavenCentral()\n}\n\ndependencies {\n    compileOnly 'org.projectlombok:lombok'\n    annotationProcessor 'org.projectlombok:lombok'\n    // Spring MVC + 내장 Tomcat + Jackson (Boot 4부터 starter-web → starter-webmvc로 이름 변경)\n    implementation 'org.springframework.boot:spring-boot-starter-webmvc'\n    // JPA(Hibernate) + HikariCP 커넥션 풀\n    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'\n    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'\n    // @Valid, @NotBlank 같은 요청 값 검증\n    implementation 'org.springframework.boot:spring-boot-starter-validation'\n    // MySQL JDBC 드라이버 — 컴파일엔 필요 없고 실행할 때만 필요\n    runtimeOnly 'com.mysql:mysql-connector-j'\n\n    // 테스트: JUnit·AssertJ·Mockito·MockMvc 묶음 (버전은 Boot BOM이 관리하므로 junit-bom 따로 두지 않음)\n    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'\n    // @DataJpaTest(리포지토리만 띄우는 테스트)\n    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'\n    // 테스트용 일회용 MySQL 컨테이너 — application-test.yml의 jdbc:tc: URL이 쓴다\n    testImplementation 'org.testcontainers:testcontainers-mysql'\n    // Gradle이 JUnit Platform 테스트를 실행할 때 필요한 런처\n    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'\n}\n\ntasks.named('test') {\n    useJUnitPlatform()\n    // 테스트는 application-test.yml(Testcontainers MySQL)을 쓰게 한다\n    systemProperty 'spring.profiles.active', 'test'\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/resources/application.yml",
+      "status": "modified",
+      "content": "spring:\n  application:\n    name: javaExperience\n  datasource:\n    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다\n    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&serverTimezone=Asia/Seoul\n    username: community\n    password: community\n  jpa:\n    hibernate:\n      # 테이블은 docker/mysql/init/ 의 dump가 만든다. 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)\n      ddl-auto: validate\n    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)\n    open-in-view: false\n    properties:\n      hibernate:\n        format_sql: true\n\nlogging:\n  level:\n    # 실행되는 SQL과 바인딩 값 — 쿼리가 몇 번 나가는지(N+1) 볼 때 쓴다\n    org.hibernate.SQL: debug\n    org.hibernate.orm.jdbc.bind: trace\n\nmybatis:\n  mapper-locations: classpath:mapper/*.xml\n  configuration:\n    map-underscore-to-camel-case: true\n\n# 0-6 — 내가 정한 설정 값. 코드에서 @Value(\"${start.greeting}\")로 읽는다\nstart:\n  greeting: 반가워요, 백엔드!\n  max-items: 5\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/post/PostController.java",
+      "status": "modified",
+      "content": "package org.example.post;\n\nimport org.slf4j.Logger;\nimport org.slf4j.LoggerFactory;\nimport org.springframework.http.ResponseEntity;\nimport org.springframework.web.bind.annotation.PostMapping;\nimport org.springframework.web.bind.annotation.RequestBody;\nimport org.springframework.web.bind.annotation.RequestMapping;\nimport org.springframework.web.bind.annotation.RestController;\n\nimport java.net.URI;\nimport java.time.LocalDateTime;\n\n@RestController\n@RequestMapping(\"/api/posts\")\npublic class PostController {\n    private static final Logger log = LoggerFactory.getLogger(PostController.class);\n    private static final long FIXED_AUTHOR_ID = 2L;\n    private final PostCreationMapper mapper;\n\n    public PostController(PostCreationMapper mapper) {\n        this.mapper = mapper;\n    }\n\n    @PostMapping\n    public ResponseEntity<PostResponse> create(@RequestBody PostCreateRequest request) {\n        log.info(\"게시글 작성 요청 제목: {}\", request.title());\n        BoardWriteRow board = mapper.findBoardBySlug(request.boardSlug());\n        if (board == null) {\n            throw new IllegalArgumentException(\"게시판을 찾을 수 없습니다: \" + request.boardSlug());\n        }\n        PostInsert post = new PostInsert();\n        post.boardId = board.id;\n        post.authorId = FIXED_AUTHOR_ID;\n        post.title = request.title();\n        post.content = request.content();\n        post.visibility = request.visibility();\n        post.now = LocalDateTime.now();\n        mapper.insertPost(post);\n        PostResponse response = new PostResponse(post.id, board.slug, post.title, post.content,\n                post.visibility, post.now);\n        return ResponseEntity.created(URI.create(\"/api/posts/\" + post.id)).body(response);\n    }\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/post/BoardWriteRow.java",
+      "status": "added",
+      "content": "package org.example.post;\n\n// 게시판 식별자와 응답 slug만 읽는다.\npublic class BoardWriteRow {\n    public Long id;\n    public String slug;\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/post/PostInsert.java",
+      "status": "added",
+      "content": "package org.example.post;\n\nimport java.time.LocalDateTime;\n\n// MyBatis가 INSERT 후 생성 키를 id에 채운다.\npublic class PostInsert {\n    public Long id;\n    public Long boardId;\n    public Long authorId;\n    public String title;\n    public String content;\n    public String visibility;\n    public LocalDateTime now;\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/post/PostCreationMapper.java",
+      "status": "added",
+      "content": "package org.example.post;\n\nimport org.apache.ibatis.annotations.Mapper;\nimport org.apache.ibatis.annotations.Param;\n\n@Mapper\npublic interface PostCreationMapper {\n    BoardWriteRow findBoardBySlug(@Param(\"slug\") String slug);\n    int insertPost(PostInsert post);\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/resources/mapper/PostCreationMapper.xml",
+      "status": "added",
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<!DOCTYPE mapper PUBLIC \"-//mybatis.org//DTD Mapper 3.0//EN\" \"https://mybatis.org/dtd/mybatis-3-mapper.dtd\">\n<mapper namespace=\"org.example.post.PostCreationMapper\">\n    <select id=\"findBoardBySlug\" resultType=\"org.example.post.BoardWriteRow\">\n        SELECT id, slug FROM board WHERE slug = #{slug}\n    </select>\n    <insert id=\"insertPost\" parameterType=\"org.example.post.PostInsert\" useGeneratedKeys=\"true\" keyProperty=\"id\">\n        INSERT INTO post (board_id, author_id, title, content, visibility, created_at, updated_at)\n        VALUES (#{boardId}, #{authorId}, #{title}, #{content}, #{visibility}, #{now}, #{now})\n    </insert>\n</mapper>\n",
+      "diff": ""
+    }
+  ]
+}

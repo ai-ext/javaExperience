@@ -1,0 +1,40 @@
+package org.example.post;
+
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import java.util.concurrent.atomic.AtomicLong;
+
+// 커밋 직전에 시작한 GET이 옛 공개 글을 늦게 캐시에 넣어도 이전 세대 키에만 남도록 한다.
+@Component
+public class PopularCacheVersion {
+
+    private final AtomicLong generation = new AtomicLong();
+    private final CacheManager cacheManager;
+
+    public PopularCacheVersion(CacheManager cacheManager) {
+        this.cacheManager = cacheManager;
+    }
+
+    public long current() {
+        return generation.get();
+    }
+
+    public void invalidateAfterCommit() {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()
+                || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new IllegalStateException("인기글 캐시 무효화에는 활성 트랜잭션이 필요합니다.");
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                generation.incrementAndGet();
+                Cache cache = cacheManager.getCache(CacheConfig.POPULAR_POSTS);
+                if (cache != null) cache.clear();
+            }
+        });
+    }
+}

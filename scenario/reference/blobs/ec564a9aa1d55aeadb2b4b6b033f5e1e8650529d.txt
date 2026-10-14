@@ -1,0 +1,47 @@
+package org.example.batch;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
+public interface WeeklyRankingRepository extends JpaRepository<WeeklyRanking, Long> {
+
+    List<WeeklyRanking> findByWeekStartOrderByRankingAsc(LocalDate weekStart);
+
+    // 빈 주도 계산 완료를 기록한다. PK와 INSERT IGNORE가 동시 실행의 선행 게이트다.
+    @Modifying
+    @Query(nativeQuery = true, value = """
+            INSERT IGNORE INTO weekly_ranking_run (week_start, created_at)
+            VALUES (:weekStart, :now)
+            """)
+    int tryStart(@Param("weekStart") LocalDate weekStart, @Param("now") LocalDateTime now);
+
+    @Query(nativeQuery = true, value = """
+            SELECT COUNT(*) FROM weekly_ranking_run WHERE week_start = :weekStart
+            """)
+    long countRun(@Param("weekStart") LocalDate weekStart);
+
+    // 기간 [from, to) 안의 좋아요·댓글(삭제 제외)을 글마다 미리 집계해 붙인다 — 점수 = 좋아요×2 + 댓글×3.
+    // 8-2(×3 + ×1)와 점수식이 다르다(요구가 다르다). 동점은 최근에 발행된 글 → id 큰 순.
+    @Query(nativeQuery = true, value = """
+            SELECT p.id AS postId, p.title AS title,
+                   COALESCE(l.cnt, 0) AS likes, COALESCE(c.cnt, 0) AS comments,
+                   COALESCE(l.cnt, 0) * 2 + COALESCE(c.cnt, 0) * 3 AS score
+              FROM post p
+              LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM post_like
+                          WHERE created_at >= :from AND created_at < :to GROUP BY post_id) l ON l.post_id = p.id
+              LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM comment
+                          WHERE deleted_at IS NULL AND created_at >= :from AND created_at < :to GROUP BY post_id) c ON c.post_id = p.id
+             WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL
+               AND COALESCE(l.cnt, 0) * 2 + COALESCE(c.cnt, 0) * 3 > 0
+             ORDER BY score DESC, p.published_at DESC, p.id DESC
+             LIMIT :limit
+            """)
+    List<WeeklyScoreRow> aggregate(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to,
+                                   @Param("limit") int limit);
+}

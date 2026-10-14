@@ -1,0 +1,809 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10-2. 공통 응답 틀과 전역 예외 처리</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 10장. 명세서 프로젝트 — 게시판 API v1(/api/v1) › 10-2</p><p class="level-tags"><span>기초</span><span>별도 명세서 프로젝트</span><span>DB project</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="10-2-공통-응답-틀과-전역-예외-처리"><a class="anchor" href="#10-2-공통-응답-틀과-전역-예외-처리" aria-hidden="true">#</a>10-2. 공통 응답 틀과 전역 예외 처리</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p>프론트 개발자가 명세서의 &quot;공통 응답&quot;을 보고 부탁한다.</p>
+<blockquote>
+<p>&quot;응답이 성공이든 실패든 <code>status</code>·<code>message</code>·<code>data</code> 모양이 같으면 좋겠어요. fetch 래퍼 하나로 다 받게요. 실패면 <code>code</code>를 보고 화면을 바꿀 거고요.&quot;</p>
+</blockquote>
+<p>지금 서버는 성공하면 헬스 체크의 Map을 그대로 내보낸다. 실패하면 Spring 기본 에러 JSON(<code>timestamp</code>, <code>error</code>, <code>path</code>)이 나간다. 응답 모양이 두 가지인 셈이다. 이 단계에서는 <strong>모든 응답을 한 가지 틀로</strong> 맞춘다.</p>
+<ul>
+<li>성공: 컨트롤러가 <code>ApiResponse.ok(데이터)</code>로 감싸 돌려준다.</li>
+<li>실패: 예외를 던지기만 한다. 컨트롤러 밖의 <strong>전역 예외 처리기</strong>(<code>@RestControllerAdvice</code>) 한 곳이 실패를 공통 틀로 바꾼다. 컨트롤러마다 try/catch를 쓰지 않는다.</li>
+</ul>
+<p>아직 입력을 받는 API가 없다. 그래서 400 틀(검증·깨진 JSON)은 이 단계에서 처리기만 만들어 둔다. 실제 확인은 첫 입력 API인 회원 가입(10-3)에서 한다. 이 단계의 확인은 성공 틀, 없는 주소(404), 틀린 메서드(405)다.</p>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>프론트의 공통 fetch 래퍼</h3><p>모든 API 호출이 지나가는 함수. 응답 모양이 하나라 성공이면 data를, 실패면 code·message를 꺼낸다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>board-api 상태</strong><span>운영자</span></div><div class="screen-widget screen-code"><strong>api.ts</strong><span>const res = await fetch(url, init);
+const body = await res.json();   // 항상 {status, message, data, ...}
+if (body.code) throw new ApiError(body.code, body.message, body.errors);
+return body.data;</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>상태 보기 · 주소 오타</span></div><div class="screen-widget screen-stats"><strong>stats</strong><span>회원 · 글</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>요청한 주소가 없습니다. (NOT_FOUND)</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>성공 — 틀로 감싼 응답</summary><ol><li><span class="flow-kind">사용자</span><p>[상태 보기]를 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/v1/health</p></li><li><span class="flow-kind">서버</span><p>HealthController가 Map을 만들어 ApiResponse.ok(map)으로 감싼다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>{
+  &quot;status&quot;: 200,
+  &quot;message&quot;: &quot;OK&quot;,
+  &quot;data&quot;: { &quot;up&quot;: true, &quot;database&quot;: &quot;project&quot;, &quot;users&quot;: 3, ... }
+}</dd></dl></li><li><span class="flow-kind">화면</span><p>래퍼가 body.data만 꺼내 화면에 넘긴다</p></li></ol></details><details class="scenario-flow"><summary>실패 — 없는 주소</summary><ol><li><span class="flow-kind">사용자</span><p>(프론트 실수) 주소를 /api/v1/helth로 잘못 적었다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/v1/helth</p></li><li><span class="flow-kind">서버</span><p>맞는 컨트롤러가 없어 Spring이 NoResourceFoundException을 던진다 → GlobalExceptionHandler가 잡아 공통 틀로</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>404</dd><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>{
+  &quot;status&quot;: 404,
+  &quot;message&quot;: &quot;요청한 주소가 없습니다.&quot;,
+  &quot;code&quot;: &quot;NOT_FOUND&quot;,
+  &quot;errors&quot;: [],
+  &quot;data&quot;: null
+}</dd></dl></li><li><span class="flow-kind">화면</span><p>래퍼가 code를 보고 에러로 던지고, 화면은 message를 토스트로 띄운다</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>공통 응답</td>
+<td><code>ApiResponse&lt;T&gt;</code> — 성공 <code>{status, message, data}</code>, 실패 <code>{status, message, code, errors, data: null}</code></td>
+</tr>
+<tr>
+<td>실패 코드</td>
+<td><code>ErrorCode</code> — 명세서 상태 코드 표의 <code>code</code>와 HTTP 상태, 기본 문구</td>
+</tr>
+<tr>
+<td>서비스용 예외</td>
+<td><code>ApiException(ErrorCode, message)</code> — 서비스가 &quot;이 요청은 이 코드로 실패&quot;를 알릴 때 던진다</td>
+</tr>
+<tr>
+<td>전역 처리기</td>
+<td><code>@RestControllerAdvice</code> 클래스 하나. 아래 표의 예외를 공통 틀로 바꾼다</td>
+</tr>
+<tr>
+<td>헬스 체크</td>
+<td><code>GET /api/v1/health</code>의 응답을 <code>ApiResponse.ok(...)</code>로 감싼다</td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>예외(누가 던지나)</th>
+<th>응답</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ApiException</code>(우리 서비스)</td>
+<td>그 코드의 상태 + <code>code</code></td>
+</tr>
+<tr>
+<td><code>MethodArgumentNotValidException</code>(<code>@Valid</code> 실패)</td>
+<td>400 <code>VALIDATION_FAILED</code> + 필드별 <code>errors</code></td>
+</tr>
+<tr>
+<td><code>HttpMessageNotReadableException</code>(본문 JSON 깨짐)</td>
+<td>400 <code>BAD_JSON</code></td>
+</tr>
+<tr>
+<td><code>MethodArgumentTypeMismatchException</code>(<code>/posts/abc</code>처럼 타입이 틀린 경로·쿼리 값)</td>
+<td>400 <code>VALIDATION_FAILED</code></td>
+</tr>
+<tr>
+<td><code>MissingServletRequestParameterException</code>(필수 쿼리 없음)</td>
+<td>400 <code>VALIDATION_FAILED</code></td>
+</tr>
+<tr>
+<td><code>NoResourceFoundException</code>(없는 주소)</td>
+<td>404 <code>NOT_FOUND</code></td>
+</tr>
+<tr>
+<td><code>HttpRequestMethodNotSupportedException</code>(틀린 메서드)</td>
+<td>405 <code>METHOD_NOT_ALLOWED</code></td>
+</tr>
+<tr>
+<td>그 밖의 모든 <code>Exception</code></td>
+<td>500 <code>INTERNAL_ERROR</code> — 원인은 <strong>로그에만</strong>, 응답에는 내부 정보를 싣지 않는다</td>
+</tr>
+</tbody></table></div>
+<p>10-1 명세서의 상태 코드 표에도 405 <code>METHOD_NOT_ALLOWED</code>와 500 <code>INTERNAL_ERROR</code>가 있다. 이 단계의 전역 처리기가 두 경우를 그 표에 맞는 공통 응답으로 만든다.</p>
+<h2 id="따라-치기"><a class="anchor" href="#따라-치기" aria-hidden="true">#</a>따라 치기</h2>
+<p>모두 <code>org.example.board.common</code> 패키지에 둔다.</p>
+<h3 id="apiresponse"><a class="anchor" href="#apiresponse" aria-hidden="true">#</a>ApiResponse</h3>
+<p><code>src/main/java/org/example/board/common/ApiResponse.java</code></p>
+<pre><code class="language-java">package org.example.board.common;
+
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+// 모든 응답의 공통 틀 — 성공: {status, message, data} / 실패: {status, message, code, errors, data:null}
+public record ApiResponse&lt;T&gt;(
+        int status,
+        String message,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String code,
+        @JsonInclude(JsonInclude.Include.NON_NULL) List&lt;FieldErrorItem&gt; errors,
+        T data) {
+
+    // 필드 하나의 검증 실패 — {&quot;field&quot;: &quot;title&quot;, &quot;reason&quot;: &quot;제목은 5자 이상이어야 합니다.&quot;}
+    public record FieldErrorItem(String field, String reason) {
+    }
+
+    public static &lt;T&gt; ApiResponse&lt;T&gt; ok(T data) {
+        return new ApiResponse&lt;&gt;(200, &quot;OK&quot;, null, null, data);
+    }
+
+    public static &lt;T&gt; ApiResponse&lt;T&gt; created(T data) {
+        return new ApiResponse&lt;&gt;(201, &quot;Created&quot;, null, null, data);
+    }
+
+    public static ApiResponse&lt;Void&gt; fail(ErrorCode code, String message, List&lt;FieldErrorItem&gt; errors) {
+        return new ApiResponse&lt;&gt;(code.status().value(), message, code.name(), errors, null);
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>public record ApiResponse&lt;T&gt;(...)</code></td>
+<td><code>&lt;T&gt;</code>는 &quot;data 자리에 올 타입은 쓰는 쪽이 정한다&quot;는 뜻이다(제네릭, TS의 <code>ApiResponse&lt;T&gt;</code>와 같다). <code>ApiResponse&lt;UserResponse&gt;</code>처럼 쓴다. record는 <a href="../../lessons/B4-record-getter-immutable.html">B4</a></td>
+</tr>
+<tr>
+<td><code>@JsonInclude(JsonInclude.Include.NON_NULL) String code</code></td>
+<td>값이 <code>null</code>이면 JSON에서 <strong>키째 뺀다</strong>. 성공 응답에 <code>&quot;code&quot;: null</code>이 붙지 않게 한다</td>
+</tr>
+<tr>
+<td><code>T data</code>에는 <code>@JsonInclude</code>가 없음</td>
+<td>실패·삭제 응답에서 <code>&quot;data&quot;: null</code>을 <strong>보여야</strong> 해서 일부러 안 붙였다. 전역 설정으로 null을 모두 빼면 이 칸도 사라진다</td>
+</tr>
+<tr>
+<td><code>public record FieldErrorItem(...)</code></td>
+<td>record 안의 record. 바깥에서는 <code>ApiResponse.FieldErrorItem</code>으로 부른다</td>
+</tr>
+<tr>
+<td><code>public static &lt;T&gt; ApiResponse&lt;T&gt; ok(T data)</code></td>
+<td><code>new ApiResponse&lt;&gt;(200, &quot;OK&quot;, null, null, data)</code>를 매번 쓰지 않게 해 주는 정적 팩토리 메서드. <code>static</code>은 <a href="../../lessons/B3-static-and-inner-classes.html">B3</a></td>
+</tr>
+<tr>
+<td><code>fail(...)</code>의 <code>code.name()</code></td>
+<td>enum 상수의 이름 문자열(<code>&quot;NOT_FOUND&quot;</code>)</td>
+</tr>
+</tbody></table></div>
+<p><code>com.fasterxml.jackson.annotation.JsonInclude</code> — Boot 4는 Jackson 3(<code>tools.jackson.*</code>)을 쓰지만 <strong>애노테이션 패키지는 예전 이름 그대로</strong>다. IntelliJ 자동 import가 다른 것을 고르지 않게 확인한다.</p>
+<h3 id="errorcode"><a class="anchor" href="#errorcode" aria-hidden="true">#</a>ErrorCode</h3>
+<p><code>src/main/java/org/example/board/common/ErrorCode.java</code></p>
+<pre><code class="language-java">package org.example.board.common;
+
+import org.springframework.http.HttpStatus;
+
+// 명세서 1. 공통의 code 표 — 화면(프론트)이 문구 대신 이 값으로 분기한다
+public enum ErrorCode {
+    VALIDATION_FAILED(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;),
+    BAD_JSON(HttpStatus.BAD_REQUEST, &quot;요청 본문을 읽을 수 없습니다.&quot;),
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, &quot;인증이 필요합니다.&quot;),
+    FORBIDDEN(HttpStatus.FORBIDDEN, &quot;권한이 없습니다.&quot;),
+    NOT_FOUND(HttpStatus.NOT_FOUND, &quot;대상을 찾을 수 없습니다.&quot;),
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, &quot;지원하지 않는 메서드입니다.&quot;),
+    DUPLICATE(HttpStatus.CONFLICT, &quot;이미 존재합니다.&quot;),
+    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, &quot;서버 오류가 발생했습니다.&quot;);
+
+    private final HttpStatus status;
+    private final String defaultMessage;
+
+    ErrorCode(HttpStatus status, String defaultMessage) {
+        this.status = status;
+        this.defaultMessage = defaultMessage;
+    }
+
+    public HttpStatus status() {
+        return status;
+    }
+
+    public String defaultMessage() {
+        return defaultMessage;
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>public enum ErrorCode { VALIDATION_FAILED(HttpStatus.BAD_REQUEST, &quot;…&quot;), … }</code></td>
+<td>enum은 &quot;정해진 값만 있는 타입&quot;이다(TS의 union <code>&#39;A&#39; | &#39;B&#39;</code>에 가깝다). 상수마다 생성자 인자로 HTTP 상태와 기본 문구를 붙였다</td>
+</tr>
+<tr>
+<td><code>private final HttpStatus status;</code> + 생성자</td>
+<td>enum도 필드·생성자를 가질 수 있다. 생성자는 상수를 만들 때만 불린다</td>
+</tr>
+</tbody></table></div>
+<h3 id="apiexception"><a class="anchor" href="#apiexception" aria-hidden="true">#</a>ApiException</h3>
+<p><code>src/main/java/org/example/board/common/ApiException.java</code></p>
+<pre><code class="language-java">package org.example.board.common;
+
+// 서비스가 &quot;이 요청은 이 코드로 실패&quot;를 알릴 때 던진다 — 전역 처리기가 공통 틀로 바꾼다
+public class ApiException extends RuntimeException {
+
+    private final ErrorCode code;
+
+    public ApiException(ErrorCode code) {
+        this(code, code.defaultMessage());
+    }
+
+    public ApiException(ErrorCode code, String message) {
+        super(message);
+        this.code = code;
+    }
+
+    public ErrorCode code() {
+        return code;
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>extends RuntimeException</code></td>
+<td>언체크 예외라 메서드마다 <code>throws</code>를 적지 않아도 된다. 예외 기초는 <a href="../../lessons/B7-exceptions.html">B7</a></td>
+</tr>
+<tr>
+<td><code>this(code, code.defaultMessage())</code></td>
+<td>같은 클래스의 다른 생성자를 부른다. 문구를 안 주면 기본 문구를 쓴다</td>
+</tr>
+<tr>
+<td><code>super(message)</code></td>
+<td>부모(<code>RuntimeException</code>)에 문구를 넘긴다. <code>getMessage()</code>로 꺼낸다</td>
+</tr>
+</tbody></table></div>
+<h3 id="globalexceptionhandler"><a class="anchor" href="#globalexceptionhandler" aria-hidden="true">#</a>GlobalExceptionHandler</h3>
+<p><code>src/main/java/org/example/board/common/GlobalExceptionHandler.java</code></p>
+<pre><code class="language-java">package org.example.board.common;
+
+import java.util.Comparator;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import org.example.board.common.ApiResponse.FieldErrorItem;
+
+// 컨트롤러 밖으로 나온 예외를 한곳에서 공통 응답 틀로 바꾼다
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    // 서비스가 던진 실패(401·403·404·409 …)
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; handleApi(ApiException e) {
+        return fail(e.code(), e.getMessage(), List.of());
+    }
+
+    // @Valid 검증 실패 — 필드별 이유를 errors에 담는다
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; handleInvalid(MethodArgumentNotValidException e) {
+        List&lt;FieldErrorItem&gt; errors = e.getBindingResult().getFieldErrors().stream()
+                .map(fe -&gt; new FieldErrorItem(fe.getField(), fe.getDefaultMessage()))
+                .sorted(Comparator.comparing(FieldErrorItem::field))
+                .toList();
+        return fail(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(), errors);
+    }
+
+    // 쿼리·경로 값의 타입이 틀림(?page=abc, /posts/abc)
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        return fail(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(),
+                List.of(new FieldErrorItem(e.getName(), &quot;형식이 올바르지 않습니다.&quot;)));
+    }
+
+    // 필수 쿼리 파라미터 없음
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; handleMissingParam(MissingServletRequestParameterException e) {
+        return fail(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(),
+                List.of(new FieldErrorItem(e.getParameterName(), &quot;필수 값입니다.&quot;)));
+    }
+
+    // 본문이 JSON이 아니거나 깨짐
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; handleBadJson(HttpMessageNotReadableException e) {
+        return fail(ErrorCode.BAD_JSON, ErrorCode.BAD_JSON.defaultMessage(), List.of());
+    }
+
+    // 없는 주소
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; handleNoResource(NoResourceFoundException e) {
+        return fail(ErrorCode.NOT_FOUND, &quot;요청한 주소가 없습니다.&quot;, List.of());
+    }
+
+    // 주소는 있는데 메서드가 다름(DELETE /api/v1/health)
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; handleMethod(HttpRequestMethodNotSupportedException e) {
+        return fail(ErrorCode.METHOD_NOT_ALLOWED, ErrorCode.METHOD_NOT_ALLOWED.defaultMessage(), List.of());
+    }
+
+    // 그 밖의 예상 못 한 예외 — 원인은 로그에만 남기고, 응답에는 내부 정보를 싣지 않는다
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; handleUnexpected(Exception e) {
+        log.error(&quot;처리하지 못한 예외&quot;, e);
+        return fail(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.defaultMessage(), List.of());
+    }
+
+    private ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; fail(ErrorCode code, String message, List&lt;FieldErrorItem&gt; errors) {
+        return ResponseEntity.status(code.status()).body(ApiResponse.fail(code, message, errors));
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@RestControllerAdvice</code></td>
+<td>모든 컨트롤러에 공통으로 붙는 &quot;조언&quot;이다. 컨트롤러 밖으로 나온 예외가 여기로 온다. 응답은 JSON</td>
+</tr>
+<tr>
+<td><code>@ExceptionHandler(ApiException.class)</code></td>
+<td>이 타입(과 자식 타입) 예외를 이 메서드가 처리한다. 더 구체적인 타입의 처리기가 먼저 고려된다 — <code>Exception.class</code> 처리기는 다른 처리기가 없는 예외만 받는다</td>
+</tr>
+<tr>
+<td><code>ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt;</code></td>
+<td>본문뿐 아니라 <strong>상태 코드</strong>까지 정해서 돌려주려고 <code>ResponseEntity</code>로 감쌌다. <code>Void</code>는 &quot;data 자리에 아무것도 없음&quot;</td>
+</tr>
+<tr>
+<td><code>e.getBindingResult().getFieldErrors()</code></td>
+<td><code>@Valid</code>가 실패한 필드 목록. <code>getField()</code>는 필드 이름, <code>getDefaultMessage()</code>는 애노테이션에 적은 <code>message</code></td>
+</tr>
+<tr>
+<td><code>.sorted(Comparator.comparing(FieldErrorItem::field))</code></td>
+<td>필드 순서가 실행마다 달라지지 않게 이름순으로 정렬한다. <code>FieldErrorItem::field</code>는 &quot;각 항목의 field()를 꺼내라&quot;는 메서드 참조(람다 줄임) — <a href="../../lessons/B6-collections-optional-lambda.html">B6</a></td>
+</tr>
+<tr>
+<td><code>log.error(&quot;처리하지 못한 예외&quot;, e)</code></td>
+<td>마지막 인자로 예외를 주면 스택트레이스가 로그에 남는다. 500은 반드시 로그로 원인을 남긴다</td>
+</tr>
+</tbody></table></div>
+<h3 id="healthcontroller--틀로-감싸기"><a class="anchor" href="#healthcontroller--틀로-감싸기" aria-hidden="true">#</a>HealthController — 틀로 감싸기</h3>
+<p><code>HealthController</code>의 두 줄만 바꾼다.</p>
+<pre><code class="language-java">    @GetMapping(&quot;/api/v1/health&quot;)
+    public ApiResponse&lt;Map&lt;String, Object&gt;&gt; health() {   // 반환 타입
+        // … 그대로 …
+        return ApiResponse.ok(body);                      // 감싸서 반환
+    }</code></pre>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 <strong>만들 것</strong>의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</p>
+<p>이 단계의 처리 흐름:</p>
+<ul>
+<li>HealthController가 Map을 만들어 ApiResponse.ok(map)으로 감싼다</li>
+<li>맞는 컨트롤러가 없어 Spring이 NoResourceFoundException을 던진다 → GlobalExceptionHandler가 잡아 공통 틀로</li>
+</ul>
+<details>
+<summary>Controller — HTTP 연결</summary>
+
+<p><code>HealthController.java</code>. 매핑과 메서드의 입력·응답을 위 <strong>만들 것</strong>의 HTTP 계약과 대조한다. 변경된 메서드: <code>health</code>.</p>
+<pre><code class="language-java">@GetMapping(&quot;/api/v1/health&quot;)
+public ApiResponse&lt;Map&lt;String, Object&gt;&gt; health() {
+    Map&lt;String, Object&gt; body = new LinkedHashMap&lt;&gt;();
+    body.put(&quot;up&quot;, true);
+    body.put(&quot;database&quot;, jdbcTemplate.queryForObject(&quot;SELECT DATABASE()&quot;, String.class));
+    // users·posts·comments·likes도 10-1과 같이 채운다
+    return ApiResponse.ok(body);
+}</code></pre>
+<p>헬스 체크의 DB 조회는 10-1과 같다. 바뀐 부분은 <code>Map</code>을 반환하기 전에 <code>ApiResponse.ok</code>으로 감싼 응답 계약이다.</p>
+</details>
+
+<details>
+<summary>DTO — 요청·응답 필드</summary>
+
+<p><code>ApiResponse.java</code>. 필드 이름·타입·검증·응답 형태를 위 <strong>만들 것</strong>과 대조한다. 변경된 메서드: <code>ok</code>, <code>created</code>, <code>fail</code>.</p>
+<pre><code class="language-java">public record ApiResponse&lt;T&gt;(int status, String message,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String code,
+        @JsonInclude(JsonInclude.Include.NON_NULL) List&lt;FieldErrorItem&gt; errors,
+        T data) {
+    public static &lt;T&gt; ApiResponse&lt;T&gt; ok(T data) {
+        return new ApiResponse&lt;&gt;(200, &quot;OK&quot;, null, null, data);
+    }
+}</code></pre>
+<p>성공의 <code>code</code>·<code>errors</code>는 JSON에서 빠지고, 실패의 <code>data: null</code>은 남는다. 전체 파일 접기에서 <code>created</code>와 <code>fail</code>도 이어서 확인한다.</p>
+</details>
+
+<details>
+<summary>예외 처리 — 실패 응답</summary>
+
+<p><code>ApiException.java</code>, <code>GlobalExceptionHandler.java</code>. 예외가 어떤 HTTP 상태와 오류 본문으로 바뀌는지 실패 계약과 대조한다. 변경된 메서드: <code>code</code>, <code>handleApi</code>, <code>handleInvalid</code>, <code>handleTypeMismatch</code>.</p>
+<pre><code class="language-java">@ExceptionHandler(NoResourceFoundException.class)
+public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; handleNoResource(NoResourceFoundException e) {
+    return fail(ErrorCode.NOT_FOUND, &quot;요청한 주소가 없습니다.&quot;, List.of());
+}
+
+@ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; handleMethod(HttpRequestMethodNotSupportedException e) {
+    return fail(ErrorCode.METHOD_NOT_ALLOWED,
+            ErrorCode.METHOD_NOT_ALLOWED.defaultMessage(), List.of());
+}</code></pre>
+<p>이 단계의 C2·C3는 위 두 경로를 확인한다. 검증·깨진 JSON·예상 밖 예외도 같은 처리기 안의 별도 메서드에서 공통 틀로 만든다.</p>
+</details>
+
+<details>
+<summary>설정·보조 코드</summary>
+
+<p><code>ErrorCode.java</code>. 이 파일에서 바뀐 설정·보조 타입이 서버 흐름의 어느 단계에 필요한지 확인한다. 변경된 메서드: <code>status</code>, <code>defaultMessage</code>.</p>
+<pre><code class="language-java">NOT_FOUND(HttpStatus.NOT_FOUND, &quot;대상을 찾을 수 없습니다.&quot;),
+METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, &quot;지원하지 않는 메서드입니다.&quot;);</code></pre>
+<p><code>ErrorCode</code>는 HTTP 상태·기본 문구를 한곳에 묶는다. 이 단계에는 새 DB Mapper가 없고, MyBatis는 10-7의 선택 목록 실습에서 도입한다.</p>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/common/ApiException.java</summary><pre><code>package org.example.board.common;
+
+<p>// 서비스가 &quot;이 요청은 이 코드로 실패&quot;를 알릴 때 던진다 — 전역 처리기가 공통 틀로 바꾼다
+public class ApiException extends RuntimeException {</p>
+<pre><code>private final ErrorCode code;
+
+public ApiException(ErrorCode code) {
+    this(code, code.defaultMessage());
+}
+
+public ApiException(ErrorCode code, String message) {
+    super(message);
+    this.code = code;
+}
+
+public ErrorCode code() {
+    return code;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/common/ApiResponse.java</summary><pre><code>package org.example.board.common;
+
+<p>import java.util.List;</p>
+<p>import com.fasterxml.jackson.annotation.JsonInclude;</p>
+<p>// 모든 응답의 공통 틀 — 성공: {status, message, data} / 실패: {status, message, code, errors, data:null}
+public record ApiResponse&lt;T&gt;(
+        int status,
+        String message,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String code,
+        @JsonInclude(JsonInclude.Include.NON_NULL) List&lt;FieldErrorItem&gt; errors,
+        T data) {</p>
+<pre><code>// 필드 하나의 검증 실패 — {&amp;quot;field&amp;quot;: &amp;quot;title&amp;quot;, &amp;quot;reason&amp;quot;: &amp;quot;제목은 5자 이상이어야 합니다.&amp;quot;}
+public record FieldErrorItem(String field, String reason) {
+}
+
+public static &amp;lt;T&amp;gt; ApiResponse&amp;lt;T&amp;gt; ok(T data) {
+    return new ApiResponse&amp;lt;&amp;gt;(200, &amp;quot;OK&amp;quot;, null, null, data);
+}
+
+public static &amp;lt;T&amp;gt; ApiResponse&amp;lt;T&amp;gt; created(T data) {
+    return new ApiResponse&amp;lt;&amp;gt;(201, &amp;quot;Created&amp;quot;, null, null, data);
+}
+
+public static ApiResponse&amp;lt;Void&amp;gt; fail(ErrorCode code, String message, List&amp;lt;FieldErrorItem&amp;gt; errors) {
+    return new ApiResponse&amp;lt;&amp;gt;(code.status().value(), message, code.name(), errors, null);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/common/ErrorCode.java</summary><pre><code>package org.example.board.common;
+
+<p>import org.springframework.http.HttpStatus;</p>
+<p>// 명세서 1. 공통의 code 표 — 화면(프론트)이 문구 대신 이 값으로 분기한다
+public enum ErrorCode {
+    VALIDATION_FAILED(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;),
+    BAD_JSON(HttpStatus.BAD_REQUEST, &quot;요청 본문을 읽을 수 없습니다.&quot;),
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, &quot;인증이 필요합니다.&quot;),
+    FORBIDDEN(HttpStatus.FORBIDDEN, &quot;권한이 없습니다.&quot;),
+    NOT_FOUND(HttpStatus.NOT_FOUND, &quot;대상을 찾을 수 없습니다.&quot;),
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, &quot;지원하지 않는 메서드입니다.&quot;),
+    DUPLICATE(HttpStatus.CONFLICT, &quot;이미 존재합니다.&quot;),
+    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, &quot;서버 오류가 발생했습니다.&quot;);</p>
+<pre><code>private final HttpStatus status;
+private final String defaultMessage;
+
+ErrorCode(HttpStatus status, String defaultMessage) {
+    this.status = status;
+    this.defaultMessage = defaultMessage;
+}
+
+public HttpStatus status() {
+    return status;
+}
+
+public String defaultMessage() {
+    return defaultMessage;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/common/GlobalExceptionHandler.java</summary><pre><code>package org.example.board.common;
+
+<p>import java.util.Comparator;
+import java.util.List;</p>
+<p>import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;</p>
+<p>import org.example.board.common.ApiResponse.FieldErrorItem;</p>
+<p>// 컨트롤러 밖으로 나온 예외를 한곳에서 공통 응답 틀로 바꾼다
+@RestControllerAdvice
+public class GlobalExceptionHandler {</p>
+<pre><code>private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+// 서비스가 던진 실패(401·403·404·409 …)
+@ExceptionHandler(ApiException.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleApi(ApiException e) {
+    return fail(e.code(), e.getMessage(), List.of());
+}
+
+// @Valid 검증 실패 — 필드별 이유를 errors에 담는다
+@ExceptionHandler(MethodArgumentNotValidException.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleInvalid(MethodArgumentNotValidException e) {
+    List&amp;lt;FieldErrorItem&amp;gt; errors = e.getBindingResult().getFieldErrors().stream()
+            .map(fe -&amp;gt; new FieldErrorItem(fe.getField(), fe.getDefaultMessage()))
+            .sorted(Comparator.comparing(FieldErrorItem::field))
+            .toList();
+    return fail(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(), errors);
+}
+
+// 쿼리·경로 값의 타입이 틀림(?page=abc, /posts/abc)
+@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+    return fail(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(),
+            List.of(new FieldErrorItem(e.getName(), &amp;quot;형식이 올바르지 않습니다.&amp;quot;)));
+}
+
+// 필수 쿼리 파라미터 없음
+@ExceptionHandler(MissingServletRequestParameterException.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleMissingParam(MissingServletRequestParameterException e) {
+    return fail(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(),
+            List.of(new FieldErrorItem(e.getParameterName(), &amp;quot;필수 값입니다.&amp;quot;)));
+}
+
+// 본문이 JSON이 아니거나 깨짐
+@ExceptionHandler(HttpMessageNotReadableException.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleBadJson(HttpMessageNotReadableException e) {
+    return fail(ErrorCode.BAD_JSON, ErrorCode.BAD_JSON.defaultMessage(), List.of());
+}
+
+// 없는 주소
+@ExceptionHandler(NoResourceFoundException.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleNoResource(NoResourceFoundException e) {
+    return fail(ErrorCode.NOT_FOUND, &amp;quot;요청한 주소가 없습니다.&amp;quot;, List.of());
+}
+
+// 주소는 있는데 메서드가 다름(DELETE /api/v1/health)
+@ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleMethod(HttpRequestMethodNotSupportedException e) {
+    return fail(ErrorCode.METHOD_NOT_ALLOWED, ErrorCode.METHOD_NOT_ALLOWED.defaultMessage(), List.of());
+}
+
+// 그 밖의 예상 못 한 예외 — 원인은 로그에만 남기고, 응답에는 내부 정보를 싣지 않는다
+@ExceptionHandler(Exception.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleUnexpected(Exception e) {
+    log.error(&amp;quot;처리하지 못한 예외&amp;quot;, e);
+    return fail(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.defaultMessage(), List.of());
+}
+
+private ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; fail(ErrorCode code, String message, List&amp;lt;FieldErrorItem&amp;gt; errors) {
+    return ResponseEntity.status(code.status()).body(ApiResponse.fail(code, message, errors));
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/board/common/HealthController.java</summary><pre><code>package org.example.board.common;
+
+<p>import java.util.LinkedHashMap;
+import java.util.Map;</p>
+<p>import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>// 서버가 떠 있고, project DB에 붙었고, Flyway V1이 시드를 넣었는지 한 번에 본다
+@RestController
+public class HealthController {</p>
+<pre><code>private final JdbcTemplate jdbcTemplate;
+
+public HealthController(JdbcTemplate jdbcTemplate) {
+    this.jdbcTemplate = jdbcTemplate;
+}
+
+@GetMapping(&amp;quot;/api/v1/health&amp;quot;)
+public ApiResponse&amp;lt;Map&amp;lt;String, Object&amp;gt;&amp;gt; health() {
+    Map&amp;lt;String, Object&amp;gt; body = new LinkedHashMap&amp;lt;&amp;gt;();
+    body.put(&amp;quot;up&amp;quot;, true);
+    body.put(&amp;quot;database&amp;quot;, jdbcTemplate.queryForObject(&amp;quot;SELECT DATABASE()&amp;quot;, String.class));
+    body.put(&amp;quot;users&amp;quot;, count(&amp;quot;users&amp;quot;));
+    body.put(&amp;quot;posts&amp;quot;, count(&amp;quot;posts&amp;quot;));
+    body.put(&amp;quot;comments&amp;quot;, count(&amp;quot;comments&amp;quot;));
+    body.put(&amp;quot;likes&amp;quot;, count(&amp;quot;post_likes&amp;quot;));
+    return ApiResponse.ok(body);
+}
+
+private long count(String table) {
+    return jdbcTemplate.queryForObject(&amp;quot;SELECT COUNT(*) FROM &amp;quot; + table, Long.class);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/10-2.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080
+
+# 요청 H — 성공 틀
+curl -i &quot;$BASE/api/v1/health&quot;
+
+# 요청 N — 없는 주소
+curl -i &quot;$BASE/api/v1/no-such-path&quot;
+
+# 요청 M — 틀린 메서드
+curl -i -X DELETE &quot;$BASE/api/v1/health&quot;</code></pre></details>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="H" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>H · 성공 틀</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/health" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.status&quot;,&quot;equals&quot;:200},{&quot;path&quot;:&quot;$.message&quot;,&quot;equals&quot;:&quot;OK&quot;},{&quot;path&quot;:&quot;$.data.up&quot;,&quot;equals&quot;:true},{&quot;path&quot;:&quot;$.data.database&quot;,&quot;equals&quot;:&quot;project&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;exists&quot;:false},{&quot;path&quot;:&quot;$.errors&quot;,&quot;exists&quot;:false}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="N" data-method="GET" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>N · 없는 주소</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/no-such-path" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:404,&quot;json&quot;:[{&quot;path&quot;:&quot;$.status&quot;,&quot;equals&quot;:404},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;NOT_FOUND&quot;},{&quot;path&quot;:&quot;$.message&quot;,&quot;type&quot;:&quot;string&quot;},{&quot;path&quot;:&quot;$.errors&quot;,&quot;equals&quot;:[]},{&quot;path&quot;:&quot;$.data&quot;,&quot;type&quot;:&quot;null&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="M" data-method="DELETE" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>M · 틀린 메서드</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/v1/health" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:405,&quot;json&quot;:[{&quot;path&quot;:&quot;$.status&quot;,&quot;equals&quot;:405},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;METHOD_NOT_ALLOWED&quot;},{&quot;path&quot;:&quot;$.errors&quot;,&quot;equals&quot;:[]},{&quot;path&quot;:&quot;$.data&quot;,&quot;type&quot;:&quot;null&quot;}]}</pre></dd></dl></details></article></div></section><p>10-1의 확인(C1)은 이제 실패한다. 응답이 틀로 감싸졌기 때문이고, 정상이다.</p>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 H</td>
+<td>상태 <code>200</code>, 본문 <code>status</code>=<code>200</code>, <code>message</code>=<code>OK</code>, <code>data.up</code>=<code>true</code>, <code>data.database</code>=<code>project</code>. 성공 응답에 <code>code</code>·<code>errors</code> 키가 <strong>없다</strong></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 N</td>
+<td>상태 <code>404</code>, 본문 <code>status</code>=<code>404</code>, <code>code</code>=<code>NOT_FOUND</code>, <code>message</code>는 문자열, <code>errors</code>=<code>[]</code>, <code>data</code>=<code>null</code></td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 M</td>
+<td>상태 <code>405</code>, 본문 <code>code</code>=<code>METHOD_NOT_ALLOWED</code>, <code>errors</code>=<code>[]</code>, <code>data</code>=<code>null</code></td>
+</tr>
+<tr>
+<td>R1</td>
+<td>처리 위치</td>
+<td>실패를 컨트롤러의 try/catch가 아니라 <code>@RestControllerAdvice</code> 한 곳에서 공통 틀로 바꾼다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>500</td>
+<td>예상 못 한 예외는 500 <code>INTERNAL_ERROR</code>로 답하고, 원인(스택트레이스)은 로그에만 남긴다. 응답에 예외 메시지·클래스 이름을 싣지 않는다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>400 준비</td>
+<td><code>@Valid</code> 실패(필드별 <code>errors</code>)와 깨진 JSON(<code>BAD_JSON</code>) 처리기가 있다 — 10-3에서 확인한다</td>
+</tr>
+</tbody></table></div>
+<h2 id="일부러-망가뜨리기"><a class="anchor" href="#일부러-망가뜨리기" aria-hidden="true">#</a>일부러 망가뜨리기</h2>
+<p>하나씩 바꾸고 다시 띄운 뒤 확인한다. 끝나면 되돌린다. 모두 Boot 4.1.1에서 재현한 결과다.</p>
+<h3 id="①-restcontrolleradvice를-지운다--spring-기본-에러-모양"><a class="anchor" href="#①-restcontrolleradvice를-지운다--spring-기본-에러-모양" aria-hidden="true">#</a>① <code>@RestControllerAdvice</code>를 지운다 → Spring 기본 에러 모양</h3>
+<p>없는 주소 <code>GET /api/v1/nothing-here</code>를 보낸다(요청 N과 같은 경우).</p>
+<pre><code class="language-text">{&quot;timestamp&quot;:&quot;2026-10-09T15:18:20.585Z&quot;,&quot;status&quot;:404,&quot;error&quot;:&quot;Not Found&quot;,&quot;path&quot;:&quot;/api/v1/nothing-here&quot;}</code></pre>
+<ul>
+<li>읽는 법: 처리기 클래스는 있지만 애노테이션이 없으면 Spring이 그 클래스를 모른다. 예외가 Spring Boot의 기본 에러 처리(<code>/error</code>)로 가서 다른 모양이 나간다. <code>code</code>가 없으니 프론트 래퍼가 실패를 알아보지 못한다.</li>
+<li>고치기: 클래스 위에 <code>@RestControllerAdvice</code>를 다시 붙인다.</li>
+</ul>
+<h3 id="②-noresourcefoundexception-처리기를-지운다--없는-주소가-500"><a class="anchor" href="#②-noresourcefoundexception-처리기를-지운다--없는-주소가-500" aria-hidden="true">#</a>② <code>NoResourceFoundException</code> 처리기를 지운다 → 없는 주소가 500</h3>
+<p><code>@ExceptionHandler(NoResourceFoundException.class)</code> 한 줄을 주석으로 막고 <code>GET /api/v1/nothing-here</code>를 보낸다.</p>
+<pre><code class="language-text">{&quot;status&quot;:500,&quot;message&quot;:&quot;서버 오류가 발생했습니다.&quot;,&quot;code&quot;:&quot;INTERNAL_ERROR&quot;,&quot;errors&quot;:[],&quot;data&quot;:null}</code></pre>
+<p>로그:</p>
+<pre><code class="language-text">ERROR ... o.e.board.common.GlobalExceptionHandler  : 처리하지 못한 예외
+
+org.springframework.web.servlet.resource.NoResourceFoundException: No static resource api/v1/nothing-here for request '/api/v1/nothing-here'.</code></pre>
+<ul>
+<li>읽는 법: Spring 6.1부터는 맞는 컨트롤러가 없을 때 &quot;정적 파일도 없다&quot;는 예외(<code>NoResourceFoundException</code>)를 던진다. 전용 처리기가 없으면 마지막 <code>Exception</code> 처리기가 받아서 500이 된다. 오타 주소 하나가 &quot;서버 오류&quot;로 둔갑한다.</li>
+<li>고치기: 처리기를 되돌린다. <strong><code>Exception</code> 전체를 잡는 처리기를 둘 때는, Spring이 원래 4xx로 답하던 예외를 빠뜨리지 않았는지</strong> 본다(405·400도 같은 이유로 처리기를 따로 두었다).</li>
+</ul>
+<h3 id="③-apiresponse의-jsoninclude를-지운다--성공에도-code-null"><a class="anchor" href="#③-apiresponse의-jsoninclude를-지운다--성공에도-code-null" aria-hidden="true">#</a>③ <code>ApiResponse</code>의 <code>@JsonInclude</code>를 지운다 → 성공에도 <code>code: null</code></h3>
+<p>요청 H를 보낸다.</p>
+<pre><code class="language-text">{&quot;status&quot;:200,&quot;message&quot;:&quot;OK&quot;,&quot;code&quot;:null,&quot;errors&quot;:null,&quot;data&quot;:{&quot;up&quot;:true,&quot;database&quot;:&quot;project&quot;,&quot;users&quot;:3,&quot;posts&quot;:25,&quot;comments&quot;:40,&quot;likes&quot;:30}}</code></pre>
+<p>에러는 아니지만 명세서의 성공 모양과 다르다. 프론트 래퍼가 <code>&quot;code&quot; in body</code>로 실패를 판단하면 성공도 실패로 오해한다. C1이 실패한다.</p>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../lessons/D1-json-jackson.html">D1 JSON과 Jackson</a> — 응답 객체가 JSON이 되는 규칙, null·날짜 처리</li>
+<li><a href="../../lessons/A5-rest-api-design.html">A5 REST API 설계와 명세서 읽기</a> — 공통 응답 틀과 ProblemDetail 비교</li>
+<li><a href="../../lessons/F1-validation-errors.html">F1 검증과 에러 응답이 왜 필요한가</a> — 400을 어떻게 알려 줄까</li>
+<li><a href="../../lessons/B7-exceptions.html">B7 예외</a> — <code>RuntimeException</code>, 체크·언체크</li>
+<li><a href="../../lessons/B3-static-and-inner-classes.html">B3 static과 안쪽 클래스</a> — 정적 팩토리 메서드, record 안의 record</li>
+<li><a href="../../docs/knowledge/W08-where-to-handle-exceptions.html">W08 예외는 어디서 처리하나</a></li>
+<li><a href="../../docs/knowledge/P16-json-jackson-practical.html">P16 JSON·Jackson</a> — <code>@JsonInclude</code>, null 처리</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 응답이 여전히 기본 에러 모양이다</summary>
+
+<p>처리기 클래스가 <code>org.example.board</code> 아래 패키지에 있는지 본다. <code>@SpringBootApplication</code>이 붙은 클래스의 패키지와 그 아래만 Spring이 찾는다. 애노테이션은 <code>@ControllerAdvice</code>가 아니라 <code>@RestControllerAdvice</code>(JSON 응답)다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 상태 코드는 200인데 본문 status가 404다</summary>
+
+<p>처리기 메서드가 <code>ApiResponse</code>를 그냥 반환하면 HTTP 상태는 기본값 200이다. <code>ResponseEntity.status(code.status()).body(...)</code>로 상태까지 정한다(또는 메서드에 <code>@ResponseStatus</code>).</p>
+</details>
+
+<details>
+<summary>힌트 3 — 헬스 체크가 data 안에 또 status를 갖는다</summary>
+
+<p><code>body.put(&quot;status&quot;, ...)</code> 같은 키를 Map에 넣지 않았는지 본다. 틀의 <code>status</code>와 헷갈린다. 헬스 정보는 <code>up</code>·<code>database</code>·숫자들만 둔다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="10-3-signup.html">10-3. 회원 가입</a> — 첫 입력 API. 비밀번호는 BCrypt 해시로 저장하고, 이메일이 겹치면 409, 입력이 틀리면 이 단계에서 만든 400 틀로 답한다.</p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 10-2. 공통 응답 틀과 전역 예외 처리\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch10-project/10-2-common-response.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity project -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="10-1-new-project.html">← 이전 10-1. 새 프로젝트 시작 — 명세서 읽기, project DB·Flyway, 헬스 체크</a><a href="10-3-signup.html">다음 → 10-3. 회원 가입 — BCrypt 해시와 이메일 중복 409</a></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+package org.example.post;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
+
+// 14-7 월별 아카이브 — 비로그인 가능. BoardPostController처럼 @Validated 없이 매개변수 제약을 건다(2-2)
+@RestController
+@RequestMapping("/api/boards/{slug}/archive")
+public class ArchiveController {
+
+    private final PostQueryService postQueryService;
+
+    public ArchiveController(PostQueryService postQueryService) {
+        this.postQueryService = postQueryService;
+    }
+
+    @GetMapping
+    public ArchiveResponse archive(@PathVariable String slug, @LoginMember AuthenticatedMember viewer) {
+        return postQueryService.archive(slug, viewer);
+    }
+
+    // 경로 값에도 @Min/@Max를 걸 수 있다 — 범위 밖이면 2-2의 page·size처럼 400
+    @GetMapping("/{year}/{month}")
+    public PostListResponse month(@PathVariable String slug,
+                                  @PathVariable @Min(2000) @Max(2100) int year,
+                                  @PathVariable @Min(1) @Max(12) int month,
+                                  @RequestParam(required = false) String page,
+                                  @RequestParam(required = false) String size,
+                                  @LoginMember AuthenticatedMember viewer) {
+        return postQueryService.month(slug, year, month,
+                parseNonNegative(page, "page", 0), parseRange(size, "size", 10, 1, 50), viewer);
+    }
+
+    private static int parseNonNegative(String raw, String name, int defaultValue) {
+        if (raw == null) return defaultValue;
+        if (raw.matches("[0-9]+")) {
+            try {
+                return Integer.parseInt(raw);
+            } catch (NumberFormatException ignored) {
+                // int 범위를 넘는 값도 아래에서 400으로 처리한다.
+            }
+        }
+        throw new InvalidParametersException(Map.of(name, "0 이상의 정수여야 합니다."));
+    }
+
+    private static int parseRange(String raw, String name, int defaultValue, int min, int max) {
+        if (raw == null) return defaultValue;
+        if (raw.matches("[0-9]+")) {
+            try {
+                int value = Integer.parseInt(raw);
+                if (value >= min && value <= max) return value;
+            } catch (NumberFormatException ignored) {
+                // int 범위를 넘는 값도 아래에서 400으로 처리한다.
+            }
+        }
+        throw new InvalidParametersException(Map.of(name, min + "~" + max + " 사이의 정수여야 합니다."));
+    }
+}

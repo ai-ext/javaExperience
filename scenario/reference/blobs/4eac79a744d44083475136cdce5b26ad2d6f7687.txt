@@ -1,0 +1,41 @@
+package org.example.revision;
+
+import java.util.ArrayList;
+import java.util.List;
+
+// 쉼표를 구분자로 쓰되 태그 이름 안의 쉼표·역슬래시는 이스케이프한다.
+public final class RevisionTagCodec {
+    private RevisionTagCodec() { }
+
+    public static String encode(List<String> tags) {
+        List<String> escaped = new ArrayList<>(tags.size());
+        for (String tag : tags) {
+            escaped.add(tag.replace("\\", "\\\\").replace(",", "\\,"));
+        }
+        return String.join(",", escaped);
+    }
+
+    public static List<String> decode(String encoded) {
+        if (encoded.isEmpty()) return List.of();
+        List<String> tags = new ArrayList<>();
+        StringBuilder tag = new StringBuilder();
+        boolean escaped = false;
+        for (int i = 0; i < encoded.length(); i++) {
+            char c = encoded.charAt(i);
+            if (escaped) {
+                tag.append(c);
+                escaped = false;
+            } else if (c == '\\') {
+                escaped = true;
+            } else if (c == ',') {
+                tags.add(tag.toString());
+                tag.setLength(0);
+            } else {
+                tag.append(c);
+            }
+        }
+        if (escaped) throw new IllegalArgumentException("끝나지 않은 태그 이스케이프");
+        tags.add(tag.toString());
+        return List.copyOf(tags);
+    }
+}

@@ -1,10 +1,10 @@
 # javaExperience
 
-Spring Boot 백엔드를 **직접 만들면서** 배우는 실습 레포다. 게시판 API를 단계별로 키우고, 단계마다 Claude에게 채점과 피드백을 받는다.
+Spring Boot 백엔드를 **직접 만들면서** 배우는 공개 실습 레포다. 게시판 API 100단계를 이어서 만들고, Codex 또는 Claude Code로 단계별 채점과 피드백을 받을 수 있다. 시나리오와 HTML은 GitHub 로그인 없이 읽거나 다운로드할 수 있다.
 
 | 폴더 | 내용 |
 |---|---|
-| [`scenario/`](scenario/README.md) | **따라 만들기 시나리오** — 단계별 요구사항·채점 기준·결과 테스트 프롬프트. 여기서 시작한다 |
+| [`scenario/`](scenario/README.md) | **따라 만들기 시나리오** — 100단계 요구사항·난이도·역할별 전체 코드 접기, 쿼리 연습 18개. 여기서 시작한다 |
 | [`practice/`](practice/MISSIONS.md) | 학습용 미션 — 함정이 섞인 많은 데이터(`practice` DB)로 조회·쿼리 연습 |
 | [`docs/knowledge/`](docs/knowledge/README.md) | 공부자료 133개 — 단계마다 "필요한 지식"으로 링크된다 |
 | `docker/` | 실습 DB(MySQL 8.4) 초기 데이터 dump(`mysql/init/`)와 CloudBeaver(웹 DBeaver) 설정 |
@@ -13,7 +13,7 @@ Spring Boot 백엔드를 **직접 만들면서** 배우는 실습 레포다. 게
 
 ## 시작하기
 
-준비물: Docker Desktop, IntelliJ IDEA, JDK 21(없으면 Gradle이 찾는다 — `gradle/gradle-daemon-jvm.properties`), Claude Code(결과 테스트용).
+준비물: Docker Desktop, IntelliJ IDEA, JDK 21(없으면 Gradle이 찾는다 — `gradle/gradle-daemon-jvm.properties`). AI 채점을 원하면 Codex 또는 Claude Code를 선택해 쓸 수 있다.
 
 ```bash
 git clone https://github.com/ai-ext/javaExperience.git
@@ -24,7 +24,9 @@ docker compose up -d        # DB와 CloudBeaver 띄우기(처음 한 번은 1~2�
 
 1. IntelliJ로 폴더를 열고(Gradle 프로젝트로 가져오기), `org.example.Main`을 실행한다.
 2. 브라우저로 `http://localhost:8080/hello` → `hello`가 보이면 준비 끝.
-3. 파일 탐색기에서 **`scenario/README.html`** 을 브라우저로 열고 1-1부터 시작한다(GitHub에서 보면 `scenario/README.md`).
+3. 파일 탐색기에서 **`scenario/README.html`** 을 브라우저로 연다. 백엔드가 처음이면 0-1, 이미 Java 기본기를 알면 1-1부터 시작한다. GitHub에서는 `scenario/README.md`를 바로 읽을 수 있다.
+
+`scenario/README.html`은 정적 파일이라 studymate 로그인이나 웹 서버가 필요 없다. 페이지의 화면 흐름과 코드 토글을 보고, API 호출은 curl·IntelliJ HTTP Client로 직접 해 본다. `community`·`practice`·10장 `project` DB는 서로 다른 데이터이므로 DB를 바꿀 때 이전 단계의 글 ID를 재사용하지 않는다.
 
 ## 실행
 
@@ -46,7 +48,9 @@ docker compose up -d        # DB와 CloudBeaver 띄우기(처음 한 번은 1~2�
 |---|---|
 | 호스트·포트 | `localhost` · `13308` |
 | 계정 | `community` / `community` |
-| DB | `community` — 시나리오용(앱 기본 연결, 거의 빈 상태) · `practice` — 학습용(글 145·좋아요 568…) |
+| DB | `community` — 본편 기본 DB · `practice` — 쿼리·배치용 학습 데이터 · `project` — 10장 별도 프로젝트(빈 DB) |
+
+10장은 `./gradlew bootRun --args='--spring.profiles.active=project'`로 실행한다. 기존 Docker 볼륨에는 새 `project` DB가 자동으로 생기지 않는다. 데이터를 지우지 않고 추가하려면 `docker compose exec -T mysql mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS project; GRANT ALL PRIVILEGES ON project.* TO 'community'@'%';"`를 한 번 실행한다.
 
 **CloudBeaver(웹 DBeaver) — compose에 들어 있다**
 
@@ -54,7 +58,7 @@ docker compose up -d        # DB와 CloudBeaver 띄우기(처음 한 번은 1~2�
 |---|---|
 | 주소 | `http://localhost:8978` |
 | 로그인 | `cbadmin` / `Admin1234` |
-| 연결 | `community (시나리오)` · `practice (학습용)` — 미리 들어 있어 두 번 누르면 바로 접속된다 |
+| 연결 | `community (시나리오)` · `practice (학습용)` · `project (10장)` — 새 CloudBeaver 작업 공간에 미리 들어 있다 |
 
 - 연결 설정은 `docker/cloudbeaver/data-sources.json`이고 처음 뜰 때 한 번 들어간다. 바꿨다면 `docker compose rm -sf cloudbeaver && docker volume rm <폴더이름>_cloudbeaver-data && docker compose up -d`.
 - 아이디가 `admin`이 아닌 이유: CloudBeaver에 같은 이름의 기본 팀이 있어 쓸 수 없다. 비밀번호는 CloudBeaver 규칙(8자 이상·대소문자·숫자)에 맞춘 것이다.
@@ -70,4 +74,4 @@ docker compose up -d        # DB와 CloudBeaver 띄우기(처음 한 번은 1~2�
 
 - 각자 `<이름>/<장>` 브랜치(예: `hyemin/ch1`)에서 개발하고 push한다. 리뷰를 받고 싶으면 PR을 연다.
 - `main`에는 직접 push하지 않는다(무료 플랜이라 보호 규칙으로 막혀 있지는 않다 — 약속으로 지킨다).
-- 시나리오·문서를 고치면 `cd tools/site && npm install && npm run build`로 `.html`을 다시 만들어 함께 커밋한다(깨진 링크가 있으면 빌드가 실패한다).
+- 시나리오·문서를 고치면 `cd tools/site && npm install && npm run build`로 `.html`을 다시 만들어 함께 커밋한다(깨진 링크가 있으면 빌드가 실패한다). 누적 전체 코드를 제공하는 시나리오에는 canonical `snapshots/<id>.json`과 `snapshots/blobs/*.txt`를 `scenario/snapshots/`에 함께 둔다. canonical snapshot을 복사한 뒤 `python3 tools/site/localize-snapshots.py`를 실행해 공개 DB 포트 설정과 blob 참조를 갱신한다. HTML은 목록과 파일 코드를 사용자가 펼칠 때 각각 지연 로드한다.

@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H3. 스케줄링 — @Scheduled와 &quot;지금 실행&quot; API</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="h3-스케줄링--scheduled와-지금-실행-api"><a class="anchor" href="#h3-스케줄링--scheduled와-지금-실행-api" aria-hidden="true">#</a>H3. 스케줄링 — @Scheduled와 &quot;지금 실행&quot; API</h1>
+<blockquote>
+<p>개념 레슨 · 40분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>&quot;매일 0시에 명예의 전당을 계산해 주세요.&quot; 이 일은 아무도 요청을 보내지 않는다. 서버가 <strong>정해진 시각에 스스로</strong> 메서드를 불러야 한다. Spring에서는 두 개면 된다.</p>
+<ul>
+<li>설정 클래스 하나에 <code>@EnableScheduling</code> — &quot;예약 메서드를 찾아 시간표에 올려라&quot;</li>
+<li>부를 메서드에 <code>@Scheduled(…)</code> — &quot;이 메서드를 이때 불러라&quot;. <strong>인자 없는</strong> 메서드만 된다.</li>
+</ul>
+<p>언제 부를지는 셋 중 하나로 적는다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>방식</th>
+<th>예</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>cron</code></td>
+<td><code>@Scheduled(cron = &quot;0 0 9 * * MON-FRI&quot;, zone = &quot;Asia/Seoul&quot;)</code></td>
+<td>달력 시각. 평일 서울 시각 9시 0분 0초</td>
+</tr>
+<tr>
+<td><code>fixedRate</code></td>
+<td><code>@Scheduled(fixedRate = 60_000)</code></td>
+<td>앞 실행이 <strong>시작한</strong> 때부터 60초마다</td>
+</tr>
+<tr>
+<td><code>fixedDelay</code></td>
+<td><code>@Scheduled(fixedDelay = 60_000)</code></td>
+<td>앞 실행이 <strong>끝난</strong> 뒤 60초 쉬고</td>
+</tr>
+</tbody></table></div>
+<p>숫자 단위는 밀리초다. cron은 리눅스 crontab과 달리 <strong>6칸</strong>이다: <code>초 분 시 일 월 요일</code>. <code>zone</code>을 안 적으면 서버(JVM)의 기본 시간대로 해석한다.</p>
+<p>알아 둘 사실이 셋 더 있다. 이 레슨에서 전부 실행해 확인한다.</p>
+<ol>
+<li>예약 메서드를 부르는 스레드는 <strong>기본 1개</strong>(<code>scheduling-1</code>)다. 한 작업이 오래 걸리면 다른 예약 작업이 줄을 선다.</li>
+<li>예약 메서드에서 예외가 나면 로그만 남고 <strong>다음 회차는 그대로 돈다.</strong> 실패한 회차를 다시 해 주지는 않는다.</li>
+<li>운영자가 쓰는 <strong>[지금 실행] API</strong>도 같은 일을 한다. 예약 실행과 수동 실행이 같은 날짜로 겹칠 수 있다. 두 번 돌아도 결과가 한 번인 것(<strong>멱등</strong>)은 DB의 <code>UNIQUE</code>로 지킨다.</li>
+</ol>
+<pre><code class="language-text">[cron 0시]──────┐
+                ├──▶ DigestJob.run(날짜) ──▶ INSERT … (UNIQUE: 작업 이름 + 날짜)
+[POST …/run]────┘</code></pre>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<p>이 레슨을 쓰면서 Spring Boot 4.1 앱(포트 <code>18300</code>)으로 실험한 결과다. 로그 앞의 <code>[scheduling-1]</code>은 메서드를 부른 스레드 이름이다. 아래 한 줄짜리 도우미로 찍었다.</p>
+<pre><code class="language-java">static void p(String s) {
+    System.out.println(LocalTime.now().truncatedTo(ChronoUnit.MILLIS) + &quot; [&quot; + Thread.currentThread().getName() + &quot;] &quot; + s);
+}</code></pre>
+<h3 id="cron은-6칸-zone은-해석-기준"><a class="anchor" href="#cron은-6칸-zone은-해석-기준" aria-hidden="true">#</a>cron은 6칸, zone은 해석 기준</h3>
+<p><code>CronExpression.parse(…).next(시각)</code>은 &quot;이 시각 다음에 언제 도는가&quot;를 계산한다. 9시를 실제로 기다리지 않고 확인할 수 있다. 기준은 2026-10-10 토요일 15:00(서울)이다.</p>
+<pre><code class="language-java">CronExpression cron = CronExpression.parse(&quot;0 0 9 * * MON-FRI&quot;);
+cron.next(from.withZoneSameInstant(ZoneId.of(&quot;Asia/Seoul&quot;)));
+cron.next(from.withZoneSameInstant(ZoneId.of(&quot;UTC&quot;)));</code></pre>
+<pre><code class="language-text">서울로 해석    2026-10-12T09:00+09:00[Asia/Seoul]
+UTC로 해석     2026-10-12T09:00Z[UTC]  = 서울 2026-10-12T18:00+09:00[Asia/Seoul]</code></pre>
+<p>같은 <code>0 0 9 * * MON-FRI</code>인데, UTC로 해석하면 서울 기준 <strong>오후 6시</strong>에 돈다. 내 맥은 기본 시간대가 <code>Asia/Seoul</code>이지만 서버는 UTC인 경우가 많다. 그래서 <code>zone = &quot;Asia/Seoul&quot;</code>을 적어 둔다.</p>
+<h3 id="스레드는-하나--긴-작업이-짧은-작업을-막는다"><a class="anchor" href="#스레드는-하나--긴-작업이-짧은-작업을-막는다" aria-hidden="true">#</a>스레드는 하나 — 긴 작업이 짧은 작업을 막는다</h3>
+<pre><code class="language-java">@Scheduled(fixedRate = 1000)
+public void tick() { p(&quot;tick&quot;); }
+
+@Scheduled(fixedRate = 5000, initialDelay = 2000)        // 켜고 2초 뒤 첫 실행
+public void slowReport() throws InterruptedException {
+    p(&quot;slowReport 시작&quot;);
+    Thread.sleep(3000);
+    p(&quot;slowReport 끝&quot;);
+}</code></pre>
+<pre><code class="language-text">15:58:41.877 [scheduling-1] tick
+15:58:42.872 [scheduling-1] tick
+15:58:42.872 [scheduling-1] slowReport 시작
+15:58:45.882 [scheduling-1] slowReport 끝
+15:58:45.883 [scheduling-1] tick
+15:58:45.883 [scheduling-1] tick
+15:58:45.883 [scheduling-1] tick
+15:58:46.877 [scheduling-1] tick</code></pre>
+<p>1초마다 돌아야 할 <code>tick</code>이 3초 동안 <strong>한 번도 못 돌다가</strong>, <code>slowReport</code>가 끝나자 밀린 세 번이 같은 밀리초에 한꺼번에 돌았다. 둘 다 <code>scheduling-1</code> 하나를 나눠 쓰기 때문이다. <code>spring.task.scheduling.pool.size=2</code>로 다시 켜면 이렇다.</p>
+<pre><code class="language-text">15:59:47.988 [scheduling-1] tick
+15:59:47.988 [scheduling-2] slowReport 시작
+15:59:48.978 [scheduling-1] tick
+15:59:49.988 [scheduling-1] tick
+15:59:50.988 [scheduling-1] tick
+15:59:50.998 [scheduling-2] slowReport 끝</code></pre>
+<h3 id="일이-주기보다-길면--fixedrate도-겹치지-않는다"><a class="anchor" href="#일이-주기보다-길면--fixedrate도-겹치지-않는다" aria-hidden="true">#</a>일이 주기보다 길면 — fixedRate도 겹치지 않는다</h3>
+<p>2.5초 걸리는 일을 1초 주기로 걸었다.</p>
+<pre><code class="language-text">fixedRate = 1000                                   fixedDelay = 1000
+15:58:55.955 #1 시작                               15:59:10.811 #1 시작
+15:58:58.465 #1 끝                                 15:59:13.316 #1 끝
+15:58:58.474 #2 시작   ← 끝나자마자                15:59:14.335 #2 시작   ← 끝나고 1초 뒤
+15:59:00.980 #2 끝                                 15:59:16.840 #2 끝
+15:59:00.981 #3 시작                               15:59:17.858 #3 시작</code></pre>
+<p><code>fixedRate</code>라도 같은 메서드가 <strong>동시에 두 번 돌지 않았다.</strong> 주기가 이미 지났으니 앞 실행이 끝나자마자 바로 다음을 시작했다. <code>fixedDelay</code>는 끝난 뒤 1초를 꼬박 쉬었다.</p>
+<h3 id="예외가-나도-다음-회차는-돈다"><a class="anchor" href="#예외가-나도-다음-회차는-돈다" aria-hidden="true">#</a>예외가 나도 다음 회차는 돈다</h3>
+<pre><code class="language-java">@Scheduled(fixedRate = 1000)
+public void work() {
+    int i = n.incrementAndGet();
+    p(&quot;실행 #&quot; + i);
+    if (i == 2) throw new IllegalStateException(&quot;집계 테이블이 잠겨 있음&quot;);
+}</code></pre>
+<pre><code class="language-text">15:59:25.469 [scheduling-1] 실행 #1
+15:59:26.471 [scheduling-1] 실행 #2
+ERROR … [   scheduling-1] o.s.s.s.TaskUtils$LoggingErrorHandler    : Unexpected error occurred in scheduled task
+
+java.lang.IllegalStateException: 집계 테이블이 잠겨 있음
+15:59:27.477 [scheduling-1] 실행 #3
+15:59:28.475 [scheduling-1] 실행 #4</code></pre>
+<p><code>LoggingErrorHandler</code>가 로그만 남기고 #3, #4…를 계속 불렀다. #2가 하려던 일은 그냥 <strong>안 된 채로</strong> 지나갔다. 실패를 알려면 15-6처럼 실행 기록을 따로 남긴다.</p>
+<h3 id="지금-실행-api--같은-메서드-unique로-멱등"><a class="anchor" href="#지금-실행-api--같은-메서드-unique로-멱등" aria-hidden="true">#</a>[지금 실행] API — 같은 메서드, UNIQUE로 멱등</h3>
+<p>예약과 수동이 <strong>같은 서비스 메서드</strong>를 부른다. 컨트롤러가 <code>@Scheduled</code> 메서드를 직접 부르지 않는다.</p>
+<pre><code class="language-java">@Scheduled(cron = &quot;${app.digest-cron:0 0 9 * * MON-FRI}&quot;, zone = &quot;Asia/Seoul&quot;)
+public void weekdayMorning() {
+    p(&quot;예약 실행: &quot; + job.runIdempotent(job.today(), &quot;SCHEDULED&quot;));
+}
+
+@PostMapping(&quot;/h3/jobs/daily-digest/run&quot;)
+public Map&lt;String, Object&gt; runNow(
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+    LocalDate day = (date != null) ? date : job.today();
+    return Map.of(&quot;runDate&quot;, day.toString(), &quot;result&quot;, job.runIdempotent(day, &quot;MANUAL&quot;));
+}</code></pre>
+<pre><code class="language-java">@Transactional
+public String runIdempotent(LocalDate day, String trigger) {
+    int inserted = jdbc.update(
+            &quot;INSERT IGNORE INTO lesson_h3_digest (job_name, run_date, trigger_type, made_at) VALUES ('daily-digest', ?, ?, ?)&quot;,
+            day, trigger, LocalDateTime.now(clock));
+    return inserted == 1 ? &quot;만듦&quot; : &quot;이미 있음&quot;;
+}</code></pre>
+<p><code>lesson_h3_digest</code>에는 <code>UNIQUE (job_name, run_date)</code>가 있다. <code>INSERT IGNORE</code>는 UNIQUE에 걸리면 에러 대신 <strong>0행</strong>으로 끝난다. 요청 둘을 동시에 보냈다(<code>&amp;</code>는 &quot;기다리지 말고 다음 명령&quot;, <code>wait</code>는 &quot;다 끝날 때까지&quot;).</p>
+<pre><code class="language-text">$ curl -s -X POST &quot;$B/h3/jobs/daily-digest/run&quot; &amp; curl -s -X POST &quot;$B/h3/jobs/daily-digest/run&quot; &amp; wait
+{&quot;result&quot;:&quot;만듦&quot;,&quot;runDate&quot;:&quot;2026-10-05&quot;}
+{&quot;result&quot;:&quot;이미 있음&quot;,&quot;runDate&quot;:&quot;2026-10-05&quot;}</code></pre>
+<p>cron을 5초마다(<code>*/5 * * * * *</code>)로 바꿔 켜고, 수동으로 먼저 한 번 돌렸다. 예약 실행은 매번 <code>이미 있음</code>이었고 행은 하나(<code>MANUAL</code>)뿐이었다.</p>
+<pre><code class="language-text">16:02:35.028 [scheduling-1] 예약 실행: 이미 있음
+16:02:40.016 [scheduling-1] 예약 실행: 이미 있음</code></pre>
+<h3 id="고정-clock--오늘을-정하는-곳은-하나"><a class="anchor" href="#고정-clock--오늘을-정하는-곳은-하나" aria-hidden="true">#</a>고정 Clock — &quot;오늘&quot;을 정하는 곳은 하나</h3>
+<p>위 응답의 <code>runDate</code>가 실제 날짜(10일)가 아니라 <code>2026-10-05</code>다. <code>LocalDate.now()</code> 대신 <code>LocalDate.now(clock)</code>을 쓰고, <code>Clock</code>을 빈으로 만들었기 때문이다.</p>
+<pre><code class="language-java">@Bean
+Clock clock(@Value(&quot;${app.fixed-now:}&quot;) String fixedNow) {
+    ZoneId seoul = ZoneId.of(&quot;Asia/Seoul&quot;);
+    if (fixedNow.isBlank()) return Clock.system(seoul);                 // 운영: 진짜 시계
+    return Clock.fixed(Instant.parse(fixedNow), seoul);                 // 연습·테스트: 멈춘 시계
+}</code></pre>
+<p><code>--app.fixed-now=2026-10-04T15:00:00Z</code>로 켰다. UTC 10월 4일 15시는 서울 10월 5일 0시다. 15장의 &quot;지금 = 2026-10-05 00:00&quot;이 이 방식이다. 다만 고정 시계는 <strong>날짜 계산만</strong> 고정한다. <code>@Scheduled</code>의 실제 타이머는 진짜 시간으로 돈다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>15분. 0~9장 앱에 <code>h3</code> 패키지를 만들어 한다.</p>
+<p><strong>1. 스레드 하나 겪기.</strong> <code>@EnableScheduling</code>을 붙인 설정 클래스와 위 <code>tick</code>·<code>slowReport</code>를 넣고 켠다. 10초 뒤 로그에서 <code>slowReport 끝</code> 바로 뒤에 <code>tick</code>이 같은 시각으로 여러 줄 찍히는지 본다. <code>application.yml</code>에 <code>spring.task.scheduling.pool.size: 2</code>를 넣고 다시 켜면 <code>scheduling-2</code>가 보인다. 확인했으면 두 메서드를 지운다(계속 로그가 찍힌다).</p>
+<p><strong>2. 멱등 테이블을 만든다.</strong> E7에서 만든 <code>sqlp</code> 함수(<code>practice</code> DB)로 만든다. 앱도 <code>practice</code> 프로파일로 띄운다(15장처럼). 앱이 보는 DB와 표를 만든 DB가 다르면 <code>Table … doesn&#39;t exist</code>가 난다.</p>
+<pre><code class="language-sql">CREATE TABLE lesson_h3_digest (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  job_name VARCHAR(64) NOT NULL,
+  run_date DATE NOT NULL,
+  trigger_type VARCHAR(16) NOT NULL,
+  made_at DATETIME NOT NULL,
+  CONSTRAINT uk_digest UNIQUE (job_name, run_date)
+);</code></pre>
+<p><strong>3. 서비스·컨트롤러·예약 메서드</strong>를 위 예시대로 넣는다. 앱에 이미 <code>Clock</code> 빈이 있으면(8장 이후) 그걸 쓰고 위 <code>Clock</code> 빈은 넣지 않는다(같은 타입 빈이 둘이면 켜지지 않는다). <code>app.fixed-now</code>가 없으면 <code>--app.fixed-now=2026-10-04T15:00:00Z</code>로 켠다(IntelliJ 실행 설정의 Program arguments). 동시에 두 번, 날짜 지정(<code>?date=2026-10-02</code>), 잘못된 날짜(<code>?date=2026-1-5</code> → <code>400</code>)를 보내 본다.</p>
+<p><strong>4. 정리.</strong> <code>sqlp &quot;DROP TABLE lesson_h3_digest&quot;</code>.</p>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p><strong>1. crontab을 그대로 붙여 넣기.</strong> <code>@Scheduled(cron = &quot;0 9 * * MON-FRI&quot;)</code>(5칸)이면 앱이 <strong>켜지지 않는다.</strong></p>
+<pre><code class="language-text">Caused by: java.lang.IllegalStateException: Encountered invalid @Scheduled method 'run': Cron expression must consist of 6 fields (found 5 in &quot;0 9 * * MON-FRI&quot;)</code></pre>
+<p><strong>2. 예약 메서드에 날짜를 받기.</strong> <code>public void run(LocalDate date)</code>에 <code>@Scheduled</code>를 붙이면 역시 켜지지 않는다.</p>
+<pre><code class="language-text">Caused by: java.lang.IllegalStateException: Could not create recurring task for @Scheduled method 'run': Only no-arg methods may be annotated with @Scheduled</code></pre>
+<p>날짜가 필요하면 예약 메서드 안에서 <code>LocalDate.now(clock)</code>으로 구해 서비스에 넘긴다(위 예시).</p>
+<p><strong>3. &quot;있나 보고 없으면 넣기&quot;.</strong> UNIQUE를 뺀 표(<code>ALTER TABLE lesson_h3_digest DROP INDEX uk_digest</code>)에 이렇게 짰다(<code>sleep</code>은 집계 시간 흉내).</p>
+<pre><code class="language-java">Integer n = jdbc.queryForObject(&quot;SELECT COUNT(*) FROM lesson_h3_digest WHERE job_name = 'daily-digest' AND run_date = ?&quot;, Integer.class, day);
+if (n &gt; 0) return &quot;이미 있음&quot;;
+Thread.sleep(200);
+jdbc.update(&quot;INSERT INTO lesson_h3_digest …&quot;, …);</code></pre>
+<p>하나씩 보내면 두 번째는 <code>이미 있음</code>이다. 동시에 두 개를 보내면 둘 다 <code>만듦</code>이었고 같은 날짜 행이 <strong>두 줄</strong> 생겼다. 둘 다 &quot;없네&quot;를 본 뒤에 넣었기 때문이다(H1의 틈과 같다). 같은 코드에 UNIQUE만 걸면 하나는 <code>500</code>이 됐다.</p>
+<pre><code class="language-text">java.sql.SQLIntegrityConstraintViolationException: Duplicate entry 'daily-digest-2026-10-05' for key 'lesson_h3_digest.uk_digest'</code></pre>
+<p>두 줄은 막았지만 사용자에게 500은 이상하다. 처음부터 <code>INSERT IGNORE</code>(또는 <code>DuplicateKeyException</code>을 잡아 &quot;이미 있음&quot;)로 DB에게 판정을 맡긴다.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> <code>0 30 2 * * *</code>는 언제 도나? 리눅스 crontab의 <code>30 2 * * *</code>를 그대로 넣으면?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>매일 2시 30분 0초.</strong> 첫 칸이 초다. 5칸을 넣으면 <code>Cron expression must consist of 6 fields</code>로 <strong>앱이 켜지지 않는다.</strong></p>
+</details>
+
+<p><strong>2.</strong> <code>@Scheduled(cron = &quot;0 0 9 * * *&quot;)</code>만 적고 UTC 서버에 배포했다. 서울 기준 몇 시에 도나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>18시.</strong> <code>zone</code>이 없으면 JVM 기본 시간대(UTC)의 9시다. <code>zone = &quot;Asia/Seoul&quot;</code>을 적는다.</p>
+</details>
+
+<p><strong>3.</strong> 기본 설정에서 1초마다 도는 작업과 3초 걸리는 작업이 같이 있다. 1초짜리는 어떻게 되나?</p>
+<details>
+<summary>정답</summary>
+
+<p>3초짜리가 도는 동안 <strong>못 돌다가</strong> 끝나면 밀린 만큼 몰아서 돈다. 예약 스레드가 기본 1개(<code>scheduling-1</code>)라서다. <code>spring.task.scheduling.pool.size</code>로 늘린다.</p>
+</details>
+
+<p><strong>4.</strong> 예약 메서드가 예외를 던졌다. 다음 회차는? 실패한 회차는?</p>
+<details>
+<summary>정답</summary>
+
+<p>다음 회차는 <strong>그대로 돈다</strong>(<code>LoggingErrorHandler</code>가 로그만 남김). 실패한 회차는 <strong>다시 해 주지 않는다.</strong> 실패를 알려면 실행 기록·알림을 따로 둔다.</p>
+</details>
+
+<p><strong>5.</strong> 0시 예약 실행과 운영자의 [지금 실행]이 같은 날짜로 동시에 들어왔다. 결과 행이 하나만 생기게 하려면?</p>
+<details>
+<summary>정답</summary>
+
+<p>결과 테이블에 **<code>UNIQUE (작업 이름, 기준일)</code>**을 걸고, 넣을 때 <code>INSERT IGNORE</code>처럼 걸리면 0행으로 끝나게 한다. &quot;있나 보고 넣기&quot;는 동시에 오면 둘 다 넣는다. 두 진입점은 같은 서비스 메서드를 부른다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/P30-scheduling-practical.html">P30 스케줄링 실무</a> — 주기 선택, cron과 시간대, 풀 크기, ShedLock</li>
+<li><a href="../docs/knowledge/S15-async-scheduling-batch.html">S15 비동기·스케줄링·Spring Batch</a> — 프로세스마다 시간표가 따로라는 것</li>
+<li><a href="../docs/knowledge/W20-time-timezone.html">W20 시간과 시간대</a> — <code>Clock</code> 주입</li>
+<li><a href="./H1-concurrency-taste.html">H1 동시성 맛보기</a> — &quot;읽고 판단하고 쓰기&quot; 사이의 틈</li>
+<li>Spring Framework 7 API — <code>@Scheduled</code>(6칸 cron, <code>zone</code>, <code>fixedRate</code>·<code>fixedDelay</code>): <a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/scheduling/annotation/Scheduled.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/scheduling/annotation/Scheduled.html</a></li>
+<li>Spring Framework 7 API — <code>TaskUtils</code>(반복 작업의 예외는 로그 후 억제): <a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/scheduling/support/TaskUtils.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/scheduling/support/TaskUtils.html</a></li>
+<li>Spring Boot — <code>spring.task.scheduling.pool.size</code>(기본 1): <a href="https://docs.spring.io/spring-boot/appendix/application-properties/index.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/appendix/application-properties/index.html</a></li>
+<li>Java 21 API — <code>Clock</code>: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/time/Clock.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/time/Clock.html</a></li>
+<li>MySQL 8.0 — <code>INSERT … ON DUPLICATE KEY UPDATE</code>: <a href="https://dev.mysql.com/doc/refman/8.0/en/insert-on-duplicate.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.0/en/insert-on-duplicate.html</a></li>
+</ul>
+<p>서버를 두 대 띄우면 두 대 모두 같은 예약을 돈다. UNIQUE가 결과를 하나로 지켜 주지만, 메일·외부 API처럼 DB 밖의 일은 두 번 일어난다. 그때는 ShedLock 같은 분산 락을 쓴다.</p>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li>실습: <a href="../scenario/ch15-scheduling-batch/15-1-hall-of-fame.html">15-1. 명예의 전당 — 매일 0시 배치와 멱등</a> — 오늘의 cron·zone·[지금 실행]·UNIQUE·<code>app.fixed-now</code>가 그대로 나온다.</li>
+<li><a href="../scenario/ch15-scheduling-batch/15-3-scheduled-publish.html">15-3. 예약 발행</a> — 1분마다 도는 배치.</li>
+<li><a href="../scenario/ch15-scheduling-batch/15-6-job-runs-retry.html">15-6. 배치 실행 기록과 다시 돌리기</a> — 예외가 나도 다음 회차는 돈다는 것을 기록으로 잡는다.</li>
+<li>많은 행을 지우는 배치는 <a href="./H4-bulk-processing.html">H4. 대량 데이터 처리</a>에서.</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

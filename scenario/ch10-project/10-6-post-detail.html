@@ -1,0 +1,1348 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10-6. 게시글 상세 — 조회수·작성자·태그·댓글을 한 번에, N+1 없이</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 10장. 명세서 프로젝트 — 게시판 API v1(/api/v1) › 10-6</p><p class="level-tags"><span>기초</span><span>별도 명세서 프로젝트</span><span>DB project</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="10-6-게시글-상세--조회수작성자태그댓글을-한-번에-n1-없이"><a class="anchor" href="#10-6-게시글-상세--조회수작성자태그댓글을-한-번에-n1-없이" aria-hidden="true">#</a>10-6. 게시글 상세 — 조회수·작성자·태그·댓글을 한 번에, N+1 없이</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>API</th>
+<th>규칙</th>
+<th>성공</th>
+<th>실패</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GET /api/v1/posts/{postId}</code></td>
+<td>조회수 +1(같은 요청의 응답에도 반영), 작성자 <code>{id, nickname}</code>, 태그, 좋아요 수, 내가 좋아요했나(로그인 시), <strong>댓글 목록</strong>(시간순, 답글은 부모 아래)</td>
+<td>200</td>
+<td>404(없음·삭제·남의 <code>PRIVATE</code>)</td>
+</tr>
+</tbody></table></div>
+<p>상세 화면은 글 하나에 딸린 것을 모두 보여 준다. 작성자, 태그, 댓글(과 댓글마다의 작성자)이다. 엔티티를 하나씩 따라가며 읽으면 쿼리가 <strong>댓글 수만큼</strong> 늘어난다. 이것이 N+1 문제다. 이 단계의 목표는 기능과 함께 <strong>쿼리 수를 댓글 수와 상관없이 고정하는 것</strong>이다.</p>
+<p>댓글은 10-9에서 쓰기를 만든다. 지금은 시드 데이터에 있는 댓글을 <strong>읽어서 트리로 만드는 것</strong>만 한다. 글 1에 모든 경우가 들어 있다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>댓글</th>
+<th>상태</th>
+<th>상세에서</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1 &quot;좋은 정리네요&quot;</td>
+<td>최상위, 답글 2·3</td>
+<td>보인다, <code>replies</code> 2개</td>
+</tr>
+<tr>
+<td>4 &quot;지울 댓글&quot;</td>
+<td>최상위, <strong>삭제됨</strong>, 답글 5(살아 있음)</td>
+<td>내용·작성자를 숨기고 &quot;삭제된 댓글입니다&quot;로 자리만, <code>replies</code>에 5</td>
+</tr>
+<tr>
+<td>6 &quot;record는 불변이라 좋아요&quot;</td>
+<td>최상위, 답글 7(삭제됨)</td>
+<td>보인다, <code>replies</code> 비어 있음</td>
+</tr>
+<tr>
+<td>8 &quot;아무 답글 없이 지운 댓글&quot;</td>
+<td>최상위, 삭제됨, 답글 없음</td>
+<td><strong>아예 빠진다</strong></td>
+</tr>
+</tbody></table></div>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>글 상세 화면</h3><p>글 1번을 연다. 조회수가 하나 오르고, 댓글은 답글이 부모 아래 들여쓰기로 보인다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>자바 record 정리</strong><span>김자바</span></div><div class="screen-widget screen-chips"><strong>chips</strong><span>java</span></div><div class="screen-widget screen-stats"><strong>stats</strong><span>조회 · 좋아요</span></div><div class="screen-widget screen-text"><strong>text</strong><span>자바 record 정리 — 본문입니다.</span></div><div class="screen-widget screen-list"><strong>댓글</strong><span>좋은 정리네요 ·   ↳ 저도 그렇게 생각해요 ·   ↳ 감사합니다! · 삭제된 댓글입니다 ·   ↳ 삭제된 댓글에 단 답글 · record는 불변이라 좋아요</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>글을 찾을 수 없어요</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>상세 열기</summary><ol><li><span class="flow-kind">사용자</span><p>목록에서 글 1번을 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/v1/posts/1</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>-- ① 글 + 작성자 + 태그 한 번에
+SELECT ... FROM posts p JOIN users a ON a.id = p.author_id
+  LEFT JOIN post_tags pt ON ... LEFT JOIN tags t ON ...
+WHERE p.id = 1 AND p.deleted_at IS NULL;
+-- ② 조회수
+UPDATE posts SET view_count = view_count + 1 WHERE id = 1;
+-- ③ 댓글 + 댓글 작성자 한 번에
+SELECT ... FROM comments c JOIN users a ON a.id = c.author_id
+WHERE c.post_id = 1 ORDER BY c.created_at, c.id;</dd><dt>note</dt><dd>댓글이 6개든 600개든 쿼리는 3번(로그인했으면 좋아요 여부 1번 더)</dd></dl></li><li><span class="flow-kind">서버</span><p>평평한 댓글 목록 → 최상위 + replies 트리. 지운 부모는 답글이 있을 때만 자리를 남긴다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{
+  &quot;status&quot;: 200,
+  &quot;data&quot;: {
+    &quot;id&quot;: 1, &quot;viewCount&quot;: 11, &quot;likeCount&quot;: 2, &quot;liked&quot;: false,
+    &quot;author&quot;: { &quot;id&quot;: 1, &quot;nickname&quot;: &quot;김자바&quot; },
+    &quot;tags&quot;: [&quot;java&quot;],
+    &quot;comments&quot;: [
+      { &quot;id&quot;: 1, &quot;content&quot;: &quot;좋은 정리네요&quot;, &quot;deleted&quot;: false, &quot;replies&quot;: [ {&quot;id&quot;: 2, ...}, {&quot;id&quot;: 3, ...} ] },
+      { &quot;id&quot;: 4, &quot;content&quot;: &quot;삭제된 댓글입니다&quot;, &quot;author&quot;: null, &quot;deleted&quot;: true, &quot;replies&quot;: [ {&quot;id&quot;: 5, ...} ] },
+      { &quot;id&quot;: 6, ..., &quot;replies&quot;: [] }
+    ]
+  }
+}</dd></dl></li><li><span class="flow-kind">화면</span><p>조회수·태그·댓글 트리가 그려진다</p></li></ol></details><details class="scenario-flow"><summary>남의 비공개 글</summary><ol><li><span class="flow-kind">사용자</span><p>이스프링이 주소창에 /posts/24를 직접 친다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/v1/posts/24</p><dl><dt>headers</dt><dd>Authorization: Bearer (이스프링 토큰)</dd></dl></li><li><span class="flow-kind">서버</span><p>24는 김자바의 PRIVATE 글 → 403이 아니라 404. &quot;있지만 못 본다&quot;를 알려 주면 비공개 글이 있다는 사실이 샌다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>404</dd><dt>body</dt><dd>{ &quot;status&quot;: 404, &quot;code&quot;: &quot;NOT_FOUND&quot;, &quot;message&quot;: &quot;게시글을 찾을 수 없습니다.&quot;, ... }</dd></dl></li><li><span class="flow-kind">화면</span><p>없는 글과 똑같이 보인다</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>메서드·경로</td>
+<td><code>GET /api/v1/posts/{postId}</code> — 로그인 선택(<code>@LoginUser(required = false) Long userId</code>)</td>
+</tr>
+<tr>
+<td>404</td>
+<td>없는 글, <code>deleted_at</code>이 있는 글, <strong>남의</strong> <code>PRIVATE</code> 글(작성자 본인은 볼 수 있다). 숫자가 아닌 id(<code>/posts/abc</code>)는 400</td>
+</tr>
+<tr>
+<td>조회수</td>
+<td><code>view_count</code>를 DB에서 +1. 응답의 <code>viewCount</code>는 <strong>올린 뒤의 값</strong></td>
+</tr>
+<tr>
+<td>응답 <code>data</code></td>
+<td><code>id</code>, <code>title</code>, <code>content</code>, <code>visibility</code>, <code>viewCount</code>, <code>likeCount</code>, <code>liked</code>(비로그인은 <code>false</code>), <code>author{id, nickname}</code>, <code>tags</code>(이름순), <code>comments</code>, <code>createdAt</code>, <code>updatedAt</code></td>
+</tr>
+<tr>
+<td><code>comments</code></td>
+<td>최상위 댓글을 시간순으로. 각각 <code>{id, content, author{id, nickname}, deleted, createdAt, replies: [...]}</code>. 답글은 부모의 <code>replies</code>에 시간순(답글 항목에는 <code>replies</code>가 없어도 된다)</td>
+</tr>
+<tr>
+<td>지운 댓글</td>
+<td>지운 답글은 빠진다. 지운 최상위 댓글은 <strong>살아 있는 답글이 있으면</strong> <code>content</code>=&quot;삭제된 댓글입니다&quot;, <code>author</code>=<code>null</code>, <code>deleted</code>=<code>true</code>로 자리만 남기고, 없으면 빠진다</td>
+</tr>
+<tr>
+<td>쿼리 수</td>
+<td>댓글이 몇 개든 고정(목표: 비로그인 3번, 로그인 4번)</td>
+</tr>
+<tr>
+<td>작성 응답</td>
+<td>10-5의 작성 응답도 같은 모양으로(<code>liked: false</code>, <code>comments: []</code>)</td>
+</tr>
+</tbody></table></div>
+<h2 id="설계-포인트"><a class="anchor" href="#설계-포인트" aria-hidden="true">#</a>설계 포인트</h2>
+<ul>
+<li><strong>N+1이 생기는 자리.</strong> 댓글 목록을 <code>findByPostId</code>로 읽고 응답을 만들며 <code>comment.getAuthor().getNickname()</code>을 부르면, 작성자가 <code>LAZY</code>라 <strong>댓글마다</strong> <code>SELECT ... FROM users</code>가 나간다. 댓글 6개면 1 + 6번이다. 해결은 &quot;필요한 것을 처음 쿼리에서 같이 가져오기&quot;다. JPQL의 <code>join fetch</code>를 쓴다.</li>
+<li><strong>컬렉션 두 개를 한 번에 fetch join하지 않는다.</strong> 글 + 태그 + 댓글을 한 JPQL에 모두 <code>join fetch</code>하면 행이 곱으로 불어난다(태그 2 × 댓글 6 = 12행). 컬렉션이 둘 이상이면 Hibernate가 거부하기도 한다(<code>MultipleBagFetchException</code>). 글·작성자·태그 한 쿼리, 댓글·작성자 한 쿼리로 나눈다.</li>
+<li><strong>조회수는 &quot;읽고 +1 해서 저장&quot;하지 않는다.</strong> 엔티티의 <code>viewCount</code>를 +1 하고 변경 감지에 맡기면, 동시에 두 명이 열 때 둘 다 10을 읽고 11을 쓴다. <code>UPDATE posts SET view_count = view_count + 1</code>을 DB에서 바로 실행한다(<code>@Modifying @Query</code>). 응답에는 읽었던 값 + 1을 싣는다. 두 요청이 동시에 10을 읽으면 각 응답은 11일 수 있지만 DB의 최종 값은 12다. 응답 값은 <strong>이 요청의 증가를 반영한 값</strong>이며, 동시 요청까지 포함한 최신 합계를 보장하지 않는다.</li>
+<li><strong>트리는 메모리에서.</strong> 댓글을 시간순 평평한 목록으로 한 번에 읽고, 자바에서 <code>parent_id</code>별로 묶어 트리를 만든다. 부모 댓글마다 답글을 다시 조회하면 그게 또 N+1이다.</li>
+<li><strong>남의 비공개는 404.</strong> 403(&quot;권한 없음&quot;)은 &quot;그 글이 있다&quot;를 알려 준다. 접근 규칙은 <a href="../../lessons/G2-access-rules-in-one-place.html">G2</a>처럼 한곳에 모아 두면 10-8·10-9에서 다시 쓴다.</li>
+</ul>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 <strong>만들 것</strong>의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</p>
+<p>이 단계의 처리 흐름:</p>
+<ul>
+<li>댓글이 6개든 600개든 쿼리는 3번(로그인했으면 좋아요 여부 1번 더)</li>
+<li>평평한 댓글 목록 → 최상위 + replies 트리. 지운 부모는 답글이 있을 때만 자리를 남긴다</li>
+<li>24는 김자바의 PRIVATE 글 → 403이 아니라 404. &quot;있지만 못 본다&quot;를 알려 주면 비공개 글이 있다는 사실이 샌다</li>
+</ul>
+<details>
+<summary>Controller — HTTP 연결</summary>
+
+<p><code>PostController.java</code>. 매핑과 메서드의 입력·응답을 위 <strong>만들 것</strong>의 HTTP 계약과 대조한다. 이번 단계 매핑: <code>@GetMapping(&quot;/api/v1/posts/{postId}&quot;)</code>. 변경된 메서드: <code>create</code>, <code>detail</code>.</p>
+<pre><code class="language-java">@GetMapping(&quot;/api/v1/posts/{postId}&quot;)
+public ApiResponse&lt;PostDetailResponse&gt; detail(@PathVariable Long postId,
+        @LoginUser(required = false) Long userId) {
+    return ApiResponse.ok(postService.detail(postId, userId));
+}</code></pre>
+<p>인증이 선택인 GET이라 토큰이 없으면 <code>userId</code>는 <code>null</code>이다. 잘못된 토큰을 보냈다면 인터셉터가 401로 막는다.</p>
+</details>
+
+<details>
+<summary>DTO — 요청·응답 필드</summary>
+
+<p><code>CommentResponse.java</code>, <code>PostDetailResponse.java</code>. 필드 이름·타입·검증·응답 형태를 위 <strong>만들 것</strong>과 대조한다. 변경된 메서드: <code>of</code>.</p>
+<pre><code class="language-java">public record PostDetailResponse(Long id, String title, String content, Visibility visibility,
+        int viewCount, int likeCount, boolean liked, AuthorResponse author,
+        List&lt;String&gt; tags, List&lt;CommentResponse&gt; comments,
+        LocalDateTime createdAt, LocalDateTime updatedAt) {
+}</code></pre>
+<p>이 단계는 10-5의 <code>PostResponse</code>를 삭제하고 작성·상세가 함께 쓰는 응답 DTO로 바꾼다. 삭제된 최상위 댓글은 답글이 있을 때만 <code>author: null</code>, <code>deleted: true</code>로 반환한다. 실제 생성 메서드와 <code>replies</code> 형태는 아래 DTO 접기에 있다.</p>
+</details>
+
+<details>
+<summary>Service — 처리 순서</summary>
+
+<p><code>PostService.java</code>. 위 서버 처리 순서가 어디에서 검증·조회·상태 변경으로 이어지는지 따라간다. 변경된 메서드: <code>create</code>, <code>detail</code>. 트랜잭션 경계는 아래 코드의 <code>@Transactional</code> 위치에서 확인한다.</p>
+<pre><code class="language-java">@Transactional
+public PostDetailResponse detail(Long postId, Long loginUserId) {
+    Post post = postRepository.findDetailById(postId)
+            .orElseThrow(() -&gt; new ApiException(ErrorCode.NOT_FOUND, &quot;게시글을 찾을 수 없습니다.&quot;));
+    if (post.getVisibility() == Visibility.PRIVATE &amp;&amp; !post.getAuthor().getId().equals(loginUserId)) {
+        throw new ApiException(ErrorCode.NOT_FOUND, &quot;게시글을 찾을 수 없습니다.&quot;);
+    }
+    postRepository.increaseViewCount(postId);
+    boolean liked = loginUserId != null &amp;&amp; postRepository.countLike(postId, loginUserId) &gt; 0;
+    return PostDetailResponse.of(post, post.getViewCount() + 1, liked,
+            CommentTree.build(commentRepository.findAllWithAuthorByPostId(postId)));
+}</code></pre>
+<p>없는 글·삭제된 글·남의 비공개 글은 조회수를 올리기 전에 404로 끝난다. 응답 조회수는 DB의 원자적 증가 결과와 맞춘다.</p>
+</details>
+
+<details>
+<summary>JPA / Repository — DB 조건</summary>
+
+<p><code>CommentRepository.java</code>, <code>PostRepository.java</code>. 쿼리·파생 메서드의 조건을 화면 시나리오의 DB 단계 및 직접 확인 SQL과 대조한다. 직접 작성한 JPQL·SQL과 아래 파일의 <code>@Query</code>를 비교한다.</p>
+<pre><code class="language-java">@Query(&quot;select distinct p from Post p join fetch p.author left join fetch p.tags where p.id = :id and p.deletedAt is null&quot;)
+Optional&lt;Post&gt; findDetailById(Long id);
+
+@Modifying
+@Query(&quot;update Post p set p.viewCount = p.viewCount + 1 where p.id = :id&quot;)
+int increaseViewCount(Long id);
+
+@Query(&quot;select c from Comment c join fetch c.author where c.post.id = :postId order by c.createdAt, c.id&quot;)
+List&lt;Comment&gt; findAllWithAuthorByPostId(Long postId);</code></pre>
+<p>글+작성자+태그, 조회수 UPDATE, 댓글+작성자를 각각 한 쿼리로 처리한다. 로그인했을 때만 좋아요 여부 조회가 하나 더 있다.</p>
+</details>
+
+<details>
+<summary>Entity — 테이블·상태</summary>
+
+<p><code>Comment.java</code>. 실제 테이블의 컬럼·외래키와 엔티티 매핑을 대조한다.</p>
+<pre><code class="language-java">@ManyToOne(fetch = FetchType.LAZY, optional = false)
+@JoinColumn(name = &quot;post_id&quot;)
+private Post post;
+
+@ManyToOne(fetch = FetchType.LAZY, optional = false)
+@JoinColumn(name = &quot;author_id&quot;)
+private User author;
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &quot;parent_id&quot;)
+private Comment parent;</code></pre>
+<p><code>parent_id</code>가 <code>null</code>이면 최상위 댓글이고, 값이 있으면 답글이다. <code>deleted_at</code>은 화면 표시와 자리 유지 규칙에 사용한다.</p>
+</details>
+
+<details>
+<summary>설정·보조 코드</summary>
+
+<p><code>CommentTree.java</code>. 이 파일에서 바뀐 설정·보조 타입이 서버 흐름의 어느 단계에 필요한지 확인한다. 변경된 메서드: <code>build</code>.</p>
+<pre><code class="language-java">for (Comment c : flat) {
+    if (c.getParent() != null &amp;&amp; !c.isDeleted()) {
+        repliesByParent.computeIfAbsent(c.getParent().getId(), k -&gt; new ArrayList&lt;&gt;())
+                .add(CommentResponse.reply(c));
+    }
+}</code></pre>
+<p>댓글을 시간순 한 번 읽은 뒤 메모리에서 부모별로 묶는다. 지운 답글은 제외하고, 지운 최상위 댓글은 살아 있는 답글이 있을 때만 남긴다. 전체 반복문은 아래 보조 코드 접기에 있다.</p>
+</details>
+
+<details>
+<summary>MyBatis / Mapper — 상세를 고정 횟수의 JOIN으로 읽기</summary>
+
+<p>선택 경로는 <code>PostMapper.xml</code>의 <code>findDetailRows</code>가 <code>posts</code>·<code>users</code>·<code>post_tags</code>·<code>tags</code>를 한 번에 JOIN한다. 태그 수만큼 반복된 <code>PostDetailRow</code>를 Service에서 글 하나와 이름순 태그 목록으로 조립한다. <code>findCommentRows</code>는 <code>comments</code>와 작성자 <code>users</code>를 한 번에 JOIN하고 <code>parentId</code>로 답글 트리를 만든다.</p>
+<pre><code class="language-xml">&lt;select id=&quot;findCommentRows&quot; resultType=&quot;org.example.board.comment.CommentRow&quot;&gt;
+    SELECT c.id, c.parent_id AS parentId, c.content, c.created_at AS createdAt,
+           c.deleted_at AS deletedAt, a.id AS authorId, a.nickname AS authorNickname
+    FROM comments c JOIN users a ON a.id = c.author_id
+    WHERE c.post_id = #{postId}
+    ORDER BY c.created_at, c.id
+&lt;/select&gt;
+&lt;update id=&quot;increaseViewCount&quot;&gt;
+    UPDATE posts SET view_count = view_count + 1 WHERE id = #{postId}
+&lt;/update&gt;</code></pre>
+<p>비로그인은 글 JOIN·조회수 UPDATE·댓글 JOIN 3번, 로그인하면 좋아요 여부 SELECT까지 4번이다. 10-5의 MyBatis 가입·인증·글쓰기 경로도 포함해 기본 10-6 스냅샷에 적용할 21개 파일 전문은 아래 <strong>MyBatis 대체 구현 코드</strong>에서 펼쳐 볼 수 있다.</p>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>Entity — src/main/java/org/example/board/comment/Comment.java</summary><pre><code>package org.example.board.comment;
+
+<p>import java.time.LocalDateTime;</p>
+<p>import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import org.example.board.post.Post;
+import org.example.board.user.User;</p>
+<p>@Entity
+@Table(name = &quot;comments&quot;)
+public class Comment {</p>
+<pre><code>@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+@ManyToOne(fetch = FetchType.LAZY, optional = false)
+@JoinColumn(name = &amp;quot;post_id&amp;quot;)
+private Post post;
+
+@ManyToOne(fetch = FetchType.LAZY, optional = false)
+@JoinColumn(name = &amp;quot;author_id&amp;quot;)
+private User author;
+
+// 최상위 댓글이면 null. 답글의 답글은 받지 않는다(한 단계만)
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &amp;quot;parent_id&amp;quot;)
+private Comment parent;
+
+@Column(nullable = false, length = 500)
+private String content;
+
+@Column(name = &amp;quot;created_at&amp;quot;, nullable = false)
+private LocalDateTime createdAt;
+
+@Column(name = &amp;quot;deleted_at&amp;quot;)
+private LocalDateTime deletedAt;
+
+protected Comment() {
+}
+
+public Long getId() {
+    return id;
+}
+
+public Post getPost() {
+    return post;
+}
+
+public User getAuthor() {
+    return author;
+}
+
+public Comment getParent() {
+    return parent;
+}
+
+public String getContent() {
+    return content;
+}
+
+public LocalDateTime getCreatedAt() {
+    return createdAt;
+}
+
+public boolean isDeleted() {
+    return deletedAt != null;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/comment/CommentRepository.java</summary><pre><code>package org.example.board.comment;
+
+<p>import java.util.List;</p>
+<p>import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;</p>
+<p>public interface CommentRepository extends JpaRepository&lt;Comment, Long&gt; {</p>
+<pre><code>// 글의 댓글 전부를 작성자와 함께 한 번에(댓글마다 작성자를 따로 읽는 N+1을 피한다)
+@Query(&amp;quot;select c from Comment c join fetch c.author where c.post.id = :postId order by c.createdAt, c.id&amp;quot;)
+List&amp;lt;Comment&amp;gt; findAllWithAuthorByPostId(Long postId);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/comment/CommentResponse.java</summary><pre><code>package org.example.board.comment;
+
+<p>import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>import com.fasterxml.jackson.annotation.JsonInclude;
+import org.example.board.post.AuthorResponse;</p>
+<p>// 최상위 댓글은 replies(답글 목록)를 가진다. 답글에는 replies가 없다
+public record CommentResponse(
+        Long id,
+        String content,
+        AuthorResponse author,
+        boolean deleted,
+        LocalDateTime createdAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) List&lt;CommentResponse&gt; replies) {</p>
+<pre><code>static final String DELETED_CONTENT = &amp;quot;삭제된 댓글입니다&amp;quot;;
+
+static CommentResponse reply(Comment c) {
+    return new CommentResponse(c.getId(), c.getContent(), AuthorResponse.from(c.getAuthor()), false,
+            c.getCreatedAt(), null);
+}
+
+static CommentResponse top(Comment c, List&amp;lt;CommentResponse&amp;gt; replies) {
+    if (c.isDeleted()) {
+        // 지운 부모는 내용·작성자를 숨기고 자리만 남긴다(답글이 고아가 되지 않게)
+        return new CommentResponse(c.getId(), DELETED_CONTENT, null, true, c.getCreatedAt(), replies);
+    }
+    return new CommentResponse(c.getId(), c.getContent(), AuthorResponse.from(c.getAuthor()), false,
+            c.getCreatedAt(), replies);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/comment/CommentTree.java</summary><pre><code>package org.example.board.comment;
+
+<p>import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;</p>
+<p>// 평평한 댓글 목록(시간순) → 최상위 + replies 트리
+public final class CommentTree {</p>
+<pre><code>private CommentTree() {
+}
+
+public static List&amp;lt;CommentResponse&amp;gt; build(List&amp;lt;Comment&amp;gt; flat) {
+    Map&amp;lt;Long, List&amp;lt;CommentResponse&amp;gt;&amp;gt; repliesByParent = new LinkedHashMap&amp;lt;&amp;gt;();
+    for (Comment c : flat) {
+        if (c.getParent() != null &amp;amp;&amp;amp; !c.isDeleted()) {
+            repliesByParent.computeIfAbsent(c.getParent().getId(), k -&amp;gt; new ArrayList&amp;lt;&amp;gt;()).add(CommentResponse.reply(c));
+        }
+    }
+    List&amp;lt;CommentResponse&amp;gt; result = new ArrayList&amp;lt;&amp;gt;();
+    for (Comment c : flat) {
+        if (c.getParent() != null) {
+            continue;
+        }
+        List&amp;lt;CommentResponse&amp;gt; replies = repliesByParent.getOrDefault(c.getId(), List.of());
+        // 지운 댓글에 살아 있는 답글이 없으면 자리도 남기지 않는다
+        if (c.isDeleted() &amp;amp;&amp;amp; replies.isEmpty()) {
+            continue;
+        }
+        result.add(CommentResponse.top(c, replies));
+    }
+    return result;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/board/post/PostController.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.net.URI;</p>
+<p>import jakarta.validation.Valid;
+import org.example.board.auth.LoginUser;
+import org.example.board.common.ApiResponse;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>@RestController
+public class PostController {</p>
+<pre><code>private final PostService postService;
+
+public PostController(PostService postService) {
+    this.postService = postService;
+}
+
+@PostMapping(&amp;quot;/api/v1/posts&amp;quot;)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;PostDetailResponse&amp;gt;&amp;gt; create(@LoginUser Long userId,
+                                                        @Valid @RequestBody PostCreateRequest request) {
+    PostDetailResponse created = postService.create(userId, request);
+    return ResponseEntity.created(URI.create(&amp;quot;/api/v1/posts/&amp;quot; + created.id()))
+            .body(ApiResponse.created(created));
+}
+
+@GetMapping(&amp;quot;/api/v1/posts/{postId}&amp;quot;)
+public ApiResponse&amp;lt;PostDetailResponse&amp;gt; detail(@PathVariable Long postId,
+                                              @LoginUser(required = false) Long userId) {
+    return ApiResponse.ok(postService.detail(postId, userId));
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/post/PostDetailResponse.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>import org.example.board.comment.CommentResponse;</p>
+<p>public record PostDetailResponse(
+        Long id,
+        String title,
+        String content,
+        Visibility visibility,
+        int viewCount,
+        int likeCount,
+        boolean liked,
+        AuthorResponse author,
+        List&lt;String&gt; tags,
+        List&lt;CommentResponse&gt; comments,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt) {</p>
+<pre><code>public static PostDetailResponse of(Post post, int viewCount, boolean liked, List&amp;lt;CommentResponse&amp;gt; comments) {
+    return new PostDetailResponse(post.getId(), post.getTitle(), post.getContent(), post.getVisibility(),
+            viewCount, post.getLikeCount(), liked, AuthorResponse.from(post.getAuthor()),
+            post.getTags().stream().map(Tag::getName).sorted().toList(),
+            comments, post.getCreatedAt(), post.getUpdatedAt());
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/post/PostRepository.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.util.Optional;</p>
+<p>import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;</p>
+<p>public interface PostRepository extends JpaRepository&lt;Post, Long&gt; {</p>
+<pre><code>// 상세 한 번에: 글 + 작성자 + 태그(삭제된 글은 없는 것으로)
+@Query(&amp;quot;select distinct p from Post p join fetch p.author left join fetch p.tags where p.id = :id and p.deletedAt is null&amp;quot;)
+Optional&amp;lt;Post&amp;gt; findDetailById(Long id);
+
+// 조회수는 읽고-더하고-쓰지 않고 DB에서 한 번에 +1(동시에 읽어도 숫자를 잃지 않는다)
+@Modifying
+@Query(&amp;quot;update Post p set p.viewCount = p.viewCount + 1 where p.id = :id&amp;quot;)
+int increaseViewCount(Long id);
+
+@Query(value = &amp;quot;select count(*) from post_likes where post_id = :postId and user_id = :userId&amp;quot;, nativeQuery = true)
+long countLike(Long postId, Long userId);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/post/PostResponse.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/post/PostService.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;</p>
+<p>import org.example.board.comment.CommentRepository;
+import org.example.board.comment.CommentTree;
+import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.user.User;
+import org.example.board.user.UserRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>// 게시글 쓰기 — JPA
+@Service
+public class PostService {</p>
+<pre><code>private final PostRepository postRepository;
+private final TagRepository tagRepository;
+private final UserRepository userRepository;
+private final CommentRepository commentRepository;
+
+public PostService(PostRepository postRepository, TagRepository tagRepository, UserRepository userRepository,
+                   CommentRepository commentRepository) {
+    this.postRepository = postRepository;
+    this.tagRepository = tagRepository;
+    this.userRepository = userRepository;
+    this.commentRepository = commentRepository;
+}
+
+@Transactional
+public PostDetailResponse create(Long userId, PostCreateRequest request) {
+    User author = userRepository.findById(userId)
+            .orElseThrow(() -&amp;gt; new ApiException(ErrorCode.UNAUTHORIZED));
+    Post post = new Post(author, request.title(), request.content(),
+            Visibility.valueOf(request.visibility()), findOrCreateTags(request.tags()));
+    postRepository.save(post);
+    return PostDetailResponse.of(post, post.getViewCount(), false, List.of());
+}
+
+// 상세: 보이는 글인지 확인 → 조회수 +1 → 좋아요 여부·댓글 트리와 함께
+@Transactional
+public PostDetailResponse detail(Long postId, Long loginUserId) {
+    Post post = postRepository.findDetailById(postId)
+            .orElseThrow(() -&amp;gt; new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;));
+    boolean isAuthor = post.getAuthor().getId().equals(loginUserId);
+    if (post.getVisibility() == Visibility.PRIVATE &amp;amp;&amp;amp; !isAuthor) {
+        // 남의 비공개 글은 &amp;quot;있지만 못 본다&amp;quot;(403)가 아니라 &amp;quot;없다&amp;quot;(404) — 있다는 사실도 흘리지 않는다
+        throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+    }
+    postRepository.increaseViewCount(postId);
+    boolean liked = loginUserId != null &amp;amp;&amp;amp; postRepository.countLike(postId, loginUserId) &amp;gt; 0;
+    return PostDetailResponse.of(post, post.getViewCount() + 1, liked,
+            CommentTree.build(commentRepository.findAllWithAuthorByPostId(postId)));
+}
+
+// 이름으로 찾고, 없으면 새로 만든다(tags.name은 UNIQUE)
+private Set&amp;lt;Tag&amp;gt; findOrCreateTags(List&amp;lt;String&amp;gt; names) {
+    Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+    for (String name : names) {
+        tags.add(tagRepository.findByName(name).orElseGet(() -&amp;gt; tagRepository.save(new Tag(name))));
+    }
+    return tags;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/10-6.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="mybatis-대체-구현-코드"><a class="anchor" href="#mybatis-대체-구현-코드" aria-hidden="true">#</a>MyBatis 대체 구현 코드</h2>
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+<p>group = &#39;org.example&#39;
+version = &#39;0.0.1-SNAPSHOT&#39;</p>
+<p>java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}</p>
+<p>repositories {
+    mavenCentral()
+}</p>
+<p>dependencies {
+    // start.spring.io에서 고른 것: Spring Web · Spring Data JPA · Validation · MySQL Driver · Flyway Migration
+    implementation &#39;org.springframework.boot:spring-boot-starter-webmvc&#39;
+    implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;
+    implementation &#39;org.springframework.boot:spring-boot-starter-validation&#39;
+    implementation &#39;org.springframework.boot:spring-boot-starter-flyway&#39;
+    // 10-3 비밀번호 해시(BCrypt) — Spring Security 전체가 아니라 암호화 모듈만
+    implementation &#39;org.springframework.security:spring-security-crypto&#39;
+    // 10-4 JWT 발급·검증(jjwt) — api는 컴파일에, 구현·JSON 처리는 실행할 때만
+    implementation &#39;io.jsonwebtoken:jjwt-api:0.13.0&#39;
+    runtimeOnly &#39;io.jsonwebtoken:jjwt-impl:0.13.0&#39;
+    runtimeOnly &#39;io.jsonwebtoken:jjwt-jackson:0.13.0&#39;
+    runtimeOnly &#39;com.mysql:mysql-connector-j&#39;
+    runtimeOnly &#39;org.flywaydb:flyway-mysql&#39;</p>
+<pre><code>testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'</code></pre>
+<p>}</p>
+<p>tasks.named(&#39;test&#39;) {
+    useJUnitPlatform()
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/auth/AuthService.java</summary><pre><code>package org.example.board.auth;
+
+<p>import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.user.User;
+import org.example.board.user.UserMapper;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>@Service
+public class AuthService {</p>
+<pre><code>// 없는 이메일과 틀린 비밀번호를 같은 문구로 — 어느 이메일이 가입돼 있는지 흘리지 않는다
+private static final String LOGIN_FAILED = &amp;quot;이메일 또는 비밀번호가 올바르지 않습니다.&amp;quot;;
+
+private final UserMapper userMapper;
+private final PasswordEncoder passwordEncoder;
+private final JwtProvider jwtProvider;
+
+public AuthService(UserMapper userMapper, PasswordEncoder passwordEncoder, JwtProvider jwtProvider) {
+    this.userMapper = userMapper;
+    this.passwordEncoder = passwordEncoder;
+    this.jwtProvider = jwtProvider;
+}
+
+@Transactional(readOnly = true)
+public TokenResponse login(LoginRequest request) {
+    User user = userMapper.findByEmail(request.email());
+    if (user == null) throw new ApiException(ErrorCode.UNAUTHORIZED, LOGIN_FAILED);
+    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        throw new ApiException(ErrorCode.UNAUTHORIZED, LOGIN_FAILED);
+    }
+    return new TokenResponse(jwtProvider.issue(user.getId()), jwtProvider.validitySeconds());
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/comment/Comment.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/comment/CommentRepository.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/comment/CommentResponse.java</summary><pre><code>package org.example.board.comment;
+
+<p>import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>import com.fasterxml.jackson.annotation.JsonInclude;
+import org.example.board.post.AuthorResponse;</p>
+<p>// 최상위 댓글은 replies(답글 목록)를 가진다. 답글에는 replies가 없다
+public record CommentResponse(
+        Long id,
+        String content,
+        AuthorResponse author,
+        boolean deleted,
+        LocalDateTime createdAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) List&lt;CommentResponse&gt; replies) {</p>
+<pre><code>static final String DELETED_CONTENT = &amp;quot;삭제된 댓글입니다&amp;quot;;
+
+static CommentResponse reply(CommentRow c) {
+    return new CommentResponse(c.id, c.content, new AuthorResponse(c.authorId, c.authorNickname), false,
+            c.createdAt, null);
+}
+
+static CommentResponse top(CommentRow c, List&amp;lt;CommentResponse&amp;gt; replies) {
+    if (c.deletedAt != null) {
+        // 지운 부모는 내용·작성자를 숨기고 자리만 남긴다(답글이 고아가 되지 않게)
+        return new CommentResponse(c.id, DELETED_CONTENT, null, true, c.createdAt, replies);
+    }
+    return new CommentResponse(c.id, c.content, new AuthorResponse(c.authorId, c.authorNickname), false,
+            c.createdAt, replies);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/comment/CommentRow.java</summary><pre><code>package org.example.board.comment;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 댓글·작성자 JOIN의 한 행. parentId로 메모리에서 답글을 묶는다.
+public class CommentRow {
+    public Long id;
+    public Long parentId;
+    public String content;
+    public Long authorId;
+    public String authorNickname;
+    public LocalDateTime createdAt;
+    public LocalDateTime deletedAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/comment/CommentTree.java</summary><pre><code>package org.example.board.comment;
+
+<p>import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;</p>
+<p>// 평평한 댓글 목록(시간순) → 최상위 + replies 트리
+public final class CommentTree {</p>
+<pre><code>private CommentTree() {
+}
+
+public static List&amp;lt;CommentResponse&amp;gt; build(List&amp;lt;CommentRow&amp;gt; flat) {
+    Map&amp;lt;Long, List&amp;lt;CommentResponse&amp;gt;&amp;gt; repliesByParent = new LinkedHashMap&amp;lt;&amp;gt;();
+    for (CommentRow c : flat) {
+        if (c.parentId != null &amp;amp;&amp;amp; c.deletedAt == null) {
+            repliesByParent.computeIfAbsent(c.parentId, k -&amp;gt; new ArrayList&amp;lt;&amp;gt;()).add(CommentResponse.reply(c));
+        }
+    }
+    List&amp;lt;CommentResponse&amp;gt; result = new ArrayList&amp;lt;&amp;gt;();
+    for (CommentRow c : flat) {
+        if (c.parentId != null) {
+            continue;
+        }
+        List&amp;lt;CommentResponse&amp;gt; replies = repliesByParent.getOrDefault(c.id, List.of());
+        // 지운 댓글에 살아 있는 답글이 없으면 자리도 남기지 않는다
+        if (c.deletedAt != null &amp;amp;&amp;amp; replies.isEmpty()) {
+            continue;
+        }
+        result.add(CommentResponse.top(c, replies));
+    }
+    return result;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/post/Post.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashSet;
+import java.util.Set;</p>
+<p>import org.example.board.user.User;</p>
+<p>public class Post {</p>
+<pre><code>private Long id;
+
+private User author;
+
+private String title;
+
+private String content;
+
+private Visibility visibility;
+
+private int viewCount;
+
+private int likeCount;
+
+// MyBatis 경로에서는 Service가 post_tags INSERT를 명시적으로 수행한다.
+private Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+
+private LocalDateTime createdAt;
+
+private LocalDateTime updatedAt;
+
+private LocalDateTime deletedAt;
+
+public Post() {
+}
+
+public Post(User author, String title, String content, Visibility visibility, Set&amp;lt;Tag&amp;gt; tags) {
+    this.author = author;
+    this.title = title;
+    this.content = content;
+    this.visibility = visibility;
+    this.tags.addAll(tags);
+    this.createdAt = now();
+    this.updatedAt = this.createdAt;
+}
+
+private static LocalDateTime now() {
+    return LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+}
+
+public Long getId() {
+    return id;
+}
+
+public void setId(Long id) {
+    this.id = id;
+}
+
+public User getAuthor() {
+    return author;
+}
+
+public String getTitle() {
+    return title;
+}
+
+public String getContent() {
+    return content;
+}
+
+public Visibility getVisibility() {
+    return visibility;
+}
+
+public int getViewCount() {
+    return viewCount;
+}
+
+public int getLikeCount() {
+    return likeCount;
+}
+
+public Set&amp;lt;Tag&amp;gt; getTags() {
+    return tags;
+}
+
+public LocalDateTime getCreatedAt() {
+    return createdAt;
+}
+
+public LocalDateTime getUpdatedAt() {
+    return updatedAt;
+}
+
+public LocalDateTime getDeletedAt() {
+    return deletedAt;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/post/PostDetailRow.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 글·작성자·태그 LEFT JOIN 결과의 평평한 한 행. 태그 하나마다 글 필드가 반복된다.
+public class PostDetailRow {
+    public Long id;
+    public String title;
+    public String content;
+    public String visibility;
+    public int viewCount;
+    public int likeCount;
+    public Long authorId;
+    public String authorNickname;
+    public Long tagId;
+    public String tagName;
+    public LocalDateTime createdAt;
+    public LocalDateTime updatedAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/board/post/PostMapper.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.util.List;</p>
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.example.board.comment.CommentRow;</p>
+<p>@Mapper
+public interface PostMapper {
+    void insertPost(Post post);
+    Tag findTagByName(String name);
+    void insertTag(Tag tag);
+    void linkTag(@Param(&quot;postId&quot;) Long postId, @Param(&quot;tagId&quot;) Long tagId);</p>
+<pre><code>List&amp;lt;PostDetailRow&amp;gt; findDetailRows(Long postId);
+int increaseViewCount(Long postId);
+long countLike(@Param(&amp;quot;postId&amp;quot;) Long postId, @Param(&amp;quot;userId&amp;quot;) Long userId);
+List&amp;lt;CommentRow&amp;gt; findCommentRows(Long postId);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/post/PostRepository.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/post/PostService.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;</p>
+<p>import org.example.board.comment.CommentTree;
+import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.user.User;
+import org.example.board.user.UserMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>@Service
+public class PostService {
+    private final PostMapper postMapper;
+    private final UserMapper userMapper;</p>
+<pre><code>public PostService(PostMapper postMapper, UserMapper userMapper) {
+    this.postMapper = postMapper;
+    this.userMapper = userMapper;
+}
+
+@Transactional
+public PostDetailResponse create(Long userId, PostCreateRequest request) {
+    User author = userMapper.findById(userId);
+    if (author == null) throw new ApiException(ErrorCode.UNAUTHORIZED);
+    Set&amp;lt;Tag&amp;gt; tags = findOrCreateTags(request.tags());
+    Post post = new Post(author, request.title(), request.content(),
+            Visibility.valueOf(request.visibility()), tags);
+    postMapper.insertPost(post);
+    for (Tag tag : tags) postMapper.linkTag(post.getId(), tag.getId());
+    return PostDetailResponse.of(post, post.getViewCount(), false, List.of());
+}
+
+@Transactional
+public PostDetailResponse detail(Long postId, Long loginUserId) {
+    List&amp;lt;PostDetailRow&amp;gt; rows = postMapper.findDetailRows(postId);
+    if (rows.isEmpty()) throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+    PostDetailRow first = rows.get(0);
+    if (&amp;quot;PRIVATE&amp;quot;.equals(first.visibility) &amp;amp;&amp;amp; !first.authorId.equals(loginUserId))
+        throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+    postMapper.increaseViewCount(postId);
+    boolean liked = loginUserId != null &amp;amp;&amp;amp; postMapper.countLike(postId, loginUserId) &amp;gt; 0;
+    List&amp;lt;String&amp;gt; tags = new ArrayList&amp;lt;&amp;gt;();
+    for (PostDetailRow row : rows) if (row.tagName != null) tags.add(row.tagName);
+    return new PostDetailResponse(first.id, first.title, first.content,
+            Visibility.valueOf(first.visibility), first.viewCount + 1, first.likeCount,
+            liked, new AuthorResponse(first.authorId, first.authorNickname), tags,
+            CommentTree.build(postMapper.findCommentRows(postId)), first.createdAt, first.updatedAt);
+}
+
+private Set&amp;lt;Tag&amp;gt; findOrCreateTags(List&amp;lt;String&amp;gt; names) {
+    Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+    for (String name : names) {
+        Tag tag = postMapper.findTagByName(name);
+        if (tag == null) {
+            tag = new Tag(name);
+            postMapper.insertTag(tag);
+        }
+        tags.add(tag);
+    }
+    return tags;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/post/Tag.java</summary><pre><code>package org.example.board.post;
+
+<p>public class Tag {
+    private Long id;
+    private String name;</p>
+<pre><code>public Tag() {
+    // MyBatis 조회 결과용 생성자
+}
+
+public Tag(String name) {
+    this.name = name;
+}
+
+public Long getId() {
+    return id;
+}
+
+public void setId(Long id) {
+    this.id = id;
+}
+
+public String getName() {
+    return name;
+}
+
+public void setName(String name) {
+    this.name = name;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/post/TagRepository.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/user/User.java</summary><pre><code>package org.example.board.user;
+
+<p>import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;</p>
+<p>public class User {</p>
+<pre><code>private Long id;
+
+private String email;
+
+private String passwordHash;
+
+private String nickname;
+
+private LocalDateTime createdAt;
+
+public User() {
+    // MyBatis가 SELECT 결과를 매핑할 때 사용한다.
+}
+
+public User(String email, String passwordHash, String nickname) {
+    this.email = email;
+    this.passwordHash = passwordHash;
+    this.nickname = nickname;
+    this.createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+}
+
+public Long getId() {
+    return id;
+}
+
+public void setId(Long id) {
+    this.id = id;
+}
+
+public String getEmail() {
+    return email;
+}
+
+public void setEmail(String email) {
+    this.email = email;
+}
+
+public String getPasswordHash() {
+    return passwordHash;
+}
+
+public void setPasswordHash(String passwordHash) {
+    this.passwordHash = passwordHash;
+}
+
+public String getNickname() {
+    return nickname;
+}
+
+public void setNickname(String nickname) {
+    this.nickname = nickname;
+}
+
+public LocalDateTime getCreatedAt() {
+    return createdAt;
+}
+
+public void setCreatedAt(LocalDateTime createdAt) {
+    this.createdAt = createdAt;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/board/user/UserMapper.java</summary><pre><code>package org.example.board.user;
+
+<p>import org.apache.ibatis.annotations.Mapper;</p>
+<p>@Mapper
+public interface UserMapper {
+    boolean existsByEmail(String email);
+    User findByEmail(String email);
+    User findById(Long id);
+    void insert(User user);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/user/UserRepository.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/user/UserService.java</summary><pre><code>package org.example.board.user;
+
+<p>import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>@Service
+public class UserService {</p>
+<pre><code>private final UserMapper userMapper;
+private final PasswordEncoder passwordEncoder;
+
+public UserService(UserMapper userMapper, PasswordEncoder passwordEncoder) {
+    this.userMapper = userMapper;
+    this.passwordEncoder = passwordEncoder;
+}
+
+@Transactional
+public UserResponse signup(SignupRequest request) {
+    if (userMapper.existsByEmail(request.email())) {
+        throw new ApiException(ErrorCode.DUPLICATE, &amp;quot;이미 가입된 이메일입니다.&amp;quot;);
+    }
+    User user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname());
+    try {
+        userMapper.insert(user);
+    } catch (DuplicateKeyException e) {
+        // 확인과 저장 사이에 같은 이메일이 먼저 들어간 경우 — DB의 UNIQUE가 마지막 방어선이다
+        throw new ApiException(ErrorCode.DUPLICATE, &amp;quot;이미 가입된 이메일입니다.&amp;quot;);
+    }
+    return UserResponse.from(user);
+}
+
+@Transactional(readOnly = true)
+public UserResponse me(Long userId) {
+    // 토큰은 맞는데 회원이 없다(DB를 되돌린 뒤 옛 토큰 등) — 로그인부터 다시
+    User user = userMapper.findById(userId);
+    if (user == null) throw new ApiException(ErrorCode.UNAUTHORIZED);
+    return UserResponse.from(user);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: board-api
+  datasource:
+    # javaExperience MySQL(호스트 3306)의 project DB. 빈 DB면 Flyway가 V1으로 테이블·시드를 만든다
+    url: jdbc:mysql://localhost:13308/project?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+
+<p>app:
+  jwt:
+    # 예시용 비밀키 — 실제 서비스에서는 코드·저장소에 두지 않고 환경 변수 등으로 주입한다. HS256은 32바이트 이상
+    secret: board-api-example-secret-key-change-me-0123456789
+    validity-seconds: 3600</p>
+<p>mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/PostMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.board.post.PostMapper&quot;&gt;
+    &lt;insert id=&quot;insertPost&quot; parameterType=&quot;org.example.board.post.Post&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+        INSERT INTO posts (author_id, title, content, visibility, view_count, like_count, created_at, updated_at, deleted_at)
+        VALUES (#{author.id}, #{title}, #{content}, #{visibility}, 0, 0, #{createdAt}, #{updatedAt}, NULL)
+    &lt;/insert&gt;
+    &lt;select id=&quot;findTagByName&quot; resultType=&quot;org.example.board.post.Tag&quot;&gt;
+        SELECT id, name FROM tags WHERE name = #{name}
+    &lt;/select&gt;
+    &lt;insert id=&quot;insertTag&quot; parameterType=&quot;org.example.board.post.Tag&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+        INSERT INTO tags (name) VALUES (#{name})
+    &lt;/insert&gt;
+    &lt;insert id=&quot;linkTag&quot;&gt;
+        INSERT INTO post_tags (post_id, tag_id) VALUES (#{postId}, #{tagId})
+    &lt;/insert&gt;
+    &lt;select id=&quot;findDetailRows&quot; resultType=&quot;org.example.board.post.PostDetailRow&quot;&gt;
+        SELECT p.id, p.title, p.content, p.visibility,
+               p.view_count AS viewCount, p.like_count AS likeCount,
+               p.created_at AS createdAt, p.updated_at AS updatedAt,
+               a.id AS authorId, a.nickname AS authorNickname,
+               t.id AS tagId, t.name AS tagName
+        FROM posts p
+        JOIN users a ON a.id = p.author_id
+        LEFT JOIN post_tags pt ON pt.post_id = p.id
+        LEFT JOIN tags t ON t.id = pt.tag_id
+        WHERE p.id = #{postId} AND p.deleted_at IS NULL
+        ORDER BY t.name
+    &lt;/select&gt;
+    &lt;update id=&quot;increaseViewCount&quot;&gt;
+        UPDATE posts SET view_count = view_count + 1 WHERE id = #{postId}
+    &lt;/update&gt;
+    &lt;select id=&quot;countLike&quot; resultType=&quot;long&quot;&gt;
+        SELECT COUNT(*) FROM post_likes WHERE post_id = #{postId} AND user_id = #{userId}
+    &lt;/select&gt;
+    &lt;select id=&quot;findCommentRows&quot; resultType=&quot;org.example.board.comment.CommentRow&quot;&gt;
+        SELECT c.id, c.parent_id AS parentId, c.content, c.created_at AS createdAt,
+               c.deleted_at AS deletedAt, a.id AS authorId, a.nickname AS authorNickname
+        FROM comments c JOIN users a ON a.id = c.author_id
+        WHERE c.post_id = #{postId}
+        ORDER BY c.created_at, c.id
+    &lt;/select&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/UserMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.board.user.UserMapper&quot;&gt;
+    &lt;select id=&quot;existsByEmail&quot; resultType=&quot;boolean&quot;&gt;
+        SELECT EXISTS(SELECT 1 FROM users WHERE email = #{email})
+    &lt;/select&gt;
+    &lt;select id=&quot;findByEmail&quot; resultType=&quot;org.example.board.user.User&quot;&gt;
+        SELECT id, email, password_hash, nickname, created_at
+        FROM users WHERE email = #{email}
+    &lt;/select&gt;
+    &lt;select id=&quot;findById&quot; resultType=&quot;org.example.board.user.User&quot;&gt;
+        SELECT id, email, password_hash, nickname, created_at
+        FROM users WHERE id = #{id}
+    &lt;/select&gt;
+    &lt;insert id=&quot;insert&quot; parameterType=&quot;org.example.board.user.User&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+        INSERT INTO users (email, password_hash, nickname, created_at)
+        VALUES (#{email}, #{passwordHash}, #{nickname}, #{createdAt})
+    &lt;/insert&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080
+tok() { curl -s -X POST &quot;$BASE/api/v1/auth/login&quot; -H 'Content-Type: application/json' \
+  -d &quot;{\&quot;email\&quot;:\&quot;$1@example.com\&quot;,\&quot;password\&quot;:\&quot;password1234\&quot;}&quot; | sed -E 's/.*&quot;accessToken&quot;:&quot;([^&quot;]+)&quot;.*/\1/'; }
+KIM=$(tok kim); LEE=$(tok lee)
+
+curl -s &quot;$BASE/api/v1/posts/1&quot;; echo                                  # A 비로그인 상세(트리)
+curl -s &quot;$BASE/api/v1/posts/1&quot;; echo                                  # B 다시 — viewCount +1
+curl -s &quot;$BASE/api/v1/posts/11&quot; -H &quot;Authorization: Bearer $KIM&quot;; echo   # K 김자바가 좋아요한 글
+curl -s &quot;$BASE/api/v1/posts/12&quot; -H &quot;Authorization: Bearer $KIM&quot;; echo   # K2 안 누른 글
+curl -s -i &quot;$BASE/api/v1/posts/24&quot;; echo                                # P1 비공개 — 비로그인
+curl -s -i &quot;$BASE/api/v1/posts/24&quot; -H &quot;Authorization: Bearer $LEE&quot;; echo  # P2 비공개 — 남
+curl -s -i &quot;$BASE/api/v1/posts/24&quot; -H &quot;Authorization: Bearer $KIM&quot;; echo  # P3 비공개 — 작성자
+curl -s -i &quot;$BASE/api/v1/posts/25&quot;; echo                                # D 삭제된 글
+curl -s -i &quot;$BASE/api/v1/posts/999999&quot;; echo                            # X 없는 글
+curl -s -i &quot;$BASE/api/v1/posts/abc&quot;; echo                               # T 숫자 아님</code></pre></details>
+<p><strong>쿼리 수 세기</strong> — <code>application.yml</code>에 SQL 로그를 켜고 요청 A를 보낸 뒤, 로그에서 <code>org.hibernate.SQL</code> 줄을 센다.</p>
+<pre><code class="language-yaml">logging:
+  level:
+    org.hibernate.SQL: debug</code></pre>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="A" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>A · 비로그인 상세(글 1)</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/posts/1" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.id&quot;,&quot;equals&quot;:1},{&quot;path&quot;:&quot;$.data.author&quot;,&quot;equals&quot;:{&quot;id&quot;:1,&quot;nickname&quot;:&quot;김자바&quot;}},{&quot;path&quot;:&quot;$.data.tags&quot;,&quot;equals&quot;:[&quot;java&quot;]},{&quot;path&quot;:&quot;$.data.likeCount&quot;,&quot;equals&quot;:2},{&quot;path&quot;:&quot;$.data.liked&quot;,&quot;equals&quot;:false},{&quot;path&quot;:&quot;$.data.viewCount&quot;,&quot;type&quot;:&quot;number&quot;}]}
+C2: {&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.comments&quot;,&quot;length&quot;:3},{&quot;path&quot;:&quot;$.data.comments[*].id&quot;,&quot;equals&quot;:[1,4,6]},{&quot;path&quot;:&quot;$.data.comments[0].author&quot;,&quot;equals&quot;:{&quot;id&quot;:2,&quot;nickname&quot;:&quot;이스프링&quot;}},{&quot;path&quot;:&quot;$.data.comments[0].replies[*].id&quot;,&quot;equals&quot;:[2,3]},{&quot;path&quot;:&quot;$.data.comments[0].replies[0].content&quot;,&quot;equals&quot;:&quot;저도 그렇게 생각해요&quot;},{&quot;path&quot;:&quot;$.data.comments[1].deleted&quot;,&quot;equals&quot;:true},{&quot;path&quot;:&quot;$.data.comments[1].content&quot;,&quot;equals&quot;:&quot;삭제된 댓글입니다&quot;},{&quot;path&quot;:&quot;$.data.comments[1].author&quot;,&quot;type&quot;:&quot;null&quot;},{&quot;path&quot;:&quot;$.data.comments[1].replies[*].id&quot;,&quot;equals&quot;:[5]},{&quot;path&quot;:&quot;$.data.comments[2].replies&quot;,&quot;equals&quot;:[]}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="B" data-method="GET" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>B · 다시 — 조회수 +1</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/posts/1" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.viewCount&quot;,&quot;equals&quot;:&quot;{{A.body.data.viewCount + 1}}&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="L" data-method="POST" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>L · 로그인(김자바)</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="M" data-method="POST" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>M · 로그인(이스프링)</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;lee@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;lee@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="K" data-method="GET" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>K · 김자바가 좋아요한 글 11</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/posts/11" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.liked&quot;,&quot;equals&quot;:true},{&quot;path&quot;:&quot;$.data.likeCount&quot;,&quot;equals&quot;:3}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="K2" data-method="GET" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>K2 · 김자바가 안 누른 글 12</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/posts/12" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.liked&quot;,&quot;equals&quot;:false}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="P1" data-method="GET" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>P1 · 비공개 글 — 비로그인</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/posts/24" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:404,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;NOT_FOUND&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="P2" data-method="GET" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>P2 · 비공개 글 — 남(이스프링)</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/posts/24" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{M.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{M.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:404,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;NOT_FOUND&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="P3" data-method="GET" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>P3 · 비공개 글 — 작성자(김자바)</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/posts/24" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.visibility&quot;,&quot;equals&quot;:&quot;PRIVATE&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="D" data-method="GET" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>D · 삭제된 글</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/posts/25" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:404,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;NOT_FOUND&quot;},{&quot;path&quot;:&quot;$.data&quot;,&quot;type&quot;:&quot;null&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="X" data-method="GET" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>X · 없는 글</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/posts/999999" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:404,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;NOT_FOUND&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="T" data-method="GET" data-request-index="11" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T · 숫자 아님</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/posts/abc" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 A</td>
+<td><code>200</code>, <code>id</code>=<code>1</code>, <code>author</code>=<code>{id: 1, nickname: 김자바}</code>, <code>tags</code>=<code>[&quot;java&quot;]</code>, <code>likeCount</code>=<code>2</code>, <code>liked</code>=<code>false</code>(비로그인), <code>viewCount</code>는 숫자</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 A</td>
+<td>최상위 댓글 id가 <code>[1, 4, 6]</code> 순서. 1의 작성자는 이스프링, 답글 id <code>[2, 3]</code>. 4는 <code>deleted</code>=<code>true</code>, <code>content</code>=<code>삭제된 댓글입니다</code>, <code>author</code>=<code>null</code>, 답글 <code>[5]</code>. 6의 <code>replies</code>=<code>[]</code>. 7·8은 없다</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 B</td>
+<td><code>viewCount</code> = 요청 A의 <code>viewCount</code> + 1</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 K·K2</td>
+<td>김자바로 글 11은 <code>liked</code>=<code>true</code>, <code>likeCount</code>=<code>3</code>. 글 12는 <code>liked</code>=<code>false</code></td>
+</tr>
+<tr>
+<td>C5</td>
+<td>요청 P1·P2·P3</td>
+<td>비공개 글 24: 비로그인 <code>404</code>, 이스프링 <code>404</code>, 작성자 김자바 <code>200</code>(<code>visibility</code>=<code>PRIVATE</code>)</td>
+</tr>
+<tr>
+<td>C6</td>
+<td>요청 D·X</td>
+<td>삭제된 글·없는 글 모두 <code>404 NOT_FOUND</code>, <code>data</code>=<code>null</code></td>
+</tr>
+<tr>
+<td>C7</td>
+<td>요청 T</td>
+<td><code>400 VALIDATION_FAILED</code></td>
+</tr>
+<tr>
+<td>D1</td>
+<td>요청 A 직후 <code>SELECT view_count FROM posts WHERE id = 1</code></td>
+<td>요청 A 응답의 <code>viewCount</code>와 같다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>쿼리 수</td>
+<td>SQL 로그에서 요청 A 하나에 나가는 쿼리가 댓글 수와 상관없이 고정이다(글·작성자·태그 1, 조회수 UPDATE 1, 댓글·작성자 1 — 로그인 시 좋아요 여부 +1)</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>조회수</td>
+<td>엔티티 값을 +1 해서 저장하지 않고 <code>UPDATE ... SET view_count = view_count + 1</code> 한 번</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>접근 규칙</td>
+<td>&quot;보이는 글인가&quot;(삭제·비공개) 판단이 한곳(메서드 하나)에 있다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../lessons/E4-jpa-associations.html">E4 JPA 연관관계 첫걸음</a> — 지연 로딩, N+1을 SQL 로그로 세고 fetch join으로 줄이기</li>
+<li><a href="../../lessons/E3-what-is-jpa.html">E3 JPA는 무엇인가</a></li>
+<li><a href="../../lessons/G2-access-rules-in-one-place.html">G2 권한 규칙을 한 곳에</a> — 404와 403을 고르는 기준</li>
+<li><a href="../../lessons/H1-concurrency-taste.html">H1 동시성 맛보기</a> — 조회수를 읽고-더하고-쓰면 생기는 일</li>
+<li><a href="../../docs/knowledge/S09-jpa-hibernate.html">S09 JPA·Hibernate</a> — 지연 로딩, fetch join, N+1</li>
+<li><a href="../../docs/knowledge/S10-spring-data-query.html">S10 Spring Data 쿼리</a> — <code>@Query</code>, <code>@Modifying</code></li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 글·작성자·태그를 한 번에</summary>
+
+<pre><code class="language-java">@Query(&quot;select distinct p from Post p join fetch p.author left join fetch p.tags &quot;
+        + &quot;where p.id = :id and p.deletedAt is null&quot;)
+Optional&lt;Post&gt; findDetailById(Long id);</code></pre>
+<p>태그가 없는 글도 나와야 하니 태그는 <code>left join fetch</code>다. <code>distinct</code>는 태그 수만큼 같은 글이 겹치는 것을 막는다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 댓글을 작성자와 함께</summary>
+
+<p><code>Comment</code> 엔티티(<code>comments</code>)를 만든다. <code>post</code>·<code>author</code>·<code>parent</code>는 모두 <code>@ManyToOne(fetch = LAZY)</code>다. 저장소에서 이렇게 읽는다.</p>
+<pre><code class="language-java">@Query(&quot;select c from Comment c join fetch c.author where c.post.id = :postId order by c.createdAt, c.id&quot;)
+List&lt;Comment&gt; findAllWithAuthorByPostId(Long postId);</code></pre>
+<p><code>c.getParent().getId()</code>는 부모를 따로 조회하지 않는다. 지연 로딩 프록시도 id는 이미 알고 있다.</p>
+</details>
+
+<details>
+<summary>힌트 3 — 평평한 목록 → 트리</summary>
+
+<ol>
+<li>한 바퀴 돌며 <strong>살아 있는 답글</strong>을 <code>Map&lt;부모 id, List&lt;답글&gt;&gt;</code>에 모은다.</li>
+<li>다시 돌며 최상위 댓글마다 <code>replies = map.getOrDefault(id, List.of())</code>를 붙인다.</li>
+<li>최상위가 삭제됐는데 <code>replies</code>가 비었으면 건너뛴다. 남기면 내용·작성자를 가린다.</li>
+</ol>
+<p>답글 항목에 <code>replies</code>를 아예 빼고 싶으면 그 필드에 <code>@JsonInclude(JsonInclude.Include.NON_NULL)</code>을 붙이고 답글은 <code>null</code>로 만든다.</p>
+</details>
+
+<details>
+<summary>힌트 4 — 조회수 +1과 응답 값</summary>
+
+<pre><code class="language-java">@Modifying
+@Query(&quot;update Post p set p.viewCount = p.viewCount + 1 where p.id = :id&quot;)
+int increaseViewCount(Long id);</code></pre>
+<p>서비스 메서드에 <code>@Transactional</code>이 있어야 한다(<code>@Modifying</code> 쿼리는 트랜잭션 안에서만). 벌크 UPDATE는 이미 읽어 둔 엔티티의 값을 바꾸지 않는다. 응답에는 <code>post.getViewCount() + 1</code>을 싣는다.</p>
+<p>&quot;내가 좋아요했나&quot;는 아직 좋아요 엔티티가 없으니(10-10) 네이티브 쿼리로 센다. <code>@Query(value = &quot;select count(*) from post_likes where post_id = :postId and user_id = :userId&quot;, nativeQuery = true) long countLike(...)</code>처럼 쓴다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="10-7-post-list.html">10-7. 목록</a> — 최신순·인기순·페이지·커서·태그·검색. 조건이 많은 이 API를 JPA(JPQL·<code>Pageable</code>)로 만들고, 원하면 같은 목록을 MyBatis 동적 SQL로도 짜 본다(선택).</p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 10-6. 게시글 상세 — 조회수·작성자·태그·댓글을 한 번에, N+1 없이\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch10-project/10-6-post-detail.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity project -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="10-5-create-post.html">← 이전 10-5. 게시글 작성 — JPA, 검증 규칙·태그·작성자는 토큰 주인</a><a href="10-7-post-list.html">다음 → 10-7. 목록 — 최신·인기·페이지·커서·태그·검색, JPA(JPQL·Pageable)</a></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
+</body>
+</html>

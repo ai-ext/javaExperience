@@ -1,0 +1,53 @@
+package org.example.config;
+
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.example.auth.AuthenticatedMember;
+import org.springdoc.core.models.GroupedOpenApi;
+import org.springdoc.core.utils.SpringDocUtils;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+// 13-7 API 문서 — /v3/api-docs/{그룹}(JSON), /swagger-ui/index.html(화면)
+@Configuration
+public class OpenApiConfig {
+
+    static {
+        // @LoginMember AuthenticatedMember는 요청 값이 아니라 인터셉터가 넣는 값 — 문서에 "me" 같은 쿼리 파라미터로 나오지 않게 뺀다
+        SpringDocUtils.getConfig().addRequestWrapperToIgnore(AuthenticatedMember.class);
+    }
+
+    @Bean
+    public OpenAPI boardOpenApi() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("javaExperience 게시판 API")
+                        .version("13-7")
+                        .description("시나리오 1~13장에서 만든 게시판 API. 토큰은 [Authorize]에 tok-kimjava 같은 값을 넣는다(Bearer 생략)."))
+                // 모든 API에 "Bearer 토큰" 입력칸을 붙인다 — GET은 토큰 없이도 되지만, 넣으면 그 회원 기준으로 답한다
+                .components(new Components().addSecuritySchemes("bearerAuth",
+                        new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer")))
+                .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
+    }
+
+    // 사용자용과 운영용을 나눈다 — 운영 API를 앱 개발자 문서에 섞지 않는다
+    @Bean
+    public GroupedOpenApi publicApi() {
+        return GroupedOpenApi.builder()
+                .group("public")
+                .pathsToMatch("/api/**")
+                .pathsToExclude("/api/admin/**")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi adminApi() {
+        return GroupedOpenApi.builder()
+                .group("admin")
+                .pathsToMatch("/api/admin/**")
+                .build();
+    }
+}

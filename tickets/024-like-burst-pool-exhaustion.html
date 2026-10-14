@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-024. 좋아요가 몰리면 30초씩 멈춘다 — 커넥션 풀 고갈</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="t-024-좋아요가-몰리면-30초씩-멈춘다--커넥션-풀-고갈"><a class="anchor" href="#t-024-좋아요가-몰리면-30초씩-멈춘다--커넥션-풀-고갈" aria-hidden="true">#</a>T-024. 좋아요가 몰리면 30초씩 멈춘다 — 커넥션 풀 고갈</h1>
+<blockquote>
+<p>난이도 고급 · 유형 버그 · DB community · 예상 90분</p>
+</blockquote>
+<h2 id="티켓"><a class="anchor" href="#티켓" aria-hidden="true">#</a>티켓</h2>
+<blockquote>
+<p><strong>요청자</strong> 운영·SRE · <strong>배경</strong> 이벤트 글 두 개가 동시에 화제가 되자 API 전체가 30초 동안 응답하지 않다가 500을 쏟아냈다. 그 시간 DB CPU는 한가했고, 앱 로그에는 <code>HikariPool-1 - Connection is not available, request timed out after 30000ms (total=10, active=10, idle=0, waiting=…)</code>. 누군가 &quot;풀을 50으로 늘리자&quot;고 했다.</p>
+</blockquote>
+<ul>
+<li>좋아요가 동시에 몰려도 요청이 멈추지 않게 고쳐 주세요. <strong>풀 크기를 늘리는 것은 해결로 치지 않습니다</strong>(왜 안 되는지도 설명).</li>
+<li>좋아요·댓글 알림은 계속 만들어져야 합니다. 좋아요가 롤백되면 알림을 만들지 않는 규칙, 알림 저장이 실패해도 좋아요는 성공하는 규칙도 그대로입니다.</li>
+<li><strong>완료 조건</strong>: 회원 20명이 글 두 개에 동시에 좋아요(서로 다른 40건)를 눌러도 모두 몇 초 안에 <code>200</code>, 두 글의 좋아요 수가 각각 20, 잠시 뒤 알림이 40개 생긴다.</li>
+</ul>
+<p><strong>DB 시작 상태</strong>: <code>community</code> 처음 상태(<code>bash scripts/java-db.sh --reset</code>). 기준 코드로 앱을 켜면 Flyway가 V2<del>V6을 적용한다. 박디비(회원 4)의 글 15·17(자유글 04·06, 처음 좋아요 0)에 동시성 회원 <code>tok-c01</code></del><code>tok-c20</code>이 좋아요를 누른다. 커넥션 풀은 Spring Boot 기본(HikariCP 최대 10개)이다.</p>
+<h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
+<p>고급 티켓이라 실마리는 없다. <code>직접 확인</code>의 <code>xargs -P 40</code> 줄로 재현하고, 멈춘 30초 동안 <code>jcmd &lt;pid&gt; Thread.print</code>(또는 IntelliJ 디버거의 스레드 덤프)로 요청 스레드들이 <strong>어디서</strong> 기다리는지 본다.</p>
+<blockquote>
+<p>브라우저의 버튼 확인은 같은 서버로 동시에 6개 정도만 보낸다(HTTP/1.1 연결 수 제한). 6개로는 풀 10개가 바닥나지 않아 <strong>기준 코드에서도 통과할 수 있다</strong> — 재현은 터미널(<code>xargs -P 40</code>)로 한다.</p>
+</blockquote>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>이벤트 글 두 개 — 좋아요 폭주</h3><p>서로 다른 회원 40명분의 좋아요가 거의 동시에 온다. 모두 바로 처리되고, 글 작성자에게 알림이 쌓여야 한다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>자유글 04</strong><span>동시성01(회원 7)</span></div><div class="screen-widget screen-stats"><strong>stats</strong><span>좋아요</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>좋아요</span></div><div class="screen-widget screen-code"><strong>앱 로그</strong><span>HikariPool-1 - Connection is not available, request timed out after 30000ms (total=10, active=10, idle=0, waiting=30)</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>지금(버그) — 40건이 동시에</summary><ol><li><span class="flow-kind">사용자</span><p>40건의 좋아요가 거의 동시에 들어온다</p></li><li><span class="flow-kind">HTTP 요청</span><p>PUT /api/posts/15/like</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-c01</dd></dl></li><li><span class="flow-kind">서버</span><p>좋아요 트랜잭션 커밋 → 커밋 뒤 리스너가 알림을 만들려고 새 트랜잭션(커넥션)을 연다. 그런데 요청의 첫 커넥션은 아직 반납 전이다</p></li><li><span class="flow-kind">서버</span><p>커넥션 10개를 쥔 요청 10개가 모두 '두 번째 커넥션'을 기다린다 — 아무도 반납하지 않는다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>500</dd><dt>body</dt><dd>(30초 뒤) Could not open JPA EntityManager for transaction</dd></dl></li><li><span class="flow-kind">화면</span><p>버튼이 30초 동안 돌다가 실패 — 다른 API도 같이 멈춘다</p></li></ol></details><details class="scenario-flow"><summary>고친 뒤</summary><ol><li><span class="flow-kind">사용자</span><p>40건이 동시에</p></li><li><span class="flow-kind">HTTP 요청</span><p>PUT /api/posts/15/like</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-c01</dd></dl></li><li><span class="flow-kind">서버</span><p>요청은 좋아요만 커밋하고 커넥션을 바로 반납한다. 알림은 커넥션을 하나만 쓰는 다른 곳에서 만든다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{&quot;postId&quot;: 15, &quot;liked&quot;: true, &quot;likeCount&quot;: 20}</dd></dl></li><li><span class="flow-kind">화면</span><p>모두 바로 처리, 잠시 뒤 작성자에게 알림 40개</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>대상</td>
+<td>좋아요(<code>PUT /api/posts/{id}/like</code>)·댓글 작성 뒤의 알림 생성 경로</td>
+</tr>
+<tr>
+<td>고칠 동작</td>
+<td>동시 요청이 풀 크기 이상 몰려도 요청 하나가 커넥션을 <strong>두 개 동시에</strong> 쥐지 않는다 → 멈추지 않는다</td>
+</tr>
+<tr>
+<td>알림</td>
+<td>좋아요·댓글이 커밋된 뒤에만 만든다(롤백이면 없음). 알림 저장 실패가 좋아요·댓글 응답을 실패로 만들지 않는다. 응답보다 조금 늦게 생겨도 된다</td>
+</tr>
+<tr>
+<td>그대로인 것</td>
+<td>좋아요 응답 모양, 멱등(이미 누른 좋아요는 알림 없음), 교착 상태 재시도</td>
+</tr>
+<tr>
+<td>하지 말 것</td>
+<td>풀 크기·대기 시간만 바꾸기</td>
+</tr>
+</tbody></table></div>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+pairs() { for p in 15 17; do for i in $(seq -w 1 20); do echo &quot;tok-c$i $p&quot;; done; done; }
+
+pairs | xargs -P 40 -L1 sh -c 'curl -s -o /dev/null -X DELETE &quot;'$BASE'/api/posts/$1/like&quot; -H &quot;Authorization: Bearer $0&quot;'   # 요청 R — 다시 돌릴 수 있게 먼저 취소
+time (pairs | xargs -P 40 -L1 sh -c 'curl -s -o /dev/null -w &quot;%{http_code}\n&quot; -X PUT &quot;'$BASE'/api/posts/$1/like&quot; -H &quot;Authorization: Bearer $0&quot;' | sort | uniq -c)   # 요청 P
+curl -s &quot;$BASE/api/posts/15&quot;; curl -s &quot;$BASE/api/posts/17&quot;     # 요청 B1·B2 — likeCount 20</code></pre>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 먼저 40건을 모두 취소하고 다시 누르므로 몇 번을 눌러도 같은 결과다(위 안내처럼 브라우저에서는 기준 코드도 통과할 수 있다).</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="R" data-method="DELETE" data-request-index="0" data-concurrent-count="40" data-concurrent-vars="{&quot;tok&quot;:[&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;],&quot;post&quot;:[&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;]}" data-repeat="0"><h4>R · 먼저 40건 취소(다시 돌리기용)</h4><p class="request-method">DELETE · 동시 요청 40개</p><label>경로 <input class="request-path" value="/api/posts/{{post}}/like" autocomplete="off"></label><div class="request-variables"><label>tok — 토큰을 직접 입력 (한 줄에 하나) <textarea class="request-var-values" data-name="tok" rows="6" placeholder="40개 값, 한 줄에 하나씩"></textarea></label><label>post — 요청별 값 <textarea class="request-var-values" data-name="post" rows="6" placeholder="40개 값, 한 줄에 하나씩">15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17</textarea></label><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{tok}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 동시 요청 40개</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{tok}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="P" data-method="PUT" data-request-index="1" data-concurrent-count="40" data-concurrent-vars="{&quot;tok&quot;:[&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;],&quot;post&quot;:[&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;15&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;,&quot;17&quot;]}" data-repeat="0"><h4>P · 서로 다른 좋아요 40건 동시에</h4><p class="request-method">PUT · 동시 요청 40개</p><label>경로 <input class="request-path" value="/api/posts/{{post}}/like" autocomplete="off"></label><div class="request-variables"><label>tok — 토큰을 직접 입력 (한 줄에 하나) <textarea class="request-var-values" data-name="tok" rows="6" placeholder="40개 값, 한 줄에 하나씩"></textarea></label><label>post — 요청별 값 <textarea class="request-var-values" data-name="post" rows="6" placeholder="40개 값, 한 줄에 하나씩">15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+15
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17
+17</textarea></label><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{tok}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">PUT 동시 요청 40개</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{tok}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.liked&quot;,&quot;equals&quot;:true}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="B1" data-method="GET" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>B1 · 글 15 좋아요 수</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/15" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.likeCount&quot;,&quot;equals&quot;:20}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="B2" data-method="GET" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>B2 · 글 17 좋아요 수</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/17" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.likeCount&quot;,&quot;equals&quot;:20}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP(필수), D = DB(필수, SELECT만), T = 테스트(선택), R = 코드 리뷰(피드백)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 P</td>
+<td>40건 모두 <code>200</code>·<code>liked: true</code> — 기준 코드는 30초 대기 끝에 대부분 <code>500</code>(검증 CLI는 15초에서 시간 초과로 멈춘다)</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 B1·B2</td>
+<td>두 글 모두 <code>likeCount</code> 20</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT COUNT(*) FROM post_like l WHERE l.post_id IN (15, 17) AND NOT EXISTS (SELECT 1 FROM notification n WHERE n.type = &#39;LIKE&#39; AND n.post_id = l.post_id AND n.actor_id = l.member_id)</code></td>
+<td><code>0</code> — 지금 있는 좋아요마다 알림이 있다(버튼 확인 몇 초 뒤). 기준 코드로 재현한 직후엔 0보다 크다</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT post_id, like_count, (SELECT COUNT(*) FROM post_like l WHERE l.post_id = p.id) AS likes FROM post p WHERE p.id IN (15, 17)</code></td>
+<td><code>15 20 20</code>, <code>17 20 20</code></td>
+</tr>
+<tr>
+<td>T1</td>
+<td>(선택) 테스트</td>
+<td>스레드 40개로 좋아요(회원 20 × 글 2)를 동시에 부르고 10초 안에 모두 끝나는지 + 알림 40개(별도 스레드면 잠깐 기다렸다가). 고치기 전 코드에서는 실패해야 한다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>원인</td>
+<td><code>AFTER_COMMIT</code> 리스너는 요청 스레드에서, <strong>커넥션 반납 전에</strong> 돈다. 거기서 <code>REQUIRES_NEW</code>가 커넥션을 하나 더 빌리므로 요청 하나가 두 개를 쥔다. 풀 크기만큼의 요청이 동시에 그 지점에 오면 서로 반납을 기다리는 교착(풀 데드락)이 된다 — 스레드 덤프로 보여 줄 수 있다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>풀을 늘리면?</td>
+<td>풀 크기 N이면 N개 동시에서 또 멈춘다(문제를 옮길 뿐). 요청당 필요한 커넥션 수의 최댓값을 1로 만드는 것이 해결이다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>고친 방법과 대가</td>
+<td>예: 리스너를 크기가 정해진 별도 스레드 풀로(<code>@Async</code>) — 큐가 넘칠 때 정책(<code>CallerRunsPolicy</code>가 왜 위험한지), 서버 종료 때 큐에 남은 알림. 다른 길: 같은 트랜잭션에서 알림을 쓰기(<code>BEFORE_COMMIT</code>·직접 호출 — 알림 실패가 좋아요를 롤백), 아웃박스 테이블(같은 트랜잭션에 기록 + 나중에 발송). 각각 무엇을 얻고 잃는지 말할 수 있다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../docs/knowledge/R08-app-to-db-connection.html">R08 앱 서버와 DB 서버 연결</a> — 커넥션 풀과 대기</li>
+<li><a href="../docs/knowledge/S08-transactions.html">S08 트랜잭션</a> — 전파(<code>REQUIRES_NEW</code>)와 커밋 뒤 콜백</li>
+<li><a href="../docs/knowledge/S15-async-scheduling-batch.html">S15 비동기·스케줄링·배치</a> — <code>@Async</code>와 스레드 풀 설정</li>
+<li><a href="../docs/knowledge/W25-spring-multithreading.html">W25 Spring 멀티스레드</a> — 요청마다 스레드, 공유 자원</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 어디서 기다리나</summary>
+
+<p>멈춘 동안의 스레드 덤프에서 <code>http-nio-…-exec-N</code> 스레드 대부분이 <code>HikariPool.getConnection</code>에서 <code>TIMED_WAITING</code>이다. 그중 정확히 10개(풀 크기)는 아래쪽에 <code>NotificationEventListener.onPostLiked</code> → <code>TransactionSynchronizationUtils.invokeAfterCompletion</code> → <code>AbstractPlatformTransactionManager.processCommit</code>이 있고, 위쪽에 <code>handleExistingTransaction</code>(바깥 트랜잭션이 아직 살아 있다)이 있다. 커밋은 끝났지만 아직 <code>processCommit</code> 안 — 첫 커넥션을 정리(반납)하는 코드는 그 뒤에 있다. 나머지 스레드는 첫 커넥션을 기다린다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 고치기</summary>
+
+<p><code>@EnableAsync</code> + 알림 전용 <code>ThreadPoolTaskExecutor</code>(코어·최대 2, 큐 수천, 넘치면 로그만 남기고 버리기)를 빈으로 만들고, 리스너 두 메서드에 <code>@Async(&quot;그 빈 이름&quot;)</code>을 <code>@TransactionalEventListener</code>와 함께 단다. 요청 스레드는 커밋 직후 커넥션을 반납하고, 알림은 스레드 수만큼만 커넥션을 쓴다.</p>
+</details>
+
+
+</main>
+
+
+</body>
+</html>

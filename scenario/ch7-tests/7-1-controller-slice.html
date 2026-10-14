@@ -9,12 +9,17 @@
 <body>
 <header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
 <main>
-<p class="crumbs"><a href="../README.html">시나리오</a> › 7장. 테스트로 지키기 › 7-1</p>
-<h1 id="7-1-컨트롤러-슬라이스-테스트"><a class="anchor" href="#7-1-컨트롤러-슬라이스-테스트" aria-hidden="true">#</a>7-1. 컨트롤러 슬라이스 테스트</h1>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 7장. 테스트로 지키기 › 7-1</p><p class="level-tags"><span>중급</span><span>게시판 본편</span><span>DB community</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="7-1-컨트롤러-슬라이스-테스트"><a class="anchor" href="#7-1-컨트롤러-슬라이스-테스트" aria-hidden="true">#</a>7-1. 컨트롤러 슬라이스 테스트</h1>
 <h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
 <p>지금까지 확인은 서버를 띄우고 curl을 보내는 식이었다. 코드를 고칠 때마다 사람이 다시 해야 한다. 이제 <strong>자동으로 도는 테스트</strong>로 계약을 고정한다.</p>
 <p>첫 번째는 <strong>컨트롤러만</strong> 시험하는 테스트다. DB도 서비스도 띄우지 않고(가짜로 바꾸고), &quot;이 요청이 오면 이 상태 코드·헤더·JSON이 나간다&quot;는 HTTP 계약만 빠르게 확인한다.</p>
-<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>IntelliJ에서 컨트롤러 테스트 실행</h3><p>서버를 띄우지 않고 MockMvc가 가짜 HTTP 요청을 컨트롤러에 넣는다. DB도 서비스도 진짜가 아니다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>IntelliJ — PostControllerTest</strong><span></span></div><div class="screen-widget screen-code"><strong>실행</strong><span>./gradlew test --tests org.example.post.PostControllerTest</span></div><div class="screen-widget screen-code"><strong>결과</strong><span>PostControllerTest &gt; 올바른 토큰이면 201과 Location() PASSED
+PostControllerTest &gt; 빈 제목이면 400 problem+json() PASSED
+PostControllerTest &gt; 토큰이 없으면 401() PASSED
+PostControllerTest &gt; 없는 글이면 404() PASSED</span></div><div class="screen-widget screen-text"><strong>text</strong><span>실행 로그에 HikariPool·Testcontainers가 없다 — DB를 띄우지 않았다</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>201 시나리오</summary><ol><li><span class="flow-kind">사용자</span><p>테스트를 실행한다(▶ 또는 gradlew)</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts</p><dl><dt>headers</dt><dd>Content-Type: application/json · Authorization: Bearer tok-kimjava</dd><dt>body</dt><dd>{&quot;boardSlug&quot;: &quot;dev&quot;, &quot;title&quot;: &quot;제목&quot;, ...}  ← MockMvc가 만든 요청</dd></dl></li><li><span class="flow-kind">서버</span><p>@WebMvcTest: 컨트롤러·검증·Advice는 진짜, PostService는 @MockitoBean 가짜 — given(postService.create(...)).willReturn(응답)</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>201</dd><dt>headers</dt><dd>Location: /api/posts/1</dd><dt>body</dt><dd>{&quot;id&quot;: 1, &quot;author&quot;: {&quot;id&quot;: 2, ...}}</dd></dl></li><li><span class="flow-kind">화면</span><p>status·header·jsonPath까지 단언하고 통과</p></li></ol></details><details class="scenario-flow"><summary>400 시나리오</summary><ol><li><span class="flow-kind">사용자</span><p>빈 제목 테스트</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts</p><dl><dt>headers</dt><dd>Content-Type: application/json · Authorization: Bearer tok-kimjava</dd><dt>body</dt><dd>{&quot;title&quot;: &quot;&quot;}</dd></dl></li><li><span class="flow-kind">서버</span><p>검증에서 막혀 서비스가 불리지 않는다 — then(postService).shouldHaveNoInteractions()로 확인</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>400</dd><dt>headers</dt><dd>Content-Type: application/problem+json</dd></dl></li><li><span class="flow-kind">화면</span><p>통과 — 0.x초</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
 <p>테스트 클래스 <strong><code>PostControllerTest</code></strong> (이름 그대로) — <code>@WebMvcTest(PostController.class)</code></p>
 <div class="table-wrap"><table>
 <thead>
@@ -48,10 +53,201 @@
 <ul>
 <li>서비스는 <code>@MockitoBean</code>으로 가짜로 바꾸고, 각 테스트에서 돌려줄 값을 정한다(<code>given(...).willReturn(...)</code>).</li>
 <li>1-6의 토큰 확인 부품(인터셉터·ArgumentResolver 등)이 리포지토리를 쓴다면 그 리포지토리도 <code>@MockitoBean</code>으로 바꾸고 &quot;토큰 → 회원&quot;을 정해 준다.</li>
+<li>그 부품이 <code>Clock</code> 같은 <strong>설정 빈</strong>(<code>@Configuration</code>)을 주입받는다면 <code>@WebMvcTest</code>는 일반 <code>@Configuration</code>을 읽지 않으므로 <code>@Import(ClockConfig.class)</code>처럼 직접 가져온다.</li>
+<li>서비스가 엔티티를 돌려주고 컨트롤러가 DTO로 바꾸는 구조(1-3)라면, 테스트에서 id·게시판이 채워진 엔티티를 mock으로 꾸며야 한다. 서비스가 응답 DTO(또는 결과 객체)를 돌려주면 슬라이스 테스트가 훨씬 쉬워진다 — 구조를 고를 때의 트레이드오프다.</li>
 <li>DB 없이 돌아야 한다. 이 테스트만 돌리면 Testcontainers MySQL이 뜨지 않는다.</li>
 </ul>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 <strong>만들 것</strong>의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</p>
+<p>이 단계의 처리 흐름:</p>
+<ul>
+<li>@WebMvcTest: 컨트롤러·검증·Advice는 진짜, PostService는 @MockitoBean 가짜 — given(postService.create(...)).willReturn(응답)</li>
+<li>검증에서 막혀 서비스가 불리지 않는다 — then(postService).shouldHaveNoInteractions()로 확인</li>
+</ul>
+<details>
+<summary>테스트 — 계약 확인</summary>
+
+<p><code>PostControllerTest.java</code>는 실제 <code>PostController</code>와 MVC 검증·예외 처리·인증 부품을 띄운다. 서비스와 토큰 저장소만 mock으로 바꾼다.</p>
+<pre><code class="language-java">@WebMvcTest(PostController.class)
+@Import(ClockConfig.class)
+class PostControllerTest {
+    @Autowired MockMvc mockMvc;
+    @MockitoBean PostService postService;
+    @MockitoBean PostQueryService postQueryService;
+    @MockitoBean ApiTokenRepository apiTokenRepository;
+}</code></pre>
+<p>201은 <code>Location</code>과 작성자 ID까지, 400은 Problem JSON의 <code>title</code> 오류와 서비스 무호출까지 확인한다. 토큰이 없으면 401과 <code>WWW-Authenticate</code>를 확인하고, 조회 서비스가 <code>PostNotFoundException</code>을 던지면 404를 확인한다.</p>
+<pre><code class="language-java">mockMvc.perform(post(&quot;/api/posts&quot;)
+        .header(&quot;Authorization&quot;, &quot;Bearer tok-kimjava&quot;)
+        .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+        .andExpect(status().isCreated())
+        .andExpect(header().string(&quot;Location&quot;, endsWith(&quot;/api/posts/22&quot;)))
+        .andExpect(jsonPath(&quot;$.author.id&quot;).value(2));
+
+mockMvc.perform(post(&quot;/api/posts&quot;)
+        .header(&quot;Authorization&quot;, &quot;Bearer tok-kimjava&quot;)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(&quot;{\&quot;boardSlug\&quot;:\&quot;dev\&quot;,\&quot;title\&quot;:\&quot;\&quot;,\&quot;content\&quot;:\&quot;본문\&quot;,\&quot;tags\&quot;:[],\&quot;visibility\&quot;:\&quot;PUBLIC\&quot;}&quot;))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath(&quot;$.errors[*].field&quot;, hasItem(&quot;title&quot;)));
+then(postService).shouldHaveNoInteractions();</code></pre>
+<p><code>VALID_BODY</code>와 <code>givenToken</code> 준비 코드를 포함한 실행 가능한 전문은 아래 <strong>테스트</strong> 코드 접기에서 확인한다.</p>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>테스트 — src/test/java/org/example/post/PostControllerTest.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.ApiToken;
+import org.example.auth.ApiTokenRepository;
+import org.example.auth.ClockConfig;
+import org.example.board.Board;
+import org.example.member.Member;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;</p>
+<p>import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Optional;</p>
+<p>import static org.hamcrest.Matchers.endsWith;
+import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;</p>
+<p>// 7-1: 컨트롤러만 띄워 HTTP 계약(상태 코드·헤더·JSON)을 고정한다. DB·서비스는 띄우지 않는다.
+// 실물: PostController, ApiExceptionHandler(Advice), Bean Validation, AuthInterceptor·LoginMemberArgumentResolver
+// 가짜: 컨트롤러가 쓰는 서비스 두 개 + 인터셉터가 쓰는 ApiTokenRepository(&quot;토큰 → 회원&quot;을 정해 준다)
+// Clock은 리포지토리가 아니라 설정 빈이라 실물(ClockConfig)을 가져온다 — @WebMvcTest는 일반 @Configuration을 읽지 않는다.
+@WebMvcTest(PostController.class)
+@Import(ClockConfig.class)
+class PostControllerTest {</p>
+<pre><code>private static final String VALID_BODY = &amp;quot;&amp;quot;&amp;quot;
+        {&amp;quot;boardSlug&amp;quot;:&amp;quot;dev&amp;quot;,&amp;quot;title&amp;quot;:&amp;quot;[테스트] 제목&amp;quot;,&amp;quot;content&amp;quot;:&amp;quot;본문&amp;quot;,&amp;quot;tags&amp;quot;:[],&amp;quot;visibility&amp;quot;:&amp;quot;PUBLIC&amp;quot;}
+        &amp;quot;&amp;quot;&amp;quot;;
+
+@Autowired
+MockMvc mockMvc;
+
+@MockitoBean
+PostService postService;
+
+@MockitoBean
+PostQueryService postQueryService;
+
+@MockitoBean
+ApiTokenRepository apiTokenRepository;
+
+@Test
+void 올바른_토큰과_본문이면_201과_Location과_작성자를_돌려준다() throws Exception {
+    Member kimjava = givenToken(&amp;quot;tok-kimjava&amp;quot;, 2L, &amp;quot;김자바&amp;quot;);
+    Post created = fakePost(22L, kimjava);
+    given(postService.create(eq(2L), any(PostCreateRequest.class))).willReturn(created);
+
+    mockMvc.perform(post(&amp;quot;/api/posts&amp;quot;)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(VALID_BODY))
+            .andExpect(status().isCreated())
+            .andExpect(header().string(&amp;quot;Location&amp;quot;, endsWith(&amp;quot;/api/posts/22&amp;quot;)))
+            .andExpect(jsonPath(&amp;quot;$.id&amp;quot;).value(22))
+            .andExpect(jsonPath(&amp;quot;$.author.id&amp;quot;).value(2))
+            .andExpect(jsonPath(&amp;quot;$.author.nickname&amp;quot;).value(&amp;quot;김자바&amp;quot;));
+}
+
+@Test
+void 빈_제목이면_400_problem_json에_title_오류가_있고_서비스를_부르지_않는다() throws Exception {
+    givenToken(&amp;quot;tok-kimjava&amp;quot;, 2L, &amp;quot;김자바&amp;quot;);
+
+    mockMvc.perform(post(&amp;quot;/api/posts&amp;quot;)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(&amp;quot;&amp;quot;&amp;quot;
+                            {&amp;quot;boardSlug&amp;quot;:&amp;quot;dev&amp;quot;,&amp;quot;title&amp;quot;:&amp;quot;&amp;quot;,&amp;quot;content&amp;quot;:&amp;quot;본문&amp;quot;,&amp;quot;tags&amp;quot;:[],&amp;quot;visibility&amp;quot;:&amp;quot;PUBLIC&amp;quot;}
+                            &amp;quot;&amp;quot;&amp;quot;))
+            .andExpect(status().isBadRequest())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath(&amp;quot;$.status&amp;quot;).value(400))
+            .andExpect(jsonPath(&amp;quot;$.errors[*].field&amp;quot;, hasItem(&amp;quot;title&amp;quot;)));
+
+    then(postService).shouldHaveNoInteractions();
+}
+
+@Test
+void 토큰이_없으면_401이고_서비스도_토큰_조회도_하지_않는다() throws Exception {
+    mockMvc.perform(post(&amp;quot;/api/posts&amp;quot;)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(VALID_BODY))
+            .andExpect(status().isUnauthorized())
+            .andExpect(header().string(&amp;quot;WWW-Authenticate&amp;quot;, &amp;quot;Bearer&amp;quot;))
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+
+    then(postService).shouldHaveNoInteractions();
+    then(apiTokenRepository).shouldHaveNoInteractions();
+}
+
+@Test
+void 서비스가_글_없음_예외를_던지면_404_problem_json이다() throws Exception {
+    given(postQueryService.getDetail(eq(999L), any())).willThrow(new PostNotFoundException());
+
+    mockMvc.perform(get(&amp;quot;/api/posts/999&amp;quot;))
+            .andExpect(status().isNotFound())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath(&amp;quot;$.status&amp;quot;).value(404));
+}
+
+// 인터셉터가 쓰는 &amp;quot;토큰 → 회원&amp;quot;을 정해 준다(만료 2099년, 폐기 없음, ACTIVE)
+private Member givenToken(String token, Long memberId, String nickname) {
+    Member member = mock(Member.class);
+    given(member.getId()).willReturn(memberId);
+    given(member.getNickname()).willReturn(nickname);
+    given(member.getRole()).willReturn(&amp;quot;USER&amp;quot;);
+    given(member.getMemberStatus()).willReturn(&amp;quot;ACTIVE&amp;quot;);
+
+    ApiToken apiToken = mock(ApiToken.class);
+    given(apiToken.getExpiresAt()).willReturn(LocalDateTime.of(2099, 12, 31, 23, 59, 59));
+    given(apiToken.getMember()).willReturn(member);
+    given(apiTokenRepository.findByTokenFetchMember(token)).willReturn(Optional.of(apiToken));
+    return member;
+}
+
+// PostService.create가 돌려주는 것은 엔티티라(1-3: DTO 변환은 컨트롤러 몫) id·게시판이 채워진 가짜 엔티티를 만든다
+private Post fakePost(Long id, Member author) {
+    Board board = mock(Board.class);
+    given(board.getSlug()).willReturn(&amp;quot;dev&amp;quot;);
+
+    Post post = mock(Post.class);
+    given(post.getId()).willReturn(id);
+    given(post.getBoard()).willReturn(board);
+    given(post.getAuthor()).willReturn(author);
+    given(post.getTitle()).willReturn(&amp;quot;[테스트] 제목&amp;quot;);
+    given(post.getContent()).willReturn(&amp;quot;본문&amp;quot;);
+    given(post.getTags()).willReturn(new LinkedHashSet&amp;lt;&amp;gt;());
+    given(post.getVisibility()).willReturn(&amp;quot;PUBLIC&amp;quot;);
+    given(post.getCreatedAt()).willReturn(LocalDateTime.of(2026, 10, 9, 12, 0));
+    return post;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/7-1.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
 <h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
-<pre><code class="language-bash">./gradlew test --tests '*PostControllerTest'</code></pre>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>./gradlew test --tests org.example.post.PostControllerTest</code></pre></details>
 <h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
 <p>T = 테스트 실행(필수), R = 코드 리뷰(피드백용).</p>
 <div class="table-wrap"><table>
@@ -64,7 +260,7 @@
 </thead>
 <tbody><tr>
 <td>T1</td>
-<td><code>./gradlew test --tests &#39;*PostControllerTest&#39;</code></td>
+<td><code>./gradlew test --tests org.example.post.PostControllerTest</code></td>
 <td>통과, 테스트 4개 이상</td>
 </tr>
 <tr>
@@ -75,7 +271,7 @@
 <tr>
 <td>R2</td>
 <td>가짜 범위</td>
-<td>컨트롤러가 직접 쓰는 협력 객체만 <code>@MockitoBean</code>이다. 컨트롤러·Advice·검증은 실물이다</td>
+<td>컨트롤러가 쓰는 서비스와 인증 인터셉터가 쓰는 토큰 저장소만 <code>@MockitoBean</code>이다. 컨트롤러·Advice·검증은 실물이다</td>
 </tr>
 <tr>
 <td>R3</td>
@@ -113,47 +309,46 @@
 
 <section class="grader" id="result-test">
   <h2>결과 테스트 프롬프트</h2>
-  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
   <div class="grader-inputs">
-    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
-    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
   </div>
   <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
   <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
-  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 7-1. 컨트롤러 슬라이스 테스트\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch7-tests/7-1-controller-slice.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 7-1. 컨트롤러 슬라이스 테스트\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch7-tests/7-1-controller-slice.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
 </section>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
   const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
   const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
                   set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
   $('repo').value = store.get('jx.repo');
-  $('base').value = store.get('jx.base');
   function fill() {
     const repo = $('repo').value.trim();
-    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
     $('prompt').value = tpl
-      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
       .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
       .replaceAll('{{BASE}}', base);
     store.set('jx.repo', repo);
-    store.set('jx.base', $('base').value.trim());
   }
   $('repo').addEventListener('input', fill);
-  $('base').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
   fill();
   $('copy').addEventListener('click', async () => {
     const text = $('prompt').value;
     let ok = false;
     try { await navigator.clipboard.writeText(text); ok = true; } catch {}
     if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
-    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
   });
 })();
 </script>
-<nav class="pager"><a href="../ch6-bookmark/6-3-my-bookmarks.html">← 이전 6-3. 내 북마크 목록</a><a href="7-2-service-unit.html">다음 → 7-2. 서비스 단위 테스트 — mock과 spy</a></nav>
+<nav class="pager"><a href="../ch6-bookmark/6-5-my-marked-posts.html">← 이전 6-5. 내가 표시한 글 — 좋아요·북마크 조건 조합</a><a href="7-2-service-unit.html">다음 → 7-2. 서비스 단위 테스트 — mock과 spy</a></nav>
 </main>
 
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
 </body>
 </html>

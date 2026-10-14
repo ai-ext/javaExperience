@@ -1,0 +1,34 @@
+package org.example.comment;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+public class CommentQueryService {
+    private final PostRepository posts;
+    private final PostAccessPolicy accessPolicy;
+    private final CommentRepository comments;
+
+    public CommentQueryService(PostRepository posts, PostAccessPolicy accessPolicy,
+                               CommentRepository comments) {
+        this.posts = posts;
+        this.accessPolicy = accessPolicy;
+        this.comments = comments;
+    }
+
+    @Transactional(readOnly = true)
+    public List<CommentResponse> listTopLevel(Long postId, AuthenticatedMember viewer) {
+        Post post = posts.findById(postId).orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(viewer, post)) {
+            throw new PostNotFoundException();
+        }
+        return comments.findTopLevel(postId).stream().map(CommentResponse::from).toList();
+    }
+}

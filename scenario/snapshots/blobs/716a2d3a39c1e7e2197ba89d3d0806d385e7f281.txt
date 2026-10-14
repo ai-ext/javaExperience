@@ -1,0 +1,59 @@
+package org.example.post;
+
+import org.example.board.Board;
+import org.example.board.BoardRepository;
+import org.example.tag.Tag;
+import org.example.tag.TagRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+// 글 만들기 규칙. HTTP(ResponseEntity, 헤더 등)는 알지 않는다.
+@Service
+public class PostService {
+
+    // 로그인 기능이 없는 동안 작성자를 고정한다 — 1-6에서 토큰 기반으로 바꾼다
+    private static final long FIXED_AUTHOR_ID = 2L;
+
+    private final PostRepository postRepository;
+    private final BoardRepository boardRepository;
+    private final TagRepository tagRepository;
+
+    public PostService(PostRepository postRepository, BoardRepository boardRepository,
+                        TagRepository tagRepository) {
+        this.postRepository = postRepository;
+        this.boardRepository = boardRepository;
+        this.tagRepository = tagRepository;
+    }
+
+    // 글 한 행 + 새 태그 + post_tag 연결을 한 트랜잭션으로 — 중간에 실패하면 전부 되돌린다
+    @Transactional
+    public Post create(PostCreateRequest request) {
+        Board board = boardRepository.findBySlug(request.boardSlug())
+                .orElseThrow(() -> new IllegalArgumentException("게시판을 찾을 수 없습니다: " + request.boardSlug()));
+
+        LocalDateTime now = LocalDateTime.now();
+        Post post = new Post(board, FIXED_AUTHOR_ID, request.title(), request.content(),
+                request.visibility(), now);
+
+        for (String tagName : distinctTagNames(request.tags())) {
+            Tag tag = tagRepository.findByName(tagName)
+                    .orElseGet(() -> tagRepository.save(new Tag(tagName, now)));
+            post.addTag(tag);
+        }
+
+        return postRepository.save(post);
+    }
+
+    private List<String> distinctTagNames(List<String> tags) {
+        if (tags == null) {
+            return List.of();
+        }
+        Set<String> seen = new LinkedHashSet<>(tags);
+        return List.copyOf(seen);
+    }
+}

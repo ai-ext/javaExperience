@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H9. CSV 내려받기와 시간 다루기</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="h9-csv-내려받기와-시간-다루기"><a class="anchor" href="#h9-csv-내려받기와-시간-다루기" aria-hidden="true">#</a>H9. CSV 내려받기와 시간 다루기</h1>
+<blockquote>
+<p>개념 레슨 · 40분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>운영자가 &quot;신고 목록을 엑셀로 받고 싶어요&quot;라고 한다. 서버는 <strong>CSV</strong>(쉼표로 칸을 나눈 텍스트 파일)를 응답으로 내려준다. 동시에 그 목록의 &quot;신고 시각&quot;을 어떻게 적을지도 정해야 한다. 이 레슨은 둘을 같이 본다. CSV에는 시각 칸이 꼭 들어가기 때문이다.</p>
+<h3 id="csv-응답에-필요한-다섯-가지"><a class="anchor" href="#csv-응답에-필요한-다섯-가지" aria-hidden="true">#</a>CSV 응답에 필요한 다섯 가지</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>무엇</th>
+<th>어떻게</th>
+<th>왜</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>형식</td>
+<td><code>Content-Type: text/csv;charset=UTF-8</code></td>
+<td>받는 쪽이 글자 인코딩을 안다</td>
+</tr>
+<tr>
+<td>파일 이름</td>
+<td><code>Content-Disposition: attachment; filename*=UTF-8&#39;&#39;…</code></td>
+<td>H2와 같다. 한글 이름은 <code>filename*</code></td>
+</tr>
+<tr>
+<td>BOM</td>
+<td>본문 맨 앞에 <code>EF BB BF</code> 3바이트</td>
+<td>Excel이 &quot;UTF-8 파일&quot;로 알아보게(Microsoft 안내)</td>
+</tr>
+<tr>
+<td>칸 규칙(RFC 4180)</td>
+<td>쉼표·큰따옴표·줄바꿈이 든 칸은 <code>&quot;…&quot;</code>로 감싸고, 안의 <code>&quot;</code>는 <code>&quot;&quot;</code>로. 줄 끝은 <code>\r\n</code></td>
+<td>칸이 밀리지 않게</td>
+</tr>
+<tr>
+<td>수식 막기</td>
+<td><code>=</code> <code>+</code> <code>-</code> <code>@</code> 등으로 시작하는 칸은 앞에 <code>&#39;</code>를 붙인다</td>
+<td>스프레드시트가 수식으로 실행하지 않게(OWASP)</td>
+</tr>
+</tbody></table></div>
+<h3 id="시간-타입-넷"><a class="anchor" href="#시간-타입-넷" aria-hidden="true">#</a>시간 타입 넷</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>타입</th>
+<th>담는 것</th>
+<th>예</th>
+<th>쓰는 곳</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>LocalDateTime</code></td>
+<td>벽시계 날짜·시각. <strong>어느 나라 시계인지 없다</strong></td>
+<td><code>2026-10-10T14:30</code></td>
+<td>&quot;서울 기준 14시 30분&quot;처럼 지역이 정해진 값</td>
+</tr>
+<tr>
+<td><code>Instant</code></td>
+<td>세계 어디서나 같은 <strong>한 순간</strong>(UTC)</td>
+<td><code>2026-10-10T05:30:00Z</code></td>
+<td>일이 일어난 시점(로그, 생성 시각)</td>
+</tr>
+<tr>
+<td><code>OffsetDateTime</code></td>
+<td>순간 + UTC와의 차이</td>
+<td><code>2026-10-10T14:30+09:00</code></td>
+<td>차이까지 보여 줄 때</td>
+</tr>
+<tr>
+<td><code>ZonedDateTime</code></td>
+<td>순간 + 지역 규칙(<code>Asia/Seoul</code>)</td>
+<td><code>…+09:00[Asia/Seoul]</code></td>
+<td>서머타임이 있는 지역의 예약</td>
+</tr>
+</tbody></table></div>
+<p><code>LocalDateTime.now()</code>는 <strong>JVM 기본 시간대</strong>의 벽시계를 읽는다. 내 맥은 서울이지만 배포 서버는 UTC일 수 있다. 그래서 &quot;지금&quot;은 <code>Clock</code>에서 읽는다(H3).</p>
+<p>DB도 둘이다. MySQL <code>DATETIME</code>은 넣은 글자 그대로 저장하고 그대로 돌려준다. <code>TIMESTAMP</code>는 넣을 때 <strong>세션 시간대 → UTC</strong>로 바꿔 저장하고, 꺼낼 때 <strong>UTC → 세션 시간대</strong>로 바꾼다.</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<p>포트 <code>18300</code> 앱과 <code>practice</code> DB에서 실행한 결과다.</p>
+<h3 id="csv-컨트롤러"><a class="anchor" href="#csv-컨트롤러" aria-hidden="true">#</a>CSV 컨트롤러</h3>
+<pre><code class="language-java">final class Csv {
+    // RFC 4180: 쉼표·큰따옴표·줄바꿈이 있으면 큰따옴표로 감싸고, 안의 큰따옴표는 두 번 쓴다
+    static String cell(String value) {
+        String v = (value == null) ? &quot;&quot; : value;
+        if (v.contains(&quot;,&quot;) || v.contains(&quot;\&quot;&quot;) || v.contains(&quot;\n&quot;) || v.contains(&quot;\r&quot;)) {
+            return &quot;\&quot;&quot; + v.replace(&quot;\&quot;&quot;, &quot;\&quot;\&quot;&quot;) + &quot;\&quot;&quot;;
+        }
+        return v;
+    }
+
+    // 수식 막기: = + - @ 탭 CR로 시작하면 작은따옴표를 붙여 글자로 만든다
+    static String safeCell(String value) {
+        String v = (value == null) ? &quot;&quot; : value;
+        if (!v.isEmpty() &amp;&amp; &quot;=+-@\t\r&quot;.indexOf(v.charAt(0)) &gt;= 0) {
+            return &quot;\&quot;'&quot; + v.replace(&quot;\&quot;&quot;, &quot;\&quot;\&quot;&quot;) + &quot;\&quot;&quot;;
+        }
+        return cell(v);
+    }
+}</code></pre>
+<pre><code class="language-java">@GetMapping(&quot;/h9/posts.csv&quot;)
+public ResponseEntity&lt;byte[]&gt; csv(@RequestParam(defaultValue = &quot;true&quot;) boolean bom,
+                                  @RequestParam(defaultValue = &quot;true&quot;) boolean safe) {
+    StringBuilder sb = new StringBuilder();
+    if (bom) sb.append('﻿');                       // UTF-8 BOM: 맨 앞에 한 번
+    for (List&lt;String&gt; row : ROWS) {
+        sb.append(Csv.row(row, safe));                  // 칸을 쉼표로 잇고 끝에 \r\n
+    }
+    ContentDisposition cd = ContentDisposition.attachment()
+            .filename(&quot;게시글목록.csv&quot;, StandardCharsets.UTF_8).build();
+    return ResponseEntity.ok()
+            .contentType(new MediaType(&quot;text&quot;, &quot;csv&quot;, StandardCharsets.UTF_8))
+            .header(HttpHeaders.CONTENT_DISPOSITION, cd.toString())
+            .body(sb.toString().getBytes(StandardCharsets.UTF_8));
+}</code></pre>
+<p><code>ROWS</code>에는 일부러 까다로운 값을 넣었다: <code>쉼표, 있는 제목</code>, <code>따옴표 &quot;인용&quot; 제목</code>, 줄바꿈이 든 <code>두 줄⏎제목</code>, <code>=HYPERLINK(&quot;http://evil.example&quot;,&quot;클릭&quot;)</code>, <code>-1+2</code>.</p>
+<h3 id="헤더와-첫-바이트"><a class="anchor" href="#헤더와-첫-바이트" aria-hidden="true">#</a>헤더와 첫 바이트</h3>
+<pre><code class="language-text">$ curl -s -D - -o posts.csv &quot;$B/h9/posts.csv&quot;
+HTTP/1.1 200
+Content-Disposition: attachment; filename=&quot;_____________.csv&quot;; filename*=UTF-8''%EA%B2%8C%EC%8B%9C%EA%B8%80%EB%AA%A9%EB%A1%9D.csv
+Content-Type: text/csv;charset=UTF-8
+Content-Length: 248
+
+$ xxd posts.csv | head -1
+00000000: efbb bf69 642c ec9e 91ec 84b1 ec9e 902c  ...id,.........,</code></pre>
+<p><code>ef bb bf</code>가 BOM, 그 뒤 <code>69 64 2c</code>가 <code>id,</code>다. <code>?bom=false</code>로 받으면 첫 바이트가 바로 <code>6964 2c…</code>였다.</p>
+<h3 id="줄마다--무엇이-감싸졌나"><a class="anchor" href="#줄마다--무엇이-감싸졌나" aria-hidden="true">#</a>줄마다 — 무엇이 감싸졌나</h3>
+<p>BOM을 떼고 <code>\r\n</code>으로 잘라 한 줄씩 찍었다(파이썬 <code>repr</code>이라 바깥 작은따옴표는 표시용이다).</p>
+<pre><code class="language-text">'id,작성자,제목'
+'1,김자바,첫 글'
+'2,이스프링,&quot;쉼표, 있는 제목&quot;'
+'3,박디비,&quot;따옴표 &quot;&quot;인용&quot;&quot; 제목&quot;'
+'4,최줄바꿈,&quot;두 줄\n제목&quot;'
+'5,해커,&quot;\'=HYPERLINK(&quot;&quot;http://evil.example&quot;&quot;,&quot;&quot;클릭&quot;&quot;)&quot;'
+'6,정마이너스,&quot;\'-1+2&quot;'</code></pre>
+<ul>
+<li>2번: 쉼표가 있어 통째로 <code>&quot;…&quot;</code>.</li>
+<li>3번: 안의 <code>&quot;</code>가 <code>&quot;&quot;</code>로 두 번.</li>
+<li>4번: 칸 <strong>안의</strong> 줄바꿈(<code>\n</code>)은 따옴표 안이라 줄이 끝난 게 아니다. 줄 끝은 <code>\r\n</code>이다.</li>
+<li>5·6번: 앞에 <code>&#39;</code>가 붙었다. <code>safe=false</code>로 받으면 <code>5,해커,&quot;=HYPERLINK(…)&quot;</code>, <code>6,정마이너스,-1+2</code> 그대로였다.</li>
+</ul>
+<p>규칙대로 썼는지는 CSV 읽는 프로그램으로 다시 읽어 확인한다. 파이썬 <code>csv</code> 모듈로 읽었더니 <strong>7행, 모든 행이 3칸</strong>이었고 값도 원래대로 돌아왔다(<code>[&#39;4&#39;, &#39;최줄바꿈&#39;, &#39;두 줄\n제목&#39;]</code>).</p>
+<blockquote>
+<p>Excel에서 BOM이 있어야 한글이 안 깨지는 것, <code>&#39;</code>·탭 접두가 수식 실행을 막는 것은 Microsoft·OWASP 문서의 내용이다. 이 레슨에서는 Excel로 열어 보지 않았다. OWASP는 Excel에서 저장 후 다시 열면 <code>&#39;</code> 방식이 풀릴 수 있다며, Excel용으로는 따옴표 안에 <strong>탭</strong>을 붙이는 방법(<code>&quot;\t=1+2&quot;</code>)을 따로 적어 두었다. 탭은 데이터에 남는다.</p>
+</blockquote>
+<h3 id="시간--같은-한-순간-json에서는"><a class="anchor" href="#시간--같은-한-순간-json에서는" aria-hidden="true">#</a>시간 — 같은 한 순간, JSON에서는</h3>
+<p><code>Clock</code>을 <code>2026-10-10T05:30:00Z</code>(서울 14:30)에 고정하고 타입별로 응답에 넣었다. Boot 4.1(Jackson 3) <strong>기본 설정</strong> 그대로의 출력이다.</p>
+<pre><code class="language-java">Instant instant = Instant.now(clock);
+m.put(&quot;instant&quot;, instant);
+m.put(&quot;localDateTime&quot;, LocalDateTime.now(clock));
+m.put(&quot;offsetDateTime&quot;, OffsetDateTime.now(clock));
+m.put(&quot;zonedDateTime&quot;, ZonedDateTime.now(clock));
+m.put(&quot;zonedNewYork&quot;, instant.atZone(ZoneId.of(&quot;America/New_York&quot;)));</code></pre>
+<pre><code class="language-text">&quot;instant&quot;:&quot;2026-10-10T05:30:00Z&quot;
+&quot;localDateTime&quot;:&quot;2026-10-10T14:30:00&quot;
+&quot;offsetDateTime&quot;:&quot;2026-10-10T14:30:00+09:00&quot;
+&quot;zonedDateTime&quot;:&quot;2026-10-10T14:30:00+09:00&quot;
+&quot;zonedNewYork&quot;:&quot;2026-10-10T01:30:00-04:00&quot;</code></pre>
+<p>전부 ISO 문자열이다. <code>localDateTime</code>에는 어느 나라 시각인지가 <strong>없다.</strong> <code>zonedDateTime</code>도 <code>[Asia/Seoul]</code> 없이 <code>+09:00</code>만 나갔다. 지역 이름이 필요하면 따로 칸을 둔다.</p>
+<h3 id="jvm-시간대가-바뀌면"><a class="anchor" href="#jvm-시간대가-바뀌면" aria-hidden="true">#</a>JVM 시간대가 바뀌면</h3>
+<p>같은 앱을 <code>-Duser.timezone=UTC</code>로 켜서(서버가 UTC라고 치고) 진짜 시계로 불렀다.</p>
+<pre><code class="language-text">&quot;localDateTime&quot;:&quot;2026-10-10T16:49:16.813507&quot;         ← LocalDateTime.now(clock) — Clock이 서울
+&quot;jvmDefaultZone&quot;:&quot;UTC&quot;
+&quot;localDateTimeNoClock&quot;:&quot;2026-10-10T07:49:16.814203&quot;  ← LocalDateTime.now()</code></pre>
+<p><code>LocalDateTime.now()</code>만 9시간 이른 값이 됐다. <code>Clock</code>을 <code>Clock.system(ZoneId.of(&quot;Asia/Seoul&quot;))</code>로 만들어 주입한 쪽은 그대로였다.</p>
+<h3 id="datetime과-timestamp"><a class="anchor" href="#datetime과-timestamp" aria-hidden="true">#</a>DATETIME과 TIMESTAMP</h3>
+<pre><code class="language-sql">CREATE TABLE lesson_h9_time (id BIGINT AUTO_INCREMENT PRIMARY KEY, label VARCHAR(40) NOT NULL,
+                             dt DATETIME NOT NULL, ts TIMESTAMP NOT NULL);</code></pre>
+<pre><code class="language-text">mysql&gt; SET time_zone = '+09:00';
+mysql&gt; INSERT INTO lesson_h9_time (label, dt, ts) VALUES ('cli +09:00', '2026-10-10 14:30:00', '2026-10-10 14:30:00');
+mysql&gt; SELECT label, dt, ts FROM lesson_h9_time;
+| cli +09:00 | 2026-10-10 14:30:00 | 2026-10-10 14:30:00 |
+mysql&gt; SET time_zone = '+00:00';
+mysql&gt; SELECT label, dt, ts FROM lesson_h9_time;
+| cli +09:00 | 2026-10-10 14:30:00 | 2026-10-10 05:30:00 |</code></pre>
+<p><code>dt</code>는 그대로, <code>ts</code>는 세션 시간대를 바꾸자 <strong>보이는 값이 바뀌었다.</strong> 저장된 건 UTC 05:30 한 순간이고, 보여 줄 때 세션 시간대로 바꾼 것이다. <code>TIMESTAMP</code>는 2038-01-19까지만 담는다.</p>
+<pre><code class="language-text">mysql&gt; INSERT INTO lesson_h9_time (label, dt, ts) VALUES ('범위 밖', '2040-01-01 00:00:00', '2040-01-01 00:00:00');
+ERROR 1292 (22007): Incorrect datetime value: '2040-01-01 00:00:00' for column 'ts' at row 1</code></pre>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>15분.</p>
+<p><strong>1. CSV.</strong> 위 <code>Csv</code>와 컨트롤러를 앱에 넣고(<code>Csv.row</code>는 칸을 <code>cell</code> 또는 <code>safeCell</code>로 바꿔 쉼표로 잇고 <code>\r\n</code>을 붙이는 한 줄짜리), <code>curl -s -D - -o posts.csv …</code>로 헤더를, <code>xxd posts.csv | head -1</code>로 <code>efbb bf</code>를 확인한다. <code>python3 -c &quot;import csv; print(list(csv.reader(open(&#39;posts.csv&#39;, encoding=&#39;utf-8-sig&#39;, newline=&#39;&#39;))))&quot;</code>로 다시 읽어 행마다 3칸인지 본다.</p>
+<p><strong>2. TIMESTAMP.</strong> G3의 mysql 접속 명령에서 맨 끝 <code>community</code>를 <code>practice</code>로 바꿔 들어가, 위 <code>CREATE</code>·<code>SET time_zone</code>·<code>INSERT</code>·<code>SELECT</code>를 순서대로 친다. 서버 기본 시간대는 <code>SELECT @@global.time_zone, @@system_time_zone;</code>로 본다. 이 레슨을 쓸 때 실험한 MySQL 컨테이너는 <code>SYSTEM</code>, <code>UTC</code>였다.</p>
+<p><strong>3. 정리.</strong> <code>DROP TABLE lesson_h9_time</code>.</p>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p><strong>1. 바깥만 따옴표로 감싸기.</strong> <code>&quot;따옴표 &quot;인용&quot; 제목&quot;</code>처럼 안의 <code>&quot;</code>를 두 번 쓰지 않고, 쉼표 칸은 감싸지 않은 줄을 파이썬 <code>csv</code>로 읽었다.</p>
+<pre><code class="language-text">3,박디비,&quot;따옴표 &quot;인용&quot; 제목&quot;   →  ['3', '박디비', '따옴표 인용&quot; 제목&quot;']
+2,이스프링,쉼표, 있는 제목      →  ['2', '이스프링', '쉼표', ' 있는 제목']     (4칸)</code></pre>
+<p>값이 망가지거나 칸이 하나 밀렸다.</p>
+<p><strong>2. <code>serverTimezone</code>이면 세션도 서울인 줄 알기.</strong> 앱(JVM은 서울)에서 같은 <code>LocalDateTime</code> 14:30을 <code>dt</code>·<code>ts</code>에 넣고, mysql에서 세션 <code>+00:00</code>으로 읽었다. URL만 바꿨다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>JDBC URL에 붙인 것</th>
+<th><code>dt</code></th>
+<th><code>ts</code>(UTC로 읽음)</th>
+<th>서울로 읽은 <code>ts</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>(없음)</td>
+<td>14:30</td>
+<td>14:30</td>
+<td><strong>23:30</strong></td>
+</tr>
+<tr>
+<td><code>serverTimezone=Asia/Seoul</code></td>
+<td>14:30</td>
+<td>14:30</td>
+<td><strong>23:30</strong></td>
+</tr>
+<tr>
+<td><code>connectionTimeZone=Asia/Seoul&amp;forceConnectionTimeZoneToSession=true</code></td>
+<td>14:30</td>
+<td>05:30</td>
+<td>14:30</td>
+</tr>
+</tbody></table></div>
+<p>앞의 둘은 앱 연결에서 <code>@@session.time_zone</code>을 찍어 보니 <code>SYSTEM</code>(서버 기본, 이 DB는 UTC) 그대로였다. 그래서 서울 14:30이 &quot;UTC 14:30&quot;으로 저장됐다. 서울 세션으로 읽으면 23:30이다. 세션까지 바꾸는 건 마지막 줄뿐이었다(Connector/J 9.7). <code>DATETIME</code>은 세 경우 모두 14:30이다. 그래서 &quot;벽시계 값을 그대로&quot;면 <code>DATETIME</code>, <code>TIMESTAMP</code>를 쓰면 연결 설정까지 같이 정한다.</p>
+<p><strong>3. <code>LocalDateTime.now()</code>.</strong> 예시의 <code>localDateTimeNoClock</code>. 서버 시간대가 바뀌면 같이 바뀐다.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> 칸 값이 <code>A,&quot;B&quot;</code>다. RFC 4180으로 쓰면?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong><code>&quot;A,&quot;&quot;B&quot;&quot;&quot;</code>.</strong> 쉼표가 있으니 통째로 큰따옴표로 감싸고, 안의 <code>&quot;</code>는 <code>&quot;&quot;</code>로 두 번 쓴다.</p>
+</details>
+
+<p><strong>2.</strong> 셀을 큰따옴표로 감싸면 <code>=1+2</code>가 수식으로 실행되는 것도 막히나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>아니다.</strong> 따옴표는 CSV 칸을 나누는 규칙일 뿐, 읽은 뒤 값은 <code>=1+2</code>다. 수식 막기는 따로 한다(앞에 <code>&#39;</code> 붙이기, Excel용으로는 따옴표 안 탭 — OWASP).</p>
+</details>
+
+<p><strong>3.</strong> UTF-8로 잘 만든 CSV인데 Excel에서 한글이 깨진다는 연락이 왔다. 응답에서 무엇을 확인하나?</p>
+<details>
+<summary>정답</summary>
+
+<p>본문 맨 앞에 **BOM(<code>EF BB BF</code>)**이 있는지 <code>xxd</code>로 본다. <code>charset=UTF-8</code> 헤더도 함께 둔다. BOM은 맨 앞에 한 번만.</p>
+</details>
+
+<p><strong>4.</strong> 글 작성 시각을 기록한다. <code>LocalDateTime.now()</code>와 <code>Instant.now(clock)</code> 중 무엇이 서버 시간대에 흔들리나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong><code>LocalDateTime.now()</code>.</strong> JVM 기본 시간대의 벽시계를 읽어서, 서버를 UTC로 띄우면 9시간 달라진다(실험에서 16:49 → 07:49). 일이 일어난 순간은 <code>Instant</code>, 지역 시각이 필요하면 시간대를 정한 <code>Clock</code>에서 읽는다.</p>
+</details>
+
+<p><strong>5.</strong> 세션 시간대를 <code>+09:00</code>에서 <code>+00:00</code>으로 바꾸고 같은 행을 다시 읽었다. <code>DATETIME</code> 칸과 <code>TIMESTAMP</code> 칸 중 어느 쪽 값이 바뀌나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong><code>TIMESTAMP</code>.</strong> UTC로 저장해 두고 세션 시간대로 바꿔 보여 준다(14:30 → 05:30). <code>DATETIME</code>은 넣은 글자 그대로다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/W20-time-timezone.html">W20 시간과 시간대</a> — &quot;언제&quot;와 &quot;몇 시&quot;, DST의 빈 시각·겹친 시각, JPA·MySQL 연결 설정</li>
+<li><a href="./H2-file-upload-download.html">H2 파일 업로드·다운로드</a> — <code>Content-Disposition</code>, <code>filename*</code></li>
+<li><a href="./D1-json-jackson.html">D1 JSON과 Jackson</a> — 응답 JSON 모양 정하기</li>
+<li>RFC 4180 — CSV: <a href="https://www.rfc-editor.org/rfc/rfc4180.txt" target="_blank" rel="noopener">https://www.rfc-editor.org/rfc/rfc4180.txt</a></li>
+<li>OWASP — CSV Injection: <a href="https://owasp.org/www-community/attacks/CSV_Injection" target="_blank" rel="noopener">https://owasp.org/www-community/attacks/CSV_Injection</a></li>
+<li>Microsoft — Excel에서 UTF-8 CSV 열기: <a href="https://support.microsoft.com/en-us/excel/opening-csv-utf-8-files-correctly-in-excel" target="_blank" rel="noopener">https://support.microsoft.com/en-us/excel/opening-csv-utf-8-files-correctly-in-excel</a></li>
+<li>Spring Framework 7 API — <code>ContentDisposition</code>: <a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/http/ContentDisposition.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/http/ContentDisposition.html</a></li>
+<li>MySQL 8.0 — DATE, DATETIME, TIMESTAMP: <a href="https://dev.mysql.com/doc/refman/8.0/en/datetime.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.0/en/datetime.html</a></li>
+<li>Java 21 API — <code>LocalDateTime</code>·<code>Instant</code>·<code>ZonedDateTime</code>·<code>Clock</code>: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/time/package-summary.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/time/package-summary.html</a></li>
+</ul>
+<p>행이 수만 개면 문자열을 다 만들어 <code>byte[]</code>로 돌려주지 않고, <code>StreamingResponseBody</code>로 쓰면서 DB도 나눠 읽는다(Spring 문서).</p>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li><a href="../scenario/ch13-operations/13-6-csv-export.html">13-6. 신고 내역 CSV 내려받기</a> — 이 레슨의 BOM·한글 파일명·수식 주입 막기를 신고 목록 내려받기에 그대로 쓴다.</li>
+</ul>
+<p>시간 다루기는 아래 실습에서 그대로 쓴다.</p>
+<ul>
+<li><a href="../scenario/ch13-operations/13-1-roles-and-hide.html">13-1. 운영 역할 — 글 숨김·복구</a> — <code>LocalDateTime.now()</code>의 마이크로초가 <code>DATETIME</code>에서 반올림되는 함정</li>
+<li><a href="../scenario/ch13-operations/13-3-member-suspension.html">13-3. 작성자 기간 정지</a> — 끝 시각 저장과 <code>Clock</code>으로 &quot;지금&quot; 비교</li>
+<li><a href="../scenario/ch15-scheduling-batch/15-1-hall-of-fame.html">15-1. 명예의 전당</a> — <code>app.fixed-now</code>로 고정한 &quot;오늘&quot;</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

@@ -1,0 +1,2350 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13-3. 작성자 기간 정지</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 13장. 운영 기능 — 역할·신고 처리·정지·금칙어·도배 방지 › 13-3</p><p class="level-tags"><span>중급</span><span>게시판 본편</span><span>DB community</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="13-3-작성자-기간-정지"><a class="anchor" href="#13-3-작성자-기간-정지" aria-hidden="true">#</a>13-3. 작성자 기간 정지</h1>
+<blockquote>
+<p>시나리오 DB(<code>community</code>) — 앱을 기본 프로파일로 띄운다.</p>
+</blockquote>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<blockquote>
+<p>&quot;신고 처리를 하다 보면 같은 사람이 계속 문제를 일으켜요. 글만 숨겨서는 또 써요. &#39;3일 동안 글·댓글 금지&#39; 같은 정지를 걸 수 있게 해 주세요. 정지 중에도 글 읽기는 되고요. 기간이 끝나면 저희가 따로 안 풀어도 저절로 풀려야 해요. 정지당한 분이 글을 쓰려고 하면 언제 풀리는지 알려 주세요.&quot;</p>
+</blockquote>
+<p>1-6에서 만든 <code>member_status = &#39;SUSPENDED&#39;</code>는 <strong>영구 정지</strong>다. 토큰을 확인하는 단계에서 모든 요청을 막는다(최정지, 회원 5). 이번에 만드는 것은 다르다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>영구 정지(1-6)</th>
+<th>기간 정지(이번)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>막는 것</td>
+<td>모든 요청(읽기 포함)</td>
+<td><strong>쓰기</strong>(GET이 아닌 요청)만</td>
+</tr>
+<tr>
+<td>끝</td>
+<td>운영자가 상태를 바꿀 때까지</td>
+<td><code>suspended_until</code>이 지나면 <strong>저절로</strong></td>
+</tr>
+<tr>
+<td>저장</td>
+<td>상태 값</td>
+<td>끝나는 시각 + 사유</td>
+</tr>
+</tbody></table></div>
+<p>&quot;저절로 풀린다&quot;를 스케줄러로 만들 필요는 없다. 끝나는 시각만 저장하고, 요청이 올 때마다 <code>지금 &lt; 끝나는 시각</code>인지 비교하면 된다. 비교에 쓰는 &quot;지금&quot;은 <code>Clock</code>에서 얻는다. 그래야 테스트에서 시각을 앞뒤로 넘겨 확인할 수 있다(HTTP 확인으로는 3일을 기다릴 수 없다).</p>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>기간 정지</h3><p>운영 화면에서 일수·사유로 정지. 정지된 회원의 쓰기는 403 + 끝나는 시각, 읽기는 그대로.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>글쓰기</strong><span>동시성03</span></div><div class="screen-widget screen-field"><strong>제목</strong><span>오늘 이벤트 공유합니다</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>등록</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>10월 13일 15:00까지 글을 쓸 수 없어요 (사유: 도배 경고)</span></div><div class="screen-widget screen-field"><strong>[운영] 정지 일수(1~30)</strong><span>3</span></div><div class="screen-widget screen-field"><strong>[운영] 사유(2~200자)</strong><span>도배 경고</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>운영자가 3일 정지</summary><ol><li><span class="flow-kind">사용자</span><p>운영 화면에서 회원 9에게 3일 정지</p></li><li><span class="flow-kind">HTTP 요청</span><p>PUT /api/admin/members/9/suspension</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-admin · Content-Type: application/json</dd><dt>body</dt><dd>{&quot;days&quot;: 3, &quot;reason&quot;: &quot;도배 경고&quot;}</dd></dl></li><li><span class="flow-kind">서버</span><p>권한 SUSPEND_MEMBER(13-1 표: MODERATOR·ADMIN) → 회원 찾기(404) → 운영진이면 409 → 지금 + 3일을 끝 시각으로 저장(이미 정지 중이면 덮어쓰기)</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>UPDATE member SET suspended_until = '2026-10-13 15:00:00', suspend_reason = '도배 경고' WHERE id = 9</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{&quot;memberId&quot;: 9, &quot;suspendedUntil&quot;: &quot;2026-10-13T15:00:00&quot;, &quot;reason&quot;: &quot;도배 경고&quot;}</dd></dl></li><li><span class="flow-kind">화면</span><p>정지 완료</p></li></ol></details><details class="scenario-flow"><summary>정지된 회원이 글쓰기</summary><ol><li><span class="flow-kind">사용자</span><p>회원 9가 글을 쓰고 [등록]</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-c03 · Content-Type: application/json</dd><dt>body</dt><dd>{&quot;boardSlug&quot;: &quot;free&quot;, &quot;title&quot;: &quot;오늘 이벤트 공유합니다&quot;, ...}</dd></dl></li><li><span class="flow-kind">서버</span><p>AuthInterceptor — 토큰 확인 뒤, GET이 아니고 지금 &lt; suspended_until이면 403(컨트롤러까지 가지 않는다)</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>403</dd><dt>body</dt><dd>{&quot;status&quot;: 403, &quot;detail&quot;: &quot;정지 기간에는 글·댓글을 쓰거나 바꿀 수 없습니다.&quot;, &quot;suspendedUntil&quot;: &quot;2026-10-13T15:00:00&quot;, &quot;reason&quot;: &quot;도배 경고&quot;}</dd></dl></li><li><span class="flow-kind">화면</span><p>언제 풀리는지 알려 주는 토스트</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<p><strong>V43</strong> — <code>db/migration/V43__member_suspension.sql</code></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>컬럼</th>
+<th>타입·규칙</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>member.suspended_until</code></td>
+<td><code>DATETIME NULL</code> — 이 시각 <strong>전까지</strong> 쓰기 금지. <code>NULL</code>이거나 지났으면 정지 아님</td>
+</tr>
+<tr>
+<td><code>member.suspend_reason</code></td>
+<td><code>VARCHAR(200) NULL</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>API</strong> — 권한 <code>SUSPEND_MEMBER</code>(13-1 표에 추가: MODERATOR·ADMIN)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>메서드·경로</th>
+<th>응답</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>PUT /api/admin/members/{id}/suspension</code></td>
+<td><code>200</code> <code>{ &quot;memberId&quot;, &quot;suspendedUntil&quot;, &quot;reason&quot; }</code> — 끝 = 지금 + <code>days</code>일. 이미 정지 중이면 새 값으로 덮어쓴다</td>
+</tr>
+<tr>
+<td><code>DELETE /api/admin/members/{id}/suspension</code></td>
+<td><code>204</code> — 정지가 없어도 <code>204</code>(멱등)</td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상황</th>
+<th>응답</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PUT으로 운영진(<code>MODERATOR</code>·<code>ADMIN</code>)을 정지하려 할 때</td>
+<td><code>409</code> — 먼저 역할을 <code>USER</code>로 바꾼다</td>
+</tr>
+<tr>
+<td>DELETE로 운영진의 남은 정지 기록을 해제할 때</td>
+<td><code>204</code> — 정지가 없어도 멱등</td>
+</tr>
+<tr>
+<td>정지 중인 <code>USER</code>를 <code>MODERATOR</code>로 승격하려 할 때</td>
+<td><code>409</code> — 먼저 기간 정지를 해제하거나 만료될 때까지 기다린다</td>
+</tr>
+<tr>
+<td>없는 회원·탈퇴 회원</td>
+<td><code>404</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>정지와 역할의 일관성</strong> — 정지 부여와 역할 변경은 회원 행을 잠그고 판단한다. 운영진은 새로 정지하지 않고, 기간 정지 중인 회원은 운영진으로 승격하지 않는다. 만료되거나 정지를 해제하면 승격할 수 있다.</p>
+<p><strong>정지의 효과</strong> — 토큰 확인(1-6 <code>AuthInterceptor</code>) 바로 다음에 판단한다</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>요청</th>
+<th>정지 중</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET(읽기)</td>
+<td>그대로 된다</td>
+</tr>
+<tr>
+<td>POST·PUT·PATCH·DELETE(쓰기)</td>
+<td><code>403</code> + 본문에 <code>suspendedUntil</code>·<code>reason</code>(ProblemDetail 속성)</td>
+</tr>
+<tr>
+<td><code>suspended_until</code>이 지난 뒤</td>
+<td>아무것도 안 해도 다시 된다</td>
+</tr>
+</tbody></table></div>
+<p><strong>필드 규칙</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>필수</th>
+<th>null·빈 값</th>
+<th>길이·범위</th>
+<th>형식</th>
+<th>기본값</th>
+<th>틀렸을 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>days</code></td>
+<td>필수</td>
+<td>안 됨</td>
+<td>1~30(1·30 성공, 0·31 거절)</td>
+<td>정수</td>
+<td>없음</td>
+<td><code>400</code>, <code>errors</code>에 <code>days</code>(숫자가 아니면 형식 오류 <code>400</code>, <code>errors</code>에 <code>days</code> — 11-1 공통 처리기)</td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td>필수</td>
+<td>안 됨 — 없음·<code>null</code>·공백만 거절</td>
+<td>2~200자(2·200 성공, 1·201 거절)</td>
+<td>문자열</td>
+<td>없음</td>
+<td><code>400</code>, <code>errors</code>에 <code>reason</code></td>
+</tr>
+<tr>
+<td><code>{id}</code>(경로)</td>
+<td>필수</td>
+<td>—</td>
+<td>—</td>
+<td>숫자</td>
+<td>—</td>
+<td>숫자가 아니면 <code>400</code></td>
+</tr>
+<tr>
+<td>본문 전체</td>
+<td>필수</td>
+<td>—</td>
+<td>—</td>
+<td>JSON</td>
+<td>—</td>
+<td>JSON이 아니면 <code>400</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>테스트 하나</strong> — &quot;기간이 지나면 풀린다&quot;를 시각을 넘겨 가며 확인하는 단위 테스트(Spring 없이). 끝 1초 전 = 정지, 끝 시각 = 풀림(끝은 포함하지 않는다), 하루 뒤 = 풀림, 해제 뒤 = 풀림.</p>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>운영자는 회원 행을 잠근 뒤 정지 시각을 저장하고, <code>AuthInterceptor</code>는 매 요청에서 <code>Clock</code>의 현재 시각과 비교한다. 아래 접기는 실제 답안 코드다. <strong>구현 코드</strong>와 <strong>MyBatis 대체 구현 코드</strong> 토글에는 단계별 변경 파일 전문이 있다.</p>
+<details>
+<summary>Controller — 운영 API와 HTTP 검증</summary>
+
+<pre><code class="language-java">package org.example.admin;
+
+import jakarta.validation.Validator;
+import org.example.post.InvalidParametersException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+@RestController
+@RequirePermission(Permission.SUSPEND_MEMBER)
+public class SuspensionController {
+
+    private final SuspensionService suspensionService;
+    private final Validator validator;
+
+    public SuspensionController(SuspensionService suspensionService, Validator validator) {
+        this.suspensionService = suspensionService;
+        this.validator = validator;
+    }
+
+    @PutMapping(&quot;/api/admin/members/{id}/suspension&quot;)
+    public SuspensionResponse suspend(@PathVariable Long id, @RequestBody JsonNode body) {
+        SuspensionRequest.Parsed parsed = SuspensionRequest.parse(body);
+        SuspensionRequest request = parsed.request();
+        Map&lt;String, String&gt; errors = new LinkedHashMap&lt;&gt;(parsed.errors());
+        validator.validate(request).forEach(v -&gt; errors.putIfAbsent(v.getPropertyPath().toString(), v.getMessage()));
+        if (!errors.isEmpty()) {
+            throw new InvalidParametersException(errors);
+        }
+        return suspensionService.suspend(id, request);
+    }
+
+    @DeleteMapping(&quot;/api/admin/members/{id}/suspension&quot;)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void lift(@PathVariable Long id) {
+        suspensionService.lift(id);
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>DTO — 요청 타입·경계·응답</summary>
+
+<pre><code class="language-java">package org.example.admin;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import org.example.post.InvalidParametersException;
+import tools.jackson.databind.JsonNode;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public record SuspensionRequest(
+        @NotNull(message = &quot;정지 일수를 적어 주세요.&quot;)
+        @Min(value = 1, message = &quot;정지는 1일 이상입니다.&quot;)
+        @Max(value = 30, message = &quot;정지는 30일까지입니다.&quot;)
+        Integer days,
+
+        @NotBlank(message = &quot;정지 사유를 적어 주세요.&quot;)
+        @Size(min = 2, max = 200, message = &quot;정지 사유는 2~200자입니다.&quot;)
+        String reason
+) {
+    public SuspensionRequest {
+        if (reason != null) reason = reason.strip();
+    }
+
+    public static Parsed parse(JsonNode body) {
+        if (body == null || !body.isObject()) {
+            throw new InvalidParametersException(Map.of(&quot;body&quot;, &quot;JSON 객체가 필요합니다.&quot;));
+        }
+        Map&lt;String, String&gt; errors = new LinkedHashMap&lt;&gt;();
+        Integer days = days(body.get(&quot;days&quot;), errors);
+        String reason = reason(body.get(&quot;reason&quot;), errors);
+        return new Parsed(new SuspensionRequest(days, reason), Map.copyOf(errors));
+    }
+
+    public record Parsed(SuspensionRequest request, Map&lt;String, String&gt; errors) {
+    }
+
+    private static Integer days(JsonNode value, Map&lt;String, String&gt; errors) {
+        if (value == null || value.isNull()) return null;
+        if (!value.isIntegralNumber() || !value.canConvertToInt()) {
+            errors.put(&quot;days&quot;, &quot;days는 정수여야 합니다.&quot;);
+            return null;
+        }
+        return value.intValue();
+    }
+
+    private static String reason(JsonNode value, Map&lt;String, String&gt; errors) {
+        if (value == null || value.isNull()) return null;
+        if (!value.isTextual()) {
+            errors.put(&quot;reason&quot;, &quot;reason은 문자열이어야 합니다.&quot;);
+            return null;
+        }
+        return value.asText();
+    }
+}
+
+package org.example.admin;
+
+import java.time.LocalDateTime;
+
+public record SuspensionResponse(Long memberId, LocalDateTime suspendedUntil, String reason) {
+}</code></pre>
+</details>
+
+<details>
+<summary>Service — 잠금 조회·기간 계산·해제</summary>
+
+<pre><code class="language-java">package org.example.admin;
+
+import org.example.member.Member;
+import org.example.member.MemberNotFoundException;
+import org.example.member.MemberRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+
+// 13-3 기간 정지 — 끝나는 시각만 저장한다. 풀리는 건 요청마다 &quot;지금 &lt; 끝&quot; 비교로 판단(배치·스케줄러 없음)
+@Service
+public class SuspensionService {
+
+    private static final String WITHDRAWN = &quot;WITHDRAWN&quot;;
+
+    private final MemberRepository memberRepository;
+    private final Clock clock;
+
+    public SuspensionService(MemberRepository memberRepository, Clock clock) {
+        this.memberRepository = memberRepository;
+        this.clock = clock;
+    }
+
+    // 이미 정지 중이면 새 기간으로 덮어쓴다(늘리기·줄이기 모두). 운영진(MODERATOR·ADMIN)은 정지할 수 없다 — 409
+    @Transactional
+    public SuspensionResponse suspend(Long memberId, SuspensionRequest request) {
+        Member member = findMember(memberId);
+        if (!Role.USER.name().equals(member.getRole())) {
+            throw new ModerationConflictException(&quot;운영진은 정지할 수 없습니다. 먼저 역할을 USER로 바꾸세요.&quot;);
+        }
+        LocalDateTime until = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS).plusDays(request.days());
+        member.suspendUntil(until, request.reason().strip());
+        return new SuspensionResponse(member.getId(), member.getSuspendedUntil(), member.getSuspendReason());
+    }
+
+    // 정지가 없어도 204(멱등)
+    @Transactional
+    public void lift(Long memberId) {
+        findMember(memberId).liftSuspension();
+    }
+
+    private Member findMember(Long memberId) {
+        return memberRepository.findByIdForUpdate(memberId)
+                .filter(m -&gt; !WITHDRAWN.equals(m.getMemberStatus()) &amp;&amp; m.getDeletedAt() == null)
+                .orElseThrow(MemberNotFoundException::new);
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>역할 변경 — 정지 중 승격 충돌</summary>
+
+<pre><code class="language-java">package org.example.admin;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.member.Member;
+import org.example.member.MemberNotFoundException;
+import org.example.member.MemberRepository;
+import org.example.post.AuthorResponse;
+import org.example.post.Post;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+
+// 13-1 운영 — 권한 확인은 PermissionInterceptor가 끝냈다. 여기는 상태 규칙만 본다.
+@Service
+public class ModerationService {
+
+    private static final String WITHDRAWN = &quot;WITHDRAWN&quot;;
+
+    private final PostRepository postRepository;
+    private final MemberRepository memberRepository;
+    private final Clock clock;
+
+    public ModerationService(PostRepository postRepository, MemberRepository memberRepository, Clock clock) {
+        this.postRepository = postRepository;
+        this.memberRepository = memberRepository;
+        this.clock = clock;
+    }
+
+    // 없는 글·삭제된 글 404 → 임시저장 409 → 숨기기/복구(이미 그 상태면 그대로 — 처음 숨긴 사람·시각 유지)
+    @Transactional
+    public PostStatusResponse changePostStatus(AuthenticatedMember me, Long postId, String status) {
+        // 숨김 요청 둘이 동시에 와도 첫 hiddenBy/hiddenAt을 보존하도록 글 행을 잠근다.
+        Post post = postRepository.findByIdForUpdate(postId)
+                .filter(p -&gt; p.getDeletedAt() == null)
+                .orElseThrow(PostNotFoundException::new);
+        if (&quot;HIDDEN&quot;.equals(status)) {
+            // DATETIME은 초 단위다 — 소수 초를 그대로 넘기면 MySQL이 반올림해 저장해서(…:09.51 → :10)
+            // 이번 응답의 hiddenAt과 다음에 읽은 값이 달라진다. 저장할 값을 미리 초로 자른다
+            post.hide(memberRepository.getReferenceById(me.id()), LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS));
+        } else {
+            post.unhide();
+        }
+        return toStatusResponse(post);
+    }
+
+    // 운영자(ADMIN)의 역할은 API로 바꾸지 않는다(자기 강등으로 운영자가 0명이 되는 사고 방지) — 409
+    @Transactional
+    public MemberRoleResponse changeRole(Long memberId, String role) {
+        Member member = memberRepository.findByIdForUpdate(memberId)
+                .filter(m -&gt; !WITHDRAWN.equals(m.getMemberStatus()) &amp;&amp; m.getDeletedAt() == null)
+                .orElseThrow(MemberNotFoundException::new);
+        if (Role.ADMIN.name().equals(member.getRole())) {
+            throw new ModerationConflictException(&quot;운영자의 역할은 바꿀 수 없습니다.&quot;);
+        }
+        if (Role.MODERATOR.name().equals(role) &amp;&amp; member.isSuspendedAt(LocalDateTime.now(clock))) {
+            throw new ModerationConflictException(&quot;기간 정지 중에는 운영진으로 승격할 수 없습니다. 먼저 정지를 해제하세요.&quot;);
+        }
+        member.changeRole(role);
+        return new MemberRoleResponse(member.getId(), member.getNickname(), member.getRole());
+    }
+
+    static PostStatusResponse toStatusResponse(Post post) {
+        Member by = post.getHiddenBy();
+        return new PostStatusResponse(post.getId(), post.getStatus(),
+                by == null ? null : new AuthorResponse(by.getId(), by.getNickname()), post.getHiddenAt());
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>인증 Interceptor — 영구 정지와 기간 정지</summary>
+
+<pre><code class="language-java">package org.example.auth;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.example.member.Member;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.stereotype.Component;
+import org.springframework.web.cors.CorsUtils;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+
+// /api/** 요청의 토큰을 한 곳에서 확인한다(컨트롤러마다 반복하지 않는다).
+// GET이고 헤더가 없으면 비로그인으로 통과시킨다(2-1에서 필요).
+@Component
+public class AuthInterceptor implements HandlerInterceptor {
+
+    public static final String LOGIN_MEMBER_ATTRIBUTE = &quot;loginMember&quot;;
+    private static final String BEARER_PREFIX = &quot;Bearer &quot;;
+    private static final String ACTIVE_STATUS = &quot;ACTIVE&quot;;
+
+    private final ApiTokenRepository apiTokenRepository;
+    private final Clock clock;
+
+    public AuthInterceptor(ApiTokenRepository apiTokenRepository, Clock clock) {
+        this.apiTokenRepository = apiTokenRepository;
+        this.clock = clock;
+    }
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        // CORS 사전 요청(OPTIONS)은 토큰 없이 온다 — 막으면 브라우저의 요청이 전부 CORS로 실패한다
+        if (CorsUtils.isPreFlightRequest(request)) {
+            return true;
+        }
+
+        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+        boolean isGet = HttpMethod.GET.matches(request.getMethod());
+
+        if (header == null) {
+            if (isGet) {
+                return true;
+            }
+            throw new AuthenticationRequiredException(&quot;인증이 필요합니다.&quot;);
+        }
+        if (!header.startsWith(BEARER_PREFIX)) {
+            throw new AuthenticationRequiredException(&quot;인증이 필요합니다.&quot;);
+        }
+
+        String token = header.substring(BEARER_PREFIX.length()).trim();
+        ApiToken apiToken = apiTokenRepository.findByTokenFetchMember(token)
+                .orElseThrow(() -&gt; new AuthenticationRequiredException(&quot;인증이 필요합니다.&quot;));
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        boolean expired = !now.isBefore(apiToken.getExpiresAt());
+        if (apiToken.getRevokedAt() != null || expired) {
+            throw new AuthenticationRequiredException(&quot;인증이 필요합니다.&quot;);
+        }
+
+        Member member = apiToken.getMember();
+        if (!ACTIVE_STATUS.equals(member.getMemberStatus())) {
+            throw new MemberNotActiveException(&quot;정지되었거나 탈퇴한 회원입니다.&quot;);
+        }
+        // 13-3 기간 정지 — 읽기(GET)는 그대로, 쓰기만 막는다. 기간이 지나면 이 비교가 false가 되어 저절로 풀린다
+        if (!isGet &amp;&amp; member.isSuspendedAt(now)) {
+            throw new MemberSuspendedException(member.getSuspendedUntil(), member.getSuspendReason());
+        }
+
+        request.setAttribute(LOGIN_MEMBER_ATTRIBUTE,
+                new AuthenticatedMember(member.getId(), member.getNickname(), member.getRole()));
+        return true;
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>Entity — 끝 시각의 배타적 경계</summary>
+
+<pre><code class="language-java">package org.example.member;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+import java.time.LocalDateTime;
+
+// 회원 — 탈퇴(WITHDRAWN)해도 행은 남고 deleted_at이 찍힌다. 지금은 조회만 한다(가입 API 없음)
+@Entity
+@Table(name = &quot;member&quot;)
+public class Member {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column(nullable = false, unique = true)
+    private String nickname;
+
+    @Column(nullable = false)
+    private String role;
+
+    @Column(name = &quot;member_status&quot;, nullable = false)
+    private String memberStatus;
+
+    // 13-3 기간 정지(V43) — 이 시각 전까지 쓰기 금지. null이거나 지났으면 정지 아님
+    @Column(name = &quot;suspended_until&quot;)
+    private LocalDateTime suspendedUntil;
+
+    @Column(name = &quot;suspend_reason&quot;, length = 200)
+    private String suspendReason;
+
+    @Column(name = &quot;created_at&quot;, nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = &quot;updated_at&quot;, nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Column(name = &quot;deleted_at&quot;)
+    private LocalDateTime deletedAt;
+
+    protected Member() {
+        // JPA
+    }
+
+    // 13-1 운영 API로만 — USER ↔ MODERATOR
+    public void changeRole(String role) {
+        this.role = role;
+    }
+
+    // 13-3 — &quot;지금&quot;을 밖에서 받는다(테스트에서 시각을 앞뒤로 넘겨 볼 수 있다)
+    public boolean isSuspendedAt(LocalDateTime now) {
+        return suspendedUntil != null &amp;&amp; now.isBefore(suspendedUntil);
+    }
+
+    public void suspendUntil(LocalDateTime until, String reason) {
+        this.suspendedUntil = until;
+        this.suspendReason = reason;
+    }
+
+    public void liftSuspension() {
+        this.suspendedUntil = null;
+        this.suspendReason = null;
+    }
+
+    public LocalDateTime getSuspendedUntil() {
+        return suspendedUntil;
+    }
+
+    public String getSuspendReason() {
+        return suspendReason;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public String getMemberStatus() {
+        return memberStatus;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>Flyway / SQL — 정지 컬럼</summary>
+
+<pre><code class="language-sql">-- V43 — 기간 정지(13-3). suspended_until이 &quot;지금&quot;보다 뒤면 정지 중 — 지나면 아무것도 안 해도 저절로 풀린다(배치 없음).
+-- 기존 member_status = 'SUSPENDED'(영구 정지, 1-6)와는 별개다: 그건 로그인부터 막고, 이건 쓰기만 막는다.
+ALTER TABLE member
+    ADD COLUMN suspended_until DATETIME     NULL AFTER member_status,
+    ADD COLUMN suspend_reason  VARCHAR(200) NULL AFTER suspended_until;</code></pre>
+</details>
+
+<details>
+<summary>예외 처리 — 403과 끝 시각</summary>
+
+<pre><code class="language-java">package org.example.auth;
+
+import java.time.LocalDateTime;
+
+// 13-3 기간 정지 중인 회원의 쓰기 요청 — 전역 핸들러가 403 + 끝나는 시각·사유로 변환한다
+public class MemberSuspendedException extends RuntimeException {
+
+    private final LocalDateTime suspendedUntil;
+    private final String reason;
+
+    public MemberSuspendedException(LocalDateTime suspendedUntil, String reason) {
+        super(&quot;정지 기간에는 글·댓글을 쓰거나 바꿀 수 없습니다.&quot;);
+        this.suspendedUntil = suspendedUntil;
+        this.reason = reason;
+    }
+
+    public LocalDateTime getSuspendedUntil() {
+        return suspendedUntil;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+}
+
+// 13-3 기간 정지 중 쓰기 — 언제 풀리는지·왜인지를 함께 준다(화면이 안내 문구를 만들 수 있게)
+    @ExceptionHandler(MemberSuspendedException.class)
+    public ProblemDetail handleMemberSuspended(MemberSuspendedException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty(&quot;suspendedUntil&quot;, ex.getSuspendedUntil());
+        problem.setProperty(&quot;reason&quot;, ex.getReason());
+        return problem;
+    }</code></pre>
+</details>
+
+<details>
+<summary>권한 표 — SUSPEND_MEMBER</summary>
+
+<pre><code class="language-java">package org.example.admin;
+
+// 13-1 운영 권한 — 역할(Role)이 어떤 권한을 갖는지는 Role 한 곳에서 정한다.
+// 컨트롤러는 &quot;운영자인가&quot;가 아니라 &quot;이 일을 할 권한이 있나&quot;(@RequirePermission)만 적는다.
+public enum Permission {
+    MODERATE_POST,   // 글 숨김·복구, 숨김 글 보기
+    MANAGE_ROLE,     // 역할 바꾸기
+    RUN_BATCH,       // 8-5 정합성 배치 수동 실행
+    HANDLE_REPORT,   // 13-2 신고 목록·처리
+    SUSPEND_MEMBER   // 13-3 기간 정지·해제
+}
+
+package org.example.admin;
+
+import java.util.EnumSet;
+import java.util.Set;
+
+// 13-1 역할 → 권한 표. 새 역할·권한이 생기면 여기만 고친다(문자열 &quot;ADMIN&quot; 비교를 여기저기 두지 않는다)
+public enum Role {
+    USER(EnumSet.noneOf(Permission.class)),
+    MODERATOR(EnumSet.of(Permission.MODERATE_POST, Permission.HANDLE_REPORT, Permission.SUSPEND_MEMBER)),
+    ADMIN(EnumSet.allOf(Permission.class));
+
+    private final Set&lt;Permission&gt; permissions;
+
+    Role(Set&lt;Permission&gt; permissions) {
+        this.permissions = permissions;
+    }
+
+    public boolean can(Permission permission) {
+        return permissions.contains(permission);
+    }
+
+    // member.role 문자열(DB 값)로 판정 — 모르는 값이면 아무 권한도 없다
+    public static boolean has(String role, Permission permission) {
+        for (Role r : values()) {
+            if (r.name().equals(role)) {
+                return r.can(permission);
+            }
+        }
+        return false;
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>단위 테스트 — 만료 경계</summary>
+
+<pre><code class="language-java">package org.example.member;
+
+import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Constructor;
+import java.time.LocalDateTime;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+// 13-3 T1 — &quot;기간이 지나면 저절로 풀린다&quot;는 HTTP로는 기다릴 수 없어서 시각을 넘겨 가며 단위 테스트로 본다(Spring 없이)
+class MemberSuspensionTest {
+
+    private static final LocalDateTime UNTIL = LocalDateTime.of(2026, 10, 13, 15, 0, 0);
+
+    @Test
+    void suspendedOnlyBeforeUntil() throws Exception {
+        Member member = newMember();
+        member.suspendUntil(UNTIL, &quot;도배&quot;);
+
+        assertTrue(member.isSuspendedAt(UNTIL.minusSeconds(1)), &quot;끝나기 1초 전에는 정지 중&quot;);
+        assertFalse(member.isSuspendedAt(UNTIL), &quot;끝나는 시각부터는 풀린다(끝 시각은 포함하지 않는다)&quot;);
+        assertFalse(member.isSuspendedAt(UNTIL.plusDays(1)), &quot;지나면 아무것도 안 해도 풀려 있다&quot;);
+    }
+
+    @Test
+    void notSuspendedWhenNeverSuspendedOrLifted() throws Exception {
+        Member member = newMember();
+        assertFalse(member.isSuspendedAt(UNTIL), &quot;정지한 적 없으면 정지 아님&quot;);
+
+        member.suspendUntil(UNTIL, &quot;도배&quot;);
+        member.liftSuspension();
+        assertFalse(member.isSuspendedAt(UNTIL.minusDays(1)), &quot;해제하면 기간 안이어도 정지 아님&quot;);
+    }
+
+    // Member는 JPA용 protected 생성자만 있다 — 테스트에서는 리플렉션으로 만든다
+    private static Member newMember() throws Exception {
+        Constructor&lt;Member&gt; constructor = Member.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        return constructor.newInstance();
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>MyBatis Mapper — 잠금 조회·UPDATE</summary>
+
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot;
+        &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.admin.SuspensionMapper&quot;&gt;
+    &lt;select id=&quot;findForUpdate&quot; resultType=&quot;org.example.admin.MemberSuspensionTarget&quot;&gt;
+        SELECT id, role, member_status AS memberStatus, deleted_at AS deletedAt
+        FROM member
+        WHERE id = #{memberId}
+        FOR UPDATE
+    &lt;/select&gt;
+
+    &lt;update id=&quot;suspend&quot;&gt;
+        UPDATE member
+        SET suspended_until = #{until}, suspend_reason = #{reason}
+        WHERE id = #{memberId}
+    &lt;/update&gt;
+
+    &lt;update id=&quot;lift&quot;&gt;
+        UPDATE member
+        SET suspended_until = NULL, suspend_reason = NULL
+        WHERE id = #{memberId}
+    &lt;/update&gt;
+&lt;/mapper&gt;</code></pre>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/admin/Permission.java</summary><pre><code>package org.example.admin;
+
+<p>// 13-1 운영 권한 — 역할(Role)이 어떤 권한을 갖는지는 Role 한 곳에서 정한다.
+// 컨트롤러는 &quot;운영자인가&quot;가 아니라 &quot;이 일을 할 권한이 있나&quot;(@RequirePermission)만 적는다.
+public enum Permission {
+    MODERATE_POST,   // 글 숨김·복구, 숨김 글 보기
+    MANAGE_ROLE,     // 역할 바꾸기
+    RUN_BATCH,       // 8-5 정합성 배치 수동 실행
+    HANDLE_REPORT,   // 13-2 신고 목록·처리
+    SUSPEND_MEMBER   // 13-3 기간 정지·해제
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/admin/Role.java</summary><pre><code>package org.example.admin;
+
+<p>import java.util.EnumSet;
+import java.util.Set;</p>
+<p>// 13-1 역할 → 권한 표. 새 역할·권한이 생기면 여기만 고친다(문자열 &quot;ADMIN&quot; 비교를 여기저기 두지 않는다)
+public enum Role {
+    USER(EnumSet.noneOf(Permission.class)),
+    MODERATOR(EnumSet.of(Permission.MODERATE_POST, Permission.HANDLE_REPORT, Permission.SUSPEND_MEMBER)),
+    ADMIN(EnumSet.allOf(Permission.class));</p>
+<pre><code>private final Set&amp;lt;Permission&amp;gt; permissions;
+
+Role(Set&amp;lt;Permission&amp;gt; permissions) {
+    this.permissions = permissions;
+}
+
+public boolean can(Permission permission) {
+    return permissions.contains(permission);
+}
+
+// member.role 문자열(DB 값)로 판정 — 모르는 값이면 아무 권한도 없다
+public static boolean has(String role, Permission permission) {
+    for (Role r : values()) {
+        if (r.name().equals(role)) {
+            return r.can(permission);
+        }
+    }
+    return false;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/admin/SuspensionController.java</summary><pre><code>package org.example.admin;
+
+<p>import jakarta.validation.Validator;
+import org.example.post.InvalidParametersException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;</p>
+<p>import java.util.LinkedHashMap;
+import java.util.Map;</p>
+<p>@RestController
+@RequirePermission(Permission.SUSPEND_MEMBER)
+public class SuspensionController {</p>
+<pre><code>private final SuspensionService suspensionService;
+private final Validator validator;
+
+public SuspensionController(SuspensionService suspensionService, Validator validator) {
+    this.suspensionService = suspensionService;
+    this.validator = validator;
+}
+
+@PutMapping(&amp;quot;/api/admin/members/{id}/suspension&amp;quot;)
+public SuspensionResponse suspend(@PathVariable Long id, @RequestBody JsonNode body) {
+    SuspensionRequest.Parsed parsed = SuspensionRequest.parse(body);
+    SuspensionRequest request = parsed.request();
+    Map&amp;lt;String, String&amp;gt; errors = new LinkedHashMap&amp;lt;&amp;gt;(parsed.errors());
+    validator.validate(request).forEach(v -&amp;gt; errors.putIfAbsent(v.getPropertyPath().toString(), v.getMessage()));
+    if (!errors.isEmpty()) {
+        throw new InvalidParametersException(errors);
+    }
+    return suspensionService.suspend(id, request);
+}
+
+@DeleteMapping(&amp;quot;/api/admin/members/{id}/suspension&amp;quot;)
+@ResponseStatus(HttpStatus.NO_CONTENT)
+public void lift(@PathVariable Long id) {
+    suspensionService.lift(id);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/admin/SuspensionRequest.java</summary><pre><code>package org.example.admin;
+
+<p>import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import org.example.post.InvalidParametersException;
+import tools.jackson.databind.JsonNode;</p>
+<p>import java.util.LinkedHashMap;
+import java.util.Map;</p>
+<p>public record SuspensionRequest(
+        @NotNull(message = &quot;정지 일수를 적어 주세요.&quot;)
+        @Min(value = 1, message = &quot;정지는 1일 이상입니다.&quot;)
+        @Max(value = 30, message = &quot;정지는 30일까지입니다.&quot;)
+        Integer days,</p>
+<pre><code>    @NotBlank(message = &amp;quot;정지 사유를 적어 주세요.&amp;quot;)
+    @Size(min = 2, max = 200, message = &amp;quot;정지 사유는 2~200자입니다.&amp;quot;)
+    String reason</code></pre>
+<p>) {
+    public SuspensionRequest {
+        if (reason != null) reason = reason.strip();
+    }</p>
+<pre><code>public static Parsed parse(JsonNode body) {
+    if (body == null || !body.isObject()) {
+        throw new InvalidParametersException(Map.of(&amp;quot;body&amp;quot;, &amp;quot;JSON 객체가 필요합니다.&amp;quot;));
+    }
+    Map&amp;lt;String, String&amp;gt; errors = new LinkedHashMap&amp;lt;&amp;gt;();
+    Integer days = days(body.get(&amp;quot;days&amp;quot;), errors);
+    String reason = reason(body.get(&amp;quot;reason&amp;quot;), errors);
+    return new Parsed(new SuspensionRequest(days, reason), Map.copyOf(errors));
+}
+
+public record Parsed(SuspensionRequest request, Map&amp;lt;String, String&amp;gt; errors) {
+}
+
+private static Integer days(JsonNode value, Map&amp;lt;String, String&amp;gt; errors) {
+    if (value == null || value.isNull()) return null;
+    if (!value.isIntegralNumber() || !value.canConvertToInt()) {
+        errors.put(&amp;quot;days&amp;quot;, &amp;quot;days는 정수여야 합니다.&amp;quot;);
+        return null;
+    }
+    return value.intValue();
+}
+
+private static String reason(JsonNode value, Map&amp;lt;String, String&amp;gt; errors) {
+    if (value == null || value.isNull()) return null;
+    if (!value.isTextual()) {
+        errors.put(&amp;quot;reason&amp;quot;, &amp;quot;reason은 문자열이어야 합니다.&amp;quot;);
+        return null;
+    }
+    return value.asText();
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/admin/SuspensionResponse.java</summary><pre><code>package org.example.admin;
+
+<p>import java.time.LocalDateTime;</p>
+<p>public record SuspensionResponse(Long memberId, LocalDateTime suspendedUntil, String reason) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/admin/SuspensionService.java</summary><pre><code>package org.example.admin;
+
+<p>import org.example.member.Member;
+import org.example.member.MemberNotFoundException;
+import org.example.member.MemberRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;</p>
+<p>// 13-3 기간 정지 — 끝나는 시각만 저장한다. 풀리는 건 요청마다 &quot;지금 &lt; 끝&quot; 비교로 판단(배치·스케줄러 없음)
+@Service
+public class SuspensionService {</p>
+<pre><code>private static final String WITHDRAWN = &amp;quot;WITHDRAWN&amp;quot;;
+
+private final MemberRepository memberRepository;
+private final Clock clock;
+
+public SuspensionService(MemberRepository memberRepository, Clock clock) {
+    this.memberRepository = memberRepository;
+    this.clock = clock;
+}
+
+// 이미 정지 중이면 새 기간으로 덮어쓴다(늘리기·줄이기 모두). 운영진(MODERATOR·ADMIN)은 정지할 수 없다 — 409
+@Transactional
+public SuspensionResponse suspend(Long memberId, SuspensionRequest request) {
+    Member member = findMember(memberId);
+    if (!Role.USER.name().equals(member.getRole())) {
+        throw new ModerationConflictException(&amp;quot;운영진은 정지할 수 없습니다. 먼저 역할을 USER로 바꾸세요.&amp;quot;);
+    }
+    LocalDateTime until = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS).plusDays(request.days());
+    member.suspendUntil(until, request.reason().strip());
+    return new SuspensionResponse(member.getId(), member.getSuspendedUntil(), member.getSuspendReason());
+}
+
+// 정지가 없어도 204(멱등)
+@Transactional
+public void lift(Long memberId) {
+    findMember(memberId).liftSuspension();
+}
+
+private Member findMember(Long memberId) {
+    return memberRepository.findByIdForUpdate(memberId)
+            .filter(m -&amp;gt; !WITHDRAWN.equals(m.getMemberStatus()) &amp;amp;&amp;amp; m.getDeletedAt() == null)
+            .orElseThrow(MemberNotFoundException::new);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/auth/AuthInterceptor.java</summary><pre><code>package org.example.auth;
+
+<p>import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.example.member.Member;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.stereotype.Component;
+import org.springframework.web.cors.CorsUtils;
+import org.springframework.web.servlet.HandlerInterceptor;</p>
+<p>import java.time.Clock;
+import java.time.LocalDateTime;</p>
+<p>// /api/** 요청의 토큰을 한 곳에서 확인한다(컨트롤러마다 반복하지 않는다).
+// GET이고 헤더가 없으면 비로그인으로 통과시킨다(2-1에서 필요).
+@Component
+public class AuthInterceptor implements HandlerInterceptor {</p>
+<pre><code>public static final String LOGIN_MEMBER_ATTRIBUTE = &amp;quot;loginMember&amp;quot;;
+private static final String BEARER_PREFIX = &amp;quot;Bearer &amp;quot;;
+private static final String ACTIVE_STATUS = &amp;quot;ACTIVE&amp;quot;;
+
+private final ApiTokenRepository apiTokenRepository;
+private final Clock clock;
+
+public AuthInterceptor(ApiTokenRepository apiTokenRepository, Clock clock) {
+    this.apiTokenRepository = apiTokenRepository;
+    this.clock = clock;
+}
+
+@Override
+public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+    // CORS 사전 요청(OPTIONS)은 토큰 없이 온다 — 막으면 브라우저의 요청이 전부 CORS로 실패한다
+    if (CorsUtils.isPreFlightRequest(request)) {
+        return true;
+    }
+
+    String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+    boolean isGet = HttpMethod.GET.matches(request.getMethod());
+
+    if (header == null) {
+        if (isGet) {
+            return true;
+        }
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+    if (!header.startsWith(BEARER_PREFIX)) {
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+
+    String token = header.substring(BEARER_PREFIX.length()).trim();
+    ApiToken apiToken = apiTokenRepository.findByTokenFetchMember(token)
+            .orElseThrow(() -&amp;gt; new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;));
+
+    LocalDateTime now = LocalDateTime.now(clock);
+    boolean expired = !now.isBefore(apiToken.getExpiresAt());
+    if (apiToken.getRevokedAt() != null || expired) {
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+
+    Member member = apiToken.getMember();
+    if (!ACTIVE_STATUS.equals(member.getMemberStatus())) {
+        throw new MemberNotActiveException(&amp;quot;정지되었거나 탈퇴한 회원입니다.&amp;quot;);
+    }
+    // 13-3 기간 정지 — 읽기(GET)는 그대로, 쓰기만 막는다. 기간이 지나면 이 비교가 false가 되어 저절로 풀린다
+    if (!isGet &amp;amp;&amp;amp; member.isSuspendedAt(now)) {
+        throw new MemberSuspendedException(member.getSuspendedUntil(), member.getSuspendReason());
+    }
+
+    request.setAttribute(LOGIN_MEMBER_ATTRIBUTE,
+            new AuthenticatedMember(member.getId(), member.getNickname(), member.getRole()));
+    return true;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/auth/MemberSuspendedException.java</summary><pre><code>package org.example.auth;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 13-3 기간 정지 중인 회원의 쓰기 요청 — 전역 핸들러가 403 + 끝나는 시각·사유로 변환한다
+public class MemberSuspendedException extends RuntimeException {</p>
+<pre><code>private final LocalDateTime suspendedUntil;
+private final String reason;
+
+public MemberSuspendedException(LocalDateTime suspendedUntil, String reason) {
+    super(&amp;quot;정지 기간에는 글·댓글을 쓰거나 바꿀 수 없습니다.&amp;quot;);
+    this.suspendedUntil = suspendedUntil;
+    this.reason = reason;
+}
+
+public LocalDateTime getSuspendedUntil() {
+    return suspendedUntil;
+}
+
+public String getReason() {
+    return reason;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/common/ApiExceptionHandler.java</summary><pre><code>package org.example.common;
+
+<p>import jakarta.servlet.http.HttpServletRequest;
+import tools.jackson.core.JacksonException;
+import org.example.admin.AdminOnlyException;
+import org.example.admin.ModerationConflictException;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.MemberNotActiveException;
+import org.example.auth.MemberSuspendedException;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardWriteForbiddenException;
+import org.example.bookmark.BookmarkFolderNotFoundException;
+import org.example.bookmark.InvalidBookmarkFieldException;
+import org.example.bookmark.BookmarkNotFoundException;
+import org.example.bookmark.DuplicateBookmarkFolderNameException;
+import org.example.bookmark.InvalidBookmarkFolderException;
+import org.example.comment.CommentForbiddenException;
+import org.example.comment.CommentNotFoundException;
+import org.example.comment.InvalidParentCommentException;
+import org.example.image.EmptyImageException;
+import org.example.image.ImageNotFoundException;
+import org.example.image.UnsupportedImageException;
+import org.example.like.SelfLikeNotAllowedException;
+import org.example.member.MemberNotFoundException;
+import org.example.notification.NotificationNotFoundException;
+import org.example.post.InvalidParametersException;
+import org.example.post.InvalidPostFieldException;
+import org.example.post.InvalidSearchConditionException;
+import org.example.post.PostForbiddenException;
+import org.example.post.PostNotDeletedException;
+import org.example.revision.RevisionForbiddenException;
+import org.example.post.PostNotDraftException;
+import org.example.post.PostRestoreExpiredException;
+import org.example.post.PostRestoreForbiddenException;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostStatusConflictException;
+import org.example.report.DuplicateReportException;
+import org.example.report.NothingToResolveException;
+import org.example.report.ReportTargetNotFoundException;
+import org.example.report.SelfReportNotAllowedException;
+import org.example.social.FollowBlockedException;
+import org.example.social.SelfFollowNotAllowedException;
+import org.example.social.SelfMuteNotAllowedException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;</p>
+<p>import java.net.URI;
+import java.util.List;
+import java.util.Map;</p>
+<p>// 모든 컨트롤러의 에러 응답을 한 곳에서 RFC 9457 Problem Details로 만든다.
+// 컨트롤러마다 try-catch를 두지 않는다.
+@RestControllerAdvice
+public class ApiExceptionHandler {</p>
+<pre><code>@ExceptionHandler(MethodArgumentNotValidException.class)
+public ProblemDetail handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    List&amp;lt;Map&amp;lt;String, String&amp;gt;&amp;gt; errors = ex.getBindingResult().getFieldErrors().stream()
+            .map(fieldError -&amp;gt; Map.of(
+                    &amp;quot;field&amp;quot;, fieldError.getField(),
+                    &amp;quot;message&amp;quot;, fieldError.getDefaultMessage() == null ? &amp;quot;&amp;quot; : fieldError.getDefaultMessage()
+            ))
+            .toList();
+    problem.setProperty(&amp;quot;errors&amp;quot;, errors);
+    return problem;
+}
+
+@ExceptionHandler(HttpMessageNotReadableException.class)
+public ProblemDetail handleUnreadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;요청 본문을 읽을 수 없습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    // 11-1 JSON 문법은 맞는데 한 필드의 형식이 틀린 경우(숫자 자리에 &amp;quot;abc&amp;quot;, 목록 자리에 문자열) —
+    // Jackson이 남긴 경로로 어느 필드인지 errors에 담는다. 목록 안이면 Bean Validation과 같은 모양(imageIds[0]).
+    // JSON 문법 자체가 깨졌으면 경로가 비어 있어 errors 없이 400만 나간다. Jackson은 첫 오류에서 멈추므로 하나만 들어간다.
+    if (ex.getCause() instanceof JacksonException jackson &amp;amp;&amp;amp; !jackson.getPath().isEmpty()) {
+        problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, fieldPath(jackson), &amp;quot;message&amp;quot;, &amp;quot;형식이 올바르지 않습니다.&amp;quot;)));
+    }
+    return problem;
+}
+
+// 11-1 경로·쿼리 값의 형식 오류(/api/posts/abc, ?size=abc) — 그대로 두면 Spring 기본 응답이라 어느 값이 틀렸는지 없다
+@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, ex.getName(),
+            &amp;quot;message&amp;quot;, &amp;quot;형식이 올바르지 않습니다: &amp;quot; + ex.getValue())));
+    return problem;
+}
+
+private static String fieldPath(JacksonException jackson) {
+    StringBuilder field = new StringBuilder();
+    for (JacksonException.Reference ref : jackson.getPath()) {
+        if (ref.getPropertyName() != null) {
+            if (!field.isEmpty()) {
+                field.append('.');
+            }
+            field.append(ref.getPropertyName());
+        } else {
+            field.append('[').append(ref.getIndex()).append(']');
+        }
+    }
+    return field.toString();
+}
+
+@ExceptionHandler(BoardNotFoundException.class)
+public ProblemDetail handleBoardNotFound(BoardNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostNotFoundException.class)
+public ProblemDetail handlePostNotFound(PostNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(BoardWriteForbiddenException.class)
+public ProblemDetail handleBoardWriteForbidden(BoardWriteForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(SelfLikeNotAllowedException.class)
+public ProblemDetail handleSelfLikeNotAllowed(SelfLikeNotAllowedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostForbiddenException.class)
+public ProblemDetail handlePostForbidden(PostForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-1 임시저장이 아닌 글을 발행 — 지금 상태와 충돌
+@ExceptionHandler(PostNotDraftException.class)
+public ProblemDetail handlePostNotDraft(PostNotDraftException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-6 이력은 작성자·운영자만
+@ExceptionHandler(RevisionForbiddenException.class)
+public ProblemDetail handleRevisionForbidden(RevisionForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-5 복구
+@ExceptionHandler(PostNotDeletedException.class)
+public ProblemDetail handlePostNotDeleted(PostNotDeletedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostRestoreForbiddenException.class)
+public ProblemDetail handlePostRestoreForbidden(PostRestoreForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostRestoreExpiredException.class)
+public ProblemDetail handlePostRestoreExpired(PostRestoreExpiredException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.GONE, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-2 이미지 업로드
+@ExceptionHandler(EmptyImageException.class)
+public ProblemDetail handleEmptyImage(EmptyImageException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(UnsupportedImageException.class)
+public ProblemDetail handleUnsupportedImage(UnsupportedImageException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// spring.servlet.multipart.max-file-size를 넘으면 컨트롤러에 오기 전에(요청을 읽는 단계에서) 터진다
+@ExceptionHandler(MaxUploadSizeExceededException.class)
+public ProblemDetail handleMaxUploadSize(HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONTENT_TOO_LARGE, &amp;quot;파일은 1MB까지 올릴 수 있습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(ImageNotFoundException.class)
+public ProblemDetail handleImageNotFound(ImageNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-4 쿼리 파라미터 여러 개를 한꺼번에 검사한 결과
+@ExceptionHandler(InvalidParametersException.class)
+public ProblemDetail handleInvalidParameters(InvalidParametersException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, ex.getErrors().entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .map(e -&amp;gt; Map.of(&amp;quot;field&amp;quot;, e.getKey(), &amp;quot;message&amp;quot;, e.getValue()))
+            .toList());
+    return problem;
+}
+
+@ExceptionHandler(InvalidPostFieldException.class)
+public ProblemDetail handleInvalidPostField(InvalidPostFieldException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, ex.getField(), &amp;quot;message&amp;quot;, ex.getMessage())));
+    return problem;
+}
+
+@ExceptionHandler(CommentNotFoundException.class)
+public ProblemDetail handleCommentNotFound(CommentNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidParentCommentException.class)
+public ProblemDetail handleInvalidParentComment(InvalidParentCommentException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(CommentForbiddenException.class)
+public ProblemDetail handleCommentForbidden(CommentForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(BookmarkFolderNotFoundException.class)
+public ProblemDetail handleBookmarkFolderNotFound(BookmarkFolderNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(BookmarkNotFoundException.class)
+public ProblemDetail handleBookmarkNotFound(BookmarkNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidBookmarkFolderException.class)
+public ProblemDetail handleInvalidBookmarkFolder(InvalidBookmarkFolderException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(DuplicateBookmarkFolderNameException.class)
+public ProblemDetail handleDuplicateBookmarkFolderName(DuplicateBookmarkFolderNameException ex,
+                                                       HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidCursorException.class)
+public ProblemDetail handleInvalidCursor(InvalidCursorException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidSearchConditionException.class)
+public ProblemDetail handleInvalidSearchCondition(InvalidSearchConditionException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(AdminOnlyException.class)
+public ProblemDetail handleAdminOnly(AdminOnlyException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostStatusConflictException.class)
+public ProblemDetail handlePostStatusConflict(PostStatusConflictException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(ModerationConflictException.class)
+public ProblemDetail handleModerationConflict(ModerationConflictException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(NotificationNotFoundException.class)
+public ProblemDetail handleNotificationNotFound(NotificationNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(MemberNotFoundException.class)
+public ProblemDetail handleMemberNotFound(MemberNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(SelfFollowNotAllowedException.class)
+public ProblemDetail handleSelfFollow(SelfFollowNotAllowedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(SelfMuteNotAllowedException.class)
+public ProblemDetail handleSelfMute(SelfMuteNotAllowedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(FollowBlockedException.class)
+public ProblemDetail handleFollowBlocked(FollowBlockedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(ReportTargetNotFoundException.class)
+public ProblemDetail handleReportTargetNotFound(ReportTargetNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(SelfReportNotAllowedException.class)
+public ProblemDetail handleSelfReport(SelfReportNotAllowedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(NothingToResolveException.class)
+public ProblemDetail handleNothingToResolve(NothingToResolveException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(DuplicateReportException.class)
+public ProblemDetail handleDuplicateReport(DuplicateReportException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidBookmarkFieldException.class)
+public ProblemDetail handleInvalidBookmarkField(InvalidBookmarkFieldException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, ex.getField(), &amp;quot;message&amp;quot;, ex.getMessage())));
+    return problem;
+}
+
+// 누구인지 모름 — WWW-Authenticate 헤더를 함께 내려준다
+@ExceptionHandler(AuthenticationRequiredException.class)
+public ResponseEntity&amp;lt;ProblemDetail&amp;gt; handleAuthenticationRequired(AuthenticationRequiredException ex,
+                                                                   HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .header(HttpHeaders.WWW_AUTHENTICATE, &amp;quot;Bearer&amp;quot;)
+            .body(problem);
+}
+
+// 13-3 기간 정지 중 쓰기 — 언제 풀리는지·왜인지를 함께 준다(화면이 안내 문구를 만들 수 있게)
+@ExceptionHandler(MemberSuspendedException.class)
+public ProblemDetail handleMemberSuspended(MemberSuspendedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;suspendedUntil&amp;quot;, ex.getSuspendedUntil());
+    problem.setProperty(&amp;quot;reason&amp;quot;, ex.getReason());
+    return problem;
+}
+
+// 누구인지는 알지만(토큰은 유효) 회원 상태 때문에 안 됨
+@ExceptionHandler(MemberNotActiveException.class)
+public ProblemDetail handleMemberNotActive(MemberNotActiveException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Entity — src/main/java/org/example/member/Member.java</summary><pre><code>package org.example.member;
+
+<p>import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;</p>
+<p>import java.time.LocalDateTime;</p>
+<p>// 회원 — 탈퇴(WITHDRAWN)해도 행은 남고 deleted_at이 찍힌다. 지금은 조회만 한다(가입 API 없음)
+@Entity
+@Table(name = &quot;member&quot;)
+public class Member {</p>
+<pre><code>@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+@Column(nullable = false, unique = true)
+private String email;
+
+@Column(nullable = false, unique = true)
+private String nickname;
+
+@Column(nullable = false)
+private String role;
+
+@Column(name = &amp;quot;member_status&amp;quot;, nullable = false)
+private String memberStatus;
+
+// 13-3 기간 정지(V43) — 이 시각 전까지 쓰기 금지. null이거나 지났으면 정지 아님
+@Column(name = &amp;quot;suspended_until&amp;quot;)
+private LocalDateTime suspendedUntil;
+
+@Column(name = &amp;quot;suspend_reason&amp;quot;, length = 200)
+private String suspendReason;
+
+@Column(name = &amp;quot;created_at&amp;quot;, nullable = false)
+private LocalDateTime createdAt;
+
+@Column(name = &amp;quot;updated_at&amp;quot;, nullable = false)
+private LocalDateTime updatedAt;
+
+@Column(name = &amp;quot;deleted_at&amp;quot;)
+private LocalDateTime deletedAt;
+
+protected Member() {
+    // JPA
+}
+
+// 13-1 운영 API로만 — USER ↔ MODERATOR
+public void changeRole(String role) {
+    this.role = role;
+}
+
+// 13-3 — &amp;quot;지금&amp;quot;을 밖에서 받는다(테스트에서 시각을 앞뒤로 넘겨 볼 수 있다)
+public boolean isSuspendedAt(LocalDateTime now) {
+    return suspendedUntil != null &amp;amp;&amp;amp; now.isBefore(suspendedUntil);
+}
+
+public void suspendUntil(LocalDateTime until, String reason) {
+    this.suspendedUntil = until;
+    this.suspendReason = reason;
+}
+
+public void liftSuspension() {
+    this.suspendedUntil = null;
+    this.suspendReason = null;
+}
+
+public LocalDateTime getSuspendedUntil() {
+    return suspendedUntil;
+}
+
+public String getSuspendReason() {
+    return suspendReason;
+}
+
+public Long getId() {
+    return id;
+}
+
+public String getEmail() {
+    return email;
+}
+
+public String getNickname() {
+    return nickname;
+}
+
+public String getRole() {
+    return role;
+}
+
+public String getMemberStatus() {
+    return memberStatus;
+}
+
+public LocalDateTime getCreatedAt() {
+    return createdAt;
+}
+
+public LocalDateTime getUpdatedAt() {
+    return updatedAt;
+}
+
+public LocalDateTime getDeletedAt() {
+    return deletedAt;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DB / SQL — src/main/resources/db/migration/V43__member_suspension.sql</summary><pre><code>-- V43 — 기간 정지(13-3). suspended_until이 &quot;지금&quot;보다 뒤면 정지 중 — 지나면 아무것도 안 해도 저절로 풀린다(배치 없음).
+-- 기존 member_status = 'SUSPENDED'(영구 정지, 1-6)와는 별개다: 그건 로그인부터 막고, 이건 쓰기만 막는다.
+ALTER TABLE member
+    ADD COLUMN suspended_until DATETIME     NULL AFTER member_status,
+    ADD COLUMN suspend_reason  VARCHAR(200) NULL AFTER suspended_until;
+</code></pre></details>
+<details class="code-file"><summary>테스트 — src/test/java/org/example/member/MemberSuspensionTest.java</summary><pre><code>package org.example.member;
+
+<p>import org.junit.jupiter.api.Test;</p>
+<p>import java.lang.reflect.Constructor;
+import java.time.LocalDateTime;</p>
+<p>import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;</p>
+<p>// 13-3 T1 — &quot;기간이 지나면 저절로 풀린다&quot;는 HTTP로는 기다릴 수 없어서 시각을 넘겨 가며 단위 테스트로 본다(Spring 없이)
+class MemberSuspensionTest {</p>
+<pre><code>private static final LocalDateTime UNTIL = LocalDateTime.of(2026, 10, 13, 15, 0, 0);
+
+@Test
+void suspendedOnlyBeforeUntil() throws Exception {
+    Member member = newMember();
+    member.suspendUntil(UNTIL, &amp;quot;도배&amp;quot;);
+
+    assertTrue(member.isSuspendedAt(UNTIL.minusSeconds(1)), &amp;quot;끝나기 1초 전에는 정지 중&amp;quot;);
+    assertFalse(member.isSuspendedAt(UNTIL), &amp;quot;끝나는 시각부터는 풀린다(끝 시각은 포함하지 않는다)&amp;quot;);
+    assertFalse(member.isSuspendedAt(UNTIL.plusDays(1)), &amp;quot;지나면 아무것도 안 해도 풀려 있다&amp;quot;);
+}
+
+@Test
+void notSuspendedWhenNeverSuspendedOrLifted() throws Exception {
+    Member member = newMember();
+    assertFalse(member.isSuspendedAt(UNTIL), &amp;quot;정지한 적 없으면 정지 아님&amp;quot;);
+
+    member.suspendUntil(UNTIL, &amp;quot;도배&amp;quot;);
+    member.liftSuspension();
+    assertFalse(member.isSuspendedAt(UNTIL.minusDays(1)), &amp;quot;해제하면 기간 안이어도 정지 아님&amp;quot;);
+}
+
+// Member는 JPA용 protected 생성자만 있다 — 테스트에서는 리플렉션으로 만든다
+private static Member newMember() throws Exception {
+    Constructor&amp;lt;Member&amp;gt; constructor = Member.class.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    return constructor.newInstance();
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/admin/ModerationService.java</summary><pre><code>package org.example.admin;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.member.Member;
+import org.example.member.MemberNotFoundException;
+import org.example.member.MemberRepository;
+import org.example.post.AuthorResponse;
+import org.example.post.Post;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;</p>
+<p>// 13-1 운영 — 권한 확인은 PermissionInterceptor가 끝냈다. 여기는 상태 규칙만 본다.
+@Service
+public class ModerationService {</p>
+<pre><code>private static final String WITHDRAWN = &amp;quot;WITHDRAWN&amp;quot;;
+
+private final PostRepository postRepository;
+private final MemberRepository memberRepository;
+private final Clock clock;
+
+public ModerationService(PostRepository postRepository, MemberRepository memberRepository, Clock clock) {
+    this.postRepository = postRepository;
+    this.memberRepository = memberRepository;
+    this.clock = clock;
+}
+
+// 없는 글·삭제된 글 404 → 임시저장 409 → 숨기기/복구(이미 그 상태면 그대로 — 처음 숨긴 사람·시각 유지)
+@Transactional
+public PostStatusResponse changePostStatus(AuthenticatedMember me, Long postId, String status) {
+    // 숨김 요청 둘이 동시에 와도 첫 hiddenBy/hiddenAt을 보존하도록 글 행을 잠근다.
+    Post post = postRepository.findByIdForUpdate(postId)
+            .filter(p -&amp;gt; p.getDeletedAt() == null)
+            .orElseThrow(PostNotFoundException::new);
+    if (&amp;quot;HIDDEN&amp;quot;.equals(status)) {
+        // DATETIME은 초 단위다 — 소수 초를 그대로 넘기면 MySQL이 반올림해 저장해서(…:09.51 → :10)
+        // 이번 응답의 hiddenAt과 다음에 읽은 값이 달라진다. 저장할 값을 미리 초로 자른다
+        post.hide(memberRepository.getReferenceById(me.id()), LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS));
+    } else {
+        post.unhide();
+    }
+    return toStatusResponse(post);
+}
+
+// 운영자(ADMIN)의 역할은 API로 바꾸지 않는다(자기 강등으로 운영자가 0명이 되는 사고 방지) — 409
+@Transactional
+public MemberRoleResponse changeRole(Long memberId, String role) {
+    Member member = memberRepository.findByIdForUpdate(memberId)
+            .filter(m -&amp;gt; !WITHDRAWN.equals(m.getMemberStatus()) &amp;amp;&amp;amp; m.getDeletedAt() == null)
+            .orElseThrow(MemberNotFoundException::new);
+    if (Role.ADMIN.name().equals(member.getRole())) {
+        throw new ModerationConflictException(&amp;quot;운영자의 역할은 바꿀 수 없습니다.&amp;quot;);
+    }
+    if (Role.MODERATOR.name().equals(role) &amp;amp;&amp;amp; member.isSuspendedAt(LocalDateTime.now(clock))) {
+        throw new ModerationConflictException(&amp;quot;기간 정지 중에는 운영진으로 승격할 수 없습니다. 먼저 정지를 해제하세요.&amp;quot;);
+    }
+    member.changeRole(role);
+    return new MemberRoleResponse(member.getId(), member.getNickname(), member.getRole());
+}
+
+static PostStatusResponse toStatusResponse(Post post) {
+    Member by = post.getHiddenBy();
+    return new PostStatusResponse(post.getId(), post.getStatus(),
+            by == null ? null : new AuthorResponse(by.getId(), by.getNickname()), post.getHiddenAt());
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/13-3.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="mybatis-대체-구현-코드"><a class="anchor" href="#mybatis-대체-구현-코드" aria-hidden="true">#</a>MyBatis 대체 구현 코드</h2>
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {
+    id 'java'
+    // bootRun / bootJar 태스크 제공 + 실행 가능한 fat jar 패키징
+    id 'org.springframework.boot' version '4.1.1'
+    // Boot BOM을 적용해서 아래 의존성들의 버전을 생략할 수 있게 해줌
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+<p>group = &#39;org.example&#39;
+version = &#39;1.0-SNAPSHOT&#39;</p>
+<p>java {
+    toolchain {
+        // 컴파일·실행 JDK를 고정 (Boot 4는 Java 17 이상 필요, 로컬에 설치된 21 사용)
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}</p>
+<p>repositories {
+    mavenCentral()
+}</p>
+<p>dependencies {
+    compileOnly &#39;org.projectlombok:lombok&#39;
+    annotationProcessor &#39;org.projectlombok:lombok&#39;
+    // Spring MVC + 내장 Tomcat + Jackson (Boot 4부터 starter-web → starter-webmvc로 이름 변경)
+    implementation &#39;org.springframework.boot:spring-boot-starter-webmvc&#39;
+    // JPA(Hibernate) + HikariCP 커넥션 풀
+    implementation &#39;org.springframework.boot:spring-boot-starter-data-jpa&#39;
+    implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;
+    // @Valid, @NotBlank 같은 요청 값 검증
+    implementation &#39;org.springframework.boot:spring-boot-starter-validation&#39;
+    // MySQL JDBC 드라이버 — 컴파일엔 필요 없고 실행할 때만 필요
+    runtimeOnly &#39;com.mysql:mysql-connector-j&#39;
+    // 9-1 스키마 변경은 Flyway 마이그레이션(db/migration)으로만 한다
+    implementation &#39;org.springframework.boot:spring-boot-starter-flyway&#39;
+    runtimeOnly &#39;org.flywaydb:flyway-mysql&#39;</p>
+<pre><code>// 테스트: JUnit·AssertJ·Mockito·MockMvc 묶음 (버전은 Boot BOM이 관리하므로 junit-bom 따로 두지 않음)
+testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+// @DataJpaTest(리포지토리만 띄우는 테스트)
+testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+// 테스트용 일회용 MySQL 컨테이너 — application-test.yml의 jdbc:tc: URL이 쓴다
+testImplementation 'org.testcontainers:testcontainers-mysql'
+// Gradle이 JUnit Platform 테스트를 실행할 때 필요한 런처
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'</code></pre>
+<p>}</p>
+<p>tasks.named(&#39;test&#39;) {
+    useJUnitPlatform()
+    // 테스트는 application-test.yml(Testcontainers MySQL)을 쓰게 한다
+    systemProperty &#39;spring.profiles.active&#39;, &#39;test&#39;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: javaExperience
+  datasource:
+    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  flyway:
+    # 이미 테이블·데이터가 있는 DB(compose의 community·practice)는 V1(CREATE TABLE)을 실행하면 실패한다.
+    # 그래서 기록 테이블이 없으면 &quot;V1까지 됐다&quot;고만 적고(baseline) V2부터 실행한다. 빈 DB면 V1부터 실제로 실행한다.
+    baseline-on-migrate: true
+    baseline-version: 1
+  servlet:
+    multipart:
+      # 11-2 이미지 한 장 1MB, 요청 전체 2MB까지. 넘으면 MaxUploadSizeExceededException → 413
+      max-file-size: 1MB
+      max-request-size: 2MB
+  jpa:
+    hibernate:
+      # 스키마는 Flyway만 바꾼다(9-1). 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)
+      ddl-auto: validate
+    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        # 컬렉션(태그) 지연 로딩을 글마다 1번이 아니라 IN (...) 한 번으로 묶는다(2-4, N+1 대응)
+        default_batch_fetch_size: 100
+
+<p>mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true</p>
+<h1 id="11-2-올린-이미지를-저장할-폴더앱을-실행한-위치-기준-git에는-올리지-않는다gitignore"><a class="anchor" href="#11-2-올린-이미지를-저장할-폴더앱을-실행한-위치-기준-git에는-올리지-않는다gitignore" aria-hidden="true">#</a>11-2 올린 이미지를 저장할 폴더(앱을 실행한 위치 기준). git에는 올리지 않는다(.gitignore)</h1>
+<p>app:
+  upload-dir: uploads</p>
+<p>logging:
+  level:
+    # 실행 SQL은 확인하되 토큰을 포함한 바인딩 값은 로그에 남기지 않는다
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: info</p>
+<h1 id="0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다"><a class="anchor" href="#0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다" aria-hidden="true">#</a>0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다</h1>
+<p>start:
+  greeting: 반가워요, 백엔드!
+  max-items: 5
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/admin/MemberSuspensionTarget.java</summary><pre><code>package org.example.admin;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// MyBatis가 잠근 회원 행에서 정지 명령에 필요한 값만 가져온다.
+public record MemberSuspensionTarget(Long id, String role, String memberStatus, LocalDateTime deletedAt) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/admin/SuspensionMapper.java</summary><pre><code>package org.example.admin;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>import java.time.LocalDateTime;</p>
+<p>@Mapper
+public interface SuspensionMapper {
+    MemberSuspensionTarget findForUpdate(@Param(&quot;memberId&quot;) Long memberId);</p>
+<pre><code>int suspend(@Param(&amp;quot;memberId&amp;quot;) Long memberId, @Param(&amp;quot;until&amp;quot;) LocalDateTime until,
+            @Param(&amp;quot;reason&amp;quot;) String reason);
+
+int lift(@Param(&amp;quot;memberId&amp;quot;) Long memberId);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/SuspensionMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot;
+        &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.admin.SuspensionMapper&quot;&gt;
+    &lt;select id=&quot;findForUpdate&quot; resultType=&quot;org.example.admin.MemberSuspensionTarget&quot;&gt;
+        SELECT id, role, member_status AS memberStatus, deleted_at AS deletedAt
+        FROM member
+        WHERE id = #{memberId}
+        FOR UPDATE
+    &lt;/select&gt;
+
+<pre><code>&amp;lt;update id=&amp;quot;suspend&amp;quot;&amp;gt;
+    UPDATE member
+    SET suspended_until = #{until}, suspend_reason = #{reason}
+    WHERE id = #{memberId}
+&amp;lt;/update&amp;gt;
+
+&amp;lt;update id=&amp;quot;lift&amp;quot;&amp;gt;
+    UPDATE member
+    SET suspended_until = NULL, suspend_reason = NULL
+    WHERE id = #{memberId}
+&amp;lt;/update&amp;gt;</code></pre>
+<p>&lt;/mapper&gt;
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/admin/SuspensionService.java</summary><pre><code>package org.example.admin;
+
+<p>import org.example.member.MemberNotFoundException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;</p>
+<p>// 13-3 기간 정지 — 끝나는 시각만 저장한다. 풀리는 건 요청마다 &quot;지금 &lt; 끝&quot; 비교로 판단(배치·스케줄러 없음)
+@Service
+public class SuspensionService {</p>
+<pre><code>private static final String WITHDRAWN = &amp;quot;WITHDRAWN&amp;quot;;
+
+private final SuspensionMapper suspensionMapper;
+private final Clock clock;
+
+public SuspensionService(SuspensionMapper suspensionMapper, Clock clock) {
+    this.suspensionMapper = suspensionMapper;
+    this.clock = clock;
+}
+
+// 이미 정지 중이면 새 기간으로 덮어쓴다(늘리기·줄이기 모두). 운영진(MODERATOR·ADMIN)은 정지할 수 없다 — 409
+@Transactional
+public SuspensionResponse suspend(Long memberId, SuspensionRequest request) {
+    MemberSuspensionTarget member = findMember(memberId);
+    if (!Role.USER.name().equals(member.role())) {
+        throw new ModerationConflictException(&amp;quot;운영진은 정지할 수 없습니다. 먼저 역할을 USER로 바꾸세요.&amp;quot;);
+    }
+    LocalDateTime until = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS).plusDays(request.days());
+    suspensionMapper.suspend(memberId, until, request.reason());
+    return new SuspensionResponse(member.id(), until, request.reason());
+}
+
+// 정지가 없어도 204(멱등)
+@Transactional
+public void lift(Long memberId) {
+    findMember(memberId);
+    suspensionMapper.lift(memberId);
+}
+
+private MemberSuspensionTarget findMember(Long memberId) {
+    MemberSuspensionTarget member = suspensionMapper.findForUpdate(memberId);
+    if (member == null || WITHDRAWN.equals(member.memberStatus()) || member.deletedAt() != null) {
+        throw new MemberNotFoundException();
+    }
+    return member;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<p>회원 9(<code>tok-c03</code>, 동시성03)를 정지했다가 끝에서 푼다.</p>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080
+AD='Authorization: Bearer tok-admin'; C3='Authorization: Bearer tok-c03'; J='Content-Type: application/json'
+
+curl -s -X PUT &quot;$BASE/api/admin/members/9/suspension&quot; -H &quot;$AD&quot; -H &quot;$J&quot; -d '{&quot;days&quot;:3,&quot;reason&quot;:&quot;[채점] 도배 경고&quot;}'; echo     # S
+curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$C3&quot; -H &quot;$J&quot; -d '{&quot;boardSlug&quot;:&quot;free&quot;,&quot;title&quot;:&quot;[채점] 정지 중 글&quot;,&quot;content&quot;:&quot;x&quot;}'; echo   # W1 403 + suspendedUntil
+curl -s -o /dev/null -w '%{http_code}\n' &quot;$BASE/api/posts/2&quot; -H &quot;$C3&quot;                                                          # G1 200
+for b in '{}' '{&quot;days&quot;:0,&quot;reason&quot;:&quot;[채점] 사유&quot;}' '{&quot;days&quot;:31,&quot;reason&quot;:&quot;[채점] 사유&quot;}' '{&quot;days&quot;:3,&quot;reason&quot;:&quot;가&quot;}'; do
+  curl -s -o /dev/null -w &quot;$b → %{http_code}\n&quot; -X PUT &quot;$BASE/api/admin/members/9/suspension&quot; -H &quot;$AD&quot; -H &quot;$J&quot; -d &quot;$b&quot;; done   # 모두 400
+curl -s -o /dev/null -w '%{http_code}\n' -X PUT &quot;$BASE/api/admin/members/1/suspension&quot; -H &quot;$AD&quot; -H &quot;$J&quot; -d '{&quot;days&quot;:3,&quot;reason&quot;:&quot;[채점] 사유&quot;}'   # TA 409
+
+# &quot;저절로 풀린다&quot;를 눈으로 — 내 DB에서만, 끝 시각을 과거로 돌려 본다(채점 D 항목이 아니라 실험)
+docker compose exec -T mysql mysql -ucommunity -pcommunity community -e &quot;UPDATE member SET suspended_until = NOW() - INTERVAL 1 MINUTE WHERE id = 9&quot;
+curl -s -o /dev/null -w '%{http_code}\n' -X PUT &quot;$BASE/api/posts/2/like&quot; -H &quot;$C3&quot;                                                # 200 — 풀렸다
+curl -s -o /dev/null -X DELETE &quot;$BASE/api/posts/2/like&quot; -H &quot;$C3&quot;
+curl -s -o /dev/null -w '%{http_code}\n' -X DELETE &quot;$BASE/api/admin/members/9/suspension&quot; -H &quot;$AD&quot;                              # 204</code></pre></details>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 끝에서 정지를 풀고 만든 글을 지우므로 몇 번을 눌러도 같은 결과다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="S" data-method="PUT" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>S · 회원 9를 3일 정지</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;[채점] 도배 경고&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;[채점] 도배 경고&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.memberId&quot;,&quot;equals&quot;:9},{&quot;path&quot;:&quot;$.suspendedUntil&quot;,&quot;type&quot;:&quot;string&quot;},{&quot;path&quot;:&quot;$.reason&quot;,&quot;equals&quot;:&quot;[채점] 도배 경고&quot;}]}
+C2: {&quot;status&quot;:200}</pre></dd></dl></details></article><article class="api-request" data-request-id="W1" data-method="POST" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>W1 · 정지 중 글쓰기</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c03" value="Bearer tok-c03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 정지 중 글&quot;,
+  &quot;content&quot;: &quot;정지 중에는 저장되면 안 된다&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 정지 중 글&quot;,
+  &quot;content&quot;: &quot;정지 중에는 저장되면 안 된다&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:403,&quot;json&quot;:[{&quot;path&quot;:&quot;$.suspendedUntil&quot;,&quot;equals&quot;:&quot;{{S.body.suspendedUntil}}&quot;},{&quot;path&quot;:&quot;$.reason&quot;,&quot;equals&quot;:&quot;[채점] 도배 경고&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="W2" data-method="PUT" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>W2 · 정지 중 좋아요</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/2/like" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c03" value="Bearer tok-c03" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:403}</pre></dd></dl></details></article><article class="api-request" data-request-id="W3" data-method="POST" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>W3 · 정지 중 댓글</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts/2/comments" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c03" value="Bearer tok-c03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;[채점] 정지 중 댓글&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;[채점] 정지 중 댓글&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:403}</pre></dd></dl></details></article><article class="api-request" data-request-id="G1" data-method="GET" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>G1 · 정지 중 글 읽기</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/2" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c03" value="Bearer tok-c03" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200}</pre></dd></dl></details></article><article class="api-request" data-request-id="G2" data-method="GET" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>G2 · 정지 중 내 알림</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/notifications" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c03" value="Bearer tok-c03" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200}</pre></dd></dl></details></article><article class="api-request" data-request-id="S2" data-method="PUT" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>S2 · 정지 기간 바꾸기(1일)</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 1,
+  &quot;reason&quot;: &quot;[채점] 기간 줄임&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 1,
+  &quot;reason&quot;: &quot;[채점] 기간 줄임&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.reason&quot;,&quot;equals&quot;:&quot;[채점] 기간 줄임&quot;},{&quot;path&quot;:&quot;$.suspendedUntil&quot;,&quot;notEquals&quot;:&quot;{{S.body.suspendedUntil}}&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="D0" data-method="PUT" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>D0 · 빈 본문</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;days&quot;},{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;reason&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="DN" data-method="PUT" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>DN · days가 null</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: null,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: null,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;days&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="DZ" data-method="PUT" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>DZ · days=0(하한 밖)</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 0,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 0,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;days&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="D31" data-method="PUT" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>D31 · days=31(상한 밖)</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 31,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 31,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;days&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="DX" data-method="PUT" data-request-index="11" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>DX · days가 숫자 아님</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: &quot;abc&quot;,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: &quot;abc&quot;,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="RB" data-method="PUT" data-request-index="12" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>RB · reason이 공백만</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;   &quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;   &quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;reason&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="R1" data-method="PUT" data-request-index="13" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R1 · reason 1자(하한 밖)</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;가&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;가&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;reason&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="RL" data-method="PUT" data-request-index="14" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>RL · reason 201자(상한 밖)</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;reason&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="BJ" data-method="PUT" data-request-index="15" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>BJ · JSON이 아닌 본문</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="application/json" value="application/json" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">days=3</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;,
+  &quot;Content-Type&quot;: &quot;application/json&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>days=3</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="B30" data-method="PUT" data-request-index="16" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>B30 · days=30·reason 200자(경계 안)</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 30,
+  &quot;reason&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 30,
+  &quot;reason&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.reason&quot;,&quot;matches&quot;:&quot;^가{200}$&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="B1" data-method="PUT" data-request-index="17" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>B1 · days=1·reason 2자(경계 안)</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 1,
+  &quot;reason&quot;: &quot;도배&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 1,
+  &quot;reason&quot;: &quot;도배&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.reason&quot;,&quot;equals&quot;:&quot;도배&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="TA" data-method="PUT" data-request-index="18" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>TA · 운영자(1) 정지</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/1/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:409}</pre></dd></dl></details></article><article class="api-request" data-request-id="TN" data-method="PUT" data-request-index="19" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>TN · 없는 회원</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/99999999/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:404}</pre></dd></dl></details></article><article class="api-request" data-request-id="TX" data-method="PUT" data-request-index="20" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>TX · 회원 id가 숫자 아님</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/abc/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="P1" data-method="PUT" data-request-index="21" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>P1 · 일반 회원이 정지</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:403}</pre></dd></dl></details></article><article class="api-request" data-request-id="P2" data-method="PUT" data-request-index="22" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>P2 · 토큰 없이 정지</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot;[채점] 사유&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:401}</pre></dd></dl></details></article><article class="api-request" data-request-id="DT" data-method="PUT" data-request-index="23" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>DT · days 숫자 문자열 거절</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: &quot;3&quot;,
+  &quot;reason&quot;: &quot;도배&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: &quot;3&quot;,
+  &quot;reason&quot;: &quot;도배&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;days&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="DF" data-method="PUT" data-request-index="24" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>DF · days 소수 거절</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 3.5,
+  &quot;reason&quot;: &quot;도배&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 3.5,
+  &quot;reason&quot;: &quot;도배&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;days&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="RT" data-method="PUT" data-request-index="25" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>RT · reason 숫자 거절</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: 123
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: 123
+}</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;reason&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="RS" data-method="PUT" data-request-index="26" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>RS · 공백을 빼면 reason 1자</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot; 가 &quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: 3,
+  &quot;reason&quot;: &quot; 가 &quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;reason&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="RM" data-method="PUT" data-request-index="27" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>RM · 형식 오류와 누락 오류를 함께 반환</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;days&quot;: &quot;3&quot;,
+  &quot;reason&quot;: null
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;days&quot;: &quot;3&quot;,
+  &quot;reason&quot;: null
+}</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;days&quot;},{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;reason&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="PR" data-method="PATCH" data-request-index="28" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>PR · 정지 중 운영진 승격 거절</h4><p class="request-method">PATCH</p><label>경로 <input class="request-path" value="/api/admin/members/9/role" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;role&quot;: &quot;MODERATOR&quot;
+}</textarea></label><button type="button" class="send-request">PATCH 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;role&quot;: &quot;MODERATOR&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:409}</pre></dd></dl></details></article><article class="api-request" data-request-id="L" data-method="DELETE" data-request-index="29" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>L · 정지 풀기</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:204}</pre></dd></dl></details></article><article class="api-request" data-request-id="L2" data-method="DELETE" data-request-index="30" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>L2 · 한 번 더 풀기</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/admin/members/9/suspension" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:204}</pre></dd></dl></details></article><article class="api-request" data-request-id="PA" data-method="PATCH" data-request-index="31" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>PA · 정지 해제 뒤 운영진 승격</h4><p class="request-method">PATCH</p><label>경로 <input class="request-path" value="/api/admin/members/9/role" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;role&quot;: &quot;MODERATOR&quot;
+}</textarea></label><button type="button" class="send-request">PATCH 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;role&quot;: &quot;MODERATOR&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.role&quot;,&quot;equals&quot;:&quot;MODERATOR&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="PB" data-method="PATCH" data-request-index="32" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>PB · 실습 회원 역할 복원</h4><p class="request-method">PATCH</p><label>경로 <input class="request-path" value="/api/admin/members/9/role" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;role&quot;: &quot;USER&quot;
+}</textarea></label><button type="button" class="send-request">PATCH 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;role&quot;: &quot;USER&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.role&quot;,&quot;equals&quot;:&quot;USER&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="W4" data-method="POST" data-request-index="33" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>W4 · 푼 뒤 글쓰기</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c03" value="Bearer tok-c03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 정지 풀린 뒤 글&quot;,
+  &quot;content&quot;: &quot;풀리면 다시 쓸 수 있다&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 정지 풀린 뒤 글&quot;,
+  &quot;content&quot;: &quot;풀리면 다시 쓸 수 있다&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:201}</pre></dd></dl></details></article><article class="api-request" data-request-id="X4" data-method="DELETE" data-request-index="34" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>X4 · 뒷정리 — W4 글 지우기</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/posts/{{W4.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c03" value="Bearer tok-c03" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:204}</pre></dd></dl></details></article><article class="api-request" data-request-id="X1" data-method="DELETE" data-request-index="35" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>X1 · 뒷정리 — W1이 저장됐다면 지우기</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/posts/{{W1.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c03" value="Bearer tok-c03" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="X2" data-method="DELETE" data-request-index="36" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>X2 · 뒷정리 — W2 좋아요 취소</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/posts/2/like" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c03" value="Bearer tok-c03" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="X3" data-method="DELETE" data-request-index="37" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>X3 · 뒷정리 — W3이 저장됐다면 지우기</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/comments/{{W3.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c03" value="Bearer tok-c03" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), T = 테스트(필수), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>S / W1 / W2 / W3</td>
+<td>정지 <code>200</code>(끝 시각·사유) / 정지 중 글쓰기 <code>403</code> + 본문의 <code>suspendedUntil</code>이 S와 같고 <code>reason</code>이 있다 / 좋아요·댓글도 <code>403</code></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>S / G1 / G2</td>
+<td>정지 중에도 글 읽기·내 알림 보기는 <code>200</code></td>
+</tr>
+<tr>
+<td>C3</td>
+<td>S2 / TA / TN / TX / P1 / P2</td>
+<td>다시 정지하면 새 사유·새 끝 시각으로 덮어쓴다 / 운영자 정지 <code>409</code> / 없는 회원 <code>404</code> / 숫자 아닌 id <code>400</code> / 일반 회원 <code>403</code> / 토큰 없음 <code>401</code></td>
+</tr>
+<tr>
+<td>C4</td>
+<td>D0 / DN·DZ·D31 / DX / RB·R1·RL / BJ</td>
+<td>빈 본문 <code>400</code>(<code>errors</code>에 <code>days</code>·<code>reason</code> 둘 다) / <code>days</code> null·0·31 <code>400</code> / 숫자 아님 <code>400</code> / <code>reason</code> 공백만·1자·201자 <code>400</code> / JSON 아님 <code>400</code> — <code>500</code> 없음</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>B30 / B1</td>
+<td>경계 바로 안쪽 <code>days</code>=30·<code>reason</code> 200자, <code>days</code>=1·<code>reason</code> 2자는 <code>200</code></td>
+</tr>
+<tr>
+<td>C6</td>
+<td>L / L2 / W4 / X4</td>
+<td>풀기 <code>204</code>, 또 풀어도 <code>204</code> / 풀린 뒤 글쓰기 <code>201</code> / 뒷정리 <code>204</code></td>
+</tr>
+<tr>
+<td>C7</td>
+<td>DT / DF / RT / RS / RM</td>
+<td>숫자 문자열·소수·숫자 사유·공백 제거 후 1자·혼합 오류는 <code>400</code>, <code>errors</code>에 해당 필드가 있다</td>
+</tr>
+<tr>
+<td>C8</td>
+<td>PR / PA / PB</td>
+<td>정지 중 승격 <code>409</code>, 정지 해제 뒤 승격 <code>200</code>, 회원 역할 복원 <code>200</code></td>
+</tr>
+<tr>
+<td>T1</td>
+<td>정지 판정 단위 테스트(<code>./gradlew test</code>)</td>
+<td>끝 1초 전 정지 · 끝 시각 풀림 · 하루 뒤 풀림 · 해제 뒤 풀림 — 모두 통과, Spring·DB 없이</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT suspended_until IS NULL, suspend_reason IS NULL FROM member WHERE id = 9</code></td>
+<td><code>1</code>, <code>1</code> — 풀었다</td>
+</tr>
+<tr>
+<td>D2</td>
+<td>실행 <strong>전</strong>과 <strong>후</strong>에 <code>SELECT COUNT(*) FROM post WHERE author_id = 9 AND title = &#39;[채점] 정지 중 글&#39;</code></td>
+<td>전후 값이 같다 — 정지 중 요청(W1)은 저장되지 않았다(지운 행까지 세므로 &quot;0&quot;이 아니라 &quot;늘지 않았다&quot;로 본다)</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>판단 위치</td>
+<td>정지 판단이 컨트롤러마다가 아니라 토큰 확인 직후 한 곳에 있다. 영구 정지(1-6, 모든 요청)와 기간 정지(쓰기만)를 구분한다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>저절로</td>
+<td>풀어 주는 배치·스케줄러가 없고, 요청마다 <code>Clock</code>의 지금과 끝 시각을 비교한다. 끝 시각은 포함하지 않는다(<code>now.isBefore(until)</code>)</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>쓰기의 범위</td>
+<td>GET이 아닌 요청을 전부 막으면 &quot;알림 읽음 표시(PATCH)&quot;·&quot;좋아요 취소(DELETE)&quot;도 막힌다는 것을 알고, 막을 것·허용할 것을 어디서 정할지 말할 수 있다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>운영진 보호</td>
+<td>운영진 정지와 정지 중 승격을 <code>409</code>로 막는 이유, &quot;역할 낮추기 → 정지&quot; 및 &quot;정지 해제 → 승격&quot; 순서를 설명할 수 있다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/W20-time-timezone.html">W20 시간과 시간대</a> — 끝 시각 저장과 비교, <code>Clock</code></li>
+<li><a href="../../docs/knowledge/V05-testing-tricky-things.html">V05 까다로운 것 테스트하기</a> — 시간이 지나야 하는 동작을 테스트로</li>
+<li><a href="../../lessons/I1-why-tests.html">I1 왜 테스트하나</a></li>
+<li><a href="../../lessons/F2-auth-token.html">F2 토큰 인증</a> — 인터셉터의 확인 순서</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 어디서 막나</summary>
+
+<p><code>AuthInterceptor</code>에서 회원을 읽고 <code>ACTIVE</code>인지 확인한 바로 다음에:</p>
+<pre><code class="language-java">if (!isGet &amp;&amp; member.isSuspendedAt(now)) {
+    throw new MemberSuspendedException(member.getSuspendedUntil(), member.getSuspendReason());
+}</code></pre>
+<p><code>now</code>는 토큰 만료 확인에 이미 쓰는 <code>LocalDateTime.now(clock)</code>이다. 전역 핸들러에서 <code>problem.setProperty(&quot;suspendedUntil&quot;, ...)</code>로 끝 시각을 본문에 싣는다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 테스트</summary>
+
+<p><code>Member</code>에 <code>isSuspendedAt(LocalDateTime now)</code>를 두면 Spring 없이 시각만 바꿔 가며 볼 수 있다. <code>Member</code>의 생성자가 JPA용 <code>protected</code>라면 테스트를 같은 패키지(<code>org.example.member</code>)에 두거나 리플렉션으로 만든다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="13-4-banned-words.html">13-4. 금칙어 필터</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 13-3. 작성자 기간 정지\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch13-operations/13-3-member-suspension.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="13-2-report-handling.html">← 이전 13-2. 신고 처리</a><a href="13-4-banned-words.html">다음 → 13-4. 금칙어 필터</a></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
+</body>
+</html>

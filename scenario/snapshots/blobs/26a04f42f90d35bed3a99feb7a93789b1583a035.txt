@@ -1,0 +1,45 @@
+package org.example.like;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class LikeController {
+
+    private final LikeService likeService;
+
+    public LikeController(LikeService likeService) {
+        this.likeService = likeService;
+    }
+
+    @PutMapping("/api/posts/{id}/like")
+    public LikeResponse like(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+        return likeService.like(id, loginMember);
+    }
+
+    @DeleteMapping("/api/posts/{id}/like")
+    public LikeResponse unlike(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+        return likeService.unlike(id, loginMember);
+    }
+
+    // GET이지만 1-6 인터셉터의 "GET + 헤더 없음 = 비로그인 통과"가 적용되므로,
+    // 이 엔드포인트는 인증이 필수라는 걸 여기서 직접 확인한다(토큰 없으면 401).
+    @GetMapping("/api/me/likes")
+    public MyLikesResponse myLikes(@RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
+                                    @RequestParam(required = false) String cursor,
+                                    @LoginMember AuthenticatedMember loginMember) {
+        if (loginMember == null) {
+            throw new AuthenticationRequiredException("인증이 필요합니다.");
+        }
+        return likeService.myLikes(loginMember, size, cursor);
+    }
+}

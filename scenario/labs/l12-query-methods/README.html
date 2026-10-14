@@ -1,0 +1,2068 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L12. 기초 파생 메서드·MyBatis SQL</title>
+<link rel="stylesheet" href="../../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../../README.html">javaExperience</a><a href="../../README.html">시나리오</a><a href="../../../practice/MISSIONS.html">학습용 미션</a><a href="../../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="l12-기초-파생-메서드mybatis-sql"><a class="anchor" href="#l12-기초-파생-메서드mybatis-sql" aria-hidden="true">#</a>L12. 기초 파생 메서드·MyBatis SQL</h1>
+<blockquote>
+<p>최종 본편 16-4 · practice DB에서 연속 실행</p>
+</blockquote>
+<h2 id="상황과-개념"><a class="anchor" href="#상황과-개념" aria-hidden="true">#</a>상황과 개념</h2>
+<p>Spring Data의 findBy 뒤는 Post의 Java 속성(id/deletedAt/hiddenAt/status/visibility)과 IsNull·And 키워드를 분석합니다. Board_Slug는 board.slug 연관 경로입니다. 이 프로젝트에 hide boolean은 없으므로 HiddenAtIsNull을 씁니다. MyBatis는 함수 이름을 분석하지 않고 XML SQL을 실행합니다. <a href="https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html" target="_blank" rel="noopener">Spring Data 공식 문서</a> · <a href="https://docs.spring.io/spring-data/commons/reference/repositories/query-methods-details.html" target="_blank" rel="noopener">속성 경로</a> · <a href="https://mybatis.org/mybatis-3/sqlmap-xml.html" target="_blank" rel="noopener">MyBatis 매퍼</a>.</p>
+<h2 id="실행-준비"><a class="anchor" href="#실행-준비" aria-hidden="true">#</a>실행 준비</h2>
+<p>저장소 루트에서 <code>python3 tools/materialize-query-practice.py --output /tmp/query-practice --through l12-query-methods</code>를 실행합니다. 처음 L12를 적용할 때 출력 디렉터리는 비어 있어야 합니다. 이후 L13·L14에서 같은 경로로 명령을 다시 실행하면 다음 overlay만 적용됩니다. Java 21로 복원 폴더에서 <code>./gradlew bootRun --args=&quot;--spring.profiles.active=practice&quot;</code>를 실행합니다. DB 접속은 SPRING_DATASOURCE_URL/SPRING_DATASOURCE_USERNAME/SPRING_DATASOURCE_PASSWORD 환경변수로 조정합니다. L13은 L12 위에, L14는 L12와 L13 위에 적용됩니다.</p>
+<p>기존 POST /api/posts에 작성자 토큰과 <code>{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;쿼리 연습 JPA&quot;,&quot;content&quot;:&quot;본문&quot;,&quot;tags&quot;:[&quot;spring&quot;],&quot;visibility&quot;:&quot;PUBLIC&quot;}</code>를 보내 201 응답의 id를 받으세요. 같은 DB에서 이 id를 아래 {id}로 사용합니다. 새 API는 공개 데이터 비교용이며 개인별 권한은 기존 API에서 확인합니다.</p>
+<h2 id="순서대로-구현할-시나리오"><a class="anchor" href="#순서대로-구현할-시나리오" aria-hidden="true">#</a>순서대로 구현할 시나리오</h2>
+<h3 id="q01-생성-후-상세"><a class="anchor" href="#q01-생성-후-상세" aria-hidden="true">#</a>Q01. 생성 후 상세</h3>
+<ul>
+<li>요청: <code>GET /api/query-practice/jpa/posts/{id}</code></li>
+<li>조건: id와 공개 조건</li>
+<li>JPA 파생 메서드: <code>findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility</code></li>
+<li>MyBatis/SQL: <code>WHERE id=? AND 공개조건</code></li>
+<li>기대: 200/404</li>
+<li>연결: 앞서 만든 같은 게시글 id를 쓰고 기존 API에서 상태를 바꾼 뒤 재조회합니다.</li>
+</ul>
+<details><summary>Q01 구현 코드 — Controller · Service · DTO · Repository · Mapper</summary>
+
+<p>이 시나리오에서 사용하는 실행 파일 전문입니다. 여러 시나리오가 같은 클래스를 이어 확장하므로 공통 메서드도 함께 표시합니다.</p>
+<p><strong>Controller · BasicQueryController.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.context.annotation.Profile;
+import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+
+// practice에서만 제공하는 익명 공개 목록 비교 API. 개인화된 조회는 기존 /api/posts가 담당한다.
+@Profile(&quot;practice&quot;)
+@RestController
+@RequestMapping(&quot;/api/query-practice/{engine}&quot;)
+public class BasicQueryController {
+    private final BasicQueryService service;
+    public BasicQueryController(BasicQueryService service) { this.service = service; }
+
+    @GetMapping(&quot;/posts/{id}&quot;)
+    public QueryPostRow detail(@PathVariable String engine, @PathVariable String id) {
+        return service.detail(engine, id);
+    }
+    @GetMapping(&quot;/posts&quot;)
+    public QueryPage list(@PathVariable String engine, @RequestParam Map&lt;String, String&gt; params) {
+        return service.list(engine, params);
+    }
+    @GetMapping(&quot;/posts/{id}/exists&quot;)
+    public Map&lt;String, Boolean&gt; exists(@PathVariable String engine, @PathVariable String id) {
+        return Map.of(&quot;exists&quot;, service.exists(engine, id));
+    }
+    @GetMapping(&quot;/count&quot;)
+    public Map&lt;String, Long&gt; count(@PathVariable String engine, @RequestParam String boardSlug) {
+        return Map.of(&quot;count&quot;, service.count(engine, boardSlug));
+    }
+}</code></pre>
+<p><strong>Service · BasicQueryService.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.example.post.Post;
+import java.util.Map;
+
+@Service
+@Transactional(readOnly = true)
+public class BasicQueryService {
+    private final DerivedPostRepository repository;
+    private final BasicPostMapper mapper;
+
+    public BasicQueryService(DerivedPostRepository repository, BasicPostMapper mapper) {
+        this.repository = repository;
+        this.mapper = mapper;
+    }
+
+    public QueryPostRow detail(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        QueryPostRow row = &quot;jpa&quot;.equals(engine)
+                ? repository.findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;).map(QueryPostRow::of).orElse(null)
+                : mapper.detail(id);
+        if (row == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return row;
+    }
+
+    public QueryPage list(String engine, Map&lt;String, String&gt; params) {
+        QueryInputs.engine(engine);
+        String board = QueryInputs.text(params, &quot;boardSlug&quot;, 50);
+        String keyword = QueryInputs.text(params, &quot;keyword&quot;, 100);
+        Long author = params.containsKey(&quot;authorId&quot;) ? QueryInputs.positive(params.get(&quot;authorId&quot;), &quot;authorId&quot;) : null;
+        // 기본편은 조건 하나씩 만든다. 조건 조합은 L13에서 같은 DTO로 확장한다.
+        if ((board == null ? 0 : 1) + (keyword == null ? 0 : 1) + (author == null ? 0 : 1) &gt; 1) throw QueryInputs.bad(&quot;filter&quot;);
+        int page = QueryInputs.number(params, &quot;page&quot;, 0, 0, 10000);
+        int size = QueryInputs.number(params, &quot;size&quot;, 10, 1, 50);
+        if (&quot;mybatis&quot;.equals(engine)) {
+            String pattern = QueryInputs.pattern(keyword);
+            return new QueryPage(mapper.list(board, author, pattern, size, (long) page * size), page, size, mapper.count(board, author, pattern));
+        }
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, &quot;id&quot;));
+        Page&lt;Post&gt; result;
+        if (board != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board, pageable);
+        else if (author != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, author, pageable);
+        else if (keyword != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, keyword, pageable);
+        else result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, pageable);
+        return new QueryPage(result.getContent().stream().map(QueryPostRow::of).toList(), page, size, result.getTotalElements());
+    }
+
+    public boolean exists(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;) : mapper.exists(id);
+    }
+
+    public long count(String engine, String board) {
+        QueryInputs.engine(engine);
+        if (board == null || board.isBlank() || board.length() &gt; 50) throw QueryInputs.bad(&quot;boardSlug&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board) : mapper.count(board, null, null);
+    }
+}</code></pre>
+<p><strong>DTO · QueryPostRow.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+
+// 엔티티 전체를 JSON으로 노출하지 않고 이번 화면에 필요한 열만 반환한다.
+public record QueryPostRow(Long id, String title, String boardSlug, Long authorId) {
+    public static QueryPostRow of(Post post) {
+        return new QueryPostRow(post.getId(), post.getTitle(), post.getBoard().getSlug(), post.getAuthor().getId());
+    }
+}</code></pre>
+<p><strong>DTO · QueryPage.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import java.util.List;
+
+public record QueryPage(List&lt;QueryPostRow&gt; items, int page, int size, long total) {}</code></pre>
+<p><strong>JPA Repository · DerivedPostRepository.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.repository.Repository;
+import java.util.Optional;
+
+// 이름의 프로퍼티 경로·키워드를 Spring Data가 분석한다. 직접 SQL 문자열을 만든 메서드가 아니다.
+public interface DerivedPostRepository extends Repository&lt;Post, Long&gt; {
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Optional&lt;Post&gt; findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(String status, String visibility, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(String status, String visibility, Long authorId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(String status, String visibility, String keyword, Pageable pageable);
+
+    boolean existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+    long countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug);
+}</code></pre>
+<p><strong>MyBatis Mapper/XML · BasicPostMapper.xml</strong></p>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.querypractice.BasicPostMapper&quot;&gt;
+    &lt;sql id=&quot;visible&quot;&gt;
+        p.deleted_at IS NULL AND p.hidden_at IS NULL AND p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC'
+    &lt;/sql&gt;
+    &lt;sql id=&quot;filters&quot;&gt;
+        &lt;if test=&quot;board != null&quot;&gt;AND b.slug = #{board}&lt;/if&gt;
+        &lt;if test=&quot;author != null&quot;&gt;AND p.author_id = #{author}&lt;/if&gt;
+        &lt;if test=&quot;pattern != null&quot;&gt;AND LOWER(p.title) LIKE LOWER(#{pattern}) ESCAPE '!'&lt;/if&gt;
+    &lt;/sql&gt;
+    &lt;select id=&quot;detail&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;list&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+        ORDER BY p.id DESC LIMIT #{limit} OFFSET #{offset}
+    &lt;/select&gt;
+    &lt;select id=&quot;count&quot; resultType=&quot;long&quot;&gt;
+        SELECT COUNT(*) FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;exists&quot; resultType=&quot;boolean&quot;&gt;
+        SELECT EXISTS(SELECT 1 FROM post p WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;)
+    &lt;/select&gt;
+&lt;/mapper&gt;</code></pre>
+</details>
+
+
+<h3 id="q02-숨김삭제비공개-제외"><a class="anchor" href="#q02-숨김삭제비공개-제외" aria-hidden="true">#</a>Q02. 숨김·삭제·비공개 제외</h3>
+<ul>
+<li>요청: <code>GET /api/query-practice/mybatis/posts/{id}</code></li>
+<li>조건: deletedAt/hiddenAt NULL, status PUBLISHED, visibility PUBLIC</li>
+<li>JPA 파생 메서드: <code>...DeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility</code></li>
+<li>MyBatis/SQL: <code>WHERE 공개조건</code></li>
+<li>기대: 조건 밖 404</li>
+<li>연결: 앞서 만든 같은 게시글 id를 쓰고 기존 API에서 상태를 바꾼 뒤 재조회합니다.</li>
+</ul>
+<details><summary>Q02 구현 코드 — Controller · Service · DTO · Repository · Mapper</summary>
+
+<p>이 시나리오에서 사용하는 실행 파일 전문입니다. 여러 시나리오가 같은 클래스를 이어 확장하므로 공통 메서드도 함께 표시합니다.</p>
+<p><strong>Controller · BasicQueryController.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.context.annotation.Profile;
+import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+
+// practice에서만 제공하는 익명 공개 목록 비교 API. 개인화된 조회는 기존 /api/posts가 담당한다.
+@Profile(&quot;practice&quot;)
+@RestController
+@RequestMapping(&quot;/api/query-practice/{engine}&quot;)
+public class BasicQueryController {
+    private final BasicQueryService service;
+    public BasicQueryController(BasicQueryService service) { this.service = service; }
+
+    @GetMapping(&quot;/posts/{id}&quot;)
+    public QueryPostRow detail(@PathVariable String engine, @PathVariable String id) {
+        return service.detail(engine, id);
+    }
+    @GetMapping(&quot;/posts&quot;)
+    public QueryPage list(@PathVariable String engine, @RequestParam Map&lt;String, String&gt; params) {
+        return service.list(engine, params);
+    }
+    @GetMapping(&quot;/posts/{id}/exists&quot;)
+    public Map&lt;String, Boolean&gt; exists(@PathVariable String engine, @PathVariable String id) {
+        return Map.of(&quot;exists&quot;, service.exists(engine, id));
+    }
+    @GetMapping(&quot;/count&quot;)
+    public Map&lt;String, Long&gt; count(@PathVariable String engine, @RequestParam String boardSlug) {
+        return Map.of(&quot;count&quot;, service.count(engine, boardSlug));
+    }
+}</code></pre>
+<p><strong>Service · BasicQueryService.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.example.post.Post;
+import java.util.Map;
+
+@Service
+@Transactional(readOnly = true)
+public class BasicQueryService {
+    private final DerivedPostRepository repository;
+    private final BasicPostMapper mapper;
+
+    public BasicQueryService(DerivedPostRepository repository, BasicPostMapper mapper) {
+        this.repository = repository;
+        this.mapper = mapper;
+    }
+
+    public QueryPostRow detail(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        QueryPostRow row = &quot;jpa&quot;.equals(engine)
+                ? repository.findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;).map(QueryPostRow::of).orElse(null)
+                : mapper.detail(id);
+        if (row == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return row;
+    }
+
+    public QueryPage list(String engine, Map&lt;String, String&gt; params) {
+        QueryInputs.engine(engine);
+        String board = QueryInputs.text(params, &quot;boardSlug&quot;, 50);
+        String keyword = QueryInputs.text(params, &quot;keyword&quot;, 100);
+        Long author = params.containsKey(&quot;authorId&quot;) ? QueryInputs.positive(params.get(&quot;authorId&quot;), &quot;authorId&quot;) : null;
+        // 기본편은 조건 하나씩 만든다. 조건 조합은 L13에서 같은 DTO로 확장한다.
+        if ((board == null ? 0 : 1) + (keyword == null ? 0 : 1) + (author == null ? 0 : 1) &gt; 1) throw QueryInputs.bad(&quot;filter&quot;);
+        int page = QueryInputs.number(params, &quot;page&quot;, 0, 0, 10000);
+        int size = QueryInputs.number(params, &quot;size&quot;, 10, 1, 50);
+        if (&quot;mybatis&quot;.equals(engine)) {
+            String pattern = QueryInputs.pattern(keyword);
+            return new QueryPage(mapper.list(board, author, pattern, size, (long) page * size), page, size, mapper.count(board, author, pattern));
+        }
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, &quot;id&quot;));
+        Page&lt;Post&gt; result;
+        if (board != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board, pageable);
+        else if (author != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, author, pageable);
+        else if (keyword != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, keyword, pageable);
+        else result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, pageable);
+        return new QueryPage(result.getContent().stream().map(QueryPostRow::of).toList(), page, size, result.getTotalElements());
+    }
+
+    public boolean exists(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;) : mapper.exists(id);
+    }
+
+    public long count(String engine, String board) {
+        QueryInputs.engine(engine);
+        if (board == null || board.isBlank() || board.length() &gt; 50) throw QueryInputs.bad(&quot;boardSlug&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board) : mapper.count(board, null, null);
+    }
+}</code></pre>
+<p><strong>DTO · QueryPostRow.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+
+// 엔티티 전체를 JSON으로 노출하지 않고 이번 화면에 필요한 열만 반환한다.
+public record QueryPostRow(Long id, String title, String boardSlug, Long authorId) {
+    public static QueryPostRow of(Post post) {
+        return new QueryPostRow(post.getId(), post.getTitle(), post.getBoard().getSlug(), post.getAuthor().getId());
+    }
+}</code></pre>
+<p><strong>DTO · QueryPage.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import java.util.List;
+
+public record QueryPage(List&lt;QueryPostRow&gt; items, int page, int size, long total) {}</code></pre>
+<p><strong>JPA Repository · DerivedPostRepository.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.repository.Repository;
+import java.util.Optional;
+
+// 이름의 프로퍼티 경로·키워드를 Spring Data가 분석한다. 직접 SQL 문자열을 만든 메서드가 아니다.
+public interface DerivedPostRepository extends Repository&lt;Post, Long&gt; {
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Optional&lt;Post&gt; findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(String status, String visibility, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(String status, String visibility, Long authorId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(String status, String visibility, String keyword, Pageable pageable);
+
+    boolean existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+    long countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug);
+}</code></pre>
+<p><strong>MyBatis Mapper/XML · BasicPostMapper.xml</strong></p>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.querypractice.BasicPostMapper&quot;&gt;
+    &lt;sql id=&quot;visible&quot;&gt;
+        p.deleted_at IS NULL AND p.hidden_at IS NULL AND p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC'
+    &lt;/sql&gt;
+    &lt;sql id=&quot;filters&quot;&gt;
+        &lt;if test=&quot;board != null&quot;&gt;AND b.slug = #{board}&lt;/if&gt;
+        &lt;if test=&quot;author != null&quot;&gt;AND p.author_id = #{author}&lt;/if&gt;
+        &lt;if test=&quot;pattern != null&quot;&gt;AND LOWER(p.title) LIKE LOWER(#{pattern}) ESCAPE '!'&lt;/if&gt;
+    &lt;/sql&gt;
+    &lt;select id=&quot;detail&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;list&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+        ORDER BY p.id DESC LIMIT #{limit} OFFSET #{offset}
+    &lt;/select&gt;
+    &lt;select id=&quot;count&quot; resultType=&quot;long&quot;&gt;
+        SELECT COUNT(*) FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;exists&quot; resultType=&quot;boolean&quot;&gt;
+        SELECT EXISTS(SELECT 1 FROM post p WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;)
+    &lt;/select&gt;
+&lt;/mapper&gt;</code></pre>
+</details>
+
+
+<h3 id="q03-게시판-조회"><a class="anchor" href="#q03-게시판-조회" aria-hidden="true">#</a>Q03. 게시판 조회</h3>
+<ul>
+<li>요청: <code>GET /api/query-practice/jpa/posts?boardSlug=dev</code></li>
+<li>조건: board.slug=dev</li>
+<li>JPA 파생 메서드: <code>...AndBoard_Slug</code></li>
+<li>MyBatis/SQL: <code>JOIN board AND slug=?</code></li>
+<li>기대: items/total</li>
+<li>연결: 앞서 만든 같은 게시글 id를 쓰고 기존 API에서 상태를 바꾼 뒤 재조회합니다.</li>
+</ul>
+<details><summary>Q03 구현 코드 — Controller · Service · DTO · Repository · Mapper</summary>
+
+<p>이 시나리오에서 사용하는 실행 파일 전문입니다. 여러 시나리오가 같은 클래스를 이어 확장하므로 공통 메서드도 함께 표시합니다.</p>
+<p><strong>Controller · BasicQueryController.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.context.annotation.Profile;
+import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+
+// practice에서만 제공하는 익명 공개 목록 비교 API. 개인화된 조회는 기존 /api/posts가 담당한다.
+@Profile(&quot;practice&quot;)
+@RestController
+@RequestMapping(&quot;/api/query-practice/{engine}&quot;)
+public class BasicQueryController {
+    private final BasicQueryService service;
+    public BasicQueryController(BasicQueryService service) { this.service = service; }
+
+    @GetMapping(&quot;/posts/{id}&quot;)
+    public QueryPostRow detail(@PathVariable String engine, @PathVariable String id) {
+        return service.detail(engine, id);
+    }
+    @GetMapping(&quot;/posts&quot;)
+    public QueryPage list(@PathVariable String engine, @RequestParam Map&lt;String, String&gt; params) {
+        return service.list(engine, params);
+    }
+    @GetMapping(&quot;/posts/{id}/exists&quot;)
+    public Map&lt;String, Boolean&gt; exists(@PathVariable String engine, @PathVariable String id) {
+        return Map.of(&quot;exists&quot;, service.exists(engine, id));
+    }
+    @GetMapping(&quot;/count&quot;)
+    public Map&lt;String, Long&gt; count(@PathVariable String engine, @RequestParam String boardSlug) {
+        return Map.of(&quot;count&quot;, service.count(engine, boardSlug));
+    }
+}</code></pre>
+<p><strong>Service · BasicQueryService.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.example.post.Post;
+import java.util.Map;
+
+@Service
+@Transactional(readOnly = true)
+public class BasicQueryService {
+    private final DerivedPostRepository repository;
+    private final BasicPostMapper mapper;
+
+    public BasicQueryService(DerivedPostRepository repository, BasicPostMapper mapper) {
+        this.repository = repository;
+        this.mapper = mapper;
+    }
+
+    public QueryPostRow detail(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        QueryPostRow row = &quot;jpa&quot;.equals(engine)
+                ? repository.findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;).map(QueryPostRow::of).orElse(null)
+                : mapper.detail(id);
+        if (row == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return row;
+    }
+
+    public QueryPage list(String engine, Map&lt;String, String&gt; params) {
+        QueryInputs.engine(engine);
+        String board = QueryInputs.text(params, &quot;boardSlug&quot;, 50);
+        String keyword = QueryInputs.text(params, &quot;keyword&quot;, 100);
+        Long author = params.containsKey(&quot;authorId&quot;) ? QueryInputs.positive(params.get(&quot;authorId&quot;), &quot;authorId&quot;) : null;
+        // 기본편은 조건 하나씩 만든다. 조건 조합은 L13에서 같은 DTO로 확장한다.
+        if ((board == null ? 0 : 1) + (keyword == null ? 0 : 1) + (author == null ? 0 : 1) &gt; 1) throw QueryInputs.bad(&quot;filter&quot;);
+        int page = QueryInputs.number(params, &quot;page&quot;, 0, 0, 10000);
+        int size = QueryInputs.number(params, &quot;size&quot;, 10, 1, 50);
+        if (&quot;mybatis&quot;.equals(engine)) {
+            String pattern = QueryInputs.pattern(keyword);
+            return new QueryPage(mapper.list(board, author, pattern, size, (long) page * size), page, size, mapper.count(board, author, pattern));
+        }
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, &quot;id&quot;));
+        Page&lt;Post&gt; result;
+        if (board != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board, pageable);
+        else if (author != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, author, pageable);
+        else if (keyword != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, keyword, pageable);
+        else result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, pageable);
+        return new QueryPage(result.getContent().stream().map(QueryPostRow::of).toList(), page, size, result.getTotalElements());
+    }
+
+    public boolean exists(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;) : mapper.exists(id);
+    }
+
+    public long count(String engine, String board) {
+        QueryInputs.engine(engine);
+        if (board == null || board.isBlank() || board.length() &gt; 50) throw QueryInputs.bad(&quot;boardSlug&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board) : mapper.count(board, null, null);
+    }
+}</code></pre>
+<p><strong>DTO · QueryPostRow.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+
+// 엔티티 전체를 JSON으로 노출하지 않고 이번 화면에 필요한 열만 반환한다.
+public record QueryPostRow(Long id, String title, String boardSlug, Long authorId) {
+    public static QueryPostRow of(Post post) {
+        return new QueryPostRow(post.getId(), post.getTitle(), post.getBoard().getSlug(), post.getAuthor().getId());
+    }
+}</code></pre>
+<p><strong>DTO · QueryPage.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import java.util.List;
+
+public record QueryPage(List&lt;QueryPostRow&gt; items, int page, int size, long total) {}</code></pre>
+<p><strong>JPA Repository · DerivedPostRepository.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.repository.Repository;
+import java.util.Optional;
+
+// 이름의 프로퍼티 경로·키워드를 Spring Data가 분석한다. 직접 SQL 문자열을 만든 메서드가 아니다.
+public interface DerivedPostRepository extends Repository&lt;Post, Long&gt; {
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Optional&lt;Post&gt; findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(String status, String visibility, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(String status, String visibility, Long authorId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(String status, String visibility, String keyword, Pageable pageable);
+
+    boolean existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+    long countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug);
+}</code></pre>
+<p><strong>MyBatis Mapper/XML · BasicPostMapper.xml</strong></p>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.querypractice.BasicPostMapper&quot;&gt;
+    &lt;sql id=&quot;visible&quot;&gt;
+        p.deleted_at IS NULL AND p.hidden_at IS NULL AND p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC'
+    &lt;/sql&gt;
+    &lt;sql id=&quot;filters&quot;&gt;
+        &lt;if test=&quot;board != null&quot;&gt;AND b.slug = #{board}&lt;/if&gt;
+        &lt;if test=&quot;author != null&quot;&gt;AND p.author_id = #{author}&lt;/if&gt;
+        &lt;if test=&quot;pattern != null&quot;&gt;AND LOWER(p.title) LIKE LOWER(#{pattern}) ESCAPE '!'&lt;/if&gt;
+    &lt;/sql&gt;
+    &lt;select id=&quot;detail&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;list&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+        ORDER BY p.id DESC LIMIT #{limit} OFFSET #{offset}
+    &lt;/select&gt;
+    &lt;select id=&quot;count&quot; resultType=&quot;long&quot;&gt;
+        SELECT COUNT(*) FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;exists&quot; resultType=&quot;boolean&quot;&gt;
+        SELECT EXISTS(SELECT 1 FROM post p WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;)
+    &lt;/select&gt;
+&lt;/mapper&gt;</code></pre>
+</details>
+
+
+<h3 id="q04-작성자-조회"><a class="anchor" href="#q04-작성자-조회" aria-hidden="true">#</a>Q04. 작성자 조회</h3>
+<ul>
+<li>요청: <code>GET /api/query-practice/mybatis/posts?authorId=5</code></li>
+<li>조건: author.id=5</li>
+<li>JPA 파생 메서드: <code>...AndAuthor_Id</code></li>
+<li>MyBatis/SQL: <code>author_id=?</code></li>
+<li>기대: items/total</li>
+<li>연결: 앞서 만든 같은 게시글 id를 쓰고 기존 API에서 상태를 바꾼 뒤 재조회합니다.</li>
+</ul>
+<details><summary>Q04 구현 코드 — Controller · Service · DTO · Repository · Mapper</summary>
+
+<p>이 시나리오에서 사용하는 실행 파일 전문입니다. 여러 시나리오가 같은 클래스를 이어 확장하므로 공통 메서드도 함께 표시합니다.</p>
+<p><strong>Controller · BasicQueryController.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.context.annotation.Profile;
+import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+
+// practice에서만 제공하는 익명 공개 목록 비교 API. 개인화된 조회는 기존 /api/posts가 담당한다.
+@Profile(&quot;practice&quot;)
+@RestController
+@RequestMapping(&quot;/api/query-practice/{engine}&quot;)
+public class BasicQueryController {
+    private final BasicQueryService service;
+    public BasicQueryController(BasicQueryService service) { this.service = service; }
+
+    @GetMapping(&quot;/posts/{id}&quot;)
+    public QueryPostRow detail(@PathVariable String engine, @PathVariable String id) {
+        return service.detail(engine, id);
+    }
+    @GetMapping(&quot;/posts&quot;)
+    public QueryPage list(@PathVariable String engine, @RequestParam Map&lt;String, String&gt; params) {
+        return service.list(engine, params);
+    }
+    @GetMapping(&quot;/posts/{id}/exists&quot;)
+    public Map&lt;String, Boolean&gt; exists(@PathVariable String engine, @PathVariable String id) {
+        return Map.of(&quot;exists&quot;, service.exists(engine, id));
+    }
+    @GetMapping(&quot;/count&quot;)
+    public Map&lt;String, Long&gt; count(@PathVariable String engine, @RequestParam String boardSlug) {
+        return Map.of(&quot;count&quot;, service.count(engine, boardSlug));
+    }
+}</code></pre>
+<p><strong>Service · BasicQueryService.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.example.post.Post;
+import java.util.Map;
+
+@Service
+@Transactional(readOnly = true)
+public class BasicQueryService {
+    private final DerivedPostRepository repository;
+    private final BasicPostMapper mapper;
+
+    public BasicQueryService(DerivedPostRepository repository, BasicPostMapper mapper) {
+        this.repository = repository;
+        this.mapper = mapper;
+    }
+
+    public QueryPostRow detail(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        QueryPostRow row = &quot;jpa&quot;.equals(engine)
+                ? repository.findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;).map(QueryPostRow::of).orElse(null)
+                : mapper.detail(id);
+        if (row == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return row;
+    }
+
+    public QueryPage list(String engine, Map&lt;String, String&gt; params) {
+        QueryInputs.engine(engine);
+        String board = QueryInputs.text(params, &quot;boardSlug&quot;, 50);
+        String keyword = QueryInputs.text(params, &quot;keyword&quot;, 100);
+        Long author = params.containsKey(&quot;authorId&quot;) ? QueryInputs.positive(params.get(&quot;authorId&quot;), &quot;authorId&quot;) : null;
+        // 기본편은 조건 하나씩 만든다. 조건 조합은 L13에서 같은 DTO로 확장한다.
+        if ((board == null ? 0 : 1) + (keyword == null ? 0 : 1) + (author == null ? 0 : 1) &gt; 1) throw QueryInputs.bad(&quot;filter&quot;);
+        int page = QueryInputs.number(params, &quot;page&quot;, 0, 0, 10000);
+        int size = QueryInputs.number(params, &quot;size&quot;, 10, 1, 50);
+        if (&quot;mybatis&quot;.equals(engine)) {
+            String pattern = QueryInputs.pattern(keyword);
+            return new QueryPage(mapper.list(board, author, pattern, size, (long) page * size), page, size, mapper.count(board, author, pattern));
+        }
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, &quot;id&quot;));
+        Page&lt;Post&gt; result;
+        if (board != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board, pageable);
+        else if (author != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, author, pageable);
+        else if (keyword != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, keyword, pageable);
+        else result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, pageable);
+        return new QueryPage(result.getContent().stream().map(QueryPostRow::of).toList(), page, size, result.getTotalElements());
+    }
+
+    public boolean exists(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;) : mapper.exists(id);
+    }
+
+    public long count(String engine, String board) {
+        QueryInputs.engine(engine);
+        if (board == null || board.isBlank() || board.length() &gt; 50) throw QueryInputs.bad(&quot;boardSlug&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board) : mapper.count(board, null, null);
+    }
+}</code></pre>
+<p><strong>DTO · QueryPostRow.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+
+// 엔티티 전체를 JSON으로 노출하지 않고 이번 화면에 필요한 열만 반환한다.
+public record QueryPostRow(Long id, String title, String boardSlug, Long authorId) {
+    public static QueryPostRow of(Post post) {
+        return new QueryPostRow(post.getId(), post.getTitle(), post.getBoard().getSlug(), post.getAuthor().getId());
+    }
+}</code></pre>
+<p><strong>DTO · QueryPage.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import java.util.List;
+
+public record QueryPage(List&lt;QueryPostRow&gt; items, int page, int size, long total) {}</code></pre>
+<p><strong>JPA Repository · DerivedPostRepository.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.repository.Repository;
+import java.util.Optional;
+
+// 이름의 프로퍼티 경로·키워드를 Spring Data가 분석한다. 직접 SQL 문자열을 만든 메서드가 아니다.
+public interface DerivedPostRepository extends Repository&lt;Post, Long&gt; {
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Optional&lt;Post&gt; findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(String status, String visibility, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(String status, String visibility, Long authorId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(String status, String visibility, String keyword, Pageable pageable);
+
+    boolean existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+    long countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug);
+}</code></pre>
+<p><strong>MyBatis Mapper/XML · BasicPostMapper.xml</strong></p>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.querypractice.BasicPostMapper&quot;&gt;
+    &lt;sql id=&quot;visible&quot;&gt;
+        p.deleted_at IS NULL AND p.hidden_at IS NULL AND p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC'
+    &lt;/sql&gt;
+    &lt;sql id=&quot;filters&quot;&gt;
+        &lt;if test=&quot;board != null&quot;&gt;AND b.slug = #{board}&lt;/if&gt;
+        &lt;if test=&quot;author != null&quot;&gt;AND p.author_id = #{author}&lt;/if&gt;
+        &lt;if test=&quot;pattern != null&quot;&gt;AND LOWER(p.title) LIKE LOWER(#{pattern}) ESCAPE '!'&lt;/if&gt;
+    &lt;/sql&gt;
+    &lt;select id=&quot;detail&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;list&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+        ORDER BY p.id DESC LIMIT #{limit} OFFSET #{offset}
+    &lt;/select&gt;
+    &lt;select id=&quot;count&quot; resultType=&quot;long&quot;&gt;
+        SELECT COUNT(*) FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;exists&quot; resultType=&quot;boolean&quot;&gt;
+        SELECT EXISTS(SELECT 1 FROM post p WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;)
+    &lt;/select&gt;
+&lt;/mapper&gt;</code></pre>
+</details>
+
+
+<h3 id="q05-제목-검색"><a class="anchor" href="#q05-제목-검색" aria-hidden="true">#</a>Q05. 제목 검색</h3>
+<ul>
+<li>요청: <code>GET /api/query-practice/jpa/posts?keyword=JPA</code></li>
+<li>조건: 대소문자 무시, 와일드카드는 문자</li>
+<li>JPA 파생 메서드: <code>...AndTitleContainingIgnoreCase</code></li>
+<li>MyBatis/SQL: <code>LOWER(title) LIKE ... ESCAPE !</code></li>
+<li>기대: 포함된 글만</li>
+<li>연결: 앞서 만든 같은 게시글 id를 쓰고 기존 API에서 상태를 바꾼 뒤 재조회합니다.</li>
+</ul>
+<details><summary>Q05 구현 코드 — Controller · Service · DTO · Repository · Mapper</summary>
+
+<p>이 시나리오에서 사용하는 실행 파일 전문입니다. 여러 시나리오가 같은 클래스를 이어 확장하므로 공통 메서드도 함께 표시합니다.</p>
+<p><strong>Controller · BasicQueryController.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.context.annotation.Profile;
+import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+
+// practice에서만 제공하는 익명 공개 목록 비교 API. 개인화된 조회는 기존 /api/posts가 담당한다.
+@Profile(&quot;practice&quot;)
+@RestController
+@RequestMapping(&quot;/api/query-practice/{engine}&quot;)
+public class BasicQueryController {
+    private final BasicQueryService service;
+    public BasicQueryController(BasicQueryService service) { this.service = service; }
+
+    @GetMapping(&quot;/posts/{id}&quot;)
+    public QueryPostRow detail(@PathVariable String engine, @PathVariable String id) {
+        return service.detail(engine, id);
+    }
+    @GetMapping(&quot;/posts&quot;)
+    public QueryPage list(@PathVariable String engine, @RequestParam Map&lt;String, String&gt; params) {
+        return service.list(engine, params);
+    }
+    @GetMapping(&quot;/posts/{id}/exists&quot;)
+    public Map&lt;String, Boolean&gt; exists(@PathVariable String engine, @PathVariable String id) {
+        return Map.of(&quot;exists&quot;, service.exists(engine, id));
+    }
+    @GetMapping(&quot;/count&quot;)
+    public Map&lt;String, Long&gt; count(@PathVariable String engine, @RequestParam String boardSlug) {
+        return Map.of(&quot;count&quot;, service.count(engine, boardSlug));
+    }
+}</code></pre>
+<p><strong>Service · BasicQueryService.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.example.post.Post;
+import java.util.Map;
+
+@Service
+@Transactional(readOnly = true)
+public class BasicQueryService {
+    private final DerivedPostRepository repository;
+    private final BasicPostMapper mapper;
+
+    public BasicQueryService(DerivedPostRepository repository, BasicPostMapper mapper) {
+        this.repository = repository;
+        this.mapper = mapper;
+    }
+
+    public QueryPostRow detail(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        QueryPostRow row = &quot;jpa&quot;.equals(engine)
+                ? repository.findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;).map(QueryPostRow::of).orElse(null)
+                : mapper.detail(id);
+        if (row == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return row;
+    }
+
+    public QueryPage list(String engine, Map&lt;String, String&gt; params) {
+        QueryInputs.engine(engine);
+        String board = QueryInputs.text(params, &quot;boardSlug&quot;, 50);
+        String keyword = QueryInputs.text(params, &quot;keyword&quot;, 100);
+        Long author = params.containsKey(&quot;authorId&quot;) ? QueryInputs.positive(params.get(&quot;authorId&quot;), &quot;authorId&quot;) : null;
+        // 기본편은 조건 하나씩 만든다. 조건 조합은 L13에서 같은 DTO로 확장한다.
+        if ((board == null ? 0 : 1) + (keyword == null ? 0 : 1) + (author == null ? 0 : 1) &gt; 1) throw QueryInputs.bad(&quot;filter&quot;);
+        int page = QueryInputs.number(params, &quot;page&quot;, 0, 0, 10000);
+        int size = QueryInputs.number(params, &quot;size&quot;, 10, 1, 50);
+        if (&quot;mybatis&quot;.equals(engine)) {
+            String pattern = QueryInputs.pattern(keyword);
+            return new QueryPage(mapper.list(board, author, pattern, size, (long) page * size), page, size, mapper.count(board, author, pattern));
+        }
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, &quot;id&quot;));
+        Page&lt;Post&gt; result;
+        if (board != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board, pageable);
+        else if (author != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, author, pageable);
+        else if (keyword != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, keyword, pageable);
+        else result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, pageable);
+        return new QueryPage(result.getContent().stream().map(QueryPostRow::of).toList(), page, size, result.getTotalElements());
+    }
+
+    public boolean exists(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;) : mapper.exists(id);
+    }
+
+    public long count(String engine, String board) {
+        QueryInputs.engine(engine);
+        if (board == null || board.isBlank() || board.length() &gt; 50) throw QueryInputs.bad(&quot;boardSlug&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board) : mapper.count(board, null, null);
+    }
+}</code></pre>
+<p><strong>DTO · QueryPostRow.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+
+// 엔티티 전체를 JSON으로 노출하지 않고 이번 화면에 필요한 열만 반환한다.
+public record QueryPostRow(Long id, String title, String boardSlug, Long authorId) {
+    public static QueryPostRow of(Post post) {
+        return new QueryPostRow(post.getId(), post.getTitle(), post.getBoard().getSlug(), post.getAuthor().getId());
+    }
+}</code></pre>
+<p><strong>DTO · QueryPage.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import java.util.List;
+
+public record QueryPage(List&lt;QueryPostRow&gt; items, int page, int size, long total) {}</code></pre>
+<p><strong>JPA Repository · DerivedPostRepository.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.repository.Repository;
+import java.util.Optional;
+
+// 이름의 프로퍼티 경로·키워드를 Spring Data가 분석한다. 직접 SQL 문자열을 만든 메서드가 아니다.
+public interface DerivedPostRepository extends Repository&lt;Post, Long&gt; {
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Optional&lt;Post&gt; findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(String status, String visibility, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(String status, String visibility, Long authorId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(String status, String visibility, String keyword, Pageable pageable);
+
+    boolean existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+    long countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug);
+}</code></pre>
+<p><strong>MyBatis Mapper/XML · BasicPostMapper.xml</strong></p>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.querypractice.BasicPostMapper&quot;&gt;
+    &lt;sql id=&quot;visible&quot;&gt;
+        p.deleted_at IS NULL AND p.hidden_at IS NULL AND p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC'
+    &lt;/sql&gt;
+    &lt;sql id=&quot;filters&quot;&gt;
+        &lt;if test=&quot;board != null&quot;&gt;AND b.slug = #{board}&lt;/if&gt;
+        &lt;if test=&quot;author != null&quot;&gt;AND p.author_id = #{author}&lt;/if&gt;
+        &lt;if test=&quot;pattern != null&quot;&gt;AND LOWER(p.title) LIKE LOWER(#{pattern}) ESCAPE '!'&lt;/if&gt;
+    &lt;/sql&gt;
+    &lt;select id=&quot;detail&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;list&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+        ORDER BY p.id DESC LIMIT #{limit} OFFSET #{offset}
+    &lt;/select&gt;
+    &lt;select id=&quot;count&quot; resultType=&quot;long&quot;&gt;
+        SELECT COUNT(*) FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;exists&quot; resultType=&quot;boolean&quot;&gt;
+        SELECT EXISTS(SELECT 1 FROM post p WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;)
+    &lt;/select&gt;
+&lt;/mapper&gt;</code></pre>
+</details>
+
+
+<h3 id="q06-존재-확인"><a class="anchor" href="#q06-존재-확인" aria-hidden="true">#</a>Q06. 존재 확인</h3>
+<ul>
+<li>요청: <code>GET /api/query-practice/jpa/posts/{id}/exists</code></li>
+<li>조건: 공개 글인가</li>
+<li>JPA 파생 메서드: <code>existsByIdAnd...</code></li>
+<li>MyBatis/SQL: <code>SELECT EXISTS</code></li>
+<li>기대: exists true/false</li>
+<li>연결: 앞서 만든 같은 게시글 id를 쓰고 기존 API에서 상태를 바꾼 뒤 재조회합니다.</li>
+</ul>
+<details><summary>Q06 구현 코드 — Controller · Service · DTO · Repository · Mapper</summary>
+
+<p>이 시나리오에서 사용하는 실행 파일 전문입니다. 여러 시나리오가 같은 클래스를 이어 확장하므로 공통 메서드도 함께 표시합니다.</p>
+<p><strong>Controller · BasicQueryController.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.context.annotation.Profile;
+import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+
+// practice에서만 제공하는 익명 공개 목록 비교 API. 개인화된 조회는 기존 /api/posts가 담당한다.
+@Profile(&quot;practice&quot;)
+@RestController
+@RequestMapping(&quot;/api/query-practice/{engine}&quot;)
+public class BasicQueryController {
+    private final BasicQueryService service;
+    public BasicQueryController(BasicQueryService service) { this.service = service; }
+
+    @GetMapping(&quot;/posts/{id}&quot;)
+    public QueryPostRow detail(@PathVariable String engine, @PathVariable String id) {
+        return service.detail(engine, id);
+    }
+    @GetMapping(&quot;/posts&quot;)
+    public QueryPage list(@PathVariable String engine, @RequestParam Map&lt;String, String&gt; params) {
+        return service.list(engine, params);
+    }
+    @GetMapping(&quot;/posts/{id}/exists&quot;)
+    public Map&lt;String, Boolean&gt; exists(@PathVariable String engine, @PathVariable String id) {
+        return Map.of(&quot;exists&quot;, service.exists(engine, id));
+    }
+    @GetMapping(&quot;/count&quot;)
+    public Map&lt;String, Long&gt; count(@PathVariable String engine, @RequestParam String boardSlug) {
+        return Map.of(&quot;count&quot;, service.count(engine, boardSlug));
+    }
+}</code></pre>
+<p><strong>Service · BasicQueryService.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.example.post.Post;
+import java.util.Map;
+
+@Service
+@Transactional(readOnly = true)
+public class BasicQueryService {
+    private final DerivedPostRepository repository;
+    private final BasicPostMapper mapper;
+
+    public BasicQueryService(DerivedPostRepository repository, BasicPostMapper mapper) {
+        this.repository = repository;
+        this.mapper = mapper;
+    }
+
+    public QueryPostRow detail(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        QueryPostRow row = &quot;jpa&quot;.equals(engine)
+                ? repository.findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;).map(QueryPostRow::of).orElse(null)
+                : mapper.detail(id);
+        if (row == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return row;
+    }
+
+    public QueryPage list(String engine, Map&lt;String, String&gt; params) {
+        QueryInputs.engine(engine);
+        String board = QueryInputs.text(params, &quot;boardSlug&quot;, 50);
+        String keyword = QueryInputs.text(params, &quot;keyword&quot;, 100);
+        Long author = params.containsKey(&quot;authorId&quot;) ? QueryInputs.positive(params.get(&quot;authorId&quot;), &quot;authorId&quot;) : null;
+        // 기본편은 조건 하나씩 만든다. 조건 조합은 L13에서 같은 DTO로 확장한다.
+        if ((board == null ? 0 : 1) + (keyword == null ? 0 : 1) + (author == null ? 0 : 1) &gt; 1) throw QueryInputs.bad(&quot;filter&quot;);
+        int page = QueryInputs.number(params, &quot;page&quot;, 0, 0, 10000);
+        int size = QueryInputs.number(params, &quot;size&quot;, 10, 1, 50);
+        if (&quot;mybatis&quot;.equals(engine)) {
+            String pattern = QueryInputs.pattern(keyword);
+            return new QueryPage(mapper.list(board, author, pattern, size, (long) page * size), page, size, mapper.count(board, author, pattern));
+        }
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, &quot;id&quot;));
+        Page&lt;Post&gt; result;
+        if (board != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board, pageable);
+        else if (author != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, author, pageable);
+        else if (keyword != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, keyword, pageable);
+        else result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, pageable);
+        return new QueryPage(result.getContent().stream().map(QueryPostRow::of).toList(), page, size, result.getTotalElements());
+    }
+
+    public boolean exists(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;) : mapper.exists(id);
+    }
+
+    public long count(String engine, String board) {
+        QueryInputs.engine(engine);
+        if (board == null || board.isBlank() || board.length() &gt; 50) throw QueryInputs.bad(&quot;boardSlug&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board) : mapper.count(board, null, null);
+    }
+}</code></pre>
+<p><strong>DTO · QueryPostRow.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+
+// 엔티티 전체를 JSON으로 노출하지 않고 이번 화면에 필요한 열만 반환한다.
+public record QueryPostRow(Long id, String title, String boardSlug, Long authorId) {
+    public static QueryPostRow of(Post post) {
+        return new QueryPostRow(post.getId(), post.getTitle(), post.getBoard().getSlug(), post.getAuthor().getId());
+    }
+}</code></pre>
+<p><strong>DTO · QueryPage.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import java.util.List;
+
+public record QueryPage(List&lt;QueryPostRow&gt; items, int page, int size, long total) {}</code></pre>
+<p><strong>JPA Repository · DerivedPostRepository.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.repository.Repository;
+import java.util.Optional;
+
+// 이름의 프로퍼티 경로·키워드를 Spring Data가 분석한다. 직접 SQL 문자열을 만든 메서드가 아니다.
+public interface DerivedPostRepository extends Repository&lt;Post, Long&gt; {
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Optional&lt;Post&gt; findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(String status, String visibility, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(String status, String visibility, Long authorId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(String status, String visibility, String keyword, Pageable pageable);
+
+    boolean existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+    long countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug);
+}</code></pre>
+<p><strong>MyBatis Mapper/XML · BasicPostMapper.xml</strong></p>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.querypractice.BasicPostMapper&quot;&gt;
+    &lt;sql id=&quot;visible&quot;&gt;
+        p.deleted_at IS NULL AND p.hidden_at IS NULL AND p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC'
+    &lt;/sql&gt;
+    &lt;sql id=&quot;filters&quot;&gt;
+        &lt;if test=&quot;board != null&quot;&gt;AND b.slug = #{board}&lt;/if&gt;
+        &lt;if test=&quot;author != null&quot;&gt;AND p.author_id = #{author}&lt;/if&gt;
+        &lt;if test=&quot;pattern != null&quot;&gt;AND LOWER(p.title) LIKE LOWER(#{pattern}) ESCAPE '!'&lt;/if&gt;
+    &lt;/sql&gt;
+    &lt;select id=&quot;detail&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;list&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+        ORDER BY p.id DESC LIMIT #{limit} OFFSET #{offset}
+    &lt;/select&gt;
+    &lt;select id=&quot;count&quot; resultType=&quot;long&quot;&gt;
+        SELECT COUNT(*) FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;exists&quot; resultType=&quot;boolean&quot;&gt;
+        SELECT EXISTS(SELECT 1 FROM post p WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;)
+    &lt;/select&gt;
+&lt;/mapper&gt;</code></pre>
+</details>
+
+
+<h3 id="q07-게시판-글-수"><a class="anchor" href="#q07-게시판-글-수" aria-hidden="true">#</a>Q07. 게시판 글 수</h3>
+<ul>
+<li>요청: <code>GET /api/query-practice/mybatis/count?boardSlug=dev</code></li>
+<li>조건: 공개 글 수</li>
+<li>JPA 파생 메서드: <code>countBy...AndBoard_Slug</code></li>
+<li>MyBatis/SQL: <code>COUNT(*)</code></li>
+<li>기대: count n</li>
+<li>연결: 앞서 만든 같은 게시글 id를 쓰고 기존 API에서 상태를 바꾼 뒤 재조회합니다.</li>
+</ul>
+<details><summary>Q07 구현 코드 — Controller · Service · DTO · Repository · Mapper</summary>
+
+<p>이 시나리오에서 사용하는 실행 파일 전문입니다. 여러 시나리오가 같은 클래스를 이어 확장하므로 공통 메서드도 함께 표시합니다.</p>
+<p><strong>Controller · BasicQueryController.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.context.annotation.Profile;
+import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+
+// practice에서만 제공하는 익명 공개 목록 비교 API. 개인화된 조회는 기존 /api/posts가 담당한다.
+@Profile(&quot;practice&quot;)
+@RestController
+@RequestMapping(&quot;/api/query-practice/{engine}&quot;)
+public class BasicQueryController {
+    private final BasicQueryService service;
+    public BasicQueryController(BasicQueryService service) { this.service = service; }
+
+    @GetMapping(&quot;/posts/{id}&quot;)
+    public QueryPostRow detail(@PathVariable String engine, @PathVariable String id) {
+        return service.detail(engine, id);
+    }
+    @GetMapping(&quot;/posts&quot;)
+    public QueryPage list(@PathVariable String engine, @RequestParam Map&lt;String, String&gt; params) {
+        return service.list(engine, params);
+    }
+    @GetMapping(&quot;/posts/{id}/exists&quot;)
+    public Map&lt;String, Boolean&gt; exists(@PathVariable String engine, @PathVariable String id) {
+        return Map.of(&quot;exists&quot;, service.exists(engine, id));
+    }
+    @GetMapping(&quot;/count&quot;)
+    public Map&lt;String, Long&gt; count(@PathVariable String engine, @RequestParam String boardSlug) {
+        return Map.of(&quot;count&quot;, service.count(engine, boardSlug));
+    }
+}</code></pre>
+<p><strong>Service · BasicQueryService.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.example.post.Post;
+import java.util.Map;
+
+@Service
+@Transactional(readOnly = true)
+public class BasicQueryService {
+    private final DerivedPostRepository repository;
+    private final BasicPostMapper mapper;
+
+    public BasicQueryService(DerivedPostRepository repository, BasicPostMapper mapper) {
+        this.repository = repository;
+        this.mapper = mapper;
+    }
+
+    public QueryPostRow detail(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        QueryPostRow row = &quot;jpa&quot;.equals(engine)
+                ? repository.findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;).map(QueryPostRow::of).orElse(null)
+                : mapper.detail(id);
+        if (row == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return row;
+    }
+
+    public QueryPage list(String engine, Map&lt;String, String&gt; params) {
+        QueryInputs.engine(engine);
+        String board = QueryInputs.text(params, &quot;boardSlug&quot;, 50);
+        String keyword = QueryInputs.text(params, &quot;keyword&quot;, 100);
+        Long author = params.containsKey(&quot;authorId&quot;) ? QueryInputs.positive(params.get(&quot;authorId&quot;), &quot;authorId&quot;) : null;
+        // 기본편은 조건 하나씩 만든다. 조건 조합은 L13에서 같은 DTO로 확장한다.
+        if ((board == null ? 0 : 1) + (keyword == null ? 0 : 1) + (author == null ? 0 : 1) &gt; 1) throw QueryInputs.bad(&quot;filter&quot;);
+        int page = QueryInputs.number(params, &quot;page&quot;, 0, 0, 10000);
+        int size = QueryInputs.number(params, &quot;size&quot;, 10, 1, 50);
+        if (&quot;mybatis&quot;.equals(engine)) {
+            String pattern = QueryInputs.pattern(keyword);
+            return new QueryPage(mapper.list(board, author, pattern, size, (long) page * size), page, size, mapper.count(board, author, pattern));
+        }
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, &quot;id&quot;));
+        Page&lt;Post&gt; result;
+        if (board != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board, pageable);
+        else if (author != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, author, pageable);
+        else if (keyword != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, keyword, pageable);
+        else result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, pageable);
+        return new QueryPage(result.getContent().stream().map(QueryPostRow::of).toList(), page, size, result.getTotalElements());
+    }
+
+    public boolean exists(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;) : mapper.exists(id);
+    }
+
+    public long count(String engine, String board) {
+        QueryInputs.engine(engine);
+        if (board == null || board.isBlank() || board.length() &gt; 50) throw QueryInputs.bad(&quot;boardSlug&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board) : mapper.count(board, null, null);
+    }
+}</code></pre>
+<p><strong>DTO · QueryPostRow.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+
+// 엔티티 전체를 JSON으로 노출하지 않고 이번 화면에 필요한 열만 반환한다.
+public record QueryPostRow(Long id, String title, String boardSlug, Long authorId) {
+    public static QueryPostRow of(Post post) {
+        return new QueryPostRow(post.getId(), post.getTitle(), post.getBoard().getSlug(), post.getAuthor().getId());
+    }
+}</code></pre>
+<p><strong>DTO · QueryPage.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import java.util.List;
+
+public record QueryPage(List&lt;QueryPostRow&gt; items, int page, int size, long total) {}</code></pre>
+<p><strong>JPA Repository · DerivedPostRepository.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.repository.Repository;
+import java.util.Optional;
+
+// 이름의 프로퍼티 경로·키워드를 Spring Data가 분석한다. 직접 SQL 문자열을 만든 메서드가 아니다.
+public interface DerivedPostRepository extends Repository&lt;Post, Long&gt; {
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Optional&lt;Post&gt; findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(String status, String visibility, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(String status, String visibility, Long authorId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(String status, String visibility, String keyword, Pageable pageable);
+
+    boolean existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+    long countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug);
+}</code></pre>
+<p><strong>MyBatis Mapper/XML · BasicPostMapper.xml</strong></p>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.querypractice.BasicPostMapper&quot;&gt;
+    &lt;sql id=&quot;visible&quot;&gt;
+        p.deleted_at IS NULL AND p.hidden_at IS NULL AND p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC'
+    &lt;/sql&gt;
+    &lt;sql id=&quot;filters&quot;&gt;
+        &lt;if test=&quot;board != null&quot;&gt;AND b.slug = #{board}&lt;/if&gt;
+        &lt;if test=&quot;author != null&quot;&gt;AND p.author_id = #{author}&lt;/if&gt;
+        &lt;if test=&quot;pattern != null&quot;&gt;AND LOWER(p.title) LIKE LOWER(#{pattern}) ESCAPE '!'&lt;/if&gt;
+    &lt;/sql&gt;
+    &lt;select id=&quot;detail&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;list&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+        ORDER BY p.id DESC LIMIT #{limit} OFFSET #{offset}
+    &lt;/select&gt;
+    &lt;select id=&quot;count&quot; resultType=&quot;long&quot;&gt;
+        SELECT COUNT(*) FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;exists&quot; resultType=&quot;boolean&quot;&gt;
+        SELECT EXISTS(SELECT 1 FROM post p WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;)
+    &lt;/select&gt;
+&lt;/mapper&gt;</code></pre>
+</details>
+
+
+<h3 id="q08-페이지"><a class="anchor" href="#q08-페이지" aria-hidden="true">#</a>Q08. 페이지</h3>
+<ul>
+<li>요청: <code>GET /api/query-practice/jpa/posts?page=0&amp;size=10</code></li>
+<li>조건: id DESC, size 1~50</li>
+<li>JPA 파생 메서드: <code>Pageable</code></li>
+<li>MyBatis/SQL: <code>ORDER BY id DESC LIMIT/OFFSET</code></li>
+<li>기대: items/total/page/size</li>
+<li>연결: 앞서 만든 같은 게시글 id를 쓰고 기존 API에서 상태를 바꾼 뒤 재조회합니다.</li>
+</ul>
+<details><summary>Q08 구현 코드 — Controller · Service · DTO · Repository · Mapper</summary>
+
+<p>이 시나리오에서 사용하는 실행 파일 전문입니다. 여러 시나리오가 같은 클래스를 이어 확장하므로 공통 메서드도 함께 표시합니다.</p>
+<p><strong>Controller · BasicQueryController.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.context.annotation.Profile;
+import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+
+// practice에서만 제공하는 익명 공개 목록 비교 API. 개인화된 조회는 기존 /api/posts가 담당한다.
+@Profile(&quot;practice&quot;)
+@RestController
+@RequestMapping(&quot;/api/query-practice/{engine}&quot;)
+public class BasicQueryController {
+    private final BasicQueryService service;
+    public BasicQueryController(BasicQueryService service) { this.service = service; }
+
+    @GetMapping(&quot;/posts/{id}&quot;)
+    public QueryPostRow detail(@PathVariable String engine, @PathVariable String id) {
+        return service.detail(engine, id);
+    }
+    @GetMapping(&quot;/posts&quot;)
+    public QueryPage list(@PathVariable String engine, @RequestParam Map&lt;String, String&gt; params) {
+        return service.list(engine, params);
+    }
+    @GetMapping(&quot;/posts/{id}/exists&quot;)
+    public Map&lt;String, Boolean&gt; exists(@PathVariable String engine, @PathVariable String id) {
+        return Map.of(&quot;exists&quot;, service.exists(engine, id));
+    }
+    @GetMapping(&quot;/count&quot;)
+    public Map&lt;String, Long&gt; count(@PathVariable String engine, @RequestParam String boardSlug) {
+        return Map.of(&quot;count&quot;, service.count(engine, boardSlug));
+    }
+}</code></pre>
+<p><strong>Service · BasicQueryService.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.example.post.Post;
+import java.util.Map;
+
+@Service
+@Transactional(readOnly = true)
+public class BasicQueryService {
+    private final DerivedPostRepository repository;
+    private final BasicPostMapper mapper;
+
+    public BasicQueryService(DerivedPostRepository repository, BasicPostMapper mapper) {
+        this.repository = repository;
+        this.mapper = mapper;
+    }
+
+    public QueryPostRow detail(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        QueryPostRow row = &quot;jpa&quot;.equals(engine)
+                ? repository.findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;).map(QueryPostRow::of).orElse(null)
+                : mapper.detail(id);
+        if (row == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return row;
+    }
+
+    public QueryPage list(String engine, Map&lt;String, String&gt; params) {
+        QueryInputs.engine(engine);
+        String board = QueryInputs.text(params, &quot;boardSlug&quot;, 50);
+        String keyword = QueryInputs.text(params, &quot;keyword&quot;, 100);
+        Long author = params.containsKey(&quot;authorId&quot;) ? QueryInputs.positive(params.get(&quot;authorId&quot;), &quot;authorId&quot;) : null;
+        // 기본편은 조건 하나씩 만든다. 조건 조합은 L13에서 같은 DTO로 확장한다.
+        if ((board == null ? 0 : 1) + (keyword == null ? 0 : 1) + (author == null ? 0 : 1) &gt; 1) throw QueryInputs.bad(&quot;filter&quot;);
+        int page = QueryInputs.number(params, &quot;page&quot;, 0, 0, 10000);
+        int size = QueryInputs.number(params, &quot;size&quot;, 10, 1, 50);
+        if (&quot;mybatis&quot;.equals(engine)) {
+            String pattern = QueryInputs.pattern(keyword);
+            return new QueryPage(mapper.list(board, author, pattern, size, (long) page * size), page, size, mapper.count(board, author, pattern));
+        }
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, &quot;id&quot;));
+        Page&lt;Post&gt; result;
+        if (board != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board, pageable);
+        else if (author != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, author, pageable);
+        else if (keyword != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, keyword, pageable);
+        else result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, pageable);
+        return new QueryPage(result.getContent().stream().map(QueryPostRow::of).toList(), page, size, result.getTotalElements());
+    }
+
+    public boolean exists(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;) : mapper.exists(id);
+    }
+
+    public long count(String engine, String board) {
+        QueryInputs.engine(engine);
+        if (board == null || board.isBlank() || board.length() &gt; 50) throw QueryInputs.bad(&quot;boardSlug&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board) : mapper.count(board, null, null);
+    }
+}</code></pre>
+<p><strong>DTO · QueryPostRow.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+
+// 엔티티 전체를 JSON으로 노출하지 않고 이번 화면에 필요한 열만 반환한다.
+public record QueryPostRow(Long id, String title, String boardSlug, Long authorId) {
+    public static QueryPostRow of(Post post) {
+        return new QueryPostRow(post.getId(), post.getTitle(), post.getBoard().getSlug(), post.getAuthor().getId());
+    }
+}</code></pre>
+<p><strong>DTO · QueryPage.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import java.util.List;
+
+public record QueryPage(List&lt;QueryPostRow&gt; items, int page, int size, long total) {}</code></pre>
+<p><strong>JPA Repository · DerivedPostRepository.java</strong></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.repository.Repository;
+import java.util.Optional;
+
+// 이름의 프로퍼티 경로·키워드를 Spring Data가 분석한다. 직접 SQL 문자열을 만든 메서드가 아니다.
+public interface DerivedPostRepository extends Repository&lt;Post, Long&gt; {
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Optional&lt;Post&gt; findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(String status, String visibility, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(String status, String visibility, Long authorId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(String status, String visibility, String keyword, Pageable pageable);
+
+    boolean existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+    long countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug);
+}</code></pre>
+<p><strong>MyBatis Mapper/XML · BasicPostMapper.xml</strong></p>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.querypractice.BasicPostMapper&quot;&gt;
+    &lt;sql id=&quot;visible&quot;&gt;
+        p.deleted_at IS NULL AND p.hidden_at IS NULL AND p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC'
+    &lt;/sql&gt;
+    &lt;sql id=&quot;filters&quot;&gt;
+        &lt;if test=&quot;board != null&quot;&gt;AND b.slug = #{board}&lt;/if&gt;
+        &lt;if test=&quot;author != null&quot;&gt;AND p.author_id = #{author}&lt;/if&gt;
+        &lt;if test=&quot;pattern != null&quot;&gt;AND LOWER(p.title) LIKE LOWER(#{pattern}) ESCAPE '!'&lt;/if&gt;
+    &lt;/sql&gt;
+    &lt;select id=&quot;detail&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;list&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+        ORDER BY p.id DESC LIMIT #{limit} OFFSET #{offset}
+    &lt;/select&gt;
+    &lt;select id=&quot;count&quot; resultType=&quot;long&quot;&gt;
+        SELECT COUNT(*) FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;exists&quot; resultType=&quot;boolean&quot;&gt;
+        SELECT EXISTS(SELECT 1 FROM post p WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;)
+    &lt;/select&gt;
+&lt;/mapper&gt;</code></pre>
+</details>
+
+
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<ol>
+<li>각 요청의 id/items/total을 기록합니다.</li>
+<li>같은 필터를 JPA·MyBatis에 보내 비교합니다. L14는 QueryDSL도 비교합니다.</li>
+<li>기존 API로 수정→좋아요·북마크→숨김→복구→삭제하고 같은 id의 조회 결과를 확인합니다.</li>
+<li>잘못된 page/size, 빈 결과, 문자 %/_/! 검색과 공개 조건을 확인합니다.</li>
+</ol>
+<h2 id="역할별-전체-코드"><a class="anchor" href="#역할별-전체-코드" aria-hidden="true">#</a>역할별 전체 코드</h2>
+<p>각 토글은 추가/덮어쓰기 파일의 전문입니다. 기존 본편 Controller·Service·Entity는 최종 snapshot에서 함께 확인합니다.</p>
+<details><summary>설정 · build.gradle</summary>
+
+<p><code>build.gradle</code></p>
+<pre><code class="language-groovy">plugins {
+    id 'java'
+    // bootRun / bootJar 태스크 제공 + 실행 가능한 fat jar 패키징
+    id 'org.springframework.boot' version '4.1.1'
+    // Boot BOM을 적용해서 아래 의존성들의 버전을 생략할 수 있게 해줌
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'org.example'
+version = '1.0-SNAPSHOT'
+
+java {
+    toolchain {
+        // 컴파일·실행 JDK를 고정 (Boot 4는 Java 17 이상 필요, 로컬에 설치된 21 사용)
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    // Spring MVC + 내장 Tomcat + Jackson (Boot 4부터 starter-web → starter-webmvc로 이름 변경)
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    // JPA(Hibernate) + HikariCP 커넥션 풀
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'
+    // @Valid, @NotBlank 같은 요청 값 검증
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // MySQL JDBC 드라이버 — 컴파일엔 필요 없고 실행할 때만 필요
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    // 9-1 스키마 변경은 Flyway 마이그레이션(db/migration)으로만 한다
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    runtimeOnly 'org.flywaydb:flyway-mysql'
+    // 13-7 API 문서(OpenAPI 3.1 + Swagger UI) — springdoc 3.x가 Spring Boot 4용(3.1.1은 Boot 4.1.0 기준으로 빌드됨).
+    // Boot BOM이 관리하지 않는 라이브러리라 버전을 직접 적는다
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+    // 16-3 인기글 캐시 — Spring Cache 추상화 + 로컬 메모리 캐시(Caffeine, TTL 지원)
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'com.github.ben-manes.caffeine:caffeine'
+
+    // 테스트: JUnit·AssertJ·Mockito·MockMvc 묶음 (버전은 Boot BOM이 관리하므로 junit-bom 따로 두지 않음)
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    // @DataJpaTest(리포지토리만 띄우는 테스트)
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+    // 테스트용 일회용 MySQL 컨테이너 — application-test.yml의 jdbc:tc: URL이 쓴다
+    testImplementation 'org.testcontainers:testcontainers-mysql'
+    // Gradle이 JUnit Platform 테스트를 실행할 때 필요한 런처
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    // 테스트는 application-test.yml(Testcontainers MySQL)을 쓰게 한다
+    systemProperty 'spring.profiles.active', 'test'
+}</code></pre>
+</details>
+
+<details><summary>Mapper/XML · BasicPostMapper.java</summary>
+
+<p><code>src/main/java/org/example/querypractice/BasicPostMapper.java</code></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import java.util.List;
+
+@Mapper
+public interface BasicPostMapper {
+    QueryPostRow detail(@Param(&quot;id&quot;) long id);
+    List&lt;QueryPostRow&gt; list(@Param(&quot;board&quot;) String board, @Param(&quot;author&quot;) Long author,
+                           @Param(&quot;pattern&quot;) String pattern, @Param(&quot;limit&quot;) int limit, @Param(&quot;offset&quot;) long offset);
+    long count(@Param(&quot;board&quot;) String board, @Param(&quot;author&quot;) Long author, @Param(&quot;pattern&quot;) String pattern);
+    boolean exists(@Param(&quot;id&quot;) long id);
+}</code></pre>
+</details>
+
+<details><summary>Controller · BasicQueryController.java</summary>
+
+<p><code>src/main/java/org/example/querypractice/BasicQueryController.java</code></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.context.annotation.Profile;
+import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+
+// practice에서만 제공하는 익명 공개 목록 비교 API. 개인화된 조회는 기존 /api/posts가 담당한다.
+@Profile(&quot;practice&quot;)
+@RestController
+@RequestMapping(&quot;/api/query-practice/{engine}&quot;)
+public class BasicQueryController {
+    private final BasicQueryService service;
+    public BasicQueryController(BasicQueryService service) { this.service = service; }
+
+    @GetMapping(&quot;/posts/{id}&quot;)
+    public QueryPostRow detail(@PathVariable String engine, @PathVariable String id) {
+        return service.detail(engine, id);
+    }
+    @GetMapping(&quot;/posts&quot;)
+    public QueryPage list(@PathVariable String engine, @RequestParam Map&lt;String, String&gt; params) {
+        return service.list(engine, params);
+    }
+    @GetMapping(&quot;/posts/{id}/exists&quot;)
+    public Map&lt;String, Boolean&gt; exists(@PathVariable String engine, @PathVariable String id) {
+        return Map.of(&quot;exists&quot;, service.exists(engine, id));
+    }
+    @GetMapping(&quot;/count&quot;)
+    public Map&lt;String, Long&gt; count(@PathVariable String engine, @RequestParam String boardSlug) {
+        return Map.of(&quot;count&quot;, service.count(engine, boardSlug));
+    }
+}</code></pre>
+</details>
+
+<details><summary>Service · BasicQueryService.java</summary>
+
+<p><code>src/main/java/org/example/querypractice/BasicQueryService.java</code></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.example.post.Post;
+import java.util.Map;
+
+@Service
+@Transactional(readOnly = true)
+public class BasicQueryService {
+    private final DerivedPostRepository repository;
+    private final BasicPostMapper mapper;
+
+    public BasicQueryService(DerivedPostRepository repository, BasicPostMapper mapper) {
+        this.repository = repository;
+        this.mapper = mapper;
+    }
+
+    public QueryPostRow detail(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        QueryPostRow row = &quot;jpa&quot;.equals(engine)
+                ? repository.findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;).map(QueryPostRow::of).orElse(null)
+                : mapper.detail(id);
+        if (row == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return row;
+    }
+
+    public QueryPage list(String engine, Map&lt;String, String&gt; params) {
+        QueryInputs.engine(engine);
+        String board = QueryInputs.text(params, &quot;boardSlug&quot;, 50);
+        String keyword = QueryInputs.text(params, &quot;keyword&quot;, 100);
+        Long author = params.containsKey(&quot;authorId&quot;) ? QueryInputs.positive(params.get(&quot;authorId&quot;), &quot;authorId&quot;) : null;
+        // 기본편은 조건 하나씩 만든다. 조건 조합은 L13에서 같은 DTO로 확장한다.
+        if ((board == null ? 0 : 1) + (keyword == null ? 0 : 1) + (author == null ? 0 : 1) &gt; 1) throw QueryInputs.bad(&quot;filter&quot;);
+        int page = QueryInputs.number(params, &quot;page&quot;, 0, 0, 10000);
+        int size = QueryInputs.number(params, &quot;size&quot;, 10, 1, 50);
+        if (&quot;mybatis&quot;.equals(engine)) {
+            String pattern = QueryInputs.pattern(keyword);
+            return new QueryPage(mapper.list(board, author, pattern, size, (long) page * size), page, size, mapper.count(board, author, pattern));
+        }
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, &quot;id&quot;));
+        Page&lt;Post&gt; result;
+        if (board != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board, pageable);
+        else if (author != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, author, pageable);
+        else if (keyword != null) result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, keyword, pageable);
+        else result = repository.findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, pageable);
+        return new QueryPage(result.getContent().stream().map(QueryPostRow::of).toList(), page, size, result.getTotalElements());
+    }
+
+    public boolean exists(String engine, String rawId) {
+        QueryInputs.engine(engine);
+        long id = QueryInputs.positive(rawId, &quot;id&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(id, &quot;PUBLISHED&quot;, &quot;PUBLIC&quot;) : mapper.exists(id);
+    }
+
+    public long count(String engine, String board) {
+        QueryInputs.engine(engine);
+        if (board == null || board.isBlank() || board.length() &gt; 50) throw QueryInputs.bad(&quot;boardSlug&quot;);
+        return &quot;jpa&quot;.equals(engine) ? repository.countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(&quot;PUBLISHED&quot;, &quot;PUBLIC&quot;, board) : mapper.count(board, null, null);
+    }
+}</code></pre>
+</details>
+
+<details><summary>Repository · DerivedPostRepository.java</summary>
+
+<p><code>src/main/java/org/example/querypractice/DerivedPostRepository.java</code></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.repository.Repository;
+import java.util.Optional;
+
+// 이름의 프로퍼티 경로·키워드를 Spring Data가 분석한다. 직접 SQL 문자열을 만든 메서드가 아니다.
+public interface DerivedPostRepository extends Repository&lt;Post, Long&gt; {
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Optional&lt;Post&gt; findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(String status, String visibility, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndAuthor_Id(String status, String visibility, Long authorId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {&quot;board&quot;, &quot;author&quot;})
+    Page&lt;Post&gt; findByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndTitleContainingIgnoreCase(String status, String visibility, String keyword, Pageable pageable);
+
+    boolean existsByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility(Long id, String status, String visibility);
+    long countByDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibilityAndBoard_Slug(String status, String visibility, String boardSlug);
+}</code></pre>
+</details>
+
+<details><summary>DTO·입력 · QueryInputs.java</summary>
+
+<p><code>src/main/java/org/example/querypractice/QueryInputs.java</code></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import java.util.Map;
+
+public final class QueryInputs {
+    private QueryInputs() {}
+
+    public static ResponseStatusException bad(String field) {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, field + &quot; 값을 확인해 주세요.&quot;);
+    }
+
+    public static void engine(String engine) {
+        if (!&quot;jpa&quot;.equals(engine) &amp;&amp; !&quot;mybatis&quot;.equals(engine)) throw bad(&quot;engine&quot;);
+    }
+
+    public static long positive(String raw, String field) {
+        if (raw == null || !raw.matches(&quot;[0-9]+&quot;)) throw bad(field);
+        try {
+            long value = Long.parseLong(raw);
+            if (value &gt; 0) return value;
+        } catch (NumberFormatException ignored) { }
+        throw bad(field);
+    }
+
+    public static int number(Map&lt;String, String&gt; params, String field, int fallback, int min, int max) {
+        String raw = params.get(field);
+        if (raw == null) return fallback;
+        if (raw.matches(&quot;[0-9]+&quot;)) {
+            try {
+                int value = Integer.parseInt(raw);
+                if (value &gt;= min &amp;&amp; value &lt;= max) return value;
+            } catch (NumberFormatException ignored) { }
+        }
+        throw bad(field);
+    }
+
+    public static String text(Map&lt;String, String&gt; params, String field, int max) {
+        String value = params.get(field);
+        if (value != null &amp;&amp; (value.isBlank() || value.length() &gt; max)) throw bad(field);
+        return value;
+    }
+
+    // %, _도 사용자가 입력한 문자로 찾는다. SQL 와일드카드로 확장하지 않는다.
+    public static String pattern(String keyword) {
+        return keyword == null ? null : &quot;%&quot; + keyword.replace(&quot;!&quot;, &quot;!!&quot;).replace(&quot;%&quot;, &quot;!%&quot;).replace(&quot;_&quot;, &quot;!_&quot;) + &quot;%&quot;;
+    }
+}</code></pre>
+</details>
+
+<details><summary>DTO·입력 · QueryPage.java</summary>
+
+<p><code>src/main/java/org/example/querypractice/QueryPage.java</code></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import java.util.List;
+
+public record QueryPage(List&lt;QueryPostRow&gt; items, int page, int size, long total) {}</code></pre>
+</details>
+
+<details><summary>DTO·입력 · QueryPostRow.java</summary>
+
+<p><code>src/main/java/org/example/querypractice/QueryPostRow.java</code></p>
+<pre><code class="language-java">package org.example.querypractice;
+
+import org.example.post.Post;
+
+// 엔티티 전체를 JSON으로 노출하지 않고 이번 화면에 필요한 열만 반환한다.
+public record QueryPostRow(Long id, String title, String boardSlug, Long authorId) {
+    public static QueryPostRow of(Post post) {
+        return new QueryPostRow(post.getId(), post.getTitle(), post.getBoard().getSlug(), post.getAuthor().getId());
+    }
+}</code></pre>
+</details>
+
+<details><summary>설정 · application.yml</summary>
+
+<p><code>src/main/resources/application.yml</code></p>
+<pre><code class="language-yaml">spring:
+  application:
+    name: javaExperience
+  datasource:
+    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  flyway:
+    # 이미 테이블·데이터가 있는 DB(compose의 community·practice)는 V1(CREATE TABLE)을 실행하면 실패한다.
+    # 그래서 기록 테이블이 없으면 &quot;V1까지 됐다&quot;고만 적고(baseline) V2부터 실행한다. 빈 DB면 V1부터 실제로 실행한다.
+    baseline-on-migrate: true
+    baseline-version: 1
+  servlet:
+    multipart:
+      # 11-2 이미지 한 장 1MB, 요청 전체 2MB까지. 넘으면 MaxUploadSizeExceededException → 413
+      max-file-size: 1MB
+      max-request-size: 2MB
+  jpa:
+    hibernate:
+      # 스키마는 Flyway만 바꾼다(9-1). 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)
+      ddl-auto: validate
+    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        # 컬렉션(태그) 지연 로딩을 글마다 1번이 아니라 IN (...) 한 번으로 묶는다(2-4, N+1 대응)
+        default_batch_fetch_size: 100
+  # 16-3 인기글 캐시 — 60초 뒤 만료(expireAfterWrite), 키는 최대 100개
+  cache:
+    cache-names: popularPosts
+    caffeine:
+      spec: maximumSize=100,expireAfterWrite=60s
+
+# 11-2 올린 이미지를 저장할 폴더(앱을 실행한 위치 기준). git에는 올리지 않는다(.gitignore)
+app:
+  upload-dir: uploads
+
+logging:
+  level:
+    # 실행 SQL은 확인하되 토큰을 포함한 바인딩 값은 로그에 남기지 않는다
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: info
+
+# 0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다
+start:
+  greeting: 반가워요, 백엔드!
+  max-items: 5
+
+# 13-7 앱 개발자가 문서를 열면 사용자용 API 그룹을 먼저 보여 준다.
+springdoc:
+  swagger-ui:
+    urls-primary-name: public
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true</code></pre>
+</details>
+
+<details><summary>Mapper/XML · BasicPostMapper.xml</summary>
+
+<p><code>src/main/resources/mapper/BasicPostMapper.xml</code></p>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.querypractice.BasicPostMapper&quot;&gt;
+    &lt;sql id=&quot;visible&quot;&gt;
+        p.deleted_at IS NULL AND p.hidden_at IS NULL AND p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC'
+    &lt;/sql&gt;
+    &lt;sql id=&quot;filters&quot;&gt;
+        &lt;if test=&quot;board != null&quot;&gt;AND b.slug = #{board}&lt;/if&gt;
+        &lt;if test=&quot;author != null&quot;&gt;AND p.author_id = #{author}&lt;/if&gt;
+        &lt;if test=&quot;pattern != null&quot;&gt;AND LOWER(p.title) LIKE LOWER(#{pattern}) ESCAPE '!'&lt;/if&gt;
+    &lt;/sql&gt;
+    &lt;select id=&quot;detail&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;list&quot; resultType=&quot;org.example.querypractice.QueryPostRow&quot;&gt;
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+        ORDER BY p.id DESC LIMIT #{limit} OFFSET #{offset}
+    &lt;/select&gt;
+    &lt;select id=&quot;count&quot; resultType=&quot;long&quot;&gt;
+        SELECT COUNT(*) FROM post p JOIN board b ON b.id = p.board_id
+        WHERE &lt;include refid=&quot;visible&quot;/&gt; &lt;include refid=&quot;filters&quot;/&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;exists&quot; resultType=&quot;boolean&quot;&gt;
+        SELECT EXISTS(SELECT 1 FROM post p WHERE p.id = #{id} AND &lt;include refid=&quot;visible&quot;/&gt;)
+    &lt;/select&gt;
+&lt;/mapper&gt;</code></pre>
+</details>
+
+
+<h2 id="자동-요청-확인"><a class="anchor" href="#자동-요청-확인" aria-hidden="true">#</a>자동 요청 확인</h2>
+<p>practice 프로필의 요청 패널에서 순서대로 실행합니다. 생성 응답 ID가 다음 요청에 전달됩니다. 운영자 요청은 연습용 관리자 토큰을 사용합니다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="P" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>P · 공개 글 생성</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p05" value="Bearer tok-p05" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[쿼리연습] JPA 연결&quot;,
+  &quot;content&quot;: &quot;본문 JPA 검색&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p05&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[쿼리연습] JPA 연결&quot;,
+  &quot;content&quot;: &quot;본문 JPA 검색&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="A" data-method="GET" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>A · 생성한 글 상세 JPA</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/query-practice/jpa/posts/{{P.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.id&quot;,&quot;equals&quot;:&quot;{{P.body.id}}&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="B" data-method="GET" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>B · 생성한 글 상세 MyBatis</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/query-practice/mybatis/posts/{{P.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="C" data-method="GET" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>C · 게시판 조회</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/query-practice/jpa/posts?boardSlug=dev" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items&quot;,&quot;type&quot;:&quot;array&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="D" data-method="GET" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>D · 작성자 조회</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/query-practice/mybatis/posts?authorId={{P.body.author.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items&quot;,&quot;type&quot;:&quot;array&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E" data-method="GET" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E · 제목 조회</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/query-practice/jpa/posts?keyword=JPA" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items&quot;,&quot;type&quot;:&quot;array&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="F" data-method="GET" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>F · 존재 조회</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/query-practice/jpa/posts/{{P.body.id}}/exists" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.exists&quot;,&quot;equals&quot;:true}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="G" data-method="GET" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>G · 게시판 수</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/query-practice/mybatis/count?boardSlug=dev" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.count&quot;,&quot;gte&quot;:1}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="H" data-method="GET" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>H · 다음 페이지</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/query-practice/jpa/posts?page=1&amp;size=2" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.page&quot;,&quot;equals&quot;:1},{&quot;path&quot;:&quot;$.size&quot;,&quot;equals&quot;:2}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="I" data-method="PATCH" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>I · 운영자 숨김</h4><p class="request-method">PATCH</p><label>경로 <input class="request-path" value="/api/admin/posts/{{P.body.id}}/status" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p01" value="Bearer tok-p01" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;status&quot;: &quot;HIDDEN&quot;
+}</textarea></label><button type="button" class="send-request">PATCH 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p01&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;status&quot;: &quot;HIDDEN&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="J" data-method="GET" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>J · 숨긴 글 상세</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/query-practice/jpa/posts/{{P.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:404}</pre></dd></dl></details></article><article class="api-request" data-request-id="K" data-method="PATCH" data-request-index="11" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>K · 재공개</h4><p class="request-method">PATCH</p><label>경로 <input class="request-path" value="/api/admin/posts/{{P.body.id}}/status" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p01" value="Bearer tok-p01" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;status&quot;: &quot;PUBLISHED&quot;
+}</textarea></label><button type="button" class="send-request">PATCH 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p01&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;status&quot;: &quot;PUBLISHED&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 패널 1번째 확인 · 생성 후 상세</td>
+<td>생성 응답 ID와 같은 게시글에 대해 명세의 조건·응답을 확인</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 패널 2번째 확인 · 숨김·삭제·비공개 제외</td>
+<td>생성 응답 ID와 같은 게시글에 대해 명세의 조건·응답을 확인</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 패널 3번째 확인 · 게시판 조회</td>
+<td>생성 응답 ID와 같은 게시글에 대해 명세의 조건·응답을 확인</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 패널 4번째 확인 · 작성자 조회</td>
+<td>생성 응답 ID와 같은 게시글에 대해 명세의 조건·응답을 확인</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>요청 패널 5번째 확인 · 제목 검색</td>
+<td>생성 응답 ID와 같은 게시글에 대해 명세의 조건·응답을 확인</td>
+</tr>
+<tr>
+<td>C6</td>
+<td>요청 패널 6번째 확인 · 존재 확인</td>
+<td>생성 응답 ID와 같은 게시글에 대해 명세의 조건·응답을 확인</td>
+</tr>
+<tr>
+<td>C7</td>
+<td>요청 패널 7번째 확인 · 게시판 글 수</td>
+<td>생성 응답 ID와 같은 게시글에 대해 명세의 조건·응답을 확인</td>
+</tr>
+<tr>
+<td>C8</td>
+<td>요청 패널 8번째 확인 · 페이지</td>
+<td>생성 응답 ID와 같은 게시글에 대해 명세의 조건·응답을 확인</td>
+</tr>
+</tbody></table></div>
+
+
+</main>
+
+
+</body>
+</html>

@@ -1,0 +1,37 @@
+package org.example.post;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
+
+// 8-4 조합 검색 — 인증은 선택(2-3과 같다). PostController 슬라이스 테스트(7-1)에 협력 객체를 늘리지 않으려 별도 컨트롤러
+@RestController
+public class PostSearchController {
+
+    private final PostQueryService postQueryService;
+
+    public PostSearchController(PostQueryService postQueryService) {
+        this.postQueryService = postQueryService;
+    }
+
+    @GetMapping("/api/posts/search")
+    public PostListResponse search(@RequestParam(required = false) String board,
+                                   @RequestParam(required = false) String tag,
+                                   @RequestParam(required = false) Long author,
+                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                   @RequestParam(required = false) String q,
+                                   @RequestParam(defaultValue = "0") @Min(0) int page,
+                                   @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size,
+                                   @LoginMember AuthenticatedMember viewer) {
+        PostSearchCondition.validateDates(from, to);
+        return postQueryService.search(board, tag, author, from, to, q, page, size, viewer);
+    }
+}

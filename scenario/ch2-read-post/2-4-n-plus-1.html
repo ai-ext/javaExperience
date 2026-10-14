@@ -9,15 +9,23 @@
 <body>
 <header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
 <main>
-<p class="crumbs"><a href="../README.html">시나리오</a> › 2장. 게시글 조회 — GET /api/posts › 2-4</p>
-<h1 id="2-4-쿼리-수-줄이기n1"><a class="anchor" href="#2-4-쿼리-수-줄이기n1" aria-hidden="true">#</a>2-4. 쿼리 수 줄이기(N+1)</h1>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 2장. 게시글 조회 — GET /api/posts › 2-4</p><p class="level-tags"><span>고급</span><span>게시판 본편</span><span>DB community</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="2-4-쿼리-수-줄이기n1"><a class="anchor" href="#2-4-쿼리-수-줄이기n1" aria-hidden="true">#</a>2-4. 쿼리 수 줄이기(N+1)</h1>
 <h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
 <p>목록 API를 호출하고 SQL 로그(<code>org.hibernate.SQL: debug</code>)를 보면 글 목록을 한 번 가져온 뒤 <strong>글마다</strong> 작성자 조회·태그 조회가 따로 나간다. 20개를 보여 주면 40번 넘게 DB에 다녀온다. 사용자가 늘면 DB가 먼저 버티지 못한다.</p>
 <p><strong>응답은 그대로 두고, 한 번 호출에 나가는 SQL 수를 페이지 크기와 상관없이 일정하게</strong> 만든다. 그리고 그 사실을 테스트로 고정한다(다시 늘어나면 테스트가 깨지게).</p>
-<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>목록 화면 뒤의 SQL</h3><p>화면은 같아도 서버 로그를 보면 글마다 쿼리가 따로 나간다. 사용자가 늘면 DB가 먼저 지친다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>자유 게시판</strong><span></span></div><div class="screen-widget screen-list"><strong>list</strong><span>자유글 10 · 자유글 09 · 자유글 08 · 자유글 07 · 자유글 06</span></div><div class="screen-widget screen-code"><strong>고치기 전 SQL 로그</strong><span>select ... from post ... limit 20
+select ... from member where id=?   ← 글마다
+select ... from post_tag ... where post_id=?   ← 글마다
+… (40줄 이상)</span></div><div class="screen-widget screen-code"><strong>고친 뒤 SQL 로그</strong><span>select ... from post p join member m ... limit 20
+select count(*) ...
+select ... from post_tag ... where post_id in (?, ?, …)</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>고치기 전</summary><ol><li><span class="flow-kind">사용자</span><p>목록을 20개씩 본다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/boards/free/posts?size=20</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT ... FROM post ... LIMIT 20</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT * FROM member WHERE id = ?</dd><dt>note</dt><dd>작성자가 지연 로딩이라 글마다 한 번씩</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT ... FROM post_tag JOIN tag ... WHERE post_id = ?</dd><dt>note</dt><dd>태그도 글마다 한 번씩</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>{&quot;items&quot;: [20개], ...}</dd></dl></li><li><span class="flow-kind">화면</span><p>응답은 같지만 SQL이 1 + 20 + 20번</p></li></ol></details><details class="scenario-flow"><summary>고친 뒤</summary><ol><li><span class="flow-kind">사용자</span><p>같은 목록을 본다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/boards/free/posts?size=20</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT p.*, m.* FROM post p JOIN member m ON m.id = p.author_id ... LIMIT 20</dd><dt>note</dt><dd>작성자는 fetch join</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT ... FROM post_tag JOIN tag ... WHERE post_id IN (21, 20, …)</dd><dt>note</dt><dd>태그는 IN 한 번(배치 조회)</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>{&quot;items&quot;: [20개], ...}</dd></dl></li><li><span class="flow-kind">화면</span><p>size를 5에서 20으로 늘려도 SQL 수가 늘지 않는다 — PostListQueryCountTest가 이걸 지킨다</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
 <ol>
 <li>2-3의 게시판 목록 API를 고쳐 SQL 문장 수를 줄인다.<ul>
-<li>기준: <code>size=5</code>와 <code>size=20</code>의 문장 수가 <strong>같고</strong>, <strong>5개 이하</strong>다(목록·건수·태그 등).</li>
+<li>기준: <code>size=20</code>의 문장 수가 <code>size=5</code>보다 <strong>많지 않고</strong>(글 수에 비례해 늘지 않는다), 둘 다 <strong>5개 이하</strong>다(목록·건수·태그 등).</li>
+<li>참고: Spring Data의 <code>Page</code>는 가져온 글이 <code>size</code>보다 적으면(마지막 페이지) 건수 쿼리를 생략한다. 자유 게시판은 13개라 <code>size=20</code>이 한 문장 적게 나올 수 있다 — 정상이다.</li>
 <li>보는 사람 확인용 서브쿼리는 목록 쿼리 안에 들어가므로 따로 세지 않는다.</li>
 </ul>
 </li>
@@ -29,11 +37,683 @@
 </li>
 </ol>
 <p>응답 JSON은 2-3과 완전히 같아야 한다.</p>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>이 단계의 화면·DB 흐름을 아래 참조 파일과 연결한다. 요구 계약을 먼저 구현하고, 필요한 파일 역할만 펼쳐 전체 코드와 비교한다.</p>
+<p>구현 순서에서 확인할 흐름:</p>
+<ul>
+<li>작성자가 지연 로딩이라 글마다 한 번씩</li>
+<li>태그도 글마다 한 번씩</li>
+<li>작성자는 fetch join</li>
+<li>태그는 IN 한 번(배치 조회)</li>
+</ul>
+<details>
+<summary>Service</summary>
+
+<p><code>PostQueryService.java</code>: 조회·검증·상태 변경의 순서를 화면 흐름과 대조한다.</p>
+</details>
+
+<details>
+<summary>JPA / Repository</summary>
+
+<p><code>PostRepository.java</code>: JPA 조회 조건을 DB 예시와 대조한다.</p>
+</details>
+
+<details>
+<summary>설정·보조 코드</summary>
+
+<p><code>application.yml</code>: 이 파일의 변경이 화면 흐름에 필요한 위치를 확인한다.</p>
+</details>
+
+<details>
+<summary>테스트</summary>
+
+<p><code>PostListQueryCountTest.java</code>, <code>application-test.yml</code>: 요청과 기대값을 채점 기준과 대조한다.</p>
+</details>
+
+<details>
+<summary>MyBatis — 페이지 크기가 늘어도 SELECT 수를 고정하기</summary>
+
+<p>아래 <strong>MyBatis 대체 구현 코드</strong>의 11개 파일을 이 단계 전체 소스에 적용한다. 2-3의 조회 권한 조건은 <code>PostVisibilityMapper.xml</code>의 목록·COUNT 공통 조건으로 유지한다. 목록 SQL에서 작성자를 JOIN해 한 번에 읽고, 페이지에 나온 글 ID를 모아 <code>post_tag</code>·<code>tag</code>를 <code>IN</code> 쿼리 한 번으로 읽는다. Mapper 실행 순서는 게시판 ID, 목록, COUNT, 태그로 페이지 크기와 관계없이 SELECT 4개다. 글마다 작성자·태그를 다시 읽는 N+1 루프는 없다.</p>
+<p>기본 JPA 테스트의 Hibernate <code>Statistics</code>는 MyBatis SQL을 세지 못한다. 대체 코드의 <code>MyBatisStatementCounter</code>는 MyBatis <code>Executor.query</code>를 가로채 요청 스레드의 SELECT 호출 수를 세고, <code>PostListQueryCountTest</code>가 <code>size=5</code>와 <code>size=20</code>에서 <strong>실제로 0보다 큰 수</strong>인지, 두 수가 같은지, 5개 이하인지 검사한다. 격리 테스트 DB에서는 두 크기 모두 4개였다. JPA·MyBatis 양쪽의 C1 응답과 2-3 접근 조건도 대조한다.</p>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostQueryService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.board.Board;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardRepository;
+import org.example.tag.Tag;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.util.List;</p>
+<p>// 글 조회 전용 서비스 — 1-3/1-4의 PostService(쓰기)와 책임을 나눈다
+@Service
+public class PostQueryService {</p>
+<pre><code>private final PostRepository postRepository;
+private final BoardRepository boardRepository;
+private final PostAccessPolicy accessPolicy;
+
+public PostQueryService(PostRepository postRepository, BoardRepository boardRepository,
+                         PostAccessPolicy accessPolicy) {
+    this.postRepository = postRepository;
+    this.boardRepository = boardRepository;
+    this.accessPolicy = accessPolicy;
+}
+
+@Transactional
+public PostDetailResponse getDetail(Long id, AuthenticatedMember viewer) {
+    Post post = postRepository.findById(id)
+            .orElseThrow(PostNotFoundException::new);
+
+    // 볼 수 없으면 403이 아니라 404 — 글이 있다는 사실도 숨긴다. 조회수도 올리지 않는다.
+    if (!accessPolicy.canView(viewer, post)) {
+        throw new PostNotFoundException();
+    }
+
+    post.increaseViewCount();
+    return toDetailResponse(post);
+}
+
+@Transactional(readOnly = true)
+public PostListResponse list(String boardSlug, int page, int size, AuthenticatedMember viewer) {
+    Board board = boardRepository.findBySlug(boardSlug)
+            .orElseThrow(() -&amp;gt; new BoardNotFoundException(boardSlug));
+
+    Long viewerId = viewer == null ? null : viewer.id();
+
+    PageRequest pageRequest = PageRequest.of(page, size,
+            Sort.by(Sort.Order.desc(&amp;quot;publishedAt&amp;quot;), Sort.Order.desc(&amp;quot;id&amp;quot;)));
+    List&amp;lt;Post&amp;gt; content = postRepository.findViewableByBoard(board, viewerId, pageRequest);
+    long total = postRepository.countViewableByBoard(board, viewerId);
+    Page&amp;lt;Post&amp;gt; result = new PageImpl&amp;lt;&amp;gt;(content, pageRequest, total);
+
+    List&amp;lt;PostListItemResponse&amp;gt; items = result.getContent().stream()
+            .map(this::toListItem)
+            .toList();
+
+    return new PostListResponse(
+            items,
+            result.getNumber(),
+            result.getSize(),
+            result.getTotalElements(),
+            result.getTotalPages(),
+            result.hasNext()
+    );
+}
+
+private PostListItemResponse toListItem(Post post) {
+    return new PostListItemResponse(
+            post.getId(),
+            post.getTitle(),
+            new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+            post.getTags().stream().map(Tag::getName).toList(),
+            post.getLikeCount(),
+            post.getCommentCount(),
+            post.getViewCount(),
+            post.getPublishedAt()
+    );
+}
+
+private PostDetailResponse toDetailResponse(Post post) {
+    // 트랜잭션 안에서 지연 로딩 연관을 읽어 DTO로 옮긴다(open-in-view: false)
+    return new PostDetailResponse(
+            post.getId(),
+            post.getBoard().getSlug(),
+            post.getTitle(),
+            post.getContent(),
+            post.getTags().stream().map(Tag::getName).toList(),
+            post.getVisibility(),
+            new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+            post.getViewCount(),
+            post.getLikeCount(),
+            post.getCommentCount(),
+            post.getCreatedAt()
+    );
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/post/PostRepository.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.board.Board;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;</p>
+<p>import java.util.List;</p>
+<p>// Spring Data JPA가 구현을 만들어 준다(1-3의 메모리 구현을 대체)
+public interface PostRepository extends JpaRepository&lt;Post, Long&gt; {</p>
+<pre><code>// 2-3의 &amp;quot;볼 수 있나&amp;quot; 규칙 중 목록에 해당하는 부분을 쿼리로 옮긴 것 — PostAccessPolicy.canView와
+// 같은 규칙이지만, 목록은 PUBLISHED 글만 대상이다(자기 임시저장·운영자 숨김 글도 목록에는 넣지 않는다).
+// 메모리에서 거르지 않고 쿼리에서 걸러야 페이지 크기·totalElements가 맞는다.
+//
+// Page&amp;lt;Post&amp;gt; 대신 List&amp;lt;Post&amp;gt; + 아래 countViewableByBoard를 따로 둔다: Page&amp;lt;&amp;gt;로 받으면
+// Spring Data가 &amp;quot;content 개수 &amp;lt; size면 count 쿼리를 생략&amp;quot;하는 최적화를 적용해서, size=5(꽉 찬
+// 페이지, count 쿼리 나감)와 size=20(13개뿐이라 마지막 페이지, count 쿼리 생략)의 SQL 문장 수가
+// 13과1씩 달라졌다(2-4의 PostListQueryCountTest가 요구하는 &amp;quot;size와 무관하게 문장 수 동일&amp;quot;이 깨짐).
+// count를 항상 명시적으로 실행해 문장 수를 size와 무관하게 고정한다(R2와도 맞다).
+@Query(&amp;quot;&amp;quot;&amp;quot;
+        SELECT p FROM Post p
+        JOIN FETCH p.author
+        WHERE p.board = :board
+          AND p.deletedAt IS NULL
+          AND p.status = 'PUBLISHED'
+          AND (
+               p.visibility = 'PUBLIC'
+               OR (:viewerId IS NOT NULL AND p.author.id = :viewerId)
+               OR (:viewerId IS NOT NULL AND EXISTS (
+                       SELECT 1 FROM Follow f
+                       WHERE f.follower.id = :viewerId AND f.followee = p.author))
+          )
+          AND (
+               :viewerId IS NULL OR NOT EXISTS (
+                   SELECT 1 FROM MemberBlock b
+                   WHERE (b.blocker.id = :viewerId AND b.blocked = p.author)
+                      OR (b.blocked.id = :viewerId AND b.blocker = p.author)
+               )
+          )
+        &amp;quot;&amp;quot;&amp;quot;)
+List&amp;lt;Post&amp;gt; findViewableByBoard(@Param(&amp;quot;board&amp;quot;) Board board,
+                                @Param(&amp;quot;viewerId&amp;quot;) Long viewerId,
+                                Pageable pageable);
+
+// findViewableByBoard와 같은 조건의 건수 — 반드시 같이 고친다
+@Query(&amp;quot;&amp;quot;&amp;quot;
+        SELECT COUNT(p) FROM Post p
+        WHERE p.board = :board
+          AND p.deletedAt IS NULL
+          AND p.status = 'PUBLISHED'
+          AND (
+               p.visibility = 'PUBLIC'
+               OR (:viewerId IS NOT NULL AND p.author.id = :viewerId)
+               OR (:viewerId IS NOT NULL AND EXISTS (
+                       SELECT 1 FROM Follow f
+                       WHERE f.follower.id = :viewerId AND f.followee = p.author))
+          )
+          AND (
+               :viewerId IS NULL OR NOT EXISTS (
+                   SELECT 1 FROM MemberBlock b
+                   WHERE (b.blocker.id = :viewerId AND b.blocked = p.author)
+                      OR (b.blocked.id = :viewerId AND b.blocker = p.author)
+               )
+          )
+        &amp;quot;&amp;quot;&amp;quot;)
+long countViewableByBoard(@Param(&amp;quot;board&amp;quot;) Board board, @Param(&amp;quot;viewerId&amp;quot;) Long viewerId);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: javaExperience
+  datasource:
+    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  jpa:
+    hibernate:
+      # 테이블은 docker/mysql/init/ 의 dump가 만든다. 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)
+      ddl-auto: validate
+    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        # 컬렉션(태그) 지연 로딩을 글마다 1번이 아니라 IN (...) 한 번으로 묶는다(2-4, N+1 대응)
+        default_batch_fetch_size: 100
+
+<p>logging:
+  level:
+    # 실행 SQL은 확인하되 토큰을 포함한 바인딩 값은 로그에 남기지 않는다
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: info</p>
+<h1 id="0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다"><a class="anchor" href="#0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다" aria-hidden="true">#</a>0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다</h1>
+<p>start:
+  greeting: 반가워요, 백엔드!
+  max-items: 5
+</code></pre></details></p>
+<details class="code-file"><summary>테스트 — src/test/java/org/example/post/PostListQueryCountTest.java</summary><pre><code>package org.example.post;
+
+<p>import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.web.servlet.MockMvc;</p>
+<p>import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;</p>
+<p>// 2-4: 페이지 크기와 상관없이 목록 조회의 SQL 문장 수가 일정한지(N+1이 없는지) 고정한다.
+// generate_statistics=true는 application-test.yml(공용 설정)에 있다 — 테스트별로 따로 켜면
+// Spring이 별도 컨텍스트를 만들어 같은 Testcontainers 컨테이너의 스키마를 두 번 초기화하려다 깨진다.
+@SpringBootTest
+@AutoConfigureMockMvc
+class PostListQueryCountTest {</p>
+<pre><code>@Autowired
+MockMvc mockMvc;
+
+@Autowired
+EntityManagerFactory entityManagerFactory;
+
+@Test
+void queryCountIsSameRegardlessOfPageSizeAndBounded() throws Exception {
+    Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+
+    statistics.clear();
+    mockMvc.perform(get(&amp;quot;/api/boards/free/posts&amp;quot;).param(&amp;quot;size&amp;quot;, &amp;quot;5&amp;quot;))
+            .andExpect(status().isOk());
+    long countForSize5 = statistics.getPrepareStatementCount();
+
+    statistics.clear();
+    mockMvc.perform(get(&amp;quot;/api/boards/free/posts&amp;quot;).param(&amp;quot;size&amp;quot;, &amp;quot;20&amp;quot;))
+            .andExpect(status().isOk());
+    long countForSize20 = statistics.getPrepareStatementCount();
+
+    assertTrue(countForSize5 &amp;gt; 0, &amp;quot;Hibernate SQL 계측이 실제로 켜져 있어야 한다&amp;quot;);
+    assertEquals(countForSize5, countForSize20,
+            &amp;quot;size=5와 size=20의 SQL 문장 수가 같아야 한다(N+1이면 글 수만큼 늘어난다)&amp;quot;);
+    assertTrue(countForSize5 &amp;lt;= 5,
+            &amp;quot;SQL 문장 수는 5개 이하여야 한다(실제: &amp;quot; + countForSize5 + &amp;quot;)&amp;quot;);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>테스트 — src/test/resources/application-test.yml</summary><pre><code># 테스트 전용 설정 — build.gradle의 test 태스크가 test 프로파일을 켠다.
+# compose DB 대신 Testcontainers가 띄운 일회용 MySQL 8.4를 쓴다(Docker가 켜져 있어야 한다).
+# 시나리오용(community) dump를 매번 새로 적재하므로 테스트가 compose DB의 데이터를 바꾸지 않는다.
+spring:
+  datasource:
+    url: jdbc:tc:mysql:8.4:///community
+  sql:
+    init:
+      mode: always
+      encoding: UTF-8
+      # dump 하나에 테이블과 데이터가 함께 있다
+      schema-locations: file:docker/mysql/init/01-community.sql
+  jpa:
+    properties:
+      hibernate:
+        # 2-4 PostListQueryCountTest가 SQL 문장 수를 센다. 여기(공용 설정)에 두는 이유:
+        # 테스트별로 @TestPropertySource를 따로 쓰면 Spring이 별도 ApplicationContext를 만드는데,
+        # jdbc:tc:... URL이 같아 Testcontainers는 같은 컨테이너를 재사용한다 → 두 번째 컨텍스트가
+        # 스키마 초기화를 다시 돌리다 &quot;Table already exists&quot;로 깨진다. 모든 테스트가 같은 설정을
+        # 공유해야 컨텍스트(와 컨테이너)가 하나로 캐시된다.
+        generate_statistics: true
+</code></pre></details>
+
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/2-4.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="mybatis-대체-구현-코드"><a class="anchor" href="#mybatis-대체-구현-코드" aria-hidden="true">#</a>MyBatis 대체 구현 코드</h2>
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {
+    id 'java'
+    // bootRun / bootJar 태스크 제공 + 실행 가능한 fat jar 패키징
+    id 'org.springframework.boot' version '4.1.1'
+    // Boot BOM을 적용해서 아래 의존성들의 버전을 생략할 수 있게 해줌
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+<p>group = &#39;org.example&#39;
+version = &#39;1.0-SNAPSHOT&#39;</p>
+<p>java {
+    toolchain {
+        // 컴파일·실행 JDK를 고정 (Boot 4는 Java 17 이상 필요, 로컬에 설치된 21 사용)
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}</p>
+<p>repositories {
+    mavenCentral()
+}</p>
+<p>dependencies {
+    compileOnly &#39;org.projectlombok:lombok&#39;
+    annotationProcessor &#39;org.projectlombok:lombok&#39;
+    // Spring MVC + 내장 Tomcat + Jackson (Boot 4부터 starter-web → starter-webmvc로 이름 변경)
+    implementation &#39;org.springframework.boot:spring-boot-starter-webmvc&#39;
+    // JPA(Hibernate) + HikariCP 커넥션 풀
+    implementation &#39;org.springframework.boot:spring-boot-starter-data-jpa&#39;
+    implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;
+    // @Valid, @NotBlank 같은 요청 값 검증
+    implementation &#39;org.springframework.boot:spring-boot-starter-validation&#39;
+    // MySQL JDBC 드라이버 — 컴파일엔 필요 없고 실행할 때만 필요
+    runtimeOnly &#39;com.mysql:mysql-connector-j&#39;</p>
+<pre><code>// 테스트: JUnit·AssertJ·Mockito·MockMvc 묶음 (버전은 Boot BOM이 관리하므로 junit-bom 따로 두지 않음)
+testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+// @DataJpaTest(리포지토리만 띄우는 테스트)
+testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+// 테스트용 일회용 MySQL 컨테이너 — application-test.yml의 jdbc:tc: URL이 쓴다
+testImplementation 'org.testcontainers:testcontainers-mysql'
+// Gradle이 JUnit Platform 테스트를 실행할 때 필요한 런처
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'</code></pre>
+<p>}</p>
+<p>tasks.named(&#39;test&#39;) {
+    useJUnitPlatform()
+    // 테스트는 application-test.yml(Testcontainers MySQL)을 쓰게 한다
+    systemProperty &#39;spring.profiles.active&#39;, &#39;test&#39;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: javaExperience
+  datasource:
+    # compose.yaml의 mysql(호스트 13308 → 컨테이너 3306)의 community DB(시나리오용). 앱을 띄우기 전에 docker compose up -d
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  jpa:
+    hibernate:
+      # 테이블은 docker/mysql/init/ 의 dump가 만든다. 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)
+      ddl-auto: validate
+    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+<p>logging:
+  level:
+    # 실행 SQL은 확인하되 토큰을 포함한 바인딩 값은 로그에 남기지 않는다
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: info
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true</p>
+<h1 id="0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다-1"><a class="anchor" href="#0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다-1" aria-hidden="true">#</a>0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다</h1>
+<p>start:
+  greeting: 반가워요, 백엔드!
+  max-items: 5
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostQueryService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.board.BoardNotFoundException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;</p>
+<p>// 글 조회 전용 서비스 — 1-3/1-4의 PostService(쓰기)와 책임을 나눈다
+@Service
+public class PostQueryService {</p>
+<pre><code>private final PostVisibilityMapper mapper;
+
+public PostQueryService(PostVisibilityMapper mapper) {
+    this.mapper = mapper;
+}
+
+@Transactional
+public PostDetailResponse getDetail(Long id, AuthenticatedMember viewer) {
+    Long viewerId = viewer == null ? null : viewer.id();
+    String viewerRole = viewer == null ? null : viewer.role();
+    // SQL에서 권한을 먼저 걸러 404일 때 조회수가 변하지 않게 한다.
+    PostDetailRow row = mapper.findVisibleDetail(id, viewerId, viewerRole);
+    if (row == null) {
+        throw new PostNotFoundException();
+    }
+    mapper.increaseViewCount(id);
+    List&amp;lt;String&amp;gt; tags = mapper.findTagsByPostIds(List.of(id)).stream()
+            .map(PostTagRow::name).toList();
+    return new PostDetailResponse(row.id, row.boardSlug, row.title, row.content,
+            tags, row.visibility, new AuthorResponse(row.authorId, row.authorNickname),
+            row.viewCount + 1, row.likeCount, row.commentCount, row.createdAt);
+}
+
+@Transactional(readOnly = true)
+public PostListResponse list(String boardSlug, int page, int size, AuthenticatedMember viewer) {
+    Long boardId = mapper.findBoardIdBySlug(boardSlug);
+    if (boardId == null) throw new BoardNotFoundException(boardSlug);
+
+    Long viewerId = viewer == null ? null : viewer.id();
+
+    long offset = (long) page * size;
+    List&amp;lt;PostListRow&amp;gt; rows = mapper.findViewableByBoard(boardId, viewerId, size, offset);
+    long total = mapper.countViewableByBoard(boardId, viewerId);
+    Map&amp;lt;Long, List&amp;lt;String&amp;gt;&amp;gt; tags = rows.isEmpty() ? Map.of()
+            : mapper.findTagsByPostIds(rows.stream().map(row -&amp;gt; row.id).toList()).stream()
+                .collect(Collectors.groupingBy(PostTagRow::postId,
+                        Collectors.mapping(PostTagRow::name, Collectors.toList())));
+    List&amp;lt;PostListItemResponse&amp;gt; items = rows.stream()
+            .map(row -&amp;gt; toListItem(row, tags.getOrDefault(row.id, List.of()))).toList();
+
+    return new PostListResponse(
+            items,
+            page,
+            size,
+            total,
+            (int) ((total + size - 1) / size),
+            offset + rows.size() &amp;lt; total
+    );
+}
+
+private PostListItemResponse toListItem(PostListRow row, List&amp;lt;String&amp;gt; tags) {
+    return new PostListItemResponse(
+            row.id,
+            row.title,
+            new AuthorResponse(row.authorId, row.authorNickname),
+            tags,
+            row.likeCount,
+            row.commentCount,
+            row.viewCount,
+            row.publishedAt
+    );
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostDetailRow.java</summary><pre><code>package org.example.post;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 권한 조건을 통과한 상세 SQL 한 행. 태그는 별도 쿼리로 읽는다.
+public class PostDetailRow {
+    public Long id;
+    public String boardSlug;
+    public String title;
+    public String content;
+    public String visibility;
+    public Long authorId;
+    public String authorNickname;
+    public Integer viewCount;
+    public Integer likeCount;
+    public Integer commentCount;
+    public LocalDateTime createdAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostListRow.java</summary><pre><code>package org.example.post;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 게시판 목록 SQL의 한 행. 태그는 페이지 글 ID로 따로 읽는다.
+public class PostListRow {
+    public Long id;
+    public String title;
+    public Long authorId;
+    public String authorNickname;
+    public Integer likeCount;
+    public Integer commentCount;
+    public Integer viewCount;
+    public LocalDateTime publishedAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostTagRow.java</summary><pre><code>package org.example.post;
+
+<p>public record PostTagRow(Long postId, String name) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/post/PostVisibilityMapper.java</summary><pre><code>package org.example.post;
+
+<p>import java.util.List;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>@Mapper
+public interface PostVisibilityMapper {
+    PostDetailRow findVisibleDetail(@Param(&quot;id&quot;) Long id, @Param(&quot;viewerId&quot;) Long viewerId,
+            @Param(&quot;viewerRole&quot;) String viewerRole);</p>
+<pre><code>int increaseViewCount(@Param(&amp;quot;id&amp;quot;) Long id);
+
+Long findBoardIdBySlug(@Param(&amp;quot;slug&amp;quot;) String slug);
+
+List&amp;lt;PostListRow&amp;gt; findViewableByBoard(@Param(&amp;quot;boardId&amp;quot;) Long boardId, @Param(&amp;quot;viewerId&amp;quot;) Long viewerId,
+        @Param(&amp;quot;limit&amp;quot;) int limit, @Param(&amp;quot;offset&amp;quot;) long offset);
+
+long countViewableByBoard(@Param(&amp;quot;boardId&amp;quot;) Long boardId, @Param(&amp;quot;viewerId&amp;quot;) Long viewerId);
+
+List&amp;lt;PostTagRow&amp;gt; findTagsByPostIds(@Param(&amp;quot;postIds&amp;quot;) List&amp;lt;Long&amp;gt; postIds);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/PostVisibilityMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.post.PostVisibilityMapper&quot;&gt;
+    &lt;sql id=&quot;listWhere&quot;&gt;
+        p.board_id = #{boardId}
+        AND p.deleted_at IS NULL
+        AND p.status = 'PUBLISHED'
+        AND (p.visibility = 'PUBLIC'
+             &lt;if test=&quot;viewerId != null&quot;&gt;
+                OR p.author_id = #{viewerId}
+                OR EXISTS (SELECT 1 FROM follow f
+                           WHERE f.follower_id = #{viewerId} AND f.followee_id = p.author_id)
+             &lt;/if&gt;)
+        &lt;if test=&quot;viewerId != null&quot;&gt;
+            AND NOT EXISTS (SELECT 1 FROM member_block b
+                            WHERE (b.blocker_id = #{viewerId} AND b.blocked_id = p.author_id)
+                               OR (b.blocked_id = #{viewerId} AND b.blocker_id = p.author_id))
+        &lt;/if&gt;
+    &lt;/sql&gt;
+
+<pre><code>&amp;lt;select id=&amp;quot;findVisibleDetail&amp;quot; resultType=&amp;quot;org.example.post.PostDetailRow&amp;quot;&amp;gt;
+    SELECT p.id, b.slug AS board_slug, p.title, p.content, p.visibility,
+           m.id AS author_id, m.nickname AS author_nickname,
+           p.view_count, p.like_count, p.comment_count, p.created_at
+    FROM post p JOIN board b ON b.id = p.board_id
+                JOIN member m ON m.id = p.author_id
+    WHERE p.id = #{id} AND p.deleted_at IS NULL
+      AND (p.status = 'PUBLISHED'
+           &amp;lt;if test=&amp;quot;viewerId != null&amp;quot;&amp;gt;OR (p.status = 'DRAFT' AND p.author_id = #{viewerId})&amp;lt;/if&amp;gt;
+           &amp;lt;if test=&amp;quot;viewerRole == 'ADMIN'&amp;quot;&amp;gt;OR p.status = 'HIDDEN'&amp;lt;/if&amp;gt;)
+      AND (p.status != 'PUBLISHED' OR p.visibility != 'FOLLOWERS'
+           &amp;lt;if test=&amp;quot;viewerId != null&amp;quot;&amp;gt;
+               OR p.author_id = #{viewerId}
+               OR EXISTS (SELECT 1 FROM follow f
+                          WHERE f.follower_id = #{viewerId} AND f.followee_id = p.author_id)
+           &amp;lt;/if&amp;gt;)
+      &amp;lt;if test=&amp;quot;viewerId != null&amp;quot;&amp;gt;
+          AND (p.author_id = #{viewerId} OR NOT EXISTS
+               (SELECT 1 FROM member_block b
+                WHERE (b.blocker_id = #{viewerId} AND b.blocked_id = p.author_id)
+                   OR (b.blocked_id = #{viewerId} AND b.blocker_id = p.author_id)))
+      &amp;lt;/if&amp;gt;
+&amp;lt;/select&amp;gt;
+
+&amp;lt;update id=&amp;quot;increaseViewCount&amp;quot;&amp;gt;
+    UPDATE post SET view_count = view_count + 1 WHERE id = #{id}
+&amp;lt;/update&amp;gt;
+
+&amp;lt;select id=&amp;quot;findBoardIdBySlug&amp;quot; resultType=&amp;quot;long&amp;quot;&amp;gt;
+    SELECT id FROM board WHERE slug = #{slug}
+&amp;lt;/select&amp;gt;
+
+&amp;lt;select id=&amp;quot;findViewableByBoard&amp;quot; resultType=&amp;quot;org.example.post.PostListRow&amp;quot;&amp;gt;
+    SELECT p.id, p.title, p.like_count, p.comment_count, p.view_count, p.published_at,
+           m.id AS author_id, m.nickname AS author_nickname
+    FROM post p JOIN member m ON m.id = p.author_id
+    &amp;lt;where&amp;gt;&amp;lt;include refid=&amp;quot;listWhere&amp;quot;/&amp;gt;&amp;lt;/where&amp;gt;
+    ORDER BY p.published_at DESC, p.id DESC
+    LIMIT #{limit} OFFSET #{offset}
+&amp;lt;/select&amp;gt;
+
+&amp;lt;select id=&amp;quot;countViewableByBoard&amp;quot; resultType=&amp;quot;long&amp;quot;&amp;gt;
+    SELECT COUNT(*) FROM post p
+    &amp;lt;where&amp;gt;&amp;lt;include refid=&amp;quot;listWhere&amp;quot;/&amp;gt;&amp;lt;/where&amp;gt;
+&amp;lt;/select&amp;gt;
+
+&amp;lt;select id=&amp;quot;findTagsByPostIds&amp;quot; resultType=&amp;quot;org.example.post.PostTagRow&amp;quot;&amp;gt;
+    SELECT pt.post_id AS postId, t.name FROM post_tag pt
+    JOIN tag t ON t.id = pt.tag_id
+    WHERE pt.post_id IN
+    &amp;lt;foreach collection=&amp;quot;postIds&amp;quot; item=&amp;quot;id&amp;quot; open=&amp;quot;(&amp;quot; separator=&amp;quot;,&amp;quot; close=&amp;quot;)&amp;quot;&amp;gt;#{id}&amp;lt;/foreach&amp;gt;
+    ORDER BY t.name
+&amp;lt;/select&amp;gt;</code></pre>
+<p>&lt;/mapper&gt;
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/post/PostAccessPolicy.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>테스트 — src/test/java/org/example/post/MyBatisStatementCounter.java</summary><pre><code>package org.example.post;
+
+<p>import org.apache.ibatis.executor.Executor;
+import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.plugin.Interceptor;
+import org.apache.ibatis.plugin.Intercepts;
+import org.apache.ibatis.plugin.Invocation;
+import org.apache.ibatis.plugin.Signature;
+import org.apache.ibatis.session.ResultHandler;
+import org.apache.ibatis.session.RowBounds;
+import org.springframework.stereotype.Component;</p>
+<p>// 테스트 중 Mapper가 실행한 SELECT 문장 수를 요청 스레드별로 센다.
+@Component
+@Intercepts(@Signature(type = Executor.class, method = &quot;query&quot;,
+        args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class}))
+public class MyBatisStatementCounter implements Interceptor {
+    private final ThreadLocal&lt;Long&gt; count = ThreadLocal.withInitial(() -&gt; 0L);</p>
+<pre><code>@Override
+public Object intercept(Invocation invocation) throws Throwable {
+    count.set(count.get() + 1);
+    return invocation.proceed();
+}
+
+public void clear() { count.set(0L); }
+public long getCount() { return count.get(); }</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>테스트 — src/test/java/org/example/post/PostListQueryCountTest.java</summary><pre><code>package org.example.post;
+
+<p>import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.web.servlet.MockMvc;</p>
+<p>import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;</p>
+<p>// JPA Statistics는 Mapper SQL을 세지 못하므로 MyBatis Executor에서 SELECT를 센다.
+@SpringBootTest
+@AutoConfigureMockMvc
+class PostListQueryCountTest {
+    @Autowired MockMvc mockMvc;
+    @Autowired MyBatisStatementCounter counter;</p>
+<pre><code>@Test
+void queryCountDoesNotGrowWithPageSize() throws Exception {
+    counter.clear();
+    mockMvc.perform(get(&amp;quot;/api/boards/free/posts&amp;quot;).param(&amp;quot;size&amp;quot;, &amp;quot;5&amp;quot;))
+            .andExpect(status().isOk());
+    long countForSize5 = counter.getCount();
+
+    counter.clear();
+    mockMvc.perform(get(&amp;quot;/api/boards/free/posts&amp;quot;).param(&amp;quot;size&amp;quot;, &amp;quot;20&amp;quot;))
+            .andExpect(status().isOk());
+    long countForSize20 = counter.getCount();
+
+    System.out.printf(&amp;quot;MyBatis SELECT count: size=5 %d, size=20 %d%n&amp;quot;, countForSize5, countForSize20);
+    assertTrue(countForSize5 &amp;gt; 0, &amp;quot;Mapper SELECT가 실제로 계측되어야 한다&amp;quot;);
+    assertEquals(countForSize5, countForSize20,
+            &amp;quot;글 수가 늘어도 SELECT 문장 수가 증가하지 않아야 한다&amp;quot;);
+    assertTrue(countForSize5 &amp;lt;= 5, &amp;quot;목록·COUNT·태그 SQL이 5개 이하여야 한다&amp;quot;);
+}</code></pre>
+<p>}
+</code></pre></details></p>
 <h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
-<pre><code class="language-bash">BASE=http://localhost:8080
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080
 curl -s &quot;$BASE/api/boards/free/posts?size=20&quot; &gt; /dev/null   # 앱 로그에서 SQL 줄 수를 세 본다
-./gradlew test --tests '*PostListQueryCountTest'</code></pre>
-<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+./gradlew test --tests '*PostListQueryCountTest'</code></pre></details>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="Q" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>Q · free 목록(size=20)</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/boards/free/posts?size=20" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;equals&quot;:[21,20,19,18,17,16,15,14,13,12,9,5,4]},{&quot;path&quot;:&quot;$.items[*].author.id&quot;,&quot;length&quot;:13},{&quot;path&quot;:&quot;$.items[*].tags&quot;,&quot;length&quot;:13},{&quot;path&quot;:&quot;$.items[0].tags&quot;,&quot;equals&quot;:[&quot;mysql&quot;]},{&quot;path&quot;:&quot;$.items[0].author.id&quot;,&quot;equals&quot;:4},{&quot;path&quot;:&quot;$.items[0].author.nickname&quot;,&quot;equals&quot;:&quot;박디비&quot;},{&quot;path&quot;:&quot;$.items[1].tags&quot;,&quot;equals&quot;:[&quot;java&quot;]}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
 <p>C = HTTP 확인(필수), T = 테스트 실행(필수), R = 코드 리뷰(피드백용).</p>
 <div class="table-wrap"><table>
 <thead>
@@ -61,7 +741,7 @@ curl -s &quot;$BASE/api/boards/free/posts?size=20&quot; &gt; /dev/null   # 앱 �
 <tr>
 <td>R2</td>
 <td>기준 단언</td>
-<td><code>size=5</code>와 <code>size=20</code>의 문장 수가 같다는 것과 상한(5 이하)을 둘 다 단언한다</td>
+<td><code>size=20</code>의 문장 수가 <code>size=5</code> 이하라는 것(글 수에 비례하지 않음)과 상한(5 이하)을 둘 다 단언한다</td>
 </tr>
 <tr>
 <td>R3</td>
@@ -86,7 +766,7 @@ curl -s &quot;$BASE/api/boards/free/posts?size=20&quot; &gt; /dev/null   # 앱 �
 <details>
 <summary>힌트 1 — SQL 세기</summary>
 
-<p>테스트에 <code>@TestPropertySource(properties = &quot;spring.jpa.properties.hibernate.generate_statistics=true&quot;)</code>를 붙이고, <code>EntityManagerFactory</code>를 주입받아 <code>emf.unwrap(SessionFactory.class).getStatistics()</code>를 얻는다. 호출 직전 <code>statistics.clear()</code>, 호출 뒤 <code>statistics.getPrepareStatementCount()</code>.</p>
+<p><code>src/test/resources/application-test.yml</code>에 <code>spring.jpa.properties.hibernate.generate_statistics: true</code>를 켠다. 테스트 클래스에 <code>@TestPropertySource</code>로 따로 켜면 스프링 컨텍스트가 하나 더 생기고, 같은 테스트 DB에 스키마 초기화가 다시 돌아 &quot;Table already exists&quot;로 실패한다. 그다음 <code>EntityManagerFactory</code>를 주입받아 <code>emf.unwrap(SessionFactory.class).getStatistics()</code>를 얻는다. 호출 직전 <code>statistics.clear()</code>, 호출 뒤 <code>statistics.getPrepareStatementCount()</code>.</p>
 </details>
 
 <details>
@@ -96,51 +776,50 @@ curl -s &quot;$BASE/api/boards/free/posts?size=20&quot; &gt; /dev/null   # 앱 �
 </details>
 
 <h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
-<p><a href="../ch3-update-delete/3-1-patch.html">3-1. 부분 수정(PATCH)과 본인 확인</a></p>
+<p><a href="2-5-guided-jpa-query.html">2-5. JPA 쿼리 작성</a> — SQL JOIN 결과를 Repository 쿼리와 DTO로 옮긴다.</p>
 
 <section class="grader" id="result-test">
   <h2>결과 테스트 프롬프트</h2>
-  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
   <div class="grader-inputs">
-    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
-    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
   </div>
   <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
   <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
-  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 2-4. 쿼리 수 줄이기(N+1)\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch2-read-post/2-4-n-plus-1.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 2-4. 쿼리 수 줄이기(N+1)\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch2-read-post/2-4-n-plus-1.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
 </section>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
   const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
   const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
                   set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
   $('repo').value = store.get('jx.repo');
-  $('base').value = store.get('jx.base');
   function fill() {
     const repo = $('repo').value.trim();
-    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
     $('prompt').value = tpl
-      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
       .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
       .replaceAll('{{BASE}}', base);
     store.set('jx.repo', repo);
-    store.set('jx.base', $('base').value.trim());
   }
   $('repo').addEventListener('input', fill);
-  $('base').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
   fill();
   $('copy').addEventListener('click', async () => {
     const text = $('prompt').value;
     let ok = false;
     try { await navigator.clipboard.writeText(text); ok = true; } catch {}
     if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
-    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
   });
 })();
 </script>
-<nav class="pager"><a href="2-3-visibility.html">← 이전 2-3. 볼 수 있는 글만 — 임시저장·삭제·숨김·팔로워·차단</a><a href="../ch3-update-delete/3-1-patch.html">다음 → 3-1. 부분 수정(PATCH)과 본인 확인</a></nav>
+<nav class="pager"><a href="2-3-visibility.html">← 이전 2-3. 볼 수 있는 글만 — 임시저장·삭제·숨김·팔로워·차단</a><a href="2-5-guided-jpa-query.html">다음 → 2-5. JPA 쿼리 작성 — 예시에서 JOIN까지</a></nav>
 </main>
 
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
 </body>
 </html>

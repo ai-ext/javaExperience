@@ -1,0 +1,45 @@
+package org.example.post;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+class MemberPostControllerTest {
+
+    @Autowired MockMvc mockMvc;
+
+    @Test
+    void publicPostAndEmptyList() throws Exception {
+        mockMvc.perform(get("/api/members/3/posts").param("board", "dev"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(2))
+                .andExpect(jsonPath("$[0].authorNickname").value("이스프링"))
+                .andExpect(jsonPath("$[0].boardSlug").value("dev"))
+                .andExpect(jsonPath("$.length()").value(1));
+        mockMvc.perform(get("/api/members/4/posts").param("board", "dev"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void missingAndInvalidInputs() throws Exception {
+        mockMvc.perform(get("/api/members/999999/posts").param("board", "dev"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/members/3/posts").param("board", "nope"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/members/abc/posts").param("board", "dev"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/members/3/posts"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/members/3/posts").param("board", ""))
+                .andExpect(status().isBadRequest());
+    }
+}

@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-028. 인기글 캐시 — 60초 재사용, 그래도 비공개 글은 바로 빠지게</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="t-028-인기글-캐시--60초-재사용-그래도-비공개-글은-바로-빠지게"><a class="anchor" href="#t-028-인기글-캐시--60초-재사용-그래도-비공개-글은-바로-빠지게" aria-hidden="true">#</a>T-028. 인기글 캐시 — 60초 재사용, 그래도 비공개 글은 바로 빠지게</h1>
+<blockquote>
+<p>난이도 고급 · 유형 성능 · DB practice · 예상 90분</p>
+</blockquote>
+<h2 id="티켓"><a class="anchor" href="#티켓" aria-hidden="true">#</a>티켓</h2>
+<blockquote>
+<p><strong>요청자</strong> DBA·기획 · <strong>배경</strong> 앱 첫 화면이 인기글(<code>GET /api/posts/popular</code>)을 부른다. 요청마다 좋아요·댓글 테이블을 기간으로 훑어 집계해서, 접속이 몰리는 아침 9시에 DB CPU의 절반이 이 쿼리다. 기획과 합의: <strong>좋아요·댓글 점수는 1분쯤 늦게 반영돼도 된다.</strong> 단, 작성자가 글을 비공개로 바꾸거나 지운 글이 인기글에 남아 있으면 안 된다(신고 들어온다).</p>
+</blockquote>
+<ul>
+<li>인기글 결과를 서버에서 <strong>60초 동안 재사용</strong>해 주세요(기간·개수 조합마다 따로).</li>
+<li>캐시에서 준 응답인지 알 수 있게 <code>X-Cache: HIT</code> / <code>MISS</code> 헤더를 붙여 주세요. 응답 본문 모양(배열)은 그대로입니다.</li>
+<li>글의 공개 범위·제목이 바뀌거나 글이 지워지면 <strong>다음 요청부터 바로</strong> 반영돼야 합니다.</li>
+<li>캐시가 비어 있을 때 요청이 한꺼번에 몰려도 집계 쿼리는 <strong>한 번만</strong> 돌아야 합니다(9시 정각에 캐시가 만료되면 그 순간 DB가 다시 맞는다).</li>
+<li><strong>완료 조건</strong>: 연속 두 번 부르면 두 번째는 <code>HIT</code>이고 같은 결과, 1위 글을 비공개로 바꾸면 바로 다음 요청에서 빠지고, 다시 공개하면 바로 돌아온다.</li>
+</ul>
+<p><strong>DB 시작 상태</strong>: <code>practice</code> 처음 상태(<code>bash scripts/java-db.sh --reset</code>). 기준 코드를 practice 프로파일로 켠다(“지금”이 2026-10-05 00:00으로 고정). 최근 7일 1위는 밤샘개발자(<code>tok-p06</code>)의 글 145다.</p>
+<h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
+<p>고급 티켓이라 실마리는 없다. 캐시를 어디에 두고(서버 메모리·Redis), 언제 지우고, 만료 시각을 무엇으로 잴지 먼저 정한다 — practice 프로파일의 &quot;지금&quot;은 고정돼 있다는 점을 기억한다.</p>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>앱 첫 화면 — 이번 주 인기글</h3><p>모두가 같은 인기글을 본다. 1분 안의 점수 차이는 괜찮지만, 비공개로 바뀐 글은 바로 사라져야 한다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>홈</strong><span>(비로그인)</span></div><div class="screen-widget screen-list"><strong>이번 주 인기글</strong><span>스프링 트랜잭션 전파 삽질기 · MySQL 인덱스 설계 실전 적용 후기</span></div><div class="screen-widget screen-code"><strong>응답 헤더</strong><span>X-Cache: HIT</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>두 번째 요청은 캐시에서</summary><ol><li><span class="flow-kind">사용자</span><p>앱을 연다(누군가 10초 전에도 열었다)</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/posts/popular?days=7&amp;limit=5</p></li><li><span class="flow-kind">서버</span><p>(7일, 5개) 결과가 60초 안에 만든 것 — 집계 쿼리 없이 그대로</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>headers</dt><dd>X-Cache: HIT</dd><dt>body</dt><dd>[{&quot;postId&quot;: 145, …}, {&quot;postId&quot;: 143, …}, …]</dd></dl></li><li><span class="flow-kind">화면</span><p>같은 목록</p></li></ol></details><details class="scenario-flow"><summary>1위 글을 비공개로</summary><ol><li><span class="flow-kind">사용자</span><p>글 145의 작성자가 공개 범위를 팔로워 공개로 바꾼다</p></li><li><span class="flow-kind">HTTP 요청</span><p>PATCH /api/posts/145</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-p06 · Content-Type: application/json</dd><dt>body</dt><dd>{&quot;visibility&quot;: &quot;FOLLOWERS&quot;}</dd></dl></li><li><span class="flow-kind">서버</span><p>수정이 커밋된 뒤 인기글 캐시를 비운다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/posts/popular?days=7&amp;limit=5</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>headers</dt><dd>X-Cache: MISS</dd><dt>body</dt><dd>[{&quot;postId&quot;: 143, …}, …]</dd></dl></li><li><span class="flow-kind">화면</span><p>145가 바로 빠졌다</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>대상</td>
+<td><code>GET /api/posts/popular?days=&amp;limit=</code></td>
+</tr>
+<tr>
+<td>캐시</td>
+<td><code>(days, limit)</code>마다 결과를 60초 재사용. 서버 메모리면 충분(서버 한 대) — 라이브러리를 쓰든 직접 만들든 자유</td>
+</tr>
+<tr>
+<td>헤더</td>
+<td>캐시에서 준 응답 <code>X-Cache: HIT</code>, 새로 집계한 응답 <code>X-Cache: MISS</code></td>
+</tr>
+<tr>
+<td>바로 반영</td>
+<td>글 수정(제목·공개 범위 등)·삭제가 <strong>커밋되면</strong> 인기글 캐시를 비운다</td>
+</tr>
+<tr>
+<td>늦어도 되는 것</td>
+<td>좋아요·댓글로 바뀌는 점수(최대 60초)</td>
+</tr>
+<tr>
+<td>몰릴 때</td>
+<td>비어 있는 같은 키에 동시에 요청이 와도 집계는 한 번(나머지는 그 결과를 기다려 받는다)</td>
+</tr>
+<tr>
+<td>그대로인 것</td>
+<td>응답 본문 모양(배열)·순서·검증(days 1<del>30, limit 1</del>50)</td>
+</tr>
+</tbody></table></div>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080; J='Content-Type: application/json'; H='Authorization: Bearer tok-p06'
+
+curl -si &quot;$BASE/api/posts/popular?days=7&amp;limit=5&quot; | grep -i x-cache           # 요청 A
+curl -si &quot;$BASE/api/posts/popular?days=7&amp;limit=5&quot;                             # 요청 B — X-Cache: HIT, A와 같은 본문
+curl -s -X PATCH &quot;$BASE/api/posts/145&quot; -H &quot;$H&quot; -H &quot;$J&quot; -d '{&quot;visibility&quot;:&quot;FOLLOWERS&quot;}'   # 요청 V
+curl -si &quot;$BASE/api/posts/popular?days=7&amp;limit=5&quot;                             # 요청 C — MISS, 145 없음
+curl -s -X PATCH &quot;$BASE/api/posts/145&quot; -H &quot;$H&quot; -H &quot;$J&quot; -d '{&quot;visibility&quot;:&quot;PUBLIC&quot;}'      # 요청 R
+curl -si &quot;$BASE/api/posts/popular?days=7&amp;limit=5&quot;                             # 요청 E — MISS, 145가 다시 1위</code></pre>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 바꾼 공개 범위를 되돌리므로 몇 번을 눌러도 같은 결과다.</p>
+<blockquote>
+<p>버튼은 브라우저에서 CORS를 거친다. 브라우저 JS는 <code>exposedHeaders</code>에 없는 응답 헤더를 읽지 못하므로 CORS 설정의 <code>exposedHeaders</code>에 <code>X-Cache</code>를 더한다(터미널 <code>curl</code>은 상관없다).</p>
+</blockquote>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="A" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>A · 인기글</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/popular?days=7&amp;limit=5" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="B" data-method="GET" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>B · 바로 다시</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/popular?days=7&amp;limit=5" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;headers&quot;:{&quot;X-Cache&quot;:{&quot;equals&quot;:&quot;HIT&quot;}},&quot;json&quot;:[{&quot;path&quot;:&quot;$&quot;,&quot;equals&quot;:&quot;{{A.body}}&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="V" data-method="PATCH" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>V · 1위 글을 팔로워 공개로</h4><p class="request-method">PATCH</p><label>경로 <input class="request-path" value="/api/posts/145" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;visibility&quot;: &quot;FOLLOWERS&quot;
+}</textarea></label><button type="button" class="send-request">PATCH 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;visibility&quot;: &quot;FOLLOWERS&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200}</pre></dd></dl></details></article><article class="api-request" data-request-id="C" data-method="GET" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>C · 인기글 — 바로 빠졌나</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/popular?days=7&amp;limit=5" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;headers&quot;:{&quot;X-Cache&quot;:{&quot;equals&quot;:&quot;MISS&quot;}},&quot;json&quot;:[{&quot;path&quot;:&quot;$[*].postId&quot;,&quot;notContains&quot;:145},{&quot;path&quot;:&quot;$&quot;,&quot;length&quot;:5}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="R" data-method="PATCH" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R · 다시 공개</h4><p class="request-method">PATCH</p><label>경로 <input class="request-path" value="/api/posts/145" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</textarea></label><button type="button" class="send-request">PATCH 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200}</pre></dd></dl></details></article><article class="api-request" data-request-id="E" data-method="GET" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E · 인기글 — 바로 돌아왔나</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/popular?days=7&amp;limit=5" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;headers&quot;:{&quot;X-Cache&quot;:{&quot;equals&quot;:&quot;MISS&quot;}},&quot;json&quot;:[{&quot;path&quot;:&quot;$[0].postId&quot;,&quot;equals&quot;:145},{&quot;path&quot;:&quot;$&quot;,&quot;equals&quot;:&quot;{{A.body}}&quot;}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP(필수), D = DB(필수, SELECT만), T = 테스트(선택), R = 코드 리뷰(피드백)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 A·B</td>
+<td>연속 두 번째는 <code>X-Cache: HIT</code>, 본문은 A와 같다</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 V·C</td>
+<td>공개 범위를 바꾼 <strong>바로 다음</strong> 요청이 <code>MISS</code>(캐시를 비웠다)이고 145가 없다, 5개는 채워져 있다</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 R·E</td>
+<td>되돌린 바로 다음 요청도 <code>MISS</code>, 145가 다시 1위 — 처음과 같은 목록</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT visibility FROM post WHERE id = 145</code></td>
+<td><code>PUBLIC</code>(버튼 확인이 되돌려 놓았다)</td>
+</tr>
+<tr>
+<td>D2</td>
+<td>(재현) 앱 로그 <code>org.hibernate.SQL</code>에서 버튼 한 번에 나간 인기글 집계 쿼리(<code>… FROM post p LEFT JOIN (SELECT post_id, COUNT(*) … FROM post_like …</code>) 수를 센다 — 로그를 보는 확인이라 SELECT 규칙의 예외</td>
+<td>기준 코드 4번(A·B·C·E) → 고친 뒤 3번(A·C·E, 60초 안에 다시 누르면 A도 HIT라 2번)</td>
+</tr>
+<tr>
+<td>T1</td>
+<td>(선택) 테스트</td>
+<td>비어 있는 키에 스레드 20개가 동시에 요청 → 집계 함수 호출 1번·<code>MISS</code> 1번, 비운 뒤 다시 집계</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>언제 지우나</td>
+<td>변경이 <strong>커밋된 뒤</strong> 지운다(<code>@TransactionalEventListener(AFTER_COMMIT)</code> 등). 커밋 전에 지우면 그 틈에 다른 요청이 옛 데이터로 다시 채워 60초 동안 남는다, 롤백된 변경으로 지우면 안 될 이유</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>만료와 몰림</td>
+<td>만료 시각을 주입받은 <code>Clock</code>으로 재면 practice(고정 시각)에서 영영 만료되지 않는다 — 단조 시계(<code>System.nanoTime</code>)나 캐시 라이브러리의 시계. 같은 키 동시 미스는 한 요청만 집계하고 나머지는 기다리게(single-flight), 그 기다림을 <strong>트랜잭션·커넥션을 쥔 채로</strong> 하지 않는다(쥐고 기다리면 T-024처럼 풀이 마른다)</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>서버가 여러 대라면</td>
+<td>서버 메모리 캐시는 서버마다 따로 차고 따로 지워진다 — 공용 캐시(Redis)·지우기 브로드캐스트·짧은 TTL 중 무엇을 고를지, 캐시 키에 사용자 정보가 안 들어가는 이유(비로그인 기준 결과라 모두에게 같다)</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../docs/knowledge/W17-where-to-cache.html">W17 캐시는 어디에</a> — 서버 로컬 vs Redis, 무효화</li>
+<li><a href="../docs/knowledge/W23-cache-and-in-memory.html">W23 캐시와 인메모리</a> — 적중률·만료</li>
+<li><a href="../docs/knowledge/S11-cache-redis-migration.html">S11 캐시·Redis·DB 마이그레이션</a> — Spring Cache, 캐시 스탬피드</li>
+<li><a href="../docs/knowledge/J11-juc.html">J11 java.util.concurrent</a> — <code>ConcurrentHashMap</code>·<code>CompletableFuture</code>로 한 번만 계산하기</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 캐시 한 개</summary>
+
+<p><code>ConcurrentHashMap&lt;키(days, limit), CompletableFuture&lt;결과+만료시각&gt;&gt;</code>. <code>putIfAbsent</code>로 내 future를 넣는 데 성공한 요청만 집계하고 <code>complete</code>, 나머지는 기존 future를 <code>join</code>해 기다린다. 만료됐으면 <code>remove(key, 그 future)</code> 하고 다시. 결과가 HIT인지 MISS인지 함께 돌려줘 컨트롤러가 헤더를 붙인다. 서비스 메서드의 <code>@Transactional</code>은 걷어 낸다(집계는 저장소 메서드의 기본 트랜잭션으로 충분).</p>
+</details>
+
+<details>
+<summary>힌트 2 — 지우기</summary>
+
+<p>글 서비스의 수정·삭제에서 <code>PostChangedEvent</code> 같은 이벤트를 발행하고, <code>@TransactionalEventListener(phase = AFTER_COMMIT)</code> 리스너가 캐시를 통째로 비운다(키가 몇 개뿐이라 고르지 않아도 된다).</p>
+</details>
+
+
+</main>
+
+
+</body>
+</html>

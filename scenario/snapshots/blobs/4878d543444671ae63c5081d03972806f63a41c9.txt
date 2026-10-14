@@ -1,0 +1,67 @@
+package org.example.recent;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.example.post.InvalidParametersException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/me/recent-posts")
+public class RecentViewController {
+
+    private final RecentViewService recentViewService;
+
+    public RecentViewController(RecentViewService recentViewService) {
+        this.recentViewService = recentViewService;
+    }
+
+    // GET이지만 "내 것"이라 인증이 필수 — 인터셉터의 "GET + 헤더 없음 = 통과"와 별개로 여기서 401(4-3과 같다)
+    @GetMapping
+    public RecentPostsResponse list(@RequestParam(required = false) String size,
+                                    @LoginMember AuthenticatedMember loginMember) {
+        if (loginMember == null) {
+            throw new AuthenticationRequiredException("인증이 필요합니다.");
+        }
+        return recentViewService.list(loginMember, parseSize(size));
+    }
+
+    private static int parseSize(String raw) {
+        if (raw == null) {
+            return 20;
+        }
+        if (!raw.matches("[0-9]+")) {
+            throw new InvalidParametersException(Map.of("size", "1~20 사이의 숫자여야 합니다."));
+        }
+        try {
+            int size = Integer.parseInt(raw);
+            if (size >= 1 && size <= 20) {
+                return size;
+            }
+        } catch (NumberFormatException ignored) {
+            // int 범위를 넘는 값도 같은 400으로 처리한다.
+        }
+        throw new InvalidParametersException(Map.of("size", "1~20 사이의 숫자여야 합니다."));
+    }
+
+    @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void clear(@LoginMember AuthenticatedMember loginMember) {
+        recentViewService.clear(loginMember);
+    }
+
+    @DeleteMapping("/{postId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void remove(@PathVariable Long postId, @LoginMember AuthenticatedMember loginMember) {
+        recentViewService.remove(loginMember, postId);
+    }
+}

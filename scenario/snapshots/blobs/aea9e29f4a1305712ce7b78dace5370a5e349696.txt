@@ -1,0 +1,108 @@
+package org.example.bookmark;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import org.example.member.Member;
+import org.example.post.Post;
+import org.hibernate.annotations.DynamicUpdate;
+
+import java.time.LocalDateTime;
+
+// 북마크(즐겨찾기) — UNIQUE(member_id, post_id). folder가 null이면 기본 폴더
+@Entity
+@Table(name = "bookmark")
+@DynamicUpdate
+public class Bookmark {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "member_id", nullable = false)
+    private Member member;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id", nullable = false)
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "folder_id")
+    private BookmarkFolder folder;
+
+    // 9-5 이름 변경 완료(memo 컬럼은 V6에서 지웠다). API JSON 필드 이름은 계속 memo다 — DTO와 컬럼은 다른 계약이다.
+    @Column(length = 200)
+    private String note;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    protected Bookmark() {
+        // JPA
+    }
+
+    public Bookmark(Member member, Post post, BookmarkFolder folder, String note, LocalDateTime now) {
+        this.member = member;
+        this.post = post;
+        this.folder = folder;
+        this.note = note;
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    // PUT(upsert)으로 다시 오면 보낸 폴더·메모(API의 memo → 컬럼 note)로 바꾼다(안 보내면 null = 기본 폴더·메모 없음)
+    public void change(BookmarkFolder folder, String note, LocalDateTime now) {
+        this.folder = folder;
+        this.note = note;
+        this.updatedAt = now;
+    }
+
+    // 6-2 — 다른 폴더로 옮기기(null이면 기본 폴더)
+    public void moveTo(BookmarkFolder folder, LocalDateTime now) {
+        this.folder = folder;
+        this.updatedAt = now;
+    }
+
+    public void changeMemo(String memo, LocalDateTime now) {
+        this.note = memo;
+        this.updatedAt = now;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Member getMember() {
+        return member;
+    }
+
+    public Post getPost() {
+        return post;
+    }
+
+    public BookmarkFolder getFolder() {
+        return folder;
+    }
+
+    public String getNote() {
+        return note;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+}

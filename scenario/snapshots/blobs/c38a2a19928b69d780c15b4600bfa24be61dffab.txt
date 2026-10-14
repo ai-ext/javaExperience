@@ -1,0 +1,37 @@
+package org.example.board.post;
+
+import java.util.List;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.Repository;
+
+// 목록·검색 전용(읽기만) — 쓰기용 PostRepository와 나눠 둔다
+public interface PostQueryRepository extends Repository<Post, Long> {
+
+    // 보이는 글: 삭제 안 됨 + (공개 또는 내 글) + 태그·검색어(없으면 조건 없음). 목록·개수·커서가 같은 조건을 쓴다
+    String VISIBLE = """
+            p.deletedAt is null
+            and (p.visibility = org.example.board.post.Visibility.PUBLIC or p.author.id = :loginUserId)
+            and (:tag is null or exists (select 1 from Post p2 join p2.tags t where p2.id = p.id and t.name = :tag))
+            and (:q is null or p.title like concat('%', :q, '%'))
+            """;
+
+    // 페이지 방식 — 정렬·page·size는 Pageable로. Page라서 개수 쿼리(count)도 Spring Data가 같은 조건으로 만든다.
+    // 작성자는 @EntityGraph로 함께 읽는다(글마다 작성자를 따로 읽는 N+1 방지)
+    @EntityGraph(attributePaths = "author")
+    @Query("select p from Post p where " + VISIBLE)
+    Page<Post> findVisible(Long loginUserId, String tag, String q, Pageable pageable);
+
+    // 커서 방식(최신순만) — 마지막으로 받은 id보다 작은 것부터. Slice는 size+1개를 읽어 다음 여부만 알고 개수 쿼리는 안 한다
+    @EntityGraph(attributePaths = "author")
+    @Query("select p from Post p where " + VISIBLE + " and (:cursorId is null or p.id < :cursorId)")
+    Slice<Post> findVisibleBefore(Long loginUserId, String tag, String q, Long cursorId, Pageable pageable);
+
+    // 이번 페이지 글들의 태그를 IN 한 번으로(이름순)
+    @Query("select new org.example.board.post.PostTagRow(p.id, t.name) from Post p join p.tags t where p.id in :postIds order by t.name")
+    List<PostTagRow> findTagsByPostIds(List<Long> postIds);
+}

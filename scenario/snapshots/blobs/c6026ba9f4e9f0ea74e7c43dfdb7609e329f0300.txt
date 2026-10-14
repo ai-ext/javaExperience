@@ -1,0 +1,43 @@
+package org.example.board.user;
+
+import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    @Transactional
+    public UserResponse signup(SignupRequest request) {
+        if (userRepository.existsByEmail(request.email())) {
+            throw new ApiException(ErrorCode.DUPLICATE, "이미 가입된 이메일입니다.");
+        }
+        User user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname());
+        try {
+            userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            // 확인과 저장 사이에 같은 이메일이 먼저 들어간 경우 — DB의 UNIQUE가 마지막 방어선이다
+            throw new ApiException(ErrorCode.DUPLICATE, "이미 가입된 이메일입니다.");
+        }
+        return UserResponse.from(user);
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse me(Long userId) {
+        // 토큰은 맞는데 회원이 없다(DB를 되돌린 뒤 옛 토큰 등) — 로그인부터 다시
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHORIZED));
+        return UserResponse.from(user);
+    }
+}

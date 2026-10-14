@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-020. 인기글 쿼리 — 기간 범위 인덱스</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="t-020-인기글-쿼리--기간-범위-인덱스"><a class="anchor" href="#t-020-인기글-쿼리--기간-범위-인덱스" aria-hidden="true">#</a>T-020. 인기글 쿼리 — 기간 범위 인덱스</h1>
+<blockquote>
+<p>난이도 중급 · 유형 성능 · DB practice · 예상 60분</p>
+</blockquote>
+<h2 id="티켓"><a class="anchor" href="#티켓" aria-hidden="true">#</a>티켓</h2>
+<blockquote>
+<p><strong>요청자</strong> DBA · <strong>배경</strong> 운영 DB의 좋아요 테이블이 3천만 행을 넘자 메인 화면 &quot;최근 7일 인기글&quot; API가 2초 걸린다. 슬로우 쿼리 로그의 실행 계획을 보니 기간 조건이 있는데도 좋아요·댓글 테이블을 <strong>처음부터 끝까지</strong> 훑는다. 최근 7일 행은 전체의 몇 %뿐이다.</p>
+</blockquote>
+<ul>
+<li>인기글 쿼리가 기간 안의 행만 읽도록 인덱스를 추가해 주세요. 결과(순위·점수)는 바뀌면 안 됩니다.</li>
+<li>운영 DB라 스키마 변경은 Flyway 마이그레이션으로, 쓰기를 막지 않는 방식으로 합니다.</li>
+<li>고치기 전후 실행 계획(<code>EXPLAIN</code>)을 남겨 리뷰에 붙여 주세요. 학습용 데이터(practice)는 작지만 실행 계획은 같은 모양으로 바뀐다.</li>
+<li><strong>완료 조건</strong>: 두 집계 서브쿼리의 실행 계획이 <code>type=range</code> + 새 인덱스 + <code>Using index</code>(테이블 행을 읽지 않음)로 바뀌고, 응답은 그대로다.</li>
+</ul>
+<p><strong>DB 시작 상태</strong>: <code>practice</code> 처음 상태(<code>bash scripts/java-db.sh --reset</code>). 기준 코드를 practice 프로파일로 켜면 Flyway가 V2~V6을 적용한다 — <strong>다음 마이그레이션 번호는 V7</strong>. practice 프로파일은 &quot;지금&quot;이 2026-10-05 00:00으로 고정이라 최근 7일은 <code>[2026-09-28, 2026-10-05)</code>, 그 안의 좋아요는 568행 중 53행, 댓글은 351행 중 18행이다.</p>
+<h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
+<ul>
+<li>인기글 쿼리(네이티브 SQL)를 찾아 두 서브쿼리를 따로 떼어 <code>EXPLAIN</code>을 돌려 본다. <code>type</code>·<code>key</code>·<code>rows</code>·<code>Extra</code>를 읽는다.</li>
+<li>이미 인덱스를 추가한 마이그레이션이 하나 있다(같음 조건 + 정렬용). 이번 조건은 <strong>같음이 아니라 범위</strong>다 — 컬럼 순서를 어떻게 정할지가 다르다.</li>
+</ul>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>메인 — 최근 7일 인기글</h3><p>화면은 그대로. 서버가 DB에 같은 결과를 더 적은 행을 읽어 받는다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>홈</strong><span>(비로그인)</span></div><div class="screen-widget screen-list"><strong>최근 7일 인기글</strong><span>스프링 트랜잭션 전파 삽질기 · MySQL 인덱스 설계 실전 적용 후기 · 예외 처리 전략 정리</span></div><div class="screen-widget screen-code"><strong>EXPLAIN (좋아요 서브쿼리)</strong><span>전: type=index  key=uk_post_like  rows=568  Extra=Using where
+후: type=range  key=ix_post_like_created_post  rows=53  Extra=Using where; Using index; Using temporary</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>인기글 열기</summary><ol><li><span class="flow-kind">사용자</span><p>메인 화면을 연다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/posts/popular?days=7</p></li><li><span class="flow-kind">서버</span><p>기간 [지금-7일, 지금) 안의 좋아요·댓글을 글별로 세어 점수를 매긴다(쿼리는 그대로)</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT post_id, COUNT(*) FROM post_like WHERE created_at &gt;= ? AND created_at &lt; ? GROUP BY post_id</dd><dt>note</dt><dd>새 인덱스 (created_at, post_id)로 기간 안의 행만 범위로 읽고, 테이블 행에는 가지 않는다</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>[{&quot;postId&quot;: 145, &quot;score&quot;: 61, …}, {&quot;postId&quot;: 143, &quot;score&quot;: 61, …}, …]</dd></dl></li><li><span class="flow-kind">화면</span><p>같은 순위</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>마이그레이션</td>
+<td><code>src/main/resources/db/migration/V7__&lt;설명&gt;.sql</code> 하나 — <code>post_like</code>·<code>comment</code>에 기간 집계용 인덱스. 온라인 DDL(<code>ALGORITHM = INPLACE, LOCK = NONE</code>)</td>
+</tr>
+<tr>
+<td>실행 계획</td>
+<td>아래 D1·D2의 두 서브쿼리가 <code>type = range</code>, <code>key</code> = 새 인덱스, <code>Extra</code>에 <code>Using index</code></td>
+</tr>
+<tr>
+<td>바꾸지 않을 것</td>
+<td>인기글 SQL·API 응답(순위·점수·동점 규칙)</td>
+</tr>
+</tbody></table></div>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080   # practice 프로파일로 켠 앱
+
+curl -s &quot;$BASE/api/posts/popular?days=7&quot;            # 요청 A — 순위가 그대로인지
+curl -s &quot;$BASE/api/posts/popular?days=7&amp;limit=3&quot;    # 요청 B
+# 실행 계획은 아래 채점 기준의 D1·D2를 DB 클라이언트(CloudBeaver 등)에서 돌린다</code></pre>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 성능 티켓이라 C 항목은 <strong>응답이 그대로인지</strong>(회귀)를 본다 — 기준 코드에서도 통과한다. 개선은 D 항목(실행 계획)으로 판정한다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="A" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>A · 최근 7일 인기글</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/popular?days=7" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$[*].postId&quot;,&quot;equals&quot;:[145,143,144,140,139,138,137,136,131,114]},{&quot;path&quot;:&quot;$[*].score&quot;,&quot;equals&quot;:[61,61,10,9,5,3,3,3,3,3]}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="B" data-method="GET" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>B · 상위 3개</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/popular?days=7&amp;limit=3" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$[0]&quot;,&quot;equals&quot;:{&quot;postId&quot;:145,&quot;title&quot;:&quot;스프링 트랜잭션 전파 삽질기&quot;,&quot;score&quot;:61,&quot;likes&quot;:20,&quot;comments&quot;:1}},{&quot;path&quot;:&quot;$&quot;,&quot;length&quot;:3}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP(필수), D = DB(필수, SELECT만), R = 코드 리뷰(피드백)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 A</td>
+<td>순위·점수가 고치기 전과 같다(145·143 동점 61, 최신이 먼저)</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 B</td>
+<td>응답 모양·<code>limit</code> 그대로</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>EXPLAIN SELECT post_id, COUNT(*) FROM post_like WHERE created_at &gt;= &#39;2026-09-28&#39; AND created_at &lt; &#39;2026-10-05&#39; GROUP BY post_id</code></td>
+<td>고치기 전 <code>type=index key=uk_post_like rows=568</code> → 고친 뒤 <code>type=range</code>, <code>key</code>가 새 인덱스, <code>rows</code> 50 안팎, <code>Extra</code>에 <code>Using index</code></td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>EXPLAIN SELECT post_id, COUNT(*) FROM comment WHERE deleted_at IS NULL AND created_at &gt;= &#39;2026-09-28&#39; AND created_at &lt; &#39;2026-10-05&#39; GROUP BY post_id</code></td>
+<td>고치기 전 <code>type=index rows=351</code> → 고친 뒤 <code>type=range</code>, 새 인덱스, <code>Extra</code>에 <code>Using index</code></td>
+</tr>
+<tr>
+<td>D3</td>
+<td><code>SELECT table_name, index_name, GROUP_CONCAT(column_name ORDER BY seq_in_index) AS cols FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name IN (&#39;post_like&#39;, &#39;comment&#39;) GROUP BY table_name, index_name HAVING cols LIKE &#39;created_at%&#39;</code></td>
+<td>두 테이블에 <code>created_at</code>이 <strong>첫 번째</strong>인 인덱스가 하나씩(예: <code>created_at,post_id</code> · <code>created_at,deleted_at,post_id</code>)</td>
+</tr>
+<tr>
+<td>D4</td>
+<td><code>SELECT version, success FROM flyway_schema_history WHERE version = &#39;7&#39;</code></td>
+<td><code>7 1</code> 한 행</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>컬럼 순서</td>
+<td>범위 조건 컬럼(<code>created_at</code>)을 앞에 두었다. <code>(post_id, created_at)</code> 순서라면 왜 기간만으로는 범위 탐색을 못 하는지, 범위 뒤의 컬럼은 탐색이 아니라 <strong>커버링</strong>에만 쓰인다는 것을 설명할 수 있다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>커버링</td>
+<td><code>Using index</code>가 무슨 뜻인지(테이블 행을 안 읽음), 댓글 인덱스에 <code>deleted_at</code>을 넣은(또는 안 넣은) 이유와 그 차이를 실행 계획으로 보여 줄 수 있다. <code>Using temporary</code>(GROUP BY)는 이 인덱스로 없어지지 않는 이유도 안다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>운영 반영</td>
+<td>온라인 DDL 옵션, 인덱스가 늘면 쓰기(좋아요 INSERT)가 조금 느려지는 대가, 작은 테이블에서는 옵티마이저가 인덱스를 안 쓸 수도 있다(통계·행 수)는 점을 말할 수 있다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../docs/knowledge/R05-index-btree.html">R05 인덱스와 B-Tree</a> — 복합 인덱스 컬럼 순서, 범위 조건 뒤의 컬럼</li>
+<li><a href="../docs/knowledge/S17-performance-tuning.html">S17 Spring Boot 애플리케이션 성능</a> — <code>EXPLAIN</code> 읽기(type·key·rows·Extra)</li>
+<li><a href="../docs/knowledge/S11-cache-redis-migration.html">S11 캐시·Redis·DB 마이그레이션</a> — 운영 DB 스키마 변경을 마이그레이션으로</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 어떤 인덱스</summary>
+
+<p>조건은 <code>created_at</code> 범위 하나, 꺼내는 값은 <code>post_id</code>(그리고 댓글은 <code>deleted_at</code> 확인). 그래서 <code>(created_at, post_id)</code>, 댓글은 <code>(created_at, deleted_at, post_id)</code>. 기존 마이그레이션 V2처럼 <code>ALTER TABLE … ADD INDEX …, ALGORITHM = INPLACE, LOCK = NONE;</code> 뒤에 <code>ANALYZE TABLE</code>로 통계를 갱신한다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 전체 쿼리의 계획</summary>
+
+<p>인기글 SQL 전체에 <code>EXPLAIN</code>을 붙이면 두 서브쿼리가 <code>DERIVED</code> 줄로 나온다. 그 두 줄의 <code>type</code>·<code>key</code>가 D1·D2와 같아지면 된다. 바깥 <code>post</code> 쪽은 행이 145개뿐이라 이번 범위가 아니다.</p>
+</details>
+
+
+</main>
+
+
+</body>
+</html>

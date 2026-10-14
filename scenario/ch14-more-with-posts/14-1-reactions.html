@@ -1,0 +1,1457 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>14-1. 공감 종류 — 👍❤️😂😢 중 하나만</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 14장. 게시글로 더 만들기 — 공감·투표·고정·시리즈·추천 › 14-1</p><p class="level-tags"><span>중급</span><span>게시판 본편</span><span>DB community</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="14-1-공감-종류--️-중-하나만"><a class="anchor" href="#14-1-공감-종류--️-중-하나만" aria-hidden="true">#</a>14-1. 공감 종류 — 👍❤️😂😢 중 하나만</h1>
+<blockquote>
+<p>14장은 시나리오 DB(<code>community</code>)로 한다 — 앱을 기본 프로파일로 띄운다(13장과 같다). 이 장의 마이그레이션 번호는 <strong>V50~V59</strong>다(11<del>13장의 V20</del>V49 다음).</p>
+</blockquote>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<blockquote>
+<p>&quot;하트 하나로는 부족하대요. 👍❤️😂😢 네 가지 중에 하나를 고르게 해 주세요. 한 사람이 한 글에 <strong>한 종류만</strong>이고, 다른 걸 누르면 <strong>바뀌고</strong>, 다시 취소할 수도 있어야 해요. 글 아래에는 종류별 개수를 보여 줄 거예요.&quot;</p>
+</blockquote>
+<p>4장 좋아요는 &quot;눌렀다/안 눌렀다&quot; 두 상태였다. 이번에는 <strong>상태가 다섯 개</strong>다(없음·👍·❤️·😂·😢). 그래서 행이 &quot;있다/없다&quot;만으로는 부족하고, 행에 <strong>종류 칼럼</strong>이 생긴다. 다른 종류를 누르면 행을 지우고 새로 만드는 게 아니라 <strong>그 행의 종류만 바꾼다</strong>. 개수는 글 테이블에 칼럼 네 개를 두지 않고, 공감 테이블을 <strong><code>GROUP BY</code>로 센다</strong>.</p>
+<p>좋아요(4장)는 그대로 둔다. 둘은 서로 다른 기능이다.</p>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>글 아래 공감 버튼</h3><p>네 종류 중 하나만 고른다. 다른 종류를 누르면 바뀌고, 개수는 종류별로 센다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>자유글 02</strong><span>김자바</span></div><div class="screen-widget screen-text"><strong>text</strong><span>페이징 확인용 자유글 02입니다.</span></div><div class="screen-widget screen-stats"><strong>stats</strong><span>👍 · ❤️ · 😂 · 😢</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>👍 · ❤️ · 😂 (내 공감) · 😢</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>❤️를 누르고 😂로 바꾸기</summary><ol><li><span class="flow-kind">사용자</span><p>❤️를 눌렀다가 마음을 바꿔 😂를 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>PUT /api/posts/13/reaction</p><dl><dt>headers</dt><dd>Content-Type: application/json · Authorization: Bearer tok-kimjava</dd><dt>body</dt><dd>{&quot;kind&quot;: &quot;LAUGH&quot;}</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT id, kind FROM post_reaction WHERE post_id = 13 AND member_id = 2</dd><dt>note</dt><dd>이미 ❤️ 행이 있다</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>UPDATE post_reaction SET kind = 'LAUGH', updated_at = ? WHERE id = ?</dd><dt>note</dt><dd>지우고 새로 만들지 않는다 — 행은 하나 그대로</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT kind, COUNT(*) AS cnt FROM post_reaction WHERE post_id = 13 GROUP BY kind</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>{&quot;postId&quot;: 13, &quot;myReaction&quot;: &quot;LAUGH&quot;, &quot;counts&quot;: {&quot;THUMBS_UP&quot;: 0, &quot;HEART&quot;: 1, &quot;LAUGH&quot;: 1, &quot;SAD&quot;: 0}, &quot;total&quot;: 2}</dd></dl></li><li><span class="flow-kind">화면</span><p>😂 버튼이 내 공감으로 표시되고 ❤️ 1 · 😂 1</p></li></ol></details><details class="scenario-flow"><summary>비로그인으로 개수 보기</summary><ol><li><span class="flow-kind">사용자</span><p>로그인하지 않고 글을 연다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/posts/13/reactions</p></li><li><span class="flow-kind">서버</span><p>글을 볼 수 있는지 먼저 확인한다(2-3 규칙) — 볼 수 없는 글이면 404</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT kind, COUNT(*) AS cnt FROM post_reaction WHERE post_id = 13 GROUP BY kind</dd><dt>note</dt><dd>아무도 누르지 않은 종류는 결과에 없다 → 0으로 채운다</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>{&quot;postId&quot;: 13, &quot;myReaction&quot;: null, &quot;counts&quot;: {&quot;THUMBS_UP&quot;: 0, &quot;HEART&quot;: 1, &quot;LAUGH&quot;: 1, &quot;SAD&quot;: 0}, &quot;total&quot;: 2}</dd></dl></li><li><span class="flow-kind">화면</span><p>네 종류의 개수가 모두 보인다(0 포함). 내 공감 표시는 없다</p></li></ol></details><details class="scenario-flow"><summary>없는 종류</summary><ol><li><span class="flow-kind">사용자</span><p>앱이 옛 버전이라 😡(ANGRY)를 보낸다</p></li><li><span class="flow-kind">HTTP 요청</span><p>PUT /api/posts/13/reaction</p><dl><dt>headers</dt><dd>Content-Type: application/json · Authorization: Bearer tok-kimjava</dd><dt>body</dt><dd>{&quot;kind&quot;: &quot;ANGRY&quot;}</dd></dl></li><li><span class="flow-kind">서버</span><p>JSON을 enum으로 읽다가 실패 → 400. DB까지 가지 않는다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>400</dd><dt>headers</dt><dd>Content-Type: application/problem+json</dd></dl></li><li><span class="flow-kind">화면</span><p>'앱을 업데이트해 주세요'</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<p><strong>V50</strong> — <code>db/migration/V50__create_post_reaction.sql</code></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>컬럼</th>
+<th>타입·규칙</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td><code>BIGINT AUTO_INCREMENT PRIMARY KEY</code></td>
+</tr>
+<tr>
+<td><code>post_id</code> · <code>member_id</code></td>
+<td>FK → <code>post</code> · <code>member</code>. <strong><code>UNIQUE(post_id, member_id)</code></strong> — 한 사람이 한 글에 행 하나</td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>VARCHAR(20)</code>, <code>CHECK (kind IN (&#39;THUMBS_UP&#39;, &#39;HEART&#39;, &#39;LAUGH&#39;, &#39;SAD&#39;))</code></td>
+</tr>
+<tr>
+<td><code>created_at</code> · <code>updated_at</code></td>
+<td>만든 시각 · 종류를 바꾼 시각</td>
+</tr>
+</tbody></table></div>
+<p><strong>API</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>메서드·경로</th>
+<th>의미</th>
+<th>성공 응답</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>PUT /api/posts/{id}/reaction</code></td>
+<td>공감하기·종류 바꾸기 <code>{ &quot;kind&quot;: &quot;HEART&quot; }</code></td>
+<td><code>200</code> 아래 요약 JSON</td>
+</tr>
+<tr>
+<td><code>DELETE /api/posts/{id}/reaction</code></td>
+<td>취소(안 했어도 성공)</td>
+<td><code>200</code> 아래 요약 JSON</td>
+</tr>
+<tr>
+<td><code>GET /api/posts/{id}/reactions</code></td>
+<td>개수 보기 — <strong>비로그인 가능</strong></td>
+<td><code>200</code> 아래 요약 JSON</td>
+</tr>
+</tbody></table></div>
+<pre><code class="language-json">{ &quot;postId&quot;: 13, &quot;myReaction&quot;: &quot;LAUGH&quot;, &quot;counts&quot;: { &quot;THUMBS_UP&quot;: 0, &quot;HEART&quot;: 1, &quot;LAUGH&quot;: 1, &quot;SAD&quot;: 0 }, &quot;total&quot;: 2 }</code></pre>
+<p><strong>필드 규칙</strong> — <code>PUT /api/posts/{id}/reaction</code> 본문</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>필수</th>
+<th>null·빈 값</th>
+<th>길이·범위</th>
+<th>형식</th>
+<th>기본값</th>
+<th>틀렸을 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>kind</code></td>
+<td>예</td>
+<td>안 됨(<code>null</code>·<code>&quot;&quot;</code>·공백만 → 400)</td>
+<td>—</td>
+<td><code>THUMBS_UP</code>·<code>HEART</code>·<code>LAUGH</code>·<code>SAD</code> 중 하나(대문자 그대로, <code>heart</code>는 안 됨)</td>
+<td>없음</td>
+<td><code>400</code>, <code>errors</code>에 <code>kind</code></td>
+</tr>
+<tr>
+<td>본문 자체</td>
+<td>예</td>
+<td>—</td>
+<td>—</td>
+<td>JSON 객체(배열·깨진 JSON → 400)</td>
+<td>—</td>
+<td><code>400</code></td>
+</tr>
+<tr>
+<td>경로 <code>{id}</code></td>
+<td>예</td>
+<td>—</td>
+<td>—</td>
+<td>숫자(<code>abc</code> → 400)</td>
+<td>—</td>
+<td>없는 글이면 <code>404</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>잘못된 입력은 어떤 경우에도 500이 아니다.</strong> 종류를 enum으로 바로 받으면 Jackson이 JSON을 읽다가 실패해 어느 필드가 틀렸는지 흐려지므로, 문자열로 받아 <code>@NotBlank</code>·<code>@Pattern</code>으로 검사한 뒤 enum으로 바꾼다(1-5 <code>visibility</code>와 같은 방식).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상황</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>같은 종류를 또 PUT</td>
+<td><code>200</code>, 아무것도 바뀌지 않는다(멱등)</td>
+</tr>
+<tr>
+<td>다른 종류를 PUT</td>
+<td><code>200</code>, 그 행의 <code>kind</code>만 바뀐다(행 수는 그대로)</td>
+</tr>
+<tr>
+<td><code>counts</code></td>
+<td>네 종류를 <strong>항상 모두</strong> 담는다(0 포함). <code>myReaction</code>은 비로그인이거나 공감하지 않았으면 <code>null</code></td>
+</tr>
+<tr>
+<td><code>kind</code>가 위 표의 규칙을 어김</td>
+<td><code>400</code> + <code>errors</code>에 <code>kind</code></td>
+</tr>
+<tr>
+<td>없는 글, 2-3 규칙상 볼 수 없는 글</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>PUT·DELETE에 토큰 없음</td>
+<td><code>401</code></td>
+</tr>
+</tbody></table></div>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p><strong>먼저 위 계약을 직접 구현한 뒤</strong>, 필요한 역할을 펼쳐 실제 실행한 파일 전문과 비교한다. JPA는 엔티티 변경 감지로 종류를 바꾸고, MyBatis는 <code>(post_id, member_id)</code> 고유키에 대한 UPSERT로 삽입·변경을 한 문장에 처리한다. 두 경로 모두 글 접근 정책과 DTO·Controller·Flyway 스키마는 같다. <code>created_at</code>은 처음 공감한 시각이므로 MyBatis의 중복 키 갱신에서는 바꾸지 않는다.</p>
+<p>MyBatis 대안을 실행할 때 <code>build.gradle</code>의 <code>dependencies</code>에 <code>implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;</code>을 추가한다. 아래 MyBatis <code>ReactionService</code>가 JPA 버전을 <strong>대체</strong>하고, <code>ReactionMapper</code>·<code>ReactionCount</code>·XML을 추가한다. 글 조회·접근 정책은 기존 JPA <code>PostRepository</code>와 <code>PostAccessPolicy</code>를 재사용한다. MyBatis 대안은 공감 테이블의 조회·저장을 담당한다.</p>
+<p>이 단계의 C 기준은 순차 요청이다. JPA 예시의 최초 공감은 <code>SELECT</code> 후 <code>INSERT</code>하므로 같은 회원·글의 <strong>최초 PUT 두 건이 동시에 오면</strong> 고유키 충돌로 한 요청이 실패할 수 있다. 동시 최초 요청까지 200으로 보장하려면 원자적 UPSERT나 잠금·재시도 정책을 별도로 설계해야 한다. 아래 MyBatis 대안은 고유키 기반 UPSERT를 사용한다.</p>
+<details>
+<summary>MyBatis / 설정 — 의존성·Mapper XML 경로</summary>
+
+<p><code>build.gradle</code>의 <code>dependencies</code>에 추가:</p>
+<pre><code class="language-groovy">implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'</code></pre>
+<p><code>src/main/resources/application.yml</code>에 추가:</p>
+<pre><code class="language-yaml">mybatis:
+  mapper-locations: classpath:mapper/*.xml</code></pre>
+</details>
+
+<details>
+<summary>Controller — 공감·취소·비로그인 조회</summary>
+
+<p><code>src/main/java/org/example/reaction/ReactionController.java</code></p>
+<pre><code class="language-java">package org.example.reaction;
+
+import jakarta.validation.Valid;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class ReactionController {
+
+    private final ReactionService reactionService;
+
+    public ReactionController(ReactionService reactionService) {
+        this.reactionService = reactionService;
+    }
+
+    // 공감하거나 종류 바꾸기 — PUT이라 같은 요청을 여러 번 보내도 결과가 같다
+    @PutMapping(&quot;/api/posts/{id}/reaction&quot;)
+    public ReactionSummaryResponse react(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember,
+                                         @Valid @RequestBody ReactionRequest request) {
+        return reactionService.react(id, loginMember, request.toKind());
+    }
+
+    @DeleteMapping(&quot;/api/posts/{id}/reaction&quot;)
+    public ReactionSummaryResponse cancel(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+        return reactionService.cancel(id, loginMember);
+    }
+
+    // 비로그인도 볼 수 있다(myReaction은 null)
+    @GetMapping(&quot;/api/posts/{id}/reactions&quot;)
+    public ReactionSummaryResponse get(@PathVariable Long id, @LoginMember AuthenticatedMember viewer) {
+        return reactionService.get(id, viewer);
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>DTO — 종류 검증·GROUP BY 결과·응답</summary>
+
+<p><code>src/main/java/org/example/reaction/ReactionRequest.java</code></p>
+<pre><code class="language-java">package org.example.reaction;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+
+// 종류는 문자열로 받아 Bean Validation으로 검사한다(1-5의 visibility와 같은 방식) — 틀리면 400과 함께
+// errors에 &quot;kind&quot;가 들어간다. enum으로 바로 받으면 JSON을 읽는 단계에서 실패해 어느 필드가 틀렸는지 흐려진다.
+public record ReactionRequest(
+        @NotBlank(message = &quot;공감 종류를 골라 주세요.&quot;)
+        @Pattern(regexp = &quot;THUMBS_UP|HEART|LAUGH|SAD&quot;, message = &quot;공감 종류는 THUMBS_UP·HEART·LAUGH·SAD 중 하나여야 합니다.&quot;)
+        String kind
+) {
+    public ReactionKind toKind() {
+        return ReactionKind.valueOf(kind);
+    }
+}</code></pre>
+<p><code>src/main/java/org/example/reaction/ReactionCountRow.java</code></p>
+<pre><code class="language-java">package org.example.reaction;
+
+// GROUP BY kind 결과 한 줄 — 인터페이스 프로젝션(별칭 kind·cnt와 getter 이름을 맞춘다)
+public interface ReactionCountRow {
+    String getKind();
+
+    long getCnt();
+}</code></pre>
+<p><code>src/main/java/org/example/reaction/ReactionSummaryResponse.java</code></p>
+<pre><code class="language-java">package org.example.reaction;
+
+import java.util.Map;
+
+// counts는 네 종류를 항상 모두 담는다(0 포함). myReaction은 비로그인이거나 공감하지 않았으면 null
+public record ReactionSummaryResponse(
+        Long postId,
+        ReactionKind myReaction,
+        Map&lt;ReactionKind, Long&gt; counts,
+        long total
+) {
+}</code></pre>
+</details>
+
+<details>
+<summary>Service — 접근 검사·트랜잭션·0 채우기</summary>
+
+<p><code>src/main/java/org/example/reaction/ReactionService.java</code></p>
+<pre><code class="language-java">package org.example.reaction;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.member.MemberRepository;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+// 공감 — 한 사람이 한 글에 한 종류. 같은 종류 또 → 그대로(멱등), 다른 종류 → 바꾸기, 취소 → 행 삭제
+@Service
+public class ReactionService {
+
+    private final PostReactionRepository reactionRepository;
+    private final PostRepository postRepository;
+    private final MemberRepository memberRepository;
+    private final PostAccessPolicy accessPolicy;
+    private final Clock clock;
+
+    public ReactionService(PostReactionRepository reactionRepository, PostRepository postRepository,
+                           MemberRepository memberRepository, PostAccessPolicy accessPolicy, Clock clock) {
+        this.reactionRepository = reactionRepository;
+        this.postRepository = postRepository;
+        this.memberRepository = memberRepository;
+        this.accessPolicy = accessPolicy;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public ReactionSummaryResponse react(Long postId, AuthenticatedMember me, ReactionKind kind) {
+        Post post = findViewable(postId, me);
+        LocalDateTime now = LocalDateTime.now(clock);
+        reactionRepository.findByPost_IdAndMember_Id(postId, me.id())
+                .ifPresentOrElse(
+                        reaction -&gt; reaction.changeKind(kind, now),
+                        () -&gt; reactionRepository.save(
+                                new PostReaction(post, memberRepository.getReferenceById(me.id()), kind, now)));
+        // 변경 감지로 바뀐 kind가 아래 COUNT 전에 DB에 반영되게 한다(JPQL·네이티브 쿼리 전에 자동 flush)
+        return summary(postId, me);
+    }
+
+    @Transactional
+    public ReactionSummaryResponse cancel(Long postId, AuthenticatedMember me) {
+        findViewable(postId, me);
+        reactionRepository.deleteMine(postId, me.id());
+        return summary(postId, me);
+    }
+
+    @Transactional(readOnly = true)
+    public ReactionSummaryResponse get(Long postId, AuthenticatedMember viewer) {
+        findViewable(postId, viewer);
+        return summary(postId, viewer);
+    }
+
+    private Post findViewable(Long postId, AuthenticatedMember viewer) {
+        Post post = postRepository.findById(postId).orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(viewer, post)) {
+            throw new PostNotFoundException();
+        }
+        return post;
+    }
+
+    private ReactionSummaryResponse summary(Long postId, AuthenticatedMember viewer) {
+        Map&lt;ReactionKind, Long&gt; counts = new EnumMap&lt;&gt;(ReactionKind.class);
+        for (ReactionKind kind : ReactionKind.values()) {
+            counts.put(kind, 0L);
+        }
+        for (ReactionCountRow row : reactionRepository.countByKind(postId)) {
+            counts.put(ReactionKind.valueOf(row.getKind()), row.getCnt());
+        }
+        long total = counts.values().stream().mapToLong(Long::longValue).sum();
+        ReactionKind mine = viewer == null ? null
+                : reactionRepository.findByPost_IdAndMember_Id(postId, viewer.id())
+                        .map(PostReaction::getKind).orElse(null);
+        return new ReactionSummaryResponse(postId, mine, new LinkedHashMap&lt;&gt;(counts), total);
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>JPA / Repository — 내 공감·삭제·종류별 집계</summary>
+
+<p><code>src/main/java/org/example/reaction/PostReactionRepository.java</code></p>
+<pre><code class="language-java">package org.example.reaction;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface PostReactionRepository extends JpaRepository&lt;PostReaction, Long&gt; {
+
+    Optional&lt;PostReaction&gt; findByPost_IdAndMember_Id(Long postId, Long memberId);
+
+    @Modifying
+    @Query(&quot;DELETE FROM PostReaction r WHERE r.post.id = :postId AND r.member.id = :memberId&quot;)
+    int deleteMine(@Param(&quot;postId&quot;) Long postId, @Param(&quot;memberId&quot;) Long memberId);
+
+    // 종류별 개수 — 공감이 하나도 없는 종류는 결과에 없다(0 채우기는 서비스에서)
+    @Query(nativeQuery = true, value = &quot;&quot;&quot;
+            SELECT kind AS kind, COUNT(*) AS cnt
+              FROM post_reaction
+             WHERE post_id = :postId
+             GROUP BY kind
+            &quot;&quot;&quot;)
+    List&lt;ReactionCountRow&gt; countByKind(@Param(&quot;postId&quot;) Long postId);
+}</code></pre>
+</details>
+
+<details>
+<summary>Entity — 한 회원·한 글의 공감 종류</summary>
+
+<p><code>src/main/java/org/example/reaction/PostReaction.java</code></p>
+<pre><code class="language-java">package org.example.reaction;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import org.example.member.Member;
+import org.example.post.Post;
+
+import java.time.LocalDateTime;
+
+// 글 공감 — (post_id, member_id) UNIQUE. 행이 있으면 그 종류로 공감한 상태다
+@Entity
+@Table(name = &quot;post_reaction&quot;)
+public class PostReaction {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;post_id&quot;, nullable = false)
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;member_id&quot;, nullable = false)
+    private Member member;
+
+    // ORDINAL(0,1,2…)로 저장하면 enum 순서를 바꾸는 순간 기존 데이터의 뜻이 바뀐다 — 이름으로 저장한다
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ReactionKind kind;
+
+    @Column(name = &quot;created_at&quot;, nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = &quot;updated_at&quot;, nullable = false)
+    private LocalDateTime updatedAt;
+
+    protected PostReaction() {
+        // JPA
+    }
+
+    public PostReaction(Post post, Member member, ReactionKind kind, LocalDateTime now) {
+        this.post = post;
+        this.member = member;
+        this.kind = kind;
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    // 다른 종류로 바꾸기 — 같은 종류면 아무것도 하지 않는다(UPDATE도 나가지 않는다)
+    public void changeKind(ReactionKind kind, LocalDateTime now) {
+        if (this.kind == kind) {
+            return;
+        }
+        this.kind = kind;
+        this.updatedAt = now;
+    }
+
+    public ReactionKind getKind() {
+        return kind;
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>Flyway / SQL — UNIQUE·외래키·CHECK</summary>
+
+<p><code>src/main/resources/db/migration/V50__create_post_reaction.sql</code></p>
+<pre><code class="language-sql">-- 14-1 공감 종류 — 한 회원이 한 글에 한 종류만(UNIQUE). 종류를 바꾸면 행을 새로 만들지 않고 kind만 바꾼다.
+-- 종류별 개수는 이 테이블을 GROUP BY로 센다(post에 종류별 카운터 컬럼을 두지 않는다).
+CREATE TABLE post_reaction (
+    id         BIGINT      NOT NULL AUTO_INCREMENT,
+    post_id    BIGINT      NOT NULL,
+    member_id  BIGINT      NOT NULL,
+    kind       VARCHAR(20) NOT NULL,
+    created_at DATETIME    NOT NULL,
+    updated_at DATETIME    NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_post_reaction (post_id, member_id),
+    KEY fk_post_reaction_member (member_id),
+    CONSTRAINT fk_post_reaction_post FOREIGN KEY (post_id) REFERENCES post (id),
+    CONSTRAINT fk_post_reaction_member FOREIGN KEY (member_id) REFERENCES member (id),
+    CONSTRAINT ck_post_reaction_kind CHECK (kind IN ('THUMBS_UP', 'HEART', 'LAUGH', 'SAD'))
+);</code></pre>
+</details>
+
+<details>
+<summary>Enum — 허용한 네 종류</summary>
+
+<p><code>src/main/java/org/example/reaction/ReactionKind.java</code></p>
+<pre><code class="language-java">package org.example.reaction;
+
+// 공감 종류 — DB에는 이름 그대로(VARCHAR) 저장한다. 순서를 바꾸면 응답의 counts 순서도 바뀐다
+public enum ReactionKind {
+    THUMBS_UP, HEART, LAUGH, SAD
+}</code></pre>
+</details>
+
+<details>
+<summary>MyBatis / DTO — 집계 행</summary>
+
+<p><code>src/main/java/org/example/reaction/ReactionCount.java</code></p>
+<pre><code class="language-java">package org.example.reaction;
+
+// GROUP BY 결과의 한 행이다. 없는 종류는 Service에서 0으로 채운다.
+public record ReactionCount(String kind, Long cnt) {
+}</code></pre>
+</details>
+
+<details>
+<summary>MyBatis / Mapper — DB 연산 인터페이스</summary>
+
+<p><code>src/main/java/org/example/reaction/ReactionMapper.java</code></p>
+<pre><code class="language-java">package org.example.reaction;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Mapper
+public interface ReactionMapper {
+    void upsert(@Param(&quot;postId&quot;) Long postId, @Param(&quot;memberId&quot;) Long memberId,
+                @Param(&quot;kind&quot;) String kind, @Param(&quot;now&quot;) LocalDateTime now);
+
+    int deleteMine(@Param(&quot;postId&quot;) Long postId, @Param(&quot;memberId&quot;) Long memberId);
+
+    String findMine(@Param(&quot;postId&quot;) Long postId, @Param(&quot;memberId&quot;) Long memberId);
+
+    List&lt;ReactionCount&gt; countByKind(@Param(&quot;postId&quot;) Long postId);
+}</code></pre>
+</details>
+
+<details>
+<summary>MyBatis / SQL — UPSERT·삭제·GROUP BY</summary>
+
+<p><code>src/main/resources/mapper/ReactionMapper.xml</code></p>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot;
+        &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.reaction.ReactionMapper&quot;&gt;
+    &lt;resultMap id=&quot;reactionCount&quot; type=&quot;org.example.reaction.ReactionCount&quot;&gt;
+        &lt;constructor&gt;
+            &lt;arg column=&quot;kind&quot; javaType=&quot;java.lang.String&quot;/&gt;
+            &lt;arg column=&quot;cnt&quot; javaType=&quot;java.lang.Long&quot;/&gt;
+        &lt;/constructor&gt;
+    &lt;/resultMap&gt;
+
+    &lt;insert id=&quot;upsert&quot;&gt;
+        INSERT INTO post_reaction (post_id, member_id, kind, created_at, updated_at)
+        VALUES (#{postId}, #{memberId}, #{kind}, #{now}, #{now})
+        ON DUPLICATE KEY UPDATE
+            updated_at = IF(kind &amp;lt;&amp;gt; #{kind}, #{now}, updated_at),
+            kind = #{kind}
+    &lt;/insert&gt;
+
+    &lt;delete id=&quot;deleteMine&quot;&gt;
+        DELETE FROM post_reaction WHERE post_id = #{postId} AND member_id = #{memberId}
+    &lt;/delete&gt;
+
+    &lt;select id=&quot;findMine&quot; resultType=&quot;java.lang.String&quot;&gt;
+        SELECT kind FROM post_reaction WHERE post_id = #{postId} AND member_id = #{memberId}
+    &lt;/select&gt;
+
+    &lt;select id=&quot;countByKind&quot; resultMap=&quot;reactionCount&quot;&gt;
+        SELECT kind, COUNT(*) AS cnt FROM post_reaction
+        WHERE post_id = #{postId} GROUP BY kind
+    &lt;/select&gt;
+&lt;/mapper&gt;</code></pre>
+</details>
+
+<details>
+<summary>MyBatis / Service — 동일 HTTP 계약</summary>
+
+<p><code>src/main/java/org/example/reaction/ReactionService.java</code></p>
+<pre><code class="language-java">package org.example.reaction;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+// MyBatis 대안: 공감 테이블은 Mapper가 담당하고 글 접근 규칙은 기존 PostAccessPolicy를 재사용한다.
+@Service
+public class ReactionService {
+    private final ReactionMapper reactionMapper;
+    private final PostRepository postRepository;
+    private final PostAccessPolicy accessPolicy;
+    private final Clock clock;
+
+    public ReactionService(ReactionMapper reactionMapper, PostRepository postRepository,
+                           PostAccessPolicy accessPolicy, Clock clock) {
+        this.reactionMapper = reactionMapper;
+        this.postRepository = postRepository;
+        this.accessPolicy = accessPolicy;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public ReactionSummaryResponse react(Long postId, AuthenticatedMember me, ReactionKind kind) {
+        findViewable(postId, me);
+        reactionMapper.upsert(postId, me.id(), kind.name(), LocalDateTime.now(clock));
+        return summary(postId, me);
+    }
+
+    @Transactional
+    public ReactionSummaryResponse cancel(Long postId, AuthenticatedMember me) {
+        findViewable(postId, me);
+        reactionMapper.deleteMine(postId, me.id());
+        return summary(postId, me);
+    }
+
+    @Transactional(readOnly = true)
+    public ReactionSummaryResponse get(Long postId, AuthenticatedMember viewer) {
+        findViewable(postId, viewer);
+        return summary(postId, viewer);
+    }
+
+    private void findViewable(Long postId, AuthenticatedMember viewer) {
+        Post post = postRepository.findById(postId).orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(viewer, post)) {
+            throw new PostNotFoundException();
+        }
+    }
+
+    private ReactionSummaryResponse summary(Long postId, AuthenticatedMember viewer) {
+        Map&lt;ReactionKind, Long&gt; counts = new EnumMap&lt;&gt;(ReactionKind.class);
+        for (ReactionKind kind : ReactionKind.values()) {
+            counts.put(kind, 0L);
+        }
+        for (ReactionCount row : reactionMapper.countByKind(postId)) {
+            counts.put(ReactionKind.valueOf(row.kind()), row.cnt());
+        }
+        long total = counts.values().stream().mapToLong(Long::longValue).sum();
+        String mine = viewer == null ? null : reactionMapper.findMine(postId, viewer.id());
+        return new ReactionSummaryResponse(postId,
+                mine == null ? null : ReactionKind.valueOf(mine), new LinkedHashMap&lt;&gt;(counts), total);
+    }
+}</code></pre>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>Entity — src/main/java/org/example/reaction/PostReaction.java</summary><pre><code>package org.example.reaction;
+
+<p>import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import org.example.member.Member;
+import org.example.post.Post;</p>
+<p>import java.time.LocalDateTime;</p>
+<p>// 글 공감 — (post_id, member_id) UNIQUE. 행이 있으면 그 종류로 공감한 상태다
+@Entity
+@Table(name = &quot;post_reaction&quot;)
+public class PostReaction {</p>
+<pre><code>@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &amp;quot;post_id&amp;quot;, nullable = false)
+private Post post;
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &amp;quot;member_id&amp;quot;, nullable = false)
+private Member member;
+
+// ORDINAL(0,1,2…)로 저장하면 enum 순서를 바꾸는 순간 기존 데이터의 뜻이 바뀐다 — 이름으로 저장한다
+@Enumerated(EnumType.STRING)
+@Column(nullable = false)
+private ReactionKind kind;
+
+@Column(name = &amp;quot;created_at&amp;quot;, nullable = false)
+private LocalDateTime createdAt;
+
+@Column(name = &amp;quot;updated_at&amp;quot;, nullable = false)
+private LocalDateTime updatedAt;
+
+protected PostReaction() {
+    // JPA
+}
+
+public PostReaction(Post post, Member member, ReactionKind kind, LocalDateTime now) {
+    this.post = post;
+    this.member = member;
+    this.kind = kind;
+    this.createdAt = now;
+    this.updatedAt = now;
+}
+
+// 다른 종류로 바꾸기 — 같은 종류면 아무것도 하지 않는다(UPDATE도 나가지 않는다)
+public void changeKind(ReactionKind kind, LocalDateTime now) {
+    if (this.kind == kind) {
+        return;
+    }
+    this.kind = kind;
+    this.updatedAt = now;
+}
+
+public ReactionKind getKind() {
+    return kind;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/reaction/PostReactionRepository.java</summary><pre><code>package org.example.reaction;
+
+<p>import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;</p>
+<p>import java.util.List;
+import java.util.Optional;</p>
+<p>public interface PostReactionRepository extends JpaRepository&lt;PostReaction, Long&gt; {</p>
+<pre><code>Optional&amp;lt;PostReaction&amp;gt; findByPost_IdAndMember_Id(Long postId, Long memberId);
+
+@Modifying
+@Query(&amp;quot;DELETE FROM PostReaction r WHERE r.post.id = :postId AND r.member.id = :memberId&amp;quot;)
+int deleteMine(@Param(&amp;quot;postId&amp;quot;) Long postId, @Param(&amp;quot;memberId&amp;quot;) Long memberId);
+
+// 종류별 개수 — 공감이 하나도 없는 종류는 결과에 없다(0 채우기는 서비스에서)
+@Query(nativeQuery = true, value = &amp;quot;&amp;quot;&amp;quot;
+        SELECT kind AS kind, COUNT(*) AS cnt
+          FROM post_reaction
+         WHERE post_id = :postId
+         GROUP BY kind
+        &amp;quot;&amp;quot;&amp;quot;)
+List&amp;lt;ReactionCountRow&amp;gt; countByKind(@Param(&amp;quot;postId&amp;quot;) Long postId);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/reaction/ReactionController.java</summary><pre><code>package org.example.reaction;
+
+<p>import jakarta.validation.Valid;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>@RestController
+public class ReactionController {</p>
+<pre><code>private final ReactionService reactionService;
+
+public ReactionController(ReactionService reactionService) {
+    this.reactionService = reactionService;
+}
+
+// 공감하거나 종류 바꾸기 — PUT이라 같은 요청을 여러 번 보내도 결과가 같다
+@PutMapping(&amp;quot;/api/posts/{id}/reaction&amp;quot;)
+public ReactionSummaryResponse react(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember,
+                                     @Valid @RequestBody ReactionRequest request) {
+    return reactionService.react(id, loginMember, request.toKind());
+}
+
+@DeleteMapping(&amp;quot;/api/posts/{id}/reaction&amp;quot;)
+public ReactionSummaryResponse cancel(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+    return reactionService.cancel(id, loginMember);
+}
+
+// 비로그인도 볼 수 있다(myReaction은 null)
+@GetMapping(&amp;quot;/api/posts/{id}/reactions&amp;quot;)
+public ReactionSummaryResponse get(@PathVariable Long id, @LoginMember AuthenticatedMember viewer) {
+    return reactionService.get(id, viewer);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/reaction/ReactionCountRow.java</summary><pre><code>package org.example.reaction;
+
+<p>// GROUP BY kind 결과 한 줄 — 인터페이스 프로젝션(별칭 kind·cnt와 getter 이름을 맞춘다)
+public interface ReactionCountRow {
+    String getKind();</p>
+<pre><code>long getCnt();</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/reaction/ReactionKind.java</summary><pre><code>package org.example.reaction;
+
+<p>// 공감 종류 — DB에는 이름 그대로(VARCHAR) 저장한다. 순서를 바꾸면 응답의 counts 순서도 바뀐다
+public enum ReactionKind {
+    THUMBS_UP, HEART, LAUGH, SAD
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/reaction/ReactionRequest.java</summary><pre><code>package org.example.reaction;
+
+<p>import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;</p>
+<p>// 종류는 문자열로 받아 Bean Validation으로 검사한다(1-5의 visibility와 같은 방식) — 틀리면 400과 함께
+// errors에 &quot;kind&quot;가 들어간다. enum으로 바로 받으면 JSON을 읽는 단계에서 실패해 어느 필드가 틀렸는지 흐려진다.
+public record ReactionRequest(
+        @NotBlank(message = &quot;공감 종류를 골라 주세요.&quot;)
+        @Pattern(regexp = &quot;THUMBS_UP|HEART|LAUGH|SAD&quot;, message = &quot;공감 종류는 THUMBS_UP·HEART·LAUGH·SAD 중 하나여야 합니다.&quot;)
+        String kind
+) {
+    public ReactionKind toKind() {
+        return ReactionKind.valueOf(kind);
+    }
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/reaction/ReactionService.java</summary><pre><code>package org.example.reaction;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.member.MemberRepository;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
+import java.util.Map;</p>
+<p>// 공감 — 한 사람이 한 글에 한 종류. 같은 종류 또 → 그대로(멱등), 다른 종류 → 바꾸기, 취소 → 행 삭제
+@Service
+public class ReactionService {</p>
+<pre><code>private final PostReactionRepository reactionRepository;
+private final PostRepository postRepository;
+private final MemberRepository memberRepository;
+private final PostAccessPolicy accessPolicy;
+private final Clock clock;
+
+public ReactionService(PostReactionRepository reactionRepository, PostRepository postRepository,
+                       MemberRepository memberRepository, PostAccessPolicy accessPolicy, Clock clock) {
+    this.reactionRepository = reactionRepository;
+    this.postRepository = postRepository;
+    this.memberRepository = memberRepository;
+    this.accessPolicy = accessPolicy;
+    this.clock = clock;
+}
+
+@Transactional
+public ReactionSummaryResponse react(Long postId, AuthenticatedMember me, ReactionKind kind) {
+    Post post = findViewable(postId, me);
+    LocalDateTime now = LocalDateTime.now(clock);
+    reactionRepository.findByPost_IdAndMember_Id(postId, me.id())
+            .ifPresentOrElse(
+                    reaction -&amp;gt; reaction.changeKind(kind, now),
+                    () -&amp;gt; reactionRepository.save(
+                            new PostReaction(post, memberRepository.getReferenceById(me.id()), kind, now)));
+    // 변경 감지로 바뀐 kind가 아래 COUNT 전에 DB에 반영되게 한다(JPQL·네이티브 쿼리 전에 자동 flush)
+    return summary(postId, me);
+}
+
+@Transactional
+public ReactionSummaryResponse cancel(Long postId, AuthenticatedMember me) {
+    findViewable(postId, me);
+    reactionRepository.deleteMine(postId, me.id());
+    return summary(postId, me);
+}
+
+@Transactional(readOnly = true)
+public ReactionSummaryResponse get(Long postId, AuthenticatedMember viewer) {
+    findViewable(postId, viewer);
+    return summary(postId, viewer);
+}
+
+private Post findViewable(Long postId, AuthenticatedMember viewer) {
+    Post post = postRepository.findById(postId).orElseThrow(PostNotFoundException::new);
+    if (!accessPolicy.canView(viewer, post)) {
+        throw new PostNotFoundException();
+    }
+    return post;
+}
+
+private ReactionSummaryResponse summary(Long postId, AuthenticatedMember viewer) {
+    Map&amp;lt;ReactionKind, Long&amp;gt; counts = new EnumMap&amp;lt;&amp;gt;(ReactionKind.class);
+    for (ReactionKind kind : ReactionKind.values()) {
+        counts.put(kind, 0L);
+    }
+    for (ReactionCountRow row : reactionRepository.countByKind(postId)) {
+        counts.put(ReactionKind.valueOf(row.getKind()), row.getCnt());
+    }
+    long total = counts.values().stream().mapToLong(Long::longValue).sum();
+    ReactionKind mine = viewer == null ? null
+            : reactionRepository.findByPost_IdAndMember_Id(postId, viewer.id())
+                    .map(PostReaction::getKind).orElse(null);
+    return new ReactionSummaryResponse(postId, mine, new LinkedHashMap&amp;lt;&amp;gt;(counts), total);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/reaction/ReactionSummaryResponse.java</summary><pre><code>package org.example.reaction;
+
+<p>import java.util.Map;</p>
+<p>// counts는 네 종류를 항상 모두 담는다(0 포함). myReaction은 비로그인이거나 공감하지 않았으면 null
+public record ReactionSummaryResponse(
+        Long postId,
+        ReactionKind myReaction,
+        Map&lt;ReactionKind, Long&gt; counts,
+        long total
+) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DB / SQL — src/main/resources/db/migration/V50__create_post_reaction.sql</summary><pre><code>-- 14-1 공감 종류 — 한 회원이 한 글에 한 종류만(UNIQUE). 종류를 바꾸면 행을 새로 만들지 않고 kind만 바꾼다.
+-- 종류별 개수는 이 테이블을 GROUP BY로 센다(post에 종류별 카운터 컬럼을 두지 않는다).
+CREATE TABLE post_reaction (
+    id         BIGINT      NOT NULL AUTO_INCREMENT,
+    post_id    BIGINT      NOT NULL,
+    member_id  BIGINT      NOT NULL,
+    kind       VARCHAR(20) NOT NULL,
+    created_at DATETIME    NOT NULL,
+    updated_at DATETIME    NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_post_reaction (post_id, member_id),
+    KEY fk_post_reaction_member (member_id),
+    CONSTRAINT fk_post_reaction_post FOREIGN KEY (post_id) REFERENCES post (id),
+    CONSTRAINT fk_post_reaction_member FOREIGN KEY (member_id) REFERENCES member (id),
+    CONSTRAINT ck_post_reaction_kind CHECK (kind IN ('THUMBS_UP', 'HEART', 'LAUGH', 'SAD'))
+);
+</code></pre></details>
+
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/14-1.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="mybatis-대체-구현-코드"><a class="anchor" href="#mybatis-대체-구현-코드" aria-hidden="true">#</a>MyBatis 대체 구현 코드</h2>
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {
+    id 'java'
+    // bootRun / bootJar 태스크 제공 + 실행 가능한 fat jar 패키징
+    id 'org.springframework.boot' version '4.1.1'
+    // Boot BOM을 적용해서 아래 의존성들의 버전을 생략할 수 있게 해줌
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+<p>group = &#39;org.example&#39;
+version = &#39;1.0-SNAPSHOT&#39;</p>
+<p>java {
+    toolchain {
+        // 컴파일·실행 JDK를 고정 (Boot 4는 Java 17 이상 필요, 로컬에 설치된 21 사용)
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}</p>
+<p>repositories {
+    mavenCentral()
+}</p>
+<p>dependencies {
+    compileOnly &#39;org.projectlombok:lombok&#39;
+    annotationProcessor &#39;org.projectlombok:lombok&#39;
+    // Spring MVC + 내장 Tomcat + Jackson (Boot 4부터 starter-web → starter-webmvc로 이름 변경)
+    implementation &#39;org.springframework.boot:spring-boot-starter-webmvc&#39;
+    // JPA(Hibernate) + HikariCP 커넥션 풀
+    implementation &#39;org.springframework.boot:spring-boot-starter-data-jpa&#39;
+    implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;
+    // @Valid, @NotBlank 같은 요청 값 검증
+    implementation &#39;org.springframework.boot:spring-boot-starter-validation&#39;
+    // MySQL JDBC 드라이버 — 컴파일엔 필요 없고 실행할 때만 필요
+    runtimeOnly &#39;com.mysql:mysql-connector-j&#39;
+    // 9-1 스키마 변경은 Flyway 마이그레이션(db/migration)으로만 한다
+    implementation &#39;org.springframework.boot:spring-boot-starter-flyway&#39;
+    runtimeOnly &#39;org.flywaydb:flyway-mysql&#39;
+    // 13-7 API 문서(OpenAPI 3.1 + Swagger UI) — springdoc 3.x가 Spring Boot 4용(3.1.1은 Boot 4.1.0 기준으로 빌드됨).
+    // Boot BOM이 관리하지 않는 라이브러리라 버전을 직접 적는다
+    implementation &#39;org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1&#39;</p>
+<pre><code>// 테스트: JUnit·AssertJ·Mockito·MockMvc 묶음 (버전은 Boot BOM이 관리하므로 junit-bom 따로 두지 않음)
+testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+// @DataJpaTest(리포지토리만 띄우는 테스트)
+testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+// 테스트용 일회용 MySQL 컨테이너 — application-test.yml의 jdbc:tc: URL이 쓴다
+testImplementation 'org.testcontainers:testcontainers-mysql'
+// Gradle이 JUnit Platform 테스트를 실행할 때 필요한 런처
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'</code></pre>
+<p>}</p>
+<p>tasks.named(&#39;test&#39;) {
+    useJUnitPlatform()
+    // 테스트는 application-test.yml(Testcontainers MySQL)을 쓰게 한다
+    systemProperty &#39;spring.profiles.active&#39;, &#39;test&#39;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: javaExperience
+  datasource:
+    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  flyway:
+    # 이미 테이블·데이터가 있는 DB(compose의 community·practice)는 V1(CREATE TABLE)을 실행하면 실패한다.
+    # 그래서 기록 테이블이 없으면 &quot;V1까지 됐다&quot;고만 적고(baseline) V2부터 실행한다. 빈 DB면 V1부터 실제로 실행한다.
+    baseline-on-migrate: true
+    baseline-version: 1
+  servlet:
+    multipart:
+      # 11-2 이미지 한 장 1MB, 요청 전체 2MB까지. 넘으면 MaxUploadSizeExceededException → 413
+      max-file-size: 1MB
+      max-request-size: 2MB
+  jpa:
+    hibernate:
+      # 스키마는 Flyway만 바꾼다(9-1). 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)
+      ddl-auto: validate
+    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        # 컬렉션(태그) 지연 로딩을 글마다 1번이 아니라 IN (...) 한 번으로 묶는다(2-4, N+1 대응)
+        default_batch_fetch_size: 100
+
+<h1 id="11-2-올린-이미지를-저장할-폴더앱을-실행한-위치-기준-git에는-올리지-않는다gitignore"><a class="anchor" href="#11-2-올린-이미지를-저장할-폴더앱을-실행한-위치-기준-git에는-올리지-않는다gitignore" aria-hidden="true">#</a>11-2 올린 이미지를 저장할 폴더(앱을 실행한 위치 기준). git에는 올리지 않는다(.gitignore)</h1>
+<p>app:
+  upload-dir: uploads</p>
+<p>logging:
+  level:
+    # 실행 SQL은 확인하되 토큰을 포함한 바인딩 값은 로그에 남기지 않는다
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: info</p>
+<h1 id="0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다"><a class="anchor" href="#0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다" aria-hidden="true">#</a>0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다</h1>
+<p>start:
+  greeting: 반가워요, 백엔드!
+  max-items: 5</p>
+<h1 id="13-7-앱-개발자가-문서를-열면-사용자용-api-그룹을-먼저-보여-준다"><a class="anchor" href="#13-7-앱-개발자가-문서를-열면-사용자용-api-그룹을-먼저-보여-준다" aria-hidden="true">#</a>13-7 앱 개발자가 문서를 열면 사용자용 API 그룹을 먼저 보여 준다.</h1>
+<p>springdoc:
+  swagger-ui:
+    urls-primary-name: public</p>
+<p>mybatis:
+  mapper-locations: classpath:mapper/*.xml
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/reaction/ReactionCount.java</summary><pre><code>package org.example.reaction;
+
+<p>// GROUP BY 결과의 한 행이다. 없는 종류는 Service에서 0으로 채운다.
+public record ReactionCount(String kind, Long cnt) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/reaction/ReactionMapper.java</summary><pre><code>package org.example.reaction;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>@Mapper
+public interface ReactionMapper {
+    void upsert(@Param(&quot;postId&quot;) Long postId, @Param(&quot;memberId&quot;) Long memberId,
+                @Param(&quot;kind&quot;) String kind, @Param(&quot;now&quot;) LocalDateTime now);</p>
+<pre><code>int deleteMine(@Param(&amp;quot;postId&amp;quot;) Long postId, @Param(&amp;quot;memberId&amp;quot;) Long memberId);
+
+String findMine(@Param(&amp;quot;postId&amp;quot;) Long postId, @Param(&amp;quot;memberId&amp;quot;) Long memberId);
+
+List&amp;lt;ReactionCount&amp;gt; countByKind(@Param(&amp;quot;postId&amp;quot;) Long postId);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/ReactionMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot;
+        &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.reaction.ReactionMapper&quot;&gt;
+    &lt;resultMap id=&quot;reactionCount&quot; type=&quot;org.example.reaction.ReactionCount&quot;&gt;
+        &lt;constructor&gt;
+            &lt;arg column=&quot;kind&quot; javaType=&quot;java.lang.String&quot;/&gt;
+            &lt;arg column=&quot;cnt&quot; javaType=&quot;java.lang.Long&quot;/&gt;
+        &lt;/constructor&gt;
+    &lt;/resultMap&gt;
+
+<pre><code>&amp;lt;insert id=&amp;quot;upsert&amp;quot;&amp;gt;
+    INSERT INTO post_reaction (post_id, member_id, kind, created_at, updated_at)
+    VALUES (#{postId}, #{memberId}, #{kind}, #{now}, #{now})
+    ON DUPLICATE KEY UPDATE
+        updated_at = IF(kind &amp;amp;lt;&amp;amp;gt; #{kind}, #{now}, updated_at),
+        kind = #{kind}
+&amp;lt;/insert&amp;gt;
+
+&amp;lt;delete id=&amp;quot;deleteMine&amp;quot;&amp;gt;
+    DELETE FROM post_reaction WHERE post_id = #{postId} AND member_id = #{memberId}
+&amp;lt;/delete&amp;gt;
+
+&amp;lt;select id=&amp;quot;findMine&amp;quot; resultType=&amp;quot;java.lang.String&amp;quot;&amp;gt;
+    SELECT kind FROM post_reaction WHERE post_id = #{postId} AND member_id = #{memberId}
+&amp;lt;/select&amp;gt;
+
+&amp;lt;select id=&amp;quot;countByKind&amp;quot; resultMap=&amp;quot;reactionCount&amp;quot;&amp;gt;
+    SELECT kind, COUNT(*) AS cnt FROM post_reaction
+    WHERE post_id = #{postId} GROUP BY kind
+&amp;lt;/select&amp;gt;</code></pre>
+<p>&lt;/mapper&gt;
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/reaction/ReactionService.java</summary><pre><code>package org.example.reaction;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
+import java.util.Map;</p>
+<p>// MyBatis 대안: 공감 테이블은 Mapper가 담당하고 글 접근 규칙은 기존 PostAccessPolicy를 재사용한다.
+@Service
+public class ReactionService {
+    private final ReactionMapper reactionMapper;
+    private final PostRepository postRepository;
+    private final PostAccessPolicy accessPolicy;
+    private final Clock clock;</p>
+<pre><code>public ReactionService(ReactionMapper reactionMapper, PostRepository postRepository,
+                       PostAccessPolicy accessPolicy, Clock clock) {
+    this.reactionMapper = reactionMapper;
+    this.postRepository = postRepository;
+    this.accessPolicy = accessPolicy;
+    this.clock = clock;
+}
+
+@Transactional
+public ReactionSummaryResponse react(Long postId, AuthenticatedMember me, ReactionKind kind) {
+    findViewable(postId, me);
+    reactionMapper.upsert(postId, me.id(), kind.name(), LocalDateTime.now(clock));
+    return summary(postId, me);
+}
+
+@Transactional
+public ReactionSummaryResponse cancel(Long postId, AuthenticatedMember me) {
+    findViewable(postId, me);
+    reactionMapper.deleteMine(postId, me.id());
+    return summary(postId, me);
+}
+
+@Transactional(readOnly = true)
+public ReactionSummaryResponse get(Long postId, AuthenticatedMember viewer) {
+    findViewable(postId, viewer);
+    return summary(postId, viewer);
+}
+
+private void findViewable(Long postId, AuthenticatedMember viewer) {
+    Post post = postRepository.findById(postId).orElseThrow(PostNotFoundException::new);
+    if (!accessPolicy.canView(viewer, post)) {
+        throw new PostNotFoundException();
+    }
+}
+
+private ReactionSummaryResponse summary(Long postId, AuthenticatedMember viewer) {
+    Map&amp;lt;ReactionKind, Long&amp;gt; counts = new EnumMap&amp;lt;&amp;gt;(ReactionKind.class);
+    for (ReactionKind kind : ReactionKind.values()) {
+        counts.put(kind, 0L);
+    }
+    for (ReactionCount row : reactionMapper.countByKind(postId)) {
+        counts.put(ReactionKind.valueOf(row.kind()), row.cnt());
+    }
+    long total = counts.values().stream().mapToLong(Long::longValue).sum();
+    String mine = viewer == null ? null : reactionMapper.findMine(postId, viewer.id());
+    return new ReactionSummaryResponse(postId,
+            mine == null ? null : ReactionKind.valueOf(mine), new LinkedHashMap&amp;lt;&amp;gt;(counts), total);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<p>13번 글(박디비의 &quot;자유글 02&quot;)에 김자바와 이스프링이 공감한다. 처음 두 줄은 다시 실행해도 같은 결과가 나오게 둘의 공감을 지운다.</p>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080
+K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; J='Content-Type: application/json'
+
+curl -s -X DELETE &quot;$BASE/api/posts/13/reaction&quot; -H &quot;$K&quot; &gt; /dev/null                      # E0 처음 상태로
+curl -s -X DELETE &quot;$BASE/api/posts/13/reaction&quot; -H &quot;$L&quot; &gt; /dev/null                      # E0b
+curl -s -X PUT &quot;$BASE/api/posts/13/reaction&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{&quot;kind&quot;:&quot;HEART&quot;}'; echo  # E1
+curl -s -X PUT &quot;$BASE/api/posts/13/reaction&quot; -H &quot;$L&quot; -H &quot;$J&quot; -d '{&quot;kind&quot;:&quot;HEART&quot;}'; echo  # E2
+curl -s -X PUT &quot;$BASE/api/posts/13/reaction&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{&quot;kind&quot;:&quot;LAUGH&quot;}'; echo  # E3 바꾸기
+curl -s -X PUT &quot;$BASE/api/posts/13/reaction&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{&quot;kind&quot;:&quot;LAUGH&quot;}'; echo  # E4 또
+curl -s &quot;$BASE/api/posts/13/reactions&quot;; echo                                             # E5 비로그인
+curl -i -X PUT &quot;$BASE/api/posts/13/reaction&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{&quot;kind&quot;:&quot;ANGRY&quot;}'        # E6 없는 종류
+curl -i -X PUT &quot;$BASE/api/posts/13/reaction&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{&quot;kind&quot;:null}'           # E6d null
+curl -i -X PUT &quot;$BASE/api/posts/13/reaction&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{&quot;kind&quot;:123}'            # E7b 숫자
+curl -i -X PUT &quot;$BASE/api/posts/999999/reaction&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{&quot;kind&quot;:&quot;SAD&quot;}'      # E8b 없는 글
+curl -i -X PUT &quot;$BASE/api/posts/9/reaction&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{&quot;kind&quot;:&quot;HEART&quot;}'         # E8 차단한 회원의 글
+curl -i -X PUT &quot;$BASE/api/posts/13/reaction&quot; -H &quot;$J&quot; -d '{&quot;kind&quot;:&quot;HEART&quot;}'                # E9 토큰 없음
+curl -s -X DELETE &quot;$BASE/api/posts/13/reaction&quot; -H &quot;$L&quot;; echo                            # E10 취소
+curl -s -X PUT &quot;$BASE/api/posts/12/reaction&quot; -H 'Authorization: Bearer tok-c01' -H &quot;$J&quot; -d '{&quot;kind&quot;:&quot;THUMBS_UP&quot;}'; echo   # E11
+curl -s -X PUT &quot;$BASE/api/posts/12/reaction&quot; -H 'Authorization: Bearer tok-c02' -H &quot;$J&quot; -d '{&quot;kind&quot;:&quot;SAD&quot;}'; echo         # E12</code></pre></details>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="E0" data-method="DELETE" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E0 · 처음 상태로(김자바 공감 지우기)</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="E0b" data-method="DELETE" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E0b · 처음 상태로(이스프링 공감 지우기)</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="E1" data-method="PUT" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E1 · 김자바 ❤️</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: &quot;HEART&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: &quot;HEART&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.myReaction&quot;,&quot;equals&quot;:&quot;HEART&quot;},{&quot;path&quot;:&quot;$.counts.HEART&quot;,&quot;equals&quot;:1},{&quot;path&quot;:&quot;$.counts.THUMBS_UP&quot;,&quot;equals&quot;:0},{&quot;path&quot;:&quot;$.total&quot;,&quot;equals&quot;:1}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E2" data-method="PUT" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E2 · 이스프링 ❤️</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: &quot;HEART&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: &quot;HEART&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.counts.HEART&quot;,&quot;equals&quot;:2},{&quot;path&quot;:&quot;$.total&quot;,&quot;equals&quot;:2}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E3" data-method="PUT" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E3 · 김자바 😂로 바꾸기</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: &quot;LAUGH&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: &quot;LAUGH&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.myReaction&quot;,&quot;equals&quot;:&quot;LAUGH&quot;},{&quot;path&quot;:&quot;$.counts.HEART&quot;,&quot;equals&quot;:1},{&quot;path&quot;:&quot;$.counts.LAUGH&quot;,&quot;equals&quot;:1},{&quot;path&quot;:&quot;$.total&quot;,&quot;equals&quot;:2}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E4" data-method="PUT" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E4 · 김자바 😂 또</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: &quot;LAUGH&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: &quot;LAUGH&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.myReaction&quot;,&quot;equals&quot;:&quot;LAUGH&quot;},{&quot;path&quot;:&quot;$.counts.LAUGH&quot;,&quot;equals&quot;:1},{&quot;path&quot;:&quot;$.total&quot;,&quot;equals&quot;:2}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E5" data-method="GET" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E5 · 비로그인으로 개수 보기</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/13/reactions" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.myReaction&quot;,&quot;type&quot;:&quot;null&quot;},{&quot;path&quot;:&quot;$.counts.THUMBS_UP&quot;,&quot;equals&quot;:0},{&quot;path&quot;:&quot;$.counts.HEART&quot;,&quot;equals&quot;:1},{&quot;path&quot;:&quot;$.counts.LAUGH&quot;,&quot;equals&quot;:1},{&quot;path&quot;:&quot;$.counts.SAD&quot;,&quot;equals&quot;:0}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E6" data-method="PUT" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E6 · 잘못된 입력 — 없는 종류 ANGRY</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: &quot;ANGRY&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: &quot;ANGRY&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;kind&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E6b" data-method="PUT" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E6b · 잘못된 입력 — 소문자 heart</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: &quot;heart&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: &quot;heart&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;kind&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E6c" data-method="PUT" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E6c · 잘못된 입력 — 빈 문자열</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: &quot;&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: &quot;&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;kind&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E6d" data-method="PUT" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E6d · 잘못된 입력 — null</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: null
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: null
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;kind&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E6e" data-method="PUT" data-request-index="11" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E6e · 잘못된 입력 — 공백만</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: &quot;   &quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: &quot;   &quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;kind&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E7" data-method="PUT" data-request-index="12" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E7 · 잘못된 입력 — kind 없음</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;kind&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E7b" data-method="PUT" data-request-index="13" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E7b · 잘못된 입력 — 숫자 자리</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: 123
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: 123
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;kind&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E7c" data-method="PUT" data-request-index="14" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E7c · 잘못된 입력 — 배열</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: [
+    &quot;HEART&quot;
+  ]
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: [
+    &quot;HEART&quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;kind&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E7d" data-method="PUT" data-request-index="15" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E7d · 잘못된 입력 — JSON이 아님</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="application/json" value="application/json" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">kind=HEART</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;,
+  &quot;Content-Type&quot;: &quot;application/json&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>kind=HEART</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="E8" data-method="PUT" data-request-index="16" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E8 · 나를 차단한 회원의 글(9번)</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/9/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: &quot;HEART&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: &quot;HEART&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:404}</pre></dd></dl></details></article><article class="api-request" data-request-id="E8b" data-method="PUT" data-request-index="17" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E8b · 없는 글</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/999999/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: &quot;HEART&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: &quot;HEART&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:404}</pre></dd></dl></details></article><article class="api-request" data-request-id="E8c" data-method="PUT" data-request-index="18" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E8c · 글 id 자리에 문자</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/abc/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: &quot;HEART&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: &quot;HEART&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="E9" data-method="PUT" data-request-index="19" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E9 · 토큰 없이</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: &quot;HEART&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: &quot;HEART&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:401}</pre></dd></dl></details></article><article class="api-request" data-request-id="E10" data-method="DELETE" data-request-index="20" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E10 · 이스프링 취소</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/posts/13/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.myReaction&quot;,&quot;type&quot;:&quot;null&quot;},{&quot;path&quot;:&quot;$.counts.HEART&quot;,&quot;equals&quot;:0},{&quot;path&quot;:&quot;$.counts.LAUGH&quot;,&quot;equals&quot;:1},{&quot;path&quot;:&quot;$.total&quot;,&quot;equals&quot;:1}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E11" data-method="PUT" data-request-index="21" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E11 · 동시성01 👍(12번 글)</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/12/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c01" value="Bearer tok-c01" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: &quot;THUMBS_UP&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c01&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: &quot;THUMBS_UP&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C9: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.myReaction&quot;,&quot;equals&quot;:&quot;THUMBS_UP&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E12" data-method="PUT" data-request-index="22" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E12 · 동시성02 😢(12번 글)</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/12/reaction" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c02" value="Bearer tok-c02" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;kind&quot;: &quot;SAD&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c02&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;kind&quot;: &quot;SAD&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C9: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.myReaction&quot;,&quot;equals&quot;:&quot;SAD&quot;}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>E1</td>
+<td><code>200</code>, <code>myReaction</code>=<code>HEART</code>, <code>counts.HEART</code>=1, <code>counts.THUMBS_UP</code>=0, <code>total</code>=1</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>E2</td>
+<td><code>200</code>, <code>counts.HEART</code>=2</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>E3 / E4</td>
+<td>둘 다 <code>200</code>, <code>myReaction</code>=<code>LAUGH</code>, ❤️ 1 · 😂 1, <code>total</code>=2</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>E5</td>
+<td><code>200</code>, <code>myReaction</code>=<code>null</code>, 네 종류 모두 있음(👍 0 · ❤️ 1 · 😂 1 · 😢 0)</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>E6~E7c(없는 종류·소문자·빈 문자열·null·공백만·없음·숫자·배열)</td>
+<td>모두 <code>400</code>, <code>errors[].field</code>에 <code>kind</code> — 500·200이 아니다</td>
+</tr>
+<tr>
+<td>C6</td>
+<td>E7d / E8c</td>
+<td><code>400</code>(JSON이 아님) / <code>400</code>(글 id 자리에 문자)</td>
+</tr>
+<tr>
+<td>C7</td>
+<td>E8 / E8b / E9</td>
+<td><code>404</code>(볼 수 없는 글) / <code>404</code>(없는 글) / <code>401</code></td>
+</tr>
+<tr>
+<td>C8</td>
+<td>E10</td>
+<td><code>200</code>, <code>myReaction</code>=<code>null</code>, ❤️ 0 · 😂 1, <code>total</code>=1</td>
+</tr>
+<tr>
+<td>C9</td>
+<td>E11 / E12</td>
+<td><code>200</code> — 규칙 안쪽 값(👍·😢)은 성공한다</td>
+</tr>
+<tr>
+<td>D1</td>
+<td>E10 뒤 <code>SELECT member_id, kind FROM post_reaction WHERE post_id = 13</code></td>
+<td><code>2, LAUGH</code> 한 줄</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT COUNT(*) FROM post_reaction WHERE post_id = 13 AND member_id = 2</code></td>
+<td><code>1</code> — E3(바꾸기)이 새 행을 만들지 않고 E1의 행을 바꿨다</td>
+</tr>
+<tr>
+<td>D3</td>
+<td><code>SELECT COUNT(*) FROM information_schema.check_constraints WHERE constraint_schema = &#39;community&#39; AND constraint_name LIKE &#39;%reaction%&#39;</code></td>
+<td><code>1</code> 이상 — 종류 제약이 DB에도 있다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>enum 저장</td>
+<td><code>@Enumerated(EnumType.STRING)</code>으로 이름을 저장한다. <code>ORDINAL</code>(0·1·2…)이면 enum 순서를 바꾸는 순간 기존 행의 뜻이 바뀐다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>개수</td>
+<td>글마다 종류별 카운터 칼럼을 두지 않고 <code>GROUP BY kind</code>로 센다. 아무도 누르지 않은 종류는 결과에 없으니 서비스에서 0으로 채운다. 목록 화면에서 글 20개의 개수를 보여 줘야 할 때 이 방식의 비용과 4-2 카운터 칼럼 방식의 비용을 비교할 수 있다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>바꾸기</td>
+<td>&quot;있으면 kind만 바꾸고, 없으면 만든다&quot;. 지우고 다시 만들면 <code>created_at</code>(처음 공감한 시각)을 잃는다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>소유자</td>
+<td>취소가 &quot;내 공감&quot;만 지운다(<code>WHERE post_id = ? AND member_id = ?</code>)</td>
+</tr>
+</tbody></table></div>
+<blockquote>
+<p>같은 사람이 처음 공감을 <strong>동시에</strong> 두 번 보내면 둘 다 &quot;없다&quot;를 보고 INSERT해서 하나는 <code>UNIQUE</code> 위반이 난다. 이 장은 동시성을 다루지 않는다 — 막는 방법은 <a href="../ch4-like/4-2-like-concurrency.html">4-2</a>와 <a href="../../lessons/H1-concurrency-taste.html">H1 레슨</a>을 본다.</p>
+</blockquote>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/P20-jpa-entity-mapping.html#q4-enum-ordinal의-문제는">P20 — Enum ORDINAL의 문제는?</a> — 왜 <code>STRING</code>인가</li>
+<li><a href="../../docs/knowledge/J06-enum-annotation-reflection.html#q2-enummap과-hashmapenum-v-중-언제-enummap을-고르나">J06 — EnumMap·EnumSet</a> — 네 종류를 0으로 채운 맵</li>
+<li><a href="../../docs/knowledge/S10-spring-data-query.html#specification과-projection은-서로-다른-문제를-푼다">S10 — Projection</a> — <code>GROUP BY</code> 결과를 인터페이스로 받기</li>
+<li><a href="../../docs/knowledge/R03-schema-types-constraints.html#3단계-제약이-실제-오류를-막는지-확인한다">R03 스키마와 제약</a> — <code>UNIQUE</code>·<code>CHECK</code></li>
+<li><a href="../../lessons/G2-access-rules-in-one-place.html">G2 레슨 — 접근 규칙을 한 곳에</a> — 볼 수 없는 글이면 404</li>
+<li><a href="../../lessons/F1-validation-errors.html">F1 레슨 — 검증과 오류 응답</a> — <code>@NotBlank</code>·<code>@Pattern</code>과 <code>errors</code> 목록</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 바꾸기와 만들기를 한 메서드로</summary>
+
+<p><code>findByPost_IdAndMember_Id(postId, memberId)</code>로 내 행을 찾는다. 있으면 엔티티의 <code>changeKind(kind)</code>(같은 종류면 아무것도 안 함)를 부르고, 없으면 <code>save(new PostReaction(...))</code>. 트랜잭션 안에서 엔티티 값만 바꾸면 커밋 때 UPDATE가 나간다(변경 감지). 이어서 개수를 세는 쿼리를 실행하기 전에 Hibernate가 바뀐 값을 먼저 DB에 반영(flush)하므로 개수에 바로 반영된다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 종류별 개수</summary>
+
+<pre><code class="language-java">@Query(nativeQuery = true, value = &quot;SELECT kind AS kind, COUNT(*) AS cnt FROM post_reaction WHERE post_id = :postId GROUP BY kind&quot;)
+List&lt;ReactionCountRow&gt; countByKind(@Param(&quot;postId&quot;) Long postId);   // interface ReactionCountRow { String getKind(); long getCnt(); }</code></pre>
+<p>응답의 <code>counts</code>는 <code>EnumMap</code>에 네 종류를 0으로 넣어 두고 결과로 덮어쓴다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="14-2-polls.html">14-2. 글 투표</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 14-1. 공감 종류 — 👍❤️😂😢 중 하나만\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch14-more-with-posts/14-1-reactions.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="../ch13-operations/13-7-api-docs.html">← 이전 13-7. API 문서 — Swagger UI</a><a href="14-2-polls.html">다음 → 14-2. 글 투표 — 한 사람 한 표</a></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
+</body>
+</html>

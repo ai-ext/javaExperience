@@ -1,0 +1,2403 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11-5. 휴지통 — 지운 글 모아 보기와 복구</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 11장. 게시글 심화 — 임시저장·이미지·조회수·검색·휴지통·이력 › 11-5</p><p class="level-tags"><span>중급</span><span>게시판 본편</span><span>DB community</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="11-5-휴지통--지운-글-모아-보기와-복구"><a class="anchor" href="#11-5-휴지통--지운-글-모아-보기와-복구" aria-hidden="true">#</a>11-5. 휴지통 — 지운 글 모아 보기와 복구</h1>
+<blockquote>
+<p>시나리오 DB(<code>community</code>). 이번 단계 마이그레이션은 <code>V22</code>다.</p>
+</blockquote>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<blockquote>
+<p>&quot;실수로 글을 지웠다는 문의가 매주 와요. 3-2에서 지운 글도 DB에 남겨 뒀잖아요? 휴지통에서 30일 안에는 직접 되살리게 해 주세요. 단, 신고 때문에 운영자가 지운 글은 작성자가 되살리면 안 돼요.&quot;</p>
+</blockquote>
+<p>3-2의 soft delete로 지운 글은 행이 남아 있다(<code>deleted_at</code>). 이제 그 행을 <strong>작성자에게 다시 보여 주고 되살리는</strong> 기능을 만든다.</p>
+<p>문제는 &quot;누가 지웠나&quot;를 모른다는 것이다. 3-2는 작성자와 운영자 둘 다 지울 수 있게 했는데, 지금 <code>post</code>에는 지운 시각만 있다. 그래서 <strong>지운 회원(<code>deleted_by</code>) 컬럼</strong>을 더하고, 휴지통에는 &quot;내가 쓰고 <strong>내가</strong> 지운 글&quot;만 보여 준다.</p>
+<p>복구는 2-3 규칙과 부딪친다. 2-3 규칙 1번은 &quot;삭제된 글은 작성자도 못 본다&quot;이다. 그래서 복구는 &quot;볼 수 있나&quot;(<code>canView</code>)를 쓰지 않고 <strong>작성자인지 직접</strong> 확인한다.</p>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>휴지통</h3><p>내가 지운 내 글을 30일 동안 모아 두고, [복구]로 되살린다. 운영자가 지운 글은 여기 없다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>휴지통</strong><span>김자바</span></div><div class="screen-widget screen-list"><strong>지운 글 — 30일 뒤 복구 불가</strong><span>[채점] 휴지통</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>복구</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>글을 되살렸어요</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>운영자가 삭제한 글은 되살릴 수 없어요</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>휴지통 열기</summary><ol><li><span class="flow-kind">사용자</span><p>[내 정보] → [휴지통]</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/me/trash</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-kimjava</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT p.*, b.slug FROM post p JOIN board b ON b.id = p.board_id
+WHERE p.author_id = 2 AND p.deleted_by = 2
+  AND p.deleted_at &gt;= NOW() - INTERVAL 30 DAY
+ORDER BY p.deleted_at DESC, p.id DESC</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{&quot;items&quot;: [{&quot;id&quot;: 61, &quot;boardSlug&quot;: &quot;free&quot;, &quot;title&quot;: &quot;[채점] 휴지통&quot;, &quot;deletedAt&quot;: &quot;2026-10-10T15:19:59&quot;, &quot;restoreUntil&quot;: &quot;2026-11-09T15:19:59&quot;}]}</dd></dl></li><li><span class="flow-kind">화면</span><p>지운 글과 복구 기한</p></li></ol></details><details class="scenario-flow"><summary>복구</summary><ol><li><span class="flow-kind">사용자</span><p>[복구]를 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts/61/restore</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-kimjava</dd></dl></li><li><span class="flow-kind">서버</span><p>내 글인가(아니면 404) → 지운 글인가(아니면 409) → 내가 지웠나(아니면 403) → 30일 안인가(지났으면 410)</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>UPDATE post SET deleted_at = NULL, deleted_by = NULL WHERE id = 61</dd><dt>note</dt><dd>updated_at은 그대로 — 내용을 고친 게 아니다</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{&quot;id&quot;: 61, &quot;status&quot;: &quot;PUBLISHED&quot;, ...}</dd></dl></li><li><span class="flow-kind">화면</span><p>'글을 되살렸어요' — 원래 자리(발행 시각 그대로)에 다시 보인다</p></li></ol></details><details class="scenario-flow"><summary>운영자가 지운 글</summary><ol><li><span class="flow-kind">사용자</span><p>예전 글 주소로 복구를 시도한다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts/62/restore</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-kimjava</dd></dl></li><li><span class="flow-kind">서버</span><p>deleted_by = 1(운영자) — 작성자라도 되살릴 수 없다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>403</dd><dt>body</dt><dd>{&quot;status&quot;: 403, &quot;detail&quot;: &quot;직접 지운 글만 되살릴 수 있습니다.&quot;}</dd></dl></li><li><span class="flow-kind">화면</span><p>'운영자가 삭제한 글은 되살릴 수 없어요'</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<p><strong>V22</strong> — <code>db/migration/V22__add_post_deleted_by.sql</code></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>변경</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>컬럼</td>
+<td><code>post.deleted_by BIGINT NULL</code>(FK → <code>member</code>) — 지운 회원</td>
+</tr>
+<tr>
+<td>기존 행</td>
+<td>고치지 않는다. 이 컬럼 전에 지운 글(예: 8번)은 누가 지웠는지 모르므로 <code>NULL</code> — 휴지통에 안 나오고 작성자가 되살릴 수 없다</td>
+</tr>
+<tr>
+<td>삭제(3-2)</td>
+<td><code>DELETE /api/posts/{id}</code>가 <code>deleted_at</code>과 함께 <code>deleted_by</code> = 지운 회원(작성자 또는 운영자)을 채운다</td>
+</tr>
+</tbody></table></div>
+<p><strong>휴지통</strong> — <code>GET /api/me/trash</code></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>인증</td>
+<td>필요 — 토큰이 없으면 <code>401</code></td>
+</tr>
+<tr>
+<td>대상</td>
+<td><code>author_id</code> = 나 <strong>그리고</strong> <code>deleted_by</code> = 나, 지운 지 30일 안</td>
+</tr>
+<tr>
+<td>정렬</td>
+<td><code>deleted_at</code> 최신 → <code>id</code> 큰 순</td>
+</tr>
+<tr>
+<td>응답</td>
+<td><code>200</code> <code>{ &quot;items&quot;: [ { &quot;id&quot;, &quot;boardSlug&quot;, &quot;title&quot;, &quot;deletedAt&quot;, &quot;restoreUntil&quot; } ] }</code> — <code>restoreUntil</code> = <code>deletedAt</code> + 30일</td>
+</tr>
+</tbody></table></div>
+<p><strong>복구</strong> — <code>POST /api/posts/{id}/restore</code></p>
+<p>요청 값 규칙 — 본문은 없다. 어떤 값에도 <code>500</code>이 나오면 안 된다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>값</th>
+<th>필수</th>
+<th>형식</th>
+<th>틀렸을 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>경로 <code>{id}</code></td>
+<td>예</td>
+<td>양의 정수</td>
+<td>숫자가 아니면 <code>400</code>, 없는 글이면 <code>404</code></td>
+</tr>
+<tr>
+<td>토큰</td>
+<td>예</td>
+<td><code>Bearer</code></td>
+<td><code>401</code></td>
+</tr>
+</tbody></table></div>
+<p>아래 순서대로 확인한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>순서</th>
+<th>상황</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>없는 글, 또는 <strong>내 글이 아님</strong>(지웠든 아니든)</td>
+<td><code>404</code> — 남의 지운 글이 있다는 것도 숨긴다</td>
+</tr>
+<tr>
+<td>2</td>
+<td>내 글인데 지운 글이 아님</td>
+<td><code>409</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>내 글인데 <strong>다른 사람(운영자)이 지움</strong>, 또는 누가 지웠는지 모름(<code>deleted_by</code> NULL)</td>
+<td><code>403</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>지운 지 30일이 지남</td>
+<td><code>410 Gone</code></td>
+</tr>
+<tr>
+<td>—</td>
+<td>그 밖(내가 지운 내 글, 30일 안)</td>
+<td><code>200</code>, 상세 모양(2-1·11-1). <code>deleted_at</code>·<code>deleted_by</code>를 비운다. <code>updated_at</code>·<code>published_at</code>은 그대로</td>
+</tr>
+</tbody></table></div>
+<p>되살린 글은 상세·목록·검색에 원래대로(같은 <code>published_at</code> 자리에) 다시 나온다. 좋아요·댓글·태그·이미지는 지울 때 건드리지 않았으므로 그대로 붙어 있다(3-2 R4).</p>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>3-2의 일반 조회는 <code>deleted_at IS NULL</code>인 글만 다룬다. 휴지통은 <strong>그 반대 행</strong>을 읽어야 하므로 조회 목적을 분리한다. 운영자 숨김(<code>status = &#39;HIDDEN&#39;</code>)은 삭제 시각과 관계없는 별도 상태다.</p>
+<details>
+<summary>Controller / DTO — 휴지통 목록과 복구 응답</summary>
+
+<p><code>MyPostController.java</code>와 <code>PostController.java</code>의 변경 부분이다. 토큰 없는 휴지통 요청은 직접 <code>401</code>로 막고, 복구 응답은 기존 상세 DTO를 재사용한다.</p>
+<pre><code class="language-java">@GetMapping(&quot;/api/me/trash&quot;)
+public MyTrashResponse myTrash(@LoginMember AuthenticatedMember loginMember) {
+    if (loginMember == null) throw new AuthenticationRequiredException(&quot;인증이 필요합니다.&quot;);
+    return postService.myTrash(loginMember);
+}
+
+@PostMapping(&quot;/{id}/restore&quot;) // PostController의 /api/posts 아래
+public PostDetailResponse restore(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+    if (id &lt;= 0) throw new InvalidPostFieldException(&quot;id&quot;, &quot;id는 양의 정수여야 합니다.&quot;);
+    return toDetailResponse(postService.restore(id, loginMember));
+}
+
+public record MyTrashItemResponse(Long id, String boardSlug, String title,
+                                  LocalDateTime deletedAt, LocalDateTime restoreUntil) {}
+public record MyTrashResponse(List&lt;MyTrashItemResponse&gt; items) {}</code></pre>
+<p><code>restoreUntil</code>은 <code>deletedAt.plusDays(RESTORE_DAYS)</code>로 만든다. 삭제 기록이나 <code>deletedBy</code>는 일반 상세 DTO에 넣지 않는다.</p>
+</details>
+
+<details>
+<summary>Service — 삭제된 행을 잠그고 순서대로 검사</summary>
+
+<p><code>PostService.restore</code>의 판정 순서다. 글 행을 먼저 잠가 삭제와 복구, 중복 복구가 겹쳐도 최신 상태를 기준으로 한 번씩 처리한다.</p>
+<pre><code class="language-java">@Transactional
+public Post restore(Long id, AuthenticatedMember loginMember) {
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+    if (!post.getAuthor().getId().equals(loginMember.id())) throw new PostNotFoundException();
+    if (post.getDeletedAt() == null) throw new PostNotDeletedException();
+    if (!loginMember.id().equals(post.getDeletedBy())) throw new PostRestoreForbiddenException();
+    if (post.getDeletedAt().plusDays(RESTORE_DAYS).isBefore(LocalDateTime.now(clock)))
+        throw new PostRestoreExpiredException();
+    post.restore(); // deletedAt·deletedBy만 null, publishedAt·updatedAt 유지
+    // 응답에 필요한 지연 로딩 연관은 트랜잭션 안에서 읽는다.
+    return post;
+}</code></pre>
+<p><code>postAccessPolicy.canView()</code>는 삭제된 글을 누구에게나 거절하므로 복구에 쓰지 않는다. 작성자와 삭제자를 각각 확인하며, 휴지통 목록과 복구가 같은 <code>Clock</code>·30일 기준을 쓴다.</p>
+</details>
+
+<details>
+<summary>JPA / Repository — 살아 있는 글과 삭제된 글의 조회 경로</summary>
+
+<pre><code class="language-java">@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query(&quot;SELECT p FROM Post p WHERE p.id = :id&quot;)
+Optional&lt;Post&gt; findByIdForUpdate(Long id);
+
+@Query(&quot;&quot;&quot;
+    SELECT p FROM Post p JOIN FETCH p.board
+    WHERE p.author.id = :memberId AND p.deletedBy = :memberId
+      AND p.deletedAt IS NOT NULL AND p.deletedAt &gt;= :since
+    ORDER BY p.deletedAt DESC, p.id DESC
+    &quot;&quot;&quot;)
+List&lt;Post&gt; findMyTrash(Long memberId, LocalDateTime since);</code></pre>
+<p>휴지통과 복구는 삭제된 행을 읽어야 한다. 일반 상세는 <code>PostAccessPolicy</code>에서 삭제된 글을 숨긴다. 전역 <code>deleted_at IS NULL</code> 필터를 엔티티에 붙이면 휴지통·복구 조회에서도 행이 사라질 수 있다.</p>
+</details>
+
+<details>
+<summary>MyBatis Mapper — 휴지통 조회·삭제·복구의 대체 구현</summary>
+
+<p>정답의 <strong>MyBatis 대체 구현 코드</strong> 토글에서 <code>MyTrashMapper.java</code>·XML·<code>MyTrashRow.java</code>·<code>PostService.java</code> 전문을 볼 수 있다. 목록은 필요한 열만 <code>post</code>와 <code>board</code>에서 읽고, 삭제자는 로그인 회원 id를 <code>#{deletedBy}</code>로 바인딩한다.</p>
+<pre><code class="language-xml">&lt;select id=&quot;findMyTrash&quot; resultMap=&quot;trashRow&quot;&gt;
+    SELECT p.id, b.slug AS board_slug, p.title, p.deleted_at
+    FROM post p JOIN board b ON b.id = p.board_id
+    WHERE p.author_id = #{memberId} AND p.deleted_by = #{memberId}
+      AND p.deleted_at IS NOT NULL AND p.deleted_at &gt;= #{since}
+    ORDER BY p.deleted_at DESC, p.id DESC
+&lt;/select&gt;
+&lt;update id=&quot;restore&quot;&gt;
+    UPDATE post SET deleted_at = NULL, deleted_by = NULL
+    WHERE id = #{id} AND deleted_by = #{deletedBy} AND deleted_at = #{deletedAt}
+&lt;/update&gt;</code></pre>
+<p>Service의 <code>findByIdForUpdate</code>와 권한·만료 검사는 동일하다. Mapper의 삭제·복구 <code>UPDATE</code> 이후 JPA 영속성 컨텍스트의 글을 <code>EntityManager.refresh</code>로 갱신한다. 같은 트랜잭션의 다음 조회와 복구 상세 응답이 최신 상태를 보게 한다.</p>
+</details>
+
+<details>
+<summary>DB / SQL — 삭제와 숨김을 따로 검산</summary>
+
+<pre><code class="language-sql">SELECT id, status, deleted_at, deleted_by
+FROM post WHERE id IN (@deleted_id, @hidden_id);
+
+SELECT id FROM post
+WHERE author_id = @me AND deleted_by = @me
+  AND deleted_at &gt;= NOW() - INTERVAL 30 DAY
+ORDER BY deleted_at DESC, id DESC;</code></pre>
+<p><code>@deleted_id</code>, <code>@hidden_id</code>, <code>@me</code>는 직접 확인에서 얻은 실제 id를 <code>SET</code>으로 지정한다. 숨김만 된 글은 첫 쿼리에 <code>HIDDEN</code>이지만 <code>deleted_at</code>은 <code>NULL</code>이며, 둘째 휴지통에는 나오지 않는다.</p>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/common/ApiExceptionHandler.java</summary><pre><code>package org.example.common;
+
+<p>import jakarta.servlet.http.HttpServletRequest;
+import tools.jackson.core.JacksonException;
+import org.example.admin.AdminOnlyException;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.MemberNotActiveException;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardWriteForbiddenException;
+import org.example.bookmark.BookmarkFolderNotFoundException;
+import org.example.bookmark.InvalidBookmarkFieldException;
+import org.example.bookmark.BookmarkNotFoundException;
+import org.example.bookmark.DuplicateBookmarkFolderNameException;
+import org.example.bookmark.InvalidBookmarkFolderException;
+import org.example.comment.CommentForbiddenException;
+import org.example.comment.CommentNotFoundException;
+import org.example.comment.InvalidParentCommentException;
+import org.example.image.EmptyImageException;
+import org.example.image.ImageNotFoundException;
+import org.example.image.UnsupportedImageException;
+import org.example.like.SelfLikeNotAllowedException;
+import org.example.notification.NotificationNotFoundException;
+import org.example.post.InvalidParametersException;
+import org.example.post.InvalidPostFieldException;
+import org.example.post.InvalidSearchConditionException;
+import org.example.post.PostForbiddenException;
+import org.example.post.PostNotDeletedException;
+import org.example.post.PostNotDraftException;
+import org.example.post.PostRestoreExpiredException;
+import org.example.post.PostRestoreForbiddenException;
+import org.example.post.PostNotFoundException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;</p>
+<p>import java.net.URI;
+import java.util.List;
+import java.util.Map;</p>
+<p>// 모든 컨트롤러의 에러 응답을 한 곳에서 RFC 9457 Problem Details로 만든다.
+// 컨트롤러마다 try-catch를 두지 않는다.
+@RestControllerAdvice
+public class ApiExceptionHandler {</p>
+<pre><code>@ExceptionHandler(MethodArgumentNotValidException.class)
+public ProblemDetail handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    List&amp;lt;Map&amp;lt;String, String&amp;gt;&amp;gt; errors = ex.getBindingResult().getFieldErrors().stream()
+            .map(fieldError -&amp;gt; Map.of(
+                    &amp;quot;field&amp;quot;, fieldError.getField(),
+                    &amp;quot;message&amp;quot;, fieldError.getDefaultMessage() == null ? &amp;quot;&amp;quot; : fieldError.getDefaultMessage()
+            ))
+            .toList();
+    problem.setProperty(&amp;quot;errors&amp;quot;, errors);
+    return problem;
+}
+
+@ExceptionHandler(HttpMessageNotReadableException.class)
+public ProblemDetail handleUnreadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;요청 본문을 읽을 수 없습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    // 11-1 JSON 문법은 맞는데 한 필드의 형식이 틀린 경우(숫자 자리에 &amp;quot;abc&amp;quot;, 목록 자리에 문자열) —
+    // Jackson이 남긴 경로로 어느 필드인지 errors에 담는다. 목록 안이면 Bean Validation과 같은 모양(imageIds[0]).
+    // JSON 문법 자체가 깨졌으면 경로가 비어 있어 errors 없이 400만 나간다. Jackson은 첫 오류에서 멈추므로 하나만 들어간다.
+    if (ex.getCause() instanceof JacksonException jackson &amp;amp;&amp;amp; !jackson.getPath().isEmpty()) {
+        problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, fieldPath(jackson), &amp;quot;message&amp;quot;, &amp;quot;형식이 올바르지 않습니다.&amp;quot;)));
+    }
+    return problem;
+}
+
+// 11-1 경로·쿼리 값의 형식 오류(/api/posts/abc, ?size=abc) — 그대로 두면 Spring 기본 응답이라 어느 값이 틀렸는지 없다
+@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, ex.getName(),
+            &amp;quot;message&amp;quot;, &amp;quot;형식이 올바르지 않습니다: &amp;quot; + ex.getValue())));
+    return problem;
+}
+
+private static String fieldPath(JacksonException jackson) {
+    StringBuilder field = new StringBuilder();
+    for (JacksonException.Reference ref : jackson.getPath()) {
+        if (ref.getPropertyName() != null) {
+            if (!field.isEmpty()) {
+                field.append('.');
+            }
+            field.append(ref.getPropertyName());
+        } else {
+            field.append('[').append(ref.getIndex()).append(']');
+        }
+    }
+    return field.toString();
+}
+
+@ExceptionHandler(BoardNotFoundException.class)
+public ProblemDetail handleBoardNotFound(BoardNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostNotFoundException.class)
+public ProblemDetail handlePostNotFound(PostNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(BoardWriteForbiddenException.class)
+public ProblemDetail handleBoardWriteForbidden(BoardWriteForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(SelfLikeNotAllowedException.class)
+public ProblemDetail handleSelfLikeNotAllowed(SelfLikeNotAllowedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostForbiddenException.class)
+public ProblemDetail handlePostForbidden(PostForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-1 임시저장이 아닌 글을 발행 — 지금 상태와 충돌
+@ExceptionHandler(PostNotDraftException.class)
+public ProblemDetail handlePostNotDraft(PostNotDraftException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-5 복구
+@ExceptionHandler(PostNotDeletedException.class)
+public ProblemDetail handlePostNotDeleted(PostNotDeletedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostRestoreForbiddenException.class)
+public ProblemDetail handlePostRestoreForbidden(PostRestoreForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostRestoreExpiredException.class)
+public ProblemDetail handlePostRestoreExpired(PostRestoreExpiredException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.GONE, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-2 이미지 업로드
+@ExceptionHandler(EmptyImageException.class)
+public ProblemDetail handleEmptyImage(EmptyImageException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(UnsupportedImageException.class)
+public ProblemDetail handleUnsupportedImage(UnsupportedImageException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// spring.servlet.multipart.max-file-size를 넘으면 컨트롤러에 오기 전에(요청을 읽는 단계에서) 터진다
+@ExceptionHandler(MaxUploadSizeExceededException.class)
+public ProblemDetail handleMaxUploadSize(HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONTENT_TOO_LARGE, &amp;quot;파일은 1MB까지 올릴 수 있습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(ImageNotFoundException.class)
+public ProblemDetail handleImageNotFound(ImageNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-4 쿼리 파라미터 여러 개를 한꺼번에 검사한 결과
+@ExceptionHandler(InvalidParametersException.class)
+public ProblemDetail handleInvalidParameters(InvalidParametersException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, ex.getErrors().entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .map(e -&amp;gt; Map.of(&amp;quot;field&amp;quot;, e.getKey(), &amp;quot;message&amp;quot;, e.getValue()))
+            .toList());
+    return problem;
+}
+
+@ExceptionHandler(InvalidPostFieldException.class)
+public ProblemDetail handleInvalidPostField(InvalidPostFieldException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, ex.getField(), &amp;quot;message&amp;quot;, ex.getMessage())));
+    return problem;
+}
+
+@ExceptionHandler(CommentNotFoundException.class)
+public ProblemDetail handleCommentNotFound(CommentNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidParentCommentException.class)
+public ProblemDetail handleInvalidParentComment(InvalidParentCommentException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(CommentForbiddenException.class)
+public ProblemDetail handleCommentForbidden(CommentForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(BookmarkFolderNotFoundException.class)
+public ProblemDetail handleBookmarkFolderNotFound(BookmarkFolderNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(BookmarkNotFoundException.class)
+public ProblemDetail handleBookmarkNotFound(BookmarkNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidBookmarkFolderException.class)
+public ProblemDetail handleInvalidBookmarkFolder(InvalidBookmarkFolderException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(DuplicateBookmarkFolderNameException.class)
+public ProblemDetail handleDuplicateBookmarkFolderName(DuplicateBookmarkFolderNameException ex,
+                                                       HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidCursorException.class)
+public ProblemDetail handleInvalidCursor(InvalidCursorException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidSearchConditionException.class)
+public ProblemDetail handleInvalidSearchCondition(InvalidSearchConditionException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(AdminOnlyException.class)
+public ProblemDetail handleAdminOnly(AdminOnlyException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(NotificationNotFoundException.class)
+public ProblemDetail handleNotificationNotFound(NotificationNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidBookmarkFieldException.class)
+public ProblemDetail handleInvalidBookmarkField(InvalidBookmarkFieldException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, ex.getField(), &amp;quot;message&amp;quot;, ex.getMessage())));
+    return problem;
+}
+
+// 누구인지 모름 — WWW-Authenticate 헤더를 함께 내려준다
+@ExceptionHandler(AuthenticationRequiredException.class)
+public ResponseEntity&amp;lt;ProblemDetail&amp;gt; handleAuthenticationRequired(AuthenticationRequiredException ex,
+                                                                   HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .header(HttpHeaders.WWW_AUTHENTICATE, &amp;quot;Bearer&amp;quot;)
+            .body(problem);
+}
+
+// 누구인지는 알지만(토큰은 유효) 회원 상태 때문에 안 됨
+@ExceptionHandler(MemberNotActiveException.class)
+public ProblemDetail handleMemberNotActive(MemberNotActiveException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/post/MyPostController.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>// /api/me/... 중 글에 관한 것 — 11-1 내 임시저장 글
+@RestController
+public class MyPostController {</p>
+<pre><code>private final PostService postService;
+
+public MyPostController(PostService postService) {
+    this.postService = postService;
+}
+
+@GetMapping(&amp;quot;/api/me/drafts&amp;quot;)
+public MyDraftsResponse myDrafts(@LoginMember AuthenticatedMember loginMember) {
+    // GET은 토큰 없이도 인터셉터를 통과한다 — 내 목록은 누구인지 알아야 하므로 여기서 401
+    if (loginMember == null) {
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+    return postService.myDrafts(loginMember);
+}
+
+// 11-5 휴지통
+@GetMapping(&amp;quot;/api/me/trash&amp;quot;)
+public MyTrashResponse myTrash(@LoginMember AuthenticatedMember loginMember) {
+    if (loginMember == null) {
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+    return postService.myTrash(loginMember);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/MyTrashItemResponse.java</summary><pre><code>package org.example.post;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 11-5 휴지통 항목 — restoreUntil이 지나면 되살릴 수 없다
+public record MyTrashItemResponse(Long id, String boardSlug, String title, LocalDateTime deletedAt,
+                                  LocalDateTime restoreUntil) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/MyTrashResponse.java</summary><pre><code>package org.example.post;
+
+<p>import java.util.List;</p>
+<p>// 11-5 GET /api/me/trash
+public record MyTrashResponse(List&lt;MyTrashItemResponse&gt; items) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Entity — src/main/java/org/example/post/Post.java</summary><pre><code>package org.example.post;
+
+<p>import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.Table;
+import org.example.board.Board;
+import org.example.image.PostImage;
+import org.example.member.Member;
+import org.example.tag.Tag;</p>
+<p>import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;</p>
+<p>// post 테이블 엔티티 — like_count·comment_count는 목록 성능용 비정규화 컬럼
+@Entity
+@Table(name = &quot;post&quot;)
+public class Post {</p>
+<pre><code>private static final int EXCERPT_LENGTH = 100;
+
+@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &amp;quot;board_id&amp;quot;, nullable = false)
+private Board board;
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &amp;quot;author_id&amp;quot;, nullable = false)
+private Member author;
+
+@Column(nullable = false)
+private String title;
+
+@Column(nullable = false, columnDefinition = &amp;quot;text&amp;quot;)
+private String content;
+
+// 9-3 목록용 요약 — 본문 앞 100자. 본문이 바뀌는 곳(생성자·changeContent)에서만 계산한다
+@Column(nullable = false, length = 120)
+private String excerpt;
+
+@Column(nullable = false)
+private String status;
+
+@Column(nullable = false)
+private String visibility;
+
+@Column(name = &amp;quot;view_count&amp;quot;, nullable = false)
+private Integer viewCount;
+
+@Column(name = &amp;quot;like_count&amp;quot;, nullable = false)
+private Integer likeCount;
+
+@Column(name = &amp;quot;comment_count&amp;quot;, nullable = false)
+private Integer commentCount;
+
+@Column(name = &amp;quot;published_at&amp;quot;)
+private LocalDateTime publishedAt;
+
+@Column(name = &amp;quot;created_at&amp;quot;, nullable = false)
+private LocalDateTime createdAt;
+
+@Column(name = &amp;quot;updated_at&amp;quot;, nullable = false)
+private LocalDateTime updatedAt;
+
+@Column(name = &amp;quot;deleted_at&amp;quot;)
+private LocalDateTime deletedAt;
+
+// 11-5 지운 회원 id(V22). 이 컬럼 전에 지운 글은 null
+@Column(name = &amp;quot;deleted_by&amp;quot;)
+private Long deletedBy;
+
+@ManyToMany(fetch = FetchType.LAZY)
+@JoinTable(
+        name = &amp;quot;post_tag&amp;quot;,
+        joinColumns = @JoinColumn(name = &amp;quot;post_id&amp;quot;),
+        inverseJoinColumns = @JoinColumn(name = &amp;quot;tag_id&amp;quot;)
+)
+private Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+
+// 11-2 첨부 이미지 — 연결은 post_image.post_id가 갖는다(주인은 PostImage). 올린 순서(id)대로
+@OneToMany(mappedBy = &amp;quot;post&amp;quot;)
+@OrderBy(&amp;quot;id&amp;quot;)
+private List&amp;lt;PostImage&amp;gt; images = new ArrayList&amp;lt;&amp;gt;();
+
+protected Post() {
+    // JPA
+}
+
+public Post(Board board, Member author, String title, String content,
+            String status, String visibility, LocalDateTime now) {
+    this.board = board;
+    this.author = author;
+    this.title = title;
+    this.content = content;
+    this.excerpt = excerptOf(content);
+    this.status = status;
+    this.visibility = visibility;
+    this.viewCount = 0;
+    this.likeCount = 0;
+    this.commentCount = 0;
+    // 11-1 임시저장 글은 아직 발행되지 않았다 — 발행 시각은 publish()에서 채운다
+    this.publishedAt = &amp;quot;PUBLISHED&amp;quot;.equals(status) ? now : null;
+    this.createdAt = now;
+    this.updatedAt = now;
+}
+
+public void addTag(Tag tag) {
+    tags.add(tag);
+}
+
+public void replace(String title, String content, String visibility, Set&amp;lt;Tag&amp;gt; tags,
+                    LocalDateTime now) {
+    this.title = title;
+    changeContent(content);
+    this.visibility = visibility;
+    this.tags.clear();
+    this.tags.addAll(tags);
+    this.updatedAt = now;
+}
+
+// 3-1 부분 수정 — 값 검증은 PostService가 미리 하고, 엔티티는 바꾸기만 한다
+public void changeTitle(String title) {
+    this.title = title;
+}
+
+public void changeContent(String content) {
+    this.content = content;
+    this.excerpt = excerptOf(content);
+}
+
+// MySQL LEFT(content, 100)과 같은 결과가 나오게 &amp;quot;문자(코드 포인트)&amp;quot; 기준으로 자른다.
+// String.substring은 UTF-16 단위라 이모지 같은 문자가 끼면 반쪽이 잘리거나 개수가 어긋난다.
+private static String excerptOf(String content) {
+    if (content.codePointCount(0, content.length()) &amp;lt;= EXCERPT_LENGTH) {
+        return content;
+    }
+    return content.substring(0, content.offsetByCodePoints(0, EXCERPT_LENGTH));
+}
+
+// 11-1 발행 — 임시저장(DRAFT)인지는 PostService가 먼저 확인한다.
+// 발행 시각은 &amp;quot;처음 쓴 시각&amp;quot;이 아니라 &amp;quot;공개된 시각&amp;quot;이다(목록 정렬 기준이 published_at).
+public void publish(LocalDateTime now) {
+    this.status = &amp;quot;PUBLISHED&amp;quot;;
+    this.publishedAt = now;
+    this.updatedAt = now;
+}
+
+public void changeVisibility(String visibility) {
+    this.visibility = visibility;
+}
+
+public void replaceTags(Set&amp;lt;Tag&amp;gt; newTags) {
+    this.tags.clear();
+    this.tags.addAll(newTags);
+}
+
+public void touchUpdatedAt(LocalDateTime now) {
+    this.updatedAt = now;
+}
+
+// soft delete — 행은 남기고 deleted_at만 채운다. 좋아요·댓글·태그 연결은 건드리지 않는다.
+// 11-5 누가 지웠는지(deletedBy)도 남긴다 — 휴지통·복구 권한에 쓴다
+public void delete(LocalDateTime now, Long deletedBy) {
+    this.deletedAt = now;
+    this.deletedBy = deletedBy;
+    this.updatedAt = now;
+}
+
+// 11-5 복구 — 지운 표시만 지운다. 내용을 고친 게 아니므로 updated_at은 그대로 둔다(T-002의 &amp;quot;수정됨&amp;quot;이 켜지지 않게)
+public void restore() {
+    this.deletedAt = null;
+    this.deletedBy = null;
+}
+
+
+public Long getId() {
+    return id;
+}
+
+public Board getBoard() {
+    return board;
+}
+
+public Member getAuthor() {
+    return author;
+}
+
+public String getTitle() {
+    return title;
+}
+
+public String getContent() {
+    return content;
+}
+
+public String getExcerpt() {
+    return excerpt;
+}
+
+public String getStatus() {
+    return status;
+}
+
+public String getVisibility() {
+    return visibility;
+}
+
+public Integer getViewCount() {
+    return viewCount;
+}
+
+public Integer getLikeCount() {
+    return likeCount;
+}
+
+public Integer getCommentCount() {
+    return commentCount;
+}
+
+public LocalDateTime getPublishedAt() {
+    return publishedAt;
+}
+
+public LocalDateTime getCreatedAt() {
+    return createdAt;
+}
+
+public LocalDateTime getUpdatedAt() {
+    return updatedAt;
+}
+
+public LocalDateTime getDeletedAt() {
+    return deletedAt;
+}
+
+public Long getDeletedBy() {
+    return deletedBy;
+}
+
+public Set&amp;lt;Tag&amp;gt; getTags() {
+    return tags;
+}
+
+public List&amp;lt;PostImage&amp;gt; getImages() {
+    return images;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/post/PostController.java</summary><pre><code>package org.example.post;
+
+<p>import jakarta.validation.Valid;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.example.tag.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>import java.net.URI;
+import java.util.List;</p>
+<p>@RestController
+@RequestMapping(&quot;/api/posts&quot;)
+public class PostController {</p>
+<pre><code>private static final Logger log = LoggerFactory.getLogger(PostController.class);
+
+private final PostService postService;
+private final PostQueryService postQueryService;
+
+public PostController(PostService postService, PostQueryService postQueryService) {
+    this.postService = postService;
+    this.postQueryService = postQueryService;
+}
+
+@GetMapping(&amp;quot;/{id}&amp;quot;)
+public PostDetailResponse getOne(@PathVariable Long id, @LoginMember AuthenticatedMember viewer) {
+    return postQueryService.getDetail(id, viewer);
+}
+
+@PostMapping
+public ResponseEntity&amp;lt;PostResponse&amp;gt; create(@LoginMember AuthenticatedMember loginMember,
+                                            @Valid @RequestBody PostCreateRequest request) {
+    log.info(&amp;quot;게시글 작성 요청 제목: {}&amp;quot;, request.title());
+
+    Post post = postService.create(loginMember.id(), request);
+    PostResponse response = toResponse(post);
+
+    return ResponseEntity.created(URI.create(&amp;quot;/api/posts/&amp;quot; + post.getId())).body(response);
+}
+
+@PostMapping(&amp;quot;/{sourceId}/copies&amp;quot;)
+public ResponseEntity&amp;lt;PostResponse&amp;gt; copy(@PathVariable Long sourceId,
+                                         @RequestParam(defaultValue = &amp;quot;false&amp;quot;) boolean copyTags,
+                                         @LoginMember AuthenticatedMember loginMember,
+                                         @Valid @RequestBody CopyPostRequest request) {
+    Post post = postService.copy(sourceId, loginMember.id(), copyTags, request);
+    return ResponseEntity.created(URI.create(&amp;quot;/api/posts/&amp;quot; + post.getId()))
+            .body(toResponse(post));
+}
+
+@PutMapping(&amp;quot;/{id}&amp;quot;)
+public PostDetailResponse replace(@PathVariable Long id,
+                                  @LoginMember AuthenticatedMember loginMember,
+                                  @Valid @RequestBody PostReplaceRequest request) {
+    return postService.replace(id, loginMember, request);
+}
+
+@PatchMapping(&amp;quot;/{id}&amp;quot;)
+public PostDetailResponse patch(@PathVariable Long id,
+                                 @LoginMember AuthenticatedMember loginMember,
+                                 @RequestBody PostUpdateRequest request) {
+    Post post = postService.patch(id, loginMember, request);
+    return toDetailResponse(post);
+}
+
+// 11-1 임시저장 글 발행
+@PostMapping(&amp;quot;/{id}/publish&amp;quot;)
+public PostDetailResponse publish(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+    return toDetailResponse(postService.publish(id, loginMember));
+}
+
+// 11-5 휴지통에서 되살리기
+@PostMapping(&amp;quot;/{id}/restore&amp;quot;)
+public PostDetailResponse restore(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+    if (id &amp;lt;= 0) throw new InvalidPostFieldException(&amp;quot;id&amp;quot;, &amp;quot;id는 양의 정수여야 합니다.&amp;quot;);
+    return toDetailResponse(postService.restore(id, loginMember));
+}
+
+@DeleteMapping(&amp;quot;/{id}&amp;quot;)
+@ResponseStatus(HttpStatus.NO_CONTENT)
+public void delete(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+    postService.delete(id, loginMember);
+}
+
+private PostDetailResponse toDetailResponse(Post post) {
+    List&amp;lt;String&amp;gt; tagNames = post.getTags().stream().map(Tag::getName).toList();
+    AuthorResponse author = new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname());
+    return new PostDetailResponse(
+            post.getId(),
+            post.getBoard().getSlug(),
+            post.getTitle(),
+            post.getContent(),
+            tagNames,
+            post.getVisibility(),
+            author,
+            post.getViewCount(),
+            post.getLikeCount(),
+            post.getCommentCount(),
+            post.getImages().stream().map(i -&amp;gt; new ImageResponse(i.getId(), i.url())).toList(),
+            post.getStatus(),
+            post.getPublishedAt(),
+            post.getCreatedAt()
+    );
+}
+
+private PostResponse toResponse(Post post) {
+    List&amp;lt;String&amp;gt; tagNames = post.getTags().stream().map(Tag::getName).toList();
+    AuthorResponse author = new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname());
+    return new PostResponse(
+            post.getId(),
+            post.getBoard().getSlug(),
+            post.getTitle(),
+            post.getContent(),
+            tagNames,
+            post.getVisibility(),
+            author,
+            post.getStatus(),
+            post.getPublishedAt(),
+            post.getCreatedAt()
+    );
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/post/PostNotDeletedException.java</summary><pre><code>package org.example.post;
+
+<p>// 11-5 지운 글이 아닌데 복구하려 함 — 전역 핸들러가 409로 바꾼다
+public class PostNotDeletedException extends RuntimeException {</p>
+<pre><code>public PostNotDeletedException() {
+    super(&amp;quot;지운 글이 아닙니다.&amp;quot;);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/post/PostRepository.java</summary><pre><code>package org.example.post;
+
+<p>import jakarta.persistence.LockModeType;
+import org.example.board.Board;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;</p>
+<p>import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>// Spring Data JPA가 구현을 만들어 준다(1-3의 메모리 구현을 대체)
+public interface PostRepository extends JpaRepository&lt;Post, Long&gt; {</p>
+<pre><code>// 발행 중 같은 글을 다시 발행하지 않도록 트랜잭션 끝까지 글 행을 잠근다.
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query(&amp;quot;SELECT p FROM Post p WHERE p.id = :id&amp;quot;)
+java.util.Optional&amp;lt;Post&amp;gt; findByIdForUpdate(@Param(&amp;quot;id&amp;quot;) Long id);
+
+// 6-5: 두 표시의 합집합/교집합을 페이지 적용 전에 DB에서 판정한다.
+@EntityGraph(attributePaths = {&amp;quot;author&amp;quot;, &amp;quot;board&amp;quot;})
+@Query(value = &amp;quot;&amp;quot;&amp;quot;
+        SELECT p FROM Post p
+        WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deletedAt IS NULL
+          AND NOT EXISTS (SELECT 1 FROM MemberBlock b
+              WHERE (b.blocker.id = :memberId AND b.blocked = p.author)
+                 OR (b.blocked.id = :memberId AND b.blocker = p.author))
+          AND (:liked = false OR EXISTS (SELECT 1 FROM PostLike l
+              WHERE l.member.id = :memberId AND l.post = p))
+          AND (:bookmarked = false OR EXISTS (SELECT 1 FROM Bookmark bm
+              WHERE bm.member.id = :memberId AND bm.post = p))
+          AND (EXISTS (SELECT 1 FROM PostLike l
+              WHERE l.member.id = :memberId AND l.post = p)
+               OR EXISTS (SELECT 1 FROM Bookmark bm
+              WHERE bm.member.id = :memberId AND bm.post = p))
+        &amp;quot;&amp;quot;&amp;quot;,
+        countQuery = &amp;quot;&amp;quot;&amp;quot;
+        SELECT COUNT(p) FROM Post p
+        WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deletedAt IS NULL
+          AND NOT EXISTS (SELECT 1 FROM MemberBlock b
+              WHERE (b.blocker.id = :memberId AND b.blocked = p.author)
+                 OR (b.blocked.id = :memberId AND b.blocker = p.author))
+          AND (:liked = false OR EXISTS (SELECT 1 FROM PostLike l
+              WHERE l.member.id = :memberId AND l.post = p))
+          AND (:bookmarked = false OR EXISTS (SELECT 1 FROM Bookmark bm
+              WHERE bm.member.id = :memberId AND bm.post = p))
+          AND (EXISTS (SELECT 1 FROM PostLike l
+              WHERE l.member.id = :memberId AND l.post = p)
+               OR EXISTS (SELECT 1 FROM Bookmark bm
+              WHERE bm.member.id = :memberId AND bm.post = p))
+        &amp;quot;&amp;quot;&amp;quot;)
+Page&amp;lt;Post&amp;gt; findMarkedPosts(@Param(&amp;quot;memberId&amp;quot;) Long memberId,
+                           @Param(&amp;quot;liked&amp;quot;) boolean liked,
+                           @Param(&amp;quot;bookmarked&amp;quot;) boolean bookmarked,
+                           Pageable pageable);
+
+// 2-3의 &amp;quot;볼 수 있나&amp;quot; 규칙 중 목록에 해당하는 부분을 쿼리로 옮긴 것 — PostAccessPolicy.canView와
+// 같은 규칙이지만, 목록은 PUBLISHED 글만 대상이다(자기 임시저장·운영자 숨김 글도 목록에는 넣지 않는다).
+// 메모리에서 거르지 않고 쿼리에서 걸러야 페이지 크기·totalElements가 맞는다.
+//
+// Page&amp;lt;Post&amp;gt; 대신 List&amp;lt;Post&amp;gt; + 아래 countViewableByBoard를 따로 둔다: Page&amp;lt;&amp;gt;로 받으면
+// Spring Data가 &amp;quot;content 개수 &amp;lt; size면 count 쿼리를 생략&amp;quot;하는 최적화를 적용해서, size=5(꽉 찬
+// 페이지, count 쿼리 나감)와 size=20(13개뿐이라 마지막 페이지, count 쿼리 생략)의 SQL 문장 수가
+// 13과1씩 달라졌다(2-4의 PostListQueryCountTest가 요구하는 &amp;quot;size와 무관하게 문장 수 동일&amp;quot;이 깨짐).
+// count를 항상 명시적으로 실행해 문장 수를 size와 무관하게 고정한다(R2와도 맞다).
+@Query(&amp;quot;&amp;quot;&amp;quot;
+        SELECT p FROM Post p
+        JOIN FETCH p.author
+        WHERE p.board = :board
+          AND p.deletedAt IS NULL
+          AND p.status = 'PUBLISHED'
+          AND (
+               p.visibility = 'PUBLIC'
+               OR (:viewerId IS NOT NULL AND p.author.id = :viewerId)
+               OR (:viewerId IS NOT NULL AND EXISTS (
+                       SELECT 1 FROM Follow f
+                       WHERE f.follower.id = :viewerId AND f.followee = p.author))
+          )
+          AND (
+               :viewerId IS NULL OR NOT EXISTS (
+                   SELECT 1 FROM MemberBlock b
+                   WHERE (b.blocker.id = :viewerId AND b.blocked = p.author)
+                      OR (b.blocked.id = :viewerId AND b.blocker = p.author)
+               )
+          )
+        &amp;quot;&amp;quot;&amp;quot;)
+List&amp;lt;Post&amp;gt; findViewableByBoard(@Param(&amp;quot;board&amp;quot;) Board board,
+                                @Param(&amp;quot;viewerId&amp;quot;) Long viewerId,
+                                Pageable pageable);
+
+// findViewableByBoard와 같은 조건의 건수 — 반드시 같이 고친다
+@Query(&amp;quot;&amp;quot;&amp;quot;
+        SELECT COUNT(p) FROM Post p
+        WHERE p.board = :board
+          AND p.deletedAt IS NULL
+          AND p.status = 'PUBLISHED'
+          AND (
+               p.visibility = 'PUBLIC'
+               OR (:viewerId IS NOT NULL AND p.author.id = :viewerId)
+               OR (:viewerId IS NOT NULL AND EXISTS (
+                       SELECT 1 FROM Follow f
+                       WHERE f.follower.id = :viewerId AND f.followee = p.author))
+          )
+          AND (
+               :viewerId IS NULL OR NOT EXISTS (
+                   SELECT 1 FROM MemberBlock b
+                   WHERE (b.blocker.id = :viewerId AND b.blocked = p.author)
+                      OR (b.blocked.id = :viewerId AND b.blocker = p.author)
+               )
+          )
+        &amp;quot;&amp;quot;&amp;quot;)
+long countViewableByBoard(@Param(&amp;quot;board&amp;quot;) Board board, @Param(&amp;quot;viewerId&amp;quot;) Long viewerId);
+
+@Query(&amp;quot;&amp;quot;&amp;quot;
+        SELECT p FROM Post p
+        JOIN FETCH p.author a
+        JOIN p.board b
+        WHERE a.id = :memberId
+          AND b.slug = :boardSlug
+          AND p.status = 'PUBLISHED'
+          AND p.visibility = 'PUBLIC'
+          AND p.deletedAt IS NULL
+        ORDER BY p.publishedAt DESC, p.id DESC
+        &amp;quot;&amp;quot;&amp;quot;)
+List&amp;lt;Post&amp;gt; findPublicPostsByAuthorAndBoard(@Param(&amp;quot;memberId&amp;quot;) Long memberId,
+                                            @Param(&amp;quot;boardSlug&amp;quot;) String boardSlug);
+// 4-2: &amp;quot;읽고 +1 해서 저장&amp;quot; 대신 DB가 한 번에 더한다 — 두 요청이 동시에 와도 읽고 쓰는 사이에
+// 끼어들 틈이 없다(갱신 손실 방지). 영속성 컨텍스트를 거치지 않으므로 최신 값은 findLikeCountById로 다시 읽는다.
+@Modifying
+@Query(&amp;quot;UPDATE Post p SET p.likeCount = p.likeCount + 1 WHERE p.id = :id&amp;quot;)
+int incrementLikeCount(@Param(&amp;quot;id&amp;quot;) Long id);
+
+@Modifying
+@Query(&amp;quot;UPDATE Post p SET p.likeCount = p.likeCount - 1 WHERE p.id = :id AND p.likeCount &amp;gt; 0&amp;quot;)
+int decrementLikeCount(@Param(&amp;quot;id&amp;quot;) Long id);
+
+@Query(&amp;quot;SELECT p.likeCount FROM Post p WHERE p.id = :id&amp;quot;)
+Integer findLikeCountById(@Param(&amp;quot;id&amp;quot;) Long id);
+
+// 11-1 내 임시저장 글 — 게시판 slug를 같이 쓰므로 fetch join(글마다 board를 따로 읽지 않는다)
+@Query(&amp;quot;&amp;quot;&amp;quot;
+        SELECT p FROM Post p JOIN FETCH p.board
+         WHERE p.author.id = :authorId AND p.status = 'DRAFT' AND p.deletedAt IS NULL
+         ORDER BY p.updatedAt DESC, p.id DESC
+        &amp;quot;&amp;quot;&amp;quot;)
+List&amp;lt;Post&amp;gt; findMyDrafts(@Param(&amp;quot;authorId&amp;quot;) Long authorId);
+
+// 11-3 조회수 +1 — 4-2의 좋아요 수처럼 DB가 한 문장 안에서 더한다. 다시 읽는 값은 findViewCountById로
+@Modifying
+@Query(&amp;quot;UPDATE Post p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id&amp;quot;)
+int incrementViewCount(@Param(&amp;quot;id&amp;quot;) Long id);
+
+// REPEATABLE READ의 오래된 읽기 스냅샷 대신 현재 커밋된 값을 본다.
+@Query(nativeQuery = true, value = &amp;quot;SELECT view_count FROM post WHERE id = :id FOR UPDATE&amp;quot;)
+Integer findViewCountById(@Param(&amp;quot;id&amp;quot;) Long id);
+
+// 11-5 휴지통 — 내가 쓰고 내가 지운 글, since 이후에 지운 것만(30일 안)
+@Query(&amp;quot;&amp;quot;&amp;quot;
+        SELECT p FROM Post p JOIN FETCH p.board
+         WHERE p.author.id = :memberId AND p.deletedBy = :memberId
+           AND p.deletedAt IS NOT NULL AND p.deletedAt &amp;gt;= :since
+         ORDER BY p.deletedAt DESC, p.id DESC
+        &amp;quot;&amp;quot;&amp;quot;)
+List&amp;lt;Post&amp;gt; findMyTrash(@Param(&amp;quot;memberId&amp;quot;) Long memberId, @Param(&amp;quot;since&amp;quot;) LocalDateTime since);
+
+// 5-1: 댓글 저장과 같은 트랜잭션에서 comment_count를 원자적으로 올린다(4-2와 같은 방식)
+@Modifying
+@Query(&amp;quot;UPDATE Post p SET p.commentCount = p.commentCount + 1 WHERE p.id = :id&amp;quot;)
+int incrementCommentCount(@Param(&amp;quot;id&amp;quot;) Long id);
+
+// 5-3: 댓글 삭제와 같은 트랜잭션에서 내린다
+@Modifying
+@Query(&amp;quot;UPDATE Post p SET p.commentCount = p.commentCount - 1 WHERE p.id = :id AND p.commentCount &amp;gt; 0&amp;quot;)
+int decrementCommentCount(@Param(&amp;quot;id&amp;quot;) Long id);
+
+// 8-2: 기간 [from, to) 안의 좋아요×3 + 댓글(삭제 제외)×1. 누적 like_count(어긋날 수 있음)를 쓰지 않고
+// 기간 안의 행을 센다. 글마다 따로 세지 않고 미리 집계한 서브쿼리 두 개를 LEFT JOIN한다.
+// 볼 수 있는 글(비로그인 기준)·점수 &amp;gt; 0·정렬·LIMIT을 모두 DB에서 처리한다.
+@Query(nativeQuery = true, value = &amp;quot;&amp;quot;&amp;quot;
+        SELECT p.id AS postId,
+               p.title AS title,
+               COALESCE(l.cnt, 0) * 3 + COALESCE(c.cnt, 0) AS score,
+               COALESCE(l.cnt, 0) AS likes,
+               COALESCE(c.cnt, 0) AS comments
+          FROM post p
+          LEFT JOIN (SELECT post_id, COUNT(*) AS cnt
+                       FROM post_like
+                      WHERE created_at &amp;gt;= :from AND created_at &amp;lt; :to
+                      GROUP BY post_id) l ON l.post_id = p.id
+          LEFT JOIN (SELECT post_id, COUNT(*) AS cnt
+                       FROM comment
+                      WHERE deleted_at IS NULL AND created_at &amp;gt;= :from AND created_at &amp;lt; :to
+                      GROUP BY post_id) c ON c.post_id = p.id
+         WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL
+           AND (l.cnt IS NOT NULL OR c.cnt IS NOT NULL)
+         ORDER BY score DESC, p.published_at DESC, p.id DESC
+         LIMIT :limit
+        &amp;quot;&amp;quot;&amp;quot;)
+List&amp;lt;PopularPostRow&amp;gt; findPopular(@Param(&amp;quot;from&amp;quot;) LocalDateTime from,
+                                 @Param(&amp;quot;to&amp;quot;) LocalDateTime to,
+                                 @Param(&amp;quot;limit&amp;quot;) int limit);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/post/PostRestoreExpiredException.java</summary><pre><code>package org.example.post;
+
+<p>// 11-5 지운 지 30일이 지나 복구 기간이 끝남 — 410 Gone
+public class PostRestoreExpiredException extends RuntimeException {</p>
+<pre><code>public PostRestoreExpiredException() {
+    super(&amp;quot;복구할 수 있는 기간(30일)이 지났습니다.&amp;quot;);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/post/PostRestoreForbiddenException.java</summary><pre><code>package org.example.post;
+
+<p>// 11-5 운영자 등 다른 사람이 지운 글이거나 누가 지웠는지 모르는 글 — 작성자도 되살릴 수 없다(403)
+public class PostRestoreForbiddenException extends RuntimeException {</p>
+<pre><code>public PostRestoreForbiddenException() {
+    super(&amp;quot;직접 지운 글만 되살릴 수 있습니다.&amp;quot;);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/post/PostService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.board.Board;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardRepository;
+import org.example.board.BoardWriteForbiddenException;
+import org.example.image.PostImage;
+import org.example.image.PostImageRepository;
+import tools.jackson.databind.JsonNode;
+import org.example.member.Member;
+import org.example.member.MemberRepository;
+import org.example.tag.Tag;
+import org.example.tag.TagRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;</p>
+<p>// 글 만들기·고치기 규칙. HTTP(ResponseEntity, 헤더 등)는 알지 않는다.
+@Service
+public class PostService {</p>
+<pre><code>private static final String ADMIN_WRITE_ROLE = &amp;quot;ADMIN&amp;quot;;
+private static final String ADMIN_ROLE = &amp;quot;ADMIN&amp;quot;;
+private static final String DEFAULT_VISIBILITY = &amp;quot;PUBLIC&amp;quot;;
+private static final String PUBLISHED = &amp;quot;PUBLISHED&amp;quot;;
+private static final String DRAFT = &amp;quot;DRAFT&amp;quot;;
+// 11-5 지운 뒤 이 기간 안에만 되살릴 수 있다
+private static final int RESTORE_DAYS = 30;
+
+// 1-5(PostCreateRequest)와 같은 규칙 — PATCH는 Bean Validation(@Valid)으로 표현할 수 없다
+// (null=그대로, 값이 있을 때만 검사해야 하는데 @NotBlank는 null도 실패로 본다). 숫자만이라도
+// 같은 값을 쓰도록 여기 모아 둔다.
+private static final int TITLE_MAX_LENGTH = 200;
+private static final int TAGS_MAX_COUNT = 5;
+private static final int TAG_NAME_MAX_LENGTH = 30;
+
+private final PostRepository postRepository;
+private final BoardRepository boardRepository;
+private final MemberRepository memberRepository;
+private final TagRepository tagRepository;
+private final PostAccessPolicy accessPolicy;
+private final PostImageRepository postImageRepository;
+private final Clock clock;
+
+public PostService(PostRepository postRepository, BoardRepository boardRepository,
+                    MemberRepository memberRepository, TagRepository tagRepository,
+                    PostAccessPolicy accessPolicy, PostImageRepository postImageRepository, Clock clock) {
+    this.postRepository = postRepository;
+    this.boardRepository = boardRepository;
+    this.memberRepository = memberRepository;
+    this.tagRepository = tagRepository;
+    this.accessPolicy = accessPolicy;
+    this.postImageRepository = postImageRepository;
+    this.clock = clock;
+}
+
+@Transactional
+public Post create(Long authorId, PostCreateRequest request) {
+    Board board = boardRepository.findBySlug(request.boardSlug())
+            .orElseThrow(() -&amp;gt; new BoardNotFoundException(request.boardSlug()));
+    // 작성자는 요청 본문이 아니라 토큰으로 인증된 회원에서 받는다(authorId 같은 값은 무시한다)
+    Member author = memberRepository.getReferenceById(authorId);
+
+    if (ADMIN_WRITE_ROLE.equals(board.getWriteRole()) &amp;amp;&amp;amp; !ADMIN_ROLE.equals(author.getRole())) {
+        throw new BoardWriteForbiddenException(board.getSlug());
+    }
+
+    String visibility = request.visibility() != null ? request.visibility() : DEFAULT_VISIBILITY;
+    // 11-1 상태를 안 보내면 지금처럼 바로 발행. DRAFT면 published_at은 비워 둔다(Post 생성자)
+    String status = request.status() != null ? request.status() : PUBLISHED;
+    LocalDateTime now = LocalDateTime.now();
+    Post post = new Post(board, author, request.title(), request.content(),
+            status, visibility, now);
+
+    for (Tag tag : resolveTags(request.tags(), now)) {
+        post.addTag(tag);
+    }
+
+    Post saved = postRepository.save(post);
+    attachImages(saved, authorId, request.imageIds());
+    // 트랜잭션(영속성 컨텍스트) 안에서 지연 로딩 연관을 미리 읽어 둔다.
+    // open-in-view: false라서 컨트롤러가 트랜잭션 밖에서 건드리면 LazyInitializationException이 난다.
+    saved.getAuthor().getNickname();
+    saved.getTags().forEach(Tag::getName);
+    return saved;
+}
+
+// 11-2 내가 올렸고 아직 어느 글에도 안 붙은 이미지만 붙일 수 있다. 하나라도 아니면 400(글도 저장 안 됨 — 같은 트랜잭션)
+private void attachImages(Post post, Long authorId, JsonNode imageIds) {
+    if (imageIds == null || imageIds.isNull()) {
+        return;
+    }
+    if (!imageIds.isArray()) {
+        throw new InvalidPostFieldException(&amp;quot;imageIds&amp;quot;, &amp;quot;이미지 ID는 숫자 배열이어야 합니다.&amp;quot;);
+    }
+    if (imageIds.size() == 0) {
+        return;
+    }
+    List&amp;lt;Long&amp;gt; requestedIds = new java.util.ArrayList&amp;lt;&amp;gt;();
+    for (int index = 0; index &amp;lt; imageIds.size(); index++) {
+        JsonNode id = imageIds.get(index);
+        if (!id.isIntegralNumber() || !id.canConvertToLong()) {
+            throw new InvalidPostFieldException(&amp;quot;imageIds[&amp;quot; + index + &amp;quot;]&amp;quot;, &amp;quot;이미지 ID는 정수여야 합니다.&amp;quot;);
+        }
+        requestedIds.add(id.longValue());
+    }
+    List&amp;lt;Long&amp;gt; ids = requestedIds.stream().distinct().sorted().toList();
+    if (ids.size() &amp;gt; 10) {
+        throw new InvalidPostFieldException(&amp;quot;imageIds&amp;quot;, &amp;quot;이미지는 10개까지입니다.&amp;quot;);
+    }
+    List&amp;lt;PostImage&amp;gt; images = postImageRepository.findAllByIdForUpdate(ids);
+    boolean allUsable = images.size() == ids.size() &amp;amp;&amp;amp; images.stream().allMatch(image -&amp;gt;
+            image.getUploader().getId().equals(authorId) &amp;amp;&amp;amp; image.getPost() == null);
+    if (!allUsable) {
+        throw new InvalidPostFieldException(&amp;quot;imageIds&amp;quot;, &amp;quot;내가 올렸고 아직 글에 붙지 않은 이미지만 붙일 수 있습니다.&amp;quot;);
+    }
+    images.forEach(image -&amp;gt; {
+        image.attachTo(post);
+        post.getImages().add(image);
+    });
+}
+
+@Transactional
+public Post copy(Long sourceId, Long authorId, boolean copyTags, CopyPostRequest request) {
+    Post source = postRepository.findById(sourceId).orElseThrow(PostNotFoundException::new);
+    if (source.getDeletedAt() != null || !&amp;quot;PUBLISHED&amp;quot;.equals(source.getStatus())
+            || !&amp;quot;PUBLIC&amp;quot;.equals(source.getVisibility())) {
+        throw new PostNotFoundException();
+    }
+    Member author = memberRepository.getReferenceById(authorId);
+    if (ADMIN_WRITE_ROLE.equals(source.getBoard().getWriteRole())
+            &amp;amp;&amp;amp; !ADMIN_ROLE.equals(author.getRole())) {
+        throw new BoardWriteForbiddenException(source.getBoard().getSlug());
+    }
+    LocalDateTime now = LocalDateTime.now();
+    Post copied = new Post(source.getBoard(), author, request.title(), source.getContent(),
+            &amp;quot;PUBLISHED&amp;quot;, &amp;quot;PUBLIC&amp;quot;, now);
+    if (copyTags) {
+        source.getTags().forEach(copied::addTag);
+    }
+    Post saved = postRepository.save(copied);
+    saved.getBoard().getSlug();
+    saved.getAuthor().getNickname();
+    saved.getTags().forEach(Tag::getName);
+    return saved;
+}
+
+@Transactional
+public PostDetailResponse replace(Long id, AuthenticatedMember me, PostReplaceRequest request) {
+    Post post = postRepository.findByIdForUpdate(id).orElseThrow(PostNotFoundException::new);
+    if (!accessPolicy.canView(me, post)) {
+        throw new PostNotFoundException();
+    }
+    if (!post.getAuthor().getId().equals(me.id())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+    Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+    for (String name : distinctTagNames(request.tags())) {
+        tags.add(tagRepository.findByName(name)
+                .orElseGet(() -&amp;gt; tagRepository.save(new Tag(name, now))));
+    }
+    post.replace(request.title(), request.content(), request.visibility(), tags, now);
+
+    return new PostDetailResponse(post.getId(), post.getBoard().getSlug(), post.getTitle(),
+            post.getContent(), post.getTags().stream().map(Tag::getName).toList(),
+            post.getVisibility(),
+            new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+            post.getViewCount(), post.getLikeCount(), post.getCommentCount(),
+            post.getImages().stream().map(i -&amp;gt; new ImageResponse(i.getId(), i.url())).toList(),
+            post.getStatus(), post.getPublishedAt(), post.getCreatedAt());
+}
+
+@Transactional
+public Post patch(Long id, AuthenticatedMember loginMember, PostUpdateRequest request) {
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+
+    // 404(볼 수 없음)를 먼저 확인하고, 그다음에 403(작성자 아님)을 확인한다.
+    // 반대로 하면 볼 수 없는 글의 존재가 403으로 드러난다.
+    if (!accessPolicy.canView(loginMember, post)) {
+        throw new PostNotFoundException();
+    }
+    if (!post.getAuthor().getId().equals(loginMember.id())) {
+        throw new PostForbiddenException();
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+
+    if (request.title() != null) {
+        validateTitle(request.title());
+        post.changeTitle(request.title());
+    }
+    if (request.content() != null) {
+        validateContent(request.content());
+        post.changeContent(request.content());
+    }
+    if (request.tags() != null) {
+        validateTags(request.tags());
+        post.replaceTags(resolveTags(request.tags(), now));
+    }
+    if (request.visibility() != null) {
+        validateVisibility(request.visibility());
+        post.changeVisibility(request.visibility());
+    }
+    // boardSlug는 요청에 와도 무시한다(게시판은 못 옮긴다) — PostUpdateRequest에 아예 없다.
+
+    post.touchUpdatedAt(now);
+
+    // 트랜잭션 안에서 지연 로딩 연관을 미리 읽어 둔다(컨트롤러가 세션 밖에서 DTO를 만든다).
+    // board는 findById로 읽은 프록시라 건드리지 않으면 LazyInitializationException이 난다
+    // (create()의 board는 findBySlug로 이미 로딩된 엔티티라 같은 문제가 없었다).
+    post.getBoard().getSlug();
+    post.getAuthor().getNickname();
+    post.getTags().forEach(Tag::getName);
+    post.getImages().forEach(PostImage::getStoredName);
+    return post;
+}
+
+// 11-1 임시저장 글 발행 — 404(볼 수 없음) → 403(작성자 아님) → 409(임시저장이 아님) 순서
+@Transactional
+public Post publish(Long id, AuthenticatedMember loginMember) {
+    // 같은 임시저장 글의 발행 요청을 직렬화해 두 번째 요청은 커밋 뒤 상태를 본다.
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+    if (!accessPolicy.canView(loginMember, post)) {
+        throw new PostNotFoundException();
+    }
+    if (!post.getAuthor().getId().equals(loginMember.id())) {
+        throw new PostForbiddenException();
+    }
+    if (!DRAFT.equals(post.getStatus())) {
+        throw new PostNotDraftException();
+    }
+    post.publish(LocalDateTime.now());
+
+    post.getBoard().getSlug();
+    post.getAuthor().getNickname();
+    post.getTags().forEach(Tag::getName);
+    post.getImages().forEach(PostImage::getStoredName);
+    return post;
+}
+
+// 11-1 내 임시저장 글 — 최근에 고친 것부터. 지운 글은 빠진다
+@Transactional(readOnly = true)
+public MyDraftsResponse myDrafts(AuthenticatedMember loginMember) {
+    List&amp;lt;MyDraftItemResponse&amp;gt; items = postRepository.findMyDrafts(loginMember.id()).stream()
+            .map(p -&amp;gt; new MyDraftItemResponse(p.getId(), p.getBoard().getSlug(), p.getTitle(), p.getUpdatedAt()))
+            .toList();
+    return new MyDraftsResponse(items);
+}
+
+// 11-5 휴지통 — 내가 지운 내 글 중 아직 복구할 수 있는 것(지운 지 30일 안), 최근에 지운 순
+@Transactional(readOnly = true)
+public MyTrashResponse myTrash(AuthenticatedMember loginMember) {
+    LocalDateTime now = LocalDateTime.now(clock);
+    List&amp;lt;MyTrashItemResponse&amp;gt; items = postRepository.findMyTrash(loginMember.id(), now.minusDays(RESTORE_DAYS)).stream()
+            .map(p -&amp;gt; new MyTrashItemResponse(p.getId(), p.getBoard().getSlug(), p.getTitle(), p.getDeletedAt(),
+                    p.getDeletedAt().plusDays(RESTORE_DAYS)))
+            .toList();
+    return new MyTrashResponse(items);
+}
+
+// 11-5 복구 — 404(없음·내 글 아님) → 409(지운 글 아님) → 403(내가 지운 게 아님) → 410(30일 지남) 순서.
+// 지운 글은 2-3 규칙(canView)으로는 아무도 못 보므로, 여기서는 &amp;quot;작성자인가&amp;quot;를 직접 확인한다.
+@Transactional
+public Post restore(Long id, AuthenticatedMember loginMember) {
+    // 삭제·중복 복구와 경합할 때 판정 이후의 상태 변경까지 직렬화한다.
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+    if (!post.getAuthor().getId().equals(loginMember.id())) {
+        throw new PostNotFoundException();
+    }
+    if (post.getDeletedAt() == null) {
+        throw new PostNotDeletedException();
+    }
+    if (!loginMember.id().equals(post.getDeletedBy())) {
+        throw new PostRestoreForbiddenException();
+    }
+    if (post.getDeletedAt().plusDays(RESTORE_DAYS).isBefore(LocalDateTime.now(clock))) {
+        throw new PostRestoreExpiredException();
+    }
+    post.restore();
+
+    post.getBoard().getSlug();
+    post.getAuthor().getNickname();
+    post.getTags().forEach(Tag::getName);
+    post.getImages().forEach(PostImage::getStoredName);
+    return post;
+}
+
+@Transactional
+public void delete(Long id, AuthenticatedMember loginMember) {
+    // 발행과 삭제가 같은 글을 동시에 갱신하지 않도록 행을 잠근다.
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+
+    // 404(볼 수 없음·이미 삭제됨) → 403(작성자도 운영자도 아님) 순서
+    if (!accessPolicy.canView(loginMember, post)) {
+        throw new PostNotFoundException();
+    }
+    boolean isAuthor = post.getAuthor().getId().equals(loginMember.id());
+    boolean isAdmin = ADMIN_ROLE.equals(loginMember.role());
+    if (!isAuthor &amp;amp;&amp;amp; !isAdmin) {
+        throw new PostForbiddenException();
+    }
+
+    post.delete(LocalDateTime.now(clock), loginMember.id());
+}
+
+private void validateTitle(String title) {
+    if (title.isBlank()) {
+        throw new InvalidPostFieldException(&amp;quot;title&amp;quot;, &amp;quot;제목을 입력해 주세요.&amp;quot;);
+    }
+    if (title.length() &amp;gt; TITLE_MAX_LENGTH) {
+        throw new InvalidPostFieldException(&amp;quot;title&amp;quot;, &amp;quot;제목은 &amp;quot; + TITLE_MAX_LENGTH + &amp;quot;자 이하여야 합니다.&amp;quot;);
+    }
+}
+
+private void validateContent(String content) {
+    if (content.isBlank()) {
+        throw new InvalidPostFieldException(&amp;quot;content&amp;quot;, &amp;quot;본문을 입력해 주세요.&amp;quot;);
+    }
+}
+
+private void validateTags(List&amp;lt;String&amp;gt; tags) {
+    if (tags.size() &amp;gt; TAGS_MAX_COUNT) {
+        throw new InvalidPostFieldException(&amp;quot;tags&amp;quot;, &amp;quot;태그는 &amp;quot; + TAGS_MAX_COUNT + &amp;quot;개까지입니다.&amp;quot;);
+    }
+    for (String tag : tags) {
+        if (tag == null || tag.isBlank() || tag.length() &amp;gt; TAG_NAME_MAX_LENGTH) {
+            throw new InvalidPostFieldException(&amp;quot;tags&amp;quot;, &amp;quot;태그 이름은 1~&amp;quot; + TAG_NAME_MAX_LENGTH + &amp;quot;자여야 합니다.&amp;quot;);
+        }
+    }
+}
+
+private void validateVisibility(String visibility) {
+    if (!&amp;quot;PUBLIC&amp;quot;.equals(visibility) &amp;amp;&amp;amp; !&amp;quot;FOLLOWERS&amp;quot;.equals(visibility)) {
+        throw new InvalidPostFieldException(&amp;quot;visibility&amp;quot;, &amp;quot;공개 범위는 PUBLIC 또는 FOLLOWERS여야 합니다.&amp;quot;);
+    }
+}
+
+// 이름으로 찾고 없으면 만든다. 요청 안의 중복은 제거한다(1-4/1-5와 같은 규칙, 3-1에서도 재사용).
+private Set&amp;lt;Tag&amp;gt; resolveTags(List&amp;lt;String&amp;gt; tagNames, LocalDateTime now) {
+    Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+    for (String tagName : distinctTagNames(tagNames)) {
+        Tag tag = tagRepository.findByName(tagName)
+                .orElseGet(() -&amp;gt; tagRepository.save(new Tag(tagName, now)));
+        tags.add(tag);
+    }
+    return tags;
+}
+
+private List&amp;lt;String&amp;gt; distinctTagNames(List&amp;lt;String&amp;gt; tags) {
+    if (tags == null) {
+        return List.of();
+    }
+    Set&amp;lt;String&amp;gt; seen = new LinkedHashSet&amp;lt;&amp;gt;(tags);
+    return List.copyOf(seen);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DB / SQL — src/main/resources/db/migration/V22__add_post_deleted_by.sql</summary><pre><code>-- V22(11-5) — 누가 지웠나. 휴지통은 &quot;내가 지운 내 글&quot;만 보여 주고, 운영자가 지운 글은 작성자가 되살리지 못한다.
+-- NULL 허용 컬럼 추가라 기존 행을 고치지 않는다. 이 컬럼이 생기기 전에 지운 글(deleted_at만 있는 행)은
+-- 누가 지웠는지 모르므로 NULL로 남고, 휴지통에도 나오지 않는다(복구는 운영 문의로).
+ALTER TABLE post
+    ADD COLUMN deleted_by BIGINT NULL AFTER deleted_at,
+    ADD CONSTRAINT fk_post_deleted_by FOREIGN KEY (deleted_by) REFERENCES member (id);
+</code></pre></details>
+
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/11-5.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="mybatis-대체-구현-코드"><a class="anchor" href="#mybatis-대체-구현-코드" aria-hidden="true">#</a>MyBatis 대체 구현 코드</h2>
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {
+    id 'java'
+    // bootRun / bootJar 태스크 제공 + 실행 가능한 fat jar 패키징
+    id 'org.springframework.boot' version '4.1.1'
+    // Boot BOM을 적용해서 아래 의존성들의 버전을 생략할 수 있게 해줌
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+<p>group = &#39;org.example&#39;
+version = &#39;1.0-SNAPSHOT&#39;</p>
+<p>java {
+    toolchain {
+        // 컴파일·실행 JDK를 고정 (Boot 4는 Java 17 이상 필요, 로컬에 설치된 21 사용)
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}</p>
+<p>repositories {
+    mavenCentral()
+}</p>
+<p>dependencies {
+    implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;
+    compileOnly &#39;org.projectlombok:lombok&#39;
+    annotationProcessor &#39;org.projectlombok:lombok&#39;
+    // Spring MVC + 내장 Tomcat + Jackson (Boot 4부터 starter-web → starter-webmvc로 이름 변경)
+    implementation &#39;org.springframework.boot:spring-boot-starter-webmvc&#39;
+    // JPA(Hibernate) + HikariCP 커넥션 풀
+    implementation &#39;org.springframework.boot:spring-boot-starter-data-jpa&#39;
+    // @Valid, @NotBlank 같은 요청 값 검증
+    implementation &#39;org.springframework.boot:spring-boot-starter-validation&#39;
+    // MySQL JDBC 드라이버 — 컴파일엔 필요 없고 실행할 때만 필요
+    runtimeOnly &#39;com.mysql:mysql-connector-j&#39;
+    // 9-1 스키마 변경은 Flyway 마이그레이션(db/migration)으로만 한다
+    implementation &#39;org.springframework.boot:spring-boot-starter-flyway&#39;
+    runtimeOnly &#39;org.flywaydb:flyway-mysql&#39;</p>
+<pre><code>// 테스트: JUnit·AssertJ·Mockito·MockMvc 묶음 (버전은 Boot BOM이 관리하므로 junit-bom 따로 두지 않음)
+testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+// @DataJpaTest(리포지토리만 띄우는 테스트)
+testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+// 테스트용 일회용 MySQL 컨테이너 — application-test.yml의 jdbc:tc: URL이 쓴다
+testImplementation 'org.testcontainers:testcontainers-mysql'
+// Gradle이 JUnit Platform 테스트를 실행할 때 필요한 런처
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'</code></pre>
+<p>}</p>
+<p>tasks.named(&#39;test&#39;) {
+    useJUnitPlatform()
+    // 테스트는 application-test.yml(Testcontainers MySQL)을 쓰게 한다
+    systemProperty &#39;spring.profiles.active&#39;, &#39;test&#39;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/post/MyTrashMapper.java</summary><pre><code>package org.example.post;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>// 11-5 대체 경로: 휴지통 조회와 삭제·복구의 DB 변경을 명시적 SQL로 수행한다.
+@Mapper
+public interface MyTrashMapper {
+    List&lt;MyTrashRow&gt; findMyTrash(@Param(&quot;memberId&quot;) Long memberId, @Param(&quot;since&quot;) LocalDateTime since);</p>
+<pre><code>int softDelete(@Param(&amp;quot;id&amp;quot;) Long id, @Param(&amp;quot;deletedBy&amp;quot;) Long deletedBy,
+               @Param(&amp;quot;now&amp;quot;) LocalDateTime now);
+
+int restore(@Param(&amp;quot;id&amp;quot;) Long id, @Param(&amp;quot;deletedBy&amp;quot;) Long deletedBy,
+            @Param(&amp;quot;deletedAt&amp;quot;) LocalDateTime deletedAt);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/MyTrashRow.java</summary><pre><code>package org.example.post;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// MyBatis 휴지통 목록은 응답에 필요한 열만 읽는다.
+public record MyTrashRow(Long id, String boardSlug, String title, LocalDateTime deletedAt) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/post/PostService.java</summary><pre><code>package org.example.post;
+
+<p>import jakarta.persistence.EntityManager;</p>
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.board.Board;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardRepository;
+import org.example.board.BoardWriteForbiddenException;
+import org.example.image.PostImage;
+import org.example.image.PostImageRepository;
+import tools.jackson.databind.JsonNode;
+import org.example.member.Member;
+import org.example.member.MemberRepository;
+import org.example.tag.Tag;
+import org.example.tag.TagRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;</p>
+<p>// 글 만들기·고치기 규칙. HTTP(ResponseEntity, 헤더 등)는 알지 않는다.
+@Service
+public class PostService {</p>
+<pre><code>private static final String ADMIN_WRITE_ROLE = &amp;quot;ADMIN&amp;quot;;
+private static final String ADMIN_ROLE = &amp;quot;ADMIN&amp;quot;;
+private static final String DEFAULT_VISIBILITY = &amp;quot;PUBLIC&amp;quot;;
+private static final String PUBLISHED = &amp;quot;PUBLISHED&amp;quot;;
+private static final String DRAFT = &amp;quot;DRAFT&amp;quot;;
+// 11-5 지운 뒤 이 기간 안에만 되살릴 수 있다
+private static final int RESTORE_DAYS = 30;
+
+// 1-5(PostCreateRequest)와 같은 규칙 — PATCH는 Bean Validation(@Valid)으로 표현할 수 없다
+// (null=그대로, 값이 있을 때만 검사해야 하는데 @NotBlank는 null도 실패로 본다). 숫자만이라도
+// 같은 값을 쓰도록 여기 모아 둔다.
+private static final int TITLE_MAX_LENGTH = 200;
+private static final int TAGS_MAX_COUNT = 5;
+private static final int TAG_NAME_MAX_LENGTH = 30;
+
+private final PostRepository postRepository;
+private final BoardRepository boardRepository;
+private final MemberRepository memberRepository;
+private final TagRepository tagRepository;
+private final PostAccessPolicy accessPolicy;
+private final PostImageRepository postImageRepository;
+private final MyTrashMapper myTrashMapper;
+private final EntityManager entityManager;
+private final Clock clock;
+
+public PostService(PostRepository postRepository, BoardRepository boardRepository,
+                    MemberRepository memberRepository, TagRepository tagRepository,
+                    PostAccessPolicy accessPolicy, PostImageRepository postImageRepository,
+                    MyTrashMapper myTrashMapper, EntityManager entityManager, Clock clock) {
+    this.postRepository = postRepository;
+    this.boardRepository = boardRepository;
+    this.memberRepository = memberRepository;
+    this.tagRepository = tagRepository;
+    this.accessPolicy = accessPolicy;
+    this.postImageRepository = postImageRepository;
+    this.myTrashMapper = myTrashMapper;
+    this.entityManager = entityManager;
+    this.clock = clock;
+}
+
+@Transactional
+public Post create(Long authorId, PostCreateRequest request) {
+    Board board = boardRepository.findBySlug(request.boardSlug())
+            .orElseThrow(() -&amp;gt; new BoardNotFoundException(request.boardSlug()));
+    // 작성자는 요청 본문이 아니라 토큰으로 인증된 회원에서 받는다(authorId 같은 값은 무시한다)
+    Member author = memberRepository.getReferenceById(authorId);
+
+    if (ADMIN_WRITE_ROLE.equals(board.getWriteRole()) &amp;amp;&amp;amp; !ADMIN_ROLE.equals(author.getRole())) {
+        throw new BoardWriteForbiddenException(board.getSlug());
+    }
+
+    String visibility = request.visibility() != null ? request.visibility() : DEFAULT_VISIBILITY;
+    // 11-1 상태를 안 보내면 지금처럼 바로 발행. DRAFT면 published_at은 비워 둔다(Post 생성자)
+    String status = request.status() != null ? request.status() : PUBLISHED;
+    LocalDateTime now = LocalDateTime.now();
+    Post post = new Post(board, author, request.title(), request.content(),
+            status, visibility, now);
+
+    for (Tag tag : resolveTags(request.tags(), now)) {
+        post.addTag(tag);
+    }
+
+    Post saved = postRepository.save(post);
+    attachImages(saved, authorId, request.imageIds());
+    // 트랜잭션(영속성 컨텍스트) 안에서 지연 로딩 연관을 미리 읽어 둔다.
+    // open-in-view: false라서 컨트롤러가 트랜잭션 밖에서 건드리면 LazyInitializationException이 난다.
+    saved.getAuthor().getNickname();
+    saved.getTags().forEach(Tag::getName);
+    return saved;
+}
+
+// 11-2 내가 올렸고 아직 어느 글에도 안 붙은 이미지만 붙일 수 있다. 하나라도 아니면 400(글도 저장 안 됨 — 같은 트랜잭션)
+private void attachImages(Post post, Long authorId, JsonNode imageIds) {
+    if (imageIds == null || imageIds.isNull()) {
+        return;
+    }
+    if (!imageIds.isArray()) {
+        throw new InvalidPostFieldException(&amp;quot;imageIds&amp;quot;, &amp;quot;이미지 ID는 숫자 배열이어야 합니다.&amp;quot;);
+    }
+    if (imageIds.size() == 0) {
+        return;
+    }
+    List&amp;lt;Long&amp;gt; requestedIds = new java.util.ArrayList&amp;lt;&amp;gt;();
+    for (int index = 0; index &amp;lt; imageIds.size(); index++) {
+        JsonNode id = imageIds.get(index);
+        if (!id.isIntegralNumber() || !id.canConvertToLong()) {
+            throw new InvalidPostFieldException(&amp;quot;imageIds[&amp;quot; + index + &amp;quot;]&amp;quot;, &amp;quot;이미지 ID는 정수여야 합니다.&amp;quot;);
+        }
+        requestedIds.add(id.longValue());
+    }
+    List&amp;lt;Long&amp;gt; ids = requestedIds.stream().distinct().sorted().toList();
+    if (ids.size() &amp;gt; 10) {
+        throw new InvalidPostFieldException(&amp;quot;imageIds&amp;quot;, &amp;quot;이미지는 10개까지입니다.&amp;quot;);
+    }
+    List&amp;lt;PostImage&amp;gt; images = postImageRepository.findAllByIdForUpdate(ids);
+    boolean allUsable = images.size() == ids.size() &amp;amp;&amp;amp; images.stream().allMatch(image -&amp;gt;
+            image.getUploader().getId().equals(authorId) &amp;amp;&amp;amp; image.getPost() == null);
+    if (!allUsable) {
+        throw new InvalidPostFieldException(&amp;quot;imageIds&amp;quot;, &amp;quot;내가 올렸고 아직 글에 붙지 않은 이미지만 붙일 수 있습니다.&amp;quot;);
+    }
+    images.forEach(image -&amp;gt; {
+        image.attachTo(post);
+        post.getImages().add(image);
+    });
+}
+
+@Transactional
+public Post copy(Long sourceId, Long authorId, boolean copyTags, CopyPostRequest request) {
+    Post source = postRepository.findById(sourceId).orElseThrow(PostNotFoundException::new);
+    if (source.getDeletedAt() != null || !&amp;quot;PUBLISHED&amp;quot;.equals(source.getStatus())
+            || !&amp;quot;PUBLIC&amp;quot;.equals(source.getVisibility())) {
+        throw new PostNotFoundException();
+    }
+    Member author = memberRepository.getReferenceById(authorId);
+    if (ADMIN_WRITE_ROLE.equals(source.getBoard().getWriteRole())
+            &amp;amp;&amp;amp; !ADMIN_ROLE.equals(author.getRole())) {
+        throw new BoardWriteForbiddenException(source.getBoard().getSlug());
+    }
+    LocalDateTime now = LocalDateTime.now();
+    Post copied = new Post(source.getBoard(), author, request.title(), source.getContent(),
+            &amp;quot;PUBLISHED&amp;quot;, &amp;quot;PUBLIC&amp;quot;, now);
+    if (copyTags) {
+        source.getTags().forEach(copied::addTag);
+    }
+    Post saved = postRepository.save(copied);
+    saved.getBoard().getSlug();
+    saved.getAuthor().getNickname();
+    saved.getTags().forEach(Tag::getName);
+    return saved;
+}
+
+@Transactional
+public PostDetailResponse replace(Long id, AuthenticatedMember me, PostReplaceRequest request) {
+    Post post = postRepository.findByIdForUpdate(id).orElseThrow(PostNotFoundException::new);
+    if (!accessPolicy.canView(me, post)) {
+        throw new PostNotFoundException();
+    }
+    if (!post.getAuthor().getId().equals(me.id())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+    Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+    for (String name : distinctTagNames(request.tags())) {
+        tags.add(tagRepository.findByName(name)
+                .orElseGet(() -&amp;gt; tagRepository.save(new Tag(name, now))));
+    }
+    post.replace(request.title(), request.content(), request.visibility(), tags, now);
+
+    return new PostDetailResponse(post.getId(), post.getBoard().getSlug(), post.getTitle(),
+            post.getContent(), post.getTags().stream().map(Tag::getName).toList(),
+            post.getVisibility(),
+            new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+            post.getViewCount(), post.getLikeCount(), post.getCommentCount(),
+            post.getImages().stream().map(i -&amp;gt; new ImageResponse(i.getId(), i.url())).toList(),
+            post.getStatus(), post.getPublishedAt(), post.getCreatedAt());
+}
+
+@Transactional
+public Post patch(Long id, AuthenticatedMember loginMember, PostUpdateRequest request) {
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+
+    // 404(볼 수 없음)를 먼저 확인하고, 그다음에 403(작성자 아님)을 확인한다.
+    // 반대로 하면 볼 수 없는 글의 존재가 403으로 드러난다.
+    if (!accessPolicy.canView(loginMember, post)) {
+        throw new PostNotFoundException();
+    }
+    if (!post.getAuthor().getId().equals(loginMember.id())) {
+        throw new PostForbiddenException();
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+
+    if (request.title() != null) {
+        validateTitle(request.title());
+        post.changeTitle(request.title());
+    }
+    if (request.content() != null) {
+        validateContent(request.content());
+        post.changeContent(request.content());
+    }
+    if (request.tags() != null) {
+        validateTags(request.tags());
+        post.replaceTags(resolveTags(request.tags(), now));
+    }
+    if (request.visibility() != null) {
+        validateVisibility(request.visibility());
+        post.changeVisibility(request.visibility());
+    }
+    // boardSlug는 요청에 와도 무시한다(게시판은 못 옮긴다) — PostUpdateRequest에 아예 없다.
+
+    post.touchUpdatedAt(now);
+
+    // 트랜잭션 안에서 지연 로딩 연관을 미리 읽어 둔다(컨트롤러가 세션 밖에서 DTO를 만든다).
+    // board는 findById로 읽은 프록시라 건드리지 않으면 LazyInitializationException이 난다
+    // (create()의 board는 findBySlug로 이미 로딩된 엔티티라 같은 문제가 없었다).
+    post.getBoard().getSlug();
+    post.getAuthor().getNickname();
+    post.getTags().forEach(Tag::getName);
+    post.getImages().forEach(PostImage::getStoredName);
+    return post;
+}
+
+// 11-1 임시저장 글 발행 — 404(볼 수 없음) → 403(작성자 아님) → 409(임시저장이 아님) 순서
+@Transactional
+public Post publish(Long id, AuthenticatedMember loginMember) {
+    // 같은 임시저장 글의 발행 요청을 직렬화해 두 번째 요청은 커밋 뒤 상태를 본다.
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+    if (!accessPolicy.canView(loginMember, post)) {
+        throw new PostNotFoundException();
+    }
+    if (!post.getAuthor().getId().equals(loginMember.id())) {
+        throw new PostForbiddenException();
+    }
+    if (!DRAFT.equals(post.getStatus())) {
+        throw new PostNotDraftException();
+    }
+    post.publish(LocalDateTime.now());
+
+    post.getBoard().getSlug();
+    post.getAuthor().getNickname();
+    post.getTags().forEach(Tag::getName);
+    post.getImages().forEach(PostImage::getStoredName);
+    return post;
+}
+
+// 11-1 내 임시저장 글 — 최근에 고친 것부터. 지운 글은 빠진다
+@Transactional(readOnly = true)
+public MyDraftsResponse myDrafts(AuthenticatedMember loginMember) {
+    List&amp;lt;MyDraftItemResponse&amp;gt; items = postRepository.findMyDrafts(loginMember.id()).stream()
+            .map(p -&amp;gt; new MyDraftItemResponse(p.getId(), p.getBoard().getSlug(), p.getTitle(), p.getUpdatedAt()))
+            .toList();
+    return new MyDraftsResponse(items);
+}
+
+// 11-5 휴지통 — 내가 지운 내 글 중 아직 복구할 수 있는 것(지운 지 30일 안), 최근에 지운 순
+@Transactional(readOnly = true)
+public MyTrashResponse myTrash(AuthenticatedMember loginMember) {
+    LocalDateTime now = LocalDateTime.now(clock);
+    List&amp;lt;MyTrashItemResponse&amp;gt; items = myTrashMapper.findMyTrash(loginMember.id(), now.minusDays(RESTORE_DAYS)).stream()
+            .map(row -&amp;gt; new MyTrashItemResponse(row.id(), row.boardSlug(), row.title(), row.deletedAt(),
+                    row.deletedAt().plusDays(RESTORE_DAYS)))
+            .toList();
+    return new MyTrashResponse(items);
+}
+
+// 11-5 복구 — 404(없음·내 글 아님) → 409(지운 글 아님) → 403(내가 지운 게 아님) → 410(30일 지남) 순서.
+// 지운 글은 2-3 규칙(canView)으로는 아무도 못 보므로, 여기서는 &amp;quot;작성자인가&amp;quot;를 직접 확인한다.
+@Transactional
+public Post restore(Long id, AuthenticatedMember loginMember) {
+    // 삭제·중복 복구와 경합할 때 판정 이후의 상태 변경까지 직렬화한다.
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+    if (!post.getAuthor().getId().equals(loginMember.id())) {
+        throw new PostNotFoundException();
+    }
+    if (post.getDeletedAt() == null) {
+        throw new PostNotDeletedException();
+    }
+    if (!loginMember.id().equals(post.getDeletedBy())) {
+        throw new PostRestoreForbiddenException();
+    }
+    if (post.getDeletedAt().plusDays(RESTORE_DAYS).isBefore(LocalDateTime.now(clock))) {
+        throw new PostRestoreExpiredException();
+    }
+    if (myTrashMapper.restore(id, loginMember.id(), post.getDeletedAt()) != 1) {
+        throw new PostNotDeletedException();
+    }
+    // Mapper UPDATE는 JPA 영속성 컨텍스트를 바꾸지 않으므로 응답용 엔티티를 다시 읽는다.
+    entityManager.refresh(post);
+
+    post.getBoard().getSlug();
+    post.getAuthor().getNickname();
+    post.getTags().forEach(Tag::getName);
+    post.getImages().forEach(PostImage::getStoredName);
+    return post;
+}
+
+@Transactional
+public void delete(Long id, AuthenticatedMember loginMember) {
+    // 발행과 삭제가 같은 글을 동시에 갱신하지 않도록 행을 잠근다.
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+
+    // 404(볼 수 없음·이미 삭제됨) → 403(작성자도 운영자도 아님) 순서
+    if (!accessPolicy.canView(loginMember, post)) {
+        throw new PostNotFoundException();
+    }
+    boolean isAuthor = post.getAuthor().getId().equals(loginMember.id());
+    boolean isAdmin = ADMIN_ROLE.equals(loginMember.role());
+    if (!isAuthor &amp;amp;&amp;amp; !isAdmin) {
+        throw new PostForbiddenException();
+    }
+
+    if (myTrashMapper.softDelete(id, loginMember.id(), LocalDateTime.now(clock)) != 1) {
+        throw new PostNotFoundException();
+    }
+    // 같은 트랜잭션에서 다시 조회해도 삭제 상태가 보이도록 관리 엔티티를 동기화한다.
+    entityManager.refresh(post);
+}
+
+private void validateTitle(String title) {
+    if (title.isBlank()) {
+        throw new InvalidPostFieldException(&amp;quot;title&amp;quot;, &amp;quot;제목을 입력해 주세요.&amp;quot;);
+    }
+    if (title.length() &amp;gt; TITLE_MAX_LENGTH) {
+        throw new InvalidPostFieldException(&amp;quot;title&amp;quot;, &amp;quot;제목은 &amp;quot; + TITLE_MAX_LENGTH + &amp;quot;자 이하여야 합니다.&amp;quot;);
+    }
+}
+
+private void validateContent(String content) {
+    if (content.isBlank()) {
+        throw new InvalidPostFieldException(&amp;quot;content&amp;quot;, &amp;quot;본문을 입력해 주세요.&amp;quot;);
+    }
+}
+
+private void validateTags(List&amp;lt;String&amp;gt; tags) {
+    if (tags.size() &amp;gt; TAGS_MAX_COUNT) {
+        throw new InvalidPostFieldException(&amp;quot;tags&amp;quot;, &amp;quot;태그는 &amp;quot; + TAGS_MAX_COUNT + &amp;quot;개까지입니다.&amp;quot;);
+    }
+    for (String tag : tags) {
+        if (tag == null || tag.isBlank() || tag.length() &amp;gt; TAG_NAME_MAX_LENGTH) {
+            throw new InvalidPostFieldException(&amp;quot;tags&amp;quot;, &amp;quot;태그 이름은 1~&amp;quot; + TAG_NAME_MAX_LENGTH + &amp;quot;자여야 합니다.&amp;quot;);
+        }
+    }
+}
+
+private void validateVisibility(String visibility) {
+    if (!&amp;quot;PUBLIC&amp;quot;.equals(visibility) &amp;amp;&amp;amp; !&amp;quot;FOLLOWERS&amp;quot;.equals(visibility)) {
+        throw new InvalidPostFieldException(&amp;quot;visibility&amp;quot;, &amp;quot;공개 범위는 PUBLIC 또는 FOLLOWERS여야 합니다.&amp;quot;);
+    }
+}
+
+// 이름으로 찾고 없으면 만든다. 요청 안의 중복은 제거한다(1-4/1-5와 같은 규칙, 3-1에서도 재사용).
+private Set&amp;lt;Tag&amp;gt; resolveTags(List&amp;lt;String&amp;gt; tagNames, LocalDateTime now) {
+    Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+    for (String tagName : distinctTagNames(tagNames)) {
+        Tag tag = tagRepository.findByName(tagName)
+                .orElseGet(() -&amp;gt; tagRepository.save(new Tag(tagName, now)));
+        tags.add(tag);
+    }
+    return tags;
+}
+
+private List&amp;lt;String&amp;gt; distinctTagNames(List&amp;lt;String&amp;gt; tags) {
+    if (tags == null) {
+        return List.of();
+    }
+    Set&amp;lt;String&amp;gt; seen = new LinkedHashSet&amp;lt;&amp;gt;(tags);
+    return List.copyOf(seen);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: javaExperience
+  datasource:
+    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  flyway:
+    # 이미 테이블·데이터가 있는 DB(compose의 community·practice)는 V1(CREATE TABLE)을 실행하면 실패한다.
+    # 그래서 기록 테이블이 없으면 &quot;V1까지 됐다&quot;고만 적고(baseline) V2부터 실행한다. 빈 DB면 V1부터 실제로 실행한다.
+    baseline-on-migrate: true
+    baseline-version: 1
+  servlet:
+    multipart:
+      # 11-2 이미지 한 장 1MB, 요청 전체 2MB까지. 넘으면 MaxUploadSizeExceededException → 413
+      max-file-size: 1MB
+      max-request-size: 2MB
+  jpa:
+    hibernate:
+      # 스키마는 Flyway만 바꾼다(9-1). 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)
+      ddl-auto: validate
+    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        # 컬렉션(태그) 지연 로딩을 글마다 1번이 아니라 IN (...) 한 번으로 묶는다(2-4, N+1 대응)
+        default_batch_fetch_size: 100
+
+<h1 id="11-2-올린-이미지를-저장할-폴더앱을-실행한-위치-기준-git에는-올리지-않는다gitignore"><a class="anchor" href="#11-2-올린-이미지를-저장할-폴더앱을-실행한-위치-기준-git에는-올리지-않는다gitignore" aria-hidden="true">#</a>11-2 올린 이미지를 저장할 폴더(앱을 실행한 위치 기준). git에는 올리지 않는다(.gitignore)</h1>
+<p>app:
+  upload-dir: uploads</p>
+<p>logging:
+  level:
+    # 실행 SQL은 확인하되 토큰을 포함한 바인딩 값은 로그에 남기지 않는다
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: info</p>
+<h1 id="0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다"><a class="anchor" href="#0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다" aria-hidden="true">#</a>0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다</h1>
+<p>start:
+  greeting: 반가워요, 백엔드!
+  max-items: 5</p>
+<p>mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/MyTrashMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.post.MyTrashMapper&quot;&gt;
+    &lt;resultMap id=&quot;trashRow&quot; type=&quot;org.example.post.MyTrashRow&quot;&gt;
+        &lt;constructor&gt;
+            &lt;idArg column=&quot;id&quot; javaType=&quot;java.lang.Long&quot;/&gt;
+            &lt;arg column=&quot;board_slug&quot; javaType=&quot;java.lang.String&quot;/&gt;
+            &lt;arg column=&quot;title&quot; javaType=&quot;java.lang.String&quot;/&gt;
+            &lt;arg column=&quot;deleted_at&quot; javaType=&quot;java.time.LocalDateTime&quot;/&gt;
+        &lt;/constructor&gt;
+    &lt;/resultMap&gt;
+
+<pre><code>&amp;lt;select id=&amp;quot;findMyTrash&amp;quot; resultMap=&amp;quot;trashRow&amp;quot;&amp;gt;
+    SELECT p.id, b.slug AS board_slug, p.title, p.deleted_at
+    FROM post p JOIN board b ON b.id = p.board_id
+    WHERE p.author_id = #{memberId} AND p.deleted_by = #{memberId}
+      AND p.deleted_at IS NOT NULL AND p.deleted_at &amp;gt;= #{since}
+    ORDER BY p.deleted_at DESC, p.id DESC
+&amp;lt;/select&amp;gt;
+
+&amp;lt;update id=&amp;quot;softDelete&amp;quot;&amp;gt;
+    UPDATE post
+    SET deleted_at = #{now}, deleted_by = #{deletedBy}, updated_at = #{now}
+    WHERE id = #{id} AND deleted_at IS NULL
+&amp;lt;/update&amp;gt;
+
+&amp;lt;update id=&amp;quot;restore&amp;quot;&amp;gt;
+    UPDATE post
+    SET deleted_at = NULL, deleted_by = NULL
+    WHERE id = #{id} AND deleted_by = #{deletedBy} AND deleted_at = #{deletedAt}
+&amp;lt;/update&amp;gt;</code></pre>
+<p>&lt;/mapper&gt;
+</code></pre></details></p>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080; J='Content-Type: application/json'
+K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; A='Authorization: Bearer tok-admin'
+mk() { curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d &quot;{\&quot;boardSlug\&quot;:\&quot;free\&quot;,\&quot;title\&quot;:\&quot;$1\&quot;,\&quot;content\&quot;:\&quot;x\&quot;}&quot; | python3 -c 'import sys,json; print(json.load(sys.stdin)[&quot;id&quot;])'; }
+
+T=$(mk '[채점] 휴지통'); echo &quot;T=$T&quot;                                  # R0
+curl -s -o /dev/null -w '%{http_code}\n' -X DELETE &quot;$BASE/api/posts/$T&quot; -H &quot;$K&quot;   # R1 내가 지움 → 204
+curl -s &quot;$BASE/api/me/trash&quot; -H &quot;$K&quot;; echo                             # R2
+curl -i -X POST &quot;$BASE/api/posts/$T/restore&quot; -H &quot;$L&quot;                   # R3 남이 복구 → 404
+curl -s -X POST &quot;$BASE/api/posts/$T/restore&quot; -H &quot;$K&quot;; echo             # R4 복구 → 200
+curl -s -o /dev/null -w '%{http_code}\n' &quot;$BASE/api/posts/$T&quot;           # R5 비로그인 상세 → 200
+curl -i -X POST &quot;$BASE/api/posts/$T/restore&quot; -H &quot;$K&quot;                   # R6 또 복구 → 409
+Z=$(mk '[채점] 운영자가 지울 글'); echo &quot;Z=$Z&quot;
+curl -s -o /dev/null -w '%{http_code}\n' -X DELETE &quot;$BASE/api/posts/$Z&quot; -H &quot;$A&quot;   # R7 운영자가 지움
+curl -i -X POST &quot;$BASE/api/posts/$Z/restore&quot; -H &quot;$K&quot;                   # R8 → 403
+curl -i -X POST &quot;$BASE/api/posts/8/restore&quot; -H &quot;$L&quot;                    # R9 V22 전에 지운 글 → 403
+curl -i -X POST &quot;$BASE/api/posts/99999999/restore&quot; -H &quot;$K&quot;             # R10 없는 글 → 404
+curl -i -X POST &quot;$BASE/api/posts/abc/restore&quot; -H &quot;$K&quot;                  # R11 숫자 아님 → 400
+curl -i -X POST &quot;$BASE/api/posts/-1/restore&quot; -H &quot;$K&quot;                   # R11B 음수 → 400(errors.id)
+curl -i -X POST &quot;$BASE/api/posts/0/restore&quot; -H &quot;$K&quot;                    # R11C 0 → 400(errors.id)
+curl -i &quot;$BASE/api/me/trash&quot;                                           # R12 토큰 없음 → 401
+
+# C9 수동 필수 확인 — 시각을 되돌릴 수 없으니 실습 DB에서 지운 시각을 31일 전으로 바꿔 본다
+E=$(mk '[채점] 오래전에 지운 글'); curl -s -o /dev/null -X DELETE &quot;$BASE/api/posts/$E&quot; -H &quot;$K&quot;
+docker compose exec -T mysql mysql -ucommunity -pcommunity community -e &quot;UPDATE post SET deleted_at = NOW() - INTERVAL 31 DAY WHERE id = $E&quot; 2&gt;/dev/null
+curl -i -X POST &quot;$BASE/api/posts/$E/restore&quot; -H &quot;$K&quot;                   # R13 → 410
+curl -s &quot;$BASE/api/me/trash&quot; -H &quot;$K&quot;; echo                             # R14 휴지통에도 없다
+
+# C10 동시 복구: 새 글을 지우고 같은 글의 복구 요청 10개를 동시에 보낸다.
+P=$(mk '[채점] 동시 복구'); curl -s -o /dev/null -X DELETE &quot;$BASE/api/posts/$P&quot; -H &quot;$K&quot;
+for i in {1..10}; do curl -s -o /dev/null -w '%{http_code}\n' -X POST &quot;$BASE/api/posts/$P/restore&quot; -H &quot;$K&quot; &amp; done
+wait   # 200 한 번, 409 아홉 번. DB의 deleted_at·deleted_by는 둘 다 NULL</code></pre></details>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글을 만들어 지우고 되살리므로 몇 번을 눌러도 같은 결과다(8번 글은 403만 확인하고 바꾸지 않는다).</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="R0" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R0 · R0 김자바의 새 글</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 휴지통&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 휴지통&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="R1" data-method="DELETE" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R1 · R1 김자바가 지움</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/posts/{{R0.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:204}</pre></dd></dl></details></article><article class="api-request" data-request-id="R2" data-method="GET" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R2 · R2 김자바의 휴지통</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/trash" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[0].id&quot;,&quot;equals&quot;:&quot;{{R0.body.id}}&quot;},{&quot;path&quot;:&quot;$.items[0].boardSlug&quot;,&quot;equals&quot;:&quot;free&quot;},{&quot;path&quot;:&quot;$.items[0].deletedAt&quot;,&quot;type&quot;:&quot;string&quot;},{&quot;path&quot;:&quot;$.items[0].restoreUntil&quot;,&quot;type&quot;:&quot;string&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="R3" data-method="POST" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R3 · R3 이스프링이 복구</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts/{{R0.body.id}}/restore" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:404}</pre></dd></dl></details></article><article class="api-request" data-request-id="R4" data-method="POST" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R4 · R4 김자바가 복구</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts/{{R0.body.id}}/restore" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.id&quot;,&quot;equals&quot;:&quot;{{R0.body.id}}&quot;},{&quot;path&quot;:&quot;$.status&quot;,&quot;equals&quot;:&quot;PUBLISHED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="R5" data-method="GET" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R5 · R5 비로그인 상세</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/{{R0.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200}</pre></dd></dl></details></article><article class="api-request" data-request-id="R6" data-method="POST" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R6 · R6 또 복구</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts/{{R0.body.id}}/restore" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:409}</pre></dd></dl></details></article><article class="api-request" data-request-id="R6B" data-method="GET" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R6B · R6B 복구 뒤 휴지통</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/trash" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;notContains&quot;:&quot;{{R0.body.id}}&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="Z0" data-method="POST" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>Z0 · Z0 김자바의 새 글</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 운영자가 지울 글&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 운영자가 지울 글&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="R7" data-method="DELETE" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R7 · R7 운영자가 지움</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/posts/{{Z0.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:204}</pre></dd></dl></details></article><article class="api-request" data-request-id="R7B" data-method="GET" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R7B · R7B 김자바의 휴지통</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/trash" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;notContains&quot;:&quot;{{Z0.body.id}}&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="R8" data-method="POST" data-request-index="11" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R8 · R8 김자바가 복구</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts/{{Z0.body.id}}/restore" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:403}</pre></dd></dl></details></article><article class="api-request" data-request-id="R9" data-method="POST" data-request-index="12" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R9 · R9 이스프링이 8번(V22 전에 지운 글) 복구</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts/8/restore" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:403}</pre></dd></dl></details></article><article class="api-request" data-request-id="R10" data-method="POST" data-request-index="13" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R10 · R10 없는 글 복구</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts/99999999/restore" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:404}</pre></dd></dl></details></article><article class="api-request" data-request-id="R11" data-method="POST" data-request-index="14" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R11 · R11 숫자가 아닌 id</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts/abc/restore" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="R11B" data-method="POST" data-request-index="15" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R11B · R11B 음수 id</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts/-1/restore" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;id&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="R11C" data-method="POST" data-request-index="16" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R11C · R11C 0 id</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts/0/restore" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;id&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="R12" data-method="GET" data-request-index="17" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>R12 · R12 토큰 없이 휴지통</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/trash" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:401}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용). <code>{T}</code>·<code>{Z}</code>는 직접 확인에서 만든 글의 id다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>R1</td>
+<td><code>204</code>(3-2 그대로)</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>R2</td>
+<td>휴지통 첫 항목이 <code>{T}</code>, <code>deletedAt</code>·<code>restoreUntil</code>이 문자열</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>R3(이스프링이 김자바 글 복구)</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>C4</td>
+<td>R4 / R5</td>
+<td><code>200</code>(<code>status</code>=<code>PUBLISHED</code>) / 비로그인 상세 <code>200</code> — 다시 보인다</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>R6 / R6B</td>
+<td>또 복구 <code>409</code> / 휴지통에서 빠짐</td>
+</tr>
+<tr>
+<td>C6</td>
+<td>R7 / R7B / R8</td>
+<td>운영자 삭제 <code>204</code> / 김자바 휴지통에 없음 / 김자바가 복구 <code>403</code></td>
+</tr>
+<tr>
+<td>C7</td>
+<td>R9(V22 전에 지운 8번)</td>
+<td><code>403</code> — 누가 지웠는지 모르는 글은 되살리지 않는다</td>
+</tr>
+<tr>
+<td>C8</td>
+<td>R10 / R11 / R11B / R11C / R12</td>
+<td>없는 글 <code>404</code> / 숫자 아닌 id <code>400</code> / 음수·0 id <code>400</code>(<code>errors.id</code>) / 토큰 없음 <code>401</code> — 500이 아니다</td>
+</tr>
+<tr>
+<td>C9</td>
+<td>R13 / R14</td>
+<td><code>410</code> / 휴지통에 없음 — 수동</td>
+</tr>
+<tr>
+<td>C10</td>
+<td>같은 글을 10번 동시에 복구</td>
+<td><code>200</code> 1번·<code>409</code> 9번, DB의 <code>deleted_at</code>·<code>deleted_by</code>는 <code>NULL</code> — 수동</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT deleted_at, deleted_by FROM post WHERE id = {T}</code></td>
+<td><code>NULL</code>, <code>NULL</code> — 되살렸다</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT deleted_at IS NOT NULL, deleted_by FROM post WHERE id = {Z}</code></td>
+<td><code>1</code>, <code>1</code> — 운영자가 지운 기록</td>
+</tr>
+<tr>
+<td>D3</td>
+<td><code>SELECT deleted_by FROM post WHERE id = 8</code></td>
+<td><code>NULL</code> — 마이그레이션이 옛 행을 짐작으로 채우지 않았다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>확인 순서</td>
+<td>404(내 글 아님) → 409 → 403 → 410. &quot;내 글이 아니면 404&quot;를 맨 앞에 둬서 남의 지운 글의 상태가 새어 나가지 않는다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>2-3 규칙과의 관계</td>
+<td>복구가 <code>canView</code>를 쓰지 않는 이유(삭제된 글은 누구도 볼 수 없다)를 설명하고, 대신 작성자 확인을 직접 했다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>지운 사람 기록</td>
+<td>3-2의 삭제가 <code>deleted_by</code>도 같이 채운다(엔티티 메서드 하나에서)</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>기간</td>
+<td>&quot;30일&quot;을 상수 하나로 두고, 휴지통 조회 조건과 복구 검사에 같은 값·같은 <code>Clock</code>을 쓴다</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>30일 지난 글</td>
+<td>휴지통에서 사라진 글의 행은 여전히 남아 있다. 정말 지우려면(개인정보 보관 기한 등) 배치로 지우거나 익명화한다는 것을 안다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../ch3-update-delete/3-2-soft-delete.html">3-2. 삭제 — soft delete</a></li>
+<li><a href="../../lessons/G2-access-rules-in-one-place.html">G2 접근 규칙을 한 곳에</a> — 규칙의 예외(복구)를 어디에 둘지</li>
+<li><a href="../../lessons/J2-why-migrations.html">J2 마이그레이션은 왜</a> — 컬럼 추가와 기존 행</li>
+<li><a href="../../docs/knowledge/R07-backup-restore.html">R07 백업과 복원</a></li>
+<li><a href="../../lessons/A5-rest-api-design.html">A5 REST API 설계와 명세서 읽기</a> — 409·403·410을 고르는 기준</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 지운 사람 남기기</summary>
+
+<p><code>Post.delete(LocalDateTime now)</code>를 <code>delete(LocalDateTime now, Long deletedBy)</code>로 바꾸고 <code>PostService.delete()</code>에서 로그인 회원 id를 넘긴다. 엔티티에는 <code>@Column(name = &quot;deleted_by&quot;) private Long deletedBy;</code>면 충분하다(회원 엔티티를 거쳐 읽을 일이 없다). <code>restore()</code>는 <code>deletedAt</code>·<code>deletedBy</code>만 <code>null</code>로.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 휴지통 쿼리와 복구 순서</summary>
+
+<pre><code class="language-java">@Query(&quot;&quot;&quot;
+        SELECT p FROM Post p JOIN FETCH p.board
+         WHERE p.author.id = :memberId AND p.deletedBy = :memberId
+           AND p.deletedAt IS NOT NULL AND p.deletedAt &gt;= :since
+         ORDER BY p.deletedAt DESC, p.id DESC
+        &quot;&quot;&quot;)
+List&lt;Post&gt; findMyTrash(@Param(&quot;memberId&quot;) Long memberId, @Param(&quot;since&quot;) LocalDateTime since);</code></pre>
+<p><code>since</code> = <code>LocalDateTime.now(clock).minusDays(30)</code>. 복구는 <code>findById</code> → 작성자 아니면 404 → <code>deletedAt == null</code>이면 409 → <code>!내 id.equals(deletedBy)</code>면 403(<code>deletedBy</code>가 <code>null</code>이어도 여기서 걸린다) → <code>deletedAt.plusDays(30).isBefore(now)</code>면 410(<code>HttpStatus.GONE</code>). 예외마다 <code>ApiExceptionHandler</code>에 상태 코드를 등록한다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="11-6-revisions.html">11-6. 글 수정 이력</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 11-5. 휴지통 — 지운 글 모아 보기와 복구\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch11-post-advanced/11-5-trash-restore.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="11-4-search.html">← 이전 11-4. 통합 검색 — 제목·본문·작성자</a><a href="11-6-revisions.html">다음 → 11-6. 글 수정 이력</a></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
+</body>
+</html>

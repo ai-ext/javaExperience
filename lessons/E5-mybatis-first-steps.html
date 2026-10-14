@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E5. MyBatis 첫걸음 — SQL을 내가 쥐는 방식</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="e5-mybatis-첫걸음--sql을-내가-쥐는-방식"><a class="anchor" href="#e5-mybatis-첫걸음--sql을-내가-쥐는-방식" aria-hidden="true">#</a>E5. MyBatis 첫걸음 — SQL을 내가 쥐는 방식</h1>
+<blockquote>
+<p>개념 레슨 · 35분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>E3·E4의 JPA는 <strong>객체를 설명하면 SQL은 Hibernate가 쓴다.</strong> 편하지만 &quot;정렬 두 가지, 페이지 방식 두 가지, 태그·검색어는 있을 수도 없을 수도&quot;(10-7 목록 API) 같은 조회에서는 Hibernate가 어떤 SQL을 만들지 짐작하기 어렵다.</p>
+<p>MyBatis는 반대다. <strong>SQL은 내가 쓰고</strong>, MyBatis는 두 가지만 대신해 준다. ① 자바 값을 SQL의 <code>?</code> 자리에 넣고, ② 결과 행을 자바 객체에 옮겨 담는다.</p>
+<p>MyBatis는 이 SQL을 자바 코드 안이 아니라 <strong>XML 파일</strong>에 따로 모아 둔다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>JPA (E3·E4)</th>
+<th>MyBatis</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SQL은 누가</td>
+<td>Hibernate가 만든다</td>
+<td>내가 XML에 쓴다</td>
+</tr>
+<tr>
+<td>결과는</td>
+<td>엔티티(연관·프록시·변경 감지 포함)</td>
+<td>그냥 자바 객체(한 줄 = 한 객체)</td>
+</tr>
+<tr>
+<td>잘하는 일</td>
+<td>저장·수정, 연관을 따라가는 읽기</td>
+<td>조건이 많은 목록·검색·통계</td>
+</tr>
+<tr>
+<td>10장에서</td>
+<td>기본 경로 전부(10-5 쓰기, 10-7 목록)</td>
+<td>선택: 10-7 &quot;MyBatis로 짜 보기&quot; 칸, 10-12</td>
+</tr>
+</tbody></table></div>
+<h3 id="세-조각--인터페이스--xml--설정-세-줄"><a class="anchor" href="#세-조각--인터페이스--xml--설정-세-줄" aria-hidden="true">#</a>세 조각 — 인터페이스 · XML · 설정 세 줄</h3>
+<ol>
+<li><strong>Mapper 인터페이스</strong> — 메서드 모양만 적는다. 구현 클래스는 만들지 않는다(E3의 <code>TagRepository</code>처럼).</li>
+<li><strong>XML</strong> — 메서드마다 실행할 SQL. 둘을 잇는 규칙은 하나다. <strong>XML의 <code>namespace</code> = 인터페이스의 전체 이름, 각 SQL의 <code>id</code> = 메서드 이름.</strong> <code>org.example.e5.PostMapper</code> + <code>findById</code>가 SQL 하나를 찾는 열쇠다.</li>
+<li><strong>설정 세 줄</strong>(<code>application.yml</code>)</li>
+</ol>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>설정</th>
+<th>뜻</th>
+<th>없으면</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>mybatis.mapper-locations</code></td>
+<td>XML이 어디 있나(<code>classpath:mapper/*.xml</code>)</td>
+<td>XML을 아예 안 읽는다 — 서버는 뜨고, 부를 때 터진다(일부러 틀려 보기 2)</td>
+</tr>
+<tr>
+<td><code>mybatis.type-aliases-package</code></td>
+<td>이 패키지의 클래스는 XML에서 짧은 이름(<code>PostRow</code>)으로 쓴다</td>
+<td><code>org.example.e5.PostRow</code>처럼 전체 이름을 써야 한다</td>
+</tr>
+<tr>
+<td><code>mybatis.configuration.map-underscore-to-camel-case</code></td>
+<td>열 <code>author_id</code> → 필드 <code>authorId</code></td>
+<td>밑줄 있는 열이 전부 <code>null</code>·<code>0</code>이 된다(일부러 틀려 보기 1)</td>
+</tr>
+</tbody></table></div>
+<h3 id="--값은-sql-글자에-붙이지-않는다"><a class="anchor" href="#--값은-sql-글자에-붙이지-않는다" aria-hidden="true">#</a><code>#{}</code> — 값은 SQL 글자에 붙이지 않는다</h3>
+<p>XML에 <code>WHERE author_id = #{authorId}</code>라고 쓰면 MyBatis는 SQL을 <code>WHERE author_id = ?</code>로 바꾸고 값 <code>5</code>를 따로 보낸다. E3에서 본 <code>binding parameter</code>와 같다. 로그에서는 이렇게 보인다.</p>
+<pre><code class="language-text">==&gt;  Preparing: SELECT … FROM post WHERE author_id = ? AND title LIKE CONCAT('%', ?, '%') ORDER BY id
+==&gt; Parameters: 5(Long), Docker(String)</code></pre>
+<p><code>${q}</code>라고 쓰면 다르다. 값이 SQL 글자에 그대로 박힌다. 실제로 바꿔 보니 <code>… AND title LIKE &#39;%Docker%&#39; …</code>가 되고 <code>Parameters</code>에는 <code>5(Long)</code>만 남았다. 사용자가 보낸 글자가 SQL이 되는 셈이라 SQL 주입의 통로다. <strong>값은 언제나 <code>#{}</code></strong>. <code>${}</code>가 왜, 언제 필요한지는 랩 L7에서 다룬다.</p>
+<h3 id="resulttype과-resultmap"><a class="anchor" href="#resulttype과-resultmap" aria-hidden="true">#</a>resultType과 resultMap</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>쓰는 법</th>
+<th>언제</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>resultType=&quot;PostRow&quot;</code></td>
+<td>열 이름 ↔ 필드 이름을 MyBatis가 맞춰 넣는다</td>
+<td>대부분. 목록을 돌려줘도 <code>List</code>가 아니라 <strong>한 줄의 타입</strong>을 쓴다</td>
+</tr>
+<tr>
+<td><code>resultMap=&quot;postRowMap&quot;</code></td>
+<td>열 → 필드를 표로 직접 적는다</td>
+<td>이름이 안 맞을 때, 글 안에 작성자 객체를 넣는 식의 중첩 결과(랩 L6)</td>
+</tr>
+</tbody></table></div>
+<h3 id="insert와-usegeneratedkeys"><a class="anchor" href="#insert와-usegeneratedkeys" aria-hidden="true">#</a>insert와 <code>useGeneratedKeys</code></h3>
+<p><code>INSERT</code> 뒤에 DB(<code>AUTO_INCREMENT</code>)가 붙인 번호를 객체에 받으려면 <code>useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;</code>를 붙인다. JPA의 <code>save</code> 후 id가 채워지던 것(E3 ④⑤)을 직접 부탁하는 셈이다.</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<p><code>practice</code> DB의 <code>post</code> 테이블을 읽는다. 쓰기는 연습용 테이블 <code>lesson_post</code>에 한다. 따라 해 보기에서 그대로 실행한 코드다.</p>
+<pre><code class="language-yaml">mybatis:
+  mapper-locations: classpath:mapper/*.xml        # ① XML이 어디 있나
+  type-aliases-package: org.example.e5           # ② resultType에 짧은 이름(PostRow)을 쓰게
+  configuration:
+    map-underscore-to-camel-case: true           # ③ author_id → authorId
+
+logging:
+  level:
+    org.example.e5: debug                         # 매퍼가 보내는 SQL과 값을 본다</code></pre>
+<pre><code class="language-java">// SQL 결과 한 줄을 담는 그릇. MyBatis가 열 이름과 같은 필드에 값을 넣는다
+public class PostRow {
+    private Long id;
+    private Long authorId;
+    private String title;
+    private int viewCount;
+    private LocalDateTime createdAt;
+
+    public Long getId() { return id; }
+    public Long getAuthorId() { return authorId; }
+    public String getTitle() { return title; }
+    public int getViewCount() { return viewCount; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+
+    @Override
+    public String toString() {
+        return &quot;PostRow{id=&quot; + id + &quot;, authorId=&quot; + authorId + &quot;, title=&quot; + title
+                + &quot;, viewCount=&quot; + viewCount + &quot;, createdAt=&quot; + createdAt + &quot;}&quot;;
+    }
+}</code></pre>
+<p>setter가 없어도 MyBatis가 필드에 직접 넣는다(10-7 선택 칸의 <code>PostListRow</code>도 이렇게 한다). INSERT에 넘길 <code>NewPost</code>는 <code>id</code>(비워 둠)·<code>authorId</code>·<code>title</code> 필드와 생성자 <code>NewPost(Long authorId, String title)</code>, getter만 있는 클래스다.</p>
+<pre><code class="language-java">// 구현 클래스는 없다 — MyBatis가 같은 이름의 XML(namespace + id)에서 SQL을 찾아 실행한다
+@Mapper
+public interface PostMapper {
+
+    PostRow findById(Long id);
+
+    PostRow findByIdWithMap(Long id);
+
+    List&lt;PostRow&gt; search(@Param(&quot;authorId&quot;) Long authorId, @Param(&quot;q&quot;) String q);
+
+    int insert(NewPost post);
+}</code></pre>
+<p><code>src/main/resources/mapper/PostMapper.xml</code></p>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;!-- namespace = 인터페이스의 전체 이름 --&gt;
+&lt;mapper namespace=&quot;org.example.e5.PostMapper&quot;&gt;
+
+    &lt;!-- id = 메서드 이름. resultType = 결과 한 줄을 담을 클래스 --&gt;
+    &lt;select id=&quot;findById&quot; resultType=&quot;PostRow&quot;&gt;
+        SELECT id, author_id, title, view_count, created_at
+        FROM post
+        WHERE id = #{id}
+    &lt;/select&gt;
+
+    &lt;!-- resultMap = 열 → 필드를 하나하나 적어 둔 표 --&gt;
+    &lt;resultMap id=&quot;postRowMap&quot; type=&quot;PostRow&quot;&gt;
+        &lt;id     column=&quot;id&quot;         property=&quot;id&quot;/&gt;
+        &lt;result column=&quot;author_id&quot;  property=&quot;authorId&quot;/&gt;
+        &lt;result column=&quot;title&quot;      property=&quot;title&quot;/&gt;
+        &lt;result column=&quot;view_count&quot; property=&quot;viewCount&quot;/&gt;
+        &lt;result column=&quot;created_at&quot; property=&quot;createdAt&quot;/&gt;
+    &lt;/resultMap&gt;
+
+    &lt;select id=&quot;findByIdWithMap&quot; resultMap=&quot;postRowMap&quot;&gt;
+        SELECT id, author_id, title, view_count, created_at
+        FROM post
+        WHERE id = #{id}
+    &lt;/select&gt;
+
+    &lt;!-- 조건이 있을 때만 붙인다. WHERE와 맨 앞 AND는 where 태그가 정리한다 --&gt;
+    &lt;select id=&quot;search&quot; resultType=&quot;PostRow&quot;&gt;
+        SELECT id, author_id, title, view_count, created_at
+        FROM post
+        &lt;where&gt;
+            &lt;if test=&quot;authorId != null&quot;&gt;
+                AND author_id = #{authorId}
+            &lt;/if&gt;
+            &lt;if test=&quot;q != null and q != ''&quot;&gt;
+                AND title LIKE CONCAT('%', #{q}, '%')
+            &lt;/if&gt;
+        &lt;/where&gt;
+        ORDER BY id
+    &lt;/select&gt;
+
+    &lt;!-- DB가 붙인 번호를 post.id에 넣어 달라 --&gt;
+    &lt;insert id=&quot;insert&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+        INSERT INTO lesson_post (author_id, title)
+        VALUES (#{authorId}, #{title})
+    &lt;/insert&gt;
+&lt;/mapper&gt;</code></pre>
+<p><code>search</code>의 <code>if</code>·<code>where</code> 태그가 <strong>동적 SQL</strong>이다. 조건이 둘 다 비면 <code>WHERE</code>째 사라지고, 첫 조건이 비면 둘째 조건 앞의 <code>AND</code>를 지워 준다. 실제로 만들어진 SQL은 따라 해 보기 ④~⑥에서 본다.</p>
+<p><code>@Param</code>은 XML의 <code>#{authorId}</code>가 어느 인자인지 이름을 붙여 준다. 이 프로젝트(Spring Boot Gradle 플러그인)는 매개변수 이름을 남기도록 컴파일해서 빼도 동작했지만, 10장·랩 코드처럼 인자가 둘 이상이면 붙여 둔다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>15분. E4처럼 연습용 프로젝트를 하나 만든다(패키지 <code>org.example.e5</code>). 의존성은 둘이다. <code>implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;</code>(Spring Boot 4.1용, 10장·랩과 같은 버전)과 <code>runtimeOnly &#39;com.mysql:mysql-connector-j&#39;</code>. <code>application.yml</code>에는 E4의 <code>spring.datasource</code> 세 줄(<code>practice</code> DB)과 위 예시의 <code>mybatis</code>·<code>logging</code>을 넣는다. 웹 의존성이 없으니 포트는 쓰지 않는다.</p>
+<p><strong>1. 연습 테이블을 만든다.</strong> E2의 <code>sql</code> 함수는 <code>community</code> DB용이라 <code>practice</code>용을 하나 더 만든다.</p>
+<pre><code class="language-bash">sqlp() { docker exec -i studymate-mysql-1 mysql --default-character-set=utf8mb4 -t -ucommunity -pcommunity practice -e &quot;$1&quot;; }
+sqlp &quot;CREATE TABLE lesson_post (id BIGINT AUTO_INCREMENT PRIMARY KEY, author_id BIGINT NOT NULL, title VARCHAR(200) NOT NULL)&quot;</code></pre>
+<p><strong>2. 예시의 파일과 연습 파일을 만든다.</strong></p>
+<pre><code class="language-java">// 연습용 — 서버가 뜰 때 한 번 실행된다
+@Component
+public class E5Playground implements CommandLineRunner {
+
+    private final PostMapper postMapper;
+
+    public E5Playground(PostMapper postMapper) {
+        this.postMapper = postMapper;
+    }
+
+    @Override
+    public void run(String... args) {
+        System.out.println(&quot;① 매퍼의 실제 클래스: &quot; + postMapper.getClass().getName());
+        System.out.println(&quot;② &quot; + postMapper.findById(5L));
+        System.out.println(&quot;③ &quot; + postMapper.findByIdWithMap(5L));
+        System.out.println(&quot;④ 조건 없음: &quot; + postMapper.search(null, null).size() + &quot;건&quot;);
+        System.out.println(&quot;⑤ 작성자 5: &quot; + postMapper.search(5L, null).size() + &quot;건&quot;);
+        System.out.println(&quot;⑥ 작성자 5 + 'Docker': &quot; + postMapper.search(5L, &quot;Docker&quot;).size() + &quot;건&quot;);
+
+        NewPost post = new NewPost(1L, &quot;MyBatis로 넣은 글&quot;);
+        System.out.println(&quot;⑦ insert 전 id: &quot; + post.getId());
+        int rows = postMapper.insert(post);
+        System.out.println(&quot;⑧ 바뀐 행: &quot; + rows + &quot;, insert 후 id: &quot; + post.getId());
+    }
+}</code></pre>
+<p><strong>3. 켜고 콘솔을 읽는다.</strong> 실제로 나온 것이다(로그 앞부분 시각·스레드는 지웠다. 수는 시드 기준).</p>
+<pre><code class="language-text">① 매퍼의 실제 클래스: jdk.proxy2.$Proxy49
+PostMapper.findById: ==&gt;  Preparing: SELECT id, author_id, title, view_count, created_at FROM post WHERE id = ?
+PostMapper.findById: ==&gt; Parameters: 5(Long)
+PostMapper.findById: &lt;==      Total: 1
+② PostRow{id=5, authorId=28, title=JPA N+1 문제 비교해보기, viewCount=36, createdAt=2026-07-03T05:13:20}
+③ PostRow{id=5, authorId=28, title=JPA N+1 문제 비교해보기, viewCount=36, createdAt=2026-07-03T05:13:20}
+PostMapper.search: ==&gt;  Preparing: SELECT id, author_id, title, view_count, created_at FROM post ORDER BY id
+④ 조건 없음: 145건
+PostMapper.search: ==&gt;  Preparing: SELECT id, author_id, title, view_count, created_at FROM post WHERE author_id = ? ORDER BY id
+⑤ 작성자 5: 12건
+PostMapper.search: ==&gt;  Preparing: SELECT id, author_id, title, view_count, created_at FROM post WHERE author_id = ? AND title LIKE CONCAT('%', ?, '%') ORDER BY id
+⑥ 작성자 5 + 'Docker': 3건
+⑦ insert 전 id: null
+PostMapper.insert: ==&gt;  Preparing: INSERT INTO lesson_post (author_id, title) VALUES (?, ?)
+PostMapper.insert: ==&gt; Parameters: 1(Long), MyBatis로 넣은 글(String)
+PostMapper.insert: &lt;==    Updates: 1
+⑧ 바뀐 행: 1, insert 후 id: 1</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>번호</th>
+<th>볼 것</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>①</td>
+<td>인터페이스만 만들었는데 실행 중 만들어진 프록시가 들어왔다(E3의 저장소와 같다)</td>
+</tr>
+<tr>
+<td>②③</td>
+<td>같은 결과. ②는 밑줄→카멜 설정이, ③은 <code>resultMap</code> 표가 <code>author_id</code>를 <code>authorId</code>에 넣었다</td>
+</tr>
+<tr>
+<td>④</td>
+<td>조건이 없으면 <code>WHERE</code>가 통째로 사라진다 → <strong>145건 전부</strong>. 목록 API라면 페이지(<code>LIMIT</code>)를 꼭 붙인다(10-7)</td>
+</tr>
+<tr>
+<td>⑤⑥</td>
+<td>조건이 있을 때만 그 줄이 붙고, <code>#{}</code> 자리는 <code>?</code>다</td>
+</tr>
+<tr>
+<td>⑦⑧</td>
+<td><code>useGeneratedKeys</code> 덕에 INSERT 뒤 <code>id</code>가 채워졌다(새 테이블이라 1)</td>
+</tr>
+</tbody></table></div>
+<p><strong>4. 연습 테이블을 지운다.</strong> <code>sqlp &quot;DROP TABLE lesson_post&quot;</code>. 연습 파일(<code>E5Playground</code>)도 지운다.</p>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p>메시지는 Spring Boot 4.1.1 · mybatis-spring-boot-starter 4.1.0(MyBatis 3.5.19)에서 재현한 원문이다.</p>
+<p><strong>1. <code>map-underscore-to-camel-case</code>를 <code>false</code>로 바꾼다</strong></p>
+<pre><code class="language-text">② PostRow{id=5, authorId=null, title=JPA N+1 문제 비교해보기, viewCount=0, createdAt=null}
+③ PostRow{id=5, authorId=28, title=JPA N+1 문제 비교해보기, viewCount=36, createdAt=2026-07-03T05:13:20}</code></pre>
+<p>에러가 없다. 밑줄 있는 열(<code>author_id</code>·<code>view_count</code>·<code>created_at</code>)만 조용히 빈 값이 된다. 이름이 같은 <code>id</code>·<code>title</code>은 멀쩡하다. 직접 짝을 적은 <code>resultMap</code>(③)은 설정과 상관없다.</p>
+<p><strong>2. <code>Invalid bound statement (not found)</code> — 원인 둘, 메시지 하나</strong></p>
+<p>(가) XML의 <code>&lt;select id=&quot;findById&quot;</code>를 <code>id=&quot;findOne&quot;</code>으로 바꾼다. (나) 되돌리고, XML 폴더 이름을 <code>mapper</code> → <code>mappers</code>로 바꾼다(<code>mapper-locations</code>와 안 맞게). 둘 다 똑같이 나온다.</p>
+<pre><code class="language-text">org.apache.ibatis.binding.BindingException: Invalid bound statement (not found): org.example.e5.PostMapper.findById
+	…
+	at jdk.proxy2/jdk.proxy2.$Proxy49.findById(Unknown Source) ~[na:na]
+	at org.example.e5.E5Playground.run(E5Playground.java:19) ~[!/:0.0.1-SNAPSHOT]</code></pre>
+<p><code>namespace + id</code>(<code>org.example.e5.PostMapper.findById</code>)로 SQL을 찾았는데 없다는 뜻이다. 두 경우 모두 <strong>서버는 멀쩡히 떴다</strong>(①이 찍혔다). 경고도 한 줄 없다. 그 메서드를 <strong>부르는 순간</strong> 터진다. 그래서 순서대로 본다.</p>
+<ol>
+<li>XML의 <code>namespace</code>가 인터페이스 전체 이름과 같은가(<code>namespace=&quot;org.example.e5.PostMappr&quot;</code> 같은 오타도 같은 메시지였다)</li>
+<li><code>id</code>가 메서드 이름과 같은가</li>
+<li>XML이 <code>mapper-locations</code>가 가리키는 곳에 있는가. <code>src/main/java</code> 안에 XML을 두어도 같은 메시지였다. Gradle은 그 폴더의 XML을 빌드 결과에 넣지 않는다. XML은 <code>src/main/resources</code> 아래에 둔다.</li>
+</ol>
+<p><strong>3. <code>resultType=&quot;PostRow&quot;</code>를 <code>&quot;PostRoww&quot;</code>로 틀린다</strong></p>
+<pre><code class="language-text">Caused by: org.apache.ibatis.type.TypeException: Could not resolve type alias 'PostRoww'.  Cause: java.lang.ClassNotFoundException: Cannot find class: PostRoww</code></pre>
+<p>이번엔 <strong>서버가 안 뜬다.</strong> XML을 읽는 시점(시작할 때)에 클래스 이름을 확인하기 때문이다. 바로 위에 <code>Error parsing Mapper XML. The XML location is &#39;class path resource [mapper/PostMapper.xml]&#39;</code>이 있어 어느 파일인지도 알려 준다. 2와 달리 일찍, 친절하게 실패한다.</p>
+<p><strong>4. <code>useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;</code>를 지운다</strong> — <code>⑧ 바뀐 행: 1, insert 후 id: null</code>. 행은 들어갔는데 번호를 못 받았다. 10-5처럼 &quot;만든 글의 id로 <code>Location</code> 헤더를 만드는&quot; 코드라면 여기서 <code>null</code>이 샌다.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> <code>PostMapper.search(...)</code>를 부르면 MyBatis는 XML에서 무엇을 보고 SQL을 고르나?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>namespace</code>(= <code>org.example.e5.PostMapper</code>, 인터페이스의 전체 이름)와 <code>id</code>(= <code>search</code>, 메서드 이름)를 이은 <code>org.example.e5.PostMapper.search</code>가 열쇠다. 하나라도 다르거나 XML을 아예 못 읽었으면 <code>Invalid bound statement (not found): org.example.e5.PostMapper.search</code>.</p>
+</details>
+
+<p><strong>2.</strong> <code>List&lt;PostRow&gt;</code>를 돌려주는 메서드의 <code>resultType</code>에는 무엇을 쓰나?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>PostRow</code>(별칭 설정이 없으면 <code>org.example.e5.PostRow</code>). <code>resultType</code>은 <strong>결과 한 줄</strong>을 담을 타입이다. 몇 줄이든 MyBatis가 메서드의 반환 타입을 보고 <code>List</code>에 모아 준다.</p>
+</details>
+
+<p><strong>3.</strong> <code>search(null, null)</code>이 145건을 돌려준 이유는? 목록 API에서 무엇을 조심해야 하나?</p>
+<details>
+<summary>정답</summary>
+
+<p>두 <code>if</code>가 모두 거짓이라 <code>where</code> 태그가 <code>WHERE</code>째 지웠다. SQL이 <code>SELECT … FROM post ORDER BY id</code>가 되어 전부 읽는다. <code>where</code> 태그는 SQL을 문법에 맞게 다듬어 줄 뿐, 조건이 하나도 없을 때 막아 주지 않는다. 목록 API에는 <code>LIMIT</code>(페이지)과 기본 조건(삭제 안 된 글, 공개 글 등)을 늘 붙인다(10-7).</p>
+</details>
+
+<p><strong>4.</strong> 서버는 잘 떴는데 API를 부르자 <code>Invalid bound statement (not found)</code>가 났다. 볼 곳 두 가지는?</p>
+<details>
+<summary>정답</summary>
+
+<p>① <strong>이름이 맞나</strong> — XML <code>namespace</code>가 인터페이스 전체 이름과, <code>id</code>가 메서드 이름과 글자까지 같은가. ② <strong>XML이 읽혔나</strong> — 파일이 <code>src/main/resources</code> 아래, <code>mapper-locations</code> 패턴(<code>classpath:mapper/*.xml</code>)이 가리키는 곳에 있는가. 둘 다 메시지가 같고 시작할 때 경고도 없어서, 메시지만으로는 어느 쪽인지 모른다.</p>
+</details>
+
+<p><strong>5.</strong> 검색어 <code>q</code>를 <code>LIKE &#39;%${q}%&#39;</code>로 쓰면 무엇이 달라지나?</p>
+<details>
+<summary>정답</summary>
+
+<p>값이 <code>?</code>로 따로 가지 않고 SQL 글자에 그대로 박힌다(로그의 <code>Preparing</code>에 <code>&#39;%Docker%&#39;</code>가 보이고 <code>Parameters</code>에서 빠진다). 사용자가 <code>&#39;</code>나 SQL 조각을 보내면 SQL 자체가 바뀐다(SQL 주입). 값은 <code>#{q}</code>로 쓰고 <code>LIKE CONCAT(&#39;%&#39;, #{q}, &#39;%&#39;)</code>처럼 만든다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/W04-mybatis-xml-practical.html">W04 MyBatis XML 쿼리 실무</a> — mapper·동적 SQL·<code>#{}</code>와 <code>${}</code></li>
+<li><a href="../docs/knowledge/W05-jpa-vs-mybatis-strategy.html">W05 JPA vs MyBatis — 언제 무엇을, 섞어 쓰는 전략</a> · <a href="../docs/knowledge/W03-db-access-comparison.html">W03 DB 접근 방식 총비교</a></li>
+<li>노하우 랩(Java 학습 → 노하우 랩): <strong>L6</strong> MyBatis 기초 — resultMap·association·collection · <strong>L7</strong> MyBatis 동적 SQL — <code>#{}</code>·<code>${}</code>, 안전한 정렬·조건 · <strong>L9</strong> JPA+MyBatis 한 트랜잭션</li>
+<li>원문: <a href="https://mybatis.org/spring-boot-starter/mybatis-spring-boot-autoconfigure/" target="_blank" rel="noopener">MyBatis Spring Boot Starter</a> — 설정 항목·<code>@Mapper</code> 스캔 · <a href="https://mybatis.org/mybatis-3/sqlmap-xml.html" target="_blank" rel="noopener">Mapper XML</a> — <code>#{}</code>·resultType·resultMap·<code>useGeneratedKeys</code> · <a href="https://mybatis.org/mybatis-3/dynamic-sql.html" target="_blank" rel="noopener">동적 SQL</a> · <a href="https://mybatis.org/spring/transactions.html" target="_blank" rel="noopener">MyBatis-Spring 트랜잭션</a></li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li>실습: <a href="../scenario/ch10-project/10-7-post-list.html">10-7. 목록</a>의 <strong>선택 칸 &quot;같은 목록을 MyBatis로 짜 보기&quot;</strong> — 기본은 JPA로 만들고, 같은 목록을 정렬·페이지·커서·태그·검색을 <code>if</code>·<code>choose</code>로 한 XML에 담아 다시 짠다. 확인 버튼은 같아서 어느 쪽으로 짜도 통과한다.</li>
+<li>실습(선택): <a href="../scenario/ch10-project/10-12-jpa-mybatis-flush.html">10-12. JPA와 MyBatis를 한 트랜잭션에서</a> — 둘을 같이 쓸 때 flush가 왜 필요한지.</li>
+<li>실습: <a href="../scenario/ch8-query-deep/8-4-dynamic-search.html">8-4. 조합 검색</a> — 8장도 같은 <code>practice</code> DB에서 SQL을 먼저 완성하고 API로 옮긴다.</li>
+<li>레슨: <a href="F1-validation-errors.html">F1. 검증과 에러 응답(ProblemDetail)</a></li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

@@ -1,0 +1,30 @@
+package org.example.board.common;
+
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+// 모든 응답의 공통 틀 — 성공: {status, message, data} / 실패: {status, message, code, errors, data:null}
+public record ApiResponse<T>(
+        int status,
+        String message,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String code,
+        @JsonInclude(JsonInclude.Include.NON_NULL) List<FieldErrorItem> errors,
+        T data) {
+
+    // 필드 하나의 검증 실패 — {"field": "title", "reason": "제목은 5자 이상이어야 합니다."}
+    public record FieldErrorItem(String field, String reason) {
+    }
+
+    public static <T> ApiResponse<T> ok(T data) {
+        return new ApiResponse<>(200, "OK", null, null, data);
+    }
+
+    public static <T> ApiResponse<T> created(T data) {
+        return new ApiResponse<>(201, "Created", null, null, data);
+    }
+
+    public static ApiResponse<Void> fail(ErrorCode code, String message, List<FieldErrorItem> errors) {
+        return new ApiResponse<>(code.status().value(), message, code.name(), errors, null);
+    }
+}

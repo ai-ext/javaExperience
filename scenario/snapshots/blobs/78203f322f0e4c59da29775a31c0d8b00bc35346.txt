@@ -1,0 +1,32 @@
+package org.example.bookmark;
+
+import tools.jackson.databind.JsonNode;
+
+// PUT 본문 — 둘 다 생략 가능. folderId가 null이면 기본 폴더
+public record BookmarkRequest(
+        Long folderId,
+
+        String memo
+) {
+    public static BookmarkRequest from(JsonNode body) {
+        if (body == null) return new BookmarkRequest(null, null);
+        if (!body.isObject()) throw new InvalidBookmarkFieldException("body", "JSON 객체를 보내 주세요.");
+        JsonNode folder = body.get("folderId");
+        JsonNode memo = body.get("memo");
+        Long folderId = null;
+        if (folder != null && !folder.isNull()) {
+            if (!folder.isIntegralNumber() || !folder.canConvertToLong() || folder.longValue() <= 0) {
+                throw new InvalidBookmarkFieldException("folderId", "폴더 ID는 양의 정수여야 합니다.");
+            }
+            folderId = folder.asLong();
+        }
+        String memoValue = null;
+        if (memo != null && !memo.isNull()) {
+            if (!memo.isTextual() || memo.asText().length() > 200) {
+                throw new InvalidBookmarkFieldException("memo", "메모는 문자열이며 200자 이하여야 합니다.");
+            }
+            memoValue = memo.asText();
+        }
+        return new BookmarkRequest(folderId, memoValue);
+    }
+}

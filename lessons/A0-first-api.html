@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A0. API 개발이 뭔가 — API 하나를 띄우고 직접 고쳐 보기</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="a0-api-개발이-뭔가--api-하나를-띄우고-직접-고쳐-보기"><a class="anchor" href="#a0-api-개발이-뭔가--api-하나를-띄우고-직접-고쳐-보기" aria-hidden="true">#</a>A0. API 개발이 뭔가 — API 하나를 띄우고 직접 고쳐 보기</h1>
+<blockquote>
+<p>실습 · 40분</p>
+</blockquote>
+<h2 id="api-개발이-하는-일"><a class="anchor" href="#api-개발이-하는-일" aria-hidden="true">#</a>API 개발이 하는 일</h2>
+<p>API 개발은 <strong>요청을 받아 → 처리하고 → 필요하면 DB에 저장·조회하고 → 응답을 돌려주는 프로그램</strong>을 만드는 일이다.</p>
+<ul>
+<li>요청은 &quot;어떤 주소로, 어떤 방법(<code>GET</code>·<code>POST</code> …)으로, 무엇을 담아&quot; 보낸 글 한 통이다.</li>
+<li>서버는 그 주소를 맡은 코드를 찾아 실행한다. 글을 저장하라는 요청이면 DB에 한 줄을 넣고, 목록을 달라는 요청이면 DB에서 읽는다.</li>
+<li>결과를 상태 코드(<code>200</code>·<code>404</code> …)와 본문(대개 JSON)으로 돌려준다.</li>
+</ul>
+<p>이번 레슨은 설명보다 손이 먼저다. 실습 레포를 띄워 API에 요청을 보내 보고, 응답을 고쳐 보고, API 하나를 새로 만든다. 마지막에 요청 하나가 서버 안에서 지나가는 길을 그림 한 장으로 본다.</p>
+<h2 id="①-띄우고-요청-보내기"><a class="anchor" href="#①-띄우고-요청-보내기" aria-hidden="true">#</a>① 띄우고 요청 보내기</h2>
+<p>실습 레포 <strong>javaExperience</strong>를 <a href="../README.html">시작하기</a>대로 받고 DB 설정을 맞춘다. IntelliJ에서 <code>org.example.Main</code>을 실행하거나, 레포 폴더에서 아래를 실행한다.</p>
+<pre><code class="language-bash">./gradlew bootRun</code></pre>
+<p>로그 맨 아래에 이 두 줄이 나오면 서버가 뜬 것이다. 서버는 이제 8080번 포트에서 요청을 기다린다. 터미널이 붙잡혀 있는 게 정상이다.</p>
+<pre><code class="language-text">... o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8080 (http) with context path '/'
+... org.example.Main                         : Started Main in 1.537 seconds (process running for 1.765)</code></pre>
+<p>다른 터미널을 열고, 레포에 이미 있는 API <code>GET /hello</code>에 요청을 보낸다. <code>-i</code>는 응답의 머리글까지 보여 달라는 옵션이다.</p>
+<pre><code class="language-bash">curl -i http://localhost:8080/hello</code></pre>
+<pre><code class="language-text">HTTP/1.1 200
+Content-Type: text/plain;charset=UTF-8
+Content-Length: 5
+Date: Sat, 10 Oct 2026 05:06:46 GMT
+
+hello</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>줄</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>HTTP/1.1 200</code></td>
+<td>상태 코드 <code>200</code> — 성공</td>
+</tr>
+<tr>
+<td><code>Content-Type: text/plain;charset=UTF-8</code></td>
+<td>본문은 그냥 글자다(JSON이 아니다)</td>
+</tr>
+<tr>
+<td><code>Content-Length: 5</code></td>
+<td>본문이 5바이트 — <code>hello</code> 다섯 글자</td>
+</tr>
+<tr>
+<td>빈 줄 다음 <code>hello</code></td>
+<td>본문. 서버 코드가 돌려준 값이 그대로 왔다</td>
+</tr>
+</tbody></table></div>
+<h2 id="②-응답-한-줄-고치기"><a class="anchor" href="#②-응답-한-줄-고치기" aria-hidden="true">#</a>② 응답 한 줄 고치기</h2>
+<p>이 응답을 만든 코드는 <code>src/main/java/org/example/controller/HelloController.java</code>에 있다. 파일을 열어 <code>hello()</code> 메서드를 찾는다.</p>
+<pre><code class="language-java">    @GetMapping(&quot;/hello&quot;)
+    public String hello() {
+        return &quot;hello&quot;;
+    }</code></pre>
+<ul>
+<li><code>@GetMapping(&quot;/hello&quot;)</code> — &quot;<code>GET /hello</code> 요청이 오면 이 메서드를 실행하라&quot;는 표시다.</li>
+<li><code>return &quot;hello&quot;;</code> — 돌려준 값이 응답 본문이 된다.</li>
+</ul>
+<p><code>return</code> 줄을 바꾼다.</p>
+<pre><code class="language-java">        return &quot;안녕, 백엔드&quot;;</code></pre>
+<p>저장하고 같은 요청을 다시 보내면 <strong>여전히 <code>hello</code>다.</strong> 실행 중인 서버는 시작할 때 읽어 둔 코드로 돈다. 서버를 멈추고(IntelliJ ■ 또는 터미널에서 <code>Ctrl+C</code>) 다시 실행한 뒤 보낸다.</p>
+<pre><code class="language-bash">curl -i http://localhost:8080/hello</code></pre>
+<pre><code class="language-text">HTTP/1.1 200
+Content-Type: text/plain;charset=UTF-8
+Content-Length: 17
+Date: Sat, 10 Oct 2026 05:07:03 GMT
+
+안녕, 백엔드</code></pre>
+<p><code>Content-Length</code>가 <code>17</code>이 됐다. 한글은 UTF-8에서 한 글자가 3바이트라 <code>안녕</code>·<code>백엔드</code> 다섯 글자가 15바이트, 쉼표와 띄어쓰기가 2바이트다.</p>
+<p>다 봤으면 <code>&quot;hello&quot;</code>로 되돌린다. 레포의 테스트(<code>HelloControllerTest</code>)가 응답이 <code>hello</code>인지 확인한다.</p>
+<h2 id="③-api-하나-새로-만들기"><a class="anchor" href="#③-api-하나-새로-만들기" aria-hidden="true">#</a>③ API 하나 새로 만들기</h2>
+<p><code>GET /api/first/ping</code>을 부르면 JSON <code>{&quot;message&quot;:&quot;pong&quot;}</code>을 돌려주는 API를 만든다. <code>HelloController.java</code>와 같은 폴더에 파일을 하나 더 만든다. IntelliJ에서 <code>controller</code> 폴더를 오른쪽 클릭 → New → Java Class → <code>FirstController</code>.</p>
+<p><code>src/main/java/org/example/controller/FirstController.java</code></p>
+<pre><code class="language-java">package org.example.controller;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
+
+@RestController
+public class FirstController {
+
+    @GetMapping(&quot;/api/first/ping&quot;)
+    public Map&lt;String, String&gt; ping() {
+        return Map.of(&quot;message&quot;, &quot;pong&quot;);
+    }
+}</code></pre>
+<p>지금은 <strong>이렇게 쓴다</strong>고만 알면 된다. 뜻은 뒤에서 하나씩 연다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>지금 알 것</th>
+<th>자세히는</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>package ...;</code> · <code>import ...;</code></td>
+<td>파일이 사는 폴더 이름, 다른 곳의 클래스를 가져다 쓴다는 선언</td>
+<td><a href="../scenario/ch0-first-steps/0-1-ts-to-java.html">0-1</a></td>
+</tr>
+<tr>
+<td><code>@RestController</code></td>
+<td>&quot;이 클래스는 HTTP 요청을 받고, 반환값을 응답 본문으로 쓴다&quot;</td>
+<td><a href="../scenario/ch0-first-steps/0-2-annotations.html">0-2</a> · <a href="B8-annotations.html">B8</a></td>
+</tr>
+<tr>
+<td><code>@GetMapping(&quot;/api/first/ping&quot;)</code></td>
+<td>이 메서드가 맡을 메서드·주소</td>
+<td><a href="../scenario/ch0-first-steps/0-2-annotations.html">0-2</a></td>
+</tr>
+<tr>
+<td><code>Map.of(&quot;message&quot;, &quot;pong&quot;)</code></td>
+<td>키 <code>message</code>, 값 <code>pong</code>인 묶음. Spring이 JSON으로 바꿔 보낸다. 실무에서는 응답 모양을 정한 클래스(record)를 쓴다</td>
+<td><a href="../scenario/ch0-first-steps/0-1-ts-to-java.html">0-1</a> · <a href="D1-json-jackson.html">D1</a></td>
+</tr>
+</tbody></table></div>
+<p>서버를 다시 띄우기 <strong>전에</strong> 먼저 보내 본다.</p>
+<pre><code class="language-bash">curl -i http://localhost:8080/api/first/ping</code></pre>
+<pre><code class="language-text">HTTP/1.1 404
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Sat, 10 Oct 2026 05:07:13 GMT
+
+{&quot;timestamp&quot;:&quot;2026-10-10T05:07:13.297Z&quot;,&quot;status&quot;:404,&quot;error&quot;:&quot;Not Found&quot;,&quot;path&quot;:&quot;/api/first/ping&quot;}</code></pre>
+<p><code>404</code> — 그 주소를 맡은 코드가 없다. 서버는 아직 새 파일을 모른다. 다시 띄운 뒤 같은 요청을 보낸다.</p>
+<pre><code class="language-text">HTTP/1.1 200
+Content-Type: application/json
+Content-Length: 18
+Date: Sat, 10 Oct 2026 05:07:20 GMT
+
+{&quot;message&quot;:&quot;pong&quot;}</code></pre>
+<p>이번에는 <code>Content-Type</code>이 <code>application/json</code>이다. <code>String</code>을 돌려준 <code>/hello</code>는 글자로, <code>Map</code>을 돌려준 <code>/api/first/ping</code>은 JSON으로 나갔다.</p>
+<p>같은 주소에 방법만 <code>POST</code>로 바꿔 보면:</p>
+<pre><code class="language-bash">curl -i -X POST http://localhost:8080/api/first/ping</code></pre>
+<pre><code class="language-text">HTTP/1.1 405
+Allow: GET
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Sat, 10 Oct 2026 05:07:20 GMT
+
+{&quot;timestamp&quot;:&quot;2026-10-10T05:07:20.157Z&quot;,&quot;status&quot;:405,&quot;error&quot;:&quot;Method Not Allowed&quot;,&quot;path&quot;:&quot;/api/first/ping&quot;}</code></pre>
+<p>주소는 맞는데 그 <strong>방법</strong>은 받지 않는다는 <code>405</code>다. <code>Allow: GET</code>이 받는 방법을 알려 준다. 서버 로그에도 한 줄이 남는다.</p>
+<pre><code class="language-text">WARN ... .w.s.m.s.DefaultHandlerExceptionResolver : Resolved [org.springframework.web.HttpRequestMethodNotSupportedException: Request method 'POST' is not supported]</code></pre>
+<p><code>FirstController</code>는 지워도 되고 남겨 둬도 된다. 0장 이후 단계가 쓰는 주소와 겹치지 않는다.</p>
+<h2 id="④-요청-하나가-지나가는-길"><a class="anchor" href="#④-요청-하나가-지나가는-길" aria-hidden="true">#</a>④ 요청 하나가 지나가는 길</h2>
+<p><code>/hello</code>와 <code>/api/first/ping</code>은 컨트롤러에서 바로 답했다. 실제 API는 대개 서비스·저장소를 거쳐 DB까지 갔다 온다. 아래는 1장에서 만들 &quot;게시글 작성&quot; API <code>POST /api/posts</code>가 지나가는 길이다. 상자 안은 1장이 끝나면 레포에 생길 파일 이름이다.</p>
+<pre class="mermaid">flowchart LR
+    REQ[&quot;요청&lt;br/&gt;POST /api/posts&lt;br/&gt;본문 JSON&quot;] --&gt; C[&quot;PostController&lt;br/&gt;주소·본문을 받는다&lt;br/&gt;PostCreateRequest&quot;]
+    C --&gt; S[&quot;PostService&lt;br/&gt;규칙을 지키며 처리한다&quot;]
+    S --&gt; R[&quot;PostRepository&lt;br/&gt;저장·조회를 맡는다&quot;]
+    R --&gt; DB[(&quot;MySQL&lt;br/&gt;post 테이블&quot;)]
+    C -- &quot;처리 결과로&quot; --&gt; RES[&quot;응답&lt;br/&gt;201 + PostResponse JSON&quot;]</pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>자리</th>
+<th>하는 일</th>
+<th>어디서 만드나</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>컨트롤러 <code>PostController</code></td>
+<td>주소·메서드를 맡고, 요청 본문을 객체(<code>PostCreateRequest</code>)로 받고, 응답을 만든다</td>
+<td><a href="../scenario/ch1-create-post/1-1-receive-request.html">1-1</a> · <a href="../scenario/ch1-create-post/1-2-dto-response.html">1-2</a></td>
+</tr>
+<tr>
+<td>서비스 <code>PostService</code></td>
+<td>&quot;글을 쓸 게시판이 실제로 있어야 한다&quot; 같은 업무 규칙을 지키며 일을 처리한다</td>
+<td><a href="../scenario/ch1-create-post/1-3-service-layer.html">1-3</a></td>
+</tr>
+<tr>
+<td>저장소 <code>PostRepository</code> + <code>Post</code></td>
+<td>DB에 넣고 꺼내는 일만 맡는다. <code>Post</code> 객체 하나가 <code>post</code> 테이블 한 줄이 된다</td>
+<td><a href="../scenario/ch1-create-post/1-2-dto-response.html">1-2</a>(처음 저장) · <a href="../scenario/ch1-create-post/1-4-save-to-db.html">1-4</a>(테이블에 정확히 맞추기)</td>
+</tr>
+<tr>
+<td>DB <code>post</code> 테이블</td>
+<td>서버가 꺼져도 남는 데이터</td>
+<td><a href="E2-db-sql-basics.html">E2</a></td>
+</tr>
+</tbody></table></div>
+<p>DB에는 이미 시나리오용 글이 들어 있다. 저장된 모습을 SQL로 직접 본다.</p>
+<pre><code class="language-bash">docker exec -i studymate-mysql-1 mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community -e &quot;SELECT id, title, author_id FROM post ORDER BY id LIMIT 3;&quot;</code></pre>
+<pre><code class="language-text">id	title	author_id
+1	[공지] 실습 게시판 이용 안내	1
+2	JPA 연관관계 매핑 정리	3
+3	인덱스는 언제 타나요?	4</code></pre>
+<p>1장을 마치면 <code>POST /api/posts</code> 요청 하나가 이 표의 새 줄 하나가 된다.</p>
+<h2 id="⑤-앞으로-어디서-깊어지나"><a class="anchor" href="#⑤-앞으로-어디서-깊어지나" aria-hidden="true">#</a>⑤ 앞으로 어디서 깊어지나</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>오늘 한 것</th>
+<th>깊어지는 곳</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>서버를 띄우고 포트에서 기다리게 하기</td>
+<td><a href="A3-server-process-port.html">A3</a> · <a href="A4-what-spring-boot-does.html">A4</a> · <a href="C1-intellij-run-debug.html">C1</a></td>
+</tr>
+<tr>
+<td>curl로 요청 보내고 응답 읽기</td>
+<td><a href="A1-client-server-http.html">A1</a> · <a href="A2-http-anatomy.html">A2</a></td>
+</tr>
+<tr>
+<td>컨트롤러·<code>@GetMapping</code>·응답 객체</td>
+<td>0장 <a href="../scenario/ch0-first-steps/0-1-ts-to-java.html">0-1</a>~<a href="../scenario/ch0-first-steps/0-4-dto-rules.html">0-4</a> · <a href="B8-annotations.html">B8</a></td>
+</tr>
+<tr>
+<td>에러 응답(404·405)과 로그 읽기</td>
+<td><a href="../scenario/ch0-first-steps/0-5-read-stack-trace.html">0-5</a> · <a href="C4-logs-and-stack-traces.html">C4</a></td>
+</tr>
+<tr>
+<td>컨트롤러 → 서비스 → 저장소 → DB</td>
+<td>1장 <a href="../scenario/ch1-create-post/1-1-receive-request.html">1-1</a>~<a href="../scenario/ch1-create-post/1-4-save-to-db.html">1-4</a> · <a href="E1-why-layers.html">E1</a> · <a href="E3-what-is-jpa.html">E3</a></td>
+</tr>
+</tbody></table></div>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> <code>HelloController</code>의 <code>return</code> 값을 바꾸고 저장했는데 curl 응답이 그대로다. 왜이고, 어떻게 하나?</p>
+<details>
+<summary>정답</summary>
+
+<p>실행 중인 서버는 <strong>시작할 때</strong> 컴파일된 코드로 돈다. 파일을 저장해도 이미 떠 있는 서버에는 반영되지 않는다. 서버를 멈추고 다시 실행한 뒤 요청을 보낸다.</p>
+</details>
+
+<p><strong>2.</strong> <code>/hello</code>의 <code>Content-Type</code>은 <code>text/plain</code>, <code>/api/first/ping</code>은 <code>application/json</code>이었다. 무엇이 달라서인가?</p>
+<details>
+<summary>정답</summary>
+
+<p>메서드가 돌려준 값의 타입이다. <code>String</code>을 돌려주면 그 글자가 그대로 본문이 되고, <code>Map</code>이나 객체를 돌려주면 Spring이 JSON으로 바꿔 <code>application/json</code>으로 보낸다.</p>
+</details>
+
+<p><strong>3.</strong> 새 파일을 만든 뒤 서버를 다시 띄우지 않고 <code>GET /api/first/ping</code>을 보냈더니 <code>404</code>가 왔다. 다시 띄운 뒤 <code>POST</code>로 보냈더니 <code>405</code>가 왔다. 두 코드는 각각 무엇을 말하나?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>404</code>는 &quot;그 주소를 맡은 코드가 없다&quot;, <code>405</code>는 &quot;주소는 있지만 그 방법(메서드)은 받지 않는다&quot;이다. <code>405</code> 응답의 <code>Allow: GET</code> 머리글이 받는 방법을 알려 준다.</p>
+</details>
+
+<p><strong>4.</strong> 요청이 <code>PostController → PostService → PostRepository → DB</code> 순으로 간다. &quot;글을 쓸 게시판이 실제로 있어야 한다&quot; 같은 규칙과 &quot;<code>post</code> 테이블에 한 줄 넣기&quot;는 각각 어디에 두나?</p>
+<details>
+<summary>정답</summary>
+
+<p>규칙은 <strong>서비스</strong>(<code>PostService</code>), DB에 넣는 일은 <strong>저장소</strong>(<code>PostRepository</code>)다. 컨트롤러는 요청을 받고 응답을 만드는 일만 한다. 이렇게 나눠 두면 저장 방식이 바뀌어도 규칙 코드는 그대로 둘 수 있다(1-3·E1).</p>
+</details>
+
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<p><a href="../scenario/ch0-first-steps/0-1-ts-to-java.html">0-1. Java로 첫 API — 타입·변수·클래스·생성자·record</a> — 오늘 따라 친 코드의 문법(타입·변수·클래스·생성자)을 한 줄씩 읽으며, 응답 모양을 record로 정한 API를 만든다.</p>
+
+
+</main>
+<script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</script>
+
+</body>
+</html>

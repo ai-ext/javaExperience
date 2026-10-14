@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0-3. 요청의 네 자리 — 경로·쿼리·헤더·본문</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 0장. 백엔드 첫걸음 — /api/start › 0-3</p><p class="level-tags"><span>기초</span><span>게시판 본편</span><span>DB community</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="0-3-요청의-네-자리--경로쿼리헤더본문"><a class="anchor" href="#0-3-요청의-네-자리--경로쿼리헤더본문" aria-hidden="true">#</a>0-3. 요청의 네 자리 — 경로·쿼리·헤더·본문</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p>요청 한 통에는 값이 실리는 자리가 네 곳 있다. 경로(<code>/echo/7</code>), 쿼리(<code>?q=spring</code>), 헤더(<code>X-Client: studymate</code>), 본문(JSON)이다. 서버는 이 네 자리를 <strong>각각 다른 어노테이션</strong>으로 받는다. 이걸 짝지어 두지 않으면 &quot;<code>@PathVariable</code>이 뭐였더라&quot;, &quot;<code>@RequestBody</code>를 두 개 놓으면 왜 안 되지&quot;에서 계속 막힌다.</p>
+<p>이 단계에서는 **받은 것을 그대로 돌려주는 API(echo)**를 만든다. 응답의 키 이름에 <code>fromPath</code>처럼 어느 자리에서 왔는지를 적어 두었다. 그래서 버튼을 누르면 내가 보낸 값이 서버의 어느 매개변수로 들어갔는지 바로 보인다. 본문을 <code>Map</code>으로 받는 방법과 DTO로 받는 방법도 나란히 비교한다.</p>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>요청 실험실</h3><p>경로·쿼리·헤더·본문 칸을 채워 보내면, 서버가 각 자리에서 받은 값을 이름표를 붙여 그대로 돌려준다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>요청 실험실</strong><span>김자바</span></div><div class="screen-widget screen-field"><strong>경로의 id</strong><span>7</span></div><div class="screen-widget screen-field"><strong>쿼리 q</strong><span>spring</span></div><div class="screen-widget screen-field"><strong>헤더 X-Client</strong><span>studymate</span></div><div class="screen-widget screen-field"><strong>본문(JSON)</strong><span>{&quot;title&quot;: &quot;첫 요청&quot;, &quot;tags&quot;: [&quot;java&quot;, &quot;spring&quot;], &quot;extra&quot;: &quot;덤&quot;}</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>Map으로 받기 · DTO로 받기</span></div><div class="screen-widget screen-code"><strong>서버가 받은 것</strong><span>fromPath   ← @PathVariable
+fromQuery  ← @RequestParam
+fromHeader ← @RequestHeader
+fromBody   ← @RequestBody</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>Map으로 받기</summary><ol><li><span class="flow-kind">사용자</span><p>네 칸을 채우고 [Map으로 받기]를 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/start/echo/7?q=spring</p><dl><dt>headers</dt><dd>Content-Type: application/json · X-Client: studymate</dd><dt>body</dt><dd>{
+  &quot;title&quot;: &quot;첫 요청&quot;,
+  &quot;tags&quot;: [&quot;java&quot;, &quot;spring&quot;],
+  &quot;extra&quot;: &quot;덤&quot;
+}</dd></dl></li><li><span class="flow-kind">서버</span><p>경로의 7 → @PathVariable Long id, 쿼리 q=spring → @RequestParam String q, 헤더 X-Client → @RequestHeader(&quot;X-Client&quot;) String client</p></li><li><span class="flow-kind">서버</span><p>본문 JSON 전체 → @RequestBody Map&lt;String, Object&gt; body. 키가 무엇이든 들어온 그대로 담긴다(extra도)</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>{
+  &quot;fromPath&quot;: 7,
+  &quot;fromQuery&quot;: &quot;spring&quot;,
+  &quot;fromHeader&quot;: &quot;studymate&quot;,
+  &quot;fromBody&quot;: {
+    &quot;title&quot;: &quot;첫 요청&quot;,
+    &quot;tags&quot;: [&quot;java&quot;, &quot;spring&quot;],
+    &quot;extra&quot;: &quot;덤&quot;
+  }
+}</dd></dl></li><li><span class="flow-kind">화면</span><p>각 값이 어느 자리에서 왔는지 이름표와 함께 보인다</p></li></ol></details><details class="scenario-flow"><summary>DTO로 받기</summary><ol><li><span class="flow-kind">사용자</span><p>같은 값으로 [DTO로 받기]를 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/start/echo/7/dto?q=spring</p><dl><dt>headers</dt><dd>Content-Type: application/json · X-Client: studymate</dd><dt>body</dt><dd>{
+  &quot;title&quot;: &quot;첫 요청&quot;,
+  &quot;tags&quot;: [&quot;java&quot;, &quot;spring&quot;],
+  &quot;extra&quot;: &quot;덤&quot;
+}</dd></dl></li><li><span class="flow-kind">서버</span><p>본문 → @RequestBody EchoBody body. record EchoBody(String title, List&lt;String&gt; tags)에 있는 필드만 채우고 모르는 extra는 버린다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>{
+  &quot;fromPath&quot;: 7,
+  &quot;fromQuery&quot;: &quot;spring&quot;,
+  &quot;fromHeader&quot;: &quot;studymate&quot;,
+  &quot;fromBody&quot;: {
+    &quot;title&quot;: &quot;첫 요청&quot;,
+    &quot;tags&quot;: [&quot;java&quot;, &quot;spring&quot;]
+  }
+}</dd></dl></li><li><span class="flow-kind">화면</span><p>fromBody에 extra가 없다 — DTO는 정한 모양만 받는다</p></li></ol></details><details class="scenario-flow"><summary>쿼리 q를 빠뜨렸을 때</summary><ol><li><span class="flow-kind">사용자</span><p>쿼리 칸을 비우고 보낸다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/start/echo/7</p><dl><dt>headers</dt><dd>Content-Type: application/json · X-Client: studymate</dd><dt>body</dt><dd>{&quot;title&quot;: &quot;첫 요청&quot;}</dd></dl></li><li><span class="flow-kind">서버</span><p>@RequestParam은 기본이 필수다. 컨트롤러 메서드에 들어가기 전에 Spring이 막는다 — 로그: Required request parameter 'q' ... is not present</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>400</dd><dt>headers</dt><dd>Content-Type: application/json</dd></dl></li><li><span class="flow-kind">화면</span><p>400 — 요청을 고쳐서 다시 보내야 한다</p></li></ol></details><details class="scenario-flow"><summary>본문 형식을 안 알렸을 때(Content-Type)</summary><ol><li><span class="flow-kind">사용자</span><p>(클라이언트 실수) Content-Type을 text/plain으로 보낸다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/start/echo/7?q=spring</p><dl><dt>headers</dt><dd>Content-Type: text/plain · X-Client: studymate</dd><dt>body</dt><dd>{&quot;title&quot;: &quot;첫 요청&quot;}</dd></dl></li><li><span class="flow-kind">서버</span><p>JSON 변환기는 application/json 본문만 읽는다. 글자는 JSON처럼 생겼어도 형식표가 text/plain이라 읽지 않는다 — 로그: Content-Type 'text/plain;charset=UTF-8' is not supported</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>415</dd><dt>headers</dt><dd>Accept: application/json, application/*+json</dd></dl></li><li><span class="flow-kind">화면</span><p>415 Unsupported Media Type — 응답 헤더 Accept가 '이 형식으로 보내라'를 알려 준다</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>메서드·경로 1</td>
+<td><code>POST /api/start/echo/{id}</code> — 본문을 <code>Map&lt;String, Object&gt;</code>로 받는다</td>
+</tr>
+<tr>
+<td>메서드·경로 2</td>
+<td><code>POST /api/start/echo/{id}/dto</code> — 본문을 DTO(<code>record EchoBody(String title, List&lt;String&gt; tags)</code>)로 받는다</td>
+</tr>
+<tr>
+<td>경로 <code>{id}</code></td>
+<td>숫자 → 응답 <code>fromPath</code></td>
+</tr>
+<tr>
+<td>쿼리 <code>q</code></td>
+<td>필수 → 응답 <code>fromQuery</code></td>
+</tr>
+<tr>
+<td>헤더 <code>X-Client</code></td>
+<td>필수 → 응답 <code>fromHeader</code></td>
+</tr>
+<tr>
+<td>본문</td>
+<td>JSON(<code>Content-Type: application/json</code>) → 응답 <code>fromBody</code></td>
+</tr>
+<tr>
+<td>응답</td>
+<td>상태 <code>200</code>, <code>{ &quot;fromPath&quot;, &quot;fromQuery&quot;, &quot;fromHeader&quot;, &quot;fromBody&quot; }</code></td>
+</tr>
+<tr>
+<td>CORS</td>
+<td><code>X-Client</code> 헤더를 허락해야 버튼이 동작한다 — 0-1의 <code>CorsConfig</code>에 이미 들어 있다</td>
+</tr>
+</tbody></table></div>
+<h2 id="따라-치기"><a class="anchor" href="#따라-치기" aria-hidden="true">#</a>따라 치기</h2>
+<p><code>src/main/java/org/example/start/EchoController.java</code></p>
+<pre><code class="language-java">package org.example.start;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class EchoController {
+
+    // 본문 DTO — JSON의 title·tags만 받는다(모르는 필드는 버린다)
+    public record EchoBody(String title, List&lt;String&gt; tags) {
+    }
+
+    // 응답 — 어느 자리에서 온 값인지 이름에 적었다
+    public record EchoResponse(Long fromPath, String fromQuery, String fromHeader, Object fromBody) {
+    }
+
+    // 본문을 Map으로 — 들어온 JSON을 키·값 그대로 받는다
+    @PostMapping(&quot;/api/start/echo/{id}&quot;)
+    public EchoResponse echo(@PathVariable Long id,
+                             @RequestParam String q,
+                             @RequestHeader(&quot;X-Client&quot;) String client,
+                             @RequestBody Map&lt;String, Object&gt; body) {
+        return new EchoResponse(id, q, client, body);
+    }
+
+    // 본문을 DTO로 — 정한 필드만 받는다
+    @PostMapping(&quot;/api/start/echo/{id}/dto&quot;)
+    public EchoResponse echoDto(@PathVariable Long id,
+                                @RequestParam String q,
+                                @RequestHeader(&quot;X-Client&quot;) String client,
+                                @RequestBody EchoBody body) {
+        return new EchoResponse(id, q, client, body);
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>줄</th>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>3~4</td>
+<td><code>import java.util.List;</code></td>
+<td><code>List</code>·<code>Map</code>은 Java 기본 라이브러리(<code>java.util</code>)에 있다</td>
+</tr>
+<tr>
+<td>17</td>
+<td><code>public record EchoBody(String title, List&lt;String&gt; tags)</code></td>
+<td>본문 DTO. <code>List&lt;String&gt;</code>은 &quot;문자열 목록&quot;이다. <code>&lt;&gt;</code> 안은 목록에 든 타입이다. 클래스 안의 record라 바깥에서는 <code>EchoController.EchoBody</code>로 부른다</td>
+</tr>
+<tr>
+<td>21</td>
+<td><code>Object fromBody</code></td>
+<td><code>Object</code>는 &quot;아무 객체나&quot;다. Map이든 DTO든 담으려고 이렇게 했다. 보통 API에서는 쓰지 않는다</td>
+</tr>
+<tr>
+<td>25</td>
+<td><code>@PostMapping(&quot;/api/start/echo/{id}&quot;)</code></td>
+<td><code>{id}</code>는 경로 안의 <strong>변수 자리</strong>다</td>
+</tr>
+<tr>
+<td>26</td>
+<td><code>@PathVariable Long id</code></td>
+<td><code>{id}</code> 자리의 글자를 <code>Long</code>(큰 정수)으로 바꿔 넣는다. 매개변수 이름 <code>id</code>와 <code>{id}</code>가 같아야 한다</td>
+</tr>
+<tr>
+<td>27</td>
+<td><code>@RequestParam String q</code></td>
+<td><code>?q=...</code>. 이름이 같으면 <code>@RequestParam(&quot;q&quot;)</code>의 <code>&quot;q&quot;</code>를 생략할 수 있다</td>
+</tr>
+<tr>
+<td>28</td>
+<td><code>@RequestHeader(&quot;X-Client&quot;) String client</code></td>
+<td>요청 헤더 <code>X-Client</code>의 값. 헤더 이름에 <code>-</code>가 있어 Java 변수 이름으로 못 쓰니 괄호 안에 적는다</td>
+</tr>
+<tr>
+<td>29</td>
+<td><code>@RequestBody Map&lt;String, Object&gt; body</code></td>
+<td>본문 JSON 전체를 Map으로 받는다. <code>Map&lt;String, Object&gt;</code>는 &quot;키는 문자열, 값은 아무거나&quot;다</td>
+</tr>
+<tr>
+<td>30</td>
+<td><code>return new EchoResponse(id, q, client, body);</code></td>
+<td>받은 네 가지를 그대로 담아 돌려준다</td>
+</tr>
+<tr>
+<td>38</td>
+<td><code>@RequestBody EchoBody body</code></td>
+<td>같은 본문을 DTO로 받는다. <code>title</code>·<code>tags</code>만 채워지고, 모르는 키 <code>extra</code>는 버린다</td>
+</tr>
+</tbody></table></div>
+<h3 id="요청-글과-한-줄씩-맞춰-보기"><a class="anchor" href="#요청-글과-한-줄씩-맞춰-보기" aria-hidden="true">#</a>요청 글과 한 줄씩 맞춰 보기</h3>
+<p>아래 <a href="#직접-확인">직접 확인</a>의 요청 A가 서버에 도착한 모양이다. curl이 알아서 붙이는 <code>Host</code>·<code>User-Agent</code> 같은 머리글은 빼고 주요 줄만 옮겼다.</p>
+<pre><code class="language-text">POST /api/start/echo/7?q=spring       ← @PostMapping · ① 경로의 7 · ② 쿼리 q
+Content-Type: application/json        ← &quot;본문은 JSON이에요&quot; — 없거나 다르면 415
+X-Client: studymate                   ← ③ 헤더 → @RequestHeader(&quot;X-Client&quot;)
+
+{&quot;title&quot;:&quot;첫 요청&quot;,&quot;tags&quot;:[&quot;java&quot;,&quot;spring&quot;],&quot;extra&quot;:&quot;덤&quot;}   ← ④ 본문 → @RequestBody</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>자리</th>
+<th>curl에서</th>
+<th>Spring에서</th>
+<th>없으면</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>① 경로</td>
+<td>URL 안 <code>/echo/7</code></td>
+<td><code>@PathVariable Long id</code> + 경로의 <code>{id}</code></td>
+<td>다른 주소라 404</td>
+</tr>
+<tr>
+<td>② 쿼리</td>
+<td><code>?q=spring</code></td>
+<td><code>@RequestParam String q</code></td>
+<td>400(필수일 때)</td>
+</tr>
+<tr>
+<td>③ 헤더</td>
+<td><code>-H &#39;X-Client: studymate&#39;</code></td>
+<td><code>@RequestHeader(&quot;X-Client&quot;) String client</code></td>
+<td>400(필수일 때)</td>
+</tr>
+<tr>
+<td>④ 본문</td>
+<td><code>-d &#39;{...}&#39;</code> + <code>-H &#39;Content-Type: application/json&#39;</code></td>
+<td><code>@RequestBody 타입 이름</code> — <strong>하나만</strong></td>
+<td>400(본문 없음), 415(형식 다름)</td>
+</tr>
+</tbody></table></div>
+<h3 id="본문은-왜-requestbody-하나뿐인가"><a class="anchor" href="#본문은-왜-requestbody-하나뿐인가" aria-hidden="true">#</a>본문은 왜 <code>@RequestBody</code> 하나뿐인가</h3>
+<p>경로·쿼리·헤더는 요청 맨 앞(주소·머리글)에 있어서 몇 번이든 꺼내 읽을 수 있다. <strong>본문은 요청 끝에 붙은 한 덩어리 흐름(스트림)이다.</strong> 서버는 그것을 처음부터 끝까지 <strong>한 번</strong> 읽는다. 첫 번째 <code>@RequestBody</code>가 다 읽고 나면 두 번째 <code>@RequestBody</code>가 읽을 것이 남아 있지 않다. 그래서 400이 난다(아래 <a href="#일부러-망가뜨리기">망가뜨리기</a> ①).</p>
+<p>본문에서 여러 값을 받고 싶으면 <strong>그 값들을 다 담는 객체 하나</strong>를 만든다.</p>
+<h3 id="map으로-받기-vs-dto로-받기"><a class="anchor" href="#map으로-받기-vs-dto로-받기" aria-hidden="true">#</a>Map으로 받기 vs DTO로 받기</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th><code>Map&lt;String, Object&gt;</code></th>
+<th>DTO(<code>record EchoBody</code>)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>모르는 키(<code>extra</code>)</td>
+<td>그대로 담긴다</td>
+<td>버려진다</td>
+</tr>
+<tr>
+<td>값 꺼내기</td>
+<td><code>body.get(&quot;title&quot;)</code> → <code>Object</code>라 <code>(String)</code>으로 바꿔야 한다. 오타 <code>body.get(&quot;titel&quot;)</code>도 컴파일된다(결과는 <code>null</code>)</td>
+<td><code>body.title()</code> → 이미 <code>String</code>. 오타는 컴파일 에러</td>
+</tr>
+<tr>
+<td>타입이 틀린 값(<code>&quot;tags&quot;: 3</code>)</td>
+<td>그대로 담긴다</td>
+<td>400(변환 실패)</td>
+</tr>
+<tr>
+<td>어디에 쓰나</td>
+<td>이 echo처럼 &quot;뭐가 오는지 그대로 보기&quot;</td>
+<td><strong>보통의 API 전부</strong> — 받을 모양을 코드로 못 박는다</td>
+</tr>
+</tbody></table></div>
+<p>실무 API에서는 DTO로 받는다. 1-1의 채점 기준에도 &quot;Map이 아니라 전용 클래스로 받는다&quot;가 있다.</p>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 <strong>만들 것</strong>의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</p>
+<p>이 단계의 처리 흐름:</p>
+<ul>
+<li>경로의 7 → @PathVariable Long id, 쿼리 q=spring → @RequestParam String q, 헤더 X-Client → @RequestHeader(&quot;X-Client&quot;) String client</li>
+<li>본문 JSON 전체 → @RequestBody Map&lt;String, Object&gt; body. 키가 무엇이든 들어온 그대로 담긴다(extra도)</li>
+<li>본문 → @RequestBody EchoBody body. record EchoBody(String title, List<String> tags)에 있는 필드만 채우고 모르는 extra는 버린다</li>
+<li>@RequestParam은 기본이 필수다. 컨트롤러 메서드에 들어가기 전에 Spring이 막는다 — 로그: Required request parameter &#39;q&#39; ... is not present</li>
+</ul>
+<details>
+<summary>Controller — HTTP 연결</summary>
+
+<p><code>EchoController.java</code>. 매핑과 메서드의 입력·응답을 위 <strong>만들 것</strong>의 HTTP 계약과 대조한다. 이번 단계 매핑: <code>@PostMapping(&quot;/api/start/echo/{id}&quot;)</code>, <code>@PostMapping(&quot;/api/start/echo/{id}/dto&quot;)</code>. 변경된 메서드: <code>echo</code>, <code>echoDto</code>.</p>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/start/EchoController.java</summary><pre><code>package org.example.start;
+
+<p>import java.util.List;
+import java.util.Map;</p>
+<p>import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>@RestController
+public class EchoController {</p>
+<pre><code>// 본문 DTO — JSON의 title·tags만 받는다(모르는 필드는 버린다)
+public record EchoBody(String title, List&amp;lt;String&amp;gt; tags) {
+}
+
+// 응답 — 어느 자리에서 온 값인지 이름에 적었다
+public record EchoResponse(Long fromPath, String fromQuery, String fromHeader, Object fromBody) {
+}
+
+// 본문을 Map으로 — 들어온 JSON을 키·값 그대로 받는다
+@PostMapping(&amp;quot;/api/start/echo/{id}&amp;quot;)
+public EchoResponse echo(@PathVariable Long id,
+                         @RequestParam String q,
+                         @RequestHeader(&amp;quot;X-Client&amp;quot;) String client,
+                         @RequestBody Map&amp;lt;String, Object&amp;gt; body) {
+    return new EchoResponse(id, q, client, body);
+}
+
+// 본문을 DTO로 — 정한 필드만 받는다
+@PostMapping(&amp;quot;/api/start/echo/{id}/dto&amp;quot;)
+public EchoResponse echoDto(@PathVariable Long id,
+                            @RequestParam String q,
+                            @RequestHeader(&amp;quot;X-Client&amp;quot;) String client,
+                            @RequestBody EchoBody body) {
+    return new EchoResponse(id, q, client, body);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/0-3.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080
+
+# 요청 A — Map으로 받기
+curl -i -X POST &quot;$BASE/api/start/echo/7?q=spring&quot; \
+  -H 'Content-Type: application/json' -H 'X-Client: studymate' \
+  -d '{&quot;title&quot;:&quot;첫 요청&quot;,&quot;tags&quot;:[&quot;java&quot;,&quot;spring&quot;],&quot;extra&quot;:&quot;덤&quot;}'
+
+# 요청 B — DTO로 받기(같은 본문)
+curl -i -X POST &quot;$BASE/api/start/echo/7/dto?q=spring&quot; \
+  -H 'Content-Type: application/json' -H 'X-Client: studymate' \
+  -d '{&quot;title&quot;:&quot;첫 요청&quot;,&quot;tags&quot;:[&quot;java&quot;,&quot;spring&quot;],&quot;extra&quot;:&quot;덤&quot;}'
+
+# 요청 C — 쿼리 q 없이
+curl -i -X POST &quot;$BASE/api/start/echo/7&quot; \
+  -H 'Content-Type: application/json' -H 'X-Client: studymate' -d '{&quot;title&quot;:&quot;첫 요청&quot;}'
+
+# 요청 D — 본문 형식을 text/plain으로
+curl -i -X POST &quot;$BASE/api/start/echo/7?q=spring&quot; \
+  -H 'Content-Type: text/plain' -H 'X-Client: studymate' -d '{&quot;title&quot;:&quot;첫 요청&quot;}'</code></pre></details>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="A" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>A · Map으로 받기</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/start/echo/7?q=spring" autocomplete="off"></label><div class="request-fields"><label>헤더 · X-Client <input class="request-header" data-name="X-Client" data-template="studymate" value="studymate" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;title&quot;: &quot;첫 요청&quot;,
+  &quot;tags&quot;: [
+    &quot;java&quot;,
+    &quot;spring&quot;
+  ],
+  &quot;extra&quot;: &quot;덤&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;X-Client&quot;: &quot;studymate&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;title&quot;: &quot;첫 요청&quot;,
+  &quot;tags&quot;: [
+    &quot;java&quot;,
+    &quot;spring&quot;
+  ],
+  &quot;extra&quot;: &quot;덤&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.fromPath&quot;,&quot;equals&quot;:7},{&quot;path&quot;:&quot;$.fromQuery&quot;,&quot;equals&quot;:&quot;spring&quot;},{&quot;path&quot;:&quot;$.fromHeader&quot;,&quot;equals&quot;:&quot;studymate&quot;},{&quot;path&quot;:&quot;$.fromBody&quot;,&quot;equals&quot;:{&quot;title&quot;:&quot;첫 요청&quot;,&quot;tags&quot;:[&quot;java&quot;,&quot;spring&quot;],&quot;extra&quot;:&quot;덤&quot;}}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="B" data-method="POST" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>B · DTO로 받기</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/start/echo/7/dto?q=spring" autocomplete="off"></label><div class="request-fields"><label>헤더 · X-Client <input class="request-header" data-name="X-Client" data-template="studymate" value="studymate" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;title&quot;: &quot;첫 요청&quot;,
+  &quot;tags&quot;: [
+    &quot;java&quot;,
+    &quot;spring&quot;
+  ],
+  &quot;extra&quot;: &quot;덤&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;X-Client&quot;: &quot;studymate&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;title&quot;: &quot;첫 요청&quot;,
+  &quot;tags&quot;: [
+    &quot;java&quot;,
+    &quot;spring&quot;
+  ],
+  &quot;extra&quot;: &quot;덤&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.fromPath&quot;,&quot;equals&quot;:7},{&quot;path&quot;:&quot;$.fromBody.title&quot;,&quot;equals&quot;:&quot;첫 요청&quot;},{&quot;path&quot;:&quot;$.fromBody.tags&quot;,&quot;equals&quot;:[&quot;java&quot;,&quot;spring&quot;]},{&quot;path&quot;:&quot;$.fromBody.extra&quot;,&quot;exists&quot;:false}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="C" data-method="POST" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>C · 쿼리 q 없이</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/start/echo/7" autocomplete="off"></label><div class="request-fields"><label>헤더 · X-Client <input class="request-header" data-name="X-Client" data-template="studymate" value="studymate" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;title&quot;: &quot;첫 요청&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;X-Client&quot;: &quot;studymate&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;title&quot;: &quot;첫 요청&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="D" data-method="POST" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>D · 본문 형식 text/plain</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/start/echo/7?q=spring" autocomplete="off"></label><div class="request-fields"><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="text/plain" value="text/plain" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · X-Client <input class="request-header" data-name="X-Client" data-template="studymate" value="studymate" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">{&quot;title&quot;:&quot;첫 요청&quot;}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Content-Type&quot;: &quot;text/plain&quot;,
+  &quot;X-Client&quot;: &quot;studymate&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{&quot;title&quot;:&quot;첫 요청&quot;}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:415}</pre></dd></dl></details></article></div></section><p>버튼은 브라우저가 보내므로, 개발자 도구(F12) → Network 탭에 요청 A 앞의 <code>OPTIONS</code> 줄이 하나 더 보인다. <code>X-Client</code> 같은 직접 만든 헤더를 붙이면 브라우저가 먼저 &quot;이 헤더를 보내도 되나&quot;를 묻는다(preflight, 1-1).</p>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 A</td>
+<td>상태 <code>200</code>, <code>fromPath</code>=<code>7</code>(숫자), <code>fromQuery</code>=<code>spring</code>, <code>fromHeader</code>=<code>studymate</code>, <code>fromBody</code>가 보낸 JSON과 같다(<code>extra</code> 포함)</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 B</td>
+<td>상태 <code>200</code>, <code>fromPath</code>=<code>7</code>, <code>fromBody</code>의 <code>title</code>·<code>tags</code>가 보낸 값과 같고 <code>extra</code>는 없다</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 C</td>
+<td>상태 <code>400</code></td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 D</td>
+<td>상태 <code>415</code></td>
+</tr>
+<tr>
+<td>R1</td>
+<td>매개변수</td>
+<td>네 자리를 각각 <code>@PathVariable</code>·<code>@RequestParam</code>·<code>@RequestHeader</code>·<code>@RequestBody</code>로 받는다. <code>@RequestBody</code>는 메서드마다 하나</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>DTO</td>
+<td>본문 DTO가 <code>record</code>(또는 static 클래스)다</td>
+</tr>
+</tbody></table></div>
+<h2 id="일부러-망가뜨리기"><a class="anchor" href="#일부러-망가뜨리기" aria-hidden="true">#</a>일부러 망가뜨리기</h2>
+<p>하나씩 바꾸고 다시 띄운 뒤 요청을 보낸다. 끝나면 되돌린다. 아래는 모두 Boot 4.1.1에서 재현한 원문이다. 4xx 에러는 앱 로그에 <strong><code>WARN</code> 한 줄</strong>(<code>Resolved [...]</code>)만 남는다. 스택트레이스가 없으니 이 한 줄을 읽으면 된다.</p>
+<h3 id="①-requestbody를-두-개-둔다--400"><a class="anchor" href="#①-requestbody를-두-개-둔다--400" aria-hidden="true">#</a>① <code>@RequestBody</code>를 두 개 둔다 → 400</h3>
+<p><code>echoDto</code>의 매개변수 끝에 <code>@RequestBody Map&lt;String, Object&gt; raw</code>를 하나 더 붙이고 요청 B를 보낸다.</p>
+<pre><code class="language-text">WARN ... .w.s.m.s.DefaultHandlerExceptionResolver : Resolved [org.springframework.http.converter.HttpMessageNotReadableException: Required request body is missing: public org.example.start.EchoController$EchoResponse org.example.start.EchoController.echoDto(java.lang.Long,java.lang.String,java.lang.String,org.example.start.EchoController$EchoBody,java.util.Map&lt;java.lang.String, java.lang.Object&gt;)]</code></pre>
+<ul>
+<li>읽는 법: 본문을 보냈는데 <code>Required request body is missing</code>(본문이 없다)가 나온다. 첫 번째가 본문을 다 읽어 버려서 두 번째에게는 빈 흐름만 남았다. 뒤에 붙은 것은 문제가 난 메서드의 전체 모양이다. <code>EchoController$EchoBody</code>의 <code>$</code>는 &quot;<code>EchoController</code> 안의 <code>EchoBody</code>&quot;라는 뜻이다.</li>
+<li>고치기: <code>@RequestBody</code>는 하나만 둔다. 여러 값이 필요하면 DTO 하나에 필드로 담는다.</li>
+</ul>
+<h3 id="②-content-type을-빼고-보낸다--415"><a class="anchor" href="#②-content-type을-빼고-보낸다--415" aria-hidden="true">#</a>② Content-Type을 빼고 보낸다 → 415</h3>
+<p>curl에서 <code>-H &#39;Content-Type: application/json&#39;</code>을 빼고 <code>-d</code>만 쓰면 curl이 <code>application/x-www-form-urlencoded</code>(HTML 폼 형식)로 보낸다.</p>
+<pre><code class="language-text">WARN ... .w.s.m.s.DefaultHandlerExceptionResolver : Resolved [org.springframework.web.HttpMediaTypeNotSupportedException: Content-Type 'application/x-www-form-urlencoded;charset=UTF-8' is not supported]</code></pre>
+<p>브라우저에서 본문을 문자열로만 보내고 <code>Content-Type</code>을 적지 않으면 브라우저가 <code>text/plain;charset=UTF-8</code>을 붙인다. 그때는 <code>Content-Type &#39;text/plain;charset=UTF-8&#39; is not supported</code>(요청 D와 같다)가 나온다. 응답 헤더 <code>Accept: application/json, application/*+json</code>이 서버가 받는 형식이다.</p>
+<h3 id="③-쿼리-q를-빼고-보낸다--400-요청-c"><a class="anchor" href="#③-쿼리-q를-빼고-보낸다--400-요청-c" aria-hidden="true">#</a>③ 쿼리 <code>q</code>를 빼고 보낸다 → 400 (요청 C)</h3>
+<pre><code class="language-text">WARN ... Resolved [org.springframework.web.bind.MissingServletRequestParameterException: Required request parameter 'q' for method parameter type String is not present]</code></pre>
+<h3 id="④-헤더-x-client를-빼고-보낸다--400"><a class="anchor" href="#④-헤더-x-client를-빼고-보낸다--400" aria-hidden="true">#</a>④ 헤더 <code>X-Client</code>를 빼고 보낸다 → 400</h3>
+<pre><code class="language-text">WARN ... Resolved [org.springframework.web.bind.MissingRequestHeaderException: Required request header 'X-Client' for method parameter type String is not present]</code></pre>
+<p>없어도 되는 값이면 <code>@RequestParam(required = false)</code>, <code>@RequestHeader(value = &quot;X-Client&quot;, required = false)</code>로 쓴다. 그러면 값이 없을 때 <code>null</code>이 들어온다.</p>
+<h3 id="⑤-경로에-숫자-대신-글자--400"><a class="anchor" href="#⑤-경로에-숫자-대신-글자--400" aria-hidden="true">#</a>⑤ 경로에 숫자 대신 글자 → 400</h3>
+<p><code>POST /api/start/echo/abc?q=spring</code></p>
+<pre><code class="language-text">WARN ... Resolved [org.springframework.web.method.annotation.MethodArgumentTypeMismatchException: Method parameter 'id': Failed to convert value of type 'java.lang.String' to required type 'java.lang.Long'; For input string: &quot;abc&quot;]</code></pre>
+<p>경로·쿼리·헤더는 원래 <strong>전부 글자</strong>다. <code>Long</code>·<code>int</code>로 선언하면 Spring이 대신 바꿔 준다. 바꿀 수 없는 글자가 오면 메서드에 들어가기 전에 400이 난다.</p>
+<h3 id="⑥-닫는-괄호가-없는-json--400"><a class="anchor" href="#⑥-닫는-괄호가-없는-json--400" aria-hidden="true">#</a>⑥ 닫는 괄호가 없는 JSON → 400</h3>
+<p>본문을 <code>{&quot;title&quot;: &quot;깨짐&quot;</code>으로 보낸다.</p>
+<pre><code class="language-text">WARN ... Resolved [org.springframework.http.converter.HttpMessageNotReadableException: JSON parse error: Unexpected end-of-input: expected close marker for Object (start marker at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); byte offset: #UNKNOWN])]</code></pre>
+<p><code>Source: REDACTED</code>는 Jackson 3가 보안상 본문 내용을 로그에 싣지 않는다는 표시다. 무엇을 보냈는지는 보낸 쪽(curl 명령)에서 확인한다.</p>
+<h3 id="⑦-cors-설정에서-x-client를-뺀다--버튼만-실패-curl은-성공"><a class="anchor" href="#⑦-cors-설정에서-x-client를-뺀다--버튼만-실패-curl은-성공" aria-hidden="true">#</a>⑦ CORS 설정에서 <code>X-Client</code>를 뺀다 → 버튼만 실패, curl은 성공</h3>
+<p><code>CorsConfig</code>의 <code>.allowedHeaders(...)</code>에서 <code>&quot;X-Client&quot;</code>를 지우고 다시 띄운다. 실행 칸의 버튼을 누르면 &quot;CORS로 막혔어요&quot;가 뜬다. curl은 그대로 통과한다. 브라우저가 보내는 사전 질문(preflight)을 curl로 흉내 내 보면 이유가 보인다.</p>
+<pre><code class="language-bash">curl -i -X OPTIONS &quot;$BASE/api/start/echo/7?q=spring&quot; -H 'Origin: http://localhost:3000' \
+  -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: content-type,x-client'</code></pre>
+<pre><code class="language-text">HTTP/1.1 200
+Access-Control-Allow-Origin: http://localhost:3000
+Access-Control-Allow-Methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+Access-Control-Allow-Headers: content-type</code></pre>
+<p>(실측은 <code>Origin: http://localhost:3020</code>으로 했다. 출처 값만 다르다.) <code>x-client</code>를 허락해 달라고 물었는데 <code>Allow-Headers</code>에 <code>content-type</code>만 돌아왔다. 그래서 브라우저가 본 요청을 보내지 않는다. 서버 로그에는 아무것도 남지 않는다. 막은 쪽이 서버가 아니라 브라우저이기 때문이다.</p>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/P03-annotations-cheatsheet.html#23-웹-매핑과-입력-위치">P03 애노테이션 — 웹 매핑과 입력 위치</a> — <code>@PathVariable</code>·<code>@RequestParam</code>·<code>@RequestHeader</code>·<code>@RequestBody</code></li>
+<li><a href="../../docs/knowledge/P16-json-jackson-practical.html#22-requestbody가-동작하는-지점">P16 JSON·Jackson — <code>@RequestBody</code>가 동작하는 지점</a> — 본문이 객체가 되는 순서와 400·415</li>
+<li><a href="../../docs/knowledge/W13-frontend-backend-boundary.html">W13 프론트와 백엔드의 경계</a> — 화면이 보내는 것과 서버가 받는 것</li>
+<li><a href="../../docs/knowledge/W09-why-dto.html">W09 DTO는 왜 쓰나</a> — Map 대신 DTO로 받는 이유</li>
+<li><a href="../../docs/knowledge/D11-web-security-basics.html#31-요청-경계-https-origin-cors">D11 웹 보안 기초 — Origin과 CORS</a> — preflight와 허락 헤더</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 응답 모양</summary>
+
+<p>응답 record는 <code>record EchoResponse(Long fromPath, String fromQuery, String fromHeader, Object fromBody)</code>. <code>fromBody</code>를 <code>Object</code>로 두면 Map과 DTO를 둘 다 담을 수 있다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 경로 변수</summary>
+
+<p><code>@PostMapping(&quot;/api/start/echo/{id}&quot;)</code>의 <code>{id}</code>와 <code>@PathVariable Long id</code>의 이름이 같아야 한다. 이름이 다르면 <code>@PathVariable(&quot;id&quot;) Long postId</code>처럼 괄호 안에 적는다.</p>
+</details>
+
+<details>
+<summary>힌트 3 — 버튼은 실패하고 curl은 성공</summary>
+
+<p><code>CorsConfig</code>의 <code>allowedHeaders</code>에 <code>&quot;X-Client&quot;</code>가 있는지, 바꾼 뒤 앱을 다시 띄웠는지 본다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="0-4-dto-rules.html">0-4. DTO 만들기</a> — DTO를 클래스 안에 만들 때 생기는 실제 에러(static이 아닐 때, getter가 없을 때)를 고장 내고 고친다.</p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 0-3. 요청의 네 자리 — 경로·쿼리·헤더·본문\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch0-first-steps/0-3-request-four-places.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="0-2-annotations.html">← 이전 0-2. 어노테이션은 무엇인가 — 떼어 보면 404</a><a href="0-4-dto-rules.html">다음 → 0-4. DTO 만들기 — record·static·기본 생성자</a></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
+</body>
+</html>

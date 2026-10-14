@@ -1,0 +1,68 @@
+package org.example.moderation;
+
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+// 13-4 금칙어 검사 한 곳 — 글(작성·수정)과 댓글(작성·수정)이 같이 쓴다.
+// 1) BLOCK: 공백을 모두 지우고 소문자로 맞춘 본문에 금칙어가 있으면 거절("바 카 라"도 잡는다)
+// 2) MASK: 본문에서 그 단어(대소문자 무시)를 같은 길이의 *로 바꾼다 — 공백을 끼운 변형은 가리지 않는다
+// 금칙어는 요청마다 DB에서 읽는다(바로 반영). 자주 불리면 캐시가 필요하다 — 16장
+@Component
+public class ContentFilter {
+
+    private static final String BLOCK = "BLOCK";
+
+    private final BannedWordRepository bannedWordRepository;
+
+    public ContentFilter(BannedWordRepository bannedWordRepository) {
+        this.bannedWordRepository = bannedWordRepository;
+    }
+
+    // fields: 필드 이름 → 값(null이면 검사하지 않는다 — PATCH에서 안 바꾸는 필드). BLOCK에 걸리면 걸린 필드 모두를 담아 400
+    public Map<String, String> apply(Map<String, String> fields) {
+        List<BannedWord> words = bannedWordRepository.findAllByOrderByIdAsc();
+        List<Map<String, String>> errors = new ArrayList<>();
+        for (Map.Entry<String, String> e : fields.entrySet()) {
+            if (e.getValue() == null) {
+                continue;
+            }
+            String normalized = normalize(e.getValue());
+            for (BannedWord w : words) {
+                if (BLOCK.equals(w.getAction()) && normalized.contains(normalize(w.getWord()))) {
+                    errors.add(Map.of("field", e.getKey(), "message", "사용할 수 없는 단어가 들어 있습니다: " + w.getWord()));
+                    break;
+                }
+            }
+        }
+        if (!errors.isEmpty()) {
+            throw new BannedContentException(errors);
+        }
+        Map<String, String> masked = new LinkedHashMap<>();
+        fields.forEach((k, v) -> masked.put(k, v == null ? null : mask(v, words)));
+        return masked;
+    }
+
+    private static String mask(String text, List<BannedWord> words) {
+        String result = text;
+        for (BannedWord w : words) {
+            if (BLOCK.equals(w.getAction())) {
+                continue;
+            }
+            Matcher m = Pattern.compile(Pattern.quote(w.getWord()), Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE)
+                    .matcher(result);
+            result = m.replaceAll(r -> "*".repeat(r.group().length()));
+        }
+        return result;
+    }
+
+    private static String normalize(String text) {
+        return text.replaceAll("(?U)\\s+", "").toLowerCase(Locale.ROOT);
+    }
+}

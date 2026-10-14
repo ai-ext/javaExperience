@@ -1,0 +1,55 @@
+package org.example.revision;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.post.AuthorResponse;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+// 11-6 이력 조회 — 401(누군지 모름) → 404(볼 수 없는 글) → 403(작성자·운영자 아님) 순서
+@Service
+public class RevisionService {
+
+    private static final String ADMIN_ROLE = "ADMIN";
+
+    private final PostRepository postRepository;
+    private final PostRevisionRepository revisionRepository;
+    private final PostAccessPolicy accessPolicy;
+
+    public RevisionService(PostRepository postRepository, PostRevisionRepository revisionRepository,
+                           PostAccessPolicy accessPolicy) {
+        this.postRepository = postRepository;
+        this.revisionRepository = revisionRepository;
+        this.accessPolicy = accessPolicy;
+    }
+
+    @Transactional(readOnly = true)
+    public RevisionListResponse list(Long postId, AuthenticatedMember viewer) {
+        if (viewer == null) {
+            throw new AuthenticationRequiredException("인증이 필요합니다.");
+        }
+        Post post = postRepository.findById(postId).orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(viewer, post)) {
+            throw new PostNotFoundException();
+        }
+        boolean isAuthor = post.getAuthor().getId().equals(viewer.id());
+        if (!isAuthor && !ADMIN_ROLE.equals(viewer.role())) {
+            throw new RevisionForbiddenException();
+        }
+        List<RevisionListResponse.Item> items = revisionRepository.findByPostIdNewestFirst(postId).stream()
+                .map(r -> new RevisionListResponse.Item(
+                        r.getId(),
+                        new AuthorResponse(r.getEditor().getId(), r.getEditor().getNickname()),
+                        r.getCreatedAt(),
+                        r.getChangedFieldList(),
+                        new RevisionListResponse.Before(r.getTitle(), r.getContent(), r.getTagList(), r.getVisibility())))
+                .toList();
+        return new RevisionListResponse(items);
+    }
+}

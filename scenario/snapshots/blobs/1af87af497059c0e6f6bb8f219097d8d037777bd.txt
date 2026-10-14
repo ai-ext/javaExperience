@@ -1,0 +1,35 @@
+package org.example.board.comment;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+// 평평한 댓글 목록(시간순) → 최상위 + replies 트리
+public final class CommentTree {
+
+    private CommentTree() {
+    }
+
+    public static List<CommentResponse> build(List<Comment> flat) {
+        Map<Long, List<CommentResponse>> repliesByParent = new LinkedHashMap<>();
+        for (Comment c : flat) {
+            if (c.getParent() != null && !c.isDeleted()) {
+                repliesByParent.computeIfAbsent(c.getParent().getId(), k -> new ArrayList<>()).add(CommentResponse.reply(c));
+            }
+        }
+        List<CommentResponse> result = new ArrayList<>();
+        for (Comment c : flat) {
+            if (c.getParent() != null) {
+                continue;
+            }
+            List<CommentResponse> replies = repliesByParent.getOrDefault(c.getId(), List.of());
+            // 지운 댓글에 살아 있는 답글이 없으면 자리도 남기지 않는다
+            if (c.isDeleted() && replies.isEmpty()) {
+                continue;
+            }
+            result.add(CommentResponse.top(c, replies));
+        }
+        return result;
+    }
+}

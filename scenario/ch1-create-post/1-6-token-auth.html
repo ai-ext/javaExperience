@@ -9,8 +9,8 @@
 <body>
 <header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
 <main>
-<p class="crumbs"><a href="../README.html">시나리오</a> › 1장. 게시글 작성 — POST /api/posts › 1-6</p>
-<h1 id="1-6-토큰으로-작성자-정하기"><a class="anchor" href="#1-6-토큰으로-작성자-정하기" aria-hidden="true">#</a>1-6. 토큰으로 작성자 정하기</h1>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 1장. 게시글 작성 — POST /api/posts › 1-6</p><p class="level-tags"><span>기초</span><span>게시판 본편</span><span>DB community</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="1-6-토큰으로-작성자-정하기"><a class="anchor" href="#1-6-토큰으로-작성자-정하기" aria-hidden="true">#</a>1-6. 토큰으로 작성자 정하기</h1>
 <h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
 <p>지금은 누가 보내도 작성자가 김자바다. 실제 서비스에서는 사용자가 로그인한 뒤 받은 <strong>토큰</strong>을 요청 헤더에 실어 보낸다.</p>
 <p>로그인과 토큰 발급은 이번에 만들지 않는다. <strong>토큰은 이미 발급되어 <code>api_token</code> 테이블에 있다고 가정</strong>하고, 요청에 실려 온 토큰의 주인을 작성자로 정한다.</p>
@@ -30,7 +30,9 @@
     C-&gt;&gt;S: 작성(작성자 = 로그인 회원)
     S--&gt;&gt;F: 201
   end</pre>
-<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>로그인한 사용자의 글쓰기</h3><p>프론트는 로그인 때 받은 토큰을 매 요청 헤더에 싣는다. 서버는 그 토큰의 주인을 작성자로 쓴다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>새 글 쓰기</strong><span>이스프링 (로그인됨)</span></div><div class="screen-widget screen-select"><strong>게시판</strong><span>개발</span></div><div class="screen-widget screen-field"><strong>제목</strong><span>[채점] 첫 게시글</span></div><div class="screen-widget screen-field"><strong>본문</strong><span>Spring Boot로 만든 첫 게시글입니다.</span></div><div class="screen-widget screen-chips"><strong>태그</strong><span>spring · jpa</span></div><div class="screen-widget screen-select"><strong>공개 범위</strong><span>전체 공개</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>저장</span></div><div class="screen-widget screen-text"><strong>text</strong><span>#24 · 이스프링 · 방금 전</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>로그인이 만료됐어요. 다시 로그인해 주세요</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>로그인한 이스프링이 저장</summary><ol><li><span class="flow-kind">사용자</span><p>이스프링으로 로그인한 상태에서 저장한다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts</p><dl><dt>headers</dt><dd>Content-Type: application/json · Authorization: Bearer tok-lee</dd><dt>body</dt><dd>{&quot;boardSlug&quot;: &quot;dev&quot;, &quot;title&quot;: &quot;[채점] 토큰&quot;, ...}</dd></dl></li><li><span class="flow-kind">서버</span><p>토큰 확인(인터셉터·ArgumentResolver 등 한 곳): Bearer 형식 → 토큰 조회 → 만료·폐기·회원 상태 확인</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT member_id, expires_at, revoked_at FROM api_token WHERE token = 'tok-lee'</dd></dl></li><li><span class="flow-kind">서버</span><p>작성자 = 토큰 주인(3, 이스프링). 본문에 authorId가 와도 무시한다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>201</dd><dt>headers</dt><dd>Location: /api/posts/24</dd><dt>body</dt><dd>{&quot;id&quot;: 24, &quot;author&quot;: {&quot;id&quot;: 3, &quot;nickname&quot;: &quot;이스프링&quot;}, ...}</dd></dl></li><li><span class="flow-kind">화면</span><p>작성자가 '이스프링'으로 표시된다</p></li></ol></details><details class="scenario-flow"><summary>토큰이 만료됨</summary><ol><li><span class="flow-kind">사용자</span><p>며칠 만에 들어와 저장한다(저장된 토큰이 만료됨)</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts</p><dl><dt>headers</dt><dd>Content-Type: application/json · Authorization: Bearer tok-kimjava-old</dd><dt>body</dt><dd>{&quot;boardSlug&quot;: &quot;dev&quot;, ...}</dd></dl></li><li><span class="flow-kind">서버</span><p>토큰 확인에서 막힌다 — 본문은 아예 읽지 않는다(그래서 본문이 깨져도 401)</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>401</dd><dt>headers</dt><dd>WWW-Authenticate: Bearer · Content-Type: application/problem+json</dd><dt>body</dt><dd>{&quot;status&quot;: 401, &quot;detail&quot;: &quot;로그인이 필요합니다.&quot;}</dd></dl></li><li><span class="flow-kind">화면</span><p>401이면 로그인 화면으로 보내고, 다시 로그인하면 쓰던 글을 이어서 저장한다</p></li></ol></details><details class="scenario-flow"><summary>정지된 회원</summary><ol><li><span class="flow-kind">사용자</span><p>정지된 회원(최정지)이 저장한다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts</p><dl><dt>headers</dt><dd>Content-Type: application/json · Authorization: Bearer tok-choi</dd><dt>body</dt><dd>{&quot;boardSlug&quot;: &quot;dev&quot;, ...}</dd></dl></li><li><span class="flow-kind">서버</span><p>토큰은 유효하다 — 누구인지는 안다. 하지만 회원 상태가 SUSPENDED → 403</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>403</dd><dt>headers</dt><dd>Content-Type: application/problem+json</dd><dt>body</dt><dd>{&quot;status&quot;: 403, &quot;detail&quot;: &quot;이용이 정지된 계정입니다.&quot;}</dd></dl></li><li><span class="flow-kind">화면</span><p>다시 로그인해도 소용없으므로 로그인 화면이 아니라 '이용이 정지된 계정이에요' 안내를 띄운다</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
 <p><strong>요청 헤더</strong> — <code>Authorization: Bearer &lt;토큰&gt;</code></p>
 <div class="table-wrap"><table>
 <thead>
@@ -97,9 +99,936 @@
 <li>요청 본문에 <code>&quot;authorId&quot;</code> 같은 값이 와도 <strong>무시한다.</strong> 작성자를 클라이언트가 정하게 두면 남의 이름으로 글을 쓸 수 있다.</li>
 <li>1-5의 공지 게시판 규칙(운영자만)은 이제 토큰 주인 기준이다.</li>
 <li>만료는 &quot;지금 시각 ≥ <code>expires_at</code>&quot;이다.</li>
+<li><strong>CORS 사전 요청(preflight, <code>OPTIONS</code>)은 토큰 확인에서 뺀다.</strong> 브라우저는 토큰을 싣기 전에 <code>OPTIONS</code>로 먼저 묻는데, 이것까지 막으면 1-1에서 연 CORS가 무너져 브라우저 API 실행 화면이 전부 &quot;CORS로 막혔어요&quot;가 된다. 인터셉터 맨 앞에서 <code>CorsUtils.isPreFlightRequest(request)</code>면 통과시킨다.</li>
 </ul>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 <strong>만들 것</strong>의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</p>
+<p>이 단계의 처리 흐름:</p>
+<ul>
+<li>토큰 확인(인터셉터·ArgumentResolver 등 한 곳): Bearer 형식 → 토큰 조회 → 만료·폐기·회원 상태 확인</li>
+<li>작성자 = 토큰 주인(3, 이스프링). 본문에 authorId가 와도 무시한다</li>
+<li>토큰 확인에서 막힌다 — 본문은 아예 읽지 않는다(그래서 본문이 깨져도 401)</li>
+<li>토큰은 유효하다 — 누구인지는 안다. 하지만 회원 상태가 SUSPENDED → 403</li>
+</ul>
+<details>
+<summary>Controller — HTTP 연결</summary>
+
+<p><code>AuthInterceptor.java</code>, <code>PostController.java</code>. 매핑과 메서드의 입력·응답을 위 <strong>만들 것</strong>의 HTTP 계약과 대조한다. 변경된 메서드: <code>preHandle</code>, <code>create</code>.</p>
+</details>
+
+<details>
+<summary>Service — 처리 순서</summary>
+
+<p><code>PostService.java</code>. 위 서버 처리 순서가 어디에서 검증·조회·상태 변경으로 이어지는지 따라간다. 변경된 메서드: <code>create</code>. 트랜잭션 경계는 아래 코드의 <code>@Transactional</code> 위치에서 확인한다.</p>
+</details>
+
+<details>
+<summary>JPA / Repository — DB 조건</summary>
+
+<p><code>ApiTokenRepository.java</code>. 쿼리·파생 메서드의 조건을 화면 시나리오의 DB 단계 및 직접 확인 SQL과 대조한다. 직접 작성한 JPQL·SQL과 아래 파일의 <code>@Query</code>를 비교한다.</p>
+</details>
+
+<details>
+<summary>MyBatis — 토큰 조회와 글·태그 저장 대체 경로</summary>
+
+<p>아래 <strong>MyBatis 대체 구현 코드</strong> 접기를 선택해 기본 JPA 스냅샷에 15개 파일 변경을 적용한다. <code>AuthTokenMapper.xml</code>은 <code>api_token</code>과 <code>member</code>를 JOIN해 만료·폐기·회원 상태를 한 번에 읽는다. 토큰 원문은 결과 DTO와 로그에 싣지 않는다. <code>PostCreationMapper.xml</code>은 게시판의 <code>write_role</code>과 인증된 작성자를 조회하고, <code>post</code> INSERT의 생성 키로 <code>tag</code>와 <code>post_tag</code>를 연결한다. 태그 ID와 DB에 저장된 이름으로 중복 연결을 막고 응답을 만든다. <code>PostService</code>의 <code>@Transactional</code>이 글·태그 저장을 한 트랜잭션으로 묶는다. <code>PostController</code>는 요청의 <code>authorId</code>를 읽지 않고 인터셉터가 확인한 회원 ID만 전달한다. JPA와 MyBatis 양쪽에서 T1~T11 및 D1·D2를 같은 계약으로 확인한다.</p>
+</details>
+
+<details>
+<summary>Entity — 테이블·상태</summary>
+
+<p><code>ApiToken.java</code>. 실제 테이블의 컬럼·외래키와 엔티티 매핑을 대조한다.</p>
+</details>
+
+<details>
+<summary>예외 처리 — 실패 응답</summary>
+
+<p><code>AuthenticationRequiredException.java</code>, <code>MemberNotActiveException.java</code>, <code>ApiExceptionHandler.java</code>. 예외가 어떤 HTTP 상태와 오류 본문으로 바뀌는지 실패 계약과 대조한다. 변경된 메서드: <code>handleAuthenticationRequired</code>, <code>handleMemberNotActive</code>.</p>
+</details>
+
+<details>
+<summary>설정·보조 코드</summary>
+
+<p><code>AuthenticatedMember.java</code>, <code>ClockConfig.java</code>, <code>LoginMember.java</code>, <code>LoginMemberArgumentResolver.java</code>, <code>WebMvcConfig.java</code>, <code>application.yml</code>. 이 파일에서 바뀐 설정·보조 타입이 서버 흐름의 어느 단계에 필요한지 확인한다. 변경된 메서드: <code>clock</code>, <code>supportsParameter</code>, <code>resolveArgument</code>, <code>addInterceptors</code>. <code>application.yml</code>의 <code>org.hibernate.orm.jdbc.bind</code>는 <code>info</code>로 낮춰 토큰 조회 바인딩 값이 로그에 남지 않게 한다.</p>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>Entity — src/main/java/org/example/auth/ApiToken.java</summary><pre><code>package org.example.auth;
+
+<p>import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import org.example.member.Member;</p>
+<p>import java.time.LocalDateTime;</p>
+<p>// api_token 테이블 — 로그인 기능 대신 미리 발급해 둔 토큰. Authorization: Bearer &lt;token&gt;
+@Entity
+@Table(name = &quot;api_token&quot;)
+public class ApiToken {</p>
+<pre><code>@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+@Column(nullable = false, unique = true)
+private String token;
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &amp;quot;member_id&amp;quot;, nullable = false)
+private Member member;
+
+@Column(name = &amp;quot;expires_at&amp;quot;, nullable = false)
+private LocalDateTime expiresAt;
+
+@Column(name = &amp;quot;revoked_at&amp;quot;)
+private LocalDateTime revokedAt;
+
+@Column(name = &amp;quot;created_at&amp;quot;, nullable = false)
+private LocalDateTime createdAt;
+
+protected ApiToken() {
+    // JPA
+}
+
+public Long getId() {
+    return id;
+}
+
+public String getToken() {
+    return token;
+}
+
+public Member getMember() {
+    return member;
+}
+
+public LocalDateTime getExpiresAt() {
+    return expiresAt;
+}
+
+public LocalDateTime getRevokedAt() {
+    return revokedAt;
+}
+
+public LocalDateTime getCreatedAt() {
+    return createdAt;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/auth/ApiTokenRepository.java</summary><pre><code>package org.example.auth;
+
+<p>import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.lang.NonNull;</p>
+<p>import java.util.Optional;</p>
+<p>public interface ApiTokenRepository extends JpaRepository&lt;ApiToken, Long&gt; {</p>
+<pre><code>// member를 함께 fetch해서 트랜잭션 밖(인터셉터)에서도 LazyInitializationException 없이 읽는다
+@Query(&amp;quot;SELECT t FROM ApiToken t JOIN FETCH t.member WHERE t.token = :token&amp;quot;)
+Optional&amp;lt;ApiToken&amp;gt; findByTokenFetchMember(@Param(&amp;quot;token&amp;quot;) @NonNull String token);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/auth/AuthenticatedMember.java</summary><pre><code>package org.example.auth;
+
+<p>// 인터셉터가 토큰을 확인한 뒤 컨트롤러로 넘기는 로그인 회원 정보
+public record AuthenticatedMember(Long id, String nickname, String role) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/auth/AuthenticationRequiredException.java</summary><pre><code>package org.example.auth;
+
+<p>// 누구인지 모름(헤더 없음·형식 오류·없는 토큰·만료·폐기) — 전역 핸들러가 401로 변환한다
+public class AuthenticationRequiredException extends RuntimeException {</p>
+<pre><code>public AuthenticationRequiredException(String message) {
+    super(message);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/auth/AuthInterceptor.java</summary><pre><code>package org.example.auth;
+
+<p>import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.example.member.Member;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.stereotype.Component;
+import org.springframework.web.cors.CorsUtils;
+import org.springframework.web.servlet.HandlerInterceptor;</p>
+<p>import java.time.Clock;
+import java.time.LocalDateTime;</p>
+<p>// /api/** 요청의 토큰을 한 곳에서 확인한다(컨트롤러마다 반복하지 않는다).
+// GET이고 헤더가 없으면 비로그인으로 통과시킨다(2-1에서 필요).
+@Component
+public class AuthInterceptor implements HandlerInterceptor {</p>
+<pre><code>public static final String LOGIN_MEMBER_ATTRIBUTE = &amp;quot;loginMember&amp;quot;;
+private static final String BEARER_PREFIX = &amp;quot;Bearer &amp;quot;;
+private static final String ACTIVE_STATUS = &amp;quot;ACTIVE&amp;quot;;
+
+private final ApiTokenRepository apiTokenRepository;
+private final Clock clock;
+
+public AuthInterceptor(ApiTokenRepository apiTokenRepository, Clock clock) {
+    this.apiTokenRepository = apiTokenRepository;
+    this.clock = clock;
+}
+
+@Override
+public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+    // CORS 사전 요청(OPTIONS)은 토큰 없이 온다 — 막으면 브라우저의 요청이 전부 CORS로 실패한다
+    if (CorsUtils.isPreFlightRequest(request)) {
+        return true;
+    }
+
+    String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+    boolean isGet = HttpMethod.GET.matches(request.getMethod());
+
+    if (header == null) {
+        if (isGet) {
+            return true;
+        }
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+    if (!header.startsWith(BEARER_PREFIX)) {
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+
+    String token = header.substring(BEARER_PREFIX.length()).trim();
+    ApiToken apiToken = apiTokenRepository.findByTokenFetchMember(token)
+            .orElseThrow(() -&amp;gt; new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;));
+
+    LocalDateTime now = LocalDateTime.now(clock);
+    boolean expired = !now.isBefore(apiToken.getExpiresAt());
+    if (apiToken.getRevokedAt() != null || expired) {
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+
+    Member member = apiToken.getMember();
+    if (!ACTIVE_STATUS.equals(member.getMemberStatus())) {
+        throw new MemberNotActiveException(&amp;quot;정지되었거나 탈퇴한 회원입니다.&amp;quot;);
+    }
+
+    request.setAttribute(LOGIN_MEMBER_ATTRIBUTE,
+            new AuthenticatedMember(member.getId(), member.getNickname(), member.getRole()));
+    return true;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 — src/main/java/org/example/auth/ClockConfig.java</summary><pre><code>package org.example.auth;
+
+<p>import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;</p>
+<p>import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneId;</p>
+<p>// 토큰 만료 판단의 기준 시각 — 테스트에서 시간을 고정할 수 있도록 빈으로 분리한다.
+// app.fixed-now가 있으면(practice 프로파일, 8-2) 그 시각으로 고정하고, 없으면 시스템 시계를 쓴다.
+@Configuration
+public class ClockConfig {</p>
+<pre><code>@Bean
+public Clock clock(@Value(&amp;quot;${app.fixed-now:}&amp;quot;) String fixedNow) {
+    if (fixedNow == null || fixedNow.isBlank()) {
+        return Clock.systemDefaultZone();
+    }
+    return Clock.fixed(
+            LocalDateTime.parse(fixedNow).atZone(ZoneId.systemDefault()).toInstant(),
+            ZoneId.systemDefault()
+    );
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/auth/LoginMember.java</summary><pre><code>package org.example.auth;
+
+<p>import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;</p>
+<p>// 컨트롤러 메서드 매개변수(AuthenticatedMember)에 붙여 로그인 회원을 받는다
+@Target(ElementType.PARAMETER)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface LoginMember {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/auth/LoginMemberArgumentResolver.java</summary><pre><code>package org.example.auth;
+
+<p>import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.core.MethodParameter;
+import org.springframework.stereotype.Component;
+import org.springframework.web.bind.support.WebDataBinderFactory;
+import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+import org.springframework.web.method.support.ModelAndViewContainer;</p>
+<p>// @LoginMember가 붙은 AuthenticatedMember 매개변수에 인터셉터가 넣어 둔 회원을 꽂아 준다
+@Component
+public class LoginMemberArgumentResolver implements HandlerMethodArgumentResolver {</p>
+<pre><code>@Override
+public boolean supportsParameter(MethodParameter parameter) {
+    return parameter.hasParameterAnnotation(LoginMember.class)
+            &amp;amp;&amp;amp; parameter.getParameterType().equals(AuthenticatedMember.class);
+}
+
+@Override
+public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
+                               NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
+    HttpServletRequest request = (HttpServletRequest) webRequest.getNativeRequest();
+    return request.getAttribute(AuthInterceptor.LOGIN_MEMBER_ATTRIBUTE);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/auth/MemberNotActiveException.java</summary><pre><code>package org.example.auth;
+
+<p>// 누구인지는 알지만(토큰은 유효) 회원 상태가 ACTIVE가 아님 — 전역 핸들러가 403으로 변환한다
+public class MemberNotActiveException extends RuntimeException {</p>
+<pre><code>public MemberNotActiveException(String message) {
+    super(message);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 — src/main/java/org/example/auth/WebMvcConfig.java</summary><pre><code>package org.example.auth;
+
+<p>import org.springframework.context.annotation.Configuration;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;</p>
+<p>import java.util.List;</p>
+<p>@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {</p>
+<pre><code>private final AuthInterceptor authInterceptor;
+private final LoginMemberArgumentResolver loginMemberArgumentResolver;
+
+public WebMvcConfig(AuthInterceptor authInterceptor, LoginMemberArgumentResolver loginMemberArgumentResolver) {
+    this.authInterceptor = authInterceptor;
+    this.loginMemberArgumentResolver = loginMemberArgumentResolver;
+}
+
+@Override
+public void addInterceptors(InterceptorRegistry registry) {
+    // /hello 등 /api 밖의 엔드포인트는 토큰 확인 대상이 아니다
+    registry.addInterceptor(authInterceptor).addPathPatterns(&amp;quot;/api/**&amp;quot;)
+            .excludePathPatterns(&amp;quot;/api/start/**&amp;quot;);
+}
+
+@Override
+public void addArgumentResolvers(List&amp;lt;HandlerMethodArgumentResolver&amp;gt; resolvers) {
+    resolvers.add(loginMemberArgumentResolver);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/common/ApiExceptionHandler.java</summary><pre><code>package org.example.common;
+
+<p>import jakarta.servlet.http.HttpServletRequest;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.MemberNotActiveException;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardWriteForbiddenException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;</p>
+<p>import java.net.URI;
+import java.util.List;
+import java.util.Map;</p>
+<p>// 모든 컨트롤러의 에러 응답을 한 곳에서 RFC 9457 Problem Details로 만든다.
+// 컨트롤러마다 try-catch를 두지 않는다.
+@RestControllerAdvice
+public class ApiExceptionHandler {</p>
+<pre><code>@ExceptionHandler(MethodArgumentNotValidException.class)
+public ProblemDetail handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    List&amp;lt;Map&amp;lt;String, String&amp;gt;&amp;gt; errors = ex.getBindingResult().getFieldErrors().stream()
+            .map(fieldError -&amp;gt; Map.of(
+                    &amp;quot;field&amp;quot;, fieldError.getField(),
+                    &amp;quot;message&amp;quot;, fieldError.getDefaultMessage() == null ? &amp;quot;&amp;quot; : fieldError.getDefaultMessage()
+            ))
+            .toList();
+    problem.setProperty(&amp;quot;errors&amp;quot;, errors);
+    return problem;
+}
+
+@ExceptionHandler(HttpMessageNotReadableException.class)
+public ProblemDetail handleUnreadable(HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;요청 본문을 읽을 수 없습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(BoardNotFoundException.class)
+public ProblemDetail handleBoardNotFound(BoardNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(BoardWriteForbiddenException.class)
+public ProblemDetail handleBoardWriteForbidden(BoardWriteForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 누구인지 모름 — WWW-Authenticate 헤더를 함께 내려준다
+@ExceptionHandler(AuthenticationRequiredException.class)
+public ResponseEntity&amp;lt;ProblemDetail&amp;gt; handleAuthenticationRequired(AuthenticationRequiredException ex,
+                                                                   HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .header(HttpHeaders.WWW_AUTHENTICATE, &amp;quot;Bearer&amp;quot;)
+            .body(problem);
+}
+
+// 누구인지는 알지만(토큰은 유효) 회원 상태 때문에 안 됨
+@ExceptionHandler(MemberNotActiveException.class)
+public ProblemDetail handleMemberNotActive(MemberNotActiveException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/post/PostController.java</summary><pre><code>package org.example.post;
+
+<p>import jakarta.validation.Valid;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.example.tag.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>import java.net.URI;
+import java.util.List;</p>
+<p>@RestController
+@RequestMapping(&quot;/api/posts&quot;)
+public class PostController {</p>
+<pre><code>private static final Logger log = LoggerFactory.getLogger(PostController.class);
+
+private final PostService postService;
+
+public PostController(PostService postService) {
+    this.postService = postService;
+}
+
+@PostMapping
+public ResponseEntity&amp;lt;PostResponse&amp;gt; create(@LoginMember AuthenticatedMember loginMember,
+                                            @Valid @RequestBody PostCreateRequest request) {
+    log.info(&amp;quot;게시글 작성 요청 제목: {}&amp;quot;, request.title());
+
+    Post post = postService.create(loginMember.id(), request);
+    PostResponse response = toResponse(post);
+
+    return ResponseEntity.created(URI.create(&amp;quot;/api/posts/&amp;quot; + post.getId())).body(response);
+}
+
+private PostResponse toResponse(Post post) {
+    List&amp;lt;String&amp;gt; tagNames = post.getTags().stream().map(Tag::getName).toList();
+    AuthorResponse author = new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname());
+    return new PostResponse(
+            post.getId(),
+            post.getBoard().getSlug(),
+            post.getTitle(),
+            post.getContent(),
+            tagNames,
+            post.getVisibility(),
+            author,
+            post.getCreatedAt()
+    );
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/post/PostService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.board.Board;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardRepository;
+import org.example.board.BoardWriteForbiddenException;
+import org.example.member.Member;
+import org.example.member.MemberRepository;
+import org.example.tag.Tag;
+import org.example.tag.TagRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;</p>
+<p>// 글 만들기 규칙. HTTP(ResponseEntity, 헤더 등)는 알지 않는다.
+@Service
+public class PostService {</p>
+<pre><code>private final PostRepository postRepository;
+private final BoardRepository boardRepository;
+private final MemberRepository memberRepository;
+private final TagRepository tagRepository;
+
+public PostService(PostRepository postRepository, BoardRepository boardRepository,
+                    MemberRepository memberRepository, TagRepository tagRepository) {
+    this.postRepository = postRepository;
+    this.boardRepository = boardRepository;
+    this.memberRepository = memberRepository;
+    this.tagRepository = tagRepository;
+}
+
+private static final String ADMIN_WRITE_ROLE = &amp;quot;ADMIN&amp;quot;;
+private static final String ADMIN_ROLE = &amp;quot;ADMIN&amp;quot;;
+private static final String DEFAULT_VISIBILITY = &amp;quot;PUBLIC&amp;quot;;
+
+@Transactional
+public Post create(Long authorId, PostCreateRequest request) {
+    Board board = boardRepository.findBySlug(request.boardSlug())
+            .orElseThrow(() -&amp;gt; new BoardNotFoundException(request.boardSlug()));
+    // 작성자는 요청 본문이 아니라 토큰으로 인증된 회원에서 받는다(authorId 같은 값은 무시한다)
+    Member author = memberRepository.getReferenceById(authorId);
+
+    if (ADMIN_WRITE_ROLE.equals(board.getWriteRole()) &amp;amp;&amp;amp; !ADMIN_ROLE.equals(author.getRole())) {
+        throw new BoardWriteForbiddenException(board.getSlug());
+    }
+
+    String visibility = request.visibility() != null ? request.visibility() : DEFAULT_VISIBILITY;
+    LocalDateTime now = LocalDateTime.now();
+    Post post = new Post(board, author, request.title(), request.content(),
+            &amp;quot;PUBLISHED&amp;quot;, visibility, now);
+
+    for (String tagName : distinctTagNames(request.tags())) {
+        Tag tag = tagRepository.findByName(tagName)
+                .orElseGet(() -&amp;gt; tagRepository.save(new Tag(tagName, now)));
+        post.addTag(tag);
+    }
+
+    Post saved = postRepository.save(post);
+    // 트랜잭션(영속성 컨텍스트) 안에서 지연 로딩 연관을 미리 읽어 둔다.
+    // open-in-view: false라서 컨트롤러가 트랜잭션 밖에서 건드리면 LazyInitializationException이 난다.
+    saved.getAuthor().getNickname();
+    saved.getTags().forEach(Tag::getName);
+    return saved;
+}
+
+private List&amp;lt;String&amp;gt; distinctTagNames(List&amp;lt;String&amp;gt; tags) {
+    if (tags == null) {
+        return List.of();
+    }
+    Set&amp;lt;String&amp;gt; seen = new LinkedHashSet&amp;lt;&amp;gt;(tags);
+    return List.copyOf(seen);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: javaExperience
+  datasource:
+    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  jpa:
+    hibernate:
+      # 테이블은 docker/mysql/init/ 의 dump가 만든다. 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)
+      ddl-auto: validate
+    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+<p>logging:
+  level:
+    # 실행 SQL은 확인하되 토큰을 포함한 바인딩 값은 로그에 남기지 않는다
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: info</p>
+<h1 id="0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다"><a class="anchor" href="#0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다" aria-hidden="true">#</a>0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다</h1>
+<p>start:
+  greeting: 반가워요, 백엔드!
+  max-items: 5
+</code></pre></details></p>
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/1-6.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="mybatis-대체-구현-코드"><a class="anchor" href="#mybatis-대체-구현-코드" aria-hidden="true">#</a>MyBatis 대체 구현 코드</h2>
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {
+    id 'java'
+    // bootRun / bootJar 태스크 제공 + 실행 가능한 fat jar 패키징
+    id 'org.springframework.boot' version '4.1.1'
+    // Boot BOM을 적용해서 아래 의존성들의 버전을 생략할 수 있게 해줌
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+<p>group = &#39;org.example&#39;
+version = &#39;1.0-SNAPSHOT&#39;</p>
+<p>java {
+    toolchain {
+        // 컴파일·실행 JDK를 고정 (Boot 4는 Java 17 이상 필요, 로컬에 설치된 21 사용)
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}</p>
+<p>repositories {
+    mavenCentral()
+}</p>
+<p>dependencies {
+    compileOnly &#39;org.projectlombok:lombok&#39;
+    annotationProcessor &#39;org.projectlombok:lombok&#39;
+    // Spring MVC + 내장 Tomcat + Jackson (Boot 4부터 starter-web → starter-webmvc로 이름 변경)
+    implementation &#39;org.springframework.boot:spring-boot-starter-webmvc&#39;
+    // JPA(Hibernate) + HikariCP 커넥션 풀
+    implementation &#39;org.springframework.boot:spring-boot-starter-data-jpa&#39;
+    implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;
+    // @Valid, @NotBlank 같은 요청 값 검증
+    implementation &#39;org.springframework.boot:spring-boot-starter-validation&#39;
+    // MySQL JDBC 드라이버 — 컴파일엔 필요 없고 실행할 때만 필요
+    runtimeOnly &#39;com.mysql:mysql-connector-j&#39;</p>
+<pre><code>// 테스트: JUnit·AssertJ·Mockito·MockMvc 묶음 (버전은 Boot BOM이 관리하므로 junit-bom 따로 두지 않음)
+testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+// @DataJpaTest(리포지토리만 띄우는 테스트)
+testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+// 테스트용 일회용 MySQL 컨테이너 — application-test.yml의 jdbc:tc: URL이 쓴다
+testImplementation 'org.testcontainers:testcontainers-mysql'
+// Gradle이 JUnit Platform 테스트를 실행할 때 필요한 런처
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'</code></pre>
+<p>}</p>
+<p>tasks.named(&#39;test&#39;) {
+    useJUnitPlatform()
+    // 테스트는 application-test.yml(Testcontainers MySQL)을 쓰게 한다
+    systemProperty &#39;spring.profiles.active&#39;, &#39;test&#39;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: javaExperience
+  datasource:
+    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  jpa:
+    hibernate:
+      # 테이블은 docker/mysql/init/ 의 dump가 만든다. 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)
+      ddl-auto: validate
+    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+<p>logging:
+  level:
+    # 실행되는 SQL과 바인딩 값 — 쿼리가 몇 번 나가는지(N+1) 볼 때 쓴다
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: info</p>
+<h1 id="0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다-1"><a class="anchor" href="#0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다-1" aria-hidden="true">#</a>0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다</h1>
+<p>mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true</p>
+<p>start:
+  greeting: 반가워요, 백엔드!
+  max-items: 5
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/auth/AuthInterceptor.java</summary><pre><code>package org.example.auth;
+
+<p>import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.stereotype.Component;
+import org.springframework.web.cors.CorsUtils;
+import org.springframework.web.servlet.HandlerInterceptor;</p>
+<p>import java.time.Clock;
+import java.time.LocalDateTime;</p>
+<p>// /api/** 요청의 토큰을 한 곳에서 확인한다(컨트롤러마다 반복하지 않는다).
+// GET이고 헤더가 없으면 비로그인으로 통과시킨다(2-1에서 필요).
+@Component
+public class AuthInterceptor implements HandlerInterceptor {</p>
+<pre><code>public static final String LOGIN_MEMBER_ATTRIBUTE = &amp;quot;loginMember&amp;quot;;
+private static final String BEARER_PREFIX = &amp;quot;Bearer &amp;quot;;
+private static final String ACTIVE_STATUS = &amp;quot;ACTIVE&amp;quot;;
+
+private final AuthTokenMapper authTokenMapper;
+private final Clock clock;
+
+public AuthInterceptor(AuthTokenMapper authTokenMapper, Clock clock) {
+    this.authTokenMapper = authTokenMapper;
+    this.clock = clock;
+}
+
+@Override
+public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+    // CORS 사전 요청(OPTIONS)은 토큰 없이 온다 — 막으면 브라우저의 요청이 전부 CORS로 실패한다
+    if (CorsUtils.isPreFlightRequest(request)) {
+        return true;
+    }
+
+    String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+    boolean isGet = HttpMethod.GET.matches(request.getMethod());
+
+    if (header == null) {
+        if (isGet) {
+            return true;
+        }
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+    if (!header.startsWith(BEARER_PREFIX)) {
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+
+    String token = header.substring(BEARER_PREFIX.length()).trim();
+    AuthTokenRow tokenRow = authTokenMapper.findByToken(token);
+    if (tokenRow == null) {
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+
+    LocalDateTime now = LocalDateTime.now(clock);
+    boolean expired = !now.isBefore(tokenRow.expiresAt);
+    if (tokenRow.revokedAt != null || expired) {
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+
+    if (!ACTIVE_STATUS.equals(tokenRow.memberStatus)) {
+        throw new MemberNotActiveException(&amp;quot;정지되었거나 탈퇴한 회원입니다.&amp;quot;);
+    }
+
+    request.setAttribute(LOGIN_MEMBER_ATTRIBUTE,
+            new AuthenticatedMember(tokenRow.memberId, tokenRow.nickname, tokenRow.role));
+    return true;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/auth/AuthTokenRow.java</summary><pre><code>package org.example.auth;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 토큰과 회원을 한 번의 JOIN으로 읽는 결과. 토큰 원문은 로그에 남기지 않는다.
+public class AuthTokenRow {
+    public Long memberId;
+    public String nickname;
+    public String role;
+    public String memberStatus;
+    public LocalDateTime expiresAt;
+    public LocalDateTime revokedAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/auth/AuthTokenMapper.java</summary><pre><code>package org.example.auth;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>@Mapper
+public interface AuthTokenMapper {
+    AuthTokenRow findByToken(@Param(&quot;token&quot;) String token);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/AuthTokenMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.auth.AuthTokenMapper&quot;&gt;
+    &lt;select id=&quot;findByToken&quot; resultType=&quot;org.example.auth.AuthTokenRow&quot;&gt;
+        SELECT m.id AS member_id, m.nickname, m.role, m.member_status,
+               t.expires_at, t.revoked_at
+        FROM api_token t JOIN member m ON m.id = t.member_id
+        WHERE t.token = #{token}
+    &lt;/select&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/post/PostController.java</summary><pre><code>package org.example.post;
+
+<p>import jakarta.validation.Valid;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>import java.net.URI;</p>
+<p>@RestController
+@RequestMapping(&quot;/api/posts&quot;)
+public class PostController {</p>
+<pre><code>private static final Logger log = LoggerFactory.getLogger(PostController.class);
+
+private final PostService postService;
+
+public PostController(PostService postService) {
+    this.postService = postService;
+}
+
+@PostMapping
+public ResponseEntity&amp;lt;PostResponse&amp;gt; create(@LoginMember AuthenticatedMember loginMember,
+                                            @Valid @RequestBody PostCreateRequest request) {
+    log.info(&amp;quot;게시글 작성 요청 제목: {}&amp;quot;, request.title());
+
+    PostResponse response = postService.create(loginMember.id(), request);
+
+    return ResponseEntity.created(URI.create(&amp;quot;/api/posts/&amp;quot; + response.id())).body(response);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/post/PostService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.board.BoardNotFoundException;
+import org.example.board.BoardWriteForbiddenException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;</p>
+<p>// 게시판·작성자 확인부터 글·태그 연결까지 Mapper SQL로 실행한다.
+@Service
+public class PostService {
+    private static final String ADMIN_ROLE = &quot;ADMIN&quot;;
+    private static final String DEFAULT_VISIBILITY = &quot;PUBLIC&quot;;
+    private final PostCreationMapper mapper;</p>
+<pre><code>public PostService(PostCreationMapper mapper) {
+    this.mapper = mapper;
+}
+
+@Transactional
+public PostResponse create(Long authorId, PostCreateRequest request) {
+    BoardWriteRow board = mapper.findBoardBySlug(request.boardSlug());
+    if (board == null) {
+        throw new BoardNotFoundException(request.boardSlug());
+    }
+    // authorId는 요청 JSON이 아니라 AuthInterceptor가 확인한 토큰에서 왔다.
+    AuthorWriteRow author = mapper.findAuthorById(authorId);
+    if (author == null) {
+        throw new IllegalStateException(&amp;quot;인증된 작성자를 찾을 수 없습니다.&amp;quot;);
+    }
+    if (ADMIN_ROLE.equals(board.writeRole) &amp;amp;&amp;amp; !ADMIN_ROLE.equals(author.role)) {
+        throw new BoardWriteForbiddenException(board.slug);
+    }
+
+    PostInsert post = new PostInsert();
+    post.boardId = board.id;
+    post.authorId = author.id;
+    post.title = request.title();
+    post.content = request.content();
+    post.visibility = request.visibility() == null ? DEFAULT_VISIBILITY : request.visibility();
+    post.now = LocalDateTime.now();
+    mapper.insertPost(post);
+
+    Map&amp;lt;Long, String&amp;gt; storedTags = new LinkedHashMap&amp;lt;&amp;gt;();
+    for (String tagName : distinctTagNames(request.tags())) {
+        mapper.insertTagIfAbsent(tagName, post.now);
+        TagWriteRow tag = mapper.findTagByName(tagName);
+        if (!storedTags.containsKey(tag.id)) {
+            mapper.linkTag(post.id, tag.id);
+            storedTags.put(tag.id, tag.name);
+        }
+    }
+    return new PostResponse(post.id, board.slug, post.title, post.content,
+            List.copyOf(storedTags.values()), post.visibility,
+            new AuthorResponse(author.id, author.nickname), post.now);
+}
+
+private List&amp;lt;String&amp;gt; distinctTagNames(List&amp;lt;String&amp;gt; tags) {
+    if (tags == null) {
+        return List.of();
+    }
+    Set&amp;lt;String&amp;gt; seen = new LinkedHashSet&amp;lt;&amp;gt;(tags);
+    return List.copyOf(seen);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/BoardWriteRow.java</summary><pre><code>package org.example.post;
+
+<p>// 게시판 쓰기 권한 검사에 필요한 컬럼만 읽는다.
+public class BoardWriteRow {
+    public Long id;
+    public String slug;
+    public String writeRole;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/AuthorWriteRow.java</summary><pre><code>package org.example.post;
+
+<p>// 작성자 ID는 인증된 토큰에서 받고, 닉네임·역할은 DB에서 확인한다.
+public class AuthorWriteRow {
+    public Long id;
+    public String nickname;
+    public String role;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/post/PostInsert.java</summary><pre><code>package org.example.post;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// MyBatis가 INSERT 후 생성 키를 id에 채운다.
+public class PostInsert {
+    public Long id;
+    public Long boardId;
+    public Long authorId;
+    public String title;
+    public String content;
+    public String visibility;
+    public LocalDateTime now;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/TagWriteRow.java</summary><pre><code>package org.example.post;
+
+<p>// DB에 저장된 태그의 정규 이름을 응답에 사용한다.
+public class TagWriteRow {
+    public Long id;
+    public String name;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/post/PostCreationMapper.java</summary><pre><code>package org.example.post;
+
+<p>import java.time.LocalDateTime;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>@Mapper
+public interface PostCreationMapper {
+    BoardWriteRow findBoardBySlug(@Param(&quot;slug&quot;) String slug);
+    AuthorWriteRow findAuthorById(@Param(&quot;id&quot;) Long id);
+    int insertPost(PostInsert post);
+    int insertTagIfAbsent(@Param(&quot;name&quot;) String name, @Param(&quot;now&quot;) LocalDateTime now);
+    TagWriteRow findTagByName(@Param(&quot;name&quot;) String name);
+    int linkTag(@Param(&quot;postId&quot;) Long postId, @Param(&quot;tagId&quot;) Long tagId);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/PostCreationMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.post.PostCreationMapper&quot;&gt;
+    &lt;select id=&quot;findBoardBySlug&quot; resultType=&quot;org.example.post.BoardWriteRow&quot;&gt;
+        SELECT id, slug, write_role FROM board WHERE slug = #{slug}
+    &lt;/select&gt;
+    &lt;select id=&quot;findAuthorById&quot; resultType=&quot;org.example.post.AuthorWriteRow&quot;&gt;
+        SELECT id, nickname, role FROM member WHERE id = #{id}
+    &lt;/select&gt;
+    &lt;insert id=&quot;insertPost&quot; parameterType=&quot;org.example.post.PostInsert&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+        INSERT INTO post (board_id, author_id, title, content, status, visibility,
+                          view_count, like_count, comment_count, published_at,
+                          created_at, updated_at, deleted_at)
+        VALUES (#{boardId}, #{authorId}, #{title}, #{content}, 'PUBLISHED', #{visibility},
+                0, 0, 0, #{now}, #{now}, #{now}, NULL)
+    &lt;/insert&gt;
+    &lt;insert id=&quot;insertTagIfAbsent&quot;&gt;
+        INSERT INTO tag (name, created_at) VALUES (#{name}, #{now})
+        ON DUPLICATE KEY UPDATE id = id
+    &lt;/insert&gt;
+    &lt;select id=&quot;findTagByName&quot; resultType=&quot;org.example.post.TagWriteRow&quot;&gt;
+        SELECT id, name FROM tag WHERE name = #{name}
+    &lt;/select&gt;
+    &lt;insert id=&quot;linkTag&quot;&gt;
+        INSERT INTO post_tag (post_id, tag_id) VALUES (#{postId}, #{tagId})
+    &lt;/insert&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/auth/ApiTokenRepository.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+
 <h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
-<pre><code class="language-bash">BASE=http://localhost:8080
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080
 BODY='{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[채점] 토큰&quot;,&quot;content&quot;:&quot;토큰으로 쓴 글&quot;,&quot;tags&quot;:[&quot;spring&quot;],&quot;visibility&quot;:&quot;PUBLIC&quot;}'
 post() { curl -s -i -X POST &quot;$BASE/api/posts&quot; -H 'Content-Type: application/json' &quot;$@&quot;; echo; echo ----; }
 
@@ -116,8 +1045,179 @@ post -d '{&quot;title&quot;: &quot;[채점] 깨짐&quot;'                       
 post -H 'Authorization: Bearer tok-admin' \
   -d '{&quot;boardSlug&quot;:&quot;notice&quot;,&quot;title&quot;:&quot;[채점] 토큰-공지&quot;,&quot;content&quot;:&quot;공지&quot;,&quot;tags&quot;:[],&quot;visibility&quot;:&quot;PUBLIC&quot;}'           # T10 운영자 공지
 post -H 'Authorization: Bearer tok-kimjava' \
-  -d '{&quot;boardSlug&quot;:&quot;notice&quot;,&quot;title&quot;:&quot;[채점] 토큰-공지-실패&quot;,&quot;content&quot;:&quot;공지&quot;,&quot;tags&quot;:[],&quot;visibility&quot;:&quot;PUBLIC&quot;}'      # T11 일반 회원 공지</code></pre>
-<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+  -d '{&quot;boardSlug&quot;:&quot;notice&quot;,&quot;title&quot;:&quot;[채점] 토큰-공지-실패&quot;,&quot;content&quot;:&quot;공지&quot;,&quot;tags&quot;:[],&quot;visibility&quot;:&quot;PUBLIC&quot;}'      # T11 일반 회원 공지</code></pre></details>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="T1" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T1 · T1 정상(이스프링)</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰&quot;,
+  &quot;content&quot;: &quot;토큰으로 쓴 글&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰&quot;,
+  &quot;content&quot;: &quot;토큰으로 쓴 글&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:201,&quot;json&quot;:[{&quot;path&quot;:&quot;$.author.id&quot;,&quot;equals&quot;:3},{&quot;path&quot;:&quot;$.author.nickname&quot;,&quot;equals&quot;:&quot;이스프링&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="T2" data-method="POST" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T2 · T2 본문의 authorId는 무시</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰-작성자위조&quot;,
+  &quot;content&quot;: &quot;본문&quot;,
+  &quot;tags&quot;: [],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;,
+  &quot;authorId&quot;: 1
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰-작성자위조&quot;,
+  &quot;content&quot;: &quot;본문&quot;,
+  &quot;tags&quot;: [],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;,
+  &quot;authorId&quot;: 1
+}</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:201,&quot;json&quot;:[{&quot;path&quot;:&quot;$.author.id&quot;,&quot;equals&quot;:2}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="T3" data-method="POST" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T3 · T3 헤더 없음</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰&quot;,
+  &quot;content&quot;: &quot;토큰으로 쓴 글&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰&quot;,
+  &quot;content&quot;: &quot;토큰으로 쓴 글&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:401,&quot;headers&quot;:{&quot;Content-Type&quot;:{&quot;contains&quot;:&quot;application/problem+json&quot;},&quot;WWW-Authenticate&quot;:{&quot;matches&quot;:&quot;^Bearer&quot;}}}</pre></dd></dl></details></article><article class="api-request" data-request-id="T4" data-method="POST" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T4 · T4 Bearer 없음</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="tok-kimjava" value="tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰&quot;,
+  &quot;content&quot;: &quot;토큰으로 쓴 글&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰&quot;,
+  &quot;content&quot;: &quot;토큰으로 쓴 글&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:401}</pre></dd></dl></details></article><article class="api-request" data-request-id="T5" data-method="POST" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T5 · T5 없는 토큰</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer no-such-token" value="Bearer no-such-token" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰&quot;,
+  &quot;content&quot;: &quot;토큰으로 쓴 글&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer no-such-token&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰&quot;,
+  &quot;content&quot;: &quot;토큰으로 쓴 글&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:401}</pre></dd></dl></details></article><article class="api-request" data-request-id="T6" data-method="POST" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T6 · T6 만료</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava-old" value="Bearer tok-kimjava-old" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰&quot;,
+  &quot;content&quot;: &quot;토큰으로 쓴 글&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava-old&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰&quot;,
+  &quot;content&quot;: &quot;토큰으로 쓴 글&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:401}</pre></dd></dl></details></article><article class="api-request" data-request-id="T7" data-method="POST" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T7 · T7 폐기</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava-revoked" value="Bearer tok-kimjava-revoked" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰&quot;,
+  &quot;content&quot;: &quot;토큰으로 쓴 글&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava-revoked&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰&quot;,
+  &quot;content&quot;: &quot;토큰으로 쓴 글&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:401}</pre></dd></dl></details></article><article class="api-request" data-request-id="T8" data-method="POST" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T8 · T8 정지 회원</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-choi" value="Bearer tok-choi" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰&quot;,
+  &quot;content&quot;: &quot;토큰으로 쓴 글&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-choi&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰&quot;,
+  &quot;content&quot;: &quot;토큰으로 쓴 글&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:403,&quot;headers&quot;:{&quot;Content-Type&quot;:{&quot;contains&quot;:&quot;application/problem+json&quot;}}}</pre></dd></dl></details></article><article class="api-request" data-request-id="T9" data-method="POST" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T9 · T9 깨진 본문 + 헤더 없음</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="application/json" value="application/json" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">{&quot;title&quot;: &quot;[채점] 깨짐&quot;</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Content-Type&quot;: &quot;application/json&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{&quot;title&quot;: &quot;[채점] 깨짐&quot;</pre></dd><dt>Expected result</dt><dd><pre>C9: {&quot;status&quot;:401}</pre></dd></dl></details></article><article class="api-request" data-request-id="T10" data-method="POST" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T10 · T10 운영자 공지</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;notice&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰-공지&quot;,
+  &quot;content&quot;: &quot;공지&quot;,
+  &quot;tags&quot;: [],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;notice&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰-공지&quot;,
+  &quot;content&quot;: &quot;공지&quot;,
+  &quot;tags&quot;: [],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C10: {&quot;status&quot;:201,&quot;json&quot;:[{&quot;path&quot;:&quot;$.author.id&quot;,&quot;equals&quot;:1}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="T11" data-method="POST" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T11 · T11 일반 회원 공지</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;notice&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰-공지-실패&quot;,
+  &quot;content&quot;: &quot;공지&quot;,
+  &quot;tags&quot;: [],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;notice&quot;,
+  &quot;title&quot;: &quot;[채점] 토큰-공지-실패&quot;,
+  &quot;content&quot;: &quot;공지&quot;,
+  &quot;tags&quot;: [],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C11: {&quot;status&quot;:403}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
 <p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용). 요청은 위 T1~T11을 그대로 쓴다. <code>{id}</code>는 T1 응답의 <code>id</code>다.</p>
 <div class="table-wrap"><table>
 <thead>
@@ -210,12 +1310,17 @@ post -H 'Authorization: Bearer tok-kimjava' \
 <tr>
 <td>R4</td>
 <td>비밀값</td>
-<td>토큰 원문을 로그에 남기지 않는다</td>
+<td>토큰 원문을 로그에 남기지 않는다 — 내가 쓴 로그 문은 물론, <code>application.yml</code>의 <code>org.hibernate.orm.jdbc.bind: trace</code>(1-4의 SQL 로그 읽기에서 본 것)도 토큰 조회 SQL의 값을 그대로 찍는다. 이 단계부터 그 줄을 지우거나 <code>info</code>로 낮춘다</td>
 </tr>
 <tr>
 <td>R5</td>
 <td>작성자 출처</td>
 <td>서비스가 작성자를 요청 본문이 아니라 인증된 회원에서 받는다</td>
+</tr>
+<tr>
+<td>R6</td>
+<td>사전 요청</td>
+<td>토큰 확인이 <code>OPTIONS</code> 사전 요청을 막지 않는다(<code>CorsUtils.isPreFlightRequest</code>)</td>
 </tr>
 </tbody></table></div>
 <h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
@@ -232,7 +1337,7 @@ post -H 'Authorization: Bearer tok-kimjava' \
 <details>
 <summary>힌트 1 — 어디서 확인할까</summary>
 
-<p><code>HandlerInterceptor</code>의 <code>preHandle</code>은 컨트롤러 메서드의 매개변수(<code>@RequestBody</code>)를 만들기 <strong>전에</strong> 실행된다. 그래서 C9(깨진 본문 + 토큰 없음 → 401)를 맞추기 쉽다. 확인한 회원은 <code>request.setAttribute(...)</code>로 넘긴다. <code>/api/**</code>에만 적용하고 <code>/hello</code>는 빼는 식으로 등록 경로를 정한다(<code>WebMvcConfigurer.addInterceptors</code>).</p>
+<p><code>HandlerInterceptor</code>의 <code>preHandle</code>은 컨트롤러 메서드의 매개변수(<code>@RequestBody</code>)를 만들기 <strong>전에</strong> 실행된다. 그래서 C9(깨진 본문 + 토큰 없음 → 401)를 맞추기 쉽다. 확인한 회원은 <code>request.setAttribute(...)</code>로 넘긴다. <code>/api/**</code>에 적용하되 0장의 공개 실습 API <code>/api/start/**</code>는 <code>excludePathPatterns</code>로 뺀다(<code>WebMvcConfigurer.addInterceptors</code>). <code>/hello</code>도 <code>/api/**</code> 밖이라 대상이 아니다. 2-1부터는 로그인 없이 보는 GET이 생기므로, &quot;GET이고 <code>Authorization</code> 헤더가 없으면 통과&quot;를 지금 넣어 두거나 2-1에서 고친다(헤더가 <strong>있는데</strong> 틀리면 GET이라도 401).</p>
 </details>
 
 <details>
@@ -248,53 +1353,52 @@ post -H 'Authorization: Bearer tok-kimjava' \
 </details>
 
 <h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
-<p><a href="../ch2-read-post/2-1-get-one.html">2-1. 단건 조회와 404</a> — 이제 만든 글을 읽는다. 조회는 토큰 없이도 되게 바꿔야 한다.</p>
+<p><a href="1-7-direct-db-dml.html">1-7. DB 직접 조작</a> — 방금 만든 글을 SQL로 확인하고 트랜잭션을 연습한다.</p>
 
 <section class="grader" id="result-test">
   <h2>결과 테스트 프롬프트</h2>
-  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
   <div class="grader-inputs">
-    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
-    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
   </div>
   <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
   <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
-  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 1-6. 토큰으로 작성자 정하기\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch1-create-post/1-6-token-auth.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 1-6. 토큰으로 작성자 정하기\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch1-create-post/1-6-token-auth.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
 </section>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
   const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
   const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
                   set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
   $('repo').value = store.get('jx.repo');
-  $('base').value = store.get('jx.base');
   function fill() {
     const repo = $('repo').value.trim();
-    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
     $('prompt').value = tpl
-      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
       .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
       .replaceAll('{{BASE}}', base);
     store.set('jx.repo', repo);
-    store.set('jx.base', $('base').value.trim());
   }
   $('repo').addEventListener('input', fill);
-  $('base').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
   fill();
   $('copy').addEventListener('click', async () => {
     const text = $('prompt').value;
     let ok = false;
     try { await navigator.clipboard.writeText(text); ok = true; } catch {}
     if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
-    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
   });
 })();
 </script>
-<nav class="pager"><a href="1-5-validation.html">← 이전 1-5. 입력 검증과 에러 응답</a><a href="../ch2-read-post/2-1-get-one.html">다음 → 2-1. 단건 조회와 404</a></nav>
+<nav class="pager"><a href="1-5-validation.html">← 이전 1-5. 입력 검증과 에러 응답</a><a href="1-7-direct-db-dml.html">다음 → 1-7. DB 직접 조작 — 여러 테이블과 트랜잭션</a></nav>
 </main>
 <script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
 const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
 mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</script>
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
 </body>
 </html>

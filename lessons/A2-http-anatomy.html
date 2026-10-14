@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A2. HTTP 해부 — 요청·응답 글을 칸별로</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="a2-http-해부--요청응답-글을-칸별로"><a class="anchor" href="#a2-http-해부--요청응답-글을-칸별로" aria-hidden="true">#</a>A2. HTTP 해부 — 요청·응답 글을 칸별로</h1>
+<blockquote>
+<p>개념 레슨 · 35분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>A1에서 HTTP는 &quot;요청과 응답을 어떤 모양의 <strong>글</strong>로 쓸지 정한 약속&quot;이라고 했다. 이번에는 그 글을 칸별로 뜯는다. 0-3에서 echo API에 경로·쿼리·헤더·본문을 채워 보냈다. curl 옵션 하나하나가 이 글의 어느 한 칸으로 가고, 서버(Spring)는 그 칸들을 하나씩 꺼내 쓴다.</p>
+<p>요청 글은 네 부분이다.</p>
+<pre><code class="language-text">POST /post?q=spring HTTP/1.1          ← ① 요청 줄: 메서드 · 경로(+쿼리) · 버전
+Host: httpbin.org                     ← ② 헤더(머리글): &quot;이름: 값&quot;이 한 줄에 하나
+Content-Type: application/json
+X-Client: studymate
+Content-Length: 42
+                                      ← ③ 빈 줄: 여기서 헤더가 끝난다
+{&quot;title&quot;:&quot;hello&quot;,&quot;tags&quot;:[&quot;java&quot;,&quot;spring&quot;]}   ← ④ 본문</code></pre>
+<p>응답 글도 모양이 같다. 첫 줄만 다르다.</p>
+<pre><code class="language-text">HTTP/1.1 200 OK                       ← ① 상태 줄: 버전 · 상태 코드 · 짧은 설명
+Content-Type: application/json        ← ② 헤더
+Content-Length: 573
+                                      ← ③ 빈 줄
+{ &quot;args&quot;: ..., &quot;json&quot;: ... }          ← ④ 본문</code></pre>
+<h3 id="칸-하나씩"><a class="anchor" href="#칸-하나씩" aria-hidden="true">#</a>칸 하나씩</h3>
+<p><strong>메서드</strong> — 이 요청으로 <strong>무엇을 하려는지</strong> 나타내는 동사다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>메서드</th>
+<th>뜻</th>
+<th>본문</th>
+<th>게시판으로 치면</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GET</code></td>
+<td>가져오기(읽기만)</td>
+<td>없음</td>
+<td>글 목록·글 하나 보기</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td>새로 만들기</td>
+<td>있음</td>
+<td>글 쓰기</td>
+</tr>
+<tr>
+<td><code>PUT</code></td>
+<td>통째로 바꾸기</td>
+<td>있음</td>
+<td>글 전체 고치기</td>
+</tr>
+<tr>
+<td><code>PATCH</code></td>
+<td>일부만 바꾸기</td>
+<td>있음</td>
+<td>제목만 고치기</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td>지우기</td>
+<td>보통 없음</td>
+<td>글 삭제</td>
+</tr>
+</tbody></table></div>
+<p><strong>URL</strong> — 요청이 갈 곳이다. <code>http://localhost:8080/api/posts/7?sort=new&amp;page=2</code>를 자르면:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>조각</th>
+<th>값</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>스킴</td>
+<td><code>http</code></td>
+<td>어떤 약속으로 말할지(<code>https</code>는 암호화한 HTTP)</td>
+</tr>
+<tr>
+<td>호스트</td>
+<td><code>localhost</code></td>
+<td>어느 컴퓨터(A3에서 자세히)</td>
+</tr>
+<tr>
+<td>포트</td>
+<td><code>8080</code></td>
+<td>그 컴퓨터의 몇 번 문(A3)</td>
+</tr>
+<tr>
+<td><strong>경로</strong>(path)</td>
+<td><code>/api/posts/7</code></td>
+<td>서버 안의 <strong>무엇</strong>. <code>7</code>처럼 경로 속에 넣은 값은 &quot;몇 번 글&quot; 같은 <strong>대상</strong>을 가리킬 때 쓴다</td>
+</tr>
+<tr>
+<td><strong>쿼리</strong>(query)</td>
+<td><code>sort=new&amp;page=2</code></td>
+<td><code>?</code> 뒤의 <code>이름=값</code>을 <code>&amp;</code>로 이은 것. 정렬·페이지·검색어처럼 <strong>조건</strong>을 붙일 때 쓴다</td>
+</tr>
+</tbody></table></div>
+<p>요청 줄에는 경로와 쿼리만 들어간다. 호스트와 포트는 <code>Host:</code> 헤더로 따로 간다.</p>
+<p><strong>헤더</strong> — 본문 말고 <strong>덧붙이는 정보</strong>다. 자주 보는 것:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>헤더</th>
+<th>어느 쪽</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Content-Type</code></td>
+<td>요청·응답</td>
+<td>본문이 어떤 형식인가. JSON이면 <code>application/json</code></td>
+</tr>
+<tr>
+<td><code>Accept</code></td>
+<td>요청</td>
+<td>어떤 형식으로 답해 주면 좋겠나</td>
+</tr>
+<tr>
+<td><code>Authorization</code></td>
+<td>요청</td>
+<td>내가 누구인지(로그인 토큰). F2에서 본다</td>
+</tr>
+<tr>
+<td><code>Content-Length</code></td>
+<td>요청·응답</td>
+<td>본문이 몇 <strong>바이트</strong>인가. 보통 도구가 알아서 붙인다</td>
+</tr>
+<tr>
+<td><code>X-로 시작하는 이름</code></td>
+<td>요청</td>
+<td>팀이 직접 정한 헤더(예: <code>X-Client</code>)</td>
+</tr>
+</tbody></table></div>
+<p><strong>본문</strong>(body) — 실제로 보내는 데이터 덩어리다. 요즘 API는 거의 JSON이다. 헤더의 <code>Content-Type</code>이 &quot;이 덩어리를 어떻게 읽어라&quot;를 알려 준다. <strong>이게 빠지면 서버는 JSON인 줄 모른다</strong>(아래 따라 해 보기 ③).</p>
+<p><strong>상태 코드</strong> — 응답 첫 줄의 숫자. 앞자리만 봐도 누구 잘못인지 안다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>뜻</th>
+<th>누구 탓</th>
+<th>이 레포에서 보게 될 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>200 OK</code></td>
+<td>성공</td>
+<td>—</td>
+<td>조회 성공</td>
+</tr>
+<tr>
+<td><code>201 Created</code></td>
+<td>새로 만들었다</td>
+<td>—</td>
+<td>글 쓰기 성공</td>
+</tr>
+<tr>
+<td><code>204 No Content</code></td>
+<td>성공, 돌려줄 본문 없음</td>
+<td>—</td>
+<td>삭제 성공</td>
+</tr>
+<tr>
+<td><code>400 Bad Request</code></td>
+<td>요청이 잘못됐다</td>
+<td>클라이언트</td>
+<td>필수 쿼리 빠짐, 깨진 JSON</td>
+</tr>
+<tr>
+<td><code>401 Unauthorized</code></td>
+<td>누군지 모르겠다</td>
+<td>클라이언트</td>
+<td>토큰 없음</td>
+</tr>
+<tr>
+<td><code>403 Forbidden</code></td>
+<td>누군지는 아는데 권한이 없다</td>
+<td>클라이언트</td>
+<td>남의 글 지우기</td>
+</tr>
+<tr>
+<td><code>404 Not Found</code></td>
+<td>그런 것이 없다</td>
+<td>클라이언트</td>
+<td>없는 경로, 없는 글 번호</td>
+</tr>
+<tr>
+<td><code>405 Method Not Allowed</code></td>
+<td>그 주소에 그 메서드는 안 받는다</td>
+<td>클라이언트</td>
+<td>POST만 받는 주소에 GET</td>
+</tr>
+<tr>
+<td><code>415 Unsupported Media Type</code></td>
+<td>그 본문 형식은 못 읽는다</td>
+<td>클라이언트</td>
+<td><code>Content-Type</code> 빠짐</td>
+</tr>
+<tr>
+<td><code>500 Internal Server Error</code></td>
+<td>서버 코드가 터졌다</td>
+<td><strong>서버</strong></td>
+<td>처리하지 못한 예외(0-5)</td>
+</tr>
+</tbody></table></div>
+<p>**4xx는 &quot;요청을 고쳐라&quot;, 5xx는 &quot;서버를 고쳐라&quot;**다. 클라이언트는 이 숫자를 보고 다음 행동(다시 입력·다시 로그인·잠시 뒤 재시도)을 정한다.</p>
+<p><strong>JSON</strong> — 본문에 쓰는 글자 형식이다. 규칙이 엄격해서, 아래처럼 쓰면 서버가 읽지 못하고 400으로 거절한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>흔한 실수</th>
+<th>JSON 규칙</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>{ title: &quot;a&quot; }</code> (키 따옴표 없음)</td>
+<td>키도 반드시 큰따옴표: <code>{ &quot;title&quot;: &quot;a&quot; }</code></td>
+</tr>
+<tr>
+<td><code>&#39;작은따옴표&#39;</code></td>
+<td>큰따옴표만</td>
+</tr>
+<tr>
+<td>날짜·함수 같은 값을 그대로</td>
+<td>값은 문자열·숫자·<code>true</code>/<code>false</code>·<code>null</code>·배열·객체뿐. 날짜는 보통 <code>&quot;2026-10-10T09:00:00&quot;</code> 같은 문자열</td>
+</tr>
+<tr>
+<td>끝 쉼표 <code>[1, 2,]</code>, 주석</td>
+<td>안 된다</td>
+</tr>
+</tbody></table></div>
+<p>서버에서는 Spring 안의 <strong>Jackson</strong>이라는 라이브러리가 이 글자를 Java 객체로 바꾸고, 돌려줄 객체를 다시 이 글자로 바꾼다.</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<h3 id="curl-옵션--http-글--spring-대응표"><a class="anchor" href="#curl-옵션--http-글--spring-대응표" aria-hidden="true">#</a>curl 옵션 ↔ HTTP 글 ↔ Spring 대응표</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>칸</th>
+<th>HTTP 글에서</th>
+<th>curl에서</th>
+<th>Spring에서 받는 법(0-3에서 만든 echo API)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>메서드</td>
+<td>요청 줄 첫 낱말</td>
+<td><code>-X POST</code>(<code>-d</code>가 있으면 자동 POST)</td>
+<td><code>@PostMapping</code></td>
+</tr>
+<tr>
+<td>경로 <code>/posts/7</code></td>
+<td>요청 줄 두 번째 칸</td>
+<td>주소 그대로</td>
+<td><code>@PathVariable</code></td>
+</tr>
+<tr>
+<td>쿼리 <code>?q=spring</code></td>
+<td>요청 줄 두 번째 칸의 <code>?</code> 뒤</td>
+<td>주소 그대로, 또는 <code>-G --data-urlencode</code></td>
+<td><code>@RequestParam</code></td>
+</tr>
+<tr>
+<td>헤더</td>
+<td>헤더 줄</td>
+<td><code>-H &#39;X-Client: studymate&#39;</code></td>
+<td><code>@RequestHeader</code></td>
+</tr>
+<tr>
+<td>본문</td>
+<td>빈 줄 다음</td>
+<td><code>-d &#39;{...}&#39;</code></td>
+<td><code>@RequestBody</code></td>
+</tr>
+<tr>
+<td>응답 상태</td>
+<td>응답 상태 줄</td>
+<td><code>-i</code>로 보인다</td>
+<td>메서드가 정상 반환하면 200, 예외면 4xx·5xx</td>
+</tr>
+<tr>
+<td>응답 헤더</td>
+<td>응답 헤더 줄</td>
+<td><code>-i</code>로 보인다</td>
+<td><code>ResponseEntity</code>로 붙인다(1-2)</td>
+</tr>
+<tr>
+<td>응답 본문</td>
+<td>빈 줄 다음</td>
+<td>마지막에 찍힌다</td>
+<td>메서드의 반환값을 Jackson이 JSON으로</td>
+</tr>
+</tbody></table></div>
+<h3 id="실제-글-실측"><a class="anchor" href="#실제-글-실측" aria-hidden="true">#</a>실제 글 (실측)</h3>
+<p>메서드·쿼리·헤더·본문을 모두 채운 요청을 httpbin에 보낸 결과다. httpbin은 받은 요청을 JSON으로 되돌려준다.</p>
+<pre><code class="language-bash">curl -v &quot;http://httpbin.org/post?q=spring&quot; \
+  -H 'Content-Type: application/json' \
+  -H 'X-Client: studymate' \
+  -d '{&quot;title&quot;:&quot;hello&quot;,&quot;tags&quot;:[&quot;java&quot;,&quot;spring&quot;]}'</code></pre>
+<pre><code class="language-text">&gt; POST /post?q=spring HTTP/1.1
+&gt; Host: httpbin.org
+&gt; User-Agent: curl/8.7.1
+&gt; Accept: */*
+&gt; Content-Type: application/json
+&gt; X-Client: studymate
+&gt; Content-Length: 42
+&gt;
+&lt; HTTP/1.1 200 OK
+&lt; Content-Type: application/json
+&lt; Content-Length: 573
+&lt; Server: gunicorn/19.9.0
+...
+{
+  &quot;args&quot;: { &quot;q&quot;: &quot;spring&quot; },
+  &quot;data&quot;: &quot;{\&quot;title\&quot;:\&quot;hello\&quot;,\&quot;tags\&quot;:[\&quot;java\&quot;,\&quot;spring\&quot;]}&quot;,
+  &quot;headers&quot;: { &quot;Content-Type&quot;: &quot;application/json&quot;, &quot;X-Client&quot;: &quot;studymate&quot;, ... },
+  &quot;json&quot;: { &quot;tags&quot;: [&quot;java&quot;, &quot;spring&quot;], &quot;title&quot;: &quot;hello&quot; },
+  &quot;url&quot;: &quot;http://httpbin.org/post?q=spring&quot;
+}</code></pre>
+<ul>
+<li>쿼리 <code>q=spring</code> → <code>args</code>. 헤더 → <code>headers</code>. 본문 글자 그대로 → <code>data</code>, 그 글자를 JSON으로 읽은 결과 → <code>json</code>.</li>
+<li><code>Content-Length: 42</code> — 본문 <code>{&quot;title&quot;:&quot;hello&quot;,...}</code>가 정확히 42바이트다. 한글은 한 글자가 3바이트라 글자 수와 바이트 수가 다르다.</li>
+</ul>
+<h3 id="에러-응답도-같은-모양이다"><a class="anchor" href="#에러-응답도-같은-모양이다" aria-hidden="true">#</a>에러 응답도 같은 모양이다</h3>
+<p>Spring Boot 서버에 잘못된 요청을 보내면 상태 코드와 함께 이런 JSON이 온다(실측, 0장 정답 코드, Boot 4.1.1, 헤더 일부 생략).</p>
+<pre><code class="language-text">HTTP/1.1 405
+Allow: POST
+Content-Type: application/json
+
+{&quot;timestamp&quot;:&quot;2026-10-09T15:00:13.969Z&quot;,&quot;status&quot;:405,&quot;error&quot;:&quot;Method Not Allowed&quot;,&quot;path&quot;:&quot;/api/start/echo/7&quot;}</code></pre>
+<p>POST만 받는 주소에 GET을 보냈더니 405와 함께 <code>Allow: POST</code> 헤더로 &quot;POST로 보내라&quot;를 알려 준다. 헤더도 응답의 일부라 꼭 같이 본다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>10~15분. 터미널에서 하나씩 보내고, 결과의 어느 칸에 무엇이 있는지 짚는다.</p>
+<p><strong>① 쿼리와 헤더 보내기</strong></p>
+<pre><code class="language-bash">curl -i &quot;http://httpbin.org/get?sort=new&amp;page=2&quot; -H 'X-Client: studymate'</code></pre>
+<p>기대: <code>200 OK</code>. 본문의 <code>args</code>에 <code>&quot;page&quot;: &quot;2&quot;</code>, <code>&quot;sort&quot;: &quot;new&quot;</code>가, <code>headers</code>에 <code>&quot;X-Client&quot;: &quot;studymate&quot;</code>가 있다. 쿼리 값 <code>2</code>가 숫자가 아니라 <strong>문자열</strong> <code>&quot;2&quot;</code>로 온다는 점도 본다. 쿼리는 늘 글자다. 숫자로 바꾸는 것은 서버 몫이다.</p>
+<p><strong>② JSON 본문 보내기</strong> — 위 <a href="#실제-글-실측">실제 글</a>의 명령을 그대로 보낸다. <code>json</code> 칸이 채워졌는지 본다.</p>
+<p><strong>③ Content-Type을 빼고 보내기</strong></p>
+<pre><code class="language-bash">curl -s &quot;http://httpbin.org/post&quot; -d '{&quot;title&quot;:&quot;hello&quot;}'</code></pre>
+<p>기대(실측, 일부 줄 생략):</p>
+<pre><code class="language-text">{
+  &quot;data&quot;: &quot;&quot;,
+  &quot;form&quot;: {
+    &quot;{\&quot;title\&quot;:\&quot;hello\&quot;}&quot;: &quot;&quot;
+  },
+  &quot;headers&quot;: {
+    &quot;Content-Type&quot;: &quot;application/x-www-form-urlencoded&quot;,
+    ...
+  },
+  &quot;json&quot;: null,
+  ...
+}</code></pre>
+<p><code>json</code>이 <code>null</code>이다. curl은 <code>-d</code>만 쓰면 <code>Content-Type: application/x-www-form-urlencoded</code>(HTML 폼 형식)를 붙인다. 서버는 본문을 폼으로 읽으려다 엉뚱하게 잘랐다. Spring 서버라면 이 요청을 <strong>415</strong>로 거절한다(0-3 <a href="../scenario/ch0-first-steps/0-3-request-four-places.html#②-content-type을-빼고-보낸다--415">망가뜨리기 ②</a>). JSON을 보낼 때는 <strong><code>Content-Type: application/json</code>을 직접 붙인다.</strong></p>
+<p><strong>④ 상태 코드만 보기</strong></p>
+<pre><code class="language-bash">curl -s -o /dev/null -w '%{http_code}\n' http://httpbin.org/status/201
+curl -i http://httpbin.org/status/404
+curl -i -X DELETE http://httpbin.org/get</code></pre>
+<p>기대: <code>201</code> / <code>HTTP/1.1 404 NOT FOUND</code>(본문 없음) / <code>HTTP/1.1 405 METHOD NOT ALLOWED</code>. 세 번째는 GET만 받는 주소에 DELETE를 보냈다.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> <code>curl &quot;http://localhost:8080/api/posts?page=2&quot; -H &#39;Authorization: Bearer abc&#39;</code>에서 <code>page=2</code>와 <code>Bearer abc</code>는 HTTP 글의 각각 어느 칸에 들어가나?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>page=2</code>는 <strong>요청 줄</strong>의 경로 뒤 <code>?</code> 다음(쿼리)에, <code>Bearer abc</code>는 <strong>헤더</strong> 줄 <code>Authorization: Bearer abc</code>에 들어간다. <code>-X</code>도 <code>-d</code>도 없으니 메서드는 GET이고, 요청 줄은 <code>GET /api/posts?page=2 HTTP/1.1</code>이다.</p>
+</details>
+
+<p><strong>2.</strong> &quot;7번 글 보기&quot;와 &quot;글 목록을 최신순으로 보기&quot;를 주소로 만든다면 <code>7</code>과 <code>최신순</code>을 각각 경로와 쿼리 중 어디에 두는 것이 자연스러운가?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>7</code>은 <strong>경로</strong>(<code>/api/posts/7</code>), 최신순은 <strong>쿼리</strong>(<code>/api/posts?sort=new</code>)다. 경로는 &quot;무엇(대상)&quot;을 가리키고, 쿼리는 &quot;어떻게(조건·필터·정렬·페이지)&quot;를 덧붙인다. 쿼리는 빠져도 같은 대상(목록)을 가리키지만, 경로의 <code>7</code>이 빠지면 다른 것이 된다.</p>
+</details>
+
+<p><strong>3.</strong> 서버에서 404와 500이 났다. 각각 누가 무엇을 고쳐야 하나?</p>
+<details>
+<summary>정답</summary>
+
+<p>404는 4xx라 <strong>요청 쪽</strong> 문제다. 주소 오타이거나 없는 번호를 요청했다. 500은 5xx라 <strong>서버 코드</strong> 문제다. 처리하지 못한 예외가 났으니 서버 로그의 스택트레이스를 본다(0-5). 단, 서버가 &quot;없는 글&quot;을 404 대신 500으로 답하고 있다면 그것도 서버가 고칠 일이다.</p>
+</details>
+
+<p><strong>4.</strong> <code>curl -X POST &quot;http://localhost:8080/api/start/echo/7&quot; -d &#39;{&quot;title&quot;:&quot;hello&quot;}&#39;</code>로 올바른 JSON을 보냈는데 Spring 서버가 415를 돌려준다. 무엇을 빠뜨렸을 가능성이 가장 큰가?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>Content-Type: application/json</code> 헤더다. 415는 &quot;그 본문 형식은 못 읽는다&quot;는 뜻이다. 헤더가 없으면 서버는 본문이 JSON인 줄 모른다. curl은 <code>-d</code>만 쓰면 <code>application/x-www-form-urlencoded</code>를 붙인다. <code>-H &#39;Content-Type: application/json&#39;</code>을 더한다.</p>
+</details>
+
+<p><strong>5.</strong> 다음 중 JSON으로 <strong>틀린</strong> 것을 모두 고르고 이유를 말하라. ㉠ <code>{&quot;age&quot;: 20}</code> ㉡ <code>{&#39;age&#39;: 20}</code> ㉢ <code>{&quot;tags&quot;: [&quot;a&quot;, &quot;b&quot;,]}</code> ㉣ <code>{&quot;deleted&quot;: null}</code></p>
+<details>
+<summary>정답</summary>
+
+<p>㉡과 ㉢이 틀렸다. ㉡은 작은따옴표를 썼다. JSON은 큰따옴표만 쓴다. ㉢은 배열 끝에 쉼표가 있다. JSON은 끝 쉼표를 허용하지 않는다. ㉣의 <code>null</code>은 JSON 값이다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/D02-server-network-basics.html#2-용어-사전">D02 서버·네트워크 기초</a> — URL·헤더·상태 코드 용어</li>
+<li><a href="../docs/knowledge/D03-rest-api-dev-process.html">D03 REST API 개발 과정</a> — 메서드·경로를 어떻게 정하나</li>
+<li><a href="../docs/knowledge/P16-json-jackson-practical.html">P16 JSON과 Jackson 실전</a> — 서버가 JSON을 객체로 바꾸는 방법</li>
+<li><a href="../docs/knowledge/S05-mvc-request-flow.html#1-왜-알아야-하나">S05 Spring MVC 요청 처리 흐름</a> — 요청 글이 컨트롤러 메서드에 닿기까지</li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<p><a href="A3-server-process-port.html">A3. 서버 프로그램</a> — URL의 호스트·포트가 실제로 무엇인지, 서버가 &quot;켜져 있다&quot;는 게 무슨 뜻인지 직접 띄워 본다. 요청의 네 자리를 Spring에서 받는 실습은 <a href="../scenario/ch0-first-steps/0-3-request-four-places.html">0-3</a>에서 했다.</p>
+
+
+</main>
+
+
+</body>
+</html>

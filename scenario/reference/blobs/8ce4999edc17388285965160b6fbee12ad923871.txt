@@ -1,0 +1,26 @@
+-- 8-1 회원별 활동 요약 (practice DB)
+-- member를 기준으로 두고 숫자마다 상관 서브쿼리로 따로 센다.
+-- 글·댓글·좋아요를 한 번에 LEFT JOIN 한 뒤 COUNT하면 행이 곱해져(회원 2: 182) 숫자가 부풀어 오른다.
+--   posts          : 그 회원이 쓴 PUBLISHED·미삭제 글
+--   comments       : 그 회원이 쓴 미삭제 댓글 중, 달린 글도 미삭제인 것
+--   likes_received : 그 회원이 쓴 미삭제 글에 달린 좋아요 "행 수"(post.like_count는 어긋날 수 있어 쓰지 않는다)
+--   likes_given    : 그 회원이 누른 좋아요 행 수
+--   nickname       : 탈퇴(WITHDRAWN) 회원은 '탈퇴한 회원'
+SELECT m.id AS member_id,
+       CASE WHEN m.member_status = 'WITHDRAWN' THEN '탈퇴한 회원' ELSE m.nickname END AS nickname,
+       (SELECT COUNT(*)
+          FROM post p
+         WHERE p.author_id = m.id AND p.status = 'PUBLISHED' AND p.deleted_at IS NULL) AS posts,
+       (SELECT COUNT(*)
+          FROM comment c
+          JOIN post p ON p.id = c.post_id
+         WHERE c.member_id = m.id AND c.deleted_at IS NULL AND p.deleted_at IS NULL) AS comments,
+       (SELECT COUNT(*)
+          FROM post_like l
+          JOIN post p ON p.id = l.post_id
+         WHERE p.author_id = m.id AND p.deleted_at IS NULL) AS likes_received,
+       (SELECT COUNT(*)
+          FROM post_like l
+         WHERE l.member_id = m.id) AS likes_given
+  FROM member m
+ ORDER BY likes_received DESC, m.id ASC;

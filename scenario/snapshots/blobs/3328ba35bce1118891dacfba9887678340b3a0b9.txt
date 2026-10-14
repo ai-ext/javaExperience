@@ -1,0 +1,42 @@
+package org.example.member;
+
+import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Constructor;
+import java.time.LocalDateTime;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+// 13-3 T1 — "기간이 지나면 저절로 풀린다"는 HTTP로는 기다릴 수 없어서 시각을 넘겨 가며 단위 테스트로 본다(Spring 없이)
+class MemberSuspensionTest {
+
+    private static final LocalDateTime UNTIL = LocalDateTime.of(2026, 10, 13, 15, 0, 0);
+
+    @Test
+    void suspendedOnlyBeforeUntil() throws Exception {
+        Member member = newMember();
+        member.suspendUntil(UNTIL, "도배");
+
+        assertTrue(member.isSuspendedAt(UNTIL.minusSeconds(1)), "끝나기 1초 전에는 정지 중");
+        assertFalse(member.isSuspendedAt(UNTIL), "끝나는 시각부터는 풀린다(끝 시각은 포함하지 않는다)");
+        assertFalse(member.isSuspendedAt(UNTIL.plusDays(1)), "지나면 아무것도 안 해도 풀려 있다");
+    }
+
+    @Test
+    void notSuspendedWhenNeverSuspendedOrLifted() throws Exception {
+        Member member = newMember();
+        assertFalse(member.isSuspendedAt(UNTIL), "정지한 적 없으면 정지 아님");
+
+        member.suspendUntil(UNTIL, "도배");
+        member.liftSuspension();
+        assertFalse(member.isSuspendedAt(UNTIL.minusDays(1)), "해제하면 기간 안이어도 정지 아님");
+    }
+
+    // Member는 JPA용 protected 생성자만 있다 — 테스트에서는 리플렉션으로 만든다
+    private static Member newMember() throws Exception {
+        Constructor<Member> constructor = Member.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        return constructor.newInstance();
+    }
+}

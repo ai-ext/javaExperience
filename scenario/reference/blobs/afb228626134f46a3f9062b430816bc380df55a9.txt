@@ -1,0 +1,53 @@
+package org.example.batch;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+// 15-1 명예의 전당 — 기준일(date) 0시 "전"까지 받은 좋아요가 20개 이상인 글을 올린다.
+// 예약 실행(매일 0시)과 수동 실행(운영자 API)이 이 메서드 하나를 같이 쓴다.
+@Service
+public class HallOfFameService {
+
+    public static final int MIN_LIKES = 20;
+    private static final Logger log = LoggerFactory.getLogger(HallOfFameService.class);
+
+    private final HallOfFameRepository hallOfFameRepository;
+    private final Clock clock;
+
+    public HallOfFameService(HallOfFameRepository hallOfFameRepository, Clock clock) {
+        this.hallOfFameRepository = hallOfFameRepository;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public HallOfFameRunResponse run(LocalDate date) {
+        // 기간은 [처음, date 0시) — date 당일에 눌린 좋아요는 아직 "어제까지"가 아니다
+        LocalDateTime cutoff = date.atStartOfDay();
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        List<HallOfFameEntry> added = new ArrayList<>();
+        for (HallOfFameRow row : hallOfFameRepository.findCandidates(cutoff, MIN_LIKES)) {
+            if (hallOfFameRepository.insertIgnore(row.getPostId(), row.getLikes(), date, now) == 1) {
+                added.add(new HallOfFameEntry(row.getPostId(), row.getTitle(), row.getLikes(), date));
+            }
+        }
+        log.info("명예의 전당 date={} cutoff={} 새로 올라간 글 {}건 {}", date, cutoff, added.size(),
+                added.stream().map(HallOfFameEntry::postId).toList());
+        return new HallOfFameRunResponse(date, MIN_LIKES, added);
+    }
+
+    @Transactional(readOnly = true)
+    public List<HallOfFameEntry> list(int size) {
+        return hallOfFameRepository.findList(size).stream()
+                .map(r -> new HallOfFameEntry(r.getPostId(), r.getTitle(), r.getLikes(), r.getEnteredOn()))
+                .toList();
+    }
+}

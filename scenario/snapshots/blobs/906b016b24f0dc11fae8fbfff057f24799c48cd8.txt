@@ -1,0 +1,175 @@
+package org.example.comment;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.member.Member;
+import org.example.member.MemberRepository;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.notification.CommentCreatedEvent;
+import org.example.post.AuthorResponse;
+import org.example.post.PostRepository;
+import org.example.social.BlockPolicy;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Service
+public class CommentService {
+
+    private static final String PUBLISHED = "PUBLISHED";
+
+    private final CommentRepository commentRepository;
+    private final PostRepository postRepository;
+    private final MemberRepository memberRepository;
+    private final PostAccessPolicy accessPolicy;
+    private final BlockPolicy blockPolicy;
+    private final ApplicationEventPublisher eventPublisher;
+
+    public CommentService(CommentRepository commentRepository, PostRepository postRepository,
+                           MemberRepository memberRepository, PostAccessPolicy accessPolicy,
+                           BlockPolicy blockPolicy, ApplicationEventPublisher eventPublisher) {
+        this.commentRepository = commentRepository;
+        this.postRepository = postRepository;
+        this.memberRepository = memberRepository;
+        this.accessPolicy = accessPolicy;
+        this.blockPolicy = blockPolicy;
+        this.eventPublisher = eventPublisher;
+    }
+
+    // 댓글 저장과 comment_count 증가를 한 트랜잭션으로 묶는다 — 둘 중 하나만 반영되면 숫자가 틀어진다
+    @Transactional
+    public Comment create(Long postId, AuthenticatedMember loginMember, CommentCreateRequest request) {
+        Post post = findCommentablePost(postId, loginMember);
+        Comment parent = resolveParent(postId, request.parentId());
+
+        Member author = memberRepository.getReferenceById(loginMember.id());
+        Comment saved = commentRepository.save(new Comment(post, author, parent, request.content(), LocalDateTime.now()));
+        postRepository.incrementCommentCount(postId);
+        // 9-4: 글 작성자에게 COMMENT 알림(자기 글에 자기 댓글은 리스너 쪽에서 거른다). 같은 트랜잭션에서 만든다
+        eventPublisher.publishEvent(new CommentCreatedEvent(postId, saved.getId(), loginMember.id()));
+
+        // 트랜잭션 안에서 지연 로딩 연관을 미리 읽어 둔다(컨트롤러가 세션 밖에서 DTO를 만든다)
+        saved.getMember().getNickname();
+        return saved;
+    }
+
+    // 작성자만 지운다(soft delete). 없거나 이미 지운 댓글은 404, 남의 댓글은 403.
+    // comment_count 감소는 같은 트랜잭션에서 원자적으로 한다.
+    @Transactional
+    public void delete(Long commentId, AuthenticatedMember loginMember) {
+        Comment comment = commentRepository.findById(commentId)
+                .filter(c -> c.getDeletedAt() == null)
+                .orElseThrow(CommentNotFoundException::new);
+
+        if (!comment.getMember().getId().equals(loginMember.id())) {
+            throw new CommentForbiddenException();
+        }
+
+        // 앞선 읽기와 별개로 DB에서 deleted_at IS NULL을 다시 검사한다.
+        // 동시에 같은 댓글을 지울 때 한 요청만 1행을 변경하고 댓글 수를 내린다.
+        if (commentRepository.softDeleteIfLive(commentId, LocalDateTime.now()) != 1) {
+            throw new CommentNotFoundException();
+        }
+        if (postRepository.decrementCommentCount(comment.getPost().getId()) != 1) {
+            throw new IllegalStateException("댓글 수 변경 실패");
+        }
+    }
+
+    // 그 글의 댓글을 작성자와 함께 한 번에 읽어(N+1 없음) 메모리에서 트리로 조립한다.
+    // 표시 규칙: 지운 최상위는 살아 있는 답글이 있을 때만 "삭제된 댓글입니다" 자리를 남긴다,
+    // 지운 답글은 뺀다, 보는 사람과 차단 관계인 회원의 댓글은 뺀다(최상위면 답글까지).
+    @Transactional(readOnly = true)
+    public List<CommentThreadResponse> list(Long postId, AuthenticatedMember viewer) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(viewer, post)) {
+            throw new PostNotFoundException();
+        }
+
+        List<Comment> all = commentRepository.findByPostIdWithMember(postId);
+        Long viewerId = viewer == null ? null : viewer.id();
+        Set<Long> blockedMemberIds = viewerId == null ? Set.of() : blockPolicy.blockRelatedIds(viewerId);
+
+        Map<Long, List<Comment>> repliesByParent = all.stream()
+                .filter(c -> c.getParent() != null)
+                .collect(Collectors.groupingBy(c -> c.getParent().getId(), LinkedHashMap::new, Collectors.toList()));
+
+        List<CommentThreadResponse> result = new ArrayList<>();
+        for (Comment top : all) {
+            if (top.getParent() != null) {
+                continue; // 답글은 부모와 함께 처리
+            }
+            if (blockedMemberIds.contains(top.getMember().getId())) {
+                continue; // 차단 — 최상위째 뺀다(답글도 함께)
+            }
+
+            // "살아 있는 답글"은 지운 것·차단으로 빠지는 것을 제외하고 센다
+            List<Comment> visibleReplies = repliesByParent.getOrDefault(top.getId(), List.of()).stream()
+                    .filter(r -> r.getDeletedAt() == null)
+                    .filter(r -> !blockedMemberIds.contains(r.getMember().getId()))
+                    .toList();
+
+            boolean deleted = top.getDeletedAt() != null;
+            if (deleted && visibleReplies.isEmpty()) {
+                continue; // 지웠고 남은 답글도 없으면 자리도 남기지 않는다
+            }
+
+            List<CommentReplyResponse> replies = visibleReplies.stream()
+                    .map(r -> new CommentReplyResponse(r.getId(), toAuthor(r.getMember()), r.getContent(), r.getCreatedAt()))
+                    .toList();
+
+            result.add(new CommentThreadResponse(
+                    top.getId(),
+                    deleted ? null : toAuthor(top.getMember()),
+                    deleted ? "삭제된 댓글입니다" : top.getContent(),
+                    top.getCreatedAt(),
+                    deleted,
+                    replies
+            ));
+        }
+        return result;
+    }
+
+    // 볼 수 있는 PUBLISHED 글인가 — 아니면 404(4-1 LikeService.findLikeablePost와 같은 규칙)
+    private Post findCommentablePost(Long postId, AuthenticatedMember loginMember) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(loginMember, post) || !PUBLISHED.equals(post.getStatus())) {
+            throw new PostNotFoundException();
+        }
+        return post;
+    }
+
+    // 부모 댓글 검증 — 같은 글의, 최상위, 지워지지 않은 댓글이어야 한다.
+    // 부모가 없으면 404(CommentNotFoundException), 있는데 규칙에 안 맞으면 400(InvalidParentCommentException).
+    private Comment resolveParent(Long postId, Long parentId) {
+        if (parentId == null) {
+            return null;
+        }
+        Comment parent = commentRepository.findById(parentId)
+                .orElseThrow(CommentNotFoundException::new);
+        if (!parent.getPost().getId().equals(postId)) {
+            throw new InvalidParentCommentException("다른 글의 댓글에는 답글을 달 수 없습니다.");
+        }
+        if (parent.getParent() != null) {
+            throw new InvalidParentCommentException("답글에는 답글을 달 수 없습니다.");
+        }
+        if (parent.getDeletedAt() != null) {
+            throw new InvalidParentCommentException("지워진 댓글에는 답글을 달 수 없습니다.");
+        }
+        return parent;
+    }
+
+    private AuthorResponse toAuthor(Member member) {
+        return new AuthorResponse(member.getId(), member.getNickname());
+    }
+}

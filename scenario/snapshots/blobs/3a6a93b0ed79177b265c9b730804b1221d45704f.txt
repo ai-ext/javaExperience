@@ -1,0 +1,49 @@
+package org.example.post;
+
+import org.example.tag.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/posts")
+public class PostController {
+
+    private static final Logger log = LoggerFactory.getLogger(PostController.class);
+
+    private final PostService postService;
+
+    public PostController(PostService postService) {
+        this.postService = postService;
+    }
+
+    @PostMapping
+    public ResponseEntity<PostResponse> create(@RequestBody PostCreateRequest request) {
+        log.info("게시글 작성 요청 제목: {}", request.title());
+
+        Post post = postService.create(request);
+        PostResponse response = toResponse(post);
+
+        return ResponseEntity.created(URI.create("/api/posts/" + post.getId())).body(response);
+    }
+
+    private PostResponse toResponse(Post post) {
+        List<String> tagNames = post.getTags().stream().map(Tag::getName).toList();
+        return new PostResponse(
+                post.getId(),
+                post.getBoard().getSlug(),
+                post.getTitle(),
+                post.getContent(),
+                tagNames,
+                post.getVisibility(),
+                post.getCreatedAt()
+        );
+    }
+}

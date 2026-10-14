@@ -1,0 +1,972 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10-12. JPA로 쓰고 같은 트랜잭션에서 MyBatis로 읽기 — flush (선택)</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 10장. 명세서 프로젝트 — 게시판 API v1(/api/v1) › 10-12</p><p class="level-tags"><span>고급</span><span>별도 명세서 프로젝트</span><span>DB project</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="10-12-jpa로-쓰고-같은-트랜잭션에서-mybatis로-읽기--flush-선택"><a class="anchor" href="#10-12-jpa로-쓰고-같은-트랜잭션에서-mybatis로-읽기--flush-선택" aria-hidden="true">#</a>10-12. JPA로 쓰고 같은 트랜잭션에서 MyBatis로 읽기 — flush (선택)</h1>
+<blockquote>
+<p><strong>선택 단계 — JPA와 MyBatis를 한 프로젝트에서 같이 쓸 때만</strong> 해당한다. 10-11까지 JPA만으로 만들었다면 명세서 프로젝트는 이미 끝났다. 회사 코드처럼 두 기술이 섞인 서비스를 다룰 일이 있거나, 10-7 <a href="10-7-post-list.html#선택--같은-목록을-mybatis로-짜-보기">선택 칸</a>을 MyBatis로 짰다면 여기서 그 경계의 함정을 직접 겪는다. MyBatis가 아직 없으면 아래 <a href="#mybatis-넣기">MyBatis 넣기</a>부터 한다.</p>
+</blockquote>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p>프론트 개발자의 요청으로 명세가 바뀐다.</p>
+<blockquote>
+<p>&quot;글을 쓰거나 고친 뒤에 목록을 다시 불러오기 싫어요. 응답에 <strong>목록 카드 한 줄</strong>을 같이 주시면 목록에 바로 끼울게요. 목록 API랑 모양이 똑같아야 해요.&quot;</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>바뀐 API</th>
+<th>추가되는 것</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>POST /api/v1/posts</code>, <code>PUT /api/v1/posts/{postId}</code></td>
+<td>응답 <code>data.listItem</code> — 10-7 목록의 항목과 <strong>같은 모양</strong>(<code>id, title, visibility, viewCount, likeCount, author, tags, createdAt</code>)</td>
+</tr>
+</tbody></table></div>
+<p>이 단계는 그 카드 한 줄을 <strong>MyBatis</strong>로 읽는다(10-7을 MyBatis로 짰다면 목록과 같은 쿼리 조각을 그대로 쓰니 모양이 저절로 같다). 그러면 한 서비스 메서드 안에서 이렇게 된다.</p>
+<ol>
+<li>JPA로 쓴다(엔티티 저장·변경).</li>
+<li>같은 트랜잭션에서 MyBatis로 방금 그 글을 읽는다.</li>
+</ol>
+<p>여기에 함정이 있다. JPA는 바뀐 내용을 <strong>바로 DB에 보내지 않는다.</strong> 모아 두었다가 커밋 직전이나 필요할 때 한꺼번에 보낸다(flush). MyBatis는 JPA 밖에 있어서, JPA가 아직 안 보낸 변경을 모른다. 이 단계에서는 &quot;언제 보이고 언제 안 보이는지&quot;를 직접 재현하고, 확실히 보이게 만든다.</p>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>글 수정 → 목록으로 돌아가기</h3><p>수정 응답의 listItem을 목록의 해당 줄에 그대로 바꿔 끼운다. 목록을 다시 부르지 않는다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>게시판</strong><span>김자바</span></div><div class="screen-widget screen-list"><strong>list</strong><span>[채점] 10-12 수정 후 · 셋째 주 회고</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>수정했어요</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>flush하고 읽기(정상)</summary><ol><li><span class="flow-kind">사용자</span><p>수정 폼에서 제목·태그·공개 범위를 바꿔 저장</p></li><li><span class="flow-kind">HTTP 요청</span><p>PUT /api/v1/posts/39</p><dl><dt>headers</dt><dd>Authorization: Bearer (김자바) · Content-Type: application/json</dd><dt>body</dt><dd>{
+  &quot;title&quot;: &quot;[채점] 10-12 수정 후&quot;,
+  &quot;tags&quot;: [&quot;after&quot;],
+  &quot;visibility&quot;: &quot;PRIVATE&quot;
+}</dd></dl></li><li><span class="flow-kind">서버</span><p>post.replace(...) — 아직 JPA 안에만 있는 변경 → postRepository.flush()로 DB에 보낸다(커밋은 아직) → MyBatis 카드 쿼리로 id 39 한 줄</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>UPDATE posts SET title = ?, visibility = ? WHERE id = 39;
+DELETE FROM post_tags WHERE post_id = 39 AND tag_id = ...;
+INSERT INTO post_tags (post_id, tag_id) VALUES (39, ...);
+-- 같은 트랜잭션·같은 커넥션이라 커밋 전 변경이 보인다
+SELECT p.id, p.title, ... FROM posts p JOIN users u ... WHERE p.id = 39;</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{
+  &quot;status&quot;: 200,
+  &quot;data&quot;: {
+    &quot;id&quot;: 39, &quot;title&quot;: &quot;[채점] 10-12 수정 후&quot;, ...,
+    &quot;listItem&quot;: { &quot;id&quot;: 39, &quot;title&quot;: &quot;[채점] 10-12 수정 후&quot;, &quot;visibility&quot;: &quot;PRIVATE&quot;, &quot;tags&quot;: [&quot;after&quot;], ... }
+  }
+}</dd></dl></li><li><span class="flow-kind">화면</span><p>목록의 그 줄이 새 제목·태그로 바뀐다</p></li></ol></details><details class="scenario-flow"><summary>flush 없이 읽기(버그)</summary><ol><li><span class="flow-kind">사용자</span><p>같은 수정을 flush 없는 코드에 보낸다</p></li><li><span class="flow-kind">HTTP 요청</span><p>PUT /api/v1/posts/39</p><dl><dt>headers</dt><dd>Authorization: Bearer (김자바)</dd><dt>body</dt><dd>{ &quot;title&quot;: &quot;[채점] 10-12 수정 후&quot;, &quot;tags&quot;: [&quot;after&quot;] }</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT p.id, p.title, ... WHERE p.id = 39;   -- MyBatis: 아직 옛 제목
+UPDATE posts SET title = ? WHERE id = 39;   -- JPA가 나중에 보냄</dd><dt>note</dt><dd>실측 SQL 로그 순서 그대로</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{
+  &quot;data&quot;: {
+    &quot;title&quot;: &quot;[채점] 10-12 수정 후&quot;,
+    &quot;listItem&quot;: { &quot;title&quot;: &quot;[채점] 10-12 flush 없이&quot;, &quot;tags&quot;: [&quot;check&quot;, &quot;flush&quot;], ... }
+  }
+}</dd></dl></li><li><span class="flow-kind">화면</span><p>상세는 새 제목인데 목록 줄은 옛 제목 — 새로고침하면 그제야 맞는다</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MyBatis</td>
+<td>목록 카드 컬럼으로 글 하나를 읽는 쿼리(예: <code>findListRowById</code>) + 태그 쿼리. 10-7 선택 칸을 했다면 그 <code>columns</code> 조각·태그 쿼리를 그대로 쓴다</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/posts</code></td>
+<td>저장 뒤 <strong>flush</strong> → MyBatis로 그 글 한 줄 → 응답 <code>data.listItem</code></td>
+</tr>
+<tr>
+<td><code>PUT /api/v1/posts/{postId}</code></td>
+<td>변경 뒤 <strong>flush</strong> → MyBatis로 한 줄 → 응답 <code>data.listItem</code></td>
+</tr>
+<tr>
+<td>상세·목록</td>
+<td><code>GET</code> 응답에는 <code>listItem</code>이 없다(키째 없음)</td>
+</tr>
+<tr>
+<td>모양</td>
+<td><code>listItem</code>이 같은 글의 목록 항목(<code>GET /api/v1/posts</code>의 <code>items[n]</code>)과 <strong>완전히 같다</strong></td>
+</tr>
+</tbody></table></div>
+<p><strong>필드 규칙</strong> — 작성·수정 규칙은 10-5·10-8 그대로다. flush·MyBatis를 끼워 넣어도 검증이 먼저라 잘못된 입력은 저장·flush 전에 <code>400</code>이어야 한다</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>필수</th>
+<th>null·빈 값</th>
+<th>길이·범위</th>
+<th>형식</th>
+<th>기본값</th>
+<th>틀렸을 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>title</code></td>
+<td>필수</td>
+<td>안 됨</td>
+<td>다듬은 뒤 5~100자</td>
+<td>문자열</td>
+<td>없음</td>
+<td><code>400 VALIDATION_FAILED</code>, <code>errors</code>에 <code>title</code></td>
+</tr>
+<tr>
+<td><code>tags</code></td>
+<td>선택</td>
+<td>생략·<code>null</code>이면 <code>[]</code></td>
+<td>0<del>5개, 각 1</del>20자</td>
+<td>문자열 배열</td>
+<td><code>[]</code></td>
+<td><code>400</code>, <code>errors</code>에 <code>tags</code></td>
+</tr>
+<tr>
+<td>본문 전체</td>
+<td>필수</td>
+<td>—</td>
+<td>—</td>
+<td>JSON</td>
+<td>—</td>
+<td><code>400 BAD_JSON</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="mybatis-넣기"><a class="anchor" href="#mybatis-넣기" aria-hidden="true">#</a>MyBatis 넣기</h3>
+<p>10-7을 JPA로만 짰다면 MyBatis가 아직 없다. 이 단계에서 처음 넣는다(10-7 선택 칸을 했다면 이미 있으니 건너뛴다).</p>
+<p><code>build.gradle</code>의 <code>dependencies</code>에 한 줄 — MyBatis는 Boot BOM에 없어서 버전을 직접 적는다(4.1.x가 Boot 4.1용).</p>
+<pre><code class="language-groovy">implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'</code></pre>
+<p><code>application.yml</code>에 둔다.</p>
+<pre><code class="language-yaml">mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true   # 컬럼 view_count → 필드 viewCount</code></pre>
+<p>매퍼는 인터페이스(<code>post/PostQueryMapper.java</code>, <code>@Mapper</code>)와 XML(<code>src/main/resources/mapper/PostQueryMapper.xml</code>) 한 쌍이다. XML의 <code>namespace</code>가 인터페이스의 전체 이름과 같아야 하고, <code>&lt;select id&gt;</code>가 메서드 이름이다(자세히는 <a href="../../lessons/E5-mybatis-first-steps.html">E5 MyBatis 첫걸음</a>).</p>
+<pre><code class="language-java">@Mapper
+public interface PostQueryMapper {
+    PostListRow findListRowById(@Param(&quot;id&quot;) Long id);
+    List&lt;PostTagRow&gt; findTagsByPostIds(@Param(&quot;postIds&quot;) List&lt;Long&gt; postIds);
+}</code></pre>
+<p>결과 한 줄은 컬럼이 평평한(<code>author_id</code>, <code>author_nickname</code>) 클래스 <code>PostListRow</code>로 받고, 목록 항목 record로 옮길 때 <code>author{id, nickname}</code>으로 묶는다. MyBatis는 setter가 없어도 필드에 값을 넣는다. 태그 한 쌍은 10-7의 <code>PostTagRow</code> record를 그대로 쓴다.</p>
+<h2 id="설계-포인트--직접-재현한-것"><a class="anchor" href="#설계-포인트--직접-재현한-것" aria-hidden="true">#</a>설계 포인트 — 직접 재현한 것</h2>
+<p>아래는 정답 코드에서 <code>postRepository.flush()</code>를 빼거나 순서를 바꿔 SQL 로그(<code>org.hibernate.SQL</code>·MyBatis 매퍼 DEBUG)로 확인한 결과다(Boot 4.1.1, Hibernate 7.4, MyBatis 3.5.19).</p>
+<h3 id="①-작성--글은-보이는데-태그가-비어-있다"><a class="anchor" href="#①-작성--글은-보이는데-태그가-비어-있다" aria-hidden="true">#</a>① 작성 — 글은 보이는데 태그가 비어 있다</h3>
+<p>flush 없이 작성하면 응답이 이렇다.</p>
+<pre><code class="language-text">data.tags            ['check', 'flush']
+data.listItem.title  [채점] 10-12 flush 없이      ← 글은 보인다
+data.listItem.tags   []                           ← 태그는 안 보인다</code></pre>
+<p>SQL 로그 순서는 다음과 같다.</p>
+<pre><code class="language-text">insert into posts (author_id,content,created_at,...) values (...)    ← save() 순간 바로 나감
+==&gt;  Preparing: SELECT p.id, p.title, ... (MyBatis 목록 한 줄)
+==&gt;  Preparing: SELECT pt.post_id, t.name ... (MyBatis 태그)
+insert into post_tags (post_id,tag_id) values (?,?)                  ← 커밋 직전 flush 때
+insert into post_tags (post_id,tag_id) values (?,?)</code></pre>
+<ul>
+<li>글 행이 보이는 이유: id가 <code>IDENTITY</code>(AUTO_INCREMENT)라 JPA는 <strong>id를 알려고 <code>save</code> 순간 INSERT를 보낸다</strong>. 다른 변경처럼 미뤄 둘 수 없다.</li>
+<li>태그가 안 보이는 이유: <code>post_tags</code>(연결 테이블) INSERT는 미뤄 두었다가 flush 때 나간다.</li>
+<li>&quot;작성 직후 MyBatis로 읽어 봤더니 되더라&quot;는 <strong>우연히 IDENTITY라서</strong>다. 연관된 행은 여전히 늦다.</li>
+</ul>
+<h3 id="②-수정--통째로-옛-값"><a class="anchor" href="#②-수정--통째로-옛-값" aria-hidden="true">#</a>② 수정 — 통째로 옛 값</h3>
+<p>flush 없이 수정하면 이렇다.</p>
+<pre><code class="language-text">data.title           [채점] 10-12 수정 후
+data.listItem.title  [채점] 10-12 flush 없이     ← 옛 제목
+data.listItem.tags   ['check', 'flush']          ← 옛 태그</code></pre>
+<pre><code class="language-text">==&gt;  Preparing: SELECT p.id, p.title, ... (MyBatis)
+update posts set title=? where id=?                               ← MyBatis 조회 뒤에야 나감
+delete from post_tags where post_id=? and tag_id=?
+insert into post_tags (post_id,tag_id) values (?,?)
+select count(*) from post_likes where post_id = ? and user_id = ?   ← (좋아요 여부 네이티브 쿼리)</code></pre>
+<p>변경 감지는 엔티티의 값만 바꿔 두고, UPDATE는 flush 때 만든다. 로그를 보면 UPDATE가 <strong>JPA 네이티브 쿼리(<code>countLike</code>) 바로 앞에서</strong> 나갔다. Hibernate는 자기가 실행하는 쿼리 앞에서는 결과가 틀리지 않게 알아서 flush한다(auto flush). <strong>MyBatis 쿼리는 Hibernate가 모르는 쿼리라 그 앞에서는 flush하지 않는다.</strong></p>
+<p>함정이 하나 더 있다. MyBatis 조회를 우연히 <code>countLike</code> <strong>뒤에</strong> 두면 flush 없이도 맞게 나온다. 순서를 바꾸는 순간 깨지는 코드다. 필요한 곳에 <code>flush()</code>를 직접 적는다.</p>
+<h3 id="③-flush하면-왜-보이나--같은-커넥션"><a class="anchor" href="#③-flush하면-왜-보이나--같은-커넥션" aria-hidden="true">#</a>③ flush하면 왜 보이나 — 같은 커넥션</h3>
+<p><code>flush()</code>는 SQL을 DB로 보낼 뿐 <strong>커밋하지 않는다.</strong> 커밋 전의 변경은 원래 다른 커넥션에서 안 보인다. 그런데도 MyBatis가 새 값을 읽는다는 것은 <strong>MyBatis가 JPA와 같은 트랜잭션·같은 커넥션을 쓰고 있다</strong>는 뜻이다. <code>@Transactional</code>(JPA 트랜잭션 관리자)이 연 커넥션을 MyBatis-Spring이 그대로 받아 쓴다. 그래서 둘을 섞으려면 반드시 <strong>같은 <code>@Transactional</code> 메서드 안</strong>에서 부른다.</p>
+<h3 id="④-그래도-옛-값--mybatis-1차-캐시"><a class="anchor" href="#④-그래도-옛-값--mybatis-1차-캐시" aria-hidden="true">#</a>④ 그래도 옛 값 — MyBatis 1차 캐시</h3>
+<p>수정 메서드 <strong>앞부분</strong>에서 같은 MyBatis 쿼리로 &quot;수정 전 카드&quot;를 한 번 읽고, 변경 → flush → 다시 읽어 보았다.</p>
+<pre><code class="language-text">data.title           [채점] 10-12 수정 후
+data.listItem.title  [채점] 10-12 캐시 실험     ← flush했는데도 옛 값
+data.listItem.tags   ['check']</code></pre>
+<p>MyBatis는 한 트랜잭션 안에서 <strong>같은 쿼리·같은 파라미터</strong>의 결과를 기억해 두고(1차 캐시) DB에 다시 묻지 않는다. JPA의 flush는 MyBatis 캐시를 비우지 않는다. 그 쿼리에 <code>flushCache=&quot;true&quot;</code>를 주자 새 값이 나왔다(실측). 한 트랜잭션에서 같은 MyBatis 조회를 두 번 할 일이 있으면 이 점을 기억한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>조건</th>
+<th>MyBatis가 보나</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>JPA <code>save</code> + IDENTITY id — 그 글 행</td>
+<td>보인다(INSERT가 즉시)</td>
+</tr>
+<tr>
+<td>연관 행(<code>post_tags</code>), 변경 감지 UPDATE — flush 전</td>
+<td><strong>안 보인다</strong></td>
+</tr>
+<tr>
+<td>flush 뒤, 같은 트랜잭션</td>
+<td>보인다</td>
+</tr>
+<tr>
+<td>JPA 쿼리(JPQL·네이티브)가 사이에 실행된 뒤</td>
+<td>보인다(auto flush) — 우연에 기대지 말 것</td>
+</tr>
+<tr>
+<td>같은 MyBatis 쿼리를 앞에서 이미 읽었음</td>
+<td>flush해도 <strong>옛 값</strong>(1차 캐시)</td>
+</tr>
+<tr>
+<td>커밋 뒤(다른 요청)</td>
+<td>보인다</td>
+</tr>
+</tbody></table></div>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p><code>POST /api/v1/posts</code> · <code>PUT /api/v1/posts/{postId}</code> · <code>GET /api/v1/posts</code> 계약을 기준으로 아래 순서대로 구현한다. 먼저 직접 작성하고, 막힌 역할만 펼쳐 아래의 전체 구현 코드와 비교한다.</p>
+<p>화면 시나리오에서 서버가 맡는 일:</p>
+<ul>
+<li>post.replace(...) — 아직 JPA 안에만 있는 변경 → postRepository.flush()로 DB에 보낸다(커밋은 아직) → MyBatis 카드 쿼리로 id 39 한 줄</li>
+</ul>
+<details>
+<summary>DTO / 목록 카드 응답</summary>
+
+<p><code>PostDetailResponse.java</code>, <code>PostListItemResponse.java</code>: 방금 쓴 글의 목록 카드 필드를 작성·수정 응답에 담는다. <code>withListItem</code>이 MyBatis 조회 결과를 기존 응답 구조에 연결하는지 확인한다.</p>
+<pre><code class="language-java">// 상세 GET은 null이라 listItem 키가 빠지고, 작성·수정 응답에만 값을 넣는다.
+@JsonInclude(JsonInclude.Include.NON_NULL) PostListItemResponse listItem
+
+public PostDetailResponse withListItem(PostListItemResponse item) {
+    return new PostDetailResponse(id, title, content, visibility, viewCount, likeCount, liked,
+            author, tags, comments, createdAt, updatedAt, item);
+}
+
+static PostListItemResponse of(PostListRow row, List&lt;String&gt; tags) {
+    return new PostListItemResponse(row.getId(), row.getTitle(), row.getVisibility(),
+            row.getViewCount(), row.getLikeCount(),
+            new AuthorResponse(row.getAuthorId(), row.getAuthorNickname()), tags, row.getCreatedAt());
+}</code></pre>
+</details>
+
+<details>
+<summary>Service / 규칙·트랜잭션</summary>
+
+<p><code>PostQueryService.java</code>, <code>PostService.java</code>: JPA 쓰기와 MyBatis 읽기를 같은 <code>@Transactional</code> 안에 두고, 조회 전에 <code>postRepository.flush()</code>를 호출한다. <code>listItem</code>은 읽은 행과 태그를 응답 DTO로 조립한다.</p>
+<pre><code class="language-java">// PostService.create: save(IDENTITY INSERT)만으로는 post_tags가 아직 DB에 없을 수 있다.
+postRepository.save(post);
+postRepository.flush();
+return PostDetailResponse.of(post, post.getViewCount(), false, List.of())
+        .withListItem(postQueryService.listItem(post.getId()));
+
+// PostService.update: replace의 변경 감지를 MyBatis 조회 전에 확정한다.
+post.replace(request.title(), request.content(), Visibility.valueOf(request.visibility()),
+        findOrCreateTags(request.tags()));
+postRepository.flush();
+PostListItemResponse listItem = postQueryService.listItem(postId);</code></pre>
+<pre><code class="language-java">// PostQueryService: 현재 트랜잭션의 같은 커넥션에서 Mapper를 호출한다.
+PostListRow row = postQueryMapper.findListRowById(postId);
+List&lt;String&gt; tags = postQueryMapper.findTagsByPostIds(List.of(postId)).stream()
+        .map(PostTagRow::name).toList();
+return PostListItemResponse.of(row, tags);</code></pre>
+</details>
+
+<details>
+<summary>MyBatis / Mapper·SQL</summary>
+
+<p><code>PostQueryMapper.java</code>, <code>PostQueryMapper.xml</code>: Mapper 인터페이스 메서드와 XML <code>&lt;select id&gt;</code>를 같은 이름으로 연결한다. <code>#{id}</code>를 바인딩하고 여러 태그 ID는 <code>&lt;foreach&gt;</code>로 넘긴다. JPA가 쓴 직후 읽는 쿼리는 같은 트랜잭션·커넥션에서 실행한다.</p>
+<pre><code class="language-java">PostListRow findListRowById(@Param(&quot;id&quot;) Long id);
+List&lt;PostTagRow&gt; findTagsByPostIds(@Param(&quot;postIds&quot;) List&lt;Long&gt; postIds);</code></pre>
+<pre><code class="language-xml">&lt;select id=&quot;findListRowById&quot; resultType=&quot;org.example.board.post.PostListRow&quot;&gt;
+  &lt;include refid=&quot;columns&quot;/&gt;
+  WHERE p.id = #{id}
+&lt;/select&gt;
+&lt;select id=&quot;findTagsByPostIds&quot; resultType=&quot;org.example.board.post.PostTagRow&quot;&gt;
+  SELECT pt.post_id, t.name FROM post_tags pt JOIN tags t ON t.id = pt.tag_id
+  WHERE pt.post_id IN
+  &lt;foreach collection=&quot;postIds&quot; item=&quot;id&quot; open=&quot;(&quot; separator=&quot;,&quot; close=&quot;)&quot;&gt;#{id}&lt;/foreach&gt;
+&lt;/select&gt;</code></pre>
+</details>
+
+<details>
+<summary>설정 / 보조 코드</summary>
+
+<p><code>build.gradle</code>, <code>application.yml</code>에서 MyBatis 의존성과 Mapper 경로를 확인한다. <code>PostListRow.java</code>는 Mapper SQL의 결과 열을 받는 DTO이므로 XML의 컬럼 별칭과 필드 이름을 맞춘다.</p>
+<pre><code class="language-groovy">implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'</code></pre>
+<pre><code class="language-yaml">mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true</code></pre>
+</details>
+
+<details>
+<summary>JPA → MyBatis — flush와 1차 캐시 확인</summary>
+
+<p>이 단계는 MyBatis를 실제로 추가하는 선택 과제다. JPA <code>save</code>·변경 감지 뒤에 <code>flush()</code>로 SQL을 보내고 Mapper를 호출한다. 같은 Mapper 쿼리를 트랜잭션 안에서 이미 실행했다면 MyBatis 1차 캐시가 옛 값을 줄 수 있으므로 XML의 <code>flushCache=&quot;true&quot;</code> 또는 캐시 범위 설정을 검토한다. 전체 구현은 아래 Java·XML 파일에서 확인한다.</p>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+<p>group = &#39;org.example&#39;
+version = &#39;0.0.1-SNAPSHOT&#39;</p>
+<p>java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}</p>
+<p>repositories {
+    mavenCentral()
+}</p>
+<p>dependencies {
+    // start.spring.io에서 고른 것: Spring Web · Spring Data JPA · Validation · MySQL Driver · Flyway Migration
+    implementation &#39;org.springframework.boot:spring-boot-starter-webmvc&#39;
+    implementation &#39;org.springframework.boot:spring-boot-starter-data-jpa&#39;
+    implementation &#39;org.springframework.boot:spring-boot-starter-validation&#39;
+    implementation &#39;org.springframework.boot:spring-boot-starter-flyway&#39;
+    // 10-3 비밀번호 해시(BCrypt) — Spring Security 전체가 아니라 암호화 모듈만
+    implementation &#39;org.springframework.security:spring-security-crypto&#39;
+    // 10-4 JWT 발급·검증(jjwt) — api는 컴파일에, 구현·JSON 처리는 실행할 때만
+    implementation &#39;io.jsonwebtoken:jjwt-api:0.13.0&#39;
+    runtimeOnly &#39;io.jsonwebtoken:jjwt-impl:0.13.0&#39;
+    runtimeOnly &#39;io.jsonwebtoken:jjwt-jackson:0.13.0&#39;
+    // 10-12 JPA와 MyBatis를 한 프로젝트에서 — Boot BOM에 없어서 버전을 직접 적는다(4.1.x가 Boot 4.1용)
+    implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;
+    runtimeOnly &#39;com.mysql:mysql-connector-j&#39;
+    runtimeOnly &#39;org.flywaydb:flyway-mysql&#39;</p>
+<pre><code>testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'</code></pre>
+<p>}</p>
+<p>tasks.named(&#39;test&#39;) {
+    useJUnitPlatform()
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/post/PostDetailResponse.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>import com.fasterxml.jackson.annotation.JsonInclude;
+import org.example.board.comment.CommentResponse;</p>
+<p>public record PostDetailResponse(
+        Long id,
+        String title,
+        String content,
+        Visibility visibility,
+        int viewCount,
+        int likeCount,
+        boolean liked,
+        AuthorResponse author,
+        List&lt;String&gt; tags,
+        List&lt;CommentResponse&gt; comments,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt,
+        // 작성·수정 응답에만 — 목록 화면이 다시 조회하지 않고 바로 끼울 카드(목록 항목과 같은 모양, MyBatis로 읽는다)
+        @JsonInclude(JsonInclude.Include.NON_NULL) PostListItemResponse listItem) {</p>
+<pre><code>public static PostDetailResponse of(Post post, int viewCount, boolean liked, List&amp;lt;CommentResponse&amp;gt; comments) {
+    return new PostDetailResponse(post.getId(), post.getTitle(), post.getContent(), post.getVisibility(),
+            viewCount, post.getLikeCount(), liked, AuthorResponse.from(post.getAuthor()),
+            post.getTags().stream().map(Tag::getName).sorted().toList(),
+            comments, post.getCreatedAt(), post.getUpdatedAt(), null);
+}
+
+public PostDetailResponse withListItem(PostListItemResponse item) {
+    return new PostDetailResponse(id, title, content, visibility, viewCount, likeCount, liked, author, tags,
+            comments, createdAt, updatedAt, item);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/post/PostListItemResponse.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>public record PostListItemResponse(
+        Long id,
+        String title,
+        String visibility,
+        int viewCount,
+        int likeCount,
+        AuthorResponse author,
+        List&lt;String&gt; tags,
+        LocalDateTime createdAt) {</p>
+<pre><code>static PostListItemResponse of(Post post, List&amp;lt;String&amp;gt; tags) {
+    return new PostListItemResponse(post.getId(), post.getTitle(), post.getVisibility().name(), post.getViewCount(),
+            post.getLikeCount(), AuthorResponse.from(post.getAuthor()), tags, post.getCreatedAt());
+}
+
+// 10-12: MyBatis가 읽은 한 줄(작성·수정 응답의 listItem) — 목록 항목과 같은 모양
+static PostListItemResponse of(PostListRow row, List&amp;lt;String&amp;gt; tags) {
+    return new PostListItemResponse(row.getId(), row.getTitle(), row.getVisibility(), row.getViewCount(),
+            row.getLikeCount(), new AuthorResponse(row.getAuthorId(), row.getAuthorNickname()), tags,
+            row.getCreatedAt());
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/post/PostListRow.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// MyBatis가 글 한 줄(목록 카드 모양)을 담는 그릇(컬럼 author_id → authorId, 밑줄→카멜 자동 변환)
+public class PostListRow {</p>
+<pre><code>private Long id;
+private String title;
+private String visibility;
+private int viewCount;
+private int likeCount;
+private LocalDateTime createdAt;
+private Long authorId;
+private String authorNickname;
+
+public Long getId() {
+    return id;
+}
+
+public String getTitle() {
+    return title;
+}
+
+public String getVisibility() {
+    return visibility;
+}
+
+public int getViewCount() {
+    return viewCount;
+}
+
+public int getLikeCount() {
+    return likeCount;
+}
+
+public LocalDateTime getCreatedAt() {
+    return createdAt;
+}
+
+public Long getAuthorId() {
+    return authorId;
+}
+
+public String getAuthorNickname() {
+    return authorNickname;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/board/post/PostQueryMapper.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.util.List;</p>
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>// 10-12 — JPA로 쓴 글을 같은 트랜잭션에서 MyBatis로 읽는다. SQL은 resources/mapper/PostQueryMapper.xml
+@Mapper
+public interface PostQueryMapper {</p>
+<pre><code>PostListRow findListRowById(@Param(&amp;quot;id&amp;quot;) Long id);
+
+List&amp;lt;PostTagRow&amp;gt; findTagsByPostIds(@Param(&amp;quot;postIds&amp;quot;) List&amp;lt;Long&amp;gt; postIds);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/post/PostQueryService.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;</p>
+<p>import org.example.board.common.ApiException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>// 게시글 목록·검색 — JPA(JPQL + Pageable). 작성·수정 응답의 카드 한 줄(listItem)만 MyBatis(10-12)
+@Service
+public class PostQueryService {</p>
+<pre><code>// 정렬은 사용자가 보낸 문자열을 Sort에 넣지 않고 정해 둔 두 가지 중에서 고른다
+private static final Sort LATEST = Sort.by(Sort.Order.desc(&amp;quot;id&amp;quot;));
+private static final Sort POPULAR = Sort.by(Sort.Order.desc(&amp;quot;likeCount&amp;quot;), Sort.Order.desc(&amp;quot;id&amp;quot;));
+
+private final PostQueryRepository postQueryRepository;
+private final PostQueryMapper postQueryMapper;
+
+public PostQueryService(PostQueryRepository postQueryRepository, PostQueryMapper postQueryMapper) {
+    this.postQueryRepository = postQueryRepository;
+    this.postQueryMapper = postQueryMapper;
+}
+
+@Transactional(readOnly = true)
+public Object list(PostListQuery query, Long loginUserId) {
+    if (query.cursorMode()) {
+        return cursorList(query, loginUserId);
+    }
+    int page = query.page() == null ? 0 : query.page();
+    Sort sort = &amp;quot;popular&amp;quot;.equals(query.sort()) ? POPULAR : LATEST;
+    Page&amp;lt;Post&amp;gt; result = postQueryRepository.findVisible(loginUserId, query.tag(), query.q(),
+            PageRequest.of(page, query.size(), sort));
+    // Spring의 Page를 그대로 내보내지 않고 명세의 모양으로 옮긴다
+    return new PageResponse&amp;lt;&amp;gt;(withTags(result.getContent()), page, query.size(), result.getTotalElements(),
+            result.hasNext());
+}
+
+// 같은 트랜잭션 안에서 부르면 JPA가 flush한 것까지 보인다(호출하는 쪽이 먼저 flush해야 한다)
+public PostListItemResponse listItem(Long postId) {
+    PostListRow row = postQueryMapper.findListRowById(postId);
+    List&amp;lt;String&amp;gt; tags = postQueryMapper.findTagsByPostIds(List.of(postId)).stream().map(PostTagRow::name).toList();
+    return PostListItemResponse.of(row, tags);
+}
+
+private CursorResponse&amp;lt;PostListItemResponse&amp;gt; cursorList(PostListQuery query, Long loginUserId) {
+    // 인기순은 좋아요가 바뀌면 순서가 흔들려 커서가 글을 빠뜨리거나 두 번 준다 — 최신순만 허락한다
+    if (&amp;quot;popular&amp;quot;.equals(query.sort())) {
+        throw ApiException.invalid(&amp;quot;cursor&amp;quot;, &amp;quot;커서 페이징은 최신순(latest)에서만 쓸 수 있습니다.&amp;quot;);
+    }
+    if (query.page() != null) {
+        throw ApiException.invalid(&amp;quot;page&amp;quot;, &amp;quot;page와 cursor는 함께 쓸 수 없습니다.&amp;quot;);
+    }
+    Long cursorId = parseCursor(query.cursor());
+    // 커서는 항상 첫 &amp;quot;페이지&amp;quot;(0)만 읽는다 — 어디서부터인지는 id &amp;lt; cursorId가 정한다(keyset)
+    Slice&amp;lt;Post&amp;gt; slice = postQueryRepository.findVisibleBefore(loginUserId, query.tag(), query.q(), cursorId,
+            PageRequest.of(0, query.size(), LATEST));
+    List&amp;lt;Post&amp;gt; posts = slice.getContent();
+    String next = slice.hasNext() ? String.valueOf(posts.get(posts.size() - 1).getId()) : null;
+    return new CursorResponse&amp;lt;&amp;gt;(withTags(posts), next);
+}
+
+private Long parseCursor(String cursor) {
+    if (cursor.isBlank()) {
+        return null;
+    }
+    try {
+        return Long.valueOf(cursor);
+    } catch (NumberFormatException e) {
+        throw ApiException.invalid(&amp;quot;cursor&amp;quot;, &amp;quot;커서 값이 올바르지 않습니다.&amp;quot;);
+    }
+}
+
+// 글과 태그를 JOIN한 채 페이징하지 않는다(행이 태그 수만큼 불어난다) — 이번 페이지 글들의 태그를 IN 한 번으로
+private List&amp;lt;PostListItemResponse&amp;gt; withTags(List&amp;lt;Post&amp;gt; posts) {
+    if (posts.isEmpty()) {
+        return List.of();
+    }
+    Map&amp;lt;Long, List&amp;lt;String&amp;gt;&amp;gt; tagsByPost = postQueryRepository.findTagsByPostIds(posts.stream().map(Post::getId).toList())
+            .stream()
+            .collect(Collectors.groupingBy(PostTagRow::postId, Collectors.mapping(PostTagRow::name, Collectors.toList())));
+    return posts.stream()
+            .map(p -&amp;gt; PostListItemResponse.of(p, tagsByPost.getOrDefault(p.getId(), List.of())))
+            .toList();
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/post/PostService.java</summary><pre><code>package org.example.board.post;
+
+<p>import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;</p>
+<p>import jakarta.persistence.EntityManager;</p>
+<p>import org.example.board.comment.CommentRepository;
+import org.example.board.comment.CommentTree;
+import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.user.User;
+import org.example.board.user.UserRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>// 게시글 쓰기 — JPA
+@Service
+public class PostService {</p>
+<pre><code>private final PostRepository postRepository;
+private final TagRepository tagRepository;
+private final UserRepository userRepository;
+private final CommentRepository commentRepository;
+private final EntityManager entityManager;
+private final PostQueryService postQueryService;
+
+public PostService(PostRepository postRepository, TagRepository tagRepository, UserRepository userRepository,
+                   CommentRepository commentRepository, PostQueryService postQueryService, EntityManager entityManager) {
+    this.postRepository = postRepository;
+    this.tagRepository = tagRepository;
+    this.userRepository = userRepository;
+    this.commentRepository = commentRepository;
+    this.entityManager = entityManager;
+    this.postQueryService = postQueryService;
+}
+
+@Transactional
+public PostDetailResponse create(Long userId, PostRequest request) {
+    User author = userRepository.findById(userId)
+            .orElseThrow(() -&amp;gt; new ApiException(ErrorCode.UNAUTHORIZED));
+    Post post = new Post(author, request.title(), request.content(),
+            Visibility.valueOf(request.visibility()), findOrCreateTags(request.tags()));
+    postRepository.save(post);
+    // posts 행은 save 때 이미 INSERT됐지만(IDENTITY) post_tags는 flush 때 들어간다.
+    // MyBatis는 JPA가 아직 DB에 안 보낸 변경을 모른다 — 읽기 전에 flush
+    postRepository.flush();
+    return PostDetailResponse.of(post, post.getViewCount(), false, List.of())
+            .withListItem(postQueryService.listItem(post.getId()));
+}
+
+// 상세: 보이는 글인지 확인 → 조회수 +1 → 좋아요 여부·댓글 트리와 함께
+@Transactional
+public PostDetailResponse detail(Long postId, Long loginUserId) {
+    Post post = postRepository.findDetailById(postId)
+            .orElseThrow(() -&amp;gt; new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;));
+    boolean isAuthor = post.getAuthor().getId().equals(loginUserId);
+    if (post.getVisibility() == Visibility.PRIVATE &amp;amp;&amp;amp; !isAuthor) {
+        // 남의 비공개 글은 &amp;quot;있지만 못 본다&amp;quot;(403)가 아니라 &amp;quot;없다&amp;quot;(404) — 있다는 사실도 흘리지 않는다
+        throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+    }
+    postRepository.increaseViewCount(postId);
+    boolean liked = loginUserId != null &amp;amp;&amp;amp; postRepository.countLike(postId, loginUserId) &amp;gt; 0;
+    return PostDetailResponse.of(post, post.getViewCount() + 1, liked,
+            CommentTree.build(commentRepository.findAllWithAuthorByPostId(postId)));
+}
+
+// 수정: 없음·남의 비공개 → 404, 남의 글 → 403
+@Transactional
+public PostDetailResponse update(Long userId, Long postId, PostRequest request) {
+    Post post = findWritable(userId, postId, &amp;quot;작성자만 수정할 수 있습니다.&amp;quot;);
+    post.replace(request.title(), request.content(), Visibility.valueOf(request.visibility()),
+            findOrCreateTags(request.tags()));
+    // 변경 감지(dirty checking)한 UPDATE·태그 교체는 아직 JPA 안에만 있다 — MyBatis로 읽기 전에 DB로 보낸다
+    postRepository.flush();
+    PostListItemResponse listItem = postQueryService.listItem(postId);
+    boolean liked = postRepository.countLike(postId, userId) &amp;gt; 0;
+    return PostDetailResponse.of(post, post.getViewCount(), liked,
+            CommentTree.build(commentRepository.findAllWithAuthorByPostId(postId))).withListItem(listItem);
+}
+
+@Transactional
+public void delete(Long userId, Long postId) {
+    findWritable(userId, postId, &amp;quot;작성자만 삭제할 수 있습니다.&amp;quot;).delete();
+}
+
+private Post findWritable(Long userId, Long postId, String forbiddenMessage) {
+    // 삭제와 수정의 경합에서 먼저 행을 잠근다. 선행 삭제가 끝났다면 404로 종료한다.
+    if (entityManager.createNativeQuery(&amp;quot;select id from posts where id = :id and deleted_at is null for update&amp;quot;)
+            .setParameter(&amp;quot;id&amp;quot;, postId).getResultList().isEmpty()) {
+        throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+    }
+    Post post = postRepository.findDetailById(postId)
+            .orElseThrow(() -&amp;gt; new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;));
+    boolean isAuthor = post.getAuthor().getId().equals(userId);
+    if (post.getVisibility() == Visibility.PRIVATE &amp;amp;&amp;amp; !isAuthor) {
+        throw new ApiException(ErrorCode.NOT_FOUND, &amp;quot;게시글을 찾을 수 없습니다.&amp;quot;);
+    }
+    if (!isAuthor) {
+        throw new ApiException(ErrorCode.FORBIDDEN, forbiddenMessage);
+    }
+    return post;
+}
+
+// 이름으로 찾고, 없으면 새로 만든다(tags.name은 UNIQUE)
+private Set&amp;lt;Tag&amp;gt; findOrCreateTags(List&amp;lt;String&amp;gt; names) {
+    Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+    for (String name : names) {
+        tags.add(tagRepository.findByName(name).orElseGet(() -&amp;gt; tagRepository.save(new Tag(name))));
+    }
+    return tags;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: board-api
+  datasource:
+    # javaExperience MySQL(호스트 3306)의 project DB. 빈 DB면 Flyway가 V1으로 테이블·시드를 만든다
+    url: jdbc:mysql://localhost:13308/project?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  jpa:
+    hibernate:
+      # 스키마는 Flyway만 만든다. 엔티티가 테이블과 다르면 기동이 실패한다
+      ddl-auto: validate
+    open-in-view: false
+
+<p>app:
+  jwt:
+    # 예시용 비밀키 — 실제 서비스에서는 코드·저장소에 두지 않고 환경 변수 등으로 주입한다. HS256은 32바이트 이상
+    secret: board-api-example-secret-key-change-me-0123456789
+    validity-seconds: 3600</p>
+<p>mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    # 컬럼 view_count → 필드 viewCount
+    map-underscore-to-camel-case: true
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/PostQueryMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.board.post.PostQueryMapper&quot;&gt;
+
+<pre><code>&amp;lt;!-- 목록 카드 한 줄의 컬럼(목록 API 항목과 같은 필드) --&amp;gt;
+&amp;lt;sql id=&amp;quot;columns&amp;quot;&amp;gt;
+    SELECT p.id, p.title, p.visibility, p.view_count, p.like_count, p.created_at,
+           u.id AS author_id, u.nickname AS author_nickname
+    FROM posts p
+    JOIN users u ON u.id = p.author_id
+&amp;lt;/sql&amp;gt;
+
+&amp;lt;!-- 글 하나를 목록 카드 모양으로(작성·수정 응답용) — 같은 트랜잭션에서 JPA가 방금 쓴 것을 읽는다 --&amp;gt;
+&amp;lt;select id=&amp;quot;findListRowById&amp;quot; resultType=&amp;quot;org.example.board.post.PostListRow&amp;quot;&amp;gt;
+    &amp;lt;include refid=&amp;quot;columns&amp;quot;/&amp;gt;
+    WHERE p.id = #{id}
+&amp;lt;/select&amp;gt;
+
+&amp;lt;select id=&amp;quot;findTagsByPostIds&amp;quot; resultType=&amp;quot;org.example.board.post.PostTagRow&amp;quot;&amp;gt;
+    SELECT pt.post_id, t.name
+    FROM post_tags pt
+    JOIN tags t ON t.id = pt.tag_id
+    WHERE pt.post_id IN
+    &amp;lt;foreach collection=&amp;quot;postIds&amp;quot; item=&amp;quot;id&amp;quot; open=&amp;quot;(&amp;quot; separator=&amp;quot;,&amp;quot; close=&amp;quot;)&amp;quot;&amp;gt;#{id}&amp;lt;/foreach&amp;gt;
+    ORDER BY t.name
+&amp;lt;/select&amp;gt;</code></pre>
+<p>&lt;/mapper&gt;
+</code></pre></details></p>
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/10-12.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080
+KIM=$(curl -s -X POST &quot;$BASE/api/v1/auth/login&quot; -H 'Content-Type: application/json' \
+  -d '{&quot;email&quot;:&quot;kim@example.com&quot;,&quot;password&quot;:&quot;password1234&quot;}' | sed -E 's/.*&quot;accessToken&quot;:&quot;([^&quot;]+)&quot;.*/\1/')
+
+curl -s -X POST &quot;$BASE/api/v1/posts&quot; -H &quot;Authorization: Bearer $KIM&quot; -H 'Content-Type: application/json' \
+  -d '{&quot;title&quot;:&quot;[채점] 10-12 작성&quot;,&quot;tags&quot;:[&quot;Flush&quot;,&quot;check&quot;]}'; echo                 # P — listItem.tags가 [check, flush]인가
+ID=…   # 위 응답의 data.id
+curl -s -X PUT &quot;$BASE/api/v1/posts/$ID&quot; -H &quot;Authorization: Bearer $KIM&quot; -H 'Content-Type: application/json' \
+  -d '{&quot;title&quot;:&quot;[채점] 10-12 수정 후&quot;,&quot;tags&quot;:[&quot;after&quot;],&quot;visibility&quot;:&quot;PRIVATE&quot;}'; echo   # U — listItem이 새 값인가
+curl -s -G &quot;$BASE/api/v1/posts&quot; --data-urlencode 'q=10-12 수정 후' -H &quot;Authorization: Bearer $KIM&quot;; echo   # 목록 첫 줄과 비교</code></pre></details>
+<p>SQL 순서를 직접 보려면 <code>application.yml</code>에 둔다.</p>
+<pre><code class="language-yaml">logging:
+  level:
+    org.hibernate.SQL: debug
+    org.example.board.post.PostQueryMapper: debug   # MyBatis 매퍼의 SQL(==&gt; Preparing)</code></pre>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 요청 I는 수정한 글을 목록 API로 다시 읽어 <code>listItem</code>과 통째로 비교한다(상세 G보다 먼저 — 상세를 열면 조회수가 올라 달라진다). 수정한 글은 비공개라 김자바의 목록에만 나온다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="L" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>L · 로그인(김자바)</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="P" data-method="POST" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>P · 작성 — 응답에 listItem</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;title&quot;: &quot;[채점] 10-12 작성&quot;,
+  &quot;tags&quot;: [
+    &quot;Flush&quot;,
+    &quot;check&quot;
+  ]
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;title&quot;: &quot;[채점] 10-12 작성&quot;,
+  &quot;tags&quot;: [
+    &quot;Flush&quot;,
+    &quot;check&quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:201,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.listItem.id&quot;,&quot;equals&quot;:&quot;{{P.body.data.id}}&quot;},{&quot;path&quot;:&quot;$.data.listItem.title&quot;,&quot;equals&quot;:&quot;[채점] 10-12 작성&quot;},{&quot;path&quot;:&quot;$.data.listItem.tags&quot;,&quot;equals&quot;:[&quot;check&quot;,&quot;flush&quot;]},{&quot;path&quot;:&quot;$.data.listItem.author&quot;,&quot;equals&quot;:{&quot;id&quot;:1,&quot;nickname&quot;:&quot;김자바&quot;}},{&quot;path&quot;:&quot;$.data.listItem.likeCount&quot;,&quot;equals&quot;:0}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="U" data-method="PUT" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>U · 수정 — 응답에 listItem</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/v1/posts/{{P.body.data.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;title&quot;: &quot;[채점] 10-12 수정 후&quot;,
+  &quot;tags&quot;: [
+    &quot;after&quot;
+  ],
+  &quot;visibility&quot;: &quot;PRIVATE&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;title&quot;: &quot;[채점] 10-12 수정 후&quot;,
+  &quot;tags&quot;: [
+    &quot;after&quot;
+  ],
+  &quot;visibility&quot;: &quot;PRIVATE&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.title&quot;,&quot;equals&quot;:&quot;[채점] 10-12 수정 후&quot;},{&quot;path&quot;:&quot;$.data.listItem.id&quot;,&quot;equals&quot;:&quot;{{P.body.data.id}}&quot;},{&quot;path&quot;:&quot;$.data.listItem.title&quot;,&quot;equals&quot;:&quot;[채점] 10-12 수정 후&quot;},{&quot;path&quot;:&quot;$.data.listItem.tags&quot;,&quot;equals&quot;:[&quot;after&quot;]},{&quot;path&quot;:&quot;$.data.listItem.visibility&quot;,&quot;equals&quot;:&quot;PRIVATE&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="I" data-method="GET" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>I · 목록에서 같은 글</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/posts?q=10-12%20%EC%88%98%EC%A0%95%20%ED%9B%84&amp;size=1" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.items[0].id&quot;,&quot;equals&quot;:&quot;{{P.body.data.id}}&quot;},{&quot;path&quot;:&quot;$.data.items[0]&quot;,&quot;equals&quot;:&quot;{{U.body.data.listItem}}&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="G" data-method="GET" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>G · 상세 — listItem 없음</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/posts/{{P.body.data.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.listItem&quot;,&quot;exists&quot;:false}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="V1" data-method="POST" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>V1 · 작성 — 제목 4자</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;title&quot;: &quot;넷글자다&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;title&quot;: &quot;넷글자다&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;title&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="V2" data-method="POST" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>V2 · 작성 — 태그 6개</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;title&quot;: &quot;[채점] 10-12 태그 초과&quot;,
+  &quot;tags&quot;: [
+    &quot;a&quot;,
+    &quot;b&quot;,
+    &quot;c&quot;,
+    &quot;d&quot;,
+    &quot;e&quot;,
+    &quot;f&quot;
+  ]
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;title&quot;: &quot;[채점] 10-12 태그 초과&quot;,
+  &quot;tags&quot;: [
+    &quot;a&quot;,
+    &quot;b&quot;,
+    &quot;c&quot;,
+    &quot;d&quot;,
+    &quot;e&quot;,
+    &quot;f&quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;tags&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="V3" data-method="PUT" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>V3 · 수정 — 제목 101자</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/v1/posts/{{P.body.data.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;title&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가&quot;
+}</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;title&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;title&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="V4" data-method="PUT" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>V4 · 수정 — 깨진 JSON</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/v1/posts/{{P.body.data.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="application/json" value="application/json" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">{&quot;title&quot;:</textarea></label><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;,
+  &quot;Content-Type&quot;: &quot;application/json&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{&quot;title&quot;:</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;BAD_JSON&quot;}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 P</td>
+<td><code>201</code>, <code>listItem.id</code>=새 글, <code>title</code>, <code>tags</code>=<code>[&quot;check&quot;,&quot;flush&quot;]</code>(<strong>비어 있지 않다</strong>), <code>author</code>, <code>likeCount</code>=<code>0</code></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 U</td>
+<td><code>200</code>, <code>listItem</code>의 <code>title</code>=<code>[채점] 10-12 수정 후</code>, <code>tags</code>=<code>[&quot;after&quot;]</code>, <code>visibility</code>=<code>PRIVATE</code> — 수정 <strong>후</strong> 값</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 G</td>
+<td>상세에는 <code>listItem</code> 키가 없다</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 I</td>
+<td>목록의 그 글 항목이 U의 <code>listItem</code>과 통째로 같다</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>V1~V4</td>
+<td>작성 제목 4자 <code>title</code>·태그 6개 <code>tags</code>, 수정 제목 101자 <code>title</code> — <code>400 VALIDATION_FAILED</code> / 수정 깨진 JSON <code>400 BAD_JSON</code> — <code>500</code>이 아니다(10-5·10-8 규칙이 그대로 산다)</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>flush 위치</td>
+<td>JPA로 쓴 뒤, MyBatis로 읽기 <strong>바로 전에</strong> <code>flush()</code>(또는 <code>EntityManager.flush()</code>)를 명시한다. 다른 JPA 쿼리의 auto flush에 기대지 않는다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>트랜잭션</td>
+<td>쓰기와 MyBatis 읽기가 같은 <code>@Transactional</code> 메서드 안에 있다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>재사용</td>
+<td><code>listItem</code>을 목록 항목과 같은 record로 만든다(모양을 따로 손으로 맞추지 않는다). 10-7을 MyBatis로 짰다면 같은 컬럼 조각(<code>&lt;sql&gt;</code>)과 태그 쿼리를 재사용한다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>설명</td>
+<td>작성 직후 글 행은 flush 없이도 보이는데 태그는 안 보이는 이유(IDENTITY)를 설명할 수 있다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../lessons/E5-mybatis-first-steps.html">E5 MyBatis 첫걸음</a> — Mapper 인터페이스+XML, <code>#{}</code></li>
+<li><a href="../../lessons/G3-first-transaction.html">G3 트랜잭션 첫 만남</a></li>
+<li><a href="../../lessons/E3-what-is-jpa.html">E3 JPA는 무엇인가</a> — 영속성 컨텍스트</li>
+<li><a href="../../docs/knowledge/W05-jpa-vs-mybatis-strategy.html">W05 JPA와 MyBatis를 어떻게 나눠 쓰나</a></li>
+<li><a href="../../docs/knowledge/S09-jpa-hibernate.html">S09 JPA·Hibernate</a> — flush·변경 감지</li>
+<li><a href="../../docs/knowledge/S08-transactions.html">S08 트랜잭션</a> — 커밋 전 변경은 누가 보나</li>
+<li><a href="../../docs/knowledge/W16-id-generation.html">W16 id는 어떻게 만드나</a> — IDENTITY가 INSERT를 앞당기는 이유</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — MyBatis 쿼리</summary>
+
+<p>목록 카드의 컬럼을 <code>&lt;sql id=&quot;columns&quot;&gt;</code> 조각으로 둔다(10-7 선택 칸을 했다면 이미 있다).</p>
+<pre><code class="language-xml">&lt;sql id=&quot;columns&quot;&gt;
+    SELECT p.id, p.title, p.visibility, p.view_count, p.like_count, p.created_at,
+           u.id AS author_id, u.nickname AS author_nickname
+    FROM posts p
+    JOIN users u ON u.id = p.author_id
+&lt;/sql&gt;</code></pre>
+<pre><code class="language-xml">&lt;select id=&quot;findListRowById&quot; resultType=&quot;org.example.board.post.PostListRow&quot;&gt;
+    &lt;include refid=&quot;columns&quot;/&gt;
+    WHERE p.id = #{id}
+&lt;/select&gt;</code></pre>
+<p>태그는 <code>SELECT pt.post_id, t.name FROM post_tags pt JOIN tags t ON t.id = pt.tag_id WHERE pt.post_id IN &lt;foreach …&gt;#{id}&lt;/foreach&gt; ORDER BY t.name</code>. 목록 서비스에 <code>listItem(Long postId)</code>를 두고, 행 하나와 그 글의 태그로 항목 하나를 만든다. 태그도 <strong>MyBatis로</strong> 읽어야 한다 — JPA 쿼리로 읽으면 그 앞에서 Hibernate가 auto flush해 버려 아래 ①을 재현할 수 없다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 서비스에서의 순서</summary>
+
+<pre><code class="language-java">postRepository.save(post);          // 작성: posts INSERT는 여기서
+postRepository.flush();             // post_tags INSERT를 지금 보낸다
+PostListItemResponse item = postQueryService.listItem(post.getId());</code></pre>
+<pre><code class="language-java">post.replace(...);                  // 수정: 엔티티 값만 바뀜
+postRepository.flush();             // UPDATE·post_tags 교체를 지금 보낸다
+PostListItemResponse item = postQueryService.listItem(postId);</code></pre>
+<p><code>JpaRepository</code>에 <code>flush()</code>가 있다. <code>EntityManager</code>를 주입받아 <code>em.flush()</code>를 불러도 같다.</p>
+</details>
+
+<details>
+<summary>힌트 3 — 응답에 listItem 붙이기</summary>
+
+<p>상세 응답 record에 <code>@JsonInclude(JsonInclude.Include.NON_NULL) PostListItemResponse listItem</code> 필드를 더하고, 상세(<code>GET</code>)에서는 <code>null</code>로 둔다. 그러면 <code>GET</code> 응답에는 키가 없고, 10-5·10-8의 확인도 그대로 통과한다.</p>
+</details>
+
+<details>
+<summary>더 깊이 — 처음부터 피하는 설계</summary>
+
+<p>이 함정은 &quot;한 메서드 안에서 쓰기 기술과 읽기 기술이 다르다&quot;에서 생긴다. 실무에서 흔히 쓰는 길은 셋이다.</p>
+<ul>
+<li>쓰는 메서드는 쓰기만 하고 id만 돌려준다. 읽기는 커밋 뒤 따로 한다(컨트롤러에서 서비스 두 번 호출 — 둘째 호출은 새 트랜잭션).</li>
+<li>응답을 JPA 엔티티에서 바로 만든다(MyBatis를 안 거친다). 10-7을 JPA로 짰다면 목록 항목을 만드는 <code>PostListItemResponse.of(Post, 태그)</code>를 그대로 쓰면 되니 가장 단순하다. 목록이 MyBatis라면 &quot;목록과 같은 모양&quot;을 사람이 맞춰야 한다.</li>
+<li>이 단계처럼 같은 트랜잭션에서 읽되, 경계에 <code>flush()</code>를 명시한다.</li>
+</ul>
+<p>어느 쪽이든 &quot;왜 그렇게 했는지&quot;를 코드 주석 한 줄로 남긴다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p>명세서 프로젝트를 끝냈다. 명세서 표의 &quot;실패&quot; 칸을 하나씩 짚으며 그 상황을 만드는 요청을 스스로 떠올려 본다. 모두 떠오르면 이 API를 처음부터 다시 만들 수 있다. 다음은 Java 탭의 티켓이다. 실무에서 들어오는 요청 하나를 받아 이미 있는 코드를 고친다.</p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 10-12. JPA로 쓰고 같은 트랜잭션에서 MyBatis로 읽기 — flush (선택)\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch10-project/10-12-jpa-mybatis-flush.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity project -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="10-11-idempotent-like.html">← 이전 10-11. 토글의 문제 — 멱등 PUT/DELETE를 v2로 나란히</a><span></span></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
+</body>
+</html>

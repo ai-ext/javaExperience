@@ -1,0 +1,79 @@
+package org.example.report;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.comment.Comment;
+import org.example.comment.CommentRepository;
+import org.example.member.MemberRepository;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostRepository;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+
+// 12-6 신고 — 확인 순서: 대상 찾기(없음·지움·볼 수 없음 404) → 내 것(400) → 이미 신고(409) → 저장
+@Service
+public class ReportService {
+
+    public static final String POST = "POST";
+    public static final String COMMENT = "COMMENT";
+
+    private final ReportRepository reportRepository;
+    private final PostRepository postRepository;
+    private final CommentRepository commentRepository;
+    private final MemberRepository memberRepository;
+    private final PostAccessPolicy accessPolicy;
+    private final Clock clock;
+
+    public ReportService(ReportRepository reportRepository, PostRepository postRepository,
+                         CommentRepository commentRepository, MemberRepository memberRepository,
+                         PostAccessPolicy accessPolicy, Clock clock) {
+        this.reportRepository = reportRepository;
+        this.postRepository = postRepository;
+        this.commentRepository = commentRepository;
+        this.memberRepository = memberRepository;
+        this.accessPolicy = accessPolicy;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public ReportResponse report(AuthenticatedMember me, ReportRequest request) {
+        Long ownerId = findVisibleTargetOwner(me, request.targetType(), request.targetId());
+        if (ownerId.equals(me.id())) {
+            throw new SelfReportNotAllowedException();
+        }
+        // 흔한 경우(이미 신고함)는 먼저 걸러 깔끔한 409를 주고,
+        // 동시에 두 번 눌러 둘 다 통과한 경우는 UNIQUE(uk_report_reporter_target)가 막는다 — 그 오류도 409로 바꾼다
+        if (reportRepository.existsByReporter_IdAndTargetTypeAndTargetId(me.id(), request.targetType(), request.targetId())) {
+            throw new DuplicateReportException();
+        }
+        String detail = request.detail() == null || request.detail().isBlank() ? null : request.detail().strip();
+        Report saved;
+        try {
+            saved = reportRepository.saveAndFlush(new Report(memberRepository.getReferenceById(me.id()),
+                    request.targetType(), request.targetId(), request.reason(), detail, LocalDateTime.now(clock)));
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateReportException();
+        }
+        return new ReportResponse(saved.getId(), saved.getTargetType(), saved.getTargetId(), saved.getReason(),
+                saved.getDetail(), saved.getCreatedAt());
+    }
+
+    // 대상의 작성자 id. 글은 2-3 규칙(볼 수 있나), 댓글은 지워지지 않았고 그 글을 볼 수 있어야 한다
+    private Long findVisibleTargetOwner(AuthenticatedMember me, String targetType, Long targetId) {
+        if (POST.equals(targetType)) {
+            Post post = postRepository.findById(targetId)
+                    .filter(p -> "PUBLISHED".equals(p.getStatus()) && accessPolicy.canView(me, p))
+                    .orElseThrow(ReportTargetNotFoundException::new);
+            return post.getAuthor().getId();
+        }
+        Comment comment = commentRepository.findById(targetId)
+                .filter(c -> c.getDeletedAt() == null)
+                .filter(c -> "PUBLISHED".equals(c.getPost().getStatus()) && accessPolicy.canView(me, c.getPost()))
+                .orElseThrow(ReportTargetNotFoundException::new);
+        return comment.getMember().getId();
+    }
+}

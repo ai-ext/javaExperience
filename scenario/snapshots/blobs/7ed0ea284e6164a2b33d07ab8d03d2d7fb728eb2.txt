@@ -1,0 +1,54 @@
+package org.example.board.auth;
+
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Date;
+
+import javax.crypto.SecretKey;
+
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+// 액세스 토큰 발급·검증 — HS256, sub = 회원 id, 유효 시간은 설정값(기본 1시간)
+@Component
+public class JwtProvider {
+
+    private final SecretKey key;
+    private final long validitySeconds;
+
+    public JwtProvider(@Value("${app.jwt.secret}") String secret,
+                       @Value("${app.jwt.validity-seconds}") long validitySeconds) {
+        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        this.validitySeconds = validitySeconds;
+    }
+
+    public String issue(Long userId) {
+        Instant now = Instant.now();
+        return Jwts.builder()
+                .subject(String.valueOf(userId))
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusSeconds(validitySeconds)))
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+    }
+
+    public long validitySeconds() {
+        return validitySeconds;
+    }
+
+    // 서명이 틀리거나, 만료됐거나, 형식이 깨졌으면 모두 401 — 이유를 응답에 자세히 싣지 않는다
+    public Long parseUserId(String token) {
+        try {
+            String subject = Jwts.parser().verifyWith(key).build()
+                    .parseSignedClaims(token).getPayload().getSubject();
+            return Long.valueOf(subject);
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new ApiException(ErrorCode.UNAUTHORIZED, "토큰이 올바르지 않거나 만료되었습니다.");
+        }
+    }
+}

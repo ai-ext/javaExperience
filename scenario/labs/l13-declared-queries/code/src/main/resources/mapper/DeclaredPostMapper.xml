@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.querypractice.DeclaredPostMapper">
+    <sql id="filters">
+        p.deleted_at IS NULL AND p.hidden_at IS NULL AND p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC'
+        <if test="f.boardSlug != null">AND b.slug = #{f.boardSlug}</if>
+        <if test="f.authorId != null">AND p.author_id = #{f.authorId}</if>
+        <if test="f.pattern != null">AND (LOWER(p.title) LIKE LOWER(#{f.pattern}) ESCAPE '!' OR LOWER(p.content) LIKE LOWER(#{f.pattern}) ESCAPE '!')</if>
+        <if test="f.tag != null">AND EXISTS (SELECT 1 FROM post_tag pt JOIN tag t ON t.id = pt.tag_id WHERE pt.post_id = p.id AND t.name = #{f.tag})</if>
+        <if test="f.from != null">AND p.created_at &gt;= #{f.from}</if>
+        <if test="f.to != null">AND p.created_at &lt; #{f.to}</if>
+    </sql>
+    <select id="search" resultType="org.example.querypractice.QueryPostRow">
+        SELECT p.id, p.title, b.slug AS board_slug, p.author_id
+        FROM post p JOIN board b ON b.id = p.board_id
+        WHERE <include refid="filters"/>
+        <choose><when test="f.sort == 'likes'">ORDER BY p.like_count DESC, p.id DESC</when><otherwise>ORDER BY p.id DESC</otherwise></choose>
+        LIMIT #{f.size} OFFSET #{f.offset}
+    </select>
+    <select id="count" resultType="long">
+        SELECT COUNT(*) FROM post p JOIN board b ON b.id = p.board_id WHERE <include refid="filters"/>
+    </select>
+    <select id="boardCounts" resultType="org.example.querypractice.BoardCountRow">
+        SELECT b.slug AS board_slug, COUNT(p.id) AS post_count FROM board b
+        LEFT JOIN post p ON p.board_id = b.id AND p.deleted_at IS NULL AND p.hidden_at IS NULL
+                        AND p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC'
+        GROUP BY b.slug ORDER BY b.slug
+    </select>
+</mapper>

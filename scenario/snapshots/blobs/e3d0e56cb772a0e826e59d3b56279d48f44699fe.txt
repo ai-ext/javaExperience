@@ -1,0 +1,38 @@
+package org.example.auth;
+
+import org.example.admin.PermissionInterceptor;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.util.List;
+
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+
+    private final AuthInterceptor authInterceptor;
+    private final PermissionInterceptor permissionInterceptor;
+    private final LoginMemberArgumentResolver loginMemberArgumentResolver;
+
+    public WebMvcConfig(AuthInterceptor authInterceptor, PermissionInterceptor permissionInterceptor,
+                        LoginMemberArgumentResolver loginMemberArgumentResolver) {
+        this.authInterceptor = authInterceptor;
+        this.permissionInterceptor = permissionInterceptor;
+        this.loginMemberArgumentResolver = loginMemberArgumentResolver;
+    }
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        // /hello 등 /api 밖의 엔드포인트는 토큰 확인 대상이 아니다
+        registry.addInterceptor(authInterceptor).addPathPatterns("/api/**")
+                .excludePathPatterns("/api/start/**");
+        // 13-1: 누구인지 확인한 "다음에" 권한을 본다 — 등록 순서가 실행 순서다
+        registry.addInterceptor(permissionInterceptor).addPathPatterns("/api/**");
+    }
+
+    @Override
+    public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
+        resolvers.add(loginMemberArgumentResolver);
+    }
+}

@@ -1,0 +1,69 @@
+package org.example.report;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.charset.StandardCharsets;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+
+// 13-6 신고 내역 CSV — 엑셀에서 바로 열리게: UTF-8 + BOM, RFC 4180 따옴표 규칙, 줄 끝 CRLF.
+// 셀이 = + - @ 로 시작하면 앞에 '를 붙인다(CSV 주입 — 엑셀이 수식으로 실행하지 않게).
+// 전부 메모리에 만든다 — 행이 수십만이면 StreamingResponseBody + 나눠 읽기로 바꿔야 한다
+@Service
+public class ReportCsvService {
+
+    private static final String BOM = "\uFEFF";
+    private static final String CRLF = "\r\n";
+    // 탭·개행·전각 기호도 스프레드시트에서 수식 시작으로 해석될 수 있다.
+    private static final String FORMULA_PREFIXES = "=+-@\t\r\n＝＋－＠";
+    private static final String HEADER = "신고번호,대상,대상번호,사유,상세,신고자,신고시각,처리상태,처리자,처리시각";
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final Map<String, String> TARGET = Map.of("POST", "글", "COMMENT", "댓글");
+    private static final Map<String, String> REASON = Map.of(
+            "SPAM", "스팸·광고", "ABUSE", "욕설·비방", "ADULT", "음란물", "PRIVACY", "개인정보 노출", "ETC", "기타");
+    private static final Map<String, String> STATUS = Map.of("PENDING", "대기", "ACCEPTED", "조치", "REJECTED", "기각");
+
+    private final ReportRepository reportRepository;
+
+    public ReportCsvService(ReportRepository reportRepository) {
+        this.reportRepository = reportRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] export(String status) {
+        List<Report> reports = reportRepository.findForExport(status);
+        StringBuilder csv = new StringBuilder(BOM).append(HEADER).append(CRLF);
+        for (Report r : reports) {
+            csv.append(String.join(",",
+                    String.valueOf(r.getId()),
+                    TARGET.get(r.getTargetType()),
+                    String.valueOf(r.getTargetId()),
+                    REASON.get(r.getReason()),
+                    cell(r.getDetail()),
+                    cell(r.getReporter().getNickname()),
+                    r.getCreatedAt().format(TIME),
+                    STATUS.get(r.getStatus()),
+                    cell(r.getHandledBy() == null ? null : r.getHandledBy().getNickname()),
+                    r.getHandledAt() == null ? "" : r.getHandledAt().format(TIME)
+            )).append(CRLF);
+        }
+        return csv.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    // 사람이 쓴 값만 이 함수를 거친다(숫자·코드·시각은 쉼표·따옴표가 들어갈 일이 없다)
+    static String cell(String value) {
+        if (value == null) {
+            return "";
+        }
+        String v = value;
+        if (!v.isEmpty() && FORMULA_PREFIXES.indexOf(v.charAt(0)) >= 0) {
+            v = "'" + v;
+        }
+        if (v.contains(",") || v.contains("\"") || v.contains("\n") || v.contains("\r") || v.contains("\t")) {
+            v = "\"" + v.replace("\"", "\"\"") + "\"";
+        }
+        return v;
+    }
+}

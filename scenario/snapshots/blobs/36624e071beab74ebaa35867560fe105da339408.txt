@@ -1,0 +1,130 @@
+package org.example.post;
+
+import jakarta.validation.Valid;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.example.tag.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/posts")
+public class PostController {
+
+    private static final Logger log = LoggerFactory.getLogger(PostController.class);
+
+    private final PostService postService;
+    private final PostQueryService postQueryService;
+
+    public PostController(PostService postService, PostQueryService postQueryService) {
+        this.postService = postService;
+        this.postQueryService = postQueryService;
+    }
+
+    @GetMapping("/{id}")
+    public PostDetailResponse getOne(@PathVariable Long id, @LoginMember AuthenticatedMember viewer) {
+        return postQueryService.getDetail(id, viewer);
+    }
+
+    @PostMapping
+    public ResponseEntity<PostResponse> create(@LoginMember AuthenticatedMember loginMember,
+                                                @Valid @RequestBody PostCreateRequest request) {
+        log.info("게시글 작성 요청 제목: {}", request.title());
+
+        Post post = postService.create(loginMember.id(), request);
+        PostResponse response = toResponse(post);
+
+        return ResponseEntity.created(URI.create("/api/posts/" + post.getId())).body(response);
+    }
+
+    @PostMapping("/{sourceId}/copies")
+    public ResponseEntity<PostResponse> copy(@PathVariable Long sourceId,
+                                             @RequestParam(defaultValue = "false") boolean copyTags,
+                                             @LoginMember AuthenticatedMember loginMember,
+                                             @Valid @RequestBody CopyPostRequest request) {
+        Post post = postService.copy(sourceId, loginMember.id(), copyTags, request);
+        return ResponseEntity.created(URI.create("/api/posts/" + post.getId()))
+                .body(toResponse(post));
+    }
+
+    @PutMapping("/{id}")
+    public PostDetailResponse replace(@PathVariable Long id,
+                                      @LoginMember AuthenticatedMember loginMember,
+                                      @Valid @RequestBody PostReplaceRequest request) {
+        return postService.replace(id, loginMember, request);
+    }
+
+    @PatchMapping("/{id}")
+    public PostDetailResponse patch(@PathVariable Long id,
+                                     @LoginMember AuthenticatedMember loginMember,
+                                     @RequestBody PostUpdateRequest request) {
+        Post post = postService.patch(id, loginMember, request);
+        return toDetailResponse(post);
+    }
+
+    // 11-1 임시저장 글 발행
+    @PostMapping("/{id}/publish")
+    public PostDetailResponse publish(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+        return toDetailResponse(postService.publish(id, loginMember));
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+        postService.delete(id, loginMember);
+    }
+
+    private PostDetailResponse toDetailResponse(Post post) {
+        List<String> tagNames = post.getTags().stream().map(Tag::getName).toList();
+        AuthorResponse author = new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname());
+        return new PostDetailResponse(
+                post.getId(),
+                post.getBoard().getSlug(),
+                post.getTitle(),
+                post.getContent(),
+                tagNames,
+                post.getVisibility(),
+                author,
+                post.getViewCount(),
+                post.getLikeCount(),
+                post.getCommentCount(),
+                post.getImages().stream().map(i -> new ImageResponse(i.getId(), i.url())).toList(),
+                post.getStatus(),
+                post.getPublishedAt(),
+                post.getCreatedAt()
+        );
+    }
+
+    private PostResponse toResponse(Post post) {
+        List<String> tagNames = post.getTags().stream().map(Tag::getName).toList();
+        AuthorResponse author = new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname());
+        return new PostResponse(
+                post.getId(),
+                post.getBoard().getSlug(),
+                post.getTitle(),
+                post.getContent(),
+                tagNames,
+                post.getVisibility(),
+                author,
+                post.getStatus(),
+                post.getPublishedAt(),
+                post.getCreatedAt()
+        );
+    }
+}

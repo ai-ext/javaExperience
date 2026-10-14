@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-017. 조회수가 덜 오르고, 좋아요 수가 가끔 줄어든다</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="t-017-조회수가-덜-오르고-좋아요-수가-가끔-줄어든다"><a class="anchor" href="#t-017-조회수가-덜-오르고-좋아요-수가-가끔-줄어든다" aria-hidden="true">#</a>T-017. 조회수가 덜 오르고, 좋아요 수가 가끔 줄어든다</h1>
+<blockquote>
+<p>난이도 중급 · 유형 버그 · DB community · 예상 60분</p>
+</blockquote>
+<h2 id="티켓"><a class="anchor" href="#티켓" aria-hidden="true">#</a>티켓</h2>
+<blockquote>
+<p><strong>요청자</strong> 마케팅·운영 · <strong>배경</strong> 이벤트 글을 공유한 뒤 접속 로그로는 3만 번 열렸는데 글의 조회수는 9천이다. 같은 시기에 &quot;좋아요를 눌렀는데 숫자가 하나 줄었다&quot;는 문의도 왔다(밤마다 도는 정합성 배치가 다음 날 숫자를 고쳐 놓아서 재현이 안 된다고 넘겼던 건).</p>
+</blockquote>
+<ul>
+<li>동시에 여러 명이 같은 글을 열어도 조회수가 연 횟수만큼 정확히 올라가게 고쳐 주세요.</li>
+<li>상세 응답의 <code>viewCount</code>는 <strong>이번 조회까지 반영된 값</strong>이어야 합니다(동시에 연 사람들이 같은 숫자를 받으면 안 된다).</li>
+<li>좋아요 수 문의도 같은 원인인지 확인해 주세요 — 조회 처리가 좋아요 수를 건드리면 안 됩니다.</li>
+<li><strong>완료 조건</strong>: 동시 조회 30번 뒤 조회수가 정확히 30(+직접 연 횟수) 오르고, 좋아요 수는 실제 좋아요 행 수와 같다.</li>
+</ul>
+<p><strong>DB 시작 상태</strong>: <code>community</code> 처음 상태(<code>bash scripts/java-db.sh --reset</code>). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 글 12(자유 게시판, 이스프링의 공개 글)를 쓴다.</p>
+<h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
+<ul>
+<li>먼저 재현한다: 아래 버튼 확인을 기준 코드에 그대로 돌려 숫자가 얼마나 모자라는지 본다. 앱 로그(<code>org.hibernate.SQL</code>)에서 상세 조회 한 번에 나가는 <code>UPDATE post …</code> 문장을 찾아 <strong>어떤 컬럼들을 SET 하는지</strong> 읽는다.</li>
+<li>좋아요 수는 이미 동시 요청에 안전하게 바꾸고 있다. 그 방식과 조회수 방식이 무엇이 다른지 비교한다.</li>
+</ul>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>이벤트 글 — 동시에 열기</h3><p>많은 사람이 동시에 같은 글을 연다. 응답의 조회수는 저마다 달라야 하고, 끝난 뒤 조회수는 연 횟수만큼 올라 있어야 한다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>자유글 01</strong><span>(비로그인)</span></div><div class="screen-widget screen-text"><strong>text</strong><span>자유글 01</span></div><div class="screen-widget screen-stats"><strong>stats</strong><span>조회 · 좋아요</span></div><div class="screen-widget screen-code"><strong>앱 로그</strong><span>update post set author_id=?, board_id=?, comment_count=?, content=?, …, like_count=?, …, view_count=? where id=?</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>지금(버그) — 30명이 동시에 열면</summary><ol><li><span class="flow-kind">사용자</span><p>30명이 거의 동시에 글 12를 연다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/posts/12</p></li><li><span class="flow-kind">서버</span><p>각 요청이 글을 읽어(view_count = 2) 엔티티에서 +1 → 커밋 때 변경 감지가 행 전체를 UPDATE. 여러 요청이 같은 2를 읽었으니 모두 3을 쓴다</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>UPDATE post SET …, like_count = 1, …, view_count = 3 WHERE id = 12</dd><dt>note</dt><dd>읽어 둔 like_count까지 다시 써서, 그사이 눌린 좋아요가 지워질 수 있다</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{&quot;id&quot;: 12, …, &quot;viewCount&quot;: 3, …}</dd></dl></li><li><span class="flow-kind">화면</span><p>30번 열었는데 조회수는 몇만 오른다</p></li></ol></details><details class="scenario-flow"><summary>고친 뒤</summary><ol><li><span class="flow-kind">사용자</span><p>30명이 동시에 연다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/posts/12</p></li><li><span class="flow-kind">서버</span><p>읽고 더해서 쓰지 않고 DB가 한 번에 더한다. 응답 값은 더한 뒤 다시 읽는다</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>UPDATE post SET view_count = view_count + 1 WHERE id = 12</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{&quot;id&quot;: 12, …, &quot;viewCount&quot;: 17, …}</dd></dl></li><li><span class="flow-kind">화면</span><p>사람마다 다른 숫자, 끝나면 정확히 30 증가</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>대상</td>
+<td><code>GET /api/posts/{id}</code> (상세)</td>
+</tr>
+<tr>
+<td>고칠 동작</td>
+<td>동시 조회에도 <code>view_count</code>가 조회 수만큼 정확히 오른다</td>
+</tr>
+<tr>
+<td>응답 <code>viewCount</code></td>
+<td>이번 조회가 반영된 값 — 동시에 연 요청끼리 같은 값을 받지 않는다</td>
+</tr>
+<tr>
+<td>함께 지킬 것</td>
+<td>상세 조회가 <code>like_count</code>·<code>comment_count</code> 등 다른 컬럼을 다시 쓰지 않는다</td>
+</tr>
+<tr>
+<td>그대로인 것</td>
+<td>볼 수 없는 글은 404이고 조회수도 안 오른다, 응답 모양</td>
+</tr>
+</tbody></table></div>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+
+curl -s &quot;$BASE/api/posts/12&quot;                                                    # 요청 A — 지금 viewCount
+seq 30 | xargs -P 30 -I{} curl -s -o /dev/null -w '%{http_code}\n' &quot;$BASE/api/posts/12&quot; | sort | uniq -c   # 요청 P — 동시에 30번
+curl -s &quot;$BASE/api/posts/12&quot;                                                    # 요청 B — A의 viewCount + 31이어야 한다</code></pre>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 앞뒤 값의 차이만 보므로 몇 번을 눌러도 같은 결과다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="A" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>A · 처음 조회수</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/12" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="P" data-method="GET" data-request-index="1" data-concurrent-count="30" data-concurrent-vars="{}" data-repeat="0"><h4>P · 동시에 30번 열기</h4><p class="request-method">GET · 동시 요청 30개</p><label>경로 <input class="request-path" value="/api/posts/12" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 동시 요청 30개</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200}
+C3: {&quot;distinct&quot;:{&quot;path&quot;:&quot;$.viewCount&quot;,&quot;count&quot;:30}}</pre></dd></dl></details></article><article class="api-request" data-request-id="B" data-method="GET" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>B · 다시 조회수</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/12" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.viewCount&quot;,&quot;equals&quot;:&quot;{{A.body.viewCount + 31}}&quot;}]}
+C4: {&quot;json&quot;:[{&quot;path&quot;:&quot;$.likeCount&quot;,&quot;equals&quot;:&quot;{{A.body.likeCount}}&quot;}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP(필수), D = DB(필수, SELECT만), T = 테스트(선택), R = 코드 리뷰(피드백)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 P</td>
+<td>동시 30번 모두 <code>200</code></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 A·B</td>
+<td>B의 <code>viewCount</code> = A의 <code>viewCount + 31</code>(P 30번 + B 자신 1번)</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 P</td>
+<td>30개 응답의 <code>viewCount</code>가 모두 다르다 — 각자 자기 조회가 반영된 값을 받았다</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 A·B</td>
+<td>좋아요 수는 그대로</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT p.view_count, p.like_count, (SELECT COUNT(*) FROM post_like l WHERE l.post_id = p.id) AS likes FROM post p WHERE p.id = 12</code></td>
+<td><code>view_count</code>가 B 응답과 같고, <code>like_count</code>와 <code>likes</code>가 같다(<code>1 1</code>)</td>
+</tr>
+<tr>
+<td>T1</td>
+<td>(선택) 동시성 테스트</td>
+<td>스레드 여러 개로 상세를 동시에 부른 뒤 조회수를 확인하는 테스트(기존 좋아요 동시성 테스트와 같은 방식)</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>원인</td>
+<td>&quot;읽고 → 자바에서 +1 → 변경 감지로 저장&quot;이 왜 갱신 손실(lost update)을 만드는지, 그리고 Hibernate 기본 UPDATE가 <strong>바뀐 컬럼만이 아니라 모든 컬럼</strong>을 쓰기 때문에 읽어 둔 <code>like_count</code>까지 덮어써서 좋아요 수가 줄 수 있다는 것을 로그로 보여 줄 수 있다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>고친 방법</td>
+<td><code>UPDATE … SET view_count = view_count + 1</code>(원자적 증가) 뒤 값을 다시 읽었다. 비관적 락(<code>SELECT … FOR UPDATE</code>)·낙관적 락(<code>@Version</code>)과 비교해 조회수에 무엇이 맞는지, <code>@DynamicUpdate</code>만으로는 왜 조회수 손실이 안 고쳐지는지 말할 수 있다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>응답 값</td>
+<td>원자적 UPDATE는 영속성 컨텍스트의 엔티티를 바꾸지 않는다 — 엔티티 값에 +1 해서 돌려주면 C3이 깨지는 이유를 안다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../docs/knowledge/P18-concurrency-inventory.html">P18 동시성 — 재고·카운터</a> — 갱신 손실과 원자적 증가</li>
+<li><a href="../docs/knowledge/S08-transactions.html">S08 트랜잭션</a> — 격리 수준과 &quot;읽고 쓰기&quot; 사이의 틈</li>
+<li><a href="../docs/knowledge/S09-jpa-hibernate.html">S09 JPA·Hibernate</a> — 변경 감지가 만드는 UPDATE 문장, 벌크 연산과 영속성 컨텍스트</li>
+<li><a href="../docs/knowledge/W25-spring-multithreading.html">W25 Spring 멀티스레드</a> — 요청마다 다른 스레드, 같은 행</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 재현 로그</summary>
+
+<p>상세 조회 한 번의 로그에 <code>update post set author_id=?, board_id=?, comment_count=?, content=?, … like_count=?, … view_count=? where id=?</code>가 보인다. 이 요청이 읽은 시점의 <code>like_count</code>가 그대로 다시 쓰인다. 조회수만 바꾸고 싶은데 행 전체를 쓰고 있다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 고치기</summary>
+
+<p>글 저장소에 <code>@Modifying @Query(&quot;UPDATE Post p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id&quot;)</code>를 두고, 상세 서비스는 엔티티의 <code>increaseViewCount()</code> 대신 이것을 부른다. 응답의 조회수는 <code>SELECT p.viewCount FROM Post p WHERE p.id = :id</code>로 다시 읽는다(좋아요 수를 다시 읽는 메서드가 이미 같은 모양이다). 엔티티를 더는 바꾸지 않으니 행 전체 UPDATE도 사라진다.</p>
+</details>
+
+
+</main>
+
+
+</body>
+</html>

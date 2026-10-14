@@ -1,0 +1,61 @@
+package org.example.poll;
+
+import jakarta.validation.Validator;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.example.post.InvalidParametersException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
+
+import java.net.URI;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+@RestController
+public class PollController {
+
+    private final PollService pollService;
+    private final Validator validator;
+
+    public PollController(PollService pollService, Validator validator) {
+        this.pollService = pollService;
+        this.validator = validator;
+    }
+
+    @PostMapping("/api/posts/{postId}/poll")
+    public ResponseEntity<PollResponse> create(@PathVariable Long postId, @LoginMember AuthenticatedMember loginMember,
+                                               @RequestBody JsonNode body) {
+        PollCreateRequest.Parsed parsed = PollCreateRequest.parse(body);
+        Map<String, String> errors = new LinkedHashMap<>(parsed.errors());
+        validator.validate(parsed.request()).forEach(v -> errors.putIfAbsent(v.getPropertyPath().toString().replace(".<list element>", ""), v.getMessage()));
+        if (!errors.isEmpty()) {
+            throw new InvalidParametersException(errors);
+        }
+        PollResponse response = pollService.create(postId, loginMember, parsed.request());
+        return ResponseEntity.created(URI.create("/api/posts/" + postId + "/poll")).body(response);
+    }
+
+    // 한 표는 새로 생기는 자원이라 POST·201. 같은 사람이 또 보내면 409(PUT처럼 멱등이 아니다)
+    @PostMapping("/api/posts/{postId}/poll/votes")
+    public ResponseEntity<PollResponse> vote(@PathVariable Long postId, @LoginMember AuthenticatedMember loginMember,
+                                             @RequestBody JsonNode body) {
+        VoteRequest.Parsed parsed = VoteRequest.parse(body);
+        Map<String, String> errors = new LinkedHashMap<>(parsed.errors());
+        validator.validate(parsed.request()).forEach(v -> errors.putIfAbsent(v.getPropertyPath().toString().replace(".<list element>", ""), v.getMessage()));
+        if (!errors.isEmpty()) {
+            throw new InvalidParametersException(errors);
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(pollService.vote(postId, loginMember, parsed.request().optionId()));
+    }
+
+    @GetMapping("/api/posts/{postId}/poll")
+    public PollResponse get(@PathVariable Long postId, @LoginMember AuthenticatedMember viewer) {
+        return pollService.get(postId, viewer);
+    }
+}

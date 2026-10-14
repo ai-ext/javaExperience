@@ -1,0 +1,95 @@
+package org.example.board.comment;
+
+import java.util.List;
+
+import jakarta.persistence.EntityManager;
+
+import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.post.Post;
+import org.example.board.post.PostRepository;
+import org.example.board.post.Visibility;
+import org.example.board.user.User;
+import org.example.board.user.UserRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class CommentService {
+
+    private final CommentRepository commentRepository;
+    private final PostRepository postRepository;
+    private final UserRepository userRepository;
+    private final EntityManager entityManager;
+
+    public CommentService(CommentRepository commentRepository, PostRepository postRepository,
+                          UserRepository userRepository, EntityManager entityManager) {
+        this.commentRepository = commentRepository;
+        this.postRepository = postRepository;
+        this.userRepository = userRepository;
+        this.entityManager = entityManager;
+    }
+
+    @Transactional
+    public CommentCreatedResponse create(Long userId, Long postId, CommentRequest request) {
+        lockActivePost(postId);
+        Post post = findVisiblePost(postId, userId);
+        User author = userRepository.findById(userId).orElseThrow(() -> new ApiException(ErrorCode.UNAUTHORIZED));
+        Comment parent = request.parentId() == null ? null : findParent(post, request.parentId());
+        Comment comment = commentRepository.save(new Comment(post, author, parent, request.content()));
+        return CommentCreatedResponse.from(comment);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CommentResponse> list(Long postId, Long loginUserId) {
+        findVisiblePost(postId, loginUserId);
+        return CommentTree.build(commentRepository.findAllWithAuthorByPostId(postId));
+    }
+
+    @Transactional
+    public void delete(Long userId, Long commentId) {
+        List<?> postIds = entityManager.createNativeQuery("select post_id from comments where id = :id")
+                .setParameter("id", commentId).getResultList();
+        if (postIds.isEmpty()) throw new ApiException(ErrorCode.NOT_FOUND, "댓글을 찾을 수 없습니다.");
+        lockActivePost(((Number) postIds.get(0)).longValue());
+        if (!lockActiveComment(commentId))
+            throw new ApiException(ErrorCode.NOT_FOUND, "댓글을 찾을 수 없습니다.");
+        Comment comment = commentRepository.findById(commentId)
+                .filter(c -> !c.isDeleted() && !c.getPost().isDeleted())
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "댓글을 찾을 수 없습니다."));
+        if (!comment.getAuthor().getId().equals(userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "작성자만 삭제할 수 있습니다.");
+        }
+        comment.delete();
+    }
+
+    // 부모는 같은 글의, 지워지지 않은, 최상위 댓글이어야 한다(답글의 답글 금지)
+    private Comment findParent(Post post, Long parentId) {
+        if (!lockActiveComment(parentId))
+            throw ApiException.invalid("parentId", "답글은 같은 글의 최상위 댓글에만 달 수 있습니다.");
+        return commentRepository.findById(parentId)
+                .filter(p -> p.getPost().getId().equals(post.getId()) && p.getParent() == null && !p.isDeleted())
+                .orElseThrow(() -> ApiException.invalid("parentId", "답글은 같은 글의 최상위 댓글에만 달 수 있습니다."));
+    }
+
+    // 모든 댓글 쓰기는 글 행 → 댓글 행 순서로 잠가 삭제·답글 추가를 직렬화한다.
+    private void lockActivePost(Long postId) {
+        if (entityManager.createNativeQuery("select id from posts where id = :id and deleted_at is null for update")
+                .setParameter("id", postId).getResultList().isEmpty())
+            throw new ApiException(ErrorCode.NOT_FOUND, "게시글을 찾을 수 없습니다.");
+    }
+
+    private boolean lockActiveComment(Long commentId) {
+        return !entityManager.createNativeQuery("select id from comments where id = :id and deleted_at is null for update")
+                .setParameter("id", commentId).getResultList().isEmpty();
+    }
+
+    private Post findVisiblePost(Long postId, Long loginUserId) {
+        Post post = postRepository.findByIdAndDeletedAtIsNull(postId)
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "게시글을 찾을 수 없습니다."));
+        if (post.getVisibility() == Visibility.PRIVATE && !post.getAuthor().getId().equals(loginUserId)) {
+            throw new ApiException(ErrorCode.NOT_FOUND, "게시글을 찾을 수 없습니다.");
+        }
+        return post;
+    }
+}

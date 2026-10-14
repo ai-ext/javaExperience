@@ -178,3 +178,4 @@
 | [S20. Spring Cloud·MSA 패턴](S20-spring-cloud-msa.md) | MSA는 배포·확장의 경계를 분리하는 대신 네트워크 지연, 부분 실패, 데이터 일관성, 운영 복잡성을 서비스 간 경계로 끌어온다. |
 | [S21. Spring Boot 3→4·Framework 7 변화와 마이그레이션](S21-boot4-migration.md) | Boot 4는 단순한 버전 교체가 아니라 Framework 7·Jakarta EE 11·Jackson 3·재편된 모듈 경계를 함께 올리는 메이저 업그레이드다. |
 | [S22. 아키텍처 스타일과 DDD 기초 — 코드를 어떻게 나눌까](S22-architecture-ddd.md) | 레이어드의 핵심 문제는 레이어 수가 아니라 비즈니스 규칙이 `Service`와 ORM 모델에 흩어지고 의존성 방향이 뒤엉키는 데 있다. |
+| [S23. OpenAPI·Swagger UI — API 계약을 문서로 확인하기](S23-openapi-swagger.md) | 구현한 요청·응답 계약을 OpenAPI 문서와 Swagger UI에서 확인하고 유지한다. |

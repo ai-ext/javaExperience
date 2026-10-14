@@ -1,0 +1,1283 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10-4. 로그인과 JWT — 인터셉터와 @LoginUser, 내 정보</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 10장. 명세서 프로젝트 — 게시판 API v1(/api/v1) › 10-4</p><p class="level-tags"><span>중급</span><span>별도 명세서 프로젝트</span><span>DB project</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="10-4-로그인과-jwt--인터셉터와-loginuser-내-정보"><a class="anchor" href="#10-4-로그인과-jwt--인터셉터와-loginuser-내-정보" aria-hidden="true">#</a>10-4. 로그인과 JWT — 인터셉터와 @LoginUser, 내 정보</h1>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p>이제부터 글쓰기·수정·댓글은 &quot;누가&quot; 하는지 알아야 한다. 명세서는 이렇게 정했다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>API</th>
+<th>요청</th>
+<th>성공</th>
+<th>실패</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>POST /api/v1/auth/login</code></td>
+<td><code>{email, password}</code></td>
+<td>200 <code>{accessToken, expiresIn}</code></td>
+<td>400, 401(이메일이 없든 비밀번호가 틀리든 같은 응답)</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/users/me</code></td>
+<td>토큰</td>
+<td>200 <code>{id, email, nickname}</code></td>
+<td>401</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li>토큰은 <strong>JWT</strong>다. HS256 서명, 유효 1시간, 비밀키는 설정 <code>app.jwt.secret</code>, 페이로드의 <code>sub</code>가 회원 id다.</li>
+<li>요청은 <code>Authorization: Bearer &lt;토큰&gt;</code> 헤더로 토큰을 싣는다.</li>
+</ul>
+<p>1-6에서는 DB의 토큰 표를 찾아 확인했다. 이번에는 <strong>서버가 토큰을 저장하지 않는다.</strong> JWT는 서버가 비밀키로 서명한 문자열이다. 서명이 맞으면 서버가 발급한 것이고, 그 안의 <code>sub</code>를 믿는다. 토큰 확인은 1-6과 같은 방식으로 한다. <strong>인터셉터</strong>가 한곳에서 확인하고, 컨트롤러는 <code>@LoginUser Long userId</code> 매개변수로 회원 id를 받는다.</p>
+<p>실무에서는 이 일을 보통 Spring Security가 한다. 이 단계는 그 안에서 일어나는 일(헤더 읽기 → 서명 확인 → 회원 id 꺼내기 → 401)을 직접 만들어 보는 것이다. Security로 옮기는 법은 &quot;더 깊이&quot;에 있다.</p>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>로그인 → 내 정보</h3><p>로그인하면 토큰을 받아 저장하고, 이후 요청마다 Authorization 헤더에 싣는다. 서버는 서명으로 진짜인지 확인한다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>로그인</strong><span></span></div><div class="screen-widget screen-field"><strong>이메일</strong><span>kim@example.com</span></div><div class="screen-widget screen-field"><strong>비밀번호</strong><span>••••••••••••</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>로그인 · 내 정보</span></div><div class="screen-widget screen-text"><strong>text</strong><span>김자바 (kim@example.com)</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>다시 로그인해 주세요</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>로그인</summary><ol><li><span class="flow-kind">사용자</span><p>이메일·비밀번호를 넣고 [로그인]</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/v1/auth/login</p><dl><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT * FROM users WHERE email = 'kim@example.com';</dd><dt>note</dt><dd>있으면 passwordEncoder.matches(원문, password_hash)</dd></dl></li><li><span class="flow-kind">서버</span><p>JwtProvider가 sub=1, exp=지금+1시간으로 서명한 토큰을 만든다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{
+  &quot;status&quot;: 200,
+  &quot;message&quot;: &quot;OK&quot;,
+  &quot;data&quot;: { &quot;accessToken&quot;: &quot;eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIi...&quot;, &quot;expiresIn&quot;: 3600 }
+}</dd></dl></li><li><span class="flow-kind">화면</span><p>프론트가 accessToken을 저장한다(메모리·저장소)</p></li></ol></details><details class="scenario-flow"><summary>내 정보</summary><ol><li><span class="flow-kind">사용자</span><p>[내 정보]를 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/v1/users/me</p><dl><dt>headers</dt><dd>Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...</dd></dl></li><li><span class="flow-kind">서버</span><p>AuthInterceptor: Bearer 떼기 → 서명·만료 확인 → sub=1을 요청 속성에 → @LoginUser Long userId = 1</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT * FROM users WHERE id = 1;</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{
+  &quot;status&quot;: 200,
+  &quot;message&quot;: &quot;OK&quot;,
+  &quot;data&quot;: { &quot;id&quot;: 1, &quot;email&quot;: &quot;kim@example.com&quot;, &quot;nickname&quot;: &quot;김자바&quot; }
+}</dd></dl></li><li><span class="flow-kind">화면</span><p>내 닉네임과 이메일이 보인다</p></li></ol></details><details class="scenario-flow"><summary>토큰이 만료됐을 때</summary><ol><li><span class="flow-kind">사용자</span><p>한 시간 넘게 지나 [내 정보]를 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/v1/users/me</p><dl><dt>headers</dt><dd>Authorization: Bearer (만료된 토큰)</dd></dl></li><li><span class="flow-kind">서버</span><p>jjwt가 ExpiredJwtException → JwtProvider가 ApiException(UNAUTHORIZED)로 바꾼다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>401</dd><dt>headers</dt><dd>WWW-Authenticate: Bearer</dd><dt>body</dt><dd>{
+  &quot;status&quot;: 401,
+  &quot;message&quot;: &quot;토큰이 올바르지 않거나 만료되었습니다.&quot;,
+  &quot;code&quot;: &quot;UNAUTHORIZED&quot;,
+  &quot;errors&quot;: [],
+  &quot;data&quot;: null
+}</dd></dl></li><li><span class="flow-kind">화면</span><p>프론트 래퍼가 code UNAUTHORIZED를 보고 로그인 화면으로 보낸다</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>의존성</td>
+<td>jjwt <strong>0.13.0</strong> — <code>implementation &#39;io.jsonwebtoken:jjwt-api:0.13.0&#39;</code>, <code>runtimeOnly &#39;io.jsonwebtoken:jjwt-impl:0.13.0&#39;</code>, <code>runtimeOnly &#39;io.jsonwebtoken:jjwt-jackson:0.13.0&#39;</code></td>
+</tr>
+<tr>
+<td>설정</td>
+<td><code>app.jwt.secret</code>(32바이트 이상), <code>app.jwt.validity-seconds: 3600</code> — 아래 <a href="#설정">설정</a></td>
+</tr>
+<tr>
+<td>로그인</td>
+<td><code>POST /api/v1/auth/login</code> — 이메일은 가입 때와 같이 다듬어(공백 제거·소문자) 찾는다. 없는 이메일·틀린 비밀번호 모두 <strong>같은</strong> 401 문구. 비밀번호는 비었는지만 검사한다(가입의 8~64자·72바이트 규칙을 다시 걸지 않는다 — 아래 설계 포인트)</td>
+</tr>
+<tr>
+<td>토큰</td>
+<td>HS256, <code>sub</code> = 회원 id(문자열), <code>iat</code>·<code>exp</code>, 유효 3600초. 응답 <code>{accessToken, expiresIn: 3600}</code></td>
+</tr>
+<tr>
+<td>토큰 확인</td>
+<td>인터셉터(<code>/api/**</code>, 가입·로그인 주소는 제외). 헤더가 없으면 <code>GET</code>은 비로그인으로 통과, 그 밖의 메서드는 401. 헤더가 있는데 <code>Bearer </code>로 시작하지 않거나, 서명이 틀리거나, 만료면 401. <strong>CORS preflight(<code>OPTIONS</code>)는 통과</strong></td>
+</tr>
+<tr>
+<td>매개변수</td>
+<td><code>@LoginUser Long userId</code> — 로그인이 필수면 없을 때 401. <code>@LoginUser(required = false)</code>면 비로그인일 때 <code>null</code>(목록·상세용, 10-6부터)</td>
+</tr>
+<tr>
+<td>내 정보</td>
+<td><code>GET /api/v1/users/me</code> → <code>{id, email, nickname}</code></td>
+</tr>
+<tr>
+<td>401 응답</td>
+<td>공통 틀 + 헤더 <code>WWW-Authenticate: Bearer</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>필드 규칙</strong> — 로그인은 비었는지만 본다(가입 규칙을 다시 걸지 않는다 — 아래 설계 포인트). 잘못된 입력은 <code>500</code>이 나면 안 된다</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>필수</th>
+<th>null·빈 값</th>
+<th>길이·범위</th>
+<th>형식</th>
+<th>기본값</th>
+<th>틀렸을 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>email</code></td>
+<td>필수</td>
+<td>안 됨 — 없음·<code>null</code>·<code>&quot;&quot;</code>·공백만 거절</td>
+<td>—</td>
+<td>문자열(형식은 보지 않는다 — 틀린 형식은 없는 이메일과 같은 <code>401</code>)</td>
+<td>없음</td>
+<td><code>400 VALIDATION_FAILED</code>, <code>errors</code>에 <code>email</code></td>
+</tr>
+<tr>
+<td><code>password</code></td>
+<td>필수</td>
+<td>안 됨 — 없음·<code>null</code>·<code>&quot;&quot;</code>·공백만 거절</td>
+<td>—</td>
+<td>문자열</td>
+<td>없음</td>
+<td><code>400</code>, <code>errors</code>에 <code>password</code></td>
+</tr>
+<tr>
+<td>본문 전체</td>
+<td>필수</td>
+<td>—</td>
+<td>—</td>
+<td>JSON, 각 값은 문자열</td>
+<td>—</td>
+<td><code>400 BAD_JSON</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="설정"><a class="anchor" href="#설정" aria-hidden="true">#</a>설정</h3>
+<p><code>application.yml</code>에 더한다.</p>
+<pre><code class="language-yaml">app:
+  jwt:
+    # 예시용 비밀키 — 실제 서비스에서는 코드·저장소에 두지 않고 환경 변수 등으로 주입한다. HS256은 32바이트 이상
+    secret: board-api-example-secret-key-change-me-0123456789
+    validity-seconds: 3600</code></pre>
+<p><strong>이 비밀키는 실습용 예시 값이다.</strong> 이 문서에 공개돼 있으니 누구나 이 키로 토큰을 만들 수 있다. 실제 서비스에서는 길고 무작위인 키를 환경 변수(<code>APP_JWT_SECRET</code>)나 비밀 저장소로 넣고, 깃에 올리지 않는다. 아래 확인의 &quot;만료 토큰&quot;(요청 M3)은 이 예시 키로 서명해 두었다. 다른 키를 쓰면 M3는 &quot;만료&quot;가 아니라 &quot;서명 틀림&quot;으로 401이 난다. 어느 쪽이든 결과는 같다.</p>
+<h2 id="설계-포인트"><a class="anchor" href="#설계-포인트" aria-hidden="true">#</a>설계 포인트</h2>
+<ul>
+<li><strong>JWT는 암호화가 아니라 서명이다.</strong> 점(<code>.</code>)으로 나뉜 세 덩어리 중 가운데(페이로드)는 Base64라 누구나 읽는다(<a href="https://jwt.io" target="_blank" rel="noopener">jwt.io</a>에 붙여 보라). 비밀번호 같은 비밀은 넣지 않는다. 비밀키는 &quot;위조 방지&quot;에만 쓰인다.</li>
+<li><strong>인증은 컨트롤러보다 먼저.</strong> 인터셉터는 컨트롤러 메서드 매개변수를 만들기(본문 읽기·<code>@Valid</code>) <strong>전에</strong> 돈다. 그래서 토큰 없는 <code>POST</code>는 본문이 깨져 있어도 401이다(10-5에서 확인한다).</li>
+<li><strong><code>GET</code>은 비로그인 통과, 나머지는 막기.</strong> 목록·상세는 비로그인도 보지만, 로그인하면 결과가 달라진다(내 비공개 글, &quot;내가 좋아요했나&quot;). 그래서 <code>GET</code>에서 헤더가 없으면 그냥 통과시키고, <code>@LoginUser(required = false)</code>가 <code>null</code>을 받는다. <code>GET /users/me</code>처럼 로그인이 필수인 <code>GET</code>은 매개변수 해석기가 401을 던진다.</li>
+<li><strong>헤더는 있는데 틀린 토큰은 <code>GET</code>이어도 401.</strong> &quot;토큰을 보냈는데 무시당함&quot;보다 &quot;토큰이 틀렸다&quot;를 알려 주는 편이 프론트가 고치기 쉽다.</li>
+<li><strong>로그인 실패 문구를 하나로.</strong> &quot;없는 이메일입니다&quot;와 &quot;비밀번호가 틀렸습니다&quot;를 나누면 남의 가입 여부를 캐낼 수 있다.</li>
+<li><strong>로그인에는 가입의 72바이트 규칙을 걸지 않는다.</strong> 10-3에서 막은 것은 <code>encode</code>가 72바이트를 넘으면 예외를 던지기 때문이다. 로그인의 <code>matches</code>는 예외 없이 앞 72바이트만 비교해 500이 나지 않는다(<a href="../../lessons/F4-password-storage.html">F4</a>). 가입이 72바이트를 넘는 비밀번호를 받지 않으니, 그런 입력은 틀린 비밀번호와 똑같이 401로 답하면 된다. 규칙은 비밀번호를 <strong>정할 때</strong>(가입) 검사한다 — 규칙이 바뀌어도 예전 규칙으로 가입한 회원은 로그인할 수 있어야 한다. 단, 정확히 72바이트(한글 24자)로 가입한 회원은 뒤에 무엇을 붙여도 로그인된다. 앞 72바이트를 모두 알아야 하니 구멍은 아니다.</li>
+</ul>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 <strong>만들 것</strong>의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</p>
+<p>이 단계의 처리 흐름:</p>
+<ul>
+<li>있으면 passwordEncoder.matches(원문, password_hash)</li>
+<li>JwtProvider가 sub=1, exp=지금+1시간으로 서명한 토큰을 만든다</li>
+<li>AuthInterceptor: Bearer 떼기 → 서명·만료 확인 → sub=1을 요청 속성에 → @LoginUser Long userId = 1</li>
+<li>jjwt가 ExpiredJwtException → JwtProvider가 ApiException(UNAUTHORIZED)로 바꾼다</li>
+</ul>
+<details>
+<summary>Controller — HTTP 연결</summary>
+
+<p><code>AuthController.java</code>, <code>AuthInterceptor.java</code>, <code>UserController.java</code>. 매핑과 메서드의 입력·응답을 위 <strong>만들 것</strong>의 HTTP 계약과 대조한다. 이번 단계 매핑: <code>@PostMapping(&quot;/api/v1/auth/login&quot;)</code>, <code>@GetMapping(&quot;/api/v1/users/me&quot;)</code>. 변경된 메서드: <code>login</code>, <code>preHandle</code>, <code>me</code>.</p>
+<pre><code class="language-java">@PostMapping(&quot;/api/v1/auth/login&quot;)
+public ApiResponse&lt;TokenResponse&gt; login(@Valid @RequestBody LoginRequest request) {
+    return ApiResponse.ok(authService.login(request));
+}
+
+@GetMapping(&quot;/api/v1/users/me&quot;)
+public ApiResponse&lt;UserResponse&gt; me(@LoginUser Long userId) {
+    return ApiResponse.ok(userService.me(userId));
+}</code></pre>
+<p>인터셉터는 <code>OPTIONS</code> preflight를 통과시키고, <code>GET</code>에 헤더가 없으면 익명 조회를 허용한다. 다른 메서드에 토큰이 없거나 보낸 토큰이 틀리면 컨트롤러 전에 401을 던진다. 파일 전문은 아래 Controller 역할 접기에서 확인한다.</p>
+</details>
+
+<details>
+<summary>DTO — 요청·응답 필드</summary>
+
+<p><code>LoginRequest.java</code>, <code>TokenResponse.java</code>. 필드 이름·타입·검증·응답 형태를 위 <strong>만들 것</strong>과 대조한다.</p>
+<pre><code class="language-java">public record LoginRequest(
+        @NotBlank(message = &quot;이메일은 필수입니다.&quot;) String email,
+        @NotBlank(message = &quot;비밀번호는 필수입니다.&quot;) String password) {
+    public LoginRequest {
+        email = email == null ? null : email.strip().toLowerCase(Locale.ROOT);
+    }
+}
+
+public record TokenResponse(String accessToken, long expiresIn) {
+}</code></pre>
+<p>로그인 비밀번호는 <code>@NotBlank</code>만 검사한다. 가입 때의 길이·72바이트 규칙을 다시 적용하지 않는다.</p>
+</details>
+
+<details>
+<summary>Service — 처리 순서</summary>
+
+<p><code>AuthService.java</code>, <code>UserService.java</code>. 위 서버 처리 순서가 어디에서 검증·조회·상태 변경으로 이어지는지 따라간다. 변경된 메서드: <code>login</code>, <code>me</code>. 트랜잭션 경계는 아래 코드의 <code>@Transactional</code> 위치에서 확인한다.</p>
+<pre><code class="language-java">@Transactional(readOnly = true)
+public TokenResponse login(LoginRequest request) {
+    User user = userRepository.findByEmail(request.email())
+            .orElseThrow(() -&gt; new ApiException(ErrorCode.UNAUTHORIZED, LOGIN_FAILED));
+    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        throw new ApiException(ErrorCode.UNAUTHORIZED, LOGIN_FAILED);
+    }
+    return new TokenResponse(jwtProvider.issue(user.getId()), jwtProvider.validitySeconds());
+}
+
+@Transactional(readOnly = true)
+public UserResponse me(Long userId) {
+    User user = userRepository.findById(userId)
+            .orElseThrow(() -&gt; new ApiException(ErrorCode.UNAUTHORIZED));
+    return UserResponse.from(user);
+}</code></pre>
+<p>없는 이메일과 틀린 비밀번호가 같은 <code>LOGIN_FAILED</code> 문구를 쓴다. <code>me</code>는 DB에서 회원을 다시 읽어 해시가 빠진 DTO로 돌려준다.</p>
+</details>
+
+<details>
+<summary>MyBatis / Mapper — 가입에서 로그인·내 정보까지 이어가기</summary>
+
+<p>10-3의 MyBatis 선택 경로를 계속 쓸 때는 <code>findByEmail</code>과 <code>findById</code> SQL을 추가한다. <code>AuthService</code>는 첫 조회 결과가 없으면 401, 있으면 같은 <code>PasswordEncoder.matches</code>를 쓴다. <code>UserService.me</code>도 조회 결과가 없으면 401이다. 인터셉터·JWT·Controller의 계약은 JPA 경로와 같다.</p>
+<pre><code class="language-xml">&lt;select id=&quot;findByEmail&quot; resultType=&quot;org.example.board.user.User&quot;&gt;
+    SELECT id, email, password_hash, nickname, created_at
+    FROM users WHERE email = #{email}
+&lt;/select&gt;
+&lt;select id=&quot;findById&quot; resultType=&quot;org.example.board.user.User&quot;&gt;
+    SELECT id, email, password_hash, nickname, created_at
+    FROM users WHERE id = #{id}
+&lt;/select&gt;</code></pre>
+<p>MyBatis 설정의 <code>map-underscore-to-camel-case: true</code>가 <code>password_hash</code>를 <code>passwordHash</code>에 매핑한다. 아래 <strong>MyBatis 대체 구현 코드</strong>에는 JPA Repository 삭제, POJO·Mapper·Service·설정의 파일 전문이 있다. 기본 10-4 스냅샷에 적용하면 독립적으로 실행된다.</p>
+</details>
+
+<details>
+<summary>예외 처리 — 실패 응답</summary>
+
+<p><code>GlobalExceptionHandler.java</code>. 예외가 어떤 HTTP 상태와 오류 본문으로 바뀌는지 실패 계약과 대조한다.</p>
+<pre><code class="language-java">private ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; fail(ErrorCode code, String message, List&lt;FieldErrorItem&gt; errors) {
+    ResponseEntity.BodyBuilder builder = ResponseEntity.status(code.status());
+    if (code == ErrorCode.UNAUTHORIZED) {
+        builder.header(HttpHeaders.WWW_AUTHENTICATE, &quot;Bearer&quot;);
+    }
+    return builder.body(ApiResponse.fail(code, message, errors));
+}</code></pre>
+<p>토큰 파싱·로그인·<code>@LoginUser</code>에서 발생한 401이 이 한곳을 거쳐 같은 응답 틀과 <code>WWW-Authenticate</code> 헤더를 받는다.</p>
+</details>
+
+<details>
+<summary>설정·보조 코드</summary>
+
+<p><code>build.gradle</code>, <code>JwtProvider.java</code>, <code>LoginUser.java</code>, <code>LoginUserArgumentResolver.java</code>, <code>WebMvcConfig.java</code>, <code>application.yml</code>. 이 파일에서 바뀐 설정·보조 타입이 서버 흐름의 어느 단계에 필요한지 확인한다. 변경된 메서드: <code>issue</code>, <code>validitySeconds</code>, <code>parseUserId</code>, <code>supportsParameter</code>.</p>
+<pre><code class="language-java">return Jwts.builder()
+        .subject(String.valueOf(userId))
+        .issuedAt(Date.from(now))
+        .expiration(Date.from(now.plusSeconds(validitySeconds)))
+        .signWith(key, Jwts.SIG.HS256)
+        .compact();
+
+String subject = Jwts.parser().verifyWith(key).build()
+        .parseSignedClaims(token).getPayload().getSubject();</code></pre>
+<p><code>JwtProvider</code>가 발급과 서명·만료 검사를 맡고, <code>WebMvcConfig</code>가 인터셉터와 <code>LoginUserArgumentResolver</code>를 등록한다. Resolver는 요청 속성의 회원 id를 <code>@LoginUser Long</code>에 넣고, 필수인데 없으면 401을 던진다. 예시 비밀키·의존성·전체 Java 코드는 아래 설정·보조 코드 접기에서 확인한다.</p>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+<p>group = &#39;org.example&#39;
+version = &#39;0.0.1-SNAPSHOT&#39;</p>
+<p>java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}</p>
+<p>repositories {
+    mavenCentral()
+}</p>
+<p>dependencies {
+    // start.spring.io에서 고른 것: Spring Web · Spring Data JPA · Validation · MySQL Driver · Flyway Migration
+    implementation &#39;org.springframework.boot:spring-boot-starter-webmvc&#39;
+    implementation &#39;org.springframework.boot:spring-boot-starter-data-jpa&#39;
+    implementation &#39;org.springframework.boot:spring-boot-starter-validation&#39;
+    implementation &#39;org.springframework.boot:spring-boot-starter-flyway&#39;
+    // 10-3 비밀번호 해시(BCrypt) — Spring Security 전체가 아니라 암호화 모듈만
+    implementation &#39;org.springframework.security:spring-security-crypto&#39;
+    // 10-4 JWT 발급·검증(jjwt) — api는 컴파일에, 구현·JSON 처리는 실행할 때만
+    implementation &#39;io.jsonwebtoken:jjwt-api:0.13.0&#39;
+    runtimeOnly &#39;io.jsonwebtoken:jjwt-impl:0.13.0&#39;
+    runtimeOnly &#39;io.jsonwebtoken:jjwt-jackson:0.13.0&#39;
+    runtimeOnly &#39;com.mysql:mysql-connector-j&#39;
+    runtimeOnly &#39;org.flywaydb:flyway-mysql&#39;</p>
+<pre><code>testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'</code></pre>
+<p>}</p>
+<p>tasks.named(&#39;test&#39;) {
+    useJUnitPlatform()
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/board/auth/AuthController.java</summary><pre><code>package org.example.board.auth;
+
+<p>import jakarta.validation.Valid;
+import org.example.board.common.ApiResponse;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>@RestController
+public class AuthController {</p>
+<pre><code>private final AuthService authService;
+
+public AuthController(AuthService authService) {
+    this.authService = authService;
+}
+
+@PostMapping(&amp;quot;/api/v1/auth/login&amp;quot;)
+public ApiResponse&amp;lt;TokenResponse&amp;gt; login(@Valid @RequestBody LoginRequest request) {
+    return ApiResponse.ok(authService.login(request));
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/auth/AuthInterceptor.java</summary><pre><code>package org.example.board.auth;
+
+<p>import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.stereotype.Component;
+import org.springframework.web.cors.CorsUtils;
+import org.springframework.web.servlet.HandlerInterceptor;</p>
+<p>// /api/** 의 토큰을 한곳에서 확인한다 — 컨트롤러에 들어가기 전이라 본문 검증보다 먼저 401이 난다
+@Component
+public class AuthInterceptor implements HandlerInterceptor {</p>
+<pre><code>public static final String USER_ID_ATTRIBUTE = &amp;quot;loginUserId&amp;quot;;
+private static final String BEARER_PREFIX = &amp;quot;Bearer &amp;quot;;
+
+private final JwtProvider jwtProvider;
+
+public AuthInterceptor(JwtProvider jwtProvider) {
+    this.jwtProvider = jwtProvider;
+}
+
+@Override
+public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+    // 브라우저의 CORS 사전 요청(OPTIONS)은 토큰 없이 온다 — 막으면 실행 칸 전체가 CORS로 실패한다
+    if (CorsUtils.isPreFlightRequest(request)) {
+        return true;
+    }
+    String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+    if (header == null) {
+        // 조회(GET)는 비로그인도 된다. 쓰기는 토큰이 있어야 한다
+        if (HttpMethod.GET.matches(request.getMethod())) {
+            return true;
+        }
+        throw new ApiException(ErrorCode.UNAUTHORIZED);
+    }
+    if (!header.startsWith(BEARER_PREFIX)) {
+        throw new ApiException(ErrorCode.UNAUTHORIZED, &amp;quot;Authorization 헤더는 'Bearer &amp;lt;토큰&amp;gt;' 형식이어야 합니다.&amp;quot;);
+    }
+    Long userId = jwtProvider.parseUserId(header.substring(BEARER_PREFIX.length()).trim());
+    request.setAttribute(USER_ID_ATTRIBUTE, userId);
+    return true;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/auth/AuthService.java</summary><pre><code>package org.example.board.auth;
+
+<p>import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.user.User;
+import org.example.board.user.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>@Service
+public class AuthService {</p>
+<pre><code>// 없는 이메일과 틀린 비밀번호를 같은 문구로 — 어느 이메일이 가입돼 있는지 흘리지 않는다
+private static final String LOGIN_FAILED = &amp;quot;이메일 또는 비밀번호가 올바르지 않습니다.&amp;quot;;
+
+private final UserRepository userRepository;
+private final PasswordEncoder passwordEncoder;
+private final JwtProvider jwtProvider;
+
+public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtProvider jwtProvider) {
+    this.userRepository = userRepository;
+    this.passwordEncoder = passwordEncoder;
+    this.jwtProvider = jwtProvider;
+}
+
+@Transactional(readOnly = true)
+public TokenResponse login(LoginRequest request) {
+    User user = userRepository.findByEmail(request.email())
+            .orElseThrow(() -&amp;gt; new ApiException(ErrorCode.UNAUTHORIZED, LOGIN_FAILED));
+    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        throw new ApiException(ErrorCode.UNAUTHORIZED, LOGIN_FAILED);
+    }
+    return new TokenResponse(jwtProvider.issue(user.getId()), jwtProvider.validitySeconds());
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/auth/JwtProvider.java</summary><pre><code>package org.example.board.auth;
+
+<p>import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Date;</p>
+<p>import javax.crypto.SecretKey;</p>
+<p>import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;</p>
+<p>// 액세스 토큰 발급·검증 — HS256, sub = 회원 id, 유효 시간은 설정값(기본 1시간)
+@Component
+public class JwtProvider {</p>
+<pre><code>private final SecretKey key;
+private final long validitySeconds;
+
+public JwtProvider(@Value(&amp;quot;${app.jwt.secret}&amp;quot;) String secret,
+                   @Value(&amp;quot;${app.jwt.validity-seconds}&amp;quot;) long validitySeconds) {
+    this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    this.validitySeconds = validitySeconds;
+}
+
+public String issue(Long userId) {
+    Instant now = Instant.now();
+    return Jwts.builder()
+            .subject(String.valueOf(userId))
+            .issuedAt(Date.from(now))
+            .expiration(Date.from(now.plusSeconds(validitySeconds)))
+            .signWith(key, Jwts.SIG.HS256)
+            .compact();
+}
+
+public long validitySeconds() {
+    return validitySeconds;
+}
+
+// 서명이 틀리거나, 만료됐거나, 형식이 깨졌으면 모두 401 — 이유를 응답에 자세히 싣지 않는다
+public Long parseUserId(String token) {
+    try {
+        String subject = Jwts.parser().verifyWith(key).build()
+                .parseSignedClaims(token).getPayload().getSubject();
+        return Long.valueOf(subject);
+    } catch (JwtException | IllegalArgumentException e) {
+        throw new ApiException(ErrorCode.UNAUTHORIZED, &amp;quot;토큰이 올바르지 않거나 만료되었습니다.&amp;quot;);
+    }
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/auth/LoginRequest.java</summary><pre><code>package org.example.board.auth;
+
+<p>import java.util.Locale;</p>
+<p>import jakarta.validation.constraints.NotBlank;</p>
+<p>public record LoginRequest(
+        @NotBlank(message = &quot;이메일은 필수입니다.&quot;) String email,
+        @NotBlank(message = &quot;비밀번호는 필수입니다.&quot;) String password) {</p>
+<pre><code>// 가입 때와 같은 규칙으로 다듬어야 같은 회원을 찾는다
+public LoginRequest {
+    email = email == null ? null : email.strip().toLowerCase(Locale.ROOT);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/auth/LoginUser.java</summary><pre><code>package org.example.board.auth;
+
+<p>import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;</p>
+<p>// 컨트롤러 매개변수(Long userId)에 붙이면 토큰 주인의 id가 들어온다.
+// required = false면 비로그인일 때 null(목록·상세처럼 로그인이 선택인 API)
+@Target(ElementType.PARAMETER)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface LoginUser {
+    boolean required() default true;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/auth/LoginUserArgumentResolver.java</summary><pre><code>package org.example.board.auth;
+
+<p>import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.springframework.core.MethodParameter;
+import org.springframework.stereotype.Component;
+import org.springframework.web.bind.support.WebDataBinderFactory;
+import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+import org.springframework.web.method.support.ModelAndViewContainer;</p>
+<p>// @LoginUser Long userId 에 인터셉터가 꺼내 둔 회원 id를 넣는다
+@Component
+public class LoginUserArgumentResolver implements HandlerMethodArgumentResolver {</p>
+<pre><code>@Override
+public boolean supportsParameter(MethodParameter parameter) {
+    return parameter.hasParameterAnnotation(LoginUser.class) &amp;amp;&amp;amp; parameter.getParameterType().equals(Long.class);
+}
+
+@Override
+public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
+                              NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
+    Object userId = webRequest.getAttribute(AuthInterceptor.USER_ID_ATTRIBUTE, RequestAttributes.SCOPE_REQUEST);
+    if (userId == null &amp;amp;&amp;amp; parameter.getParameterAnnotation(LoginUser.class).required()) {
+        throw new ApiException(ErrorCode.UNAUTHORIZED);
+    }
+    return userId;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/auth/TokenResponse.java</summary><pre><code>package org.example.board.auth;
+
+<p>public record TokenResponse(String accessToken, long expiresIn) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 — src/main/java/org/example/board/auth/WebMvcConfig.java</summary><pre><code>package org.example.board.auth;
+
+<p>import java.util.List;</p>
+<p>import org.springframework.context.annotation.Configuration;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;</p>
+<p>@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {</p>
+<pre><code>private final AuthInterceptor authInterceptor;
+private final LoginUserArgumentResolver loginUserArgumentResolver;
+
+public WebMvcConfig(AuthInterceptor authInterceptor, LoginUserArgumentResolver loginUserArgumentResolver) {
+    this.authInterceptor = authInterceptor;
+    this.loginUserArgumentResolver = loginUserArgumentResolver;
+}
+
+@Override
+public void addInterceptors(InterceptorRegistry registry) {
+    registry.addInterceptor(authInterceptor)
+            .addPathPatterns(&amp;quot;/api/**&amp;quot;)
+            // 토큰을 받으러 오는 요청 — 여기에 토큰을 요구하면 아무도 로그인할 수 없다
+            .excludePathPatterns(&amp;quot;/api/v1/users&amp;quot;, &amp;quot;/api/v1/auth/login&amp;quot;);
+}
+
+@Override
+public void addArgumentResolvers(List&amp;lt;HandlerMethodArgumentResolver&amp;gt; resolvers) {
+    resolvers.add(loginUserArgumentResolver);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/common/GlobalExceptionHandler.java</summary><pre><code>package org.example.board.common;
+
+<p>import java.util.Comparator;
+import java.util.List;</p>
+<p>import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;</p>
+<p>import org.example.board.common.ApiResponse.FieldErrorItem;</p>
+<p>// 컨트롤러 밖으로 나온 예외를 한곳에서 공통 응답 틀로 바꾼다
+@RestControllerAdvice
+public class GlobalExceptionHandler {</p>
+<pre><code>private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+// 서비스가 던진 실패(401·403·404·409 …)
+@ExceptionHandler(ApiException.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleApi(ApiException e) {
+    return fail(e.code(), e.getMessage(), List.of());
+}
+
+// @Valid 검증 실패 — 필드별 이유를 errors에 담는다
+@ExceptionHandler(MethodArgumentNotValidException.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleInvalid(MethodArgumentNotValidException e) {
+    List&amp;lt;FieldErrorItem&amp;gt; errors = e.getBindingResult().getFieldErrors().stream()
+            .map(fe -&amp;gt; new FieldErrorItem(fe.getField(), fe.getDefaultMessage()))
+            .sorted(Comparator.comparing(FieldErrorItem::field))
+            .toList();
+    return fail(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(), errors);
+}
+
+// 쿼리·경로 값의 타입이 틀림(?page=abc, /posts/abc)
+@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+    return fail(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(),
+            List.of(new FieldErrorItem(e.getName(), &amp;quot;형식이 올바르지 않습니다.&amp;quot;)));
+}
+
+// 필수 쿼리 파라미터 없음
+@ExceptionHandler(MissingServletRequestParameterException.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleMissingParam(MissingServletRequestParameterException e) {
+    return fail(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(),
+            List.of(new FieldErrorItem(e.getParameterName(), &amp;quot;필수 값입니다.&amp;quot;)));
+}
+
+// 본문이 JSON이 아니거나 깨짐
+@ExceptionHandler(HttpMessageNotReadableException.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleBadJson(HttpMessageNotReadableException e) {
+    return fail(ErrorCode.BAD_JSON, ErrorCode.BAD_JSON.defaultMessage(), List.of());
+}
+
+// 없는 주소
+@ExceptionHandler(NoResourceFoundException.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleNoResource(NoResourceFoundException e) {
+    return fail(ErrorCode.NOT_FOUND, &amp;quot;요청한 주소가 없습니다.&amp;quot;, List.of());
+}
+
+// 주소는 있는데 메서드가 다름(DELETE /api/v1/health)
+@ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleMethod(HttpRequestMethodNotSupportedException e) {
+    return fail(ErrorCode.METHOD_NOT_ALLOWED, ErrorCode.METHOD_NOT_ALLOWED.defaultMessage(), List.of());
+}
+
+// 그 밖의 예상 못 한 예외 — 원인은 로그에만 남기고, 응답에는 내부 정보를 싣지 않는다
+@ExceptionHandler(Exception.class)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; handleUnexpected(Exception e) {
+    log.error(&amp;quot;처리하지 못한 예외&amp;quot;, e);
+    return fail(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.defaultMessage(), List.of());
+}
+
+private ResponseEntity&amp;lt;ApiResponse&amp;lt;Void&amp;gt;&amp;gt; fail(ErrorCode code, String message, List&amp;lt;FieldErrorItem&amp;gt; errors) {
+    ResponseEntity.BodyBuilder builder = ResponseEntity.status(code.status());
+    if (code == ErrorCode.UNAUTHORIZED) {
+        // 401에는 &amp;quot;어떤 방식으로 인증하라&amp;quot;를 헤더로 알린다(RFC 6750)
+        builder.header(HttpHeaders.WWW_AUTHENTICATE, &amp;quot;Bearer&amp;quot;);
+    }
+    return builder.body(ApiResponse.fail(code, message, errors));
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/board/user/UserController.java</summary><pre><code>package org.example.board.user;
+
+<p>import java.net.URI;</p>
+<p>import jakarta.validation.Valid;
+import org.example.board.auth.LoginUser;
+import org.example.board.common.ApiResponse;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>@RestController
+public class UserController {</p>
+<pre><code>private final UserService userService;
+
+public UserController(UserService userService) {
+    this.userService = userService;
+}
+
+@PostMapping(&amp;quot;/api/v1/users&amp;quot;)
+public ResponseEntity&amp;lt;ApiResponse&amp;lt;UserResponse&amp;gt;&amp;gt; signup(@Valid @RequestBody SignupRequest request) {
+    UserResponse created = userService.signup(request);
+    return ResponseEntity.created(URI.create(&amp;quot;/api/v1/users/&amp;quot; + created.id()))
+            .body(ApiResponse.created(created));
+}
+
+@GetMapping(&amp;quot;/api/v1/users/me&amp;quot;)
+public ApiResponse&amp;lt;UserResponse&amp;gt; me(@LoginUser Long userId) {
+    return ApiResponse.ok(userService.me(userId));
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/user/UserService.java</summary><pre><code>package org.example.board.user;
+
+<p>import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>@Service
+public class UserService {</p>
+<pre><code>private final UserRepository userRepository;
+private final PasswordEncoder passwordEncoder;
+
+public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    this.userRepository = userRepository;
+    this.passwordEncoder = passwordEncoder;
+}
+
+@Transactional
+public UserResponse signup(SignupRequest request) {
+    if (userRepository.existsByEmail(request.email())) {
+        throw new ApiException(ErrorCode.DUPLICATE, &amp;quot;이미 가입된 이메일입니다.&amp;quot;);
+    }
+    User user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname());
+    try {
+        userRepository.save(user);
+    } catch (DataIntegrityViolationException e) {
+        // 확인과 저장 사이에 같은 이메일이 먼저 들어간 경우 — DB의 UNIQUE가 마지막 방어선이다
+        throw new ApiException(ErrorCode.DUPLICATE, &amp;quot;이미 가입된 이메일입니다.&amp;quot;);
+    }
+    return UserResponse.from(user);
+}
+
+@Transactional(readOnly = true)
+public UserResponse me(Long userId) {
+    // 토큰은 맞는데 회원이 없다(DB를 되돌린 뒤 옛 토큰 등) — 로그인부터 다시
+    User user = userRepository.findById(userId)
+            .orElseThrow(() -&amp;gt; new ApiException(ErrorCode.UNAUTHORIZED));
+    return UserResponse.from(user);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: board-api
+  datasource:
+    # javaExperience MySQL(호스트 3306)의 project DB. 빈 DB면 Flyway가 V1으로 테이블·시드를 만든다
+    url: jdbc:mysql://localhost:13308/project?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  jpa:
+    hibernate:
+      # 스키마는 Flyway만 만든다. 엔티티가 테이블과 다르면 기동이 실패한다
+      ddl-auto: validate
+    open-in-view: false
+
+<p>app:
+  jwt:
+    # 예시용 비밀키 — 실제 서비스에서는 코드·저장소에 두지 않고 환경 변수 등으로 주입한다. HS256은 32바이트 이상
+    secret: board-api-example-secret-key-change-me-0123456789
+    validity-seconds: 3600
+</code></pre></details></p>
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/10-4.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="mybatis-대체-구현-코드"><a class="anchor" href="#mybatis-대체-구현-코드" aria-hidden="true">#</a>MyBatis 대체 구현 코드</h2>
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+<p>group = &#39;org.example&#39;
+version = &#39;0.0.1-SNAPSHOT&#39;</p>
+<p>java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}</p>
+<p>repositories {
+    mavenCentral()
+}</p>
+<p>dependencies {
+    // start.spring.io에서 고른 것: Spring Web · Spring Data JPA · Validation · MySQL Driver · Flyway Migration
+    implementation &#39;org.springframework.boot:spring-boot-starter-webmvc&#39;
+    implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;
+    implementation &#39;org.springframework.boot:spring-boot-starter-validation&#39;
+    implementation &#39;org.springframework.boot:spring-boot-starter-flyway&#39;
+    // 10-3 비밀번호 해시(BCrypt) — Spring Security 전체가 아니라 암호화 모듈만
+    implementation &#39;org.springframework.security:spring-security-crypto&#39;
+    // 10-4 JWT 발급·검증(jjwt) — api는 컴파일에, 구현·JSON 처리는 실행할 때만
+    implementation &#39;io.jsonwebtoken:jjwt-api:0.13.0&#39;
+    runtimeOnly &#39;io.jsonwebtoken:jjwt-impl:0.13.0&#39;
+    runtimeOnly &#39;io.jsonwebtoken:jjwt-jackson:0.13.0&#39;
+    runtimeOnly &#39;com.mysql:mysql-connector-j&#39;
+    runtimeOnly &#39;org.flywaydb:flyway-mysql&#39;</p>
+<pre><code>testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'</code></pre>
+<p>}</p>
+<p>tasks.named(&#39;test&#39;) {
+    useJUnitPlatform()
+}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: board-api
+  datasource:
+    # javaExperience MySQL(호스트 3306)의 project DB. 빈 DB면 Flyway가 V1으로 테이블·시드를 만든다
+    url: jdbc:mysql://localhost:13308/project?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+
+<p>app:
+  jwt:
+    # 예시용 비밀키 — 실제 서비스에서는 코드·저장소에 두지 않고 환경 변수 등으로 주입한다. HS256은 32바이트 이상
+    secret: board-api-example-secret-key-change-me-0123456789
+    validity-seconds: 3600</p>
+<p>mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/user/User.java</summary><pre><code>package org.example.board.user;
+
+<p>import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;</p>
+<p>public class User {</p>
+<pre><code>private Long id;
+
+private String email;
+
+private String passwordHash;
+
+private String nickname;
+
+private LocalDateTime createdAt;
+
+public User() {
+    // MyBatis가 SELECT 결과를 매핑할 때 사용한다.
+}
+
+public User(String email, String passwordHash, String nickname) {
+    this.email = email;
+    this.passwordHash = passwordHash;
+    this.nickname = nickname;
+    this.createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+}
+
+public Long getId() {
+    return id;
+}
+
+public void setId(Long id) {
+    this.id = id;
+}
+
+public String getEmail() {
+    return email;
+}
+
+public void setEmail(String email) {
+    this.email = email;
+}
+
+public String getPasswordHash() {
+    return passwordHash;
+}
+
+public void setPasswordHash(String passwordHash) {
+    this.passwordHash = passwordHash;
+}
+
+public String getNickname() {
+    return nickname;
+}
+
+public void setNickname(String nickname) {
+    this.nickname = nickname;
+}
+
+public LocalDateTime getCreatedAt() {
+    return createdAt;
+}
+
+public void setCreatedAt(LocalDateTime createdAt) {
+    this.createdAt = createdAt;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/user/UserService.java</summary><pre><code>package org.example.board.user;
+
+<p>import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>@Service
+public class UserService {</p>
+<pre><code>private final UserMapper userMapper;
+private final PasswordEncoder passwordEncoder;
+
+public UserService(UserMapper userMapper, PasswordEncoder passwordEncoder) {
+    this.userMapper = userMapper;
+    this.passwordEncoder = passwordEncoder;
+}
+
+@Transactional
+public UserResponse signup(SignupRequest request) {
+    if (userMapper.existsByEmail(request.email())) {
+        throw new ApiException(ErrorCode.DUPLICATE, &amp;quot;이미 가입된 이메일입니다.&amp;quot;);
+    }
+    User user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname());
+    try {
+        userMapper.insert(user);
+    } catch (DuplicateKeyException e) {
+        // 확인과 저장 사이에 같은 이메일이 먼저 들어간 경우 — DB의 UNIQUE가 마지막 방어선이다
+        throw new ApiException(ErrorCode.DUPLICATE, &amp;quot;이미 가입된 이메일입니다.&amp;quot;);
+    }
+    return UserResponse.from(user);
+}
+
+@Transactional(readOnly = true)
+public UserResponse me(Long userId) {
+    // 토큰은 맞는데 회원이 없다(DB를 되돌린 뒤 옛 토큰 등) — 로그인부터 다시
+    User user = userMapper.findById(userId);
+    if (user == null) throw new ApiException(ErrorCode.UNAUTHORIZED);
+    return UserResponse.from(user);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/auth/AuthService.java</summary><pre><code>package org.example.board.auth;
+
+<p>import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.user.User;
+import org.example.board.user.UserMapper;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>@Service
+public class AuthService {</p>
+<pre><code>// 없는 이메일과 틀린 비밀번호를 같은 문구로 — 어느 이메일이 가입돼 있는지 흘리지 않는다
+private static final String LOGIN_FAILED = &amp;quot;이메일 또는 비밀번호가 올바르지 않습니다.&amp;quot;;
+
+private final UserMapper userMapper;
+private final PasswordEncoder passwordEncoder;
+private final JwtProvider jwtProvider;
+
+public AuthService(UserMapper userMapper, PasswordEncoder passwordEncoder, JwtProvider jwtProvider) {
+    this.userMapper = userMapper;
+    this.passwordEncoder = passwordEncoder;
+    this.jwtProvider = jwtProvider;
+}
+
+@Transactional(readOnly = true)
+public TokenResponse login(LoginRequest request) {
+    User user = userMapper.findByEmail(request.email());
+    if (user == null) throw new ApiException(ErrorCode.UNAUTHORIZED, LOGIN_FAILED);
+    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        throw new ApiException(ErrorCode.UNAUTHORIZED, LOGIN_FAILED);
+    }
+    return new TokenResponse(jwtProvider.issue(user.getId()), jwtProvider.validitySeconds());
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/board/user/UserMapper.java</summary><pre><code>package org.example.board.user;
+
+<p>import org.apache.ibatis.annotations.Mapper;</p>
+<p>@Mapper
+public interface UserMapper {
+    boolean existsByEmail(String email);
+    User findByEmail(String email);
+    User findById(Long id);
+    void insert(User user);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/UserMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.board.user.UserMapper&quot;&gt;
+    &lt;select id=&quot;existsByEmail&quot; resultType=&quot;boolean&quot;&gt;
+        SELECT EXISTS(SELECT 1 FROM users WHERE email = #{email})
+    &lt;/select&gt;
+    &lt;select id=&quot;findByEmail&quot; resultType=&quot;org.example.board.user.User&quot;&gt;
+        SELECT id, email, password_hash, nickname, created_at
+        FROM users WHERE email = #{email}
+    &lt;/select&gt;
+    &lt;select id=&quot;findById&quot; resultType=&quot;org.example.board.user.User&quot;&gt;
+        SELECT id, email, password_hash, nickname, created_at
+        FROM users WHERE id = #{id}
+    &lt;/select&gt;
+    &lt;insert id=&quot;insert&quot; parameterType=&quot;org.example.board.user.User&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+        INSERT INTO users (email, password_hash, nickname, created_at)
+        VALUES (#{email}, #{passwordHash}, #{nickname}, #{createdAt})
+    &lt;/insert&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/user/UserRepository.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080
+login() { curl -s -i -X POST &quot;$BASE/api/v1/auth/login&quot; -H 'Content-Type: application/json' -d &quot;$1&quot;; echo; echo ----; }
+
+login '{&quot;email&quot;:&quot;kim@example.com&quot;,&quot;password&quot;:&quot;password1234&quot;}'        # L 로그인
+login '{&quot;email&quot;:&quot;kim@example.com&quot;,&quot;password&quot;:&quot;wrong-pass&quot;}'          # W 틀린 비밀번호
+login '{&quot;email&quot;:&quot;nobody@example.com&quot;,&quot;password&quot;:&quot;wrong-pass&quot;}'       # U 없는 이메일
+login '{&quot;email&quot;:&quot; KIM@Example.com &quot;,&quot;password&quot;:&quot;password1234&quot;}'     # K 대소문자·공백
+login '{&quot;email&quot;:&quot;kim@example.com&quot;}'                                  # V 비밀번호 빠짐
+login '{&quot;email&quot;:&quot;kim@example.com&quot;,&quot;password&quot;:&quot;가가가가가가가가가가가가가가가가가가가가가가가가가&quot;}'  # P 한글 25자(75바이트)
+
+TOKEN=$(curl -s -X POST &quot;$BASE/api/v1/auth/login&quot; -H 'Content-Type: application/json' \
+  -d '{&quot;email&quot;:&quot;kim@example.com&quot;,&quot;password&quot;:&quot;password1234&quot;}' | sed -E 's/.*&quot;accessToken&quot;:&quot;([^&quot;]+)&quot;.*/\1/')
+curl -s -i &quot;$BASE/api/v1/users/me&quot; -H &quot;Authorization: Bearer $TOKEN&quot;; echo   # M 내 정보
+curl -s -i &quot;$BASE/api/v1/users/me&quot;; echo                                     # M0 헤더 없음
+curl -s -i &quot;$BASE/api/v1/users/me&quot; -H 'Authorization: Token abc'; echo      # M1 Bearer 아님
+
+# M5 — preflight(브라우저가 Authorization을 싣기 전에 묻는 요청)는 토큰 없이도 통과해야 한다
+curl -i -X OPTIONS &quot;$BASE/api/v1/users/me&quot; -H 'Origin: http://localhost:3000' \
+  -H 'Access-Control-Request-Method: GET' -H 'Access-Control-Request-Headers: authorization'</code></pre></details>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. M2(서명 틀림)는 다른 키로, M3(만료)는 예시 키로 미리 서명해 둔 토큰이다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="L" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>L · 로그인</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.status&quot;,&quot;equals&quot;:200},{&quot;path&quot;:&quot;$.data.accessToken&quot;,&quot;matches&quot;:&quot;^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$&quot;},{&quot;path&quot;:&quot;$.data.expiresIn&quot;,&quot;equals&quot;:3600}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="W" data-method="POST" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>W · 틀린 비밀번호</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;wrong-pass&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;wrong-pass&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:401,&quot;headers&quot;:{&quot;WWW-Authenticate&quot;:{&quot;matches&quot;:&quot;^Bearer&quot;}},&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;UNAUTHORIZED&quot;},{&quot;path&quot;:&quot;$.data&quot;,&quot;type&quot;:&quot;null&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="U" data-method="POST" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>U · 없는 이메일</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;nobody@example.com&quot;,
+  &quot;password&quot;: &quot;wrong-pass&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;nobody@example.com&quot;,
+  &quot;password&quot;: &quot;wrong-pass&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:401,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;UNAUTHORIZED&quot;},{&quot;path&quot;:&quot;$.message&quot;,&quot;equals&quot;:&quot;{{W.body.message}}&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="K" data-method="POST" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>K · 대소문자·공백만 다른 이메일</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot; KIM@Example.com &quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot; KIM@Example.com &quot;,
+  &quot;password&quot;: &quot;password1234&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.accessToken&quot;,&quot;type&quot;:&quot;string&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="V" data-method="POST" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>V · 비밀번호 빠짐</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;kim@example.com&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;kim@example.com&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;},{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;password&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="P" data-method="POST" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>P · 한글 25자 비밀번호(75바이트)</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C9: {&quot;status&quot;:401,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;UNAUTHORIZED&quot;},{&quot;path&quot;:&quot;$.message&quot;,&quot;equals&quot;:&quot;{{W.body.message}}&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="V1" data-method="POST" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>V1 · 빈 객체</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{}</pre></dd><dt>Expected result</dt><dd><pre>C10: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;email&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="V2" data-method="POST" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>V2 · 둘 다 빈 문자열</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;&quot;,
+  &quot;password&quot;: &quot;&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;&quot;,
+  &quot;password&quot;: &quot;&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C10: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;email&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="V3" data-method="POST" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>V3 · 이메일 null</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: null,
+  &quot;password&quot;: &quot;password1234&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: null,
+  &quot;password&quot;: &quot;password1234&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C10: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;email&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="V4" data-method="POST" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>V4 · 비밀번호 공백만</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;   &quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: &quot;   &quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C10: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;password&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="V5" data-method="POST" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>V5 · 깨진 JSON</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="application/json" value="application/json" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">{&quot;email&quot;:</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Content-Type&quot;: &quot;application/json&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{&quot;email&quot;:</pre></dd><dt>Expected result</dt><dd><pre>C11: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;BAD_JSON&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="V6" data-method="POST" data-request-index="11" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>V6 · 비밀번호 자리에 배열</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/v1/auth/login" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: [
+    &quot;password1234&quot;
+  ]
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;kim@example.com&quot;,
+  &quot;password&quot;: [
+    &quot;password1234&quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C11: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;BAD_JSON&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="M" data-method="GET" data-request-index="12" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>M · 내 정보</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/users/me" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer {{L.body.data.accessToken}}" value="" placeholder="연습용 토큰을 직접 입력" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer {{L.body.data.accessToken}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.id&quot;,&quot;equals&quot;:1},{&quot;path&quot;:&quot;$.data.email&quot;,&quot;equals&quot;:&quot;kim@example.com&quot;},{&quot;path&quot;:&quot;$.data.nickname&quot;,&quot;equals&quot;:&quot;김자바&quot;},{&quot;path&quot;:&quot;$.data.passwordHash&quot;,&quot;exists&quot;:false}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="M0" data-method="GET" data-request-index="13" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>M0 · 헤더 없음</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/users/me" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:401,&quot;headers&quot;:{&quot;WWW-Authenticate&quot;:{&quot;matches&quot;:&quot;^Bearer&quot;}},&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;UNAUTHORIZED&quot;},{&quot;path&quot;:&quot;$.errors&quot;,&quot;equals&quot;:[]},{&quot;path&quot;:&quot;$.data&quot;,&quot;type&quot;:&quot;null&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="M1" data-method="GET" data-request-index="14" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>M1 · Bearer 아님</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/users/me" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Token abc" value="Token abc" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Token abc&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:401,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;UNAUTHORIZED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="M2" data-method="GET" data-request-index="15" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>M2 · 서명 틀림</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/users/me" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjQxMDI0NDQ4MDB9.8tkf3cuMdbvWnSNMb5Eg3Jl6T9XEBPEvwmdHDayGx6k" value="Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjQxMDI0NDQ4MDB9.8tkf3cuMdbvWnSNMb5Eg3Jl6T9XEBPEvwmdHDayGx6k" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjQxMDI0NDQ4MDB9.8tkf3cuMdbvWnSNMb5Eg3Jl6T9XEBPEvwmdHDayGx6k&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:401,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;UNAUTHORIZED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="M3" data-method="GET" data-request-index="16" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>M3 · 만료(2026-01-01 발급, 1시간)</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/users/me" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjE3NjcyMjkyMDB9.O9UEF68q_1e6oiEif_yQxyarpM7zGJeCcOU-YMxzlrE" value="Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjE3NjcyMjkyMDB9.O9UEF68q_1e6oiEif_yQxyarpM7zGJeCcOU-YMxzlrE" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjE3NjcyMjkyMDB9.O9UEF68q_1e6oiEif_yQxyarpM7zGJeCcOU-YMxzlrE&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:401,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;UNAUTHORIZED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="M4" data-method="GET" data-request-index="17" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>M4 · JWT 모양이 아님</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/v1/users/me" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer not.a.jwt" value="Bearer not.a.jwt" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer not.a.jwt&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:401,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;UNAUTHORIZED&quot;}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 L</td>
+<td><code>200</code>, <code>data.accessToken</code>이 <code>xxx.yyy.zzz</code> 모양, <code>data.expiresIn</code>=<code>3600</code></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 W·U</td>
+<td>둘 다 <code>401 UNAUTHORIZED</code>, <code>WWW-Authenticate: Bearer</code>, <strong><code>message</code>가 서로 같다</strong></td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 K</td>
+<td><code>200</code> — 가입 때와 같은 규칙으로 이메일을 다듬어 찾는다</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 V</td>
+<td><code>400 VALIDATION_FAILED</code>, <code>errors</code>에 <code>password</code></td>
+</tr>
+<tr>
+<td>C5</td>
+<td>요청 M</td>
+<td><code>200</code>, <code>data</code> = <code>{id: 1, email: kim@example.com, nickname: 김자바}</code>, 해시 없음</td>
+</tr>
+<tr>
+<td>C6</td>
+<td>요청 M0</td>
+<td><code>401 UNAUTHORIZED</code>, <code>WWW-Authenticate: Bearer</code>, <code>errors</code>=<code>[]</code>, <code>data</code>=<code>null</code></td>
+</tr>
+<tr>
+<td>C7</td>
+<td>요청 M1~M4</td>
+<td>모두 <code>401 UNAUTHORIZED</code> — Bearer 아님·서명 틀림·만료·모양 깨짐</td>
+</tr>
+<tr>
+<td>C8</td>
+<td>요청 M5 (curl)</td>
+<td>토큰 없는 preflight가 <code>200</code>, <code>Access-Control-Allow-Headers</code>에 <code>authorization</code></td>
+</tr>
+<tr>
+<td>C9</td>
+<td>요청 P</td>
+<td><code>401 UNAUTHORIZED</code>, <code>message</code>가 요청 W와 같다 — 72바이트를 넘는 비밀번호도 틀린 비밀번호다. <code>500</code>이면 로그인에서 <code>encode</code>를 부르고 있다</td>
+</tr>
+<tr>
+<td>C10</td>
+<td>V1 / V2 / V3 / V4</td>
+<td>빈 객체·둘 다 빈 문자열은 <code>errors</code>에 <code>email</code>·<code>password</code> 둘 다, 이메일 <code>null</code>은 <code>email</code>, 비밀번호 공백만은 <code>password</code> — 모두 <code>400 VALIDATION_FAILED</code>(<code>401</code>·<code>500</code>이 아니다)</td>
+</tr>
+<tr>
+<td>C11</td>
+<td>V5 / V6</td>
+<td>깨진 JSON·비밀번호 자리에 배열 → <code>400 BAD_JSON</code></td>
+</tr>
+<tr>
+<td>R1</td>
+<td>토큰 확인 위치</td>
+<td>컨트롤러마다 헤더를 읽지 않고 인터셉터 한곳에서 확인한다. 컨트롤러는 <code>@LoginUser</code>로 id만 받는다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>비밀키</td>
+<td>코드에 문자열로 박지 않고 설정(<code>app.jwt.secret</code>)에서 읽는다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>예외</td>
+<td>jjwt의 예외(<code>JwtException</code>)를 그대로 흘리지 않고 401 <code>ApiException</code>으로 바꾼다(그대로 두면 500)</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>비교</td>
+<td>비밀번호는 <code>passwordEncoder.matches(원문, 해시)</code>로 비교한다(다시 해시해서 문자열 비교하지 않는다 — 솔트 때문에 매번 다르고, 한글 25자 같은 72바이트 초과 입력은 <code>encode</code>가 예외를 던져 500이 된다)</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../lessons/F5-jwt-anatomy.html">F5 JWT 해부</a> — 토큰의 세 덩어리, 서명·만료 검증이 실패하는 모습</li>
+<li><a href="../../lessons/F2-auth-token.html">F2 인증과 토큰</a> — 로그인 상태를 서버가 아는 법</li>
+<li><a href="../../lessons/F3-cors.html">F3 CORS</a> — preflight가 토큰 없이 오는 이유</li>
+<li><a href="../../lessons/B8-annotations.html">B8 어노테이션은 무엇인가</a> — <code>@LoginUser</code>를 직접 만든다</li>
+<li><a href="../../lessons/F4-password-storage.html">F4 비밀번호 저장</a> — <code>matches</code>가 앞 72바이트만 비교하는 이유</li>
+<li><a href="../../docs/knowledge/S13-jwt-oauth2.html">S13 JWT·OAuth2</a> — JWT 구조, 서명, 만료</li>
+<li><a href="../../docs/knowledge/S12-security-architecture.html">S12 Spring Security 구조</a> — 더 깊이</li>
+<li><a href="../ch1-create-post/1-6-token-auth.html">1-6. 토큰 인증</a> — 같은 인터셉터 방식(DB 토큰 버전)</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 파일 구성</summary>
+
+<p><code>org.example.board.auth</code> 패키지에 둔다.</p>
+<ul>
+<li><code>JwtProvider</code>(<code>@Component</code>) — <code>issue(Long userId)</code>, <code>parseUserId(String token)</code></li>
+<li><code>LoginUser</code>(애노테이션) — <code>boolean required() default true;</code></li>
+<li><code>AuthInterceptor</code>(<code>HandlerInterceptor</code>) — 헤더 확인 → <code>request.setAttribute(&quot;loginUserId&quot;, id)</code></li>
+<li><code>LoginUserArgumentResolver</code>(<code>HandlerMethodArgumentResolver</code>) — 속성에서 id를 꺼내 매개변수에 넣는다</li>
+<li><code>WebMvcConfig</code>(<code>WebMvcConfigurer</code>) — 인터셉터·해석기 등록</li>
+<li><code>AuthController</code>·<code>AuthService</code>·<code>LoginRequest</code>·<code>TokenResponse</code></li>
+</ul>
+<p><code>GET /users/me</code>는 <code>UserController</code>에 더한다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — jjwt 0.13 사용법</summary>
+
+<pre><code class="language-java">SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+
+String token = Jwts.builder()
+        .subject(String.valueOf(userId))
+        .issuedAt(Date.from(now))
+        .expiration(Date.from(now.plusSeconds(3600)))
+        .signWith(key, Jwts.SIG.HS256)
+        .compact();
+
+String sub = Jwts.parser().verifyWith(key).build()
+        .parseSignedClaims(token).getPayload().getSubject();</code></pre>
+<p><code>parseSignedClaims</code>는 서명이 틀리면 <code>SignatureException</code>, 만료면 <code>ExpiredJwtException</code>, 모양이 깨지면 <code>MalformedJwtException</code>을 던진다. 모두 <code>JwtException</code>의 자식이다. 이것을 잡아 <code>ApiException(UNAUTHORIZED)</code>로 바꾼다.</p>
+<p>jjwt-jackson은 Jackson <strong>2</strong>(<code>com.fasterxml.jackson.core:jackson-databind</code>)를 따로 끌어온다. Boot 4.1.1은 Jackson 3(<code>tools.jackson</code>)을 쓰지만 패키지가 달라서 둘이 함께 있어도 충돌하지 않는다(실측: 2.21.5와 3.1.5가 함께 올라오고 로그인·검증 모두 정상).</p>
+</details>
+
+<details>
+<summary>힌트 3 — 비밀키가 짧으면</summary>
+
+<p><code>app.jwt.secret</code>을 <code>short-secret</code>처럼 짧게 두면 앱이 뜨지 않는다.</p>
+<pre><code class="language-text">Caused by: io.jsonwebtoken.security.WeakKeyException: The specified key byte array is 96 bits which is not secure enough for any JWT HMAC-SHA algorithm.  The JWT JWA Specification (RFC 7518, Section 3.2) states that keys used with HMAC-SHA algorithms MUST have a size &gt;= 256 bits (the key size must be greater than or equal to the hash output size).</code></pre>
+<p>HS256은 키가 256비트(32바이트) 이상이어야 한다.</p>
+</details>
+
+<details>
+<summary>힌트 4 — 인터셉터 뼈대</summary>
+
+<pre><code class="language-java">public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+    if (CorsUtils.isPreFlightRequest(request)) return true;          // preflight 통과
+    String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+    if (header == null) {
+        if (HttpMethod.GET.matches(request.getMethod())) return true; // 비로그인 조회
+        throw new ApiException(ErrorCode.UNAUTHORIZED);
+    }
+    if (!header.startsWith(&quot;Bearer &quot;)) throw new ApiException(ErrorCode.UNAUTHORIZED);
+    request.setAttribute(&quot;loginUserId&quot;, jwtProvider.parseUserId(header.substring(7).trim()));
+    return true;
+}</code></pre>
+<p>등록할 때 <code>.excludePathPatterns(&quot;/api/v1/users&quot;, &quot;/api/v1/auth/login&quot;)</code> — 토큰을 받으러 오는 요청에 토큰을 요구하면 아무도 로그인할 수 없다.</p>
+<p>인터셉터에서 던진 예외도 <code>@RestControllerAdvice</code>가 받는다(인터셉터는 DispatcherServlet 안에서 돈다). 401 응답에 <code>WWW-Authenticate</code> 헤더를 붙이는 일은 전역 처리기의 <code>fail(...)</code>에서 <code>UNAUTHORIZED</code>일 때 하면 한곳으로 모인다.</p>
+</details>
+
+<details>
+<summary>더 깊이 — Spring Security로 옮긴다면</summary>
+
+<p>같은 일을 Security에서는 <code>SecurityFilterChain</code> + <code>OncePerRequestFilter</code>(JWT 필터)로 한다. 인터셉터보다 앞(서블릿 필터)에서 돌고, <code>@AuthenticationPrincipal</code>이 <code>@LoginUser</code> 역할을 한다. 401·403 응답 모양은 <code>AuthenticationEntryPoint</code>·<code>AccessDeniedHandler</code>로 맞춘다. 실무 코드에서 이 이름들을 보면 이 단계에서 만든 것의 자리라고 생각하면 된다. 이 장은 Security 없이 끝까지 간다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="10-5-create-post.html">10-5. 게시글 작성</a> — 토큰 주인을 작성자로 글을 저장한다. 처음으로 JPA 연관관계(작성자·태그)를 쓴다.</p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 10-4. 로그인과 JWT — 인터셉터와 @LoginUser, 내 정보\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch10-project/10-4-login-jwt.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity project -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="10-3-signup.html">← 이전 10-3. 회원 가입 — BCrypt 해시와 이메일 중복 409</a><a href="10-5-create-post.html">다음 → 10-5. 게시글 작성 — JPA, 검증 규칙·태그·작성자는 토큰 주인</a></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+package org.example.batch;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+
+// 15-6 배치 실행 기록 조회와 "실패한 날만 다시 돌리기"
+@RestController
+public class JobRunController {
+
+    private final JobRunRepository jobRunRepository;
+    private final JobCatalog jobCatalog;
+    private final JobLauncher jobLauncher;
+    private final JobRetryGate retryGate;
+
+    public JobRunController(JobRunRepository jobRunRepository, JobCatalog jobCatalog, JobLauncher jobLauncher, JobRetryGate retryGate) {
+        this.jobRunRepository = jobRunRepository;
+        this.jobCatalog = jobCatalog;
+        this.jobLauncher = jobLauncher;
+        this.retryGate = retryGate;
+    }
+
+    @GetMapping("/api/admin/jobs/runs")
+    public List<JobRunResponse> runs(@RequestParam(required = false) String job,
+                                     @RequestParam(required = false) @Pattern(regexp = "RUNNING|SUCCESS|FAILED",
+                                             message = "status는 RUNNING, SUCCESS, FAILED 중 하나여야 합니다.") String status,
+                                     @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+                                     @LoginMember AuthenticatedMember me) {
+        AdminGuard.requireAdmin(me);
+        if (job != null && !jobCatalog.exists(job)) {
+            throw new InvalidJobParameterException("job", "job은 " + jobCatalog.names() + " 중 하나여야 합니다.");
+        }
+        return jobRunRepository.search(job, status, PageRequest.of(0, size)).stream()
+                .map(JobRunResponse::of)
+                .toList();
+    }
+
+    // 날마다 따로 돈다 — 한 날이 또 실패해도 다음 날은 계속 돌린다. 이미 성공한 날(마지막 실행이 SUCCESS)은 건너뛴다
+    @PostMapping("/api/admin/jobs/{job}/retry-failed")
+    public RetryResponse retryFailed(@PathVariable String job, @LoginMember AuthenticatedMember me) {
+        AdminGuard.requireAdmin(me);
+        if (!jobCatalog.exists(job)) {
+            throw new JobNotFoundException(job);
+        }
+        List<RetryResponse.Retried> retried = new ArrayList<>();
+        for (LocalDate date : jobRunRepository.findFailedDates(job)) {
+            retryGate.runIfFree(job, date, () -> {
+                JobRun failed = jobRunRepository.findFirstByJobNameAndRunDateOrderByIdDesc(job, date).orElseThrow();
+                if (!JobRun.FAILED.equals(failed.getStatus())) {
+                    return; // 선점을 기다리는 동안 다른 요청이 복구했다.
+                }
+                String error = null;
+                AtomicReference<Long> runId = new AtomicReference<>();
+                try {
+                    jobLauncher.launch(job, date, JobRunner.RETRY, failed.getReferenceAt(), runId::set);
+                } catch (RuntimeException e) {
+                    error = e.getClass().getSimpleName() + ": " + e.getMessage();
+                }
+                JobRun own = jobRunRepository.findById(runId.get()).orElseThrow();
+                retried.add(new RetryResponse.Retried(date, own.getStatus(), own.getId(), error));
+            });
+        }
+        return new RetryResponse(job, retried);
+    }
+}

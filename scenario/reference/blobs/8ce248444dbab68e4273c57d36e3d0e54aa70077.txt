@@ -1,0 +1,70 @@
+package org.example.post;
+
+import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@Transactional
+class PostReplaceControllerTest {
+    @Autowired MockMvc mockMvc;
+    @Autowired ObjectMapper objectMapper;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired EntityManager em;
+
+    @Test
+    void replacesPostAndTagsTogether() throws Exception {
+        var created = mockMvc.perform(post("/api/posts")
+                        .header("Authorization", "Bearer tok-kimjava")
+                        .contentType("application/json")
+                        .content("{\"boardSlug\":\"dev\",\"title\":\"이전\",\"content\":\"이전 본문\",\"tags\":[\"spring\"],\"visibility\":\"FOLLOWERS\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        long id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+
+        mockMvc.perform(put("/api/posts/{id}", id)
+                        .header("Authorization", "Bearer tok-kimjava")
+                        .contentType("application/json")
+                        .content("{\"title\":\"[PUT실습] 새 제목\",\"content\":\"수정한 본문\",\"tags\":[\"java\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("[PUT실습] 새 제목"))
+                .andExpect(jsonPath("$.visibility").value("PUBLIC"))
+                .andExpect(jsonPath("$.tags[0]").value("java"));
+        em.flush();
+        assertEquals("PUBLIC", jdbc.queryForObject("SELECT visibility FROM post WHERE id=?", String.class, id));
+        assertEquals("java", jdbc.queryForObject("SELECT t.name FROM post_tag pt JOIN tag t ON t.id=pt.tag_id WHERE pt.post_id=?", String.class, id));
+
+        mockMvc.perform(put("/api/posts/{id}", id)
+                        .header("Authorization", "Bearer tok-kimjava")
+                        .contentType("application/json").content("{\"title\":\"제목만\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/posts/{id}", id)
+                        .header("Authorization", "Bearer tok-kimjava"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value("수정한 본문"));
+        mockMvc.perform(put("/api/posts/{id}", id)
+                        .header("Authorization", "Bearer tok-lee")
+                        .contentType("application/json").content("{\"title\":\"남의 글\",\"content\":\"본문\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/posts/{id}", id)
+                        .contentType("application/json").content("{\"title\":\"제목\",\"content\":\"본문\"}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(put("/api/posts/999999")
+                        .header("Authorization", "Bearer tok-kimjava")
+                        .contentType("application/json").content("{\"title\":\"제목\",\"content\":\"본문\"}"))
+                .andExpect(status().isNotFound());
+    }
+}

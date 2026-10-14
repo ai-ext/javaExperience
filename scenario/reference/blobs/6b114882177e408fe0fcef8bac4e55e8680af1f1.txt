@@ -1,0 +1,61 @@
+package org.example.social;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+public class RelationController {
+
+    private final RelationService relationService;
+
+    public RelationController(RelationService relationService) {
+        this.relationService = relationService;
+    }
+
+    // 인증 필요 없음
+    @GetMapping("/api/members/{id}/mutuals")
+    public List<Long> mutuals(@PathVariable Long id) {
+        return relationService.mutuals(id);
+    }
+
+    // GET이지만 "내 것" 엔드포인트라 인증 필수
+    @GetMapping("/api/me/follow-back")
+    public List<Long> followBack(@LoginMember AuthenticatedMember me) {
+        return relationService.followBack(requireLogin(me).id());
+    }
+
+    @GetMapping("/api/me/suggestions")
+    public List<SuggestionResponse> suggestions(@RequestParam(value = "limit", required = false) String limit,
+                                                @LoginMember AuthenticatedMember me) {
+        return relationService.suggestions(requireLogin(me).id(), parseLimit(limit));
+    }
+
+    private AuthenticatedMember requireLogin(AuthenticatedMember me) {
+        if (me == null) {
+            throw new AuthenticationRequiredException("인증이 필요합니다.");
+        }
+        return me;
+    }
+
+    // 생략만 기본값을 쓴다. 빈 값과 범위 밖 숫자는 400이다.
+    private int parseLimit(String raw) {
+        if (raw == null) return 5;
+        if (!raw.matches("[0-9]+")) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit은 1~20이어야 합니다.");
+        try {
+            int value = Integer.parseInt(raw);
+            if (value >= 1 && value <= 20) return value;
+        } catch (NumberFormatException ignored) {
+            // int 범위를 넘는 긴 숫자도 400으로 돌린다.
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit은 1~20이어야 합니다.");
+    }
+}

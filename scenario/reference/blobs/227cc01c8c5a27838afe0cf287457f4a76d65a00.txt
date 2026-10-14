@@ -1,0 +1,58 @@
+package org.example.social;
+
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.Repository;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+
+// 8-3 관계 쿼리 — follow를 자기 자신과 JOIN해서 관계를 찾는다.
+// "없는 것"(아직 안 팔로우)은 NOT EXISTS로 찾는다. NOT IN은 서브쿼리에 NULL이 하나라도 끼면 결과가 통째로
+// 비는 함정이 있어 쓰지 않는다(이 스키마는 NOT NULL이라 당장은 안전하지만 습관으로).
+public interface RelationQueryRepository extends Repository<Follow, Long> {
+
+    // 서로 팔로우 — uk_follow(follower_id, followee_id)로 내 팔로잉을 찾고, 역방향 확인도 같은 인덱스를 탄다
+    @Query(nativeQuery = true, value = """
+            SELECT f.followee_id
+              FROM follow f
+             WHERE f.follower_id = :memberId
+               AND EXISTS (SELECT 1 FROM follow r
+                            WHERE r.follower_id = f.followee_id AND r.followee_id = :memberId)
+             ORDER BY f.followee_id
+            """)
+    List<Long> findMutualIds(@Param("memberId") Long memberId);
+
+    // 나를 팔로우하지만 내가 안 하는 활성 회원 — ix_follow_followee(followee_id, follower_id)를 탄다
+    @Query(nativeQuery = true, value = """
+            SELECT f.follower_id
+              FROM follow f
+              JOIN member m ON m.id = f.follower_id
+             WHERE f.followee_id = :memberId
+               AND m.member_status = 'ACTIVE'
+               AND NOT EXISTS (SELECT 1 FROM follow r
+                                WHERE r.follower_id = :memberId AND r.followee_id = f.follower_id)
+             ORDER BY f.follower_id
+            """)
+    List<Long> findFollowBackIds(@Param("memberId") Long memberId);
+
+    // 친구의 친구 — 내가 팔로우하는 사람(f1)이 팔로우하는 사람(f2) 중 나 아님·아직 안 팔로우·차단 관계 없음·활성.
+    // 겹치는 사람 수 = 그 사람을 팔로우하는 내 팔로잉 수
+    @Query(nativeQuery = true, value = """
+            SELECT m.id AS memberId, m.nickname AS nickname, COUNT(*) AS mutualCount
+              FROM follow f1
+              JOIN follow f2 ON f2.follower_id = f1.followee_id
+              JOIN member m ON m.id = f2.followee_id
+             WHERE f1.follower_id = :memberId
+               AND f2.followee_id <> :memberId
+               AND m.member_status = 'ACTIVE'
+               AND NOT EXISTS (SELECT 1 FROM follow x
+                                WHERE x.follower_id = :memberId AND x.followee_id = f2.followee_id)
+               AND NOT EXISTS (SELECT 1 FROM member_block b
+                                WHERE (b.blocker_id = :memberId AND b.blocked_id = f2.followee_id)
+                                   OR (b.blocked_id = :memberId AND b.blocker_id = f2.followee_id))
+             GROUP BY m.id, m.nickname
+             ORDER BY mutualCount DESC, m.id ASC
+             LIMIT :limit
+            """)
+    List<SuggestionRow> findSuggestions(@Param("memberId") Long memberId, @Param("limit") int limit);
+}

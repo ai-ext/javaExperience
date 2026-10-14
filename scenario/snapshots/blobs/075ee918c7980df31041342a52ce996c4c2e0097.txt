@@ -1,0 +1,59 @@
+package org.example.bookmark;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
+import java.util.List;
+import tools.jackson.databind.JsonNode;
+
+@RestController
+@RequestMapping("/api/me/bookmark-folders")
+public class BookmarkFolderController {
+
+    private final BookmarkFolderService folderService;
+
+    public BookmarkFolderController(BookmarkFolderService folderService) {
+        this.folderService = folderService;
+    }
+
+    // GET이지만 "내 것" 엔드포인트라 인증 필수(인터셉터는 GET+헤더 없음을 통과시키므로 여기서 확인)
+    @GetMapping
+    public List<BookmarkFolderSummaryResponse> list(@LoginMember AuthenticatedMember me) {
+        if (me == null) {
+            throw new AuthenticationRequiredException("인증이 필요합니다.");
+        }
+        return folderService.list(me);
+    }
+
+    @PostMapping
+    public ResponseEntity<BookmarkFolderResponse> create(@LoginMember AuthenticatedMember me,
+                                                         @RequestBody JsonNode request) {
+        BookmarkFolderResponse created = folderService.create(me, BookmarkFolderRequest.from(request));
+        return ResponseEntity.created(URI.create("/api/me/bookmark-folders/" + created.id())).body(created);
+    }
+
+    @PatchMapping("/{id}")
+    public BookmarkFolderResponse rename(@PathVariable Long id, @LoginMember AuthenticatedMember me,
+                                         @RequestBody JsonNode request) {
+        return folderService.rename(me, id, BookmarkFolderRequest.from(request));
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id, @LoginMember AuthenticatedMember me) {
+        folderService.delete(me, id);
+    }
+}

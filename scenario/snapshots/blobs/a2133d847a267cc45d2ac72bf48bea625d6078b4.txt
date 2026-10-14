@@ -1,0 +1,68 @@
+package org.example.comment;
+
+import org.example.auth.AuthenticatedMember;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+// 실제 트랜잭션을 여러 스레드에서 동시에 실행한다. 테스트 자체에는 @Transactional을 붙이지 않는다.
+@SpringBootTest
+@AutoConfigureMockMvc
+class CommentConcurrentDeleteTest {
+    @Autowired CommentService comments;
+    @Autowired JdbcTemplate jdbc;
+
+    @Test
+    void duplicateDeletesOnlyDecreaseCountOnce() throws InterruptedException {
+        AuthenticatedMember author = new AuthenticatedMember(2L, "김자바", "USER");
+        Long id = comments.create(3L, author, new CommentCreateRequest("동시 삭제 검증", null)).getId();
+        int before = jdbc.queryForObject("SELECT comment_count FROM post WHERE id = 3", Integer.class);
+        int parallel = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(parallel);
+        CountDownLatch ready = new CountDownLatch(parallel);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(parallel);
+        List<String> results = new CopyOnWriteArrayList<>();
+        for (int i = 0; i < parallel; i++) {
+            pool.submit(() -> {
+                try {
+                    ready.countDown();
+                    start.await();
+                    comments.delete(id, author);
+                    results.add("deleted");
+                } catch (CommentNotFoundException e) {
+                    results.add("not_found");
+                } catch (Exception e) {
+                    results.add(e.getClass().getSimpleName());
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+        boolean allReady = ready.await(10, TimeUnit.SECONDS);
+        start.countDown();
+        assertTrue(allReady, "모든 삭제 요청이 출발 전에 준비돼야 한다");
+        assertTrue(done.await(30, TimeUnit.SECONDS), "모든 삭제 요청이 끝나야 한다");
+        pool.shutdown();
+
+        assertEquals(1, results.stream().filter("deleted"::equals).count(), results.toString());
+        assertEquals(parallel - 1, results.stream().filter("not_found"::equals).count(), results.toString());
+        int after = jdbc.queryForObject("SELECT comment_count FROM post WHERE id = 3", Integer.class);
+        int live = jdbc.queryForObject("SELECT COUNT(*) FROM comment WHERE post_id = 3 AND deleted_at IS NULL", Integer.class);
+        assertEquals(before - 1, after);
+        assertEquals(live, after, "댓글 수와 실제 미삭제 행 수가 같아야 한다");
+        assertEquals(1, jdbc.queryForObject("SELECT deleted_at IS NOT NULL FROM comment WHERE id = ?", Integer.class, id));
+    }
+}

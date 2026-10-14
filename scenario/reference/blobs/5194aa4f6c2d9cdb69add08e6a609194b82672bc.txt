@@ -1,0 +1,31 @@
+package org.example.batch;
+
+import org.example.post.Post;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.Repository;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+public interface ScheduledPublishRepository extends Repository<Post, Long> {
+
+    // SCHEDULED이고 예약 시각이 기준 시각 "이하"(그 시각이 되면 발행)인 글 — 인덱스 (status, publish_at)
+    @Query("""
+            SELECT p FROM Post p
+             WHERE p.status = 'SCHEDULED' AND p.publishAt <= :at AND p.deletedAt IS NULL
+             ORDER BY p.publishAt ASC, p.id ASC
+            """)
+    List<Post> findDue(@Param("at") LocalDateTime at, Pageable pageable);
+
+    // 동시 수동·정기 실행에서도 실제로 상태를 바꾼 요청만 1을 받는다.
+    @Modifying
+    @Query("""
+            UPDATE Post p SET p.status = 'PUBLISHED', p.publishedAt = p.publishAt, p.updatedAt = :now
+             WHERE p.id = :id AND p.status = 'SCHEDULED'
+               AND p.publishAt <= :at AND p.deletedAt IS NULL
+            """)
+    int publishIfDue(@Param("id") Long id, @Param("at") LocalDateTime at, @Param("now") LocalDateTime now);
+}

@@ -1,0 +1,58 @@
+package org.example.admin;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import org.example.post.InvalidParametersException;
+import tools.jackson.databind.JsonNode;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public record SuspensionRequest(
+        @NotNull(message = "정지 일수를 적어 주세요.")
+        @Min(value = 1, message = "정지는 1일 이상입니다.")
+        @Max(value = 30, message = "정지는 30일까지입니다.")
+        Integer days,
+
+        @NotBlank(message = "정지 사유를 적어 주세요.")
+        @Size(min = 2, max = 200, message = "정지 사유는 2~200자입니다.")
+        String reason
+) {
+    public SuspensionRequest {
+        if (reason != null) reason = reason.strip();
+    }
+
+    public static Parsed parse(JsonNode body) {
+        if (body == null || !body.isObject()) {
+            throw new InvalidParametersException(Map.of("body", "JSON 객체가 필요합니다."));
+        }
+        Map<String, String> errors = new LinkedHashMap<>();
+        Integer days = days(body.get("days"), errors);
+        String reason = reason(body.get("reason"), errors);
+        return new Parsed(new SuspensionRequest(days, reason), Map.copyOf(errors));
+    }
+
+    public record Parsed(SuspensionRequest request, Map<String, String> errors) {
+    }
+
+    private static Integer days(JsonNode value, Map<String, String> errors) {
+        if (value == null || value.isNull()) return null;
+        if (!value.isIntegralNumber() || !value.canConvertToInt()) {
+            errors.put("days", "days는 정수여야 합니다.");
+            return null;
+        }
+        return value.intValue();
+    }
+
+    private static String reason(JsonNode value, Map<String, String> errors) {
+        if (value == null || value.isNull()) return null;
+        if (!value.isTextual()) {
+            errors.put("reason", "reason은 문자열이어야 합니다.");
+            return null;
+        }
+        return value.asText();
+    }
+}

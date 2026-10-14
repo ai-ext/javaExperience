@@ -1,0 +1,63 @@
+package org.example.social;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.member.Member;
+import org.example.member.MemberNotFoundException;
+import org.example.member.MemberRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+
+// 12-4 팔로우·언팔로우 — PUT/DELETE 모두 멱등(현재 상태로 맞추고 그 상태를 돌려준다)
+@Service
+public class FollowService {
+
+    private static final String WITHDRAWN = "WITHDRAWN";
+
+    private final FollowRepository followRepository;
+    private final MemberRepository memberRepository;
+    private final BlockPolicy blockPolicy;
+    private final Clock clock;
+
+    public FollowService(FollowRepository followRepository, MemberRepository memberRepository,
+                         BlockPolicy blockPolicy, Clock clock) {
+        this.followRepository = followRepository;
+        this.memberRepository = memberRepository;
+        this.blockPolicy = blockPolicy;
+        this.clock = clock;
+    }
+
+    // 확인 순서: 자기 자신(400) → 없는·탈퇴 회원(404) → 차단 관계(403) → INSERT IGNORE
+    // READ_COMMITTED: 같은 요청이 동시에 오면 늦은 쪽의 INSERT IGNORE는 먼저 온 쪽의 커밋을 기다린 뒤 0행으로 끝난다.
+    // MySQL 기본(REPEATABLE READ)이면 마지막 COUNT가 트랜잭션 처음(회원 조회 시점)의 스냅샷을 읽어서
+    // "following: true인데 팔로워 수에 나는 없음"이 된다(실측: 동시 6건 중 5건이 n). 문장마다 새 스냅샷을 보게 한다.
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public FollowResponse follow(AuthenticatedMember me, Long targetId) {
+        Member target = findTarget(me, targetId);
+        if (blockPolicy.isBlockedEitherWay(me.id(), target.getId())) {
+            throw new FollowBlockedException();
+        }
+        followRepository.insertIgnore(me.id(), target.getId(), LocalDateTime.now(clock));
+        return new FollowResponse(target.getId(), true, followRepository.countByFollowee_Id(target.getId()));
+    }
+
+    // 언팔로우는 차단 관계여도 된다(관계를 끊는 쪽이라 막을 이유가 없다). 없던 관계면 0행 — 그래도 200
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public FollowResponse unfollow(AuthenticatedMember me, Long targetId) {
+        Member target = findTarget(me, targetId);
+        followRepository.deleteRelation(me.id(), target.getId());
+        return new FollowResponse(target.getId(), false, followRepository.countByFollowee_Id(target.getId()));
+    }
+
+    private Member findTarget(AuthenticatedMember me, Long targetId) {
+        if (me.id().equals(targetId)) {
+            throw new SelfFollowNotAllowedException();
+        }
+        return memberRepository.findById(targetId)
+                .filter(m -> !WITHDRAWN.equals(m.getMemberStatus()) && m.getDeletedAt() == null)
+                .orElseThrow(MemberNotFoundException::new);
+    }
+}

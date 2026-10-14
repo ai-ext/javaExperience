@@ -1,0 +1,19 @@
+package org.example.board.like;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+
+public interface PostLikeRepository extends JpaRepository<PostLike, PostLikeId> {
+
+    // 이미 있으면 아무것도 안 한다(INSERT IGNORE) — 바뀐 행 수(1 또는 0)로 "이번에 새로 눌렀나"를 안다
+    @Modifying
+    @Query(value = "insert ignore into post_likes (post_id, user_id, created_at) values (:postId, :userId, now())",
+            nativeQuery = true)
+    int insertIfAbsent(Long postId, Long userId);
+
+    // 없으면 0행 — 에러가 아니다
+    @Modifying
+    @Query(value = "delete from post_likes where post_id = :postId and user_id = :userId", nativeQuery = true)
+    int deleteIfPresent(Long postId, Long userId);
+}

@@ -1,0 +1,53 @@
+package org.example.marked;
+
+import org.example.bookmark.BookmarkRepository;
+import org.example.like.PostLikeRepository;
+import org.example.post.Post;
+import org.example.post.PostRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Set;
+
+@Service
+public class MarkedPostService {
+    private final PostRepository posts;
+    private final PostLikeRepository likes;
+    private final BookmarkRepository bookmarks;
+
+    public MarkedPostService(PostRepository posts, PostLikeRepository likes,
+                             BookmarkRepository bookmarks) {
+        this.posts = posts;
+        this.likes = likes;
+        this.bookmarks = bookmarks;
+    }
+
+    @Transactional(readOnly = true)
+    public MarkedPostPageResponse list(Long memberId, boolean liked, boolean bookmarked,
+                                       int page, int size) {
+        // JPA/Hibernate의 조회 시작 위치는 int 범위다. 유효한 큰 page는 빈 페이지와 전체 건수를 돌려준다.
+        if ((long) page * size > Integer.MAX_VALUE) {
+            long total = posts.findMarkedPosts(memberId, liked, bookmarked,
+                    PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "id"))).getTotalElements();
+            return new MarkedPostPageResponse(List.of(), page, size, total);
+        }
+        Page<Post> result = posts.findMarkedPosts(memberId, liked, bookmarked,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id")));
+        List<Long> ids = result.getContent().stream().map(Post::getId).toList();
+        if (ids.isEmpty()) return new MarkedPostPageResponse(List.of(), page, size, result.getTotalElements());
+
+        // 관계 상태는 항목마다 조회하지 않고 각 테이블에서 한 번씩 읽는다.
+        Set<Long> likedIds = Set.copyOf(likes.findPostIdsForMember(memberId, ids));
+        Set<Long> bookmarkedIds = Set.copyOf(bookmarks.findPostIdsForMember(memberId, ids));
+        List<MarkedPostItem> items = result.getContent().stream()
+                .map(post -> new MarkedPostItem(post.getId(), post.getTitle(),
+                        post.getAuthor().getNickname(), post.getBoard().getSlug(),
+                        likedIds.contains(post.getId()), bookmarkedIds.contains(post.getId())))
+                .toList();
+        return new MarkedPostPageResponse(items, page, size, result.getTotalElements());
+    }
+}

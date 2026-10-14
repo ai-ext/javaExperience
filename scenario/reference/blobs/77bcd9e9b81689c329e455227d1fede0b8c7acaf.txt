@@ -1,0 +1,13 @@
+-- V2 — 4-3 "내가 좋아요한 글"(WHERE member_id = ? ORDER BY created_at DESC, id DESC)용 복합 인덱스.
+-- 컬럼 순서: 같음 조건(member_id) → 정렬 순서(created_at, id). 그러면 그 회원의 행이 이미 정렬된 채
+-- 인덱스에 모여 있어 filesort 없이 역방향으로 읽다가 LIMIT에서 멈춘다.
+-- 큰 테이블에서는 쓰기를 막지 않도록 온라인 DDL(INPLACE, LOCK=NONE)을 명시한다 — 안 되는 경우면 바로 에러로 알 수 있다.
+ALTER TABLE post_like
+    ADD INDEX ix_post_like_member_created (member_id, created_at, id),
+    ALGORITHM = INPLACE, LOCK = NONE;
+
+-- 통계가 오래되면 옵티마이저가 새 인덱스를 안 쓰는 경우가 있다(이 데이터에서 실제로 그랬다)
+ANALYZE TABLE post_like;
+
+-- fk_post_like_member(member_id)는 새 인덱스의 맨 앞 컬럼이 member_id라 외래키가 대신 쓸 수 있어 지워도 된다.
+-- 하지만 지우는 건 되돌리기 어려운 별개의 변경이라 이 파일에 섞지 않는다(필요하면 새 버전으로).

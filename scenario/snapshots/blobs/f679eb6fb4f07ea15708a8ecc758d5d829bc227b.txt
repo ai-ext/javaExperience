@@ -1,0 +1,49 @@
+package org.example.admin;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+// 비정규화 숫자(like_count·comment_count)를 실제 행 수로 맞춘다. 몇 번을 돌려도 결과가 같다(멱등).
+// 이건 "나중에 맞추는" 안전망이다 — 4-2·5-1처럼 숫자를 원자적으로 바꿔 애초에 어긋나지 않게 하는 게 먼저다.
+// 수동 실행(AdminController)과 예약 실행(RecountScheduler)이 이 메서드 하나를 같이 쓴다.
+@Service
+public class RecountService {
+
+    private static final Logger log = LoggerFactory.getLogger(RecountService.class);
+
+    private final RecountRepository recountRepository;
+
+    public RecountService(RecountRepository recountRepository) {
+        this.recountRepository = recountRepository;
+    }
+
+    // 찾기와 고치기를 한 트랜잭션에서 한다. 그 사이에 좋아요가 눌리면 응답의 after와 실제 값이
+    // 조금 다를 수 있지만, UPDATE는 그 시점의 실제 행 수로 맞추므로 결과는 맞다.
+    @Transactional
+    public RecountResponse recount() {
+        List<CountFix> likeFixed = toFixes(recountRepository.findLikeCountMismatches());
+        List<CountFix> commentFixed = toFixes(recountRepository.findCommentCountMismatches());
+
+        if (!likeFixed.isEmpty()) {
+            recountRepository.fixLikeCounts();
+        }
+        if (!commentFixed.isEmpty()) {
+            recountRepository.fixCommentCounts();
+        }
+
+        likeFixed.forEach(f -> log.info("like_count 보정 postId={} {} -> {}", f.postId(), f.before(), f.after()));
+        commentFixed.forEach(f -> log.info("comment_count 보정 postId={} {} -> {}", f.postId(), f.before(), f.after()));
+        log.info("정합성 배치 완료: like {}건, comment {}건 보정", likeFixed.size(), commentFixed.size());
+        return new RecountResponse(likeFixed, commentFixed);
+    }
+
+    private List<CountFix> toFixes(List<CountMismatchRow> rows) {
+        return rows.stream()
+                .map(r -> new CountFix(r.getPostId(), r.getBeforeCount(), r.getAfterCount()))
+                .toList();
+    }
+}

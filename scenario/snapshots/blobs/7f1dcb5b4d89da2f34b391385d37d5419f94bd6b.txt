@@ -1,0 +1,134 @@
+package org.example.notification;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.comment.CommentRepository;
+import org.example.member.Member;
+import org.example.post.PostAccessPolicy;
+import org.example.social.BlockPolicy;
+import org.example.member.MemberRepository;
+import org.example.post.AuthorResponse;
+import org.example.post.Post;
+import org.example.post.PostRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Set;
+
+@Service
+public class NotificationService {
+
+    private final NotificationRepository notificationRepository;
+    private final PostRepository postRepository;
+    private final CommentRepository commentRepository;
+    private final MemberRepository memberRepository;
+    private final PostAccessPolicy accessPolicy;
+    private final BlockPolicy blockPolicy;
+    private final Clock clock;
+
+    public NotificationService(NotificationRepository notificationRepository, PostRepository postRepository,
+                               CommentRepository commentRepository, MemberRepository memberRepository,
+                               PostAccessPolicy accessPolicy, BlockPolicy blockPolicy, Clock clock) {
+        this.notificationRepository = notificationRepository;
+        this.postRepository = postRepository;
+        this.commentRepository = commentRepository;
+        this.memberRepository = memberRepository;
+        this.accessPolicy = accessPolicy;
+        this.blockPolicy = blockPolicy;
+        this.clock = clock;
+    }
+
+    // 9-4: 좋아요·댓글 알림은 원래 저장 트랜잭션 안에서 함께 저장한다.
+    // 알림 저장이 실패하면 원래 작업도 롤백된다.
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void notifyLike(Long postId, Long actorId) {
+        create(postId, actorId, Notification.LIKE, null);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void notifyComment(Long postId, Long commentId, Long actorId) {
+        create(postId, actorId, Notification.COMMENT, commentId);
+    }
+
+    // 12-2 — 멘션된 닉네임마다 MENTION 알림. 보내지 않는 경우:
+    //  없는 닉네임·활동 중(ACTIVE)이 아닌 회원 / 나 자신 / 글 작성자(이미 COMMENT 알림을 받는다)
+    //  / 나와 차단 관계 / 그 글을 볼 수 없는 회원(팔로워 공개 글인데 팔로워가 아님 등 — 2-3 규칙)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void notifyMentions(Long postId, Long commentId, Long actorId, Set<String> nicknames) {
+        Post post = postRepository.findById(postId).orElse(null);
+        if (post == null || nicknames.isEmpty()) {
+            return;
+        }
+        // 동일 댓글의 커밋 후 이벤트도 이 행에서 직렬화한다.
+        if (commentRepository.findByIdForUpdate(commentId).isEmpty()) {
+            return;
+        }
+        Long postAuthorId = post.getAuthor().getId();
+        Member actor = memberRepository.getReferenceById(actorId);
+        LocalDateTime now = LocalDateTime.now(clock);
+        for (Member target : memberRepository.findByNicknameIn(nicknames)) {
+            Long targetId = target.getId();
+            if (!nicknames.contains(target.getNickname())
+                    || !"ACTIVE".equals(target.getMemberStatus()) || target.getDeletedAt() != null
+                    || targetId.equals(actorId) || targetId.equals(postAuthorId)
+                    || blockPolicy.isBlockedEitherWay(actorId, targetId)) {
+                continue;
+            }
+            AuthenticatedMember asTarget = new AuthenticatedMember(targetId, target.getNickname(), target.getRole());
+            if (!accessPolicy.canView(asTarget, post)) {
+                continue;
+            }
+            if (notificationRepository.existsByMember_IdAndComment_IdAndType(
+                    targetId, commentId, Notification.MENTION)) {
+                continue;
+            }
+            notificationRepository.save(new Notification(target, actor, Notification.MENTION, post,
+                    commentRepository.getReferenceById(commentId), now));
+        }
+    }
+
+    private void create(Long postId, Long actorId, String type, Long commentId) {
+        Post post = postRepository.findById(postId).orElse(null);
+        if (post == null) {
+            return;
+        }
+        Long receiverId = post.getAuthor().getId();
+        if (receiverId.equals(actorId)) {
+            return; // 자기 글에 자기가 한 일은 알리지 않는다
+        }
+        notificationRepository.save(new Notification(
+                memberRepository.getReferenceById(receiverId),
+                memberRepository.getReferenceById(actorId),
+                type,
+                post,
+                commentId == null ? null : commentRepository.getReferenceById(commentId),
+                LocalDateTime.now(clock)));
+    }
+
+    @Transactional(readOnly = true)
+    public NotificationListResponse list(AuthenticatedMember me, boolean unreadOnly, int size) {
+        List<NotificationResponse> items = notificationRepository
+                .findMine(me.id(), unreadOnly, PageRequest.of(0, size)).stream()
+                .map(n -> new NotificationResponse(
+                        n.getId(),
+                        n.getType(),
+                        new AuthorResponse(n.getActor().getId(), n.getActor().getNickname()),
+                        n.getPost().getId(),
+                        n.getComment() == null ? null : n.getComment().getId(),
+                        n.getReadAt() != null,
+                        n.getCreatedAt()))
+                .toList();
+        return new NotificationListResponse(items, notificationRepository.countByMember_IdAndReadAtIsNull(me.id()));
+    }
+
+    @Transactional
+    public void markRead(AuthenticatedMember me, Long notificationId) {
+        notificationRepository.findByIdAndMember_Id(notificationId, me.id())
+                .orElseThrow(NotificationNotFoundException::new)
+                .markRead(LocalDateTime.now(clock));
+    }
+}

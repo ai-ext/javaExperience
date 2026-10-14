@@ -1,0 +1,59 @@
+package org.example.moderation;
+
+import jakarta.validation.Validator;
+import org.example.admin.Permission;
+import org.example.admin.RequirePermission;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.example.post.InvalidParametersException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+// 13-4 — 금칙어 관리는 운영자(ADMIN)만(13-1 표의 MANAGE_BANNED_WORD)
+@RestController
+@RequirePermission(Permission.MANAGE_BANNED_WORD)
+public class BannedWordController {
+
+    private final BannedWordService bannedWordService;
+    private final Validator validator;
+
+    public BannedWordController(BannedWordService bannedWordService, Validator validator) {
+        this.bannedWordService = bannedWordService;
+        this.validator = validator;
+    }
+
+    @GetMapping("/api/admin/banned-words")
+    public List<BannedWordResponse> list() {
+        return bannedWordService.list();
+    }
+
+    @PostMapping("/api/admin/banned-words")
+    @ResponseStatus(HttpStatus.CREATED)
+    public BannedWordResponse add(@LoginMember AuthenticatedMember me, @RequestBody JsonNode body) {
+        BannedWordRequest.Parsed parsed = BannedWordRequest.parse(body);
+        BannedWordRequest request = parsed.request();
+        Map<String, String> errors = new LinkedHashMap<>(parsed.errors());
+        validator.validate(request).forEach(v -> errors.putIfAbsent(v.getPropertyPath().toString(), v.getMessage()));
+        if (!errors.isEmpty()) {
+            throw new InvalidParametersException(errors);
+        }
+        return bannedWordService.add(me, request);
+    }
+
+    @DeleteMapping("/api/admin/banned-words/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        bannedWordService.delete(id);
+    }
+}

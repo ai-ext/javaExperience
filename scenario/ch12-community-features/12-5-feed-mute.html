@@ -1,0 +1,2217 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12-5. 팔로잉 피드 — 뮤트</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 12장. 소통 확장 — 수정·멘션·알림함·팔로우·신고 › 12-5</p><p class="level-tags"><span>고급</span><span>게시판 본편</span><span>DB practice</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="12-5-팔로잉-피드--뮤트"><a class="anchor" href="#12-5-팔로잉-피드--뮤트" aria-hidden="true">#</a>12-5. 팔로잉 피드 — 뮤트</h1>
+<blockquote>
+<p>학습용 DB(<code>practice</code>) — 앱을 <code>practice</code> 프로파일로 띄운다.</p>
+</blockquote>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<blockquote>
+<p>&quot;홈에 &#39;내 피드&#39;를 만들어 주세요. 내가 팔로우하는 사람들 글과 내 글을 최신순으로요. 그리고 언팔로우까지는 하기 싫은데 글이 너무 많이 올라오는 사람이 있대요. 그 사람 글만 <strong>내 피드에서</strong> 안 보이게 하는 &#39;뮤트&#39;를 넣어 주세요. 차단처럼 상대가 눈치채면 안 돼요.&quot;</p>
+</blockquote>
+<p>피드 자체는 티켓 <a href="../../tickets/012-following-feed-api.html">T-012</a>와 같은 기능이다. 대상은 (나 + 팔로잉)의 글, 순서는 최신순, 페이징은 커서, 차단 관계는 뺀다. T-012를 했다면 그 코드를 그대로 쓰고, 이 단계에서는 <strong>뮤트</strong>만 더하면 된다.</p>
+<p>뮤트는 차단과 다르다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>차단(2-3)</th>
+<th>뮤트(이번)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>상대가 아나</td>
+<td>상대도 내 글을 못 본다</td>
+<td>모른다(상대에게 아무 변화 없음)</td>
+</tr>
+<tr>
+<td>어디에 적용</td>
+<td>상세·목록·댓글·좋아요 전부</td>
+<td><strong>내 피드만</strong> — 게시판 목록·글 상세는 그대로 보인다</td>
+</tr>
+<tr>
+<td>팔로우</td>
+<td>할 수 없다(12-4)</td>
+<td>팔로우는 그대로 유지</td>
+</tr>
+</tbody></table></div>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>홈 — 내 피드</h3><p>팔로잉 + 내 글을 커서로. 글의 [⋯] → [이 사람 글 안 보기]가 뮤트 — 피드에서만 빠진다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>내 피드</strong><span>밤샘개발자</span></div><div class="screen-widget screen-list"><strong>list</strong><span>스프링 트랜잭션 전파 삽질기 · 주말에 만든 사이드 프로젝트 · 스터디원 구합니다 · MySQL 인덱스 설계 비교해보기</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>이 사람 글 안 보기 · 다시 보기</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>피드 열기</summary><ol><li><span class="flow-kind">사용자</span><p>홈의 [내 피드]를 연다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/me/feed?size=2</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-p06</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT ... FROM post p JOIN member a ON a.id = p.author_id WHERE p.deleted_at IS NULL AND p.status = 'PUBLISHED' AND (a.id = 6 OR EXISTS (SELECT 1 FROM follow f WHERE f.follower_id = 6 AND f.followee_id = a.id)) AND NOT EXISTS (차단) AND NOT EXISTS (SELECT 1 FROM member_mute m WHERE m.muter_id = 6 AND m.muted_id = a.id) ORDER BY p.published_at DESC, p.id DESC LIMIT 3</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{&quot;items&quot;: [{&quot;id&quot;: 145, ...}, {&quot;id&quot;: 101, ...}], &quot;nextCursor&quot;: &quot;MjAyNi0wOS0wMVQwOToyMjo0MnwxMDE&quot;}</dd></dl></li><li><span class="flow-kind">화면</span><p>글 2개, 내리면 커서로 이어 받는다</p></li></ol></details><details class="scenario-flow"><summary>뮤트</summary><ol><li><span class="flow-kind">사용자</span><p>리액트에서왔어요의 글에서 [⋯] → [이 사람 글 안 보기]</p></li><li><span class="flow-kind">HTTP 요청</span><p>PUT /api/members/7/mute</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-p06</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>INSERT IGNORE INTO member_mute (muter_id, muted_id, created_at) VALUES (6, 7, ...)</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>body</dt><dd>{&quot;memberId&quot;: 7, &quot;muted&quot;: true}</dd></dl></li><li><span class="flow-kind">화면</span><p>피드에서 101·44가 빠진다. 게시판 목록·글 상세에서는 그대로 보인다</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<p><strong>V32</strong> — <code>db/migration/V32__create_member_mute.sql</code></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>컬럼</th>
+<th>타입·규칙</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td><code>BIGINT AUTO_INCREMENT PRIMARY KEY</code></td>
+</tr>
+<tr>
+<td><code>muter_id</code></td>
+<td>뮤트한 회원, FK → <code>member</code></td>
+</tr>
+<tr>
+<td><code>muted_id</code></td>
+<td>뮤트당한 회원, FK → <code>member</code></td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>만든 시각</td>
+</tr>
+<tr>
+<td>제약</td>
+<td><code>UNIQUE (muter_id, muted_id)</code>, <code>CHECK (muter_id &lt;&gt; muted_id)</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>뮤트 API</strong> — 토큰 필요, 본문 없음. 12-4 팔로우와 같은 모양의 멱등 PUT·DELETE</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>메서드·경로</th>
+<th>응답 <code>200</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>PUT /api/members/{id}/mute</code></td>
+<td><code>{ &quot;memberId&quot;: 7, &quot;muted&quot;: true }</code> — 이미 뮤트해도 같은 응답</td>
+</tr>
+<tr>
+<td><code>DELETE /api/members/{id}/mute</code></td>
+<td><code>{ &quot;memberId&quot;: 7, &quot;muted&quot;: false }</code></td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>값</th>
+<th>틀렸을 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>{id}</code> = 나</td>
+<td><code>400</code></td>
+</tr>
+<tr>
+<td><code>{id}</code>가 숫자가 아님</td>
+<td><code>400</code></td>
+</tr>
+<tr>
+<td>없는 회원·탈퇴 회원</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td>차단 관계</td>
+<td>막지 않는다(<code>200</code>) — 내 피드만 바뀐다</td>
+</tr>
+</tbody></table></div>
+<p><strong>피드 API</strong> — <code>GET /api/me/feed?size=10</code> 또는 <code>GET /api/me/feed?size=10&amp;cursor={nextCursor}</code> (토큰 필수, 없으면 <code>401</code>)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>대상</td>
+<td>작성자가 <strong>나</strong> 또는 <strong>내가 팔로우하는 회원</strong>, <code>PUBLISHED</code>, 삭제 안 됨. 팔로워 공개 글도 포함(팔로우 중이니까)</td>
+</tr>
+<tr>
+<td>빼는 글</td>
+<td>나와 차단 관계(어느 쪽이든)인 작성자, <strong>내가 뮤트한</strong> 작성자</td>
+</tr>
+<tr>
+<td>정렬·커서</td>
+<td><code>published_at DESC, id DESC</code>, 커서는 마지막 항목의 <code>(published_at, id)</code></td>
+</tr>
+<tr>
+<td>응답</td>
+<td><code>{ &quot;items&quot;: [게시판 목록 항목과 같은 모양], &quot;nextCursor&quot;: &quot;…&quot; 또는 null }</code></td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>값</th>
+<th>필수</th>
+<th>범위·형식</th>
+<th>기본값</th>
+<th>틀렸을 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>size</code></td>
+<td>아니요</td>
+<td>정수 1~50(1·50 성공, 0·51 거절)</td>
+<td>10</td>
+<td><code>400</code></td>
+</tr>
+<tr>
+<td><code>cursor</code></td>
+<td>아니요</td>
+<td>앞 응답의 <code>nextCursor</code></td>
+<td>없음(첫 묶음)</td>
+<td>빈 값·깨진 값 <code>400</code></td>
+</tr>
+</tbody></table></div>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>이 단계의 화면·DB 흐름을 아래 참조 파일과 연결한다. 요구 계약을 먼저 구현하고, 필요한 파일 역할만 펼쳐 전체 코드와 비교한다.</p>
+<details>
+<summary>예외 처리</summary>
+
+<p><code>ApiExceptionHandler.java</code>, <code>SelfMuteNotAllowedException.java</code>: 실패 상태와 응답 본문을 계약과 대조한다.</p>
+<pre><code class="language-java">package org.example.social;
+
+// 자기 자신 뮤트 — 전역 핸들러가 400으로 변환한다
+public class SelfMuteNotAllowedException extends RuntimeException {
+
+    public SelfMuteNotAllowedException() {
+        super(&quot;자기 자신은 뮤트할 수 없습니다.&quot;);
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>Controller</summary>
+
+<p><code>FeedController.java</code>, <code>MuteController.java</code>: HTTP 매핑과 입력·응답을 <strong>만들 것</strong>의 계약과 대조한다.</p>
+<pre><code class="language-java">package org.example.post;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+
+@RestController
+public class FeedController {
+
+    private final PostQueryService postQueryService;
+
+    public FeedController(PostQueryService postQueryService) {
+        this.postQueryService = postQueryService;
+    }
+
+    // GET이지만 &quot;내 것&quot;이라 인증 필수
+    @GetMapping(&quot;/api/me/feed&quot;)
+    public FeedResponse feed(@RequestParam(value = &quot;size&quot;, required = false) String size,
+                             @RequestParam(required = false) String cursor,
+                             @LoginMember AuthenticatedMember me) {
+        if (me == null) {
+            throw new AuthenticationRequiredException(&quot;인증이 필요합니다.&quot;);
+        }
+        return postQueryService.feed(me, parseSize(size), cursor);
+    }
+
+    private int parseSize(String raw) {
+        if (raw == null) {
+            return 10;
+        }
+        if (!raw.matches(&quot;[0-9]{1,2}&quot;)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;size는 1~50의 정수여야 합니다.&quot;);
+        }
+        int value = Integer.parseInt(raw);
+        if (value &lt; 1 || value &gt; 50) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;size는 1~50의 정수여야 합니다.&quot;);
+        }
+        return value;
+    }
+}
+
+package org.example.social;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class MuteController {
+
+    private final MuteService muteService;
+
+    public MuteController(MuteService muteService) {
+        this.muteService = muteService;
+    }
+
+    @PutMapping(&quot;/api/members/{id}/mute&quot;)
+    public MuteResponse mute(@PathVariable Long id, @LoginMember AuthenticatedMember me) {
+        return muteService.mute(me, id);
+    }
+
+    @DeleteMapping(&quot;/api/members/{id}/mute&quot;)
+    public MuteResponse unmute(@PathVariable Long id, @LoginMember AuthenticatedMember me) {
+        return muteService.unmute(me, id);
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>DTO / 결과 행</summary>
+
+<p><code>FeedResponse.java</code>, <code>MuteResponse.java</code>: 필드 이름·타입을 요청·응답 예시와 대조한다.</p>
+<pre><code class="language-java">package org.example.post;
+
+import java.util.List;
+
+// 12-5 피드 — 항목은 게시판 목록(2-2)과 같은 모양, 다음 묶음이 없으면 nextCursor = null
+public record FeedResponse(List&lt;PostListItemResponse&gt; items, String nextCursor) {
+}
+
+package org.example.social;
+
+public record MuteResponse(Long memberId, boolean muted) {
+}</code></pre>
+</details>
+
+<details>
+<summary>Service</summary>
+
+<p><code>PostQueryService.java</code>, <code>MuteService.java</code>: 조회·검증·상태 변경의 순서를 화면 흐름과 대조한다.</p>
+<pre><code class="language-java">// 12-5 팔로잉 피드 — size+1개를 읽어 다음 묶음이 있는지 정한다(4-3·6-3과 같은 커서)
+    @Transactional(readOnly = true)
+    public FeedResponse feed(AuthenticatedMember me, int size, String cursor) {
+        Cursor after = Cursor.decode(cursor);
+        List&lt;Post&gt; rows = postRepository.findFeed(me.id(),
+                after == null ? null : after.at(), after == null ? null : after.id(),
+                PageRequest.of(0, size + 1));
+        boolean hasNext = rows.size() &gt; size;
+        List&lt;Post&gt; page = hasNext ? rows.subList(0, size) : rows;
+        String nextCursor = null;
+        if (hasNext) {
+            Post last = page.get(page.size() - 1);
+            nextCursor = new Cursor(last.getPublishedAt(), last.getId()).encode();
+        }
+        return new FeedResponse(page.stream().map(this::toListItem).toList(), nextCursor);
+    }
+
+
+package org.example.social;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.member.MemberNotFoundException;
+import org.example.member.MemberRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+
+// 12-5 뮤트 — 팔로우(12-4)와 같은 모양의 멱등 PUT/DELETE. 차단 관계여도 된다(내 피드만 바뀐다)
+@Service
+public class MuteService {
+
+    private static final String WITHDRAWN = &quot;WITHDRAWN&quot;;
+
+    private final MemberMuteRepository memberMuteRepository;
+    private final MemberRepository memberRepository;
+    private final Clock clock;
+
+    public MuteService(MemberMuteRepository memberMuteRepository, MemberRepository memberRepository, Clock clock) {
+        this.memberMuteRepository = memberMuteRepository;
+        this.memberRepository = memberRepository;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public MuteResponse mute(AuthenticatedMember me, Long targetId) {
+        Long id = checkTarget(me, targetId);
+        memberMuteRepository.insertIgnore(me.id(), id, LocalDateTime.now(clock));
+        return new MuteResponse(id, true);
+    }
+
+    @Transactional
+    public MuteResponse unmute(AuthenticatedMember me, Long targetId) {
+        Long id = checkTarget(me, targetId);
+        memberMuteRepository.deleteRelation(me.id(), id);
+        return new MuteResponse(id, false);
+    }
+
+    private Long checkTarget(AuthenticatedMember me, Long targetId) {
+        if (me.id().equals(targetId)) {
+            throw new SelfMuteNotAllowedException();
+        }
+        return memberRepository.findById(targetId)
+                .filter(m -&gt; !WITHDRAWN.equals(m.getMemberStatus()) &amp;&amp; m.getDeletedAt() == null)
+                .orElseThrow(MemberNotFoundException::new)
+                .getId();
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>JPA / Repository</summary>
+
+<p><code>PostRepository.java</code>, <code>MemberMuteRepository.java</code>: JPA 조회 조건을 DB 예시와 대조한다.</p>
+<pre><code class="language-java">// 12-5 피드 — 작성자가 나이거나 내가 팔로우하는 회원인 게시된 글. 차단 관계(어느 쪽이든)와 내가 뮤트한 회원의 글은 뺀다.
+    // 팔로워 공개 글은 따로 걸지 않는다 — 작성자가 나 또는 팔로잉뿐이라 저절로 볼 수 있다.
+    // 키셋 커서 (published_at, id). 작성자는 함께 읽고 태그는 batch fetch(2-4)가 묶어 읽는다.
+    @Query(&quot;&quot;&quot;
+            SELECT p FROM Post p
+            JOIN FETCH p.author a
+            WHERE p.deletedAt IS NULL
+              AND p.status = 'PUBLISHED'
+              AND (a.id = :me OR EXISTS (SELECT 1 FROM Follow f WHERE f.follower.id = :me AND f.followee = a))
+              AND NOT EXISTS (SELECT 1 FROM MemberBlock b
+                              WHERE (b.blocker.id = :me AND b.blocked = a) OR (b.blocked.id = :me AND b.blocker = a))
+              AND NOT EXISTS (SELECT 1 FROM MemberMute m WHERE m.muter.id = :me AND m.muted = a)
+              AND (
+                   :cursorAt IS NULL
+                   OR p.publishedAt &lt; :cursorAt
+                   OR (p.publishedAt = :cursorAt AND p.id &lt; :cursorId)
+              )
+            ORDER BY p.publishedAt DESC, p.id DESC
+            &quot;&quot;&quot;)
+    List&lt;Post&gt; findFeed(@Param(&quot;me&quot;) Long me,
+                        @Param(&quot;cursorAt&quot;) LocalDateTime cursorAt,
+                        @Param(&quot;cursorId&quot;) Long cursorId,
+                        Pageable pageable);
+}
+package org.example.social;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+
+public interface MemberMuteRepository extends JpaRepository&lt;MemberMute, Long&gt; {
+
+    // 이미 있으면 0행 — 멱등(12-4 팔로우와 같은 방법)
+    @Modifying
+    @Query(value = &quot;INSERT IGNORE INTO member_mute (muter_id, muted_id, created_at) VALUES (:muterId, :mutedId, :now)&quot;,
+            nativeQuery = true)
+    int insertIgnore(@Param(&quot;muterId&quot;) Long muterId, @Param(&quot;mutedId&quot;) Long mutedId, @Param(&quot;now&quot;) LocalDateTime now);
+
+    @Modifying
+    @Query(&quot;DELETE FROM MemberMute m WHERE m.muter.id = :muterId AND m.muted.id = :mutedId&quot;)
+    int deleteRelation(@Param(&quot;muterId&quot;) Long muterId, @Param(&quot;mutedId&quot;) Long mutedId);
+}</code></pre>
+</details>
+
+<details>
+<summary>Entity</summary>
+
+<p><code>MemberMute.java</code>: 컬럼·관계 매핑을 DB 테이블과 대조한다.</p>
+<pre><code class="language-java">package org.example.social;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import org.example.member.Member;
+
+import java.time.LocalDateTime;
+
+// 뮤트(V32) — muter의 피드(12-5)에서만 muted의 글을 뺀다. 저장은 INSERT IGNORE(리포지토리)로 한다
+@Entity
+@Table(name = &quot;member_mute&quot;)
+public class MemberMute {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;muter_id&quot;, nullable = false)
+    private Member muter;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;muted_id&quot;, nullable = false)
+    private Member muted;
+
+    @Column(name = &quot;created_at&quot;, nullable = false)
+    private LocalDateTime createdAt;
+
+    protected MemberMute() {
+        // JPA
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Member getMuter() {
+        return muter;
+    }
+
+    public Member getMuted() {
+        return muted;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>Flyway / SQL</summary>
+
+<p><code>V32__create_member_mute.sql</code>: DDL·백필 순서를 스키마 계약과 대조한다.</p>
+<pre><code class="language-sql">-- V32 — 뮤트(12-5). &quot;이 사람 글을 내 피드에서만 안 보기&quot;. 차단(member_block)과 달리 상대는 모르고,
+-- 글 상세·게시판 목록·댓글에는 아무 영향이 없다. 한 사람이 같은 사람을 두 번 뮤트할 수 없다(UNIQUE).
+CREATE TABLE member_mute (
+    id         BIGINT   NOT NULL AUTO_INCREMENT,
+    muter_id   BIGINT   NOT NULL,
+    muted_id   BIGINT   NOT NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_member_mute (muter_id, muted_id),
+    KEY ix_member_mute_muted (muted_id),
+    CONSTRAINT fk_member_mute_muter FOREIGN KEY (muter_id) REFERENCES member (id),
+    CONSTRAINT fk_member_mute_muted FOREIGN KEY (muted_id) REFERENCES member (id),
+    CONSTRAINT ck_member_mute_self CHECK (muter_id &lt;&gt; muted_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '뮤트 — muter의 피드에서 muted의 글을 뺀다';</code></pre>
+</details>
+<details>
+<summary>MyBatis Mapper — 피드·뮤트 SQL 대체 구현</summary>
+
+<p>정답의 <strong>MyBatis 대체 구현 코드</strong> 토글에서 <code>FeedPostMapper.java</code>·<code>FeedPostMapper.xml</code>·<code>MuteCommandMapper.java</code>·<code>MuteCommandMapper.xml</code>과 교체한 Service 전문을 볼 수 있다. 피드의 목록 행은 <code>PostListRow</code>에, 태그는 <code>PostTagRow</code>에 매핑한다. 글은 <code>size+1</code>개만 읽고 태그는 화면에 보여 줄 글 ID를 한 번에 읽는다.</p>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.post.FeedPostMapper&quot;&gt;
+    &lt;select id=&quot;findFeed&quot; resultType=&quot;org.example.post.PostListRow&quot;&gt;
+        SELECT p.id, p.title, p.excerpt,
+               a.id AS author_id, a.nickname AS author_nickname,
+               p.like_count, p.comment_count, p.view_count, p.published_at
+        FROM post p JOIN member a ON a.id = p.author_id
+        WHERE p.deleted_at IS NULL AND p.status = 'PUBLISHED'
+          AND (a.id = #{me} OR EXISTS (
+              SELECT 1 FROM follow f WHERE f.follower_id = #{me} AND f.followee_id = a.id))
+          AND NOT EXISTS (
+              SELECT 1 FROM member_block b
+              WHERE (b.blocker_id = #{me} AND b.blocked_id = a.id)
+                 OR (b.blocked_id = #{me} AND b.blocker_id = a.id))
+          AND NOT EXISTS (
+              SELECT 1 FROM member_mute m WHERE m.muter_id = #{me} AND m.muted_id = a.id)
+        &lt;if test=&quot;cursorAt != null&quot;&gt;
+          AND (p.published_at &amp;lt; #{cursorAt}
+               OR (p.published_at = #{cursorAt} AND p.id &amp;lt; #{cursorId}))
+        &lt;/if&gt;
+        ORDER BY p.published_at DESC, p.id DESC LIMIT #{limit}
+    &lt;/select&gt;
+    &lt;select id=&quot;findTagsByPostIds&quot; resultType=&quot;org.example.post.PostTagRow&quot;&gt;
+        SELECT pt.post_id, t.name
+        FROM post_tag pt JOIN tag t ON t.id = pt.tag_id
+        WHERE pt.post_id IN
+        &lt;foreach collection=&quot;ids&quot; item=&quot;id&quot; open=&quot;(&quot; separator=&quot;,&quot; close=&quot;)&quot;&gt;#{id}&lt;/foreach&gt;
+        ORDER BY t.name
+    &lt;/select&gt;
+&lt;/mapper&gt;</code></pre>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.social.MuteCommandMapper&quot;&gt;
+    &lt;insert id=&quot;insertIgnore&quot;&gt;
+        INSERT IGNORE INTO member_mute (muter_id, muted_id, created_at)
+        VALUES (#{muterId}, #{mutedId}, #{now})
+    &lt;/insert&gt;
+    &lt;delete id=&quot;deleteRelation&quot;&gt;
+        DELETE FROM member_mute WHERE muter_id = #{muterId} AND muted_id = #{mutedId}
+    &lt;/delete&gt;
+&lt;/mapper&gt;</code></pre>
+</details>
+
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/common/ApiExceptionHandler.java</summary><pre><code>package org.example.common;
+
+<p>import jakarta.servlet.http.HttpServletRequest;
+import tools.jackson.core.JacksonException;
+import org.example.admin.AdminOnlyException;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.MemberNotActiveException;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardWriteForbiddenException;
+import org.example.bookmark.BookmarkFolderNotFoundException;
+import org.example.bookmark.InvalidBookmarkFieldException;
+import org.example.bookmark.BookmarkNotFoundException;
+import org.example.bookmark.DuplicateBookmarkFolderNameException;
+import org.example.bookmark.InvalidBookmarkFolderException;
+import org.example.comment.CommentForbiddenException;
+import org.example.comment.CommentNotFoundException;
+import org.example.comment.InvalidParentCommentException;
+import org.example.image.EmptyImageException;
+import org.example.image.ImageNotFoundException;
+import org.example.image.UnsupportedImageException;
+import org.example.like.SelfLikeNotAllowedException;
+import org.example.member.MemberNotFoundException;
+import org.example.notification.NotificationNotFoundException;
+import org.example.post.InvalidParametersException;
+import org.example.post.InvalidPostFieldException;
+import org.example.post.InvalidSearchConditionException;
+import org.example.post.PostForbiddenException;
+import org.example.post.PostNotDeletedException;
+import org.example.revision.RevisionForbiddenException;
+import org.example.post.PostNotDraftException;
+import org.example.post.PostRestoreExpiredException;
+import org.example.post.PostRestoreForbiddenException;
+import org.example.post.PostNotFoundException;
+import org.example.social.FollowBlockedException;
+import org.example.social.SelfFollowNotAllowedException;
+import org.example.social.SelfMuteNotAllowedException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;</p>
+<p>import java.net.URI;
+import java.util.List;
+import java.util.Map;</p>
+<p>// 모든 컨트롤러의 에러 응답을 한 곳에서 RFC 9457 Problem Details로 만든다.
+// 컨트롤러마다 try-catch를 두지 않는다.
+@RestControllerAdvice
+public class ApiExceptionHandler {</p>
+<pre><code>@ExceptionHandler(MethodArgumentNotValidException.class)
+public ProblemDetail handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    List&amp;lt;Map&amp;lt;String, String&amp;gt;&amp;gt; errors = ex.getBindingResult().getFieldErrors().stream()
+            .map(fieldError -&amp;gt; Map.of(
+                    &amp;quot;field&amp;quot;, fieldError.getField(),
+                    &amp;quot;message&amp;quot;, fieldError.getDefaultMessage() == null ? &amp;quot;&amp;quot; : fieldError.getDefaultMessage()
+            ))
+            .toList();
+    problem.setProperty(&amp;quot;errors&amp;quot;, errors);
+    return problem;
+}
+
+@ExceptionHandler(HttpMessageNotReadableException.class)
+public ProblemDetail handleUnreadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;요청 본문을 읽을 수 없습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    // 11-1 JSON 문법은 맞는데 한 필드의 형식이 틀린 경우(숫자 자리에 &amp;quot;abc&amp;quot;, 목록 자리에 문자열) —
+    // Jackson이 남긴 경로로 어느 필드인지 errors에 담는다. 목록 안이면 Bean Validation과 같은 모양(imageIds[0]).
+    // JSON 문법 자체가 깨졌으면 경로가 비어 있어 errors 없이 400만 나간다. Jackson은 첫 오류에서 멈추므로 하나만 들어간다.
+    if (ex.getCause() instanceof JacksonException jackson &amp;amp;&amp;amp; !jackson.getPath().isEmpty()) {
+        problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, fieldPath(jackson), &amp;quot;message&amp;quot;, &amp;quot;형식이 올바르지 않습니다.&amp;quot;)));
+    }
+    return problem;
+}
+
+// 11-1 경로·쿼리 값의 형식 오류(/api/posts/abc, ?size=abc) — 그대로 두면 Spring 기본 응답이라 어느 값이 틀렸는지 없다
+@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, ex.getName(),
+            &amp;quot;message&amp;quot;, &amp;quot;형식이 올바르지 않습니다: &amp;quot; + ex.getValue())));
+    return problem;
+}
+
+private static String fieldPath(JacksonException jackson) {
+    StringBuilder field = new StringBuilder();
+    for (JacksonException.Reference ref : jackson.getPath()) {
+        if (ref.getPropertyName() != null) {
+            if (!field.isEmpty()) {
+                field.append('.');
+            }
+            field.append(ref.getPropertyName());
+        } else {
+            field.append('[').append(ref.getIndex()).append(']');
+        }
+    }
+    return field.toString();
+}
+
+@ExceptionHandler(BoardNotFoundException.class)
+public ProblemDetail handleBoardNotFound(BoardNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostNotFoundException.class)
+public ProblemDetail handlePostNotFound(PostNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(BoardWriteForbiddenException.class)
+public ProblemDetail handleBoardWriteForbidden(BoardWriteForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(SelfLikeNotAllowedException.class)
+public ProblemDetail handleSelfLikeNotAllowed(SelfLikeNotAllowedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostForbiddenException.class)
+public ProblemDetail handlePostForbidden(PostForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-1 임시저장이 아닌 글을 발행 — 지금 상태와 충돌
+@ExceptionHandler(PostNotDraftException.class)
+public ProblemDetail handlePostNotDraft(PostNotDraftException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-6 이력은 작성자·운영자만
+@ExceptionHandler(RevisionForbiddenException.class)
+public ProblemDetail handleRevisionForbidden(RevisionForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-5 복구
+@ExceptionHandler(PostNotDeletedException.class)
+public ProblemDetail handlePostNotDeleted(PostNotDeletedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostRestoreForbiddenException.class)
+public ProblemDetail handlePostRestoreForbidden(PostRestoreForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostRestoreExpiredException.class)
+public ProblemDetail handlePostRestoreExpired(PostRestoreExpiredException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.GONE, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-2 이미지 업로드
+@ExceptionHandler(EmptyImageException.class)
+public ProblemDetail handleEmptyImage(EmptyImageException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(UnsupportedImageException.class)
+public ProblemDetail handleUnsupportedImage(UnsupportedImageException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// spring.servlet.multipart.max-file-size를 넘으면 컨트롤러에 오기 전에(요청을 읽는 단계에서) 터진다
+@ExceptionHandler(MaxUploadSizeExceededException.class)
+public ProblemDetail handleMaxUploadSize(HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONTENT_TOO_LARGE, &amp;quot;파일은 1MB까지 올릴 수 있습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(ImageNotFoundException.class)
+public ProblemDetail handleImageNotFound(ImageNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-4 쿼리 파라미터 여러 개를 한꺼번에 검사한 결과
+@ExceptionHandler(InvalidParametersException.class)
+public ProblemDetail handleInvalidParameters(InvalidParametersException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, ex.getErrors().entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .map(e -&amp;gt; Map.of(&amp;quot;field&amp;quot;, e.getKey(), &amp;quot;message&amp;quot;, e.getValue()))
+            .toList());
+    return problem;
+}
+
+@ExceptionHandler(InvalidPostFieldException.class)
+public ProblemDetail handleInvalidPostField(InvalidPostFieldException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, ex.getField(), &amp;quot;message&amp;quot;, ex.getMessage())));
+    return problem;
+}
+
+@ExceptionHandler(CommentNotFoundException.class)
+public ProblemDetail handleCommentNotFound(CommentNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidParentCommentException.class)
+public ProblemDetail handleInvalidParentComment(InvalidParentCommentException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(CommentForbiddenException.class)
+public ProblemDetail handleCommentForbidden(CommentForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(BookmarkFolderNotFoundException.class)
+public ProblemDetail handleBookmarkFolderNotFound(BookmarkFolderNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(BookmarkNotFoundException.class)
+public ProblemDetail handleBookmarkNotFound(BookmarkNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidBookmarkFolderException.class)
+public ProblemDetail handleInvalidBookmarkFolder(InvalidBookmarkFolderException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(DuplicateBookmarkFolderNameException.class)
+public ProblemDetail handleDuplicateBookmarkFolderName(DuplicateBookmarkFolderNameException ex,
+                                                       HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidCursorException.class)
+public ProblemDetail handleInvalidCursor(InvalidCursorException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidSearchConditionException.class)
+public ProblemDetail handleInvalidSearchCondition(InvalidSearchConditionException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(AdminOnlyException.class)
+public ProblemDetail handleAdminOnly(AdminOnlyException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(NotificationNotFoundException.class)
+public ProblemDetail handleNotificationNotFound(NotificationNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(MemberNotFoundException.class)
+public ProblemDetail handleMemberNotFound(MemberNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(SelfFollowNotAllowedException.class)
+public ProblemDetail handleSelfFollow(SelfFollowNotAllowedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(SelfMuteNotAllowedException.class)
+public ProblemDetail handleSelfMute(SelfMuteNotAllowedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(FollowBlockedException.class)
+public ProblemDetail handleFollowBlocked(FollowBlockedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidBookmarkFieldException.class)
+public ProblemDetail handleInvalidBookmarkField(InvalidBookmarkFieldException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, ex.getField(), &amp;quot;message&amp;quot;, ex.getMessage())));
+    return problem;
+}
+
+// 누구인지 모름 — WWW-Authenticate 헤더를 함께 내려준다
+@ExceptionHandler(AuthenticationRequiredException.class)
+public ResponseEntity&amp;lt;ProblemDetail&amp;gt; handleAuthenticationRequired(AuthenticationRequiredException ex,
+                                                                   HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .header(HttpHeaders.WWW_AUTHENTICATE, &amp;quot;Bearer&amp;quot;)
+            .body(problem);
+}
+
+// 누구인지는 알지만(토큰은 유효) 회원 상태 때문에 안 됨
+@ExceptionHandler(MemberNotActiveException.class)
+public ProblemDetail handleMemberNotActive(MemberNotActiveException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/post/FeedController.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;</p>
+<p>@RestController
+public class FeedController {</p>
+<pre><code>private final PostQueryService postQueryService;
+
+public FeedController(PostQueryService postQueryService) {
+    this.postQueryService = postQueryService;
+}
+
+// GET이지만 &amp;quot;내 것&amp;quot;이라 인증 필수
+@GetMapping(&amp;quot;/api/me/feed&amp;quot;)
+public FeedResponse feed(@RequestParam(value = &amp;quot;size&amp;quot;, required = false) String size,
+                         @RequestParam(required = false) String cursor,
+                         @LoginMember AuthenticatedMember me) {
+    if (me == null) {
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+    return postQueryService.feed(me, parseSize(size), cursor);
+}
+
+private int parseSize(String raw) {
+    if (raw == null) {
+        return 10;
+    }
+    if (!raw.matches(&amp;quot;[0-9]{1,2}&amp;quot;)) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &amp;quot;size는 1~50의 정수여야 합니다.&amp;quot;);
+    }
+    int value = Integer.parseInt(raw);
+    if (value &amp;lt; 1 || value &amp;gt; 50) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &amp;quot;size는 1~50의 정수여야 합니다.&amp;quot;);
+    }
+    return value;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/FeedResponse.java</summary><pre><code>package org.example.post;
+
+<p>import java.util.List;</p>
+<p>// 12-5 피드 — 항목은 게시판 목록(2-2)과 같은 모양, 다음 묶음이 없으면 nextCursor = null
+public record FeedResponse(List&lt;PostListItemResponse&gt; items, String nextCursor) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostQueryService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.board.Board;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardRepository;
+import org.example.member.MemberRepository;
+import org.example.common.Cursor;
+import org.example.tag.Tag;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;</p>
+<p>import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;</p>
+<p>// 글 조회 전용 서비스 — 1-3/1-4의 PostService(쓰기)와 책임을 나눈다
+@Service
+public class PostQueryService {</p>
+<pre><code>private final PostRepository postRepository;
+private final BoardRepository boardRepository;
+private final MemberRepository memberRepository;
+private final PostAccessPolicy accessPolicy;
+private final PostSearchRepository postSearchRepository;
+private final PostViewRepository postViewRepository;
+private final Clock clock;
+
+public PostQueryService(PostRepository postRepository, BoardRepository boardRepository,
+                         MemberRepository memberRepository, PostAccessPolicy accessPolicy,
+                         PostSearchRepository postSearchRepository, PostViewRepository postViewRepository,
+                         Clock clock) {
+    this.postRepository = postRepository;
+    this.boardRepository = boardRepository;
+    this.memberRepository = memberRepository;
+    this.accessPolicy = accessPolicy;
+    this.postSearchRepository = postSearchRepository;
+    this.postViewRepository = postViewRepository;
+    this.clock = clock;
+}
+
+@Transactional(readOnly = true)
+public List&amp;lt;PostHeadlineResponse&amp;gt; listPublicByAuthor(Long memberId, String boardSlug) {
+    if (!memberRepository.existsById(memberId)) {
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, &amp;quot;회원을 찾을 수 없습니다.&amp;quot;);
+    }
+    boardRepository.findBySlug(boardSlug)
+            .orElseThrow(() -&amp;gt; new BoardNotFoundException(boardSlug));
+    return postRepository.findPublicPostsByAuthorAndBoard(memberId, boardSlug).stream()
+            .map(post -&amp;gt; new PostHeadlineResponse(
+                    post.getId(), post.getTitle(),
+                    post.getAuthor().getNickname(), boardSlug))
+            .toList();
+}
+
+@Transactional
+public PostDetailResponse getDetail(Long id, AuthenticatedMember viewer) {
+    // 접근 권한도 잠금 이후의 최신 상태로 판단한다(삭제·공개 범위 변경과의 경합).
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+
+    // 볼 수 없으면 403이 아니라 404 — 글이 있다는 사실도 숨긴다. 조회수도 올리지 않는다.
+    if (!accessPolicy.canView(viewer, post)) {
+        throw new PostNotFoundException();
+    }
+
+    // post_view INSERT와 post 카운터 UPDATE의 잠금 순서는 위 글 행 잠금으로 고정된다.
+    if (shouldCountView(viewer, post)) {
+        postRepository.incrementViewCount(id);
+    }
+    // 벌크 UPDATE는 관리 엔티티의 viewCount를 갱신하지 않으므로 DB에서 현재 값을 다시 읽는다.
+    int viewCount = postRepository.findViewCountById(id);
+    return toDetailResponse(post, viewCount);
+}
+
+// 11-3 조회수를 셀까? — 비로그인은 누군지 몰라 매번 센다, 작성자 본인은 안 센다,
+// 로그인 회원은 그 글을 오늘 처음 볼 때만(post_view에 오늘 행이 새로 생겼을 때만) 센다.
+private boolean shouldCountView(AuthenticatedMember viewer, Post post) {
+    if (viewer == null) {
+        return true;
+    }
+    if (viewer.id().equals(post.getAuthor().getId())) {
+        return false;
+    }
+    LocalDateTime now = LocalDateTime.now(clock);
+    return postViewRepository.insertIfAbsent(post.getId(), viewer.id(), now.toLocalDate(), now) == 1;
+}
+
+// 2-2 게시판 목록 — 8-4 조합 검색에서 &amp;quot;게시판&amp;quot; 조건만 있는 경우와 같다(같은 쿼리 조립기를 쓴다)
+@Transactional(readOnly = true)
+public PostListResponse list(String boardSlug, int page, int size, AuthenticatedMember viewer) {
+    Board board = boardRepository.findBySlug(boardSlug)
+            .orElseThrow(() -&amp;gt; new BoardNotFoundException(boardSlug));
+    return toListResponse(postSearchRepository.search(
+            PostSearchCondition.ofBoard(board.getId()), viewerIdOf(viewer), PageRequest.of(page, size)));
+}
+
+// 8-4 조합 검색 — 들어온 조건만 붙는다. 없는 게시판·없는 태그는 결과 0건(200)
+@Transactional(readOnly = true)
+public PostListResponse search(String boardSlug, String tag, Long authorId, LocalDate from, LocalDate to,
+                               String q, int page, int size, AuthenticatedMember viewer) {
+    if (from != null &amp;amp;&amp;amp; to != null &amp;amp;&amp;amp; from.isAfter(to)) {
+        throw new InvalidSearchConditionException(&amp;quot;from이 to보다 늦을 수 없습니다.&amp;quot;);
+    }
+    PageRequest pageRequest = PageRequest.of(page, size);
+    Long boardId = null;
+    if (boardSlug != null &amp;amp;&amp;amp; !boardSlug.isBlank()) {
+        Board board = boardRepository.findBySlug(boardSlug).orElse(null);
+        if (board == null) {
+            return toListResponse(Page.empty(pageRequest));
+        }
+        boardId = board.getId();
+    }
+    PostSearchCondition condition = new PostSearchCondition(boardId, tag, authorId, from, to, q, null, null);
+    return toListResponse(postSearchRepository.search(condition, viewerIdOf(viewer), pageRequest));
+}
+
+// 11-4 통합 검색 — 검색어를 정리·검사한 뒤 8-4와 같은 쿼리 조립기(볼 수 있는 글 규칙 포함)에 넘긴다
+@Transactional(readOnly = true)
+public PostListResponse keywordSearch(KeywordSearchRequest request, AuthenticatedMember viewer) {
+    return toListResponse(postSearchRepository.search(
+            PostSearchCondition.ofKeywords(request.words(), request.scope()),
+            viewerIdOf(viewer), PageRequest.of(request.page(), request.size())));
+}
+
+// 12-5 팔로잉 피드 — size+1개를 읽어 다음 묶음이 있는지 정한다(4-3·6-3과 같은 커서)
+@Transactional(readOnly = true)
+public FeedResponse feed(AuthenticatedMember me, int size, String cursor) {
+    Cursor after = Cursor.decode(cursor);
+    List&amp;lt;Post&amp;gt; rows = postRepository.findFeed(me.id(),
+            after == null ? null : after.at(), after == null ? null : after.id(),
+            PageRequest.of(0, size + 1));
+    boolean hasNext = rows.size() &amp;gt; size;
+    List&amp;lt;Post&amp;gt; page = hasNext ? rows.subList(0, size) : rows;
+    String nextCursor = null;
+    if (hasNext) {
+        Post last = page.get(page.size() - 1);
+        nextCursor = new Cursor(last.getPublishedAt(), last.getId()).encode();
+    }
+    return new FeedResponse(page.stream().map(this::toListItem).toList(), nextCursor);
+}
+
+private PostListResponse toListResponse(Page&amp;lt;PostListRow&amp;gt; result) {
+    List&amp;lt;Long&amp;gt; ids = result.getContent().stream().map(PostListRow::id).toList();
+    Map&amp;lt;Long, List&amp;lt;String&amp;gt;&amp;gt; tags = postSearchRepository.findTagsByPostIds(ids).stream()
+            .collect(Collectors.groupingBy(PostTagRow::postId,
+                    Collectors.mapping(PostTagRow::name, Collectors.toList())));
+    List&amp;lt;PostListItemResponse&amp;gt; items = result.getContent().stream()
+            .map(row -&amp;gt; toListItem(row, tags.getOrDefault(row.id(), List.of())))
+            .toList();
+    return new PostListResponse(
+            items,
+            result.getNumber(),
+            result.getSize(),
+            result.getTotalElements(),
+            result.getTotalPages(),
+            (long) result.getNumber() * result.getSize() + items.size() &amp;lt; result.getTotalElements()
+    );
+}
+
+private Long viewerIdOf(AuthenticatedMember viewer) {
+    return viewer == null ? null : viewer.id();
+}
+
+private PostListItemResponse toListItem(PostListRow post, List&amp;lt;String&amp;gt; tags) {
+    return new PostListItemResponse(
+            post.id(),
+            post.title(),
+            post.excerpt(),
+            new AuthorResponse(post.authorId(), post.authorNickname()),
+            tags,
+            post.likeCount(),
+            post.commentCount(),
+            post.viewCount(),
+            post.publishedAt()
+    );
+}
+
+private PostListItemResponse toListItem(Post post) {
+    return new PostListItemResponse(
+            post.getId(),
+            post.getTitle(),
+            post.getExcerpt(),
+            new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+            post.getTags().stream().map(Tag::getName).sorted().toList(),
+            post.getLikeCount(),
+            post.getCommentCount(),
+            post.getViewCount(),
+            post.getPublishedAt()
+    );
+}
+
+private PostDetailResponse toDetailResponse(Post post, int viewCount) {
+    // 트랜잭션 안에서 지연 로딩 연관을 읽어 DTO로 옮긴다(open-in-view: false)
+    return new PostDetailResponse(
+            post.getId(),
+            post.getBoard().getSlug(),
+            post.getTitle(),
+            post.getContent(),
+            post.getTags().stream().map(Tag::getName).sorted().toList(),
+            post.getVisibility(),
+            new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+            viewCount,
+            post.getLikeCount(),
+            post.getCommentCount(),
+            post.getImages().stream().map(i -&amp;gt; new ImageResponse(i.getId(), i.url())).toList(),
+            post.getStatus(),
+            post.getPublishedAt(),
+            post.getCreatedAt()
+    );
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/post/PostRepository.java</summary><pre><code>package org.example.post;
+
+<p>import jakarta.persistence.LockModeType;
+import org.example.board.Board;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;</p>
+<p>import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>// Spring Data JPA가 구현을 만들어 준다(1-3의 메모리 구현을 대체)
+public interface PostRepository extends JpaRepository&lt;Post, Long&gt; {</p>
+<pre><code>// 발행 중 같은 글을 다시 발행하지 않도록 트랜잭션 끝까지 글 행을 잠근다.
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query(&amp;quot;SELECT p FROM Post p WHERE p.id = :id&amp;quot;)
+java.util.Optional&amp;lt;Post&amp;gt; findByIdForUpdate(@Param(&amp;quot;id&amp;quot;) Long id);
+
+// 6-5: 두 표시의 합집합/교집합을 페이지 적용 전에 DB에서 판정한다.
+@EntityGraph(attributePaths = {&amp;quot;author&amp;quot;, &amp;quot;board&amp;quot;})
+@Query(value = &amp;quot;&amp;quot;&amp;quot;
+        SELECT p FROM Post p
+        WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deletedAt IS NULL
+          AND NOT EXISTS (SELECT 1 FROM MemberBlock b
+              WHERE (b.blocker.id = :memberId AND b.blocked = p.author)
+                 OR (b.blocked.id = :memberId AND b.blocker = p.author))
+          AND (:liked = false OR EXISTS (SELECT 1 FROM PostLike l
+              WHERE l.member.id = :memberId AND l.post = p))
+          AND (:bookmarked = false OR EXISTS (SELECT 1 FROM Bookmark bm
+              WHERE bm.member.id = :memberId AND bm.post = p))
+          AND (EXISTS (SELECT 1 FROM PostLike l
+              WHERE l.member.id = :memberId AND l.post = p)
+               OR EXISTS (SELECT 1 FROM Bookmark bm
+              WHERE bm.member.id = :memberId AND bm.post = p))
+        &amp;quot;&amp;quot;&amp;quot;,
+        countQuery = &amp;quot;&amp;quot;&amp;quot;
+        SELECT COUNT(p) FROM Post p
+        WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deletedAt IS NULL
+          AND NOT EXISTS (SELECT 1 FROM MemberBlock b
+              WHERE (b.blocker.id = :memberId AND b.blocked = p.author)
+                 OR (b.blocked.id = :memberId AND b.blocker = p.author))
+          AND (:liked = false OR EXISTS (SELECT 1 FROM PostLike l
+              WHERE l.member.id = :memberId AND l.post = p))
+          AND (:bookmarked = false OR EXISTS (SELECT 1 FROM Bookmark bm
+              WHERE bm.member.id = :memberId AND bm.post = p))
+          AND (EXISTS (SELECT 1 FROM PostLike l
+              WHERE l.member.id = :memberId AND l.post = p)
+               OR EXISTS (SELECT 1 FROM Bookmark bm
+              WHERE bm.member.id = :memberId AND bm.post = p))
+        &amp;quot;&amp;quot;&amp;quot;)
+Page&amp;lt;Post&amp;gt; findMarkedPosts(@Param(&amp;quot;memberId&amp;quot;) Long memberId,
+                           @Param(&amp;quot;liked&amp;quot;) boolean liked,
+                           @Param(&amp;quot;bookmarked&amp;quot;) boolean bookmarked,
+                           Pageable pageable);
+
+// 2-3의 &amp;quot;볼 수 있나&amp;quot; 규칙 중 목록에 해당하는 부분을 쿼리로 옮긴 것 — PostAccessPolicy.canView와
+// 같은 규칙이지만, 목록은 PUBLISHED 글만 대상이다(자기 임시저장·운영자 숨김 글도 목록에는 넣지 않는다).
+// 메모리에서 거르지 않고 쿼리에서 걸러야 페이지 크기·totalElements가 맞는다.
+//
+// Page&amp;lt;Post&amp;gt; 대신 List&amp;lt;Post&amp;gt; + 아래 countViewableByBoard를 따로 둔다: Page&amp;lt;&amp;gt;로 받으면
+// Spring Data가 &amp;quot;content 개수 &amp;lt; size면 count 쿼리를 생략&amp;quot;하는 최적화를 적용해서, size=5(꽉 찬
+// 페이지, count 쿼리 나감)와 size=20(13개뿐이라 마지막 페이지, count 쿼리 생략)의 SQL 문장 수가
+// 13과1씩 달라졌다(2-4의 PostListQueryCountTest가 요구하는 &amp;quot;size와 무관하게 문장 수 동일&amp;quot;이 깨짐).
+// count를 항상 명시적으로 실행해 문장 수를 size와 무관하게 고정한다(R2와도 맞다).
+@Query(&amp;quot;&amp;quot;&amp;quot;
+        SELECT p FROM Post p
+        JOIN FETCH p.author
+        WHERE p.board = :board
+          AND p.deletedAt IS NULL
+          AND p.status = 'PUBLISHED'
+          AND (
+               p.visibility = 'PUBLIC'
+               OR (:viewerId IS NOT NULL AND p.author.id = :viewerId)
+               OR (:viewerId IS NOT NULL AND EXISTS (
+                       SELECT 1 FROM Follow f
+                       WHERE f.follower.id = :viewerId AND f.followee = p.author))
+          )
+          AND (
+               :viewerId IS NULL OR NOT EXISTS (
+                   SELECT 1 FROM MemberBlock b
+                   WHERE (b.blocker.id = :viewerId AND b.blocked = p.author)
+                      OR (b.blocked.id = :viewerId AND b.blocker = p.author)
+               )
+          )
+        &amp;quot;&amp;quot;&amp;quot;)
+List&amp;lt;Post&amp;gt; findViewableByBoard(@Param(&amp;quot;board&amp;quot;) Board board,
+                                @Param(&amp;quot;viewerId&amp;quot;) Long viewerId,
+                                Pageable pageable);
+
+// findViewableByBoard와 같은 조건의 건수 — 반드시 같이 고친다
+@Query(&amp;quot;&amp;quot;&amp;quot;
+        SELECT COUNT(p) FROM Post p
+        WHERE p.board = :board
+          AND p.deletedAt IS NULL
+          AND p.status = 'PUBLISHED'
+          AND (
+               p.visibility = 'PUBLIC'
+               OR (:viewerId IS NOT NULL AND p.author.id = :viewerId)
+               OR (:viewerId IS NOT NULL AND EXISTS (
+                       SELECT 1 FROM Follow f
+                       WHERE f.follower.id = :viewerId AND f.followee = p.author))
+          )
+          AND (
+               :viewerId IS NULL OR NOT EXISTS (
+                   SELECT 1 FROM MemberBlock b
+                   WHERE (b.blocker.id = :viewerId AND b.blocked = p.author)
+                      OR (b.blocked.id = :viewerId AND b.blocker = p.author)
+               )
+          )
+        &amp;quot;&amp;quot;&amp;quot;)
+long countViewableByBoard(@Param(&amp;quot;board&amp;quot;) Board board, @Param(&amp;quot;viewerId&amp;quot;) Long viewerId);
+
+@Query(&amp;quot;&amp;quot;&amp;quot;
+        SELECT p FROM Post p
+        JOIN FETCH p.author a
+        JOIN p.board b
+        WHERE a.id = :memberId
+          AND b.slug = :boardSlug
+          AND p.status = 'PUBLISHED'
+          AND p.visibility = 'PUBLIC'
+          AND p.deletedAt IS NULL
+        ORDER BY p.publishedAt DESC, p.id DESC
+        &amp;quot;&amp;quot;&amp;quot;)
+List&amp;lt;Post&amp;gt; findPublicPostsByAuthorAndBoard(@Param(&amp;quot;memberId&amp;quot;) Long memberId,
+                                            @Param(&amp;quot;boardSlug&amp;quot;) String boardSlug);
+// 4-2: &amp;quot;읽고 +1 해서 저장&amp;quot; 대신 DB가 한 번에 더한다 — 두 요청이 동시에 와도 읽고 쓰는 사이에
+// 끼어들 틈이 없다(갱신 손실 방지). 영속성 컨텍스트를 거치지 않으므로 최신 값은 findLikeCountById로 다시 읽는다.
+@Modifying
+@Query(&amp;quot;UPDATE Post p SET p.likeCount = p.likeCount + 1 WHERE p.id = :id&amp;quot;)
+int incrementLikeCount(@Param(&amp;quot;id&amp;quot;) Long id);
+
+@Modifying
+@Query(&amp;quot;UPDATE Post p SET p.likeCount = p.likeCount - 1 WHERE p.id = :id AND p.likeCount &amp;gt; 0&amp;quot;)
+int decrementLikeCount(@Param(&amp;quot;id&amp;quot;) Long id);
+
+@Query(&amp;quot;SELECT p.likeCount FROM Post p WHERE p.id = :id&amp;quot;)
+Integer findLikeCountById(@Param(&amp;quot;id&amp;quot;) Long id);
+
+// 11-1 내 임시저장 글 — 게시판 slug를 같이 쓰므로 fetch join(글마다 board를 따로 읽지 않는다)
+@Query(&amp;quot;&amp;quot;&amp;quot;
+        SELECT p FROM Post p JOIN FETCH p.board
+         WHERE p.author.id = :authorId AND p.status = 'DRAFT' AND p.deletedAt IS NULL
+         ORDER BY p.updatedAt DESC, p.id DESC
+        &amp;quot;&amp;quot;&amp;quot;)
+List&amp;lt;Post&amp;gt; findMyDrafts(@Param(&amp;quot;authorId&amp;quot;) Long authorId);
+
+// 11-3 조회수 +1 — 4-2의 좋아요 수처럼 DB가 한 문장 안에서 더한다. 다시 읽는 값은 findViewCountById로
+@Modifying
+@Query(&amp;quot;UPDATE Post p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id&amp;quot;)
+int incrementViewCount(@Param(&amp;quot;id&amp;quot;) Long id);
+
+// REPEATABLE READ의 오래된 읽기 스냅샷 대신 현재 커밋된 값을 본다.
+@Query(nativeQuery = true, value = &amp;quot;SELECT view_count FROM post WHERE id = :id FOR UPDATE&amp;quot;)
+Integer findViewCountById(@Param(&amp;quot;id&amp;quot;) Long id);
+
+// 11-5 휴지통 — 내가 쓰고 내가 지운 글, since 이후에 지운 것만(30일 안)
+@Query(&amp;quot;&amp;quot;&amp;quot;
+        SELECT p FROM Post p JOIN FETCH p.board
+         WHERE p.author.id = :memberId AND p.deletedBy = :memberId
+           AND p.deletedAt IS NOT NULL AND p.deletedAt &amp;gt;= :since
+         ORDER BY p.deletedAt DESC, p.id DESC
+        &amp;quot;&amp;quot;&amp;quot;)
+List&amp;lt;Post&amp;gt; findMyTrash(@Param(&amp;quot;memberId&amp;quot;) Long memberId, @Param(&amp;quot;since&amp;quot;) LocalDateTime since);
+
+// 5-1: 댓글 저장과 같은 트랜잭션에서 comment_count를 원자적으로 올린다(4-2와 같은 방식)
+@Modifying
+@Query(&amp;quot;UPDATE Post p SET p.commentCount = p.commentCount + 1 WHERE p.id = :id&amp;quot;)
+int incrementCommentCount(@Param(&amp;quot;id&amp;quot;) Long id);
+
+// 5-3: 댓글 삭제와 같은 트랜잭션에서 내린다
+@Modifying
+@Query(&amp;quot;UPDATE Post p SET p.commentCount = p.commentCount - 1 WHERE p.id = :id AND p.commentCount &amp;gt; 0&amp;quot;)
+int decrementCommentCount(@Param(&amp;quot;id&amp;quot;) Long id);
+
+// 8-2: 기간 [from, to) 안의 좋아요×3 + 댓글(삭제 제외)×1. 누적 like_count(어긋날 수 있음)를 쓰지 않고
+// 기간 안의 행을 센다. 글마다 따로 세지 않고 미리 집계한 서브쿼리 두 개를 LEFT JOIN한다.
+// 볼 수 있는 글(비로그인 기준)·점수 &amp;gt; 0·정렬·LIMIT을 모두 DB에서 처리한다.
+@Query(nativeQuery = true, value = &amp;quot;&amp;quot;&amp;quot;
+        SELECT p.id AS postId,
+               p.title AS title,
+               COALESCE(l.cnt, 0) * 3 + COALESCE(c.cnt, 0) AS score,
+               COALESCE(l.cnt, 0) AS likes,
+               COALESCE(c.cnt, 0) AS comments
+          FROM post p
+          LEFT JOIN (SELECT post_id, COUNT(*) AS cnt
+                       FROM post_like
+                      WHERE created_at &amp;gt;= :from AND created_at &amp;lt; :to
+                      GROUP BY post_id) l ON l.post_id = p.id
+          LEFT JOIN (SELECT post_id, COUNT(*) AS cnt
+                       FROM comment
+                      WHERE deleted_at IS NULL AND created_at &amp;gt;= :from AND created_at &amp;lt; :to
+                      GROUP BY post_id) c ON c.post_id = p.id
+         WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL
+           AND (l.cnt IS NOT NULL OR c.cnt IS NOT NULL)
+         ORDER BY score DESC, p.published_at DESC, p.id DESC
+         LIMIT :limit
+        &amp;quot;&amp;quot;&amp;quot;)
+List&amp;lt;PopularPostRow&amp;gt; findPopular(@Param(&amp;quot;from&amp;quot;) LocalDateTime from,
+                                 @Param(&amp;quot;to&amp;quot;) LocalDateTime to,
+                                 @Param(&amp;quot;limit&amp;quot;) int limit);
+
+// 12-5 피드 — 작성자가 나이거나 내가 팔로우하는 회원인 게시된 글. 차단 관계(어느 쪽이든)와 내가 뮤트한 회원의 글은 뺀다.
+// 팔로워 공개 글은 따로 걸지 않는다 — 작성자가 나 또는 팔로잉뿐이라 저절로 볼 수 있다.
+// 키셋 커서 (published_at, id). 작성자는 함께 읽고 태그는 batch fetch(2-4)가 묶어 읽는다.
+@Query(&amp;quot;&amp;quot;&amp;quot;
+        SELECT p FROM Post p
+        JOIN FETCH p.author a
+        WHERE p.deletedAt IS NULL
+          AND p.status = 'PUBLISHED'
+          AND (a.id = :me OR EXISTS (SELECT 1 FROM Follow f WHERE f.follower.id = :me AND f.followee = a))
+          AND NOT EXISTS (SELECT 1 FROM MemberBlock b
+                          WHERE (b.blocker.id = :me AND b.blocked = a) OR (b.blocked.id = :me AND b.blocker = a))
+          AND NOT EXISTS (SELECT 1 FROM MemberMute m WHERE m.muter.id = :me AND m.muted = a)
+          AND (
+               :cursorAt IS NULL
+               OR p.publishedAt &amp;lt; :cursorAt
+               OR (p.publishedAt = :cursorAt AND p.id &amp;lt; :cursorId)
+          )
+        ORDER BY p.publishedAt DESC, p.id DESC
+        &amp;quot;&amp;quot;&amp;quot;)
+List&amp;lt;Post&amp;gt; findFeed(@Param(&amp;quot;me&amp;quot;) Long me,
+                    @Param(&amp;quot;cursorAt&amp;quot;) LocalDateTime cursorAt,
+                    @Param(&amp;quot;cursorId&amp;quot;) Long cursorId,
+                    Pageable pageable);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Entity — src/main/java/org/example/social/MemberMute.java</summary><pre><code>package org.example.social;
+
+<p>import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import org.example.member.Member;</p>
+<p>import java.time.LocalDateTime;</p>
+<p>// 뮤트(V32) — muter의 피드(12-5)에서만 muted의 글을 뺀다. 저장은 INSERT IGNORE(리포지토리)로 한다
+@Entity
+@Table(name = &quot;member_mute&quot;)
+public class MemberMute {</p>
+<pre><code>@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &amp;quot;muter_id&amp;quot;, nullable = false)
+private Member muter;
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &amp;quot;muted_id&amp;quot;, nullable = false)
+private Member muted;
+
+@Column(name = &amp;quot;created_at&amp;quot;, nullable = false)
+private LocalDateTime createdAt;
+
+protected MemberMute() {
+    // JPA
+}
+
+public Long getId() {
+    return id;
+}
+
+public Member getMuter() {
+    return muter;
+}
+
+public Member getMuted() {
+    return muted;
+}
+
+public LocalDateTime getCreatedAt() {
+    return createdAt;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/social/MemberMuteRepository.java</summary><pre><code>package org.example.social;
+
+<p>import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;</p>
+<p>import java.time.LocalDateTime;</p>
+<p>public interface MemberMuteRepository extends JpaRepository&lt;MemberMute, Long&gt; {</p>
+<pre><code>// 이미 있으면 0행 — 멱등(12-4 팔로우와 같은 방법)
+@Modifying
+@Query(value = &amp;quot;INSERT IGNORE INTO member_mute (muter_id, muted_id, created_at) VALUES (:muterId, :mutedId, :now)&amp;quot;,
+        nativeQuery = true)
+int insertIgnore(@Param(&amp;quot;muterId&amp;quot;) Long muterId, @Param(&amp;quot;mutedId&amp;quot;) Long mutedId, @Param(&amp;quot;now&amp;quot;) LocalDateTime now);
+
+@Modifying
+@Query(&amp;quot;DELETE FROM MemberMute m WHERE m.muter.id = :muterId AND m.muted.id = :mutedId&amp;quot;)
+int deleteRelation(@Param(&amp;quot;muterId&amp;quot;) Long muterId, @Param(&amp;quot;mutedId&amp;quot;) Long mutedId);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/social/MuteController.java</summary><pre><code>package org.example.social;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>@RestController
+public class MuteController {</p>
+<pre><code>private final MuteService muteService;
+
+public MuteController(MuteService muteService) {
+    this.muteService = muteService;
+}
+
+@PutMapping(&amp;quot;/api/members/{id}/mute&amp;quot;)
+public MuteResponse mute(@PathVariable Long id, @LoginMember AuthenticatedMember me) {
+    return muteService.mute(me, id);
+}
+
+@DeleteMapping(&amp;quot;/api/members/{id}/mute&amp;quot;)
+public MuteResponse unmute(@PathVariable Long id, @LoginMember AuthenticatedMember me) {
+    return muteService.unmute(me, id);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/social/MuteResponse.java</summary><pre><code>package org.example.social;
+
+<p>public record MuteResponse(Long memberId, boolean muted) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/social/MuteService.java</summary><pre><code>package org.example.social;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.member.MemberNotFoundException;
+import org.example.member.MemberRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.time.Clock;
+import java.time.LocalDateTime;</p>
+<p>// 12-5 뮤트 — 팔로우(12-4)와 같은 모양의 멱등 PUT/DELETE. 차단 관계여도 된다(내 피드만 바뀐다)
+@Service
+public class MuteService {</p>
+<pre><code>private static final String WITHDRAWN = &amp;quot;WITHDRAWN&amp;quot;;
+
+private final MemberMuteRepository memberMuteRepository;
+private final MemberRepository memberRepository;
+private final Clock clock;
+
+public MuteService(MemberMuteRepository memberMuteRepository, MemberRepository memberRepository, Clock clock) {
+    this.memberMuteRepository = memberMuteRepository;
+    this.memberRepository = memberRepository;
+    this.clock = clock;
+}
+
+@Transactional
+public MuteResponse mute(AuthenticatedMember me, Long targetId) {
+    Long id = checkTarget(me, targetId);
+    memberMuteRepository.insertIgnore(me.id(), id, LocalDateTime.now(clock));
+    return new MuteResponse(id, true);
+}
+
+@Transactional
+public MuteResponse unmute(AuthenticatedMember me, Long targetId) {
+    Long id = checkTarget(me, targetId);
+    memberMuteRepository.deleteRelation(me.id(), id);
+    return new MuteResponse(id, false);
+}
+
+private Long checkTarget(AuthenticatedMember me, Long targetId) {
+    if (me.id().equals(targetId)) {
+        throw new SelfMuteNotAllowedException();
+    }
+    return memberRepository.findById(targetId)
+            .filter(m -&amp;gt; !WITHDRAWN.equals(m.getMemberStatus()) &amp;amp;&amp;amp; m.getDeletedAt() == null)
+            .orElseThrow(MemberNotFoundException::new)
+            .getId();
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/social/SelfMuteNotAllowedException.java</summary><pre><code>package org.example.social;
+
+<p>// 자기 자신 뮤트 — 전역 핸들러가 400으로 변환한다
+public class SelfMuteNotAllowedException extends RuntimeException {</p>
+<pre><code>public SelfMuteNotAllowedException() {
+    super(&amp;quot;자기 자신은 뮤트할 수 없습니다.&amp;quot;);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DB / SQL — src/main/resources/db/migration/V32__create_member_mute.sql</summary><pre><code>-- V32 — 뮤트(12-5). &quot;이 사람 글을 내 피드에서만 안 보기&quot;. 차단(member_block)과 달리 상대는 모르고,
+-- 글 상세·게시판 목록·댓글에는 아무 영향이 없다. 한 사람이 같은 사람을 두 번 뮤트할 수 없다(UNIQUE).
+CREATE TABLE member_mute (
+    id         BIGINT   NOT NULL AUTO_INCREMENT,
+    muter_id   BIGINT   NOT NULL,
+    muted_id   BIGINT   NOT NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_member_mute (muter_id, muted_id),
+    KEY ix_member_mute_muted (muted_id),
+    CONSTRAINT fk_member_mute_muter FOREIGN KEY (muter_id) REFERENCES member (id),
+    CONSTRAINT fk_member_mute_muted FOREIGN KEY (muted_id) REFERENCES member (id),
+    CONSTRAINT ck_member_mute_self CHECK (muter_id &lt;&gt; muted_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '뮤트 — muter의 피드에서 muted의 글을 뺀다';
+</code></pre></details>
+
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/12-5.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="mybatis-대체-구현-코드"><a class="anchor" href="#mybatis-대체-구현-코드" aria-hidden="true">#</a>MyBatis 대체 구현 코드</h2>
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {
+    id 'java'
+    // bootRun / bootJar 태스크 제공 + 실행 가능한 fat jar 패키징
+    id 'org.springframework.boot' version '4.1.1'
+    // Boot BOM을 적용해서 아래 의존성들의 버전을 생략할 수 있게 해줌
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+<p>group = &#39;org.example&#39;
+version = &#39;1.0-SNAPSHOT&#39;</p>
+<p>java {
+    toolchain {
+        // 컴파일·실행 JDK를 고정 (Boot 4는 Java 17 이상 필요, 로컬에 설치된 21 사용)
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}</p>
+<p>repositories {
+    mavenCentral()
+}</p>
+<p>dependencies {
+    compileOnly &#39;org.projectlombok:lombok&#39;
+    annotationProcessor &#39;org.projectlombok:lombok&#39;
+    // Spring MVC + 내장 Tomcat + Jackson (Boot 4부터 starter-web → starter-webmvc로 이름 변경)
+    implementation &#39;org.springframework.boot:spring-boot-starter-webmvc&#39;
+    // JPA(Hibernate) + HikariCP 커넥션 풀
+    implementation &#39;org.springframework.boot:spring-boot-starter-data-jpa&#39;
+    implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;
+    // @Valid, @NotBlank 같은 요청 값 검증
+    implementation &#39;org.springframework.boot:spring-boot-starter-validation&#39;
+    // MySQL JDBC 드라이버 — 컴파일엔 필요 없고 실행할 때만 필요
+    runtimeOnly &#39;com.mysql:mysql-connector-j&#39;
+    // 9-1 스키마 변경은 Flyway 마이그레이션(db/migration)으로만 한다
+    implementation &#39;org.springframework.boot:spring-boot-starter-flyway&#39;
+    runtimeOnly &#39;org.flywaydb:flyway-mysql&#39;</p>
+<pre><code>// 테스트: JUnit·AssertJ·Mockito·MockMvc 묶음 (버전은 Boot BOM이 관리하므로 junit-bom 따로 두지 않음)
+testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+// @DataJpaTest(리포지토리만 띄우는 테스트)
+testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+// 테스트용 일회용 MySQL 컨테이너 — application-test.yml의 jdbc:tc: URL이 쓴다
+testImplementation 'org.testcontainers:testcontainers-mysql'
+// Gradle이 JUnit Platform 테스트를 실행할 때 필요한 런처
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'</code></pre>
+<p>}</p>
+<p>tasks.named(&#39;test&#39;) {
+    useJUnitPlatform()
+    // 테스트는 application-test.yml(Testcontainers MySQL)을 쓰게 한다
+    systemProperty &#39;spring.profiles.active&#39;, &#39;test&#39;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: javaExperience
+  datasource:
+    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  flyway:
+    # 이미 테이블·데이터가 있는 DB(compose의 community·practice)는 V1(CREATE TABLE)을 실행하면 실패한다.
+    # 그래서 기록 테이블이 없으면 &quot;V1까지 됐다&quot;고만 적고(baseline) V2부터 실행한다. 빈 DB면 V1부터 실제로 실행한다.
+    baseline-on-migrate: true
+    baseline-version: 1
+  servlet:
+    multipart:
+      # 11-2 이미지 한 장 1MB, 요청 전체 2MB까지. 넘으면 MaxUploadSizeExceededException → 413
+      max-file-size: 1MB
+      max-request-size: 2MB
+  jpa:
+    hibernate:
+      # 스키마는 Flyway만 바꾼다(9-1). 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)
+      ddl-auto: validate
+    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        # 컬렉션(태그) 지연 로딩을 글마다 1번이 아니라 IN (...) 한 번으로 묶는다(2-4, N+1 대응)
+        default_batch_fetch_size: 100
+
+<p>mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true</p>
+<h1 id="11-2-올린-이미지를-저장할-폴더앱을-실행한-위치-기준-git에는-올리지-않는다gitignore"><a class="anchor" href="#11-2-올린-이미지를-저장할-폴더앱을-실행한-위치-기준-git에는-올리지-않는다gitignore" aria-hidden="true">#</a>11-2 올린 이미지를 저장할 폴더(앱을 실행한 위치 기준). git에는 올리지 않는다(.gitignore)</h1>
+<p>app:
+  upload-dir: uploads</p>
+<p>logging:
+  level:
+    # 실행 SQL은 확인하되 토큰을 포함한 바인딩 값은 로그에 남기지 않는다
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: info</p>
+<h1 id="0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다"><a class="anchor" href="#0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다" aria-hidden="true">#</a>0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다</h1>
+<p>start:
+  greeting: 반가워요, 백엔드!
+  max-items: 5
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/social/MuteCommandMapper.java</summary><pre><code>package org.example.social;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>import java.time.LocalDateTime;</p>
+<p>@Mapper
+public interface MuteCommandMapper {
+    int insertIgnore(@Param(&quot;muterId&quot;) Long muterId, @Param(&quot;mutedId&quot;) Long mutedId,
+                     @Param(&quot;now&quot;) LocalDateTime now);</p>
+<pre><code>int deleteRelation(@Param(&amp;quot;muterId&amp;quot;) Long muterId, @Param(&amp;quot;mutedId&amp;quot;) Long mutedId);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/MuteCommandMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.social.MuteCommandMapper&quot;&gt;
+    &lt;insert id=&quot;insertIgnore&quot;&gt;
+        INSERT IGNORE INTO member_mute (muter_id, muted_id, created_at)
+        VALUES (#{muterId}, #{mutedId}, #{now})
+    &lt;/insert&gt;
+    &lt;delete id=&quot;deleteRelation&quot;&gt;
+        DELETE FROM member_mute WHERE muter_id = #{muterId} AND muted_id = #{mutedId}
+    &lt;/delete&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/post/FeedPostMapper.java</summary><pre><code>package org.example.post;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>@Mapper
+public interface FeedPostMapper {
+    List&lt;PostListRow&gt; findFeed(@Param(&quot;me&quot;) Long me, @Param(&quot;cursorAt&quot;) LocalDateTime cursorAt,
+                               @Param(&quot;cursorId&quot;) Long cursorId, @Param(&quot;limit&quot;) int limit);</p>
+<pre><code>List&amp;lt;PostTagRow&amp;gt; findTagsByPostIds(@Param(&amp;quot;ids&amp;quot;) List&amp;lt;Long&amp;gt; ids);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/FeedPostMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.post.FeedPostMapper&quot;&gt;
+    &lt;select id=&quot;findFeed&quot; resultType=&quot;org.example.post.PostListRow&quot;&gt;
+        SELECT p.id, p.title, p.excerpt,
+               a.id AS author_id, a.nickname AS author_nickname,
+               p.like_count, p.comment_count, p.view_count, p.published_at
+        FROM post p JOIN member a ON a.id = p.author_id
+        WHERE p.deleted_at IS NULL AND p.status = 'PUBLISHED'
+          AND (a.id = #{me} OR EXISTS (
+              SELECT 1 FROM follow f WHERE f.follower_id = #{me} AND f.followee_id = a.id))
+          AND NOT EXISTS (
+              SELECT 1 FROM member_block b
+              WHERE (b.blocker_id = #{me} AND b.blocked_id = a.id)
+                 OR (b.blocked_id = #{me} AND b.blocker_id = a.id))
+          AND NOT EXISTS (
+              SELECT 1 FROM member_mute m WHERE m.muter_id = #{me} AND m.muted_id = a.id)
+        &lt;if test=&quot;cursorAt != null&quot;&gt;
+          AND (p.published_at &amp;lt; #{cursorAt}
+               OR (p.published_at = #{cursorAt} AND p.id &amp;lt; #{cursorId}))
+        &lt;/if&gt;
+        ORDER BY p.published_at DESC, p.id DESC LIMIT #{limit}
+    &lt;/select&gt;
+    &lt;select id=&quot;findTagsByPostIds&quot; resultType=&quot;org.example.post.PostTagRow&quot;&gt;
+        SELECT pt.post_id, t.name
+        FROM post_tag pt JOIN tag t ON t.id = pt.tag_id
+        WHERE pt.post_id IN
+        &lt;foreach collection=&quot;ids&quot; item=&quot;id&quot; open=&quot;(&quot; separator=&quot;,&quot; close=&quot;)&quot;&gt;#{id}&lt;/foreach&gt;
+        ORDER BY t.name
+    &lt;/select&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/social/MuteService.java</summary><pre><code>package org.example.social;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.member.MemberNotFoundException;
+import org.example.member.MemberRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.time.Clock;
+import java.time.LocalDateTime;</p>
+<p>// 12-5 뮤트 — 팔로우(12-4)와 같은 모양의 멱등 PUT/DELETE. 차단 관계여도 된다(내 피드만 바뀐다)
+@Service
+public class MuteService {</p>
+<pre><code>private static final String WITHDRAWN = &amp;quot;WITHDRAWN&amp;quot;;
+
+private final MuteCommandMapper muteCommandMapper;
+private final MemberRepository memberRepository;
+private final Clock clock;
+
+public MuteService(MuteCommandMapper muteCommandMapper, MemberRepository memberRepository, Clock clock) {
+    this.muteCommandMapper = muteCommandMapper;
+    this.memberRepository = memberRepository;
+    this.clock = clock;
+}
+
+@Transactional
+public MuteResponse mute(AuthenticatedMember me, Long targetId) {
+    Long id = checkTarget(me, targetId);
+    muteCommandMapper.insertIgnore(me.id(), id, LocalDateTime.now(clock));
+    return new MuteResponse(id, true);
+}
+
+@Transactional
+public MuteResponse unmute(AuthenticatedMember me, Long targetId) {
+    Long id = checkTarget(me, targetId);
+    muteCommandMapper.deleteRelation(me.id(), id);
+    return new MuteResponse(id, false);
+}
+
+private Long checkTarget(AuthenticatedMember me, Long targetId) {
+    if (me.id().equals(targetId)) {
+        throw new SelfMuteNotAllowedException();
+    }
+    return memberRepository.findById(targetId)
+            .filter(m -&amp;gt; !WITHDRAWN.equals(m.getMemberStatus()) &amp;amp;&amp;amp; m.getDeletedAt() == null)
+            .orElseThrow(MemberNotFoundException::new)
+            .getId();
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostQueryService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.board.Board;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardRepository;
+import org.example.member.MemberRepository;
+import org.example.common.Cursor;
+import org.example.tag.Tag;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;</p>
+<p>import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;</p>
+<p>// 글 조회 전용 서비스 — 1-3/1-4의 PostService(쓰기)와 책임을 나눈다
+@Service
+public class PostQueryService {</p>
+<pre><code>private final PostRepository postRepository;
+private final BoardRepository boardRepository;
+private final MemberRepository memberRepository;
+private final PostAccessPolicy accessPolicy;
+private final PostSearchRepository postSearchRepository;
+private final FeedPostMapper feedPostMapper;
+private final PostViewRepository postViewRepository;
+private final Clock clock;
+
+public PostQueryService(PostRepository postRepository, BoardRepository boardRepository,
+                         MemberRepository memberRepository, PostAccessPolicy accessPolicy,
+                         PostSearchRepository postSearchRepository, FeedPostMapper feedPostMapper,
+                         PostViewRepository postViewRepository,
+                         Clock clock) {
+    this.postRepository = postRepository;
+    this.boardRepository = boardRepository;
+    this.memberRepository = memberRepository;
+    this.accessPolicy = accessPolicy;
+    this.postSearchRepository = postSearchRepository;
+    this.feedPostMapper = feedPostMapper;
+    this.postViewRepository = postViewRepository;
+    this.clock = clock;
+}
+
+@Transactional(readOnly = true)
+public List&amp;lt;PostHeadlineResponse&amp;gt; listPublicByAuthor(Long memberId, String boardSlug) {
+    if (!memberRepository.existsById(memberId)) {
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, &amp;quot;회원을 찾을 수 없습니다.&amp;quot;);
+    }
+    boardRepository.findBySlug(boardSlug)
+            .orElseThrow(() -&amp;gt; new BoardNotFoundException(boardSlug));
+    return postRepository.findPublicPostsByAuthorAndBoard(memberId, boardSlug).stream()
+            .map(post -&amp;gt; new PostHeadlineResponse(
+                    post.getId(), post.getTitle(),
+                    post.getAuthor().getNickname(), boardSlug))
+            .toList();
+}
+
+@Transactional
+public PostDetailResponse getDetail(Long id, AuthenticatedMember viewer) {
+    // 접근 권한도 잠금 이후의 최신 상태로 판단한다(삭제·공개 범위 변경과의 경합).
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+
+    // 볼 수 없으면 403이 아니라 404 — 글이 있다는 사실도 숨긴다. 조회수도 올리지 않는다.
+    if (!accessPolicy.canView(viewer, post)) {
+        throw new PostNotFoundException();
+    }
+
+    // post_view INSERT와 post 카운터 UPDATE의 잠금 순서는 위 글 행 잠금으로 고정된다.
+    if (shouldCountView(viewer, post)) {
+        postRepository.incrementViewCount(id);
+    }
+    // 벌크 UPDATE는 관리 엔티티의 viewCount를 갱신하지 않으므로 DB에서 현재 값을 다시 읽는다.
+    int viewCount = postRepository.findViewCountById(id);
+    return toDetailResponse(post, viewCount);
+}
+
+// 11-3 조회수를 셀까? — 비로그인은 누군지 몰라 매번 센다, 작성자 본인은 안 센다,
+// 로그인 회원은 그 글을 오늘 처음 볼 때만(post_view에 오늘 행이 새로 생겼을 때만) 센다.
+private boolean shouldCountView(AuthenticatedMember viewer, Post post) {
+    if (viewer == null) {
+        return true;
+    }
+    if (viewer.id().equals(post.getAuthor().getId())) {
+        return false;
+    }
+    LocalDateTime now = LocalDateTime.now(clock);
+    return postViewRepository.insertIfAbsent(post.getId(), viewer.id(), now.toLocalDate(), now) == 1;
+}
+
+// 2-2 게시판 목록 — 8-4 조합 검색에서 &amp;quot;게시판&amp;quot; 조건만 있는 경우와 같다(같은 쿼리 조립기를 쓴다)
+@Transactional(readOnly = true)
+public PostListResponse list(String boardSlug, int page, int size, AuthenticatedMember viewer) {
+    Board board = boardRepository.findBySlug(boardSlug)
+            .orElseThrow(() -&amp;gt; new BoardNotFoundException(boardSlug));
+    return toListResponse(postSearchRepository.search(
+            PostSearchCondition.ofBoard(board.getId()), viewerIdOf(viewer), PageRequest.of(page, size)));
+}
+
+// 8-4 조합 검색 — 들어온 조건만 붙는다. 없는 게시판·없는 태그는 결과 0건(200)
+@Transactional(readOnly = true)
+public PostListResponse search(String boardSlug, String tag, Long authorId, LocalDate from, LocalDate to,
+                               String q, int page, int size, AuthenticatedMember viewer) {
+    if (from != null &amp;amp;&amp;amp; to != null &amp;amp;&amp;amp; from.isAfter(to)) {
+        throw new InvalidSearchConditionException(&amp;quot;from이 to보다 늦을 수 없습니다.&amp;quot;);
+    }
+    PageRequest pageRequest = PageRequest.of(page, size);
+    Long boardId = null;
+    if (boardSlug != null &amp;amp;&amp;amp; !boardSlug.isBlank()) {
+        Board board = boardRepository.findBySlug(boardSlug).orElse(null);
+        if (board == null) {
+            return toListResponse(Page.empty(pageRequest));
+        }
+        boardId = board.getId();
+    }
+    PostSearchCondition condition = new PostSearchCondition(boardId, tag, authorId, from, to, q, null, null);
+    return toListResponse(postSearchRepository.search(condition, viewerIdOf(viewer), pageRequest));
+}
+
+// 11-4 통합 검색 — 검색어를 정리·검사한 뒤 8-4와 같은 쿼리 조립기(볼 수 있는 글 규칙 포함)에 넘긴다
+@Transactional(readOnly = true)
+public PostListResponse keywordSearch(KeywordSearchRequest request, AuthenticatedMember viewer) {
+    return toListResponse(postSearchRepository.search(
+            PostSearchCondition.ofKeywords(request.words(), request.scope()),
+            viewerIdOf(viewer), PageRequest.of(request.page(), request.size())));
+}
+
+// 12-5 팔로잉 피드 — size+1개를 읽어 다음 묶음이 있는지 정한다(4-3·6-3과 같은 커서)
+@Transactional(readOnly = true)
+public FeedResponse feed(AuthenticatedMember me, int size, String cursor) {
+    Cursor after = Cursor.decode(cursor);
+    List&amp;lt;PostListRow&amp;gt; rows = feedPostMapper.findFeed(me.id(),
+            after == null ? null : after.at(), after == null ? null : after.id(),
+            size + 1);
+    boolean hasNext = rows.size() &amp;gt; size;
+    List&amp;lt;PostListRow&amp;gt; page = hasNext ? rows.subList(0, size) : rows;
+    String nextCursor = null;
+    if (hasNext) {
+        PostListRow last = page.get(page.size() - 1);
+        nextCursor = new Cursor(last.publishedAt(), last.id()).encode();
+    }
+    if (page.isEmpty()) {
+        return new FeedResponse(List.of(), null);
+    }
+    Map&amp;lt;Long, List&amp;lt;String&amp;gt;&amp;gt; tags = feedPostMapper.findTagsByPostIds(page.stream().map(PostListRow::id).toList())
+            .stream().collect(Collectors.groupingBy(PostTagRow::postId,
+                    Collectors.mapping(PostTagRow::name, Collectors.toList())));
+    return new FeedResponse(page.stream()
+            .map(row -&amp;gt; toListItem(row, tags.getOrDefault(row.id(), List.of()))).toList(), nextCursor);
+}
+
+private PostListResponse toListResponse(Page&amp;lt;PostListRow&amp;gt; result) {
+    List&amp;lt;Long&amp;gt; ids = result.getContent().stream().map(PostListRow::id).toList();
+    Map&amp;lt;Long, List&amp;lt;String&amp;gt;&amp;gt; tags = postSearchRepository.findTagsByPostIds(ids).stream()
+            .collect(Collectors.groupingBy(PostTagRow::postId,
+                    Collectors.mapping(PostTagRow::name, Collectors.toList())));
+    List&amp;lt;PostListItemResponse&amp;gt; items = result.getContent().stream()
+            .map(row -&amp;gt; toListItem(row, tags.getOrDefault(row.id(), List.of())))
+            .toList();
+    return new PostListResponse(
+            items,
+            result.getNumber(),
+            result.getSize(),
+            result.getTotalElements(),
+            result.getTotalPages(),
+            (long) result.getNumber() * result.getSize() + items.size() &amp;lt; result.getTotalElements()
+    );
+}
+
+private Long viewerIdOf(AuthenticatedMember viewer) {
+    return viewer == null ? null : viewer.id();
+}
+
+private PostListItemResponse toListItem(PostListRow post, List&amp;lt;String&amp;gt; tags) {
+    return new PostListItemResponse(
+            post.id(),
+            post.title(),
+            post.excerpt(),
+            new AuthorResponse(post.authorId(), post.authorNickname()),
+            tags,
+            post.likeCount(),
+            post.commentCount(),
+            post.viewCount(),
+            post.publishedAt()
+    );
+}
+
+private PostListItemResponse toListItem(Post post) {
+    return new PostListItemResponse(
+            post.getId(),
+            post.getTitle(),
+            post.getExcerpt(),
+            new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+            post.getTags().stream().map(Tag::getName).sorted().toList(),
+            post.getLikeCount(),
+            post.getCommentCount(),
+            post.getViewCount(),
+            post.getPublishedAt()
+    );
+}
+
+private PostDetailResponse toDetailResponse(Post post, int viewCount) {
+    // 트랜잭션 안에서 지연 로딩 연관을 읽어 DTO로 옮긴다(open-in-view: false)
+    return new PostDetailResponse(
+            post.getId(),
+            post.getBoard().getSlug(),
+            post.getTitle(),
+            post.getContent(),
+            post.getTags().stream().map(Tag::getName).sorted().toList(),
+            post.getVisibility(),
+            new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+            viewCount,
+            post.getLikeCount(),
+            post.getCommentCount(),
+            post.getImages().stream().map(i -&amp;gt; new ImageResponse(i.getId(), i.url())).toList(),
+            post.getStatus(),
+            post.getPublishedAt(),
+            post.getCreatedAt()
+    );
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<p>회원 6(<code>tok-p06</code>)은 회원 7만 팔로우한다. 회원 6의 글은 145(공개)·91(팔로워 공개)·83(임시저장), 회원 7의 글은 101·44다.</p>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080
+H='Authorization: Bearer tok-p06'
+ids() { python3 -c 'import sys,json; d=json.load(sys.stdin); print([i[&quot;id&quot;] for i in d[&quot;items&quot;]], d[&quot;nextCursor&quot;])'; }
+
+curl -s -X DELETE &quot;$BASE/api/members/7/mute&quot; -H &quot;$H&quot;; echo           # 처음 상태로
+curl -s &quot;$BASE/api/me/feed?size=2&quot; -H &quot;$H&quot; | ids                       # A1 [145, 101] + 커서
+curl -s &quot;$BASE/api/me/feed?size=2&amp;cursor=&lt;A1의 nextCursor&gt;&quot; -H &quot;$H&quot; | ids   # A2 [91, 44] None
+curl -s -X PUT &quot;$BASE/api/members/7/mute&quot; -H &quot;$H&quot;; echo              # M 뮤트
+curl -s &quot;$BASE/api/me/feed&quot; -H &quot;$H&quot; | ids                              # B [145, 91] — 7의 글이 빠짐
+curl -s -o /dev/null -w '%{http_code}\n' &quot;$BASE/api/posts/44&quot; -H &quot;$H&quot;   # D 200 — 상세는 그대로
+curl -s -X DELETE &quot;$BASE/api/members/7/mute&quot; -H &quot;$H&quot;; echo           # U 다시 보기
+curl -s &quot;$BASE/api/me/feed&quot; -H &quot;$H&quot; | ids                              # C [145, 101, 91, 44]
+for q in 'size=0' 'size=51' 'size=abc' 'cursor=abc'; do curl -s -o /dev/null -w &quot;$q → %{http_code}\n&quot; &quot;$BASE/api/me/feed?$q&quot; -H &quot;$H&quot;; done   # 모두 400</code></pre></details>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 끝에서 뮤트를 풀므로 몇 번을 눌러도 같은 결과다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="X" data-method="DELETE" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>X · 처음 상태로(뮤트 풀기)</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/members/7/mute" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="A1" data-method="GET" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>A1 · 피드 첫 묶음</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/feed?size=2" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;equals&quot;:[145,101]},{&quot;path&quot;:&quot;$.items[1].author&quot;,&quot;equals&quot;:{&quot;id&quot;:7,&quot;nickname&quot;:&quot;리액트에서왔어요&quot;}},{&quot;path&quot;:&quot;$.items[0].excerpt&quot;,&quot;type&quot;:&quot;string&quot;},{&quot;path&quot;:&quot;$.nextCursor&quot;,&quot;type&quot;:&quot;string&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="A2" data-method="GET" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>A2 · 피드 다음 묶음</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/feed?size=2&amp;cursor={{A1.body.nextCursor}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;equals&quot;:[91,44]},{&quot;path&quot;:&quot;$.nextCursor&quot;,&quot;type&quot;:&quot;null&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="M" data-method="PUT" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>M · 회원 7 뮤트</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/members/7/mute" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$&quot;,&quot;equals&quot;:{&quot;memberId&quot;:7,&quot;muted&quot;:true}}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="M2" data-method="PUT" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>M2 · 또 뮤트</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/members/7/mute" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$&quot;,&quot;equals&quot;:{&quot;memberId&quot;:7,&quot;muted&quot;:true}}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="B" data-method="GET" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>B · 뮤트 뒤 피드</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/feed" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;equals&quot;:[145,91]},{&quot;path&quot;:&quot;$.nextCursor&quot;,&quot;type&quot;:&quot;null&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="D" data-method="GET" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>D · 뮤트한 회원의 글 상세</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/44" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200}</pre></dd></dl></details></article><article class="api-request" data-request-id="U" data-method="DELETE" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>U · 뮤트 풀기</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/members/7/mute" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$&quot;,&quot;equals&quot;:{&quot;memberId&quot;:7,&quot;muted&quot;:false}}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="C" data-method="GET" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>C · 푼 뒤 피드</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/feed" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;equals&quot;:[145,101,91,44]}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="MS" data-method="PUT" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>MS · 자기 자신 뮤트</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/members/6/mute" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="MN" data-method="PUT" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>MN · 없는 회원 뮤트</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/members/99999999/mute" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:404}</pre></dd></dl></details></article><article class="api-request" data-request-id="MX" data-method="PUT" data-request-index="11" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>MX · id가 숫자 아님</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/members/abc/mute" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="S0" data-method="GET" data-request-index="12" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>S0 · size=0</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/feed?size=0" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="S51" data-method="GET" data-request-index="13" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>S51 · size=51</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/feed?size=51" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="SX" data-method="GET" data-request-index="14" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>SX · size가 숫자 아님</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/feed?size=abc" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="SE" data-method="GET" data-request-index="15" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>SE · 빈 size</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/feed?size=" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="CE" data-method="GET" data-request-index="16" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>CE · 빈 cursor</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/feed?cursor=" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="CX" data-method="GET" data-request-index="17" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>CX · 깨진 커서</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/feed?cursor=abc" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="S1" data-method="GET" data-request-index="18" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>S1 · size=1</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/feed?size=1" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;equals&quot;:[145]}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="S50" data-method="GET" data-request-index="19" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>S50 · size=50</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/feed?size=50" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p06" value="Bearer tok-p06" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p06&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200}</pre></dd></dl></details></article><article class="api-request" data-request-id="NT" data-method="GET" data-request-index="20" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>NT · 토큰 없이 피드</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/feed" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:401}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>A1 / A2</td>
+<td><code>145, 101</code>(항목은 게시판 목록 모양 — 작성자·요약) + 커서 / <code>91, 44</code>, <code>nextCursor</code>=null — 팔로워 공개 글(91)이 들어 있고 임시저장(83)은 없다</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>M / M2 / B</td>
+<td>뮤트 <code>{memberId: 7, muted: true}</code> 두 번 다 같다 / 피드가 <code>145, 91</code> — 7의 글만 빠졌다</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>D / U / C</td>
+<td>뮤트한 회원의 글 상세는 <code>200</code>(차단과 다르다) / 풀기 <code>muted: false</code> / 피드가 다시 <code>145, 101, 91, 44</code></td>
+</tr>
+<tr>
+<td>C4</td>
+<td>MS·MN·MX / S0·S51·SX·SE·CX·CE / S1·S50 / NT</td>
+<td>자기 자신 <code>400</code>·없는 회원 <code>404</code>·숫자 아님 <code>400</code> / 범위 밖·숫자 아님·깨진 커서 <code>400</code> / 경계 안쪽 <code>200</code> / 토큰 없음 <code>401</code> — 어느 것도 <code>500</code>이 아니다</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT COUNT(*) FROM member_mute WHERE muter_id = 6</code></td>
+<td><code>0</code> — 끝에서 풀었다</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT p.id FROM post p WHERE p.deleted_at IS NULL AND p.status = &#39;PUBLISHED&#39; AND (p.author_id = 6 OR p.author_id IN (SELECT followee_id FROM follow WHERE follower_id = 6)) ORDER BY p.published_at DESC, p.id DESC</code></td>
+<td><code>145 101 91 44</code> — C3과 같다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>쿼리 한 번</td>
+<td>팔로잉 목록을 읽어 회원마다 글을 따로 조회하지 않고, 팔로우·차단·뮤트 조건을 <code>EXISTS</code>/<code>NOT EXISTS</code>로 넣은 쿼리 하나 + 태그 묶음 조회로 끝낸다(T-012 R1과 같다)</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>뮤트의 범위</td>
+<td>뮤트 조건이 피드 쿼리에만 있고 <code>PostAccessPolicy</code>(상세·목록 공용 규칙)에는 없다. 넣으면 무엇이 깨지는지(상세 404 → 상대가 눈치챔) 말할 수 있다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>차단은 따로</td>
+<td>내가 팔로우한 뒤 상대가 나를 차단할 수 있으므로 피드에도 차단 조건이 필요하다(12-4가 새 팔로우는 막지만 이미 있는 관계는 남는다)</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>인덱스</td>
+<td><code>NOT EXISTS (SELECT 1 FROM member_mute WHERE muter_id = ? AND muted_id = 작성자)</code>가 <code>uk_member_mute</code>를 탄다는 것을 <code>EXPLAIN</code>으로 확인했다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/W15-paging-offset-vs-cursor.html">W15 페이징 — OFFSET vs 커서</a></li>
+<li><a href="../../docs/knowledge/R04-sql-crud-join.html">R04 SQL CRUD와 JOIN</a> — <code>EXISTS</code>·<code>NOT EXISTS</code></li>
+<li><a href="../../lessons/G2-access-rules-in-one-place.html">G2 접근 규칙을 한 곳에</a> — 뮤트를 왜 여기에 넣지 않나(R2)</li>
+<li><a href="../../lessons/J1-reading-explain.html">J1 EXPLAIN 읽기</a></li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 피드 쿼리</summary>
+
+<pre><code class="language-sql">WHERE p.deletedAt IS NULL AND p.status = 'PUBLISHED'
+  AND (a.id = :me OR EXISTS (SELECT 1 FROM Follow f WHERE f.follower.id = :me AND f.followee = a))
+  AND NOT EXISTS (SELECT 1 FROM MemberBlock b WHERE (b.blocker.id = :me AND b.blocked = a) OR (b.blocked.id = :me AND b.blocker = a))
+  AND NOT EXISTS (SELECT 1 FROM MemberMute m WHERE m.muter.id = :me AND m.muted = a)
+  AND (:cursorAt IS NULL OR p.publishedAt &lt; :cursorAt OR (p.publishedAt = :cursorAt AND p.id &lt; :cursorId))
+ORDER BY p.publishedAt DESC, p.id DESC</code></pre>
+<p><code>JOIN FETCH p.author a</code>로 작성자를 함께 읽고, <code>PageRequest.of(0, size + 1)</code>.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 뮤트 API</summary>
+
+<p>12-4 팔로우 코드를 거의 그대로 쓴다. <code>member_mute</code>에 <code>INSERT IGNORE</code>/<code>DELETE</code>, 차단 확인은 빼고, 응답은 <code>{memberId, muted}</code>.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="12-6-report.html">12-6. 신고하기</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 12-5. 팔로잉 피드 — 뮤트\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n이 단계는 학습용 DB(practice)를 쓴다. 앱이 practice 프로파일로 떠 있어야 한다(README의 \"학습용 데이터로 앱 실행\"). 아니면 그 방법만 알려 주고 멈춰라.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch12-community-features/12-5-feed-mute.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity practice -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="12-4-follow.html">← 이전 12-4. 팔로우·언팔로우</a><a href="12-6-report.html">다음 → 12-6. 신고하기</a></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
+</body>
+</html>

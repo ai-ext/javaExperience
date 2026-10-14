@@ -1,0 +1,63 @@
+package org.example.bookmark;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.JsonNode;
+
+
+@Service
+public class BookmarkService {
+    private final PostRepository posts;
+    private final PostAccessPolicy accessPolicy;
+    private final BookmarkRepository bookmarks;
+    private final BookmarkFolderRepository folders;
+
+    public BookmarkService(PostRepository posts, PostAccessPolicy accessPolicy,
+                           BookmarkRepository bookmarks, BookmarkFolderRepository folders) {
+        this.posts = posts;
+        this.accessPolicy = accessPolicy;
+        this.bookmarks = bookmarks;
+        this.folders = folders;
+    }
+
+    @Transactional
+    public BookmarkResponse set(Long postId, AuthenticatedMember me, BookmarkRequest request) {
+        Post post = posts.findById(postId).orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(me, post) || !"PUBLISHED".equals(post.getStatus())) {
+            throw new PostNotFoundException();
+        }
+        Long folderId = folderId(request.folderId());
+        String memo = memo(request.memo());
+        BookmarkFolder folder = folderId == null ? null : folders.findByIdAndMember_Id(folderId, me.id())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        bookmarks.insertIfAbsent(me.id(), postId, folderId, memo);
+        Bookmark bookmark = bookmarks.findCurrentForUpdate(me.id(), postId)
+                .orElseThrow(() -> new IllegalStateException("북마크 저장 결과를 찾을 수 없습니다."));
+        return new BookmarkResponse(bookmark.getId(), postId, true,
+                bookmark.getFolder() == null ? null : bookmark.getFolder().getId(), bookmark.getMemo());
+    }
+
+    private Long folderId(JsonNode node) {
+        if (node == null || node.isNull()) return null;
+        if (!node.isIntegralNumber() || !node.canConvertToLong() || node.longValue() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        return node.asLong();
+    }
+
+    private String memo(JsonNode node) {
+        if (node == null || node.isNull()) return null;
+        if (!node.isTextual()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        String value = node.asText();
+        if (value.length() > 200) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        return value;
+    }
+}

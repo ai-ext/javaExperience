@@ -1,0 +1,10 @@
+-- V62 — 예약 발행(15-3). 상태에 SCHEDULED를 더하고, 예약 시각(publish_at) 컬럼을 단다.
+-- CHECK 제약은 고칠 수 없어서 지우고 다시 만든다(이름 ck_post_status는 V1 그대로).
+-- 앞 장에서 상태 값을 더했다면 SHOW CREATE TABLE post로 지금 목록을 먼저 보고 거기에 SCHEDULED를 더한다.
+ALTER TABLE post DROP CHECK ck_post_status;
+ALTER TABLE post ADD COLUMN publish_at DATETIME NULL AFTER published_at;
+ALTER TABLE post
+    ADD CONSTRAINT ck_post_status CHECK (status IN ('DRAFT', 'PUBLISHED', 'HIDDEN', 'SCHEDULED')),
+    ADD CONSTRAINT ck_post_scheduled CHECK (status <> 'SCHEDULED' OR publish_at IS NOT NULL);
+-- 1분마다 도는 배치의 "SCHEDULED이고 시각이 지난 글" 조회용 — 같음 조건(status) → 범위(publish_at)
+CREATE INDEX ix_post_scheduled ON post (status, publish_at);

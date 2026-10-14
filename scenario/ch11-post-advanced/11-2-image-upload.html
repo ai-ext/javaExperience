@@ -1,0 +1,3190 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11-2. 글에 이미지 첨부</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 11장. 게시글 심화 — 임시저장·이미지·조회수·검색·휴지통·이력 › 11-2</p><p class="level-tags"><span>중급</span><span>게시판 본편</span><span>DB community</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="11-2-글에-이미지-첨부"><a class="anchor" href="#11-2-글에-이미지-첨부" aria-hidden="true">#</a>11-2. 글에 이미지 첨부</h1>
+<blockquote>
+<p>시나리오 DB(<code>community</code>). 이번 단계 마이그레이션은 <code>V20</code>이다.</p>
+</blockquote>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<blockquote>
+<p>&quot;글에 사진을 넣고 싶다는 요청이 제일 많아요. 사진을 고르면 바로 올라가서 미리보기가 뜨고, [발행]을 누르면 그 사진들이 글에 붙게 해 주세요. 사진 아닌 파일이나 너무 큰 파일은 막아 주시고요.&quot;</p>
+</blockquote>
+<p>지금까지 요청 본문은 전부 JSON이었다. 파일은 JSON에 담지 않고 **<code>multipart/form-data</code>**로 보낸다 — 본문을 경계 문자열(boundary)로 나눠 &quot;파트&quot;마다 이름·파일 이름·형식·내용을 담는 형식이다.</p>
+<p>실무에서는 보통 두 번에 나눈다.</p>
+<ol>
+<li>사진을 고르는 순간 <strong>이미지만 먼저 올린다</strong> → 서버가 저장하고 <code>id</code>와 주소를 돌려준다(미리보기에 쓴다).</li>
+<li>글을 저장할 때 본문 JSON에 <strong>그 이미지 <code>id</code>들만</strong> 넣는다 → 서버가 이미지를 글에 연결한다.</li>
+</ol>
+<p>파일 내용은 DB가 아니라 <strong>디스크</strong>(설정한 폴더)에 두고, DB에는 &quot;누가 올린 어떤 파일인지, 어느 글에 붙었는지&quot;만 남긴다. <a href="../../tickets/007-post-thumbnail.html">T-007</a>은 외부 저장소가 준 주소만 받는 경우였다. 이번에는 서버가 파일을 직접 받는다.</p>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>글쓰기 — 사진 첨부</h3><p>사진은 고르는 순간 먼저 올라가고(id를 받음), 글을 저장할 때 그 id만 보낸다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>글쓰기</strong><span>김자바</span></div><div class="screen-widget screen-field"><strong>제목</strong><span>주말 등산 사진</span></div><div class="screen-widget screen-field"><strong>본문</strong><span>정상에서 찍었어요</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>사진 추가</span></div><div class="screen-widget screen-chips"><strong>첨부한 사진</strong><span>mountain.gif</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>발행</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>사진은 1MB까지 올릴 수 있어요</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>PNG·JPEG·GIF·WebP만 올릴 수 있어요</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>사진 올리기</summary><ol><li><span class="flow-kind">사용자</span><p>[사진 추가]로 mountain.gif를 고른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/images</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-kimjava · Content-Type: multipart/form-data; boundary=----b1</dd><dt>body</dt><dd>------b1
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;mountain.gif&quot;
+Content-Type: image/gif
+
+GIF89a…(파일 바이트)
+------b1--</dd></dl></li><li><span class="flow-kind">서버</span><p>크기(1MB) → 파일 앞 바이트로 형식 판정(GIF89a) → 저장 이름은 서버가 짓는다(무작위 32자 + .gif)</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>INSERT INTO post_image (uploader_id, post_id, stored_name, original_name, content_type, size_bytes, created_at)
+VALUES (2, NULL, '3f2a…e1.gif', 'mountain.gif', 'image/gif', 14, NOW())</dd><dt>note</dt><dd>파일 내용은 디스크 uploads/3f2a…e1.gif — post_id는 아직 NULL</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>201</dd><dt>headers</dt><dd>Location: /api/images/3f2a…e1.gif</dd><dt>body</dt><dd>{&quot;id&quot;: 7, &quot;fileName&quot;: &quot;3f2a…e1.gif&quot;, &quot;url&quot;: &quot;/api/images/3f2a…e1.gif&quot;, &quot;contentType&quot;: &quot;image/gif&quot;, &quot;size&quot;: 14}</dd></dl></li><li><span class="flow-kind">화면</span><p>url로 미리보기를 띄운다(GET /api/images/3f2a…e1.gif)</p></li></ol></details><details class="scenario-flow"><summary>글 저장 — 이미지 연결</summary><ol><li><span class="flow-kind">사용자</span><p>[발행]을 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-kimjava · Content-Type: application/json</dd><dt>body</dt><dd>{&quot;boardSlug&quot;: &quot;free&quot;, &quot;title&quot;: &quot;주말 등산 사진&quot;, &quot;content&quot;: &quot;정상에서 찍었어요&quot;, &quot;imageIds&quot;: [7]}</dd></dl></li><li><span class="flow-kind">서버</span><p>이미지 7이 내가 올린 것이고 아직 어느 글에도 안 붙었나? → 글 저장과 같은 트랜잭션에서 연결</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>INSERT INTO post (...) VALUES (...);  -- 글 25
+UPDATE post_image SET post_id = 25 WHERE id = 7</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>201</dd><dt>body</dt><dd>{&quot;id&quot;: 25, ...}</dd></dl></li><li><span class="flow-kind">화면</span><p>글 상세(GET /api/posts/25)의 images로 사진을 그린다</p></li></ol></details><details class="scenario-flow"><summary>사진이 아닌 파일</summary><ol><li><span class="flow-kind">사용자</span><p>이름만 photo.png인 텍스트 파일을 고른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/images</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-kimjava · Content-Type: multipart/form-data; boundary=----b1</dd><dt>body</dt><dd>…filename=&quot;photo.png&quot;
+Content-Type: image/png
+
+hello</dd></dl></li><li><span class="flow-kind">서버</span><p>이름(.png)과 Content-Type은 보내는 쪽이 마음대로 쓴다 — 파일 앞 바이트가 PNG 서명이 아니다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>415</dd><dt>body</dt><dd>{&quot;status&quot;: 415, &quot;detail&quot;: &quot;PNG, JPEG, GIF, WebP 이미지만 올릴 수 있습니다.&quot;}</dd></dl></li><li><span class="flow-kind">화면</span><p>'PNG·JPEG·GIF·WebP만 올릴 수 있어요'</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<p><strong>V20</strong> — <code>db/migration/V20__create_post_image.sql</code></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>컬럼</th>
+<th>타입·규칙</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td><code>BIGINT AUTO_INCREMENT PRIMARY KEY</code></td>
+</tr>
+<tr>
+<td><code>uploader_id</code></td>
+<td>올린 회원, FK → <code>member</code></td>
+</tr>
+<tr>
+<td><code>post_id</code></td>
+<td>붙은 글, FK → <code>post</code>. 업로드 직후에는 <code>NULL</code></td>
+</tr>
+<tr>
+<td><code>stored_name</code></td>
+<td>서버가 지은 저장 이름(<code>VARCHAR(64)</code>, <code>UNIQUE</code>) — 무작위 32자(16진수) + <code>.</code> + 확장자</td>
+</tr>
+<tr>
+<td><code>original_name</code></td>
+<td>사용자가 보낸 파일 이름(기록용, <code>VARCHAR(255)</code>)</td>
+</tr>
+<tr>
+<td><code>content_type</code></td>
+<td>판정한 형식(<code>image/png</code> 등)</td>
+</tr>
+<tr>
+<td><code>size_bytes</code></td>
+<td>바이트 수</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>올린 시각</td>
+</tr>
+<tr>
+<td>인덱스</td>
+<td><code>(post_id, id)</code> — 글의 이미지를 올린 순서대로</td>
+</tr>
+</tbody></table></div>
+<p><strong>업로드</strong> — <code>POST /api/images</code></p>
+<p>필드(파트) 규칙 — 어떤 잘못된 입력에도 <code>500</code>이 나오면 안 된다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>파트</th>
+<th>필수</th>
+<th>빈 값</th>
+<th>크기</th>
+<th>형식</th>
+<th>틀렸을 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>file</code></td>
+<td>예</td>
+<td>0바이트 안 됨</td>
+<td>1MB(1,048,576바이트)까지</td>
+<td>앞 바이트가 PNG·JPEG·GIF·WebP 서명</td>
+<td>없음·0바이트 <code>400</code> / 형식 <code>415</code> / 크기 <code>413</code></td>
+</tr>
+<tr>
+<td>그 밖의 파트</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>무시한다</td>
+<td>—</td>
+</tr>
+<tr>
+<td>본문이 multipart가 아님(JSON 등)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>415</code></td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>인증</td>
+<td>필요</td>
+</tr>
+<tr>
+<td>요청</td>
+<td><code>multipart/form-data</code>, 파일 파트 이름 <code>file</code></td>
+</tr>
+<tr>
+<td>형식</td>
+<td>**파일 앞 바이트(서명)**로 판정: PNG(<code>89 50 4E 47 0D 0A 1A 0A</code>), JPEG(<code>FF D8 FF</code>), GIF(<code>GIF87a</code>·<code>GIF89a</code>), WebP(<code>RIFF????WEBP</code>). 이름·<code>Content-Type</code>은 믿지 않는다</td>
+</tr>
+<tr>
+<td>성공</td>
+<td><code>201</code>, <code>Location: /api/images/{fileName}</code>, 본문 <code>{ &quot;id&quot;, &quot;fileName&quot;, &quot;url&quot;, &quot;contentType&quot;, &quot;size&quot; }</code> — <code>url</code>=<code>/api/images/{fileName}</code>, <code>contentType</code>은 판정한 형식</td>
+</tr>
+<tr>
+<td>저장</td>
+<td>파일은 설정 폴더(<code>app.upload-dir</code>, 기본 <code>uploads</code>)에 <code>fileName</code>으로, DB에는 <code>post_image</code> 한 행(<code>post_id</code> NULL)</td>
+</tr>
+<tr>
+<td><code>file</code> 파트가 없거나 0바이트</td>
+<td><code>400</code></td>
+</tr>
+<tr>
+<td>허용하지 않는 형식</td>
+<td><code>415</code></td>
+</tr>
+<tr>
+<td>1MB 초과</td>
+<td><code>413</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>받기</strong> — <code>GET /api/images/{fileName}</code></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>인증</td>
+<td>없음(이름이 추측할 수 없는 무작위라 주소를 아는 사람만 연다)</td>
+</tr>
+<tr>
+<td>성공</td>
+<td><code>200</code>, <code>Content-Type</code>=저장할 때 판정한 형식, 본문=파일 바이트</td>
+</tr>
+<tr>
+<td>서버가 지은 이름 모양이 아니거나(<code>../</code> 등) 없는 파일</td>
+<td><code>404</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>글에 연결</strong> — <code>POST /api/posts</code></p>
+<p>필드 규칙 — 11-1 표에 <code>imageIds</code> 한 줄이 더해진다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>필수</th>
+<th>null·빈 값</th>
+<th>길이·범위</th>
+<th>형식</th>
+<th>기본값</th>
+<th>틀렸을 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>imageIds</code></td>
+<td>아니오</td>
+<td>null·<code>[]</code> 허용(이미지 없음). 원소 <code>null</code>은 안 됨</td>
+<td>서로 다른 id 10개까지(같은 id가 겹치면 하나로)</td>
+<td>정수 배열 — <code>&quot;7&quot;</code>, <code>7.5</code>, <code>&quot;abc&quot;</code>는 형식 오류 <code>400</code>(<code>errors</code>에 <code>imageIds[0]</code>)</td>
+<td><code>[]</code></td>
+<td>400(<code>imageIds</code>)</td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>붙일 수 있는 이미지</td>
+<td><strong>내가 올렸고</strong>, <strong>아직 어느 글에도 안 붙은</strong> 것. 하나라도 아니면(남의 이미지, 이미 다른 글에 붙은 이미지, 없는 id) <code>400</code>, <code>errors</code>의 <code>field</code>가 <code>imageIds</code> — 이때 글도 저장되지 않는다</td>
+</tr>
+<tr>
+<td>상세 응답</td>
+<td><code>GET /api/posts/{id}</code>에 <code>images: [ { &quot;id&quot;, &quot;url&quot; } ]</code> — 올린 순서(<code>id</code>)</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li>수정(<code>PATCH</code>)으로 이미지를 바꾸거나 빼는 것, 글에 끝내 안 붙은 이미지를 지우는 정리 작업은 이번 범위가 아니다(R4에서 방법만 말한다).</li>
+</ul>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 <strong>만들 것</strong>의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</p>
+<p>이 단계의 처리 흐름:</p>
+<ul>
+<li>크기(1MB) → 파일 앞 바이트로 형식 판정(GIF89a) → 저장 이름은 서버가 짓는다(무작위 32자 + .gif)</li>
+<li>파일 내용은 디스크 uploads/3f2a…e1.gif — post_id는 아직 NULL</li>
+<li>이미지 7이 내가 올린 것이고 아직 어느 글에도 안 붙었나? → 글 저장과 같은 트랜잭션에서 연결</li>
+<li>이름(.png)과 Content-Type은 보내는 쪽이 마음대로 쓴다 — 파일 앞 바이트가 PNG 서명이 아니다</li>
+</ul>
+<details>
+<summary>Controller — HTTP 연결</summary>
+
+<p><code>ImageController.java</code>, <code>PostController.java</code>. 매핑과 메서드의 입력·응답을 위 <strong>만들 것</strong>의 HTTP 계약과 대조한다. 이번 단계 매핑: <code>@PostMapping(value = &quot;/api/images&quot;, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)</code>, <code>@GetMapping(&quot;/api/images/{fileName}&quot;)</code>. 변경된 메서드: <code>upload</code>, <code>download</code>.</p>
+<pre><code class="language-java">@PostMapping(value = &quot;/api/images&quot;, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+public ResponseEntity&lt;ImageUploadResponse&gt; upload(@LoginMember AuthenticatedMember me,
+        @RequestPart(value = &quot;file&quot;, required = false) MultipartFile file) {
+    if (file == null) throw new EmptyImageException();
+    PostImage image = imageService.upload(me.id(), file);
+    return ResponseEntity.created(URI.create(image.url()))
+            .body(new ImageUploadResponse(image.getId(), image.getStoredName(), image.url(),
+                    image.getContentType(), image.getSizeBytes()));
+}</code></pre>
+<p>받기는 저장 이름 형식을 먼저 검사하고 <code>Content-Type</code>을 DB의 판정 결과로 응답한다.</p>
+</details>
+
+<details>
+<summary>DTO — 요청·응답 필드</summary>
+
+<p><code>ImageUploadResponse.java</code>, <code>ImageResponse.java</code>, <code>PostCreateRequest.java</code>, <code>PostDetailResponse.java</code>. 필드 이름·타입·검증·응답 형태를 위 <strong>만들 것</strong>과 대조한다.</p>
+<pre><code class="language-java">public record ImageUploadResponse(Long id, String fileName, String url,
+                                  String contentType, Integer size) {}
+
+// PostCreateRequest: 원래 JSON 타입을 보존한다. 문자열·소수가 Long으로 바뀌지 않게 Service가 검사한다.
+JsonNode imageIds
+
+public record ImageResponse(Long id, String url) {}</code></pre>
+</details>
+
+<details>
+<summary>Service — 처리 순서</summary>
+
+<p><code>ImageService.java</code>, <code>PostQueryService.java</code>, <code>PostService.java</code>. 위 서버 처리 순서가 어디에서 검증·조회·상태 변경으로 이어지는지 따라간다. 변경된 메서드: <code>upload</code>, <code>afterCompletion</code>, <code>findByStoredName</code>. 트랜잭션 경계는 아래 코드의 <code>@Transactional</code> 위치에서 확인한다.</p>
+<pre><code class="language-java">if (file.isEmpty()) throw new EmptyImageException();
+byte[] bytes = file.getBytes();
+ImageType type = ImageType.detect(bytes).orElseThrow(UnsupportedImageException::new);
+String storedName = UUID.randomUUID().toString().replace(&quot;-&quot;, &quot;&quot;) + &quot;.&quot; + type.extension();
+// 같은 트랜잭션에서 이미지 행을 만든다. 먼저 롤백 정리 콜백을 등록한 뒤 디스크에 쓴다.
+TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+    @Override public void afterCompletion(int status) {
+        if (status != STATUS_COMMITTED) storage.delete(storedName);
+    }
+});
+storage.save(storedName, bytes);
+
+// 글 생성 트랜잭션: 중복 id 제거 → 행 잠금 → 업로더·미연결 상태 확인 → 연결.
+if (!imageIds.isArray()) throw new InvalidPostFieldException(&quot;imageIds&quot;, &quot;숫자 배열이어야 합니다.&quot;);
+List&lt;Long&gt; requestedIds = new ArrayList&lt;&gt;();
+for (int i = 0; i &lt; imageIds.size(); i++) {
+    JsonNode id = imageIds.get(i);
+    if (!id.isIntegralNumber() || !id.canConvertToLong())
+        throw new InvalidPostFieldException(&quot;imageIds[&quot; + i + &quot;]&quot;, &quot;정수여야 합니다.&quot;);
+    requestedIds.add(id.longValue());
+}
+List&lt;Long&gt; ids = requestedIds.stream().distinct().sorted().toList();
+if (ids.size() &gt; 10) throw new InvalidPostFieldException(&quot;imageIds&quot;, &quot;이미지는 10개까지입니다.&quot;);
+List&lt;PostImage&gt; images = postImageRepository.findAllByIdForUpdate(ids);
+if (images.size() != ids.size() || images.stream().anyMatch(i -&gt;
+        !i.getUploader().getId().equals(authorId) || i.getPost() != null)) {
+    throw new InvalidPostFieldException(&quot;imageIds&quot;, &quot;사용할 수 없는 이미지입니다.&quot;);
+}
+images.forEach(image -&gt; image.attachTo(post));</code></pre>
+</details>
+
+<details>
+<summary>JPA / Repository — DB 조건</summary>
+
+<p><code>PostImageRepository.java</code>. 쿼리·파생 메서드의 조건을 화면 시나리오의 DB 단계 및 직접 확인 SQL과 대조한다.</p>
+<pre><code class="language-java">@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query(&quot;SELECT image FROM PostImage image WHERE image.id IN :ids&quot;)
+List&lt;PostImage&gt; findAllByIdForUpdate(@Param(&quot;ids&quot;) Collection&lt;Long&gt; ids);</code></pre>
+<p>잠금과 글 저장이 같은 트랜잭션에 있어야 두 요청이 같은 미연결 이미지를 동시에 붙이지 못한다.</p>
+</details>
+
+<details>
+<summary>MyBatis Mapper — 업로드·조회·첨부 SQL</summary>
+
+<p><strong>MyBatis 대체 코드</strong> 토글은 이미지 행 INSERT와 저장 이름 조회, 글에 붙이는 UPDATE를 Mapper로 실행한다. 기존 글 저장과 응답용 엔티티 조회는 JPA를 유지한다. 글 저장과 이미지 연결은 같은 트랜잭션이며, UPDATE의 영향 행 수가 0이면 글 생성도 롤백한다.</p>
+<pre><code class="language-java">int insert(MyImageInsertRow row); // useGeneratedKeys로 id를 받는다
+Long findIdByStoredName(@Param(&quot;storedName&quot;) String storedName);
+int attach(@Param(&quot;id&quot;) Long id, @Param(&quot;uploaderId&quot;) Long uploaderId,
+           @Param(&quot;postId&quot;) Long postId);</code></pre>
+<pre><code class="language-xml">&lt;insert id=&quot;insert&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+  INSERT INTO post_image (uploader_id, post_id, stored_name, original_name,
+                          content_type, size_bytes, created_at)
+  VALUES (#{uploaderId}, NULL, #{storedName}, #{originalName},
+          #{contentType}, #{sizeBytes}, #{createdAt})
+&lt;/insert&gt;
+&lt;update id=&quot;attach&quot;&gt;
+  UPDATE post_image SET post_id = #{postId}
+  WHERE id = #{id} AND uploader_id = #{uploaderId} AND post_id IS NULL
+&lt;/update&gt;</code></pre>
+<p>미연결 조건을 UPDATE 안에 두면 두 글이 같은 이미지를 동시에 연결하려 할 때 하나만 성공한다.</p>
+</details>
+
+<details>
+<summary>Entity — 테이블·상태</summary>
+
+<p><code>PostImage.java</code>, <code>Post.java</code>. 실제 테이블의 컬럼·외래키와 엔티티 매핑을 대조한다. 변경된 메서드: <code>attachTo</code>, <code>url</code>.</p>
+<pre><code class="language-java">@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &quot;post_id&quot;)
+private Post post; // 업로드 직후 null
+
+public void attachTo(Post post) { this.post = post; }
+public String url() { return &quot;/api/images/&quot; + storedName; }</code></pre>
+</details>
+
+<details>
+<summary>Flyway / SQL — 스키마 변경</summary>
+
+<p><code>V20__create_post_image.sql</code>. 실행 순서와 DDL·백필 대상을 시나리오의 스키마 계약과 대조한다.</p>
+<pre><code class="language-sql">CREATE TABLE post_image (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    uploader_id BIGINT NOT NULL,
+    post_id BIGINT NULL,
+    stored_name VARCHAR(64) NOT NULL,
+    UNIQUE KEY uk_post_image_stored_name (stored_name),
+    KEY ix_post_image_post (post_id, id),
+    FOREIGN KEY (uploader_id) REFERENCES member(id),
+    FOREIGN KEY (post_id) REFERENCES post(id)
+    -- original_name, content_type, size_bytes, created_at도 실제 V20에 선언
+);</code></pre>
+</details>
+
+<details>
+<summary>예외 처리 — 실패 응답</summary>
+
+<p><code>ApiExceptionHandler.java</code>, <code>EmptyImageException.java</code>, <code>ImageNotFoundException.java</code>, <code>UnsupportedImageException.java</code>. 예외가 어떤 HTTP 상태와 오류 본문으로 바뀌는지 실패 계약과 대조한다. 변경된 메서드: <code>handleEmptyImage</code>, <code>handleUnsupportedImage</code>, <code>handleMaxUploadSize</code>, <code>handleImageNotFound</code>.</p>
+<pre><code class="language-java">@ExceptionHandler(EmptyImageException.class)
+public ProblemDetail handleEmptyImage(EmptyImageException ex, HttpServletRequest request) { /* 400 */ }
+@ExceptionHandler(UnsupportedImageException.class)
+public ProblemDetail handleUnsupportedImage(UnsupportedImageException ex, HttpServletRequest request) { /* 415 */ }
+@ExceptionHandler(MaxUploadSizeExceededException.class)
+public ProblemDetail handleMaxUploadSize(HttpServletRequest request) { /* 413 */ }</code></pre>
+<p>전체 응답 전문은 아래 <strong>전체 구현 코드</strong>에서 <code>ApiExceptionHandler.java</code>를 펼쳐 확인한다.</p>
+</details>
+
+<details>
+<summary>설정·보조 코드</summary>
+
+<p><code>.gitignore</code>, <code>ImageStorage.java</code>, <code>ImageType.java</code>, <code>application.yml</code>. 이 파일에서 바뀐 설정·보조 타입이 서버 흐름의 어느 단계에 필요한지 확인한다. 변경된 메서드: <code>save</code>, <code>pathOf</code>, <code>delete</code>, <code>contentType</code>.</p>
+<pre><code class="language-java">public Path pathOf(String storedName) { return root.resolve(storedName); }
+public void save(String storedName, byte[] bytes) {
+    try {
+        Files.createDirectories(root);
+        Files.write(root.resolve(storedName), bytes);
+    } catch (IOException e) {
+        throw new UncheckedIOException(&quot;이미지를 저장하지 못했습니다.&quot;, e);
+    }
+}</code></pre>
+<p><code>application.yml</code>의 <code>spring.servlet.multipart.max-file-size: 1MB</code>, <code>app.upload-dir</code>과 파일 서명 판정 <code>ImageType.detect</code>도 함께 확인한다.</p>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — .gitignore</summary><pre><code>.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+<h3 id="intellij-idea"><a class="anchor" href="#intellij-idea" aria-hidden="true">#</a>IntelliJ IDEA</h3>
+<p>.idea/modules.xml
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/libraries/
+*.iws
+*.iml
+*.ipr
+out/
+!<strong>/src/main/</strong>/out/
+!<strong>/src/test/</strong>/out/</p>
+<h3 id="eclipse"><a class="anchor" href="#eclipse" aria-hidden="true">#</a>Eclipse</h3>
+<p>.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!<strong>/src/main/</strong>/bin/
+!<strong>/src/test/</strong>/bin/</p>
+<h3 id="netbeans"><a class="anchor" href="#netbeans" aria-hidden="true">#</a>NetBeans</h3>
+<p>/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/</p>
+<h3 id="vs-code"><a class="anchor" href="#vs-code" aria-hidden="true">#</a>VS Code</h3>
+<p>.vscode/</p>
+<h3 id="mac-os"><a class="anchor" href="#mac-os" aria-hidden="true">#</a>Mac OS</h3>
+<p>.DS_Store</p>
+<h3 id="로컬-전용"><a class="anchor" href="#로컬-전용" aria-hidden="true">#</a>로컬 전용</h3>
+<p>.worktrees/
+tools/site/node_modules/
+docker/mysql/backup/
+uploads/
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/common/ApiExceptionHandler.java</summary><pre><code>package org.example.common;
+
+<p>import jakarta.servlet.http.HttpServletRequest;
+import tools.jackson.core.JacksonException;
+import org.example.admin.AdminOnlyException;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.MemberNotActiveException;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardWriteForbiddenException;
+import org.example.bookmark.BookmarkFolderNotFoundException;
+import org.example.bookmark.InvalidBookmarkFieldException;
+import org.example.bookmark.BookmarkNotFoundException;
+import org.example.bookmark.DuplicateBookmarkFolderNameException;
+import org.example.bookmark.InvalidBookmarkFolderException;
+import org.example.comment.CommentForbiddenException;
+import org.example.comment.CommentNotFoundException;
+import org.example.comment.InvalidParentCommentException;
+import org.example.image.EmptyImageException;
+import org.example.image.ImageNotFoundException;
+import org.example.image.UnsupportedImageException;
+import org.example.like.SelfLikeNotAllowedException;
+import org.example.notification.NotificationNotFoundException;
+import org.example.post.InvalidPostFieldException;
+import org.example.post.InvalidSearchConditionException;
+import org.example.post.PostForbiddenException;
+import org.example.post.PostNotDraftException;
+import org.example.post.PostNotFoundException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;</p>
+<p>import java.net.URI;
+import java.util.List;
+import java.util.Map;</p>
+<p>// 모든 컨트롤러의 에러 응답을 한 곳에서 RFC 9457 Problem Details로 만든다.
+// 컨트롤러마다 try-catch를 두지 않는다.
+@RestControllerAdvice
+public class ApiExceptionHandler {</p>
+<pre><code>@ExceptionHandler(MethodArgumentNotValidException.class)
+public ProblemDetail handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    List&amp;lt;Map&amp;lt;String, String&amp;gt;&amp;gt; errors = ex.getBindingResult().getFieldErrors().stream()
+            .map(fieldError -&amp;gt; Map.of(
+                    &amp;quot;field&amp;quot;, fieldError.getField(),
+                    &amp;quot;message&amp;quot;, fieldError.getDefaultMessage() == null ? &amp;quot;&amp;quot; : fieldError.getDefaultMessage()
+            ))
+            .toList();
+    problem.setProperty(&amp;quot;errors&amp;quot;, errors);
+    return problem;
+}
+
+@ExceptionHandler(HttpMessageNotReadableException.class)
+public ProblemDetail handleUnreadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;요청 본문을 읽을 수 없습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    // 11-1 JSON 문법은 맞는데 한 필드의 형식이 틀린 경우(숫자 자리에 &amp;quot;abc&amp;quot;, 목록 자리에 문자열) —
+    // Jackson이 남긴 경로로 어느 필드인지 errors에 담는다. 목록 안이면 Bean Validation과 같은 모양(imageIds[0]).
+    // JSON 문법 자체가 깨졌으면 경로가 비어 있어 errors 없이 400만 나간다. Jackson은 첫 오류에서 멈추므로 하나만 들어간다.
+    if (ex.getCause() instanceof JacksonException jackson &amp;amp;&amp;amp; !jackson.getPath().isEmpty()) {
+        problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, fieldPath(jackson), &amp;quot;message&amp;quot;, &amp;quot;형식이 올바르지 않습니다.&amp;quot;)));
+    }
+    return problem;
+}
+
+// 11-1 경로·쿼리 값의 형식 오류(/api/posts/abc, ?size=abc) — 그대로 두면 Spring 기본 응답이라 어느 값이 틀렸는지 없다
+@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, ex.getName(),
+            &amp;quot;message&amp;quot;, &amp;quot;형식이 올바르지 않습니다: &amp;quot; + ex.getValue())));
+    return problem;
+}
+
+private static String fieldPath(JacksonException jackson) {
+    StringBuilder field = new StringBuilder();
+    for (JacksonException.Reference ref : jackson.getPath()) {
+        if (ref.getPropertyName() != null) {
+            if (!field.isEmpty()) {
+                field.append('.');
+            }
+            field.append(ref.getPropertyName());
+        } else {
+            field.append('[').append(ref.getIndex()).append(']');
+        }
+    }
+    return field.toString();
+}
+
+@ExceptionHandler(BoardNotFoundException.class)
+public ProblemDetail handleBoardNotFound(BoardNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostNotFoundException.class)
+public ProblemDetail handlePostNotFound(PostNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(BoardWriteForbiddenException.class)
+public ProblemDetail handleBoardWriteForbidden(BoardWriteForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(SelfLikeNotAllowedException.class)
+public ProblemDetail handleSelfLikeNotAllowed(SelfLikeNotAllowedException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(PostForbiddenException.class)
+public ProblemDetail handlePostForbidden(PostForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-1 임시저장이 아닌 글을 발행 — 지금 상태와 충돌
+@ExceptionHandler(PostNotDraftException.class)
+public ProblemDetail handlePostNotDraft(PostNotDraftException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// 11-2 이미지 업로드
+@ExceptionHandler(EmptyImageException.class)
+public ProblemDetail handleEmptyImage(EmptyImageException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(UnsupportedImageException.class)
+public ProblemDetail handleUnsupportedImage(UnsupportedImageException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+// spring.servlet.multipart.max-file-size를 넘으면 컨트롤러에 오기 전에(요청을 읽는 단계에서) 터진다
+@ExceptionHandler(MaxUploadSizeExceededException.class)
+public ProblemDetail handleMaxUploadSize(HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONTENT_TOO_LARGE, &amp;quot;파일은 1MB까지 올릴 수 있습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(ImageNotFoundException.class)
+public ProblemDetail handleImageNotFound(ImageNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidPostFieldException.class)
+public ProblemDetail handleInvalidPostField(InvalidPostFieldException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, ex.getField(), &amp;quot;message&amp;quot;, ex.getMessage())));
+    return problem;
+}
+
+@ExceptionHandler(CommentNotFoundException.class)
+public ProblemDetail handleCommentNotFound(CommentNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidParentCommentException.class)
+public ProblemDetail handleInvalidParentComment(InvalidParentCommentException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(CommentForbiddenException.class)
+public ProblemDetail handleCommentForbidden(CommentForbiddenException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(BookmarkFolderNotFoundException.class)
+public ProblemDetail handleBookmarkFolderNotFound(BookmarkFolderNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(BookmarkNotFoundException.class)
+public ProblemDetail handleBookmarkNotFound(BookmarkNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidBookmarkFolderException.class)
+public ProblemDetail handleInvalidBookmarkFolder(InvalidBookmarkFolderException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(DuplicateBookmarkFolderNameException.class)
+public ProblemDetail handleDuplicateBookmarkFolderName(DuplicateBookmarkFolderNameException ex,
+                                                       HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidCursorException.class)
+public ProblemDetail handleInvalidCursor(InvalidCursorException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidSearchConditionException.class)
+public ProblemDetail handleInvalidSearchCondition(InvalidSearchConditionException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(AdminOnlyException.class)
+public ProblemDetail handleAdminOnly(AdminOnlyException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(NotificationNotFoundException.class)
+public ProblemDetail handleNotificationNotFound(NotificationNotFoundException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+
+@ExceptionHandler(InvalidBookmarkFieldException.class)
+public ProblemDetail handleInvalidBookmarkField(InvalidBookmarkFieldException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &amp;quot;입력값이 올바르지 않습니다.&amp;quot;);
+    problem.setInstance(URI.create(request.getRequestURI()));
+    problem.setProperty(&amp;quot;errors&amp;quot;, List.of(Map.of(&amp;quot;field&amp;quot;, ex.getField(), &amp;quot;message&amp;quot;, ex.getMessage())));
+    return problem;
+}
+
+// 누구인지 모름 — WWW-Authenticate 헤더를 함께 내려준다
+@ExceptionHandler(AuthenticationRequiredException.class)
+public ResponseEntity&amp;lt;ProblemDetail&amp;gt; handleAuthenticationRequired(AuthenticationRequiredException ex,
+                                                                   HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .header(HttpHeaders.WWW_AUTHENTICATE, &amp;quot;Bearer&amp;quot;)
+            .body(problem);
+}
+
+// 누구인지는 알지만(토큰은 유효) 회원 상태 때문에 안 됨
+@ExceptionHandler(MemberNotActiveException.class)
+public ProblemDetail handleMemberNotActive(MemberNotActiveException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/image/EmptyImageException.java</summary><pre><code>package org.example.image;
+
+<p>// 11-2 file 파트가 없거나 0바이트 — 전역 핸들러가 400으로 바꾼다
+public class EmptyImageException extends RuntimeException {</p>
+<pre><code>public EmptyImageException() {
+    super(&amp;quot;올릴 파일(file)이 없습니다.&amp;quot;);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/image/ImageController.java</summary><pre><code>package org.example.image;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;</p>
+<p>import java.net.URI;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;</p>
+<p>// 11-2 이미지 올리기·받기. 파일 주소도 /api/** 아래에 둔다(CORS·인증 인터셉터가 같은 규칙으로 걸린다).
+@RestController
+public class ImageController {</p>
+<pre><code>// 서버가 지은 이름 모양만 받는다 — ../ 같은 경로 조작은 여기서 걸러진다
+private static final Pattern STORED_NAME = Pattern.compile(&amp;quot;[0-9a-f]{32}\\.(png|jpg|gif|webp)&amp;quot;);
+
+private final ImageService imageService;
+private final ImageStorage storage;
+
+public ImageController(ImageService imageService, ImageStorage storage) {
+    this.imageService = imageService;
+    this.storage = storage;
+}
+
+// multipart/form-data의 file 파트. 토큰 필요(POST라 인터셉터가 확인한다)
+@PostMapping(value = &amp;quot;/api/images&amp;quot;, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+public ResponseEntity&amp;lt;ImageUploadResponse&amp;gt; upload(@LoginMember AuthenticatedMember loginMember,
+                                                  @RequestPart(value = &amp;quot;file&amp;quot;, required = false) MultipartFile file) {
+    if (file == null) {
+        throw new EmptyImageException();
+    }
+    PostImage image = imageService.upload(loginMember.id(), file);
+    ImageUploadResponse body = new ImageUploadResponse(image.getId(), image.getStoredName(), image.url(),
+            image.getContentType(), image.getSizeBytes());
+    return ResponseEntity.created(URI.create(image.url())).body(body);
+}
+
+// 파일 받기 — 누구나(GET, 토큰 없음). 이름이 추측할 수 없는 무작위라 주소를 아는 사람만 연다.
+@GetMapping(&amp;quot;/api/images/{fileName}&amp;quot;)
+public ResponseEntity&amp;lt;Resource&amp;gt; download(@PathVariable String fileName) {
+    if (!STORED_NAME.matcher(fileName).matches()) {
+        throw new ImageNotFoundException();
+    }
+    PostImage image = imageService.findByStoredName(fileName);
+    FileSystemResource resource = new FileSystemResource(storage.pathOf(image.getStoredName()));
+    if (!resource.exists()) {
+        throw new ImageNotFoundException();
+    }
+    return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(image.getContentType()))
+            // 같은 이름의 내용은 바뀌지 않으므로 오래 캐시해도 된다
+            .cacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic().immutable())
+            .header(&amp;quot;X-Content-Type-Options&amp;quot;, &amp;quot;nosniff&amp;quot;)
+            .body(resource);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/image/ImageNotFoundException.java</summary><pre><code>package org.example.image;
+
+<p>public class ImageNotFoundException extends RuntimeException {</p>
+<pre><code>public ImageNotFoundException() {
+    super(&amp;quot;이미지를 찾을 수 없습니다.&amp;quot;);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/image/ImageService.java</summary><pre><code>package org.example.image;
+
+<p>import org.example.member.Member;
+import org.example.member.MemberRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;</p>
+<p>import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.time.LocalDateTime;
+import java.util.UUID;</p>
+<p>// 11-2 업로드 규칙 — 크기 상한은 설정(spring.servlet.multipart.max-file-size)이 먼저 막고,
+// 여기서는 빈 파일과 형식(파일 서명)을 본다.
+@Service
+public class ImageService {</p>
+<pre><code>private static final int ORIGINAL_NAME_MAX_LENGTH = 255;
+
+private final PostImageRepository postImageRepository;
+private final MemberRepository memberRepository;
+private final ImageStorage storage;
+
+public ImageService(PostImageRepository postImageRepository, MemberRepository memberRepository,
+                    ImageStorage storage) {
+    this.postImageRepository = postImageRepository;
+    this.memberRepository = memberRepository;
+    this.storage = storage;
+}
+
+@Transactional
+public PostImage upload(Long uploaderId, MultipartFile file) {
+    if (file.isEmpty()) {
+        throw new EmptyImageException();
+    }
+    byte[] bytes;
+    try {
+        bytes = file.getBytes();
+    } catch (IOException e) {
+        throw new UncheckedIOException(e);
+    }
+    ImageType type = ImageType.detect(bytes).orElseThrow(UnsupportedImageException::new);
+
+    // 저장 이름은 서버가 짓는다 — 사용자가 보낸 이름(../../etc/passwd.png, 같은 이름 덮어쓰기)을 경로에 쓰지 않는다
+    String storedName = UUID.randomUUID().toString().replace(&amp;quot;-&amp;quot;, &amp;quot;&amp;quot;) + &amp;quot;.&amp;quot; + type.extension();
+    Member uploader = memberRepository.getReferenceById(uploaderId);
+    PostImage image = postImageRepository.save(new PostImage(uploader, storedName, originalNameOf(file),
+            type.contentType(), bytes.length, LocalDateTime.now()));
+
+    // 파일 쓰기 자체가 중간에 실패해도 롤백 때 일부 기록된 파일을 지울 수 있게 먼저 등록한다.
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+        @Override
+        public void afterCompletion(int status) {
+            if (status != STATUS_COMMITTED) {
+                storage.delete(storedName);
+            }
+        }
+    });
+    storage.save(storedName, bytes);
+    return image;
+}
+
+@Transactional(readOnly = true)
+public PostImage findByStoredName(String storedName) {
+    return postImageRepository.findByStoredName(storedName).orElseThrow(ImageNotFoundException::new);
+}
+
+private static String originalNameOf(MultipartFile file) {
+    String name = file.getOriginalFilename();
+    if (name == null || name.isBlank()) {
+        return &amp;quot;image&amp;quot;;
+    }
+    return name.length() &amp;gt; ORIGINAL_NAME_MAX_LENGTH ? name.substring(0, ORIGINAL_NAME_MAX_LENGTH) : name;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/image/ImageStorage.java</summary><pre><code>package org.example.image;
+
+<p>import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;</p>
+<p>import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;</p>
+<p>// 11-2 파일을 디스크에 쓰고 읽는 일만 한다(무엇을 허용할지는 ImageService가 정한다).
+// 저장 위치는 설정(app.upload-dir)으로 뺀다 — 서버마다, 테스트마다 다를 수 있다.
+@Component
+public class ImageStorage {</p>
+<pre><code>private final Path root;
+
+public ImageStorage(@Value(&amp;quot;${app.upload-dir:uploads}&amp;quot;) String uploadDir) {
+    this.root = Path.of(uploadDir).toAbsolutePath().normalize();
+}
+
+public void save(String storedName, byte[] bytes) {
+    try {
+        Files.createDirectories(root);
+        Files.write(root.resolve(storedName), bytes);
+    } catch (IOException e) {
+        throw new UncheckedIOException(&amp;quot;이미지를 저장하지 못했습니다.&amp;quot;, e);
+    }
+}
+
+// storedName은 서버가 지은 이름(무작위+확장자)만 들어온다 — 컨트롤러가 형식을 먼저 확인한다
+public Path pathOf(String storedName) {
+    return root.resolve(storedName);
+}
+
+public void delete(String storedName) {
+    try {
+        Files.deleteIfExists(root.resolve(storedName));
+    } catch (IOException ignored) {
+        // 지우지 못한 파일은 남아도 된다(어디에도 연결되지 않는다)
+    }
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/image/ImageType.java</summary><pre><code>package org.example.image;
+
+<p>import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Optional;</p>
+<p>// 11-2 허용하는 이미지 형식 — 파일 앞부분의 &quot;서명&quot;(매직 넘버)으로 판정한다.
+// 요청의 Content-Type이나 파일 이름(.png)은 보내는 쪽이 마음대로 적을 수 있으므로 믿지 않는다.
+public enum ImageType {</p>
+<pre><code>PNG(&amp;quot;image/png&amp;quot;, &amp;quot;png&amp;quot;),
+JPEG(&amp;quot;image/jpeg&amp;quot;, &amp;quot;jpg&amp;quot;),
+GIF(&amp;quot;image/gif&amp;quot;, &amp;quot;gif&amp;quot;),
+WEBP(&amp;quot;image/webp&amp;quot;, &amp;quot;webp&amp;quot;);
+
+private static final byte[] PNG_SIGNATURE = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
+private static final byte[] JPEG_SIGNATURE = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
+
+private final String contentType;
+private final String extension;
+
+ImageType(String contentType, String extension) {
+    this.contentType = contentType;
+    this.extension = extension;
+}
+
+public String contentType() {
+    return contentType;
+}
+
+public String extension() {
+    return extension;
+}
+
+public static Optional&amp;lt;ImageType&amp;gt; detect(byte[] bytes) {
+    if (startsWith(bytes, PNG_SIGNATURE)) {
+        return Optional.of(PNG);
+    }
+    if (startsWith(bytes, JPEG_SIGNATURE)) {
+        return Optional.of(JPEG);
+    }
+    if (startsWith(bytes, ascii(&amp;quot;GIF87a&amp;quot;)) || startsWith(bytes, ascii(&amp;quot;GIF89a&amp;quot;))) {
+        return Optional.of(GIF);
+    }
+    // WebP: &amp;quot;RIFF&amp;quot; + 길이 4바이트 + &amp;quot;WEBP&amp;quot;
+    if (bytes.length &amp;gt;= 12 &amp;amp;&amp;amp; startsWith(bytes, ascii(&amp;quot;RIFF&amp;quot;))
+            &amp;amp;&amp;amp; Arrays.equals(Arrays.copyOfRange(bytes, 8, 12), ascii(&amp;quot;WEBP&amp;quot;))) {
+        return Optional.of(WEBP);
+    }
+    return Optional.empty();
+}
+
+private static boolean startsWith(byte[] bytes, byte[] prefix) {
+    return bytes.length &amp;gt;= prefix.length &amp;amp;&amp;amp; Arrays.equals(Arrays.copyOf(bytes, prefix.length), prefix);
+}
+
+private static byte[] ascii(String s) {
+    return s.getBytes(StandardCharsets.US_ASCII);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/image/ImageUploadResponse.java</summary><pre><code>package org.example.image;
+
+<p>// 11-2 업로드 응답 — fileName은 서버가 지은 저장 이름, url은 그 파일을 받는 주소
+public record ImageUploadResponse(Long id, String fileName, String url, String contentType, Integer size) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Entity — src/main/java/org/example/image/PostImage.java</summary><pre><code>package org.example.image;
+
+<p>import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import org.example.member.Member;
+import org.example.post.Post;</p>
+<p>import java.time.LocalDateTime;</p>
+<p>// 11-2 첨부 이미지(V20) — 파일 내용은 디스크에, 이 행은 파일의 이름표
+@Entity
+@Table(name = &quot;post_image&quot;)
+public class PostImage {</p>
+<pre><code>@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &amp;quot;uploader_id&amp;quot;, nullable = false)
+private Member uploader;
+
+// 업로드 직후엔 null — 글을 쓸 때 attachTo()로 연결한다
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &amp;quot;post_id&amp;quot;)
+private Post post;
+
+@Column(name = &amp;quot;stored_name&amp;quot;, nullable = false, length = 64)
+private String storedName;
+
+@Column(name = &amp;quot;original_name&amp;quot;, nullable = false)
+private String originalName;
+
+@Column(name = &amp;quot;content_type&amp;quot;, nullable = false, length = 50)
+private String contentType;
+
+@Column(name = &amp;quot;size_bytes&amp;quot;, nullable = false)
+private Integer sizeBytes;
+
+@Column(name = &amp;quot;created_at&amp;quot;, nullable = false)
+private LocalDateTime createdAt;
+
+protected PostImage() {
+    // JPA
+}
+
+public PostImage(Member uploader, String storedName, String originalName, String contentType,
+                 int sizeBytes, LocalDateTime now) {
+    this.uploader = uploader;
+    this.storedName = storedName;
+    this.originalName = originalName;
+    this.contentType = contentType;
+    this.sizeBytes = sizeBytes;
+    this.createdAt = now;
+}
+
+public void attachTo(Post post) {
+    this.post = post;
+}
+
+// 응답에 내려 주는 주소 — 파일은 GET /api/images/{storedName}으로 받는다
+public String url() {
+    return &amp;quot;/api/images/&amp;quot; + storedName;
+}
+
+public Long getId() {
+    return id;
+}
+
+public Member getUploader() {
+    return uploader;
+}
+
+public Post getPost() {
+    return post;
+}
+
+public String getStoredName() {
+    return storedName;
+}
+
+public String getOriginalName() {
+    return originalName;
+}
+
+public String getContentType() {
+    return contentType;
+}
+
+public Integer getSizeBytes() {
+    return sizeBytes;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/image/PostImageRepository.java</summary><pre><code>package org.example.image;
+
+<p>import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;</p>
+<p>import java.util.Collection;
+import java.util.List;
+import java.util.Optional;</p>
+<p>public interface PostImageRepository extends JpaRepository&lt;PostImage, Long&gt; {</p>
+<pre><code>Optional&amp;lt;PostImage&amp;gt; findByStoredName(String storedName);
+
+// 같은 미연결 이미지를 두 글이 동시에 선점하지 못하도록 행을 잠근다.
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query(&amp;quot;SELECT image FROM PostImage image WHERE image.id IN :ids&amp;quot;)
+List&amp;lt;PostImage&amp;gt; findAllByIdForUpdate(@Param(&amp;quot;ids&amp;quot;) Collection&amp;lt;Long&amp;gt; ids);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/image/UnsupportedImageException.java</summary><pre><code>package org.example.image;
+
+<p>// 11-2 허용하지 않는 형식(이미지가 아니거나 PNG·JPEG·GIF·WebP가 아님) — 전역 핸들러가 415로 바꾼다
+public class UnsupportedImageException extends RuntimeException {</p>
+<pre><code>public UnsupportedImageException() {
+    super(&amp;quot;PNG, JPEG, GIF, WebP 이미지만 올릴 수 있습니다.&amp;quot;);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/ImageResponse.java</summary><pre><code>package org.example.post;
+
+<p>// 11-2 글에 붙은 이미지 — 상세 응답의 images 항목
+public record ImageResponse(Long id, String url) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Entity — src/main/java/org/example/post/Post.java</summary><pre><code>package org.example.post;
+
+<p>import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.Table;
+import org.example.board.Board;
+import org.example.image.PostImage;
+import org.example.member.Member;
+import org.example.tag.Tag;</p>
+<p>import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;</p>
+<p>// post 테이블 엔티티 — like_count·comment_count는 목록 성능용 비정규화 컬럼
+@Entity
+@Table(name = &quot;post&quot;)
+public class Post {</p>
+<pre><code>private static final int EXCERPT_LENGTH = 100;
+
+@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &amp;quot;board_id&amp;quot;, nullable = false)
+private Board board;
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &amp;quot;author_id&amp;quot;, nullable = false)
+private Member author;
+
+@Column(nullable = false)
+private String title;
+
+@Column(nullable = false, columnDefinition = &amp;quot;text&amp;quot;)
+private String content;
+
+// 9-3 목록용 요약 — 본문 앞 100자. 본문이 바뀌는 곳(생성자·changeContent)에서만 계산한다
+@Column(nullable = false, length = 120)
+private String excerpt;
+
+@Column(nullable = false)
+private String status;
+
+@Column(nullable = false)
+private String visibility;
+
+@Column(name = &amp;quot;view_count&amp;quot;, nullable = false)
+private Integer viewCount;
+
+@Column(name = &amp;quot;like_count&amp;quot;, nullable = false)
+private Integer likeCount;
+
+@Column(name = &amp;quot;comment_count&amp;quot;, nullable = false)
+private Integer commentCount;
+
+@Column(name = &amp;quot;published_at&amp;quot;)
+private LocalDateTime publishedAt;
+
+@Column(name = &amp;quot;created_at&amp;quot;, nullable = false)
+private LocalDateTime createdAt;
+
+@Column(name = &amp;quot;updated_at&amp;quot;, nullable = false)
+private LocalDateTime updatedAt;
+
+@Column(name = &amp;quot;deleted_at&amp;quot;)
+private LocalDateTime deletedAt;
+
+@ManyToMany(fetch = FetchType.LAZY)
+@JoinTable(
+        name = &amp;quot;post_tag&amp;quot;,
+        joinColumns = @JoinColumn(name = &amp;quot;post_id&amp;quot;),
+        inverseJoinColumns = @JoinColumn(name = &amp;quot;tag_id&amp;quot;)
+)
+private Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+
+// 11-2 첨부 이미지 — 연결은 post_image.post_id가 갖는다(주인은 PostImage). 올린 순서(id)대로
+@OneToMany(mappedBy = &amp;quot;post&amp;quot;)
+@OrderBy(&amp;quot;id&amp;quot;)
+private List&amp;lt;PostImage&amp;gt; images = new ArrayList&amp;lt;&amp;gt;();
+
+protected Post() {
+    // JPA
+}
+
+public Post(Board board, Member author, String title, String content,
+            String status, String visibility, LocalDateTime now) {
+    this.board = board;
+    this.author = author;
+    this.title = title;
+    this.content = content;
+    this.excerpt = excerptOf(content);
+    this.status = status;
+    this.visibility = visibility;
+    this.viewCount = 0;
+    this.likeCount = 0;
+    this.commentCount = 0;
+    // 11-1 임시저장 글은 아직 발행되지 않았다 — 발행 시각은 publish()에서 채운다
+    this.publishedAt = &amp;quot;PUBLISHED&amp;quot;.equals(status) ? now : null;
+    this.createdAt = now;
+    this.updatedAt = now;
+}
+
+public void addTag(Tag tag) {
+    tags.add(tag);
+}
+
+public void replace(String title, String content, String visibility, Set&amp;lt;Tag&amp;gt; tags,
+                    LocalDateTime now) {
+    this.title = title;
+    changeContent(content);
+    this.visibility = visibility;
+    this.tags.clear();
+    this.tags.addAll(tags);
+    this.updatedAt = now;
+}
+
+// 변경 감지로 조회수를 올린다 — 트랜잭션 커밋 시 UPDATE 한 번이 나간다
+public void increaseViewCount() {
+    this.viewCount = this.viewCount + 1;
+}
+
+// 3-1 부분 수정 — 값 검증은 PostService가 미리 하고, 엔티티는 바꾸기만 한다
+public void changeTitle(String title) {
+    this.title = title;
+}
+
+public void changeContent(String content) {
+    this.content = content;
+    this.excerpt = excerptOf(content);
+}
+
+// MySQL LEFT(content, 100)과 같은 결과가 나오게 &amp;quot;문자(코드 포인트)&amp;quot; 기준으로 자른다.
+// String.substring은 UTF-16 단위라 이모지 같은 문자가 끼면 반쪽이 잘리거나 개수가 어긋난다.
+private static String excerptOf(String content) {
+    if (content.codePointCount(0, content.length()) &amp;lt;= EXCERPT_LENGTH) {
+        return content;
+    }
+    return content.substring(0, content.offsetByCodePoints(0, EXCERPT_LENGTH));
+}
+
+// 11-1 발행 — 임시저장(DRAFT)인지는 PostService가 먼저 확인한다.
+// 발행 시각은 &amp;quot;처음 쓴 시각&amp;quot;이 아니라 &amp;quot;공개된 시각&amp;quot;이다(목록 정렬 기준이 published_at).
+public void publish(LocalDateTime now) {
+    this.status = &amp;quot;PUBLISHED&amp;quot;;
+    this.publishedAt = now;
+    this.updatedAt = now;
+}
+
+public void changeVisibility(String visibility) {
+    this.visibility = visibility;
+}
+
+public void replaceTags(Set&amp;lt;Tag&amp;gt; newTags) {
+    this.tags.clear();
+    this.tags.addAll(newTags);
+}
+
+public void touchUpdatedAt(LocalDateTime now) {
+    this.updatedAt = now;
+}
+
+// soft delete — 행은 남기고 deleted_at만 채운다. 좋아요·댓글·태그 연결은 건드리지 않는다.
+public void delete(LocalDateTime now) {
+    this.deletedAt = now;
+    this.updatedAt = now;
+}
+
+
+public Long getId() {
+    return id;
+}
+
+public Board getBoard() {
+    return board;
+}
+
+public Member getAuthor() {
+    return author;
+}
+
+public String getTitle() {
+    return title;
+}
+
+public String getContent() {
+    return content;
+}
+
+public String getExcerpt() {
+    return excerpt;
+}
+
+public String getStatus() {
+    return status;
+}
+
+public String getVisibility() {
+    return visibility;
+}
+
+public Integer getViewCount() {
+    return viewCount;
+}
+
+public Integer getLikeCount() {
+    return likeCount;
+}
+
+public Integer getCommentCount() {
+    return commentCount;
+}
+
+public LocalDateTime getPublishedAt() {
+    return publishedAt;
+}
+
+public LocalDateTime getCreatedAt() {
+    return createdAt;
+}
+
+public LocalDateTime getUpdatedAt() {
+    return updatedAt;
+}
+
+public LocalDateTime getDeletedAt() {
+    return deletedAt;
+}
+
+public Set&amp;lt;Tag&amp;gt; getTags() {
+    return tags;
+}
+
+public List&amp;lt;PostImage&amp;gt; getImages() {
+    return images;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/post/PostController.java</summary><pre><code>package org.example.post;
+
+<p>import jakarta.validation.Valid;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.example.tag.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>import java.net.URI;
+import java.util.List;</p>
+<p>@RestController
+@RequestMapping(&quot;/api/posts&quot;)
+public class PostController {</p>
+<pre><code>private static final Logger log = LoggerFactory.getLogger(PostController.class);
+
+private final PostService postService;
+private final PostQueryService postQueryService;
+
+public PostController(PostService postService, PostQueryService postQueryService) {
+    this.postService = postService;
+    this.postQueryService = postQueryService;
+}
+
+@GetMapping(&amp;quot;/{id}&amp;quot;)
+public PostDetailResponse getOne(@PathVariable Long id, @LoginMember AuthenticatedMember viewer) {
+    return postQueryService.getDetail(id, viewer);
+}
+
+@PostMapping
+public ResponseEntity&amp;lt;PostResponse&amp;gt; create(@LoginMember AuthenticatedMember loginMember,
+                                            @Valid @RequestBody PostCreateRequest request) {
+    log.info(&amp;quot;게시글 작성 요청 제목: {}&amp;quot;, request.title());
+
+    Post post = postService.create(loginMember.id(), request);
+    PostResponse response = toResponse(post);
+
+    return ResponseEntity.created(URI.create(&amp;quot;/api/posts/&amp;quot; + post.getId())).body(response);
+}
+
+@PostMapping(&amp;quot;/{sourceId}/copies&amp;quot;)
+public ResponseEntity&amp;lt;PostResponse&amp;gt; copy(@PathVariable Long sourceId,
+                                         @RequestParam(defaultValue = &amp;quot;false&amp;quot;) boolean copyTags,
+                                         @LoginMember AuthenticatedMember loginMember,
+                                         @Valid @RequestBody CopyPostRequest request) {
+    Post post = postService.copy(sourceId, loginMember.id(), copyTags, request);
+    return ResponseEntity.created(URI.create(&amp;quot;/api/posts/&amp;quot; + post.getId()))
+            .body(toResponse(post));
+}
+
+@PutMapping(&amp;quot;/{id}&amp;quot;)
+public PostDetailResponse replace(@PathVariable Long id,
+                                  @LoginMember AuthenticatedMember loginMember,
+                                  @Valid @RequestBody PostReplaceRequest request) {
+    return postService.replace(id, loginMember, request);
+}
+
+@PatchMapping(&amp;quot;/{id}&amp;quot;)
+public PostDetailResponse patch(@PathVariable Long id,
+                                 @LoginMember AuthenticatedMember loginMember,
+                                 @RequestBody PostUpdateRequest request) {
+    Post post = postService.patch(id, loginMember, request);
+    return toDetailResponse(post);
+}
+
+// 11-1 임시저장 글 발행
+@PostMapping(&amp;quot;/{id}/publish&amp;quot;)
+public PostDetailResponse publish(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+    return toDetailResponse(postService.publish(id, loginMember));
+}
+
+@DeleteMapping(&amp;quot;/{id}&amp;quot;)
+@ResponseStatus(HttpStatus.NO_CONTENT)
+public void delete(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+    postService.delete(id, loginMember);
+}
+
+private PostDetailResponse toDetailResponse(Post post) {
+    List&amp;lt;String&amp;gt; tagNames = post.getTags().stream().map(Tag::getName).toList();
+    AuthorResponse author = new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname());
+    return new PostDetailResponse(
+            post.getId(),
+            post.getBoard().getSlug(),
+            post.getTitle(),
+            post.getContent(),
+            tagNames,
+            post.getVisibility(),
+            author,
+            post.getViewCount(),
+            post.getLikeCount(),
+            post.getCommentCount(),
+            post.getImages().stream().map(i -&amp;gt; new ImageResponse(i.getId(), i.url())).toList(),
+            post.getStatus(),
+            post.getPublishedAt(),
+            post.getCreatedAt()
+    );
+}
+
+private PostResponse toResponse(Post post) {
+    List&amp;lt;String&amp;gt; tagNames = post.getTags().stream().map(Tag::getName).toList();
+    AuthorResponse author = new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname());
+    return new PostResponse(
+            post.getId(),
+            post.getBoard().getSlug(),
+            post.getTitle(),
+            post.getContent(),
+            tagNames,
+            post.getVisibility(),
+            author,
+            post.getStatus(),
+            post.getPublishedAt(),
+            post.getCreatedAt()
+    );
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostCreateRequest.java</summary><pre><code>package org.example.post;
+
+<p>import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import tools.jackson.databind.JsonNode;</p>
+<p>import java.util.List;</p>
+<p>// 게시글 작성 요청 — Bean Validation으로 저장 전에 막는다
+public record PostCreateRequest(
+        @NotBlank(message = &quot;게시판을 선택해 주세요.&quot;)
+        String boardSlug,</p>
+<pre><code>    @NotBlank(message = &amp;quot;제목을 입력해 주세요.&amp;quot;)
+    @Size(max = 200, message = &amp;quot;제목은 200자 이하여야 합니다.&amp;quot;)
+    String title,
+
+    @NotBlank(message = &amp;quot;본문을 입력해 주세요.&amp;quot;)
+    String content,
+
+    @Size(max = 5, message = &amp;quot;태그는 5개까지입니다.&amp;quot;)
+    List&amp;lt;@NotNull @Size(min = 1, max = 30, message = &amp;quot;태그 이름은 1~30자여야 합니다.&amp;quot;) String&amp;gt; tags,
+
+    @Pattern(regexp = &amp;quot;PUBLIC|FOLLOWERS&amp;quot;, message = &amp;quot;공개 범위는 PUBLIC 또는 FOLLOWERS여야 합니다.&amp;quot;)
+    String visibility,
+
+    // 11-1 임시저장 — 생략하면 PUBLISHED(바로 발행)
+    @Pattern(regexp = &amp;quot;DRAFT|PUBLISHED&amp;quot;, message = &amp;quot;상태는 DRAFT 또는 PUBLISHED여야 합니다.&amp;quot;)
+    String status,
+
+    // 11-2 먼저 올려 둔 이미지(POST /api/images)의 id — 이 글에 붙인다
+    JsonNode imageIds</code></pre>
+<p>) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostDetailResponse.java</summary><pre><code>package org.example.post;
+
+<p>import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>// 게시글 상세 조회 응답 — 작성 응답(PostResponse)과 달리 조회수·좋아요·댓글 수를 포함한다
+public record PostDetailResponse(
+        Long id,
+        String boardSlug,
+        String title,
+        String content,
+        List&lt;String&gt; tags,
+        String visibility,
+        AuthorResponse author,
+        Integer viewCount,
+        Integer likeCount,
+        Integer commentCount,
+        List&lt;ImageResponse&gt; images,
+        String status,
+        LocalDateTime publishedAt,
+        LocalDateTime createdAt
+) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostQueryService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.board.Board;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardRepository;
+import org.example.member.MemberRepository;
+import org.example.tag.Tag;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;</p>
+<p>import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;</p>
+<p>// 글 조회 전용 서비스 — 1-3/1-4의 PostService(쓰기)와 책임을 나눈다
+@Service
+public class PostQueryService {</p>
+<pre><code>private final PostRepository postRepository;
+private final BoardRepository boardRepository;
+private final MemberRepository memberRepository;
+private final PostAccessPolicy accessPolicy;
+private final PostSearchRepository postSearchRepository;
+
+public PostQueryService(PostRepository postRepository, BoardRepository boardRepository,
+                         MemberRepository memberRepository, PostAccessPolicy accessPolicy,
+                         PostSearchRepository postSearchRepository) {
+    this.postRepository = postRepository;
+    this.boardRepository = boardRepository;
+    this.memberRepository = memberRepository;
+    this.accessPolicy = accessPolicy;
+    this.postSearchRepository = postSearchRepository;
+}
+
+@Transactional(readOnly = true)
+public List&amp;lt;PostHeadlineResponse&amp;gt; listPublicByAuthor(Long memberId, String boardSlug) {
+    if (!memberRepository.existsById(memberId)) {
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, &amp;quot;회원을 찾을 수 없습니다.&amp;quot;);
+    }
+    boardRepository.findBySlug(boardSlug)
+            .orElseThrow(() -&amp;gt; new BoardNotFoundException(boardSlug));
+    return postRepository.findPublicPostsByAuthorAndBoard(memberId, boardSlug).stream()
+            .map(post -&amp;gt; new PostHeadlineResponse(
+                    post.getId(), post.getTitle(),
+                    post.getAuthor().getNickname(), boardSlug))
+            .toList();
+}
+
+@Transactional
+public PostDetailResponse getDetail(Long id, AuthenticatedMember viewer) {
+    Post post = postRepository.findById(id)
+            .orElseThrow(PostNotFoundException::new);
+
+    // 볼 수 없으면 403이 아니라 404 — 글이 있다는 사실도 숨긴다. 조회수도 올리지 않는다.
+    if (!accessPolicy.canView(viewer, post)) {
+        throw new PostNotFoundException();
+    }
+
+    post.increaseViewCount();
+    return toDetailResponse(post);
+}
+
+// 2-2 게시판 목록 — 8-4 조합 검색에서 &amp;quot;게시판&amp;quot; 조건만 있는 경우와 같다(같은 쿼리 조립기를 쓴다)
+@Transactional(readOnly = true)
+public PostListResponse list(String boardSlug, int page, int size, AuthenticatedMember viewer) {
+    Board board = boardRepository.findBySlug(boardSlug)
+            .orElseThrow(() -&amp;gt; new BoardNotFoundException(boardSlug));
+    return toListResponse(postSearchRepository.search(
+            PostSearchCondition.ofBoard(board.getId()), viewerIdOf(viewer), PageRequest.of(page, size)));
+}
+
+// 8-4 조합 검색 — 들어온 조건만 붙는다. 없는 게시판·없는 태그는 결과 0건(200)
+@Transactional(readOnly = true)
+public PostListResponse search(String boardSlug, String tag, Long authorId, LocalDate from, LocalDate to,
+                               String q, int page, int size, AuthenticatedMember viewer) {
+    if (from != null &amp;amp;&amp;amp; to != null &amp;amp;&amp;amp; from.isAfter(to)) {
+        throw new InvalidSearchConditionException(&amp;quot;from이 to보다 늦을 수 없습니다.&amp;quot;);
+    }
+    PageRequest pageRequest = PageRequest.of(page, size);
+    Long boardId = null;
+    if (boardSlug != null &amp;amp;&amp;amp; !boardSlug.isBlank()) {
+        Board board = boardRepository.findBySlug(boardSlug).orElse(null);
+        if (board == null) {
+            return toListResponse(Page.empty(pageRequest));
+        }
+        boardId = board.getId();
+    }
+    PostSearchCondition condition = new PostSearchCondition(boardId, tag, authorId, from, to, q);
+    return toListResponse(postSearchRepository.search(condition, viewerIdOf(viewer), pageRequest));
+}
+
+private PostListResponse toListResponse(Page&amp;lt;PostListRow&amp;gt; result) {
+    List&amp;lt;Long&amp;gt; ids = result.getContent().stream().map(PostListRow::id).toList();
+    Map&amp;lt;Long, List&amp;lt;String&amp;gt;&amp;gt; tags = postSearchRepository.findTagsByPostIds(ids).stream()
+            .collect(Collectors.groupingBy(PostTagRow::postId,
+                    Collectors.mapping(PostTagRow::name, Collectors.toList())));
+    List&amp;lt;PostListItemResponse&amp;gt; items = result.getContent().stream()
+            .map(row -&amp;gt; toListItem(row, tags.getOrDefault(row.id(), List.of())))
+            .toList();
+    return new PostListResponse(
+            items,
+            result.getNumber(),
+            result.getSize(),
+            result.getTotalElements(),
+            result.getTotalPages(),
+            (long) result.getNumber() * result.getSize() + items.size() &amp;lt; result.getTotalElements()
+    );
+}
+
+private Long viewerIdOf(AuthenticatedMember viewer) {
+    return viewer == null ? null : viewer.id();
+}
+
+private PostListItemResponse toListItem(PostListRow post, List&amp;lt;String&amp;gt; tags) {
+    return new PostListItemResponse(
+            post.id(),
+            post.title(),
+            post.excerpt(),
+            new AuthorResponse(post.authorId(), post.authorNickname()),
+            tags,
+            post.likeCount(),
+            post.commentCount(),
+            post.viewCount(),
+            post.publishedAt()
+    );
+}
+
+private PostListItemResponse toListItem(Post post) {
+    return new PostListItemResponse(
+            post.getId(),
+            post.getTitle(),
+            post.getExcerpt(),
+            new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+            post.getTags().stream().map(Tag::getName).sorted().toList(),
+            post.getLikeCount(),
+            post.getCommentCount(),
+            post.getViewCount(),
+            post.getPublishedAt()
+    );
+}
+
+private PostDetailResponse toDetailResponse(Post post) {
+    // 트랜잭션 안에서 지연 로딩 연관을 읽어 DTO로 옮긴다(open-in-view: false)
+    return new PostDetailResponse(
+            post.getId(),
+            post.getBoard().getSlug(),
+            post.getTitle(),
+            post.getContent(),
+            post.getTags().stream().map(Tag::getName).sorted().toList(),
+            post.getVisibility(),
+            new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+            post.getViewCount(),
+            post.getLikeCount(),
+            post.getCommentCount(),
+            post.getImages().stream().map(i -&amp;gt; new ImageResponse(i.getId(), i.url())).toList(),
+            post.getStatus(),
+            post.getPublishedAt(),
+            post.getCreatedAt()
+    );
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/post/PostService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.board.Board;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardRepository;
+import org.example.board.BoardWriteForbiddenException;
+import org.example.image.PostImage;
+import org.example.image.PostImageRepository;
+import tools.jackson.databind.JsonNode;
+import org.example.member.Member;
+import org.example.member.MemberRepository;
+import org.example.tag.Tag;
+import org.example.tag.TagRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;</p>
+<p>// 글 만들기·고치기 규칙. HTTP(ResponseEntity, 헤더 등)는 알지 않는다.
+@Service
+public class PostService {</p>
+<pre><code>private static final String ADMIN_WRITE_ROLE = &amp;quot;ADMIN&amp;quot;;
+private static final String ADMIN_ROLE = &amp;quot;ADMIN&amp;quot;;
+private static final String DEFAULT_VISIBILITY = &amp;quot;PUBLIC&amp;quot;;
+private static final String PUBLISHED = &amp;quot;PUBLISHED&amp;quot;;
+private static final String DRAFT = &amp;quot;DRAFT&amp;quot;;
+
+// 1-5(PostCreateRequest)와 같은 규칙 — PATCH는 Bean Validation(@Valid)으로 표현할 수 없다
+// (null=그대로, 값이 있을 때만 검사해야 하는데 @NotBlank는 null도 실패로 본다). 숫자만이라도
+// 같은 값을 쓰도록 여기 모아 둔다.
+private static final int TITLE_MAX_LENGTH = 200;
+private static final int TAGS_MAX_COUNT = 5;
+private static final int TAG_NAME_MAX_LENGTH = 30;
+
+private final PostRepository postRepository;
+private final BoardRepository boardRepository;
+private final MemberRepository memberRepository;
+private final TagRepository tagRepository;
+private final PostAccessPolicy accessPolicy;
+private final PostImageRepository postImageRepository;
+
+public PostService(PostRepository postRepository, BoardRepository boardRepository,
+                    MemberRepository memberRepository, TagRepository tagRepository,
+                    PostAccessPolicy accessPolicy, PostImageRepository postImageRepository) {
+    this.postRepository = postRepository;
+    this.boardRepository = boardRepository;
+    this.memberRepository = memberRepository;
+    this.tagRepository = tagRepository;
+    this.accessPolicy = accessPolicy;
+    this.postImageRepository = postImageRepository;
+}
+
+@Transactional
+public Post create(Long authorId, PostCreateRequest request) {
+    Board board = boardRepository.findBySlug(request.boardSlug())
+            .orElseThrow(() -&amp;gt; new BoardNotFoundException(request.boardSlug()));
+    // 작성자는 요청 본문이 아니라 토큰으로 인증된 회원에서 받는다(authorId 같은 값은 무시한다)
+    Member author = memberRepository.getReferenceById(authorId);
+
+    if (ADMIN_WRITE_ROLE.equals(board.getWriteRole()) &amp;amp;&amp;amp; !ADMIN_ROLE.equals(author.getRole())) {
+        throw new BoardWriteForbiddenException(board.getSlug());
+    }
+
+    String visibility = request.visibility() != null ? request.visibility() : DEFAULT_VISIBILITY;
+    // 11-1 상태를 안 보내면 지금처럼 바로 발행. DRAFT면 published_at은 비워 둔다(Post 생성자)
+    String status = request.status() != null ? request.status() : PUBLISHED;
+    LocalDateTime now = LocalDateTime.now();
+    Post post = new Post(board, author, request.title(), request.content(),
+            status, visibility, now);
+
+    for (Tag tag : resolveTags(request.tags(), now)) {
+        post.addTag(tag);
+    }
+
+    Post saved = postRepository.save(post);
+    attachImages(saved, authorId, request.imageIds());
+    // 트랜잭션(영속성 컨텍스트) 안에서 지연 로딩 연관을 미리 읽어 둔다.
+    // open-in-view: false라서 컨트롤러가 트랜잭션 밖에서 건드리면 LazyInitializationException이 난다.
+    saved.getAuthor().getNickname();
+    saved.getTags().forEach(Tag::getName);
+    return saved;
+}
+
+// 11-2 내가 올렸고 아직 어느 글에도 안 붙은 이미지만 붙일 수 있다. 하나라도 아니면 400(글도 저장 안 됨 — 같은 트랜잭션)
+private void attachImages(Post post, Long authorId, JsonNode imageIds) {
+    if (imageIds == null || imageIds.isNull()) {
+        return;
+    }
+    if (!imageIds.isArray()) {
+        throw new InvalidPostFieldException(&amp;quot;imageIds&amp;quot;, &amp;quot;이미지 ID는 숫자 배열이어야 합니다.&amp;quot;);
+    }
+    if (imageIds.size() == 0) {
+        return;
+    }
+    List&amp;lt;Long&amp;gt; requestedIds = new java.util.ArrayList&amp;lt;&amp;gt;();
+    for (int index = 0; index &amp;lt; imageIds.size(); index++) {
+        JsonNode id = imageIds.get(index);
+        if (!id.isIntegralNumber() || !id.canConvertToLong()) {
+            throw new InvalidPostFieldException(&amp;quot;imageIds[&amp;quot; + index + &amp;quot;]&amp;quot;, &amp;quot;이미지 ID는 정수여야 합니다.&amp;quot;);
+        }
+        requestedIds.add(id.longValue());
+    }
+    List&amp;lt;Long&amp;gt; ids = requestedIds.stream().distinct().sorted().toList();
+    if (ids.size() &amp;gt; 10) {
+        throw new InvalidPostFieldException(&amp;quot;imageIds&amp;quot;, &amp;quot;이미지는 10개까지입니다.&amp;quot;);
+    }
+    List&amp;lt;PostImage&amp;gt; images = postImageRepository.findAllByIdForUpdate(ids);
+    boolean allUsable = images.size() == ids.size() &amp;amp;&amp;amp; images.stream().allMatch(image -&amp;gt;
+            image.getUploader().getId().equals(authorId) &amp;amp;&amp;amp; image.getPost() == null);
+    if (!allUsable) {
+        throw new InvalidPostFieldException(&amp;quot;imageIds&amp;quot;, &amp;quot;내가 올렸고 아직 글에 붙지 않은 이미지만 붙일 수 있습니다.&amp;quot;);
+    }
+    images.forEach(image -&amp;gt; {
+        image.attachTo(post);
+        post.getImages().add(image);
+    });
+}
+
+@Transactional
+public Post copy(Long sourceId, Long authorId, boolean copyTags, CopyPostRequest request) {
+    Post source = postRepository.findById(sourceId).orElseThrow(PostNotFoundException::new);
+    if (source.getDeletedAt() != null || !&amp;quot;PUBLISHED&amp;quot;.equals(source.getStatus())
+            || !&amp;quot;PUBLIC&amp;quot;.equals(source.getVisibility())) {
+        throw new PostNotFoundException();
+    }
+    Member author = memberRepository.getReferenceById(authorId);
+    if (ADMIN_WRITE_ROLE.equals(source.getBoard().getWriteRole())
+            &amp;amp;&amp;amp; !ADMIN_ROLE.equals(author.getRole())) {
+        throw new BoardWriteForbiddenException(source.getBoard().getSlug());
+    }
+    LocalDateTime now = LocalDateTime.now();
+    Post copied = new Post(source.getBoard(), author, request.title(), source.getContent(),
+            &amp;quot;PUBLISHED&amp;quot;, &amp;quot;PUBLIC&amp;quot;, now);
+    if (copyTags) {
+        source.getTags().forEach(copied::addTag);
+    }
+    Post saved = postRepository.save(copied);
+    saved.getBoard().getSlug();
+    saved.getAuthor().getNickname();
+    saved.getTags().forEach(Tag::getName);
+    return saved;
+}
+
+@Transactional
+public PostDetailResponse replace(Long id, AuthenticatedMember me, PostReplaceRequest request) {
+    Post post = postRepository.findByIdForUpdate(id).orElseThrow(PostNotFoundException::new);
+    if (!accessPolicy.canView(me, post)) {
+        throw new PostNotFoundException();
+    }
+    if (!post.getAuthor().getId().equals(me.id())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+    Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+    for (String name : distinctTagNames(request.tags())) {
+        tags.add(tagRepository.findByName(name)
+                .orElseGet(() -&amp;gt; tagRepository.save(new Tag(name, now))));
+    }
+    post.replace(request.title(), request.content(), request.visibility(), tags, now);
+
+    return new PostDetailResponse(post.getId(), post.getBoard().getSlug(), post.getTitle(),
+            post.getContent(), post.getTags().stream().map(Tag::getName).toList(),
+            post.getVisibility(),
+            new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+            post.getViewCount(), post.getLikeCount(), post.getCommentCount(),
+            post.getImages().stream().map(i -&amp;gt; new ImageResponse(i.getId(), i.url())).toList(),
+            post.getStatus(), post.getPublishedAt(), post.getCreatedAt());
+}
+
+@Transactional
+public Post patch(Long id, AuthenticatedMember loginMember, PostUpdateRequest request) {
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+
+    // 404(볼 수 없음)를 먼저 확인하고, 그다음에 403(작성자 아님)을 확인한다.
+    // 반대로 하면 볼 수 없는 글의 존재가 403으로 드러난다.
+    if (!accessPolicy.canView(loginMember, post)) {
+        throw new PostNotFoundException();
+    }
+    if (!post.getAuthor().getId().equals(loginMember.id())) {
+        throw new PostForbiddenException();
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+
+    if (request.title() != null) {
+        validateTitle(request.title());
+        post.changeTitle(request.title());
+    }
+    if (request.content() != null) {
+        validateContent(request.content());
+        post.changeContent(request.content());
+    }
+    if (request.tags() != null) {
+        validateTags(request.tags());
+        post.replaceTags(resolveTags(request.tags(), now));
+    }
+    if (request.visibility() != null) {
+        validateVisibility(request.visibility());
+        post.changeVisibility(request.visibility());
+    }
+    // boardSlug는 요청에 와도 무시한다(게시판은 못 옮긴다) — PostUpdateRequest에 아예 없다.
+
+    post.touchUpdatedAt(now);
+
+    // 트랜잭션 안에서 지연 로딩 연관을 미리 읽어 둔다(컨트롤러가 세션 밖에서 DTO를 만든다).
+    // board는 findById로 읽은 프록시라 건드리지 않으면 LazyInitializationException이 난다
+    // (create()의 board는 findBySlug로 이미 로딩된 엔티티라 같은 문제가 없었다).
+    post.getBoard().getSlug();
+    post.getAuthor().getNickname();
+    post.getTags().forEach(Tag::getName);
+    post.getImages().forEach(PostImage::getStoredName);
+    return post;
+}
+
+// 11-1 임시저장 글 발행 — 404(볼 수 없음) → 403(작성자 아님) → 409(임시저장이 아님) 순서
+@Transactional
+public Post publish(Long id, AuthenticatedMember loginMember) {
+    // 같은 임시저장 글의 발행 요청을 직렬화해 두 번째 요청은 커밋 뒤 상태를 본다.
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+    if (!accessPolicy.canView(loginMember, post)) {
+        throw new PostNotFoundException();
+    }
+    if (!post.getAuthor().getId().equals(loginMember.id())) {
+        throw new PostForbiddenException();
+    }
+    if (!DRAFT.equals(post.getStatus())) {
+        throw new PostNotDraftException();
+    }
+    post.publish(LocalDateTime.now());
+
+    post.getBoard().getSlug();
+    post.getAuthor().getNickname();
+    post.getTags().forEach(Tag::getName);
+    post.getImages().forEach(PostImage::getStoredName);
+    return post;
+}
+
+// 11-1 내 임시저장 글 — 최근에 고친 것부터. 지운 글은 빠진다
+@Transactional(readOnly = true)
+public MyDraftsResponse myDrafts(AuthenticatedMember loginMember) {
+    List&amp;lt;MyDraftItemResponse&amp;gt; items = postRepository.findMyDrafts(loginMember.id()).stream()
+            .map(p -&amp;gt; new MyDraftItemResponse(p.getId(), p.getBoard().getSlug(), p.getTitle(), p.getUpdatedAt()))
+            .toList();
+    return new MyDraftsResponse(items);
+}
+
+@Transactional
+public void delete(Long id, AuthenticatedMember loginMember) {
+    // 발행과 삭제가 같은 글을 동시에 갱신하지 않도록 행을 잠근다.
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+
+    // 404(볼 수 없음·이미 삭제됨) → 403(작성자도 운영자도 아님) 순서
+    if (!accessPolicy.canView(loginMember, post)) {
+        throw new PostNotFoundException();
+    }
+    boolean isAuthor = post.getAuthor().getId().equals(loginMember.id());
+    boolean isAdmin = ADMIN_ROLE.equals(loginMember.role());
+    if (!isAuthor &amp;amp;&amp;amp; !isAdmin) {
+        throw new PostForbiddenException();
+    }
+
+    post.delete(LocalDateTime.now());
+}
+
+private void validateTitle(String title) {
+    if (title.isBlank()) {
+        throw new InvalidPostFieldException(&amp;quot;title&amp;quot;, &amp;quot;제목을 입력해 주세요.&amp;quot;);
+    }
+    if (title.length() &amp;gt; TITLE_MAX_LENGTH) {
+        throw new InvalidPostFieldException(&amp;quot;title&amp;quot;, &amp;quot;제목은 &amp;quot; + TITLE_MAX_LENGTH + &amp;quot;자 이하여야 합니다.&amp;quot;);
+    }
+}
+
+private void validateContent(String content) {
+    if (content.isBlank()) {
+        throw new InvalidPostFieldException(&amp;quot;content&amp;quot;, &amp;quot;본문을 입력해 주세요.&amp;quot;);
+    }
+}
+
+private void validateTags(List&amp;lt;String&amp;gt; tags) {
+    if (tags.size() &amp;gt; TAGS_MAX_COUNT) {
+        throw new InvalidPostFieldException(&amp;quot;tags&amp;quot;, &amp;quot;태그는 &amp;quot; + TAGS_MAX_COUNT + &amp;quot;개까지입니다.&amp;quot;);
+    }
+    for (String tag : tags) {
+        if (tag == null || tag.isBlank() || tag.length() &amp;gt; TAG_NAME_MAX_LENGTH) {
+            throw new InvalidPostFieldException(&amp;quot;tags&amp;quot;, &amp;quot;태그 이름은 1~&amp;quot; + TAG_NAME_MAX_LENGTH + &amp;quot;자여야 합니다.&amp;quot;);
+        }
+    }
+}
+
+private void validateVisibility(String visibility) {
+    if (!&amp;quot;PUBLIC&amp;quot;.equals(visibility) &amp;amp;&amp;amp; !&amp;quot;FOLLOWERS&amp;quot;.equals(visibility)) {
+        throw new InvalidPostFieldException(&amp;quot;visibility&amp;quot;, &amp;quot;공개 범위는 PUBLIC 또는 FOLLOWERS여야 합니다.&amp;quot;);
+    }
+}
+
+// 이름으로 찾고 없으면 만든다. 요청 안의 중복은 제거한다(1-4/1-5와 같은 규칙, 3-1에서도 재사용).
+private Set&amp;lt;Tag&amp;gt; resolveTags(List&amp;lt;String&amp;gt; tagNames, LocalDateTime now) {
+    Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+    for (String tagName : distinctTagNames(tagNames)) {
+        Tag tag = tagRepository.findByName(tagName)
+                .orElseGet(() -&amp;gt; tagRepository.save(new Tag(tagName, now)));
+        tags.add(tag);
+    }
+    return tags;
+}
+
+private List&amp;lt;String&amp;gt; distinctTagNames(List&amp;lt;String&amp;gt; tags) {
+    if (tags == null) {
+        return List.of();
+    }
+    Set&amp;lt;String&amp;gt; seen = new LinkedHashSet&amp;lt;&amp;gt;(tags);
+    return List.copyOf(seen);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: javaExperience
+  datasource:
+    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  flyway:
+    # 이미 테이블·데이터가 있는 DB(compose의 community·practice)는 V1(CREATE TABLE)을 실행하면 실패한다.
+    # 그래서 기록 테이블이 없으면 &quot;V1까지 됐다&quot;고만 적고(baseline) V2부터 실행한다. 빈 DB면 V1부터 실제로 실행한다.
+    baseline-on-migrate: true
+    baseline-version: 1
+  servlet:
+    multipart:
+      # 11-2 이미지 한 장 1MB, 요청 전체 2MB까지. 넘으면 MaxUploadSizeExceededException → 413
+      max-file-size: 1MB
+      max-request-size: 2MB
+  jpa:
+    hibernate:
+      # 스키마는 Flyway만 바꾼다(9-1). 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)
+      ddl-auto: validate
+    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        # 컬렉션(태그) 지연 로딩을 글마다 1번이 아니라 IN (...) 한 번으로 묶는다(2-4, N+1 대응)
+        default_batch_fetch_size: 100
+
+<h1 id="11-2-올린-이미지를-저장할-폴더앱을-실행한-위치-기준-git에는-올리지-않는다gitignore"><a class="anchor" href="#11-2-올린-이미지를-저장할-폴더앱을-실행한-위치-기준-git에는-올리지-않는다gitignore" aria-hidden="true">#</a>11-2 올린 이미지를 저장할 폴더(앱을 실행한 위치 기준). git에는 올리지 않는다(.gitignore)</h1>
+<p>app:
+  upload-dir: uploads</p>
+<p>logging:
+  level:
+    # 실행 SQL은 확인하되 토큰을 포함한 바인딩 값은 로그에 남기지 않는다
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: info</p>
+<h1 id="0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다"><a class="anchor" href="#0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다" aria-hidden="true">#</a>0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다</h1>
+<p>start:
+  greeting: 반가워요, 백엔드!
+  max-items: 5
+</code></pre></details></p>
+<details class="code-file"><summary>DB / SQL — src/main/resources/db/migration/V20__create_post_image.sql</summary><pre><code>-- V20(11-2) — 글에 붙이는 이미지. 파일 자체는 디스크(app.upload-dir)에, DB에는 &quot;어떤 파일인가&quot;만 둔다.
+-- post_id는 업로드 직후엔 NULL(아직 글에 안 붙음)이고, 글을 쓸 때 imageIds로 연결하면 채워진다.
+-- stored_name은 서버가 지은 이름(무작위 32자 + 확장자) — 사용자가 보낸 파일 이름(original_name)은 경로에 쓰지 않는다.
+CREATE TABLE post_image (
+    id            BIGINT       NOT NULL AUTO_INCREMENT,
+    uploader_id   BIGINT       NOT NULL,
+    post_id       BIGINT       NULL,
+    stored_name   VARCHAR(64)  NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    content_type  VARCHAR(50)  NOT NULL,
+    size_bytes    INT          NOT NULL,
+    created_at    DATETIME     NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_post_image_stored_name (stored_name),
+    KEY ix_post_image_post (post_id, id),
+    CONSTRAINT fk_post_image_uploader FOREIGN KEY (uploader_id) REFERENCES member (id),
+    CONSTRAINT fk_post_image_post FOREIGN KEY (post_id) REFERENCES post (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '글 첨부 이미지 — post_id NULL은 아직 글에 안 붙은 업로드';
+</code></pre></details>
+
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/11-2.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="mybatis-대체-구현-코드"><a class="anchor" href="#mybatis-대체-구현-코드" aria-hidden="true">#</a>MyBatis 대체 구현 코드</h2>
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {
+    id 'java'
+    // bootRun / bootJar 태스크 제공 + 실행 가능한 fat jar 패키징
+    id 'org.springframework.boot' version '4.1.1'
+    // Boot BOM을 적용해서 아래 의존성들의 버전을 생략할 수 있게 해줌
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+<p>group = &#39;org.example&#39;
+version = &#39;1.0-SNAPSHOT&#39;</p>
+<p>java {
+    toolchain {
+        // 컴파일·실행 JDK를 고정 (Boot 4는 Java 17 이상 필요, 로컬에 설치된 21 사용)
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}</p>
+<p>repositories {
+    mavenCentral()
+}</p>
+<p>dependencies {
+    implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;
+    compileOnly &#39;org.projectlombok:lombok&#39;
+    annotationProcessor &#39;org.projectlombok:lombok&#39;
+    // Spring MVC + 내장 Tomcat + Jackson (Boot 4부터 starter-web → starter-webmvc로 이름 변경)
+    implementation &#39;org.springframework.boot:spring-boot-starter-webmvc&#39;
+    // JPA(Hibernate) + HikariCP 커넥션 풀
+    implementation &#39;org.springframework.boot:spring-boot-starter-data-jpa&#39;
+    // @Valid, @NotBlank 같은 요청 값 검증
+    implementation &#39;org.springframework.boot:spring-boot-starter-validation&#39;
+    // MySQL JDBC 드라이버 — 컴파일엔 필요 없고 실행할 때만 필요
+    runtimeOnly &#39;com.mysql:mysql-connector-j&#39;
+    // 9-1 스키마 변경은 Flyway 마이그레이션(db/migration)으로만 한다
+    implementation &#39;org.springframework.boot:spring-boot-starter-flyway&#39;
+    runtimeOnly &#39;org.flywaydb:flyway-mysql&#39;</p>
+<pre><code>// 테스트: JUnit·AssertJ·Mockito·MockMvc 묶음 (버전은 Boot BOM이 관리하므로 junit-bom 따로 두지 않음)
+testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+// @DataJpaTest(리포지토리만 띄우는 테스트)
+testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+// 테스트용 일회용 MySQL 컨테이너 — application-test.yml의 jdbc:tc: URL이 쓴다
+testImplementation 'org.testcontainers:testcontainers-mysql'
+// Gradle이 JUnit Platform 테스트를 실행할 때 필요한 런처
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'</code></pre>
+<p>}</p>
+<p>tasks.named(&#39;test&#39;) {
+    useJUnitPlatform()
+    // 테스트는 application-test.yml(Testcontainers MySQL)을 쓰게 한다
+    systemProperty &#39;spring.profiles.active&#39;, &#39;test&#39;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/image/ImageService.java</summary><pre><code>package org.example.image;
+
+<p>import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;</p>
+<p>import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.time.LocalDateTime;
+import java.util.UUID;</p>
+<p>// 11-2 업로드 규칙 — 크기 상한은 설정(spring.servlet.multipart.max-file-size)이 먼저 막고,
+// 여기서는 빈 파일과 형식(파일 서명)을 본다.
+@Service
+public class ImageService {</p>
+<pre><code>private static final int ORIGINAL_NAME_MAX_LENGTH = 255;
+
+private final PostImageRepository postImageRepository;
+private final MyImageMapper myImageMapper;
+private final ImageStorage storage;
+
+public ImageService(PostImageRepository postImageRepository, MyImageMapper myImageMapper,
+                    ImageStorage storage) {
+    this.postImageRepository = postImageRepository;
+    this.myImageMapper = myImageMapper;
+    this.storage = storage;
+}
+
+@Transactional
+public PostImage upload(Long uploaderId, MultipartFile file) {
+    if (file.isEmpty()) {
+        throw new EmptyImageException();
+    }
+    byte[] bytes;
+    try {
+        bytes = file.getBytes();
+    } catch (IOException e) {
+        throw new UncheckedIOException(e);
+    }
+    ImageType type = ImageType.detect(bytes).orElseThrow(UnsupportedImageException::new);
+
+    // 저장 이름은 서버가 짓는다 — 사용자가 보낸 이름(../../etc/passwd.png, 같은 이름 덮어쓰기)을 경로에 쓰지 않는다
+    String storedName = UUID.randomUUID().toString().replace(&amp;quot;-&amp;quot;, &amp;quot;&amp;quot;) + &amp;quot;.&amp;quot; + type.extension();
+    MyImageInsertRow row = new MyImageInsertRow(uploaderId, storedName, originalNameOf(file),
+            type.contentType(), bytes.length, LocalDateTime.now());
+    myImageMapper.insert(row);
+    PostImage image = postImageRepository.findById(row.getId()).orElseThrow(ImageNotFoundException::new);
+
+    // 파일 쓰기 자체가 중간에 실패해도 롤백 때 일부 기록된 파일을 지울 수 있게 먼저 등록한다.
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+        @Override
+        public void afterCompletion(int status) {
+            if (status != STATUS_COMMITTED) {
+                storage.delete(storedName);
+            }
+        }
+    });
+    storage.save(storedName, bytes);
+    return image;
+}
+
+@Transactional(readOnly = true)
+public PostImage findByStoredName(String storedName) {
+    Long id = myImageMapper.findIdByStoredName(storedName);
+    if (id == null) throw new ImageNotFoundException();
+    return postImageRepository.findById(id).orElseThrow(ImageNotFoundException::new);
+}
+
+private static String originalNameOf(MultipartFile file) {
+    String name = file.getOriginalFilename();
+    if (name == null || name.isBlank()) {
+        return &amp;quot;image&amp;quot;;
+    }
+    return name.length() &amp;gt; ORIGINAL_NAME_MAX_LENGTH ? name.substring(0, ORIGINAL_NAME_MAX_LENGTH) : name;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/image/MyImageInsertRow.java</summary><pre><code>package org.example.image;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// MyBatis INSERT 뒤 생성된 이미지 ID를 받는다.
+public class MyImageInsertRow {
+    private Long id;
+    private final Long uploaderId;
+    private final String storedName;
+    private final String originalName;
+    private final String contentType;
+    private final int sizeBytes;
+    private final LocalDateTime createdAt;</p>
+<pre><code>public MyImageInsertRow(Long uploaderId, String storedName, String originalName,
+                        String contentType, int sizeBytes, LocalDateTime createdAt) {
+    this.uploaderId = uploaderId;
+    this.storedName = storedName;
+    this.originalName = originalName;
+    this.contentType = contentType;
+    this.sizeBytes = sizeBytes;
+    this.createdAt = createdAt;
+}
+
+public Long getId() { return id; }
+public void setId(Long id) { this.id = id; }
+public Long getUploaderId() { return uploaderId; }
+public String getStoredName() { return storedName; }
+public String getOriginalName() { return originalName; }
+public String getContentType() { return contentType; }
+public int getSizeBytes() { return sizeBytes; }
+public LocalDateTime getCreatedAt() { return createdAt; }</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/image/MyImageMapper.java</summary><pre><code>package org.example.image;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>@Mapper
+public interface MyImageMapper {
+    int insert(MyImageInsertRow row);
+    Long findIdByStoredName(@Param(&quot;storedName&quot;) String storedName);
+    int attach(@Param(&quot;id&quot;) Long id, @Param(&quot;uploaderId&quot;) Long uploaderId, @Param(&quot;postId&quot;) Long postId);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/post/PostService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.board.Board;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardRepository;
+import org.example.board.BoardWriteForbiddenException;
+import org.example.image.PostImage;
+import org.example.image.MyImageMapper;
+import tools.jackson.databind.JsonNode;
+import org.example.member.Member;
+import org.example.member.MemberRepository;
+import org.example.tag.Tag;
+import org.example.tag.TagRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;</p>
+<p>// 글 만들기·고치기 규칙. HTTP(ResponseEntity, 헤더 등)는 알지 않는다.
+@Service
+public class PostService {</p>
+<pre><code>private static final String ADMIN_WRITE_ROLE = &amp;quot;ADMIN&amp;quot;;
+private static final String ADMIN_ROLE = &amp;quot;ADMIN&amp;quot;;
+private static final String DEFAULT_VISIBILITY = &amp;quot;PUBLIC&amp;quot;;
+private static final String PUBLISHED = &amp;quot;PUBLISHED&amp;quot;;
+private static final String DRAFT = &amp;quot;DRAFT&amp;quot;;
+
+// 1-5(PostCreateRequest)와 같은 규칙 — PATCH는 Bean Validation(@Valid)으로 표현할 수 없다
+// (null=그대로, 값이 있을 때만 검사해야 하는데 @NotBlank는 null도 실패로 본다). 숫자만이라도
+// 같은 값을 쓰도록 여기 모아 둔다.
+private static final int TITLE_MAX_LENGTH = 200;
+private static final int TAGS_MAX_COUNT = 5;
+private static final int TAG_NAME_MAX_LENGTH = 30;
+
+private final PostRepository postRepository;
+private final BoardRepository boardRepository;
+private final MemberRepository memberRepository;
+private final TagRepository tagRepository;
+private final PostAccessPolicy accessPolicy;
+private final MyImageMapper myImageMapper;
+
+public PostService(PostRepository postRepository, BoardRepository boardRepository,
+                    MemberRepository memberRepository, TagRepository tagRepository,
+                    PostAccessPolicy accessPolicy, MyImageMapper myImageMapper) {
+    this.postRepository = postRepository;
+    this.boardRepository = boardRepository;
+    this.memberRepository = memberRepository;
+    this.tagRepository = tagRepository;
+    this.accessPolicy = accessPolicy;
+    this.myImageMapper = myImageMapper;
+}
+
+@Transactional
+public Post create(Long authorId, PostCreateRequest request) {
+    Board board = boardRepository.findBySlug(request.boardSlug())
+            .orElseThrow(() -&amp;gt; new BoardNotFoundException(request.boardSlug()));
+    // 작성자는 요청 본문이 아니라 토큰으로 인증된 회원에서 받는다(authorId 같은 값은 무시한다)
+    Member author = memberRepository.getReferenceById(authorId);
+
+    if (ADMIN_WRITE_ROLE.equals(board.getWriteRole()) &amp;amp;&amp;amp; !ADMIN_ROLE.equals(author.getRole())) {
+        throw new BoardWriteForbiddenException(board.getSlug());
+    }
+
+    String visibility = request.visibility() != null ? request.visibility() : DEFAULT_VISIBILITY;
+    // 11-1 상태를 안 보내면 지금처럼 바로 발행. DRAFT면 published_at은 비워 둔다(Post 생성자)
+    String status = request.status() != null ? request.status() : PUBLISHED;
+    LocalDateTime now = LocalDateTime.now();
+    Post post = new Post(board, author, request.title(), request.content(),
+            status, visibility, now);
+
+    for (Tag tag : resolveTags(request.tags(), now)) {
+        post.addTag(tag);
+    }
+
+    Post saved = postRepository.save(post);
+    attachImages(saved, authorId, request.imageIds());
+    // 트랜잭션(영속성 컨텍스트) 안에서 지연 로딩 연관을 미리 읽어 둔다.
+    // open-in-view: false라서 컨트롤러가 트랜잭션 밖에서 건드리면 LazyInitializationException이 난다.
+    saved.getAuthor().getNickname();
+    saved.getTags().forEach(Tag::getName);
+    return saved;
+}
+
+// 11-2 내가 올렸고 아직 어느 글에도 안 붙은 이미지만 붙일 수 있다. 하나라도 아니면 400(글도 저장 안 됨 — 같은 트랜잭션)
+private void attachImages(Post post, Long authorId, JsonNode imageIds) {
+    if (imageIds == null || imageIds.isNull()) {
+        return;
+    }
+    if (!imageIds.isArray()) {
+        throw new InvalidPostFieldException(&amp;quot;imageIds&amp;quot;, &amp;quot;이미지 ID는 숫자 배열이어야 합니다.&amp;quot;);
+    }
+    if (imageIds.size() == 0) {
+        return;
+    }
+    List&amp;lt;Long&amp;gt; requestedIds = new java.util.ArrayList&amp;lt;&amp;gt;();
+    for (int index = 0; index &amp;lt; imageIds.size(); index++) {
+        JsonNode id = imageIds.get(index);
+        if (!id.isIntegralNumber() || !id.canConvertToLong()) {
+            throw new InvalidPostFieldException(&amp;quot;imageIds[&amp;quot; + index + &amp;quot;]&amp;quot;, &amp;quot;이미지 ID는 정수여야 합니다.&amp;quot;);
+        }
+        requestedIds.add(id.longValue());
+    }
+    List&amp;lt;Long&amp;gt; ids = requestedIds.stream().distinct().sorted().toList();
+    if (ids.size() &amp;gt; 10) {
+        throw new InvalidPostFieldException(&amp;quot;imageIds&amp;quot;, &amp;quot;이미지는 10개까지입니다.&amp;quot;);
+    }
+    // UPDATE 자체가 미연결 조건을 검사하며 행을 잠근다. 하나라도 실패하면 글·앞선 연결도 함께 롤백한다.
+    postRepository.flush();
+    for (Long imageId : ids) {
+        if (myImageMapper.attach(imageId, authorId, post.getId()) != 1) {
+            throw new InvalidPostFieldException(&amp;quot;imageIds&amp;quot;, &amp;quot;내가 올렸고 아직 글에 붙지 않은 이미지만 붙일 수 있습니다.&amp;quot;);
+        }
+    }
+}
+
+@Transactional
+public Post copy(Long sourceId, Long authorId, boolean copyTags, CopyPostRequest request) {
+    Post source = postRepository.findById(sourceId).orElseThrow(PostNotFoundException::new);
+    if (source.getDeletedAt() != null || !&amp;quot;PUBLISHED&amp;quot;.equals(source.getStatus())
+            || !&amp;quot;PUBLIC&amp;quot;.equals(source.getVisibility())) {
+        throw new PostNotFoundException();
+    }
+    Member author = memberRepository.getReferenceById(authorId);
+    if (ADMIN_WRITE_ROLE.equals(source.getBoard().getWriteRole())
+            &amp;amp;&amp;amp; !ADMIN_ROLE.equals(author.getRole())) {
+        throw new BoardWriteForbiddenException(source.getBoard().getSlug());
+    }
+    LocalDateTime now = LocalDateTime.now();
+    Post copied = new Post(source.getBoard(), author, request.title(), source.getContent(),
+            &amp;quot;PUBLISHED&amp;quot;, &amp;quot;PUBLIC&amp;quot;, now);
+    if (copyTags) {
+        source.getTags().forEach(copied::addTag);
+    }
+    Post saved = postRepository.save(copied);
+    saved.getBoard().getSlug();
+    saved.getAuthor().getNickname();
+    saved.getTags().forEach(Tag::getName);
+    return saved;
+}
+
+@Transactional
+public PostDetailResponse replace(Long id, AuthenticatedMember me, PostReplaceRequest request) {
+    Post post = postRepository.findByIdForUpdate(id).orElseThrow(PostNotFoundException::new);
+    if (!accessPolicy.canView(me, post)) {
+        throw new PostNotFoundException();
+    }
+    if (!post.getAuthor().getId().equals(me.id())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+    Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+    for (String name : distinctTagNames(request.tags())) {
+        tags.add(tagRepository.findByName(name)
+                .orElseGet(() -&amp;gt; tagRepository.save(new Tag(name, now))));
+    }
+    post.replace(request.title(), request.content(), request.visibility(), tags, now);
+
+    return new PostDetailResponse(post.getId(), post.getBoard().getSlug(), post.getTitle(),
+            post.getContent(), post.getTags().stream().map(Tag::getName).toList(),
+            post.getVisibility(),
+            new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+            post.getViewCount(), post.getLikeCount(), post.getCommentCount(),
+            post.getImages().stream().map(i -&amp;gt; new ImageResponse(i.getId(), i.url())).toList(),
+            post.getStatus(), post.getPublishedAt(), post.getCreatedAt());
+}
+
+@Transactional
+public Post patch(Long id, AuthenticatedMember loginMember, PostUpdateRequest request) {
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+
+    // 404(볼 수 없음)를 먼저 확인하고, 그다음에 403(작성자 아님)을 확인한다.
+    // 반대로 하면 볼 수 없는 글의 존재가 403으로 드러난다.
+    if (!accessPolicy.canView(loginMember, post)) {
+        throw new PostNotFoundException();
+    }
+    if (!post.getAuthor().getId().equals(loginMember.id())) {
+        throw new PostForbiddenException();
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+
+    if (request.title() != null) {
+        validateTitle(request.title());
+        post.changeTitle(request.title());
+    }
+    if (request.content() != null) {
+        validateContent(request.content());
+        post.changeContent(request.content());
+    }
+    if (request.tags() != null) {
+        validateTags(request.tags());
+        post.replaceTags(resolveTags(request.tags(), now));
+    }
+    if (request.visibility() != null) {
+        validateVisibility(request.visibility());
+        post.changeVisibility(request.visibility());
+    }
+    // boardSlug는 요청에 와도 무시한다(게시판은 못 옮긴다) — PostUpdateRequest에 아예 없다.
+
+    post.touchUpdatedAt(now);
+
+    // 트랜잭션 안에서 지연 로딩 연관을 미리 읽어 둔다(컨트롤러가 세션 밖에서 DTO를 만든다).
+    // board는 findById로 읽은 프록시라 건드리지 않으면 LazyInitializationException이 난다
+    // (create()의 board는 findBySlug로 이미 로딩된 엔티티라 같은 문제가 없었다).
+    post.getBoard().getSlug();
+    post.getAuthor().getNickname();
+    post.getTags().forEach(Tag::getName);
+    post.getImages().forEach(PostImage::getStoredName);
+    return post;
+}
+
+// 11-1 임시저장 글 발행 — 404(볼 수 없음) → 403(작성자 아님) → 409(임시저장이 아님) 순서
+@Transactional
+public Post publish(Long id, AuthenticatedMember loginMember) {
+    // 같은 임시저장 글의 발행 요청을 직렬화해 두 번째 요청은 커밋 뒤 상태를 본다.
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+    if (!accessPolicy.canView(loginMember, post)) {
+        throw new PostNotFoundException();
+    }
+    if (!post.getAuthor().getId().equals(loginMember.id())) {
+        throw new PostForbiddenException();
+    }
+    if (!DRAFT.equals(post.getStatus())) {
+        throw new PostNotDraftException();
+    }
+    post.publish(LocalDateTime.now());
+
+    post.getBoard().getSlug();
+    post.getAuthor().getNickname();
+    post.getTags().forEach(Tag::getName);
+    post.getImages().forEach(PostImage::getStoredName);
+    return post;
+}
+
+// 11-1 내 임시저장 글 — 최근에 고친 것부터. 지운 글은 빠진다
+@Transactional(readOnly = true)
+public MyDraftsResponse myDrafts(AuthenticatedMember loginMember) {
+    List&amp;lt;MyDraftItemResponse&amp;gt; items = postRepository.findMyDrafts(loginMember.id()).stream()
+            .map(p -&amp;gt; new MyDraftItemResponse(p.getId(), p.getBoard().getSlug(), p.getTitle(), p.getUpdatedAt()))
+            .toList();
+    return new MyDraftsResponse(items);
+}
+
+@Transactional
+public void delete(Long id, AuthenticatedMember loginMember) {
+    // 발행과 삭제가 같은 글을 동시에 갱신하지 않도록 행을 잠근다.
+    Post post = postRepository.findByIdForUpdate(id)
+            .orElseThrow(PostNotFoundException::new);
+
+    // 404(볼 수 없음·이미 삭제됨) → 403(작성자도 운영자도 아님) 순서
+    if (!accessPolicy.canView(loginMember, post)) {
+        throw new PostNotFoundException();
+    }
+    boolean isAuthor = post.getAuthor().getId().equals(loginMember.id());
+    boolean isAdmin = ADMIN_ROLE.equals(loginMember.role());
+    if (!isAuthor &amp;amp;&amp;amp; !isAdmin) {
+        throw new PostForbiddenException();
+    }
+
+    post.delete(LocalDateTime.now());
+}
+
+private void validateTitle(String title) {
+    if (title.isBlank()) {
+        throw new InvalidPostFieldException(&amp;quot;title&amp;quot;, &amp;quot;제목을 입력해 주세요.&amp;quot;);
+    }
+    if (title.length() &amp;gt; TITLE_MAX_LENGTH) {
+        throw new InvalidPostFieldException(&amp;quot;title&amp;quot;, &amp;quot;제목은 &amp;quot; + TITLE_MAX_LENGTH + &amp;quot;자 이하여야 합니다.&amp;quot;);
+    }
+}
+
+private void validateContent(String content) {
+    if (content.isBlank()) {
+        throw new InvalidPostFieldException(&amp;quot;content&amp;quot;, &amp;quot;본문을 입력해 주세요.&amp;quot;);
+    }
+}
+
+private void validateTags(List&amp;lt;String&amp;gt; tags) {
+    if (tags.size() &amp;gt; TAGS_MAX_COUNT) {
+        throw new InvalidPostFieldException(&amp;quot;tags&amp;quot;, &amp;quot;태그는 &amp;quot; + TAGS_MAX_COUNT + &amp;quot;개까지입니다.&amp;quot;);
+    }
+    for (String tag : tags) {
+        if (tag == null || tag.isBlank() || tag.length() &amp;gt; TAG_NAME_MAX_LENGTH) {
+            throw new InvalidPostFieldException(&amp;quot;tags&amp;quot;, &amp;quot;태그 이름은 1~&amp;quot; + TAG_NAME_MAX_LENGTH + &amp;quot;자여야 합니다.&amp;quot;);
+        }
+    }
+}
+
+private void validateVisibility(String visibility) {
+    if (!&amp;quot;PUBLIC&amp;quot;.equals(visibility) &amp;amp;&amp;amp; !&amp;quot;FOLLOWERS&amp;quot;.equals(visibility)) {
+        throw new InvalidPostFieldException(&amp;quot;visibility&amp;quot;, &amp;quot;공개 범위는 PUBLIC 또는 FOLLOWERS여야 합니다.&amp;quot;);
+    }
+}
+
+// 이름으로 찾고 없으면 만든다. 요청 안의 중복은 제거한다(1-4/1-5와 같은 규칙, 3-1에서도 재사용).
+private Set&amp;lt;Tag&amp;gt; resolveTags(List&amp;lt;String&amp;gt; tagNames, LocalDateTime now) {
+    Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+    for (String tagName : distinctTagNames(tagNames)) {
+        Tag tag = tagRepository.findByName(tagName)
+                .orElseGet(() -&amp;gt; tagRepository.save(new Tag(tagName, now)));
+        tags.add(tag);
+    }
+    return tags;
+}
+
+private List&amp;lt;String&amp;gt; distinctTagNames(List&amp;lt;String&amp;gt; tags) {
+    if (tags == null) {
+        return List.of();
+    }
+    Set&amp;lt;String&amp;gt; seen = new LinkedHashSet&amp;lt;&amp;gt;(tags);
+    return List.copyOf(seen);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: javaExperience
+  datasource:
+    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  flyway:
+    # 이미 테이블·데이터가 있는 DB(compose의 community·practice)는 V1(CREATE TABLE)을 실행하면 실패한다.
+    # 그래서 기록 테이블이 없으면 &quot;V1까지 됐다&quot;고만 적고(baseline) V2부터 실행한다. 빈 DB면 V1부터 실제로 실행한다.
+    baseline-on-migrate: true
+    baseline-version: 1
+  servlet:
+    multipart:
+      # 11-2 이미지 한 장 1MB, 요청 전체 2MB까지. 넘으면 MaxUploadSizeExceededException → 413
+      max-file-size: 1MB
+      max-request-size: 2MB
+  jpa:
+    hibernate:
+      # 스키마는 Flyway만 바꾼다(9-1). 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)
+      ddl-auto: validate
+    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        # 컬렉션(태그) 지연 로딩을 글마다 1번이 아니라 IN (...) 한 번으로 묶는다(2-4, N+1 대응)
+        default_batch_fetch_size: 100
+
+<h1 id="11-2-올린-이미지를-저장할-폴더앱을-실행한-위치-기준-git에는-올리지-않는다gitignore-1"><a class="anchor" href="#11-2-올린-이미지를-저장할-폴더앱을-실행한-위치-기준-git에는-올리지-않는다gitignore-1" aria-hidden="true">#</a>11-2 올린 이미지를 저장할 폴더(앱을 실행한 위치 기준). git에는 올리지 않는다(.gitignore)</h1>
+<p>app:
+  upload-dir: uploads</p>
+<p>logging:
+  level:
+    # 실행 SQL은 확인하되 토큰을 포함한 바인딩 값은 로그에 남기지 않는다
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: info</p>
+<h1 id="11-2-mybatis-대체-mapper"><a class="anchor" href="#11-2-mybatis-대체-mapper" aria-hidden="true">#</a>11-2 MyBatis 대체 Mapper</h1>
+<p>mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true</p>
+<h1 id="0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다-1"><a class="anchor" href="#0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다-1" aria-hidden="true">#</a>0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다</h1>
+<p>start:
+  greeting: 반가워요, 백엔드!
+  max-items: 5
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/MyImageMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.image.MyImageMapper&quot;&gt;
+    &lt;insert id=&quot;insert&quot; parameterType=&quot;org.example.image.MyImageInsertRow&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+        INSERT INTO post_image (uploader_id, post_id, stored_name, original_name, content_type, size_bytes, created_at)
+        VALUES (#{uploaderId}, NULL, #{storedName}, #{originalName}, #{contentType}, #{sizeBytes}, #{createdAt})
+    &lt;/insert&gt;
+    &lt;select id=&quot;findIdByStoredName&quot; resultType=&quot;long&quot;&gt;
+        SELECT id FROM post_image WHERE stored_name = #{storedName}
+    &lt;/select&gt;
+    &lt;update id=&quot;attach&quot;&gt;
+        UPDATE post_image SET post_id = #{postId}
+        WHERE id = #{id} AND uploader_id = #{uploaderId} AND post_id IS NULL
+    &lt;/update&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080
+K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; J='Content-Type: application/json'
+jget() { python3 -c &quot;import sys,json; print(json.load(sys.stdin)['$1'])&quot;; }
+
+printf 'GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;' &gt; dot.gif   # 1×1 GIF
+echo hello &gt; fake.png
+head -c 1200000 /dev/urandom &gt; big.gif                                  # 1.2MB
+
+curl -s -X POST &quot;$BASE/api/images&quot; -H &quot;$K&quot; -F &quot;file=@dot.gif&quot; | tee up.json; echo     # I0 (-F가 multipart로 보낸다)
+F=$(jget fileName &lt; up.json); IMG=$(jget id &lt; up.json)
+curl -s -D - -o got.gif &quot;$BASE/api/images/$F&quot; | grep -i content-type; cmp dot.gif got.gif &amp;&amp; echo 같은파일   # I1
+curl -i -X POST &quot;$BASE/api/images&quot; -H &quot;$K&quot; -F &quot;file=@fake.png;type=image/png&quot;        # I2
+curl -i -X POST &quot;$BASE/api/images&quot; -F &quot;file=@dot.gif&quot;                                # I3 토큰 없음
+curl -i -X POST &quot;$BASE/api/images&quot; -H &quot;$K&quot; -F &quot;file=@big.gif&quot;                        # I4 1MB 초과
+P=$(curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$K&quot; -H &quot;$J&quot; \
+  -d &quot;{\&quot;boardSlug\&quot;:\&quot;free\&quot;,\&quot;title\&quot;:\&quot;[채점] 사진 글\&quot;,\&quot;content\&quot;:\&quot;사진 첨부\&quot;,\&quot;imageIds\&quot;:[$IMG]}&quot; | jget id); echo &quot;P=$P&quot;   # I5
+curl -s &quot;$BASE/api/posts/$P&quot;; echo                                                   # I6
+curl -i -X POST &quot;$BASE/api/posts&quot; -H &quot;$K&quot; -H &quot;$J&quot; \
+  -d &quot;{\&quot;boardSlug\&quot;:\&quot;free\&quot;,\&quot;title\&quot;:\&quot;[채점] 같은 사진 또\&quot;,\&quot;content\&quot;:\&quot;x\&quot;,\&quot;imageIds\&quot;:[$IMG]}&quot;   # I7 이미 붙은 이미지
+# 잘못된 입력 — 모두 400(또는 415), 500이 아니어야 한다
+: &gt; empty.gif; curl -s -X POST &quot;$BASE/api/images&quot; -H &quot;$K&quot; -F &quot;file=@empty.gif&quot;; echo                # E1 0바이트
+curl -s -X POST &quot;$BASE/api/images&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{&quot;file&quot;:&quot;dot.gif&quot;}'; echo                       # E2 JSON으로 보냄
+for ids in '[null]' '[&quot;abc&quot;]' '[99999999]' '[1,2,3,4,5,6,7,8,9,10,11]'; do
+  curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d &quot;{\&quot;boardSlug\&quot;:\&quot;free\&quot;,\&quot;title\&quot;:\&quot;[채점] 잘못된 이미지\&quot;,\&quot;content\&quot;:\&quot;x\&quot;,\&quot;imageIds\&quot;:$ids}&quot;; echo   # E3~E6
+done</code></pre></details>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 실행 칸은 파일을 고를 수 없어서 <code>multipart/form-data</code> 본문을 글자로 직접 적어 보낸다(경계 <code>jx11</code>, 줄바꿈은 <code>\r\n</code>). 그래서 올리는 파일은 글자로만 된 작은 GIF 조각(<code>GIF89a…</code>)이다 — 형식 판정이 앞 바이트만 보므로 충분하다. 1MB 초과(C9)는 본문에 1MB를 적을 수 없어 위 curl(I4)로 직접 본다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="I0" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>I0 · I0 GIF 올리기(김자바)</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/images" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="multipart/form-data; boundary=jx11" value="multipart/form-data; boundary=jx11" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">--jx11&#13;
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;dot.gif&quot;&#13;
+Content-Type: image/gif&#13;
+&#13;
+GIF89a     ;&#13;
+--jx11--&#13;
+</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;,
+  &quot;Content-Type&quot;: &quot;multipart/form-data; boundary=jx11&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>--jx11&#13;
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;dot.gif&quot;&#13;
+Content-Type: image/gif&#13;
+&#13;
+GIF89a     ;&#13;
+--jx11--&#13;
+</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:201,&quot;headers&quot;:{&quot;location&quot;:{&quot;endsWith&quot;:&quot;/api/images/{{I0.body.fileName}}&quot;}},&quot;json&quot;:[{&quot;path&quot;:&quot;$.id&quot;,&quot;type&quot;:&quot;number&quot;},{&quot;path&quot;:&quot;$.fileName&quot;,&quot;matches&quot;:&quot;^[0-9a-f]{32}\\.gif$&quot;},{&quot;path&quot;:&quot;$.url&quot;,&quot;equals&quot;:&quot;/api/images/{{I0.body.fileName}}&quot;},{&quot;path&quot;:&quot;$.contentType&quot;,&quot;equals&quot;:&quot;image/gif&quot;},{&quot;path&quot;:&quot;$.size&quot;,&quot;equals&quot;:14}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="I1" data-method="GET" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>I1 · I1 올린 파일 받기</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/images/{{I0.body.fileName}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;headers&quot;:{&quot;content-type&quot;:{&quot;contains&quot;:&quot;image/gif&quot;}},&quot;bodyText&quot;:{&quot;contains&quot;:&quot;GIF89a&quot;}}</pre></dd></dl></details></article><article class="api-request" data-request-id="I2" data-method="POST" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>I2 · I2 이름만 .png인 텍스트</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/images" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="multipart/form-data; boundary=jx11" value="multipart/form-data; boundary=jx11" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">--jx11&#13;
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;photo.png&quot;&#13;
+Content-Type: image/png&#13;
+&#13;
+hello&#13;
+--jx11--&#13;
+</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;,
+  &quot;Content-Type&quot;: &quot;multipart/form-data; boundary=jx11&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>--jx11&#13;
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;photo.png&quot;&#13;
+Content-Type: image/png&#13;
+&#13;
+hello&#13;
+--jx11--&#13;
+</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:415}</pre></dd></dl></details></article><article class="api-request" data-request-id="I3" data-method="POST" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>I3 · I3 토큰 없이 올리기</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/images" autocomplete="off"></label><div class="request-fields"><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="multipart/form-data; boundary=jx11" value="multipart/form-data; boundary=jx11" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">--jx11&#13;
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;dot.gif&quot;&#13;
+Content-Type: image/gif&#13;
+&#13;
+GIF89a     ;&#13;
+--jx11--&#13;
+</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Content-Type&quot;: &quot;multipart/form-data; boundary=jx11&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>--jx11&#13;
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;dot.gif&quot;&#13;
+Content-Type: image/gif&#13;
+&#13;
+GIF89a     ;&#13;
+--jx11--&#13;
+</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:401}</pre></dd></dl></details></article><article class="api-request" data-request-id="I8" data-method="POST" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>I8 · I8 file 파트 없이</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/images" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="multipart/form-data; boundary=jx11" value="multipart/form-data; boundary=jx11" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">--jx11&#13;
+Content-Disposition: form-data; name=&quot;note&quot;&#13;
+&#13;
+file 없음&#13;
+--jx11--&#13;
+</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;,
+  &quot;Content-Type&quot;: &quot;multipart/form-data; boundary=jx11&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>--jx11&#13;
+Content-Disposition: form-data; name=&quot;note&quot;&#13;
+&#13;
+file 없음&#13;
+--jx11--&#13;
+</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="I5" data-method="POST" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>I5 · I5 이미지를 붙여 글쓰기</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 사진 글&quot;,
+  &quot;content&quot;: &quot;사진 첨부&quot;,
+  &quot;imageIds&quot;: [
+    &quot;{{I0.body.id}}&quot;
+  ]
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 사진 글&quot;,
+  &quot;content&quot;: &quot;사진 첨부&quot;,
+  &quot;imageIds&quot;: [
+    &quot;{{I0.body.id}}&quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:201}</pre></dd></dl></details></article><article class="api-request" data-request-id="I6" data-method="GET" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>I6 · I6 글 상세</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/{{I5.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.images&quot;,&quot;length&quot;:1},{&quot;path&quot;:&quot;$.images[0].id&quot;,&quot;equals&quot;:&quot;{{I0.body.id}}&quot;},{&quot;path&quot;:&quot;$.images[0].url&quot;,&quot;equals&quot;:&quot;{{I0.body.url}}&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="I7" data-method="POST" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>I7 · I7 이미 붙은 이미지로 또 글쓰기</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 같은 사진 또&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: [
+    &quot;{{I0.body.id}}&quot;
+  ]
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 같은 사진 또&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: [
+    &quot;{{I0.body.id}}&quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[0].field&quot;,&quot;equals&quot;:&quot;imageIds&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="J0" data-method="POST" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>J0 · J0 김자바가 하나 더 올리기</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/images" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="multipart/form-data; boundary=jx11" value="multipart/form-data; boundary=jx11" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">--jx11&#13;
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;dot.gif&quot;&#13;
+Content-Type: image/gif&#13;
+&#13;
+GIF89a     ;&#13;
+--jx11--&#13;
+</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;,
+  &quot;Content-Type&quot;: &quot;multipart/form-data; boundary=jx11&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>--jx11&#13;
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;dot.gif&quot;&#13;
+Content-Type: image/gif&#13;
+&#13;
+GIF89a     ;&#13;
+--jx11--&#13;
+</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:201}</pre></dd></dl></details></article><article class="api-request" data-request-id="E1" data-method="POST" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E1 · E1 0바이트 파일</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/images" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="multipart/form-data; boundary=jx11" value="multipart/form-data; boundary=jx11" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">--jx11&#13;
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;empty.gif&quot;&#13;
+Content-Type: image/gif&#13;
+&#13;
+&#13;
+--jx11--&#13;
+</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;,
+  &quot;Content-Type&quot;: &quot;multipart/form-data; boundary=jx11&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>--jx11&#13;
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;empty.gif&quot;&#13;
+Content-Type: image/gif&#13;
+&#13;
+&#13;
+--jx11--&#13;
+</pre></dd><dt>Expected result</dt><dd><pre>C10: {&quot;status&quot;:400}</pre></dd></dl></details></article><article class="api-request" data-request-id="E3" data-method="POST" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E3 · E3 imageIds에 null</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 잘못된 이미지&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: [
+    null
+  ]
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 잘못된 이미지&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: [
+    null
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C11: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[0].field&quot;,&quot;matches&quot;:&quot;^imageIds&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E4" data-method="POST" data-request-index="11" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E4 · E4 imageIds에 문자</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 잘못된 이미지&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: [
+    &quot;abc&quot;
+  ]
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 잘못된 이미지&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: [
+    &quot;abc&quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C11: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;imageIds[0]&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E5" data-method="POST" data-request-index="12" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E5 · E5 없는 이미지 id</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 잘못된 이미지&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: [
+    99999999
+  ]
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 잘못된 이미지&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: [
+    99999999
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C11: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[0].field&quot;,&quot;equals&quot;:&quot;imageIds&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E6" data-method="POST" data-request-index="13" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E6 · E6 이미지 11개</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 잘못된 이미지&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+  ]
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 잘못된 이미지&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C11: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[0].field&quot;,&quot;equals&quot;:&quot;imageIds&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="T0" data-method="POST" data-request-index="14" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>T0 · T0 형식 검사용 미연결 이미지</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/images" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="multipart/form-data; boundary=jx11" value="multipart/form-data; boundary=jx11" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">--jx11&#13;
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;dot.gif&quot;&#13;
+Content-Type: image/gif&#13;
+&#13;
+GIF89a     ;&#13;
+--jx11--&#13;
+</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;,
+  &quot;Content-Type&quot;: &quot;multipart/form-data; boundary=jx11&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>--jx11&#13;
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;dot.gif&quot;&#13;
+Content-Type: image/gif&#13;
+&#13;
+GIF89a     ;&#13;
+--jx11--&#13;
+</pre></dd><dt>Expected result</dt><dd><pre>C13: {&quot;status&quot;:201}</pre></dd></dl></details></article><article class="api-request" data-request-id="E7" data-method="POST" data-request-index="15" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E7 · E7 숫자처럼 보이는 문자열 ID</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">{&quot;boardSlug&quot;: &quot;free&quot;, &quot;title&quot;: &quot;[채점] 잘못된 형식 이미지&quot;, &quot;content&quot;: &quot;x&quot;, &quot;imageIds&quot;: [&quot;{{T0.body.id}}&quot;]}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{&quot;boardSlug&quot;: &quot;free&quot;, &quot;title&quot;: &quot;[채점] 잘못된 형식 이미지&quot;, &quot;content&quot;: &quot;x&quot;, &quot;imageIds&quot;: [&quot;{{T0.body.id}}&quot;]}</pre></dd><dt>Expected result</dt><dd><pre>C13: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;imageIds[0]&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E8" data-method="POST" data-request-index="16" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E8 · E8 소수 ID</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">{&quot;boardSlug&quot;: &quot;free&quot;, &quot;title&quot;: &quot;[채점] 잘못된 형식 이미지&quot;, &quot;content&quot;: &quot;x&quot;, &quot;imageIds&quot;: [{{T0.body.id}}.5]}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{&quot;boardSlug&quot;: &quot;free&quot;, &quot;title&quot;: &quot;[채점] 잘못된 형식 이미지&quot;, &quot;content&quot;: &quot;x&quot;, &quot;imageIds&quot;: [{{T0.body.id}}.5]}</pre></dd><dt>Expected result</dt><dd><pre>C13: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;imageIds[0]&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="K" data-method="POST" data-request-index="17" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="10"><h4>K · K 김자바가 10장 올리기</h4><p class="request-method">POST · 같은 요청 10회 순차 전송</p><label>경로 <input class="request-path" value="/api/images" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c12" value="Bearer tok-c12" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="multipart/form-data; boundary=jx11" value="multipart/form-data; boundary=jx11" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">--jx11&#13;
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;dot.gif&quot;&#13;
+Content-Type: image/gif&#13;
+&#13;
+GIF89a     ;&#13;
+--jx11--&#13;
+</textarea></label><button type="button" class="send-request">POST 같은 요청 10회 순차 전송</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c12&quot;,
+  &quot;Content-Type&quot;: &quot;multipart/form-data; boundary=jx11&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>--jx11&#13;
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;dot.gif&quot;&#13;
+Content-Type: image/gif&#13;
+&#13;
+GIF89a     ;&#13;
+--jx11--&#13;
+</pre></dd><dt>Expected result</dt><dd><pre>C12: {&quot;status&quot;:201}</pre></dd></dl></details></article><article class="api-request" data-request-id="K10" data-method="POST" data-request-index="18" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>K10 · K10 정확히 10장 붙여 글쓰기</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-variables"><label>K#1.body.id <input class="request-variable" data-ref="{{K#1.body.id}}" autocomplete="off"></label><label>K#2.body.id <input class="request-variable" data-ref="{{K#2.body.id}}" autocomplete="off"></label><label>K#3.body.id <input class="request-variable" data-ref="{{K#3.body.id}}" autocomplete="off"></label><label>K#4.body.id <input class="request-variable" data-ref="{{K#4.body.id}}" autocomplete="off"></label><label>K#5.body.id <input class="request-variable" data-ref="{{K#5.body.id}}" autocomplete="off"></label><label>K#6.body.id <input class="request-variable" data-ref="{{K#6.body.id}}" autocomplete="off"></label><label>K#7.body.id <input class="request-variable" data-ref="{{K#7.body.id}}" autocomplete="off"></label><label>K#8.body.id <input class="request-variable" data-ref="{{K#8.body.id}}" autocomplete="off"></label><label>K#9.body.id <input class="request-variable" data-ref="{{K#9.body.id}}" autocomplete="off"></label><label>K#10.body.id <input class="request-variable" data-ref="{{K#10.body.id}}" autocomplete="off"></label><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c12" value="Bearer tok-c12" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 사진 10장&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: [
+    &quot;{{K#1.body.id}}&quot;,
+    &quot;{{K#2.body.id}}&quot;,
+    &quot;{{K#3.body.id}}&quot;,
+    &quot;{{K#4.body.id}}&quot;,
+    &quot;{{K#5.body.id}}&quot;,
+    &quot;{{K#6.body.id}}&quot;,
+    &quot;{{K#7.body.id}}&quot;,
+    &quot;{{K#8.body.id}}&quot;,
+    &quot;{{K#9.body.id}}&quot;,
+    &quot;{{K#10.body.id}}&quot;
+  ]
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c12&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 사진 10장&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: [
+    &quot;{{K#1.body.id}}&quot;,
+    &quot;{{K#2.body.id}}&quot;,
+    &quot;{{K#3.body.id}}&quot;,
+    &quot;{{K#4.body.id}}&quot;,
+    &quot;{{K#5.body.id}}&quot;,
+    &quot;{{K#6.body.id}}&quot;,
+    &quot;{{K#7.body.id}}&quot;,
+    &quot;{{K#8.body.id}}&quot;,
+    &quot;{{K#9.body.id}}&quot;,
+    &quot;{{K#10.body.id}}&quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C12: {&quot;status&quot;:201}</pre></dd></dl></details></article><article class="api-request" data-request-id="K11" data-method="GET" data-request-index="19" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>K11 · K11 10장 글 상세</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/{{K10.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C12: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.images&quot;,&quot;length&quot;:10},{&quot;path&quot;:&quot;$.images[0].id&quot;,&quot;equals&quot;:&quot;{{K#1.body.id}}&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="K0" data-method="POST" data-request-index="20" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>K0 · K0 imageIds 빈 배열</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-c12" value="Bearer tok-c12" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 사진 없음&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: []
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-c12&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 사진 없음&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: []
+}</pre></dd><dt>Expected result</dt><dd><pre>C12: {&quot;status&quot;:201}</pre></dd></dl></details></article><article class="api-request" data-request-id="J1" data-method="POST" data-request-index="21" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>J1 · J1 이스프링이 김자바의 이미지로 글쓰기</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 남의 사진&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: [
+    &quot;{{J0.body.id}}&quot;
+  ]
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[채점] 남의 사진&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;imageIds&quot;: [
+    &quot;{{J0.body.id}}&quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[0].field&quot;,&quot;equals&quot;:&quot;imageIds&quot;}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용). <code>{IMG}</code>·<code>{P}</code>는 직접 확인에서 올린 이미지·만든 글의 id, <code>{F}</code>는 이미지의 <code>fileName</code>이다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>I0</td>
+<td><code>201</code>, <code>Location</code>이 <code>/api/images/{fileName}</code>, <code>fileName</code>이 <code>32자 16진수.gif</code>, <code>url</code>=<code>/api/images/{fileName}</code>, <code>contentType</code>=<code>image/gif</code>, <code>size</code>=<code>14</code></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>I1</td>
+<td><code>200</code>, <code>Content-Type: image/gif</code>, 본문이 올린 바이트(<code>GIF89a…</code>) — curl에서는 <code>cmp</code>가 <code>같은파일</code></td>
+</tr>
+<tr>
+<td>C3</td>
+<td>I2(이름만 <code>.png</code>인 텍스트)</td>
+<td><code>415</code></td>
+</tr>
+<tr>
+<td>C4</td>
+<td>I3(토큰 없음)</td>
+<td><code>401</code></td>
+</tr>
+<tr>
+<td>C5</td>
+<td>I8(<code>file</code> 파트 없음)</td>
+<td><code>400</code></td>
+</tr>
+<tr>
+<td>C6</td>
+<td>I5 / I6</td>
+<td><code>201</code> / 상세 <code>images</code>가 1개, 그 <code>id</code>·<code>url</code>이 I0과 같다</td>
+</tr>
+<tr>
+<td>C7</td>
+<td>I7(이미 붙은 이미지)</td>
+<td><code>400</code>, <code>errors[0].field</code>=<code>imageIds</code></td>
+</tr>
+<tr>
+<td>C8</td>
+<td>J0 / J1(이스프링이 김자바의 이미지를 붙임)</td>
+<td><code>201</code> / <code>400</code>, <code>errors[0].field</code>=<code>imageIds</code></td>
+</tr>
+<tr>
+<td>C9</td>
+<td>I4(1.2MB)</td>
+<td><code>413</code> — 수동(curl)</td>
+</tr>
+<tr>
+<td>C10</td>
+<td>E1(0바이트)</td>
+<td><code>400</code> — 500이 아니다. JSON으로 보내는 E2(<code>415</code>)는 직접 확인의 curl로 본다(이 415는 컨트롤러를 고르기 전에 나서 CORS 헤더가 붙지 않아, 브라우저 실행 칸에서는 응답을 읽을 수 없다)</td>
+</tr>
+<tr>
+<td>C11</td>
+<td>E3~E6(<code>imageIds</code>가 <code>[null]</code>·<code>[&quot;abc&quot;]</code>·없는 id·11개)</td>
+<td>모두 <code>400</code>(<code>[&quot;abc&quot;]</code>는 형식 오류라 <code>errors</code>에 <code>imageIds[0]</code>(11-1 공통 처리기), 나머지는 <code>errors[0].field</code>가 <code>imageIds</code>로 시작)</td>
+</tr>
+<tr>
+<td>C12</td>
+<td>K(10장 올리기) / K10 / K11 / K0</td>
+<td>경계 안쪽: 정확히 10장 붙인 글 <code>201</code>, 상세 <code>images</code> 10개(올린 순서) / <code>imageIds: []</code>도 <code>201</code></td>
+</tr>
+<tr>
+<td>C13</td>
+<td>T0 / E7 / E8</td>
+<td>미연결 이미지 업로드 <code>201</code>; 그 ID를 문자열(<code>&quot;7&quot;</code>)·소수(<code>7.5</code>)로 보낸 글은 각각 <code>400</code> + <code>errors</code>의 <code>imageIds[0]</code> — Jackson의 Long 자동 변환을 허용하지 않는다</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT post_id, uploader_id, content_type, size_bytes, stored_name, original_name FROM post_image WHERE id = {IMG}</code></td>
+<td><code>{P}</code>, <code>2</code>, <code>image/gif</code>, <code>43</code>(직접 확인의 1×1 GIF) 또는 <code>14</code>(실행 칸의 간단한 GIF 서명), <code>{F}</code>, <code>dot.gif</code></td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT COUNT(*) FROM post WHERE title IN (&#39;[채점] 같은 사진 또&#39;, &#39;[채점] 잘못된 이미지&#39;, &#39;[채점] 잘못된 형식 이미지&#39;)</code></td>
+<td><code>0</code> — 400이면 글도 저장되지 않았다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>형식 판정</td>
+<td><code>Content-Type</code>·확장자가 아니라 파일 앞 바이트로 판정한다. 왜 그래야 하는지(보내는 쪽이 마음대로 적는다, 브라우저가 내용을 보고 실행할 수 있다) 말할 수 있다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>저장 이름</td>
+<td>사용자가 보낸 파일 이름을 경로에 쓰지 않는다(<code>../../</code>로 다른 폴더에 쓰기, 같은 이름 덮어쓰기). 받기 API가 서버가 지은 이름 모양만 받는다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>크기 제한</td>
+<td><code>spring.servlet.multipart.max-file-size</code>로 컨트롤러에 오기 전에 막고, <code>MaxUploadSizeExceededException</code>을 413으로 바꾼다. 컨트롤러에서 <code>file.getSize()</code>만 보면 이미 다 받은 뒤라는 것을 안다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>남는 파일</td>
+<td>파일 쓰기 전에 등록한 <code>afterCompletion</code>이 같은 프로세스의 DB 롤백 때 디스크 파일 삭제를 시도한다. 프로세스가 갑자기 종료되거나 글에 끝내 안 붙은 업로드(<code>post_id IS NULL</code>이 오래된 행)는 별도 정리 배치가 필요하다는 것을 말할 수 있다</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>저장 위치 설정</td>
+<td>업로드 폴더를 코드에 박지 않고 <code>application.yml</code>(<code>app.upload-dir</code>)로 뺐다. 서버를 여러 대 띄우면 로컬 디스크가 왜 문제인지(다른 서버엔 파일이 없다 → S3 같은 공용 저장소) 안다</td>
+</tr>
+<tr>
+<td>R6</td>
+<td>저장 결과 관찰</td>
+<td>앱을 실행한 폴더(설정한 업로드 폴더)에 <code>{F}</code> 파일이 있고, 이름에 사용자가 보낸 <code>dot.gif</code>가 들어 있지 않다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/P17-file-upload-storage.html">P17 파일 업로드·다운로드와 외부 스토리지</a> — <code>MultipartFile</code>, 크기 제한, 저장 이름과 표시 이름, S3</li>
+<li><a href="../../lessons/A2-http-anatomy.html">A2 HTTP 요청·응답 뜯어보기</a> — <code>Content-Type</code>과 본문 형식</li>
+<li><a href="../../docs/knowledge/D11-web-security-basics.html">D11 웹 보안 기초</a> — 사용자 입력(파일 이름 포함)을 믿지 않는다</li>
+<li><a href="../../lessons/C3-application-yml-profiles.html">C3 application.yml과 프로파일</a> — 설정 값을 코드 밖으로</li>
+<li><a href="../../docs/knowledge/R03-schema-types-constraints.html">R03 스키마와 테이블 설계 — PK·FK·제약</a></li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — multipart 받기</summary>
+
+<pre><code class="language-java">@PostMapping(value = &quot;/api/images&quot;, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+public ResponseEntity&lt;ImageUploadResponse&gt; upload(@LoginMember AuthenticatedMember loginMember,
+                                                  @RequestPart(value = &quot;file&quot;, required = false) MultipartFile file) {</code></pre>
+<p><code>required = false</code>로 받고 <code>null</code>이거나 <code>file.isEmpty()</code>면 400 예외를 직접 던지면 응답 모양을 다른 400과 맞추기 쉽다. 크기 제한은 <code>application.yml</code>에:</p>
+<pre><code class="language-yaml">spring:
+  servlet:
+    multipart:
+      max-file-size: 1MB
+      max-request-size: 2MB</code></pre>
+<p>넘으면 요청을 읽는 단계에서 <code>MaxUploadSizeExceededException</code>이 난다 — <code>@RestControllerAdvice</code>에 핸들러를 더해 <code>413</code>(<code>HttpStatus.CONTENT_TOO_LARGE</code>)으로 바꾼다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 형식 판정과 저장</summary>
+
+<p><code>file.getBytes()</code>로 읽어 앞 바이트를 비교한다. GIF는 <code>&quot;GIF89a&quot;.getBytes(StandardCharsets.US_ASCII)</code>와 앞 6바이트를 <code>Arrays.equals</code>로 비교하면 된다. PNG·JPEG 서명은 <code>(byte) 0x89</code>처럼 <code>byte</code>로 바꿔 적는다(자바 <code>byte</code>는 -128~127이라 <code>0x89</code>를 그대로 못 넣는다).</p>
+<p>저장 이름은 <code>UUID.randomUUID().toString().replace(&quot;-&quot;, &quot;&quot;) + &quot;.&quot; + 확장자</code>. 폴더는 <code>@Value(&quot;${app.upload-dir:uploads}&quot;)</code>로 받아 <code>Files.createDirectories</code> → <code>Files.write(root.resolve(이름), bytes)</code>.</p>
+<p>받기는 <code>ResponseEntity.ok().contentType(MediaType.parseMediaType(행의 content_type)).body(new FileSystemResource(경로))</code>. 이름은 <code>[0-9a-f]{32}\.(png|jpg|gif|webp)</code> 정규식에 맞을 때만 찾는다.</p>
+</details>
+
+<details>
+<summary>힌트 3 — 글에 연결</summary>
+
+<p><code>PostImage</code>에 <code>@ManyToOne Post post</code>(nullable)를 두고, <code>PostService.create()</code>에서 글을 <code>save</code>한 뒤 <code>postImageRepository.findAllById(ids)</code>로 읽어 &quot;개수가 같은가, 모두 <code>uploader</code>가 나인가, 모두 <code>post == null</code>인가&quot;를 본다. 하나라도 아니면 3-1에서 만든 <code>InvalidPostFieldException(&quot;imageIds&quot;, …)</code>를 던진다 — 같은 트랜잭션이라 방금 저장한 글도 롤백된다. 상세 응답은 <code>Post</code>에 <code>@OneToMany(mappedBy = &quot;post&quot;) @OrderBy(&quot;id&quot;)</code>를 두거나 <code>findByPostIdOrderById</code>로 따로 읽는다(트랜잭션 안에서).</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="11-3-view-count.html">11-3. 조회수 — 같은 사람은 하루 한 번</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 11-2. 글에 이미지 첨부\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch11-post-advanced/11-2-image-upload.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="11-1-draft-publish.html">← 이전 11-1. 임시저장했다가 발행하기</a><a href="11-3-view-count.html">다음 → 11-3. 조회수 — 같은 사람은 하루 한 번</a></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
+</body>
+</html>

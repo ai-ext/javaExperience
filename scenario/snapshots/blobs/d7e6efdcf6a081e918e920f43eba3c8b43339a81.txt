@@ -1,0 +1,67 @@
+package org.example.image;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.net.URI;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
+
+// 11-2 이미지 올리기·받기. 파일 주소도 /api/** 아래에 둔다(CORS·인증 인터셉터가 같은 규칙으로 걸린다).
+@RestController
+public class ImageController {
+
+    // 서버가 지은 이름 모양만 받는다 — ../ 같은 경로 조작은 여기서 걸러진다
+    private static final Pattern STORED_NAME = Pattern.compile("[0-9a-f]{32}\\.(png|jpg|gif|webp)");
+
+    private final ImageService imageService;
+    private final ImageStorage storage;
+
+    public ImageController(ImageService imageService, ImageStorage storage) {
+        this.imageService = imageService;
+        this.storage = storage;
+    }
+
+    // multipart/form-data의 file 파트. 토큰 필요(POST라 인터셉터가 확인한다)
+    @PostMapping(value = "/api/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ImageUploadResponse> upload(@LoginMember AuthenticatedMember loginMember,
+                                                      @RequestPart(value = "file", required = false) MultipartFile file) {
+        if (file == null) {
+            throw new EmptyImageException();
+        }
+        PostImage image = imageService.upload(loginMember.id(), file);
+        ImageUploadResponse body = new ImageUploadResponse(image.getId(), image.getStoredName(), image.url(),
+                image.getContentType(), image.getSizeBytes());
+        return ResponseEntity.created(URI.create(image.url())).body(body);
+    }
+
+    // 파일 받기 — 누구나(GET, 토큰 없음). 이름이 추측할 수 없는 무작위라 주소를 아는 사람만 연다.
+    @GetMapping("/api/images/{fileName}")
+    public ResponseEntity<Resource> download(@PathVariable String fileName) {
+        if (!STORED_NAME.matcher(fileName).matches()) {
+            throw new ImageNotFoundException();
+        }
+        PostImage image = imageService.findByStoredName(fileName);
+        FileSystemResource resource = new FileSystemResource(storage.pathOf(image.getStoredName()));
+        if (!resource.exists()) {
+            throw new ImageNotFoundException();
+        }
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(image.getContentType()))
+                // 같은 이름의 내용은 바뀌지 않으므로 오래 캐시해도 된다
+                .cacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic().immutable())
+                .header("X-Content-Type-Options", "nosniff")
+                .body(resource);
+    }
+}

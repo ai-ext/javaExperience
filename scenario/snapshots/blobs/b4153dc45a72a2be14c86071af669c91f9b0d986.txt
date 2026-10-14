@@ -1,0 +1,51 @@
+package org.example.admin;
+
+import org.example.post.Post;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.Repository;
+
+import java.util.List;
+
+// 8-5 정합성 배치 — 어긋난 글을 SELECT로 찾고, 글마다 엔티티를 불러 고치는 대신 UPDATE … JOIN(집계)으로 한 번에 고친다.
+// (별칭에 before를 쓰지 않는다 — MySQL 예약어)
+public interface RecountRepository extends Repository<Post, Long> {
+
+    @Query(nativeQuery = true, value = """
+            SELECT p.id AS postId, p.like_count AS beforeCount, COALESCE(l.cnt, 0) AS afterCount
+              FROM post p
+              LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM post_like GROUP BY post_id) l ON l.post_id = p.id
+             WHERE p.deleted_at IS NULL AND p.like_count <> COALESCE(l.cnt, 0)
+             ORDER BY p.id
+            """)
+    List<CountMismatchRow> findLikeCountMismatches();
+
+    @Query(nativeQuery = true, value = """
+            SELECT p.id AS postId, p.comment_count AS beforeCount, COALESCE(c.cnt, 0) AS afterCount
+              FROM post p
+              LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM comment WHERE deleted_at IS NULL GROUP BY post_id) c
+                     ON c.post_id = p.id
+             WHERE p.deleted_at IS NULL AND p.comment_count <> COALESCE(c.cnt, 0)
+             ORDER BY p.id
+            """)
+    List<CountMismatchRow> findCommentCountMismatches();
+
+    @Modifying
+    @Query(nativeQuery = true, value = """
+            UPDATE post p
+              LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM post_like GROUP BY post_id) l ON l.post_id = p.id
+               SET p.like_count = COALESCE(l.cnt, 0)
+             WHERE p.deleted_at IS NULL AND p.like_count <> COALESCE(l.cnt, 0)
+            """)
+    int fixLikeCounts();
+
+    @Modifying
+    @Query(nativeQuery = true, value = """
+            UPDATE post p
+              LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM comment WHERE deleted_at IS NULL GROUP BY post_id) c
+                     ON c.post_id = p.id
+               SET p.comment_count = COALESCE(c.cnt, 0)
+             WHERE p.deleted_at IS NULL AND p.comment_count <> COALESCE(c.cnt, 0)
+            """)
+    int fixCommentCounts();
+}

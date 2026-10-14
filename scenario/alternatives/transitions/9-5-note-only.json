@@ -1,0 +1,18 @@
+{
+  "id": "9-5",
+  "source": "최종 9-5 소스의 실습용 V6을 운영용 정합화 V6으로 교체; note 전용 코드가 모든 서버에 올라오기 전에는 DROP 금지",
+  "files": [
+    {
+      "path": "src/main/resources/db/migration/V6__drop_bookmark_memo.sql",
+      "status": "deleted",
+      "content": "",
+      "diff": "--- a/src/main/resources/db/migration/V6__drop_bookmark_memo.sql\n+++ b/src/main/resources/db/migration/V6__drop_bookmark_memo.sql\n@@ -1,9 +0,0 @@\n--- V6 — bookmark.memo → note 이름 변경의 3·4단계. 모든 서버가 \"양쪽 쓰기\" 코드(V5와 같은 커밋)가 된 뒤에 적용한다.\n--- 실제 여러 대 배포라면 3(맞추기 + 읽기 전환)과 4(지우기)는 서로 다른 배포지만, 실습은 서버 한 대라 한 파일에 둔다.\n-\n--- 3. 맞추기 — V5 이후 옛 서버가 memo를 \"고친\" 행은 note가 null이 아니라 옛 값이다. note IS NULL로는 그 행을\n---    못 잡으므로, 값이 다른 행 전부(지운 값 = null 포함, <=>는 null끼리도 같다고 본다)를 memo 기준으로 맞춘다.\n-UPDATE bookmark SET note = memo WHERE NOT (CAST(note AS BINARY) <=> CAST(memo AS BINARY));\n-\n--- 4. 좁히기 — 이 뒤로는 데이터 없이 되돌릴 수 없다(memo가 사라진다). 적용 전에 백업과 위 맞추기 결과를 확인한다.\n-ALTER TABLE bookmark DROP COLUMN memo;\n"
+    },
+    {
+      "path": "src/main/resources/db/migration/V6__reconcile_bookmark_note.sql",
+      "status": "added",
+      "content": "-- 모든 memo 전용 서버가 사라진 뒤 한 번만 적용한다.\n-- note 읽기·양쪽 쓰기 서버를 배포하기 전에 옛 서버의 마지막 수정값을 맞춘다.\nUPDATE bookmark SET note = memo\nWHERE NOT (CAST(note AS BINARY) <=> CAST(memo AS BINARY));\n",
+      "diff": "--- a/src/main/resources/db/migration/V6__reconcile_bookmark_note.sql\n+++ b/src/main/resources/db/migration/V6__reconcile_bookmark_note.sql\n@@ -0,0 +1,4 @@\n+-- 모든 memo 전용 서버가 사라진 뒤 한 번만 적용한다.\n+-- note 읽기·양쪽 쓰기 서버를 배포하기 전에 옛 서버의 마지막 수정값을 맞춘다.\n+UPDATE bookmark SET note = memo\n+WHERE NOT (CAST(note AS BINARY) <=> CAST(memo AS BINARY));\n"
+    }
+  ]
+}

@@ -3,22 +3,88 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>1-3. 서비스·저장소로 나누기</title>
+<title>1-3. 서비스로 나누기 — 태그까지 한 트랜잭션으로</title>
 <link rel="stylesheet" href="../../tools/site/site.css">
 </head>
 <body>
 <header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
 <main>
-<p class="crumbs"><a href="../README.html">시나리오</a> › 1장. 게시글 작성 — POST /api/posts › 1-3</p>
-<h1 id="1-3-서비스저장소로-나누기"><a class="anchor" href="#1-3-서비스저장소로-나누기" aria-hidden="true">#</a>1-3. 서비스·저장소로 나누기</h1>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 1장. 게시글 작성 — POST /api/posts › 1-3</p><p class="level-tags"><span>기초</span><span>게시판 본편</span><span>DB community</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="1-3-서비스로-나누기--태그까지-한-트랜잭션으로"><a class="anchor" href="#1-3-서비스로-나누기--태그까지-한-트랜잭션으로" aria-hidden="true">#</a>1-3. 서비스로 나누기 — 태그까지 한 트랜잭션으로</h1>
 <h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
-<p>컨트롤러 하나에 요청 받기, id 발급, 보관, 응답 만들기가 다 들어 있다. 다음 단계에서 메모리 대신 DB에 저장해야 하는데, 지금 구조라면 컨트롤러를 통째로 고쳐야 한다.</p>
-<p><strong>API는 그대로 두고 코드만 세 층으로 나눈다.</strong> 저장 방식이 바뀌어도 바뀌는 곳이 한 군데가 되도록.</p>
+<blockquote>
+<p>&quot;태그도 저장해 주세요. 없는 태그면 새로 만들고요. 같은 태그가 두 번 오면 한 번만 붙여 주세요.&quot;</p>
+</blockquote>
+<p>1-2에서는 컨트롤러가 저장소 둘(<code>BoardRepository</code>·<code>PostRepository</code>)을 바로 불렀다. 태그까지 저장하려면 일이 늘어난다.</p>
+<ol>
+<li>slug로 게시판을 찾는다.</li>
+<li>태그 이름마다 <code>tag</code>에서 찾고, 없으면 <code>INSERT</code>한다.</li>
+<li><code>post</code>에 글을 <code>INSERT</code>한다.</li>
+<li><code>post_tag</code>에 (글, 태그) 연결을 태그 수만큼 <code>INSERT</code>한다.</li>
+</ol>
+<p>DB에 쓰는 일이 여러 번이다. <strong>3번에서 실패하면 2번에서 새로 만든 태그만 덩그러니 남는다.</strong> 이 묶음을 &quot;전부 되거나, 전부 안 되거나&quot;로 만들어야 한다. 그 경계가 <strong>트랜잭션</strong>이고, 트랜잭션은 서비스 메서드 하나에 건다.</p>
+<p>그래서 이 단계에서 <strong>컨트롤러에서 서비스를 떼어 낸다.</strong> 저장소는 1-2의 JPA 저장소 그대로 쓴다.</p>
 <pre class="mermaid">flowchart LR
-  C[&quot;PostController&lt;br/&gt;HTTP ↔ DTO 변환&quot;] --&gt; S[&quot;PostService&lt;br/&gt;글 만들기 규칙&quot;]
-  S --&gt; R[&quot;PostRepository&lt;br/&gt;(인터페이스)&quot;]
-  M[&quot;MemoryPostRepository&lt;br/&gt;메모리 보관·id 발급&quot;] -. 구현 .-&gt; R</pre>
-<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+  C[&quot;PostController&lt;br/&gt;HTTP ↔ DTO 변환&quot;] --&gt; S[&quot;PostService&lt;br/&gt;@Transactional&lt;br/&gt;글 만들기 규칙&quot;]
+  S --&gt; B[&quot;BoardRepository&quot;]
+  S --&gt; T[&quot;TagRepository&quot;]
+  S --&gt; P[&quot;PostRepository&quot;]
+  B &amp; T &amp; P --&gt; DB[(&quot;MySQL community&quot;)]</pre>
+<h2 id="왜-나누나"><a class="anchor" href="#왜-나누나" aria-hidden="true">#</a>왜 나누나</h2>
+<p>나누는 기준은 <strong>바뀌는 이유가 다르냐</strong>다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>층</th>
+<th>하는 일</th>
+<th>이 층만 고치는 경우</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>PostController</code></td>
+<td>HTTP 받기(본문 → 요청 DTO), HTTP 돌려주기(상태 코드·헤더·응답 DTO)</td>
+<td>응답에 헤더를 하나 더 넣는다, 경로를 바꾼다</td>
+</tr>
+<tr>
+<td><code>PostService</code></td>
+<td>글 만들기 규칙(게시판 확인, 태그 찾기·만들기, 시각 정하기)과 트랜잭션 경계</td>
+<td>&quot;같은 태그는 한 번만&quot;, &quot;작성 시각은 서버 시계&quot; 같은 규칙을 바꾼다</td>
+</tr>
+<tr>
+<td><code>PostRepository</code> 등</td>
+<td>테이블 하나에 넣고 꺼내기</td>
+<td>조회 조건(<code>findBySlug</code> 등)을 더한다</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li>같은 규칙을 다른 API(예: 관리자용 글쓰기)에서 써도 서비스를 그대로 부르면 된다. 컨트롤러에 규칙이 있으면 복사해야 한다.</li>
+<li>서비스는 <code>ResponseEntity</code>를 모르고, 컨트롤러는 <code>TagRepository</code>를 모른다. 서로 모르니 한쪽을 바꿔도 다른 쪽은 그대로다.</li>
+<li>트랜잭션은 &quot;어디서부터 어디까지가 한 묶음인가&quot;다. HTTP를 다루는 컨트롤러도, 테이블 하나만 아는 저장소도 그 묶음을 알 수 없다. 묶음을 아는 곳이 서비스다.</li>
+</ul>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>글쓰기 — 태그까지 한 번에</h3><p>태그가 저장되고 응답에 실린다. 서버 안에서는 서비스 메서드 하나가 트랜잭션 하나다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>새 글 쓰기</strong><span>김자바</span></div><div class="screen-widget screen-select"><strong>게시판</strong><span>개발</span></div><div class="screen-widget screen-field"><strong>제목</strong><span>[채점] 태그 저장</span></div><div class="screen-widget screen-field"><strong>본문</strong><span>Spring Boot로 만든 첫 게시글입니다.</span></div><div class="screen-widget screen-chips"><strong>태그</strong><span>spring · 채점태그</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>저장</span></div><div class="screen-widget screen-text"><strong>text</strong><span>#spring #채점태그</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>글을 올렸어요</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>저장하지 못했어요</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>저장 — 서버 안 계층과 트랜잭션</summary><ol><li><span class="flow-kind">사용자</span><p>새 태그 '채점태그'를 붙여 저장한다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts</p><dl><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 태그 저장&quot;,
+  &quot;content&quot;: &quot;Spring Boot로 만든 첫 게시글입니다.&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;,
+    &quot;채점태그&quot;,
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</dd></dl></li><li><span class="flow-kind">서버</span><p>PostController: HTTP만 안다 — 요청 DTO를 받아 postService.create(...)를 부른다</p></li><li><span class="flow-kind">서버</span><p>PostService.create(@Transactional): 트랜잭션 시작. 태그 이름의 중복을 지운다(spring, 채점태그)</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT ... FROM board WHERE slug = 'dev'</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT ... FROM tag WHERE name = 'spring'</dd><dt>note</dt><dd>있다 — 그 태그를 쓴다</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT ... FROM tag WHERE name = '채점태그'</dd><dt>note</dt><dd>없다 — 새로 만든다</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>INSERT INTO tag (created_at, name) VALUES (NOW(), '채점태그')</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>INSERT INTO post (author_id, board_id, content, created_at, title, updated_at, visibility) VALUES (2, 2, ..., 'PUBLIC')</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>INSERT INTO post_tag (post_id, tag_id) VALUES (22, 2), (22, 10)</dd><dt>note</dt><dd>메서드가 끝날 때 COMMIT — 여기까지 한 묶음</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>201</dd><dt>headers</dt><dd>Location: /api/posts/22</dd><dt>body</dt><dd>{
+  &quot;id&quot;: 22,
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 태그 저장&quot;,
+  &quot;content&quot;: &quot;Spring Boot로 만든 첫 게시글입니다.&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;,
+    &quot;채점태그&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;,
+  &quot;createdAt&quot;: &quot;2026-10-06T17:30:00&quot;
+}</dd></dl></li><li><span class="flow-kind">화면</span><p>응답의 tags로 태그를 바로 그린다. 같은 태그를 두 번 보냈어도 한 번만 붙었다</p></li></ol></details><details class="scenario-flow"><summary>중간에 실패하면 — 새 태그도 되돌린다</summary><ol><li><span class="flow-kind">사용자</span><p>제목을 201자로 쓰고 새 태그 '[채점]롤백태그'를 붙여 저장한다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/posts</p><dl><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>{&quot;boardSlug&quot;: &quot;dev&quot;, &quot;title&quot;: &quot;[채점] 관찰-000…(201자)&quot;, &quot;tags&quot;: [&quot;spring&quot;, &quot;[채점]롤백태그&quot;], ...}</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>INSERT INTO tag (created_at, name) VALUES (NOW(), '[채점]롤백태그')</dd><dt>note</dt><dd>새 태그는 들어갔다(아직 COMMIT 전)</dd></dl></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>INSERT INTO post (...) VALUES (..., '[채점] 관찰-000…', ...)</dd><dt>note</dt><dd>Data too long for column 'title' — 실패</dd></dl></li><li><span class="flow-kind">서버</span><p>예외가 서비스 메서드 밖으로 나가므로 트랜잭션이 ROLLBACK — 방금 넣은 태그도 사라진다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>500</dd><dt>body</dt><dd>{&quot;status&quot;: 500, &quot;error&quot;: &quot;Internal Server Error&quot;, &quot;path&quot;: &quot;/api/posts&quot;}</dd></dl></li><li><span class="flow-kind">화면</span><p>저장 실패. DB에는 글도 새 태그도 남지 않았다(500은 1-5에서 400으로 바꾼다)</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -30,36 +96,1009 @@
 <tbody><tr>
 <td><code>PostController</code></td>
 <td>요청 DTO 받기 → 서비스 호출 → 응답 DTO·201·Location 만들기</td>
-<td>보관, id 발급, 시각 정하기</td>
+<td>저장소 호출, 시각 정하기, 태그 처리</td>
 </tr>
 <tr>
 <td><code>PostService</code></td>
-<td>글 하나 만들기(생성 시각 정하기, 저장소에 저장)</td>
+<td>글 하나 만들기 — 게시판 찾기, 태그 찾기·만들기, 글 저장. 메서드 하나가 트랜잭션 하나(<code>@Transactional</code>)</td>
 <td>HTTP(<code>ResponseEntity</code>, 헤더)를 알지 않는다</td>
 </tr>
 <tr>
-<td><code>PostRepository</code></td>
-<td>저장·id 발급의 <strong>약속(인터페이스)</strong></td>
-<td>—</td>
-</tr>
-<tr>
-<td><code>MemoryPostRepository</code></td>
-<td>그 약속의 메모리 구현(<code>Map</code> + <code>AtomicLong</code>)</td>
+<td><code>PostRepository</code>·<code>BoardRepository</code>·<code>TagRepository</code></td>
+<td>1-2와 같은 <code>JpaRepository</code> 인터페이스. <code>TagRepository</code>에 <code>findByName</code></td>
 <td>—</td>
 </tr>
 </tbody></table></div>
+<p><strong>API</strong> — 요청은 그대로, 응답에 <code>tags</code>가 추가된다(7개 필드).</p>
+<pre><code class="language-json">{
+  &quot;id&quot;: 22,
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 태그 저장&quot;,
+  &quot;content&quot;: &quot;Spring Boot로 만든 첫 게시글입니다.&quot;,
+  &quot;tags&quot;: [&quot;spring&quot;, &quot;채점태그&quot;],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;,
+  &quot;createdAt&quot;: &quot;2026-10-06T17:30:00&quot;
+}</code></pre>
+<p>상태 <code>201</code>, <code>Location: /api/posts/{id}</code>는 1-2와 같다.</p>
+<p><strong>태그 규칙</strong></p>
 <ul>
-<li><strong>API 계약은 1-2와 완전히 같다.</strong> 요청·응답·상태 코드·<code>Location</code> 모두 그대로.</li>
-<li>저장되는 글은 요청·응답 DTO와 다른 클래스로 둔다(예: <code>Post</code>). 이 클래스가 다음 단계에서 JPA 엔티티가 된다.</li>
-<li>객체는 Spring이 만들어 넣어 주게 한다(생성자 주입). 직접 <code>new PostService()</code> 하지 않는다.</li>
+<li>이미 있는 이름(예: <code>spring</code>)은 그 태그를 연결한다.</li>
+<li>없는 이름은 <code>tag</code>에 새로 만든 뒤 연결한다.</li>
+<li>같은 이름이 요청에 두 번 와도 한 번만 연결한다.</li>
+<li>연결 테이블은 <code>post_tag</code>(복합 기본키 <code>post_id</code>, <code>tag_id</code>)다.</li>
 </ul>
+<p><strong>트랜잭션 규칙</strong> — 게시판 찾기부터 <code>post_tag</code> 연결까지가 한 트랜잭션이다. 중간에 실패하면 새로 만든 태그도 남지 않는다.</p>
+<p><strong>필드 규칙</strong> — 1-2의 표 그대로다. 아직 검증하지 않는다. 이 단계 정답 코드에서도 제목 <code>null</code>은 <code>500</code>이다(관찰 O1). 달라진 점은 실패할 때 <strong>반쪽이 남지 않는다</strong>는 것이다(관찰 O2와 D3). 검증은 <a href="1-5-validation.html">1-5</a>에서 한다.</p>
+<h2 id="따라-치기"><a class="anchor" href="#따라-치기" aria-hidden="true">#</a>따라 치기</h2>
+<p>1-2의 <code>PostCreateRequest</code>·<code>Board</code>·<code>BoardRepository</code>·<code>PostRepository</code>는 그대로 둔다. 아래 다섯 파일을 만들거나 고친다. 이 코드로 아래 &quot;직접 확인&quot;의 C1~C3이 통과하는 것을 확인했다.</p>
+<p><strong>① <code>Tag.java</code>·<code>TagRepository.java</code> — 태그 엔티티와 저장소(<code>org.example.tag</code>)</strong></p>
+<p><a href="../../lessons/E3-what-is-jpa.html">E3 레슨</a>에서 만들었다면 그대로 쓴다. 없으면 E3의 예시 그대로 만든다(<code>tag</code> 테이블의 <code>id</code>·<code>name</code>·<code>created_at</code>). 저장소에는 이름으로 찾는 메서드 하나를 둔다.</p>
+<pre><code class="language-java">public interface TagRepository extends JpaRepository&lt;Tag, Long&gt; {
+
+    Optional&lt;Tag&gt; findByName(String name);
+}</code></pre>
+<p><strong>② <code>Post.java</code> — 태그 연결 추가</strong></p>
+<p>1-2의 <code>Post</code>에 아래를 더한다(import는 <code>jakarta.persistence.JoinTable</code>·<code>ManyToMany</code>, <code>org.example.tag.Tag</code>, <code>java.util.LinkedHashSet</code>·<code>Set</code>).</p>
+<pre><code class="language-java">    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = &quot;post_tag&quot;,
+            joinColumns = @JoinColumn(name = &quot;post_id&quot;),
+            inverseJoinColumns = @JoinColumn(name = &quot;tag_id&quot;)
+    )
+    private Set&lt;Tag&gt; tags = new LinkedHashSet&lt;&gt;();
+
+    public void addTag(Tag tag) {
+        tags.add(tag);
+    }
+
+    public Set&lt;Tag&gt; getTags() {
+        return tags;
+    }</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>줄</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@ManyToMany</code> + <code>@JoinTable(name = &quot;post_tag&quot;, …)</code></td>
+<td>글 하나에 태그 여럿, 태그 하나에 글 여럿. 그 사이를 <code>post_tag</code> 테이블이 잇는다. <code>joinColumns</code>는 &quot;이 엔티티(글) 쪽 컬럼&quot;, <code>inverseJoinColumns</code>는 &quot;상대(태그) 쪽 컬럼&quot;이다.</td>
+</tr>
+<tr>
+<td><code>Set&lt;Tag&gt;</code> · <code>LinkedHashSet</code></td>
+<td>같은 태그를 두 번 넣어도 하나만 남는다. <code>LinkedHashSet</code>은 넣은 순서를 지킨다.</td>
+</tr>
+<tr>
+<td><code>addTag(tag)</code></td>
+<td>글을 저장할 때 Hibernate가 이 집합을 보고 <code>post_tag</code>에 행을 넣는다. 연결 행을 내가 <code>INSERT</code>하지 않는다.</td>
+</tr>
+</tbody></table></div>
+<p><strong>③ <code>PostService.java</code> — 글 만들기 규칙과 트랜잭션(<code>org.example.post</code>)</strong></p>
+<pre><code class="language-java">package org.example.post;
+
+import org.example.board.Board;
+import org.example.board.BoardRepository;
+import org.example.tag.Tag;
+import org.example.tag.TagRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+// 글 만들기 규칙. HTTP(ResponseEntity, 헤더 등)는 알지 않는다.
+@Service
+public class PostService {
+
+    // 로그인 기능이 없는 동안 작성자를 고정한다 — 1-6에서 토큰 기반으로 바꾼다
+    private static final long FIXED_AUTHOR_ID = 2L;
+
+    private final PostRepository postRepository;
+    private final BoardRepository boardRepository;
+    private final TagRepository tagRepository;
+
+    public PostService(PostRepository postRepository, BoardRepository boardRepository,
+                        TagRepository tagRepository) {
+        this.postRepository = postRepository;
+        this.boardRepository = boardRepository;
+        this.tagRepository = tagRepository;
+    }
+
+    // 글 한 행 + 새 태그 + post_tag 연결을 한 트랜잭션으로 — 중간에 실패하면 전부 되돌린다
+    @Transactional
+    public Post create(PostCreateRequest request) {
+        Board board = boardRepository.findBySlug(request.boardSlug())
+                .orElseThrow(() -&gt; new IllegalArgumentException(&quot;게시판을 찾을 수 없습니다: &quot; + request.boardSlug()));
+
+        LocalDateTime now = LocalDateTime.now();
+        Post post = new Post(board, FIXED_AUTHOR_ID, request.title(), request.content(),
+                request.visibility(), now);
+
+        for (String tagName : distinctTagNames(request.tags())) {
+            Tag tag = tagRepository.findByName(tagName)
+                    .orElseGet(() -&gt; tagRepository.save(new Tag(tagName, now)));
+            post.addTag(tag);
+        }
+
+        return postRepository.save(post);
+    }
+
+    private List&lt;String&gt; distinctTagNames(List&lt;String&gt; tags) {
+        if (tags == null) {
+            return List.of();
+        }
+        Set&lt;String&gt; seen = new LinkedHashSet&lt;&gt;(tags);
+        return List.copyOf(seen);
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>줄</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@Service</code></td>
+<td>이 클래스로 객체(빈)를 하나 만들어 두라는 표시. Spring은 서버를 켤 때 이 표시가 붙은 클래스를 찾아 <strong>딱 하나</strong> 만든다. 이게 없으면 컨트롤러가 받을 <code>PostService</code>가 없어서 서버가 안 뜬다(아래 &quot;일부러 망가뜨리기&quot; 1번).</td>
+</tr>
+<tr>
+<td><code>private final …Repository</code> 셋 + 생성자</td>
+<td><strong>생성자 주입</strong>. Spring이 서비스를 만들 때 생성자 인자를 보고, 보관 중인 저장소 빈을 넣어 준다. 생성자가 하나면 <code>@Autowired</code>를 안 붙여도 된다.</td>
+</tr>
+<tr>
+<td><code>@Transactional</code></td>
+<td>메서드가 시작할 때 트랜잭션을 열고, 정상으로 끝나면 <code>COMMIT</code>, 예외가 밖으로 나가면 <code>ROLLBACK</code>한다. 안에서 부른 저장소들은 모두 같은 트랜잭션(같은 DB 연결)을 쓴다.</td>
+</tr>
+<tr>
+<td><code>findByName(...).orElseGet(() -&gt; tagRepository.save(...))</code></td>
+<td>있으면 그 태그, 없을 때만 만든다. 이미 있는 이름을 또 <code>INSERT</code>하면 <code>tag.name</code>의 UNIQUE에 걸린다.</td>
+</tr>
+<tr>
+<td><code>distinctTagNames</code></td>
+<td>요청 안의 중복을 미리 지운다. <code>LinkedHashSet</code>에 넣었다 빼면 중복 없이 순서가 유지된다.</td>
+</tr>
+<tr>
+<td><code>new Post(...)</code>, <code>new Tag(...)</code></td>
+<td>값을 담는 엔티티는 <code>new</code> 해도 된다. <code>new</code> 하지 말라는 건 <strong>다른 빈</strong>(서비스·저장소) 이야기다.</td>
+</tr>
+</tbody></table></div>
+<p>왜 <code>final</code> + 생성자인가.</p>
+<ul>
+<li><strong>빠뜨릴 수 없다</strong> — 생성자 인자라서 저장소 없이는 <code>PostService</code>를 만들 수가 없다. 컴파일러와 Spring이 둘 다 막아 준다. 필드 주입(<code>@Autowired private PostRepository postRepository;</code>)은 빠져도 일단 만들어지고, 쓰는 순간 <code>null</code>이 터진다.</li>
+<li><strong>바뀌지 않는다</strong> — <code>final</code>이라 한 번 들어온 저장소를 중간에 다른 걸로 바꿀 수 없다. 빈은 서버 전체에서 하나를 여러 요청이 같이 쓰므로, 안 바뀌는 게 안전하다.</li>
+<li><strong>테스트하기 쉽다</strong> — Spring 없이도 생성자에 가짜 저장소를 넣어 시험할 수 있다(7-2).</li>
+</ul>
+<p><strong>④ <code>PostResponse.java</code> — <code>tags</code> 추가</strong></p>
+<pre><code class="language-java">public record PostResponse(
+        Long id,
+        String boardSlug,
+        String title,
+        String content,
+        List&lt;String&gt; tags,
+        String visibility,
+        LocalDateTime createdAt
+) {
+}</code></pre>
+<p><strong>⑤ <code>PostController.java</code> — HTTP만 안다(통째로 바꾼다)</strong></p>
+<pre><code class="language-java">package org.example.post;
+
+import org.example.tag.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
+import java.util.List;
+
+@RestController
+@RequestMapping(&quot;/api/posts&quot;)
+public class PostController {
+
+    private static final Logger log = LoggerFactory.getLogger(PostController.class);
+
+    private final PostService postService;
+
+    public PostController(PostService postService) {
+        this.postService = postService;
+    }
+
+    @PostMapping
+    public ResponseEntity&lt;PostResponse&gt; create(@RequestBody PostCreateRequest request) {
+        log.info(&quot;게시글 작성 요청 제목: {}&quot;, request.title());
+
+        Post post = postService.create(request);
+        PostResponse response = toResponse(post);
+
+        return ResponseEntity.created(URI.create(&quot;/api/posts/&quot; + post.getId())).body(response);
+    }
+
+    private PostResponse toResponse(Post post) {
+        List&lt;String&gt; tagNames = post.getTags().stream().map(Tag::getName).toList();
+        return new PostResponse(
+                post.getId(),
+                post.getBoard().getSlug(),
+                post.getTitle(),
+                post.getContent(),
+                tagNames,
+                post.getVisibility(),
+                post.getCreatedAt()
+        );
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>줄</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>private final PostService postService;</code> + 생성자</td>
+<td>컨트롤러에서 저장소 필드가 사라졌다. 서비스 하나만 받는다.</td>
+</tr>
+<tr>
+<td><code>postService.create(request)</code></td>
+<td>컨트롤러는 &quot;글을 만들어 줘&quot;라고 부탁만 한다. 게시판·태그·시각은 서비스가 정한다.</td>
+</tr>
+<tr>
+<td><code>toResponse(post)</code></td>
+<td>엔티티 → 응답 DTO 변환은 컨트롤러 한 곳에서 한다(채점 R5). 서비스는 엔티티를 돌려준다.</td>
+</tr>
+<tr>
+<td><code>ResponseEntity.created(...)</code></td>
+<td><code>201</code>과 <code>Location</code> 헤더. HTTP 일이라 컨트롤러에 남는다.</td>
+</tr>
+</tbody></table></div>
+<p>서버를 켜면 Spring이 이 순서로 조립한다. 저장소(Spring Data JPA가 만든 구현)를 먼저 만들고, 그걸 넣어 서비스를 만들고, 그 서비스를 넣어 컨트롤러를 만든다. 어느 하나라도 만들 수 없으면 서버가 뜨지 않는다.</p>
+<p><code>PostRepository</code>는 1-2부터 인터페이스였다. 서비스는 그 인터페이스 타입으로 받고, 실제 구현은 Spring Data JPA가 만든 객체가 들어온다. 저장 방식이 바뀌어도(예: 테스트용 가짜 저장소) 서비스 코드는 그대로다.</p>
+<h2 id="일부러-망가뜨리기"><a class="anchor" href="#일부러-망가뜨리기" aria-hidden="true">#</a>일부러 망가뜨리기</h2>
+<p>다 만들어 통과한 뒤, 하나씩 망가뜨려 에러를 직접 보고 되돌린다. 메시지는 Spring Boot 4.1.1에서 이 단계 정답 코드로 재현한 원문이다(경로 앞부분은 PC마다 다르다).</p>
+<p><strong>1. <code>PostService</code>에서 <code>@Service</code>를 지운다</strong> → 서버가 안 뜬다.</p>
+<pre><code class="language-text">***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Parameter 0 of constructor in org.example.post.PostController required a bean of type 'org.example.post.PostService' that could not be found.
+
+
+Action:
+
+Consider defining a bean of type 'org.example.post.PostService' in your configuration.</code></pre>
+<ul>
+<li><strong>어디를 보나</strong> — 상자 안 <code>Description:</code>. &quot;<code>PostController</code> 생성자의 0번째 인자(<code>PostService</code>)를 만들 빈이 없다&quot;는 뜻이다.</li>
+<li><strong>고치는 법</strong> — <code>@Service</code>를 되돌린다. 저장소(<code>PostRepository</code> 등)에는 <code>@Repository</code>가 없어도 된다. <code>JpaRepository</code>를 상속한 인터페이스는 Spring Data JPA가 찾아 빈을 만든다. → <a href="../../errors.html#빈을-찾을-수-없음">에러 도감: 빈을 찾을 수 없음</a></li>
+</ul>
+<p><strong>2. 컨트롤러에서 <code>new PostService()</code>로 직접 만든다</strong> → 컴파일이 안 된다.</p>
+<pre><code class="language-java">public PostController() {
+    this.postService = new PostService();   // 망가뜨린 코드
+}</code></pre>
+<pre><code class="language-text">…/PostController.java:24: error: constructor PostService in class PostService cannot be applied to given types;
+        this.postService = new PostService();   // 망가뜨린 코드
+                           ^
+  required: PostRepository,BoardRepository,TagRepository
+  found:    no arguments
+  reason: actual and formal argument lists differ in length</code></pre>
+<ul>
+<li><strong>어디를 보나</strong> — <code>required:</code>(생성자가 원하는 것)와 <code>found:</code>(내가 넘긴 것).</li>
+<li><strong>인자를 맞춰 넣을 수도 없다</strong> — <code>PostRepository</code>는 인터페이스라 <code>new</code>로 만들 수 없다. 구현은 Spring Data JPA가 서버를 켤 때 만든 객체 하나뿐이다. 그래서 다른 빈은 직접 <code>new</code> 하지 않고 생성자로 받는다. → <a href="../../errors.html#생성자-인자-불일치">에러 도감: 생성자 인자 불일치</a></li>
+</ul>
+<p><strong>3. 필드 주입으로 바꾼다</strong> — <code>@Autowired private PostService postService;</code>(생성자 없음)</p>
+<ul>
+<li><p>서버는 <strong>정상으로 뜨고 <code>201</code>도 나온다.</strong> 그래서 더 위험하다.</p>
+</li>
+<li><p><code>final</code>을 같이 쓰면 컴파일이 안 된다.</p>
+<pre><code class="language-text">…/PostController.java:23: error: variable postService not initialized in the default constructor
+    private final PostService postService;
+                              ^</code></pre>
+</li>
+<li><p><code>final</code>을 빼고 Spring 밖에서 <code>new PostController()</code>로 만들어 부르면(테스트 코드에서 흔하다) 실행 중에 터진다.</p>
+<pre><code class="language-text">Caused by: java.lang.NullPointerException: Cannot invoke &quot;org.example.post.PostService.create(org.example.post.PostCreateRequest)&quot; because &quot;this.postService&quot; is null
+  at org.example.post.PostController.create(PostController.java:29)</code></pre>
+</li>
+<li><p><strong>고치는 법</strong> — 생성자 주입 + <code>final</code>로 되돌린다(채점 R4). → <a href="../../errors.html#new로-만든-객체의-null">에러 도감: new로 만든 객체의 null</a></p>
+</li>
+</ul>
+<p><strong>4. 순환 참조를 만든다</strong> — <code>PostService</code>가 생성자로 <code>PostController</code>를 받게 한다(서비스가 컨트롤러를 부르는, 거꾸로 된 방향).</p>
+<pre><code class="language-java">private final PostController postController;   // 망가뜨린 코드
+
+public PostService(PostRepository postRepository, BoardRepository boardRepository,
+                    TagRepository tagRepository, PostController postController) {
+    this.postController = postController;
+    // …
+}</code></pre>
+<pre><code class="language-text">***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+The dependencies of some of the beans in the application context form a cycle:
+
+┌─────┐
+|  postController defined in URL […/org/example/post/PostController.class]
+↑     ↓
+|  postService defined in URL […/org/example/post/PostService.class]
+└─────┘</code></pre>
+<ul>
+<li><strong>어디를 보나</strong> — <code>┌─────┐</code> 상자. 컨트롤러를 만들려면 서비스가, 서비스를 만들려면 컨트롤러가 필요하다.</li>
+<li><strong>고치는 법</strong> — 방향을 컨트롤러 → 서비스 → 저장소 한 방향으로. 서비스는 컨트롤러를 몰라야 한다. <code>Action:</code>에 나오는 <code>spring.main.allow-circular-references</code>는 문제를 숨길 뿐이라 쓰지 않는다. → <a href="../../errors.html#빈-순환-참조">에러 도감: 빈 순환 참조</a></li>
+</ul>
+<p><strong>5. <code>@Transactional</code>을 지운다</strong> → 성공하는 요청은 그대로 <code>201</code>이다. 차이는 <strong>실패할 때</strong> 보인다. 관찰 요청 O2(제목 201자 + 새 태그 <code>[채점]롤백태그</code>)를 보내고 DB를 본다.</p>
+<pre><code class="language-bash">docker compose exec -T mysql mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community -e &quot;
+SELECT id, name FROM tag WHERE name = '[채점]롤백태그';&quot;</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>O2 응답</th>
+<th><code>tag</code>에 <code>[채점]롤백태그</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@Transactional</code> 있음(정답)</td>
+<td><code>500</code></td>
+<td>없음(0행) — 글 저장이 실패하자 태그 <code>INSERT</code>도 되돌려졌다</td>
+</tr>
+<tr>
+<td><code>@Transactional</code> 지움</td>
+<td><code>500</code></td>
+<td><strong>1행 남음</strong> — 글은 없는데 태그만 생겼다</td>
+</tr>
+</tbody></table></div>
+<p>트랜잭션이 없으면 저장소 메서드 하나하나가 따로 <code>COMMIT</code>된다. 태그 <code>INSERT</code>는 이미 확정된 뒤에 글 <code>INSERT</code>가 실패한 것이다. 고치는 법 — 서비스 메서드에 <code>@Transactional</code>을 되돌린다. 남은 태그는 <code>docker compose down -v &amp;&amp; docker compose up -d</code>(javaExperience 레포 루트)으로 지운다. → <a href="../../lessons/G3-first-transaction.html">G3 첫 트랜잭션</a></p>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 <strong>만들 것</strong>의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</p>
+<p>이 단계의 처리 흐름:</p>
+<ul>
+<li>PostController: HTTP만 안다 — 요청 DTO를 받아 postService.create(...)를 부른다</li>
+<li>PostService.create(@Transactional): 트랜잭션 시작. 태그 이름의 중복을 지운다(spring, 채점태그)</li>
+<li>있다 — 그 태그를 쓴다</li>
+<li>없다 — 새로 만든다</li>
+</ul>
+<details>
+<summary>Controller — HTTP 연결</summary>
+
+<p><code>PostController.java</code>. 매핑과 메서드의 입력·응답을 위 <strong>만들 것</strong>의 HTTP 계약과 대조한다.</p>
+</details>
+
+<details>
+<summary>DTO — 요청·응답 필드</summary>
+
+<p><code>PostResponse.java</code>. 필드 이름·타입·검증·응답 형태를 위 <strong>만들 것</strong>과 대조한다.</p>
+</details>
+
+<details>
+<summary>Service — 처리 순서</summary>
+
+<p><code>PostService.java</code>. 위 서버 처리 순서가 어디에서 검증·조회·상태 변경으로 이어지는지 따라간다. 변경된 메서드: <code>create</code>. 트랜잭션 경계는 아래 코드의 <code>@Transactional</code> 위치에서 확인한다.</p>
+</details>
+
+<details>
+<summary>JPA / Repository — DB 조건</summary>
+
+<p><code>TagRepository.java</code>. 쿼리·파생 메서드의 조건을 화면 시나리오의 DB 단계 및 직접 확인 SQL과 대조한다.</p>
+</details>
+
+<details>
+<summary>Entity — 테이블·상태</summary>
+
+<p><code>Post.java</code>, <code>Tag.java</code>. 실제 테이블의 컬럼·외래키와 엔티티 매핑을 대조한다. 변경된 메서드: <code>addTag</code>.</p>
+</details>
+
+<details>
+<summary>MyBatis — 태그·글·연결 행을 한 트랜잭션으로</summary>
+
+<p>아래 <strong>MyBatis 대체 구현 코드</strong>의 9개 파일을 이 단계 전체 소스에 적용한다. Controller는 HTTP와 <code>Location</code>만 맡고 <code>PostService.create</code>가 <code>@Transactional</code> 안에서 <code>findBoardBySlug</code>, 태그 조회·삽입, 글 삽입, <code>post_tag</code> 연결을 순서대로 실행한다. <code>PostCreationMapper.java</code>의 메서드와 <code>PostCreationMapper.xml</code>의 같은 <code>id</code>를 짝지어 본다.</p>
+<p><code>spring</code>처럼 요청에 두 번 나온 이름은 먼저 제거한다. DB가 대소문자 차이를 같은 태그로 볼 수도 있으므로 <code>findTagByName</code>이 돌려준 <strong>태그 ID</strong>로도 중복을 제거한다. 응답에는 요청 철자 대신 DB에 저장된 <code>TagWriteRow.name</code>을 넣는다. <code>useGeneratedKeys</code>가 채운 글 ID로 <code>post_tag</code>를 INSERT한다. 이 단계의 글 INSERT는 여전히 일부 컬럼만 적고 <code>status</code>·카운트는 DB 기본값에 맡긴다.</p>
+<p>O2의 201자 제목에서는 태그 INSERT 뒤 글 INSERT가 실패한다. 서비스의 <code>@Transactional</code> 때문에 먼저 넣은 <code>[채점]롤백태그</code>도 되돌려져 D3가 0이어야 한다. JPA 경로와 MyBatis 경로에 같은 O2·D3를 실행해 본다.</p>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>Entity — src/main/java/org/example/post/Post.java</summary><pre><code>package org.example.post;
+
+<p>import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import org.example.board.Board;
+import org.example.tag.Tag;</p>
+<p>import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;</p>
+<p>// post 테이블 엔티티 — 저장에 꼭 필요한 컬럼만 먼저 매핑한다(나머지 컬럼은 1-4에서 테이블에 맞춘다)
+@Entity
+@Table(name = &quot;post&quot;)
+public class Post {</p>
+<pre><code>@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = &amp;quot;board_id&amp;quot;, nullable = false)
+private Board board;
+
+// 로그인 기능이 없는 동안 작성자는 id 숫자로만 둔다 — 1-4에서 Member 연관관계로 바꾼다
+@Column(name = &amp;quot;author_id&amp;quot;, nullable = false)
+private Long authorId;
+
+@Column(nullable = false)
+private String title;
+
+@Column(nullable = false)
+private String content;
+
+@Column(nullable = false)
+private String visibility;
+
+@Column(name = &amp;quot;created_at&amp;quot;, nullable = false)
+private LocalDateTime createdAt;
+
+@Column(name = &amp;quot;updated_at&amp;quot;, nullable = false)
+private LocalDateTime updatedAt;
+
+@ManyToMany(fetch = FetchType.LAZY)
+@JoinTable(
+        name = &amp;quot;post_tag&amp;quot;,
+        joinColumns = @JoinColumn(name = &amp;quot;post_id&amp;quot;),
+        inverseJoinColumns = @JoinColumn(name = &amp;quot;tag_id&amp;quot;)
+)
+private Set&amp;lt;Tag&amp;gt; tags = new LinkedHashSet&amp;lt;&amp;gt;();
+
+protected Post() {
+    // JPA
+}
+
+public Post(Board board, Long authorId, String title, String content,
+            String visibility, LocalDateTime now) {
+    this.board = board;
+    this.authorId = authorId;
+    this.title = title;
+    this.content = content;
+    this.visibility = visibility;
+    this.createdAt = now;
+    this.updatedAt = now;
+}
+
+public void addTag(Tag tag) {
+    tags.add(tag);
+}
+
+public Long getId() {
+    return id;
+}
+
+public Board getBoard() {
+    return board;
+}
+
+public Long getAuthorId() {
+    return authorId;
+}
+
+public String getTitle() {
+    return title;
+}
+
+public String getContent() {
+    return content;
+}
+
+public String getVisibility() {
+    return visibility;
+}
+
+public LocalDateTime getCreatedAt() {
+    return createdAt;
+}
+
+public LocalDateTime getUpdatedAt() {
+    return updatedAt;
+}
+
+public Set&amp;lt;Tag&amp;gt; getTags() {
+    return tags;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/post/PostController.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.tag.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>import java.net.URI;
+import java.util.List;</p>
+<p>@RestController
+@RequestMapping(&quot;/api/posts&quot;)
+public class PostController {</p>
+<pre><code>private static final Logger log = LoggerFactory.getLogger(PostController.class);
+
+private final PostService postService;
+
+public PostController(PostService postService) {
+    this.postService = postService;
+}
+
+@PostMapping
+public ResponseEntity&amp;lt;PostResponse&amp;gt; create(@RequestBody PostCreateRequest request) {
+    log.info(&amp;quot;게시글 작성 요청 제목: {}&amp;quot;, request.title());
+
+    Post post = postService.create(request);
+    PostResponse response = toResponse(post);
+
+    return ResponseEntity.created(URI.create(&amp;quot;/api/posts/&amp;quot; + post.getId())).body(response);
+}
+
+private PostResponse toResponse(Post post) {
+    List&amp;lt;String&amp;gt; tagNames = post.getTags().stream().map(Tag::getName).toList();
+    return new PostResponse(
+            post.getId(),
+            post.getBoard().getSlug(),
+            post.getTitle(),
+            post.getContent(),
+            tagNames,
+            post.getVisibility(),
+            post.getCreatedAt()
+    );
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostResponse.java</summary><pre><code>package org.example.post;
+
+<p>import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>// 게시글 작성 응답 전용 DTO — 요청 DTO나 엔티티를 그대로 돌려주지 않는다
+public class PostResponse {
+    private final Long id;
+    private final String boardSlug;
+    private final String title;
+    private final String content;
+    private final List&lt;String&gt; tags;
+    private final String visibility;
+    private final LocalDateTime createdAt;</p>
+<pre><code>public PostResponse(Long id, String boardSlug, String title, String content,
+                    List&amp;lt;String&amp;gt; tags, String visibility, LocalDateTime createdAt) {
+    this.id = id;
+    this.boardSlug = boardSlug;
+    this.title = title;
+    this.content = content;
+    this.tags = tags;
+    this.visibility = visibility;
+    this.createdAt = createdAt;
+}
+
+public Long getId() { return id; }
+public String getBoardSlug() { return boardSlug; }
+public String getTitle() { return title; }
+public String getContent() { return content; }
+public List&amp;lt;String&amp;gt; getTags() { return tags; }
+public String getVisibility() { return visibility; }
+public LocalDateTime getCreatedAt() { return createdAt; }</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/post/PostService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.board.Board;
+import org.example.board.BoardRepository;
+import org.example.tag.Tag;
+import org.example.tag.TagRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;</p>
+<p>// 글 만들기 규칙. HTTP(ResponseEntity, 헤더 등)는 알지 않는다.
+@Service
+public class PostService {</p>
+<pre><code>// 로그인 기능이 없는 동안 작성자를 고정한다 — 1-6에서 토큰 기반으로 바꾼다
+private static final long FIXED_AUTHOR_ID = 2L;
+
+private final PostRepository postRepository;
+private final BoardRepository boardRepository;
+private final TagRepository tagRepository;
+
+public PostService(PostRepository postRepository, BoardRepository boardRepository,
+                    TagRepository tagRepository) {
+    this.postRepository = postRepository;
+    this.boardRepository = boardRepository;
+    this.tagRepository = tagRepository;
+}
+
+// 글 한 행 + 새 태그 + post_tag 연결을 한 트랜잭션으로 — 중간에 실패하면 전부 되돌린다
+@Transactional
+public Post create(PostCreateRequest request) {
+    Board board = boardRepository.findBySlug(request.boardSlug())
+            .orElseThrow(() -&amp;gt; new IllegalArgumentException(&amp;quot;게시판을 찾을 수 없습니다: &amp;quot; + request.boardSlug()));
+
+    LocalDateTime now = LocalDateTime.now();
+    Post post = new Post(board, FIXED_AUTHOR_ID, request.title(), request.content(),
+            request.visibility(), now);
+
+    for (String tagName : distinctTagNames(request.tags())) {
+        Tag tag = tagRepository.findByName(tagName)
+                .orElseGet(() -&amp;gt; tagRepository.save(new Tag(tagName, now)));
+        post.addTag(tag);
+    }
+
+    return postRepository.save(post);
+}
+
+private List&amp;lt;String&amp;gt; distinctTagNames(List&amp;lt;String&amp;gt; tags) {
+    if (tags == null) {
+        return List.of();
+    }
+    Set&amp;lt;String&amp;gt; seen = new LinkedHashSet&amp;lt;&amp;gt;(tags);
+    return List.copyOf(seen);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Entity — src/main/java/org/example/tag/Tag.java</summary><pre><code>package org.example.tag;
+
+<p>import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;</p>
+<p>import java.time.LocalDateTime;</p>
+<p>@Entity
+@Table(name = &quot;tag&quot;)
+public class Tag {</p>
+<pre><code>@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+@Column(nullable = false, unique = true)
+private String name;
+
+@Column(name = &amp;quot;created_at&amp;quot;, nullable = false)
+private LocalDateTime createdAt;
+
+protected Tag() {
+    // JPA
+}
+
+public Tag(String name, LocalDateTime createdAt) {
+    this.name = name;
+    this.createdAt = createdAt;
+}
+
+public Long getId() {
+    return id;
+}
+
+public String getName() {
+    return name;
+}
+
+public LocalDateTime getCreatedAt() {
+    return createdAt;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/tag/TagRepository.java</summary><pre><code>package org.example.tag;
+
+<p>import org.springframework.data.jpa.repository.JpaRepository;</p>
+<p>import java.util.Optional;</p>
+<p>public interface TagRepository extends JpaRepository&lt;Tag, Long&gt; {</p>
+<pre><code>Optional&amp;lt;Tag&amp;gt; findByName(String name);</code></pre>
+<p>}
+</code></pre></details></p>
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/1-3.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="mybatis-대체-구현-코드"><a class="anchor" href="#mybatis-대체-구현-코드" aria-hidden="true">#</a>MyBatis 대체 구현 코드</h2>
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {
+    id 'java'
+    // bootRun / bootJar 태스크 제공 + 실행 가능한 fat jar 패키징
+    id 'org.springframework.boot' version '4.1.1'
+    // Boot BOM을 적용해서 아래 의존성들의 버전을 생략할 수 있게 해줌
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+<p>group = &#39;org.example&#39;
+version = &#39;1.0-SNAPSHOT&#39;</p>
+<p>java {
+    toolchain {
+        // 컴파일·실행 JDK를 고정 (Boot 4는 Java 17 이상 필요, 로컬에 설치된 21 사용)
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}</p>
+<p>repositories {
+    mavenCentral()
+}</p>
+<p>dependencies {
+    compileOnly &#39;org.projectlombok:lombok&#39;
+    annotationProcessor &#39;org.projectlombok:lombok&#39;
+    // Spring MVC + 내장 Tomcat + Jackson (Boot 4부터 starter-web → starter-webmvc로 이름 변경)
+    implementation &#39;org.springframework.boot:spring-boot-starter-webmvc&#39;
+    // JPA(Hibernate) + HikariCP 커넥션 풀
+    implementation &#39;org.springframework.boot:spring-boot-starter-data-jpa&#39;
+    implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;
+    // @Valid, @NotBlank 같은 요청 값 검증
+    implementation &#39;org.springframework.boot:spring-boot-starter-validation&#39;
+    // MySQL JDBC 드라이버 — 컴파일엔 필요 없고 실행할 때만 필요
+    runtimeOnly &#39;com.mysql:mysql-connector-j&#39;</p>
+<pre><code>// 테스트: JUnit·AssertJ·Mockito·MockMvc 묶음 (버전은 Boot BOM이 관리하므로 junit-bom 따로 두지 않음)
+testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+// @DataJpaTest(리포지토리만 띄우는 테스트)
+testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+// 테스트용 일회용 MySQL 컨테이너 — application-test.yml의 jdbc:tc: URL이 쓴다
+testImplementation 'org.testcontainers:testcontainers-mysql'
+// Gradle이 JUnit Platform 테스트를 실행할 때 필요한 런처
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'</code></pre>
+<p>}</p>
+<p>tasks.named(&#39;test&#39;) {
+    useJUnitPlatform()
+    // 테스트는 application-test.yml(Testcontainers MySQL)을 쓰게 한다
+    systemProperty &#39;spring.profiles.active&#39;, &#39;test&#39;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: javaExperience
+  datasource:
+    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  jpa:
+    hibernate:
+      # 테이블은 docker/mysql/init/ 의 dump가 만든다. 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)
+      ddl-auto: validate
+    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+<p>logging:
+  level:
+    # 실행되는 SQL과 바인딩 값 — 쿼리가 몇 번 나가는지(N+1) 볼 때 쓴다
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace</p>
+<p>mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true</p>
+<h1 id="0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다"><a class="anchor" href="#0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다" aria-hidden="true">#</a>0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다</h1>
+<p>start:
+  greeting: 반가워요, 백엔드!
+  max-items: 5
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/post/PostController.java</summary><pre><code>package org.example.post;
+
+<p>import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import java.net.URI;</p>
+<p>@RestController
+@RequestMapping(&quot;/api/posts&quot;)
+public class PostController {
+    private static final Logger log = LoggerFactory.getLogger(PostController.class);
+    private final PostService postService;</p>
+<pre><code>public PostController(PostService postService) {
+    this.postService = postService;
+}
+
+@PostMapping
+public ResponseEntity&amp;lt;PostResponse&amp;gt; create(@RequestBody PostCreateRequest request) {
+    log.info(&amp;quot;게시글 작성 요청 제목: {}&amp;quot;, request.title());
+    PostResponse response = postService.create(request);
+    return ResponseEntity.created(URI.create(&amp;quot;/api/posts/&amp;quot; + response.id())).body(response);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/post/PostService.java</summary><pre><code>package org.example.post;
+
+<p>import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;</p>
+<p>// 태그·글·연결 행을 하나의 트랜잭션에서 Mapper SQL로 저장한다.
+@Service
+public class PostService {
+    private static final long FIXED_AUTHOR_ID = 2L;
+    private final PostCreationMapper mapper;</p>
+<pre><code>public PostService(PostCreationMapper mapper) {
+    this.mapper = mapper;
+}
+
+@Transactional
+public PostResponse create(PostCreateRequest request) {
+    BoardWriteRow board = mapper.findBoardBySlug(request.boardSlug());
+    if (board == null) {
+        throw new IllegalArgumentException(&amp;quot;게시판을 찾을 수 없습니다: &amp;quot; + request.boardSlug());
+    }
+    PostInsert post = new PostInsert();
+    post.boardId = board.id;
+    post.authorId = FIXED_AUTHOR_ID;
+    post.title = request.title();
+    post.content = request.content();
+    post.visibility = request.visibility();
+    post.now = LocalDateTime.now();
+
+    Map&amp;lt;Long, String&amp;gt; storedTags = new LinkedHashMap&amp;lt;&amp;gt;();
+    for (String tagName : new LinkedHashSet&amp;lt;&amp;gt;(request.tags() == null ? List.&amp;lt;String&amp;gt;of() : request.tags())) {
+        mapper.insertTagIfAbsent(tagName, post.now);
+        TagWriteRow tag = mapper.findTagByName(tagName);
+        storedTags.putIfAbsent(tag.id, tag.name);
+    }
+    // 앞선 태그 INSERT가 끝난 뒤 글 INSERT가 실패해도 @Transactional이 함께 되돌린다.
+    mapper.insertPost(post);
+    for (Long tagId : storedTags.keySet()) {
+        mapper.linkTag(post.id, tagId);
+    }
+    return new PostResponse(post.id, board.slug, post.title, post.content,
+            List.copyOf(storedTags.values()), post.visibility, post.now);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/BoardWriteRow.java</summary><pre><code>package org.example.post;
+
+<p>// 저장할 게시판의 ID와 응답 slug만 읽는다.
+public class BoardWriteRow {
+    public Long id;
+    public String slug;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/post/PostInsert.java</summary><pre><code>package org.example.post;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// MyBatis가 INSERT 후 생성 키를 id에 채운다.
+public class PostInsert {
+    public Long id;
+    public Long boardId;
+    public Long authorId;
+    public String title;
+    public String content;
+    public String visibility;
+    public LocalDateTime now;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/TagWriteRow.java</summary><pre><code>package org.example.post;
+
+<p>// DB에 저장된 태그의 정규 이름을 응답에 사용한다.
+public class TagWriteRow {
+    public Long id;
+    public String name;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/post/PostCreationMapper.java</summary><pre><code>package org.example.post;
+
+<p>import java.time.LocalDateTime;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>@Mapper
+public interface PostCreationMapper {
+    BoardWriteRow findBoardBySlug(@Param(&quot;slug&quot;) String slug);
+    int insertPost(PostInsert post);
+    int insertTagIfAbsent(@Param(&quot;name&quot;) String name, @Param(&quot;now&quot;) LocalDateTime now);
+    TagWriteRow findTagByName(@Param(&quot;name&quot;) String name);
+    int linkTag(@Param(&quot;postId&quot;) Long postId, @Param(&quot;tagId&quot;) Long tagId);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/PostCreationMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.post.PostCreationMapper&quot;&gt;
+    &lt;select id=&quot;findBoardBySlug&quot; resultType=&quot;org.example.post.BoardWriteRow&quot;&gt;
+        SELECT id, slug FROM board WHERE slug = #{slug}
+    &lt;/select&gt;
+    &lt;insert id=&quot;insertPost&quot; parameterType=&quot;org.example.post.PostInsert&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+        INSERT INTO post (board_id, author_id, title, content, visibility, created_at, updated_at)
+        VALUES (#{boardId}, #{authorId}, #{title}, #{content}, #{visibility}, #{now}, #{now})
+    &lt;/insert&gt;
+    &lt;insert id=&quot;insertTagIfAbsent&quot;&gt;
+        INSERT INTO tag (name, created_at) VALUES (#{name}, #{now})
+        ON DUPLICATE KEY UPDATE id = id
+    &lt;/insert&gt;
+    &lt;select id=&quot;findTagByName&quot; resultType=&quot;org.example.post.TagWriteRow&quot;&gt;
+        SELECT id, name FROM tag WHERE name = #{name}
+    &lt;/select&gt;
+    &lt;insert id=&quot;linkTag&quot;&gt;
+        INSERT INTO post_tag (post_id, tag_id) VALUES (#{postId}, #{tagId})
+    &lt;/insert&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+
 <h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
-<p>1-2와 같다. 요청 A를 두 번 보내 <code>201</code>, <code>Location</code>, id 증가를 확인한다.</p>
-<pre><code class="language-bash">BASE=http://localhost:8080
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080
+
+# 요청 A — 태그 포함(같은 태그 spring을 두 번). 두 번 보낸다
 curl -i -X POST &quot;$BASE/api/posts&quot; -H 'Content-Type: application/json' \
-  -d '{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[채점] 첫 게시글&quot;,&quot;content&quot;:&quot;Spring Boot로 만든 첫 게시글입니다.&quot;,&quot;tags&quot;:[&quot;spring&quot;,&quot;jpa&quot;],&quot;visibility&quot;:&quot;PUBLIC&quot;}'</code></pre>
-<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
-<p>C = HTTP 확인(필수), R = 코드 리뷰(피드백용). 이 단계는 <strong>구조를 바꾸는 단계라 R 항목이 핵심 피드백</strong>이다.</p>
+  -d '{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[채점] 태그 저장&quot;,&quot;content&quot;:&quot;Spring Boot로 만든 첫 게시글입니다.&quot;,&quot;tags&quot;:[&quot;spring&quot;,&quot;채점태그&quot;,&quot;spring&quot;],&quot;visibility&quot;:&quot;PUBLIC&quot;}'
+
+# DB 확인 — 방금 글의 태그, 채점태그 개수
+docker compose exec -T mysql mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community -e &quot;
+SELECT t.name FROM post_tag pt JOIN tag t ON t.id = pt.tag_id WHERE pt.post_id = (SELECT MAX(id) FROM post) ORDER BY t.name;
+SELECT COUNT(*) FROM tag WHERE name = '채점태그';&quot;</code></pre></details>
+<p>CloudBeaver의 <code>community</code> 연결으로 <code>post_tag</code>를 열어 봐도 된다. 방금 글의 id로 두 행이 보인다.</p>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 관찰 요청(O1·O2)을 먼저 보낸다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="O1" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>O1 · 관찰 O1 — 제목 없음(null)</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: null,
+  &quot;content&quot;: &quot;본문&quot;,
+  &quot;tags&quot;: [],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: null,
+  &quot;content&quot;: &quot;본문&quot;,
+  &quot;tags&quot;: [],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="O2" data-method="POST" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>O2 · 관찰 O2 — 제목 201자 + 새 태그(되돌려지나)</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 관찰-0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000&quot;,
+  &quot;content&quot;: &quot;본문&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;,
+    &quot;[채점]롤백태그&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 관찰-0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000&quot;,
+  &quot;content&quot;: &quot;본문&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;,
+    &quot;[채점]롤백태그&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="A" data-method="POST" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="2"><h4>A · 요청 A(두 번) — 태그 포함, spring 중복</h4><p class="request-method">POST · 같은 요청 2회 순차 전송</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 태그 저장&quot;,
+  &quot;content&quot;: &quot;Spring Boot로 만든 첫 게시글입니다.&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;,
+    &quot;채점태그&quot;,
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</textarea></label><button type="button" class="send-request">POST 같은 요청 2회 순차 전송</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[채점] 태그 저장&quot;,
+  &quot;content&quot;: &quot;Spring Boot로 만든 첫 게시글입니다.&quot;,
+  &quot;tags&quot;: [
+    &quot;spring&quot;,
+    &quot;채점태그&quot;,
+    &quot;spring&quot;
+  ],
+  &quot;visibility&quot;: &quot;PUBLIC&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용). C4·C5는 <strong>관찰</strong>이다(채점 안 함 — 필수 N/M에 세지 않는다). <code>{id}</code>는 C1 응답의 <code>id</code>다. 이 단계는 구조를 바꾸는 단계라 <strong>R 항목이 핵심 피드백</strong>이다.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -71,22 +1110,47 @@ curl -i -X POST &quot;$BASE/api/posts&quot; -H 'Content-Type: application/json' 
 <tbody><tr>
 <td>C1</td>
 <td>요청 A</td>
-<td>상태 <code>201</code>, <code>Location</code>이 <code>/api/posts/{응답의 id}</code>로 끝난다</td>
+<td>상태 <code>201</code>, <code>Location</code>이 <code>/api/posts/{id}</code>로 끝나고 <code>id</code>가 21보다 크다</td>
 </tr>
 <tr>
 <td>C2</td>
 <td>요청 A</td>
-<td>본문 7개 필드(<code>id</code>·<code>boardSlug</code>·<code>title</code>·<code>content</code>·<code>tags</code>·<code>visibility</code>·<code>createdAt</code>), <code>id</code>·<code>createdAt</code> 말고는 요청 값과 같다</td>
+<td>본문 7개 필드. <code>tags</code> = <code>[&quot;spring&quot;,&quot;채점태그&quot;]</code>(순서 무관, 중복 없음), 나머지는 요청 값과 같다</td>
 </tr>
 <tr>
 <td>C3</td>
 <td>요청 A를 한 번 더</td>
-<td><code>id</code>가 정확히 1 커진다</td>
+<td>상태 <code>201</code>, <code>id</code>가 C1보다 크고 <code>tags</code>는 여전히 2개</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>관찰 O1 — 제목 <code>null</code></td>
+<td><strong>채점 제외(관찰)</strong> — 결과 줄의 필수 N/M에 세지 않는다. 받은 상태 코드를 적기만 한다. (정답 코드: <code>500</code> → 1-5에서 <code>400</code>)</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>관찰 O2 — 제목 201자 + 새 태그</td>
+<td><strong>채점 제외(관찰)</strong> — 결과 줄의 필수 N/M에 세지 않는다. 받은 상태 코드를 적기만 한다. (정답 코드: <code>500</code>, 새 태그는 되돌려진다 — D3 → 1-5에서 <code>400</code>)</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT t.name FROM post_tag pt JOIN tag t ON t.id = pt.tag_id WHERE pt.post_id = {id} ORDER BY t.name</code></td>
+<td>2행: <code>spring</code>, <code>채점태그</code></td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT COUNT(*) FROM tag WHERE name = &#39;채점태그&#39;</code></td>
+<td><code>1</code> — 요청을 여러 번 보내도 태그는 하나</td>
+</tr>
+<tr>
+<td>D3</td>
+<td><code>SELECT COUNT(*) FROM tag WHERE name = &#39;[채점]롤백태그&#39;</code></td>
+<td><code>0</code> — 실패한 요청의 새 태그가 남지 않았다</td>
 </tr>
 <tr>
 <td>R1</td>
 <td>컨트롤러</td>
-<td><code>Map</code>, 카운터, 저장 코드가 컨트롤러에 남아 있지 않다. 서비스만 호출한다</td>
+<td>저장소를 부르지 않는다. 서비스만 호출하고 HTTP(상태·헤더·DTO)만 다룬다</td>
 </tr>
 <tr>
 <td>R2</td>
@@ -95,8 +1159,8 @@ curl -i -X POST &quot;$BASE/api/posts&quot; -H 'Content-Type: application/json' 
 </tr>
 <tr>
 <td>R3</td>
-<td>저장소</td>
-<td><code>PostRepository</code> 인터페이스와 메모리 구현(<code>@Repository</code>)이 있고, 서비스는 <strong>인터페이스 타입</strong>에 의존한다</td>
+<td>트랜잭션</td>
+<td>글·태그 저장이 서비스 메서드 하나의 <code>@Transactional</code> 안에 있다</td>
 </tr>
 <tr>
 <td>R4</td>
@@ -105,80 +1169,93 @@ curl -i -X POST &quot;$BASE/api/posts&quot; -H 'Content-Type: application/json' 
 </tr>
 <tr>
 <td>R5</td>
-<td>모델 분리</td>
-<td>저장되는 클래스(<code>Post</code> 등)와 요청·응답 DTO가 분리되어 있다. 변환 위치가 한 군데로 정해져 있다</td>
+<td>변환</td>
+<td>엔티티와 요청·응답 DTO가 분리되어 있고, 엔티티 → 응답 DTO 변환 위치가 한 군데로 정해져 있다</td>
+</tr>
+<tr>
+<td>R6</td>
+<td>태그</td>
+<td>이름으로 찾고 없을 때만 만든다. 요청 안의 중복을 제거한다</td>
 </tr>
 </tbody></table></div>
 <h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
 <ul>
+<li><a href="../../lessons/E1-why-layers.html">E1 계층을 나누는 이유</a> — 나눠진 조각을 누가 이어 붙이나</li>
 <li><a href="../../docs/knowledge/W02-why-layers.html">W02 왜 Controller·Service·Repository로 나누나</a> — 안 나누면 생기는 일</li>
 <li><a href="../../docs/knowledge/P02-mvc-layered-architecture.html">P02 MVC 패턴과 계층형 구조</a></li>
-<li><a href="../../docs/knowledge/W12-why-interfaces.html">W12 인터페이스는 왜 만드나</a> — 다음 단계에서 저장소를 갈아 끼우는 이유</li>
-<li><a href="../../docs/knowledge/P11-bean-registration-di.html">P11 빈 등록과 의존성 주입</a> — <code>@Service</code>·<code>@Repository</code>와 생성자 주입</li>
+<li><a href="../../docs/knowledge/P11-bean-registration-di.html">P11 빈 등록과 의존성 주입</a> — <code>@Service</code>와 생성자 주입</li>
 <li><a href="../../docs/knowledge/P03-annotations-cheatsheet.html#22-생성자-주입과-빈-선택">P03 — 생성자 주입과 빈 선택</a></li>
 <li><a href="../../docs/knowledge/P12-why-beans-ioc-intro.html">P12 왜 빈과 IoC인가</a> — <code>new</code>를 직접 안 쓰는 이유</li>
+<li><a href="../../docs/knowledge/W11-why-tx-in-service.html">W11 트랜잭션은 왜 서비스 계층에 거나</a></li>
+<li><a href="../../lessons/G3-first-transaction.html">G3 첫 트랜잭션</a> — 반쪽 저장을 직접 만들어 본다</li>
+<li><a href="../../docs/knowledge/P20-jpa-entity-mapping.html#25-cascade-orphanremoval-다대다">P20 — cascade, orphanRemoval, 다대다</a> — <code>post_tag</code>를 어떻게 매핑할까</li>
 </ul>
 <h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
 <details>
-<summary>힌트 1 — 저장소 약속</summary>
+<summary>힌트 1 — 서비스 뼈대</summary>
 
-<p><code>interface PostRepository { Post save(Post post); }</code> 정도로 시작한다. 메모리 구현은 <code>ConcurrentHashMap&lt;Long, Post&gt;</code>와 <code>AtomicLong</code>으로 id를 붙여 저장한 뒤 돌려준다.</p>
+<p><code>@Service</code> 클래스에 저장소 셋을 <code>private final</code>로 두고, 셋을 받는 생성자 하나. <code>public Post create(PostCreateRequest request)</code>에 <code>@Transactional</code>(<code>org.springframework.transaction.annotation</code>). 컨트롤러에 있던 게시판 찾기·<code>new Post(...)</code>·<code>save</code>를 그대로 옮긴다.</p>
 </details>
 
 <details>
-<summary>힌트 2 — 생성자 주입</summary>
+<summary>힌트 2 — 태그</summary>
 
-<p><code>private final PostService postService;</code> 필드와 그 필드를 받는 생성자 하나. 생성자가 하나면 <code>@Autowired</code>를 안 붙여도 Spring이 주입한다.</p>
+<p><code>post_tag</code>는 컬럼이 두 개뿐인 연결 테이블이라 <code>@ManyToMany</code> + <code>@JoinTable(name = &quot;post_tag&quot;, ...)</code>로 매핑할 수 있다. 태그는 <code>TagRepository.findByName</code>으로 찾고 없으면 <code>save</code>한다. 요청 목록은 <code>new LinkedHashSet&lt;&gt;(tags)</code>로 중복을 지운다.</p>
+</details>
+
+<details>
+<summary>힌트 3 — 응답의 tags</summary>
+
+<p><code>post.getTags().stream().map(Tag::getName).toList()</code>. 서비스가 돌려준 <code>Post</code>의 태그는 서비스 안에서 찾거나 만든 객체라, 컨트롤러에서 이름을 읽어도 DB에 다시 가지 않는다.</p>
 </details>
 
 <h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
-<p><a href="1-4-save-to-db.html">1-4. DB에 저장하기</a> — <code>MemoryPostRepository</code>를 JPA로 바꾼다. 이 단계에서 잘 나눴다면 컨트롤러는 거의 안 바뀐다.</p>
+<p><a href="1-4-save-to-db.html">1-4. 엔티티와 테이블 정확히 맞추기</a> — 지금 <code>post</code> 행의 <code>published_at</code>은 <code>NULL</code>이고 <code>status</code>는 DB 기본값이다. 엔티티를 테이블의 모든 컬럼에 맞추고, 작성자를 응답에 싣는다.</p>
 
 <section class="grader" id="result-test">
   <h2>결과 테스트 프롬프트</h2>
-  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
   <div class="grader-inputs">
-    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
-    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
   </div>
   <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
   <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
-  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 1-3. 서비스·저장소로 나누기\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch1-create-post/1-3-service-layer.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 1-3. 서비스로 나누기 — 태그까지 한 트랜잭션으로\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch1-create-post/1-3-service-layer.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
 </section>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
   const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
   const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
                   set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
   $('repo').value = store.get('jx.repo');
-  $('base').value = store.get('jx.base');
   function fill() {
     const repo = $('repo').value.trim();
-    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
     $('prompt').value = tpl
-      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
       .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
       .replaceAll('{{BASE}}', base);
     store.set('jx.repo', repo);
-    store.set('jx.base', $('base').value.trim());
   }
   $('repo').addEventListener('input', fill);
-  $('base').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
   fill();
   $('copy').addEventListener('click', async () => {
     const text = $('prompt').value;
     let ok = false;
     try { await navigator.clipboard.writeText(text); ok = true; } catch {}
     if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
-    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
   });
 })();
 </script>
-<nav class="pager"><a href="1-2-dto-response.html">← 이전 1-2. DTO로 응답하기 — 201과 Location</a><a href="1-4-save-to-db.html">다음 → 1-4. DB에 저장하기 — JPA</a></nav>
+<nav class="pager"><a href="1-2-dto-response.html">← 이전 1-2. DB에 저장하고 201로 응답 — JPA 첫걸음</a><a href="1-4-save-to-db.html">다음 → 1-4. 엔티티와 테이블 정확히 맞추기 — 컬럼·NOT NULL·기본값</a></nav>
 </main>
 <script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
 const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
 mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</script>
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
 </body>
 </html>

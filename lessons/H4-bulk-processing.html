@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H4. 대량 데이터 처리 — 나눠서 지우고 바꾸기</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="h4-대량-데이터-처리--나눠서-지우고-바꾸기"><a class="anchor" href="#h4-대량-데이터-처리--나눠서-지우고-바꾸기" aria-hidden="true">#</a>H4. 대량 데이터 처리 — 나눠서 지우고 바꾸기</h1>
+<blockquote>
+<p>개념 레슨 · 40분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>&quot;삭제하고 30일 지난 글을 진짜로 지워 주세요. 댓글도 같이요.&quot; 지울 글이 6,000개, 댓글이 18,000개다. <code>DELETE</code> 한 문장이면 될 것 같지만 세 가지에 걸린다.</p>
+<ul>
+<li><strong>순서</strong> — 댓글(<code>comment.post_id</code>)이 글을 가리키는 FK가 있으면 글을 먼저 못 지운다. <strong>자식 먼저</strong>, 부모 나중.</li>
+<li><strong>잠금</strong> — <code>DELETE</code>는 지우는 행을 잠근다. 잠금은 <strong>커밋할 때까지</strong> 유지된다. 한 트랜잭션에 18,000행이면 그동안 그 행을 고치려는 요청이 전부 기다린다. 중간에 실패하면 전부 되돌아간다.</li>
+<li><strong>메모리</strong> — JPA로 수만 개를 다루면, 트랜잭션이 끝날 때까지 엔티티를 전부 들고 있다(E7의 영속성 컨텍스트).</li>
+</ul>
+<p>그래서 <strong>잘게 나눠서</strong>(청크) 한다. 나누는 장치가 셋인데, 서로 다른 것을 조절한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>장치</th>
+<th>조절하는 것</th>
+<th>이 레슨의 방법</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>트랜잭션 청크</td>
+<td>한 번에 커밋할 행 수 = 잠금이 잡혀 있는 범위와 시간</td>
+<td><code>DELETE … ORDER BY id LIMIT 1000</code>을 청크마다 따로 커밋</td>
+</tr>
+<tr>
+<td>JPA 영속성 컨텍스트</td>
+<td>앱이 들고 있는 엔티티 수</td>
+<td>500개마다 <code>flush()</code> + <code>clear()</code></td>
+</tr>
+<tr>
+<td>JDBC 배치</td>
+<td>같은 SQL을 DB에 몇 번에 나눠 보내나</td>
+<td><code>JdbcTemplate.batchUpdate</code></td>
+</tr>
+</tbody></table></div>
+<p><code>flush()</code>는 &quot;모아 둔 SQL을 지금 DB로 보내라&quot;이고, <strong>커밋이 아니다.</strong> <code>flush()</code>를 아무리 불러도 트랜잭션은 하나 그대로다.</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<p><code>practice</code>에 연습용 표를 만들어 실험했다. 글 10,000개 중 6,000개가 오래전에 지운 글, 글마다 댓글 3개다.</p>
+<pre><code class="language-sql">CREATE TABLE lesson_h4_post (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(100) NOT NULL,
+  deleted_at DATETIME NULL
+);
+CREATE TABLE lesson_h4_comment (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  post_id BIGINT NOT NULL,
+  body VARCHAR(100) NOT NULL,
+  CONSTRAINT fk_h4_comment_post FOREIGN KEY (post_id) REFERENCES lesson_h4_post (id)
+);
+SET SESSION cte_max_recursion_depth = 20000;
+INSERT INTO lesson_h4_post (title, deleted_at)
+WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i &lt; 10000)
+SELECT CONCAT('글 ', i), IF(i &lt;= 6000, '2026-08-01 00:00:00', NULL) FROM n;
+INSERT INTO lesson_h4_comment (post_id, body)
+SELECT p.id, CONCAT('댓글 ', k.k) FROM lesson_h4_post p
+CROSS JOIN (SELECT 1 k UNION ALL SELECT 2 UNION ALL SELECT 3) k;</code></pre>
+<p><code>WITH RECURSIVE</code>는 1부터 10000까지 숫자 행을 만드는 문법이다. 한도를 안 올리면 <code>ERROR 3636 … Recursive query aborted after 1001 iterations</code>가 난다(기본 1000). 지울 댓글은 <code>id</code> 1<del>18000, 남길 댓글은 18001</del>30000이 됐다.</p>
+<h3 id="부모부터-지우면--1451"><a class="anchor" href="#부모부터-지우면--1451" aria-hidden="true">#</a>부모부터 지우면 — 1451</h3>
+<pre><code class="language-text">mysql&gt; DELETE FROM lesson_h4_post WHERE deleted_at &lt; '2026-09-05';
+ERROR 1451 (23000): Cannot delete or update a parent row: a foreign key constraint fails (`practice`.`lesson_h4_comment`, CONSTRAINT `fk_h4_comment_post` FOREIGN KEY (`post_id`) REFERENCES `lesson_h4_post` (`id`))</code></pre>
+<h3 id="limit은-최대-몇-행"><a class="anchor" href="#limit은-최대-몇-행" aria-hidden="true">#</a><code>LIMIT</code>은 &quot;최대 몇 행&quot;</h3>
+<pre><code class="language-text">mysql&gt; DELETE FROM lesson_h4_comment
+    -&gt; WHERE post_id IN (SELECT id FROM lesson_h4_post WHERE deleted_at &lt; '2026-09-05')
+    -&gt; ORDER BY id LIMIT 1000;
+Query OK, 1000 rows affected (0.03 sec)</code></pre>
+<p>한 번에 1000행만 지웠다. 나머지는 남아 있다. <strong>0행이 나올 때까지 되풀이</strong>한다. 매번 &quot;앞에서부터 1000개&quot;를 지우니 <code>OFFSET</code>이 필요 없다(지울 때 <code>OFFSET</code>으로 넘기면 앞이 지워져 당겨지면서 행을 건너뛴다). 단, 표 두 개를 조인한 <code>DELETE</code>에는 <code>LIMIT</code>을 못 쓴다.</p>
+<pre><code class="language-text">mysql&gt; DELETE c FROM lesson_h4_comment c JOIN lesson_h4_post p ON p.id = c.post_id
+    -&gt; WHERE p.deleted_at &lt; '2026-09-05' LIMIT 1000;
+ERROR 1064 (42000): You have an error in your SQL syntax; … near 'LIMIT 1000' at line 1</code></pre>
+<h3 id="한-번에-vs-1000건씩--누가-기다리나"><a class="anchor" href="#한-번에-vs-1000건씩--누가-기다리나" aria-hidden="true">#</a>한 번에 vs 1000건씩 — 누가 기다리나</h3>
+<p>터미널 A가 <code>START TRANSACTION</code> 후 <code>DELETE</code>를 하고 <strong>커밋 전</strong>에 멈춘다. 그동안 터미널 B가 댓글 하나를 고친다(기다림 한도 3초로 줄임). 실제 결과다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>A가 한 것</th>
+<th>B가 고친 댓글</th>
+<th>B 결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>18,000행 한 번에 <code>DELETE</code></td>
+<td>17000번(지울 대상)</td>
+<td><code>ERROR 1205 … Lock wait timeout exceeded</code></td>
+</tr>
+<tr>
+<td>〃</td>
+<td>25000번(남길 댓글)</td>
+<td>바로 성공</td>
+</tr>
+<tr>
+<td><code>ORDER BY id LIMIT 1000</code></td>
+<td>17000번</td>
+<td>바로 성공</td>
+</tr>
+<tr>
+<td>〃</td>
+<td>500번(이번 청크)</td>
+<td><code>ERROR 1205</code></td>
+</tr>
+</tbody></table></div>
+<p>한 번에 지우면 지울 대상 전부가 커밋 때까지 잠긴다. 1000건씩이면 잠긴 건 이번 청크 1000행뿐이고, 커밋하면 풀린다.</p>
+<h3 id="청크-루프--청크-하나가-트랜잭션-하나"><a class="anchor" href="#청크-루프--청크-하나가-트랜잭션-하나" aria-hidden="true">#</a>청크 루프 — 청크 하나가 트랜잭션 하나</h3>
+<pre><code class="language-java">@Service
+public class TrashPurge {
+    private static final int CHUNK = 1000;
+    private static final Logger log = LoggerFactory.getLogger(TrashPurge.class);   // org.slf4j
+    private final JdbcTemplate jdbc;
+    private final TransactionTemplate tx;
+    // 생성자 생략
+
+    // 이 메서드에는 @Transactional을 붙이지 않는다 — 청크마다 따로 커밋해야 하니까
+    public long purge(LocalDateTime cutoff) {
+        long comments = deleteInChunks(&quot;comment&quot;,
+                &quot;DELETE FROM lesson_h4_comment WHERE post_id IN &quot;
+                        + &quot;(SELECT id FROM lesson_h4_post WHERE deleted_at &lt; ?) ORDER BY id LIMIT ?&quot;, cutoff);
+        long posts = deleteInChunks(&quot;post&quot;,
+                &quot;DELETE FROM lesson_h4_post WHERE deleted_at &lt; ? ORDER BY id LIMIT ?&quot;, cutoff);
+        log.info(&quot;purge 끝 comment={} post={}&quot;, comments, posts);
+        return posts;
+    }
+
+    private long deleteInChunks(String name, String sql, LocalDateTime cutoff) {
+        long total = 0;
+        int round = 0;
+        while (true) {
+            Integer deleted = tx.execute(status -&gt; jdbc.update(sql, cutoff, CHUNK));   // 한 청크 = 한 트랜잭션
+            round++;
+            total += deleted;
+            log.info(&quot;{} 청크 {}: {}건 (누적 {})&quot;, name, round, deleted, total);
+            if (deleted &lt; CHUNK) return total;
+        }
+    }
+}</code></pre>
+<p><code>TransactionTemplate.execute</code>는 람다 하나를 트랜잭션 하나로 실행하고 커밋한다(E4·E7에서 쓴 것). <code>jdbc.update</code>는 영향받은 행 수를 돌려준다.</p>
+<pre><code class="language-text">comment 청크 1: 1000건 (누적 1000)
+comment 청크 2: 1000건 (누적 2000)
+…
+comment 청크 18: 1000건 (누적 18000)
+comment 청크 19: 0건 (누적 18000)
+post 청크 1: 1000건 (누적 1000)
+…
+post 청크 6: 1000건 (누적 6000)
+post 청크 7: 0건 (누적 6000)
+purge 끝 comment=18000 post=6000</code></pre>
+<p>남은 행은 글 4,000, 댓글 12,000이다. 처리 건수를 청크마다 로그로 남기면, 중간에 죽어도 어디까지 됐는지 보인다. 다시 돌려도 남은 것만 지운다.</p>
+<h3 id="jpa로-2만-개-넣기--들고-있는-엔티티가-쌓인다"><a class="anchor" href="#jpa로-2만-개-넣기--들고-있는-엔티티가-쌓인다" aria-hidden="true">#</a>JPA로 2만 개 넣기 — 들고 있는 엔티티가 쌓인다</h3>
+<p>한 트랜잭션에서 <code>em.persist</code>를 2만 번 했다. 5,000개마다 영속성 컨텍스트가 관리하는 엔티티 수를 찍었다(<code>em.unwrap(Session.class).getStatistics().getEntityCount()</code>).</p>
+<pre><code class="language-java">for (int i = 1; i &lt;= 20_000; i++) {
+    em.persist(new LessonH4Post(&quot;대량 &quot; + i));
+    if (i % 5000 == 0) p(i + &quot;개째 — 들고 있는 엔티티 &quot; + managed() + &quot;개&quot;);
+    if (clearEvery500 &amp;&amp; i % 500 == 0) {
+        em.flush();   // 쌓인 SQL을 DB로 (커밋 아님)
+        em.clear();   // 들고 있던 엔티티를 놓는다
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>5,000개째</th>
+<th>20,000개째</th>
+<th>커밋 직전 힙(GC 후)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>그냥</td>
+<td>5,000개</td>
+<td><strong>20,000개</strong></td>
+<td>30MB</td>
+</tr>
+<tr>
+<td>500개마다 <code>flush</code>·<code>clear</code></td>
+<td>500개</td>
+<td>500개</td>
+<td>23MB</td>
+</tr>
+</tbody></table></div>
+<p>엔티티가 작아서 차이가 7MB지만, 들고 있는 수는 계속 늘었다. 엔티티가 크거나 수십만 개면 메모리가 모자란다(Hibernate 문서의 경고). 걸린 시간은 두 방식을 두 번씩 재서 3.9~9.3초로 들쭉날쭉해 어느 쪽이 빠르다고 말할 수 없었다.</p>
+<p><code>clear()</code> 뒤에는 그 객체를 고쳐도 저장되지 않는다.</p>
+<pre><code class="language-text">clear 전 contains: true
+clear 후 contains: false
+DB 제목: 글 7001          ← changeTitle(&quot;clear 뒤에 고침&quot;)을 했지만 UPDATE가 안 나갔다</code></pre>
+<h3 id="saveall과-batchupdate"><a class="anchor" href="#saveall과-batchupdate" aria-hidden="true">#</a><code>saveAll</code>과 <code>batchUpdate</code></h3>
+<p><code>posts.saveAll(5개)</code>의 SQL 로그는 <code>insert into lesson_h4_post (deleted_at,title) values (?,?)</code> <strong>다섯 줄</strong>이었다. <code>saveAll</code>은 <code>save</code>를 하나씩 부른다. <code>spring.jpa.properties.hibernate.jdbc.batch_size=50</code>을 켜고 통계(<code>generate_statistics=true</code>)를 보면 이렇다.</p>
+<pre><code class="language-text">executing 5 JDBC statements
+executing 0 JDBC batches</code></pre>
+<p><code>@GeneratedValue(strategy = IDENTITY)</code>(AUTO_INCREMENT)는 INSERT마다 DB가 만든 id를 받아야 해서 Hibernate가 묶지 않는다. 묶어 보내려면 <code>JdbcTemplate.batchUpdate</code>를 쓴다.</p>
+<pre><code class="language-java">int[] counts = tx.execute(s -&gt; jdbc.batchUpdate(&quot;UPDATE lesson_h4_post SET title = ? WHERE id = ?&quot;, params));</code></pre>
+<p>2,000행을 한 트랜잭션에서 세 번씩 돌렸다. URL에 <code>rewriteBatchedStatements=true</code>를 붙이면 드라이버(Connector/J 9.7)가 여러 문장을 한 번에 보낸다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>URL</th>
+<th>돌려준 배열</th>
+<th>시간(3회)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>기본</td>
+<td>길이 2000, 전부 <code>1</code></td>
+<td>475 · 415 · 402ms</td>
+</tr>
+<tr>
+<td><code>rewriteBatchedStatements=true</code></td>
+<td>길이 2000, 전부 <code>1</code></td>
+<td>189 · 183 · 210ms</td>
+</tr>
+</tbody></table></div>
+<p>배열은 &quot;각 파라미터 묶음이 몇 행을 바꿨나&quot;다. 두 경우 모두 <code>1</code>이 2,000개였다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>15분. G3의 mysql 접속 명령에서 맨 끝 DB 이름 <code>community</code>를 <code>practice</code>로 바꿔 들어간다(진짜 <code>post</code>·<code>comment</code>는 건드리지 않는다).</p>
+<p><strong>1.</strong> 예시의 <code>CREATE</code>·<code>INSERT</code>를 실행하고 <code>SELECT COUNT(*)</code>로 10000·30000을 확인한다.</p>
+<p><strong>2.</strong> 부모부터 <code>DELETE</code> → <code>1451</code>을 본다.</p>
+<p><strong>3.</strong> 댓글 <code>DELETE … ORDER BY id LIMIT 1000</code>을 <code>0 rows affected</code>가 나올 때까지 손으로 되풀이한다(19번). 그다음 글도 같은 방식으로(7번).</p>
+<p><strong>4. 잠금 보기.</strong> 5의 <code>DROP</code> 두 줄을 먼저 하고 1을 다시 해 데이터를 되살린다(표가 남아 있으면 <code>CREATE</code>가 <code>ERROR 1050</code>). 그다음 터미널 두 개를 같은 방식으로 연다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>순서</th>
+<th>A</th>
+<th>B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>START TRANSACTION;</code></td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>댓글 <code>DELETE</code>(LIMIT 없이)</td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td></td>
+<td><code>SET SESSION innodb_lock_wait_timeout = 3;</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td></td>
+<td><code>UPDATE lesson_h4_comment SET body = &#39;수정&#39; WHERE id = 17000;</code> → 3초 뒤 <code>1205</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>ROLLBACK;</code></td>
+<td></td>
+</tr>
+</tbody></table></div>
+<p>2번을 <code>ORDER BY id LIMIT 1000</code>으로 바꾸면 4번이 바로 끝난다.</p>
+<p><strong>5. 정리.</strong> <code>DROP TABLE lesson_h4_comment; DROP TABLE lesson_h4_post;</code> (자식 먼저)</p>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p><strong>1. 바깥에 <code>@Transactional</code>.</strong> 청크 루프를 트랜잭션 하나 안에서 불렀다(<code>tx.executeWithoutResult(s -&gt; purge.purge(…))</code>, 서비스에 <code>@Transactional</code>을 붙인 것과 같다). 로그는 위와 <strong>똑같이</strong> <code>청크 1…19</code>가 찍혔다. 그런데 루프가 끝나고 커밋 전에 B가 17000번을 고치자 <code>ERROR 1205</code>였다. 안쪽 <code>tx.execute</code>가 새 트랜잭션을 열지 않고 바깥 트랜잭션에 <strong>합류</strong>했기 때문이다. 18,000행 잠금이 끝까지 유지됐고, 롤백하자 30,000행이 전부 돌아왔다. 바깥 트랜잭션 없이 돌리면 같은 시점에 B는 <code>Rows matched: 0</code>(이미 지워짐)으로 바로 끝났다.</p>
+<p><strong>2. <code>flush()</code>면 커밋된 줄 알기.</strong> 위 1과 같은 이유다. <code>flush</code>는 SQL을 보낼 뿐이다. 커밋 경계는 <code>TransactionTemplate</code>이나 <code>@Transactional</code> 메서드가 끝나는 곳이다.</p>
+<p><strong>3. <code>clear()</code> 뒤에 옛 객체 고치기.</strong> 예시의 <code>DB 제목: 글 7001</code>. 고칠 게 있으면 <code>clear()</code> 전에 고치거나, 다시 <code>find</code>해서 고친다.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> <code>DELETE FROM t WHERE … LIMIT 500</code>을 한 번 실행했다. 대상이 2,000행이면 몇 행이 지워지나? 다 지우려면?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>500행.</strong> <code>LIMIT</code>은 한 문장이 지울 최대 행 수다. 영향받은 행이 0(또는 500 미만)이 될 때까지 되풀이한다.</p>
+</details>
+
+<p><strong>2.</strong> 글과 댓글(<code>comment.post_id</code> FK)을 지운다. 순서는? 반대로 하면?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>댓글 먼저, 글 나중.</strong> 글을 먼저 지우면 <code>ERROR 1451 Cannot delete or update a parent row</code>다(<code>ON DELETE CASCADE</code>가 없을 때).</p>
+</details>
+
+<p><strong>3.</strong> 18,000행을 한 트랜잭션으로 지우는 동안 다른 요청이 그중 한 행을 고치려 하면? 1000건씩 청크마다 커밋하면?</p>
+<details>
+<summary>정답</summary>
+
+<p>한 번에: 커밋까지 기다리다 <code>1205 Lock wait timeout</code>이 날 수 있다. 청크: 잠긴 건 지금 청크 1000행뿐이라 다른 행은 바로 고쳐진다.</p>
+</details>
+
+<p><strong>4.</strong> 청크 루프 안에서 <code>tx.execute</code>로 청크마다 커밋하게 짰는데, 그 메서드를 부르는 서비스에 <code>@Transactional</code>이 붙어 있다. 어떻게 되나?</p>
+<details>
+<summary>정답</summary>
+
+<p>안쪽 트랜잭션이 바깥에 <strong>합류</strong>해서 청크마다 커밋되지 않는다. 로그는 청크별로 찍히지만 잠금은 끝까지 유지되고, 실패하면 전부 롤백된다. 청크 루프를 감싸는 메서드에는 트랜잭션을 걸지 않는다.</p>
+</details>
+
+<p><strong>5.</strong> 한 트랜잭션에서 <code>em.persist</code>를 2만 번 했다. 500개마다 <code>flush()</code>·<code>clear()</code>를 넣으면 무엇이 달라지고 무엇이 그대로인가?</p>
+<details>
+<summary>정답</summary>
+
+<p>달라지는 것: 들고 있는 엔티티가 2만 개까지 쌓이지 않고 500개 이하로 유지된다(메모리). 그대로인 것: <strong>트랜잭션은 하나</strong>다. <code>flush</code>는 커밋이 아니다. 그리고 <code>clear()</code> 전에 받은 객체를 나중에 고쳐도 저장되지 않는다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="./E7-jpa-update-delete.html">E7 JPA로 수정·삭제하기</a> — 영속성 컨텍스트, <code>@Modifying</code> 벌크 수정과 <code>clearAutomatically</code></li>
+<li><a href="./G3-first-transaction.html">G3 첫 트랜잭션</a> — 트랜잭션 경계와 롤백</li>
+<li><a href="./H1-concurrency-taste.html">H1 동시성 맛보기</a> — 행 잠금과 <code>1205</code></li>
+<li><a href="../docs/knowledge/S15-async-scheduling-batch.html">S15 비동기·스케줄링·Spring Batch</a> — 청크 경계와 체크포인트(Spring Batch)</li>
+<li><a href="../docs/knowledge/S09-jpa-hibernate.html">S09 JPA·Hibernate</a> — 영속성 컨텍스트와 flush</li>
+<li>MySQL 8.0 — <code>DELETE</code>(LIMIT 반복, 다중 테이블 제약): <a href="https://dev.mysql.com/doc/refman/8.0/en/delete.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.0/en/delete.html</a></li>
+<li>MySQL 8.0 — InnoDB Locking: <a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html</a></li>
+<li>MySQL 8.0 — FOREIGN KEY: <a href="https://dev.mysql.com/doc/refman/8.0/en/create-table-foreign-keys.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.0/en/create-table-foreign-keys.html</a></li>
+<li>Hibernate ORM 7 User Guide — Batching(기본 꺼짐, IDENTITY는 insert 배치 불가, flush/clear): <a href="https://docs.hibernate.org/orm/7.0/userguide/html_single/" target="_blank" rel="noopener">https://docs.hibernate.org/orm/7.0/userguide/html_single/</a></li>
+<li>Spring Framework — JDBC Batch Operations: <a href="https://docs.spring.io/spring-framework/reference/data-access/jdbc/advanced.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/data-access/jdbc/advanced.html</a></li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li>실습: <a href="../scenario/ch15-scheduling-batch/15-4-trash-purge.html">15-4. 휴지통 비우기 — 자식 먼저, 1000건씩</a> — 진짜 <code>post</code>·<code>comment</code>·<code>post_like</code>… FK 순서, 답글 먼저, 30일 경계까지.</li>
+<li>예약 실행은 <a href="./H3-scheduling.html">H3. 스케줄링</a>에서.</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

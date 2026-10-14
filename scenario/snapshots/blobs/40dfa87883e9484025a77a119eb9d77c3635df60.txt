@@ -1,0 +1,55 @@
+package org.example.post;
+
+import org.example.board.Board;
+import org.example.board.BoardRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
+import java.time.LocalDateTime;
+
+@RestController
+@RequestMapping("/api/posts")
+public class PostController {
+
+    private static final Logger log = LoggerFactory.getLogger(PostController.class);
+
+    // 로그인 기능이 없는 동안 작성자를 고정한다 — 1-6에서 토큰 기반으로 바꾼다
+    private static final long FIXED_AUTHOR_ID = 2L;
+
+    // 1-3에서 서비스로 옮긴다 — 지금은 컨트롤러가 저장소를 바로 부른다
+    private final PostRepository postRepository;
+    private final BoardRepository boardRepository;
+
+    public PostController(PostRepository postRepository, BoardRepository boardRepository) {
+        this.postRepository = postRepository;
+        this.boardRepository = boardRepository;
+    }
+
+    @PostMapping
+    public ResponseEntity<PostResponse> create(@RequestBody PostCreateRequest request) {
+        log.info("게시글 작성 요청 제목: {}", request.title());
+
+        Board board = boardRepository.findBySlug(request.boardSlug())
+                .orElseThrow(() -> new IllegalArgumentException("게시판을 찾을 수 없습니다: " + request.boardSlug()));
+        Post post = new Post(board, FIXED_AUTHOR_ID, request.title(), request.content(),
+                request.visibility(), LocalDateTime.now());
+        // 여기서 INSERT가 나간다. 돌려받은 saved의 id에 DB가 붙인 번호(AUTO_INCREMENT)가 들어 있다
+        Post saved = postRepository.save(post);
+
+        PostResponse response = new PostResponse(
+                saved.getId(),
+                board.getSlug(),
+                saved.getTitle(),
+                saved.getContent(),
+                saved.getVisibility(),
+                saved.getCreatedAt()
+        );
+        return ResponseEntity.created(URI.create("/api/posts/" + saved.getId())).body(response);
+    }
+}

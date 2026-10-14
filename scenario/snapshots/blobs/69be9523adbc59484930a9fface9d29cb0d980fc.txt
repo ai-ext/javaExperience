@@ -1,0 +1,33 @@
+package org.example.board.post;
+
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+
+public interface PostRepository extends JpaRepository<Post, Long> {
+
+    // 상세 한 번에: 글 + 작성자 + 태그(삭제된 글은 없는 것으로)
+    @Query("select distinct p from Post p join fetch p.author left join fetch p.tags where p.id = :id and p.deletedAt is null")
+    Optional<Post> findDetailById(Long id);
+
+    Optional<Post> findByIdAndDeletedAtIsNull(Long id);
+
+    // 조회수는 읽고-더하고-쓰지 않고 DB에서 한 번에 +1(동시에 읽어도 숫자를 잃지 않는다)
+    @Modifying
+    @Query("update Post p set p.viewCount = p.viewCount + 1 where p.id = :id")
+    int increaseViewCount(Long id);
+
+    // 좋아요 수도 DB에서 바로 더하고 뺀다
+    @Modifying
+    @Query("update Post p set p.likeCount = p.likeCount + :delta where p.id = :id "
+            + "and p.deletedAt is null and (p.visibility = :publicVisibility or p.author.id = :userId)")
+    int changeLikeCount(Long id, Long userId, Visibility publicVisibility, int delta);
+
+    @Query("select p.likeCount from Post p where p.id = :id")
+    int findLikeCount(Long id);
+
+    @Query(value = "select count(*) from post_likes where post_id = :postId and user_id = :userId", nativeQuery = true)
+    long countLike(Long postId, Long userId);
+}

@@ -1,0 +1,85 @@
+package org.example.reaction;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.member.MemberRepository;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+// 공감 — 한 사람이 한 글에 한 종류. 같은 종류 또 → 그대로(멱등), 다른 종류 → 바꾸기, 취소 → 행 삭제
+@Service
+public class ReactionService {
+
+    private final PostReactionRepository reactionRepository;
+    private final PostRepository postRepository;
+    private final MemberRepository memberRepository;
+    private final PostAccessPolicy accessPolicy;
+    private final Clock clock;
+
+    public ReactionService(PostReactionRepository reactionRepository, PostRepository postRepository,
+                           MemberRepository memberRepository, PostAccessPolicy accessPolicy, Clock clock) {
+        this.reactionRepository = reactionRepository;
+        this.postRepository = postRepository;
+        this.memberRepository = memberRepository;
+        this.accessPolicy = accessPolicy;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public ReactionSummaryResponse react(Long postId, AuthenticatedMember me, ReactionKind kind) {
+        Post post = findViewable(postId, me);
+        LocalDateTime now = LocalDateTime.now(clock);
+        reactionRepository.findByPost_IdAndMember_Id(postId, me.id())
+                .ifPresentOrElse(
+                        reaction -> reaction.changeKind(kind, now),
+                        () -> reactionRepository.save(
+                                new PostReaction(post, memberRepository.getReferenceById(me.id()), kind, now)));
+        // 변경 감지로 바뀐 kind가 아래 COUNT 전에 DB에 반영되게 한다(JPQL·네이티브 쿼리 전에 자동 flush)
+        return summary(postId, me);
+    }
+
+    @Transactional
+    public ReactionSummaryResponse cancel(Long postId, AuthenticatedMember me) {
+        findViewable(postId, me);
+        reactionRepository.deleteMine(postId, me.id());
+        return summary(postId, me);
+    }
+
+    @Transactional(readOnly = true)
+    public ReactionSummaryResponse get(Long postId, AuthenticatedMember viewer) {
+        findViewable(postId, viewer);
+        return summary(postId, viewer);
+    }
+
+    private Post findViewable(Long postId, AuthenticatedMember viewer) {
+        Post post = postRepository.findById(postId).orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(viewer, post)) {
+            throw new PostNotFoundException();
+        }
+        return post;
+    }
+
+    private ReactionSummaryResponse summary(Long postId, AuthenticatedMember viewer) {
+        Map<ReactionKind, Long> counts = new EnumMap<>(ReactionKind.class);
+        for (ReactionKind kind : ReactionKind.values()) {
+            counts.put(kind, 0L);
+        }
+        for (ReactionCountRow row : reactionRepository.countByKind(postId)) {
+            counts.put(ReactionKind.valueOf(row.getKind()), row.getCnt());
+        }
+        long total = counts.values().stream().mapToLong(Long::longValue).sum();
+        ReactionKind mine = viewer == null ? null
+                : reactionRepository.findByPost_IdAndMember_Id(postId, viewer.id())
+                        .map(PostReaction::getKind).orElse(null);
+        return new ReactionSummaryResponse(postId, mine, new LinkedHashMap<>(counts), total);
+    }
+}

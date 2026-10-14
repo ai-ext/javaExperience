@@ -1,0 +1,78 @@
+package org.example.image;
+
+import org.example.member.Member;
+import org.example.member.MemberRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+// 11-2 업로드 규칙 — 크기 상한은 설정(spring.servlet.multipart.max-file-size)이 먼저 막고,
+// 여기서는 빈 파일과 형식(파일 서명)을 본다.
+@Service
+public class ImageService {
+
+    private static final int ORIGINAL_NAME_MAX_LENGTH = 255;
+
+    private final PostImageRepository postImageRepository;
+    private final MemberRepository memberRepository;
+    private final ImageStorage storage;
+
+    public ImageService(PostImageRepository postImageRepository, MemberRepository memberRepository,
+                        ImageStorage storage) {
+        this.postImageRepository = postImageRepository;
+        this.memberRepository = memberRepository;
+        this.storage = storage;
+    }
+
+    @Transactional
+    public PostImage upload(Long uploaderId, MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new EmptyImageException();
+        }
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        ImageType type = ImageType.detect(bytes).orElseThrow(UnsupportedImageException::new);
+
+        // 저장 이름은 서버가 짓는다 — 사용자가 보낸 이름(../../etc/passwd.png, 같은 이름 덮어쓰기)을 경로에 쓰지 않는다
+        String storedName = UUID.randomUUID().toString().replace("-", "") + "." + type.extension();
+        Member uploader = memberRepository.getReferenceById(uploaderId);
+        PostImage image = postImageRepository.save(new PostImage(uploader, storedName, originalNameOf(file),
+                type.contentType(), bytes.length, LocalDateTime.now()));
+
+        // 파일 쓰기 자체가 중간에 실패해도 롤백 때 일부 기록된 파일을 지울 수 있게 먼저 등록한다.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    storage.delete(storedName);
+                }
+            }
+        });
+        storage.save(storedName, bytes);
+        return image;
+    }
+
+    @Transactional(readOnly = true)
+    public PostImage findByStoredName(String storedName) {
+        return postImageRepository.findByStoredName(storedName).orElseThrow(ImageNotFoundException::new);
+    }
+
+    private static String originalNameOf(MultipartFile file) {
+        String name = file.getOriginalFilename();
+        if (name == null || name.isBlank()) {
+            return "image";
+        }
+        return name.length() > ORIGINAL_NAME_MAX_LENGTH ? name.substring(0, ORIGINAL_NAME_MAX_LENGTH) : name;
+    }
+}

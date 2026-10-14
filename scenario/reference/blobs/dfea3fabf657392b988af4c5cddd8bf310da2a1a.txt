@@ -1,0 +1,39 @@
+package org.example.admin;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.example.auth.AuthInterceptor;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.springframework.stereotype.Component;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+// 13-1 권한 확인 한 곳 — AuthInterceptor(누구인가) 다음에 돈다.
+// @RequirePermission이 붙은 핸들러만 본다: 로그인 안 함 → 401, 권한 없음 → 403.
+// GET은 AuthInterceptor가 토큰 없이도 통과시키므로 여기서 401을 내야 한다(컨트롤러마다 null 확인을 반복하지 않는다).
+@Component
+public class PermissionInterceptor implements HandlerInterceptor {
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        if (!(handler instanceof HandlerMethod method)) {
+            return true;
+        }
+        RequirePermission required = method.getMethodAnnotation(RequirePermission.class);
+        if (required == null) {
+            required = method.getBeanType().getAnnotation(RequirePermission.class);
+        }
+        if (required == null) {
+            return true;
+        }
+        AuthenticatedMember me = (AuthenticatedMember) request.getAttribute(AuthInterceptor.LOGIN_MEMBER_ATTRIBUTE);
+        if (me == null) {
+            throw new AuthenticationRequiredException("인증이 필요합니다.");
+        }
+        if (!Role.has(me.role(), required.value())) {
+            throw new AdminOnlyException("이 작업을 할 권한이 없습니다.");
+        }
+        return true;
+    }
+}

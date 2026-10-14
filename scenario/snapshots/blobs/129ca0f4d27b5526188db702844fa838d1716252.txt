@@ -1,0 +1,31 @@
+package org.example.board.comment;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import tools.jackson.databind.JsonNode;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+public record CommentRequest(
+        @NotBlank(message = "댓글 내용은 필수입니다.")
+        @Size(max = 500, message = "댓글은 500자 이하여야 합니다.")
+        String content,
+        Long parentId) {
+
+    public CommentRequest {
+        content = content == null ? null : content.strip();
+    }
+
+    // Jackson의 숫자→문자열, 소수→정수 자동 변환을 막고 원래 JSON 타입을 검사한다.
+    @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
+    public static CommentRequest fromJson(JsonNode body) {
+        if (body == null || !body.isObject()) throw new IllegalArgumentException("JSON 객체가 필요합니다.");
+        JsonNode rawContent = body.get("content");
+        JsonNode rawParent = body.get("parentId");
+        if (rawContent != null && !rawContent.isNull() && !rawContent.isTextual())
+            throw new IllegalArgumentException("content는 문자열이어야 합니다.");
+        if (rawParent != null && !rawParent.isNull() && (!rawParent.isIntegralNumber() || !rawParent.canConvertToLong()))
+            throw new IllegalArgumentException("parentId는 정수여야 합니다.");
+        return new CommentRequest(rawContent == null || rawContent.isNull() ? null : rawContent.asText(),
+                rawParent == null || rawParent.isNull() ? null : rawParent.longValue());
+    }
+}

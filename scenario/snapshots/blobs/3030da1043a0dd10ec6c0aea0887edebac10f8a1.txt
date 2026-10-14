@@ -1,0 +1,46 @@
+package org.example.board.comment;
+
+import java.net.URI;
+import java.util.List;
+
+import jakarta.validation.Valid;
+import org.example.board.auth.LoginUser;
+import org.example.board.common.ApiResponse;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class CommentController {
+
+    private final CommentService commentService;
+
+    public CommentController(CommentService commentService) {
+        this.commentService = commentService;
+    }
+
+    @PostMapping("/api/v1/posts/{postId}/comments")
+    public ResponseEntity<ApiResponse<CommentCreatedResponse>> create(@LoginUser Long userId,
+                                                                      @PathVariable Long postId,
+                                                                      @Valid @RequestBody CommentRequest request) {
+        CommentCreatedResponse created = commentService.create(userId, postId, request);
+        return ResponseEntity.created(URI.create("/api/v1/comments/" + created.id()))
+                .body(ApiResponse.created(created));
+    }
+
+    @GetMapping("/api/v1/posts/{postId}/comments")
+    public ApiResponse<List<CommentResponse>> list(@PathVariable Long postId,
+                                                   @LoginUser(required = false) Long userId) {
+        return ApiResponse.ok(commentService.list(postId, userId));
+    }
+
+    @DeleteMapping("/api/v1/comments/{commentId}")
+    public ApiResponse<Void> delete(@LoginUser Long userId, @PathVariable Long commentId) {
+        commentService.delete(userId, commentId);
+        return ApiResponse.ok(null);
+    }
+}

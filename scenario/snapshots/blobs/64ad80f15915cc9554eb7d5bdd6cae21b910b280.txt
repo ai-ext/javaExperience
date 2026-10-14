@@ -1,0 +1,90 @@
+package org.example.post;
+
+import org.example.board.Board;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardRepository;
+import org.example.tag.Tag;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+// 글 조회 전용 서비스 — 1-3/1-4의 PostService(쓰기)와 책임을 나눈다
+@Service
+public class PostQueryService {
+
+    private static final String PUBLISHED = "PUBLISHED";
+
+    private final PostRepository postRepository;
+    private final BoardRepository boardRepository;
+
+    public PostQueryService(PostRepository postRepository, BoardRepository boardRepository) {
+        this.postRepository = postRepository;
+        this.boardRepository = boardRepository;
+    }
+
+    @Transactional
+    public PostDetailResponse getDetail(Long id) {
+        Post post = postRepository.findById(id)
+                .orElseThrow(PostNotFoundException::new);
+
+        post.increaseViewCount();
+        return toDetailResponse(post);
+    }
+
+    @Transactional(readOnly = true)
+    public PostListResponse list(String boardSlug, int page, int size) {
+        Board board = boardRepository.findBySlug(boardSlug)
+                .orElseThrow(() -> new BoardNotFoundException(boardSlug));
+
+        PageRequest pageRequest = PageRequest.of(page, size,
+                Sort.by(Sort.Order.desc("publishedAt"), Sort.Order.desc("id")));
+        Page<Post> result = postRepository.findByBoardAndStatusAndDeletedAtIsNull(board, PUBLISHED, pageRequest);
+
+        List<PostListItemResponse> items = result.getContent().stream()
+                .map(this::toListItem)
+                .toList();
+
+        return new PostListResponse(
+                items,
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages(),
+                result.hasNext()
+        );
+    }
+
+    private PostListItemResponse toListItem(Post post) {
+        return new PostListItemResponse(
+                post.getId(),
+                post.getTitle(),
+                new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+                post.getTags().stream().map(Tag::getName).toList(),
+                post.getLikeCount(),
+                post.getCommentCount(),
+                post.getViewCount(),
+                post.getPublishedAt()
+        );
+    }
+
+    private PostDetailResponse toDetailResponse(Post post) {
+        // 트랜잭션 안에서 지연 로딩 연관을 읽어 DTO로 옮긴다(open-in-view: false)
+        return new PostDetailResponse(
+                post.getId(),
+                post.getBoard().getSlug(),
+                post.getTitle(),
+                post.getContent(),
+                post.getTags().stream().map(Tag::getName).toList(),
+                post.getVisibility(),
+                new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+                post.getViewCount(),
+                post.getLikeCount(),
+                post.getCommentCount(),
+                post.getCreatedAt()
+        );
+    }
+}

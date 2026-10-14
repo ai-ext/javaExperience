@@ -1,0 +1,45 @@
+package org.example.post;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+
+@RestController
+public class FeedController {
+
+    private final PostQueryService postQueryService;
+
+    public FeedController(PostQueryService postQueryService) {
+        this.postQueryService = postQueryService;
+    }
+
+    // GET이지만 "내 것"이라 인증 필수
+    @GetMapping("/api/me/feed")
+    public FeedResponse feed(@RequestParam(value = "size", required = false) String size,
+                             @RequestParam(required = false) String cursor,
+                             @LoginMember AuthenticatedMember me) {
+        if (me == null) {
+            throw new AuthenticationRequiredException("인증이 필요합니다.");
+        }
+        return postQueryService.feed(me, parseSize(size), cursor);
+    }
+
+    private int parseSize(String raw) {
+        if (raw == null) {
+            return 10;
+        }
+        if (!raw.matches("[0-9]{1,2}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "size는 1~50의 정수여야 합니다.");
+        }
+        int value = Integer.parseInt(raw);
+        if (value < 1 || value > 50) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "size는 1~50의 정수여야 합니다.");
+        }
+        return value;
+    }
+}

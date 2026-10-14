@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>G2. 권한 규칙을 한 곳에</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="g2-권한-규칙을-한-곳에"><a class="anchor" href="#g2-권한-규칙을-한-곳에" aria-hidden="true">#</a>G2. 권한 규칙을 한 곳에</h1>
+<blockquote>
+<p>개념 레슨 · 30분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>화면이 남의 글에는 수정 버튼을 <strong>안 보여 준다</strong>고 하자. 그래도 요청은 보낼 수 있다. curl로 <code>PATCH /api/posts/3</code>을 직접 보내면 그만이다. 그래서 <strong>서버가 요청마다 다시 확인</strong>한다. 화면에서 숨기는 것은 편의이고, 막는 것은 서버다(F1의 &quot;서버 검증은 마지막 문&quot;과 같은 이야기).</p>
+<h3 id="같은-질문이-api마다-나온다"><a class="anchor" href="#같은-질문이-api마다-나온다" aria-hidden="true">#</a>같은 질문이 API마다 나온다</h3>
+<p>게시판에는 &quot;이 사람이 이 글을 …할 수 있나&quot;라는 질문이 계속 나온다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>API</th>
+<th>묻는 것</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>상세 <code>GET /api/posts/{id}</code> (2-1·2-3)</td>
+<td>볼 수 있나</td>
+</tr>
+<tr>
+<td>목록 <code>GET /api/boards/{slug}/posts</code> (2-2·2-3)</td>
+<td>볼 수 있나(여러 글을 한꺼번에)</td>
+</tr>
+<tr>
+<td>수정 <code>PATCH</code> (3-1)</td>
+<td>볼 수 있나 → 고칠 수 있나</td>
+</tr>
+<tr>
+<td>삭제 <code>DELETE</code> (3-2)</td>
+<td>볼 수 있나 → 지울 수 있나</td>
+</tr>
+<tr>
+<td>좋아요 <code>PUT …/like</code> (4-1) · 댓글 (5-1) · 북마크 (6-1)</td>
+<td>볼 수 있나</td>
+</tr>
+</tbody></table></div>
+<p>&quot;볼 수 있나&quot;의 규칙은 여러 줄이다. 지운 글은 아무도 못 본다. 임시저장(<code>DRAFT</code>)은 작성자만 본다. 운영자 숨김(<code>HIDDEN</code>)은 운영자만 본다. 2-3에서는 팔로워 공개와 차단까지 붙는다.</p>
+<p>이 규칙을 API마다 복사해 넣으면, 규칙이 바뀔 때 한 곳을 빠뜨린다. 그러면 <strong>상세에서는 안 보이는 글을 좋아요 API로는 건드릴 수 있는</strong> 구멍이 생긴다. 그래서 규칙을 <strong>클래스 하나</strong>(예: <code>PostAccessPolicy</code>)에 모으고, 모든 서비스가 그 클래스에 묻는다.</p>
+<h3 id="404인가-403인가"><a class="anchor" href="#404인가-403인가" aria-hidden="true">#</a>404인가 403인가</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상황</th>
+<th>상태 코드</th>
+<th>이유</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>글이 없다, 또는 이 사람은 볼 수 없다</td>
+<td><code>404</code></td>
+<td>볼 수 없는 글은 <strong>있다는 사실도</strong> 숨긴다</td>
+</tr>
+<tr>
+<td>볼 수는 있는데 고칠·지울 권한이 없다</td>
+<td><code>403</code></td>
+<td>글이 있는 건 이미 아는 사람이다</td>
+</tr>
+</tbody></table></div>
+<p>그래서 확인 순서가 정해진다. <strong>먼저 &quot;볼 수 있나&quot;(아니면 404), 그다음 &quot;고칠 수 있나&quot;(아니면 403).</strong> 순서를 바꾸면 403이 &quot;그 번호의 글이 있긴 하다&quot;를 알려 준다. 아래 &quot;일부러 틀려 보기&quot;에서 실제로 본다.</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<p>Spring 없이 순수 Java로 규칙 클래스와 서비스를 만든다. 시나리오 데이터의 회원·글을 몇 개 옮겼다(3번 공개 글, 7번 박디비의 임시저장, 8번 지운 글, 10번 운영자 숨김). JDK 21 <code>jshell</code>에서 실행한 그대로다.</p>
+<pre><code class="language-java">import java.util.*;
+
+enum Role { USER, ADMIN }
+enum Status { DRAFT, PUBLISHED, HIDDEN }
+record Member(long id, String nickname, Role role) {}
+record Post(long id, Member author, Status status, boolean deleted) {}
+
+class NotFoundException extends RuntimeException { NotFoundException(long id) { super(&quot;404 글 없음: &quot; + id); } }
+class ForbiddenException extends RuntimeException { ForbiddenException() { super(&quot;403 권한 없음&quot;); } }
+
+// 규칙은 여기에만 있다
+class PostAccessPolicy {
+    boolean canView(Member viewer, Post post) {
+        if (post.deleted()) return false;
+        return switch (post.status()) {
+            case PUBLISHED -&gt; true;
+            case DRAFT     -&gt; isAuthor(viewer, post);
+            case HIDDEN    -&gt; isAdmin(viewer);
+        };
+    }
+    boolean canEdit(Member viewer, Post post)   { return isAuthor(viewer, post); }
+    boolean canDelete(Member viewer, Post post) { return isAuthor(viewer, post) || isAdmin(viewer); }
+    private boolean isAuthor(Member viewer, Post post) { return viewer != null &amp;&amp; viewer.id() == post.author().id(); }
+    private boolean isAdmin(Member viewer)             { return viewer != null &amp;&amp; viewer.role() == Role.ADMIN; }
+}
+
+// 서비스는 규칙을 묻기만 한다
+class PostService {
+    private final PostAccessPolicy policy;
+    private final Map&lt;Long, Post&gt; store;
+    PostService(PostAccessPolicy policy, Map&lt;Long, Post&gt; store) { this.policy = policy; this.store = store; }
+
+    // &quot;볼 수 있는 글 찾기&quot; — 상세·수정·삭제가 모두 이 메서드로 글을 찾는다
+    private Post findVisible(Member viewer, long id) {
+        Post post = store.get(id);
+        if (post == null || !policy.canView(viewer, post)) throw new NotFoundException(id);
+        return post;
+    }
+    String detail(Member viewer, long id) { findVisible(viewer, id); return &quot;200&quot;; }
+    String update(Member viewer, long id) {
+        Post post = findVisible(viewer, id);                            // 1. 볼 수 있나 → 아니면 404
+        if (!policy.canEdit(viewer, post)) throw new ForbiddenException(); // 2. 고칠 수 있나 → 아니면 403
+        return &quot;200 수정함&quot;;
+    }
+    String delete(Member viewer, long id) {
+        Post post = findVisible(viewer, id);
+        if (!policy.canDelete(viewer, post)) throw new ForbiddenException();
+        return &quot;204 지움&quot;;
+    }
+}</code></pre>
+<p><code>null</code>인 <code>viewer</code>는 로그인하지 않은 사람이다. 데이터를 넣고 불러 본다.</p>
+<pre><code class="language-java">var admin = new Member(1, &quot;운영자&quot;, Role.ADMIN)
+var kim   = new Member(2, &quot;김자바&quot;, Role.USER)
+var lee   = new Member(3, &quot;이스프링&quot;, Role.USER)
+var park  = new Member(4, &quot;박디비&quot;, Role.USER)
+var store = Map.of(
+    3L,  new Post(3,  park, Status.PUBLISHED, false),
+    7L,  new Post(7,  park, Status.DRAFT,     false),
+    8L,  new Post(8,  lee,  Status.PUBLISHED, true),
+    10L, new Post(10, park, Status.HIDDEN,    false))
+var service = new PostService(new PostAccessPolicy(), store)</code></pre>
+<pre><code class="language-text">jshell&gt; service.detail(null, 3)
+$16 ==&gt; &quot;200&quot;
+
+jshell&gt; service.detail(kim, 7)
+|  Exception REPL.$JShell$15$NotFoundException: 404 글 없음: 7
+|        at PostService.findVisible (#9:9)
+|        at PostService.detail (#9:12)
+|        at (#17:1)
+
+jshell&gt; service.detail(park, 7)
+$18 ==&gt; &quot;200&quot;
+
+jshell&gt; service.update(lee, 3)
+|  Exception REPL.$JShell$16$ForbiddenException: 403 권한 없음
+|        at PostService.update (#9:15)
+|        at (#19:1)
+
+jshell&gt; service.update(park, 3)
+$20 ==&gt; &quot;200 수정함&quot;
+
+jshell&gt; service.delete(admin, 3)
+$21 ==&gt; &quot;204 지움&quot;
+
+jshell&gt; service.update(lee, 8)
+|  Exception REPL.$JShell$15$NotFoundException: 404 글 없음: 8
+|        at PostService.findVisible (#9:9)
+|        at PostService.update (#9:14)
+|        at (#22:1)
+
+jshell&gt; service.detail(admin, 10)
+$23 ==&gt; &quot;200&quot;</code></pre>
+<ul>
+<li><code>REPL.$JShell$15$</code>는 jshell이 클래스 이름 앞에 붙이는 것이다. <code>$16</code>·<code>#9</code> 같은 번호는 붙여 넣은 순서에 따라 다르다.</li>
+<li>이스프링은 3번 글을 볼 수는 있지만 작성자가 아니다 → <code>403</code>.</li>
+<li>8번은 이스프링 <strong>자신의</strong> 글이지만 지운 글이다 → 고치려 해도 <code>404</code>. 3-1 채점 C7(&quot;작성자가 지운 글을 고치려 함 → 404&quot;)이 이것이다. 수정이 상세와 같은 <code>findVisible</code>로 글을 찾기 때문에 따로 신경 쓰지 않아도 맞게 나온다.</li>
+</ul>
+<p>실제 프로젝트에서는 <code>PostAccessPolicy</code>에 <code>@Component</code>를 붙여 빈으로 만들고, 서비스가 생성자로 받는다(E1). 팔로우·차단을 보려면 리포지토리도 필요하니 정책 클래스가 그것들을 생성자로 받는다(7-2 힌트의 <code>new PostAccessPolicy(followRepository, blockRepository)</code>).</p>
+<h3 id="목록은-쿼리로"><a class="anchor" href="#목록은-쿼리로" aria-hidden="true">#</a>목록은 쿼리로</h3>
+<p>상세는 글 하나를 꺼내 <code>canView</code>로 판정하면 된다. 목록은 다르다. 글을 다 꺼내 Java에서 거르면 G1에서 본 것처럼 쪽 크기와 전체 개수가 틀어진다. 그래서 같은 규칙을 <strong><code>WHERE</code> 조건으로 옮겨</strong> 쿼리에서 거른다. 규칙이 두 군데(Java 판정, 쿼리 조건)에 있게 되는 셈이라, <strong>같은 클래스 옆에</strong> 두고 함께 고친다. 2-3의 힌트와 R1이 이 이야기다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>10분. <code>jshell</code>을 연다(JDK 21).</p>
+<p><strong>1. 붙여 넣고 예측하기.</strong> 위 코드를 붙여 넣는다. 아래를 실행하기 <strong>전에</strong> 결과(<code>200</code>·<code>204</code>·<code>403</code>·<code>404</code>)를 종이에 먼저 적는다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>호출</th>
+<th>예측</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>service.detail(park, 10)</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>service.delete(park, 10)</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>service.delete(lee, 8)</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>service.delete(kim, 3)</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>service.update(admin, 3)</code></td>
+<td></td>
+</tr>
+</tbody></table></div>
+<details>
+<summary>실제 결과</summary>
+
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>호출</th>
+<th>결과</th>
+<th>이유</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>service.detail(park, 10)</code></td>
+<td><code>404</code></td>
+<td>작성자라도 운영자 숨김 글은 못 본다(2-3 C5)</td>
+</tr>
+<tr>
+<td><code>service.delete(park, 10)</code></td>
+<td><code>404</code></td>
+<td>볼 수 없으니 지우기 전에 404</td>
+</tr>
+<tr>
+<td><code>service.delete(lee, 8)</code></td>
+<td><code>404</code></td>
+<td>이미 지운 글을 또 지우기(3-2 C5)</td>
+</tr>
+<tr>
+<td><code>service.delete(kim, 3)</code></td>
+<td><code>403</code></td>
+<td>볼 수는 있지만 작성자도 운영자도 아니다</td>
+</tr>
+<tr>
+<td><code>service.update(admin, 3)</code></td>
+<td><code>403</code></td>
+<td>운영자는 지울 수는 있지만 고칠 수는 없다(지금 규칙)</td>
+</tr>
+</tbody></table></div>
+</details>
+
+<p><strong>2. 규칙을 한 곳만 고친다.</strong> &quot;운영자는 어떤 글이든 고칠 수 있다&quot;로 규칙이 바뀌었다. <code>PostAccessPolicy</code>의 <code>canEdit</code> 한 줄만 바꿔 클래스 전체를 다시 붙여 넣는다.</p>
+<pre><code class="language-java">    boolean canEdit(Member viewer, Post post)   { return isAuthor(viewer, post) || isAdmin(viewer); }</code></pre>
+<p>jshell이 <code>modified class PostAccessPolicy</code>라고 알려 준다. 바뀐 클래스로 서비스를 다시 만들고 부른다.</p>
+<pre><code class="language-text">jshell&gt; var service = new PostService(new PostAccessPolicy(), store)
+service ==&gt; PostService@2fd66ad3
+
+jshell&gt; service.update(admin, 3)
+$37 ==&gt; &quot;200 수정함&quot;
+
+jshell&gt; service.update(admin, 10)
+$38 ==&gt; &quot;200 수정함&quot;</code></pre>
+<p><code>PostService</code>는 한 글자도 안 고쳤다. 수정 API가 열 개여도 고칠 곳은 <code>canEdit</code> 한 줄이다.</p>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p>같은 jshell에 이어서 친다. 아래 두 메서드는 <code>canView</code>만 쓰거나 아예 규칙 클래스를 안 써서, 따라 해 보기 2로 <code>canEdit</code>을 바꿨어도 결과가 같다.</p>
+<p><strong>1. 규칙을 복사해 &quot;작성자인가&quot;만 본다.</strong> 수정 기능을 급하게 만들면서 <code>findVisible</code>을 안 쓰고 직접 찾았다.</p>
+<pre><code class="language-java">String updateCopied(Member viewer, long id) {
+    Post post = store.get(id);
+    if (post == null) throw new NotFoundException(id);
+    if (post.author().id() != viewer.id()) throw new ForbiddenException();
+    return &quot;200 수정함&quot;;
+}</code></pre>
+<pre><code class="language-text">jshell&gt; updateCopied(lee, 8)
+$30 ==&gt; &quot;200 수정함&quot;</code></pre>
+<p><strong>지운 글이 고쳐졌다.</strong> 작성자 확인은 맞게 했지만 &quot;지운 글은 없는 글&quot; 규칙이 빠졌다. 상세(<code>404</code>)와 수정(<code>200</code>)이 서로 다른 말을 한다. 3-1 C7이 잡는 실수다. 규칙을 복사하면 이렇게 한 줄씩 빠진다.</p>
+<p><strong>2. 순서를 거꾸로 한다.</strong> 작성자부터 확인하고, 볼 수 있는지는 나중에 본다.</p>
+<pre><code class="language-java">String updateReversed(Member viewer, long id) {
+    Post post = store.get(id);
+    if (post != null &amp;&amp; post.author().id() != viewer.id()) throw new ForbiddenException();
+    if (post == null || !new PostAccessPolicy().canView(viewer, post)) throw new NotFoundException(id);
+    return &quot;200 수정함&quot;;
+}</code></pre>
+<pre><code class="language-text">jshell&gt; updateReversed(lee, 7)
+|  Exception REPL.$JShell$16$ForbiddenException: 403 권한 없음
+
+jshell&gt; updateReversed(lee, 999)
+|  Exception REPL.$JShell$15$NotFoundException: 404 글 없음: 999</code></pre>
+<p>(<code>at …</code> 줄은 뺐다.) 7번은 박디비의 임시저장 글이라 이스프링에게는 <strong>없는 글</strong>이어야 한다. 그런데 <code>403</code>이 나왔다. 999번(정말 없는 글)은 <code>404</code>다. 번호를 1부터 바꿔 가며 보내 보면 <code>403</code>이 나오는 번호마다 &quot;남의 숨은 글이 있다&quot;는 것을 알게 된다. 올바른 <code>service.update(lee, 7)</code>은 둘 다 <code>404</code>로 똑같이 답한다.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> 화면에서는 남의 글에 수정 버튼을 안 보여 준다. 그래도 누군가 curl로 <code>PATCH /api/posts/3</code>을 직접 보낼 수 있다. 서버의 수정 API에서 작성자 확인을 빼도 되나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>안 된다.</strong> 버튼을 숨긴 것은 화면 편의일 뿐이다. 요청은 curl 등으로 누구나 보낼 수 있다. id만 바꿔 남의 글을 고치는 사고를 IDOR라고 부른다(3-1 상황). 확인은 서버가 요청마다 한다.</p>
+</details>
+
+<p><strong>2.</strong> 이스프링이 박디비의 임시저장 글(7번)을 지우려 한다. <code>403</code>과 <code>404</code> 중 무엇을 돌려주나? 왜인가?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong><code>404</code>.</strong> 임시저장 글은 작성자만 볼 수 있으니 이스프링에게는 없는 글이다. <code>403</code>을 주면 &quot;그 번호에 글이 있긴 한데 네 것이 아니다&quot;를 알려 주게 된다. 볼 수 있는지(404) → 권한이 있는지(403) 순서로 확인한다.</p>
+</details>
+
+<p><strong>3.</strong> &quot;숨김 글은 운영자만 본다&quot; 규칙을 상세 API에만 넣고 좋아요 API에는 안 넣었다. 무슨 일이 생기나? 어떻게 막나?</p>
+<details>
+<summary>정답</summary>
+
+<p>일반 회원이 숨김 글 번호로 좋아요를 누를 수 있다. 응답에 <code>likeCount</code>가 오면 숨김 글이 있다는 것과 그 숫자까지 새어 나간다. 막는 법은 좋아요 서비스도 상세와 <strong>같은 &quot;볼 수 있는 글 찾기&quot;</strong>(규칙 클래스)로 글을 찾게 하는 것이다. 4-1 R3(&quot;볼 수 있는 글인가를 2-3의 규칙으로 확인&quot;)이 이것을 본다.</p>
+</details>
+
+<p><strong>4.</strong> 규칙 클래스를 만들었더니 목록 API는 <code>findAll()</code>로 다 가져온 뒤 <code>stream().filter(p -&gt; policy.canView(viewer, p))</code>로 거르게 되었다. 상세와 규칙이 똑같으니 괜찮은가?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>규칙은 같지만 쪽 자르기가 틀어진다.</strong> DB에서 5개를 잘라 온 뒤 거르면 4개만 남을 수 있고, 다 가져와서 거르면 글이 많을 때 느리다. <code>totalElements</code>도 DB의 <code>COUNT</code>와 맞지 않는다. 목록은 같은 규칙을 <code>WHERE</code> 조건으로 옮겨 쿼리에서 거른다(2-3 R3). 대신 두 표현이 어긋나지 않게 같은 클래스 옆에 두고 함께 고친다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/D11-web-security-basics.html#32-인증과-인가-신원-확인-후-객체까지-확인">D11 — 인증과 인가: 신원 확인 후 객체까지 확인</a></li>
+<li><a href="../docs/knowledge/D11-web-security-basics.html#41-안전한-sql-바인딩과-idor-방어를-먼저-설계하기">D11 — 안전한 SQL 바인딩과 IDOR 방어</a></li>
+<li><a href="../docs/knowledge/D11-web-security-basics.html#q1-인증과-인가를-실제-api에서-어떻게-나누나">D11 — 인증과 인가를 실제 API에서 어떻게 나누나(403과 404)</a></li>
+<li><a href="../docs/knowledge/W13-frontend-backend-boundary.html">W13 프론트와 백엔드의 경계</a> — 화면에서 숨기는 것과 서버가 막는 것</li>
+<li><a href="../docs/knowledge/W02-why-layers.html">W02 왜 Controller·Service·Repository로 나누나</a> — 규칙이 서비스 쪽에 있는 이유</li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li>레슨: <a href="G3-first-transaction.html">G3. 트랜잭션 첫 만남</a> — 글과 태그를 &quot;한 번에&quot; 저장하는 이유.</li>
+<li>실습: <a href="../scenario/ch2-read-post/2-3-visibility.html">2-3. 볼 수 있는 글만</a> — 오늘의 규칙에 팔로워 공개·차단을 더하고 상세·목록에 똑같이 건다. <a href="../scenario/ch3-update-delete/3-1-patch.html">3-1</a>·<a href="../scenario/ch3-update-delete/3-2-soft-delete.html">3-2</a>에서 403·404 순서를 다시 쓴다.</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

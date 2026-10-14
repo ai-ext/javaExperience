@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-015. 댓글 삭제 권한 — 글 작성자·운영자</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="t-015-댓글-삭제-권한--글-작성자운영자"><a class="anchor" href="#t-015-댓글-삭제-권한--글-작성자운영자" aria-hidden="true">#</a>T-015. 댓글 삭제 권한 — 글 작성자·운영자</h1>
+<blockquote>
+<p>난이도 중급 · 유형 기존 API 변경 · DB community · 예상 45분</p>
+</blockquote>
+<h2 id="티켓"><a class="anchor" href="#티켓" aria-hidden="true">#</a>티켓</h2>
+<blockquote>
+<p><strong>요청자</strong> 운영팀·기획 · <strong>배경</strong> 광고 댓글이 달려도 운영자가 지울 수 없어서 DB로 처리하고 있다. 글쓴이들도 &quot;내 글에 달린 악성 댓글을 내가 지우게 해 달라&quot;고 요청한다. 글 삭제는 이미 운영자도 할 수 있는데 댓글만 작성자 전용이다.</p>
+</blockquote>
+<ul>
+<li>댓글 삭제를 <strong>댓글 작성자 · 그 댓글이 달린 글의 작성자 · 운영자</strong>가 할 수 있게 바꿔 주세요. 그 밖의 회원은 지금처럼 403입니다.</li>
+<li>다른 사람 글에 달린 댓글은 글 작성자 권한으로 지울 수 없습니다(내 글의 댓글만).</li>
+<li>누가 지우든 삭제 방식(soft delete)·댓글 수(<code>comment_count</code>) 감소·목록 표시 규칙은 지금과 같습니다.</li>
+<li><strong>완료 조건</strong>: 세 경우 모두 204이고, 댓글 수가 정확히 한 번만 줄어든다.</li>
+</ul>
+<p><strong>DB 시작 상태</strong>: <code>community</code> 처음 상태(<code>bash scripts/java-db.sh --reset</code>). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 글 11(질문 게시판)은 이스프링(회원 3)의 글, 글 3은 박디비(회원 4)의 글이다. 운영자 토큰은 <code>tok-admin</code>.</p>
+<h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
+<ul>
+<li>글 삭제와 댓글 삭제가 권한을 어떻게 다르게 확인하는지 나란히 놓고 본다.</li>
+<li>댓글에서 그 댓글이 달린 글의 작성자까지 가려면 어떤 연관을 따라가야 하는지, 그때 쿼리가 몇 번 나가는지 본다.</li>
+</ul>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>내 글의 댓글 — 글쓴이가 삭제</h3><p>글쓴이·운영자에게도 댓글 [삭제] 버튼이 보이고, 누르면 204 뒤 목록에서 사라진다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>트랜잭션은 어디에 거나요?</strong><span>이스프링</span></div><div class="screen-widget screen-list"><strong>댓글</strong><span>광고 같은 댓글이에요 · 트랜잭션은 서비스 메서드에 거는 게 일반적이에요</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>댓글을 삭제했어요</span></div><div class="screen-widget screen-toast"><strong>toast</strong><span>삭제할 권한이 없어요</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>글쓴이가 남의 댓글 삭제</summary><ol><li><span class="flow-kind">사용자</span><p>이스프링이 자기 글의 광고 댓글에서 [삭제]를 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>DELETE /api/comments/{광고 댓글 id}</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-lee</dd></dl></li><li><span class="flow-kind">서버</span><p>댓글을 찾고(지운 댓글이면 404) → 댓글 작성자인가, 이 댓글이 달린 글의 작성자인가, 운영자인가 → 하나라도 맞으면 soft delete + comment_count - 1(한 트랜잭션)</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>UPDATE comment SET deleted_at = NOW(), updated_at = NOW() WHERE id = ?; UPDATE post SET comment_count = comment_count - 1 WHERE id = 11 AND comment_count &gt; 0</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>204</dd></dl></li><li><span class="flow-kind">화면</span><p>광고 댓글이 사라지고 토스트</p></li></ol></details><details class="scenario-flow"><summary>남의 글에 달린 댓글 — 거절</summary><ol><li><span class="flow-kind">사용자</span><p>이스프링이 박디비 글(글 3)에 달린 댓글을 지우려 한다</p></li><li><span class="flow-kind">HTTP 요청</span><p>DELETE /api/comments/{그 댓글 id}</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-lee</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>403</dd><dt>body</dt><dd>{&quot;status&quot;: 403, &quot;detail&quot;: &quot;댓글을 삭제할 권한이 없습니다.&quot;}</dd></dl></li><li><span class="flow-kind">화면</span><p>권한 없음 토스트</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>대상</td>
+<td><code>DELETE /api/comments/{id}</code></td>
+</tr>
+<tr>
+<td><code>204</code></td>
+<td>요청자가 <strong>댓글 작성자</strong> 또는 <strong>그 댓글이 달린 글의 작성자</strong> 또는 <strong>운영자(<code>ADMIN</code>)</strong></td>
+</tr>
+<tr>
+<td><code>403</code></td>
+<td>위 셋이 아님</td>
+</tr>
+<tr>
+<td><code>404</code></td>
+<td>없는 댓글, 이미 지운 댓글(누가 지웠든) — 권한 확인보다 먼저</td>
+</tr>
+<tr>
+<td>그대로인 것</td>
+<td>soft delete, <code>comment_count</code> 1 감소(같은 트랜잭션), 댓글 목록 표시 규칙</td>
+</tr>
+</tbody></table></div>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+J='Content-Type: application/json'
+
+curl -s &quot;$BASE/api/posts/11&quot;                                                                                            # 요청 P0 — 지금 commentCount
+curl -s -X POST &quot;$BASE/api/posts/11/comments&quot; -H 'Authorization: Bearer tok-park' -H &quot;$J&quot; -d '{&quot;content&quot;:&quot;[T-015] 광고&quot;}'   # 요청 A
+curl -i -X DELETE &quot;$BASE/api/comments/{A의 id}&quot; -H 'Authorization: Bearer tok-kimjava'                                   # 요청 B — 아무 관계 없음
+curl -i -X DELETE &quot;$BASE/api/comments/{A의 id}&quot; -H 'Authorization: Bearer tok-lee'                                       # 요청 C — 글 작성자
+curl -s &quot;$BASE/api/posts/11&quot;                                                                                            # 요청 P1 — 처음과 같은 수
+curl -s -X POST &quot;$BASE/api/posts/11/comments&quot; -H 'Authorization: Bearer tok-han' -H &quot;$J&quot; -d '{&quot;content&quot;:&quot;[T-015] 광고 2&quot;}'  # 요청 E
+curl -i -X DELETE &quot;$BASE/api/comments/{E의 id}&quot; -H 'Authorization: Bearer tok-admin'                                     # 요청 F — 운영자 (한 번 더: 요청 G)
+curl -s -X POST &quot;$BASE/api/posts/3/comments&quot; -H 'Authorization: Bearer tok-kimjava' -H &quot;$J&quot; -d '{&quot;content&quot;:&quot;[T-015] 남의 글&quot;}'  # 요청 H
+curl -i -X DELETE &quot;$BASE/api/comments/{H의 id}&quot; -H 'Authorization: Bearer tok-lee'                                       # 요청 I — 남의 글
+curl -i -X DELETE &quot;$BASE/api/comments/{H의 id}&quot; -H 'Authorization: Bearer tok-park'                                      # 요청 J — 글 3의 작성자</code></pre>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 매번 새 댓글을 만들어 지우므로 몇 번을 눌러도 같은 결과다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="P0" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>P0 · 처음 댓글 수</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/11" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article class="api-request" data-request-id="A" data-method="POST" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>A · 박디비가 글 11에 댓글</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts/11/comments" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-park" value="Bearer tok-park" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;[T-015] 광고&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-park&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;[T-015] 광고&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:201}</pre></dd></dl></details></article><article class="api-request" data-request-id="B" data-method="DELETE" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>B · 관계없는 김자바가 삭제</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/comments/{{A.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:403}</pre></dd></dl></details></article><article class="api-request" data-request-id="C" data-method="DELETE" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>C · 글 작성자 이스프링이 삭제</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/comments/{{A.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:204}</pre></dd></dl></details></article><article class="api-request" data-request-id="P1" data-method="GET" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>P1 · 다시 댓글 수</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/11" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.commentCount&quot;,&quot;equals&quot;:&quot;{{P0.body.commentCount}}&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E" data-method="POST" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E · 한차단이 글 11에 댓글</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts/11/comments" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-han" value="Bearer tok-han" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;[T-015] 광고 2&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-han&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;[T-015] 광고 2&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:201}</pre></dd></dl></details></article><article class="api-request" data-request-id="F" data-method="DELETE" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>F · 운영자가 삭제</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/comments/{{E.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:204}</pre></dd></dl></details></article><article class="api-request" data-request-id="G" data-method="DELETE" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>G · 운영자가 한 번 더</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/comments/{{E.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:404}</pre></dd></dl></details></article><article class="api-request" data-request-id="H" data-method="POST" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>H · 김자바가 글 3(박디비 글)에 댓글</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts/3/comments" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;[T-015] 남의 글&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;[T-015] 남의 글&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:201}</pre></dd></dl></details></article><article class="api-request" data-request-id="I" data-method="DELETE" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>I · 이스프링이 남의 글 댓글 삭제</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/comments/{{H.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:403}</pre></dd></dl></details></article><article class="api-request" data-request-id="J" data-method="DELETE" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>J · 글 3의 작성자 박디비가 삭제</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/comments/{{H.body.id}}" autocomplete="off"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-park" value="Bearer tok-park" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-park&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:204}</pre></dd></dl></details></article><article class="api-request" data-request-id="L" data-method="GET" data-request-index="11" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>L · 글 11 댓글 목록</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/11/comments" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$[*].id&quot;,&quot;notContains&quot;:&quot;{{A.body.id}}&quot;},{&quot;path&quot;:&quot;$[*].id&quot;,&quot;notContains&quot;:&quot;{{E.body.id}}&quot;}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP(필수), D = DB(필수, SELECT만), R = 코드 리뷰(피드백)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 A·B·C</td>
+<td>관계없는 회원 <code>403</code>, <strong>글 작성자</strong> <code>204</code></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 P0·P1</td>
+<td>댓글 하나 달고 지운 뒤 <code>commentCount</code>가 처음과 같다(한 번만 줄었다)</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 E·F·G</td>
+<td><strong>운영자</strong> <code>204</code>, 이미 지운 댓글은 운영자에게도 <code>404</code></td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 H·I·J</td>
+<td>남의 글에 달린 댓글은 글 작성자 권한이 없다(<code>403</code>), 그 글의 작성자는 <code>204</code></td>
+</tr>
+<tr>
+<td>C5</td>
+<td>요청 L</td>
+<td>지운 두 댓글이 목록에 없다(답글이 없는 최상위라 자리도 남지 않는다)</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT p.comment_count, (SELECT COUNT(*) FROM comment c WHERE c.post_id = p.id AND c.deleted_at IS NULL) AS actual FROM post p WHERE p.id IN (3, 11) ORDER BY p.id</code></td>
+<td>각 행의 두 값이 같다(글 3 <code>0 0</code>, 글 11 <code>4 4</code>) — 몇 번을 돌려도 어긋나지 않는다</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT COUNT(*) FROM comment WHERE content LIKE &#39;[T-015]%&#39; AND deleted_at IS NULL</code></td>
+<td><code>0</code> — 이 티켓으로 만든 댓글은 모두 지워졌다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>권한 판정 위치</td>
+<td>&quot;누가 지울 수 있나&quot;를 한 메서드(또는 정책 클래스)에 모았다. 글 삭제의 &quot;작성자 또는 운영자&quot; 판정과 나란히 읽힌다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>순서</td>
+<td>404(없음·이미 지움)를 403보다 먼저 본다. 반대면 지워진 댓글에 대해 권한 오류가 나와 상태가 드러난다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>쿼리</td>
+<td>글 작성자 확인을 위해 댓글 → 글 → 작성자 id까지 따라갈 때 어떤 SELECT가 더 나가는지 로그로 확인했다(프록시의 id만 읽으면 로딩이 안 된다는 점 포함)</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../docs/knowledge/S12-security-architecture.html">S12 Spring Security 구조</a> — 인가 규칙을 어디에 두나</li>
+<li><a href="../docs/knowledge/S08-transactions.html">S08 트랜잭션</a> — soft delete와 숫자 감소를 한 트랜잭션으로</li>
+<li><a href="../docs/knowledge/S09-jpa-hibernate.html">S09 JPA·Hibernate</a> — 지연 로딩 프록시에서 id만 읽을 때</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 판정</summary>
+
+<p><code>boolean canDelete = 댓글 작성자 id == 내 id || 댓글.getPost().getAuthor().getId() == 내 id || &quot;ADMIN&quot;.equals(내 role)</code>. 로그인 회원 정보에는 이미 역할(role)이 들어 있다. 글 삭제 쪽 코드가 같은 모양이다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 지연 로딩</summary>
+
+<p><code>comment.getPost()</code>는 프록시라 <code>getId()</code>까지는 쿼리가 안 나가지만, <code>getAuthor()</code>를 부르면 글을 읽는 SELECT가 한 번 나간다. 서비스 메서드가 트랜잭션 안이라 문제는 없다. 거슬리면 댓글을 읽을 때 글을 함께 fetch하는 조회 메서드를 하나 더 둔다.</p>
+</details>
+
+
+</main>
+
+
+</body>
+</html>

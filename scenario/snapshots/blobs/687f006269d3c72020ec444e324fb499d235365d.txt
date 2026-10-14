@@ -1,0 +1,40 @@
+package org.example.board.common;
+
+import java.util.List;
+
+import org.example.board.common.ApiResponse.FieldErrorItem;
+
+// 서비스가 "이 요청은 이 코드로 실패"를 알릴 때 던진다 — 전역 처리기가 공통 틀로 바꾼다
+public class ApiException extends RuntimeException {
+
+    private final ErrorCode code;
+    private final List<FieldErrorItem> errors;
+
+    public ApiException(ErrorCode code) {
+        this(code, code.defaultMessage());
+    }
+
+    public ApiException(ErrorCode code, String message) {
+        this(code, message, List.of());
+    }
+
+    private ApiException(ErrorCode code, String message, List<FieldErrorItem> errors) {
+        super(message);
+        this.code = code;
+        this.errors = errors;
+    }
+
+    // 애노테이션으로 못 거는 규칙(여러 값을 함께 봐야 하는 것)을 서비스에서 400으로
+    public static ApiException invalid(String field, String reason) {
+        return new ApiException(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(),
+                List.of(new FieldErrorItem(field, reason)));
+    }
+
+    public ErrorCode code() {
+        return code;
+    }
+
+    public List<FieldErrorItem> errors() {
+        return errors;
+    }
+}

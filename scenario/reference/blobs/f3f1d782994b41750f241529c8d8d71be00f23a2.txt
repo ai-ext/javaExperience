@@ -1,0 +1,40 @@
+package org.example.fakesite;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import org.springframework.web.util.HtmlUtils;
+
+import java.util.Map;
+
+// 16-4 연습용 "외부 사이트" — 링크 미리보기가 부를 HTML 페이지. /api 밖이라 토큰 확인을 받지 않는다.
+// 실서비스에는 두지 않는다(누구나 서버 스레드를 delay만큼 붙잡게 할 수 있다).
+@RestController
+public class FakeSiteController {
+
+    // 이 서버의 주소(요청의 Host 기준) — 실행 칸이 미리보기 링크를 만들 때 쓴다
+    @GetMapping("/fake-site/base")
+    public Map<String, String> base() {
+        return Map.of("base", ServletUriComponentsBuilder.fromCurrentContextPath().toUriString());
+    }
+
+    // delay(ms)만큼 늦게 og:title이 든 HTML을 돌려준다
+    @GetMapping(value = "/fake-site/page", produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> page(@RequestParam(defaultValue = "가짜 페이지") String title,
+                                       @RequestParam(defaultValue = "0") @Min(0) @Max(10000) long delay)
+            throws InterruptedException {
+        if (delay > 0) {
+            Thread.sleep(delay);
+        }
+        String t = HtmlUtils.htmlEscape(title);
+        String html = "<!doctype html><html><head><meta charset=\"utf-8\">"
+                + "<meta property=\"og:title\" content=\"" + t + "\">"
+                + "<title>" + t + "</title></head><body><p>연습용 외부 페이지</p></body></html>";
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType("text/html;charset=UTF-8")).body(html);
+    }
+}

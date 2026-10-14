@@ -1,0 +1,25 @@
+package org.example.like;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
+
+    boolean existsByPost_IdAndMember_Id(Long postId, Long memberId);
+
+    long deleteByPost_IdAndMember_Id(Long postId, Long memberId);
+
+    long countByPost_Id(Long postId);
+
+    long countByPost_IdAndMember_Id(Long postId, Long memberId);
+
+    // 4-2: "있나 확인 후 INSERT"는 동시에 같은 회원이 여러 번 눌렀을 때 그 사이에 둘 다 "없음"을
+    // 확인하고 INSERT를 시도해 중복 키 오류(500)가 날 수 있다. INSERT IGNORE로 DB의 UNIQUE
+    // (post_id, member_id) 제약이 중복을 막게 하고, 실제로 들어간 행 수(0 또는 1)만 돌려받는다.
+    @Modifying
+    @Query(value = "INSERT IGNORE INTO post_like (post_id, member_id, created_at) VALUES (:postId, :memberId, NOW())",
+            nativeQuery = true)
+    int insertIgnore(@Param("postId") Long postId, @Param("memberId") Long memberId);
+}

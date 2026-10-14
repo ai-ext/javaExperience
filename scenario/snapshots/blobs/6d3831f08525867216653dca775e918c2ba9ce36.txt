@@ -1,0 +1,33 @@
+package org.example.batch;
+
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDate;
+import java.util.List;
+
+public interface JobRunRepository extends JpaRepository<JobRun, Long> {
+
+    @Query("""
+            SELECT r FROM JobRun r
+             WHERE (:job IS NULL OR r.jobName = :job)
+               AND (:status IS NULL OR r.status = :status)
+             ORDER BY r.id DESC
+            """)
+    List<JobRun> search(@Param("job") String job, @Param("status") String status, Pageable pageable);
+
+    // "실패한 날" = 그 날(run_date) 몫의 가장 마지막 실행이 FAILED인 날. 실패 뒤에 성공한 날은 빠진다
+    @Query(nativeQuery = true, value = """
+            SELECT r.run_date
+              FROM job_run r
+             WHERE r.job_name = :job
+               AND r.id = (SELECT MAX(r2.id) FROM job_run r2 WHERE r2.job_name = r.job_name AND r2.run_date = r.run_date)
+               AND r.status = 'FAILED'
+             ORDER BY r.run_date
+            """)
+    List<LocalDate> findFailedDates(@Param("job") String job);
+
+    java.util.Optional<JobRun> findFirstByJobNameAndRunDateOrderByIdDesc(String jobName, LocalDate runDate);
+}

@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-022. 에러 응답에 code — 예외 처리 한 곳으로 정리</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="t-022-에러-응답에-code--예외-처리-한-곳으로-정리"><a class="anchor" href="#t-022-에러-응답에-code--예외-처리-한-곳으로-정리" aria-hidden="true">#</a>T-022. 에러 응답에 <code>code</code> — 예외 처리 한 곳으로 정리</h1>
+<blockquote>
+<p>난이도 중급 · 유형 리팩터 · DB community · 예상 90분</p>
+</blockquote>
+<h2 id="티켓"><a class="anchor" href="#티켓" aria-hidden="true">#</a>티켓</h2>
+<blockquote>
+<p><strong>요청자</strong> 프론트 팀·앱 팀 · <strong>배경</strong> 앱이 에러 문구(<code>detail</code>) 문자열을 비교해서 화면을 나누고 있다가, 문구를 고친 날 장애가 났다. 기계가 읽을 고정 <code>code</code>를 달라는 요청이다. 열어 보니 전역 핸들러에 예외마다 거의 같은 메서드가 20개 가까이 있고, 몇몇 에러(크기 범위 밖 파라미터, 경로 숫자 자리에 글자, 처리 못 한 500)는 아예 다른 모양(Spring 기본 오류 JSON)으로 나간다.</p>
+</blockquote>
+<ul>
+<li>모든 에러 응답을 같은 Problem Details 모양으로 맞추고 <code>code</code>를 넣어 주세요. 코드 표는 아래 &quot;만들 것&quot;에 있습니다.</li>
+<li>핸들러 20개에 <code>code</code> 한 줄씩 더하는 대신 <strong>예외와 코드를 한 곳에서 관리</strong>하도록 정리해 주세요(다음에 예외가 늘 때 빠뜨리지 않게). 정상 응답과 기존 에러의 상태 코드·<code>detail</code> 문구는 바꾸지 않습니다.</li>
+<li>처리하지 못한 예외(500)는 내부 메시지·예외 이름을 응답에 내보내지 않고 로그에만 남깁니다.</li>
+<li><strong>완료 조건</strong>: 아래 표의 에러가 모두 <code>status</code>·<code>detail</code>·<code>code</code>를 가진 같은 모양이고, 기존 상태 코드는 그대로다.</li>
+</ul>
+<p><strong>DB 시작 상태</strong>: <code>community</code> 처음 상태(<code>bash scripts/java-db.sh --reset</code>). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 이스프링(<code>tok-lee</code>)은 북마크 폴더 <code>스프링 공부</code>를 이미 갖고 있고, <code>tok-choi</code>는 정지 회원, 글 1은 운영자의 글이다.</p>
+<h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
+<ul>
+<li>전역 예외 처리 클래스를 열어 메서드들이 서로 무엇이 다른지(상태 코드와 예외 종류뿐인지) 본다.</li>
+<li>크기 범위 밖 파라미터(<code>size=0</code>)가 왜 다른 모양으로 나가는지 — 그 예외는 지금 누가 처리하고 있는지 찾는다. Spring MVC가 표준 예외를 Problem Details로 바꿔 주는 기반 클래스가 있다.</li>
+</ul>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>앱 — 에러 처리</h3><p>앱은 detail 문구 대신 code로 분기한다. 문구를 고쳐도 앱이 깨지지 않는다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>북마크 폴더</strong><span>이스프링</span></div><div class="screen-widget screen-field"><strong>새 폴더 이름</strong><span>스프링 공부</span></div><div class="screen-widget screen-actions"><strong>actions</strong><span>만들기</span></div><div class="screen-widget screen-code"><strong>앱 코드</strong><span>if (e.code === 'DUPLICATE_BOOKMARK_FOLDER_NAME') showFieldError(…)
+else if (e.code === 'AUTHENTICATION_REQUIRED') goLogin()
+else toast(e.detail)</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>같은 이름 폴더</summary><ol><li><span class="flow-kind">사용자</span><p>이미 있는 이름으로 [만들기]를 누른다</p></li><li><span class="flow-kind">HTTP 요청</span><p>POST /api/me/bookmark-folders</p><dl><dt>headers</dt><dd>Authorization: Bearer tok-lee · Content-Type: application/json</dd><dt>body</dt><dd>{&quot;name&quot;: &quot;스프링 공부&quot;}</dd></dl></li><li><span class="flow-kind">서버</span><p>서비스가 던진 예외가 자기 에러 코드를 들고 있고, 전역 핸들러 한 메서드가 상태·detail·code를 채운다</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>409</dd><dt>body</dt><dd>{&quot;status&quot;: 409, &quot;title&quot;: &quot;Conflict&quot;, &quot;detail&quot;: &quot;같은 이름의 폴더가 이미 있습니다.&quot;, &quot;instance&quot;: &quot;/api/me/bookmark-folders&quot;, &quot;code&quot;: &quot;DUPLICATE_BOOKMARK_FOLDER_NAME&quot;}</dd></dl></li><li><span class="flow-kind">화면</span><p>앱이 code를 보고 입력칸 아래에 오류를 띄운다</p></li></ol></details><details class="scenario-flow"><summary>범위 밖 파라미터 — 지금은 다른 모양</summary><ol><li><span class="flow-kind">사용자</span><p>목록을 size=0으로 부른다(프론트 버그)</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/boards/free/posts?size=0</p></li><li><span class="flow-kind">서버</span><p>지금: 전역 핸들러가 모르는 예외라 Spring 기본 오류 JSON(timestamp·error·path). 고친 뒤: 같은 Problem Details + INVALID_INPUT</p></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>400</dd><dt>body</dt><dd>{&quot;status&quot;: 400, &quot;detail&quot;: &quot;입력값이 올바르지 않습니다.&quot;, &quot;code&quot;: &quot;INVALID_INPUT&quot;, …}</dd></dl></li><li><span class="flow-kind">화면</span><p>앱의 공통 처리 한 곳에서 잡힌다</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<p>모든 에러 응답 = Problem Details(<code>status</code>·<code>title</code>·<code>detail</code>·<code>instance</code>) + <strong><code>code</code></strong>. 상태 코드와 기존 <code>detail</code> 문구는 그대로.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상황(예)</th>
+<th>상태</th>
+<th><code>code</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>요청 값 검증 실패(본문 검증, 수정 API 필드 검증, 파라미터 범위 <code>size=0</code>, 경로 자리 타입 <code>/api/posts/abc</code>)</td>
+<td>400</td>
+<td><code>INVALID_INPUT</code> (본문·필드 검증은 지금처럼 <code>errors</code>도)</td>
+</tr>
+<tr>
+<td>본문을 읽을 수 없음(깨진 JSON)</td>
+<td>400</td>
+<td><code>MALFORMED_BODY</code></td>
+</tr>
+<tr>
+<td>내 글 좋아요 · 깨진 커서 · 답글 규칙 · 검색 조건 · 폴더 규칙</td>
+<td>400</td>
+<td><code>SELF_LIKE_NOT_ALLOWED</code> · <code>INVALID_CURSOR</code> · <code>INVALID_PARENT_COMMENT</code> · <code>INVALID_SEARCH_CONDITION</code> · <code>INVALID_BOOKMARK_FOLDER</code></td>
+</tr>
+<tr>
+<td>토큰 없음·잘못됨(<code>WWW-Authenticate</code> 헤더 유지)</td>
+<td>401</td>
+<td><code>AUTHENTICATION_REQUIRED</code></td>
+</tr>
+<tr>
+<td>정지·탈퇴 회원 · 남의 글 · 남의 댓글 · 게시판 쓰기 권한 · 운영자 전용</td>
+<td>403</td>
+<td><code>MEMBER_NOT_ACTIVE</code> · <code>POST_FORBIDDEN</code> · <code>COMMENT_FORBIDDEN</code> · <code>BOARD_WRITE_FORBIDDEN</code> · <code>ADMIN_ONLY</code></td>
+</tr>
+<tr>
+<td>없는 글·게시판·댓글·북마크·폴더·알림</td>
+<td>404</td>
+<td><code>POST_NOT_FOUND</code> · <code>BOARD_NOT_FOUND</code> · <code>COMMENT_NOT_FOUND</code> · <code>BOOKMARK_NOT_FOUND</code> · <code>BOOKMARK_FOLDER_NOT_FOUND</code> · <code>NOTIFICATION_NOT_FOUND</code></td>
+</tr>
+<tr>
+<td>같은 이름 폴더</td>
+<td>409</td>
+<td><code>DUPLICATE_BOOKMARK_FOLDER_NAME</code></td>
+</tr>
+<tr>
+<td>처리하지 못한 예외</td>
+<td>500</td>
+<td><code>INTERNAL_ERROR</code> — <code>detail</code>은 <code>서버 오류가 발생했습니다.</code>, 예외 이름·메시지는 로그에만</td>
+</tr>
+</tbody></table></div>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+J='Content-Type: application/json'; K='Authorization: Bearer tok-kimjava'
+
+curl -s &quot;$BASE/api/posts/999999&quot;                                                            # 요청 A
+curl -s &quot;$BASE/api/boards/nope/posts&quot;                                                       # 요청 B
+curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{}'                                   # 요청 C — 본문 검증
+curl -s &quot;$BASE/api/boards/free/posts?size=0&quot;                                                # 요청 D — 파라미터 범위
+curl -s &quot;$BASE/api/posts/abc&quot;                                                               # 요청 M — 경로 타입
+curl -i -X POST &quot;$BASE/api/posts&quot; -H &quot;$J&quot; -d '{}'                                           # 요청 E — 토큰 없음
+curl -s &quot;$BASE/api/me/likes&quot; -H 'Authorization: Bearer tok-choi'                            # 요청 L — 정지 회원
+curl -s -X DELETE &quot;$BASE/api/posts/2&quot; -H &quot;$K&quot;                                               # 요청 F — 남의 글
+curl -s -X POST &quot;$BASE/api/me/bookmark-folders&quot; -H 'Authorization: Bearer tok-lee' -H &quot;$J&quot; -d '{&quot;name&quot;:&quot;스프링 공부&quot;}'   # 요청 G
+curl -s -X PUT &quot;$BASE/api/posts/1/like&quot; -H 'Authorization: Bearer tok-admin'               # 요청 I — 내 글 좋아요
+curl -s &quot;$BASE/api/me/likes?cursor=@@@&quot; -H &quot;$K&quot;                                             # 요청 N — 깨진 커서
+curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{bad'                                 # 요청 J — 깨진 JSON
+curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$K&quot; -H &quot;$J&quot; -d '{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[T-022]&quot;,&quot;content&quot;:&quot;x&quot;,&quot;tags&quot;:[null]}'   # 요청 H — 아직 남은 500</code></pre>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 실패하는 요청만 보내므로(데이터가 바뀌지 않는다) 몇 번을 눌러도 같은 결과다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="A" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>A · 없는 글</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/999999" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:404,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;POST_NOT_FOUND&quot;},{&quot;path&quot;:&quot;$.detail&quot;,&quot;equals&quot;:&quot;글을 찾을 수 없습니다.&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="B" data-method="GET" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>B · 없는 게시판</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/boards/nope/posts" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:404,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;BOARD_NOT_FOUND&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="C" data-method="POST" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>C · 본문 검증 실패</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{}</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;INVALID_INPUT&quot;},{&quot;path&quot;:&quot;$.errors&quot;,&quot;type&quot;:&quot;array&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="D" data-method="GET" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>D · size=0</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/boards/free/posts?size=0" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;INVALID_INPUT&quot;},{&quot;path&quot;:&quot;$.detail&quot;,&quot;type&quot;:&quot;string&quot;},{&quot;path&quot;:&quot;$.timestamp&quot;,&quot;exists&quot;:false}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="M" data-method="GET" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>M · 경로에 글자</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/posts/abc" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;INVALID_INPUT&quot;},{&quot;path&quot;:&quot;$.timestamp&quot;,&quot;exists&quot;:false}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="E" data-method="POST" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>E · 토큰 없이 작성</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:401,&quot;headers&quot;:{&quot;WWW-Authenticate&quot;:{&quot;contains&quot;:&quot;Bearer&quot;}},&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;AUTHENTICATION_REQUIRED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="L" data-method="GET" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>L · 정지 회원</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/likes" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-choi" value="Bearer tok-choi" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-choi&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:403,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;MEMBER_NOT_ACTIVE&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="F" data-method="DELETE" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>F · 남의 글 삭제</h4><p class="request-method">DELETE</p><label>경로 <input class="request-path" value="/api/posts/2" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">DELETE 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:403,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;POST_FORBIDDEN&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="G" data-method="POST" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>G · 같은 이름 폴더</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/me/bookmark-folders" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;name&quot;: &quot;스프링 공부&quot;
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;name&quot;: &quot;스프링 공부&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:409,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;DUPLICATE_BOOKMARK_FOLDER_NAME&quot;},{&quot;path&quot;:&quot;$.detail&quot;,&quot;equals&quot;:&quot;같은 이름의 폴더가 이미 있습니다.&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="I" data-method="PUT" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>I · 내 글 좋아요</h4><p class="request-method">PUT</p><label>경로 <input class="request-path" value="/api/posts/1/like" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-admin" value="Bearer tok-admin" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">PUT 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-admin&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;SELF_LIKE_NOT_ALLOWED&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="N" data-method="GET" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>N · 깨진 커서</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/me/likes?cursor=@@@" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;INVALID_CURSOR&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="J" data-method="POST" data-request-index="11" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>J · 깨진 JSON</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="application/json" value="application/json" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">{bad</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;,
+  &quot;Content-Type&quot;: &quot;application/json&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{bad</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;MALFORMED_BODY&quot;}]}</pre></dd></dl></details></article><article class="api-request" data-request-id="H" data-method="POST" data-request-index="12" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>H · 처리 못 한 예외</h4><p class="request-method">POST</p><label>경로 <input class="request-path" value="/api/posts" autocomplete="off"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[T-022]&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;tags&quot;: [
+    null
+  ]
+}</textarea></label><button type="button" class="send-request">POST 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[T-022]&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;tags&quot;: [
+    null
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;bodyText&quot;:{&quot;notContains&quot;:&quot;Exception&quot;},&quot;anyOf&quot;:[{&quot;status&quot;:500,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;INTERNAL_ERROR&quot;},{&quot;path&quot;:&quot;$.detail&quot;,&quot;equals&quot;:&quot;서버 오류가 발생했습니다.&quot;}]},{&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;INVALID_INPUT&quot;}]}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP(필수), D = DB(필수, SELECT만), R = 코드 리뷰(피드백)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 A·B</td>
+<td>404 두 종류가 각자의 <code>code</code>, <code>detail</code> 문구는 그대로</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 C·D·M</td>
+<td>검증 실패 세 종류가 모두 <code>INVALID_INPUT</code>, 파라미터 범위·경로 타입도 Spring 기본 오류 JSON(<code>timestamp</code>)이 아니라 Problem Details</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 E·L</td>
+<td><code>401 AUTHENTICATION_REQUIRED</code>(헤더 유지) — 인터셉터에서 던진 예외도 같은 길로 간다, <code>403 MEMBER_NOT_ACTIVE</code></td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 F·G·I·N</td>
+<td>403·409·400 예외들이 표의 <code>code</code>, 상태 그대로</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>요청 J</td>
+<td>깨진 JSON <code>400 MALFORMED_BODY</code></td>
+</tr>
+<tr>
+<td>C6</td>
+<td>요청 H</td>
+<td>처리 못 한 예외는 <code>500 INTERNAL_ERROR</code> + 고정 문구, 응답에 예외 이름이 없다</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT COUNT(*) FROM post WHERE title = &#39;[T-022]&#39;</code></td>
+<td><code>0</code> — 실패한 요청들이 아무것도 남기지 않았다</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT COUNT(*) FROM bookmark_folder WHERE member_id = 3 AND name = &#39;스프링 공부&#39;</code></td>
+<td><code>1</code> — 409가 중복을 막았다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>한 곳</td>
+<td>에러 코드(상태·코드 이름)를 enum 하나에 모으고, 도메인 예외는 자기 코드를 들고 다니며, 전역 핸들러에는 그 공통 예외를 처리하는 메서드 <strong>하나</strong>가 남았다(예외마다 메서드 X). 새 예외를 더할 때 바꿀 곳이 enum 한 줄 + 예외 클래스뿐이다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>Spring 표준 예외</td>
+<td><code>ResponseEntityExceptionHandler</code>를 상속(또는 같은 효과)해 Spring MVC 표준 예외(파라미터 검증·타입 변환·본문 읽기·지원 안 하는 메서드 등)도 Problem Details로 나간다. 기존 <code>MethodArgumentNotValidException</code> 핸들러와 겹쳐 기동이 실패하는 함정을 겪었거나 피했다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>리팩터 안전망</td>
+<td>정리 전에 C1~C5를 먼저 돌려 상태 코드·문구가 그대로인지 확인했고(코드만 추가된 상태와 비교), 500의 내부 메시지는 로그(<code>log.error</code>)에만 남긴다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../docs/knowledge/W08-where-to-handle-exceptions.html">W08 예외는 어디서 잡나</a> — 전역 핸들러와 예외 계층</li>
+<li><a href="../docs/knowledge/J04-exceptions.html">J04 예외</a> — 공통 부모 예외로 묶기</li>
+<li><a href="../docs/knowledge/J06-enum-annotation-reflection.html">J06 enum·애노테이션·리플렉션</a> — 필드를 가진 enum</li>
+<li><a href="../docs/knowledge/S05-mvc-request-flow.html">S05 MVC 요청 흐름</a> — 인터셉터·컨트롤러에서 던진 예외가 핸들러까지 가는 길</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 모양</summary>
+
+<p><code>enum ErrorCode { POST_NOT_FOUND(HttpStatus.NOT_FOUND), … }</code> + <code>abstract class ApiException extends RuntimeException { ErrorCode errorCode; }</code>. 기존 예외들은 <code>extends ApiException</code>으로 바꾸고 생성자에서 자기 코드를 넘긴다(메시지는 그대로). 수정 API 필드 오류처럼 응답에 더 넣을 것(<code>errors</code>)이 있는 예외는 그 값을 꺼낼 메서드를 하나 더 둔다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 핸들러</summary>
+
+<p><code>class ApiExceptionHandler extends ResponseEntityExceptionHandler</code>. <code>@ExceptionHandler(ApiException.class)</code> 하나, <code>@ExceptionHandler(Exception.class)</code> 하나(500). 본문 검증은 부모의 <code>handleMethodArgumentNotValid</code>를 <strong>오버라이드</strong>한다(같은 예외에 <code>@ExceptionHandler</code>를 또 달면 기동이 실패한다). 나머지 표준 예외는 <code>handleExceptionInternal</code>을 오버라이드해 상태에 맞는 <code>code</code>를 붙인다. 부모가 이미 처리하는 예외가 <code>@ExceptionHandler(Exception.class)</code>로 새지 않는지(더 구체적인 쪽이 이긴다) 확인한다.</p>
+</details>
+
+
+</main>
+
+
+</body>
+</html>

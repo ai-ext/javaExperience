@@ -1,0 +1,147 @@
+package org.example.post;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
+import org.example.social.Follow;
+import org.example.social.MemberBlock;
+import org.example.tag.Tag;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
+// 게시글 목록·검색의 단일 쿼리 조립기(Criteria API).
+// - 들어온 조건만 Predicate로 붙인다(8-4). 조합마다 메서드를 만들지 않는다.
+// - "볼 수 있는 글"(2-3 규칙 중 목록 부분) 조각은 viewable() 한 곳에만 있다 — 게시판 목록(2-2)과 검색(8-4)이 같이 쓴다.
+//   단건 판정은 PostAccessPolicy(자바)이고, 규칙을 바꿀 때는 이 메서드와 그 클래스를 같이 고친다.
+// - 목록은 필요한 열만 투영해 content(TEXT)를 읽지 않는다. 태그는 페이지 글 ID로 IN 한 번.
+// - 건수는 항상 별도 COUNT 쿼리로 센다 — Spring Data의 Page는 "조회된 행 < size면 count 생략"을 해서
+//   SQL 문장 수가 데이터 양에 따라 달라진다(2-4 PostListQueryCountTest가 그걸 잡았다).
+@Repository
+public class PostSearchRepository {
+
+    private final EntityManager em;
+
+    public PostSearchRepository(EntityManager em) {
+        this.em = em;
+    }
+
+    public Page<PostListRow> search(PostSearchCondition cond, Long viewerId, Pageable pageable) {
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+
+        CriteriaQuery<PostListRow> query = cb.createQuery(PostListRow.class);
+        Root<Post> post = query.from(Post.class);
+        query.select(cb.construct(PostListRow.class,
+                        post.get("id"), post.get("title"), post.get("excerpt"),
+                        post.get("author").get("id"), post.get("author").get("nickname"),
+                        post.get("likeCount"), post.get("commentCount"), post.get("viewCount"),
+                        post.get("publishedAt")))
+                .where(conditions(cb, query, post, cond, viewerId))
+                .orderBy(cb.desc(post.get("publishedAt")), cb.desc(post.get("id")));
+        CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
+        Root<Post> countRoot = countQuery.from(Post.class);
+        countQuery.select(cb.count(countRoot))
+                .where(conditions(cb, countQuery, countRoot, cond, viewerId));
+        long total = em.createQuery(countQuery).getSingleResult();
+
+        // 전체 건수를 먼저 확인해야 큰 page의 long offset을 int로 잘라 이전 글을 재노출하지 않는다.
+        long offset = pageable.getOffset();
+        if (offset >= total) {
+            return new PageImpl<>(List.of(), pageable, total);
+        }
+        if (offset > Integer.MAX_VALUE) {
+            throw new InvalidSearchConditionException("요청한 페이지가 너무 큽니다.");
+        }
+        List<PostListRow> content = em.createQuery(query)
+                .setFirstResult((int) offset)
+                .setMaxResults(pageable.getPageSize())
+                .getResultList();
+        return new PageImpl<>(content, pageable, total);
+    }
+
+    public List<PostTagRow> findTagsByPostIds(List<Long> postIds) {
+        if (postIds.isEmpty()) return List.of();
+        return em.createQuery("""
+                        SELECT new org.example.post.PostTagRow(p.id, t.name)
+                        FROM Post p JOIN p.tags t
+                        WHERE p.id IN :ids
+                        ORDER BY t.name
+                        """, PostTagRow.class)
+                .setParameter("ids", postIds)
+                .getResultList();
+    }
+
+    private Predicate[] conditions(CriteriaBuilder cb, CriteriaQuery<?> query, Root<Post> post,
+                                   PostSearchCondition cond, Long viewerId) {
+        List<Predicate> predicates = new ArrayList<>(viewable(cb, query, post, viewerId));
+
+        if (cond.boardId() != null) {
+            predicates.add(cb.equal(post.get("board").get("id"), cond.boardId()));
+        }
+        if (cond.authorId() != null) {
+            predicates.add(cb.equal(post.get("author").get("id"), cond.authorId()));
+        }
+        if (cond.from() != null) {
+            predicates.add(cb.greaterThanOrEqualTo(post.get("publishedAt"), cond.from().atStartOfDay()));
+        }
+        if (cond.to() != null && !cond.to().equals(LocalDate.of(9999, 12, 31))) { // 최대 DB 날짜는 상한을 생략한다.
+            predicates.add(cb.lessThan(post.get("publishedAt"), cond.to().plusDays(1).atStartOfDay()));
+        }
+        if (cond.q() != null && !cond.q().isBlank()) {
+            String pattern = "%" + escapeLike(cond.q().strip().toLowerCase()) + "%";
+            predicates.add(cb.like(cb.lower(post.get("title")), pattern, '\\'));
+        }
+        if (cond.tag() != null && !cond.tag().isBlank()) {
+            // JOIN하면 태그가 여러 개 걸린 글이 중복돼 건수가 부푼다 — EXISTS로 거른다
+            Subquery<Long> tagged = query.subquery(Long.class);
+            Root<Post> sub = tagged.from(Post.class);
+            Join<Post, Tag> tags = sub.join("tags");
+            tagged.select(sub.get("id"))
+                    .where(cb.equal(sub, post), cb.equal(tags.get("name"), cond.tag()));
+            predicates.add(cb.exists(tagged));
+        }
+        return predicates.toArray(Predicate[]::new);
+    }
+
+    // "볼 수 있는 글" — 목록은 PUBLISHED만(자기 임시저장·숨김 글도 목록에는 없다), 삭제 제외,
+    // PUBLIC이거나 (로그인 시) 내 글·내가 팔로우하는 작성자의 글, 차단 관계(양방향) 작성자 제외
+    private List<Predicate> viewable(CriteriaBuilder cb, CriteriaQuery<?> query, Root<Post> post, Long viewerId) {
+        List<Predicate> predicates = new ArrayList<>();
+        predicates.add(cb.isNull(post.get("deletedAt")));
+        predicates.add(cb.equal(post.get("status"), "PUBLISHED"));
+
+        Predicate isPublic = cb.equal(post.get("visibility"), "PUBLIC");
+        if (viewerId == null) {
+            predicates.add(isPublic);
+            return predicates;
+        }
+
+        Subquery<Long> follows = query.subquery(Long.class);
+        Root<Follow> f = follows.from(Follow.class);
+        follows.select(f.get("id")).where(
+                cb.equal(f.get("follower").get("id"), viewerId),
+                cb.equal(f.get("followee"), post.get("author")));
+        predicates.add(cb.or(isPublic, cb.equal(post.get("author").get("id"), viewerId), cb.exists(follows)));
+
+        Subquery<Long> blocked = query.subquery(Long.class);
+        Root<MemberBlock> b = blocked.from(MemberBlock.class);
+        blocked.select(b.get("id")).where(cb.or(
+                cb.and(cb.equal(b.get("blocker").get("id"), viewerId), cb.equal(b.get("blocked"), post.get("author"))),
+                cb.and(cb.equal(b.get("blocked").get("id"), viewerId), cb.equal(b.get("blocker"), post.get("author")))));
+        predicates.add(cb.not(cb.exists(blocked)));
+        return predicates;
+    }
+
+    private static String escapeLike(String raw) {
+        return raw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+}

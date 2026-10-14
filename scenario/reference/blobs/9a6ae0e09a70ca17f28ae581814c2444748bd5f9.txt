@@ -1,0 +1,74 @@
+package org.example.report;
+
+import jakarta.validation.Validator;
+import org.example.admin.Permission;
+import org.example.admin.RequirePermission;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.example.post.InvalidParametersException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.JsonNode;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+// 13-2 — 신고 처리 권한(HANDLE_REPORT)은 MODERATOR·ADMIN
+@RestController
+@RequirePermission(Permission.HANDLE_REPORT)
+public class ReportAdminController {
+
+    private final ReportHandlingService reportHandlingService;
+    private final Validator validator;
+
+    public ReportAdminController(ReportHandlingService reportHandlingService, Validator validator) {
+        this.reportHandlingService = reportHandlingService;
+        this.validator = validator;
+    }
+
+    @GetMapping("/api/admin/reports")
+    public ReportGroupPageResponse groups(
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "page", required = false) String page,
+            @RequestParam(value = "size", required = false) String size) {
+        return reportHandlingService.groups(parseStatus(status), parseNumber(page, 0, 0, Integer.MAX_VALUE),
+                parseNumber(size, 20, 1, 50));
+    }
+
+    @PostMapping("/api/admin/reports/resolve")
+    public ResolveResponse resolve(@LoginMember AuthenticatedMember me, @RequestBody JsonNode body) {
+        ResolveRequest.Parsed parsed = ResolveRequest.parse(body);
+        ResolveRequest request = parsed.request();
+        Map<String, String> errors = new LinkedHashMap<>(parsed.errors());
+        validator.validate(request).forEach(v -> errors.putIfAbsent(v.getPropertyPath().toString(), v.getMessage()));
+        if (!errors.isEmpty()) {
+            throw new InvalidParametersException(errors);
+        }
+        return reportHandlingService.resolve(me, request);
+    }
+
+    private String parseStatus(String raw) {
+        if (raw == null) return "PENDING";
+        if (raw.equals("PENDING") || raw.equals("ACCEPTED") || raw.equals("REJECTED")) return raw;
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "status가 올바르지 않습니다.");
+    }
+
+    private int parseNumber(String raw, int defaultValue, int min, int max) {
+        if (raw == null) return defaultValue;
+        if (!raw.matches("[0-9]+")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "목록 범위가 올바르지 않습니다.");
+        }
+        try {
+            int value = Integer.parseInt(raw);
+            if (value >= min && value <= max) return value;
+        } catch (NumberFormatException ignored) {
+            // 범위를 넘는 수는 아래에서 400으로 처리한다.
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "목록 범위가 올바르지 않습니다.");
+    }
+}

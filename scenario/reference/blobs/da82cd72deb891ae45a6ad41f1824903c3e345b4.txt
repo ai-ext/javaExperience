@@ -1,0 +1,94 @@
+package org.example.bookmark;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.member.MemberRepository;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+// 북마크 폴더 — 한도(10개)·이름 중복·소유자 확인
+@Service
+public class BookmarkFolderService {
+
+    private static final int MAX_FOLDERS = 10;
+    private static final int NAME_MAX_LENGTH = 50;
+
+    private final BookmarkFolderRepository folderRepository;
+    private final BookmarkRepository bookmarkRepository;
+    private final MemberRepository memberRepository;
+
+    public BookmarkFolderService(BookmarkFolderRepository folderRepository, BookmarkRepository bookmarkRepository,
+                                  MemberRepository memberRepository) {
+        this.folderRepository = folderRepository;
+        this.bookmarkRepository = bookmarkRepository;
+        this.memberRepository = memberRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public List<BookmarkFolderSummaryResponse> list(AuthenticatedMember me) {
+        return folderRepository.findSummaries(me.id());
+    }
+
+    // 회원 행을 먼저 잠가 같은 회원의 동시 생성 요청을 직렬화한다.
+    @Transactional
+    public BookmarkFolderResponse create(AuthenticatedMember me, BookmarkFolderRequest request) {
+        String name = normalizeName(request.name());
+        memberRepository.findByIdForUpdate(me.id()).orElseThrow();
+        if (folderRepository.countByMember_Id(me.id()) >= MAX_FOLDERS) {
+            throw new InvalidBookmarkFolderException("폴더는 " + MAX_FOLDERS + "개까지 만들 수 있습니다.");
+        }
+        if (folderRepository.existsByMember_IdAndName(me.id(), name)) {
+            throw new DuplicateBookmarkFolderNameException();
+        }
+        BookmarkFolder saved = saveOrConflict(
+                new BookmarkFolder(memberRepository.getReferenceById(me.id()), name, LocalDateTime.now()));
+        return new BookmarkFolderResponse(saved.getId(), saved.getName());
+    }
+
+    @Transactional
+    public BookmarkFolderResponse rename(AuthenticatedMember me, Long folderId, BookmarkFolderRequest request) {
+        String name = normalizeName(request.name());
+        BookmarkFolder folder = findMine(folderId, me.id());
+        if (folderRepository.existsByMember_IdAndNameAndIdNot(me.id(), name, folderId)) {
+            throw new DuplicateBookmarkFolderNameException();
+        }
+        folder.rename(name, LocalDateTime.now());
+        BookmarkFolder saved = saveOrConflict(folder);
+        return new BookmarkFolderResponse(saved.getId(), saved.getName());
+    }
+
+    // 북마크를 기본 폴더로 옮기는 것(UPDATE 한 번)과 폴더 삭제가 한 트랜잭션이다
+    @Transactional
+    public void delete(AuthenticatedMember me, Long folderId) {
+        BookmarkFolder folder = findMine(folderId, me.id());
+        bookmarkRepository.moveAllToDefaultFolder(folder.getId());
+        folderRepository.delete(folder);
+    }
+
+    private BookmarkFolder findMine(Long folderId, Long memberId) {
+        return folderRepository.findByIdAndMember_Id(folderId, memberId)
+                .orElseThrow(BookmarkFolderNotFoundException::new);
+    }
+
+    // 서비스에서 먼저 확인해도 두 요청이 동시에 오면 둘 다 통과할 수 있다.
+    // 그때는 DB의 UNIQUE(member_id, name)가 막으므로, 그 예외를 409로 바꾼다(flush로 이 자리에서 터지게 한다).
+    private BookmarkFolder saveOrConflict(BookmarkFolder folder) {
+        try {
+            return folderRepository.saveAndFlush(folder);
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateBookmarkFolderNameException();
+        }
+    }
+
+    // 앞뒤 공백을 자른 뒤 1~50자
+    private String normalizeName(String raw) {
+        String name = raw == null ? "" : raw.strip();
+        if (name.isEmpty() || name.length() > NAME_MAX_LENGTH) {
+            throw new InvalidBookmarkFolderException("폴더 이름은 1~" + NAME_MAX_LENGTH + "자여야 합니다.");
+        }
+        return name;
+    }
+}

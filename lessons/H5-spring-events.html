@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H5. Spring 이벤트 — 저장이 끝난 뒤에 알리기</title>
+<link rel="stylesheet" href="../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../README.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="h5-spring-이벤트--저장이-끝난-뒤에-알리기"><a class="anchor" href="#h5-spring-이벤트--저장이-끝난-뒤에-알리기" aria-hidden="true">#</a>H5. Spring 이벤트 — 저장이 끝난 뒤에 알리기</h1>
+<blockquote>
+<p>개념 레슨 · 35분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>새 글을 저장하면 팔로워에게 알림을 만들고 싶다. 가장 쉬운 방법은 서비스에서 알림 코드를 바로 부르는 것이다.</p>
+<pre><code class="language-java">@Transactional
+public Long create(PostCreateRequest req) {
+    Post post = posts.save(...);
+    notificationService.notifyNewPost(post.getId());   // 바로 부른다
+    pointService.addPoint(...);                         // 이게 실패하면?
+    return post.getId();
+}</code></pre>
+<p>문제는 <strong>순서</strong>다. 알림을 만든 뒤에 같은 트랜잭션의 다른 일(포인트 적립)이 실패하면 트랜잭션 전체가 롤백된다(G3). 글은 사라졌는데 &quot;새 글이 올라왔어요&quot; 알림이나 푸시는 이미 나갔다. <strong>없는 글 알림</strong>이다.</p>
+<p>그래서 순서를 이렇게 바꾼다.</p>
+<ol>
+<li>서비스는 &quot;글이 만들어졌다&quot;는 <strong>사실(이벤트)</strong> 만 알리고 자기 일을 계속한다.</li>
+<li>트랜잭션이 <strong>커밋에 성공하면</strong> 그때 알림 담당이 그 사실을 받아 알림을 만든다.</li>
+<li>롤백되면 알림 담당은 아예 불리지 않는다.</li>
+</ol>
+<p>Spring에서 쓰는 도구는 셋이다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>도구</th>
+<th>하는 일</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ApplicationEventPublisher</code></td>
+<td>이벤트를 알리는 창구. <code>publishEvent(객체)</code> 한 줄. 서비스 생성자로 주입받는다</td>
+</tr>
+<tr>
+<td><code>@EventListener</code></td>
+<td>그 객체 타입을 받는 메서드. <strong><code>publishEvent</code>를 부른 그 순간</strong> 바로 실행된다</td>
+</tr>
+<tr>
+<td><code>@TransactionalEventListener</code></td>
+<td>이벤트를 발행한 <strong>트랜잭션의 결과</strong>에 맞춰 실행된다. 기본값은 <code>AFTER_COMMIT</code>(커밋 성공 뒤)</td>
+</tr>
+</tbody></table></div>
+<p><code>@TransactionalEventListener</code>의 <code>phase</code>로 고를 수 있는 시점은 <code>BEFORE_COMMIT</code>, <code>AFTER_COMMIT</code>(기본), <code>AFTER_ROLLBACK</code>, <code>AFTER_COMPLETION</code>(커밋이든 롤백이든 끝난 뒤)이다.</p>
+<p>이벤트 객체는 아무 클래스나 된다. 값만 담으면 되니 B4의 <code>record</code>가 짧다.</p>
+<pre><code class="language-java">public record PostCreated(Long postId) {}</code></pre>
+<p>이벤트는 메시지 큐가 아니다. 같은 앱, 같은 스레드 안에서 메서드를 대신 불러 주는 장치다. 서버가 꺼지면 처리 못 한 이벤트는 그냥 사라진다.</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<p>이 레슨을 쓰면서 작은 Spring Boot 4.1 앱(포트 <code>18310</code>, MySQL <code>practice</code> DB의 연습 테이블 <code>lesson_h5_post</code>·<code>lesson_h5_notice</code>)을 만들어 돌렸다. 서비스는 글을 저장하고 이벤트를 발행한다. <code>fail=true</code>면 <strong>발행한 뒤에</strong> 일부러 예외를 던진다.</p>
+<pre><code class="language-java">@Transactional
+public Long create(String title, boolean fail) {
+    H5Post post = posts.save(new H5Post(title));
+    log.info(&quot;글 저장 id={}&quot;, post.getId());
+    events.publishEvent(new PostCreated(post.getId()));
+    log.info(&quot;이벤트 발행 끝&quot;);
+    if (fail) throw new IllegalStateException(&quot;저장 뒤에 일부러 실패&quot;);
+    return post.getId();
+}</code></pre>
+<p>리스너 세 개를 한 클래스에 두었다. 클래스는 <code>@Component</code>로 빈이 되어야 한다.</p>
+<pre><code class="language-java">@Component
+public class H5Listeners {
+    @EventListener
+    public void plain(PostCreated e) { log.info(&quot;[@EventListener] 알림 보냄 postId={}&quot;, e.postId()); }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void afterCommit(PostCreated e) { log.info(&quot;[AFTER_COMMIT] 알림 보냄 postId={}&quot;, e.postId()); }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
+    public void afterRollback(PostCreated e) { log.info(&quot;[AFTER_ROLLBACK] 롤백됨 postId={}&quot;, e.postId()); }
+}</code></pre>
+<p>트랜잭션 시작·커밋이 로그에 보이도록 <code>application.yml</code>에 <code>logging.level.org.springframework.orm.jpa.JpaTransactionManager: debug</code>를 켰다. 아래 로그는 시각·스레드 이름 앞부분을 줄인 것이다.</p>
+<p><strong>성공 — <code>curl -X POST &quot;localhost:18310/h5/posts?title=ok&quot;</code></strong></p>
+<pre><code class="language-text">JpaTransactionManager : Creating new transaction with name [org.example.h5.H5PostService.create]
+org.hibernate.SQL     : insert into lesson_h5_post (title) values (?)
+H5PostService         : 글 저장 id=1
+H5Listeners           : [@EventListener] 알림 보냄 postId=1
+H5PostService         : 이벤트 발행 끝
+JpaTransactionManager : Initiating transaction commit
+JpaTransactionManager : Committing JPA transaction on EntityManager [SessionImpl(564658318&lt;open&gt;)]
+H5Listeners           : [AFTER_COMMIT] 알림 보냄 postId=1</code></pre>
+<p><code>@EventListener</code>는 <code>이벤트 발행 끝</code>보다 <strong>먼저</strong> 찍혔다. <code>publishEvent</code> 안에서 바로 불린 것이다. <code>AFTER_COMMIT</code>은 <code>Committing</code> 뒤에 찍혔다.</p>
+<p><strong>실패 — <code>curl -X POST &quot;localhost:18310/h5/posts?title=bad&amp;fail=true&quot;</code></strong></p>
+<pre><code class="language-text">org.hibernate.SQL     : insert into lesson_h5_post (title) values (?)
+H5PostService         : 글 저장 id=2
+H5Listeners           : [@EventListener] 알림 보냄 postId=2
+H5PostService         : 이벤트 발행 끝
+JpaTransactionManager : Initiating transaction rollback
+H5Listeners           : [AFTER_ROLLBACK] 롤백됨 postId=2
+… Request processing failed: java.lang.IllegalStateException: 저장 뒤에 일부러 실패</code></pre>
+<p>응답은 <code>500</code>, <code>lesson_h5_post</code>에 id 2는 <strong>없다</strong>. 그런데 <code>@EventListener</code>는 <code>postId=2</code> 알림을 이미 보냈다. 이것이 &quot;없는 글 알림&quot;이다. <code>AFTER_COMMIT</code> 줄은 아예 없다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>성공</th>
+<th>롤백</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@EventListener</code></td>
+<td>커밋 <strong>전</strong>에 실행</td>
+<td>실행됨 (사고)</td>
+</tr>
+<tr>
+<td><code>AFTER_COMMIT</code></td>
+<td>커밋 <strong>뒤</strong>에 실행</td>
+<td>실행 안 됨</td>
+</tr>
+<tr>
+<td><code>AFTER_ROLLBACK</code></td>
+<td>실행 안 됨</td>
+<td>롤백 뒤 실행</td>
+</tr>
+</tbody></table></div>
+<h3 id="트랜잭션이-없으면"><a class="anchor" href="#트랜잭션이-없으면" aria-hidden="true">#</a>트랜잭션이 없으면</h3>
+<p><code>@Transactional</code>이 없는 메서드에서 <code>publishEvent</code>를 부르면 기다릴 커밋이 없다. <code>org.springframework.transaction.event</code> 로그를 <code>debug</code>로 켜면 이렇게 나온다.</p>
+<pre><code class="language-text">TransactionalApplicationListenerMethodAdapter : No transaction is active - skipping org.springframework.context.PayloadApplicationEvent[…]
+H5Listeners : [@EventListener] 알림 보냄 postId=3</code></pre>
+<p><code>AFTER_COMMIT</code>·<code>AFTER_ROLLBACK</code> 리스너는 <strong>조용히 건너뛰었다.</strong> 기본 로그 수준에서는 이 줄도 안 보인다. <code>@TransactionalEventListener(fallbackExecution = true)</code>로 두면 트랜잭션이 없을 때도 실행되는데, 그때는 <code>publishEvent</code> 순간 바로 실행된다(커밋을 기다리는 의미가 없어진다).</p>
+<h3 id="커밋-뒤에-db에-쓰기"><a class="anchor" href="#커밋-뒤에-db에-쓰기" aria-hidden="true">#</a>커밋 뒤에 DB에 쓰기</h3>
+<p>알림은 결국 <code>notification</code> 테이블에 <strong>행을 넣는</strong> 일이다. <code>AFTER_COMMIT</code> 리스너에서 별도 빈(<code>NoticeWriter</code>)의 <code>@Transactional</code> 메서드를 불러 <code>lesson_h5_notice</code>에 한 줄 넣어 봤다. 네 가지 방법으로 했다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th><code>NoticeWriter</code> 메서드</th>
+<th>로그</th>
+<th><code>lesson_h5_notice</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@Transactional</code> + <code>repository.save(...)</code></td>
+<td><code>Participating in existing transaction</code>, <strong>INSERT SQL이 안 나감</strong>, 예외 없음</td>
+<td>없음</td>
+</tr>
+<tr>
+<td><code>@Transactional</code> + <code>@Modifying</code> 네이티브 INSERT</td>
+<td><code>InvalidDataAccessApiUsageException: No active transaction for update or delete query</code></td>
+<td>없음</td>
+</tr>
+<tr>
+<td><code>@Transactional</code> + <code>JdbcTemplate.update(...)</code></td>
+<td>예외 없음</td>
+<td><strong>있음</strong></td>
+</tr>
+<tr>
+<td><code>@Transactional(propagation = REQUIRES_NEW)</code> + <code>save</code></td>
+<td>아래 로그</td>
+<td>있음</td>
+</tr>
+</tbody></table></div>
+<p><code>@Transactional</code>의 기본값(<code>REQUIRED</code>)은 &quot;이미 트랜잭션이 있으면 거기 끼고, 없으면 새로 연다&quot;다. 커밋이 끝난 직후에도 Spring은 <strong>끝난 트랜잭션을 아직 붙들고 있어서</strong> <code>REQUIRED</code>가 거기 끼어 버린다(<code>Participating in existing transaction</code>). 그 트랜잭션은 이미 커밋됐으니 다시 커밋해 줄 사람이 없다. 그래서 같은 <code>REQUIRED</code>인데 조용히 사라지거나, 에러가 나거나, 저장되기도 한다. 이런 코드는 믿을 수 없다.</p>
+<p><code>REQUIRES_NEW</code>는 &quot;있든 없든 <strong>새 트랜잭션</strong>을 연다&quot;다.</p>
+<pre><code class="language-text">JpaTransactionManager : Suspending current transaction, creating new transaction with name [org.example.h5.NoticeWriter.saveRequiresNew]
+org.hibernate.SQL     : insert into lesson_h5_notice (post_id,via) values (?,?)
+JpaTransactionManager : Initiating transaction commit
+JpaTransactionManager : Resuming suspended transaction after completion of inner transaction</code></pre>
+<p>새로 열고, 넣고, <strong>자기가 커밋한다.</strong> 그래서 16-1의 알림 서비스는 <code>REQUIRES_NEW</code>다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>15분. 실습 레포(<code>practice</code> 프로파일)에서 한다. 끝나면 되돌린다.</p>
+<p><strong>1. 이벤트와 리스너를 만든다.</strong></p>
+<pre><code class="language-java">// PostCreatedEvent.java
+public record PostCreatedEvent(Long postId, Long authorId) {}</code></pre>
+<pre><code class="language-java">// PostEventLogger.java — 연습용, 끝나면 지운다
+@Component
+public class PostEventLogger {
+    private static final Logger log = LoggerFactory.getLogger(PostEventLogger.class);
+
+    @EventListener
+    public void plain(PostCreatedEvent e) { log.info(&quot;[@EventListener] postId={}&quot;, e.postId()); }
+
+    @TransactionalEventListener   // phase 생략 = AFTER_COMMIT
+    public void afterCommit(PostCreatedEvent e) { log.info(&quot;[AFTER_COMMIT] postId={}&quot;, e.postId()); }
+}</code></pre>
+<p><strong>2. 서비스에서 발행한다.</strong> <code>PostService</code> 생성자에 <code>ApplicationEventPublisher events</code>를 더하고, <code>create</code>의 <code>save(...)</code> 바로 뒤에 <code>events.publishEvent(new PostCreatedEvent(post.getId(), authorId));</code>를 넣는다. <code>create</code> <strong>맨 끝</strong>(return 바로 앞)에 연습용 실패 장치를 잠시 넣는다.</p>
+<pre><code class="language-java">if (request.title().startsWith(&quot;[롤백]&quot;)) throw new IllegalStateException(&quot;연습용 롤백&quot;);</code></pre>
+<p><strong>3. 두 번 보낸다.</strong></p>
+<pre><code class="language-bash">BASE=http://localhost:8080; W='Authorization: Bearer tok-p04'; J='Content-Type: application/json'
+curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$W&quot; -H &quot;$J&quot; -d '{&quot;boardSlug&quot;:&quot;free&quot;,&quot;title&quot;:&quot;H5 성공&quot;,&quot;content&quot;:&quot;본문&quot;}'; echo
+curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$W&quot; -H &quot;$J&quot; -d '{&quot;boardSlug&quot;:&quot;free&quot;,&quot;title&quot;:&quot;[롤백] H5&quot;,&quot;content&quot;:&quot;본문&quot;}'; echo</code></pre>
+<p>앱 로그에서 본다. 첫 요청은 <code>[@EventListener]</code>와 <code>[AFTER_COMMIT]</code>이 둘 다, 두 번째(<code>500</code>)는 <code>[@EventListener]</code>만 찍혀야 한다. <code>practice</code> DB를 보는 <code>sql</code> 함수(16-1 직접 확인 첫 줄)로 <code>sql &quot;SELECT id, title FROM post ORDER BY id DESC LIMIT 2&quot;</code>를 보면 <code>H5 성공</code>은 있고 <code>[롤백] H5</code>는 없다.</p>
+<p><strong>4. 되돌린다.</strong> 실패 장치 한 줄과 <code>PostEventLogger</code>를 지운다. 이벤트 record와 발행은 16-1에서 그대로 쓴다.</p>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p><strong>1. 리스너에 <code>@Transactional</code>만 붙인다.</strong> &quot;리스너에서 DB에 쓰니까 트랜잭션을 걸자&quot;며 이렇게 쓰면,</p>
+<pre><code class="language-java">@Transactional
+@TransactionalEventListener
+public void onCreated(PostCreated e) { … }</code></pre>
+<p>앱이 <strong>아예 안 뜬다.</strong> Spring 7.0.9에서 실제로 받은 메시지다.</p>
+<pre><code class="language-text">Caused by: java.lang.IllegalStateException: @TransactionalEventListener method must not be annotated with @Transactional unless when declared as REQUIRES_NEW or NOT_SUPPORTED: public void org.example.h5bad.BadListener.onCreated(org.example.h5.PostCreated)</code></pre>
+<p>위 &quot;커밋 뒤에 DB에 쓰기&quot;의 함정을 Spring이 막아 준 것이다. 메시지대로 <code>@Transactional(propagation = Propagation.REQUIRES_NEW)</code>로 바꾸거나, 16-1처럼 쓰기를 <strong>다른 빈</strong>의 <code>REQUIRES_NEW</code> 메서드로 옮긴다. 다른 빈의 <code>REQUIRED</code> 메서드로 옮기면 이 검사는 통과하지만 표의 첫 세 줄처럼 된다.</p>
+<p><strong>2. 리스너가 예외를 던진다.</strong> <code>AFTER_COMMIT</code> 리스너 안에서 <code>throw new IllegalStateException(&quot;알림 서버 응답 없음&quot;)</code>을 던졌다.</p>
+<pre><code class="language-text">ERROR … o.s.t.s.TransactionSynchronizationUtils : TransactionSynchronization.afterCompletion threw exception
+
+java.lang.IllegalStateException: 알림 서버 응답 없음
+	at org.example.h5.H5Listeners.afterCommit(H5Listeners.java:26)</code></pre>
+<p>응답은 <strong><code>200</code></strong> 이고 글도 저장돼 있었다. 이미 커밋이 끝났으니 되돌릴 수 없다. 대신 알림은 하나도 안 생겼고 로그 한 줄만 남는다. 그래서 16-1 힌트의 리스너는 <code>try/catch</code>로 잡아 <strong>무엇이 실패했는지</strong>(<code>postId</code>)를 직접 로그에 남긴다.</p>
+<p><strong>3. 컨트롤러에서 발행한다.</strong> <code>publishEvent</code>를 <code>@Transactional</code> 서비스 밖(컨트롤러)으로 옮기면 &quot;트랜잭션이 없으면&quot;의 상황이다. 에러도 없이 <code>AFTER_COMMIT</code> 리스너만 안 불린다. 16-1 힌트 3이 이 경우다.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> <code>@EventListener</code>로 알림을 만들었다. 글 저장 뒤 같은 트랜잭션의 다른 작업이 실패해 롤백됐다. 알림은?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>만들어진다(보내진다).</strong> <code>@EventListener</code>는 <code>publishEvent</code>를 부른 순간 실행된다. 롤백은 그 뒤의 일이라 알림을 되돌리지 못한다. 예시에서 <code>postId=2</code> 글은 DB에 없는데 <code>[@EventListener] 알림 보냄 postId=2</code>가 찍혔다. 커밋 성공 뒤에만 하려면 <code>@TransactionalEventListener(AFTER_COMMIT)</code>.</p>
+</details>
+
+<p><strong>2.</strong> <code>@TransactionalEventListener</code>를 붙였는데 로그가 전혀 안 찍힌다. 에러도 없다. 가장 먼저 볼 곳은?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong><code>publishEvent</code>가 트랜잭션 안에서 불렸는지.</strong> 트랜잭션이 없으면 기본적으로 건너뛴다(<code>fallbackExecution</code> 기본값 <code>false</code>). <code>debug</code> 로그에만 <code>No transaction is active - skipping</code>이 남는다. <code>@Transactional</code> 서비스 메서드 안, <code>save</code> 뒤에서 발행한다.</p>
+</details>
+
+<p><strong>3.</strong> <code>@TransactionalEventListener</code>에 <code>phase</code>를 안 적으면 언제 실행되나? <code>BEFORE_COMMIT</code>을 쓰면 &quot;커밋이 확정된 뒤&quot;인가?</p>
+<details>
+<summary>정답</summary>
+
+<p>생략하면 <strong><code>AFTER_COMMIT</code></strong>. <code>BEFORE_COMMIT</code>은 커밋을 <strong>시도하기 직전</strong>이라 그 뒤 커밋이 실패할 수 있다. 되돌릴 수 없는 일(알림, 메일)은 <code>AFTER_COMMIT</code>에 둔다.</p>
+</details>
+
+<p><strong>4.</strong> <code>AFTER_COMMIT</code> 리스너가 다른 빈의 <code>@Transactional</code>(기본 <code>REQUIRED</code>) 메서드로 <code>repository.save(notice)</code>를 했다. 로그에 에러가 없는데 알림 행이 없다. 왜이고, 어떻게 고치나?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>REQUIRED</code>는 <strong>이미 커밋이 끝난 원래 트랜잭션</strong>에 끼어든다(<code>Participating in existing transaction</code>). 그 트랜잭션을 다시 커밋해 줄 곳이 없어 INSERT가 나가지 않았다. 쓰기 메서드를 <code>@Transactional(propagation = Propagation.REQUIRES_NEW)</code>로 바꿔 <strong>새 트랜잭션을 열고 스스로 커밋</strong>하게 한다.</p>
+</details>
+
+<p><strong>5.</strong> <code>AFTER_COMMIT</code> 리스너에서 예외가 나면 클라이언트는 무엇을 받나? 그래서 리스너는 어떻게 쓰나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>정상 응답(이 레슨에서 <code>200</code>)</strong>. 글은 이미 커밋됐고, 예외는 <code>TransactionSynchronization.afterCompletion threw exception</code> 로그로만 남는다. 아무도 다시 시도하지 않으니 리스너가 직접 <code>try/catch</code>로 잡아 <code>postId</code> 같은 단서를 로그에 남긴다. 반드시 전달돼야 하는 일이면 아웃박스 같은 다른 설계가 필요하다(더 깊이).</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/S08-transactions.html#이벤트와-커밋의-관계">S08 — 이벤트와 커밋의 관계</a></li>
+<li><a href="../docs/knowledge/S08-transactions.html#예제-3--커밋-후-알림과-그-한계">S08 — 예제 3 커밋 후 알림과 그 한계</a></li>
+<li><a href="../docs/knowledge/S08-transactions.html#전파-7종">S08 — 전파 7종</a> — <code>REQUIRED</code>와 <code>REQUIRES_NEW</code></li>
+<li><a href="../docs/knowledge/S08-transactions.html#아웃박스-db-커밋과-메시지-전달-사이를-메우기">S08 — 아웃박스: DB 커밋과 메시지 전달 사이를 메우기</a></li>
+<li>Spring Framework Reference — Transaction-bound Events: <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/event.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/data-access/transaction/event.html</a></li>
+<li><code>TransactionalEventListener</code> Javadoc(<code>phase</code>, <code>fallbackExecution</code>): <a href="https://docs.spring.io/spring-framework/docs/7.0.0/javadoc-api/org/springframework/transaction/event/TransactionalEventListener.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/docs/7.0.0/javadoc-api/org/springframework/transaction/event/TransactionalEventListener.html</a></li>
+<li><code>ApplicationEventPublisher</code> Javadoc: <a href="https://docs.spring.io/spring-framework/docs/7.0.0/javadoc-api/org/springframework/context/ApplicationEventPublisher.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/docs/7.0.0/javadoc-api/org/springframework/context/ApplicationEventPublisher.html</a></li>
+<li>Spring Framework Reference — Transaction Propagation: <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html</a></li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li>실습: <a href="../scenario/ch16-events-async-cache/16-1-new-post-event.html">16-1. 새 글 알림 — 커밋된 뒤에만 보내기</a> — 오늘의 이벤트·<code>AFTER_COMMIT</code>·<code>REQUIRES_NEW</code>로 팔로워 알림을 만들고, <code>rollback-test</code>로 롤백 때 알림이 없는지 확인한다.</li>
+<li>레슨: <a href="H6-async-thread-pool.html">H6. @Async와 스레드 풀</a> — <code>AFTER_COMMIT</code> 리스너도 요청 스레드에서 돈다. 느린 알림이 응답을 붙잡지 않게 하려면.</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

@@ -9,7 +9,7 @@ TARGET=/opt/cloudbeaver/workspace/GlobalConfiguration/.dbeaver
 if [ ! -f "$TARGET/data-sources.json" ]; then
   mkdir -p "$TARGET"
   cp /config/data-sources.json "$TARGET/data-sources.json"
-  echo "[javaExperience] 미리 만든 DB 연결(community·practice)을 넣었다"
+  echo "[javaExperience] 미리 만든 DB 연결(community·practice·project)을 넣었다"
 fi
 cd /opt/cloudbeaver
 exec ./run-server.sh

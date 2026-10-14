@@ -1,0 +1,101 @@
+package org.example.like;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.post.PostRepository;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+// 4-2: 동시에 좋아요를 눌러도 like_count = post_like 행 수가 되는지 재현·고정한다.
+// 테스트 메서드에는 일부러 @Transactional을 붙이지 않는다 — 붙이면 모든 스레드가
+// 같은(커밋 전) 트랜잭션을 공유해 실제 동시 쓰기 상황이 재현되지 않는다.
+//
+// @AutoConfigureMockMvc는 이 테스트에서 쓰지 않지만 그래도 붙인다 — 이 프로젝트의 모든
+// @SpringBootTest가 똑같은 애노테이션 조합이어야 Spring이 컨텍스트를 하나로 캐시하고, 그래야
+// Testcontainers의 jdbc:tc:... 컨테이너도 하나만 뜬다. 빠뜨리면 2-4에서 겪은 것과 같은 문제
+// (별도 컨텍스트가 같은 컨테이너에 스키마 초기화를 또 시도 → Table already exists)가 재현된다.
+@SpringBootTest
+@AutoConfigureMockMvc
+class LikeConcurrencyTest {
+
+    private static final Long POST_ID = 16L; // 이스프링의 "자유글 05" — 시드에서 좋아요 0개로 시작
+
+    @Autowired
+    LikeService likeService;
+
+    @Autowired
+    PostRepository postRepository;
+
+    @Autowired
+    PostLikeRepository postLikeRepository;
+
+    @Test
+    void differentMembersLikingAtOnceKeepsCountConsistent() throws InterruptedException {
+        int threadCount = 20;
+        List<AuthenticatedMember> members = new java.util.ArrayList<>();
+        for (int i = 0; i < threadCount; i++) {
+            members.add(new AuthenticatedMember(7L + i, "동시성" + (i + 1), "USER"));
+        }
+
+        List<Exception> errors = runConcurrently(threadCount, index -> likeService.like(POST_ID, members.get(index)));
+
+        assertTrue(errors.isEmpty(), "모든 요청이 예외 없이 끝나야 한다: " + errors);
+        Integer likeCount = postRepository.findLikeCountById(POST_ID);
+        long rowCount = postLikeRepository.countByPost_Id(POST_ID);
+
+        assertEquals(20L, rowCount, "서로 다른 회원 20명이 좋아요했으니 행도 20개여야 한다");
+        assertEquals(rowCount, likeCount.longValue(), "like_count는 실제 post_like 행 수와 같아야 한다");
+    }
+
+    @Test
+    void sameMemberLikingFiveTimesAtOnceInsertsOnlyOneRow() throws InterruptedException {
+        AuthenticatedMember member = new AuthenticatedMember(7L, "동시성01", "USER");
+
+        List<Exception> errors = runConcurrently(5, index -> likeService.like(POST_ID, member));
+
+        assertTrue(errors.isEmpty(), "중복 키 오류 등으로 실패한 요청이 있으면 안 된다: " + errors);
+        long rowCount = postLikeRepository.countByPost_IdAndMember_Id(POST_ID, member.id());
+        assertEquals(1L, rowCount, "같은 회원이 동시에 여러 번 눌러도 행은 1개여야 한다");
+    }
+
+    private List<Exception> runConcurrently(int count, java.util.function.IntConsumer task) throws InterruptedException {
+        ExecutorService pool = Executors.newFixedThreadPool(count);
+        CountDownLatch ready = new CountDownLatch(count);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(count);
+        List<Exception> errors = new CopyOnWriteArrayList<>();
+
+        for (int i = 0; i < count; i++) {
+            int index = i;
+            pool.submit(() -> {
+                try {
+                    ready.countDown();
+                    start.await();
+                    task.accept(index);
+                } catch (Exception e) {
+                    errors.add(e);
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+
+        boolean allReady = ready.await(10, TimeUnit.SECONDS);
+        start.countDown(); // 모든 스레드가 준비된 뒤 한꺼번에 출발시킨다
+        assertTrue(allReady, "모든 스레드가 출발 전에 준비돼야 한다");
+        assertTrue(done.await(30, TimeUnit.SECONDS), "모든 요청이 끝나야 한다");
+        pool.shutdown();
+        return errors;
+    }
+}

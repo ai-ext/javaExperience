@@ -1,0 +1,46 @@
+package org.example.batch;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+
+@RestController
+public class ScheduledPublishController {
+
+    private static final int MAX_AHEAD_DAYS = 30;
+
+    private final ScheduledPublishService scheduledPublishService;
+    private final Clock clock;
+
+    public ScheduledPublishController(ScheduledPublishService scheduledPublishService, Clock clock) {
+        this.scheduledPublishService = scheduledPublishService;
+        this.clock = clock;
+    }
+
+    // at = "이 시각이 됐다고 치고" 돌린다(생략하면 지금). 예약을 30일 안쪽만 받으므로 그보다 뒤 시각은 400.
+    @PostMapping("/api/admin/jobs/scheduled-publish/run")
+    public ScheduledPublishResponse run(@RequestParam(required = false) String at,
+                                        @LoginMember AuthenticatedMember me) {
+        AdminGuard.requireAdmin(me);
+        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime effectiveAt;
+        if (at == null || at.isBlank()) {
+            effectiveAt = now;
+        } else {
+            try {
+                effectiveAt = StrictDateTimes.parse(at);
+            } catch (IllegalArgumentException ex) {
+                throw new InvalidJobParameterException("at", ex.getMessage());
+            }
+        }
+        if (effectiveAt.isAfter(now.plusDays(MAX_AHEAD_DAYS))) {
+            throw new InvalidJobParameterException("at", "기준 시각은 지금부터 " + MAX_AHEAD_DAYS + "일 안쪽(" + now.plusDays(MAX_AHEAD_DAYS) + "까지)만 됩니다.");
+        }
+        return scheduledPublishService.publishDue(effectiveAt);
+    }
+}

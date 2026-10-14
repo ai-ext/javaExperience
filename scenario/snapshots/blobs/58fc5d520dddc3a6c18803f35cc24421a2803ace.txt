@@ -1,0 +1,102 @@
+package org.example.post;
+
+import org.example.board.Board;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+
+// Spring Data JPA가 구현을 만들어 준다(1-3의 메모리 구현을 대체)
+public interface PostRepository extends JpaRepository<Post, Long> {
+
+    // 2-3의 "볼 수 있나" 규칙 중 목록에 해당하는 부분을 쿼리로 옮긴 것 — PostAccessPolicy.canView와
+    // 같은 규칙이지만, 목록은 PUBLISHED 글만 대상이다(자기 임시저장·운영자 숨김 글도 목록에는 넣지 않는다).
+    // 메모리에서 거르지 않고 쿼리에서 걸러야 페이지 크기·totalElements가 맞는다.
+    //
+    // Page<Post> 대신 List<Post> + 아래 countViewableByBoard를 따로 둔다: Page<>로 받으면
+    // Spring Data가 "content 개수 < size면 count 쿼리를 생략"하는 최적화를 적용해서, size=5(꽉 찬
+    // 페이지, count 쿼리 나감)와 size=20(13개뿐이라 마지막 페이지, count 쿼리 생략)의 SQL 문장 수가
+    // 13과1씩 달라졌다(2-4의 PostListQueryCountTest가 요구하는 "size와 무관하게 문장 수 동일"이 깨짐).
+    // count를 항상 명시적으로 실행해 문장 수를 size와 무관하게 고정한다(R2와도 맞다).
+    @Query("""
+            SELECT p FROM Post p
+            JOIN FETCH p.author
+            WHERE p.board = :board
+              AND p.deletedAt IS NULL
+              AND p.status = 'PUBLISHED'
+              AND (
+                   p.visibility = 'PUBLIC'
+                   OR (:viewerId IS NOT NULL AND p.author.id = :viewerId)
+                   OR (:viewerId IS NOT NULL AND EXISTS (
+                           SELECT 1 FROM Follow f
+                           WHERE f.follower.id = :viewerId AND f.followee = p.author))
+              )
+              AND (
+                   :viewerId IS NULL OR NOT EXISTS (
+                       SELECT 1 FROM MemberBlock b
+                       WHERE (b.blocker.id = :viewerId AND b.blocked = p.author)
+                          OR (b.blocked.id = :viewerId AND b.blocker = p.author)
+                   )
+              )
+            """)
+    List<Post> findViewableByBoard(@Param("board") Board board,
+                                    @Param("viewerId") Long viewerId,
+                                    Pageable pageable);
+
+    // findViewableByBoard와 같은 조건의 건수 — 반드시 같이 고친다
+    @Query("""
+            SELECT COUNT(p) FROM Post p
+            WHERE p.board = :board
+              AND p.deletedAt IS NULL
+              AND p.status = 'PUBLISHED'
+              AND (
+                   p.visibility = 'PUBLIC'
+                   OR (:viewerId IS NOT NULL AND p.author.id = :viewerId)
+                   OR (:viewerId IS NOT NULL AND EXISTS (
+                           SELECT 1 FROM Follow f
+                           WHERE f.follower.id = :viewerId AND f.followee = p.author))
+              )
+              AND (
+                   :viewerId IS NULL OR NOT EXISTS (
+                       SELECT 1 FROM MemberBlock b
+                       WHERE (b.blocker.id = :viewerId AND b.blocked = p.author)
+                          OR (b.blocked.id = :viewerId AND b.blocker = p.author)
+                   )
+              )
+            """)
+    long countViewableByBoard(@Param("board") Board board, @Param("viewerId") Long viewerId);
+
+    @Query("""
+            SELECT p FROM Post p
+            JOIN FETCH p.author a
+            JOIN p.board b
+            WHERE a.id = :memberId
+              AND b.slug = :boardSlug
+              AND p.status = 'PUBLISHED'
+              AND p.visibility = 'PUBLIC'
+              AND p.deletedAt IS NULL
+            ORDER BY p.publishedAt DESC, p.id DESC
+            """)
+    List<Post> findPublicPostsByAuthorAndBoard(@Param("memberId") Long memberId,
+                                                @Param("boardSlug") String boardSlug);
+    // 4-2: "읽고 +1 해서 저장" 대신 DB가 한 번에 더한다 — 두 요청이 동시에 와도 읽고 쓰는 사이에
+    // 끼어들 틈이 없다(갱신 손실 방지). 영속성 컨텍스트를 거치지 않으므로 최신 값은 findLikeCountById로 다시 읽는다.
+    @Modifying
+    @Query("UPDATE Post p SET p.likeCount = p.likeCount + 1 WHERE p.id = :id")
+    int incrementLikeCount(@Param("id") Long id);
+
+    @Modifying
+    @Query("UPDATE Post p SET p.likeCount = p.likeCount - 1 WHERE p.id = :id AND p.likeCount > 0")
+    int decrementLikeCount(@Param("id") Long id);
+
+    @Query("SELECT p.likeCount FROM Post p WHERE p.id = :id")
+    Integer findLikeCountById(@Param("id") Long id);
+
+    // 5-1: 댓글 저장과 같은 트랜잭션에서 comment_count를 원자적으로 올린다(4-2와 같은 방식)
+    @Modifying
+    @Query("UPDATE Post p SET p.commentCount = p.commentCount + 1 WHERE p.id = :id")
+    int incrementCommentCount(@Param("id") Long id);
+}

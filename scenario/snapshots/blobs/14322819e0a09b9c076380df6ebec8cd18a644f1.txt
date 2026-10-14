@@ -1,0 +1,125 @@
+package org.example.notification;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import org.example.comment.Comment;
+import org.example.member.Member;
+import org.example.post.Post;
+
+import java.time.LocalDateTime;
+
+// 알림(V4) — member가 받는 사람(글 작성자), actor가 좋아요·댓글을 한 사람
+@Entity
+@Table(name = "notification")
+public class Notification {
+
+    public static final String LIKE = "LIKE";
+    public static final String COMMENT = "COMMENT";
+    public static final String MENTION = "MENTION";
+    public static final String LIKE_MILESTONE = "LIKE_MILESTONE";
+    public static final String NEW_POST = "NEW_POST"; // 16-1 팔로우한 회원의 새 글
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "member_id", nullable = false)
+    private Member member;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    // 15-5 시스템 알림(LIKE_MILESTONE)은 보낸 사람이 없다 → null
+    @JoinColumn(name = "actor_id")
+    private Member actor;
+
+    @Column(nullable = false, length = 20)
+    private String type;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id", nullable = false)
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "comment_id")
+    private Comment comment;
+
+    // 15-5 좋아요 몇 개 달성(10·50·100). 다른 종류는 null
+    @Column(name = "milestone")
+    private Integer milestone;
+
+    @Column(name = "read_at")
+    private LocalDateTime readAt;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    protected Notification() {
+        // JPA
+    }
+
+    public Notification(Member member, Member actor, String type, Post post, Comment comment, LocalDateTime now) {
+        this.member = member;
+        this.actor = actor;
+        this.type = type;
+        this.post = post;
+        this.comment = comment;
+        this.createdAt = now;
+    }
+
+    // 15-5 좋아요 달성 축하 — 받는 사람은 글 작성자, 보낸 사람 없음
+    public static Notification likeMilestone(Member member, Post post, int milestone, LocalDateTime now) {
+        Notification n = new Notification(member, null, LIKE_MILESTONE, post, null, now);
+        n.milestone = milestone;
+        return n;
+    }
+
+    // 이미 읽었으면 처음 읽은 시각을 유지한다(멱등)
+    public void markRead(LocalDateTime now) {
+        if (this.readAt == null) {
+            this.readAt = now;
+        }
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Member getMember() {
+        return member;
+    }
+
+    public Member getActor() {
+        return actor;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public Post getPost() {
+        return post;
+    }
+
+    public Comment getComment() {
+        return comment;
+    }
+
+    public Integer getMilestone() {
+        return milestone;
+    }
+
+    public LocalDateTime getReadAt() {
+        return readAt;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+}

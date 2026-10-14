@@ -1,0 +1,46 @@
+package org.example.series;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.example.post.InvalidParametersException;
+import tools.jackson.databind.JsonNode;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+// 제목은 앞뒤 공백을 자른 길이로 2~100자(서비스에서 다시 확인), 소개는 없어도 된다(null 허용, 500자까지)
+public record SeriesCreateRequest(
+        @NotBlank(message = "시리즈 제목을 입력해 주세요.")
+        @Size(min = 2, max = 100, message = "시리즈 제목은 2~100자여야 합니다.")
+        String title,
+
+        @Size(max = 500, message = "소개는 500자 이하여야 합니다.")
+        String description
+) {
+    // 길이는 공백을 제거한 값으로 검사하고, Jackson의 숫자→문자열 변환 전에 타입을 확인한다.
+    public static Parsed parse(JsonNode body) {
+        if (body == null || !body.isObject()) {
+            throw new InvalidParametersException(Map.of("body", "JSON 객체가 필요합니다."));
+        }
+        Map<String, String> errors = new LinkedHashMap<>();
+        String title = text(body.get("title"), "title", errors);
+        String description = text(body.get("description"), "description", errors);
+        SeriesCreateRequest request = new SeriesCreateRequest(title,
+                description == null || description.isBlank() ? null : description);
+        return new Parsed(request, Map.copyOf(errors));
+    }
+
+    public record Parsed(SeriesCreateRequest request, Map<String, String> errors) {
+    }
+
+    private static String text(JsonNode value, String field, Map<String, String> errors) {
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (!value.isTextual()) {
+            errors.put(field, "문자열이어야 합니다.");
+            return null;
+        }
+        return value.asText().strip();
+    }
+}

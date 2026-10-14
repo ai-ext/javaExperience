@@ -1,0 +1,85 @@
+package org.example.post;
+
+import jakarta.persistence.EntityManager;
+import tools.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@Transactional
+class PostCopyControllerTest {
+
+    @Autowired MockMvc mockMvc;
+    @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired EntityManager entityManager;
+    @Autowired ObjectMapper objectMapper;
+
+    @Test
+    void copiesPostWithOrWithoutTags() throws Exception {
+        var withTags = mockMvc.perform(post("/api/posts/2/copies")
+                        .param("copyTags", "true")
+                        .header("Authorization", "Bearer tok-kimjava")
+                        .contentType("application/json")
+                        .content("{\"title\":\"[복사실습] 태그 있음\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.author.id").value(2))
+                .andExpect(jsonPath("$.tags.length()").value(2))
+                .andReturn();
+        long firstId = objectMapper.readTree(withTags.getResponse().getContentAsString()).get("id").asLong();
+        assertNotEquals(2, firstId);
+        assertEquals("/api/posts/" + firstId, withTags.getResponse().getHeader("Location"));
+        entityManager.flush();
+        assertEquals(2L, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM post_tag WHERE post_id=?", Long.class, firstId));
+
+        var withoutTags = mockMvc.perform(post("/api/posts/2/copies")
+                        .param("copyTags", "false")
+                        .header("Authorization", "Bearer tok-kimjava")
+                        .contentType("application/json")
+                        .content("{\"title\":\"[복사실습] 태그 없음\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tags.length()").value(0))
+                .andReturn();
+        long secondId = objectMapper.readTree(withoutTags.getResponse().getContentAsString()).get("id").asLong();
+        entityManager.flush();
+        assertEquals(0L, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM post_tag WHERE post_id=?", Long.class, secondId));
+        assertEquals("JPA 연관관계 매핑 정리", jdbcTemplate.queryForObject(
+                "SELECT title FROM post WHERE id=2", String.class));
+    }
+
+    @Test
+    void rejectsBadInputAndUnavailableSource() throws Exception {
+        mockMvc.perform(post("/api/posts/2/copies").param("copyTags", "maybe")
+                        .header("Authorization", "Bearer tok-kimjava")
+                        .contentType("application/json").content("{\"title\":\"새 제목\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/posts/2/copies")
+                        .header("Authorization", "Bearer tok-kimjava")
+                        .contentType("application/json").content("{}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/posts/6/copies")
+                        .header("Authorization", "Bearer tok-kimjava")
+                        .contentType("application/json").content("{\"title\":\"새 제목\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/posts/1/copies")
+                        .header("Authorization", "Bearer tok-kimjava")
+                        .contentType("application/json").content("{\"title\":\"공지 복사\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/posts/2/copies")
+                        .contentType("application/json").content("{\"title\":\"새 제목\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+}

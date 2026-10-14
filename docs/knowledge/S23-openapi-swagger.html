@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S23. API 문서화 — OpenAPI와 Swagger UI</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
+<main>
+
+<h1 id="s23-api-문서화--openapi와-swagger-ui"><a class="anchor" href="#s23-api-문서화--openapi와-swagger-ui" aria-hidden="true">#</a>S23. API 문서화 — OpenAPI와 Swagger UI</h1>
+<blockquote>
+<ul>
+<li>OpenAPI는 HTTP API 계약을 기술하는 명세이고, Swagger UI는 명세를 화면으로 보여 주며 요청도 실행하는 도구다.</li>
+<li>springdoc-openapi는 Spring 애플리케이션에서 OpenAPI 문서를 만들고 Swagger UI를 연결한다.</li>
+<li>문서는 실제 인증·오류 응답까지 반영해야 한다. 생성된 명세와 실행 결과를 테스트로 함께 확인한다.</li>
+</ul>
+</blockquote>
+<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<p>API 사용자는 컨트롤러 코드를 읽지 않고도 어떤 경로에 어떤 요청을 보내야 하는지, 인증은 어떻게 하는지, 오류가 나면 어떤 형식으로 오는지 알아야 한다. 문서가 없거나 실제 응답과 다르면 호출자는 추측으로 클라이언트를 만들고, 서버 변경은 연동 장애로 이어진다.</p>
+<p>Swagger UI의 <code>Try it out</code>은 보기 좋은 예제에 그치지 않는다. 명세에 정의된 서버 주소로 브라우저 요청을 전송하므로, 잘못된 서버 주소·보안 설정·CORS는 문서 화면에서는 보이던 API 호출이 실패하는 원인이 된다.</p>
+<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>용어</th>
+<th>뜻</th>
+<th>설계 시 확인할 점</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>OpenAPI 3.x</td>
+<td>경로, 메서드, 매개변수, 본문, 응답, 보안 등을 JSON/YAML로 표현하는 API 명세</td>
+<td>명세는 API 계약이다. <code>servers</code>, <code>paths</code>, <code>components</code> 등이 주요 항목이다.</td>
+</tr>
+<tr>
+<td>Swagger UI</td>
+<td>OpenAPI 명세를 읽어 API 설명 화면과 <code>Try it out</code>을 제공하는 웹 UI</td>
+<td>화면에서 고른 서버 주소로 요청을 보낸다. UI 자체가 서버 API를 구현하지는 않는다.</td>
+</tr>
+<tr>
+<td>springdoc-openapi</td>
+<td>Spring MVC/WebFlux 애플리케이션을 분석해 OpenAPI 문서를 만들고 Swagger UI 리소스를 제공하는 라이브러리</td>
+<td>컨트롤러의 타입·매핑은 자동으로 읽고, 설명·보안·오류는 애너테이션이나 설정으로 보완한다.</td>
+</tr>
+<tr>
+<td><code>@Operation</code></td>
+<td>한 API 작업(경로와 HTTP 메서드)의 요약·설명·보안 등을 기술</td>
+<td>경로와 메서드 자체는 Spring 매핑이 결정한다.</td>
+</tr>
+<tr>
+<td><code>@ApiResponse</code></td>
+<td>작업이 돌려줄 상태 코드·설명·응답 본문 스키마를 기술</td>
+<td>성공과 대표 오류를 실제 동작에 맞춘다.</td>
+</tr>
+<tr>
+<td><code>@Schema</code></td>
+<td>요청·응답 모델과 필드의 타입·설명·예시를 기술</td>
+<td>실제 JSON 필드명·제약과 어긋나지 않게 한다.</td>
+</tr>
+<tr>
+<td>서버(<code>servers</code>)</td>
+<td>명세가 가리키는 API 기본 URL 목록</td>
+<td>UI의 서버 선택 목록이다. 경로 뒤에 API의 각 operation path가 붙는다.</td>
+</tr>
+<tr>
+<td>보안 스키마</td>
+<td>인증 방식의 이름과 종류를 기술하는 재사용 정의</td>
+<td><code>HTTP bearer</code> 정의만으로 보호되는 것은 아니다. API 작업에 보안 요구사항도 적용해야 한다.</td>
+</tr>
+</tbody></table></div>
+<h3 id="세-도구의-관계"><a class="anchor" href="#세-도구의-관계" aria-hidden="true">#</a>세 도구의 관계</h3>
+<p>OpenAPI는 표준 명세 형식이다. Swagger는 OpenAPI를 다루는 도구 생태계의 이름이며, 이 문서에서는 Swagger UI를 명세 뷰어로 사용한다. springdoc-openapi는 Spring 코드에서 OpenAPI 문서를 만들어 <code>/v3/api-docs</code>로 제공하고 Swagger UI가 그 명세를 읽도록 연결한다. 따라서 <strong>Spring 매핑·DTO → springdoc 생성 → OpenAPI JSON/YAML → Swagger UI</strong> 순서로 이어진다.</p>
+<p>코드 우선 방식에서는 컨트롤러와 DTO를 먼저 만들고 애너테이션으로 문서를 보강한다. 기존 Spring 앱과 함께 발전시키기 쉽다. 명세 우선(contract-first) 방식에서는 OpenAPI 계약을 먼저 검토·합의하고 구현을 맞춘다. 여러 팀이 동시에 연동하거나 외부 공개 계약을 엄격히 관리할 때 유리하다. 어느 방식이든 생성 또는 검토한 계약을 CI에서 검증해야 한다.</p>
+<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+<p>애플리케이션이 시작되면 springdoc은 Spring의 요청 매핑, 메서드 인자, 반환 타입과 문서 애너테이션을 바탕으로 OpenAPI 문서를 구성한다. Swagger UI는 설정에서 문서 URL을 읽어 명세를 렌더링한다. 기본 경로는 JSON 명세 <code>/v3/api-docs</code>, YAML 명세 <code>/v3/api-docs.yaml</code>, UI <code>/swagger-ui.html</code>이다. 경로와 기능은 설정으로 바꿀 수 있다.</p>
+<p><code>Try it out</code>에서는 선택한 서버 URL에 operation의 경로와 쿼리를 결합해 브라우저가 HTTP 요청을 보낸다. 예를 들어 서버가 <code>http://localhost:8080</code>이고 operation path가 <code>/api/posts/42</code>라면 그 주소로 요청한다. <code>servers</code>에 포트가 잘못 적혀 있으면 UI가 표시하는 API 설명은 맞아도 요청은 엉뚱한 포트로 간다. 포트가 바뀌면 API 경로를 고치는 대신 <code>servers</code>의 기본 URL을 실제 주소에 맞춘다.</p>
+<p>브라우저는 출처(origin)가 다른 서버로 <code>fetch</code>/XHR을 보낼 때 CORS 규칙을 적용한다. 출처는 스킴·호스트·포트의 조합이므로 포트만 달라도 다른 출처다. UI가 API와 같은 출처에서 서비스되면 보통 별도 CORS 허용이 필요 없지만, 다른 호스트나 포트의 UI에서 호출하면 API 서버가 그 UI 출처를 허용해야 브라우저가 응답을 읽게 할 수 있다. 학습 화면의 <strong>‘버튼 확인’</strong> 동작이 브라우저에서 백엔드로 <code>fetch</code>를 보내는 구조라면 같은 원리로, 화면과 API의 출처가 다를 때 CORS 설정을 확인해야 한다.</p>
+<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+<p>예제는 Java 21 + Spring Boot 4.1 기준이다. 공식 springdoc 호환성 안내는 <code>springdoc-openapi</code> 3.x가 Spring Boot 4와 호환된다고 설명하고, 현재 안정판으로 3.1.1을 안내한다. 다만 같은 FAQ의 구체적인 “빌드한 조합” 표에는 Boot 4.0.x ↔ springdoc 3.0.x만 적혀 있고 Boot 4.1.x 조합은 별도로 열거되어 있지 않다. 따라서 아래는 현재 3.x 안정판을 사용하는 설정 예이며, Boot 4.1 프로젝트의 빌드와 문서 엔드포인트를 CI에서 확인한다. 2.x 계열은 Boot 3.x 호환 세대이므로 Boot 4 예제에 섞지 않는다.</p>
+<h3 id="의존성-추가"><a class="anchor" href="#의존성-추가" aria-hidden="true">#</a>의존성 추가</h3>
+<p>Spring MVC 프로젝트라면 UI를 포함한 starter를 추가한다. 버전은 springdoc 라이브러리 버전이며, Spring Boot 플러그인/BOM 버전과 같은 숫자로 맞추는 값이 아니다.</p>
+<pre><code class="language-xml">&lt;!-- Maven: pom.xml --&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springdoc&lt;/groupId&gt;
+    &lt;artifactId&gt;springdoc-openapi-starter-webmvc-ui&lt;/artifactId&gt;
+    &lt;version&gt;3.1.1&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+<p>Gradle(실습 레포):</p>
+<pre><code class="language-groovy">dependencies {
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+}</code></pre>
+<p>Boot가 아닌 WebFlux 앱은 WebFlux용 starter를 고른다. MVC와 WebFlux용 starter를 한 애플리케이션에 함께 넣지 않는다.</p>
+<h3 id="게시판-api와-스키마-문서화"><a class="anchor" href="#게시판-api와-스키마-문서화" aria-hidden="true">#</a>게시판 API와 스키마 문서화</h3>
+<p>컨트롤러 매핑은 실제 동작을 결정한다. OpenAPI 애너테이션은 사람과 도구가 계약을 이해할 수 있도록 요약, 스키마, 응답, 보안을 덧붙인다.</p>
+<pre><code class="language-java">import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping(&quot;/api/posts&quot;)
+@SecurityRequirement(name = &quot;bearerAuth&quot;)
+class PostController {
+
+    @PostMapping
+    @Operation(summary = &quot;게시글 작성&quot;, description = &quot;새 게시글을 생성한다.&quot;)
+    @ApiResponses({
+        @ApiResponse(responseCode = &quot;201&quot;, description = &quot;게시글 생성&quot;,
+            content = @Content(mediaType = &quot;application/json&quot;,
+                schema = @Schema(implementation = PostView.class))),
+        @ApiResponse(responseCode = &quot;400&quot;, description = &quot;요청 본문 오류&quot;,
+            content = @Content(mediaType = &quot;application/problem+json&quot;,
+                schema = @Schema(implementation = ProblemDetail.class))),
+        @ApiResponse(responseCode = &quot;401&quot;, description = &quot;인증 필요&quot;,
+            content = @Content(mediaType = &quot;application/problem+json&quot;,
+                schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    ResponseEntity&lt;PostView&gt; create(@Valid @RequestBody CreatePostRequest request) {
+        // 실제 예제에서는 서비스를 호출해 저장 결과를 반환한다.
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new PostView(42L, request.title(), request.content()));
+    }
+
+    @GetMapping(&quot;/{id}&quot;)
+    @Operation(summary = &quot;게시글 단건 조회&quot;)
+    @ApiResponses({
+        @ApiResponse(responseCode = &quot;200&quot;, description = &quot;게시글 조회&quot;,
+            content = @Content(mediaType = &quot;application/json&quot;,
+                schema = @Schema(implementation = PostView.class))),
+        @ApiResponse(responseCode = &quot;404&quot;, description = &quot;게시글 없음&quot;,
+            content = @Content(mediaType = &quot;application/problem+json&quot;,
+                schema = @Schema(implementation = ProblemDetail.class))),
+        @ApiResponse(responseCode = &quot;401&quot;, description = &quot;인증 필요&quot;,
+            content = @Content(mediaType = &quot;application/problem+json&quot;,
+                schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    PostView find(@PathVariable long id) {
+        return new PostView(id, &quot;OpenAPI&quot;, &quot;문서 예제&quot;);
+    }
+
+    record CreatePostRequest(
+        @Schema(description = &quot;게시글 제목&quot;, example = &quot;OpenAPI 시작하기&quot;)
+        String title,
+        @Schema(description = &quot;게시글 본문&quot;, example = &quot;요청과 응답 계약을 문서화합니다.&quot;)
+        String content) {}
+
+    record PostView(
+        @Schema(description = &quot;게시글 ID&quot;, example = &quot;42&quot;)
+        long id,
+        String title,
+        String content) {}
+}</code></pre>
+<p>위 메서드는 구조를 보여 주는 예다. 실제 서비스에서는 저장 결과를 반환하고, 없는 ID와 유효성 오류를 공통 오류 처리기로 <code>ProblemDetail</code> 응답에 매핑한다. <code>@ApiResponse</code>의 상태 코드와 본문은 그 처리 결과와 일치시킨다.</p>
+<h3 id="bearer-보안-서버-그룹-설정"><a class="anchor" href="#bearer-보안-서버-그룹-설정" aria-hidden="true">#</a>Bearer 보안, 서버, 그룹 설정</h3>
+<p>보안 스키마는 OpenAPI에 <code>Authorization: Bearer ...</code> 방식을 알린다. <code>@SecurityRequirement</code>가 적용된 API에 Swagger UI의 <strong>Authorize</strong> 버튼이 표시된다. 아래의 서버 주소는 UI의 기본 선택값이다. 실제 실행 포트가 다르면 그 주소만 환경에 맞춰 변경한다.</p>
+<pre><code class="language-java">import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.info.Info;
+import io.swagger.v3.oas.annotations.servers.Server;
+import io.swagger.v3.oas.annotations.security.SecurityScheme;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
+import org.springdoc.core.models.GroupedOpenApi;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+@OpenAPIDefinition(
+    info = @Info(title = &quot;게시판 API&quot;, version = &quot;1.0.0&quot;),
+    servers = @Server(url = &quot;http://localhost:8080&quot;, description = &quot;로컬 개발 서버&quot;)
+)
+@SecurityScheme(
+    name = &quot;bearerAuth&quot;,
+    type = SecuritySchemeType.HTTP,
+    scheme = &quot;bearer&quot;
+)
+class OpenApiConfiguration {
+    @Bean
+    GroupedOpenApi postsApi() {
+        return GroupedOpenApi.builder()
+                .group(&quot;posts-v1&quot;)
+                .pathsToMatch(&quot;/api/posts/**&quot;)
+                .build();
+    }
+}</code></pre>
+<p>이 그룹 명세는 <code>/v3/api-docs/posts-v1</code>에서 확인할 수 있다. 그룹은 문서를 경로나 패키지 기준으로 나누는 기능이다. <code>info.version</code>은 API 계약 버전이고 springdoc 의존성 버전과 무관하다. <code>/api/v1/**</code>, <code>/api/v2/**</code>처럼 런타임 API도 버전이 나뉘어 있다면 그룹도 각각 정의하고, 각 문서의 경로·요청·응답을 해당 계약과 맞춘다. 그룹 이름만 바꾼다고 실제 API 라우팅이 바뀌지는 않는다.</p>
+<p>ProblemDetail은 Spring MVC가 RFC 9457 형식 오류 본문을 표현하는 타입이다. API가 실제로 <code>application/problem+json</code>을 응답하도록 처리한 뒤, 위처럼 오류 코드마다 미디어 타입과 스키마를 기록한다. 확장 필드를 사용하는 경우에는 그 필드 설명도 별도로 추가해 실제 JSON과 맞춘다.</p>
+<h2 id="5-실무-판단"><a class="anchor" href="#5-실무-판단" aria-hidden="true">#</a>5. 실무 판단</h2>
+<ul>
+<li><strong>코드 우선:</strong> 내부 서비스나 기존 Spring 앱에 적합하다. 매핑과 타입에서 기본 문서를 만들고, 설명·보안·오류만 애너테이션으로 보강한다.</li>
+<li><strong>명세 우선(contract-first):</strong> 외부 고객·여러 팀이 공유하는 계약, 클라이언트 생성이 중요한 API에 적합하다. 구현 전에 OpenAPI 변경을 리뷰하고, 생성 코드나 계약 테스트로 구현과 맞춘다.</li>
+<li><strong>운영 노출:</strong> API 문서를 공개할지 내부 인증 뒤에 둘지 먼저 정한다. 공개하지 않기로 했다면 운영 프로파일에서 UI와 명세 엔드포인트를 모두 끄거나 접근 통제를 한다. UI만 숨기고 <code>/v3/api-docs</code>를 공개 상태로 두면 명세는 계속 노출될 수 있다.</li>
+<li><strong>문서와 응답의 일치:</strong> 문서는 자동 생성돼도 모든 상태·보안 정책이 자동으로 발견되는 것은 아니다. OpenAPI 명세 검사와 실제 HTTP 응답 테스트를 함께 실행한다.</li>
+</ul>
+<p>운영에서 끄는 예시는 <code>application-prod.yaml</code>에 둔다.</p>
+<pre><code class="language-yaml">springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false</code></pre>
+<p>조직 내부에서 운영 문서를 써야 한다면 무조건 끄기보다 인증·네트워크 정책으로 보호하고, 운영 주소와 실제 인가 정책을 점검한다. 문서 비활성화 여부는 보안 경계의 대체물이 아니다.</p>
+<p>CI에서는 최소한 다음을 확인한다.</p>
+<ol>
+<li><code>GET /v3/api-docs</code>를 읽어 게시글 경로, 메서드, 성공·오류 응답, bearer 보안 정의가 있는지 검사한다.</li>
+<li>인증이 있는 성공 요청과 없는 요청, 유효하지 않은 요청, 없는 ID를 실제로 보내 상태 코드와 <code>Content-Type: application/problem+json</code>, 본문을 확인한다.</li>
+<li>생성 명세를 이전 릴리스 계약과 비교해 경로 제거, 필수 필드 추가, 타입 변경 같은 호환성 파괴가 의도된 것인지 리뷰한다.</li>
+</ol>
+<h2 id="직접-해보기"><a class="anchor" href="#직접-해보기" aria-hidden="true">#</a>직접 해보기</h2>
+<p>실습 레포의 Spring Boot 4.1 Web MVC 애플리케이션에 적용한다.</p>
+<ol>
+<li>위 Maven 의존성을 추가하고 애플리케이션을 실행한다. Gradle이면 동일한 <code>org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1</code> 좌표를 의존성으로 선언한다.</li>
+<li>브라우저에서 <code>http://localhost:8080/swagger-ui.html</code>을 연다. OpenAPI JSON은 <code>http://localhost:8080/v3/api-docs</code>, 그룹 문서는 <code>http://localhost:8080/v3/api-docs/posts-v1</code>에서 확인한다.</li>
+<li><code>POST /api/posts</code>를 펼치고 <strong>Try it out</strong>을 누른 뒤 제목과 본문 JSON을 입력한다. 실행 결과가 실제 생성 응답의 상태 코드와 본문인지 확인한다.</li>
+<li>UI의 <strong>Authorize</strong>를 눌러 bearer 토큰을 입력한다. 입력 칸이 토큰 값만 요구하면 <code>Bearer </code> 접두사는 빼고 토큰만 넣는다. UI가 실제 요청 헤더 <code>Authorization: Bearer &lt;토큰&gt;</code>을 보내는지 확인한다. 인증 실패와 본문 오류도 각각 실행해 <code>ProblemDetail</code> 응답을 확인한다.</li>
+<li>애플리케이션 포트를 8081로 바꿔 다시 실행하고 OpenAPI의 <code>servers</code> 기본 URL도 <code>http://localhost:8081</code>로 바꾼 뒤 <strong>Try it out</strong>을 반복한다. 서버 주소 선택이 실제 요청 목적지를 바꾼다는 점을 확인한다.</li>
+<li>Swagger UI를 API와 다른 포트 또는 도메인에서 열어 테스트한다면, API 서버의 CORS 허용 출처에 UI 출처를 추가한다. 출처가 같다면 이 단계의 CORS 변경은 필요하지 않다.</li>
+</ol>
+<h2 id="자주-하는-실수"><a class="anchor" href="#자주-하는-실수" aria-hidden="true">#</a>자주 하는 실수</h2>
+<ol>
+<li><strong>증상:</strong> Spring Boot 4에서 클래스 로딩·자동 설정 오류가 난다 → <strong>원인:</strong> Boot 3용 springdoc 2.x나 다른 세대 starter를 섞었다 → <strong>대처:</strong> 4.x 호환 3.x 계열을 선택하고 Boot·Framework 조합으로 시작과 문서 응답을 확인한다.</li>
+<li><strong>증상:</strong> UI는 열리지만 API 호출이 실패한다 → <strong>원인:</strong> <code>servers</code>가 다른 포트·내부 주소를 가리킨다 → <strong>대처:</strong> 브라우저에서 접근 가능한 실제 API 기본 URL로 맞춘다.</li>
+<li><strong>증상:</strong> <code>Try it out</code>이 CORS 오류를 낸다 → <strong>원인:</strong> UI와 API의 출처가 다른데 API가 UI 출처를 허용하지 않는다 → <strong>대처:</strong> 필요한 출처·메서드·헤더만 Spring CORS 정책에서 허용한다.</li>
+<li><strong>증상:</strong> Authorize에 토큰을 넣어도 401이 난다 → <strong>원인:</strong> OpenAPI 보안 스키마를 빠뜨렸거나, 설정이 요구하는 토큰 형식과 입력이 다르다 → <strong>대처:</strong> HTTP bearer 스키마와 operation 보안 요구사항을 확인하고 UI가 만든 요청 헤더를 확인한다.</li>
+<li><strong>증상:</strong> 문서에 404가 없거나 실제 오류 본문이 다르다 → <strong>원인:</strong> 성공 반환 타입만 자동 문서화했다 → <strong>대처:</strong> <code>@ApiResponse</code>에 실제 상태·미디어 타입·ProblemDetail 스키마를 추가하고 오류 테스트와 대조한다.</li>
+<li><strong>증상:</strong> 운영에서 화면은 숨었지만 명세를 내려받을 수 있다 → <strong>원인:</strong> Swagger UI만 비활성화하고 API 문서 경로는 열어 두었다 → <strong>대처:</strong> <code>/v3/api-docs</code>의 노출 정책도 정하고 <code>springdoc.api-docs.enabled</code>와 접근 제어를 설정한다.</li>
+<li><strong>증상:</strong> DTO 필드 설명이나 예시가 실제 JSON과 다르다 → <strong>원인:</strong> 애너테이션 설명만 수정하고 직렬화 결과는 검증하지 않았다 → <strong>대처:</strong> 응답 본문 계약 테스트를 두고 생성 명세와 실제 JSON을 함께 리뷰한다.</li>
+</ol>
+<h2 id="자가점검-qa"><a class="anchor" href="#자가점검-qa" aria-hidden="true">#</a>자가점검 Q&amp;A</h2>
+<h3 id="q1-openapi와-swagger-ui는-무엇이-다른가"><a class="anchor" href="#q1-openapi와-swagger-ui는-무엇이-다른가" aria-hidden="true">#</a>Q1. OpenAPI와 Swagger UI는 무엇이 다른가?</h3>
+<p>OpenAPI는 API 계약을 표현하는 표준 명세다. Swagger UI는 그 명세를 읽어 사람이 탐색하고 요청을 실행하게 하는 화면 도구다.</p>
+<p><strong>꼬리 질문:</strong> Swagger UI를 제거하면 API 명세도 사라지는가? → 아니다. <code>/v3/api-docs</code>를 끄지 않았다면 UI 없이도 JSON/YAML 명세를 요청할 수 있다.</p>
+<h3 id="q2-securityscheme만-선언하면-api가-jwt-인증으로-보호되는가"><a class="anchor" href="#q2-securityscheme만-선언하면-api가-jwt-인증으로-보호되는가" aria-hidden="true">#</a>Q2. <code>@SecurityScheme</code>만 선언하면 API가 JWT 인증으로 보호되는가?</h3>
+<p>아니다. 보안 스키마는 문서에서 인증 방법을 설명한다. 실제 요청 인증은 Spring Security 등이 수행하고, OpenAPI에는 해당 operation의 <code>@SecurityRequirement</code>도 지정해야 UI에 인증이 연결된다.</p>
+<p><strong>꼬리 질문:</strong> 토큰을 브라우저 UI에 넣어도 되는가? → 개발용 테스트 토큰만 사용하고, 운영 토큰·장기 비밀 키를 문서 UI에 입력하거나 공유하지 않는다.</p>
+<h3 id="q3-servers를-바꾸면-무엇이-달라지는가"><a class="anchor" href="#q3-servers를-바꾸면-무엇이-달라지는가" aria-hidden="true">#</a>Q3. <code>servers</code>를 바꾸면 무엇이 달라지는가?</h3>
+<p>Swagger UI가 <code>Try it out</code> 요청을 보낼 기본 호스트·포트·기본 경로가 달라진다. operation의 <code>/api/posts</code> 경로나 실제 서버의 리스닝 포트 자체가 자동 변경되는 것은 아니다.</p>
+<p><strong>꼬리 질문:</strong> UI와 API가 다른 포트면 왜 CORS가 필요한가? → 포트가 다르면 브라우저 기준 출처가 다르다. API가 UI의 출처를 CORS 정책으로 허용해야 브라우저가 응답을 읽을 수 있다.</p>
+<h3 id="q4-그룹-posts-v1을-만들면-api가-버전-관리되는가"><a class="anchor" href="#q4-그룹-posts-v1을-만들면-api가-버전-관리되는가" aria-hidden="true">#</a>Q4. 그룹 <code>posts-v1</code>을 만들면 API가 버전 관리되는가?</h3>
+<p>아니다. 그룹은 문서에 포함할 경로·패키지를 나누고 별도 명세 URL을 제공한다. API 버전은 실제 요청 매핑, 경로·헤더 정책과 호환성 약속으로 구현해야 한다.</p>
+<p><strong>꼬리 질문:</strong> <code>info.version</code>은 springdoc 버전인가? → 아니다. 해당 OpenAPI 문서에 표현한 API 계약의 버전이다.</p>
+<h3 id="q5-문서를-자동-생성하는데-왜-테스트가-필요한가"><a class="anchor" href="#q5-문서를-자동-생성하는데-왜-테스트가-필요한가" aria-hidden="true">#</a>Q5. 문서를 자동 생성하는데 왜 테스트가 필요한가?</h3>
+<p>springdoc은 매핑과 모델에서 많은 정보를 얻지만, 인증 정책·대표 오류·미디어 타입·설명은 애너테이션과 설정에 의존한다. 실제 응답과 생성 명세가 어긋날 수 있다. 명세 검사와 HTTP 계약 테스트를 함께 실행해 차이를 잡는다.</p>
+<h2 id="참고문헌"><a class="anchor" href="#참고문헌" aria-hidden="true">#</a>참고문헌</h2>
+<ul>
+<li>OpenAPI Specification 3.1.1 — <a href="https://spec.openapis.org/oas/v3.1.1.html" target="_blank" rel="noopener">https://spec.openapis.org/oas/v3.1.1.html</a> — API 문서의 표준 구조와 필드 정의.</li>
+<li>springdoc-openapi 공식 문서 — <a href="https://springdoc.org/" target="_blank" rel="noopener">https://springdoc.org/</a> — Spring 지원 버전 안내, starter, 기본 문서/UI 경로, 설정 키와 <code>GroupedOpenApi</code> 사용법.</li>
+<li>springdoc-openapi Releases — <a href="https://github.com/springdoc/springdoc-openapi/releases" target="_blank" rel="noopener">https://github.com/springdoc/springdoc-openapi/releases</a> — 3.x 릴리스와 변경 내용. 3.1.1 릴리스 — <a href="https://github.com/springdoc/springdoc-openapi/releases/tag/v3.1.1" target="_blank" rel="noopener">https://github.com/springdoc/springdoc-openapi/releases/tag/v3.1.1</a></li>
+<li>Swagger: API Server and Base Path — <a href="https://swagger.io/docs/specification/v3_0/api-host-and-base-path/" target="_blank" rel="noopener">https://swagger.io/docs/specification/v3_0/api-host-and-base-path/</a> — OpenAPI 3의 <code>servers</code>, 여러 서버, 상대 URL 동작.</li>
+<li>Swagger UI Configuration — <a href="https://swagger.io/docs/open-source-tools/swagger-ui/usage/configuration/" target="_blank" rel="noopener">https://swagger.io/docs/open-source-tools/swagger-ui/usage/configuration/</a> — 문서 URL과 <code>Try it out</code> 등 UI 설정.</li>
+<li>swagger-core Annotations — <a href="https://github.com/swagger-api/swagger-core/wiki/Swagger-2.X---Annotations" target="_blank" rel="noopener">https://github.com/swagger-api/swagger-core/wiki/Swagger-2.X---Annotations</a> — <code>@Operation</code>, <code>@ApiResponse</code>, <code>@Schema</code>, 보안 애너테이션의 역할.</li>
+<li>Spring Framework: Error Responses — <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-rest-exceptions.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-rest-exceptions.html</a> — <code>ProblemDetail</code>, <code>ErrorResponse</code>, RFC 9457 오류 응답 처리.</li>
+<li>Spring Framework: CORS — <a href="https://docs.spring.io/spring-framework/reference/web/webmvc-cors.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/web/webmvc-cors.html</a> — Spring MVC CORS 처리와 허용 정책.</li>
+<li>Spring Boot: Profiles — <a href="https://docs.spring.io/spring-boot/reference/features/profiles.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/features/profiles.html</a> — 활성 프로파일 및 <code>application-{profile}</code> 설정.</li>
+<li>RFC 9457: Problem Details for HTTP APIs — <a href="https://www.rfc-editor.org/rfc/rfc9457.html" target="_blank" rel="noopener">https://www.rfc-editor.org/rfc/rfc9457.html</a> — HTTP API 오류 본문 표준.</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

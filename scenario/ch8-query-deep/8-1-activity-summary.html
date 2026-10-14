@@ -9,8 +9,8 @@
 <body>
 <header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
 <main>
-<p class="crumbs"><a href="../README.html">시나리오</a> › 8장. 쿼리 심화 — 학습용 데이터(practice) › 8-1</p>
-<h1 id="8-1-회원별-활동-요약--left-join과-집계"><a class="anchor" href="#8-1-회원별-활동-요약--left-join과-집계" aria-hidden="true">#</a>8-1. 회원별 활동 요약 — LEFT JOIN과 집계</h1>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 8장. 쿼리 심화 — 학습용 데이터(practice) › 8-1</p><p class="level-tags"><span>고급</span><span>게시판 본편</span><span>DB practice</span></p>
+<section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><p>요청은 이 페이지가 열린 출처에서 브라우저로 전송됩니다. CORS 설정에 이 출처가 허용되어 있어야 합니다.</p></section><h1 id="8-1-회원별-활동-요약--left-join과-집계"><a class="anchor" href="#8-1-회원별-활동-요약--left-join과-집계" aria-hidden="true">#</a>8-1. 회원별 활동 요약 — LEFT JOIN과 집계</h1>
 <blockquote>
 <p><strong>8장은 학습용 DB(<code>practice</code>)를 쓴다.</strong> 앱을 <code>./gradlew bootRun --args=&#39;--spring.profiles.active=practice&#39;</code>로 띄운다(IntelliJ: Active profiles에 <code>practice</code>). 회원 30명·글 145·좋아요 568에 함정이 섞여 있다(<a href="../../practice/MISSIONS.html">학습용 미션</a>의 &quot;데이터에 숨겨 둔 함정&quot;). 토큰은 <code>tok-p01</code><del><code>tok-p30</code>(번호 = 회원 id), 운영자는 <code>tok-p01</code>. 2</del>6장에서 만든 API와 규칙(볼 수 있는 글만 등)이 그대로 동작한다고 가정한다.</p>
 </blockquote>
@@ -18,8 +18,15 @@
 <blockquote>
 <p>&quot;관리자 화면에 회원별 활동 요약 표를 넣어 주세요. 쓴 글, 쓴 댓글, 받은 좋아요, 누른 좋아요요. 활동이 없는 회원도 0으로 나와야 해요.&quot;</p>
 </blockquote>
-<p>여러 테이블을 묶어 세는 <strong>집계 쿼리</strong>다. 8장부터는 순서를 바꾼다. <strong>SQL을 먼저 완성하고</strong>(CloudBeaver의 <code>practice (학습용)</code> 연결), 그다음 API로 옮긴다.</p>
-<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<p>여러 테이블을 묶어 세는 <strong>집계 쿼리</strong>다. 8장부터는 순서를 바꾼다. <strong>SQL을 먼저 완성하고</strong>(CloudBeaver의 <code>practice (Java 학습용)</code> 연결), 그다음 API로 옮긴다.</p>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-display"><h3>관리자 — 회원 활동 요약</h3><p>여러 테이블을 묶어 세는 집계. 활동이 없는 회원도 0으로 나와야 한다.</p><div class="screen-widgets"><div class="screen-widget screen-bar"><strong>관리자 · 회원 활동</strong><span>운영자</span></div><div class="screen-widget screen-list"><strong>list</strong><span>코딩하는고양이 · 스프링요정 · 탈퇴한 회원 · 새로온회원</span></div></div></div><div class="scenario-flows"><details class="scenario-flow"><summary>표 열기</summary><ol><li><span class="flow-kind">사용자</span><p>관리자 화면에서 '회원 활동'을 연다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/stats/member-activity</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT m.id, m.nickname,
+  (SELECT COUNT(*) FROM post p WHERE p.author_id = m.id AND p.status = 'PUBLISHED' AND p.deleted_at IS NULL) AS posts,
+  (SELECT COUNT(*) FROM comment c ...) AS comments,
+  (SELECT COUNT(*) FROM post_like l JOIN post p ... WHERE p.author_id = m.id ...) AS likes_received,
+  (SELECT COUNT(*) FROM post_like l WHERE l.member_id = m.id) AS likes_given
+FROM member m ORDER BY likes_received DESC, m.id</dd><dt>note</dt><dd>숫자마다 따로 센다 — 쿼리 한 번</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>[{&quot;memberId&quot;: 2, &quot;nickname&quot;: &quot;코딩하는고양이&quot;, &quot;posts&quot;: 13, &quot;comments&quot;: 13, &quot;likesReceived&quot;: 74, &quot;likesGiven&quot;: 18}, …]</dd></dl></li><li><span class="flow-kind">화면</span><p>30명 전부, 활동 없는 회원도 0으로</p></li></ol></details><details class="scenario-flow"><summary>잘못된 쿼리 — 곱해지는 JOIN</summary><ol><li><span class="flow-kind">사용자</span><p>(틀린 구현) 글·댓글을 한 번에 LEFT JOIN 해서 센다</p></li><li><span class="flow-kind">HTTP 요청</span><p>GET /api/stats/member-activity</p></li><li><span class="flow-kind">DB</span><p></p><dl><dt>sql</dt><dd>SELECT m.id, COUNT(p.id), COUNT(c.id) FROM member m LEFT JOIN post p ON ... LEFT JOIN comment c ON ... GROUP BY m.id</dd><dt>note</dt><dd>글 13개 × 댓글 14개 → 행이 곱해져 182</dd></dl></li><li><span class="flow-kind">HTTP 응답</span><p></p><dl><dt>status</dt><dd>200</dd><dt>headers</dt><dd>Content-Type: application/json</dd><dt>body</dt><dd>[{&quot;memberId&quot;: 2, &quot;posts&quot;: 182, &quot;comments&quot;: 182, ...}]</dd></dl></li><li><span class="flow-kind">화면</span><p>숫자가 부풀어 오른다 — 이 단계의 핵심 함정</p></li></ol></details></div></section><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -73,13 +80,2727 @@
 <td>탈퇴(<code>WITHDRAWN</code>) 회원은 <code>&quot;탈퇴한 회원&quot;</code></td>
 </tr>
 </tbody></table></div>
+<h2 id="구현-가이드"><a class="anchor" href="#구현-가이드" aria-hidden="true">#</a>구현 가이드</h2>
+<p>이 단계의 화면·DB 흐름을 아래 참조 파일과 연결한다. 요구 계약을 먼저 구현하고, 필요한 파일 역할만 펼쳐 전체 코드와 비교한다.</p>
+<p>구현 순서에서 확인할 흐름:</p>
+<ul>
+<li>숫자마다 따로 센다 — 쿼리 한 번</li>
+<li>글 13개 × 댓글 14개 → 행이 곱해져 182</li>
+</ul>
+<details>
+<summary>DB / SQL</summary>
+
+<p><code>8-1-member-activity.sql</code>은 <code>member</code>에서 출발한다. 숫자를 각각 상관 서브쿼리로 세면 활동이 없는 회원도 결과에서 빠지지 않고 <code>COUNT(*)</code>가 0을 돌려준다. 댓글은 댓글과 원글의 <code>deleted_at</code>을 둘 다 확인하고, 받은 좋아요는 <code>post.like_count</code>가 아닌 <code>post_like</code> 행을 센다.</p>
+<pre><code class="language-sql">SELECT m.id AS member_id,
+       CASE WHEN m.member_status = 'WITHDRAWN' THEN '탈퇴한 회원' ELSE m.nickname END AS nickname,
+       (SELECT COUNT(*) FROM post p
+         WHERE p.author_id = m.id AND p.status = 'PUBLISHED' AND p.deleted_at IS NULL) AS posts,
+       (SELECT COUNT(*) FROM comment c JOIN post p ON p.id = c.post_id
+         WHERE c.member_id = m.id AND c.deleted_at IS NULL AND p.deleted_at IS NULL) AS comments,
+       (SELECT COUNT(*) FROM post_like l JOIN post p ON p.id = l.post_id
+         WHERE p.author_id = m.id AND p.deleted_at IS NULL) AS likes_received,
+       (SELECT COUNT(*) FROM post_like l WHERE l.member_id = m.id) AS likes_given
+  FROM member m
+ ORDER BY likes_received DESC, m.id ASC;</code></pre>
+<p>이 쿼리를 먼저 <code>practice</code> DB에서 실행하고 회원 30이 모두 0인지, 회원 12의 받은 좋아요가 10인지 확인한다.</p>
+</details>
+
+<details>
+<summary>DTO / 결과 행</summary>
+
+<p><code>MemberActivityResponse.java</code>는 JSON 응답이다. <code>MemberActivityRow.java</code>는 JPA 네이티브 쿼리의 열 별칭을 받는 인터페이스 프로젝션이다. <code>COUNT(*)</code>는 <code>Long</code>으로 받고 응답에는 <code>long</code>으로 넘긴다.</p>
+<pre><code class="language-java">public record MemberActivityResponse(Long memberId, String nickname,
+        long posts, long comments, long likesReceived, long likesGiven) {}
+
+public interface MemberActivityRow {
+    Long getMemberId();
+    String getNickname();
+    Long getPosts();
+    Long getComments();
+    Long getLikesReceived();
+    Long getLikesGiven();
+}</code></pre>
+</details>
+
+<details>
+<summary>Controller</summary>
+
+<p><code>StatsController.java</code>는 요청 값을 받지 않고 요약 목록을 반환한다. 기존 인증 인터셉터가 <code>/api/stats/member-activity</code>를 막지 않는지도 HTTP로 확인한다.</p>
+<pre><code class="language-java">@GetMapping(&quot;/api/stats/member-activity&quot;)
+public List&lt;MemberActivityResponse&gt; memberActivity() {
+    return statsService.memberActivity();
+}</code></pre>
+</details>
+
+<details>
+<summary>JPA / Repository</summary>
+
+<p><code>StatsRepository.java</code>는 위 SQL과 같은 네이티브 쿼리 한 번으로 <code>List&lt;MemberActivityRow&gt;</code>를 만든다. SQL 파일의 <code>member_id</code>·<code>likes_received</code> 별칭을 Java getter에 맞는 <code>memberId</code>·<code>likesReceived</code>로 바꾸는 부분을 확인한다.</p>
+<pre><code class="language-java">public interface StatsRepository extends Repository&lt;Member, Long&gt; {
+    @Query(nativeQuery = true, value = &quot;&quot;&quot;
+            SELECT m.id AS memberId,
+                   CASE WHEN m.member_status = 'WITHDRAWN' THEN '탈퇴한 회원' ELSE m.nickname END AS nickname,
+                   (SELECT COUNT(*) FROM post p WHERE p.author_id = m.id
+                    AND p.status = 'PUBLISHED' AND p.deleted_at IS NULL) AS posts,
+                   (SELECT COUNT(*) FROM comment c JOIN post p ON p.id = c.post_id
+                    WHERE c.member_id = m.id AND c.deleted_at IS NULL
+                      AND p.deleted_at IS NULL) AS comments,
+                   (SELECT COUNT(*) FROM post_like l JOIN post p ON p.id = l.post_id
+                    WHERE p.author_id = m.id AND p.deleted_at IS NULL) AS likesReceived,
+                   (SELECT COUNT(*) FROM post_like l WHERE l.member_id = m.id) AS likesGiven
+              FROM member m ORDER BY likesReceived DESC, m.id ASC
+            &quot;&quot;&quot;)
+    List&lt;MemberActivityRow&gt; findMemberActivity();
+}</code></pre>
+<p>별칭이 인터페이스 getter와 맞지 않으면 값이 <code>null</code>로 들어올 수 있으므로 JSON에서 앞 5명과 활동 없는 회원 30을 직접 확인한다.</p>
+</details>
+
+<details>
+<summary>Service</summary>
+
+<p><code>StatsService.java</code>는 집계 결과를 응답 DTO로 옮긴다. 회원별로 다시 저장소를 호출하는 반복문을 두지 않는다.</p>
+<pre><code class="language-java">@Transactional(readOnly = true)
+public List&lt;MemberActivityResponse&gt; memberActivity() {
+    return statsRepository.findMemberActivity().stream()
+            .map(r -&gt; new MemberActivityResponse(r.getMemberId(), r.getNickname(),
+                    r.getPosts(), r.getComments(), r.getLikesReceived(), r.getLikesGiven()))
+            .toList();
+}</code></pre>
+<p>MyBatis로 풀 때는 같은 SQL을 <code>MyBatisStatsMapper.xml</code>의 <code>&lt;select&gt;</code>에 넣고 <code>MyBatisStatsMapper.findMemberActivity()</code> 한 번만 호출한다. Java <code>MemberActivityRow</code>에는 기본 생성자와 setter를 두고 <code>map-underscore-to-camel-case</code>로 <code>likes_received</code>를 <code>likesReceived</code>에 매핑한다. <strong>MyBatis / Mapper</strong> 코드 접기에서 Java·XML·Service의 전체 대체 구현을 확인한다.</p>
+</details>
+
+<h2 id="전체-구현-코드"><a class="anchor" href="#전체-구현-코드" aria-hidden="true">#</a>전체 구현 코드</h2>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<details class="code-file"><summary>DB / SQL — sql/8-1-member-activity.sql</summary><pre><code>-- 8-1 회원별 활동 요약 (practice DB)
+-- member를 기준으로 두고 숫자마다 상관 서브쿼리로 따로 센다.
+-- 글·댓글·좋아요를 한 번에 LEFT JOIN 한 뒤 COUNT하면 행이 곱해져(회원 2: 182) 숫자가 부풀어 오른다.
+--   posts          : 그 회원이 쓴 PUBLISHED·미삭제 글
+--   comments       : 그 회원이 쓴 미삭제 댓글 중, 달린 글도 미삭제인 것
+--   likes_received : 그 회원이 쓴 미삭제 글에 달린 좋아요 &quot;행 수&quot;(post.like_count는 어긋날 수 있어 쓰지 않는다)
+--   likes_given    : 그 회원이 누른 좋아요 행 수
+--   nickname       : 탈퇴(WITHDRAWN) 회원은 '탈퇴한 회원'
+SELECT m.id AS member_id,
+       CASE WHEN m.member_status = 'WITHDRAWN' THEN '탈퇴한 회원' ELSE m.nickname END AS nickname,
+       (SELECT COUNT(*)
+          FROM post p
+         WHERE p.author_id = m.id AND p.status = 'PUBLISHED' AND p.deleted_at IS NULL) AS posts,
+       (SELECT COUNT(*)
+          FROM comment c
+          JOIN post p ON p.id = c.post_id
+         WHERE c.member_id = m.id AND c.deleted_at IS NULL AND p.deleted_at IS NULL) AS comments,
+       (SELECT COUNT(*)
+          FROM post_like l
+          JOIN post p ON p.id = l.post_id
+         WHERE p.author_id = m.id AND p.deleted_at IS NULL) AS likes_received,
+       (SELECT COUNT(*)
+          FROM post_like l
+         WHERE l.member_id = m.id) AS likes_given
+  FROM member m
+ ORDER BY likes_received DESC, m.id ASC;
+</code></pre></details>
+<details class="code-file"><summary>DTO — src/main/java/org/example/stats/MemberActivityResponse.java</summary><pre><code>package org.example.stats;
+
+<p>public record MemberActivityResponse(
+        Long memberId,
+        String nickname,
+        long posts,
+        long comments,
+        long likesReceived,
+        long likesGiven
+) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/stats/MemberActivityRow.java</summary><pre><code>package org.example.stats;
+
+<p>// 네이티브 쿼리 결과를 받는 인터페이스 프로젝션 — 컬럼 별칭과 getter 이름이 같아야 한다
+public interface MemberActivityRow {</p>
+<pre><code>Long getMemberId();
+
+String getNickname();
+
+Long getPosts();
+
+Long getComments();
+
+Long getLikesReceived();
+
+Long getLikesGiven();</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/stats/StatsController.java</summary><pre><code>package org.example.stats;
+
+<p>import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>import java.util.List;</p>
+<p>@RestController
+public class StatsController {</p>
+<pre><code>private final StatsService statsService;
+
+public StatsController(StatsService statsService) {
+    this.statsService = statsService;
+}
+
+// 8-1 — 인증 필요 없음(명세)
+@GetMapping(&amp;quot;/api/stats/member-activity&amp;quot;)
+public List&amp;lt;MemberActivityResponse&amp;gt; memberActivity() {
+    return statsService.memberActivity();
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/stats/StatsRepository.java</summary><pre><code>package org.example.stats;
+
+<p>import org.example.member.Member;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.Repository;</p>
+<p>import java.util.List;</p>
+<p>// 통계는 엔티티를 읽어 자바에서 세지 않고 SQL 한 번으로 집계해 프로젝션으로 받는다.
+// (엔티티 조회는 회원 30명 × 연관 컬렉션 로딩이 되고, 세는 일은 DB가 훨씬 잘한다)
+public interface StatsRepository extends Repository&lt;Member, Long&gt; {</p>
+<pre><code>// sql/8-1-member-activity.sql과 같은 쿼리 — 별칭만 프로젝션 getter 이름(camelCase)에 맞췄다.
+// 숫자마다 상관 서브쿼리로 따로 세서 JOIN으로 행이 곱해지지 않게 한다.
+@Query(nativeQuery = true, value = &amp;quot;&amp;quot;&amp;quot;
+        SELECT m.id AS memberId,
+               CASE WHEN m.member_status = 'WITHDRAWN' THEN '탈퇴한 회원' ELSE m.nickname END AS nickname,
+               (SELECT COUNT(*)
+                  FROM post p
+                 WHERE p.author_id = m.id AND p.status = 'PUBLISHED' AND p.deleted_at IS NULL) AS posts,
+               (SELECT COUNT(*)
+                  FROM comment c
+                  JOIN post p ON p.id = c.post_id
+                 WHERE c.member_id = m.id AND c.deleted_at IS NULL AND p.deleted_at IS NULL) AS comments,
+               (SELECT COUNT(*)
+                  FROM post_like l
+                  JOIN post p ON p.id = l.post_id
+                 WHERE p.author_id = m.id AND p.deleted_at IS NULL) AS likesReceived,
+               (SELECT COUNT(*)
+                  FROM post_like l
+                 WHERE l.member_id = m.id) AS likesGiven
+          FROM member m
+         ORDER BY likesReceived DESC, m.id ASC
+        &amp;quot;&amp;quot;&amp;quot;)
+List&amp;lt;MemberActivityRow&amp;gt; findMemberActivity();</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/stats/StatsService.java</summary><pre><code>package org.example.stats;
+
+<p>import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.util.List;</p>
+<p>@Service
+public class StatsService {</p>
+<pre><code>private final StatsRepository statsRepository;
+
+public StatsService(StatsRepository statsRepository) {
+    this.statsRepository = statsRepository;
+}
+
+@Transactional(readOnly = true)
+public List&amp;lt;MemberActivityResponse&amp;gt; memberActivity() {
+    return statsRepository.findMemberActivity().stream()
+            .map(r -&amp;gt; new MemberActivityResponse(
+                    r.getMemberId(), r.getNickname(),
+                    r.getPosts(), r.getComments(), r.getLikesReceived(), r.getLikesGiven()))
+            .toList();
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/8-1.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+<h2 id="mybatis-대체-구현-코드"><a class="anchor" href="#mybatis-대체-구현-코드" aria-hidden="true">#</a>MyBatis 대체 구현 코드</h2>
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {
+    id 'java'
+    // bootRun / bootJar 태스크 제공 + 실행 가능한 fat jar 패키징
+    id 'org.springframework.boot' version '4.1.1'
+    // Boot BOM을 적용해서 아래 의존성들의 버전을 생략할 수 있게 해줌
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+<p>group = &#39;org.example&#39;
+version = &#39;1.0-SNAPSHOT&#39;</p>
+<p>java {
+    toolchain {
+        // 컴파일·실행 JDK를 고정 (Boot 4는 Java 17 이상 필요, 로컬에 설치된 21 사용)
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}</p>
+<p>repositories {
+    mavenCentral()
+}</p>
+<p>dependencies {
+    compileOnly &#39;org.projectlombok:lombok&#39;
+    annotationProcessor &#39;org.projectlombok:lombok&#39;
+    // Spring MVC + 내장 Tomcat + Jackson (Boot 4부터 starter-web → starter-webmvc로 이름 변경)
+    implementation &#39;org.springframework.boot:spring-boot-starter-webmvc&#39;
+    // JPA(Hibernate) + HikariCP 커넥션 풀
+    implementation &#39;org.springframework.boot:spring-boot-starter-data-jpa&#39;
+    implementation &#39;org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0&#39;
+    // @Valid, @NotBlank 같은 요청 값 검증
+    implementation &#39;org.springframework.boot:spring-boot-starter-validation&#39;
+    // MySQL JDBC 드라이버 — 컴파일엔 필요 없고 실행할 때만 필요
+    runtimeOnly &#39;com.mysql:mysql-connector-j&#39;</p>
+<pre><code>// 테스트: JUnit·AssertJ·Mockito·MockMvc 묶음 (버전은 Boot BOM이 관리하므로 junit-bom 따로 두지 않음)
+testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+// @DataJpaTest(리포지토리만 띄우는 테스트)
+testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+// 테스트용 일회용 MySQL 컨테이너 — application-test.yml의 jdbc:tc: URL이 쓴다
+testImplementation 'org.testcontainers:testcontainers-mysql'
+// Gradle이 JUnit Platform 테스트를 실행할 때 필요한 런처
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'</code></pre>
+<p>}</p>
+<p>tasks.named(&#39;test&#39;) {
+    useJUnitPlatform()
+    // 테스트는 application-test.yml(Testcontainers MySQL)을 쓰게 한다
+    systemProperty &#39;spring.profiles.active&#39;, &#39;test&#39;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/bookmark/BookmarkController.java</summary><pre><code>package org.example.bookmark;
+
+<p>import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;</p>
+<p>@RestController
+public class BookmarkController {</p>
+<pre><code>private final MyBatisBookmarkService bookmarkService;
+
+public BookmarkController(MyBatisBookmarkService bookmarkService) {
+    this.bookmarkService = bookmarkService;
+}
+
+@PutMapping(&amp;quot;/api/posts/{id}/bookmark&amp;quot;)
+public BookmarkResponse bookmark(@PathVariable Long id,
+                                 @LoginMember AuthenticatedMember loginMember,
+                                 @RequestBody(required = false) JsonNode request) {
+    BookmarkRequest body = BookmarkRequest.from(request);
+    return bookmarkService.bookmark(id, loginMember, body);
+}
+
+@PatchMapping(&amp;quot;/api/posts/{id}/bookmark&amp;quot;)
+public BookmarkResponse patchMemo(@PathVariable Long id,
+                                  @LoginMember AuthenticatedMember loginMember,
+                                  @RequestBody BookmarkMemoPatchRequest request) {
+    return bookmarkService.patchMemo(id, loginMember, request);
+}
+
+@DeleteMapping(&amp;quot;/api/posts/{id}/bookmark&amp;quot;)
+@ResponseStatus(HttpStatus.NO_CONTENT)
+public void unbookmark(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+    bookmarkService.unbookmark(id, loginMember);
+}
+
+@PatchMapping(&amp;quot;/api/me/bookmarks/{bookmarkId}&amp;quot;)
+public BookmarkResponse move(@PathVariable Long bookmarkId,
+                             @LoginMember AuthenticatedMember loginMember,
+                             @RequestBody JsonNode request) {
+    return bookmarkService.move(bookmarkId, loginMember, BookmarkMoveRequest.from(request));
+}
+
+// GET이지만 &amp;quot;내 것&amp;quot; 엔드포인트라 인증 필수(4-3과 같은 이유로 컨트롤러에서 확인)
+@GetMapping(&amp;quot;/api/me/bookmarks&amp;quot;)
+public MyBookmarksResponse myBookmarks(@RequestParam(required = false) String folder,
+                                       @RequestParam(defaultValue = &amp;quot;10&amp;quot;) @Min(1) @Max(100) int size,
+                                       @RequestParam(required = false) String cursor,
+                                       @LoginMember AuthenticatedMember loginMember) {
+    if (loginMember == null) {
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+    return bookmarkService.myBookmarks(loginMember, folder, size, cursor);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/bookmark/BookmarkFolderController.java</summary><pre><code>package org.example.bookmark;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>import java.net.URI;
+import java.util.List;
+import tools.jackson.databind.JsonNode;</p>
+<p>@RestController
+@RequestMapping(&quot;/api/me/bookmark-folders&quot;)
+public class BookmarkFolderController {</p>
+<pre><code>private final MyBatisBookmarkFolderService folderService;
+
+public BookmarkFolderController(MyBatisBookmarkFolderService folderService) {
+    this.folderService = folderService;
+}
+
+// GET이지만 &amp;quot;내 것&amp;quot; 엔드포인트라 인증 필수(인터셉터는 GET+헤더 없음을 통과시키므로 여기서 확인)
+@GetMapping
+public List&amp;lt;BookmarkFolderSummaryResponse&amp;gt; list(@LoginMember AuthenticatedMember me) {
+    if (me == null) {
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+    return folderService.list(me);
+}
+
+@PostMapping
+public ResponseEntity&amp;lt;BookmarkFolderResponse&amp;gt; create(@LoginMember AuthenticatedMember me,
+                                                     @RequestBody JsonNode request) {
+    BookmarkFolderResponse created = folderService.create(me, BookmarkFolderRequest.from(request));
+    return ResponseEntity.created(URI.create(&amp;quot;/api/me/bookmark-folders/&amp;quot; + created.id())).body(created);
+}
+
+@PatchMapping(&amp;quot;/{id}&amp;quot;)
+public BookmarkFolderResponse rename(@PathVariable Long id, @LoginMember AuthenticatedMember me,
+                                     @RequestBody JsonNode request) {
+    return folderService.rename(me, id, BookmarkFolderRequest.from(request));
+}
+
+@DeleteMapping(&amp;quot;/{id}&amp;quot;)
+@ResponseStatus(HttpStatus.NO_CONTENT)
+public void delete(@PathVariable Long id, @LoginMember AuthenticatedMember me) {
+    folderService.delete(me, id);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/bookmark/BookmarkFolderInsertRow.java</summary><pre><code>package org.example.bookmark;
+
+<p>import java.time.LocalDateTime;</p>
+<p>public class BookmarkFolderInsertRow {
+    public Long id;
+    public Long memberId;
+    public String name;
+    public LocalDateTime at;</p>
+<pre><code>public BookmarkFolderInsertRow(Long memberId, String name, LocalDateTime at) {
+    this.memberId = memberId;
+    this.name = name;
+    this.at = at;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/bookmark/BookmarkFolderRow.java</summary><pre><code>package org.example.bookmark;
+
+<p>public class BookmarkFolderRow {
+    public Long id;
+    public String name;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/bookmark/BookmarkInsertRow.java</summary><pre><code>package org.example.bookmark;
+
+<p>import java.time.LocalDateTime;</p>
+<p>public class BookmarkInsertRow {
+    public Long id;
+    public Long memberId;
+    public Long postId;
+    public Long folderId;
+    public String memo;
+    public LocalDateTime at;</p>
+<pre><code>public BookmarkInsertRow(Long memberId, Long postId, Long folderId, String memo, LocalDateTime at) {
+    this.memberId = memberId;
+    this.postId = postId;
+    this.folderId = folderId;
+    this.memo = memo;
+    this.at = at;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/bookmark/BookmarkListRow.java</summary><pre><code>package org.example.bookmark;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 키셋 조회 결과. available=false일 때 제목·작성자는 응답에 담지 않는다.
+public class BookmarkListRow {
+    public Long id;
+    public Long postId;
+    public Long folderId;
+    public String memo;
+    public LocalDateTime bookmarkedAt;
+    public Boolean available;
+    public String title;
+    public Long authorId;
+    public String authorNickname;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/bookmark/BookmarkRow.java</summary><pre><code>package org.example.bookmark;
+
+<p>public class BookmarkRow {
+    public Long id;
+    public Long postId;
+    public Long folderId;
+    public String memo;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/bookmark/MyBatisBookmarkFolderMapper.java</summary><pre><code>package org.example.bookmark;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import java.util.List;</p>
+<p>@Mapper
+public interface MyBatisBookmarkFolderMapper {
+    List&lt;BookmarkFolderSummaryResponse&gt; findSummaries(@Param(&quot;memberId&quot;) Long memberId);
+    Long lockMember(@Param(&quot;memberId&quot;) Long memberId);
+    long countByMember(@Param(&quot;memberId&quot;) Long memberId);
+    int countByName(@Param(&quot;memberId&quot;) Long memberId, @Param(&quot;name&quot;) String name,
+                    @Param(&quot;exceptId&quot;) Long exceptId);
+    BookmarkFolderRow findMine(@Param(&quot;id&quot;) Long id, @Param(&quot;memberId&quot;) Long memberId);
+    int insert(BookmarkFolderInsertRow row);
+    int rename(@Param(&quot;id&quot;) Long id, @Param(&quot;memberId&quot;) Long memberId, @Param(&quot;name&quot;) String name);
+    int moveAllToDefault(@Param(&quot;folderId&quot;) Long folderId, @Param(&quot;memberId&quot;) Long memberId);
+    int deleteMine(@Param(&quot;id&quot;) Long id, @Param(&quot;memberId&quot;) Long memberId);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/bookmark/MyBatisBookmarkFolderService.java</summary><pre><code>package org.example.bookmark;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>@Service
+public class MyBatisBookmarkFolderService {
+    private static final int MAX_FOLDERS = 10;
+    private final MyBatisBookmarkFolderMapper folders;</p>
+<pre><code>public MyBatisBookmarkFolderService(MyBatisBookmarkFolderMapper folders) {
+    this.folders = folders;
+}
+
+@Transactional(readOnly = true)
+public List&amp;lt;BookmarkFolderSummaryResponse&amp;gt; list(AuthenticatedMember me) {
+    return folders.findSummaries(me.id());
+}
+
+@Transactional
+public BookmarkFolderResponse create(AuthenticatedMember me, BookmarkFolderRequest request) {
+    String name = normalizeName(request.name());
+    // 같은 회원의 생성 요청을 직렬화해 10개 한도를 지킨다.
+    folders.lockMember(me.id());
+    if (folders.countByMember(me.id()) &amp;gt;= MAX_FOLDERS) {
+        throw new InvalidBookmarkFolderException(&amp;quot;폴더는 10개까지 만들 수 있습니다.&amp;quot;);
+    }
+    if (folders.countByName(me.id(), name, null) &amp;gt; 0) throw new DuplicateBookmarkFolderNameException();
+    BookmarkFolderInsertRow row = new BookmarkFolderInsertRow(me.id(), name, LocalDateTime.now());
+    try {
+        folders.insert(row);
+    } catch (DataIntegrityViolationException ex) {
+        throw new DuplicateBookmarkFolderNameException();
+    }
+    return new BookmarkFolderResponse(row.id, name);
+}
+
+@Transactional
+public BookmarkFolderResponse rename(AuthenticatedMember me, Long folderId, BookmarkFolderRequest request) {
+    String name = normalizeName(request.name());
+    if (folders.findMine(folderId, me.id()) == null) throw new BookmarkFolderNotFoundException();
+    if (folders.countByName(me.id(), name, folderId) &amp;gt; 0) throw new DuplicateBookmarkFolderNameException();
+    try {
+        if (folders.rename(folderId, me.id(), name) != 1) throw new BookmarkFolderNotFoundException();
+    } catch (DataIntegrityViolationException ex) {
+        throw new DuplicateBookmarkFolderNameException();
+    }
+    return new BookmarkFolderResponse(folderId, name);
+}
+
+@Transactional
+public void delete(AuthenticatedMember me, Long folderId) {
+    if (folders.findMine(folderId, me.id()) == null) throw new BookmarkFolderNotFoundException();
+    folders.moveAllToDefault(folderId, me.id());
+    if (folders.deleteMine(folderId, me.id()) != 1) throw new BookmarkFolderNotFoundException();
+}
+
+private String normalizeName(String raw) {
+    String name = raw == null ? &amp;quot;&amp;quot; : raw.strip();
+    if (name.isEmpty() || name.length() &amp;gt; 50) {
+        throw new InvalidBookmarkFolderException(&amp;quot;폴더 이름은 1~50자여야 합니다.&amp;quot;);
+    }
+    return name;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/bookmark/MyBatisBookmarkMapper.java</summary><pre><code>package org.example.bookmark;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>@Mapper
+public interface MyBatisBookmarkMapper {
+    String findPostStatus(@Param(&quot;postId&quot;) Long postId);
+    Long findOwnedFolder(@Param(&quot;folderId&quot;) Long folderId, @Param(&quot;memberId&quot;) Long memberId);
+    BookmarkRow findBookmark(@Param(&quot;memberId&quot;) Long memberId, @Param(&quot;postId&quot;) Long postId);
+    int upsert(BookmarkInsertRow row);
+    int updateMemo(@Param(&quot;memberId&quot;) Long memberId, @Param(&quot;postId&quot;) Long postId,
+                   @Param(&quot;memo&quot;) String memo);
+    int deleteByMemberAndPost(@Param(&quot;memberId&quot;) Long memberId, @Param(&quot;postId&quot;) Long postId);
+    BookmarkRow findOwnedBookmark(@Param(&quot;id&quot;) Long id, @Param(&quot;memberId&quot;) Long memberId);
+    int moveBookmark(@Param(&quot;id&quot;) Long id, @Param(&quot;memberId&quot;) Long memberId,
+                     @Param(&quot;folderId&quot;) Long folderId);
+    List&lt;BookmarkListRow&gt; findMyBookmarks(@Param(&quot;memberId&quot;) Long memberId,
+                                          @Param(&quot;viewerRole&quot;) String viewerRole,
+                                          @Param(&quot;folderMode&quot;) String folderMode,
+                                          @Param(&quot;folderId&quot;) Long folderId,
+                                          @Param(&quot;cursorAt&quot;) LocalDateTime cursorAt,
+                                          @Param(&quot;cursorId&quot;) Long cursorId,
+                                          @Param(&quot;limit&quot;) int limit);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/bookmark/MyBatisBookmarkService.java</summary><pre><code>package org.example.bookmark;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostVisibilityMapper;
+import org.example.post.AuthorResponse;
+import org.example.common.Cursor;
+import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.JsonNode;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;</p>
+<p>@Service
+public class MyBatisBookmarkService {
+    private final PostVisibilityMapper visiblePosts;
+    private final MyBatisBookmarkMapper bookmarks;</p>
+<pre><code>public MyBatisBookmarkService(PostVisibilityMapper visiblePosts, MyBatisBookmarkMapper bookmarks) {
+    this.visiblePosts = visiblePosts;
+    this.bookmarks = bookmarks;
+}
+
+@Transactional
+public BookmarkResponse bookmark(Long postId, AuthenticatedMember me, BookmarkRequest request) {
+    if (visiblePosts.findVisibleDetail(postId, me.id(), me.role()) == null
+            || !&amp;quot;PUBLISHED&amp;quot;.equals(bookmarks.findPostStatus(postId))) {
+        throw new PostNotFoundException();
+    }
+    Long folderId = request.folderId();
+    if (folderId != null &amp;amp;&amp;amp; bookmarks.findOwnedFolder(folderId, me.id()) == null) {
+        throw new BookmarkFolderNotFoundException();
+    }
+    // UNIQUE(member_id,post_id)를 이용해 생성과 변경을 하나의 SQL로 처리한다.
+    bookmarks.upsert(new BookmarkInsertRow(me.id(), postId, folderId, request.memo(), LocalDateTime.now()));
+    // FOR UPDATE로 현재 행을 읽는다. 반복 PUT도 같은 bookmarkId를 돌려준다.
+    BookmarkRow row = bookmarks.findBookmark(me.id(), postId);
+    return new BookmarkResponse(row.id, postId, true, row.folderId, row.memo);
+}
+
+@Transactional
+public BookmarkResponse patchMemo(Long postId, AuthenticatedMember me,
+                                  BookmarkMemoPatchRequest request) {
+    if (request == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+    // 회원과 글 조건으로 행을 잠그고, 생략된 memo는 UPDATE하지 않는다.
+    BookmarkRow row = bookmarks.findBookmark(me.id(), postId);
+    if (row == null) throw new BookmarkNotFoundException();
+    if (request.isMemoPresent()) {
+        JsonNode value = request.getMemo();
+        if (value != null &amp;amp;&amp;amp; !value.isNull() &amp;amp;&amp;amp; !value.isTextual()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        String memo = value == null || value.isNull() ? null : value.asText();
+        if (memo != null &amp;amp;&amp;amp; memo.length() &amp;gt; 200) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        if (bookmarks.updateMemo(me.id(), postId, memo) != 1) {
+            throw new BookmarkNotFoundException();
+        }
+        row.memo = memo;
+    }
+    return new BookmarkResponse(row.id, postId, true, row.folderId, row.memo);
+}
+
+@Transactional
+public void unbookmark(Long postId, AuthenticatedMember me) {
+    bookmarks.deleteByMemberAndPost(me.id(), postId);
+}
+
+@Transactional
+public BookmarkResponse move(Long bookmarkId, AuthenticatedMember me, BookmarkMoveRequest request) {
+    BookmarkRow row = bookmarks.findOwnedBookmark(bookmarkId, me.id());
+    if (row == null) throw new BookmarkNotFoundException();
+    Long folderId = request.folderId();
+    if (folderId != null &amp;amp;&amp;amp; bookmarks.findOwnedFolder(folderId, me.id()) == null) {
+        throw new BookmarkFolderNotFoundException();
+    }
+    if (bookmarks.moveBookmark(bookmarkId, me.id(), folderId) != 1) {
+        throw new BookmarkNotFoundException();
+    }
+    return new BookmarkResponse(bookmarkId, row.postId, true, folderId, row.memo);
+}
+
+@Transactional(readOnly = true)
+public MyBookmarksResponse myBookmarks(AuthenticatedMember me, String folder, int size, String cursor) {
+    String mode;
+    Long folderId = null;
+    if (folder == null) {
+        mode = &amp;quot;ALL&amp;quot;;
+    } else if (&amp;quot;default&amp;quot;.equals(folder)) {
+        mode = &amp;quot;DEFAULT&amp;quot;;
+    } else {
+        mode = &amp;quot;ID&amp;quot;;
+        try {
+            folderId = Long.valueOf(folder);
+        } catch (NumberFormatException ex) {
+            throw new InvalidBookmarkFolderException(&amp;quot;folder는 생략·default·폴더 id 중 하나여야 합니다.&amp;quot;);
+        }
+        if (bookmarks.findOwnedFolder(folderId, me.id()) == null) {
+            throw new BookmarkFolderNotFoundException();
+        }
+    }
+    Cursor after = Cursor.decode(cursor);
+    List&amp;lt;BookmarkListRow&amp;gt; rows = bookmarks.findMyBookmarks(me.id(), me.role(), mode, folderId,
+            after == null ? null : after.at(), after == null ? null : after.id(), size + 1);
+    boolean hasNext = rows.size() &amp;gt; size;
+    List&amp;lt;BookmarkListRow&amp;gt; page = hasNext ? rows.subList(0, size) : rows;
+    List&amp;lt;BookmarkItemResponse&amp;gt; items = page.stream().map(row -&amp;gt; {
+        boolean available = Boolean.TRUE.equals(row.available);
+        return new BookmarkItemResponse(row.id, row.postId, row.folderId, row.memo,
+                row.bookmarkedAt, available, available ? row.title : null,
+                available ? new AuthorResponse(row.authorId, row.authorNickname) : null);
+    }).toList();
+    BookmarkListRow last = page.isEmpty() ? null : page.get(page.size() - 1);
+    return new MyBookmarksResponse(items,
+            hasNext ? new Cursor(last.bookmarkedAt, last.id).encode() : null);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/comment/CommentController.java</summary><pre><code>package org.example.comment;
+
+<p>import jakarta.validation.Valid;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.net.URI;
+import java.util.List;</p>
+<p>@RestController
+public class CommentController {
+    private final MyBatisCommentService comments;
+    private final MyBatisCommentQueryService query;</p>
+<pre><code>public CommentController(MyBatisCommentService comments, MyBatisCommentQueryService query) {
+    this.comments = comments;
+    this.query = query;
+}
+
+@PostMapping(&amp;quot;/api/posts/{postId}/comments&amp;quot;)
+public ResponseEntity&amp;lt;CommentResponse&amp;gt; create(@PathVariable Long postId,
+        @LoginMember AuthenticatedMember member, @Valid @RequestBody CommentCreateRequest request) {
+    CommentResponse created = comments.create(postId, member, request);
+    return ResponseEntity.created(URI.create(&amp;quot;/api/comments/&amp;quot; + created.id())).body(created);
+}
+
+@GetMapping(&amp;quot;/api/posts/{postId}/comments&amp;quot;)
+public List&amp;lt;CommentThreadResponse&amp;gt; list(@PathVariable Long postId,
+        @LoginMember AuthenticatedMember viewer) {
+    return query.list(postId, viewer);
+}
+
+@DeleteMapping(&amp;quot;/api/comments/{id}&amp;quot;)
+@ResponseStatus(HttpStatus.NO_CONTENT)
+public void delete(@PathVariable Long id, @LoginMember AuthenticatedMember member) {
+    comments.delete(id, member);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/comment/CommentDeleteRow.java</summary><pre><code>package org.example.comment;
+
+<p>import java.time.LocalDateTime;</p>
+<p>public class CommentDeleteRow {
+    public Long id;
+    public Long postId;
+    public Long memberId;
+    public LocalDateTime deletedAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/comment/CommentInsertRow.java</summary><pre><code>package org.example.comment;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 생성 키를 MyBatis가 id에 채우는 삽입 매개변수.
+public class CommentInsertRow {
+    public Long id;
+    public Long postId;
+    public Long memberId;
+    public Long parentId;
+    public String content;
+    public LocalDateTime at;</p>
+<pre><code>public CommentInsertRow(Long postId, Long memberId, Long parentId, String content, LocalDateTime at) {
+    this.postId = postId;
+    this.memberId = memberId;
+    this.parentId = parentId;
+    this.content = content;
+    this.at = at;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/comment/CommentRow.java</summary><pre><code>package org.example.comment;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// SQL 조회 행. Service에서 중첩 작성자 DTO로 변환한다.
+public class CommentRow {
+    public Long id;
+    public String content;
+    public LocalDateTime createdAt;
+    public Long authorId;
+    public String authorNickname;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/comment/CommentTreeRow.java</summary><pre><code>package org.example.comment;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 댓글과 작성자를 한 번의 JOIN으로 읽은 평평한 행.
+public class CommentTreeRow {
+    public Long id;
+    public Long parentId;
+    public Long authorId;
+    public String authorNickname;
+    public String content;
+    public LocalDateTime createdAt;
+    public LocalDateTime deletedAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/comment/MyBatisCommentMapper.java</summary><pre><code>package org.example.comment;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import java.util.List;</p>
+<p>@Mapper
+public interface MyBatisCommentMapper {
+    ParentCommentRow findParent(@Param(&quot;parentId&quot;) Long parentId);
+    String findPostStatus(@Param(&quot;postId&quot;) Long postId);
+    int insertComment(CommentInsertRow row);
+    int incrementCommentCount(@Param(&quot;postId&quot;) Long postId);
+    List&lt;CommentRow&gt; selectTopLevel(@Param(&quot;postId&quot;) Long postId);
+    List&lt;CommentTreeRow&gt; selectThreadRows(@Param(&quot;postId&quot;) Long postId);
+    List&lt;Long&gt; selectBlockedMemberIds(@Param(&quot;viewerId&quot;) Long viewerId);
+    CommentDeleteRow findForDelete(@Param(&quot;id&quot;) Long id);
+    int softDelete(@Param(&quot;id&quot;) Long id, @Param(&quot;at&quot;) java.time.LocalDateTime at);
+    int decrementCommentCount(@Param(&quot;postId&quot;) Long postId);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/comment/MyBatisCommentQueryService.java</summary><pre><code>package org.example.comment;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.post.AuthorResponse;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostVisibilityMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;</p>
+<p>@Service
+public class MyBatisCommentQueryService {
+    private final PostVisibilityMapper posts;
+    private final MyBatisCommentMapper comments;</p>
+<pre><code>public MyBatisCommentQueryService(PostVisibilityMapper posts, MyBatisCommentMapper comments) {
+    this.posts = posts;
+    this.comments = comments;
+}
+
+@Transactional(readOnly = true)
+public List&amp;lt;CommentThreadResponse&amp;gt; list(Long postId, AuthenticatedMember viewer) {
+    Long viewerId = viewer == null ? null : viewer.id();
+    String role = viewer == null ? null : viewer.role();
+    if (posts.findVisibleDetail(postId, viewerId, role) == null) throw new PostNotFoundException();
+    List&amp;lt;CommentTreeRow&amp;gt; all = comments.selectThreadRows(postId);
+    Set&amp;lt;Long&amp;gt; blocked = viewerId == null ? Set.of() :
+            Set.copyOf(comments.selectBlockedMemberIds(viewerId));
+    Map&amp;lt;Long, List&amp;lt;CommentTreeRow&amp;gt;&amp;gt; replies = all.stream()
+            .filter(r -&amp;gt; r.parentId != null)
+            .collect(Collectors.groupingBy(r -&amp;gt; r.parentId, LinkedHashMap::new, Collectors.toList()));
+    List&amp;lt;CommentThreadResponse&amp;gt; result = new ArrayList&amp;lt;&amp;gt;();
+    for (CommentTreeRow top : all) {
+        if (top.parentId != null || blocked.contains(top.authorId)) continue;
+        List&amp;lt;CommentReplyResponse&amp;gt; visible = replies.getOrDefault(top.id, List.of()).stream()
+                .filter(r -&amp;gt; r.deletedAt == null &amp;amp;&amp;amp; !blocked.contains(r.authorId))
+                .map(r -&amp;gt; new CommentReplyResponse(r.id,
+                        new AuthorResponse(r.authorId, r.authorNickname), r.content, r.createdAt))
+                .toList();
+        boolean deleted = top.deletedAt != null;
+        if (deleted &amp;amp;&amp;amp; visible.isEmpty()) continue;
+        result.add(new CommentThreadResponse(top.id,
+                deleted ? null : new AuthorResponse(top.authorId, top.authorNickname),
+                deleted ? &amp;quot;삭제된 댓글입니다&amp;quot; : top.content, top.createdAt, deleted, visible));
+    }
+    return result;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/comment/MyBatisCommentService.java</summary><pre><code>package org.example.comment;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.post.PostDetailRow;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostVisibilityMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;</p>
+<p>@Service
+public class MyBatisCommentService {
+    private final PostVisibilityMapper visiblePosts;
+    private final MyBatisCommentMapper comments;</p>
+<pre><code>public MyBatisCommentService(PostVisibilityMapper visiblePosts, MyBatisCommentMapper comments) {
+    this.visiblePosts = visiblePosts;
+    this.comments = comments;
+}
+
+@Transactional
+public CommentResponse create(Long postId, AuthenticatedMember me, CommentCreateRequest request) {
+    PostDetailRow post = visiblePosts.findVisibleDetail(postId, me.id(), me.role());
+    if (post == null || !&amp;quot;PUBLISHED&amp;quot;.equals(comments.findPostStatus(postId)))
+        throw new PostNotFoundException();
+
+    Long parentId = request.parentId();
+    if (parentId != null) {
+        ParentCommentRow parent = comments.findParent(parentId);
+        if (parent == null) throw new CommentNotFoundException();
+        if (!postId.equals(parent.postId))
+            throw new InvalidParentCommentException(&amp;quot;다른 글의 댓글에는 답글을 달 수 없습니다.&amp;quot;);
+        if (parent.parentId != null)
+            throw new InvalidParentCommentException(&amp;quot;답글에는 답글을 달 수 없습니다.&amp;quot;);
+        if (parent.deletedAt != null)
+            throw new InvalidParentCommentException(&amp;quot;지워진 댓글에는 답글을 달 수 없습니다.&amp;quot;);
+    }
+    CommentInsertRow row = new CommentInsertRow(postId, me.id(), parentId,
+            request.content(), LocalDateTime.now());
+    if (comments.insertComment(row) != 1) throw new IllegalStateException(&amp;quot;댓글 저장 실패&amp;quot;);
+    if (comments.incrementCommentCount(postId) != 1)
+        throw new IllegalStateException(&amp;quot;댓글 수 변경 실패&amp;quot;);
+    return new CommentResponse(row.id, postId, parentId,
+            new CommentAuthorResponse(me.id(), me.nickname()), row.content, row.at, false);
+}
+
+// 삭제 표시와 댓글 수 감소를 같은 트랜잭션에서 실행한다.
+@Transactional
+public void delete(Long id, AuthenticatedMember member) {
+    CommentDeleteRow row = comments.findForDelete(id);
+    if (row == null || row.deletedAt != null) throw new CommentNotFoundException();
+    if (!member.id().equals(row.memberId)) throw new CommentForbiddenException();
+    if (comments.softDelete(id, LocalDateTime.now()) != 1) throw new CommentNotFoundException();
+    if (comments.decrementCommentCount(row.postId) != 1)
+        throw new IllegalStateException(&amp;quot;댓글 수 변경 실패&amp;quot;);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/comment/ParentCommentRow.java</summary><pre><code>package org.example.comment;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 부모 후보의 존재·글·깊이·삭제 상태를 한 행으로 확인한다.
+public class ParentCommentRow {
+    public Long id;
+    public Long postId;
+    public Long parentId;
+    public LocalDateTime deletedAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/like/LikeController.java</summary><pre><code>package org.example.like;
+
+<p>import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>@RestController
+public class LikeController {</p>
+<pre><code>private final MyBatisLikeService likeService;
+
+public LikeController(MyBatisLikeService likeService) {
+    this.likeService = likeService;
+}
+
+@PutMapping(&amp;quot;/api/posts/{id}/like&amp;quot;)
+public LikeResponse like(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+    return likeService.like(id, loginMember);
+}
+
+@DeleteMapping(&amp;quot;/api/posts/{id}/like&amp;quot;)
+public LikeResponse unlike(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+    return likeService.unlike(id, loginMember);
+}
+
+// GET이지만 1-6 인터셉터의 &amp;quot;GET + 헤더 없음 = 비로그인 통과&amp;quot;가 적용되므로,
+// 이 엔드포인트는 인증이 필수라는 걸 여기서 직접 확인한다(토큰 없으면 401).
+@GetMapping(&amp;quot;/api/me/likes&amp;quot;)
+public MyLikesResponse myLikes(@RequestParam(defaultValue = &amp;quot;10&amp;quot;) @Min(1) @Max(100) int size,
+                                @RequestParam(required = false) String cursor,
+                                @LoginMember AuthenticatedMember loginMember) {
+    if (loginMember == null) {
+        throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    }
+    return likeService.myLikes(loginMember, size, cursor);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/like/MyBatisLikeMapper.java</summary><pre><code>package org.example.like;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import java.time.LocalDateTime;
+import java.util.List;</p>
+<p>@Mapper
+public interface MyBatisLikeMapper {
+    List&lt;MyLikeRow&gt; findMyLikes(@Param(&quot;memberId&quot;) Long memberId, @Param(&quot;cursorAt&quot;) LocalDateTime cursorAt,
+                                @Param(&quot;cursorId&quot;) Long cursorId, @Param(&quot;limit&quot;) int limit);
+    String findPostStatus(@Param(&quot;postId&quot;) Long postId);
+    boolean existsLike(@Param(&quot;postId&quot;) Long postId, @Param(&quot;memberId&quot;) Long memberId);
+    Integer findLikeCount(@Param(&quot;postId&quot;) Long postId);
+    int insertIgnoreLike(@Param(&quot;postId&quot;) Long postId, @Param(&quot;memberId&quot;) Long memberId);
+    int insertLike(@Param(&quot;postId&quot;) Long postId, @Param(&quot;memberId&quot;) Long memberId);
+    int deleteLike(@Param(&quot;postId&quot;) Long postId, @Param(&quot;memberId&quot;) Long memberId);
+    int decreaseLikeCount(@Param(&quot;postId&quot;) Long postId);
+    int increaseLikeCount(@Param(&quot;postId&quot;) Long postId);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/like/MyBatisLikeService.java</summary><pre><code>package org.example.like;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.post.AuthorResponse;
+import org.example.post.PostDetailRow;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostVisibilityMapper;
+import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.annotation.Transactional;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.DateTimeException;
+import java.util.Base64;
+import java.util.List;</p>
+<p>// 관계 행 삽입과 개수 증감을 같은 트랜잭션에서 원자적으로 처리한다.
+@Service
+public class MyBatisLikeService {
+    private static final int MAX_ATTEMPTS = 10;
+    private final PostVisibilityMapper visiblePosts;
+    private final MyBatisLikeMapper likes;
+    private final TransactionTemplate transactions;</p>
+<pre><code>public MyBatisLikeService(PostVisibilityMapper visiblePosts, MyBatisLikeMapper likes,
+                          PlatformTransactionManager manager) {
+    this.visiblePosts = visiblePosts;
+    this.likes = likes;
+    this.transactions = new TransactionTemplate(manager);
+}
+
+public LikeResponse like(Long postId, AuthenticatedMember me) {
+    return withDeadlockRetry(() -&amp;gt; transactions.execute(status -&amp;gt; doLike(postId, me)));
+}
+
+public LikeResponse unlike(Long postId, AuthenticatedMember me) {
+    return withDeadlockRetry(() -&amp;gt; transactions.execute(status -&amp;gt; doUnlike(postId, me)));
+}
+
+private LikeResponse doLike(Long postId, AuthenticatedMember me) {
+    PostDetailRow post = findLikeablePost(postId, me);
+    if (post.authorId.equals(me.id())) throw new SelfLikeNotAllowedException();
+    if (likes.insertIgnoreLike(postId, me.id()) == 1) likes.increaseLikeCount(postId);
+    return new LikeResponse(postId, true, likes.findLikeCount(postId));
+}
+
+private LikeResponse doUnlike(Long postId, AuthenticatedMember me) {
+    findLikeablePost(postId, me);
+    if (likes.deleteLike(postId, me.id()) == 1) likes.decreaseLikeCount(postId);
+    return new LikeResponse(postId, false, likes.findLikeCount(postId));
+}
+
+@Transactional(readOnly = true)
+public MyLikesResponse myLikes(AuthenticatedMember me, int size, String cursor) {
+    LocalDateTime cursorAt = null;
+    Long cursorId = null;
+    if (cursor != null) {
+        String[] parts = decodeCursor(cursor);
+        cursorAt = LocalDateTime.parse(parts[0]);
+        cursorId = Long.valueOf(parts[1]);
+    }
+    List&amp;lt;MyLikeRow&amp;gt; rows = likes.findMyLikes(me.id(), cursorAt, cursorId, size + 1);
+    boolean hasNext = rows.size() &amp;gt; size;
+    List&amp;lt;MyLikeRow&amp;gt; page = hasNext ? rows.subList(0, size) : rows;
+    List&amp;lt;MyLikeItemResponse&amp;gt; items = page.stream()
+            .map(row -&amp;gt; new MyLikeItemResponse(row.postId, row.title,
+                    new AuthorResponse(row.authorId, row.authorNickname), row.likedAt))
+            .toList();
+    String nextCursor = hasNext ? encodeCursor(page.get(page.size() - 1)) : null;
+    return new MyLikesResponse(items, nextCursor);
+}
+
+private String encodeCursor(MyLikeRow last) {
+    String raw = last.likedAt + &amp;quot;|&amp;quot; + last.likeId;
+    return Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+}
+
+private String[] decodeCursor(String cursor) {
+    try {
+        String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+        String[] parts = raw.split(&amp;quot;\\|&amp;quot;, -1);
+        if (parts.length != 2) throw new IllegalArgumentException();
+        LocalDateTime.parse(parts[0]);
+        if (Long.parseLong(parts[1]) &amp;lt; 1) throw new IllegalArgumentException();
+        return parts;
+    } catch (IllegalArgumentException | DateTimeException ex) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &amp;quot;올바르지 않은 cursor입니다.&amp;quot;);
+    }
+}
+
+private PostDetailRow findLikeablePost(Long postId, AuthenticatedMember me) {
+    PostDetailRow post = visiblePosts.findVisibleDetail(postId, me.id(), me.role());
+    if (post == null || !&amp;quot;PUBLISHED&amp;quot;.equals(likes.findPostStatus(postId)))
+        throw new PostNotFoundException();
+    return post;
+}
+
+private LikeResponse withDeadlockRetry(java.util.function.Supplier&amp;lt;LikeResponse&amp;gt; action) {
+    for (int attempt = 1; ; attempt++) {
+        try {
+            return action.get();
+        } catch (ConcurrencyFailureException e) {
+            if (attempt &amp;gt;= MAX_ATTEMPTS) throw e;
+            try {
+                Thread.sleep((long) (Math.random() * 20 * attempt));
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw e;
+            }
+        }
+    }
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/like/MyLikeRow.java</summary><pre><code>package org.example.like;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 키셋 정렬에 쓰는 관계 ID를 응답 필드와 분리한 조회 행.
+public class MyLikeRow {
+    public Long likeId;
+    public Long postId;
+    public String title;
+    public Long authorId;
+    public String authorNickname;
+    public LocalDateTime likedAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/marked/MarkedPostController.java</summary><pre><code>package org.example.marked;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;</p>
+<p>@RestController
+public class MarkedPostController {
+    private final MyBatisMarkedPostService service;</p>
+<pre><code>public MarkedPostController(MyBatisMarkedPostService service) {
+    this.service = service;
+}
+
+@GetMapping(&amp;quot;/api/me/posts&amp;quot;)
+public MarkedPostPageResponse list(@RequestParam(required = false) String liked,
+                                   @RequestParam(required = false) String bookmarked,
+                                   @RequestParam(required = false) String page,
+                                   @RequestParam(required = false) String size,
+                                   @LoginMember AuthenticatedMember me) {
+    if (me == null) throw new AuthenticationRequiredException(&amp;quot;인증이 필요합니다.&amp;quot;);
+    int pageNumber = parseNumber(page, 0, 0, Integer.MAX_VALUE);
+    int pageSize = parseNumber(size, 20, 1, 100);
+    return service.list(me.id(), parseBoolean(liked), parseBoolean(bookmarked), pageNumber, pageSize);
+}
+
+private boolean parseBoolean(String value) {
+    if (value == null) return false;
+    if (&amp;quot;true&amp;quot;.equals(value)) return true;
+    if (&amp;quot;false&amp;quot;.equals(value)) return false;
+    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &amp;quot;필터는 true 또는 false여야 합니다.&amp;quot;);
+}
+
+private int parseNumber(String value, int fallback, int min, int max) {
+    if (value == null) return fallback;
+    if (!value.matches(&amp;quot;[0-9]+&amp;quot;)) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &amp;quot;page 또는 size의 형식이 잘못됐습니다.&amp;quot;);
+    }
+    try {
+        int parsed = Integer.parseInt(value);
+        if (parsed &amp;gt;= min &amp;amp;&amp;amp; parsed &amp;lt;= max) return parsed;
+    } catch (NumberFormatException ignored) {
+        // int 범위를 벗어나는 값도 동일한 요청 오류다.
+    }
+    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &amp;quot;page 또는 size가 범위를 벗어났습니다.&amp;quot;);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/marked/MarkedPostRow.java</summary><pre><code>package org.example.marked;
+
+<p>// 목록 SELECT의 한 행. 두 관계의 존재 여부도 같은 행에서 받는다.
+public class MarkedPostRow {
+    public Long postId;
+    public String title;
+    public String authorNickname;
+    public String boardSlug;
+    public Boolean liked;
+    public Boolean bookmarked;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/marked/MyBatisMarkedPostMapper.java</summary><pre><code>package org.example.marked;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import java.util.List;</p>
+<p>@Mapper
+public interface MyBatisMarkedPostMapper {
+    List&lt;MarkedPostRow&gt; findMarkedPosts(@Param(&quot;memberId&quot;) Long memberId,
+                                        @Param(&quot;liked&quot;) boolean liked,
+                                        @Param(&quot;bookmarked&quot;) boolean bookmarked,
+                                        @Param(&quot;limit&quot;) int limit,
+                                        @Param(&quot;offset&quot;) long offset);
+    long countMarkedPosts(@Param(&quot;memberId&quot;) Long memberId,
+                          @Param(&quot;liked&quot;) boolean liked,
+                          @Param(&quot;bookmarked&quot;) boolean bookmarked);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/marked/MyBatisMarkedPostService.java</summary><pre><code>package org.example.marked;
+
+<p>import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.util.List;</p>
+<p>@Service
+public class MyBatisMarkedPostService {
+    private final MyBatisMarkedPostMapper markedPosts;</p>
+<pre><code>public MyBatisMarkedPostService(MyBatisMarkedPostMapper markedPosts) {
+    this.markedPosts = markedPosts;
+}
+
+@Transactional(readOnly = true)
+public MarkedPostPageResponse list(Long memberId, boolean liked, boolean bookmarked,
+                                   int page, int size) {
+    // 목록과 개수는 동일한 FROM/WHERE 조각을 사용한다.
+    long total = markedPosts.countMarkedPosts(memberId, liked, bookmarked);
+    List&amp;lt;MarkedPostItem&amp;gt; items = markedPosts.findMarkedPosts(memberId, liked, bookmarked,
+            size, (long) page * size).stream()
+            .map(row -&amp;gt; new MarkedPostItem(row.postId, row.title, row.authorNickname,
+                    row.boardSlug, Boolean.TRUE.equals(row.liked),
+                    Boolean.TRUE.equals(row.bookmarked)))
+            .toList();
+    return new MarkedPostPageResponse(items, page, size, total);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/post/PostController.java</summary><pre><code>package org.example.post;
+
+<p>import jakarta.validation.Valid;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.example.tag.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;</p>
+<p>import java.net.URI;
+import java.util.List;</p>
+<p>@RestController
+@RequestMapping(&quot;/api/posts&quot;)
+public class PostController {</p>
+<pre><code>private static final Logger log = LoggerFactory.getLogger(PostController.class);
+
+private final PostService postService;
+private final PostQueryService postQueryService;
+private final PostReplaceMyBatisService postReplaceMyBatisService;
+private final PostPatchMyBatisService postPatchMyBatisService;
+private final PostDeleteMyBatisService postDeleteMyBatisService;
+
+public PostController(PostService postService, PostQueryService postQueryService,
+                      PostReplaceMyBatisService postReplaceMyBatisService,
+                      PostPatchMyBatisService postPatchMyBatisService,
+                      PostDeleteMyBatisService postDeleteMyBatisService) {
+    this.postService = postService;
+    this.postQueryService = postQueryService;
+    this.postReplaceMyBatisService = postReplaceMyBatisService;
+    this.postPatchMyBatisService = postPatchMyBatisService;
+    this.postDeleteMyBatisService = postDeleteMyBatisService;
+}
+
+@GetMapping(&amp;quot;/{id}&amp;quot;)
+public PostDetailResponse getOne(@PathVariable Long id, @LoginMember AuthenticatedMember viewer) {
+    return postQueryService.getDetail(id, viewer);
+}
+
+@PostMapping
+public ResponseEntity&amp;lt;PostResponse&amp;gt; create(@LoginMember AuthenticatedMember loginMember,
+                                            @Valid @RequestBody PostCreateRequest request) {
+    log.info(&amp;quot;게시글 작성 요청 제목: {}&amp;quot;, request.title());
+
+    Post post = postService.create(loginMember.id(), request);
+    PostResponse response = toResponse(post);
+
+    return ResponseEntity.created(URI.create(&amp;quot;/api/posts/&amp;quot; + post.getId())).body(response);
+}
+
+@PostMapping(&amp;quot;/{sourceId}/copies&amp;quot;)
+public ResponseEntity&amp;lt;PostResponse&amp;gt; copy(@PathVariable Long sourceId,
+                                         @RequestParam(defaultValue = &amp;quot;false&amp;quot;) boolean copyTags,
+                                         @LoginMember AuthenticatedMember loginMember,
+                                         @Valid @RequestBody CopyPostRequest request) {
+    Post post = postService.copy(sourceId, loginMember.id(), copyTags, request);
+    return ResponseEntity.created(URI.create(&amp;quot;/api/posts/&amp;quot; + post.getId()))
+            .body(toResponse(post));
+}
+
+@PutMapping(&amp;quot;/{id}&amp;quot;)
+public PostDetailResponse replace(@PathVariable Long id,
+                                  @LoginMember AuthenticatedMember loginMember,
+                                  @Valid @RequestBody PostReplaceRequest request) {
+    return postReplaceMyBatisService.replace(id, loginMember, request);
+}
+
+@PatchMapping(&amp;quot;/{id}&amp;quot;)
+public PostDetailResponse patch(@PathVariable Long id,
+                                 @LoginMember AuthenticatedMember loginMember,
+                                 @RequestBody PostUpdateRequest request) {
+    return postPatchMyBatisService.patch(id, loginMember, request);
+}
+
+@DeleteMapping(&amp;quot;/{id}&amp;quot;)
+@ResponseStatus(HttpStatus.NO_CONTENT)
+public void delete(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+    postDeleteMyBatisService.delete(id, loginMember);
+}
+
+private PostDetailResponse toDetailResponse(Post post) {
+    List&amp;lt;String&amp;gt; tagNames = post.getTags().stream().map(Tag::getName).toList();
+    AuthorResponse author = new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname());
+    return new PostDetailResponse(
+            post.getId(),
+            post.getBoard().getSlug(),
+            post.getTitle(),
+            post.getContent(),
+            tagNames,
+            post.getVisibility(),
+            author,
+            post.getViewCount(),
+            post.getLikeCount(),
+            post.getCommentCount(),
+            post.getCreatedAt()
+    );
+}
+
+private PostResponse toResponse(Post post) {
+    List&amp;lt;String&amp;gt; tagNames = post.getTags().stream().map(Tag::getName).toList();
+    AuthorResponse author = new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname());
+    return new PostResponse(
+            post.getId(),
+            post.getBoard().getSlug(),
+            post.getTitle(),
+            post.getContent(),
+            tagNames,
+            post.getVisibility(),
+            author,
+            post.getCreatedAt()
+    );
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/post/PostDeleteMyBatisService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>// 행과 연관 데이터를 지우지 않고 삭제 시각만 기록한다.
+@Service
+public class PostDeleteMyBatisService {
+    private final PostVisibilityMapper visibilityMapper;
+    private final PostReplaceMapper replaceMapper;</p>
+<pre><code>public PostDeleteMyBatisService(PostVisibilityMapper visibilityMapper,
+                                PostReplaceMapper replaceMapper) {
+    this.visibilityMapper = visibilityMapper;
+    this.replaceMapper = replaceMapper;
+}
+
+@Transactional
+public void delete(Long id, AuthenticatedMember me) {
+    PostDetailRow current = visibilityMapper.findVisibleDetail(id, me.id(), me.role());
+    if (current == null) throw new PostNotFoundException();
+    if (!current.authorId.equals(me.id()) &amp;amp;&amp;amp; !&amp;quot;ADMIN&amp;quot;.equals(me.role()))
+        throw new PostForbiddenException();
+    if (replaceMapper.softDelete(id) != 1) throw new PostNotFoundException();
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostDetailRow.java</summary><pre><code>package org.example.post;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 권한 조건을 통과한 상세 SQL 한 행. 태그는 별도 쿼리로 읽는다.
+public class PostDetailRow {
+    public Long id;
+    public String boardSlug;
+    public String title;
+    public String content;
+    public String visibility;
+    public Long authorId;
+    public String authorNickname;
+    public Integer viewCount;
+    public Integer likeCount;
+    public Integer commentCount;
+    public LocalDateTime createdAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostHeadlineRow.java</summary><pre><code>package org.example.post;
+
+<p>// 공개 글 목록 SQL이 선택한 네 열만 담는다.
+public class PostHeadlineRow {
+    public Long id;
+    public String title;
+    public String authorNickname;
+    public String boardSlug;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostListRow.java</summary><pre><code>package org.example.post;
+
+<p>import java.time.LocalDateTime;</p>
+<p>// 게시판 목록 SQL의 한 행. 태그는 페이지 글 ID로 따로 읽는다.
+public class PostListRow {
+    public Long id;
+    public String title;
+    public Long authorId;
+    public String authorNickname;
+    public Integer likeCount;
+    public Integer commentCount;
+    public Integer viewCount;
+    public LocalDateTime publishedAt;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/post/PostPatchMyBatisService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;</p>
+<p>// PATCH는 전달된 값만 변경한다. null은 유지하고 빈 태그 목록은 연결을 비운다.
+@Service
+public class PostPatchMyBatisService {
+    private static final int TITLE_MAX_LENGTH = 200;
+    private static final int TAGS_MAX_COUNT = 5;
+    private static final int TAG_NAME_MAX_LENGTH = 30;</p>
+<pre><code>private final PostVisibilityMapper visibilityMapper;
+private final PostReplaceMapper replaceMapper;
+
+public PostPatchMyBatisService(PostVisibilityMapper visibilityMapper,
+                               PostReplaceMapper replaceMapper) {
+    this.visibilityMapper = visibilityMapper;
+    this.replaceMapper = replaceMapper;
+}
+
+@Transactional
+public PostDetailResponse patch(Long id, AuthenticatedMember me, PostUpdateRequest request) {
+    PostDetailRow current = visibilityMapper.findVisibleDetail(id, me.id(), me.role());
+    if (current == null) throw new PostNotFoundException();
+    if (!current.authorId.equals(me.id())) throw new PostForbiddenException();
+
+    // 모든 입력을 확인한 뒤 쓰기를 시작한다.
+    if (request.title() != null) validateTitle(request.title());
+    if (request.content() != null) validateContent(request.content());
+    if (request.tags() != null) validateTags(request.tags());
+    if (request.visibility() != null) validateVisibility(request.visibility());
+
+    List&amp;lt;String&amp;gt; tags;
+    if (request.tags() == null) {
+        tags = visibilityMapper.findTagsByPostIds(List.of(id)).stream()
+                .map(PostTagRow::name).toList();
+    } else {
+        List&amp;lt;PostReplaceTagRow&amp;gt; resolved = new ArrayList&amp;lt;&amp;gt;();
+        Set&amp;lt;Long&amp;gt; seenIds = new HashSet&amp;lt;&amp;gt;();
+        for (String name : request.tags()) {
+            replaceMapper.insertTagIfMissing(name);
+            PostReplaceTagRow tag = replaceMapper.findTagByName(name);
+            if (seenIds.add(tag.id)) resolved.add(tag);
+        }
+        replaceMapper.deletePostTags(id);
+        for (PostReplaceTagRow tag : resolved) replaceMapper.insertPostTag(id, tag.id);
+        tags = resolved.stream().map(tag -&amp;gt; tag.name).toList();
+    }
+    replaceMapper.patchPost(id, request.title(), request.content(), request.visibility());
+    return new PostDetailResponse(id, current.boardSlug,
+            request.title() == null ? current.title : request.title(),
+            request.content() == null ? current.content : request.content(),
+            tags,
+            request.visibility() == null ? current.visibility : request.visibility(),
+            new AuthorResponse(current.authorId, current.authorNickname),
+            current.viewCount, current.likeCount, current.commentCount, current.createdAt);
+}
+
+private void validateTitle(String title) {
+    if (title.isBlank()) throw new InvalidPostFieldException(&amp;quot;title&amp;quot;, &amp;quot;제목을 입력해 주세요.&amp;quot;);
+    if (title.length() &amp;gt; TITLE_MAX_LENGTH)
+        throw new InvalidPostFieldException(&amp;quot;title&amp;quot;, &amp;quot;제목은 &amp;quot; + TITLE_MAX_LENGTH + &amp;quot;자 이하여야 합니다.&amp;quot;);
+}
+
+private void validateContent(String content) {
+    if (content.isBlank()) throw new InvalidPostFieldException(&amp;quot;content&amp;quot;, &amp;quot;본문을 입력해 주세요.&amp;quot;);
+}
+
+private void validateTags(List&amp;lt;String&amp;gt; tags) {
+    if (tags.size() &amp;gt; TAGS_MAX_COUNT)
+        throw new InvalidPostFieldException(&amp;quot;tags&amp;quot;, &amp;quot;태그는 &amp;quot; + TAGS_MAX_COUNT + &amp;quot;개까지입니다.&amp;quot;);
+    for (String tag : tags) {
+        if (tag == null || tag.isBlank() || tag.length() &amp;gt; TAG_NAME_MAX_LENGTH)
+            throw new InvalidPostFieldException(&amp;quot;tags&amp;quot;, &amp;quot;태그 이름은 1~&amp;quot; + TAG_NAME_MAX_LENGTH + &amp;quot;자여야 합니다.&amp;quot;);
+    }
+}
+
+private void validateVisibility(String visibility) {
+    if (!&amp;quot;PUBLIC&amp;quot;.equals(visibility) &amp;amp;&amp;amp; !&amp;quot;FOLLOWERS&amp;quot;.equals(visibility))
+        throw new InvalidPostFieldException(&amp;quot;visibility&amp;quot;, &amp;quot;공개 범위는 PUBLIC 또는 FOLLOWERS여야 합니다.&amp;quot;);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostQueryService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.board.BoardNotFoundException;
+import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;</p>
+<p>// 글 조회 전용 서비스 — 1-3/1-4의 PostService(쓰기)와 책임을 나눈다
+@Service
+public class PostQueryService {</p>
+<pre><code>private final PostVisibilityMapper mapper;
+
+public PostQueryService(PostVisibilityMapper mapper) {
+    this.mapper = mapper;
+}
+
+
+@Transactional(readOnly = true)
+public List&amp;lt;PostHeadlineResponse&amp;gt; listPublicByAuthor(Long memberId, String boardSlug) {
+    if (boardSlug == null || boardSlug.isBlank()) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &amp;quot;게시판을 선택해 주세요.&amp;quot;);
+    }
+    if (mapper.findMemberId(memberId) == null) {
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, &amp;quot;회원을 찾을 수 없습니다.&amp;quot;);
+    }
+    if (mapper.findBoardIdBySlug(boardSlug) == null) {
+        throw new BoardNotFoundException(boardSlug);
+    }
+    return mapper.selectPublicByAuthorAndBoard(memberId, boardSlug).stream()
+            .map(row -&amp;gt; new PostHeadlineResponse(row.id, row.title,
+                    row.authorNickname, row.boardSlug)).toList();
+}
+
+@Transactional
+public PostDetailResponse getDetail(Long id, AuthenticatedMember viewer) {
+    Long viewerId = viewer == null ? null : viewer.id();
+    String viewerRole = viewer == null ? null : viewer.role();
+    // SQL에서 권한을 먼저 걸러 404일 때 조회수가 변하지 않게 한다.
+    PostDetailRow row = mapper.findVisibleDetail(id, viewerId, viewerRole);
+    if (row == null) {
+        throw new PostNotFoundException();
+    }
+    mapper.increaseViewCount(id);
+    List&amp;lt;String&amp;gt; tags = mapper.findTagsByPostIds(List.of(id)).stream()
+            .map(PostTagRow::name).toList();
+    return new PostDetailResponse(row.id, row.boardSlug, row.title, row.content,
+            tags, row.visibility, new AuthorResponse(row.authorId, row.authorNickname),
+            row.viewCount + 1, row.likeCount, row.commentCount, row.createdAt);
+}
+
+@Transactional(readOnly = true)
+public PostListResponse list(String boardSlug, int page, int size, AuthenticatedMember viewer) {
+    Long boardId = mapper.findBoardIdBySlug(boardSlug);
+    if (boardId == null) throw new BoardNotFoundException(boardSlug);
+
+    Long viewerId = viewer == null ? null : viewer.id();
+
+    long offset = (long) page * size;
+    List&amp;lt;PostListRow&amp;gt; rows = mapper.findViewableByBoard(boardId, viewerId, size, offset);
+    long total = mapper.countViewableByBoard(boardId, viewerId);
+    Map&amp;lt;Long, List&amp;lt;String&amp;gt;&amp;gt; tags = rows.isEmpty() ? Map.of()
+            : mapper.findTagsByPostIds(rows.stream().map(row -&amp;gt; row.id).toList()).stream()
+                .collect(Collectors.groupingBy(PostTagRow::postId,
+                        Collectors.mapping(PostTagRow::name, Collectors.toList())));
+    List&amp;lt;PostListItemResponse&amp;gt; items = rows.stream()
+            .map(row -&amp;gt; toListItem(row, tags.getOrDefault(row.id, List.of()))).toList();
+
+    return new PostListResponse(
+            items,
+            page,
+            size,
+            total,
+            (int) ((total + size - 1) / size),
+            offset + rows.size() &amp;lt; total
+    );
+}
+
+private PostListItemResponse toListItem(PostListRow row, List&amp;lt;String&amp;gt; tags) {
+    return new PostListItemResponse(
+            row.id,
+            row.title,
+            new AuthorResponse(row.authorId, row.authorNickname),
+            tags,
+            row.likeCount,
+            row.commentCount,
+            row.viewCount,
+            row.publishedAt
+    );
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/post/PostReplaceMapper.java</summary><pre><code>package org.example.post;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>@Mapper
+public interface PostReplaceMapper {
+    PostReplaceTagRow findTagByName(@Param(&quot;name&quot;) String name);
+    int insertTagIfMissing(@Param(&quot;name&quot;) String name);
+    int softDelete(@Param(&quot;id&quot;) Long id);
+    int patchPost(@Param(&quot;id&quot;) Long id, @Param(&quot;title&quot;) String title,
+                  @Param(&quot;content&quot;) String content, @Param(&quot;visibility&quot;) String visibility);
+    int updatePost(@Param(&quot;id&quot;) Long id, @Param(&quot;title&quot;) String title,
+                   @Param(&quot;content&quot;) String content, @Param(&quot;visibility&quot;) String visibility);
+    int deletePostTags(@Param(&quot;postId&quot;) Long postId);
+    int insertPostTag(@Param(&quot;postId&quot;) Long postId, @Param(&quot;tagId&quot;) Long tagId);
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/post/PostReplaceMyBatisService.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;</p>
+<p>import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;</p>
+<p>// 전체 교체: 글과 연결 태그를 한 트랜잭션에서 수정한다.
+@Service
+public class PostReplaceMyBatisService {
+    private final PostVisibilityMapper visibilityMapper;
+    private final PostReplaceMapper replaceMapper;</p>
+<pre><code>public PostReplaceMyBatisService(PostVisibilityMapper visibilityMapper,
+                                 PostReplaceMapper replaceMapper) {
+    this.visibilityMapper = visibilityMapper;
+    this.replaceMapper = replaceMapper;
+}
+
+@Transactional
+public PostDetailResponse replace(Long id, AuthenticatedMember me, PostReplaceRequest request) {
+    PostDetailRow current = visibilityMapper.findVisibleDetail(id, me.id(), me.role());
+    if (current == null) {
+        throw new PostNotFoundException();
+    }
+    if (!current.authorId.equals(me.id())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+    }
+
+    // 이름이 다른 대소문자 표기도 같은 tag 행으로 연결한다.
+    List&amp;lt;PostReplaceTagRow&amp;gt; tags = new ArrayList&amp;lt;&amp;gt;();
+    Set&amp;lt;Long&amp;gt; seenTagIds = new HashSet&amp;lt;&amp;gt;();
+    for (String name : request.tags()) {
+        replaceMapper.insertTagIfMissing(name);
+        PostReplaceTagRow tag = replaceMapper.findTagByName(name);
+        if (seenTagIds.add(tag.id)) {
+            tags.add(tag);
+        }
+    }
+    replaceMapper.updatePost(id, request.title(), request.content(), request.visibility());
+    replaceMapper.deletePostTags(id);
+    for (PostReplaceTagRow tag : tags) {
+        replaceMapper.insertPostTag(id, tag.id);
+    }
+    return new PostDetailResponse(id, current.boardSlug, request.title(),
+            request.content(), tags.stream().map(tag -&amp;gt; tag.name).toList(),
+            request.visibility(),
+            new AuthorResponse(current.authorId, current.authorNickname),
+            current.viewCount, current.likeCount, current.commentCount, current.createdAt);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostReplaceTagRow.java</summary><pre><code>package org.example.post;
+
+<p>// Mapper가 tag 테이블에서 읽은 원래 표기와 ID를 담는다.
+public class PostReplaceTagRow {
+    public Long id;
+    public String name;
+}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/post/PostTagRow.java</summary><pre><code>package org.example.post;
+
+<p>public record PostTagRow(Long postId, String name) {
+}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/post/PostVisibilityMapper.java</summary><pre><code>package org.example.post;
+
+<p>import java.util.List;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;</p>
+<p>@Mapper
+public interface PostVisibilityMapper {
+    PostDetailRow findVisibleDetail(@Param(&quot;id&quot;) Long id, @Param(&quot;viewerId&quot;) Long viewerId,
+            @Param(&quot;viewerRole&quot;) String viewerRole);</p>
+<pre><code>int increaseViewCount(@Param(&amp;quot;id&amp;quot;) Long id);
+
+Long findBoardIdBySlug(@Param(&amp;quot;slug&amp;quot;) String slug);
+Long findMemberId(@Param(&amp;quot;memberId&amp;quot;) Long memberId);
+List&amp;lt;PostHeadlineRow&amp;gt; selectPublicByAuthorAndBoard(@Param(&amp;quot;memberId&amp;quot;) Long memberId,
+        @Param(&amp;quot;boardSlug&amp;quot;) String boardSlug);
+
+List&amp;lt;PostListRow&amp;gt; findViewableByBoard(@Param(&amp;quot;boardId&amp;quot;) Long boardId, @Param(&amp;quot;viewerId&amp;quot;) Long viewerId,
+        @Param(&amp;quot;limit&amp;quot;) int limit, @Param(&amp;quot;offset&amp;quot;) long offset);
+
+long countViewableByBoard(@Param(&amp;quot;boardId&amp;quot;) Long boardId, @Param(&amp;quot;viewerId&amp;quot;) Long viewerId);
+
+List&amp;lt;PostTagRow&amp;gt; findTagsByPostIds(@Param(&amp;quot;postIds&amp;quot;) List&amp;lt;Long&amp;gt; postIds);</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>DTO — src/main/java/org/example/stats/MemberActivityRow.java</summary><pre><code>package org.example.stats;
+
+<p>// MyBatis XML의 컬럼 별칭을 기본 생성자와 setter로 채우는 조회 전용 행이다.
+public class MemberActivityRow {
+    private Long memberId;
+    private String nickname;
+    private long posts;
+    private long comments;
+    private long likesReceived;
+    private long likesGiven;</p>
+<pre><code>public Long getMemberId() { return memberId; }
+public void setMemberId(Long memberId) { this.memberId = memberId; }
+public String getNickname() { return nickname; }
+public void setNickname(String nickname) { this.nickname = nickname; }
+public long getPosts() { return posts; }
+public void setPosts(long posts) { this.posts = posts; }
+public long getComments() { return comments; }
+public void setComments(long comments) { this.comments = comments; }
+public long getLikesReceived() { return likesReceived; }
+public void setLikesReceived(long likesReceived) { this.likesReceived = likesReceived; }
+public long getLikesGiven() { return likesGiven; }
+public void setLikesGiven(long likesGiven) { this.likesGiven = likesGiven; }</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/stats/MyBatisStatsMapper.java</summary><pre><code>package org.example.stats;
+
+<p>import org.apache.ibatis.annotations.Mapper;
+import java.util.List;</p>
+<p>@Mapper
+public interface MyBatisStatsMapper {
+    List&lt;MemberActivityRow&gt; findMemberActivity();
+}
+</code></pre></details></p>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/stats/StatsRepository.java</summary><p>이 단계에서 삭제한 파일이다.</p></details>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/stats/StatsService.java</summary><pre><code>package org.example.stats;
+
+<p>import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;</p>
+<p>import java.util.List;</p>
+<p>@Service
+public class StatsService {</p>
+<pre><code>private final MyBatisStatsMapper statsMapper;
+
+public StatsService(MyBatisStatsMapper statsMapper) {
+    this.statsMapper = statsMapper;
+}
+
+@Transactional(readOnly = true)
+public List&amp;lt;MemberActivityResponse&amp;gt; memberActivity() {
+    return statsMapper.findMemberActivity().stream()
+            .map(r -&amp;gt; new MemberActivityResponse(
+                    r.getMemberId(), r.getNickname(),
+                    r.getPosts(), r.getComments(), r.getLikesReceived(), r.getLikesGiven()))
+            .toList();
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:
+  application:
+    name: javaExperience
+  datasource:
+    # compose.yaml의 mysql(호스트 13308 → 컨테이너 3306)의 community DB(시나리오용). 앱을 띄우기 전에 docker compose up -d
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  jpa:
+    hibernate:
+      # 테이블은 docker/mysql/init/ 의 dump가 만든다. 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)
+      ddl-auto: validate
+    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+<p>logging:
+  level:
+    # 실행 SQL은 확인하되 토큰을 포함한 바인딩 값은 로그에 남기지 않는다
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: info
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true</p>
+<h1 id="0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다"><a class="anchor" href="#0-6--내가-정한-설정-값-코드에서-valuestartgreeting로-읽는다" aria-hidden="true">#</a>0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다</h1>
+<p>start:
+  greeting: 반가워요, 백엔드!
+  max-items: 5
+</code></pre></details></p>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/MyBatisBookmarkFolderMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.bookmark.MyBatisBookmarkFolderMapper&quot;&gt;
+    &lt;select id=&quot;findSummaries&quot; resultType=&quot;org.example.bookmark.BookmarkFolderSummaryResponse&quot;&gt;
+        SELECT f.id, f.name, COUNT(b.id) AS bookmarkCount
+        FROM bookmark_folder f LEFT JOIN bookmark b ON b.folder_id = f.id
+        WHERE f.member_id = #{memberId}
+        GROUP BY f.id, f.name, f.created_at
+        ORDER BY f.created_at ASC, f.id ASC
+    &lt;/select&gt;
+    &lt;select id=&quot;lockMember&quot; resultType=&quot;long&quot;&gt;
+        SELECT id FROM member WHERE id = #{memberId} FOR UPDATE
+    &lt;/select&gt;
+    &lt;select id=&quot;countByMember&quot; resultType=&quot;long&quot;&gt;
+        SELECT COUNT(*) FROM bookmark_folder WHERE member_id = #{memberId}
+    &lt;/select&gt;
+    &lt;select id=&quot;countByName&quot; resultType=&quot;int&quot;&gt;
+        SELECT COUNT(*) FROM bookmark_folder
+        WHERE member_id = #{memberId} AND name = #{name}
+        &lt;if test=&quot;exceptId != null&quot;&gt;AND id != #{exceptId}&lt;/if&gt;
+    &lt;/select&gt;
+    &lt;select id=&quot;findMine&quot; resultType=&quot;org.example.bookmark.BookmarkFolderRow&quot;&gt;
+        SELECT id, name FROM bookmark_folder WHERE id = #{id} AND member_id = #{memberId}
+    &lt;/select&gt;
+    &lt;insert id=&quot;insert&quot; parameterType=&quot;org.example.bookmark.BookmarkFolderInsertRow&quot;
+            useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+        INSERT INTO bookmark_folder(member_id, name, created_at, updated_at)
+        VALUES (#{memberId}, #{name}, #{at}, #{at})
+    &lt;/insert&gt;
+    &lt;update id=&quot;rename&quot;&gt;
+        UPDATE bookmark_folder SET name = #{name}, updated_at = NOW()
+        WHERE id = #{id} AND member_id = #{memberId}
+    &lt;/update&gt;
+    &lt;update id=&quot;moveAllToDefault&quot;&gt;
+        UPDATE bookmark SET folder_id = NULL, updated_at = NOW()
+        WHERE folder_id = #{folderId} AND member_id = #{memberId}
+    &lt;/update&gt;
+    &lt;delete id=&quot;deleteMine&quot;&gt;
+        DELETE FROM bookmark_folder WHERE id = #{id} AND member_id = #{memberId}
+    &lt;/delete&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/MyBatisBookmarkMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.bookmark.MyBatisBookmarkMapper&quot;&gt;
+    &lt;select id=&quot;findPostStatus&quot; resultType=&quot;string&quot;&gt;
+        SELECT status FROM post WHERE id = #{postId}
+    &lt;/select&gt;
+    &lt;select id=&quot;findOwnedFolder&quot; resultType=&quot;long&quot;&gt;
+        SELECT id FROM bookmark_folder WHERE id = #{folderId} AND member_id = #{memberId}
+    &lt;/select&gt;
+    &lt;select id=&quot;findBookmark&quot; resultType=&quot;org.example.bookmark.BookmarkRow&quot;&gt;
+        SELECT id, folder_id, memo FROM bookmark
+        WHERE member_id = #{memberId} AND post_id = #{postId} FOR UPDATE
+    &lt;/select&gt;
+    &lt;insert id=&quot;upsert&quot; parameterType=&quot;org.example.bookmark.BookmarkInsertRow&quot;&gt;
+        INSERT INTO bookmark(member_id, post_id, folder_id, memo, created_at, updated_at)
+        VALUES (#{memberId}, #{postId}, #{folderId}, #{memo}, #{at}, #{at})
+        ON DUPLICATE KEY UPDATE folder_id = VALUES(folder_id), memo = VALUES(memo), updated_at = NOW()
+    &lt;/insert&gt;
+    &lt;update id=&quot;updateMemo&quot;&gt;
+        UPDATE bookmark SET memo = #{memo}, updated_at = NOW()
+        WHERE member_id = #{memberId} AND post_id = #{postId}
+    &lt;/update&gt;
+    &lt;delete id=&quot;deleteByMemberAndPost&quot;&gt;
+        DELETE FROM bookmark WHERE member_id = #{memberId} AND post_id = #{postId}
+    &lt;/delete&gt;
+    &lt;select id=&quot;findOwnedBookmark&quot; resultType=&quot;org.example.bookmark.BookmarkRow&quot;&gt;
+        SELECT id, post_id, folder_id, memo FROM bookmark
+        WHERE id = #{id} AND member_id = #{memberId} FOR UPDATE
+    &lt;/select&gt;
+    &lt;update id=&quot;moveBookmark&quot;&gt;
+        UPDATE bookmark SET folder_id = #{folderId}, updated_at = NOW()
+        WHERE id = #{id} AND member_id = #{memberId}
+    &lt;/update&gt;
+    &lt;!-- 북마크 자체는 숨기지 않는다. 글 공개 규칙은 응답의 available로 계산한다. --&gt;
+    &lt;select id=&quot;findMyBookmarks&quot; resultType=&quot;org.example.bookmark.BookmarkListRow&quot;&gt;
+        SELECT b.id, b.post_id, b.folder_id, b.memo, b.created_at AS bookmarked_at,
+               p.title, p.author_id, author.nickname AS author_nickname,
+               CASE WHEN p.deleted_at IS NULL
+                    AND (p.status = 'PUBLISHED'
+                         OR (p.status = 'DRAFT' AND p.author_id = #{memberId})
+                         OR (p.status = 'HIDDEN' AND #{viewerRole} = 'ADMIN'))
+                    AND (p.status != 'PUBLISHED' OR p.visibility != 'FOLLOWERS'
+                         OR p.author_id = #{memberId}
+                         OR EXISTS (SELECT 1 FROM follow f WHERE f.follower_id = #{memberId}
+                                    AND f.followee_id = p.author_id))
+                    AND (p.author_id = #{memberId}
+                         OR NOT EXISTS (SELECT 1 FROM member_block block_rel
+                                        WHERE (block_rel.blocker_id = #{memberId} AND block_rel.blocked_id = p.author_id)
+                                           OR (block_rel.blocked_id = #{memberId} AND block_rel.blocker_id = p.author_id)))
+                    THEN 1 ELSE 0 END AS available
+        FROM bookmark b
+        JOIN post p ON p.id = b.post_id
+        JOIN member author ON author.id = p.author_id
+        WHERE b.member_id = #{memberId}
+        &lt;choose&gt;
+            &lt;when test=&quot;folderMode == 'DEFAULT'&quot;&gt;AND b.folder_id IS NULL&lt;/when&gt;
+            &lt;when test=&quot;folderMode == 'ID'&quot;&gt;AND b.folder_id = #{folderId}&lt;/when&gt;
+        &lt;/choose&gt;
+        &lt;if test=&quot;cursorAt != null&quot;&gt;
+            AND (b.created_at &amp;lt; #{cursorAt}
+                 OR (b.created_at = #{cursorAt} AND b.id &amp;lt; #{cursorId}))
+        &lt;/if&gt;
+        ORDER BY b.created_at DESC, b.id DESC
+        LIMIT #{limit}
+    &lt;/select&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/MyBatisCommentMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.comment.MyBatisCommentMapper&quot;&gt;
+    &lt;select id=&quot;findParent&quot; resultType=&quot;org.example.comment.ParentCommentRow&quot;&gt;
+        SELECT id, post_id, parent_id, deleted_at FROM comment WHERE id = #{parentId}
+    &lt;/select&gt;
+    &lt;select id=&quot;findPostStatus&quot; resultType=&quot;string&quot;&gt;
+        SELECT status FROM post WHERE id = #{postId}
+    &lt;/select&gt;
+    &lt;insert id=&quot;insertComment&quot; parameterType=&quot;org.example.comment.CommentInsertRow&quot;
+            useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+        INSERT INTO comment(post_id, member_id, parent_id, content, created_at, updated_at)
+        VALUES (#{postId}, #{memberId}, #{parentId}, #{content}, #{at}, #{at})
+    &lt;/insert&gt;
+    &lt;update id=&quot;incrementCommentCount&quot;&gt;
+        UPDATE post SET comment_count = comment_count + 1 WHERE id = #{postId}
+    &lt;/update&gt;
+    &lt;select id=&quot;selectTopLevel&quot; resultType=&quot;org.example.comment.CommentRow&quot;&gt;
+        SELECT c.id, c.content, c.created_at,
+               m.id AS author_id, m.nickname AS author_nickname
+        FROM comment c JOIN member m ON m.id = c.member_id
+        WHERE c.post_id = #{postId} AND c.parent_id IS NULL
+          AND c.deleted_at IS NULL
+        ORDER BY c.created_at ASC, c.id ASC
+    &lt;/select&gt;
+    &lt;select id=&quot;selectThreadRows&quot; resultType=&quot;org.example.comment.CommentTreeRow&quot;&gt;
+        SELECT c.id, c.parent_id, c.member_id AS author_id, m.nickname AS author_nickname,
+               c.content, c.created_at, c.deleted_at
+        FROM comment c JOIN member m ON m.id = c.member_id
+        WHERE c.post_id = #{postId}
+        ORDER BY c.created_at ASC, c.id ASC
+    &lt;/select&gt;
+    &lt;select id=&quot;selectBlockedMemberIds&quot; resultType=&quot;long&quot;&gt;
+        SELECT CASE WHEN blocker_id = #{viewerId} THEN blocked_id ELSE blocker_id END
+        FROM member_block WHERE blocker_id = #{viewerId} OR blocked_id = #{viewerId}
+    &lt;/select&gt;
+    &lt;select id=&quot;findForDelete&quot; resultType=&quot;org.example.comment.CommentDeleteRow&quot;&gt;
+        SELECT id, post_id, member_id, deleted_at FROM comment WHERE id = #{id}
+    &lt;/select&gt;
+    &lt;update id=&quot;softDelete&quot;&gt;
+        UPDATE comment SET deleted_at = #{at}, updated_at = #{at}
+        WHERE id = #{id} AND deleted_at IS NULL
+    &lt;/update&gt;
+    &lt;update id=&quot;decrementCommentCount&quot;&gt;
+        UPDATE post SET comment_count = comment_count - 1
+        WHERE id = #{postId} AND comment_count &gt; 0
+    &lt;/update&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/MyBatisLikeMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.like.MyBatisLikeMapper&quot;&gt;
+    &lt;select id=&quot;findMyLikes&quot; resultType=&quot;org.example.like.MyLikeRow&quot;&gt;
+        SELECT l.id AS like_id, p.id AS post_id, p.title,
+               a.id AS author_id, a.nickname AS author_nickname,
+               l.created_at AS liked_at
+        FROM post_like l
+        JOIN post p ON p.id = l.post_id
+        JOIN member a ON a.id = p.author_id
+        WHERE l.member_id = #{memberId}
+          AND p.deleted_at IS NULL AND p.status = 'PUBLISHED'
+          AND (p.visibility = 'PUBLIC' OR p.author_id = #{memberId}
+               OR EXISTS (SELECT 1 FROM follow f
+                          WHERE f.follower_id = #{memberId} AND f.followee_id = p.author_id))
+          AND NOT EXISTS (SELECT 1 FROM member_block b
+                          WHERE (b.blocker_id = #{memberId} AND b.blocked_id = p.author_id)
+                             OR (b.blocked_id = #{memberId} AND b.blocker_id = p.author_id))
+          &lt;if test=&quot;cursorAt != null&quot;&gt;
+            AND (l.created_at &amp;lt; #{cursorAt} OR
+                 (l.created_at = #{cursorAt} AND l.id &amp;lt; #{cursorId}))
+          &lt;/if&gt;
+        ORDER BY l.created_at DESC, l.id DESC
+        LIMIT #{limit}
+    &lt;/select&gt;
+    &lt;select id=&quot;findPostStatus&quot; resultType=&quot;string&quot;&gt;
+        SELECT status FROM post WHERE id = #{postId}
+    &lt;/select&gt;
+    &lt;select id=&quot;existsLike&quot; resultType=&quot;boolean&quot;&gt;
+        SELECT EXISTS(SELECT 1 FROM post_like
+                      WHERE post_id = #{postId} AND member_id = #{memberId})
+    &lt;/select&gt;
+    &lt;select id=&quot;findLikeCount&quot; resultType=&quot;int&quot;&gt;
+        SELECT like_count FROM post WHERE id = #{postId}
+    &lt;/select&gt;
+    &lt;insert id=&quot;insertIgnoreLike&quot;&gt;
+        INSERT IGNORE INTO post_like(post_id, member_id, created_at)
+        VALUES (#{postId}, #{memberId}, CURRENT_TIMESTAMP)
+    &lt;/insert&gt;
+    &lt;insert id=&quot;insertLike&quot;&gt;
+        INSERT INTO post_like(post_id, member_id, created_at)
+        VALUES (#{postId}, #{memberId}, CURRENT_TIMESTAMP)
+    &lt;/insert&gt;
+    &lt;delete id=&quot;deleteLike&quot;&gt;
+        DELETE FROM post_like WHERE post_id = #{postId} AND member_id = #{memberId}
+    &lt;/delete&gt;
+    &lt;update id=&quot;decreaseLikeCount&quot;&gt;
+        UPDATE post SET like_count = GREATEST(0, like_count - 1) WHERE id = #{postId}
+    &lt;/update&gt;
+    &lt;update id=&quot;increaseLikeCount&quot;&gt;
+        UPDATE post SET like_count = like_count + 1 WHERE id = #{postId}
+    &lt;/update&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/MyBatisMarkedPostMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.marked.MyBatisMarkedPostMapper&quot;&gt;
+    &lt;!-- 목록과 COUNT가 동일한 공개·차단·표시 조건을 공유한다. --&gt;
+    &lt;sql id=&quot;markedFromWhere&quot;&gt;
+        FROM post p
+        JOIN member author ON author.id = p.author_id
+        JOIN board board_ref ON board_ref.id = p.board_id
+        LEFT JOIN post_like l ON l.post_id = p.id AND l.member_id = #{memberId}
+        LEFT JOIN bookmark bm ON bm.post_id = p.id AND bm.member_id = #{memberId}
+        WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM member_block blocked
+              WHERE (blocked.blocker_id = #{memberId} AND blocked.blocked_id = p.author_id)
+                 OR (blocked.blocked_id = #{memberId} AND blocked.blocker_id = p.author_id))
+        &lt;choose&gt;
+            &lt;when test=&quot;liked and bookmarked&quot;&gt;AND l.id IS NOT NULL AND bm.id IS NOT NULL&lt;/when&gt;
+            &lt;when test=&quot;liked&quot;&gt;AND l.id IS NOT NULL&lt;/when&gt;
+            &lt;when test=&quot;bookmarked&quot;&gt;AND bm.id IS NOT NULL&lt;/when&gt;
+            &lt;otherwise&gt;AND (l.id IS NOT NULL OR bm.id IS NOT NULL)&lt;/otherwise&gt;
+        &lt;/choose&gt;
+    &lt;/sql&gt;
+    &lt;select id=&quot;findMarkedPosts&quot; resultType=&quot;org.example.marked.MarkedPostRow&quot;&gt;
+        SELECT p.id AS post_id, p.title,
+               author.nickname AS author_nickname, board_ref.slug AS board_slug,
+               (l.id IS NOT NULL) AS liked, (bm.id IS NOT NULL) AS bookmarked
+        &lt;include refid=&quot;markedFromWhere&quot; /&gt;
+        ORDER BY p.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    &lt;/select&gt;
+    &lt;select id=&quot;countMarkedPosts&quot; resultType=&quot;long&quot;&gt;
+        SELECT COUNT(*)
+        &lt;include refid=&quot;markedFromWhere&quot; /&gt;
+    &lt;/select&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/MyBatisStatsMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.stats.MyBatisStatsMapper&quot;&gt;
+    &lt;select id=&quot;findMemberActivity&quot; resultType=&quot;org.example.stats.MemberActivityRow&quot;&gt;
+        SELECT m.id AS member_id,
+               CASE WHEN m.member_status = 'WITHDRAWN' THEN '탈퇴한 회원' ELSE m.nickname END AS nickname,
+               (SELECT COUNT(*) FROM post p
+                 WHERE p.author_id = m.id AND p.status = 'PUBLISHED' AND p.deleted_at IS NULL) AS posts,
+               (SELECT COUNT(*) FROM comment c JOIN post p ON p.id = c.post_id
+                 WHERE c.member_id = m.id AND c.deleted_at IS NULL AND p.deleted_at IS NULL) AS comments,
+               (SELECT COUNT(*) FROM post_like l JOIN post p ON p.id = l.post_id
+                 WHERE p.author_id = m.id AND p.deleted_at IS NULL) AS likes_received,
+               (SELECT COUNT(*) FROM post_like l WHERE l.member_id = m.id) AS likes_given
+          FROM member m
+         ORDER BY likes_received DESC, m.id ASC
+    &lt;/select&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/PostReplaceMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.post.PostReplaceMapper&quot;&gt;
+    &lt;select id=&quot;findTagByName&quot; resultType=&quot;org.example.post.PostReplaceTagRow&quot;&gt;
+        SELECT id, name FROM tag WHERE name = #{name} LIMIT 1
+    &lt;/select&gt;
+    &lt;insert id=&quot;insertTagIfMissing&quot;&gt;
+        INSERT INTO tag(name, created_at) VALUES (#{name}, CURRENT_TIMESTAMP)
+        ON DUPLICATE KEY UPDATE id = id
+    &lt;/insert&gt;
+    &lt;update id=&quot;softDelete&quot;&gt;
+        UPDATE post SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND deleted_at IS NULL
+    &lt;/update&gt;
+    &lt;update id=&quot;patchPost&quot;&gt;
+        UPDATE post
+        &lt;set&gt;
+            &lt;if test=&quot;title != null&quot;&gt;title = #{title},&lt;/if&gt;
+            &lt;if test=&quot;content != null&quot;&gt;content = #{content},&lt;/if&gt;
+            &lt;if test=&quot;visibility != null&quot;&gt;visibility = #{visibility},&lt;/if&gt;
+            updated_at = CURRENT_TIMESTAMP
+        &lt;/set&gt;
+        WHERE id = #{id}
+    &lt;/update&gt;
+    &lt;update id=&quot;updatePost&quot;&gt;
+        UPDATE post SET title = #{title}, content = #{content},
+                        visibility = #{visibility}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    &lt;/update&gt;
+    &lt;delete id=&quot;deletePostTags&quot;&gt;
+        DELETE FROM post_tag WHERE post_id = #{postId}
+    &lt;/delete&gt;
+    &lt;insert id=&quot;insertPostTag&quot;&gt;
+        INSERT INTO post_tag(post_id, tag_id) VALUES (#{postId}, #{tagId})
+    &lt;/insert&gt;
+&lt;/mapper&gt;
+</code></pre></details>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/PostVisibilityMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.post.PostVisibilityMapper&quot;&gt;
+    &lt;sql id=&quot;listWhere&quot;&gt;
+        p.board_id = #{boardId}
+        AND p.deleted_at IS NULL
+        AND p.status = 'PUBLISHED'
+        AND (p.visibility = 'PUBLIC'
+             &lt;if test=&quot;viewerId != null&quot;&gt;
+                OR p.author_id = #{viewerId}
+                OR EXISTS (SELECT 1 FROM follow f
+                           WHERE f.follower_id = #{viewerId} AND f.followee_id = p.author_id)
+             &lt;/if&gt;)
+        &lt;if test=&quot;viewerId != null&quot;&gt;
+            AND NOT EXISTS (SELECT 1 FROM member_block b
+                            WHERE (b.blocker_id = #{viewerId} AND b.blocked_id = p.author_id)
+                               OR (b.blocked_id = #{viewerId} AND b.blocker_id = p.author_id))
+        &lt;/if&gt;
+    &lt;/sql&gt;
+
+<pre><code>&amp;lt;select id=&amp;quot;findVisibleDetail&amp;quot; resultType=&amp;quot;org.example.post.PostDetailRow&amp;quot;&amp;gt;
+    SELECT p.id, b.slug AS board_slug, p.title, p.content, p.visibility,
+           m.id AS author_id, m.nickname AS author_nickname,
+           p.view_count, p.like_count, p.comment_count, p.created_at
+    FROM post p JOIN board b ON b.id = p.board_id
+                JOIN member m ON m.id = p.author_id
+    WHERE p.id = #{id} AND p.deleted_at IS NULL
+      AND (p.status = 'PUBLISHED'
+           &amp;lt;if test=&amp;quot;viewerId != null&amp;quot;&amp;gt;OR (p.status = 'DRAFT' AND p.author_id = #{viewerId})&amp;lt;/if&amp;gt;
+           &amp;lt;if test=&amp;quot;viewerRole == 'ADMIN'&amp;quot;&amp;gt;OR p.status = 'HIDDEN'&amp;lt;/if&amp;gt;)
+      AND (p.status != 'PUBLISHED' OR p.visibility != 'FOLLOWERS'
+           &amp;lt;if test=&amp;quot;viewerId != null&amp;quot;&amp;gt;
+               OR p.author_id = #{viewerId}
+               OR EXISTS (SELECT 1 FROM follow f
+                          WHERE f.follower_id = #{viewerId} AND f.followee_id = p.author_id)
+           &amp;lt;/if&amp;gt;)
+      &amp;lt;if test=&amp;quot;viewerId != null&amp;quot;&amp;gt;
+          AND (p.author_id = #{viewerId} OR NOT EXISTS
+               (SELECT 1 FROM member_block b
+                WHERE (b.blocker_id = #{viewerId} AND b.blocked_id = p.author_id)
+                   OR (b.blocked_id = #{viewerId} AND b.blocker_id = p.author_id)))
+      &amp;lt;/if&amp;gt;
+&amp;lt;/select&amp;gt;
+
+&amp;lt;update id=&amp;quot;increaseViewCount&amp;quot;&amp;gt;
+    UPDATE post SET view_count = view_count + 1 WHERE id = #{id}
+&amp;lt;/update&amp;gt;
+
+&amp;lt;select id=&amp;quot;findMemberId&amp;quot; resultType=&amp;quot;long&amp;quot;&amp;gt;
+    SELECT id FROM member WHERE id = #{memberId}
+&amp;lt;/select&amp;gt;
+&amp;lt;select id=&amp;quot;selectPublicByAuthorAndBoard&amp;quot; resultType=&amp;quot;org.example.post.PostHeadlineRow&amp;quot;&amp;gt;
+    SELECT p.id, p.title, m.nickname AS author_nickname, b.slug AS board_slug
+    FROM post p JOIN member m ON m.id = p.author_id
+                JOIN board b ON b.id = p.board_id
+    WHERE m.id = #{memberId} AND b.slug = #{boardSlug}
+      AND p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC'
+      AND p.deleted_at IS NULL
+    ORDER BY p.published_at DESC, p.id DESC
+&amp;lt;/select&amp;gt;
+&amp;lt;select id=&amp;quot;findBoardIdBySlug&amp;quot; resultType=&amp;quot;long&amp;quot;&amp;gt;
+    SELECT id FROM board WHERE slug = #{slug}
+&amp;lt;/select&amp;gt;
+
+&amp;lt;select id=&amp;quot;findViewableByBoard&amp;quot; resultType=&amp;quot;org.example.post.PostListRow&amp;quot;&amp;gt;
+    SELECT p.id, p.title, p.like_count, p.comment_count, p.view_count, p.published_at,
+           m.id AS author_id, m.nickname AS author_nickname
+    FROM post p JOIN member m ON m.id = p.author_id
+    &amp;lt;where&amp;gt;&amp;lt;include refid=&amp;quot;listWhere&amp;quot;/&amp;gt;&amp;lt;/where&amp;gt;
+    ORDER BY p.published_at DESC, p.id DESC
+    LIMIT #{limit} OFFSET #{offset}
+&amp;lt;/select&amp;gt;
+
+&amp;lt;select id=&amp;quot;countViewableByBoard&amp;quot; resultType=&amp;quot;long&amp;quot;&amp;gt;
+    SELECT COUNT(*) FROM post p
+    &amp;lt;where&amp;gt;&amp;lt;include refid=&amp;quot;listWhere&amp;quot;/&amp;gt;&amp;lt;/where&amp;gt;
+&amp;lt;/select&amp;gt;
+
+&amp;lt;select id=&amp;quot;findTagsByPostIds&amp;quot; resultType=&amp;quot;org.example.post.PostTagRow&amp;quot;&amp;gt;
+    SELECT pt.post_id AS postId, t.name FROM post_tag pt
+    JOIN tag t ON t.id = pt.tag_id
+    WHERE pt.post_id IN
+    &amp;lt;foreach collection=&amp;quot;postIds&amp;quot; item=&amp;quot;id&amp;quot; open=&amp;quot;(&amp;quot; separator=&amp;quot;,&amp;quot; close=&amp;quot;)&amp;quot;&amp;gt;#{id}&amp;lt;/foreach&amp;gt;
+    ORDER BY t.name
+&amp;lt;/select&amp;gt;</code></pre>
+<p>&lt;/mapper&gt;
+</code></pre></details></p>
+<details class="code-file"><summary>테스트 — src/test/java/org/example/bookmark/MyBatisBookmarkConcurrentSetTest.java</summary><pre><code>package org.example.bookmark;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;</p>
+<p>import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;</p>
+<p>import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;</p>
+<p>// 읽기→저장의 경쟁 상태를 실제 커밋 경계에서 검증한다. 테스트 자체에는 @Transactional을 붙이지 않는다.
+@SpringBootTest
+@AutoConfigureMockMvc
+class MyBatisBookmarkConcurrentSetTest {
+    @Autowired MyBatisBookmarkService bookmarks;
+    @Autowired JdbcTemplate jdbc;</p>
+<pre><code>@Test
+void sameMemberSettingSamePostConcurrentlyGetsOneIdAndNoErrors() throws InterruptedException {
+    AuthenticatedMember member = new AuthenticatedMember(2L, &amp;quot;김자바&amp;quot;, &amp;quot;USER&amp;quot;);
+    int parallel = 8;
+    ExecutorService pool = Executors.newFixedThreadPool(parallel);
+    CountDownLatch ready = new CountDownLatch(parallel);
+    CountDownLatch start = new CountDownLatch(1);
+    CountDownLatch done = new CountDownLatch(parallel);
+    List&amp;lt;Long&amp;gt; ids = new CopyOnWriteArrayList&amp;lt;&amp;gt;();
+    List&amp;lt;Exception&amp;gt; errors = new CopyOnWriteArrayList&amp;lt;&amp;gt;();
+    for (int i = 0; i &amp;lt; parallel; i++) {
+        pool.submit(() -&amp;gt; {
+            try {
+                ready.countDown();
+                start.await();
+                ids.add(bookmarks.bookmark(17L, member, new BookmarkRequest(null, null)).bookmarkId());
+            } catch (Exception e) {
+                errors.add(e);
+            } finally {
+                done.countDown();
+            }
+        });
+    }
+    boolean allReady = ready.await(10, TimeUnit.SECONDS);
+    start.countDown();
+    assertTrue(allReady, &amp;quot;모든 PUT이 출발 전에 준비돼야 한다&amp;quot;);
+    assertTrue(done.await(30, TimeUnit.SECONDS), &amp;quot;모든 PUT이 끝나야 한다&amp;quot;);
+    pool.shutdown();
+
+    assertTrue(errors.isEmpty(), errors.toString());
+    assertEquals(parallel, ids.size());
+    assertEquals(1, ids.stream().distinct().count());
+    assertEquals(1, jdbc.queryForObject(
+            &amp;quot;SELECT COUNT(*) FROM bookmark WHERE member_id = 2 AND post_id = 17&amp;quot;, Integer.class));
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>테스트 — src/test/java/org/example/like/LikeConcurrencyTest.java</summary><pre><code>package org.example.like;
+
+<p>import org.example.auth.AuthenticatedMember;
+import org.example.post.PostRepository;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;</p>
+<p>import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;</p>
+<p>import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;</p>
+<p>// 4-2: 동시에 좋아요를 눌러도 like_count = post_like 행 수가 되는지 재현·고정한다.
+// 테스트 메서드에는 일부러 @Transactional을 붙이지 않는다 — 붙이면 모든 스레드가
+// 같은(커밋 전) 트랜잭션을 공유해 실제 동시 쓰기 상황이 재현되지 않는다.
+//
+// @AutoConfigureMockMvc는 이 테스트에서 쓰지 않지만 그래도 붙인다 — 이 프로젝트의 모든
+// @SpringBootTest가 똑같은 애노테이션 조합이어야 Spring이 컨텍스트를 하나로 캐시하고, 그래야
+// Testcontainers의 jdbc:tc:... 컨테이너도 하나만 뜬다. 빠뜨리면 2-4에서 겪은 것과 같은 문제
+// (별도 컨텍스트가 같은 컨테이너에 스키마 초기화를 또 시도 → Table already exists)가 재현된다.
+@SpringBootTest
+@AutoConfigureMockMvc
+class LikeConcurrencyTest {</p>
+<pre><code>private static final Long POST_ID = 16L; // 이스프링의 &amp;quot;자유글 05&amp;quot; — 시드에서 좋아요 0개로 시작
+
+@Autowired
+MyBatisLikeService likeService;
+
+@Autowired
+PostRepository postRepository;
+
+@Autowired
+PostLikeRepository postLikeRepository;
+
+@Test
+void differentMembersLikingAtOnceKeepsCountConsistent() throws InterruptedException {
+    int threadCount = 20;
+    List&amp;lt;AuthenticatedMember&amp;gt; members = new java.util.ArrayList&amp;lt;&amp;gt;();
+    for (int i = 0; i &amp;lt; threadCount; i++) {
+        members.add(new AuthenticatedMember(7L + i, &amp;quot;동시성&amp;quot; + (i + 1), &amp;quot;USER&amp;quot;));
+    }
+
+    List&amp;lt;Exception&amp;gt; errors = runConcurrently(threadCount, index -&amp;gt; likeService.like(POST_ID, members.get(index)));
+
+    assertTrue(errors.isEmpty(), &amp;quot;모든 요청이 예외 없이 끝나야 한다: &amp;quot; + errors);
+    Integer likeCount = postRepository.findLikeCountById(POST_ID);
+    long rowCount = postLikeRepository.countByPost_Id(POST_ID);
+
+    assertEquals(20L, rowCount, &amp;quot;서로 다른 회원 20명이 좋아요했으니 행도 20개여야 한다&amp;quot;);
+    assertEquals(rowCount, likeCount.longValue(), &amp;quot;like_count는 실제 post_like 행 수와 같아야 한다&amp;quot;);
+}
+
+@Test
+void sameMemberLikingFiveTimesAtOnceInsertsOnlyOneRow() throws InterruptedException {
+    AuthenticatedMember member = new AuthenticatedMember(7L, &amp;quot;동시성01&amp;quot;, &amp;quot;USER&amp;quot;);
+
+    List&amp;lt;Exception&amp;gt; errors = runConcurrently(5, index -&amp;gt; likeService.like(POST_ID, member));
+
+    assertTrue(errors.isEmpty(), &amp;quot;중복 키 오류 등으로 실패한 요청이 있으면 안 된다: &amp;quot; + errors);
+    long rowCount = postLikeRepository.countByPost_IdAndMember_Id(POST_ID, member.id());
+    assertEquals(1L, rowCount, &amp;quot;같은 회원이 동시에 여러 번 눌러도 행은 1개여야 한다&amp;quot;);
+}
+
+private List&amp;lt;Exception&amp;gt; runConcurrently(int count, java.util.function.IntConsumer task) throws InterruptedException {
+    ExecutorService pool = Executors.newFixedThreadPool(count);
+    CountDownLatch ready = new CountDownLatch(count);
+    CountDownLatch start = new CountDownLatch(1);
+    CountDownLatch done = new CountDownLatch(count);
+    List&amp;lt;Exception&amp;gt; errors = new CopyOnWriteArrayList&amp;lt;&amp;gt;();
+
+    for (int i = 0; i &amp;lt; count; i++) {
+        int index = i;
+        pool.submit(() -&amp;gt; {
+            try {
+                ready.countDown();
+                start.await();
+                task.accept(index);
+            } catch (Exception e) {
+                errors.add(e);
+            } finally {
+                done.countDown();
+            }
+        });
+    }
+
+    boolean allReady = ready.await(10, TimeUnit.SECONDS);
+    start.countDown(); // 모든 스레드가 준비된 뒤 한꺼번에 출발시킨다
+    assertTrue(allReady, &amp;quot;모든 스레드가 출발 전에 준비돼야 한다&amp;quot;);
+    assertTrue(done.await(30, TimeUnit.SECONDS), &amp;quot;모든 요청이 끝나야 한다&amp;quot;);
+    pool.shutdown();
+    return errors;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>테스트 — src/test/java/org/example/like/LikeControllerTest.java</summary><pre><code>package org.example.like;
+
+<p>import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;</p>
+<p>import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;</p>
+<p>@SpringBootTest
+@AutoConfigureMockMvc
+@Transactional
+class LikeControllerTest {
+    @Autowired MockMvc mvc;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired EntityManager em;
+    @Autowired ObjectMapper mapper;</p>
+<pre><code>@Test
+void putIsIdempotentAndPersistsOneRelation() throws Exception {
+    var first = mvc.perform(put(&amp;quot;/api/posts/3/like&amp;quot;)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath(&amp;quot;$.postId&amp;quot;).value(3))
+            .andExpect(jsonPath(&amp;quot;$.liked&amp;quot;).value(true))
+            .andReturn();
+    long count = mapper.readTree(first.getResponse().getContentAsString()).get(&amp;quot;likeCount&amp;quot;).asLong();
+    mvc.perform(put(&amp;quot;/api/posts/3/like&amp;quot;)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath(&amp;quot;$.likeCount&amp;quot;).value(count));
+    em.flush();
+    assertEquals(1L, jdbc.queryForObject(
+            &amp;quot;SELECT COUNT(*) FROM post_like WHERE post_id=3 AND member_id=2&amp;quot;, Long.class));
+    assertEquals(count, jdbc.queryForObject(&amp;quot;SELECT like_count FROM post WHERE id=3&amp;quot;, Long.class));
+}
+
+@Test
+void refusesOwnUnavailableAndUnauthenticatedPosts() throws Exception {
+    var created = mvc.perform(post(&amp;quot;/api/posts&amp;quot;)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;)
+                    .contentType(&amp;quot;application/json&amp;quot;)
+                    .content(&amp;quot;{\&amp;quot;boardSlug\&amp;quot;:\&amp;quot;dev\&amp;quot;,\&amp;quot;title\&amp;quot;:\&amp;quot;내 글\&amp;quot;,\&amp;quot;content\&amp;quot;:\&amp;quot;본문\&amp;quot;}&amp;quot;))
+            .andExpect(status().isCreated()).andReturn();
+    long ownId = mapper.readTree(created.getResponse().getContentAsString()).get(&amp;quot;id&amp;quot;).asLong();
+    em.flush(); // JPA 생성 결과를 DB에 반영한 뒤 MyBatis 조회를 확인한다.
+    mvc.perform(put(&amp;quot;/api/posts/{id}/like&amp;quot;, ownId)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;))
+            .andExpect(status().isBadRequest());
+    mvc.perform(put(&amp;quot;/api/posts/8/like&amp;quot;)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;))
+            .andExpect(status().isNotFound());
+    mvc.perform(put(&amp;quot;/api/posts/999999/like&amp;quot;)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;))
+            .andExpect(status().isNotFound());
+    mvc.perform(put(&amp;quot;/api/posts/3/like&amp;quot;))
+            .andExpect(status().isUnauthorized());
+    mvc.perform(put(&amp;quot;/api/posts/3/like&amp;quot;)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-choi&amp;quot;))
+            .andExpect(status().isForbidden());
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>테스트 — src/test/java/org/example/post/MyBatisStatementCounter.java</summary><pre><code>package org.example.post;
+
+<p>import org.apache.ibatis.executor.Executor;
+import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.plugin.Interceptor;
+import org.apache.ibatis.plugin.Intercepts;
+import org.apache.ibatis.plugin.Invocation;
+import org.apache.ibatis.plugin.Signature;
+import org.apache.ibatis.session.ResultHandler;
+import org.apache.ibatis.session.RowBounds;
+import org.springframework.stereotype.Component;</p>
+<p>// 테스트 중 Mapper가 실행한 SELECT 문장 수를 요청 스레드별로 센다.
+@Component
+@Intercepts(@Signature(type = Executor.class, method = &quot;query&quot;,
+        args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class}))
+public class MyBatisStatementCounter implements Interceptor {
+    private final ThreadLocal&lt;Long&gt; count = ThreadLocal.withInitial(() -&gt; 0L);</p>
+<pre><code>@Override
+public Object intercept(Invocation invocation) throws Throwable {
+    count.set(count.get() + 1);
+    return invocation.proceed();
+}
+
+public void clear() { count.set(0L); }
+public long getCount() { return count.get(); }</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>테스트 — src/test/java/org/example/post/PostControllerTest.java</summary><pre><code>package org.example.post;
+
+<p>import org.example.auth.ApiToken;
+import org.example.auth.ApiTokenRepository;
+import org.example.auth.ClockConfig;
+import org.example.board.Board;
+import org.example.member.Member;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;</p>
+<p>import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Optional;</p>
+<p>import static org.hamcrest.Matchers.endsWith;
+import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;</p>
+<p>// 7-1: 컨트롤러만 띄워 HTTP 계약(상태 코드·헤더·JSON)을 고정한다. DB·서비스는 띄우지 않는다.
+// 실물: PostController, ApiExceptionHandler(Advice), Bean Validation, AuthInterceptor·LoginMemberArgumentResolver
+// 가짜: 컨트롤러가 쓰는 서비스 두 개 + 인터셉터가 쓰는 ApiTokenRepository(&quot;토큰 → 회원&quot;을 정해 준다)
+// Clock은 리포지토리가 아니라 설정 빈이라 실물(ClockConfig)을 가져온다 — @WebMvcTest는 일반 @Configuration을 읽지 않는다.
+@WebMvcTest(PostController.class)
+@Import(ClockConfig.class)
+class PostControllerTest {</p>
+<pre><code>private static final String VALID_BODY = &amp;quot;&amp;quot;&amp;quot;
+        {&amp;quot;boardSlug&amp;quot;:&amp;quot;dev&amp;quot;,&amp;quot;title&amp;quot;:&amp;quot;[테스트] 제목&amp;quot;,&amp;quot;content&amp;quot;:&amp;quot;본문&amp;quot;,&amp;quot;tags&amp;quot;:[],&amp;quot;visibility&amp;quot;:&amp;quot;PUBLIC&amp;quot;}
+        &amp;quot;&amp;quot;&amp;quot;;
+
+@Autowired
+MockMvc mockMvc;
+
+@MockitoBean
+PostService postService;
+
+@MockitoBean
+PostQueryService postQueryService;
+
+// MyBatis 선택 경로에서 PostController가 추가로 받는 세 서비스도 슬라이스 테스트에서는 mock한다.
+@MockitoBean
+PostReplaceMyBatisService postReplaceMyBatisService;
+
+@MockitoBean
+PostPatchMyBatisService postPatchMyBatisService;
+
+@MockitoBean
+PostDeleteMyBatisService postDeleteMyBatisService;
+
+@MockitoBean
+ApiTokenRepository apiTokenRepository;
+
+@Test
+void 올바른_토큰과_본문이면_201과_Location과_작성자를_돌려준다() throws Exception {
+    Member kimjava = givenToken(&amp;quot;tok-kimjava&amp;quot;, 2L, &amp;quot;김자바&amp;quot;);
+    Post created = fakePost(22L, kimjava);
+    given(postService.create(eq(2L), any(PostCreateRequest.class))).willReturn(created);
+
+    mockMvc.perform(post(&amp;quot;/api/posts&amp;quot;)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(VALID_BODY))
+            .andExpect(status().isCreated())
+            .andExpect(header().string(&amp;quot;Location&amp;quot;, endsWith(&amp;quot;/api/posts/22&amp;quot;)))
+            .andExpect(jsonPath(&amp;quot;$.id&amp;quot;).value(22))
+            .andExpect(jsonPath(&amp;quot;$.author.id&amp;quot;).value(2))
+            .andExpect(jsonPath(&amp;quot;$.author.nickname&amp;quot;).value(&amp;quot;김자바&amp;quot;));
+}
+
+@Test
+void 빈_제목이면_400_problem_json에_title_오류가_있고_서비스를_부르지_않는다() throws Exception {
+    givenToken(&amp;quot;tok-kimjava&amp;quot;, 2L, &amp;quot;김자바&amp;quot;);
+
+    mockMvc.perform(post(&amp;quot;/api/posts&amp;quot;)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(&amp;quot;&amp;quot;&amp;quot;
+                            {&amp;quot;boardSlug&amp;quot;:&amp;quot;dev&amp;quot;,&amp;quot;title&amp;quot;:&amp;quot;&amp;quot;,&amp;quot;content&amp;quot;:&amp;quot;본문&amp;quot;,&amp;quot;tags&amp;quot;:[],&amp;quot;visibility&amp;quot;:&amp;quot;PUBLIC&amp;quot;}
+                            &amp;quot;&amp;quot;&amp;quot;))
+            .andExpect(status().isBadRequest())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath(&amp;quot;$.status&amp;quot;).value(400))
+            .andExpect(jsonPath(&amp;quot;$.errors[*].field&amp;quot;, hasItem(&amp;quot;title&amp;quot;)));
+
+    then(postService).shouldHaveNoInteractions();
+}
+
+@Test
+void 토큰이_없으면_401이고_서비스도_토큰_조회도_하지_않는다() throws Exception {
+    mockMvc.perform(post(&amp;quot;/api/posts&amp;quot;)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(VALID_BODY))
+            .andExpect(status().isUnauthorized())
+            .andExpect(header().string(&amp;quot;WWW-Authenticate&amp;quot;, &amp;quot;Bearer&amp;quot;))
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+
+    then(postService).shouldHaveNoInteractions();
+    then(apiTokenRepository).shouldHaveNoInteractions();
+}
+
+@Test
+void 서비스가_글_없음_예외를_던지면_404_problem_json이다() throws Exception {
+    given(postQueryService.getDetail(eq(999L), any())).willThrow(new PostNotFoundException());
+
+    mockMvc.perform(get(&amp;quot;/api/posts/999&amp;quot;))
+            .andExpect(status().isNotFound())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath(&amp;quot;$.status&amp;quot;).value(404));
+}
+
+// 인터셉터가 쓰는 &amp;quot;토큰 → 회원&amp;quot;을 정해 준다(만료 2099년, 폐기 없음, ACTIVE)
+private Member givenToken(String token, Long memberId, String nickname) {
+    Member member = mock(Member.class);
+    given(member.getId()).willReturn(memberId);
+    given(member.getNickname()).willReturn(nickname);
+    given(member.getRole()).willReturn(&amp;quot;USER&amp;quot;);
+    given(member.getMemberStatus()).willReturn(&amp;quot;ACTIVE&amp;quot;);
+
+    ApiToken apiToken = mock(ApiToken.class);
+    given(apiToken.getExpiresAt()).willReturn(LocalDateTime.of(2099, 12, 31, 23, 59, 59));
+    given(apiToken.getMember()).willReturn(member);
+    given(apiTokenRepository.findByTokenFetchMember(token)).willReturn(Optional.of(apiToken));
+    return member;
+}
+
+// PostService.create가 돌려주는 것은 엔티티라(1-3: DTO 변환은 컨트롤러 몫) id·게시판이 채워진 가짜 엔티티를 만든다
+private Post fakePost(Long id, Member author) {
+    Board board = mock(Board.class);
+    given(board.getSlug()).willReturn(&amp;quot;dev&amp;quot;);
+
+    Post post = mock(Post.class);
+    given(post.getId()).willReturn(id);
+    given(post.getBoard()).willReturn(board);
+    given(post.getAuthor()).willReturn(author);
+    given(post.getTitle()).willReturn(&amp;quot;[테스트] 제목&amp;quot;);
+    given(post.getContent()).willReturn(&amp;quot;본문&amp;quot;);
+    given(post.getTags()).willReturn(new LinkedHashSet&amp;lt;&amp;gt;());
+    given(post.getVisibility()).willReturn(&amp;quot;PUBLIC&amp;quot;);
+    given(post.getCreatedAt()).willReturn(LocalDateTime.of(2026, 10, 9, 12, 0));
+    return post;
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>테스트 — src/test/java/org/example/post/PostListQueryCountTest.java</summary><pre><code>package org.example.post;
+
+<p>import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.web.servlet.MockMvc;</p>
+<p>import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;</p>
+<p>// JPA Statistics는 Mapper SQL을 세지 못하므로 MyBatis Executor에서 SELECT를 센다.
+@SpringBootTest
+@AutoConfigureMockMvc
+class PostListQueryCountTest {
+    @Autowired MockMvc mockMvc;
+    @Autowired MyBatisStatementCounter counter;</p>
+<pre><code>@Test
+void queryCountDoesNotGrowWithPageSize() throws Exception {
+    counter.clear();
+    mockMvc.perform(get(&amp;quot;/api/boards/free/posts&amp;quot;).param(&amp;quot;size&amp;quot;, &amp;quot;5&amp;quot;))
+            .andExpect(status().isOk());
+    long countForSize5 = counter.getCount();
+
+    counter.clear();
+    mockMvc.perform(get(&amp;quot;/api/boards/free/posts&amp;quot;).param(&amp;quot;size&amp;quot;, &amp;quot;20&amp;quot;))
+            .andExpect(status().isOk());
+    long countForSize20 = counter.getCount();
+
+    System.out.printf(&amp;quot;MyBatis SELECT count: size=5 %d, size=20 %d%n&amp;quot;, countForSize5, countForSize20);
+    assertTrue(countForSize5 &amp;gt; 0, &amp;quot;Mapper SELECT가 실제로 계측되어야 한다&amp;quot;);
+    assertEquals(countForSize5, countForSize20,
+            &amp;quot;글 수가 늘어도 SELECT 문장 수가 증가하지 않아야 한다&amp;quot;);
+    assertTrue(countForSize5 &amp;lt;= 5, &amp;quot;목록·COUNT·태그 SQL이 5개 이하여야 한다&amp;quot;);
+}</code></pre>
+<p>}
+</code></pre></details></p>
+<details class="code-file"><summary>테스트 — src/test/java/org/example/post/PostReplaceControllerTest.java</summary><pre><code>package org.example.post;
+
+<p>import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;</p>
+<p>import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;</p>
+<p>@SpringBootTest
+@AutoConfigureMockMvc
+@Transactional
+class PostReplaceControllerTest {
+    @Autowired MockMvc mockMvc;
+    @Autowired ObjectMapper objectMapper;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired EntityManager em;</p>
+<pre><code>@Test
+void replacesPostAndTagsTogether() throws Exception {
+    var created = mockMvc.perform(post(&amp;quot;/api/posts&amp;quot;)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;)
+                    .contentType(&amp;quot;application/json&amp;quot;)
+                    .content(&amp;quot;{\&amp;quot;boardSlug\&amp;quot;:\&amp;quot;dev\&amp;quot;,\&amp;quot;title\&amp;quot;:\&amp;quot;이전\&amp;quot;,\&amp;quot;content\&amp;quot;:\&amp;quot;이전 본문\&amp;quot;,\&amp;quot;tags\&amp;quot;:[\&amp;quot;spring\&amp;quot;],\&amp;quot;visibility\&amp;quot;:\&amp;quot;FOLLOWERS\&amp;quot;}&amp;quot;))
+            .andExpect(status().isCreated()).andReturn();
+    long id = objectMapper.readTree(created.getResponse().getContentAsString()).get(&amp;quot;id&amp;quot;).asLong();
+    em.flush(); // JPA 생성 결과를 DB에 반영한 뒤 MyBatis 교체를 확인한다.
+
+    mockMvc.perform(put(&amp;quot;/api/posts/{id}&amp;quot;, id)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;)
+                    .contentType(&amp;quot;application/json&amp;quot;)
+                    .content(&amp;quot;{\&amp;quot;title\&amp;quot;:\&amp;quot;[PUT실습] 새 제목\&amp;quot;,\&amp;quot;content\&amp;quot;:\&amp;quot;수정한 본문\&amp;quot;,\&amp;quot;tags\&amp;quot;:[\&amp;quot;java\&amp;quot;]}&amp;quot;))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath(&amp;quot;$.title&amp;quot;).value(&amp;quot;[PUT실습] 새 제목&amp;quot;))
+            .andExpect(jsonPath(&amp;quot;$.visibility&amp;quot;).value(&amp;quot;PUBLIC&amp;quot;))
+            .andExpect(jsonPath(&amp;quot;$.tags[0]&amp;quot;).value(&amp;quot;java&amp;quot;));
+    em.flush();
+    assertEquals(&amp;quot;PUBLIC&amp;quot;, jdbc.queryForObject(&amp;quot;SELECT visibility FROM post WHERE id=?&amp;quot;, String.class, id));
+    assertEquals(&amp;quot;java&amp;quot;, jdbc.queryForObject(&amp;quot;SELECT t.name FROM post_tag pt JOIN tag t ON t.id=pt.tag_id WHERE pt.post_id=?&amp;quot;, String.class, id));
+
+    mockMvc.perform(put(&amp;quot;/api/posts/{id}&amp;quot;, id)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;)
+                    .contentType(&amp;quot;application/json&amp;quot;).content(&amp;quot;{\&amp;quot;title\&amp;quot;:\&amp;quot;제목만\&amp;quot;}&amp;quot;))
+            .andExpect(status().isBadRequest());
+    mockMvc.perform(get(&amp;quot;/api/posts/{id}&amp;quot;, id)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath(&amp;quot;$.content&amp;quot;).value(&amp;quot;수정한 본문&amp;quot;));
+    mockMvc.perform(put(&amp;quot;/api/posts/{id}&amp;quot;, id)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-lee&amp;quot;)
+                    .contentType(&amp;quot;application/json&amp;quot;).content(&amp;quot;{\&amp;quot;title\&amp;quot;:\&amp;quot;남의 글\&amp;quot;,\&amp;quot;content\&amp;quot;:\&amp;quot;본문\&amp;quot;}&amp;quot;))
+            .andExpect(status().isForbidden());
+    mockMvc.perform(put(&amp;quot;/api/posts/{id}&amp;quot;, id)
+                    .contentType(&amp;quot;application/json&amp;quot;).content(&amp;quot;{\&amp;quot;title\&amp;quot;:\&amp;quot;제목\&amp;quot;,\&amp;quot;content\&amp;quot;:\&amp;quot;본문\&amp;quot;}&amp;quot;))
+            .andExpect(status().isUnauthorized());
+    mockMvc.perform(put(&amp;quot;/api/posts/999999&amp;quot;)
+                    .header(&amp;quot;Authorization&amp;quot;, &amp;quot;Bearer tok-kimjava&amp;quot;)
+                    .contentType(&amp;quot;application/json&amp;quot;).content(&amp;quot;{\&amp;quot;title\&amp;quot;:\&amp;quot;제목\&amp;quot;,\&amp;quot;content\&amp;quot;:\&amp;quot;본문\&amp;quot;}&amp;quot;))
+            .andExpect(status().isNotFound());
+}</code></pre>
+<p>}
+</code></pre></details></p>
 <h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
-<pre><code class="language-bash">BASE=http://localhost:8080
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>BASE=http://localhost:8080
 curl -s &quot;$BASE/api/stats/member-activity&quot; | python3 -c '
 import sys,json; d=json.load(sys.stdin); print(len(d))
 for r in d[:5]: print(r)
-print([r for r in d if r[&quot;memberId&quot;] in (12, 26, 29, 30)])'</code></pre>
-<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+print([r for r in d if r[&quot;memberId&quot;] in (12, 26, 29, 30)])'</code></pre></details>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.</p>
+<section class="api-practice" aria-label="HTTP 요청 실행"><h3>브라우저에서 요청 보내기</h3><p>서버 주소를 입력한 뒤 요청 버튼을 누르세요. 토큰은 직접 입력하며 페이지에 저장하지 않습니다.</p><div class="api-request-list"><article class="api-request" data-request-id="A" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><h4>A · 회원 활동 요약</h4><p class="request-method">GET</p><label>경로 <input class="request-path" value="/api/stats/member-activity" autocomplete="off"></label><div class="request-fields"></div><button type="button" class="send-request">GET 요청 보내기</button><p class="request-status" role="status" aria-live="polite"></p><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$&quot;,&quot;length&quot;:30}]}
+C2: {&quot;json&quot;:[{&quot;path&quot;:&quot;$[0].memberId&quot;,&quot;equals&quot;:2},{&quot;path&quot;:&quot;$[0].nickname&quot;,&quot;equals&quot;:&quot;코딩하는고양이&quot;},{&quot;path&quot;:&quot;$[0].posts&quot;,&quot;equals&quot;:13},{&quot;path&quot;:&quot;$[0].comments&quot;,&quot;equals&quot;:13},{&quot;path&quot;:&quot;$[0].likesReceived&quot;,&quot;equals&quot;:74},{&quot;path&quot;:&quot;$[0].likesGiven&quot;,&quot;equals&quot;:18},{&quot;path&quot;:&quot;$[1].memberId&quot;,&quot;equals&quot;:4},{&quot;path&quot;:&quot;$[1].nickname&quot;,&quot;equals&quot;:&quot;스프링요정&quot;},{&quot;path&quot;:&quot;$[1].posts&quot;,&quot;equals&quot;:19},{&quot;path&quot;:&quot;$[1].comments&quot;,&quot;equals&quot;:19},{&quot;path&quot;:&quot;$[1].likesReceived&quot;,&quot;equals&quot;:60},{&quot;path&quot;:&quot;$[1].likesGiven&quot;,&quot;equals&quot;:23},{&quot;path&quot;:&quot;$[2].memberId&quot;,&quot;equals&quot;:3},{&quot;path&quot;:&quot;$[2].nickname&quot;,&quot;equals&quot;:&quot;자바초보탈출&quot;},{&quot;path&quot;:&quot;$[2].posts&quot;,&quot;equals&quot;:12},{&quot;path&quot;:&quot;$[2].comments&quot;,&quot;equals&quot;:16},{&quot;path&quot;:&quot;$[2].likesReceived&quot;,&quot;equals&quot;:55},{&quot;path&quot;:&quot;$[2].likesGiven&quot;,&quot;equals&quot;:15},{&quot;path&quot;:&quot;$[3].memberId&quot;,&quot;equals&quot;:5},{&quot;path&quot;:&quot;$[3].nickname&quot;,&quot;equals&quot;:&quot;쿼리장인&quot;},{&quot;path&quot;:&quot;$[3].posts&quot;,&quot;equals&quot;:9},{&quot;path&quot;:&quot;$[3].comments&quot;,&quot;equals&quot;:14},{&quot;path&quot;:&quot;$[3].likesReceived&quot;,&quot;equals&quot;:40},{&quot;path&quot;:&quot;$[3].likesGiven&quot;,&quot;equals&quot;:12},{&quot;path&quot;:&quot;$[4].memberId&quot;,&quot;equals&quot;:22},{&quot;path&quot;:&quot;$[4].nickname&quot;,&quot;equals&quot;:&quot;야근없는팀&quot;},{&quot;path&quot;:&quot;$[4].posts&quot;,&quot;equals&quot;:5},{&quot;path&quot;:&quot;$[4].comments&quot;,&quot;equals&quot;:10},{&quot;path&quot;:&quot;$[4].likesReceived&quot;,&quot;equals&quot;:39},{&quot;path&quot;:&quot;$[4].likesGiven&quot;,&quot;equals&quot;:24}]}
+C3: {&quot;json&quot;:[{&quot;path&quot;:&quot;$&quot;,&quot;contains&quot;:{&quot;memberId&quot;:30,&quot;nickname&quot;:&quot;새로온회원&quot;,&quot;posts&quot;:0,&quot;comments&quot;:0,&quot;likesReceived&quot;:0,&quot;likesGiven&quot;:0}},{&quot;path&quot;:&quot;$&quot;,&quot;contains&quot;:{&quot;memberId&quot;:26,&quot;nickname&quot;:&quot;조용한독자&quot;,&quot;posts&quot;:0,&quot;comments&quot;:9,&quot;likesReceived&quot;:0,&quot;likesGiven&quot;:23}},{&quot;path&quot;:&quot;$&quot;,&quot;contains&quot;:{&quot;memberId&quot;:29,&quot;nickname&quot;:&quot;탈퇴한 회원&quot;,&quot;posts&quot;:3,&quot;comments&quot;:10,&quot;likesReceived&quot;:13,&quot;likesGiven&quot;:14}}]}
+C4: {&quot;json&quot;:[{&quot;path&quot;:&quot;$&quot;,&quot;contains&quot;:{&quot;memberId&quot;:12,&quot;nickname&quot;:&quot;백엔드입문&quot;,&quot;posts&quot;:6,&quot;comments&quot;:12,&quot;likesReceived&quot;:10,&quot;likesGiven&quot;:29}}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
 <p>C = HTTP 확인(필수), R = 코드 리뷰(피드백용). 값은 (memberId, nickname, posts, comments, likesReceived, likesGiven) 순서다.</p>
 <div class="table-wrap"><table>
 <thead>
@@ -149,47 +2870,46 @@ print([r for r in d if r[&quot;memberId&quot;] in (12, 26, 29, 30)])'</code></pr
 
 <section class="grader" id="result-test">
   <h2>결과 테스트 프롬프트</h2>
-  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
   <div class="grader-inputs">
-    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
-    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
   </div>
   <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
   <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
-  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 8-1. 회원별 활동 요약 — LEFT JOIN과 집계\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n이 단계는 학습용 DB(practice)를 쓴다. 앱이 practice 프로파일로 떠 있어야 한다(README의 \"학습용 데이터로 앱 실행\"). 아니면 그 방법만 알려 주고 멈춰라.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch8-query-deep/8-1-activity-summary.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity practice -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 8-1. 회원별 활동 요약 — LEFT JOIN과 집계\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n이 단계는 학습용 DB(practice)를 쓴다. 앱이 practice 프로파일로 떠 있어야 한다(README의 \"학습용 데이터로 앱 실행\"). 아니면 그 방법만 알려 주고 멈춰라.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch8-query-deep/8-1-activity-summary.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity practice -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
 </section>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
   const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
   const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
                   set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
   $('repo').value = store.get('jx.repo');
-  $('base').value = store.get('jx.base');
   function fill() {
     const repo = $('repo').value.trim();
-    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
     $('prompt').value = tpl
-      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
       .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
       .replaceAll('{{BASE}}', base);
     store.set('jx.repo', repo);
-    store.set('jx.base', $('base').value.trim());
   }
   $('repo').addEventListener('input', fill);
-  $('base').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
   fill();
   $('copy').addEventListener('click', async () => {
     const text = $('prompt').value;
     let ok = false;
     try { await navigator.clipboard.writeText(text); ok = true; } catch {}
     if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
-    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
   });
 })();
 </script>
 <nav class="pager"><a href="../ch7-tests/7-3-integration.html">← 이전 7-3. 통합 테스트 — Testcontainers</a><a href="8-2-popular-ranking.html">다음 → 8-2. 최근 N일 인기글 랭킹 — 조건부 집계와 고정 시계</a></nav>
 </main>
 
+<script src="../../tools/site/scenario-runner.js" defer></script><script src="../../tools/site/scenario-snapshots.js" defer></script>
 </body>
 </html>

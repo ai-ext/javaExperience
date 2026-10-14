@@ -1,0 +1,78 @@
+package org.example.bookmark;
+
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
+
+    @Query("SELECT b.post.id FROM Bookmark b WHERE b.member.id = :memberId AND b.post.id IN :postIds")
+    List<Long> findPostIdsForMember(@Param("memberId") Long memberId,
+                                    @Param("postIds") List<Long> postIds);
+
+    Optional<Bookmark> findByMember_IdAndPost_Id(Long memberId, Long postId);
+
+    long deleteByMember_IdAndPost_Id(Long memberId, Long postId);
+
+    // 북마크도 항상 "내 것" 조건으로 찾는다
+    Optional<Bookmark> findByIdAndMember_Id(Long id, Long memberId);
+
+    // 6-2 폴더 삭제 — 안의 북마크를 기본 폴더로. 북마크마다가 아니라 UPDATE 한 번
+    @Modifying
+    @Query("UPDATE Bookmark b SET b.folder = null WHERE b.folder.id = :folderId")
+    int moveAllToDefaultFolder(@Param("folderId") Long folderId);
+
+    // 6-3 내 북마크 — 북마크한 시각 최신순 키셋 페이징. 글·작성자를 함께 읽는다(항목마다 따로 조회하지 않음).
+    // 4-3과 달리 "볼 수 있는 글" 조건을 여기 넣지 않는다 — 볼 수 없게 된 글도 남기고 항목별로 표시하기 때문이다.
+    // folderMode: ALL(전체) / DEFAULT(기본 폴더 = folder_id IS NULL) / ID(그 폴더)
+    @Query("""
+            SELECT b FROM Bookmark b
+            JOIN FETCH b.post p
+            JOIN FETCH p.author
+            LEFT JOIN b.folder f
+            WHERE b.member.id = :memberId
+              AND (:folderMode = 'ALL'
+                   OR (:folderMode = 'DEFAULT' AND f.id IS NULL)
+                   OR (:folderMode = 'ID' AND f.id = :folderId))
+              AND (:cursorAt IS NULL
+                   OR b.createdAt < :cursorAt
+                   OR (b.createdAt = :cursorAt AND b.id < :cursorId))
+            ORDER BY b.createdAt DESC, b.id DESC
+            """)
+    List<Bookmark> findMyBookmarks(@Param("memberId") Long memberId,
+                                   @Param("folderMode") String folderMode,
+                                   @Param("folderId") Long folderId,
+                                   @Param("cursorAt") LocalDateTime cursorAt,
+                                   @Param("cursorId") Long cursorId,
+                                   Pageable pageable);
+    // UNIQUE(member_id,post_id)를 이용해 동시 반복 PUT도 한 행으로 합친다.
+    @Modifying
+    @Query(value = """
+            INSERT INTO bookmark(member_id, post_id, folder_id, note, created_at, updated_at)
+            VALUES (:memberId, :postId, :folderId, :memo, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE id = id
+            """, nativeQuery = true)
+    int insertIfAbsent(@Param("memberId") Long memberId, @Param("postId") Long postId,
+                       @Param("folderId") Long folderId, @Param("memo") String memo);
+
+    // REPEATABLE_READ의 이전 스냅샷이 아닌 현재 행을 읽는다.
+    @Query(value = "SELECT * FROM bookmark WHERE member_id = :memberId AND post_id = :postId FOR UPDATE",
+            nativeQuery = true)
+    Optional<Bookmark> findCurrentForUpdate(@Param("memberId") Long memberId,
+                                             @Param("postId") Long postId);
+    // 6-1: 생성 또는 폴더·메모 수정. UNIQUE 키 충돌도 하나의 SQL에서 처리한다.
+    @Modifying
+    @Query(value = """
+            INSERT INTO bookmark(member_id, post_id, folder_id, note, created_at, updated_at)
+            VALUES (:memberId, :postId, :folderId, :memo, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE folder_id = VALUES(folder_id), note = VALUES(note), updated_at = NOW()
+            """, nativeQuery = true)
+    int upsert(@Param("memberId") Long memberId, @Param("postId") Long postId,
+               @Param("folderId") Long folderId, @Param("memo") String memo);
+}

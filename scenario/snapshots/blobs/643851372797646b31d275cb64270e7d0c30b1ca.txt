@@ -1,0 +1,124 @@
+package org.example.report;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.comment.Comment;
+import org.example.comment.CommentRepository;
+import org.example.member.MemberRepository;
+import org.example.post.Post;
+import org.example.post.PostRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.example.post.CacheConfig;
+import org.example.post.PopularCacheVersion;
+import org.springframework.cache.annotation.CacheEvict;
+
+// 13-2 신고 처리 — 대상별로 묶어 보여 주고, 대상 하나의 대기 신고를 한 번에 처리한다
+@Service
+public class ReportHandlingService {
+
+    private static final int PREVIEW_LENGTH = 50;
+
+    private final ReportRepository reportRepository;
+    private final PostRepository postRepository;
+    private final CommentRepository commentRepository;
+    private final MemberRepository memberRepository;
+    private final Clock clock;
+    private final PopularCacheVersion popularCacheVersion;
+
+    public ReportHandlingService(ReportRepository reportRepository, PostRepository postRepository,
+                                 CommentRepository commentRepository, MemberRepository memberRepository, Clock clock, PopularCacheVersion popularCacheVersion) {
+        this.reportRepository = reportRepository;
+        this.postRepository = postRepository;
+        this.commentRepository = commentRepository;
+        this.memberRepository = memberRepository;
+        this.clock = clock;
+        this.popularCacheVersion = popularCacheVersion;
+    }
+
+    // 묶음 목록 + 미리보기(글 제목·댓글 내용)는 종류별 IN 한 번씩 — 묶음마다 대상을 따로 조회하지 않는다
+    @Transactional(readOnly = true)
+    public ReportGroupPageResponse groups(String status, int page, int size) {
+        List<ReportGroupRow> rows = reportRepository.findGroups(status, size + 1, (long) page * size);
+        boolean hasNext = rows.size() > size;
+        List<ReportGroupRow> pageRows = hasNext ? rows.subList(0, size) : rows;
+
+        Map<Long, String> postTitles = postRepository.findAllById(idsOf(pageRows, ReportService.POST)).stream()
+                .filter(p -> p.getDeletedAt() == null)
+                .collect(Collectors.toMap(Post::getId, Post::getTitle));
+        Map<Long, String> commentTexts = commentRepository.findAllById(idsOf(pageRows, ReportService.COMMENT)).stream()
+                .filter(c -> c.getDeletedAt() == null)
+                .collect(Collectors.toMap(Comment::getId, c -> cut(c.getContent())));
+
+        List<ReportGroupResponse> items = pageRows.stream()
+                .map(r -> new ReportGroupResponse(r.getTargetType(), r.getTargetId(),
+                        (ReportService.POST.equals(r.getTargetType()) ? postTitles : commentTexts).get(r.getTargetId()),
+                        r.getReportCount(), Arrays.asList(r.getReasons().split(",")),
+                        r.getFirstReportedAt(), r.getLastReportedAt()))
+                .toList();
+        return new ReportGroupPageResponse(items, page, size, reportRepository.countGroups(status), hasNext);
+    }
+
+    // 1) 대기 신고를 조건부 UPDATE로 "가져간다" — 두 사람이 동시에 처리해도 한쪽만 1행 이상을 얻는다
+    // 2) 가져간 쪽만 대상에 조치한다(HIDE: 글 숨김·댓글 삭제). 0행이면 이미 처리됐거나 신고가 없다
+    // 신고 수락으로 글을 숨긴 경우만 인기글 캐시를 비운다. 거절·댓글 처리에는 글 순위가 그대로다.
+    @CacheEvict(cacheNames = CacheConfig.POPULAR_POSTS, allEntries = true,
+            condition = "#p1.action() == 'HIDE' && #p1.targetType() == 'POST'")
+    @Transactional
+    public ResolveResponse resolve(AuthenticatedMember me, ResolveRequest request) {
+        String newStatus = "HIDE".equals(request.action()) ? "ACCEPTED" : "REJECTED";
+        LocalDateTime now = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS);
+        int updated = reportRepository.resolvePending(request.targetType(), request.targetId(), newStatus, me.id(), now);
+        if (updated == 0) {
+            if (!reportRepository.existsByTargetTypeAndTargetId(request.targetType(), request.targetId())) {
+                throw new ReportTargetNotFoundException();
+            }
+            throw new NothingToResolveException();
+        }
+        String targetStatus = "HIDE".equals(request.action()) ? applyHide(me, request, now) : null;
+        if ("HIDE".equals(request.action()) && ReportService.POST.equals(request.targetType())) {
+            popularCacheVersion.invalidateAfterCommit();
+        }
+        return new ResolveResponse(request.targetType(), request.targetId(), request.action(), updated, targetStatus);
+    }
+
+    // 글은 13-1의 숨김(누가·언제 기록), 댓글은 5-3의 삭제와 같은 규칙(soft delete + comment_count 1 감소)
+    private String applyHide(AuthenticatedMember me, ResolveRequest request, LocalDateTime now) {
+        if (ReportService.POST.equals(request.targetType())) {
+            return postRepository.findByIdForUpdate(request.targetId())
+                    .filter(p -> p.getDeletedAt() == null)
+                    .map(p -> {
+                        p.hide(memberRepository.getReferenceById(me.id()), now);
+                        return p.getStatus();
+                    })
+                    .orElse("DELETED");
+        }
+        commentRepository.findById(request.targetId())
+                .filter(c -> c.getDeletedAt() == null)
+                .ifPresent(c -> {
+                    if (commentRepository.softDeleteIfLive(c.getId(), now) == 1
+                            && postRepository.decrementCommentCount(c.getPost().getId()) != 1) {
+                        throw new IllegalStateException("댓글 수 갱신에 실패했습니다.");
+                    }
+                });
+        return "DELETED";
+    }
+
+    private static List<Long> idsOf(List<ReportGroupRow> rows, String type) {
+        return rows.stream().filter(r -> type.equals(r.getTargetType())).map(ReportGroupRow::getTargetId).toList();
+    }
+
+    private static String cut(String text) {
+        return text.codePointCount(0, text.length()) <= PREVIEW_LENGTH
+                ? text : text.substring(0, text.offsetByCodePoints(0, PREVIEW_LENGTH));
+    }
+}

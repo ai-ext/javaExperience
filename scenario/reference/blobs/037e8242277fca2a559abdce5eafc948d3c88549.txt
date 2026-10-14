@@ -1,0 +1,56 @@
+package org.example.recent;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+public interface RecentViewRepository extends JpaRepository<RecentView, Long> {
+
+    @Query(nativeQuery = true, value = "SELECT viewed_at FROM recent_view WHERE member_id = :memberId ORDER BY viewed_at DESC, id DESC LIMIT 1 FOR UPDATE")
+    LocalDateTime findLatestViewedAt(@Param("memberId") Long memberId);
+
+    // 처음 보면 INSERT, 이미 본 글이면 viewed_at만 갱신 — "있나 보고 나서 넣기"를 SQL 한 문장으로
+    @Modifying
+    @Query(nativeQuery = true, value = """
+            INSERT INTO recent_view (member_id, post_id, viewed_at)
+            VALUES (:memberId, :postId, :viewedAt) AS new
+            ON DUPLICATE KEY UPDATE viewed_at = new.viewed_at
+            """)
+    int upsert(@Param("memberId") Long memberId, @Param("postId") Long postId,
+               @Param("viewedAt") LocalDateTime viewedAt);
+
+    // 최근 keep개만 남기고 지운다. MySQL은 IN 서브쿼리 안의 LIMIT을 허용하지 않아 파생 테이블로 한 번 감싼다
+    @Modifying
+    @Query(nativeQuery = true, value = """
+            DELETE FROM recent_view
+             WHERE member_id = :memberId
+               AND id NOT IN (SELECT id FROM (SELECT id FROM recent_view
+                                               WHERE member_id = :memberId
+                                               ORDER BY viewed_at DESC, id DESC
+                                               LIMIT :keep FOR UPDATE) AS latest)
+            """)
+    int trim(@Param("memberId") Long memberId, @Param("keep") int keep);
+
+    @Query("""
+            SELECT rv FROM RecentView rv
+            JOIN FETCH rv.post p
+            JOIN FETCH p.author
+            WHERE rv.memberId = :memberId
+            ORDER BY rv.viewedAt DESC, rv.id DESC
+            """)
+    List<RecentView> findLatest(@Param("memberId") Long memberId);
+
+    long countByMemberId(Long memberId);
+
+    @Modifying
+    @Query("DELETE FROM RecentView rv WHERE rv.memberId = :memberId")
+    int deleteAllOf(@Param("memberId") Long memberId);
+
+    @Modifying
+    @Query("DELETE FROM RecentView rv WHERE rv.memberId = :memberId AND rv.post.id = :postId")
+    int deleteOne(@Param("memberId") Long memberId, @Param("postId") Long postId);
+}

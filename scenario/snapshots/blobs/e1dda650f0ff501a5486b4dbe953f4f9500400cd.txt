@@ -1,0 +1,57 @@
+package org.example.batch;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Clock;
+import java.time.LocalDate;
+import java.util.List;
+
+@RestController
+public class HallOfFameController {
+
+    private final HallOfFameService hallOfFameService;
+    private final Clock clock;
+
+    public HallOfFameController(HallOfFameService hallOfFameService, Clock clock) {
+        this.hallOfFameService = hallOfFameService;
+        this.clock = clock;
+    }
+
+    // 수동 실행 — cron을 기다리지 않고 "그 날짜에 돌았다면"을 바로 확인한다.
+    // date는 yyyy-MM-dd(형식이 틀리면 타입 변환 실패 → 전역 핸들러가 400), 미래는 JobDates가 400.
+    @PostMapping("/api/admin/jobs/hall-of-fame/run")
+    public HallOfFameRunResponse run(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                     @LoginMember AuthenticatedMember me) {
+        AdminGuard.requireAdmin(me);
+        return hallOfFameService.run(JobDates.resolve(date, clock));
+    }
+
+    @GetMapping("/api/hall-of-fame")
+    public List<HallOfFameEntry> list(@RequestParam(required = false) String size) {
+        return hallOfFameService.list(parseSize(size));
+    }
+
+    private static int parseSize(String raw) {
+        if (raw == null) {
+            return 20;
+        }
+        if (!raw.matches("[0-9]+")) {
+            throw new InvalidJobParameterException("size", "1~100 사이의 정수여야 합니다.");
+        }
+        try {
+            int value = Integer.parseInt(raw);
+            if (value >= 1 && value <= 100) {
+                return value;
+            }
+        } catch (NumberFormatException ignored) {
+            // int 범위 밖의 숫자도 400으로 응답한다.
+        }
+        throw new InvalidJobParameterException("size", "1~100 사이의 정수여야 합니다.");
+    }
+}

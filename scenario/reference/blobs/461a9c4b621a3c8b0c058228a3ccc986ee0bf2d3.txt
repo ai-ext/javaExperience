@@ -1,0 +1,74 @@
+package org.example.notification;
+
+import org.example.push.FakePushSender;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+import java.util.List;
+
+// 9-4의 좋아요·댓글 알림은 원래 트랜잭션에서 처리한다. 저장 실패는 원래 작업을 롤백시킨다.
+// 멘션·새 글 알림은 각 시나리오의 커밋 후 처리 규칙을 따른다.
+@Component
+public class NotificationEventListener {
+
+    private static final Logger log = LoggerFactory.getLogger(NotificationEventListener.class);
+
+    private final NotificationService notificationService;
+    private final FakePushSender pushSender;
+
+    public NotificationEventListener(NotificationService notificationService, FakePushSender pushSender) {
+        this.notificationService = notificationService;
+        this.pushSender = pushSender;
+    }
+
+    @EventListener
+    public void onPostLiked(PostLikedEvent event) {
+        notificationService.notifyLike(event.postId(), event.actorId());
+    }
+
+    // 16-1 새 글 → 팔로워 알림. 글 트랜잭션이 롤백되면 이 메서드는 아예 불리지 않는다.
+    // 16-2 커밋 뒤 일을 알림 전용 스레드 풀에 넘긴다 — 글쓰기 응답은 푸시를 기다리지 않는다.
+    // 푸시 하나가 실패해도 다음 회원으로 넘어가고, 결과(SENT·FAILED)를 알림 행에 남긴다.
+    @Async("notificationExecutor")
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onPostCreated(PostCreatedEvent event) {
+        List<Long> recipients;
+        try {
+            recipients = notificationService.notifyNewPost(event.postId(), event.authorId());
+        } catch (RuntimeException e) {
+            log.warn("새 글 알림 생성 실패 postId={}", event.postId(), e);
+            return;
+        }
+        int failed = 0;
+        for (Long memberId : recipients) {
+            try {
+                pushSender.send(memberId, "새 글이 올라왔어요");
+                notificationService.markPush(event.postId(), memberId, "SENT");
+            } catch (RuntimeException e) {
+                failed++;
+                log.warn("푸시 실패 postId={} memberId={} — {}", event.postId(), memberId, e.getMessage());
+                notificationService.markPush(event.postId(), memberId, "FAILED");
+            }
+        }
+        log.info("새 글 알림 {}건(푸시 실패 {}건) postId={}", recipients.size(), failed, event.postId());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onCommentMentioned(CommentMentionedEvent event) {
+        try {
+            notificationService.notifyMentions(event.postId(), event.commentId(), event.actorId(), event.nicknames());
+        } catch (RuntimeException e) {
+            log.warn("멘션 알림 생성 실패 postId={} commentId={}", event.postId(), event.commentId(), e);
+        }
+    }
+
+    @EventListener
+    public void onCommentCreated(CommentCreatedEvent event) {
+        notificationService.notifyComment(event.postId(), event.commentId(), event.actorId());
+    }
+}

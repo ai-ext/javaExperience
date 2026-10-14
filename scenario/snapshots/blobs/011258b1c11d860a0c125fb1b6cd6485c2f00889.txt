@@ -1,0 +1,23 @@
+package org.example.bookmark;
+
+import tools.jackson.databind.JsonNode;
+import org.example.post.InvalidParametersException;
+
+import java.util.Map;
+
+// 본문 생략·빈 객체는 만료 없음. 원문 타입을 확인해 문자열·소수의 숫자 강제 변환을 막는다.
+public record ShareRequest(Integer expiresInDays) {
+    public static ShareRequest fromJson(JsonNode body) {
+        if (body == null) return new ShareRequest(null);
+        if (!body.isObject()) {
+            throw new InvalidParametersException(Map.of("body", "JSON 객체여야 합니다."));
+        }
+        JsonNode days = body.get("expiresInDays");
+        if (days == null || days.isNull()) return new ShareRequest(null);
+        if (!days.isIntegralNumber() || !days.canConvertToInt()
+                || days.intValue() < 1 || days.intValue() > 30) {
+            throw new InvalidParametersException(Map.of("expiresInDays", "1~30 사이의 정수여야 합니다."));
+        }
+        return new ShareRequest(days.intValue());
+    }
+}
