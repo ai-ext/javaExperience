@@ -2,80 +2,9 @@
 
 이 공개 저장소에는 **101개 단계의 요구사항과 HTML**, 각 단계의 구현 가이드·역할별 전체 코드 접기, JPA/MyBatis 대체 코드, 쿼리 연습 18개가 들어 있다. GitHub 로그인 없이 저장소를 다운로드해 따라갈 수 있다. 정답 코드는 직접 구현해 본 뒤 접기를 열어 비교한다.
 
-## 브라우저에서 API 요청 보내기
+**처음 시작하기:** [0-1 Java 첫 API부터](ch0-first-steps/0-1-ts-to-java.md) · [바로 게시글 API 만들기](ch1-create-post/1-1-receive-request.md) · [진행 방법 보기](#진행-방법)
 
-시나리오 HTML의 `직접 확인`에는 각 HTTP 요청 버튼이 있다. 페이지 위쪽의 서버 주소 기본값은 `http://localhost:8080`이다. 서버 주소를 바꿀 수 있고, 경로·본문·일반 헤더도 요청별로 편집할 수 있다. 문서에 공개된 연습용 `Authorization` 값은 기본 입력값으로 표시되며 편집할 수 있다. 실제 토큰이 필요한 요청은 입력란이 비어 있으므로 직접 입력한다. 입력한 토큰은 저장하지 않는다. 각 요청의 `Postman 설정 보기`에는 method, 전체 URL, 헤더, raw body, 기대 결과가 있다. 응답 상태·브라우저에서 읽을 수 있는 헤더·본문은 요청 아래에 표시된다.
-
-HTML을 파일로 바로 열면 브라우저 보안 정책 때문에 요청이 안정적으로 동작하지 않을 수 있다. 저장소 루트에서 정적 사이트를 HTTP로 제공한다.
-
-```bash
-python3 -m http.server 8765 --bind 127.0.0.1
-```
-
-그다음 `http://127.0.0.1:8765/scenario/README.html`을 연다. Spring Boot 서버의 CORS 설정에서 페이지 출처 `http://127.0.0.1:8765`와 사용하는 method·headers를 허용해야 한다. JSON, `Authorization` 또는 사용자 지정 헤더 요청은 브라우저가 먼저 CORS preflight를 보낼 수 있다. SQL, Gradle, 여러 요청의 결과를 다음 요청에 연결하는 확인은 페이지에 별도 수동 지시로 남아 있다.
-
-## 진행 방법
-
-1. 레포 루트에서 `docker compose up -d`로 DB를 띄우고 IntelliJ에서 `Main`을 실행한다([README의 실행](../README.md#실행)).
-2. 목차에서 장·단계를 골라 **화면 시나리오 → 요청·응답 계약 → 구현 가이드** 순서로 읽는다. 화면 시나리오의 각 흐름을 펼치면 사용자 행동, HTTP, 서버, DB, 응답이 차례대로 보인다.
-3. 직접 구현하고 `직접 확인`의 요청 버튼으로 HTTP 동작을 확인한다. SQL·테스트 등 수동 확인은 해당 단계 지시를 따른다. 막힐 때만 역할별 전체 코드 접기와 필요한 지식 문서를 연다.
-4. 결과 테스트 프롬프트를 Codex 또는 Claude Code에 붙여 넣어 해당 단계의 계약을 검토한다. GitHub 로그인은 필요하지 않다.
-5. 단계별로 커밋하고 이전·다음 링크로 진행한다. 본편은 9-5 다음에 11-1로 이어지며, 10장은 별도 명세서 프로젝트다.
-
-> 단계가 진행되며 같은 API의 응답 계약이 확장된다. 이전 단계의 채점이 나중에 실패할 수 있다. `community`, `practice`, `project`는 서로 다른 DB이므로 DB를 바꾼 뒤에는 이전 글 ID를 그대로 사용할 수 없다.
-
-- **작업 브랜치** — 각자 새 브랜치를 만들어 구현한다. 공개 저장소를 읽거나 다운로드할 때는 계정이 필요하지 않다. 원격에 push하거나 PR을 보낼 때는 GitHub 계정과 권한이 필요하다.
-- **DB 초기화** — `docker compose down -v && docker compose up -d`는 로컬 실습 데이터를 모두 지운다. 필요한 데이터를 먼저 보관한다.
-
-## 시나리오 데이터 (`community` DB)
-
-게시글은 여러분이 API로 만든다. 처음에는 아래 데이터만 있다. 2장부터는 이 데이터로 채점하므로 **채점 결과가 이상하면 먼저 DB를 처음 상태로 돌린다**(`docker compose down -v && docker compose up -d`).
-
-**회원과 토큰** — 요청 헤더 `Authorization: Bearer <토큰>`
-
-| 회원 id | 닉네임 | 역할·상태 | 토큰 | 관계 |
-|---|---|---|---|---|
-| 1 | 운영자 | ADMIN | `tok-admin` | 숨김 글을 볼 수 있다 |
-| 2 | 김자바 | USER — **여러분의 기본 계정** | `tok-kimjava` · 만료 `tok-kimjava-old` · 폐기 `tok-kimjava-revoked` | 이스프링(3)을 팔로우 |
-| 3 | 이스프링 | USER | `tok-lee` | 북마크 6개·폴더 2개 |
-| 4 | 박디비 | USER | `tok-park` | 좋아요 8개, **폴더 10개(한도)** |
-| 5 | 최정지 | USER, **정지(SUSPENDED)** | `tok-choi` | |
-| 6 | 한차단 | USER | `tok-han` | **김자바를 차단** |
-| 7~26 | 동시성01~20 | USER | `tok-c01` ~ `tok-c20` | 동시 요청 확인용(4-2) |
-
-**게시판** — `notice`(공지, 운영자만 글쓰기) · `dev`(개발) · `qna`(질문) · `free`(자유)
-
-**미리 있는 글 21개** — 여러분이 만드는 글은 id 22부터 붙는다.
-
-| id | 게시판 | 작성자 | 특징 |
-|---|---|---|---|
-| 1 | notice | 운영자 | 공지 |
-| 2 | dev | 이스프링 | 좋아요 1 |
-| 3 | qna | 박디비 | |
-| 4 · 5 | free | 이스프링 · 박디비 | 공개 |
-| 6 | free | 이스프링 | **팔로워 공개**(`FOLLOWERS`) — 김자바만 볼 수 있다 |
-| 7 | free | 박디비 | **임시저장**(`DRAFT`) — 박디비만 볼 수 있다 |
-| 8 | free | 이스프링 | **삭제됨**(`deleted_at`) — 아무도 못 본다 |
-| 9 | free | 한차단 | 김자바를 차단한 회원의 글 — 김자바에게만 안 보인다 |
-| 10 | free | 박디비 | **운영자 숨김**(`HIDDEN`) — 운영자만 볼 수 있다 |
-| 11 | qna | 이스프링 | 댓글 6개(답글·삭제된 댓글·차단한 회원의 댓글 포함) |
-| 12~21 | free | 이스프링·박디비 번갈아 | 페이징 확인용 "자유글 01~10" |
-
-- 태그 8개: `java`, `spring`, `jpa`, `mysql`, `docker`, `테스트`, `회고`, `질문`
-- 테이블 구조와 데이터는 dump 파일 [`docker/mysql/init/01-community.sql`](../docker/mysql/init/01-community.sql)에 있다. 눈으로 보려면 CloudBeaver(`http://localhost:8978`, `cbadmin` / `Admin1234`)의 `community (시나리오)` 연결을 연다.
-
-## 8·9장은 학습용 데이터(`practice` DB)
-
-8장(쿼리 심화)과 9장(스키마 변경)은 데이터가 많은 학습용 DB로 한다 — 회원 30·글 145·좋아요 568에 일부러 숫자가 어긋난 글, 삭제·숨김 글 등이 섞여 있다([학습용 미션](../practice/MISSIONS.md)의 "데이터에 숨겨 둔 함정").
-
-- 앱 실행: `./gradlew bootRun --args='--spring.profiles.active=practice'` (IntelliJ: Active profiles에 `practice`)
-- 토큰: `tok-p01` ~ `tok-p30` — 번호가 회원 id다. 회원 1이 운영자(`ADMIN`), 28은 정지, 29는 탈퇴
-- "지금 시각"은 `2026-10-05 00:00`으로 고정한다(`application-practice.yml`의 `app.fixed-now`, 8-2에서 `Clock` 빈으로 연결)
-- 결과 테스트 프롬프트도 이 장에서는 `practice` DB를 조회한다
-
-## 쿼리 설계 18개 연습
-
-기존 게시판 기능으로 만든 데이터를 같은 ID로 계속 조회하고 검색한다. [L12: 파생 쿼리·MyBatis 8개](labs/l12-query-methods/README.md) → [L13: `@Query`·동적 SQL 6개](labs/l13-declared-queries/README.md) → [L14: QueryDSL 4개](labs/l14-querydsl-extension/README.md) 순서다. 각 Q 시나리오에 Controller·Service·DTO·Repository·Mapper 코드 접기가 있다. 이 연습용 완성 프로젝트는 `python3 tools/materialize-query-practice.py --output /tmp/query-practice`로 별도 폴더에 복원할 수 있다.
+각 단계에서 API 서버 주소를 확인하고 요청 버튼을 누르면 브라우저에서 응답을 볼 수 있다.
 
 ## 목차
 
@@ -266,3 +195,78 @@ PUT 전체 교체와 PATCH 부분 수정 뒤 본인 글을 지운다. 지운 글
 - [10-11. 토글의 문제 — 멱등 PUT/DELETE를 v2로 나란히 · 중급](ch10-project/10-11-idempotent-like.md)
 - [10-12. JPA로 쓰고 같은 트랜잭션에서 MyBatis로 읽기 — flush (선택) · 고급](ch10-project/10-12-jpa-mybatis-flush.md)
 <!-- toc:end -->
+
+## 진행 방법
+
+1. 레포 루트에서 `docker compose up -d`로 DB를 띄우고 IntelliJ에서 `Main`을 실행한다([README의 실행](../README.md#실행)).
+2. 목차에서 장·단계를 골라 **화면 시나리오 → 요청·응답 계약 → 구현 가이드** 순서로 읽는다. 화면 시나리오의 각 흐름을 펼치면 사용자 행동, HTTP, 서버, DB, 응답이 차례대로 보인다.
+3. 직접 구현하고 `직접 확인`의 요청 버튼으로 HTTP 동작을 확인한다. SQL·테스트 등 수동 확인은 해당 단계 지시를 따른다. 막힐 때만 역할별 전체 코드 접기와 필요한 지식 문서를 연다.
+4. 결과 테스트 프롬프트를 Codex 또는 Claude Code에 붙여 넣어 해당 단계의 계약을 검토한다. GitHub 로그인은 필요하지 않다.
+5. 단계별로 커밋하고 이전·다음 링크로 진행한다. 본편은 9-5 다음에 11-1로 이어지며, 10장은 별도 명세서 프로젝트다.
+
+> 단계가 진행되며 같은 API의 응답 계약이 확장된다. 이전 단계의 채점이 나중에 실패할 수 있다. `community`, `practice`, `project`는 서로 다른 DB이므로 DB를 바꾼 뒤에는 이전 글 ID를 그대로 사용할 수 없다.
+
+- **작업 브랜치** — 각자 새 브랜치를 만들어 구현한다. 공개 저장소를 읽거나 다운로드할 때는 계정이 필요하지 않다. 원격에 push하거나 PR을 보낼 때는 GitHub 계정과 권한이 필요하다.
+- **DB 초기화** — `docker compose down -v && docker compose up -d`는 로컬 실습 데이터를 모두 지운다. 필요한 데이터를 먼저 보관한다.
+
+## 시나리오 데이터 (`community` DB)
+
+게시글은 여러분이 API로 만든다. 처음에는 아래 데이터만 있다. 2장부터는 이 데이터로 채점하므로 **채점 결과가 이상하면 먼저 DB를 처음 상태로 돌린다**(`docker compose down -v && docker compose up -d`).
+
+**회원과 토큰** — 요청 헤더 `Authorization: Bearer <토큰>`
+
+| 회원 id | 닉네임 | 역할·상태 | 토큰 | 관계 |
+|---|---|---|---|---|
+| 1 | 운영자 | ADMIN | `tok-admin` | 숨김 글을 볼 수 있다 |
+| 2 | 김자바 | USER — **여러분의 기본 계정** | `tok-kimjava` · 만료 `tok-kimjava-old` · 폐기 `tok-kimjava-revoked` | 이스프링(3)을 팔로우 |
+| 3 | 이스프링 | USER | `tok-lee` | 북마크 6개·폴더 2개 |
+| 4 | 박디비 | USER | `tok-park` | 좋아요 8개, **폴더 10개(한도)** |
+| 5 | 최정지 | USER, **정지(SUSPENDED)** | `tok-choi` | |
+| 6 | 한차단 | USER | `tok-han` | **김자바를 차단** |
+| 7~26 | 동시성01~20 | USER | `tok-c01` ~ `tok-c20` | 동시 요청 확인용(4-2) |
+
+**게시판** — `notice`(공지, 운영자만 글쓰기) · `dev`(개발) · `qna`(질문) · `free`(자유)
+
+**미리 있는 글 21개** — 여러분이 만드는 글은 id 22부터 붙는다.
+
+| id | 게시판 | 작성자 | 특징 |
+|---|---|---|---|
+| 1 | notice | 운영자 | 공지 |
+| 2 | dev | 이스프링 | 좋아요 1 |
+| 3 | qna | 박디비 | |
+| 4 · 5 | free | 이스프링 · 박디비 | 공개 |
+| 6 | free | 이스프링 | **팔로워 공개**(`FOLLOWERS`) — 김자바만 볼 수 있다 |
+| 7 | free | 박디비 | **임시저장**(`DRAFT`) — 박디비만 볼 수 있다 |
+| 8 | free | 이스프링 | **삭제됨**(`deleted_at`) — 아무도 못 본다 |
+| 9 | free | 한차단 | 김자바를 차단한 회원의 글 — 김자바에게만 안 보인다 |
+| 10 | free | 박디비 | **운영자 숨김**(`HIDDEN`) — 운영자만 볼 수 있다 |
+| 11 | qna | 이스프링 | 댓글 6개(답글·삭제된 댓글·차단한 회원의 댓글 포함) |
+| 12~21 | free | 이스프링·박디비 번갈아 | 페이징 확인용 "자유글 01~10" |
+
+- 태그 8개: `java`, `spring`, `jpa`, `mysql`, `docker`, `테스트`, `회고`, `질문`
+- 테이블 구조와 데이터는 dump 파일 [`docker/mysql/init/01-community.sql`](../docker/mysql/init/01-community.sql)에 있다. 눈으로 보려면 CloudBeaver(`http://localhost:8978`, `cbadmin` / `Admin1234`)의 `community (시나리오)` 연결을 연다.
+
+## 8·9장은 학습용 데이터(`practice` DB)
+
+8장(쿼리 심화)과 9장(스키마 변경)은 데이터가 많은 학습용 DB로 한다 — 회원 30·글 145·좋아요 568에 일부러 숫자가 어긋난 글, 삭제·숨김 글 등이 섞여 있다([학습용 미션](../practice/MISSIONS.md)의 "데이터에 숨겨 둔 함정").
+
+- 앱 실행: `./gradlew bootRun --args='--spring.profiles.active=practice'` (IntelliJ: Active profiles에 `practice`)
+- 토큰: `tok-p01` ~ `tok-p30` — 번호가 회원 id다. 회원 1이 운영자(`ADMIN`), 28은 정지, 29는 탈퇴
+- "지금 시각"은 `2026-10-05 00:00`으로 고정한다(`application-practice.yml`의 `app.fixed-now`, 8-2에서 `Clock` 빈으로 연결)
+- 결과 테스트 프롬프트도 이 장에서는 `practice` DB를 조회한다
+
+## 쿼리 설계 18개 연습
+
+기존 게시판 기능으로 만든 데이터를 같은 ID로 계속 조회하고 검색한다. [L12: 파생 쿼리·MyBatis 8개](labs/l12-query-methods/README.md) → [L13: `@Query`·동적 SQL 6개](labs/l13-declared-queries/README.md) → [L14: QueryDSL 4개](labs/l14-querydsl-extension/README.md) 순서다. 각 Q 시나리오에 Controller·Service·DTO·Repository·Mapper 코드 접기가 있다. 이 연습용 완성 프로젝트는 `python3 tools/materialize-query-practice.py --output /tmp/query-practice`로 별도 폴더에 복원할 수 있다.
+
+
+
+## 브라우저에서 API 요청 보내기
+
+HTML 파일을 직접 열면(`file://`) 요청이 막힐 수 있다. 저장소 루트에서 아래 명령을 실행해 HTTP로 연다.
+
+```bash
+python3 -m http.server 8765 --bind 127.0.0.1
+```
+
+그다음 `http://127.0.0.1:8765/scenario/README.html`을 연다. API 서버(기본 `http://localhost:8080`)의 CORS 설정에서 페이지 출처 `http://127.0.0.1:8765`를 허용해야 한다.

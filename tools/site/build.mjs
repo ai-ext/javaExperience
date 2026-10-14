@@ -134,8 +134,23 @@ function render(abs) {
   }
   let html = marked.parse(source);
   html = html.replace(/<table>/g, '<div class="table-wrap"><table>').replace(/<\/table>/g, '</table></div>');
+  if (abs === path.join(ROOT, 'scenario/README.md')) {
+    html = collapseSection(html, '시나리오 데이터', '시나리오 데이터 · community DB');
+    html = collapseSection(html, '8·9장은 학습용 데이터', '학습용 데이터 · practice DB');
+    html = collapseSection(html, '브라우저에서 API 요청 보내기', '요청이 안 될 때 · 로컬 서버와 CORS 설정');
+  }
   html = autolinkDocIds(html, abs);
   return { html, anchors, links, hasMermaid };
+}
+
+function collapseSection(html, headingText, summary) {
+  const headings = [...html.matchAll(/<h2\b[^>]*>[\s\S]*?<\/h2>/g)];
+  const heading = headings.find((match) => stripTags(match[0]).includes(headingText));
+  if (!heading) throw new Error(`scenario/README.md에 접을 섹션이 없다: ${headingText}`);
+  const start = heading.index;
+  const next = headings.find((match) => match.index > start);
+  const end = next?.index ?? html.length;
+  return `${html.slice(0, start)}<details class="catalog-data"><summary>${summary}</summary>${html.slice(start, end)}</details>${html.slice(end)}`;
 }
 
 function legacyCurlRequest(markdown) {
@@ -269,12 +284,14 @@ function page({ abs, title, body, hasMermaid }) {
     body = requestPageTools() + body + graderPanel(lv);
   }
   if (abs === path.join(ROOT, 'scenario/README.md')) {
-    body = `<nav class="difficulty-filter" aria-label="시나리오 난이도">
+    const filter = `<nav class="difficulty-filter" aria-label="시나리오 난이도">
       <button type="button" data-grade="all" aria-pressed="true">전체</button>
       <button type="button" data-grade="기초" aria-pressed="false">기초</button>
       <button type="button" data-grade="중급" aria-pressed="false">중급</button>
       <button type="button" data-grade="고급" aria-pressed="false">고급</button>
-    </nav>` + body + `<script>
+    </nav>`;
+    if (!body.includes('<h2 id="목차"')) throw new Error('scenario/README.md에 목차 제목이 없다');
+    body = body.replace('<h2 id="목차"', `${filter}<h2 id="목차"`) + `<script>
 (() => {
   const buttons = [...document.querySelectorAll('[data-grade]')];
   const entries = [...document.querySelectorAll('main li')].map((item) => ({
