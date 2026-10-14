@@ -13,6 +13,9 @@ import { fileURLToPath } from 'node:url';
 import { Marked } from 'marked';
 import { renderScreen, withImplementationCode } from './scenario-content.mjs';
 import { renderCatalog, renderStage } from './api-architecture-view.mjs';
+import { renderLearningJourney } from './learning-journey.mjs';
+import { renderKnowledgeVisual } from './knowledge-visual.mjs';
+import { renderMissionVisual } from './mission-visual.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const rel = (p) => path.relative(ROOT, p).split(path.sep).join('/');
@@ -303,8 +306,13 @@ function page({ abs, title, body, hasMermaid }) {
       <button type="button" data-grade="중급" aria-pressed="false">중급</button>
       <button type="button" data-grade="고급" aria-pressed="false">고급</button>
     </nav>`;
-    if (!body.includes('<h2 id="목차"')) throw new Error('scenario/README.md에 목차 제목이 없다');
-    body = body.replace('<h2 id="목차"', `${renderCatalog(API_ARCHITECTURE, levelHref)}${filter}<h2 id="목차"`) + `<script>
+    const titleEnd = body.indexOf('</h1>') + '</h1>'.length;
+    const tocStart = body.indexOf('<h2 id="목차"');
+    if (titleEnd < 5 || tocStart < titleEnd) throw new Error('scenario/README.md에 제목 또는 목차가 없다');
+    body = body.slice(0, titleEnd) + renderLearningJourney(MANIFEST, API_ARCHITECTURE, levelHref)
+      + '<details class="journey-intro"><summary>저장소 소개 · 시작 방법 보기</summary>'
+      + body.slice(titleEnd, tocStart) + '</details>'
+      + renderCatalog(API_ARCHITECTURE, levelHref) + filter + body.slice(tocStart) + `<script>
 (() => {
   const buttons = [...document.querySelectorAll('[data-grade]')];
   const entries = [...document.querySelectorAll('main li')].map((item) => ({
@@ -318,6 +326,21 @@ function page({ abs, title, body, hasMermaid }) {
 })();
 </script>`;
   }
+  if (abs === path.join(ROOT, 'docs/knowledge/README.md')) {
+    const firstSection = body.search(/<h2\b/);
+    if (firstSection < 0) throw new Error('공부자료 목차 시작을 찾을 수 없다');
+    body = body.slice(0, firstSection) + renderKnowledgeVisual(ROOT, abs)
+      + '<details class="knowledge-original-index"><summary>기존 문서 전체 표 보기</summary>'
+      + body.slice(firstSection) + '</details>';
+  }
+  if (abs === path.join(ROOT, 'practice/MISSIONS.md')) {
+    const firstSection = body.search(/<h2\b/);
+    const missionSection = body.indexOf('<h2 id="미션"');
+    if (firstSection < 0 || missionSection < firstSection) throw new Error('미션 본문 구간을 찾을 수 없다');
+    body = body.slice(0, firstSection) + renderMissionVisual(ROOT, abs)
+      + '<details class="mission-setup"><summary>실행 준비 · 데이터 · 공통 업무 규칙 펼치기</summary>'
+      + body.slice(firstSection, missionSection) + '</details>' + body.slice(missionSection);
+  }
   const mermaid = hasMermaid
     ? `<script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
 const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
@@ -330,7 +353,7 @@ mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</sc
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <link rel="stylesheet" href="${assetUrl('tools/site/site.css', path.dirname(abs))}">
-${lv || lab || abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/api-architecture.css', path.dirname(abs))}">\n` : ''}<script src="${assetUrl('tools/site/syntax-highlight.js', path.dirname(abs))}" defer></script>
+${lv || lab || abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/api-architecture.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/learning-journey.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'docs/knowledge/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/knowledge-visual.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'practice/MISSIONS.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/mission-visual.css', path.dirname(abs))}">\n` : ''}<script src="${assetUrl('tools/site/syntax-highlight.js', path.dirname(abs))}" defer></script>
 </head>
 <body>
 <header class="topbar"><a href="${up('README.html')}">javaExperience</a><a href="${up('scenario/README.html')}">시나리오</a><a href="${up('practice/MISSIONS.html')}">학습용 미션</a><a href="${up('docs/knowledge/README.html')}">공부자료</a></header>
