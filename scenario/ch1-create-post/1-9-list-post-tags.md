@@ -166,6 +166,13 @@ ORDER BY t.name;
 
 비공개·삭제된 글도 같은 `404` 규칙을 따른다. 이 둘은 공개 데이터 상태를 바꾸어 별도로 확인할 수 있지만, 위 실행 칸의 C3 요청은 존재하지 않는 글만 자동 검사한다.
 
+## 필요한 지식
+
+- [J03 제네릭](../../docs/knowledge/J03-generics.md) — `List<TagResponse>`처럼 타입을 담는 타입
+- [J09 Stream API](../../docs/knowledge/J09-stream-api.md) — `stream()`, `map()`, `toList()`로 컬렉션 변환
+- [P02 계층형 아키텍처](../../docs/knowledge/P02-mvc-layered-architecture.md) — Controller와 Service의 책임
+- [P03 애노테이션 — 웹 매핑과 입력 위치](../../docs/knowledge/P03-annotations-cheatsheet.md#23-웹-매핑과-입력-위치) — `@GetMapping`, `@PathVariable`
+
 ## 다음 단계
 
 [2-1. 게시글 단건 조회](../ch2-read-post/2-1-get-one.md) — 태그만 따로 읽는 API에서 글 상세 응답을 읽는 API로 넓힌다.

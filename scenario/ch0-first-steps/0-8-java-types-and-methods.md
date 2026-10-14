@@ -147,6 +147,12 @@ curl -i http://localhost:8080/api/start/summary
 | R1 | 코드 리뷰 | primitive와 reference 타입이 있고, 반환 타입·매개변수 타입이 명시되어 있다 |
 | R2 | 설명 | static, final, ClassName.class의 의미를 API 코드 예로 설명한다 |
 
+## 필요한 지식
+
+- [J01 Java 기본 타입과 참조 타입](../../docs/knowledge/J01-types-string.md) — primitive와 reference 타입을 구분한다
+- [J03 제네릭](../../docs/knowledge/J03-generics.md) — `List<String>`에서 꺾쇠 안 타입 읽기
+- [P09 Java 문법 기초](../../docs/knowledge/P09-java-syntax-basics.md) — 타입·변수·메서드 선언 순서
+
 ## 다음 단계
 
 [1-1. 요청 받기](../ch1-create-post/1-1-receive-request.md) — 요청 JSON을 DTO로 받고 게시글 API의 입구를 만든다.
