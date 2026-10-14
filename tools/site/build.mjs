@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Marked } from 'marked';
 import { renderScreen, withImplementationCode } from './scenario-content.mjs';
+import { renderCatalog, renderStage } from './api-architecture-view.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const rel = (p) => path.relative(ROOT, p).split(path.sep).join('/');
@@ -48,6 +49,7 @@ const DOC_BY_ID = new Map(fs.readdirSync(DOC_DIR).filter((f) => /^[A-Z]\d{2}-.*\
 
 // ---------------------------------------------------------------- 시나리오 목록(scenario.json)
 const MANIFEST = JSON.parse(read(path.join(ROOT, 'scenario/scenario.json')));
+const API_ARCHITECTURE = JSON.parse(read(path.join(ROOT, 'scenario/api-architecture.json')));
 const CHAPTERS = [
   ...MANIFEST.chapters.filter((ch) => ch.project !== 'spec-board'),
   ...MANIFEST.chapters.filter((ch) => ch.project === 'spec-board'),
@@ -59,6 +61,15 @@ for (const ch of CHAPTERS) {
   }
 }
 const LEVEL_BY_ABS = new Map(LEVELS.map((l, i) => [l.abs, { ...l, index: i }]));
+const LEVEL_BY_ID = new Map(LEVELS.map((level) => [level.id, level]));
+const NON_API_STAGE_NOTES = {
+  '1-7': 'DBeaver 또는 SQL 클라이언트가 MySQL에 직접 접속해 여러 테이블과 트랜잭션을 확인하는 단계입니다.',
+  '7-1': 'Controller 테스트가 기존 HTTP 요청·응답 계약을 확인하는 단계입니다.',
+  '7-2': 'Service 단위 테스트가 기존 비즈니스 규칙을 확인하는 단계입니다.',
+  '7-3': '통합 테스트가 Spring Boot와 MySQL을 함께 확인하는 단계입니다.',
+  '9-1': 'Flyway가 MySQL 스키마를 관리하는 단계입니다.',
+  '13-7': '기존 API를 Swagger UI로 문서화하는 단계입니다. 새 Controller 경로는 만들지 않습니다.',
+};
 
 function writeToc() {
   const p = path.join(ROOT, 'scenario/README.md');
@@ -270,6 +281,10 @@ function graderPanel(lv) {
 // ---------------------------------------------------------------- 페이지 틀
 function page({ abs, title, body, hasMermaid }) {
   const up = (p) => path.relative(path.dirname(abs), path.join(ROOT, p)).split(path.sep).join('/') || '.';
+  const levelHref = (id) => {
+    const target = LEVEL_BY_ID.get(id)?.abs;
+    return target ? path.relative(path.dirname(abs), target).split(path.sep).join('/').replace(/\.md$/, '.html') : null;
+  };
   const lv = LEVEL_BY_ABS.get(abs);
   let crumbs = '';
   let pager = '';
@@ -281,7 +296,11 @@ function page({ abs, title, body, hasMermaid }) {
     const next = LEVELS[lv.index + 1]?.chapter.project === lv.chapter.project ? LEVELS[lv.index + 1] : null;
     const link = (l, label) => (l ? `<a href="${path.relative(path.dirname(abs), l.abs).split(path.sep).join('/').replace(/\.md$/, '.html')}">${label} ${escapeHtml(l.id)}. ${escapeHtml(l.title)}</a>` : '<span></span>');
     pager = `<nav class="pager">${link(prev, '← 이전')}${link(next, '다음 →')}</nav>`;
-    body = requestPageTools() + body + graderPanel(lv);
+    const stageMap = renderStage(API_ARCHITECTURE, lv.id, levelHref);
+    const stageNote = !stageMap && NON_API_STAGE_NOTES[lv.id]
+      ? `<section class="api-map-stage"><h3>이 단계의 작업 위치</h3><p class="api-map-stage-note">${escapeHtml(NON_API_STAGE_NOTES[lv.id])}</p></section>`
+      : '';
+    body = requestPageTools() + stageMap + stageNote + `<p class="api-map-link"><a href="${up('scenario/README.html')}#api-map-title">전체 API 구조도 보기</a></p>` + body + graderPanel(lv);
   }
   if (abs === path.join(ROOT, 'scenario/README.md')) {
     const filter = `<nav class="difficulty-filter" aria-label="시나리오 난이도">
@@ -291,7 +310,7 @@ function page({ abs, title, body, hasMermaid }) {
       <button type="button" data-grade="고급" aria-pressed="false">고급</button>
     </nav>`;
     if (!body.includes('<h2 id="목차"')) throw new Error('scenario/README.md에 목차 제목이 없다');
-    body = body.replace('<h2 id="목차"', `${filter}<h2 id="목차"`) + `<script>
+    body = body.replace('<h2 id="목차"', `${renderCatalog(API_ARCHITECTURE, levelHref)}${filter}<h2 id="목차"`) + `<script>
 (() => {
   const buttons = [...document.querySelectorAll('[data-grade]')];
   const entries = [...document.querySelectorAll('main li')].map((item) => ({
@@ -317,7 +336,7 @@ mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</sc
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <link rel="stylesheet" href="${assetUrl('tools/site/site.css', path.dirname(abs))}">
-<script src="${assetUrl('tools/site/syntax-highlight.js', path.dirname(abs))}" defer></script>
+${lv || abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/api-architecture.css', path.dirname(abs))}">\n` : ''}<script src="${assetUrl('tools/site/syntax-highlight.js', path.dirname(abs))}" defer></script>
 </head>
 <body>
 <header class="topbar"><a href="${up('README.html')}">javaExperience</a><a href="${up('scenario/README.html')}">시나리오</a><a href="${up('practice/MISSIONS.html')}">학습용 미션</a><a href="${up('docs/knowledge/README.html')}">공부자료</a></header>
