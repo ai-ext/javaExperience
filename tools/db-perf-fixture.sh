@@ -18,7 +18,7 @@ usage() {
 
 환경변수:
   PERF_DB_PORT              호스트 포트 (기본 13319)
-  PERF_ROW_COUNT            생성할 post_like 행 수, 100000~1000000 (기본 500000)
+  PERF_ROW_COUNT            생성할 post_like 행 수 (board/member/post/tag/comment도 함께 생성), 100000~1000000 (기본 500000)
   PERF_DB_ROOT_PASSWORD     전용 컨테이너 root 암호 (기본 perf-local-only)
 
 up은 컨테이너가 이미 실행 중이면 데이터를 다시 만들지 않는다.

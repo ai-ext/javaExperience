@@ -40,6 +40,7 @@ python3 -m http.server 8765 --bind 127.0.0.1
 | DB 상태 | `docker compose ps` (`healthy`면 준비됨) |
 | 앱 실행 | IntelliJ에서 `Main` 실행, 또는 `./gradlew bootRun` |
 | 학습용 데이터로 앱 실행 | `./gradlew bootRun --args='--spring.profiles.active=practice'` |
+| 격리된 성능 DB 만들기 | `tools/db-perf-fixture.sh up` — 게시판·회원·글·좋아요·댓글·태그 데이터, 기본 좋아요 50만 행 |
 | 테스트 | `./gradlew test` (Docker가 켜져 있어야 한다 — 아래 "테스트") |
 | DB를 처음 상태로 | `docker compose down -v && docker compose up -d` |
 | 지금 DB 상태를 떠 두기 | `./docker/mysql/dump.sh` → `docker/mysql/backup/<시각>/` (git에 안 올라감) |
@@ -53,6 +54,8 @@ python3 -m http.server 8765 --bind 127.0.0.1
 | 호스트·포트 | `localhost` · `13308` |
 | 계정 | `community` / `community` |
 | DB | `community` — 본편 기본 DB · `practice` — 쿼리·배치용 학습 데이터 · `project` — 10장 별도 프로젝트(빈 DB) |
+
+느린 쿼리와 인덱스 실습은 별도 `javaexperience_perf` DB를 쓴다. [DB-14 실제 스키마부터 느린 쿼리까지](scenario/db-query-journey/db-14-live-schema-to-slow-query.md)에서 DBeaver/CloudBeaver로 열·인덱스·FK를 직접 확인하고, 같은 목록 쿼리의 실행 계획을 인덱스 전후로 비교한다. 이 DB는 `127.0.0.1:13319`의 전용 임시 컨테이너이며 `practice` 데이터와 분리된다.
 
 10장은 `./gradlew bootRun --args='--spring.profiles.active=project'`로 실행한다. 기존 Docker 볼륨에는 새 `project` DB가 자동으로 생기지 않는다. 데이터를 지우지 않고 추가하려면 `docker compose exec -T mysql mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS project; GRANT ALL PRIVILEGES ON project.* TO 'community'@'%';"`를 한 번 실행한다.
 
