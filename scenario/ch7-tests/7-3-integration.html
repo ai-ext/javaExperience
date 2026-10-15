@@ -141,107 +141,12 @@ class PostFlowIntegrationTest {
 
 </div>
   </details><details class="lesson-scene lesson-build" data-lesson-kind="build">
-    <summary id="전체-구현-코드" aria-label="전체 구현 코드 내용 펼치기"><span class="lesson-scene-index">04</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>전체 구현 코드</strong><em>이 단계에서 변경된 파일의 전문입니다.</em></span><span class="lesson-scene-count">2개 코드 · 열기 ↓</span></summary>
+    <summary id="전체-구현-코드" aria-label="전체 구현 코드 내용 펼치기"><span class="lesson-scene-index">04</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>전체 구현 코드</strong><em>이 단계에서 변경된 파일의 전문입니다.</em></span><span class="lesson-scene-count">1개 코드 · 열기 ↓</span></summary>
     <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>이 단계에서 바뀐 파일</span><span>현재 전체 코드</span></div>
 <h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
 <p>이 단계에서 변경된 파일의 전문입니다.</p>
-<details class="code-file"><summary>테스트 — src/test/java/org/example/post/PostFlowIntegrationTest.java</summary><pre><code>package org.example.post;
+<details class="code-file"><summary>테스트 — src/test/java/org/example/post/PostFlowIntegrationTest.java</summary><pre><code>package org.example.post;&#10;&#10;import com.jayway.jsonpath.JsonPath;&#10;import org.junit.jupiter.api.Test;&#10;import org.springframework.beans.factory.annotation.Autowired;&#10;import org.springframework.boot.test.context.SpringBootTest;&#10;import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;&#10;import org.springframework.http.MediaType;&#10;import org.springframework.test.web.servlet.MockMvc;&#10;&#10;import java.util.List;&#10;&#10;import static org.assertj.core.api.Assertions.assertThat;&#10;import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;&#10;import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;&#10;import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;&#10;import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;&#10;import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;&#10;import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;&#10;&#10;// 7-3: 진짜 MySQL(Testcontainers, application-test.yml이 시나리오 dump를 넣는다) 위에서 사용자 흐름을 끝까지 돌린다.&#10;// 서비스·리포지토리를 mock으로 바꾸지 않는다.&#10;//&#10;// @Transactional을 붙이지 않는다 — 붙이면 테스트가 끝날 때 롤백돼 깔끔하지만, 요청마다 커밋되는 실제&#10;// 동작(원자적 UPDATE, 커밋 뒤 다른 트랜잭션에서 보이는 값)이 가려진다. 대신 테스트마다 자기 글을 새로 만들어 쓴다.&#10;// 애노테이션 조합(@SpringBootTest + @AutoConfigureMockMvc)을 다른 통합 테스트와 같게 둬 컨텍스트·컨테이너를 공유한다.&#10;@SpringBootTest&#10;@AutoConfigureMockMvc&#10;class PostFlowIntegrationTest {&#10;&#10;    private static final String KIMJAVA = &quot;Bearer tok-kimjava&quot;;&#10;    private static final String LEE = &quot;Bearer tok-lee&quot;;&#10;&#10;    @Autowired&#10;    MockMvc mockMvc;&#10;&#10;    @Test&#10;    void 글쓰기_조회_좋아요_댓글_삭제까지_한_흐름() throws Exception {&#10;        // 1. 김자바가 dev 게시판에 글을 쓴다&#10;        String created = mockMvc.perform(post(&quot;/api/posts&quot;)&#10;                        .header(&quot;Authorization&quot;, KIMJAVA)&#10;                        .contentType(MediaType.APPLICATION_JSON)&#10;                        .content(&quot;&quot;&quot;&#10;                                {&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[통합] 흐름 확인&quot;,&quot;content&quot;:&quot;통합 테스트 본문&quot;,&quot;tags&quot;:[&quot;spring&quot;],&quot;visibility&quot;:&quot;PUBLIC&quot;}&#10;                                &quot;&quot;&quot;))&#10;                .andExpect(status().isCreated())&#10;                .andReturn().getResponse().getContentAsString();&#10;        Integer postId = JsonPath.read(created, &quot;$.id&quot;);&#10;&#10;        // 2. 비로그인 상세&#10;        mockMvc.perform(get(&quot;/api/posts/{id}&quot;, postId))&#10;                .andExpect(status().isOk())&#10;                .andExpect(jsonPath(&quot;$.author.id&quot;).value(2));&#10;&#10;        // 3. 이스프링이 좋아요&#10;        mockMvc.perform(put(&quot;/api/posts/{id}/like&quot;, postId).header(&quot;Authorization&quot;, LEE))&#10;                .andExpect(status().isOk())&#10;                .andExpect(jsonPath(&quot;$.liked&quot;).value(true))&#10;                .andExpect(jsonPath(&quot;$.likeCount&quot;).value(1));&#10;&#10;        // 4. 이스프링이 댓글&#10;        mockMvc.perform(post(&quot;/api/posts/{id}/comments&quot;, postId)&#10;                        .header(&quot;Authorization&quot;, LEE)&#10;                        .contentType(MediaType.APPLICATION_JSON)&#10;                        .content(&quot;&quot;&quot;&#10;                                {&quot;content&quot;:&quot;[통합] 댓글&quot;}&#10;                                &quot;&quot;&quot;))&#10;                .andExpect(status().isCreated())&#10;                .andExpect(jsonPath(&quot;$.postId&quot;).value(postId));&#10;&#10;        // 5. 상세에서 숫자 확인(커밋된 값을 다시 읽는다)&#10;        mockMvc.perform(get(&quot;/api/posts/{id}&quot;, postId))&#10;                .andExpect(status().isOk())&#10;                .andExpect(jsonPath(&quot;$.likeCount&quot;).value(1))&#10;                .andExpect(jsonPath(&quot;$.commentCount&quot;).value(1));&#10;&#10;        // 6. 김자바가 글을 지운다&#10;        mockMvc.perform(delete(&quot;/api/posts/{id}&quot;, postId).header(&quot;Authorization&quot;, KIMJAVA))&#10;                .andExpect(status().isNoContent());&#10;&#10;        // 7. 지운 글은 상세 404, 좋아요도 404&#10;        mockMvc.perform(get(&quot;/api/posts/{id}&quot;, postId))&#10;                .andExpect(status().isNotFound());&#10;        mockMvc.perform(put(&quot;/api/posts/{id}/like&quot;, postId).header(&quot;Authorization&quot;, LEE))&#10;                .andExpect(status().isNotFound());&#10;    }&#10;&#10;    // 시드 데이터 규칙(2-3) — 비로그인이면 PUBLISHED·PUBLIC·미삭제만, 최신순&#10;    @Test&#10;    void 비로그인_자유게시판_목록은_시드_규칙대로다() throws Exception {&#10;        String body = mockMvc.perform(get(&quot;/api/boards/free/posts&quot;).param(&quot;size&quot;, &quot;20&quot;))&#10;                .andExpect(status().isOk())&#10;                .andReturn().getResponse().getContentAsString();&#10;&#10;        List&lt;Integer&gt; ids = JsonPath.read(body, &quot;$.items[*].id&quot;);&#10;        assertThat(ids).containsExactly(21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 9, 5, 4);&#10;        Integer total = JsonPath.read(body, &quot;$.totalElements&quot;);&#10;        assertThat(total).isEqualTo(13);&#10;    }&#10;}&#10;</code></pre></details>
 
-<p>import com.jayway.jsonpath.JsonPath;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;</p>
-<p>import java.util.List;</p>
-<p>import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;</p>
-<p>// 7-3: 진짜 MySQL(Testcontainers, application-test.yml이 시나리오 dump를 넣는다) 위에서 사용자 흐름을 끝까지 돌린다.
-// 서비스·리포지토리를 mock으로 바꾸지 않는다.
-//
-// @Transactional을 붙이지 않는다 — 붙이면 테스트가 끝날 때 롤백돼 깔끔하지만, 요청마다 커밋되는 실제
-// 동작(원자적 UPDATE, 커밋 뒤 다른 트랜잭션에서 보이는 값)이 가려진다. 대신 테스트마다 자기 글을 새로 만들어 쓴다.
-// 애노테이션 조합(@SpringBootTest + @AutoConfigureMockMvc)을 다른 통합 테스트와 같게 둬 컨텍스트·컨테이너를 공유한다.
-@SpringBootTest
-@AutoConfigureMockMvc
-class PostFlowIntegrationTest {</p>
-<pre><code>private static final String KIMJAVA = &amp;quot;Bearer tok-kimjava&amp;quot;;
-private static final String LEE = &amp;quot;Bearer tok-lee&amp;quot;;
-
-@Autowired
-MockMvc mockMvc;
-
-@Test
-void 글쓰기_조회_좋아요_댓글_삭제까지_한_흐름() throws Exception {
-    // 1. 김자바가 dev 게시판에 글을 쓴다
-    String created = mockMvc.perform(post(&amp;quot;/api/posts&amp;quot;)
-                    .header(&amp;quot;Authorization&amp;quot;, KIMJAVA)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(&amp;quot;&amp;quot;&amp;quot;
-                            {&amp;quot;boardSlug&amp;quot;:&amp;quot;dev&amp;quot;,&amp;quot;title&amp;quot;:&amp;quot;[통합] 흐름 확인&amp;quot;,&amp;quot;content&amp;quot;:&amp;quot;통합 테스트 본문&amp;quot;,&amp;quot;tags&amp;quot;:[&amp;quot;spring&amp;quot;],&amp;quot;visibility&amp;quot;:&amp;quot;PUBLIC&amp;quot;}
-                            &amp;quot;&amp;quot;&amp;quot;))
-            .andExpect(status().isCreated())
-            .andReturn().getResponse().getContentAsString();
-    Integer postId = JsonPath.read(created, &amp;quot;$.id&amp;quot;);
-
-    // 2. 비로그인 상세
-    mockMvc.perform(get(&amp;quot;/api/posts/{id}&amp;quot;, postId))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath(&amp;quot;$.author.id&amp;quot;).value(2));
-
-    // 3. 이스프링이 좋아요
-    mockMvc.perform(put(&amp;quot;/api/posts/{id}/like&amp;quot;, postId).header(&amp;quot;Authorization&amp;quot;, LEE))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath(&amp;quot;$.liked&amp;quot;).value(true))
-            .andExpect(jsonPath(&amp;quot;$.likeCount&amp;quot;).value(1));
-
-    // 4. 이스프링이 댓글
-    mockMvc.perform(post(&amp;quot;/api/posts/{id}/comments&amp;quot;, postId)
-                    .header(&amp;quot;Authorization&amp;quot;, LEE)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(&amp;quot;&amp;quot;&amp;quot;
-                            {&amp;quot;content&amp;quot;:&amp;quot;[통합] 댓글&amp;quot;}
-                            &amp;quot;&amp;quot;&amp;quot;))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath(&amp;quot;$.postId&amp;quot;).value(postId));
-
-    // 5. 상세에서 숫자 확인(커밋된 값을 다시 읽는다)
-    mockMvc.perform(get(&amp;quot;/api/posts/{id}&amp;quot;, postId))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath(&amp;quot;$.likeCount&amp;quot;).value(1))
-            .andExpect(jsonPath(&amp;quot;$.commentCount&amp;quot;).value(1));
-
-    // 6. 김자바가 글을 지운다
-    mockMvc.perform(delete(&amp;quot;/api/posts/{id}&amp;quot;, postId).header(&amp;quot;Authorization&amp;quot;, KIMJAVA))
-            .andExpect(status().isNoContent());
-
-    // 7. 지운 글은 상세 404, 좋아요도 404
-    mockMvc.perform(get(&amp;quot;/api/posts/{id}&amp;quot;, postId))
-            .andExpect(status().isNotFound());
-    mockMvc.perform(put(&amp;quot;/api/posts/{id}/like&amp;quot;, postId).header(&amp;quot;Authorization&amp;quot;, LEE))
-            .andExpect(status().isNotFound());
-}
-
-// 시드 데이터 규칙(2-3) — 비로그인이면 PUBLISHED·PUBLIC·미삭제만, 최신순
-@Test
-void 비로그인_자유게시판_목록은_시드_규칙대로다() throws Exception {
-    String body = mockMvc.perform(get(&amp;quot;/api/boards/free/posts&amp;quot;).param(&amp;quot;size&amp;quot;, &amp;quot;20&amp;quot;))
-            .andExpect(status().isOk())
-            .andReturn().getResponse().getContentAsString();
-
-    List&amp;lt;Integer&amp;gt; ids = JsonPath.read(body, &amp;quot;$.items[*].id&amp;quot;);
-    assertThat(ids).containsExactly(21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 9, 5, 4);
-    Integer total = JsonPath.read(body, &amp;quot;$.totalElements&amp;quot;);
-    assertThat(total).isEqualTo(13);
-}</code></pre>
-<p>}
-</code></pre></details></p>
 <h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
 <p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
 <details class="cumulative-code" data-snapshot-url="../snapshots/7-3.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>

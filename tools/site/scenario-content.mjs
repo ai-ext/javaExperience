@@ -234,7 +234,9 @@ function codeFiles(files) {
     const title = `${roleOf(file)} — ${file.path}`;
     const code = file.status === 'deleted'
       ? '<p>이 단계에서 삭제한 파일이다.</p>'
-      : `<pre><code>${esc(file.content)}</code></pre>`;
+      // Markdown 파서가 HTML 블록 안의 빈 줄을 새 문단으로 해석하지 않게 한다.
+      // 브라우저가 &#10;을 다시 줄바꿈으로 해석하므로 코드 원문의 줄 구조는 유지된다.
+      : `<pre><code>${esc(file.content).replace(/\n/g, '&#10;')}</code></pre>`;
     return `<details class="code-file"><summary>${esc(title)}</summary>${code}</details>`;
   }).join('\n');
 }

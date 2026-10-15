@@ -8,6 +8,8 @@ const manifest = JSON.parse(fs.readFileSync(path.join(root, 'scenario/scenario.j
 const items = [];
 const failures = [];
 const knowledgeDocs = [];
+const decodeCode = (value) => value.replace(/&#10;/g, '\n').replace(/&quot;/g, '"')
+  .replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
 
 for (const filename of fs.readdirSync(path.join(root, 'docs/knowledge')).filter((name) => /^[A-Z]\d{2}-.*\.md$/.test(name))) {
   const sourcePath = path.join(root, 'docs/knowledge', filename);
@@ -54,8 +56,28 @@ for (const chapter of manifest.chapters) for (const level of chapter.levels) {
   if (!html.includes('class="scenario-flow-panel"')) failures.push(`${level.id}: 흐름 패널 누락`);
   const roleMaps = (html.match(/class="implementation-route"/g) || []).length;
   const lessonCards = (html.match(/class="lesson-scene lesson-/g) || []).length;
+  const answer = JSON.parse(fs.readFileSync(path.join(root, 'scenario/answers', `${level.id}.json`), 'utf8'));
+  const expectedFiles = [...answer.files];
+  const mybatisPath = path.join(root, 'scenario/alternatives/mybatis', `${level.id}.json`);
+  if (fs.existsSync(mybatisPath)) expectedFiles.push(...JSON.parse(fs.readFileSync(mybatisPath, 'utf8')).files);
+  if (level.id === '9-5') {
+    for (const filename of ['9-5-v5.json', '9-5-v5-mybatis.json', '9-5-note-read.json', '9-5-note-read-mybatis.json', '9-5-note-only.json', '9-5-v7-drop.json']) {
+      expectedFiles.push(...JSON.parse(fs.readFileSync(path.join(root, 'scenario/alternatives/transitions', filename), 'utf8')).files);
+    }
+  }
+  const codeFiles = [...html.matchAll(/<details class="code-file">([\s\S]*?)<\/details>/g)];
   if (roleMaps !== 1) failures.push(`${level.id}: 정답 파일 역할 지도 ${roleMaps}개`);
   if (lessonCards < 4) failures.push(`${level.id}: 학습 절 카드 ${lessonCards}개`);
+  if (codeFiles.length !== expectedFiles.length) failures.push(`${level.id}: 전체 파일 코드 ${codeFiles.length}/${expectedFiles.length}`);
+  if (codeFiles.some(([, body]) => /<pre><code>[\s\S]*?<p\b/.test(body) || body.includes('&amp;quot;')))
+    failures.push(`${level.id}: 전체 코드 안에 문단 분리 또는 이중 이스케이프가 있음`);
+  let exactCodeFiles = 0;
+  expectedFiles.forEach((file, index) => {
+    if (file.status === 'deleted') return;
+    const encoded = codeFiles[index]?.[1].match(/<pre><code>([\s\S]*?)<\/code><\/pre>/)?.[1];
+    if (encoded == null || decodeCode(encoded) !== file.content) failures.push(`${level.id}: ${file.path} 원문 코드 불일치`);
+    else exactCodeFiles++;
+  });
   if (html.includes('class="stage-sketch"')) failures.push(`${level.id}: 중복 SVG 시안 표시`);
   const requestSteps = steps.filter((step) => step.kind === 'request').length;
   const requestButtons = (html.match(/class="send-request"/g) || []).length;
@@ -72,6 +94,8 @@ for (const chapter of manifest.chapters) for (const level of chapter.levels) {
     requestButtons,
     roleMaps,
     lessonCards,
+    codeFiles: codeFiles.length,
+    exactCodeFiles,
     requestPractice: requestButtons ? 'browser_button' : requestSteps ? 'manual_or_test_flow' : 'no_http_request',
   });
 }
@@ -87,6 +111,8 @@ const totals = {
   requestButtons: items.reduce((sum, item) => sum + item.requestButtons, 0),
   roleMaps: items.reduce((sum, item) => sum + item.roleMaps, 0),
   lessonCards: items.reduce((sum, item) => sum + item.lessonCards, 0),
+  codeFiles: items.reduce((sum, item) => sum + item.codeFiles, 0),
+  exactCodeFiles: items.reduce((sum, item) => sum + item.exactCodeFiles, 0),
   knowledgeDocs: knowledgeDocs.length,
   knowledgeSections: knowledgeDocs.reduce((sum, doc) => sum + doc.sections, 0),
   manualOrTestFlowLevels: items.filter((item) => item.requestPractice === 'manual_or_test_flow').map((item) => item.id),
@@ -95,12 +121,13 @@ if (items.length !== 101) failures.push(`단계 수 ${items.length}/101`);
 const report = {
   schemaVersion: 2,
   status: failures.length ? 'failed' : 'verified',
-  scope: '101개 단계 화면의 시안·요소·흐름·코드 역할 지도·학습 카드와 전체 공부자료 주제 지도의 정적 대조',
+  scope: '101개 단계 화면의 시안·요소·흐름·전체 코드·학습 카드와 전체 공부자료 주제 지도의 정적 대조',
   design: [
     '단계 본문은 화면 JSON에서 그린 실제 DOM 시안과 선택 가능한 요청 흐름을 나란히 보여준다.',
     '정답 변경 파일의 역할 지도는 화면 시나리오와 구분하고, DBeaver는 MySQL 직접 접속의 별도 경로로 둔다.',
     '같은 SVG를 단계 화면에 중복하지 않고 카탈로그 미리보기에만 사용한다.',
     '장문 절은 단계별 카드에 넣고 요청 버튼·원문 코드·채점 기준을 보존한다.',
+    '전체 코드 토글의 기본·MyBatis·배포 전환 파일을 모두 검사하고 삭제 파일을 제외한 코드를 원문과 문자 단위로 대조한다.',
     '공부자료의 실제 절을 주제 지도와 접기 카드로 연결하고 원문 본문·코드·앵커를 보존한다.',
   ],
   limits: [
