@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S15. 비동기·스케줄링·Spring Batch</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,10 +18,10 @@
 <code>@Scheduled</code>는 각 애플리케이션 인스턴스의 시계에 등록된다. 여러 인스턴스에서 한 번만 실행하려면 공유 저장소의 분산 잠금이 필요하다.
 Spring Batch는 작업 상태와 체크포인트를 저장해 실패 후 이어서 처리한다. 재시작 안전성은 저장소뿐 아니라 입력과 부수 효과의 멱등성에 달렸다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>대량 정산을 <code>@Async</code>에 맡기고 HTTP 성공을 돌려줬지만 배포 재시작으로 작업이 사라질 수 있다. 복제본 세 개인 서비스에서 새벽 <code>@Scheduled</code> 정산은 각 프로세스가 실행하므로 세 번 청구될 수 있다. 또 DB 청크는 롤백됐는데 외부 API 호출은 성공했다면 재시작 시 API가 중복 호출된다. 비동기 실행, 중복 방지, 체크포인트, 외부 효과의 멱등성을 한 설계로 봐야 한다.</p>
 <p>이 문서는 <code>@Async</code>·<code>TaskExecutor</code>, <code>@Scheduled</code>·ShedLock, Batch의 Job·Step·chunk·JobRepository를 다룬다. 프록시 경계 → <a class="docref" href="S02-aop-proxy.html">S02</a>, Virtual Thread → <a class="docref" href="S07-webflux-vs-vt.html">S07</a>, 메시징 → <a class="docref" href="S14-messaging.html">S14</a> 참조.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -87,7 +87,7 @@ Spring Batch는 작업 상태와 체크포인트를 저장해 실패 후 이어�
 <td>겹친 실행을 잠금으로 건너뛰면 되는지, 실행을 예약·대기·관리해야 하는지. [5]</td>
 </tr>
 </tbody></table></div>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>3.1 @Async: 프록시가 실행기에 제출 · 3.2 @Scheduled: 각 프로세스의 시간표 · 3.3 Batch의 실행·체크포인트</small></span><span class="knowledge-chapter-meta">2개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="31-async-프록시가-실행기에-제출"><a class="anchor" href="#31-async-프록시가-실행기에-제출" aria-hidden="true">#</a>3.1 <code>@Async</code>: 프록시가 실행기에 제출</h3>
 <ol>
 <li><code>@EnableAsync</code>가 비동기 인프라를 등록한다. 호출이 프록시를 지나야 인터셉터가 개입하며, 자기 호출은 우회할 수 있다(프록시 → <a class="docref" href="S02-aop-proxy.html">S02</a>).</li>
@@ -115,7 +115,7 @@ StepExecution → read → process → write → chunk commit / checkpoint
 <p>Chunk는 정한 건수 단위로 읽고 가공해 기록한 뒤 트랜잭션을 커밋한다. 재시작은 JobRepository만으로 충분하지 않다. Reader가 진행 위치를 저장·복원하고, 저장소 메타데이터도 재기동 후 남아야 한다. DB 롤백은 이미 성공한 외부 HTTP·파일·메일을 취소하지 않으므로 멱등 키나 중복 제거도 필요하다.</p>
 <p>Spring Batch 6은 공통 인프라 설정과 저장소별 설정을 분리했다. 공식 변경 문서는 <code>@EnableBatchProcessing</code>이 JDBC에만 묶이지 않으며 JDBC·Mongo 저장소용 전용 애노테이션을 소개한다.</p>
 <p>새 chunk 구현·동시성 모델, 실패 실행 복구, graceful shutdown, JFR 관측성, local chunking·remote step도 변경 목록에 포함한다. 운영 재시작이 필요하면 resourceless 인프라와 내구성 저장소를 구분해 선택한다. [4]</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1 — 고정 주기와 완료 후 지연 (순수 Java) · 예제 2 — 업무별 제한이 있는 @Async 실행기 · 예제 3 — 시간대와 주기를 드러내는 스케줄 · 예제 4 — 명시적 JobRepository와 청크 경계</small></span><span class="knowledge-chapter-meta">5개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="예제-1--고정-주기와-완료-후-지연-순수-java"><a class="anchor" href="#예제-1--고정-주기와-완료-후-지연-순수-java" aria-hidden="true">#</a>예제 1 — 고정 주기와 완료 후 지연 (순수 Java)</h3>
 <p>다음 프로그램은 각 작업을 80ms 동안 실행하지만 두 방식 모두 설정값은 50ms다. 실제 시작 간격을 비교한다. 값은 머신 부하에 따라 달라질 수 있다. 두 API는 상대 지연을 사용한다. [6]</p>
 <pre><code class="language-java">import java.util.concurrent.CountDownLatch;
@@ -276,14 +276,14 @@ class ImportJobConfiguration {
     }
 }</code></pre>
 <p><code>chunk(2, transactionManager)</code>는 두 항목 단위 커밋이다. 이 목록 Reader는 영속 체크포인트가 아니므로 운영 재시작에는 JobParameters와 저장 상태를 따로 설계한다. Boot 자동 실행이 필요 없으면 <code>spring.batch.job.enabled=false</code>를 고려한다.</p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>Java 5</strong> — <code>ScheduledExecutorService</code>가 지연·주기 작업 API로 추가됐다. 직접 <code>sleep</code> 루프를 관리하던 부담을 실행기 계약으로 옮겼다. [6]</li>
 <li><strong>Spring 실행 추상화</strong> — <code>TaskExecutor</code>·<code>TaskScheduler</code>는 JDK와 애플리케이션 실행 환경의 차이를 감추는 역할을 한다. 이번에 읽은 현재 레퍼런스에서 세부 도입 버전 이력은 확인하지 않아 날짜를 단정하지 않는다. [1]</li>
 <li><strong>Spring Batch 6.0</strong> — Framework 7 등 의존성을 올리고 JDBC에 묶인 설정을 공통·저장소별로 나눴다. 새 chunk·동시성 모델, 실패 실행 복구, graceful shutdown, local chunking 등이 추가됐다. 다양한 저장소와 실행 경로를 수용하려는 변화다. [4]</li>
 <li><strong>Boot 4.1 현재</strong> — <code>Executor</code> Bean이 없을 때 자동 <code>AsyncTaskExecutor</code>를 제공하며 Virtual Thread 설정에 따라 구현이 다르다. 이전 버전 대비 도입 시점은 확인하지 않았다. [2]</li>
 </ul>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>유실 없이 재기동 후 이어야 하는 작업은 단순 <code>@Async</code>가 아니라 Spring Batch나 내구성 있는 작업 전달 구조로 만든다.</li>
 <li><strong>기본값 추천:</strong> 업무별 이름을 가진 <code>ThreadPoolTaskExecutor</code>에 유한 큐, 명시적 거부 정책, 종료 대기 시간을 둔다. 풀 크기는 CPU·DB 연결·원격 동시 한도에 맞춰 부하 관찰 후 정한다.</li>
@@ -294,7 +294,7 @@ class ImportJobConfiguration {
 <li>큰 입력은 페이지·커서·키셋 읽기를 검토한다. chunk 크기는 트랜잭션 시간·롤백량·메타데이터 오버헤드를 실측해 조정한다. 병렬화는 독립 파티션을 우선 검토하고 Reader·Writer의 thread safety를 확인한다.</li>
 <li>Virtual Thread → <a class="docref" href="S07-webflux-vs-vt.html">S07</a>, 메시지 전달과 재시도 → <a class="docref" href="S14-messaging.html">S14</a> 참조.</li>
 </ul>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong><code>@Async</code> 미동작</strong> → 자기 호출이 프록시를 우회 → Bean 경계로 나누고 프록시 제약은 <a class="docref" href="S02-aop-proxy.html">S02</a> 참조.</li>
 <li><strong>큐 대기·메모리 폭증</strong> → 무제한 또는 과대 큐에서 유입이 처리량을 초과 → 유한 큐, 거부 정책, 대기시간 관측을 둔다.</li>
@@ -307,7 +307,7 @@ class ImportJobConfiguration {
 <li><strong>외부 효과 중복</strong> → DB 롤백이 외부 요청은 되돌리지 않음 → 멱등 키·중복 제거를 추가한다.</li>
 <li><strong>큰 chunk의 긴 롤백</strong> → 트랜잭션 범위가 과도함 → 항목 크기와 실패 복구량을 포함해 작은 값부터 측정한다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. @Async는 메서드를 무조건 새 스레드에서 실행하나? · Q2. 실행기 큐를 크게 하면 처리량이 늘어나는가? · Q3. fixed rate와 fixed delay의 차이는? · Q4. @Scheduled는 여러 노드에서 한 번만 실행되는가?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-async는-메서드를-무조건-새-스레드에서-실행하나"><a class="anchor" href="#q1-async는-메서드를-무조건-새-스레드에서-실행하나" aria-hidden="true">#</a>Q1. <code>@Async</code>는 메서드를 무조건 새 스레드에서 실행하나?</h3>
 <p>아니다. 프록시가 호출을 실행기에 넘기는 구조이고 실행기 설정에 따라 동기 실행도 가능하다. 애노테이션만으로 스레드 수나 내구성을 알 수 없다.</p>
 <p><strong>꼬리질문:</strong> 자기 호출 문제는? → 프록시를 통과하지 않아 인터셉터가 실행되지 않을 수 있다. 자세한 원리는 → <a class="docref" href="S02-aop-proxy.html">S02</a>.</p>
@@ -332,7 +332,7 @@ class ImportJobConfiguration {
 <h3 id="q8-공유-reader를-병렬-step에서-써도-되나"><a class="anchor" href="#q8-공유-reader를-병렬-step에서-써도-되나" aria-hidden="true">#</a>Q8. 공유 Reader를 병렬 Step에서 써도 되나?</h3>
 <p>thread safety, 읽기 순서, 체크포인트 경합을 확인해야 한다. 가능하면 입력 범위를 독립 파티션으로 나눠 각각 상태를 관리한다. Batch 6의 새 동시성 모델도 업무 상태 공유 문제를 없애지는 않는다. [4]</p>
 <p><strong>꼬리질문:</strong> 메시지 병렬 처리 설계는? → 이 문서 범위를 벗어나며 → <a class="docref" href="S14-messaging.html">S14</a> 참조.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li>Task Execution and Scheduling — <a href="https://docs.spring.io/spring-framework/reference/integration/scheduling.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/integration/scheduling.html</a> — <code>TaskExecutor</code>·<code>TaskScheduler</code>와 실행기 종류.</li>
 <li>Task Execution and Scheduling — <a href="https://docs.spring.io/spring-boot/reference/features/task-execution-and-scheduling.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/features/task-execution-and-scheduling.html</a> — Boot 자동 실행기와 <code>applicationTaskExecutor</code> 통합.</li>
@@ -341,7 +341,24 @@ class ImportJobConfiguration {
 <li>ShedLock — <a href="https://github.com/lukas-krecan/ShedLock" target="_blank" rel="noopener">https://github.com/lukas-krecan/ShedLock</a> — 잠금 동작, 노드 간 skip, 분산 스케줄러가 아닌 점.</li>
 <li>ScheduledExecutorService (Java SE 25) — <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ScheduledExecutorService.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ScheduledExecutorService.html</a> — 상대 지연·주기 API.</li>
 </ol>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 

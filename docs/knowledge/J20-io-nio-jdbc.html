@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J20. I/O·NIO·HttpClient·JDBC 기초</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,10 +18,10 @@
 NIO의 <code>Buffer</code>는 <code>position</code>·<code>limit</code> 상태를 옮기며, <code>Selector</code>는 논블로킹 채널의 준비된 이벤트를 모아준다.
 JDBC 입력값은 <code>PreparedStatement</code> 바인딩으로 SQL 문법과 분리하고, 풀의 대기·연결 상한을 DB 예산에 맞춘다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>UTF-8 파일을 기본 문자셋으로 읽으면 배포 환경에 따라 한글이 깨진다. 큰 파일을 <code>readAllBytes</code>로 읽으면 파일 크기만큼 힙을 잡고, 소켓을 동기 <code>read</code>하면 요청 스레드가 입력을 기다린다. NIO에서 <code>flip()</code>을 빼먹으면 버퍼에 쓴 데이터가 읽기 범위 밖에 남는다.</p>
 <p>요청마다 DB 연결을 만들면 연결·인증 비용을 반복하고 DB 세션이 불어난다. 반대로 풀을 과도하게 키우면 느린 쿼리가 DB를 포화시켜 앱 대기만 늘린다. 사용자 값을 SQL 문자열에 붙이면 값이 SQL 문법이 되어 조회 조건을 우회할 수 있다. HTTP 요청도 타임아웃과 본문 소비 방식을 정하지 않으면 스레드·메모리가 응답을 기다리며 쌓인다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong><small>헷갈리는 쌍</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -109,7 +109,7 @@ JDBC 입력값은 <code>PreparedStatement</code> 바인딩으로 SQL 문법과 �
 <td>풀 연결을 닫으면 대개 세션 종료가 아니라 풀 반환이다. 닫지 않으면 다른 요청이 대기한다.</td>
 </tr>
 </tbody></table></div>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>3.1 바이트에서 문자까지 · 3.2 Path와 Files · 3.3 NIO의 버퍼·채널·셀렉터 · 3.4 HttpClient 요청 흐름</small></span><span class="knowledge-chapter-meta">3개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="31-바이트에서-문자까지"><a class="anchor" href="#31-바이트에서-문자까지" aria-hidden="true">#</a>3.1 바이트에서 문자까지</h3>
 <pre><code class="language-text">파일/소켓 → InputStream.read(byte[]) → [선택] BufferedInputStream
          → InputStreamReader(CharsetDecoder) → [선택] BufferedReader → 앱</code></pre>
@@ -136,7 +136,7 @@ JDBC 입력값은 <code>PreparedStatement</code> 바인딩으로 SQL 문법과 �
  → setX(index, 값) → 실행 → ResultSet 순회 → close로 반환</code></pre>
 <p><code>Connection</code>은 DB 세션이며 JDBC 기본 auto-commit은 켜져 있다. <code>PreparedStatement</code>는 SQL 텍스트와 <code>setString</code> 같은 값 설정 API를 분리한다. 드라이버가 실제 서버 준비문을 언제 생성하는지와 별개로, 앱에서 값을 SQL 문자열로 합치지 않는 경계가 핵심이다. <code>ResultSet</code>은 보통 행 커서다.</p>
 <p>풀은 물리 연결을 재사용하고 대수를 제한한다. 유휴 연결이 없고 상한에 도달하면 <code>getConnection()</code> 호출은 기다리므로 풀은 대기열이기도 하다. 상한을 늘리면 DB 동시 쿼리가 증가해 포화를 악화시킬 수 있다. 인스턴스 수를 곱한 총 연결량과 DB 처리 용량으로 맞춘다. 트랜잭션·JPA는 각각 → <a class="docref" href="S08-transactions.html">S08</a>, → <a class="docref" href="S09-jpa-hibernate.html">S09</a> 참조.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1 — 문자 디코딩, 버퍼링, 파일 왕복 · 예제 2 — ByteBuffer 읽기·쓰기 상태 · 예제 3 — HttpClient.sendAsync와 응답 본문 핸들러</small></span><span class="knowledge-chapter-meta">6개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>아래 세 예제는 JDK 21의 단일 파일 실행으로 실제 실행했다. HTTP 요청은 루프백 서버를 대상으로 해 외부 네트워크에 의존하지 않는다.</p>
 <h3 id="예제-1--문자-디코딩-버퍼링-파일-왕복"><a class="anchor" href="#예제-1--문자-디코딩-버퍼링-파일-왕복" aria-hidden="true">#</a>예제 1 — 문자 디코딩, 버퍼링, 파일 왕복</h3>
 <pre><code class="language-java">import java.io.BufferedReader;
@@ -239,7 +239,7 @@ public class HttpClientDemo {
 }</code></pre>
 <p>실행 출력:</p>
 <pre><code class="language-text">status=200 body=ok version=HTTP_1_1</code></pre>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -270,7 +270,7 @@ public class HttpClientDemo {
 </tr>
 </tbody></table></div>
 <p>이 문서에서 다룬 기본 <code>InputStream</code>·<code>Reader</code>·<code>Buffer</code>·<code>Channel</code>·<code>Selector</code> 사용 원리는 Java 25에서도 유효하다. Java 25 기준 <code>HttpClient</code> API 문서는 종료·대기 메서드까지 제공하므로 장기 실행 클라이언트의 수명도 관리할 수 있다. Boot 4.1.1의 의존성 기준 HikariCP는 7.0.2다. 버전 숫자보다 프로젝트 BOM이 실제 채택 버전을 결정한다.</p>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>텍스트 경계에는 UTF-8을 명시한다. 큰 파일은 전체 문자열보다 버퍼 스트림으로 순차 처리한다.</li>
 <li>동시 소켓 연결이 많아 스레드 대기가 병목일 때 Selector를 검토한다. 연결 수가 적고 단순한 작업은 동기 I/O를 기본으로 둔다.</li>
@@ -280,7 +280,7 @@ public class HttpClientDemo {
 <li>Java 역직렬화 입력은 기본적으로 신뢰하지 않는다. 불가피하면 필터와 스키마 검증을 함께 적용한다.</li>
 </ul>
 <p>HikariCP README 기준 <code>connectionTimeout</code> 기본은 30초, <code>idleTimeout</code>은 10분, <code>leakDetectionThreshold</code> 0은 비활성이다. 대기 시간을 늘려도 DB 처리량은 늘지 않으며, 누수 탐지는 진단 기준으로 쓴다.</p>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>증상:</strong> 한글이 환경별로 깨진다 → <strong>원인:</strong> 기본 문자셋에 의존 → <strong>대처:</strong> 경계에 <code>UTF_8</code>을 지정하고 엄격한 검증은 디코더 <code>REPORT</code>를 쓴다.</li>
 <li><strong>증상:</strong> 대형 파일에서 OOM → <strong>원인:</strong> 전체 입력을 배열·문자열에 적재 → <strong>대처:</strong> 스트리밍으로 처리하고 최대 크기를 검증한다.</li>
@@ -291,7 +291,7 @@ public class HttpClientDemo {
 <li><strong>증상:</strong> DB 연결 대기와 CPU가 함께 증가한다 → <strong>원인:</strong> 누수·느린 쿼리 상태에서 풀만 확장 → <strong>대처:</strong> close 경로와 쿼리를 먼저 진단하고 전체 연결 예산을 지킨다.</li>
 <li><strong>증상:</strong> 역직렬화 중 의도치 않은 클래스 동작·자원 폭증 → <strong>원인:</strong> 신뢰하지 않는 <code>ObjectInputStream</code> 데이터 → <strong>대처:</strong> 스키마 포맷으로 바꾸거나 허용 클래스와 그래프 한계를 필터링한다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. InputStream.read(byte[])가 배열 전체를 채운다고 가정하면? · Q2. 바이트를 Reader로 바꿀 때 문자셋이 왜 필요한가? · Q3. flip()과 compact()는 언제 구분해 쓰나? · Q4. 논블로킹 채널이면 호출 스레드는 절대 기다리지 않나?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-inputstreamreadbyte가-배열-전체를-채운다고-가정하면"><a class="anchor" href="#q1-inputstreamreadbyte가-배열-전체를-채운다고-가정하면" aria-hidden="true">#</a>Q1. <code>InputStream.read(byte[])</code>가 배열 전체를 채운다고 가정하면?</h3>
 <p>네트워크 등은 일부 바이트만 준비돼 반환될 수 있다. 길이·구분자·EOF에 도달할 때까지 읽기를 반복한다. <code>available()</code>은 전체 스트림 길이가 아니다.</p>
 <p><strong>꼬리질문:</strong> <code>available()</code>이 파일 크기를 돌려주나? <strong>답:</strong> 아니다. 즉시 읽을 수 있는 추정량이다.</p>
@@ -316,7 +316,7 @@ public class HttpClientDemo {
 <h3 id="q8-역직렬화-필터가-데이터-신뢰성을-보장하나"><a class="anchor" href="#q8-역직렬화-필터가-데이터-신뢰성을-보장하나" aria-hidden="true">#</a>Q8. 역직렬화 필터가 데이터 신뢰성을 보장하나?</h3>
 <p>필터는 허용 클래스와 그래프 복잡도를 제한하지만 값의 진위나 업무 규칙은 검증하지 않는다. 신뢰할 수 없는 Java 직렬화는 가능하면 받지 않는다.</p>
 <p><strong>꼬리질문:</strong> JEP 290과 415 차이는? <strong>답:</strong> 290은 입력 필터를 추가했고, 415는 역직렬화 컨텍스트에 따른 필터 선택을 보탰다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><code>InputStream</code> — <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/InputStream.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/InputStream.html</a> — 바이트 읽기·닫기·전송 API.</li>
 <li><code>Reader</code> — <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/Reader.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/Reader.html</a> — 문자 스트림의 추상화와 하위 구현.</li>
@@ -332,7 +332,24 @@ public class HttpClientDemo {
 <li>HikariCP README — <a href="https://github.com/brettwooldridge/HikariCP" target="_blank" rel="noopener">https://github.com/brettwooldridge/HikariCP</a> — 풀 설정값의 의미와 기본 대기·유휴·누수 감지 동작.</li>
 <li>Spring Boot 관리 의존성 좌표 — <a href="https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html</a> — Boot 4.1.1의 HikariCP 7.0.2 관리 버전.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 

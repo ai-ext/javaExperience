@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S03. Spring Boot 자동 구성 원리</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,11 +18,11 @@
 자동 구성 후보는 classpath의 <code>AutoConfiguration.imports</code>에서 발견되고 <code>@Conditional*</code>가 현재 환경과 사용자 빈에 맞지 않는 구성을 걸러낸다.
 스타터는 필요한 의존성을 모으는 편의 모듈이고, 자동 구성은 조건을 만족할 때 기본 빈을 등록하는 코드다. Boot 4에서는 기술별 모듈과 스타터를 명시적으로 맞춰야 한다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>운영 프로필에서만 애플리케이션이 <code>DataSource</code>를 만들지 못하거나, 테스트에서 빈이 두 개 생겨 주입이 실패하는 문제는 “Boot가 알아서 한다”는 설명만 외우면 진단하기 어렵다. 자동 구성은 매직이 아니라 <strong>의존성·구성 메타데이터·사용자 정의 빈·조건이 순서대로 합쳐진 결과</strong>다. 무엇을 보고 켜졌는지, 무엇 때문에 꺼졌는지를 구분하면 시작 실패를 빠르게 좁힐 수 있다.</p>
 <p>예를 들어 서비스가 자기 <code>Clock</code> 빈을 선언했는데 자동 구성에서 만든 <code>Clock</code>도 살아 있으면 <code>NoUniqueBeanDefinitionException</code>이 날 수 있다. 기본 빈을 만드는 <code>@Bean</code>에 <code>@ConditionalOnMissingBean</code>이 없거나, 조건 대상 타입을 지나치게 넓게 선언했는지 확인해야 한다. 반대로 자동 구성이 빠졌다면 의존성 JAR만 확인하지 말고 Boot 4에서 해당 기능이 별도 모듈로 이동했는지, imports 파일이 패키징된 JAR에 들어갔는지도 확인한다.</p>
 <p>또 메인 클래스가 <code>com.example.app.web</code>처럼 너무 안쪽 패키지에 있으면 형제 패키지의 컴포넌트가 검색되지 않는다. <code>@SpringBootApplication</code>의 컴포넌트 스캔 기준은 기본적으로 그 클래스의 패키지다. “자동 구성은 켜져 있는데 내 <code>@Service</code>는 왜 없나?”라는 문제는 자동 구성 후보 로딩과 컴포넌트 스캔을 혼동한 결과다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong><small>자주 혼동하는 것</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -94,7 +94,7 @@
 </tbody></table></div>
 <p><code>scanBasePackages</code>는 컴포넌트 스캔 범위만 바꾼다. 엔티티나 Spring Data 저장소 탐색 범위까지 바꾸지는 않는다. <code>@EntityScan</code>, <code>@Enable...Repositories</code>는 별도로 설정한다. 메인 클래스는 도메인 패키지들을 포괄하는 루트 패키지에 둔다.</p>
 <p>스타터와 자동 구성 모듈도 다르다. 애플리케이션이 <code>spring-boot-starter-data-jpa</code>를 추가하면 관련 라이브러리와 Boot의 JPA 지원이 의존성 그래프에 들어온다. 그 다음 자동 구성 클래스의 조건이 맞아야 기본 빈이 등록된다. 즉 <strong>의존성 추가는 조건을 평가할 재료를 제공하고, 조건 평가는 실제 구성을 결정한다.</strong></p>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>@SpringBootApplication은 세 역할을 묶는다 · 후보 검색부터 빈 생성까지 · 조건 애노테이션 선택 · SpringApplication 기동과 이벤트</small></span><span class="knowledge-chapter-meta">4개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="springbootapplication은-세-역할을-묶는다"><a class="anchor" href="#springbootapplication은-세-역할을-묶는다" aria-hidden="true">#</a><code>@SpringBootApplication</code>은 세 역할을 묶는다</h3>
 <p>Boot 4.1.1 API의 선언을 풀면 <code>@SpringBootApplication</code>은 <code>@SpringBootConfiguration</code>, <code>@EnableAutoConfiguration</code>, <code>@ComponentScan</code>을 포함한다. 실제 <code>@ComponentScan</code>에는 테스트용 <code>TypeExcludeFilter</code>도 지정돼 있다.</p>
 <p>기본 컴포넌트 탐색 기준 패키지는 애노테이션이 붙은 클래스의 패키지다. <code>@EnableAutoConfiguration</code>은 <code>AutoConfigurationImportSelector</code>를 통해 자동 구성 후보 선택을 시작한다.</p>
@@ -253,7 +253,7 @@ ApplicationRunner rebuildSearchIndex(SearchIndex index, TaskExecutor executor) {
 <p><code>@PostConstruct</code>도 refresh 중 빈 초기화에 묶이므로 장시간 작업 위치로 쓰지 않는다. 지연 초기화는 빈 생성 시점을 늦출 뿐 작업 큐나 readiness 정책을 대신하지 않고, 설정 오류 발견을 첫 요청까지 미룰 수 있다.</p>
 <p>함정은 “프로세스가 떠 있음”, “컨텍스트가 refresh 됨”, “트래픽을 받아도 됨”을 같은 상태로 보는 것이다. 시작 이벤트에서 runner 완료를 가정하지 말고, 준비 전에도 안전한 경로만 열어 두며, runner 예외와 비동기 초기화 실패가 readiness에 어떻게 반영되는지 함께 설계한다.</p>
 <p>참고: SpringApplication — <a href="https://docs.spring.io/spring-boot/reference/features/spring-application.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/features/spring-application.html</a></p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1: 메인 구성 클래스와 의도적인 제외 (미실행) · 예제 2: 라이브러리 기본 빈과 사용자 대체 허용 (미실행) · 예제 3: 자동 구성 JAR 등록과 사용자 오버라이드 (미실행) · 조건 평가 리포트 보기 (미실행)</small></span><span class="knowledge-chapter-meta">6개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="예제-1-메인-구성-클래스와-의도적인-제외-미실행"><a class="anchor" href="#예제-1-메인-구성-클래스와-의도적인-제외-미실행" aria-hidden="true">#</a>예제 1: 메인 구성 클래스와 의도적인 제외 (미실행)</h3>
 <pre><code class="language-java">package com.example.shop;
 
@@ -329,13 +329,13 @@ class ShopAuditConfiguration {
 <h3 id="조건-평가-리포트-보기-미실행"><a class="anchor" href="#조건-평가-리포트-보기-미실행" aria-hidden="true">#</a>조건 평가 리포트 보기 (미실행)</h3>
 <pre><code class="language-bash">java -jar shop.jar --debug</code></pre>
 <p><code>--debug</code>는 일부 핵심 로거를 올리고 조건 리포트를 출력한다. <code>Positive matches</code>, <code>Negative matches</code>, 제외 목록으로 불일치 조건을 찾는다. 내부 빈 메서드 대신 공개 조건과 사용자 빈으로 조정한다.</p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>Spring Boot 2.7</strong> — 자동 구성 후보가 커지면서 모든 종류의 팩토리 확장점을 다루던 범용 <code>spring.factories</code>에 자동 구성 등록까지 섞지 않도록 전용 <code>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code> 파일을 도입했다. <code>@AutoConfiguration</code>도 2.7.0부터 제공되어 자동 구성 순서와 <code>proxyBeanMethods=false</code> 의도를 드러낸다. (2.7 릴리스 노트, <code>@AutoConfiguration</code> API)</li>
 <li><strong>Spring Boot 4.0</strong> — 하나의 큰 의존성 모듈에 기능이 묶여 불필요한 라이브러리까지 끌고 오는 문제를 줄이도록 기술별 소형 모듈과 일관된 스타터 구성을 도입했다. 사용자는 <code>spring-boot-starter-web</code> 같은 이전 의존성 이름에 기대지 말고 실제 기능에 맞는 Boot 4 스타터를 선택해야 한다. 예를 들어 MVC는 <code>spring-boot-starter-webmvc</code>, Flyway는 <code>spring-boot-starter-flyway</code>다. 자동 구성 구현도 사용하려는 Boot 모듈이 classpath에 있는지 확인하고, 선택 의존성을 조건으로 감싸야 한다. (Boot 4.0 마이그레이션 가이드와 릴리스 노트)</li>
 <li><strong>Spring Boot 4.1.x 기준</strong> — 현재 기준 문서는 4.1.1이며 <code>@SpringBootApplication</code>, 조건 애노테이션, <code>AutoConfiguration.imports</code>를 그대로 사용한다. Boot 4에서 이동한 기술별 패키지/모듈은 실제 참조 API와 마이그레이션 표를 확인한다. 예를 들어 데이터소스 제외 클래스는 <code>org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration</code> 패키지에 있다. (4.1.1 API와 자동 구성 문서)</li>
 </ul>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>애플리케이션 시작 클래스는 도메인 코드의 공통 루트 패키지에 둔다. 그래야 하위 패키지의 컨트롤러·서비스를 기본 스캔 범위에서 발견한다.</li>
 <li>기능 라이브러리를 추가해도 자동 구성이 없으면 빈은 자동 생성되지 않는다. 해당 기능의 Boot 스타터가 있는지와 후보 등록 파일을 확인한다.</li>
@@ -348,7 +348,7 @@ class ShopAuditConfiguration {
 <li>Boot 4로 올릴 때 직접 선언한 의존성이 많거나 오래된 스타터를 쓴다면 기능별 최신 스타터와 패키지를 대조한다. <code>starter-test</code>도 기술별로 제공되는지 확인한다.</li>
 <li>자동 구성 클래스 자체를 애플리케이션의 <code>@ComponentScan</code>에 넣지 않는다. 전용 imports 메타데이터와 <code>@Import</code>를 통해 필요한 구성을 제한적으로 연결한다.</li>
 </ul>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>증상:</strong> 내 <code>@Service</code>가 빈으로 안 잡힌다 → <strong>원인:</strong> <code>@SpringBootApplication</code> 패키지 아래가 아닌 형제 패키지에 두었다 → <strong>대처:</strong> 메인 클래스를 루트 패키지로 옮기거나 타입 안전한 <code>scanBasePackageClasses</code>를 지정한다.</li>
 <li><strong>증상:</strong> 자동 구성 기본 빈과 애플리케이션 빈이 함께 등록된다 → <strong>원인:</strong> 자동 구성에 <code>@ConditionalOnMissingBean</code>이 빠졌거나 조건 타입과 실제 사용자 빈 타입이 맞지 않는다 → <strong>대처:</strong> 조건 대상을 명확히 하고 자동 구성 기본값이 조건부가 되게 한다. <code>@Primary</code>는 두 빈을 제거하지 않는다.</li>
@@ -360,7 +360,7 @@ class ShopAuditConfiguration {
 <li><strong>증상:</strong> 자동 구성 순서를 바꿨지만 실제 빈이 먼저 생성되는 문제는 남는다 → <strong>원인:</strong> <code>@AutoConfigureBefore/After</code>를 빈 인스턴스 생성 순서로 오해했다 → <strong>대처:</strong> 구성 정의 의존성을 만들고 실제 초기화 제어는 주입 관계, <code>@DependsOn</code> 등으로 표현한다.</li>
 <li><strong>증상:</strong> 자동 구성 조건 표현식 평가 중 특정 빈이 너무 일찍 만들어진다 → <strong>원인:</strong> <code>@ConditionalOnExpression</code>에서 빈을 참조했다 → <strong>대처:</strong> class/property/bean 조건 애노테이션으로 나눠 표현한다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. @SpringBootApplication은 어떤 기능을 켜며, 컴포넌트 스캔 범위는 무엇으로 정해지나? · Q2. 스타터를 추가하면 자동 구성이 무조건 켜지나? · Q3. AutoConfiguration.imports는 무엇이고 왜 필요한가? · Q4. @ConditionalOnMissingBean은 어떤 문제를 막나?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-springbootapplication은-어떤-기능을-켜며-컴포넌트-스캔-범위는-무엇으로-정해지나"><a class="anchor" href="#q1-springbootapplication은-어떤-기능을-켜며-컴포넌트-스캔-범위는-무엇으로-정해지나" aria-hidden="true">#</a>Q1. <code>@SpringBootApplication</code>은 어떤 기능을 켜며, 컴포넌트 스캔 범위는 무엇으로 정해지나?</h3>
 <p><code>@SpringBootConfiguration</code>, <code>@EnableAutoConfiguration</code>, <code>@ComponentScan</code>의 합성 애노테이션이다. 기본 스캔 기준은 이 애노테이션이 붙은 클래스의 패키지다. 자동 구성 후보 검색은 컴포넌트 스캔과 별도 경로다.</p>
 <p><strong>꼬리질문:</strong> <code>scanBasePackages</code>가 엔티티도 찾나? <strong>답:</strong> 아니다. 엔티티/저장소 탐색은 별도 설정이다.</p>
@@ -385,7 +385,7 @@ class ShopAuditConfiguration {
 <h3 id="q8-boot-4로-업그레이드하며-자동-구성-의존성을-왜-다시-봐야-하나"><a class="anchor" href="#q8-boot-4로-업그레이드하며-자동-구성-의존성을-왜-다시-봐야-하나" aria-hidden="true">#</a>Q8. Boot 4로 업그레이드하며 자동 구성 의존성을 왜 다시 봐야 하나?</h3>
 <p>Boot 4는 큰 모듈을 기술별 소형 모듈과 일관된 스타터들로 나눴다. 특히 스타터에 기대던 암묵적 전이 의존성과 클래스 패키지 경로가 달라질 수 있다. 마이그레이션 가이드에서 기술별 main/test 스타터를 대조한다.</p>
 <p><strong>꼬리질문:</strong> 데이터소스 import도 바뀔 수 있나? <strong>답:</strong> 그렇다. 기술별 모듈/패키지 이동의 영향을 받는다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Creating Your Own Auto-configuration — <a href="https://docs.spring.io/spring-boot/reference/features/developing-auto-configuration.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/features/developing-auto-configuration.html</a> — 조건과 커스텀 스타터.</li>
 <li>Auto-configuration — <a href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/using/auto-configuration.html</a> — 기본 동작과 제외·진단.</li>
@@ -398,7 +398,24 @@ class ShopAuditConfiguration {
 <li>Spring Boot 4.0 Release Notes — <a href="https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Release-Notes" target="_blank" rel="noopener">https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Release-Notes</a> — 4.0 변경 사항.</li>
 <li>Spring Boot 4.0 Migration Guide — <a href="https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Migration-Guide" target="_blank" rel="noopener">https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Migration-Guide</a> — 모듈·스타터 구조.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 

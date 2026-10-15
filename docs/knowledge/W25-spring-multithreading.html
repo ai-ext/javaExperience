@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>W25. 스프링은 왜 멀티스레드인가 — 요청마다 스레드, 공유되는 싱글턴 빈</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,7 +18,7 @@
 그 스레드들은 기본 싱글턴 빈을 동시에 호출하므로, 요청별 데이터를 빈 필드에 보관하면 사용자 간 값이 섞일 수 있다.
 기본 선택은 “싱글턴 서비스 + 불변 의존성 + 메서드 지역 변수”; 작업 스레드 수와 DB 커넥션 풀은 별개로 조정한다.</p>
 </blockquote>
-<h2 id="1-질문"><a class="anchor" href="#1-질문" aria-hidden="true">#</a>1. 질문</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-질문" aria-label="1. 질문 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 질문</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>신입이 다음과 같은 장면을 만나면 “스프링은 요청마다 객체를 만드는가?”라는 질문이 생긴다.</p>
 <ol>
 <li><code>http-nio-8080-exec-*</code>가 동시에 보이는데 여러 요청이 한 <code>@Service</code>를 쓴다고 한다.</li>
@@ -26,7 +26,7 @@
 <li>Tomcat 스레드를 늘렸는데 DB 대기와 타임아웃이 오히려 늘었다.</li>
 </ol>
 <p>범위는 Boot 4.1의 동기 MVC + Tomcat이다. WebFlux·비동기·스레드 상세는 <a class="docref" href="W14-sync-async-blocking.html">W14</a>, <a class="docref" href="J10-jmm-threads.html">J10</a>/<a class="docref" href="J11-juc.html">J11</a>을 참조한다.</p>
-<h2 id="2-짧은-답"><a class="anchor" href="#2-짧은-답" aria-hidden="true">#</a>2. 짧은 답</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-짧은-답" aria-label="2. 짧은 답 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 짧은 답</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Spring MVC는 여러 요청을 동시에 처리하려고 서블릿 컨테이너의 작업 스레드 풀을 사용한다.</li>
 <li>동기 요청 하나는 보통 작업 스레드 하나에서 필터·컨트롤러·서비스·DB 호출·응답 반환을 이어간다.</li>
@@ -36,7 +36,7 @@
 <li>Tomcat 작업 스레드, <code>@Async</code> 실행기, 스케줄러, HikariCP DB 커넥션 풀은 서로 다른 자원 풀이다.</li>
 <li>대기·타임아웃은 스레드 덤프와 풀 지표로 어느 단계가 막혔는지 먼저 확인한 다음 그 자원을 조정한다.</li>
 </ul>
-<h2 id="3-왜-그런가--원리"><a class="anchor" href="#3-왜-그런가--원리" aria-hidden="true">#</a>3. 왜 그런가 — 원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-왜-그런가--원리" aria-label="3. 왜 그런가 — 원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 왜 그런가 — 원리</strong><small>프로세스 하나 안에서 요청 스레드가 나뉜다 · 싱글턴은 한 객체를 공유한다 · 풀은 서로 다른 단계의 용량이다 · ThreadLocal은 스레드별 칸이지 요청별 저장소가 아니다</small></span><span class="knowledge-chapter-meta">2개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="프로세스-하나-안에서-요청-스레드가-나뉜다"><a class="anchor" href="#프로세스-하나-안에서-요청-스레드가-나뉜다" aria-hidden="true">#</a>프로세스 하나 안에서 요청 스레드가 나뉜다</h3>
 <p>JVM 프로세스 하나 안에는 각자 실행 흐름과 스택을 가진 여러 Java 스레드가 있다. 같은 객체를 참조하면 힙 필드는 공유한다. OS 수준 설명은 <a class="docref" href="D14-os-basics-backend.html">D14</a>, 동기화는 <a class="docref" href="J10-jmm-threads.html">J10</a>을 참조한다.</p>
 <p>동기 서블릿 요청의 경로를 단순화하면 다음과 같다.</p>
@@ -70,7 +70,7 @@
 <h3 id="threadlocal은-스레드별-칸이지-요청별-저장소가-아니다"><a class="anchor" href="#threadlocal은-스레드별-칸이지-요청별-저장소가-아니다" aria-hidden="true">#</a>ThreadLocal은 스레드별 칸이지 요청별 저장소가 아니다</h3>
 <p><code>ThreadLocal&lt;T&gt;</code>은 스레드마다 별도 값을 제공한다. Spring 트랜잭션은 <code>TransactionSynchronizationManager</code>로 JDBC 자원을 현재 스레드에 바인딩한다. Spring Security의 <code>SecurityContextHolder</code>는 인증 문맥을 제공하고, 전통적인 Servlet 설정은 스레드 로컬 전략을 쓴다. 로깅 MDC에도 요청 ID 등을 넣는다.</p>
 <p>Tomcat은 worker를 재사용하므로 직접 넣은 값은 요청 종료 때 <code>try/finally</code>로 <code>remove()</code> 해야 다음 요청에 새지 않는다. 프레임워크가 관리하는 문맥은 정리 경로를 제공한다. <code>@Async</code>와 스케줄러는 다른 스레드에서 실행되므로 트랜잭션·인증 정보가 자동으로 넘어온다고 가정하지 않는다. 보안 문맥은 명시적 executor 래퍼 등으로 전달하고, 트랜잭션은 비동기 경계에서 새로 설계한다.</p>
-<h2 id="4-선택지-비교"><a class="anchor" href="#4-선택지-비교" aria-hidden="true">#</a>4. 선택지 비교</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-선택지-비교" aria-label="4. 선택지 비교 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 선택지 비교</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -132,7 +132,7 @@
 </tr>
 </tbody></table></div>
 <p>가상 스레드는 Java 21에서 정식화됐다. DB 용량을 늘리는 기능은 아니며 자세한 선택은 <a class="docref" href="J12-virtual-threads.html">J12</a>·<a class="docref" href="S07-webflux-vs-vt.html">S07</a>을 참조한다.</p>
-<h2 id="5-코드로-보기"><a class="anchor" href="#5-코드로-보기" aria-hidden="true">#</a>5. 코드로 보기</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-코드로-보기" aria-label="5. 코드로 보기 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 코드로 보기</strong><small>5.1 공유 싱글턴 필드에서 요청 상태가 섞이는 순수 Java 재현 · 5.2 기본 추천: 싱글턴 서비스는 입력을 받아 계산한다 (미실행) · 5.3 요청 상태를 객체로 묶어야 할 때: request scope (미실행) · 5.4 별도 스레드로 넘기는 작업은 executor를 명시한다 (미실행)</small></span><span class="knowledge-chapter-meta">5개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="51-공유-싱글턴-필드에서-요청-상태가-섞이는-순수-java-재현"><a class="anchor" href="#51-공유-싱글턴-필드에서-요청-상태가-섞이는-순수-java-재현" aria-hidden="true">#</a>5.1 공유 싱글턴 필드에서 요청 상태가 섞이는 순수 Java 재현</h3>
 <p>실제 서비스에서 요청별 이름을 필드에 보관하는 잘못된 형태다. 두 요청의 순서를 래치로 고정하여 Alice가 자기 이름을 쓴 뒤 Bob이 덮어쓰고, Alice가 다시 필드를 읽게 했다. 래치가 스레드 순서를 정하므로 출력은 재현 가능하다.</p>
 <pre><code class="language-java">import java.util.concurrent.CountDownLatch;
@@ -286,7 +286,7 @@ class MailService {
     }
 }</code></pre>
 <p>기본 proxy 모드의 <code>@Async</code>는 같은 클래스 내부의 <code>this.send(...)</code> 호출을 가로채지 못한다. <code>@Scheduled</code>는 scheduler에서 실행된다. 비동기 메서드의 DB 작업은 별도 트랜잭션으로 설계한다.</p>
-<h2 id="6-실무에서는-실제로"><a class="anchor" href="#6-실무에서는-실제로" aria-hidden="true">#</a>6. 실무에서는 실제로</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무에서는-실제로" aria-label="6. 실무에서는 실제로 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무에서는 실제로</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>신규 서비스:</strong> 무상태 싱글턴을 기본으로 두고 Tomcat busy, Hikari pending, DB 부하를 같이 본다. 백그라운드 일만 제한된 executor나 브로커로 분리한다.</li>
 <li><strong>레거시:</strong> 서비스 필드를 의존성·설정·캐시·요청 데이터로 분류하고 요청 값은 인자나 지역 변수로 옮긴다.</li>
@@ -294,7 +294,7 @@ class MailService {
 <li><strong>스타트업·신규 API:</strong> 결과를 기다릴 필요 없는 작업만 비동기로 보내고 재시도·중복·종료 처리를 정한다. 주문·결제를 fire-and-forget하면 유실될 수 있다.</li>
 <li><strong>혼합·마이그레이션:</strong> HTTP는 동기, 메일은 <code>@Async</code>/브로커, 집계는 <code>@Scheduled</code>로 나눌 수 있다. 공유 필드 제거 후 문맥 정리와 풀 제한을 검증한다. 가상 스레드는 <a class="docref" href="J12-virtual-threads.html">J12</a>·<a class="docref" href="S07-webflux-vs-vt.html">S07</a> 참조.</li>
 </ul>
-<h2 id="7-흔한-오해와-실수"><a class="anchor" href="#7-흔한-오해와-실수" aria-hidden="true">#</a>7. 흔한 오해와 실수</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-흔한-오해와-실수" aria-label="7. 흔한 오해와 실수 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 흔한 오해와 실수</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>오해: 싱글턴이면 요청을 직렬 처리한다.</strong> → 스코프는 객체 수명이지 호출 잠금이 아니다. → 여러 요청에 노출된 가변 필드를 제거한다.</li>
 <li><strong>증상: 다른 사용자의 이름·검색 조건이 응답에 나온다.</strong> → 요청별 값을 서비스 필드에 저장했다. → 인자·지역 변수로 옮기고 동시 요청 로그로 추적한다.</li>
@@ -304,7 +304,7 @@ class MailService {
 <li><strong>증상: 다음 요청에 이전 ID가 찍히거나 <code>@Async</code>가 문맥을 잃는다.</strong> → 스레드 풀은 재사용되고 다른 스레드로 ThreadLocal이 자동 전달되지 않는다. → 직접 값은 <code>try/finally</code>에서 지우고, 필요한 보안 전달과 비동기 트랜잭션을 명시한다.</li>
 <li><strong>증상: <code>@Async</code> 호출이 동기로 실행된다.</strong> → 같은 객체 내부 호출이 기본 proxy를 우회했다. → 별도 빈의 프록시를 통해 호출하고 Future 예외를 확인한다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. Spring 싱글턴 서비스가 동시 요청을 처리할 수 있는 이유는? · Q2. 한 HTTP 요청은 항상 처음부터 끝까지 같은 스레드인가? · Q3. 스레드 덤프에서 http-nio-8080-exec-*가 200개 바쁘면 무엇부터 볼까? · Q4. private final Repository repository는 왜 괜찮다고 하나?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-spring-싱글턴-서비스가-동시-요청을-처리할-수-있는-이유는"><a class="anchor" href="#q1-spring-싱글턴-서비스가-동시-요청을-처리할-수-있는-이유는" aria-hidden="true">#</a>Q1. Spring 싱글턴 서비스가 동시 요청을 처리할 수 있는 이유는?</h3>
 <p>컨테이너가 기본 서비스 인스턴스 하나를 만들지만, 여러 Tomcat worker thread가 그 객체의 메서드를 동시에 호출할 수 있다. 요청 데이터가 각 메서드 인자와 호출별 지역 변수에만 있으면 요청끼리 덮어쓸 공유 상태가 없다. 싱글턴이라는 사실 자체는 동기화를 제공하지 않는다.</p>
 <p><strong>꼬리질문:</strong> 서비스에 필드로 둬도 되는 것은? — 생성 시 주입되고 재대입되지 않는 의존성 참조나 불변 설정은 보통 가능하다. 다만 참조 대상이 thread-safe인지 별도 확인한다.</p>
@@ -326,7 +326,7 @@ class MailService {
 <h3 id="q7-async로-실행한-작업은-호출한-트랜잭션에-포함되는가"><a class="anchor" href="#q7-async로-실행한-작업은-호출한-트랜잭션에-포함되는가" aria-hidden="true">#</a>Q7. <code>@Async</code>로 실행한 작업은 호출한 트랜잭션에 포함되는가?</h3>
 <p>기본적으로 다른 스레드에서 실행되므로 호출 스레드에 ThreadLocal로 연결된 트랜잭션 자원이 공유되지 않는다. 비동기 메서드에서 필요한 DB 변경은 독립된 트랜잭션 경계를 정하고, 실패·재시도·중복 처리까지 설계한다. 인증 문맥도 자동 전달을 전제하지 않는다.</p>
 <p><strong>꼬리질문:</strong> 같은 클래스에서 <code>this.asyncMethod()</code>를 부르면? — 기본 proxy 모드의 <code>@Async</code>는 프록시를 통과하지 않아 비동기로 전환되지 않는다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Spring Boot Common Application Properties — <a href="https://docs.spring.io/spring-boot/appendix/application-properties/index.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/appendix/application-properties/index.html</a> — Tomcat worker 기본값과 가상 스레드 조건.</li>
 <li>Apache Tomcat 11 Executor — <a href="https://tomcat.apache.org/tomcat-11.0-doc/config/executor.html" target="_blank" rel="noopener">https://tomcat.apache.org/tomcat-11.0-doc/config/executor.html</a> — executor max/min 설정.</li>
@@ -340,7 +340,24 @@ class MailService {
 <li>HikariCP About Pool Sizing — <a href="https://github.com/brettwooldridge/HikariCP/wiki/About-Pool-Sizing" target="_blank" rel="noopener">https://github.com/brettwooldridge/HikariCP/wiki/About-Pool-Sizing</a> — DB 연결 풀 크기를 무조건 늘리면 안 되는 이유를 확인했다.</li>
 <li>The Java Tutorials: Concurrency — <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/" target="_blank" rel="noopener">https://docs.oracle.com/javase/tutorial/essential/concurrency/</a> — 스레드·동기화·스레드 풀의 기초 개요를 확인했다. 문서는 JDK 8 시대 자료임을 명시한다.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 <script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';

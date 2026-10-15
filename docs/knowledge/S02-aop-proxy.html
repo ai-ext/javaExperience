@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S02. AOP와 프록시</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,10 +18,10 @@
 Spring AOP는 빈 참조를 프록시로 감싸 메서드 호출 경계에서 advice를 실행한다. 따라서 외부에서 프록시를 거치는 호출만 가로챈다.
 Boot 4.1은 기본적으로 CGLIB 프록시를 선택하며, 인터페이스 계약을 우선할 때는 JDK 프록시로 바꿀 수 있다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p><code>@Aspect</code>에 <code>@Around</code>를 붙였는데도 같은 객체의 내부 호출에는 로그가 안 남거나, <code>final</code> 메서드에서 메트릭이 빠지는 경우가 있다. Spring AOP의 경계는 애노테이션이 아니라 “호출이 프록시를 통과했는가”다.</p>
 <p>또한 프록시가 구현 클래스가 아니라 인터페이스 타입으로만 보이는 상황도 있다. JDK 동적 프록시는 구현한 인터페이스를 통해 호출되므로, 구현 클래스에만 있는 메서드나 구현 타입 주입이 기대와 다를 수 있다. 반대로 CGLIB는 클래스를 상속하므로 <code>final</code> 클래스는 프록시화하지 못하고 <code>final</code> 메서드는 재정의하지 못한다. 기본 프록시 종류와 제약을 알면 런타임 프록시 오류, AOP 누락, 테스트와 운영 간 차이를 좁힐 수 있다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>AOP(Aspect-Oriented Programming)는 핵심 업무 코드 여러 곳에 흩어지는 공통 관심사를 별도의 모듈로 모으는 방식이다. AOP의 모듈화 단위는 aspect다. 로깅, 메트릭, 보안 검사, 트랜잭션 경계가 전형적인 관심사다. 이 문서는 공통 AOP와 프록시 원리를 다루며, <code>@Transactional</code>의 전파·롤백 규칙은 → <a class="docref" href="S08-transactions.html">S08</a> 참조.</p>
 <div class="table-wrap"><table>
 <thead>
@@ -98,7 +98,7 @@ Boot 4.1은 기본적으로 CGLIB 프록시를 선택하며, 인터페이스 계
 </tr>
 </tbody></table></div>
 <p><code>@Aspect</code> 애노테이션을 사용한다고 곧바로 AspectJ 위빙이 되는 것은 아니다. Spring은 AspectJ 애노테이션 문법과 pointcut 표현식 일부를 읽어 Spring AOP 프록시를 만들 수 있다. 프록시 대신 실제 AspectJ 위빙을 사용하려면 컴파일 시점 위빙이나 load-time weaving을 따로 구성해야 한다.</p>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>프록시 호출 흐름 · JDK 동적 프록시와 CGLIB · self-invocation이 빠지는 이유 · Advice 순서</small></span><span class="knowledge-chapter-meta">2개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="프록시-호출-흐름"><a class="anchor" href="#프록시-호출-흐름" aria-hidden="true">#</a>프록시 호출 흐름</h3>
 <p>일반적인 빈 자동 프록시 구성은 <code>BeanPostProcessor</code> 기반이다. 컨테이너는 빈을 생성하고 의존성을 주입한 뒤 초기화 콜백을 처리한다. 자동 프록시 생성기는 빈을 대상으로 적용 가능한 advisor를 찾고, 대상이면 초기화 후 반환할 객체를 프록시로 감싼다. 애플리케이션의 다른 빈은 컨테이너가 반환한 프록시 참조를 주입받는다.</p>
 <pre><code class="language-text">빈 생성·주입·초기화
@@ -161,7 +161,7 @@ target.methodA 안에서 this.methodB() 호출
 <h3 id="advice-순서"><a class="anchor" href="#advice-순서" aria-hidden="true">#</a>Advice 순서</h3>
 <p>서로 다른 aspect의 우선순위는 <code>@Order</code> 또는 <code>Ordered</code>로 정할 수 있다. 숫자가 낮을수록 우선순위가 높다. 중첩된 <code>@Around</code> advice라면 우선순위가 높은 aspect가 바깥에서 먼저 진입하고, <code>proceed()</code> 이후에는 역순으로 빠져나온다.</p>
 <p><code>@Order</code>는 빈 생성 순서를 지정하지 않는다. 같은 aspect 안에 선언한 여러 advice 메서드의 실행 순서에도 의존하지 말고 순서 제어가 필요하면 aspect를 나누어 각각 순서를 지정한다.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1 — JDK 프록시의 호출 위임 (순수 Java, 실행 완료) · 예제 2 — 실행 시간 로깅 aspect · 예제 3 — Micrometer 메트릭과 빈 경계</small></span><span class="knowledge-chapter-meta">5개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="예제-1--jdk-프록시의-호출-위임-순수-java-실행-완료"><a class="anchor" href="#예제-1--jdk-프록시의-호출-위임-순수-java-실행-완료" aria-hidden="true">#</a>예제 1 — JDK 프록시의 호출 위임 (순수 Java, 실행 완료)</h3>
 <p>다음 프로그램은 인터페이스 호출이 <code>InvocationHandler</code>로 전달되는 구조를 보인다. Spring은 이 기본 프록시 앞뒤에 advisor 판정과 interceptor 체인을 추가한다.</p>
 <pre><code class="language-java">import java.lang.reflect.InvocationHandler;
@@ -273,7 +273,7 @@ public class ServiceMetricsAspect {
     }
 }</code></pre>
 <p>타이머는 예외가 발생해도 완료된다. 성공·실패를 나누는 값이 필요하다면 제한된 값의 결과 태그를 적용하고, 고유 ID나 임의 입력값은 태그로 넣지 않는다. 이 예제는 기본 <code>MeterRegistry</code>와 <code>Timer.Sample</code>을 사용하는 Spring 코드다 (미실행).</p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>Spring Framework 2.0부터 <code>@Order</code> 제공:</strong> 같은 우선순위로 취급되던 컴포넌트 가운데 실행 우선순위를 표현할 방법이 필요했다. 낮은 값이 높은 우선순위이며, 현재도 기본은 <code>Ordered.LOWEST_PRECEDENCE</code>다. <a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/core/annotation/Order.html" target="_blank" rel="noopener">Order API</a></li>
 <li><strong>Spring Framework 4.0부터 다양한 컴포넌트와 컬렉션 주입에 애노테이션 기반 정렬 지원:</strong> 클래스패스 등록만으로 조립되는 컴포넌트 목록에 순서를 반영하기 어려웠던 점을 보완했다. 이 정렬은 싱글턴 시작 순서와 별개다. 같은 API 문서의 버전 설명을 참고한다.</li>
@@ -281,7 +281,7 @@ public class ServiceMetricsAspect {
 <li><strong>Spring Boot 4.1.1 (기준일):</strong> 자동 설정은 CGLIB를 기본으로 하며 <code>spring.aop.proxy-target-class=false</code>로 JDK 프록시를 선택한다. Framework의 일반 기본 동작(인터페이스가 있으면 JDK)과 Boot 기본 설정을 혼동하면 안 된다. <a href="https://docs.spring.io/spring-boot/reference/features/aop.html" target="_blank" rel="noopener">Boot AOP 문서</a></li>
 </ul>
 <p>AspectJ는 compile-time, post-compile, load-time 위빙을 제공한다. 클래스 파일을 언제 직조하는가는 빌드와 클래스 로딩 환경에 따라 정하는 배포 선택이며, Spring AOP 프록시와 다른 실행 모델이다. 자세한 구성은 AspectJ LTW 문서를 참고한다.</p>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>기본값 추천:</strong> Boot 애플리케이션에서는 CGLIB 기본값을 그대로 사용하고, 구현 세부보다 인터페이스 계약으로 서비스를 주입한다. 클래스 기반 프록시로 통일하면 인터페이스가 없는 빈도 프록시화할 수 있어 Boot 기본 설정과 일치한다.</li>
 <li>빈을 인터페이스에만 의존시키고 구현 타입 노출을 피하고 싶으면 <code>spring.aop.proxy-target-class=false</code>로 JDK 프록시를 선택한다. 구현체만 가진 메서드는 프록시 참조에서 사용할 수 없으므로 필요한 동작을 인터페이스에 선언한다.</li>
@@ -291,7 +291,7 @@ public class ServiceMetricsAspect {
 <li><code>@Order</code>가 필요한 독립적인 aspect에만 우선순위를 명시한다. 값이 낮은 aspect가 바깥에서 먼저 진입하므로 보안/검증/관측의 진입과 종료 순서를 이 기준으로 설계한다.</li>
 <li>내부 호출까지 가로채야 한다면 우선 빈 책임을 나눠 외부 빈 호출로 만든다. 그 구조가 도메인 모델을 해치고 더 넓은 join point가 필요할 때만 AspectJ 위빙을 검토한다.</li>
 </ul>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>내부 호출에 advice가 없음 →</strong> <code>this.other()</code>가 target 안에서 직접 실행되어 프록시를 통과하지 않는다 → 조언 대상 동작을 별도 빈으로 옮기거나 필요한 경우 위빙을 선택한다.</li>
 <li><strong><code>final</code>/<code>private</code> 메서드에 붙인 advice가 동작하지 않음 →</strong> CGLIB 하위 클래스는 해당 메서드를 override할 수 없다 → public/protected 등 프록시가 가로챌 수 있는 메서드 경계를 설계하고, 필요한 로직을 분리한다.</li>
@@ -301,7 +301,7 @@ public class ServiceMetricsAspect {
 <li><strong>메트릭 시계열이 끝없이 늘어남 →</strong> 요청 ID·주문번호 같은 고유값을 태그로 사용했다 → 유한한 태그만 허용하고 이미 생긴 고카디널리티 시계열은 수집 설정에서 정리한다.</li>
 <li><strong><code>@Aspect</code>는 곧 AspectJ 위빙이라고 생각함 →</strong> 애노테이션 문법을 쓰더라도 Spring은 기본적으로 프록시를 만든다 → 생성자·필드 접근·내부 호출이 필요하면 위빙을 명시적으로 설정한다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. Spring AOP의 join point는 무엇이며 AspectJ와 어떻게 다른가? · Q2. 인터페이스가 있는데도 Boot에서 CGLIB 프록시가 나오는 이유는? · Q3. @Transactional 또는 커스텀 advice가 내부 호출에서 빠지는 이유는? · Q4. CGLIB가 final 메서드에 advice를 적용하지 못하는 이유는?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-spring-aop의-join-point는-무엇이며-aspectj와-어떻게-다른가"><a class="anchor" href="#q1-spring-aop의-join-point는-무엇이며-aspectj와-어떻게-다른가" aria-hidden="true">#</a>Q1. Spring AOP의 join point는 무엇이며 AspectJ와 어떻게 다른가?</h3>
 <p>Spring AOP는 Spring 빈의 메서드 실행만 조언한다. AspectJ 위빙은 바이트코드에 적용되어 생성자·필드 접근 등 더 넓은 지점을 선택할 수 있다.</p>
 <p><strong>꼬리질문:</strong> Spring에서 AspectJ pointcut 문법을 쓰면 곧 위빙인가?
@@ -334,7 +334,7 @@ public class ServiceMetricsAspect {
 <p>Spring 컨테이너가 관리하지 않는 객체나 생성자·필드 접근을 조언해야 하거나, 내부 호출을 포함한 넓은 실행 지점이 요구될 때 위빙을 검토한다. 대신 빌드 플러그인·위버·클래스로더 구성이 필요하다. 프록시로 해결되면 Spring AOP가 단순하다.</p>
 <p><strong>꼬리질문:</strong> load-time weaving은 애플리케이션 코드 실행이 끝난 뒤에도 클래스를 바꾸나?
 <strong>답:</strong> 아니다. 클래스 로더가 클래스를 JVM에 정의할 때 위빙한다. 이미 정의된 클래스를 실행 도중 바꾸는 일반적인 런타임 weaving과 구분해야 한다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Aspect Oriented Programming with Spring — <a href="https://docs.spring.io/spring-framework/reference/core/aop.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/core/aop.html</a> — Spring AOP의 목적과 AspectJ 표현식 기반 지원을 확인.</li>
 <li>Proxying Mechanisms — <a href="https://docs.spring.io/spring-framework/reference/core/aop/proxying.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/core/aop/proxying.html</a> — JDK/CGLIB 선택, final/private 제약, 프록시 호출 의미, Framework 7 설정을 확인.</li>
@@ -347,7 +347,24 @@ public class ServiceMetricsAspect {
 <li><code>java.lang.reflect.Proxy</code> Javadoc — <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html</a> — JDK 동적 프록시와 <code>InvocationHandler</code> 디스패치를 확인.</li>
 <li>AspectJ Load-Time Weaving — <a href="https://eclipse.dev/aspectj/doc/released/devguide/ltw.html" target="_blank" rel="noopener">https://eclipse.dev/aspectj/doc/released/devguide/ltw.html</a> — compile-time·post-compile·load-time 위빙의 차이를 확인.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 

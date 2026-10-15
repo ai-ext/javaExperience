@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S06. REST API 설계와 HTTP 클라이언트</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -20,10 +20,10 @@
 <li>타임아웃은 연결·응답 등 각 대기 구간에 명시하고, 재시도는 멱등성과 중복 처리 계약을 확인한 뒤 적용한다.</li>
 </ul>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>결제 <code>POST</code>가 타임아웃 났다고 그대로 재전송하면, 첫 요청은 처리됐지만 응답만 유실된 경우 주문이 중복 생성될 수 있다. 부분 업데이트를 <code>PUT</code>으로 구현하면 생략된 필드가 지워질 수 있다. 외부 API에 타임아웃이 없으면 요청 스레드와 연결 풀이 잠식된다.</p>
 <p>목록을 <code>createdAt</code>만으로 정렬하면 동시간 행이 페이지 경계에서 중복·누락될 수 있다. <code>Page</code>를 그대로 공개하면 내부 타입과 전체 건수 쿼리가 계약에 묶인다. Jackson 3 전환도 패키지·확장 API 변화뿐 아니라 JSON 호환성을 확인해야 한다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong><small>메서드와 상태 코드 · 자주 혼동하는 쌍</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -141,7 +141,7 @@
 <td>연결 타임아웃은 원격 연결을 맺을 때 기다리는 한도다. 응답/읽기 타임아웃은 연결 뒤 응답 데이터가 오기를 기다리는 한도다. 호출 전체 deadline은 별도 계층에서 관리할 수 있다.</td>
 </tr>
 </tbody></table></div>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>요청 처리에서 서버와 클라이언트의 역할은 분리된다.</p>
 <pre><code class="language-text">호출자
   │ 메서드 + URI + 헤더 + 본문(표현)
@@ -158,7 +158,7 @@
 <p>Spring <code>RestClient</code>는 메서드·URI·헤더·본문을 fluent 요청으로 조립하고, terminal body/entity 변환에서 전송과 메시지 변환을 수행한다. <code>WebClient</code>는 reactive publisher 흐름과 스트리밍에 맞는다.</p>
 <p>HTTP Interface 프록시는 설정한 클라이언트 어댑터로 요청을 보낸다. 기본 URL·공통 헤더는 클라이언트에, 서비스별 정책은 호출 경계에 둔다.</p>
 <p>재시도는 타임아웃과 별개다. 타임아웃은 서버 작업 취소를 뜻하지 않는다. 멱등 메서드라도 횟수·대기 간격·총 deadline을 제한한다. POST는 idempotency key와 서버측 결과 저장 계약 없이는 자동 재시도하지 않는다.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1 — 명시적 페이지 계약과 입력 상한 · 예제 2 — Framework 7 내장 API 버저닝 · 예제 3 — RestClient의 연결·읽기 시간 제한</small></span><span class="knowledge-chapter-meta">4개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>예제는 Spring Boot 4.1 / Framework 7 기준이며 <strong>미실행</strong>이다. 필요 의존성은 <code>spring-boot-starter-web</code>이며, Spring Data 웹 인자 지원은 Spring Data Commons가 추가로 필요하다.</p>
 <h3 id="예제-1--명시적-페이지-계약과-입력-상한"><a class="anchor" href="#예제-1--명시적-페이지-계약과-입력-상한" aria-hidden="true">#</a>예제 1 — 명시적 페이지 계약과 입력 상한</h3>
 <p><code>Page</code> 대신 외부 계약에 필요한 필드만 DTO로 정의한다.</p>
@@ -281,7 +281,7 @@ interface InventoryApi {
     record Item(String sku, int available) {}
 }</code></pre>
 <p>프록시는 <code>HttpServiceProxyFactory</code>와 <code>RestClientAdapter</code>로 만든다. <code>WebClient</code>는 reactive 흐름·스트리밍에 쓰고, MVC에서 습관적으로 <code>.block()</code>하면 비동기 이점을 잃는다.</p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -312,7 +312,7 @@ interface InventoryApi {
 </tr>
 </tbody></table></div>
 <p>하위 라이브러리 버전은 공통 브리프의 Boot BOM을 따른다.</p>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong><small>HTTP 캐시와 조건부 GET (보강)</small></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>기본값 추천:</strong> 새 동기 호출은 <code>RestClient</code>로 시작한다. reactive·스트리밍은 <code>WebClient</code>, 선언형 계약은 HTTP Interface로 분리한다.</li>
 <li>기존 <code>RestTemplate</code>은 변경 영역부터 옮긴다. Framework 7 문서는 이를 deprecated 처리한다.</li>
@@ -371,7 +371,7 @@ class ProfileController {
 <p>참고: HTTP Caching — <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-caching.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-caching.html</a>
 참고: RFC 9110: HTTP Semantics — <a href="https://www.rfc-editor.org/rfc/rfc9110.html" target="_blank" rel="noopener">https://www.rfc-editor.org/rfc/rfc9110.html</a>
 참고: RFC 9111: HTTP Caching — <a href="https://www.rfc-editor.org/rfc/rfc9111.html" target="_blank" rel="noopener">https://www.rfc-editor.org/rfc/rfc9111.html</a></p>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>증상:</strong> GET이 상태를 바꾼다 → <strong>원인:</strong> 조회에 쓰기를 숨겼다 → <strong>대처:</strong> GET/HEAD는 읽기 전용으로 둔다.</li>
 <li><strong>증상:</strong> 결제·주문이 중복된다 → <strong>원인:</strong> 타임아웃 뒤 POST를 무조건 재시도했다 → <strong>대처:</strong> idempotency key와 서버의 결과 재생 계약을 둔다.</li>
@@ -382,7 +382,7 @@ class ProfileController {
 <li><strong>증상:</strong> Jackson 전환 후 직렬화 오류·계약 차이가 난다 → <strong>원인:</strong> 패키지/API 변화나 Jackson 세대 혼용이다 → <strong>대처:</strong> <code>tools.jackson</code>과 날짜·enum·null·다형성 계약을 확인한다.</li>
 <li><strong>증상:</strong> 캐시가 다른 API 버전 응답을 돌려준다 → <strong>원인:</strong> 버전 헤더가 캐시 키에 없다 → <strong>대처:</strong> <code>Vary</code>와 CDN 키를 맞추고 폐기 정책을 문서화한다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. PUT과 PATCH를 어떻게 구분하며, PATCH는 재시도해도 안전한가? · Q2. PUT/DELETE가 멱등이라는 말은 응답도 똑같다는 뜻인가? · Q3. 목록 API에서 offset과 cursor를 어떤 기준으로 선택하나? · Q4. 요청 타임아웃이 난 뒤 서버가 작업을 했는지 알 수 있나?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-put과-patch를-어떻게-구분하며-patch는-재시도해도-안전한가"><a class="anchor" href="#q1-put과-patch를-어떻게-구분하며-patch는-재시도해도-안전한가" aria-hidden="true">#</a>Q1. PUT과 PATCH를 어떻게 구분하며, PATCH는 재시도해도 안전한가?</h3>
 <p>PUT은 전체 표현 교체라 반복 후 최종 상태가 같아야 한다. PATCH는 연산에 따라 멱등일 수도 아닐 수도 있다. 생략과 null의 의미를 정하지 않으면 부분 수정에서 데이터가 지워진다.</p>
 <p><strong>꼬리 질문:</strong> <code>PATCH {"counter": counter + 1}</code> 같은 연산은 멱등인가? → 아니다. 동일 요청 재적용마다 값이 증가하므로 조건부 버전 검사나 별도 중복 제거 계약 없이는 안전하게 재시도할 수 없다.</p>
@@ -407,7 +407,7 @@ class ProfileController {
 <h3 id="q8-springdoc이-openapi-문서를-생성하면-api-계약-검토는-끝나는가"><a class="anchor" href="#q8-springdoc이-openapi-문서를-생성하면-api-계약-검토는-끝나는가" aria-hidden="true">#</a>Q8. springdoc이 OpenAPI 문서를 생성하면 API 계약 검토는 끝나는가?</h3>
 <p>아니다. springdoc은 OpenAPI와 Swagger UI 생성을 돕지만 버전별 요청/응답, 오류, 인증, 제약이 실제와 맞는지 검토해야 한다. 런타임 정책은 자동 문서에서 빠질 수 있다.</p>
 <p><strong>꼬리 질문:</strong> 릴리스에서 무엇을 비교할 수 있나? → 생성된 OpenAPI 스펙을 저장해 변경분을 비교하고, 호환성 정책에 따라 제거·타입 변경·필수화 같은 breaking change를 배포 전에 차단한다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>REST Clients — <a href="https://docs.spring.io/spring-framework/reference/integration/rest-clients.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/integration/rest-clients.html</a> — <code>RestClient</code>, <code>WebClient</code>, <code>RestTemplate</code>, HTTP Service Clients의 기능과 요청/응답 변환.</li>
 <li>Spring Framework 6.1 Release Notes — <a href="https://github.com/spring-projects/spring-framework/wiki/Spring-Framework-6.1-Release-Notes" target="_blank" rel="noopener">https://github.com/spring-projects/spring-framework/wiki/Spring-Framework-6.1-Release-Notes</a> — <code>RestClient</code> 도입 세대와 동작 변경 사항.</li>
@@ -423,7 +423,24 @@ class ProfileController {
 <li>RFC 9457: Problem Details for HTTP APIs — <a href="https://www.rfc-editor.org/rfc/rfc9457.html" target="_blank" rel="noopener">https://www.rfc-editor.org/rfc/rfc9457.html</a> — 기계가 읽는 표준 HTTP 오류 본문 형식.</li>
 <li>springdoc-openapi — <a href="https://springdoc.org/" target="_blank" rel="noopener">https://springdoc.org/</a> — Spring Boot 애플리케이션의 OpenAPI 3 및 Swagger UI 문서.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 

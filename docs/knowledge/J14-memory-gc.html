@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J14. 메모리 구조와 GC</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,11 +18,11 @@
 GC는 도달 가능한 객체를 보존하며, collector별로 처리량·지연시간·CPU와 메모리 사용의 균형이 다르다.
 운영 기본값은 G1과 GC 로그이며, 먼저 로그에서 할당·회수·생존량을 읽고 병목에 맞춰 collector를 바꾼다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p><code>-Xmx</code>를 크게 했는데도 프로세스가 컨테이너 메모리 제한을 넘거나, <code>OutOfMemoryError: Direct buffer memory</code>가 나는 사례가 있다. 이때 힙만 보면 원인을 놓친다.</p>
 <p>클래스 메타데이터, JIT 코드, 스레드 스택, direct buffer payload도 프로세스 메모리를 쓴다. 반대로 <code>GC overhead limit exceeded</code>나 잦은 Full GC에서 무조건 <code>-Xmx</code>를 올리면, 객체를 계속 붙잡는 캐시·리스너 누수는 그대로 둔 채 장애 시점만 늦출 수 있다.</p>
 <p>GC 로그의 <code>before -&gt; after</code>를 보면 단기 할당과 장기 생존 객체 증가를 구분할 수 있다. G1의 pause target은 보증이 아니며, ZGC·Shenandoah도 CPU와 메모리 여유가 부족하면 할당이 정체되거나 처리량이 떨어진다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong><small>용어 정리 · 헷갈리는 메모리 쌍 · 객체 레이아웃과 compact object headers · 세대별 가설</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="용어-정리"><a class="anchor" href="#용어-정리" aria-hidden="true">#</a>용어 정리</h3>
 <div class="table-wrap"><table>
 <thead>
@@ -130,7 +130,7 @@ GC는 도달 가능한 객체를 보존하며, collector별로 처리량·지연
 <h3 id="세대별-가설"><a class="anchor" href="#세대별-가설" aria-hidden="true">#</a>세대별 가설</h3>
 <p>대부분 객체는 생성 후 오래 살지 않는다는 가설을 활용한다. young 영역을 자주 모으고, 생존 객체는 승격(promote)한다. Old에서 young을 가리키는 참조는 remembered set/card table로 기록해 young 수집 때 누락하지 않는다.</p>
 <p>이는 가정이지 보장이 아니다. 캐시·세션·큐의 생존 객체가 많으면 old 회수 비용이 커진다. 세대형 ZGC와 Shenandoah도 세대를 나누지만 정책과 barrier는 각 collector가 구현한다.</p>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>JVM 메모리의 큰 그림 · GC가 객체를 살려 두거나 회수하는 과정 · G1: region 단위 수집과 pause 목표 · ZGC와 Shenandoah: 낮은 지연시간을 위한 동시 작업</small></span><span class="knowledge-chapter-meta">4개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="jvm-메모리의-큰-그림"><a class="anchor" href="#jvm-메모리의-큰-그림" aria-hidden="true">#</a>JVM 메모리의 큰 그림</h3>
 <pre><code class="language-text">프로세스 주소 공간 (JVM 명세의 영역 + HotSpot 구현 영역)
 ├─ Java heap (공유) ─ 객체/배열, GC 수집 대상
@@ -177,7 +177,7 @@ Mixed GC: young + 회수 가치가 높은 일부 old region을 collection set에
 <p>대표 운영 옵션은 다음과 같다.</p>
 <pre><code class="language-shell">-Xlog:gc*:file=/var/log/myapp/gc.log:time,uptime,level,tags:filecount=5,filesize=20M</code></pre>
 <p><code>gc*</code>는 상세도를 높인다. 파일 크기·개수는 디스크 예산에 맞추고, 필요 구간에서 태그/레벨을 추가한다. 레거시 <code>PrintGCDetails</code> 대신 unified logging 문법을 사용한다.[11][12]</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1: heap buffer와 direct buffer 구분 · 예제 2: 작은 힙에서 allocation GC 로그 관찰</small></span><span class="knowledge-chapter-meta">5개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="예제-1-heap-buffer와-direct-buffer-구분"><a class="anchor" href="#예제-1-heap-buffer와-direct-buffer-구분" aria-hidden="true">#</a>예제 1: heap buffer와 direct buffer 구분</h3>
 <p><code>ByteBuffer.allocateDirect</code>의 내용은 일반 GC 힙 밖에 놓일 수 있다. wrapper와 데이터의 위치를 혼동하지 말고 <code>isDirect()</code>로 어떤 버퍼를 만든 것인지 확인한다.[3]</p>
 <pre><code class="language-java">import java.nio.ByteBuffer;
@@ -219,7 +219,7 @@ direct: direct=true capacity=16</code></pre>
 [0.145s][info][gc] GC(1) Pause Young (Allocation Failure) 6M-&gt;3M(15M) 2.011ms
 [0.165s][info][gc] GC(2) Pause Young (Allocation Failure) 8M-&gt;4M(15M) 1.459ms</code></pre>
 <p>관측한 전체 로그 파일은 43줄이었다. 실제 시간·용량·이벤트 수는 JDK 배포판과 실행 환경에서 달라질 수 있다. 명령행의 <code>-Xlog:gc</code>/<code>-Xlog:gc=info</code>가 legacy <code>PrintGC</code>와 유사한 info 수준 GC 메시지를 출력한다.[12]</p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -260,7 +260,7 @@ direct: direct=true capacity=16</code></pre>
 </tr>
 </tbody></table></div>
 <p>Java 25는 이 자료의 기준 버전이다. Java 25에서 G1은 대부분의 하드웨어·OS 조합의 기본이고, ZGC는 generational 모드가 기본이다.[6][7]</p>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p><strong>기본값 추천: 별도 근거가 없는 Spring/Java 서버는 JVM 기본 collector인 G1로 시작하고, 시작 때부터 회전 가능한 <code>-Xlog:gc</code> 로그를 남겨라.</strong> 낮은 tail latency가 무조건 필요한 게 아니라면 먼저 G1의 allocation rate, pause 분포, GC 후 생존량으로 병목을 분리한다. G1은 Java 25 대부분의 환경에서 기본 collector이고 기본 튜닝을 거의 요구하지 않도록 설계됐다.[5][6]</p>
 <ul>
 <li>if 서비스의 목표가 일반적인 API 응답시간과 처리량 균형이면 then G1을 유지한다. pause goal은 수집 집합 크기 조정 힌트로 사용하고, 목표값만 낮춰 latency를 보장하려 하지 않는다.</li>
@@ -274,7 +274,7 @@ direct: direct=true capacity=16</code></pre>
 <li>if 처음 GC 로그를 켜면 then <code>-Xlog:gc</code>로 시작하고 필요할 때만 <code>gc*</code>로 넓혀 file rotation을 둔다.[11][12]</li>
 </ul>
 <p>컨테이너 메모리 플래그(<code>MaxRAMPercentage</code>)는 <a class="docref" href="J16-jvm-in-containers.html">J16</a> 참조. 프로파일링 도구는 <a class="docref" href="J15-jit-profiling.html">J15</a> 참조.</p>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>힙만 보고 한도를 올림</strong> — 컨테이너 OOM-kill → native 메모리를 놓침 → RSS, heap, Metaspace, direct buffer, 스레드 수를 함께 본다.</li>
 <li><strong>GC 로그 최대치만 비교</strong> — 회수 후 생존 추세를 놓침 → <code>before -&gt; after</code>, pause, 간격, 직후 점유율을 읽는다.</li>
@@ -287,7 +287,7 @@ direct: direct=true capacity=16</code></pre>
 <li><strong>GC 로그를 무제한 상세도로 켬</strong> — I/O·디스크 고갈 → 필요한 태그만 켜고 회전 크기를 제한한다.[11][12]</li>
 <li><strong>compact header를 켜고 객체 크기를 단정</strong> — 크기는 VM/옵션에 종속 → 기본 변경이 아님을 기록하고 배포 조합을 계측한다.[4]</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. JVMS의 method area와 HotSpot Metaspace는 같은 개념인가? · Q2. 힙이 충분한데 OOM이 발생할 수 있는가? · Q3. Young GC 뒤 사용량이 다시 높은 값으로 올라오면 무엇을 의심하는가? · Q4. G1의 mixed GC는 Full GC와 어떻게 다른가?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-jvms의-method-area와-hotspot-metaspace는-같은-개념인가"><a class="anchor" href="#q1-jvms의-method-area와-hotspot-metaspace는-같은-개념인가" aria-hidden="true">#</a>Q1. JVMS의 method area와 HotSpot Metaspace는 같은 개념인가?</h3>
 <p><strong>답:</strong> 아니다. method area는 클래스 구조와 런타임 상수 풀을 위한 추상 영역이다. Metaspace는 HotSpot의 native 클래스 메타데이터 구현이다. 명세는 물리 배치나 GC 방식을 강제하지 않는다.[1][2]</p>
 <p><strong>꼬리질문:</strong> <code>static</code> 필드는 모두 Metaspace에 있는가? <strong>답:</strong> 아니다. static 변수와 interned String은 heap으로, 클래스 메타데이터는 native로 이동했다.[2]</p>
@@ -312,7 +312,7 @@ direct: direct=true capacity=16</code></pre>
 <h3 id="q8--xloggc와--xloggc-중-무엇으로-시작하는가"><a class="anchor" href="#q8--xloggc와--xloggc-중-무엇으로-시작하는가" aria-hidden="true">#</a>Q8. <code>-Xlog:gc</code>와 <code>-Xlog:gc*</code> 중 무엇으로 시작하는가?</h3>
 <p><strong>답:</strong> <code>-Xlog:gc</code>로 이벤트와 pause를 보고 필요할 때 <code>gc*</code>로 넓힌다. 파일 회전과 보존량을 설정한다. JDK 9 이후 unified logging 문법은 <code>-Xlog</code>다.[11][12]</p>
 <p><strong>꼬리질문:</strong> <code>Allocation Failure</code>는 Java <code>OutOfMemoryError</code>인가? <strong>답:</strong> 아니다. 수집을 시작한 원인이고 회수 후 정상 실행할 수 있다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li>Java Virtual Machine Specification, Chapter 2 — <a href="https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-2.html" target="_blank" rel="noopener">https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-2.html</a> — 런타임 데이터 영역과 객체 표현은 명세상 추상 계약이며 물리 배치는 구현 세부사항이다.</li>
 <li>JEP 122: Remove the Permanent Generation — <a href="https://openjdk.org/jeps/122" target="_blank" rel="noopener">https://openjdk.org/jeps/122</a> — HotSpot PermGen 제거와 클래스 메타데이터/native 메모리 이동을 설명한다.</li>
@@ -328,7 +328,24 @@ direct: direct=true capacity=16</code></pre>
 <li>JEP 271: Unified GC Logging — <a href="https://openjdk.org/jeps/271" target="_blank" rel="noopener">https://openjdk.org/jeps/271</a> — GC 로그를 unified logging에 통합하고 <code>-Xlog:gc</code>의 역할을 설명한다.</li>
 <li><code>OutOfMemoryError</code> API (Java SE 25) — <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/OutOfMemoryError.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/OutOfMemoryError.html</a> — JVM이 객체 할당에 실패하고 GC로도 공간을 만들 수 없을 때의 오류 계약을 정의한다.</li>
 </ol>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S21. Spring Boot 3→4·Framework 7 변화와 마이그레이션</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,11 +18,11 @@
 가장 안전한 순서는 3.5 최신화 → deprecated 제거 → 의존성·Java·서버 기준선 점검 → properties migrator/OpenRewrite 적용 → 테스트와 운영 검증이다.
 기준일(2026-09-28)의 기본 추천은 Java 25 + Spring Boot 4.1.1이며, 애플리케이션의 Java 최소 버전은 여전히 17이다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>Boot 3 애플리케이션을 <code>4.1.1</code>로 바꾸고 배포했는데 기동 직후 <code>ClassNotFoundException: javax...</code>가 나거나, Undertow starter가 해석되지 않거나, JSON 직렬화 커스텀 모듈이 컴파일되지 않는 상황이 실제 마이그레이션의 첫 장애다. Boot 4는 Spring Framework 7과 Jakarta EE 11을 기준으로 하므로 <code>javax.*</code> 잔재, Servlet 6.1 미지원 서버, Boot가 관리하지 않는 Spring Cloud·Hibernate 버전이 한꺼번에 드러난다.</p>
 <p>더 위험한 문제는 컴파일되지 않는 변화보다 조용한 의미 변화다. <code>spring-boot-properties-migrator</code>가 옛 프로퍼티를 임시로 읽어 주면 개발 환경은 정상처럼 보이지만, 제거한 운영 이미지에서 설정이 사라질 수 있다. Framework 7의 <code>HttpHeaders</code>는 <code>MultiValueMap</code> 계약을 상속하지 않으며, 7.0.8부터 SpEL 평가 연산 상한은 기본 10,000회다.</p>
 <p>면접에서 “Boot 4는 Java 25가 필수”라고 답하면 틀리다. 최소 기준선은 17이고 Java 25는 권장 실행 환경이다. GraalVM native-image는 25 이상, Kotlin은 2.2 이상으로 올라간다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong><small>헷갈리는 변화의 비교</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -126,7 +126,7 @@
 <td>테스트 context 조작 방식이 바뀐다</td>
 </tr>
 </tbody></table></div>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>3.1 업그레이드는 하나의 dependency graph 재해결이다 · 3.2 JSpecify null-safety는 runtime 검사가 아니라 계약의 이동이다 · 3.3 HttpHeaders와 HTTP interface의 설계 차이 · 3.4 API Versioning의 분리된 책임</small></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="31-업그레이드는-하나의-dependency-graph-재해결이다"><a class="anchor" href="#31-업그레이드는-하나의-dependency-graph-재해결이다" aria-hidden="true">#</a>3.1 업그레이드는 하나의 dependency graph 재해결이다</h3>
 <p>Boot starter는 단순한 편의 dependency가 아니라 관리되는 버전 집합의 진입점이다. 4.0은 큰 jar 몇 개 대신 더 작은 focused module을 제공하고 starter 구성을 정리했다.</p>
 <p>따라서 직접 <code>spring-boot-autoconfigure</code>나 제3자 라이브러리만 추가하던 애플리케이션은 “예전에는 전이 의존성으로 우연히 되던 기능”을 잃는다. 직접 관리하는 프로젝트라면 <code>spring-framework 7.x</code>, Servlet 6.1, JPA 3.2, Hibernate ORM 7.1/7.2, Validation 3.1, Netty 4.2, JUnit 6 호환성을 함께 맞춘다.</p>
@@ -151,7 +151,7 @@
 <h3 id="34-api-versioning의-분리된-책임"><a class="anchor" href="#34-api-versioning의-분리된-책임" aria-hidden="true">#</a>3.4 API Versioning의 분리된 책임</h3>
 <p>요청에 버전을 전달하는 위치는 header, query parameter, media type, URL 등 여러 가지다. Framework의 API Versioning은 “어느 위치에서 읽을지”와 “문자열을 어떤 버전으로 해석할지”를 <code>ApiVersionResolver</code>, <code>ApiVersionParser</code>, <code>ApiVersionDeprecationHandler</code>로 나눈다. Boot 4는 MVC와 WebFlux에 각각 <code>spring.mvc.apiversion.*</code>, <code>spring.webflux.apiversion.*</code> 설정과 auto-configuration을 제공한다.</p>
 <p>controller가 <code>if (version == ...)</code>로 프로토콜 parsing까지 떠안지 않는 것이 핵심이다. resolver는 후보를 찾고 parser는 정규화하며 deprecation handler는 sunset 경고·거부 정책을 담당한다. 버전 전략을 정한 뒤 두 stack을 별도로 검증한다.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1 — properties migrator를 진단 단계에만 추가 · 예제 2 — HTTP Service Client · 예제 3 — API Versioning 설정의 출발점 · 예제 4 — 순수 Java로 property rename을 검증</small></span><span class="knowledge-chapter-meta">5개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="예제-1--properties-migrator를-진단-단계에만-추가"><a class="anchor" href="#예제-1--properties-migrator를-진단-단계에만-추가" aria-hidden="true">#</a>예제 1 — properties migrator를 진단 단계에만 추가</h3>
 <p>Maven 기준이다. Boot 4.0 migration guide가 안내하는 모듈은 runtime classpath에만 넣는다. 기동 로그의 renamed/removed 진단을 기록한 뒤 실제 <code>application.yml</code>을 고치고 dependency를 제거한다.</p>
 <pre><code class="language-xml">&lt;dependency&gt;
@@ -205,7 +205,7 @@ public class MigrationPropertiesDemo {
 <pre><code class="language-text">management.health.mongodb.enabled=true
 server.port=8080</code></pre>
 <p>운영에서는 Boot configuration changelog와 OpenRewrite recipe를 기준으로 삼고, 치환 뒤 옛 key가 남지 않았는지 테스트한다.</p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -241,7 +241,7 @@ server.port=8080</code></pre>
 </tr>
 </tbody></table></div>
 <p>지원 기간은 OSS 기준으로 Boot 4.0 EOL 2026-12-31, 4.1·Framework 7.0 EOL 2027-07-31이다. <code>extendedSupport</code>는 상용 지원 계약과 혼동하지 않는다. Java LTS 로드맵은 <a class="docref" href="J17-versions-roadmap.html">J17</a>을 참조한다.</p>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>상황이 3.0~3.4라면</strong> 먼저 최신 3.5.x로 올려라. Boot 4 공식 가이드가 3.5를 중간 기준선으로 삼기 때문에 dependency 차이와 제거 예정 API를 한 단계씩 줄일 수 있다.</li>
 <li><strong>상황이 팀의 표준 JDK를 결정하는 단계라면</strong> Java 25를 기본값으로 추천한다. Boot/Framework 최소선은 17이지만 최신 LTS의 장기 패치·도구 호환성을 활용하고, 라이브러리 지원 범위를 CI에서 검증한다.</li>
@@ -253,7 +253,7 @@ server.port=8080</code></pre>
 <li><strong>상황이 API versioning을 도입한다면</strong> header/query/media type 중 하나를 정하고 resolver/parser/deprecation 정책을 먼저 고정하라. controller 안에서 문자열을 직접 분기하면 WebMVC/WebFlux·문서·폐기 응답이 다시 갈라진다.</li>
 <li><strong>상황이 native-image라면</strong> GraalVM 25 이상과 exact reachability metadata를 별도 pipeline에서 검증하라. JVM 테스트 통과만으로 reflection/resource 문제를 증명할 수 없다.</li>
 </ul>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>기동은 되지만 운영에서 설정이 사라진다 →</strong> migrator가 옛 property를 임시 변환 중이다 → <strong>대처:</strong> 로그의 모든 rename을 실제 YAML로 반영하고 migrator dependency를 제거한 이미지로 재기동한다.</li>
 <li><strong><code>javax.annotation.*</code> 또는 <code>javax.inject.*</code>에서 컴파일 실패 →</strong> Framework 7이 해당 패키지를 지원하지 않는다 → <strong>대처:</strong> <code>jakarta.annotation.*</code>, <code>jakarta.inject.*</code>로 import와 직접 dependency를 함께 교체하고 생성된 소스·테스트도 검색한다.</li>
@@ -263,7 +263,7 @@ server.port=8080</code></pre>
 <li><strong>4.0에서 경고만 보던 코드가 4.1에서 갑자기 실패한다 →</strong> Boot 4.0 deprecated가 4.1에서 제거됐다 → <strong>대처:</strong> <code>-Xlint</code>만 믿지 말고 Boot 3.5/4.0의 deprecation 로그와 migration guide를 릴리스마다 소거한다.</li>
 <li><strong><code>-DskipTests</code>인데 AOT 테스트 처리가 실행된다 →</strong> Boot 4.1 Maven plugin은 AOT skip에 <code>maven.test.skip</code>을 사용하도록 바뀌었다 → <strong>대처:</strong> CI profile의 skip 목적을 분리하고 AOT를 끄는 이유를 명시한다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. Boot 4에서 Java 25가 필수인가? · Q2. Boot 3.5를 거쳐야 하는 이유는? · Q3. properties migrator를 계속 운영 dependency로 두면 어떤가? · Q4. Framework 7의 JSpecify는 @NonNull과 같은가?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-boot-4에서-java-25가-필수인가"><a class="anchor" href="#q1-boot-4에서-java-25가-필수인가" aria-hidden="true">#</a>Q1. Boot 4에서 Java 25가 필수인가?</h3>
 <p>아니다. Boot 4.0과 Framework 7은 JDK 17 baseline을 유지한다. Java 25는 기준일 현재 최신 LTS이므로 권장 실행 환경이고, GraalVM native-image는 별도로 25 이상 요구된다.</p>
 <p>꼬리질문: 그렇다면 Java 17을 계속 써도 되는가? → 지원 범위 안에서는 가능하지만, Kotlin 2.2·jOOQ 3.20 등 하위 프로젝트가 더 높은 Java를 요구할 수 있어 전체 graph를 확인해야 한다.</p>
@@ -288,7 +288,7 @@ server.port=8080</code></pre>
 <h3 id="q8-40-deprecated는-언제-고쳐야-하는가"><a class="anchor" href="#q8-40-deprecated는-언제-고쳐야-하는가" aria-hidden="true">#</a>Q8. 4.0 deprecated는 언제 고쳐야 하는가?</h3>
 <p>즉시 고친다. Boot 4.1 release notes는 4.0 deprecated 클래스·메서드·프로퍼티가 제거됐다고 명시한다. 소거하지 않으면 다음 minor가 다시 마이그레이션이 된다.</p>
 <p>꼬리질문: 컴파일이 되면 deprecated가 없는 것인가? → 아니다. property와 reflection 호출은 startup diagnostics와 문자열 검색도 사용한다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Spring Boot 4.0 Release Notes — <a href="https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Release-Notes" target="_blank" rel="noopener">https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Release-Notes</a> — HTTP Service Client, API Versioning, 모듈·starter 등 4.0 변화.</li>
 <li>Spring Boot 4.0 Migration Guide — <a href="https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Migration-Guide" target="_blank" rel="noopener">https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Migration-Guide</a> — 3.5 선행, Java/Jakarta 기준, properties migrator와 제거 기능.</li>
@@ -301,7 +301,24 @@ server.port=8080</code></pre>
 <li>Spring Boot lifecycle data — <a href="https://endoflife.date/api/spring-boot.json" target="_blank" rel="noopener">https://endoflife.date/api/spring-boot.json</a> — Boot 4.0/4.1 OSS EOL·최신 릴리스·extended support 구분.</li>
 <li>Spring Framework lifecycle data — <a href="https://endoflife.date/api/spring-framework.json" target="_blank" rel="noopener">https://endoflife.date/api/spring-framework.json</a> — Framework 7.0 OSS EOL·지원 Java/Jakarta 범위.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 <script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';

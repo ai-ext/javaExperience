@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S07. WebFlux·리액티브와 Virtual Threads 선택</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,11 +18,11 @@
 Virtual Threads(VT)는 블로킹 방식의 코드를 유지하면서 대기 중인 작업의 스레드 비용을 낮춘다.
 일반 CRUD의 기본 선택은 Spring MVC + VT이며, 리액티브 입출력·스트리밍이 실제 요구일 때 WebFlux를 고른다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>WebFlux 컨트롤러에서 <code>JdbcTemplate</code>이나 <code>Thread.sleep()</code>을 호출하면, Netty 이벤트 루프가 반환할 때까지 다른 연결의 I/O 처리도 밀린다. MVC보다 적은 이벤트 루프 스레드에 여러 연결을 맡기는 구조라 막힌 루프 하나의 피해 반경이 크다. 지연과 대기열이 커지고 재시도가 겹치면 DB 부하까지 높아진다.</p>
 <p>JDBC/JPA 중심 MVC에서 <code>spring.threads.virtual.enabled=true</code>만 켜도 모든 동시성 한계가 없어지지 않는다. Boot의 <code>AsyncTaskExecutor</code>·스케줄러와 서블릿 컨테이너의 HTTP executor는 다른 구성 지점이다. 속성이 바꿀 대상을 오해하면 <code>@Async</code>만 달라지고 요청 스레드는 그대로일 수 있다. DB 풀·외부 API 제한·CPU도 여전히 병목이다.</p>
 <p>선택을 틀리면 코드만 복잡해지는 게 아니다. “리액티브니까 빨라졌다”는 가정으로 JDBC를 이벤트 루프에서 호출하거나, VT를 켜고 무제한 동시 DB 쿼리를 던져 커넥션 풀을 고갈시킬 수 있다. 프레임워크 모델, 라이브러리의 I/O 방식, 병목 자원 세 가지를 함께 봐야 한다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong><small>MVC + VT와 WebFlux 비교</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -113,7 +113,7 @@ Virtual Threads(VT)는 블로킹 방식의 코드를 유지하면서 대기 중�
 </tr>
 </tbody></table></div>
 <p>Spring MVC와 WebFlux 모듈은 함께 존재한다. MVC 앱에서 <code>WebClient</code>를 쓰는 것만으로 애플리케이션 전체를 WebFlux로 바꿀 이유는 없다. 반대로 WebFlux 서버를 골랐다고 데이터 접근 계층이 자동으로 논블로킹이 되는 것도 아니다. [1][3]</p>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>3.1 MVC + VT 요청 경로 · 3.2 WebFlux 요청과 Reactive Streams 수요 · 3.3 이벤트 루프에서 블로킹하면 생기는 일 · 3.4 Reactor scheduler로 레거시 블로킹 호출 격리</small></span><span class="knowledge-chapter-meta">4개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="31-mvc--vt-요청-경로"><a class="anchor" href="#31-mvc--vt-요청-경로" aria-hidden="true">#</a>3.1 MVC + VT 요청 경로</h3>
 <pre><code class="language-text">HTTP 연결
   → Tomcat connector의 요청 executor
@@ -144,7 +144,7 @@ Virtual Threads(VT)는 블로킹 방식의 코드를 유지하면서 대기 중�
        &lt;──────── 결과 신호 ────────────────────────────────┘</code></pre>
 <p><code>Mono.fromCallable(blockingCall).subscribeOn(Schedulers.boundedElastic())</code>로 블로킹 source를 감싸 별도 scheduler에서 실행한다. <code>subscribeOn</code>은 source 실행에, <code>publishOn</code>은 연산자 뒤의 신호 처리에 영향을 준다. <code>publishOn</code>을 뒤에 추가한다고 먼저 실행한 blocking 호출이 옮겨지지는 않는다. [4]</p>
 <p><code>boundedElastic</code>은 불가피한 동기 I/O를 격리하는 장치이지 무한 용량의 풀이 아니다. 대기열·동시 실행·timeout을 제한한다. 호출량이 크면 MVC + VT 또는 리액티브 드라이버를 포함한 경로를 검토한다.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1: Boot 자동 구성에 Virtual Threads 사용 요청 · 예제 2: WebFlux에서 논블로킹 WebClient 결과 반환 · 예제 3: 불가피한 JDBC 호출을 격리</small></span><span class="knowledge-chapter-meta">3개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>다음 예제는 Spring Boot 4.1 / Spring Framework 7 기준이다. 실행 환경에는 <code>spring-boot-starter-web</code> 또는 <code>spring-boot-starter-webflux</code> 등 각 예제에 필요한 의존성이 있어야 한다. 모두 Spring 예제이며 여기서는 실행하지 않았다. <strong>(미실행)</strong></p>
 <h3 id="예제-1-boot-자동-구성에-virtual-threads-사용-요청"><a class="anchor" href="#예제-1-boot-자동-구성에-virtual-threads-사용-요청" aria-hidden="true">#</a>예제 1: Boot 자동 구성에 Virtual Threads 사용 요청</h3>
 <pre><code class="language-yaml"># application.yml
@@ -205,14 +205,14 @@ final class LegacyCatalogService {
     record Item(long id, String name) {}
 }</code></pre>
 <p><code>fromCallable</code>이 JDBC를 감싸고 <code>subscribeOn</code>이 별도 scheduler에서 실행한다. 메서드 안에서 <code>subscribe()</code>하지 않는다. JDBC 드라이버·DataSource와 <code>catalog</code> 테이블이 필요하고, 조회 결과가 없을 때의 예외도 처리해야 한다. JDBC 자체는 여전히 동기식이며 DB 연결 풀과 조회 동시 수가 한도를 정한다. <strong>(미실행)</strong></p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>Spring Framework 5.0 — WebFlux 추가.</strong> 기존 Spring MVC는 Servlet API와 Servlet 컨테이너를 중심으로 만들어져 논블로킹 서버 I/O와 Reactive Streams backpressure를 기반으로 하는 별도 웹 스택이 필요했다. WebFlux는 이후 MVC와 나란히 배포되며 Reactor Netty 및 Servlet 계열 서버를 지원한다. [1]</li>
 <li><strong>JDK 19 → 20 — Virtual Threads 프리뷰(JEP 425, 436). JDK 21 — 정식화(JEP 444).</strong> 대기 시간이 긴 서버에서 스레드당 자원 비용 때문에 thread-per-request 방식의 동시성이 제한되는 문제가, 기존 <code>Thread</code> 코드를 최대한 유지하는 경량 스레드 기능을 낳았다. Java 21에서 정식화됐고, VT의 JVM 내부 동작은 → <a class="docref" href="J12-virtual-threads.html">J12</a> 참조. [6]</li>
 <li><strong>Spring Framework 6.1 — <code>SimpleAsyncTaskScheduler</code> 추가.</strong> 기존의 풀 재사용 모델과 다른 VT의 thread-per-task 실행을 예약 작업에 연결하되, 하나의 scheduler thread가 예약 시점을 관리하고 실행마다 새 스레드를 시작한다. fixed-delay 작업은 scheduler thread 하나에서 실행되므로 VT 친화 설정에서 fixed-rate나 cron 방식이 권장된다. [5]</li>
 <li><strong>Spring Boot 4.1.1 / Framework 7.0.9 — 현재 문서 기준.</strong> Java 21 이상에서 <code>spring.threads.virtual.enabled</code>를 켜면 Boot가 관리하는 task execution·scheduling 자동 구성이 가상 스레드용 구현을 선택한다. 사용자 정의 실행기와 서블릿 컨테이너 설정까지 무조건 바꾸지는 않으므로 적용 지점을 확인해야 한다. [2][5]</li>
 </ul>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p><strong>기본 추천: 일반적인 CRUD는 Spring MVC + Virtual Threads부터 검토한다.</strong> Java 25·Boot 4.1.1에서 JDBC/JPA와 동기 라이브러리를 유지하며 블로킹 대기 비용을 줄이기 쉽다. 실제 요청 executor 적용 여부와 DB 동시성을 확인한다.</p>
 <ul>
 <li>if JDBC/JPA·동기 SDK가 중심이면 then MVC + VT를 검토한다. 리액티브 wrapper가 블로킹 라이브러리를 논블로킹으로 바꾸지는 않는다.</li>
@@ -223,7 +223,7 @@ final class LegacyCatalogService {
 <li>if Tomcat 요청 thread를 VT로 바꾸려면 then task executor와 별도로 connector executor를 구성한다.</li>
 <li>if CPU나 DB가 병목이면 then VT/WebFlux 선택과 별개로 CPU 병렬성·DB 풀·벌크헤드·timeout을 조정한다. 성능 비교는 같은 부하와 자원 조건에서 측정한다.</li>
 </ul>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>증상:</strong> WebFlux 요청이 몰릴 때 unrelated API까지 타임아웃된다. → <strong>원인:</strong> 이벤트 루프에서 JDBC·동기 HTTP·<code>Thread.sleep()</code>을 실행했다. → <strong>대처:</strong> 논블로킹 client/driver로 교체하거나 소스 호출 자체를 <code>boundedElastic</code> 등 명시된 executor로 격리하고, timeout·동시성 한도를 둔다.</li>
 <li><strong>증상:</strong> 리액티브 controller에서 값이 바로 필요하다며 <code>.block()</code>을 호출한다. → <strong>원인:</strong> 비동기 결과를 다시 요청 스레드에서 기다리며 이벤트 루프를 막는다. → <strong>대처:</strong> <code>Mono</code>/<code>Flux</code>를 반환하고 <code>map</code>, <code>flatMap</code>으로 조합한다. imperative 경계가 필요하다면 그 경계와 executor를 분명히 분리한다.</li>
@@ -234,7 +234,7 @@ final class LegacyCatalogService {
 <li><strong>증상:</strong> <code>@Async</code> 호출을 했는데 동기 실행되거나 실행기가 달라진다. → <strong>원인:</strong> auto-config back-off 조건, 잘못된 빈 이름/형식, <code>AsyncConfigurer</code>, 프록시를 거치지 않는 자기 호출을 놓쳤다. → <strong>대처:</strong> 현재 선택된 executor bean과 프록시 경계를 확인하고, Boot가 기대하는 <code>applicationTaskExecutor</code> 등 명명 규칙을 따른다.</li>
 <li><strong>증상:</strong> 리액티브 API 내부에서 응답이 없어지거나 취소 후 작업이 계속 돈다. → <strong>원인:</strong> 직접 <code>subscribe()</code>해 WebFlux가 체인을 관리하지 못하거나 cancellation을 무시했다. → <strong>대처:</strong> 일반 controller와 service는 publisher를 반환하고, 애플리케이션이 구독 수명주기를 직접 소유해야 하는 제한된 경우에만 <code>subscribe()</code>한다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. Mono·Flux를 반환하면 요청이 별도 스레드로 자동 이동하나? · Q2. WebFlux에서 이벤트 루프 블로킹이 왜 MVC보다 크게 번지나? · Q3. backpressure가 DB 과부하를 자동으로 막나? · Q4. MVC + VT와 WebFlux 중 무엇이 더 빠른가?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-monoflux를-반환하면-요청이-별도-스레드로-자동-이동하나"><a class="anchor" href="#q1-monoflux를-반환하면-요청이-별도-스레드로-자동-이동하나" aria-hidden="true">#</a>Q1. <code>Mono</code>·<code>Flux</code>를 반환하면 요청이 별도 스레드로 자동 이동하나?</h3>
 <p>아니다. publisher 타입은 결과 신호 모델이지 스레드 지시자가 아니다. 동기 코드가 어느 스레드에서 실행되는지는 source와 operator의 scheduler, 구독 경로에 달려 있다. 그래서 <code>Mono.fromCallable(blocking).subscribeOn(...)</code>처럼 블로킹 source의 실행 문맥을 지정한다.</p>
 <p><strong>꼬리질문:</strong> 그럼 <code>WebClient</code>도 매 호출마다 새 스레드를 만드나? <strong>답:</strong> 아니다. Reactor Netty 같은 클라이언트는 논블로킹 I/O와 이벤트 기반 처리를 이용한다. API 타입이 <code>Mono</code>인 것만으로 호출 구현이 논블로킹인지 판단하지 말고 실제 connector/driver를 본다.</p>
@@ -256,7 +256,7 @@ final class LegacyCatalogService {
 <h3 id="q7-webflux--boundedelastic이면-jdbc도-리액티브해지나"><a class="anchor" href="#q7-webflux--boundedelastic이면-jdbc도-리액티브해지나" aria-hidden="true">#</a>Q7. WebFlux + <code>boundedElastic</code>이면 JDBC도 리액티브해지나?</h3>
 <p>아니다. 이는 블로킹 JDBC를 이벤트 루프에서 떼어 worker에서 실행하게 할 뿐 호출의 I/O 방식은 동기식이다. bounded scheduler 용량을 초과하면 큐잉과 지연이 생길 수 있다. 장기적으로는 DB 접근 방식과 서버 모델이 요구사항에 맞는지 검토한다.</p>
 <p><strong>꼬리질문:</strong> <code>subscribeOn</code>과 <code>publishOn</code> 차이는? <strong>답:</strong> <code>subscribeOn</code>은 source 구독과 실행 문맥을 지정하는 데 사용되며 위치 영향이 source 기준으로 작다. <code>publishOn</code>은 해당 위치 이후 downstream 신호 처리 문맥을 바꾼다. 블로킹 source를 옮기는 데는 source 자체를 감싼 뒤 <code>subscribeOn</code>을 두는 패턴이 명확하다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li>Spring WebFlux — <a href="https://docs.spring.io/spring-framework/reference/web/webflux.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/web/webflux.html</a> — WebFlux의 Reactive Streams backpressure, 논블로킹 특성, MVC와 공존하는 모듈 개요.</li>
 <li>Spring Boot Task Execution and Scheduling — <a href="https://docs.spring.io/spring-boot/reference/features/task-execution-and-scheduling.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/features/task-execution-and-scheduling.html</a> — <code>spring.threads.virtual.enabled</code>, auto-configured <code>AsyncTaskExecutor</code>의 조건과 사용 통합점.</li>
@@ -266,7 +266,24 @@ final class LegacyCatalogService {
 <li>JEP 444: Virtual Threads — <a href="https://openjdk.org/jeps/444" target="_blank" rel="noopener">https://openjdk.org/jeps/444</a> — VT 도입 목적과 JDK 19·20 preview, JDK 21 정식화 이력.</li>
 <li>Apache Tomcat 11 <code>VirtualThreadExecutor</code> API — <a href="https://tomcat.apache.org/tomcat-11.0-doc/api/org/apache/tomcat/util/threads/VirtualThreadExecutor.html" target="_blank" rel="noopener">https://tomcat.apache.org/tomcat-11.0-doc/api/org/apache/tomcat/util/threads/VirtualThreadExecutor.html</a> — 작업마다 새 virtual thread를 만드는 Tomcat executor API.</li>
 </ol>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 

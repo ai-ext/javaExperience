@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>W06. 디버깅은 왜 서버에선 브레이크포인트·로그로, 프론트에선 console.log로 하나</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,7 +18,7 @@
 그래서 로컬 개발은 브레이크포인트, 운영은 로그·메트릭·트레이스처럼 실행을 멈추지 않는 사후 관찰이 기본이다.
 프론트에서도 브레이크포인트를 쓰고 서버에서도 <code>println</code>을 쓰며, 선택 기준은 언어가 아니라 실행 위치·재현성·중단 영향·접근 권한이다.</p>
 </blockquote>
-<h2 id="1-질문"><a class="anchor" href="#1-질문" aria-hidden="true">#</a>1. 질문</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-질문" aria-label="1. 질문 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 질문</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>Spring으로 API를 만들고 브라우저에서 확인하던 신입 개발자에게 이런 장면이 생긴다.</p>
 <ol>
 <li>화면 이름이 이상해 프론트엔드는 Console에 값을 찍고, 백엔드는 IntelliJ에서 API 메서드에 중단점을 건다. 둘 다 값을 보는데 왜 도구가 다를까?</li>
@@ -26,7 +26,7 @@
 <li>서버 JVM은 개발자 노트북 밖 컨테이너에서 돈다. 내 브라우저처럼 화면에 DevTools를 열 수 없다면 어떻게 관찰할까?</li>
 </ol>
 <p>이 질문의 전제부터 바로잡자. 프론트엔드는 <code>console.log</code>만 쓰지 않는다. Chrome DevTools Sources에는 줄·조건·예외·이벤트 리스너 중단점과 Logpoint가 있다. 서버도 임시 <code>System.out.println</code>이나 <code>logger.debug</code>를 쓸 수 있다. 차이는 “프론트 언어 대 백엔드 언어”가 아니라 “어느 프로세스에서 누가 실행하고, 그 프로세스에 멈춤을 걸어도 되는가”다.</p>
-<h2 id="2-짧은-답"><a class="anchor" href="#2-짧은-답" aria-hidden="true">#</a>2. 짧은 답</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-짧은-답" aria-label="2. 짧은 답 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 짧은 답</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>브라우저 코드가 내 탭에서 잘못 동작하고 재현 가능하면 DevTools Sources의 중단점으로 멈춰 Scope와 Call stack을 본다. 작은 값 확인은 Console이나 Logpoint가 빠르다.</li>
 <li>서버 코드를 로컬에서 재현할 수 있으면 IntelliJ가 JVM을 Debug 모드로 실행하게 하고 서비스 메서드에 중단점을 건다. 호출 스택·지역 변수·스레드 상태를 한 시점에 볼 수 있다.</li>
@@ -36,7 +36,7 @@
 <li>간헐적 운영 문제는 APM/트레이스, 동적 로그, 스냅샷 디버깅으로 원인을 좁힌다. 제품 기능과 데이터 보존·민감정보 정책은 별도로 확인한다.</li>
 <li><strong>기본값 추천: 로컬은 중단점, 운영은 요청 상관관계를 갖춘 로그와 트레이스, 빠른 단일 값 확인은 임시 출력.</strong></li>
 </ul>
-<h2 id="3-왜-그런가--원리"><a class="anchor" href="#3-왜-그런가--원리" aria-hidden="true">#</a>3. 왜 그런가 — 원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-왜-그런가--원리" aria-label="3. 왜 그런가 — 원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 왜 그런가 — 원리</strong><small>코드가 실행되는 위치가 도구의 모양을 결정한다 · 중단점은 순간을 정지시켜 상태를 깊게 보는 도구다 · 로그와 텔레메트리는 실행을 계속하면서 사후에 조사한다 · JDWP는 JVM에 디버거를 연결하는 통로다</small></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="코드가-실행되는-위치가-도구의-모양을-결정한다"><a class="anchor" href="#코드가-실행되는-위치가-도구의-모양을-결정한다" aria-hidden="true">#</a>코드가 실행되는 위치가 도구의 모양을 결정한다</h3>
 <p>브라우저 프런트엔드의 JavaScript는 페이지가 열린 브라우저 탭의 렌더러 프로세스에서 실행된다. 개발자는 그 브라우저를 직접 보고 있고, 해당 탭에 DevTools를 열어 소스와 실행 상태를 연결할 수 있다. 버튼 클릭이나 네트워크 응답을 같은 탭에서 반복하며 버그를 재현한 뒤, 실행을 멈추거나 값을 찍어볼 수 있다. 한 탭의 메인 스레드가 중단되어 UI가 멈춰도 영향은 주로 그 탭 사용자에게 머문다.</p>
 <p>서버의 Java 코드는 JVM 프로세스에서 실행된다. JVM은 대개 개발자 노트북 밖에서 여러 요청을 처리하며, 브라우저 새로고침처럼 쉽게 초기화되지 않는다. 컨테이너의 표준 출력은 로그 수집기로 전달되기도 하므로, 서버 로그는 원격 환경의 수집 경로에서 찾는다.</p>
@@ -66,7 +66,7 @@
 <h3 id="사후-관찰은-문제-발생-전에-일부-문맥을-준비한다"><a class="anchor" href="#사후-관찰은-문제-발생-전에-일부-문맥을-준비한다" aria-hidden="true">#</a>사후 관찰은 문제 발생 전에 일부 문맥을 준비한다</h3>
 <p>사건 때 아무 신호도 기록하지 않았다면 로그·트레이스가 호출 스택과 지역 변수를 되살려주지는 않는다. 요청 ID로 로그를 연결하고 메트릭으로 오류율·지연 변화를 보며, APM 트레이스로 외부 호출을 추적한다. 비즈니스 조건과 변수값은 별도 계측이 필요하다.</p>
 <p>동적 로그·스냅샷 도구는 특정 지점과 조건에서 실행 문맥을 수집한다. Lightrun 예시는 조건·횟수 제한과 여러 실행 결과 비교를 제공한다. 정식 계측을 대체하지 않으며 수집 범위·접근권한·비용을 검토해야 한다.</p>
-<h2 id="4-선택지-비교"><a class="anchor" href="#4-선택지-비교" aria-hidden="true">#</a>4. 선택지 비교</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-선택지-비교" aria-label="4. 선택지 비교 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 선택지 비교</strong><small>고르는 순서</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -134,7 +134,7 @@
 <li>운영에서 이미 발생했고 재현이 어렵다면 기존 로그와 trace ID를 찾고, 오류율·지연 메트릭으로 영향 범위를 정한다. 기록이 비어 있을 때는 안전한 배포 로그나 승인된 동적 계측을 추가한다.</li>
 <li>원격 디버깅은 운영 인스턴스의 첫 선택지로 쓰지 않는다. 인스턴스 격리와 네트워크 제한으로 정지·접근 위험을 감당할 수 있는지 먼저 판단한다.</li>
 </ol>
-<h2 id="5-코드로-보기"><a class="anchor" href="#5-코드로-보기" aria-hidden="true">#</a>5. 코드로 보기</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-코드로-보기" aria-label="5. 코드로 보기 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 코드로 보기</strong><small>브라우저 탭에서 확인하기 · Spring Boot 서버에서 확인하기 · 같은 서버 위치를 출력으로 관찰하기 · 원격 JVM에 붙는 설정은 관측 설정과 다르다</small></span><span class="knowledge-chapter-meta">7개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>아래 예제는 브라우저와 서버에서 같은 합계 계산을 확인한다. 서버의 <code>int</code> 곱셈에 오버플로우를 남겨 계층별 값 비교를 보여준다. 금액 모델 설계 예제는 아니다. (Java 25 / Spring Boot 4.1 기준)</p>
 <h3 id="브라우저-탭에서-확인하기"><a class="anchor" href="#브라우저-탭에서-확인하기" aria-hidden="true">#</a>브라우저 탭에서 확인하기</h3>
 <pre><code class="language-html">&lt;label&gt;단가 &lt;input id=&quot;price&quot; type=&quot;number&quot; value=&quot;100000&quot;&gt;&lt;/label&gt;
@@ -231,7 +231,7 @@ public class QuoteService {
 <pre><code class="language-text">-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=127.0.0.1:5005</code></pre>
 <p><code>server=y</code>는 JVM이 연결을 기다리고 <code>suspend=n</code>은 연결 전에도 실행을 계속한다. 루프백 주소는 같은 호스트에서만 접근한다. 원격 실습은 포트 포워딩·터널로 제한하며, <code>*:5005</code>처럼 모든 인터페이스에 열지 않는다.</p>
 <p>운영에서 JDWP 대신 로컬 재현, 로그·트레이스, 승인된 스냅샷을 먼저 검토한다. 예외적으로 붙을 때는 트래픽을 분리하고 접근 경로와 작업 시간을 제한한다.</p>
-<h2 id="6-실무에서는-실제로"><a class="anchor" href="#6-실무에서는-실제로" aria-hidden="true">#</a>6. 실무에서는 실제로</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무에서는-실제로" aria-label="6. 실무에서는 실제로 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무에서는 실제로</strong><small>신규 서비스 · 레거시 서비스 · SI·금융·규제 환경 · 스타트업·작은 팀</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="신규-서비스"><a class="anchor" href="#신규-서비스" aria-hidden="true">#</a>신규 서비스</h3>
 <p>로컬은 IDE Debug, 운영은 구조화 로그와 오류율·지연 메트릭을 기본으로 둔다. 브라우저와 API를 함께 볼 때는 Network 응답부터 비교한다. 임시 출력은 문제 해결 뒤 제거한다.</p>
 <h3 id="레거시-서비스"><a class="anchor" href="#레거시-서비스" aria-hidden="true">#</a>레거시 서비스</h3>
@@ -252,7 +252,7 @@ public class QuoteService {
 <li>운영 JDWP는 기본 도구가 아니다. 영향 격리와 접근 통제를 증명할 수 있는 특수 조사에 한해 고려한다.</li>
 </ul>
 <p>관련 범위: 디버깅 방법론은 <a class="docref" href="D05-debugging-methodology.html">D05</a>, IntelliJ는 <a class="docref" href="P15-intellij-practical.html">P15</a>, 로거는 <a class="docref" href="W07-why-logger.html">W07</a>, 운영 관측성은 <a class="docref" href="D09-operations-observability.html">D09</a>를 참조한다.</p>
-<h2 id="7-흔한-오해와-실수"><a class="anchor" href="#7-흔한-오해와-실수" aria-hidden="true">#</a>7. 흔한 오해와 실수</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-흔한-오해와-실수" aria-label="7. 흔한 오해와 실수 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 흔한 오해와 실수</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><p><strong>오해: 프론트는 Console, 서버는 브레이크포인트를 쓴다.</strong> 증상 → 프론트 코드를 찍어보다가 재현 경로를 놓치거나, 서버 로그가 쌓여도 값을 읽기 어렵다. 실제 → 양쪽 모두 중단점과 출력이 있고 실행 위치·접근성에 따라 유리한 방식이 달라진다. 대처 → Network와 실제 응답을 기준으로 오류가 생기는 계층을 가른 다음 도구를 고른다.</p>
 </li>
@@ -267,7 +267,7 @@ public class QuoteService {
 <li><p><strong>오해: APM을 설치하면 지역 변수까지 자동으로 보인다.</strong> 증상 → 대시보드에서 요청 지연은 보이지만 특정 조건의 잘못된 값은 찾지 못한다. 실제 → 자동 계측은 보통 프레임워크 경계·HTTP·DB 호출처럼 정해진 정보를 수집한다. 대처 → 비즈니스 단계와 결과를 필요한 수준으로 계측하고, 조건 값이 필요하면 로컬 중단점이나 승인된 스냅샷 관찰을 추가한다.</p>
 </li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. 브라우저에도 브레이크포인트가 있는데 왜 console.log가 자주 보이나? · Q2. 로컬 Spring 서버에서 장애가 재현되면 왜 로그보다 중단점이 빠를 수 있나? · Q3. 운영 JVM에 JDWP를 열어 두면 어떤 위험이 있나? · Q4. 운영에서 로그와 트레이스는 각각 어떤 질문에 답하나?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-브라우저에도-브레이크포인트가-있는데-왜-consolelog가-자주-보이나"><a class="anchor" href="#q1-브라우저에도-브레이크포인트가-있는데-왜-consolelog가-자주-보이나" aria-hidden="true">#</a>Q1. 브라우저에도 브레이크포인트가 있는데 왜 <code>console.log</code>가 자주 보이나?</h3>
 <p>브라우저 코드가 개발자에게 가까워 버튼을 누르고 Console을 보는 과정이 빠르다. 한 값이나 이벤트 순서만 확인할 때는 출력이 간단하다. 조건 분기와 호출 경로, 예상 밖 변수까지 살펴야 하면 Sources 중단점이나 조건부 중단점이 더 적합하다.</p>
 <p><strong>꼬리질문: Chrome Logpoint는 일반 <code>console.log</code>와 어떻게 다른가?</strong></p>
@@ -292,7 +292,7 @@ public class QuoteService {
 <p>서버 런타임이 stdout을 수집할 수는 있지만 <code>println</code> 자체는 레벨, 구조화 필드, 요청 상관관계, 마스킹 규칙을 제공하지 않는다. 동시 요청과 여러 인스턴스가 있으면 어느 실행의 출력인지 찾기 어려워진다. 한 번 확인하는 임시 용도와 지속적인 운영 기록을 구분한다.</p>
 <p><strong>꼬리질문: 임시 <code>println</code>이 급한 장애를 해결했다면 바로 지워야 하나?</strong></p>
 <p>그 값이 반복해서 필요한 운영 문맥인지 판단한다. 필요하다면 안전한 필드와 적절한 레벨을 가진 로그로 정식화하고, 일회성 출력이라면 제거한다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Debug JavaScript — <a href="https://developer.chrome.com/docs/devtools/javascript" target="_blank" rel="noopener">https://developer.chrome.com/docs/devtools/javascript</a> — Console 출력과 Sources 패널, 브레이크포인트를 이용한 브라우저 디버깅 흐름을 확인했다.</li>
 <li>Pause your code with breakpoints — <a href="https://developer.chrome.com/docs/devtools/javascript/breakpoints" target="_blank" rel="noopener">https://developer.chrome.com/docs/devtools/javascript/breakpoints</a> — 줄·조건부 중단점, Logpoint 등 DevTools 중단점 유형과 사용 목적을 확인했다.</li>
@@ -303,7 +303,24 @@ public class QuoteService {
 <li>Observability primer — <a href="https://opentelemetry.io/docs/concepts/observability-primer/" target="_blank" rel="noopener">https://opentelemetry.io/docs/concepts/observability-primer/</a> — 로그·메트릭·트레이스의 역할과 분산 요청 추적의 목적을 확인했다.</li>
 <li>Production Code Snapshots — <a href="https://lightrun.com/platform/telemetry/snapshots/" target="_blank" rel="noopener">https://lightrun.com/platform/telemetry/snapshots/</a> — 제품 예시로 조건·횟수 제한 및 실행별 스냅샷 비교 방식을 확인했다.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 <script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';

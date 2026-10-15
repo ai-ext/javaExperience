@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S09. JPA·Hibernate</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,13 +18,13 @@
 영속성 컨텍스트는 트랜잭션 범위에서 동일성·변경 감지·쓰기 지연을 제공하지만, 쿼리 수와 잠금까지 자동으로 최적화해 주지는 않는다.
 기본 추천은 짧은 <code>@Transactional</code> 서비스, LAZY 연관관계, 요청별 fetch 계획, <code>@Version</code> 낙관적 락이며 OSIV는 끈다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>운영에서 흔한 장애는 <code>findAll()</code> 한 번이 아니라 그 다음 줄에서 시작한다. 주문 100건을 읽고 각 주문의 고객·항목을 순회했더니 SQL이 1+100+100번 나가 커넥션 풀이 잠기는 것이 N+1이다. 반대로 모든 연관관계를 EAGER로 바꾸면 목록 화면에서 필요 없는 테이블까지 한꺼번에 조인해 결과 행이 폭증한다.</p>
 <p><code>@Transactional</code>이 끝난 뒤 LAZY 필드를 응답 DTO 변환 중 읽으면 <code>LazyInitializationException</code>이 난다. OSIV가 이를 가려 주면 HTTP 응답을 만드는 동안 DB를 다시 조회해 응답 지연이 커지고, 이미 끝난 업무 트랜잭션 뒤에 데이터가 추가 로딩되는 혼란이 생긴다.</p>
 <p>또 다른 실수는 <code>entity.setStatus(...)</code> 뒤에 <code>save()</code>를 매번 호출해야 저장된다고 생각하는 것이다. 관리 상태 엔티티는 변경 감지 대상이므로 트랜잭션 커밋 시 반영된다. 반대로 <code>flush()</code>가 커밋이라고 착각하면 아직 롤백 가능한 SQL 전송 시점과 실제 트랜잭션 확정 시점을 혼동한다.</p>
 <p>양방향 연관관계에서 반대편 컬렉션만 고치면 DB FK가 바뀌지 않는다. 두 사용자가 같은 재고를 수정할 때 버전 칼럼이 없으면 마지막 커밋이 앞선 수정을 조용히 덮어쓸 수 있다.</p>
 <p>이 문서는 엔티티 수명주기와 Hibernate 동작을 실무 관점에서 다룬다. Spring Data 리포지토리와 쿼리 도구 비교는 → <a class="docref" href="S10-spring-data-query.html">S10</a> 참조. 트랜잭션 프록시·전파 속성은 → <a class="docref" href="S08-transactions.html">S08</a> 참조.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong><small>엔티티 상태 · 헷갈리는 매핑 옵션</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -141,7 +141,7 @@
 </tr>
 </tbody></table></div>
 <p>JPA는 <code>@ManyToOne</code>과 <code>@OneToOne</code> 기본 fetch를 EAGER로, 컬렉션 관계를 LAZY로 정의한다. 기본값에 의존하지 말고 단일값 연관관계도 <code>fetch = LAZY</code>를 명시해 조회 범위를 호출부에서 통제한다. Hibernate의 LAZY 구현은 프록시나 바이트코드 향상에 의존한다. 엔티티 클래스나 메서드를 <code>final</code>로 만들거나 생성자를 막으면 프록시 생성이 제한될 수 있다.</p>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>조회부터 변경 저장까지 · 관계형 매핑과 주인 · LAZY와 N+1 · OSIV와 경계</small></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="조회부터-변경-저장까지"><a class="anchor" href="#조회부터-변경-저장까지" aria-hidden="true">#</a>조회부터 변경 저장까지</h3>
 <pre><code class="language-text">EntityManager.find(Order, id)
         │
@@ -170,7 +170,7 @@
 </ul>
 <h3 id="osiv와-경계"><a class="anchor" href="#osiv와-경계" aria-hidden="true">#</a>OSIV와 경계</h3>
 <p>Boot 웹 애플리케이션은 <code>spring.jpa.open-in-view=true</code>가 기본이다. 요청 동안 바인딩한 <code>EntityManager</code>로 직렬화 중 LAZY 로딩을 허용하지만 추가 SQL과 커넥션 점유를 감춘다. 서비스 트랜잭션에서 데이터를 완성하고 DTO로 바꾸도록 <code>false</code>를 기본 추천한다.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1: 소유자와 양방향 관계 일관성 · 예제 2: 영속 상태 변경과 flush · 예제 3: 유스케이스에 맞춘 fetch join</small></span><span class="knowledge-chapter-meta">4개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>아래 예제는 Java 25 문법을 쓰지 않으며 Boot 4.1.1의 Jakarta Persistence 3.2 / Hibernate 7.4 계열 API 기준이다. 데이터베이스·부트스트랩 설정을 포함한 애플리케이션 전체는 아니고 각 파일은 의존성 주입되는 Spring 빈 또는 엔티티다. <strong>예제 1~3: (미실행).</strong></p>
 <h3 id="예제-1-소유자와-양방향-관계-일관성"><a class="anchor" href="#예제-1-소유자와-양방향-관계-일관성" aria-hidden="true">#</a>예제 1: 소유자와 양방향 관계 일관성</h3>
 <pre><code class="language-java">// PurchaseOrder.java
@@ -261,7 +261,7 @@ public class OrderReadService {
     }
 }</code></pre>
 <p>같은 호출에서 컬렉션 추가 조회가 나지 않는다. 컬렉션 fetch join으로 페이지 처리하지 말고 부모 ID를 먼저 페이지 조회하거나 batch fetch를 검토한다. JPA <code>EntityGraph</code> 또는 Spring Data <code>@EntityGraph(attributePaths = &quot;lines&quot;)</code>도 로딩 계획을 선언한다(→ <a class="docref" href="S10-spring-data-query.html">S10</a>).</p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -292,7 +292,7 @@ public class OrderReadService {
 </tr>
 </tbody></table></div>
 <p>주요 근거: <a href="https://docs.hibernate.org/orm/7.0/migration-guide/" target="_blank" rel="noopener">Hibernate 7.0 Migration Guide</a>, <a href="https://docs.hibernate.org/orm/7.4/introduction/html_single/" target="_blank" rel="noopener">Hibernate 7.4 Introduction</a>, <a href="https://docs.hibernate.org/orm/7.4/migration-guide/" target="_blank" rel="noopener">Hibernate 7.4 Migration Guide</a>, <a href="https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html" target="_blank" rel="noopener">Spring Boot Managed Dependency Coordinates</a>.</p>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>if</strong> 새 엔티티라면 <strong>then</strong> <code>persist()</code>한다. <strong>이유:</strong> 새 객체를 컨텍스트에 등록한다.</li>
 <li><strong>if</strong> 조회한 managed 엔티티를 수정한다면 <strong>then</strong> 필드를 바꾸고 트랜잭션을 짧게 끝낸다. <strong>이유:</strong> dirty checking이 반영하므로 재저장할 필요가 없다.</li>
@@ -305,7 +305,7 @@ public class OrderReadService {
 <li><strong>if</strong> 운영 스키마를 배포한다면 <strong>then</strong> ORM의 <code>ddl-auto=update</code> 대신 Flyway/Liquibase 등 마이그레이션을 쓴다. 내장 DB 등 환경에 따라 Boot 기본값이 달라질 수 있어 속성을 명시한다.</li>
 <li><strong>if</strong> Hibernate를 올린다면 <strong>then</strong> Boot BOM과 해당 ORM 버전 migration guide를 확인하고 생성 DDL·대표 SQL을 점검한다. 컴파일 성공만으로 DB 동작 호환성이 보장되지는 않는다.</li>
 </ul>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>N+1을 EAGER로 덮기</strong>: 목록이 느리고 조인 행이 급증함 → 모든 관계를 전역 로딩 계약으로 만들고 호출별 필요를 분리하지 않음 → 연관관계는 LAZY로 두고 SQL 로그·통계로 문제를 확인한 뒤 쿼리별 fetch 계획을 지정한다.</li>
 <li><strong><code>flush()</code>를 commit으로 취급</strong>: flush 후 예외가 나면 이미 저장됐다고 오해함 → flush는 현재 트랜잭션의 SQL 동기화일 뿐 확정이 아님 → 커밋·롤백은 트랜잭션 관리자가 결정하고 외부 메시지 발송은 커밋 이후 패턴으로 다룬다(→ <a class="docref" href="S08-transactions.html">S08</a>).</li>
@@ -317,7 +317,7 @@ public class OrderReadService {
 <li><strong>낙관적 충돌을 일반 서버 오류로 처리</strong>: 동시 수정 요청 중 한쪽이 500으로 끝나고 사용자가 최신 상태를 잃음 → <code>@Version</code> 충돌의 업무 의미를 정의하지 않음 → 충돌을 API의 재조회·재시도 또는 409 같은 명시적 응답으로 변환한다.</li>
 <li><strong>자동 DDL을 운영 스키마 마이그레이션에 사용</strong>: 로컬에서는 되지만 운영에서 칼럼 변경·데이터 변환을 재현하지 못함 → <code>ddl-auto=update</code>가 안전한 변경 계획이라고 오해 → 개발은 명시적 <code>create-drop</code> 등으로 제한하고 운영은 스키마 도구와 검토된 migration을 사용한다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. 영속성 컨텍스트의 1차 캐시가 애플리케이션 캐시와 다른 점은? · Q2. dirty checking은 언제 UPDATE를 내고, flush()는 무엇을 보장하지 않는가? · Q3. 양방향 일대다에서 어느 쪽이 FK를 바꾸나? · Q5. LAZY를 기본으로 두어도 N+1이 생기는 이유와 대응은?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-영속성-컨텍스트의-1차-캐시가-애플리케이션-캐시와-다른-점은"><a class="anchor" href="#q1-영속성-컨텍스트의-1차-캐시가-애플리케이션-캐시와-다른-점은" aria-hidden="true">#</a>Q1. 영속성 컨텍스트의 1차 캐시가 애플리케이션 캐시와 다른 점은?</h3>
 <p>같은 컨텍스트 안에서 엔티티 타입과 식별자에 대해 동일 인스턴스를 보장하는 작업 단위 캐시다. 요청이나 트랜잭션을 넘어 재사용하는 공유 캐시가 아니다. 변경 감지의 원본 상태를 함께 관리한다.</p>
 <p><strong>꼬리질문:</strong> 같은 컨텍스트에서 같은 ID를 두 번 <code>find()</code>하면? — 이미 관리 중인 객체가 반환되어 보통 두 번째 SELECT는 없다. 쿼리 결과 캐시와 혼동하지 않는다.</p>
@@ -342,7 +342,7 @@ public class OrderReadService {
 <h3 id="q9-hibernate-7-업그레이드에서-코드-컴파일-외에-무엇을-점검하나"><a class="anchor" href="#q9-hibernate-7-업그레이드에서-코드-컴파일-외에-무엇을-점검하나" aria-hidden="true">#</a>Q9. Hibernate 7 업그레이드에서 코드 컴파일 외에 무엇을 점검하나?</h3>
 <p>Hibernate 7.0은 Java 17+/Jakarta Persistence 3.2를 기준으로 표준 API 정리와 레거시 API 제거를 포함한다. 마이그레이션 가이드의 API·DDL·DB 동작 변경을 체크한다. Boot BOM의 Hibernate 7.4.5.Final과 일치하는 가이드를 적용하고 실제 DB에서 대표 쿼리와 스키마 diff를 확인한다.</p>
 <p><strong>꼬리질문:</strong> Hibernate 7.0 가이드만으로 7.4 업그레이드를 점검할 수 있나? — 아니다. 7.4 migration guide에서 7.4 계열의 추가 동작·DDL 변경도 확인한다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Hibernate ORM 7.0 User Guide — <a href="https://docs.jboss.org/hibernate/orm/7.0/userguide/html_single/Hibernate_User_Guide.html" target="_blank" rel="noopener">https://docs.jboss.org/hibernate/orm/7.0/userguide/html_single/Hibernate_User_Guide.html</a> — 영속성 컨텍스트, flush, 관계, fetching, locking 관련 장 구성과 동작 근거.</li>
 <li>Hibernate ORM 7.4 User Guide — <a href="https://docs.hibernate.org/orm/7.4/userguide/html_single/Hibernate_User_Guide.html" target="_blank" rel="noopener">https://docs.hibernate.org/orm/7.4/userguide/html_single/Hibernate_User_Guide.html</a> — Boot 4.1 관리 계열 사용자 가이드; 컨텍스트·flush·fetch·locking 기준.</li>
@@ -354,7 +354,24 @@ public class OrderReadService {
 <li>Managed Dependency Coordinates :: Spring Boot — <a href="https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html</a> — Boot 4.1.1 관리 Hibernate ORM 7.4.5.Final 및 Spring Data JPA 4.1.1.</li>
 <li>Jakarta Persistence 3.2 Specification — <a href="https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2" target="_blank" rel="noopener">https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2</a> — 엔티티 상태, 영속성 컨텍스트, fetch graph와 동시성 락의 표준 규약.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 

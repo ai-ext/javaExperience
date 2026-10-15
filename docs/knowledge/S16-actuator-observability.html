@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S16. Actuator·관측성 (메트릭·트레이싱·로깅)</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -20,11 +20,11 @@
 <li>Observation으로 업무 구간을 한 번 계측하고 메트릭·트레이스 핸들러가 각각의 신호로 내보내게 한다. 로그의 trace ID 전파와 함께 써야 요청의 지표·흐름·상세 기록을 연결할 수 있다.</li>
 </ul>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p><code>/actuator/env</code>를 인증 없이 공개하면 설정 정보가 노출된다. 반대로 Prometheus registry만 추가하고 scrape endpoint를 공개하지 않아 지표가 비는 일도 있다. Actuator는 endpoint access와 전송 경로 exposure를 함께 설정해야 안전하게 동작한다.</p>
 <p>Kubernetes liveness에 DB 검사를 넣으면 DB 장애가 Pod 재시작 폭주로 번질 수 있고, readiness에 모든 health indicator를 넣으면 전체 인스턴스가 트래픽에서 빠질 수 있다. 생존 여부와 트래픽 수용 가능성을 구분해야 한다.</p>
 <p>request ID·사용자 ID·원본 URL을 메트릭 태그로 만들면 값 조합마다 시계열과 Meter가 생긴다. 고유값을 메트릭으로 모으지 말고 route template과 제한된 상태 값으로 집계하고, 개별 요청 정보는 로그·trace에 둔다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -93,7 +93,7 @@
 <td>메트릭은 저카디널리티 집계용, trace는 개별 흐름 분석용이다. 개인정보는 어느 쪽에도 무심코 넣지 않는다.</td>
 </tr>
 </tbody></table></div>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>3.1 Endpoint 접근과 노출 · 3.2 Health와 Kubernetes · 3.3 Meter와 cardinality · 3.4 Observation, trace, MDC</small></span><span class="knowledge-chapter-meta">2개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="31-endpoint-접근과-노출"><a class="anchor" href="#31-endpoint-접근과-노출" aria-hidden="true">#</a>3.1 Endpoint 접근과 노출</h3>
 <pre><code class="language-text">Endpoint bean → access 허용? → HTTP/JMX exposure에 포함? → 보안 필터·네트워크 허용? → 응답</code></pre>
 <p>세 조건은 독립적이다. 기본 HTTP/JMX 노출은 health이며, Prometheus endpoint를 쓰려면 레지스트리 의존성·access·exposure를 모두 갖춰야 한다. <code>exclude</code>는 <code>include</code>보다 우선한다. <code>/env</code>, <code>/configprops</code>, <code>/quartz</code> 값은 기본 마스킹된다. <code>show-values=always</code>는 피하고 필요하면 <code>when-authorized</code>와 운영 역할을 사용한다.</p>
@@ -119,7 +119,7 @@
 <p>Boot 기본 sampling probability는 0.1이며 <code>management.tracing.sampling.probability</code>로 조정한다. 샘플링되지 않은 요청도 메트릭·로그에는 남을 수 있다. 원격 호출 trace 전파에는 Boot가 구성한 <code>RestClient.Builder</code>, <code>RestTemplateBuilder</code>, <code>WebClient.Builder</code>를 사용한다. 직접 만든 client는 전파가 빠질 수 있다.</p>
 <p>Reactor에서 ThreadLocal은 자동 복원되지 않는다. <code>spring.reactor.context-propagation=auto</code>, Boot <code>@Async</code> executor의 <code>spring.task.execution.propagate-context=true</code>를 검토한다. 직접 구성한 executor에는 <code>ContextPropagatingTaskDecorator</code>를 등록한다.</p>
 <p>MDC도 실행 흐름이 바뀔 때 자동 전파된다고 가정하지 말고 <code>MDC.putCloseable</code>로 현재 scope를 정리한다.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1: Actuator, Prometheus, OTLP 노출 경계 · 예제 2: Counter와 생명주기가 있는 Gauge · 예제 3: 업무 동작을 Observation으로 감싸기 · 예제 4: 구조화 로그와 MDC 정리</small></span><span class="knowledge-chapter-meta">5개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>아래 Spring 예제는 Boot 4.1 API를 기준으로 한 코드이며, 이 작업 환경에서 애플리케이션을 빌드해 검증하지 않았다. 각 Java 클래스는 적힌 파일명으로 별도 파일에 둔다. 애플리케이션의 HTTP starter와 빌드 플러그인은 이미 구성되어 있다고 가정한다.</p>
 <h3 id="예제-1-actuator-prometheus-otlp-노출-경계"><a class="anchor" href="#예제-1-actuator-prometheus-otlp-노출-경계" aria-hidden="true">#</a>예제 1: Actuator, Prometheus, OTLP 노출 경계</h3>
 <p>Gradle 의존성 예시:</p>
@@ -251,7 +251,7 @@ public class OrderAuditLogger {
     }
 }</code></pre>
 <p>Boot의 ECS 출력은 MDC의 key-value를 JSON 필드로 포함한다. <code>orderId</code>처럼 값 종류가 큰 필드는 로그에서는 요청을 좁히는 데 쓸 수 있지만, 메트릭 태그로 재사용하지 않는다. MDC scope는 현재 실행 흐름에서 닫힌다. 별도 스레드나 Reactor로 넘길 때는 문맥 전파 설정을 추가로 확인한다. <strong>(미실행: Boot logging 설정 및 SLF4J 2 런타임 필요)</strong></p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -276,7 +276,7 @@ public class OrderAuditLogger {
 <td><a href="https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html" target="_blank" rel="noopener">Dependency Coordinates</a></td>
 </tr>
 </tbody></table></div>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p><strong>기본값 추천:</strong> health와 필요한 scrape endpoint만 read-only로 노출하고, 관리 포트·네트워크 정책·인증으로 보호한다. 전체 endpoint 공개는 기본값으로 두지 않는다.</p>
 <ul>
 <li>if 상태 확인이 목적이면 then health를 열고 상세 정보는 <code>when-authorized</code>로 둔다.</li>
@@ -288,7 +288,7 @@ public class OrderAuditLogger {
 <li>if 로그 수집 형식이 JSON이면 then ECS·GELF·Logstash JSON 중 파이프라인에 맞는 것을 쓴다. logfmt는 Boot 내장 형식이라 단정하지 말고 <code>StructuredLogFormatter</code> 구현을 검토한다.</li>
 <li>배포 파이프라인과 이미지 운용은 이 문서 범위가 아니다 → <a class="docref" href="S19-packaging-deploy.html">S19</a> 참조.</li>
 </ul>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -328,7 +328,7 @@ public class OrderAuditLogger {
 <td>Boot builder와 context propagation 사용, MDC scope 정리</td>
 </tr>
 </tbody></table></div>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. 기본 health 노출은 모든 Actuator endpoint가 공개됐다는 뜻인가? · Q2. DB 장애 때 liveness와 readiness 중 무엇을 실패시킬까? · Q3. request ID를 메트릭 tag로 넣으면 왜 위험한가? · Q4. Timer와 Counter를 어떻게 구분하는가? 인스턴스별 p95 평균은 전체 p95인가?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-기본-health-노출은-모든-actuator-endpoint가-공개됐다는-뜻인가"><a class="anchor" href="#q1-기본-health-노출은-모든-actuator-endpoint가-공개됐다는-뜻인가" aria-hidden="true">#</a>Q1. 기본 health 노출은 모든 Actuator endpoint가 공개됐다는 뜻인가?</h3>
 <p>아니다. Boot 4.1은 access와 HTTP/JMX exposure를 따로 설정한다. 기본 exposure는 health뿐이며 다른 endpoint는 별도로 공개해야 한다.</p>
 <p><strong>꼬리질문:</strong> access 기본값을 <code>none</code>으로 바꾼 경우 health exposure만으로 충분한가? <strong>답:</strong> 아니다. health access도 다시 허용해야 한다.</p>
@@ -350,7 +350,7 @@ public class OrderAuditLogger {
 <h3 id="q7-ecs-json과-logfmt는-어떻게-선택하는가"><a class="anchor" href="#q7-ecs-json과-logfmt는-어떻게-선택하는가" aria-hidden="true">#</a>Q7. ECS JSON과 logfmt는 어떻게 선택하는가?</h3>
 <p>Boot structured logging은 ECS·GELF·Logstash JSON을 제공하고 MDC 및 SLF4J key-value를 JSON 필드로 출력할 수 있다. logfmt는 내장 형식이라고 가정하지 말고 필요하면 <code>StructuredLogFormatter</code>로 지원한다.</p>
 <p><strong>꼬리질문:</strong> MDC를 <code>put</code>하고 정리하지 않으면? <strong>답:</strong> 재사용 스레드에 값이 남을 수 있으므로 <code>putCloseable</code> 같은 scope를 쓴다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Production-ready Features — <a href="https://docs.spring.io/spring-boot/reference/actuator/index.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/actuator/index.html</a> — Actuator 운영 기능 개요.</li>
 <li>Endpoints — <a href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/actuator/endpoints.html</a> — access·exposure·보안·health 그룹·probe.</li>
@@ -365,7 +365,24 @@ public class OrderAuditLogger {
 <li>Spring Boot 4.0 Release Notes — <a href="https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Release-Notes" target="_blank" rel="noopener">https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Release-Notes</a> — OpenTelemetry 스타터와 OTLP 지원.</li>
 <li>Managed Dependency Coordinates — <a href="https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html</a> — Boot 4.1.1의 Micrometer 1.17.1.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 

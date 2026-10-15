@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>D06. 배포란 무엇인가 — 환경·방식·무중단 배포·롤백</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,7 +18,7 @@
 무중단은 배포 도구 이름이 아니라 용량·트래픽 전환·헬스 확인·종료·DB 호환성이 함께 맞아야 얻는 결과다.
 장애 때 이전 버전으로 돌아갈 수 있도록 애플리케이션과 데이터 변경을 나누어 계획하고, 지표를 보고 단계적으로 넓혀라.</p>
 </blockquote>
-<h2 id="1-큰-그림"><a class="anchor" href="#1-큰-그림" aria-hidden="true">#</a>1. 큰 그림</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-큰-그림" aria-label="1. 큰 그림 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 큰 그림</strong></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <pre class="mermaid">flowchart LR
     A[&quot;코드 변경·커밋&quot;] --&gt; B[&quot;빌드·테스트&quot;]
     B --&gt; C[&quot;버전이 붙은 산출물&quot;]
@@ -33,7 +33,7 @@
 <p>코드는 저장소에 있다고 서비스에 반영된 것이 아니다. 빌드 단계가 코드와 의존성을 실행 가능한 산출물(JAR 또는 컨테이너 이미지)로 만들고, 테스트·검토를 거친 같은 산출물을 환경별 실행 설정과 함께 배치한다. dev와 QA에서 발견한 문제를 고친 뒤 운영과 비슷한 stg에서 배포 절차와 주요 시나리오를 확인하고 prod로 간다. 조직에 따라 QA가 사람·팀·검증 단계 이름이기도 하므로 정확한 의미는 팀의 운영 문서에서 확인한다.</p>
 <p>prod 배포 후에도 완료 버튼을 누르면 끝나는 게 아니다. 새 프로세스가 요청을 받을 준비가 됐는지 확인하고, 오류율·지연·로그·업무 지표를 살핀다. 문제가 없으면 전체 트래픽 또는 기능 공개 범위를 넓힌다. 이상이 보이면 확대를 멈추고 이전 산출물로 복귀하거나 수정본을 배포한다. DB 구조를 바꿨다면 앱만 되돌려도 예전 앱이 새 스키마에서 동작하는지 별도로 판단해야 한다.</p>
 <p>이 문서는 전체 개발 과정(<a class="docref" href="D01-dev-lifecycle-overview.html">D01</a>)에서 검증된 변경을 실행 환경에 옮겨 사용자에게 제공하는 구간을 다룬다. 파이프라인 구성은 <a class="docref" href="D08-cicd-collaboration.html">D08</a>, 이미지 빌드·Kubernetes 매니페스트·probe 설정은 <a class="docref" href="S19-packaging-deploy.html">S19</a>, 인프라 형태는 <a class="docref" href="D07-onprem-vs-cloud.html">D07</a> 참조.</p>
-<h2 id="2-용어-사전"><a class="anchor" href="#2-용어-사전" aria-hidden="true">#</a>2. 용어 사전</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-용어-사전" aria-label="2. 용어 사전 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 용어 사전</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -206,7 +206,7 @@
 <td>배포 책임이 사라지는 것이 아니라 운영 경계가 플랫폼과 나뉨</td>
 </tr>
 </tbody></table></div>
-<h2 id="3-단계별로-보기"><a class="anchor" href="#3-단계별로-보기" aria-hidden="true">#</a>3. 단계별로 보기</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-단계별로-보기" aria-label="3. 단계별로 보기 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 단계별로 보기</strong><small>3.1 환경과 설정을 맞춘다 · 3.2 산출물을 실행 환경에 옮기는 방식 · 3.3 prod로 전환하고 상태를 판단한다 · 3.4 무중단·점진 배포 전략</small></span><span class="knowledge-chapter-meta">2개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="31-환경과-설정을-맞춘다"><a class="anchor" href="#31-환경과-설정을-맞춘다" aria-hidden="true">#</a>3.1 환경과 설정을 맞춘다</h3>
 <p>환경은 앱 버전, 의존 서비스, 네트워크, 권한, 설정이 묶인 실행 조건이다. local은 개인 확인, dev는 통합, QA는 계획된 검증, stg는 운영 리허설, prod는 실제 서비스가 목적이다. 조직에 따라 QA는 환경 또는 검증 조직을 뜻한다.</p>
 <p>가능하면 같은 JAR 또는 이미지 digest를 환경 간 승격한다. 코드까지 다시 빌드하면 검증한 산출물과 prod 실행물의 동일성을 확인하기 어렵다. DB URL·외부 API 주소는 외부 설정으로, 비밀번호·토큰은 시크릿 저장소로 분리한다. Spring Boot는 properties/YAML, 환경 변수, 시스템 속성, 명령행 인자의 우선순위를 정의한다.</p>
@@ -321,7 +321,7 @@
 <p>예를 들어 <code>full_name</code>을 <code>given_name</code>·<code>family_name</code>으로 나눈다고 하자. 첫 배포에서 새 컬럼을 추가하고 예전 앱도 새 스키마에서 계속 동작하게 한다. 다음 버전은 필요 기간 동안 새 값을 기록하면서 읽기 전환·데이터 backfill을 검증한다.</p>
 <p>모든 앱과 배치가 옛 컬럼을 더 이상 쓰지 않는 걸 확인한 뒤, 나중 배포에서 컬럼을 제거한다. 중간 버전에서 오류가 나도 이전 앱이 스키마를 읽을 수 있으므로 복귀 경로가 남는다.</p>
 <p>컬럼 삭제와 이름 변경을 앱 릴리스와 한 번에 묶으면 “앱 롤백은 성공했는데 DB 때문에 구버전이 시작되지 않음”이 발생할 수 있다. 대용량 테이블의 backfill은 트랜잭션 잠금·부하·재시작 가능성을 따져 작은 배치로 처리한다. 마이그레이션 스크립트가 한 번 실행되면 되돌리는 SQL이 존재해도 데이터를 원래대로 복원한다는 보장은 없다. 자동화 파이프라인 안에 마이그레이션을 넣는 절차는 <a class="docref" href="D08-cicd-collaboration.html">D08</a>에서 다룬다.</p>
-<h2 id="4-직접-해보기"><a class="anchor" href="#4-직접-해보기" aria-hidden="true">#</a>4. 직접 해보기</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-직접-해보기" aria-label="4. 직접 해보기 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 직접 해보기</strong></span><span class="knowledge-chapter-meta">5개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>클라우드 계정 없이 로컬에서 “외부 설정 → 산출물 실행 → 헬스 확인 → 종료”를 관찰한다. 기준은 Java 25, Spring Boot 4.1.x, Gradle 프로젝트다. 아래 실습은 문서 작성 중 미실행이며, 이미 생성된 Boot 앱을 전제로 한다. 이미지·probe 매니페스트는 <a class="docref" href="S19-packaging-deploy.html">S19</a> 참조.</p>
 <ol>
 <li>Actuator 의존성이 없다면 <code>build.gradle</code>의 <code>dependencies</code>에 추가한다.</li>
@@ -352,7 +352,7 @@ ls -l build/libs</code></pre>
 <p>응답이 <code>UP</code>이면 앱이 보고하는 상태가 정상인 것이다. 이것만으로 인증·주문·DB 쓰기 등 모든 기능이 정상임을 증명하지는 않는다. 이어서 실행 중인 터미널에서 <code>Ctrl-C</code>로 정상 종료를 요청하고, 진행 중 요청이 어떻게 마무리되는지 관찰한다. IDE의 정지 버튼은 <code>SIGTERM</code>을 보내지 않을 수 있으므로 graceful shutdown 관찰에는 터미널에서의 종료 신호를 사용한다.</p>
 <p>환경별로는 같은 JAR를 다시 빌드하지 말고 <code>SPRING_PROFILES_ACTIVE=stg</code>처럼 프로파일과 외부 설정을 바꿔 실행해 본다. DB 주소나 키를 <code>application-prod.yaml</code>에 평문으로 커밋하지 않는다.</p>
 <p>배포 방식 실습을 확장하려면 이 앱을 서비스 매니저 단위로 등록하거나 컨테이너 런타임·PaaS에 올릴 수 있지만, 이는 선택 과제이며 실제 계정·리소스 비용이 발생할 수 있다. 서비스 단위·이미지 빌드·클러스터 배포 설정은 각각 운영체제 및 플랫폼 문서를 확인한다.</p>
-<h2 id="5-자주-하는-오해와-실수"><a class="anchor" href="#5-자주-하는-오해와-실수" aria-hidden="true">#</a>5. 자주 하는 오해와 실수</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-자주-하는-오해와-실수" aria-label="5. 자주 하는 오해와 실수 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 자주 하는 오해와 실수</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>“배포했으니 고객도 새 기능을 본다” →</strong> 서버 반영과 공개는 다를 수 있다. 기능 플래그·라우팅·권한에 따라 코드는 실행 중이어도 사용자에게 감춰져 있다. 배포 완료와 기능 공개 이벤트를 별도로 기록한다.</li>
 <li><strong>“Rolling이면 무중단이다” →</strong> 교체 구간의 여유 용량, 준비 상태, 기존 요청 종료, 앱·DB 호환이 맞지 않으면 오류가 난다. 단일 인스턴스라면 교체 중 받을 서버가 없을 수도 있으니 용량·헬스·의존성 전환을 점검한다.</li>
@@ -373,14 +373,14 @@ ls -l build/libs</code></pre>
 <li><input disabled="" type="checkbox"> 롤백 또는 롤포워드 담당자와 중단 기준이 명확한가?</li>
 <li><input disabled="" type="checkbox"> 결과와 사용자 영향, 후속 조치를 변경 기록에 남겼는가?</li>
 </ul>
-<h2 id="6-시각화-설계-메모"><a class="anchor" href="#6-시각화-설계-메모" aria-hidden="true">#</a>6. 시각화 설계 메모</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-시각화-설계-메모" aria-label="6. 시각화 설계 메모 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 시각화 설계 메모</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>개발에서 prod까지 승격 흐름</strong> | 목적: 개발 과정에서 배포 위치를 보여준다 | 요소: 커밋, artifact, dev·QA·stg·prod, 승인, 복구 | 관계: 동일 artifact가 환경을 승격하고 실패 시 복구로 분기 | 애니메이션: 검증→승격→관찰 | 오해: QA·stg 통과가 운영 보증은 아니다. 1절 Mermaid 대응.</li>
 <li><strong>배포 방식의 실행 단위 비교</strong> | 목적: nohup, systemd, Docker, Kubernetes·PaaS의 책임 경계를 그린다 | 요소: 프로세스, 서비스 관리자, 이미지, 오케스트레이터 | 관계: 관리 범위가 프로세스에서 여러 인스턴스로 확대 | 애니메이션: JAR→서비스 관리→이미지→rollout | 오해: 컨테이너가 배포·복구를 자동화하지는 않는다.</li>
 <li><strong>전략별 트래픽 전환 타임라인</strong> | 목적: rolling·blue-green·canary·flag의 차이를 보여준다 | 요소: 구/신 버전, 라우터, 사용자, 기능 스위치, 지표 | 관계: 교체·경로 전환·표본 확대·행동 제어 | 애니메이션: 요청 범위와 활성 기능 변화 | 오해: canary와 feature flag는 조합 가능하지만 같은 전략은 아니다. 3절 sequence diagram 대응.</li>
 <li><strong>DB expand-contract와 롤백 창</strong> | 목적: 스키마 변경을 릴리스로 나누는 이유를 보여준다 | 요소: 앱 버전, 컬럼, 이관, 삭제 | 관계: 구·신 버전 호환 뒤 구형식 제거 | 애니메이션: 추가→이관→전환→삭제 | 오해: 앱 롤백과 데이터 복구는 별개. 3절 흐름도 대응.</li>
 </ol>
-<h2 id="7-자가점검-qa-면접-대비"><a class="anchor" href="#7-자가점검-qa-면접-대비" aria-hidden="true">#</a>7. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-자가점검-qa-면접-대비" aria-label="7. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. 배포와 릴리스는 어떻게 다른가? · Q2. stg에서 성공했는데 prod에 장애가 날 수 있는 이유는? · Q3. rolling과 blue-green의 복구 특성을 비교하라. · Q4. 카나리 배포에서 무엇을 관찰해야 하나?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-배포와-릴리스는-어떻게-다른가"><a class="anchor" href="#q1-배포와-릴리스는-어떻게-다른가" aria-hidden="true">#</a>Q1. 배포와 릴리스는 어떻게 다른가?</h3>
 <p>배포는 산출물을 특정 환경에서 실행하는 행위다. 릴리스는 버전을 확정하거나 사용자가 기능을 쓸 수 있게 공개하는 의미로 쓰이며 조직마다 범위가 다르다. 코드는 배포됐어도 기능 플래그가 꺼져 있으면 고객 공개는 하지 않은 상태일 수 있다.</p>
 <p><strong>꼬리질문: 기능 플래그가 장애 복구를 대신하나?</strong> 코드 경로만 끌 수 있다. DB 변경·잘못 처리된 데이터·외부 부작용은 별도 복구가 필요하다.</p>
@@ -399,7 +399,7 @@ ls -l build/libs</code></pre>
 <h3 id="q6-spring-boot-graceful-shutdown이-배포에-기여하는-점은"><a class="anchor" href="#q6-spring-boot-graceful-shutdown이-배포에-기여하는-점은" aria-hidden="true">#</a>Q6. Spring Boot graceful shutdown이 배포에 기여하는 점은?</h3>
 <p>종료 단계에서 새 요청을 거절하고 이미 처리 중인 요청이 끝날 유예 시간을 준다. 덕분에 버전 교체 중 응답이 끊길 위험을 줄인다. 단, 플랫폼 종료 시간이 앱 제한 시간보다 짧거나 요청이 유예 시간을 넘으면 강제 종료될 수 있다.</p>
 <p><strong>꼬리질문: 그러면 무중단이 보장되는가?</strong> 보장되지 않는다. 새 인스턴스 readiness, 남은 용량, 라우터의 연결 해제, 종료 신호 전달도 함께 맞아야 한다.</p>
-<h2 id="8-참고문헌"><a class="anchor" href="#8-참고문헌" aria-hidden="true">#</a>8. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-참고문헌" aria-label="8. 참고문헌 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Deployments — <a href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/" target="_blank" rel="noopener">https://kubernetes.io/docs/concepts/workloads/controllers/deployment/</a> — 원하는 상태를 선언하고 ReplicaSet·Pod를 점진적으로 바꾸며 rollout 상태·revision·rollback을 관리하는 흐름.</li>
 <li>Blue Green Deployment — <a href="https://martinfowler.com/bliki/BlueGreenDeployment.html" target="_blank" rel="noopener">https://martinfowler.com/bliki/BlueGreenDeployment.html</a> — 두 운영 환경을 준비하고 라우팅을 전환하는 방식과 전환 시 고려점.</li>
@@ -411,7 +411,24 @@ ls -l build/libs</code></pre>
 <li>Parallel Change — <a href="https://martinfowler.com/bliki/ParallelChange.html" target="_blank" rel="noopener">https://martinfowler.com/bliki/ParallelChange.html</a> — expand-migrate-contract 단계로 호환되지 않는 인터페이스 변경을 나누는 패턴.</li>
 <li>Database migration pipeline — <a href="https://docs.gitlab.com/development/database/database_migration_pipeline/" target="_blank" rel="noopener">https://docs.gitlab.com/development/database/database_migration_pipeline/</a> — 마이그레이션을 프로덕션과 유사한 조건에서 자동 검증하는 사례.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 <script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S08. 트랜잭션 관리</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -16,11 +16,11 @@
 <blockquote>
 <p>3줄 요약 — Spring 트랜잭션은 <code>PlatformTransactionManager</code>가 자원 트랜잭션을 시작·커밋·롤백하고, <code>@Transactional</code>은 그 경계를 선언하는 방법이다.<br>기본값은 대개 기존 트랜잭션에 참여하는 <code>REQUIRED</code>, 데이터베이스 기본 격리수준, 읽기 전용 아님, <code>RuntimeException</code>·<code>Error</code> 롤백이며 checked 예외는 기본 롤백 대상이 아니다.<br>트랜잭션은 한 자원 경계 안에서만 원자적이다. 데이터베이스 변경과 메시지 발행을 함께 보장하려면 아웃박스로 내구성 있는 이벤트 전달을 설계한다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>주문 저장은 성공했는데 결제 메시지가 전송되지 않거나, 재고 차감은 실패했는데 주문 행은 남는 장애는 DB 커밋과 브로커 전송을 하나의 원자적 작업이라 착각해 생긴다. <code>@Transactional</code>은 두 시스템을 묶지 않는다.</p>
 <p><code>IOException</code> 같은 checked 예외는 기본 롤백 대상이 아니므로 변경이 커밋될 수 있다. 내부 호출이나 <code>private</code> 메서드에만 붙인 애노테이션도 프록시를 통과하지 않으면 적용되지 않는다.</p>
 <p>면접에서는 <code>REQUIRES_NEW</code>의 풀 고갈, <code>readOnly=true</code>의 힌트 성격, <code>SERIALIZABLE</code>의 재시도 비용까지 설명해야 설계 판단으로 이어진다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong><small>PlatformTransactionManager의 역할 · 전파 7종 · 격리수준과 동시성 이상 · @Transactional 속성</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -193,7 +193,7 @@
 </tr>
 </tbody></table></div>
 <p>메서드 설정은 클래스 기본값을 덮어쓴다. 참여 중인 <code>REQUIRED</code>에서 격리·timeout은 바뀌지 않는다. 설정 불일치 검출에는 <code>validateExistingTransaction</code>을 검토한다.</p>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>선언적 경계의 호출 흐름 · 전파는 호출 경계와 물리 자원을 나눈다 · 롤백 규칙 매칭 · 이벤트와 커밋의 관계</small></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="선언적-경계의-호출-흐름"><a class="anchor" href="#선언적-경계의-호출-흐름" aria-hidden="true">#</a>선언적 경계의 호출 흐름</h3>
 <pre><code class="language-text">호출자
   │ 프록시를 통한 메서드 호출
@@ -224,7 +224,7 @@ TransactionInterceptor ── @Transactional 메타데이터 읽기
 <h3 id="이벤트와-커밋의-관계"><a class="anchor" href="#이벤트와-커밋의-관계" aria-hidden="true">#</a>이벤트와 커밋의 관계</h3>
 <p><code>@TransactionalEventListener</code>는 Spring 애플리케이션 이벤트를 트랜잭션 단계에 묶는다. 기본 <code>AFTER_COMMIT</code>은 DB 커밋이 성공한 뒤 처리하고, <code>BEFORE_COMMIT</code>, <code>AFTER_ROLLBACK</code>, <code>AFTER_COMPLETION</code>도 선택할 수 있다.</p>
 <p>트랜잭션이 없으면 기본적으로 리스너를 호출하지 않으며, 일반 이벤트처럼 실행하려는 특수 상황에서만 <code>fallbackExecution=true</code>를 쓴다. 이는 프로세스 안에서 커밋 여부와 후처리 시점을 맞추는 기능이지, 브로커까지 원자적 전달을 보장하는 큐가 아니다.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1 — 서비스 경계와 checked 예외 롤백 · 예제 2 — TransactionTemplate으로 좁은 구간을 명시 · 예제 3 — 커밋 후 알림과 그 한계</small></span><span class="knowledge-chapter-meta">3개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="예제-1--서비스-경계와-checked-예외-롤백"><a class="anchor" href="#예제-1--서비스-경계와-checked-예외-롤백" aria-hidden="true">#</a>예제 1 — 서비스 경계와 checked 예외 롤백</h3>
 <p>Spring 7 API 예제다. 저장소 구현·컨테이너·DB 구성에 연결해야 한다. <strong>(미실행: Spring 컨테이너 및 DB 구성 필요)</strong></p>
 <pre><code class="language-java">import org.springframework.stereotype.Service;
@@ -314,7 +314,7 @@ class OrderNotificationListener {
 
 }</code></pre>
 <p>트랜잭션 안에서 이벤트를 발행하면 롤백 시 리스너는 실행되지 않는다. 다만 커밋 후 전송 전 프로세스가 종료되면 유실될 수 있어, 중요한 외부 이벤트는 아웃박스에 기록한다.</p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -344,7 +344,7 @@ class OrderNotificationListener {
 <td><a href="https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html" target="_blank" rel="noopener">관리 버전</a></td>
 </tr>
 </tbody></table></div>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong><small>아웃박스: DB 커밋과 메시지 전달 사이를 메우기</small></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>기본값 추천:</strong> 같은 DB의 변경 여러 개를 묶는 서비스 진입 메서드에 <code>@Transactional</code>과 <code>REQUIRED</code>를 쓴다. 저장소 호출이 한 커밋에 참여한다.</li>
 <li>if 내부 실패가 전체 업무를 취소해야 하면 <code>REQUIRED</code>; 안쪽 예외를 삼킨다면 rollback-only와 바깥 결과를 명시한다.</li>
@@ -366,7 +366,7 @@ class OrderNotificationListener {
     published_at TIMESTAMP NULL
 );</code></pre>
 <p>삽입과 비즈니스 변경을 같은 메서드에서 커밋한다. 발행 후 표시 전 릴레이가 죽으면 중복될 수 있으므로 <code>event_id</code>로 중복을 제거하고 필요한 순서·재시도·정리 규칙을 둔다. 여러 서비스 DB에 걸친 업무는 → <a class="docref" href="S20-spring-cloud-msa.html">S20</a> 참조.</p>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>checked 예외를 던졌는데 데이터가 저장됨</strong> → 기본 롤백 규칙은 <code>RuntimeException</code>과 <code>Error</code> 중심이라 checked 예외에서 커밋 가능 → <code>rollbackFor</code> 타입 규칙이나 전역 <code>ALL_EXCEPTIONS</code>를 적용하고 실제 예외 타입을 확인한다.</li>
 <li><strong>내부 호출의 <code>REQUIRES_NEW</code>가 무시됨</strong> → 같은 객체의 <code>this.other()</code> 호출이 프록시를 통과하지 않아 내부 <code>@Transactional</code> 메타데이터가 적용되지 않음 → 트랜잭션 경계가 다른 책임을 별도 빈으로 분리해 외부 빈 호출로 만들거나 적절한 프로그램 방식 API를 사용한다. 프록시 원리는 → <a class="docref" href="S02-aop-proxy.html">S02</a> 참조.</li>
@@ -376,7 +376,7 @@ class OrderNotificationListener {
 <li><strong><code>readOnly=true</code>인데 쓰기가 성공함</strong> → 읽기 전용은 최적화 힌트이지 보안 규칙이 아님 → 권한은 DB에서 통제한다.</li>
 <li><strong>커밋 후 이벤트 유실</strong> → <code>@TransactionalEventListener</code>와 브로커 사이에 프로세스 종료 구간이 있음 → outbox와 멱등 소비를 쓴다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. PlatformTransactionManager와 @Transactional의 관계는? · Q2. 내부 REQUIRED 메서드가 rollback-only가 되면 왜 바깥 커밋에서 예외가 나는가? · Q3. REQUIRES_NEW 대신 NESTED를 선택할 수 있는 상황은? · Q4. checked 예외를 던졌는데 롤백되지 않는 이유와 해결책은?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-platformtransactionmanager와-transactional의-관계는"><a class="anchor" href="#q1-platformtransactionmanager와-transactional의-관계는" aria-hidden="true">#</a>Q1. <code>PlatformTransactionManager</code>와 <code>@Transactional</code>의 관계는?</h3>
 <p><code>@Transactional</code>은 속성 메타데이터고, <code>PlatformTransactionManager</code>는 명령형 자원에서 실제 경계를 만든다. 인터셉터가 속성을 읽고 <code>getTransaction</code>, <code>commit</code>, <code>rollback</code>을 호출한다. 매니저가 관리하지 않는 메시지 브로커까지 자동으로 하나의 DB 트랜잭션이 되지는 않는다.</p>
 <p>꼬리질문: 리액티브에서는 무엇이 다른가? <strong>Reactor Context를 쓰는 <code>ReactiveTransactionManager</code>를 사용하며 ThreadLocal 트랜잭션과 구분한다.</strong></p>
@@ -391,7 +391,7 @@ class OrderNotificationListener {
 <p>아니다. 직렬화 결과를 보장하기 위해 DB가 충돌하는 트랜잭션을 실패시키는 구현이 흔하다. 실패를 전체 업무 단위에서 재시도할 수 있도록 멱등성, 최대 재시도, backoff를 준비해야 한다. 또 격리수준은 새 물리 트랜잭션에만 적용되는지 확인한다.<br>꼬리질문: Spring의 <code>ISOLATION_DEFAULT</code>는 항상 <code>READ_COMMITTED</code>인가? <strong>아니다. 기반 데이터베이스의 기본 격리수준을 따른다.</strong></p>
 <h3 id="q6-transactionaleventlistenerafter_commit와-아웃박스의-차이는"><a class="anchor" href="#q6-transactionaleventlistenerafter_commit와-아웃박스의-차이는" aria-hidden="true">#</a>Q6. <code>@TransactionalEventListener(AFTER_COMMIT)</code>와 아웃박스의 차이는?</h3>
 <p>전자는 Spring 프로세스 안에서 커밋 후 리스너를 실행하는 시점을 맞춰준다. 커밋 뒤 프로세스가 죽으면 외부 메시지 전송이 누락될 수 있다. 아웃박스는 이벤트 발행 의도를 DB 변경과 같은 커밋에 저장해 릴레이 재시도를 가능하게 한다.<br>꼬리질문: 아웃박스가 중복 전달을 없애는가? <strong>아니다. 소비자 멱등 처리와 이벤트 ID 기반 중복 제거를 설계한다.</strong></p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Transaction Management — <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/data-access/transaction.html</a> — 공식 개요.</li>
 <li><code>PlatformTransactionManager</code> API — <a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/transaction/PlatformTransactionManager.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/transaction/PlatformTransactionManager.html</a> — 관리자 계약.</li>
@@ -406,7 +406,24 @@ class OrderNotificationListener {
 <li>Transactional outbox pattern — <a href="https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html" target="_blank" rel="noopener">https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html</a> — 이중 쓰기 대응.</li>
 <li>Spring Boot managed dependencies — <a href="https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html</a> — 관리 버전.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 

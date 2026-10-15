@@ -7,6 +7,22 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'scenario/scenario.json'), 'utf8'));
 const items = [];
 const failures = [];
+const knowledgeDocs = [];
+
+for (const filename of fs.readdirSync(path.join(root, 'docs/knowledge')).filter((name) => /^[A-Z]\d{2}-.*\.md$/.test(name))) {
+  const sourcePath = path.join(root, 'docs/knowledge', filename);
+  const htmlPath = sourcePath.replace(/\.md$/, '.html');
+  if (!fs.existsSync(htmlPath)) { failures.push(`${filename}: 공부자료 HTML 없음`); continue; }
+  const html = fs.readFileSync(htmlPath, 'utf8');
+  const headings = [...html.matchAll(/<summary id="([^"]+)" aria-label="[^"]+ 펼치기"/g)];
+  const cards = (html.match(/<details class="knowledge-chapter">/g) || []).length;
+  const mapSteps = (html.match(/class="knowledge-page-step"/g) || []).length;
+  if (!cards || cards !== headings.length || cards !== mapSteps) failures.push(`${filename}: 공부자료 주제 지도 ${mapSteps}, 접기 카드 ${cards}, 앵커 ${headings.length}`);
+  for (const [, id] of headings) {
+    if (!html.includes(`href="#${id}"`)) failures.push(`${filename}: ${id} 앵커 링크 없음`);
+  }
+  knowledgeDocs.push({ id: filename.slice(0, 3), sections: cards });
+}
 
 for (const chapter of manifest.chapters) for (const level of chapter.levels) {
   if (!level.file) continue;
@@ -71,25 +87,28 @@ const totals = {
   requestButtons: items.reduce((sum, item) => sum + item.requestButtons, 0),
   roleMaps: items.reduce((sum, item) => sum + item.roleMaps, 0),
   lessonCards: items.reduce((sum, item) => sum + item.lessonCards, 0),
+  knowledgeDocs: knowledgeDocs.length,
+  knowledgeSections: knowledgeDocs.reduce((sum, doc) => sum + doc.sections, 0),
   manualOrTestFlowLevels: items.filter((item) => item.requestPractice === 'manual_or_test_flow').map((item) => item.id),
 };
 if (items.length !== 101) failures.push(`단계 수 ${items.length}/101`);
 const report = {
   schemaVersion: 2,
   status: failures.length ? 'failed' : 'verified',
-  scope: '101개 단계 화면의 시안·요소·흐름·코드 역할 지도·학습 카드 정적 대조',
+  scope: '101개 단계 화면의 시안·요소·흐름·코드 역할 지도·학습 카드와 전체 공부자료 주제 지도의 정적 대조',
   design: [
     '단계 본문은 화면 JSON에서 그린 실제 DOM 시안과 선택 가능한 요청 흐름을 나란히 보여준다.',
     '정답 변경 파일의 역할 지도는 화면 시나리오와 구분하고, DBeaver는 MySQL 직접 접속의 별도 경로로 둔다.',
     '같은 SVG를 단계 화면에 중복하지 않고 카탈로그 미리보기에만 사용한다.',
     '장문 절은 단계별 카드에 넣고 요청 버튼·원문 코드·채점 기준을 보존한다.',
+    '공부자료의 실제 절을 주제 지도와 접기 카드로 연결하고 원문 본문·코드·앵커를 보존한다.',
   ],
   limits: [
     '빛으로 표시하는 계층은 시나리오의 예상 흐름이며 실제 Spring Boot 내부 호출 추적이 아니다.',
     '정답 파일 역할 지도는 해당 단계의 변경 파일을 기준으로 하며 기존 파일 전체의 호출 그래프가 아니다.',
     '실습 API의 실제 HTTP·DB 채점은 학습자가 구현한 서버를 대상으로 별도로 실행해야 한다.',
   ],
-  totals, failures, levels: items,
+  totals, failures, levels: items, knowledgeDocs,
 };
 fs.writeFileSync(path.join(root, 'docs/scenario-visual-state.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify({ status: report.status, totals, failures }, null, 2));

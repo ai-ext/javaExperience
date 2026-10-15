@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S11. 캐시·Redis·DB 마이그레이션</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,11 +18,11 @@
 여러 애플리케이션 인스턴스가 같은 캐시를 봐야 하면 Redis, 한 인스턴스의 제한된 메모리 최적화라면 Caffeine을 고른다.
 DB 스키마 변경은 구버전·신버전 코드가 함께 떠 있는 배포 구간을 견디도록 expand → migrate → contract 순서로 나눈다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p><code>@Cacheable</code> 이후 사용자가 고친 가격을 다른 서버가 오래 보여 줄 수 있다. Caffeine은 인스턴스끼리 복제되지 않고, Redis도 쓰기 무효화가 빠지면 stale하다. 인기 키가 함께 만료되면 DB에 스탬피드가 난다.</p>
 <p>구버전 서버가 <code>old_name</code>을 읽는 동안 컬럼을 삭제하면 요청이 실패한다. 새 컬럼을 채우기 전에 읽으면 값이 비어 보인다. 따라서 스키마 변경은 롤링 배포 중 구·신 코드의 호환성을 고려해야 한다.</p>
 <p>Spring Cache는 저장소만 추상화한다. 키·TTL·무효화·다중 인스턴스 정책을 정하지 않은 <code>@Cacheable</code>은 장애 원인을 숨기는 층이 된다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong><small>로컬 캐시와 분산 캐시 · Flyway와 Liquibase</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -150,7 +150,7 @@ DB 스키마 변경은 구버전·신버전 코드가 함께 떠 있는 배포 �
 </tr>
 </tbody></table></div>
 <p>둘 다 스키마 변경의 이력과 실행을 관리한다. 같은 데이터베이스에 Flyway와 Liquibase, Hibernate <code>ddl-auto=update</code>, 임의의 <code>schema.sql</code>을 동시에 쓰면 어떤 도구가 스키마의 정본인지 모호해진다. 조직에서 선택한 한 가지 migration 도구를 배포의 정본으로 둔다.</p>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>메서드 캐시 호출 흐름 · Cache-aside와 write-through · 만료와 스탬피드 · 무중단 스키마 변경 흐름</small></span><span class="knowledge-chapter-meta">2개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="메서드-캐시-호출-흐름"><a class="anchor" href="#메서드-캐시-호출-흐름" aria-hidden="true">#</a>메서드 캐시 호출 흐름</h3>
 <pre class="mermaid">sequenceDiagram
     participant C as 호출자
@@ -188,7 +188,7 @@ DB 스키마 변경은 구버전·신버전 코드가 함께 떠 있는 배포 �
 4. Switch: 읽기 기준을 새 구조로 바꾸고 구버전 인스턴스가 모두 빠졌는지 확인한다
 5. Contract: 별도 배포에서 구 컬럼/코드 제거, 인덱스·제약 조건을 정리한다</code></pre>
 <p>배포 중에는 구버전과 신버전 프로세스가 함께 실행될 수 있다. 따라서 새 컬럼 추가는 구 코드가 무시할 수 있도록 하고, 새 코드 전환은 구버전이 종료된 뒤 진행한다. 대량 backfill을 DDL과 같은 긴 트랜잭션으로 묶지 않고 작은 단위로 처리하면 잠금 지속 시간과 롤백 부담을 줄일 수 있다. 컬럼 삭제처럼 되돌리기 어려운 작업은 호환 구간이 끝난 뒤 별도 단계에 둔다.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1: 조회 메서드를 Cache-aside로 만들기 (미실행) · 예제 2: Redis 캐시별 TTL과 키 접두어 (미실행) · 예제 3: Flyway 기반 Expand/contract DDL</small></span><span class="knowledge-chapter-meta">4개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>아래 Spring 예제는 Boot 4.1 / Framework 7 API 기준이다. 이 작업 환경에서 애플리케이션으로 실행하지 않았다. (미실행)</p>
 <h3 id="예제-1-조회-메서드를-cache-aside로-만들기-미실행"><a class="anchor" href="#예제-1-조회-메서드를-cache-aside로-만들기-미실행" aria-hidden="true">#</a>예제 1: 조회 메서드를 Cache-aside로 만들기 (미실행)</h3>
 <pre><code class="language-java">import org.springframework.cache.annotation.Cacheable;
@@ -254,7 +254,7 @@ ALTER TABLE customer ADD COLUMN display_name varchar(120);</code></pre>
 <pre><code class="language-sql">-- V20261003_02__contract_customer_legacy_name.sql
 ALTER TABLE customer DROP COLUMN legacy_name;</code></pre>
 <p>두 번째 파일은 새 코드만 남고 <code>legacy_name</code> 참조가 없음을 확인한 뒤, 별도 배포에서 실행한다. 운영 DB에 따라 DDL 잠금·인덱스 작성 방식이 다르므로 큰 테이블은 해당 DB의 online DDL 제약과 실행 시간을 확인한다.</p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>Spring Framework 3.1</strong>: 메서드 결과 캐시 추상화를 도입했다. 캐시 제품마다 다른 API를 서비스 코드에 직접 넣으면 교체·테스트 때 코드가 결합되므로 <code>Cache</code> / <code>CacheManager</code>와 선언형 애노테이션으로 경계를 만들었다. 근거: 현재 <a href="https://docs.spring.io/spring-framework/reference/integration/cache.html" target="_blank" rel="noopener">Cache Abstraction 문서</a>.</li>
 <li><strong>Spring Framework 4.0</strong>: 여러 파라미터의 기본 키 생성이 해시 코드만 보던 방식에서 모든 인자를 묶는 <code>SimpleKey</code> 방식으로 바뀌었다. 서로 다른 인자 조합이 같은 해시를 가져 잘못된 값을 공유할 수 있었기 때문이다. 복합 키가 필요한 메서드는 그래도 <code>key</code>를 명시하는 편이 읽기 쉽다. 근거: <a href="https://docs.spring.io/spring-framework/reference/integration/cache/annotations.html" target="_blank" rel="noopener">애노테이션 캐시 문서</a>.</li>
@@ -263,7 +263,7 @@ ALTER TABLE customer DROP COLUMN legacy_name;</code></pre>
 <li><strong>Spring Data Redis 기본 동작</strong>: 관리 버전/현재 메이저는 (미확인). Redis cache writer 기본값은 lock-free와 <code>KEYS</code> 전체 삭제이며, 큰 keyspace에서는 지원 드라이버·모드에 따라 <code>SCAN</code> 배치를 검토한다. 근거: <a href="https://docs.spring.io/spring-data/redis/reference/redis/redis-cache.html" target="_blank" rel="noopener">Redis Cache 문서</a>.</li>
 <li><strong>Flyway 버전 migration</strong>: 적용된 파일은 체크섬으로 변경을 감지하므로 이미 영구 환경에 적용한 migration은 고치지 않고 새 버전으로 정정한다. 이전 SQL을 바꾸어 이력을 숨기면 환경별 스키마 결과를 재현하기 어렵기 때문이다. Boot 4.1.1 관리 Flyway는 12.4.0이다. Liquibase 현재 문서 페이지에는 5.2.1 Secure가 표시되지만 Boot 4.1.1의 관리 버전은 이 조사에서 확인하지 못했다. 근거: <a href="https://documentation.red-gate.com/flyway/flyway-concepts/migrations/versioned-migrations" target="_blank" rel="noopener">Flyway Versioned Migrations</a>, <a href="https://docs.liquibase.com/concepts/changelogs/home.html" target="_blank" rel="noopener">Liquibase Changelog</a>, <a href="https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html" target="_blank" rel="noopener">Boot 관리 의존성 좌표</a>.</li>
 </ul>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>기본값 추천</strong>: 여러 인스턴스가 같은 값을 읽는 서비스라면 Cache-aside + Redis + 데이터별 명시 TTL + 쓰기 커밋 후 키 무효화를 기본으로 시작한다. TTL은 무효화 누락의 상한을 줄이고, Redis는 인스턴스별 로컬 캐시 불일치를 피한다. 단, 강한 일관성이 필요한 값이나 DB 조회가 충분히 싼 경로는 캐시하지 않는다.</li>
 <li>If 조회 결과를 공유해야 하면 Redis, 한 JVM 안에서만 재사용하면 충분하면 Caffeine을 쓴다. 어느 쪽이든 최대 크기·만료 정책과 실패 시 DB 보호 한계를 정한다.</li>
@@ -275,7 +275,7 @@ ALTER TABLE customer DROP COLUMN legacy_name;</code></pre>
 <li>If 새 필드·테이블을 도입하면 additive 확장, backfill, 읽기 전환, 제거를 나눈다. 큰 테이블은 DB별 DDL 잠금과 online 변경 지원을 확인한다.</li>
 <li>If Flyway 버전 migration이 운영에 적용되면 파일을 고치지 말고 새 migration으로 앞으로 수정한다. Liquibase는 changeset/changelog에 조건과 환경 구분을 표현할 수 있다. 팀의 SQL 검토 방식, DB 종류, 변경 분기 요구에 맞춰 택한다.</li>
 </ul>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>다중 서버에서 로컬 캐시만 사용</strong>: 서버마다 같은 키의 값이 다름 → Caffeine은 JVM 내부에만 존재 → 공유가 필요하면 Redis를 쓰고, 로컬 계층도 둔다면 무효화 이벤트/짧은 TTL을 설계한다.</li>
 <li><strong>조회 키에서 필터 인자 누락</strong>: 특정 조건의 결과가 다른 요청에 반환됨 → 기본 인자 조합이 실제 결과를 구분하지 못함 → <code>key</code>에 결과를 바꾸는 모든 입력을 포함하고 테넌트 경계를 점검한다.</li>
@@ -286,7 +286,7 @@ ALTER TABLE customer DROP COLUMN legacy_name;</code></pre>
 <li><strong>서로 다른 도구가 스키마를 동시에 관리</strong>: 로컬과 운영의 테이블 정의가 달라짐 → <code>ddl-auto</code>, <code>schema.sql</code>, Flyway/Liquibase의 실행 책임이 중복 → 운영 정본은 migration 한 가지로 고정한다.</li>
 <li><strong>적용된 migration 수정 또는 컬럼 즉시 삭제</strong>: 환경마다 checksum 오류·배포 중 SQL 실패 → 이력 불변성과 구버전 프로세스 호환성을 깨뜨림 → 새 버전으로 수정하고 expand/contract 단계를 분리한다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. Spring Cache가 Redis를 제공하는가? · Q2. Cache-aside에서 DB 쓰기와 캐시 무효화 순서는? · Q3. Caffeine과 Redis 선택 기준은 무엇인가? · Q4. 캐시 스탬피드가 왜 발생하며 어떻게 막는가?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-spring-cache가-redis를-제공하는가"><a class="anchor" href="#q1-spring-cache가-redis를-제공하는가" aria-hidden="true">#</a>Q1. Spring Cache가 Redis를 제공하는가?</h3>
 <p>아니다. Spring Cache는 애노테이션과 <code>Cache</code>/<code>CacheManager</code> 계약이다. Boot나 애플리케이션이 어떤 provider를 연결할지 결정하며 Redis를 쓰려면 Spring Data Redis 구현과 연결 설정이 필요하다. 같은 <code>@Cacheable</code> 코드라도 실제 저장소와 공유 범위는 달라진다.</p>
 <p><strong>꼬리질문:</strong> 로컬과 Redis를 동시에 쓰면 자동 L1/L2인가? <strong>답:</strong> 아니다. 계층 조회·쓰기·무효화 순서를 직접 구성해야 한다.</p>
@@ -306,7 +306,7 @@ ALTER TABLE customer DROP COLUMN legacy_name;</code></pre>
 <p>롤링 배포 중 구버전과 신버전 코드가 동시에 요청을 받을 수 있다. 먼저 nullable 컬럼을 추가하면 구버전은 계속 작동하고, 신버전 전환과 데이터 채우기를 끝낸 다음 구 컬럼을 지울 수 있다. 삭제는 이전 코드가 완전히 빠진 뒤 별도 배포로 수행한다.</p>
 <p><strong>꼬리질문:</strong> backfill을 한 트랜잭션으로 해도 되는가? <strong>답:</strong> 대규모 테이블이면 잠금과 롤백이 커지므로 진행 기록과 재시도가 가능한 작은 배치로 나눈다.</p>
 <p>세션 저장소 보안 측면 → <a class="docref" href="S12-security-architecture.html">S12</a> 참조.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Cache Abstraction — <a href="https://docs.spring.io/spring-framework/reference/integration/cache.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/integration/cache.html</a> — 추상화의 목적, 도입 버전, JCache 확장 확인.</li>
 <li>Declarative Annotation-based Caching — <a href="https://docs.spring.io/spring-framework/reference/integration/cache/annotations.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/integration/cache/annotations.html</a> — 캐시 애노테이션, 기본 키, 커스텀 키 규칙 확인.</li>
@@ -323,7 +323,24 @@ ALTER TABLE customer DROP COLUMN legacy_name;</code></pre>
 <li>Caching patterns (AWS Whitepaper) — <a href="https://docs.aws.amazon.com/whitepapers/latest/database-caching-strategies-using-redis/caching-patterns.html" target="_blank" rel="noopener">https://docs.aws.amazon.com/whitepapers/latest/database-caching-strategies-using-redis/caching-patterns.html</a> — cache-aside와 write-through 흐름·장단점 비교. 과거 참고용 문서임을 감안.</li>
 <li>Database Initialization (Spring Boot) — <a href="https://docs.spring.io/spring-boot/how-to/data-initialization.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/how-to/data-initialization.html</a> — Hibernate 초기화 기본값, SQL 초기화와 단일 초기화 도구 권고 확인.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 <script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J10. 스레드와 Java Memory Model</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,10 +18,10 @@
 JMM은 “메모리를 즉시 비운다”는 구현 설명이 아니라 허용되는 실행 결과를 정의한다.
 기본기는 잠금으로 불변식을 보호하고, <strong>volatile</strong>은 한 변수의 가시성과 순서를 전달하는 데 쓴다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>운영 서버에서 종료 플래그를 일반 <strong>boolean</strong>으로 두면, 한 스레드가 <strong>true</strong>로 바꿔도 다른 스레드는 루프를 계속 돌 수 있다. JIT는 반복 읽기를 제거할 수 있고 sleep은 가시성을 보장하지 않는다. <strong>volatile</strong> 없는 이중 검사 락은 객체 완성 전에 참조를 공개할 수 있다.</p>
 <p>데이터 레이스는 동작을 불확정하게 만든다. <strong>count++</strong> 갱신 누락, 객체 필드의 기본값 관측, <strong>wait()</strong> 뒤 거짓 조건에서 진행하는 오류가 대표적이다. 서로 다른 순서로 잠금을 얻다가 멈추면 데드락이다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong><small>스레드 상태</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -108,7 +108,7 @@ JMM은 “메모리를 즉시 비운다”는 구현 설명이 아니라 허용�
 </tr>
 </tbody></table></div>
 <p><strong>wait</strong>와 <strong>sleep</strong>은 서로 바꿔 쓸 수 없다. <strong>wait</strong>는 해당 모니터를 보유한 상태에서만 부를 수 있고 그 객체의 모니터를 놓고 대기한다. <strong>sleep</strong>은 모니터를 놓지 않으며 조건 변화와도 연결되지 않는다. 어느 쪽도 그 자체로 공유 메모리 가시성을 제공하지 않는다.</p>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>실행 흐름과 상태 · 모니터와 wait/notify · JMM: 허용 결과를 정하는 규칙 · volatile, 불변 객체와 안전한 공개</small></span><span class="knowledge-chapter-meta">3개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="실행-흐름과-상태"><a class="anchor" href="#실행-흐름과-상태" aria-hidden="true">#</a>실행 흐름과 상태</h3>
 <p>**start()**는 호출 스레드에서 대상 **run()**을 실행하는 메서드 호출이 아니다. 새 스레드의 첫 동작은 <strong>start()</strong> 호출보다 happens-before다. 다른 스레드가 **join()**에서 정상 반환하면 종료한 스레드의 동작은 그 반환보다 happens-before다.</p>
 <pre><code class="language-text">Thread 객체 생성 ──&gt; NEW ──start()──&gt; RUNNABLE
@@ -161,7 +161,7 @@ Thread B: acquire 동작 ────── program order ──&gt; 공유 데�
 <li><strong>기아(starvation)</strong>: 특정 스레드가 잠금이나 CPU를 오래 얻지 못한다. <strong>synchronized</strong> 모니터는 공정한 대기 순서를 약속하지 않으며, 우선순위도 진행 보장으로 쓰지 않는다.</li>
 </ul>
 <p>데드락의 전형은 A가 <strong>x</strong>를 잡고 <strong>y</strong>를 기다리는 동안 B가 <strong>y</strong>를 잡고 <strong>x</strong>를 기다리는 순환이다. 공유 잠금의 획득 순서를 일관되게 정하면 이 순환을 차단할 수 있다.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1 — volatile로 데이터 게시 · 예제 2 — 조건 변수와 wait/notifyAll · 예제 3 — 올바른 이중 검사 락</small></span><span class="knowledge-chapter-meta">6개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>세 예제는 Corretto JDK 21에서 실행했다. **Thread.onSpinWait()**는 힌트일 뿐 가시성 보장은 <strong>volatile</strong>이 제공한다.</p>
 <h3 id="예제-1--volatile로-데이터-게시"><a class="anchor" href="#예제-1--volatile로-데이터-게시" aria-hidden="true">#</a>예제 1 — <strong>volatile</strong>로 데이터 게시</h3>
 <pre><code class="language-java">public class VolatileVisibilityDemo {
@@ -264,13 +264,13 @@ received=42</code></pre>
 }</code></pre>
 <p>바깥 검사는 초기화가 끝난 뒤 매번 클래스 모니터에 진입하지 않게 한다. 내부 재검사는 두 호출이 동시에 첫 검사를 통과한 경우 중복 생성을 막는다. <strong>instance</strong>를 <strong>volatile</strong>로 선언해 생성 완료 후 참조 게시에 release/acquire 순서를 부여한다.</p>
 <pre><code class="language-text">same=true, initializedValue=42</code></pre>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>Java 5 / JSR 133 (2004 최종 승인)</strong>: 이전 JMM은 의도치 않은 결과와 불명확한 동기화 관용구를 허용해 구현 최적화와 프로그래머 추론을 모두 어렵게 했다. 이를 고치기 위해 JLS 17의 스레드·잠금·volatile·데이터 레이스 의미를 크게 다시 규정했고 <strong>volatile</strong>, <strong>final</strong>, 안전한 재정렬의 근거가 현재의 모델로 정리됐다. <a href="https://jcp.org/en/jsr/detail?id=133" target="_blank" rel="noopener">JSR 133 상세</a></li>
 <li><strong>JDK 15 / JEP 374</strong>: 무경쟁 <strong>synchronized</strong>를 줄이려던 biased locking은 경합 시 회수 비용과 VM 복잡성에 비해 최근 앱에서 이득이 줄어 기본 비활성화되고 관련 옵션이 deprecated 됐다. 이는 JLS 잠금 의미 변경이 아니라 HotSpot 최적화 이력이다. <a href="https://openjdk.org/jeps/374" target="_blank" rel="noopener">JEP 374</a></li>
 <li><strong>JDK 24 / JEP 491</strong>: virtual thread가 <strong>synchronized</strong>에서 블로킹될 때 carrier를 붙잡던 구현 한계가 확장성을 제한해, 거의 모든 pinning 사례를 제거하도록 HotSpot이 바뀌었다. 모니터의 언어 의미를 대체하지 않으며 virtual thread 상세는 <a class="docref" href="J12-virtual-threads.html">J12</a> 참조. <a href="https://openjdk.org/jeps/491" target="_blank" rel="noopener">JEP 491</a></li>
 </ul>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>여러 필드가 함께 만족해야 하는 불변식이면</strong> 하나의 <strong>private final Object lock</strong>과 <strong>synchronized</strong>로 읽기·쓰기를 보호하라. 잠금 범위가 데이터 규칙을 드러내고, 한 필드만 volatile로 표시하는 식의 부분 보호를 피한다.</li>
 <li><strong>단일 상태 플래그를 한 스레드가 쓰고 여러 스레드가 읽으면</strong> <strong>volatile boolean</strong>을 사용하라. 플래그를 읽어 <strong>true</strong>가 된 뒤 관련 데이터를 읽는 설계라면 데이터 쓰기를 먼저 하고 volatile 플래그를 마지막에 써라.</li>
@@ -282,7 +282,7 @@ received=42</code></pre>
 <li><strong>여러 잠금을 써야 하면</strong> 모든 코드가 같은 전역 순서를 따르게 하라. 잠금 순환을 만들지 않고 코드 리뷰에서 순서가 확인되어야 한다.</li>
 </ul>
 <p><strong>기본값 추천:</strong> 변경 가능한 공유 데이터의 일관성이 목적이면 <strong>private final</strong> 모니터 하나에 접근을 모으고 <strong>synchronized</strong>로 보호한다. <strong>volatile</strong>은 독립 상태 전달에 한정해 고른다. </p>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>일반 boolean 종료 플래그</strong> — 증상: 종료 요청 뒤 무한 루프가 이어진다 → 원인: 읽기와 쓰기 사이 HB가 없고 컴파일러가 읽기를 재사용할 수 있다 → 대처: <strong>volatile</strong> 또는 같은 모니터로 읽기·쓰기를 동기화한다. **sleep()**은 해결책이 아니다.</li>
 <li><strong>if로 감싼 wait()</strong> — 증상: 조건이 거짓인데 큐를 비우거나 예외가 난다 → 원인: spurious wakeup, 경쟁자 선점, 다른 조건의 대기자가 같은 **notifyAll()**로 깨어날 수 있다 → 대처: 잠금 안에서 **while (!조건) wait()**로 재검사한다.</li>
@@ -293,7 +293,7 @@ received=42</code></pre>
 <li><strong>모니터를 풀지 않는 sleep()</strong> — 증상: 잠든 스레드가 공유 잠금을 계속 쥐어 다른 스레드가 진행하지 못한다 → 원인: **sleep()**은 모니터를 해제하지 않는다 → 대처: 임계 구역을 짧게 유지하고 조건 대기에는 올바른 <strong>wait()</strong> 패턴을 쓴다.</li>
 <li><strong>공개 객체 생성자에서 this 유출</strong> — 증상: 다른 스레드가 생성자 완료 전에 필드나 콜백을 관측한다 → 원인: 생성 도중 참조가 공유 위치에 저장되거나 다른 스레드에 전달됐다 → 대처: 생성 중 등록·시작을 피하고 객체 완성 후 안전한 채널로 공개한다. <strong>final</strong> 보장은 조기 유출을 정당화하지 않는다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p><strong>Q2. happens-before는 실제 CPU 실행 순서와 같은가?</strong><br>아니다. HB는 가시성과 관측 가능한 순서를 제한하는 명세상의 부분순서다.</p>
 <p>구현은 HB에 위배되는 결과가 생기지 않는 한 명령을 재배치할 수 있다.<br>따라서 “먼저 쓴 필드가 먼저 보인다”가 아니라 어떤 동기화 연결이 있는지 추적한다.</p>
 <p>꼬리질문: 같은 락의 unlock/lock은 어떤 역할인가? release-acquire 연결을 만들고 unlock 이전의 동작을 후속 lock 뒤의 동작에 공개한다.</p>
@@ -310,7 +310,7 @@ received=42</code></pre>
 <p><strong>Q7. final 필드가 있으면 객체를 아무렇게나 공개해도 되나?</strong><br>생성자가 완료되고 <strong>this</strong>가 생성 중 유출되지 않았다면 final 필드의 초기화 값에 특별한 가시성 보장이 있다.<br>일반 필드까지 같은 보장을 받는 것은 아니며, final 참조가 가리키는 가변 객체도 자동으로 thread-safe하지 않다.</p>
 <p>나머지 상태에는 안전한 공개와 후속 변경을 위한 동기화가 필요하다.<br>꼬리질문: final 참조가 가리키는 리스트는 불변인가?</p>
 <p>아니다. 참조 재할당이 금지될 뿐 리스트 원소 변경은 가능하다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>The Java Language Specification, Java SE 25, Chapter 17 — <a href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html" target="_blank" rel="noopener">https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html</a> — 모니터, wait set, JMM, happens-before, final 필드 의미의 정본.</li>
 <li>The Java Language Specification, Java SE 25, §12.4.2 — <a href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-12.html" target="_blank" rel="noopener">https://docs.oracle.com/javase/specs/jls/se25/html/jls-12.html</a> — 클래스 초기화의 동기화 절차.</li>
@@ -322,7 +322,24 @@ received=42</code></pre>
 <li>JEP 374: Deprecate and Disable Biased Locking — <a href="https://openjdk.org/jeps/374" target="_blank" rel="noopener">https://openjdk.org/jeps/374</a> — JDK 15 biased locking 기본 비활성화 배경.</li>
 <li>JEP 491: Synchronize Virtual Threads without Pinning — <a href="https://openjdk.org/jeps/491" target="_blank" rel="noopener">https://openjdk.org/jeps/491</a> — JDK 24에서 synchronized의 virtual thread pinning 구현을 개선한 이유.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 

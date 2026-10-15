@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S19. 패키징·컨테이너화·배포</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -16,10 +16,10 @@
 <blockquote>
 <p>실행 JAR는 배포 가능한 단위이고, 계층은 변경 범위를 작게 만드는 장치다.<br>컨테이너의 probe·자원·설정·종료 유예 시간은 애플리케이션의 실제 수명 주기와 맞춰야 한다.<br>기본 선택은 JVM 기반 계층형 이미지이며, 빌드팩은 단순함, Native Image는 시작 시간·메모리 요구가 분명할 때 선택한다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>개발 환경에서는 <code>java -jar app.jar</code>가 잘 되는데 컨테이너를 매번 새로 내려받느라 배포 시간이 길거나, Pod가 시작하자마자 liveness probe에 실패해 재시작을 반복할 수 있다. 실행 중인 요청이 남아 있는데 Kubernetes가 종료 유예 시간을 다 써 버리면 사용자는 배포 때마다 502·연결 끊김을 본다. 반대로 liveness가 DB 응답까지 검사하면 DB가 잠깐 느려졌을 때 살아 있는 애플리케이션을 한꺼번에 재시작해 장애를 키운다.</p>
 <p>JAR 하나만 넣으면 앱 코드가 바뀔 때 의존성 Docker layer까지 무효화될 수 있다. 배포 설계는 변경 주기, 종료 신호, 트래픽 전환을 함께 맞추는 일이다. 이 장은 실행 가능 JAR, 계층, 빌드팩, AOT/native, Kubernetes를 잇는다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong><small>헷갈리는 선택 비교</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -109,7 +109,7 @@
 <td>빌드가 무겁고 느리며, 지원되지 않는 동적 접근은 힌트와 테스트가 필요하다.</td>
 </tr>
 </tbody></table></div>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>3.1 실행 가능 JAR는 어떻게 시작되는가 · 3.2 Dockerfile과 Buildpacks가 이미지를 만드는 흐름 · 3.3 AOT·Native Image·CDS/AOT cache의 차이 · 3.4 종료 신호, probe, 트래픽 전환</small></span><span class="knowledge-chapter-meta">2개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="31-실행-가능-jar는-어떻게-시작되는가"><a class="anchor" href="#31-실행-가능-jar는-어떻게-시작되는가" aria-hidden="true">#</a>3.1 실행 가능 JAR는 어떻게 시작되는가</h3>
 <p>플러그인은 애플리케이션과 의존성 외에 Boot loader를 포함하고 manifest에 실행 진입점을 기록한다. 보통 <code>BOOT-INF/classes</code>는 앱 클래스, <code>BOOT-INF/lib</code>는 의존성, <code>BOOT-INF/layers.idx</code>는 계층 정의다. manifest의 <code>Main-Class</code>는 Boot launcher이고 실제 진입점은 <code>Start-Class</code>다.</p>
 <p><code>java -jar</code>가 launcher를 실행하면 loader가 중첩 의존성을 읽어 앱 main을 호출한다. 따라서 이를 <code>java -cp app.jar Main</code>으로 대체하면 nested JAR 의존성이 classpath에 풀리지 않는다.</p>
@@ -142,7 +142,7 @@
 <p>Boot는 내장 Tomcat·Jetty·Reactor Netty의 graceful shutdown을 기본 활성화한다. 컨텍스트 종료 초기에 서버가 새 요청을 멈추고 진행 중 요청에 시간을 준다. <code>spring.lifecycle.timeout-per-shutdown-phase</code>는 종료 단계 제한이며 앱 자체 스레드·스케줄러·소비자는 별도 lifecycle로 닫아야 한다.</p>
 <p>Kubernetes는 종료 신호 후 <code>terminationGracePeriodSeconds</code>가 지나면 프로세스를 강제 종료한다. 이 값은 앱의 종료 timeout보다 길게 두고 endpoint 갱신·sidecar 등에도 여유를 둔다. Startup 성공 전에는 다른 probe가 대기한다.</p>
 <p>Liveness 실패는 재시작, readiness 실패는 서비스 endpoint에서 제외를 뜻한다. DB 장애를 liveness에 연결하면 재시작 폭주가 날 수 있다. Actuator probe 상세는 <a class="docref" href="S16-actuator-observability.html">S16</a> 참조.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1 — 계층형 JAR 추출 Dockerfile · 예제 2 — Native Image 빌드 · 예제 3 — Graceful shutdown과 Kubernetes 배포 · 예제 4 — Azure Pipelines에서 이미지 빌드·배포</small></span><span class="knowledge-chapter-meta">5개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>아래 Spring Boot 4.1 배포 예시는 환경별 이미지·registry·Service Connection을 프로젝트 값으로 바꿔 사용한다. (미실행)</p>
 <h3 id="예제-1--계층형-jar-추출-dockerfile"><a class="anchor" href="#예제-1--계층형-jar-추출-dockerfile" aria-hidden="true">#</a>예제 1 — 계층형 JAR 추출 Dockerfile</h3>
 <p>패키징 결과는 <code>target/app.jar</code>라고 가정한다. Gradle은 <code>JAR_FILE</code>을 <code>build/libs</code>에 맞춘다.</p>
@@ -272,13 +272,13 @@ steps:
       manifests: $(Build.SourcesDirectory)/k8s/deployment.yaml
       containers: $(containerRegistry)/$(imageRepository):$(tag)</code></pre>
 <p>에이전트의 JDK를 고정하고, 운영 태그는 빌드 ID처럼 변경 불가능한 값으로 둔다. 태그를 덮어쓰면 같은 manifest가 다른 이미지를 가리킨다. (미실행)</p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>Spring Boot 2.3.0.M1 (2020)</strong>: JAR 전체 복사로 코드 변경마다 의존성 layer까지 갱신되는 문제를 줄이려 Buildpacks와 layered JAR를 도입했다. <a href="https://spring.io/blog/2020/01/27/creating-docker-images-with-spring-boot-2-3-0-m1/" target="_blank" rel="noopener">Spring 블로그</a></li>
 <li><strong>Spring Boot 3.0 세대 (2022)</strong>: 동적 JVM 실행만으로 빠른 기동·작은 footprint를 달성하기 어려워 AOT와 GraalVM Native Image 지원을 강화했다. <a href="https://spring.io/blog/2022/09/22/spring-boot-3-0-0-m5-available-now/" target="_blank" rel="noopener">Spring Boot 3.0.0-M5</a></li>
 <li><strong>현재 기준: Spring Boot 4.1.1</strong>: 2.3 시절 builder 설정을 복사하지 말고 <code>jarmode=tools</code>·AOT cache 등 현재 공식 설정을 따른다.</li>
 </ul>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>기본값 추천:</strong> JVM 실행 가능 JAR를 계층별로 추출하는 멀티 스테이지 Dockerfile과 비루트 runtime을 쓴다. 앱 변경 시 의존성 layer를 재사용하기 쉽고 운영 JVM 진단성을 유지한다.</li>
 <li>이미지 구성을 직접 통제하면 Dockerfile, 표준 이미지 생성을 간소화하려면 <code>bootBuildImage</code>를 고른다. builder/run image와 버전은 고정한다.</li>
@@ -290,7 +290,7 @@ steps:
 <li>Azure Pipelines는 <code>verify → build/push → deploy</code> 순서, 불변 이미지 태그, 최소 권한 Service Connection을 사용한다.</li>
 <li>JVM 옵션·CDS/Leyden 원리는 <a class="docref" href="J16-jvm-in-containers.html">J16</a>, probe endpoint 상세는 <a class="docref" href="S16-actuator-observability.html">S16</a> 참조.</li>
 </ul>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>앱만 바꿔도 이미지 전체 재전송 →</strong> JAR를 한 번에 <code>COPY</code> → <code>jarmode=tools extract --layers</code> 후 계층별 복사.</li>
 <li><strong><code>ClassNotFoundException</code> →</strong> plain JAR 또는 Boot loader를 classpath로 실행 → repackaged JAR를 <code>java -jar</code>로 실행.</li>
@@ -301,7 +301,7 @@ steps:
 <li><strong>OOMKilled·CPU throttling →</strong> request·limit이 실측과 무관 → 부하를 측정해 조정하고 JVM 메모리는 <a class="docref" href="J16-jvm-in-containers.html">J16</a>과 맞춤.</li>
 <li><strong>ConfigMap 변경이 기존 Pod에 미반영 →</strong> 환경 변수는 시작 때 주입 → 새 Pod로 rollout.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. 실행 가능 JAR가 일반 JAR와 다른 점은? · Q2. layered JAR가 Docker 이미지 전송량을 줄이는 원리는? · Q3. jarmode=tools는 앱 런타임인가? · Q4. Buildpacks와 Dockerfile은 언제 각각 고르나?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-실행-가능-jar가-일반-jar와-다른-점은"><a class="anchor" href="#q1-실행-가능-jar가-일반-jar와-다른-점은" aria-hidden="true">#</a>Q1. 실행 가능 JAR가 일반 JAR와 다른 점은?</h3>
 <p>Boot loader가 중첩 의존성을 읽고 manifest의 <code>Start-Class</code>를 호출한다. 일반 <code>java -cp app.jar Main</code>은 내부 JAR를 classpath에 풀지 않는다. 따라서 Boot 실행 JAR는 <code>java -jar</code>로 시작한다.</p>
 <p><strong>꼬리질문:</strong> 왜 <code>BOOT-INF/lib</code>를 쓰나? Boot loader가 그 안의 nested JAR를 읽어 클래스 경로를 구성하기 때문이다.</p>
@@ -326,7 +326,7 @@ steps:
 <h3 id="q8-configmapsecretresource-requestlimit을-어떻게-구분하나"><a class="anchor" href="#q8-configmapsecretresource-requestlimit을-어떻게-구분하나" aria-hidden="true">#</a>Q8. ConfigMap·Secret·resource request/limit을 어떻게 구분하나?</h3>
 <p>ConfigMap은 비밀 아닌 설정, Secret은 자격 증명 용도다. request는 주로 스케줄 배치에 쓰이고 limit은 사용 상한이며 CPU는 throttling, 메모리는 초과 시 OOM 종료가 가능하다.</p>
 <p><strong>꼬리질문:</strong> ConfigMap을 환경 변수로 바꾸면 기존 JVM이 즉시 읽나? 아니다. 새 Pod를 rollout해야 한다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>The Executable Jar Format — <a href="https://docs.spring.io/spring-boot/specification/executable-jar/index.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/specification/executable-jar/index.html</a> — JAR 구조.</li>
 <li>Efficient Deployments — <a href="https://docs.spring.io/spring-boot/reference/packaging/efficient.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/packaging/efficient.html</a> — 추출 레이아웃과 tools 모드.</li>
@@ -343,7 +343,24 @@ steps:
 <li>Spring Boot 2.3 Docker images — <a href="https://spring.io/blog/2020/01/27/creating-docker-images-with-spring-boot-2-3-0-m1/" target="_blank" rel="noopener">https://spring.io/blog/2020/01/27/creating-docker-images-with-spring-boot-2-3-0-m1/</a> — Buildpacks·layered JAR 도입.</li>
 <li>Spring Boot 3.0 M5 — <a href="https://spring.io/blog/2022/09/22/spring-boot-3-0-0-m5-available-now/" target="_blank" rel="noopener">https://spring.io/blog/2022/09/22/spring-boot-3-0-0-m5-available-now/</a> — AOT·Native 지원 강화.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 

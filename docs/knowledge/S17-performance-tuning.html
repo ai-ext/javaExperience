@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S17. Spring Boot 애플리케이션 성능</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -20,11 +20,11 @@
 <li>지표와 현실적인 부하로 가설을 검증하고, 시작 시간·메모리·지연 시간·오류율을 함께 본다.</li>
 </ul>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>장애 때 Tomcat 스레드를 200에서 800으로 올렸더니 DB 풀 대기와 API p99가 함께 나빠질 수 있다. worker는 실행 자리를 늘려도 DB 처리 능력을 늘리지 않는다. 나머지 요청은 커넥션을 기다리며 worker와 메모리를 점유해 큐·timeout을 키운다. “스레드 부족” 로그만 보고 숫자를 바꾸면 병목을 옮길 뿐이다.</p>
 <p>서버의 <code>connection-timeout</code>을 요청 제한 시간으로 착각해도 안 된다. 이 값은 Tomcat이 HTTP 연결에서 요청 데이터를 기다리는 단계와 관련되며 DB 쿼리 실행을 막지 않는다. DB가 끝나기 전에 프록시가 연결을 끊으면 서버 작업이 계속될 수 있다. 계층별 제한이 맞지 않으면 재시도까지 겹쳐 부하가 커진다.</p>
 <p>기동 시간도 같은 원리다. “Started in 8 seconds”라는 합계만으로는 느린 자동 구성, 데이터베이스 연결, 빈 생성 중 무엇을 고칠지 알 수 없다. 지연 초기화로 시작 로그만 빨라졌는데 첫 사용자 요청이 설정 오류로 실패할 수도 있다. 측정 없이 옵션을 바꾸지 말고, 원인과 사용자에게 보이는 지연을 따로 확인해야 한다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong><small>헷갈리는 한계값</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -121,7 +121,7 @@
 </tbody></table></div>
 <p>Spring Boot 4.1.1의 공통 속성 문서에서 Tomcat worker 기본값은 <code>server.tomcat.threads.max=200</code>, <code>min-spare=10</code>이다. <code>max-queue-capacity</code>의 문서 기본값은 2147483647이며 0보다 큰 값에서 설정이 적용된다. 이는 운영에서 대기열을 사실상 무제한으로 열어 두라는 권고가 아니다.</p>
 <p>큐가 쌓이면 완료율은 늘지 않은 채 대기 시간과 메모리 점유가 늘 수 있으므로 실제 부하와 실패 동작을 보고 제한한다. 값은 <a href="https://docs.spring.io/spring-boot/appendix/application-properties/index.html" target="_blank" rel="noopener">공통 속성 문서</a>의 현재 버전을 기준으로 삼고, 배포 버전에서 다시 확인한다.</p>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>요청 경로와 포화 전파 · 시간 제한의 전파 · 기동 시간 계측과 lazy initialization · 메모리 사용을 추적하는 순서</small></span><span class="knowledge-chapter-meta">3개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="요청-경로와-포화-전파"><a class="anchor" href="#요청-경로와-포화-전파" aria-hidden="true">#</a>요청 경로와 포화 전파</h3>
 <pre><code class="language-text">클라이언트
    │ 요청·deadline
@@ -163,7 +163,7 @@ DB ── CPU·디스크·락·동시 세션 한도</code></pre>
 </ol>
 <p>Actuator/Micrometer는 메트릭을 레지스트리에 연결해 시간에 따른 JVM과 프로세스 상태를 관측하는 기반을 제공한다. 진단 endpoint를 켜는 것과 HTTP로 외부에 노출하는 것은 별도 설정으로 확인한다.</p>
 <p>Boot endpoint 문서는 웹 애플리케이션에서 <code>heapdump</code>를 제공하며 endpoint 접근 정책상 기본 unrestricted 예외에 해당한다고 설명한다. 그렇다고 모든 애플리케이션에서 자동으로 외부 공개된다는 뜻은 아니지만, 운영 노출 목록과 인증·접근 제어를 반드시 확인해야 한다.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1 — Tomcat, Hikari, 시간 제한의 출발 설정 · 예제 2 — 단계별 Spring 기동 기록 · 예제 3 — k6에서 요청률과 SLO를 함께 고정</small></span><span class="knowledge-chapter-meta">3개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>다음 숫자는 공통 기본값이 아니라 시작점 예시다. 실제 replica 수, DB 용량, 지연 목표에 맞춰 부하 시험으로 바꾼다.</p>
 <h3 id="예제-1--tomcat-hikari-시간-제한의-출발-설정"><a class="anchor" href="#예제-1--tomcat-hikari-시간-제한의-출발-설정" aria-hidden="true">#</a>예제 1 — Tomcat, Hikari, 시간 제한의 출발 설정</h3>
 <pre><code class="language-yaml"># application.yml — Boot 4.1 설정 예시 (미실행)
@@ -233,13 +233,13 @@ export default function () {
 }</code></pre>
 <p>예를 들어 <code>BASE_URL=https://staging.example.com k6 run load.js</code>처럼 실행한다. 50 req/s와 임계값은 문법 예시일 뿐 서비스 SLO나 목표 부하가 아니다. 시나리오 executor는 고정 VU, 반복 수, 도착률 등 서로 다른 부하 형태를 모델링한다.</p>
 <p>고정 도착률은 요청 처리 시간이 늘어도 시작 요청률을 유지하려는 부하에 적합하지만, 생성기 자체가 충분한 VU와 자원을 확보했는지 확인해야 한다. threshold는 시험 결과를 성공/실패로 판정해 CI에서 SLO를 강제하는 기준이 된다.</p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>Spring Boot 2.4.0 — <code>BufferingApplicationStartup</code> 도입.</strong> 전체 시작 로그만으로는 개별 초기화 단계의 비용을 분리하기 어려워 단계별 기록과 시간 분석을 위한 구현이 추가됐다. API 문서가 <code>Since: 2.4.0</code>으로 명시한다. 현재 문서 기준 Boot 4.1에서는 클래스 패키지가 <code>org.springframework.boot.context.metrics.buffering</code>이다.</li>
 <li><strong>Java 19·20 preview → Java 21 정식화 — Virtual Threads (JEP 444).</strong> 전통적인 스레드당 요청 방식은 많은 블로킹 I/O 대기 작업에서 플랫폼 스레드 관리 비용이 커질 수 있어, 더 가벼운 동시성 방식이 도입됐다. Boot의 Tomcat 속성 문서도 virtual threads가 활성화되면 <code>server.tomcat.threads.max</code>가 영향을 주지 않는다고 명시한다. 가벼운 스레드가 CPU나 DB 연결을 늘리지는 않으므로 DB 풀과 downstream 한도는 계속 측정한다.</li>
 <li><strong>현재 기준 — Boot 4.1.1 / Framework 7.0.9.</strong> 서버 속성 이름과 기본값은 버전에 따라 문서에서 확인한다. 이 문서의 worker 기본값은 Boot 4.1.1 공통 속성 문서 기준이며, 오래된 블로그의 Tomcat 설정 키나 기본값을 복사하지 않는다.</li>
 </ul>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong><small>부하 시험 설계</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Tomcat worker가 max에 붙지만 DB 풀 여유·CPU 비포화라면 worker를 조금 늘려 p95/p99·오류율·큐를 비교한다. <code>max-queue-capacity</code>는 유한하게 둔다.</li>
 <li>DB <code>pending</code>·CPU·락 대기가 늘면 worker를 키우지 말고 쿼리 시간과 전체 연결 예산을 본다. 풀은 DB 처리량이 늘어나는 범위에서 정한다.</li>
@@ -259,7 +259,7 @@ export default function () {
 </ol>
 <p>k6은 JavaScript 시나리오에 executor와 metric threshold를 선언하는 방식이라 작은 스크립트와 CI 성능 게이트를 만들기 쉽다. Gatling은 시뮬레이션에 <code>injectOpen</code> 또는 <code>injectClosed</code> 프로파일을 설정하고 주입 단계를 순서대로 조합하며 Java, Kotlin, Scala, JavaScript API를 제공한다.</p>
 <p>open 모델은 사용자 도착률을 고정하는 서비스 트래픽에, closed 모델은 동시 사용자 수와 사용자 think time이 부하를 정하는 경우에 가깝다. 어떤 도구든 스크립트가 실제 사용자 경로, 인증, 데이터 분포, think time을 대표하는지가 결과 신뢰도를 좌우한다.</p>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>worker 숫자만 크게 올림</strong> — busy thread 경고는 줄었는데 p99와 DB 대기가 악화된다 → 처리량이 아니라 동시에 실행·대기하는 작업만 늘었다 → CPU, Hikari pending, DB wait를 함께 확인하고 가장 먼저 포화되는 자원을 제한한다.</li>
 <li><strong>풀 크기를 요청 스레드 수와 1:1로 설정</strong> — DB 세션 수가 replica 수와 함께 폭증한다 → 인스턴스별 한도만 보고 전체 연결 예산을 계산하지 않았다 → 배포 중 최대 replica와 batch·운영 연결까지 더해 DB 한도 내에서 재시험한다.</li>
@@ -270,7 +270,7 @@ export default function () {
 <li><strong>heap만 보고 컨테이너 메모리를 판단</strong> — JVM heap은 안정적인데 컨테이너 OOM으로 재시작한다 → RSS에는 direct memory, 스레드 스택 등 heap 외부 영역도 포함된다 → cgroup 메모리, 프로세스 RSS, heap을 같은 축에서 비교한다.</li>
 <li><strong>평균 응답 시간으로 통과 판정</strong> — 평균은 괜찮지만 일부 요청이 timeout을 넘는다 → 극단 지연 꼬리가 평균에 가려졌다 → 요청 유형별 p95/p99와 오류율 threshold를 정하고 같은 데이터 크기로 반복한다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. Tomcat worker를 늘렸는데 처리량이 줄 수도 있는 이유는? · Q2. Tomcat thread 수와 max-connections는 어떻게 다른가? · Q3. Hikari 풀을 키우면 DB 처리량이 항상 늘지 않는 이유는? · Q4. server.tomcat.connection-timeout을 요청 제한 시간으로 써도 될까?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-tomcat-worker를-늘렸는데-처리량이-줄-수도-있는-이유는"><a class="anchor" href="#q1-tomcat-worker를-늘렸는데-처리량이-줄-수도-있는-이유는" aria-hidden="true">#</a>Q1. Tomcat worker를 늘렸는데 처리량이 줄 수도 있는 이유는?</h3>
 <p>worker는 동시에 실행 가능한 서블릿 작업의 수만 늘린다. DB나 CPU가 이미 포화이면 추가 worker는 더 많은 경쟁 요청과 문맥 전환, 커넥션 대기를 만든다. busy worker 수 하나만 보지 말고 DB 풀 pending, DB wait, p99가 함께 어떻게 움직이는지 확인한다.</p>
 <ul>
@@ -301,7 +301,7 @@ export default function () {
 <ul>
 <li><strong>꼬리질문:</strong> lazy 설정 후 시작 시간이 줄지 않으면? <strong>답:</strong> eager 빈이 해당 빈에 의존하거나 다른 초기화 작업이 병목일 수 있다. startup timeline으로 실제 생성 경로를 찾는다.</li>
 </ul>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>SpringApplication :: Spring Boot — <a href="https://docs.spring.io/spring-boot/reference/features/spring-application.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/features/spring-application.html</a> — 기동 로그와 SpringApplication 시작 동작을 확인.</li>
 <li>About Pool Sizing — <a href="https://github.com/brettwooldridge/HikariCP/wiki/About-Pool-Sizing" target="_blank" rel="noopener">https://github.com/brettwooldridge/HikariCP/wiki/About-Pool-Sizing</a> — 작은 DB 풀과 CPU·I/O 경합의 원리를 설명하며 소개된 개선 수치는 특정 시연 사례.</li>
@@ -317,7 +317,24 @@ export default function () {
 <li>JEP 444: Virtual Threads — <a href="https://openjdk.org/jeps/444" target="_blank" rel="noopener">https://openjdk.org/jeps/444</a> — Java 21 정식화와 경량 스레드의 목표·이력을 확인.</li>
 </ul>
 <p>GC·JIT 세부는 → <a class="docref" href="J14-memory-gc.html">J14</a>/<a class="docref" href="J15-jit-profiling.html">J15</a>, native·AOT는 → <a class="docref" href="S19-packaging-deploy.html">S19</a> 참조.</p>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 

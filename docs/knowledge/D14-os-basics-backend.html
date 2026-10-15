@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>D14. 백엔드 개발자를 위한 운영체제 기초 — 프로세스·스레드·메모리·I/O</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,7 +18,7 @@
 서버 성능은 CPU 계산 시간만이 아니라 스케줄링, 페이지 폴트, 파일 디스크립터, I/O 대기와 스레드풀 포화의 합이다.
 JVM과 Spring도 이 흐름 위에 있으므로, 장애 때 Java 로그와 <code>ps</code>, <code>/proc</code>, <code>vmstat</code>를 함께 본다.</p>
 </blockquote>
-<h2 id="1-큰-그림"><a class="anchor" href="#1-큰-그림" aria-hidden="true">#</a>1. 큰 그림</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-큰-그림" aria-label="1. 큰 그림 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 큰 그림</strong></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <pre class="mermaid">flowchart LR
     A[&quot;클라이언트 요청&quot;] --&gt; B[&quot;소켓 파일 디스크립터&quot;]
     B --&gt; C[&quot;커널 네트워크 스택&quot;]
@@ -32,7 +32,7 @@ JVM과 Spring도 이 흐름 위에 있으므로, 장애 때 Java 로그와 <code
     I --&gt; J[&quot;cgroup 제한 또는 OOM&quot;]</pre>
 <p>운영체제는 여러 프로그램을 동시에 실행하는 것처럼 보이게 한다. 프로세스별 가상 주소 공간을 만들고, 각 프로세스의 스레드를 CPU 코어에 배치한다. 파일·소켓 작업은 시스템 콜로 커널에 요청하며, 커널은 잠든 스레드를 깨우거나 <code>epoll</code>로 여러 디스크립터를 감시한다.</p>
 <p>Spring Boot의 요청 한 건도 이 흐름의 한 지점이다. JVM 프로세스 안에서 Tomcat 작업 스레드가 요청을 실행하거나, WebFlux의 Netty 이벤트루프가 이벤트를 처리한다. 컨테이너에서는 같은 프로세스가 namespace로 보이는 자원을 격리하고 cgroup으로 CPU·메모리 사용량을 제한한다. 이 문서는 전체 개발 과정(<a class="docref" href="D01-dev-lifecycle-overview.html">D01</a>) 중 “프로그램이 실행되어 서버 자원과 상호작용하는 단계”를 소유한다.</p>
-<h2 id="2-용어-사전"><a class="anchor" href="#2-용어-사전" aria-hidden="true">#</a>2. 용어 사전</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-용어-사전" aria-label="2. 용어 사전 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 용어 사전</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -235,7 +235,7 @@ JVM과 Spring도 이 흐름 위에 있으므로, 장애 때 Java 로그와 <code
 <td>격리(namespace)와 제한(cgroup)은 별개다</td>
 </tr>
 </tbody></table></div>
-<h2 id="3-단계별로-보기"><a class="anchor" href="#3-단계별로-보기" aria-hidden="true">#</a>3. 단계별로 보기</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-단계별로-보기" aria-label="3. 단계별로 보기 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 단계별로 보기</strong><small>3.1 실행: 프로그램에서 프로세스로 · 3.2 실행: 스레드와 스케줄링 · 3.3 메모리: 주소에서 페이지까지 · 3.4 I/O: 시스템 콜부터 이벤트루프까지</small></span><span class="knowledge-chapter-meta">3개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="31-실행-프로그램에서-프로세스로"><a class="anchor" href="#31-실행-프로그램에서-프로세스로" aria-hidden="true">#</a>3.1 실행: 프로그램에서 프로세스로</h3>
 <p>쉘이 <code>java -jar app.jar</code>를 실행하면 런처가 JVM 프로세스를 만들고, JVM은 자신의 가상 주소 공간에 코드, 클래스 메타데이터, Java heap, 스레드 스택, native 라이브러리와 mmap 영역을 배치한다. Linux <code>fork()</code>는 호출 프로세스를 복제한 자식 프로세스를 만들며 부모와 자식의 주소 공간은 분리된다.</p>
 <p>구현은 처음부터 모든 RAM을 복사하기보다 copy-on-write 페이지를 공유하고, 한쪽이 쓰는 시점에 페이지를 분리하는 방식으로 복제 비용을 늦춘다. <code>fork()</code> 후 자식이 <code>execve()</code>를 호출하면 실행 이미지를 다른 프로그램으로 바꾼다.</p>
@@ -290,7 +290,7 @@ JVM과 Spring도 이 흐름 위에 있으므로, 장애 때 Java 로그와 <code
 <p>edge-triggered에서는 non-blocking FD를 사용하고 <code>read</code>/<code>write</code>가 <code>EAGAIN</code>을 반환할 때까지 처리해야 한다. 일부만 읽고 다시 기다리면 남은 데이터가 있어도 새 이벤트가 오지 않아 연결이 멈출 수 있다.</p>
 <p>Spring Boot servlet 애플리케이션은 기본적으로 embedded Tomcat을 포함하고, WebFlux는 Reactor Netty를 포함한다. Tomcat 모델에서는 작업 스레드가 요청 코드의 블로킹 I/O 동안 기다리는 것이 자연스럽다. Netty 이벤트루프 모델에서는 이벤트루프가 짧은 작업만 처리하고, JDBC·파일 읽기 같은 블로킹 작업을 이벤트루프에서 실행하면 같은 루프의 여러 연결이 함께 지연된다.</p>
 <p>virtual thread는 Java 21에서 정식화된 JEP 444 기능으로, 블로킹 I/O 때 Java 실행을 suspend하여 carrier OS 스레드를 다른 virtual thread에 양보한다. 그래도 CPU-bound 코드를 더 빨리 만들거나 DB 커넥션 풀의 한도를 없애지는 않는다.</p>
-<h2 id="4-직접-해보기"><a class="anchor" href="#4-직접-해보기" aria-hidden="true">#</a>4. 직접 해보기</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-직접-해보기" aria-label="4. 직접 해보기 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 직접 해보기</strong><small>4.1 Java에서 플랫폼 스레드·virtual thread·파일 I/O 확인 · 4.2 Java 프로세스와 JVM 메모리 관찰 · 4.3 FD 누수와 한도 확인 · 4.4 Spring Boot 4.1에서 연결하기</small></span><span class="knowledge-chapter-meta">5개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="41-java에서-플랫폼-스레드virtual-thread파일-io-확인"><a class="anchor" href="#41-java에서-플랫폼-스레드virtual-thread파일-io-확인" aria-hidden="true">#</a>4.1 Java에서 플랫폼 스레드·virtual thread·파일 I/O 확인</h3>
 <p>아래 예제는 JDK 21에서도 실행 가능하고, Java 25 기준에서도 같은 API를 쓸 수 있다. virtual thread는 JEP 444(Java 21)로 정식화되었다. 예제는 스레드 종류를 구분하고, 파일 읽기라는 I/O를 실행한다.</p>
 <pre><code class="language-java">import java.nio.file.Files;
@@ -345,7 +345,7 @@ ss -tanp | grep &lt;PID&gt;</code></pre>
 <h3 id="44-spring-boot-41에서-연결하기"><a class="anchor" href="#44-spring-boot-41에서-연결하기" aria-hidden="true">#</a>4.4 Spring Boot 4.1에서 연결하기</h3>
 <p>Spring MVC는 <code>spring-boot-starter-webmvc</code>와 embedded Tomcat을, WebFlux는 <code>spring-boot-starter-webflux</code>와 Reactor Netty를 기본 조합으로 사용한다. Boot 4.1.1·Java 25 Gradle에서 <code>jps -lv</code>, <code>jcmd &lt;PID&gt; Thread.print</code>, <code>curl http://localhost:8080/</code>를 확인한다.</p>
 <p>컨트롤러의 <code>Thread.sleep(5000)</code>은 Tomcat 스레드 점유를 보여준다. WebFlux 이벤트루프의 JDBC·파일 I/O는 여러 연결을 지연시키므로 실험 후 제거한다.</p>
-<h2 id="5-자주-하는-오해와-실수"><a class="anchor" href="#5-자주-하는-오해와-실수" aria-hidden="true">#</a>5. 자주 하는 오해와 실수</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-자주-하는-오해와-실수" aria-label="5. 자주 하는 오해와 실수 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 자주 하는 오해와 실수</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><p><strong>“프로세스 메모리 = <code>-Xmx</code>” →</strong> <code>-Xmx</code>는 Java heap 상한일 뿐이다. 스레드 스택, Metaspace, direct memory, native library, mmap과 페이지가 더해져 컨테이너 OOM이 날 수 있다. <strong>대처:</strong> heap과 RSS를 함께 보고 cgroup limit 아래에 native 여유를 남긴다.</p>
 </li>
@@ -362,7 +362,7 @@ ss -tanp | grep &lt;PID&gt;</code></pre>
 <li><p><strong>“서버가 느리면 GC부터 튜닝한다” →</strong> swap, page fault, FD 고갈, 스레드풀 큐, DB 커넥션 대기일 수 있다. <strong>대처:</strong> 요청 latency와 함께 <code>vmstat</code>, <code>ps -L</code>, <code>/proc</code>, 풀 metric을 시간축으로 맞춘다.</p>
 </li>
 </ol>
-<h2 id="6-시각화-설계-메모"><a class="anchor" href="#6-시각화-설계-메모" aria-hidden="true">#</a>6. 시각화 설계 메모</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-시각화-설계-메모" aria-label="6. 시각화 설계 메모 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 시각화 설계 메모</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><p><strong>[요청의 OS 경로 | 요소: client, socket FD, kernel, Tomcat/Netty, JVM, DB | 관계: 호출·대기·깨움 | 순서: 도착→ready→실행→DB 대기→응답 | 오해: Java 메서드 호출만으로 끝나지 않음]</strong> 위 flowchart를 기본 장면으로 쓴다.</p>
 </li>
@@ -373,7 +373,7 @@ ss -tanp | grep &lt;PID&gt;</code></pre>
 <li><p><strong>[I/O 모델 비교 | 요소: 연결, 스레드, event loop, ready list | 관계: sleep/wakeup·notification | 순서: 증가→풀 포화→ready list→처리 | 오해: non-blocking FD와 앱 전체는 다름]</strong> 3.4를 나란히 보여준다.</p>
 </li>
 </ol>
-<h2 id="7-자가점검-qa-면접-대비"><a class="anchor" href="#7-자가점검-qa-면접-대비" aria-hidden="true">#</a>7. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-자가점검-qa-면접-대비" aria-label="7. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. 프로세스와 스레드의 차이는 무엇인가? · Q2. 동시성과 병렬성은 어떻게 다른가? · Q3. 컨텍스트 스위칭이 왜 비용인가? · Q4. epoll은 무엇을 해결하며 edge-triggered의 함정은?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-프로세스와-스레드의-차이는-무엇인가"><a class="anchor" href="#q1-프로세스와-스레드의-차이는-무엇인가" aria-hidden="true">#</a>Q1. 프로세스와 스레드의 차이는 무엇인가?</h3>
 <p>프로세스는 독립된 가상 주소 공간과 자원 경계를 갖고, 스레드는 한 프로세스 안의 실행 단위다. 스레드는 heap·FD 같은 자원을 공유해 전환과 통신이 상대적으로 가볍지만 경쟁과 장애 전파가 생긴다. 프로세스 분리는 비용이 더 크지만 한 프로세스의 메모리 오류가 다른 프로세스로 바로 번지지 않는다.</p>
 <p>꼬리질문: <code>fork()</code> 직후 부모와 자식은 메모리를 바로 두 벌 복사하는가?  → 보통 copy-on-write로 페이지를 공유하다가 쓰기 시 분리한다.</p>
@@ -392,7 +392,7 @@ ss -tanp | grep &lt;PID&gt;</code></pre>
 <h3 id="q6-뮤텍스와-세마포어는-어떻게-구분하는가"><a class="anchor" href="#q6-뮤텍스와-세마포어는-어떻게-구분하는가" aria-hidden="true">#</a>Q6. 뮤텍스와 세마포어는 어떻게 구분하는가?</h3>
 <p>뮤텍스는 한 소유자만 임계구역에 들어가도록 상호배제를 표현하는 잠금이다. 세마포어는 허용된 동시 진입 수를 카운터로 표현하므로 DB 커넥션이나 외부 API 호출 수 제한에 맞다. 둘 다 잘못된 순서·해제 누락으로 대기와 장애를 만들 수 있다.</p>
 <p>꼬리질문: 데드락의 전형적인 조건은? → 상호배제, 점유 후 대기, 강제 선점 불가, 순환 대기의 네 조건이 동시에 성립하는 상태다.</p>
-<h2 id="8-참고문헌"><a class="anchor" href="#8-참고문헌" aria-hidden="true">#</a>8. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-참고문헌" aria-label="8. 참고문헌 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><code>epoll(7) — Linux manual page</code> — <a href="https://man7.org/linux/man-pages/man7/epoll.7.html" target="_blank" rel="noopener">https://man7.org/linux/man-pages/man7/epoll.7.html</a> — epoll과 LT·ET.</li>
 <li><code>fork(2) — Linux manual page</code> — <a href="https://man7.org/linux/man-pages/man2/fork.2.html" target="_blank" rel="noopener">https://man7.org/linux/man-pages/man2/fork.2.html</a> — 프로세스 복제와 FD 상속.</li>
@@ -405,7 +405,24 @@ ss -tanp | grep &lt;PID&gt;</code></pre>
 <li><code>JEP 444: Virtual Threads</code> — <a href="https://openjdk.org/jeps/444" target="_blank" rel="noopener">https://openjdk.org/jeps/444</a> — Java 21 정식화.</li>
 <li><code>Embedded Web Servers :: Spring Boot</code> — <a href="https://docs.spring.io/spring-boot/how-to/webserver.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/how-to/webserver.html</a> — Tomcat과 Reactor Netty.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 <script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';

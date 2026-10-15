@@ -15,7 +15,7 @@ import { renderScreen, withImplementationCode } from './scenario-content.mjs';
 import { renderCatalog, renderStage } from './api-architecture-view.mjs';
 import { renderLearningJourney } from './learning-journey.mjs';
 import { renderKnowledgeVisual } from './knowledge-visual.mjs';
-import { renderKnowledgePageVisual } from './knowledge-page-visual.mjs';
+import { renderKnowledgePageVisual, renderKnowledgePageSections } from './knowledge-page-visual.mjs';
 import { renderMissionVisual } from './mission-visual.mjs';
 import { renderMissionDetails } from './mission-detail-visual.mjs';
 import { renderHomeVisual } from './home-visual.mjs';
@@ -351,7 +351,11 @@ function page({ abs, title, body, hasMermaid }) {
   }
   if (abs.startsWith(`${DOC_DIR}${path.sep}`) && path.basename(abs).match(/^[A-Z]\d{2}-.*\.md$/)) {
     const titleEnd = body.indexOf('</h1>') + '</h1>'.length;
-    if (titleEnd > 5) body = body.slice(0, titleEnd) + renderKnowledgePageVisual(abs, body) + body.slice(titleEnd);
+    if (titleEnd > 5) {
+      const visual = renderKnowledgePageVisual(abs, body);
+      body = renderKnowledgePageSections(body);
+      body = body.slice(0, titleEnd) + visual + body.slice(titleEnd);
+    }
   }
   if (abs === path.join(ROOT, 'practice/MISSIONS.md')) {
     const firstSection = body.search(/<h2\b/);

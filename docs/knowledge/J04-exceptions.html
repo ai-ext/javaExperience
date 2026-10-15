@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J04. 예외 처리</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=280eea38a5b5">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,11 +18,11 @@
 체크 예외는 호출자에게 복구 결정을 강제하고, 언체크 예외는 호출자가 계약을 어겼거나 현재 계층에서 복구할 수 없다는 뜻으로 쓴다.
 리소스는 <code>try-with-resources</code>로 닫고, 정리 과정의 실패는 원래 실패의 suppressed 예외로 보존한다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>파일을 쓰던 중 본문에서 <code>IOException</code>이 났는데 <code>finally</code>의 <code>close()</code>가 또 예외를 던지면, 잘못 작성된 정리 코드는 처음 쓰기 실패를 덮어써서 로그에 닫기 실패만 남길 수 있다. 원인을 찾는 데 필요한 가장 중요한 정보가 사라진다. <code>try-with-resources</code>는 본문 실패를 주 예외로 유지하고 닫기 실패를 suppressed 목록에 붙인다.</p>
 <p>또 다른 사고는 계층 사이에서 예외를 바꾸며 원인을 버리는 것이다. 저장소 계층의 <code>SQLException</code>을 서비스 예외로 바꿀 때 <code>new ServiceException(e.getMessage())</code>만 던지면 DB 드라이버와 호출 경로가 담긴 원인 체인이 사라진다.</p>
 <p>반대로 모든 예외를 <code>catch (Exception)</code>으로 잡아 <code>null</code>을 반환하면 호출자는 실패와 정상적인 “값 없음”을 구분하지 못한다. 예외 타입과 체인은 로그 장식이 아니라 복구·관측·API 경계의 계약이다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>모든 던질 수 있는 객체는 <code>Throwable</code> 하위 타입이다. 표준 계층은 <code>Object → Throwable → Error / Exception</code>이고, <code>RuntimeException</code>은 <code>Exception</code>의 하위 타입이다.</p>
 <p>JVM도 배열 범위 오류 같은 런타임 실패를 <code>Throwable</code> 하위 객체로 표현한다. JLS는 예외를 발생 지점에서 프로그램이 지정한 포착 지점으로 제어를 옮기는 비지역 제어 이동으로 정의한다.[JLS 11.1, 11.3]</p>
 <div class="table-wrap"><table>
@@ -101,7 +101,7 @@
 </tr>
 </tbody></table></div>
 <p>호출자가 다른 파일 선택·재시도처럼 의미 있는 복구를 할 수 있고 책임을 API 계약으로 고정하려면 checked를 고려한다. 호출자가 해결할 수 없거나 입력 계약·객체 상태가 잘못된 실패라면 unchecked가 자연스럽다. 기준은 “누가 어떤 대안을 실행할 수 있는가”다. Oracle의 unchecked 논의는 JDK 8 튜토리얼이며 체크 규칙은 현행 JLS를 따른다.</p>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>발생부터 포착까지 · try-with-resources와 suppressed · finally의 완료 규칙 · 예외 변환과 체이닝</small></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="발생부터-포착까지"><a class="anchor" href="#발생부터-포착까지" aria-hidden="true">#</a>발생부터 포착까지</h3>
 <pre class="mermaid">flowchart TD
     A[throw 또는 JVM이 예외 생성] --&gt; B[현재 위치의 가장 안쪽 try 확인]
@@ -129,7 +129,7 @@
 <h3 id="람다에서-checked-exception이-막히는-이유"><a class="anchor" href="#람다에서-checked-exception이-막히는-이유" aria-hidden="true">#</a>람다에서 checked exception이 막히는 이유</h3>
 <p>람다의 허용 예외는 대상 함수형 인터페이스의 추상 메서드 시그니처가 결정한다. <code>Runnable.run()</code>과 <code>Consumer.accept()</code>는 checked를 선언하지 않지만 <code>Callable.call()</code>이나 <code>IOAction.run() throws IOException</code>은 전달 가능하다.[JLS 15.27; JLS 11.2]</p>
 <p>호출부가 처리하게 하려면 checked 인터페이스를 쓰고, unchecked 계약의 API 경계에서는 <code>UncheckedIOException</code>에 cause를 담는다. sneaky-throw는 선언과 실제 실패를 달라지게 해 호출을 예측하기 어렵게 만든다.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>4.1 계층 경계에서 원인을 보존하고 finally 반환 함정을 보기 · 4.2 주 예외와 닫기 실패의 suppressed 보존 · 4.3 checked 예외를 받는 함수형 인터페이스와 래퍼</small></span><span class="knowledge-chapter-meta">6개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>다음 예제는 JDK 21 Corretto 21.0.6에서 각각 단일 파일로 실행했다. Java 25에서도 사용하는 언어 기능과 표준 API는 동일하다.</p>
 <h3 id="41-계층-경계에서-원인을-보존하고-finally-반환-함정을-보기"><a class="anchor" href="#41-계층-경계에서-원인을-보존하고-finally-반환-함정을-보기" aria-hidden="true">#</a>4.1 계층 경계에서 원인을 보존하고 <code>finally</code> 반환 함정을 보기</h3>
 <pre><code class="language-java">import java.io.IOException;
@@ -254,7 +254,7 @@ public class CheckedLambdaDemo {
 <pre><code class="language-text">UncheckedIOException
 IOException: read failed</code></pre>
 <p>자체 함수형 인터페이스에서는 <code>IOException</code>을 합법적으로 전달할 수 있다. <code>Runnable</code>로 변환하는 지점에서 이를 unchecked 계약으로 바꾸며, 원인 예외는 그대로 붙인다. 이 어댑터를 선택할 때는 호출자가 실제로 예외를 어디서 처리할지 함께 정해야 한다.</p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -279,7 +279,7 @@ IOException: read failed</code></pre>
 <td>이 조사에서 예외 처리의 기본 제어 의미가 바뀐 별도 Java 25 언어 변경은 확인되지 않았다. 기준 설명은 JLS 25와 SE 25 API를 사용한다.</td>
 </tr>
 </tbody></table></div>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>파일·소켓·DB 커서 등 <code>AutoCloseable</code> 자원을 열면 → <code>try-with-resources</code>에 선언한다. 닫기 순서와 주 예외/suppressed 보존을 언어가 처리한다.</li>
 <li>호출자가 입력 변경·재시도 등 구체적인 복구 결정을 할 수 있고 그 의무가 API 계약이어야 하면 → checked 예외를 고려한다. 호출자가 처리할 수 없는 예외를 기계적으로 <code>throws</code>에 늘어놓지 않는다.</li>
@@ -290,7 +290,7 @@ IOException: read failed</code></pre>
 <li><strong>기본값 추천:</strong> 일반 애플리케이션 내부의 복구 불가능한 실패는 도메인 의미를 담은 unchecked 예외로 표현하고, I/O처럼 호출자가 처리할 가치가 있는 checked 예외는 바깥 경계까지 보존한다. 자원 정리는 항상 <code>try-with-resources</code>를 우선한다.</li>
 </ul>
 <p>Spring MVC 응답 예외 변환은 → <a class="docref" href="S05-mvc-request-flow.html">S05</a> 참조. 트랜잭션 롤백 규칙은 → <a class="docref" href="S08-transactions.html">S08</a> 참조.</p>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><p><strong>증상:</strong> 원래 DB 오류 대신 “서비스 처리 실패” 한 줄만 남는다 → <strong>원인:</strong> 새 예외에 <code>e.getMessage()</code>만 복사하고 cause를 누락했다 → <strong>대처:</strong> <code>new ServiceException(message, e)</code>로 연결하고, 메시지에 SQL·토큰 같은 민감 값을 다시 노출하지 않는다.</p>
 </li>
@@ -307,7 +307,7 @@ IOException: read failed</code></pre>
 <li><p><strong>증상:</strong> 서버의 흔한 분기에서 예외·스택 로그가 급증한다 → <strong>원인:</strong> 정상적인 탐색 실패나 검증 결과를 제어 흐름 예외로 사용한다 → <strong>대처:</strong> 반환 결과로 모델링하고 프로파일링한다. 병목 수치나 최적화 효과는 측정 환경 없이 단정하지 않는다.</p>
 </li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. Exception과 RuntimeException의 차이는 무엇이며 컴파일러가 무엇을 보장하나? · Q2. checked exception은 언제 설계상 유용한가? · Q3. catch (Exception)은 Error도 잡는가? catch (Throwable)은? · Q4. TWR에서 본문과 close()가 모두 예외를 던지면 어떤 예외가 바깥으로 나가는가?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <h3 id="q1-exception과-runtimeexception의-차이는-무엇이며-컴파일러가-무엇을-보장하나"><a class="anchor" href="#q1-exception과-runtimeexception의-차이는-무엇이며-컴파일러가-무엇을-보장하나" aria-hidden="true">#</a>Q1. <code>Exception</code>과 <code>RuntimeException</code>의 차이는 무엇이며 컴파일러가 무엇을 보장하나?</h3>
 <p><code>RuntimeException</code>은 <code>Exception</code>의 하위 클래스다. 그 하위 타입은 unchecked이므로 호출자가 catch하거나 <code>throws</code>로 선언할 의무가 없다. 일반 <code>Exception</code> 하위 중 <code>RuntimeException</code>·<code>Error</code> 계열이 아닌 타입은 checked로 분석된다. 컴파일러는 checked 예외의 누락을 검사하지만, 런타임 복구 가능성까지 보장하지는 않는다.</p>
 <p><strong>꼬리질문:</strong> unchecked는 잡을 수 없는가? → 잡을 수 있다. 단지 컴파일러가 처리 여부를 강제하지 않을 뿐이다.</p>
@@ -333,7 +333,7 @@ IOException: read failed</code></pre>
 <h3 id="q8-예외가-비싼-편이라는-말은-어떤-맥락에서-맞나"><a class="anchor" href="#q8-예외가-비싼-편이라는-말은-어떤-맥락에서-맞나" aria-hidden="true">#</a>Q8. 예외가 비싼 편이라는 말은 어떤 맥락에서 맞나?</h3>
 <p><code>Throwable</code>은 생성 시점의 스택 스냅샷을 담으므로 예외 생성과 추적 정보 보관 비용이 있다. 예외가 드물면 진단 가치가 있고, 흔한 정상 분기마다 예외를 던지면 불필요한 생성·추적·로그 작업이 생길 수 있다. 환경별 비용 수치를 일반화하지 말고 정상 결과는 결과 타입으로 모델링한 뒤 실제 경로를 프로파일링한다. stack trace를 비활성화하는 최적화는 관측 가능성과 함께 측정 후 판단한다.</p>
 <p><strong>꼬리질문:</strong> 예외 객체를 재사용하면 되는가? → 생성 당시 스택이 현재 실패 위치를 나타내지 않을 수 있어 보통 실패별 새 객체를 만든다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Java Language Specification, Java SE 25, Chapter 11: Exceptions — <a href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-11.html" target="_blank" rel="noopener">https://docs.oracle.com/javase/specs/jls/se25/html/jls-11.html</a> — 예외 종류, checked 검사, 런타임 처리기의 기준 규칙.</li>
 <li>Java Language Specification, Java SE 25, Chapter 15: Expressions — <a href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-15.html" target="_blank" rel="noopener">https://docs.oracle.com/javase/specs/jls/se25/html/jls-15.html</a> — 람다 표현식(§15.27)과 표현식의 예외 분석 근거.</li>
@@ -345,7 +345,24 @@ IOException: read failed</code></pre>
 <li>The Java Tutorials: Chained Exceptions — <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/chained.html" target="_blank" rel="noopener">https://docs.oracle.com/javase/tutorial/essential/exceptions/chained.html</a> — 예외 cause 연결 API와 계층 변환 예.</li>
 <li>JEP 213: Milling Project Coin — <a href="https://openjdk.org/jeps/213" target="_blank" rel="noopener">https://openjdk.org/jeps/213</a> — Java 9의 effectively-final resource 변수 개선.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const chapter = target?.closest('details.knowledge-chapter');
+    if (chapter) chapter.open = true;
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 <script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
