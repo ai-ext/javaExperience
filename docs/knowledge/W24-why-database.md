@@ -109,7 +109,9 @@ final class InMemoryMemberStore {
 }
 ```
 
-`ConcurrentHashMap`은 같은 JVM의 여러 스레드가 접근할 때 개별 `put`과 `get`을 안전하게 수행하도록 돕지만 저장 데이터는 프로세스 종료와 함께 사라진다. 이메일 유일성도 구현하지 않았다. `containsValue`를 확인하고 `put`하는 식으로 붙이면 두 호출 사이 경쟁이 생기므로 `putIfAbsent`에 맞는 키 모델이나 DB의 `UNIQUE`가 필요하다. 두 컬렉션을 함께 바꾸는 주문 처리를 원자화해 주지도 않는다.
+`ConcurrentHashMap`은 같은 JVM의 여러 스레드가 접근할 때 개별 `put`과 `get`을 안전하게 수행하도록 돕지만 저장 데이터는 프로세스 종료와 함께 사라진다. 이메일 유일성도 구현하지 않았다.
+
+`containsValue`를 확인하고 `put`하는 식으로 붙이면 두 호출 사이 경쟁이 생기므로 `putIfAbsent`에 맞는 키 모델이나 DB의 `UNIQUE`가 필요하다. 두 컬렉션을 함께 바꾸는 주문 처리를 원자화해 주지도 않는다.
 
 ### JSON Lines 파일
 

@@ -1,0 +1,43 @@
+package org.example.batch;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Clock;
+import java.time.LocalDate;
+
+@RestController
+public class WeeklyRankingController {
+
+    private final WeeklyRankingService weeklyRankingService;
+    private final JobLauncher jobLauncher;
+    private final Clock clock;
+
+    public WeeklyRankingController(WeeklyRankingService weeklyRankingService, JobLauncher jobLauncher, Clock clock) {
+        this.weeklyRankingService = weeklyRankingService;
+        this.jobLauncher = jobLauncher;
+        this.clock = clock;
+    }
+
+    // date = 배치가 도는 월요일. 그 전 7일(지난주 월~일)을 집계한다.
+    @PostMapping("/api/admin/jobs/weekly-ranking/run")
+    public WeeklyRankingResponse run(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                     @LoginMember AuthenticatedMember me) {
+        AdminGuard.requireAdmin(me);
+        LocalDate runDate = JobDates.resolve(date, clock);
+        // 15-6 월요일 검사를 기록 전에 — 잘못된 입력이 "실패한 날"로 남아 재실행 대상이 되지 않게
+        WeeklyRankingService.requireMonday("date", runDate);
+        return jobLauncher.launch(JobCatalog.WEEKLY_RANKING, runDate, JobRunner.MANUAL);
+    }
+
+    // weekStart = 랭킹 주의 시작(월요일). 없으면 404 — 스냅샷이 없는 주를 그 자리에서 계산해 주지 않는다.
+    @GetMapping("/api/rankings/weekly")
+    public WeeklyRankingResponse get(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart) {
+        return weeklyRankingService.get(weekStart);
+    }
+}

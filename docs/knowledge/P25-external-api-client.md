@@ -14,7 +14,9 @@ Spring의 외부 API 클라이언트는 HTTP 요청을 만들고 응답을 DTO�
 
 ### 2.1 클라이언트 선택
 
-일반 Spring MVC의 동기 호출은 `RestClient`, WebFlux에서 끝까지 논블로킹인 흐름은 `WebClient`를 쓴다. 선언적 endpoint가 많으면 HTTP Interface를 고려하고, 기존 OpenFeign 조직은 팀 표준을 유지한다. WebFlux에서 `RestClient`를 직접 호출하거나 WebClient를 매번 `.block()`하면 각각 이벤트 루프를 막거나 논블로킹 이점을 잃는다. `RestTemplate`은 기존 코드 유지보수에만 두고 새 코드는 `RestClient` 기준으로 작성한다.
+일반 Spring MVC의 동기 호출은 `RestClient`, WebFlux에서 끝까지 논블로킹인 흐름은 `WebClient`를 쓴다. 선언적 endpoint가 많으면 HTTP Interface를 고려하고, 기존 OpenFeign 조직은 팀 표준을 유지한다.
+
+WebFlux에서 `RestClient`를 직접 호출하거나 WebClient를 매번 `.block()`하면 각각 이벤트 루프를 막거나 논블로킹 이점을 잃는다. `RestTemplate`은 기존 코드 유지보수에만 두고 새 코드는 `RestClient` 기준으로 작성한다.
 
 ### 2.2 의존성과 설정
 
@@ -97,7 +99,9 @@ public class PartnerClientConfig {
 }
 ```
 
-`connectTimeout`은 TCP 연결을 기다리는 시간이고 `readTimeout`은 연결 후 응답 바이트를 기다리는 시간이다. 둘 중 하나만 설정하면 다른 단계에서 무한 대기가 남는다. Java 25의 JDK `HttpClient`를 쓰기 싫다면 `HttpComponentsClientHttpRequestFactory`를 선택하고 Apache HttpClient의 connection/request/response timeout을 명시한다. 기본 요청 팩토리의 구체 구현과 버전별 지원 여부를 가정하지 말고, 사용 중인 Spring Boot 문서와 Javadoc에서 확인한다.
+`connectTimeout`은 TCP 연결을 기다리는 시간이고 `readTimeout`은 연결 후 응답 바이트를 기다리는 시간이다. 둘 중 하나만 설정하면 다른 단계에서 무한 대기가 남는다.
+
+Java 25의 JDK `HttpClient`를 쓰기 싫다면 `HttpComponentsClientHttpRequestFactory`를 선택하고 Apache HttpClient의 connection/request/response timeout을 명시한다. 기본 요청 팩토리의 구체 구현과 버전별 지원 여부를 가정하지 말고, 사용 중인 Spring Boot 문서와 Javadoc에서 확인한다.
 
 ### 2.4 GET, POST, DTO, 상태 코드
 
@@ -151,7 +155,9 @@ class PartnerUnavailableException extends RuntimeException {
 }
 ```
 
-`retrieve()` 뒤에 최종 연산인 `body`, `toEntity`, `toBodilessEntity` 등을 호출해야 실제 응답을 소비한다. 일치하는 `onStatus`가 없으면 400 이상은 `RestClientResponseException` 계열로 변환된다. 호출부에서 `try { ... } catch (Exception e) { return null; }`처럼 뭉뚱그리지 말고, 재시도 가능한 장애·업무상 4xx·영구 실패를 구분한다. 헤더까지 필요하면 `toEntity(Product.class)`로 받는다.
+`retrieve()` 뒤에 최종 연산인 `body`, `toEntity`, `toBodilessEntity` 등을 호출해야 실제 응답을 소비한다. 일치하는 `onStatus`가 없으면 400 이상은 `RestClientResponseException` 계열로 변환된다.
+
+호출부에서 `try { ... } catch (Exception e) { return null; }`처럼 뭉뚱그리지 말고, 재시도 가능한 장애·업무상 4xx·영구 실패를 구분한다. 헤더까지 필요하면 `toEntity(Product.class)`로 받는다.
 
 ### 2.5 HTTP Interface
 
@@ -185,7 +191,9 @@ class ProductApiConfig {
 }
 ```
 
-Spring Boot 4.1에서는 HTTP Service Client 자동 구성과 `@ImportHttpServices` 계열 등록을 사용할 수 있지만, 인터페이스를 만들었다고 모든 빈이 저절로 생기는 것은 아니다. 프로젝트의 Boot 4.1 reference에서 자동 구성 방식과 그룹별 `RestClient` 설정을 확인하고, 단순하고 예측 가능한 앱은 위 수동 등록을 기본으로 둔다. 자동 구성을 쓸 때도 `baseUrl`, 인증 헤더, 타임아웃, 어떤 요청 팩토리인지 테스트로 고정한다. HTTP Interface는 메서드 선언을 줄여 줄 뿐, 오류 변환·재시도·관측 정책을 대신 결정하지 않는다.
+Spring Boot 4.1에서는 HTTP Service Client 자동 구성과 `@ImportHttpServices` 계열 등록을 사용할 수 있지만, 인터페이스를 만들었다고 모든 빈이 저절로 생기는 것은 아니다. 프로젝트의 Boot 4.1 reference에서 자동 구성 방식과 그룹별 `RestClient` 설정을 확인하고, 단순하고 예측 가능한 앱은 위 수동 등록을 기본으로 둔다.
+
+자동 구성을 쓸 때도 `baseUrl`, 인증 헤더, 타임아웃, 어떤 요청 팩토리인지 테스트로 고정한다. HTTP Interface는 메서드 선언을 줄여 줄 뿐, 오류 변환·재시도·관측 정책을 대신 결정하지 않는다.
 
 ### 2.6 인증과 로깅
 
@@ -193,7 +201,9 @@ API 키는 `.defaultHeader`, 만료되는 Bearer 토큰은 요청 시점에 토�
 
 ### 2.7 재시도와 멱등성
 
-재시도는 연결 실패·일시적 503·429처럼 일시적이고 재시도 가능한 경우에만 짧은 지수 백오프와 최대 횟수를 둔다. POST 결제처럼 서버가 처리했지만 응답만 유실된 상황에서는 클라이언트가 실패를 보았어도 이미 성공했을 수 있다. `Idempotency-Key`를 서버가 지원할 때 같은 키로 재시도하고, 지원하지 않으면 자동 재시도하지 않는다. Spring Retry 또는 Resilience4j를 도입할 수 있지만 이 문서의 기본 추천은 “멱등 GET만 2~3회, 쓰기 요청은 명시적 정책 없이는 0회”다.
+재시도는 연결 실패·일시적 503·429처럼 일시적이고 재시도 가능한 경우에만 짧은 지수 백오프와 최대 횟수를 둔다. POST 결제처럼 서버가 처리했지만 응답만 유실된 상황에서는 클라이언트가 실패를 보았어도 이미 성공했을 수 있다.
+
+`Idempotency-Key`를 서버가 지원할 때 같은 키로 재시도하고, 지원하지 않으면 자동 재시도하지 않는다. Spring Retry 또는 Resilience4j를 도입할 수 있지만 이 문서의 기본 추천은 “멱등 GET만 2~3회, 쓰기 요청은 명시적 정책 없이는 0회”다.
 
 ## 3. 따라 하기
 
@@ -333,7 +343,9 @@ class PartnerClientTest {
 
 ## 6. 한 단계 더
 
-요청은 `RestClient`의 fluent builder에서 URI·헤더·body를 만들고, 요청 팩토리가 실제 TCP/TLS를 수행하며, message converter가 JSON과 DTO를 변환한다. `retrieve()`는 상태 처리 규칙을 적용하고 최종 연산이 응답을 읽는다. HTTP Interface는 이 호출부를 프록시 생성 단계로 옮길 뿐 같은 요청 팩토리와 converter를 사용한다. 따라서 HTTP Interface로 바꿔도 timeout·인증·관측·재시도 정책은 그대로 검증해야 한다.
+요청은 `RestClient`의 fluent builder에서 URI·헤더·body를 만들고, 요청 팩토리가 실제 TCP/TLS를 수행하며, message converter가 JSON과 DTO를 변환한다. `retrieve()`는 상태 처리 규칙을 적용하고 최종 연산이 응답을 읽는다.
+
+HTTP Interface는 이 호출부를 프록시 생성 단계로 옮길 뿐 같은 요청 팩토리와 converter를 사용한다. 따라서 HTTP Interface로 바꿔도 timeout·인증·관측·재시도 정책은 그대로 검증해야 한다.
 
 외부 API의 설계·리소스 모델 비교는 → S06, 장애 격리·bulkhead·circuit breaker는 → S20, Jackson의 상세 변환 규칙은 → P16 참조. 이 문서에서는 그 주제를 다시 설명하지 않는다.
 

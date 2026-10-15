@@ -1,0 +1,94 @@
+package org.example.post;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.social.BlockPolicy;
+import org.example.social.FollowRepository;
+import org.springframework.stereotype.Component;
+
+import java.util.Set;
+import java.util.function.Predicate;
+
+// "이 사람이 이 글을 볼 수 있나" 규칙을 한 곳에 모은다.
+// 상세(GET /api/posts/{id})는 이 자바 코드로 판정하고, 목록(게시판 목록)은
+// 같은 다섯 조건을 PostRepository의 JPQL(findViewableByBoard)로 옮겨 건다.
+// 규칙을 바꿀 때는 두 곳을 같이 고쳐야 한다.
+@Component
+public class PostAccessPolicy {
+
+    private static final String PUBLISHED = "PUBLISHED";
+    private static final String DRAFT = "DRAFT";
+    private static final String HIDDEN = "HIDDEN";
+    private static final String PUBLIC = "PUBLIC";
+    private static final String FOLLOWERS = "FOLLOWERS";
+    private static final String ADMIN_ROLE = "ADMIN";
+
+    private final FollowRepository followRepository;
+    private final BlockPolicy blockPolicy;
+
+    public PostAccessPolicy(FollowRepository followRepository, BlockPolicy blockPolicy) {
+        this.followRepository = followRepository;
+        this.blockPolicy = blockPolicy;
+    }
+
+    // 글 하나를 판정한다 — 팔로우·차단은 필요할 때만 그 자리에서 조회한다
+    public boolean canView(AuthenticatedMember viewer, Post post) {
+        return canView(viewer, post,
+                authorId -> followRepository.existsByFollower_IdAndFollowee_Id(viewer.id(), authorId),
+                authorId -> blockPolicy.isBlockedEitherWay(viewer.id(), authorId));
+    }
+
+    // 여러 글을 한꺼번에 판정할 때(6-3 북마크 목록) — 같은 규칙을 쓰되 팔로우·차단 정보를
+    // 미리 한 번에 읽어 두고 메모리에서 판정한다(항목마다 쿼리를 보내지 않는다).
+    public Predicate<Post> viewableBy(AuthenticatedMember viewer) {
+        Set<Long> followees = viewer == null ? Set.of() : Set.copyOf(followRepository.findFolloweeIds(viewer.id()));
+        Set<Long> blocked = viewer == null ? Set.of() : blockPolicy.blockRelatedIds(viewer.id());
+        return post -> canView(viewer, post, followees::contains, blocked::contains);
+    }
+
+    // follows/blocked는 viewer가 있을 때만 호출된다
+    private boolean canView(AuthenticatedMember viewer, Post post,
+                            Predicate<Long> follows, Predicate<Long> blocked) {
+        // 1. 삭제된 글은 작성자 본인도 못 본다
+        if (post.getDeletedAt() != null) {
+            return false;
+        }
+
+        Long viewerId = viewer == null ? null : viewer.id();
+        Long authorId = post.getAuthor().getId();
+        boolean isAuthor = viewerId != null && viewerId.equals(authorId);
+        boolean isAdmin = viewer != null && ADMIN_ROLE.equals(viewer.role());
+
+        // 2. 상태별 허용 — DRAFT는 작성자만, HIDDEN은 운영자만
+        boolean statusOk = switch (post.getStatus()) {
+            case PUBLISHED -> true;
+            case DRAFT -> isAuthor;
+            case HIDDEN -> isAdmin;
+            default -> false;
+        };
+        if (!statusOk) {
+            return false;
+        }
+
+        // 3. PUBLISHED + FOLLOWERS 공개는 작성자 본인이거나 팔로워만
+        if (PUBLISHED.equals(post.getStatus()) && FOLLOWERS.equals(post.getVisibility()) && !isAuthor) {
+            if (viewerId == null || !follows.test(authorId)) {
+                return false;
+            }
+        }
+
+        // 4. 둘 사이에 차단이 있으면(어느 쪽이 차단했든) 못 본다
+        if (viewerId != null && !isAuthor && blocked.test(authorId)) {
+            return false;
+        }
+
+        // 5. 발행 글의 공개 범위가 알려진 값인지 검사한다.
+        // 비로그인과 일반 열람자는 PUBLIC 또는 위에서 확인한 FOLLOWERS만 볼 수 있다.
+        // DB에 PRIVATE/알 수 없는 값이 들어와도 공개로 취급하지 않는다.
+        if (PUBLISHED.equals(post.getStatus()) && !isAuthor
+                && !PUBLIC.equals(post.getVisibility())
+                && !FOLLOWERS.equals(post.getVisibility())) {
+            return false;
+        }
+        return true;
+    }
+}

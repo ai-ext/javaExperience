@@ -1,0 +1,54 @@
+package org.example.notification;
+
+import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+// 알림 저장이 실패하면 같은 트랜잭션의 좋아요와 숫자 증가도 되돌아가야 한다.
+@SpringBootTest
+@AutoConfigureMockMvc
+class NotificationRollbackIntegrationTest {
+
+    @Autowired MockMvc mockMvc;
+    @Autowired JdbcTemplate jdbcTemplate;
+    @MockitoBean NotificationRepository notificationRepository;
+
+    @Test
+    void notificationFailureRollsBackLikeAndCount() throws Exception {
+        String created = mockMvc.perform(post("/api/posts")
+                        .header("Authorization", "Bearer tok-kimjava")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"boardSlug":"dev","title":"[통합] 알림 롤백","content":"알림 실패 확인","tags":[]}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Integer postId = JsonPath.read(created, "$.id");
+        when(notificationRepository.save(any(Notification.class)))
+                .thenThrow(new IllegalStateException("알림 저장 실패"));
+
+        assertThatThrownBy(() -> mockMvc.perform(
+                put("/api/posts/{id}/like", postId).header("Authorization", "Bearer tok-lee")))
+                .hasRootCauseInstanceOf(IllegalStateException.class);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM post_like WHERE post_id = ? AND member_id = 3",
+                Long.class, postId)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT like_count FROM post WHERE id = ?", Integer.class, postId)).isZero();
+    }
+}

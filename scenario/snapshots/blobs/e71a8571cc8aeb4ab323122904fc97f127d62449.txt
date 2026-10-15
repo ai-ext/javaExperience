@@ -1,0 +1,83 @@
+package org.example.board.post;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.example.board.common.ApiException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+// 게시글 목록·검색 — JPA(JPQL + Pageable)
+@Service
+public class PostQueryService {
+
+    // 정렬은 사용자가 보낸 문자열을 Sort에 넣지 않고 정해 둔 두 가지 중에서 고른다
+    private static final Sort LATEST = Sort.by(Sort.Order.desc("id"));
+    private static final Sort POPULAR = Sort.by(Sort.Order.desc("likeCount"), Sort.Order.desc("id"));
+
+    private final PostQueryRepository postQueryRepository;
+
+    public PostQueryService(PostQueryRepository postQueryRepository) {
+        this.postQueryRepository = postQueryRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public Object list(PostListQuery query, Long loginUserId) {
+        if (query.cursorMode()) {
+            return cursorList(query, loginUserId);
+        }
+        int page = query.page() == null ? 0 : query.page();
+        Sort sort = "popular".equals(query.sort()) ? POPULAR : LATEST;
+        Page<Post> result = postQueryRepository.findVisible(loginUserId, query.tag(), query.q(),
+                PageRequest.of(page, query.size(), sort));
+        // Spring의 Page를 그대로 내보내지 않고 명세의 모양으로 옮긴다
+        return new PageResponse<>(withTags(result.getContent()), page, query.size(), result.getTotalElements(),
+                result.hasNext());
+    }
+
+    private CursorResponse<PostListItemResponse> cursorList(PostListQuery query, Long loginUserId) {
+        // 인기순은 좋아요가 바뀌면 순서가 흔들려 커서가 글을 빠뜨리거나 두 번 준다 — 최신순만 허락한다
+        if ("popular".equals(query.sort())) {
+            throw ApiException.invalid("cursor", "커서 페이징은 최신순(latest)에서만 쓸 수 있습니다.");
+        }
+        if (query.page() != null) {
+            throw ApiException.invalid("page", "page와 cursor는 함께 쓸 수 없습니다.");
+        }
+        Long cursorId = parseCursor(query.cursor());
+        // 커서는 항상 첫 "페이지"(0)만 읽는다 — 어디서부터인지는 id < cursorId가 정한다(keyset)
+        Slice<Post> slice = postQueryRepository.findVisibleBefore(loginUserId, query.tag(), query.q(), cursorId,
+                PageRequest.of(0, query.size(), LATEST));
+        List<Post> posts = slice.getContent();
+        String next = slice.hasNext() ? String.valueOf(posts.get(posts.size() - 1).getId()) : null;
+        return new CursorResponse<>(withTags(posts), next);
+    }
+
+    private Long parseCursor(String cursor) {
+        if (cursor.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(cursor);
+        } catch (NumberFormatException e) {
+            throw ApiException.invalid("cursor", "커서 값이 올바르지 않습니다.");
+        }
+    }
+
+    // 글과 태그를 JOIN한 채 페이징하지 않는다(행이 태그 수만큼 불어난다) — 이번 페이지 글들의 태그를 IN 한 번으로
+    private List<PostListItemResponse> withTags(List<Post> posts) {
+        if (posts.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, List<String>> tagsByPost = postQueryRepository.findTagsByPostIds(posts.stream().map(Post::getId).toList())
+                .stream()
+                .collect(Collectors.groupingBy(PostTagRow::postId, Collectors.mapping(PostTagRow::name, Collectors.toList())));
+        return posts.stream()
+                .map(p -> PostListItemResponse.of(p, tagsByPost.getOrDefault(p.getId(), List.of())))
+                .toList();
+    }
+}

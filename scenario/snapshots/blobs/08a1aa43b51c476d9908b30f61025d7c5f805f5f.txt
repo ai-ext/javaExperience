@@ -1,0 +1,71 @@
+package org.example.reaction;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import org.example.member.Member;
+import org.example.post.Post;
+
+import java.time.LocalDateTime;
+
+// 글 공감 — (post_id, member_id) UNIQUE. 행이 있으면 그 종류로 공감한 상태다
+@Entity
+@Table(name = "post_reaction")
+public class PostReaction {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id", nullable = false)
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "member_id", nullable = false)
+    private Member member;
+
+    // ORDINAL(0,1,2…)로 저장하면 enum 순서를 바꾸는 순간 기존 데이터의 뜻이 바뀐다 — 이름으로 저장한다
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ReactionKind kind;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    protected PostReaction() {
+        // JPA
+    }
+
+    public PostReaction(Post post, Member member, ReactionKind kind, LocalDateTime now) {
+        this.post = post;
+        this.member = member;
+        this.kind = kind;
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    // 다른 종류로 바꾸기 — 같은 종류면 아무것도 하지 않는다(UPDATE도 나가지 않는다)
+    public void changeKind(ReactionKind kind, LocalDateTime now) {
+        if (this.kind == kind) {
+            return;
+        }
+        this.kind = kind;
+        this.updatedAt = now;
+    }
+
+    public ReactionKind getKind() {
+        return kind;
+    }
+}

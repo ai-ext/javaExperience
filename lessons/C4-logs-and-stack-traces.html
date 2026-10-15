@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C4. 로그와 스택트레이스 — 한 줄의 구조와 읽는 순서</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="c4-로그와-스택트레이스--한-줄의-구조와-읽는-순서"><a class="anchor" href="#c4-로그와-스택트레이스--한-줄의-구조와-읽는-순서" aria-hidden="true">#</a>C4. 로그와 스택트레이스 — 한 줄의 구조와 읽는 순서</h1>
+<blockquote>
+<p>개념 레슨 · 30분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>서버에서 무슨 일이 있었는지는 서버가 남기는 <strong>로그</strong>(log)에 있다. 로그의 특징은 두 가지다.</p>
+<ul>
+<li>로그는 <strong>서버의 터미널</strong>(IntelliJ Run 창)에 찍힌다. 요청을 보낸 클라이언트에는 가지 않는다. curl에는 <code>500</code>만 보이고, 이유는 서버 로그에만 있다.</li>
+<li>서버는 사용자 여럿의 요청을 동시에 처리한다. 그래서 줄마다 <strong>언제, 얼마나 심각한, 어느 일꾼(스레드)이, 어느 코드에서</strong> 남겼는지가 붙어 있다.</li>
+</ul>
+<h3 id="로그-레벨--얼마나-심각한가"><a class="anchor" href="#로그-레벨--얼마나-심각한가" aria-hidden="true">#</a>로그 레벨 — 얼마나 심각한가</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>레벨</th>
+<th>뜻</th>
+<th>기본 설정에서 보이나</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TRACE</code></td>
+<td>아주 자세한 흐름</td>
+<td>안 보임</td>
+</tr>
+<tr>
+<td><code>DEBUG</code></td>
+<td>개발할 때만 보고 싶은 값</td>
+<td>안 보임</td>
+</tr>
+<tr>
+<td><code>INFO</code></td>
+<td>정상 흐름의 큰 사건(앱 시작, 처리 완료)</td>
+<td><strong>보임</strong></td>
+</tr>
+<tr>
+<td><code>WARN</code></td>
+<td>이상하지만 처리는 했다(잘못된 요청 4xx 등)</td>
+<td>보임</td>
+</tr>
+<tr>
+<td><code>ERROR</code></td>
+<td>처리하지 못했다(500, 기동 실패)</td>
+<td>보임</td>
+</tr>
+</tbody></table></div>
+<p>Spring Boot는 기본으로 <strong>INFO 이상만</strong> 찍는다. 레벨은 패키지마다 따로 정할 수 있다. 예를 들어 <code>logging.level.org.example: debug</code>를 주면 내 코드(<code>org.example</code> 아래)만 DEBUG까지 찍힌다. 레포의 <code>application.yml</code>이 <code>org.hibernate.SQL: debug</code>로 SQL만 자세히 찍는 것도 같은 원리다.</p>
+<h3 id="코드에서-로그-남기기"><a class="anchor" href="#코드에서-로그-남기기" aria-hidden="true">#</a>코드에서 로그 남기기</h3>
+<p><code>System.out.println</code>도 터미널에 찍히긴 한다. 하지만 시각·레벨·스레드가 안 붙고, 레벨로 껐다 켤 수도 없다. 서버 코드는 <strong>로거</strong>(logger)를 쓴다. Spring Boot에는 SLF4J라는 로거가 이미 들어 있다(A4의 트리에서 <code>spring-boot-starter-logging</code> → <code>logback</code>·<code>slf4j</code>).</p>
+<pre><code class="language-java">private static final Logger log = LoggerFactory.getLogger(LogController.class);
+
+log.debug(&quot;요청 들어옴 n={}&quot;, n);   // {} 자리에 n 값이 들어간다
+log.info(&quot;처리 시작 n={}&quot;, n);
+log.warn(&quot;음수가 왔다 n={}&quot;, n);</code></pre>
+<p><code>{}</code>는 템플릿 리터럴의 <code>${}</code>처럼 값이 들어갈 자리다. 문자열을 <code>+</code>로 잇지 않고 <code>{}</code>를 쓰면, 그 레벨이 꺼져 있을 때 문자열을 아예 만들지 않는다.</p>
+<h3 id="스택트레이스와-caused-by"><a class="anchor" href="#스택트레이스와-caused-by" aria-hidden="true">#</a>스택트레이스와 <code>Caused by</code></h3>
+<p><strong>스택트레이스</strong>(stack trace)는 예외가 났을 때 &quot;그 순간 누가 누구를 불렀나&quot;를 찍은 목록이다. 맨 위가 예외가 터진 곳, 아래로 갈수록 그것을 부른 곳이다.</p>
+<p>Java에서는 예외를 잡아서 <strong>더 큰 의미의 예외로 감싸 다시 던지는</strong> 일이 많다. &quot;숫자로 못 바꿨다&quot;를 잡아 &quot;설정을 못 읽었다&quot;로 감싸고, 그걸 또 &quot;서버를 못 띄웠다&quot;로 감싼다. 감쌀 때 원래 예외를 같이 넘기면, 스택트레이스에 <code>Caused by:</code>로 줄줄이 찍힌다.</p>
+<pre class="mermaid">flowchart TB
+    R[&quot;readPort()&lt;br/&gt;Integer.parseInt에 '팔공팔공'&lt;br/&gt;NumberFormatException 발생&quot;] -- &quot;잡아서 감싼다&quot; --&gt; L[&quot;loadConfig()&lt;br/&gt;IllegalStateException&lt;br/&gt;'설정을 읽지 못했다'&quot;]
+    L -- &quot;잡아서 또 감싼다&quot; --&gt; S[&quot;start()&lt;br/&gt;RuntimeException&lt;br/&gt;'서버를 시작하지 못했다'&quot;]
+    S --&gt; P[&quot;출력 순서:&lt;br/&gt;바깥 예외가 맨 위&lt;br/&gt;Caused by 아래로 갈수록 안쪽&lt;br/&gt;맨 아래 Caused by = 진짜 원인&quot;]</pre>
+<p>그래서 규칙은 하나다. <strong><code>Caused by</code>가 여러 개면 맨 아래 것이 처음 일어난 일(진짜 원인)이다.</strong> 위의 것들은 &quot;그래서 이것도 실패했다&quot;는 전달이다.</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<h3 id="로그-한-줄-해부"><a class="anchor" href="#로그-한-줄-해부" aria-hidden="true">#</a>로그 한 줄 해부</h3>
+<p>0장 정답 코드에 위의 <code>LogController</code>를 더해 <code>GET /api/start/log?n=-3</code>을 보냈을 때 찍힌 줄이다(실측, Boot 4.1.1, 포트 8189).</p>
+<pre><code class="language-text">2026-10-10T00:02:52.743+09:00  WARN 10929 --- [javaExperience] [nio-8189-exec-4] org.example.start.LogController          : 음수가 왔다 n=-3</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>칸</th>
+<th>값</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>시각</td>
+<td><code>2026-10-10T00:02:52.743+09:00</code></td>
+<td>밀리초까지. <code>+09:00</code>은 한국 시간</td>
+</tr>
+<tr>
+<td>레벨</td>
+<td><code>WARN</code></td>
+<td>얼마나 심각한가</td>
+</tr>
+<tr>
+<td>PID</td>
+<td><code>10929</code></td>
+<td>프로세스 번호(A3)</td>
+</tr>
+<tr>
+<td><code>---</code></td>
+<td></td>
+<td>칸 구분</td>
+</tr>
+<tr>
+<td>앱 이름</td>
+<td><code>[javaExperience]</code></td>
+<td><code>spring.application.name</code>(C3)</td>
+</tr>
+<tr>
+<td>스레드</td>
+<td><code>[nio-8189-exec-4]</code></td>
+<td>이 줄을 남긴 일꾼. 앱이 뜰 때는 <code>main</code>, 요청 처리 중에는 Tomcat의 <code>http-nio-포트-exec-번호</code>. 칸이 15자라 앞이 잘린다(<code>io-8189-exec-10</code>처럼)</td>
+</tr>
+<tr>
+<td>로거 이름</td>
+<td><code>org.example.start.LogController</code></td>
+<td>어느 클래스가 남겼나. 길면 패키지를 첫 글자로 줄인다: <code>o.s.boot.tomcat.TomcatWebServer</code> = <code>org.springframework.boot.tomcat.TomcatWebServer</code></td>
+</tr>
+<tr>
+<td>메시지</td>
+<td><code>음수가 왔다 n=-3</code></td>
+<td><code>:</code> 뒤가 본문</td>
+</tr>
+</tbody></table></div>
+<p>같은 요청의 INFO 줄도 바로 위에 찍혔다. 스레드 칸이 같은 <code>nio-8189-exec-4</code>라서 <strong>같은 요청에서 나온 줄</strong>인 것을 안다. 요청이 여럿 섞여 찍힐 때 스레드 칸으로 줄을 묶어 읽는다.</p>
+<pre><code class="language-text">... INFO 10929 --- [javaExperience] [nio-8189-exec-4] org.example.start.LogController          : 처리 시작 n=-3
+... WARN 10929 --- [javaExperience] [nio-8189-exec-4] org.example.start.LogController          : 음수가 왔다 n=-3</code></pre>
+<p><code>log.debug(...)</code> 줄은 안 보인다. 기본 레벨이 INFO라서다. <code>--logging.level.org.example=debug</code>를 주고 다시 띄워 <code>?n=2</code>를 보내면 DEBUG 줄이 나타난다(실측).</p>
+<pre><code class="language-text">... DEBUG 11926 --- [javaExperience] [nio-8189-exec-2] org.example.start.LogController          : 요청 들어옴 n=2
+...  INFO 11926 --- [javaExperience] [nio-8189-exec-2] org.example.start.LogController          : 처리 시작 n=2</code></pre>
+<h3 id="감싼-예외의-스택트레이스"><a class="anchor" href="#감싼-예외의-스택트레이스" aria-hidden="true">#</a>감싼 예외의 스택트레이스</h3>
+<p>위 그림의 코드를 그대로 실행한 결과다(실측, Java 21).</p>
+<p><code>Wrap.java</code></p>
+<pre><code class="language-java">public class Wrap {
+
+    // 가장 안쪽 — 진짜 문제가 생기는 곳
+    static int readPort(String text) {
+        return Integer.parseInt(text);
+    }
+
+    // 가운데 — 받은 예외를 감싸서 다시 던진다
+    static int loadConfig(String text) {
+        try {
+            return readPort(text);
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException(&quot;설정을 읽지 못했다&quot;, e);
+        }
+    }
+
+    // 바깥 — 또 감싼다
+    static void start(String text) {
+        try {
+            loadConfig(text);
+        } catch (IllegalStateException e) {
+            throw new RuntimeException(&quot;서버를 시작하지 못했다&quot;, e);
+        }
+    }
+
+    public static void main(String[] args) {
+        start(&quot;팔공팔공&quot;);
+    }
+}</code></pre>
+<pre><code class="language-text">Exception in thread &quot;main&quot; java.lang.RuntimeException: 서버를 시작하지 못했다
+	at Wrap.start(Wrap.java:22)
+	at Wrap.main(Wrap.java:27)
+Caused by: java.lang.IllegalStateException: 설정을 읽지 못했다
+	at Wrap.loadConfig(Wrap.java:13)
+	at Wrap.start(Wrap.java:20)
+	... 1 more
+Caused by: java.lang.NumberFormatException: For input string: &quot;팔공팔공&quot;
+	at java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)
+	at java.base/java.lang.Integer.parseInt(Integer.java:662)
+	at java.base/java.lang.Integer.parseInt(Integer.java:778)
+	at Wrap.readPort(Wrap.java:5)
+	at Wrap.loadConfig(Wrap.java:11)
+	... 2 more</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>읽는 순서</th>
+<th>줄</th>
+<th>얻는 것</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>① 맨 아래 <code>Caused by</code></td>
+<td><code>NumberFormatException: For input string: &quot;팔공팔공&quot;</code></td>
+<td><strong>무엇이</strong> 처음 터졌나 — 숫자가 아닌 글자를 숫자로 바꾸려 했다</td>
+</tr>
+<tr>
+<td>② 그 아래 <strong>처음 나오는 내 코드</strong> <code>at</code> 줄</td>
+<td><code>at Wrap.readPort(Wrap.java:5)</code></td>
+<td><strong>어디서</strong> — 5번 줄. 그 위 <code>java.base/...</code> 세 줄은 Java 기본 라이브러리 안쪽이라 건너뛴다</td>
+</tr>
+<tr>
+<td>③ 위의 <code>Caused by</code>·첫 줄</td>
+<td><code>설정을 읽지 못했다</code>, <code>서버를 시작하지 못했다</code></td>
+<td>그 결과 무엇이 연달아 실패했나(맥락)</td>
+</tr>
+<tr>
+<td>무시</td>
+<td><code>... 1 more</code>, <code>... 2 more</code></td>
+<td>&quot;나머지는 바로 위 예외의 스택과 같아 생략&quot;이라는 뜻. 숨은 정보가 있는 게 아니다</td>
+</tr>
+</tbody></table></div>
+<p>실제 Spring 로그는 이 모양이 훨씬 길어서 <code>at</code> 줄이 수십 개다. 그래도 순서는 같다: <strong>맨 아래 <code>Caused by</code> → 그 아래 처음 나오는 내 패키지(<code>org.example</code>) 줄 → 파일:줄.</strong> 실제 Spring 로그에서 이 순서로 찾는 실습은 <a href="../scenario/ch0-first-steps/0-5-read-stack-trace.html">0-5</a>에서 한다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>15분.</p>
+<p><strong>① 감싼 예외 직접 만들기 (5분)</strong> — 아무 폴더(예: <code>~/tmp</code>)에서.</p>
+<p>위 <code>Wrap.java</code>를 그대로 저장하고:</p>
+<pre><code class="language-bash">javac Wrap.java
+java Wrap</code></pre>
+<p>기대: 위 <a href="#감싼-예외의-스택트레이스">예시</a>와 같은 출력. 그다음 <code>main</code>의 <code>&quot;팔공팔공&quot;</code>을 <code>&quot;8080&quot;</code>으로 바꿔 다시 <code>javac</code>·<code>java</code> → 아무것도 안 찍히고 끝난다(정상).</p>
+<p><code>loadConfig</code>의 <code>throw new IllegalStateException(&quot;설정을 읽지 못했다&quot;, e);</code>에서 <strong><code>, e</code>를 지우고</strong> 다시 돌려 본다. 맨 아래 <code>Caused by: java.lang.NumberFormatException</code> 묶음이 <strong>사라진다.</strong> 감쌀 때 원래 예외를 넘기지 않으면 진짜 원인이 로그에서 없어진다. 예외를 감쌀 때는 꼭 원래 예외를 같이 넘긴다.</p>
+<p><strong>② 서버에 로그 남기기 (7분)</strong> — 실습 레포에서.</p>
+<p><code>src/main/java/org/example/start/LogController.java</code>(폴더가 없으면 만든다)</p>
+<pre><code class="language-java">package org.example.start;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class LogController {
+
+    // 이 클래스 이름(org.example.start.LogController)을 이름표로 쓰는 로거
+    private static final Logger log = LoggerFactory.getLogger(LogController.class);
+
+    @GetMapping(&quot;/api/start/log&quot;)
+    public String write(@RequestParam(defaultValue = &quot;1&quot;) int n) {
+        log.debug(&quot;요청 들어옴 n={}&quot;, n);
+        log.info(&quot;처리 시작 n={}&quot;, n);
+        if (n &lt; 0) {
+            log.warn(&quot;음수가 왔다 n={}&quot;, n);
+        }
+        return &quot;ok&quot;;
+    }
+}</code></pre>
+<p>앱을 띄우고 <code>curl &quot;http://localhost:8080/api/start/log?n=-3&quot;</code>. Run 창에서:</p>
+<ul>
+<li>INFO 줄과 WARN 줄을 찾는다. 두 줄의 <strong>스레드 칸이 같은지</strong> 본다.</li>
+<li>DEBUG 줄(<code>요청 들어옴</code>)은 <strong>없는</strong> 것을 확인한다.</li>
+</ul>
+<p>앱을 끄고 DEBUG까지 켜서 다시 띄운다.</p>
+<pre><code class="language-bash">./gradlew bootRun --args='--logging.level.org.example=debug'</code></pre>
+<p>(IntelliJ는 Run 설정의 Program arguments에 <code>--logging.level.org.example=debug</code>.) 같은 요청을 다시 보내면 <code>DEBUG ... 요청 들어옴 n=-3</code>이 생긴다. Spring 자신의 줄(<code>o.s...</code>)은 늘지 않는다. <code>org.example</code> 아래만 DEBUG로 바꿨기 때문이다.</p>
+<p><strong>③ 정리 (1분)</strong> — <code>LogController.java</code>는 지워도 된다(0장 이후 코드와 겹치지 않으니 남겨도 된다).</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> 아래 줄에서 레벨, 스레드, 로그를 남긴 클래스를 각각 찾아라.</p>
+<pre><code class="language-text">2026-10-10T00:00:13.925+09:00  WARN 6336 --- [javaExperience] [nio-8189-exec-7] .w.s.m.s.DefaultHandlerExceptionResolver : Resolved [org.springframework.web.bind.MissingServletRequestParameterException: Required request parameter 'q' for method parameter type String is not present]</code></pre>
+<details>
+<summary>정답</summary>
+
+<p>레벨은 <code>WARN</code>, 스레드는 <code>nio-8189-exec-7</code>(요청을 처리한 Tomcat 일꾼), 클래스는 <code>.w.s.m.s.DefaultHandlerExceptionResolver</code>다. 앞의 <code>.w.s.m.s.</code>는 긴 패키지 이름을 줄인 것이다(<code>org.springframework.web.servlet.mvc.support</code>의 앞부분이 잘렸다). 내 클래스가 아니라 Spring이 남긴 줄이고, 메시지는 &quot;필수 쿼리 <code>q</code>가 없어서 요청을 거절했다(400)&quot;는 뜻이다. 4xx라 ERROR가 아니라 WARN이다.</p>
+</details>
+
+<p><strong>2.</strong> 코드에 <code>log.debug(&quot;저장할 글 = {}&quot;, post);</code>를 넣었는데 로그에 아무것도 안 나온다. 코드가 실행되지 않은 것일까?</p>
+<details>
+<summary>정답</summary>
+
+<p>꼭 그렇지는 않다. Spring Boot 기본 레벨은 <strong>INFO</strong>라 DEBUG 줄은 실행돼도 찍히지 않는다. <code>logging.level.org.example: debug</code>(yml) 또는 <code>--logging.level.org.example=debug</code>(실행 인자)로 내 패키지의 레벨을 낮추면 보인다. 정말 실행됐는지 바로 확인하고 싶으면 잠깐 <code>log.info</code>로 바꾸거나 중단점(C1)을 건다.</p>
+</details>
+
+<p><strong>3.</strong> 기동 실패 로그에 <code>Caused by:</code>가 네 개 있다. 어느 것부터 읽나? 왜인가?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>맨 아래</strong> <code>Caused by</code>부터 읽는다. 예외는 안쪽에서 처음 터지고, 바깥 코드가 그것을 잡아 더 큰 의미의 예외로 감싸 다시 던진다. 출력은 바깥 예외가 맨 위, 안쪽으로 갈수록 아래다. 그래서 맨 아래가 처음 일어난 일(진짜 원인)이다. 위의 것들은 &quot;그래서 이것도 못 했다&quot;는 결과다.</p>
+</details>
+
+<p><strong>4.</strong> 스택트레이스 끝에 <code>... 2 more</code>가 있다. 중요한 줄이 숨겨진 것인가?</p>
+<details>
+<summary>정답</summary>
+
+<p>아니다. &quot;이 예외의 나머지 호출 경로는 바로 위(감싼 쪽) 예외의 스택과 같아서 생략했다&quot;는 뜻이다. 같은 줄을 반복해 찍지 않으려는 표시다. 볼 것은 생략되지 않은 위쪽 <code>at</code> 줄들이다.</p>
+</details>
+
+<p><strong>5.</strong> 예외를 감싸 다시 던질 때 <code>throw new IllegalStateException(&quot;설정을 읽지 못했다&quot;);</code>처럼 원래 예외(<code>e</code>)를 빼면 무엇이 문제인가?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>Caused by</code> 묶음이 사라져 <strong>진짜 원인</strong>(예: <code>NumberFormatException: For input string: &quot;팔공팔공&quot;</code>)과 그 줄 번호가 로그에 남지 않는다. &quot;설정을 읽지 못했다&quot;만 보고는 왜 실패했는지 알 수 없다. 따라 해 보기 ①에서 직접 확인했다. 감쌀 때는 <code>new XxxException(&quot;메시지&quot;, e)</code>처럼 원래 예외를 두 번째 인자로 넘긴다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/W07-why-logger.html#3-왜-그런가--원리">W07 왜 System.out.println 대신 로거를 쓰나</a> — SLF4J·레벨·<code>{}</code></li>
+<li><a href="../docs/knowledge/J04-exceptions.html#3-내부-동작원리">J04 예외 처리</a> — 예외 체이닝(<code>Caused by</code>)이 만들어지는 방식</li>
+<li><a href="../docs/knowledge/D05-debugging-methodology.html">D05 디버깅 방법론</a> — 재현 → 로그 → 가설 → 확인</li>
+<li><a href="../docs/knowledge/D09-operations-observability.html#1-큰-그림">D09 운영과 관측</a> — 배포한 서버의 로그는 어디서 보나</li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<p>실습으로 돌아간다 — 시나리오 <a href="../scenario/ch0-first-steps/0-5-read-stack-trace.html#2단계--로그에서-원인-줄을-찾는다">0-5</a>로 간다. 실제 Spring 에러 로그에서 내 코드 줄을 찾는다.</p>
+
+
+</main>
+<script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</script>
+
+</body>
+</html>

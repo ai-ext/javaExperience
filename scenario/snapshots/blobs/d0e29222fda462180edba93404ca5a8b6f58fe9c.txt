@@ -1,0 +1,83 @@
+package org.example.notification;
+
+import jakarta.validation.constraints.Pattern;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class NotificationController {
+
+    private final NotificationService notificationService;
+
+    public NotificationController(NotificationService notificationService) {
+        this.notificationService = notificationService;
+    }
+
+    // GET이지만 "내 것" 엔드포인트라 인증 필수
+    @GetMapping("/api/me/notifications")
+    public NotificationListResponse list(@RequestParam(value = "unreadOnly", required = false) String unreadOnly,
+                                         // 15-5 종류로 거르기(선택) — 정해진 값이 아니면 400
+                                         @RequestParam(required = false) @Pattern(regexp = "LIKE|COMMENT|MENTION|LIKE_MILESTONE",
+                                                 message = "type은 LIKE, COMMENT, MENTION, LIKE_MILESTONE 중 하나여야 합니다.") String type,
+                                         @RequestParam(value = "size", required = false) String size,
+                                         @RequestParam(required = false) String cursor,
+                                         @LoginMember AuthenticatedMember me) {
+        return notificationService.list(requireLogin(me), parseUnreadOnly(unreadOnly), type, parseSize(size), cursor);
+    }
+
+    // 생략만 기본값이다. Spring boolean 변환의 1/yes/on 허용을 피한다.
+    private boolean parseUnreadOnly(String raw) {
+        if (raw == null || "false".equals(raw)) return false;
+        if ("true".equals(raw)) return true;
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unreadOnly는 true 또는 false여야 합니다.");
+    }
+
+    private int parseSize(String raw) {
+        if (raw == null) return 20;
+        if (!raw.matches("[0-9]+")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "size는 1~100이어야 합니다.");
+        }
+        try {
+            int value = Integer.parseInt(raw);
+            if (value >= 1 && value <= 100) return value;
+        } catch (NumberFormatException ignored) {
+            // int 범위를 넘는 긴 숫자도 400으로 돌린다.
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "size는 1~100이어야 합니다.");
+    }
+
+    // 12-3: 종 아이콘이 주기적으로 부른다 — 목록 없이 개수만
+    @GetMapping("/api/me/notifications/unread-count")
+    public UnreadCountResponse unreadCount(@LoginMember AuthenticatedMember me) {
+        return notificationService.unreadCount(requireLogin(me));
+    }
+
+    // 12-3: 전부 읽음. POST라 토큰 없음은 인터셉터가 401로 막는다
+    @PostMapping("/api/me/notifications/read-all")
+    public ReadAllResponse readAll(@LoginMember AuthenticatedMember me) {
+        return notificationService.readAll(me);
+    }
+
+    private AuthenticatedMember requireLogin(AuthenticatedMember me) {
+        if (me == null) {
+            throw new AuthenticationRequiredException("인증이 필요합니다.");
+        }
+        return me;
+    }
+
+    @PatchMapping("/api/me/notifications/{id}/read")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void markRead(@PathVariable Long id, @LoginMember AuthenticatedMember me) {
+        notificationService.markRead(me, id);
+    }
+}

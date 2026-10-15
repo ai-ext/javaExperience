@@ -1,0 +1,84 @@
+package org.example.board.common;
+
+import java.util.Comparator;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import org.example.board.common.ApiResponse.FieldErrorItem;
+
+// 컨트롤러 밖으로 나온 예외를 한곳에서 공통 응답 틀로 바꾼다
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    // 서비스가 던진 실패(401·403·404·409 …)
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<ApiResponse<Void>> handleApi(ApiException e) {
+        return fail(e.code(), e.getMessage(), List.of());
+    }
+
+    // @Valid 검증 실패 — 필드별 이유를 errors에 담는다
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalid(MethodArgumentNotValidException e) {
+        List<FieldErrorItem> errors = e.getBindingResult().getFieldErrors().stream()
+                .map(fe -> new FieldErrorItem(fe.getField(), fe.getDefaultMessage()))
+                .sorted(Comparator.comparing(FieldErrorItem::field))
+                .toList();
+        return fail(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(), errors);
+    }
+
+    // 쿼리·경로 값의 타입이 틀림(?page=abc, /posts/abc)
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        return fail(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(),
+                List.of(new FieldErrorItem(e.getName(), "형식이 올바르지 않습니다.")));
+    }
+
+    // 필수 쿼리 파라미터 없음
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingParam(MissingServletRequestParameterException e) {
+        return fail(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(),
+                List.of(new FieldErrorItem(e.getParameterName(), "필수 값입니다.")));
+    }
+
+    // 본문이 JSON이 아니거나 깨짐
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBadJson(HttpMessageNotReadableException e) {
+        return fail(ErrorCode.BAD_JSON, ErrorCode.BAD_JSON.defaultMessage(), List.of());
+    }
+
+    // 없는 주소
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResource(NoResourceFoundException e) {
+        return fail(ErrorCode.NOT_FOUND, "요청한 주소가 없습니다.", List.of());
+    }
+
+    // 주소는 있는데 메서드가 다름(DELETE /api/v1/health)
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethod(HttpRequestMethodNotSupportedException e) {
+        return fail(ErrorCode.METHOD_NOT_ALLOWED, ErrorCode.METHOD_NOT_ALLOWED.defaultMessage(), List.of());
+    }
+
+    // 그 밖의 예상 못 한 예외 — 원인은 로그에만 남기고, 응답에는 내부 정보를 싣지 않는다
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception e) {
+        log.error("처리하지 못한 예외", e);
+        return fail(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.defaultMessage(), List.of());
+    }
+
+    private ResponseEntity<ApiResponse<Void>> fail(ErrorCode code, String message, List<FieldErrorItem> errors) {
+        return ResponseEntity.status(code.status()).body(ApiResponse.fail(code, message, errors));
+    }
+}

@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-006. 태그 입력 정리(#·공백·대소문자)</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="t-006-태그-입력-정리공백대소문자"><a class="anchor" href="#t-006-태그-입력-정리공백대소문자" aria-hidden="true">#</a>T-006. 태그 입력 정리(#·공백·대소문자)</h1>
+<blockquote>
+<p>난이도 쉬움 · 유형 기존 API 변경 · DB community · 예상 30분</p>
+</blockquote>
+<h2 id="티켓"><a class="anchor" href="#티켓" aria-hidden="true">#</a>티켓</h2>
+<blockquote>
+<p><strong>요청자</strong> 운영 · <strong>배경</strong> 태그 검색에서 <code>spring</code>을 누르면 <code>#Spring</code>, <code>spring</code>으로 달린 글이 안 나온다. DB를 보니 <code>#Spring</code>·<code>JPA</code>·<code>#JPA</code> 같은 태그가 따로 생겨 있다. 프론트 태그 입력칸이 <code>#</code>을 붙여 보내기도 하고, 공백만 있는 태그(<code>&quot;  &quot;</code>)도 그대로 저장된다.</p>
+</blockquote>
+<ul>
+<li>글 작성·수정 때 태그 이름을 정리해서 저장해 주세요: <strong>앞뒤 공백 제거 → 앞에 붙은 <code>#</code> 제거 → 소문자</strong>.</li>
+<li>정리한 뒤에 같은 이름은 하나로 합칩니다(<code>#Spring</code>과 <code>spring</code>은 같은 태그).</li>
+<li>정리하고 나니 빈 이름(<code>&quot;  &quot;</code>, <code>&quot;#&quot;</code>)이면 400으로 거절합니다. 이미 잘못 저장된 태그 정리(데이터 보정)는 이 티켓 범위가 아닙니다.</li>
+<li><strong>완료 조건</strong>: 작성(POST)·수정(PATCH) 어느 쪽으로 들어와도 같은 규칙이 적용된다.</li>
+</ul>
+<p><strong>DB 시작 상태</strong>: <code>community</code> 처음 상태(<code>bash scripts/java-db.sh --reset</code>). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 태그는 <code>java</code>·<code>spring</code>·<code>jpa</code>·<code>mysql</code>·<code>docker</code>·<code>테스트</code>·<code>회고</code>·<code>질문</code> 8개.</p>
+<h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
+<ul>
+<li>글 작성과 글 부분 수정이 태그 이름을 태그 행으로 바꾸는 과정(찾고 없으면 만들기, 중복 제거)을 같은 메서드로 처리한다. 그 메서드를 찾으면 고칠 곳은 한 군데다.</li>
+<li>작성 요청은 Bean Validation이 먼저 길이(1~30자)를 본다. 공백 두 칸(<code>&quot;  &quot;</code>)은 길이 2라서 통과한다는 점에 주의한다.</li>
+<li>400 응답에 <code>errors: [{field, message}]</code>를 담는 예외가 이미 있다(수정 API가 쓴다).</li>
+</ul>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>시나리오 화면</span><span class="mockup-live"><i></i> 단계 시안</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">사용자에게 보이는 상태</span><h3>글쓰기 — 태그 입력</h3><p>사용자가 #을 붙이거나 대소문자를 섞어 써도 서버가 같은 태그로 정리해 저장한다.</p></div></div><div class="mock-screen" aria-label="글쓰기 — 태그 입력 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>새 글 쓰기</strong><span>김자바</span></header><div class="mock-control screen-field" data-screen-id="title"><label>제목</label><div class="mock-field">[T-006] 태그 정리</div></div><div class="mock-chip-group" data-screen-id="tags-input"><span class="screen-widget-label">입력한 태그</span><span class="mock-chip">#Spring</span><span class="mock-chip"> JPA </span><span class="mock-chip">spring</span><span class="mock-chip">#JPA</span></div><div class="mock-chip-group" data-screen-id="tags-saved"><span class="screen-widget-label">저장된 태그</span><span class="mock-chip">spring</span><span class="mock-chip">jpa</span></div><div class="mock-actions" data-screen-id="buttons"><span class="mock-button mock-primary" data-screen-id="save">저장</span></div><div class="mock-toast tone-error" data-screen-id="toast"><span class="mock-toast-icon" aria-hidden="true">!</span><span>빈 태그는 쓸 수 없어요</span></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">화면 뒤에서 일어나는 일</span><h4>요청부터 응답까지</h4></div><span class="flow-hint">이 단계에 기록된 처리 순서를 보여줍니다.</span></div><div class="flow-tracks" aria-label="흐름별 요청 처리 경로"><div class="flow-route" aria-label="섞어 쓴 태그 저장"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="jpa" data-index="2"><span class="flow-node-number">3</span>JPA</span><span class="flow-node" data-node="mysql" data-index="3"><span class="flow-node-number">4</span>MySQL</span><span class="flow-node" data-node="response" data-index="4"><span class="flow-node-number">5</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="5"><span class="flow-node-number">6</span>응답 반영</span></div><div class="flow-route" aria-label="빈 태그"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="response" data-index="2"><span class="flow-node-number">3</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="3"><span class="flow-node-number">4</span>응답 반영</span></div></div><p class="flow-swipe-hint">좌우로 밀어 전체 경로 보기 →</p><aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside><p class="flow-selection-status" role="status" aria-live="polite">카드를 선택하면 화면의 관련 요소와 계층이 강조됩니다.</p><div class="scenario-flows"><section class="scenario-flow" aria-label="섞어 쓴 태그 저장" data-flow-index="0"><h5>섞어 쓴 태그 저장<span class="scenario-flow-count">6단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="tags-input|save" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">태그 네 개를 입력하고 [저장]을 누른다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/posts" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/posts</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">POST /api/posts</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-kimjava · Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;boardSlug&quot;: &quot;dev&quot;, &quot;title&quot;: &quot;[T-006] 태그 정리&quot;, &quot;content&quot;: &quot;태그 정리 확인&quot;, &quot;tags&quot;: [&quot;#Spring&quot;, &quot; JPA &quot;, &quot;spring&quot;, &quot;#JPA&quot;]}</pre></details></li><li><button type="button" class="flow-step" data-node="jpa" data-nodes="jpa" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-layers"><span class="flow-layer" data-node="jpa">JPA</span></span><span class="flow-step-text">이름마다 공백 제거 → # 제거 → 소문자. spring·jpa·spring·jpa → 중복을 합쳐 spring·jpa. 이미 있는 태그 행을 찾아 연결한다</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> SELECT * FROM tag WHERE name = 'spring'; SELECT * FROM tag WHERE name = 'jpa'; INSERT INTO post_tag …</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 201</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;id&quot;: 22, ..., &quot;tags&quot;: [&quot;spring&quot;, &quot;jpa&quot;], ...}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="tags-saved" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">저장된 글에는 정리된 태그 두 개만 보인다</span></button></li></ol></section><section class="scenario-flow" aria-label="빈 태그" data-flow-index="1"><h5>빈 태그<span class="scenario-flow-count">5단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="tags-input|save" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">태그 칸에 #만 넣고 저장한다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/posts" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/posts</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">POST /api/posts</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-kimjava · Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;boardSlug&quot;: &quot;dev&quot;, &quot;title&quot;: &quot;[T-006] 빈 태그&quot;, &quot;content&quot;: &quot;빈 태그&quot;, &quot;tags&quot;: [&quot;#&quot;]}</pre></details></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">정리하니 빈 이름 → 저장하지 않고 400(errors의 field는 tags)</span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 400</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;status&quot;: 400, &quot;errors&quot;: [{&quot;field&quot;: &quot;tags&quot;, &quot;message&quot;: &quot;태그 이름은 1~30자여야 합니다.&quot;}]}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="toast" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">오류를 띄우고 글은 저장되지 않는다</span></button></li></ol></section></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: '사용자 화면', request: 'HTTP 요청', server: '서버', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'server', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = (labels[selected] || button.querySelector('.flow-kind')?.textContent || '시나리오') + ' 단계 · ' + (button.querySelector('.flow-step-text')?.textContent.trim() || '세부 내용은 아래 설명을 확인하세요.');
+    }));
+  }
+})();
+</script><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>대상</td>
+<td><code>POST /api/posts</code>, <code>PATCH /api/posts/{id}</code>의 <code>tags</code></td>
+</tr>
+<tr>
+<td>정리 순서</td>
+<td>① 앞뒤 공백 제거 ② 앞에 붙은 <code>#</code> 모두 제거(<code>##spring</code>도) ③ 다시 앞뒤 공백 제거 ④ 소문자(로케일 무관)</td>
+</tr>
+<tr>
+<td>중복</td>
+<td>정리한 이름 기준으로 합친다. 응답의 태그 순서는 보장하지 않는다(글의 태그는 <code>Set</code>이다)</td>
+</tr>
+<tr>
+<td>빈 이름·너무 김</td>
+<td>정리한 뒤 비었거나 30자를 넘으면 <code>400</code>, <code>errors</code>의 <code>field</code>가 <code>tags</code>로 시작</td>
+</tr>
+<tr>
+<td>응답</td>
+<td>기존과 같은 모양. <code>tags</code>에는 정리된 이름</td>
+</tr>
+<tr>
+<td>DB 변화</td>
+<td>정리된 이름으로만 <code>tag</code> 행이 생긴다(없을 때만). 400이면 글·태그 모두 저장되지 않는다</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li>태그 개수 제한(5개)은 지금처럼 요청에 온 개수 기준으로 둔다. 한국어 태그(<code>회고</code>)는 소문자 변환에 영향이 없다.</li>
+</ul>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+H='Authorization: Bearer tok-kimjava'
+
+# 요청 A — 섞어 쓴 태그
+curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$H&quot; -H 'Content-Type: application/json' \
+  -d '{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[T-006] 태그 정리&quot;,&quot;content&quot;:&quot;태그 정리 확인&quot;,&quot;tags&quot;:[&quot;#Spring&quot;,&quot; JPA &quot;,&quot;spring&quot;,&quot;#JPA&quot;]}'
+# 요청 B — 공백만 / 요청 C — #만
+curl -i -X POST &quot;$BASE/api/posts&quot; -H &quot;$H&quot; -H 'Content-Type: application/json' -d '{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[T-006] 공백 태그&quot;,&quot;content&quot;:&quot;x&quot;,&quot;tags&quot;:[&quot;  &quot;]}'
+curl -i -X POST &quot;$BASE/api/posts&quot; -H &quot;$H&quot; -H 'Content-Type: application/json' -d '{&quot;boardSlug&quot;:&quot;dev&quot;,&quot;title&quot;:&quot;[T-006] 빈 태그&quot;,&quot;content&quot;:&quot;x&quot;,&quot;tags&quot;:[&quot;#&quot;]}'
+# 요청 D — A에서 만든 글({id})의 태그를 수정
+curl -s -X PATCH &quot;$BASE/api/posts/{id}&quot; -H &quot;$H&quot; -H 'Content-Type: application/json' -d '{&quot;tags&quot;:[&quot;#Docker&quot;,&quot;MySQL&quot;,&quot;##docker&quot;]}'</code></pre>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.</p>
+<section id="browser-requests-1" class="api-practice" aria-label="HTTP 요청 실행"><div class="request-panel-heading"><div><p class="request-eyebrow">직접 확인 · 4개 요청</p><h3>브라우저에서 요청 보내기</h3></div><p>위 서버 주소를 확인하고 순서대로 실행하세요. 토큰은 입력 후에도 저장하지 않습니다.</p></div><nav class="request-steps" aria-label="요청 실행 순서"><ol><li data-method="POST"><a href="#browser-request-1-1"><span class="request-step-number">1</span><span class="request-step-content"><span class="request-step-method">POST · A</span><span class="request-step-title">섞어 쓴 태그로 작성</span></span></a></li><li data-method="POST"><a href="#browser-request-1-2"><span class="request-step-number">2</span><span class="request-step-content"><span class="request-step-method">POST · B</span><span class="request-step-title">공백만 있는 태그</span></span></a></li><li data-method="POST"><a href="#browser-request-1-3"><span class="request-step-number">3</span><span class="request-step-content"><span class="request-step-method">POST · C</span><span class="request-step-title">#만 있는 태그</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-4"><span class="request-step-number">4</span><span class="request-step-content"><span class="request-step-method">PATCH · D</span><span class="request-step-title">수정으로 태그 바꾸기</span></span></a></li></ol></nav><div class="api-request-list"><article id="browser-request-1-1" class="api-request" data-request-id="A" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · A</p><h4>섞어 쓴 태그로 작성</h4></div><span class="request-number">요청 1</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[T-006] 태그 정리&quot;,
+  &quot;content&quot;: &quot;태그 정리 확인&quot;,
+  &quot;tags&quot;: [
+    &quot;#Spring&quot;,
+    &quot; JPA &quot;,
+    &quot;spring&quot;,
+    &quot;#JPA&quot;
+  ]
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-1">POST 요청 보내기</button><p id="request-status-1-1" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[T-006] 태그 정리&quot;,
+  &quot;content&quot;: &quot;태그 정리 확인&quot;,
+  &quot;tags&quot;: [
+    &quot;#Spring&quot;,
+    &quot; JPA &quot;,
+    &quot;spring&quot;,
+    &quot;#JPA&quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:201,&quot;json&quot;:[{&quot;path&quot;:&quot;$.tags&quot;,&quot;length&quot;:2},{&quot;path&quot;:&quot;$.tags&quot;,&quot;contains&quot;:&quot;spring&quot;},{&quot;path&quot;:&quot;$.tags&quot;,&quot;contains&quot;:&quot;jpa&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-2" class="api-request" data-request-id="B" data-method="POST" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · B</p><h4>공백만 있는 태그</h4></div><span class="request-number">요청 2</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[T-006] 공백 태그&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;tags&quot;: [
+    &quot;  &quot;
+  ]
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-2">POST 요청 보내기</button><p id="request-status-1-2" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[T-006] 공백 태그&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;tags&quot;: [
+    &quot;  &quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[0].field&quot;,&quot;matches&quot;:&quot;^tags&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-3" class="api-request" data-request-id="C" data-method="POST" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · C</p><h4>#만 있는 태그</h4></div><span class="request-number">요청 3</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[T-006] 빈 태그&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;tags&quot;: [
+    &quot;#&quot;
+  ]
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-3">POST 요청 보내기</button><p id="request-status-1-3" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;dev&quot;,
+  &quot;title&quot;: &quot;[T-006] 빈 태그&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;tags&quot;: [
+    &quot;#&quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[0].field&quot;,&quot;matches&quot;:&quot;^tags&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-4" class="api-request" data-request-id="D" data-method="PATCH" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · D</p><h4>수정으로 태그 바꾸기</h4></div><span class="request-number">요청 4</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/{{A.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;tags&quot;: [
+    &quot;#Docker&quot;,
+    &quot;MySQL&quot;,
+    &quot;##docker&quot;
+  ]
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-4">PATCH 요청 보내기</button><p id="request-status-1-4" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;tags&quot;: [
+    &quot;#Docker&quot;,
+    &quot;MySQL&quot;,
+    &quot;##docker&quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.tags&quot;,&quot;length&quot;:2},{&quot;path&quot;:&quot;$.tags&quot;,&quot;contains&quot;:&quot;docker&quot;},{&quot;path&quot;:&quot;$.tags&quot;,&quot;contains&quot;:&quot;mysql&quot;}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP(필수), D = DB(필수, SELECT만), R = 코드 리뷰(피드백)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 A</td>
+<td><code>201</code>, <code>tags</code>가 <code>spring</code>·<code>jpa</code> 두 개(순서 무관)</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 B·C</td>
+<td>둘 다 <code>400</code>, <code>errors[0].field</code>가 <code>tags</code>로 시작</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 D</td>
+<td><code>200</code>, <code>tags</code>가 <code>docker</code>·<code>mysql</code> 두 개(순서 무관) — 수정 API에도 같은 규칙</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT name FROM tag WHERE name LIKE &#39;#%&#39; OR BINARY name &lt;&gt; BINARY LOWER(TRIM(name)) OR TRIM(name) = &#39;&#39;</code></td>
+<td>0행 — <code>#</code>·공백·대문자가 남은 태그가 없다</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT COUNT(*) FROM tag</code></td>
+<td><code>8</code> — 새 태그 행이 생기지 않았다(전부 이미 있던 태그에 연결)</td>
+</tr>
+<tr>
+<td>D3</td>
+<td><code>SELECT COUNT(*) FROM post WHERE title IN (&#39;[T-006] 공백 태그&#39;, &#39;[T-006] 빈 태그&#39;)</code></td>
+<td><code>0</code> — 400이면 글도 저장되지 않는다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>한 곳</td>
+<td>정리 규칙이 작성·수정이 함께 지나가는 한 메서드에 있다. 컨트롤러나 요청 DTO마다 따로 쓰지 않는다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>순서</td>
+<td>정리한 <strong>뒤에</strong> 중복을 합친다(앞에서 합치면 <code>#Spring</code>과 <code>spring</code>이 둘 다 남는다)</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>로케일</td>
+<td><code>toLowerCase(Locale.ROOT)</code>처럼 서버 로케일에 영향받지 않게 한다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>DB 정렬 규칙</td>
+<td>MySQL 정렬 규칙(<code>utf8mb4_0900_ai_ci</code>)은 대소문자를 구분하지 않아 <code>Spring</code>으로 찾으면 <code>spring</code> 행이 나온다는 것, 그래도 저장 값을 정리해야 하는 이유(응답·다른 저장소·검색엔진)를 말할 수 있다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../docs/knowledge/W10-where-to-validate.html">W10 검증은 어디서 하나</a> — 프론트가 정리해 보내도 서버가 다시 하는 이유</li>
+<li><a href="../docs/knowledge/J01-types-string.html">J01 기본 타입·참조 타입·박싱·String</a> — <code>strip</code>·<code>trim</code>·<code>toLowerCase</code></li>
+<li><a href="../docs/knowledge/R03-schema-types-constraints.html">R03 스키마와 테이블 설계</a> — 문자열 정렬 규칙(collation)과 UNIQUE</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 어디를 고치나</summary>
+
+<p>글 서비스에서 &quot;이름으로 찾고 없으면 만든다&quot;는 메서드와, 그 안에서 쓰는 &quot;요청 안의 중복 제거&quot; 메서드를 찾는다. 중복 제거 전에 이름마다 정리 함수를 거치게 바꾸면 작성·수정이 같이 바뀐다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 정리 함수</summary>
+
+<pre><code class="language-java">String name = raw.strip();
+while (name.startsWith(&quot;#&quot;)) name = name.substring(1);
+name = name.strip().toLowerCase(Locale.ROOT);
+if (name.isEmpty() || name.length() &gt; 30) throw new InvalidPostFieldException(&quot;tags&quot;, &quot;태그 이름은 1~30자여야 합니다.&quot;);</code></pre>
+<p>정리한 이름을 <code>LinkedHashSet</code>에 넣으면 순서를 지키며 중복이 빠진다.</p>
+</details>
+
+
+</main>
+
+
+</body>
+</html>

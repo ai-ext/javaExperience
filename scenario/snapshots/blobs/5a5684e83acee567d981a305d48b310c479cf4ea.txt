@@ -1,0 +1,79 @@
+package org.example.board.like;
+
+import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.post.Post;
+import org.example.board.post.PostRepository;
+import org.example.board.post.Visibility;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class LikeService {
+
+    private final PostLikeRepository postLikeRepository;
+    private final PostRepository postRepository;
+
+    public LikeService(PostLikeRepository postLikeRepository, PostRepository postRepository) {
+        this.postLikeRepository = postLikeRepository;
+        this.postRepository = postRepository;
+    }
+
+    // 토글: 없으면 만들고, 있으면 지운다. like_count도 함께(한 트랜잭션)
+    @Transactional
+    public LikeResponse toggle(Long userId, Long postId) {
+        findVisiblePost(postId, userId);
+        PostLikeId id = new PostLikeId(postId, userId);
+        boolean liked;
+        if (postLikeRepository.existsById(id)) {
+            postLikeRepository.deleteById(id);
+            if (postRepository.changeLikeCount(postId, userId, Visibility.PUBLIC, -1) == 0)
+                throw new ApiException(ErrorCode.NOT_FOUND, "게시글을 찾을 수 없습니다.");
+            liked = false;
+        } else {
+            postLikeRepository.save(new PostLike(postId, userId));
+            if (postRepository.changeLikeCount(postId, userId, Visibility.PUBLIC, 1) == 0)
+                throw new ApiException(ErrorCode.NOT_FOUND, "게시글을 찾을 수 없습니다.");
+            liked = true;
+        }
+        return new LikeResponse(liked, postRepository.findLikeCount(postId));
+    }
+
+    // v2 멱등 API — 몇 번을 보내도(재시도·더블클릭·동시) 결과는 "누른 상태" 하나
+    @Transactional
+    public LikeResponse like(Long userId, Long postId) {
+        lockVisiblePost(postId, userId);
+        if (postLikeRepository.insertIfAbsent(postId, userId) == 1) {
+            postRepository.changeLikeCount(postId, userId, Visibility.PUBLIC, 1);
+        }
+        return new LikeResponse(true, postRepository.findLikeCount(postId));
+    }
+
+    @Transactional
+    public LikeResponse unlike(Long userId, Long postId) {
+        lockVisiblePost(postId, userId);
+        if (postLikeRepository.deleteIfPresent(postId, userId) == 1) {
+            postRepository.changeLikeCount(postId, userId, Visibility.PUBLIC, -1);
+        }
+        return new LikeResponse(false, postRepository.findLikeCount(postId));
+    }
+
+    // 글 행을 먼저 잠근다(SELECT … FOR UPDATE). 같은 글의 좋아요 요청은 여기서 한 줄로 선다.
+    // 잠그지 않으면 post_likes INSERT(외래 키 확인용 공유 락)와 posts UPDATE(배타 락)가 엇갈려 데드락이 난다
+    private void lockVisiblePost(Long postId, Long userId) {
+        Post post = postRepository.findByIdForUpdate(postId)
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "게시글을 찾을 수 없습니다."));
+        if (post.getVisibility() == Visibility.PRIVATE && !post.getAuthor().getId().equals(userId)) {
+            throw new ApiException(ErrorCode.NOT_FOUND, "게시글을 찾을 수 없습니다.");
+        }
+    }
+
+    private Post findVisiblePost(Long postId, Long userId) {
+        Post post = postRepository.findByIdAndDeletedAtIsNull(postId)
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "게시글을 찾을 수 없습니다."));
+        if (post.getVisibility() == Visibility.PRIVATE && !post.getAuthor().getId().equals(userId)) {
+            throw new ApiException(ErrorCode.NOT_FOUND, "게시글을 찾을 수 없습니다.");
+        }
+        return post;
+    }
+}

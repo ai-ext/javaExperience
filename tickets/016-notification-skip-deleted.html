@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-016. 알림 목록에서 지워진 글·댓글 알림 빼기</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="t-016-알림-목록에서-지워진-글댓글-알림-빼기"><a class="anchor" href="#t-016-알림-목록에서-지워진-글댓글-알림-빼기" aria-hidden="true">#</a>T-016. 알림 목록에서 지워진 글·댓글 알림 빼기</h1>
+<blockquote>
+<p>난이도 중급 · 유형 기존 API 변경 · DB community · 예상 50분</p>
+</blockquote>
+<h2 id="티켓"><a class="anchor" href="#티켓" aria-hidden="true">#</a>티켓</h2>
+<blockquote>
+<p><strong>요청자</strong> CS·프론트 팀 · <strong>배경</strong> &quot;알림을 눌렀더니 없는 글이라고 나온다&quot;는 문의가 많다. 글쓴이가 글을 지웠거나 댓글 단 사람이 댓글을 지운 뒤에도 알림이 그대로 남아 있다. 게다가 종 아이콘의 빨간 숫자(안 읽은 개수)가 목록에 보이는 안 읽은 알림 수보다 크다.</p>
+</blockquote>
+<ul>
+<li>내 알림 목록에서 <strong>삭제된 글</strong>에 대한 알림과 <strong>삭제된 댓글</strong>에 대한 댓글 알림을 빼 주세요. 알림 행 자체는 지우지 않습니다(나중에 글 복구 기능이 생길 수 있다).</li>
+<li>안 읽은 개수(<code>unreadCount</code>)도 같은 기준으로 세 주세요. 목록과 숫자가 다르면 안 됩니다.</li>
+<li><strong>완료 조건</strong>: 지워진 글·댓글 알림이 목록과 숫자 어디에도 나오지 않고, 살아 있는 알림은 그대로 최신순이다.</li>
+</ul>
+<p><strong>DB 시작 상태</strong>: <code>community</code> 처음 상태(<code>bash scripts/java-db.sh --reset</code>). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 알림 테이블은 비어 있다 — 아래 요청들이 이스프링(회원 3)의 새 글 두 개에 박디비(회원 4)의 좋아요·댓글을 달아 알림을 만든다.</p>
+<h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
+<ul>
+<li>알림 목록은 쿼리 두 개(목록, 안 읽은 개수)로 만든다. 둘이 어떤 조건을 공유하고 있는지 본다.</li>
+<li>글과 댓글은 지워도 행이 남는다(soft delete). 알림 행에서 글·댓글의 삭제 여부까지 가려면 무엇을 조인해야 하는지 본다.</li>
+</ul>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>시나리오 화면</span><span class="mockup-live"><i></i> 단계 시안</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">사용자에게 보이는 상태</span><h3>알림 — 종 아이콘</h3><p>지워진 글·댓글 알림은 목록에서도, 빨간 숫자에서도 빠진다.</p></div></div><div class="mock-screen" aria-label="알림 — 종 아이콘 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>알림</strong><span>이스프링</span></header><div class="mock-stats" data-screen-id="badge"><div class="mock-stats-item" data-screen-id="unread"><span>안 읽음</span><strong>1</strong></div></div><div class="mock-list" data-screen-id="notifications"><div class="mock-list-item tone-default" data-screen-id="n-like"><span class="mock-list-main"><strong>박디비님이 내 글을 좋아해요</strong><small>방금</small></span></div><div class="mock-list-item tone-muted" data-screen-id="n-gone"><span class="mock-list-main"><strong>박디비님이 댓글을 남겼어요 (지워진 댓글)</strong></span><span class="mock-list-badge">빠져야 함</span></div></div><div class="mock-toast tone-error" data-screen-id="toast-404"><span class="mock-toast-icon" aria-hidden="true">!</span><span>글을 찾을 수 없습니다</span></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">화면 뒤에서 일어나는 일</span><h4>요청부터 응답까지</h4></div><span class="flow-hint">이 단계에 기록된 처리 순서를 보여줍니다.</span></div><div class="flow-tracks" aria-label="흐름별 요청 처리 경로"><div class="flow-route" aria-label="지금(문제) — 눌러 보면 404"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="response" data-index="2"><span class="flow-node-number">3</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="3"><span class="flow-node-number">4</span>응답 반영</span></div><div class="flow-route" aria-label="고친 뒤"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="mysql" data-index="2"><span class="flow-node-number">3</span>MySQL</span><span class="flow-node" data-node="response" data-index="3"><span class="flow-node-number">4</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="4"><span class="flow-node-number">5</span>응답 반영</span></div></div><p class="flow-swipe-hint">좌우로 밀어 전체 경로 보기 →</p><aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside><p class="flow-selection-status" role="status" aria-live="polite">카드를 선택하면 화면의 관련 요소와 계층이 강조됩니다.</p><div class="scenario-flows"><section class="scenario-flow" aria-label="지금(문제) — 눌러 보면 404" data-flow-index="0"><h5>지금(문제) — 눌러 보면 404<span class="scenario-flow-count">4단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="n-gone" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">지워진 댓글 알림을 누른다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="GET" data-path="/api/me/notifications" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-get">GET</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/me/notifications</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">GET /api/me/notifications</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-lee</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;items&quot;: [{&quot;type&quot;: &quot;COMMENT&quot;, &quot;commentId&quot;: 9, …}, …], &quot;unreadCount&quot;: 4}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="toast-404" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">지운 글로 이동해 '글을 찾을 수 없습니다'</span></button></li></ol></section><section class="scenario-flow" aria-label="고친 뒤" data-flow-index="1"><h5>고친 뒤<span class="scenario-flow-count">6단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="badge" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">종 아이콘을 누른다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="GET" data-path="/api/me/notifications" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-get">GET</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/me/notifications</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">GET /api/me/notifications</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-lee</span></span></button></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">목록과 안 읽은 개수가 같은 조건(글 삭제 안 됨, 댓글 알림이면 댓글 삭제 안 됨)으로 조회한다</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> SELECT … FROM notification n JOIN post p ON p.id = n.post_id LEFT JOIN comment c ON c.id = n.comment_id WHERE n.member_id = 3 AND p.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY n.created_at DESC, n.id DESC</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;items&quot;: [{&quot;type&quot;: &quot;LIKE&quot;, &quot;postId&quot;: 23, …}], &quot;unreadCount&quot;: 1}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="notifications|unread" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">살아 있는 알림만, 숫자도 1</span></button></li></ol></section></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: '사용자 화면', request: 'HTTP 요청', server: '서버', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'server', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = (labels[selected] || button.querySelector('.flow-kind')?.textContent || '시나리오') + ' 단계 · ' + (button.querySelector('.flow-step-text')?.textContent.trim() || '세부 내용은 아래 설명을 확인하세요.');
+    }));
+  }
+})();
+</script><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>대상</td>
+<td><code>GET /api/me/notifications</code> (<code>unreadOnly</code>·<code>size</code> 그대로)</td>
+</tr>
+<tr>
+<td>빼는 알림</td>
+<td>글이 삭제된 알림(<code>post.deleted_at</code> 있음), 댓글 알림 중 그 댓글이 삭제된 것(<code>comment.deleted_at</code> 있음)</td>
+</tr>
+<tr>
+<td><code>unreadCount</code></td>
+<td>위 알림을 뺀 기준으로 센다 — <code>unreadOnly=true</code> 목록(크기 제한 안)의 개수와 같다</td>
+</tr>
+<tr>
+<td>그대로인 것</td>
+<td>응답 모양, 최신순(<code>created_at DESC, id DESC</code>), 알림 행(지우지 않는다), 읽음 처리 API</td>
+</tr>
+</tbody></table></div>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+J='Content-Type: application/json'; LEE='Authorization: Bearer tok-lee'; PARK='Authorization: Bearer tok-park'
+
+curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$LEE&quot; -H &quot;$J&quot; -d '{&quot;boardSlug&quot;:&quot;free&quot;,&quot;title&quot;:&quot;[T-016] 지울 글&quot;,&quot;content&quot;:&quot;x&quot;}'   # 요청 A
+curl -s -X PUT &quot;$BASE/api/posts/{A의 id}/like&quot; -H &quot;$PARK&quot;                                                             # 요청 B
+curl -s -X POST &quot;$BASE/api/posts/{A의 id}/comments&quot; -H &quot;$PARK&quot; -H &quot;$J&quot; -d '{&quot;content&quot;:&quot;[T-016] 댓글&quot;}'                 # 요청 C
+curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$LEE&quot; -H &quot;$J&quot; -d '{&quot;boardSlug&quot;:&quot;free&quot;,&quot;title&quot;:&quot;[T-016] 남길 글&quot;,&quot;content&quot;:&quot;x&quot;}'   # 요청 D
+curl -s -X PUT &quot;$BASE/api/posts/{D의 id}/like&quot; -H &quot;$PARK&quot;                                                             # 요청 E
+curl -s -X POST &quot;$BASE/api/posts/{D의 id}/comments&quot; -H &quot;$PARK&quot; -H &quot;$J&quot; -d '{&quot;content&quot;:&quot;[T-016] 지울 댓글&quot;}'            # 요청 F
+curl -i -X DELETE &quot;$BASE/api/comments/{F의 id}&quot; -H &quot;$PARK&quot;                                                            # 요청 G — 댓글 삭제
+curl -i -X DELETE &quot;$BASE/api/posts/{A의 id}&quot; -H &quot;$LEE&quot;                                                                # 요청 H — 글 삭제
+curl -s &quot;$BASE/api/me/notifications?size=100&quot; -H &quot;$LEE&quot;                                                              # 요청 I
+curl -s &quot;$BASE/api/me/notifications?unreadOnly=true&amp;size=100&quot; -H &quot;$LEE&quot;                                              # 요청 K</code></pre>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 매번 새 글·댓글로 알림을 만들므로 몇 번을 눌러도 같은 결과다.</p>
+<section id="browser-requests-1" class="api-practice" aria-label="HTTP 요청 실행"><div class="request-panel-heading"><div><p class="request-eyebrow">직접 확인 · 10개 요청</p><h3>브라우저에서 요청 보내기</h3></div><p>위 서버 주소를 확인하고 순서대로 실행하세요. 토큰은 입력 후에도 저장하지 않습니다.</p></div><details class="request-steps"><summary>요청 순서 보기 <span>POST 4 · PUT 2 · DELETE 2 · GET 2</span></summary><nav aria-label="요청 실행 순서"><ol><li data-method="POST"><a href="#browser-request-1-1"><span class="request-step-number">1</span><span class="request-step-content"><span class="request-step-method">POST · A</span><span class="request-step-title">이스프링 글 1(지울 글)</span></span></a></li><li data-method="PUT"><a href="#browser-request-1-2"><span class="request-step-number">2</span><span class="request-step-content"><span class="request-step-method">PUT · B</span><span class="request-step-title">박디비 좋아요(글 1)</span></span></a></li><li data-method="POST"><a href="#browser-request-1-3"><span class="request-step-number">3</span><span class="request-step-content"><span class="request-step-method">POST · C</span><span class="request-step-title">박디비 댓글(글 1)</span></span></a></li><li data-method="POST"><a href="#browser-request-1-4"><span class="request-step-number">4</span><span class="request-step-content"><span class="request-step-method">POST · D</span><span class="request-step-title">이스프링 글 2(남길 글)</span></span></a></li><li data-method="PUT"><a href="#browser-request-1-5"><span class="request-step-number">5</span><span class="request-step-content"><span class="request-step-method">PUT · E</span><span class="request-step-title">박디비 좋아요(글 2)</span></span></a></li><li data-method="POST"><a href="#browser-request-1-6"><span class="request-step-number">6</span><span class="request-step-content"><span class="request-step-method">POST · F</span><span class="request-step-title">박디비 댓글(글 2)</span></span></a></li><li data-method="DELETE"><a href="#browser-request-1-7"><span class="request-step-number">7</span><span class="request-step-content"><span class="request-step-method">DELETE · G</span><span class="request-step-title">박디비가 그 댓글 삭제</span></span></a></li><li data-method="DELETE"><a href="#browser-request-1-8"><span class="request-step-number">8</span><span class="request-step-content"><span class="request-step-method">DELETE · H</span><span class="request-step-title">이스프링이 글 1 삭제</span></span></a></li><li data-method="GET"><a href="#browser-request-1-9"><span class="request-step-number">9</span><span class="request-step-content"><span class="request-step-method">GET · I</span><span class="request-step-title">이스프링 알림 목록</span></span></a></li><li data-method="GET"><a href="#browser-request-1-10"><span class="request-step-number">10</span><span class="request-step-content"><span class="request-step-method">GET · K</span><span class="request-step-title">이스프링 안 읽은 알림만</span></span></a></li></ol></nav></details><div class="api-request-list"><article id="browser-request-1-1" class="api-request" data-request-id="A" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · A</p><h4>이스프링 글 1(지울 글)</h4></div><span class="request-number">요청 1</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-016] 지울 글&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-1">POST 요청 보내기</button><p id="request-status-1-1" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-016] 지울 글&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article id="browser-request-1-2" class="api-request" data-request-id="B" data-method="PUT" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PUT · B</p><h4>박디비 좋아요(글 1)</h4></div><span class="request-number">요청 2</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/{{A.body.id}}/like" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-park" value="Bearer tok-park" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-2">PUT 요청 보내기</button><p id="request-status-1-2" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-park&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article id="browser-request-1-3" class="api-request" data-request-id="C" data-method="POST" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · C</p><h4>박디비 댓글(글 1)</h4></div><span class="request-number">요청 3</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/{{A.body.id}}/comments" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-park" value="Bearer tok-park" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;[T-016] 댓글&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-3">POST 요청 보내기</button><p id="request-status-1-3" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-park&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;[T-016] 댓글&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article id="browser-request-1-4" class="api-request" data-request-id="D" data-method="POST" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · D</p><h4>이스프링 글 2(남길 글)</h4></div><span class="request-number">요청 4</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-016] 남길 글&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-4">POST 요청 보내기</button><p id="request-status-1-4" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-016] 남길 글&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article id="browser-request-1-5" class="api-request" data-request-id="E" data-method="PUT" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PUT · E</p><h4>박디비 좋아요(글 2)</h4></div><span class="request-number">요청 5</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/{{D.body.id}}/like" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-park" value="Bearer tok-park" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-5">PUT 요청 보내기</button><p id="request-status-1-5" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-park&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article id="browser-request-1-6" class="api-request" data-request-id="F" data-method="POST" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · F</p><h4>박디비 댓글(글 2)</h4></div><span class="request-number">요청 6</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/{{D.body.id}}/comments" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-park" value="Bearer tok-park" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;[T-016] 지울 댓글&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-6">POST 요청 보내기</button><p id="request-status-1-6" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-park&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;[T-016] 지울 댓글&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article id="browser-request-1-7" class="api-request" data-request-id="G" data-method="DELETE" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">DELETE · G</p><h4>박디비가 그 댓글 삭제</h4></div><span class="request-number">요청 7</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{F.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-park" value="Bearer tok-park" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-7">DELETE 요청 보내기</button><p id="request-status-1-7" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-park&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article id="browser-request-1-8" class="api-request" data-request-id="H" data-method="DELETE" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">DELETE · H</p><h4>이스프링이 글 1 삭제</h4></div><span class="request-number">요청 8</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/{{A.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-8">DELETE 요청 보내기</button><p id="request-status-1-8" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article id="browser-request-1-9" class="api-request" data-request-id="I" data-method="GET" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · I</p><h4>이스프링 알림 목록</h4></div><span class="request-number">요청 9</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/me/notifications?size=100" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-9">GET 요청 보내기</button><p id="request-status-1-9" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].postId&quot;,&quot;notContains&quot;:&quot;{{A.body.id}}&quot;}]}
+C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].commentId&quot;,&quot;notContains&quot;:&quot;{{F.body.id}}&quot;}]}
+C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[0].type&quot;,&quot;equals&quot;:&quot;LIKE&quot;},{&quot;path&quot;:&quot;$.items[0].postId&quot;,&quot;equals&quot;:&quot;{{D.body.id}}&quot;},{&quot;path&quot;:&quot;$.items[0].actor&quot;,&quot;equals&quot;:{&quot;id&quot;:4,&quot;nickname&quot;:&quot;박디비&quot;}}]}
+C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.unreadCount&quot;,&quot;equals&quot;:&quot;{{K.body.unreadCount}}&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-10" class="api-request" data-request-id="K" data-method="GET" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · K</p><h4>이스프링 안 읽은 알림만</h4></div><span class="request-number">요청 10</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/me/notifications?unreadOnly=true&amp;size=100" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-10">GET 요청 보내기</button><p id="request-status-1-10" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.unreadCount&quot;,&quot;equals&quot;:&quot;{{K.body.items.length}}&quot;}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP(필수), D = DB(필수, SELECT만), R = 코드 리뷰(피드백)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 I</td>
+<td>삭제된 글(A)에 대한 알림(좋아요·댓글 모두)이 없다</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 I</td>
+<td>삭제된 댓글(F)에 대한 알림이 없다</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 I</td>
+<td>맨 위는 살아 있는 글 D의 박디비 좋아요 알림 — 최신순 그대로</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 I·K</td>
+<td><code>unreadCount</code>가 안 읽은 목록의 개수와 같다(목록만 거르고 숫자는 안 거른 구현을 잡는다)</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT n.type, p.deleted_at IS NOT NULL AS post_deleted, c.deleted_at IS NOT NULL AS comment_deleted FROM notification n JOIN post p ON p.id = n.post_id LEFT JOIN comment c ON c.id = n.comment_id WHERE n.member_id = 3 ORDER BY n.id DESC LIMIT 4</code></td>
+<td>한 번 돌린 직후: <code>COMMENT 0 1</code> · <code>LIKE 0 0</code> · <code>COMMENT 1 0</code> · <code>LIKE 1 0</code> — 알림 행 4개는 그대로 남아 있고, 응답에는 <code>LIKE 0 0</code>만 나온다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>같은 조건</td>
+<td>목록 쿼리와 개수 쿼리가 <strong>같은 조건</strong>을 쓴다. 한쪽만 고치면 생기는 숫자 불일치를 설명할 수 있다(조건 조각을 공유하거나, 두 쿼리를 나란히 두고 테스트로 묶는다)</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>조인</td>
+<td>댓글이 없는 좋아요 알림이 빠지지 않게 댓글은 <code>LEFT JOIN</code>(또는 <code>n.comment IS NULL OR …</code>)으로 걸었다. 자바에서 목록을 받아 거르지 않았다(그러면 <code>size</code>보다 적게 오고 개수도 틀린다)</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>남기기 vs 지우기</td>
+<td>알림 행을 지우지 않고 읽을 때 거른 이유(복구 가능성, 쓰기 경로가 여러 곳)와, 반대로 글·댓글 삭제 때 알림을 지우는 방법의 장단점을 말할 수 있다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../docs/knowledge/R04-sql-crud-join.html">R04 SQL CRUD와 JOIN</a> — <code>LEFT JOIN</code>에서 조건을 WHERE에 두면 생기는 일</li>
+<li><a href="../docs/knowledge/S10-spring-data-query.html">S10 Spring Data와 쿼리 도구</a> — 파생 쿼리로 안 되는 COUNT를 <code>@Query</code>로</li>
+<li><a href="../docs/knowledge/R03-schema-types-constraints.html">R03 스키마·타입·제약</a> — soft delete 행이 남을 때 읽기 쪽이 지는 책임</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 목록</summary>
+
+<p>목록 JPQL에 <code>JOIN n.post p LEFT JOIN n.comment c</code>를 더하고 <code>AND p.deletedAt IS NULL AND (c IS NULL OR c.deletedAt IS NULL)</code>. 보낸 사람 <code>JOIN FETCH n.actor</code>는 그대로 둔다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 개수</summary>
+
+<p><code>countByMember_IdAndReadAtIsNull</code> 같은 파생 쿼리로는 조인 조건을 표현할 수 없다. 같은 FROM·WHERE를 쓴 <code>@Query(&quot;SELECT COUNT(n) FROM Notification n JOIN n.post p LEFT JOIN n.comment c WHERE …&quot;)</code>로 바꾼다.</p>
+</details>
+
+
+</main>
+
+
+</body>
+</html>

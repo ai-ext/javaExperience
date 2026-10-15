@@ -1,0 +1,45 @@
+package org.example.moderation;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import org.example.post.InvalidParametersException;
+import tools.jackson.databind.JsonNode;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+// 금칙어 안에는 공백을 둘 수 없다 — 검사할 때 본문의 공백을 지우고 비교하므로(띄어 쓰기로 피해 가기 방지)
+public record BannedWordRequest(
+        @NotBlank(message = "금칙어를 적어 주세요.")
+        @Size(min = 2, max = 30, message = "금칙어는 2~30자입니다.")
+        @Pattern(regexp = "(?U)^\\S*$", message = "금칙어에는 공백을 넣을 수 없습니다.")
+        String word,
+
+        @NotNull(message = "처리 방법을 골라 주세요.")
+        @Pattern(regexp = "BLOCK|MASK", message = "처리 방법은 BLOCK 또는 MASK입니다.")
+        String action
+) {
+    public static Parsed parse(JsonNode body) {
+        if (body == null || !body.isObject()) {
+            throw new InvalidParametersException(Map.of("body", "JSON 객체가 필요합니다."));
+        }
+        Map<String, String> errors = new LinkedHashMap<>();
+        String word = text(body.get("word"), "word", errors);
+        String action = text(body.get("action"), "action", errors);
+        return new Parsed(new BannedWordRequest(word, action), Map.copyOf(errors));
+    }
+
+    public record Parsed(BannedWordRequest request, Map<String, String> errors) {
+    }
+
+    private static String text(JsonNode value, String field, Map<String, String> errors) {
+        if (value == null || value.isNull()) return null;
+        if (!value.isTextual()) {
+            errors.put(field, field + "은 문자열이어야 합니다.");
+            return null;
+        }
+        return value.asText();
+    }
+}

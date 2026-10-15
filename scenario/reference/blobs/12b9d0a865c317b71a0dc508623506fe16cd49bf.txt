@@ -1,0 +1,55 @@
+package org.example.report;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Validator;
+import org.example.post.InvalidParametersException;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import tools.jackson.databind.JsonNode;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+@RestController
+public class ReportController {
+
+    private final ReportService reportService;
+    private final Validator validator;
+
+    public ReportController(ReportService reportService, Validator validator) {
+        this.reportService = reportService;
+        this.validator = validator;
+    }
+
+    // POST라 토큰 없음은 인터셉터가 401로 막는다
+    @Operation(summary = "글·댓글 신고",
+            description = "같은 사람이 같은 대상을 두 번 신고하면 409. 사유가 ETC면 detail 필수.")
+    @ApiResponse(responseCode = "201", description = "신고 접수")
+    @ApiResponse(responseCode = "400", description = "필드 규칙 위반 — errors에 틀린 필드 모두",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "404", description = "대상 없음·지워짐·볼 수 없음",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "409", description = "이미 신고함",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
+    @PostMapping("/api/reports")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ReportResponse report(@LoginMember AuthenticatedMember me, @RequestBody JsonNode body) {
+        ReportRequest.Parsed parsed = ReportRequest.parse(body);
+        ReportRequest request = parsed.request();
+        Map<String, String> errors = new LinkedHashMap<>(parsed.errors());
+        validator.validate(request).forEach(v -> errors.putIfAbsent(v.getPropertyPath().toString(), v.getMessage()));
+        if (!errors.isEmpty()) {
+            throw new InvalidParametersException(errors);
+        }
+        return reportService.report(me, request);
+    }
+}

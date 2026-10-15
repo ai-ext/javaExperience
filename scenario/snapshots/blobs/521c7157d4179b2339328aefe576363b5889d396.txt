@@ -1,0 +1,58 @@
+package org.example.poll;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import org.example.post.InvalidParametersException;
+import tools.jackson.databind.JsonNode;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+// Jackson의 숫자→문자열 강제변환 전에 원문 타입을 검사한다. 길이는 앞뒤 공백을 제거한 값 기준이다.
+public record PollCreateRequest(
+        @NotBlank(message = "질문을 입력해 주세요.")
+        @Size(max = 200, message = "질문은 200자 이하여야 합니다.")
+        String question,
+
+        @NotNull(message = "선택지를 입력해 주세요.")
+        @Size(min = 2, max = 5, message = "선택지는 2~5개여야 합니다.")
+        List<@NotBlank(message = "빈 선택지는 안 됩니다.") @Size(max = 50, message = "선택지는 50자 이하여야 합니다.") String> options
+) {
+    public static Parsed parse(JsonNode body) {
+        if (body == null || !body.isObject()) {
+            throw new InvalidParametersException(Map.of("body", "JSON 객체가 필요합니다."));
+        }
+        Map<String, String> errors = new LinkedHashMap<>();
+        String question = text(body.get("question"), "question", errors);
+        JsonNode rawOptions = body.get("options");
+        List<String> options = null;
+        if (rawOptions != null && !rawOptions.isNull()) {
+            if (!rawOptions.isArray()) {
+                errors.put("options", "선택지는 문자열 배열이어야 합니다.");
+            } else {
+                options = new ArrayList<>();
+                for (int i = 0; i < rawOptions.size(); i++) {
+                    options.add(text(rawOptions.get(i), "options[" + i + "]", errors));
+                }
+            }
+        }
+        return new Parsed(new PollCreateRequest(question, options), Map.copyOf(errors));
+    }
+
+    public record Parsed(PollCreateRequest request, Map<String, String> errors) {
+    }
+
+    private static String text(JsonNode value, String field, Map<String, String> errors) {
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (!value.isTextual()) {
+            errors.put(field, field + "는 문자열이어야 합니다.");
+            return null;
+        }
+        return value.asText().strip();
+    }
+}

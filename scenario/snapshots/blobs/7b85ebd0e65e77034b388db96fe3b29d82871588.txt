@@ -1,0 +1,68 @@
+package org.example.bookmark;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
+
+@RestController
+public class BookmarkController {
+
+    private final BookmarkService bookmarkService;
+
+    public BookmarkController(BookmarkService bookmarkService) {
+        this.bookmarkService = bookmarkService;
+    }
+
+    @PutMapping("/api/posts/{id}/bookmark")
+    public BookmarkResponse bookmark(@PathVariable Long id,
+                                     @LoginMember AuthenticatedMember loginMember,
+                                     @RequestBody(required = false) JsonNode request) {
+        BookmarkRequest body = BookmarkRequest.from(request);
+        return bookmarkService.bookmark(id, loginMember, body);
+    }
+
+    @PatchMapping("/api/posts/{id}/bookmark")
+    public BookmarkResponse patchMemo(@PathVariable Long id,
+                                      @LoginMember AuthenticatedMember loginMember,
+                                      @RequestBody BookmarkMemoPatchRequest request) {
+        return bookmarkService.patchMemo(id, loginMember, request);
+    }
+
+    @DeleteMapping("/api/posts/{id}/bookmark")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void unbookmark(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+        bookmarkService.unbookmark(id, loginMember);
+    }
+
+    @PatchMapping("/api/me/bookmarks/{bookmarkId}")
+    public BookmarkResponse move(@PathVariable Long bookmarkId,
+                                 @LoginMember AuthenticatedMember loginMember,
+                                 @RequestBody JsonNode request) {
+        return bookmarkService.move(bookmarkId, loginMember, BookmarkMoveRequest.from(request));
+    }
+
+    // GET이지만 "내 것" 엔드포인트라 인증 필수(4-3과 같은 이유로 컨트롤러에서 확인)
+    @GetMapping("/api/me/bookmarks")
+    public MyBookmarksResponse myBookmarks(@RequestParam(required = false) String folder,
+                                           @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
+                                           @RequestParam(required = false) String cursor,
+                                           @LoginMember AuthenticatedMember loginMember) {
+        if (loginMember == null) {
+            throw new AuthenticationRequiredException("인증이 필요합니다.");
+        }
+        return bookmarkService.myBookmarks(loginMember, folder, size, cursor);
+    }
+}

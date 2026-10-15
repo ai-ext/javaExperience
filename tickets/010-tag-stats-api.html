@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-010. 태그별 글 수 통계 API</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="t-010-태그별-글-수-통계-api"><a class="anchor" href="#t-010-태그별-글-수-통계-api" aria-hidden="true">#</a>T-010. 태그별 글 수 통계 API</h1>
+<blockquote>
+<p>난이도 쉬움 · 유형 새 API · DB community · 예상 30분</p>
+</blockquote>
+<h2 id="티켓"><a class="anchor" href="#티켓" aria-hidden="true">#</a>티켓</h2>
+<blockquote>
+<p><strong>요청자</strong> 기획 · <strong>배경</strong> 메인 화면 사이드바에 &quot;인기 태그&quot; 박스를 넣는다. 태그 이름 옆에 글 수를 붙여 많이 쓰인 순으로 보여 준다.</p>
+</blockquote>
+<ul>
+<li>태그별 글 수를 내려주는 API를 만들어 주세요. 로그인 없이 보는 박스라 <strong>누구나 볼 수 있는 글</strong>(게시됨·전체 공개·삭제 안 됨)만 셉니다. 팔로워 공개 글·임시저장·숨김·삭제된 글은 빼 주세요.</li>
+<li>글이 하나도 없는 태그는 안 보여 줍니다. 몇 개까지 받을지는 프론트가 정합니다(기본 10개, 최대 50개).</li>
+<li><strong>완료 조건</strong>: 글 수가 많은 순, 같으면 태그 이름 순. 숫자는 DB에서 센다(목록을 다 읽어 자바에서 세지 않는다).</li>
+</ul>
+<p><strong>DB 시작 상태</strong>: <code>community</code> 처음 상태(<code>bash scripts/java-db.sh --reset</code>). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 공개 글에 달린 태그는 <code>mysql</code> 6 · <code>java</code> 5 · <code>spring</code> 3 · <code>질문</code> 2 · <code>jpa</code> 1 · <code>회고</code> 1이고, <code>docker</code>·<code>테스트</code>는 글이 없다.</p>
+<h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
+<ul>
+<li>회원 활동 통계 API가 이미 있다 — 네이티브 SQL 한 번으로 집계하고 인터페이스 프로젝션으로 받는 방식이다. 같은 방식을 따른다.</li>
+<li>글과 태그는 연결 테이블로 이어져 있다(복합 PK). &quot;누구나 볼 수 있는 글&quot; 조건은 인기글 API의 SQL에도 같은 모양으로 들어 있다.</li>
+</ul>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>시나리오 화면</span><span class="mockup-live"><i></i> 단계 시안</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">사용자에게 보이는 상태</span><h3>메인 — 인기 태그 박스</h3><p>메인을 열 때 태그별 글 수를 받아 많은 순으로 칩을 그린다.</p></div></div><div class="mock-screen" aria-label="메인 — 인기 태그 박스 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>커뮤니티</strong><span></span></header><div class="mock-list" data-screen-id="tag-box"><span class="screen-widget-label">인기 태그</span><div class="mock-list-item tone-default" data-screen-id="t-mysql"><span class="mock-list-main"><strong>#mysql</strong><small>글 6</small></span></div><div class="mock-list-item tone-default" data-screen-id="t-java"><span class="mock-list-main"><strong>#java</strong><small>글 5</small></span></div><div class="mock-list-item tone-default" data-screen-id="t-spring"><span class="mock-list-main"><strong>#spring</strong><small>글 3</small></span></div></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">화면 뒤에서 일어나는 일</span><h4>요청부터 응답까지</h4></div><span class="flow-hint">이 단계에 기록된 처리 순서를 보여줍니다.</span></div><div class="flow-tracks" aria-label="흐름별 요청 처리 경로"><div class="flow-route" aria-label="메인 열기"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="mysql" data-index="2"><span class="flow-node-number">3</span>MySQL</span><span class="flow-node" data-node="response" data-index="3"><span class="flow-node-number">4</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="4"><span class="flow-node-number">5</span>응답 반영</span></div></div><p class="flow-swipe-hint">좌우로 밀어 전체 경로 보기 →</p><aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside><p class="flow-selection-status" role="status" aria-live="polite">카드를 선택하면 화면의 관련 요소와 계층이 강조됩니다.</p><div class="scenario-flows"><section class="scenario-flow" aria-label="메인 열기" data-flow-index="0"><h5>메인 열기<span class="scenario-flow-count">6단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="bar" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">메인 화면을 연다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="GET" data-path="/api/stats/tags?limit=10" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-get">GET</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/stats/tags?limit=10</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">GET /api/stats/tags?limit=10</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-text">태그 ⨝ 연결 테이블 ⨝ 글을 공개 글 조건으로 거른 뒤 태그별로 센다 — SQL 한 번</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> SELECT t.name, COUNT(*) AS postCount FROM tag t JOIN post_tag pt ON pt.tag_id = t.id JOIN post p ON p.id = pt.post_id WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL GROUP BY t.id, t.name ORDER BY postCount DESC, t.name LIMIT 10</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>[
+  {&quot;name&quot;: &quot;mysql&quot;, &quot;postCount&quot;: 6},
+  {&quot;name&quot;: &quot;java&quot;, &quot;postCount&quot;: 5},
+  {&quot;name&quot;: &quot;spring&quot;, &quot;postCount&quot;: 3},
+  {&quot;name&quot;: &quot;질문&quot;, &quot;postCount&quot;: 2},
+  {&quot;name&quot;: &quot;jpa&quot;, &quot;postCount&quot;: 1},
+  {&quot;name&quot;: &quot;회고&quot;, &quot;postCount&quot;: 1}
+]</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="tag-box|t-mysql" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">많이 쓰인 태그부터 칩이 보인다. 글이 없는 docker·테스트는 없다</span></button></li></ol></section></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: '사용자 화면', request: 'HTTP 요청', server: '서버', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'server', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = (labels[selected] || button.querySelector('.flow-kind')?.textContent || '시나리오') + ' 단계 · ' + (button.querySelector('.flow-step-text')?.textContent.trim() || '세부 내용은 아래 설명을 확인하세요.');
+    }));
+  }
+})();
+</script><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>메서드·경로</td>
+<td><code>GET /api/stats/tags?limit=10</code></td>
+</tr>
+<tr>
+<td>인증</td>
+<td>필요 없음</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>기본 <code>10</code>, <code>1</code>~`50<code>. 벗어나면 </code>400`</td>
+</tr>
+<tr>
+<td>셀 글</td>
+<td><code>status = &#39;PUBLISHED&#39;</code> · <code>visibility = &#39;PUBLIC&#39;</code> · <code>deleted_at IS NULL</code></td>
+</tr>
+<tr>
+<td>응답</td>
+<td><code>200</code>, 배열 <code>[{&quot;name&quot;: &quot;mysql&quot;, &quot;postCount&quot;: 6}, …]</code> — 두 필드. 글 수↓, 같으면 이름↑. 글 0개인 태그는 빼고, 최대 <code>limit</code>개</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li>DB 변화 없음(조회만).</li>
+</ul>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+H='Authorization: Bearer tok-kimjava'
+
+# 준비 — 셀 대상이 아닌 글을 만든다: 팔로워 공개 글(docker), 쓰고 지운 글(테스트)
+curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$H&quot; -H 'Content-Type: application/json' \
+  -d '{&quot;boardSlug&quot;:&quot;free&quot;,&quot;title&quot;:&quot;[T-010] 팔로워 공개&quot;,&quot;content&quot;:&quot;x&quot;,&quot;tags&quot;:[&quot;docker&quot;],&quot;visibility&quot;:&quot;FOLLOWERS&quot;}'   # 요청 A
+curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$H&quot; -H 'Content-Type: application/json' \
+  -d '{&quot;boardSlug&quot;:&quot;free&quot;,&quot;title&quot;:&quot;[T-010] 지울 글&quot;,&quot;content&quot;:&quot;x&quot;,&quot;tags&quot;:[&quot;테스트&quot;]}'                                # 요청 B
+curl -i -X DELETE &quot;$BASE/api/posts/{B의 id}&quot; -H &quot;$H&quot;                                                               # 요청 C
+
+curl -s &quot;$BASE/api/stats/tags&quot;            # 요청 D
+curl -s &quot;$BASE/api/stats/tags?limit=2&quot;    # 요청 E
+curl -i &quot;$BASE/api/stats/tags?limit=0&quot;    # 요청 F</code></pre>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.</p>
+<section id="browser-requests-1" class="api-practice" aria-label="HTTP 요청 실행"><div class="request-panel-heading"><div><p class="request-eyebrow">직접 확인 · 6개 요청</p><h3>브라우저에서 요청 보내기</h3></div><p>위 서버 주소를 확인하고 순서대로 실행하세요. 토큰은 입력 후에도 저장하지 않습니다.</p></div><nav class="request-steps" aria-label="요청 실행 순서"><ol><li data-method="POST"><a href="#browser-request-1-1"><span class="request-step-number">1</span><span class="request-step-content"><span class="request-step-method">POST · A</span><span class="request-step-title">팔로워 공개 글(docker)</span></span></a></li><li data-method="POST"><a href="#browser-request-1-2"><span class="request-step-number">2</span><span class="request-step-content"><span class="request-step-method">POST · B</span><span class="request-step-title">지울 글(테스트)</span></span></a></li><li data-method="DELETE"><a href="#browser-request-1-3"><span class="request-step-number">3</span><span class="request-step-content"><span class="request-step-method">DELETE · C</span><span class="request-step-title">B 삭제</span></span></a></li><li data-method="GET"><a href="#browser-request-1-4"><span class="request-step-number">4</span><span class="request-step-content"><span class="request-step-method">GET · D</span><span class="request-step-title">태그 통계</span></span></a></li><li data-method="GET"><a href="#browser-request-1-5"><span class="request-step-number">5</span><span class="request-step-content"><span class="request-step-method">GET · E</span><span class="request-step-title">상위 2개</span></span></a></li><li data-method="GET"><a href="#browser-request-1-6"><span class="request-step-number">6</span><span class="request-step-content"><span class="request-step-method">GET · F</span><span class="request-step-title">limit=0</span></span></a></li></ol></nav><div class="api-request-list"><article id="browser-request-1-1" class="api-request" data-request-id="A" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · A</p><h4>팔로워 공개 글(docker)</h4></div><span class="request-number">요청 1</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-010] 팔로워 공개&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;tags&quot;: [
+    &quot;docker&quot;
+  ],
+  &quot;visibility&quot;: &quot;FOLLOWERS&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-1">POST 요청 보내기</button><p id="request-status-1-1" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-010] 팔로워 공개&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;tags&quot;: [
+    &quot;docker&quot;
+  ],
+  &quot;visibility&quot;: &quot;FOLLOWERS&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article id="browser-request-1-2" class="api-request" data-request-id="B" data-method="POST" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · B</p><h4>지울 글(테스트)</h4></div><span class="request-number">요청 2</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-010] 지울 글&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;tags&quot;: [
+    &quot;테스트&quot;
+  ]
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-2">POST 요청 보내기</button><p id="request-status-1-2" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-010] 지울 글&quot;,
+  &quot;content&quot;: &quot;x&quot;,
+  &quot;tags&quot;: [
+    &quot;테스트&quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article id="browser-request-1-3" class="api-request" data-request-id="C" data-method="DELETE" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">DELETE · C</p><h4>B 삭제</h4></div><span class="request-number">요청 3</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/{{B.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-3">DELETE 요청 보내기</button><p id="request-status-1-3" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article id="browser-request-1-4" class="api-request" data-request-id="D" data-method="GET" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · D</p><h4>태그 통계</h4></div><span class="request-number">요청 4</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/stats/tags" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-4">GET 요청 보내기</button><p id="request-status-1-4" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$[0]&quot;,&quot;equals&quot;:{&quot;name&quot;:&quot;mysql&quot;,&quot;postCount&quot;:6}},{&quot;path&quot;:&quot;$[*].name&quot;,&quot;equals&quot;:[&quot;mysql&quot;,&quot;java&quot;,&quot;spring&quot;,&quot;질문&quot;,&quot;jpa&quot;,&quot;회고&quot;]},{&quot;path&quot;:&quot;$[*].postCount&quot;,&quot;equals&quot;:[6,5,3,2,1,1]}]}
+C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$&quot;,&quot;type&quot;:&quot;array&quot;},{&quot;path&quot;:&quot;$[*].name&quot;,&quot;notContains&quot;:&quot;docker&quot;},{&quot;path&quot;:&quot;$[*].name&quot;,&quot;notContains&quot;:&quot;테스트&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-5" class="api-request" data-request-id="E" data-method="GET" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · E</p><h4>상위 2개</h4></div><span class="request-number">요청 5</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/stats/tags?limit=2" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-5">GET 요청 보내기</button><p id="request-status-1-5" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$[*].name&quot;,&quot;equals&quot;:[&quot;mysql&quot;,&quot;java&quot;]}]}</pre></dd></dl></details></article><article id="browser-request-1-6" class="api-request" data-request-id="F" data-method="GET" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · F</p><h4>limit=0</h4></div><span class="request-number">요청 6</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/stats/tags?limit=0" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-6">GET 요청 보내기</button><p id="request-status-1-6" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP(필수), D = DB(필수, SELECT만), R = 코드 리뷰(피드백)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 D</td>
+<td><code>200</code>, <code>mysql 6 · java 5 · spring 3 · 질문 2 · jpa 1 · 회고 1</code> 순서, 항목은 <code>name</code>·<code>postCount</code> 두 필드</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 D</td>
+<td><code>200</code> 배열이고, 팔로워 공개 글의 <code>docker</code>, 지운 글의 <code>테스트</code>가 세어지지 않았다</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 E</td>
+<td><code>limit=2</code>면 <code>mysql</code>, <code>java</code> 두 개</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 F</td>
+<td><code>limit=0</code>은 <code>400</code></td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT t.name, COUNT(*) FROM tag t JOIN post_tag pt ON pt.tag_id = t.id JOIN post p ON p.id = pt.post_id WHERE p.status = &#39;PUBLISHED&#39; AND p.visibility = &#39;PUBLIC&#39; AND p.deleted_at IS NULL GROUP BY t.id, t.name ORDER BY COUNT(*) DESC, t.name</code></td>
+<td>요청 D와 같은 6행</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT t.name, COUNT(*) FROM tag t JOIN post_tag pt ON pt.tag_id = t.id GROUP BY t.id, t.name ORDER BY t.name</code></td>
+<td>조건 없이 세면 <code>docker</code>·<code>테스트</code>도 나온다 — 조건이 왜 필요한지 비교</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>집계 위치</td>
+<td><code>GROUP BY</code>·<code>COUNT</code>·<code>ORDER BY</code>·<code>LIMIT</code>을 DB에서 한다. 태그나 글을 모두 읽어 자바에서 세지 않는다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>공개 글 조건</td>
+<td>세는 조건이 &quot;비로그인이 볼 수 있는 글&quot;과 같다. 같은 조건이 다른 SQL(인기글)에도 있다는 걸 알고, 규칙이 바뀌면 같이 고쳐야 할 곳으로 꼽을 수 있다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>응답 DTO</td>
+<td>프로젝션(행)을 그대로 내보내지 않고 응답 record로 옮긴다(회원 활동 통계와 같은 방식). <code>COUNT(*)</code>가 <code>Long</code>으로 온다는 점을 처리했다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>정렬 끝까지</td>
+<td>글 수가 같을 때 이름 순으로 정해서 결과가 매번 같다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../docs/knowledge/R04-sql-crud-join.html">R04 SQL로 데이터 다루기</a> — JOIN·GROUP BY·COUNT</li>
+<li><a href="../docs/knowledge/S10-spring-data-query.html">S10 Spring Data와 쿼리 도구</a> — 네이티브 쿼리와 인터페이스 프로젝션</li>
+<li><a href="../docs/knowledge/W03-db-access-comparison.html">W03 DB 접근 방식 총비교</a> — 집계는 SQL로</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 저장소</summary>
+
+<p>통계 저장소에 <code>@Query(nativeQuery = true, value = &quot;&quot;&quot; … &quot;&quot;&quot;)</code> 메서드를 하나 더 둔다. 별칭을 <code>AS name</code>, <code>AS postCount</code>로 주고 <code>interface TagStatRow { String getName(); Long getPostCount(); }</code>로 받는다. <code>LIMIT :limit</code>과 <code>@Param(&quot;limit&quot;) int limit</code>.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 컨트롤러</summary>
+
+<p><code>@GetMapping(&quot;/api/stats/tags&quot;)</code>, <code>@RequestParam(defaultValue = &quot;10&quot;) @Min(1) @Max(50) int limit</code> — 범위를 벗어나면 다른 목록 API의 <code>size</code>처럼 400이 된다.</p>
+</details>
+
+
+</main>
+
+
+</body>
+</html>

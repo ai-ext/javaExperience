@@ -8,7 +8,9 @@
 
 배치에 `.parallel()`을 덧붙였더니 DB 호출이 한꺼번에 몰려 풀이 막히고, 요청별 `ThreadLocal` 정보가 사라질 수 있다. `ArrayList`를 `reduce`에서 수정하거나 순서 의존 누산기를 병렬화하면 결과도 달라진다. `toMap`은 중복 키에서 기본 수집기가 예외를 내며, `peek` 로그는 최적화로 생략될 수 있다.
 
-Stream API를 단순히 “람다로 컬렉션을 도는 문법”으로 보면 이런 문제를 놓친다. 스트림은 값을 저장하지 않고 계산을 기술한다. 구현은 필요한 값만 읽거나, 여러 단계를 한 번에 수행하거나, 순차 연산을 생략할 수도 있다. 병렬 모드에서는 입력을 분할해 여러 스레드에서 실행하고 부분 결과를 결합한다. 따라서 순서, 부수 효과, 연산의 결합 가능성, 소스의 분할 특성이 모두 결과와 성능에 영향을 준다. 람다와 함수형 인터페이스의 원리는 → J08 참조.
+Stream API를 단순히 “람다로 컬렉션을 도는 문법”으로 보면 이런 문제를 놓친다. 스트림은 값을 저장하지 않고 계산을 기술한다. 구현은 필요한 값만 읽거나, 여러 단계를 한 번에 수행하거나, 순차 연산을 생략할 수도 있다.
+
+병렬 모드에서는 입력을 분할해 여러 스레드에서 실행하고 부분 결과를 결합한다. 따라서 순서, 부수 효과, 연산의 결합 가능성, 소스의 분할 특성이 모두 결과와 성능에 영향을 준다. 람다와 함수형 인터페이스의 원리는 → J08 참조.
 
 ## 2. 핵심 개념
 
@@ -31,7 +33,9 @@ Stream API를 단순히 “람다로 컬렉션을 도는 문법”으로 보면 
 
 **`map`과 `flatMap`:** `map`은 원소 하나를 결과 하나로 바꾼다. `flatMap`은 원소 하나를 하위 스트림으로 바꾼 다음 하위 스트림들을 이어 붙인다. `List<List<T>>`를 평탄화하거나 주문별 품목을 한 줄의 품목 흐름으로 만드는 데 적합하다. 하위 결과가 없으면 빈 스트림을 반환하면 된다.
 
-**`groupingBy`, `partitioningBy`, `toMap`:** `groupingBy(classifier)`는 분류 키마다 원소 목록을 만든다. downstream `Collector`를 붙이면 목록 대신 합계·개수·최댓값 등을 그룹별로 바로 계산한다. `partitioningBy(predicate)`는 분류 키가 `true`와 `false`뿐인 두 갈래 분할이다. `toMap(keyMapper, valueMapper)`은 키가 유일하다고 가정한다. 중복 키가 허용되면 병합 함수가 있는 오버로드를 사용하고, 더 구체적인 맵이 필요하면 맵 공급자도 지정한다.
+**`groupingBy`, `partitioningBy`, `toMap`:** `groupingBy(classifier)`는 분류 키마다 원소 목록을 만든다. downstream `Collector`를 붙이면 목록 대신 합계·개수·최댓값 등을 그룹별로 바로 계산한다. `partitioningBy(predicate)`는 분류 키가 `true`와 `false`뿐인 두 갈래 분할이다.
+
+`toMap(keyMapper, valueMapper)`은 키가 유일하다고 가정한다. 중복 키가 허용되면 병합 함수가 있는 오버로드를 사용하고, 더 구체적인 맵이 필요하면 맵 공급자도 지정한다.
 
 | 선택 | 결과 모양 | 예시 |
 |---|---|---|
@@ -39,9 +43,13 @@ Stream API를 단순히 “람다로 컬렉션을 도는 문법”으로 보면 
 | `partitioningBy` | 조건별 `true`/`false` 두 그룹 | 기준 이상/미만 주문 |
 | `toMap` | 키 → 값 | SKU별 재고 합계; 중복 정책을 병합 함수로 결정 |
 
-**`reduce`와 `collect`:** `reduce`는 불변 값의 누적 결과(합계·곱 등)를 만든다. 병렬 reduction은 임의의 묶음 순서로 계산될 수 있으므로 누산 연산은 결합법칙을 만족해야 하며 항등값도 맞아야 한다. `collect`는 컬렉션처럼 변경 가능한 컨테이너를 만들고, 분할 처리 시 각 부분 컨테이너를 결합하는 용도다. 여러 스레드가 같은 `ArrayList`를 공유하도록 `reduce`하지 말고 `collect(Collectors.toList())`처럼 Collector의 생성·누적·결합 계약을 사용한다.
+**`reduce`와 `collect`:** `reduce`는 불변 값의 누적 결과(합계·곱 등)를 만든다. 병렬 reduction은 임의의 묶음 순서로 계산될 수 있으므로 누산 연산은 결합법칙을 만족해야 하며 항등값도 맞아야 한다.
 
-**원시 스트림:** `IntStream`, `LongStream`, `DoubleStream`은 기본형 특화 스트림이다. `mapToInt`, `sum`, `average`, `summaryStatistics`는 `Integer` 등의 박싱과 언박싱을 줄이고 수치 연산을 직접 표현한다. `Stream<T>`에는 객체 참조, 원시 특화 스트림에는 해당 숫자형이 흐른다. Java는 `boolean`이나 `char`용 특화 스트림은 제공하지 않는다.
+`collect`는 컬렉션처럼 변경 가능한 컨테이너를 만들고, 분할 처리 시 각 부분 컨테이너를 결합하는 용도다. 여러 스레드가 같은 `ArrayList`를 공유하도록 `reduce`하지 말고 `collect(Collectors.toList())`처럼 Collector의 생성·누적·결합 계약을 사용한다.
+
+**원시 스트림:** `IntStream`, `LongStream`, `DoubleStream`은 기본형 특화 스트림이다. `mapToInt`, `sum`, `average`, `summaryStatistics`는 `Integer` 등의 박싱과 언박싱을 줄이고 수치 연산을 직접 표현한다.
+
+`Stream<T>`에는 객체 참조, 원시 특화 스트림에는 해당 숫자형이 흐른다. Java는 `boolean`이나 `char`용 특화 스트림은 제공하지 않는다.
 
 ## 3. 내부 동작·원리
 
@@ -89,7 +97,9 @@ Stream 구현은 결과에 영향 없는 단계를 생략할 수 있다. 크기�
 
 병렬 reduction은 분할별 부분 결과를 combiner로 합친다. 합계에는 자연스럽지만 순서 의존 연산에는 맞지 않을 수 있다. Collector의 `CONCURRENT` 특성이 없으면 작업들이 한 가변 컨테이너를 함께 갱신한다고 가정하지 않는다. `forEach`는 순서를 보장하지 않으므로 순서가 계약이면 `forEachOrdered`나 순차 처리를 쓴다.
 
-OpenJDK의 일반적인 병렬 Stream은 `ForkJoinPool` 공용 풀을 활용한다. 다른 Fork/Join 작업과 경쟁하며, 블로킹 I/O가 끼어도 워커 확장이 보장되지 않는다. JDBC·HTTP 호출을 넣지 말고, 트랜잭션·MDC·보안 문맥 등 `ThreadLocal` 상태의 전파도 가정하지 않는다. Stream API에는 실행기를 지정하는 메서드가 없으므로, 사용자 풀에 제출해 병렬 Stream을 실행하는 관행은 구현 의존으로 취급하고 계약으로 삼지 않는다.
+OpenJDK의 일반적인 병렬 Stream은 `ForkJoinPool` 공용 풀을 활용한다. 다른 Fork/Join 작업과 경쟁하며, 블로킹 I/O가 끼어도 워커 확장이 보장되지 않는다.
+
+JDBC·HTTP 호출을 넣지 말고, 트랜잭션·MDC·보안 문맥 등 `ThreadLocal` 상태의 전파도 가정하지 않는다. Stream API에는 실행기를 지정하는 메서드가 없으므로, 사용자 풀에 제출해 병렬 Stream을 실행하는 관행은 구현 의존으로 취급하고 계약으로 삼지 않는다.
 
 ### Stream Gatherers (JEP 485)
 

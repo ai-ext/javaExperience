@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-014. 글 목록에 내 좋아요·북마크 표시</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="t-014-글-목록에-내-좋아요북마크-표시"><a class="anchor" href="#t-014-글-목록에-내-좋아요북마크-표시" aria-hidden="true">#</a>T-014. 글 목록에 내 좋아요·북마크 표시</h1>
+<blockquote>
+<p>난이도 중급 · 유형 기존 API 변경 · DB community · 예상 60분</p>
+</blockquote>
+<h2 id="티켓"><a class="anchor" href="#티켓" aria-hidden="true">#</a>티켓</h2>
+<blockquote>
+<p><strong>요청자</strong> 프론트 팀 · <strong>배경</strong> 목록 카드의 하트·책갈피 아이콘을 &quot;내가 눌렀는지&quot;에 따라 채우고 싶다. 지금은 목록을 받은 뒤 카드마다 상세 API를 한 번씩 더 불러 확인하고 있어서, 목록 하나에 요청이 20번 넘게 나간다.</p>
+</blockquote>
+<ul>
+<li>게시판 글 목록과 조합 검색 응답의 각 항목에 &quot;내가 좋아요했는지&quot;·&quot;내가 북마크했는지&quot;를 넣어 주세요. 비로그인은 둘 다 <code>false</code>입니다.</li>
+<li>서버도 항목마다 따로 조회하면 같은 문제를 서버로 옮긴 것뿐입니다. 목록 크기(최대 50)와 상관없이 쿼리 수가 일정해야 합니다.</li>
+<li><strong>완료 조건</strong>: 기존 필드·정렬·건수는 그대로이고 두 필드만 더해진다. 좋아요를 누르고 다시 목록을 받으면 바로 반영돼 있다.</li>
+</ul>
+<p><strong>DB 시작 상태</strong>: <code>community</code> 처음 상태(<code>bash scripts/java-db.sh --reset</code>). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 박디비(회원 4)는 자유 게시판 글 4·9·12·14에 좋아요를 눌렀고, 이스프링(회원 3)은 글 5에 좋아요, 글 5·9·13(자유 게시판)과 2에 북마크를 해 두었다.</p>
+<h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
+<ul>
+<li>게시판 목록과 조합 검색은 같은 서비스 메서드에서 같은 항목 DTO로 바뀐다. 고칠 곳이 한 군데로 모이는지 확인한다.</li>
+<li>좋아요·북마크 저장소에는 &quot;한 글&quot;을 기준으로 한 메서드만 있다. 이번에는 &quot;글 여러 개&quot;를 한 번에 물어야 한다.</li>
+</ul>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>시나리오 화면</span><span class="mockup-live"><i></i> 단계 시안</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">사용자에게 보이는 상태</span><h3>자유 게시판 — 카드 아이콘</h3><p>목록 한 번으로 카드마다 하트·책갈피를 채운다. 상세를 카드 수만큼 부르지 않는다.</p></div></div><div class="mock-screen" aria-label="자유 게시판 — 카드 아이콘 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>자유 게시판</strong><span>이스프링</span></header><div class="mock-list" data-screen-id="posts"><div class="mock-list-item tone-default" data-screen-id="p-13"><span class="mock-list-main"><strong>자유글 02</strong><small>박디비</small></span><span class="mock-list-badge">🔖</span></div><div class="mock-list-item tone-default" data-screen-id="p-12"><span class="mock-list-main"><strong>자유글 01</strong><small>이스프링</small></span></div><div class="mock-list-item tone-default" data-screen-id="p-9"><span class="mock-list-main"><strong>차단 확인용 글</strong><small>한차단</small></span><span class="mock-list-badge">🔖</span></div><div class="mock-list-item tone-default" data-screen-id="p-5"><span class="mock-list-main"><strong>스터디원 구해요</strong><small>박디비</small></span><span class="mock-list-badge">♥ 🔖</span></div></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">화면 뒤에서 일어나는 일</span><h4>요청부터 응답까지</h4></div><span class="flow-hint">이 단계에 기록된 처리 순서를 보여줍니다.</span></div><div class="flow-tracks" aria-label="흐름별 요청 처리 경로"><div class="flow-route" aria-label="목록 열기"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="mysql" data-index="2"><span class="flow-node-number">3</span>MySQL</span><span class="flow-node" data-node="response" data-index="3"><span class="flow-node-number">4</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="4"><span class="flow-node-number">5</span>응답 반영</span></div></div><p class="flow-swipe-hint">좌우로 밀어 전체 경로 보기 →</p><aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside><p class="flow-selection-status" role="status" aria-live="polite">카드를 선택하면 화면의 관련 요소와 계층이 강조됩니다.</p><div class="scenario-flows"><section class="scenario-flow" aria-label="목록 열기" data-flow-index="0"><h5>목록 열기<span class="scenario-flow-count">7단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="bar" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">자유 게시판을 연다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="GET" data-path="/api/boards/free/posts?size=20" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-get">GET</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/boards/free/posts?size=20</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">GET /api/boards/free/posts?size=20</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-lee</span></span></button></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">글 목록을 읽은 뒤, 그 글 id 묶음으로 '내 좋아요'·'내 북마크'를 각각 한 번씩만 묻는다</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> SELECT post_id FROM post_like WHERE member_id = 3 AND post_id IN (21, 20, …, 4)</span></span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> SELECT post_id FROM bookmark WHERE member_id = 3 AND post_id IN (21, 20, …, 4)</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;items&quot;: [ …, {&quot;id&quot;: 5, &quot;title&quot;: &quot;스터디원 구해요&quot;, …, &quot;likedByMe&quot;: true, &quot;bookmarkedByMe&quot;: true}, … ], &quot;page&quot;: 0, …}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="posts|p-13|p-9|p-5" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">13·9는 책갈피, 5는 하트와 책갈피가 채워진다</span></button></li></ol></section></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: '사용자 화면', request: 'HTTP 요청', server: '서버', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'server', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = (labels[selected] || button.querySelector('.flow-kind')?.textContent || '시나리오') + ' 단계 · ' + (button.querySelector('.flow-step-text')?.textContent.trim() || '세부 내용은 아래 설명을 확인하세요.');
+    }));
+  }
+})();
+</script><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>대상</td>
+<td><code>GET /api/boards/{slug}/posts</code>, <code>GET /api/posts/search</code></td>
+</tr>
+<tr>
+<td>추가 필드(항목마다)</td>
+<td><code>likedByMe</code>(불리언) · <code>bookmarkedByMe</code>(불리언). 비로그인은 둘 다 <code>false</code></td>
+</tr>
+<tr>
+<td>그대로인 것</td>
+<td>나머지 필드, 정렬, <code>page</code>·<code>totalElements</code> 등 페이지 정보</td>
+</tr>
+<tr>
+<td>쿼리 수</td>
+<td>목록 크기와 무관하게 일정 — 로그인 시 기존보다 최대 2번(좋아요 1·북마크 1) 늘어난다</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li>DB 변화 없음(조회만).</li>
+</ul>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+
+curl -s &quot;$BASE/api/boards/free/posts?size=20&quot; -H 'Authorization: Bearer tok-park'   # 요청 A — 좋아요 4개
+curl -s &quot;$BASE/api/boards/free/posts?size=20&quot; -H 'Authorization: Bearer tok-lee'    # 요청 B — 좋아요 1·북마크 3
+curl -s &quot;$BASE/api/boards/free/posts?size=20&quot;                                        # 요청 C — 비로그인
+curl -s &quot;$BASE/api/posts/search?tag=spring&quot; -H 'Authorization: Bearer tok-lee'      # 요청 D — 검색도
+curl -s -X PUT &quot;$BASE/api/posts/16/like&quot; -H 'Authorization: Bearer tok-park'        # 요청 X1 — 좋아요 누르고
+curl -s &quot;$BASE/api/boards/free/posts?size=20&quot; -H 'Authorization: Bearer tok-park'   # 요청 X2 — 바로 반영
+curl -s -X DELETE &quot;$BASE/api/posts/16/like&quot; -H 'Authorization: Bearer tok-park'     # 요청 X3 — 되돌리기</code></pre>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 마지막에 좋아요를 되돌리므로 몇 번을 눌러도 같은 결과다.</p>
+<section id="browser-requests-1" class="api-practice" aria-label="HTTP 요청 실행"><div class="request-panel-heading"><div><p class="request-eyebrow">직접 확인 · 7개 요청</p><h3>브라우저에서 요청 보내기</h3></div><p>위 서버 주소를 확인하고 순서대로 실행하세요. 토큰은 입력 후에도 저장하지 않습니다.</p></div><nav class="request-steps" aria-label="요청 실행 순서"><ol><li data-method="GET"><a href="#browser-request-1-1"><span class="request-step-number">1</span><span class="request-step-content"><span class="request-step-method">GET · A</span><span class="request-step-title">박디비 — 자유 게시판</span></span></a></li><li data-method="GET"><a href="#browser-request-1-2"><span class="request-step-number">2</span><span class="request-step-content"><span class="request-step-method">GET · B</span><span class="request-step-title">이스프링 — 자유 게시판</span></span></a></li><li data-method="GET"><a href="#browser-request-1-3"><span class="request-step-number">3</span><span class="request-step-content"><span class="request-step-method">GET · C</span><span class="request-step-title">비로그인</span></span></a></li><li data-method="GET"><a href="#browser-request-1-4"><span class="request-step-number">4</span><span class="request-step-content"><span class="request-step-method">GET · D</span><span class="request-step-title">이스프링 — 검색 tag=spring</span></span></a></li><li data-method="PUT"><a href="#browser-request-1-5"><span class="request-step-number">5</span><span class="request-step-content"><span class="request-step-method">PUT · X1</span><span class="request-step-title">박디비가 글 16 좋아요</span></span></a></li><li data-method="GET"><a href="#browser-request-1-6"><span class="request-step-number">6</span><span class="request-step-content"><span class="request-step-method">GET · X2</span><span class="request-step-title">다시 목록</span></span></a></li><li data-method="DELETE"><a href="#browser-request-1-7"><span class="request-step-number">7</span><span class="request-step-content"><span class="request-step-method">DELETE · X3</span><span class="request-step-title">좋아요 되돌리기</span></span></a></li></ol></nav><div class="api-request-list"><article id="browser-request-1-1" class="api-request" data-request-id="A" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · A</p><h4>박디비 — 자유 게시판</h4></div><span class="request-number">요청 1</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/boards/free/posts?size=20" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-park" value="Bearer tok-park" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-1">GET 요청 보내기</button><p id="request-status-1-1" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-park&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;equals&quot;:[21,20,19,18,17,16,15,14,13,12,9,5,4]},{&quot;path&quot;:&quot;$.items[*].likedByMe&quot;,&quot;equals&quot;:[false,false,false,false,false,false,false,true,false,true,true,false,true]},{&quot;path&quot;:&quot;$.items[*].bookmarkedByMe&quot;,&quot;equals&quot;:[false,false,false,false,false,false,false,false,false,false,false,false,false]}]}</pre></dd></dl></details></article><article id="browser-request-1-2" class="api-request" data-request-id="B" data-method="GET" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · B</p><h4>이스프링 — 자유 게시판</h4></div><span class="request-number">요청 2</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/boards/free/posts?size=20" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-2">GET 요청 보내기</button><p id="request-status-1-2" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;equals&quot;:[21,20,19,18,17,16,15,14,13,12,9,6,5,4]},{&quot;path&quot;:&quot;$.items[*].likedByMe&quot;,&quot;equals&quot;:[false,false,false,false,false,false,false,false,false,false,false,false,true,false]},{&quot;path&quot;:&quot;$.items[*].bookmarkedByMe&quot;,&quot;equals&quot;:[false,false,false,false,false,false,false,false,true,false,true,false,true,false]}]}</pre></dd></dl></details></article><article id="browser-request-1-3" class="api-request" data-request-id="C" data-method="GET" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · C</p><h4>비로그인</h4></div><span class="request-number">요청 3</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/boards/free/posts?size=20" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-3">GET 요청 보내기</button><p id="request-status-1-3" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].likedByMe&quot;,&quot;notContains&quot;:true},{&quot;path&quot;:&quot;$.items[*].bookmarkedByMe&quot;,&quot;notContains&quot;:true},{&quot;path&quot;:&quot;$.items[0].likedByMe&quot;,&quot;equals&quot;:false},{&quot;path&quot;:&quot;$.totalElements&quot;,&quot;equals&quot;:13}]}</pre></dd></dl></details></article><article id="browser-request-1-4" class="api-request" data-request-id="D" data-method="GET" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · D</p><h4>이스프링 — 검색 tag=spring</h4></div><span class="request-number">요청 4</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/search?tag=spring" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-4">GET 요청 보내기</button><p id="request-status-1-4" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;equals&quot;:[11,5,2]},{&quot;path&quot;:&quot;$.items[*].likedByMe&quot;,&quot;equals&quot;:[false,true,false]},{&quot;path&quot;:&quot;$.items[*].bookmarkedByMe&quot;,&quot;equals&quot;:[false,true,true]}]}</pre></dd></dl></details></article><article id="browser-request-1-5" class="api-request" data-request-id="X1" data-method="PUT" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PUT · X1</p><h4>박디비가 글 16 좋아요</h4></div><span class="request-number">요청 5</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/16/like" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-park" value="Bearer tok-park" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-5">PUT 요청 보내기</button><p id="request-status-1-5" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PUT</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-park&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:200}</pre></dd></dl></details></article><article id="browser-request-1-6" class="api-request" data-request-id="X2" data-method="GET" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · X2</p><h4>다시 목록</h4></div><span class="request-number">요청 6</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/boards/free/posts?size=20" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-park" value="Bearer tok-park" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-6">GET 요청 보내기</button><p id="request-status-1-6" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-park&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[5].id&quot;,&quot;equals&quot;:16},{&quot;path&quot;:&quot;$.items[5].likedByMe&quot;,&quot;equals&quot;:true}]}</pre></dd></dl></details></article><article id="browser-request-1-7" class="api-request" data-request-id="X3" data-method="DELETE" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">DELETE · X3</p><h4>좋아요 되돌리기</h4></div><span class="request-number">요청 7</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/16/like" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-park" value="Bearer tok-park" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-7">DELETE 요청 보내기</button><p id="request-status-1-7" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-park&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.liked&quot;,&quot;equals&quot;:false}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP(필수), D = DB(필수, SELECT만), T = 테스트(선택), R = 코드 리뷰(피드백)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 A</td>
+<td>박디비: 14·12·9·4만 <code>likedByMe: true</code>, 북마크는 모두 <code>false</code></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 B</td>
+<td>이스프링: 5만 좋아요, 13·9·5가 북마크 — 순서·건수는 기존 그대로</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 C</td>
+<td>비로그인: 두 필드가 있고 모두 <code>false</code>, 전체 13건 그대로</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 D</td>
+<td>조합 검색에도 같은 두 필드</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>요청 X1~X3</td>
+<td>좋아요를 누른 직후 목록의 글 16이 <code>true</code> — 캐시하지 않고 바로 반영</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT post_id FROM post_like WHERE member_id = 4 AND post_id IN (SELECT id FROM post WHERE board_id = 4) ORDER BY post_id</code></td>
+<td><code>4 6 8 9 12 14</code> — 그중 목록에 보이는 <code>4 9 12 14</code>만 C1에서 <code>true</code>(6 팔로워 공개·8 삭제는 박디비 목록에 없다)</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT post_id FROM bookmark WHERE member_id = 3 AND post_id IN (SELECT id FROM post WHERE board_id = 4) ORDER BY post_id</code></td>
+<td><code>5 8 9 10 13</code> — 그중 목록에 보이는 <code>5 9 13</code>만 C2에서 <code>true</code>(8 삭제·10 숨김은 목록에 없다)</td>
+</tr>
+<tr>
+<td>T1</td>
+<td>(선택) 목록 SQL 수 테스트</td>
+<td>로그인 상태로 <code>size=5</code>와 <code>size=20</code>의 SQL 문장 수가 같다(기존 <code>PostListQueryCountTest</code>와 같은 방식)</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>쿼리 수</td>
+<td>항목마다 <code>exists…</code>를 부르지 않고, 목록의 글 id 묶음으로 <code>IN</code> 쿼리 한 번씩(좋아요·북마크) 읽어 <code>Set</code>으로 판정한다. 비로그인이면 그 두 쿼리도 보내지 않는다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>위치</td>
+<td>게시판 목록·검색이 공유하는 응답 변환 한 곳에서 처리했다(두 API에 같은 코드를 복사하지 않음)</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>대안</td>
+<td>목록 쿼리에 <code>LEFT JOIN post_like … ON member_id = ?</code>를 붙이는 방법과 비교해, 페이지 COUNT 쿼리·행 중복·쿼리 재사용 측면에서 왜 &quot;목록 뒤에 IN 한 번&quot;을 골랐는지(또는 반대) 말할 수 있다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../docs/knowledge/S09-jpa-hibernate.html">S09 JPA·Hibernate</a> — N+1이 생기는 모양과 묶어서 읽기</li>
+<li><a href="../docs/knowledge/S10-spring-data-query.html">S10 Spring Data와 쿼리 도구</a> — <code>IN</code> 조건 JPQL, 컬럼 하나만 고르는 쿼리</li>
+<li><a href="../docs/knowledge/W09-why-dto.html">W09 DTO는 왜 쓰나</a> — 응답 DTO에 &quot;보는 사람 기준&quot; 값 넣기</li>
+<li><a href="../docs/knowledge/V02-layered-tests-handson.html">V02 계층별 테스트 실습</a> — SQL 수를 테스트로 고정하기(T1)</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 저장소</summary>
+
+<p><code>@Query(&quot;SELECT l.post.id FROM PostLike l WHERE l.member.id = :memberId AND l.post.id IN :postIds&quot;) List&lt;Long&gt; findLikedPostIds(...)</code> — 북마크도 같은 모양. 반환값을 <code>Set&lt;Long&gt;</code>으로 바꿔 두고 항목을 만들 때 <code>contains</code>로 본다. 목록이 비었으면 <code>IN ()</code>을 보내지 않는다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 어디서 부르나</summary>
+
+<p>목록·검색 결과(<code>Page&lt;Post&gt;</code>)를 응답으로 바꾸는 private 메서드에 보는 사람 id를 넘기고, 거기서 글 id 목록을 뽑아 두 쿼리를 보낸 다음 항목을 만든다. 항목 DTO record에 필드 두 개를 더하면 컴파일 에러가 나는 곳(테스트 포함)을 따라가 맞춘다.</p>
+</details>
+
+
+</main>
+
+
+</body>
+</html>

@@ -55,17 +55,23 @@ spy는 실제 객체를 감싸고, 별도 설정이 없는 호출은 실제 메�
 | `mock(LegacyInventory.class)` | 실제 메서드 없이 `int` 기본값 `0` 반환 |
 | `spy(new LegacyInventory())` | 실제 메서드 실행, 여기서는 `7` 반환 |
 
-Mockito에서 직접 만들 때는 `LegacyInventory spy = spy(new LegacyInventory());`를 쓴다. 필드 선언은 `@ExtendWith(MockitoExtension.class)`와 함께 `@Spy LegacyInventory inventory = new LegacyInventory();`처럼 쓸 수 있다. `@Spy` 필드는 Mockito 확장이나 `MockitoAnnotations.openMocks(this)`가 초기화해야 한다. Spring 컨텍스트 테스트라면 `@MockitoSpyBean LegacyInventory inventory;`가 기존 빈을 spy로 감싼다. 이 이름은 Spring Framework 7의 API다. Boot 3.4에서 deprecated된 `@SpyBean`은 Boot 4에서 제거 대상이고, Framework의 `@MockitoSpyBean`을 사용한다.
+Mockito에서 직접 만들 때는 `LegacyInventory spy = spy(new LegacyInventory());`를 쓴다. 필드 선언은 `@ExtendWith(MockitoExtension.class)`와 함께 `@Spy LegacyInventory inventory = new LegacyInventory();`처럼 쓸 수 있다. `@Spy` 필드는 Mockito 확장이나 `MockitoAnnotations.openMocks(this)`가 초기화해야 한다.
+
+Spring 컨텍스트 테스트라면 `@MockitoSpyBean LegacyInventory inventory;`가 기존 빈을 spy로 감싼다. 이 이름은 Spring Framework 7의 API다. Boot 3.4에서 deprecated된 `@SpyBean`은 Boot 4에서 제거 대상이고, Framework의 `@MockitoSpyBean`을 사용한다.
 
 #### `when`을 쓰면 설정 중에도 실제 메서드가 호출된다 (보강)
 
-일반 mock과 달리 spy에 `when(spy.find("remote")).thenReturn(99)`를 쓰면 `when`의 인자를 계산하면서 `find`를 먼저 실행한다. 실제 조회나 파일 쓰기처럼 부작용이 있으면 준비 단계에서 부작용이 생기며, 메서드가 예외를 던지면 stubbing 자체가 완료되지 않는다. 이때는 `doReturn(99).when(spy).find("remote")`를 쓰면 메서드를 먼저 실행하지 않고 반환값을 설정한다. 아래 테스트 첫 두 메서드가 예외와 호출 횟수로 두 동작을 보여 준다. `doReturn` 계열은 spy의 위험한 실제 호출을 피할 때 쓰고, 일반 mock의 단순한 stubbing은 읽기 쉬운 `when`으로 둔다.
+일반 mock과 달리 spy에 `when(spy.find("remote")).thenReturn(99)`를 쓰면 `when`의 인자를 계산하면서 `find`를 먼저 실행한다. 실제 조회나 파일 쓰기처럼 부작용이 있으면 준비 단계에서 부작용이 생기며, 메서드가 예외를 던지면 stubbing 자체가 완료되지 않는다. 이때는 `doReturn(99).when(spy).find("remote")`를 쓰면 메서드를 먼저 실행하지 않고 반환값을 설정한다.
+
+아래 테스트 첫 두 메서드가 예외와 호출 횟수로 두 동작을 보여 준다. `doReturn` 계열은 spy의 위험한 실제 호출을 피할 때 쓰고, 일반 mock의 단순한 stubbing은 읽기 쉬운 `when`으로 둔다.
 
 #### 상태, final·private 메서드 주의 (보강)
 
 실제 메서드를 호출한 spy 내부의 상태는 다음 호출에도 남는다. 다만 Mockito의 `spy(original)`은 원본 객체로 계속 위임하는 프록시가 아니라 상태를 복사해 spy 객체를 만든다. 따라서 spy를 조작했다고 전달한 `original`의 필드도 바뀔 것이라 기대하면 안 된다. 세 번째 테스트는 spy의 호출 횟수는 1이지만 원본 객체의 횟수는 0인 점을 확인한다.
 
-final 메서드와 클래스의 처리는 Mockito 버전 및 MockMaker 설정에 따라 다르다. Mockito 5 기본 inline MockMaker에서는 final도 다룰 수 있지만, 다른 MockMaker를 선택한 프로젝트에서는 제한될 수 있으니 현재 테스트 설정을 확인한다. private 메서드는 Mockito로 직접 stub하거나 verify할 수 없다. private 구현을 억지로 끊기보다 외부에 드러난 동작을 검증하거나 필요한 협력자를 주입한다.
+final 메서드와 클래스의 처리는 Mockito 버전 및 MockMaker 설정에 따라 다르다. Mockito 5 기본 inline MockMaker에서는 final도 다룰 수 있지만, 다른 MockMaker를 선택한 프로젝트에서는 제한될 수 있으니 현재 테스트 설정을 확인한다.
+
+private 메서드는 Mockito로 직접 stub하거나 verify할 수 없다. private 구현을 억지로 끊기보다 외부에 드러난 동작을 검증하거나 필요한 협력자를 주입한다.
 
 spy는 레거시 코드에서 외부 호출 한 군데만 잠시 막아야 하거나, 실제 경로를 실행하며 특정 협력자 호출을 확인하는 경우에 제한적으로 유용하다. 그러나 spy가 여러 개 필요하거나 내부 메서드까지 stub하고 싶다면 의존성 경계가 섞였다는 설계 신호일 수 있다. 외부 의존성을 주입해 분리하고, 상태와 동작이 있는 간단한 fake를 만들 수 있다면 보통 그 편이 테스트 의도를 분명히 한다.
 

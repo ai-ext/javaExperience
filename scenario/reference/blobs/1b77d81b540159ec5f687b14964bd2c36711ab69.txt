@@ -1,0 +1,44 @@
+package org.example.start;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+class ProfileControllerTest {
+
+    @Autowired MockMvc mockMvc;
+
+    @Test
+    void sameJsonAsRecordVersion() throws Exception {
+        // 이 참조 worktree는 2-4 상태라 1-6 인증 인터셉터가 모든 POST /api/**에 적용된다.
+        // 0-7을 실제로 풀 때는 인터셉터가 아직 없지만, 여기서는 토큰을 보내 DTO 동작만 검증한다.
+        mockMvc.perform(post("/api/start/profile").header("Authorization", "Bearer tok-kimjava")
+                        .contentType("application/json")
+                        .content("{\"name\":\"김자바\",\"age\":20}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("김자바"))
+                .andExpect(jsonPath("$.age").value(20))
+                .andExpect(jsonPath("$.adult").value(true));
+    }
+
+    @Test
+    void missingOrInvalidFieldsReturn400() throws Exception {
+        for (String body : new String[] {
+                "{\"name\":\" \",\"age\":20}",
+                "{\"name\":\"김자바\"}",
+                "{\"name\":\"김자바\",\"age\":151}"
+        }) {
+            mockMvc.perform(post("/api/start/profile").header("Authorization", "Bearer tok-kimjava")
+                            .contentType("application/json").content(body))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+}

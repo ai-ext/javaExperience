@@ -39,7 +39,9 @@ private OrderStatus status;
 private String memo;
 ```
 
-`IDENTITY`는 INSERT 때 DB가 키를 만든다. `SEQUENCE`는 DB 시퀀스에서 키를 먼저 얻는다. `AUTO`는 구현체에 맡기므로 운영 DDL을 명확히 해야 하면 전략을 적는다. Enum의 기본값은 `ORDINAL`이므로 반드시 STRING을 쓴다. 상수 순서를 바꾸면 과거 숫자의 의미가 바뀐다. JSON은 이식성이 우선이면 문자열+검증, Hibernate 7 JSON 연산이 필요하면 `@JdbcTypeCode(SqlTypes.JSON)`을 검토한다.
+`IDENTITY`는 INSERT 때 DB가 키를 만든다. `SEQUENCE`는 DB 시퀀스에서 키를 먼저 얻는다. `AUTO`는 구현체에 맡기므로 운영 DDL을 명확히 해야 하면 전략을 적는다.
+
+Enum의 기본값은 `ORDINAL`이므로 반드시 STRING을 쓴다. 상수 순서를 바꾸면 과거 숫자의 의미가 바뀐다. JSON은 이식성이 우선이면 문자열+검증, Hibernate 7 JSON 연산이 필요하면 `@JdbcTypeCode(SqlTypes.JSON)`을 검토한다.
 
 ### 2.3 감사 필드
 

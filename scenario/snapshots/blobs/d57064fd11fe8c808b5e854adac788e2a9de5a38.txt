@@ -1,0 +1,36 @@
+package org.example.board.auth;
+
+import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.user.User;
+import org.example.board.user.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class AuthService {
+
+    // 없는 이메일과 틀린 비밀번호를 같은 문구로 — 어느 이메일이 가입돼 있는지 흘리지 않는다
+    private static final String LOGIN_FAILED = "이메일 또는 비밀번호가 올바르지 않습니다.";
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtProvider jwtProvider;
+
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtProvider jwtProvider) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtProvider = jwtProvider;
+    }
+
+    @Transactional(readOnly = true)
+    public TokenResponse login(LoginRequest request) {
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHORIZED, LOGIN_FAILED));
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            throw new ApiException(ErrorCode.UNAUTHORIZED, LOGIN_FAILED);
+        }
+        return new TokenResponse(jwtProvider.issue(user.getId()), jwtProvider.validitySeconds());
+    }
+}

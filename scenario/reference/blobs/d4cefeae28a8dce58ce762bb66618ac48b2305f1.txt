@@ -1,0 +1,36 @@
+package org.example.stats;
+
+import org.example.member.Member;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.Repository;
+
+import java.util.List;
+
+// 통계는 엔티티를 읽어 자바에서 세지 않고 SQL 한 번으로 집계해 프로젝션으로 받는다.
+// (엔티티 조회는 회원 30명 × 연관 컬렉션 로딩이 되고, 세는 일은 DB가 훨씬 잘한다)
+public interface StatsRepository extends Repository<Member, Long> {
+
+    // sql/8-1-member-activity.sql과 같은 쿼리 — 별칭만 프로젝션 getter 이름(camelCase)에 맞췄다.
+    // 숫자마다 상관 서브쿼리로 따로 세서 JOIN으로 행이 곱해지지 않게 한다.
+    @Query(nativeQuery = true, value = """
+            SELECT m.id AS memberId,
+                   CASE WHEN m.member_status = 'WITHDRAWN' THEN '탈퇴한 회원' ELSE m.nickname END AS nickname,
+                   (SELECT COUNT(*)
+                      FROM post p
+                     WHERE p.author_id = m.id AND p.status = 'PUBLISHED' AND p.deleted_at IS NULL) AS posts,
+                   (SELECT COUNT(*)
+                      FROM comment c
+                      JOIN post p ON p.id = c.post_id
+                     WHERE c.member_id = m.id AND c.deleted_at IS NULL AND p.deleted_at IS NULL) AS comments,
+                   (SELECT COUNT(*)
+                      FROM post_like l
+                      JOIN post p ON p.id = l.post_id
+                     WHERE p.author_id = m.id AND p.deleted_at IS NULL) AS likesReceived,
+                   (SELECT COUNT(*)
+                      FROM post_like l
+                     WHERE l.member_id = m.id) AS likesGiven
+              FROM member m
+             ORDER BY likesReceived DESC, m.id ASC
+            """)
+    List<MemberActivityRow> findMemberActivity();
+}

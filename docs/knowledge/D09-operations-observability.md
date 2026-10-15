@@ -163,7 +163,9 @@ RPO 5분은 허용 데이터 손실, RTO 2시간은 복구 목표 시간이다. 
 
 ## 4. 직접 해보기
 
-아래 실습은 Mac 로컬에서 Docker Compose로 Prometheus와 Grafana를 실행하고, 호스트에서 실행한 Spring Boot 4.1 애플리케이션의 메트릭을 긁어 보는 구성이다. Java 25와 Gradle Wrapper를 사용하는 프로젝트를 준비한다. 애플리케이션의 `/actuator/prometheus` 노출 설정은 이 문서 범위가 아니므로 → S16의 Actuator·Micrometer 설정을 먼저 적용한다. 여기서는 수집·조회 흐름에 집중한다.
+아래 실습은 Mac 로컬에서 Docker Compose로 Prometheus와 Grafana를 실행하고, 호스트에서 실행한 Spring Boot 4.1 애플리케이션의 메트릭을 긁어 보는 구성이다. Java 25와 Gradle Wrapper를 사용하는 프로젝트를 준비한다.
+
+애플리케이션의 `/actuator/prometheus` 노출 설정은 이 문서 범위가 아니므로 → S16의 Actuator·Micrometer 설정을 먼저 적용한다. 여기서는 수집·조회 흐름에 집중한다.
 
 프로젝트 루트에 `ops/prometheus.yml` 파일을 만든다.
 
@@ -214,7 +216,9 @@ docker compose -f ops/compose.yaml up -d
 docker compose -f ops/compose.yaml ps
 ```
 
-`curl` 응답이 404면 앱 엔드포인트 설정이나 포트를 확인한다. Prometheus의 `http://localhost:9090/targets`에서 `spring-app`이 `UP`인지 본다. 쿼리 화면에서 `up{job="spring-app"}`를 실행하면 스크레이프 성공 시 1, 실패 시 0이 나온다. Grafana(`http://localhost:3000`)에 로그인한 뒤 데이터 소스를 Prometheus로 추가하고 URL을 `http://prometheus:9090`으로 지정한다. Grafana와 Prometheus가 Compose 네트워크 안에서 이름으로 통신하기 때문이다.
+`curl` 응답이 404면 앱 엔드포인트 설정이나 포트를 확인한다. Prometheus의 `http://localhost:9090/targets`에서 `spring-app`이 `UP`인지 본다. 쿼리 화면에서 `up{job="spring-app"}`를 실행하면 스크레이프 성공 시 1, 실패 시 0이 나온다.
+
+Grafana(`http://localhost:3000`)에 로그인한 뒤 데이터 소스를 Prometheus로 추가하고 URL을 `http://prometheus:9090`으로 지정한다. Grafana와 Prometheus가 Compose 네트워크 안에서 이름으로 통신하기 때문이다.
 
 이제 요청을 몇 번 보내 그래프 변화를 만든다. 앱을 잠시 종료하면 scrape target이 실패하고 `up`이 0으로 바뀌며, 다시 실행하면 1로 회복되어야 한다. 이 결과는 “앱이 메트릭 주소에서 scrape에 응답한다”는 뜻이지 전체 사용자 기능이 정상이라는 증거는 아니다. 잘못된 응답이 200으로 나가는 경우나 DB 장애는 별도 SLI·로그·트레이스로 확인해야 한다. 사용한 구성을 정리할 때는 다음 명령을 실행한다.
 

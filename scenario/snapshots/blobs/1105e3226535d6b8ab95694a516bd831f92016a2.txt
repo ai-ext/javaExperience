@@ -1,0 +1,85 @@
+package org.example.batch;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+// 15-2 주간 랭킹 — 월요일(date)에 "지난 7일" [date-7일 0시, date 0시)을 집계해 상위 10을 저장한다.
+// 스냅샷은 한 주에 한 번만 만든다. 이미 있으면 다시 계산하지 않고 저장된 것을 돌려준다(그때의 값).
+@Service
+public class WeeklyRankingService {
+
+    public static final int TOP = 10;
+    private static final LocalDate MIN_DATABASE_DATE = LocalDate.of(1000, 1, 1);
+    private static final Logger log = LoggerFactory.getLogger(WeeklyRankingService.class);
+
+    private final WeeklyRankingRepository weeklyRankingRepository;
+    private final Clock clock;
+
+    public WeeklyRankingService(WeeklyRankingRepository weeklyRankingRepository, Clock clock) {
+        this.weeklyRankingRepository = weeklyRankingRepository;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public WeeklyRankingResponse run(LocalDate date) {
+        requireMonday("date", date);
+        LocalDate weekStart = date.minusDays(7);
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (weeklyRankingRepository.tryStart(weekStart, now) == 0) {
+            log.info("주간 랭킹 week={} 이미 있음 — 다시 만들지 않는다", weekStart);
+            return new WeeklyRankingResponse(weekStart, false, load(weekStart));
+        }
+
+        LocalDateTime from = weekStart.atStartOfDay();
+        LocalDateTime to = date.atStartOfDay();
+        List<WeeklyRanking> rows = new ArrayList<>();
+        int rank = 1;
+        for (WeeklyScoreRow r : weeklyRankingRepository.aggregate(from, to, TOP)) {
+            rows.add(new WeeklyRanking(weekStart, rank++, r.getPostId(), r.getTitle(),
+                    r.getScore().intValue(), r.getLikes().intValue(), r.getComments().intValue(), now));
+        }
+        // 완료 표식과 상위 10행을 같은 트랜잭션에 저장한다. 후보 0건이어도 표식은 남는다.
+        weeklyRankingRepository.saveAll(rows);
+        log.info("주간 랭킹 week={} [{} ~ {}) {}개 저장", weekStart, from, to, rows.size());
+        return new WeeklyRankingResponse(weekStart, true, rows.stream().map(WeeklyRankingService::toItem).toList());
+    }
+
+    @Transactional(readOnly = true)
+    public WeeklyRankingResponse get(LocalDate weekStart) {
+        requireMonday("weekStart", weekStart);
+        if (weeklyRankingRepository.countRun(weekStart) == 0) {
+            throw new WeeklyRankingNotFoundException(weekStart);
+        }
+        return new WeeklyRankingResponse(weekStart, false, load(weekStart));
+    }
+
+    private List<WeeklyRankingItem> load(LocalDate weekStart) {
+        return weeklyRankingRepository.findByWeekStartOrderByRankingAsc(weekStart).stream()
+                .map(WeeklyRankingService::toItem)
+                .toList();
+    }
+
+    private static WeeklyRankingItem toItem(WeeklyRanking w) {
+        return new WeeklyRankingItem(w.getRanking(), w.getPostId(), w.getTitle(), w.getScore(), w.getLikes(), w.getComments());
+    }
+
+    private static void requireMonday(String field, LocalDate date) {
+        // MySQL DATE는 1000-01-01부터 저장한다. 실행일에서 7일 뺀 주 시작도 이 범위여야 한다.
+        LocalDate min = "date".equals(field) ? MIN_DATABASE_DATE.plusDays(7) : MIN_DATABASE_DATE;
+        if (date.isBefore(min)) {
+            throw new InvalidJobParameterException(field, field + "는 " + min + " 이후여야 합니다.");
+        }
+        if (date.getDayOfWeek() != DayOfWeek.MONDAY) {
+            throw new InvalidJobParameterException(field, field + "는 월요일이어야 합니다(" + date + "는 " + date.getDayOfWeek() + ").");
+        }
+    }
+}

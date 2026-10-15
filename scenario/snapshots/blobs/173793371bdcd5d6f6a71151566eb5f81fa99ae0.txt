@@ -1,0 +1,39 @@
+package org.example.post;
+
+import org.example.board.Board;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+// Spring Data JPA가 구현을 만들어 준다(1-3의 메모리 구현을 대체)
+public interface PostRepository extends JpaRepository<Post, Long> {
+
+    // 2-3의 "볼 수 있나" 규칙 중 목록에 해당하는 부분을 쿼리로 옮긴 것 — PostAccessPolicy.canView와
+    // 같은 규칙이지만, 목록은 PUBLISHED 글만 대상이다(자기 임시저장·운영자 숨김 글도 목록에는 넣지 않는다).
+    // 메모리에서 거르지 않고 쿼리에서 걸러야 페이지 크기·totalElements가 맞는다.
+    @Query("""
+            SELECT p FROM Post p
+            WHERE p.board = :board
+              AND p.deletedAt IS NULL
+              AND p.status = 'PUBLISHED'
+              AND (
+                   p.visibility = 'PUBLIC'
+                   OR (:viewerId IS NOT NULL AND p.author.id = :viewerId)
+                   OR (:viewerId IS NOT NULL AND EXISTS (
+                           SELECT 1 FROM Follow f
+                           WHERE f.follower.id = :viewerId AND f.followee = p.author))
+              )
+              AND (
+                   :viewerId IS NULL OR NOT EXISTS (
+                       SELECT 1 FROM MemberBlock b
+                       WHERE (b.blocker.id = :viewerId AND b.blocked = p.author)
+                          OR (b.blocked.id = :viewerId AND b.blocker = p.author)
+                   )
+              )
+            """)
+    Page<Post> findViewableByBoard(@Param("board") Board board,
+                                    @Param("viewerId") Long viewerId,
+                                    Pageable pageable);
+}

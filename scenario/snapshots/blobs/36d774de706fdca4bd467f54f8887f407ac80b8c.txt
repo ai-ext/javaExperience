@@ -1,0 +1,55 @@
+package org.example.batch;
+
+import org.example.post.Post;
+import org.example.notification.PostCreatedEvent;
+import org.springframework.context.ApplicationEventPublisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+// 15-3 예약 발행 — 기준 시각(at)이 예약 시각 이상이 된 SCHEDULED 글을 PUBLISHED로 바꾼다.
+// 1분마다 도는 예약 실행과 운영자 수동 실행이 같은 메서드를 쓴다.
+@Service
+public class ScheduledPublishService {
+
+    // 한 번에 너무 많이 잡지 않는다 — 남은 건 다음 분에 이어서
+    private static final int BATCH_LIMIT = 500;
+    private static final Logger log = LoggerFactory.getLogger(ScheduledPublishService.class);
+
+    private final ScheduledPublishRepository scheduledPublishRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
+
+    public ScheduledPublishService(ScheduledPublishRepository scheduledPublishRepository, ApplicationEventPublisher eventPublisher, Clock clock) {
+        this.scheduledPublishRepository = scheduledPublishRepository;
+        this.eventPublisher = eventPublisher;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public ScheduledPublishResponse publishDue(LocalDateTime at) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        List<PublishedPost> published = new ArrayList<>();
+        for (Post post : scheduledPublishRepository.findDue(at, PageRequest.of(0, BATCH_LIMIT))) {
+            if (scheduledPublishRepository.publishIfDue(post.getId(), at, now) == 1) {
+                published.add(new PublishedPost(post.getId(), post.getTitle(), post.getPublishAt()));
+                // 실제로 상태를 바꾼 실행만 알린다. 트랜잭션이 롤백되면 AFTER_COMMIT 리스너는 실행되지 않는다.
+                eventPublisher.publishEvent(new PostCreatedEvent(post.getId(), post.getAuthor().getId()));
+            }
+        }
+        // 매분 도는 배치라 0건이면 조용히(디버그), 발행했을 때만 INFO로 건수와 id를 남긴다
+        if (published.isEmpty()) {
+            log.debug("예약 발행 at={} 0건", at);
+        } else {
+            log.info("예약 발행 at={} {}건 ids={}", at, published.size(), published.stream().map(PublishedPost::postId).toList());
+        }
+        return new ScheduledPublishResponse(at, published);
+    }
+}

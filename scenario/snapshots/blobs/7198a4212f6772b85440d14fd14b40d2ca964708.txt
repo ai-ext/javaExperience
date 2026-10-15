@@ -1,0 +1,38 @@
+package org.example.push;
+
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Set;
+
+// 연습용 가짜 푸시 서버 — 실제 푸시(외부 서버 호출)처럼 "느리고 가끔 실패"하는 상황을 만든다.
+// 설정은 운영자 API(PUT /api/admin/fake-push)로 바꾼다. 앱을 다시 띄우면 지연 0·실패 없음으로 돌아간다.
+@Component
+public class FakePushSender {
+
+    // 요청 스레드(설정 변경)와 알림 스레드(발송)가 함께 읽고 쓰므로 volatile — 설정 한 벌을 통째로 바꾼다
+    private volatile Settings settings = new Settings(0, Set.of());
+
+    public void send(Long memberId, String message) {
+        Settings current = settings;
+        if (current.delayMs() > 0) {
+            try {
+                Thread.sleep(current.delayMs());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new PushFailedException("발송 중단 memberId=" + memberId);
+            }
+        }
+        if (current.failMemberIds().contains(memberId)) {
+            throw new PushFailedException("푸시 서버가 거절했습니다 memberId=" + memberId);
+        }
+    }
+
+    public Settings update(int delayMs, List<Long> failMemberIds) {
+        this.settings = new Settings(delayMs, failMemberIds == null ? Set.of() : Set.copyOf(failMemberIds));
+        return settings;
+    }
+
+    public record Settings(int delayMs, Set<Long> failMemberIds) {
+    }
+}

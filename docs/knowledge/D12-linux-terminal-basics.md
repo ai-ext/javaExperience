@@ -59,19 +59,29 @@ flowchart TD
 
 ### 3.1 쉘과 파일
 
-무엇이 일어나나: Bash는 명령을 나누고 변수·따옴표를 처리한 뒤 builtin 또는 실행 파일을 실행한다. <code>cd</code>는 현재 쉘의 작업 위치를 바꾸므로 builtin이다. <code>PATH</code>는 실행 파일 검색 경로이며 <code>command -v java</code>로 실제 선택된 프로그램을 본다. <code>&gt;</code>는 stdout을 덮어쓰고 <code>&gt;&gt;</code>는 추가한다. <code>2&gt;</code>는 stderr를 분리하며 <code>2&gt;&amp;1</code>은 stderr를 stdout의 현재 대상으로 연결한다. 리다이렉션은 왼쪽에서 오른쪽으로 적용되므로 순서를 바꾸면 결과가 달라진다. 파이프 <code>|</code>는 기본적으로 stdout만 다음 명령의 stdin에 보낸다.
+무엇이 일어나나: Bash는 명령을 나누고 변수·따옴표를 처리한 뒤 builtin 또는 실행 파일을 실행한다. <code>cd</code>는 현재 쉘의 작업 위치를 바꾸므로 builtin이다. <code>PATH</code>는 실행 파일 검색 경로이며 <code>command -v java</code>로 실제 선택된 프로그램을 본다.
+
+<code>&gt;</code>는 stdout을 덮어쓰고 <code>&gt;&gt;</code>는 추가한다. <code>2&gt;</code>는 stderr를 분리하며 <code>2&gt;&amp;1</code>은 stderr를 stdout의 현재 대상으로 연결한다.
+
+리다이렉션은 왼쪽에서 오른쪽으로 적용되므로 순서를 바꾸면 결과가 달라진다. 파이프 <code>|</code>는 기본적으로 stdout만 다음 명령의 stdin에 보낸다.
 
 누가/도구: 개발자와 쉘, <code>pwd</code>, <code>ls</code>, <code>cat</code>, <code>less</code>, <code>grep</code>, <code>find</code>.
 
 입력과 산출물: 경로·명령·환경이 입력이고, 출력·종료 상태·프로세스가 결과다. <code>/etc</code>는 설정, <code>/var/log</code>는 텍스트 로그가 흔한 위치, <code>/opt</code>는 추가 앱, <code>/home</code>은 사용자 홈으로 쓰인다. 리눅스 로그가 꼭 파일로만 저장되는 것은 아니다.
 
-실패하면: <code>command not found</code>는 설치 또는 <code>PATH</code>, <code>Permission denied</code>는 파일 권한이나 상위 디렉터리 통과 권한을 본다. <code>cat</code>은 짧은 파일, <code>less</code>는 긴 파일에 쓰고, <code>grep -n ERROR file</code>이나 <code>find /opt/orders -name '*.jar'</code>처럼 검색 경로를 좁힌다. <code>cp</code>는 복사, <code>mv</code>는 이동·이름 변경이다. <code>rm</code>은 휴지통 없이 지우므로 대상과 <code>pwd</code>를 확인하고 <code>rm -i</code>부터 쓴다.
+실패하면: <code>command not found</code>는 설치 또는 <code>PATH</code>, <code>Permission denied</code>는 파일 권한이나 상위 디렉터리 통과 권한을 본다. <code>cat</code>은 짧은 파일, <code>less</code>는 긴 파일에 쓰고, <code>grep -n ERROR file</code>이나 <code>find /opt/orders -name '*.jar'</code>처럼 검색 경로를 좁힌다.
+
+<code>cp</code>는 복사, <code>mv</code>는 이동·이름 변경이다. <code>rm</code>은 휴지통 없이 지우므로 대상과 <code>pwd</code>를 확인하고 <code>rm -i</code>부터 쓴다.
 
 ### 3.2 권한·프로세스·네트워크
 
-무엇이 일어나나: rwx는 소유자·그룹·기타별 권한이다. 파일 x는 실행, 디렉터리 x는 경로 탐색을 뜻한다. <code>chmod 640</code>은 소유자 rw·그룹 r, <code>chown</code>은 소유권 변경이다. <code>sudo</code>는 필요한 명령에만 쓴다. <code>ps</code>·<code>top</code>은 프로세스 관찰, <code>kill</code>은 기본 SIGTERM 종료 요청이다. SIGKILL은 정리 기회 없는 강제 종료다.
+무엇이 일어나나: rwx는 소유자·그룹·기타별 권한이다. 파일 x는 실행, 디렉터리 x는 경로 탐색을 뜻한다. <code>chmod 640</code>은 소유자 rw·그룹 r, <code>chown</code>은 소유권 변경이다.
 
-포트는 프로세스가 연 소켓에서 확인한다. <code>ss -lntp</code>가 기본 선택이고 <code>netstat -lntp</code>는 구형 환경에서 볼 수 있다. <code>lsof -i :8080</code>은 파일을 연 프로세스와 포트를 연결한다. <code>curl</code>은 HTTP 응답, <code>nc -vz host 8080</code>은 TCP 연결 가능성을 확인한다. <code>ping</code>은 ICMP만 확인하므로 TCP 포트 테스트가 아니다.
+<code>sudo</code>는 필요한 명령에만 쓴다. <code>ps</code>·<code>top</code>은 프로세스 관찰, <code>kill</code>은 기본 SIGTERM 종료 요청이다. SIGKILL은 정리 기회 없는 강제 종료다.
+
+포트는 프로세스가 연 소켓에서 확인한다. <code>ss -lntp</code>가 기본 선택이고 <code>netstat -lntp</code>는 구형 환경에서 볼 수 있다. <code>lsof -i :8080</code>은 파일을 연 프로세스와 포트를 연결한다.
+
+<code>curl</code>은 HTTP 응답, <code>nc -vz host 8080</code>은 TCP 연결 가능성을 확인한다. <code>ping</code>은 ICMP만 확인하므로 TCP 포트 테스트가 아니다.
 
 누가/도구: 운영자, <code>chmod</code>, <code>chown</code>, <code>sudo</code>, <code>ps</code>, <code>top</code>, <code>kill</code>, <code>ss</code>, <code>lsof</code>, <code>curl</code>, <code>ping</code>, <code>nc</code>.
 
@@ -81,7 +91,9 @@ flowchart TD
 
 ### 3.3 SSH에서 서비스 기동까지
 
-무엇이 일어나나: SSH는 원격 로그인을 암호화하며 host key 확인과 사용자 인증을 거친다. 공개키는 서버 계정에 등록하고 개인키는 클라이언트에 보관한다. <code>scp</code>는 파일 복사, <code>rsync</code>는 차이를 비교해 동기화한다. systemd는 unit의 사용자·작업 디렉터리·실행 명령으로 서비스를 만들고 프로세스 종료를 감시한다. <code>Type=exec</code>는 실행 파일을 실제로 시작했는지 확인한다. Spring Boot의 stdout/stderr는 systemd가 수집해 journal에서 볼 수 있다.
+무엇이 일어나나: SSH는 원격 로그인을 암호화하며 host key 확인과 사용자 인증을 거친다. 공개키는 서버 계정에 등록하고 개인키는 클라이언트에 보관한다. <code>scp</code>는 파일 복사, <code>rsync</code>는 차이를 비교해 동기화한다.
+
+systemd는 unit의 사용자·작업 디렉터리·실행 명령으로 서비스를 만들고 프로세스 종료를 감시한다. <code>Type=exec</code>는 실행 파일을 실제로 시작했는지 확인한다. Spring Boot의 stdout/stderr는 systemd가 수집해 journal에서 볼 수 있다.
 
 ```mermaid
 sequenceDiagram
@@ -261,7 +273,8 @@ curl -i http://127.0.0.1:8080/
 
 **Q2. <code>&gt;</code>와 <code>|</code>의 차이는?**  
 <code>&gt;</code>는 출력을 파일에 연결하고 <code>|</code>는 앞 명령의 stdout을 뒤 명령의 stdin으로 보낸다.  
-stderr는 자동으로 파이프에 합쳐지지 않는다.  
+stderr는 자동으로 파이프에 합쳐지지 않는다.
+
 로그를 볼 때 두 스트림이 어디로 연결되는지 확인한다.  
 **꼬리질문: <code>2&gt;&amp;1</code>은?** stderr를 stdout의 현재 대상으로 연결하며 순서에 따라 결과가 달라진다.
 
@@ -279,7 +292,8 @@ KILL은 처리할 수 없는 강제 종료라 마지막 수단이다.
 
 **Q5. <code>daemon-reload</code>, <code>restart</code>, <code>enable</code>은?**  
 앞은 unit 정의 재읽기, restart는 프로세스 재시작, enable은 부팅 자동 시작 등록이다.  
-각 동작은 서로 대체하지 않는다.  
+각 동작은 서로 대체하지 않는다.
+
 설정 재읽기와 실제 프로세스 반영 단계를 구분한다.  
 **꼬리질문: 지금 시작하면서 자동 등록하려면?** <code>systemctl enable --now orders.service</code>를 쓴다.
 

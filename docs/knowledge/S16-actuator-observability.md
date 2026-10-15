@@ -72,7 +72,9 @@ Observation → low-cardinality tags → Meter
 
 Boot 기본 sampling probability는 0.1이며 `management.tracing.sampling.probability`로 조정한다. 샘플링되지 않은 요청도 메트릭·로그에는 남을 수 있다. 원격 호출 trace 전파에는 Boot가 구성한 `RestClient.Builder`, `RestTemplateBuilder`, `WebClient.Builder`를 사용한다. 직접 만든 client는 전파가 빠질 수 있다.
 
-Reactor에서 ThreadLocal은 자동 복원되지 않는다. `spring.reactor.context-propagation=auto`, Boot `@Async` executor의 `spring.task.execution.propagate-context=true`를 검토한다. 직접 구성한 executor에는 `ContextPropagatingTaskDecorator`를 등록한다. MDC도 실행 흐름이 바뀔 때 자동 전파된다고 가정하지 말고 `MDC.putCloseable`로 현재 scope를 정리한다.
+Reactor에서 ThreadLocal은 자동 복원되지 않는다. `spring.reactor.context-propagation=auto`, Boot `@Async` executor의 `spring.task.execution.propagate-context=true`를 검토한다. 직접 구성한 executor에는 `ContextPropagatingTaskDecorator`를 등록한다.
+
+MDC도 실행 흐름이 바뀔 때 자동 전파된다고 가정하지 말고 `MDC.putCloseable`로 현재 scope를 정리한다.
 ## 4. 코드로 확인
 
 아래 Spring 예제는 Boot 4.1 API를 기준으로 한 코드이며, 이 작업 환경에서 애플리케이션을 빌드해 검증하지 않았다. 각 Java 클래스는 적힌 파일명으로 별도 파일에 둔다. 애플리케이션의 HTTP starter와 빌드 플러그인은 이미 구성되어 있다고 가정한다.
@@ -136,7 +138,9 @@ logging:
       console: ecs
 ```
 
-`management.endpoints.access.default=none`을 설정했으므로 노출 목록에 넣은 endpoint도 개별 read access를 열어야 한다. 이 예제는 세 endpoint만 read-only로 허용한다. 앱에 DB health contributor가 없다면 readiness include에서 `db`를 제거한다. 운영 역할 인증과 실제 네트워크 제한은 앱 배포 환경에 맞춰 더한다. **(미실행: Spring Boot 애플리케이션 설정 예시)**
+`management.endpoints.access.default=none`을 설정했으므로 노출 목록에 넣은 endpoint도 개별 read access를 열어야 한다. 이 예제는 세 endpoint만 read-only로 허용한다. 앱에 DB health contributor가 없다면 readiness include에서 `db`를 제거한다.
+
+운영 역할 인증과 실제 네트워크 제한은 앱 배포 환경에 맞춰 더한다. **(미실행: Spring Boot 애플리케이션 설정 예시)**
 
 ### 예제 2: Counter와 생명주기가 있는 Gauge
 

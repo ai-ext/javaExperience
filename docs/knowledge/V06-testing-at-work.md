@@ -30,7 +30,9 @@
     cd practice/starter
     rg --files src/main src/test
 
-실제 파일은 ProductServiceUnitTest.java, ProductControllerTest.java, ProductRepositoryTest.java, ProductApiIntegrationTest.java, ProductMySqlIntegrationTest.java다. ProductServiceUnitTest는 Repository를 mock으로 대체하고 서비스를 직접 생성해 매핑·예외·페이징 위임을 확인한다. 리팩터링 전 현재 응답·예외·경계값을 요구사항과 대조한다. 현재 동작이 잘못됐다면 그 동작을 정답으로 고정하지 말고 의도된 결과를 회귀 테스트에 둔다. 확인 방법: rg 결과에서 계층별 테스트 파일과 대상 메서드가 있는지 확인한다.
+실제 파일은 ProductServiceUnitTest.java, ProductControllerTest.java, ProductRepositoryTest.java, ProductApiIntegrationTest.java, ProductMySqlIntegrationTest.java다. ProductServiceUnitTest는 Repository를 mock으로 대체하고 서비스를 직접 생성해 매핑·예외·페이징 위임을 확인한다. 리팩터링 전 현재 응답·예외·경계값을 요구사항과 대조한다.
+
+현재 동작이 잘못됐다면 그 동작을 정답으로 고정하지 말고 의도된 결과를 회귀 테스트에 둔다. 확인 방법: rg 결과에서 계층별 테스트 파일과 대상 메서드가 있는지 확인한다.
 
 ### 2단계: 버그 조건을 테스트로 먼저 재현
 
@@ -84,7 +86,9 @@ class ProductRepositoryTest {
 }
 ```
 
-이 코드도 미실행이다. 현재 저장소에는 같은 테스트 클래스가 이미 있고, 실제 클래스는 PageRequest와 Page import를 별도로 둔다. 파일을 새로 만들 때는 중복 클래스를 만들지 말고 기존 메서드에 실패 조건을 추가한다. Boot 4에서 DataJpaTest는 org.springframework.boot.data.jpa.test.autoconfigure 패키지다. 이 슬라이스의 기본 DB 치환 동작은 Testcontainers를 쓰는 경우 @AutoConfigureTestDatabase(replace = NONE)으로 분명히 바꾼다.
+이 코드도 미실행이다. 현재 저장소에는 같은 테스트 클래스가 이미 있고, 실제 클래스는 PageRequest와 Page import를 별도로 둔다. 파일을 새로 만들 때는 중복 클래스를 만들지 말고 기존 메서드에 실패 조건을 추가한다.
+
+Boot 4에서 DataJpaTest는 org.springframework.boot.data.jpa.test.autoconfigure 패키지다. 이 슬라이스의 기본 DB 치환 동작은 Testcontainers를 쓰는 경우 @AutoConfigureTestDatabase(replace = NONE)으로 분명히 바꾼다.
 
 테스트를 먼저 추가하고 재현할 때 확인할 명령은 다음과 같다.
 
@@ -136,7 +140,9 @@ class ProductControllerRegressionTest {
 }
 ```
 
-새 파일로 추가한다면 이름에 맞춰 클래스도 ProductControllerRegressionTest로 둔다. 현재 저장소는 같은 API 단언을 ProductControllerTest와 ProductControllerSliceTest에 이미 가지고 있다. Boot 4의 WebMvcTest와 AutoConfigureMockMvc 패키지는 org.springframework.boot.webmvc.test.autoconfigure다. Boot 3 import를 복사하지 않는다. 확인 방법: ./gradlew test --tests 'com.example.practice.product.ProductControllerTest' 실행 후 404와 ProblemDetail 필드를 확인한다. 실제 DB까지 필요한 경우에만 @SpringBootTest와 Testcontainers를 쓴다.
+새 파일로 추가한다면 이름에 맞춰 클래스도 ProductControllerRegressionTest로 둔다. 현재 저장소는 같은 API 단언을 ProductControllerTest와 ProductControllerSliceTest에 이미 가지고 있다. Boot 4의 WebMvcTest와 AutoConfigureMockMvc 패키지는 org.springframework.boot.webmvc.test.autoconfigure다.
+
+Boot 3 import를 복사하지 않는다. 확인 방법: ./gradlew test --tests 'com.example.practice.product.ProductControllerTest' 실행 후 404와 ProblemDetail 필드를 확인한다. 실제 DB까지 필요한 경우에만 @SpringBootTest와 Testcontainers를 쓴다.
 
 ### 4단계: CI에서 실행하고 실패 보고서 보관
 

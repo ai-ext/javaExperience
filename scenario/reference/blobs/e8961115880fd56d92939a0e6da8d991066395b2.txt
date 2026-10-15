@@ -1,0 +1,81 @@
+package org.example.link;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.util.HtmlUtils;
+
+import java.io.InputStream;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+// 16-4 외부 페이지 제목 가져오기. 느리거나 실패하면 기다리지 않고 null — 글 저장은 막지 않는다.
+// 트랜잭션 밖(컨트롤러)에서 부른다: 외부 응답을 기다리는 동안 DB 커넥션을 붙잡지 않으려고.
+// 실서비스라면 내부 주소(localhost·사설 IP·클라우드 메타데이터) 요청을 막아야 한다(SSRF). 연습용 가짜 사이트가 localhost라 여기선 열어 둔다.
+@Service
+public class LinkPreviewService {
+
+    private static final Logger log = LoggerFactory.getLogger(LinkPreviewService.class);
+    private static final int MAX_BYTES = 64 * 1024; // 앞부분 64KB만 읽는다(<head>면 충분)
+    private static final int TITLE_MAX_LENGTH = 200;
+    private static final Pattern OG_TITLE = Pattern.compile(
+            "<meta[^>]+property=[\"']og:title[\"'][^>]*content=[\"']([^\"']*)[\"']", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TITLE = Pattern.compile("<title[^>]*>([^<]*)</title>", Pattern.CASE_INSENSITIVE);
+
+    private final RestClient restClient;
+
+    // Boot 4는 RestClient.Builder 자동 설정이 별도 모듈(spring-boot-restclient)이라 여기선 RestClient.builder()로 직접 만든다
+    public LinkPreviewService(@Value("${app.link-preview.connect-timeout-ms:1000}") long connectTimeoutMs,
+                              @Value("${app.link-preview.read-timeout-ms:2000}") long readTimeoutMs) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofMillis(connectTimeoutMs)); // 연결이 안 붙을 때
+        factory.setReadTimeout(Duration.ofMillis(readTimeoutMs));       // 붙었는데 응답이 안 올 때
+        this.restClient = RestClient.builder().requestFactory(factory).build();
+    }
+
+    public LinkPreview fetch(String url) {
+        if (url == null) {
+            return null;
+        }
+        try {
+            String html = restClient.get()
+                    .uri(URI.create(url)) // 문자열 그대로 — 템플릿으로 다시 인코딩하지 않는다
+                    .exchange((request, response) -> {
+                        if (!response.getStatusCode().is2xxSuccessful()) {
+                            return null;
+                        }
+                        try (InputStream in = response.getBody()) {
+                            return new String(in.readNBytes(MAX_BYTES), StandardCharsets.UTF_8);
+                        }
+                    });
+            return new LinkPreview(url, extractTitle(html));
+        } catch (RuntimeException e) {
+            // 시간 초과·접속 실패 등 — 미리보기 없이 링크만 남긴다
+            log.warn("링크 미리보기 실패 url={} — {}", url, e.getMessage());
+            return new LinkPreview(url, null);
+        }
+    }
+
+    private String extractTitle(String html) {
+        if (html == null) {
+            return null;
+        }
+        Matcher m = OG_TITLE.matcher(html);
+        String raw = m.find() ? m.group(1) : null;
+        if (raw == null) {
+            Matcher t = TITLE.matcher(html);
+            raw = t.find() ? t.group(1) : null;
+        }
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String title = HtmlUtils.htmlUnescape(raw).strip();
+        return title.length() > TITLE_MAX_LENGTH ? title.substring(0, TITLE_MAX_LENGTH) : title;
+    }
+}

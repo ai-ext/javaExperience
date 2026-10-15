@@ -1,0 +1,40 @@
+package org.example.recent;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+// 14-5: "최근 20개만" — 화면으로 21개를 열어 보기는 번거로워서 기록 메서드를 직접 부른다.
+// 회원 26(동시성20)은 다른 테스트가 쓰지 않는 회원이다. 다른 통합 테스트와 애노테이션을 같게 둬 컨텍스트를 공유한다.
+@SpringBootTest
+@AutoConfigureMockMvc
+class RecentViewCapTest {
+
+    private static final long MEMBER = 26L;
+
+    @Autowired
+    RecentViewService recentViewService;
+
+    @Autowired
+    RecentViewRepository repository;
+
+    @Test
+    void 스물한_개를_보면_가장_오래된_것이_빠지고_다시_본_글은_맨_앞으로() {
+        for (long postId = 1; postId <= 21; postId++) {
+            recentViewService.record(MEMBER, postId);
+        }
+        assertThat(repository.countByMemberId(MEMBER)).isEqualTo(20);
+        List<Long> ids = repository.findLatest(MEMBER).stream().map(rv -> rv.getPost().getId()).toList();
+        assertThat(ids).doesNotContain(1L);
+        assertThat(ids.getFirst()).isEqualTo(21L);
+
+        recentViewService.record(MEMBER, 5L); // 이미 본 글 — 행이 늘지 않고 맨 앞으로
+        assertThat(repository.countByMemberId(MEMBER)).isEqualTo(20);
+        assertThat(repository.findLatest(MEMBER).getFirst().getPost().getId()).isEqualTo(5L);
+    }
+}

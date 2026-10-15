@@ -1,0 +1,40 @@
+package org.example.comment;
+
+import jakarta.validation.Valid;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
+import java.util.List;
+
+@RestController
+public class CommentController {
+
+    private final CommentService commentService;
+    private final CommentQueryService query;
+
+    public CommentController(CommentService commentService, CommentQueryService query) {
+        this.commentService = commentService;
+        this.query = query;
+    }
+
+    @GetMapping("/api/posts/{postId}/comments")
+    public List<CommentResponse> list(@PathVariable Long postId,
+                                      @LoginMember AuthenticatedMember viewer) {
+        return query.listTopLevel(postId, viewer);
+    }
+
+    @PostMapping("/api/posts/{postId}/comments")
+    public ResponseEntity<CommentResponse> create(@PathVariable Long postId,
+                                                   @LoginMember AuthenticatedMember loginMember,
+                                                   @Valid @RequestBody CommentCreateRequest request) {
+        Comment comment = commentService.create(postId, loginMember, request);
+        return ResponseEntity.created(URI.create("/api/comments/" + comment.getId())).body(CommentResponse.from(comment));
+    }
+}

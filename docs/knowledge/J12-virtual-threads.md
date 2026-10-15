@@ -232,7 +232,9 @@ public class DashboardService {
 
 ### 운영 관측
 
-JFR의 `jdk.VirtualThreadStart`, `jdk.VirtualThreadEnd`, `jdk.VirtualThreadPinned`, `jdk.VirtualThreadSubmitFailed`는 각각 시작·종료·pinning·scheduler 제출 실패를 살필 때 쓴다. pinning 진단 예: `jcmd <pid> JFR.start name=vt settings=profile duration=60s filename=vt.jfr`, 이어서 `jfr print --events jdk.VirtualThreadPinned vt.jfr`. 활성 이벤트는 `jfr metadata vt.jfr`로 확인한다. Java 24 이후 남은 pinning 경로를 찾는 데 유용하다.
+JFR의 `jdk.VirtualThreadStart`, `jdk.VirtualThreadEnd`, `jdk.VirtualThreadPinned`, `jdk.VirtualThreadSubmitFailed`는 각각 시작·종료·pinning·scheduler 제출 실패를 살필 때 쓴다. pinning 진단 예: `jcmd <pid> JFR.start name=vt settings=profile duration=60s filename=vt.jfr`, 이어서 `jfr print --events jdk.VirtualThreadPinned vt.jfr`.
+
+활성 이벤트는 `jfr metadata vt.jfr`로 확인한다. Java 24 이후 남은 pinning 경로를 찾는 데 유용하다.
 
 `jcmd <pid> Thread.dump_to_file -format=json threads.json`으로 VT 덤프도 확보한다. JFR 시간·덤프·요청 ID를 맞추고 녹화 이벤트와 기간을 필요한 만큼 설정한다.
 

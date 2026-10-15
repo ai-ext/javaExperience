@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F8. 요청 수 제한·도배 방지 — 429와 Retry-After</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="f8-요청-수-제한도배-방지--429와-retry-after"><a class="anchor" href="#f8-요청-수-제한도배-방지--429와-retry-after" aria-hidden="true">#</a>F8. 요청 수 제한·도배 방지 — 429와 Retry-After</h1>
+<blockquote>
+<p>개념 레슨 · 30분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>로그인한 회원이 1초에 글을 50개 올린다. 토큰도 맞고(F2), 권한도 있고(F7), 값도 멀쩡하다(F6). 그래도 막아야 한다. 게시판이 한 사람 글로 덮이고, 그 사이 DB는 다른 사람의 요청을 처리하느라 느려진다.</p>
+<p>그래서 서버가 <strong>요청을 센다.</strong> &quot;누가, 무엇을, 얼마 동안 몇 번&quot; 할 수 있는지 정하고, 넘으면 저장하지 않고 거절한다. 이것을 <strong>요청 수 제한</strong>(rate limiting)이라고 한다. 이 레슨의 규칙은 <strong>&quot;회원 한 명이 1분에 글 5개까지&quot;</strong> 다.</p>
+<p>클라이언트 쪽에서 연속 전송을 막아 두어도 제한이 되지 않는다. <code>for i in $(seq 50); do curl -X POST …; done</code> 한 줄이면 클라이언트를 거치지 않고 50번 보낸다. 세는 일은 서버가, 글쓰기 API 안에서 한다.</p>
+<h3 id="거절은-429와-retry-after로"><a class="anchor" href="#거절은-429와-retry-after로" aria-hidden="true">#</a>거절은 <code>429</code>와 <code>Retry-After</code>로</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>무엇</th>
+<th>뜻</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>429 Too Many Requests</code></td>
+<td>일정 시간 동안 요청을 너무 많이 보냈다</td>
+<td>RFC 6585</td>
+</tr>
+<tr>
+<td>본문</td>
+<td>왜 막혔는지 설명을 담는 게 좋다</td>
+<td>RFC 6585</td>
+</tr>
+<tr>
+<td><code>Retry-After: 40</code> 헤더</td>
+<td><strong>40초</strong> 뒤에 다시 시도하라(날짜 형식도 허용)</td>
+<td>RFC 9110</td>
+</tr>
+</tbody></table></div>
+<p><code>429</code>도 <code>400</code>처럼 &quot;보낸 쪽이 바꿔야 하는&quot; 응답이다. 다만 바꿀 것은 값이 아니라 <strong>시간</strong>이다. <code>Retry-After</code>가 있으면 클라이언트는 그만큼 기다렸다 다시 보내면 된다. 없으면 클라이언트는 언제 다시 보낼지 짐작해야 하고, 보통 곧바로 다시 보내 또 막힌다.</p>
+<h3 id="무엇을-기준으로-세나"><a class="anchor" href="#무엇을-기준으로-세나" aria-hidden="true">#</a>무엇을 기준으로 세나</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>기준</th>
+<th>좋은 점</th>
+<th>조심할 점</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>회원 id</td>
+<td>사람마다 따로 센다</td>
+<td>로그인 전 요청(가입·로그인)에는 못 쓴다</td>
+</tr>
+<tr>
+<td>IP 주소</td>
+<td>로그인 전에도 쓸 수 있다</td>
+<td>회사·학교·카페는 여러 사람이 IP 하나를 같이 쓴다. 한 명 때문에 모두 막힌다</td>
+</tr>
+</tbody></table></div>
+<p>글쓰기는 로그인한 회원만 하니 <strong>회원 id</strong>로 센다. IP는 로그인 시도처럼 회원을 모르는 곳에 느슨하게 보탠다.</p>
+<h3 id="어떻게-세나--세-가지-방식"><a class="anchor" href="#어떻게-세나--세-가지-방식" aria-hidden="true">#</a>어떻게 세나 — 세 가지 방식</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>방식</th>
+<th>세는 법</th>
+<th>&quot;1분에 5개&quot;가 뜻하는 것</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>고정 윈도우</strong></td>
+<td>시계의 1분 칸(<code>12:00:00</code>~`12:00:59`)마다 0부터 센다</td>
+<td>같은 &quot;분&quot; 안에 5개</td>
+</tr>
+<tr>
+<td>슬라이딩 윈도우</td>
+<td>지금부터 거꾸로 60초 안의 요청을 센다</td>
+<td>어느 순간에 봐도 직전 60초에 5개</td>
+</tr>
+<tr>
+<td>토큰 버킷</td>
+<td>통에 토큰 5개, 요청마다 하나씩 쓰고 시간이 지나면 조금씩 다시 찬다</td>
+<td>몰아서 5개, 그 뒤엔 채워지는 속도만큼</td>
+</tr>
+</tbody></table></div>
+<p>이 레슨은 가장 단순한 <strong>고정 윈도우</strong>를 DB <code>COUNT</code>로 만들어 본다. 나머지 둘은 표의 뜻만 알면 된다. 여러 서버가 같은 숫자를 함께 세야 하면 보통 Redis 같은 공용 저장소에 둔다.</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<p>이 레슨을 쓰면서 작은 Spring Boot 4.1.1 앱을 practice DB에 붙여 띄웠다. 토큰 확인은 F7의 <code>AuthInterceptor</code>를 그대로 쓰고, 글은 연습용 테이블 <code>lesson_f8_post(author_id, title, created_at DATETIME(3))</code>에 저장한다. <code>(author_id, created_at)</code> 인덱스를 붙였다. 셀 때 이 두 칸으로 찾기 때문이다.</p>
+<h3 id="①-이번-분-칸에-쓴-글을-센다"><a class="anchor" href="#①-이번-분-칸에-쓴-글을-센다" aria-hidden="true">#</a>① 이번 분 칸에 쓴 글을 센다</h3>
+<pre><code class="language-java">@Component
+public class PostRateLimiter {
+    static final int LIMIT = 5;
+    private final JdbcTemplate jdbc;
+
+    /** 허용이면 0, 막아야 하면 기다릴 초(Retry-After) */
+    public long check(long memberId, LocalDateTime now) {
+        LocalDateTime windowStart = now.truncatedTo(ChronoUnit.MINUTES);       // 16:05:20.224 → 16:05:00
+        Integer count = jdbc.queryForObject(
+                &quot;SELECT COUNT(*) FROM lesson_f8_post WHERE author_id = ? AND created_at &gt;= ?&quot;,
+                Integer.class, memberId, windowStart);
+        if (count &lt; LIMIT) return 0;
+        long millisLeft = Duration.between(now, windowStart.plusMinutes(1)).toMillis();
+        return Math.max(1, (millisLeft + 999) / 1000);                          // 올림 — &quot;0초 기다려&quot;는 없다
+    }
+}</code></pre>
+<p>남은 시간을 올림하고 최소 1초로 두는 것은, 내림해서 <code>Retry-After: 0</code>을 주면 클라이언트가 곧바로 다시 보내 또 막히기 때문이다. 서비스는 세어 보고, 넘었으면 예외를 던지고, 아니면 저장한다. 시각은 Java에서 <strong>한 번</strong> 잡아 세기와 저장에 같이 쓴다. DB 컨테이너의 시계(UTC)와 앱의 시계(Asia/Seoul)가 달라서, 한쪽은 <code>NOW()</code>, 한쪽은 Java 시각을 쓰면 아홉 시간이 어긋난다.</p>
+<pre><code class="language-java">@Transactional
+public long create(long memberId, String title) {
+    LocalDateTime now = LocalDateTime.now();
+    long retryAfter = limiter.check(memberId, now);
+    if (retryAfter &gt; 0) throw new TooManyPostsException(retryAfter);
+    jdbc.update(&quot;INSERT INTO lesson_f8_post (author_id, title, created_at) VALUES (?, ?, ?)&quot;, memberId, title, now);
+    …
+}
+
+// 처리기 — 상태 429, 헤더 Retry-After, 본문 ProblemDetail
+@ExceptionHandler(TooManyPostsException.class)
+public ResponseEntity&lt;ProblemDetail&gt; tooMany(TooManyPostsException ex) {
+    ProblemDetail p = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+    p.setProperty(&quot;retryAfterSeconds&quot;, ex.retryAfterSeconds());
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+            .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.retryAfterSeconds()))
+            .body(p);
+}</code></pre>
+<h3 id="②-여섯-번째에서-막힌다"><a class="anchor" href="#②-여섯-번째에서-막힌다" aria-hidden="true">#</a>② 여섯 번째에서 막힌다</h3>
+<p>회원 6(<code>tok-p06</code>)으로 16:05:20에 여섯 번 연달아 보냈다. 앞의 숫자는 보낸 시각이다.</p>
+<pre><code class="language-text">16:05:20.024  HTTP/1.1 201  {&quot;id&quot;:7}
+16:05:20.065  HTTP/1.1 201  {&quot;id&quot;:8}
+16:05:20.106  HTTP/1.1 201  {&quot;id&quot;:9}
+16:05:20.141  HTTP/1.1 201  {&quot;id&quot;:10}
+16:05:20.182  HTTP/1.1 201  {&quot;id&quot;:11}
+16:05:20.224  HTTP/1.1 429
+              Retry-After: 40
+              Content-Type: application/problem+json
+
+              {&quot;detail&quot;:&quot;글은 1분에 5개까지 쓸 수 있습니다.&quot;,&quot;instance&quot;:&quot;/f8/posts&quot;,&quot;status&quot;:429,&quot;title&quot;:&quot;Too Many Requests&quot;,&quot;retryAfterSeconds&quot;:40}</code></pre>
+<p>이번 칸은 16:06:00에 끝난다. 남은 시간 39.776초를 올림해 <code>40</code>이다.</p>
+<h3 id="③-40초-기다리면-된다"><a class="anchor" href="#③-40초-기다리면-된다" aria-hidden="true">#</a>③ 40초 기다리면 된다</h3>
+<p>같은 회원으로, 받은 <code>Retry-After</code>만큼 기다렸다 다시 보냈다.</p>
+<pre><code class="language-text">16:05:20.225  Retry-After 40초 기다린다
+16:06:00.224  HTTP/1.1 201  {&quot;id&quot;:12}</code></pre>
+<p>새 칸(16:06)이 시작돼 카운트가 0부터 다시 셌다.</p>
+<h3 id="④-고정-윈도우의-구멍--분이-바뀌는-순간"><a class="anchor" href="#④-고정-윈도우의-구멍--분이-바뀌는-순간" aria-hidden="true">#</a>④ 고정 윈도우의 구멍 — 분이 바뀌는 순간</h3>
+<p>회원 3(<code>tok-p03</code>)으로 16:06:58.5쯤 다섯 개, 16:07:00.3쯤 다섯 개를 더 보냈다.</p>
+<pre><code class="language-text">16:06:58.466  HTTP/1.1 201  {&quot;id&quot;:13}
+16:06:58.917  HTTP/1.1 201  {&quot;id&quot;:14}
+16:06:59.008  HTTP/1.1 201  {&quot;id&quot;:15}
+16:06:59.110  HTTP/1.1 201  {&quot;id&quot;:16}
+16:06:59.221  HTTP/1.1 201  {&quot;id&quot;:17}
+16:07:00.273  HTTP/1.1 201  {&quot;id&quot;:18}
+16:07:00.347  HTTP/1.1 201  {&quot;id&quot;:19}
+16:07:00.381  HTTP/1.1 201  {&quot;id&quot;:20}
+16:07:00.416  HTTP/1.1 201  {&quot;id&quot;:21}
+16:07:00.453  HTTP/1.1 201  {&quot;id&quot;:22}
+16:07:00.488  HTTP/1.1 429  Retry-After: 60</code></pre>
+<p>DB에 남은 것은 <strong>1.6초 사이에 10개</strong>다(<code>16:06:58.869</code>~`16:07:00.480`). 규칙은 &quot;1분에 5개&quot;인데, 고정 윈도우는 &quot;같은 분 칸 안에 5개&quot;만 지킨다. 칸이 바뀌면 바로 다시 5개다. 이게 싫으면 슬라이딩 윈도우를 쓴다. 정책 문구(&quot;1분에 5개&quot;)와 실제로 세는 방식이 같은 말인지 확인해야 한다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>10분. 두 방식이 <strong>같은 순간에 다른 숫자</strong>를 내는 것을 SQL로 본다. G3처럼 <code>mysql</code>에 들어가 임시 테이블로 한다(접속을 끊으면 사라진다).</p>
+<pre><code class="language-bash">docker exec -it -e LANG=C.UTF-8 studymate-mysql-1 mysql --default-character-set=utf8mb4 -ucommunity -pcommunity practice</code></pre>
+<p><strong>1. 분이 바뀌기 직전에 글 다섯 개를 넣는다.</strong></p>
+<pre><code class="language-sql">CREATE TEMPORARY TABLE t_post (id BIGINT PRIMARY KEY AUTO_INCREMENT, author_id BIGINT NOT NULL, created_at DATETIME(3) NOT NULL);
+INSERT INTO t_post (author_id, created_at) VALUES
+  (2, '2026-10-10 12:00:58.400'), (2, '2026-10-10 12:00:58.600'), (2, '2026-10-10 12:00:59.000'),
+  (2, '2026-10-10 12:00:59.200'), (2, '2026-10-10 12:00:59.400');</code></pre>
+<p><strong>2. 여섯 번째 요청이 12:01:00.200에 왔다고 치고 두 방식으로 센다.</strong></p>
+<pre><code class="language-sql">SET @now = '2026-10-10 12:01:00.200';
+SELECT COUNT(*) AS fixed_window FROM t_post
+ WHERE author_id = 2 AND created_at &gt;= DATE_FORMAT(@now, '%Y-%m-%d %H:%i:00');
+SELECT COUNT(*) AS sliding_window FROM t_post
+ WHERE author_id = 2 AND created_at &gt; @now - INTERVAL 1 MINUTE;</code></pre>
+<pre><code class="language-text">+--------------+
+| fixed_window |
++--------------+
+|            0 |
++--------------+
++----------------+
+| sliding_window |
++----------------+
+|              5 |
++----------------+</code></pre>
+<p>고정 윈도우는 <code>12:01:00</code>부터 세니 0개 — <strong>허용</strong>. 슬라이딩은 <code>12:00:00.200</code> 이후를 세니 5개 — <strong>거절</strong>. 두 SQL의 차이는 <code>WHERE</code>의 시작 시각 하나다. &quot;최근 1분&quot;(<code>NOW() - INTERVAL 1 MINUTE</code>)이라고 적으면 고정 윈도우가 아니라 슬라이딩 윈도우다.</p>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p><strong>1. 동시에 보낸다</strong> — 세고(<code>SELECT COUNT</code>) 저장하는(<code>INSERT</code>) 사이는 비어 있다. 회원 4(<code>tok-p04</code>)로 요청 20개를 <strong>동시에</strong> 보냈다.</p>
+<pre><code class="language-text">16:07:04.954 동시에 20 개
+Counter({'HTTP/1.1 201': 12, 'HTTP/1.1 429': 8})</code></pre>
+<pre><code class="language-text">+-----------+-----+
+| author_id | cnt |
++-----------+-----+
+|         4 |  12 |
++-----------+-----+</code></pre>
+<p>한도가 5인데 12개가 들어갔다. 여러 요청이 동시에 <code>COUNT</code>를 해서 모두 &quot;아직 5개 미만&quot;을 봤다. <code>@Transactional</code>로 묶었는데도 그렇다. 트랜잭션은 &quot;다 되거나 다 없던 일&quot;을 보장할 뿐, 다른 요청이 끼어들지 못하게 줄을 세우지는 않는다(H1).</p>
+<p>줄을 세우는 한 방법은 같은 회원의 요청이 <strong>같은 행을 잠그게</strong> 하는 것이다. 세기 전에 그 회원의 <code>member</code> 행을 <code>FOR UPDATE</code>로 읽었다. 잠금은 트랜잭션이 끝날 때 풀리니 <code>@Transactional</code> 안이어야 한다.</p>
+<pre><code class="language-java">jdbc.queryForObject(&quot;SELECT id FROM member WHERE id = ? FOR UPDATE&quot;, Long.class, memberId);   // 같은 회원은 여기서 한 줄로</code></pre>
+<p>회원 5(<code>tok-p05</code>)로 같은 20개를 동시에 보냈다.</p>
+<pre><code class="language-text">16:08:04.973 동시에 20 개
+Counter({'HTTP/1.1 429': 15, 'HTTP/1.1 201': 5})</code></pre>
+<p>정확히 5개다. 대신 같은 회원의 글쓰기가 한 줄로 서서 기다린다. 트래픽이 크면 Redis의 원자적 증가(<code>INCR</code>) 같은 다른 길을 찾는다.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> <code>Retry-After: 40</code>의 뜻은?</p>
+<details>
+<summary>정답</summary>
+
+<p>이 응답을 받은 뒤 <strong>40초</strong> 기다렸다 다시 보내라는 뜻이다. RFC 9110은 초 단위 숫자와 날짜(<code>Retry-After: Sat, 10 Oct 2026 07:06:00 GMT</code>) 두 형식을 허용한다. 클라이언트는 둘 다 읽을 수 있어야 한다.</p>
+</details>
+
+<p><strong>2.</strong> 고정 윈도우 &quot;1분에 5개&quot;에서, 같은 회원의 글 10개가 2초 안에 모두 통과할 수 있나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>있다.</strong> 분이 바뀌기 직전에 5개, 바뀐 직후에 5개면 두 개의 다른 칸이라 둘 다 허용이다(④에서 1.6초에 10개). &quot;어느 60초를 잘라도 5개 이하&quot;가 필요하면 슬라이딩 윈도우를 쓴다.</p>
+</details>
+
+<p><strong>3.</strong> 회사 사무실 50명이 같은 공인 IP로 나간다. 글쓰기 제한을 IP 기준 &quot;1분에 5개&quot;로 걸면?</p>
+<details>
+<summary>정답</summary>
+
+<p>50명이 <strong>합쳐서</strong> 1분에 5개만 쓸 수 있다. 한 사람이 도배하면 나머지 49명도 막힌다. 로그인이 필요한 글쓰기는 회원 id로 센다. IP 기준은 로그인 전 요청에 넉넉하게 거는 보조선이다.</p>
+</details>
+
+<p><strong>4.</strong> <code>COUNT</code> 뒤 <code>INSERT</code>를 <code>@Transactional</code> 하나로 묶었다. 동시에 들어온 요청 20개 중 몇 개가 통과할 수 있나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>5개보다 많이</strong> 통과할 수 있다(실측 12개). 트랜잭션은 끼어들기를 막지 않는다. 동시에 센 요청들이 모두 같은 숫자(5 미만)를 본다. 같은 회원의 요청이 한 줄로 서도록 행을 잠그거나(<code>FOR UPDATE</code>, 실측 정확히 5개), 세기와 늘리기를 한 번에 하는 원자적 연산을 쓴다.</p>
+</details>
+
+<p><strong>5.</strong> 서버가 두 대이고 각자 메모리(<code>ConcurrentHashMap</code>)에 회원별 카운터를 둔다. &quot;1분에 5개&quot;가 지켜지나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>안 지켜진다.</strong> 요청이 두 서버에 나뉘어 가면 각 서버가 따로 5개씩 세어 최대 10개가 통과한다. 서버를 재시작해도 카운터가 사라진다. 여러 서버가 같은 숫자를 봐야 하면 DB나 Redis처럼 공용 저장소에서 센다. 이 레슨의 DB <code>COUNT</code>는 서버가 몇 대든 같은 테이블을 센다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/W10-where-to-validate.html#중복-검사와-경쟁-조건">W10 — 중복 검사와 경쟁 조건</a> — &quot;세고 나서 쓰기&quot;가 동시에 깨지는 같은 모양</li>
+<li><a href="../docs/knowledge/P23-redis-practical.html">P23 Redis 실무</a> — 여러 서버가 공유하는 카운터</li>
+<li>원문: <a href="https://www.rfc-editor.org/rfc/rfc6585#section-4" target="_blank" rel="noopener">RFC 6585 — 429 Too Many Requests</a> — 본문 설명, <code>Retry-After</code>, 캐시 금지 · <a href="https://www.rfc-editor.org/rfc/rfc9110.html#name-retry-after" target="_blank" rel="noopener">RFC 9110 — Retry-After</a> — 초·날짜 두 형식 · <a href="https://redis.io/docs/latest/develop/use-cases/rate-limiter/" target="_blank" rel="noopener">Redis — Rate limiter</a> — 고정·슬라이딩 윈도우, <code>INCR</code>+<code>EXPIRE</code>, 원자 갱신 · <a href="https://bucket4j.com/8.14.0/toc.html" target="_blank" rel="noopener">Bucket4j 8.14 레퍼런스</a> — 토큰 버킷 · <a href="https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/" target="_blank" rel="noopener">OWASP API4:2023 Unrestricted Resource Consumption</a> — 제한이 없거나 너무 느슨할 때</li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li>레슨: <a href="H1-concurrency-taste.html">H1. 동시성 맛보기</a> — &quot;일부러 틀려 보기 1&quot;의 12개가 왜 생기는지, 잠금을 더 깊게.</li>
+<li>실습: <a href="../scenario/ch13-operations/13-3-member-suspension.html">13-3. 작성자 기간 정지</a> — 도배한 회원에게 운영자가 내리는 다음 조치. 막힌 요청을 <code>403</code>과 사유로 알려 주는 모양이 <code>429</code>와 닮았다.</li>
+<li>레슨: <a href="G4-transaction-in-practice.html">G4. 트랜잭션 실전</a> — <code>@Transactional</code>이 롤백하지 않는 경우들.</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

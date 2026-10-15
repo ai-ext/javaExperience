@@ -1,0 +1,100 @@
+package org.example.post;
+
+import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+// 7-3: 진짜 MySQL(Testcontainers, application-test.yml이 시나리오 dump를 넣는다) 위에서 사용자 흐름을 끝까지 돌린다.
+// 서비스·리포지토리를 mock으로 바꾸지 않는다.
+//
+// @Transactional을 붙이지 않는다 — 붙이면 테스트가 끝날 때 롤백돼 깔끔하지만, 요청마다 커밋되는 실제
+// 동작(원자적 UPDATE, 커밋 뒤 다른 트랜잭션에서 보이는 값)이 가려진다. 대신 테스트마다 자기 글을 새로 만들어 쓴다.
+// 애노테이션 조합(@SpringBootTest + @AutoConfigureMockMvc)을 다른 통합 테스트와 같게 둬 컨텍스트·컨테이너를 공유한다.
+@SpringBootTest
+@AutoConfigureMockMvc
+class PostFlowIntegrationTest {
+
+    private static final String KIMJAVA = "Bearer tok-kimjava";
+    private static final String LEE = "Bearer tok-lee";
+
+    @Autowired
+    MockMvc mockMvc;
+
+    @Test
+    void 글쓰기_조회_좋아요_댓글_삭제까지_한_흐름() throws Exception {
+        // 1. 김자바가 dev 게시판에 글을 쓴다
+        String created = mockMvc.perform(post("/api/posts")
+                        .header("Authorization", KIMJAVA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"boardSlug":"dev","title":"[통합] 흐름 확인","content":"통합 테스트 본문","tags":["spring"],"visibility":"PUBLIC"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Integer postId = JsonPath.read(created, "$.id");
+
+        // 2. 비로그인 상세
+        mockMvc.perform(get("/api/posts/{id}", postId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.author.id").value(2));
+
+        // 3. 이스프링이 좋아요
+        mockMvc.perform(put("/api/posts/{id}/like", postId).header("Authorization", LEE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.liked").value(true))
+                .andExpect(jsonPath("$.likeCount").value(1));
+
+        // 4. 이스프링이 댓글
+        mockMvc.perform(post("/api/posts/{id}/comments", postId)
+                        .header("Authorization", LEE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"content":"[통합] 댓글"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.postId").value(postId));
+
+        // 5. 상세에서 숫자 확인(커밋된 값을 다시 읽는다)
+        mockMvc.perform(get("/api/posts/{id}", postId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.likeCount").value(1))
+                .andExpect(jsonPath("$.commentCount").value(1));
+
+        // 6. 김자바가 글을 지운다
+        mockMvc.perform(delete("/api/posts/{id}", postId).header("Authorization", KIMJAVA))
+                .andExpect(status().isNoContent());
+
+        // 7. 지운 글은 상세 404, 좋아요도 404
+        mockMvc.perform(get("/api/posts/{id}", postId))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(put("/api/posts/{id}/like", postId).header("Authorization", LEE))
+                .andExpect(status().isNotFound());
+    }
+
+    // 시드 데이터 규칙(2-3) — 비로그인이면 PUBLISHED·PUBLIC·미삭제만, 최신순
+    @Test
+    void 비로그인_자유게시판_목록은_시드_규칙대로다() throws Exception {
+        String body = mockMvc.perform(get("/api/boards/free/posts").param("size", "20"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        List<Integer> ids = JsonPath.read(body, "$.items[*].id");
+        assertThat(ids).containsExactly(21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 9, 5, 4);
+        Integer total = JsonPath.read(body, "$.totalElements");
+        assertThat(total).isEqualTo(13);
+    }
+}

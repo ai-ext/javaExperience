@@ -1,0 +1,42 @@
+package org.example.post;
+
+import org.example.tag.Tag;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+// 글 조회 전용 서비스 — 1-3/1-4의 PostService(쓰기)와 책임을 나눈다
+@Service
+public class PostQueryService {
+
+    private final PostRepository postRepository;
+
+    public PostQueryService(PostRepository postRepository) {
+        this.postRepository = postRepository;
+    }
+
+    @Transactional
+    public PostDetailResponse getDetail(Long id) {
+        Post post = postRepository.findById(id)
+                .orElseThrow(PostNotFoundException::new);
+
+        post.increaseViewCount();
+        return toDetailResponse(post);
+    }
+
+    private PostDetailResponse toDetailResponse(Post post) {
+        // 트랜잭션 안에서 지연 로딩 연관을 읽어 DTO로 옮긴다(open-in-view: false)
+        return new PostDetailResponse(
+                post.getId(),
+                post.getBoard().getSlug(),
+                post.getTitle(),
+                post.getContent(),
+                post.getTags().stream().map(Tag::getName).toList(),
+                post.getVisibility(),
+                new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+                post.getViewCount(),
+                post.getLikeCount(),
+                post.getCommentCount(),
+                post.getCreatedAt()
+        );
+    }
+}

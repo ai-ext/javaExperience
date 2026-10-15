@@ -4,22 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>V04. 테스트 DB 전략 — H2 vs Testcontainers, 데이터 준비, @Transactional의 함정</title>
-<link rel="stylesheet" href="../../tools/site/site.css">
+<link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=600678cfa7dd">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
-<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
-<main>
+<header class="topbar"><a href="../../index.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
+<main class="knowledge-main">
 
-<h1 id="v04-테스트-db-전략--h2-vs-testcontainers-데이터-준비-transactional의-함정"><a class="anchor" href="#v04-테스트-db-전략--h2-vs-testcontainers-데이터-준비-transactional의-함정" aria-hidden="true">#</a>V04. 테스트 DB 전략 — H2 vs Testcontainers, 데이터 준비, @Transactional의 함정</h1>
+<h1 id="v04-테스트-db-전략--h2-vs-testcontainers-데이터-준비-transactional의-함정"><a class="anchor" href="#v04-테스트-db-전략--h2-vs-testcontainers-데이터-준비-transactional의-함정" aria-hidden="true">#</a>V04. 테스트 DB 전략 — H2 vs Testcontainers, 데이터 준비, @Transactional의 함정</h1><section class="knowledge-page-map" aria-label="문서 읽기 지도"><div class="knowledge-page-map-head"><div><p class="knowledge-page-map-kicker">Verification &amp; tests <span>· V04</span></p><h2>이 문서에서 볼 내용</h2><p>계층별 테스트와 검증</p></div><span class="knowledge-page-map-count">8개 주제</span></div><nav class="knowledge-page-steps" aria-label="문서의 실제 절로 이동"><a class="knowledge-page-step" href="#1-한-줄로-말하면"><span class="knowledge-page-step-no">01</span><span>1. 한 줄로 말하면</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#2-당장-알아야-할-것"><span class="knowledge-page-step-no">02</span><span>2. 당장 알아야 할 것</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#3-따라-하기"><span class="knowledge-page-step-no">03</span><span>3. 따라 하기</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#4-치트시트"><span class="knowledge-page-step-no">04</span><span>4. 치트시트</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#5-자주-나는-에러와-해결"><span class="knowledge-page-step-no">05</span><span>5. 자주 나는 에러와 해결</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#6-한-단계-더"><span class="knowledge-page-step-no">06</span><span>6. 한 단계 더</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#7-자가점검-qa-면접-대비"><span class="knowledge-page-step-no">07</span><span>7. 자가점검 Q&amp;A (면접 대비)</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#8-참고문헌"><span class="knowledge-page-step-no">08</span><span>8. 참고문헌</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a></nav></section>
 <blockquote>
 <p>3줄 요약 — 서비스·도메인 로직은 DB 없이 빠르게 검증하고, SQL·제약·방언을 검증할 Repository/API 테스트에는 운영과 같은 DB 엔진을 쓴다.
 Spring Boot 4.1의 <code>@DataJpaTest</code>는 기본적으로 임베디드 DB로 바꾸고 테스트마다 트랜잭션을 롤백하므로, Testcontainers를 붙일 때는 DB 교체를 명시적으로 끈다.
 테스트 메서드의 <code>@Transactional</code>은 편리한 격리 장치이자 현실과 다른 실행 조건이다. 지연 로딩·커밋 이벤트·flush·실제 HTTP 요청 경계를 별도로 검증한다.</p>
 </blockquote>
-<h2 id="1-한-줄로-말하면"><a class="anchor" href="#1-한-줄로-말하면" aria-hidden="true">#</a>1. 한 줄로 말하면</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-한-줄로-말하면" aria-label="1. 한 줄로 말하면 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">1. 한 줄로 말하면</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>테스트 DB 전략은 테스트 목적에 맞는 데이터베이스 엔진과 테스트 데이터 수명 주기를 고르는 일이다. 애플리케이션의 판단 로직은 mock/fake로 빠르게 확인하고, 쿼리·DDL·인덱스·제약·잠금처럼 DB 구현에 맡긴 동작은 운영과 같은 MySQL로 확인해야 한다. H2만으로 검증하면 MySQL에서 깨지고, 전부 컨테이너로 돌리면 피드백이 느려질 수 있다.</p>
 <p>기본 추천은 단위 테스트는 DB 없이, Repository/DB 통합 테스트는 운영 DB 컨테이너로 구성하는 것이다. 이 프로젝트는 MySQL 8.4다. H2는 빠른 매핑 실험에 쓰되 운영 SQL 호환성의 증거로 취급하지 않는다.</p>
-<h2 id="2-당장-알아야-할-것"><a class="anchor" href="#2-당장-알아야-할-것" aria-hidden="true">#</a>2. 당장 알아야 할 것</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-당장-알아야-할-것" aria-label="2. 당장 알아야 할 것 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">2. 당장 알아야 할 것</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><p><strong>목적에 맞게 경계를 고른다.</strong> Service 분기는 DB 없는 mock/fake, JPA 쿼리·제약은 운영 DB 엔진으로 확인한다. 기존 <code>ProductServiceUnitTest</code>와 <code>ProductRepositoryTest</code>가 각각 그 역할을 한다.</p>
 </li>
@@ -70,9 +72,10 @@ Spring Boot 4.1의 <code>@DataJpaTest</code>는 기본적으로 임베디드 DB�
 <li><p><strong>속도는 수명 관리로 개선한다.</strong> static <code>@Container</code>는 클래스 내 공유, Boot-managed container Bean은 Spring context와 함께 관리한다. Testcontainers reusable은 종료 후에도 컨테이너가 남는 실험 기능이라 일반 CI의 기본값으로 삼지 않는다.</p>
 </li>
 </ol>
-<h2 id="3-따라-하기"><a class="anchor" href="#3-따라-하기" aria-hidden="true">#</a>3. 따라 하기</h2>
-<h3 id="1단계--의존성-확인"><a class="anchor" href="#1단계--의존성-확인" aria-hidden="true">#</a>1단계 — 의존성 확인</h3>
-<p>기준 버전은 Java 25 / Boot 4.1.1이다. 연습 프로젝트는 현재 JDK 21 toolchain이므로 이 문서 코드는 21에서도 실행 가능한 문법을 쓴다. <code>practice/starter/build.gradle.kts</code>에 아래 테스트 의존성이 이미 있다. Maven은 Boot parent/BOM 아래 같은 artifact(<code>spring-boot-starter-test</code>, <code>spring-boot-starter-data-jpa-test</code>, <code>spring-boot-testcontainers</code>, <code>testcontainers-mysql</code>, <code>testcontainers-junit-jupiter</code>)를 <code>&lt;scope&gt;test&lt;/scope&gt;</code>로 선언하고 버전은 생략한다.</p>
+</div></details><details class="knowledge-chapter"><summary id="3-따라-하기" aria-label="3. 따라 하기 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 따라 하기</strong><small>1단계 — 의존성 확인 · 2단계 — Repository 테스트를 MySQL로 실행 · 3단계 — 테스트별 데이터 추가 · 4단계 — @Transactional 함정을 재현</small></span><span class="knowledge-chapter-meta">9개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="1단계--의존성-확인" aria-label="1단계 — 의존성 확인 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">1단계 — 의존성 확인</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
+<p>기준 버전은 Java 25 / Boot 4.1.1이다. 연습 프로젝트는 현재 JDK 21 toolchain이므로 이 문서 코드는 21에서도 실행 가능한 문법을 쓴다.</p>
+<p><code>practice/starter/build.gradle.kts</code>에 아래 테스트 의존성이 이미 있다. Maven은 Boot parent/BOM 아래 같은 artifact(<code>spring-boot-starter-test</code>, <code>spring-boot-starter-data-jpa-test</code>, <code>spring-boot-testcontainers</code>, <code>testcontainers-mysql</code>, <code>testcontainers-junit-jupiter</code>)를 <code>&lt;scope&gt;test&lt;/scope&gt;</code>로 선언하고 버전은 생략한다.</p>
 <pre><code class="language-kotlin">testImplementation(&quot;org.springframework.boot:spring-boot-starter-test&quot;)
 testImplementation(&quot;org.springframework.boot:spring-boot-starter-data-jpa-test&quot;)
 testImplementation(&quot;org.springframework.boot:spring-boot-testcontainers&quot;)
@@ -81,7 +84,7 @@ testImplementation(&quot;org.testcontainers:testcontainers-junit-jupiter&quot;)<
 <pre><code class="language-bash">cd practice/starter
 ./gradlew -version</code></pre>
 <p><strong>확인 방법:</strong> Gradle 9.8.0과 Java toolchain을 확인한다.</p>
-<h3 id="2단계--repository-테스트를-mysql로-실행"><a class="anchor" href="#2단계--repository-테스트를-mysql로-실행" aria-hidden="true">#</a>2단계 — Repository 테스트를 MySQL로 실행</h3>
+</div></details><details class="knowledge-topic"><summary id="2단계--repository-테스트를-mysql로-실행" aria-label="2단계 — Repository 테스트를 MySQL로 실행 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">2단계 — Repository 테스트를 MySQL로 실행</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p><code>src/test/java/com/example/practice/product/ProductRepositoryTest.java</code>는 실제 프로젝트의 패키지·메서드·시드에 맞춘 형태다. <code>Replace.NONE</code>이 없으면 <code>@DataJpaTest</code>가 임베디드 DB로 바꿀 수 있다.</p>
 <pre><code class="language-java">package com.example.practice.product;
 
@@ -124,7 +127,7 @@ class ProductRepositoryTest {
 <p><code>file:../schema/...</code>는 Gradle 프로젝트 루트에서 실행한다는 전제다. 이 SQL은 전용 컨테이너에서만 실행한다. 위 Spring 테스트 코드는 이번 문서 작업 중 실행하지 않았다(미실행).</p>
 <pre><code class="language-bash">./gradlew test --tests 'com.example.practice.product.ProductRepositoryTest'</code></pre>
 <p><strong>확인 방법:</strong> 첫 페이지 10행·총 79행·총 8페이지 assertion이 통과해야 한다. H2 URL이 찍히면 <code>Replace.NONE</code>과 <code>@ServiceConnection</code>을 확인한다. README에는 같은 구성이 기존 프로젝트에서 통과한 기록이 있다.</p>
-<h3 id="3단계--테스트별-데이터-추가"><a class="anchor" href="#3단계--테스트별-데이터-추가" aria-hidden="true">#</a>3단계 — 테스트별 데이터 추가</h3>
+</div></details><details class="knowledge-topic"><summary id="3단계--테스트별-데이터-추가" aria-label="3단계 — 테스트별 데이터 추가 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">3단계 — 테스트별 데이터 추가</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>전체 seed가 필요 없는 케이스는 <code>src/test/resources/sql/product-fixture.sql</code>처럼 FK 부모부터 필요한 행만 넣는다.</p>
 <pre><code class="language-sql">INSERT INTO category (id, name, depth, sort_order, created_at, updated_at)
 VALUES (9001, '테스트 분류', 1, 1, '2026-09-01 00:00:00', '2026-09-01 00:00:00');
@@ -137,7 +140,7 @@ void usesOnlyItsFixture() {
     assertThat(productRepository.findByIdAndDeletedAtIsNull(9001L)).isPresent();
 }</code></pre>
 <p><strong>확인 방법:</strong> <code>@Sql</code> 파일을 못 찾으면 경로를 <code>/sql/...</code> classpath 기준으로 확인한다. 같은 테스트를 반복 실행해 PK 중복이 없어야 한다. <code>@DataJpaTest</code> 트랜잭션에 참여한 행은 롤백되지만, commit·HTTP 경계의 행은 cleanup이 필요하다.</p>
-<h3 id="4단계--transactional-함정을-재현"><a class="anchor" href="#4단계--transactional-함정을-재현" aria-hidden="true">#</a>4단계 — <code>@Transactional</code> 함정을 재현</h3>
+</div></details><details class="knowledge-topic"><summary id="4단계--transactional-함정을-재현" aria-label="4단계 — @Transactional 함정을 재현 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">4단계 — @Transactional 함정을 재현</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>(미실행) 아래 Spring 코드는 개념을 가진 실제 도메인에 적용하는 패턴이다. starter에는 <code>Order</code> 관계·쓰기 API·커밋 리스너가 없어 그대로 실행할 수 없으며, 기존 <code>Product</code> 테스트와 혼동하지 않는다.</p>
 <p><strong>지연 로딩:</strong> 연관관계가 있는 서비스가 엔티티를 반환하면 테스트의 바깥 트랜잭션 때문에 서비스 종료 후에도 lazy 접근이 성공할 수 있다. 운영 코드에서 DTO를 트랜잭션 안에서 만들거나 필요한 연관을 fetch join/EntityGraph로 가져온다.</p>
 <pre><code class="language-java">// LAZY 연관을 가진 주문 서비스에 적용하는 실패 재현 형태
@@ -169,7 +172,7 @@ class OrderHttpTest {
 }</code></pre>
 <p>POST 경로·요청·ID는 실제 쓰기 API에 맞춘다. 연습 상품 API는 GET만 있어 이 코드는 쓰기 API 보유 프로젝트에 적용한다. 단순 MVC+DB 검증은 MockMvc와 Testcontainers를 쓰면 정리가 쉽다.</p>
 <p><strong>확인 방법:</strong> 예외, 리스너 횟수, DB 행을 직접 assertion한다. 단순히 테스트 종료 때 예외가 없다는 것만으로 지연 flush/commit을 검증했다고 보지 않는다.</p>
-<h2 id="4-치트시트"><a class="anchor" href="#4-치트시트" aria-hidden="true">#</a>4. 치트시트</h2>
+</div></details></div></details><details class="knowledge-chapter"><summary id="4-치트시트" aria-label="4. 치트시트 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">4. 치트시트</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -228,7 +231,7 @@ class OrderHttpTest {
 <td>서버/collation 동등성은 없음</td>
 </tr>
 </tbody></table></div>
-<h2 id="5-자주-나는-에러와-해결"><a class="anchor" href="#5-자주-나는-에러와-해결" aria-hidden="true">#</a>5. 자주 나는 에러와 해결</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-자주-나는-에러와-해결" aria-label="5. 자주 나는 에러와 해결 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">5. 자주 나는 에러와 해결</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>테스트가 H2로 연결됨</strong> → <code>@DataJpaTest</code> 기본 DB 교체 → <code>@ServiceConnection</code>과 <code>@AutoConfigureTestDatabase(replace = NONE)</code> 확인.</li>
 <li><strong><code>package ...test.autoconfigure.orm.jpa does not exist</code></strong> → Boot 3 import를 복사함 → Boot 4 JPA import는 <code>org.springframework.boot.data.jpa.test.autoconfigure</code>, DB 설정은 <code>org.springframework.boot.jdbc.test.autoconfigure</code>. <code>@WebMvcTest</code>/<code>@AutoConfigureMockMvc</code>는 <code>org.springframework.boot.webmvc.test.autoconfigure</code>.</li>
@@ -237,30 +240,31 @@ class OrderHttpTest {
 <li><strong>재실행 때 Duplicate entry</strong> → 커밋 데이터가 남거나 공유 DB 사용 → rollback 가능한 fixture, 테스트 전용 컨테이너, commit/HTTP 테스트 cleanup을 적용한다.</li>
 <li><strong>H2 통과·MySQL 실패</strong> → 방언·함수·collation·락 차이 → 운영 엔진 Testcontainers로 최소 재현 SQL을 검증한다. H2 모드를 더 붙여 실제 엔진 동작이라고 간주하지 않는다.</li>
 </ol>
-<h2 id="6-한-단계-더"><a class="anchor" href="#6-한-단계-더" aria-hidden="true">#</a>6. 한 단계 더</h2>
-<p>테스트 트랜잭션은 현재 스레드에 바인딩된다. Spring 서비스의 <code>REQUIRED</code>는 대개 참여하지만 <code>REQUIRES_NEW</code>, 비동기 작업, 다른 스레드의 HTTP 요청은 같은 트랜잭션이 아니다. context 캐시는 Spring 설정 재사용이지 데이터 정리 기능이 아니다. 느리면 먼저 컨테이너·SQL seed·context 중 비용이 큰 구간을 찾고 수명을 조정한다. Testcontainers reusable은 테스트 뒤에도 남는 실험 기능이다.</p>
+</div></details><details class="knowledge-chapter"><summary id="6-한-단계-더" aria-label="6. 한 단계 더 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">6. 한 단계 더</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<p>테스트 트랜잭션은 현재 스레드에 바인딩된다. Spring 서비스의 <code>REQUIRED</code>는 대개 참여하지만 <code>REQUIRES_NEW</code>, 비동기 작업, 다른 스레드의 HTTP 요청은 같은 트랜잭션이 아니다. context 캐시는 Spring 설정 재사용이지 데이터 정리 기능이 아니다.</p>
+<p>느리면 먼저 컨테이너·SQL seed·context 중 비용이 큰 구간을 찾고 수명을 조정한다. Testcontainers reusable은 테스트 뒤에도 남는 실험 기능이다.</p>
 <p>Boot 3.1 릴리스에서 Testcontainers 의존성 관리가 포함됐고, Boot 4.1의 <code>DataJpaTest</code>는 <code>org.springframework.boot.data.jpa.test.autoconfigure</code>에 있으며 API 문서상 4.0.0부터 제공된다. Boot 4 프로젝트는 해당 테스트 모듈을 의존성에 포함한다.</p>
 <p>JPA 원리 → <a class="docref" href="S09-jpa-hibernate.html">S09</a> 참조. 트랜잭션 → <a class="docref" href="S08-transactions.html">S08</a> 참조. 계층별 테스트 → <a class="docref" href="V02-layered-tests-handson.html">V02</a> 참조.</p>
-<h2 id="7-자가점검-qa-면접-대비"><a class="anchor" href="#7-자가점검-qa-면접-대비" aria-hidden="true">#</a>7. 자가점검 Q&amp;A (면접 대비)</h2>
-<h3 id="q1-datajpatest가-h2를-쓰는-이유와-mysql을-쓰는-방법은"><a class="anchor" href="#q1-datajpatest가-h2를-쓰는-이유와-mysql을-쓰는-방법은" aria-hidden="true">#</a>Q1. <code>@DataJpaTest</code>가 H2를 쓰는 이유와 MySQL을 쓰는 방법은?</h3>
+</div></details><details class="knowledge-chapter"><summary id="7-자가점검-qa-면접-대비" aria-label="7. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">7. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. @DataJpaTest가 H2를 쓰는 이유와 MySQL을 쓰는 방법은? · Q2. H2 MODE=MySQL은 Testcontainers와 동등한가? · Q3. 테스트가 자동 rollback이면 왜 cleanup이 필요한가? · Q4. save()가 성공하면 SQL 제약도 검증된 것인가?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="q1-datajpatest가-h2를-쓰는-이유와-mysql을-쓰는-방법은" aria-label="Q1. @DataJpaTest가 H2를 쓰는 이유와 MySQL을 쓰는 방법은? 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">Q1. @DataJpaTest가 H2를 쓰는 이유와 MySQL을 쓰는 방법은?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>임베디드 DB가 있으면 기본적으로 DataSource를 교체한다. 컨테이너에 <code>@ServiceConnection</code>, 테스트에 <code>@AutoConfigureTestDatabase(replace = NONE)</code>을 설정한다. 로그에서 실제 DB URL을 확인한다. 설정 후 실제 컨테이너 엔진도 재확인한다.</p>
 <p><strong>꼬리질문:</strong> H2가 완전히 쓸모없나? → 빠른 DB 중립 테스트에는 유용하지만 MySQL 호환 증거는 아니다.</p>
-<h3 id="q2-h2-modemysql은-testcontainers와-동등한가"><a class="anchor" href="#q2-h2-modemysql은-testcontainers와-동등한가" aria-hidden="true">#</a>Q2. H2 <code>MODE=MySQL</code>은 Testcontainers와 동등한가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q2-h2-modemysql은-testcontainers와-동등한가" aria-label="Q2. H2 MODE=MySQL은 Testcontainers와 동등한가? 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">Q2. H2 MODE=MySQL은 Testcontainers와 동등한가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>아니다. 일부 문법 모드일 뿐 엔진 구현·collation·함수·잠금 의미를 복제하지 않는다. 운영 SQL은 MySQL로 검증한다. 방언 오류는 해당 서버 버전 회귀 테스트로 고정한다.</p>
 <p><strong>꼬리질문:</strong> 모든 테스트를 MySQL로 해야 하나? → 로직 테스트는 DB 없이, DB 경계만 실제 엔진으로 둔다.</p>
-<h3 id="q3-테스트가-자동-rollback이면-왜-cleanup이-필요한가"><a class="anchor" href="#q3-테스트가-자동-rollback이면-왜-cleanup이-필요한가" aria-hidden="true">#</a>Q3. 테스트가 자동 rollback이면 왜 cleanup이 필요한가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q3-테스트가-자동-rollback이면-왜-cleanup이-필요한가" aria-label="Q3. 테스트가 자동 rollback이면 왜 cleanup이 필요한가? 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">Q3. 테스트가 자동 rollback이면 왜 cleanup이 필요한가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>테스트 관리 트랜잭션에 참여한 작업만 롤백된다. HTTP 서버·다른 스레드·commit 테스트는 별도 정리한다. 특히 HTTP 요청과 <code>REQUIRES_NEW</code>를 확인한다.</p>
 <p><strong>꼬리질문:</strong> <code>RANDOM_PORT</code>를 언제 쓰나? → 실제 서버 스택을 확인할 때만. 일반 MVC 통합은 MockMvc가 단순하다.</p>
-<h3 id="q4-save가-성공하면-sql-제약도-검증된-것인가"><a class="anchor" href="#q4-save가-성공하면-sql-제약도-검증된-것인가" aria-hidden="true">#</a>Q4. <code>save()</code>가 성공하면 SQL 제약도 검증된 것인가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q4-save가-성공하면-sql-제약도-검증된-것인가" aria-label="Q4. save()가 성공하면 SQL 제약도 검증된 것인가? 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">Q4. save()가 성공하면 SQL 제약도 검증된 것인가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>항상 그렇지는 않다. flush 전에 SQL이 보류될 수 있으므로 제약 위반을 재현할 땐 <code>flush()</code> 또는 실제 예외 발생 지점을 assertion한다. <code>IDENTITY</code>는 더 일찍 INSERT할 수 있다. 예외가 어느 호출에서 나는지 테스트가 직접 잡아야 한다.</p>
 <p><strong>꼬리질문:</strong> flush는 commit인가? → 아니다. 현재 트랜잭션에서 SQL을 실행하는 단계다.</p>
-<h3 id="q5-테스트에서는-lazy-loading이-되고-운영에서는-실패할-수-있나"><a class="anchor" href="#q5-테스트에서는-lazy-loading이-되고-운영에서는-실패할-수-있나" aria-hidden="true">#</a>Q5. 테스트에서는 lazy loading이 되고 운영에서는 실패할 수 있나?</h3>
+</div></details><details class="knowledge-topic"><summary id="q5-테스트에서는-lazy-loading이-되고-운영에서는-실패할-수-있나" aria-label="Q5. 테스트에서는 lazy loading이 되고 운영에서는 실패할 수 있나? 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">Q5. 테스트에서는 lazy loading이 되고 운영에서는 실패할 수 있나?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>테스트 메서드 트랜잭션이 서비스 반환 뒤에도 영속성 컨텍스트를 유지할 수 있다. 운영에서는 트랜잭션 종료 뒤 접근해 <code>LazyInitializationException</code>이 날 수 있다. DTO를 트랜잭션 안에서 구성한다. API 경계의 로딩 범위를 검토한다.</p>
 <p><strong>꼬리질문:</strong> 테스트에 <code>@Transactional</code>을 빼는 게 해결책인가? → 재현에는 좋지만 조회 범위와 API DTO를 고치는 것이 해결이다.</p>
-<h3 id="q6-after_commit-이벤트를-테스트하려면"><a class="anchor" href="#q6-after_commit-이벤트를-테스트하려면" aria-hidden="true">#</a>Q6. <code>AFTER_COMMIT</code> 이벤트를 테스트하려면?</h3>
+</div></details><details class="knowledge-topic"><summary id="q6-after_commit-이벤트를-테스트하려면" aria-label="Q6. AFTER_COMMIT 이벤트를 테스트하려면? 펼치기"><span class="knowledge-topic-no">06</span><strong role="heading" aria-level="3">Q6. AFTER_COMMIT 이벤트를 테스트하려면?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>rollback만 하는 <code>@DataJpaTest</code>로는 실행을 검증할 수 없다. 테스트 트랜잭션을 명시 커밋하고 결과를 확인한 다음 남은 데이터를 치운다. 외부 전송은 fake로 검증한다. commit 경로는 rollback 테스트와 분리한다.</p>
 <p><strong>꼬리질문:</strong> 이벤트 발행과 메일 전달 성공은 같은가? → 아니다. 외부 전달 보장은 outbox·재시도 등의 별도 문제다.</p>
-<h2 id="8-참고문헌"><a class="anchor" href="#8-참고문헌" aria-hidden="true">#</a>8. 참고문헌</h2>
+</div></details></div></details><details class="knowledge-chapter"><summary id="8-참고문헌" aria-label="8. 참고문헌 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">8. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Testing Spring Boot Applications — <a href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html</a> — <code>RANDOM_PORT</code> 서버와 테스트의 별도 트랜잭션.</li>
 <li>DataJpaTest (Spring Boot 4.1.1 API) — <a href="https://docs.spring.io/spring-boot/api/java/org/springframework/boot/data/jpa/test/autoconfigure/DataJpaTest.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/api/java/org/springframework/boot/data/jpa/test/autoconfigure/DataJpaTest.html</a> — 패키지, 임베디드 DB 교체, 롤백 기본값.</li>
@@ -273,9 +277,31 @@ class OrderHttpTest {
 <li>Character Sets and Collations in MySQL — <a href="https://dev.mysql.com/doc/refman/8.4/en/charset-mysql.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.4/en/charset-mysql.html</a> — MySQL 8.4의 <code>utf8mb4</code> 기본 collation.</li>
 <li>Spring Boot 3.1 Release Notes — <a href="https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-3.1-Release-Notes" target="_blank" rel="noopener">https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-3.1-Release-Notes</a> — Testcontainers dependency management 이력.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    let parent = target?.closest('details.knowledge-topic, details.knowledge-chapter');
+    while (parent) {
+      parent.open = true;
+      parent = parent.parentElement?.closest('details.knowledge-topic, details.knowledge-chapter');
+    }
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }));
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
+
 
 </body>
 </html>

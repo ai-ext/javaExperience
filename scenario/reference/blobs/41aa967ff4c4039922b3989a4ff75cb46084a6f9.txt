@@ -1,0 +1,70 @@
+package org.example.like;
+
+import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@Transactional
+class LikeControllerTest {
+    @Autowired MockMvc mvc;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired EntityManager em;
+    @Autowired ObjectMapper mapper;
+
+    @Test
+    void putIsIdempotentAndPersistsOneRelation() throws Exception {
+        var first = mvc.perform(put("/api/posts/3/like")
+                        .header("Authorization", "Bearer tok-kimjava"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.postId").value(3))
+                .andExpect(jsonPath("$.liked").value(true))
+                .andReturn();
+        long count = mapper.readTree(first.getResponse().getContentAsString()).get("likeCount").asLong();
+        mvc.perform(put("/api/posts/3/like")
+                        .header("Authorization", "Bearer tok-kimjava"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.likeCount").value(count));
+        em.flush();
+        assertEquals(1L, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM post_like WHERE post_id=3 AND member_id=2", Long.class));
+        assertEquals(count, jdbc.queryForObject("SELECT like_count FROM post WHERE id=3", Long.class));
+    }
+
+    @Test
+    void refusesOwnUnavailableAndUnauthenticatedPosts() throws Exception {
+        var created = mvc.perform(post("/api/posts")
+                        .header("Authorization", "Bearer tok-kimjava")
+                        .contentType("application/json")
+                        .content("{\"boardSlug\":\"dev\",\"title\":\"내 글\",\"content\":\"본문\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        long ownId = mapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+        mvc.perform(put("/api/posts/{id}/like", ownId)
+                        .header("Authorization", "Bearer tok-kimjava"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/posts/8/like")
+                        .header("Authorization", "Bearer tok-kimjava"))
+                .andExpect(status().isNotFound());
+        mvc.perform(put("/api/posts/999999/like")
+                        .header("Authorization", "Bearer tok-kimjava"))
+                .andExpect(status().isNotFound());
+        mvc.perform(put("/api/posts/3/like"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(put("/api/posts/3/like")
+                        .header("Authorization", "Bearer tok-choi"))
+                .andExpect(status().isForbidden());
+    }
+}

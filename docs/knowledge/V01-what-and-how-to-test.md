@@ -115,7 +115,9 @@ Maven에서는 Boot 의존성 관리 아래 같은 항목을 쓴다.
 
 ### 3단계: 성공과 실패 HTTP 계약을 분리한다
 
-아래 전체 코드는 `src/test/java/com/example/practice/product/ProductControllerTest.java`에 둘 수 있다. 컨트롤러를 MVC slice로 올리고 Service만 테스트 응답으로 대체한다. 예외 처리기는 앱의 실제 `GlobalExceptionHandler`를 import한다. Boot 4.1의 `@WebMvcTest` import는 `org.springframework.boot.webmvc.test.autoconfigure`다. **예제 미실행.**
+아래 전체 코드는 `src/test/java/com/example/practice/product/ProductControllerTest.java`에 둘 수 있다. 컨트롤러를 MVC slice로 올리고 Service만 테스트 응답으로 대체한다. 예외 처리기는 앱의 실제 `GlobalExceptionHandler`를 import한다.
+
+Boot 4.1의 `@WebMvcTest` import는 `org.springframework.boot.webmvc.test.autoconfigure`다. **예제 미실행.**
 
 ```java
 package com.example.practice.product;
@@ -219,7 +221,11 @@ Boot 4.1.1 `@DataJpaTest`의 패키지는 `org.springframework.boot.data.jpa.tes
 
 ## 6. 한 단계 더
 
-테스트는 “실패를 재현하기 어려운 위험”에 우선순위를 두면 된다. 비즈니스 규칙은 가장 빠른 범위에서 확인하고, 프레임워크 연결이나 DB 쿼리 같은 경계는 실제 기술을 쓰는 테스트로 대표 조건을 검증한다. 넓은 통합 테스트는 설정·직렬화·저장 경로가 함께 이어지는지 확인하는 용도로 소수만 유지한다. 테스트 피라미드는 비용과 피드백 속도를 비교하는 도구이지 고정된 테스트 개수 비율이 아니다. 테스트는 작성 시점의 구현을 고정하지 말고 외부에서 관찰 가능한 동작을 문서화한다. 실패 이름·assertion·테스트 데이터가 원인 파악 시간을 줄여야 한다. JUnit·Mockito 기본 API → J19, Spring 테스트 애노테이션과 컨텍스트 → S18, 계층별 테스트 작성 → V02, mock 선택 → V03, DB 전략 → V04, 레거시·CI 테스트 운영 → V06 참조.
+테스트는 “실패를 재현하기 어려운 위험”에 우선순위를 두면 된다. 비즈니스 규칙은 가장 빠른 범위에서 확인하고, 프레임워크 연결이나 DB 쿼리 같은 경계는 실제 기술을 쓰는 테스트로 대표 조건을 검증한다. 넓은 통합 테스트는 설정·직렬화·저장 경로가 함께 이어지는지 확인하는 용도로 소수만 유지한다.
+
+테스트 피라미드는 비용과 피드백 속도를 비교하는 도구이지 고정된 테스트 개수 비율이 아니다. 테스트는 작성 시점의 구현을 고정하지 말고 외부에서 관찰 가능한 동작을 문서화한다.
+
+실패 이름·assertion·테스트 데이터가 원인 파악 시간을 줄여야 한다. JUnit·Mockito 기본 API → J19, Spring 테스트 애노테이션과 컨텍스트 → S18, 계층별 테스트 작성 → V02, mock 선택 → V03, DB 전략 → V04, 레거시·CI 테스트 운영 → V06 참조.
 
 ## 7. 자가점검 Q&A (면접 대비)
 

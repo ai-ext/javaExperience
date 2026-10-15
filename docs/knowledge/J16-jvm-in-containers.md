@@ -72,7 +72,9 @@ java -Xlog:os+container=trace -XshowSettings:system -XX:+PrintCommandLineFlags -
 
 ### 3.3 CPU quota와 `ActiveProcessorCount`
 
-CPU quota는 주기별 CPU 실행 시간을 제한한다. 0.5 CPU는 코어 절반을 따로 배정한다기보다 스레드들이 경쟁해도 평균 실행 시간이 제한된다는 뜻이다. `ActiveProcessorCount=N`은 GC와 ForkJoinPool 같은 JVM 풀 크기 산정에 쓸 CPU 수를 강제한다. `UseContainerSupport`가 꺼져 있어도 적용되지만 quota·affinity를 변경하거나 앱 스레드를 제한하지 않는다. quota와 감지값이 다를 때만 조정하고 throttling과 지연시간을 함께 본다.
+CPU quota는 주기별 CPU 실행 시간을 제한한다. 0.5 CPU는 코어 절반을 따로 배정한다기보다 스레드들이 경쟁해도 평균 실행 시간이 제한된다는 뜻이다. `ActiveProcessorCount=N`은 GC와 ForkJoinPool 같은 JVM 풀 크기 산정에 쓸 CPU 수를 강제한다.
+
+`UseContainerSupport`가 꺼져 있어도 적용되지만 quota·affinity를 변경하거나 앱 스레드를 제한하지 않는다. quota와 감지값이 다를 때만 조정하고 throttling과 지연시간을 함께 본다.
 
 ### 3.4 힙, 네이티브 메모리, RSS와 NMT
 
@@ -118,7 +120,9 @@ AOT cache를 써도 HotSpot은 계속 실행된다. JEP 483 초기 범위는 JDK
 
 CRaC는 준비된 JVM 상태를 체크포인트하고 복원해 시작·워밍업을 줄인다. 파일과 소켓 등 외부 자원은 체크포인트 전 닫고 복원 뒤 다시 획득하도록 조정한다. JDK 배포판·체크포인트 엔진 지원은 환경별로 검증해야 한다.
 
-Native Image는 빌드 시 정적 reachability 분석으로 필요한 코드와 리소스를 찾아 OS별 네이티브 바이너리로 만든다. 리플렉션·프록시·동적 리소스는 분석에 잡히지 않을 수 있어 metadata가 필요하다. 빌드 시 초기화가 환경설정·비밀을 고정하지 않게 주의한다. 실행 때 HotSpot은 뜨지 않지만 GraalVM 런타임, Java heap과 GC는 남는다. HotSpot 플래그·NMT를 그대로 적용하면 안 된다. GraalVM 문서상 기본 GC는 저메모리 지향 Serial이다.
+Native Image는 빌드 시 정적 reachability 분석으로 필요한 코드와 리소스를 찾아 OS별 네이티브 바이너리로 만든다. 리플렉션·프록시·동적 리소스는 분석에 잡히지 않을 수 있어 metadata가 필요하다. 빌드 시 초기화가 환경설정·비밀을 고정하지 않게 주의한다.
+
+실행 때 HotSpot은 뜨지 않지만 GraalVM 런타임, Java heap과 GC는 남는다. HotSpot 플래그·NMT를 그대로 적용하면 안 된다. GraalVM 문서상 기본 GC는 저메모리 지향 Serial이다.
 
 ## 4. 코드로 확인
 

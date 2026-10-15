@@ -1,0 +1,69 @@
+package org.example.admin;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.member.Member;
+import org.example.member.MemberNotFoundException;
+import org.example.member.MemberRepository;
+import org.example.post.AuthorResponse;
+import org.example.post.Post;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+
+// 13-1 운영 — 권한 확인은 PermissionInterceptor가 끝냈다. 여기는 상태 규칙만 본다.
+@Service
+public class ModerationService {
+
+    private static final String WITHDRAWN = "WITHDRAWN";
+
+    private final PostRepository postRepository;
+    private final MemberRepository memberRepository;
+    private final Clock clock;
+
+    public ModerationService(PostRepository postRepository, MemberRepository memberRepository, Clock clock) {
+        this.postRepository = postRepository;
+        this.memberRepository = memberRepository;
+        this.clock = clock;
+    }
+
+    // 없는 글·삭제된 글 404 → 임시저장 409 → 숨기기/복구(이미 그 상태면 그대로 — 처음 숨긴 사람·시각 유지)
+    @Transactional
+    public PostStatusResponse changePostStatus(AuthenticatedMember me, Long postId, String status) {
+        // 숨김 요청 둘이 동시에 와도 첫 hiddenBy/hiddenAt을 보존하도록 글 행을 잠근다.
+        Post post = postRepository.findByIdForUpdate(postId)
+                .filter(p -> p.getDeletedAt() == null)
+                .orElseThrow(PostNotFoundException::new);
+        if ("HIDDEN".equals(status)) {
+            // DATETIME은 초 단위다 — 소수 초를 그대로 넘기면 MySQL이 반올림해 저장해서(…:09.51 → :10)
+            // 이번 응답의 hiddenAt과 다음에 읽은 값이 달라진다. 저장할 값을 미리 초로 자른다
+            post.hide(memberRepository.getReferenceById(me.id()), LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS));
+        } else {
+            post.unhide();
+        }
+        return toStatusResponse(post);
+    }
+
+    // 운영자(ADMIN)의 역할은 API로 바꾸지 않는다(자기 강등으로 운영자가 0명이 되는 사고 방지) — 409
+    @Transactional
+    public MemberRoleResponse changeRole(Long memberId, String role) {
+        Member member = memberRepository.findById(memberId)
+                .filter(m -> !WITHDRAWN.equals(m.getMemberStatus()) && m.getDeletedAt() == null)
+                .orElseThrow(MemberNotFoundException::new);
+        if (Role.ADMIN.name().equals(member.getRole())) {
+            throw new ModerationConflictException("운영자의 역할은 바꿀 수 없습니다.");
+        }
+        member.changeRole(role);
+        return new MemberRoleResponse(member.getId(), member.getNickname(), member.getRole());
+    }
+
+    static PostStatusResponse toStatusResponse(Post post) {
+        Member by = post.getHiddenBy();
+        return new PostStatusResponse(post.getId(), post.getStatus(),
+                by == null ? null : new AuthorResponse(by.getId(), by.getNickname()), post.getHiddenAt());
+    }
+}

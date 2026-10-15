@@ -1,0 +1,52 @@
+package org.example.batch;
+
+import org.springframework.stereotype.Component;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.ToIntFunction;
+
+// 배치 이름 → "그 날 몫을 돌리는 방법"과 "처리 건수 세는 법". 재실행 API가 이름으로 찾아 쓴다.
+@Component
+public class JobCatalog {
+
+    public static final String HALL_OF_FAME = "hall-of-fame";
+    public static final String WEEKLY_RANKING = "weekly-ranking";
+    public static final String SCHEDULED_PUBLISH = "scheduled-publish";
+    public static final String TRASH_PURGE = "trash-purge";
+    public static final String LIKE_MILESTONE = "like-milestone";
+
+    public record Job<T>(BiFunction<LocalDate, LocalDateTime, T> work, ToIntFunction<T> processed) {
+    }
+
+    private final Map<String, Job<?>> jobs = new LinkedHashMap<>();
+
+    public JobCatalog(HallOfFameService hallOfFame, WeeklyRankingService weeklyRanking,
+                      ScheduledPublishService scheduledPublish, TrashPurgeService trashPurge,
+                      LikeMilestoneService likeMilestone) {
+        jobs.put(HALL_OF_FAME, new Job<>((date, at) -> hallOfFame.run(date), r -> r.added().size()));
+        jobs.put(WEEKLY_RANKING, new Job<>((date, at) -> weeklyRanking.run(date), r -> r.created() ? r.items().size() : 0));
+        // 예약 발행은 원래 기준 시각을 보존한다. 과거 기록에 시각이 없으면 해당 날짜의 끝을 기준으로 복구한다.
+        jobs.put(SCHEDULED_PUBLISH, new Job<>((date, at) -> scheduledPublish.publishDue(
+                at != null ? at : date.plusDays(1).atStartOfDay().minusNanos(1)), r -> r.published().size()));
+        jobs.put(TRASH_PURGE, new Job<>((date, at) -> trashPurge.purge(date), TrashPurgeResponse::deletedPosts));
+        jobs.put(LIKE_MILESTONE, new Job<>((date, at) -> likeMilestone.run(), r -> r.added().size()));
+    }
+
+    public Set<String> names() {
+        return jobs.keySet();
+    }
+
+    public boolean exists(String name) {
+        return jobs.containsKey(name);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> Job<T> get(String name) {
+        return (Job<T>) jobs.get(name);
+    }
+}

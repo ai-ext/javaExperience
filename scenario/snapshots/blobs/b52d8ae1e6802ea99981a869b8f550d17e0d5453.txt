@@ -1,0 +1,60 @@
+package org.example.image;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Optional;
+
+// 11-2 허용하는 이미지 형식 — 파일 앞부분의 "서명"(매직 넘버)으로 판정한다.
+// 요청의 Content-Type이나 파일 이름(.png)은 보내는 쪽이 마음대로 적을 수 있으므로 믿지 않는다.
+public enum ImageType {
+
+    PNG("image/png", "png"),
+    JPEG("image/jpeg", "jpg"),
+    GIF("image/gif", "gif"),
+    WEBP("image/webp", "webp");
+
+    private static final byte[] PNG_SIGNATURE = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
+    private static final byte[] JPEG_SIGNATURE = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
+
+    private final String contentType;
+    private final String extension;
+
+    ImageType(String contentType, String extension) {
+        this.contentType = contentType;
+        this.extension = extension;
+    }
+
+    public String contentType() {
+        return contentType;
+    }
+
+    public String extension() {
+        return extension;
+    }
+
+    public static Optional<ImageType> detect(byte[] bytes) {
+        if (startsWith(bytes, PNG_SIGNATURE)) {
+            return Optional.of(PNG);
+        }
+        if (startsWith(bytes, JPEG_SIGNATURE)) {
+            return Optional.of(JPEG);
+        }
+        if (startsWith(bytes, ascii("GIF87a")) || startsWith(bytes, ascii("GIF89a"))) {
+            return Optional.of(GIF);
+        }
+        // WebP: "RIFF" + 길이 4바이트 + "WEBP"
+        if (bytes.length >= 12 && startsWith(bytes, ascii("RIFF"))
+                && Arrays.equals(Arrays.copyOfRange(bytes, 8, 12), ascii("WEBP"))) {
+            return Optional.of(WEBP);
+        }
+        return Optional.empty();
+    }
+
+    private static boolean startsWith(byte[] bytes, byte[] prefix) {
+        return bytes.length >= prefix.length && Arrays.equals(Arrays.copyOf(bytes, prefix.length), prefix);
+    }
+
+    private static byte[] ascii(String s) {
+        return s.getBytes(StandardCharsets.US_ASCII);
+    }
+}

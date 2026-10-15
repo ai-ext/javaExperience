@@ -305,7 +305,9 @@ Gmail SMTP는 계정 비밀번호 대신 조직 정책상 허용되는 앱 비�
 
 ## 6. 한 단계 더
 
-호출 흐름은 `서비스 → JavaMailSender → Jakarta Mail Session → SMTP 서버 → 수신 시스템`이다. `send()`의 예외는 `MailException`으로 추상화되지만 재시도 분류는 애플리케이션 책임이다. Mailpit은 SMTP 수신과 UI/API 검증을 제공한다. 운영에서는 SMTP를 HTTP 성공의 필수 조건으로 두지 말고 커밋 이후 durable job으로 넘긴다. 세부 비동기는 → S15, MVC 계층은 → P02.
+호출 흐름은 `서비스 → JavaMailSender → Jakarta Mail Session → SMTP 서버 → 수신 시스템`이다. `send()`의 예외는 `MailException`으로 추상화되지만 재시도 분류는 애플리케이션 책임이다. Mailpit은 SMTP 수신과 UI/API 검증을 제공한다.
+
+운영에서는 SMTP를 HTTP 성공의 필수 조건으로 두지 말고 커밋 이후 durable job으로 넘긴다. 세부 비동기는 → S15, MVC 계층은 → P02.
 
 ## 7. 자가점검 Q&A (면접 대비)
 

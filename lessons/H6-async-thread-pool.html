@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H6. @Async와 스레드 풀 — 느린 일은 뒤에서</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="h6-async와-스레드-풀--느린-일은-뒤에서"><a class="anchor" href="#h6-async와-스레드-풀--느린-일은-뒤에서" aria-hidden="true">#</a>H6. @Async와 스레드 풀 — 느린 일은 뒤에서</h1>
+<blockquote>
+<p>개념 레슨 · 35분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>H1에서 봤듯 톰캣은 요청마다 스레드(일꾼)를 하나 내어 준다. 그 스레드는 컨트롤러 → 서비스 → 리스너까지 <strong>처음부터 끝까지 혼자</strong> 일하고, 다 끝나야 응답을 보낸다. H5의 <code>AFTER_COMMIT</code> 리스너도 같은 스레드에서 돈다.</p>
+<p>알림마다 외부 푸시 서버를 부르고, 한 건에 0.5초가 걸린다고 하자. 팔로워가 3명이면 글쓰기 응답이 1.5초 늦는다. 30명이면 15초다. 사용자는 푸시가 다 나갈 때까지 기다릴 이유가 없다.</p>
+<p><code>@Async</code>는 이렇게 말하는 표시다.</p>
+<blockquote>
+<p><strong>이 메서드는 지금 스레드에서 돌리지 말고, 다른 스레드에 맡겨라. 나는 기다리지 않고 바로 다음 줄로 간다.</strong></p>
+</blockquote>
+<p>맡길 스레드는 <strong>스레드 풀</strong>에서 나온다. 스레드를 미리 몇 개 만들어 두고 일이 오면 빈 스레드에 준다. 모두 바쁘면 일을 <strong>큐</strong>(대기열)에 쌓아 둔다. 이 풀을 Spring에서는 실행기(<code>Executor</code>)라고 부른다.</p>
+<p>필요한 것은 둘이다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>무엇</th>
+<th>어디에</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@EnableAsync</code></td>
+<td><code>@Configuration</code> 클래스 하나에. 이게 없으면 <code>@Async</code>는 그냥 무시된다</td>
+</tr>
+<tr>
+<td><code>@Async</code></td>
+<td>다른 스레드에서 돌릴 메서드에. 반환형은 <code>void</code> 또는 <code>CompletableFuture</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="프록시--async가-일하는-방법"><a class="anchor" href="#프록시--async가-일하는-방법" aria-hidden="true">#</a>프록시 — <code>@Async</code>가 일하는 방법</h3>
+<p>Spring은 <code>@Async</code>가 붙은 빈을 그대로 주입하지 않는다. 겉모양이 같은 <strong>대리 객체(프록시)</strong> 로 감싸서 준다. 다른 빈이 <code>sender.sendAsync(1)</code>을 부르면 먼저 프록시가 받는다. 프록시는 &quot;이 메서드에 <code>@Async</code>가 있네&quot; 하고 실행기에 일을 넘긴 뒤 바로 돌아온다. G3에서 붙인 <code>@Transactional</code>도 이 방식으로 동작한다.</p>
+<p>그래서 <strong>같은 클래스 안에서 <code>this.메서드()</code>로 부르면</strong> 프록시를 안 거치고 <code>@Async</code>가 무시된다. 아래에서 실측한다.</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<p>이 레슨을 쓰면서 작은 Spring Boot 4.1 앱(포트 <code>18310</code>)을 만들어 돌렸다. 푸시 한 건은 <code>Thread.sleep(500)</code>으로 흉내 냈다.</p>
+<pre><code class="language-java">@Configuration
+@EnableAsync
+public class AsyncConfig {}
+
+@Component
+public class PushSender {
+    public void send(long memberId) {          // 그냥 메서드
+        sleep(500);
+        log.info(&quot;푸시 보냄 memberId={}&quot;, memberId);
+    }
+
+    @Async
+    public void sendAsync(long memberId) {     // 다른 스레드에서
+        sleep(500);
+        log.info(&quot;푸시 보냄 memberId={}&quot;, memberId);
+    }
+}
+
+@Service
+public class NotifyService {
+    private final PushSender sender;   // 다른 빈 — 프록시가 들어온다
+
+    public void notifySync()  { for (long id = 1; id &lt;= 3; id++) sender.send(id); }
+    public void notifyAsync() { for (long id = 1; id &lt;= 3; id++) sender.sendAsync(id); }
+
+    public void notifySelf()  { for (long id = 1; id &lt;= 3; id++) this.pushInside(id); }
+
+    @Async
+    public void pushInside(long memberId) {     // 같은 클래스의 @Async
+        sleep(500);
+        log.info(&quot;푸시 보냄(같은 클래스) memberId={}&quot;, memberId);
+    }
+}</code></pre>
+<p><code>curl -s -o /dev/null -w &#39;HTTP %{http_code} time_total=%{time_total}s\n&#39; -X POST …</code>로 응답 시간을 쟀다. 로그의 <code>[…]</code>는 스레드 이름이다(앞부분 줄임).</p>
+<p><strong>동기 — 1.66초</strong></p>
+<pre><code class="language-text">HTTP 200 time_total=1.664627s
+16:01:54.192 [io-18310-exec-1] PushSender : 푸시 보냄 memberId=1
+16:01:54.702 [io-18310-exec-1] PushSender : 푸시 보냄 memberId=2
+16:01:55.205 [io-18310-exec-1] PushSender : 푸시 보냄 memberId=3</code></pre>
+<p>요청 스레드(<code>http-nio-18310-exec-1</code>)가 0.5초씩 세 번 기다렸다.</p>
+<p><strong><code>@Async</code> — 0.02초</strong></p>
+<pre><code class="language-text">HTTP 200 time_total=0.022551s
+16:01:57.771 [task-2] PushSender : 푸시 보냄 memberId=2
+16:01:57.776 [task-1] PushSender : 푸시 보냄 memberId=1
+16:01:57.771 [task-3] PushSender : 푸시 보냄 memberId=3</code></pre>
+<p>응답은 바로 갔고, 푸시는 <code>task-1</code>~`task-3` 세 스레드가 <strong>동시에</strong> 0.5초 뒤 끝냈다. 순서도 섞였다.</p>
+<p><strong>같은 클래스 <code>this.</code> 호출 — 1.55초</strong></p>
+<pre><code class="language-text">HTTP 200 time_total=1.552667s
+16:01:59.807 [io-18310-exec-3] NotifyService : 푸시 보냄(같은 클래스) memberId=1
+16:02:00.309 [io-18310-exec-3] NotifyService : 푸시 보냄(같은 클래스) memberId=2
+16:02:00.823 [io-18310-exec-3] NotifyService : 푸시 보냄(같은 클래스) memberId=3</code></pre>
+<p><code>@Async</code>를 붙였는데 요청 스레드에서 하나씩 돌았다. 에러도 경고도 없다. 고치는 법은 위처럼 <strong>다른 빈</strong>(<code>PushSender</code>)으로 옮기는 것이다.</p>
+<h3 id="예외는-어디로-가나"><a class="anchor" href="#예외는-어디로-가나" aria-hidden="true">#</a>예외는 어디로 가나</h3>
+<p><code>@Async void</code> 메서드가 예외를 던지게 하고, 부르는 쪽을 <code>try/catch</code>로 감쌌다.</p>
+<pre><code class="language-text">$ curl -s -X POST localhost:18310/h6/fail-void
+호출한 쪽은 예외를 못 봤다</code></pre>
+<pre><code class="language-text">ERROR … [task-4] .a.i.SimpleAsyncUncaughtExceptionHandler : Unexpected exception occurred invoking async method: public void org.example.h6.PushSender.sendAsyncFail(long)
+
+java.lang.IllegalStateException: 푸시 서버 오류 memberId=26</code></pre>
+<p>부른 쪽은 이미 다음 줄로 가 버려서 잡을 수 없다. 예외는 <code>task-4</code> 스레드에서 로그 한 줄로 끝난다. 실패를 기록하려면 <code>@Async</code> 메서드 <strong>안에서</strong> 잡아야 한다(16-2의 <code>FAILED</code> 기록).</p>
+<p>결과가 필요하면 <code>CompletableFuture</code>를 돌려준다. 메서드 안에서는 <code>return CompletableFuture.completedFuture(&quot;SENT &quot; + memberId);</code>처럼 감싸 돌려주고, 부른 쪽은 <code>join()</code>으로 기다린다. 실패하면 <code>join()</code>에서 예외가 나온다.</p>
+<pre><code class="language-text">join에서 잡았다: java.util.concurrent.CompletionException: java.lang.IllegalStateException: 푸시 서버 오류 memberId=26</code></pre>
+<p>단, <code>join()</code>은 끝날 때까지 <strong>기다린다.</strong> 응답 경로에서 <code>join()</code>하면 응답 시간이 다시 늘어난다.</p>
+<h3 id="boot가-만들어-주는-풀과-직접-만드는-풀"><a class="anchor" href="#boot가-만들어-주는-풀과-직접-만드는-풀" aria-hidden="true">#</a>Boot가 만들어 주는 풀과 직접 만드는 풀</h3>
+<p>실행기를 따로 만들지 않으면 Boot 4.1이 <code>applicationTaskExecutor</code> 빈(<code>ThreadPoolTaskExecutor</code>)을 만든다. 스레드 이름은 <code>task-N</code>이다. 1초짜리 작업 10개를 한꺼번에 넣어 기본값을 확인했다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>설정</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>기본값</td>
+<td>스레드 <code>task-1</code>~`task-8`(<strong>8개</strong>), 다 끝나는 데 2.0초. 큐는 끝이 없다</td>
+</tr>
+<tr>
+<td><code>spring.task.execution.pool.core-size=2</code> (6개 넣음)</td>
+<td>스레드 2개, 3.0초</td>
+</tr>
+</tbody></table></div>
+<p>풀의 순서가 중요하다. <strong>core 수까지 스레드 → 큐 → 큐가 차면 max까지 스레드 → 그래도 넘치면 거절.</strong> core 2, max 4, 큐 2로 두고 1초짜리 8개를 넣었다.</p>
+<pre><code class="language-text">작업 1 시작 thread=task-1
+작업 2 시작 thread=task-2
+작업 5 시작 thread=task-3
+작업 6 시작 thread=task-4
+작업 7 거절: org.springframework.core.task.TaskRejectedException: ExecutorService in active state did not accept task: …
+작업 8 거절: org.springframework.core.task.TaskRejectedException: ExecutorService in active state did not accept task: …
+작업 4 시작 thread=task-2
+작업 3 시작 thread=task-4</code></pre>
+<p>마지막 두 줄은 1초 뒤에 찍혔다. 3·4는 큐에 들어가 1초를 기다렸고, 5·6이 오자 큐가 차서 스레드 3·4가 생겼다. 7·8은 갈 곳이 없어 <strong>부른 쪽에서</strong> <code>TaskRejectedException</code>이 났다. 큐를 끝없이 두면(기본값) max는 영영 안 쓰인다.</p>
+<p>16-2처럼 업무별 풀을 직접 만들면 Boot의 풀은 <strong>물러난다</strong>. 아래 빈 하나만 두었더니 실행기 빈 목록이 <code>{&quot;notificationExecutor&quot;: &quot;…ThreadPoolTaskExecutor&quot;}</code> 하나였고, 이름 없는 <code>@Async</code>도 <code>notify-1</code>·<code>notify-2</code>에서 돌았다.</p>
+<pre><code class="language-java">@Bean
+public ThreadPoolTaskExecutor notificationExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(2);
+    executor.setMaxPoolSize(4);
+    executor.setQueueCapacity(2);
+    executor.setThreadNamePrefix(&quot;notify-&quot;);
+    return executor;
+}
+// 쓰는 쪽: @Async(&quot;notificationExecutor&quot;)</code></pre>
+<p>여기에 <code>executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());</code>를 더해 같은 8개를 넣으면, 거절 대신 7·8을 <strong>요청 스레드가 직접</strong> 돌렸다(<code>thread=http-nio-18310-exec-1</code>). 일은 안 버리지만 요청이 2.0초 붙잡혔다(<code>submitMs: 2011</code>).</p>
+<h3 id="가상-스레드를-켜면"><a class="anchor" href="#가상-스레드를-켜면" aria-hidden="true">#</a>가상 스레드를 켜면</h3>
+<p>Java 21의 가상 스레드는 아주 가볍게 많이 만들 수 있는 스레드다. <code>spring.threads.virtual.enabled=true</code>를 켜면 Boot가 만드는 실행기가 바뀐다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>끔(기본)</th>
+<th>켬</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>applicationTaskExecutor</code> 클래스</td>
+<td><code>ThreadPoolTaskExecutor</code></td>
+<td><code>SimpleAsyncTaskExecutor</code></td>
+</tr>
+<tr>
+<td>1초 작업 10개(<code>core-size=2</code>도 줌)</td>
+<td><code>task-1</code>·<code>task-2</code>만, <strong>5.0초</strong></td>
+<td><code>task-1</code>~`task-10` 동시, <strong>1.0초</strong></td>
+</tr>
+<tr>
+<td><code>Thread.currentThread().isVirtual()</code></td>
+<td><code>false</code></td>
+<td><code>true</code></td>
+</tr>
+</tbody></table></div>
+<p>가상 스레드 모드는 <strong>풀이 아니다.</strong> 작업마다 새 스레드를 만들고(이름 번호가 계속 올라간다), <code>pool.*</code> 설정은 무시된다. 그래서 &quot;동시에 몇 개까지&quot;라는 제한이 사라진다. 직접 만든 <code>notificationExecutor</code> 빈이 있으면 가상 스레드를 켜도 그 풀(<code>notify-</code>, <code>isVirtual=false</code>)을 그대로 쓴다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>15분. 실습 레포에서 연습 패키지(<code>lab.h6</code>)를 만들어 한다. 끝나면 패키지째 지운다.</p>
+<p><strong>1.</strong> 위 예시의 <code>AsyncConfig</code>, <code>PushSender</code>, <code>NotifyService</code>를 붙여 넣고(<code>sleep</code>은 <code>Thread.sleep</code>을 <code>try/catch</code>로 감싼 정적 메서드), <code>POST /lab/h6/sync</code>·<code>/lab/h6/async</code>·<code>/lab/h6/self</code>가 각각 <code>notifySync()</code>·<code>notifyAsync()</code>·<code>notifySelf()</code>를 부르는 컨트롤러를 만든다. <code>/lab/**</code>가 토큰 검사에 걸리면 F2에서 만든 인증 필터의 제외 경로에 잠시 더한다.</p>
+<p><strong>2.</strong> 세 번 재 본다.</p>
+<pre><code class="language-bash">for p in sync async self; do
+  curl -s -o /dev/null -w &quot;$p %{time_total}s\n&quot; -X POST http://localhost:8080/lab/h6/$p
+done</code></pre>
+<p><code>sync</code>·<code>self</code>는 1.5초 남짓, <code>async</code>는 0.1초 아래여야 한다. 앱 로그에서 <code>async</code>만 <code>task-…</code> 스레드인지 본다.</p>
+<p><strong>3.</strong> <code>application.yml</code>에 <code>spring.task.execution.pool.core-size: 1</code>을 넣고 다시 띄운다. <code>async</code>의 응답 시간은 그대로인데, 로그의 세 줄이 <strong>0.5초 간격</strong>으로 <code>task-1</code> 하나에서 찍힌다. 응답은 빨라도 일은 풀 크기만큼만 동시에 된다.</p>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p><strong>1. <code>@EnableAsync</code>를 지운다.</strong> 실험 앱에서 지웠더니 <code>async</code>가 <code>1.656656s</code>로 돌아갔고, 로그가 요청 스레드(<code>http-nio-18310-exec-1</code>)에서 0.5초 간격으로 찍혔다. 에러는 없다. <code>@Async</code>가 안 먹으면 ① <code>@EnableAsync</code>, ② 같은 클래스 <code>this.</code> 호출부터 본다.</p>
+<p><strong>2. <code>@Async</code> 메서드 안에서 예외를 안 잡는다.</strong> 위 <code>fail-void</code>처럼 부른 쪽은 성공으로 안다. 16-2라면 글쓰기는 <code>201</code>인데 푸시 실패 기록(<code>FAILED</code>)이 하나도 안 남는다. 회원 한 명 단위로 <code>try/catch</code> 해서 기록하고 다음 회원으로 넘어간다.</p>
+<p><strong>3. 큐를 작게 두고 거절 정책을 안 정한다.</strong> 위 core 2·max 4·큐 2 실험처럼 바쁠 때 <code>TaskRejectedException</code>이 <strong>부른 쪽</strong>에서 난다. 거절된 7·8번 일은 아무도 실행하지 않았다. 알림이었다면 그대로 사라진다. 16-2가 큐 100에 <code>CallerRunsPolicy</code>를 쓰는 이유다.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> <code>NotifyService</code> 안에서 <code>this.pushInside(id)</code>를 불렀다. <code>pushInside</code>에 <code>@Async</code>가 있는데 응답이 1.5초 걸린다. 왜이고, 어떻게 고치나?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>@Async</code>는 <strong>프록시</strong>가 처리한다. <code>this.</code>는 프록시가 아니라 자기 자신을 바로 부르므로 그냥 메서드 호출이 된다. 로그의 스레드 이름도 요청 스레드(<code>http-nio-…</code>)였다. <code>@Async</code> 메서드를 <strong>다른 빈</strong>으로 옮겨 주입받아 부른다.</p>
+</details>
+
+<p><strong>2.</strong> <code>@Async void</code> 메서드에서 예외가 났다. 부른 쪽의 <code>try/catch</code>는 잡나? 예외는 어디에 남나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>못 잡는다.</strong> 부른 쪽은 일을 넘기자마자 다음 줄로 갔다. 예외는 작업 스레드에서 <code>SimpleAsyncUncaughtExceptionHandler</code>의 ERROR 로그(<code>Unexpected exception occurred invoking async method</code>)로만 남는다. 실패를 기록하려면 <code>@Async</code> 메서드 안에서 잡거나, <code>CompletableFuture</code>를 돌려받아 확인한다.</p>
+</details>
+
+<p><strong>3.</strong> core 2, max 4, 큐 100인 풀에 1초짜리 작업 10개를 한꺼번에 넣었다. 스레드는 몇 개까지 늘어나나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>2개.</strong> core까지 채운 뒤 나머지 8개는 큐(100칸)에 들어간다. max까지 늘리는 건 <strong>큐가 가득 찼을 때</strong>뿐이다. 실험에서 큐 2칸일 때는 5·6번째에서야 스레드 3·4가 생겼다.</p>
+</details>
+
+<p><strong>4.</strong> <code>@Async</code> 메서드가 <code>CompletableFuture</code>를 돌려준다. 컨트롤러에서 바로 <code>join()</code>하고 응답했다. 응답이 빨라지나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>아니다.</strong> <code>join()</code>은 작업이 끝날 때까지 기다린다. 일은 다른 스레드가 했지만 요청 스레드가 그만큼 기다렸다가 응답한다. 결과가 당장 필요 없을 때(알림, 푸시) 응답과 떼어 낼 수 있어야 빨라진다.</p>
+</details>
+
+<p><strong>5.</strong> <code>spring.threads.virtual.enabled=true</code>를 켜고 <code>spring.task.execution.pool.core-size=2</code>를 두었다. 1초짜리 작업 10개는 몇 초에 끝나나? 동시 실행 수를 제한하려면?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>약 1초.</strong> 가상 스레드 모드의 Boot 실행기는 <code>SimpleAsyncTaskExecutor</code>라 작업마다 새 스레드를 만들고 <code>pool.*</code> 설정을 무시한다(실측 10개 동시, 1.0초). 제한이 필요하면 <code>ThreadPoolTaskExecutor</code> 빈을 직접 만든다. 그 빈이 있으면 가상 스레드를 켜도 그 풀을 쓴다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/S15-async-scheduling-batch.html#31-async-프록시가-실행기에-제출">S15 — @Async: 프록시가 실행기에 제출</a></li>
+<li><a href="../docs/knowledge/S15-async-scheduling-batch.html#예제-2--업무별-제한이-있는-async-실행기">S15 — 예제 2 업무별 제한이 있는 @Async 실행기</a></li>
+<li><a href="../docs/knowledge/W14-sync-async-blocking.html#예제-3--async로-best-effort-후처리">W14 — 예제 3 @Async로 best-effort 후처리</a></li>
+<li><a href="../docs/knowledge/W25-spring-multithreading.html#q7-async로-실행한-작업은-호출한-트랜잭션에-포함되는가">W25 — @Async로 실행한 작업은 호출한 트랜잭션에 포함되는가?</a> — 작업 스레드에는 부른 쪽 트랜잭션이 없다</li>
+<li>Spring Boot 4.1 Reference — Task Execution and Scheduling: <a href="https://docs.spring.io/spring-boot/4.1/reference/features/task-execution-and-scheduling.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/4.1/reference/features/task-execution-and-scheduling.html</a></li>
+<li><code>@EnableAsync</code> Javadoc(프록시 모드, 실행기 찾는 순서): <a href="https://docs.spring.io/spring-framework/docs/7.0.0/javadoc-api/org/springframework/scheduling/annotation/EnableAsync.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/docs/7.0.0/javadoc-api/org/springframework/scheduling/annotation/EnableAsync.html</a></li>
+<li><code>ThreadPoolTaskExecutor</code> Javadoc: <a href="https://docs.spring.io/spring-framework/docs/7.0.0/javadoc-api/org/springframework/scheduling/concurrent/ThreadPoolTaskExecutor.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/docs/7.0.0/javadoc-api/org/springframework/scheduling/concurrent/ThreadPoolTaskExecutor.html</a></li>
+<li>Java 21 <code>ThreadPoolExecutor</code>(core → 큐 → max → 거절): <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html</a></li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li>실습: <a href="../scenario/ch16-events-async-cache/16-2-async-notification.html">16-2. 알림을 비동기로 — 느린 발송이 글쓰기를 막지 않게</a> — <code>notificationExecutor</code>(core 2·max 4·큐 100·<code>CallerRunsPolicy</code>)로 커밋 뒤 알림을 넘기고, 푸시 실패를 <code>FAILED</code>로 남긴다.</li>
+<li>레슨: <a href="H7-cache-cacheable-evict.html">H7. 캐시 — @Cacheable과 무효화</a> — 같은 프록시가 이번에는 &quot;메서드를 아예 안 부르기&quot;를 한다.</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

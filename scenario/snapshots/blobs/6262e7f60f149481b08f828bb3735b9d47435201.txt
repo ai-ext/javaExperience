@@ -1,0 +1,65 @@
+package org.example.like;
+
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
+
+    @Query("SELECT l.post.id FROM PostLike l WHERE l.member.id = :memberId AND l.post.id IN :postIds")
+    List<Long> findPostIdsForMember(@Param("memberId") Long memberId,
+                                    @Param("postIds") List<Long> postIds);
+
+    boolean existsByPost_IdAndMember_Id(Long postId, Long memberId);
+
+    long deleteByPost_IdAndMember_Id(Long postId, Long memberId);
+
+    long countByPost_Id(Long postId);
+
+    long countByPost_IdAndMember_Id(Long postId, Long memberId);
+
+    // 4-2: "있나 확인 후 INSERT"는 동시에 같은 회원이 여러 번 눌렀을 때 그 사이에 둘 다 "없음"을
+    // 확인하고 INSERT를 시도해 중복 키 오류(500)가 날 수 있다. INSERT IGNORE로 DB의 UNIQUE
+    // (post_id, member_id) 제약이 중복을 막게 하고, 실제로 들어간 행 수(0 또는 1)만 돌려받는다.
+    @Modifying
+    @Query(value = "INSERT IGNORE INTO post_like (post_id, member_id, created_at) VALUES (:postId, :memberId, NOW())",
+            nativeQuery = true)
+    int insertIgnore(@Param("postId") Long postId, @Param("memberId") Long memberId);
+
+    // 4-3: 내가 좋아요한 글 중 지금 볼 수 있는 글만, 좋아요 시각 최신순 커서 페이징.
+    // OFFSET이 아니라 "(createdAt, id) < 커서" 키셋 조건이다 — cursorAt이 null이면 첫 페이지.
+    // size+1개를 가져와 다음 페이지가 있는지 서비스에서 판단한다.
+    @Query("""
+            SELECT l FROM PostLike l
+            JOIN FETCH l.post p
+            JOIN FETCH p.author
+            WHERE l.member.id = :memberId
+              AND p.deletedAt IS NULL
+              AND p.status = 'PUBLISHED'
+              AND (
+                   p.visibility = 'PUBLIC'
+                   OR p.author.id = :memberId
+                   OR EXISTS (SELECT 1 FROM Follow f WHERE f.follower.id = :memberId AND f.followee = p.author)
+              )
+              AND NOT EXISTS (
+                   SELECT 1 FROM MemberBlock b
+                   WHERE (b.blocker.id = :memberId AND b.blocked = p.author)
+                      OR (b.blocked.id = :memberId AND b.blocker = p.author)
+              )
+              AND (
+                   :cursorAt IS NULL
+                   OR l.createdAt < :cursorAt
+                   OR (l.createdAt = :cursorAt AND l.id < :cursorId)
+              )
+            ORDER BY l.createdAt DESC, l.id DESC
+            """)
+    List<PostLike> findMyLikes(@Param("memberId") Long memberId,
+                                @Param("cursorAt") LocalDateTime cursorAt,
+                                @Param("cursorId") Long cursorId,
+                                Pageable pageable);
+}

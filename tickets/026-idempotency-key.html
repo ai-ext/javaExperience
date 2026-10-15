@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-026. 재시도하면 글이 두 번 올라간다 — Idempotency-Key</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="t-026-재시도하면-글이-두-번-올라간다--idempotency-key"><a class="anchor" href="#t-026-재시도하면-글이-두-번-올라간다--idempotency-key" aria-hidden="true">#</a>T-026. 재시도하면 글이 두 번 올라간다 — Idempotency-Key</h1>
+<blockquote>
+<p>난이도 고급 · 유형 기존 API 변경 · DB community · 예상 90분</p>
+</blockquote>
+<h2 id="티켓"><a class="anchor" href="#티켓" aria-hidden="true">#</a>티켓</h2>
+<blockquote>
+<p><strong>요청자</strong> 모바일 앱 팀 · <strong>배경</strong> 지하철에서 글을 올리면 응답을 못 받은 앱이 자동으로 다시 보낸다. 서버는 두 번 다 받았으니 같은 글이 두세 개씩 생긴다. 앱은 &quot;등록&quot; 버튼을 누를 때마다 고유한 키를 만들어 재시도에도 같은 키를 보내기로 했다.</p>
+</blockquote>
+<ul>
+<li>글 작성 요청에 <code>Idempotency-Key</code> 헤더가 있으면, <strong>같은 회원이 같은 키로 보낸 요청은 몇 번이 오든 글을 하나만</strong> 만들어 주세요. 두 번째부터는 처음 만든 글을 처음과 같은 모양으로 돌려줍니다(앱은 재시도인지 몰라도 된다).</li>
+<li>재시도로 돌려준 응답에는 <code>Idempotent-Replayed: true</code> 헤더를, 처음 만든 응답에는 <code>false</code>를 붙여 주세요(로그·디버깅용).</li>
+<li>같은 키로 <strong>내용이 다른</strong> 요청이 오면 앱 버그입니다 — <code>422</code>로 거절해 주세요.</li>
+<li>재시도는 <strong>동시에</strong> 올 수도 있습니다(앞 요청이 아직 처리 중일 때 뒤 요청이 도착). 그때도 글은 하나.</li>
+<li>키가 없는 요청은 지금과 똑같이 동작합니다.</li>
+<li><strong>완료 조건</strong>: 같은 키로 5개가 동시에 와도 글 1개, 응답 5개 모두 그 글.</li>
+</ul>
+<p><strong>DB 시작 상태</strong>: <code>community</code> 처음 상태(<code>bash scripts/java-db.sh --reset</code>). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다 — <strong>다음 마이그레이션 번호는 V7</strong>. 김자바(<code>tok-kimjava</code>)가 자유 게시판(<code>free</code>)에 쓴다.</p>
+<h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
+<p>고급 티켓이라 실마리는 없다. 동시에 같은 키가 오는 경우를 먼저 손으로 재현할 방법(아래 <code>xargs -P 5</code>)을 갖춰 두고 시작한다.</p>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>시나리오 화면</span><span class="mockup-live"><i></i> 단계 시안</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">사용자에게 보이는 상태</span><h3>글쓰기 — 응답을 못 받은 앱의 재시도</h3><p>앱이 같은 키로 다시 보낸다. 서버는 처음 만든 글을 돌려주고, 글은 하나만 남는다.</p></div></div><div class="mock-screen" aria-label="글쓰기 — 응답을 못 받은 앱의 재시도 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>글쓰기</strong><span>김자바(회원 2)</span></header><div class="mock-control screen-field" data-screen-id="title"><label>제목</label><div class="mock-field">출근길에 쓴 글</div></div><div class="mock-actions" data-screen-id="buttons"><span class="mock-button mock-primary" data-screen-id="submit">등록</span></div><div class="mock-list" data-screen-id="posts"><span class="screen-widget-label">자유 게시판</span><div class="mock-list-item tone-default" data-screen-id="p-new"><span class="mock-list-main"><strong>출근길에 쓴 글</strong><small>방금</small></span></div></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">화면 뒤에서 일어나는 일</span><h4>요청부터 응답까지</h4></div><span class="flow-hint">이 단계에 기록된 처리 순서를 보여줍니다.</span></div><div class="flow-tracks" aria-label="흐름별 요청 처리 경로"><div class="flow-route" aria-label="첫 요청 — 응답이 중간에 끊긴다"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="response" data-index="2"><span class="flow-node-number">3</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="3"><span class="flow-node-number">4</span>응답 반영</span></div><div class="flow-route" aria-label="재시도 — 같은 키"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="response" data-index="2"><span class="flow-node-number">3</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="3"><span class="flow-node-number">4</span>응답 반영</span></div></div><p class="flow-swipe-hint">좌우로 밀어 전체 경로 보기 →</p><p class="flow-selection-status" role="status" aria-live="polite">카드를 선택하면 화면의 관련 요소와 계층이 강조됩니다.</p><div class="scenario-flows"><section class="scenario-flow" aria-label="첫 요청 — 응답이 중간에 끊긴다" data-flow-index="0"><h5>첫 요청 — 응답이 중간에 끊긴다<span class="scenario-flow-count">5단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="submit" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">등록을 누른다 — 앱이 키를 만든다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/posts" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/posts</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">POST /api/posts</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-kimjava · Idempotency-Key: 6f1c-… · Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;boardSlug&quot;: &quot;free&quot;, &quot;title&quot;: &quot;출근길에 쓴 글&quot;, &quot;content&quot;: &quot;…&quot;}</pre></details></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">이 회원의 이 키는 처음 — 글을 만들고 키에 글 id를 묶어 같은 트랜잭션으로 커밋</span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 201</span><span class="flow-step-detail"><b>headers</b> Location: /api/posts/31 · Idempotent-Replayed: false</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;id&quot;: 31, …}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="submit" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">(응답이 앱까지 못 왔다) 로딩이 계속 돈다</span></button></li></ol></section><section class="scenario-flow" aria-label="재시도 — 같은 키" data-flow-index="1"><h5>재시도 — 같은 키<span class="scenario-flow-count">5단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="submit" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">앱이 자동으로 같은 요청·같은 키를 다시 보낸다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/posts" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/posts</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">POST /api/posts</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-kimjava · Idempotency-Key: 6f1c-… · Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;boardSlug&quot;: &quot;free&quot;, &quot;title&quot;: &quot;출근길에 쓴 글&quot;, &quot;content&quot;: &quot;…&quot;}</pre></details></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">이미 있는 키 — 내용이 같은지 확인하고, 새로 만들지 않고 글 31을 돌려준다</span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 201</span><span class="flow-step-detail"><b>headers</b> Location: /api/posts/31 · Idempotent-Replayed: true</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;id&quot;: 31, …}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="p-new" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">목록에 글은 하나</span></button></li></ol></section></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: '사용자 화면', request: 'HTTP 요청', server: '서버', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'server', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = (labels[selected] || button.querySelector('.flow-kind')?.textContent || '시나리오') + ' 단계 · ' + (button.querySelector('.flow-step-text')?.textContent.trim() || '세부 내용은 아래 설명을 확인하세요.');
+    }));
+  }
+})();
+</script><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>마이그레이션</td>
+<td><code>V7__&lt;설명&gt;.sql</code> — 키 저장 테이블. 같은 회원·같은 키는 한 행만 있을 수 있게(DB 제약으로). 처음 요청 내용의 지문과 만든 글 id를 둔다</td>
+</tr>
+<tr>
+<td>요청</td>
+<td><code>POST /api/posts</code> + 선택 헤더 <code>Idempotency-Key</code>(1~100자, 벗어나면 <code>400</code>)</td>
+</tr>
+<tr>
+<td>처음</td>
+<td>지금처럼 만들고 <code>201</code>·<code>Location</code> + <code>Idempotent-Replayed: false</code></td>
+</tr>
+<tr>
+<td>같은 회원·같은 키·같은 내용</td>
+<td>새로 만들지 않고 처음 글을 <code>201</code>·같은 <code>Location</code>·같은 본문 + <code>Idempotent-Replayed: true</code></td>
+</tr>
+<tr>
+<td>같은 키·다른 내용</td>
+<td><code>422</code> Problem Details</td>
+</tr>
+<tr>
+<td>동시에 같은 키</td>
+<td>글 하나, 모든 응답이 그 글(실패 응답 없이)</td>
+</tr>
+<tr>
+<td>다른 회원의 같은 키</td>
+<td>서로 상관없다(키는 회원별)</td>
+</tr>
+<tr>
+<td>그대로인 것</td>
+<td>키 없는 요청, 검증(400)·권한(403) 규칙</td>
+</tr>
+</tbody></table></div>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080; J='Content-Type: application/json'; H='Authorization: Bearer tok-kimjava'
+K=&quot;t026-$(date +%s)&quot;
+
+curl -si -X POST &quot;$BASE/api/posts&quot; -H &quot;$H&quot; -H &quot;$J&quot; -H &quot;Idempotency-Key: $K&quot; -d '{&quot;boardSlug&quot;:&quot;free&quot;,&quot;title&quot;:&quot;[T-026] 재시도&quot;,&quot;content&quot;:&quot;x&quot;}'   # 요청 K1 — 201, Replayed: false
+curl -si -X POST &quot;$BASE/api/posts&quot; -H &quot;$H&quot; -H &quot;$J&quot; -H &quot;Idempotency-Key: $K&quot; -d '{&quot;boardSlug&quot;:&quot;free&quot;,&quot;title&quot;:&quot;[T-026] 재시도&quot;,&quot;content&quot;:&quot;x&quot;}'   # 요청 K2 — 같은 id, Replayed: true
+curl -si -X POST &quot;$BASE/api/posts&quot; -H &quot;$H&quot; -H &quot;$J&quot; -H &quot;Idempotency-Key: $K&quot; -d '{&quot;boardSlug&quot;:&quot;free&quot;,&quot;title&quot;:&quot;[T-026] 재시도&quot;,&quot;content&quot;:&quot;바꿈&quot;}' # 요청 K3 — 422
+seq 5 | xargs -P 5 -I{} curl -s -X POST &quot;$BASE/api/posts&quot; -H &quot;$H&quot; -H &quot;$J&quot; -H &quot;Idempotency-Key: $K-p&quot; -d &quot;{\&quot;boardSlug\&quot;:\&quot;free\&quot;,\&quot;title\&quot;:\&quot;T026-p-$K\&quot;,\&quot;content\&quot;:\&quot;x\&quot;}&quot;; echo   # 요청 P — 같은 id 다섯 번
+curl -s &quot;$BASE/api/posts/search?q=T026-p-$K&quot;                                        # 요청 S — totalElements 1</code></pre>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 키는 매번 새로 만든 글(요청 A)의 id로 만드므로 몇 번을 눌러도 같은 결과다.</p>
+<blockquote>
+<p>버튼은 브라우저에서 CORS를 거친다. 브라우저 JS는 <code>exposedHeaders</code>에 없는 응답 헤더를 읽지 못하므로 CORS 설정의 <code>exposedHeaders</code>에 <code>Idempotent-Replayed</code>를 더한다(<code>Location</code>은 이미 있다). 보내는 <code>Idempotency-Key</code>는 <code>addCorsMappings</code>의 기본값(<code>allowedHeaders</code> 전부 허용)으로 통과한다 — <code>allowedHeaders</code>를 좁혀 두었다면 거기에도 넣는다. 터미널 <code>curl</code>은 CORS와 상관없다.</p>
+</blockquote>
+<section id="browser-requests-1" class="api-practice" aria-label="HTTP 요청 실행"><div class="request-panel-heading"><div><p class="request-eyebrow">직접 확인 · 7개 요청</p><h3>브라우저에서 요청 보내기</h3></div><p>위 서버 주소를 확인하고 순서대로 실행하세요. 토큰은 입력 후에도 저장하지 않습니다.</p></div><nav class="request-steps" aria-label="요청 실행 순서"><ol><li data-method="POST"><a href="#browser-request-1-1"><span class="request-step-number">1</span><span class="request-step-content"><span class="request-step-method">POST · A</span><span class="request-step-title">키를 만들 기준 글(키 없이)</span></span></a></li><li data-method="POST"><a href="#browser-request-1-2"><span class="request-step-number">2</span><span class="request-step-content"><span class="request-step-method">POST · K1</span><span class="request-step-title">키와 함께 처음</span></span></a></li><li data-method="POST"><a href="#browser-request-1-3"><span class="request-step-number">3</span><span class="request-step-content"><span class="request-step-method">POST · K2</span><span class="request-step-title">같은 키·같은 내용 재시도</span></span></a></li><li data-method="POST"><a href="#browser-request-1-4"><span class="request-step-number">4</span><span class="request-step-content"><span class="request-step-method">POST · K3</span><span class="request-step-title">같은 키·다른 내용</span></span></a></li><li data-method="POST"><a href="#browser-request-1-5"><span class="request-step-number">5</span><span class="request-step-content"><span class="request-step-method">POST · P</span><span class="request-step-title">같은 키로 동시에 5번</span></span></a></li><li data-method="GET"><a href="#browser-request-1-6"><span class="request-step-number">6</span><span class="request-step-content"><span class="request-step-method">GET · S</span><span class="request-step-title">그 제목으로 검색</span></span></a></li><li data-method="POST"><a href="#browser-request-1-7"><span class="request-step-number">7</span><span class="request-step-content"><span class="request-step-method">POST · O</span><span class="request-step-title">다른 회원이 같은 키</span></span></a></li></ol></nav><div class="api-request-list"><article id="browser-request-1-1" class="api-request" data-request-id="A" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · A</p><h4>키를 만들 기준 글(키 없이)</h4></div><span class="request-number">요청 1</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-026] 기준&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-1">POST 요청 보내기</button><p id="request-status-1-1" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-026] 기준&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article><article id="browser-request-1-2" class="api-request" data-request-id="K1" data-method="POST" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · K1</p><h4>키와 함께 처음</h4></div><span class="request-number">요청 2</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Idempotency-Key <input class="request-header" data-name="Idempotency-Key" data-template="t026-{{A.body.id}}" value="t026-{{A.body.id}}" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-026] 재시도&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-2">POST 요청 보내기</button><p id="request-status-1-2" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;,
+  &quot;Idempotency-Key&quot;: &quot;t026-{{A.body.id}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-026] 재시도&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:201,&quot;headers&quot;:{&quot;Idempotent-Replayed&quot;:{&quot;equals&quot;:&quot;false&quot;}}}</pre></dd></dl></details></article><article id="browser-request-1-3" class="api-request" data-request-id="K2" data-method="POST" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · K2</p><h4>같은 키·같은 내용 재시도</h4></div><span class="request-number">요청 3</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Idempotency-Key <input class="request-header" data-name="Idempotency-Key" data-template="t026-{{A.body.id}}" value="t026-{{A.body.id}}" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-026] 재시도&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-3">POST 요청 보내기</button><p id="request-status-1-3" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;,
+  &quot;Idempotency-Key&quot;: &quot;t026-{{A.body.id}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-026] 재시도&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:201,&quot;headers&quot;:{&quot;Idempotent-Replayed&quot;:{&quot;equals&quot;:&quot;true&quot;},&quot;Location&quot;:{&quot;endsWith&quot;:&quot;/api/posts/{{K1.body.id}}&quot;}},&quot;json&quot;:[{&quot;path&quot;:&quot;$.id&quot;,&quot;equals&quot;:&quot;{{K1.body.id}}&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-4" class="api-request" data-request-id="K3" data-method="POST" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · K3</p><h4>같은 키·다른 내용</h4></div><span class="request-number">요청 4</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Idempotency-Key <input class="request-header" data-name="Idempotency-Key" data-template="t026-{{A.body.id}}" value="t026-{{A.body.id}}" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-026] 재시도&quot;,
+  &quot;content&quot;: &quot;바꿈&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-4">POST 요청 보내기</button><p id="request-status-1-4" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;,
+  &quot;Idempotency-Key&quot;: &quot;t026-{{A.body.id}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-026] 재시도&quot;,
+  &quot;content&quot;: &quot;바꿈&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:422}</pre></dd></dl></details></article><article id="browser-request-1-5" class="api-request" data-request-id="P" data-method="POST" data-request-index="4" data-concurrent-count="5" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · P · 동시 요청 5개</p><h4>같은 키로 동시에 5번</h4></div><span class="request-number">요청 5</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-kimjava" value="Bearer tok-kimjava" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Idempotency-Key <input class="request-header" data-name="Idempotency-Key" data-template="t026-{{A.body.id}}-p" value="t026-{{A.body.id}}-p" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;T026-p-{{A.body.id}}&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-5">POST 동시 요청 5개</button><p id="request-status-1-5" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-kimjava&quot;,
+  &quot;Idempotency-Key&quot;: &quot;t026-{{A.body.id}}-p&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;T026-p-{{A.body.id}}&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:201,&quot;distinct&quot;:{&quot;path&quot;:&quot;$.id&quot;,&quot;count&quot;:1}}</pre></dd></dl></details></article><article id="browser-request-1-6" class="api-request" data-request-id="S" data-method="GET" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · S</p><h4>그 제목으로 검색</h4></div><span class="request-number">요청 6</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/search?q=T026-p-{{A.body.id}}&amp;size=50" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-6">GET 요청 보내기</button><p id="request-status-1-6" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.totalElements&quot;,&quot;equals&quot;:1}]}</pre></dd></dl></details></article><article id="browser-request-1-7" class="api-request" data-request-id="O" data-method="POST" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · O</p><h4>다른 회원이 같은 키</h4></div><span class="request-number">요청 7</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Idempotency-Key <input class="request-header" data-name="Idempotency-Key" data-template="t026-{{A.body.id}}" value="t026-{{A.body.id}}" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-026] 재시도&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-7">POST 요청 보내기</button><p id="request-status-1-7" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;,
+  &quot;Idempotency-Key&quot;: &quot;t026-{{A.body.id}}&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;boardSlug&quot;: &quot;free&quot;,
+  &quot;title&quot;: &quot;[T-026] 재시도&quot;,
+  &quot;content&quot;: &quot;x&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:201,&quot;json&quot;:[{&quot;path&quot;:&quot;$.id&quot;,&quot;notEquals&quot;:&quot;{{K1.body.id}}&quot;}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP(필수), D = DB(필수, SELECT만), T = 테스트(선택), R = 코드 리뷰(피드백)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 K1</td>
+<td><code>201</code> + <code>Idempotent-Replayed: false</code></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 K2</td>
+<td><code>201</code>, K1과 같은 <code>id</code>·<code>Location</code> + <code>Idempotent-Replayed: true</code></td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 K3</td>
+<td><code>422</code></td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 P</td>
+<td>동시 5개 모두 <code>201</code>, <code>id</code>는 하나뿐</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>요청 S</td>
+<td>그 제목의 글은 1개</td>
+</tr>
+<tr>
+<td>C6</td>
+<td>요청 O</td>
+<td>다른 회원은 같은 키로도 자기 글이 새로 생긴다(K1과 다른 <code>id</code>) — 회귀 가드(기준 코드도 통과)</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT COUNT(*) FROM post WHERE title LIKE &#39;T026-p-%&#39; GROUP BY title HAVING COUNT(*) &gt; 1</code></td>
+<td>0행 — 동시 재시도로 생긴 중복이 없다</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT member_id, COUNT(*) FROM idempotency_key GROUP BY member_id</code> (테이블 이름은 각자)</td>
+<td>김자바(2)는 버튼 1번에 키 2개(K·K-p), 이스프링(3)은 1개씩 늘어난다</td>
+</tr>
+<tr>
+<td>D3</td>
+<td><code>SHOW INDEX FROM idempotency_key</code></td>
+<td>(회원, 키) UNIQUE 인덱스</td>
+</tr>
+<tr>
+<td>T1</td>
+<td>(선택) 동시성 테스트</td>
+<td>같은 키로 스레드 5개 → 글 1개·결과 id 1개·예외 0</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>&quot;처음 한 번&quot;을 누가 정하나</td>
+<td>자바에서 &quot;있나 보고 없으면 만든다&quot;는 동시에 두 요청이 모두 &quot;없음&quot;을 본다 — UNIQUE 제약 + <code>INSERT IGNORE</code>(또는 중복 예외 처리)로 DB가 하나만 통과시킨다. 키 행과 글을 <strong>같은 트랜잭션</strong>에 넣는 이유(글 저장이 실패하면 키도 없어야 재시도가 된다)</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>뒤에 온 요청이 처음 글을 찾는 법</td>
+<td>뒤 요청의 INSERT는 앞 요청이 커밋할 때까지 기다린다. 그다음 <strong>일반 SELECT로는 방금 커밋된 행이 안 보일 수 있다</strong>(REPEATABLE READ — 스냅샷은 첫 일반 SELECT 때 잡힌다) → 잠금 읽기로 키 행을 읽고, 일반 SELECT는 그 뒤에 한다. 잠금 읽기가 <code>FOR UPDATE</code>가 아니라 <code>FOR SHARE</code>여야 하는 이유(중복을 만난 <code>INSERT IGNORE</code>가 이미 S 잠금을 쥐고 있어, 기다리던 요청끼리 S→X로 올리다 교착)를 말할 수 있다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>운영 고려</td>
+<td>키 보관 기간과 정리(예: 24시간), 처음 요청이 실패(400·500)했을 때 키를 남길지, 응답 본문 자체를 저장하는 방식(Stripe)과 글을 다시 읽는 방식의 차이, 키를 회원별로 두는 이유</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../docs/knowledge/S06-rest-api-clients.html">S06 REST API 설계</a> — 멱등성, 재시도와 중복</li>
+<li><a href="../docs/knowledge/S08-transactions.html">S08 트랜잭션</a> — 격리 수준, 스냅샷과 잠금 읽기</li>
+<li><a href="../docs/knowledge/P18-concurrency-inventory.html">P18 동시성 — 재고·카운터</a> — 유일성은 DB 제약으로</li>
+<li><a href="../docs/knowledge/R03-schema-types-constraints.html">R03 스키마·타입·제약</a> — 복합 UNIQUE</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 순서</summary>
+
+<p>같은 트랜잭션 안에서: ① <code>INSERT IGNORE INTO &lt;키 테이블&gt;(member_id, 키, 지문, created_at)</code> → ② 1행이면 글을 만들고 키 행에 글 id를 적는다 → ③ 0행이면 <code>SELECT 지문, post_id … FOR SHARE</code>로 읽어 지문이 다르면 422, 같으면 그 글을 읽어 돌려준다. ①을 <strong>트랜잭션의 첫 SQL</strong>로 둔다(게시판 찾기 같은 일반 SELECT보다 먼저).</p>
+</details>
+
+<details>
+<summary>힌트 2 — 동시에 5개면 일부가 500</summary>
+
+<p>로그가 <code>Deadlock found</code>이고 문장이 키 행 <code>SELECT … FOR UPDATE</code>라면: 기다리던 요청들의 <code>INSERT IGNORE</code>가 중복을 만나며 그 행에 공유 잠금(S)을 쥐었고, 모두가 배타 잠금(X)으로 올리려다 서로 막혔다(T-023과 같은 모양). 읽기만 하니 <code>FOR SHARE</code>로 바꾼다.</p>
+<p>뒤 요청이 처음 글을 <code>findById</code>로 못 찾는다면(404·NPE), 그 트랜잭션에서 키 처리 전에 일반 SELECT가 한 번 나갔기 때문이다 — 그때 잡힌 스냅샷에는 앞 요청이 나중에 커밋한 글이 없다. 키 처리를 맨 앞으로 옮긴다.</p>
+</details>
+
+
+</main>
+
+
+</body>
+</html>

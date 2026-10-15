@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-025. 글 수정이 서로 덮어쓴다 — 낙관적 락과 409</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="t-025-글-수정이-서로-덮어쓴다--낙관적-락과-409"><a class="anchor" href="#t-025-글-수정이-서로-덮어쓴다--낙관적-락과-409" aria-hidden="true">#</a>T-025. 글 수정이 서로 덮어쓴다 — 낙관적 락과 409</h1>
+<blockquote>
+<p>난이도 고급 · 유형 기존 API 변경 · DB community · 예상 90분</p>
+</blockquote>
+<h2 id="티켓"><a class="anchor" href="#티켓" aria-hidden="true">#</a>티켓</h2>
+<blockquote>
+<p><strong>요청자</strong> 모바일 앱 팀 · <strong>배경</strong> &quot;PC에서 고친 내용이 사라졌어요&quot; 문의. PC와 휴대폰에 같은 글 수정 화면을 열어 두고 PC에서 저장한 뒤, 휴대폰에서 예전 내용 그대로 저장하면 PC에서 고친 내용이 조용히 덮인다.</p>
+</blockquote>
+<ul>
+<li>글 상세 응답에 <strong>버전</strong>을 내려 주세요. 수정 화면은 연 시점의 버전을 수정 요청에 함께 보냅니다.</li>
+<li>보낸 버전이 지금 버전과 다르면(그사이 누가 먼저 고쳤으면) 저장하지 말고 <code>409</code>로 알려 주세요. 응답에 <strong>지금 버전</strong>이 있어야 앱이 &quot;새로 불러오기&quot;를 띄울 수 있습니다.</li>
+<li>글을 <strong>열기만 하는 것</strong>(조회수 증가)이나 좋아요·댓글은 버전을 바꾸면 안 됩니다 — 수정 화면을 연 채로 누가 글을 읽었다고 저장이 막히면 안 된다.</li>
+<li>구버전 앱은 버전을 보내지 않습니다. 버전이 없는 수정 요청은 지금처럼 받습니다.</li>
+<li><strong>완료 조건</strong>: 같은 버전으로 두 번 저장하면 첫 번째만 반영되고 두 번째는 <code>409</code>, 그사이 동시 조회가 몇 번 있어도 결과는 같다.</li>
+</ul>
+<p><strong>DB 시작 상태</strong>: <code>community</code> 처음 상태(<code>bash scripts/java-db.sh --reset</code>). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다 — <strong>다음 마이그레이션 번호는 V7</strong>. 이스프링(<code>tok-lee</code>)의 글 18(자유글 07)을 쓴다.</p>
+<h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
+<p>고급 티켓이라 실마리는 없다. 구현한 뒤 아래 버튼 확인의 &quot;동시에 10번 열기&quot;(요청 V)가 왜 들어 있는지 생각해 본다.</p>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>시나리오 화면</span><span class="mockup-live"><i></i> 단계 시안</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">사용자에게 보이는 상태</span><h3>글 수정 — 두 기기에서 동시에</h3><p>PC와 휴대폰이 같은 버전에서 수정 화면을 열었다. 먼저 저장한 쪽만 반영되고, 늦은 쪽은 덮어쓰지 않고 알림을 받는다.</p></div></div><div class="mock-screen" aria-label="글 수정 — 두 기기에서 동시에 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>글 수정</strong><span>이스프링(회원 3)</span></header><div class="mock-control screen-field" data-screen-id="title"><label>제목</label><div class="mock-field">[T-025] 휴대폰에서 고침</div></div><div class="mock-actions" data-screen-id="buttons"><span class="mock-button mock-primary" data-screen-id="save">저장</span><span class="mock-button mock-secondary" data-screen-id="reload">새로 불러오기</span></div><div class="mock-toast tone-warning" data-screen-id="conflict"><span class="mock-toast-icon" aria-hidden="true">i</span><span>다른 곳에서 먼저 수정했어요. 새로 불러온 뒤 다시 고쳐 주세요.</span></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">화면 뒤에서 일어나는 일</span><h4>요청부터 응답까지</h4></div><span class="flow-hint">이 단계에 기록된 처리 순서를 보여줍니다.</span></div><div class="flow-tracks" aria-label="흐름별 요청 처리 경로"><div class="flow-route" aria-label="PC가 먼저 저장"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="mysql" data-index="2"><span class="flow-node-number">3</span>MySQL</span><span class="flow-node" data-node="response" data-index="3"><span class="flow-node-number">4</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="4"><span class="flow-node-number">5</span>응답 반영</span></div><div class="flow-route" aria-label="휴대폰이 옛 버전으로 저장"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="response" data-index="2"><span class="flow-node-number">3</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="3"><span class="flow-node-number">4</span>응답 반영</span></div></div><p class="flow-swipe-hint">좌우로 밀어 전체 경로 보기 →</p><aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside><p class="flow-selection-status" role="status" aria-live="polite">카드를 선택하면 화면의 관련 요소와 계층이 강조됩니다.</p><div class="scenario-flows"><section class="scenario-flow" aria-label="PC가 먼저 저장" data-flow-index="0"><h5>PC가 먼저 저장<span class="scenario-flow-count">5단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="save" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">PC에서 제목을 고치고 저장(화면을 열 때 버전 0)</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="PATCH" data-path="/api/posts/18" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-patch">PATCH</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/posts/18</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">PATCH /api/posts/18</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-lee · Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;title&quot;: &quot;[T-025] PC에서 고침&quot;, &quot;version&quot;: 0}</pre></details></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> UPDATE post SET title = ?, …, version = 1 WHERE id = 18 AND version = 0</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;id&quot;: 18, &quot;title&quot;: &quot;[T-025] PC에서 고침&quot;, …, &quot;version&quot;: 1}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="title" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">PC 저장 완료</span></button></li></ol></section><section class="scenario-flow" aria-label="휴대폰이 옛 버전으로 저장" data-flow-index="1"><h5>휴대폰이 옛 버전으로 저장<span class="scenario-flow-count">5단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="save" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">휴대폰(버전 0에서 연 화면)에서 저장</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="PATCH" data-path="/api/posts/18" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-patch">PATCH</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/posts/18</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">PATCH /api/posts/18</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-lee · Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;title&quot;: &quot;[T-025] 휴대폰에서 고침&quot;, &quot;version&quot;: 0}</pre></details></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">보낸 버전(0) ≠ 지금 버전(1) — 저장하지 않는다</span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 409</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;status&quot;: 409, &quot;detail&quot;: &quot;…&quot;, &quot;currentVersion&quot;: 1}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="conflict|reload" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">충돌 안내 + 새로 불러오기</span></button></li></ol></section></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: '사용자 화면', request: 'HTTP 요청', server: '서버', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'server', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = (labels[selected] || button.querySelector('.flow-kind')?.textContent || '시나리오') + ' 단계 · ' + (button.querySelector('.flow-step-text')?.textContent.trim() || '세부 내용은 아래 설명을 확인하세요.');
+    }));
+  }
+})();
+</script><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>마이그레이션</td>
+<td><code>V7__&lt;설명&gt;.sql</code> — <code>post</code>에 버전 컬럼(기존 글은 0부터). 운영 중 테이블이라 테이블 복사가 일어나지 않는 방식으로</td>
+</tr>
+<tr>
+<td>상세 응답</td>
+<td><code>GET /api/posts/{id}</code>, <code>PATCH</code> 응답에 <code>version</code>(숫자)</td>
+</tr>
+<tr>
+<td>수정 요청</td>
+<td><code>PATCH /api/posts/{id}</code> 본문에 <code>version</code>(선택). 지금 버전과 다르면 <code>409</code> Problem Details + <code>currentVersion</code>(지금 버전). 같으면 저장하고 버전 +1</td>
+</tr>
+<tr>
+<td>버전 없는 요청</td>
+<td>지금처럼 저장(구버전 앱 호환) — 저장되면 버전은 오른다</td>
+</tr>
+<tr>
+<td>버전을 바꾸지 않는 것</td>
+<td>조회수 증가, 좋아요·댓글 수 변경</td>
+</tr>
+<tr>
+<td>그대로인 것</td>
+<td>404 → 403 순서, 부분 수정 규칙, 다른 응답 필드</td>
+</tr>
+</tbody></table></div>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080; J='Content-Type: application/json'; H='Authorization: Bearer tok-lee'
+
+curl -s &quot;$BASE/api/posts/18&quot;                                       # 요청 A — version을 적어 둔다(아래 V0)
+seq 10 | xargs -P 10 -I{} curl -s -o /dev/null -w '%{http_code}\n' &quot;$BASE/api/posts/18&quot; | sort | uniq -c   # 요청 V — 동시에 10번 열기
+curl -s -X PATCH &quot;$BASE/api/posts/18&quot; -H &quot;$H&quot; -H &quot;$J&quot; -d '{&quot;title&quot;:&quot;[T-025] PC에서 고침&quot;,&quot;version&quot;:V0}'          # 요청 B — 200, version V0+1
+curl -s -X PATCH &quot;$BASE/api/posts/18&quot; -H &quot;$H&quot; -H &quot;$J&quot; -d '{&quot;title&quot;:&quot;[T-025] 휴대폰에서 고침&quot;,&quot;version&quot;:V0}'      # 요청 X — 409, currentVersion V0+1
+curl -s &quot;$BASE/api/posts/18&quot;                                       # 요청 G — 제목은 PC에서 고친 것
+curl -s -X PATCH &quot;$BASE/api/posts/18&quot; -H &quot;$H&quot; -H &quot;$J&quot; -d '{&quot;title&quot;:&quot;자유글 07&quot;}'                                 # 요청 O — 버전 없이(구버전 앱), 제목 되돌리기</code></pre>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다. 마지막에 제목을 되돌리고 버전은 처음 값과의 차이로만 보므로 몇 번을 눌러도 같은 결과다.</p>
+<section id="browser-requests-1" class="api-practice" aria-label="HTTP 요청 실행"><div class="request-panel-heading"><div><p class="request-eyebrow">직접 확인 · 6개 요청</p><h3>브라우저에서 요청 보내기</h3></div><p>위 서버 주소를 확인하고 순서대로 실행하세요. 토큰은 입력 후에도 저장하지 않습니다.</p></div><nav class="request-steps" aria-label="요청 실행 순서"><ol><li data-method="GET"><a href="#browser-request-1-1"><span class="request-step-number">1</span><span class="request-step-content"><span class="request-step-method">GET · A</span><span class="request-step-title">수정 화면 열기(버전 받기)</span></span></a></li><li data-method="GET"><a href="#browser-request-1-2"><span class="request-step-number">2</span><span class="request-step-content"><span class="request-step-method">GET · V</span><span class="request-step-title">그사이 동시에 10번 열기</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-3"><span class="request-step-number">3</span><span class="request-step-content"><span class="request-step-method">PATCH · B</span><span class="request-step-title">PC에서 저장(받은 버전)</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-4"><span class="request-step-number">4</span><span class="request-step-content"><span class="request-step-method">PATCH · X</span><span class="request-step-title">휴대폰에서 저장(같은 옛 버전)</span></span></a></li><li data-method="GET"><a href="#browser-request-1-5"><span class="request-step-number">5</span><span class="request-step-content"><span class="request-step-method">GET · G</span><span class="request-step-title">다시 열기</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-6"><span class="request-step-number">6</span><span class="request-step-content"><span class="request-step-method">PATCH · O</span><span class="request-step-title">구버전 앱 — 버전 없이 저장(제목 되돌리기)</span></span></a></li></ol></nav><div class="api-request-list"><article id="browser-request-1-1" class="api-request" data-request-id="A" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · A</p><h4>수정 화면 열기(버전 받기)</h4></div><span class="request-number">요청 1</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/18" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-1">GET 요청 보내기</button><p id="request-status-1-1" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.version&quot;,&quot;type&quot;:&quot;number&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-2" class="api-request" data-request-id="V" data-method="GET" data-request-index="1" data-concurrent-count="10" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · V · 동시 요청 10개</p><h4>그사이 동시에 10번 열기</h4></div><span class="request-number">요청 2</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/18" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-2">GET 동시 요청 10개</button><p id="request-status-1-2" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.version&quot;,&quot;type&quot;:&quot;number&quot;},{&quot;path&quot;:&quot;$.version&quot;,&quot;equals&quot;:&quot;{{A.body.version}}&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-3" class="api-request" data-request-id="B" data-method="PATCH" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · B</p><h4>PC에서 저장(받은 버전)</h4></div><span class="request-number">요청 3</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/18" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;title&quot;: &quot;[T-025] PC에서 고침&quot;,
+  &quot;version&quot;: &quot;{{A.body.version}}&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-3">PATCH 요청 보내기</button><p id="request-status-1-3" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;title&quot;: &quot;[T-025] PC에서 고침&quot;,
+  &quot;version&quot;: &quot;{{A.body.version}}&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.title&quot;,&quot;equals&quot;:&quot;[T-025] PC에서 고침&quot;},{&quot;path&quot;:&quot;$.version&quot;,&quot;type&quot;:&quot;number&quot;},{&quot;path&quot;:&quot;$.version&quot;,&quot;equals&quot;:&quot;{{A.body.version + 1}}&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-4" class="api-request" data-request-id="X" data-method="PATCH" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · X</p><h4>휴대폰에서 저장(같은 옛 버전)</h4></div><span class="request-number">요청 4</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/18" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;title&quot;: &quot;[T-025] 휴대폰에서 고침&quot;,
+  &quot;version&quot;: &quot;{{A.body.version}}&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-4">PATCH 요청 보내기</button><p id="request-status-1-4" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;title&quot;: &quot;[T-025] 휴대폰에서 고침&quot;,
+  &quot;version&quot;: &quot;{{A.body.version}}&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:409,&quot;json&quot;:[{&quot;path&quot;:&quot;$.currentVersion&quot;,&quot;type&quot;:&quot;number&quot;},{&quot;path&quot;:&quot;$.currentVersion&quot;,&quot;equals&quot;:&quot;{{A.body.version + 1}}&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-5" class="api-request" data-request-id="G" data-method="GET" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · G</p><h4>다시 열기</h4></div><span class="request-number">요청 5</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/18" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-5">GET 요청 보내기</button><p id="request-status-1-5" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.title&quot;,&quot;equals&quot;:&quot;[T-025] PC에서 고침&quot;},{&quot;path&quot;:&quot;$.version&quot;,&quot;type&quot;:&quot;number&quot;},{&quot;path&quot;:&quot;$.version&quot;,&quot;equals&quot;:&quot;{{A.body.version + 1}}&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-6" class="api-request" data-request-id="O" data-method="PATCH" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · O</p><h4>구버전 앱 — 버전 없이 저장(제목 되돌리기)</h4></div><span class="request-number">요청 6</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/18" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-lee" value="Bearer tok-lee" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;title&quot;: &quot;자유글 07&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-6">PATCH 요청 보내기</button><p id="request-status-1-6" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-lee&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;title&quot;: &quot;자유글 07&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.title&quot;,&quot;equals&quot;:&quot;자유글 07&quot;},{&quot;path&quot;:&quot;$.version&quot;,&quot;type&quot;:&quot;number&quot;},{&quot;path&quot;:&quot;$.version&quot;,&quot;equals&quot;:&quot;{{A.body.version + 2}}&quot;}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP(필수), D = DB(필수, SELECT만), T = 테스트(선택), R = 코드 리뷰(피드백)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 A</td>
+<td>상세에 <code>version</code>(숫자)</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 V</td>
+<td>동시 10번 모두 <code>200</code>이고 버전은 A와 같다 — 조회가 버전을 올리지 않는다(조회수를 엔티티로 올리는 채로 <code>@Version</code>만 붙이면 여기서 낙관적 락 충돌 — 처리 안 하면 <code>500</code>, 409로 바꿨으면 <code>409</code> — 과 버전 변화가 나온다)</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 B</td>
+<td><code>200</code>, 제목 반영, <code>version</code> = A + 1</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 X</td>
+<td><code>409</code>, <code>currentVersion</code> = A + 1 — 옛 버전 저장은 반영되지 않는다</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>요청 G</td>
+<td>제목은 B의 것, <code>version</code> = A + 1</td>
+</tr>
+<tr>
+<td>C6</td>
+<td>요청 O</td>
+<td>버전 없는 수정은 지금처럼 <code>200</code>, <code>version</code> = A + 2</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = &#39;post&#39; AND column_name = &#39;version&#39;</code></td>
+<td><code>version bigint NO 0</code></td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT title, version FROM post WHERE id = 18</code></td>
+<td><code>자유글 07</code>과 C6 응답의 <code>version</code></td>
+</tr>
+<tr>
+<td>D3</td>
+<td><code>SELECT version, success FROM flyway_schema_history WHERE version = &#39;7&#39;</code></td>
+<td><code>7 1</code></td>
+</tr>
+<tr>
+<td>T1</td>
+<td>(선택) 테스트</td>
+<td>받은 버전으로 두 번 PATCH → 두 번째 <code>409</code>(<code>currentVersion</code>), 그사이 GET은 버전을 바꾸지 않는다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>버전 비교 두 겹</td>
+<td>요청의 <code>version</code>을 서비스에서 비교(409 + 지금 버전)하는 것과, <code>@Version</code>이 커밋 때 <code>UPDATE … WHERE version = ?</code>로 잡는 것이 각각 어떤 경쟁을 막는지(비교와 커밋 사이에 끼어든 수정 → <code>ObjectOptimisticLockingFailureException</code>도 <code>409</code>로) 말할 수 있다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>버전을 올리는 것·안 올리는 것</td>
+<td>조회수를 엔티티 변경 감지로 올리면 버전도 오른다 — 그래서 원자적 벌크 UPDATE로 바꿨다(벌크 JPQL은 <code>VERSIONED</code> 없이는 버전을 안 건드린다). 좋아요·댓글 수가 이미 벌크 UPDATE라서 영향이 없다는 것도 확인했다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>낙관적 vs 비관적</td>
+<td>글 수정에 <code>SELECT … FOR UPDATE</code>(비관적 락)가 맞지 않는 이유(사람이 화면을 몇 분 열어 둔다), <code>If-Match</code>·<code>ETag</code> 헤더로 같은 계약을 표현하는 방법과 비교할 수 있다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../docs/knowledge/S09-jpa-hibernate.html">S09 JPA·Hibernate</a> — <code>@Version</code>, 변경 감지와 벌크 연산</li>
+<li><a href="../docs/knowledge/P18-concurrency-inventory.html">P18 동시성 — 재고·카운터</a> — 낙관적 락과 비관적 락</li>
+<li><a href="../docs/knowledge/S06-rest-api-clients.html">S06 REST API 설계</a> — 409 Conflict, 조건부 요청</li>
+<li><a href="../docs/knowledge/S11-cache-redis-migration.html">S11 캐시·Redis·DB 마이그레이션</a> — 운영 중 컬럼 추가</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 마이그레이션과 엔티티</summary>
+
+<p><code>ALTER TABLE post ADD COLUMN version BIGINT NOT NULL DEFAULT 0, ALGORITHM = INSTANT;</code> — 맨 뒤에 기본값과 함께 붙이는 컬럼 추가는 테이블을 다시 쓰지 않는다(안 되는 경우면 <code>ALGORITHM</code>을 적어 두었으니 에러가 난다). 엔티티에 <code>@Version Long version</code>, 상세 응답 DTO에 <code>version</code>, 수정 요청 DTO에 <code>Long version</code>.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 버전이 저절로 오른다면</summary>
+
+<p><code>@Version</code>을 붙이자마자 글을 열 때마다 버전이 오르고 동시에 열면 <code>500</code>(낙관적 락 충돌)이 난다면, 상세 조회가 조회수를 엔티티 필드로 올리고(변경 감지) 있기 때문이다. 글 저장소에 <code>@Modifying @Query(&quot;UPDATE Post p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id&quot;)</code>를 두고, 응답의 조회수는 다시 읽는다. 엔티티의 조회수 증가 메서드는 지운다.</p>
+</details>
+
+
+</main>
+
+
+</body>
+</html>

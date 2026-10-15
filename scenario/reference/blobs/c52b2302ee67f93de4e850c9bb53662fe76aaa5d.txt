@@ -1,0 +1,19 @@
+-- V33 — 신고(12-6). 대상은 글 또는 댓글이라 target_type + target_id 두 컬럼으로 가리킨다.
+-- target_id에는 FK를 걸 수 없다(가리키는 테이블이 종류마다 다르다) — 대상 존재 확인은 애플리케이션이 한다.
+-- 같은 사람이 같은 대상을 두 번 신고하지 못하게 UNIQUE로 막는다(동시에 두 번 눌러도 한 줄).
+-- 처리 상태(대기·처리됨)는 13장(운영)에서 컬럼을 더한다.
+CREATE TABLE report (
+    id          BIGINT       NOT NULL AUTO_INCREMENT,
+    reporter_id BIGINT       NOT NULL,
+    target_type VARCHAR(20)  NOT NULL,
+    target_id   BIGINT       NOT NULL,
+    reason      VARCHAR(20)  NOT NULL,
+    detail      VARCHAR(500) NULL,
+    created_at  DATETIME     NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_report_reporter_target (reporter_id, target_type, target_id),
+    KEY ix_report_target (target_type, target_id),
+    CONSTRAINT fk_report_reporter FOREIGN KEY (reporter_id) REFERENCES member (id),
+    CONSTRAINT ck_report_target_type CHECK (target_type IN ('POST', 'COMMENT')),
+    CONSTRAINT ck_report_reason CHECK (reason IN ('SPAM', 'ABUSE', 'ADULT', 'PRIVACY', 'ETC'))
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '신고 — 글·댓글, 한 사람이 한 대상에 한 번';

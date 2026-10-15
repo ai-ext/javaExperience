@@ -1,0 +1,27 @@
+package org.example.auth;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+
+// "지금 시각"을 빈으로 분리한다 — 토큰 만료(1-6)와 기간 계산(8-2)이 같이 쓴다. 테스트에서 고정할 수 있다.
+// app.fixed-now가 있으면(practice 프로파일: 2026-10-05T00:00:00) 그 시각으로 고정하고, 없으면 시스템 시계.
+// 시간대는 DB(serverTimezone)·데이터와 같은 Asia/Seoul로 못박는다 — JVM 기본 시간대가 UTC인 서버에서
+// LocalDateTime.now(clock)이 9시간 어긋나지 않게.
+@Configuration
+public class ClockConfig {
+
+    private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
+
+    @Bean
+    public Clock clock(@Value("${app.fixed-now:}") String fixedNow) {
+        if (fixedNow == null || fixedNow.isBlank()) {
+            return Clock.system(ZONE);
+        }
+        return Clock.fixed(LocalDateTime.parse(fixedNow).atZone(ZONE).toInstant(), ZONE);
+    }
+}

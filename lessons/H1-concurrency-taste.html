@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H1. 동시성 맛보기 — 두 요청이 동시에 오면</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="h1-동시성-맛보기--두-요청이-동시에-오면"><a class="anchor" href="#h1-동시성-맛보기--두-요청이-동시에-오면" aria-hidden="true">#</a>H1. 동시성 맛보기 — 두 요청이 동시에 오면</h1>
+<blockquote>
+<p>개념 레슨 · 35분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>두 사람이 같은 글의 좋아요를 거의 같은 순간에 눌렀다. 서버에는 요청 두 개가 <strong>동시에</strong> 들어온다.</p>
+<ul>
+<li>Spring 서버는 요청마다 <strong>스레드</strong>를 하나씩 내어 동시에 처리한다. 톰캣이 일꾼 여러 명을 두고 들어오는 요청을 나눠 주는 셈이다.</li>
+<li>그런데 서비스 객체는 <strong>하나</strong>다(E1의 빈). DB의 <code>post</code> 행도 하나다. 일꾼 여럿이 같은 것을 동시에 만진다.</li>
+</ul>
+<p>좋아요 수를 이렇게 올리면 위험하다.</p>
+<pre><code class="language-text">1. 읽기   — like_count를 읽는다 (5)
+2. 계산   — 5 + 1 = 6
+3. 쓰기   — like_count = 6 으로 저장</code></pre>
+<p>두 요청이 1번을 동시에 하면 둘 다 <code>5</code>를 읽고, 둘 다 <code>6</code>을 쓴다. 좋아요는 둘인데 숫자는 하나만 올랐다. 이것을 <strong>갱신 손실</strong>(lost update)이라고 한다. 문제는 <strong>읽기와 쓰기 사이에 틈</strong>이 있다는 것이다. 그 틈에 다른 요청이 끼어든다.</p>
+<h3 id="고치는-가장-쉬운-방법"><a class="anchor" href="#고치는-가장-쉬운-방법" aria-hidden="true">#</a>고치는 가장 쉬운 방법</h3>
+<p>읽기·계산·쓰기를 <strong>DB에게 한 문장으로</strong> 맡긴다.</p>
+<pre><code class="language-sql">UPDATE post SET like_count = like_count + 1 WHERE id = ?;</code></pre>
+<p><code>like_count + 1</code>의 <code>like_count</code>는 앱이 아까 읽어 둔 값이 아니라 <strong>DB가 그 순간 가진 값</strong>이다. 그리고 DB는 한 행을 동시에 두 문장이 고치지 못하게 막는다. 먼저 고친 쪽이 끝날(커밋할) 때까지 다른 쪽은 <strong>기다린다</strong>(행 잠금). 그래서 순서대로 하나씩 올라간다.</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<h3 id="jshell--두-스레드가-같은-객체를-만진다"><a class="anchor" href="#jshell--두-스레드가-같은-객체를-만진다" aria-hidden="true">#</a>jshell — 두 스레드가 같은 객체를 만진다</h3>
+<p>DB 없이 Java만으로 먼저 본다. 읽기와 쓰기 사이에 <code>Thread.sleep(100)</code>을 <strong>일부러</strong> 넣었다. 틈을 넓혀서 매번 재현되게 하려는 것이다(실제 서버에서는 이 틈이 DB 왕복·다른 계산 시간이다). JDK 21 <code>jshell</code>에서 실행한 그대로다.</p>
+<pre><code class="language-java">class Post {
+    int likeCount = 0;
+    void likeNaive() throws InterruptedException {
+        int current = likeCount;   // 1. 읽기
+        Thread.sleep(100);         // 2. 그 사이에 다른 일(일부러 넓힌 틈)
+        likeCount = current + 1;   // 3. 읽은 값 + 1을 쓰기
+    }
+}
+Post post = new Post()
+Runnable click = () -&gt; { try { post.likeNaive(); } catch (InterruptedException e) {} };
+Thread a = new Thread(click), b = new Thread(click);
+a.start(); b.start(); a.join(); b.join();</code></pre>
+<ul>
+<li><code>Runnable</code>은 &quot;실행할 일 하나&quot;를 담는 타입이다. <code>() -&gt; { ... }</code>는 B6에서 본 람다다.</li>
+<li><code>start()</code>는 스레드를 출발시키고, <code>join()</code>은 그 스레드가 끝날 때까지 기다린다.</li>
+</ul>
+<pre><code class="language-text">jshell&gt; post.likeCount
+$10 ==&gt; 1</code></pre>
+<p>두 번 눌렀는데 <code>1</code>이다. Java가 제공하는 &quot;그 순간의 값에 +1&quot;(<code>AtomicInteger</code>)로 바꾸면 이렇다.</p>
+<pre><code class="language-text">jshell&gt; AtomicInteger safe = new AtomicInteger(0)
+safe ==&gt; 0
+
+jshell&gt; Thread c = new Thread(() -&gt; safe.incrementAndGet()), d = new Thread(() -&gt; safe.incrementAndGet());
+c ==&gt; Thread[#26,Thread-2,5,main]
+d ==&gt; Thread[#27,Thread-3,5,main]
+
+jshell&gt; c.start(); d.start(); c.join(); d.join();
+
+jshell&gt; safe.get()
+$19 ==&gt; 2</code></pre>
+<p>(<code>AtomicInteger</code>는 <code>import java.util.concurrent.atomic.AtomicInteger;</code> 후에 쓴다.) 다만 서버에서는 이 방법을 못 쓴다. 숫자가 Java 메모리가 아니라 <strong>DB에</strong> 있고, 서버가 여러 대일 수도 있기 때문이다.</p>
+<h3 id="spring--mysql--실제-요청-두-개"><a class="anchor" href="#spring--mysql--실제-요청-두-개" aria-hidden="true">#</a>Spring + MySQL — 실제 요청 두 개</h3>
+<p>이 레슨을 쓰면서 작은 Spring Boot 4.1 앱(포트 <code>18120</code>, MySQL)을 만들어 실제로 요청을 보냈다. 4-1에서 처음 만들기 쉬운 모양 그대로다. 글을 읽고, 숫자에 1을 더해 엔티티에 넣으면, 트랜잭션 커밋 때 JPA가 <code>UPDATE</code>를 보낸다(3-1의 변경 감지).</p>
+<pre><code class="language-java">@Transactional
+public int likeNaive(Long postId, long pauseMs) throws InterruptedException {
+    Post post = posts.findById(postId).orElseThrow();
+    int current = post.getLikeCount();
+    if (pauseMs &gt; 0) Thread.sleep(pauseMs);   // 실험용: 틈을 넓힌다
+    post.setLikeCount(current + 1);
+    return current + 1;
+}</code></pre>
+<p>하나씩 보내면 당연히 맞다.</p>
+<pre><code class="language-text">$ B=http://localhost:18120
+$ curl -s -X POST &quot;$B/h1/posts/1/reset&quot;
+$ curl -s -w '\n' -X POST &quot;$B/h1/posts/1/like-naive?pauseMs=200&quot;
+1
+$ curl -s -w '\n' -X POST &quot;$B/h1/posts/1/like-naive?pauseMs=200&quot;
+2
+$ curl -s -w '\n' &quot;$B/h1/posts/1/count&quot;
+2</code></pre>
+<p>이제 둘을 <strong>동시에</strong> 보낸다. 명령 끝의 <code>&amp;</code>는 &quot;끝나길 기다리지 말고 바로 다음 명령으로&quot;, <code>wait</code>는 &quot;뒤로 보낸 명령이 다 끝날 때까지 기다리기&quot;다.</p>
+<pre><code class="language-text">$ curl -s -X POST &quot;$B/h1/posts/1/reset&quot;
+$ curl -s -w '\n' -X POST &quot;$B/h1/posts/1/like-naive?pauseMs=200&quot; &amp; curl -s -w '\n' -X POST &quot;$B/h1/posts/1/like-naive?pauseMs=200&quot; &amp; wait
+1
+1
+$ curl -s -w '\n' &quot;$B/h1/posts/1/count&quot;
+1</code></pre>
+<p>두 요청 모두 <code>1</code>이라고 답했고, DB에도 <code>1</code>이다. 세 번 해서 세 번 모두 같았다.</p>
+<p><code>sleep</code>이 없으면 괜찮을까? 틈을 넓히지 않고(<code>pauseMs</code> 없이) 20개를 동시에 보냈다.</p>
+<pre><code class="language-bash">curl -s -X POST &quot;$B/h1/posts/1/reset&quot;
+for i in $(seq 1 20); do curl -s -o /dev/null -X POST &quot;$B/h1/posts/1/like-naive&quot; &amp; done; wait
+curl -s &quot;$B/h1/posts/1/count&quot;</code></pre>
+<p>여섯 번 돌려 <code>3</code>, <code>4</code>, <code>4</code>, <code>3</code>, <code>5</code>, <code>5</code>가 나왔다. <strong>20번 눌렀는데 3~5만 올랐다.</strong> 일부러 넓힌 틈이 없어도, 요청이 몰리면 읽기와 쓰기 사이의 짧은 틈에 다른 요청이 끼어든다.</p>
+<p>SQL 로그를 보면 이유가 보인다. 앱이 계산한 <strong>숫자</strong>를 그대로 써 넣는다.</p>
+<pre><code class="language-text">select p1_0.id,p1_0.like_count,p1_0.published_at,p1_0.title from lab_post p1_0 where p1_0.id=?
+update lab_post set like_count=?,published_at=?,title=? where id=?</code></pre>
+<h3 id="고친-코드--db가-한-문장으로-1"><a class="anchor" href="#고친-코드--db가-한-문장으로-1" aria-hidden="true">#</a>고친 코드 — DB가 한 문장으로 +1</h3>
+<pre><code class="language-java">// 저장소
+@Modifying
+@Query(&quot;update Post p set p.likeCount = p.likeCount + 1 where p.id = :id&quot;)
+int increaseLikeCount(@Param(&quot;id&quot;) Long id);
+
+// 서비스
+@Transactional
+public void likeAtomic(Long postId) {
+    posts.increaseLikeCount(postId);
+}</code></pre>
+<pre><code class="language-text">update lab_post p1_0 set like_count=(p1_0.like_count+1) where p1_0.id=?</code></pre>
+<p>같은 방식으로 20개를 동시에 세 번 보냈다. 세 번 모두 <strong><code>20</code></strong> 이었다. 둘을 동시에 보냈을 때도 <code>2</code>였다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>15분.</p>
+<p><strong>1. jshell.</strong> 위 jshell 예시를 붙여 넣고 <code>1</code>이 나오는 것을 본다. 그다음 <code>Thread.sleep(100)</code>을 <code>Thread.sleep(1)</code>로 바꿔 <code>Post</code> 클래스를 다시 붙여 넣고, <code>post</code>·<code>click</code>·스레드를 다시 만들어 돌린다. 1밀리초 틈으로도 <code>1</code>이 나온다(다섯 번 해서 다섯 번 <code>1</code>이었다). <code>sleep</code> 줄을 아예 지우면 <code>2</code>가 나온다(이것도 다섯 번 모두 <code>2</code>). 읽기와 쓰기 사이에 할 일이 전혀 없으면 두 스레드가 거의 겹치지 않기 때문이다. 하지만 실제 서버에서는 그 사이에 DB 왕복이 끼어 있어서 틈이 늘 있다. 그래서 Spring 예시에서는 <code>sleep</code> 없이도 숫자가 모자랐다.</p>
+<p><strong>2. 터미널 두 개로 DB에서 직접 겪어 보기.</strong> 이번에는 앱 없이 사람이 두 요청 역할을 한다. 먼저 E2의 <code>sql</code> 함수로 연습용 테이블을 만든다. 끝나면 지운다.</p>
+<pre><code class="language-bash">sql &quot;CREATE TABLE lesson_counter (id BIGINT PRIMARY KEY, like_count INT NOT NULL); INSERT INTO lesson_counter VALUES (1, 0)&quot;</code></pre>
+<p>터미널 두 개(A·B)를 열고 각각 <code>mysql</code>에 들어간다(G3의 접속 명령).</p>
+<pre><code class="language-bash">docker exec -it -e LANG=C.UTF-8 studymate-mysql-1 mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community</code></pre>
+<p><strong>(가) 읽고 +1 해서 쓰기.</strong> 아래 순서대로 친다. 둘 다 <code>0</code>을 읽었으니 둘 다 <code>1</code>을 쓴다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>순서</th>
+<th>A</th>
+<th>B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>START TRANSACTION;</code></td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>SELECT like_count FROM lesson_counter WHERE id = 1;</code> → <code>0</code></td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td></td>
+<td><code>START TRANSACTION;</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td></td>
+<td><code>SELECT like_count FROM lesson_counter WHERE id = 1;</code> → <code>0</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>UPDATE lesson_counter SET like_count = 1 WHERE id = 1;</code></td>
+<td></td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>COMMIT;</code></td>
+<td></td>
+</tr>
+<tr>
+<td>7</td>
+<td></td>
+<td><code>UPDATE lesson_counter SET like_count = 1 WHERE id = 1;</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td></td>
+<td><code>COMMIT;</code></td>
+</tr>
+</tbody></table></div>
+<p>7번에서 B는 이렇게 나온다.</p>
+<pre><code class="language-text">Query OK, 0 rows affected (0.00 sec)
+Rows matched: 1  Changed: 0  Warnings: 0</code></pre>
+<p>이미 <code>1</code>이라 바뀐 게 없다(<code>Changed: 0</code>). 마지막에 <code>SELECT</code>하면 <code>1</code>이다. 두 사람이 눌렀는데 하나만 남았다.</p>
+<p><strong>(나) DB에게 +1을 맡기기.</strong> 숫자를 <code>0</code>으로 되돌리고(<code>UPDATE lesson_counter SET like_count = 0 WHERE id = 1;</code>) 다시 한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>순서</th>
+<th>A</th>
+<th>B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>START TRANSACTION;</code></td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>UPDATE lesson_counter SET like_count = like_count + 1 WHERE id = 1;</code></td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td></td>
+<td><code>START TRANSACTION;</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td></td>
+<td><code>UPDATE lesson_counter SET like_count = like_count + 1 WHERE id = 1;</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>COMMIT;</code></td>
+<td></td>
+</tr>
+<tr>
+<td>6</td>
+<td></td>
+<td><code>COMMIT;</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>4번에서 B가 멈춘다.</strong> 프롬프트가 돌아오지 않는다. A가 그 행을 고치는 중이라 B가 기다리는 것이다. 5번에서 A가 커밋하는 순간 B가 풀린다. 실제로 B 쪽에 나온 결과다(기다린 시간은 사람마다 다르다).</p>
+<pre><code class="language-text">Query OK, 1 row affected (3.36 sec)
+Rows matched: 1  Changed: 1  Warnings: 0</code></pre>
+<p><code>3.36 sec</code>가 기다린 시간이다. 마지막에 <code>SELECT</code>하면 <strong><code>2</code></strong> 다.</p>
+<p><strong>3. 정리.</strong> <code>exit</code>로 두 터미널을 나온 뒤 테이블을 지운다.</p>
+<pre><code class="language-bash">sql &quot;DROP TABLE lesson_counter&quot;</code></pre>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p><strong>1. <code>synchronized</code>면 되지 않나?</strong> Java에는 &quot;이 메서드는 한 번에 한 스레드만&quot;이라는 <code>synchronized</code>가 있다. 위 Spring 앱의 서비스에 붙여 봤다.</p>
+<pre><code class="language-java">@Transactional
+public synchronized int likeSynchronized(Long postId) {
+    Post post = posts.findById(postId).orElseThrow();
+    post.setLikeCount(post.getLikeCount() + 1);
+    return post.getLikeCount();
+}</code></pre>
+<p>20개를 동시에 다섯 번 보냈더니 <code>6</code>, <code>8</code>, <code>8</code>, <code>6</code>, <code>7</code>이었다. 여전히 모자란다. <code>@Transactional</code>의 <strong>커밋은 메서드가 끝난 뒤에</strong> 일어난다. 앞 요청이 메서드를 빠져나와 아직 커밋하기 전에, 다음 요청이 들어와 옛 값을 읽는다. 게다가 서버를 두 대 띄우면 <code>synchronized</code>는 서버 안에서만 통한다. 숫자가 DB에 있으면 DB에서 막는다.</p>
+<p><strong>2. 커밋을 안 하고 두면?</strong> 따라 해 보기 2(나)에서 A가 <code>COMMIT</code> 없이 자리를 비우면 B는 계속 기다린다. 기본 대기 한도는 50초(<code>innodb_lock_wait_timeout</code>)다. A가 <code>START TRANSACTION</code>과 <code>+1</code> <code>UPDATE</code>까지만 친 상태에서, B의 한도만 5초로 줄여 재현했다.</p>
+<p>B 터미널:</p>
+<pre><code class="language-text">mysql&gt; SET SESSION innodb_lock_wait_timeout = 5;
+Query OK, 0 rows affected (0.01 sec)
+
+mysql&gt; UPDATE lesson_counter SET like_count = like_count + 1 WHERE id = 1;
+ERROR 1205 (HY000): Lock wait timeout exceeded; try restarting transaction</code></pre>
+<p>트랜잭션을 오래 열어 두면 같은 행을 만지는 다른 요청이 줄줄이 기다리다 실패한다. 트랜잭션 안에서 외부 API를 부르거나 오래 계산하면 안 되는 이유다. (A는 <code>ROLLBACK;</code>으로 끝낸다.)</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> <code>like_count</code>가 <code>10</code>인 글에 두 요청이 동시에 와서, 둘 다 <code>10</code>을 읽고 <code>11</code>을 저장했다. 최종 값은? 이 현상의 이름은?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong><code>11</code></strong>, 갱신 손실(lost update). 두 번째 쓰기가 첫 번째 쓰기를 덮었다. 읽기와 쓰기 사이에 틈이 있어서다.</p>
+</details>
+
+<p><strong>2.</strong> 예시에서 <code>Thread.sleep</code>을 넣은 이유는? <code>sleep</code>이 없는 실제 코드에서는 이 문제가 안 생기나?</p>
+<details>
+<summary>정답</summary>
+
+<p>틈을 넓혀 <strong>매번</strong> 재현하려고 넣었다. <code>sleep</code>이 없어도 생긴다. 이 레슨의 실험에서 <code>sleep</code> 없이 20개를 동시에 보내도 3~5만 올랐다. 틈이 좁으면 드물게 생길 뿐이고, 드물게 생기는 버그가 더 찾기 어렵다.</p>
+</details>
+
+<p><strong>3.</strong> 두 요청이 모두 <code>like_count</code>를 <code>5</code>로 읽었다. 각 요청이 ㉠ 앱에서 계산한 값으로 <code>UPDATE post SET like_count = 6 WHERE id = ?</code>를 보낼 때와 ㉡ <code>UPDATE post SET like_count = like_count + 1 WHERE id = ?</code>를 보낼 때, 최종 값은 각각 얼마인가?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>㉠ <code>6</code>, ㉡ <code>7</code>.</strong> ㉠은 둘 다 아까 읽어 둔 <code>5</code>로 계산한 숫자를 쓰니 하나가 다른 하나를 덮는다(갱신 손실). ㉡의 <code>like_count</code>는 앱이 읽어 둔 값이 아니라 <strong>DB가 그 순간 가진 값</strong>이다. 두 번째 문장은 행 잠금 때문에 첫 문장이 끝날 때까지 기다렸다가 <code>6</code>에 1을 더한다.</p>
+</details>
+
+<p><strong>4.</strong> 따라 해 보기 2(나)의 4번에서 B의 <code>UPDATE</code>가 바로 끝나지 않은 이유는? 그래서 결과는?</p>
+<details>
+<summary>정답</summary>
+
+<p>A가 같은 행을 고친 채 커밋하지 않아서, DB가 그 행을 잠가 두었다. B는 A가 끝날 때까지 기다렸다가, A가 커밋한 <code>1</code>에서 <code>+1</code> 해 <strong><code>2</code></strong> 가 되었다. 기다리게 하는 것 자체가 &quot;하나씩 순서대로&quot;를 만든다.</p>
+</details>
+
+<p><strong>5.</strong> 서비스 메서드에 <code>synchronized</code>를 붙였는데 숫자가 여전히 모자랐다. 이유 두 가지는?</p>
+<details>
+<summary>정답</summary>
+
+<p>① <code>@Transactional</code>의 커밋이 <code>synchronized</code> 메서드가 <strong>끝난 뒤</strong>에 일어나서, 다음 요청이 커밋 전의 옛 값을 읽을 수 있다. ② <code>synchronized</code>는 서버(JVM) 하나 안에서만 통한다. 서버를 여러 대 띄우면 서로를 모른다. 숫자가 DB에 있으니 DB에서 막는다(한 문장 <code>UPDATE</code>, 또는 락).</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/P18-concurrency-inventory.html#21-문제는-읽기--판단--쓰기가-분리될-때-생긴다">P18 — 문제는 읽기 → 판단 → 쓰기가 분리될 때 생긴다</a></li>
+<li><a href="../docs/knowledge/P18-concurrency-inventory.html#22-가장-싼-해결책-조건부-원자-update">P18 — 가장 싼 해결책: 조건부 원자 UPDATE</a></li>
+<li><a href="../docs/knowledge/P18-concurrency-inventory.html#25-jvm-락의-범위를-오해하지-않는다">P18 — JVM 락의 범위를 오해하지 않는다</a> — <code>synchronized</code>의 한계</li>
+<li><a href="../docs/knowledge/P18-concurrency-inventory.html#24-낙관적-락은-충돌을-허용하고-재시도한다">P18 — 낙관적 락은 충돌을 허용하고 재시도한다</a> — 다른 고치는 법</li>
+<li><a href="../docs/knowledge/W25-spring-multithreading.html">W25 스프링이 멀티스레드라는 것</a> — 요청마다 스레드, 빈은 하나</li>
+<li><a href="../docs/knowledge/S08-transactions.html#격리수준과-동시성-이상">S08 — 격리수준과 동시성 이상</a></li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li>실습: <a href="../scenario/ch4-like/4-1-like-toggle.html">4-1. 좋아요·취소(멱등)</a> — 같은 요청이 <strong>두 번</strong> 와도 결과가 같게.</li>
+<li>그다음 <a href="../scenario/ch4-like/4-2-like-concurrency.html">4-2. 동시에 눌러도 맞는 like_count</a>에서 오늘의 갱신 손실을 테스트로 재현하고 고친다. 거기서는 좋아요 <strong>행 추가</strong>와 숫자 갱신이 함께라 교착 상태(deadlock)까지 만난다(4-2 힌트 1).</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

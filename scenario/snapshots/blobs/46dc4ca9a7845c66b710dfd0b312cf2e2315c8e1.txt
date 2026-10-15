@@ -1,0 +1,52 @@
+package org.example.notification;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+// 9-4의 좋아요·댓글 알림은 원래 트랜잭션에서 처리한다. 저장 실패는 원래 작업을 롤백시킨다.
+// 멘션·새 글 알림은 각 시나리오의 커밋 후 처리 규칙을 따른다.
+@Component
+public class NotificationEventListener {
+
+    private static final Logger log = LoggerFactory.getLogger(NotificationEventListener.class);
+
+    private final NotificationService notificationService;
+
+    public NotificationEventListener(NotificationService notificationService) {
+        this.notificationService = notificationService;
+    }
+
+    @EventListener
+    public void onPostLiked(PostLikedEvent event) {
+        notificationService.notifyLike(event.postId(), event.actorId());
+    }
+
+    // 16-1 새 글 → 팔로워 알림. 글 트랜잭션이 롤백되면 이 메서드는 아예 불리지 않는다
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onPostCreated(PostCreatedEvent event) {
+        try {
+            int count = notificationService.notifyNewPost(event.postId(), event.authorId());
+            log.info("새 글 알림 {}건 postId={}", count, event.postId());
+        } catch (RuntimeException e) {
+            log.warn("새 글 알림 생성 실패 postId={}", event.postId(), e);
+        }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onCommentMentioned(CommentMentionedEvent event) {
+        try {
+            notificationService.notifyMentions(event.postId(), event.commentId(), event.actorId(), event.nicknames());
+        } catch (RuntimeException e) {
+            log.warn("멘션 알림 생성 실패 postId={} commentId={}", event.postId(), event.commentId(), e);
+        }
+    }
+
+    @EventListener
+    public void onCommentCreated(CommentCreatedEvent event) {
+        notificationService.notifyComment(event.postId(), event.commentId(), event.actorId());
+    }
+}

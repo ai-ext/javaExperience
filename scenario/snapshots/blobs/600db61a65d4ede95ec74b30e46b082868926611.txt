@@ -1,0 +1,85 @@
+package org.example.bookmark;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+
+// 북마크 — 좋아요(4장)와 달리 내 글도 저장할 수 있고, 폴더·메모를 함께 정한다.
+// 공유하는 것은 "볼 수 있는 PUBLISHED 글인가"(2-3 규칙)뿐이라 좋아요 코드와 억지로 합치지 않는다.
+@Service
+public class BookmarkService {
+
+    private static final String PUBLISHED = "PUBLISHED";
+
+    private final BookmarkRepository bookmarkRepository;
+    private final BookmarkFolderRepository folderRepository;
+    private final PostRepository postRepository;
+    private final PostAccessPolicy accessPolicy;
+
+    public BookmarkService(BookmarkRepository bookmarkRepository, BookmarkFolderRepository folderRepository,
+                            PostRepository postRepository,
+                            PostAccessPolicy accessPolicy) {
+        this.bookmarkRepository = bookmarkRepository;
+        this.folderRepository = folderRepository;
+        this.postRepository = postRepository;
+        this.accessPolicy = accessPolicy;
+    }
+
+    // upsert — 없으면 만들고 있으면 폴더·메모를 바꾼다(한 트랜잭션).
+    // 동시에 두 번 와서 둘 다 "없음"을 보더라도 UNIQUE(member_id, post_id)가 최후의 방어선이다.
+    @Transactional
+    public BookmarkResponse bookmark(Long postId, AuthenticatedMember loginMember, BookmarkRequest request) {
+        Post post = findBookmarkablePost(postId, loginMember);
+        BookmarkFolder folder = findMyFolder(request.folderId(), loginMember.id());
+        bookmarkRepository.upsert(loginMember.id(), postId,
+                folder == null ? null : folder.getId(), request.memo());
+        Bookmark bookmark = bookmarkRepository.findCurrentForUpdate(loginMember.id(), postId)
+                .orElseThrow(() -> new IllegalStateException("북마크 저장 결과를 찾을 수 없습니다."));
+
+        return toResponse(bookmark);
+    }
+
+    // 없어도 성공(멱등). 글이 나중에 볼 수 없게 됐어도 내 북마크는 지울 수 있어야 하므로 글 상태는 따지지 않는다.
+    @Transactional
+    public void unbookmark(Long postId, AuthenticatedMember loginMember) {
+        bookmarkRepository.deleteByMember_IdAndPost_Id(loginMember.id(), postId);
+    }
+
+    // 6-2 — 북마크를 다른 폴더로(folderId가 null이면 기본 폴더). 북마크·폴더 모두 "내 것"만
+    @Transactional
+    public BookmarkResponse move(Long bookmarkId, AuthenticatedMember loginMember, BookmarkMoveRequest request) {
+        Bookmark bookmark = bookmarkRepository.findByIdAndMember_Id(bookmarkId, loginMember.id())
+                .orElseThrow(BookmarkNotFoundException::new);
+        bookmark.moveTo(findMyFolder(request.folderId(), loginMember.id()), LocalDateTime.now());
+        return toResponse(bookmark);
+    }
+
+    // 남의 폴더·없는 폴더는 같은 404 — 폴더를 id만으로 찾지 않는다
+    private BookmarkFolder findMyFolder(Long folderId, Long memberId) {
+        if (folderId == null) {
+            return null;
+        }
+        return folderRepository.findByIdAndMember_Id(folderId, memberId)
+                .orElseThrow(BookmarkFolderNotFoundException::new);
+    }
+
+    private Post findBookmarkablePost(Long postId, AuthenticatedMember loginMember) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(loginMember, post) || !PUBLISHED.equals(post.getStatus())) {
+            throw new PostNotFoundException();
+        }
+        return post;
+    }
+
+    private BookmarkResponse toResponse(Bookmark bookmark) {
+        Long folderId = bookmark.getFolder() == null ? null : bookmark.getFolder().getId();
+        return new BookmarkResponse(bookmark.getId(), bookmark.getPost().getId(), true, folderId, bookmark.getMemo());
+    }
+}

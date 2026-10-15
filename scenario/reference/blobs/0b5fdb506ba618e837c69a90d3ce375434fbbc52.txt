@@ -1,0 +1,23 @@
+-- V64 — 좋아요 달성 축하 알림(15-5).
+-- like_milestone: 글마다 단계(10·50·100)를 한 번만 기록한다 — UNIQUE(post_id, milestone)가 "한 단계에 한 번"을 지킨다.
+-- 좋아요가 9 ↔ 10을 오가도(취소했다 다시 누름) 10 단계 행은 이미 있으니 다시 생기지 않는다.
+CREATE TABLE like_milestone (
+    id         BIGINT   NOT NULL AUTO_INCREMENT,
+    post_id    BIGINT   NOT NULL,
+    milestone  INT      NOT NULL,
+    likes      INT      NOT NULL,
+    reached_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_like_milestone (post_id, milestone),
+    CONSTRAINT fk_like_milestone_post FOREIGN KEY (post_id) REFERENCES post (id),
+    CONSTRAINT ck_like_milestone_level CHECK (milestone IN (10, 50, 100))
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '좋아요 달성 기록 — 글·단계마다 한 번';
+
+-- 알림 확장: 시스템이 보내는 알림이라 보낸 사람(actor)이 없다 → NULL 허용. 몇 개 달성인지 milestone에.
+-- 종류 CHECK는 고칠 수 없어서 지우고 다시 만든다. 앞 장에서 더한 종류(12-2 MENTION)도 남긴다 —
+-- 빠뜨리면 이미 있는 MENTION 행 때문에 제약을 만들 때 실패한다(SHOW CREATE TABLE notification으로 지금 목록부터 본다).
+ALTER TABLE notification MODIFY actor_id BIGINT NULL;
+ALTER TABLE notification ADD COLUMN milestone INT NULL AFTER comment_id;
+ALTER TABLE notification DROP CHECK ck_notification_type;
+ALTER TABLE notification
+    ADD CONSTRAINT ck_notification_type CHECK (type IN ('LIKE', 'COMMENT', 'MENTION', 'LIKE_MILESTONE'));

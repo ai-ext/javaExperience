@@ -50,7 +50,11 @@ JUnit 발견 → Spring TestContext 부트스트랩 → Boot 구성 탐색
 → 웹 환경 반영 → 테스트 객체 주입 → 같은 키의 캐시 재사용
 ```
 
-일반 `@ContextConfiguration`은 Boot `SpringApplication` 경로를 보장하지 않는다. Boot 설정, 외부 속성, 로깅 같은 애플리케이션 구성을 검증할 때 `@SpringBootTest`를 쓴다. 웹 환경 기본값 `MOCK`은 모의 웹 인프라만 만들며 포트를 열지 않는다. `@AutoConfigureMockMvc`를 함께 쓰면 전체 Boot 구성을 올린 채 서버 없이 요청할 수 있다. `RANDOM_PORT`·`DEFINED_PORT`는 서버를 시작하며 클라이언트와 서버가 별도 스레드에서 동작한다. 따라서 테스트 메서드의 `@Transactional` 롤백이 서버가 커밋한 요청 데이터까지 되돌리지 않는다. `NONE`은 웹 환경이 없는 컨텍스트다.
+일반 `@ContextConfiguration`은 Boot `SpringApplication` 경로를 보장하지 않는다. Boot 설정, 외부 속성, 로깅 같은 애플리케이션 구성을 검증할 때 `@SpringBootTest`를 쓴다. 웹 환경 기본값 `MOCK`은 모의 웹 인프라만 만들며 포트를 열지 않는다.
+
+`@AutoConfigureMockMvc`를 함께 쓰면 전체 Boot 구성을 올린 채 서버 없이 요청할 수 있다. `RANDOM_PORT`·`DEFINED_PORT`는 서버를 시작하며 클라이언트와 서버가 별도 스레드에서 동작한다.
+
+따라서 테스트 메서드의 `@Transactional` 롤백이 서버가 커밋한 요청 데이터까지 되돌리지 않는다. `NONE`은 웹 환경이 없는 컨텍스트다.
 
 ### 컨텍스트 캐시 키
 
@@ -62,13 +66,17 @@ Test A: App + profile=test + mock=paymentClient
          └─ 키 차이 → cache miss, 새 컨텍스트 초기화
 ```
 
-필드의 `@MockitoBean`은 타입으로 대상을 찾고 qualifier가 없으면 필드명을 fallback으로 쓸 수 있다. 같은 bean을 여러 클래스에서 mock하더라도 이름이 들쭉날쭉하면 오버라이드 설정과 캐시 키가 달라질 수 있다. 공통 profile·속성·mock 이름을 정렬하되 서로 다른 테스트 구성을 억지로 합치지 않는다. 캐시는 기본 최대 32개이며 초과하면 LRU로 오래된 컨텍스트를 제거한다. `@DirtiesContext`도 컨텍스트를 제거한다. 테스트를 포크한 별도 JVM에서 실행하면 정적 캐시가 공유되지 않는다.
+필드의 `@MockitoBean`은 타입으로 대상을 찾고 qualifier가 없으면 필드명을 fallback으로 쓸 수 있다. 같은 bean을 여러 클래스에서 mock하더라도 이름이 들쭉날쭉하면 오버라이드 설정과 캐시 키가 달라질 수 있다. 공통 profile·속성·mock 이름을 정렬하되 서로 다른 테스트 구성을 억지로 합치지 않는다.
+
+캐시는 기본 최대 32개이며 초과하면 LRU로 오래된 컨텍스트를 제거한다. `@DirtiesContext`도 컨텍스트를 제거한다. 테스트를 포크한 별도 JVM에서 실행하면 정적 캐시가 공유되지 않는다.
 
 ### 슬라이스와 Testcontainers
 
 슬라이스는 전체 자동 설정 대신 대상 계층 필터와 관련 자동 설정을 골라 컨텍스트를 작게 만든다. 그래서 MVC 요청 체인은 보존하면서 service/repository 그래프를 생략할 수 있다. JPA 슬라이스의 기본 rollback은 테스트 트랜잭션을 격리하지만, 다른 DB 엔진의 dialect·타입·collation·잠금 동작까지 증명하지 않는다.
 
-Testcontainers는 Docker에서 일회용 DB나 브로커를 실행한다. JUnit 확장은 `@Testcontainers`와 `@Container` 필드의 수명주기를 관리한다. `@ServiceConnection`은 컨테이너의 종류로 Boot `ConnectionDetails`를 만들어 datasource 등 자동 설정에 전달하므로 URL·사용자명·동적 포트를 수작업으로 속성에 복사할 필요가 줄어든다. Boot가 컨테이너 종류를 추론하지 못하면 `name` 또는 `type`을 명시한다. 컨테이너를 `@Bean` 메서드로 선언하면 인스턴스보다 먼저 서비스 이름을 알아야 할 수 있다.
+Testcontainers는 Docker에서 일회용 DB나 브로커를 실행한다. JUnit 확장은 `@Testcontainers`와 `@Container` 필드의 수명주기를 관리한다. `@ServiceConnection`은 컨테이너의 종류로 Boot `ConnectionDetails`를 만들어 datasource 등 자동 설정에 전달하므로 URL·사용자명·동적 포트를 수작업으로 속성에 복사할 필요가 줄어든다.
+
+Boot가 컨테이너 종류를 추론하지 못하면 `name` 또는 `type`을 명시한다. 컨테이너를 `@Bean` 메서드로 선언하면 인스턴스보다 먼저 서비스 이름을 알아야 할 수 있다.
 
 ```text
 컨테이너 시작 → @ServiceConnection → ConnectionDetails
@@ -160,7 +168,9 @@ class OrderController {
 }
 ```
 
-`@WebMvcTest`에는 지정한 컨트롤러와 MVC 인프라가 올라오며 `OrderQuery`는 mock으로 대체된다. 따라서 JSON 필드와 HTTP 상태는 확인하지만, 실제 주문 조회 구현이나 DB 매핑은 전혀 실행되지 않는다. `MockMvcTester`를 쓰는 프로젝트는 Boot가 구성한 `MockMvc`에서 생성하거나 Spring MVC 설정에 바인딩해 AssertJ 방식으로 같은 요청·응답 경계를 검증할 수 있다. 응답 내용 검증은 직렬화 설정에 맞는 converter가 등록되어 있어야 한다.
+`@WebMvcTest`에는 지정한 컨트롤러와 MVC 인프라가 올라오며 `OrderQuery`는 mock으로 대체된다. 따라서 JSON 필드와 HTTP 상태는 확인하지만, 실제 주문 조회 구현이나 DB 매핑은 전혀 실행되지 않는다.
+
+`MockMvcTester`를 쓰는 프로젝트는 Boot가 구성한 `MockMvc`에서 생성하거나 Spring MVC 설정에 바인딩해 AssertJ 방식으로 같은 요청·응답 경계를 검증할 수 있다. 응답 내용 검증은 직렬화 설정에 맞는 converter가 등록되어 있어야 한다.
 
 ### 예제 2: 실제 PostgreSQL을 `@ServiceConnection`으로 연결 (미실행)
 
@@ -203,7 +213,9 @@ class PostgreSqlConnectionTest {
 }
 ```
 
-이 검사는 애플리케이션 자동 설정의 `DataSource`가 컨테이너 연결 정보를 사용해 질의하는지 확인한다. 테이블 생성·마이그레이션이 준비된 프로젝트에서는 운영 SQL, 제약 조건, 잠금 같은 업무 관련 동작을 검증한다. 단지 `select 1`이 성공했다고 운영 스키마나 마이그레이션 전체가 맞다고 결론내리지는 않는다. 기본 슬라이스 DB를 사용하지 않도록 `@DataJpaTest`에 적용할 경우 `@AutoConfigureTestDatabase(replace = Replace.NONE)` 설정을 검토한다.
+이 검사는 애플리케이션 자동 설정의 `DataSource`가 컨테이너 연결 정보를 사용해 질의하는지 확인한다. 테이블 생성·마이그레이션이 준비된 프로젝트에서는 운영 SQL, 제약 조건, 잠금 같은 업무 관련 동작을 검증한다.
+
+단지 `select 1`이 성공했다고 운영 스키마나 마이그레이션 전체가 맞다고 결론내리지는 않는다. 기본 슬라이스 DB를 사용하지 않도록 `@DataJpaTest`에 적용할 경우 `@AutoConfigureTestDatabase(replace = Replace.NONE)` 설정을 검토한다.
 
 ## 5. 버전별 변화 — 왜 바뀌었나
 
@@ -228,7 +240,9 @@ class PostgreSqlConnectionTest {
 
 ### Fixture와 외부 입력을 고정한다 (보강)
 
-간헐 실패는 테스트가 읽는 입력이 매번 같지 않거나 테스트 사이에 상태가 새어 나올 때 생긴다. fixture는 각 테스트가 직접 만들고, 테스트가 소유한 데이터만 종료 시 정리한다. 정적 컬렉션·싱글턴 객체를 여러 테스트가 수정하지 않게 하고, fixture factory도 매 호출마다 새 객체 그래프를 반환하게 한다. DB에는 테스트 실행별 식별자를 붙여 이름 공간을 나눈다. `@AfterEach`의 삭제는 정상적인 테스트 종료를 돕지만 JVM 강제 종료나 다른 프로세스의 실행까지 정리해 주지는 않는다. CI에서는 worker별 schema/database나 테스트별 고유 key를 쓰고, 폐기 가능한 DB라면 작업 종료 시 통째로 버릴 수 있게 한다.
+간헐 실패는 테스트가 읽는 입력이 매번 같지 않거나 테스트 사이에 상태가 새어 나올 때 생긴다. fixture는 각 테스트가 직접 만들고, 테스트가 소유한 데이터만 종료 시 정리한다. 정적 컬렉션·싱글턴 객체를 여러 테스트가 수정하지 않게 하고, fixture factory도 매 호출마다 새 객체 그래프를 반환하게 한다.
+
+DB에는 테스트 실행별 식별자를 붙여 이름 공간을 나눈다. `@AfterEach`의 삭제는 정상적인 테스트 종료를 돕지만 JVM 강제 종료나 다른 프로세스의 실행까지 정리해 주지는 않는다. CI에서는 worker별 schema/database나 테스트별 고유 key를 쓰고, 폐기 가능한 DB라면 작업 종료 시 통째로 버릴 수 있게 한다.
 
 ```java
 @SpringBootTest
@@ -252,7 +266,9 @@ class InvoiceFlowTest {
 
 위 예제의 테이블은 테스트 schema에 있다고 가정한다. 삭제 조건을 업무 키 전체나 테이블 전체로 넓히지 말고 테스트가 만든 행에 한정한다. 테스트 메서드 트랜잭션 롤백은 같은 트랜잭션 안의 fixture에 유용하지만, 실제 서버 스레드·비동기 작업·별도 worker에서 쓴 데이터의 정리를 대신하지 않는다. 공용 테이블을 쓰는 두 테스트가 동시에 전체 테이블을 비우면 각각의 setup/cleanup이 서로의 데이터를 지울 수 있다.
 
-시계는 `Instant.now()`를 로직 안에서 직접 읽지 말고 `Clock`으로 전달한다. 경계 시각, 자정, 시간대/DST를 재현하기 위해 테스트는 `Clock.fixed(...)`와 명시적 UTC 또는 대상 시간대를 사용한다. 난수도 `new Random()`을 업무 로직이 직접 만들지 않게 주입한다. 실패 로그에 seed를 남겨 같은 입력열을 되풀이할 수 있게 하고, 테스트끼리 같은 가변 `Random`을 공유하지 않는다. 테스트 순서는 준비 데이터·시퀀스 값·정적 캐시가 암묵적으로 공유되는지 찾는 신호다. 순서를 바꿨을 때 실패하면 실패 테스트의 실행 전후 상태를 비교하고 각 테스트를 단독 실행해 먼저 만든 오염원을 좁힌다.
+시계는 `Instant.now()`를 로직 안에서 직접 읽지 말고 `Clock`으로 전달한다. 경계 시각, 자정, 시간대/DST를 재현하기 위해 테스트는 `Clock.fixed(...)`와 명시적 UTC 또는 대상 시간대를 사용한다. 난수도 `new Random()`을 업무 로직이 직접 만들지 않게 주입한다.
+
+실패 로그에 seed를 남겨 같은 입력열을 되풀이할 수 있게 하고, 테스트끼리 같은 가변 `Random`을 공유하지 않는다. 테스트 순서는 준비 데이터·시퀀스 값·정적 캐시가 암묵적으로 공유되는지 찾는 신호다. 순서를 바꿨을 때 실패하면 실패 테스트의 실행 전후 상태를 비교하고 각 테스트를 단독 실행해 먼저 만든 오염원을 좁힌다.
 
 ```java
 import java.time.Clock;
@@ -286,7 +302,9 @@ shared RNG next: 627
 
 ### 격리해 재현하고 병렬성의 경계를 확인한다 (보강)
 
-실패하면 우선 실패한 테스트 이름, 입력 fixture ID, 난수 seed, 기준 시각과 시간대, locale, DB schema, 테스트 worker/fork를 로그에 남긴다. 동일 클래스·메서드를 단독 실행해도 실패하는지 확인한 다음 같은 JVM에서 반복 실행하고, 실행 순서를 섞거나 병렬도를 낮춰 비교한다. 단독 실행은 통과하지만 반복/전체 실행에서 실패하면 테스트 간 상태 공유 가능성이 높다. 시각이 특정 경계에 가까울 때만 재현되면 `Clock.fixed`로 그 순간을 고정한다. 재현 가능한 최소 테스트가 생기면 cleanup 누락, 공유 mock/static state, 전역 timezone/property 변경, DB unique key 충돌을 한 항목씩 제거한다. 재시도로 녹색이 됐다는 사실은 원인 해결의 증거가 아니다.
+실패하면 우선 실패한 테스트 이름, 입력 fixture ID, 난수 seed, 기준 시각과 시간대, locale, DB schema, 테스트 worker/fork를 로그에 남긴다. 동일 클래스·메서드를 단독 실행해도 실패하는지 확인한 다음 같은 JVM에서 반복 실행하고, 실행 순서를 섞거나 병렬도를 낮춰 비교한다. 단독 실행은 통과하지만 반복/전체 실행에서 실패하면 테스트 간 상태 공유 가능성이 높다.
+
+시각이 특정 경계에 가까울 때만 재현되면 `Clock.fixed`로 그 순간을 고정한다. 재현 가능한 최소 테스트가 생기면 cleanup 누락, 공유 mock/static state, 전역 timezone/property 변경, DB unique key 충돌을 한 항목씩 제거한다. 재시도로 녹색이 됐다는 사실은 원인 해결의 증거가 아니다.
 
 JUnit Jupiter는 기본적으로 순차 실행한다. 병렬 실행을 켜더라도 기본 노드는 `SAME_THREAD`이며, 병렬 실행 설정만 추가했다고 모든 테스트가 동시에 실행되는 것은 아니다. 병렬을 실제로 켜면 공유 전역 자원 사용 테스트를 같은 lock 이름으로 선언한다.
 
@@ -297,13 +315,21 @@ class SeoulDateBoundaryTest {
 }
 ```
 
-`@ResourceLock`은 그 lock을 선언한 테스트와 생명주기 메서드를 같은 JUnit 실행 안에서 직렬화한다. 같은 전역 자원을 건드리는 모든 테스트가 같은 이름을 공유해야 한다. DB lock 문자열 하나를 붙여도 별도 JVM fork, CI worker, 다른 빌드 프로세스는 서로 조정되지 않는다. 프로세스 간 공유 DB는 실행별 schema/database나 분리된 key 범위를 쓰고, 그 자원을 안전하게 분리할 수 없는 테스트만 순차 그룹에 둔다. 전체 테스트를 직렬화하거나 `@DirtiesContext`로 매번 초기화하면 원인 대신 비용만 키울 수 있다.
+`@ResourceLock`은 그 lock을 선언한 테스트와 생명주기 메서드를 같은 JUnit 실행 안에서 직렬화한다. 같은 전역 자원을 건드리는 모든 테스트가 같은 이름을 공유해야 한다. DB lock 문자열 하나를 붙여도 별도 JVM fork, CI worker, 다른 빌드 프로세스는 서로 조정되지 않는다.
+
+프로세스 간 공유 DB는 실행별 schema/database나 분리된 key 범위를 쓰고, 그 자원을 안전하게 분리할 수 없는 테스트만 순차 그룹에 둔다. 전체 테스트를 직렬화하거나 `@DirtiesContext`로 매번 초기화하면 원인 대신 비용만 키울 수 있다.
 
 ### 테스트 시간은 계층별로 측정한다 (보강)
 
-전체 `test` 작업의 한 숫자만 보면 느린 컨텍스트 초기화와 많은 단위 테스트를 구분하기 어렵다. 빌드에서 단위, MVC/JPA slice, 실제 DB 통합, E2E를 별도 task/tag로 집계하고 각 계층의 테스트 수와 총 시간, 테스트별 상위 지연(p95 또는 느린 상위 10개)을 함께 기록한다. 반복 CI 실행에서는 중앙값과 변동 폭도 비교한다. 테스트별 시간은 벽시계 변경의 영향을 받지 않는 `System.nanoTime()` 기반으로 재고, 컨테이너 시작/종료와 애플리케이션 context 시작 시간도 분리해 적는다. context 초기화가 느리면 캐시 hit/miss와 JVM fork를 같이 살펴보고, DB 통합이 느리면 컨테이너 기동·migration·fixture 정리 비용을 나눈다. 평균 하나만 개선하면 소수의 매우 느린 테스트가 가려질 수 있다. 측정 결과에 따라 빠른 계층을 자주 실행하고 실제 인프라 검증은 CI 단계에 배치하되, 느린 테스트를 끄거나 실패를 재시도로 감추지 않는다.
+전체 `test` 작업의 한 숫자만 보면 느린 컨텍스트 초기화와 많은 단위 테스트를 구분하기 어렵다. 빌드에서 단위, MVC/JPA slice, 실제 DB 통합, E2E를 별도 task/tag로 집계하고 각 계층의 테스트 수와 총 시간, 테스트별 상위 지연(p95 또는 느린 상위 10개)을 함께 기록한다. 반복 CI 실행에서는 중앙값과 변동 폭도 비교한다.
 
-**함정:** 테스트 실행 순서를 고정하는 것은 오염원을 감출 뿐 격리를 보장하지 않는다. 공유 DB의 테스트 ID를 고정하거나 `deleteAll()`로 정리하면 병렬 worker가 서로 지울 수 있다. `@ResourceLock`은 JVM 밖의 DB/파일을 잠그지 않으며, 고정 시각만 도입하고 시스템 timezone을 전역 변경하면 다른 테스트와 경합한다. 원인을 찾을 때는 한 번에 fixture·시계·난수·순서·병렬도를 모두 바꾸지 말고, 기록된 환경과 최소 재현을 유지하며 하나씩 격리한다.
+테스트별 시간은 벽시계 변경의 영향을 받지 않는 `System.nanoTime()` 기반으로 재고, 컨테이너 시작/종료와 애플리케이션 context 시작 시간도 분리해 적는다. context 초기화가 느리면 캐시 hit/miss와 JVM fork를 같이 살펴보고, DB 통합이 느리면 컨테이너 기동·migration·fixture 정리 비용을 나눈다.
+
+평균 하나만 개선하면 소수의 매우 느린 테스트가 가려질 수 있다. 측정 결과에 따라 빠른 계층을 자주 실행하고 실제 인프라 검증은 CI 단계에 배치하되, 느린 테스트를 끄거나 실패를 재시도로 감추지 않는다.
+
+**함정:** 테스트 실행 순서를 고정하는 것은 오염원을 감출 뿐 격리를 보장하지 않는다. 공유 DB의 테스트 ID를 고정하거나 `deleteAll()`로 정리하면 병렬 worker가 서로 지울 수 있다.
+
+`@ResourceLock`은 JVM 밖의 DB/파일을 잠그지 않으며, 고정 시각만 도입하고 시스템 timezone을 전역 변경하면 다른 테스트와 경합한다. 원인을 찾을 때는 한 번에 fixture·시계·난수·순서·병렬도를 모두 바꾸지 말고, 기록된 환경과 최소 재현을 유지하며 하나씩 격리한다.
 
 참고: Parallel Execution — https://docs.junit.org/6.0.3/writing-tests/parallel-execution.html
 참고: Clock (Java SE 25) — https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/time/Clock.html

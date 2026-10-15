@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E7. JPA로 수정·삭제하기 — 변경 감지·삭제·대량 수정</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="e7-jpa로-수정삭제하기--변경-감지삭제대량-수정"><a class="anchor" href="#e7-jpa로-수정삭제하기--변경-감지삭제대량-수정" aria-hidden="true">#</a>E7. JPA로 수정·삭제하기 — 변경 감지·삭제·대량 수정</h1>
+<blockquote>
+<p>개념 레슨 · 45분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p><a href="E2-db-sql-basics.html">E2</a>에서는 <code>UPDATE tag SET name = &#39;연습태그2&#39; WHERE name = &#39;연습태그&#39;</code>를 손으로 썼다. E3·<a href="E6-repository-methods.html">E6</a>에서 본 저장소에는 <code>save</code>·<code>find…</code>·<code>delete…</code>는 있는데 <strong><code>update</code> 메서드가 없다.</strong> JPA에서 고치는 법은 이렇다.</p>
+<blockquote>
+<p><strong>트랜잭션 안에서 읽어 온 엔티티의 값을 바꾸면, 트랜잭션이 끝날 때(커밋) Hibernate가 <code>UPDATE</code>를 보낸다.</strong></p>
+</blockquote>
+<p>이걸 <strong>변경 감지</strong>(dirty checking)라고 한다. 순서는 이렇다.</p>
+<ol>
+<li><code>findById</code>로 읽으면 Hibernate는 객체를 돌려주면서, 그 객체와 <strong>읽었을 때 값의 사본</strong>을 같이 들고 있다. 이렇게 들고 있는 곳을 <strong>영속성 컨텍스트</strong>라고 한다. 트랜잭션 하나에 하나씩 생긴다.</li>
+<li>코드가 <code>post.changeTitle(&quot;새 제목&quot;)</code>으로 필드 값을 바꾼다. 이때는 아무 SQL도 안 나간다.</li>
+<li>트랜잭션이 커밋되기 직전에 Hibernate가 들고 있던 객체를 사본과 하나하나 비교한다. 달라진 객체가 있으면 <code>UPDATE</code>를 보낸다(이걸 <strong>flush</strong>라고 한다).</li>
+</ol>
+<p>그래서 <code>save()</code>를 부르지 않아도 된다. 대신 <strong>트랜잭션이 있어야</strong> 한다. 트랜잭션은 서비스 메서드에 <code>@Transactional</code>을 붙여 만든다. 메서드가 시작될 때 트랜잭션이 열리고, 정상으로 끝나면 커밋된다. 자세한 규칙(롤백, 어디에 거나)은 G3에서 배운다. 오늘은 &quot;있을 때와 없을 때 SQL이 어떻게 다른가&quot;만 본다.</p>
+<h3 id="고치고-지우는-네-가지-길"><a class="anchor" href="#고치고-지우는-네-가지-길" aria-hidden="true">#</a>고치고 지우는 네 가지 길</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>길</th>
+<th>코드</th>
+<th>나가는 SQL</th>
+<th>쓰는 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>변경 감지</td>
+<td>읽고 → 값 바꾸기</td>
+<td>커밋 때 <code>UPDATE … WHERE id = ?</code> 한 줄</td>
+<td>글 하나 고치기(제목, 상태)</td>
+</tr>
+<tr>
+<td>삭제</td>
+<td><code>delete(엔티티)</code> · <code>deleteById(id)</code></td>
+<td><code>SELECT</code> 먼저, 커밋 때 <code>DELETE</code></td>
+<td>진짜로 행을 지울 때</td>
+</tr>
+<tr>
+<td>soft delete</td>
+<td>읽고 → <code>deletedAt</code>에 지금 시각</td>
+<td>변경 감지와 같은 <code>UPDATE</code></td>
+<td>지운 척만 할 때(게시판은 보통 이쪽)</td>
+</tr>
+<tr>
+<td>벌크 수정</td>
+<td><code>@Modifying @Query(&quot;update …&quot;)</code></td>
+<td><code>UPDATE … WHERE 조건</code> 한 번에 여러 행</td>
+<td>조건에 맞는 행을 한꺼번에</td>
+</tr>
+</tbody></table></div>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<p>진짜 <code>post</code> 테이블을 고치면 다른 실습이 깨진다. <code>practice</code> DB에 <strong>연습용 복사본</strong> <code>lesson_post</code>(글 10개)와 <code>lesson_board</code>를 만들어 거기서 한다. 만드는 SQL은 따라 해 보기 1단계에 있다. 엔티티는 이렇다.</p>
+<pre><code class="language-java">@Entity
+@Table(name = &quot;lesson_post&quot;)   // 연습용 복사본 — 진짜 post는 건드리지 않는다
+public class LessonPost {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = &quot;board_id&quot;, nullable = false)
+    private Long boardId;
+
+    @Column(name = &quot;author_id&quot;, nullable = false)
+    private Long authorId;
+
+    @Column(nullable = false)
+    private String title;
+
+    @Column(nullable = false)
+    private String content;
+
+    @Enumerated(EnumType.STRING)          // DB에 'PUBLISHED' 같은 이름으로 저장
+    @Column(nullable = false)
+    private PostStatus status;
+
+    @Column(name = &quot;view_count&quot;)
+    private int viewCount;
+
+    @CreationTimestamp                    // INSERT 때 한 번 채운다
+    @Column(name = &quot;created_at&quot;, nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp                      // INSERT·UPDATE 때마다 새로 채운다
+    @Column(name = &quot;updated_at&quot;, nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Column(name = &quot;deleted_at&quot;)
+    private LocalDateTime deletedAt;      // null이면 살아 있는 글
+
+    protected LessonPost() {}
+
+    public LessonPost(Long boardId, Long authorId, String title, String content) {
+        this.boardId = boardId;
+        this.authorId = authorId;
+        this.title = title;
+        this.content = content;
+        this.status = PostStatus.DRAFT;
+    }
+
+    // 의도가 보이는 메서드 — setter 대신
+    public void changeTitle(String title) {
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException(&quot;제목은 비울 수 없다&quot;);
+        }
+        this.title = title;
+    }
+
+    public void softDelete(LocalDateTime now) {
+        this.deletedAt = now;
+    }
+
+    public Long getId() { return id; }
+    public String getTitle() { return title; }
+    public PostStatus getStatus() { return status; }
+    public int getViewCount() { return viewCount; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+}</code></pre>
+<pre><code class="language-java">public enum PostStatus { PUBLISHED, DRAFT, HIDDEN }</code></pre>
+<p><code>setTitle</code> 대신 <code>changeTitle</code>을 둔 이유가 있다. 값이 바뀌는 곳이 이 메서드 하나라서, &quot;빈 제목 금지&quot; 같은 규칙을 여기 한 번만 쓰면 된다. 서비스 코드를 읽을 때도 <code>post.changeTitle(…)</code>이 &quot;제목을 바꾼다&quot;는 업무로 읽힌다. <code>setDeletedAt(now)</code> 대신 <code>softDelete(now)</code>도 같다.</p>
+<p>서비스는 <code>@Transactional</code>이 있는 것과 없는 것을 나란히 둔다.</p>
+<pre><code class="language-java">@Service
+public class LessonPostService {
+
+    private final LessonPostRepository posts;
+
+    public LessonPostService(LessonPostRepository posts) {
+        this.posts = posts;
+    }
+
+    private LessonPost getPost(Long id) {
+        return posts.findById(id)
+                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND, &quot;글이 없습니다: &quot; + id));
+    }
+
+    @Transactional
+    public LessonPost changeTitle(Long id, String title) {
+        LessonPost post = getPost(id);
+        post.changeTitle(title);
+        System.out.println(&quot;   changeTitle 메서드 끝 — save는 안 불렀다&quot;);
+        return post;
+    }
+
+    // @Transactional 없음
+    public LessonPost changeTitleNoTx(Long id, String title) {
+        LessonPost post = getPost(id);
+        post.changeTitle(title);
+        System.out.println(&quot;   changeTitleNoTx 메서드 끝&quot;);
+        return post;
+    }
+
+    // @Transactional 없이 save를 부른다
+    public LessonPost changeTitleNoTxSave(Long id, String title) {
+        LessonPost post = getPost(id);
+        post.changeTitle(title);
+        LessonPost saved = posts.save(post);
+        System.out.println(&quot;   save가 돌려준 객체가 같은 객체인가? &quot; + (saved == post));
+        return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public void changeTitleReadOnly(Long id, String title) {
+        LessonPost post = getPost(id);
+        post.changeTitle(title);
+        System.out.println(&quot;   readOnly 메서드 끝&quot;);
+    }
+
+    @Transactional
+    public void softDelete(Long id) {
+        LessonPost post = getPost(id);
+        post.softDelete(LocalDateTime.now());
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        LessonPost post = getPost(id);
+        posts.delete(post);
+        System.out.println(&quot;   delete 호출 끝&quot;);
+    }
+}</code></pre>
+<p>아래 로그는 따라 해 보기에서 실제로 나온 것이다. 읽기 쉽게 줄였다. <code>SQL:</code>은 Hibernate가 보낸 SQL, <code>bind:</code>는 <code>?</code>에 들어간 값, <code>TX:</code>는 트랜잭션 관리자(<code>JpaTransactionManager</code>)의 로그에서 시작·참여·커밋 줄만 남긴 것이다. <code>lesson_post</code>의 SELECT 목록은 열 10개가 늘 같아서 <code>lp1_0.id,…,lp1_0.view_count</code>로 줄였다.</p>
+<h3 id="①-변경-감지--save-없이-update"><a class="anchor" href="#①-변경-감지--save-없이-update" aria-hidden="true">#</a>① 변경 감지 — <code>save</code> 없이 <code>UPDATE</code></h3>
+<pre><code class="language-text">TX: Creating new transaction with name [org.example.e7.LessonPostService.changeTitle]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT
+TX: Participating in existing transaction
+SQL: select lp1_0.id,…,lp1_0.view_count from lesson_post lp1_0 where lp1_0.id=?
+   changeTitle 메서드 끝 — save는 안 불렀다
+TX: Committing JPA transaction
+SQL: update lesson_post set author_id=?,board_id=?,content=?,deleted_at=?,status=?,title=?,updated_at=?,view_count=? where id=?
+bind: (6:VARCHAR) &lt;- [제목을 고쳤다]
+bind: (7:TIMESTAMP) &lt;- [2026-10-10T15:38:50.956617]
+bind: (9:BIGINT) &lt;- [1]</code></pre>
+<ul>
+<li><code>changeTitle</code> 메서드에 들어갈 때 트랜잭션이 <strong>새로</strong> 열렸다. 안에서 부른 <code>findById</code>는 새로 열지 않고 <strong>참여</strong>했다(<code>Participating in existing transaction</code>).</li>
+<li><code>UPDATE</code>는 <strong>&quot;메서드 끝&quot; 다음, 커밋할 때</strong> 나갔다. 값을 바꾼 줄(<code>post.changeTitle</code>)에서는 SQL이 없었다.</li>
+<li>제목만 바꿨는데 <code>UPDATE</code>에 열이 8개다. Hibernate는 기본으로 바뀐 칸만이 아니라 <strong>모든 칸</strong>을 다시 쓴다. <code>created_at</code>만 빠졌는데, <code>updatable = false</code>라서다.</li>
+<li><code>updated_at</code>(7번)에는 <code>@UpdateTimestamp</code>가 지금 시각을 넣었다.</li>
+</ul>
+<p><strong>② 같은 값으로 다시 바꾸면</strong> <code>select</code> 한 줄 뒤 커밋만 하고 <code>UPDATE</code>가 없었다. 사본과 비교해 달라진 게 없으니 보낼 것도 없다.</p>
+<h3 id="③-transactional이-없으면--아무-일도-없다"><a class="anchor" href="#③-transactional이-없으면--아무-일도-없다" aria-hidden="true">#</a>③ <code>@Transactional</code>이 없으면 — 아무 일도 없다</h3>
+<pre><code class="language-text">TX: Creating new transaction with name [org.springframework.data.jpa.repository.support.SimpleJpaRepository.findById]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT,readOnly
+SQL: select lp1_0.id,…,lp1_0.view_count from lesson_post lp1_0 where lp1_0.id=?
+TX: Committing JPA transaction
+   changeTitleNoTx 메서드 끝
+…
+③ DB 제목: [공지] 커뮤니티 이용 규칙 안내</code></pre>
+<p>서비스에 트랜잭션이 없으니, <code>findById</code>가 <strong>자기 몫의 작은 트랜잭션</strong>(<code>SimpleJpaRepository.findById … readOnly</code>)을 열고 읽자마자 커밋했다. 그 순간 영속성 컨텍스트도 닫혔다. 그 뒤에 바꾼 제목은 아무도 비교해 주지 않는다. <code>UPDATE</code>가 없고, 에러도 없다. <strong>DB 제목은 그대로다.</strong></p>
+<p>API로 부르면 더 헷갈린다. 응답에는 고친 제목이 나온다. 메모리의 객체는 바뀌었기 때문이다(따라 해 보기 4).</p>
+<h3 id="④-transactional-없이-save를-부르면"><a class="anchor" href="#④-transactional-없이-save를-부르면" aria-hidden="true">#</a>④ <code>@Transactional</code> 없이 <code>save</code>를 부르면</h3>
+<pre><code class="language-text">SQL: select lp1_0.id,…,lp1_0.view_count from lesson_post lp1_0 where lp1_0.id=?        ← findById
+TX: Creating new transaction with name [org.springframework.data.jpa.repository.support.SimpleJpaRepository.save]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT
+SQL: select lp1_0.id,…,lp1_0.view_count from lesson_post lp1_0 where lp1_0.id=?        ← save 안에서 또 읽는다
+TX: Committing JPA transaction
+SQL: update lesson_post set author_id=?,board_id=?,content=?,deleted_at=?,status=?,title=?,updated_at=?,view_count=? where id=?
+   save가 돌려준 객체가 같은 객체인가? false</code></pre>
+<p>이번엔 저장됐다. 그런데 같은 행을 <strong>두 번</strong> 읽었다. <code>save</code>는 id가 있는 객체를 받으면 &quot;이미 있는 행&quot;으로 보고 <strong>병합</strong>(merge)한다. 새 트랜잭션에서 DB 행을 다시 읽어 새 객체를 만들고, 내 객체의 값을 거기에 복사한 다음, 커밋 때 변경 감지로 <code>UPDATE</code>한다. 그래서 돌려준 객체는 내가 넘긴 객체와 <strong>다른 객체</strong>다(<code>false</code>). <code>save</code> 뒤에는 돌려받은 객체를 써야 한다.</p>
+<p>정리하면, 서비스에 <code>@Transactional</code>을 걸고 값만 바꾸는 쪽(①)이 SQL도 적고 코드도 짧다. <code>save</code>는 <strong>새 객체를 처음 넣을 때</strong>(<code>id</code>가 <code>null</code>) 부른다.</p>
+<h3 id="⑤-transactionalreadonly--true에서-바꾸면"><a class="anchor" href="#⑤-transactionalreadonly--true에서-바꾸면" aria-hidden="true">#</a>⑤ <code>@Transactional(readOnly = true)</code>에서 바꾸면</h3>
+<pre><code class="language-text">TX: Creating new transaction with name [org.example.e7.LessonPostService.changeTitleReadOnly]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT,readOnly
+SQL: select lp1_0.id,…,lp1_0.view_count from lesson_post lp1_0 where lp1_0.id=?
+   readOnly 메서드 끝
+TX: Committing JPA transaction
+…
+⑤ DB 제목: 첫 코드리뷰 받은 날</code></pre>
+<p>커밋은 했는데 <code>UPDATE</code>가 없다. 읽기 전용 트랜잭션에서는 Hibernate가 변경 감지를 건너뛴다. 조회용 서비스 메서드에 <code>readOnly = true</code>를 붙이면 쓸데없는 비교를 안 해서 좋지만, 그 안에서 값을 바꿔도 저장되지 않는다는 뜻이기도 하다.</p>
+<h3 id="⑥-작성수정-시각-자동-입력"><a class="anchor" href="#⑥-작성수정-시각-자동-입력" aria-hidden="true">#</a>⑥ 작성·수정 시각 자동 입력</h3>
+<pre><code class="language-text">SQL: insert into lesson_post (author_id,board_id,content,created_at,deleted_at,status,title,updated_at,view_count) values (?,?,?,?,?,?,?,?,?)
+bind: (4:TIMESTAMP) &lt;- [2026-10-10T15:38:51.058482]       ← created_at
+bind: (6:ENUM) &lt;- [DRAFT]
+bind: (8:TIMESTAMP) &lt;- [2026-10-10T15:38:51.058504]       ← updated_at
+⑥ 저장 직후 객체: createdAt 2026-10-10T15:38:51.058482 / updatedAt 2026-10-10T15:38:51.058504
+…(changeTitle로 제목 수정)
+SQL: update lesson_post set author_id=?,board_id=?,content=?,deleted_at=?,status=?,title=?,updated_at=?,view_count=? where id=?
+bind: (7:TIMESTAMP) &lt;- [2026-10-10T15:38:51.076943]       ← updated_at만 새 값
+⑥ DB에서 다시 읽음: createdAt 2026-10-10T15:38:51 / updatedAt 2026-10-10T15:38:51</code></pre>
+<ul>
+<li><code>@CreationTimestamp</code>·<code>@UpdateTimestamp</code>(Hibernate 기능)는 서버(JVM)의 지금 시각을 넣는다. 두 필드를 따로 채워서 처음 넣을 때도 마이크로초가 조금 다르다.</li>
+<li><code>enum</code>은 <code>@Enumerated(EnumType.STRING)</code> 덕분에 <code>&#39;DRAFT&#39;</code>라는 이름으로 들어갔다.</li>
+<li>다시 읽으니 소수점 아래가 사라졌다. 열이 <code>datetime</code>(초까지)이라서 MySQL이 반올림해 저장한다. 다른 실행에서는 <code>15:24:55.648308</code>이 <code>15:24:56</code>으로 저장됐다. 저장 직후 객체에 든 값과 DB 값이 다를 수 있다는 점만 기억한다.</li>
+</ul>
+<p>같은 일을 <strong>Spring Data의 Auditing</strong>으로도 할 수 있다. 실무 코드에서 자주 보는 쪽이다.</p>
+<pre><code class="language-java">@Entity
+@Table(name = &quot;lesson_post&quot;)
+@EntityListeners(AuditingEntityListener.class)   // 저장·수정 직전에 Spring Data가 끼어들게 한다
+public class AuditedPost {
+    // …id, boardId, authorId, title, content는 같다
+
+    @CreatedDate
+    @Column(name = &quot;created_at&quot;, nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    @Column(name = &quot;updated_at&quot;, nullable = false)
+    private LocalDateTime updatedAt;
+}</code></pre>
+<pre><code class="language-java">@Configuration
+@EnableJpaAuditing      // 이게 있어야 동작한다
+public class AuditingConfig {}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>Hibernate <code>@CreationTimestamp</code>·<code>@UpdateTimestamp</code></th>
+<th>Spring Data <code>@CreatedDate</code>·<code>@LastModifiedDate</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>필요한 설정</td>
+<td>어노테이션만</td>
+<td><code>@EntityListeners(AuditingEntityListener.class)</code> + <code>@EnableJpaAuditing</code></td>
+</tr>
+<tr>
+<td>처음 넣을 때</td>
+<td>두 값이 마이크로초 단위로 조금 다르다</td>
+<td>두 값이 똑같다(<code>…41.793438</code>과 <code>…41.793438</code>)</td>
+</tr>
+<tr>
+<td>더 할 수 있는 것</td>
+<td>시각만</td>
+<td><code>@CreatedBy</code>·<code>@LastModifiedBy</code>로 &quot;누가&quot;도 기록(로그인 정보와 연결)</td>
+</tr>
+</tbody></table></div>
+<p>Auditing에 필요한 <code>spring-aspects</code> 라이브러리는 <code>spring-boot-starter-data-jpa</code>가 이미 데려온다(<code>./gradlew dependencies</code>로 확인). 따로 추가하지 않는다. <code>@EnableJpaAuditing</code>을 빼면 어떻게 되는지는 일부러 틀려 보기 4에 있다.</p>
+<h3 id="⑦⑨-삭제--지우기-전에-먼저-읽는다"><a class="anchor" href="#⑦⑨-삭제--지우기-전에-먼저-읽는다" aria-hidden="true">#</a>⑦~⑨ 삭제 — 지우기 전에 먼저 읽는다</h3>
+<pre><code class="language-text">⑦ delete(엔티티)                         ← 서비스 @Transactional 안에서 findById → delete
+SQL: select lp1_0.id,…,lp1_0.view_count from lesson_post lp1_0 where lp1_0.id=?
+   delete 호출 끝
+TX: Committing JPA transaction
+SQL: delete from lesson_post where id=?
+⑧ deleteById(10)
+TX: Creating new transaction with name [org.springframework.data.jpa.repository.support.SimpleJpaRepository.deleteById]: …
+SQL: select lp1_0.id,…,lp1_0.view_count from lesson_post lp1_0 where lp1_0.id=?
+TX: Committing JPA transaction
+SQL: delete from lesson_post where id=?
+⑨ deleteById(9999) — 없는 번호
+SQL: select lp1_0.id,…,lp1_0.view_count from lesson_post lp1_0 where lp1_0.id=?
+TX: Committing JPA transaction
+⑨ 예외 없이 지나감</code></pre>
+<ul>
+<li><code>delete</code>도 <code>UPDATE</code>처럼 <strong>커밋 때</strong> 나간다(⑦에서 &quot;호출 끝&quot; 뒤).</li>
+<li><code>deleteById(10)</code>은 이름만 보면 <code>DELETE</code> 한 줄일 것 같은데, <strong><code>SELECT</code> 먼저</strong>다. Spring Data는 id로 엔티티를 먼저 찾고, 찾은 엔티티를 지운다.</li>
+<li>없는 번호(9999)면 <code>SELECT</code>만 하고 <strong>조용히 끝난다.</strong> 예외가 없다. &quot;없는 글을 지우려 하면 404&quot;가 필요하면 ⑦처럼 서비스에서 <code>findById(…).orElseThrow(…)</code>로 먼저 확인한다.</li>
+</ul>
+<p>이름 규칙 삭제도 같다. <code>long deleteByBoardId(Long boardId)</code>를 트랜잭션 안에서 불렀더니 <code>select … where lp1_0.board_id=?</code>로 2행을 읽은 뒤, 커밋 때 <code>delete from lesson_post where id=?</code>가 <strong>행마다 한 번씩</strong> 나갔다. 1000행이면 <code>DELETE</code>가 1000번이다.</p>
+<h3 id="⑩-soft-delete--지운-척-그리고-거르기"><a class="anchor" href="#⑩-soft-delete--지운-척-그리고-거르기" aria-hidden="true">#</a>⑩ soft delete — 지운 척, 그리고 거르기</h3>
+<pre><code class="language-text">SQL: update lesson_post set author_id=?,board_id=?,content=?,deleted_at=?,status=?,title=?,updated_at=?,view_count=? where id=?
+bind: (4:TIMESTAMP) &lt;- [2026-10-10T15:38:51.123729]       ← deleted_at
+⑩ findById(9): Optional[이직 준비 근황]
+SQL: select lp1_0.id,…,lp1_0.view_count from lesson_post lp1_0 where lp1_0.id=? and lp1_0.deleted_at is null
+⑩ findByIdAndDeletedAtIsNull(9): Optional.empty</code></pre>
+<p>soft delete는 JPA 기능이 아니라 <strong>우리가 정한 규칙</strong>이다. <code>softDelete(now)</code>로 <code>deletedAt</code>을 채우면 ①과 같은 변경 감지 <code>UPDATE</code>가 나간다. 행은 남는다.</p>
+<p>그래서 <strong><code>findById</code>는 지운 글을 그대로 찾는다.</strong> 지운 글을 거르려면 조회마다 <code>deleted_at is null</code> 조건이 있어야 한다. E6의 이름 규칙(<code>findByIdAndDeletedAtIsNull</code>)으로 만들었다. 상세·목록·수정·좋아요처럼 글을 찾는 모든 길에서 이 조건을 빠뜨리지 않는 게 3-2의 핵심이다.</p>
+<p><code>findByIdAndDeletedAtIsNull</code> 앞에는 <code>TX:</code> 줄이 없다. <code>findById</code>·<code>save</code>·<code>deleteById</code> 같은 <strong>물려받은 메서드에는 기본 트랜잭션이 붙어 있고</strong>, 내가 이름 규칙이나 <code>@Query</code>로 <strong>직접 선언한 메서드에는 없다.</strong> 읽기는 그래도 되지만, 지우기·고치기는 트랜잭션이 없으면 실패한다(일부러 틀려 보기 3).</p>
+<h3 id="⑪⑭-벌크-수정--modifying"><a class="anchor" href="#⑪⑭-벌크-수정--modifying" aria-hidden="true">#</a>⑪~⑭ 벌크 수정 — <code>@Modifying</code></h3>
+<p>&quot;게시판 2의 글 조회수를 전부 +1&quot;을 변경 감지로 하면 글마다 읽고 <code>UPDATE</code>가 한 줄씩 나간다. <code>UPDATE</code> 한 번으로 끝내려면 저장소에 직접 쓴다.</p>
+<pre><code class="language-java">public interface LessonPostRepository extends JpaRepository&lt;LessonPost, Long&gt; {
+
+    // soft delete 된 글은 못 찾는 조회
+    Optional&lt;LessonPost&gt; findByIdAndDeletedAtIsNull(Long id);
+
+    long deleteByBoardId(Long boardId);
+
+    // 벌크 UPDATE — 조건에 맞는 행을 SQL 한 번에 고친다
+    @Modifying
+    @Query(&quot;update LessonPost p set p.viewCount = p.viewCount + 1 where p.boardId = :boardId&quot;)
+    int increaseViews(@Param(&quot;boardId&quot;) Long boardId);
+
+    @Modifying(clearAutomatically = true)
+    @Query(&quot;update LessonPost p set p.viewCount = p.viewCount + 1 where p.boardId = :boardId&quot;)
+    int increaseViewsAndClear(@Param(&quot;boardId&quot;) Long boardId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(&quot;update LessonPost p set p.viewCount = p.viewCount + 1 where p.boardId = :boardId&quot;)
+    int increaseViewsFlushAndClear(@Param(&quot;boardId&quot;) Long boardId);
+}</code></pre>
+<p><code>@Modifying</code>은 &quot;이 <code>@Query</code>는 조회가 아니라 고치는 쿼리&quot;라는 표시다. 돌려주는 <code>int</code>는 바뀐 행 수다. 그런데 벌크 <code>UPDATE</code>는 <strong>영속성 컨텍스트를 거치지 않고 DB에 바로</strong> 간다. 그래서 들고 있던 객체와 DB가 어긋난다. 트랜잭션 안에서 글 5(게시판 2)를 먼저 읽고 벌크를 돌렸다.</p>
+<pre><code class="language-text">⑪ 벌크 UPDATE
+SQL: select lp1_0.id,…,lp1_0.view_count from lesson_post lp1_0 where lp1_0.id=?
+   벌크 전 view_count 36
+SQL: update lesson_post lp1_0 set view_count=(lp1_0.view_count+1) where lp1_0.board_id=?
+   벌크로 바꾼 행 1
+   들고 있던 객체 36 / 다시 findById 36
+⑪ 트랜잭션이 끝난 뒤 다시 읽기: 37</code></pre>
+<p>DB는 37인데 같은 트랜잭션 안에서는 36이다. <strong>다시 <code>findById</code>를 해도 36이고 SQL도 안 나갔다.</strong> 한 트랜잭션 안에서 이미 읽은 엔티티는 영속성 컨텍스트에 있는 것을 돌려주기 때문이다(E4에서 같은 회원을 다시 안 읽던 것과 같다).</p>
+<pre><code class="language-text">⑫ 벌크 UPDATE + clearAutomatically
+   벌크 전 view_count 37
+SQL: update lesson_post lp1_0 set view_count=(lp1_0.view_count+1) where lp1_0.board_id=?
+   벌크로 바꾼 행 1
+SQL: select lp1_0.id,…,lp1_0.view_count from lesson_post lp1_0 where lp1_0.id=?
+   들고 있던 객체 37 / 다시 findById 38</code></pre>
+<p><code>clearAutomatically = true</code>는 벌크 직후 영속성 컨텍스트를 <strong>비운다.</strong> 그래서 다시 <code>findById</code>하면 DB를 새로 읽어 38이 나온다. 이미 손에 든 객체(<code>post</code>)는 여전히 37이다. 벌크 뒤에는 다시 읽어서 쓴다.</p>
+<p>비우기에는 대가가 있다. <strong>아직 <code>UPDATE</code>로 안 보낸 변경도 같이 버려질 수 있다.</strong></p>
+<pre><code class="language-text">⑬ 게시판 이름을 고친 뒤 clearAutomatically 벌크
+SQL: select lb1_0.id,lb1_0.name from lesson_board lb1_0 where lb1_0.id=?
+SQL: update lesson_post lp1_0 set view_count=(lp1_0.view_count+1) where lp1_0.board_id=?
+TX: Committing JPA transaction
+⑬ DB 게시판 이름: 개발
+⑭ 같은 일 + flushAutomatically
+SQL: select lb1_0.id,lb1_0.name from lesson_board lb1_0 where lb1_0.id=?
+SQL: update lesson_board set name=? where id=?
+SQL: update lesson_post lp1_0 set view_count=(lp1_0.view_count+1) where lp1_0.board_id=?
+⑭ DB 게시판 이름: 개발(바꿈)</code></pre>
+<p>⑬에서 게시판 이름을 <code>개발(바꿈)</code>으로 바꿨는데 <code>update lesson_board</code>가 끝내 나가지 않았다. 벌크가 컨텍스트를 비우면서 바뀐 게시판 객체도 같이 버렸다. ⑭처럼 <code>flushAutomatically = true</code>를 더하면 벌크 <strong>전에</strong> 밀린 변경을 먼저 보내고(<code>update lesson_board</code>) 나서 비운다.</p>
+<p>따로 해 본 실험에서, 같은 <code>lesson_post</code>의 제목을 고친 뒤 <code>clearAutomatically</code> 벌크를 돌렸을 때는 Hibernate가 제목 <code>UPDATE</code>를 벌크 앞에 먼저 보내서 잃지 않았다. 벌크와 <strong>같은 테이블</strong>의 변경은 먼저 보냈고, <strong>다른 테이블</strong>(<code>lesson_board</code>)의 변경은 보내지 않은 채 버렸다. 어느 쪽인지 따지기보다 <code>clearAutomatically</code>를 켤 때는 <code>flushAutomatically</code>도 같이 켠다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>20분. E6에서 만든 연습 프로젝트에 이어서 한다. <code>E6Playground.java</code>는 지웠어야 한다.</p>
+<p><strong>1. 연습 테이블을 만든다.</strong> E2의 <code>sql</code> 함수는 <code>community</code> DB를 본다. 맨 끝 DB 이름만 <code>practice</code>로 바꾼 <code>sqlp</code>를 하나 더 만든다.</p>
+<pre><code class="language-bash">sqlp() { docker exec -i studymate-mysql-1 mysql --default-character-set=utf8mb4 -t -ucommunity -pcommunity practice -e &quot;$1&quot;; }
+sqlp &quot;DROP TABLE IF EXISTS lesson_post, lesson_board; CREATE TABLE lesson_post LIKE post; INSERT INTO lesson_post SELECT * FROM post WHERE id &lt;= 10; CREATE TABLE lesson_board LIKE board; INSERT INTO lesson_board SELECT * FROM board&quot;</code></pre>
+<p><code>CREATE TABLE … LIKE post</code>는 열·인덱스·CHECK 제약까지 똑같은 빈 테이블을 만든다. 외래키는 따라오지 않아서, 지워도 댓글·좋아요 테이블과 부딪히지 않는다. 처음부터 다시 하고 싶으면 이 줄을 또 실행한다.</p>
+<p><strong>2. 설정 한 줄을 더한다.</strong> <code>application.yml</code>의 <code>logging.level</code> 아래에 트랜잭션 로그를 켠다.</p>
+<pre><code class="language-yaml">logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace
+    org.springframework.orm.jpa.JpaTransactionManager: debug   # 트랜잭션이 언제 열리고 커밋되나</code></pre>
+<p><strong>3. 파일.</strong> 패키지는 <code>org.example.e7</code>. 예시의 <code>LessonPost</code>·<code>PostStatus</code>·<code>LessonPostRepository</code>·<code>LessonPostService</code>와 아래 <code>LessonBoard</code>·<code>LessonBoardRepository</code>·연습 파일을 만든다.</p>
+<pre><code class="language-java">@Entity
+@Table(name = &quot;lesson_board&quot;)
+public class LessonBoard {
+    @Id
+    private Long id;
+    private String name;
+
+    protected LessonBoard() {}
+
+    public void rename(String name) { this.name = name; }
+    public String getName() { return name; }
+}</code></pre>
+<pre><code class="language-java">public interface LessonBoardRepository extends JpaRepository&lt;LessonBoard, Long&gt; {}</code></pre>
+<pre><code class="language-java">// 연습용 — 서버가 뜰 때 한 번 실행된다. 다 보고 나면 지운다
+@Component
+public class E7Playground implements CommandLineRunner {
+    private final LessonPostService service;
+    private final LessonPostRepository posts;
+    private final LessonBoardRepository boards;
+    private final TransactionTemplate tx;
+
+    public E7Playground(LessonPostService service, LessonPostRepository posts,
+                        LessonBoardRepository boards, TransactionTemplate tx) {
+        this.service = service;
+        this.posts = posts;
+        this.boards = boards;
+        this.tx = tx;
+    }
+
+    private static void p(String s) { System.out.println(s); }
+    private String titleInDb(long id) { return posts.findById(id).orElseThrow().getTitle(); }
+
+    @Override
+    public void run(String... args) {
+        p(&quot;① @Transactional 안에서 제목 바꾸기 — save 없음&quot;);
+        service.changeTitle(1L, &quot;제목을 고쳤다&quot;);
+        p(&quot;① DB 제목: &quot; + titleInDb(1L));
+
+        p(&quot;② 같은 값으로 다시 바꾸기&quot;);
+        service.changeTitle(1L, &quot;제목을 고쳤다&quot;);
+
+        p(&quot;③ @Transactional 없이&quot;);
+        service.changeTitleNoTx(2L, &quot;트랜잭션 없이 고침&quot;);
+        p(&quot;③ DB 제목: &quot; + titleInDb(2L));
+
+        p(&quot;④ @Transactional 없이 + save&quot;);
+        service.changeTitleNoTxSave(2L, &quot;save로 고침&quot;);
+        p(&quot;④ DB 제목: &quot; + titleInDb(2L));
+
+        p(&quot;⑤ readOnly = true&quot;);
+        service.changeTitleReadOnly(3L, &quot;readOnly에서 고침&quot;);
+        p(&quot;⑤ DB 제목: &quot; + titleInDb(3L));
+
+        p(&quot;⑥ 새 글 저장 → 제목 수정 — 시각 자동 입력&quot;);
+        LessonPost created = posts.save(new LessonPost(1L, 1L, &quot;e7 새 글&quot;, &quot;내용&quot;));
+        p(&quot;⑥ 저장 직후 객체: createdAt &quot; + created.getCreatedAt() + &quot; / updatedAt &quot; + created.getUpdatedAt());
+        service.changeTitle(created.getId(), &quot;e7 새 글(수정)&quot;);
+        LessonPost reread = posts.findById(created.getId()).orElseThrow();
+        p(&quot;⑥ DB에서 다시 읽음: createdAt &quot; + reread.getCreatedAt() + &quot; / updatedAt &quot; + reread.getUpdatedAt());
+
+        p(&quot;⑦ delete(엔티티)&quot;);
+        service.delete(created.getId());
+
+        p(&quot;⑧ deleteById(10)&quot;);
+        posts.deleteById(10L);
+        p(&quot;⑨ deleteById(9999) — 없는 번호&quot;);
+        posts.deleteById(9999L);
+        p(&quot;⑨ 예외 없이 지나감&quot;);
+
+        p(&quot;⑩ soft delete&quot;);
+        service.softDelete(9L);
+        p(&quot;⑩ findById(9): &quot; + posts.findById(9L).map(LessonPost::getTitle));
+        p(&quot;⑩ findByIdAndDeletedAtIsNull(9): &quot; + posts.findByIdAndDeletedAtIsNull(9L).map(LessonPost::getTitle));
+
+        p(&quot;⑪ 벌크 UPDATE&quot;);
+        tx.executeWithoutResult(s -&gt; {
+            LessonPost post = posts.findById(5L).orElseThrow();
+            p(&quot;   벌크 전 view_count &quot; + post.getViewCount());
+            p(&quot;   벌크로 바꾼 행 &quot; + posts.increaseViews(2L));
+            p(&quot;   들고 있던 객체 &quot; + post.getViewCount() + &quot; / 다시 findById &quot; + posts.findById(5L).orElseThrow().getViewCount());
+        });
+        p(&quot;⑪ 트랜잭션이 끝난 뒤 다시 읽기: &quot; + posts.findById(5L).orElseThrow().getViewCount());
+
+        p(&quot;⑫ 벌크 UPDATE + clearAutomatically&quot;);
+        tx.executeWithoutResult(s -&gt; {
+            LessonPost post = posts.findById(5L).orElseThrow();
+            p(&quot;   벌크 전 view_count &quot; + post.getViewCount());
+            p(&quot;   벌크로 바꾼 행 &quot; + posts.increaseViewsAndClear(2L));
+            p(&quot;   들고 있던 객체 &quot; + post.getViewCount() + &quot; / 다시 findById &quot; + posts.findById(5L).orElseThrow().getViewCount());
+        });
+
+        p(&quot;⑬ 게시판 이름을 고친 뒤 clearAutomatically 벌크&quot;);
+        tx.executeWithoutResult(s -&gt; {
+            boards.findById(2L).orElseThrow().rename(&quot;개발(바꿈)&quot;);
+            posts.increaseViewsAndClear(2L);
+        });
+        p(&quot;⑬ DB 게시판 이름: &quot; + boards.findById(2L).orElseThrow().getName());
+
+        p(&quot;⑭ 같은 일 + flushAutomatically&quot;);
+        tx.executeWithoutResult(s -&gt; {
+            boards.findById(2L).orElseThrow().rename(&quot;개발(바꿈)&quot;);
+            posts.increaseViewsFlushAndClear(2L);
+        });
+        p(&quot;⑭ DB 게시판 이름: &quot; + boards.findById(2L).orElseThrow().getName());
+    }
+}</code></pre>
+<p><code>TransactionTemplate</code>은 E4에서 쓴 것과 같다. &quot;이 람다를 트랜잭션 하나로 묶어 실행&quot;한다. 서비스 메서드를 따로 만들지 않고 트랜잭션 안을 보려고 썼다.</p>
+<p><strong>4. 켜고 ①~⑭ 사이의 <code>SQL:</code>·<code>TX:</code> 줄을 읽는다.</strong> 예시에 옮긴 로그와 같아야 한다(시각은 다르다). 이 표만 확인하면 된다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>번호</th>
+<th><code>UPDATE</code>/<code>DELETE</code>가 나갔나</th>
+<th>어디서</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>①</td>
+<td><code>update</code> 1</td>
+<td>&quot;메서드 끝&quot; <strong>뒤</strong>, <code>Committing</code> 다음</td>
+</tr>
+<tr>
+<td>② · ③ · ⑤</td>
+<td>없음</td>
+<td>같은 값 · 트랜잭션 없음 · 읽기 전용</td>
+</tr>
+<tr>
+<td>④</td>
+<td><code>update</code> 1</td>
+<td>그 앞에 <code>select</code>가 2번</td>
+</tr>
+<tr>
+<td>⑦ · ⑧</td>
+<td><code>delete</code> 1</td>
+<td>그 앞에 <code>select</code> 1</td>
+</tr>
+<tr>
+<td>⑨</td>
+<td>없음</td>
+<td><code>select</code>만, 예외 없음</td>
+</tr>
+<tr>
+<td>⑪ · ⑫</td>
+<td>벌크 <code>update</code> 1</td>
+<td>⑫만 그 뒤에 <code>select</code>가 다시 나간다</td>
+</tr>
+<tr>
+<td>⑬</td>
+<td>벌크 <code>update</code>만</td>
+<td><code>update lesson_board</code>가 <strong>없다</strong></td>
+</tr>
+</tbody></table></div>
+<p><strong>5. API로 확인한다.</strong> <code>E7Playground.java</code>를 지우고, 1단계 <code>sqlp</code> 줄을 다시 실행해 테이블을 새로 만든 뒤 서버를 켠다. 컨트롤러는 이렇다.</p>
+<pre><code class="language-java">@RestController
+public class LessonPostController {
+
+    private final LessonPostService service;
+    private final LessonPostRepository posts;
+
+    public LessonPostController(LessonPostService service, LessonPostRepository posts) {
+        this.service = service;
+        this.posts = posts;
+    }
+
+    public record TitleRequest(String title) {}
+    public record PostResponse(Long id, String title, String status, String updatedAt) {
+        static PostResponse from(LessonPost p) {
+            return new PostResponse(p.getId(), p.getTitle(), p.getStatus().name(), String.valueOf(p.getUpdatedAt()));
+        }
+    }
+
+    @PatchMapping(&quot;/e7/posts/{id}&quot;)
+    public PostResponse changeTitle(@PathVariable Long id, @RequestBody TitleRequest req) {
+        return PostResponse.from(service.changeTitle(id, req.title()));
+    }
+
+    @PatchMapping(&quot;/e7/posts/{id}/no-tx&quot;)
+    public PostResponse changeTitleNoTx(@PathVariable Long id, @RequestBody TitleRequest req) {
+        return PostResponse.from(service.changeTitleNoTx(id, req.title()));
+    }
+
+    // 나쁜 예: 인자 없는 orElseThrow()
+    @GetMapping(&quot;/e7/posts/{id}/bad&quot;)
+    public PostResponse getBad(@PathVariable Long id) {
+        return PostResponse.from(posts.findById(id).orElseThrow());
+    }
+
+    @DeleteMapping(&quot;/e7/posts/{id}&quot;)
+    public void delete(@PathVariable Long id) {
+        service.softDelete(id);
+    }
+}</code></pre>
+<pre><code class="language-text">$ curl -s -i -X PATCH localhost:18280/e7/posts/1 -H 'Content-Type: application/json' -d '{&quot;title&quot;:&quot;curl로 고친 제목&quot;}'
+HTTP/1.1 200
+{&quot;id&quot;:1,&quot;title&quot;:&quot;curl로 고친 제목&quot;,&quot;status&quot;:&quot;PUBLISHED&quot;,&quot;updatedAt&quot;:&quot;2026-10-10T15:31:32.879569&quot;}
+
+$ curl -s -i -X PATCH localhost:18280/e7/posts/2/no-tx -H 'Content-Type: application/json' -d '{&quot;title&quot;:&quot;트랜잭션 없이 고친 제목&quot;}'
+HTTP/1.1 200
+{&quot;id&quot;:2,&quot;title&quot;:&quot;트랜잭션 없이 고친 제목&quot;,&quot;status&quot;:&quot;PUBLISHED&quot;,&quot;updatedAt&quot;:&quot;2026-07-01T11:00&quot;}
+
+$ curl -s -i -X PATCH localhost:18280/e7/posts/9999 -H 'Content-Type: application/json' -d '{&quot;title&quot;:&quot;없는 글&quot;}'
+HTTP/1.1 404
+{&quot;timestamp&quot;:&quot;2026-10-10T06:31:32.960Z&quot;,&quot;status&quot;:404,&quot;error&quot;:&quot;Not Found&quot;,&quot;path&quot;:&quot;/e7/posts/9999&quot;}
+
+$ curl -s -i localhost:18280/e7/posts/9999/bad
+HTTP/1.1 500
+{&quot;timestamp&quot;:&quot;2026-10-10T06:31:32.980Z&quot;,&quot;status&quot;:500,&quot;error&quot;:&quot;Internal Server Error&quot;,&quot;path&quot;:&quot;/e7/posts/9999/bad&quot;}
+
+$ curl -s -i -X DELETE localhost:18280/e7/posts/3
+HTTP/1.1 200</code></pre>
+<p>(헤더는 상태 줄만 남겼다.) 이제 DB를 본다.</p>
+<pre><code class="language-text">$ sqlp &quot;SELECT id, title, updated_at, deleted_at FROM lesson_post WHERE id IN (1,2,3)&quot;
++----+--------------------------------------------+---------------------+---------------------+
+| id | title                                      | updated_at          | deleted_at          |
++----+--------------------------------------------+---------------------+---------------------+
+|  1 | curl로 고친 제목                           | 2026-10-10 15:31:33 | NULL                |
+|  2 | [공지] 커뮤니티 이용 규칙 안내             | 2026-07-01 11:00:00 | NULL                |
+|  3 | 첫 코드리뷰 받은 날                        | 2026-10-10 15:31:33 | 2026-10-10 15:31:33 |
++----+--------------------------------------------+---------------------+---------------------+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>요청</th>
+<th>응답</th>
+<th>DB</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>PATCH /e7/posts/1</code></td>
+<td><code>200</code>, 새 제목</td>
+<td>바뀌었다</td>
+</tr>
+<tr>
+<td><code>PATCH /e7/posts/2/no-tx</code></td>
+<td><strong><code>200</code>, 새 제목</strong></td>
+<td><strong>안 바뀌었다</strong> — 응답의 <code>updatedAt</code>도 옛날 값 그대로다. <code>UPDATE</code>가 없었으니 <code>@UpdateTimestamp</code>도 안 돌았다</td>
+</tr>
+<tr>
+<td><code>PATCH /e7/posts/9999</code></td>
+<td><code>404</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>GET /e7/posts/9999/bad</code></td>
+<td><code>500</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>DELETE /e7/posts/3</code></td>
+<td><code>200</code></td>
+<td>행은 남고 <code>deleted_at</code>이 채워졌다</td>
+</tr>
+</tbody></table></div>
+<p>2번이 이 레슨에서 가장 무서운 장면이다. 클라이언트는 <code>200</code>과 새 제목을 받았는데 DB는 그대로다. 테스트에서 응답만 확인하면 못 잡는다. 수정 API는 <strong>DB를 다시 읽어서</strong> 확인한다.</p>
+<p>없는 글의 차이도 본다. 서비스의 <code>getPost</code>는 <code>orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND, …))</code>라서 <code>404</code>가 됐다. 인자 없는 <code>orElseThrow()</code>는 <code>java.util.NoSuchElementException: No value present</code>를 던지고, 아무도 HTTP 상태로 바꿔 주지 않으니 <code>500</code>이 된다. 서버 로그에도 이 예외가 스택트레이스와 함께 남는다. 잘못 보낸 쪽은 클라이언트인데 서버 잘못으로 답한 셈이다. 404 응답 본문을 F1의 <code>ProblemDetail</code> 모양으로 바꾸는 건 F1·2-1에서 한다.</p>
+<p><strong>6. 정리한다.</strong> 서버를 끄고 연습 테이블을 지운다.</p>
+<pre><code class="language-bash">sqlp &quot;DROP TABLE lesson_post, lesson_board&quot;</code></pre>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p>메시지는 Spring Boot 4.1.1 · Spring Data JPA 4.1.1 · Hibernate 7.4.5에서 재현한 원문이다. 할 때마다 1단계 <code>sqlp</code> 줄로 테이블을 새로 만든다.</p>
+<p><strong>1. <code>@Enumerated(EnumType.STRING)</code>을 지운다</strong> — 기본값은 <code>ORDINAL</code>(순번)이다.</p>
+<pre><code class="language-text">WARN  o.h.orm.jdbc.error : Value 'PUBLISHED' is outside of valid range for type java.lang.Byte
+org.springframework.dao.DataIntegrityViolationException: Could not extract column [7] from JDBC ResultSet [Value 'PUBLISHED' is outside of valid range for type java.lang.Byte] [n/a]; SQL [n/a]</code></pre>
+<p><code>findById(1L)</code>부터 터진다. <code>@Enumerated</code>가 없으면 Hibernate는 enum을 <strong>순번</strong>(<code>PUBLISHED</code>=0, <code>DRAFT</code>=1, <code>HIDDEN</code>=2)으로 읽고 쓴다. 열에 든 <code>&#39;PUBLISHED&#39;</code> 글자를 숫자로 읽으려다 실패했다. 새 글을 저장하면 <code>binding parameter (6:TINYINT) &lt;- [DRAFT]</code>로 숫자 <code>1</code>을 넣으려다 <code>Check constraint &#39;lesson_post_chk_2&#39; is violated.</code>로 막힌다. 이 테이블은 CHECK 제약 덕분에 바로 터졌다.</p>
+<p>정말 무서운 건 <strong>숫자 열에 처음부터 순번으로 저장해 온 경우</strong>다. 터지지 않고 값이 조용히 바뀐다. 작은 테이블로 확인했다.</p>
+<pre><code class="language-bash">sqlp &quot;CREATE TABLE lesson_ticket (id bigint NOT NULL AUTO_INCREMENT PRIMARY KEY, status tinyint NOT NULL)&quot;</code></pre>
+<pre><code class="language-java">public enum TicketStatus { OPEN, CLOSED }
+
+@Entity
+@Table(name = &quot;lesson_ticket&quot;)
+public class LessonTicket {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Enumerated(EnumType.ORDINAL)   // 순번(0, 1, 2…)으로 저장
+    private TicketStatus status;
+
+    protected LessonTicket() {}
+    public LessonTicket(TicketStatus status) { this.status = status; }
+    public Long getId() { return id; }
+    public TicketStatus getStatus() { return status; }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>순서</th>
+<th>한 일</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>save(new LessonTicket(TicketStatus.CLOSED))</code></td>
+<td><code>insert into lesson_ticket (status) values (?)</code>, DB에는 <code>status = 1</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>enum 맨 앞에 상태 하나 추가: <code>{ WAITING, OPEN, CLOSED }</code></td>
+<td>코드만 바꿨다. DB는 그대로 <code>1</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>서버를 다시 켜고 <code>findAll()</code></td>
+<td><code>티켓 1: OPEN</code> — <strong>닫힌 티켓이 열렸다</strong></td>
+</tr>
+</tbody></table></div>
+<p>순번 <code>1</code>의 뜻이 <code>CLOSED</code>에서 <code>OPEN</code>으로 바뀌었다. 에러도 경고도 없다. 그래서 상태 enum에는 늘 <code>@Enumerated(EnumType.STRING)</code>을 적는다. 문자열은 enum의 <strong>이름</strong>을 바꿀 때만 DB 값도 같이 고치면 된다. 다 보면 <code>sqlp &quot;DROP TABLE lesson_ticket&quot;</code>.</p>
+<p><strong>2. <code>@Modifying</code>을 빼먹는다</strong> — <code>@Query(&quot;update …&quot;)</code>만 남기고 트랜잭션 안에서 부른다.</p>
+<pre><code class="language-text">org.springframework.dao.InvalidDataAccessApiUsageException: Query executed via 'getResultList()' or 'getSingleResult()' must be a 'select' query [update LessonPost p set p.viewCount = p.viewCount + 1 where p.boardId = :boardId]</code></pre>
+<p><code>@Modifying</code>이 없으면 Spring Data는 조회 쿼리로 보고 결과 목록을 받으려 한다. Hibernate가 &quot;그 방법은 <code>select</code>만 된다&quot;고 거절했다. 서버는 뜨고, <strong>부를 때</strong> 터진다.</p>
+<p><strong>3. 트랜잭션 없이 벌크·이름 규칙 삭제를 부른다</strong> — 서비스나 <code>TransactionTemplate</code> 없이 <code>posts.increaseViews(2L)</code>, <code>posts.deleteByBoardId(4L)</code></p>
+<pre><code class="language-text">org.springframework.dao.InvalidDataAccessApiUsageException: No active transaction for update or delete query
+org.springframework.dao.InvalidDataAccessApiUsageException: No EntityManager with actual transaction available for current thread - cannot reliably process 'remove' call</code></pre>
+<p>⑩에서 본 대로 직접 선언한 메서드에는 기본 트랜잭션이 없다. <code>@Modifying</code>도 트랜잭션을 만들어 주지 않는다. <code>deleteByBoardId</code>는 <code>select</code>까지는 나갔다가 지우는 단계에서 막혔다. 고치기·지우기는 <code>@Transactional</code>이 붙은 서비스 메서드 안에서 부른다.</p>
+<p><strong>4. <code>@EnableJpaAuditing</code>을 빼먹는다</strong> — 예시의 <code>AuditedPost</code>(나머지 필드는 <code>LessonPost</code>와 같고, 저장소는 <code>JpaRepository&lt;AuditedPost, Long&gt;</code>)로 새 글을 저장했더니 이렇게 나왔다.</p>
+<pre><code class="language-text">org.springframework.dao.DataIntegrityViolationException: not-null property references a null or transient value for entity org.example.e7.AuditedPost.createdAt</code></pre>
+<p><code>@CreatedDate</code>는 표시일 뿐이고, 값을 채우는 일은 <code>@EnableJpaAuditing</code>이 켜 준다. 아무도 안 채운 <code>createdAt</code>이 <code>null</code>이라 <code>nullable = false</code>를 본 Hibernate가 <code>INSERT</code> 전에 막았다. 컴파일도 기동도 멀쩡해서 저장할 때 처음 알게 된다.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> 아래 서비스 메서드는 <code>save</code>를 부르지 않는다. 제목이 DB에 저장되나? 저장된다면 <code>UPDATE</code>는 어느 시점에 나가나?</p>
+<pre><code class="language-java">@Transactional
+public void rename(Long id, String title) {
+    LessonPost post = posts.findById(id).orElseThrow();
+    post.changeTitle(title);
+    System.out.println(&quot;끝&quot;);
+}</code></pre>
+<details>
+<summary>정답</summary>
+
+<p>저장된다. <code>findById</code>로 읽은 엔티티는 트랜잭션이 끝날 때까지 영속성 컨텍스트가 들고 있고, 커밋 직전에 읽었을 때의 사본과 비교해 달라진 것을 <code>UPDATE</code>로 보낸다. 그래서 <code>UPDATE</code>는 <code>끝</code>이 찍힌 <strong>다음</strong>, 커밋할 때 나간다(①의 로그 순서). 같은 값으로 바꿨다면 <code>UPDATE</code>는 아예 나가지 않는다(②).</p>
+</details>
+
+<p><strong>2.</strong> 위 메서드에서 <code>@Transactional</code>을 지우고 <code>PATCH</code>로 불렀다. 응답 JSON의 제목과 DB의 제목은 각각 어떻게 되나? 왜 그런가?</p>
+<details>
+<summary>정답</summary>
+
+<p>응답에는 <strong>새 제목</strong>, DB에는 <strong>옛 제목</strong>이다. 트랜잭션이 없으니 <code>findById</code>가 자기 트랜잭션을 열고 읽자마자 커밋하면서 영속성 컨텍스트도 닫힌다. 그 뒤 바꾼 값은 메모리의 객체에만 있고 비교해서 <code>UPDATE</code>를 보낼 주체가 없다. 에러도 없어서 응답만 보면 성공처럼 보인다. 수정 API는 DB를 다시 읽어 확인해야 한다.</p>
+</details>
+
+<p><strong>3.</strong> <code>posts.deleteById(9999L)</code>(없는 번호)를 부르면 SQL이 몇 번 나가고, 무슨 일이 일어나나? &quot;없는 글 삭제 → 404&quot;를 만들려면?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>select … where lp1_0.id=?</code> <strong>한 번</strong>만 나가고 끝난다. 예외 없이 조용히 지나간다. <code>deleteById</code>는 먼저 찾고, 찾았을 때만 지운다(있으면 <code>SELECT</code> 후 <code>DELETE</code>). 404가 필요하면 서비스에서 <code>findById(id).orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND, …))</code>로 먼저 확인하고 <code>delete(엔티티)</code>(또는 soft delete)를 한다.</p>
+</details>
+
+<p><strong>4.</strong> 한 트랜잭션 안에서 글 5(조회수 36)를 읽은 뒤 <code>@Modifying</code> 벌크로 조회수를 +1 했다. 같은 트랜잭션에서 <code>posts.findById(5L)</code>을 다시 부르면 조회수는? <code>clearAutomatically = true</code>면?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>36</strong>이다. SQL도 나가지 않는다. 벌크 <code>UPDATE</code>는 영속성 컨텍스트를 거치지 않고 DB만 바꾸고, <code>findById</code>는 이미 들고 있는 엔티티를 돌려준다. <code>clearAutomatically = true</code>면 벌크 직후 컨텍스트를 비우므로 <code>findById</code>가 <code>SELECT</code>를 다시 보내 <strong>37</strong>을 읽는다. 단 비우면 아직 안 보낸 다른 테이블의 변경이 버려질 수 있어(⑬) 필요하면 <code>flushAutomatically = true</code>도 켠다.</p>
+</details>
+
+<p><strong>5.</strong> <code>@Enumerated(EnumType.ORDINAL)</code>로 <code>CLOSED</code>(순번 1)를 저장한 뒤, enum 맨 앞에 <code>WAITING</code>을 추가했다. 그 행을 다시 읽으면? 그래서 무엇을 쓰나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong><code>OPEN</code></strong> 으로 읽힌다. DB에는 숫자 <code>1</code>만 있는데, 새 enum <code>{ WAITING, OPEN, CLOSED }</code>에서 1번은 <code>OPEN</code>이다. 에러도 없이 데이터의 뜻이 바뀐다. 그래서 <code>@Enumerated(EnumType.STRING)</code>으로 이름을 저장한다. <code>@Enumerated</code>를 아예 안 적어도 기본값이 <code>ORDINAL</code>이니 반드시 적는다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/S09-jpa-hibernate.html#예제-2-영속-상태-변경과-flush">S09 — 예제 2: 영속 상태 변경과 flush</a> · <a href="../docs/knowledge/S09-jpa-hibernate.html#엔티티-상태">S09 — 엔티티 상태</a> — 영속·준영속, <code>merge</code></li>
+<li><a href="../docs/knowledge/S10-spring-data-query.html#감사-정보는-저장-이벤트의-메타데이터다">S10 — 감사 정보는 저장 이벤트의 메타데이터다</a> — Auditing, <code>@CreatedBy</code>와 <code>AuditorAware</code></li>
+<li><a href="../docs/knowledge/W11-why-tx-in-service.html">W11 트랜잭션은 왜 서비스 계층에 거나</a> — G3와 함께</li>
+<li>원문: <a href="https://docs.spring.io/spring-data/jpa/reference/jpa/transactions.html" target="_blank" rel="noopener">Spring Data JPA — Transactionality</a> — 물려받은 메서드의 기본 트랜잭션·<code>readOnly</code> · <a href="https://docs.spring.io/spring-data/jpa/reference/jpa/entity-persistence.html" target="_blank" rel="noopener">Persisting Entities</a> — <code>save</code>가 새 객체와 기존 객체를 가르는 법 · <a href="https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html#jpa.modifying-queries" target="_blank" rel="noopener">Modifying Queries</a> — <code>@Modifying</code>·<code>clearAutomatically</code> · <a href="https://github.com/spring-projects/spring-data-jpa/blob/4.1.x/spring-data-jpa/src/main/java/org/springframework/data/jpa/repository/support/SimpleJpaRepository.java" target="_blank" rel="noopener"><code>SimpleJpaRepository</code> 소스(4.1.x)</a> — <code>deleteById</code>가 먼저 찾는 코드 · <a href="https://docs.spring.io/spring-data/jpa/reference/auditing.html" target="_blank" rel="noopener">Auditing</a> · <a href="https://docs.hibernate.org/orm/7.1/userguide/html_single/" target="_blank" rel="noopener">Hibernate ORM 사용자 가이드</a> — flush·dirty checking · <a href="https://jakarta.ee/specifications/persistence/3.2/apidocs/jakarta.persistence/jakarta/persistence/Enumerated.html" target="_blank" rel="noopener"><code>@Enumerated</code></a> · <a href="https://docs.hibernate.org/orm/7.1/javadocs/org/hibernate/annotations/CreationTimestamp.html" target="_blank" rel="noopener"><code>@CreationTimestamp</code></a> · <a href="https://docs.hibernate.org/orm/7.1/javadocs/org/hibernate/annotations/UpdateTimestamp.html" target="_blank" rel="noopener"><code>@UpdateTimestamp</code></a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Optional.html" target="_blank" rel="noopener"><code>Optional.orElseThrow</code></a></li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li>레슨: <a href="G3-first-transaction.html">G3. 트랜잭션 첫 만남</a> — 오늘 <code>TX:</code> 로그로 본 &quot;새로 열기·참여·커밋&quot;과 롤백 규칙.</li>
+<li>실습: <a href="../scenario/ch3-update-delete/3-1-patch.html">3-1. 부분 수정과 본인 확인</a> — 변경 감지로 보낸 필드만 고친다.</li>
+<li>실습: <a href="../scenario/ch3-update-delete/3-2-soft-delete.html">3-2. 삭제 — soft delete</a> — <code>deleted_at</code>을 채우고, 글을 찾는 모든 길에서 거른다.</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

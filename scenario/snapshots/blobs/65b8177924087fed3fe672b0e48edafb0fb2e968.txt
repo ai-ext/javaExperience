@@ -1,0 +1,46 @@
+package org.example.like;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.member.MemberRepository;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.LocalDateTime;
+
+@Service
+public class LikeService {
+    private final PostRepository posts;
+    private final PostLikeRepository likes;
+    private final MemberRepository members;
+    private final PostAccessPolicy accessPolicy;
+
+    public LikeService(PostRepository posts, PostLikeRepository likes,
+                       MemberRepository members, PostAccessPolicy accessPolicy) {
+        this.posts = posts;
+        this.likes = likes;
+        this.members = members;
+        this.accessPolicy = accessPolicy;
+    }
+
+    @Transactional
+    public LikeResponse setLiked(Long postId, AuthenticatedMember me) {
+        Post post = posts.findById(postId).orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(me, post) || !"PUBLISHED".equals(post.getStatus())) {
+            throw new PostNotFoundException();
+        }
+        if (post.getAuthor().getId().equals(me.id())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "내 글에는 좋아요를 누를 수 없습니다.");
+        }
+        if (!likes.existsByPost_IdAndMember_Id(postId, me.id())) {
+            likes.save(new PostLike(post, members.getReferenceById(me.id()), LocalDateTime.now()));
+            post.increaseLikeCount();
+        }
+        return new LikeResponse(postId, true, post.getLikeCount());
+    }
+}

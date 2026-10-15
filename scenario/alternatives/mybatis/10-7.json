@@ -1,0 +1,54 @@
+{
+  "id": "10-7",
+  "source": "MyBatis 대체 구현 — 격리 DB project에서 C1~C9 검증",
+  "files": [
+    {
+      "path": "build.gradle",
+      "status": "modified",
+      "content": "plugins {\n    id 'java'\n    id 'org.springframework.boot' version '4.1.1'\n    id 'io.spring.dependency-management' version '1.1.7'\n}\n\ngroup = 'org.example'\nversion = '0.0.1-SNAPSHOT'\n\njava {\n    toolchain {\n        languageVersion = JavaLanguageVersion.of(21)\n    }\n}\n\nrepositories {\n    mavenCentral()\n}\n\ndependencies {\n    // start.spring.io에서 고른 것: Spring Web · Spring Data JPA · Validation · MySQL Driver · Flyway Migration\n    implementation 'org.springframework.boot:spring-boot-starter-webmvc'\n    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'\n    implementation 'org.springframework.boot:spring-boot-starter-validation'\n    implementation 'org.springframework.boot:spring-boot-starter-flyway'\n    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'\n    // 10-3 비밀번호 해시(BCrypt) — Spring Security 전체가 아니라 암호화 모듈만\n    implementation 'org.springframework.security:spring-security-crypto'\n    // 10-4 JWT 발급·검증(jjwt) — api는 컴파일에, 구현·JSON 처리는 실행할 때만\n    implementation 'io.jsonwebtoken:jjwt-api:0.13.0'\n    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'\n    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'\n    runtimeOnly 'com.mysql:mysql-connector-j'\n    runtimeOnly 'org.flywaydb:flyway-mysql'\n\n    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'\n    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'\n}\n\ntasks.named('test') {\n    useJUnitPlatform()\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/resources/application.yml",
+      "status": "modified",
+      "content": "spring:\n  application:\n    name: board-api\n  datasource:\n    # javaExperience MySQL(호스트 3306)의 project DB. 빈 DB면 Flyway가 V1으로 테이블·시드를 만든다\n    url: jdbc:mysql://localhost:13308/project?characterEncoding=UTF-8&serverTimezone=Asia/Seoul\n    username: community\n    password: community\n  jpa:\n    hibernate:\n      # 스키마는 Flyway만 만든다. 엔티티가 테이블과 다르면 기동이 실패한다\n      ddl-auto: validate\n    open-in-view: false\n\napp:\n  jwt:\n    # 예시용 비밀키 — 실제 서비스에서는 코드·저장소에 두지 않고 환경 변수 등으로 주입한다. HS256은 32바이트 이상\n    secret: board-api-example-secret-key-change-me-0123456789\n    validity-seconds: 3600\nmybatis:\n  mapper-locations: classpath:mapper/*.xml\n  configuration:\n    map-underscore-to-camel-case: true\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/post/PostListItemResponse.java",
+      "status": "modified",
+      "content": "package org.example.board.post;\n\nimport java.time.LocalDateTime;\nimport java.util.List;\n\npublic record PostListItemResponse(\n        Long id,\n        String title,\n        String visibility,\n        int viewCount,\n        int likeCount,\n        AuthorResponse author,\n        List<String> tags,\n        LocalDateTime createdAt) {\n\n    static PostListItemResponse of(Post post, List<String> tags) {\n        return new PostListItemResponse(post.getId(), post.getTitle(), post.getVisibility().name(), post.getViewCount(),\n                post.getLikeCount(), AuthorResponse.from(post.getAuthor()), tags, post.getCreatedAt());\n    }\n\n    static PostListItemResponse of(PostListRow row, List<String> tags) {\n        return new PostListItemResponse(row.id, row.title, row.visibility, row.viewCount, row.likeCount,\n                new AuthorResponse(row.authorId, row.authorNickname), tags, row.createdAt);\n    }\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/post/PostQueryService.java",
+      "status": "modified",
+      "content": "package org.example.board.post;\n\nimport java.util.List;\nimport java.util.Map;\nimport java.util.stream.Collectors;\n\nimport org.example.board.common.ApiException;\nimport org.springframework.stereotype.Service;\nimport org.springframework.transaction.annotation.Transactional;\n\n// 게시글 목록·검색 — MyBatis 동적 SQL\n@Service\npublic class PostQueryService {\n    private final PostQueryMapper mapper;\n\n    public PostQueryService(PostQueryMapper mapper) {\n        this.mapper = mapper;\n    }\n\n    @Transactional(readOnly = true)\n    public Object list(PostListQuery query, Long loginUserId) {\n        if (query.cursorMode()) {\n            return cursorList(query, loginUserId);\n        }\n        int page = query.page() == null ? 0 : query.page();\n        long offset = (long) page * query.size();\n        List<PostListRow> rows = mapper.findPage(query, loginUserId, offset);\n        long total = mapper.count(query, loginUserId);\n        return new PageResponse<>(withTags(rows), page, query.size(), total, offset + rows.size() < total);\n    }\n\n    private CursorResponse<PostListItemResponse> cursorList(PostListQuery query, Long loginUserId) {\n        // 인기순은 좋아요가 바뀌면 순서가 흔들려 커서가 글을 빠뜨리거나 두 번 준다 — 최신순만 허락한다\n        if (\"popular\".equals(query.sort())) {\n            throw ApiException.invalid(\"cursor\", \"커서 페이징은 최신순(latest)에서만 쓸 수 있습니다.\");\n        }\n        if (query.page() != null) {\n            throw ApiException.invalid(\"page\", \"page와 cursor는 함께 쓸 수 없습니다.\");\n        }\n        Long cursorId = parseCursor(query.cursor());\n        // size + 1행으로 다음 페이지 존재 여부를 판단한다.\n        List<PostListRow> rows = mapper.findAfterCursor(query, loginUserId, cursorId, query.size() + 1);\n        boolean hasNext = rows.size() > query.size();\n        List<PostListRow> page = hasNext ? rows.subList(0, query.size()) : rows;\n        String next = hasNext ? String.valueOf(page.get(page.size() - 1).id) : null;\n        return new CursorResponse<>(withTags(page), next);\n    }\n\n    private Long parseCursor(String cursor) {\n        if (cursor.isBlank()) {\n            return null;\n        }\n        try {\n            return Long.valueOf(cursor);\n        } catch (NumberFormatException e) {\n            throw ApiException.invalid(\"cursor\", \"커서 값이 올바르지 않습니다.\");\n        }\n    }\n\n    // 글과 태그를 JOIN한 채 페이징하지 않는다 — 이번 페이지 글들의 태그를 IN 한 번으로 읽는다.\n    private List<PostListItemResponse> withTags(List<PostListRow> rows) {\n        if (rows.isEmpty()) {\n            return List.of();\n        }\n        Map<Long, List<String>> tagsByPost = mapper.findTagsByPostIds(rows.stream().map(row -> row.id).toList())\n                .stream()\n                .collect(Collectors.groupingBy(PostTagRow::postId, Collectors.mapping(PostTagRow::name, Collectors.toList())));\n        return rows.stream()\n                .map(row -> PostListItemResponse.of(row, tagsByPost.getOrDefault(row.id, List.of())))\n                .toList();\n    }\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/post/PostListRow.java",
+      "status": "added",
+      "content": "package org.example.board.post;\n\nimport java.time.LocalDateTime;\n\n// 목록 SQL의 평평한 한 행. author는 응답 DTO에서 다시 중첩한다.\npublic class PostListRow {\n    public Long id;\n    public String title;\n    public String visibility;\n    public int viewCount;\n    public int likeCount;\n    public Long authorId;\n    public String authorNickname;\n    public LocalDateTime createdAt;\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/post/PostQueryMapper.java",
+      "status": "added",
+      "content": "package org.example.board.post;\n\nimport java.util.List;\nimport org.apache.ibatis.annotations.Mapper;\nimport org.apache.ibatis.annotations.Param;\n\n@Mapper\npublic interface PostQueryMapper {\n    List<PostListRow> findPage(@Param(\"cond\") PostListQuery cond, @Param(\"loginUserId\") Long loginUserId,\n            @Param(\"offset\") long offset);\n\n    long count(@Param(\"cond\") PostListQuery cond, @Param(\"loginUserId\") Long loginUserId);\n\n    List<PostListRow> findAfterCursor(@Param(\"cond\") PostListQuery cond, @Param(\"loginUserId\") Long loginUserId,\n            @Param(\"cursorId\") Long cursorId, @Param(\"limit\") int limit);\n\n    List<PostTagRow> findTagsByPostIds(@Param(\"postIds\") List<Long> postIds);\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/resources/mapper/PostQueryMapper.xml",
+      "status": "added",
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<!DOCTYPE mapper PUBLIC \"-//mybatis.org//DTD Mapper 3.0//EN\" \"https://mybatis.org/dtd/mybatis-3-mapper.dtd\">\n<mapper namespace=\"org.example.board.post.PostQueryMapper\">\n    <sql id=\"columns\">\n        p.id, p.title, p.visibility, p.view_count, p.like_count, p.created_at,\n        u.id AS author_id, u.nickname AS author_nickname\n    </sql>\n\n    <sql id=\"visibleWhere\">\n        p.deleted_at IS NULL\n        AND (p.visibility = 'PUBLIC'\n        <if test=\"loginUserId != null\">OR p.author_id = #{loginUserId}</if>)\n        <if test=\"cond.tag != null\">\n            AND EXISTS (SELECT 1 FROM post_tags pt JOIN tags t ON t.id = pt.tag_id\n                        WHERE pt.post_id = p.id AND t.name = #{cond.tag})\n        </if>\n        <if test=\"cond.q != null\">AND p.title LIKE CONCAT('%', #{cond.q}, '%')</if>\n    </sql>\n\n    <sql id=\"sortOrder\">\n        <choose>\n            <when test=\"cond.sort == 'popular'\">ORDER BY p.like_count DESC, p.id DESC</when>\n            <otherwise>ORDER BY p.id DESC</otherwise>\n        </choose>\n    </sql>\n\n    <select id=\"findPage\" resultType=\"org.example.board.post.PostListRow\">\n        SELECT <include refid=\"columns\"/>\n        FROM posts p JOIN users u ON u.id = p.author_id\n        <where><include refid=\"visibleWhere\"/></where>\n        <include refid=\"sortOrder\"/>\n        LIMIT #{cond.size} OFFSET #{offset}\n    </select>\n\n    <select id=\"count\" resultType=\"long\">\n        SELECT COUNT(*) FROM posts p\n        <where><include refid=\"visibleWhere\"/></where>\n    </select>\n\n    <select id=\"findAfterCursor\" resultType=\"org.example.board.post.PostListRow\">\n        SELECT <include refid=\"columns\"/>\n        FROM posts p JOIN users u ON u.id = p.author_id\n        <where>\n            <include refid=\"visibleWhere\"/>\n            <if test=\"cursorId != null\">AND p.id &lt; #{cursorId}</if>\n        </where>\n        ORDER BY p.id DESC\n        LIMIT #{limit}\n    </select>\n\n    <select id=\"findTagsByPostIds\" resultType=\"org.example.board.post.PostTagRow\">\n        SELECT pt.post_id AS postId, t.name\n        FROM post_tags pt JOIN tags t ON t.id = pt.tag_id\n        WHERE pt.post_id IN\n        <foreach collection=\"postIds\" item=\"id\" open=\"(\" separator=\",\" close=\")\">#{id}</foreach>\n        ORDER BY t.name\n    </select>\n</mapper>\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/post/PostQueryRepository.java",
+      "status": "deleted",
+      "content": "",
+      "diff": ""
+    }
+  ]
+}

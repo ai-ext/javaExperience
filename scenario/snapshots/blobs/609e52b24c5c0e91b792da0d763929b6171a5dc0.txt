@@ -1,0 +1,36 @@
+package org.example.board.post;
+
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
+// 작성(POST)과 수정(PUT, 전체 교체)이 같은 규칙이라 함께 쓴다.
+// 작성자(authorId)는 받지 않는다 — 토큰 주인이 작성자다
+public record PostRequest(
+        @NotNull(message = "제목은 필수입니다.")
+        @Size(min = 5, max = 100, message = "제목은 5자 이상 100자 이하여야 합니다.")
+        String title,
+
+        @Size(max = 10000, message = "본문은 10000자 이하여야 합니다.")
+        String content,
+
+        @Size(max = 5, message = "태그는 5개까지입니다.")
+        List<@Size(min = 1, max = 20, message = "태그는 1자 이상 20자 이하여야 합니다.") String> tags,
+
+        @Pattern(regexp = "PUBLIC|PRIVATE", message = "공개 범위는 PUBLIC 또는 PRIVATE입니다.")
+        String visibility) {
+
+    // 검증보다 먼저 다듬는다: 제목 앞뒤 공백 제거, 태그는 공백 제거·소문자·중복 제거, 공개 범위 기본값 PUBLIC
+    public PostRequest {
+        title = title == null ? null : title.strip();
+        tags = tags == null ? List.of() : tags.stream()
+                .map(t -> Objects.requireNonNullElse(t, "").strip().toLowerCase(Locale.ROOT))
+                .distinct()
+                .toList();
+        visibility = visibility == null ? "PUBLIC" : visibility;
+    }
+}

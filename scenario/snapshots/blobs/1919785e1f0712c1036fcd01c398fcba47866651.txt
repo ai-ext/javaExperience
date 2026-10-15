@@ -1,0 +1,38 @@
+package org.example.batch;
+
+import org.springframework.stereotype.Component;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.function.LongConsumer;
+
+// 이름으로 배치를 찾아 실행 기록(JobRunner)과 함께 돌린다 — 수동 실행·예약 실행·재실행이 모두 이 길로 들어온다
+@Component
+public class JobLauncher {
+
+    private final JobCatalog catalog;
+    private final JobRunner runner;
+
+    public JobLauncher(JobCatalog catalog, JobRunner runner) {
+        this.catalog = catalog;
+        this.runner = runner;
+    }
+
+    public <T> T launch(String name, LocalDate date, String trigger) {
+        return launch(name, date, trigger, null);
+    }
+
+    public <T> T launch(String name, LocalDate date, String trigger, LocalDateTime referenceAt) {
+        return launch(name, date, trigger, referenceAt, id -> {});
+    }
+
+    public <T> T launch(String name, LocalDate date, String trigger, LocalDateTime referenceAt, LongConsumer started) {
+        JobCatalog.Job<T> job = catalog.get(name);
+        return runner.run(name, date, trigger, referenceAt, () -> job.work().apply(date, referenceAt), job.processed(), started);
+    }
+
+    public <T> T launchQuietly(String name, LocalDate date) {
+        JobCatalog.Job<T> job = catalog.get(name);
+        return runner.runQuietly(name, date, () -> job.work().apply(date, null), job.processed());
+    }
+}

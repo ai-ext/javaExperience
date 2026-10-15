@@ -1,0 +1,33 @@
+package org.example.common;
+
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
+import java.util.Base64;
+
+// 키셋(커서) 페이징의 "마지막으로 받은 항목" — (시각, id)를 Base64url로 감싼다.
+// 클라이언트는 열어 보지 않고 그대로 돌려보낸다. 4-3(좋아요한 글)과 6-3(북마크)이 같이 쓴다.
+public record Cursor(LocalDateTime at, Long id) {
+
+    public String encode() {
+        String raw = at + "|" + id;
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    // null이면 첫 페이지(null 반환). 형식이 깨졌으면 400
+    public static Cursor decode(String value) {
+        if (value == null) return null;
+        if (value.isBlank()) throw new InvalidCursorException();
+        try {
+            String raw = new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
+            String[] parts = raw.split("\\|", -1);
+            if (parts.length != 2) throw new IllegalArgumentException();
+            LocalDateTime at = LocalDateTime.parse(parts[0]);
+            long id = Long.parseLong(parts[1]);
+            if (id < 1) throw new IllegalArgumentException();
+            return new Cursor(at, id);
+        } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException | DateTimeParseException e) {
+            throw new InvalidCursorException();
+        }
+    }
+}

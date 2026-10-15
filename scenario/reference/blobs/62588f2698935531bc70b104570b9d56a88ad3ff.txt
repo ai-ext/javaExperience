@@ -1,0 +1,52 @@
+package org.example.marked;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.LoginMember;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+
+@RestController
+public class MarkedPostController {
+    private final MarkedPostService service;
+
+    public MarkedPostController(MarkedPostService service) {
+        this.service = service;
+    }
+
+    @GetMapping("/api/me/posts")
+    public MarkedPostPageResponse list(@RequestParam(required = false) String liked,
+                                       @RequestParam(required = false) String bookmarked,
+                                       @RequestParam(required = false) String page,
+                                       @RequestParam(required = false) String size,
+                                       @LoginMember AuthenticatedMember me) {
+        if (me == null) throw new AuthenticationRequiredException("인증이 필요합니다.");
+        int pageNumber = parseNumber(page, 0, 0, Integer.MAX_VALUE);
+        int pageSize = parseNumber(size, 20, 1, 100);
+        return service.list(me.id(), parseBoolean(liked), parseBoolean(bookmarked), pageNumber, pageSize);
+    }
+
+    private boolean parseBoolean(String value) {
+        if (value == null) return false;
+        if ("true".equals(value)) return true;
+        if ("false".equals(value)) return false;
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "필터는 true 또는 false여야 합니다.");
+    }
+
+    private int parseNumber(String value, int fallback, int min, int max) {
+        if (value == null) return fallback;
+        if (!value.matches("[0-9]+")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page 또는 size의 형식이 잘못됐습니다.");
+        }
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed >= min && parsed <= max) return parsed;
+        } catch (NumberFormatException ignored) {
+            // int 범위를 벗어나는 값도 동일한 요청 오류다.
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page 또는 size가 범위를 벗어났습니다.");
+    }
+}

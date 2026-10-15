@@ -4,23 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J16. 컨테이너 환경의 JVM</title>
-<link rel="stylesheet" href="../../tools/site/site.css">
+<link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=600678cfa7dd">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
-<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
-<main>
+<header class="topbar"><a href="../../index.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
+<main class="knowledge-main">
 
-<h1 id="j16-컨테이너-환경의-jvm"><a class="anchor" href="#j16-컨테이너-환경의-jvm" aria-hidden="true">#</a>J16. 컨테이너 환경의 JVM</h1>
+<h1 id="j16-컨테이너-환경의-jvm"><a class="anchor" href="#j16-컨테이너-환경의-jvm" aria-hidden="true">#</a>J16. 컨테이너 환경의 JVM</h1><section class="knowledge-page-map" aria-label="문서 읽기 지도"><div class="knowledge-page-map-head"><div><p class="knowledge-page-map-kicker">Java language <span>· J16</span></p><h2>이 문서에서 볼 내용</h2><p>Java 문법·런타임·자료구조</p></div><span class="knowledge-page-map-count">9개 주제</span></div><nav class="knowledge-page-steps" aria-label="문서의 실제 절로 이동"><a class="knowledge-page-step" href="#1-왜-알아야-하나"><span class="knowledge-page-step-no">01</span><span>1. 왜 알아야 하나</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#2-핵심-개념"><span class="knowledge-page-step-no">02</span><span>2. 핵심 개념</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#3-내부-동작원리"><span class="knowledge-page-step-no">03</span><span>3. 내부 동작·원리</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#4-코드로-확인"><span class="knowledge-page-step-no">04</span><span>4. 코드로 확인</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#5-버전별-변화--왜-바뀌었나"><span class="knowledge-page-step-no">05</span><span>5. 버전별 변화 — 왜 바뀌었나</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#6-실무-가이드"><span class="knowledge-page-step-no">06</span><span>6. 실무 가이드</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#7-함정안티패턴"><span class="knowledge-page-step-no">07</span><span>7. 함정·안티패턴</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#8-자가점검-qa-면접-대비"><span class="knowledge-page-step-no">08</span><span>8. 자가점검 Q&amp;A (면접 대비)</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#9-참고문헌"><span class="knowledge-page-step-no">09</span><span>9. 참고문헌</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a></nav></section>
 <blockquote>
 <p>3줄 요약 — 컨테이너 메모리·CPU 한도는 cgroup으로 적용되고, HotSpot은 이를 읽어 힙과 내부 스레드 풀의 기본 크기를 정한다.
 <code>-Xmx</code>는 전체 프로세스 메모리 한도가 아니다. 힙 밖 네이티브 메모리와 RSS를 같이 관찰해야 <code>OOMKilled</code>를 설명할 수 있다.
 CDS/AOT 캐시는 HotSpot의 시작·워밍업을 줄이고, CRaC는 실행 중인 JVM을 복원하며, GraalVM Native Image는 아예 별도 런타임 실행 파일을 만든다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>컨테이너 메모리 한도가 512MiB인데 <code>-Xmx512m</code>으로 배포하면, 힙을 꽉 채우기도 전에 커널이 프로세스를 죽일 수 있다. 힙 외에 Metaspace, JIT 코드 캐시, GC 자료구조, 스레드 스택, direct buffer, JNI 라이브러리와 메모리 매핑 파일이 같은 한도를 나눠 쓴다. Kubernetes 상태가 <code>OOMKilled</code>로 끝나고 Java 로그나 heap dump가 남지 않는 전형적인 이유다.</p>
 <p>CPU 제한도 마찬가지다. 컨테이너가 0.5 CPU만큼의 실행 시간을 받는데 JVM이 호스트의 CPU 수를 기준으로 GC·공용 풀을 크게 만들면 스레드가 과도하게 경쟁하고 CPU throttling이 늘어난다. 반대로 JVM이 관측한 CPU 수가 실제보다 작으면 병렬 처리량을 못 낸다. <code>-XX:ActiveProcessorCount</code>는 JVM의 풀 크기 계산에 쓰는 CPU 수를 바꾸지만 컨테이너의 실제 CPU quota를 바꾸지는 않는다.</p>
 <p>장애 대응 때도 구분이 중요하다. 애플리케이션 로그에 <code>java.lang.OutOfMemoryError: Java heap space</code>가 찍힌 상황과, 컨테이너 런타임이 프로세스를 <code>SIGKILL</code>해서 <code>OOMKilled</code>로 기록한 상황은 진단 자료와 해결책이 다르다. 전자는 JVM이 메모리 할당 실패를 관측했지만 후자는 JVM이 예외를 기록할 기회 없이 커널이 먼저 종료했을 수 있다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">2. 핵심 개념</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -89,8 +91,8 @@ CDS/AOT 캐시는 HotSpot의 시작·워밍업을 줄이고, CRaC는 실행 중�
 <td>HotSpot 캐시 / JVM 상태 복원 / HotSpot 없는 네이티브 런타임으로 서로 다른 층위다.</td>
 </tr>
 </tbody></table></div>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
-<h3 id="31-cgroup-한도에서-jvm-기본값까지"><a class="anchor" href="#31-cgroup-한도에서-jvm-기본값까지" aria-hidden="true">#</a>3.1 cgroup 한도에서 JVM 기본값까지</h3>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 내부 동작·원리</strong><small>3.1 cgroup 한도에서 JVM 기본값까지 · 3.2 힙 백분율과 전체 메모리 예산 · 3.3 CPU quota와 ActiveProcessorCount · 3.4 힙, 네이티브 메모리, RSS와 NMT</small></span><span class="knowledge-chapter-meta">5개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="31-cgroup-한도에서-jvm-기본값까지" aria-label="3.1 cgroup 한도에서 JVM 기본값까지 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">3.1 cgroup 한도에서 JVM 기본값까지</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>Linux 컨테이너는 호스트 커널을 공유한다. 런타임은 프로세스를 cgroup에 넣어 메모리와 CPU 사용을 제한한다. HotSpot은 컨테이너 지원으로 사용 가능한 메모리·프로세서를 감지해 힙과 내부 풀의 기본값을 계산한다. Java 25 문서는 이 지원이 Linux 전용이며 <code>UseContainerSupport</code> 기본값이 <code>true</code>라고 명시한다.</p>
 <pre><code class="language-text">컨테이너 런타임 → cgroup 한도 → Linux 커널 → HotSpot 컨테이너 인식
                                                  ├─ 메모리 → 힙 산정
@@ -102,15 +104,16 @@ CDS/AOT 캐시는 HotSpot의 시작·워밍업을 줄이고, CRaC는 실행 중�
 <p>기대와 다른 값이 보이면 옵션을 바꾸기 전에 JVM 관측값부터 확인한다.</p>
 <pre><code class="language-bash">java -Xlog:os+container=trace -XshowSettings:system -XX:+PrintCommandLineFlags -version</code></pre>
 <p><code>-Xlog:os+container=trace</code>는 감지 과정, <code>-XshowSettings:system</code>은 시스템 설정을 확인한다. Linux 컨테이너 안에서 실행해야 cgroup 결과를 본다.</p>
-<h3 id="32-힙-백분율과-전체-메모리-예산"><a class="anchor" href="#32-힙-백분율과-전체-메모리-예산" aria-hidden="true">#</a>3.2 힙 백분율과 전체 메모리 예산</h3>
+</div></details><details class="knowledge-topic"><summary id="32-힙-백분율과-전체-메모리-예산" aria-label="3.2 힙 백분율과 전체 메모리 예산 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">3.2 힙 백분율과 전체 메모리 예산</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>대략 최대 힙은 <code>R × MaxRAMPercentage / 100</code>이다. <code>R</code>은 JVM이 최대 메모리로 인식한 기준이다. Java 25 <code>MaxRAMPercentage</code> 기본값은 25.0, <code>InitialRAMPercentage</code> 기본값은 1.5625다. 두 비율은 전체 프로세스 limit이 아니다. <code>-Xmx</code>와 <code>-Xms</code>를 명시하면 실제 유효값이 바뀔 수 있으므로 <code>-XX:+PrintFlagsFinal</code>로 확인한다.</p>
 <p>1GiB를 기준으로 <code>MaxRAMPercentage=50</code>이면 최대 힙은 대략 512MiB다. 남은 절반은 Metaspace, JIT code cache, GC 자료구조, 스레드 스택, direct buffer, JNI 라이브러리와 매핑 페이지가 나눠 쓴다. 스레드·요청·GC 피크도 고려한다.</p>
 <pre><code class="language-text">컨테이너 메모리 limit = Java heap + Metaspace/code cache/GC
                       + thread stack + direct/native + 매핑 페이지 + 피크 여유</code></pre>
 <p>이는 정확한 덧셈식이 아니다. 일부 페이지는 공유되고 주소 공간 예약은 곧바로 RSS가 되지 않는다. 힙 상한을 정한 뒤 cgroup 사용량·RSS·NMT로 안전 여유를 확인한다.</p>
-<h3 id="33-cpu-quota와-activeprocessorcount"><a class="anchor" href="#33-cpu-quota와-activeprocessorcount" aria-hidden="true">#</a>3.3 CPU quota와 <code>ActiveProcessorCount</code></h3>
-<p>CPU quota는 주기별 CPU 실행 시간을 제한한다. 0.5 CPU는 코어 절반을 따로 배정한다기보다 스레드들이 경쟁해도 평균 실행 시간이 제한된다는 뜻이다. <code>ActiveProcessorCount=N</code>은 GC와 ForkJoinPool 같은 JVM 풀 크기 산정에 쓸 CPU 수를 강제한다. <code>UseContainerSupport</code>가 꺼져 있어도 적용되지만 quota·affinity를 변경하거나 앱 스레드를 제한하지 않는다. quota와 감지값이 다를 때만 조정하고 throttling과 지연시간을 함께 본다.</p>
-<h3 id="34-힙-네이티브-메모리-rss와-nmt"><a class="anchor" href="#34-힙-네이티브-메모리-rss와-nmt" aria-hidden="true">#</a>3.4 힙, 네이티브 메모리, RSS와 NMT</h3>
+</div></details><details class="knowledge-topic"><summary id="33-cpu-quota와-activeprocessorcount" aria-label="3.3 CPU quota와 ActiveProcessorCount 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">3.3 CPU quota와 ActiveProcessorCount</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
+<p>CPU quota는 주기별 CPU 실행 시간을 제한한다. 0.5 CPU는 코어 절반을 따로 배정한다기보다 스레드들이 경쟁해도 평균 실행 시간이 제한된다는 뜻이다. <code>ActiveProcessorCount=N</code>은 GC와 ForkJoinPool 같은 JVM 풀 크기 산정에 쓸 CPU 수를 강제한다.</p>
+<p><code>UseContainerSupport</code>가 꺼져 있어도 적용되지만 quota·affinity를 변경하거나 앱 스레드를 제한하지 않는다. quota와 감지값이 다를 때만 조정하고 throttling과 지연시간을 함께 본다.</p>
+</div></details><details class="knowledge-topic"><summary id="34-힙-네이티브-메모리-rss와-nmt" aria-label="3.4 힙, 네이티브 메모리, RSS와 NMT 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">3.4 힙, 네이티브 메모리, RSS와 NMT</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>힙 그래프가 평평해도 RSS가 증가할 수 있다. RSS는 상주 중인 힙 페이지뿐 아니라 스택, Metaspace, 코드 캐시, GC 구조, direct buffer, JNI 및 라이브러리·파일 매핑도 포함할 수 있다. 공유 CDS 페이지는 프로세스별 RSS를 단순 합산하면 중복 계산될 수 있다.</p>
 <p>NMT는 HotSpot 내부 메모리를 <code>summary</code>(하위 시스템) 또는 <code>detail</code>(호출 위치)로 추적한다. 기본 꺼짐이며 Java 25 문서는 활성화 오버헤드를 5~10%로 기재한다. 제3자 native 코드, JDK 라이브러리와 CDS 아카이브 메모리 일부는 완전하게 추적하지 않는다. NMT committed와 RSS는 다른 관측값이므로 차이를 곧바로 누수로 단정할 수 없다.</p>
 <pre><code class="language-bash"># JVM 시작 때 켜야 한다. 실행 중 사후 활성화는 불가하다.
@@ -119,7 +122,7 @@ java -XX:NativeMemoryTracking=summary -jar service.jar
 jcmd 1 VM.native_memory summary scale=MB
 jcmd 1 VM.native_memory baseline
 jcmd 1 VM.native_memory summary.diff scale=MB</code></pre>
-<h3 id="35-java-oom과-oomkilled"><a class="anchor" href="#35-java-oom과-oomkilled" aria-hidden="true">#</a>3.5 Java OOM과 <code>OOMKilled</code></h3>
+</div></details><details class="knowledge-topic"><summary id="35-java-oom과-oomkilled" aria-label="3.5 Java OOM과 OOMKilled 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">3.5 Java OOM과 OOMKilled</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -145,7 +148,7 @@ jcmd 1 VM.native_memory summary.diff scale=MB</code></pre>
 </tr>
 </tbody></table></div>
 <p>커널이 먼저 죽이면 JVM이 예외나 heap dump를 남기지 못한다. 종료 코드 137도 SIGKILL과 연관될 뿐 단독으로 OOM 증거가 아니다. 컨테이너 상태·이벤트와 같이 본다.</p>
-<h3 id="36-cds-appcds-aot-cache"><a class="anchor" href="#36-cds-appcds-aot-cache" aria-hidden="true">#</a>3.6 CDS, AppCDS, AOT cache</h3>
+</div></details><details class="knowledge-topic"><summary id="36-cds-appcds-aot-cache" aria-label="3.6 CDS, AppCDS, AOT cache 펼치기"><span class="knowledge-topic-no">06</span><strong role="heading" aria-level="3">3.6 CDS, AppCDS, AOT cache</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>CDS는 클래스 메타데이터를 아카이브로 만들어 시작 때 매핑한다. Oracle Java 25 문서에 따르면 JDK 12부터 Oracle JDK에 기본 아카이브가 포함되고 기본 활성화된다. AppCDS는 앱 클래스도 공유해 여러 JVM의 중복과 시작 작업을 줄인다. 메모리 공유는 같은 호스트 내에서만 이뤄진다.</p>
 <p>JEP 483은 JDK 24에서 전달된 AOT cache로 클래스 로딩·링킹 결과를 다음 JVM 시작에 재사용한다. JEP 514(JDK 25)는 캐시 생성 명령을 단순화했고, JEP 515(JDK 25)는 학습 실행의 메서드 프로파일을 캐시에 넣어 JIT 워밍업을 줄인다.</p>
 <pre><code class="language-bash"># JDK 25: 대표 실행으로 학습하며 캐시를 만든다.
@@ -153,12 +156,13 @@ java -XX:AOTCacheOutput=orders.aot -jar orders.jar
 # 배포 실행
 java -XX:AOTCache=orders.aot -jar orders.jar</code></pre>
 <p>AOT cache를 써도 HotSpot은 계속 실행된다. JEP 483 초기 범위는 JDK 내장 class loader가 classpath·module path·JDK에서 읽는 클래스이며 사용자 정의 class loader 클래스는 제외한다. 학습과 운영의 앱·JDK 구성이 다르면 캐시를 다시 만들고, 학습 중 외부 부작용이 발생하지 않도록 격리한다.</p>
-<h3 id="37-crac와-native-image"><a class="anchor" href="#37-crac와-native-image" aria-hidden="true">#</a>3.7 CRaC와 Native Image</h3>
+</div></details><details class="knowledge-topic"><summary id="37-crac와-native-image" aria-label="3.7 CRaC와 Native Image 펼치기"><span class="knowledge-topic-no">07</span><strong role="heading" aria-level="3">3.7 CRaC와 Native Image</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>CRaC는 준비된 JVM 상태를 체크포인트하고 복원해 시작·워밍업을 줄인다. 파일과 소켓 등 외부 자원은 체크포인트 전 닫고 복원 뒤 다시 획득하도록 조정한다. JDK 배포판·체크포인트 엔진 지원은 환경별로 검증해야 한다.</p>
-<p>Native Image는 빌드 시 정적 reachability 분석으로 필요한 코드와 리소스를 찾아 OS별 네이티브 바이너리로 만든다. 리플렉션·프록시·동적 리소스는 분석에 잡히지 않을 수 있어 metadata가 필요하다. 빌드 시 초기화가 환경설정·비밀을 고정하지 않게 주의한다. 실행 때 HotSpot은 뜨지 않지만 GraalVM 런타임, Java heap과 GC는 남는다. HotSpot 플래그·NMT를 그대로 적용하면 안 된다. GraalVM 문서상 기본 GC는 저메모리 지향 Serial이다.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
+<p>Native Image는 빌드 시 정적 reachability 분석으로 필요한 코드와 리소스를 찾아 OS별 네이티브 바이너리로 만든다. 리플렉션·프록시·동적 리소스는 분석에 잡히지 않을 수 있어 metadata가 필요하다. 빌드 시 초기화가 환경설정·비밀을 고정하지 않게 주의한다.</p>
+<p>실행 때 HotSpot은 뜨지 않지만 GraalVM 런타임, Java heap과 GC는 남는다. HotSpot 플래그·NMT를 그대로 적용하면 안 된다. GraalVM 문서상 기본 GC는 저메모리 지향 Serial이다.</p>
+</div></details></div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">4. 코드로 확인</strong><small>예제 1 — JVM이 인식한 CPU와 최대 힙 · 예제 2 — 힙 최대치가 컨테이너 예산에서 차지하는 양 · 예제 3 — 컨테이너 감지와 유효 플래그 확인</small></span><span class="knowledge-chapter-meta">7개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>다음 두 순수 Java 예제는 <code>Runtime.availableProcessors()</code>와 JVM 관리 인터페이스의 최대 힙을 읽는다. 컨테이너에서 실행하면 JVM이 인식한 값을 확인할 수 있다. 두 파일 모두 지정 JDK 21로 실제 실행했다. 두 번째 예제의 <code>MEMORY_LIMIT_BYTES</code>는 cgroup을 자동 읽는 값이 아니라 예산 계산을 보여주기 위해 입력한 가상 한도다.</p>
-<h3 id="예제-1--jvm이-인식한-cpu와-최대-힙"><a class="anchor" href="#예제-1--jvm이-인식한-cpu와-최대-힙" aria-hidden="true">#</a>예제 1 — JVM이 인식한 CPU와 최대 힙</h3>
+<details class="knowledge-topic"><summary id="예제-1--jvm이-인식한-cpu와-최대-힙" aria-label="예제 1 — JVM이 인식한 CPU와 최대 힙 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">예제 1 — JVM이 인식한 CPU와 최대 힙</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-java">import java.lang.management.ManagementFactory;
 
 public class ContainerProbe {
@@ -174,7 +178,7 @@ public class ContainerProbe {
 <p>실제 출력:</p>
 <pre><code class="language-text">availableProcessors=2
 maxHeapMiB=128</code></pre>
-<h3 id="예제-2--힙-최대치가-컨테이너-예산에서-차지하는-양"><a class="anchor" href="#예제-2--힙-최대치가-컨테이너-예산에서-차지하는-양" aria-hidden="true">#</a>예제 2 — 힙 최대치가 컨테이너 예산에서 차지하는 양</h3>
+</div></details><details class="knowledge-topic"><summary id="예제-2--힙-최대치가-컨테이너-예산에서-차지하는-양" aria-label="예제 2 — 힙 최대치가 컨테이너 예산에서 차지하는 양 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">예제 2 — 힙 최대치가 컨테이너 예산에서 차지하는 양</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-java">import java.lang.management.ManagementFactory;
 
 public class MemoryBudget {
@@ -195,12 +199,12 @@ public class MemoryBudget {
 maxHeapMiB=640
 remainingBudgetMiB=384</code></pre>
 <p>384MiB는 네이티브 여유가 충분하다는 뜻이 아니다. 예산에서 힙 상한을 뺀 단순 잔여량이므로 실제 RSS·cgroup 피크와 비교해야 한다.</p>
-<h3 id="예제-3--컨테이너-감지와-유효-플래그-확인"><a class="anchor" href="#예제-3--컨테이너-감지와-유효-플래그-확인" aria-hidden="true">#</a>예제 3 — 컨테이너 감지와 유효 플래그 확인</h3>
+</div></details><details class="knowledge-topic"><summary id="예제-3--컨테이너-감지와-유효-플래그-확인" aria-label="예제 3 — 컨테이너 감지와 유효 플래그 확인 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">예제 3 — 컨테이너 감지와 유효 플래그 확인</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-bash">java -Xlog:os+container=trace -XX:+PrintFlagsFinal -XshowSettings:system -version 2&gt;&amp;1 \
   | grep -E 'container|MaxRAM|RAMPercentage|ActiveProcessorCount|UseContainerSupport'</code></pre>
 <p>이 진단은 Linux 컨테이너에서 수행한다. 호스트 macOS에서 실행하면 Linux cgroup을 조회할 수 없다. 플래그 출력은 실제 JVM 버전과 명령행 인자에 따라 달라지므로, 배포 이미지 안에서 관측한다.</p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
-<div class="table-wrap"><table>
+</div></details></div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<section class="version-cards" aria-label="버전별 변화 카드"><div class="version-card-grid"><article class="version-card"><header><span class="version-card-index">01</span><h4>Java 컨테이너 인식의 초기 제안</h4></header><section class="version-card-why"><h5><span aria-hidden="true">↗</span> 왜 바뀌었나</h5><div>JEP 8182070은 cgroup 기반 컨테이너 인식과 내부 자원 정보 API를 제안했지만 현재 상태는 <code>Closed / Withdrawn</code>인 draft다. 이 문서만으로 기능 최초 정식 제공 릴리스를 특정하지 않는다. 현재 Java 25 명령 문서에는 Linux 컨테이너 자동 감지 옵션이 기재돼 있다.</div></section><section class="version-card-impact"><h5><span aria-hidden="true">✓</span> 실무에서 확인</h5><div><a href="https://openjdk.org/jeps/8182070" target="_blank" rel="noopener">JEP draft 8182070</a>, <a href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html" target="_blank" rel="noopener">Java 25 <code>java</code> command</a></div></section></article><article class="version-card"><header><span class="version-card-index">02</span><h4>JDK 12부터 (Oracle JDK 문서 기준)</h4></header><section class="version-card-why"><h5><span aria-hidden="true">↗</span> 왜 바뀌었나</h5><div>기본 CDS 아카이브를 배포해 매 JVM 시작마다 JDK 클래스 메타데이터를 다시 만드는 비용과 여러 JVM의 중복을 줄였다.</div></section><section class="version-card-impact"><h5><span aria-hidden="true">✓</span> 실무에서 확인</h5><div><a href="https://docs.oracle.com/en/java/javase/25/vm/class-data-sharing.html" target="_blank" rel="noopener">Class Data Sharing</a></div></section></article><article class="version-card"><header><span class="version-card-index">03</span><h4>JDK 24 — JEP 483</h4></header><section class="version-card-why"><h5><span aria-hidden="true">↗</span> 왜 바뀌었나</h5><div>클래스 로딩·링킹을 매번 처음부터 수행하던 시작 비용을 이전 실행에서 만든 AOT cache로 옮겼다. 클래스가 미리 로드·링크된 형태로 다음 JVM에 제공된다.</div></section><section class="version-card-impact"><h5><span aria-hidden="true">✓</span> 실무에서 확인</h5><div><a href="https://openjdk.org/jeps/483" target="_blank" rel="noopener">JEP 483</a></div></section></article><article class="version-card"><header><span class="version-card-index">04</span><h4>JDK 25 — JEP 514</h4></header><section class="version-card-why"><h5><span aria-hidden="true">↗</span> 왜 바뀌었나</h5><div>JDK 24의 record/create 2단계 명령은 일반적인 사용에 번거로웠다. <code>AOTCacheOutput</code>으로 보통의 학습·생성 절차를 단순화했다.</div></section><section class="version-card-impact"><h5><span aria-hidden="true">✓</span> 실무에서 확인</h5><div><a href="https://openjdk.org/jeps/514" target="_blank" rel="noopener">JEP 514</a></div></section></article><article class="version-card"><header><span class="version-card-index">05</span><h4>JDK 25 — JEP 515</h4></header><section class="version-card-why"><h5><span aria-hidden="true">↗</span> 왜 바뀌었나</h5><div>클래스 시작 시간을 줄여도 JIT 프로파일을 새로 모으는 워밍업은 남았다. 이전 실행의 메서드 프로파일을 AOT cache에 저장해 시작 직후 컴파일을 진행하도록 했다.</div></section><section class="version-card-impact"><h5><span aria-hidden="true">✓</span> 실무에서 확인</h5><div><a href="https://openjdk.org/jeps/515" target="_blank" rel="noopener">JEP 515</a></div></section></article><article class="version-card"><header><span class="version-card-index">06</span><h4>CRaC</h4></header><section class="version-card-why"><h5><span aria-hidden="true">↗</span> 왜 바뀌었나</h5><div>OpenJDK CRaC는 체크포인트·복원 생명주기 API와 통합을 연구하는 프로젝트다. 이 자료에서 읽은 프로젝트 문서는 이를 특정 JDK 메이저의 표준 옵션으로 규정하지 않으므로 실제 배포판 지원 버전은 별도 확인한다.</div></section><section class="version-card-impact"><h5><span aria-hidden="true">✓</span> 실무에서 확인</h5><div><a href="https://openjdk.org/projects/crac/" target="_blank" rel="noopener">OpenJDK CRaC</a></div></section></article></div><details class="version-original"><summary>원문 표 보기 <span>버전별 주요 변경 사항 전체 표</span></summary><div class="table-wrap"><table>
 <thead>
 <tr>
 <th>시기</th>
@@ -238,8 +242,8 @@ remainingBudgetMiB=384</code></pre>
 <td>OpenJDK CRaC는 체크포인트·복원 생명주기 API와 통합을 연구하는 프로젝트다. 이 자료에서 읽은 프로젝트 문서는 이를 특정 JDK 메이저의 표준 옵션으로 규정하지 않으므로 실제 배포판 지원 버전은 별도 확인한다.</td>
 <td><a href="https://openjdk.org/projects/crac/" target="_blank" rel="noopener">OpenJDK CRaC</a></td>
 </tr>
-</tbody></table></div>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</tbody></table></div></details></section>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>if Linux에서 HotSpot을 컨테이너로 실행한다면 then 기본 <code>UseContainerSupport</code>를 유지한다. cgroup 제한을 JVM 기본 산정에 반영한다.</li>
 <li>if 첫 배포라 RSS 프로파일이 없다면 then <code>-Xmx=limit</code>으로 잡지 않는다. <strong>기본값 추천은 JDK 25 HotSpot에서 컨테이너 인식을 켜고 <code>MaxRAMPercentage</code> 기본값으로 시작해 부하 피크를 관찰하는 것</strong>이다. 기본 25%가 처리량 요구에 부족하면 측정 결과를 근거로 올린다.</li>
@@ -252,7 +256,7 @@ remainingBudgetMiB=384</code></pre>
 <li>if 동적 기능을 제한할 수 있고 기동/footprint가 우선이면 then Native Image를 검토한다. reachability metadata와 플랫폼별 제약을 시험하고 HotSpot 옵션을 옮기지 않는다.</li>
 </ul>
 <p>Spring Boot 레이어드 JAR·buildpacks·Spring AOT/native 빌드는 여기서 다루지 않는다 → <a class="docref" href="S19-packaging-deploy.html">S19</a> 참조.</p>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>증상:</strong> 힙이 <code>-Xmx</code>에 닿기 전에 <code>OOMKilled</code>. → <strong>원인:</strong> limit을 힙으로 다 써 네이티브 영역이 모자란다. → <strong>대처:</strong> 힙 상한을 낮추거나 limit을 늘리고 cgroup/RSS/NMT를 수집한다.</li>
 <li><strong>증상:</strong> heap dump 없이 종료 코드 137. → <strong>원인:</strong> JVM보다 커널이 먼저 프로세스를 죽였을 수 있다. → <strong>대처:</strong> 상태·이벤트·메모리 피크를 확인한다. 137만으로 OOM을 단정하지 않는다.</li>
@@ -262,26 +266,26 @@ remainingBudgetMiB=384</code></pre>
 <li><strong>증상:</strong> AOT cache 효과가 없거나 CRaC 복원 뒤 연결이 실패한다. → <strong>원인:</strong> 학습 프로파일이 운영과 다르거나 체크포인트 전 외부 자원을 정리하지 않았다. → <strong>대처:</strong> 운영 경로로 다시 학습하고 복원 시 자원을 재획득한다.</li>
 <li><strong>증상:</strong> jlink/Native Image에서 클래스·리소스를 찾지 못한다. → <strong>원인:</strong> 동적 의존성을 정적 분석이 발견하지 못했다. → <strong>대처:</strong> 통합 테스트로 모듈이나 reachability metadata를 보완한다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
-<h3 id="q1-컨테이너에서--xmx를-memory-limit과-같게-주면-왜-위험한가"><a class="anchor" href="#q1-컨테이너에서--xmx를-memory-limit과-같게-주면-왜-위험한가" aria-hidden="true">#</a>Q1. 컨테이너에서 <code>-Xmx</code>를 memory limit과 같게 주면 왜 위험한가?</h3>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. 컨테이너에서 -Xmx를 memory limit과 같게 주면 왜 위험한가? · Q2. OutOfMemoryError와 OOMKilled는 같은 문제인가? · Q3. MaxRAMPercentage와 InitialRAMPercentage의 차이는? · Q4. CPU quota와 ActiveProcessorCount의 차이는?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="q1-컨테이너에서--xmx를-memory-limit과-같게-주면-왜-위험한가" aria-label="Q1. 컨테이너에서 -Xmx를 memory limit과 같게 주면 왜 위험한가? 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">Q1. 컨테이너에서 -Xmx를 memory limit과 같게 주면 왜 위험한가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>힙은 JVM 프로세스 메모리의 일부다. Metaspace, 코드 캐시, GC 구조, 스택과 direct/native 영역도 같은 컨테이너 한도를 쓴다. <code>-Xmx</code>가 한도를 다 차지하면 힙이 꽉 차기 전에 커널 OOM이 날 수 있다.</p>
 <p><strong>꼬리질문:</strong> 힙 상한은 무엇으로 정하는가? <strong>답:</strong> <code>MaxRAMPercentage</code>나 <code>-Xmx</code>로 정하되 cgroup 피크와 비힙 여유로 검증한다.</p>
-<h3 id="q2-outofmemoryerror와-oomkilled는-같은-문제인가"><a class="anchor" href="#q2-outofmemoryerror와-oomkilled는-같은-문제인가" aria-hidden="true">#</a>Q2. <code>OutOfMemoryError</code>와 <code>OOMKilled</code>는 같은 문제인가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q2-outofmemoryerror와-oomkilled는-같은-문제인가" aria-label="Q2. OutOfMemoryError와 OOMKilled는 같은 문제인가? 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">Q2. OutOfMemoryError와 OOMKilled는 같은 문제인가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>아니다. <code>OutOfMemoryError</code>는 JVM이 할당 실패를 감지해 던지는 Java 예외다. <code>OOMKilled</code>는 커널/런타임 강제 종료 상태로 JVM 로그나 dump가 없을 수 있다. 종료 코드만 아니라 상태와 이벤트를 확인한다.</p>
 <p><strong>꼬리질문:</strong> exit code 137이면 무조건 OOM인가? <strong>답:</strong> 아니다. SIGKILL과 연관되지만 다른 강제 종료도 가능하다.</p>
-<h3 id="q3-maxrampercentage와-initialrampercentage의-차이는"><a class="anchor" href="#q3-maxrampercentage와-initialrampercentage의-차이는" aria-hidden="true">#</a>Q3. <code>MaxRAMPercentage</code>와 <code>InitialRAMPercentage</code>의 차이는?</h3>
+</div></details><details class="knowledge-topic"><summary id="q3-maxrampercentage와-initialrampercentage의-차이는" aria-label="Q3. MaxRAMPercentage와 InitialRAMPercentage의 차이는? 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">Q3. MaxRAMPercentage와 InitialRAMPercentage의 차이는?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>전자는 최대 힙, 후자는 초기 힙을 JVM 인식 메모리 비율로 계산한다. 둘 다 프로세스 전체 한도가 아니다. <code>-Xmx</code>/<code>-Xms</code>가 있을 때는 유효값을 확인한다.</p>
 <p><strong>꼬리질문:</strong> MaxRAMPercentage를 컨테이너 limit까지 올려도 되는가? <strong>답:</strong> 비힙 영역이 남지 않으므로 위험하다. RSS와 네이티브 피크를 먼저 본다.</p>
-<h3 id="q4-cpu-quota와-activeprocessorcount의-차이는"><a class="anchor" href="#q4-cpu-quota와-activeprocessorcount의-차이는" aria-hidden="true">#</a>Q4. CPU quota와 <code>ActiveProcessorCount</code>의 차이는?</h3>
+</div></details><details class="knowledge-topic"><summary id="q4-cpu-quota와-activeprocessorcount의-차이는" aria-label="Q4. CPU quota와 ActiveProcessorCount의 차이는? 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">Q4. CPU quota와 ActiveProcessorCount의 차이는?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>quota는 커널이 주는 CPU 실행 시간을 제한한다. <code>ActiveProcessorCount</code>는 JVM 내부 풀의 크기 산정값을 바꾼다. 실제 quota나 앱 스레드 수를 변경하지 않는다.</p>
 <p><strong>꼬리질문:</strong> 언제 강제 지정하는가? <strong>답:</strong> 감지값이 실제 limit과 어긋난 것을 확인한 뒤 제한적으로 사용하고 throttling·latency를 검증한다.</p>
-<h3 id="q5-nmt와-rss가-왜-다를-수-있는가"><a class="anchor" href="#q5-nmt와-rss가-왜-다를-수-있는가" aria-hidden="true">#</a>Q5. NMT와 RSS가 왜 다를 수 있는가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q5-nmt와-rss가-왜-다를-수-있는가" aria-label="Q5. NMT와 RSS가 왜 다를 수 있는가? 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">Q5. NMT와 RSS가 왜 다를 수 있는가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>NMT는 HotSpot 내부 메모리를 추적하고 RSS는 OS의 상주 페이지를 센다. NMT는 제3자 native와 일부 공유 영역을 온전히 포함하지 않고 committed와 RSS도 같은 뜻이 아니다. 범위가 다른 지표다.</p>
 <p><strong>꼬리질문:</strong> NMT가 전체 누수를 찾는가? <strong>답:</strong> 아니다. cgroup/RSS와 함께 보고 NMT 밖 할당을 조사한다.</p>
-<h3 id="q6-cdsaot-cache-crac-native-image는-어떻게-다른가"><a class="anchor" href="#q6-cdsaot-cache-crac-native-image는-어떻게-다른가" aria-hidden="true">#</a>Q6. CDS/AOT cache, CRaC, Native Image는 어떻게 다른가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q6-cdsaot-cache-crac-native-image는-어떻게-다른가" aria-label="Q6. CDS/AOT cache, CRaC, Native Image는 어떻게 다른가? 펼치기"><span class="knowledge-topic-no">06</span><strong role="heading" aria-level="3">Q6. CDS/AOT cache, CRaC, Native Image는 어떻게 다른가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>CDS/AOT cache는 HotSpot 시작·워밍업을 위해 클래스 데이터나 프로파일을 재사용한다. CRaC는 JVM 프로세스 상태를 체크포인트하고 자원을 조정해 복원한다. Native Image는 HotSpot 없이 별도 네이티브 런타임으로 실행한다.</p>
 <p><strong>꼬리질문:</strong> Native Image도 Java heap을 쓰는가? <strong>답:</strong> 그렇다. GraalVM 런타임의 Java heap/GC는 있지만 HotSpot 자체는 아니다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details></div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>JEP 483 — <a href="https://openjdk.org/jeps/483" target="_blank" rel="noopener">https://openjdk.org/jeps/483</a> — JDK 24 AOT class loading/linking.</li>
 <li>JEP 514 — <a href="https://openjdk.org/jeps/514" target="_blank" rel="noopener">https://openjdk.org/jeps/514</a> — JDK 25 AOT cache 명령.</li>
@@ -297,9 +301,31 @@ remainingBudgetMiB=384</code></pre>
 <li>JEP 282: jlink: The Java Linker — <a href="https://openjdk.org/jeps/282" target="_blank" rel="noopener">https://openjdk.org/jeps/282</a> — 모듈 의존성 기반 사용자 정의 런타임 이미지.</li>
 <li>GoogleContainerTools/distroless — <a href="https://github.com/GoogleContainerTools/distroless" target="_blank" rel="noopener">https://github.com/GoogleContainerTools/distroless</a> — 셸 없는 런타임 이미지.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    let parent = target?.closest('details.knowledge-topic, details.knowledge-chapter');
+    while (parent) {
+      parent.open = true;
+      parent = parent.parentElement?.closest('details.knowledge-topic, details.knowledge-chapter');
+    }
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }));
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
+
 
 </body>
 </html>

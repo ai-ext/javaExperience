@@ -1,0 +1,73 @@
+package org.example.series;
+
+import jakarta.validation.Validator;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.example.post.InvalidParametersException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
+
+import java.net.URI;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+@RestController
+public class SeriesController {
+
+    private final SeriesService seriesService;
+    private final Validator validator;
+
+    public SeriesController(SeriesService seriesService, Validator validator) {
+        this.seriesService = seriesService;
+        this.validator = validator;
+    }
+
+    @PostMapping("/api/series")
+    public ResponseEntity<SeriesResponse> create(@LoginMember AuthenticatedMember loginMember,
+                                                 @RequestBody JsonNode body) {
+        SeriesCreateRequest.Parsed parsed = SeriesCreateRequest.parse(body);
+        Map<String, String> errors = new LinkedHashMap<>(parsed.errors());
+        validator.validate(parsed.request()).forEach(v -> errors.putIfAbsent(v.getPropertyPath().toString(), v.getMessage()));
+        if (!errors.isEmpty()) {
+            throw new InvalidParametersException(errors);
+        }
+        Series series = seriesService.create(loginMember, parsed.request());
+        return ResponseEntity.created(URI.create("/api/series/" + series.getId()))
+                .body(seriesService.get(series.getId(), loginMember));
+    }
+
+    @GetMapping("/api/series/{seriesId}")
+    public SeriesResponse get(@PathVariable Long seriesId, @LoginMember AuthenticatedMember viewer) {
+        return seriesService.get(seriesId, viewer);
+    }
+
+    @PutMapping("/api/series/{seriesId}/posts/{postId}")
+    public SeriesResponse addPost(@PathVariable Long seriesId, @PathVariable Long postId,
+                                  @LoginMember AuthenticatedMember loginMember) {
+        return seriesService.addPost(seriesId, postId, loginMember);
+    }
+
+    @DeleteMapping("/api/series/{seriesId}/posts/{postId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removePost(@PathVariable Long seriesId, @PathVariable Long postId,
+                           @LoginMember AuthenticatedMember loginMember) {
+        seriesService.removePost(seriesId, postId, loginMember);
+    }
+
+    // 시리즈에 없는 글이면 204(본문 없음) — 화면은 "이전/다음" 칸을 그리지 않는다
+    @GetMapping("/api/posts/{postId}/series")
+    public ResponseEntity<SeriesNavResponse> nav(@PathVariable Long postId, @LoginMember AuthenticatedMember viewer) {
+        return seriesService.nav(postId, viewer)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+}

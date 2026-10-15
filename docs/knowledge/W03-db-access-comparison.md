@@ -14,7 +14,9 @@
 
 JDBC는 DB 명령을 내리는 표준 기반이고, 나머지는 SQL 작성·결과 변환·객체 상태 관리를 다르게 추상화한다.
 일반 신규 CRUD라면 **Spring Data JPA를 기본값으로 추천**한다. SQL 중심 조회는 JdbcClient/MyBatis, JPA 동적 질의는 QueryDSL, 스키마 타입과 DB SQL 통제는 jOOQ를 검토한다.
+
 JdbcTemplate/JdbcClient는 SQL은 남기고 연결·예외·매핑 반복을 줄인다. 순수 JDBC는 통제가 최우선인 경계 사례다.
+
 QueryDSL은 ORM이나 저장소가 아니라 보통 JPA와 결합하는 쿼리 표현 계층이다. 기존 팀 관례와 운영 역량은 기본값보다 우선한다.
 
 ## 3. 왜 그런가 — 원리

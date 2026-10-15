@@ -41,7 +41,9 @@ Boot 3 애플리케이션을 `4.1.1`로 바꾸고 배포했는데 기동 직후 
 
 ### 3.1 업그레이드는 하나의 dependency graph 재해결이다
 
-Boot starter는 단순한 편의 dependency가 아니라 관리되는 버전 집합의 진입점이다. 4.0은 큰 jar 몇 개 대신 더 작은 focused module을 제공하고 starter 구성을 정리했다. 따라서 직접 `spring-boot-autoconfigure`나 제3자 라이브러리만 추가하던 애플리케이션은 “예전에는 전이 의존성으로 우연히 되던 기능”을 잃는다. 직접 관리하는 프로젝트라면 `spring-framework 7.x`, Servlet 6.1, JPA 3.2, Hibernate ORM 7.1/7.2, Validation 3.1, Netty 4.2, JUnit 6 호환성을 함께 맞춘다.
+Boot starter는 단순한 편의 dependency가 아니라 관리되는 버전 집합의 진입점이다. 4.0은 큰 jar 몇 개 대신 더 작은 focused module을 제공하고 starter 구성을 정리했다.
+
+따라서 직접 `spring-boot-autoconfigure`나 제3자 라이브러리만 추가하던 애플리케이션은 “예전에는 전이 의존성으로 우연히 되던 기능”을 잃는다. 직접 관리하는 프로젝트라면 `spring-framework 7.x`, Servlet 6.1, JPA 3.2, Hibernate ORM 7.1/7.2, Validation 3.1, Netty 4.2, JUnit 6 호환성을 함께 맞춘다.
 
 ```mermaid
 flowchart LR
@@ -58,15 +60,21 @@ flowchart LR
 
 ### 3.2 JSpecify null-safety는 runtime 검사가 아니라 계약의 이동이다
 
-Framework 7 소스는 JSpecify annotation으로 API·필드·type usage의 nullability를 표시하고 빌드에서 NullAway로 일관성을 검사한다. Java 컴파일러 자체가 null을 타입으로 표현하지는 않으므로 annotation만 붙였다고 런타임 NPE가 자동으로 사라지는 것은 아니다. IDE 또는 NullAway 같은 checker가 호출자 코드를 분석해 경고/실패를 내는 구조다. Kotlin에서는 JSpecify가 Kotlin null-safety로 번역된다.
+Framework 7 소스는 JSpecify annotation으로 API·필드·type usage의 nullability를 표시하고 빌드에서 NullAway로 일관성을 검사한다. Java 컴파일러 자체가 null을 타입으로 표현하지는 않으므로 annotation만 붙였다고 런타임 NPE가 자동으로 사라지는 것은 아니다.
+
+IDE 또는 NullAway 같은 checker가 호출자 코드를 분석해 경고/실패를 내는 구조다. Kotlin에서는 JSpecify가 Kotlin null-safety로 번역된다.
 
 기본은 `@NullMarked` 범위 안에서 non-null이고, 실제 null 가능 값만 `@Nullable`로 표시한다. 이 변화는 애플리케이션 API를 즉시 전부 annotate하라는 뜻이 아니다. 우선 Framework 7로 바꾼 뒤 IDE 경고가 늘어난 지점을 계약 위반으로 분류하고, 공용 라이브러리부터 `package-info.java`와 checker를 도입한다.
 
 ### 3.3 HttpHeaders와 HTTP interface의 설계 차이
 
-헤더 이름은 대소문자를 무시하고 같은 이름에 여러 값이 올 수 있다. 일반 Map의 `equals`, `put`, key iteration을 그대로 적용하면 서버의 의미와 맞지 않는다. Framework 7은 이 현실을 반영해 `HttpHeaders`가 `MultiValueMap` 계약을 상속하지 않게 했고, 기존 map-style 접근을 위한 일부 fallback을 deprecated로 남겼다. 헤더 유틸리티는 `set`, `add`, `getFirst`, `headerNames` 같은 헤더 전용 연산으로 옮긴다.
+헤더 이름은 대소문자를 무시하고 같은 이름에 여러 값이 올 수 있다. 일반 Map의 `equals`, `put`, key iteration을 그대로 적용하면 서버의 의미와 맞지 않는다.
 
-HTTP interface는 `@HttpExchange`가 붙은 Java interface를 읽고 Spring이 proxy를 만든다. 메서드의 `@GetExchange`, `@PostExchange`, `@RequestBody` 메타데이터가 요청 method·URL·body로 변환되고, 실제 transport는 동기/비동기 client 설정에 위임된다. Boot 4는 여기에 auto-configuration과 properties를 제공하므로 client마다 수동 proxy factory를 중복 생성하지 않아도 된다. 다만 interface가 곧 resilience 계층은 아니다. timeout, retry, circuit breaker, idempotency는 별도로 설계한다.
+Framework 7은 이 현실을 반영해 `HttpHeaders`가 `MultiValueMap` 계약을 상속하지 않게 했고, 기존 map-style 접근을 위한 일부 fallback을 deprecated로 남겼다. 헤더 유틸리티는 `set`, `add`, `getFirst`, `headerNames` 같은 헤더 전용 연산으로 옮긴다.
+
+HTTP interface는 `@HttpExchange`가 붙은 Java interface를 읽고 Spring이 proxy를 만든다. 메서드의 `@GetExchange`, `@PostExchange`, `@RequestBody` 메타데이터가 요청 method·URL·body로 변환되고, 실제 transport는 동기/비동기 client 설정에 위임된다. Boot 4는 여기에 auto-configuration과 properties를 제공하므로 client마다 수동 proxy factory를 중복 생성하지 않아도 된다.
+
+다만 interface가 곧 resilience 계층은 아니다. timeout, retry, circuit breaker, idempotency는 별도로 설계한다.
 
 ### 3.4 API Versioning의 분리된 책임
 

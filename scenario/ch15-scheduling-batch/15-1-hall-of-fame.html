@@ -1,0 +1,1612 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>15-1. 명예의 전당 — 매일 0시 배치와 멱등</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
+<link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
+<link rel="stylesheet" href="../../tools/site/scenario-visual.css?v=acace17043f4">
+<link rel="stylesheet" href="../../tools/site/scenario-code-workbench.css?v=6b63063b4651">
+<link rel="stylesheet" href="../../tools/site/lesson-atlas.css?v=72d1f0fcddbe">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../../index.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 15장. 스케줄링·배치로 게시판 돌리기 › 15-1</p><p class="level-tags"><span>고급</span><span>게시판 본편</span><span>DB practice</span></p>
+<h1 id="15-1-명예의-전당--매일-0시-배치와-멱등"><a class="anchor" href="#15-1-명예의-전당--매일-0시-배치와-멱등" aria-hidden="true">#</a>15-1. 명예의 전당 — 매일 0시 배치와 멱등</h1><h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>시나리오 화면</span><span class="mockup-live"><i></i> 단계 시안</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">사용자에게 보이는 상태</span><h3>운영 도구 — 명예의 전당 배치</h3><p>매일 0시에 도는 배치를 운영자가 날짜를 골라 바로 돌려 본다. 같은 날 두 번 돌려도 한 번만 올라간다.</p></div></div><div class="mock-screen" aria-label="운영 도구 — 명예의 전당 배치 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>운영 도구 · 배치</strong><span>운영자</span></header><div class="mock-control screen-field" data-screen-id="date"><label>기준일(이날 0시 전까지의 좋아요를 센다)</label><div class="mock-field">2026-10-04</div></div><div class="mock-actions" data-screen-id="buttons"><span class="mock-button mock-primary" data-screen-id="run">지금 실행</span></div><div class="mock-list" data-screen-id="added"><span class="screen-widget-label">이번에 새로 올라간 글</span><div class="mock-list-item tone-default" data-screen-id="a18"><span class="mock-list-main"><strong>#18 JPA N+1 문제 비교해보기</strong><small>♥22</small></span></div><div class="mock-list-item tone-default" data-screen-id="a143"><span class="mock-list-main"><strong>#143 MySQL 인덱스 설계 실전 적용 후기</strong><small>♥20</small></span></div><div class="mock-list-item tone-default" data-screen-id="a145"><span class="mock-list-main"><strong>#145 스프링 트랜잭션 전파 삽질기</strong><small>♥20 · 10-05에 올라감</small></span></div></div><div class="mock-copy emphasis-caption tone-muted" data-screen-id="nothing">새로 올라간 글이 없어요</div><div class="mock-list" data-screen-id="hall"><span class="screen-widget-label">명예의 전당(누구나 보는 화면)</span><div class="mock-list-item tone-default" data-screen-id="h145"><span class="mock-list-main"><strong>#145 스프링 트랜잭션 전파 삽질기</strong><small>2026-10-05 · ♥20</small></span></div><div class="mock-list-item tone-default" data-screen-id="h18"><span class="mock-list-main"><strong>#18 JPA N+1 문제 비교해보기</strong><small>2026-10-04 · ♥22</small></span></div></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">화면 뒤에서 일어나는 일</span><h4>요청부터 응답까지</h4></div><span class="flow-hint">이 단계에 기록된 처리 순서를 보여줍니다.</span></div><div class="flow-tracks" aria-label="흐름별 요청 처리 경로"><div class="flow-route" aria-label="10-04 기준으로 실행"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="mysql" data-index="2"><span class="flow-node-number">3</span>MySQL</span><span class="flow-node" data-node="response" data-index="3"><span class="flow-node-number">4</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="4"><span class="flow-node-number">5</span>응답 반영</span></div><div class="flow-route" aria-label="오늘(10-05) 기준 — 두 번"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="response" data-index="2"><span class="flow-node-number">3</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="3"><span class="flow-node-number">4</span>응답 반영</span></div><div class="flow-route" aria-label="명예의 전당 보기"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="response" data-index="2"><span class="flow-node-number">3</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="3"><span class="flow-node-number">4</span>응답 반영</span></div><div class="flow-route" aria-label="아직 오지 않은 날"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="response" data-index="2"><span class="flow-node-number">3</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="3"><span class="flow-node-number">4</span>응답 반영</span></div></div><p class="flow-swipe-hint">좌우로 밀어 전체 경로 보기 →</p><section class="implementation-route" aria-label="완성 코드의 역할별 구성"><div class="implementation-route-heading"><div><span class="scenario-kicker">실제 정답 파일 기준</span><h5>이 단계에서 만나는 Java 구성요소</h5></div><a href="#전체-구현-코드">코드 보기 ↗</a></div><div class="implementation-nodes"><div class="implementation-node"><strong>Scheduler</strong><small>HallOfFameScheduler.java</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>Controller</strong><small>HallOfFameController.java</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>DTO</strong><small>HallOfFameListRow.java · HallOfFameRow.java · HallOfFameRunResponse.java</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>Service</strong><small>HallOfFameService.java</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>Repository</strong><small>HallOfFameRepository.java</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>MySQL</strong><small>시나리오 SQL의 대상 DB</small></div></div><p class="implementation-disclaimer">파일의 역할 지도입니다. 위 흐름은 화면 JSON의 단계이며, 요청별 실제 호출 여부를 서버에서 추적한 결과는 아닙니다.</p></section><aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside><p class="flow-selection-status" role="status" aria-live="polite">카드를 선택하면 화면의 관련 요소와 계층이 강조됩니다.</p><div class="scenario-flows"><section class="scenario-flow" aria-label="10-04 기준으로 실행" data-flow-index="0"><h5>10-04 기준으로 실행<span class="scenario-flow-count">7단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="date|run" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">기준일 2026-10-04로 [지금 실행]</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/admin/jobs/hall-of-fame/run?date=2026-10-04" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/admin/jobs/hall-of-fame/run?date=2026-10-04</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">POST /api/admin/jobs/hall-of-fame/run?date=2026-10-04</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-p01</span></span></button></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">기준 시각 = 2026-10-04 00:00. 이 시각 '전'에 눌린 좋아요만 센다(10-04 당일 좋아요는 아직 '어제까지'가 아니다)</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> SELECT p.id, COUNT(*) AS likes FROM post p JOIN post_like l ON l.post_id = p.id AND l.created_at &lt; '2026-10-04 00:00'
+WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL
+  AND NOT EXISTS (SELECT 1 FROM hall_of_fame h WHERE h.post_id = p.id)
+GROUP BY p.id HAVING COUNT(*) &gt;= 20</span><span class="flow-step-detail"><b>note</b> post.like_count가 아니라 실제 좋아요 행을 센다</span></span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> INSERT IGNORE INTO hall_of_fame (post_id, likes, entered_on, created_at) VALUES (18, 22, '2026-10-04', ?) …</span><span class="flow-step-detail"><b>note</b> UNIQUE(post_id) — 이미 있으면 0행</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span><span class="flow-step-detail"><b>headers</b> Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;date&quot;: &quot;2026-10-04&quot;, &quot;minLikes&quot;: 20, &quot;added&quot;: [{&quot;postId&quot;: 18, &quot;likes&quot;: 22, …}, … 6개]}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="added" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">6개가 올라간다. 145번은 10-04 01:14에 20번째 좋아요를 받아서 아직 19개</span></button></li></ol></section><section class="scenario-flow" aria-label="오늘(10-05) 기준 — 두 번" data-flow-index="1"><h5>오늘(10-05) 기준 — 두 번<span class="scenario-flow-count">8단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="run" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">기준일을 2026-10-05로 바꿔 [지금 실행]</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/admin/jobs/hall-of-fame/run?date=2026-10-05" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/admin/jobs/hall-of-fame/run?date=2026-10-05</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">POST /api/admin/jobs/hall-of-fame/run?date=2026-10-05</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-p01</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span><span class="flow-step-detail"><b>headers</b> Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;date&quot;: &quot;2026-10-05&quot;, &quot;minLikes&quot;: 20, &quot;added&quot;: [{&quot;postId&quot;: 145, &quot;likes&quot;: 20, …}]}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="a145" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">이미 올라간 6개는 다시 나오지 않고 145번만</span></button></li><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="run" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">실수로 한 번 더 누른다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/admin/jobs/hall-of-fame/run?date=2026-10-05" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/admin/jobs/hall-of-fame/run?date=2026-10-05</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">POST /api/admin/jobs/hall-of-fame/run?date=2026-10-05</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-p01</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span><span class="flow-step-detail"><b>headers</b> Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;date&quot;: &quot;2026-10-05&quot;, &quot;minLikes&quot;: 20, &quot;added&quot;: []}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="nothing" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">같은 날 두 번 돌아도 한 번만</span></button></li></ol></section><section class="scenario-flow" aria-label="명예의 전당 보기" data-flow-index="2"><h5>명예의 전당 보기<span class="scenario-flow-count">4단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="hall" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">누구나 명예의 전당 화면을 연다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="GET" data-path="/api/hall-of-fame?size=20" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-get">GET</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/hall-of-fame?size=20</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">GET /api/hall-of-fame?size=20</span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span><span class="flow-step-detail"><b>headers</b> Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>[{&quot;postId&quot;: 145, &quot;title&quot;: &quot;…&quot;, &quot;likes&quot;: 20, &quot;enteredOn&quot;: &quot;2026-10-05&quot;}, {&quot;postId&quot;: 18, …, &quot;enteredOn&quot;: &quot;2026-10-04&quot;}, …]</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="h145|h18" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">최근에 올라간 순 → 좋아요 많은 순</span></button></li></ol></section><section class="scenario-flow" aria-label="아직 오지 않은 날" data-flow-index="3"><h5>아직 오지 않은 날<span class="scenario-flow-count">4단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="date" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">기준일에 2026-10-06을 넣는다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/admin/jobs/hall-of-fame/run?date=2026-10-06" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/admin/jobs/hall-of-fame/run?date=2026-10-06</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">POST /api/admin/jobs/hall-of-fame/run?date=2026-10-06</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-p01</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 400</span><span class="flow-step-detail"><b>headers</b> Content-Type: application/problem+json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;status&quot;: 400, &quot;errors&quot;: [{&quot;field&quot;: &quot;date&quot;, &quot;message&quot;: &quot;아직 오지 않은 날짜(2026-10-06)로는 실행할 수 없습니다. …&quot;}]}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="date" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">기준일 칸 아래 빨간 글씨</span></button></li></ol></section></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: '사용자 화면', request: 'HTTP 요청', server: '서버', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'server', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = (labels[selected] || button.querySelector('.flow-kind')?.textContent || '시나리오') + ' 단계 · ' + (button.querySelector('.flow-step-text')?.textContent.trim() || '세부 내용은 아래 설명을 확인하세요.');
+    }));
+  }
+})();
+</script>
+<blockquote>
+<p>학습용 DB(<code>practice</code>) — 앱을 <code>practice</code> 프로파일로 띄운다(8-1 참고, 13·14장은 <code>community</code>였다). &quot;지금&quot;은 <code>app.fixed-now</code>의 2026-10-05 00:00(월요일)이다.</p>
+</blockquote>
+<section class="api-map-stage" aria-label="이 단계의 API"><h3>이 단계에서 연결되는 API</h3><p class="api-map-stage-note">아래 역할과 파일은 완성 코드 기준입니다. 이번 단계의 작업 범위는 본문의 요구사항과 구현 가이드를 따르세요.</p><p class="api-map-stage-project"><strong>게시판 실습 프로젝트</strong></p><details class="api-map-route" id="community-board-stage-15-1-0"><summary><span class="api-map-method method-post">POST</span><code>/api/admin/jobs/hall-of-fame/run</code><span class="api-map-route-feature">운영·관리</span></summary><div class="api-map-route-body"><div class="api-map-flow" aria-label="POST /api/admin/jobs/hall-of-fame/run 처리 흐름"><div class="api-map-node"><span class="api-map-node-label">Controller</span><span class="api-map-node-files"><code>HallOfFameController.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">응답 DTO · 선택</span><span class="api-map-node-files"><code>HallOfFameRunResponse</code></span></div></div><p class="api-map-stages"><strong>시나리오</strong> <a href="15-1-hall-of-fame.html">15-1</a> · <a href="15-6-job-runs-retry.html">15-6</a></p></div></details><details class="api-map-route" id="community-board-stage-15-1-1"><summary><span class="api-map-method method-get">GET</span><code>/api/hall-of-fame</code><span class="api-map-route-feature">명예의 전당</span></summary><div class="api-map-route-body"><div class="api-map-flow" aria-label="GET /api/hall-of-fame 처리 흐름"><div class="api-map-node"><span class="api-map-node-label">Controller</span><span class="api-map-node-files"><code>HallOfFameController.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Service</span><span class="api-map-node-files"><code>HallOfFameService.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Repository / Mapper</span><span class="api-map-node-files"><code>HallOfFameRepository.java</code></span></div></div><p class="api-map-stages"><strong>시나리오</strong> <a href="15-1-hall-of-fame.html">15-1</a> · <a href="15-6-job-runs-retry.html">15-6</a></p></div></details></section><p class="api-map-link"><a href="../README.html#api-map-title">전체 API 구조도 보기</a></p><nav class="lesson-atlas" aria-label="15-1 학습 흐름"><div class="lesson-atlas-heading"><span>BUILD · RUN · UNDERSTAND</span><h2>이번 단계의 학습 흐름</h2><p>그림으로 요청의 경로를 먼저 본 다음, 필요한 절을 펼쳐 직접 만들고 확인하세요.</p></div><div class="lesson-atlas-track"><a class="lesson-atlas-stop lesson-understand" href="#상황"><b>01</b><span aria-hidden="true">◇</span><span><small>무엇을 만들까</small><strong>상황</strong></span></a><a class="lesson-atlas-stop lesson-understand" href="#만들-것"><b>02</b><span aria-hidden="true">◇</span><span><small>무엇을 만들까</small><strong>만들 것</strong></span></a><a class="lesson-atlas-stop lesson-build" href="#구현-가이드"><b>03</b><span aria-hidden="true">⌘</span><span><small>어떻게 만들까</small><strong>구현 가이드</strong></span></a><a class="lesson-atlas-stop lesson-build" href="#전체-구현-코드"><b>04</b><span aria-hidden="true">⌘</span><span><small>어떻게 만들까</small><strong>전체 구현 코드</strong></span></a><a class="lesson-atlas-stop lesson-build" href="#mybatis-대체-구현-코드"><b>05</b><span aria-hidden="true">⌘</span><span><small>어떻게 만들까</small><strong>MyBatis 대체 구현 코드</strong></span></a><a class="lesson-atlas-stop lesson-verify" href="#직접-확인"><b>06</b><span aria-hidden="true">↗</span><span><small>어떻게 확인할까</small><strong>직접 확인</strong></span></a><a class="lesson-atlas-stop lesson-verify" href="#채점-기준"><b>07</b><span aria-hidden="true">↗</span><span><small>어떻게 확인할까</small><strong>채점 기준</strong></span></a><a class="lesson-atlas-stop lesson-connect" href="#필요한-지식"><b>08</b><span aria-hidden="true">→</span><span><small>다음으로 연결</small><strong>필요한 지식</strong></span></a><a class="lesson-atlas-stop lesson-debug" href="#힌트-막힐-때만"><b>09</b><span aria-hidden="true">✳</span><span><small>막히면 확인</small><strong>힌트 (막힐 때만)</strong></span></a><a class="lesson-atlas-stop lesson-connect" href="#다음-단계"><b>10</b><span aria-hidden="true">→</span><span><small>다음으로 연결</small><strong>다음 단계</strong></span></a></div></nav><div class="lesson-scenes" aria-label="단계별 구현과 확인"><details class="lesson-scene lesson-understand" data-lesson-kind="understand">
+    <summary id="상황" aria-label="상황 내용 펼치기"><span class="lesson-scene-index">01</span><span class="lesson-scene-glyph" aria-hidden="true">◇</span><span class="lesson-scene-title"><small>무엇을 만들까</small><strong>상황</strong><em>"좋아요를 많이 받은 글을 '명예의 전당'에 올려 주세요. 매일 0시에 어제까지 좋아요 20개 이상 받은 글을 찾아서요. 한번 올라간 글은 계속 남고, 같은 글이 두 번 올라…</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<blockquote>
+<p>&quot;좋아요를 많이 받은 글을 &#39;명예의 전당&#39;에 올려 주세요. 매일 0시에 <strong>어제까지</strong> 좋아요 20개 이상 받은 글을 찾아서요. 한번 올라간 글은 계속 남고, 같은 글이 두 번 올라가면 안 돼요. 어제 배치가 돌았는지 헷갈리면 운영자가 날짜를 넣고 다시 돌릴 수 있게 해 주세요.&quot;</p>
+</blockquote>
+<p>8-5에서 <code>@Scheduled</code>·<code>@EnableScheduling</code>, 운영자 수동 실행 API, &quot;예약 실행과 수동 실행이 같은 서비스 메서드&quot; 구조를 이미 만들었다. 이 단계에서 새로 다루는 것은 셋이다.</p>
+<ul>
+<li><strong>기준일 파라미터</strong> — 배치는 &quot;언제 기준으로&quot; 도는지가 있다. 0시에 도는 배치의 기준일은 그날이고, 세는 범위는 그날 0시 <strong>전</strong>까지다. 수동 실행은 날짜를 받아 &quot;그날 0시에 돌았다면&quot;을 재현한다.</li>
+<li><strong>삽입 멱등</strong> — 8-5의 재계산은 몇 번 돌려도 같은 값으로 덮어써서 멱등이었다. 여기는 행을 <strong>추가</strong>하는 배치라 두 번 돌면 두 번 들어간다. DB의 <code>UNIQUE</code>가 마지막 방어선이다.</li>
+<li><strong>비정규화 숫자를 믿지 않기</strong> — <code>post.like_count</code>는 어긋날 수 있다(8-5). 119번 글은 <code>like_count</code>가 10이지만 실제 좋아요 행은 5개다. 집계는 <code>post_like</code> 행으로 한다.</li>
+</ul>
+<p>학습용 데이터에서 눈여겨볼 글:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>글</th>
+<th>사정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>145</td>
+<td>좋아요 20개 중 20번째가 <strong>2026-10-04 01:14</strong>에 눌렸다 → 10-04 기준(10-04 0시 전)은 19개, 10-05 기준은 20개</td>
+</tr>
+<tr>
+<td>59</td>
+<td>좋아요 22개지만 삭제된 글 → 올라가지 않는다</td>
+</tr>
+<tr>
+<td>18·55·103·131</td>
+<td>22개, 10·143은 20개</td>
+</tr>
+</tbody></table></div>
+</div>
+  </details><details class="lesson-scene lesson-understand" data-lesson-kind="understand" open>
+    <summary id="만들-것" aria-label="만들 것 내용 펼치기"><span class="lesson-scene-index">02</span><span class="lesson-scene-glyph" aria-hidden="true">◇</span><span class="lesson-scene-title"><small>무엇을 만들까</small><strong>만들 것</strong><em>V60 — db/migration/V60__create_hall_of_fame.sql (15장은 V60~V69를 쓴다)</em></span><span class="lesson-scene-count">1개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p><strong>V60</strong> — <code>db/migration/V60__create_hall_of_fame.sql</code> (15장은 V60~V69를 쓴다)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>컬럼</th>
+<th>타입·규칙</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td><code>BIGINT AUTO_INCREMENT PRIMARY KEY</code></td>
+</tr>
+<tr>
+<td><code>post_id</code></td>
+<td>FK → <code>post</code>, <strong><code>UNIQUE</code></strong> — 같은 글은 한 번만</td>
+</tr>
+<tr>
+<td><code>likes</code></td>
+<td>올라갈 때의 좋아요 수(그때의 기록)</td>
+</tr>
+<tr>
+<td><code>entered_on</code></td>
+<td><code>DATE</code> — 올라간 기준일</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>행을 만든 시각</td>
+</tr>
+</tbody></table></div>
+<p><strong>배치</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>예약 실행</td>
+<td><code>@Scheduled(cron = &quot;0 0 0 * * *&quot;, zone = &quot;Asia/Seoul&quot;)</code> — 기준일 = <code>LocalDate.now(clock)</code></td>
+</tr>
+<tr>
+<td>수동 실행</td>
+<td><code>POST /api/admin/jobs/hall-of-fame/run?date=2026-10-04</code> — 운영자만(<code>tok-p01</code>). 다른 회원 <code>403</code>, 토큰 없음 <code>401</code>. 예약 실행과 <strong>같은 서비스 메서드</strong></td>
+</tr>
+<tr>
+<td>세는 범위</td>
+<td>기준일 0시 <strong>전</strong>에 눌린 좋아요(<code>post_like.created_at &lt; 기준일 00:00</code>). 기준일 당일 좋아요는 넣지 않는다</td>
+</tr>
+<tr>
+<td>대상</td>
+<td><code>PUBLISHED</code>·<code>PUBLIC</code>·삭제 안 된 글, 좋아요 <strong>20개 이상</strong>(상수), 아직 안 올라간 글</td>
+</tr>
+<tr>
+<td>응답</td>
+<td><code>200</code>, 이번 실행에서 <strong>새로</strong> 올라간 글만(좋아요 많은 순 → <code>postId</code> 작은 순). 없으면 빈 배열</td>
+</tr>
+<tr>
+<td>목록</td>
+<td><code>GET /api/hall-of-fame?size=20</code> — 누구나. 지금도 볼 수 있는 글만, <code>entered_on</code> 최신 → <code>likes</code> 많은 순 → <code>postId</code> 작은 순</td>
+</tr>
+</tbody></table></div>
+<pre><code class="language-json">{ &quot;date&quot;: &quot;2026-10-04&quot;, &quot;minLikes&quot;: 20, &quot;added&quot;: [ { &quot;postId&quot;: 18, &quot;title&quot;: &quot;…&quot;, &quot;likes&quot;: 22, &quot;enteredOn&quot;: &quot;2026-10-04&quot; } ] }</code></pre>
+<p><strong>입력 규칙</strong> — 틀리면 <code>400</code>이고 <code>errors</code>에 틀린 파라미터가 들어간다(<code>500</code>이 나오면 안 된다)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>파라미터</th>
+<th>필수</th>
+<th>생략·빈 값</th>
+<th>범위</th>
+<th>형식</th>
+<th>기본값</th>
+<th>틀렸을 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>date</code>(실행)</td>
+<td>아니오</td>
+<td>생략·빈 값·공백이면 오늘</td>
+<td>오늘(Clock 기준)까지. <strong>미래 날짜는 400</strong> — 그날 좋아요가 아직 다 모이지 않았다</td>
+<td><code>yyyy-MM-dd</code>. <code>2026-1-5</code>·<code>2026-02-30</code>·<code>abc</code>는 400</td>
+<td>오늘</td>
+<td><code>400</code>, <code>errors[].field = &quot;date&quot;</code></td>
+</tr>
+<tr>
+<td><code>size</code>(목록)</td>
+<td>아니오</td>
+<td>생략하면 20, 빈 값·공백은 오류</td>
+<td>1~100</td>
+<td>정수</td>
+<td>20</td>
+<td><code>400</code>, <code>errors[].field = &quot;size&quot;</code></td>
+</tr>
+</tbody></table></div>
+<p><code>@RequestParam LocalDate</code>의 형식 오류는 컨트롤러에 들어오기 전에 <code>MethodArgumentTypeMismatchException</code>으로 터지므로 공통 처리기가 <code>errors</code>에 <code>date</code>를 담는다. <code>size</code>는 생략과 빈 문자열을 구별하기 위해 원문 <code>String</code>으로 받고 1~100 정수만 파싱한다.</p>
+<p>범위 밖·빈 값·정수 초과는 <code>InvalidJobParameterException</code>으로 <code>400</code>과 <code>errors[].field = &quot;size&quot;</code>를 만든다. 다른 컨트롤러의 <code>@Min</code>·<code>@Max</code> 위반에 쓰는 <code>HandlerMethodValidationException</code> 공통 처리도 이 단계에서 추가한다.</p>
+</div>
+  </details><details class="lesson-scene lesson-build" data-lesson-kind="build">
+    <summary id="구현-가이드" aria-label="구현 가이드 내용 펼치기"><span class="lesson-scene-index">03</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>구현 가이드</strong><em>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 만들 것 의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</em></span><span class="lesson-scene-count">18개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>MyBatis 대안 — 집계와 멱등 INSERT</span></div>
+<p>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 <strong>만들 것</strong>의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</p>
+<p>이 단계의 처리 흐름:</p>
+<ul>
+<li>기준 시각 = 2026-10-04 00:00. 이 시각 &#39;전&#39;에 눌린 좋아요만 센다(10-04 당일 좋아요는 아직 &#39;어제까지&#39;가 아니다)</li>
+<li>post.like_count가 아니라 실제 좋아요 행을 센다</li>
+<li>UNIQUE(post_id) — 이미 있으면 0행</li>
+</ul>
+<details>
+<summary>Controller — HTTP 연결</summary>
+
+<p><code>HallOfFameController.java</code>. 매핑과 메서드의 입력·응답을 위 <strong>만들 것</strong>의 HTTP 계약과 대조한다. 이번 단계 매핑: <code>@PostMapping(&quot;/api/admin/jobs/hall-of-fame/run&quot;)</code>, <code>@GetMapping(&quot;/api/hall-of-fame&quot;)</code>. 변경된 메서드: <code>run</code>, <code>list</code>.</p>
+<p><code>src/main/java/org/example/batch/HallOfFameController.java</code></p>
+<pre><code class="language-java">package org.example.batch;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Clock;
+import java.time.LocalDate;
+import java.util.List;
+
+@RestController
+public class HallOfFameController {
+
+    private final HallOfFameService hallOfFameService;
+    private final Clock clock;
+
+    public HallOfFameController(HallOfFameService hallOfFameService, Clock clock) {
+        this.hallOfFameService = hallOfFameService;
+        this.clock = clock;
+    }
+
+    // 수동 실행 — cron을 기다리지 않고 &quot;그 날짜에 돌았다면&quot;을 바로 확인한다.
+    // date는 yyyy-MM-dd(형식이 틀리면 타입 변환 실패 → 전역 핸들러가 400), 미래는 JobDates가 400.
+    @PostMapping(&quot;/api/admin/jobs/hall-of-fame/run&quot;)
+    public HallOfFameRunResponse run(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                     @LoginMember AuthenticatedMember me) {
+        AdminGuard.requireAdmin(me);
+        return hallOfFameService.run(JobDates.resolve(date, clock));
+    }
+
+    @GetMapping(&quot;/api/hall-of-fame&quot;)
+    public List&lt;HallOfFameEntry&gt; list(@RequestParam(required = false) String size) {
+        return hallOfFameService.list(parseSize(size));
+    }
+
+    private static int parseSize(String raw) {
+        if (raw == null) {
+            return 20;
+        }
+        if (!raw.matches(&quot;[0-9]+&quot;)) {
+            throw new InvalidJobParameterException(&quot;size&quot;, &quot;1~100 사이의 정수여야 합니다.&quot;);
+        }
+        try {
+            int value = Integer.parseInt(raw);
+            if (value &gt;= 1 &amp;&amp; value &lt;= 100) {
+                return value;
+            }
+        } catch (NumberFormatException ignored) {
+            // int 범위 밖의 숫자도 400으로 응답한다.
+        }
+        throw new InvalidJobParameterException(&quot;size&quot;, &quot;1~100 사이의 정수여야 합니다.&quot;);
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>DTO — 요청·응답 필드</summary>
+
+<p><code>HallOfFameListRow.java</code>, <code>HallOfFameRow.java</code>, <code>HallOfFameRunResponse.java</code>. 필드 이름·타입·검증·응답 형태를 위 <strong>만들 것</strong>과 대조한다.</p>
+<p><code>src/main/java/org/example/batch/HallOfFameListRow.java</code></p>
+<pre><code class="language-java">package org.example.batch;
+
+import java.time.LocalDate;
+
+public interface HallOfFameListRow {
+
+    Long getPostId();
+
+    String getTitle();
+
+    Integer getLikes();
+
+    LocalDate getEnteredOn();
+}</code></pre>
+<p><code>src/main/java/org/example/batch/HallOfFameRow.java</code></p>
+<pre><code class="language-java">package org.example.batch;
+
+public interface HallOfFameRow {
+
+    Long getPostId();
+
+    String getTitle();
+
+    Long getLikes();
+}</code></pre>
+<p><code>src/main/java/org/example/batch/HallOfFameRunResponse.java</code></p>
+<pre><code class="language-java">package org.example.batch;
+
+import java.time.LocalDate;
+import java.util.List;
+
+// added: 이번 실행에서 &quot;새로&quot; 올라간 글만. 이미 올라가 있던 글은 다시 나오지 않는다(두 번째 실행은 빈 배열).
+public record HallOfFameRunResponse(LocalDate date, int minLikes, List&lt;HallOfFameEntry&gt; added) {
+}</code></pre>
+</details>
+
+<details>
+<summary>Service — 처리 순서</summary>
+
+<p><code>HallOfFameService.java</code>. 위 서버 처리 순서가 어디에서 검증·조회·상태 변경으로 이어지는지 따라간다. 변경된 메서드: <code>run</code>, <code>list</code>. 트랜잭션 경계는 아래 코드의 <code>@Transactional</code> 위치에서 확인한다.</p>
+<p><code>src/main/java/org/example/batch/HallOfFameService.java</code></p>
+<pre><code class="language-java">package org.example.batch;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+// 15-1 명예의 전당 — 기준일(date) 0시 &quot;전&quot;까지 받은 좋아요가 20개 이상인 글을 올린다.
+// 예약 실행(매일 0시)과 수동 실행(운영자 API)이 이 메서드 하나를 같이 쓴다.
+@Service
+public class HallOfFameService {
+
+    public static final int MIN_LIKES = 20;
+    private static final Logger log = LoggerFactory.getLogger(HallOfFameService.class);
+
+    private final HallOfFameRepository hallOfFameRepository;
+    private final Clock clock;
+
+    public HallOfFameService(HallOfFameRepository hallOfFameRepository, Clock clock) {
+        this.hallOfFameRepository = hallOfFameRepository;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public HallOfFameRunResponse run(LocalDate date) {
+        // 기간은 [처음, date 0시) — date 당일에 눌린 좋아요는 아직 &quot;어제까지&quot;가 아니다
+        LocalDateTime cutoff = date.atStartOfDay();
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        List&lt;HallOfFameEntry&gt; added = new ArrayList&lt;&gt;();
+        for (HallOfFameRow row : hallOfFameRepository.findCandidates(cutoff, MIN_LIKES)) {
+            if (hallOfFameRepository.insertIgnore(row.getPostId(), row.getLikes(), date, now) == 1) {
+                added.add(new HallOfFameEntry(row.getPostId(), row.getTitle(), row.getLikes(), date));
+            }
+        }
+        log.info(&quot;명예의 전당 date={} cutoff={} 새로 올라간 글 {}건 {}&quot;, date, cutoff, added.size(),
+                added.stream().map(HallOfFameEntry::postId).toList());
+        return new HallOfFameRunResponse(date, MIN_LIKES, added);
+    }
+
+    @Transactional(readOnly = true)
+    public List&lt;HallOfFameEntry&gt; list(int size) {
+        return hallOfFameRepository.findList(size).stream()
+                .map(r -&gt; new HallOfFameEntry(r.getPostId(), r.getTitle(), r.getLikes(), r.getEnteredOn()))
+                .toList();
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>JPA / Repository — DB 조건</summary>
+
+<p><code>HallOfFameRepository.java</code>. 쿼리·파생 메서드의 조건을 화면 시나리오의 DB 단계 및 직접 확인 SQL과 대조한다. 직접 작성한 JPQL·SQL과 아래 파일의 <code>@Query</code>를 비교한다.</p>
+<p><code>src/main/java/org/example/batch/HallOfFameRepository.java</code></p>
+<pre><code class="language-java">package org.example.batch;
+
+import org.example.post.Post;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.Repository;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
+public interface HallOfFameRepository extends Repository&lt;Post, Long&gt; {
+
+    // 기준 시각(cutoff) &quot;전&quot;에 눌린 좋아요 행을 센다 — post.like_count(비정규화, 어긋날 수 있음)는 쓰지 않는다.
+    // 볼 수 있는 글(PUBLISHED·PUBLIC·삭제 안 됨)만, 이미 올라간 글은 뺀다.
+    @Query(nativeQuery = true, value = &quot;&quot;&quot;
+            SELECT p.id AS postId, p.title AS title, COUNT(*) AS likes
+              FROM post p
+              JOIN post_like l ON l.post_id = p.id AND l.created_at &lt; :cutoff
+             WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL
+               AND NOT EXISTS (SELECT 1 FROM hall_of_fame h WHERE h.post_id = p.id)
+             GROUP BY p.id, p.title
+            HAVING COUNT(*) &gt;= :minLikes
+             ORDER BY likes DESC, p.id ASC
+            &quot;&quot;&quot;)
+    List&lt;HallOfFameRow&gt; findCandidates(@Param(&quot;cutoff&quot;) LocalDateTime cutoff, @Param(&quot;minLikes&quot;) int minLikes);
+
+    // 위 조회와 INSERT 사이에 같은 배치가 한 번 더 돌아도 UNIQUE(post_id)가 막는다 — 들어간 행 수(0/1)만 받는다
+    @Modifying
+    @Query(nativeQuery = true, value = &quot;&quot;&quot;
+            INSERT IGNORE INTO hall_of_fame (post_id, likes, entered_on, created_at)
+            VALUES (:postId, :likes, :enteredOn, :now)
+            &quot;&quot;&quot;)
+    int insertIgnore(@Param(&quot;postId&quot;) Long postId, @Param(&quot;likes&quot;) long likes,
+                     @Param(&quot;enteredOn&quot;) LocalDate enteredOn, @Param(&quot;now&quot;) LocalDateTime now);
+
+    @Query(nativeQuery = true, value = &quot;&quot;&quot;
+            SELECT h.post_id AS postId, p.title AS title, h.likes AS likes, h.entered_on AS enteredOn
+              FROM hall_of_fame h
+              JOIN post p ON p.id = h.post_id
+             WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL
+             ORDER BY h.entered_on DESC, h.likes DESC, h.post_id ASC
+             LIMIT :size
+            &quot;&quot;&quot;)
+    List&lt;HallOfFameListRow&gt; findList(@Param(&quot;size&quot;) int size);
+}</code></pre>
+</details>
+
+<details>
+<summary>Flyway / SQL — 스키마 변경</summary>
+
+<p><code>V60__create_hall_of_fame.sql</code>. 실행 순서와 DDL·백필 대상을 시나리오의 스키마 계약과 대조한다.</p>
+<p><code>src/main/resources/db/migration/V60__create_hall_of_fame.sql</code></p>
+<pre><code class="language-sql">-- V60 — 명예의 전당(15-1). 기준일 0시까지 좋아요를 20개 이상 받은 글이 한 번 올라간다.
+-- UNIQUE(post_id): 같은 글은 한 번만 — 배치가 같은 날 두 번 돌아도, 다음 날 또 돌아도 중복 행이 생기지 않는다.
+-- likes는 올라갈 때의 좋아요 수(그때의 기록), entered_on은 그 기준일이다.
+CREATE TABLE hall_of_fame (
+    id         BIGINT   NOT NULL AUTO_INCREMENT,
+    post_id    BIGINT   NOT NULL,
+    likes      INT      NOT NULL,
+    entered_on DATE     NOT NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_hall_of_fame_post (post_id),
+    KEY ix_hall_of_fame_list (entered_on, likes, post_id),
+    CONSTRAINT fk_hall_of_fame_post FOREIGN KEY (post_id) REFERENCES post (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '명예의 전당 — 글마다 한 번';</code></pre>
+</details>
+
+<details>
+<summary>Scheduler — 실행 시점</summary>
+
+<p><code>HallOfFameScheduler.java</code>, <code>InvalidJobParameterException.java</code>, <code>JobDates.java</code>. 실행 주기와 대상 선택·재실행 조건을 시나리오와 대조한다. 변경된 메서드: <code>daily</code>, <code>resolve</code>.</p>
+<p><code>src/main/java/org/example/batch/HallOfFameScheduler.java</code></p>
+<pre><code class="language-java">package org.example.batch;
+
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.time.Clock;
+import java.time.LocalDate;
+
+// 매일 0시(서울) — 기준일은 그 &quot;오늘&quot;이고, 집계는 오늘 0시 전(=어제까지)이다.
+@Component
+public class HallOfFameScheduler {
+
+    private final HallOfFameService hallOfFameService;
+    private final Clock clock;
+
+    public HallOfFameScheduler(HallOfFameService hallOfFameService, Clock clock) {
+        this.hallOfFameService = hallOfFameService;
+        this.clock = clock;
+    }
+
+    @Scheduled(cron = &quot;0 0 0 * * *&quot;, zone = &quot;Asia/Seoul&quot;)
+    public void daily() {
+        hallOfFameService.run(LocalDate.now(clock));
+    }
+}</code></pre>
+<p><code>src/main/java/org/example/batch/InvalidJobParameterException.java</code></p>
+<pre><code class="language-java">package org.example.batch;
+
+// 배치 실행·조회 파라미터가 규칙에 맞지 않음 — 전역 핸들러가 400 + errors[{field, message}]로 바꾼다
+public class InvalidJobParameterException extends RuntimeException {
+
+    private final String field;
+
+    public InvalidJobParameterException(String field, String message) {
+        super(message);
+        this.field = field;
+    }
+
+    public String getField() {
+        return field;
+    }
+}</code></pre>
+<p><code>src/main/java/org/example/batch/JobDates.java</code></p>
+<pre><code class="language-java">package org.example.batch;
+
+import java.time.Clock;
+import java.time.LocalDate;
+
+// 하루 단위 배치의 &quot;기준일&quot; 규칙 — 수동 실행·예약 실행·재실행이 같은 규칙을 쓴다.
+public final class JobDates {
+
+    private JobDates() {
+    }
+
+    // 생략하면 오늘(Clock 기준). 오늘까지는 되고, 아직 오지 않은 날은 400 — 그날 데이터가 다 모이지 않았다.
+    public static LocalDate resolve(LocalDate date, Clock clock) {
+        LocalDate today = LocalDate.now(clock);
+        if (date == null) {
+            return today;
+        }
+        if (date.isAfter(today)) {
+            throw new InvalidJobParameterException(&quot;date&quot;, &quot;아직 오지 않은 날짜(&quot; + date + &quot;)로는 실행할 수 없습니다. 오늘은 &quot; + today + &quot;입니다.&quot;);
+        }
+        return date;
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>예외 처리 — 실패 응답</summary>
+
+<p><code>ApiExceptionHandler.java</code>. 예외가 어떤 HTTP 상태와 오류 본문으로 바뀌는지 실패 계약과 대조한다. 변경된 메서드: <code>handleMethodValidation</code>, <code>handleInvalidJobParameter</code>.</p>
+<p><code>src/main/java/org/example/common/ApiExceptionHandler.java</code></p>
+<pre><code class="language-java">package org.example.common;
+
+import jakarta.servlet.http.HttpServletRequest;
+import tools.jackson.core.JacksonException;
+import org.example.admin.AdminOnlyException;
+import org.example.admin.ModerationConflictException;
+import org.example.auth.AuthenticationRequiredException;
+import org.example.auth.MemberNotActiveException;
+import org.example.auth.MemberSuspendedException;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardWriteForbiddenException;
+import org.example.bookmark.BookmarkFolderNotFoundException;
+import org.example.bookmark.InvalidBookmarkFieldException;
+import org.example.bookmark.BookmarkNotFoundException;
+import org.example.bookmark.DuplicateBookmarkFolderNameException;
+import org.example.bookmark.InvalidBookmarkFolderException;
+import org.example.bookmark.SharedFolderNotFoundException;
+import org.example.comment.CommentForbiddenException;
+import org.example.comment.CommentNotFoundException;
+import org.example.comment.InvalidParentCommentException;
+import org.example.image.EmptyImageException;
+import org.example.image.ImageNotFoundException;
+import org.example.image.UnsupportedImageException;
+import org.example.like.SelfLikeNotAllowedException;
+import org.example.member.MemberNotFoundException;
+import org.example.moderation.BannedContentException;
+import org.example.moderation.BannedWordNotFoundException;
+import org.example.moderation.DuplicateBannedWordException;
+import org.example.notification.NotificationNotFoundException;
+import org.example.post.InvalidParametersException;
+import org.example.post.InvalidPostFieldException;
+import org.example.post.InvalidSearchConditionException;
+import org.example.post.PostForbiddenException;
+import org.example.post.PostNotDeletedException;
+import org.example.revision.RevisionForbiddenException;
+import org.example.post.PostNotDraftException;
+import org.example.post.PostRestoreExpiredException;
+import org.example.post.PostRestoreForbiddenException;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostStatusConflictException;
+import org.example.post.TooManyPostsException;
+import org.example.report.DuplicateReportException;
+import org.example.report.NothingToResolveException;
+import org.example.report.ReportTargetNotFoundException;
+import org.example.report.SelfReportNotAllowedException;
+import org.example.social.FollowBlockedException;
+import org.example.social.SelfFollowNotAllowedException;
+import org.example.social.SelfMuteNotAllowedException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+import org.example.poll.InvalidPollException;
+import org.example.poll.PollConflictException;
+import org.example.poll.PollNotFoundException;
+import org.example.pin.InvalidPinException;
+import org.example.series.SeriesForbiddenException;
+import org.example.series.SeriesNotFoundException;
+import org.example.batch.InvalidJobParameterException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+
+// 모든 컨트롤러의 에러 응답을 한 곳에서 RFC 9457 Problem Details로 만든다.
+// 컨트롤러마다 try-catch를 두지 않는다.
+@RestControllerAdvice
+public class ApiExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ProblemDetail handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);
+        problem.setInstance(URI.create(request.getRequestURI()));
+        List&lt;Map&lt;String, String&gt;&gt; errors = ex.getBindingResult().getFieldErrors().stream()
+                .map(fieldError -&gt; Map.of(
+                        &quot;field&quot;, fieldError.getField(),
+                        &quot;message&quot;, fieldError.getDefaultMessage() == null ? &quot;&quot; : fieldError.getDefaultMessage()
+                ))
+                .toList();
+        problem.setProperty(&quot;errors&quot;, errors);
+        return problem;
+    }
+
+    // 13-4 금칙어 — 1-5 검증 오류와 같은 모양(어느 필드인지 errors에)
+    @ExceptionHandler(BannedContentException.class)
+    public ProblemDetail handleBannedContent(BannedContentException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty(&quot;errors&quot;, ex.getErrors());
+        return problem;
+    }
+
+    @ExceptionHandler(DuplicateBannedWordException.class)
+    public ProblemDetail handleDuplicateBannedWord(DuplicateBannedWordException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(BannedWordNotFoundException.class)
+    public ProblemDetail handleBannedWordNotFound(BannedWordNotFoundException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleUnreadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;요청 본문을 읽을 수 없습니다.&quot;);
+        problem.setInstance(URI.create(request.getRequestURI()));
+        // 11-1 JSON 문법은 맞는데 한 필드의 형식이 틀린 경우(숫자 자리에 &quot;abc&quot;, 목록 자리에 문자열) —
+        // Jackson이 남긴 경로로 어느 필드인지 errors에 담는다. 목록 안이면 Bean Validation과 같은 모양(imageIds[0]).
+        // JSON 문법 자체가 깨졌으면 경로가 비어 있어 errors 없이 400만 나간다. Jackson은 첫 오류에서 멈추므로 하나만 들어간다.
+        if (ex.getCause() instanceof JacksonException jackson &amp;&amp; !jackson.getPath().isEmpty()) {
+            problem.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, fieldPath(jackson), &quot;message&quot;, &quot;형식이 올바르지 않습니다.&quot;)));
+        }
+        return problem;
+    }
+
+    // 11-1 경로·쿼리 값의 형식 오류(/api/posts/abc, ?size=abc) — 그대로 두면 Spring 기본 응답이라 어느 값이 틀렸는지 없다
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, ex.getName(),
+                &quot;message&quot;, &quot;형식이 올바르지 않습니다: &quot; + ex.getValue())));
+        return problem;
+    }
+
+    private static String fieldPath(JacksonException jackson) {
+        StringBuilder field = new StringBuilder();
+        for (JacksonException.Reference ref : jackson.getPath()) {
+            if (ref.getPropertyName() != null) {
+                if (!field.isEmpty()) {
+                    field.append('.');
+                }
+                field.append(ref.getPropertyName());
+            } else {
+                field.append('[').append(ref.getIndex()).append(']');
+            }
+        }
+        return field.toString();
+    }
+
+    @ExceptionHandler(BoardNotFoundException.class)
+    public ProblemDetail handleBoardNotFound(BoardNotFoundException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(PostNotFoundException.class)
+    public ProblemDetail handlePostNotFound(PostNotFoundException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(BoardWriteForbiddenException.class)
+    public ProblemDetail handleBoardWriteForbidden(BoardWriteForbiddenException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(SelfLikeNotAllowedException.class)
+    public ProblemDetail handleSelfLikeNotAllowed(SelfLikeNotAllowedException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(PostForbiddenException.class)
+    public ProblemDetail handlePostForbidden(PostForbiddenException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    // 11-1 임시저장이 아닌 글을 발행 — 지금 상태와 충돌
+    @ExceptionHandler(PostNotDraftException.class)
+    public ProblemDetail handlePostNotDraft(PostNotDraftException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    // 11-6 이력은 작성자·운영자만
+    @ExceptionHandler(RevisionForbiddenException.class)
+    public ProblemDetail handleRevisionForbidden(RevisionForbiddenException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    // 11-5 복구
+    @ExceptionHandler(PostNotDeletedException.class)
+    public ProblemDetail handlePostNotDeleted(PostNotDeletedException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(PostRestoreForbiddenException.class)
+    public ProblemDetail handlePostRestoreForbidden(PostRestoreForbiddenException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(PostRestoreExpiredException.class)
+    public ProblemDetail handlePostRestoreExpired(PostRestoreExpiredException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.GONE, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    // 11-2 이미지 업로드
+    @ExceptionHandler(EmptyImageException.class)
+    public ProblemDetail handleEmptyImage(EmptyImageException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(UnsupportedImageException.class)
+    public ProblemDetail handleUnsupportedImage(UnsupportedImageException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    // spring.servlet.multipart.max-file-size를 넘으면 컨트롤러에 오기 전에(요청을 읽는 단계에서) 터진다
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ProblemDetail handleMaxUploadSize(HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONTENT_TOO_LARGE, &quot;파일은 1MB까지 올릴 수 있습니다.&quot;);
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(ImageNotFoundException.class)
+    public ProblemDetail handleImageNotFound(ImageNotFoundException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    // 11-4 쿼리 파라미터 여러 개를 한꺼번에 검사한 결과
+    @ExceptionHandler(InvalidParametersException.class)
+    public ProblemDetail handleInvalidParameters(InvalidParametersException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty(&quot;errors&quot;, ex.getErrors().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -&gt; Map.of(&quot;field&quot;, e.getKey(), &quot;message&quot;, e.getValue()))
+                .toList());
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidPostFieldException.class)
+    public ProblemDetail handleInvalidPostField(InvalidPostFieldException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, ex.getField(), &quot;message&quot;, ex.getMessage())));
+        return problem;
+    }
+
+    @ExceptionHandler(CommentNotFoundException.class)
+    public ProblemDetail handleCommentNotFound(CommentNotFoundException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidParentCommentException.class)
+    public ProblemDetail handleInvalidParentComment(InvalidParentCommentException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(CommentForbiddenException.class)
+    public ProblemDetail handleCommentForbidden(CommentForbiddenException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(BookmarkFolderNotFoundException.class)
+    public ProblemDetail handleBookmarkFolderNotFound(BookmarkFolderNotFoundException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(BookmarkNotFoundException.class)
+    public ProblemDetail handleBookmarkNotFound(BookmarkNotFoundException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidBookmarkFolderException.class)
+    public ProblemDetail handleInvalidBookmarkFolder(InvalidBookmarkFolderException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(DuplicateBookmarkFolderNameException.class)
+    public ProblemDetail handleDuplicateBookmarkFolderName(DuplicateBookmarkFolderNameException ex,
+                                                           HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidCursorException.class)
+    public ProblemDetail handleInvalidCursor(InvalidCursorException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidSearchConditionException.class)
+    public ProblemDetail handleInvalidSearchCondition(InvalidSearchConditionException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(AdminOnlyException.class)
+    public ProblemDetail handleAdminOnly(AdminOnlyException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(PostStatusConflictException.class)
+    public ProblemDetail handlePostStatusConflict(PostStatusConflictException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(ModerationConflictException.class)
+    public ProblemDetail handleModerationConflict(ModerationConflictException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(NotificationNotFoundException.class)
+    public ProblemDetail handleNotificationNotFound(NotificationNotFoundException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(MemberNotFoundException.class)
+    public ProblemDetail handleMemberNotFound(MemberNotFoundException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(SelfFollowNotAllowedException.class)
+    public ProblemDetail handleSelfFollow(SelfFollowNotAllowedException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(SelfMuteNotAllowedException.class)
+    public ProblemDetail handleSelfMute(SelfMuteNotAllowedException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(FollowBlockedException.class)
+    public ProblemDetail handleFollowBlocked(FollowBlockedException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(ReportTargetNotFoundException.class)
+    public ProblemDetail handleReportTargetNotFound(ReportTargetNotFoundException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(SelfReportNotAllowedException.class)
+    public ProblemDetail handleSelfReport(SelfReportNotAllowedException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(NothingToResolveException.class)
+    public ProblemDetail handleNothingToResolve(NothingToResolveException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(DuplicateReportException.class)
+    public ProblemDetail handleDuplicateReport(DuplicateReportException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    // 13-5 도배 방지 — 429 + Retry-After(몇 초 뒤에 다시 하면 되는지). 본문에도 같은 값을 싣는다
+    @ExceptionHandler(TooManyPostsException.class)
+    public ResponseEntity&lt;ProblemDetail&gt; handleTooManyPosts(TooManyPostsException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty(&quot;retryAfterSeconds&quot;, ex.getRetryAfterSeconds());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+                .body(problem);
+    }
+
+    @ExceptionHandler(PollNotFoundException.class)
+    public ProblemDetail handlePollNotFound(PollNotFoundException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidPollException.class)
+    public ProblemDetail handleInvalidPoll(InvalidPollException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, ex.getField(), &quot;message&quot;, ex.getMessage())));
+        return problem;
+    }
+
+    @ExceptionHandler(PollConflictException.class)
+    public ProblemDetail handlePollConflict(PollConflictException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidPinException.class)
+    public ProblemDetail handleInvalidPin(InvalidPinException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        if (ex.getField() != null) {
+            problem.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, ex.getField(), &quot;message&quot;, ex.getMessage())));
+        }
+        return problem;
+    }
+
+    @ExceptionHandler(SeriesNotFoundException.class)
+    public ProblemDetail handleSeriesNotFound(SeriesNotFoundException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(SeriesForbiddenException.class)
+    public ProblemDetail handleSeriesForbidden(SeriesForbiddenException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    @ExceptionHandler(SharedFolderNotFoundException.class)
+    public ProblemDetail handleSharedFolderNotFound(SharedFolderNotFoundException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+
+    // 15-1 쿼리 파라미터 범위 오류(@Min·@Max) — 틀린 파라미터를 모두 errors에
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ProblemDetail handleMethodValidation(HandlerMethodValidationException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);
+        problem.setInstance(URI.create(request.getRequestURI()));
+        List&lt;Map&lt;String, String&gt;&gt; errors = ex.getParameterValidationResults().stream()
+                .flatMap(r -&gt; r.getResolvableErrors().stream().map(e -&gt; Map.of(
+                        &quot;field&quot;, String.valueOf(r.getMethodParameter().getParameterName()),
+                        &quot;message&quot;, e.getDefaultMessage() == null ? &quot;&quot; : e.getDefaultMessage())))
+                .toList();
+        problem.setProperty(&quot;errors&quot;, errors);
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidJobParameterException.class)
+    public ProblemDetail handleInvalidJobParameter(InvalidJobParameterException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, ex.getField(), &quot;message&quot;, ex.getMessage())));
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidBookmarkFieldException.class)
+    public ProblemDetail handleInvalidBookmarkField(InvalidBookmarkFieldException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, ex.getField(), &quot;message&quot;, ex.getMessage())));
+        return problem;
+    }
+
+    // 누구인지 모름 — WWW-Authenticate 헤더를 함께 내려준다
+    @ExceptionHandler(AuthenticationRequiredException.class)
+    public ResponseEntity&lt;ProblemDetail&gt; handleAuthenticationRequired(AuthenticationRequiredException ex,
+                                                                       HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .header(HttpHeaders.WWW_AUTHENTICATE, &quot;Bearer&quot;)
+                .body(problem);
+    }
+
+    // 13-3 기간 정지 중 쓰기 — 언제 풀리는지·왜인지를 함께 준다(화면이 안내 문구를 만들 수 있게)
+    @ExceptionHandler(MemberSuspendedException.class)
+    public ProblemDetail handleMemberSuspended(MemberSuspendedException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty(&quot;suspendedUntil&quot;, ex.getSuspendedUntil());
+        problem.setProperty(&quot;reason&quot;, ex.getReason());
+        return problem;
+    }
+
+    // 누구인지는 알지만(토큰은 유효) 회원 상태 때문에 안 됨
+    @ExceptionHandler(MemberNotActiveException.class)
+    public ProblemDetail handleMemberNotActive(MemberNotActiveException ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setInstance(URI.create(request.getRequestURI()));
+        return problem;
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>설정·보조 코드</summary>
+
+<p><code>AdminGuard.java</code>, <code>HallOfFameEntry.java</code>. 이 파일에서 바뀐 설정·보조 타입이 서버 흐름의 어느 단계에 필요한지 확인한다. 변경된 메서드: <code>requireAdmin</code>.</p>
+<p><code>src/main/java/org/example/batch/AdminGuard.java</code></p>
+<pre><code class="language-java">package org.example.batch;
+
+import org.example.admin.AdminOnlyException;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.AuthenticationRequiredException;
+
+// 배치 수동 실행·조회 API는 운영자만. POST는 인터셉터가 토큰 없음을 401로 막지만
+// GET은 &quot;헤더 없음 = 비로그인 통과&quot;라서 여기서 null도 확인한다.
+public final class AdminGuard {
+
+    private static final String ADMIN_ROLE = &quot;ADMIN&quot;;
+
+    private AdminGuard() {
+    }
+
+    public static void requireAdmin(AuthenticatedMember me) {
+        if (me == null) {
+            throw new AuthenticationRequiredException(&quot;인증이 필요합니다.&quot;);
+        }
+        if (!ADMIN_ROLE.equals(me.role())) {
+            throw new AdminOnlyException();
+        }
+    }
+}</code></pre>
+<p><code>src/main/java/org/example/batch/HallOfFameEntry.java</code></p>
+<pre><code class="language-java">package org.example.batch;
+
+import java.time.LocalDate;
+
+public record HallOfFameEntry(Long postId, String title, long likes, LocalDate enteredOn) {
+}</code></pre>
+</details>
+
+<h3 id="mybatis-대안--집계와-멱등-insert"><a class="anchor" href="#mybatis-대안--집계와-멱등-insert" aria-hidden="true">#</a>MyBatis 대안 — 집계와 멱등 INSERT</h3>
+<p><code>HallOfFameMapper</code>는 기준일 0시 전의 <code>post_like</code>를 한 번에 집계하고 <code>INSERT IGNORE</code> + <code>UNIQUE(post_id)</code>로 중복 삽입을 막는다. 조회는 <code>entered_on</code>, <code>likes</code>, <code>post_id</code> 순서로 정렬한다. 스케줄러·Controller·예외 처리·Flyway V60은 공통 코드를 재사용한다.</p>
+<details>
+<summary>MyBatis / 설정 — build.gradle</summary>
+
+<p><code>build.gradle</code></p>
+<pre><code class="language-groovy">plugins {
+    id 'java'
+    // bootRun / bootJar 태스크 제공 + 실행 가능한 fat jar 패키징
+    id 'org.springframework.boot' version '4.1.1'
+    // Boot BOM을 적용해서 아래 의존성들의 버전을 생략할 수 있게 해줌
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'org.example'
+version = '1.0-SNAPSHOT'
+
+java {
+    toolchain {
+        // 컴파일·실행 JDK를 고정 (Boot 4는 Java 17 이상 필요, 로컬에 설치된 21 사용)
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    // Spring MVC + 내장 Tomcat + Jackson (Boot 4부터 starter-web → starter-webmvc로 이름 변경)
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    // JPA(Hibernate) + HikariCP 커넥션 풀
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'
+    // @Valid, @NotBlank 같은 요청 값 검증
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // MySQL JDBC 드라이버 — 컴파일엔 필요 없고 실행할 때만 필요
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    // 9-1 스키마 변경은 Flyway 마이그레이션(db/migration)으로만 한다
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    runtimeOnly 'org.flywaydb:flyway-mysql'
+    // 13-7 API 문서(OpenAPI 3.1 + Swagger UI) — springdoc 3.x가 Spring Boot 4용(3.1.1은 Boot 4.1.0 기준으로 빌드됨).
+    // Boot BOM이 관리하지 않는 라이브러리라 버전을 직접 적는다
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+
+    // 테스트: JUnit·AssertJ·Mockito·MockMvc 묶음 (버전은 Boot BOM이 관리하므로 junit-bom 따로 두지 않음)
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    // @DataJpaTest(리포지토리만 띄우는 테스트)
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+    // 테스트용 일회용 MySQL 컨테이너 — application-test.yml의 jdbc:tc: URL이 쓴다
+    testImplementation 'org.testcontainers:testcontainers-mysql'
+    // Gradle이 JUnit Platform 테스트를 실행할 때 필요한 런처
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    // 테스트는 application-test.yml(Testcontainers MySQL)을 쓰게 한다
+    systemProperty 'spring.profiles.active', 'test'
+}</code></pre>
+</details>
+
+<details>
+<summary>MyBatis / 설정 — application.yml</summary>
+
+<p><code>src/main/resources/application.yml</code></p>
+<pre><code class="language-yaml">spring:
+  application:
+    name: javaExperience
+  datasource:
+    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  flyway:
+    # 이미 테이블·데이터가 있는 DB(compose의 community·practice)는 V1(CREATE TABLE)을 실행하면 실패한다.
+    # 그래서 기록 테이블이 없으면 &quot;V1까지 됐다&quot;고만 적고(baseline) V2부터 실행한다. 빈 DB면 V1부터 실제로 실행한다.
+    baseline-on-migrate: true
+    baseline-version: 1
+  servlet:
+    multipart:
+      # 11-2 이미지 한 장 1MB, 요청 전체 2MB까지. 넘으면 MaxUploadSizeExceededException → 413
+      max-file-size: 1MB
+      max-request-size: 2MB
+  jpa:
+    hibernate:
+      # 스키마는 Flyway만 바꾼다(9-1). 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)
+      ddl-auto: validate
+    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        # 컬렉션(태그) 지연 로딩을 글마다 1번이 아니라 IN (...) 한 번으로 묶는다(2-4, N+1 대응)
+        default_batch_fetch_size: 100
+
+# 11-2 올린 이미지를 저장할 폴더(앱을 실행한 위치 기준). git에는 올리지 않는다(.gitignore)
+app:
+  upload-dir: uploads
+
+logging:
+  level:
+    # 실행 SQL은 확인하되 토큰을 포함한 바인딩 값은 로그에 남기지 않는다
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: info
+
+# 0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다
+start:
+  greeting: 반가워요, 백엔드!
+  max-items: 5
+
+# 13-7 앱 개발자가 문서를 열면 사용자용 API 그룹을 먼저 보여 준다.
+springdoc:
+  swagger-ui:
+    urls-primary-name: public
+
+# 15-1 MyBatis 배치 SQL 매퍼
+mybatis:
+  mapper-locations: classpath:mapper/*.xml</code></pre>
+</details>
+
+<details>
+<summary>MyBatis / Mapper — HallOfFameMapper.java</summary>
+
+<p><code>src/main/java/org/example/batch/HallOfFameMapper.java</code></p>
+<pre><code class="language-java">package org.example.batch;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Mapper
+public interface HallOfFameMapper {
+
+    List&lt;HallOfFameEntry&gt; findCandidates(@Param(&quot;cutoff&quot;) LocalDateTime cutoff,
+                                         @Param(&quot;minLikes&quot;) int minLikes);
+
+    int insertIgnore(@Param(&quot;postId&quot;) Long postId, @Param(&quot;likes&quot;) long likes,
+                     @Param(&quot;enteredOn&quot;) LocalDate enteredOn, @Param(&quot;now&quot;) LocalDateTime now);
+
+    List&lt;HallOfFameEntry&gt; findList(@Param(&quot;size&quot;) int size);
+}</code></pre>
+</details>
+
+<details>
+<summary>MyBatis / SQL — HallOfFameMapper.xml</summary>
+
+<p><code>src/main/resources/mapper/HallOfFameMapper.xml</code></p>
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+&lt;mapper namespace=&quot;org.example.batch.HallOfFameMapper&quot;&gt;
+    &lt;resultMap id=&quot;entry&quot; type=&quot;org.example.batch.HallOfFameEntry&quot;&gt;
+        &lt;constructor&gt;
+            &lt;arg column=&quot;post_id&quot; javaType=&quot;java.lang.Long&quot;/&gt;
+            &lt;arg column=&quot;title&quot; javaType=&quot;java.lang.String&quot;/&gt;
+            &lt;arg column=&quot;likes&quot; javaType=&quot;_long&quot;/&gt;
+            &lt;arg column=&quot;entered_on&quot; javaType=&quot;java.time.LocalDate&quot;/&gt;
+        &lt;/constructor&gt;
+    &lt;/resultMap&gt;
+
+    &lt;select id=&quot;findCandidates&quot; resultMap=&quot;entry&quot;&gt;
+        SELECT p.id AS post_id, p.title, COUNT(*) AS likes, NULL AS entered_on
+          FROM post p
+          JOIN post_like l ON l.post_id = p.id AND l.created_at &amp;lt; #{cutoff}
+         WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL
+           AND NOT EXISTS (SELECT 1 FROM hall_of_fame h WHERE h.post_id = p.id)
+         GROUP BY p.id, p.title
+        HAVING COUNT(*) &amp;gt;= #{minLikes}
+         ORDER BY likes DESC, p.id ASC
+    &lt;/select&gt;
+
+    &lt;insert id=&quot;insertIgnore&quot;&gt;
+        INSERT IGNORE INTO hall_of_fame (post_id, likes, entered_on, created_at)
+        VALUES (#{postId}, #{likes}, #{enteredOn}, #{now})
+    &lt;/insert&gt;
+
+    &lt;select id=&quot;findList&quot; resultMap=&quot;entry&quot;&gt;
+        SELECT h.post_id, p.title, h.likes, h.entered_on
+          FROM hall_of_fame h
+          JOIN post p ON p.id = h.post_id
+         WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL
+         ORDER BY h.entered_on DESC, h.likes DESC, h.post_id ASC
+         LIMIT #{size}
+    &lt;/select&gt;
+&lt;/mapper&gt;</code></pre>
+</details>
+
+<details>
+<summary>MyBatis / Service — HallOfFameService.java</summary>
+
+<p><code>src/main/java/org/example/batch/HallOfFameService.java</code></p>
+<pre><code class="language-java">package org.example.batch;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+// 15-1 명예의 전당 — 기준일(date) 0시 &quot;전&quot;까지 받은 좋아요가 20개 이상인 글을 올린다.
+// 예약 실행(매일 0시)과 수동 실행(운영자 API)이 이 메서드 하나를 같이 쓴다.
+@Service
+public class HallOfFameService {
+
+    public static final int MIN_LIKES = 20;
+    private static final Logger log = LoggerFactory.getLogger(HallOfFameService.class);
+
+    private final HallOfFameMapper hallOfFameMapper;
+    private final Clock clock;
+
+    public HallOfFameService(HallOfFameMapper hallOfFameMapper, Clock clock) {
+        this.hallOfFameMapper = hallOfFameMapper;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public HallOfFameRunResponse run(LocalDate date) {
+        // 기간은 [처음, date 0시) — date 당일에 눌린 좋아요는 아직 &quot;어제까지&quot;가 아니다
+        LocalDateTime cutoff = date.atStartOfDay();
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        List&lt;HallOfFameEntry&gt; added = new ArrayList&lt;&gt;();
+        for (HallOfFameEntry row : hallOfFameMapper.findCandidates(cutoff, MIN_LIKES)) {
+            if (hallOfFameMapper.insertIgnore(row.postId(), row.likes(), date, now) == 1) {
+                added.add(new HallOfFameEntry(row.postId(), row.title(), row.likes(), date));
+            }
+        }
+        log.info(&quot;명예의 전당 date={} cutoff={} 새로 올라간 글 {}건 {}&quot;, date, cutoff, added.size(),
+                added.stream().map(HallOfFameEntry::postId).toList());
+        return new HallOfFameRunResponse(date, MIN_LIKES, added);
+    }
+
+    @Transactional(readOnly = true)
+    public List&lt;HallOfFameEntry&gt; list(int size) {
+        return hallOfFameMapper.findList(size);
+    }
+}</code></pre>
+</details>
+
+</div>
+  </details><details class="lesson-scene lesson-build" data-lesson-kind="build">
+    <summary id="전체-구현-코드" aria-label="전체 구현 코드 내용 펼치기"><span class="lesson-scene-index">04</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>전체 구현 코드</strong><em>이 단계에서 변경된 파일의 전문입니다.</em></span><span class="lesson-scene-count">13개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>이 단계에서 바뀐 파일</span><span>현재 전체 코드</span></div>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<div class="code-workbench" data-code-workbench><div class="code-workbench-source"><details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/batch/AdminGuard.java</summary><pre><code>package org.example.batch;&#10;&#10;import org.example.admin.AdminOnlyException;&#10;import org.example.auth.AuthenticatedMember;&#10;import org.example.auth.AuthenticationRequiredException;&#10;&#10;// 배치 수동 실행·조회 API는 운영자만. POST는 인터셉터가 토큰 없음을 401로 막지만&#10;// GET은 &quot;헤더 없음 = 비로그인 통과&quot;라서 여기서 null도 확인한다.&#10;public final class AdminGuard {&#10;&#10;    private static final String ADMIN_ROLE = &quot;ADMIN&quot;;&#10;&#10;    private AdminGuard() {&#10;    }&#10;&#10;    public static void requireAdmin(AuthenticatedMember me) {&#10;        if (me == null) {&#10;            throw new AuthenticationRequiredException(&quot;인증이 필요합니다.&quot;);&#10;        }&#10;        if (!ADMIN_ROLE.equals(me.role())) {&#10;            throw new AdminOnlyException();&#10;        }&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/batch/HallOfFameController.java</summary><pre><code>package org.example.batch;&#10;&#10;import org.example.auth.AuthenticatedMember;&#10;import org.example.auth.LoginMember;&#10;import org.springframework.format.annotation.DateTimeFormat;&#10;import org.springframework.web.bind.annotation.GetMapping;&#10;import org.springframework.web.bind.annotation.PostMapping;&#10;import org.springframework.web.bind.annotation.RequestParam;&#10;import org.springframework.web.bind.annotation.RestController;&#10;&#10;import java.time.Clock;&#10;import java.time.LocalDate;&#10;import java.util.List;&#10;&#10;@RestController&#10;public class HallOfFameController {&#10;&#10;    private final HallOfFameService hallOfFameService;&#10;    private final Clock clock;&#10;&#10;    public HallOfFameController(HallOfFameService hallOfFameService, Clock clock) {&#10;        this.hallOfFameService = hallOfFameService;&#10;        this.clock = clock;&#10;    }&#10;&#10;    // 수동 실행 — cron을 기다리지 않고 &quot;그 날짜에 돌았다면&quot;을 바로 확인한다.&#10;    // date는 yyyy-MM-dd(형식이 틀리면 타입 변환 실패 → 전역 핸들러가 400), 미래는 JobDates가 400.&#10;    @PostMapping(&quot;/api/admin/jobs/hall-of-fame/run&quot;)&#10;    public HallOfFameRunResponse run(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,&#10;                                     @LoginMember AuthenticatedMember me) {&#10;        AdminGuard.requireAdmin(me);&#10;        return hallOfFameService.run(JobDates.resolve(date, clock));&#10;    }&#10;&#10;    @GetMapping(&quot;/api/hall-of-fame&quot;)&#10;    public List&lt;HallOfFameEntry&gt; list(@RequestParam(required = false) String size) {&#10;        return hallOfFameService.list(parseSize(size));&#10;    }&#10;&#10;    private static int parseSize(String raw) {&#10;        if (raw == null) {&#10;            return 20;&#10;        }&#10;        if (!raw.matches(&quot;[0-9]+&quot;)) {&#10;            throw new InvalidJobParameterException(&quot;size&quot;, &quot;1~100 사이의 정수여야 합니다.&quot;);&#10;        }&#10;        try {&#10;            int value = Integer.parseInt(raw);&#10;            if (value &gt;= 1 &amp;&amp; value &lt;= 100) {&#10;                return value;&#10;            }&#10;        } catch (NumberFormatException ignored) {&#10;            // int 범위 밖의 숫자도 400으로 응답한다.&#10;        }&#10;        throw new InvalidJobParameterException(&quot;size&quot;, &quot;1~100 사이의 정수여야 합니다.&quot;);&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/batch/HallOfFameEntry.java</summary><pre><code>package org.example.batch;&#10;&#10;import java.time.LocalDate;&#10;&#10;public record HallOfFameEntry(Long postId, String title, long likes, LocalDate enteredOn) {&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>DTO — src/main/java/org/example/batch/HallOfFameListRow.java</summary><pre><code>package org.example.batch;&#10;&#10;import java.time.LocalDate;&#10;&#10;public interface HallOfFameListRow {&#10;&#10;    Long getPostId();&#10;&#10;    String getTitle();&#10;&#10;    Integer getLikes();&#10;&#10;    LocalDate getEnteredOn();&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/batch/HallOfFameRepository.java</summary><pre><code>package org.example.batch;&#10;&#10;import org.example.post.Post;&#10;import org.springframework.data.jpa.repository.Modifying;&#10;import org.springframework.data.jpa.repository.Query;&#10;import org.springframework.data.repository.Repository;&#10;import org.springframework.data.repository.query.Param;&#10;&#10;import java.time.LocalDate;&#10;import java.time.LocalDateTime;&#10;import java.util.List;&#10;&#10;public interface HallOfFameRepository extends Repository&lt;Post, Long&gt; {&#10;&#10;    // 기준 시각(cutoff) &quot;전&quot;에 눌린 좋아요 행을 센다 — post.like_count(비정규화, 어긋날 수 있음)는 쓰지 않는다.&#10;    // 볼 수 있는 글(PUBLISHED·PUBLIC·삭제 안 됨)만, 이미 올라간 글은 뺀다.&#10;    @Query(nativeQuery = true, value = &quot;&quot;&quot;&#10;            SELECT p.id AS postId, p.title AS title, COUNT(*) AS likes&#10;              FROM post p&#10;              JOIN post_like l ON l.post_id = p.id AND l.created_at &lt; :cutoff&#10;             WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL&#10;               AND NOT EXISTS (SELECT 1 FROM hall_of_fame h WHERE h.post_id = p.id)&#10;             GROUP BY p.id, p.title&#10;            HAVING COUNT(*) &gt;= :minLikes&#10;             ORDER BY likes DESC, p.id ASC&#10;            &quot;&quot;&quot;)&#10;    List&lt;HallOfFameRow&gt; findCandidates(@Param(&quot;cutoff&quot;) LocalDateTime cutoff, @Param(&quot;minLikes&quot;) int minLikes);&#10;&#10;    // 위 조회와 INSERT 사이에 같은 배치가 한 번 더 돌아도 UNIQUE(post_id)가 막는다 — 들어간 행 수(0/1)만 받는다&#10;    @Modifying&#10;    @Query(nativeQuery = true, value = &quot;&quot;&quot;&#10;            INSERT IGNORE INTO hall_of_fame (post_id, likes, entered_on, created_at)&#10;            VALUES (:postId, :likes, :enteredOn, :now)&#10;            &quot;&quot;&quot;)&#10;    int insertIgnore(@Param(&quot;postId&quot;) Long postId, @Param(&quot;likes&quot;) long likes,&#10;                     @Param(&quot;enteredOn&quot;) LocalDate enteredOn, @Param(&quot;now&quot;) LocalDateTime now);&#10;&#10;    @Query(nativeQuery = true, value = &quot;&quot;&quot;&#10;            SELECT h.post_id AS postId, p.title AS title, h.likes AS likes, h.entered_on AS enteredOn&#10;              FROM hall_of_fame h&#10;              JOIN post p ON p.id = h.post_id&#10;             WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL&#10;             ORDER BY h.entered_on DESC, h.likes DESC, h.post_id ASC&#10;             LIMIT :size&#10;            &quot;&quot;&quot;)&#10;    List&lt;HallOfFameListRow&gt; findList(@Param(&quot;size&quot;) int size);&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>DTO — src/main/java/org/example/batch/HallOfFameRow.java</summary><pre><code>package org.example.batch;&#10;&#10;public interface HallOfFameRow {&#10;&#10;    Long getPostId();&#10;&#10;    String getTitle();&#10;&#10;    Long getLikes();&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>DTO — src/main/java/org/example/batch/HallOfFameRunResponse.java</summary><pre><code>package org.example.batch;&#10;&#10;import java.time.LocalDate;&#10;import java.util.List;&#10;&#10;// added: 이번 실행에서 &quot;새로&quot; 올라간 글만. 이미 올라가 있던 글은 다시 나오지 않는다(두 번째 실행은 빈 배열).&#10;public record HallOfFameRunResponse(LocalDate date, int minLikes, List&lt;HallOfFameEntry&gt; added) {&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Scheduler / 배치 — src/main/java/org/example/batch/HallOfFameScheduler.java</summary><pre><code>package org.example.batch;&#10;&#10;import org.springframework.scheduling.annotation.Scheduled;&#10;import org.springframework.stereotype.Component;&#10;&#10;import java.time.Clock;&#10;import java.time.LocalDate;&#10;&#10;// 매일 0시(서울) — 기준일은 그 &quot;오늘&quot;이고, 집계는 오늘 0시 전(=어제까지)이다.&#10;@Component&#10;public class HallOfFameScheduler {&#10;&#10;    private final HallOfFameService hallOfFameService;&#10;    private final Clock clock;&#10;&#10;    public HallOfFameScheduler(HallOfFameService hallOfFameService, Clock clock) {&#10;        this.hallOfFameService = hallOfFameService;&#10;        this.clock = clock;&#10;    }&#10;&#10;    @Scheduled(cron = &quot;0 0 0 * * *&quot;, zone = &quot;Asia/Seoul&quot;)&#10;    public void daily() {&#10;        hallOfFameService.run(LocalDate.now(clock));&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/batch/HallOfFameService.java</summary><pre><code>package org.example.batch;&#10;&#10;import org.slf4j.Logger;&#10;import org.slf4j.LoggerFactory;&#10;import org.springframework.stereotype.Service;&#10;import org.springframework.transaction.annotation.Transactional;&#10;&#10;import java.time.Clock;&#10;import java.time.LocalDate;&#10;import java.time.LocalDateTime;&#10;import java.util.ArrayList;&#10;import java.util.List;&#10;&#10;// 15-1 명예의 전당 — 기준일(date) 0시 &quot;전&quot;까지 받은 좋아요가 20개 이상인 글을 올린다.&#10;// 예약 실행(매일 0시)과 수동 실행(운영자 API)이 이 메서드 하나를 같이 쓴다.&#10;@Service&#10;public class HallOfFameService {&#10;&#10;    public static final int MIN_LIKES = 20;&#10;    private static final Logger log = LoggerFactory.getLogger(HallOfFameService.class);&#10;&#10;    private final HallOfFameRepository hallOfFameRepository;&#10;    private final Clock clock;&#10;&#10;    public HallOfFameService(HallOfFameRepository hallOfFameRepository, Clock clock) {&#10;        this.hallOfFameRepository = hallOfFameRepository;&#10;        this.clock = clock;&#10;    }&#10;&#10;    @Transactional&#10;    public HallOfFameRunResponse run(LocalDate date) {&#10;        // 기간은 [처음, date 0시) — date 당일에 눌린 좋아요는 아직 &quot;어제까지&quot;가 아니다&#10;        LocalDateTime cutoff = date.atStartOfDay();&#10;        LocalDateTime now = LocalDateTime.now(clock);&#10;&#10;        List&lt;HallOfFameEntry&gt; added = new ArrayList&lt;&gt;();&#10;        for (HallOfFameRow row : hallOfFameRepository.findCandidates(cutoff, MIN_LIKES)) {&#10;            if (hallOfFameRepository.insertIgnore(row.getPostId(), row.getLikes(), date, now) == 1) {&#10;                added.add(new HallOfFameEntry(row.getPostId(), row.getTitle(), row.getLikes(), date));&#10;            }&#10;        }&#10;        log.info(&quot;명예의 전당 date={} cutoff={} 새로 올라간 글 {}건 {}&quot;, date, cutoff, added.size(),&#10;                added.stream().map(HallOfFameEntry::postId).toList());&#10;        return new HallOfFameRunResponse(date, MIN_LIKES, added);&#10;    }&#10;&#10;    @Transactional(readOnly = true)&#10;    public List&lt;HallOfFameEntry&gt; list(int size) {&#10;        return hallOfFameRepository.findList(size).stream()&#10;                .map(r -&gt; new HallOfFameEntry(r.getPostId(), r.getTitle(), r.getLikes(), r.getEnteredOn()))&#10;                .toList();&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/batch/InvalidJobParameterException.java</summary><pre><code>package org.example.batch;&#10;&#10;// 배치 실행·조회 파라미터가 규칙에 맞지 않음 — 전역 핸들러가 400 + errors[{field, message}]로 바꾼다&#10;public class InvalidJobParameterException extends RuntimeException {&#10;&#10;    private final String field;&#10;&#10;    public InvalidJobParameterException(String field, String message) {&#10;        super(message);&#10;        this.field = field;&#10;    }&#10;&#10;    public String getField() {&#10;        return field;&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/batch/JobDates.java</summary><pre><code>package org.example.batch;&#10;&#10;import java.time.Clock;&#10;import java.time.LocalDate;&#10;&#10;// 하루 단위 배치의 &quot;기준일&quot; 규칙 — 수동 실행·예약 실행·재실행이 같은 규칙을 쓴다.&#10;public final class JobDates {&#10;&#10;    private JobDates() {&#10;    }&#10;&#10;    // 생략하면 오늘(Clock 기준). 오늘까지는 되고, 아직 오지 않은 날은 400 — 그날 데이터가 다 모이지 않았다.&#10;    public static LocalDate resolve(LocalDate date, Clock clock) {&#10;        LocalDate today = LocalDate.now(clock);&#10;        if (date == null) {&#10;            return today;&#10;        }&#10;        if (date.isAfter(today)) {&#10;            throw new InvalidJobParameterException(&quot;date&quot;, &quot;아직 오지 않은 날짜(&quot; + date + &quot;)로는 실행할 수 없습니다. 오늘은 &quot; + today + &quot;입니다.&quot;);&#10;        }&#10;        return date;&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/common/ApiExceptionHandler.java</summary><pre><code>package org.example.common;&#10;&#10;import jakarta.servlet.http.HttpServletRequest;&#10;import tools.jackson.core.JacksonException;&#10;import org.example.admin.AdminOnlyException;&#10;import org.example.admin.ModerationConflictException;&#10;import org.example.auth.AuthenticationRequiredException;&#10;import org.example.auth.MemberNotActiveException;&#10;import org.example.auth.MemberSuspendedException;&#10;import org.example.board.BoardNotFoundException;&#10;import org.example.board.BoardWriteForbiddenException;&#10;import org.example.bookmark.BookmarkFolderNotFoundException;&#10;import org.example.bookmark.InvalidBookmarkFieldException;&#10;import org.example.bookmark.BookmarkNotFoundException;&#10;import org.example.bookmark.DuplicateBookmarkFolderNameException;&#10;import org.example.bookmark.InvalidBookmarkFolderException;&#10;import org.example.bookmark.SharedFolderNotFoundException;&#10;import org.example.comment.CommentForbiddenException;&#10;import org.example.comment.CommentNotFoundException;&#10;import org.example.comment.InvalidParentCommentException;&#10;import org.example.image.EmptyImageException;&#10;import org.example.image.ImageNotFoundException;&#10;import org.example.image.UnsupportedImageException;&#10;import org.example.like.SelfLikeNotAllowedException;&#10;import org.example.member.MemberNotFoundException;&#10;import org.example.moderation.BannedContentException;&#10;import org.example.moderation.BannedWordNotFoundException;&#10;import org.example.moderation.DuplicateBannedWordException;&#10;import org.example.notification.NotificationNotFoundException;&#10;import org.example.post.InvalidParametersException;&#10;import org.example.post.InvalidPostFieldException;&#10;import org.example.post.InvalidSearchConditionException;&#10;import org.example.post.PostForbiddenException;&#10;import org.example.post.PostNotDeletedException;&#10;import org.example.revision.RevisionForbiddenException;&#10;import org.example.post.PostNotDraftException;&#10;import org.example.post.PostRestoreExpiredException;&#10;import org.example.post.PostRestoreForbiddenException;&#10;import org.example.post.PostNotFoundException;&#10;import org.example.post.PostStatusConflictException;&#10;import org.example.post.TooManyPostsException;&#10;import org.example.report.DuplicateReportException;&#10;import org.example.report.NothingToResolveException;&#10;import org.example.report.ReportTargetNotFoundException;&#10;import org.example.report.SelfReportNotAllowedException;&#10;import org.example.social.FollowBlockedException;&#10;import org.example.social.SelfFollowNotAllowedException;&#10;import org.example.social.SelfMuteNotAllowedException;&#10;import org.springframework.http.HttpHeaders;&#10;import org.springframework.http.HttpStatus;&#10;import org.springframework.http.ProblemDetail;&#10;import org.springframework.http.ResponseEntity;&#10;import org.springframework.http.converter.HttpMessageNotReadableException;&#10;import org.springframework.web.bind.MethodArgumentNotValidException;&#10;import org.springframework.web.bind.annotation.ExceptionHandler;&#10;import org.springframework.web.bind.annotation.RestControllerAdvice;&#10;import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;&#10;import org.springframework.web.multipart.MaxUploadSizeExceededException;&#10;&#10;import java.net.URI;&#10;import java.util.List;&#10;import java.util.Map;&#10;import org.example.poll.InvalidPollException;&#10;import org.example.poll.PollConflictException;&#10;import org.example.poll.PollNotFoundException;&#10;import org.example.pin.InvalidPinException;&#10;import org.example.series.SeriesForbiddenException;&#10;import org.example.series.SeriesNotFoundException;&#10;import org.example.batch.InvalidJobParameterException;&#10;import org.springframework.web.method.annotation.HandlerMethodValidationException;&#10;&#10;// 모든 컨트롤러의 에러 응답을 한 곳에서 RFC 9457 Problem Details로 만든다.&#10;// 컨트롤러마다 try-catch를 두지 않는다.&#10;@RestControllerAdvice&#10;public class ApiExceptionHandler {&#10;&#10;    @ExceptionHandler(MethodArgumentNotValidException.class)&#10;    public ProblemDetail handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        List&lt;Map&lt;String, String&gt;&gt; errors = ex.getBindingResult().getFieldErrors().stream()&#10;                .map(fieldError -&gt; Map.of(&#10;                        &quot;field&quot;, fieldError.getField(),&#10;                        &quot;message&quot;, fieldError.getDefaultMessage() == null ? &quot;&quot; : fieldError.getDefaultMessage()&#10;                ))&#10;                .toList();&#10;        problem.setProperty(&quot;errors&quot;, errors);&#10;        return problem;&#10;    }&#10;&#10;    // 13-4 금칙어 — 1-5 검증 오류와 같은 모양(어느 필드인지 errors에)&#10;    @ExceptionHandler(BannedContentException.class)&#10;    public ProblemDetail handleBannedContent(BannedContentException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        problem.setProperty(&quot;errors&quot;, ex.getErrors());&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(DuplicateBannedWordException.class)&#10;    public ProblemDetail handleDuplicateBannedWord(DuplicateBannedWordException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(BannedWordNotFoundException.class)&#10;    public ProblemDetail handleBannedWordNotFound(BannedWordNotFoundException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(HttpMessageNotReadableException.class)&#10;    public ProblemDetail handleUnreadable(HttpMessageNotReadableException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;요청 본문을 읽을 수 없습니다.&quot;);&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        // 11-1 JSON 문법은 맞는데 한 필드의 형식이 틀린 경우(숫자 자리에 &quot;abc&quot;, 목록 자리에 문자열) —&#10;        // Jackson이 남긴 경로로 어느 필드인지 errors에 담는다. 목록 안이면 Bean Validation과 같은 모양(imageIds[0]).&#10;        // JSON 문법 자체가 깨졌으면 경로가 비어 있어 errors 없이 400만 나간다. Jackson은 첫 오류에서 멈추므로 하나만 들어간다.&#10;        if (ex.getCause() instanceof JacksonException jackson &amp;&amp; !jackson.getPath().isEmpty()) {&#10;            problem.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, fieldPath(jackson), &quot;message&quot;, &quot;형식이 올바르지 않습니다.&quot;)));&#10;        }&#10;        return problem;&#10;    }&#10;&#10;    // 11-1 경로·쿼리 값의 형식 오류(/api/posts/abc, ?size=abc) — 그대로 두면 Spring 기본 응답이라 어느 값이 틀렸는지 없다&#10;    @ExceptionHandler(MethodArgumentTypeMismatchException.class)&#10;    public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        problem.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, ex.getName(),&#10;                &quot;message&quot;, &quot;형식이 올바르지 않습니다: &quot; + ex.getValue())));&#10;        return problem;&#10;    }&#10;&#10;    private static String fieldPath(JacksonException jackson) {&#10;        StringBuilder field = new StringBuilder();&#10;        for (JacksonException.Reference ref : jackson.getPath()) {&#10;            if (ref.getPropertyName() != null) {&#10;                if (!field.isEmpty()) {&#10;                    field.append('.');&#10;                }&#10;                field.append(ref.getPropertyName());&#10;            } else {&#10;                field.append('[').append(ref.getIndex()).append(']');&#10;            }&#10;        }&#10;        return field.toString();&#10;    }&#10;&#10;    @ExceptionHandler(BoardNotFoundException.class)&#10;    public ProblemDetail handleBoardNotFound(BoardNotFoundException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(PostNotFoundException.class)&#10;    public ProblemDetail handlePostNotFound(PostNotFoundException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(BoardWriteForbiddenException.class)&#10;    public ProblemDetail handleBoardWriteForbidden(BoardWriteForbiddenException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(SelfLikeNotAllowedException.class)&#10;    public ProblemDetail handleSelfLikeNotAllowed(SelfLikeNotAllowedException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(PostForbiddenException.class)&#10;    public ProblemDetail handlePostForbidden(PostForbiddenException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    // 11-1 임시저장이 아닌 글을 발행 — 지금 상태와 충돌&#10;    @ExceptionHandler(PostNotDraftException.class)&#10;    public ProblemDetail handlePostNotDraft(PostNotDraftException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    // 11-6 이력은 작성자·운영자만&#10;    @ExceptionHandler(RevisionForbiddenException.class)&#10;    public ProblemDetail handleRevisionForbidden(RevisionForbiddenException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    // 11-5 복구&#10;    @ExceptionHandler(PostNotDeletedException.class)&#10;    public ProblemDetail handlePostNotDeleted(PostNotDeletedException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(PostRestoreForbiddenException.class)&#10;    public ProblemDetail handlePostRestoreForbidden(PostRestoreForbiddenException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(PostRestoreExpiredException.class)&#10;    public ProblemDetail handlePostRestoreExpired(PostRestoreExpiredException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.GONE, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    // 11-2 이미지 업로드&#10;    @ExceptionHandler(EmptyImageException.class)&#10;    public ProblemDetail handleEmptyImage(EmptyImageException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(UnsupportedImageException.class)&#10;    public ProblemDetail handleUnsupportedImage(UnsupportedImageException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    // spring.servlet.multipart.max-file-size를 넘으면 컨트롤러에 오기 전에(요청을 읽는 단계에서) 터진다&#10;    @ExceptionHandler(MaxUploadSizeExceededException.class)&#10;    public ProblemDetail handleMaxUploadSize(HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONTENT_TOO_LARGE, &quot;파일은 1MB까지 올릴 수 있습니다.&quot;);&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(ImageNotFoundException.class)&#10;    public ProblemDetail handleImageNotFound(ImageNotFoundException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    // 11-4 쿼리 파라미터 여러 개를 한꺼번에 검사한 결과&#10;    @ExceptionHandler(InvalidParametersException.class)&#10;    public ProblemDetail handleInvalidParameters(InvalidParametersException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        problem.setProperty(&quot;errors&quot;, ex.getErrors().entrySet().stream()&#10;                .sorted(Map.Entry.comparingByKey())&#10;                .map(e -&gt; Map.of(&quot;field&quot;, e.getKey(), &quot;message&quot;, e.getValue()))&#10;                .toList());&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(InvalidPostFieldException.class)&#10;    public ProblemDetail handleInvalidPostField(InvalidPostFieldException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        problem.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, ex.getField(), &quot;message&quot;, ex.getMessage())));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(CommentNotFoundException.class)&#10;    public ProblemDetail handleCommentNotFound(CommentNotFoundException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(InvalidParentCommentException.class)&#10;    public ProblemDetail handleInvalidParentComment(InvalidParentCommentException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(CommentForbiddenException.class)&#10;    public ProblemDetail handleCommentForbidden(CommentForbiddenException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(BookmarkFolderNotFoundException.class)&#10;    public ProblemDetail handleBookmarkFolderNotFound(BookmarkFolderNotFoundException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(BookmarkNotFoundException.class)&#10;    public ProblemDetail handleBookmarkNotFound(BookmarkNotFoundException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(InvalidBookmarkFolderException.class)&#10;    public ProblemDetail handleInvalidBookmarkFolder(InvalidBookmarkFolderException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(DuplicateBookmarkFolderNameException.class)&#10;    public ProblemDetail handleDuplicateBookmarkFolderName(DuplicateBookmarkFolderNameException ex,&#10;                                                           HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(InvalidCursorException.class)&#10;    public ProblemDetail handleInvalidCursor(InvalidCursorException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(InvalidSearchConditionException.class)&#10;    public ProblemDetail handleInvalidSearchCondition(InvalidSearchConditionException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(AdminOnlyException.class)&#10;    public ProblemDetail handleAdminOnly(AdminOnlyException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(PostStatusConflictException.class)&#10;    public ProblemDetail handlePostStatusConflict(PostStatusConflictException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(ModerationConflictException.class)&#10;    public ProblemDetail handleModerationConflict(ModerationConflictException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(NotificationNotFoundException.class)&#10;    public ProblemDetail handleNotificationNotFound(NotificationNotFoundException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(MemberNotFoundException.class)&#10;    public ProblemDetail handleMemberNotFound(MemberNotFoundException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(SelfFollowNotAllowedException.class)&#10;    public ProblemDetail handleSelfFollow(SelfFollowNotAllowedException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(SelfMuteNotAllowedException.class)&#10;    public ProblemDetail handleSelfMute(SelfMuteNotAllowedException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(FollowBlockedException.class)&#10;    public ProblemDetail handleFollowBlocked(FollowBlockedException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(ReportTargetNotFoundException.class)&#10;    public ProblemDetail handleReportTargetNotFound(ReportTargetNotFoundException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(SelfReportNotAllowedException.class)&#10;    public ProblemDetail handleSelfReport(SelfReportNotAllowedException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(NothingToResolveException.class)&#10;    public ProblemDetail handleNothingToResolve(NothingToResolveException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(DuplicateReportException.class)&#10;    public ProblemDetail handleDuplicateReport(DuplicateReportException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    // 13-5 도배 방지 — 429 + Retry-After(몇 초 뒤에 다시 하면 되는지). 본문에도 같은 값을 싣는다&#10;    @ExceptionHandler(TooManyPostsException.class)&#10;    public ResponseEntity&lt;ProblemDetail&gt; handleTooManyPosts(TooManyPostsException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        problem.setProperty(&quot;retryAfterSeconds&quot;, ex.getRetryAfterSeconds());&#10;        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)&#10;                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))&#10;                .body(problem);&#10;    }&#10;&#10;    @ExceptionHandler(PollNotFoundException.class)&#10;    public ProblemDetail handlePollNotFound(PollNotFoundException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(InvalidPollException.class)&#10;    public ProblemDetail handleInvalidPoll(InvalidPollException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        problem.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, ex.getField(), &quot;message&quot;, ex.getMessage())));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(PollConflictException.class)&#10;    public ProblemDetail handlePollConflict(PollConflictException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(InvalidPinException.class)&#10;    public ProblemDetail handleInvalidPin(InvalidPinException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        if (ex.getField() != null) {&#10;            problem.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, ex.getField(), &quot;message&quot;, ex.getMessage())));&#10;        }&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(SeriesNotFoundException.class)&#10;    public ProblemDetail handleSeriesNotFound(SeriesNotFoundException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(SeriesForbiddenException.class)&#10;    public ProblemDetail handleSeriesForbidden(SeriesForbiddenException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(SharedFolderNotFoundException.class)&#10;    public ProblemDetail handleSharedFolderNotFound(SharedFolderNotFoundException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;&#10;    // 15-1 쿼리 파라미터 범위 오류(@Min·@Max) — 틀린 파라미터를 모두 errors에&#10;    @ExceptionHandler(HandlerMethodValidationException.class)&#10;    public ProblemDetail handleMethodValidation(HandlerMethodValidationException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        List&lt;Map&lt;String, String&gt;&gt; errors = ex.getParameterValidationResults().stream()&#10;                .flatMap(r -&gt; r.getResolvableErrors().stream().map(e -&gt; Map.of(&#10;                        &quot;field&quot;, String.valueOf(r.getMethodParameter().getParameterName()),&#10;                        &quot;message&quot;, e.getDefaultMessage() == null ? &quot;&quot; : e.getDefaultMessage())))&#10;                .toList();&#10;        problem.setProperty(&quot;errors&quot;, errors);&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(InvalidJobParameterException.class)&#10;    public ProblemDetail handleInvalidJobParameter(InvalidJobParameterException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        problem.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, ex.getField(), &quot;message&quot;, ex.getMessage())));&#10;        return problem;&#10;    }&#10;&#10;    @ExceptionHandler(InvalidBookmarkFieldException.class)&#10;    public ProblemDetail handleInvalidBookmarkField(InvalidBookmarkFieldException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;입력값이 올바르지 않습니다.&quot;);&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        problem.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, ex.getField(), &quot;message&quot;, ex.getMessage())));&#10;        return problem;&#10;    }&#10;&#10;    // 누구인지 모름 — WWW-Authenticate 헤더를 함께 내려준다&#10;    @ExceptionHandler(AuthenticationRequiredException.class)&#10;    public ResponseEntity&lt;ProblemDetail&gt; handleAuthenticationRequired(AuthenticationRequiredException ex,&#10;                                                                       HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)&#10;                .header(HttpHeaders.WWW_AUTHENTICATE, &quot;Bearer&quot;)&#10;                .body(problem);&#10;    }&#10;&#10;    // 13-3 기간 정지 중 쓰기 — 언제 풀리는지·왜인지를 함께 준다(화면이 안내 문구를 만들 수 있게)&#10;    @ExceptionHandler(MemberSuspendedException.class)&#10;    public ProblemDetail handleMemberSuspended(MemberSuspendedException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        problem.setProperty(&quot;suspendedUntil&quot;, ex.getSuspendedUntil());&#10;        problem.setProperty(&quot;reason&quot;, ex.getReason());&#10;        return problem;&#10;    }&#10;&#10;    // 누구인지는 알지만(토큰은 유효) 회원 상태 때문에 안 됨&#10;    @ExceptionHandler(MemberNotActiveException.class)&#10;    public ProblemDetail handleMemberNotActive(MemberNotActiveException ex, HttpServletRequest request) {&#10;        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());&#10;        problem.setInstance(URI.create(request.getRequestURI()));&#10;        return problem;&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>DB / SQL — src/main/resources/db/migration/V60__create_hall_of_fame.sql</summary><pre><code>-- V60 — 명예의 전당(15-1). 기준일 0시까지 좋아요를 20개 이상 받은 글이 한 번 올라간다.&#10;-- UNIQUE(post_id): 같은 글은 한 번만 — 배치가 같은 날 두 번 돌아도, 다음 날 또 돌아도 중복 행이 생기지 않는다.&#10;-- likes는 올라갈 때의 좋아요 수(그때의 기록), entered_on은 그 기준일이다.&#10;CREATE TABLE hall_of_fame (&#10;    id         BIGINT   NOT NULL AUTO_INCREMENT,&#10;    post_id    BIGINT   NOT NULL,&#10;    likes      INT      NOT NULL,&#10;    entered_on DATE     NOT NULL,&#10;    created_at DATETIME NOT NULL,&#10;    PRIMARY KEY (id),&#10;    UNIQUE KEY uk_hall_of_fame_post (post_id),&#10;    KEY ix_hall_of_fame_list (entered_on, likes, post_id),&#10;    CONSTRAINT fk_hall_of_fame_post FOREIGN KEY (post_id) REFERENCES post (id)&#10;) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '명예의 전당 — 글마다 한 번';&#10;</code></pre></details></div></div>
+
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/15-1.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+</div>
+  </details><details class="lesson-scene lesson-build" data-lesson-kind="build">
+    <summary id="mybatis-대체-구현-코드" aria-label="MyBatis 대체 구현 코드 내용 펼치기"><span class="lesson-scene-index">05</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>MyBatis 대체 구현 코드</strong><em>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</em></span><span class="lesson-scene-count">5개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<div class="code-workbench" data-code-workbench><div class="code-workbench-source"><details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {&#10;    id 'java'&#10;    // bootRun / bootJar 태스크 제공 + 실행 가능한 fat jar 패키징&#10;    id 'org.springframework.boot' version '4.1.1'&#10;    // Boot BOM을 적용해서 아래 의존성들의 버전을 생략할 수 있게 해줌&#10;    id 'io.spring.dependency-management' version '1.1.7'&#10;}&#10;&#10;group = 'org.example'&#10;version = '1.0-SNAPSHOT'&#10;&#10;java {&#10;    toolchain {&#10;        // 컴파일·실행 JDK를 고정 (Boot 4는 Java 17 이상 필요, 로컬에 설치된 21 사용)&#10;        languageVersion = JavaLanguageVersion.of(21)&#10;    }&#10;}&#10;&#10;repositories {&#10;    mavenCentral()&#10;}&#10;&#10;dependencies {&#10;    compileOnly 'org.projectlombok:lombok'&#10;    annotationProcessor 'org.projectlombok:lombok'&#10;    // Spring MVC + 내장 Tomcat + Jackson (Boot 4부터 starter-web → starter-webmvc로 이름 변경)&#10;    implementation 'org.springframework.boot:spring-boot-starter-webmvc'&#10;    // JPA(Hibernate) + HikariCP 커넥션 풀&#10;    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'&#10;    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'&#10;    // @Valid, @NotBlank 같은 요청 값 검증&#10;    implementation 'org.springframework.boot:spring-boot-starter-validation'&#10;    // MySQL JDBC 드라이버 — 컴파일엔 필요 없고 실행할 때만 필요&#10;    runtimeOnly 'com.mysql:mysql-connector-j'&#10;    // 9-1 스키마 변경은 Flyway 마이그레이션(db/migration)으로만 한다&#10;    implementation 'org.springframework.boot:spring-boot-starter-flyway'&#10;    runtimeOnly 'org.flywaydb:flyway-mysql'&#10;    // 13-7 API 문서(OpenAPI 3.1 + Swagger UI) — springdoc 3.x가 Spring Boot 4용(3.1.1은 Boot 4.1.0 기준으로 빌드됨).&#10;    // Boot BOM이 관리하지 않는 라이브러리라 버전을 직접 적는다&#10;    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'&#10;&#10;    // 테스트: JUnit·AssertJ·Mockito·MockMvc 묶음 (버전은 Boot BOM이 관리하므로 junit-bom 따로 두지 않음)&#10;    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'&#10;    // @DataJpaTest(리포지토리만 띄우는 테스트)&#10;    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'&#10;    // 테스트용 일회용 MySQL 컨테이너 — application-test.yml의 jdbc:tc: URL이 쓴다&#10;    testImplementation 'org.testcontainers:testcontainers-mysql'&#10;    // Gradle이 JUnit Platform 테스트를 실행할 때 필요한 런처&#10;    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'&#10;}&#10;&#10;tasks.named('test') {&#10;    useJUnitPlatform()&#10;    // 테스트는 application-test.yml(Testcontainers MySQL)을 쓰게 한다&#10;    systemProperty 'spring.profiles.active', 'test'&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:&#10;  application:&#10;    name: javaExperience&#10;  datasource:&#10;    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다&#10;    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul&#10;    username: community&#10;    password: community&#10;  flyway:&#10;    # 이미 테이블·데이터가 있는 DB(compose의 community·practice)는 V1(CREATE TABLE)을 실행하면 실패한다.&#10;    # 그래서 기록 테이블이 없으면 &quot;V1까지 됐다&quot;고만 적고(baseline) V2부터 실행한다. 빈 DB면 V1부터 실제로 실행한다.&#10;    baseline-on-migrate: true&#10;    baseline-version: 1&#10;  servlet:&#10;    multipart:&#10;      # 11-2 이미지 한 장 1MB, 요청 전체 2MB까지. 넘으면 MaxUploadSizeExceededException → 413&#10;      max-file-size: 1MB&#10;      max-request-size: 2MB&#10;  jpa:&#10;    hibernate:&#10;      # 스키마는 Flyway만 바꾼다(9-1). 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)&#10;      ddl-auto: validate&#10;    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)&#10;    open-in-view: false&#10;    properties:&#10;      hibernate:&#10;        format_sql: true&#10;        # 컬렉션(태그) 지연 로딩을 글마다 1번이 아니라 IN (...) 한 번으로 묶는다(2-4, N+1 대응)&#10;        default_batch_fetch_size: 100&#10;&#10;# 11-2 올린 이미지를 저장할 폴더(앱을 실행한 위치 기준). git에는 올리지 않는다(.gitignore)&#10;app:&#10;  upload-dir: uploads&#10;&#10;logging:&#10;  level:&#10;    # 실행 SQL은 확인하되 토큰을 포함한 바인딩 값은 로그에 남기지 않는다&#10;    org.hibernate.SQL: debug&#10;    org.hibernate.orm.jdbc.bind: info&#10;&#10;# 0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다&#10;start:&#10;  greeting: 반가워요, 백엔드!&#10;  max-items: 5&#10;&#10;# 13-7 앱 개발자가 문서를 열면 사용자용 API 그룹을 먼저 보여 준다.&#10;springdoc:&#10;  swagger-ui:&#10;    urls-primary-name: public&#10;&#10;# 15-1 MyBatis 배치 SQL 매퍼&#10;mybatis:&#10;  mapper-locations: classpath:mapper/*.xml&#10;</code></pre></details>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/batch/HallOfFameMapper.java</summary><pre><code>package org.example.batch;&#10;&#10;import org.apache.ibatis.annotations.Mapper;&#10;import org.apache.ibatis.annotations.Param;&#10;&#10;import java.time.LocalDate;&#10;import java.time.LocalDateTime;&#10;import java.util.List;&#10;&#10;@Mapper&#10;public interface HallOfFameMapper {&#10;&#10;    List&lt;HallOfFameEntry&gt; findCandidates(@Param(&quot;cutoff&quot;) LocalDateTime cutoff,&#10;                                         @Param(&quot;minLikes&quot;) int minLikes);&#10;&#10;    int insertIgnore(@Param(&quot;postId&quot;) Long postId, @Param(&quot;likes&quot;) long likes,&#10;                     @Param(&quot;enteredOn&quot;) LocalDate enteredOn, @Param(&quot;now&quot;) LocalDateTime now);&#10;&#10;    List&lt;HallOfFameEntry&gt; findList(@Param(&quot;size&quot;) int size);&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/HallOfFameMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;&#10;&lt;mapper namespace=&quot;org.example.batch.HallOfFameMapper&quot;&gt;&#10;    &lt;resultMap id=&quot;entry&quot; type=&quot;org.example.batch.HallOfFameEntry&quot;&gt;&#10;        &lt;constructor&gt;&#10;            &lt;arg column=&quot;post_id&quot; javaType=&quot;java.lang.Long&quot;/&gt;&#10;            &lt;arg column=&quot;title&quot; javaType=&quot;java.lang.String&quot;/&gt;&#10;            &lt;arg column=&quot;likes&quot; javaType=&quot;_long&quot;/&gt;&#10;            &lt;arg column=&quot;entered_on&quot; javaType=&quot;java.time.LocalDate&quot;/&gt;&#10;        &lt;/constructor&gt;&#10;    &lt;/resultMap&gt;&#10;&#10;    &lt;select id=&quot;findCandidates&quot; resultMap=&quot;entry&quot;&gt;&#10;        SELECT p.id AS post_id, p.title, COUNT(*) AS likes, NULL AS entered_on&#10;          FROM post p&#10;          JOIN post_like l ON l.post_id = p.id AND l.created_at &amp;lt; #{cutoff}&#10;         WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL&#10;           AND NOT EXISTS (SELECT 1 FROM hall_of_fame h WHERE h.post_id = p.id)&#10;         GROUP BY p.id, p.title&#10;        HAVING COUNT(*) &amp;gt;= #{minLikes}&#10;         ORDER BY likes DESC, p.id ASC&#10;    &lt;/select&gt;&#10;&#10;    &lt;insert id=&quot;insertIgnore&quot;&gt;&#10;        INSERT IGNORE INTO hall_of_fame (post_id, likes, entered_on, created_at)&#10;        VALUES (#{postId}, #{likes}, #{enteredOn}, #{now})&#10;    &lt;/insert&gt;&#10;&#10;    &lt;select id=&quot;findList&quot; resultMap=&quot;entry&quot;&gt;&#10;        SELECT h.post_id, p.title, h.likes, h.entered_on&#10;          FROM hall_of_fame h&#10;          JOIN post p ON p.id = h.post_id&#10;         WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL&#10;         ORDER BY h.entered_on DESC, h.likes DESC, h.post_id ASC&#10;         LIMIT #{size}&#10;    &lt;/select&gt;&#10;&lt;/mapper&gt;&#10;</code></pre></details>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/batch/HallOfFameService.java</summary><pre><code>package org.example.batch;&#10;&#10;import org.slf4j.Logger;&#10;import org.slf4j.LoggerFactory;&#10;import org.springframework.stereotype.Service;&#10;import org.springframework.transaction.annotation.Transactional;&#10;&#10;import java.time.Clock;&#10;import java.time.LocalDate;&#10;import java.time.LocalDateTime;&#10;import java.util.ArrayList;&#10;import java.util.List;&#10;&#10;// 15-1 명예의 전당 — 기준일(date) 0시 &quot;전&quot;까지 받은 좋아요가 20개 이상인 글을 올린다.&#10;// 예약 실행(매일 0시)과 수동 실행(운영자 API)이 이 메서드 하나를 같이 쓴다.&#10;@Service&#10;public class HallOfFameService {&#10;&#10;    public static final int MIN_LIKES = 20;&#10;    private static final Logger log = LoggerFactory.getLogger(HallOfFameService.class);&#10;&#10;    private final HallOfFameMapper hallOfFameMapper;&#10;    private final Clock clock;&#10;&#10;    public HallOfFameService(HallOfFameMapper hallOfFameMapper, Clock clock) {&#10;        this.hallOfFameMapper = hallOfFameMapper;&#10;        this.clock = clock;&#10;    }&#10;&#10;    @Transactional&#10;    public HallOfFameRunResponse run(LocalDate date) {&#10;        // 기간은 [처음, date 0시) — date 당일에 눌린 좋아요는 아직 &quot;어제까지&quot;가 아니다&#10;        LocalDateTime cutoff = date.atStartOfDay();&#10;        LocalDateTime now = LocalDateTime.now(clock);&#10;&#10;        List&lt;HallOfFameEntry&gt; added = new ArrayList&lt;&gt;();&#10;        for (HallOfFameEntry row : hallOfFameMapper.findCandidates(cutoff, MIN_LIKES)) {&#10;            if (hallOfFameMapper.insertIgnore(row.postId(), row.likes(), date, now) == 1) {&#10;                added.add(new HallOfFameEntry(row.postId(), row.title(), row.likes(), date));&#10;            }&#10;        }&#10;        log.info(&quot;명예의 전당 date={} cutoff={} 새로 올라간 글 {}건 {}&quot;, date, cutoff, added.size(),&#10;                added.stream().map(HallOfFameEntry::postId).toList());&#10;        return new HallOfFameRunResponse(date, MIN_LIKES, added);&#10;    }&#10;&#10;    @Transactional(readOnly = true)&#10;    public List&lt;HallOfFameEntry&gt; list(int size) {&#10;        return hallOfFameMapper.findList(size);&#10;    }&#10;}&#10;</code></pre></details></div></div>
+
+</div>
+  </details><details class="lesson-scene lesson-verify" data-lesson-kind="verify" open>
+    <summary id="직접-확인" aria-label="직접 확인 내용 펼치기"><span class="lesson-scene-index">06</span><span class="lesson-scene-glyph" aria-hidden="true">↗</span><span class="lesson-scene-title"><small>어떻게 확인할까</small><strong>직접 확인</strong><em>요청은 브라우저에서 전송됩니다. 서버의 CORS 설정에 이 페이지 출처가 허용되어 있어야 합니다.</em></span><span class="lesson-scene-count">80개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>브라우저에서 요청 보내기</span></div><section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><div class="server-url-help"><p>요청은 브라우저에서 전송됩니다. 서버의 CORS 설정에 이 페이지 출처가 허용되어 있어야 합니다.</p><a href="#browser-requests-1">이 단계의 요청으로 이동 ↓</a></div></section>
+<p>API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.</p>
+<p>버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.</p>
+<section id="browser-requests-1" class="api-practice" aria-label="HTTP 요청 실행"><div class="request-panel-heading"><div><p class="request-eyebrow">직접 확인 · 16개 요청</p><h3>브라우저에서 요청 보내기</h3></div><p>위 서버 주소를 확인하고 순서대로 실행하세요. 토큰은 입력 후에도 저장하지 않습니다.</p></div><details class="request-steps"><summary>요청 순서 보기 <span>POST 9 · GET 7</span></summary><nav aria-label="요청 실행 순서"><ol><li data-method="POST"><a href="#browser-request-1-1"><span class="request-step-number">1</span><span class="request-step-content"><span class="request-step-method">POST · H1</span><span class="request-step-title">10-04 기준 실행</span></span></a></li><li data-method="POST"><a href="#browser-request-1-2"><span class="request-step-number">2</span><span class="request-step-content"><span class="request-step-method">POST · H2</span><span class="request-step-title">오늘(10-05) 기준 실행</span></span></a></li><li data-method="POST"><a href="#browser-request-1-3"><span class="request-step-number">3</span><span class="request-step-content"><span class="request-step-method">POST · H3</span><span class="request-step-title">오늘 기준 한 번 더</span></span></a></li><li data-method="GET"><a href="#browser-request-1-4"><span class="request-step-number">4</span><span class="request-step-content"><span class="request-step-method">GET · H4</span><span class="request-step-title">명예의 전당 목록</span></span></a></li><li data-method="POST"><a href="#browser-request-1-5"><span class="request-step-number">5</span><span class="request-step-content"><span class="request-step-method">POST · H5</span><span class="request-step-title">미래 날짜</span></span></a></li><li data-method="POST"><a href="#browser-request-1-6"><span class="request-step-number">6</span><span class="request-step-content"><span class="request-step-method">POST · H6</span><span class="request-step-title">없는 날짜</span></span></a></li><li data-method="POST"><a href="#browser-request-1-7"><span class="request-step-number">7</span><span class="request-step-content"><span class="request-step-method">POST · H7</span><span class="request-step-title">날짜 형식 아님</span></span></a></li><li data-method="GET"><a href="#browser-request-1-8"><span class="request-step-number">8</span><span class="request-step-content"><span class="request-step-method">GET · H8</span><span class="request-step-title">목록 size=0</span></span></a></li><li data-method="GET"><a href="#browser-request-1-9"><span class="request-step-number">9</span><span class="request-step-content"><span class="request-step-method">GET · H9</span><span class="request-step-title">목록 size=101</span></span></a></li><li data-method="GET"><a href="#browser-request-1-10"><span class="request-step-number">10</span><span class="request-step-content"><span class="request-step-method">GET · H10</span><span class="request-step-title">목록 size=100</span></span></a></li><li data-method="POST"><a href="#browser-request-1-11"><span class="request-step-number">11</span><span class="request-step-content"><span class="request-step-method">POST · H11</span><span class="request-step-title">일반 회원</span></span></a></li><li data-method="POST"><a href="#browser-request-1-12"><span class="request-step-number">12</span><span class="request-step-content"><span class="request-step-method">POST · H12</span><span class="request-step-title">토큰 없음</span></span></a></li><li data-method="POST"><a href="#browser-request-1-13"><span class="request-step-number">13</span><span class="request-step-content"><span class="request-step-method">POST · H13</span><span class="request-step-title">날짜 칸이 공백</span></span></a></li><li data-method="GET"><a href="#browser-request-1-14"><span class="request-step-number">14</span><span class="request-step-content"><span class="request-step-method">GET · H14</span><span class="request-step-title">목록 size 빈 값</span></span></a></li><li data-method="GET"><a href="#browser-request-1-15"><span class="request-step-number">15</span><span class="request-step-content"><span class="request-step-method">GET · H15</span><span class="request-step-title">목록 size 정수 초과</span></span></a></li><li data-method="GET"><a href="#browser-request-1-16"><span class="request-step-number">16</span><span class="request-step-content"><span class="request-step-method">GET · H16</span><span class="request-step-title">목록 size 문자</span></span></a></li></ol></nav></details><div class="api-request-list"><article id="browser-request-1-1" class="api-request" data-request-id="H1" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · H1</p><h4>10-04 기준 실행</h4></div><span class="request-number">요청 1</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/admin/jobs/hall-of-fame/run?date=2026-10-04" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p01" value="Bearer tok-p01" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-1">POST 요청 보내기</button><p id="request-status-1-1" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p01&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.date&quot;,&quot;equals&quot;:&quot;2026-10-04&quot;},{&quot;path&quot;:&quot;$.minLikes&quot;,&quot;equals&quot;:20}],&quot;anyOf&quot;:[{&quot;json&quot;:[{&quot;path&quot;:&quot;$.added[*].postId&quot;,&quot;equals&quot;:[18,55,103,131,10,143]},{&quot;path&quot;:&quot;$.added[*].likes&quot;,&quot;equals&quot;:[22,22,22,22,20,20]}]},{&quot;json&quot;:[{&quot;path&quot;:&quot;$.added&quot;,&quot;type&quot;:&quot;array&quot;},{&quot;path&quot;:&quot;$.added&quot;,&quot;length&quot;:0}]}]}</pre></dd></dl></details></article><article id="browser-request-1-2" class="api-request" data-request-id="H2" data-method="POST" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · H2</p><h4>오늘(10-05) 기준 실행</h4></div><span class="request-number">요청 2</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/admin/jobs/hall-of-fame/run?date=2026-10-05" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p01" value="Bearer tok-p01" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-2">POST 요청 보내기</button><p id="request-status-1-2" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p01&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.date&quot;,&quot;equals&quot;:&quot;2026-10-05&quot;}],&quot;anyOf&quot;:[{&quot;json&quot;:[{&quot;path&quot;:&quot;$.added[*].postId&quot;,&quot;equals&quot;:[145]},{&quot;path&quot;:&quot;$.added[*].likes&quot;,&quot;equals&quot;:[20]}]},{&quot;json&quot;:[{&quot;path&quot;:&quot;$.added&quot;,&quot;type&quot;:&quot;array&quot;},{&quot;path&quot;:&quot;$.added&quot;,&quot;length&quot;:0}]}]}</pre></dd></dl></details></article><article id="browser-request-1-3" class="api-request" data-request-id="H3" data-method="POST" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · H3</p><h4>오늘 기준 한 번 더</h4></div><span class="request-number">요청 3</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/admin/jobs/hall-of-fame/run?date=2026-10-05" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p01" value="Bearer tok-p01" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-3">POST 요청 보내기</button><p id="request-status-1-3" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p01&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.added&quot;,&quot;type&quot;:&quot;array&quot;},{&quot;path&quot;:&quot;$.added&quot;,&quot;length&quot;:0}]}</pre></dd></dl></details></article><article id="browser-request-1-4" class="api-request" data-request-id="H4" data-method="GET" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · H4</p><h4>명예의 전당 목록</h4></div><span class="request-number">요청 4</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/hall-of-fame" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-4">GET 요청 보내기</button><p id="request-status-1-4" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$&quot;,&quot;length&quot;:7},{&quot;path&quot;:&quot;$[*].postId&quot;,&quot;contains&quot;:145},{&quot;path&quot;:&quot;$[*].postId&quot;,&quot;contains&quot;:18},{&quot;path&quot;:&quot;$[*].postId&quot;,&quot;contains&quot;:55},{&quot;path&quot;:&quot;$[*].postId&quot;,&quot;contains&quot;:103},{&quot;path&quot;:&quot;$[*].postId&quot;,&quot;contains&quot;:131},{&quot;path&quot;:&quot;$[*].postId&quot;,&quot;contains&quot;:10},{&quot;path&quot;:&quot;$[*].postId&quot;,&quot;contains&quot;:143},{&quot;path&quot;:&quot;$[*].postId&quot;,&quot;notContains&quot;:59}]}</pre></dd></dl></details></article><article id="browser-request-1-5" class="api-request" data-request-id="H5" data-method="POST" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · H5</p><h4>미래 날짜</h4></div><span class="request-number">요청 5</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/admin/jobs/hall-of-fame/run?date=2026-10-06" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p01" value="Bearer tok-p01" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-5">POST 요청 보내기</button><p id="request-status-1-5" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p01&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;date&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-6" class="api-request" data-request-id="H6" data-method="POST" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · H6</p><h4>없는 날짜</h4></div><span class="request-number">요청 6</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/admin/jobs/hall-of-fame/run?date=2026-02-30" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p01" value="Bearer tok-p01" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-6">POST 요청 보내기</button><p id="request-status-1-6" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p01&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;date&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-7" class="api-request" data-request-id="H7" data-method="POST" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · H7</p><h4>날짜 형식 아님</h4></div><span class="request-number">요청 7</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/admin/jobs/hall-of-fame/run?date=abc" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p01" value="Bearer tok-p01" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-7">POST 요청 보내기</button><p id="request-status-1-7" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p01&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;date&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-8" class="api-request" data-request-id="H8" data-method="GET" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · H8</p><h4>목록 size=0</h4></div><span class="request-number">요청 8</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/hall-of-fame?size=0" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-8">GET 요청 보내기</button><p id="request-status-1-8" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;size&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-9" class="api-request" data-request-id="H9" data-method="GET" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · H9</p><h4>목록 size=101</h4></div><span class="request-number">요청 9</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/hall-of-fame?size=101" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-9">GET 요청 보내기</button><p id="request-status-1-9" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;size&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-10" class="api-request" data-request-id="H10" data-method="GET" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · H10</p><h4>목록 size=100</h4></div><span class="request-number">요청 10</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/hall-of-fame?size=100" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-10">GET 요청 보내기</button><p id="request-status-1-10" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$&quot;,&quot;length&quot;:7}]}</pre></dd></dl></details></article><article id="browser-request-1-11" class="api-request" data-request-id="H11" data-method="POST" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · H11</p><h4>일반 회원</h4></div><span class="request-number">요청 11</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/admin/jobs/hall-of-fame/run?date=2026-10-05" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p02" value="Bearer tok-p02" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-11">POST 요청 보내기</button><p id="request-status-1-11" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p02&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:403}</pre></dd></dl></details></article><article id="browser-request-1-12" class="api-request" data-request-id="H12" data-method="POST" data-request-index="11" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · H12</p><h4>토큰 없음</h4></div><span class="request-number">요청 12</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/admin/jobs/hall-of-fame/run?date=2026-10-05" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-12">POST 요청 보내기</button><p id="request-status-1-12" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:401}</pre></dd></dl></details></article><article id="browser-request-1-13" class="api-request" data-request-id="H13" data-method="POST" data-request-index="12" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · H13</p><h4>날짜 칸이 공백</h4></div><span class="request-number">요청 13</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/admin/jobs/hall-of-fame/run?date=%20" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p01" value="Bearer tok-p01" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-13">POST 요청 보내기</button><p id="request-status-1-13" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p01&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.date&quot;,&quot;equals&quot;:&quot;2026-10-05&quot;},{&quot;path&quot;:&quot;$.added&quot;,&quot;length&quot;:0}]}</pre></dd></dl></details></article><article id="browser-request-1-14" class="api-request" data-request-id="H14" data-method="GET" data-request-index="13" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · H14</p><h4>목록 size 빈 값</h4></div><span class="request-number">요청 14</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/hall-of-fame?size=" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-14">GET 요청 보내기</button><p id="request-status-1-14" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;size&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-15" class="api-request" data-request-id="H15" data-method="GET" data-request-index="14" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · H15</p><h4>목록 size 정수 초과</h4></div><span class="request-number">요청 15</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/hall-of-fame?size=999999999999999999999" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-15">GET 요청 보내기</button><p id="request-status-1-15" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;size&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-16" class="api-request" data-request-id="H16" data-method="GET" data-request-index="15" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · H16</p><h4>목록 size 문자</h4></div><span class="request-number">요청 16</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/hall-of-fame?size=abc" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-16">GET 요청 보내기</button><p id="request-status-1-16" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;size&quot;}]}</pre></dd></dl></details></article></div></section></div>
+  </details><details class="lesson-scene lesson-verify" data-lesson-kind="verify">
+    <summary id="채점-기준" aria-label="채점 기준 내용 펼치기"><span class="lesson-scene-index">07</span><span class="lesson-scene-glyph" aria-hidden="true">↗</span><span class="lesson-scene-title"><small>어떻게 확인할까</small><strong>채점 기준</strong><em>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용).</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>H1</td>
+<td><code>200</code>, <code>date</code>=<code>2026-10-04</code>. 처음이면 <code>added</code> = 18·55·103·131(22개)·10·143(20개) 순서. 이미 돌린 적이 있으면 빈 배열(아래 &quot;주의&quot;)</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>H2</td>
+<td><code>200</code>. 처음이면 <code>added</code> = 145(20개) 하나 — 10-04 기준에서는 19개였다. 이미 돌렸으면 빈 배열</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>H3 / H13</td>
+<td><code>200</code>, <code>added</code> 빈 배열 — 같은 날 두 번 돌아도 한 번만 / 공백 날짜는 생략과 같다(오늘 <code>2026-10-05</code>, <code>500</code> 아님)</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>H4</td>
+<td>7개, 145·18·55·103·131·10·143. 삭제된 59번(22개)은 없다</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>H5 / H6 / H7</td>
+<td>모두 <code>400</code>, <code>errors</code>에 <code>date</code> — 미래·없는 날짜·형식 아님(<code>500</code> 아님)</td>
+</tr>
+<tr>
+<td>C6</td>
+<td>H8<del>H10 / H14</del>H16</td>
+<td>0·101·빈 값·정수 초과·문자는 <code>400</code>(<code>size</code>), 100은 <code>200</code>·7개</td>
+</tr>
+<tr>
+<td>C7</td>
+<td>H11 / H12</td>
+<td><code>403</code> / <code>401</code></td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT COUNT(*), COUNT(DISTINCT post_id) FROM hall_of_fame</code></td>
+<td><code>7, 7</code> — 몇 번을 돌려도 같다</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = &#39;practice&#39; AND table_name = &#39;hall_of_fame&#39; AND column_name = &#39;post_id&#39; AND non_unique = 0</code></td>
+<td><code>1</code> — <code>post_id</code>에 UNIQUE가 있다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>경계</td>
+<td>기준일 0시 &quot;전&quot;(<code>&lt;</code>)까지 센다. <code>&lt;=</code>나 <code>DATE(created_at) &lt;= 기준일</code>이면 145번이 10-04 기준에 끼어든다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>멱등</td>
+<td>&quot;이미 있나 SELECT → 없으면 INSERT&quot;만으로 끝내지 않는다. 그 사이에 같은 배치가 한 번 더 돌면(수동 실행과 0시 실행이 겹치는 등) 둘 다 &quot;없음&quot;을 본다. <code>UNIQUE</code> + <code>INSERT IGNORE</code>(또는 중복 키 예외를 잡아 건너뛰기)로 DB가 막는다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>집계</td>
+<td>글마다 좋아요를 따로 세지 않고 <code>GROUP BY … HAVING COUNT(*) &gt;= 20</code> 한 번으로 후보를 얻는다. <code>post.like_count</code>를 쓰지 않는다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>시간</td>
+<td><code>LocalDate.now()</code>를 직접 부르지 않고 <code>Clock</code>을 쓴다. 예약 실행의 기준일과 수동 실행의 <code>date</code>가 같은 서비스 메서드로 들어간다</td>
+</tr>
+</tbody></table></div>
+<p><strong>주의 — 다시 돌릴 때.</strong> 이 배치는 DB에 행을 남긴다. 한 번 돌린 뒤에는 H1·H2가 빈 배열이 되는 게 맞다(C1·C2는 둘 다 통과로 본다). 앱을 자정 넘어 켜 두었다면 0시 예약 실행이 기준일 2026-10-05(고정 시계)로 이미 7개를 올렸을 수도 있다. 처음 값을 다시 보려면 <code>DELETE FROM hall_of_fame;</code>로 비운다.</p>
+</div>
+  </details><details class="lesson-scene lesson-connect" data-lesson-kind="connect">
+    <summary id="필요한-지식" aria-label="필요한 지식 내용 펼치기"><span class="lesson-scene-index">08</span><span class="lesson-scene-glyph" aria-hidden="true">→</span><span class="lesson-scene-title"><small>다음으로 연결</small><strong>필요한 지식</strong></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<ul>
+<li><a href="../../docs/knowledge/P30-scheduling-practical.html">P30 스케줄링 실무</a> — cron·시간대·실패와 중복</li>
+<li><a href="../../docs/knowledge/S15-async-scheduling-batch.html">S15 비동기·스케줄링·Spring Batch</a></li>
+<li><a href="../../docs/knowledge/W20-time-timezone.html">W20 시간과 타임존</a> — 기준일과 <code>[시작, 끝)</code></li>
+<li><a href="../../docs/knowledge/R03-schema-types-constraints.html">R03 스키마와 테이블 설계 — PK·FK·제약</a> — UNIQUE</li>
+<li><a href="../../lessons/F1-validation-errors.html">F1 입력 검증과 에러 응답</a></li>
+<li><a href="../ch8-query-deep/8-5-recount-batch.html">8-5. 정합성 배치</a> — <code>@Scheduled</code>·수동 실행 API의 출발점</li>
+</ul>
+</div>
+  </details><details class="lesson-scene lesson-debug" data-lesson-kind="debug">
+    <summary id="힌트-막힐-때만" aria-label="힌트 (막힐 때만) 내용 펼치기"><span class="lesson-scene-index">09</span><span class="lesson-scene-glyph" aria-hidden="true">✳</span><span class="lesson-scene-title"><small>막히면 확인</small><strong>힌트 (막힐 때만)</strong><em>@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date 로 받…</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<details>
+<summary>힌트 1 — 날짜 파라미터</summary>
+
+<p><code>@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date</code>로 받는다. ISO 형식은 엄격해서 <code>2026-1-5</code>·<code>2026-02-30</code>도 변환 실패다. 생략이면 <code>LocalDate.now(clock)</code>, 오늘보다 뒤면 400을 던지는 작은 메서드를 만들어 두면 15장의 다른 배치도 같이 쓴다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 새로 들어간 것만 응답하기</summary>
+
+<p>후보를 SELECT로 얻고, 한 건씩 <code>INSERT IGNORE INTO hall_of_fame … VALUES (…)</code>를 <code>@Modifying</code> 네이티브 쿼리로 보낸다. 반환값(영향받은 행 수)이 1인 것만 <code>added</code>에 넣는다. 0이면 그 사이 누군가 먼저 넣은 것이다.</p>
+</details>
+
+<details>
+<summary>더 깊이 — 서버가 여러 대라면</summary>
+
+<p>서버 두 대가 같은 0시에 같은 배치를 동시에 돌린다. 이 단계의 <code>UNIQUE</code>는 결과가 두 번 들어가는 것만 막고 일을 두 번 하는 것은 못 막는다 — 보통 ShedLock 같은 분산 락으로 한 대만 돌게 한다(8-5 R3, 이 장에서는 다루지 않는다).</p>
+</details>
+
+</div>
+  </details><details class="lesson-scene lesson-connect" data-lesson-kind="connect">
+    <summary id="다음-단계" aria-label="다음 단계 내용 펼치기"><span class="lesson-scene-index">10</span><span class="lesson-scene-glyph" aria-hidden="true">→</span><span class="lesson-scene-title"><small>다음으로 연결</small><strong>다음 단계</strong><em>15-2. 주간 랭킹 스냅샷</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p><a href="15-2-weekly-ranking-snapshot.html">15-2. 주간 랭킹 스냅샷</a></p>
+
+</div>
+  </details></div><section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 15-1. 명예의 전당 — 매일 0시 배치와 멱등\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n이 단계는 학습용 DB(practice)를 쓴다. 앱이 practice 프로파일로 떠 있어야 한다(README의 \"학습용 데이터로 앱 실행\"). 아니면 그 방법만 알려 주고 멈춰라.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch15-scheduling-batch/15-1-hall-of-fame.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity practice -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="../ch14-more-with-posts/14-8-shared-folder.html">← 이전 14-8. 폴더 공유 링크 — 읽기 전용</a><a href="15-2-weekly-ranking-snapshot.html">다음 → 15-2. 주간 랭킹 스냅샷 — 기간 경계와 그때의 값</a></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js?v=996bdd22e59f" defer></script><script src="../../tools/site/scenario-code-workbench.js?v=52d06b1c6f1a" defer></script>
+</body>
+</html>

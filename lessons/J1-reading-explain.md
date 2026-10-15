@@ -1,0 +1,278 @@
+# J1. 실행 계획(EXPLAIN) 읽기
+
+> 개념 레슨 · 35분
+
+## 이게 뭐냐
+
+API가 느릴 때 원인이 쿼리라면, 감으로 고치지 않고 어디서 시간이 새는지 **보고 나서** 고친다.
+
+그 도구가 `EXPLAIN`이다. 쿼리 앞에 `EXPLAIN`을 붙이면 MySQL이 **"이 쿼리를 어떻게 실행할 생각인지"(실행 계획)** 를 보여 준다. 쿼리를 바꾸거나 인덱스를 만들기 전에 먼저 계획을 본다.
+
+### 인덱스 한 줄 복습
+
+책 뒤의 "찾아보기"를 떠올리면 된다. 단어가 가나다순으로 정리되어 있고 쪽 번호가 붙어 있다. 찾아보기가 없으면 책을 처음부터 끝까지 넘겨야 한다.
+
+- **인덱스**: 열 값으로 **정렬해 둔** 목록 + 그 행의 위치. `(board_id, published_at, id)` 인덱스는 "게시판별로, 그 안에서 게시 시각순으로, 같으면 id순으로" 줄 세워 둔 목록이다.
+- 그래서 인덱스로는 **빨리 찾기**(같은 값으로 바로 이동)와 **정렬 없이 순서대로 읽기**가 된다.
+
+### 계획에서 볼 칸 다섯 개
+
+`EXPLAIN` 결과에는 열이 많다. 처음에는 다섯 개만 본다.
+
+| 칸 | 뜻 | 좋은 쪽 → 나쁜 쪽 |
+|---|---|---|
+| `type` | 행을 어떻게 찾나 | `const`(기본 키로 한 줄) → `ref`(인덱스로 같은 값 찾기) → `range`(인덱스로 범위) → `index`(인덱스 전체 훑기) → **`ALL`(테이블 전체 훑기)** |
+| `key` | 실제로 쓴 인덱스 | 이름이 있으면 씀, `NULL`이면 안 씀 |
+| `rows` | 읽을 것 같은 행 수(추정) | 적을수록 |
+| `filtered` | 읽은 행 중 조건을 통과할 비율(추정, %) | |
+| `Extra` | 덧붙인 설명 | 아래 표 |
+
+| `Extra`에 나오는 말 | 뜻 |
+|---|---|
+| `Using where` | 읽은 행을 조건으로 한 번 더 거른다 |
+| **`Using filesort`** | 결과를 **따로 정렬**한다. 인덱스 순서를 못 써서 다 읽은 뒤 줄 세운다 |
+| `Backward index scan` | 인덱스를 거꾸로 읽는다(`DESC` 정렬을 인덱스로 해결) |
+| `Using index condition` | 조건 일부를 인덱스를 읽는 단계에서 미리 거른다 |
+
+나쁜 신호 두 개만 기억하자. **`type = ALL`**(전체 훑기)과 **`Using filesort`**(따로 정렬). 행이 적을 때는 티가 안 나지만, 행이 수십만이 되면 이 둘이 느려지는 이유가 된다.
+
+## 예시
+
+8·9장의 학습용 DB `practice`(글 145개)에서 실행한 그대로다. 터미널에서는 E2의 `sql` 함수를 DB 이름만 바꿔 하나 더 만든다.
+
+```bash
+sqlp() { docker exec -i studymate-mysql-1 mysql --default-character-set=utf8mb4 -t -ucommunity -pcommunity practice -e "$1"; }
+```
+
+CloudBeaver라면 `practice (Java 학습용)` 연결에서 실행한다. 이 DB의 `post` 테이블에는 인덱스가 셋 있다. 기본 키(`PRIMARY`, `id`), 작성자(`fk_post_author`, `author_id`), 게시판 목록용(`ix_post_board_published`, `board_id, published_at, id`).
+
+**① 기본 키로 한 줄**
+
+```text
+$ sqlp "EXPLAIN SELECT * FROM post WHERE id = 42"
++----+-------------+-------+------------+-------+---------------+---------+---------+-------+------+----------+-------+
+| id | select_type | table | partitions | type  | possible_keys | key     | key_len | ref   | rows | filtered | Extra |
++----+-------------+-------+------------+-------+---------------+---------+---------+-------+------+----------+-------+
+|  1 | SIMPLE      | post  | NULL       | const | PRIMARY       | PRIMARY | 8       | const |    1 |   100.00 | NULL  |
++----+-------------+-------+------------+-------+---------------+---------+---------+-------+------+----------+-------+
+```
+
+`type = const`, `rows = 1`. 가장 좋은 경우다. 2-1의 상세 조회가 이것이다.
+
+**② 게시판 목록(2-2의 쿼리)**
+
+```text
+$ sqlp "EXPLAIN SELECT id, title FROM post
+        WHERE board_id = 2 AND status = 'PUBLISHED' AND deleted_at IS NULL
+        ORDER BY published_at DESC, id DESC LIMIT 10"
++----+-------------+-------+------------+------+-------------------------+-------------------------+---------+-------+------+----------+----------------------------------+
+| id | select_type | table | partitions | type | possible_keys           | key                     | key_len | ref   | rows | filtered | Extra                            |
++----+-------------+-------+------------+------+-------------------------+-------------------------+---------+-------+------+----------+----------------------------------+
+|  1 | SIMPLE      | post  | NULL       | ref  | ix_post_board_published | ix_post_board_published | 8       | const |   63 |     1.00 | Using where; Backward index scan |
++----+-------------+-------+------------+------+-------------------------+-------------------------+---------+-------+------+----------+----------------------------------+
+```
+
+- `type = ref`, `key = ix_post_board_published` — 인덱스로 `board_id = 2`인 곳으로 바로 간다.
+- `Extra`에 `Using filesort`가 **없다.** 인덱스가 이미 `published_at, id` 순서라 거꾸로 읽기만 하면(`Backward index scan`) 최신순이다. 10개를 읽으면 멈춘다.
+- `Using where` — `status`·`deleted_at`은 인덱스에 없어서 읽은 행을 한 번 더 거른다.
+
+**③ 제목 검색(8-4의 `LIKE '%…%'`)**
+
+```text
+$ sqlp "EXPLAIN SELECT id, title FROM post WHERE title LIKE '%JPA%'"
++----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-------------+
+| id | select_type | table | partitions | type | possible_keys | key  | key_len | ref  | rows | filtered | Extra       |
++----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-------------+
+|  1 | SIMPLE      | post  | NULL       | ALL  | NULL          | NULL | NULL    | NULL |  145 |    11.11 | Using where |
++----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-------------+
+```
+
+`type = ALL`, `key = NULL`, `rows = 145`(전부). `title`에는 인덱스가 없고, 있더라도 `%`로 **시작하는** 검색은 "가나다순 목록"으로 위치를 찾을 수 없다. 찾아보기에서 "가운데에 '자바'가 들어간 단어"를 찾으려면 전부 봐야 하는 것과 같다. 8-4 R4가 이것을 묻는다.
+
+**④ 한 작성자의 글을 최신순으로**
+
+```text
+$ sqlp "EXPLAIN SELECT id, title FROM post WHERE author_id = 5 ORDER BY created_at DESC LIMIT 10"
++----+-------------+-------+------------+------+----------------+----------------+---------+-------+------+----------+----------------+
+| id | select_type | table | partitions | type | possible_keys  | key            | key_len | ref   | rows | filtered | Extra          |
++----+-------------+-------+------------+------+----------------+----------------+---------+-------+------+----------+----------------+
+|  1 | SIMPLE      | post  | NULL       | ref  | fk_post_author | fk_post_author | 8       | const |   12 |   100.00 | Using filesort |
++----+-------------+-------+------------+------+----------------+----------------+---------+-------+------+----------+----------------+
+```
+
+`author_id`로는 인덱스를 써서 12개를 빨리 찾았다(`ref`). 하지만 그 인덱스에는 `created_at`이 없어서, 찾은 12개를 **따로 정렬**한다(`Using filesort`). 지금은 12개라 아무 문제 없지만, 한 사람이 글을 수만 개 쓰면 "수만 개를 다 읽고 정렬한 뒤 10개만 쓰기"가 된다. ②처럼 정렬 순서까지 담은 인덱스가 있으면 사라진다. 9-2에서 `post_like`의 같은 문제를 마이그레이션으로 고친다.
+
+### 인덱스가 없었다면 — `IGNORE INDEX`로 비교
+
+②의 목록 쿼리가 인덱스 덕을 얼마나 보는지, 인덱스를 **지우지 않고** 비교할 수 있다. `IGNORE INDEX (이름)`은 "이번 쿼리에서만 이 인덱스를 없는 셈 쳐라"다. 읽기만 하니 데이터는 그대로다.
+
+```text
+$ sqlp "EXPLAIN SELECT id, title FROM post IGNORE INDEX (ix_post_board_published)
+        WHERE board_id = 2 AND status = 'PUBLISHED' AND deleted_at IS NULL
+        ORDER BY published_at DESC, id DESC LIMIT 10"
++----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-----------------------------+
+| id | select_type | table | partitions | type | possible_keys | key  | key_len | ref  | rows | filtered | Extra                       |
++----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-----------------------------+
+|  1 | SIMPLE      | post  | NULL       | ALL  | NULL          | NULL | NULL    | NULL |  145 |     0.69 | Using where; Using filesort |
++----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-----------------------------+
+```
+
+나쁜 신호 두 개가 다 나왔다. 전체 훑기(`ALL`)에 따로 정렬(`Using filesort`)이다.
+
+### 실제로 몇 줄을 읽었나 — `EXPLAIN ANALYZE`
+
+`EXPLAIN`은 **계획**(추정)이다. `EXPLAIN ANALYZE`는 쿼리를 **실제로 돌려 보고** 단계마다 실제로 읽은 행 수(`actual … rows=`)를 보여 준다. 결과가 여러 줄이라 끝에 `\G`를 붙여 세로로 본다.
+
+```text
+$ sqlp "EXPLAIN ANALYZE SELECT id, title FROM post
+        WHERE board_id = 2 AND status = 'PUBLISHED' AND deleted_at IS NULL
+        ORDER BY published_at DESC, id DESC LIMIT 10\G"
+*************************** 1. row ***************************
+EXPLAIN: -> Limit: 10 row(s)  (cost=3.69 rows=0.63) (actual time=0.216..0.336 rows=10 loops=1)
+    -> Filter: ((post.`status` = 'PUBLISHED') and (post.deleted_at is null))  (cost=3.69 rows=0.63) (actual time=0.215..0.334 rows=10 loops=1)
+        -> Index lookup on post using ix_post_board_published (board_id=2) (reverse)  (cost=3.69 rows=63) (actual time=0.19..0.306 rows=10 loops=1)
+```
+
+```text
+$ sqlp "EXPLAIN ANALYZE SELECT id, title FROM post IGNORE INDEX (ix_post_board_published)
+        WHERE board_id = 2 AND status = 'PUBLISHED' AND deleted_at IS NULL
+        ORDER BY published_at DESC, id DESC LIMIT 10\G"
+*************************** 1. row ***************************
+EXPLAIN: -> Limit: 10 row(s)  (cost=16.2 rows=10) (actual time=0.208..0.209 rows=10 loops=1)
+    -> Sort: post.published_at DESC, post.id DESC, limit input to 10 row(s) per chunk  (cost=16.2 rows=145) (actual time=0.203..0.204 rows=10 loops=1)
+        -> Filter: ((post.`status` = 'PUBLISHED') and (post.board_id = 2) and (post.deleted_at is null))  (cost=16.2 rows=145) (actual time=0.0681..0.145 rows=55 loops=1)
+            -> Table scan on post  (cost=16.2 rows=145) (actual time=0.061..0.122 rows=145 loops=1)
+```
+
+**아래에서 위로** 읽는다. 들여쓰기가 깊은 줄이 먼저 실행된다.
+
+- 인덱스 사용: 인덱스를 거꾸로 따라가며 **10줄만** 읽고 끝났다.
+- 인덱스 무시: 테이블 **145줄 전부**를 읽고(`Table scan`), 조건으로 55줄을 남기고(`Filter`), 정렬해서(`Sort`) 10줄을 뽑았다.
+
+`actual time`(밀리초)과 `cost`는 실행할 때마다 다르다. 그리고 지금은 행이 145개뿐이라 시간은 오히려 비슷하거나 거꾸로 나오기도 한다(위 실행에서도 그랬다). 볼 것은 시간이 아니라 **읽은 행 수**다. 10줄은 글이 100만 개가 되어도 10줄이지만, 145줄은 100만 줄이 된다.
+
+계획의 추정이 틀리기도 한다는 것도 보인다. 위 첫 결과에서 `Filter`의 추정은 `rows=0.63`인데 실제로는 `rows=10`이 나왔다. `rows`·`filtered`는 통계로 낸 짐작이다.
+
+## 따라 해 보기
+
+15분. `practice` DB에서 한다. 전부 읽기만 하는 쿼리다.
+
+**1. 위 ①~④를 직접 실행**하고, 각각 `type`·`key`·`rows`·`Extra`를 표로 옮겨 적는다.
+
+**2. 예측하고 확인하기.** 아래 두 쿼리의 계획을 **먼저 예측**하고 실행한다.
+
+```sql
+-- (가) 9-2의 "내가 좋아요한 글"
+EXPLAIN SELECT l.id, l.post_id, l.created_at
+FROM post_like l
+WHERE l.member_id = 12
+ORDER BY l.created_at DESC, l.id DESC
+LIMIT 11;
+
+-- (나) 게시판 목록의 6쪽
+EXPLAIN SELECT id, title FROM post
+WHERE board_id = 2
+ORDER BY published_at DESC, id DESC
+LIMIT 10 OFFSET 50;
+```
+
+<details>
+<summary>실제 결과</summary>
+
+(가) `type = ref`, `key = fk_post_like_member`, `rows = 29`, `Extra = Using filesort`. `member_id` 인덱스로 찾고 따로 정렬한다. ④와 같은 모양이다. 9-2에서 `(member_id, created_at, id)` 인덱스를 추가해 `Using filesort`를 없앤다.
+
+(나) `type = ref`, `key = ix_post_board_published`, `rows = 63`, `filtered = 100.00`, `Extra = Backward index scan`. `Using filesort`는 없다. 인덱스 순서대로 앞의 50개를 지나간 뒤 10개를 쓴다. 정렬은 공짜지만 "지나가는" 비용은 쪽이 깊어질수록 커진다(W15의 OFFSET 이야기).
+</details>
+
+**3. 범위 조건.** 게시판 2의 9월 첫 주 글을 찾는 두 가지 쓰기를 비교한다.
+
+```sql
+EXPLAIN SELECT id, title FROM post
+WHERE board_id = 2 AND published_at >= '2026-09-01' AND published_at < '2026-09-08';
+```
+
+`type = range`, `key_len = 14`, `rows = 5`가 나온다. 인덱스의 두 번째 열(`published_at`)까지 써서 범위를 좁혔다(`key_len`은 인덱스를 몇 바이트까지 썼나다. `board_id`만이면 `8`). 같은 뜻을 아래 "일부러 틀려 보기" 2번처럼 쓰면 어떻게 달라지는지 본다.
+
+## 일부러 틀려 보기
+
+**1. 열에 계산을 씌운다.** 결과는 같지만 계획은 다르다.
+
+```text
+$ sqlp "EXPLAIN SELECT * FROM post WHERE id + 0 = 42"
++----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-------------+
+| id | select_type | table | partitions | type | possible_keys | key  | key_len | ref  | rows | filtered | Extra       |
++----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-------------+
+|  1 | SIMPLE      | post  | NULL       | ALL  | NULL          | NULL | NULL    | NULL |  145 |   100.00 | Using where |
++----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-------------+
+```
+
+①은 `const`·1줄이었는데 `ALL`·145줄이 되었다. 인덱스에는 `id` 값이 정리되어 있지 **`id + 0`** 값이 정리되어 있지 않다. 그래서 MySQL은 모든 행에 계산을 해 봐야 한다.
+
+**2. 날짜에 함수를 씌운다.** 따라 해 보기 3번을 `DATE()`로 쓰면 이렇다.
+
+```text
+$ sqlp "EXPLAIN SELECT id, title FROM post WHERE board_id = 2 AND DATE(published_at) = '2026-09-03'"
++----+-------------+-------+------------+------+-------------------------+-------------------------+---------+-------+------+----------+-----------------------+
+| id | select_type | table | partitions | type | possible_keys           | key                     | key_len | ref   | rows | filtered | Extra                 |
++----+-------------+-------+------------+------+-------------------------+-------------------------+---------+-------+------+----------+-----------------------+
+|  1 | SIMPLE      | post  | NULL       | ref  | ix_post_board_published | ix_post_board_published | 8       | const |   63 |   100.00 | Using index condition |
++----+-------------+-------+------------+------+-------------------------+-------------------------+---------+-------+------+----------+-----------------------+
+```
+
+인덱스를 쓰긴 하지만 `key_len = 8`, `rows = 63`이다. `board_id`까지만 인덱스로 좁히고, `published_at`은 `DATE()`를 씌우는 바람에 범위로 못 좁혔다. 같은 하루를 찾을 때는 `published_at >= '2026-09-03' AND published_at < '2026-09-04'`처럼 **열은 그대로 두고 값 쪽을 범위로** 쓴다.
+
+## 확인 문제
+
+**1.** `EXPLAIN` 결과가 `type = ALL`, `key = NULL`, `rows = 1000000`이다. 무슨 뜻인가?
+
+<details>
+<summary>정답</summary>
+
+인덱스를 쓰지 않고 **테이블 전체(약 100만 줄)를 훑는다**는 계획이다. 조건에 맞는 인덱스가 없거나, 조건이 인덱스를 쓸 수 없는 모양(`%`로 시작하는 `LIKE`, 열에 함수·계산)이라는 신호다.
+</details>
+
+**2.** 계획의 `Extra`에 `Using filesort`가 있다. 무엇을 하고 있고, 언제 문제가 되나?
+
+<details>
+<summary>정답</summary>
+
+찾은 행들을 인덱스 순서로 읽지 못해 **따로 정렬**한다. 정렬할 행이 적으면 문제없지만, 조건에 맞는 행이 많아지면(한 회원의 좋아요 수십만 개) 전부 읽고 정렬한 뒤 몇 개만 쓰게 되어 느려진다. 같음 조건 열 뒤에 정렬 열을 붙인 복합 인덱스로 없앨 수 있다(9-2).
+</details>
+
+**3.** `(board_id, published_at, id)` 인덱스가 있다. 다음 중 `Using filesort` 없이 인덱스 순서로 읽을 수 있는 것은?
+(가) `WHERE board_id = 2 ORDER BY published_at DESC, id DESC`
+(나) `WHERE board_id = 2 ORDER BY view_count DESC`
+
+<details>
+<summary>정답</summary>
+
+**(가).** 인덱스가 `board_id`로 묶인 다음 `published_at, id` 순서로 줄 서 있으니, `board_id = 2` 부분을 거꾸로 읽으면 그대로 최신순이다(예시 ②의 `Backward index scan`). (나)의 `view_count`는 인덱스에 없어서 따로 정렬해야 한다.
+</details>
+
+**4.** `EXPLAIN ANALYZE`로 비교했더니 인덱스를 쓴 쪽이 0.336ms, 안 쓴 쪽이 0.209ms였다. 인덱스가 소용없는 것인가?
+
+<details>
+<summary>정답</summary>
+
+**아니다.** 행이 145개뿐이라 시간 차이는 측정 잡음 수준이다. 볼 것은 **읽은 행 수**다. 인덱스 쪽은 10줄, 안 쓴 쪽은 145줄 전부를 읽었다. 데이터가 늘면 인덱스 쪽은 여전히 10줄 근처지만, 안 쓴 쪽은 늘어난 만큼 다 읽는다.
+</details>
+
+**5.** "하루치 글"을 `WHERE DATE(published_at) = '2026-09-03'`로 찾고 있다. 인덱스를 더 잘 쓰게 고쳐 보라.
+
+<details>
+<summary>정답</summary>
+
+`WHERE published_at >= '2026-09-03' AND published_at < '2026-09-04'`. 열에 함수를 씌우지 않고 값 쪽을 범위로 바꾸면, 인덱스의 정리된 순서로 그 범위만 읽을 수 있다(`type = range`).
+</details>
+
+## 더 깊이
+
+- [R05 인덱스와 B-Tree](../docs/knowledge/R05-index-btree.md) — 인덱스가 정렬된 목록인 이유, 복합 인덱스 열 순서
+- [R05 — 후보 인덱스를 만들고 계획을 비교한다](../docs/knowledge/R05-index-btree.md#2단계-후보-인덱스를-만들고-계획을-비교한다)
+- [W15 — MySQL에서 실제 계획을 비교한다](../docs/knowledge/W15-paging-offset-vs-cursor.md#mysql에서-실제-계획을-비교한다) — 깊은 OFFSET의 계획
+- [S17 Spring Boot 애플리케이션 성능](../docs/knowledge/S17-performance-tuning.md) — 느린 쿼리를 찾는 순서
+
+## 다음
+
+- 레슨: [J2. 마이그레이션은 왜 필요한가](J2-why-migrations.md) — 인덱스를 **운영 DB에** 추가하려면 어떻게 하나.
+- 실습: [8-1. 회원 활동 요약](../scenario/ch8-query-deep/8-1-activity-summary.md) — 8장의 쿼리들을 만들 때마다 `EXPLAIN`을 붙여 본다. [9-2](../scenario/ch9-schema-change/9-2-index-explain.md)에서 따라 해 보기 2(가)의 `Using filesort`를 없앤다.

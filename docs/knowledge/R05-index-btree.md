@@ -49,7 +49,9 @@
 
 ## 3. 따라 하기
 
-연습 DB는 `ds_practice`의 MySQL 8.4 스키마를 사용한다. 아래 `product.name`은 스키마에서 인덱스를 두지 않은 열이고, 상품 행은 80개다. 그 정도로 작은 테이블에서는 인덱스를 추가해도 옵티마이저가 전체 스캔을 고를 수 있으므로, 강제 인덱스 계획과 자연 선택 계획을 모두 확인한다. DDL은 트랜잭션 롤백 대상이 아니므로 마지막 `DROP INDEX`까지 같은 DB 세션에서 실행한다. 이 실습 SQL은 직접 실행하지 않았다. 결과는 모두 예상이다.
+연습 DB는 `ds_practice`의 MySQL 8.4 스키마를 사용한다. 아래 `product.name`은 스키마에서 인덱스를 두지 않은 열이고, 상품 행은 80개다. 그 정도로 작은 테이블에서는 인덱스를 추가해도 옵티마이저가 전체 스캔을 고를 수 있으므로, 강제 인덱스 계획과 자연 선택 계획을 모두 확인한다.
+
+DDL은 트랜잭션 롤백 대상이 아니므로 마지막 `DROP INDEX`까지 같은 DB 세션에서 실행한다. 이 실습 SQL은 직접 실행하지 않았다. 결과는 모두 예상이다.
 
 ### 1단계: 기준 계획을 확인한다
 
@@ -87,7 +89,9 @@ FROM product FORCE INDEX (ix_r05_product_name_demo)
 WHERE name = '연습용 상품';
 ```
 
-**확인 방법 (예상):** 자연 선택 결과의 `key`가 `NULL`일 수도 있다. 80개 행에서는 전체 읽기가 싸다고 추정할 수 있기 때문이다. `FORCE INDEX` 결과에서는 새 인덱스가 선택되어 `key=ix_r05_product_name_demo`, 동등 검색 접근(통상 `ref`)을 확인한다. `id`는 PK여서 보조 인덱스에 포함되므로 이 조회는 커버링일 수 있고 `Extra`에 `Using index`가 나타날 수 있다. `rows`는 추정치로 실제 결과 행 수가 아니다.
+**확인 방법 (예상):** 자연 선택 결과의 `key`가 `NULL`일 수도 있다. 80개 행에서는 전체 읽기가 싸다고 추정할 수 있기 때문이다. `FORCE INDEX` 결과에서는 새 인덱스가 선택되어 `key=ix_r05_product_name_demo`, 동등 검색 접근(통상 `ref`)을 확인한다.
+
+`id`는 PK여서 보조 인덱스에 포함되므로 이 조회는 커버링일 수 있고 `Extra`에 `Using index`가 나타날 수 있다. `rows`는 추정치로 실제 결과 행 수가 아니다.
 
 ### 3단계: 조회 모양을 바꿔 기존 복합 인덱스도 읽는다
 
@@ -103,15 +107,56 @@ ORDER BY ordered_at DESC;
 
 **확인 방법 (예상):** `key`가 `ix_orders_member_date`인지, `type`이 `range` 등 범위 접근인지 확인한다. `id`와 정렬·조건 열이 보조 인덱스에 있으므로 `Using index`가 가능한 모양이다. 다른 회원 ID나 데이터 분포에서는 `rows` 추정치가 달라진다. `key`가 다르면 `SHOW INDEX`와 전체 조건·반환 열을 다시 대조한다.
 
-### 4단계: 실습 인덱스를 제거한다
+### 4단계: 추정 계획과 실제 실행을 비교한다
+
+`EXPLAIN`은 옵티마이저 계획과 추정치를 보고, `EXPLAIN ANALYZE`는 뒤의 읽기 전용 SELECT를 실제 실행해 iterator별 actual time·rows·loops를 보여 준다. 결과 형식은 TREE이며 쿼리가 실행되므로 `UPDATE`, `DELETE`, 운영에서 비용이 큰 조회를 붙이지 않는다.
 
 ```sql
-DROP INDEX ix_r05_product_name_demo ON product;
+EXPLAIN
+SELECT id, name FROM product WHERE name = '연습용 상품';
 
-SHOW INDEX FROM product;
+EXPLAIN ANALYZE
+SELECT id, name FROM product WHERE name = '연습용 상품';
 ```
 
-**확인 방법 (예상):** `ix_r05_product_name_demo`가 목록에서 사라진다. CREATE 문을 다시 실행했는데 `Duplicate key name` 오류가 나면 이전 실행에서 DROP을 건너뛰었는지 먼저 `SHOW INDEX`로 확인한다. 실습 인덱스를 임의의 운영 테이블에서 지우지 않는다.
+비교표에는 `key`, 추정 rows, actual rows, loops, actual time을 직접 옮긴다. 이 테이블은 80행뿐이라 실제 시간이 의미 있게 달라지지 않을 수 있다. 측정값을 미리 정답으로 정하지 말고, 데이터 크기와 캐시 상태를 함께 적는다. `ANALYZE TABLE product;`는 옵티마이저 통계 갱신 명령이다. `EXPLAIN ANALYZE`처럼 SELECT를 실행해 측정하는 기능이 아니다.
+
+### 5단계: 인덱스 가시성을 바꿔 계획을 관찰한다
+
+아래 실습 인덱스만 대상으로 한다. Invisible index는 테이블에 남고 쓰기 때 계속 유지되지만, 옵티마이저의 기본 선택에서 제외된다. `PRIMARY` 키나 외래키가 의존하는 인덱스를 대상으로 하지 않는다.
+
+```sql
+-- 인덱스가 없다면 생성 (2단계에서 이미 만들었다면 다시 만들지 않는다)
+CREATE INDEX ix_r05_product_name_demo ON product (name);
+
+-- 자연 계획을 기록한 뒤 옵티마이저 선택에서 제외
+ALTER TABLE product ALTER INDEX ix_r05_product_name_demo INVISIBLE;
+EXPLAIN SELECT id, name FROM product WHERE name = '연습용 상품';
+
+-- 복원: 다시 옵티마이저 선택 후보로 돌린다
+ALTER TABLE product ALTER INDEX ix_r05_product_name_demo VISIBLE;
+EXPLAIN SELECT id, name FROM product WHERE name = '연습용 상품';
+```
+
+80행에서는 visible 상태에서도 MySQL이 테이블 스캔을 선택할 수 있고, invisible 전환 전후 계획이 같을 수도 있다. `FORCE INDEX`는 인덱스 사용 가능성을 따로 확인하는 도구이며, 자연 계획의 성능 증거가 아니다. `ANALYZE TABLE product;`를 실행했다면 통계 갱신 사실도 별도로 기록한다.
+
+### 6단계: 삭제와 복구를 연습한다
+
+`DROP INDEX`는 트랜잭션 롤백으로 복구되지 않는다. 이 문서의 `ds_practice.product` 실습 인덱스만 제거하고, 필요하면 같은 DDL로 다시 만든다. 실행 전에 `SHOW INDEX`로 이름과 테이블을 확인한다.
+
+```sql
+-- 정리
+DROP INDEX ix_r05_product_name_demo ON product;
+SHOW INDEX FROM product;
+
+-- 다시 실습할 때 복구
+CREATE INDEX ix_r05_product_name_demo ON product (name);
+
+-- 실습 DB에서 원래 인덱스가 없던 상태로 되돌리기
+DROP INDEX ix_r05_product_name_demo ON product;
+```
+
+현재 상태가 헷갈리면 먼저 `SHOW INDEX FROM product;`를 실행한다. 이미 존재할 때 CREATE를 반복하지 않고, DROP 후에는 이 문서가 만든 인덱스만 복구한다. 공유·운영 DB에서는 이 정리 SQL을 실행하지 않는다.
 
 ## 4. 치트시트
 
@@ -143,7 +188,9 @@ SHOW INDEX FROM product;
 
 ## 6. 한 단계 더
 
-B-Tree의 루트·내부 페이지는 다음 페이지 범위를 가리키는 경계 키를 담고, 리프 페이지는 실제 인덱스 엔트리를 정렬 상태로 담는다. InnoDB 기본 인덱스 페이지 크기는 16KB이고, 한 페이지에 여러 키와 자식 포인터가 들어가므로 이진 검색 트리처럼 키마다 별도 페이지를 방문하지 않는다. 트리의 높은 분기 수가 높이를 낮춰 디스크 페이지 접근을 줄인다. 첫 키를 찾은 뒤 범위는 리프 페이지의 연결 순서대로 읽으므로 `log N` 탐색 다음에 `K`개 결과를 훑는 비용이 더해진다. 키 삽입과 삭제 때 페이지 분할·병합 등 균형 유지 비용도 생긴다. MySQL 문서는 일반 인덱스를 B-Tree라고 부르며, 교재에서는 리프에 데이터 엔트리가 놓이는 특성을 설명할 때 B+Tree라는 말을 자주 쓴다.
+B-Tree의 루트·내부 페이지는 다음 페이지 범위를 가리키는 경계 키를 담고, 리프 페이지는 실제 인덱스 엔트리를 정렬 상태로 담는다. InnoDB 기본 인덱스 페이지 크기는 16KB이고, 한 페이지에 여러 키와 자식 포인터가 들어가므로 이진 검색 트리처럼 키마다 별도 페이지를 방문하지 않는다. 트리의 높은 분기 수가 높이를 낮춰 디스크 페이지 접근을 줄인다.
+
+첫 키를 찾은 뒤 범위는 리프 페이지의 연결 순서대로 읽으므로 `log N` 탐색 다음에 `K`개 결과를 훑는 비용이 더해진다. 키 삽입과 삭제 때 페이지 분할·병합 등 균형 유지 비용도 생긴다. MySQL 문서는 일반 인덱스를 B-Tree라고 부르며, 교재에서는 리프에 데이터 엔트리가 놓이는 특성을 설명할 때 B+Tree라는 말을 자주 쓴다.
 
 ```mermaid
 flowchart TD
@@ -204,6 +251,10 @@ PK 값이 보조 인덱스마다 붙으므로 넓은 PK는 인덱스 저장 공�
 - MySQL 8.4, Multiple-Column Indexes — https://dev.mysql.com/doc/refman/8.4/en/multiple-column-indexes.html — 복합 인덱스 왼쪽 접두 및 조건 예제를 확인했다.
 - MySQL 8.4, How MySQL Uses Indexes — https://dev.mysql.com/doc/refman/8.4/en/mysql-indexes.html — 커버링 조회와 작은 테이블·대량 조회에서 인덱스 이득이 줄 수 있음을 확인했다.
 - MySQL 8.4, EXPLAIN Output Format — https://dev.mysql.com/doc/refman/8.4/en/explain-output.html — `type`, `key`, `rows`, `Extra` 및 전체 스캔·정렬 관련 설명을 확인했다.
+- MySQL 8.4, EXPLAIN Statement — https://dev.mysql.com/doc/refman/8.4/en/explain.html — `EXPLAIN ANALYZE`의 실제 실행과 TREE 출력의 actual time·rows·loops를 확인했다.
+- MySQL 8.4, Invisible Indexes — https://dev.mysql.com/doc/refman/8.4/en/invisible-indexes.html — 보조 인덱스의 INVISIBLE/VISIBLE 전환과 옵티마이저의 기본 선택 제외를 확인했다.
+- MySQL 8.4, ANALYZE TABLE — https://dev.mysql.com/doc/refman/8.4/en/analyze-table.html — 테이블 통계 갱신 동작을 확인했다.
+- MySQL 8.4, DROP INDEX — https://dev.mysql.com/doc/refman/8.4/en/drop-index.html — 인덱스 삭제 문법을 확인했다.
 - MySQL 8.4, Optimization and Indexes — https://dev.mysql.com/doc/refman/8.4/en/optimization-indexes.html — 불필요한 인덱스의 공간·쓰기 비용을 확인했다.
 - Use The Index, Luke!, The Search Tree (B-Tree) Makes the Index Fast — https://use-the-index-luke.com/sql/anatomy/the-tree — 루트·분기·리프와 리프 연결, 균형 트리 탐색을 확인했다.
 - PostgreSQL 18, Index Types — https://www.postgresql.org/docs/current/indexes-types.html — B-Tree의 동등·범위 검색과 다른 인덱스 종류를 비교 확인했다.

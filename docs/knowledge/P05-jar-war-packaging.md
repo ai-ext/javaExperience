@@ -6,7 +6,9 @@
 
 ## 1. 한 줄로 말하면
 
-JAR(Java Archive)은 `.class`, 설정·정적 파일 같은 리소스와 `META-INF/MANIFEST.MF` 메타데이터를 하나로 묶은 ZIP 형식의 아카이브다. WAR(Web Application Archive)는 웹 애플리케이션의 클래스와 라이브러리를 `WEB-INF` 규약에 넣은 JAR 계열 배포 형식이다. 둘 다 그 자체로 운영체제 실행 파일은 아니다. JVM이 아카이브 안에서 시작 클래스와 필요한 클래스를 찾도록 실행 방식까지 맞춰야 한다.
+JAR(Java Archive)은 `.class`, 설정·정적 파일 같은 리소스와 `META-INF/MANIFEST.MF` 메타데이터를 하나로 묶은 ZIP 형식의 아카이브다. WAR(Web Application Archive)는 웹 애플리케이션의 클래스와 라이브러리를 `WEB-INF` 규약에 넣은 JAR 계열 배포 형식이다.
+
+둘 다 그 자체로 운영체제 실행 파일은 아니다. JVM이 아카이브 안에서 시작 클래스와 필요한 클래스를 찾도록 실행 방식까지 맞춰야 한다.
 
 일반 JAR은 라이브러리 의존성을 함께 담는다고 보장하지 않는다. Spring Boot 실행 JAR은 앱 클래스와 런타임 의존성을 싣고 `JarLauncher`가 클래스패스를 구성하므로 `java -jar app.jar`로 실행된다. 산출물은 외부 톰캣 사용 여부로 고른다.
 

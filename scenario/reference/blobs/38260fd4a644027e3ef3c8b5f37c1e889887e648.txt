@@ -1,0 +1,33 @@
+package org.example.post;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+// 메서드 매개변수 제약(@Min/@Max)은 @Validated 없이도 Spring MVC가 직접 검증해
+// HandlerMethodValidationException으로 바꿔 준다(Spring 6.1+). @Validated를 더하면
+// 옛 AOP 방식(ConstraintViolationException)과 충돌해 500이 났다 — 붙이지 않는다.
+@RestController
+@RequestMapping("/api/boards/{slug}/posts")
+public class BoardPostController {
+
+    private final PostQueryService postQueryService;
+
+    public BoardPostController(PostQueryService postQueryService) {
+        this.postQueryService = postQueryService;
+    }
+
+    @GetMapping
+    public PostListResponse list(@PathVariable String slug,
+                                  @RequestParam(defaultValue = "0") @Min(0) int page,
+                                  @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size,
+                                  @LoginMember AuthenticatedMember viewer) {
+        return postQueryService.list(slug, page, size, viewer);
+    }
+}

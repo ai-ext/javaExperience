@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-003. 게시판 글 목록 정렬 옵션</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="t-003-게시판-글-목록-정렬-옵션"><a class="anchor" href="#t-003-게시판-글-목록-정렬-옵션" aria-hidden="true">#</a>T-003. 게시판 글 목록 정렬 옵션</h1>
+<blockquote>
+<p>난이도 쉬움 · 유형 기존 API 변경 · DB community · 예상 30분</p>
+</blockquote>
+<h2 id="티켓"><a class="anchor" href="#티켓" aria-hidden="true">#</a>티켓</h2>
+<blockquote>
+<p><strong>요청자</strong> 프론트 팀 · <strong>배경</strong> 게시판 목록 위에 [최신순 · 좋아요순 · 조회순] 정렬 버튼을 단다. 지금 API는 최신순만 된다.</p>
+</blockquote>
+<ul>
+<li>게시판 글 목록 API에 정렬 파라미터를 추가해 주세요. 안 보내면 지금처럼 최신순입니다.</li>
+<li>좋아요 0개인 글이 많아서, 값이 같을 때 순서가 매번 바뀌면 페이지를 넘길 때 글이 겹치거나 빠집니다. 같으면 최신순으로 이어 주세요.</li>
+<li>모르는 정렬 값은 조용히 무시하지 말고 400으로 알려 주세요(프론트 오타를 바로 알 수 있게).</li>
+<li><strong>완료 조건</strong>: 정렬만 바뀌고 &quot;볼 수 있는 글&quot; 조건·전체 건수·페이지 응답 모양은 그대로다.</li>
+</ul>
+<p><strong>DB 시작 상태</strong>: <code>community</code> 처음 상태(<code>bash scripts/java-db.sh --reset</code>). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 자유 게시판(<code>free</code>)에서 비로그인이 볼 수 있는 글은 13개다.</p>
+<h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
+<ul>
+<li>게시판 글 목록 API가 받는 파라미터와, 실제 쿼리를 조립하는 곳을 찾는다. 같은 쿼리 조립기를 조합 검색 API도 쓴다 — 검색 API의 동작은 바꾸지 않는다.</li>
+<li>정렬 기준(<code>ORDER BY</code>)이 지금 어디에 고정돼 있는지 본다. 잘못된 검색 조건을 400으로 바꾸는 예외도 이미 하나 있다.</li>
+</ul>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>시나리오 화면</span><span class="mockup-live"><i></i> 단계 시안</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">사용자에게 보이는 상태</span><h3>자유 게시판 — 정렬 바꾸기</h3><p>정렬 버튼을 누르면 sort 파라미터만 바꿔 같은 목록 API를 다시 부른다.</p></div></div><div class="mock-screen" aria-label="자유 게시판 — 정렬 바꾸기 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>자유 게시판</strong><span></span></header><div class="mock-chip-group" data-screen-id="sort"><span class="screen-widget-label">정렬</span><span class="mock-chip">최신순</span><span class="mock-chip">좋아요순</span><span class="mock-chip">조회순</span></div><div class="mock-list" data-screen-id="posts"><div class="mock-list-item tone-default" data-screen-id="p4"><span class="mock-list-main"><strong>주말 회고</strong><small>이스프링 · 좋아요 2</small></span></div><div class="mock-list-item tone-default" data-screen-id="p14"><span class="mock-list-main"><strong>자유글 03</strong><small>이스프링 · 좋아요 1</small></span></div><div class="mock-list-item tone-default" data-screen-id="p12"><span class="mock-list-main"><strong>자유글 01</strong><small>이스프링 · 좋아요 1</small></span></div></div><div class="mock-toast tone-error" data-screen-id="toast"><span class="mock-toast-icon" aria-hidden="true">!</span><span>정렬 값이 올바르지 않습니다</span></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">화면 뒤에서 일어나는 일</span><h4>요청부터 응답까지</h4></div><span class="flow-hint">이 단계에 기록된 처리 순서를 보여줍니다.</span></div><div class="flow-tracks" aria-label="흐름별 요청 처리 경로"><div class="flow-route" aria-label="좋아요순"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="mysql" data-index="2"><span class="flow-node-number">3</span>MySQL</span><span class="flow-node" data-node="response" data-index="3"><span class="flow-node-number">4</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="4"><span class="flow-node-number">5</span>응답 반영</span></div><div class="flow-route" aria-label="모르는 정렬 값"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="response" data-index="2"><span class="flow-node-number">3</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="3"><span class="flow-node-number">4</span>응답 반영</span></div></div><p class="flow-swipe-hint">좌우로 밀어 전체 경로 보기 →</p><aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside><p class="flow-selection-status" role="status" aria-live="polite">카드를 선택하면 화면의 관련 요소와 계층이 강조됩니다.</p><div class="scenario-flows"><section class="scenario-flow" aria-label="좋아요순" data-flow-index="0"><h5>좋아요순<span class="scenario-flow-count">6단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="sort" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">[좋아요순]을 누른다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="GET" data-path="/api/boards/free/posts?sort=likes&amp;size=5" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-get">GET</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/boards/free/posts?sort=likes&amp;size=5</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">GET /api/boards/free/posts?sort=likes&amp;size=5</span></button></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">조건(볼 수 있는 글)은 그대로, 정렬만 좋아요 수 → 게시 시각 → id 내림차순으로 바꾼다</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> SELECT … FROM post p WHERE … ORDER BY p.like_count DESC, p.published_at DESC, p.id DESC LIMIT 5</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{
+  &quot;items&quot;: [{&quot;id&quot;: 4, ...}, {&quot;id&quot;: 14, ...}, {&quot;id&quot;: 12, ...}, {&quot;id&quot;: 9, ...}, {&quot;id&quot;: 5, ...}],
+  &quot;page&quot;: 0, &quot;size&quot;: 5, &quot;totalElements&quot;: 13, &quot;totalPages&quot;: 3, &quot;hasNext&quot;: true
+}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="posts|p4" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">좋아요 2개인 글이 맨 위, 좋아요 1개인 글들은 최신 글부터</span></button></li></ol></section><section class="scenario-flow" aria-label="모르는 정렬 값" data-flow-index="1"><h5>모르는 정렬 값<span class="scenario-flow-count">5단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="sort" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">프론트 코드 오타로 sort=hot을 보낸다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="GET" data-path="/api/boards/free/posts?sort=hot" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-get">GET</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/boards/free/posts?sort=hot</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">GET /api/boards/free/posts?sort=hot</span></button></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">정렬 값을 해석하다 모르는 값이면 잘못된 검색 조건 예외 → 400</span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 400</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;title&quot;: &quot;Bad Request&quot;, &quot;status&quot;: 400, &quot;detail&quot;: &quot;sort는 latest·likes·views 중 하나여야 합니다.&quot;}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="toast" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">개발 중에 바로 오류가 보인다</span></button></li></ol></section></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: '사용자 화면', request: 'HTTP 요청', server: '서버', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'server', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = (labels[selected] || button.querySelector('.flow-kind')?.textContent || '시나리오') + ' 단계 · ' + (button.querySelector('.flow-step-text')?.textContent.trim() || '세부 내용은 아래 설명을 확인하세요.');
+    }));
+  }
+})();
+</script><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>메서드·경로</td>
+<td><code>GET /api/boards/{slug}/posts?page=&amp;size=&amp;sort=</code> — 기존 API에 <code>sort</code>만 추가</td>
+</tr>
+<tr>
+<td><code>sort</code> 값</td>
+<td><code>latest</code>(기본, 안 보내면 이것) · <code>likes</code> · <code>views</code></td>
+</tr>
+<tr>
+<td>정렬</td>
+<td><code>latest</code>: 게시 시각↓, id↓ (지금과 같다) / <code>likes</code>: 좋아요 수↓, 게시 시각↓, id↓ / <code>views</code>: 조회수↓, 게시 시각↓, id↓</td>
+</tr>
+<tr>
+<td>모르는 값</td>
+<td><code>400</code> (Problem Details, 다른 400과 같은 모양)</td>
+</tr>
+<tr>
+<td>그대로인 것</td>
+<td>볼 수 있는 글 조건, <code>totalElements</code>·<code>totalPages</code>·<code>hasNext</code>, 항목 필드, <code>page</code>·<code>size</code> 검증, 조합 검색 API(<code>/api/posts/search</code>)의 정렬</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li>좋아요 수·조회수는 글 테이블의 숫자 컬럼(<code>like_count</code>·<code>view_count</code>)을 쓴다(목록용 비정규화 컬럼 — 매번 행을 세지 않는다).</li>
+<li>DB 변화 없음.</li>
+</ul>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+
+curl -s &quot;$BASE/api/boards/free/posts?sort=likes&amp;size=5&quot;           # 요청 A
+curl -s &quot;$BASE/api/boards/free/posts?sort=likes&amp;size=5&amp;page=1&quot;    # 요청 B — 둘째 페이지(좋아요 0개 구간)
+curl -s &quot;$BASE/api/boards/free/posts?sort=views&amp;size=5&quot;           # 요청 C
+curl -s &quot;$BASE/api/boards/free/posts?size=5&quot;                      # 요청 D — sort 없음 = 최신순
+curl -i &quot;$BASE/api/boards/free/posts?sort=hot&quot;                    # 요청 E — 모르는 값</code></pre>
+<blockquote>
+<p>이 확인은 <strong>처음 데이터</strong>의 좋아요 수·조회수·글 수를 기대값으로 쓴다. 작업하면서 글을 열어 보거나(조회수 +1) 좋아요·글쓰기를 했다면 먼저 <code>bash scripts/java-db.sh --reset</code>으로 되돌린 뒤 누른다.</p>
+</blockquote>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.</p>
+<section id="browser-requests-1" class="api-practice" aria-label="HTTP 요청 실행"><div class="request-panel-heading"><div><p class="request-eyebrow">직접 확인 · 5개 요청</p><h3>브라우저에서 요청 보내기</h3></div><p>위 서버 주소를 확인하고 순서대로 실행하세요. 토큰은 입력 후에도 저장하지 않습니다.</p></div><nav class="request-steps" aria-label="요청 실행 순서"><ol><li data-method="GET"><a href="#browser-request-1-1"><span class="request-step-number">1</span><span class="request-step-content"><span class="request-step-method">GET · A</span><span class="request-step-title">좋아요순 1쪽</span></span></a></li><li data-method="GET"><a href="#browser-request-1-2"><span class="request-step-number">2</span><span class="request-step-content"><span class="request-step-method">GET · B</span><span class="request-step-title">좋아요순 2쪽</span></span></a></li><li data-method="GET"><a href="#browser-request-1-3"><span class="request-step-number">3</span><span class="request-step-content"><span class="request-step-method">GET · C</span><span class="request-step-title">조회순</span></span></a></li><li data-method="GET"><a href="#browser-request-1-4"><span class="request-step-number">4</span><span class="request-step-content"><span class="request-step-method">GET · D</span><span class="request-step-title">sort 없음</span></span></a></li><li data-method="GET"><a href="#browser-request-1-5"><span class="request-step-number">5</span><span class="request-step-content"><span class="request-step-method">GET · E</span><span class="request-step-title">모르는 정렬 값</span></span></a></li></ol></nav><div class="api-request-list"><article id="browser-request-1-1" class="api-request" data-request-id="A" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · A</p><h4>좋아요순 1쪽</h4></div><span class="request-number">요청 1</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/boards/free/posts?sort=likes&amp;size=5" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-1">GET 요청 보내기</button><p id="request-status-1-1" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;equals&quot;:[4,14,12,9,5]},{&quot;path&quot;:&quot;$.items[*].likeCount&quot;,&quot;equals&quot;:[2,1,1,1,1]},{&quot;path&quot;:&quot;$.totalElements&quot;,&quot;equals&quot;:13}]}</pre></dd></dl></details></article><article id="browser-request-1-2" class="api-request" data-request-id="B" data-method="GET" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · B</p><h4>좋아요순 2쪽</h4></div><span class="request-number">요청 2</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/boards/free/posts?sort=likes&amp;size=5&amp;page=1" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-2">GET 요청 보내기</button><p id="request-status-1-2" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;equals&quot;:[21,20,19,18,17]}]}</pre></dd></dl></details></article><article id="browser-request-1-3" class="api-request" data-request-id="C" data-method="GET" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · C</p><h4>조회순</h4></div><span class="request-number">요청 3</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/boards/free/posts?sort=views&amp;size=5" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-3">GET 요청 보내기</button><p id="request-status-1-3" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;equals&quot;:[4,21,20,5,19]},{&quot;path&quot;:&quot;$.items[*].viewCount&quot;,&quot;equals&quot;:[15,10,9,9,8]}]}</pre></dd></dl></details></article><article id="browser-request-1-4" class="api-request" data-request-id="D" data-method="GET" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · D</p><h4>sort 없음</h4></div><span class="request-number">요청 4</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/boards/free/posts?size=5" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-4">GET 요청 보내기</button><p id="request-status-1-4" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;equals&quot;:[21,20,19,18,17]},{&quot;path&quot;:&quot;$.totalElements&quot;,&quot;equals&quot;:13},{&quot;path&quot;:&quot;$.hasNext&quot;,&quot;equals&quot;:true}]}</pre></dd></dl></details></article><article id="browser-request-1-5" class="api-request" data-request-id="E" data-method="GET" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · E</p><h4>모르는 정렬 값</h4></div><span class="request-number">요청 5</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/boards/free/posts?sort=hot" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-5">GET 요청 보내기</button><p id="request-status-1-5" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP(필수), D = DB(필수, SELECT만), R = 코드 리뷰(피드백)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 A</td>
+<td><code>200</code>, id 순서 <code>4, 14, 12, 9, 5</code>(좋아요 <code>2, 1, 1, 1, 1</code>), 전체 13건</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 B</td>
+<td>둘째 페이지가 <code>21, 20, 19, 18, 17</code> — 좋아요 0개 구간이 최신순으로 이어진다(값이 같을 때의 순서가 정해져 있다)</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 C</td>
+<td>id 순서 <code>4, 21, 20, 5, 19</code>(조회수 <code>15, 10, 9, 9, 8</code> — 9가 같은 글 20·5는 최신 글이 먼저)</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 D</td>
+<td><code>sort</code>가 없으면 지금처럼 최신순 <code>21, 20, 19, 18, 17</code>, 전체 13건</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>요청 E</td>
+<td>상태 <code>400</code></td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT id, like_count FROM post WHERE board_id = 4 AND status = &#39;PUBLISHED&#39; AND visibility = &#39;PUBLIC&#39; AND deleted_at IS NULL ORDER BY like_count DESC, published_at DESC, id DESC LIMIT 5</code></td>
+<td><code>4 2</code> · <code>14 1</code> · <code>12 1</code> · <code>9 1</code> · <code>5 1</code> — 요청 A와 같은 순서</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>값 해석</td>
+<td><code>sort</code> 문자열을 enum 같은 정해진 값으로 바꾼다. 문자열을 그대로 쿼리(정렬 컬럼 이름)에 이어 붙이지 않는다(임의 컬럼·SQL 주입)</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>끝까지 정하는 정렬</td>
+<td>모든 정렬이 <code>id</code>로 끝난다. 값이 같은 행의 순서를 DB에 맡기면 페이지가 겹치거나 빠진다는 것을 설명할 수 있다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>영향 범위</td>
+<td>조합 검색 API는 그대로 최신순이다(같은 쿼리 조립기를 쓰므로 기본값을 유지했다)</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>인덱스</td>
+<td>좋아요순·조회순은 지금 인덱스(<code>board_id, published_at, id</code>)를 못 타 정렬(filesort)이 생긴다는 걸 알고, 글이 많아지면 어떻게 할지 말할 수 있다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../docs/knowledge/W15-paging-offset-vs-cursor.html">W15 페이징 — OFFSET vs 커서</a> — 순서가 끝까지 정해져야 하는 이유(R2)</li>
+<li><a href="../docs/knowledge/S10-spring-data-query.html">S10 Spring Data와 쿼리 도구</a> — Criteria·정렬</li>
+<li><a href="../docs/knowledge/R05-index-btree.html">R05 인덱스와 B-Tree</a> — 정렬과 인덱스(R4)</li>
+<li><a href="../docs/knowledge/W10-where-to-validate.html">W10 검증은 어디서 하나</a> — 모르는 값을 무시할까 400일까</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 값 해석</summary>
+
+<p><code>enum PostListSort { LATEST, LIKES, VIEWS }</code>와 <code>static PostListSort from(String raw)</code>. 모르는 값이면 이미 있는 &quot;잘못된 검색 조건&quot; 예외를 던지면 400 처리가 따라온다. 컨트롤러는 <code>@RequestParam(defaultValue = &quot;latest&quot;) String sort</code>.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 정렬 조립</summary>
+
+<p>쿼리 조립기의 <code>orderBy(...)</code>가 받는 <code>Order</code> 목록을 enum이 만들게 한다. 예: <code>LIKES</code>면 <code>cb.desc(post.get(&quot;likeCount&quot;)), cb.desc(post.get(&quot;publishedAt&quot;)), cb.desc(post.get(&quot;id&quot;))</code>. 검색 API는 기존 메서드(기본 <code>LATEST</code>)를 그대로 부르게 둔다.</p>
+</details>
+
+
+</main>
+
+
+</body>
+</html>

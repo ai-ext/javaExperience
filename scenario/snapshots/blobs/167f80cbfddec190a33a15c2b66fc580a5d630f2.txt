@@ -1,0 +1,47 @@
+package org.example.board.post;
+
+import java.net.URI;
+
+import jakarta.validation.Valid;
+import org.example.board.auth.LoginUser;
+import org.example.board.common.ApiResponse;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class PostController {
+
+    private final PostService postService;
+    private final PostQueryService postQueryService;
+
+    public PostController(PostService postService, PostQueryService postQueryService) {
+        this.postService = postService;
+        this.postQueryService = postQueryService;
+    }
+
+    // 목록 — 쿼리 파라미터를 PostListQuery 하나로 받는다(@ModelAttribute + @Valid)
+    @GetMapping("/api/v1/posts")
+    public ApiResponse<Object> list(@Valid @ModelAttribute PostListQuery query,
+                                    @LoginUser(required = false) Long userId) {
+        return ApiResponse.ok(postQueryService.list(query, userId));
+    }
+
+    @PostMapping("/api/v1/posts")
+    public ResponseEntity<ApiResponse<PostDetailResponse>> create(@LoginUser Long userId,
+                                                            @Valid @RequestBody PostCreateRequest request) {
+        PostDetailResponse created = postService.create(userId, request);
+        return ResponseEntity.created(URI.create("/api/v1/posts/" + created.id()))
+                .body(ApiResponse.created(created));
+    }
+
+    @GetMapping("/api/v1/posts/{postId}")
+    public ApiResponse<PostDetailResponse> detail(@PathVariable Long postId,
+                                                  @LoginUser(required = false) Long userId) {
+        return ApiResponse.ok(postService.detail(postId, userId));
+    }
+}

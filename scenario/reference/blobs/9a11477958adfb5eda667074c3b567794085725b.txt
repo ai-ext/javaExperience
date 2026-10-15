@@ -1,0 +1,125 @@
+package org.example.batch;
+
+import org.example.post.Post;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.Repository;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+// 15-4 휴지통 비우기 — 글 하나에 매달린 자식 행을 FK 방향의 반대(자식 → 부모) 순서로 지운다.
+// 엔티티를 불러 하나씩 remove하지 않고 id 묶음(IN) 단위 DELETE로 보낸다.
+public interface TrashPurgeRepository extends Repository<Post, Long> {
+
+    // 인덱스 (deleted_at, id)로 범위만 읽는다. 매번 "남은 것 중 앞 1000개"를 다시 고른다(OFFSET을 쓰지 않는다 — 지운 만큼 당겨진다)
+    @Query(nativeQuery = true, value = """
+            SELECT id FROM post
+             WHERE deleted_at IS NOT NULL AND deleted_at < :cutoff
+             ORDER BY id
+             LIMIT :limit
+            """)
+    List<Long> findTargetIds(@Param("cutoff") LocalDateTime cutoff, @Param("limit") int limit);
+
+    // 먼저 고른 글이 복원되었을 수 있다. 청크 트랜잭션 안에서 아직 삭제 대상인 행만 잠근다.
+    // 잠근 id에 매달린 자식만 지워야 복원된 글의 자식을 잘못 지우지 않는다.
+    @Query(nativeQuery = true, value = """
+            SELECT id FROM post
+             WHERE id IN (:ids) AND deleted_at IS NOT NULL AND deleted_at < :cutoff
+             ORDER BY id FOR UPDATE
+            """)
+    List<Long> lockStillEligible(@Param("ids") List<Long> ids, @Param("cutoff") LocalDateTime cutoff);
+
+    // 1) 알림 — post_id와 comment_id 둘 다 FK라 댓글보다 먼저
+    @Modifying
+    @Query(nativeQuery = true, value = """
+            DELETE FROM notification
+             WHERE post_id IN (:ids)
+                OR comment_id IN (SELECT c.id FROM comment c WHERE c.post_id IN (:ids))
+            """)
+    int deleteNotifications(@Param("ids") List<Long> ids);
+
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM post_like WHERE post_id IN (:ids)")
+    int deleteLikes(@Param("ids") List<Long> ids);
+
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM bookmark WHERE post_id IN (:ids)")
+    int deleteBookmarks(@Param("ids") List<Long> ids);
+
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM post_tag WHERE post_id IN (:ids)")
+    int deleteTags(@Param("ids") List<Long> ids);
+
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM hall_of_fame WHERE post_id IN (:ids)")
+    int deleteHallOfFame(@Param("ids") List<Long> ids);
+
+    // 15-5에서 post를 가리키는 표가 하나 늘었다
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM like_milestone WHERE post_id IN (:ids)")
+    int deleteLikeMilestones(@Param("ids") List<Long> ids);
+
+    // 앞 장(11·14장)에서 post를 가리키는 표가 늘었다 — 빠뜨리면 그 자식이 있는 글에서 DELETE post가 FK로 실패한다.
+    // 지금 무엇이 post를 가리키는지는 information_schema.KEY_COLUMN_USAGE(REFERENCED_TABLE_NAME = 'post')로 확인한다(D1)
+    // 11-2 이미지 행(저장된 파일은 지우지 않는다 — 파일 청소는 따로 할 일)
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM post_image WHERE post_id IN (:ids)")
+    int deleteImages(@Param("ids") List<Long> ids);
+
+    // 11-3 조회 기록
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM post_view WHERE post_id IN (:ids)")
+    int deleteViews(@Param("ids") List<Long> ids);
+
+    // 11-6 수정 이력
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM post_revision WHERE post_id IN (:ids)")
+    int deleteRevisions(@Param("ids") List<Long> ids);
+
+    // 14-1 공감
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM post_reaction WHERE post_id IN (:ids)")
+    int deleteReactions(@Param("ids") List<Long> ids);
+
+    // 14-2 투표 — 표(poll_vote) → 선택지(poll_option) → 투표(poll) 순서. 표는 선택지와 투표를 둘 다 가리킨다
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM poll_vote WHERE poll_id IN (SELECT p.id FROM poll p WHERE p.post_id IN (:ids))")
+    int deletePollVotes(@Param("ids") List<Long> ids);
+
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM poll_option WHERE poll_id IN (SELECT p.id FROM poll p WHERE p.post_id IN (:ids))")
+    int deletePollOptions(@Param("ids") List<Long> ids);
+
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM poll WHERE post_id IN (:ids)")
+    int deletePolls(@Param("ids") List<Long> ids);
+
+    // 14-3 상단 고정, 14-4 시리즈 연결(시리즈 자체는 남긴다), 14-5 최근 본 글
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM board_pin WHERE post_id IN (:ids)")
+    int deletePins(@Param("ids") List<Long> ids);
+
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM series_post WHERE post_id IN (:ids)")
+    int deleteSeriesLinks(@Param("ids") List<Long> ids);
+
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM recent_view WHERE post_id IN (:ids)")
+    int deleteRecentViews(@Param("ids") List<Long> ids);
+
+    // 2) 답글 먼저(parent_id가 원댓글을 참조한다) → 원댓글. 한 문장으로 지우면 행 순서에 따라 FK에 걸릴 수 있다
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM comment WHERE post_id IN (:ids) AND parent_id IS NOT NULL")
+    int deleteReplies(@Param("ids") List<Long> ids);
+
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM comment WHERE post_id IN (:ids)")
+    int deleteComments(@Param("ids") List<Long> ids);
+
+    // 3) 마지막에 글 — 고른 뒤 그 사이에 조건이 바뀌었을 수 있으니 조건을 한 번 더 건다
+    @Modifying
+    @Query(nativeQuery = true, value = "DELETE FROM post WHERE id IN (:ids) AND deleted_at IS NOT NULL AND deleted_at < :cutoff")
+    int deletePosts(@Param("ids") List<Long> ids, @Param("cutoff") LocalDateTime cutoff);
+}

@@ -6,6 +6,142 @@
 
 **동시에 와도 `like_count` = 실제 좋아요 행 수**가 되게 고치고, 이를 테스트로 재현·고정한다.
 
+## 화면 시나리오
+
+사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.
+
+```screen
+{
+  "title": "인기 글에 좋아요가 몰릴 때",
+  "summary": "20명이 거의 같은 순간에 누른다. 숫자가 실제 좋아요 수와 같아야 한다.",
+  "screen": [
+    {
+      "type": "bar",
+      "id": "bar",
+      "label": "글 보기"
+    },
+    {
+      "type": "text",
+      "id": "post-title",
+      "value": "자유글 05",
+      "emphasis": "title"
+    },
+    {
+      "type": "stats",
+      "id": "post-stats",
+      "items": [
+        {
+          "id": "likes",
+          "label": "좋아요",
+          "value": "♥ 20"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "note",
+      "value": "20명이 1초 안에 눌렀다",
+      "emphasis": "caption",
+      "tone": "muted"
+    },
+    {
+      "type": "code",
+      "id": "race",
+      "label": "고치기 전 — 갱신 손실",
+      "value": "요청 A: like_count 읽음(5) → 6으로 저장\n요청 B: like_count 읽음(5) → 6으로 저장   ← A를 덮어씀\n좋아요는 2개인데 숫자는 1만 올랐다"
+    }
+  ],
+  "flows": [
+    {
+      "name": "20명이 동시에",
+      "steps": [
+        {
+          "kind": "user",
+          "text": "20명이 같은 순간 하트를 누른다",
+          "focus": [
+            "likes"
+          ]
+        },
+        {
+          "kind": "request",
+          "method": "PUT",
+          "path": "/api/posts/16/like",
+          "headers": [
+            "Authorization: Bearer tok-c01 … tok-c20 (20개 요청)"
+          ]
+        },
+        {
+          "kind": "server",
+          "text": "고치기 전: 각 요청이 엔티티를 읽고 +1 해서 저장 → 서로 덮어써 숫자가 모자란다"
+        },
+        {
+          "kind": "db",
+          "sql": "UPDATE post SET like_count = like_count + 1 WHERE id = 16",
+          "note": "고친 뒤: DB가 한 번에 더한다 — 읽고 쓰기 사이에 끼어들 틈이 없다"
+        },
+        {
+          "kind": "response",
+          "status": 200,
+          "headers": [
+            "Content-Type: application/json"
+          ],
+          "body": "{\"postId\": 16, \"liked\": true, \"likeCount\": …} × 20"
+        },
+        {
+          "kind": "screen",
+          "text": "숫자 20 = 좋아요 행 20개",
+          "focus": [
+            "likes",
+            "race"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "같은 사람이 연타 5번",
+      "steps": [
+        {
+          "kind": "user",
+          "text": "한 사람이 하트를 아주 빠르게 5번 누른다(취소 없이 PUT 5번)"
+        },
+        {
+          "kind": "request",
+          "method": "PUT",
+          "path": "/api/posts/16/like",
+          "headers": [
+            "Authorization: Bearer tok-c01 (5개 요청)"
+          ]
+        },
+        {
+          "kind": "server",
+          "text": "다섯 요청이 동시에 '아직 없음'을 확인하고 모두 INSERT를 시도 → UNIQUE(post_id, member_id)가 하나만 받아들인다"
+        },
+        {
+          "kind": "db",
+          "sql": "INSERT INTO post_like ... -- 4개는 Duplicate entry",
+          "note": "중복 키 오류를 '이미 좋아요'로 처리해 500을 내지 않는다"
+        },
+        {
+          "kind": "response",
+          "status": 200,
+          "headers": [
+            "Content-Type: application/json"
+          ],
+          "body": "{\"liked\": true, ...} × 5"
+        },
+        {
+          "kind": "screen",
+          "text": "행은 1개, 응답은 모두 200",
+          "focus": [
+            "likes"
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
 ## 만들 것
 
 1. 4-1의 API를 그대로 두고 동시성 문제를 고친다.
@@ -18,18 +154,226 @@
 
 16번 글(이스프링의 "자유글 05")을 채점에 쓴다. 이 글의 좋아요는 처음에 0개다.
 
+## 구현 가이드
+
+화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 **만들 것**의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.
+
+이 단계의 처리 흐름:
+- 고치기 전: 각 요청이 엔티티를 읽고 +1 해서 저장 → 서로 덮어써 숫자가 모자란다
+- 고친 뒤: DB가 한 번에 더한다 — 읽고 쓰기 사이에 끼어들 틈이 없다
+- 다섯 요청이 동시에 '아직 없음'을 확인하고 모두 INSERT를 시도 → UNIQUE(post_id, member_id)가 하나만 받아들인다
+- 중복 키 오류를 '이미 좋아요'로 처리해 500을 내지 않는다
+
+<details>
+<summary>Service — 처리 순서</summary>
+
+`LikeService.java`. 위 서버 처리 순서가 어디에서 검증·조회·상태 변경으로 이어지는지 따라간다. 변경된 메서드: `like`, `unlike`.
+
+`like`와 `unlike` 모두 새 트랜잭션에서 실행하고, 교착으로 롤백된 요청만 새 트랜잭션으로 재시도한다. 같은 트랜잭션 안에서 오류 뒤 SQL만 재실행하면 이미 롤백 전용이어서 실패한다.
+
+```java
+public LikeResponse like(Long postId, AuthenticatedMember me) {
+    return withDeadlockRetry(() ->
+        transactionTemplate.execute(status -> doLike(postId, me)));
+}
+
+private LikeResponse doLike(Long postId, AuthenticatedMember me) {
+    Post post = findLikeablePost(postId, me);
+    if (post.getAuthor().getId().equals(me.id())) throw new SelfLikeNotAllowedException();
+    int inserted = postLikeRepository.insertIgnore(postId, me.id());
+    if (inserted > 0) postRepository.incrementLikeCount(postId);
+    return new LikeResponse(postId, true, postRepository.findLikeCountById(postId));
+}
+```
+
+DELETE도 실제 삭제 행 수가 1일 때만 `decrementLikeCount`를 호출한다. DB에서 다시 읽은 숫자로 DTO를 만든다.
+
+</details>
+
+<details>
+<summary>JPA / Repository — DB 조건</summary>
+
+`PostLikeRepository.java`, `PostRepository.java`. 쿼리·파생 메서드의 조건을 화면 시나리오의 DB 단계 및 직접 확인 SQL과 대조한다. 직접 작성한 JPQL·SQL과 아래 파일의 `@Query`를 비교한다.
+
+```java
+@Modifying
+@Query(value = "INSERT IGNORE INTO post_like (post_id, member_id, created_at) " +
+               "VALUES (:postId, :memberId, NOW())", nativeQuery = true)
+int insertIgnore(@Param("postId") Long postId, @Param("memberId") Long memberId);
+
+@Modifying
+@Query("UPDATE Post p SET p.likeCount = p.likeCount + 1 WHERE p.id = :id")
+int incrementLikeCount(@Param("id") Long id);
+```
+
+`INSERT IGNORE`의 결과 0은 이미 관계가 있다는 뜻이다. 1일 때만 숫자를 증가시킨다. `likeCount`를 엔티티에서 읽어 `+1` 후 저장하면 갱신 손실이 다시 생긴다.
+
+</details>
+
+<details>
+<summary>Entity — 테이블·상태</summary>
+
+`Post.java`. 실제 테이블의 컬럼·외래키와 엔티티 매핑을 대조한다.
+
+좋아요 숫자 변경은 위 Repository의 원자적 UPDATE가 맡는다. `Post` 엔티티의 기존 증가 메서드를 이 동시성 경로에서 호출하지 않는다.
+
+</details>
+
+<details>
+<summary>테스트 — 계약 확인</summary>
+
+`LikeConcurrencyTest.java`. 테스트 요청과 기대값을 **직접 확인** 및 채점 기준과 대조한다.
+
+여러 스레드가 출발 신호를 기다린 뒤 같은 글에 요청하고, 모두 끝난 다음 `post_like` 행 수와 `like_count`를 비교한다. 테스트 메서드에 `@Transactional`을 붙이면 요청별 실제 커밋 경계를 재현하기 어려우므로 붙이지 않는다.
+
+</details>
+
+<details>
+<summary>MyBatis / Mapper — 중복 삽입 방지와 원자적 숫자 갱신</summary>
+
+`MyBatisLikeService`도 `TransactionTemplate`로 두 쓰기를 묶고 교착 시 새 트랜잭션에서 재시도한다. `insertIgnoreLike`가 1을 돌려준 요청만 `increaseLikeCount`를 실행한다. DELETE는 `deleteLike`가 1을 돌려준 요청만 `decreaseLikeCount`를 실행한다.
+
+```xml
+<insert id="insertIgnoreLike">
+  INSERT IGNORE INTO post_like(post_id, member_id, created_at)
+  VALUES (#{postId}, #{memberId}, CURRENT_TIMESTAMP)
+</insert>
+<update id="increaseLikeCount">
+  UPDATE post SET like_count = like_count + 1 WHERE id = #{postId}
+</update>
+```
+
+두 경로 모두 새 SELECT로 저장된 `like_count`를 응답한다. 실행 가능한 Mapper Java/XML·Service·Controller·동시성 테스트 파일 전문은 아래 MyBatis 역할별 코드 접기에 있다.
+
+</details>
+
 ## 직접 확인
 
+API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 요청은 아래 실행 패널에서 순서대로 보낸다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
+
 ```bash
-BASE=http://localhost:8080
 # 20명이 동시에 좋아요
-for i in $(seq -w 1 20); do curl -s -o /dev/null -w '%{http_code}\n' -X PUT "$BASE/api/posts/16/like" -H "Authorization: Bearer tok-c$i" & done; wait     # P1
 # 같은 사람이 동시에 5번
-for i in 1 2 3 4 5; do curl -s -o /dev/null -w '%{http_code}\n' -X PUT "$BASE/api/posts/16/like" -H 'Authorization: Bearer tok-c01' & done; wait      # P2
 # 20명이 동시에 취소
-for i in $(seq -w 1 20); do curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "$BASE/api/posts/16/like" -H "Authorization: Bearer tok-c$i" & done; wait  # P3
 
 ./gradlew test --tests '*LikeConcurrencyTest'                                                                                                              # P4
+
+```
+
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
+
+```check
+{
+  "requests": [
+    {
+      "id": "P1",
+      "title": "P1 20명이 동시에 좋아요",
+      "method": "PUT",
+      "path": "/api/posts/16/like",
+      "headers": {
+        "Authorization": "Bearer {{tok}}"
+      },
+      "concurrent": {
+        "count": 20,
+        "vars": {
+          "tok": [
+            "tok-c01",
+            "tok-c02",
+            "tok-c03",
+            "tok-c04",
+            "tok-c05",
+            "tok-c06",
+            "tok-c07",
+            "tok-c08",
+            "tok-c09",
+            "tok-c10",
+            "tok-c11",
+            "tok-c12",
+            "tok-c13",
+            "tok-c14",
+            "tok-c15",
+            "tok-c16",
+            "tok-c17",
+            "tok-c18",
+            "tok-c19",
+            "tok-c20"
+          ]
+        }
+      }
+    },
+    {
+      "id": "P2",
+      "title": "P2 같은 사람(tok-c01)이 동시에 5번",
+      "method": "PUT",
+      "path": "/api/posts/16/like",
+      "headers": {
+        "Authorization": "Bearer tok-c01"
+      },
+      "concurrent": {
+        "count": 5
+      }
+    },
+    {
+      "id": "P3",
+      "title": "P3 20명이 동시에 취소",
+      "method": "DELETE",
+      "path": "/api/posts/16/like",
+      "headers": {
+        "Authorization": "Bearer {{tok}}"
+      },
+      "concurrent": {
+        "count": 20,
+        "vars": {
+          "tok": [
+            "tok-c01",
+            "tok-c02",
+            "tok-c03",
+            "tok-c04",
+            "tok-c05",
+            "tok-c06",
+            "tok-c07",
+            "tok-c08",
+            "tok-c09",
+            "tok-c10",
+            "tok-c11",
+            "tok-c12",
+            "tok-c13",
+            "tok-c14",
+            "tok-c15",
+            "tok-c16",
+            "tok-c17",
+            "tok-c18",
+            "tok-c19",
+            "tok-c20"
+          ]
+        }
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "C1",
+      "request": "P1",
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "id": "C2",
+      "request": "P2",
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "id": "C3",
+      "request": "P3",
+      "expect": {
+        "status": 200
+      }
+    }
+  ]
+}
 ```
 
 ## 채점 기준
@@ -65,12 +409,17 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), T = 테스트 실행(
 <summary>힌트 1 — 숫자</summary>
 
 리포지토리에 `@Modifying @Query("update Post p set p.likeCount = p.likeCount + 1 where p.id = :id")`. 이 쿼리는 영속성 컨텍스트를 거치지 않으므로, 응답에 줄 최신 값은 다시 조회하거나 `clearAutomatically = true`를 쓴다.
-</details>
+
+서로 다른 회원 20명이 동시에 누르면 MySQL이 `post_like` 유니크 인덱스 삽입과 `post` 행 갱신 사이에서 **교착 상태**를 감지해 일부 트랜잭션을 되돌릴 수 있다(`Deadlock found ... try restarting transaction` → Spring의 `ConcurrencyFailureException`, 실측 20건 중 8건). 원자적 UPDATE만으로는 이걸 막지 못한다 — 트랜잭션 **밖**에서 짧게(예: 3번, 수십 ms 간격) 다시 시도한다.
+
+재시도는 같은 트랜잭션 안에서 하면 안 된다(이미 롤백 표시가 붙었다). </details>
 
 <details>
 <summary>힌트 2 — 테스트 뼈대</summary>
 
-`ExecutorService pool = Executors.newFixedThreadPool(20); CountDownLatch ready = new CountDownLatch(1), done = new CountDownLatch(20);` 각 작업은 `ready.await()` 후 서비스(또는 MockMvc)를 호출하고 `done.countDown()`. 모두 제출한 뒤 `ready.countDown()`으로 동시에 출발시키고 `done.await()`.
+`ExecutorService pool = Executors.newFixedThreadPool(20); CountDownLatch ready = new CountDownLatch(1), done = new CountDownLatch(20);` 각 작업은 `ready.await()` 후 서비스(또는 MockMvc)를 호출하고 `done.countDown()`. 모두 제출한 뒤 `ready.countDown()`으로 동시에 출발시키고 `assertThat(done.await(10, SECONDS)).isTrue()` — 시간 제한을 둔 `await`는 반환값을 꼭 단언한다(버리면 스레드가 다 안 끝났어도 테스트가 통과한다).
+
+테스트 클래스에는 다른 통합 테스트(처음부터 있는 `HelloControllerTest`)와 같은 애너테이션(`@SpringBootTest` + `@AutoConfigureMockMvc`)을 붙인다 — MockMvc를 안 쓰더라도. 하나라도 다르면 스프링 컨텍스트가 따로 만들어지고, 같은 테스트 DB에 스키마 초기화가 다시 돌아 "Table already exists"로 실패한다.
 </details>
 
 ## 다음 단계

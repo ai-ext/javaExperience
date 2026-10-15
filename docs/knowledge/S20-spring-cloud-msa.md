@@ -54,7 +54,9 @@ Kubernetes ConfigMap은 비기밀 설정을 환경 변수·인자·볼륨 파일
 
 ### 복원력의 상태와 자원 제어
 
-Resilience4j CircuitBreaker는 `CLOSED`, `OPEN`, `HALF_OPEN`과 특수 상태 `METRICS_ONLY`, `DISABLED`, `FORCED_OPEN`을 가진 유한 상태 기계다. Count-based window는 최근 N개 호출을, time-based window는 최근 N초를 집계한다. `CLOSED`에서 실패/느린 호출 기준을 넘으면 `OPEN`이 되어 호출을 즉시 거절하고, 대기 후 `HALF_OPEN`에서 제한된 시험 호출로 회복을 판정한다. sliding window는 결과 집계 장치이지 느린 호출을 중단하거나 동시성을 제한하는 장치가 아니다. 그래서 타임아웃은 따로 둔다. [R8]
+Resilience4j CircuitBreaker는 `CLOSED`, `OPEN`, `HALF_OPEN`과 특수 상태 `METRICS_ONLY`, `DISABLED`, `FORCED_OPEN`을 가진 유한 상태 기계다. Count-based window는 최근 N개 호출을, time-based window는 최근 N초를 집계한다. `CLOSED`에서 실패/느린 호출 기준을 넘으면 `OPEN`이 되어 호출을 즉시 거절하고, 대기 후 `HALF_OPEN`에서 제한된 시험 호출로 회복을 판정한다.
+
+sliding window는 결과 집계 장치이지 느린 호출을 중단하거나 동시성을 제한하는 장치가 아니다. 그래서 타임아웃은 따로 둔다. [R8]
 
 ```text
 CLOSED ── 임계치 초과 ──▶ OPEN ── 대기 후 ──▶ HALF_OPEN

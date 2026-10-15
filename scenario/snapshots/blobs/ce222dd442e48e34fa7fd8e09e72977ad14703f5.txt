@@ -1,0 +1,31 @@
+package org.example.post;
+
+import java.util.List;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+@Service
+public class PostTagService {
+
+    private final PostRepository postRepository;
+
+    public PostTagService(PostRepository postRepository) {
+        this.postRepository = postRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public List<TagResponse> listTags(Long postId) {
+        Post post = postRepository.findById(postId)
+                .filter(found -> found.getDeletedAt() == null
+                        && "PUBLISHED".equals(found.getStatus())
+                        && "PUBLIC".equals(found.getVisibility()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        return post.getTags().stream()
+                .map(tag -> new TagResponse(tag.getName()))
+                .toList();
+    }
+}

@@ -1,0 +1,37 @@
+package org.example.comment;
+
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+import java.util.Optional;
+import java.time.LocalDateTime;
+
+public interface CommentRepository extends JpaRepository<Comment, Long> {
+    // 수정과 삭제를 같은 행에서 직렬화해 삭제된 댓글을 뒤늦은 UPDATE가 되살리지 못하게 한다.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM Comment c WHERE c.id = :id")
+    Optional<Comment> findByIdForUpdate(@Param("id") Long id);
+
+    @Query("""
+            SELECT c FROM Comment c JOIN FETCH c.member
+            WHERE c.post.id = :postId AND c.parent IS NULL AND c.deletedAt IS NULL
+            ORDER BY c.createdAt ASC, c.id ASC
+            """)
+    List<Comment> findTopLevel(@Param("postId") Long postId);
+
+    // 작성자와 함께 한 번에 읽는다 — 댓글마다 작성자를 따로 조회하지 않는다(N+1 방지)
+    @Query("SELECT c FROM Comment c JOIN FETCH c.member WHERE c.post.id = :postId ORDER BY c.createdAt ASC, c.id ASC")
+    List<Comment> findByPostIdWithMember(@Param("postId") Long postId);
+
+    // 동시 DELETE 중 실제로 처음 지운 요청만 1행을 변경한다.
+    @Modifying
+    @Query("UPDATE Comment c SET c.deletedAt = :now, c.updatedAt = :now " +
+            "WHERE c.id = :id AND c.deletedAt IS NULL")
+    int softDeleteIfLive(@Param("id") Long id, @Param("now") LocalDateTime now);
+}

@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>G4. 트랜잭션 실전 — 롤백 규칙·readOnly·전파·프록시 함정</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="g4-트랜잭션-실전--롤백-규칙readonly전파프록시-함정"><a class="anchor" href="#g4-트랜잭션-실전--롤백-규칙readonly전파프록시-함정" aria-hidden="true">#</a>G4. 트랜잭션 실전 — 롤백 규칙·readOnly·전파·프록시 함정</h1>
+<blockquote>
+<p>개념 레슨 · 40분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p><a href="G3-first-transaction.html">G3</a>에서 <code>@Transactional</code>을 붙이면 메서드가 &quot;다 되거나 다 없던 일&quot;이 되는 것을 봤다. 그런데 <code>@Transactional</code>이 붙어 있어도 <strong>기대와 다르게</strong> 끝나는 경우가 있다. 이 레슨은 그 경우를 모두 실제 로그로 본다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>기대</th>
+<th>실제</th>
+<th>왜</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>예외가 났으니 롤백</td>
+<td><strong>커밋</strong></td>
+<td>checked 예외는 기본 롤백 대상이 아니다</td>
+</tr>
+<tr>
+<td>예외를 잡았으니 커밋</td>
+<td><strong>롤백</strong> + <code>UnexpectedRollbackException</code></td>
+<td>안쪽에서 이미 &quot;롤백만 가능&quot;으로 찍혔다</td>
+</tr>
+<tr>
+<td><code>@Transactional</code> 메서드니 트랜잭션 안</td>
+<td><strong>트랜잭션 없음</strong></td>
+<td>같은 객체 안에서 <code>this.</code>로 불렀다</td>
+</tr>
+<tr>
+<td><code>REQUIRES_NEW</code>니 따로 커밋</td>
+<td><strong>같이 롤백</strong></td>
+<td>역시 <code>this.</code>로 불렀다</td>
+</tr>
+<tr>
+<td><code>readOnly</code>는 그냥 힌트</td>
+<td>쓰기가 <strong>에러</strong></td>
+<td>이 환경(MySQL 드라이버)은 읽기 전용 연결에서 쓰기를 거절한다</td>
+</tr>
+</tbody></table></div>
+<h3 id="먼저-알아-둘-것--프록시"><a class="anchor" href="#먼저-알아-둘-것--프록시" aria-hidden="true">#</a>먼저 알아 둘 것 — 프록시</h3>
+<p><code>@Transactional</code>은 메서드 안에 코드를 끼워 넣지 않는다. Spring은 서비스 빈을 다른 빈에 넣어 줄 때, 진짜 객체 대신 <strong>대리 객체</strong>(프록시)를 넣는다. 컨트롤러가 <code>service.create()</code>를 부르면 실제로는 이렇게 흐른다.</p>
+<pre><code class="language-text">컨트롤러 → [프록시] 트랜잭션 시작 → [진짜 G4Service].create() → [프록시] 커밋 또는 롤백</code></pre>
+<p>프록시는 <strong>바깥에서 들어오는 호출</strong>만 본다. <code>create()</code> 안에서 <code>this.other()</code>를 부르면 <code>this</code>는 진짜 객체라서 프록시를 거치지 않는다. 그러면 <code>other()</code>에 붙은 <code>@Transactional</code>은 아무도 읽지 않는다. 이 한 줄이 아래 ③·④의 원인이다.</p>
+<h3 id="전파--이미-트랜잭션이-있을-때"><a class="anchor" href="#전파--이미-트랜잭션이-있을-때" aria-hidden="true">#</a>전파 — 이미 트랜잭션이 있을 때</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>설정</th>
+<th>바깥에 트랜잭션이 있으면</th>
+<th>없으면</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>REQUIRED</code>(기본)</td>
+<td>거기에 <strong>참여</strong>한다(<code>Participating in existing transaction</code>)</td>
+<td>새로 시작</td>
+</tr>
+<tr>
+<td><code>REQUIRES_NEW</code></td>
+<td>바깥을 <strong>잠시 멈추고</strong> 새로 시작한다. 따로 커밋·롤백된다</td>
+<td>새로 시작</td>
+</tr>
+</tbody></table></div>
+<p><code>REQUIRED</code>로 참여한 안쪽은 독립된 트랜잭션이 아니다. 바깥과 한 몸이다.</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<p>이 레슨을 쓰면서 작은 Spring Boot 4.1.1 앱(JPA + MySQL)을 띄웠다. 테이블은 연습용 <code>lesson_g4_post(title VARCHAR(50))</code>와 <code>lesson_g4_audit(message)</code>다. <code>JpaTransactionManager</code>를 <code>DEBUG</code>로 켜고, 메서드 안에서 지금 트랜잭션이 있는지를 찍었다(<code>TransactionSynchronizationManager.isActualTransactionActive()</code>, <code>getCurrentTransactionName()</code>). 로그는 시각·스레드를 떼고, <code>Opened new EntityManager</code>·<code>Exposing JPA transaction</code> 같은 반복 줄은 뺐다.</p>
+<h3 id="①-checked-예외--기본은-커밋-rollbackfor면-롤백"><a class="anchor" href="#①-checked-예외--기본은-커밋-rollbackfor면-롤백" aria-hidden="true">#</a>① checked 예외 — 기본은 커밋, <code>rollbackFor</code>면 롤백</h3>
+<p>G3에서 본 대로 <code>throws Exception</code> 메서드는 예외가 나도 커밋된다. 같은 몸통에 <code>rollbackFor</code>만 붙였다.</p>
+<pre><code class="language-java">@Transactional(rollbackFor = Exception.class)
+public void checkedRollbackFor(String title) throws Exception {
+    posts.save(new G4Post(title));
+    throw new Exception(&quot;외부 시스템 응답 없음&quot;);
+}</code></pre>
+<pre><code class="language-text">### 기본 @Transactional
+Creating new transaction with name [org.example.g4.G4Service.checkedDefault]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT
+insert into lesson_g4_post (title) values (?)
+Initiating transaction commit
+Committing JPA transaction on EntityManager [...]
+
+### rollbackFor = Exception.class
+Creating new transaction with name [org.example.g4.G4Service.checkedRollbackFor]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT,-java.lang.Exception
+insert into lesson_g4_post (title) values (?)
+Initiating transaction rollback
+Rolling back JPA transaction on EntityManager [...]</code></pre>
+<p>둘 다 응답은 <code>500</code>이었다. DB에는 <code>checked-default</code>만 남았다. 트랜잭션 설정 끝의 <strong><code>-java.lang.Exception</code></strong> 이 &quot;이 예외면 롤백(<code>-</code>)&quot;이라는 규칙이다. 로그 첫 줄만 봐도 롤백 규칙이 붙었는지 안다.</p>
+<h3 id="②-같은-객체-안에서-부르면-트랜잭션이-없다"><a class="anchor" href="#②-같은-객체-안에서-부르면-트랜잭션이-없다" aria-hidden="true">#</a>② 같은 객체 안에서 부르면 트랜잭션이 없다</h3>
+<pre><code class="language-java">public void outerNoTx(String title) {         // @Transactional 없음
+    TxProbe.print(&quot;outerNoTx&quot;);
+    this.innerTx(title);                       // 같은 객체의 메서드
+}
+
+@Transactional
+public void innerTx(String title) {
+    TxProbe.print(&quot;innerTx&quot;);
+    posts.save(new G4Post(title));
+    throw new IllegalStateException(&quot;innerTx 실패&quot;);
+}</code></pre>
+<p>컨트롤러는 <code>outerNoTx</code>를 불렀다.</p>
+<pre><code class="language-text">TX-PROBE : outerNoTx → 트랜잭션 있음=false, 이름=null, readOnly=false
+TX-PROBE : innerTx → 트랜잭션 있음=false, 이름=null, readOnly=false
+Creating new transaction with name [org.springframework.data.jpa.repository.support.SimpleJpaRepository.save]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT
+insert into lesson_g4_post (title) values (?)
+Committing JPA transaction on EntityManager [...]
+Request processing failed: java.lang.IllegalStateException: innerTx 실패</code></pre>
+<p><code>innerTx</code> 안에서도 <strong>트랜잭션 있음=false</strong>다. <code>Creating new transaction … G4Service.innerTx</code> 줄이 아예 없다. 트랜잭션은 저장소의 <code>save()</code>가 혼자 열고 바로 커밋했다(G3의 &quot;트랜잭션 없을 때&quot;와 같은 모양). 그래서 예외가 났는데도 <code>self-invocation</code> 글이 DB에 남았다.</p>
+<p>고치는 법은 트랜잭션 진입점을 <strong>바깥에서 부르는 메서드</strong>로 옮기는 것이다. <code>outerNoTx</code>에 <code>@Transactional</code>을 붙이거나, <code>innerTx</code>를 다른 빈으로 옮겨 그 빈을 주입받아 부른다.</p>
+<h3 id="③-requires_new--this로-부르면--다른-빈으로-부르면"><a class="anchor" href="#③-requires_new--this로-부르면--다른-빈으로-부르면" aria-hidden="true">#</a>③ <code>REQUIRES_NEW</code> — <code>this.</code>로 부르면 / 다른 빈으로 부르면</h3>
+<p>본 작업이 실패해도 <strong>감사 기록은 남기고</strong> 싶다. 감사 기록 메서드에 <code>REQUIRES_NEW</code>를 붙였다. 먼저 같은 클래스 안에 두고 <code>this.</code>로 불렀다.</p>
+<pre><code class="language-java">@Transactional
+public void auditSelf(String title) {
+    posts.save(new G4Post(title));
+    this.writeAudit(&quot;감사: &quot; + title);
+    throw new IllegalStateException(&quot;본 작업 실패&quot;);
+}
+
+@Transactional(propagation = Propagation.REQUIRES_NEW)
+public void writeAudit(String message) { audits.save(new G4Audit(message)); }</code></pre>
+<pre><code class="language-text">Creating new transaction with name [org.example.g4.G4Service.auditSelf]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT
+insert into lesson_g4_post (title) values (?)
+TX-PROBE : G4Service.writeAudit(this.) → 트랜잭션 있음=true, 이름=org.example.g4.G4Service.auditSelf, readOnly=false
+Participating in existing transaction
+insert into lesson_g4_audit (message) values (?)
+Initiating transaction rollback
+Rolling back JPA transaction on EntityManager [...]</code></pre>
+<p><code>writeAudit</code> 안의 트랜잭션 <strong>이름이 <code>auditSelf</code></strong> 다. 새 트랜잭션이 아니라 바깥 것을 그대로 쓰고 있다. 롤백 한 번에 글과 감사 기록이 <strong>둘 다</strong> 사라졌다.</p>
+<p>이번에는 같은 메서드를 <code>AuditService</code>라는 <strong>다른 빈</strong>에 두고 주입받아 불렀다(<code>auditService.write(…)</code>).</p>
+<pre><code class="language-text">Creating new transaction with name [org.example.g4.G4Service.auditBean]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT
+insert into lesson_g4_post (title) values (?)
+Suspending current transaction, creating new transaction with name [org.example.g4.AuditService.write]
+TX-PROBE : AuditService.write → 트랜잭션 있음=true, 이름=org.example.g4.AuditService.write, readOnly=false
+Participating in existing transaction
+insert into lesson_g4_audit (message) values (?)
+Committing JPA transaction on EntityManager [...]
+Resuming suspended transaction after completion of inner transaction
+Initiating transaction rollback
+Rolling back JPA transaction on EntityManager [...]</code></pre>
+<pre><code class="language-text">+----+--------------------+
+| id | message            |
++----+--------------------+
+|  2 | 감사: audit-bean   |
++----+--------------------+</code></pre>
+<p>바깥을 멈추고(<code>Suspending</code>) 새로 열고, 감사 기록만 <strong>먼저 커밋</strong>한 뒤, 바깥으로 돌아와(<code>Resuming</code>) 글은 롤백했다. 감사 기록이 남았다. id가 <code>2</code>인 것은 롤백된 <code>auditSelf</code>의 감사 기록이 <code>1</code>번을 썼기 때문이다(G3: 번호는 돌려받지 않는다).</p>
+<p><code>REQUIRES_NEW</code>는 바깥이 DB 연결을 쥔 채로 연결을 <strong>하나 더</strong> 쓴다. 동시에 요청이 많으면 연결이 모자랄 수 있으니 &quot;따로 커밋돼야 하는 일&quot;에만 쓴다.</p>
+<h3 id="④-readonly--true에서-쓰면"><a class="anchor" href="#④-readonly--true에서-쓰면" aria-hidden="true">#</a>④ <code>readOnly = true</code>에서 쓰면</h3>
+<pre><code class="language-java">@Transactional(readOnly = true)
+public void readOnlyJdbcInsert(String title) {
+    jdbc.update(&quot;INSERT INTO lesson_g4_post (title) VALUES (?)&quot;, title);
+}</code></pre>
+<pre><code class="language-text">Creating new transaction with name [org.example.g4.G4Service.readOnlyJdbcInsert]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT,readOnly
+TX-PROBE : readOnlyJdbcInsert → 트랜잭션 있음=true, 이름=…readOnlyJdbcInsert, readOnly=true
+Executing prepared SQL statement [INSERT INTO lesson_g4_post (title) VALUES (?)]
+Initiating transaction rollback
+Request processing failed: org.springframework.dao.TransientDataAccessResourceException: PreparedStatementCallback; SQL [INSERT INTO lesson_g4_post (title) VALUES (?)]; Connection is read-only. Queries leading to data modification are not allowed</code></pre>
+<p>JPA로 새 엔티티를 <code>save()</code>해도 같은 <code>Connection is read-only. Queries leading to data modification are not allowed</code>(이번엔 <code>JpaSystemException</code>으로 감싸져)가 났다. 둘 다 <code>500</code>, 둘 다 저장 안 됨.</p>
+<p>정리하면 <code>readOnly</code>의 결과는 <strong>쓰는 방법에 따라</strong> 다르다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th><code>readOnly = true</code> 안에서</th>
+<th>결과</th>
+<th>어디서 봤나</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>읽어 온 엔티티 값 바꾸기(변경 감지)</td>
+<td>에러 없이 <strong>조용히 저장 안 됨</strong></td>
+<td><a href="E7-jpa-update-delete.html">E7 ⑤</a></td>
+</tr>
+<tr>
+<td><code>INSERT</code>·<code>UPDATE</code>를 직접 보내기</td>
+<td><strong>에러</strong>(<code>Connection is read-only…</code>)</td>
+<td>위</td>
+</tr>
+</tbody></table></div>
+<p>Spring 문서는 <code>readOnly</code>를 &quot;읽기만 하니 최적화해도 된다&quot;는 <strong>힌트</strong>라고 설명하고, 쓰기를 막는다고 약속하지 않는다. 쓰기를 거절한 것은 이 환경의 MySQL 드라이버다. 그러니 <code>readOnly</code>를 &quot;쓰기 금지 장치&quot;로 기대지 말고, 조회 메서드에만 붙인다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>10분. 2-2 이후의 실습 레포에서 한다.</p>
+<p><strong>1. 트랜잭션 로그를 켠다.</strong> <code>application.yml</code>에 넣고 다시 켠다.</p>
+<pre><code class="language-yaml">logging:
+  level:
+    org.springframework.orm.jpa.JpaTransactionManager: debug</code></pre>
+<p><strong>2. 글 상세(<code>GET /api/posts/{id}</code>)와 글쓰기(<code>POST /api/posts</code>)를 한 번씩 부른다.</strong> 로그에서 <code>Creating new transaction with name [</code>로 시작하는 줄을 찾는다.</p>
+<ul>
+<li>이름이 <strong>서비스 메서드</strong>(<code>…PostService.getPost</code> 같은)인가, 저장소의 <code>SimpleJpaRepository…</code>인가? 저장소 이름만 나오면 서비스에 <code>@Transactional</code>이 없거나 ②처럼 프록시를 안 거쳤다.</li>
+<li>줄 끝에 <code>readOnly</code>가 붙었나? 2-2 정답 코드는 목록(<code>PostQueryService.list</code>)에만 <code>readOnly = true</code>를 붙인다. 상세는 조회수를 올리는 <strong>쓰기</strong>라서 붙이면 안 된다(2-1 채점 R2). 상세 줄에 <code>readOnly</code>가 보이면 ④와 E7 ⑤의 상황이다. 게시판 목록(<code>GET /api/boards/free/posts</code>)도 한 번 불러 비교한다.</li>
+<li>글쓰기에서 <code>Participating in existing transaction</code>이 저장 횟수만큼 나오나?</li>
+</ul>
+<p><strong>3. 끝나면</strong> <code>debug</code>를 지우거나 <code>info</code>로 돌린다. 요청마다 줄이 많이 찍힌다.</p>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p><strong>1. 내가 던진 예외를 내가 잡는다</strong> — 커밋된다.</p>
+<pre><code class="language-java">@Transactional
+public void catchOwn(String title) {
+    posts.save(new G4Post(title));
+    try { throw new IllegalStateException(&quot;알림 발송 실패&quot;); }
+    catch (IllegalStateException e) { /* 잡고 정상 반환 */ }
+}</code></pre>
+<p>로그는 <code>Initiating transaction commit</code>, 응답은 <code>200</code>, 글은 남았다. 프록시는 메서드 <strong>밖으로 나온</strong> 예외만 본다. 실패인데 저장돼야 한다면 괜찮지만, &quot;실패했는데 왜 남았지?&quot;의 흔한 원인이다.</p>
+<p><strong>2. 저장소가 던진 예외를 잡는다</strong> — 이번에는 반대로 <strong>롤백</strong>된다.</p>
+<pre><code class="language-java">@Transactional
+public void catchInner(String title) {
+    posts.save(new G4Post(title));
+    try { posts.save(new G4Post(&quot;…50자를 넘는 제목…&quot;)); }   // 칸이 모자라 실패
+    catch (RuntimeException e) { /* 잡았으니 첫 글은 커밋되겠지? */ }
+}</code></pre>
+<pre><code class="language-text">insert into lesson_g4_post (title) values (?)
+Participating in existing transaction
+insert into lesson_g4_post (title) values (?)
+HHH000247: ErrorCode: 1406, SQLState: 22001
+Data truncation: Data too long for column 'title' at row 1
+Participating transaction failed - marking existing transaction as rollback-only
+Initiating transaction commit
+Committing JPA transaction on EntityManager [...]
+Request processing failed: org.springframework.transaction.UnexpectedRollbackException: Transaction silently rolled back because it has been marked as rollback-only</code></pre>
+<p><code>save()</code>도 <code>@Transactional</code> 메서드다. 바깥 트랜잭션에 <strong>참여</strong>한 채로 실패해서, 공유하는 트랜잭션에 &quot;롤백만 가능&quot;을 찍었다. 바깥 코드가 예외를 잡고 커밋하려 하자 Spring이 실제로는 롤백하고 <code>UnexpectedRollbackException</code>을 던졌다. 로그에 <code>Committing</code>이 찍혀 있어도 DB에 첫 글은 <strong>없다.</strong> 응답은 <code>500</code>이다. 잡고 넘어갈 일이면 그 저장을 <code>REQUIRES_NEW</code>(③)로 떼어 내거나, 저장 전에 값을 검사해(F6) 예외가 안 나게 한다.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> <code>@Transactional</code> 메서드가 <code>IOException</code>을 던졌다. 앞에서 저장한 글은? 롤백되게 하려면?</p>
+<details>
+<summary>정답</summary>
+
+<p>기본은 <strong>커밋</strong>된다. <code>IOException</code>은 checked 예외라 기본 롤백 대상(<code>RuntimeException</code>·<code>Error</code>)이 아니다. <code>@Transactional(rollbackFor = IOException.class)</code>(또는 <code>Exception.class</code>)를 붙인다. 붙었는지는 로그 첫 줄 끝의 <code>-java.io.IOException</code>으로 확인한다.</p>
+</details>
+
+<p><strong>2.</strong> <code>@Transactional</code>이 없는 <code>a()</code>가 같은 클래스의 <code>@Transactional b()</code>를 부른다. 컨트롤러가 <code>a()</code>를 부르면 <code>b()</code>는 트랜잭션 안에서 도나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>아니다.</strong> <code>this.b()</code>는 프록시를 거치지 않는다. ②에서 <code>innerTx</code> 안의 <code>트랜잭션 있음=false</code>로 봤다. <code>a()</code>에 붙이거나 <code>b()</code>를 다른 빈으로 옮긴다.</p>
+</details>
+
+<p><strong>3.</strong> 같은 클래스의 <code>REQUIRES_NEW</code> 메서드를 <code>this.</code>로 불렀고, 그 뒤 바깥 메서드가 실패했다. 안쪽에서 저장한 것은?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>같이 롤백된다.</strong> <code>REQUIRES_NEW</code> 설정을 읽을 프록시를 안 거쳤으니 바깥 트랜잭션에 그냥 섞여 있다(③의 트랜잭션 이름이 <code>auditSelf</code>). 따로 커밋하려면 다른 빈의 메서드로 부른다. 16-1의 알림 저장이 그렇게 되어 있다.</p>
+</details>
+
+<p><strong>4.</strong> 바깥 메서드가 안쪽 <code>REQUIRED</code> 저장의 예외를 <code>catch</code>로 잡고 정상 반환했다. 결과는?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>전부 롤백</strong>되고 <code>UnexpectedRollbackException</code>(<code>Transaction silently rolled back because it has been marked as rollback-only</code>)이 난다. 안쪽이 참여한 트랜잭션은 바깥과 같은 것이라, 안쪽 실패가 이미 &quot;롤백만 가능&quot;으로 찍었다. 잡았다고 지워지지 않는다.</p>
+</details>
+
+<p><strong>5.</strong> &quot;조회 메서드라 <code>readOnly = true</code>를 붙였다. 실수로 안에서 값을 바꿔도 DB가 막아 주니 괜찮다.&quot; 맞나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>틀리다.</strong> 엔티티 값을 바꾸는 방식이면 에러도 없이 저장만 안 된다(E7 ⑤). 직접 <code>INSERT</code>를 보내면 이 환경에선 드라이버가 거절했지만, 그건 <code>readOnly</code>의 약속이 아니라 드라이버의 동작이다. <code>readOnly</code>는 최적화 힌트로 보고, 조회 메서드에만 붙인다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/S08-transactions.html#롤백-규칙-매칭">S08 — 롤백 규칙 매칭</a> · <a href="../docs/knowledge/S08-transactions.html#전파-7종">전파 7종</a> · <a href="../docs/knowledge/S08-transactions.html#q2-내부-required-메서드가-rollback-only가-되면-왜-바깥-커밋에서-예외가-나는가">Q2. 내부 REQUIRED가 rollback-only가 되면</a></li>
+<li><a href="../docs/knowledge/S02-aop-proxy.html#self-invocation이-빠지는-이유">S02 — self-invocation이 빠지는 이유</a> — 프록시 호출 흐름</li>
+<li><a href="../docs/knowledge/W11-why-tx-in-service.html">W11 트랜잭션은 왜 서비스 계층에 거나</a> — 자기 호출, 외부 호출을 트랜잭션 안에 두면 생기는 일</li>
+<li>원문: <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html" target="_blank" rel="noopener">Spring — Using @Transactional</a> — 프록시 모드와 자기 호출 · <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/rolling-back.html" target="_blank" rel="noopener">Rolling Back</a> · <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html" target="_blank" rel="noopener">Transaction Propagation</a> — <code>UnexpectedRollbackException</code>, <code>REQUIRES_NEW</code>의 연결 사용 · <a href="https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/transaction/annotation/Transactional.html" target="_blank" rel="noopener"><code>@Transactional</code> Javadoc</a> — <code>readOnly</code>는 런타임 최적화용 힌트</li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li>실습: <a href="../scenario/ch16-events-async-cache/16-1-new-post-event.html">16-1. 새 글 알림 — 커밋된 뒤에만 보내기</a> — 커밋 뒤 리스너가 부르는 알림 저장이 왜 <code>REQUIRES_NEW</code>여야 하는지(R2).</li>
+<li>실습: <a href="../scenario/ch16-events-async-cache/16-2-async-notification.html">16-2. 알림을 비동기로 — 느린 발송이 글쓰기를 막지 않게</a> — <code>@Async</code> 스레드에는 이어 갈 트랜잭션이 없다.</li>
+<li>다시 보기: <a href="E7-jpa-update-delete.html">E7 ⑤</a> — <code>readOnly</code>에서 변경 감지가 조용히 빠지는 장면.</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-004. 아주 큰 페이지 번호에 엉뚱한 글·500</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="t-004-아주-큰-페이지-번호에-엉뚱한-글500"><a class="anchor" href="#t-004-아주-큰-페이지-번호에-엉뚱한-글500" aria-hidden="true">#</a>T-004. 아주 큰 페이지 번호에 엉뚱한 글·500</h1>
+<blockquote>
+<p>난이도 쉬움 · 유형 버그 · DB community · 예상 25분</p>
+</blockquote>
+<h2 id="티켓"><a class="anchor" href="#티켓" aria-hidden="true">#</a>티켓</h2>
+<blockquote>
+<p><strong>요청자</strong> 운영(모니터링 알림) · <strong>배경</strong> 새벽에 크롤러가 <code>page=2147483647</code>로 목록을 긁으면서 500이 수십 건 났다. 확인해 보니 <code>page=429496730&amp;size=10</code>은 500도 안 나고 <strong>첫 페이지 근처의 글</strong>을 돌려준다(빈 목록이어야 하는데).</p>
+</blockquote>
+<ul>
+<li>게시판 글 목록과 조합 검색 두 API 모두 해당됩니다.</li>
+<li>팀 결정: 페이지 번호는 <strong>0~1000</strong>만 받는다(그 뒤를 보는 사람은 없다 — 더 보려면 검색 조건을 좁힌다). 넘으면 <code>size</code> 범위를 벗어났을 때처럼 400.</li>
+<li><strong>완료 조건</strong>: 어떤 page 값에도 500이나 &quot;다른 페이지의 글&quot;이 나오지 않는다. 정상 페이지 동작은 그대로.</li>
+</ul>
+<p><strong>DB 시작 상태</strong>: <code>community</code> 처음 상태(<code>bash scripts/java-db.sh --reset</code>). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 자유 게시판(<code>free</code>)에서 비로그인이 볼 수 있는 글은 13개다.</p>
+<h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
+<ul>
+<li>먼저 재현한다: 아래 요청 A·B를 기준 코드에 보내고, 500이 날 때 서버 로그의 예외 메시지를 읽는다.</li>
+<li>목록·검색이 함께 쓰는 쿼리 조립기가 OFFSET(몇 번째 행부터)을 어떻게 넘기는지 본다. <code>page × size</code>가 어떤 타입으로 계산되고 어떤 타입으로 바뀌는지가 핵심이다.</li>
+<li><code>size</code> 상한은 이미 걸려 있다. 같은 방식으로 <code>page</code>에도 걸 수 있다.</li>
+</ul>
+<h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>시나리오 화면</span><span class="mockup-live"><i></i> 단계 시안</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">사용자에게 보이는 상태</span><h3>자유 게시판 — 주소창에 page를 직접 넣으면</h3><p>프론트는 page를 1000까지만 만들지만, 주소를 직접 고치거나 크롤러가 보내는 값은 막을 수 없다. 서버가 판정한다.</p></div></div><div class="mock-screen" aria-label="자유 게시판 — 주소창에 page를 직접 넣으면 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>자유 게시판</strong><span></span></header><div class="mock-list" data-screen-id="posts"><div class="mock-list-item tone-default" data-screen-id="p17"><span class="mock-list-main"><strong>자유글 06</strong><small>박디비 · 2026-09-30</small></span></div><div class="mock-list-item tone-default" data-screen-id="p16"><span class="mock-list-main"><strong>자유글 05</strong><small>이스프링 · 2026-09-29</small></span></div></div><div class="mock-toast tone-error" data-screen-id="toast"><span class="mock-toast-icon" aria-hidden="true">!</span><span>잘못된 페이지 번호입니다</span></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">화면 뒤에서 일어나는 일</span><h4>요청부터 응답까지</h4></div><span class="flow-hint">이 단계에 기록된 처리 순서를 보여줍니다.</span></div><div class="flow-tracks" aria-label="흐름별 요청 처리 경로"><div class="flow-route" aria-label="지금(버그) — 엉뚱한 글"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="mysql" data-index="2"><span class="flow-node-number">3</span>MySQL</span><span class="flow-node" data-node="response" data-index="3"><span class="flow-node-number">4</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="4"><span class="flow-node-number">5</span>응답 반영</span></div><div class="flow-route" aria-label="고친 뒤 — 상한 넘음"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="controller" data-index="2"><span class="flow-node-number">3</span>Controller</span><span class="flow-node" data-node="response" data-index="3"><span class="flow-node-number">4</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="4"><span class="flow-node-number">5</span>응답 반영</span></div></div><p class="flow-swipe-hint">좌우로 밀어 전체 경로 보기 →</p><aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside><p class="flow-selection-status" role="status" aria-live="polite">카드를 선택하면 화면의 관련 요소와 계층이 강조됩니다.</p><div class="scenario-flows"><section class="scenario-flow" aria-label="지금(버그) — 엉뚱한 글" data-flow-index="0"><h5>지금(버그) — 엉뚱한 글<span class="scenario-flow-count">6단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="bar" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">주소창에 ?page=429496730&amp;size=10을 넣는다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="GET" data-path="/api/boards/free/posts?page=429496730&amp;size=10" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-get">GET</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/boards/free/posts?page=429496730&amp;size=10</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">GET /api/boards/free/posts?page=429496730&amp;size=10</span></button></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">429496730 × 10 = 4294967300(long)인데 int로 바뀌며 넘쳐서 OFFSET 4가 된다</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> SELECT … ORDER BY p.published_at DESC, p.id DESC LIMIT 10 OFFSET 4</span><span class="flow-step-detail"><b>note</b> 원래는 OFFSET 4294967300 — 결과 0건이어야 한다</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;items&quot;: [{&quot;id&quot;: 17, ...}, {&quot;id&quot;: 16, ...}, ...], &quot;page&quot;: 429496730, ...}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="posts|p17" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">아주 뒤 페이지인데 다섯 번째 최신 글부터 보인다</span></button></li></ol></section><section class="scenario-flow" aria-label="고친 뒤 — 상한 넘음" data-flow-index="1"><h5>고친 뒤 — 상한 넘음<span class="scenario-flow-count">5단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="bar" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">주소창에 ?page=2147483647을 넣는다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="GET" data-path="/api/boards/free/posts?page=2147483647" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-get">GET</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/boards/free/posts?page=2147483647</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">GET /api/boards/free/posts?page=2147483647</span></button></li><li><button type="button" class="flow-step" data-node="controller" data-nodes="controller" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-layers"><span class="flow-layer" data-node="controller">Controller</span></span><span class="flow-step-text">page가 0~1000을 벗어나 컨트롤러 입력 검증에서 막힌다 — 쿼리까지 가지 않는다</span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 400</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;status&quot;: 400, ...}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="toast" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">오류 안내 후 첫 페이지로 돌려보낸다</span></button></li></ol></section></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: '사용자 화면', request: 'HTTP 요청', server: '서버', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'server', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = (labels[selected] || button.querySelector('.flow-kind')?.textContent || '시나리오') + ' 단계 · ' + (button.querySelector('.flow-step-text')?.textContent.trim() || '세부 내용은 아래 설명을 확인하세요.');
+    }));
+  }
+})();
+</script><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>대상</td>
+<td><code>GET /api/boards/{slug}/posts</code>, <code>GET /api/posts/search</code></td>
+</tr>
+<tr>
+<td><code>page</code> 범위</td>
+<td><code>0</code> ~ <code>1000</code>. 벗어나면 <code>400</code>(<code>size</code> 범위 위반과 같은 처리)</td>
+</tr>
+<tr>
+<td>넘침</td>
+<td>어떤 <code>page</code>·<code>size</code> 조합에도 OFFSET이 넘쳐 음수(500)나 작은 값(다른 페이지의 글)이 되지 않는다</td>
+</tr>
+<tr>
+<td>그대로인 것</td>
+<td>정상 페이지의 결과·순서·<code>totalElements</code>, <code>page=1000</code>처럼 범위 안이지만 글이 없는 페이지는 <code>200</code>과 빈 <code>items</code></td>
+</tr>
+</tbody></table></div>
+<ul>
+<li>DB 변화 없음.</li>
+</ul>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+
+curl -s &quot;$BASE/api/boards/free/posts?page=429496730&amp;size=10&quot;   # 요청 A — 지금: 엉뚱한 글
+curl -i &quot;$BASE/api/boards/free/posts?page=2147483647&quot;           # 요청 B — 지금: 500
+curl -i &quot;$BASE/api/posts/search?page=2147483647&quot;                # 요청 C — 검색도 500
+curl -i &quot;$BASE/api/boards/free/posts?page=1001&quot;                 # 요청 D — 상한 바로 위
+curl -s &quot;$BASE/api/boards/free/posts?page=1000&quot;                 # 요청 E — 상한(빈 목록)
+curl -s &quot;$BASE/api/boards/free/posts?page=1&amp;size=5&quot;             # 요청 F — 정상 페이지</code></pre>
+<blockquote>
+<p>이 확인은 <strong>처음 데이터</strong>의 좋아요 수·조회수·글 수를 기대값으로 쓴다. 작업하면서 글을 열어 보거나(조회수 +1) 좋아요·글쓰기를 했다면 먼저 <code>bash scripts/java-db.sh --reset</code>으로 되돌린 뒤 누른다.</p>
+</blockquote>
+<p>버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.</p>
+<section id="browser-requests-1" class="api-practice" aria-label="HTTP 요청 실행"><div class="request-panel-heading"><div><p class="request-eyebrow">직접 확인 · 6개 요청</p><h3>브라우저에서 요청 보내기</h3></div><p>위 서버 주소를 확인하고 순서대로 실행하세요. 토큰은 입력 후에도 저장하지 않습니다.</p></div><nav class="request-steps" aria-label="요청 실행 순서"><ol><li data-method="GET"><a href="#browser-request-1-1"><span class="request-step-number">1</span><span class="request-step-content"><span class="request-step-method">GET · A</span><span class="request-step-title">page × size가 int를 넘음</span></span></a></li><li data-method="GET"><a href="#browser-request-1-2"><span class="request-step-number">2</span><span class="request-step-content"><span class="request-step-method">GET · B</span><span class="request-step-title">page = int 최댓값(목록)</span></span></a></li><li data-method="GET"><a href="#browser-request-1-3"><span class="request-step-number">3</span><span class="request-step-content"><span class="request-step-method">GET · C</span><span class="request-step-title">page = int 최댓값(검색)</span></span></a></li><li data-method="GET"><a href="#browser-request-1-4"><span class="request-step-number">4</span><span class="request-step-content"><span class="request-step-method">GET · D</span><span class="request-step-title">상한 바로 위</span></span></a></li><li data-method="GET"><a href="#browser-request-1-5"><span class="request-step-number">5</span><span class="request-step-content"><span class="request-step-method">GET · E</span><span class="request-step-title">상한(빈 목록)</span></span></a></li><li data-method="GET"><a href="#browser-request-1-6"><span class="request-step-number">6</span><span class="request-step-content"><span class="request-step-method">GET · F</span><span class="request-step-title">정상 둘째 페이지</span></span></a></li></ol></nav><div class="api-request-list"><article id="browser-request-1-1" class="api-request" data-request-id="A" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · A</p><h4>page × size가 int를 넘음</h4></div><span class="request-number">요청 1</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/boards/free/posts?page=429496730&amp;size=10" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-1">GET 요청 보내기</button><p id="request-status-1-1" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;anyOf&quot;:[{&quot;status&quot;:400},{&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items&quot;,&quot;length&quot;:0}]}]}</pre></dd></dl></details></article><article id="browser-request-1-2" class="api-request" data-request-id="B" data-method="GET" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · B</p><h4>page = int 최댓값(목록)</h4></div><span class="request-number">요청 2</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/boards/free/posts?page=2147483647" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-2">GET 요청 보내기</button><p id="request-status-1-2" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;anyOf&quot;:[{&quot;status&quot;:400},{&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items&quot;,&quot;length&quot;:0}]}]}</pre></dd></dl></details></article><article id="browser-request-1-3" class="api-request" data-request-id="C" data-method="GET" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · C</p><h4>page = int 최댓값(검색)</h4></div><span class="request-number">요청 3</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/search?page=2147483647" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-3">GET 요청 보내기</button><p id="request-status-1-3" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;anyOf&quot;:[{&quot;status&quot;:400},{&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items&quot;,&quot;length&quot;:0}]}]}</pre></dd></dl></details></article><article id="browser-request-1-4" class="api-request" data-request-id="D" data-method="GET" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · D</p><h4>상한 바로 위</h4></div><span class="request-number">요청 4</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/boards/free/posts?page=1001" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-4">GET 요청 보내기</button><p id="request-status-1-4" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:400}</pre></dd></dl></details></article><article id="browser-request-1-5" class="api-request" data-request-id="E" data-method="GET" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · E</p><h4>상한(빈 목록)</h4></div><span class="request-number">요청 5</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/boards/free/posts?page=1000" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-5">GET 요청 보내기</button><p id="request-status-1-5" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items&quot;,&quot;length&quot;:0},{&quot;path&quot;:&quot;$.page&quot;,&quot;equals&quot;:1000},{&quot;path&quot;:&quot;$.totalElements&quot;,&quot;equals&quot;:13}]}</pre></dd></dl></details></article><article id="browser-request-1-6" class="api-request" data-request-id="F" data-method="GET" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · F</p><h4>정상 둘째 페이지</h4></div><span class="request-number">요청 6</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/boards/free/posts?page=1&amp;size=5" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-6">GET 요청 보내기</button><p id="request-status-1-6" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.items[*].id&quot;,&quot;equals&quot;:[16,15,14,13,12]},{&quot;path&quot;:&quot;$.hasNext&quot;,&quot;equals&quot;:true}]}</pre></dd></dl></details></article></div></section><h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP(필수), D = DB(필수, SELECT만), R = 코드 리뷰(피드백)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 A</td>
+<td><code>400</code>(또는 <code>200</code>이면 빈 <code>items</code>) — 다른 페이지의 글이 나오지 않는다</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 B·C</td>
+<td>목록·검색 모두 <code>400</code>(또는 <code>200</code>이면 빈 <code>items</code>) — 500이 아니다</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 D</td>
+<td><code>400</code> — 팀이 정한 상한(1000)을 지킨다</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 E</td>
+<td><code>200</code>, 빈 <code>items</code>, <code>page</code> 1000, 전체 13건 그대로</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>요청 F</td>
+<td>정상 페이지는 그대로 <code>16, 15, 14, 13, 12</code></td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT COUNT(*) FROM post WHERE board_id = 4 AND status = &#39;PUBLISHED&#39; AND visibility = &#39;PUBLIC&#39; AND deleted_at IS NULL</code></td>
+<td><code>13</code> — 요청 E의 <code>totalElements</code>와 같다. 13건이면 <code>size=10</code>의 마지막 페이지는 1이다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>원인</td>
+<td><code>(int)</code> 캐스팅이 넘치면 예외 없이 값이 바뀐다(4294967300 → 4)는 것을 설명할 수 있다. 500보다 &quot;틀린 데이터 200&quot;이 더 위험한 이유도</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>고친 곳</td>
+<td>입력 경계(컨트롤러 파라미터 검증)에서 막았다. 두 API에 같은 상한을 쓰도록 한 곳에 상수로 두면 더 좋다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>이중 방어</td>
+<td>쿼리 쪽도 넘치면 조용히 잘리지 않게(<code>Math.toIntExact</code> 등) 했거나, 상한 덕분에 넘칠 수 없다는 근거(1000 × 50)를 댈 수 있다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>재현 먼저</td>
+<td>고치기 전에 요청으로 재현하고 로그의 예외(<code>First result cannot be negative</code>)를 확인했다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../docs/knowledge/J01-types-string.html">J01 기본 타입·참조 타입·박싱·String</a> — int 범위와 넘침(오버플로)</li>
+<li><a href="../docs/knowledge/W15-paging-offset-vs-cursor.html">W15 페이징 — OFFSET vs 커서</a> — 아주 뒤 페이지가 왜 비싸고, 왜 상한을 두나</li>
+<li><a href="../docs/knowledge/W10-where-to-validate.html">W10 검증은 어디서 하나</a> — 입력 경계에서 막기</li>
+<li><a href="../docs/knowledge/D05-debugging-methodology.html">D05 디버깅 방법론</a> — 재현 → 관찰 → 가설 → 검증</li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 1 — 숫자 계산</summary>
+
+<p><code>PageRequest.getOffset()</code>은 <code>long</code>이다(429496730 × 10 = 4294967300). 그걸 <code>(int)</code>로 바꾸면 2³²(4294967296)를 뺀 4가 된다. <code>page=2147483647</code>(size 10)이면 음수가 되어 Hibernate가 예외를 던진다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 고치기</summary>
+
+<p><code>size</code>에 이미 붙어 있는 <code>@Max(50)</code>처럼 <code>page</code>에 <code>@Max(1000)</code>을 붙인다(두 컨트롤러). 숫자는 상수 하나로 둔다. 쿼리 쪽 <code>(int)</code>는 <code>Math.toIntExact(...)</code>로 바꾸면 넘칠 때 조용히 틀리지 않고 예외로 드러난다.</p>
+</details>
+
+
+</main>
+
+
+</body>
+</html>

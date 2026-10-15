@@ -1,0 +1,1205 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10-1. 새 프로젝트 시작 — 명세서 읽기, project DB·Flyway, 헬스 체크</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
+<link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
+<link rel="stylesheet" href="../../tools/site/scenario-visual.css?v=acace17043f4">
+<link rel="stylesheet" href="../../tools/site/scenario-code-workbench.css?v=6b63063b4651">
+<link rel="stylesheet" href="../../tools/site/lesson-atlas.css?v=72d1f0fcddbe">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../../index.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 10장. 명세서 프로젝트 — 게시판 API v1(/api/v1) › 10-1</p><p class="level-tags"><span>기초</span><span>별도 명세서 프로젝트</span><span>DB project</span></p>
+<h1 id="10-1-새-프로젝트-시작--명세서-읽기-project-dbflyway-헬스-체크"><a class="anchor" href="#10-1-새-프로젝트-시작--명세서-읽기-project-dbflyway-헬스-체크" aria-hidden="true">#</a>10-1. 새 프로젝트 시작 — 명세서 읽기, project DB·Flyway, 헬스 체크</h1><h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>시나리오 화면</span><span class="mockup-live"><i></i> 단계 시안</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">사용자에게 보이는 상태</span><h3>서버 상태 화면</h3><p>운영자가 여는 상태 화면. 서버가 살아 있는지, 어느 DB에 붙었는지, 시드 데이터가 들어갔는지를 한 번에 본다.</p></div></div><div class="mock-screen" aria-label="서버 상태 화면 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>board-api 상태</strong><span>운영자</span></header><div class="mock-actions" data-screen-id="buttons"><span class="mock-button mock-primary" data-screen-id="refresh">새로고침</span></div><div class="mock-stats" data-screen-id="counts"><div class="mock-stats-item" data-screen-id="db"><span>DB</span><strong>project</strong></div><div class="mock-stats-item" ><span>회원</span><strong>3</strong></div><div class="mock-stats-item" ><span>글</span><strong>25</strong></div><div class="mock-stats-item" ><span>댓글</span><strong>40</strong></div><div class="mock-stats-item" ><span>좋아요</span><strong>30</strong></div></div><div class="mock-toast tone-error" data-screen-id="toast"><span class="mock-toast-icon" aria-hidden="true">!</span><span>서버 오류(500)</span></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">화면 뒤에서 일어나는 일</span><h4>요청부터 응답까지</h4></div><span class="flow-hint">이 단계에 기록된 처리 순서를 보여줍니다.</span></div><div class="flow-tracks" aria-label="흐름별 요청 처리 경로"><div class="flow-route" aria-label="상태 보기"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="controller" data-index="2"><span class="flow-node-number">3</span>Controller</span><span class="flow-node" data-node="mysql" data-index="3"><span class="flow-node-number">4</span>MySQL</span><span class="flow-node" data-node="response" data-index="4"><span class="flow-node-number">5</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="5"><span class="flow-node-number">6</span>응답 반영</span></div><div class="flow-route" aria-label="마이그레이션 파일 이름이 틀렸을 때"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="mysql" data-index="2"><span class="flow-node-number">3</span>MySQL</span><span class="flow-node" data-node="response" data-index="3"><span class="flow-node-number">4</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="4"><span class="flow-node-number">5</span>응답 반영</span></div></div><p class="flow-swipe-hint">좌우로 밀어 전체 경로 보기 →</p><section class="implementation-route" aria-label="완성 코드의 역할별 구성"><div class="implementation-route-heading"><div><span class="scenario-kicker">실제 정답 파일 기준</span><h5>이 단계에서 만나는 Java 구성요소</h5></div><a href="#전체-구현-코드">코드 보기 ↗</a></div><div class="implementation-nodes"><div class="implementation-node"><strong>Controller</strong><small>HealthController.java</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>MySQL</strong><small>시나리오 SQL의 대상 DB</small></div></div><p class="implementation-disclaimer">파일의 역할 지도입니다. 위 흐름은 화면 JSON의 단계이며, 요청별 실제 호출 여부를 서버에서 추적한 결과는 아닙니다.</p></section><aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside><p class="flow-selection-status" role="status" aria-live="polite">카드를 선택하면 화면의 관련 요소와 계층이 강조됩니다.</p><div class="scenario-flows"><section class="scenario-flow" aria-label="상태 보기" data-flow-index="0"><h5>상태 보기<span class="scenario-flow-count">6단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="refresh" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">[새로고침]을 누른다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="GET" data-path="/api/v1/health" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-get">GET</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/v1/health</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">GET /api/v1/health</span></button></li><li><button type="button" class="flow-step" data-node="controller" data-nodes="controller mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-layers"><span class="flow-layer" data-node="controller">Controller</span><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-text">HealthController가 JdbcTemplate으로 DB 이름과 테이블별 행 수를 읽는다</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> SELECT DATABASE();
+SELECT COUNT(*) FROM users;  -- posts·comments·post_likes도 같은 식</span><span class="flow-step-detail"><b>note</b> 테이블은 앱이 뜰 때 Flyway가 V1__init.sql로 만들었다</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span><span class="flow-step-detail"><b>headers</b> Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{
+  &quot;up&quot;: true,
+  &quot;database&quot;: &quot;project&quot;,
+  &quot;users&quot;: 3,
+  &quot;posts&quot;: 25,
+  &quot;comments&quot;: 40,
+  &quot;likes&quot;: 30
+}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="counts|db" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">숫자가 시드와 같으면 DB 연결과 마이그레이션이 모두 된 것이다</span></button></li></ol></section><section class="scenario-flow" aria-label="마이그레이션 파일 이름이 틀렸을 때" data-flow-index="1"><h5>마이그레이션 파일 이름이 틀렸을 때<span class="scenario-flow-count">6단계</span></h5><ol><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">V1_init.sql(밑줄 하나)은 Flyway가 마이그레이션으로 알아보지 못한다. 로그: No migrations found. Are your locations set up correctly? — 그래도 앱은 뜬다</span></button></li><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="refresh" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">[새로고침]을 누른다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="GET" data-path="/api/v1/health" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-get">GET</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/v1/health</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">GET /api/v1/health</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> SELECT COUNT(*) FROM users;</span><span class="flow-step-detail"><b>note</b> Table 'project.users' doesn't exist</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 500</span></span></button></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="toast" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">서버 오류 — 원인은 앱 로그에 있다(아래 일부러 망가뜨리기 ②)</span></button></li></ol></section></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: '사용자 화면', request: 'HTTP 요청', server: '서버', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'server', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = (labels[selected] || button.querySelector('.flow-kind')?.textContent || '시나리오') + ' 단계 · ' + (button.querySelector('.flow-step-text')?.textContent.trim() || '세부 내용은 아래 설명을 확인하세요.');
+    }));
+  }
+})();
+</script>
+<section class="api-map-stage" aria-label="이 단계의 API"><h3>이 단계에서 연결되는 API</h3><p class="api-map-stage-note">아래 역할과 파일은 완성 코드 기준입니다. 이번 단계의 작업 범위는 본문의 요구사항과 구현 가이드를 따르세요.</p><p class="api-map-stage-project"><strong>명세서 프로젝트</strong></p><details class="api-map-route" id="spec-board-stage-10-1-0"><summary><span class="api-map-method method-get">GET</span><code>/api/v1/health</code><span class="api-map-route-feature">v1</span></summary><div class="api-map-route-body"><div class="api-map-flow" aria-label="GET /api/v1/health 처리 흐름"><div class="api-map-node"><span class="api-map-node-label">Controller</span><span class="api-map-node-files"><code>HealthController.java</code></span></div></div><p class="api-map-stages"><strong>시나리오</strong> <a href="10-1-new-project.html">10-1</a> · <a href="10-2-common-response.html">10-2</a></p></div></details></section><p class="api-map-link"><a href="../README.html#api-map-title">전체 API 구조도 보기</a></p><nav class="lesson-atlas" aria-label="10-1 학습 흐름"><div class="lesson-atlas-heading"><span>BUILD · RUN · UNDERSTAND</span><h2>이번 단계의 학습 흐름</h2><p>그림으로 요청의 경로를 먼저 본 다음, 필요한 절을 펼쳐 직접 만들고 확인하세요.</p></div><div class="lesson-atlas-track"><a class="lesson-atlas-stop lesson-understand" href="#상황"><b>01</b><span aria-hidden="true">◇</span><span><small>무엇을 만들까</small><strong>상황</strong></span></a><a class="lesson-atlas-stop lesson-explore" href="#명세서-읽기"><b>02</b><span aria-hidden="true">◈</span><span><small>더 알아보기</small><strong>명세서 읽기</strong></span></a><a class="lesson-atlas-stop lesson-understand" href="#만들-것"><b>03</b><span aria-hidden="true">◇</span><span><small>무엇을 만들까</small><strong>만들 것</strong></span></a><a class="lesson-atlas-stop lesson-build" href="#따라-치기"><b>04</b><span aria-hidden="true">⌘</span><span><small>어떻게 만들까</small><strong>따라 치기</strong></span></a><a class="lesson-atlas-stop lesson-build" href="#구현-가이드"><b>05</b><span aria-hidden="true">⌘</span><span><small>어떻게 만들까</small><strong>구현 가이드</strong></span></a><a class="lesson-atlas-stop lesson-build" href="#전체-구현-코드"><b>06</b><span aria-hidden="true">⌘</span><span><small>어떻게 만들까</small><strong>전체 구현 코드</strong></span></a><a class="lesson-atlas-stop lesson-verify" href="#직접-확인"><b>07</b><span aria-hidden="true">↗</span><span><small>어떻게 확인할까</small><strong>직접 확인</strong></span></a><a class="lesson-atlas-stop lesson-verify" href="#채점-기준"><b>08</b><span aria-hidden="true">↗</span><span><small>어떻게 확인할까</small><strong>채점 기준</strong></span></a><a class="lesson-atlas-stop lesson-debug" href="#일부러-망가뜨리기"><b>09</b><span aria-hidden="true">✳</span><span><small>막히면 확인</small><strong>일부러 망가뜨리기</strong></span></a><a class="lesson-atlas-stop lesson-connect" href="#필요한-지식"><b>10</b><span aria-hidden="true">→</span><span><small>다음으로 연결</small><strong>필요한 지식</strong></span></a><a class="lesson-atlas-stop lesson-debug" href="#힌트-막힐-때만"><b>11</b><span aria-hidden="true">✳</span><span><small>막히면 확인</small><strong>힌트 (막힐 때만)</strong></span></a><a class="lesson-atlas-stop lesson-connect" href="#다음-단계"><b>12</b><span aria-hidden="true">→</span><span><small>다음으로 연결</small><strong>다음 단계</strong></span></a></div></nav><div class="lesson-scenes" aria-label="단계별 구현과 확인"><details class="lesson-scene lesson-understand" data-lesson-kind="understand">
+    <summary id="상황" aria-label="상황 내용 펼치기"><span class="lesson-scene-index">01</span><span class="lesson-scene-glyph" aria-hidden="true">◇</span><span class="lesson-scene-title"><small>무엇을 만들까</small><strong>상황</strong><em>1~9장에서는 이미 있는 레포(javaExperience)에 기능을 하나씩 붙였다. 회사에서는 이런 일도 자주 생긴다. 팀장이 명세서 한 장 을 주며 말한다.</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p>1~9장에서는 이미 있는 레포(javaExperience)에 기능을 하나씩 붙였다. 회사에서는 이런 일도 자주 생긴다. 팀장이 <strong>명세서 한 장</strong>을 주며 말한다.</p>
+<blockquote>
+<p>&quot;게시판 API v1을 새로 만들어 주세요. 명세서대로요. DB 스키마랑 시드 데이터는 마이그레이션 파일로 드릴게요.&quot;</p>
+</blockquote>
+<p>이번 장은 <strong>빈 폴더에서 새 Spring 프로젝트를 만들어</strong> 명세서의 API를 하나씩 채운다. 이 단계에서는 세 가지를 한다. 명세서를 끝까지 읽는다. 프로젝트를 만들어 DB(<code>project</code>)에 붙인다. 서버가 살아 있고 DB에 데이터가 들어갔는지 알려 주는 <strong>헬스 체크</strong> API를 연다.</p>
+<ul>
+<li>기존 javaExperience 레포와 <strong>다른 폴더</strong>에 만든다(예: <code>~/code/board-api</code>). 새 git 레포로 시작하고 단계마다 커밋한다.</li>
+<li>DB는 javaExperience MySQL(<code>localhost:13308</code>) 안의 <strong>빈 DB <code>project</code></strong> 다. 테이블과 데이터는 이 단계에서 넣는 Flyway 파일(V1)이 만든다.</li>
+</ul>
+</div>
+  </details><details class="lesson-scene lesson-explore" data-lesson-kind="explore">
+    <summary id="명세서-읽기" aria-label="명세서 읽기 내용 펼치기"><span class="lesson-scene-index">02</span><span class="lesson-scene-glyph" aria-hidden="true">◈</span><span class="lesson-scene-title"><small>더 알아보기</small><strong>명세서 읽기</strong><em>명세서는 이 장 전체의 "정답지"다. 단계를 진행하다 헷갈리면 여기로 돌아온다. 처음 읽을 때는 표의 칸이 무슨 뜻인지 부터 익힌다.</em></span><span class="lesson-scene-count">3개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>1. 공통 규칙</span><span>2. 테이블 (DB project , 아래 V1이 만든다)</span><span>3. 엔드포인트</span></div>
+<p>명세서는 이 장 전체의 &quot;정답지&quot;다. 단계를 진행하다 헷갈리면 여기로 돌아온다. 처음 읽을 때는 <strong>표의 칸이 무슨 뜻인지</strong>부터 익힌다.</p>
+<h3 id="1-공통-규칙"><a class="anchor" href="#1-공통-규칙" aria-hidden="true">#</a>1. 공통 규칙</h3>
+<ul>
+<li>기본 경로는 <code>/api/v1</code>이다. 모든 API 주소가 이것으로 시작한다(<code>v1</code> = 1판. 계약이 크게 바뀌면 <code>v2</code>를 새로 연다 — 10-11).</li>
+<li>본문은 JSON(UTF-8)이다. 시각은 ISO-8601 문자열이다(<code>2026-10-10T09:00:00</code>).</li>
+<li>인증은 요청 헤더 <code>Authorization: Bearer &lt;토큰&gt;</code>으로 한다. 토큰은 로그인 API가 준다(10-4). JWT, HS256 서명, 유효 시간 1시간, 비밀키는 설정 <code>app.jwt.secret</code>, 페이로드의 <code>sub</code>가 회원 id다.</li>
+</ul>
+<p><strong>공통 응답</strong> — 성공이든 실패든 같은 틀로 감싼다(10-2).</p>
+<pre><code class="language-json">{ &quot;status&quot;: 200, &quot;message&quot;: &quot;OK&quot;, &quot;data&quot;: { &quot;id&quot;: 1 } }</code></pre>
+<pre><code class="language-json">{ &quot;status&quot;: 400, &quot;message&quot;: &quot;입력값이 올바르지 않습니다.&quot;, &quot;code&quot;: &quot;VALIDATION_FAILED&quot;,
+  &quot;errors&quot;: [ { &quot;field&quot;: &quot;title&quot;, &quot;reason&quot;: &quot;제목은 5자 이상 100자 이하여야 합니다.&quot; } ], &quot;data&quot;: null }</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>뜻</th>
+<th>성공</th>
+<th>실패</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>status</code></td>
+<td>HTTP 상태 코드와 같은 숫자</td>
+<td>있음</td>
+<td>있음</td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td>사람이 읽는 문구</td>
+<td><code>OK</code>·<code>Created</code></td>
+<td>이유</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td>실제 내용</td>
+<td>내용(삭제 성공은 <code>null</code>)</td>
+<td>항상 <code>null</code></td>
+</tr>
+<tr>
+<td><code>code</code></td>
+<td><strong>프로그램이 읽는</strong> 실패 종류. 화면은 문구가 아니라 이 값으로 분기한다</td>
+<td>없음</td>
+<td>있음</td>
+</tr>
+<tr>
+<td><code>errors</code></td>
+<td>필드별 이유 목록</td>
+<td>없음</td>
+<td>있음(필드 오류가 없으면 <code>[]</code>)</td>
+</tr>
+</tbody></table></div>
+<p><strong>상태 코드 표</strong> — &quot;언제 무엇을 돌려주나&quot;의 약속이다. 엔드포인트 표의 &quot;실패&quot; 칸에 적힌 숫자는 모두 이 표의 뜻을 따른다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>status</th>
+<th>code</th>
+<th>언제</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>200</td>
+<td>—</td>
+<td>성공(조회·수정·삭제)</td>
+</tr>
+<tr>
+<td>201</td>
+<td>—</td>
+<td>생성 성공. 응답 헤더 <code>Location</code>에 만든 것의 주소</td>
+</tr>
+<tr>
+<td>400</td>
+<td><code>VALIDATION_FAILED</code></td>
+<td>입력 규칙 위반(길이·개수·형식·허용 값)</td>
+</tr>
+<tr>
+<td>400</td>
+<td><code>BAD_JSON</code></td>
+<td>본문을 JSON으로 읽을 수 없음</td>
+</tr>
+<tr>
+<td>401</td>
+<td><code>UNAUTHORIZED</code></td>
+<td>토큰 없음·형식 틀림·서명 틀림·만료, 로그인 실패</td>
+</tr>
+<tr>
+<td>403</td>
+<td><code>FORBIDDEN</code></td>
+<td>로그인은 했지만 남의 글·댓글을 고치거나 지우려 함</td>
+</tr>
+<tr>
+<td>404</td>
+<td><code>NOT_FOUND</code></td>
+<td>없는 글·댓글(삭제된 것, 남의 비공개 글 포함), 없는 주소</td>
+</tr>
+<tr>
+<td>405</td>
+<td><code>METHOD_NOT_ALLOWED</code></td>
+<td>주소는 있는데 메서드가 다름</td>
+</tr>
+<tr>
+<td>409</td>
+<td><code>DUPLICATE</code></td>
+<td>이메일 중복</td>
+</tr>
+<tr>
+<td>500</td>
+<td><code>INTERNAL_ERROR</code></td>
+<td>서버가 예상 못 한 오류(원인은 로그에만)</td>
+</tr>
+</tbody></table></div>
+<p>401과 403을 헷갈리지 않는다. <strong>401은 &quot;누구인지 모른다&quot;</strong>(로그인부터), <strong>403은 &quot;누구인지는 아는데 권한이 없다&quot;</strong> 다.</p>
+<p><strong>목록 응답의 <code>data</code></strong></p>
+<pre><code class="language-json">{ &quot;items&quot;: [ … ], &quot;page&quot;: 0, &quot;size&quot;: 20, &quot;totalElements&quot;: 57, &quot;hasNext&quot;: true }</code></pre>
+<p>커서 방식이면 <code>{ &quot;items&quot;: [ … ], &quot;nextCursor&quot;: &quot;17&quot; }</code>이다. 다음이 없으면 <code>nextCursor</code>가 <code>null</code>이다.</p>
+<h3 id="2-테이블-db-project-아래-v1이-만든다"><a class="anchor" href="#2-테이블-db-project-아래-v1이-만든다" aria-hidden="true">#</a>2. 테이블 (DB <code>project</code>, 아래 V1이 만든다)</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>테이블</th>
+<th>컬럼</th>
+<th>메모</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>users</code></td>
+<td><code>id</code>, <code>email</code>(UNIQUE), <code>password_hash</code>, <code>nickname</code>, <code>created_at</code></td>
+<td>비밀번호는 해시만 저장</td>
+</tr>
+<tr>
+<td><code>posts</code></td>
+<td><code>id</code>, <code>author_id</code>(FK), <code>title</code>, <code>content</code>(NULL 가능), <code>visibility</code>(<code>PUBLIC</code>·<code>PRIVATE</code>), <code>view_count</code>, <code>like_count</code>, <code>created_at</code>, <code>updated_at</code>, <code>deleted_at</code>(NULL)</td>
+<td><code>deleted_at</code>이 있으면 삭제된 글(soft delete)</td>
+</tr>
+<tr>
+<td><code>tags</code></td>
+<td><code>id</code>, <code>name</code>(UNIQUE)</td>
+<td></td>
+</tr>
+<tr>
+<td><code>post_tags</code></td>
+<td><code>post_id</code>, <code>tag_id</code> (둘이 기본 키)</td>
+<td>글 ↔ 태그 다대다 연결</td>
+</tr>
+<tr>
+<td><code>comments</code></td>
+<td><code>id</code>, <code>post_id</code>(FK), <code>author_id</code>(FK), <code>parent_id</code>(NULL, FK), <code>content</code>, <code>created_at</code>, <code>deleted_at</code>(NULL)</td>
+<td><code>parent_id</code>가 있으면 답글</td>
+</tr>
+<tr>
+<td><code>post_likes</code></td>
+<td><code>post_id</code>, <code>user_id</code>, <code>created_at</code> (앞 둘이 기본 키)</td>
+<td>한 사람이 한 글에 한 번</td>
+</tr>
+</tbody></table></div>
+<h3 id="3-엔드포인트"><a class="anchor" href="#3-엔드포인트" aria-hidden="true">#</a>3. 엔드포인트</h3>
+<p>표는 왼쪽부터 <strong>어떤 요청 → 지킬 규칙 → 성공 응답 → 실패 응답</strong> 순으로 읽는다. &quot;실패&quot; 칸의 숫자마다 &quot;어떤 입력이면 이 숫자인가&quot;를 스스로 하나씩 말해 보면 그것이 곧 채점 항목이다.</p>
+<p><strong>회원</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>API</th>
+<th>요청</th>
+<th>성공</th>
+<th>실패</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>POST /api/v1/users</code> 가입</td>
+<td><code>{email, password(8~64자·UTF-8 72바이트 이하), nickname(2~20자)}</code></td>
+<td>201 <code>{id, email, nickname}</code></td>
+<td>400, 409</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/auth/login</code> 로그인</td>
+<td><code>{email, password}</code></td>
+<td>200 <code>{accessToken, expiresIn}</code></td>
+<td>400, 401(이메일이 없든 비밀번호가 틀리든 <strong>같은 응답</strong> — 가입 여부를 흘리지 않는다)</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/users/me</code> 내 정보</td>
+<td>토큰</td>
+<td>200 <code>{id, email, nickname}</code></td>
+<td>401</td>
+</tr>
+</tbody></table></div>
+<p><strong>게시글</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>API</th>
+<th>규칙</th>
+<th>성공</th>
+<th>실패</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>POST /api/v1/posts</code></td>
+<td>토큰 필수. <code>title</code> 5<del>100자(앞뒤 공백 제거 후), <code>content</code> 없어도 됨(최대 10000자), <code>tags</code> 0</del>5개(각 1~20자, 소문자로, 중복 제거), <code>visibility</code> 기본 <code>PUBLIC</code>. 작성자 = 토큰 주인</td>
+<td>201 + <code>Location</code>, <code>data</code> = 상세</td>
+<td>400, 401</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/posts?sort=latest|popular&amp;page=&amp;size=</code> · <code>?cursor=&amp;size=</code> · <code>&amp;tag=&amp;q=</code></td>
+<td><code>PUBLIC</code>만(로그인하면 내 <code>PRIVATE</code>도). <code>size</code> 1~50, 기본 20. <code>q</code>는 제목 검색. 인기순 = 좋아요 수 내림차순, 같으면 id 내림차순. 커서는 최신순만</td>
+<td>200 페이지 또는 커서</td>
+<td>400(size 범위·잘못된 sort·인기순+커서)</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/posts/{postId}</code></td>
+<td>조회수 +1(같은 응답에도 반영). 작성자 <code>{id, nickname}</code>, 태그, 좋아요 수, 내가 좋아요했나(로그인 시), 댓글 목록(시간순, 답글은 부모 아래)</td>
+<td>200</td>
+<td>404(없음·삭제·남의 <code>PRIVATE</code>)</td>
+</tr>
+<tr>
+<td><code>PUT /api/v1/posts/{postId}</code></td>
+<td>작성자만. 전체 교체 — 빠진 필드는 기본값</td>
+<td>200</td>
+<td>400, 401, 403, 404</td>
+</tr>
+<tr>
+<td><code>DELETE /api/v1/posts/{postId}</code></td>
+<td>작성자만. soft delete</td>
+<td>200 <code>data: null</code></td>
+<td>401, 403, 404</td>
+</tr>
+</tbody></table></div>
+<p><strong>댓글</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>API</th>
+<th>규칙</th>
+<th>성공</th>
+<th>실패</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>POST /api/v1/posts/{postId}/comments</code></td>
+<td>토큰. <code>content</code> 1~500자, <code>parentId</code> 선택(같은 글의 최상위 댓글만 — 답글의 답글 금지)</td>
+<td>201</td>
+<td>400(부모가 답글·다른 글), 401, 404</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/posts/{postId}/comments</code></td>
+<td>시간순, 답글은 <code>replies</code>로. 삭제된 부모는 &quot;삭제된 댓글입니다&quot;로 자리만</td>
+<td>200</td>
+<td>404</td>
+</tr>
+<tr>
+<td><code>DELETE /api/v1/comments/{commentId}</code></td>
+<td>작성자만, soft delete</td>
+<td>200</td>
+<td>401, 403, 404</td>
+</tr>
+</tbody></table></div>
+<p><strong>좋아요</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>API</th>
+<th>규칙</th>
+<th>성공</th>
+<th>실패</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>POST /api/v1/posts/{postId}/like</code></td>
+<td>토글: 없으면 만들고 있으면 취소. 응답 <code>{liked, likeCount}</code></td>
+<td>200</td>
+<td>401, 404</td>
+</tr>
+</tbody></table></div>
+<h3 id="4-단계-순서"><a class="anchor" href="#4-단계-순서" aria-hidden="true">#</a>4. 단계 순서</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>단계</th>
+<th>하는 일</th>
+<th>난이도</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>10-1</td>
+<td>프로젝트 만들기, DB·Flyway V1, CORS, 헬스 체크</td>
+<td>쉬움</td>
+</tr>
+<tr>
+<td>10-2</td>
+<td>공통 응답 틀·전역 예외 처리</td>
+<td>쉬움</td>
+</tr>
+<tr>
+<td>10-3</td>
+<td>회원 가입(BCrypt, 이메일 중복 409)</td>
+<td>쉬움</td>
+</tr>
+<tr>
+<td>10-4</td>
+<td>로그인과 JWT, <code>GET /users/me</code></td>
+<td>중급</td>
+</tr>
+<tr>
+<td>10-5</td>
+<td>게시글 작성 — JPA</td>
+<td>중급</td>
+</tr>
+<tr>
+<td>10-6</td>
+<td>게시글 상세(조회수·댓글 함께, N+1 피하기)</td>
+<td>중급</td>
+</tr>
+<tr>
+<td>10-7</td>
+<td>목록 — 최신·인기·페이지·커서·태그·검색(JPA). 선택 칸: 같은 목록을 MyBatis로</td>
+<td>중급</td>
+</tr>
+<tr>
+<td>10-8</td>
+<td>수정(PUT)·삭제(soft), 작성자 검증 403</td>
+<td>중급</td>
+</tr>
+<tr>
+<td>10-9</td>
+<td>댓글 작성·목록(답글 트리)·삭제</td>
+<td>중급</td>
+</tr>
+<tr>
+<td>10-10</td>
+<td>좋아요 토글</td>
+<td>쉬움</td>
+</tr>
+<tr>
+<td>10-11</td>
+<td>토글의 문제 겪기 → 멱등 PUT/DELETE를 v2로</td>
+<td>고급</td>
+</tr>
+<tr>
+<td>10-12</td>
+<td>(선택) JPA로 쓰고 MyBatis로 바로 읽기 — flush</td>
+<td>고급</td>
+</tr>
+</tbody></table></div>
+<p>쓰기도 목록도 <strong>JPA</strong>로 만든다(0~9장과 같은 기술). 실무에서는 정렬·조건이 자주 바뀌는 조회를 SQL을 직접 쓰는 <strong>MyBatis</strong>로 짜는 곳도 많아서, 10-7에 같은 목록을 MyBatis로 짜 보는 <strong>선택 칸</strong>을 두었다. 한 서비스에서 둘을 함께 쓸 때 생기는 함정(flush)은 <strong>선택 단계</strong> 10-12에서 겪는다. 둘 다 건너뛰어도 명세서 프로젝트는 끝까지 간다.</p>
+</div>
+  </details><details class="lesson-scene lesson-understand" data-lesson-kind="understand" open>
+    <summary id="만들-것" aria-label="만들 것 내용 펼치기"><span class="lesson-scene-index">03</span><span class="lesson-scene-glyph" aria-hidden="true">◇</span><span class="lesson-scene-title"><small>무엇을 만들까</small><strong>만들 것</strong><em>javaExperience 레포 루트에서 한 번 실행한다. 이미 있는 DB는 건드리지 않고 없는 project 만 빈 DB로 만든다.</em></span><span class="lesson-scene-count">1개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>DB 준비</span><span>시드 데이터 (V1이 넣는 것)</span></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>프로젝트</td>
+<td><a href="https://start.spring.io" target="_blank" rel="noopener">start.spring.io</a>에서 Gradle - Groovy, Java, Spring Boot <strong>4.1.1</strong>, Group <code>org.example</code>, Artifact <code>board-api</code>, Package name <code>org.example.board</code>, Java <strong>21</strong></td>
+</tr>
+<tr>
+<td>의존성</td>
+<td>Spring Web, Spring Data JPA, Validation, MySQL Driver, Flyway Migration. MyBatis는 지금 고르지 않는다 — 10-7 선택 칸이나 10-12를 할 때 추가</td>
+</tr>
+<tr>
+<td>DB</td>
+<td>javaExperience MySQL의 빈 DB <code>project</code>(계정 <code>community</code>/<code>community</code>) — 아래 <a href="#db-준비">DB 준비</a></td>
+</tr>
+<tr>
+<td>마이그레이션</td>
+<td><code>src/main/resources/db/migration/V1__init.sql</code> — 아래 전문을 그대로</td>
+</tr>
+<tr>
+<td>CORS</td>
+<td><code>/api/**</code>를 브라우저 화면에 연다(1-1과 같은 설정)</td>
+</tr>
+<tr>
+<td>메서드·경로</td>
+<td><code>GET /api/v1/health</code></td>
+</tr>
+<tr>
+<td>응답</td>
+<td>상태 <code>200</code>, <code>{ &quot;up&quot;: true, &quot;database&quot;: &quot;project&quot;, &quot;users&quot;, &quot;posts&quot;, &quot;comments&quot;, &quot;likes&quot; }</code> — 숫자는 각 테이블의 행 수. <strong>이 단계에서는 공통 응답 틀 없이</strong> 이 모양 그대로(틀은 10-2)</td>
+</tr>
+</tbody></table></div>
+<h3 id="db-준비"><a class="anchor" href="#db-준비" aria-hidden="true">#</a>DB 준비</h3>
+<p>javaExperience 레포 루트에서 한 번 실행한다. 이미 있는 DB는 건드리지 않고 없는 <code>project</code>만 빈 DB로 만든다.</p>
+<pre><code class="language-bash">docker compose exec -T mysql mysql -uroot -proot -e &quot;CREATE DATABASE IF NOT EXISTS project; GRANT ALL PRIVILEGES ON project.* TO 'community'@'%';&quot;</code></pre>
+<p>명령이 성공하면 빈 <code>project</code> DB와 권한이 준비된 것이다. 테이블은 앱이 처음 뜰 때 Flyway가 만든다. 처음 상태로 돌리고 싶으면 <code>docker compose down -v &amp;&amp; docker compose up -d</code>을 실행한다. <code>project</code>가 다시 빈 DB가 되고, 앱을 띄우면 V1이 다시 돈다(<code>community</code>·<code>practice</code>도 함께 처음 상태로 돌아간다).</p>
+<h3 id="시드-데이터-v1이-넣는-것"><a class="anchor" href="#시드-데이터-v1이-넣는-것" aria-hidden="true">#</a>시드 데이터 (V1이 넣는 것)</h3>
+<p><strong>회원 3명</strong> — 비밀번호는 셋 다 <strong><code>password1234</code></strong> 다. DB에는 BCrypt 해시로만 들어 있다(해시가 셋 다 다른 것은 솔트 때문이다 — 10-3).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>id</th>
+<th>이메일</th>
+<th>닉네임</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>kim@example.com</code></td>
+<td>김자바 — <strong>여러분의 기본 계정</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>lee@example.com</code></td>
+<td>이스프링</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>park@example.com</code></td>
+<td>박디비</td>
+</tr>
+</tbody></table></div>
+<p><strong>글 25개</strong> — 1~23은 공개 글, 작성자는 김자바·이스프링·박디비 순서로 돈다. 채점이 기대는 글은 아래와 같다. 여러분이 만드는 글은 id 26부터 붙는다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>글</th>
+<th>특징</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>김자바 글. 댓글 트리 — 답글 2개 달린 댓글, <strong>삭제됐지만 답글이 있는 댓글</strong>, 지운 답글, 답글 없이 지운 댓글</td>
+</tr>
+<tr>
+<td>2·6·11</td>
+<td>좋아요 3개(인기순 맨 앞 — 같으면 id가 큰 11 → 6 → 2)</td>
+</tr>
+<tr>
+<td>1·4·9·14·17</td>
+<td>좋아요 2개</td>
+</tr>
+<tr>
+<td>5·11·17·21</td>
+<td>태그 <code>mybatis</code></td>
+</tr>
+<tr>
+<td>6·20</td>
+<td>제목에 &quot;트랜잭션&quot;</td>
+</tr>
+<tr>
+<td>12·18·22</td>
+<td>태그 <code>회고</code>(공개)</td>
+</tr>
+<tr>
+<td>24</td>
+<td>김자바의 <strong><code>PRIVATE</code></strong> 글(태그 <code>회고</code>) — 김자바만 본다</td>
+</tr>
+<tr>
+<td>25</td>
+<td><strong>삭제된 글</strong>(<code>deleted_at</code>) — 아무도 못 본다</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li>태그 6개: <code>java</code>, <code>spring</code>, <code>jpa</code>, <code>mybatis</code>, <code>mysql</code>, <code>회고</code></li>
+<li>좋아요 30개는 회원마다 10개씩이다. <code>posts.like_count</code>는 <code>post_likes</code> 행 수와 맞춰 두었다. 김자바(1)는 글 11에 좋아요를 눌러 두었다.</li>
+</ul>
+</div>
+  </details><details class="lesson-scene lesson-build" data-lesson-kind="build">
+    <summary id="따라-치기" aria-label="따라 치기 내용 펼치기"><span class="lesson-scene-index">04</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>따라 치기</strong><em>start.spring.io에서 받은 zip을 풀어 IntelliJ로 연다. 아래 파일들을 맞춘다.</em></span><span class="lesson-scene-count">6개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>build.gradle</span><span>application.yml</span><span>V1__init.sql — 스키마와 시드 전문</span></div>
+<p>start.spring.io에서 받은 zip을 풀어 IntelliJ로 연다. 아래 파일들을 맞춘다.</p>
+<h3 id="buildgradle"><a class="anchor" href="#buildgradle" aria-hidden="true">#</a>build.gradle</h3>
+<p><code>build.gradle</code></p>
+<pre><code class="language-groovy">plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'org.example'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // start.spring.io에서 고른 것: Spring Web · Spring Data JPA · Validation · MySQL Driver · Flyway Migration
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    runtimeOnly 'org.flywaydb:flyway-mysql'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id &#39;org.springframework.boot&#39; version &#39;4.1.1&#39;</code></td>
+<td>Spring Boot 플러그인. <code>bootRun</code>(실행)·<code>bootJar</code>(실행 가능한 jar) 작업을 준다</td>
+</tr>
+<tr>
+<td><code>id &#39;io.spring.dependency-management&#39;</code></td>
+<td>Boot가 검증한 라이브러리 버전 묶음(BOM)을 적용한다. 그래서 아래 의존성 대부분에 버전이 없다</td>
+</tr>
+<tr>
+<td><code>languageVersion = JavaLanguageVersion.of(21)</code></td>
+<td>컴파일·실행에 쓸 JDK 버전</td>
+</tr>
+<tr>
+<td><code>spring-boot-starter-webmvc</code></td>
+<td>Spring MVC + 내장 Tomcat + JSON(Jackson). Boot 4부터 이름이 <code>starter-web</code>에서 <code>starter-webmvc</code>로 바뀌었다</td>
+</tr>
+<tr>
+<td><code>spring-boot-starter-data-jpa</code></td>
+<td>JPA(Hibernate)와 커넥션 풀(HikariCP)</td>
+</tr>
+<tr>
+<td><code>spring-boot-starter-validation</code></td>
+<td><code>@NotBlank</code>·<code>@Size</code> 같은 입력 검증</td>
+</tr>
+<tr>
+<td><code>spring-boot-starter-flyway</code> · <code>flyway-mysql</code></td>
+<td>앱이 뜰 때 <code>db/migration</code>의 SQL을 순서대로 실행한다. MySQL용 모듈이 따로 있다</td>
+</tr>
+<tr>
+<td><code>runtimeOnly &#39;com.mysql:mysql-connector-j&#39;</code></td>
+<td>MySQL 드라이버. 코드에서 직접 부르지 않으니 실행할 때만 있으면 된다</td>
+</tr>
+</tbody></table></div>
+<p>start.spring.io가 만든 파일은 주석·순서가 다를 수 있다. dependencies 줄이 같으면 된다(Gradle 의존성은 <a href="../../lessons/C2-gradle-dependencies.html">C2</a>). MyBatis(<code>mybatis-spring-boot-starter</code>)는 10-7 선택 칸이나 10-12를 할 때 그 단계의 안내대로 한 줄 추가한다.</p>
+<h3 id="applicationyml"><a class="anchor" href="#applicationyml" aria-hidden="true">#</a>application.yml</h3>
+<p><code>src/main/resources/application.yml</code> — 생성된 <code>application.properties</code>는 지우고 이 파일을 만든다.</p>
+<pre><code class="language-yaml">spring:
+  application:
+    name: board-api
+  datasource:
+    # javaExperience MySQL(호스트 3306)의 project DB. 빈 DB면 Flyway가 V1으로 테이블·시드를 만든다
+    url: jdbc:mysql://localhost:13308/project?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  jpa:
+    hibernate:
+      # 스키마는 Flyway만 만든다. 엔티티가 테이블과 다르면 기동이 실패한다
+      ddl-auto: validate
+    open-in-view: false</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>url: jdbc:mysql://localhost:13308/project?...</code></td>
+<td>javaExperience MySQL(호스트 3306)의 <code>project</code> DB. <code>characterEncoding=UTF-8</code>은 한글, <code>serverTimezone</code>은 시각 변환 기준</td>
+</tr>
+<tr>
+<td><code>username</code> · <code>password</code></td>
+<td>실습 계정. 이 계정은 <code>community</code>·<code>practice</code>·<code>project</code> 세 DB에만 권한이 있다</td>
+</tr>
+<tr>
+<td><code>ddl-auto: validate</code></td>
+<td>Hibernate가 테이블을 <strong>만들거나 고치지 않고</strong>, 엔티티와 테이블이 맞는지 확인만 한다. 테이블은 Flyway만 만든다</td>
+</tr>
+<tr>
+<td><code>open-in-view: false</code></td>
+<td>DB 연결을 트랜잭션이 끝나면 바로 돌려준다(응답 JSON을 만드는 동안 붙잡지 않음)</td>
+</tr>
+</tbody></table></div>
+<p>Flyway 설정은 따로 적지 않았다. 기본값이 <code>classpath:db/migration</code> 폴더를 읽는 것이라 그대로 쓴다(설정 파일은 <a href="../../lessons/C3-application-yml-profiles.html">C3</a>).</p>
+<h3 id="v1__initsql--스키마와-시드-전문"><a class="anchor" href="#v1__initsql--스키마와-시드-전문" aria-hidden="true">#</a>V1__init.sql — 스키마와 시드 전문</h3>
+<p><code>src/main/resources/db/migration/V1__init.sql</code> — 파일 이름이 규칙이다. <strong><code>V</code> + 버전 + 밑줄 두 개(<code>__</code>) + 설명 + <code>.sql</code></strong>. 아래를 그대로 붙여 넣는다.</p>
+<pre><code class="language-sql">-- V1 — 명세서 프로젝트(게시판 API v1) 스키마와 시드 데이터
+-- 시드 회원 3명의 비밀번호는 모두 password1234 (BCrypt 해시로 저장 — 해시가 셋 다 다른 것은 솔트 때문이다)
+
+CREATE TABLE users (
+    id            BIGINT       NOT NULL AUTO_INCREMENT,
+    email         VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(100) NOT NULL,
+    nickname      VARCHAR(20)  NOT NULL,
+    created_at    DATETIME     NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_users_email UNIQUE (email)
+);
+
+CREATE TABLE posts (
+    id         BIGINT                     NOT NULL AUTO_INCREMENT,
+    author_id  BIGINT                     NOT NULL,
+    title      VARCHAR(100)               NOT NULL,
+    content    VARCHAR(10000)             NULL,
+    visibility ENUM ('PUBLIC', 'PRIVATE') NOT NULL DEFAULT 'PUBLIC',
+    view_count INT                        NOT NULL DEFAULT 0,
+    like_count INT                        NOT NULL DEFAULT 0,
+    created_at DATETIME                   NOT NULL,
+    updated_at DATETIME                   NOT NULL,
+    deleted_at DATETIME                   NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_posts_author FOREIGN KEY (author_id) REFERENCES users (id),
+    INDEX idx_posts_popular (like_count, id)
+);
+
+CREATE TABLE tags (
+    id   BIGINT      NOT NULL AUTO_INCREMENT,
+    name VARCHAR(20) NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_tags_name UNIQUE (name)
+);
+
+CREATE TABLE post_tags (
+    post_id BIGINT NOT NULL,
+    tag_id  BIGINT NOT NULL,
+    PRIMARY KEY (post_id, tag_id),
+    CONSTRAINT fk_post_tags_post FOREIGN KEY (post_id) REFERENCES posts (id),
+    CONSTRAINT fk_post_tags_tag FOREIGN KEY (tag_id) REFERENCES tags (id)
+);
+
+CREATE TABLE comments (
+    id         BIGINT       NOT NULL AUTO_INCREMENT,
+    post_id    BIGINT       NOT NULL,
+    author_id  BIGINT       NOT NULL,
+    parent_id  BIGINT       NULL,
+    content    VARCHAR(500) NOT NULL,
+    created_at DATETIME     NOT NULL,
+    deleted_at DATETIME     NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_comments_post FOREIGN KEY (post_id) REFERENCES posts (id),
+    CONSTRAINT fk_comments_author FOREIGN KEY (author_id) REFERENCES users (id),
+    CONSTRAINT fk_comments_parent FOREIGN KEY (parent_id) REFERENCES comments (id)
+);
+
+CREATE TABLE post_likes (
+    post_id    BIGINT   NOT NULL,
+    user_id    BIGINT   NOT NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (post_id, user_id),
+    CONSTRAINT fk_post_likes_post FOREIGN KEY (post_id) REFERENCES posts (id),
+    CONSTRAINT fk_post_likes_user FOREIGN KEY (user_id) REFERENCES users (id)
+);
+
+-- 회원 3 (비밀번호 password1234)
+INSERT INTO users (id, email, password_hash, nickname, created_at) VALUES
+    (1, 'kim@example.com', '$2a$10$jmTUgTXkmVjHx6KM72lBku3ufsYi0KFoYZ6y8BzknkrxDUPnvfpaO', '김자바', '2026-08-31 09:00:00'),
+    (2, 'lee@example.com', '$2a$10$iIfM01MHi3EG7/sAyms78ucqvCw4tDYz7FG6xI4fGNwgEZuJhpOcC', '이스프링', '2026-08-31 09:00:00'),
+    (3, 'park@example.com', '$2a$10$p3sn.5r2aM7ii39XAbum.OHxesye.TaVYOy59GVDyeIEROyxpraUC', '박디비', '2026-08-31 09:00:00');
+
+-- 태그 6
+INSERT INTO tags (id, name) VALUES (1, 'java'), (2, 'spring'), (3, 'jpa'), (4, 'mybatis'), (5, 'mysql'), (6, '회고');
+
+-- 글 25 — 24는 PRIVATE(김자바만 본다), 25는 삭제된 글(아무도 못 본다). like_count는 아래 post_likes 행 수와 같다
+INSERT INTO posts (id, author_id, title, content, visibility, view_count, like_count, created_at, updated_at, deleted_at) VALUES
+    (1, 1, '자바 record 정리', '자바 record 정리 — 본문입니다.', 'PUBLIC', 10, 2, '2026-09-01 09:00:00', '2026-09-01 09:00:00', NULL),
+    (2, 2, '스프링 빈과 의존성 주입', '스프링 빈과 의존성 주입 — 본문입니다.', 'PUBLIC', 17, 3, '2026-09-02 09:00:00', '2026-09-02 09:00:00', NULL),
+    (3, 3, 'MySQL 인덱스 처음 만들기', 'MySQL 인덱스 처음 만들기 — 본문입니다.', 'PUBLIC', 24, 1, '2026-09-03 09:00:00', '2026-09-03 09:00:00', NULL),
+    (4, 1, 'JPA 엔티티 매핑 기초', 'JPA 엔티티 매핑 기초 — 본문입니다.', 'PUBLIC', 31, 2, '2026-09-04 09:00:00', '2026-09-04 09:00:00', NULL),
+    (5, 2, 'MyBatis 동적 SQL 맛보기', 'MyBatis 동적 SQL 맛보기 — 본문입니다.', 'PUBLIC', 38, 1, '2026-09-05 09:00:00', '2026-09-05 09:00:00', NULL),
+    (6, 3, '트랜잭션은 언제 커밋되나', '트랜잭션은 언제 커밋되나 — 본문입니다.', 'PUBLIC', 45, 3, '2026-09-06 09:00:00', '2026-09-06 09:00:00', NULL),
+    (7, 1, 'Optional 제대로 쓰기', 'Optional 제대로 쓰기 — 본문입니다.', 'PUBLIC', 52, 1, '2026-09-07 09:00:00', '2026-09-07 09:00:00', NULL),
+    (8, 2, '컨트롤러와 서비스 나누기', '컨트롤러와 서비스 나누기 — 본문입니다.', 'PUBLIC', 9, 0, '2026-09-08 09:00:00', '2026-09-08 09:00:00', NULL),
+    (9, 3, 'JOIN 세 가지 비교', 'JOIN 세 가지 비교 — 본문입니다.', 'PUBLIC', 16, 2, '2026-09-09 09:00:00', '2026-09-09 09:00:00', NULL),
+    (10, 1, 'JPA N+1 문제 겪어 보기', 'JPA N+1 문제 겪어 보기 — 본문입니다.', 'PUBLIC', 23, 1, '2026-09-10 09:00:00', '2026-09-10 09:00:00', NULL),
+    (11, 2, 'MyBatis와 JPA 같이 쓰기', 'MyBatis와 JPA 같이 쓰기 — 본문입니다.', 'PUBLIC', 30, 3, '2026-09-11 09:00:00', '2026-09-11 09:00:00', NULL),
+    (12, 3, '첫 주 회고', '첫 주 회고 — 본문입니다.', 'PUBLIC', 37, 1, '2026-09-12 09:00:00', '2026-09-12 09:00:00', NULL),
+    (13, 1, '스트림 API 연습', '스트림 API 연습 — 본문입니다.', 'PUBLIC', 44, 1, '2026-09-13 09:00:00', '2026-09-13 09:00:00', NULL),
+    (14, 2, '검증 애노테이션 모음', '검증 애노테이션 모음 — 본문입니다.', 'PUBLIC', 51, 2, '2026-09-14 09:00:00', '2026-09-14 09:00:00', NULL),
+    (15, 3, '실행 계획 읽는 법', '실행 계획 읽는 법 — 본문입니다.', 'PUBLIC', 8, 1, '2026-09-15 09:00:00', '2026-09-15 09:00:00', NULL),
+    (16, 1, '지연 로딩과 프록시', '지연 로딩과 프록시 — 본문입니다.', 'PUBLIC', 15, 1, '2026-09-16 09:00:00', '2026-09-16 09:00:00', NULL),
+    (17, 2, 'resultMap 써 보기', 'resultMap 써 보기 — 본문입니다.', 'PUBLIC', 22, 2, '2026-09-17 09:00:00', '2026-09-17 09:00:00', NULL),
+    (18, 3, '둘째 주 회고', '둘째 주 회고 — 본문입니다.', 'PUBLIC', 29, 1, '2026-09-18 09:00:00', '2026-09-18 09:00:00', NULL),
+    (19, 1, '예외 처리 한곳에 모으기', '예외 처리 한곳에 모으기 — 본문입니다.', 'PUBLIC', 36, 0, '2026-09-19 09:00:00', '2026-09-19 09:00:00', NULL),
+    (20, 2, '트랜잭션 격리 수준', '트랜잭션 격리 수준 — 본문입니다.', 'PUBLIC', 43, 1, '2026-09-20 09:00:00', '2026-09-20 09:00:00', NULL),
+    (21, 3, '페이지와 커서 페이징', '페이지와 커서 페이징 — 본문입니다.', 'PUBLIC', 50, 1, '2026-09-21 09:00:00', '2026-09-21 09:00:00', NULL),
+    (22, 1, '셋째 주 회고', '셋째 주 회고 — 본문입니다.', 'PUBLIC', 7, 0, '2026-09-22 09:00:00', '2026-09-22 09:00:00', NULL),
+    (23, 2, '태그 없는 글입니다', '태그 없는 글입니다 — 본문입니다.', 'PUBLIC', 14, 0, '2026-09-23 09:00:00', '2026-09-23 09:00:00', NULL),
+    (24, 1, '나만 보는 메모', '나만 보는 메모 — 본문입니다.', 'PRIVATE', 21, 0, '2026-09-24 09:00:00', '2026-09-24 09:00:00', NULL),
+    (25, 2, '지워진 글입니다', '지워진 글입니다 — 본문입니다.', 'PUBLIC', 28, 0, '2026-09-25 09:00:00', '2026-09-25 09:00:00', '2026-09-25 14:00:00');
+
+INSERT INTO post_tags (post_id, tag_id) VALUES
+    (1, 1), (2, 2), (2, 1), (3, 5), (4, 3), (5, 4), (6, 2), (6, 5), (7, 1), (8, 2), (9, 5), (10, 3), (11, 4), (11, 3), (12, 6), (13, 1), (14, 2), (15, 5), (16, 3), (17, 4), (18, 6), (19, 2), (20, 5), (21, 4), (21, 5), (22, 6), (24, 6), (25, 6);
+
+-- 댓글 40 — 1번 글에 트리(답글·삭제된 부모·삭제된 답글)를 모아 두었다
+INSERT INTO comments (id, post_id, author_id, parent_id, content, created_at, deleted_at) VALUES
+    (1, 1, 2, NULL, '좋은 정리네요', '2026-09-01 10:00:00', NULL),
+    (2, 1, 3, 1, '저도 그렇게 생각해요', '2026-09-01 10:10:00', NULL),
+    (3, 1, 1, 1, '감사합니다!', '2026-09-01 10:20:00', NULL),
+    (4, 1, 3, NULL, '지울 댓글', '2026-09-01 10:30:00', '2026-09-01 10:35:00'),
+    (5, 1, 2, 4, '삭제된 댓글에 단 답글', '2026-09-01 10:40:00', NULL),
+    (6, 1, 1, NULL, 'record는 불변이라 좋아요', '2026-09-01 10:50:00', NULL),
+    (7, 1, 2, 6, '지운 답글', '2026-09-01 11:00:00', '2026-09-01 11:05:00'),
+    (8, 1, 3, NULL, '아무 답글 없이 지운 댓글', '2026-09-01 11:10:00', '2026-09-01 11:15:00'),
+    (9, 2, 3, NULL, '저는 조금 다르게 했어요', '2026-09-02 11:00:00', NULL),
+    (10, 2, 1, NULL, '덕분에 해결했습니다', '2026-09-02 12:00:00', NULL),
+    (11, 3, 1, NULL, '덕분에 해결했습니다', '2026-09-03 11:00:00', NULL),
+    (12, 3, 2, NULL, '잘 읽었습니다', '2026-09-03 12:00:00', NULL),
+    (13, 4, 2, NULL, '잘 읽었습니다', '2026-09-04 11:00:00', NULL),
+    (14, 4, 3, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-04 12:00:00', NULL),
+    (15, 5, 3, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-05 11:00:00', NULL),
+    (16, 5, 1, NULL, '저는 조금 다르게 했어요', '2026-09-05 12:00:00', NULL),
+    (17, 6, 1, NULL, '저는 조금 다르게 했어요', '2026-09-06 11:00:00', NULL),
+    (18, 6, 2, NULL, '덕분에 해결했습니다', '2026-09-06 12:00:00', NULL),
+    (19, 7, 2, NULL, '덕분에 해결했습니다', '2026-09-07 11:00:00', NULL),
+    (20, 7, 3, NULL, '잘 읽었습니다', '2026-09-07 12:00:00', NULL),
+    (21, 8, 3, NULL, '잘 읽었습니다', '2026-09-08 11:00:00', NULL),
+    (22, 8, 1, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-08 12:00:00', NULL),
+    (23, 9, 1, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-09 11:00:00', NULL),
+    (24, 9, 2, NULL, '저는 조금 다르게 했어요', '2026-09-09 12:00:00', NULL),
+    (25, 10, 2, NULL, '저는 조금 다르게 했어요', '2026-09-10 11:00:00', NULL),
+    (26, 10, 3, NULL, '덕분에 해결했습니다', '2026-09-10 12:00:00', NULL),
+    (27, 11, 3, NULL, '덕분에 해결했습니다', '2026-09-11 11:00:00', NULL),
+    (28, 11, 1, NULL, '잘 읽었습니다', '2026-09-11 12:00:00', NULL),
+    (29, 12, 1, NULL, '잘 읽었습니다', '2026-09-12 11:00:00', NULL),
+    (30, 12, 2, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-12 12:00:00', NULL),
+    (31, 13, 2, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-13 11:00:00', NULL),
+    (32, 13, 3, NULL, '저는 조금 다르게 했어요', '2026-09-13 12:00:00', NULL),
+    (33, 14, 3, NULL, '저는 조금 다르게 했어요', '2026-09-14 11:00:00', NULL),
+    (34, 14, 1, NULL, '덕분에 해결했습니다', '2026-09-14 12:00:00', NULL),
+    (35, 15, 1, NULL, '덕분에 해결했습니다', '2026-09-15 11:00:00', NULL),
+    (36, 15, 2, NULL, '잘 읽었습니다', '2026-09-15 12:00:00', NULL),
+    (37, 16, 2, NULL, '잘 읽었습니다', '2026-09-16 11:00:00', NULL),
+    (38, 16, 3, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-16 12:00:00', NULL),
+    (39, 17, 3, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-17 11:00:00', NULL),
+    (40, 17, 1, NULL, '저는 조금 다르게 했어요', '2026-09-17 12:00:00', NULL);
+
+-- 좋아요 30 — 회원마다 10개. 3개: 2·6·11번 / 2개: 1·4·9·14·17번 / 1개: 나머지 11개 글
+INSERT INTO post_likes (post_id, user_id, created_at) VALUES
+    (2, 1, '2026-09-03 10:00:00'), (6, 1, '2026-09-07 10:00:00'), (11, 1, '2026-09-12 10:00:00'), (1, 1, '2026-09-02 10:00:00'), (9, 1, '2026-09-10 10:00:00'),
+    (14, 1, '2026-09-15 10:00:00'), (3, 1, '2026-09-04 10:00:00'), (5, 1, '2026-09-06 10:00:00'), (7, 1, '2026-09-08 10:00:00'), (10, 1, '2026-09-11 10:00:00'),
+    (2, 2, '2026-09-03 11:00:00'), (6, 2, '2026-09-07 11:00:00'), (11, 2, '2026-09-12 11:00:00'), (1, 2, '2026-09-02 11:00:00'), (4, 2, '2026-09-05 11:00:00'),
+    (14, 2, '2026-09-15 11:00:00'), (17, 2, '2026-09-18 11:00:00'), (12, 2, '2026-09-13 11:00:00'), (13, 2, '2026-09-14 11:00:00'), (15, 2, '2026-09-16 11:00:00'),
+    (2, 3, '2026-09-03 12:00:00'), (6, 3, '2026-09-07 12:00:00'), (11, 3, '2026-09-12 12:00:00'), (4, 3, '2026-09-05 12:00:00'), (9, 3, '2026-09-10 12:00:00'),
+    (17, 3, '2026-09-18 12:00:00'), (16, 3, '2026-09-17 12:00:00'), (18, 3, '2026-09-19 12:00:00'), (20, 3, '2026-09-21 12:00:00'), (21, 3, '2026-09-22 12:00:00');</code></pre>
+<p>읽을 곳:</p>
+<ul>
+<li><code>ENUM (&#39;PUBLIC&#39;, &#39;PRIVATE&#39;)</code> — 이 두 값만 들어간다. JPA에서는 <code>@Enumerated(EnumType.STRING)</code>으로 맞춘다(10-5).</li>
+<li><code>INDEX idx_posts_popular (like_count, id)</code> — 인기순 정렬(<code>like_count DESC, id DESC</code>)용 인덱스.</li>
+<li><code>comments.parent_id</code>가 같은 테이블의 <code>id</code>를 가리킨다(자기 참조 외래 키). 답글을 이렇게 표현한다.</li>
+<li>비밀번호 칸에 <code>$2a$10$...</code>가 들어 있다. <code>$2a$</code>는 BCrypt, <code>10</code>은 반복 강도(2의 10제곱 번)다.</li>
+</ul>
+<p>Flyway는 실행한 파일을 <code>flyway_schema_history</code> 테이블에 적고 <strong>다시 실행하지 않는다</strong>. 한 번 적용한 V1을 고치면 다음 기동이 실패한다(아래 망가뜨리기 ③). 스키마를 바꾸려면 V2 파일을 새로 만든다(마이그레이션은 <a href="../../lessons/J2-why-migrations.html">J2</a>).</p>
+<h3 id="corsconfig"><a class="anchor" href="#corsconfig" aria-hidden="true">#</a>CorsConfig</h3>
+<p><code>src/main/java/org/example/board/common/CorsConfig.java</code></p>
+<pre><code class="language-java">package org.example.board.common;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+// 별도 브라우저 실행 화면(다른 출처)이 /api/** 를 부를 수 있게 연다 — 1-1과 같은 설정
+@Configuration
+public class CorsConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping(&quot;/api/**&quot;)
+                .allowedOriginPatterns(&quot;http://localhost:[*]&quot;, &quot;http://127.0.0.1:[*]&quot;)
+                .allowedMethods(&quot;GET&quot;, &quot;POST&quot;, &quot;PUT&quot;, &quot;PATCH&quot;, &quot;DELETE&quot;, &quot;OPTIONS&quot;)
+                .allowedHeaders(&quot;Content-Type&quot;, &quot;Authorization&quot;)
+                .exposedHeaders(&quot;Location&quot;, &quot;WWW-Authenticate&quot;);
+    }
+}</code></pre>
+<p>1-1의 <a href="../ch1-create-post/1-1-receive-request.html#cors-열기">CORS 열기</a>와 같다. 왜 필요한지는 <a href="../../lessons/F3-cors.html">F3</a>에 있다.</p>
+<p>짧게 정리하면 이렇다. 브라우저 화면(<code>localhost:3000</code>)과 내 서버(<code>localhost:8080</code>)는 출처가 달라서, 서버가 허락해야 브라우저가 응답을 화면 코드에 넘겨준다. <code>PUT</code>·<code>DELETE</code>와 <code>Authorization</code> 헤더는 10-4 이후에 쓰지만 지금 같이 열어 둔다.</p>
+<h3 id="healthcontroller"><a class="anchor" href="#healthcontroller" aria-hidden="true">#</a>HealthController</h3>
+<p><code>src/main/java/org/example/board/common/HealthController.java</code></p>
+<pre><code class="language-java">package org.example.board.common;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+// 서버가 떠 있고, project DB에 붙었고, Flyway V1이 시드를 넣었는지 한 번에 본다
+@RestController
+public class HealthController {
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public HealthController(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @GetMapping(&quot;/api/v1/health&quot;)
+    public Map&lt;String, Object&gt; health() {
+        Map&lt;String, Object&gt; body = new LinkedHashMap&lt;&gt;();
+        body.put(&quot;up&quot;, true);
+        body.put(&quot;database&quot;, jdbcTemplate.queryForObject(&quot;SELECT DATABASE()&quot;, String.class));
+        body.put(&quot;users&quot;, count(&quot;users&quot;));
+        body.put(&quot;posts&quot;, count(&quot;posts&quot;));
+        body.put(&quot;comments&quot;, count(&quot;comments&quot;));
+        body.put(&quot;likes&quot;, count(&quot;post_likes&quot;));
+        return body;
+    }
+
+    private long count(String table) {
+        return jdbcTemplate.queryForObject(&quot;SELECT COUNT(*) FROM &quot; + table, Long.class);
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>private final JdbcTemplate jdbcTemplate;</code> + 생성자</td>
+<td>Spring이 만들어 둔 <code>JdbcTemplate</code>(SQL을 바로 실행하는 도구)을 생성자로 받는다. 생성자가 하나면 <code>@Autowired</code>를 안 적어도 된다</td>
+</tr>
+<tr>
+<td><code>Map&lt;String, Object&gt; body = new LinkedHashMap&lt;&gt;();</code></td>
+<td>응답 JSON 객체. <code>LinkedHashMap</code>은 넣은 순서를 지켜서 JSON 키 순서가 코드 순서와 같다</td>
+</tr>
+<tr>
+<td><code>queryForObject(&quot;SELECT DATABASE()&quot;, String.class)</code></td>
+<td>결과가 한 칸인 SQL을 실행해 그 값을 <code>String</code>으로 받는다. 지금 붙은 DB 이름이다</td>
+</tr>
+<tr>
+<td><code>&quot;SELECT COUNT(*) FROM &quot; + table</code></td>
+<td>테이블 이름은 <code>?</code> 자리표시자로 넣을 수 없어 문자열로 붙였다. <strong>바깥 입력을 이렇게 붙이면 SQL 주입이 된다</strong> — 여기서는 코드에 박힌 이름만 쓰므로 괜찮다</td>
+</tr>
+</tbody></table></div>
+<h3 id="실행"><a class="anchor" href="#실행" aria-hidden="true">#</a>실행</h3>
+<p>IntelliJ에서 <code>BoardApiApplication</code>을 실행하거나 터미널에서 <code>./gradlew bootRun</code>을 실행한다. 로그에 아래 두 줄이 보이면 Flyway가 V1을 실행한 것이다.</p>
+<pre><code class="language-text">Migrating schema `project` to version &quot;1 - init&quot;
+Successfully applied 1 migration to schema `project`, now at version v1 (execution time 00:00.084s)</code></pre>
+</div>
+  </details><details class="lesson-scene lesson-build" data-lesson-kind="build">
+    <summary id="구현-가이드" aria-label="구현 가이드 내용 펼치기"><span class="lesson-scene-index">05</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>구현 가이드</strong><em>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 만들 것 의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</em></span><span class="lesson-scene-count">2개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 <strong>만들 것</strong>의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</p>
+<p>이 단계의 처리 흐름:</p>
+<ul>
+<li>HealthController가 JdbcTemplate으로 DB 이름과 테이블별 행 수를 읽는다</li>
+<li>테이블은 앱이 뜰 때 Flyway가 V1__init.sql로 만들었다</li>
+<li>V1_init.sql(밑줄 하나)은 Flyway가 마이그레이션으로 알아보지 못한다. 로그: No migrations found. Are your locations set up correctly? — 그래도 앱은 뜬다</li>
+<li>Table &#39;project.users&#39; doesn&#39;t exist</li>
+</ul>
+<details>
+<summary>Controller — HTTP 연결</summary>
+
+<p><code>HealthController.java</code>. 매핑과 메서드의 입력·응답을 위 <strong>만들 것</strong>의 HTTP 계약과 대조한다. 이번 단계 매핑: <code>@GetMapping(&quot;/api/v1/health&quot;)</code>. 변경된 메서드: <code>health</code>.</p>
+<pre><code class="language-java">@GetMapping(&quot;/api/v1/health&quot;)
+public Map&lt;String, Object&gt; health() {
+    Map&lt;String, Object&gt; body = new LinkedHashMap&lt;&gt;();
+    body.put(&quot;up&quot;, true);
+    body.put(&quot;database&quot;, jdbcTemplate.queryForObject(&quot;SELECT DATABASE()&quot;, String.class));
+    body.put(&quot;users&quot;, count(&quot;users&quot;));
+    body.put(&quot;posts&quot;, count(&quot;posts&quot;));
+    body.put(&quot;comments&quot;, count(&quot;comments&quot;));
+    body.put(&quot;likes&quot;, count(&quot;post_likes&quot;));
+    return body;
+}</code></pre>
+<p>테이블 이름은 사용자 입력이 아니라 컨트롤러 안의 고정 문자열 네 개다. <code>count</code>가 SQL 문자열에 이름을 붙일 수 있는 이유도 그 범위가 고정돼 있기 때문이다. 이 단계의 DB 읽기는 <code>JdbcTemplate</code>이 담당하며 JPA Entity나 MyBatis Mapper는 만들지 않는다.</p>
+</details>
+
+<details>
+<summary>Flyway / SQL — 스키마 변경</summary>
+
+<p><code>V1__init.sql</code>. 실행 순서와 DDL·백필 대상을 시나리오의 스키마 계약과 대조한다.</p>
+<p>위 <strong>따라 치기</strong>의 SQL 전문과 아래 전체 구현 코드 접기가 같은 파일이다. Flyway가 앱 기동 시 <code>V1__init.sql</code>을 한 번 적용하고 <code>flyway_schema_history</code>에 버전 <code>1</code>과 성공 여부를 기록한다. 테이블 여섯 개와 시드(회원 3·글 25·댓글 40·좋아요 30)를 SQL의 <code>CREATE TABLE</code>·<code>INSERT</code> 순서로 따라가 본다.</p>
+</details>
+
+<details>
+<summary>설정·보조 코드</summary>
+
+<p><code>CorsConfig.java</code>, <code>application.yml</code>. 이 파일에서 바뀐 설정·보조 타입이 서버 흐름의 어느 단계에 필요한지 확인한다. 변경된 메서드: <code>addCorsMappings</code>.</p>
+<pre><code class="language-java">registry.addMapping(&quot;/api/**&quot;)
+        .allowedOriginPatterns(&quot;http://localhost:[*]&quot;, &quot;http://127.0.0.1:[*]&quot;)
+        .allowedMethods(&quot;GET&quot;, &quot;POST&quot;, &quot;PUT&quot;, &quot;PATCH&quot;, &quot;DELETE&quot;, &quot;OPTIONS&quot;)
+        .allowedHeaders(&quot;Content-Type&quot;, &quot;Authorization&quot;);</code></pre>
+<p><code>application.yml</code>의 datasource는 <code>project</code> DB를 가리키고, <code>ddl-auto: validate</code>라 테이블을 만들지 않는다. 스키마 생성·시드의 책임은 Flyway V1에 있다.</p>
+</details>
+
+</div>
+  </details><details class="lesson-scene lesson-build" data-lesson-kind="build">
+    <summary id="전체-구현-코드" aria-label="전체 구현 코드 내용 펼치기"><span class="lesson-scene-index">06</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>전체 구현 코드</strong><em>이 단계에서 변경된 파일의 전문입니다.</em></span><span class="lesson-scene-count">4개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>이 단계에서 바뀐 파일</span><span>현재 전체 코드</span></div>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<div class="code-workbench" data-code-workbench><div class="code-workbench-source"><details class="code-file"><summary>설정 — src/main/java/org/example/board/common/CorsConfig.java</summary><pre><code>package org.example.board.common;&#10;&#10;import org.springframework.context.annotation.Configuration;&#10;import org.springframework.web.servlet.config.annotation.CorsRegistry;&#10;import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;&#10;&#10;// studymate 실행 칸(브라우저, 다른 출처)이 /api/** 를 부를 수 있게 연다 — 1-1과 같은 설정&#10;@Configuration&#10;public class CorsConfig implements WebMvcConfigurer {&#10;&#10;    @Override&#10;    public void addCorsMappings(CorsRegistry registry) {&#10;        registry.addMapping(&quot;/api/**&quot;)&#10;                .allowedOriginPatterns(&quot;http://localhost:[*]&quot;, &quot;http://127.0.0.1:[*]&quot;)&#10;                .allowedMethods(&quot;GET&quot;, &quot;POST&quot;, &quot;PUT&quot;, &quot;PATCH&quot;, &quot;DELETE&quot;, &quot;OPTIONS&quot;)&#10;                .allowedHeaders(&quot;Content-Type&quot;, &quot;Authorization&quot;)&#10;                .exposedHeaders(&quot;Location&quot;, &quot;WWW-Authenticate&quot;);&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/board/common/HealthController.java</summary><pre><code>package org.example.board.common;&#10;&#10;import java.util.LinkedHashMap;&#10;import java.util.Map;&#10;&#10;import org.springframework.jdbc.core.JdbcTemplate;&#10;import org.springframework.web.bind.annotation.GetMapping;&#10;import org.springframework.web.bind.annotation.RestController;&#10;&#10;// 서버가 떠 있고, project DB에 붙었고, Flyway V1이 시드를 넣었는지 한 번에 본다&#10;@RestController&#10;public class HealthController {&#10;&#10;    private final JdbcTemplate jdbcTemplate;&#10;&#10;    public HealthController(JdbcTemplate jdbcTemplate) {&#10;        this.jdbcTemplate = jdbcTemplate;&#10;    }&#10;&#10;    @GetMapping(&quot;/api/v1/health&quot;)&#10;    public Map&lt;String, Object&gt; health() {&#10;        Map&lt;String, Object&gt; body = new LinkedHashMap&lt;&gt;();&#10;        body.put(&quot;up&quot;, true);&#10;        body.put(&quot;database&quot;, jdbcTemplate.queryForObject(&quot;SELECT DATABASE()&quot;, String.class));&#10;        body.put(&quot;users&quot;, count(&quot;users&quot;));&#10;        body.put(&quot;posts&quot;, count(&quot;posts&quot;));&#10;        body.put(&quot;comments&quot;, count(&quot;comments&quot;));&#10;        body.put(&quot;likes&quot;, count(&quot;post_likes&quot;));&#10;        return body;&#10;    }&#10;&#10;    private long count(String table) {&#10;        return jdbcTemplate.queryForObject(&quot;SELECT COUNT(*) FROM &quot; + table, Long.class);&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:&#10;  application:&#10;    name: board-api&#10;  datasource:&#10;    # javaExperience MySQL(호스트 3306)의 project DB. 빈 DB면 Flyway가 V1으로 테이블·시드를 만든다&#10;    url: jdbc:mysql://localhost:13308/project?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul&#10;    username: community&#10;    password: community&#10;  jpa:&#10;    hibernate:&#10;      # 스키마는 Flyway만 만든다. 엔티티가 테이블과 다르면 기동이 실패한다&#10;      ddl-auto: validate&#10;    open-in-view: false&#10;</code></pre></details>
+<details class="code-file"><summary>DB / SQL — src/main/resources/db/migration/V1__init.sql</summary><pre><code>-- V1 — 명세서 프로젝트(게시판 API v1) 스키마와 시드 데이터&#10;-- 시드 회원 3명의 비밀번호는 모두 password1234 (BCrypt 해시로 저장 — 해시가 셋 다 다른 것은 솔트 때문이다)&#10;&#10;CREATE TABLE users (&#10;    id            BIGINT       NOT NULL AUTO_INCREMENT,&#10;    email         VARCHAR(255) NOT NULL,&#10;    password_hash VARCHAR(100) NOT NULL,&#10;    nickname      VARCHAR(20)  NOT NULL,&#10;    created_at    DATETIME     NOT NULL,&#10;    PRIMARY KEY (id),&#10;    CONSTRAINT uk_users_email UNIQUE (email)&#10;);&#10;&#10;CREATE TABLE posts (&#10;    id         BIGINT                     NOT NULL AUTO_INCREMENT,&#10;    author_id  BIGINT                     NOT NULL,&#10;    title      VARCHAR(100)               NOT NULL,&#10;    content    VARCHAR(10000)             NULL,&#10;    visibility ENUM ('PUBLIC', 'PRIVATE') NOT NULL DEFAULT 'PUBLIC',&#10;    view_count INT                        NOT NULL DEFAULT 0,&#10;    like_count INT                        NOT NULL DEFAULT 0,&#10;    created_at DATETIME                   NOT NULL,&#10;    updated_at DATETIME                   NOT NULL,&#10;    deleted_at DATETIME                   NULL,&#10;    PRIMARY KEY (id),&#10;    CONSTRAINT fk_posts_author FOREIGN KEY (author_id) REFERENCES users (id),&#10;    INDEX idx_posts_popular (like_count, id)&#10;);&#10;&#10;CREATE TABLE tags (&#10;    id   BIGINT      NOT NULL AUTO_INCREMENT,&#10;    name VARCHAR(20) NOT NULL,&#10;    PRIMARY KEY (id),&#10;    CONSTRAINT uk_tags_name UNIQUE (name)&#10;);&#10;&#10;CREATE TABLE post_tags (&#10;    post_id BIGINT NOT NULL,&#10;    tag_id  BIGINT NOT NULL,&#10;    PRIMARY KEY (post_id, tag_id),&#10;    CONSTRAINT fk_post_tags_post FOREIGN KEY (post_id) REFERENCES posts (id),&#10;    CONSTRAINT fk_post_tags_tag FOREIGN KEY (tag_id) REFERENCES tags (id)&#10;);&#10;&#10;CREATE TABLE comments (&#10;    id         BIGINT       NOT NULL AUTO_INCREMENT,&#10;    post_id    BIGINT       NOT NULL,&#10;    author_id  BIGINT       NOT NULL,&#10;    parent_id  BIGINT       NULL,&#10;    content    VARCHAR(500) NOT NULL,&#10;    created_at DATETIME     NOT NULL,&#10;    deleted_at DATETIME     NULL,&#10;    PRIMARY KEY (id),&#10;    CONSTRAINT fk_comments_post FOREIGN KEY (post_id) REFERENCES posts (id),&#10;    CONSTRAINT fk_comments_author FOREIGN KEY (author_id) REFERENCES users (id),&#10;    CONSTRAINT fk_comments_parent FOREIGN KEY (parent_id) REFERENCES comments (id)&#10;);&#10;&#10;CREATE TABLE post_likes (&#10;    post_id    BIGINT   NOT NULL,&#10;    user_id    BIGINT   NOT NULL,&#10;    created_at DATETIME NOT NULL,&#10;    PRIMARY KEY (post_id, user_id),&#10;    CONSTRAINT fk_post_likes_post FOREIGN KEY (post_id) REFERENCES posts (id),&#10;    CONSTRAINT fk_post_likes_user FOREIGN KEY (user_id) REFERENCES users (id)&#10;);&#10;&#10;-- 회원 3 (비밀번호 password1234)&#10;INSERT INTO users (id, email, password_hash, nickname, created_at) VALUES&#10;    (1, 'kim@example.com', '$2a$10$jmTUgTXkmVjHx6KM72lBku3ufsYi0KFoYZ6y8BzknkrxDUPnvfpaO', '김자바', '2026-08-31 09:00:00'),&#10;    (2, 'lee@example.com', '$2a$10$iIfM01MHi3EG7/sAyms78ucqvCw4tDYz7FG6xI4fGNwgEZuJhpOcC', '이스프링', '2026-08-31 09:00:00'),&#10;    (3, 'park@example.com', '$2a$10$p3sn.5r2aM7ii39XAbum.OHxesye.TaVYOy59GVDyeIEROyxpraUC', '박디비', '2026-08-31 09:00:00');&#10;&#10;-- 태그 6&#10;INSERT INTO tags (id, name) VALUES (1, 'java'), (2, 'spring'), (3, 'jpa'), (4, 'mybatis'), (5, 'mysql'), (6, '회고');&#10;&#10;-- 글 25 — 24는 PRIVATE(김자바만 본다), 25는 삭제된 글(아무도 못 본다). like_count는 아래 post_likes 행 수와 같다&#10;INSERT INTO posts (id, author_id, title, content, visibility, view_count, like_count, created_at, updated_at, deleted_at) VALUES&#10;    (1, 1, '자바 record 정리', '자바 record 정리 — 본문입니다.', 'PUBLIC', 10, 2, '2026-09-01 09:00:00', '2026-09-01 09:00:00', NULL),&#10;    (2, 2, '스프링 빈과 의존성 주입', '스프링 빈과 의존성 주입 — 본문입니다.', 'PUBLIC', 17, 3, '2026-09-02 09:00:00', '2026-09-02 09:00:00', NULL),&#10;    (3, 3, 'MySQL 인덱스 처음 만들기', 'MySQL 인덱스 처음 만들기 — 본문입니다.', 'PUBLIC', 24, 1, '2026-09-03 09:00:00', '2026-09-03 09:00:00', NULL),&#10;    (4, 1, 'JPA 엔티티 매핑 기초', 'JPA 엔티티 매핑 기초 — 본문입니다.', 'PUBLIC', 31, 2, '2026-09-04 09:00:00', '2026-09-04 09:00:00', NULL),&#10;    (5, 2, 'MyBatis 동적 SQL 맛보기', 'MyBatis 동적 SQL 맛보기 — 본문입니다.', 'PUBLIC', 38, 1, '2026-09-05 09:00:00', '2026-09-05 09:00:00', NULL),&#10;    (6, 3, '트랜잭션은 언제 커밋되나', '트랜잭션은 언제 커밋되나 — 본문입니다.', 'PUBLIC', 45, 3, '2026-09-06 09:00:00', '2026-09-06 09:00:00', NULL),&#10;    (7, 1, 'Optional 제대로 쓰기', 'Optional 제대로 쓰기 — 본문입니다.', 'PUBLIC', 52, 1, '2026-09-07 09:00:00', '2026-09-07 09:00:00', NULL),&#10;    (8, 2, '컨트롤러와 서비스 나누기', '컨트롤러와 서비스 나누기 — 본문입니다.', 'PUBLIC', 9, 0, '2026-09-08 09:00:00', '2026-09-08 09:00:00', NULL),&#10;    (9, 3, 'JOIN 세 가지 비교', 'JOIN 세 가지 비교 — 본문입니다.', 'PUBLIC', 16, 2, '2026-09-09 09:00:00', '2026-09-09 09:00:00', NULL),&#10;    (10, 1, 'JPA N+1 문제 겪어 보기', 'JPA N+1 문제 겪어 보기 — 본문입니다.', 'PUBLIC', 23, 1, '2026-09-10 09:00:00', '2026-09-10 09:00:00', NULL),&#10;    (11, 2, 'MyBatis와 JPA 같이 쓰기', 'MyBatis와 JPA 같이 쓰기 — 본문입니다.', 'PUBLIC', 30, 3, '2026-09-11 09:00:00', '2026-09-11 09:00:00', NULL),&#10;    (12, 3, '첫 주 회고', '첫 주 회고 — 본문입니다.', 'PUBLIC', 37, 1, '2026-09-12 09:00:00', '2026-09-12 09:00:00', NULL),&#10;    (13, 1, '스트림 API 연습', '스트림 API 연습 — 본문입니다.', 'PUBLIC', 44, 1, '2026-09-13 09:00:00', '2026-09-13 09:00:00', NULL),&#10;    (14, 2, '검증 애노테이션 모음', '검증 애노테이션 모음 — 본문입니다.', 'PUBLIC', 51, 2, '2026-09-14 09:00:00', '2026-09-14 09:00:00', NULL),&#10;    (15, 3, '실행 계획 읽는 법', '실행 계획 읽는 법 — 본문입니다.', 'PUBLIC', 8, 1, '2026-09-15 09:00:00', '2026-09-15 09:00:00', NULL),&#10;    (16, 1, '지연 로딩과 프록시', '지연 로딩과 프록시 — 본문입니다.', 'PUBLIC', 15, 1, '2026-09-16 09:00:00', '2026-09-16 09:00:00', NULL),&#10;    (17, 2, 'resultMap 써 보기', 'resultMap 써 보기 — 본문입니다.', 'PUBLIC', 22, 2, '2026-09-17 09:00:00', '2026-09-17 09:00:00', NULL),&#10;    (18, 3, '둘째 주 회고', '둘째 주 회고 — 본문입니다.', 'PUBLIC', 29, 1, '2026-09-18 09:00:00', '2026-09-18 09:00:00', NULL),&#10;    (19, 1, '예외 처리 한곳에 모으기', '예외 처리 한곳에 모으기 — 본문입니다.', 'PUBLIC', 36, 0, '2026-09-19 09:00:00', '2026-09-19 09:00:00', NULL),&#10;    (20, 2, '트랜잭션 격리 수준', '트랜잭션 격리 수준 — 본문입니다.', 'PUBLIC', 43, 1, '2026-09-20 09:00:00', '2026-09-20 09:00:00', NULL),&#10;    (21, 3, '페이지와 커서 페이징', '페이지와 커서 페이징 — 본문입니다.', 'PUBLIC', 50, 1, '2026-09-21 09:00:00', '2026-09-21 09:00:00', NULL),&#10;    (22, 1, '셋째 주 회고', '셋째 주 회고 — 본문입니다.', 'PUBLIC', 7, 0, '2026-09-22 09:00:00', '2026-09-22 09:00:00', NULL),&#10;    (23, 2, '태그 없는 글입니다', '태그 없는 글입니다 — 본문입니다.', 'PUBLIC', 14, 0, '2026-09-23 09:00:00', '2026-09-23 09:00:00', NULL),&#10;    (24, 1, '나만 보는 메모', '나만 보는 메모 — 본문입니다.', 'PRIVATE', 21, 0, '2026-09-24 09:00:00', '2026-09-24 09:00:00', NULL),&#10;    (25, 2, '지워진 글입니다', '지워진 글입니다 — 본문입니다.', 'PUBLIC', 28, 0, '2026-09-25 09:00:00', '2026-09-25 09:00:00', '2026-09-25 14:00:00');&#10;&#10;INSERT INTO post_tags (post_id, tag_id) VALUES&#10;    (1, 1), (2, 2), (2, 1), (3, 5), (4, 3), (5, 4), (6, 2), (6, 5), (7, 1), (8, 2), (9, 5), (10, 3), (11, 4), (11, 3), (12, 6), (13, 1), (14, 2), (15, 5), (16, 3), (17, 4), (18, 6), (19, 2), (20, 5), (21, 4), (21, 5), (22, 6), (24, 6), (25, 6);&#10;&#10;-- 댓글 40 — 1번 글에 트리(답글·삭제된 부모·삭제된 답글)를 모아 두었다&#10;INSERT INTO comments (id, post_id, author_id, parent_id, content, created_at, deleted_at) VALUES&#10;    (1, 1, 2, NULL, '좋은 정리네요', '2026-09-01 10:00:00', NULL),&#10;    (2, 1, 3, 1, '저도 그렇게 생각해요', '2026-09-01 10:10:00', NULL),&#10;    (3, 1, 1, 1, '감사합니다!', '2026-09-01 10:20:00', NULL),&#10;    (4, 1, 3, NULL, '지울 댓글', '2026-09-01 10:30:00', '2026-09-01 10:35:00'),&#10;    (5, 1, 2, 4, '삭제된 댓글에 단 답글', '2026-09-01 10:40:00', NULL),&#10;    (6, 1, 1, NULL, 'record는 불변이라 좋아요', '2026-09-01 10:50:00', NULL),&#10;    (7, 1, 2, 6, '지운 답글', '2026-09-01 11:00:00', '2026-09-01 11:05:00'),&#10;    (8, 1, 3, NULL, '아무 답글 없이 지운 댓글', '2026-09-01 11:10:00', '2026-09-01 11:15:00'),&#10;    (9, 2, 3, NULL, '저는 조금 다르게 했어요', '2026-09-02 11:00:00', NULL),&#10;    (10, 2, 1, NULL, '덕분에 해결했습니다', '2026-09-02 12:00:00', NULL),&#10;    (11, 3, 1, NULL, '덕분에 해결했습니다', '2026-09-03 11:00:00', NULL),&#10;    (12, 3, 2, NULL, '잘 읽었습니다', '2026-09-03 12:00:00', NULL),&#10;    (13, 4, 2, NULL, '잘 읽었습니다', '2026-09-04 11:00:00', NULL),&#10;    (14, 4, 3, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-04 12:00:00', NULL),&#10;    (15, 5, 3, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-05 11:00:00', NULL),&#10;    (16, 5, 1, NULL, '저는 조금 다르게 했어요', '2026-09-05 12:00:00', NULL),&#10;    (17, 6, 1, NULL, '저는 조금 다르게 했어요', '2026-09-06 11:00:00', NULL),&#10;    (18, 6, 2, NULL, '덕분에 해결했습니다', '2026-09-06 12:00:00', NULL),&#10;    (19, 7, 2, NULL, '덕분에 해결했습니다', '2026-09-07 11:00:00', NULL),&#10;    (20, 7, 3, NULL, '잘 읽었습니다', '2026-09-07 12:00:00', NULL),&#10;    (21, 8, 3, NULL, '잘 읽었습니다', '2026-09-08 11:00:00', NULL),&#10;    (22, 8, 1, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-08 12:00:00', NULL),&#10;    (23, 9, 1, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-09 11:00:00', NULL),&#10;    (24, 9, 2, NULL, '저는 조금 다르게 했어요', '2026-09-09 12:00:00', NULL),&#10;    (25, 10, 2, NULL, '저는 조금 다르게 했어요', '2026-09-10 11:00:00', NULL),&#10;    (26, 10, 3, NULL, '덕분에 해결했습니다', '2026-09-10 12:00:00', NULL),&#10;    (27, 11, 3, NULL, '덕분에 해결했습니다', '2026-09-11 11:00:00', NULL),&#10;    (28, 11, 1, NULL, '잘 읽었습니다', '2026-09-11 12:00:00', NULL),&#10;    (29, 12, 1, NULL, '잘 읽었습니다', '2026-09-12 11:00:00', NULL),&#10;    (30, 12, 2, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-12 12:00:00', NULL),&#10;    (31, 13, 2, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-13 11:00:00', NULL),&#10;    (32, 13, 3, NULL, '저는 조금 다르게 했어요', '2026-09-13 12:00:00', NULL),&#10;    (33, 14, 3, NULL, '저는 조금 다르게 했어요', '2026-09-14 11:00:00', NULL),&#10;    (34, 14, 1, NULL, '덕분에 해결했습니다', '2026-09-14 12:00:00', NULL),&#10;    (35, 15, 1, NULL, '덕분에 해결했습니다', '2026-09-15 11:00:00', NULL),&#10;    (36, 15, 2, NULL, '잘 읽었습니다', '2026-09-15 12:00:00', NULL),&#10;    (37, 16, 2, NULL, '잘 읽었습니다', '2026-09-16 11:00:00', NULL),&#10;    (38, 16, 3, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-16 12:00:00', NULL),&#10;    (39, 17, 3, NULL, '질문이 있어요 — 예제 코드도 볼 수 있을까요?', '2026-09-17 11:00:00', NULL),&#10;    (40, 17, 1, NULL, '저는 조금 다르게 했어요', '2026-09-17 12:00:00', NULL);&#10;&#10;-- 좋아요 30 — 회원마다 10개. 3개: 2·6·11번 / 2개: 1·4·9·14·17번 / 1개: 나머지 11개 글&#10;INSERT INTO post_likes (post_id, user_id, created_at) VALUES&#10;    (2, 1, '2026-09-03 10:00:00'), (6, 1, '2026-09-07 10:00:00'), (11, 1, '2026-09-12 10:00:00'), (1, 1, '2026-09-02 10:00:00'), (9, 1, '2026-09-10 10:00:00'),&#10;    (14, 1, '2026-09-15 10:00:00'), (3, 1, '2026-09-04 10:00:00'), (5, 1, '2026-09-06 10:00:00'), (7, 1, '2026-09-08 10:00:00'), (10, 1, '2026-09-11 10:00:00'),&#10;    (2, 2, '2026-09-03 11:00:00'), (6, 2, '2026-09-07 11:00:00'), (11, 2, '2026-09-12 11:00:00'), (1, 2, '2026-09-02 11:00:00'), (4, 2, '2026-09-05 11:00:00'),&#10;    (14, 2, '2026-09-15 11:00:00'), (17, 2, '2026-09-18 11:00:00'), (12, 2, '2026-09-13 11:00:00'), (13, 2, '2026-09-14 11:00:00'), (15, 2, '2026-09-16 11:00:00'),&#10;    (2, 3, '2026-09-03 12:00:00'), (6, 3, '2026-09-07 12:00:00'), (11, 3, '2026-09-12 12:00:00'), (4, 3, '2026-09-05 12:00:00'), (9, 3, '2026-09-10 12:00:00'),&#10;    (17, 3, '2026-09-18 12:00:00'), (16, 3, '2026-09-17 12:00:00'), (18, 3, '2026-09-19 12:00:00'), (20, 3, '2026-09-21 12:00:00'), (21, 3, '2026-09-22 12:00:00');&#10;</code></pre></details></div></div>
+
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/10-1.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+</div>
+  </details><details class="lesson-scene lesson-verify" data-lesson-kind="verify" open>
+    <summary id="직접-확인" aria-label="직접 확인 내용 펼치기"><span class="lesson-scene-index">07</span><span class="lesson-scene-glyph" aria-hidden="true">↗</span><span class="lesson-scene-title"><small>어떻게 확인할까</small><strong>직접 확인</strong><em>요청은 브라우저에서 전송됩니다. 서버의 CORS 설정에 이 페이지 출처가 허용되어 있어야 합니다.</em></span><span class="lesson-scene-count">6개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>브라우저에서 요청 보내기</span></div><section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><div class="server-url-help"><p>요청은 브라우저에서 전송됩니다. 서버의 CORS 설정에 이 페이지 출처가 허용되어 있어야 합니다.</p><a href="#browser-requests-1">이 단계의 요청으로 이동 ↓</a></div></section>
+<p>API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.</p>
+<p>DB도 터미널에서 직접 본다(javaExperience MySQL 컨테이너 이름이 다르면 <code>docker ps</code>로 찾는다).</p>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>docker compose exec -T mysql mysql -ucommunity -pcommunity project \
+  -e &quot;SELECT version, description, success FROM flyway_schema_history; SELECT id, email, nickname FROM users;&quot;</code></pre></details>
+<p>버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.</p>
+<section id="browser-requests-1" class="api-practice" aria-label="HTTP 요청 실행"><div class="request-panel-heading"><div><p class="request-eyebrow">직접 확인 · 1개 요청</p><h3>브라우저에서 요청 보내기</h3></div><p>위 서버 주소를 확인하고 순서대로 실행하세요. 토큰은 입력 후에도 저장하지 않습니다.</p></div><nav class="request-steps" aria-label="요청 실행 순서"><ol><li data-method="GET"><a href="#browser-request-1-1"><span class="request-step-number">1</span><span class="request-step-content"><span class="request-step-method">GET · H</span><span class="request-step-title">헬스 체크</span></span></a></li></ol></nav><div class="api-request-list"><article id="browser-request-1-1" class="api-request" data-request-id="H" data-method="GET" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · H</p><h4>헬스 체크</h4></div><span class="request-number">요청 1</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/health" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-1">GET 요청 보내기</button><p id="request-status-1-1" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.up&quot;,&quot;equals&quot;:true},{&quot;path&quot;:&quot;$.database&quot;,&quot;equals&quot;:&quot;project&quot;},{&quot;path&quot;:&quot;$.users&quot;,&quot;gte&quot;:3},{&quot;path&quot;:&quot;$.posts&quot;,&quot;gte&quot;:25},{&quot;path&quot;:&quot;$.comments&quot;,&quot;gte&quot;:40},{&quot;path&quot;:&quot;$.likes&quot;,&quot;type&quot;:&quot;number&quot;},{&quot;path&quot;:&quot;$.status&quot;,&quot;exists&quot;:false}]}</pre></dd></dl></details></article></div></section><p>C1의 <code>$.status</code> &quot;없음&quot;은 이 단계에서 아직 공통 틀로 감싸지 않았는지 보는 것이다. 10-2에서 틀을 씌우면 C1은 실패하는 게 정상이다.</p>
+</div>
+  </details><details class="lesson-scene lesson-verify" data-lesson-kind="verify">
+    <summary id="채점-기준" aria-label="채점 기준 내용 펼치기"><span class="lesson-scene-index">08</span><span class="lesson-scene-glyph" aria-hidden="true">↗</span><span class="lesson-scene-title"><small>어떻게 확인할까</small><strong>채점 기준</strong><em>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용).</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 H</td>
+<td>상태 <code>200</code>, <code>up</code>=<code>true</code>, <code>database</code>=<code>project</code>, <code>users</code> ≥ 3, <code>posts</code> ≥ 25, <code>comments</code> ≥ 40, <code>likes</code>는 숫자. 아직 공통 틀(<code>status</code>) 없음</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>Postman 수동 OPTIONS 요청 O</td>
+<td>상태 <code>200</code>, <code>Access-Control-Allow-Origin: http://localhost:3000</code>, <code>Access-Control-Allow-Methods</code>에 <code>PUT</code>, <code>Access-Control-Allow-Headers</code>에 <code>authorization</code></td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT version, success FROM flyway_schema_history</code></td>
+<td><code>1</code>, <code>1</code> 한 줄</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT COUNT(*) FROM users; SELECT COUNT(*) FROM posts; SELECT COUNT(*) FROM comments; SELECT COUNT(*) FROM post_likes</code></td>
+<td><code>3</code>·<code>25</code>·<code>40</code>·<code>30</code>(채점 전 다른 단계를 돌렸다면 그 이상)</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>설정</td>
+<td><code>ddl-auto</code>가 <code>validate</code>(또는 <code>none</code>)다 — Hibernate가 스키마를 만들지 않는다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>마이그레이션</td>
+<td>V1 파일 이름이 <code>V1__init.sql</code> 규칙을 지키고, 내용을 고치지 않았다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>CORS</td>
+<td><code>allowedOrigins(&quot;*&quot;)</code>로 모두 열지 않았다</td>
+</tr>
+</tbody></table></div>
+</div>
+  </details><details class="lesson-scene lesson-debug" data-lesson-kind="debug">
+    <summary id="일부러-망가뜨리기" aria-label="일부러 망가뜨리기 내용 펼치기"><span class="lesson-scene-index">09</span><span class="lesson-scene-glyph" aria-hidden="true">✳</span><span class="lesson-scene-title"><small>막히면 확인</small><strong>일부러 망가뜨리기</strong><em>하나씩 바꾸고 다시 띄운 뒤 확인한다. 끝나면 되돌린다. 아래 원문은 모두 Boot 4.1.1·MySQL 8.0에서 재현했다(경로·시각·숫자는 환경마다 다르다).</em></span><span class="lesson-scene-count">5개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>① DB 이름 오타(또는 DB를 안 만듦) → 앱이 뜨지 않는다</span><span>② V1 파일 이름에 밑줄을 하나만 → 앱은 뜨는데 500</span><span>③ 이미 적용된 V1을 고친다 → 앱이 뜨지 않는다</span></div>
+<p>하나씩 바꾸고 다시 띄운 뒤 확인한다. 끝나면 되돌린다. 아래 원문은 모두 Boot 4.1.1·MySQL 8.0에서 재현했다(경로·시각·숫자는 환경마다 다르다).</p>
+<h3 id="①-db-이름-오타또는-db를-안-만듦--앱이-뜨지-않는다"><a class="anchor" href="#①-db-이름-오타또는-db를-안-만듦--앱이-뜨지-않는다" aria-hidden="true">#</a>① DB 이름 오타(또는 DB를 안 만듦) → 앱이 뜨지 않는다</h3>
+<p><code>application.yml</code>의 URL을 <code>.../projet?...</code>로 바꾼다.</p>
+<pre><code class="language-text">ERROR ... o.s.boot.SpringApplication : Application run failed
+...
+Caused by: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'flywayInitializer' defined in class path resource [org/springframework/boot/flyway/autoconfigure/FlywayAutoConfiguration$FlywayConfiguration.class]: Unable to obtain connection from database: Access denied for user 'community'@'%' to database 'projet'
+...
+Caused by: java.sql.SQLSyntaxErrorException: Access denied for user 'community'@'%' to database 'projet'</code></pre>
+<ul>
+<li>읽는 법: 맨 아래 <code>Caused by</code>가 진짜 원인이다. <strong>없는 DB인데 &quot;Access denied&quot;(권한 없음)</strong> 가 나온다.
+실습 계정은 권한을 받은 DB 말고는 있든 없든 &quot;권한 없음&quot;으로 답한다. <code>docker compose exec -T mysql mysql -uroot -proot -e &quot;CREATE DATABASE IF NOT EXISTS project&quot;</code>를 한 번도 안 돌려 <code>project</code> 권한이 없을 때도 이 모양이다.</li>
+<li>권한은 있는데 DB만 없으면(<code>--drop</code> 뒤 등) 원인 줄이 <code>java.sql.SQLSyntaxErrorException: Unknown database &#39;project&#39;</code>로 바뀐다.</li>
+<li>고치기: URL의 DB 이름을 확인한다. 맞으면 javaExperience 레포에서 <code>docker compose exec -T mysql mysql -uroot -proot -e &quot;CREATE DATABASE IF NOT EXISTS project; GRANT ALL PRIVILEGES ON project.* TO &#39;community&#39;@&#39;%&#39;;&quot;</code>를 실행한다.</li>
+</ul>
+<h3 id="②-v1-파일-이름에-밑줄을-하나만--앱은-뜨는데-500"><a class="anchor" href="#②-v1-파일-이름에-밑줄을-하나만--앱은-뜨는데-500" aria-hidden="true">#</a>② V1 파일 이름에 밑줄을 하나만 → 앱은 뜨는데 500</h3>
+<p>파일 이름을 <code>V1_init.sql</code>로 바꾸고, DB를 처음 상태로(<code>docker compose down -v &amp;&amp; docker compose up -d</code>) 돌린 뒤 띄운다.</p>
+<pre><code class="language-text">WARN ... o.f.core.internal.command.DbValidate : No migrations found. Are your locations set up correctly?</code></pre>
+<p>앱은 정상으로 뜬다. 요청 H를 보내면 500이다.</p>
+<pre><code class="language-text">ERROR ... Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed: org.springframework.jdbc.BadSqlGrammarException: StatementCallback; bad SQL grammar [SELECT COUNT(*) FROM users]] with root cause
+
+java.sql.SQLSyntaxErrorException: Table 'project.users' doesn't exist</code></pre>
+<ul>
+<li>읽는 법: Flyway는 이름 규칙에 안 맞는 파일을 <strong>조용히 건너뛴다</strong>(경고 한 줄뿐). 테이블이 안 생겼으니 첫 SQL에서 터진다. 기동 로그의 <code>WARN</code>을 놓치지 않는다.</li>
+<li>고치기: 파일 이름을 <code>V1__init.sql</code>로 되돌리고 앱을 다시 띄운다.</li>
+</ul>
+<h3 id="③-이미-적용된-v1을-고친다--앱이-뜨지-않는다"><a class="anchor" href="#③-이미-적용된-v1을-고친다--앱이-뜨지-않는다" aria-hidden="true">#</a>③ 이미 적용된 V1을 고친다 → 앱이 뜨지 않는다</h3>
+<p>V1이 한 번 적용된 상태에서 파일 끝에 <code>INSERT INTO tags (name) VALUES (&#39;docker&#39;);</code>를 한 줄 더하고 다시 띄운다.</p>
+<pre><code class="language-text">Migration checksum mismatch for migration version 1
+-&gt; Applied to database : 702228255
+-&gt; Resolved locally    : 2004495608
+Either revert the changes to the migration, or run repair to update the schema history.
+...
+Caused by: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'flywayInitializer' defined in class path resource [org/springframework/boot/flyway/autoconfigure/FlywayAutoConfiguration$FlywayConfiguration.class]: Validate failed: Migrations have failed validation</code></pre>
+<ul>
+<li>읽는 법: Flyway는 실행한 파일의 <strong>체크섬(내용 지문)</strong> 을 기록해 둔다. 기록(<code>Applied to database</code>)과 지금 파일(<code>Resolved locally</code>)이 다르면 &quot;누가 이미 실행한 이력을 고쳤다&quot;로 보고 멈춘다. 운영 DB에서는 이게 안전장치다.</li>
+<li>고치기: V1을 원래대로 되돌린다. 바꾸고 싶은 내용은 <code>V2__add_docker_tag.sql</code>처럼 <strong>새 파일</strong>로 만든다. 실습 DB라 처음부터 다시 하고 싶으면 <code>docker compose down -v &amp;&amp; docker compose up -d</code>을 실행한다.</li>
+</ul>
+<h3 id="④-corsconfig를-지운다--버튼만-실패-postman은-응답-확인"><a class="anchor" href="#④-corsconfig를-지운다--버튼만-실패-postman은-응답-확인" aria-hidden="true">#</a>④ CorsConfig를 지운다 → 버튼만 실패, Postman은 응답 확인</h3>
+<p><code>CorsConfig.java</code>를 지우고 다시 띄운 뒤 요청 O를 보낸다.</p>
+<pre><code class="language-text">HTTP/1.1 200
+Allow: GET, HEAD, POST, PUT, DELETE, OPTIONS, PATCH
+Content-Length: 0</code></pre>
+<p><code>Access-Control-Allow-Origin</code>이 없다. 그래서 브라우저가 본 요청을 보내지 않고, 실행 칸에 &quot;CORS로 막혔어요&quot;가 뜬다. Postman은 브라우저의 CORS 정책을 적용하지 않아 요청 H의 응답을 그대로 보여 준다.</p>
+</div>
+  </details><details class="lesson-scene lesson-connect" data-lesson-kind="connect">
+    <summary id="필요한-지식" aria-label="필요한 지식 내용 펼치기"><span class="lesson-scene-index">10</span><span class="lesson-scene-glyph" aria-hidden="true">→</span><span class="lesson-scene-title"><small>다음으로 연결</small><strong>필요한 지식</strong></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<ul>
+<li><a href="../../lessons/A5-rest-api-design.html">A5 REST API 설계와 명세서 읽기</a> — 명세 표의 메서드·상태 코드·<code>Location</code>을 읽는 법</li>
+<li><a href="../../lessons/A3-server-process-port.html">A3 서버 프로그램 — 포트·프로세스·localhost·로그</a> — 8080, 기동 로그</li>
+<li><a href="../../lessons/A4-what-spring-boot-does.html">A4 Spring Boot가 해 주는 것</a> — starter와 자동 설정</li>
+<li><a href="../../lessons/C2-gradle-dependencies.html">C2 Gradle — 의존성이 뭐고 어디서 오나</a></li>
+<li><a href="../../lessons/C3-application-yml-profiles.html">C3 application.yml과 프로필</a></li>
+<li><a href="../../lessons/E2-db-sql-basics.html">E2 DB와 테이블·SQL 기초</a> — <code>CREATE TABLE</code>·외래 키·<code>INSERT</code></li>
+<li><a href="../../lessons/J2-why-migrations.html">J2 마이그레이션은 왜 필요한가</a> — Flyway가 파일을 한 번만 실행하는 이유</li>
+<li><a href="../../lessons/F3-cors.html">F3 CORS</a></li>
+<li><a href="../../docs/knowledge/P19-mysql-jpa-setup.html">P19 MySQL·JPA 설정</a> — datasource·<code>ddl-auto</code></li>
+</ul>
+</div>
+  </details><details class="lesson-scene lesson-debug" data-lesson-kind="debug">
+    <summary id="힌트-막힐-때만" aria-label="힌트 (막힐 때만) 내용 펼치기"><span class="lesson-scene-index">11</span><span class="lesson-scene-glyph" aria-hidden="true">✳</span><span class="lesson-scene-title"><small>막히면 확인</small><strong>힌트 (막힐 때만)</strong><em>목록에 있는 4.1.x 중 가장 최신을 고른 뒤, 받은 build.gradle 의 org.springframework.boot 플러그인 버전을 4.1.1 로 고친다. Inte…</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<details>
+<summary>힌트 1 — start.spring.io에 Spring Boot 4.1.1이 안 보인다</summary>
+
+<p>목록에 있는 4.1.x 중 가장 최신을 고른 뒤, 받은 <code>build.gradle</code>의 <code>org.springframework.boot</code> 플러그인 버전을 <code>4.1.1</code>로 고친다. IntelliJ에서 Gradle 새로고침(코끼리 아이콘)을 누른다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 앱이 Flyway에서 멈춘다</summary>
+
+<p>로그 맨 아래 <code>Caused by</code>를 읽는다. <code>Access denied ... to database</code>면 DB 이름이나 <code>docker compose exec -T mysql mysql -uroot -proot -e &quot;CREATE DATABASE IF NOT EXISTS project&quot;</code>를 확인한다(①).</p>
+<p><code>checksum mismatch</code>면 V1을 고친 것이다(③). <code>Communications link failure</code>면 MySQL 컨테이너가 안 떠 있다(<code>docker ps</code>로 <code>javaExperience mysql</code>을 확인한다). </details></p>
+<details>
+<summary>힌트 3 — 헬스 체크 숫자가 0이다</summary>
+
+<p>테이블은 있는데 비어 있다면 V1의 <code>INSERT</code> 부분을 빠뜨렸다. 이미 적용된 V1은 고칠 수 없으니 <code>docker compose down -v &amp;&amp; docker compose up -d</code> 후 V1 전문을 다시 붙이고 띄운다.</p>
+</details>
+
+</div>
+  </details><details class="lesson-scene lesson-connect" data-lesson-kind="connect">
+    <summary id="다음-단계" aria-label="다음 단계 내용 펼치기"><span class="lesson-scene-index">12</span><span class="lesson-scene-glyph" aria-hidden="true">→</span><span class="lesson-scene-title"><small>다음으로 연결</small><strong>다음 단계</strong><em>10-2. 공통 응답 틀과 전역 예외 처리 — 모든 응답을 {status, message, data} 로 감싸고, 실패도 같은 틀로 돌려준다.</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p><a href="10-2-common-response.html">10-2. 공통 응답 틀과 전역 예외 처리</a> — 모든 응답을 <code>{status, message, data}</code>로 감싸고, 실패도 같은 틀로 돌려준다.</p>
+
+</div>
+  </details></div><section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 10-1. 새 프로젝트 시작 — 명세서 읽기, project DB·Flyway, 헬스 체크\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch10-project/10-1-new-project.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity project -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><span></span><a href="10-2-common-response.html">다음 → 10-2. 공통 응답 틀과 전역 예외 처리</a></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js?v=996bdd22e59f" defer></script><script src="../../tools/site/scenario-code-workbench.js?v=52d06b1c6f1a" defer></script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+package org.example.push;
+
+import org.example.post.InvalidParametersException;
+import tools.jackson.databind.JsonNode;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+// 원문 JSON의 타입을 확인한다. Jackson의 Integer/Long 강제 변환에 맡기면 "150"과 1.5도 통과한다.
+public record FakePushSettingsRequest(Integer delayMs, List<Long> failMemberIds) {
+
+    public static FakePushSettingsRequest parse(JsonNode body) {
+        if (body == null || !body.isObject()) {
+            throw new InvalidParametersException(Map.of("body", "JSON 객체가 필요합니다."));
+        }
+        Map<String, String> errors = new LinkedHashMap<>();
+        JsonNode delay = body.get("delayMs");
+        Integer delayMs = null;
+        if (delay == null || delay.isNull()) {
+            errors.put("delayMs", "지연(ms)을 입력해 주세요.");
+        } else if (!delay.isIntegralNumber() || !delay.canConvertToInt()) {
+            errors.put("delayMs", "지연은 정수여야 합니다.");
+        } else if (delay.intValue() < 0 || delay.intValue() > 5000) {
+            errors.put("delayMs", "지연은 0~5000ms여야 합니다.");
+        } else {
+            delayMs = delay.intValue();
+        }
+
+        List<Long> failMemberIds = new ArrayList<>();
+        JsonNode failed = body.get("failMemberIds");
+        if (failed != null && !failed.isNull()) {
+            if (!failed.isArray()) {
+                errors.put("failMemberIds", "실패 회원은 배열이어야 합니다.");
+            } else {
+                if (failed.size() > 20) {
+                    errors.put("failMemberIds", "실패 회원은 20명까지입니다.");
+                }
+                for (int i = 0; i < failed.size(); i++) {
+                    JsonNode memberId = failed.get(i);
+                    if (!memberId.isIntegralNumber() || !memberId.canConvertToLong() || memberId.longValue() < 1) {
+                        errors.put("failMemberIds[" + i + "]", "회원 id는 1 이상의 정수여야 합니다.");
+                    } else {
+                        failMemberIds.add(memberId.longValue());
+                    }
+                }
+            }
+        }
+        if (!errors.isEmpty()) {
+            throw new InvalidParametersException(errors);
+        }
+        return new FakePushSettingsRequest(delayMs, List.copyOf(failMemberIds));
+    }
+}

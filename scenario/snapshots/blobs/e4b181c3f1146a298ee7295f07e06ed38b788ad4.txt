@@ -1,0 +1,41 @@
+package org.example.bookmark;
+
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface BookmarkFolderRepository extends JpaRepository<BookmarkFolder, Long> {
+
+    // 폴더는 id만으로 찾지 않는다 — 항상 "내 폴더인가"까지 조건에 넣는다
+    Optional<BookmarkFolder> findByIdAndMember_Id(Long id, Long memberId);
+
+    // 링크 회전·해제는 같은 폴더 행을 직렬화해 갱신 순서를 고정한다.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT f FROM BookmarkFolder f WHERE f.id = :id AND f.member.id = :memberId")
+    Optional<BookmarkFolder> findOwnedForUpdate(@Param("id") Long id, @Param("memberId") Long memberId);
+
+    // 14-8: 공유 링크로 폴더 찾기 — 주인 닉네임도 쓰므로 함께 읽는다
+    @Query("SELECT f FROM BookmarkFolder f JOIN FETCH f.member WHERE f.shareToken = :token")
+    Optional<BookmarkFolder> findByShareToken(@Param("token") String token);
+
+    long countByMember_Id(Long memberId);
+
+    boolean existsByMember_IdAndName(Long memberId, String name);
+
+    boolean existsByMember_IdAndNameAndIdNot(Long memberId, String name, Long id);
+
+    // 내 폴더 목록 + 폴더별 북마크 수를 한 번에(폴더마다 COUNT를 따로 보내지 않는다)
+    @Query("""
+            SELECT new org.example.bookmark.BookmarkFolderSummaryResponse(
+                f.id, f.name, (SELECT COUNT(b) FROM Bookmark b WHERE b.folder = f))
+            FROM BookmarkFolder f
+            WHERE f.member.id = :memberId
+            ORDER BY f.createdAt ASC, f.id ASC
+            """)
+    List<BookmarkFolderSummaryResponse> findSummaries(@Param("memberId") Long memberId);
+}

@@ -1,0 +1,60 @@
+package org.example.like;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
+
+    @Query("SELECT l.post.id FROM PostLike l WHERE l.member.id = :memberId AND l.post.id IN :postIds")
+    List<Long> findPostIdsForMember(@Param("memberId") Long memberId,
+                                    @Param("postIds") List<Long> postIds);
+
+    boolean existsByPost_IdAndMember_Id(Long postId, Long memberId);
+
+    long deleteByPost_IdAndMember_Id(Long postId, Long memberId);
+
+    long countByPost_Id(Long postId);
+
+    long countByPost_IdAndMember_Id(Long postId, Long memberId);
+
+    // 4-2: "있나 확인 후 INSERT"는 동시에 같은 회원이 여러 번 눌렀을 때 그 사이에 둘 다 "없음"을
+    // 확인하고 INSERT를 시도해 중복 키 오류(500)가 날 수 있다. INSERT IGNORE로 DB의 UNIQUE
+    // (post_id, member_id) 제약이 중복을 막게 하고, 실제로 들어간 행 수(0 또는 1)만 돌려받는다.
+    @Modifying
+    @Query(value = "INSERT IGNORE INTO post_like (post_id, member_id, created_at) VALUES (:postId, :memberId, NOW())",
+            nativeQuery = true)
+    int insertIgnore(@Param("postId") Long postId, @Param("memberId") Long memberId);
+
+    // 9-2: 실제 API SQL도 회원별 복합 인덱스 순서로 읽는다. JOIN 순서를 고정하지 않으면
+    // MySQL이 post 전체 스캔으로 시작해 정렬(filesort)하므로, 단순 EXPLAIN과 실제 API가 달라진다.
+    // 목록에는 본문이 필요 없어 필요한 열만 투영한다. size+1개로 다음 커서를 판정한다.
+    @Query(value = """
+            SELECT l.id AS likeId, p.id AS postId, p.title AS title,
+                   a.id AS authorId, a.nickname AS authorNickname, l.created_at AS likedAt
+              FROM post_like l FORCE INDEX (ix_post_like_member_created)
+              STRAIGHT_JOIN post p FORCE INDEX (PRIMARY) ON p.id = l.post_id
+              STRAIGHT_JOIN member a ON a.id = p.author_id
+             WHERE l.member_id = :memberId
+               AND p.deleted_at IS NULL AND p.status = 'PUBLISHED'
+               AND (p.visibility = 'PUBLIC' OR p.author_id = :memberId
+                    OR EXISTS (SELECT 1 FROM follow f
+                               WHERE f.follower_id = :memberId AND f.followee_id = p.author_id))
+               AND NOT EXISTS (SELECT 1 FROM member_block b
+                               WHERE b.blocker_id = :memberId AND b.blocked_id = p.author_id)
+               AND NOT EXISTS (SELECT 1 FROM member_block b
+                               WHERE b.blocker_id = p.author_id AND b.blocked_id = :memberId)
+               AND (:cursorAt IS NULL OR l.created_at < :cursorAt
+                    OR (l.created_at = :cursorAt AND l.id < :cursorId))
+             ORDER BY l.created_at DESC, l.id DESC
+             LIMIT :limit
+            """, nativeQuery = true)
+    List<MyLikeRow> findMyLikes(@Param("memberId") Long memberId,
+                                @Param("cursorAt") LocalDateTime cursorAt,
+                                @Param("cursorId") Long cursorId,
+                                @Param("limit") int limit);
+}

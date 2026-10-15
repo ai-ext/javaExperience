@@ -4,22 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>W09. DTO는 왜 쓰나 — 엔티티를 그대로 반환하면 생기는 일</title>
-<link rel="stylesheet" href="../../tools/site/site.css">
+<link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=600678cfa7dd">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
-<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
-<main>
+<header class="topbar"><a href="../../index.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
+<main class="knowledge-main">
 
-<h1 id="w09-dto는-왜-쓰나--엔티티를-그대로-반환하면-생기는-일"><a class="anchor" href="#w09-dto는-왜-쓰나--엔티티를-그대로-반환하면-생기는-일" aria-hidden="true">#</a>W09. DTO는 왜 쓰나 — 엔티티를 그대로 반환하면 생기는 일</h1>
+<h1 id="w09-dto는-왜-쓰나--엔티티를-그대로-반환하면-생기는-일"><a class="anchor" href="#w09-dto는-왜-쓰나--엔티티를-그대로-반환하면-생기는-일" aria-hidden="true">#</a>W09. DTO는 왜 쓰나 — 엔티티를 그대로 반환하면 생기는 일</h1><section class="knowledge-page-map" aria-label="문서 읽기 지도"><div class="knowledge-page-map-head"><div><p class="knowledge-page-map-kicker">Why &amp; decisions <span>· W09</span></p><h2>이 문서에서 볼 내용</h2><p>선택 이유와 설계 기준</p></div><span class="knowledge-page-map-count">9개 주제</span></div><nav class="knowledge-page-steps" aria-label="문서의 실제 절로 이동"><a class="knowledge-page-step" href="#1-질문"><span class="knowledge-page-step-no">01</span><span>1. 질문</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#2-짧은-답"><span class="knowledge-page-step-no">02</span><span>2. 짧은 답</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#3-왜-그런가--원리"><span class="knowledge-page-step-no">03</span><span>3. 왜 그런가 — 원리</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#4-선택지-비교"><span class="knowledge-page-step-no">04</span><span>4. 선택지 비교</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#5-코드로-보기"><span class="knowledge-page-step-no">05</span><span>5. 코드로 보기</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#6-실무에서는-실제로"><span class="knowledge-page-step-no">06</span><span>6. 실무에서는 실제로</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#7-흔한-오해와-실수"><span class="knowledge-page-step-no">07</span><span>7. 흔한 오해와 실수</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#8-자가점검-qa-면접-대비"><span class="knowledge-page-step-no">08</span><span>8. 자가점검 Q&amp;A (면접 대비)</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#9-참고문헌"><span class="knowledge-page-step-no">09</span><span>9. 참고문헌</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a></nav></section>
 <blockquote>
 <p>DTO는 DB 객체를 꾸미는 보일러플레이트가 아니라 외부에 공개할 데이터 계약이다.<br>엔티티를 응답으로 내보내면 지연 로딩·쿼리 수·민감 정보·API 모양이 영속성 모델과 한 경로로 엮인다.<br>기본값은 API 경계에서 필요한 필드만 담은 응답 DTO를 반환하고, 조회가 단순하면 DTO 프로젝션으로 필요한 열만 읽는 것이다.</p>
 </blockquote>
 <p>예제 기준: Java 25, Spring Boot 4.1.1, Spring Framework 7.0.9, Spring Data JPA 4.1.1.</p>
-<h2 id="1-질문"><a class="anchor" href="#1-질문" aria-hidden="true">#</a>1. 질문</h2>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-질문" aria-label="1. 질문 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">1. 질문</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>첫 번째 장면은 게시글 상세 API를 만들 때다. findById 결과를 그대로 반환해 코드를 줄였더니, 로컬에서는 JSON에 작성자와 댓글까지 잘 나오다가 배포에서 500이 난다. 요청 처리가 끝난 뒤 Jackson이 아직 초기화되지 않은 연관 필드를 읽어 LazyInitializationException이 나거나, 반대로 요청 중 DB 연결이 살아 있어 직렬화하는 동안 쿼리가 실행된다.</p>
 <p>두 번째는 양방향 관계가 있는 주문과 주문항목이다. 응답을 만들려고 주문을 반환하면 order.items[0].order.items...처럼 객체 그래프가 순환한다. JSON 변환이 실패하거나, 순환 참조를 피하려 임시 애노테이션을 붙인 뒤 어느 화면의 응답에서 필드가 사라졌는지 찾는다.</p>
 <p>세 번째는 “엔티티 필드 하나 추가했을 뿐”인데 API 응답에 내부 메모나 비밀번호 해시가 나타나거나, 반대로 컬럼 이름을 정리했더니 모바일 앱 JSON 필드가 바뀌는 상황이다. 이때 DB 모델과 API 계약을 같은 타입으로 두면 변경의 파급 범위를 분리할 수 없다.</p>
-<h2 id="2-짧은-답"><a class="anchor" href="#2-짧은-답" aria-hidden="true">#</a>2. 짧은 답</h2>
+</div></details><details class="knowledge-chapter"><summary id="2-짧은-답" aria-label="2. 짧은 답 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">2. 짧은 답</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>엔티티는 영속성 컨텍스트가 추적하는 도메인·DB 모델이고, DTO는 호출 경계에 필요한 값을 전달하는 모양이다.</li>
 <li>요청 DTO는 클라이언트가 제출할 값만 받고, 응답 DTO는 외부에 공개할 값만 담는다. 내부 DTO/Command는 외부 JSON 계약이 아니라 애플리케이션 유스케이스·모듈 사이에 별도 모양이 필요할 때 둔다.</li>
@@ -29,7 +31,7 @@
 <li>DTO를 계층마다 기계적으로 복제하지 않는다. 경계나 변경 이유가 다를 때만 타입을 나눈다.</li>
 <li>DTO도 N+1을 자동으로 해결하지 않는다. 먼저 필요한 데이터와 쿼리 범위를 정한 다음 DTO를 채운다.</li>
 </ul>
-<h2 id="3-왜-그런가--원리"><a class="anchor" href="#3-왜-그런가--원리" aria-hidden="true">#</a>3. 왜 그런가 — 원리</h2>
+</div></details><details class="knowledge-chapter"><summary id="3-왜-그런가--원리" aria-label="3. 왜 그런가 — 원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 왜 그런가 — 원리</strong></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>Spring MVC에서 @RestController 반환값은 HttpMessageConverter를 거쳐 응답 본문으로 바뀐다. Java 객체를 JSON으로 바꾸는 일은 Controller 메서드가 값을 돌려준 뒤에 진행된다. 즉, 엔티티를 반환하면 직렬화기가 엔티티의 getter를 따라가며 응답 필드를 결정한다. getter가 프록시나 지연 컬렉션에 닿으면 단순한 메모리 읽기가 아니라 ORM의 추가 조회가 될 수 있다.</p>
 <pre class="mermaid">sequenceDiagram
     participant Client as &quot;클라이언트&quot;
@@ -48,11 +50,12 @@
     Controller--&gt;&gt;Converter: &quot;객체 반환값&quot;
     Converter-&gt;&gt;DB: &quot;엔티티 getter가 지연 연관을 읽으면 추가 SQL&quot;
     Converter--&gt;&gt;Client: &quot;직렬화된 JSON 또는 오류&quot;</pre>
-<p><strong>생명주기 문제.</strong> JPA 지연 연관은 영속성 컨텍스트가 닫힌 뒤 초기화하려 하면 실패한다. Spring Boot의 spring.jpa.open-in-view 설정은 요청 처리 전체에 EntityManager를 바인딩하는 인터셉터를 등록한다. 켜져 있으면 직렬화 시점에도 조회가 가능해 예외가 잠복하는 대신 변환 단계에서 쿼리가 실행되어 위치와 개수가 잘 보이지 않는다. Hibernate는 필요한 연관을 컨텍스트가 닫히기 전에 조회하라고 안내한다. hibernate.enable_lazy_load_no_trans는 기본 비활성화이며 안전하지 않은 설정이다. OSIV나 전역 eager 변경보다 유스케이스에 맞는 조회 범위를 명시한다.</p>
+<p><strong>생명주기 문제.</strong> JPA 지연 연관은 영속성 컨텍스트가 닫힌 뒤 초기화하려 하면 실패한다. Spring Boot의 spring.jpa.open-in-view 설정은 요청 처리 전체에 EntityManager를 바인딩하는 인터셉터를 등록한다. 켜져 있으면 직렬화 시점에도 조회가 가능해 예외가 잠복하는 대신 변환 단계에서 쿼리가 실행되어 위치와 개수가 잘 보이지 않는다.</p>
+<p>Hibernate는 필요한 연관을 컨텍스트가 닫히기 전에 조회하라고 안내한다. hibernate.enable_lazy_load_no_trans는 기본 비활성화이며 안전하지 않은 설정이다. OSIV나 전역 eager 변경보다 유스케이스에 맞는 조회 범위를 명시한다.</p>
 <p><strong>객체 그래프와 계약 문제.</strong> 엔티티 연관관계는 객체 탐색과 DB 관계를 표현하지만 HTTP 응답은 클라이언트가 소비할 문서다. 양방향 탐색은 순환할 수 있고 내부 필드도 같은 객체에 있다. @JsonIgnore로 특정 API 문제를 엔티티에 막으면 직렬화 정책이 영속성 모델에 스며든다. DTO는 응답 필드를 API 경계에 고정해 엔티티 필드 추가가 자동 공개되지 않게 한다.</p>
 <p><strong>쿼리 비용 문제.</strong> 주문 50개를 읽은 뒤 고객·항목을 직렬화하며 별도 조회하면 N+1이 된다. 반대로 큰 그래프를 전부 eager로 가져오면 쓰지 않는 데이터와 조인 중복이 늘 수 있다. DTO도 쿼리 비용을 정해주지 않는다. fetch join, 명시적 fetch plan, DTO 프로젝션 중 화면에 맞는 조회를 고른다.</p>
 <p>저장 스키마와 공개 계약의 변경 주기도 다르다. DB 컬럼 정규화나 내부 관리 필드 도입은 API 버전 변경과 같은 일이 아니다. 별도 응답 DTO를 두면 이름 변경·필드 제거·계산 필드·버전 호환성을 API 쪽에서 관리한다.</p>
-<h2 id="4-선택지-비교"><a class="anchor" href="#4-선택지-비교" aria-hidden="true">#</a>4. 선택지 비교</h2>
+</div></details><details class="knowledge-chapter"><summary id="4-선택지-비교" aria-label="4. 선택지 비교 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">4. 선택지 비교</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -115,7 +118,7 @@
 </tbody></table></div>
 <p>국내의 “흔함”은 블로그 예제 수나 개인 경험만으로 빈도를 단정하지 않았다. 조직별로 레거시 CRUD, 금융권 표준 프레임워크, 신규 제품 API의 제약이 다르므로 팀 안의 기본 패턴과 운영 요구를 확인하는 편이 낫다.</p>
 <p>DTO와 프로젝션은 서로 배타적인 용어가 아니다. DTO는 전달하려는 값의 모양 또는 역할이고, 프로젝션은 조회 결과를 어떤 필드 집합으로 뽑을지에 관한 기술이다. DTO 클래스를 Spring Data의 클래스 기반 프로젝션으로 사용할 수 있다. QueryDSL도 조회의 select 단계에서 필요한 표현식을 선택해 결과 형태를 제한할 수 있다.</p>
-<h2 id="5-코드로-보기"><a class="anchor" href="#5-코드로-보기" aria-hidden="true">#</a>5. 코드로 보기</h2>
+</div></details><details class="knowledge-chapter"><summary id="5-코드로-보기" aria-label="5. 코드로 보기 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">5. 코드로 보기</strong></span><span class="knowledge-chapter-meta">9개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>예시는 주문 요약 API 하나를 네 방식으로 구현한다. Spring Boot 4.1 / Framework 7 기준 API를 사용한다. 코드 조각은 파일 단위이며 프로젝트의 엔티티·DB 스키마에 맞춰 붙여야 한다. Spring 코드 미실행.</p>
 <p>요청 DTO와 내부 명령은 응답 DTO와 목적이 다르다. HTTP 입력을 검증한 뒤 유스케이스 명령으로 옮기면 클라이언트가 엔티티의 소유자·상태 필드를 임의로 지정하지 못한다. Validation starter를 포함한 Spring 예제이며 요청 DTO에는 허용할 필드만 선언한다.</p>
 <pre><code class="language-java">package example.order;
@@ -248,7 +251,8 @@ package example.order;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface OrderRepository extends JpaRepository&lt;OrderEntity, Long&gt; {}</code></pre>
-<p>코드에서 OrderRepository는 JpaRepository&lt;OrderEntity, Long&gt;을 상속한다. 응답 JSON은 customer와 items에 접근하면서 지연 조회를 일으킬 수 있고, 항목의 order를 따라가면 순환할 수 있다. CustomerEntity.email과 internalMemo도 같은 직렬화 대상으로 보일 수 있다. 실제로 노출될 필드는 serializer 설정 및 연관 상태에 따라 다르므로, “현재 JSON에서 안 보인다”는 사실은 보안 경계가 아니다.</p>
+<p>코드에서 OrderRepository는 JpaRepository&lt;OrderEntity, Long&gt;을 상속한다. 응답 JSON은 customer와 items에 접근하면서 지연 조회를 일으킬 수 있고, 항목의 order를 따라가면 순환할 수 있다.</p>
+<p>CustomerEntity.email과 internalMemo도 같은 직렬화 대상으로 보일 수 있다. 실제로 노출될 필드는 serializer 설정 및 연관 상태에 따라 다르므로, “현재 JSON에서 안 보인다”는 사실은 보안 경계가 아니다.</p>
 <p><strong>선택 A — 직접 매핑.</strong> 전송할 필드와 조합 로직이 한 곳에서 명확하다. 짧은 필드 목록에는 가장 단순한 방법이다.</p>
 <pre><code class="language-java">// OrderSummary.java
 package example.order;
@@ -308,14 +312,14 @@ public interface OrderSummaryRepository
 }</code></pre>
 <p>이 쿼리는 응답에 필요한 항목을 직접 적는다. 프로젝트의 DTO 전체 이름과 생성자 인자는 쿼리와 맞아야 한다. Spring Data JPA 클래스 기반 프로젝션은 생성자를 사용하고, 생성자가 여러 개인 DTO라면 사용할 생성자를 표시해야 한다. DTO 메서드가 반환형과 호환되지 않거나 쿼리 문법이 어긋나면 런타임 쿼리 검증에서 실패할 수 있다. 목록 API에서는 정렬·페이지 처리와 함께 실행 계획 및 SQL을 확인한다.</p>
 <p>인터페이스 프로젝션은 컬럼 별칭과 getter 이름으로 단순 결과를 표현해 선언이 짧다. 계산 규칙이나 외부 계약이 커지면 구체 타입인 DTO가 리뷰하기 쉽다. 중첩 projection은 연관 속성 전체가 조인될 수 있으므로 “인터페이스라서 자동으로 최소 컬럼만 조회한다”고 가정하지 않는다.</p>
-<h2 id="6-실무에서는-실제로"><a class="anchor" href="#6-실무에서는-실제로" aria-hidden="true">#</a>6. 실무에서는 실제로</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무에서는-실제로" aria-label="6. 실무에서는 실제로 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">6. 실무에서는 실제로</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p><strong>신규 서비스.</strong> API 요청·응답 타입을 나누고 응답은 record로 시작한다. 단순 상세는 읽기 유스케이스에서 조회 후 매핑하고, 목록·검색은 클래스 프로젝션을 고려한다. Service와 HTTP 계약을 분리해야 하면 OrderSummary 같은 조회 모델을 두고 Controller가 응답 타입으로 옮긴다.</p>
 <p><strong>레거시 서비스.</strong> 전체 반환을 한 번에 치환하지 말고 민감 정보나 오류가 잦은 공개 API부터 DTO를 추가한다. SQL 로그와 JSON을 확인하며 화면 단위로 이전하고, Entity·Request·Response·Summary처럼 이름에 역할을 드러낸다.</p>
 <p><strong>SI·금융 프로젝트.</strong> 화면별 명세, 감사·접근통제, 변경 승인 절차가 있으면 계약 DTO가 필드 노출과 버전 관리에 유리하다. 모든 계층에 같은 VO/DTO를 복제할 필요는 없다. 팀 표준을 따르되 변환 지점을 명확히 한다.</p>
 <p><strong>스타트업·작은 팀.</strong> 정적 팩토리나 수동 매핑으로 시작하고 반복 매핑이 리뷰 비용이 될 때 MapStruct를 검토한다. ModelMapper의 런타임 이름 매칭은 API 보안·계약에서 허용되는지 확인한다.</p>
 <p><strong>변환 위치 기준.</strong> Controller는 얇은 HTTP 조립, Service는 권한·상태·유스케이스 계산, Repository/조회 컴포넌트는 읽기 전용 프로젝션에 적합하다. 응답 생성 중 지연 필드를 읽거나 Service에 Jackson 정책이 퍼지면 경계를 다시 정한다.</p>
 <p>세부 주제는 Jackson 직렬화 → <a class="docref" href="P16-json-jackson-practical.html">P16</a>, JPA 연관관계 → <a class="docref" href="P20-jpa-entity-mapping.html">P20</a>, 계층 설계 → <a class="docref" href="W02-why-layers.html">W02</a>를 참조한다.</p>
-<h2 id="7-흔한-오해와-실수"><a class="anchor" href="#7-흔한-오해와-실수" aria-hidden="true">#</a>7. 흔한 오해와 실수</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-흔한-오해와-실수" aria-label="7. 흔한 오해와 실수 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">7. 흔한 오해와 실수</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>“DTO로 바꾸면 N+1이 해결된다.”</strong> DTO 매핑이 연관 getter를 호출하면 쿼리는 그대로 발생한다. 요약 목록은 프로젝션이나 일괄 fetch를 사용하고, SQL 수와 실행 계획을 확인한다.</li>
 <li><strong>“OSIV가 켜져 있으니 LazyInitializationException은 없다.”</strong> 요청 끝까지 지연 조회가 가능해져 오류가 쿼리 폭증으로 바뀔 수 있다. 직렬화가 DB 접근을 하지 않도록 응답 필드와 조회 계획을 맞춘다.</li>
@@ -324,14 +328,25 @@ public interface OrderSummaryRepository
 <li><strong>“MapStruct면 매핑 문제가 컴파일에서 모두 잡힌다.”</strong> 생성 구현은 빠르고 명시적이지만 잘못 선언한 매핑 경로나 민감한 속성 선택까지 도메인 의미로 판별하진 않는다. 명시 매핑과 미매핑 정책을 정하고 응답 필드 변경을 리뷰한다.</li>
 <li><strong>“record DTO는 완전히 불변이다.”</strong> record의 참조 필드는 재할당되지 않지만, 그 안의 List나 객체가 변할 수 있다. 외부에 불변 계약이 필요하면 복사·불변 컬렉션을 고려한다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
-<p><strong>Q1. 엔티티를 JSON으로 반환할 때 운영에서만 실패할 수 있는 이유는?</strong><br>JSON 변환은 Controller가 반환한 뒤 getter를 따라가며 진행된다. 이때 지연 필드가 초기화되지 않았다면 영속성 컨텍스트가 닫힌 상태에서 예외가 난다. 요청 범위 EntityManager가 열려 있으면 반대로 변환 중 SQL이 실행되어 느려질 수 있다.<br>꼬리질문: 어디서 고칠까?<br>답: 필요한 데이터와 트랜잭션 범위를 정하고, DTO 또는 projection으로 API 응답을 구성한다.</p>
-<p><strong>Q2. 응답 DTO와 JPA 프로젝션은 같은 것인가?</strong><br>응답 DTO는 외부로 전달할 데이터 계약이고, 프로젝션은 조회 결과의 필드 집합을 제한하는 방식이다. 같은 DTO 클래스를 repository projection 결과로 쓸 수 있다. 모든 DTO가 쿼리 projection인 것은 아니다.<br>꼬리질문: 목록 API에서 projection을 고려할 이유는?<br>답: 엔티티 그래프 대신 응답에 필요한 값만 조회해 불필요한 로딩을 줄일 수 있다.</p>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">8. 자가점검 Q&amp;A (면접 대비)</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<p><strong>Q1. 엔티티를 JSON으로 반환할 때 운영에서만 실패할 수 있는 이유는?</strong><br>JSON 변환은 Controller가 반환한 뒤 getter를 따라가며 진행된다. 이때 지연 필드가 초기화되지 않았다면 영속성 컨텍스트가 닫힌 상태에서 예외가 난다.</p>
+<p>요청 범위 EntityManager가 열려 있으면 반대로 변환 중 SQL이 실행되어 느려질 수 있다.
+꼬리질문: 어디서 고칠까?<br>답: 필요한 데이터와 트랜잭션 범위를 정하고, DTO 또는 projection으로 API 응답을 구성한다.</p>
+<p><strong>Q2. 응답 DTO와 JPA 프로젝션은 같은 것인가?</strong><br>응답 DTO는 외부로 전달할 데이터 계약이고, 프로젝션은 조회 결과의 필드 집합을 제한하는 방식이다. 같은 DTO 클래스를 repository projection 결과로 쓸 수 있다.</p>
+<p>모든 DTO가 쿼리 projection인 것은 아니다.
+꼬리질문: 목록 API에서 projection을 고려할 이유는?<br>답: 엔티티 그래프 대신 응답에 필요한 값만 조회해 불필요한 로딩을 줄일 수 있다.</p>
 <p><strong>Q3. DTO를 써도 N+1이 발생하는 예를 들어라.</strong><br>주문 엔티티 목록을 읽고 각 주문을 MapStruct 또는 수동 mapper로 변환하면서 customer.name을 읽으면 주문 수만큼 고객을 조회할 수 있다. 변환 라이브러리는 쿼리 계획을 만들지 않는다.<br>꼬리질문: 대안은?<br>답: DTO projection, fetch join, batch fetch 등으로 목록 전체의 조회 계획을 먼저 정한다.</p>
-<p><strong>Q4. 변환을 Controller와 Service 중 어디에 두나?</strong><br>HTTP에 가까운 이름 변경·응답 조립은 Controller가 적절할 수 있다. 트랜잭션 안에서 엔티티 상태와 관계를 해석하거나 유스케이스 규칙을 적용한다면 Service/조회 컴포넌트가 낫다. 핵심은 Controller가 응답 생성 중 DB를 건드리지 않게 하는 것이다.<br>꼬리질문: 어떤 선택을 기본으로 권하나?<br>답: 단순 mapping은 API 경계에 가깝게, 쿼리 최적화가 필요한 읽기 응답은 조회 계층에서 완성한다.</p>
-<p><strong>Q5. 수동 매핑, MapStruct, ModelMapper 중 무엇을 고르나?</strong><br>필드가 적으면 수동 또는 정적 팩토리가 가장 투명하다. 반복 타입이 많으면 컴파일 시 구현을 만드는 MapStruct가 매핑 코드를 일관되게 관리하기 쉽다. 런타임 이름 매칭은 편하지만 숨은 규칙과 잘못된 필드 연결 위험을 감수해야 한다.<br>꼬리질문: MapStruct가 DTO 설계를 대신하나?<br>답: 아니다. 어느 필드를 공개할지와 쿼리를 어떻게 할지는 개발자가 결정한다.</p>
-<p><strong>Q6. API별 DTO를 만들면 DTO 남발인가?</strong><br>외부 입력 필드와 출력 필드의 보안·버전 요구가 다르면 별도 타입이 분리 이유를 갖는다. 단순히 Controller/Service/Repository마다 동일한 필드를 복제하는 건 변환만 늘린다. 타입의 변경 이유가 다른지 기준으로 판단한다.<br>꼬리질문: 요청 DTO와 엔티티를 분리하면 얻는 안전성은?<br>답: 사용자가 제출 가능한 값의 목록을 제한해 내부 상태나 권한 필드가 자동 바인딩되는 것을 막는다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+<p><strong>Q4. 변환을 Controller와 Service 중 어디에 두나?</strong><br>HTTP에 가까운 이름 변경·응답 조립은 Controller가 적절할 수 있다. 트랜잭션 안에서 엔티티 상태와 관계를 해석하거나 유스케이스 규칙을 적용한다면 Service/조회 컴포넌트가 낫다.</p>
+<p>핵심은 Controller가 응답 생성 중 DB를 건드리지 않게 하는 것이다.
+꼬리질문: 어떤 선택을 기본으로 권하나?<br>답: 단순 mapping은 API 경계에 가깝게, 쿼리 최적화가 필요한 읽기 응답은 조회 계층에서 완성한다.</p>
+<p><strong>Q5. 수동 매핑, MapStruct, ModelMapper 중 무엇을 고르나?</strong><br>필드가 적으면 수동 또는 정적 팩토리가 가장 투명하다. 반복 타입이 많으면 컴파일 시 구현을 만드는 MapStruct가 매핑 코드를 일관되게 관리하기 쉽다.</p>
+<p>런타임 이름 매칭은 편하지만 숨은 규칙과 잘못된 필드 연결 위험을 감수해야 한다.
+꼬리질문: MapStruct가 DTO 설계를 대신하나?</p>
+<p>답: 아니다. 어느 필드를 공개할지와 쿼리를 어떻게 할지는 개발자가 결정한다.</p>
+<p><strong>Q6. API별 DTO를 만들면 DTO 남발인가?</strong><br>외부 입력 필드와 출력 필드의 보안·버전 요구가 다르면 별도 타입이 분리 이유를 갖는다. 단순히 Controller/Service/Repository마다 동일한 필드를 복제하는 건 변환만 늘린다.</p>
+<p>타입의 변경 이유가 다른지 기준으로 판단한다.
+꼬리질문: 요청 DTO와 엔티티를 분리하면 얻는 안전성은?<br>답: 사용자가 제출 가능한 값의 목록을 제한해 내부 상태나 권한 필드가 자동 바인딩되는 것을 막는다.</p>
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Projections :: Spring Data JPA — <a href="https://docs.spring.io/spring-data/jpa/reference/repositories/projections.html" target="_blank" rel="noopener">https://docs.spring.io/spring-data/jpa/reference/repositories/projections.html</a> — 인터페이스·클래스 기반 프로젝션, 동적 프로젝션과 JPQL DTO 쿼리 규칙.</li>
 <li>Hibernate ORM User Guide — <a href="https://docs.jboss.org/hibernate/orm/7.4/userguide/html_single/Hibernate_User_Guide.html" target="_blank" rel="noopener">https://docs.jboss.org/hibernate/orm/7.4/userguide/html_single/Hibernate_User_Guide.html</a> — LazyInitializationException과 지연 연관 초기화, enable_lazy_load_no_trans의 기본값 및 주의.</li>
@@ -343,11 +358,33 @@ public interface OrderSummaryRepository
 <li>JEP 395: Records — <a href="https://openjdk.org/jeps/395" target="_blank" rel="noopener">https://openjdk.org/jeps/395</a> — 값을 투명하게 운반하는 record 클래스의 목적과 언어 설계.</li>
 <li>Data Transfer Object — <a href="https://martinfowler.com/eaaCatalog/dataTransferObject.html" target="_blank" rel="noopener">https://martinfowler.com/eaaCatalog/dataTransferObject.html</a> — 원격 호출 데이터 묶음과 전송 직렬화 경계를 설명하는 DTO 패턴.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    let parent = target?.closest('details.knowledge-topic, details.knowledge-chapter');
+    while (parent) {
+      parent.open = true;
+      parent = parent.parentElement?.closest('details.knowledge-topic, details.knowledge-chapter');
+    }
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }));
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
 <script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
 const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
 mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</script>
+
 </body>
 </html>

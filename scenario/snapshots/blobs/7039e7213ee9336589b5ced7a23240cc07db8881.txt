@@ -1,0 +1,30 @@
+package org.example.notification;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.util.concurrent.ThreadPoolExecutor;
+
+// 16-2 알림 전용 스레드 풀. 기본 실행기를 쓰지 않고 이름·크기·넘칠 때 동작을 정해 둔다.
+@Configuration
+@EnableAsync
+public class AsyncConfig {
+
+    @Bean(name = "notificationExecutor")
+    public ThreadPoolTaskExecutor notificationExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        // 큐(100)가 다 차야 max까지 늘어난다. 그것도 넘치면 요청 스레드가 직접 처리 — 느려지지만 알림을 버리지 않는다
+        executor.setQueueCapacity(100);
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setThreadNamePrefix("notify-");
+        // 종료할 때 큐에 남은 일을 최대 10초 기다린다
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(10);
+        executor.initialize();
+        return executor;
+    }
+}

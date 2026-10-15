@@ -90,7 +90,9 @@ HTTP Authorization: Bearer ...
   -> 인가 규칙 평가
 ```
 
-Spring Security 7.1.1에서 `JwtAuthenticationProvider`는 `JwtDecoder`로 검증한 뒤 `JwtAuthenticationConverter`로 권한을 구성한다. `issuer-uri`는 metadata에서 JWKS를 찾고 기본 검증기는 서명, `exp`, `nbf`, `iss`를 확인한다. discovery 지연 초기화로 AS 가용성이 앱 시작과 결합되지 않을 수 있다. API별 `aud`는 따로 설정한다.
+Spring Security 7.1.1에서 `JwtAuthenticationProvider`는 `JwtDecoder`로 검증한 뒤 `JwtAuthenticationConverter`로 권한을 구성한다. `issuer-uri`는 metadata에서 JWKS를 찾고 기본 검증기는 서명, `exp`, `nbf`, `iss`를 확인한다.
+
+discovery 지연 초기화로 AS 가용성이 앱 시작과 결합되지 않을 수 있다. API별 `aud`는 따로 설정한다.
 
 ### OIDC와 Authorization Server
 
@@ -264,7 +266,9 @@ public class WebApplication {
 ## 8. 자가점검 Q&A (면접 대비)
 
 **Q1. OAuth2와 OIDC의 차이는?**  
-OAuth2는 client가 access token으로 보호 리소스에 접근하도록 위임하는 인가 프레임워크다. OAuth2만으로 표준화된 사용자 인증 결과를 정의하지 않는다. OIDC는 `openid` scope, ID token, discovery와 검증 규칙을 추가한 인증 계층이다.  
+OAuth2는 client가 access token으로 보호 리소스에 접근하도록 위임하는 인가 프레임워크다. OAuth2만으로 표준화된 사용자 인증 결과를 정의하지 않는다.
+
+OIDC는 `openid` scope, ID token, discovery와 검증 규칙을 추가한 인증 계층이다.
 **꼬리질문: API가 사용자 이름이 필요하면 ID token을 받으면 되나?** 아니오. API용 audience와 권한이 있는 access token을 받고, 사용자 주체 claim을 API 계약에 맞춰 사용한다.
 
 **Q2. 서명이 유효한 JWT를 다른 API가 받아도 되는가?**  
@@ -272,19 +276,28 @@ OAuth2는 client가 access token으로 보호 리소스에 접근하도록 위�
 **꼬리질문: `iss`와 `aud`는 각각 무엇을 제한하나?** `iss`는 누가 발급했는지, `aud`는 누가 소비하도록 발급했는지를 제한한다.
 
 **Q3. PKCE는 client secret과 같은가?**  
-아니다. secret은 client의 장기 자격이고 PKCE verifier는 authorization 요청별 일회용 비밀이다. AS는 authorization 단계에서 challenge를 저장하고 token 단계의 verifier가 일치하는지 확인한다. 공개 client가 code를 가로채여도 verifier 없이는 교환할 수 없다.  
+아니다. secret은 client의 장기 자격이고 PKCE verifier는 authorization 요청별 일회용 비밀이다.
+
+AS는 authorization 단계에서 challenge를 저장하고 token 단계의 verifier가 일치하는지 확인한다. 공개 client가 code를 가로채여도 verifier 없이는 교환할 수 없다.
 **꼬리질문: 왜 `S256`인가?** Authorization request에는 verifier 자체가 아닌 해시를 보내 challenge 유출로 verifier가 드러나지 않게 하며, RFC 7636은 지원 client가 `S256`을 사용하도록 한다.
 
 **Q4. JWT를 쓰면 서버 세션이 필요 없고 로그아웃도 자동으로 되는가?**  
-아니다. 서명형 JWT는 로컬 검증을 가능하게 해 세션 조회를 줄이지만, 이미 발급된 토큰의 유효성을 서버가 즉시 회수하지 못한다. 만료까지 허용하거나 별도의 폐기 상태를 조회해야 한다. 토큰 회전·키 교체 비용도 있다.  
+아니다. 서명형 JWT는 로컬 검증을 가능하게 해 세션 조회를 줄이지만, 이미 발급된 토큰의 유효성을 서버가 즉시 회수하지 못한다.
+
+만료까지 허용하거나 별도의 폐기 상태를 조회해야 한다. 토큰 회전·키 교체 비용도 있다.
 **꼬리질문: 즉시 차단이 필수인 서비스는?** denylist/introspection 같은 상태 확인이나 짧은 세션 버전 검사를 추가하고 요청 지연·가용성 비용을 감수한다.
 
 **Q5. Access token과 refresh token을 같은 API에 보내도 되나?**  
-아니다. access token은 RS에서 권한 확인용이고 refresh token은 AS token endpoint에서 새 access token을 발급받기 위한 자격 증명이다. refresh token을 RS에 보내면 노출 영역을 불필요하게 넓힌다. refresh token은 client·resource·scope에 결속하고 안전하게 저장한다.  
+아니다. access token은 RS에서 권한 확인용이고 refresh token은 AS token endpoint에서 새 access token을 발급받기 위한 자격 증명이다.
+
+refresh token을 RS에 보내면 노출 영역을 불필요하게 넓힌다. refresh token은 client·resource·scope에 결속하고 안전하게 저장한다.
 **꼬리질문: 공개 client refresh token 탈취는 어떻게 감지하나?** 회전해 이전 토큰 재사용을 탐지하거나 sender-constraining으로 client 인스턴스에 결속한다.
 
 **Q6. Client Credentials는 언제 쓰나?**  
-사용자 대신이 아니라 서비스 client 자신의 권한으로 API를 호출하는 서버 간 통신에 쓴다. 사용자 로그인이나 동의 화면이 없다. 대상 API와 업무에 한정한 scope를 client에 등록한다. 장기 client secret은 유출될 수 있으므로 보관과 교체를 관리한다.  
+사용자 대신이 아니라 서비스 client 자신의 권한으로 API를 호출하는 서버 간 통신에 쓴다. 사용자 로그인이나 동의 화면이 없다.
+
+대상 API와 업무에 한정한 scope를 client에 등록한다. 장기 client secret은 유출될 수 있으므로 보관과 교체를 관리한다.
+
 **꼬리질문: 브라우저 SPA의 client credentials는 안전한가?** 안전하지 않다. 브라우저는 secret을 숨길 수 없으므로 서버 중계나 사용자 기반 Authorization Code + PKCE가 필요하다.
 
 ## 9. 참고문헌

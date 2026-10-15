@@ -1,0 +1,103 @@
+package org.example.poll;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostForbiddenException;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+
+// 글 투표 — 만들기(작성자만, 글마다 하나), 투표(한 사람 한 표, 바꾸기 없음), 결과(GROUP BY로 센다)
+@Service
+public class PollService {
+
+    private final PollRepository pollRepository;
+    private final PollVoteRepository voteRepository;
+    private final PostRepository postRepository;
+    private final PostAccessPolicy accessPolicy;
+    private final Clock clock;
+
+    public PollService(PollRepository pollRepository, PollVoteRepository voteRepository,
+                       PostRepository postRepository, PostAccessPolicy accessPolicy, Clock clock) {
+        this.pollRepository = pollRepository;
+        this.voteRepository = voteRepository;
+        this.postRepository = postRepository;
+        this.accessPolicy = accessPolicy;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public PollResponse create(Long postId, AuthenticatedMember me, PollCreateRequest request) {
+        Post post = findViewablePost(postId, me);
+        if (!post.getAuthor().getId().equals(me.id())) {
+            throw new PostForbiddenException();
+        }
+        List<String> labels = request.options().stream().map(String::strip).toList();
+        if (new HashSet<>(labels).size() != labels.size()) {
+            throw new InvalidPollException("options", "같은 선택지가 두 번 있습니다.");
+        }
+        if (pollRepository.existsByPost_Id(postId)) {
+            throw new PollConflictException("이 글에는 이미 투표가 있습니다.");
+        }
+        try {
+            // 먼저 확인해도 동시에 두 요청이 오면 둘 다 통과할 수 있다 — 그때는 UNIQUE(post_id)가 막는다
+            pollRepository.saveAndFlush(new Poll(post, request.question().strip(), labels, LocalDateTime.now(clock)));
+        } catch (DataIntegrityViolationException e) {
+            throw new PollConflictException("이 글에는 이미 투표가 있습니다.");
+        }
+        return result(postId, me);
+    }
+
+    @Transactional
+    public PollResponse vote(Long postId, AuthenticatedMember me, Long optionId) {
+        findViewablePost(postId, me);
+        Poll poll = pollRepository.findByPost_Id(postId).orElseThrow(PollNotFoundException::new);
+        // 선택지 id만 믿으면 남의 투표의 선택지에 표를 넣을 수 있다 — 이 투표의 선택지인지 확인한다
+        if (!poll.hasOption(optionId)) {
+            throw new InvalidPollException("optionId", "이 투표에 없는 선택지입니다.");
+        }
+        if (voteRepository.existsByPollIdAndMemberId(poll.getId(), me.id())) {
+            throw new PollConflictException("이미 투표했습니다.");
+        }
+        try {
+            voteRepository.saveAndFlush(new PollVote(poll.getId(), optionId, me.id(), LocalDateTime.now(clock)));
+        } catch (DataIntegrityViolationException e) {
+            throw new PollConflictException("이미 투표했습니다.");
+        }
+        return result(postId, me);
+    }
+
+    @Transactional(readOnly = true)
+    public PollResponse get(Long postId, AuthenticatedMember viewer) {
+        findViewablePost(postId, viewer);
+        return result(postId, viewer);
+    }
+
+    private PollResponse result(Long postId, AuthenticatedMember viewer) {
+        Poll poll = pollRepository.findByPost_Id(postId).orElseThrow(PollNotFoundException::new);
+        List<PollResponse.Option> options = pollRepository.tally(poll.getId()).stream()
+                .map(row -> new PollResponse.Option(row.getId(), row.getLabel(), row.getVotes()))
+                .toList();
+        long total = options.stream().mapToLong(PollResponse.Option::votes).sum();
+        Long mine = viewer == null ? null
+                : voteRepository.findByPollIdAndMemberId(poll.getId(), viewer.id())
+                        .map(PollVote::getOptionId).orElse(null);
+        return new PollResponse(postId, poll.getQuestion(), options, total, mine);
+    }
+
+    private Post findViewablePost(Long postId, AuthenticatedMember viewer) {
+        Post post = postRepository.findById(postId).orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(viewer, post)) {
+            throw new PostNotFoundException();
+        }
+        return post;
+    }
+}

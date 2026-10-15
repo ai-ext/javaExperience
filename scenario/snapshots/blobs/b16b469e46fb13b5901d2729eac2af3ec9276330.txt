@@ -1,0 +1,99 @@
+package org.example.like;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
+// 좋아요·취소 규칙. PUT·DELETE 모두 "현재 상태를 확인하고 필요할 때만 바꾼다"(멱등).
+// 4-2: like_count는 DB에서 원자적으로 +1/-1 하고(읽고 계산해서 저장하지 않는다), 중복 INSERT는
+// UNIQUE(post_id, member_id) + INSERT IGNORE로 막는다 — 동시 요청에도 숫자와 행 수가 어긋나지 않는다.
+//
+// 그래도 "서로 다른 회원 수십 명이 같은 글에 동시에" INSERT + UPDATE를 하면 MySQL/InnoDB가 교착
+// 상태(Deadlock found when trying to get lock)로 한쪽을 강제로 롤백시키는 경우가 실제로 있다(값이
+// 틀리는 게 아니라 그 요청만 실패한다). 그 요청은 처음부터 다시 하면 되므로 짧게 재시도한다.
+@Service
+public class LikeService {
+
+    private static final String PUBLISHED = "PUBLISHED";
+    private static final int MAX_ATTEMPTS = 10;
+
+    private final PostRepository postRepository;
+    private final PostLikeRepository postLikeRepository;
+    private final PostAccessPolicy accessPolicy;
+    private final TransactionTemplate transactionTemplate;
+
+    public LikeService(PostRepository postRepository, PostLikeRepository postLikeRepository,
+                        PostAccessPolicy accessPolicy, PlatformTransactionManager transactionManager) {
+        this.postRepository = postRepository;
+        this.postLikeRepository = postLikeRepository;
+        this.accessPolicy = accessPolicy;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
+
+    public LikeResponse like(Long postId, AuthenticatedMember loginMember) {
+        return withDeadlockRetry(() -> transactionTemplate.execute(status -> doLike(postId, loginMember)));
+    }
+
+    public LikeResponse unlike(Long postId, AuthenticatedMember loginMember) {
+        return withDeadlockRetry(() -> transactionTemplate.execute(status -> doUnlike(postId, loginMember)));
+    }
+
+    private LikeResponse doLike(Long postId, AuthenticatedMember loginMember) {
+        Post post = findLikeablePost(postId, loginMember);
+        if (post.getAuthor().getId().equals(loginMember.id())) {
+            throw new SelfLikeNotAllowedException();
+        }
+
+        int inserted = postLikeRepository.insertIgnore(postId, loginMember.id());
+        if (inserted > 0) {
+            postRepository.incrementLikeCount(postId);
+        }
+        return new LikeResponse(postId, true, postRepository.findLikeCountById(postId));
+    }
+
+    private LikeResponse doUnlike(Long postId, AuthenticatedMember loginMember) {
+        findLikeablePost(postId, loginMember);
+
+        long deleted = postLikeRepository.deleteByPost_IdAndMember_Id(postId, loginMember.id());
+        if (deleted > 0) {
+            postRepository.decrementLikeCount(postId);
+        }
+        return new LikeResponse(postId, false, postRepository.findLikeCountById(postId));
+    }
+
+    // 볼 수 있는 글인가(2-3 규칙 재사용) + PUBLISHED인가 — 둘 다 아니면 404
+    private Post findLikeablePost(Long postId, AuthenticatedMember loginMember) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(loginMember, post) || !PUBLISHED.equals(post.getStatus())) {
+            throw new PostNotFoundException();
+        }
+        return post;
+    }
+
+    private LikeResponse withDeadlockRetry(java.util.function.Supplier<LikeResponse> action) {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return action.get();
+            } catch (ConcurrencyFailureException e) {
+                if (attempt >= MAX_ATTEMPTS) {
+                    throw e;
+                }
+                // 이 트랜잭션은 이미 롤백됐다 — 처음부터(새 트랜잭션으로) 다시 시도한다.
+                // 바로 재시도하면 같은 상대와 또 부딪히기 쉬우니 짧게, 무작위로 간격을 둔다.
+                try {
+                    Thread.sleep((long) (Math.random() * 20 * attempt));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
+        }
+    }
+}

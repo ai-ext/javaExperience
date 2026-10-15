@@ -1,0 +1,72 @@
+package org.example.poll;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.Table;
+import org.example.post.Post;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+// 글 투표 — 선택지는 투표와 함께 만들어지고 함께 저장된다(cascade PERSIST). 만든 뒤에는 바꾸지 않는다
+@Entity
+@Table(name = "poll")
+public class Poll {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id", nullable = false)
+    private Post post;
+
+    @Column(nullable = false)
+    private String question;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "poll", cascade = CascadeType.PERSIST)
+    @OrderBy("position ASC")
+    private List<PollOption> options = new ArrayList<>();
+
+    protected Poll() {
+        // JPA
+    }
+
+    public Poll(Post post, String question, List<String> labels, LocalDateTime now) {
+        this.post = post;
+        this.question = question;
+        this.createdAt = now;
+        for (int i = 0; i < labels.size(); i++) {
+            options.add(new PollOption(this, labels.get(i), i + 1));
+        }
+    }
+
+    public boolean hasOption(Long optionId) {
+        return options.stream().anyMatch(o -> o.getId().equals(optionId));
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getQuestion() {
+        return question;
+    }
+
+    public List<PollOption> getOptions() {
+        return options;
+    }
+}

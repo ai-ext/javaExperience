@@ -74,13 +74,17 @@ UsernamePasswordAuthenticationFilter
   → 다음 필터와 DispatcherServlet
 ```
 
-`AuthenticationManager`가 직접 모든 검증을 하지는 않는다. `ProviderManager`는 토큰을 지원하는 provider에 위임하며 아이디/비밀번호는 보통 `DaoAuthenticationProvider`가 처리한다. Provider는 `UserDetailsService`에서 계정과 해시를 얻고 `PasswordEncoder.matches`로 비교한다. 저장 비밀번호를 복호화하지 않으며, 외부 오류는 계정 존재 여부를 드러내지 않는 편이 안전하다.
+`AuthenticationManager`가 직접 모든 검증을 하지는 않는다. `ProviderManager`는 토큰을 지원하는 provider에 위임하며 아이디/비밀번호는 보통 `DaoAuthenticationProvider`가 처리한다.
+
+Provider는 `UserDetailsService`에서 계정과 해시를 얻고 `PasswordEncoder.matches`로 비교한다. 저장 비밀번호를 복호화하지 않으며, 외부 오류는 계정 존재 여부를 드러내지 않는 편이 안전하다.
 
 인증 정보는 `SecurityContext`에 들어간다. 세션 기반 기본 설정은 저장소가 요청 간 인증을 저장·복원하지만, 커스텀 필터나 Controller가 직접 설정할 때는 저장소에 기록해야 후속 요청에도 남는다. 현재 스레드의 Holder만 수정하면 다음 요청에선 사라질 수 있다.
 
 ### 세션 수명과 고정 공격
 
-세션 인증에서는 인증 전 세션 ID를 로그인 뒤에도 재사용하는 세션 고정 공격을 막아야 한다. 기본 보안 설정은 인증 뒤 세션 ID 변경 등 세션 고정 방어를 적용한다. 세션 생성 정책은 `IF_REQUIRED`(필요할 때 생성), `NEVER`(새로 만들지 않되 기존 세션 사용), `STATELESS`(SecurityContext 저장에 `HttpSession`을 사용하지 않음)처럼 구분한다. `STATELESS`여도 애플리케이션의 다른 코드가 세션을 만들 수 있다.
+세션 인증에서는 인증 전 세션 ID를 로그인 뒤에도 재사용하는 세션 고정 공격을 막아야 한다. 기본 보안 설정은 인증 뒤 세션 ID 변경 등 세션 고정 방어를 적용한다.
+
+세션 생성 정책은 `IF_REQUIRED`(필요할 때 생성), `NEVER`(새로 만들지 않되 기존 세션 사용), `STATELESS`(SecurityContext 저장에 `HttpSession`을 사용하지 않음)처럼 구분한다. `STATELESS`여도 애플리케이션의 다른 코드가 세션을 만들 수 있다.
 
 ### 로그인부터 로그아웃까지 (보강)
 
@@ -137,7 +141,9 @@ public class BrowserSessionConfiguration {
 }
 ```
 
-`maximumSessions(1)`과 `maxSessionsPreventsLogin(false)`는 새 로그인 시 기존 세션을 만료시킨다. `true`로 바꾸면 이미 한 세션이 있을 때 새 로그인을 거부한다. 계정 공유가 허용된 것처럼 보이는 동작을 정책으로 정하고, 사용자에게 세션 종료 사실을 안내한다. 기본 세션 레지스트리는 메모리 기반이므로 서버를 여러 대 운영하면 인스턴스 간 제한이 일치하지 않을 수 있다. 클러스터에서는 Spring Session 같은 공유 세션 저장소와 그 환경에 맞는 동시성 구성을 검토한다.
+`maximumSessions(1)`과 `maxSessionsPreventsLogin(false)`는 새 로그인 시 기존 세션을 만료시킨다. `true`로 바꾸면 이미 한 세션이 있을 때 새 로그인을 거부한다. 계정 공유가 허용된 것처럼 보이는 동작을 정책으로 정하고, 사용자에게 세션 종료 사실을 안내한다.
+
+기본 세션 레지스트리는 메모리 기반이므로 서버를 여러 대 운영하면 인스턴스 간 제한이 일치하지 않을 수 있다. 클러스터에서는 Spring Session 같은 공유 세션 저장소와 그 환경에 맞는 동시성 구성을 검토한다.
 
 세션 만료와 쿠키 보안 속성은 애플리케이션 설정으로 명시할 수 있다.
 
@@ -152,7 +158,9 @@ server:
         same-site: lax
 ```
 
-`HttpOnly`는 스크립트가 세션 쿠키 값을 읽기 어렵게 하지만 XSS가 브라우저를 대신해 요청을 보내는 것까지 막지는 않는다. `Secure`는 HTTPS에서만 쿠키를 보내게 하므로 운영 HTTPS 환경에 맞춘다. `SameSite=Lax`는 일반적인 웹 화면에 출발점으로 쓸 수 있지만 CSRF 토큰을 대신하지 않는다. 외부 사이트를 왕복하는 로그인 흐름은 `Strict`에서 깨질 수 있고, 교차 사이트 쿠키를 꼭 써야 하는 `None`은 `Secure`와 CSRF 방어를 함께 요구한다.
+`HttpOnly`는 스크립트가 세션 쿠키 값을 읽기 어렵게 하지만 XSS가 브라우저를 대신해 요청을 보내는 것까지 막지는 않는다. `Secure`는 HTTPS에서만 쿠키를 보내게 하므로 운영 HTTPS 환경에 맞춘다.
+
+`SameSite=Lax`는 일반적인 웹 화면에 출발점으로 쓸 수 있지만 CSRF 토큰을 대신하지 않는다. 외부 사이트를 왕복하는 로그인 흐름은 `Strict`에서 깨질 수 있고, 교차 사이트 쿠키를 꼭 써야 하는 `None`은 `Secure`와 CSRF 방어를 함께 요구한다.
 
 세션 기반 CSRF 보호를 유지하면 상태 변경 폼도 토큰을 보내야 한다. Spring MVC/Thymeleaf 폼의 명시적 예는 다음과 같다.
 
@@ -165,7 +173,9 @@ server:
 </form>
 ```
 
-함정은 쿠키 옵션을 CSRF 정책으로 오해하는 것이다. `SameSite`는 브라우저의 쿠키 전송 조건을 좁히는 보조 수단이고, 쿠키 인증을 쓰는 상태 변경 요청에는 Spring Security의 CSRF 검증과 유효한 토큰이 필요하다. 반대로 인증이 필요한 화면 이동은 CSRF 토큰을 추가하는 것으로 권한 검사가 대체되지 않는다. 세션 만료 시간, 쿠키 속성, 로그아웃 시 세션 무효화를 함께 점검하고, 개발 HTTP 환경에서는 `secure: true` 쿠키가 전송되지 않는 점도 확인한다.
+함정은 쿠키 옵션을 CSRF 정책으로 오해하는 것이다. `SameSite`는 브라우저의 쿠키 전송 조건을 좁히는 보조 수단이고, 쿠키 인증을 쓰는 상태 변경 요청에는 Spring Security의 CSRF 검증과 유효한 토큰이 필요하다.
+
+반대로 인증이 필요한 화면 이동은 CSRF 토큰을 추가하는 것으로 권한 검사가 대체되지 않는다. 세션 만료 시간, 쿠키 속성, 로그아웃 시 세션 무효화를 함께 점검하고, 개발 HTTP 환경에서는 `secure: true` 쿠키가 전송되지 않는 점도 확인한다.
 
 참고: Authentication Persistence and Session Management — https://docs.spring.io/spring-security/reference/servlet/authentication/session-management.html
 참고: Handling Logouts — https://docs.spring.io/spring-security/reference/servlet/authentication/logout.html

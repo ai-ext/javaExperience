@@ -1,0 +1,38 @@
+package org.example.series;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface SeriesPostRepository extends JpaRepository<SeriesPost, Long> {
+
+    // 시리즈의 글을 순서대로, 글·작성자까지 한 번에
+    @Query("""
+            SELECT sp FROM SeriesPost sp
+            JOIN FETCH sp.post p
+            JOIN FETCH p.author
+            WHERE sp.series.id = :seriesId
+            ORDER BY sp.position ASC, sp.id ASC
+            """)
+    List<SeriesPost> findInOrder(@Param("seriesId") Long seriesId);
+
+    @Query("SELECT sp FROM SeriesPost sp JOIN FETCH sp.series WHERE sp.post.id = :postId")
+    Optional<SeriesPost> findByPostId(@Param("postId") Long postId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT sp FROM SeriesPost sp WHERE sp.post.id = :postId")
+    Optional<SeriesPost> findByPostIdForUpdate(@Param("postId") Long postId);
+
+    @Query("SELECT COALESCE(MAX(sp.position), 0) FROM SeriesPost sp WHERE sp.series.id = :seriesId")
+    int findMaxPosition(@Param("seriesId") Long seriesId);
+
+    @Modifying
+    @Query("DELETE FROM SeriesPost sp WHERE sp.series.id = :seriesId AND sp.post.id = :postId")
+    int deleteFromSeries(@Param("seriesId") Long seriesId, @Param("postId") Long postId);
+}

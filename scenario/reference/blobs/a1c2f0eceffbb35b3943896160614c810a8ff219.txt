@@ -1,0 +1,81 @@
+package org.example.bookmark;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.post.AuthorResponse;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.security.SecureRandom;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Base64;
+import java.util.List;
+import java.util.function.Predicate;
+
+// 북마크 폴더 공유 링크 — 읽기 전용. 링크를 가진 사람은 로그인 없이 폴더의 글 목록을 본다.
+@Service
+public class FolderShareService {
+
+    // 32바이트 보안 난수로 256비트 토큰을 만든다. UUID v4도 보안 난수지만 이 시나리오는 더 긴 토큰을 쓴다.
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final Base64.Encoder TOKEN_ENCODER = Base64.getUrlEncoder().withoutPadding();
+
+    private final BookmarkFolderRepository folderRepository;
+    private final BookmarkRepository bookmarkRepository;
+    private final PostAccessPolicy accessPolicy;
+    private final Clock clock;
+
+    public FolderShareService(BookmarkFolderRepository folderRepository, BookmarkRepository bookmarkRepository,
+                              PostAccessPolicy accessPolicy, Clock clock) {
+        this.folderRepository = folderRepository;
+        this.bookmarkRepository = bookmarkRepository;
+        this.accessPolicy = accessPolicy;
+        this.clock = clock;
+    }
+
+    // 부를 때마다 새 토큰 — 옛 링크는 죽는다(링크가 새어 나갔을 때 다시 만들면 막힌다)
+    @Transactional
+    public ShareResponse share(AuthenticatedMember me, Long folderId, Integer expiresInDays) {
+        BookmarkFolder folder = folderRepository.findOwnedForUpdate(folderId, me.id())
+                .orElseThrow(BookmarkFolderNotFoundException::new);
+        // 칼럼이 DATETIME(초 단위)이라 응답과 DB 값이 같도록 초 아래를 버린다
+        LocalDateTime now = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS);
+        LocalDateTime expiresAt = expiresInDays == null ? null : now.plusDays(expiresInDays);
+        folder.share(newToken(), expiresAt, now);
+        return new ShareResponse(folder.getId(), folder.getShareToken(),
+                "/api/shared/folders/" + folder.getShareToken(), expiresAt);
+    }
+
+    @Transactional
+    public void unshare(AuthenticatedMember me, Long folderId) {
+        BookmarkFolder folder = folderRepository.findOwnedForUpdate(folderId, me.id())
+                .orElseThrow(BookmarkFolderNotFoundException::new);
+        folder.unshare(LocalDateTime.now(clock));
+    }
+
+    // 무엇을 보여 줄지는 폴더 주인이 아니라 "링크를 연 사람" 기준(2-3)이다 — 주인 기준이면
+    // 주인만 볼 수 있는 팔로워 공개 글·차단한 사람의 글이 링크를 받은 사람에게 새어 나간다.
+    @Transactional(readOnly = true)
+    public SharedFolderResponse open(String token, AuthenticatedMember viewer) {
+        BookmarkFolder folder = folderRepository.findByShareToken(token)
+                .filter(f -> f.isShareOpen(LocalDateTime.now(clock)))
+                .orElseThrow(SharedFolderNotFoundException::new);
+        Predicate<Post> viewable = accessPolicy.viewableBy(viewer);
+        List<SharedFolderResponse.Item> items = bookmarkRepository.findInFolder(folder.getId()).stream()
+                .map(Bookmark::getPost)
+                .filter(viewable)
+                .map(post -> new SharedFolderResponse.Item(post.getId(), post.getTitle()))
+                .toList();
+        return new SharedFolderResponse(folder.getName(),
+                new AuthorResponse(folder.getMember().getId(), folder.getMember().getNickname()), items);
+    }
+
+    private static String newToken() {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return TOKEN_ENCODER.encodeToString(bytes);
+    }
+}

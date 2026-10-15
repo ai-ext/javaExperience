@@ -1,0 +1,30 @@
+package org.example.batch;
+
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+
+// 매분 0초(서울). practice는 시계가 2026-10-05 00:00에 멈춰 있어서 여기서는 아무것도 발행되지 않는다 — 수동 실행의 at으로 확인한다.
+@Component
+public class ScheduledPublishScheduler {
+
+    private final ScheduledPublishService scheduledPublishService;
+    private final JobRunner jobRunner;
+    private final Clock clock;
+
+    public ScheduledPublishScheduler(ScheduledPublishService scheduledPublishService, JobRunner jobRunner, Clock clock) {
+        this.scheduledPublishService = scheduledPublishService;
+        this.jobRunner = jobRunner;
+        this.clock = clock;
+    }
+
+    @Scheduled(cron = "0 * * * * *", zone = "Asia/Seoul")
+    public void everyMinute() {
+        LocalDateTime now = LocalDateTime.now(clock);
+        // 매분 도는 배치 — 발행한 게 없으면 기록하지 않는다
+        jobRunner.runQuietly(JobCatalog.SCHEDULED_PUBLISH, now.toLocalDate(), now,
+                () -> scheduledPublishService.publishDue(now), r -> r.published().size());
+    }
+}

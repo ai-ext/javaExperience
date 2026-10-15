@@ -1,0 +1,46 @@
+package org.example.bookmark;
+
+import tools.jackson.databind.JsonNode;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
+
+@RestController
+public class FolderShareController {
+
+    private final FolderShareService shareService;
+
+    public FolderShareController(FolderShareService shareService) {
+        this.shareService = shareService;
+    }
+
+    // 본문 생략 가능(만료 없음). 부를 때마다 새 링크
+    @PostMapping("/api/me/bookmark-folders/{id}/share")
+    public ResponseEntity<ShareResponse> share(@PathVariable Long id, @LoginMember AuthenticatedMember me,
+                                               @RequestBody(required = false) JsonNode body) {
+        ShareResponse response = shareService.share(me, id, ShareRequest.fromJson(body).expiresInDays());
+        return ResponseEntity.created(URI.create(response.url())).body(response);
+    }
+
+    @DeleteMapping("/api/me/bookmark-folders/{id}/share")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void unshare(@PathVariable Long id, @LoginMember AuthenticatedMember me) {
+        shareService.unshare(me, id);
+    }
+
+    // /api/me 밖 — 토큰 없이 열린다. 로그인한 채로 열면 그 사람 기준으로 거른다
+    @GetMapping("/api/shared/folders/{token}")
+    public SharedFolderResponse open(@PathVariable String token, @LoginMember AuthenticatedMember viewer) {
+        return shareService.open(token, viewer);
+    }
+}

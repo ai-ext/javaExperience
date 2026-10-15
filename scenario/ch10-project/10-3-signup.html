@@ -1,0 +1,1189 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10-3. 회원 가입 — BCrypt 해시와 이메일 중복 409</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
+<link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
+<link rel="stylesheet" href="../../tools/site/scenario-visual.css?v=acace17043f4">
+<link rel="stylesheet" href="../../tools/site/scenario-code-workbench.css?v=6b63063b4651">
+<link rel="stylesheet" href="../../tools/site/lesson-atlas.css?v=72d1f0fcddbe">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../../index.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 10장. 명세서 프로젝트 — 게시판 API v1(/api/v1) › 10-3</p><p class="level-tags"><span>중급</span><span>별도 명세서 프로젝트</span><span>DB project</span></p>
+<h1 id="10-3-회원-가입--bcrypt-해시와-이메일-중복-409"><a class="anchor" href="#10-3-회원-가입--bcrypt-해시와-이메일-중복-409" aria-hidden="true">#</a>10-3. 회원 가입 — BCrypt 해시와 이메일 중복 409</h1><h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>시나리오 화면</span><span class="mockup-live"><i></i> 단계 시안</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">사용자에게 보이는 상태</span><h3>회원 가입 화면</h3><p>이메일·비밀번호·닉네임을 넣고 가입한다. 서버는 비밀번호를 해시로 바꿔 저장하고, 이미 있는 이메일이면 409로 막는다.</p></div></div><div class="mock-screen" aria-label="회원 가입 화면 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>회원 가입</strong><span></span></header><div class="mock-control screen-field" data-screen-id="email"><label>이메일</label><div class="mock-field">check-10-3@example.com</div></div><div class="mock-control screen-field" data-screen-id="password"><label>비밀번호</label><div class="mock-field">••••••••••••</div></div><div class="mock-control screen-field" data-screen-id="nickname"><label>닉네임</label><div class="mock-field">채점용</div></div><div class="mock-actions" data-screen-id="buttons"><span class="mock-button mock-primary" data-screen-id="submit">가입</span></div><div class="mock-toast tone-neutral" data-screen-id="toast"><span class="mock-toast-icon" aria-hidden="true">i</span><span>가입했어요</span></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">화면 뒤에서 일어나는 일</span><h4>요청부터 응답까지</h4></div><span class="flow-hint">이 단계에 기록된 처리 순서를 보여줍니다.</span></div><div class="flow-tracks" aria-label="흐름별 요청 처리 경로"><div class="flow-route" aria-label="가입 성공"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="service" data-index="2"><span class="flow-node-number">3</span>Service</span><span class="flow-node" data-node="mysql" data-index="3"><span class="flow-node-number">4</span>MySQL</span><span class="flow-node" data-node="response" data-index="4"><span class="flow-node-number">5</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="5"><span class="flow-node-number">6</span>응답 반영</span></div><div class="flow-route" aria-label="이미 있는 이메일"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="dto" data-index="2"><span class="flow-node-number">3</span>DTO</span><span class="flow-node" data-node="response" data-index="3"><span class="flow-node-number">4</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="4"><span class="flow-node-number">5</span>응답 반영</span></div><div class="flow-route" aria-label="입력이 틀렸을 때"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="response" data-index="2"><span class="flow-node-number">3</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="3"><span class="flow-node-number">4</span>응답 반영</span></div><div class="flow-route" aria-label="한글 비밀번호가 72바이트를 넘을 때"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="response" data-index="2"><span class="flow-node-number">3</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="3"><span class="flow-node-number">4</span>응답 반영</span></div></div><p class="flow-swipe-hint">좌우로 밀어 전체 경로 보기 →</p><section class="implementation-route" aria-label="완성 코드의 역할별 구성"><div class="implementation-route-heading"><div><span class="scenario-kicker">실제 정답 파일 기준</span><h5>이 단계에서 만나는 Java 구성요소</h5></div><a href="#전체-구현-코드">코드 보기 ↗</a></div><div class="implementation-nodes"><div class="implementation-node"><strong>Controller</strong><small>UserController.java</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>DTO</strong><small>SignupRequest.java · UserResponse.java</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>Service</strong><small>UserService.java</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>Repository</strong><small>UserRepository.java</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>JPA · 영속성 컨텍스트</strong><small>런타임 · Repository 구현 뒤에서 동작</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>MySQL</strong><small>시나리오 SQL의 대상 DB</small></div></div><p class="implementation-entities"><b>Entity 모델</b> User.java <span>· 흐름의 실행 단계가 아니라 DB 테이블과 매핑되는 객체입니다.</span></p><p class="implementation-disclaimer">파일의 역할 지도입니다. 위 흐름은 화면 JSON의 단계이며, 요청별 실제 호출 여부를 서버에서 추적한 결과는 아닙니다.</p></section><aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside><p class="flow-selection-status" role="status" aria-live="polite">카드를 선택하면 화면의 관련 요소와 계층이 강조됩니다.</p><div class="scenario-flows"><section class="scenario-flow" aria-label="가입 성공" data-flow-index="0"><h5>가입 성공<span class="scenario-flow-count">6단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="email|password|nickname|submit" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">세 칸을 채우고 [가입]을 누른다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/v1/users" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/v1/users</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">POST /api/v1/users</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{
+  &quot;email&quot;: &quot;check-10-3@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</pre></details></li><li><button type="button" class="flow-step" data-node="service" data-nodes="service" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-layers"><span class="flow-layer" data-node="service">Service</span></span><span class="flow-step-text">@Valid가 길이·형식을 검사 → UserService가 이메일 중복을 확인 → passwordEncoder.encode로 해시</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> SELECT ... FROM users WHERE email = 'check-10-3@example.com';
+INSERT INTO users (email, password_hash, nickname, created_at)
+VALUES ('check-10-3@example.com', '$2a$10$...', '채점용', NOW());</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 201</span><span class="flow-step-detail"><b>headers</b> Location: /api/v1/users/4 · Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{
+  &quot;status&quot;: 201,
+  &quot;message&quot;: &quot;Created&quot;,
+  &quot;data&quot;: { &quot;id&quot;: 4, &quot;email&quot;: &quot;check-10-3@example.com&quot;, &quot;nickname&quot;: &quot;채점용&quot; }
+}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="toast" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">가입 완료 — 응답 어디에도 비밀번호가 없다</span></button></li></ol></section><section class="scenario-flow" aria-label="이미 있는 이메일" data-flow-index="1"><h5>이미 있는 이메일<span class="scenario-flow-count">5단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="email|submit" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">같은 이메일을 대문자로 바꿔 다시 가입한다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/v1/users" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/v1/users</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">POST /api/v1/users</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{
+  &quot;email&quot;: &quot; Check-10-3@Example.COM &quot;,
+  &quot;password&quot;: &quot;password1234&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</pre></details></li><li><button type="button" class="flow-step" data-node="dto" data-nodes="dto" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-layers"><span class="flow-layer" data-node="dto">DTO</span></span><span class="flow-step-text">요청 record가 이메일을 다듬는다(공백 제거·소문자) → 이미 있어 ApiException(DUPLICATE)</span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 409</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{
+  &quot;status&quot;: 409,
+  &quot;message&quot;: &quot;이미 가입된 이메일입니다.&quot;,
+  &quot;code&quot;: &quot;DUPLICATE&quot;,
+  &quot;errors&quot;: [],
+  &quot;data&quot;: null
+}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="email" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">이메일 칸 아래에 &quot;이미 가입된 이메일입니다.&quot;</span></button></li></ol></section><section class="scenario-flow" aria-label="입력이 틀렸을 때" data-flow-index="2"><h5>입력이 틀렸을 때<span class="scenario-flow-count">5단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="email|password|nickname" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">이메일 형식이 아니고, 비밀번호·닉네임이 짧다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/v1/users" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/v1/users</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">POST /api/v1/users</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;email&quot;:&quot;not-an-email&quot;,&quot;password&quot;:&quot;short&quot;,&quot;nickname&quot;:&quot;a&quot;}</pre></details></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">@Valid 실패 → MethodArgumentNotValidException → 전역 처리기가 필드별 errors로</span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 400</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{
+  &quot;status&quot;: 400,
+  &quot;code&quot;: &quot;VALIDATION_FAILED&quot;,
+  &quot;errors&quot;: [
+    { &quot;field&quot;: &quot;email&quot;, &quot;reason&quot;: &quot;이메일 형식이 아닙니다.&quot; },
+    { &quot;field&quot;: &quot;nickname&quot;, &quot;reason&quot;: &quot;닉네임은 2자 이상 20자 이하여야 합니다.&quot; },
+    { &quot;field&quot;: &quot;password&quot;, &quot;reason&quot;: &quot;비밀번호는 8자 이상 64자 이하여야 합니다.&quot; }
+  ],
+  &quot;data&quot;: null
+}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="email|password|nickname" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">칸마다 errors의 reason을 붙인다</span></button></li></ol></section><section class="scenario-flow" aria-label="한글 비밀번호가 72바이트를 넘을 때" data-flow-index="3"><h5>한글 비밀번호가 72바이트를 넘을 때<span class="scenario-flow-count">5단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="password|submit" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">비밀번호에 한글 25자를 넣고 [가입] — 64자 안이라 글자 수로는 문제없어 보인다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="POST" data-path="/api/v1/users" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-post">POST</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/v1/users</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">POST /api/v1/users</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{
+  &quot;email&quot;: &quot;check-10-3-long@example.com&quot;,
+  &quot;password&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</pre></details></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">@Valid — @Size(8~64자)는 통과, @MaxBytes(72)가 UTF-8 75바이트라 실패. encode까지 가지 않는다</span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 400</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{
+  &quot;status&quot;: 400,
+  &quot;code&quot;: &quot;VALIDATION_FAILED&quot;,
+  &quot;errors&quot;: [
+    { &quot;field&quot;: &quot;password&quot;, &quot;reason&quot;: &quot;비밀번호는 72바이트 이하여야 합니다(한글은 한 글자에 3바이트).&quot; }
+  ],
+  &quot;data&quot;: null
+}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="password" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">비밀번호 칸 아래에 reason — 한글은 24자(72바이트)까지 된다</span></button></li></ol></section></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: '사용자 화면', request: 'HTTP 요청', server: '서버', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'server', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = (labels[selected] || button.querySelector('.flow-kind')?.textContent || '시나리오') + ' 단계 · ' + (button.querySelector('.flow-step-text')?.textContent.trim() || '세부 내용은 아래 설명을 확인하세요.');
+    }));
+  }
+})();
+</script>
+<section class="api-map-stage" aria-label="이 단계의 API"><h3>이 단계에서 연결되는 API</h3><p class="api-map-stage-note">아래 역할과 파일은 완성 코드 기준입니다. 이번 단계의 작업 범위는 본문의 요구사항과 구현 가이드를 따르세요.</p><p class="api-map-stage-project"><strong>명세서 프로젝트</strong></p><details class="api-map-route" id="spec-board-stage-10-3-0"><summary><span class="api-map-method method-post">POST</span><code>/api/v1/users</code><span class="api-map-route-feature">회원·인증</span></summary><div class="api-map-route-body"><div class="api-map-flow" aria-label="POST /api/v1/users 처리 흐름"><div class="api-map-node"><span class="api-map-node-label">요청 DTO · 선택</span><span class="api-map-node-files"><code>SignupRequest</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Controller</span><span class="api-map-node-files"><code>UserController.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Service</span><span class="api-map-node-files"><code>UserService.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Repository / Mapper</span><span class="api-map-node-files"><code>UserRepository.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Entity</span><span class="api-map-node-files"><code>User.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">응답 DTO · 선택</span><span class="api-map-node-files"><code>UserResponse</code></span></div></div><p class="api-map-stages"><strong>시나리오</strong> <a href="10-3-signup.html">10-3</a></p></div></details></section><p class="api-map-link"><a href="../README.html#api-map-title">전체 API 구조도 보기</a></p><nav class="lesson-atlas" aria-label="10-3 학습 흐름"><div class="lesson-atlas-heading"><span>BUILD · RUN · UNDERSTAND</span><h2>이번 단계의 학습 흐름</h2><p>그림으로 요청의 경로를 먼저 본 다음, 필요한 절을 펼쳐 직접 만들고 확인하세요.</p></div><div class="lesson-atlas-track"><a class="lesson-atlas-stop lesson-understand" href="#상황"><b>01</b><span aria-hidden="true">◇</span><span><small>무엇을 만들까</small><strong>상황</strong></span></a><a class="lesson-atlas-stop lesson-understand" href="#만들-것"><b>02</b><span aria-hidden="true">◇</span><span><small>무엇을 만들까</small><strong>만들 것</strong></span></a><a class="lesson-atlas-stop lesson-build" href="#따라-치기"><b>03</b><span aria-hidden="true">⌘</span><span><small>어떻게 만들까</small><strong>따라 치기</strong></span></a><a class="lesson-atlas-stop lesson-build" href="#구현-가이드"><b>04</b><span aria-hidden="true">⌘</span><span><small>어떻게 만들까</small><strong>구현 가이드</strong></span></a><a class="lesson-atlas-stop lesson-build" href="#전체-구현-코드"><b>05</b><span aria-hidden="true">⌘</span><span><small>어떻게 만들까</small><strong>전체 구현 코드</strong></span></a><a class="lesson-atlas-stop lesson-build" href="#mybatis-대체-구현-코드"><b>06</b><span aria-hidden="true">⌘</span><span><small>어떻게 만들까</small><strong>MyBatis 대체 구현 코드</strong></span></a><a class="lesson-atlas-stop lesson-verify" href="#직접-확인"><b>07</b><span aria-hidden="true">↗</span><span><small>어떻게 확인할까</small><strong>직접 확인</strong></span></a><a class="lesson-atlas-stop lesson-verify" href="#채점-기준"><b>08</b><span aria-hidden="true">↗</span><span><small>어떻게 확인할까</small><strong>채점 기준</strong></span></a><a class="lesson-atlas-stop lesson-debug" href="#일부러-망가뜨리기"><b>09</b><span aria-hidden="true">✳</span><span><small>막히면 확인</small><strong>일부러 망가뜨리기</strong></span></a><a class="lesson-atlas-stop lesson-connect" href="#필요한-지식"><b>10</b><span aria-hidden="true">→</span><span><small>다음으로 연결</small><strong>필요한 지식</strong></span></a><a class="lesson-atlas-stop lesson-debug" href="#힌트-막힐-때만"><b>11</b><span aria-hidden="true">✳</span><span><small>막히면 확인</small><strong>힌트 (막힐 때만)</strong></span></a><a class="lesson-atlas-stop lesson-connect" href="#다음-단계"><b>12</b><span aria-hidden="true">→</span><span><small>다음으로 연결</small><strong>다음 단계</strong></span></a></div></nav><div class="lesson-scenes" aria-label="단계별 구현과 확인"><details class="lesson-scene lesson-understand" data-lesson-kind="understand">
+    <summary id="상황" aria-label="상황 내용 펼치기"><span class="lesson-scene-index">01</span><span class="lesson-scene-glyph" aria-hidden="true">◇</span><span class="lesson-scene-title"><small>무엇을 만들까</small><strong>상황</strong><em>명세서의 첫 API다.</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p>명세서의 첫 API다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>API</th>
+<th>요청</th>
+<th>성공</th>
+<th>실패</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>POST /api/v1/users</code> 가입</td>
+<td><code>{email, password(8~64자, UTF-8 72바이트 이하), nickname(2~20자)}</code></td>
+<td>201 <code>{id, email, nickname}</code></td>
+<td>400, 409</td>
+</tr>
+</tbody></table></div>
+<p>처음으로 <strong>입력을 받아 DB에 쓰는</strong> API다. 네 가지를 지킨다.</p>
+<ol>
+<li><strong>비밀번호는 원문으로 저장하지 않는다.</strong> DB가 새도 원래 비밀번호를 알 수 없게 BCrypt 해시만 저장한다. 로그인(10-4)은 해시끼리 비교한다.</li>
+<li><strong>같은 이메일로 두 번 가입하지 못한다</strong> → 409 <code>DUPLICATE</code>. <code>Kim@Example.com</code>과 <code>kim@example.com</code>은 같은 주소로 본다. 받은 이메일은 앞뒤 공백을 떼고 소문자로 바꿔 저장한다.</li>
+<li><strong>입력이 틀리면 10-2의 400 틀로 답한다</strong> → 필드별 <code>errors</code>.</li>
+<li><strong>비밀번호는 글자 수와 바이트 수를 둘 다 본다.</strong> 8~64자이면서 UTF-8로 72바이트 이하. BCrypt는 72바이트를 넘는 입력을 해시하지 못하고 예외를 던진다.
+  글자 수만 보면 한글 25자(75바이트)가 검증을 통과해 <code>500</code>이 된다. 넘으면 400 <code>VALIDATION_FAILED</code>(<code>field</code>: <code>password</code>)로 막는다. 왜 72바이트인지는 <a href="../../lessons/F4-password-storage.html">F4</a>에 있다.</li>
+</ol>
+<p>엔티티·저장소·서비스·컨트롤러를 한 번에 만든다. 계층을 나누는 이유는 <a href="../../lessons/E1-why-layers.html">E1</a>, JPA가 무엇인지는 <a href="../../lessons/E3-what-is-jpa.html">E3</a>에 있다.</p>
+</div>
+  </details><details class="lesson-scene lesson-understand" data-lesson-kind="understand" open>
+    <summary id="만들-것" aria-label="만들 것 내용 펼치기"><span class="lesson-scene-index">02</span><span class="lesson-scene-glyph" aria-hidden="true">◇</span><span class="lesson-scene-title"><small>무엇을 만들까</small><strong>만들 것</strong><em>필드 규칙 — 다듬은 뒤 검사한다. 잘못된 입력은 저장 전에 막고 500 이 나면 안 된다</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>의존성</td>
+<td><code>spring-security-crypto</code> 하나만 추가한다(Spring Security 전체가 아니다 — 로그인 필터·기본 로그인 페이지가 딸려 오지 않는다)</td>
+</tr>
+<tr>
+<td>메서드·경로</td>
+<td><code>POST /api/v1/users</code></td>
+</tr>
+<tr>
+<td>요청</td>
+<td><code>email</code>: 필수, 이메일 형식, 255자 이하 · <code>password</code>: 필수, 8<del>64자 <strong>그리고</strong> UTF-8 72바이트 이하(한글 24자까지) · <code>nickname</code>: 필수, 2</del>20자(앞뒤 공백 제거 후). 이메일은 앞뒤 공백 제거 + 소문자로 다듬은 뒤 검사·저장</td>
+</tr>
+<tr>
+<td>저장</td>
+<td><code>users</code>에 <code>password_hash</code> = BCrypt 해시</td>
+</tr>
+<tr>
+<td>성공</td>
+<td><code>201</code>, 헤더 <code>Location: /api/v1/users/{id}</code>, <code>data</code> = <code>{id, email, nickname}</code> — 비밀번호·해시는 싣지 않는다</td>
+</tr>
+<tr>
+<td>실패</td>
+<td>입력 규칙 위반 400 <code>VALIDATION_FAILED</code>(필드별 <code>errors</code>) · 깨진 JSON 400 <code>BAD_JSON</code> · 이메일 중복 409 <code>DUPLICATE</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>필드 규칙</strong> — 다듬은 뒤 검사한다. 잘못된 입력은 저장 전에 막고 <code>500</code>이 나면 안 된다</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>필수</th>
+<th>null·빈 값</th>
+<th>길이·범위</th>
+<th>형식</th>
+<th>기본값</th>
+<th>틀렸을 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>email</code></td>
+<td>필수</td>
+<td>안 됨 — 없음·<code>null</code>·<code>&quot;&quot;</code>·공백만 거절</td>
+<td>앞뒤 공백 제거·소문자 뒤 255자 이하</td>
+<td>이메일 형식</td>
+<td>없음</td>
+<td><code>400 VALIDATION_FAILED</code>, <code>errors</code>에 <code>email</code> · 이미 있으면 <code>409 DUPLICATE</code></td>
+</tr>
+<tr>
+<td><code>password</code></td>
+<td>필수</td>
+<td><code>null</code>·<code>&quot;&quot;</code> 거절(공백은 다듬지 않는다 — 아래 관찰 O1)</td>
+<td>8~64자(8자·64자 성공, 7자·65자 거절) <strong>그리고</strong> UTF-8 72바이트 이하(한글 24자 성공, 25자 거절)</td>
+<td>문자열</td>
+<td>없음</td>
+<td><code>400</code>, <code>errors</code>에 <code>password</code></td>
+</tr>
+<tr>
+<td><code>nickname</code></td>
+<td>필수</td>
+<td>안 됨 — 없음·<code>null</code>·<code>&quot;&quot;</code>·공백만 거절</td>
+<td>앞뒤 공백 제거 뒤 2~20자(2자·20자 성공, 1자·21자 거절)</td>
+<td>문자열</td>
+<td>없음</td>
+<td><code>400</code>, <code>errors</code>에 <code>nickname</code></td>
+</tr>
+<tr>
+<td>본문 전체</td>
+<td>필수</td>
+<td>—</td>
+<td>—</td>
+<td>JSON, 각 값은 문자열</td>
+<td>—</td>
+<td>JSON이 아니거나 문자열 자리에 배열이면 <code>400 BAD_JSON</code></td>
+</tr>
+</tbody></table></div>
+</div>
+  </details><details class="lesson-scene lesson-build" data-lesson-kind="build">
+    <summary id="따라-치기" aria-label="따라 치기 내용 펼치기"><span class="lesson-scene-index">03</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>따라 치기</strong><em>dependencies { } 안에 넣고 Gradle 새로고침을 누른다. 버전은 Boot BOM이 정한다.</em></span><span class="lesson-scene-count">9개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>build.gradle — 한 줄 추가</span><span>PasswordConfig — 해시 도구를 빈으로</span><span>User — 엔티티</span></div>
+<h3 id="buildgradle--한-줄-추가"><a class="anchor" href="#buildgradle--한-줄-추가" aria-hidden="true">#</a>build.gradle — 한 줄 추가</h3>
+<pre><code class="language-groovy">    // 10-3 비밀번호 해시(BCrypt) — Spring Security 전체가 아니라 암호화 모듈만
+    implementation 'org.springframework.security:spring-security-crypto'</code></pre>
+<p><code>dependencies { }</code> 안에 넣고 Gradle 새로고침을 누른다. 버전은 Boot BOM이 정한다.</p>
+<h3 id="passwordconfig--해시-도구를-빈으로"><a class="anchor" href="#passwordconfig--해시-도구를-빈으로" aria-hidden="true">#</a>PasswordConfig — 해시 도구를 빈으로</h3>
+<p><code>src/main/java/org/example/board/user/PasswordConfig.java</code></p>
+<pre><code class="language-java">package org.example.board.user;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+@Configuration
+public class PasswordConfig {
+
+    // 같은 비밀번호도 매번 다른 해시가 나온다(솔트). 비교는 matches()로만 한다
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@Configuration</code> + <code>@Bean</code></td>
+<td>메서드가 돌려준 객체를 Spring이 <strong>빈</strong>(앱 전체가 함께 쓰는 객체)으로 등록한다. 생성자에 <code>PasswordEncoder</code>를 적은 곳에 이 객체가 들어간다</td>
+</tr>
+<tr>
+<td><code>return new BCryptPasswordEncoder();</code></td>
+<td>반환 타입은 인터페이스 <code>PasswordEncoder</code>, 실제는 BCrypt 구현이다. 나중에 알고리즘을 바꿔도 쓰는 쪽은 그대로다(<a href="../../lessons/B5-interfaces.html">B5</a>)</td>
+</tr>
+</tbody></table></div>
+<h3 id="user--엔티티"><a class="anchor" href="#user--엔티티" aria-hidden="true">#</a>User — 엔티티</h3>
+<p><code>src/main/java/org/example/board/user/User.java</code></p>
+<pre><code class="language-java">package org.example.board.user;
+
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = &quot;users&quot;)
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String email;
+
+    @Column(name = &quot;password_hash&quot;, nullable = false)
+    private String passwordHash;
+
+    @Column(nullable = false, length = 20)
+    private String nickname;
+
+    @Column(name = &quot;created_at&quot;, nullable = false)
+    private LocalDateTime createdAt;
+
+    // JPA가 DB 행을 객체로 만들 때 쓰는 기본 생성자 — 우리 코드는 아래 생성자만 쓴다
+    protected User() {
+    }
+
+    public User(String email, String passwordHash, String nickname) {
+        this.email = email;
+        this.passwordHash = passwordHash;
+        this.nickname = nickname;
+        this.createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@Entity</code> · <code>@Table(name = &quot;users&quot;)</code></td>
+<td>이 클래스 = <code>users</code> 테이블의 한 행. 클래스 이름과 테이블 이름이 달라 <code>@Table</code>로 적었다</td>
+</tr>
+<tr>
+<td><code>@Id @GeneratedValue(strategy = GenerationType.IDENTITY)</code></td>
+<td>기본 키. 값은 DB의 <code>AUTO_INCREMENT</code>가 정한다. 그래서 <code>save</code> 하는 순간 INSERT가 나가고 id가 채워진다</td>
+</tr>
+<tr>
+<td><code>@Column(name = &quot;password_hash&quot;, nullable = false)</code></td>
+<td>필드 이름(<code>passwordHash</code>)과 컬럼 이름이 달라 적었다</td>
+</tr>
+<tr>
+<td><code>protected User() { }</code></td>
+<td>JPA가 DB 행을 객체로 만들 때 쓰는 빈 생성자. 우리 코드는 못 쓰게 <code>protected</code>로 둔다</td>
+</tr>
+<tr>
+<td><code>LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS)</code></td>
+<td>컬럼이 초 단위(<code>DATETIME</code>)라 초 아래를 버린다</td>
+</tr>
+<tr>
+<td>setter 없음</td>
+<td>만든 뒤 바꿀 일이 없는 값은 setter를 만들지 않는다</td>
+</tr>
+</tbody></table></div>
+<p><code>ddl-auto: validate</code>라 이 클래스가 테이블과 다르면(컬럼 이름 오타 등) 앱이 뜨지 않는다. 그 에러가 오히려 안전장치다.</p>
+<h3 id="userrepository"><a class="anchor" href="#userrepository" aria-hidden="true">#</a>UserRepository</h3>
+<p><code>src/main/java/org/example/board/user/UserRepository.java</code></p>
+<pre><code class="language-java">package org.example.board.user;
+
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface UserRepository extends JpaRepository&lt;User, Long&gt; {
+
+    boolean existsByEmail(String email);
+
+    Optional&lt;User&gt; findByEmail(String email);
+}</code></pre>
+<p>인터페이스만 만들면 구현은 Spring Data JPA가 만든다. <code>existsByEmail</code>·<code>findByEmail</code>은 <strong>메서드 이름이 곧 쿼리</strong>다(<code>... WHERE email = ?</code>). <code>findByEmail</code>은 10-4 로그인에서 쓴다.</p>
+<h3 id="maxbytes--바이트-수를-보는-검증-어노테이션"><a class="anchor" href="#maxbytes--바이트-수를-보는-검증-어노테이션" aria-hidden="true">#</a>MaxBytes — 바이트 수를 보는 검증 어노테이션</h3>
+<p><code>@Size</code>는 <strong>글자 수</strong>만 센다. BCrypt의 한계는 <strong>바이트</strong>(72)다. UTF-8에서 영문·숫자는 1바이트, 한글은 3바이트라 한글 25자는 25글자지만 75바이트다. 그래서 바이트를 세는 검증을 하나 만든다.</p>
+<p>서비스에서 <code>if</code>로 검사하지 않고 어노테이션으로 만드는 이유: 그러면 다른 입력 오류와 함께 <code>@Valid</code> 단계에서 <code>errors</code>(<code>field</code>: <code>password</code>)로 나온다. 서비스에서 던지는 <code>ApiException</code>에는 필드를 실을 자리가 없어 10-2의 공통 코드까지 고쳐야 한다.</p>
+<p><code>src/main/java/org/example/board/user/MaxBytes.java</code></p>
+<pre><code class="language-java">package org.example.board.user;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.nio.charset.StandardCharsets;
+
+import jakarta.validation.Constraint;
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.ConstraintValidatorContext;
+import jakarta.validation.Payload;
+
+// 글자 수가 아니라 UTF-8 바이트 수로 길이를 막는다 — BCrypt는 72바이트를 넘는 입력을 encode하지 못한다(F4)
+@Target(ElementType.FIELD)
+@Retention(RetentionPolicy.RUNTIME)
+@Constraint(validatedBy = MaxBytes.Validator.class)
+public @interface MaxBytes {
+
+    int value();
+
+    String message();
+
+    // 아래 두 줄은 Bean Validation 규칙상 모든 검증 어노테이션에 있어야 한다
+    Class&lt;?&gt;[] groups() default {};
+
+    Class&lt;? extends Payload&gt;[] payload() default {};
+
+    // 실제 검사 — true면 통과
+    class Validator implements ConstraintValidator&lt;MaxBytes, String&gt; {
+
+        private int max;
+
+        @Override
+        public void initialize(MaxBytes annotation) {
+            this.max = annotation.value();
+        }
+
+        @Override
+        public boolean isValid(String value, ConstraintValidatorContext context) {
+            // null은 @NotNull 몫이라 여기서는 통과시킨다
+            return value == null || value.getBytes(StandardCharsets.UTF_8).length &lt;= max;
+        }
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>public @interface MaxBytes</code></td>
+<td>어노테이션을 직접 만든다. <code>@MaxBytes(value = 72, message = &quot;…&quot;)</code>처럼 쓴다</td>
+</tr>
+<tr>
+<td><code>@Target(ElementType.FIELD)</code> · <code>@Retention(RetentionPolicy.RUNTIME)</code></td>
+<td>필드(record의 각 항목)에 붙이고, 실행 중에도 남아 있어야 검증기가 읽는다</td>
+</tr>
+<tr>
+<td><code>@Constraint(validatedBy = MaxBytes.Validator.class)</code></td>
+<td>&quot;이 어노테이션은 이 클래스가 검사한다&quot;를 검증 엔진에 알린다</td>
+</tr>
+<tr>
+<td><code>groups()</code> · <code>payload()</code></td>
+<td>쓰지 않지만 빠지면 앱은 뜨는데 가입 요청마다 <code>500</code>이다(로그: <code>HV000074: ... does not contain a groups parameter</code>). 그대로 따라 적는다</td>
+</tr>
+<tr>
+<td><code>value.getBytes(StandardCharsets.UTF_8).length &lt;= max</code></td>
+<td>문자열을 UTF-8 바이트 배열로 바꿔 길이를 잰다. <code>&quot;가&quot;.getBytes(UTF_8).length</code>는 3</td>
+</tr>
+<tr>
+<td><code>value == null || …</code></td>
+<td><code>null</code>은 통과 — 비어 있음은 <code>@NotNull</code>이 따로 잡는다(<code>@Email</code>과 같은 약속)</td>
+</tr>
+</tbody></table></div>
+<h3 id="signuprequest--요청--검증--다듬기"><a class="anchor" href="#signuprequest--요청--검증--다듬기" aria-hidden="true">#</a>SignupRequest — 요청 + 검증 + 다듬기</h3>
+<p><code>src/main/java/org/example/board/user/SignupRequest.java</code></p>
+<pre><code class="language-java">package org.example.board.user;
+
+import java.util.Locale;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+public record SignupRequest(
+        @NotBlank(message = &quot;이메일은 필수입니다.&quot;)
+        @Email(message = &quot;이메일 형식이 아닙니다.&quot;)
+        @Size(max = 255, message = &quot;이메일은 255자 이하여야 합니다.&quot;)
+        String email,
+
+        @NotNull(message = &quot;비밀번호는 필수입니다.&quot;)
+        @Size(min = 8, max = 64, message = &quot;비밀번호는 8자 이상 64자 이하여야 합니다.&quot;)
+        @MaxBytes(value = 72, message = &quot;비밀번호는 72바이트 이하여야 합니다(한글은 한 글자에 3바이트).&quot;)
+        String password,
+
+        @NotBlank(message = &quot;닉네임은 필수입니다.&quot;)
+        @Size(min = 2, max = 20, message = &quot;닉네임은 2자 이상 20자 이하여야 합니다.&quot;)
+        String nickname) {
+
+    // 검증 전에 다듬는다 — 이메일은 앞뒤 공백을 떼고 소문자로(같은 주소를 두 번 가입하지 못하게), 닉네임은 앞뒤 공백만
+    public SignupRequest {
+        email = email == null ? null : email.strip().toLowerCase(Locale.ROOT);
+        nickname = nickname == null ? null : nickname.strip();
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@NotBlank(message = &quot;…&quot;)</code></td>
+<td><code>null</code>·빈 문자열·공백만인 문자열을 막는다. <code>message</code>가 그대로 <code>errors[].reason</code>이 된다</td>
+</tr>
+<tr>
+<td><code>@Email</code></td>
+<td>이메일 형식 검사. <code>null</code>은 통과시키므로(다른 애노테이션 몫) <code>@NotBlank</code>와 같이 쓴다</td>
+</tr>
+<tr>
+<td><code>@NotNull</code> + <code>@Size(min = 8, max = 64)</code></td>
+<td>비밀번호는 공백도 글자로 인정해 <code>@NotBlank</code> 대신 <code>@NotNull</code>을 썼다</td>
+</tr>
+<tr>
+<td><code>@MaxBytes(value = 72, …)</code></td>
+<td>위에서 만든 바이트 검사. <code>@Size</code>와 둘 다 붙인다 — 한글 65자면 <code>password</code> 오류가 두 개 나온다</td>
+</tr>
+<tr>
+<td><code>public SignupRequest { … }</code></td>
+<td>record의 <strong>압축 생성자</strong>. JSON → 객체로 바뀔 때 실행되고, <code>@Valid</code> 검사는 그다음이다. 그래서 다듬은 값으로 검사한다</td>
+</tr>
+<tr>
+<td><code>email.strip().toLowerCase(Locale.ROOT)</code></td>
+<td><code>strip()</code>은 앞뒤 공백 제거, <code>Locale.ROOT</code>는 실행하는 컴퓨터의 언어 설정에 따라 대소문자 변환이 달라지지 않게 고정한다</td>
+</tr>
+</tbody></table></div>
+<h3 id="userresponse"><a class="anchor" href="#userresponse" aria-hidden="true">#</a>UserResponse</h3>
+<p><code>src/main/java/org/example/board/user/UserResponse.java</code></p>
+<pre><code class="language-java">package org.example.board.user;
+
+// 응답에는 비밀번호(해시 포함)를 절대 싣지 않는다
+public record UserResponse(Long id, String email, String nickname) {
+
+    public static UserResponse from(User user) {
+        return new UserResponse(user.getId(), user.getEmail(), user.getNickname());
+    }
+}</code></pre>
+<p>엔티티(<code>User</code>)를 그대로 JSON으로 내보내면 <code>passwordHash</code>까지 나간다. 내보낼 필드만 담는 응답 DTO를 따로 둔다(<a href="../../docs/knowledge/W09-why-dto.html">W09</a>).</p>
+<h3 id="userservice"><a class="anchor" href="#userservice" aria-hidden="true">#</a>UserService</h3>
+<p><code>src/main/java/org/example/board/user/UserService.java</code></p>
+<pre><code class="language-java">package org.example.board.user;
+
+import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    @Transactional
+    public UserResponse signup(SignupRequest request) {
+        if (userRepository.existsByEmail(request.email())) {
+            throw new ApiException(ErrorCode.DUPLICATE, &quot;이미 가입된 이메일입니다.&quot;);
+        }
+        User user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname());
+        try {
+            userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            // 확인과 저장 사이에 같은 이메일이 먼저 들어간 경우 — DB의 UNIQUE가 마지막 방어선이다
+            throw new ApiException(ErrorCode.DUPLICATE, &quot;이미 가입된 이메일입니다.&quot;);
+        }
+        return UserResponse.from(user);
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@Transactional</code></td>
+<td>메서드 전체를 DB 트랜잭션 하나로 묶는다. 중간에 예외가 나면 쓴 것을 되돌린다(<a href="../../lessons/G3-first-transaction.html">G3</a>)</td>
+</tr>
+<tr>
+<td><code>if (userRepository.existsByEmail(...)) throw new ApiException(DUPLICATE, …)</code></td>
+<td>먼저 확인해서 친절한 409를 준다</td>
+</tr>
+<tr>
+<td><code>passwordEncoder.encode(request.password())</code></td>
+<td>원문 → <code>$2a$10$...</code> 해시. 같은 원문도 매번 다른 해시가 나온다(솔트)</td>
+</tr>
+<tr>
+<td><code>try { save } catch (DataIntegrityViolationException e)</code></td>
+<td>확인과 저장 사이에 같은 이메일이 먼저 들어가는 경우(동시 가입)는 DB의 <code>UNIQUE</code>가 막는다. 그 예외도 409로 바꾼다 — 단, 아래 망가뜨리기 ①처럼 <strong>다른 제약 위반까지 409로 둔갑</strong>할 수 있으니 검증(<code>@Valid</code>)이 먼저 막아야 한다</td>
+</tr>
+</tbody></table></div>
+<h3 id="usercontroller"><a class="anchor" href="#usercontroller" aria-hidden="true">#</a>UserController</h3>
+<p><code>src/main/java/org/example/board/user/UserController.java</code></p>
+<pre><code class="language-java">package org.example.board.user;
+
+import java.net.URI;
+
+import jakarta.validation.Valid;
+import org.example.board.common.ApiResponse;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+
+    private final UserService userService;
+
+    public UserController(UserService userService) {
+        this.userService = userService;
+    }
+
+    @PostMapping(&quot;/api/v1/users&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;UserResponse&gt;&gt; signup(@Valid @RequestBody SignupRequest request) {
+        UserResponse created = userService.signup(request);
+        return ResponseEntity.created(URI.create(&quot;/api/v1/users/&quot; + created.id()))
+                .body(ApiResponse.created(created));
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@Valid @RequestBody SignupRequest request</code></td>
+<td>본문 JSON → <code>SignupRequest</code> → 검증. 실패하면 메서드에 들어오기 전에 400</td>
+</tr>
+<tr>
+<td><code>ResponseEntity.created(URI.create(&quot;/api/v1/users/&quot; + created.id()))</code></td>
+<td>상태 201 + <code>Location</code> 헤더</td>
+</tr>
+<tr>
+<td><code>.body(ApiResponse.created(created))</code></td>
+<td>본문은 공통 틀(<code>status: 201, message: &quot;Created&quot;</code>)</td>
+</tr>
+</tbody></table></div>
+<p><code>Location</code>은 &quot;만든 것의 주소&quot;다. 명세서에 <code>GET /api/v1/users/{id}</code> API는 없지만, 자원의 주소를 알려 준다는 약속은 지킨다.</p>
+</div>
+  </details><details class="lesson-scene lesson-build" data-lesson-kind="build">
+    <summary id="구현-가이드" aria-label="구현 가이드 내용 펼치기"><span class="lesson-scene-index">04</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>구현 가이드</strong><em>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 만들 것 의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</em></span><span class="lesson-scene-count">8개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 <strong>만들 것</strong>의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</p>
+<p>이 단계의 처리 흐름:</p>
+<ul>
+<li>@Valid가 길이·형식을 검사 → UserService가 이메일 중복을 확인 → passwordEncoder.encode로 해시</li>
+<li>요청 record가 이메일을 다듬는다(공백 제거·소문자) → 이미 있어 ApiException(DUPLICATE)</li>
+<li>@Valid 실패 → MethodArgumentNotValidException → 전역 처리기가 필드별 errors로</li>
+<li>@Valid — @Size(8~64자)는 통과, @MaxBytes(72)가 UTF-8 75바이트라 실패. encode까지 가지 않는다</li>
+</ul>
+<details>
+<summary>Controller — HTTP 연결</summary>
+
+<p><code>UserController.java</code>. 매핑과 메서드의 입력·응답을 위 <strong>만들 것</strong>의 HTTP 계약과 대조한다. 이번 단계 매핑: <code>@PostMapping(&quot;/api/v1/users&quot;)</code>. 변경된 메서드: <code>signup</code>.</p>
+<pre><code class="language-java">@PostMapping(&quot;/api/v1/users&quot;)
+public ResponseEntity&lt;ApiResponse&lt;UserResponse&gt;&gt; signup(@Valid @RequestBody SignupRequest request) {
+    UserResponse created = userService.signup(request);
+    return ResponseEntity.created(URI.create(&quot;/api/v1/users/&quot; + created.id()))
+            .body(ApiResponse.created(created));
+}</code></pre>
+</details>
+
+<details>
+<summary>DTO — 요청·응답 필드</summary>
+
+<p><code>SignupRequest.java</code>, <code>UserResponse.java</code>. 필드 이름·타입·검증·응답 형태를 위 <strong>만들 것</strong>과 대조한다. 변경된 메서드: <code>from</code>.</p>
+<pre><code class="language-java">public record SignupRequest(
+        @NotBlank @Email @Size(max = 255) String email,
+        @NotNull @Size(min = 8, max = 64) @MaxBytes(value = 72, message = &quot;비밀번호는 72바이트 이하여야 합니다(한글은 한 글자에 3바이트).&quot;) String password,
+        @NotBlank @Size(min = 2, max = 20) String nickname) {
+    public SignupRequest {
+        email = email == null ? null : email.strip().toLowerCase(Locale.ROOT);
+        nickname = nickname == null ? null : nickname.strip();
+    }
+}
+
+public record UserResponse(Long id, String email, String nickname) {
+    public static UserResponse from(User user) {
+        return new UserResponse(user.getId(), user.getEmail(), user.getNickname());
+    }
+}</code></pre>
+<p>여기는 검증과 다듬기 위치를 보여 주는 발췌다. 오류 문구까지 포함한 실행 가능한 파일 전문은 아래 <strong>전체 구현 코드</strong>의 DTO 접기에 있다.</p>
+</details>
+
+<details>
+<summary>Service — 처리 순서</summary>
+
+<p><code>UserService.java</code>. 위 서버 처리 순서가 어디에서 검증·조회·상태 변경으로 이어지는지 따라간다. 변경된 메서드: <code>signup</code>. 트랜잭션 경계는 아래 코드의 <code>@Transactional</code> 위치에서 확인한다.</p>
+<pre><code class="language-java">@Transactional
+public UserResponse signup(SignupRequest request) {
+    if (userRepository.existsByEmail(request.email())) {
+        throw new ApiException(ErrorCode.DUPLICATE, &quot;이미 가입된 이메일입니다.&quot;);
+    }
+    User user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname());
+    try {
+        userRepository.save(user);
+    } catch (DataIntegrityViolationException e) {
+        throw new ApiException(ErrorCode.DUPLICATE, &quot;이미 가입된 이메일입니다.&quot;);
+    }
+    return UserResponse.from(user);
+}</code></pre>
+</details>
+
+<details>
+<summary>JPA / Repository — DB 조건</summary>
+
+<p><code>UserRepository.java</code>. 쿼리·파생 메서드의 조건을 화면 시나리오의 DB 단계 및 직접 확인 SQL과 대조한다.</p>
+<pre><code class="language-java">public interface UserRepository extends JpaRepository&lt;User, Long&gt; {
+    boolean existsByEmail(String email);
+    Optional&lt;User&gt; findByEmail(String email);
+}</code></pre>
+<p><code>existsByEmail</code>은 정규화한 이메일을 <code>users.email</code>에 대조한다. 동시 요청 사이의 최종 중복 방어선은 V1 마이그레이션의 <code>UNIQUE(email)</code>이다.</p>
+</details>
+
+<details>
+<summary>MyBatis / Mapper — 같은 가입을 SQL로 구현하기</summary>
+
+<p>선택 경로에서는 <code>UserRepository</code>와 JPA 엔티티를 빼고 <code>UserMapper</code>와 SQL XML을 넣는다. <code>UserController</code>·<code>SignupRequest</code>·<code>UserResponse</code>의 HTTP 계약과 검증은 그대로 쓴다. 아래 <strong>MyBatis 대체 구현 코드</strong> 접기에는 기본 10-3 스냅샷에 적용할 설정·POJO·Service·Mapper 전문이 있다.</p>
+<pre><code class="language-xml">&lt;select id=&quot;existsByEmail&quot; resultType=&quot;boolean&quot;&gt;
+    SELECT EXISTS(SELECT 1 FROM users WHERE email = #{email})
+&lt;/select&gt;
+&lt;insert id=&quot;insert&quot; parameterType=&quot;org.example.board.user.User&quot;
+        useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;
+    INSERT INTO users (email, password_hash, nickname, created_at)
+    VALUES (#{email}, #{passwordHash}, #{nickname}, #{createdAt})
+&lt;/insert&gt;</code></pre>
+<p><code>#{email}</code>은 문자열을 SQL에 이어 붙이지 않고 바인딩한다. INSERT가 만든 id는 <code>useGeneratedKeys</code>로 <code>User.id</code>에 채워져 <code>Location</code>과 응답 DTO에 쓰인다.</p>
+<p>Service에서는 먼저 <code>existsByEmail</code>로 확인하고, 그 사이 같은 이메일이 들어오면 DB의 <code>UNIQUE</code> 위반을 <code>DuplicateKeyException</code>으로 받아 409 <code>DUPLICATE</code>로 바꾼다. <code>@Transactional</code>과 BCrypt 해시는 JPA 경로와 동일하다.</p>
+</details>
+
+<details>
+<summary>Entity — 테이블·상태</summary>
+
+<p><code>User.java</code>. 실제 테이블의 컬럼·외래키와 엔티티 매핑을 대조한다.</p>
+<pre><code class="language-java">@Entity
+@Table(name = &quot;users&quot;)
+public class User {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @Column(nullable = false)
+    private String email;
+    @Column(name = &quot;password_hash&quot;, nullable = false)
+    private String passwordHash;
+    @Column(nullable = false, length = 20)
+    private String nickname;
+    @Column(name = &quot;created_at&quot;, nullable = false)
+    private LocalDateTime createdAt;
+}</code></pre>
+<p>테이블에 저장하는 것은 <code>password</code> 원문이 아니라 <code>password_hash</code>다. 생성자와 접근자까지 포함한 파일 전문은 아래 Entity 접기에서 확인한다.</p>
+</details>
+
+<details>
+<summary>설정·보조 코드</summary>
+
+<p><code>build.gradle</code>, <code>MaxBytes.java</code>, <code>PasswordConfig.java</code>. 이 파일에서 바뀐 설정·보조 타입이 서버 흐름의 어느 단계에 필요한지 확인한다. 변경된 메서드: <code>initialize</code>, <code>passwordEncoder</code>.</p>
+<pre><code class="language-groovy">implementation 'org.springframework.security:spring-security-crypto'</code></pre>
+<pre><code class="language-java">@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+}
+
+// MaxBytes.Validator의 핵심 검사. null은 @NotNull이 따로 처리한다.
+return value == null || value.getBytes(StandardCharsets.UTF_8).length &lt;= max;</code></pre>
+<p><code>MaxBytes</code>의 <code>groups()</code>·<code>payload()</code>를 포함한 전체 어노테이션 정의도 아래 설정·보조 코드 접기에 있다.</p>
+</details>
+
+</div>
+  </details><details class="lesson-scene lesson-build" data-lesson-kind="build">
+    <summary id="전체-구현-코드" aria-label="전체 구현 코드 내용 펼치기"><span class="lesson-scene-index">05</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>전체 구현 코드</strong><em>이 단계에서 변경된 파일의 전문입니다.</em></span><span class="lesson-scene-count">9개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>이 단계에서 바뀐 파일</span><span>현재 전체 코드</span></div>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<div class="code-workbench" data-code-workbench><div class="code-workbench-source"><details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {&#10;    id 'java'&#10;    id 'org.springframework.boot' version '4.1.1'&#10;    id 'io.spring.dependency-management' version '1.1.7'&#10;}&#10;&#10;group = 'org.example'&#10;version = '0.0.1-SNAPSHOT'&#10;&#10;java {&#10;    toolchain {&#10;        languageVersion = JavaLanguageVersion.of(21)&#10;    }&#10;}&#10;&#10;repositories {&#10;    mavenCentral()&#10;}&#10;&#10;dependencies {&#10;    // start.spring.io에서 고른 것: Spring Web · Spring Data JPA · Validation · MySQL Driver · Flyway Migration&#10;    implementation 'org.springframework.boot:spring-boot-starter-webmvc'&#10;    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'&#10;    implementation 'org.springframework.boot:spring-boot-starter-validation'&#10;    implementation 'org.springframework.boot:spring-boot-starter-flyway'&#10;    // 10-3 비밀번호 해시(BCrypt) — Spring Security 전체가 아니라 암호화 모듈만&#10;    implementation 'org.springframework.security:spring-security-crypto'&#10;    runtimeOnly 'com.mysql:mysql-connector-j'&#10;    runtimeOnly 'org.flywaydb:flyway-mysql'&#10;&#10;    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'&#10;    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'&#10;}&#10;&#10;tasks.named('test') {&#10;    useJUnitPlatform()&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/user/MaxBytes.java</summary><pre><code>package org.example.board.user;&#10;&#10;import java.lang.annotation.ElementType;&#10;import java.lang.annotation.Retention;&#10;import java.lang.annotation.RetentionPolicy;&#10;import java.lang.annotation.Target;&#10;import java.nio.charset.StandardCharsets;&#10;&#10;import jakarta.validation.Constraint;&#10;import jakarta.validation.ConstraintValidator;&#10;import jakarta.validation.ConstraintValidatorContext;&#10;import jakarta.validation.Payload;&#10;&#10;// 글자 수가 아니라 UTF-8 바이트 수로 길이를 막는다 — BCrypt는 72바이트를 넘는 입력을 encode하지 못한다(F4)&#10;@Target(ElementType.FIELD)&#10;@Retention(RetentionPolicy.RUNTIME)&#10;@Constraint(validatedBy = MaxBytes.Validator.class)&#10;public @interface MaxBytes {&#10;&#10;    int value();&#10;&#10;    String message();&#10;&#10;    // 아래 두 줄은 Bean Validation 규칙상 모든 검증 어노테이션에 있어야 한다&#10;    Class&lt;?&gt;[] groups() default {};&#10;&#10;    Class&lt;? extends Payload&gt;[] payload() default {};&#10;&#10;    // 실제 검사 — true면 통과&#10;    class Validator implements ConstraintValidator&lt;MaxBytes, String&gt; {&#10;&#10;        private int max;&#10;&#10;        @Override&#10;        public void initialize(MaxBytes annotation) {&#10;            this.max = annotation.value();&#10;        }&#10;&#10;        @Override&#10;        public boolean isValid(String value, ConstraintValidatorContext context) {&#10;            // null은 @NotNull 몫이라 여기서는 통과시킨다&#10;            return value == null || value.getBytes(StandardCharsets.UTF_8).length &lt;= max;&#10;        }&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>설정 — src/main/java/org/example/board/user/PasswordConfig.java</summary><pre><code>package org.example.board.user;&#10;&#10;import org.springframework.context.annotation.Bean;&#10;import org.springframework.context.annotation.Configuration;&#10;import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;&#10;import org.springframework.security.crypto.password.PasswordEncoder;&#10;&#10;@Configuration&#10;public class PasswordConfig {&#10;&#10;    // 같은 비밀번호도 매번 다른 해시가 나온다(솔트). 비교는 matches()로만 한다&#10;    @Bean&#10;    public PasswordEncoder passwordEncoder() {&#10;        return new BCryptPasswordEncoder();&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/user/SignupRequest.java</summary><pre><code>package org.example.board.user;&#10;&#10;import java.util.Locale;&#10;&#10;import jakarta.validation.constraints.Email;&#10;import jakarta.validation.constraints.NotBlank;&#10;import jakarta.validation.constraints.NotNull;&#10;import jakarta.validation.constraints.Size;&#10;&#10;public record SignupRequest(&#10;        @NotBlank(message = &quot;이메일은 필수입니다.&quot;)&#10;        @Email(message = &quot;이메일 형식이 아닙니다.&quot;)&#10;        @Size(max = 255, message = &quot;이메일은 255자 이하여야 합니다.&quot;)&#10;        String email,&#10;&#10;        @NotNull(message = &quot;비밀번호는 필수입니다.&quot;)&#10;        @Size(min = 8, max = 64, message = &quot;비밀번호는 8자 이상 64자 이하여야 합니다.&quot;)&#10;        @MaxBytes(value = 72, message = &quot;비밀번호는 72바이트 이하여야 합니다(한글은 한 글자에 3바이트).&quot;)&#10;        String password,&#10;&#10;        @NotBlank(message = &quot;닉네임은 필수입니다.&quot;)&#10;        @Size(min = 2, max = 20, message = &quot;닉네임은 2자 이상 20자 이하여야 합니다.&quot;)&#10;        String nickname) {&#10;&#10;    // 검증 전에 다듬는다 — 이메일은 앞뒤 공백을 떼고 소문자로(같은 주소를 두 번 가입하지 못하게), 닉네임은 앞뒤 공백만&#10;    public SignupRequest {&#10;        email = email == null ? null : email.strip().toLowerCase(Locale.ROOT);&#10;        nickname = nickname == null ? null : nickname.strip();&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Entity — src/main/java/org/example/board/user/User.java</summary><pre><code>package org.example.board.user;&#10;&#10;import java.time.LocalDateTime;&#10;import java.time.temporal.ChronoUnit;&#10;&#10;import jakarta.persistence.Column;&#10;import jakarta.persistence.Entity;&#10;import jakarta.persistence.GeneratedValue;&#10;import jakarta.persistence.GenerationType;&#10;import jakarta.persistence.Id;&#10;import jakarta.persistence.Table;&#10;&#10;@Entity&#10;@Table(name = &quot;users&quot;)&#10;public class User {&#10;&#10;    @Id&#10;    @GeneratedValue(strategy = GenerationType.IDENTITY)&#10;    private Long id;&#10;&#10;    @Column(nullable = false)&#10;    private String email;&#10;&#10;    @Column(name = &quot;password_hash&quot;, nullable = false)&#10;    private String passwordHash;&#10;&#10;    @Column(nullable = false, length = 20)&#10;    private String nickname;&#10;&#10;    @Column(name = &quot;created_at&quot;, nullable = false)&#10;    private LocalDateTime createdAt;&#10;&#10;    // JPA가 DB 행을 객체로 만들 때 쓰는 기본 생성자 — 우리 코드는 아래 생성자만 쓴다&#10;    protected User() {&#10;    }&#10;&#10;    public User(String email, String passwordHash, String nickname) {&#10;        this.email = email;&#10;        this.passwordHash = passwordHash;&#10;        this.nickname = nickname;&#10;        this.createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);&#10;    }&#10;&#10;    public Long getId() {&#10;        return id;&#10;    }&#10;&#10;    public String getEmail() {&#10;        return email;&#10;    }&#10;&#10;    public String getPasswordHash() {&#10;        return passwordHash;&#10;    }&#10;&#10;    public String getNickname() {&#10;        return nickname;&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/board/user/UserController.java</summary><pre><code>package org.example.board.user;&#10;&#10;import java.net.URI;&#10;&#10;import jakarta.validation.Valid;&#10;import org.example.board.common.ApiResponse;&#10;import org.springframework.http.ResponseEntity;&#10;import org.springframework.web.bind.annotation.PostMapping;&#10;import org.springframework.web.bind.annotation.RequestBody;&#10;import org.springframework.web.bind.annotation.RestController;&#10;&#10;@RestController&#10;public class UserController {&#10;&#10;    private final UserService userService;&#10;&#10;    public UserController(UserService userService) {&#10;        this.userService = userService;&#10;    }&#10;&#10;    @PostMapping(&quot;/api/v1/users&quot;)&#10;    public ResponseEntity&lt;ApiResponse&lt;UserResponse&gt;&gt; signup(@Valid @RequestBody SignupRequest request) {&#10;        UserResponse created = userService.signup(request);&#10;        return ResponseEntity.created(URI.create(&quot;/api/v1/users/&quot; + created.id()))&#10;                .body(ApiResponse.created(created));&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/user/UserRepository.java</summary><pre><code>package org.example.board.user;&#10;&#10;import java.util.Optional;&#10;&#10;import org.springframework.data.jpa.repository.JpaRepository;&#10;&#10;public interface UserRepository extends JpaRepository&lt;User, Long&gt; {&#10;&#10;    boolean existsByEmail(String email);&#10;&#10;    Optional&lt;User&gt; findByEmail(String email);&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>DTO — src/main/java/org/example/board/user/UserResponse.java</summary><pre><code>package org.example.board.user;&#10;&#10;// 응답에는 비밀번호(해시 포함)를 절대 싣지 않는다&#10;public record UserResponse(Long id, String email, String nickname) {&#10;&#10;    public static UserResponse from(User user) {&#10;        return new UserResponse(user.getId(), user.getEmail(), user.getNickname());&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/user/UserService.java</summary><pre><code>package org.example.board.user;&#10;&#10;import org.example.board.common.ApiException;&#10;import org.example.board.common.ErrorCode;&#10;import org.springframework.dao.DataIntegrityViolationException;&#10;import org.springframework.security.crypto.password.PasswordEncoder;&#10;import org.springframework.stereotype.Service;&#10;import org.springframework.transaction.annotation.Transactional;&#10;&#10;@Service&#10;public class UserService {&#10;&#10;    private final UserRepository userRepository;&#10;    private final PasswordEncoder passwordEncoder;&#10;&#10;    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {&#10;        this.userRepository = userRepository;&#10;        this.passwordEncoder = passwordEncoder;&#10;    }&#10;&#10;    @Transactional&#10;    public UserResponse signup(SignupRequest request) {&#10;        if (userRepository.existsByEmail(request.email())) {&#10;            throw new ApiException(ErrorCode.DUPLICATE, &quot;이미 가입된 이메일입니다.&quot;);&#10;        }&#10;        User user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname());&#10;        try {&#10;            userRepository.save(user);&#10;        } catch (DataIntegrityViolationException e) {&#10;            // 확인과 저장 사이에 같은 이메일이 먼저 들어간 경우 — DB의 UNIQUE가 마지막 방어선이다&#10;            throw new ApiException(ErrorCode.DUPLICATE, &quot;이미 가입된 이메일입니다.&quot;);&#10;        }&#10;        return UserResponse.from(user);&#10;    }&#10;}&#10;</code></pre></details></div></div>
+
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/10-3.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+</div>
+  </details><details class="lesson-scene lesson-build" data-lesson-kind="build">
+    <summary id="mybatis-대체-구현-코드" aria-label="MyBatis 대체 구현 코드 내용 펼치기"><span class="lesson-scene-index">06</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>MyBatis 대체 구현 코드</strong><em>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</em></span><span class="lesson-scene-count">6개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<div class="code-workbench" data-code-workbench><div class="code-workbench-source"><details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {&#10;    id 'java'&#10;    id 'org.springframework.boot' version '4.1.1'&#10;    id 'io.spring.dependency-management' version '1.1.7'&#10;}&#10;&#10;group = 'org.example'&#10;version = '0.0.1-SNAPSHOT'&#10;&#10;java {&#10;    toolchain {&#10;        languageVersion = JavaLanguageVersion.of(21)&#10;    }&#10;}&#10;&#10;repositories {&#10;    mavenCentral()&#10;}&#10;&#10;dependencies {&#10;    // start.spring.io에서 고른 것: Spring Web · Spring Data JPA · Validation · MySQL Driver · Flyway Migration&#10;    implementation 'org.springframework.boot:spring-boot-starter-webmvc'&#10;    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'&#10;    implementation 'org.springframework.boot:spring-boot-starter-validation'&#10;    implementation 'org.springframework.boot:spring-boot-starter-flyway'&#10;    // 10-3 비밀번호 해시(BCrypt) — Spring Security 전체가 아니라 암호화 모듈만&#10;    implementation 'org.springframework.security:spring-security-crypto'&#10;    runtimeOnly 'com.mysql:mysql-connector-j'&#10;    runtimeOnly 'org.flywaydb:flyway-mysql'&#10;&#10;    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'&#10;    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'&#10;}&#10;&#10;tasks.named('test') {&#10;    useJUnitPlatform()&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:&#10;  application:&#10;    name: board-api&#10;  datasource:&#10;    # javaExperience MySQL(호스트 3306)의 project DB. 빈 DB면 Flyway가 V1으로 테이블·시드를 만든다&#10;    url: jdbc:mysql://localhost:13308/project?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul&#10;    username: community&#10;    password: community&#10;&#10;mybatis:&#10;  mapper-locations: classpath:mapper/*.xml&#10;  configuration:&#10;    map-underscore-to-camel-case: true&#10;</code></pre></details>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/board/user/User.java</summary><pre><code>package org.example.board.user;&#10;&#10;import java.time.LocalDateTime;&#10;import java.time.temporal.ChronoUnit;&#10;&#10;public class User {&#10;&#10;    private Long id;&#10;&#10;    private String email;&#10;&#10;    private String passwordHash;&#10;&#10;    private String nickname;&#10;&#10;    private LocalDateTime createdAt;&#10;&#10;    public User(String email, String passwordHash, String nickname) {&#10;        this.email = email;&#10;        this.passwordHash = passwordHash;&#10;        this.nickname = nickname;&#10;        this.createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);&#10;    }&#10;&#10;    public Long getId() {&#10;        return id;&#10;    }&#10;&#10;    public void setId(Long id) {&#10;        this.id = id;&#10;    }&#10;&#10;    public String getEmail() {&#10;        return email;&#10;    }&#10;&#10;    public String getPasswordHash() {&#10;        return passwordHash;&#10;    }&#10;&#10;    public String getNickname() {&#10;        return nickname;&#10;    }&#10;&#10;    public LocalDateTime getCreatedAt() {&#10;        return createdAt;&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/board/user/UserService.java</summary><pre><code>package org.example.board.user;&#10;&#10;import org.example.board.common.ApiException;&#10;import org.example.board.common.ErrorCode;&#10;import org.springframework.dao.DuplicateKeyException;&#10;import org.springframework.security.crypto.password.PasswordEncoder;&#10;import org.springframework.stereotype.Service;&#10;import org.springframework.transaction.annotation.Transactional;&#10;&#10;@Service&#10;public class UserService {&#10;&#10;    private final UserMapper userMapper;&#10;    private final PasswordEncoder passwordEncoder;&#10;&#10;    public UserService(UserMapper userMapper, PasswordEncoder passwordEncoder) {&#10;        this.userMapper = userMapper;&#10;        this.passwordEncoder = passwordEncoder;&#10;    }&#10;&#10;    @Transactional&#10;    public UserResponse signup(SignupRequest request) {&#10;        if (userMapper.existsByEmail(request.email())) {&#10;            throw new ApiException(ErrorCode.DUPLICATE, &quot;이미 가입된 이메일입니다.&quot;);&#10;        }&#10;        User user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname());&#10;        try {&#10;            userMapper.insert(user);&#10;        } catch (DuplicateKeyException e) {&#10;            // 확인과 저장 사이에 같은 이메일이 먼저 들어간 경우 — DB의 UNIQUE가 마지막 방어선이다&#10;            throw new ApiException(ErrorCode.DUPLICATE, &quot;이미 가입된 이메일입니다.&quot;);&#10;        }&#10;        return UserResponse.from(user);&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/board/user/UserMapper.java</summary><pre><code>package org.example.board.user;&#10;&#10;import org.apache.ibatis.annotations.Mapper;&#10;&#10;@Mapper&#10;public interface UserMapper {&#10;    boolean existsByEmail(String email);&#10;    void insert(User user);&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/UserMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;&#10;&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;&#10;&lt;mapper namespace=&quot;org.example.board.user.UserMapper&quot;&gt;&#10;    &lt;select id=&quot;existsByEmail&quot; resultType=&quot;boolean&quot;&gt;&#10;        SELECT EXISTS(SELECT 1 FROM users WHERE email = #{email})&#10;    &lt;/select&gt;&#10;    &lt;insert id=&quot;insert&quot; parameterType=&quot;org.example.board.user.User&quot; useGeneratedKeys=&quot;true&quot; keyProperty=&quot;id&quot;&gt;&#10;        INSERT INTO users (email, password_hash, nickname, created_at)&#10;        VALUES (#{email}, #{passwordHash}, #{nickname}, #{createdAt})&#10;    &lt;/insert&gt;&#10;&lt;/mapper&gt;&#10;</code></pre></details>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/board/user/UserRepository.java</summary><p>이 단계에서 삭제한 파일이다.</p></details></div></div>
+
+</div>
+  </details><details class="lesson-scene lesson-verify" data-lesson-kind="verify" open>
+    <summary id="직접-확인" aria-label="직접 확인 내용 펼치기"><span class="lesson-scene-index">07</span><span class="lesson-scene-glyph" aria-hidden="true">↗</span><span class="lesson-scene-title"><small>어떻게 확인할까</small><strong>직접 확인</strong><em>요청은 브라우저에서 전송됩니다. 서버의 CORS 설정에 이 페이지 출처가 허용되어 있어야 합니다.</em></span><span class="lesson-scene-count">81개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>브라우저에서 요청 보내기</span></div><section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><div class="server-url-help"><p>요청은 브라우저에서 전송됩니다. 서버의 CORS 설정에 이 페이지 출처가 허용되어 있어야 합니다.</p><a href="#browser-requests-1">이 단계의 요청으로 이동 ↓</a></div></section>
+<p>API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.</p>
+<p>DB에서 해시를 본다.</p>
+<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>docker compose exec -T mysql mysql -ucommunity -pcommunity project \
+  -e &quot;SELECT id, email, LEFT(password_hash, 7) AS head, LENGTH(password_hash) AS len FROM users WHERE email = 'check-10-3@example.com';&quot;</code></pre></details>
+<p>버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 요청 A는 처음 실행이면 201, 다시 실행하면 이미 가입돼 있어 409다. 둘 다 통과로 본다.</p>
+<section id="browser-requests-1" class="api-practice" aria-label="HTTP 요청 실행"><div class="request-panel-heading"><div><p class="request-eyebrow">직접 확인 · 16개 요청</p><h3>브라우저에서 요청 보내기</h3></div><p>위 서버 주소를 확인하고 순서대로 실행하세요. 토큰은 입력 후에도 저장하지 않습니다.</p></div><details class="request-steps"><summary>요청 순서 보기 <span>POST 16</span></summary><nav aria-label="요청 실행 순서"><ol><li data-method="POST"><a href="#browser-request-1-1"><span class="request-step-number">1</span><span class="request-step-content"><span class="request-step-method">POST · A</span><span class="request-step-title">가입(재실행이면 409)</span></span></a></li><li data-method="POST"><a href="#browser-request-1-2"><span class="request-step-number">2</span><span class="request-step-content"><span class="request-step-method">POST · B</span><span class="request-step-title">같은 이메일</span></span></a></li><li data-method="POST"><a href="#browser-request-1-3"><span class="request-step-number">3</span><span class="request-step-content"><span class="request-step-method">POST · C</span><span class="request-step-title">대소문자·공백만 다른 이메일</span></span></a></li><li data-method="POST"><a href="#browser-request-1-4"><span class="request-step-number">4</span><span class="request-step-content"><span class="request-step-method">POST · V</span><span class="request-step-title">규칙 위반 셋</span></span></a></li><li data-method="POST"><a href="#browser-request-1-5"><span class="request-step-number">5</span><span class="request-step-content"><span class="request-step-method">POST · E</span><span class="request-step-title">빈 객체</span></span></a></li><li data-method="POST"><a href="#browser-request-1-6"><span class="request-step-number">6</span><span class="request-step-content"><span class="request-step-method">POST · J</span><span class="request-step-title">깨진 JSON</span></span></a></li><li data-method="POST"><a href="#browser-request-1-7"><span class="request-step-number">7</span><span class="request-step-content"><span class="request-step-method">POST · K</span><span class="request-step-title">한글 25자 비밀번호(75바이트)</span></span></a></li><li data-method="POST"><a href="#browser-request-1-8"><span class="request-step-number">8</span><span class="request-step-content"><span class="request-step-method">POST · V1</span><span class="request-step-title">세 필드 모두 null</span></span></a></li><li data-method="POST"><a href="#browser-request-1-9"><span class="request-step-number">9</span><span class="request-step-content"><span class="request-step-method">POST · V2</span><span class="request-step-title">세 필드 모두 빈 문자열</span></span></a></li><li data-method="POST"><a href="#browser-request-1-10"><span class="request-step-number">10</span><span class="request-step-content"><span class="request-step-method">POST · V3</span><span class="request-step-title">이메일 256자</span></span></a></li><li data-method="POST"><a href="#browser-request-1-11"><span class="request-step-number">11</span><span class="request-step-content"><span class="request-step-method">POST · V4</span><span class="request-step-title">비밀번호 65자·닉네임 21자</span></span></a></li><li data-method="POST"><a href="#browser-request-1-12"><span class="request-step-number">12</span><span class="request-step-content"><span class="request-step-method">POST · V5</span><span class="request-step-title">비밀번호 7자·닉네임 다듬으면 1자</span></span></a></li><li data-method="POST"><a href="#browser-request-1-13"><span class="request-step-number">13</span><span class="request-step-content"><span class="request-step-method">POST · V6</span><span class="request-step-title">이메일 자리에 배열</span></span></a></li><li data-method="POST"><a href="#browser-request-1-14"><span class="request-step-number">14</span><span class="request-step-content"><span class="request-step-method">POST · B1</span><span class="request-step-title">경계 안쪽 — 비밀번호 8자·닉네임 다듬어 2자</span></span></a></li><li data-method="POST"><a href="#browser-request-1-15"><span class="request-step-number">15</span><span class="request-step-content"><span class="request-step-method">POST · B2</span><span class="request-step-title">경계 안쪽 — 비밀번호 64자·닉네임 20자</span></span></a></li><li data-method="POST"><a href="#browser-request-1-16"><span class="request-step-number">16</span><span class="request-step-content"><span class="request-step-method">POST · O1</span><span class="request-step-title">관찰 O1 — 공백 8칸 비밀번호</span></span></a></li></ol></nav></details><div class="api-request-list"><article id="browser-request-1-1" class="api-request" data-request-id="A" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · A</p><h4>가입(재실행이면 409)</h4></div><span class="request-number">요청 1</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;check-10-3@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-1">POST 요청 보내기</button><p id="request-status-1-1" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;check-10-3@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;anyOf&quot;:[{&quot;status&quot;:201,&quot;headers&quot;:{&quot;Location&quot;:{&quot;endsWith&quot;:&quot;/api/v1/users/{{A.body.data.id}}&quot;}},&quot;json&quot;:[{&quot;path&quot;:&quot;$.status&quot;,&quot;equals&quot;:201},{&quot;path&quot;:&quot;$.data.id&quot;,&quot;type&quot;:&quot;number&quot;},{&quot;path&quot;:&quot;$.data.email&quot;,&quot;equals&quot;:&quot;check-10-3@example.com&quot;},{&quot;path&quot;:&quot;$.data.nickname&quot;,&quot;equals&quot;:&quot;채점용&quot;},{&quot;path&quot;:&quot;$.data.password&quot;,&quot;exists&quot;:false},{&quot;path&quot;:&quot;$.data.passwordHash&quot;,&quot;exists&quot;:false}]},{&quot;status&quot;:409,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;DUPLICATE&quot;}]}]}</pre></dd></dl></details></article><article id="browser-request-1-2" class="api-request" data-request-id="B" data-method="POST" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · B</p><h4>같은 이메일</h4></div><span class="request-number">요청 2</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;check-10-3@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-2">POST 요청 보내기</button><p id="request-status-1-2" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;check-10-3@example.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:409,&quot;json&quot;:[{&quot;path&quot;:&quot;$.status&quot;,&quot;equals&quot;:409},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;DUPLICATE&quot;},{&quot;path&quot;:&quot;$.errors&quot;,&quot;equals&quot;:[]},{&quot;path&quot;:&quot;$.data&quot;,&quot;type&quot;:&quot;null&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-3" class="api-request" data-request-id="C" data-method="POST" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · C</p><h4>대소문자·공백만 다른 이메일</h4></div><span class="request-number">요청 3</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot; Check-10-3@Example.COM &quot;,
+  &quot;password&quot;: &quot;password1234&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-3">POST 요청 보내기</button><p id="request-status-1-3" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot; Check-10-3@Example.COM &quot;,
+  &quot;password&quot;: &quot;password1234&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:409,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;DUPLICATE&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-4" class="api-request" data-request-id="V" data-method="POST" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · V</p><h4>규칙 위반 셋</h4></div><span class="request-number">요청 4</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;not-an-email&quot;,
+  &quot;password&quot;: &quot;short&quot;,
+  &quot;nickname&quot;: &quot;a&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-4">POST 요청 보내기</button><p id="request-status-1-4" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;not-an-email&quot;,
+  &quot;password&quot;: &quot;short&quot;,
+  &quot;nickname&quot;: &quot;a&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;},{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;email&quot;},{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;password&quot;},{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;nickname&quot;},{&quot;path&quot;:&quot;$.errors[0].reason&quot;,&quot;type&quot;:&quot;string&quot;},{&quot;path&quot;:&quot;$.data&quot;,&quot;type&quot;:&quot;null&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-5" class="api-request" data-request-id="E" data-method="POST" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · E</p><h4>빈 객체</h4></div><span class="request-number">요청 5</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-5">POST 요청 보내기</button><p id="request-status-1-5" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;},{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;email&quot;},{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;password&quot;},{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;nickname&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-6" class="api-request" data-request-id="J" data-method="POST" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · J</p><h4>깨진 JSON</h4></div><span class="request-number">요청 6</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="application/json" value="application/json" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">{&quot;email&quot;:</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-6">POST 요청 보내기</button><p id="request-status-1-6" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Content-Type&quot;: &quot;application/json&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{&quot;email&quot;:</pre></dd><dt>Expected result</dt><dd><pre>C6: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;BAD_JSON&quot;},{&quot;path&quot;:&quot;$.data&quot;,&quot;type&quot;:&quot;null&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-7" class="api-request" data-request-id="K" data-method="POST" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · K</p><h4>한글 25자 비밀번호(75바이트)</h4></div><span class="request-number">요청 7</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;check-10-3-long@example.com&quot;,
+  &quot;password&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-7">POST 요청 보내기</button><p id="request-status-1-7" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;check-10-3-long@example.com&quot;,
+  &quot;password&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C7: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;},{&quot;path&quot;:&quot;$.errors&quot;,&quot;length&quot;:1},{&quot;path&quot;:&quot;$.errors[0].field&quot;,&quot;equals&quot;:&quot;password&quot;},{&quot;path&quot;:&quot;$.data&quot;,&quot;type&quot;:&quot;null&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-8" class="api-request" data-request-id="V1" data-method="POST" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · V1</p><h4>세 필드 모두 null</h4></div><span class="request-number">요청 8</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: null,
+  &quot;password&quot;: null,
+  &quot;nickname&quot;: null
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-8">POST 요청 보내기</button><p id="request-status-1-8" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: null,
+  &quot;password&quot;: null,
+  &quot;nickname&quot;: null
+}</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;email&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-9" class="api-request" data-request-id="V2" data-method="POST" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · V2</p><h4>세 필드 모두 빈 문자열</h4></div><span class="request-number">요청 9</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;&quot;,
+  &quot;password&quot;: &quot;&quot;,
+  &quot;nickname&quot;: &quot;&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-9">POST 요청 보내기</button><p id="request-status-1-9" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;&quot;,
+  &quot;password&quot;: &quot;&quot;,
+  &quot;nickname&quot;: &quot;&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C8: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;email&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-10" class="api-request" data-request-id="V3" data-method="POST" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · V3</p><h4>이메일 256자</h4></div><span class="request-number">요청 10</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@x.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-10">POST 요청 보내기</button><p id="request-status-1-10" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@x.com&quot;,
+  &quot;password&quot;: &quot;password1234&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C9: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;email&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-11" class="api-request" data-request-id="V4" data-method="POST" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · V4</p><h4>비밀번호 65자·닉네임 21자</h4></div><span class="request-number">요청 11</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;check-10-3-v4@example.com&quot;,
+  &quot;password&quot;: &quot;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&quot;,
+  &quot;nickname&quot;: &quot;닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-11">POST 요청 보내기</button><p id="request-status-1-11" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;check-10-3-v4@example.com&quot;,
+  &quot;password&quot;: &quot;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&quot;,
+  &quot;nickname&quot;: &quot;닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C9: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;password&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-12" class="api-request" data-request-id="V5" data-method="POST" data-request-index="11" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · V5</p><h4>비밀번호 7자·닉네임 다듬으면 1자</h4></div><span class="request-number">요청 12</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;check-10-3-v5@example.com&quot;,
+  &quot;password&quot;: &quot;aaaaaaa&quot;,
+  &quot;nickname&quot;: &quot;  둘  &quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-12">POST 요청 보내기</button><p id="request-status-1-12" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;check-10-3-v5@example.com&quot;,
+  &quot;password&quot;: &quot;aaaaaaa&quot;,
+  &quot;nickname&quot;: &quot;  둘  &quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C9: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;password&quot;},{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;VALIDATION_FAILED&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-13" class="api-request" data-request-id="V6" data-method="POST" data-request-index="12" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · V6</p><h4>이메일 자리에 배열</h4></div><span class="request-number">요청 13</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: [
+    &quot;check-10-3@example.com&quot;
+  ],
+  &quot;password&quot;: &quot;password1234&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-13">POST 요청 보내기</button><p id="request-status-1-13" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: [
+    &quot;check-10-3@example.com&quot;
+  ],
+  &quot;password&quot;: &quot;password1234&quot;,
+  &quot;nickname&quot;: &quot;채점용&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C9: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;BAD_JSON&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-14" class="api-request" data-request-id="B1" data-method="POST" data-request-index="13" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · B1</p><h4>경계 안쪽 — 비밀번호 8자·닉네임 다듬어 2자</h4></div><span class="request-number">요청 14</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;check-10-3-b1@example.com&quot;,
+  &quot;password&quot;: &quot;aaaaaaaa&quot;,
+  &quot;nickname&quot;: &quot;  닉네  &quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-14">POST 요청 보내기</button><p id="request-status-1-14" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;check-10-3-b1@example.com&quot;,
+  &quot;password&quot;: &quot;aaaaaaaa&quot;,
+  &quot;nickname&quot;: &quot;  닉네  &quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C10: {&quot;anyOf&quot;:[{&quot;status&quot;:201,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.nickname&quot;,&quot;equals&quot;:&quot;닉네&quot;}]},{&quot;status&quot;:409,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;DUPLICATE&quot;}]}]}</pre></dd></dl></details></article><article id="browser-request-1-15" class="api-request" data-request-id="B2" data-method="POST" data-request-index="14" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · B2</p><h4>경계 안쪽 — 비밀번호 64자·닉네임 20자</h4></div><span class="request-number">요청 15</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;check-10-3-b2@example.com&quot;,
+  &quot;password&quot;: &quot;bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&quot;,
+  &quot;nickname&quot;: &quot;닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-15">POST 요청 보내기</button><p id="request-status-1-15" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;check-10-3-b2@example.com&quot;,
+  &quot;password&quot;: &quot;bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&quot;,
+  &quot;nickname&quot;: &quot;닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C10: {&quot;anyOf&quot;:[{&quot;status&quot;:201,&quot;json&quot;:[{&quot;path&quot;:&quot;$.data.nickname&quot;,&quot;equals&quot;:&quot;닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉닉&quot;}]},{&quot;status&quot;:409,&quot;json&quot;:[{&quot;path&quot;:&quot;$.code&quot;,&quot;equals&quot;:&quot;DUPLICATE&quot;}]}]}</pre></dd></dl></details></article><article id="browser-request-1-16" class="api-request" data-request-id="O1" data-method="POST" data-request-index="15" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · O1</p><h4>관찰 O1 — 공백 8칸 비밀번호</h4></div><span class="request-number">요청 16</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/v1/users" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;email&quot;: &quot;check-10-3-space@example.com&quot;,
+  &quot;password&quot;: &quot;        &quot;,
+  &quot;nickname&quot;: &quot;공백비번&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-16">POST 요청 보내기</button><p id="request-status-1-16" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;email&quot;: &quot;check-10-3-space@example.com&quot;,
+  &quot;password&quot;: &quot;        &quot;,
+  &quot;nickname&quot;: &quot;공백비번&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>직접 확인 절의 기대 결과를 참고하세요.</pre></dd></dl></details></article></div></section></div>
+  </details><details class="lesson-scene lesson-verify" data-lesson-kind="verify">
+    <summary id="채점-기준" aria-label="채점 기준 내용 펼치기"><span class="lesson-scene-index">08</span><span class="lesson-scene-glyph" aria-hidden="true">↗</span><span class="lesson-scene-title"><small>어떻게 확인할까</small><strong>채점 기준</strong><em>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용).</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>요청 A</td>
+<td>처음이면 <code>201</code>, <code>Location</code>이 <code>/api/v1/users/{id}</code>로 끝남, <code>data</code>에 <code>id</code>·<code>email</code>(<code>check-10-3@example.com</code>)·<code>nickname</code>, <code>password</code>·<code>passwordHash</code> 없음. 이미 가입돼 있으면 <code>409 DUPLICATE</code></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>요청 B</td>
+<td><code>409</code>, <code>code</code>=<code>DUPLICATE</code>, <code>errors</code>=<code>[]</code>, <code>data</code>=<code>null</code></td>
+</tr>
+<tr>
+<td>C3</td>
+<td>요청 C</td>
+<td><code>409 DUPLICATE</code> — 대소문자·앞뒤 공백만 다른 이메일은 같은 이메일</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>요청 V</td>
+<td><code>400 VALIDATION_FAILED</code>, <code>errors</code>의 <code>field</code>에 <code>email</code>·<code>password</code>·<code>nickname</code>이 모두 있고 <code>reason</code>은 문자열</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>요청 E</td>
+<td><code>400 VALIDATION_FAILED</code>, 세 필드 모두 <code>errors</code>에 있음</td>
+</tr>
+<tr>
+<td>C6</td>
+<td>요청 J</td>
+<td><code>400 BAD_JSON</code></td>
+</tr>
+<tr>
+<td>C7</td>
+<td>요청 K</td>
+<td><code>400 VALIDATION_FAILED</code>, <code>errors</code>는 <code>password</code> 하나 — 한글 25자는 64자 안이지만 75바이트라 BCrypt 한계(72바이트)를 넘는다. <code>500</code>이면 바이트 검사가 없다</td>
+</tr>
+<tr>
+<td>C8</td>
+<td>V1 / V2</td>
+<td>세 필드 모두 <code>null</code>, 모두 빈 문자열 → <code>400 VALIDATION_FAILED</code>, <code>errors</code>에 <code>email</code>·<code>password</code>·<code>nickname</code>이 <strong>모두</strong> 있다 — <code>500</code>이 아니다</td>
+</tr>
+<tr>
+<td>C9</td>
+<td>V3 / V4 / V5 / V6</td>
+<td>이메일 256자 <code>email</code> / 비밀번호 65자·닉네임 21자 <code>password</code>·<code>nickname</code> / 비밀번호 7자·닉네임 다듬으면 1자 <code>password</code>·<code>nickname</code> — 모두 <code>400 VALIDATION_FAILED</code> / 이메일 자리에 배열 <code>400 BAD_JSON</code></td>
+</tr>
+<tr>
+<td>C10</td>
+<td>B1 / B2</td>
+<td>경계 바로 안쪽은 통과한다 — 비밀번호 8자·닉네임 다듬어 2자(<code>닉네</code>), 비밀번호 64자·닉네임 20자 모두 처음이면 <code>201</code>, 다시 실행하면 <code>409 DUPLICATE</code>(검증은 통과했다는 뜻)</td>
+</tr>
+<tr>
+<td>C11</td>
+<td>관찰 O1 — 공백 8칸 비밀번호</td>
+<td><strong>채점 제외(관찰)</strong> — 결과 줄의 필수 N/M에 세지 않는다. (정답 코드: 처음이면 <code>201</code> — 공백만인 비밀번호를 막지 않는다. 정책 결정 사항)</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT LEFT(password_hash, 7), LENGTH(password_hash) FROM users WHERE email = &#39;check-10-3@example.com&#39;</code></td>
+<td><code>$2a$10$</code>, <code>60</code> — 원문이 아니라 BCrypt 해시</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>응답</td>
+<td>엔티티를 그대로 반환하지 않고 응답 DTO(<code>id</code>·<code>email</code>·<code>nickname</code>)로 내보낸다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>해시</td>
+<td><code>PasswordEncoder</code>(BCrypt)를 빈으로 두고 주입받아 쓴다. 해시를 직접 만들거나 비교하지 않는다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>중복</td>
+<td>저장 전에 확인하고, 동시 가입은 DB <code>UNIQUE</code> 위반을 409로 바꿔 막는다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>바이트</td>
+<td>비밀번호의 UTF-8 바이트 수(72 이하)를 <code>encode</code> 전에, 검증 단계에서 막는다 — <code>encode</code>의 예외를 잡아 바꾸는 게 아니다</td>
+</tr>
+</tbody></table></div>
+</div>
+  </details><details class="lesson-scene lesson-debug" data-lesson-kind="debug">
+    <summary id="일부러-망가뜨리기" aria-label="일부러 망가뜨리기 내용 펼치기"><span class="lesson-scene-index">09</span><span class="lesson-scene-glyph" aria-hidden="true">✳</span><span class="lesson-scene-title"><small>막히면 확인</small><strong>일부러 망가뜨리기</strong><em>하나씩 바꾸고 다시 띄운 뒤 요청을 보낸다. 끝나면 되돌린다. 모두 Boot 4.1.1에서 재현했다. 망가뜨린 채 만든 회원은 확인 후 DELETE FROM users WHE…</em></span><span class="lesson-scene-count">9개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>① @Valid 를 뺀다 → 엉뚱한 409, 엉뚱한 201</span><span>② PasswordConfig 의 @Configuration 을 지운다 → 앱이 뜨지 않는다</span><span>③ 해시 없이 저장한다 → 에러는 없다</span></div>
+<p>하나씩 바꾸고 다시 띄운 뒤 요청을 보낸다. 끝나면 되돌린다. 모두 Boot 4.1.1에서 재현했다. 망가뜨린 채 만든 회원은 확인 후 <code>DELETE FROM users WHERE email = &#39;...&#39;</code>로 지우거나 <code>docker compose down -v &amp;&amp; docker compose up -d</code>으로 되돌린다.</p>
+<h3 id="①-valid를-뺀다--엉뚱한-409-엉뚱한-201"><a class="anchor" href="#①-valid를-뺀다--엉뚱한-409-엉뚱한-201" aria-hidden="true">#</a>① <code>@Valid</code>를 뺀다 → 엉뚱한 409, 엉뚱한 201</h3>
+<p>컨트롤러의 <code>@Valid @RequestBody</code>에서 <code>@Valid</code>를 지운다. 닉네임 없이 보낸다.</p>
+<pre><code class="language-bash">post -d '{&quot;email&quot;:&quot;novalid@example.com&quot;,&quot;password&quot;:&quot;password1234&quot;}'</code></pre>
+<pre><code class="language-text">{&quot;status&quot;:409,&quot;message&quot;:&quot;이미 가입된 이메일입니다.&quot;,&quot;code&quot;:&quot;DUPLICATE&quot;,&quot;errors&quot;:[],&quot;data&quot;:null}</code></pre>
+<p>로그:</p>
+<pre><code class="language-text">WARN ... org.hibernate.orm.jdbc.error : HHH000247: ErrorCode: 1048, SQLState: 23000
+WARN ... org.hibernate.orm.jdbc.error : Column 'nickname' cannot be null</code></pre>
+<ul>
+<li>읽는 법: 검증이 없으니 <code>nickname</code>이 <code>null</code>인 채 INSERT까지 갔다. DB의 <code>NOT NULL</code>이 막았다. 그런데 서비스가 <code>DataIntegrityViolationException</code>을 <strong>전부</strong> &quot;이메일 중복&quot;으로 바꾸고 있어서 거짓 409가 나갔다. 응답만 보면 원인을 알 수 없다. 로그의 <code>WARN</code> 두 줄이 진짜 원인이다.</li>
+<li>형식이 틀린 값은 더 나쁘다. <code>{&quot;email&quot;:&quot;not-an-email&quot;,&quot;password&quot;:&quot;x&quot;,&quot;nickname&quot;:&quot;a&quot;}</code>를 보내면 <code>201</code>로 그대로 가입된다.</li>
+<li>고치기: <code>@Valid</code>를 되돌린다. 입력 규칙은 DB 제약이 아니라 <strong>요청 검증이 먼저</strong> 막는다. DB 제약은 마지막 방어선이다.</li>
+</ul>
+<h3 id="②-passwordconfig의-configuration을-지운다--앱이-뜨지-않는다"><a class="anchor" href="#②-passwordconfig의-configuration을-지운다--앱이-뜨지-않는다" aria-hidden="true">#</a>② <code>PasswordConfig</code>의 <code>@Configuration</code>을 지운다 → 앱이 뜨지 않는다</h3>
+<pre><code class="language-text">***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Parameter 1 of constructor in org.example.board.user.UserService required a bean of type 'org.springframework.security.crypto.password.PasswordEncoder' that could not be found.
+
+
+Action:
+
+Consider defining a bean of type 'org.springframework.security.crypto.password.PasswordEncoder' in your configuration.</code></pre>
+<ul>
+<li>읽는 법: <code>Parameter 1 of constructor</code> — <code>UserService</code> 생성자의 두 번째 매개변수(0부터 센다)인 <code>PasswordEncoder</code>를 넣어 줄 빈이 없다. <code>@Configuration</code>이 없으면 Spring이 그 클래스의 <code>@Bean</code> 메서드를 보지 않는다.</li>
+<li>고치기: <code>@Configuration</code>을 되돌린다.</li>
+</ul>
+<h3 id="③-해시-없이-저장한다--에러는-없다"><a class="anchor" href="#③-해시-없이-저장한다--에러는-없다" aria-hidden="true">#</a>③ 해시 없이 저장한다 → 에러는 없다</h3>
+<p><code>passwordEncoder.encode(request.password())</code> 대신 <code>request.password()</code>를 그대로 넘긴다. 가입은 아무 문제 없이 <code>201</code>이다.</p>
+<pre><code class="language-text">{&quot;status&quot;:201,&quot;message&quot;:&quot;Created&quot;,&quot;data&quot;:{&quot;id&quot;:5,&quot;email&quot;:&quot;plain@example.com&quot;,&quot;nickname&quot;:&quot;평문&quot;}}</code></pre>
+<p>D1 조회에 원문이 그대로 보인다.</p>
+<pre><code class="language-text">LEFT(password_hash, 12)	LENGTH(password_hash)
+password1234	12</code></pre>
+<p><strong>에러가 안 나는 실수가 가장 위험하다.</strong> D1이 이것을 잡는다. 10-4의 로그인은 <code>matches(원문, 해시)</code>로 비교하므로, 이렇게 가입한 계정은 로그인하면 401이고 로그에 경고가 한 줄 남는다(10-4 코드에서 재현).</p>
+<pre><code class="language-text">WARN ... o.s.s.c.bcrypt.BCryptPasswordEncoder : Encoded password does not look like BCrypt</code></pre>
+<h3 id="④-maxbytes를-뺀다--한글-비밀번호가-500"><a class="anchor" href="#④-maxbytes를-뺀다--한글-비밀번호가-500" aria-hidden="true">#</a>④ <code>@MaxBytes</code>를 뺀다 → 한글 비밀번호가 500</h3>
+<p><code>SignupRequest</code>에서 <code>@MaxBytes(...)</code> 줄을 지우고(글자 수 <code>@Size</code>만 남는다) 요청 K를 보낸다.</p>
+<pre><code class="language-text">{&quot;status&quot;:500,&quot;message&quot;:&quot;서버 오류가 발생했습니다.&quot;,&quot;code&quot;:&quot;INTERNAL_ERROR&quot;,&quot;errors&quot;:[],&quot;data&quot;:null}</code></pre>
+<p>로그:</p>
+<pre><code class="language-text">ERROR ... o.e.board.common.GlobalExceptionHandler  : 처리하지 못한 예외
+
+java.lang.IllegalArgumentException: password cannot be more than 72 bytes
+	at org.springframework.security.crypto.bcrypt.BCrypt.hashpw(BCrypt.java:616) ~[spring-security-crypto-7.1.1.jar!/:7.1.1]
+	...
+	at org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder.encodeNonNullPassword(BCryptPasswordEncoder.java:109) ~[spring-security-crypto-7.1.1.jar!/:7.1.1]
+	...
+	at org.example.board.user.UserService.signup(UserService.java:26) ~[!/:0.0.1-SNAPSHOT]</code></pre>
+<ul>
+<li>읽는 법: 한글 25자는 <code>@Size(max = 64)</code>를 통과했다. 그다음 <code>passwordEncoder.encode</code>가 75바이트를 받고 예외를 던졌다. 전역 처리기의 마지막 갈래(<code>Exception</code>)가 잡아 <code>500</code>이 됐다. 같은 조건에서 한글 24자(72바이트)는 <code>201</code>이다.</li>
+<li>사용자 잘못(너무 긴 입력)인데 서버 오류로 답했다. <code>500</code>은 &quot;서버를 고쳐야 한다&quot;는 뜻이라 화면은 무엇을 고치라고 안내할 수도 없다.</li>
+<li>고치기: <code>@MaxBytes</code>를 되돌린다. <code>encode</code>의 예외를 <code>try</code>로 잡아 400으로 바꾸지 않는다 — 규칙은 검증이 먼저 막는다(①과 같은 원칙).</li>
+</ul>
+</div>
+  </details><details class="lesson-scene lesson-connect" data-lesson-kind="connect">
+    <summary id="필요한-지식" aria-label="필요한 지식 내용 펼치기"><span class="lesson-scene-index">10</span><span class="lesson-scene-glyph" aria-hidden="true">→</span><span class="lesson-scene-title"><small>다음으로 연결</small><strong>필요한 지식</strong></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<ul>
+<li><a href="../../lessons/E1-why-layers.html">E1 계층을 나누는 이유</a> — 컨트롤러·서비스·저장소</li>
+<li><a href="../../lessons/E3-what-is-jpa.html">E3 JPA는 무엇인가</a> — 엔티티↔테이블, 저장소 인터페이스</li>
+<li><a href="../../lessons/F1-validation-errors.html">F1 검증과 에러 응답</a> — <code>@Valid</code>와 400</li>
+<li><a href="../../lessons/B4-record-getter-immutable.html">B4 record·getter·불변</a> — 압축 생성자</li>
+<li><a href="../../lessons/G3-first-transaction.html">G3 트랜잭션 첫 만남</a></li>
+<li><a href="../../docs/knowledge/W10-where-to-validate.html">W10 검증은 어디서 하나</a></li>
+<li><a href="../../docs/knowledge/D11-web-security-basics.html">D11 웹 보안 기초</a> — 비밀번호는 왜 해시로</li>
+<li><a href="../../lessons/F4-password-storage.html">F4 비밀번호 저장</a> — BCrypt의 72바이트 한계(가입 <code>encode</code>는 예외, 로그인 <code>matches</code>는 앞 72바이트만 비교)</li>
+</ul>
+</div>
+  </details><details class="lesson-scene lesson-debug" data-lesson-kind="debug">
+    <summary id="힌트-막힐-때만" aria-label="힌트 (막힐 때만) 내용 펼치기"><span class="lesson-scene-index">11</span><span class="lesson-scene-glyph" aria-hidden="true">✳</span><span class="lesson-scene-title"><small>막히면 확인</small><strong>힌트 (막힐 때만)</strong><em>Schema-validation: missing column [...] 이나 wrong column type 이면 엔티티의 @Column(name = ...) 이 V1의 컬럼…</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<details>
+<summary>힌트 1 — 앱이 Schema-validation 에러로 뜨지 않는다</summary>
+
+<p><code>Schema-validation: missing column [...]</code>이나 <code>wrong column type</code>이면 엔티티의 <code>@Column(name = ...)</code>이 V1의 컬럼 이름과 다르다. <code>users</code> 테이블은 <code>password_hash</code>·<code>created_at</code>처럼 밑줄 이름이다.</p>
+</details>
+
+<details>
+<summary>힌트 2 — 대문자 이메일이 409가 아니라 201이다</summary>
+
+<p>이메일을 다듬지 않고 그대로 저장했다. record에 압축 생성자 <code>public SignupRequest { email = ...; }</code>를 두고 <code>strip()</code>·<code>toLowerCase(Locale.ROOT)</code>를 한다. 서비스에서 해도 되지만 그러면 <code>@Email</code> 검사는 다듬기 전 값으로 한다.</p>
+</details>
+
+<details>
+<summary>힌트 3 — errors에 필드가 하나만 나온다</summary>
+
+<p>검증은 모든 필드를 한꺼번에 본다. 하나만 나오면 처리기가 <code>getFieldError()</code>(첫 번째 하나)를 썼다. <code>getFieldErrors()</code>(목록)를 쓴다.</p>
+</details>
+
+</div>
+  </details><details class="lesson-scene lesson-connect" data-lesson-kind="connect">
+    <summary id="다음-단계" aria-label="다음 단계 내용 펼치기"><span class="lesson-scene-index">12</span><span class="lesson-scene-glyph" aria-hidden="true">→</span><span class="lesson-scene-title"><small>다음으로 연결</small><strong>다음 단계</strong><em>10-4. 로그인과 JWT — 가입한 이메일·비밀번호로 로그인해 토큰을 받고, 그 토큰으로 "내 정보"를 본다.</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p><a href="10-4-login-jwt.html">10-4. 로그인과 JWT</a> — 가입한 이메일·비밀번호로 로그인해 토큰을 받고, 그 토큰으로 &quot;내 정보&quot;를 본다.</p>
+
+</div>
+  </details></div><section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 10-3. 회원 가입 — BCrypt 해시와 이메일 중복 409\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch10-project/10-3-signup.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity project -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="10-2-common-response.html">← 이전 10-2. 공통 응답 틀과 전역 예외 처리</a><a href="10-4-login-jwt.html">다음 → 10-4. 로그인과 JWT — 인터셉터와 @LoginUser, 내 정보</a></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js?v=996bdd22e59f" defer></script><script src="../../tools/site/scenario-code-workbench.js?v=52d06b1c6f1a" defer></script>
+</body>
+</html>

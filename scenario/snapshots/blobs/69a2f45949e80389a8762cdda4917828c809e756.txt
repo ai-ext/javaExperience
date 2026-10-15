@@ -1,0 +1,560 @@
+package org.example.post;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.batch.StrictDateTimes;
+import org.example.board.Board;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardRepository;
+import org.example.board.BoardWriteForbiddenException;
+import org.example.image.PostImage;
+import org.example.image.PostImageRepository;
+import tools.jackson.databind.JsonNode;
+import org.example.member.Member;
+import org.example.member.MemberRepository;
+import org.example.revision.PostRevision;
+import org.example.revision.PostRevisionRepository;
+import org.example.moderation.ContentFilter;
+import org.example.notification.PostCreatedEvent;
+import org.example.tag.Tag;
+import org.example.tag.TagRepository;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.List;
+import java.util.Set;
+
+// 글 만들기·고치기 규칙. HTTP(ResponseEntity, 헤더 등)는 알지 않는다.
+@Service
+public class PostService {
+
+    private static final String ADMIN_WRITE_ROLE = "ADMIN";
+    private static final String ADMIN_ROLE = "ADMIN";
+    private static final String DEFAULT_VISIBILITY = "PUBLIC";
+    private static final String PUBLISHED = "PUBLISHED";
+    private static final String DRAFT = "DRAFT";
+    // 11-5 지운 뒤 이 기간 안에만 되살릴 수 있다
+    private static final int RESTORE_DAYS = 30;
+
+    // 1-5(PostCreateRequest)와 같은 규칙 — PATCH는 Bean Validation(@Valid)으로 표현할 수 없다
+    // (null=그대로, 값이 있을 때만 검사해야 하는데 @NotBlank는 null도 실패로 본다). 숫자만이라도
+    // 같은 값을 쓰도록 여기 모아 둔다.
+    private static final int TITLE_MAX_LENGTH = 200;
+    private static final int TAGS_MAX_COUNT = 5;
+    private static final int TAG_NAME_MAX_LENGTH = 30;
+    // 16-1 연습용 실패 장치 — 이 태그가 있으면 저장·이벤트 발행까지 다 한 뒤 맨 끝에서 실패시킨다(롤백 관찰용)
+    private static final String ROLLBACK_TEST_TAG = "rollback-test";
+
+    private final PostRepository postRepository;
+    private final BoardRepository boardRepository;
+    private final MemberRepository memberRepository;
+    private final TagRepository tagRepository;
+    private final PostAccessPolicy accessPolicy;
+    private final PostImageRepository postImageRepository;
+    private final Clock clock;
+    private final PostRevisionRepository revisionRepository;
+    private final ContentFilter contentFilter;
+    private final PostRateLimiter rateLimiter;
+    private final ApplicationEventPublisher eventPublisher;
+
+    // 15-3 예약은 30일 안쪽만 받는다
+    private static final int MAX_SCHEDULE_DAYS = 30;
+
+    public PostService(PostRepository postRepository, BoardRepository boardRepository,
+                        MemberRepository memberRepository, TagRepository tagRepository,
+                        PostAccessPolicy accessPolicy, PostImageRepository postImageRepository, Clock clock,
+                        PostRevisionRepository revisionRepository, ContentFilter contentFilter,
+                        PostRateLimiter rateLimiter, ApplicationEventPublisher eventPublisher) {
+        this.postRepository = postRepository;
+        this.boardRepository = boardRepository;
+        this.memberRepository = memberRepository;
+        this.tagRepository = tagRepository;
+        this.accessPolicy = accessPolicy;
+        this.postImageRepository = postImageRepository;
+        this.clock = clock;
+        this.revisionRepository = revisionRepository;
+        this.contentFilter = contentFilter;
+        this.rateLimiter = rateLimiter;
+        this.eventPublisher = eventPublisher;
+    }
+
+    @Transactional
+    public Post create(Long authorId, PostCreateRequest request) {
+        LocalDateTime publishAt = parsePublishAt(request.publishAt());
+        Board board = boardRepository.findBySlug(request.boardSlug())
+                .orElseThrow(() -> new BoardNotFoundException(request.boardSlug()));
+        // 작성자는 요청 본문이 아니라 토큰으로 인증된 회원에서 받는다(authorId 같은 값은 무시한다)
+        Member author = memberRepository.getReferenceById(authorId);
+
+        if (ADMIN_WRITE_ROLE.equals(board.getWriteRole()) && !ADMIN_ROLE.equals(author.getRole())) {
+            throw new BoardWriteForbiddenException(board.getSlug());
+        }
+
+        // 13-4 금칙어 — BLOCK이면 400(걸린 필드 모두), MASK면 가린 값으로 저장
+        Map<String, String> filtered = contentFilter.apply(fieldsOf(request.title(), request.content()));
+
+        // 유효하지 않은 태그·이미지는 요청 제한보다 먼저 400으로 응답한다.
+        if (request.tags() != null) {
+            validateTags(request.tags());
+        }
+        List<PostImage> images = loadUsableImages(authorId, request.imageIds());
+
+        // 15-3 "지금"은 Clock에서 — 예약 시각 판단과 작성 시각이 같은 시계를 쓴다(practice는 2026-10-05 00:00 고정).
+        // 초로 자른다 — DATETIME은 소수 초를 반올림해 저장해서(…:09.6 → :10) 저장된 값이 "미래"가 되고 Retry-After가 61이 된다(13-5 실측)
+        LocalDateTime now = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS);
+
+        // 15-3 예약은 그 자체로 상태다 — 11-1의 status와 함께 오면 어느 쪽을 따를지 모호하니 400.
+        // 예약 시각 범위 검사도 도배 방지보다 먼저(400인 요청은 글이 생기지 않으니 셀 것도 없다)
+        if (publishAt != null) {
+            if (request.status() != null) {
+                throw new InvalidPostFieldException("publishAt", "예약 발행(publishAt)과 상태(status)는 함께 보낼 수 없습니다.");
+            }
+            validatePublishAt(publishAt, now);
+        }
+
+        // 13-5 도배 방지 — 입력이 올바른 요청만 센다. 글의 created_at에 찍을 값과 같은 now(같은 Clock)로 센다.
+        // practice처럼 시계가 고정이면 1분이 영원히 지나지 않으므로 PostRateLimiter가 검사를 건너뛴다
+        rateLimiter.check(authorId, now);
+
+        String visibility = request.visibility() != null ? request.visibility() : DEFAULT_VISIBILITY;
+        Post post;
+        if (publishAt == null) {
+            // 11-1 상태를 안 보내면 지금처럼 바로 발행. DRAFT면 published_at은 비워 둔다(Post 생성자)
+            String status = request.status() != null ? request.status() : PUBLISHED;
+            post = new Post(board, author, filtered.get("title"), filtered.get("content"), status, visibility, now);
+        } else {
+            post = Post.scheduled(board, author, filtered.get("title"), filtered.get("content"), visibility,
+                    publishAt, now);
+        }
+
+        for (Tag tag : resolveTags(request.tags(), now)) {
+            post.addTag(tag);
+        }
+
+        Post saved = postRepository.save(post);
+        attachImages(saved, images);
+        // 16-1 알림은 여기서 바로 만들지 않고 이벤트만 남긴다 — 리스너가 커밋 "뒤"에 처리한다.
+        // 공개된 글(PUBLISHED)만 — 임시저장(11-1)·예약(15-3) 글은 작성자만 볼 수 있어서 팔로워에게 알리면 안 된다
+        if (PUBLISHED.equals(saved.getStatus())) {
+            eventPublisher.publishEvent(new PostCreatedEvent(saved.getId(), authorId));
+        }
+        // 트랜잭션(영속성 컨텍스트) 안에서 지연 로딩 연관을 미리 읽어 둔다.
+        // open-in-view: false라서 컨트롤러가 트랜잭션 밖에서 건드리면 LazyInitializationException이 난다.
+        saved.getAuthor().getNickname();
+        saved.getTags().forEach(Tag::getName);
+
+        // 16-1 저장 "뒤"의 실패를 흉내 낸다(실무라면 포인트 적립·다른 테이블 갱신 같은 후처리 실패).
+        // 예외가 나가면 글·태그 저장이 모두 롤백되고, 이미 발행한 이벤트의 AFTER_COMMIT 리스너도 불리지 않는다.
+        if (request.tags() != null && request.tags().contains(ROLLBACK_TEST_TAG)) {
+            throw new InvalidPostFieldException("tags", "연습용 실패 태그(rollback-test)라 저장을 되돌렸습니다.");
+        }
+        return saved;
+    }
+
+    // 11-2 내가 올렸고 아직 어느 글에도 안 붙은 이미지만 붙일 수 있다. 하나라도 아니면 400(글도 저장 안 됨 — 같은 트랜잭션)
+    private List<PostImage> loadUsableImages(Long authorId, JsonNode imageIds) {
+        if (imageIds == null || imageIds.isNull()) {
+            return List.of();
+        }
+        if (!imageIds.isArray()) {
+            throw new InvalidPostFieldException("imageIds", "이미지 ID는 숫자 배열이어야 합니다.");
+        }
+        if (imageIds.size() == 0) {
+            return List.of();
+        }
+        List<Long> requestedIds = new java.util.ArrayList<>();
+        for (int index = 0; index < imageIds.size(); index++) {
+            JsonNode id = imageIds.get(index);
+            if (!id.isIntegralNumber() || !id.canConvertToLong()) {
+                throw new InvalidPostFieldException("imageIds[" + index + "]", "이미지 ID는 정수여야 합니다.");
+            }
+            requestedIds.add(id.longValue());
+        }
+        List<Long> ids = requestedIds.stream().distinct().sorted().toList();
+        if (ids.size() > 10) {
+            throw new InvalidPostFieldException("imageIds", "이미지는 10개까지입니다.");
+        }
+        List<PostImage> images = postImageRepository.findAllByIdForUpdate(ids);
+        boolean allUsable = images.size() == ids.size() && images.stream().allMatch(image ->
+                image.getUploader().getId().equals(authorId) && image.getPost() == null);
+        if (!allUsable) {
+            throw new InvalidPostFieldException("imageIds", "내가 올렸고 아직 글에 붙지 않은 이미지만 붙일 수 있습니다.");
+        }
+        return images;
+    }
+
+    private void attachImages(Post post, List<PostImage> images) {
+        images.forEach(image -> {
+            image.attachTo(post);
+            post.getImages().add(image);
+        });
+    }
+
+    @Transactional
+    public Post copy(Long sourceId, Long authorId, boolean copyTags, CopyPostRequest request) {
+        Post source = postRepository.findById(sourceId).orElseThrow(PostNotFoundException::new);
+        if (source.getDeletedAt() != null || !"PUBLISHED".equals(source.getStatus())
+                || !"PUBLIC".equals(source.getVisibility())) {
+            throw new PostNotFoundException();
+        }
+        Member author = memberRepository.getReferenceById(authorId);
+        if (ADMIN_WRITE_ROLE.equals(source.getBoard().getWriteRole())
+                && !ADMIN_ROLE.equals(author.getRole())) {
+            throw new BoardWriteForbiddenException(source.getBoard().getSlug());
+        }
+        LocalDateTime now = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS);
+        Map<String, String> copiedFields = contentFilter.apply(fieldsOf(request.title(), source.getContent()));
+        rateLimiter.check(authorId, now);
+        Post copied = new Post(source.getBoard(), author, copiedFields.get("title"), copiedFields.get("content"),
+                "PUBLISHED", "PUBLIC", now);
+        if (copyTags) {
+            source.getTags().forEach(copied::addTag);
+        }
+        Post saved = postRepository.save(copied);
+        // 복사도 새 공개 글이다. 커밋 뒤에만 팔로워에게 알린다.
+        eventPublisher.publishEvent(new PostCreatedEvent(saved.getId(), authorId));
+        saved.getBoard().getSlug();
+        saved.getAuthor().getNickname();
+        saved.getTags().forEach(Tag::getName);
+        return saved;
+    }
+
+    @Transactional
+    public PostDetailResponse replace(Long id, AuthenticatedMember me, PostReplaceRequest request) {
+        Post post = postRepository.findByIdForUpdate(id).orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(me, post)) {
+            throw new PostNotFoundException();
+        }
+        if (!post.getAuthor().getId().equals(me.id())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        Set<Tag> tags = new LinkedHashSet<>();
+        for (String name : distinctTagNames(request.tags())) {
+            tags.add(tagRepository.findByName(name)
+                    .orElseGet(() -> tagRepository.save(new Tag(name, now))));
+        }
+        Map<String, String> filtered = contentFilter.apply(fieldsOf(request.title(), request.content()));
+        post.replace(filtered.get("title"), filtered.get("content"), request.visibility(), tags, now);
+
+        return new PostDetailResponse(post.getId(), post.getBoard().getSlug(), post.getTitle(),
+                post.getContent(), post.getTags().stream().map(Tag::getName).toList(),
+                post.getVisibility(),
+                new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+                post.getViewCount(), post.getLikeCount(), post.getCommentCount(),
+                post.getImages().stream().map(i -> new ImageResponse(i.getId(), i.url())).toList(),
+                post.getStatus(), post.getPublishAt(), post.getPublishedAt(), post.getCreatedAt());
+    }
+
+    @Transactional
+    public Post patch(Long id, AuthenticatedMember loginMember, PostUpdateRequest request) {
+        Post post = postRepository.findByIdForUpdate(id)
+                .orElseThrow(PostNotFoundException::new);
+
+        // 404(볼 수 없음)를 먼저 확인하고, 그다음에 403(작성자 아님)을 확인한다.
+        // 반대로 하면 볼 수 없는 글의 존재가 403으로 드러난다.
+        if (!accessPolicy.canView(loginMember, post)) {
+            throw new PostNotFoundException();
+        }
+        if (!post.getAuthor().getId().equals(loginMember.id())) {
+            throw new PostForbiddenException();
+        }
+
+        // 11-6 보낸 필드를 먼저 모두 검사하고, 틀린 것을 한꺼번에 400으로 돌려준다(하나라도 틀리면 아무것도 안 바꾼다)
+        Map<String, String> errors = new LinkedHashMap<>();
+        String title = readText(request.title(), "title", errors);
+        String content = readText(request.content(), "content", errors);
+        List<String> tags = readTags(request.tags(), errors);
+        String visibility = readText(request.visibility(), "visibility", errors);
+        if (title != null) collect(errors, () -> validateTitle(title));
+        if (content != null) collect(errors, () -> validateContent(content));
+        if (tags != null) collect(errors, () -> validateTags(tags));
+        if (visibility != null) collect(errors, () -> validateVisibility(visibility));
+        if (!errors.isEmpty()) {
+            throw new InvalidParametersException(errors);
+        }
+
+        // 13-4 금칙어 — 형식 검사를 통과한 뒤, 바꾸는 필드만 검사한다(null은 그대로라 건너뛴다).
+        // BLOCK이면 400(걸린 필드 모두), MASK면 가린 값으로 바꾼다 — 이력·변경 비교도 가린 값으로 한다
+        Map<String, String> filtered = contentFilter.apply(fieldsOf(title, content));
+        String newTitle = filtered.get("title");
+        String newContent = filtered.get("content");
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // 11-6 바꾸기 전 모습을 떠 둔다 — 실제로 바뀐 필드가 있을 때만 이력으로 남긴다
+        String beforeTitle = post.getTitle();
+        String beforeContent = post.getContent();
+        List<String> beforeTags = sortedTagNames(post.getTags());
+        String beforeVisibility = post.getVisibility();
+        List<String> changed = new ArrayList<>();
+
+        if (newTitle != null && !newTitle.equals(beforeTitle)) {
+            post.changeTitle(newTitle);
+            changed.add("title");
+        }
+        if (newContent != null && !newContent.equals(beforeContent)) {
+            post.changeContent(newContent);
+            changed.add("content");
+        }
+        if (tags != null) {
+            Set<Tag> newTags = resolveTags(tags, now);
+            if (!sortedTagNames(newTags).equals(beforeTags)) {
+                post.replaceTags(newTags);
+                changed.add("tags");
+            }
+        }
+        if (visibility != null && !visibility.equals(beforeVisibility)) {
+            post.changeVisibility(visibility);
+            changed.add("visibility");
+        }
+        // boardSlug는 요청에 와도 무시한다(게시판은 못 옮긴다) — PostUpdateRequest에 아예 없다.
+
+        // 같은 값으로 저장하면(바뀐 게 없으면) 이력도, 수정 시각도 남기지 않는다
+        if (!changed.isEmpty()) {
+            revisionRepository.save(new PostRevision(post, memberRepository.getReferenceById(loginMember.id()),
+                    beforeTitle, beforeContent, beforeTags, beforeVisibility, changed, now));
+            post.touchUpdatedAt(now);
+        }
+
+        // 트랜잭션 안에서 지연 로딩 연관을 미리 읽어 둔다(컨트롤러가 세션 밖에서 DTO를 만든다).
+        // board는 findById로 읽은 프록시라 건드리지 않으면 LazyInitializationException이 난다
+        // (create()의 board는 findBySlug로 이미 로딩된 엔티티라 같은 문제가 없었다).
+        post.getBoard().getSlug();
+        post.getAuthor().getNickname();
+        post.getTags().forEach(Tag::getName);
+        post.getImages().forEach(PostImage::getStoredName);
+        return post;
+    }
+
+    // 11-1 임시저장 글 발행 — 404(볼 수 없음) → 403(작성자 아님) → 409(임시저장이 아님) 순서
+    @Transactional
+    public Post publish(Long id, AuthenticatedMember loginMember) {
+        // 같은 임시저장 글의 발행 요청을 직렬화해 두 번째 요청은 커밋 뒤 상태를 본다.
+        Post post = postRepository.findByIdForUpdate(id)
+                .orElseThrow(PostNotFoundException::new);
+        if (!accessPolicy.canView(loginMember, post)) {
+            throw new PostNotFoundException();
+        }
+        if (!post.getAuthor().getId().equals(loginMember.id())) {
+            throw new PostForbiddenException();
+        }
+        if (!DRAFT.equals(post.getStatus())) {
+            throw new PostNotDraftException();
+        }
+        // 금칙어가 새로 추가된 뒤 오래된 임시저장을 발행하는 우회도 막는다.
+        Map<String, String> filtered = contentFilter.apply(fieldsOf(post.getTitle(), post.getContent()));
+        post.changeTitle(filtered.get("title"));
+        post.changeContent(filtered.get("content"));
+        post.publish(LocalDateTime.now());
+        // 임시저장은 여기서 처음 공개된다. 이벤트는 커밋 뒤에 처리한다.
+        eventPublisher.publishEvent(new PostCreatedEvent(post.getId(), loginMember.id()));
+
+        post.getBoard().getSlug();
+        post.getAuthor().getNickname();
+        post.getTags().forEach(Tag::getName);
+        post.getImages().forEach(PostImage::getStoredName);
+        return post;
+    }
+
+    // 11-1 내 임시저장 글 — 최근에 고친 것부터. 지운 글은 빠진다
+    @Transactional(readOnly = true)
+    public MyDraftsResponse myDrafts(AuthenticatedMember loginMember) {
+        List<MyDraftItemResponse> items = postRepository.findMyDrafts(loginMember.id()).stream()
+                .map(p -> new MyDraftItemResponse(p.getId(), p.getBoard().getSlug(), p.getTitle(), p.getUpdatedAt()))
+                .toList();
+        return new MyDraftsResponse(items);
+    }
+
+    // 11-5 휴지통 — 내가 지운 내 글 중 아직 복구할 수 있는 것(지운 지 30일 안), 최근에 지운 순
+    @Transactional(readOnly = true)
+    public MyTrashResponse myTrash(AuthenticatedMember loginMember) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        List<MyTrashItemResponse> items = postRepository.findMyTrash(loginMember.id(), now.minusDays(RESTORE_DAYS)).stream()
+                .map(p -> new MyTrashItemResponse(p.getId(), p.getBoard().getSlug(), p.getTitle(), p.getDeletedAt(),
+                        p.getDeletedAt().plusDays(RESTORE_DAYS)))
+                .toList();
+        return new MyTrashResponse(items);
+    }
+
+    // 11-5 복구 — 404(없음·내 글 아님) → 409(지운 글 아님) → 403(내가 지운 게 아님) → 410(30일 지남) 순서.
+    // 지운 글은 2-3 규칙(canView)으로는 아무도 못 보므로, 여기서는 "작성자인가"를 직접 확인한다.
+    @Transactional
+    public Post restore(Long id, AuthenticatedMember loginMember) {
+        // 삭제·중복 복구와 경합할 때 판정 이후의 상태 변경까지 직렬화한다.
+        Post post = postRepository.findByIdForUpdate(id)
+                .orElseThrow(PostNotFoundException::new);
+        if (!post.getAuthor().getId().equals(loginMember.id())) {
+            throw new PostNotFoundException();
+        }
+        if (post.getDeletedAt() == null) {
+            throw new PostNotDeletedException();
+        }
+        if (!loginMember.id().equals(post.getDeletedBy())) {
+            throw new PostRestoreForbiddenException();
+        }
+        if (post.getDeletedAt().plusDays(RESTORE_DAYS).isBefore(LocalDateTime.now(clock))) {
+            throw new PostRestoreExpiredException();
+        }
+        // 삭제된 동안 금칙어가 추가됐으면 복구 전에 다시 검사한다.
+        Map<String, String> filtered = contentFilter.apply(fieldsOf(post.getTitle(), post.getContent()));
+        post.changeTitle(filtered.get("title"));
+        post.changeContent(filtered.get("content"));
+        post.restore();
+
+        post.getBoard().getSlug();
+        post.getAuthor().getNickname();
+        post.getTags().forEach(Tag::getName);
+        post.getImages().forEach(PostImage::getStoredName);
+        return post;
+    }
+
+    @Transactional
+    public void delete(Long id, AuthenticatedMember loginMember) {
+        // 발행과 삭제가 같은 글을 동시에 갱신하지 않도록 행을 잠근다.
+        Post post = postRepository.findByIdForUpdate(id)
+                .orElseThrow(PostNotFoundException::new);
+
+        // 404(볼 수 없음·이미 삭제됨) → 403(작성자도 운영자도 아님) 순서
+        if (!accessPolicy.canView(loginMember, post)) {
+            throw new PostNotFoundException();
+        }
+        boolean isAuthor = post.getAuthor().getId().equals(loginMember.id());
+        boolean isAdmin = ADMIN_ROLE.equals(loginMember.role());
+        if (!isAuthor && !isAdmin) {
+            throw new PostForbiddenException();
+        }
+
+        post.delete(LocalDateTime.now(clock), loginMember.id());
+    }
+
+    private static String readText(JsonNode value, String field, Map<String, String> errors) {
+        if (value == null || value.isNull()) return null;
+        if (!value.isTextual()) {
+            errors.put(field, field + "는 문자열이어야 합니다.");
+            return null;
+        }
+        return value.asText();
+    }
+
+    private static List<String> readTags(JsonNode value, Map<String, String> errors) {
+        if (value == null || value.isNull()) return null;
+        if (!value.isArray()) {
+            errors.put("tags", "태그는 문자열 배열이어야 합니다.");
+            return null;
+        }
+        List<String> tags = new java.util.ArrayList<>();
+        for (JsonNode tag : value) {
+            if (!tag.isTextual()) {
+                errors.put("tags", "태그는 문자열 배열이어야 합니다.");
+                return null;
+            }
+            tags.add(tag.asText());
+        }
+        return tags;
+    }
+
+    private static void collect(Map<String, String> errors, Runnable validation) {
+        try {
+            validation.run();
+        } catch (InvalidPostFieldException e) {
+            errors.put(e.getField(), e.getMessage());
+        }
+    }
+
+    private static List<String> sortedTagNames(Set<Tag> tags) {
+        return tags.stream().map(Tag::getName).sorted().toList();
+    }
+
+    private static Map<String, String> fieldsOf(String title, String content) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        fields.put("title", title);
+        fields.put("content", content);
+        return fields;
+    }
+
+    private static LocalDateTime parsePublishAt(JsonNode raw) {
+        if (raw == null || raw.isNull()) {
+            return null;
+        }
+        if (!raw.isTextual()) {
+            throw new InvalidPostFieldException("publishAt", "예약 시각은 yyyy-MM-ddTHH:mm:ss 문자열이어야 합니다.");
+        }
+        try {
+            return StrictDateTimes.parse(raw.asText());
+        } catch (IllegalArgumentException ex) {
+            throw new InvalidPostFieldException("publishAt", ex.getMessage());
+        }
+    }
+
+    // 지금보다 "뒤"(같은 시각은 안 됨) ~ 지금 + 30일까지(그 시각 자체는 됨)
+    private void validatePublishAt(LocalDateTime publishAt, LocalDateTime now) {
+        if (!publishAt.isAfter(now)) {
+            throw new InvalidPostFieldException("publishAt", "예약 시각은 지금(" + now + ")보다 뒤여야 합니다.");
+        }
+        if (publishAt.isAfter(now.plusDays(MAX_SCHEDULE_DAYS))) {
+            throw new InvalidPostFieldException("publishAt", "예약은 " + MAX_SCHEDULE_DAYS + "일 안쪽(" + now.plusDays(MAX_SCHEDULE_DAYS) + "까지)만 됩니다.");
+        }
+    }
+
+    private void validateTitle(String title) {
+        if (title.isBlank()) {
+            throw new InvalidPostFieldException("title", "제목을 입력해 주세요.");
+        }
+        if (title.length() > TITLE_MAX_LENGTH) {
+            throw new InvalidPostFieldException("title", "제목은 " + TITLE_MAX_LENGTH + "자 이하여야 합니다.");
+        }
+    }
+
+    private void validateContent(String content) {
+        if (content.isBlank()) {
+            throw new InvalidPostFieldException("content", "본문을 입력해 주세요.");
+        }
+    }
+
+    private void validateTags(List<String> tags) {
+        if (tags.size() > TAGS_MAX_COUNT) {
+            throw new InvalidPostFieldException("tags", "태그는 " + TAGS_MAX_COUNT + "개까지입니다.");
+        }
+        for (String tag : tags) {
+            if (tag == null || tag.isBlank() || tag.length() > TAG_NAME_MAX_LENGTH) {
+                throw new InvalidPostFieldException("tags", "태그 이름은 1~" + TAG_NAME_MAX_LENGTH + "자여야 합니다.");
+            }
+        }
+    }
+
+    private void validateVisibility(String visibility) {
+        if (!"PUBLIC".equals(visibility) && !"FOLLOWERS".equals(visibility)) {
+            throw new InvalidPostFieldException("visibility", "공개 범위는 PUBLIC 또는 FOLLOWERS여야 합니다.");
+        }
+    }
+
+    // 이름으로 찾고 없으면 만든다. 요청 안의 중복은 제거한다(1-4/1-5와 같은 규칙, 3-1에서도 재사용).
+    private Set<Tag> resolveTags(List<String> tagNames, LocalDateTime now) {
+        Set<Tag> tags = new LinkedHashSet<>();
+        for (String tagName : distinctTagNames(tagNames)) {
+            Tag tag = tagRepository.findByName(tagName)
+                    .orElseGet(() -> tagRepository.save(new Tag(tagName, now)));
+            tags.add(tag);
+        }
+        return tags;
+    }
+
+    private List<String> distinctTagNames(List<String> tags) {
+        if (tags == null) {
+            return List.of();
+        }
+        Set<String> seen = new LinkedHashSet<>(tags);
+        return List.copyOf(seen);
+    }
+}

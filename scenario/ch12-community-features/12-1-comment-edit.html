@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12-1. 댓글 수정 — &quot;수정됨&quot; 표시</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
+<link rel="stylesheet" href="../../tools/site/api-architecture.css?v=3925d2d57feb">
+<link rel="stylesheet" href="../../tools/site/scenario-visual.css?v=acace17043f4">
+<link rel="stylesheet" href="../../tools/site/scenario-code-workbench.css?v=6b63063b4651">
+<link rel="stylesheet" href="../../tools/site/lesson-atlas.css?v=72d1f0fcddbe">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../../index.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 12장. 소통 확장 — 수정·멘션·알림함·팔로우·신고 › 12-1</p><p class="level-tags"><span>중급</span><span>게시판 본편</span><span>DB practice</span></p>
+<h1 id="12-1-댓글-수정--수정됨-표시"><a class="anchor" href="#12-1-댓글-수정--수정됨-표시" aria-hidden="true">#</a>12-1. 댓글 수정 — &quot;수정됨&quot; 표시</h1><h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
+<p>사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.</p>
+<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>시나리오 화면</span><span class="mockup-live"><i></i> 단계 시안</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">사용자에게 보이는 상태</span><h3>글 상세 — 댓글 고치기</h3><p>내 댓글의 [수정]을 눌러 내용을 바꾸면 '수정됨'이 붙는다. 남의 댓글에는 [수정]이 없지만 서버도 막아야 한다.</p></div></div><div class="mock-screen" aria-label="글 상세 — 댓글 고치기 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>이직 준비 근황</strong><span>자바초보탈출</span></header><div class="mock-list" data-screen-id="comments"><span class="screen-widget-label">댓글</span><div class="mock-list-item tone-default" data-screen-id="c-mine"><span class="mock-list-main"><strong>[채점] 수정한 댓글</strong><small>자바초보탈출 · 방금 전 · 수정됨</small></span><span class="mock-list-badge">수정됨</span></div></div><div class="mock-control screen-field" data-screen-id="edit-box"><label>댓글 고치기</label><div class="mock-field mock-multiline">[채점] 수정한 댓글</div></div><div class="mock-actions" data-screen-id="buttons"><span class="mock-button mock-primary" data-screen-id="save">저장</span><span class="mock-button mock-ghost" data-screen-id="cancel">취소</span></div><div class="mock-toast tone-error" data-screen-id="toast-forbidden"><span class="mock-toast-icon" aria-hidden="true">!</span><span>본인 댓글만 수정할 수 있습니다.</span></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">화면 뒤에서 일어나는 일</span><h4>요청부터 응답까지</h4></div><span class="flow-hint">이 단계에 기록된 처리 순서를 보여줍니다.</span></div><div class="flow-tracks" aria-label="흐름별 요청 처리 경로"><div class="flow-route" aria-label="내 댓글 고치기"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="mysql" data-index="2"><span class="flow-node-number">3</span>MySQL</span><span class="flow-node" data-node="response" data-index="3"><span class="flow-node-number">4</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="4"><span class="flow-node-number">5</span>응답 반영</span></div><div class="flow-route" aria-label="남의 댓글 — 서버가 막는다"><span class="flow-node" data-node="client" data-index="0"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="response" data-index="2"><span class="flow-node-number">3</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="3"><span class="flow-node-number">4</span>응답 반영</span></div></div><p class="flow-swipe-hint">좌우로 밀어 전체 경로 보기 →</p><section class="implementation-route" aria-label="완성 코드의 역할별 구성"><div class="implementation-route-heading"><div><span class="scenario-kicker">실제 정답 파일 기준</span><h5>이 단계에서 만나는 Java 구성요소</h5></div><a href="#전체-구현-코드">코드 보기 ↗</a></div><div class="implementation-nodes"><div class="implementation-node"><strong>Controller</strong><small>CommentController.java</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>DTO</strong><small>CommentReplyResponse.java · CommentResponse.java · CommentThreadResponse.java · CommentUpdateRequest.java</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>Service</strong><small>CommentService.java</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>Repository</strong><small>CommentRepository.java</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>JPA · 영속성 컨텍스트</strong><small>런타임 · Repository 구현 뒤에서 동작</small></div><span class="implementation-arrow" aria-hidden="true">→</span><div class="implementation-node"><strong>MySQL</strong><small>시나리오 SQL의 대상 DB</small></div></div><p class="implementation-entities"><b>Entity 모델</b> Comment.java <span>· 흐름의 실행 단계가 아니라 DB 테이블과 매핑되는 객체입니다.</span></p><p class="implementation-disclaimer">파일의 역할 지도입니다. 위 흐름은 화면 JSON의 단계이며, 요청별 실제 호출 여부를 서버에서 추적한 결과는 아닙니다.</p></section><aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside><p class="flow-selection-status" role="status" aria-live="polite">카드를 선택하면 화면의 관련 요소와 계층이 강조됩니다.</p><div class="scenario-flows"><section class="scenario-flow" aria-label="내 댓글 고치기" data-flow-index="0"><h5>내 댓글 고치기<span class="scenario-flow-count">6단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="edit-box|save" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">내 댓글의 [수정]을 눌러 내용을 바꾸고 [저장]</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="PATCH" data-path="/api/comments/361" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-patch">PATCH</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/comments/361</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">PATCH /api/comments/361</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-p03 · Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;content&quot;: &quot;[채점] 수정한 댓글&quot;}</pre></details></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">댓글 찾기(지웠으면 404) → 그 글을 볼 수 있나(2-3 규칙, 아니면 404) → 작성자인가(아니면 403) → 내용이 다를 때만 바꾸고 edited_at을 찍는다</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> UPDATE comment SET content = '[채점] 수정한 댓글', edited_at = NOW(), updated_at = NOW() WHERE id = 361</span><span class="flow-step-detail"><b>note</b> 변경 감지(더티 체킹) — 내용이 같으면 UPDATE 자체가 나가지 않는다</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 200</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;id&quot;: 361, &quot;postId&quot;: 32, &quot;content&quot;: &quot;[채점] 수정한 댓글&quot;, &quot;edited&quot;: true, &quot;editedAt&quot;: &quot;2026-10-10T14:03:11&quot;, ...}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="c-mine" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">댓글 옆에 '수정됨'이 붙는다</span></button></li></ol></section><section class="scenario-flow" aria-label="남의 댓글 — 서버가 막는다" data-flow-index="1"><h5>남의 댓글 — 서버가 막는다<span class="scenario-flow-count">5단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">화면에는 [수정]이 없지만, 누군가 요청을 직접 만들어 보낸다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="PATCH" data-path="/api/comments/361" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-patch">PATCH</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/comments/361</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">PATCH /api/comments/361</span><span class="flow-step-details"><span class="flow-step-detail"><b>headers</b> Authorization: Bearer tok-p04 · Content-Type: application/json</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;content&quot;: &quot;남이 바꿈&quot;}</pre></details></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">댓글도 있고 글도 볼 수 있다 → 작성자가 아니다 → 403</span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> 403</span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{&quot;status&quot;: 403, &quot;detail&quot;: &quot;본인 댓글만 수정할 수 있습니다.&quot;}</pre></details></li><li><button type="button" class="flow-step" data-node="screen" data-nodes="screen" data-method="" data-path="" data-focus="toast-forbidden" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="screen">응답 반영</span></span><span class="flow-step-text">오류 토스트</span></button></li></ol></section></div></div></section><script>
+(() => {
+  for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
+    preview.dataset.flowReady = 'true';
+    const buttons = [...preview.querySelectorAll('.flow-step')];
+    const nodes = [...preview.querySelectorAll('.flow-node')];
+    const status = preview.querySelector('.flow-selection-status');
+    const labels = { client: '사용자 화면', request: 'HTTP 요청', server: '서버', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    let animation;
+    const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
+    const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
+    document.addEventListener('scenario:request', (event) => {
+      const detail = event.detail || {};
+      const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
+      if (!request) return;
+      stopAnimation();
+      request.closest('.scenario-flow').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'server', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
+      nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
+      if (detail.phase === 'start') {
+        const routeNodes = [...new Set(relevant)].filter((id) => !['client', 'screen', 'response'].includes(id));
+        let index = 0;
+        const activate = (nodeId) => {
+          nodes.forEach((node) => {
+            const nodeIndex = routeNodes.indexOf(node.dataset.node);
+            node.classList.toggle('is-past', nodeIndex >= 0 && nodeIndex < routeNodes.indexOf(nodeId));
+            node.classList.toggle('is-expected', node.dataset.node === nodeId);
+            node.classList.toggle('is-active', node.dataset.node === nodeId);
+          });
+        };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && routeNodes.length) {
+          activate(routeNodes[0]);
+          animation = setInterval(() => { index = (index + 1) % routeNodes.length; activate(routeNodes[index]); }, 620);
+        } else {
+          nodes.find((node) => node.dataset.node === 'request')?.classList.add('is-active');
+        }
+        status.textContent = '실제 HTTP 요청 전송 중 · 빛의 이동은 설계된 계층 순서이며 서버 내부 계측은 아닙니다.';
+      } else {
+        nodes.forEach((node) => node.classList.remove('is-expected', 'is-active'));
+        const failed = detail.phase === 'http-error' || detail.phase === 'error';
+        preview.querySelector('[data-node="response"]')?.classList.add(failed ? 'is-error' : 'is-active');
+        status.textContent = detail.phase === 'error'
+          ? '네트워크 요청 실패 · ' + (detail.message || '서버 주소와 요청 값을 확인하세요.')
+          : (failed ? '실제 HTTP 오류 응답 ' : '실제 HTTP 응답 ') + (detail.status || '') + ' · 내부 경로는 시나리오에 적힌 구현 예시이며 서버 실행 추적은 아닙니다.';
+      }
+    });
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      stopAnimation();
+      const selectedNodes = (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean);
+      const selected = selectedNodes[0];
+      buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      nodes.forEach((node) => {
+        const active = selectedNodes.includes(node.dataset.node);
+        node.classList.toggle('is-active', active);
+        node.classList.toggle('is-past', false);
+      });
+      preview.querySelectorAll('[data-screen-id]').forEach((item) => item.classList.remove('is-focus'));
+      for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
+        preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
+      }
+      status.textContent = (labels[selected] || button.querySelector('.flow-kind')?.textContent || '시나리오') + ' 단계 · ' + (button.querySelector('.flow-step-text')?.textContent.trim() || '세부 내용은 아래 설명을 확인하세요.');
+    }));
+  }
+})();
+</script>
+<blockquote>
+<p>학습용 DB(<code>practice</code>) — 앱을 <code>practice</code> 프로파일로 띄운다(8-1 참고, 11장은 <code>community</code>였다). 12장은 1~9장에서 만든 게시판에 사람 사이의 기능(수정·멘션·알림함·팔로우·피드·신고)을 붙인다.</p>
+</blockquote>
+<section class="api-map-stage" aria-label="이 단계의 API"><h3>이 단계에서 연결되는 API</h3><p class="api-map-stage-note">아래 역할과 파일은 완성 코드 기준입니다. 이번 단계의 작업 범위는 본문의 요구사항과 구현 가이드를 따르세요.</p><p class="api-map-stage-project"><strong>게시판 실습 프로젝트</strong></p><details class="api-map-route" id="community-board-stage-12-1-0"><summary><span class="api-map-method method-patch">PATCH</span><code>/api/comments/{id}</code><span class="api-map-route-feature">댓글</span></summary><div class="api-map-route-body"><div class="api-map-flow" aria-label="PATCH /api/comments/{id} 처리 흐름"><div class="api-map-node"><span class="api-map-node-label">요청 DTO · 선택</span><span class="api-map-node-files"><code>CommentUpdateRequest</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Controller</span><span class="api-map-node-files"><code>CommentController.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Service</span><span class="api-map-node-files"><code>CommentService.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Repository / Mapper</span><span class="api-map-node-files"><code>CommentRepository.java</code><br><code>MemberRepository.java</code><br><code>PostRepository.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Entity</span><span class="api-map-node-files"><code>Comment.java</code><br><code>Member.java</code><br><code>Post.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">응답 DTO · 선택</span><span class="api-map-node-files"><code>CommentResponse</code></span></div></div><p class="api-map-stages"><strong>시나리오</strong> <a href="12-1-comment-edit.html">12-1</a> · <a href="12-2-mention-notification.html">12-2</a> · <a href="../ch13-operations/13-4-banned-words.html">13-4</a></p></div></details><details class="api-map-route" id="community-board-stage-12-1-1"><summary><span class="api-map-method method-delete">DELETE</span><code>/api/comments/{id}</code><span class="api-map-route-feature">댓글</span></summary><div class="api-map-route-body"><div class="api-map-flow" aria-label="DELETE /api/comments/{id} 처리 흐름"><div class="api-map-node"><span class="api-map-node-label">Controller</span><span class="api-map-node-files"><code>CommentController.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Service</span><span class="api-map-node-files"><code>CommentService.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Repository / Mapper</span><span class="api-map-node-files"><code>CommentRepository.java</code><br><code>MemberRepository.java</code><br><code>PostRepository.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Entity</span><span class="api-map-node-files"><code>Comment.java</code><br><code>Member.java</code><br><code>Post.java</code></span></div></div><p class="api-map-stages"><strong>시나리오</strong> <a href="../ch5-comment/5-3-comment-list-delete.html">5-3</a> · <a href="12-1-comment-edit.html">12-1</a> · <a href="12-2-mention-notification.html">12-2</a> · <a href="../ch13-operations/13-3-member-suspension.html">13-3</a> · <a href="../ch13-operations/13-4-banned-words.html">13-4</a></p></div></details><details class="api-map-route" id="community-board-stage-12-1-2"><summary><span class="api-map-method method-get">GET</span><code>/api/posts/{postId}/comments</code><span class="api-map-route-feature">댓글</span></summary><div class="api-map-route-body"><div class="api-map-flow" aria-label="GET /api/posts/{postId}/comments 처리 흐름"><div class="api-map-node"><span class="api-map-node-label">Controller</span><span class="api-map-node-files"><code>CommentController.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Service</span><span class="api-map-node-files"><code>CommentService.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Repository / Mapper</span><span class="api-map-node-files"><code>CommentRepository.java</code><br><code>MemberRepository.java</code><br><code>PostRepository.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Entity</span><span class="api-map-node-files"><code>Comment.java</code><br><code>Member.java</code><br><code>Post.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">응답 DTO · 선택</span><span class="api-map-node-files"><code>CommentThreadResponse</code></span></div></div><p class="api-map-stages"><strong>시나리오</strong> <a href="../ch5-comment/5-0-comment-list.html">5-0</a> · <a href="../ch5-comment/5-3-comment-list-delete.html">5-3</a> · <a href="12-1-comment-edit.html">12-1</a> · <a href="../ch13-operations/13-2-report-handling.html">13-2</a></p></div></details><details class="api-map-route" id="community-board-stage-12-1-3"><summary><span class="api-map-method method-post">POST</span><code>/api/posts/{postId}/comments</code><span class="api-map-route-feature">댓글</span></summary><div class="api-map-route-body"><div class="api-map-flow" aria-label="POST /api/posts/{postId}/comments 처리 흐름"><div class="api-map-node"><span class="api-map-node-label">요청 DTO · 선택</span><span class="api-map-node-files"><code>CommentCreateRequest</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Controller</span><span class="api-map-node-files"><code>CommentController.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Service</span><span class="api-map-node-files"><code>CommentService.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Repository / Mapper</span><span class="api-map-node-files"><code>CommentRepository.java</code><br><code>MemberRepository.java</code><br><code>PostRepository.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">Entity</span><span class="api-map-node-files"><code>Comment.java</code><br><code>Member.java</code><br><code>Post.java</code></span></div><span class="api-map-arrow" aria-hidden="true">→</span><div class="api-map-node"><span class="api-map-node-label">응답 DTO · 선택</span><span class="api-map-node-files"><code>CommentResponse</code></span></div></div><details class="api-map-stage-list"><summary>연결된 시나리오 9개 · 처음 5-1</summary><div><a href="../ch5-comment/5-1-create-comment.html">5-1</a> · <a href="../ch5-comment/5-2-reply.html">5-2</a> · <a href="../ch5-comment/5-3-comment-list-delete.html">5-3</a> · <a href="../ch9-schema-change/9-4-notifications.html">9-4</a> · <a href="12-1-comment-edit.html">12-1</a> · <a href="12-2-mention-notification.html">12-2</a> · <a href="../ch13-operations/13-2-report-handling.html">13-2</a> · <a href="../ch13-operations/13-3-member-suspension.html">13-3</a> · <a href="../ch13-operations/13-4-banned-words.html">13-4</a></div></details></div></details></section><p class="api-map-link"><a href="../README.html#api-map-title">전체 API 구조도 보기</a></p><nav class="lesson-atlas" aria-label="12-1 학습 흐름"><div class="lesson-atlas-heading"><span>BUILD · RUN · UNDERSTAND</span><h2>이번 단계의 학습 흐름</h2><p>그림으로 요청의 경로를 먼저 본 다음, 필요한 절을 펼쳐 직접 만들고 확인하세요.</p></div><div class="lesson-atlas-track"><a class="lesson-atlas-stop lesson-understand" href="#상황"><b>01</b><span aria-hidden="true">◇</span><span><small>무엇을 만들까</small><strong>상황</strong></span></a><a class="lesson-atlas-stop lesson-understand" href="#만들-것"><b>02</b><span aria-hidden="true">◇</span><span><small>무엇을 만들까</small><strong>만들 것</strong></span></a><a class="lesson-atlas-stop lesson-build" href="#구현-가이드"><b>03</b><span aria-hidden="true">⌘</span><span><small>어떻게 만들까</small><strong>구현 가이드</strong></span></a><a class="lesson-atlas-stop lesson-build" href="#전체-구현-코드"><b>04</b><span aria-hidden="true">⌘</span><span><small>어떻게 만들까</small><strong>전체 구현 코드</strong></span></a><a class="lesson-atlas-stop lesson-build" href="#mybatis-대체-구현-코드"><b>05</b><span aria-hidden="true">⌘</span><span><small>어떻게 만들까</small><strong>MyBatis 대체 구현 코드</strong></span></a><a class="lesson-atlas-stop lesson-verify" href="#직접-확인"><b>06</b><span aria-hidden="true">↗</span><span><small>어떻게 확인할까</small><strong>직접 확인</strong></span></a><a class="lesson-atlas-stop lesson-verify" href="#채점-기준"><b>07</b><span aria-hidden="true">↗</span><span><small>어떻게 확인할까</small><strong>채점 기준</strong></span></a><a class="lesson-atlas-stop lesson-connect" href="#필요한-지식"><b>08</b><span aria-hidden="true">→</span><span><small>다음으로 연결</small><strong>필요한 지식</strong></span></a><a class="lesson-atlas-stop lesson-debug" href="#힌트-막힐-때만"><b>09</b><span aria-hidden="true">✳</span><span><small>막히면 확인</small><strong>힌트 (막힐 때만)</strong></span></a><a class="lesson-atlas-stop lesson-connect" href="#다음-단계"><b>10</b><span aria-hidden="true">→</span><span><small>다음으로 연결</small><strong>다음 단계</strong></span></a></div></nav><div class="lesson-scenes" aria-label="단계별 구현과 확인"><details class="lesson-scene lesson-understand" data-lesson-kind="understand">
+    <summary id="상황" aria-label="상황 내용 펼치기"><span class="lesson-scene-index">01</span><span class="lesson-scene-glyph" aria-hidden="true">◇</span><span class="lesson-scene-title"><small>무엇을 만들까</small><strong>상황</strong><em>"댓글 오타를 고칠 수가 없어서 지우고 다시 쓰는 분이 많아요. 수정할 수 있게 해 주세요. 대신 고친 댓글에는 '수정됨'을 꼭 붙여 주세요. 답글이 달린 뒤에 내용을 바꿔…</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<blockquote>
+<p>&quot;댓글 오타를 고칠 수가 없어서 지우고 다시 쓰는 분이 많아요. 수정할 수 있게 해 주세요. 대신 고친 댓글에는 &#39;수정됨&#39;을 꼭 붙여 주세요. 답글이 달린 뒤에 내용을 바꿔 버리면 대화가 엉뚱해지거든요.&quot;</p>
+</blockquote>
+<p>5장에서 댓글을 만들고(5-1) 지웠다(5-3). 이번에는 <strong>고치기</strong>다. 3-1(글 PATCH)과 비슷하지만 두 가지가 다르다.</p>
+<ul>
+<li>누가 고칠 수 있나 — 작성자만. 수정에서는 없거나 볼 수 없으면 404를 먼저 확인하고, 남의 댓글이면 403을 반환한다.</li>
+<li>&quot;수정됨&quot;을 무엇으로 판단하나 — <code>comment.updated_at</code>은 이미 있지만 5-3의 삭제도 이 값을 바꾼다. 그래서 &quot;수정했다&quot;는 사실만 담는 컬럼을 새로 둔다. 내용이 그대로인 요청은 수정이 아니다.</li>
+</ul>
+<blockquote>
+<p>글의 &quot;수정됨&quot;은 티켓 <a href="../../tickets/002-post-edited-flag.html">T-002</a>가 <code>updated_at</code>과 <code>created_at</code> 비교로 다룬다. 댓글은 삭제도 <code>updated_at</code>을 바꾸므로 같은 방법을 쓸 수 없다 — 이 차이가 이 단계의 핵심이다.</p>
+</blockquote>
+</div>
+  </details><details class="lesson-scene lesson-understand" data-lesson-kind="understand" open>
+    <summary id="만들-것" aria-label="만들 것 내용 펼치기"><span class="lesson-scene-index">02</span><span class="lesson-scene-glyph" aria-hidden="true">◇</span><span class="lesson-scene-title"><small>무엇을 만들까</small><strong>만들 것</strong><em>V30 — db/migration/V30__add_comment_edited_at.sql</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p><strong>V30</strong> — <code>db/migration/V30__add_comment_edited_at.sql</code></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>컬럼</th>
+<th>타입·규칙</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>comment.edited_at</code></td>
+<td><code>DATETIME NULL</code> — 내용을 실제로 바꾼 마지막 시각. 기존 댓글은 <code>NULL</code>(채울 값이 없다)</td>
+</tr>
+</tbody></table></div>
+<blockquote>
+<p>12장은 Flyway 번호 V30<del>V39를 쓴다(11장이 V20</del>V29). 장을 순서대로 하지 않아도 번호가 겹치지 않게 미리 나눠 둔 것이다.</p>
+</blockquote>
+<p><strong>API</strong> — <code>PATCH /api/comments/{id}</code> (토큰 필요)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>요청 본문</td>
+<td><code>{ &quot;content&quot;: &quot;...&quot; }</code> — 아래 필드 규칙(작성 5-1과 같다)</td>
+</tr>
+<tr>
+<td>응답 <code>200</code></td>
+<td>작성 응답(5-1)과 같은 모양 + <code>&quot;edited&quot;: true/false</code>, <code>&quot;editedAt&quot;: 시각 또는 null</code></td>
+</tr>
+<tr>
+<td>내용이 그대로</td>
+<td><code>200</code>, 아무것도 바꾸지 않는다 — 처음 쓴 그대로면 <code>edited</code>=false</td>
+</tr>
+<tr>
+<td><code>404</code></td>
+<td>없는 댓글, 지운 댓글, 볼 수 없는 글(2-3 규칙)의 댓글 — <strong>403보다 먼저</strong></td>
+</tr>
+<tr>
+<td><code>403</code></td>
+<td>남의 댓글</td>
+</tr>
+<tr>
+<td><code>401</code></td>
+<td>토큰 없음</td>
+</tr>
+</tbody></table></div>
+<p><strong>필드 규칙</strong> — 잘못된 입력은 저장 전에 막고 <code>500</code>이 나면 안 된다</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>필수</th>
+<th>null·빈 값</th>
+<th>길이·범위</th>
+<th>형식</th>
+<th>기본값</th>
+<th>틀렸을 때</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>content</code></td>
+<td>필수</td>
+<td>안 됨 — 없음·<code>null</code>·<code>&quot;&quot;</code>·공백만 모두 거절</td>
+<td>1~1000자(정확히 1000자는 성공, 1001자는 거절)</td>
+<td>문자열</td>
+<td>없음</td>
+<td><code>400</code>, <code>errors</code>에 <code>content</code></td>
+</tr>
+<tr>
+<td><code>{id}</code>(경로)</td>
+<td>필수</td>
+<td>—</td>
+<td>—</td>
+<td>숫자</td>
+<td>—</td>
+<td>숫자가 아니면 <code>400</code>, 없는 댓글 <code>404</code></td>
+</tr>
+<tr>
+<td>본문 전체</td>
+<td>필수</td>
+<td>—</td>
+<td>—</td>
+<td>JSON</td>
+<td>—</td>
+<td>JSON이 아니면 <code>400</code>; <code>content</code>가 숫자·배열이어도 문자열로 강제 변환하지 않고 <code>400</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>목록에도 표시</strong> — <code>GET /api/posts/{id}/comments</code>(5-3)의 최상위 댓글·답글 항목에 <code>&quot;edited&quot;</code>를 더한다. &quot;삭제된 댓글입니다&quot; 자리는 <code>false</code>. 다른 필드는 그대로다.</p>
+</div>
+  </details><details class="lesson-scene lesson-build" data-lesson-kind="build">
+    <summary id="구현-가이드" aria-label="구현 가이드 내용 펼치기"><span class="lesson-scene-index">03</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>구현 가이드</strong><em>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 만들 것 의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</em></span><span class="lesson-scene-count">8개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p>화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 <strong>만들 것</strong>의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.</p>
+<p>이 단계의 처리 흐름:</p>
+<ul>
+<li>댓글 찾기(지웠으면 404) → 그 글을 볼 수 있나(2-3 규칙, 아니면 404) → 작성자인가(아니면 403) → 내용이 다를 때만 바꾸고 edited_at을 찍는다</li>
+<li>변경 감지(더티 체킹) — 내용이 같으면 UPDATE 자체가 나가지 않는다</li>
+<li>댓글도 있고 글도 볼 수 있다 → 작성자가 아니다 → 403</li>
+</ul>
+<details>
+<summary>Controller — HTTP 연결</summary>
+
+<p><code>CommentController.java</code>. 매핑과 메서드의 입력·응답을 위 <strong>만들 것</strong>의 HTTP 계약과 대조한다. 이번 단계 매핑: <code>@PatchMapping(&quot;/api/comments/{id}&quot;)</code>. 변경된 메서드: <code>edit</code>.</p>
+<pre><code class="language-java">// 12-1 — 내용만 고친다. 응답은 작성(5-1)과 같은 모양 + 수정 여부
+    @PatchMapping(&quot;/api/comments/{id}&quot;)
+    public CommentResponse edit(@PathVariable Long id,
+                                @LoginMember AuthenticatedMember loginMember,
+                                @RequestBody CommentUpdateRequest request) {
+        return CommentResponse.from(commentService.edit(id, loginMember, request));
+    }</code></pre>
+</details>
+
+<details>
+<summary>DTO — 요청·응답 필드</summary>
+
+<p><code>CommentReplyResponse.java</code>, <code>CommentResponse.java</code>, <code>CommentThreadResponse.java</code>, <code>CommentUpdateRequest.java</code>. 원문 <code>JsonNode</code>의 타입을 검사한 뒤 작성(5-1)과 같은 길이·공백 규칙을 적용한다. 필드 이름·타입·검증·응답 형태를 위 <strong>만들 것</strong>과 대조한다.</p>
+<pre><code class="language-java">package org.example.comment;
+
+import org.example.post.InvalidParametersException;
+import tools.jackson.databind.JsonNode;
+
+import java.util.Map;
+
+// 원문 JSON 타입을 보존해 숫자·배열을 문자열로 강제 변환하지 않는다.
+// 작성(5-1)의 1~1000자·공백 금지 규칙을 수정에도 적용한다.
+public record CommentUpdateRequest(JsonNode content) {
+    public String validatedContent() {
+        if (content == null || content.isNull() || !content.isTextual()) {
+            throw new InvalidParametersException(Map.of(&quot;content&quot;, &quot;댓글은 문자열이어야 합니다.&quot;));
+        }
+        String value = content.asText();
+        if (value.isBlank()) {
+            throw new InvalidParametersException(Map.of(&quot;content&quot;, &quot;댓글을 입력해 주세요.&quot;));
+        }
+        if (value.length() &gt; 1000) {
+            throw new InvalidParametersException(Map.of(&quot;content&quot;, &quot;댓글은 1000자 이하여야 합니다.&quot;));
+        }
+        return value;
+    }
+}
+
+package org.example.comment;
+
+import java.time.LocalDateTime;
+
+public record CommentResponse(
+        Long id, Long postId, Long parentId, CommentAuthorResponse author,
+        String content, LocalDateTime createdAt, boolean deleted,
+        boolean edited, LocalDateTime editedAt
+) {
+    public static CommentResponse from(Comment comment) {
+        return new CommentResponse(comment.getId(), comment.getPost().getId(),
+                comment.getParent() == null ? null : comment.getParent().getId(),
+                new CommentAuthorResponse(comment.getMember().getId(),
+                        comment.getMember().getNickname()),
+                comment.getContent(), comment.getCreatedAt(), comment.getDeletedAt() != null,
+                comment.isEdited(), comment.getEditedAt());
+    }
+}
+
+package org.example.comment;
+
+import org.example.post.AuthorResponse;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+// 최상위 댓글 — 지워졌지만 살아 있는 답글이 있으면 author=null, deleted=true로 자리만 남긴다
+public record CommentThreadResponse(
+        Long id,
+        AuthorResponse author,
+        String content,
+        LocalDateTime createdAt,
+        boolean edited,
+        boolean deleted,
+        List&lt;CommentReplyResponse&gt; replies
+) {
+}</code></pre>
+</details>
+
+<details>
+<summary>Service — 처리 순서</summary>
+
+<p><code>CommentService.java</code>, <code>CommentRepository.java</code>. 댓글 행을 잠근 뒤 권한·내용을 검사하고 수정한다. 위 서버 처리 순서가 어디에서 검증·조회·상태 변경으로 이어지는지 따라간다. 변경된 메서드: <code>edit</code>. 트랜잭션 경계는 아래 코드의 <code>@Transactional</code> 위치에서 확인한다.</p>
+<pre><code class="language-java">// 12-1 — 작성자만 고친다. 확인 순서: 없거나 지운 댓글·볼 수 없는 글의 댓글 404 → 남의 댓글 403.
+    // 내용이 그대로면 아무것도 바꾸지 않는다(edited_at이 안 찍혀 &quot;수정됨&quot;이 붙지 않는다).
+    @Transactional
+    public Comment edit(Long commentId, AuthenticatedMember loginMember, CommentUpdateRequest request) {
+        Comment comment = commentRepository.findByIdForUpdate(commentId)
+                .filter(c -&gt; c.getDeletedAt() == null)
+                .orElseThrow(CommentNotFoundException::new);
+        if (!accessPolicy.canView(loginMember, comment.getPost())) {
+            throw new CommentNotFoundException();
+        }
+        if (!comment.getMember().getId().equals(loginMember.id())) {
+            throw new CommentForbiddenException(&quot;본인 댓글만 수정할 수 있습니다.&quot;);
+        }
+
+        comment.edit(request.validatedContent(), LocalDateTime.now());
+
+        // 컨트롤러가 세션 밖에서 DTO를 만든다 — 지연 로딩 연관을 미리 읽어 둔다
+        comment.getMember().getNickname();
+        comment.getPost().getId();
+        if (comment.getParent() != null) {
+            comment.getParent().getId();
+        }
+        return comment;
+    }</code></pre>
+</details>
+
+<details>
+<summary>JPA / Repository — 수정과 삭제의 행 잠금</summary>
+
+<p><code>CommentRepository.java</code>의 수정 조회는 같은 댓글의 수정·삭제를 직렬화한다. 삭제가 먼저 끝나면 수정은 지운 댓글을 보고 <code>404</code>, 수정이 먼저 끝나면 삭제가 그 뒤에 적용되어 댓글이 되살아나지 않는다.</p>
+<pre><code class="language-java">@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query(&quot;SELECT c FROM Comment c WHERE c.id = :id&quot;)
+Optional&lt;Comment&gt; findByIdForUpdate(@Param(&quot;id&quot;) Long id);</code></pre>
+</details>
+
+<details>
+<summary>Entity — 테이블·상태</summary>
+
+<p><code>Comment.java</code>. 실제 테이블의 컬럼·외래키와 엔티티 매핑을 대조한다. 변경된 메서드: <code>edit</code>.</p>
+<pre><code class="language-java">package org.example.comment;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import org.example.member.Member;
+import org.example.post.Post;
+
+import java.time.LocalDateTime;
+
+// 댓글 — parent_id가 있으면 답글(1단계까지만)
+@Entity
+@Table(name = &quot;comment&quot;)
+public class Comment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;post_id&quot;, nullable = false)
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;member_id&quot;, nullable = false)
+    private Member member;
+
+    // 자기 참조 — 부모 댓글(답글일 때만). 지연 로딩
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;parent_id&quot;)
+    private Comment parent;
+
+    @Column(nullable = false)
+    private String content;
+
+    @Column(name = &quot;created_at&quot;, nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = &quot;updated_at&quot;, nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Column(name = &quot;deleted_at&quot;)
+    private LocalDateTime deletedAt;
+
+    // 12-1 — 내용을 실제로 바꾼 마지막 시각. 한 번도 안 고쳤으면 null
+    @Column(name = &quot;edited_at&quot;)
+    private LocalDateTime editedAt;
+
+    protected Comment() {
+        // JPA
+    }
+
+    public Comment(Post post, Member member, Comment parent, String content, LocalDateTime now) {
+        this.post = post;
+        this.member = member;
+        this.parent = parent;
+        this.content = content;
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    // 내용이 같으면 아무것도 바꾸지 않는다(&quot;수정됨&quot;이 붙지 않는다). 바꿨으면 true
+    public boolean edit(String newContent, LocalDateTime now) {
+        if (this.content.equals(newContent)) {
+            return false;
+        }
+        this.content = newContent;
+        this.editedAt = now;
+        this.updatedAt = now;
+        return true;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Post getPost() {
+        return post;
+    }
+
+    public Member getMember() {
+        return member;
+    }
+
+    public Comment getParent() {
+        return parent;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public LocalDateTime getEditedAt() {
+        return editedAt;
+    }
+
+    public boolean isEdited() {
+        return editedAt != null;
+    }
+}</code></pre>
+</details>
+
+<details>
+<summary>Flyway / SQL — 스키마 변경</summary>
+
+<p><code>V30__add_comment_edited_at.sql</code>. 실행 순서와 DDL·백필 대상을 시나리오의 스키마 계약과 대조한다.</p>
+<pre><code class="language-sql">-- V30 — 댓글 수정(12-1). 수정한 시각을 따로 둔다.
+-- updated_at은 삭제(5-3)에도 바뀌므로 &quot;수정됨&quot; 판단에 쓸 수 없다 — 수정만 기록하는 컬럼이 필요하다.
+-- 기존 댓글은 수정한 적이 없으므로 NULL 그대로 둔다(채울 값이 없다).
+ALTER TABLE comment ADD COLUMN edited_at DATETIME NULL AFTER updated_at;</code></pre>
+</details>
+
+<details>
+<summary>예외 처리 — 실패 응답</summary>
+
+<p><code>CommentForbiddenException.java</code>. 예외가 어떤 HTTP 상태와 오류 본문으로 바뀌는지 실패 계약과 대조한다.</p>
+<pre><code class="language-java">package org.example.comment;
+
+// 댓글은 있지만(404 아님) 작성자가 아니라서 지울 수 없을 때 — 전역 핸들러가 403으로 변환한다
+public class CommentForbiddenException extends RuntimeException {
+
+    public CommentForbiddenException() {
+        super(&quot;본인 댓글만 삭제할 수 있습니다.&quot;);
+    }
+
+    public CommentForbiddenException(String message) {
+        super(message);
+    }
+}</code></pre>
+</details>
+<details>
+<summary>MyBatis Mapper — 댓글 수정 SQL 대체 구현</summary>
+
+<p>정답의 <strong>MyBatis 대체 구현 코드</strong> 토글에서 <code>CommentEditMapper.java</code>·<code>CommentEditMapper.xml</code>·수정된 <code>CommentService.java</code> 전문을 볼 수 있다. 작성자·글 공개 범위를 먼저 확인하고, Java에서 다른 내용인지 검사하고, SQL은 <code>deleted_at IS NULL</code>인 행만 바꾼다.</p>
+<pre><code class="language-xml">&lt;update id=&quot;editIfLive&quot;&gt;
+    UPDATE comment
+    SET content = #{content}, edited_at = #{now}, updated_at = #{now}
+    WHERE id = #{id} AND deleted_at IS NULL
+&lt;/update&gt;</code></pre>
+<p>Mapper가 행을 바꾼 뒤에는 <code>EntityManager.refresh(comment)</code>로 JPA가 관리하던 댓글을 다시 읽는다. 그래야 같은 트랜잭션의 응답에 새 내용과 <code>editedAt</code>이 들어간다. 값이 같으면 UPDATE하지 않는다. MySQL의 기본 문자열 비교는 대소문자를 무시할 수 있으므로 변경 여부는 행 잠금 뒤 Java <code>String.equals</code>로 판단한다.</p>
+</details>
+
+
+</div>
+  </details><details class="lesson-scene lesson-build" data-lesson-kind="build">
+    <summary id="전체-구현-코드" aria-label="전체 구현 코드 내용 펼치기"><span class="lesson-scene-index">04</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>전체 구현 코드</strong><em>이 단계에서 변경된 파일의 전문입니다.</em></span><span class="lesson-scene-count">10개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>이 단계에서 바뀐 파일</span><span>현재 전체 코드</span></div>
+<h3 id="이-단계에서-바뀐-파일"><a class="anchor" href="#이-단계에서-바뀐-파일" aria-hidden="true">#</a>이 단계에서 바뀐 파일</h3>
+<p>이 단계에서 변경된 파일의 전문입니다.</p>
+<div class="code-workbench" data-code-workbench><div class="code-workbench-source"><details class="code-file"><summary>Entity — src/main/java/org/example/comment/Comment.java</summary><pre><code>package org.example.comment;&#10;&#10;import jakarta.persistence.Column;&#10;import jakarta.persistence.Entity;&#10;import jakarta.persistence.FetchType;&#10;import jakarta.persistence.GeneratedValue;&#10;import jakarta.persistence.GenerationType;&#10;import jakarta.persistence.Id;&#10;import jakarta.persistence.JoinColumn;&#10;import jakarta.persistence.ManyToOne;&#10;import jakarta.persistence.Table;&#10;import org.example.member.Member;&#10;import org.example.post.Post;&#10;&#10;import java.time.LocalDateTime;&#10;&#10;// 댓글 — parent_id가 있으면 답글(1단계까지만)&#10;@Entity&#10;@Table(name = &quot;comment&quot;)&#10;public class Comment {&#10;&#10;    @Id&#10;    @GeneratedValue(strategy = GenerationType.IDENTITY)&#10;    private Long id;&#10;&#10;    @ManyToOne(fetch = FetchType.LAZY)&#10;    @JoinColumn(name = &quot;post_id&quot;, nullable = false)&#10;    private Post post;&#10;&#10;    @ManyToOne(fetch = FetchType.LAZY)&#10;    @JoinColumn(name = &quot;member_id&quot;, nullable = false)&#10;    private Member member;&#10;&#10;    // 자기 참조 — 부모 댓글(답글일 때만). 지연 로딩&#10;    @ManyToOne(fetch = FetchType.LAZY)&#10;    @JoinColumn(name = &quot;parent_id&quot;)&#10;    private Comment parent;&#10;&#10;    @Column(nullable = false)&#10;    private String content;&#10;&#10;    @Column(name = &quot;created_at&quot;, nullable = false)&#10;    private LocalDateTime createdAt;&#10;&#10;    @Column(name = &quot;updated_at&quot;, nullable = false)&#10;    private LocalDateTime updatedAt;&#10;&#10;    @Column(name = &quot;deleted_at&quot;)&#10;    private LocalDateTime deletedAt;&#10;&#10;    // 12-1 — 내용을 실제로 바꾼 마지막 시각. 한 번도 안 고쳤으면 null&#10;    @Column(name = &quot;edited_at&quot;)&#10;    private LocalDateTime editedAt;&#10;&#10;    protected Comment() {&#10;        // JPA&#10;    }&#10;&#10;    public Comment(Post post, Member member, Comment parent, String content, LocalDateTime now) {&#10;        this.post = post;&#10;        this.member = member;&#10;        this.parent = parent;&#10;        this.content = content;&#10;        this.createdAt = now;&#10;        this.updatedAt = now;&#10;    }&#10;&#10;    // 내용이 같으면 아무것도 바꾸지 않는다(&quot;수정됨&quot;이 붙지 않는다). 바꿨으면 true&#10;    public boolean edit(String newContent, LocalDateTime now) {&#10;        if (this.content.equals(newContent)) {&#10;            return false;&#10;        }&#10;        this.content = newContent;&#10;        this.editedAt = now;&#10;        this.updatedAt = now;&#10;        return true;&#10;    }&#10;&#10;    public Long getId() {&#10;        return id;&#10;    }&#10;&#10;    public Post getPost() {&#10;        return post;&#10;    }&#10;&#10;    public Member getMember() {&#10;        return member;&#10;    }&#10;&#10;    public Comment getParent() {&#10;        return parent;&#10;    }&#10;&#10;    public String getContent() {&#10;        return content;&#10;    }&#10;&#10;    public LocalDateTime getCreatedAt() {&#10;        return createdAt;&#10;    }&#10;&#10;    public LocalDateTime getUpdatedAt() {&#10;        return updatedAt;&#10;    }&#10;&#10;    public LocalDateTime getDeletedAt() {&#10;        return deletedAt;&#10;    }&#10;&#10;    public LocalDateTime getEditedAt() {&#10;        return editedAt;&#10;    }&#10;&#10;    public boolean isEdited() {&#10;        return editedAt != null;&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Controller / 요청 — src/main/java/org/example/comment/CommentController.java</summary><pre><code>package org.example.comment;&#10;&#10;import jakarta.validation.Valid;&#10;import org.example.auth.AuthenticatedMember;&#10;import org.example.auth.LoginMember;&#10;import org.springframework.http.HttpStatus;&#10;import org.springframework.http.ResponseEntity;&#10;import org.springframework.web.bind.annotation.DeleteMapping;&#10;import org.springframework.web.bind.annotation.GetMapping;&#10;import org.springframework.web.bind.annotation.PatchMapping;&#10;import org.springframework.web.bind.annotation.PathVariable;&#10;import org.springframework.web.bind.annotation.PostMapping;&#10;import org.springframework.web.bind.annotation.RequestBody;&#10;import org.springframework.web.bind.annotation.ResponseStatus;&#10;import org.springframework.web.bind.annotation.RestController;&#10;&#10;import java.net.URI;&#10;import java.util.List;&#10;&#10;@RestController&#10;public class CommentController {&#10;&#10;    private final CommentService commentService;&#10;&#10;    public CommentController(CommentService commentService) {&#10;        this.commentService = commentService;&#10;    }&#10;&#10;    @PostMapping(&quot;/api/posts/{postId}/comments&quot;)&#10;    public ResponseEntity&lt;CommentResponse&gt; create(@PathVariable Long postId,&#10;                                                   @LoginMember AuthenticatedMember loginMember,&#10;                                                   @Valid @RequestBody CommentCreateRequest request) {&#10;        Comment comment = commentService.create(postId, loginMember, request);&#10;        return ResponseEntity.created(URI.create(&quot;/api/comments/&quot; + comment.getId())).body(CommentResponse.from(comment));&#10;    }&#10;&#10;    // 조회는 토큰 없이도 된다(있으면 그 회원 기준 — 차단 규칙 적용)&#10;    @GetMapping(&quot;/api/posts/{postId}/comments&quot;)&#10;    public List&lt;CommentThreadResponse&gt; list(@PathVariable Long postId, @LoginMember AuthenticatedMember viewer) {&#10;        return commentService.list(postId, viewer);&#10;    }&#10;&#10;    // 12-1 — 내용만 고친다. 응답은 작성(5-1)과 같은 모양 + 수정 여부&#10;    @PatchMapping(&quot;/api/comments/{id}&quot;)&#10;    public CommentResponse edit(@PathVariable Long id,&#10;                                @LoginMember AuthenticatedMember loginMember,&#10;                                @RequestBody CommentUpdateRequest request) {&#10;        return CommentResponse.from(commentService.edit(id, loginMember, request));&#10;    }&#10;&#10;    @DeleteMapping(&quot;/api/comments/{id}&quot;)&#10;    @ResponseStatus(HttpStatus.NO_CONTENT)&#10;    public void delete(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {&#10;        commentService.delete(id, loginMember);&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Java / 보조 코드 — src/main/java/org/example/comment/CommentForbiddenException.java</summary><pre><code>package org.example.comment;&#10;&#10;// 댓글은 있지만(404 아님) 작성자가 아니라서 지울 수 없을 때 — 전역 핸들러가 403으로 변환한다&#10;public class CommentForbiddenException extends RuntimeException {&#10;&#10;    public CommentForbiddenException() {&#10;        super(&quot;본인 댓글만 삭제할 수 있습니다.&quot;);&#10;    }&#10;&#10;    public CommentForbiddenException(String message) {&#10;        super(message);&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>DTO — src/main/java/org/example/comment/CommentReplyResponse.java</summary><pre><code>package org.example.comment;&#10;&#10;import org.example.post.AuthorResponse;&#10;&#10;import java.time.LocalDateTime;&#10;&#10;// 답글은 지워졌거나 차단된 것은 아예 목록에서 빠지므로 deleted 필드가 필요 없다&#10;public record CommentReplyResponse(&#10;        Long id,&#10;        AuthorResponse author,&#10;        String content,&#10;        LocalDateTime createdAt,&#10;        boolean edited&#10;) {&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Repository / DB 접근 — src/main/java/org/example/comment/CommentRepository.java</summary><pre><code>package org.example.comment;&#10;&#10;import jakarta.persistence.LockModeType;&#10;import org.springframework.data.jpa.repository.Lock;&#10;&#10;import org.springframework.data.jpa.repository.JpaRepository;&#10;import org.springframework.data.jpa.repository.Modifying;&#10;import org.springframework.data.jpa.repository.Query;&#10;import org.springframework.data.repository.query.Param;&#10;&#10;import java.util.List;&#10;import java.util.Optional;&#10;import java.time.LocalDateTime;&#10;&#10;public interface CommentRepository extends JpaRepository&lt;Comment, Long&gt; {&#10;    // 수정과 삭제를 같은 행에서 직렬화해 삭제된 댓글을 뒤늦은 UPDATE가 되살리지 못하게 한다.&#10;    @Lock(LockModeType.PESSIMISTIC_WRITE)&#10;    @Query(&quot;SELECT c FROM Comment c WHERE c.id = :id&quot;)&#10;    Optional&lt;Comment&gt; findByIdForUpdate(@Param(&quot;id&quot;) Long id);&#10;&#10;    @Query(&quot;&quot;&quot;&#10;            SELECT c FROM Comment c JOIN FETCH c.member&#10;            WHERE c.post.id = :postId AND c.parent IS NULL AND c.deletedAt IS NULL&#10;            ORDER BY c.createdAt ASC, c.id ASC&#10;            &quot;&quot;&quot;)&#10;    List&lt;Comment&gt; findTopLevel(@Param(&quot;postId&quot;) Long postId);&#10;&#10;    // 작성자와 함께 한 번에 읽는다 — 댓글마다 작성자를 따로 조회하지 않는다(N+1 방지)&#10;    @Query(&quot;SELECT c FROM Comment c JOIN FETCH c.member WHERE c.post.id = :postId ORDER BY c.createdAt ASC, c.id ASC&quot;)&#10;    List&lt;Comment&gt; findByPostIdWithMember(@Param(&quot;postId&quot;) Long postId);&#10;&#10;    // 동시 DELETE 중 실제로 처음 지운 요청만 1행을 변경한다.&#10;    @Modifying&#10;    @Query(&quot;UPDATE Comment c SET c.deletedAt = :now, c.updatedAt = :now &quot; +&#10;            &quot;WHERE c.id = :id AND c.deletedAt IS NULL&quot;)&#10;    int softDeleteIfLive(@Param(&quot;id&quot;) Long id, @Param(&quot;now&quot;) LocalDateTime now);&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>DTO — src/main/java/org/example/comment/CommentResponse.java</summary><pre><code>package org.example.comment;&#10;&#10;import java.time.LocalDateTime;&#10;&#10;public record CommentResponse(&#10;        Long id, Long postId, Long parentId, CommentAuthorResponse author,&#10;        String content, LocalDateTime createdAt, boolean deleted,&#10;        boolean edited, LocalDateTime editedAt&#10;) {&#10;    public static CommentResponse from(Comment comment) {&#10;        return new CommentResponse(comment.getId(), comment.getPost().getId(),&#10;                comment.getParent() == null ? null : comment.getParent().getId(),&#10;                new CommentAuthorResponse(comment.getMember().getId(),&#10;                        comment.getMember().getNickname()),&#10;                comment.getContent(), comment.getCreatedAt(), comment.getDeletedAt() != null,&#10;                comment.isEdited(), comment.getEditedAt());&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/comment/CommentService.java</summary><pre><code>package org.example.comment;&#10;&#10;import org.example.auth.AuthenticatedMember;&#10;import org.example.member.Member;&#10;import org.example.member.MemberRepository;&#10;import org.example.post.Post;&#10;import org.example.post.PostAccessPolicy;&#10;import org.example.post.PostNotFoundException;&#10;import org.example.notification.CommentCreatedEvent;&#10;import org.example.post.AuthorResponse;&#10;import org.example.post.PostRepository;&#10;import org.example.social.BlockPolicy;&#10;import org.springframework.context.ApplicationEventPublisher;&#10;import org.springframework.stereotype.Service;&#10;import org.springframework.transaction.annotation.Transactional;&#10;&#10;import java.time.LocalDateTime;&#10;import java.util.ArrayList;&#10;import java.util.LinkedHashMap;&#10;import java.util.List;&#10;import java.util.Map;&#10;import java.util.Set;&#10;import java.util.stream.Collectors;&#10;&#10;@Service&#10;public class CommentService {&#10;&#10;    private static final String PUBLISHED = &quot;PUBLISHED&quot;;&#10;&#10;    private final CommentRepository commentRepository;&#10;    private final PostRepository postRepository;&#10;    private final MemberRepository memberRepository;&#10;    private final PostAccessPolicy accessPolicy;&#10;    private final BlockPolicy blockPolicy;&#10;    private final ApplicationEventPublisher eventPublisher;&#10;&#10;    public CommentService(CommentRepository commentRepository, PostRepository postRepository,&#10;                           MemberRepository memberRepository, PostAccessPolicy accessPolicy,&#10;                           BlockPolicy blockPolicy, ApplicationEventPublisher eventPublisher) {&#10;        this.commentRepository = commentRepository;&#10;        this.postRepository = postRepository;&#10;        this.memberRepository = memberRepository;&#10;        this.accessPolicy = accessPolicy;&#10;        this.blockPolicy = blockPolicy;&#10;        this.eventPublisher = eventPublisher;&#10;    }&#10;&#10;    // 댓글 저장과 comment_count 증가를 한 트랜잭션으로 묶는다 — 둘 중 하나만 반영되면 숫자가 틀어진다&#10;    @Transactional&#10;    public Comment create(Long postId, AuthenticatedMember loginMember, CommentCreateRequest request) {&#10;        Post post = findCommentablePost(postId, loginMember);&#10;        Comment parent = resolveParent(postId, request.parentId());&#10;&#10;        Member author = memberRepository.getReferenceById(loginMember.id());&#10;        Comment saved = commentRepository.save(new Comment(post, author, parent, request.content(), LocalDateTime.now()));&#10;        postRepository.incrementCommentCount(postId);&#10;        // 9-4: 글 작성자에게 COMMENT 알림(자기 글에 자기 댓글은 리스너 쪽에서 거른다). 같은 트랜잭션에서 만든다&#10;        eventPublisher.publishEvent(new CommentCreatedEvent(postId, saved.getId(), loginMember.id()));&#10;&#10;        // 트랜잭션 안에서 지연 로딩 연관을 미리 읽어 둔다(컨트롤러가 세션 밖에서 DTO를 만든다)&#10;        saved.getMember().getNickname();&#10;        return saved;&#10;    }&#10;&#10;    // 12-1 — 작성자만 고친다. 확인 순서: 없거나 지운 댓글·볼 수 없는 글의 댓글 404 → 남의 댓글 403.&#10;    // 내용이 그대로면 아무것도 바꾸지 않는다(edited_at이 안 찍혀 &quot;수정됨&quot;이 붙지 않는다).&#10;    @Transactional&#10;    public Comment edit(Long commentId, AuthenticatedMember loginMember, CommentUpdateRequest request) {&#10;        Comment comment = commentRepository.findByIdForUpdate(commentId)&#10;                .filter(c -&gt; c.getDeletedAt() == null)&#10;                .orElseThrow(CommentNotFoundException::new);&#10;        if (!accessPolicy.canView(loginMember, comment.getPost())) {&#10;            throw new CommentNotFoundException();&#10;        }&#10;        if (!comment.getMember().getId().equals(loginMember.id())) {&#10;            throw new CommentForbiddenException(&quot;본인 댓글만 수정할 수 있습니다.&quot;);&#10;        }&#10;&#10;        comment.edit(request.validatedContent(), LocalDateTime.now());&#10;&#10;        // 컨트롤러가 세션 밖에서 DTO를 만든다 — 지연 로딩 연관을 미리 읽어 둔다&#10;        comment.getMember().getNickname();&#10;        comment.getPost().getId();&#10;        if (comment.getParent() != null) {&#10;            comment.getParent().getId();&#10;        }&#10;        return comment;&#10;    }&#10;&#10;    // 작성자만 지운다(soft delete). 없거나 이미 지운 댓글은 404, 남의 댓글은 403.&#10;    // comment_count 감소는 같은 트랜잭션에서 원자적으로 한다.&#10;    @Transactional&#10;    public void delete(Long commentId, AuthenticatedMember loginMember) {&#10;        Comment comment = commentRepository.findById(commentId)&#10;                .filter(c -&gt; c.getDeletedAt() == null)&#10;                .orElseThrow(CommentNotFoundException::new);&#10;&#10;        if (!comment.getMember().getId().equals(loginMember.id())) {&#10;            throw new CommentForbiddenException();&#10;        }&#10;&#10;        // 앞선 읽기와 별개로 DB에서 deleted_at IS NULL을 다시 검사한다.&#10;        // 동시에 같은 댓글을 지울 때 한 요청만 1행을 변경하고 댓글 수를 내린다.&#10;        if (commentRepository.softDeleteIfLive(commentId, LocalDateTime.now()) != 1) {&#10;            throw new CommentNotFoundException();&#10;        }&#10;        if (postRepository.decrementCommentCount(comment.getPost().getId()) != 1) {&#10;            throw new IllegalStateException(&quot;댓글 수 변경 실패&quot;);&#10;        }&#10;    }&#10;&#10;    // 그 글의 댓글을 작성자와 함께 한 번에 읽어(N+1 없음) 메모리에서 트리로 조립한다.&#10;    // 표시 규칙: 지운 최상위는 살아 있는 답글이 있을 때만 &quot;삭제된 댓글입니다&quot; 자리를 남긴다,&#10;    // 지운 답글은 뺀다, 보는 사람과 차단 관계인 회원의 댓글은 뺀다(최상위면 답글까지).&#10;    @Transactional(readOnly = true)&#10;    public List&lt;CommentThreadResponse&gt; list(Long postId, AuthenticatedMember viewer) {&#10;        Post post = postRepository.findById(postId)&#10;                .orElseThrow(PostNotFoundException::new);&#10;        if (!accessPolicy.canView(viewer, post)) {&#10;            throw new PostNotFoundException();&#10;        }&#10;&#10;        List&lt;Comment&gt; all = commentRepository.findByPostIdWithMember(postId);&#10;        Long viewerId = viewer == null ? null : viewer.id();&#10;        Set&lt;Long&gt; blockedMemberIds = viewerId == null ? Set.of() : blockPolicy.blockRelatedIds(viewerId);&#10;&#10;        Map&lt;Long, List&lt;Comment&gt;&gt; repliesByParent = all.stream()&#10;                .filter(c -&gt; c.getParent() != null)&#10;                .collect(Collectors.groupingBy(c -&gt; c.getParent().getId(), LinkedHashMap::new, Collectors.toList()));&#10;&#10;        List&lt;CommentThreadResponse&gt; result = new ArrayList&lt;&gt;();&#10;        for (Comment top : all) {&#10;            if (top.getParent() != null) {&#10;                continue; // 답글은 부모와 함께 처리&#10;            }&#10;            if (blockedMemberIds.contains(top.getMember().getId())) {&#10;                continue; // 차단 — 최상위째 뺀다(답글도 함께)&#10;            }&#10;&#10;            // &quot;살아 있는 답글&quot;은 지운 것·차단으로 빠지는 것을 제외하고 센다&#10;            List&lt;Comment&gt; visibleReplies = repliesByParent.getOrDefault(top.getId(), List.of()).stream()&#10;                    .filter(r -&gt; r.getDeletedAt() == null)&#10;                    .filter(r -&gt; !blockedMemberIds.contains(r.getMember().getId()))&#10;                    .toList();&#10;&#10;            boolean deleted = top.getDeletedAt() != null;&#10;            if (deleted &amp;&amp; visibleReplies.isEmpty()) {&#10;                continue; // 지웠고 남은 답글도 없으면 자리도 남기지 않는다&#10;            }&#10;&#10;            List&lt;CommentReplyResponse&gt; replies = visibleReplies.stream()&#10;                    .map(r -&gt; new CommentReplyResponse(r.getId(), toAuthor(r.getMember()), r.getContent(), r.getCreatedAt(),&#10;                            r.isEdited()))&#10;                    .toList();&#10;&#10;            result.add(new CommentThreadResponse(&#10;                    top.getId(),&#10;                    deleted ? null : toAuthor(top.getMember()),&#10;                    deleted ? &quot;삭제된 댓글입니다&quot; : top.getContent(),&#10;                    top.getCreatedAt(),&#10;                    !deleted &amp;&amp; top.isEdited(),&#10;                    deleted,&#10;                    replies&#10;            ));&#10;        }&#10;        return result;&#10;    }&#10;&#10;    // 볼 수 있는 PUBLISHED 글인가 — 아니면 404(4-1 LikeService.findLikeablePost와 같은 규칙)&#10;    private Post findCommentablePost(Long postId, AuthenticatedMember loginMember) {&#10;        Post post = postRepository.findById(postId)&#10;                .orElseThrow(PostNotFoundException::new);&#10;        if (!accessPolicy.canView(loginMember, post) || !PUBLISHED.equals(post.getStatus())) {&#10;            throw new PostNotFoundException();&#10;        }&#10;        return post;&#10;    }&#10;&#10;    // 부모 댓글 검증 — 같은 글의, 최상위, 지워지지 않은 댓글이어야 한다.&#10;    // 부모가 없으면 404(CommentNotFoundException), 있는데 규칙에 안 맞으면 400(InvalidParentCommentException).&#10;    private Comment resolveParent(Long postId, Long parentId) {&#10;        if (parentId == null) {&#10;            return null;&#10;        }&#10;        Comment parent = commentRepository.findById(parentId)&#10;                .orElseThrow(CommentNotFoundException::new);&#10;        if (!parent.getPost().getId().equals(postId)) {&#10;            throw new InvalidParentCommentException(&quot;다른 글의 댓글에는 답글을 달 수 없습니다.&quot;);&#10;        }&#10;        if (parent.getParent() != null) {&#10;            throw new InvalidParentCommentException(&quot;답글에는 답글을 달 수 없습니다.&quot;);&#10;        }&#10;        if (parent.getDeletedAt() != null) {&#10;            throw new InvalidParentCommentException(&quot;지워진 댓글에는 답글을 달 수 없습니다.&quot;);&#10;        }&#10;        return parent;&#10;    }&#10;&#10;    private AuthorResponse toAuthor(Member member) {&#10;        return new AuthorResponse(member.getId(), member.getNickname());&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>DTO — src/main/java/org/example/comment/CommentThreadResponse.java</summary><pre><code>package org.example.comment;&#10;&#10;import org.example.post.AuthorResponse;&#10;&#10;import java.time.LocalDateTime;&#10;import java.util.List;&#10;&#10;// 최상위 댓글 — 지워졌지만 살아 있는 답글이 있으면 author=null, deleted=true로 자리만 남긴다&#10;public record CommentThreadResponse(&#10;        Long id,&#10;        AuthorResponse author,&#10;        String content,&#10;        LocalDateTime createdAt,&#10;        boolean edited,&#10;        boolean deleted,&#10;        List&lt;CommentReplyResponse&gt; replies&#10;) {&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>DTO — src/main/java/org/example/comment/CommentUpdateRequest.java</summary><pre><code>package org.example.comment;&#10;&#10;import org.example.post.InvalidParametersException;&#10;import tools.jackson.databind.JsonNode;&#10;&#10;import java.util.Map;&#10;&#10;// 원문 JSON 타입을 보존해 숫자·배열을 문자열로 강제 변환하지 않는다.&#10;// 작성(5-1)의 1~1000자·공백 금지 규칙을 수정에도 적용한다.&#10;public record CommentUpdateRequest(JsonNode content) {&#10;    public String validatedContent() {&#10;        if (content == null || content.isNull() || !content.isTextual()) {&#10;            throw new InvalidParametersException(Map.of(&quot;content&quot;, &quot;댓글은 문자열이어야 합니다.&quot;));&#10;        }&#10;        String value = content.asText();&#10;        if (value.isBlank()) {&#10;            throw new InvalidParametersException(Map.of(&quot;content&quot;, &quot;댓글을 입력해 주세요.&quot;));&#10;        }&#10;        if (value.length() &gt; 1000) {&#10;            throw new InvalidParametersException(Map.of(&quot;content&quot;, &quot;댓글은 1000자 이하여야 합니다.&quot;));&#10;        }&#10;        return value;&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>DB / SQL — src/main/resources/db/migration/V30__add_comment_edited_at.sql</summary><pre><code>-- V30 — 댓글 수정(12-1). 수정한 시각을 따로 둔다.&#10;-- updated_at은 삭제(5-3)에도 바뀌므로 &quot;수정됨&quot; 판단에 쓸 수 없다 — 수정만 기록하는 컬럼이 필요하다.&#10;-- 기존 댓글은 수정한 적이 없으므로 NULL 그대로 둔다(채울 값이 없다).&#10;ALTER TABLE comment ADD COLUMN edited_at DATETIME NULL AFTER updated_at;&#10;</code></pre></details></div></div>
+
+<h3 id="현재-전체-코드"><a class="anchor" href="#현재-전체-코드" aria-hidden="true">#</a>현재 전체 코드</h3>
+<p>현재 시나리오의 전체 구현입니다. 역할을 펼친 뒤 파일을 열어 전문을 불러오세요.</p>
+<details class="cumulative-code" data-snapshot-url="../snapshots/12-1.json"><summary>현재 전체 코드 불러오기</summary><p class="snapshot-status" role="status" aria-live="polite">열면 코드 목록을 불러옵니다.</p><div class="snapshot-content"></div></details>
+
+</div>
+  </details><details class="lesson-scene lesson-build" data-lesson-kind="build">
+    <summary id="mybatis-대체-구현-코드" aria-label="MyBatis 대체 구현 코드 내용 펼치기"><span class="lesson-scene-index">05</span><span class="lesson-scene-glyph" aria-hidden="true">⌘</span><span class="lesson-scene-title"><small>어떻게 만들까</small><strong>MyBatis 대체 구현 코드</strong><em>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</em></span><span class="lesson-scene-count">5개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p>기본 JPA 구현과 같은 HTTP 계약을 지키는 선택 경로입니다.</p>
+<div class="code-workbench" data-code-workbench><div class="code-workbench-source"><details class="code-file"><summary>설정 / 기타 — build.gradle</summary><pre><code>plugins {&#10;    id 'java'&#10;    // bootRun / bootJar 태스크 제공 + 실행 가능한 fat jar 패키징&#10;    id 'org.springframework.boot' version '4.1.1'&#10;    // Boot BOM을 적용해서 아래 의존성들의 버전을 생략할 수 있게 해줌&#10;    id 'io.spring.dependency-management' version '1.1.7'&#10;}&#10;&#10;group = 'org.example'&#10;version = '1.0-SNAPSHOT'&#10;&#10;java {&#10;    toolchain {&#10;        // 컴파일·실행 JDK를 고정 (Boot 4는 Java 17 이상 필요, 로컬에 설치된 21 사용)&#10;        languageVersion = JavaLanguageVersion.of(21)&#10;    }&#10;}&#10;&#10;repositories {&#10;    mavenCentral()&#10;}&#10;&#10;dependencies {&#10;    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'&#10;    compileOnly 'org.projectlombok:lombok'&#10;    annotationProcessor 'org.projectlombok:lombok'&#10;    // Spring MVC + 내장 Tomcat + Jackson (Boot 4부터 starter-web → starter-webmvc로 이름 변경)&#10;    implementation 'org.springframework.boot:spring-boot-starter-webmvc'&#10;    // JPA(Hibernate) + HikariCP 커넥션 풀&#10;    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'&#10;    // @Valid, @NotBlank 같은 요청 값 검증&#10;    implementation 'org.springframework.boot:spring-boot-starter-validation'&#10;    // MySQL JDBC 드라이버 — 컴파일엔 필요 없고 실행할 때만 필요&#10;    runtimeOnly 'com.mysql:mysql-connector-j'&#10;    // 9-1 스키마 변경은 Flyway 마이그레이션(db/migration)으로만 한다&#10;    implementation 'org.springframework.boot:spring-boot-starter-flyway'&#10;    runtimeOnly 'org.flywaydb:flyway-mysql'&#10;&#10;    // 테스트: JUnit·AssertJ·Mockito·MockMvc 묶음 (버전은 Boot BOM이 관리하므로 junit-bom 따로 두지 않음)&#10;    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'&#10;    // @DataJpaTest(리포지토리만 띄우는 테스트)&#10;    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'&#10;    // 테스트용 일회용 MySQL 컨테이너 — application-test.yml의 jdbc:tc: URL이 쓴다&#10;    testImplementation 'org.testcontainers:testcontainers-mysql'&#10;    // Gradle이 JUnit Platform 테스트를 실행할 때 필요한 런처&#10;    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'&#10;}&#10;&#10;tasks.named('test') {&#10;    useJUnitPlatform()&#10;    // 테스트는 application-test.yml(Testcontainers MySQL)을 쓰게 한다&#10;    systemProperty 'spring.profiles.active', 'test'&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>MyBatis / Mapper — src/main/java/org/example/comment/CommentEditMapper.java</summary><pre><code>package org.example.comment;&#10;&#10;import org.apache.ibatis.annotations.Mapper;&#10;import org.apache.ibatis.annotations.Param;&#10;&#10;import java.time.LocalDateTime;&#10;&#10;// 수정 대상이 살아 있고 실제 내용이 다를 때에만 UPDATE한다.&#10;@Mapper&#10;public interface CommentEditMapper {&#10;    int editIfLive(@Param(&quot;id&quot;) Long id, @Param(&quot;content&quot;) String content,&#10;                   @Param(&quot;now&quot;) LocalDateTime now);&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>Service / 규칙 — src/main/java/org/example/comment/CommentService.java</summary><pre><code>package org.example.comment;&#10;&#10;import jakarta.persistence.EntityManager;&#10;&#10;import org.example.auth.AuthenticatedMember;&#10;import org.example.member.Member;&#10;import org.example.member.MemberRepository;&#10;import org.example.post.Post;&#10;import org.example.post.PostAccessPolicy;&#10;import org.example.post.PostNotFoundException;&#10;import org.example.notification.CommentCreatedEvent;&#10;import org.example.post.AuthorResponse;&#10;import org.example.post.PostRepository;&#10;import org.example.social.BlockPolicy;&#10;import org.springframework.context.ApplicationEventPublisher;&#10;import org.springframework.stereotype.Service;&#10;import org.springframework.transaction.annotation.Transactional;&#10;&#10;import java.time.LocalDateTime;&#10;import java.util.ArrayList;&#10;import java.util.LinkedHashMap;&#10;import java.util.List;&#10;import java.util.Map;&#10;import java.util.Set;&#10;import java.util.stream.Collectors;&#10;&#10;@Service&#10;public class CommentService {&#10;&#10;    private static final String PUBLISHED = &quot;PUBLISHED&quot;;&#10;&#10;    private final CommentRepository commentRepository;&#10;    private final CommentEditMapper editMapper;&#10;    private final EntityManager entityManager;&#10;    private final PostRepository postRepository;&#10;    private final MemberRepository memberRepository;&#10;    private final PostAccessPolicy accessPolicy;&#10;    private final BlockPolicy blockPolicy;&#10;    private final ApplicationEventPublisher eventPublisher;&#10;&#10;    public CommentService(CommentRepository commentRepository, CommentEditMapper editMapper, EntityManager entityManager,&#10;                           PostRepository postRepository,&#10;                           MemberRepository memberRepository, PostAccessPolicy accessPolicy,&#10;                           BlockPolicy blockPolicy, ApplicationEventPublisher eventPublisher) {&#10;        this.commentRepository = commentRepository;&#10;        this.editMapper = editMapper;&#10;        this.entityManager = entityManager;&#10;        this.postRepository = postRepository;&#10;        this.memberRepository = memberRepository;&#10;        this.accessPolicy = accessPolicy;&#10;        this.blockPolicy = blockPolicy;&#10;        this.eventPublisher = eventPublisher;&#10;    }&#10;&#10;    // 댓글 저장과 comment_count 증가를 한 트랜잭션으로 묶는다 — 둘 중 하나만 반영되면 숫자가 틀어진다&#10;    @Transactional&#10;    public Comment create(Long postId, AuthenticatedMember loginMember, CommentCreateRequest request) {&#10;        Post post = findCommentablePost(postId, loginMember);&#10;        Comment parent = resolveParent(postId, request.parentId());&#10;&#10;        Member author = memberRepository.getReferenceById(loginMember.id());&#10;        Comment saved = commentRepository.save(new Comment(post, author, parent, request.content(), LocalDateTime.now()));&#10;        postRepository.incrementCommentCount(postId);&#10;        // 9-4: 글 작성자에게 COMMENT 알림(자기 글에 자기 댓글은 리스너 쪽에서 거른다). 같은 트랜잭션에서 만든다&#10;        eventPublisher.publishEvent(new CommentCreatedEvent(postId, saved.getId(), loginMember.id()));&#10;&#10;        // 트랜잭션 안에서 지연 로딩 연관을 미리 읽어 둔다(컨트롤러가 세션 밖에서 DTO를 만든다)&#10;        saved.getMember().getNickname();&#10;        return saved;&#10;    }&#10;&#10;    // 12-1 — 작성자만 고친다. 확인 순서: 없거나 지운 댓글·볼 수 없는 글의 댓글 404 → 남의 댓글 403.&#10;    // 내용이 그대로면 아무것도 바꾸지 않는다(edited_at이 안 찍혀 &quot;수정됨&quot;이 붙지 않는다).&#10;    @Transactional&#10;    public Comment edit(Long commentId, AuthenticatedMember loginMember, CommentUpdateRequest request) {&#10;        Comment comment = commentRepository.findByIdForUpdate(commentId)&#10;                .filter(c -&gt; c.getDeletedAt() == null)&#10;                .orElseThrow(CommentNotFoundException::new);&#10;        if (!accessPolicy.canView(loginMember, comment.getPost())) {&#10;            throw new CommentNotFoundException();&#10;        }&#10;        if (!comment.getMember().getId().equals(loginMember.id())) {&#10;            throw new CommentForbiddenException(&quot;본인 댓글만 수정할 수 있습니다.&quot;);&#10;        }&#10;&#10;        String content = request.validatedContent();&#10;        if (!comment.getContent().equals(content)) {&#10;            // 같은 트랜잭션에서 UPDATE한 뒤 JPA 관리 엔티티도 다시 읽는다.&#10;            int updated = editMapper.editIfLive(commentId, content, LocalDateTime.now());&#10;            if (updated != 1) throw new CommentNotFoundException();&#10;            entityManager.refresh(comment);&#10;        }&#10;&#10;        // 컨트롤러가 세션 밖에서 DTO를 만든다 — 지연 로딩 연관을 미리 읽어 둔다&#10;        comment.getMember().getNickname();&#10;        comment.getPost().getId();&#10;        if (comment.getParent() != null) {&#10;            comment.getParent().getId();&#10;        }&#10;        return comment;&#10;    }&#10;&#10;    // 작성자만 지운다(soft delete). 없거나 이미 지운 댓글은 404, 남의 댓글은 403.&#10;    // comment_count 감소는 같은 트랜잭션에서 원자적으로 한다.&#10;    @Transactional&#10;    public void delete(Long commentId, AuthenticatedMember loginMember) {&#10;        Comment comment = commentRepository.findById(commentId)&#10;                .filter(c -&gt; c.getDeletedAt() == null)&#10;                .orElseThrow(CommentNotFoundException::new);&#10;&#10;        if (!comment.getMember().getId().equals(loginMember.id())) {&#10;            throw new CommentForbiddenException();&#10;        }&#10;&#10;        // 앞선 읽기와 별개로 DB에서 deleted_at IS NULL을 다시 검사한다.&#10;        // 동시에 같은 댓글을 지울 때 한 요청만 1행을 변경하고 댓글 수를 내린다.&#10;        if (commentRepository.softDeleteIfLive(commentId, LocalDateTime.now()) != 1) {&#10;            throw new CommentNotFoundException();&#10;        }&#10;        if (postRepository.decrementCommentCount(comment.getPost().getId()) != 1) {&#10;            throw new IllegalStateException(&quot;댓글 수 변경 실패&quot;);&#10;        }&#10;    }&#10;&#10;    // 그 글의 댓글을 작성자와 함께 한 번에 읽어(N+1 없음) 메모리에서 트리로 조립한다.&#10;    // 표시 규칙: 지운 최상위는 살아 있는 답글이 있을 때만 &quot;삭제된 댓글입니다&quot; 자리를 남긴다,&#10;    // 지운 답글은 뺀다, 보는 사람과 차단 관계인 회원의 댓글은 뺀다(최상위면 답글까지).&#10;    @Transactional(readOnly = true)&#10;    public List&lt;CommentThreadResponse&gt; list(Long postId, AuthenticatedMember viewer) {&#10;        Post post = postRepository.findById(postId)&#10;                .orElseThrow(PostNotFoundException::new);&#10;        if (!accessPolicy.canView(viewer, post)) {&#10;            throw new PostNotFoundException();&#10;        }&#10;&#10;        List&lt;Comment&gt; all = commentRepository.findByPostIdWithMember(postId);&#10;        Long viewerId = viewer == null ? null : viewer.id();&#10;        Set&lt;Long&gt; blockedMemberIds = viewerId == null ? Set.of() : blockPolicy.blockRelatedIds(viewerId);&#10;&#10;        Map&lt;Long, List&lt;Comment&gt;&gt; repliesByParent = all.stream()&#10;                .filter(c -&gt; c.getParent() != null)&#10;                .collect(Collectors.groupingBy(c -&gt; c.getParent().getId(), LinkedHashMap::new, Collectors.toList()));&#10;&#10;        List&lt;CommentThreadResponse&gt; result = new ArrayList&lt;&gt;();&#10;        for (Comment top : all) {&#10;            if (top.getParent() != null) {&#10;                continue; // 답글은 부모와 함께 처리&#10;            }&#10;            if (blockedMemberIds.contains(top.getMember().getId())) {&#10;                continue; // 차단 — 최상위째 뺀다(답글도 함께)&#10;            }&#10;&#10;            // &quot;살아 있는 답글&quot;은 지운 것·차단으로 빠지는 것을 제외하고 센다&#10;            List&lt;Comment&gt; visibleReplies = repliesByParent.getOrDefault(top.getId(), List.of()).stream()&#10;                    .filter(r -&gt; r.getDeletedAt() == null)&#10;                    .filter(r -&gt; !blockedMemberIds.contains(r.getMember().getId()))&#10;                    .toList();&#10;&#10;            boolean deleted = top.getDeletedAt() != null;&#10;            if (deleted &amp;&amp; visibleReplies.isEmpty()) {&#10;                continue; // 지웠고 남은 답글도 없으면 자리도 남기지 않는다&#10;            }&#10;&#10;            List&lt;CommentReplyResponse&gt; replies = visibleReplies.stream()&#10;                    .map(r -&gt; new CommentReplyResponse(r.getId(), toAuthor(r.getMember()), r.getContent(), r.getCreatedAt(),&#10;                            r.isEdited()))&#10;                    .toList();&#10;&#10;            result.add(new CommentThreadResponse(&#10;                    top.getId(),&#10;                    deleted ? null : toAuthor(top.getMember()),&#10;                    deleted ? &quot;삭제된 댓글입니다&quot; : top.getContent(),&#10;                    top.getCreatedAt(),&#10;                    !deleted &amp;&amp; top.isEdited(),&#10;                    deleted,&#10;                    replies&#10;            ));&#10;        }&#10;        return result;&#10;    }&#10;&#10;    // 볼 수 있는 PUBLISHED 글인가 — 아니면 404(4-1 LikeService.findLikeablePost와 같은 규칙)&#10;    private Post findCommentablePost(Long postId, AuthenticatedMember loginMember) {&#10;        Post post = postRepository.findById(postId)&#10;                .orElseThrow(PostNotFoundException::new);&#10;        if (!accessPolicy.canView(loginMember, post) || !PUBLISHED.equals(post.getStatus())) {&#10;            throw new PostNotFoundException();&#10;        }&#10;        return post;&#10;    }&#10;&#10;    // 부모 댓글 검증 — 같은 글의, 최상위, 지워지지 않은 댓글이어야 한다.&#10;    // 부모가 없으면 404(CommentNotFoundException), 있는데 규칙에 안 맞으면 400(InvalidParentCommentException).&#10;    private Comment resolveParent(Long postId, Long parentId) {&#10;        if (parentId == null) {&#10;            return null;&#10;        }&#10;        Comment parent = commentRepository.findById(parentId)&#10;                .orElseThrow(CommentNotFoundException::new);&#10;        if (!parent.getPost().getId().equals(postId)) {&#10;            throw new InvalidParentCommentException(&quot;다른 글의 댓글에는 답글을 달 수 없습니다.&quot;);&#10;        }&#10;        if (parent.getParent() != null) {&#10;            throw new InvalidParentCommentException(&quot;답글에는 답글을 달 수 없습니다.&quot;);&#10;        }&#10;        if (parent.getDeletedAt() != null) {&#10;            throw new InvalidParentCommentException(&quot;지워진 댓글에는 답글을 달 수 없습니다.&quot;);&#10;        }&#10;        return parent;&#10;    }&#10;&#10;    private AuthorResponse toAuthor(Member member) {&#10;        return new AuthorResponse(member.getId(), member.getNickname());&#10;    }&#10;}&#10;</code></pre></details>
+<details class="code-file"><summary>설정 / 기타 — src/main/resources/application.yml</summary><pre><code>spring:&#10;  application:&#10;    name: javaExperience&#10;  datasource:&#10;    # javaExperience MySQL의 community DB. 시작하기 안내대로 javaExperience DB를 먼저 띄운다&#10;    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul&#10;    username: community&#10;    password: community&#10;  flyway:&#10;    # 이미 테이블·데이터가 있는 DB(compose의 community·practice)는 V1(CREATE TABLE)을 실행하면 실패한다.&#10;    # 그래서 기록 테이블이 없으면 &quot;V1까지 됐다&quot;고만 적고(baseline) V2부터 실행한다. 빈 DB면 V1부터 실제로 실행한다.&#10;    baseline-on-migrate: true&#10;    baseline-version: 1&#10;  servlet:&#10;    multipart:&#10;      # 11-2 이미지 한 장 1MB, 요청 전체 2MB까지. 넘으면 MaxUploadSizeExceededException → 413&#10;      max-file-size: 1MB&#10;      max-request-size: 2MB&#10;  jpa:&#10;    hibernate:&#10;      # 스키마는 Flyway만 바꾼다(9-1). 엔티티가 테이블과 다르면 기동이 실패한다(테이블을 몰래 바꾸지 않음)&#10;      ddl-auto: validate&#10;    # 트랜잭션이 끝나면 커넥션을 바로 반납한다(컨트롤러·직렬화 단계까지 붙잡지 않음)&#10;    open-in-view: false&#10;    properties:&#10;      hibernate:&#10;        format_sql: true&#10;        # 컬렉션(태그) 지연 로딩을 글마다 1번이 아니라 IN (...) 한 번으로 묶는다(2-4, N+1 대응)&#10;        default_batch_fetch_size: 100&#10;&#10;# 11-2 올린 이미지를 저장할 폴더(앱을 실행한 위치 기준). git에는 올리지 않는다(.gitignore)&#10;app:&#10;  upload-dir: uploads&#10;&#10;logging:&#10;  level:&#10;    # 실행 SQL은 확인하되 토큰을 포함한 바인딩 값은 로그에 남기지 않는다&#10;    org.hibernate.SQL: debug&#10;    org.hibernate.orm.jdbc.bind: info&#10;&#10;# 0-6 — 내가 정한 설정 값. 코드에서 @Value(&quot;${start.greeting}&quot;)로 읽는다&#10;start:&#10;  greeting: 반가워요, 백엔드!&#10;  max-items: 5&#10;&#10;mybatis:&#10;  mapper-locations: classpath:mapper/*.xml&#10;  configuration:&#10;    map-underscore-to-camel-case: true&#10;</code></pre></details>
+<details class="code-file"><summary>MyBatis / XML — src/main/resources/mapper/CommentEditMapper.xml</summary><pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;&#10;&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;https://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;&#10;&lt;mapper namespace=&quot;org.example.comment.CommentEditMapper&quot;&gt;&#10;    &lt;update id=&quot;editIfLive&quot;&gt;&#10;        UPDATE comment&#10;        SET content = #{content}, edited_at = #{now}, updated_at = #{now}&#10;        WHERE id = #{id} AND deleted_at IS NULL&#10;    &lt;/update&gt;&#10;&lt;/mapper&gt;&#10;</code></pre></details></div></div>
+
+</div>
+  </details><details class="lesson-scene lesson-verify" data-lesson-kind="verify" open>
+    <summary id="직접-확인" aria-label="직접 확인 내용 펼치기"><span class="lesson-scene-index">06</span><span class="lesson-scene-glyph" aria-hidden="true">↗</span><span class="lesson-scene-title"><small>어떻게 확인할까</small><strong>직접 확인</strong><em>요청은 브라우저에서 전송됩니다. 서버의 CORS 설정에 이 페이지 출처가 허용되어 있어야 합니다.</em></span><span class="lesson-scene-count">95개 코드 · 열기 ↓</span></summary>
+    <div class="lesson-scene-content"><div class="lesson-scene-topics" aria-label="이 절의 세부 주제"><span>브라우저에서 요청 보내기</span></div><section class="server-url"><label>서버 주소 <input id="scenario-base-url" type="url" value="http://localhost:8080" spellcheck="false"></label><div class="server-url-help"><p>요청은 브라우저에서 전송됩니다. 서버의 CORS 설정에 이 페이지 출처가 허용되어 있어야 합니다.</p><a href="#browser-requests-1">이 단계의 요청으로 이동 ↓</a></div></section>
+<p>학습용 DB의 32번 글(회원 2의 글, 댓글 없음)에 회원 3(<code>tok-p03</code>)이 댓글을 달고 고친다.</p>
+<p>API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.</p>
+<p>버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 마지막에 만든 댓글을 지우므로 몇 번을 눌러도 같은 결과다.</p>
+<section id="browser-requests-1" class="api-practice" aria-label="HTTP 요청 실행"><div class="request-panel-heading"><div><p class="request-eyebrow">직접 확인 · 19개 요청</p><h3>브라우저에서 요청 보내기</h3></div><p>위 서버 주소를 확인하고 순서대로 실행하세요. 토큰은 입력 후에도 저장하지 않습니다.</p></div><details class="request-steps"><summary>요청 순서 보기 <span>POST 1 · PATCH 16 · GET 1 · DELETE 1</span></summary><nav aria-label="요청 실행 순서"><ol><li data-method="POST"><a href="#browser-request-1-1"><span class="request-step-number">1</span><span class="request-step-content"><span class="request-step-method">POST · K</span><span class="request-step-title">회원 3이 댓글</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-2"><span class="request-step-number">2</span><span class="request-step-content"><span class="request-step-method">PATCH · S</span><span class="request-step-title">같은 내용으로 수정</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-3"><span class="request-step-number">3</span><span class="request-step-content"><span class="request-step-method">PATCH · VM</span><span class="request-step-title">정확히 1000자(상한 바로 안)</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-4"><span class="request-step-number">4</span><span class="request-step-content"><span class="request-step-method">PATCH · E</span><span class="request-step-title">내용을 바꿔 수정</span></span></a></li><li data-method="GET"><a href="#browser-request-1-5"><span class="request-step-number">5</span><span class="request-step-content"><span class="request-step-method">GET · L</span><span class="request-step-title">댓글 목록</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-6"><span class="request-step-number">6</span><span class="request-step-content"><span class="request-step-method">PATCH · F</span><span class="request-step-title">남의 댓글 수정(회원 4)</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-7"><span class="request-step-number">7</span><span class="request-step-content"><span class="request-step-method">PATCH · V0</span><span class="request-step-title">content 없음</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-8"><span class="request-step-number">8</span><span class="request-step-content"><span class="request-step-method">PATCH · VN</span><span class="request-step-title">content가 null</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-9"><span class="request-step-number">9</span><span class="request-step-content"><span class="request-step-method">PATCH · VE</span><span class="request-step-title">빈 문자열</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-10"><span class="request-step-number">10</span><span class="request-step-content"><span class="request-step-method">PATCH · V</span><span class="request-step-title">공백만</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-11"><span class="request-step-number">11</span><span class="request-step-content"><span class="request-step-method">PATCH · VL</span><span class="request-step-title">1001자(상한 바로 밖)</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-12"><span class="request-step-number">12</span><span class="request-step-content"><span class="request-step-method">PATCH · VT</span><span class="request-step-title">숫자 content 타입 오류</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-13"><span class="request-step-number">13</span><span class="request-step-content"><span class="request-step-method">PATCH · VA</span><span class="request-step-title">배열 content 타입 오류</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-14"><span class="request-step-number">14</span><span class="request-step-content"><span class="request-step-method">PATCH · VB</span><span class="request-step-title">JSON이 아닌 본문</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-15"><span class="request-step-number">15</span><span class="request-step-content"><span class="request-step-method">PATCH · VI</span><span class="request-step-title">경로가 숫자 아님</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-16"><span class="request-step-number">16</span><span class="request-step-content"><span class="request-step-method">PATCH · VX</span><span class="request-step-title">없는 댓글</span></span></a></li><li data-method="DELETE"><a href="#browser-request-1-17"><span class="request-step-number">17</span><span class="request-step-content"><span class="request-step-method">DELETE · D</span><span class="request-step-title">지우기(뒷정리)</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-18"><span class="request-step-number">18</span><span class="request-step-content"><span class="request-step-method">PATCH · G</span><span class="request-step-title">지운 댓글 수정</span></span></a></li><li data-method="PATCH"><a href="#browser-request-1-19"><span class="request-step-number">19</span><span class="request-step-content"><span class="request-step-method">PATCH · N</span><span class="request-step-title">토큰 없이 수정</span></span></a></li></ol></nav></details><div class="api-request-list"><article id="browser-request-1-1" class="api-request" data-request-id="K" data-method="POST" data-request-index="0" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">POST · K</p><h4>회원 3이 댓글</h4></div><span class="request-number">요청 1</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/32/comments" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;[채점] 수정 전 댓글&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-1">POST 요청 보내기</button><p id="request-status-1-1" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>POST</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;[채점] 수정 전 댓글&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:201}</pre></dd></dl></details></article><article id="browser-request-1-2" class="api-request" data-request-id="S" data-method="PATCH" data-request-index="1" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · S</p><h4>같은 내용으로 수정</h4></div><span class="request-number">요청 2</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;[채점] 수정 전 댓글&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-2">PATCH 요청 보내기</button><p id="request-status-1-2" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;[채점] 수정 전 댓글&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C1: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.content&quot;,&quot;equals&quot;:&quot;[채점] 수정 전 댓글&quot;},{&quot;path&quot;:&quot;$.edited&quot;,&quot;equals&quot;:false},{&quot;path&quot;:&quot;$.editedAt&quot;,&quot;type&quot;:&quot;null&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-3" class="api-request" data-request-id="VM" data-method="PATCH" data-request-index="2" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · VM</p><h4>정확히 1000자(상한 바로 안)</h4></div><span class="request-number">요청 3</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-3">PATCH 요청 보내기</button><p id="request-status-1-3" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C4: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.content&quot;,&quot;matches&quot;:&quot;^가{1000}$&quot;},{&quot;path&quot;:&quot;$.edited&quot;,&quot;equals&quot;:true}]}</pre></dd></dl></details></article><article id="browser-request-1-4" class="api-request" data-request-id="E" data-method="PATCH" data-request-index="3" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · E</p><h4>내용을 바꿔 수정</h4></div><span class="request-number">요청 4</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;[채점] 수정한 댓글&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-4">PATCH 요청 보내기</button><p id="request-status-1-4" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;[채점] 수정한 댓글&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$.id&quot;,&quot;equals&quot;:&quot;{{K.body.id}}&quot;},{&quot;path&quot;:&quot;$.content&quot;,&quot;equals&quot;:&quot;[채점] 수정한 댓글&quot;},{&quot;path&quot;:&quot;$.edited&quot;,&quot;equals&quot;:true},{&quot;path&quot;:&quot;$.editedAt&quot;,&quot;type&quot;:&quot;string&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-5" class="api-request" data-request-id="L" data-method="GET" data-request-index="4" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">GET · L</p><h4>댓글 목록</h4></div><span class="request-number">요청 5</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/posts/32/comments" autocomplete="off" spellcheck="false"></label><div class="request-fields"></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-5">GET 요청 보내기</button><p id="request-status-1-5" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>GET</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C2: {&quot;status&quot;:200,&quot;json&quot;:[{&quot;path&quot;:&quot;$[*].id&quot;,&quot;contains&quot;:&quot;{{K.body.id}}&quot;},{&quot;path&quot;:&quot;$[*].content&quot;,&quot;contains&quot;:&quot;[채점] 수정한 댓글&quot;},{&quot;path&quot;:&quot;$[*].edited&quot;,&quot;contains&quot;:true}]}</pre></dd></dl></details></article><article id="browser-request-1-6" class="api-request" data-request-id="F" data-method="PATCH" data-request-index="5" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · F</p><h4>남의 댓글 수정(회원 4)</h4></div><span class="request-number">요청 6</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p04" value="Bearer tok-p04" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;남이 바꿈&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-6">PATCH 요청 보내기</button><p id="request-status-1-6" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p04&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;남이 바꿈&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:403}</pre></dd></dl></details></article><article id="browser-request-1-7" class="api-request" data-request-id="V0" data-method="PATCH" data-request-index="6" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · V0</p><h4>content 없음</h4></div><span class="request-number">요청 7</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-7">PATCH 요청 보내기</button><p id="request-status-1-7" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;content&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-8" class="api-request" data-request-id="VN" data-method="PATCH" data-request-index="7" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · VN</p><h4>content가 null</h4></div><span class="request-number">요청 8</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: null
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-8">PATCH 요청 보내기</button><p id="request-status-1-8" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: null
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;content&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-9" class="api-request" data-request-id="VE" data-method="PATCH" data-request-index="8" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · VE</p><h4>빈 문자열</h4></div><span class="request-number">요청 9</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-9">PATCH 요청 보내기</button><p id="request-status-1-9" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;content&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-10" class="api-request" data-request-id="V" data-method="PATCH" data-request-index="9" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · V</p><h4>공백만</h4></div><span class="request-number">요청 10</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;   &quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-10">PATCH 요청 보내기</button><p id="request-status-1-10" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;   &quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;content&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-11" class="api-request" data-request-id="VL" data-method="PATCH" data-request-index="10" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · VL</p><h4>1001자(상한 바로 밖)</h4></div><span class="request-number">요청 11</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-11">PATCH 요청 보내기</button><p id="request-status-1-11" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;content&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-12" class="api-request" data-request-id="VT" data-method="PATCH" data-request-index="11" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · VT</p><h4>숫자 content 타입 오류</h4></div><span class="request-number">요청 12</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: 123
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-12">PATCH 요청 보내기</button><p id="request-status-1-12" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: 123
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;content&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-13" class="api-request" data-request-id="VA" data-method="PATCH" data-request-index="12" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · VA</p><h4>배열 content 타입 오류</h4></div><span class="request-number">요청 13</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: [
+    &quot;x&quot;
+  ]
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-13">PATCH 요청 보내기</button><p id="request-status-1-13" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: [
+    &quot;x&quot;
+  ]
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:400,&quot;json&quot;:[{&quot;path&quot;:&quot;$.errors[*].field&quot;,&quot;contains&quot;:&quot;content&quot;}]}</pre></dd></dl></details></article><article id="browser-request-1-14" class="api-request" data-request-id="VB" data-method="PATCH" data-request-index="13" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · VB</p><h4>JSON이 아닌 본문</h4></div><span class="request-number">요청 14</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label><label>헤더 · Content-Type <input class="request-header" data-name="Content-Type" data-template="application/json" value="application/json" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="text" rows="4" spellcheck="false">content=abc</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-14">PATCH 요청 보내기</button><p id="request-status-1-14" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;,
+  &quot;Content-Type&quot;: &quot;application/json&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>content=abc</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:400}</pre></dd></dl></details></article><article id="browser-request-1-15" class="api-request" data-request-id="VI" data-method="PATCH" data-request-index="14" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · VI</p><h4>경로가 숫자 아님</h4></div><span class="request-number">요청 15</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/abc" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;x&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-15">PATCH 요청 보내기</button><p id="request-status-1-15" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;x&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:400}</pre></dd></dl></details></article><article id="browser-request-1-16" class="api-request" data-request-id="VX" data-method="PATCH" data-request-index="15" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · VX</p><h4>없는 댓글</h4></div><span class="request-number">요청 16</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/99999999" autocomplete="off" spellcheck="false"></label><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;x&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-16">PATCH 요청 보내기</button><p id="request-status-1-16" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;x&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C3: {&quot;status&quot;:404}</pre></dd></dl></details></article><article id="browser-request-1-17" class="api-request" data-request-id="D" data-method="DELETE" data-request-index="16" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">DELETE · D</p><h4>지우기(뒷정리)</h4></div><span class="request-number">요청 17</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-17">DELETE 요청 보내기</button><p id="request-status-1-17" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>DELETE</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>(본문 없음)</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:204}</pre></dd></dl></details></article><article id="browser-request-1-18" class="api-request" data-request-id="G" data-method="PATCH" data-request-index="17" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · G</p><h4>지운 댓글 수정</h4></div><span class="request-number">요청 18</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"><label>헤더 · Authorization <input class="request-header" data-name="Authorization" data-template="Bearer tok-p03" value="Bearer tok-p03" placeholder="" autocomplete="off" spellcheck="false"></label></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;지운 뒤&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-18">PATCH 요청 보내기</button><p id="request-status-1-18" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{
+  &quot;Authorization&quot;: &quot;Bearer tok-p03&quot;
+}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;지운 뒤&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:404}</pre></dd></dl></details></article><article id="browser-request-1-19" class="api-request" data-request-id="N" data-method="PATCH" data-request-index="18" data-concurrent-count="0" data-concurrent-vars="{}" data-repeat="0"><header class="request-card-head"><div><p class="request-method">PATCH · N</p><h4>토큰 없이 수정</h4></div><span class="request-number">요청 19</span></header><div class="request-editor"><label>경로 <input class="request-path" value="/api/comments/{{K.body.id}}" autocomplete="off" spellcheck="false"></label><div class="request-variables"><p>선행 요청 참조는 해당 요청을 먼저 보내면 응답 값으로 자동 채웁니다.</p></div><div class="request-fields"></div><label>Raw body <textarea class="request-body" data-body-kind="json" rows="4" spellcheck="false">{
+  &quot;content&quot;: &quot;토큰 없음&quot;
+}</textarea></label><div class="request-actions"><button type="button" class="send-request" aria-describedby="request-status-1-19">PATCH 요청 보내기</button><p id="request-status-1-19" class="request-status" role="status" aria-live="polite"></p></div></div><details class="request-response" hidden><summary>응답 확인</summary><p class="response-status"></p><h5>Headers</h5><pre class="response-headers"></pre><h5>Body</h5><pre class="response-body"></pre></details><details class="postman"><summary>Postman 설정 보기</summary><dl><dt>Method</dt><dd>PATCH</dd><dt>Full URL</dt><dd class="postman-url"></dd><dt>Headers</dt><dd><pre>{}</pre></dd><dt>Raw body</dt><dd><pre>{
+  &quot;content&quot;: &quot;토큰 없음&quot;
+}</pre></dd><dt>Expected result</dt><dd><pre>C5: {&quot;status&quot;:401}</pre></dd></dl></details></article></div></section></div>
+  </details><details class="lesson-scene lesson-verify" data-lesson-kind="verify">
+    <summary id="채점-기준" aria-label="채점 기준 내용 펼치기"><span class="lesson-scene-index">07</span><span class="lesson-scene-glyph" aria-hidden="true">↗</span><span class="lesson-scene-title"><small>어떻게 확인할까</small><strong>채점 기준</strong><em>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용).</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>K / S</td>
+<td><code>201</code> / <code>200</code>, 같은 내용으로 고치면 <code>edited</code>=false, <code>editedAt</code>=null — 바뀐 게 없으면 &quot;수정됨&quot;이 아니다</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>E / L</td>
+<td><code>200</code>, <code>content</code>가 바뀌고 <code>edited</code>=true·<code>editedAt</code> 시각 / 댓글 목록에도 그 댓글이 바뀐 내용·<code>edited</code>=true로 나온다</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>F / V0·VN·VE·V·VL·VT·VA / VB·VI / VX</td>
+<td>남의 댓글 <code>403</code> / <code>content</code> 없음·<code>null</code>·빈 문자열·공백만·1001자는 모두 <code>400</code>이고 <code>errors</code>에 <code>content</code> / JSON 아님·경로가 숫자 아님 <code>400</code> / 없는 댓글 <code>404</code> — 어느 것도 <code>500</code>이 아니다</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>VM</td>
+<td>정확히 1000자는 <code>200</code> — 경계 바로 안쪽은 통과(E 앞에서 보내므로 마지막 내용은 E의 것이다)</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>D / G / N</td>
+<td>지우기 <code>204</code> → 지운 댓글 수정 <code>404</code> / 토큰 없음 <code>401</code></td>
+</tr>
+<tr>
+<td>D1</td>
+<td><code>SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = &#39;practice&#39; AND table_name = &#39;comment&#39; AND column_name = &#39;edited_at&#39;</code></td>
+<td><code>1</code></td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT content, edited_at IS NOT NULL, deleted_at IS NOT NULL FROM comment WHERE post_id = 32 ORDER BY id DESC LIMIT 1</code></td>
+<td><code>[채점] 수정한 댓글</code>, <code>1</code>, <code>1</code> — 고친 내용이 저장됐고 마지막에 지워졌다</td>
+</tr>
+<tr>
+<td>D3</td>
+<td><code>SELECT COUNT(*) FROM comment WHERE edited_at IS NOT NULL AND BINARY content NOT LIKE BINARY &#39;[채점]%&#39;</code></td>
+<td><code>0</code> — 마이그레이션이 기존 댓글을 &quot;수정됨&quot;으로 만들지 않았다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>판단 기준</td>
+<td>&quot;수정됨&quot;을 <code>updated_at</code>과 <code>created_at</code> 비교가 아니라 <code>edited_at IS NOT NULL</code>로 판단한다. 삭제가 <code>updated_at</code>을 바꾼다는 이유를 말할 수 있다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>확인 순서</td>
+<td>404(없음·지움·볼 수 없는 글) → 403(남의 것) 순서다. 거꾸로면 볼 수 없는 글의 댓글이 있다는 사실이 403으로 드러난다(3-1과 같은 이유)</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>바꾸는 곳</td>
+<td>JPA에서는 내용 비교·<code>edited_at</code> 기록이 엔티티 <code>edit</code>에 있고, 같은 내용이면 더티 체킹 UPDATE가 없다. MyBatis 대안에서는 행 잠금 뒤 Service가 Java 문자열을 비교하고 Mapper가 <code>edited_at</code>을 기록하며, 같은 내용이면 Mapper를 호출하지 않는다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>검증 재사용</td>
+<td>작성(5-1)의 <code>@NotBlank</code>·<code>@Size(max = 1000)</code>과 같은 값 규칙을 수정 DTO의 <code>validatedContent()</code>에도 적용한다. 원문 <code>JsonNode</code>로 숫자·배열을 거르므로 문자열 강제 변환을 막는다. 1001자를 그대로 저장하려다 DB 오류(<code>500</code>)가 나는 대신 저장 전에 <code>400</code>으로 막는다</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>수정·삭제 경합</td>
+<td>수정 조회에 <code>SELECT ... FOR UPDATE</code>에 해당하는 행 잠금이 있어, 삭제와 경합해도 삭제된 댓글이 수정 UPDATE로 되살아나지 않는다</td>
+</tr>
+</tbody></table></div>
+</div>
+  </details><details class="lesson-scene lesson-connect" data-lesson-kind="connect">
+    <summary id="필요한-지식" aria-label="필요한 지식 내용 펼치기"><span class="lesson-scene-index">08</span><span class="lesson-scene-glyph" aria-hidden="true">→</span><span class="lesson-scene-title"><small>다음으로 연결</small><strong>필요한 지식</strong></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<ul>
+<li><a href="../../docs/knowledge/S06-rest-api-clients.html#메서드와-상태-코드">S06 REST API 설계 — 메서드와 상태 코드</a> — PATCH의 의미</li>
+<li><a href="../../docs/knowledge/D11-web-security-basics.html#41-안전한-sql-바인딩과-idor-방어를-먼저-설계하기">D11 — IDOR 방어</a> — 화면에 버튼이 없어도 서버가 막아야 하는 이유</li>
+<li><a href="../../docs/knowledge/S09-jpa-hibernate.html">S09 JPA·Hibernate</a> — 변경 감지(더티 체킹)</li>
+<li><a href="../../lessons/F1-validation-errors.html">F1 검증과 에러 응답</a></li>
+</ul>
+</div>
+  </details><details class="lesson-scene lesson-debug" data-lesson-kind="debug">
+    <summary id="힌트-막힐-때만" aria-label="힌트 (막힐 때만) 내용 펼치기"><span class="lesson-scene-index">09</span><span class="lesson-scene-glyph" aria-hidden="true">✳</span><span class="lesson-scene-title"><small>막히면 확인</small><strong>힌트 (막힐 때만)</strong><em>Comment 에 editedAt 필드와 edit(String newContent, LocalDateTime now) 를 둔다. 내용이 같으면 아무것도 하지 않고, 다르면 c…</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<details>
+<summary>힌트 1 — 엔티티 메서드</summary>
+
+<p><code>Comment</code>에 <code>editedAt</code> 필드와 <code>edit(String newContent, LocalDateTime now)</code>를 둔다. 내용이 같으면 아무것도 하지 않고, 다르면 <code>content</code>·<code>editedAt</code>·<code>updatedAt</code>을 바꾼다.</p>
+<p>서비스는 <code>findById</code> → 지웠으면 404 → <code>PostAccessPolicy.canView(나, 댓글의 글)</code>이 아니면 404 → 작성자가 아니면 403 → <code>edit(...)</code>. 저장 호출은 필요 없다(변경 감지). </details></p>
+<details>
+<summary>힌트 2 — LazyInitializationException</summary>
+
+<p>컨트롤러가 트랜잭션 밖에서 응답 DTO를 만들면 <code>comment.getMember().getNickname()</code>에서 터진다(<code>findById</code>로 읽은 댓글의 작성자는 지연 프록시). 3-1에서처럼 서비스 메서드 끝에서 DTO가 쓸 연관을 미리 읽어 두거나, 서비스가 DTO를 돌려준다.</p>
+</details>
+
+</div>
+  </details><details class="lesson-scene lesson-connect" data-lesson-kind="connect">
+    <summary id="다음-단계" aria-label="다음 단계 내용 펼치기"><span class="lesson-scene-index">10</span><span class="lesson-scene-glyph" aria-hidden="true">→</span><span class="lesson-scene-title"><small>다음으로 연결</small><strong>다음 단계</strong><em>12-2. 댓글 멘션 알림 — @닉네임</em></span><span class="lesson-scene-count">열기 ↓</span></summary>
+    <div class="lesson-scene-content">
+<p><a href="12-2-mention-notification.html">12-2. 댓글 멘션 알림 — @닉네임</a></p>
+
+</div>
+  </details></div><section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣으세요. 에이전트가 API와 DB를 확인하고 채점표를 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 에이전트를 연 폴더(레포 루트)를 쓴다"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 12-1. 댓글 수정 — \"수정됨\" 표시\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n이 단계는 학습용 DB(practice)를 쓴다. 앱이 practice 프로파일로 떠 있어야 한다(README의 \"학습용 데이터로 앱 실행\"). 아니면 그 방법만 알려 주고 멈춰라.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch12-community-features/12-1-comment-edit.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. 서버 주소의 응답 가능 여부를 확인해라. 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 단계 페이지의 요청 정의(method·경로·헤더·본문)를 그대로 보내고, 동적 값은 앞선 응답의 참조 규칙을 따른다. 상태 코드·응답 헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity practice -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D 항목, T는 선택)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const baseInput = $('scenario-base-url');
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = (baseInput?.value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(에이전트를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+  }
+  $('repo').addEventListener('input', fill);
+  baseInput?.addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="../ch11-post-advanced/11-6-revisions.html">← 이전 11-6. 글 수정 이력</a><a href="12-2-mention-notification.html">다음 → 12-2. 댓글 멘션 알림 — @닉네임</a></nav>
+</main>
+
+<script src="../../tools/site/scenario-runner.js?v=996bdd22e59f" defer></script><script src="../../tools/site/scenario-code-workbench.js?v=52d06b1c6f1a" defer></script>
+</body>
+</html>

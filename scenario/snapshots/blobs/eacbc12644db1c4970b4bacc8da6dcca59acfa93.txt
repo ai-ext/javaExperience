@@ -1,0 +1,25 @@
+-- V61 — 주간 랭킹 스냅샷(15-2). 매주 월요일에 지난 7일 점수 상위 10개를 "그때의 값 그대로" 저장한다.
+-- 스냅샷이라 나중에 좋아요가 바뀌어도 다시 계산하지 않는다. 제목도 그때 것을 복사해 둔다.
+-- post_id에 FK를 걸지 않는다 — 원본 글이 휴지통에서 영구 삭제(15-4)돼도 지난 랭킹 기록은 남아야 한다.
+-- 순위 컬럼 이름은 ranking — RANK는 MySQL 8의 윈도 함수 이름이라 컬럼명으로 쓰면 따옴표가 필요하다.
+CREATE TABLE weekly_ranking (
+    id         BIGINT       NOT NULL AUTO_INCREMENT,
+    week_start DATE         NOT NULL,
+    ranking    INT          NOT NULL,
+    post_id    BIGINT       NOT NULL,
+    title      VARCHAR(200) NOT NULL,
+    score      INT          NOT NULL,
+    likes      INT          NOT NULL,
+    comments   INT          NOT NULL,
+    created_at DATETIME     NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_weekly_ranking_rank (week_start, ranking),
+    UNIQUE KEY uk_weekly_ranking_post (week_start, post_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '주간 랭킹 스냅샷 — 주(월요일 시작)마다 상위 10';
+
+-- 후보가 0건인 주도 한 번 계산한 사실을 남긴다. 이 표식이 없으면 빈 주를 매번 다시 집계한다.
+-- PK가 수동/예약 동시 실행을 직렬화하고, 응답의 created 값을 일관되게 만든다.
+CREATE TABLE weekly_ranking_run (
+    week_start DATE NOT NULL PRIMARY KEY,
+    created_at DATETIME NOT NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '주간 랭킹 계산 완료 — 빈 주 포함';

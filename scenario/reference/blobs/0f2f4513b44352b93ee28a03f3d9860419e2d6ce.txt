@@ -1,0 +1,84 @@
+package org.example.batch;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.function.Supplier;
+import java.util.function.LongConsumer;
+import java.util.function.ToIntFunction;
+
+// 15-6 모든 배치를 이걸로 감싼다 — 시작에 RUNNING 한 행, 끝나면 SUCCESS(처리 건수)·FAILED(이유).
+// 이 클래스에는 @Transactional을 붙이지 않는다. 기록 저장(save)은 각자 짧은 트랜잭션으로 바로 커밋되고,
+// 배치 본문(work)은 자기 트랜잭션에서 돈다. 하나로 묶으면 배치가 실패할 때 FAILED 기록까지 같이 롤백된다.
+@Component
+public class JobRunner {
+
+    public static final String SCHEDULED = "SCHEDULED";
+    public static final String MANUAL = "MANUAL";
+    public static final String RETRY = "RETRY";
+    // 실행 기록의 시작·끝은 "실제로 돈 시각"(벽시계)이다. 업무상 날짜는 run_date(Clock 기준일)
+    private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
+    private static final Logger log = LoggerFactory.getLogger(JobRunner.class);
+
+    private final JobRunRepository jobRunRepository;
+
+    public JobRunner(JobRunRepository jobRunRepository) {
+        this.jobRunRepository = jobRunRepository;
+    }
+
+    public <T> T run(String job, LocalDate runDate, String trigger, Supplier<T> work, ToIntFunction<T> processed) {
+        return run(job, runDate, trigger, null, work, processed);
+    }
+
+    public <T> T run(String job, LocalDate runDate, String trigger, LocalDateTime referenceAt,
+                     Supplier<T> work, ToIntFunction<T> processed) {
+        return run(job, runDate, trigger, referenceAt, work, processed, id -> {});
+    }
+
+    public <T> T run(String job, LocalDate runDate, String trigger, LocalDateTime referenceAt,
+                     Supplier<T> work, ToIntFunction<T> processed, LongConsumer started) {
+        JobRun run = jobRunRepository.save(JobRun.start(job, runDate, trigger, referenceAt, LocalDateTime.now(ZONE)));
+        started.accept(run.getId());
+        try {
+            T result = work.get();
+            run.succeed(processed.applyAsInt(result), LocalDateTime.now(ZONE));
+            jobRunRepository.save(run);
+            return result;
+        } catch (RuntimeException e) {
+            run.fail(e, LocalDateTime.now(ZONE));
+            jobRunRepository.save(run);
+            log.error("배치 실패 job={} date={} runId={}", job, runDate, run.getId(), e);
+            throw e;
+        }
+    }
+
+    // 매분·10분마다 도는 예약 실행용 — 처리 0건인 성공은 기록하지 않는다(하루 1,440행이 쌓이지 않게). 실패는 남긴다
+    public <T> T runQuietly(String job, LocalDate runDate, Supplier<T> work, ToIntFunction<T> processed) {
+        return runQuietly(job, runDate, null, work, processed);
+    }
+
+    public <T> T runQuietly(String job, LocalDate runDate, LocalDateTime referenceAt,
+                            Supplier<T> work, ToIntFunction<T> processed) {
+        LocalDateTime started = LocalDateTime.now(ZONE);
+        try {
+            T result = work.get();
+            int n = processed.applyAsInt(result);
+            if (n > 0) {
+                JobRun run = JobRun.start(job, runDate, SCHEDULED, referenceAt, started);
+                run.succeed(n, LocalDateTime.now(ZONE));
+                jobRunRepository.save(run);
+            }
+            return result;
+        } catch (RuntimeException e) {
+            JobRun run = JobRun.start(job, runDate, SCHEDULED, referenceAt, started);
+            run.fail(e, LocalDateTime.now(ZONE));
+            jobRunRepository.save(run);
+            log.error("배치 실패 job={} date={}", job, runDate, e);
+            throw e;
+        }
+    }
+}

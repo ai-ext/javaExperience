@@ -1,0 +1,58 @@
+package org.example.post;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+// 11-4 통합 검색 요청 — 쿼리 파라미터를 정리·검사해 "검색할 단어들"로 바꾼다.
+// 틀린 파라미터는 한꺼번에 모아 400으로 돌려준다(errors에 모두).
+public record KeywordSearchRequest(List<String> words, String scope, int page, int size) {
+
+    private static final int Q_MIN = 2;
+    private static final int Q_MAX = 50;
+    private static final int WORDS_MAX = 5;
+    private static final int SIZE_MAX = 50;
+    private static final Set<String> SCOPES = Set.of("all", "title", "content", "author");
+
+    public static KeywordSearchRequest of(String q, String in, String page, String size) {
+        Map<String, String> errors = new LinkedHashMap<>();
+
+        // 앞뒤 공백을 지우고, 사이의 공백 여러 개는 하나로
+        String normalized = q == null ? "" : q.strip().replaceAll("\\s+", " ");
+        List<String> words = normalized.isEmpty() ? List.of() : List.of(normalized.split(" "));
+        if (normalized.length() < Q_MIN || normalized.length() > Q_MAX) {
+            errors.put("q", "검색어는 앞뒤 공백을 빼고 " + Q_MIN + "~" + Q_MAX + "자여야 합니다.");
+        } else if (words.size() > WORDS_MAX) {
+            errors.put("q", "검색어는 " + WORDS_MAX + "단어까지입니다.");
+        }
+
+        String scope = in == null ? "all" : in;
+        if (!SCOPES.contains(scope)) {
+            errors.put("in", "검색 범위는 all, title, content, author 중 하나여야 합니다.");
+        }
+
+        int p = parseInteger(page, "page", 0, 0, Integer.MAX_VALUE, errors);
+        int s = parseInteger(size, "size", 10, 1, SIZE_MAX, errors);
+
+        if (!errors.isEmpty()) {
+            throw new InvalidParametersException(errors);
+        }
+        return new KeywordSearchRequest(new ArrayList<>(words), scope, p, s);
+    }
+
+    private static int parseInteger(String raw, String field, int defaultValue, int min, int max,
+                                    Map<String, String> errors) {
+        if (raw == null) return defaultValue;
+        try {
+            int value = Integer.parseInt(raw);
+            if (value >= min && value <= max) return value;
+        } catch (NumberFormatException ignored) {
+            // 다른 필드의 오류도 끝까지 수집한다.
+        }
+        errors.put(field, field.equals("page") ? "page는 0 이상의 정수여야 합니다."
+                : "size는 1~" + SIZE_MAX + "의 정수여야 합니다.");
+        return defaultValue;
+    }
+}

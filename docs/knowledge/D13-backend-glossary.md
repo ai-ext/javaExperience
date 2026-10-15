@@ -28,7 +28,9 @@ flowchart LR
   M --- H
 ```
 
-위 그림에서 화살표는 조직마다 달라질 수 있지만 산출물의 흐름은 유지된다. 요구사항은 ticket·acceptance criteria가 되고, 설계는 API schema·ADR이 되며, 코드와 테스트는 commit·pull request가 된다. 빌드는 JAR·container image를 만들고, CI는 이를 재현 가능하게 검증한다. 배포 후 관측 데이터가 다시 다음 요구사항과 운영 개선으로 들어온다. 이 문서는 전체 개발 과정인 D01을 용어 수준으로 확장한 것이다.
+위 그림에서 화살표는 조직마다 달라질 수 있지만 산출물의 흐름은 유지된다. 요구사항은 ticket·acceptance criteria가 되고, 설계는 API schema·ADR이 되며, 코드와 테스트는 commit·pull request가 된다. 빌드는 JAR·container image를 만들고, CI는 이를 재현 가능하게 검증한다.
+
+배포 후 관측 데이터가 다시 다음 요구사항과 운영 개선으로 들어온다. 이 문서는 전체 개발 과정인 D01을 용어 수준으로 확장한 것이다.
 
 ## 2. 분야별 용어 사전
 

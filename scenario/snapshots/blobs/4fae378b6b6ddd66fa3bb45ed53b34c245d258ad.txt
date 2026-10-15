@@ -1,0 +1,52 @@
+package org.example.moderation;
+
+import org.example.auth.AuthenticatedMember;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+
+@Service
+public class BannedWordService {
+
+    private final BannedWordRepository bannedWordRepository;
+    private final Clock clock;
+
+    public BannedWordService(BannedWordRepository bannedWordRepository, Clock clock) {
+        this.bannedWordRepository = bannedWordRepository;
+        this.clock = clock;
+    }
+
+    @Transactional(readOnly = true)
+    public List<BannedWordResponse> list() {
+        return bannedWordRepository.findAllByOrderByIdAsc().stream()
+                .map(w -> new BannedWordResponse(w.getId(), w.getWord(), w.getAction()))
+                .toList();
+    }
+
+    // 중복은 409 — 대소문자만 다른 것도 같은 단어로 본다(utf8mb4_0900_ai_ci 비교 + UNIQUE)
+    @Transactional
+    public BannedWordResponse add(AuthenticatedMember me, BannedWordRequest request) {
+        String word = request.word().strip();
+        if (bannedWordRepository.existsByWord(word)) {
+            throw new DuplicateBannedWordException();
+        }
+        try {
+            BannedWord saved = bannedWordRepository.saveAndFlush(new BannedWord(word, request.action(), me.id(),
+                    LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)));
+            return new BannedWordResponse(saved.getId(), saved.getWord(), saved.getAction());
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateBannedWordException();
+        }
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        BannedWord word = bannedWordRepository.findById(id).orElseThrow(BannedWordNotFoundException::new);
+        bannedWordRepository.delete(word);
+    }
+}

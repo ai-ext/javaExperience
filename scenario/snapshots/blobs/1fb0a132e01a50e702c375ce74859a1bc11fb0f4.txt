@@ -1,0 +1,45 @@
+package org.example.board.user;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.nio.charset.StandardCharsets;
+
+import jakarta.validation.Constraint;
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.ConstraintValidatorContext;
+import jakarta.validation.Payload;
+
+// 글자 수가 아니라 UTF-8 바이트 수로 길이를 막는다 — BCrypt는 72바이트를 넘는 입력을 encode하지 못한다(F4)
+@Target(ElementType.FIELD)
+@Retention(RetentionPolicy.RUNTIME)
+@Constraint(validatedBy = MaxBytes.Validator.class)
+public @interface MaxBytes {
+
+    int value();
+
+    String message();
+
+    // 아래 두 줄은 Bean Validation 규칙상 모든 검증 어노테이션에 있어야 한다
+    Class<?>[] groups() default {};
+
+    Class<? extends Payload>[] payload() default {};
+
+    // 실제 검사 — true면 통과
+    class Validator implements ConstraintValidator<MaxBytes, String> {
+
+        private int max;
+
+        @Override
+        public void initialize(MaxBytes annotation) {
+            this.max = annotation.value();
+        }
+
+        @Override
+        public boolean isValid(String value, ConstraintValidatorContext context) {
+            // null은 @NotNull 몫이라 여기서는 통과시킨다
+            return value == null || value.getBytes(StandardCharsets.UTF_8).length <= max;
+        }
+    }
+}

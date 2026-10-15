@@ -1,0 +1,33 @@
+package org.example.board.comment;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import org.example.board.post.AuthorResponse;
+
+// 최상위 댓글은 replies(답글 목록)를 가진다. 답글에는 replies가 없다
+public record CommentResponse(
+        Long id,
+        String content,
+        AuthorResponse author,
+        boolean deleted,
+        LocalDateTime createdAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) List<CommentResponse> replies) {
+
+    static final String DELETED_CONTENT = "삭제된 댓글입니다";
+
+    static CommentResponse reply(Comment c) {
+        return new CommentResponse(c.getId(), c.getContent(), AuthorResponse.from(c.getAuthor()), false,
+                c.getCreatedAt(), null);
+    }
+
+    static CommentResponse top(Comment c, List<CommentResponse> replies) {
+        if (c.isDeleted()) {
+            // 지운 부모는 내용·작성자를 숨기고 자리만 남긴다(답글이 고아가 되지 않게)
+            return new CommentResponse(c.getId(), DELETED_CONTENT, null, true, c.getCreatedAt(), replies);
+        }
+        return new CommentResponse(c.getId(), c.getContent(), AuthorResponse.from(c.getAuthor()), false,
+                c.getCreatedAt(), replies);
+    }
+}

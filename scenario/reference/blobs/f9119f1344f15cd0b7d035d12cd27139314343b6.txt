@@ -1,0 +1,38 @@
+package org.example.batch;
+
+import org.example.post.Post;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.Repository;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+public interface LikeMilestoneRepository extends Repository<Post, Long> {
+
+    // 좋아요 "행 수"가 가장 낮은 단계(10) 이상인 글 — post.like_count(어긋날 수 있음)는 쓰지 않는다.
+    // 아직 기록 안 된 단계가 하나라도 있는 글만 돌려준다(이미 다 받은 글은 매번 다시 보지 않는다).
+    @Query(nativeQuery = true, value = """
+            SELECT x.postId, x.likes
+              FROM (SELECT p.id AS postId, COUNT(*) AS likes
+                      FROM post p
+                      JOIN post_like l ON l.post_id = p.id
+                     WHERE p.deleted_at IS NULL
+                     GROUP BY p.id
+                    HAVING COUNT(*) >= :lowest) x
+             WHERE (SELECT COUNT(*) FROM like_milestone m WHERE m.post_id = x.postId)
+                   < (CASE WHEN x.likes >= 100 THEN 3 WHEN x.likes >= 50 THEN 2 ELSE 1 END)
+             ORDER BY x.postId
+            """)
+    List<MilestoneCandidateRow> findCandidates(@Param("lowest") int lowest);
+
+    // UNIQUE(post_id, milestone) — 두 번 돌아도, 동시에 돌아도 한 행. 들어갔을 때(1)만 알림을 만든다
+    @Modifying
+    @Query(nativeQuery = true, value = """
+            INSERT IGNORE INTO like_milestone (post_id, milestone, likes, reached_at)
+            VALUES (:postId, :milestone, :likes, :now)
+            """)
+    int insertIgnore(@Param("postId") Long postId, @Param("milestone") int milestone,
+                     @Param("likes") long likes, @Param("now") LocalDateTime now);
+}

@@ -1,0 +1,153 @@
+package org.example.like;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.member.Member;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.example.post.PostNotFoundException;
+import org.example.post.PostRepository;
+import org.example.social.BlockPolicy;
+import org.example.social.FollowRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
+// 7-2: 좋아요 규칙을 Spring·DB 없이 순수 단위 테스트로 고정한다(MockitoExtension — strict stubs).
+// 리포지토리·"볼 수 있나" 정책은 mock, 5번만 정책을 spy로 감싸 실제 판정을 돌린다.
+//
+// 참고(설계 피드백): 4-2에서 좋아요 저장을 save(PostLike)가 아니라 INSERT IGNORE(insertIgnore)로 바꿨기
+// 때문에 "저장된 PostLike"라는 객체가 없다 — 2번은 insertIgnore에 넘어간 (글 id, 회원 id)를 캡처하고,
+// 3번 "저장 없음"은 "insert 시도는 하되 0행이라 숫자를 올리지 않음"으로 확인한다.
+// TransactionTemplate은 mock PlatformTransactionManager로 돌린다(getTransaction/commit이 아무것도 안 함).
+@ExtendWith(MockitoExtension.class)
+class LikeServiceTest {
+
+    private static final Long POST_ID = 3L;
+    private static final AuthenticatedMember KIMJAVA = new AuthenticatedMember(2L, "김자바", "USER");
+
+    @Mock
+    PostRepository postRepository;
+
+    @Mock
+    PostLikeRepository postLikeRepository;
+
+    @Mock
+    PostAccessPolicy accessPolicy;
+
+    @Mock
+    PlatformTransactionManager transactionManager;
+
+    LikeService likeService;
+
+    @BeforeEach
+    void setUp() {
+        likeService = new LikeService(postRepository, postLikeRepository, accessPolicy, transactionManager);
+    }
+
+    @Test
+    void 내_글에_좋아요하면_예외이고_저장도_증가도_하지_않는다() {
+        Post myPost = publishedPostBy(KIMJAVA.id());
+        given(postRepository.findById(POST_ID)).willReturn(Optional.of(myPost));
+        given(accessPolicy.canView(KIMJAVA, myPost)).willReturn(true);
+
+        assertThatThrownBy(() -> likeService.like(POST_ID, KIMJAVA))
+                .isInstanceOf(SelfLikeNotAllowedException.class);
+
+        verify(postLikeRepository, never()).insertIgnore(anyLong(), anyLong());
+        verify(postRepository, never()).incrementLikeCount(anyLong());
+    }
+
+    @Test
+    void 안_누른_글에_좋아요하면_한_번_저장하고_숫자를_한_번_올린다() {
+        Post post = publishedPostBy(4L);
+        given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
+        given(accessPolicy.canView(KIMJAVA, post)).willReturn(true);
+        given(postLikeRepository.insertIgnore(POST_ID, KIMJAVA.id())).willReturn(1);
+        given(postRepository.findLikeCountById(POST_ID)).willReturn(1);
+
+        LikeResponse response = likeService.like(POST_ID, KIMJAVA);
+
+        ArgumentCaptor<Long> postId = ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<Long> memberId = ArgumentCaptor.forClass(Long.class);
+        verify(postLikeRepository, times(1)).insertIgnore(postId.capture(), memberId.capture());
+        assertThat(postId.getValue()).isEqualTo(POST_ID);
+        assertThat(memberId.getValue()).isEqualTo(KIMJAVA.id());
+        verify(postRepository, times(1)).incrementLikeCount(POST_ID);
+        assertThat(response).isEqualTo(new LikeResponse(POST_ID, true, 1));
+    }
+
+    @Test
+    void 이미_누른_글에_또_좋아요하면_숫자를_올리지_않는다() {
+        Post post = publishedPostBy(4L);
+        given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
+        given(accessPolicy.canView(KIMJAVA, post)).willReturn(true);
+        given(postLikeRepository.insertIgnore(POST_ID, KIMJAVA.id())).willReturn(0); // UNIQUE 때문에 0행
+        given(postRepository.findLikeCountById(POST_ID)).willReturn(1);
+
+        LikeResponse response = likeService.like(POST_ID, KIMJAVA);
+
+        verify(postRepository, never()).incrementLikeCount(anyLong());
+        assertThat(response).isEqualTo(new LikeResponse(POST_ID, true, 1));
+    }
+
+    @Test
+    void 안_누른_글에_취소하면_숫자를_내리지_않는다() {
+        Post post = mock(Post.class);
+        given(post.getStatus()).willReturn("PUBLISHED");
+        given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
+        given(accessPolicy.canView(KIMJAVA, post)).willReturn(true);
+        given(postLikeRepository.deleteByPost_IdAndMember_Id(POST_ID, KIMJAVA.id())).willReturn(0L);
+        given(postRepository.findLikeCountById(POST_ID)).willReturn(0);
+
+        LikeResponse response = likeService.unlike(POST_ID, KIMJAVA);
+
+        verify(postRepository, never()).decrementLikeCount(anyLong());
+        assertThat(response).isEqualTo(new LikeResponse(POST_ID, false, 0));
+    }
+
+    // spy를 쓰는 이유: "볼 수 있나"는 결과를 지어내지(mock) 않고 2-3의 실제 규칙으로 판정하게 하면서,
+    // 서비스가 그 규칙을 정말 한 번 물어봤는지도 확인하고 싶어서다.
+    @Test
+    void 볼_수_없는_글이면_실제_규칙으로_판정해_404이고_저장하지_않는다() {
+        PostAccessPolicy realPolicy = spy(new PostAccessPolicy(mock(FollowRepository.class), mock(BlockPolicy.class)));
+        LikeService service = new LikeService(postRepository, postLikeRepository, realPolicy, transactionManager);
+
+        Post othersDraft = mock(Post.class); // 남(99번)의 임시저장 글 — 작성자만 볼 수 있다
+        Member author = mock(Member.class);
+        given(author.getId()).willReturn(99L);
+        given(othersDraft.getAuthor()).willReturn(author);
+        given(othersDraft.getStatus()).willReturn("DRAFT");
+        given(postRepository.findById(POST_ID)).willReturn(Optional.of(othersDraft));
+
+        assertThatThrownBy(() -> service.like(POST_ID, KIMJAVA))
+                .isInstanceOf(PostNotFoundException.class);
+
+        verify(realPolicy, times(1)).canView(KIMJAVA, othersDraft);
+        verify(postLikeRepository, never()).insertIgnore(anyLong(), anyLong());
+    }
+
+    private Post publishedPostBy(Long authorId) {
+        Member author = mock(Member.class);
+        given(author.getId()).willReturn(authorId);
+        Post post = mock(Post.class);
+        given(post.getAuthor()).willReturn(author);
+        given(post.getStatus()).willReturn("PUBLISHED");
+        return post;
+    }
+}

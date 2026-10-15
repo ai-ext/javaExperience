@@ -1,0 +1,132 @@
+{
+  "id": "10-6",
+  "source": "MyBatis 대체 구현 — 격리 DB에서 C1~C7·D1 검증",
+  "files": [
+    {
+      "path": "build.gradle",
+      "status": "modified",
+      "content": "plugins {\n    id 'java'\n    id 'org.springframework.boot' version '4.1.1'\n    id 'io.spring.dependency-management' version '1.1.7'\n}\n\ngroup = 'org.example'\nversion = '0.0.1-SNAPSHOT'\n\njava {\n    toolchain {\n        languageVersion = JavaLanguageVersion.of(21)\n    }\n}\n\nrepositories {\n    mavenCentral()\n}\n\ndependencies {\n    // start.spring.io에서 고른 것: Spring Web · Spring Data JPA · Validation · MySQL Driver · Flyway Migration\n    implementation 'org.springframework.boot:spring-boot-starter-webmvc'\n    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'\n    implementation 'org.springframework.boot:spring-boot-starter-validation'\n    implementation 'org.springframework.boot:spring-boot-starter-flyway'\n    // 10-3 비밀번호 해시(BCrypt) — Spring Security 전체가 아니라 암호화 모듈만\n    implementation 'org.springframework.security:spring-security-crypto'\n    // 10-4 JWT 발급·검증(jjwt) — api는 컴파일에, 구현·JSON 처리는 실행할 때만\n    implementation 'io.jsonwebtoken:jjwt-api:0.13.0'\n    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'\n    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'\n    runtimeOnly 'com.mysql:mysql-connector-j'\n    runtimeOnly 'org.flywaydb:flyway-mysql'\n\n    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'\n    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'\n}\n\ntasks.named('test') {\n    useJUnitPlatform()\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/auth/AuthService.java",
+      "status": "modified",
+      "content": "package org.example.board.auth;\n\nimport org.example.board.common.ApiException;\nimport org.example.board.common.ErrorCode;\nimport org.example.board.user.User;\nimport org.example.board.user.UserMapper;\nimport org.springframework.security.crypto.password.PasswordEncoder;\nimport org.springframework.stereotype.Service;\nimport org.springframework.transaction.annotation.Transactional;\n\n@Service\npublic class AuthService {\n\n    // 없는 이메일과 틀린 비밀번호를 같은 문구로 — 어느 이메일이 가입돼 있는지 흘리지 않는다\n    private static final String LOGIN_FAILED = \"이메일 또는 비밀번호가 올바르지 않습니다.\";\n\n    private final UserMapper userMapper;\n    private final PasswordEncoder passwordEncoder;\n    private final JwtProvider jwtProvider;\n\n    public AuthService(UserMapper userMapper, PasswordEncoder passwordEncoder, JwtProvider jwtProvider) {\n        this.userMapper = userMapper;\n        this.passwordEncoder = passwordEncoder;\n        this.jwtProvider = jwtProvider;\n    }\n\n    @Transactional(readOnly = true)\n    public TokenResponse login(LoginRequest request) {\n        User user = userMapper.findByEmail(request.email());\n        if (user == null) throw new ApiException(ErrorCode.UNAUTHORIZED, LOGIN_FAILED);\n        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {\n            throw new ApiException(ErrorCode.UNAUTHORIZED, LOGIN_FAILED);\n        }\n        return new TokenResponse(jwtProvider.issue(user.getId()), jwtProvider.validitySeconds());\n    }\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/comment/Comment.java",
+      "status": "deleted",
+      "content": "",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/comment/CommentRepository.java",
+      "status": "deleted",
+      "content": "",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/comment/CommentResponse.java",
+      "status": "modified",
+      "content": "package org.example.board.comment;\n\nimport java.time.LocalDateTime;\nimport java.util.List;\n\nimport com.fasterxml.jackson.annotation.JsonInclude;\nimport org.example.board.post.AuthorResponse;\n\n// 최상위 댓글은 replies(답글 목록)를 가진다. 답글에는 replies가 없다\npublic record CommentResponse(\n        Long id,\n        String content,\n        AuthorResponse author,\n        boolean deleted,\n        LocalDateTime createdAt,\n        @JsonInclude(JsonInclude.Include.NON_NULL) List<CommentResponse> replies) {\n\n    static final String DELETED_CONTENT = \"삭제된 댓글입니다\";\n\n    static CommentResponse reply(CommentRow c) {\n        return new CommentResponse(c.id, c.content, new AuthorResponse(c.authorId, c.authorNickname), false,\n                c.createdAt, null);\n    }\n\n    static CommentResponse top(CommentRow c, List<CommentResponse> replies) {\n        if (c.deletedAt != null) {\n            // 지운 부모는 내용·작성자를 숨기고 자리만 남긴다(답글이 고아가 되지 않게)\n            return new CommentResponse(c.id, DELETED_CONTENT, null, true, c.createdAt, replies);\n        }\n        return new CommentResponse(c.id, c.content, new AuthorResponse(c.authorId, c.authorNickname), false,\n                c.createdAt, replies);\n    }\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/comment/CommentRow.java",
+      "status": "added",
+      "content": "package org.example.board.comment;\n\nimport java.time.LocalDateTime;\n\n// 댓글·작성자 JOIN의 한 행. parentId로 메모리에서 답글을 묶는다.\npublic class CommentRow {\n    public Long id;\n    public Long parentId;\n    public String content;\n    public Long authorId;\n    public String authorNickname;\n    public LocalDateTime createdAt;\n    public LocalDateTime deletedAt;\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/comment/CommentTree.java",
+      "status": "modified",
+      "content": "package org.example.board.comment;\n\nimport java.util.ArrayList;\nimport java.util.LinkedHashMap;\nimport java.util.List;\nimport java.util.Map;\n\n// 평평한 댓글 목록(시간순) → 최상위 + replies 트리\npublic final class CommentTree {\n\n    private CommentTree() {\n    }\n\n    public static List<CommentResponse> build(List<CommentRow> flat) {\n        Map<Long, List<CommentResponse>> repliesByParent = new LinkedHashMap<>();\n        for (CommentRow c : flat) {\n            if (c.parentId != null && c.deletedAt == null) {\n                repliesByParent.computeIfAbsent(c.parentId, k -> new ArrayList<>()).add(CommentResponse.reply(c));\n            }\n        }\n        List<CommentResponse> result = new ArrayList<>();\n        for (CommentRow c : flat) {\n            if (c.parentId != null) {\n                continue;\n            }\n            List<CommentResponse> replies = repliesByParent.getOrDefault(c.id, List.of());\n            // 지운 댓글에 살아 있는 답글이 없으면 자리도 남기지 않는다\n            if (c.deletedAt != null && replies.isEmpty()) {\n                continue;\n            }\n            result.add(CommentResponse.top(c, replies));\n        }\n        return result;\n    }\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/post/Post.java",
+      "status": "modified",
+      "content": "package org.example.board.post;\n\nimport java.time.LocalDateTime;\nimport java.time.temporal.ChronoUnit;\nimport java.util.LinkedHashSet;\nimport java.util.Set;\n\nimport org.example.board.user.User;\n\npublic class Post {\n\n    private Long id;\n\n    private User author;\n\n    private String title;\n\n    private String content;\n\n    private Visibility visibility;\n\n    private int viewCount;\n\n    private int likeCount;\n\n    // MyBatis 경로에서는 Service가 post_tags INSERT를 명시적으로 수행한다.\n    private Set<Tag> tags = new LinkedHashSet<>();\n\n    private LocalDateTime createdAt;\n\n    private LocalDateTime updatedAt;\n\n    private LocalDateTime deletedAt;\n\n    public Post() {\n    }\n\n    public Post(User author, String title, String content, Visibility visibility, Set<Tag> tags) {\n        this.author = author;\n        this.title = title;\n        this.content = content;\n        this.visibility = visibility;\n        this.tags.addAll(tags);\n        this.createdAt = now();\n        this.updatedAt = this.createdAt;\n    }\n\n    private static LocalDateTime now() {\n        return LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);\n    }\n\n    public Long getId() {\n        return id;\n    }\n\n    public void setId(Long id) {\n        this.id = id;\n    }\n\n    public User getAuthor() {\n        return author;\n    }\n\n    public String getTitle() {\n        return title;\n    }\n\n    public String getContent() {\n        return content;\n    }\n\n    public Visibility getVisibility() {\n        return visibility;\n    }\n\n    public int getViewCount() {\n        return viewCount;\n    }\n\n    public int getLikeCount() {\n        return likeCount;\n    }\n\n    public Set<Tag> getTags() {\n        return tags;\n    }\n\n    public LocalDateTime getCreatedAt() {\n        return createdAt;\n    }\n\n    public LocalDateTime getUpdatedAt() {\n        return updatedAt;\n    }\n\n    public LocalDateTime getDeletedAt() {\n        return deletedAt;\n    }\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/post/PostDetailRow.java",
+      "status": "added",
+      "content": "package org.example.board.post;\n\nimport java.time.LocalDateTime;\n\n// 글·작성자·태그 LEFT JOIN 결과의 평평한 한 행. 태그 하나마다 글 필드가 반복된다.\npublic class PostDetailRow {\n    public Long id;\n    public String title;\n    public String content;\n    public String visibility;\n    public int viewCount;\n    public int likeCount;\n    public Long authorId;\n    public String authorNickname;\n    public Long tagId;\n    public String tagName;\n    public LocalDateTime createdAt;\n    public LocalDateTime updatedAt;\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/post/PostMapper.java",
+      "status": "added",
+      "content": "package org.example.board.post;\n\nimport java.util.List;\n\nimport org.apache.ibatis.annotations.Mapper;\nimport org.apache.ibatis.annotations.Param;\nimport org.example.board.comment.CommentRow;\n\n@Mapper\npublic interface PostMapper {\n    void insertPost(Post post);\n    Tag findTagByName(String name);\n    void insertTag(Tag tag);\n    void linkTag(@Param(\"postId\") Long postId, @Param(\"tagId\") Long tagId);\n\n    List<PostDetailRow> findDetailRows(Long postId);\n    int increaseViewCount(Long postId);\n    long countLike(@Param(\"postId\") Long postId, @Param(\"userId\") Long userId);\n    List<CommentRow> findCommentRows(Long postId);\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/post/PostRepository.java",
+      "status": "deleted",
+      "content": "",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/post/PostService.java",
+      "status": "modified",
+      "content": "package org.example.board.post;\n\nimport java.util.ArrayList;\nimport java.util.LinkedHashSet;\nimport java.util.List;\nimport java.util.Set;\n\nimport org.example.board.comment.CommentTree;\nimport org.example.board.common.ApiException;\nimport org.example.board.common.ErrorCode;\nimport org.example.board.user.User;\nimport org.example.board.user.UserMapper;\nimport org.springframework.stereotype.Service;\nimport org.springframework.transaction.annotation.Transactional;\n\n@Service\npublic class PostService {\n    private final PostMapper postMapper;\n    private final UserMapper userMapper;\n\n    public PostService(PostMapper postMapper, UserMapper userMapper) {\n        this.postMapper = postMapper;\n        this.userMapper = userMapper;\n    }\n\n    @Transactional\n    public PostDetailResponse create(Long userId, PostCreateRequest request) {\n        User author = userMapper.findById(userId);\n        if (author == null) throw new ApiException(ErrorCode.UNAUTHORIZED);\n        Set<Tag> tags = findOrCreateTags(request.tags());\n        Post post = new Post(author, request.title(), request.content(),\n                Visibility.valueOf(request.visibility()), tags);\n        postMapper.insertPost(post);\n        for (Tag tag : tags) postMapper.linkTag(post.getId(), tag.getId());\n        return PostDetailResponse.of(post, post.getViewCount(), false, List.of());\n    }\n\n    @Transactional\n    public PostDetailResponse detail(Long postId, Long loginUserId) {\n        List<PostDetailRow> rows = postMapper.findDetailRows(postId);\n        if (rows.isEmpty()) throw new ApiException(ErrorCode.NOT_FOUND, \"게시글을 찾을 수 없습니다.\");\n        PostDetailRow first = rows.get(0);\n        if (\"PRIVATE\".equals(first.visibility) && !first.authorId.equals(loginUserId))\n            throw new ApiException(ErrorCode.NOT_FOUND, \"게시글을 찾을 수 없습니다.\");\n        postMapper.increaseViewCount(postId);\n        boolean liked = loginUserId != null && postMapper.countLike(postId, loginUserId) > 0;\n        List<String> tags = new ArrayList<>();\n        for (PostDetailRow row : rows) if (row.tagName != null) tags.add(row.tagName);\n        return new PostDetailResponse(first.id, first.title, first.content,\n                Visibility.valueOf(first.visibility), first.viewCount + 1, first.likeCount,\n                liked, new AuthorResponse(first.authorId, first.authorNickname), tags,\n                CommentTree.build(postMapper.findCommentRows(postId)), first.createdAt, first.updatedAt);\n    }\n\n    private Set<Tag> findOrCreateTags(List<String> names) {\n        Set<Tag> tags = new LinkedHashSet<>();\n        for (String name : names) {\n            Tag tag = postMapper.findTagByName(name);\n            if (tag == null) {\n                tag = new Tag(name);\n                postMapper.insertTag(tag);\n            }\n            tags.add(tag);\n        }\n        return tags;\n    }\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/post/Tag.java",
+      "status": "modified",
+      "content": "package org.example.board.post;\n\npublic class Tag {\n    private Long id;\n    private String name;\n\n    public Tag() {\n        // MyBatis 조회 결과용 생성자\n    }\n\n    public Tag(String name) {\n        this.name = name;\n    }\n\n    public Long getId() {\n        return id;\n    }\n\n    public void setId(Long id) {\n        this.id = id;\n    }\n\n    public String getName() {\n        return name;\n    }\n\n    public void setName(String name) {\n        this.name = name;\n    }\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/post/TagRepository.java",
+      "status": "deleted",
+      "content": "",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/user/User.java",
+      "status": "modified",
+      "content": "package org.example.board.user;\n\nimport java.time.LocalDateTime;\nimport java.time.temporal.ChronoUnit;\n\npublic class User {\n\n    private Long id;\n\n    private String email;\n\n    private String passwordHash;\n\n    private String nickname;\n\n    private LocalDateTime createdAt;\n\n    public User() {\n        // MyBatis가 SELECT 결과를 매핑할 때 사용한다.\n    }\n\n    public User(String email, String passwordHash, String nickname) {\n        this.email = email;\n        this.passwordHash = passwordHash;\n        this.nickname = nickname;\n        this.createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);\n    }\n\n    public Long getId() {\n        return id;\n    }\n\n    public void setId(Long id) {\n        this.id = id;\n    }\n\n    public String getEmail() {\n        return email;\n    }\n\n    public void setEmail(String email) {\n        this.email = email;\n    }\n\n    public String getPasswordHash() {\n        return passwordHash;\n    }\n\n    public void setPasswordHash(String passwordHash) {\n        this.passwordHash = passwordHash;\n    }\n\n    public String getNickname() {\n        return nickname;\n    }\n\n    public void setNickname(String nickname) {\n        this.nickname = nickname;\n    }\n\n    public LocalDateTime getCreatedAt() {\n        return createdAt;\n    }\n\n    public void setCreatedAt(LocalDateTime createdAt) {\n        this.createdAt = createdAt;\n    }\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/user/UserMapper.java",
+      "status": "added",
+      "content": "package org.example.board.user;\n\nimport org.apache.ibatis.annotations.Mapper;\n\n@Mapper\npublic interface UserMapper {\n    boolean existsByEmail(String email);\n    User findByEmail(String email);\n    User findById(Long id);\n    void insert(User user);\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/user/UserRepository.java",
+      "status": "deleted",
+      "content": "",
+      "diff": ""
+    },
+    {
+      "path": "src/main/java/org/example/board/user/UserService.java",
+      "status": "modified",
+      "content": "package org.example.board.user;\n\nimport org.example.board.common.ApiException;\nimport org.example.board.common.ErrorCode;\nimport org.springframework.dao.DuplicateKeyException;\nimport org.springframework.security.crypto.password.PasswordEncoder;\nimport org.springframework.stereotype.Service;\nimport org.springframework.transaction.annotation.Transactional;\n\n@Service\npublic class UserService {\n\n    private final UserMapper userMapper;\n    private final PasswordEncoder passwordEncoder;\n\n    public UserService(UserMapper userMapper, PasswordEncoder passwordEncoder) {\n        this.userMapper = userMapper;\n        this.passwordEncoder = passwordEncoder;\n    }\n\n    @Transactional\n    public UserResponse signup(SignupRequest request) {\n        if (userMapper.existsByEmail(request.email())) {\n            throw new ApiException(ErrorCode.DUPLICATE, \"이미 가입된 이메일입니다.\");\n        }\n        User user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname());\n        try {\n            userMapper.insert(user);\n        } catch (DuplicateKeyException e) {\n            // 확인과 저장 사이에 같은 이메일이 먼저 들어간 경우 — DB의 UNIQUE가 마지막 방어선이다\n            throw new ApiException(ErrorCode.DUPLICATE, \"이미 가입된 이메일입니다.\");\n        }\n        return UserResponse.from(user);\n    }\n\n    @Transactional(readOnly = true)\n    public UserResponse me(Long userId) {\n        // 토큰은 맞는데 회원이 없다(DB를 되돌린 뒤 옛 토큰 등) — 로그인부터 다시\n        User user = userMapper.findById(userId);\n        if (user == null) throw new ApiException(ErrorCode.UNAUTHORIZED);\n        return UserResponse.from(user);\n    }\n}\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/resources/application.yml",
+      "status": "modified",
+      "content": "spring:\n  application:\n    name: board-api\n  datasource:\n    # javaExperience MySQL(호스트 3306)의 project DB. 빈 DB면 Flyway가 V1으로 테이블·시드를 만든다\n    url: jdbc:mysql://localhost:13308/project?characterEncoding=UTF-8&serverTimezone=Asia/Seoul\n    username: community\n    password: community\n\napp:\n  jwt:\n    # 예시용 비밀키 — 실제 서비스에서는 코드·저장소에 두지 않고 환경 변수 등으로 주입한다. HS256은 32바이트 이상\n    secret: board-api-example-secret-key-change-me-0123456789\n    validity-seconds: 3600\n\nmybatis:\n  mapper-locations: classpath:mapper/*.xml\n  configuration:\n    map-underscore-to-camel-case: true\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/resources/mapper/PostMapper.xml",
+      "status": "added",
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<!DOCTYPE mapper PUBLIC \"-//mybatis.org//DTD Mapper 3.0//EN\" \"https://mybatis.org/dtd/mybatis-3-mapper.dtd\">\n<mapper namespace=\"org.example.board.post.PostMapper\">\n    <insert id=\"insertPost\" parameterType=\"org.example.board.post.Post\" useGeneratedKeys=\"true\" keyProperty=\"id\">\n        INSERT INTO posts (author_id, title, content, visibility, view_count, like_count, created_at, updated_at, deleted_at)\n        VALUES (#{author.id}, #{title}, #{content}, #{visibility}, 0, 0, #{createdAt}, #{updatedAt}, NULL)\n    </insert>\n    <select id=\"findTagByName\" resultType=\"org.example.board.post.Tag\">\n        SELECT id, name FROM tags WHERE name = #{name}\n    </select>\n    <insert id=\"insertTag\" parameterType=\"org.example.board.post.Tag\" useGeneratedKeys=\"true\" keyProperty=\"id\">\n        INSERT INTO tags (name) VALUES (#{name})\n    </insert>\n    <insert id=\"linkTag\">\n        INSERT INTO post_tags (post_id, tag_id) VALUES (#{postId}, #{tagId})\n    </insert>\n    <select id=\"findDetailRows\" resultType=\"org.example.board.post.PostDetailRow\">\n        SELECT p.id, p.title, p.content, p.visibility,\n               p.view_count AS viewCount, p.like_count AS likeCount,\n               p.created_at AS createdAt, p.updated_at AS updatedAt,\n               a.id AS authorId, a.nickname AS authorNickname,\n               t.id AS tagId, t.name AS tagName\n        FROM posts p\n        JOIN users a ON a.id = p.author_id\n        LEFT JOIN post_tags pt ON pt.post_id = p.id\n        LEFT JOIN tags t ON t.id = pt.tag_id\n        WHERE p.id = #{postId} AND p.deleted_at IS NULL\n        ORDER BY t.name\n    </select>\n    <update id=\"increaseViewCount\">\n        UPDATE posts SET view_count = view_count + 1 WHERE id = #{postId}\n    </update>\n    <select id=\"countLike\" resultType=\"long\">\n        SELECT COUNT(*) FROM post_likes WHERE post_id = #{postId} AND user_id = #{userId}\n    </select>\n    <select id=\"findCommentRows\" resultType=\"org.example.board.comment.CommentRow\">\n        SELECT c.id, c.parent_id AS parentId, c.content, c.created_at AS createdAt,\n               c.deleted_at AS deletedAt, a.id AS authorId, a.nickname AS authorNickname\n        FROM comments c JOIN users a ON a.id = c.author_id\n        WHERE c.post_id = #{postId}\n        ORDER BY c.created_at, c.id\n    </select>\n</mapper>\n",
+      "diff": ""
+    },
+    {
+      "path": "src/main/resources/mapper/UserMapper.xml",
+      "status": "added",
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<!DOCTYPE mapper PUBLIC \"-//mybatis.org//DTD Mapper 3.0//EN\" \"https://mybatis.org/dtd/mybatis-3-mapper.dtd\">\n<mapper namespace=\"org.example.board.user.UserMapper\">\n    <select id=\"existsByEmail\" resultType=\"boolean\">\n        SELECT EXISTS(SELECT 1 FROM users WHERE email = #{email})\n    </select>\n    <select id=\"findByEmail\" resultType=\"org.example.board.user.User\">\n        SELECT id, email, password_hash, nickname, created_at\n        FROM users WHERE email = #{email}\n    </select>\n    <select id=\"findById\" resultType=\"org.example.board.user.User\">\n        SELECT id, email, password_hash, nickname, created_at\n        FROM users WHERE id = #{id}\n    </select>\n    <insert id=\"insert\" parameterType=\"org.example.board.user.User\" useGeneratedKeys=\"true\" keyProperty=\"id\">\n        INSERT INTO users (email, password_hash, nickname, created_at)\n        VALUES (#{email}, #{passwordHash}, #{nickname}, #{createdAt})\n    </insert>\n</mapper>\n",
+      "diff": ""
+    }
+  ]
+}

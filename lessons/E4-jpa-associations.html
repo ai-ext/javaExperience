@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E4. JPA 연관관계 첫걸음 — 글·작성자·태그·댓글을 잇기</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="e4-jpa-연관관계-첫걸음--글작성자태그댓글을-잇기"><a class="anchor" href="#e4-jpa-연관관계-첫걸음--글작성자태그댓글을-잇기" aria-hidden="true">#</a>E4. JPA 연관관계 첫걸음 — 글·작성자·태그·댓글을 잇기</h1>
+<blockquote>
+<p>개념 레슨 · 40분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>글 상세 API의 응답 JSON은 <code>{ &quot;author&quot;: {…}, &quot;tags&quot;: […], &quot;comments&quot;: […] }</code>처럼 한 덩어리다. DB에는 이런 덩어리가 없다. 테이블이 따로 있고 <strong>번호(외래키)</strong> 로 이어져 있을 뿐이다(E2). E3에서 <code>@ManyToOne</code>으로 &quot;번호 대신 객체&quot;를 맛봤다. 이번에는 게시판에 나오는 세 가지 관계를 다 잇는다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>관계</th>
+<th>DB에서는</th>
+<th>엔티티에서는</th>
+<th>어노테이션</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>글 → 작성자 (글 여러 개가 회원 하나를)</td>
+<td><code>post.author_id</code></td>
+<td><code>Post.author</code></td>
+<td><code>@ManyToOne</code> 다대일</td>
+</tr>
+<tr>
+<td>글 ↔ 태그 (서로 여러 개)</td>
+<td>연결 테이블 <code>post_tag(post_id, tag_id)</code></td>
+<td><code>Post.tags</code></td>
+<td><code>@ManyToMany</code> 다대다</td>
+</tr>
+<tr>
+<td>글 → 댓글 (글 하나에 댓글 여러 개)</td>
+<td><code>comment.post_id</code> — <strong>외래키는 댓글 쪽에</strong></td>
+<td><code>Post.comments</code></td>
+<td><code>@OneToMany</code> 일대다</td>
+</tr>
+</tbody></table></div>
+<p>엔티티의 연관 필드는 데이터 그 자체가 아니라 <strong>DB에서 찾아갈 수 있는 길</strong>이다. 길을 따라가는 순간(<code>post.getAuthor().getNickname()</code>) Hibernate가 SQL을 만들어 보낸다. 그래서 이 레슨의 절반은 &quot;SQL이 언제, 몇 번 나가나&quot;를 세는 일이다.</p>
+<h3 id="연관관계의-주인--외래키-열을-누가-쓰나"><a class="anchor" href="#연관관계의-주인--외래키-열을-누가-쓰나" aria-hidden="true">#</a>연관관계의 주인 — 외래키 열을 누가 쓰나</h3>
+<p><code>comment.post_id</code> 열은 댓글 테이블에 있다. 이 열과 짝인 자바 필드 <code>Comment.post</code>(<code>@ManyToOne</code>)가 <strong>주인</strong>이다. 저장할 때 Hibernate는 주인 필드만 보고 <code>post_id</code>를 채운다.</p>
+<p><code>Post.comments</code>는 같은 관계를 반대쪽에서 보는 <strong>거울</strong>이다. <code>@OneToMany(mappedBy = &quot;post&quot;)</code>라고 쓰는데, <code>mappedBy</code>는 &quot;이 관계의 진짜 주인은 <code>Comment</code>의 <code>post</code> 필드다&quot;라는 뜻이다. <strong>열 이름(<code>post_id</code>)이 아니라 자바 필드 이름</strong>을 쓴다(틀리면 서버가 안 뜬다 — 일부러 틀려 보기 2).</p>
+<p>거울에만 넣고 저장하면 어떻게 되나. 실제로 <code>post.getComments().add(comment)</code>만 하고 <code>comment.post</code>는 비운 채 저장해 봤다. SQL이 나가기도 전에 막혔다.</p>
+<pre><code class="language-text">org.springframework.dao.DataIntegrityViolationException: not-null property references a null or transient value for entity org.example.e4.Comment.post</code></pre>
+<p><code>Comment.post</code>(주인)가 비어 있다는 말이다. 주인 쪽을 채우자 <code>insert … (author_id,content,post_id) values (?,?,?)</code>에 <code>post_id</code> = <code>1</code>이 들어갔다. 다대다도 같다. <code>@JoinTable</code>을 단 <code>Post.tags</code>가 주인이라 <code>post_tag</code> 행을 쓴다.</p>
+<h3 id="언제-읽나--lazy와-eager-기본값이-다르다"><a class="anchor" href="#언제-읽나--lazy와-eager-기본값이-다르다" aria-hidden="true">#</a>언제 읽나 — LAZY와 EAGER, 기본값이 다르다</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>어노테이션</th>
+<th>기본값</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@ManyToOne</code></td>
+<td><strong>EAGER</strong></td>
+<td>글을 읽으면 작성자도 <strong>반드시 바로</strong> 읽는다</td>
+</tr>
+<tr>
+<td><code>@OneToMany</code> · <code>@ManyToMany</code></td>
+<td>LAZY</td>
+<td>컬렉션은 처음 쓸 때 읽는다</td>
+</tr>
+</tbody></table></div>
+<p>ToOne 쪽 기본값이 EAGER라서, 우리는 늘 <code>@ManyToOne(fetch = FetchType.LAZY)</code>라고 <strong>직접 적는다</strong>. 안 적으면 쓰지도 않는 작성자를 매번 읽는다(일부러 틀려 보기 1에서 센다).</p>
+<p>LAZY 필드에는 진짜 <code>Member</code> 대신 <strong>프록시(대리 객체)</strong> 가 들어 있다. 겉은 <code>Member</code>인데 안에 <code>id</code>만 들고 있다가, 다른 값을 처음 물을 때 SQL을 보낸다. 따라 해 보기 ①~④의 실제 출력이다.</p>
+<pre><code class="language-text">SQL: select p1_0.id,p1_0.author_id,p1_0.title from post p1_0 where p1_0.id=?
+① 작성자 클래스: org.example.e4.Member$HibernateProxy
+② 읽었나? false / id: 4
+SQL: select m1_0.id,m1_0.nickname from member m1_0 where m1_0.id=?
+③ 닉네임: 스프링요정
+④ 읽었나? true</code></pre>
+<p>① 클래스가 실행 중에 만들어진 <code>Member$HibernateProxy</code>다. ② <code>getId()</code>로는 SQL이 안 나간다(<code>post.author_id</code>에서 이미 안다). ③ <code>getNickname()</code>에서 비로소 <code>member</code>를 읽는다.</p>
+<p>프록시가 DB를 읽으려면 <strong>열린 DB 세션(트랜잭션)</strong> 이 있어야 한다. 트랜잭션이 끝난 뒤 처음 물으면 <code>LazyInitializationException</code>이 난다(따라 해 보기 ⑨).</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<p><code>practice</code> DB(8장에서도 쓰는 학습용 DB)의 <code>member</code>·<code>post</code>·<code>tag</code>·<code>post_tag</code>·<code>comment</code>에 맞춘 엔티티다. 쓰는 열만 매핑했다. 따라 해 보기에서 그대로 실행한 코드다.</p>
+<pre><code class="language-java">@Entity
+@Table(name = &quot;post&quot;)
+public class Post {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String title;
+
+    // ① 다대일: 글 여러 개 → 작성자 하나. post.author_id 열을 이 필드가 맡는다(주인)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = &quot;author_id&quot;)
+    private Member author;
+
+    // ② 다대다: 글 ↔ 태그. 연결 테이블 post_tag를 이 필드가 맡는다(주인)
+    @ManyToMany
+    @JoinTable(name = &quot;post_tag&quot;,
+            joinColumns = @JoinColumn(name = &quot;post_id&quot;),
+            inverseJoinColumns = @JoinColumn(name = &quot;tag_id&quot;))
+    private Set&lt;Tag&gt; tags = new LinkedHashSet&lt;&gt;();
+
+    // ③ 일대다: 글 하나 → 댓글 여러 개. 외래키는 Comment.post가 맡는다 — 여기는 읽기용 거울
+    @OneToMany(mappedBy = &quot;post&quot;)
+    private List&lt;Comment&gt; comments = new ArrayList&lt;&gt;();
+
+    protected Post() {}
+    public Long getId() { return id; }
+    public String getTitle() { return title; }
+    public Member getAuthor() { return author; }
+    public Set&lt;Tag&gt; getTags() { return tags; }
+    public List&lt;Comment&gt; getComments() { return comments; }
+}</code></pre>
+<pre><code class="language-java">@Entity
+@Table(name = &quot;comment&quot;)
+public class Comment {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String content;
+
+    // 댓글 여러 개 → 글 하나. comment.post_id 열을 이 필드가 맡는다(주인)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = &quot;post_id&quot;)
+    private Post post;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = &quot;member_id&quot;)
+    private Member author;
+
+    protected Comment() {}
+    public Long getId() { return id; }
+    public String getContent() { return content; }
+    public Post getPost() { return post; }
+    public Member getAuthor() { return author; }
+}</code></pre>
+<p><code>Member</code>(테이블 <code>member</code>, 필드 <code>id</code>·<code>nickname</code>)와 <code>Tag</code>(테이블 <code>tag</code>, 필드 <code>id</code>·<code>name</code>)는 E3의 <code>Tag</code>처럼 <code>@Entity</code>·<code>@Table</code>·<code>@Id</code>·<code>@GeneratedValue(strategy = GenerationType.IDENTITY)</code>·<code>protected</code> 기본 생성자·getter만 있는 클래스다. import는 <code>jakarta.persistence.*</code>와 <code>java.util.*</code>다.</p>
+<h3 id="n1--목록-1번--글마다-1번"><a class="anchor" href="#n1--목록-1번--글마다-1번" aria-hidden="true">#</a>N+1 — 목록 1번 + 글마다 1번</h3>
+<p>글 10개를 읽고 글마다 댓글 수를 세면 SQL이 몇 번 나갈까. 따라 해 보기 ⑤의 실제 로그다(가운데를 줄였다).</p>
+<pre><code class="language-text">SQL: select p1_0.id,p1_0.author_id,p1_0.title from post p1_0 order by p1_0.id limit ?
+⑤ 글 10개 읽음 — 이제 댓글 수를 센다
+SQL: select c1_0.post_id,c1_0.id,c1_0.member_id,c1_0.content from comment c1_0 where c1_0.post_id=?
+   글 1 댓글 0개
+SQL: select c1_0.post_id,c1_0.id,c1_0.member_id,c1_0.content from comment c1_0 where c1_0.post_id=?
+   글 2 댓글 1개
+…(같은 SQL이 글 10까지 한 번씩)</code></pre>
+<p>목록 <strong>1번</strong> + 글마다 <strong>1번씩 10번</strong> = 11번. 글이 50개면 51번이다. 이것이 <strong>N+1</strong>이다. 화면은 멀쩡하고 에러도 없어서 로그를 세 보지 않으면 모른다.</p>
+<p>작성자는 조금 다르다(⑥). 글 10개인데 <code>member</code> SELECT는 <strong>8번</strong>만 나갔다. 글 6·7은 같은 회원(쿼리장인), 글 1·9도 같은 회원(스프링요정)이다. 한 트랜잭션 안에서 이미 읽은 회원은 Hibernate가 기억해 두고(영속성 컨텍스트) 다시 읽지 않는다. 그래도 &quot;글 수만큼 늘어난다&quot;는 성질은 같다.</p>
+<h3 id="줄이기--join-fetch와-entitygraph"><a class="anchor" href="#줄이기--join-fetch와-entitygraph" aria-hidden="true">#</a>줄이기 — join fetch와 @EntityGraph</h3>
+<p>&quot;이 조회에서는 댓글(또는 작성자)도 같이 읽어라&quot;를 저장소 메서드에 적는다.</p>
+<pre><code class="language-java">public interface PostRepository extends JpaRepository&lt;Post, Long&gt; {
+    // 기본: 글만 읽는다(작성자·댓글은 나중에 쓸 때)
+    List&lt;Post&gt; findTop10ByOrderByIdAsc();
+
+    // 작성자를 같이 읽는다 — 이 메서드에만 적용
+    @EntityGraph(attributePaths = &quot;author&quot;)
+    List&lt;Post&gt; findTop10WithAuthorByOrderByIdAsc();
+
+    // 댓글을 같이 읽는다 — JPQL에 join fetch
+    @Query(&quot;select p from Post p left join fetch p.comments where p.id &lt;= 10 order by p.id&quot;)
+    List&lt;Post&gt; findFirstTenWithComments();
+}</code></pre>
+<p><code>WithAuthor</code>는 사람이 읽으라고 붙인 이름표다. Spring Data는 <code>find</code>와 <code>By</code> 사이에서 <code>Top10</code>만 읽는다. 실제로 나간 SQL은 각각 <strong>한 번</strong>이었다(⑦·⑧).</p>
+<pre><code class="language-text">SQL: select p1_0.id,p1_0.author_id,c1_0.post_id,c1_0.id,c1_0.member_id,c1_0.content,p1_0.title from post p1_0 left join comment c1_0 on p1_0.id=c1_0.post_id where p1_0.id&lt;=10 order by p1_0.id
+⑦ join fetch: 글 10개, 댓글 합계 19개
+SQL: select p1_0.id,p1_0.author_id,a1_0.id,a1_0.nickname,p1_0.title from post p1_0 join member a1_0 on a1_0.id=p1_0.author_id order by p1_0.id limit ?
+⑧ @EntityGraph: 글 10개, 작성자 8명</code></pre>
+<p>댓글 JOIN 결과는 댓글 수만큼 행이 불어나지만(22행), 돌아온 <code>List</code>는 글 10개 그대로였다(Hibernate 7이 같은 글을 하나로 합친다). 컬렉션을 join fetch 하면서 페이지를 자르는 일은 따로 조심할 게 있어 랩 L3에서 다룬다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>15분. 연습용 프로젝트를 하나 만든다. 실습 레포에는 이미 <code>Post</code>·<code>Tag</code> 엔티티가 있어서 같은 이름을 또 만들면 부딪힌다.</p>
+<p><strong>1. 프로젝트.</strong> start.spring.io에서 Gradle·Java 21·Spring Boot 4.1.1, 의존성 <strong>Spring Web · Spring Data JPA · MySQL Driver</strong>를 골라 받는다(화면 설명은 10-1에 있다). 패키지는 <code>org.example.e4</code>. <code>build.gradle</code>의 의존성이 <code>spring-boot-starter-webmvc</code>·<code>spring-boot-starter-data-jpa</code>·<code>runtimeOnly &#39;com.mysql:mysql-connector-j&#39;</code> 세 줄이면 된다. <code>application.yml</code>은 이렇게 둔다.</p>
+<pre><code class="language-yaml">server:
+  port: 18160
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/practice?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  jpa:
+    hibernate:
+      ddl-auto: none        # 테이블은 건드리지 않는다(읽기만 한다)
+    open-in-view: false     # 실습 레포·10장과 같다 — 트랜잭션이 끝나면 DB 세션도 닫힌다
+logging:
+  level:
+    org.hibernate.SQL: debug</code></pre>
+<p><strong>2. 파일.</strong> 예시의 엔티티 네 개와 <code>PostRepository</code>, 그리고 아래 연습 파일을 만든다.</p>
+<pre><code class="language-java">// 연습용 — 서버가 뜰 때 한 번 실행된다
+@Component
+public class E4Playground implements CommandLineRunner {
+    private final PostRepository postRepository;
+    private final TransactionTemplate tx;
+    public E4Playground(PostRepository postRepository, TransactionTemplate tx) {
+        this.postRepository = postRepository;
+        this.tx = tx;
+    }
+
+    @Override
+    public void run(String... args) {
+        // tx.executeWithoutResult(…) 안 = 트랜잭션 안(서비스의 @Transactional 메서드 안과 같다)
+        tx.executeWithoutResult(s -&gt; {
+            Post post = postRepository.findById(1L).orElseThrow();
+            Member author = post.getAuthor();
+            System.out.println(&quot;① 작성자 클래스: &quot; + author.getClass().getName());
+            System.out.println(&quot;② 읽었나? &quot; + Hibernate.isInitialized(author) + &quot; / id: &quot; + author.getId());
+            System.out.println(&quot;③ 닉네임: &quot; + author.getNickname());
+            System.out.println(&quot;④ 읽었나? &quot; + Hibernate.isInitialized(author));
+        });
+
+        tx.executeWithoutResult(s -&gt; {
+            List&lt;Post&gt; posts = postRepository.findTop10ByOrderByIdAsc();
+            System.out.println(&quot;⑤ 글 &quot; + posts.size() + &quot;개 읽음 — 이제 댓글 수를 센다&quot;);
+            for (Post p : posts) {
+                System.out.println(&quot;   글 &quot; + p.getId() + &quot; 댓글 &quot; + p.getComments().size() + &quot;개&quot;);
+            }
+            System.out.println(&quot;⑥ 이번엔 작성자 닉네임&quot;);
+            for (Post p : posts) {
+                System.out.println(&quot;   글 &quot; + p.getId() + &quot; 작성자 &quot; + p.getAuthor().getNickname());
+            }
+        });
+
+        tx.executeWithoutResult(s -&gt; {
+            List&lt;Post&gt; posts = postRepository.findFirstTenWithComments();
+            int total = posts.stream().mapToInt(p -&gt; p.getComments().size()).sum();
+            System.out.println(&quot;⑦ join fetch: 글 &quot; + posts.size() + &quot;개, 댓글 합계 &quot; + total + &quot;개&quot;);
+        });
+
+        tx.executeWithoutResult(s -&gt; {
+            List&lt;Post&gt; posts = postRepository.findTop10WithAuthorByOrderByIdAsc();
+            long authors = posts.stream().map(p -&gt; p.getAuthor().getNickname()).distinct().count();
+            System.out.println(&quot;⑧ @EntityGraph: 글 &quot; + posts.size() + &quot;개, 작성자 &quot; + authors + &quot;명&quot;);
+        });
+
+        // 트랜잭션 밖 — 저장소 메서드가 끝나면 DB 세션도 닫힌다
+        Post outside = postRepository.findById(1L).orElseThrow();
+        try {
+            System.out.println(&quot;⑨ 밖에서 닉네임: &quot; + outside.getAuthor().getNickname());
+        } catch (Exception e) {
+            System.out.println(&quot;⑨ &quot; + e);
+        }
+    }
+}</code></pre>
+<p>import는 <code>org.hibernate.Hibernate</code>, <code>org.springframework.transaction.support.TransactionTemplate</code>, <code>java.util.List</code> 등이다. <code>TransactionTemplate</code>은 &quot;이 람다를 트랜잭션 하나로 묶어 실행해 줘&quot;다. 연습 파일에서 <code>@Transactional</code> 메서드를 따로 만들지 않으려고 썼다(G3에서 <code>@Transactional</code>을 배운다).</p>
+<p><strong>3. 켜고 SQL 줄을 센다.</strong> <code>①</code>~`⑨<code>사이의</code>org.hibernate.SQL` 줄이 몇 개인지 센다. 시드 그대로인 DB에서 나온 수다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>구간</th>
+<th>SQL 수</th>
+<th>볼 것</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>①~④</td>
+<td>2</td>
+<td>글 1번, 닉네임을 물을 때 회원 1번</td>
+</tr>
+<tr>
+<td>⑤</td>
+<td>1 + 10</td>
+<td>목록 1 + 글마다 댓글 1 — N+1</td>
+</tr>
+<tr>
+<td>⑥</td>
+<td>8</td>
+<td>글 10개, 같은 회원은 다시 안 읽어서 8</td>
+</tr>
+<tr>
+<td>⑦ · ⑧</td>
+<td>1 · 1</td>
+<td>JOIN 한 번으로 끝</td>
+</tr>
+<tr>
+<td>⑨</td>
+<td>1 + 에러</td>
+<td>글은 읽었지만 작성자는 못 읽는다</td>
+</tr>
+</tbody></table></div>
+<p>⑨는 이렇게 나온다.</p>
+<pre><code class="language-text">⑨ org.hibernate.LazyInitializationException: Could not initialize proxy [org.example.e4.Member#4] - no session</code></pre>
+<p><code>[org.example.e4.Member#4]</code>는 &quot;id 4인 <code>Member</code>의 프록시&quot;다. <code>findById</code>가 끝나면서 트랜잭션과 DB 세션이 닫혔고, 프록시가 읽으러 갈 곳이 없다. 실제 API에서는 컨트롤러에서 DTO를 만들다 이렇게 터진다. → <a href="../errors.html#지연-로딩--no-session">에러 도감: 지연 로딩 — no session</a></p>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p>메시지는 Spring Boot 4.1.1 · Hibernate 7.4.5에서 재현한 원문이다.</p>
+<p><strong>1. <code>Post.author</code>에서 <code>fetch = FetchType.LAZY</code>를 지운다</strong> — 기본값 EAGER가 된다.</p>
+<pre><code class="language-text">SQL: select p1_0.id,p1_0.author_id,a1_0.id,a1_0.nickname,p1_0.title from post p1_0 join member a1_0 on a1_0.id=p1_0.author_id where p1_0.id=?
+① 작성자 클래스: org.example.e4.Member
+…
+SQL: select p1_0.id,p1_0.author_id,p1_0.title from post p1_0 order by p1_0.id limit ?
+SQL: select m1_0.id,m1_0.nickname from member m1_0 where m1_0.id=?
+…(member SELECT가 8번)
+⑤ 글 10개 읽음 — 이제 댓글 수를 센다</code></pre>
+<p><code>findById</code>는 JOIN 한 번으로 바뀌고 ①이 프록시가 아닌 진짜 <code>Member</code>가 된다. 그런데 목록(⑤ 앞)에서는 작성자를 <strong>쓰지도 않았는데</strong> <code>member</code> SELECT가 8번 먼저 나갔다. EAGER는 &quot;바로 읽어라&quot;일 뿐 &quot;JOIN 한 번으로 읽어라&quot;가 아니다. 댓글 join fetch(⑦)에도 같은 8번이 붙었다. 다시 <code>LAZY</code>로 돌려 놓는다.</p>
+<p><strong>2. <code>mappedBy</code>에 열 이름을 쓴다</strong> — <code>@OneToMany(mappedBy = &quot;post_id&quot;)</code></p>
+<pre><code class="language-text">Caused by: org.hibernate.AnnotationException: Collection 'org.example.e4.Post.comments' is 'mappedBy' a property named 'post_id' which does not exist in the target entity 'org.example.e4.Comment'</code></pre>
+<p>서버가 안 뜬다. <code>Comment</code>에 <code>post_id</code>라는 <strong>필드</strong>가 없다는 말이다. <code>mappedBy</code>는 상대 엔티티의 필드 이름(<code>&quot;post&quot;</code>)이다.</p>
+<p><strong>3. 엔티티를 그대로 응답한다.</strong> 컨트롤러에 <code>@GetMapping(&quot;/e4/posts/{id}/entity&quot;)</code>로 <code>postRepository.findById(id).orElseThrow()</code>를 그대로 돌려주는 메서드를 만든다(나쁜 예).</p>
+<p><code>curl localhost:18160/e4/posts/5/entity</code> → <code>500</code>. 서버 로그에는 ⑨와 같은 원인이 JSON 쓰기 단계에서 나온다.</p>
+<pre><code class="language-text">WARN … Resolved [org.springframework.http.converter.HttpMessageNotWritableException: Could not write JSON: Could not initialize proxy [org.example.e4.Member#28] - no session]</code></pre>
+<p>Jackson이 응답을 만들려고 <code>getAuthor()</code>의 프록시를 건드렸는데 세션이 이미 닫혔다. <code>open-in-view: true</code>(Spring Boot의 원래 기본값)로 켜면 더 나쁘다. 세션이 응답 끝까지 살아 있어서 <code>Post → comments → post → comments …</code>를 끝없이 따라간다. 상태 코드는 <strong><code>200</code></strong> 인데 본문은 39880바이트에서 잘린 깨진 JSON이었고(<code>&quot;hibernateLazyInitializer&quot;:{}</code> 같은 내부 필드까지 섞였다), 로그에는 이렇게 남았다.</p>
+<pre><code class="language-text">WARN … Ignoring exception, response committed already: org.springframework.http.converter.HttpMessageNotWritableException: Could not write JSON: Document nesting depth (501) exceeds the maximum allowed (500, from `StreamWriteConstraints.getMaxNestingDepth()`)</code></pre>
+<p>클라이언트는 <code>200</code>을 받았는데 본문 JSON을 읽다가 터진다. 상태 코드만 보는 모니터링에도 안 잡히는 최악의 버그다. 고치는 법은 하나다. <strong>트랜잭션 안에서 필요한 값만 DTO로 옮겨</strong> 돌려준다.</p>
+<pre><code class="language-java">@Service
+public class PostQueryService {
+    private final PostRepository postRepository;
+    public PostQueryService(PostRepository postRepository) {
+        this.postRepository = postRepository;
+    }
+
+    public record AuthorResponse(Long id, String nickname) {}
+    public record PostResponse(Long id, String title, AuthorResponse author, List&lt;String&gt; tags, int commentCount) {}
+
+    @Transactional(readOnly = true)
+    public PostResponse find(Long id) {
+        Post post = postRepository.findById(id).orElseThrow();
+        return new PostResponse(
+                post.getId(),
+                post.getTitle(),
+                new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+                post.getTags().stream().map(Tag::getName).toList(),
+                post.getComments().size());
+    }
+}</code></pre>
+<p>컨트롤러는 <code>postQueryService.find(id)</code>를 돌려주기만 한다. <code>curl localhost:18160/e4/posts/5</code> → <code>200</code>, <code>{&quot;id&quot;:5,&quot;title&quot;:&quot;JPA N+1 문제 비교해보기&quot;,&quot;author&quot;:{&quot;id&quot;:28,&quot;nickname&quot;:&quot;말많은회원&quot;},&quot;tags&quot;:[&quot;spring&quot;,&quot;jpa&quot;],&quot;commentCount&quot;:4}</code>(태그 순서는 실행마다 바뀔 수 있다). SQL은 글·작성자·태그(<code>post_tag join tag</code>)·댓글 4번이었다.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> <code>Post.comments</code>와 <code>Comment.post</code> 중 <code>comment.post_id</code> 열에 값을 쓰는 쪽은? <code>mappedBy = &quot;post&quot;</code>의 <code>&quot;post&quot;</code>는 무엇을 가리키나?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>Comment.post</code>다. 외래키 열이 <code>comment</code> 테이블에 있고, 그 열과 짝인 <code>@ManyToOne</code> 필드가 <strong>주인</strong>이다. <code>&quot;post&quot;</code>는 <code>Comment</code> 클래스의 <strong>자바 필드 이름</strong>이다. 열 이름 <code>post_id</code>를 쓰면 <code>is &#39;mappedBy&#39; a property named &#39;post_id&#39; which does not exist</code>로 서버가 안 뜬다. 거울(<code>Post.comments</code>)에만 넣고 저장하면 <code>not-null property references a null or transient value … Comment.post</code>로 막힌다.</p>
+</details>
+
+<p><strong>2.</strong> <code>@ManyToOne</code>에 <code>fetch</code>를 안 적고 <code>findTop10ByOrderByIdAsc()</code>를 부른 뒤 작성자는 한 번도 안 건드렸다. SQL은 1번인가?</p>
+<details>
+<summary>정답</summary>
+
+<p>아니다. <code>@ManyToOne</code>의 기본값은 <strong>EAGER</strong>라서 작성자를 바로 읽어야 한다. 실습 DB에서는 목록 1번 뒤에 <code>member</code> SELECT가 8번 더 나갔다. EAGER는 JOIN을 약속하지 않는다. 그래서 ToOne에는 늘 <code>fetch = FetchType.LAZY</code>를 직접 적고, 필요한 조회에서만 join fetch나 <code>@EntityGraph</code>로 같이 읽는다.</p>
+</details>
+
+<p><strong>3.</strong> ⑥에서 글은 10개인데 <code>member</code> SELECT는 8번이었다. 왜 10번이 아닌가? 그래도 N+1이라고 부르는 이유는?</p>
+<details>
+<summary>정답</summary>
+
+<p>한 트랜잭션 안에서 이미 읽은 회원은 Hibernate가 기억해 두고(영속성 컨텍스트) 다시 읽지 않는다. 글 6·7, 글 1·9가 같은 작성자라 두 번이 줄었다. 하지만 작성자가 다양할수록 SELECT 수가 글 수를 따라 늘어나는 구조는 그대로다. 목록 1번 + 행마다 추가 조회 = N+1이다.</p>
+</details>
+
+<p><strong>4.</strong> ⑨에서 <code>outside.getAuthor().getId()</code>였다면 에러가 났을까?</p>
+<details>
+<summary>정답</summary>
+
+<p>안 난다. 프록시는 처음부터 <code>id</code>를 들고 있다(②에서 <code>읽었나? false</code>인데도 id 4가 나왔다). <code>post.author_id</code> 열에서 이미 알기 때문이다. DB를 읽어야 하는 <code>getNickname()</code> 같은 값을 물을 때만 세션이 필요하다. 그래서 &quot;<code>getId()</code>로는 괜찮던데요&quot;가 지연 로딩 버그를 늦게 발견하게 만든다.</p>
+</details>
+
+<p><strong>5.</strong> 엔티티 <code>Post</code>를 컨트롤러에서 그대로 응답하면 어떤 일이 생기나(<code>open-in-view</code>가 꺼졌을 때와 켜졌을 때)? 어떻게 고치나?</p>
+<details>
+<summary>정답</summary>
+
+<p>꺼져 있으면(실습 레포·10장 설정) JSON을 만들다 프록시를 건드려 <code>Could not write JSON: Could not initialize proxy … - no session</code>, 응답은 <code>500</code>이다. 켜져 있으면 <code>post → comments → post …</code>를 끝없이 따라가다 <code>Document nesting depth (501) exceeds the maximum allowed (500 …)</code>가 나는데, 이미 <code>200</code>을 보낸 뒤라 클라이언트는 잘린 JSON을 받는다. 서비스의 트랜잭션 안에서 필요한 값만 <strong>DTO(record)</strong> 로 옮겨 돌려준다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/P20-jpa-entity-mapping.html#24-연관관계의-주인">P20 — 연관관계의 주인</a> — 양방향 편의 메서드, cascade·orphanRemoval, 다대다를 연결 엔티티로 푸는 법</li>
+<li><a href="../docs/knowledge/S09-jpa-hibernate.html#관계형-매핑과-주인">S09 — 관계형 매핑과 주인</a> — 영속성 컨텍스트, LAZY와 N+1(심화)</li>
+<li><a href="../docs/knowledge/W09-why-dto.html">W09 DTO는 왜 쓰나</a> · <a href="../docs/knowledge/W11-why-tx-in-service.html">W11 트랜잭션은 왜 서비스 계층에 거나</a></li>
+<li>노하우 랩(Java 학습 → 노하우 랩): <strong>L2</strong> 지연 로딩과 LazyInitializationException · <strong>L3</strong> N+1과 조회 전략 선택(컬렉션 fetch join과 페이지) · <strong>L4b</strong> Spring 트랜잭션 경계와 프록시 · <strong>L5</strong> Cascade와 orphanRemoval · <strong>L10</strong> 코드 리뷰 — JPA 냄새 모음 PR</li>
+<li>원문: <a href="https://javadoc.io/static/jakarta.persistence/jakarta.persistence-api/3.2.0/jakarta.persistence/jakarta/persistence/ManyToOne.html" target="_blank" rel="noopener">Jakarta Persistence <code>ManyToOne</code></a> · <a href="https://javadoc.io/static/jakarta.persistence/jakarta.persistence-api/3.2.0/jakarta.persistence/jakarta/persistence/OneToMany.html" target="_blank" rel="noopener"><code>OneToMany</code></a> · <a href="https://javadoc.io/static/jakarta.persistence/jakarta.persistence-api/3.2.0/jakarta.persistence/jakarta/persistence/ManyToMany.html" target="_blank" rel="noopener"><code>ManyToMany</code></a> — 기본 fetch 값 · <a href="https://docs.hibernate.org/orm/7.2/userguide/html_single/" target="_blank" rel="noopener">Hibernate ORM 사용자 가이드</a> — fetch join, batch fetching · <a href="https://docs.spring.io/spring-data/data-jpa/docs/4.1.0/api/org/springframework/data/jpa/repository/EntityGraph.html" target="_blank" rel="noopener">Spring Data JPA <code>@EntityGraph</code></a></li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li>실습: <a href="../scenario/ch3-update-delete/3-1-patch.html">3-1. 부분 수정과 본인 확인</a> — 읽은 글의 작성자·게시판이 프록시라서, 트랜잭션 밖에서 DTO를 만들면 ⑨처럼 터진다.</li>
+<li>실습: <a href="../scenario/ch10-project/10-5-create-post.html">10-5. 게시글 작성</a> — <code>@ManyToOne</code> 작성자와 <code>@ManyToMany</code> 태그(<code>post_tags</code>)로 처음 저장한다. 10장 DB는 테이블 이름이 <code>users</code>·<code>posts</code>·<code>tags</code>·<code>post_tags</code>·<code>comments</code>로 다를 뿐 모양은 같다.</li>
+<li>실습: <a href="../scenario/ch10-project/10-6-post-detail.html">10-6. 게시글 상세</a> — 작성자·태그·댓글을 쿼리 수를 고정한 채 읽는다. 10장 풀이는 <code>Post.comments</code> 컬렉션 대신 댓글 저장소에서 <code>join fetch c.author</code>로 읽는다. 둘 다 된다.</li>
+<li>레슨: <a href="E5-mybatis-first-steps.html">E5. MyBatis 첫걸음</a> — SQL을 직접 쓰는 다른 방식.</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

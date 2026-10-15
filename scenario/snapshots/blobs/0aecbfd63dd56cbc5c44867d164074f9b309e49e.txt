@@ -1,0 +1,23 @@
+package org.example.post;
+
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.Repository;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+// 11-3 조회 기록(post_view). 엔티티 없이 SQL 한 문장만 쓴다 — 읽을 일이 없고 "새로 생겼나"만 알면 된다.
+public interface PostViewRepository extends Repository<PostView, PostView.Key> {
+
+    // 오늘 처음 보는 거면 1행이 생기고 1을, 이미 봤으면(PK 중복) 아무것도 안 하고 0을 돌려준다.
+    // "있나 SELECT → 없으면 INSERT" 두 번 대신 한 문장이라, 새로고침이 겹쳐도 한 번만 1이 나온다.
+    @Modifying
+    @Query(nativeQuery = true, value = """
+            INSERT IGNORE INTO post_view (post_id, member_id, viewed_on, created_at)
+            VALUES (:postId, :memberId, :viewedOn, :now)
+            """)
+    int insertIfAbsent(@Param("postId") Long postId, @Param("memberId") Long memberId,
+                       @Param("viewedOn") LocalDate viewedOn, @Param("now") LocalDateTime now);
+}

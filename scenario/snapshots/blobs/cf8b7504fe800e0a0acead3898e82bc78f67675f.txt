@@ -1,0 +1,118 @@
+package org.example.comment;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import org.example.member.Member;
+import org.example.post.Post;
+
+import java.time.LocalDateTime;
+
+// 댓글 — parent_id가 있으면 답글(1단계까지만)
+@Entity
+@Table(name = "comment")
+public class Comment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id", nullable = false)
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "member_id", nullable = false)
+    private Member member;
+
+    // 자기 참조 — 부모 댓글(답글일 때만). 지연 로딩
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    private Comment parent;
+
+    @Column(nullable = false)
+    private String content;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    // 12-1 — 내용을 실제로 바꾼 마지막 시각. 한 번도 안 고쳤으면 null
+    @Column(name = "edited_at")
+    private LocalDateTime editedAt;
+
+    protected Comment() {
+        // JPA
+    }
+
+    public Comment(Post post, Member member, Comment parent, String content, LocalDateTime now) {
+        this.post = post;
+        this.member = member;
+        this.parent = parent;
+        this.content = content;
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    // 내용이 같으면 아무것도 바꾸지 않는다("수정됨"이 붙지 않는다). 바꿨으면 true
+    public boolean edit(String newContent, LocalDateTime now) {
+        if (this.content.equals(newContent)) {
+            return false;
+        }
+        this.content = newContent;
+        this.editedAt = now;
+        this.updatedAt = now;
+        return true;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Post getPost() {
+        return post;
+    }
+
+    public Member getMember() {
+        return member;
+    }
+
+    public Comment getParent() {
+        return parent;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public LocalDateTime getEditedAt() {
+        return editedAt;
+    }
+
+    public boolean isEdited() {
+        return editedAt != null;
+    }
+}

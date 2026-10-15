@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.board.post.PostQueryMapper">
+
+    <!-- 목록 카드 한 줄의 컬럼(목록 API 항목과 같은 필드) -->
+    <sql id="columns">
+        SELECT p.id, p.title, p.visibility, p.view_count, p.like_count, p.created_at,
+               u.id AS author_id, u.nickname AS author_nickname
+        FROM posts p
+        JOIN users u ON u.id = p.author_id
+    </sql>
+
+    <!-- 글 하나를 목록 카드 모양으로(작성·수정 응답용) — 같은 트랜잭션에서 JPA가 방금 쓴 것을 읽는다 -->
+    <select id="findListRowById" resultType="org.example.board.post.PostListRow">
+        <include refid="columns"/>
+        WHERE p.id = #{id}
+    </select>
+
+    <select id="findTagsByPostIds" resultType="org.example.board.post.PostTagRow">
+        SELECT pt.post_id, t.name
+        FROM post_tags pt
+        JOIN tags t ON t.id = pt.tag_id
+        WHERE pt.post_id IN
+        <foreach collection="postIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY t.name
+    </select>
+</mapper>

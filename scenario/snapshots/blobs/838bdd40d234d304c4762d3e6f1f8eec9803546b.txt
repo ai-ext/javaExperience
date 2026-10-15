@@ -1,0 +1,47 @@
+package org.example.batch;
+
+import org.example.post.Post;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.Repository;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
+public interface HallOfFameRepository extends Repository<Post, Long> {
+
+    // 기준 시각(cutoff) "전"에 눌린 좋아요 행을 센다 — post.like_count(비정규화, 어긋날 수 있음)는 쓰지 않는다.
+    // 볼 수 있는 글(PUBLISHED·PUBLIC·삭제 안 됨)만, 이미 올라간 글은 뺀다.
+    @Query(nativeQuery = true, value = """
+            SELECT p.id AS postId, p.title AS title, COUNT(*) AS likes
+              FROM post p
+              JOIN post_like l ON l.post_id = p.id AND l.created_at < :cutoff
+             WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL
+               AND NOT EXISTS (SELECT 1 FROM hall_of_fame h WHERE h.post_id = p.id)
+             GROUP BY p.id, p.title
+            HAVING COUNT(*) >= :minLikes
+             ORDER BY likes DESC, p.id ASC
+            """)
+    List<HallOfFameRow> findCandidates(@Param("cutoff") LocalDateTime cutoff, @Param("minLikes") int minLikes);
+
+    // 위 조회와 INSERT 사이에 같은 배치가 한 번 더 돌아도 UNIQUE(post_id)가 막는다 — 들어간 행 수(0/1)만 받는다
+    @Modifying
+    @Query(nativeQuery = true, value = """
+            INSERT IGNORE INTO hall_of_fame (post_id, likes, entered_on, created_at)
+            VALUES (:postId, :likes, :enteredOn, :now)
+            """)
+    int insertIgnore(@Param("postId") Long postId, @Param("likes") long likes,
+                     @Param("enteredOn") LocalDate enteredOn, @Param("now") LocalDateTime now);
+
+    @Query(nativeQuery = true, value = """
+            SELECT h.post_id AS postId, p.title AS title, h.likes AS likes, h.entered_on AS enteredOn
+              FROM hall_of_fame h
+              JOIN post p ON p.id = h.post_id
+             WHERE p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC' AND p.deleted_at IS NULL
+             ORDER BY h.entered_on DESC, h.likes DESC, h.post_id ASC
+             LIMIT :size
+            """)
+    List<HallOfFameListRow> findList(@Param("size") int size);
+}

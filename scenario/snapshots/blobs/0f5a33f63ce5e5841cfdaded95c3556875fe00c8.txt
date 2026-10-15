@@ -1,0 +1,47 @@
+package org.example.comment;
+
+import jakarta.validation.Valid;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
+import java.util.List;
+
+@RestController
+public class CommentController {
+
+    private final CommentService commentService;
+
+    public CommentController(CommentService commentService) {
+        this.commentService = commentService;
+    }
+
+    @PostMapping("/api/posts/{postId}/comments")
+    public ResponseEntity<CommentResponse> create(@PathVariable Long postId,
+                                                   @LoginMember AuthenticatedMember loginMember,
+                                                   @Valid @RequestBody CommentCreateRequest request) {
+        Comment comment = commentService.create(postId, loginMember, request);
+        return ResponseEntity.created(URI.create("/api/comments/" + comment.getId())).body(CommentResponse.from(comment));
+    }
+
+    // 조회는 토큰 없이도 된다(있으면 그 회원 기준 — 차단 규칙 적용)
+    @GetMapping("/api/posts/{postId}/comments")
+    public List<CommentThreadResponse> list(@PathVariable Long postId, @LoginMember AuthenticatedMember viewer) {
+        return commentService.list(postId, viewer);
+    }
+
+    @DeleteMapping("/api/comments/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id, @LoginMember AuthenticatedMember loginMember) {
+        commentService.delete(id, loginMember);
+    }
+}

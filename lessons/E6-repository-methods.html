@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E6. 저장소 메서드 만들기 — 이름으로 쿼리·@Query·페이지</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="e6-저장소-메서드-만들기--이름으로-쿼리query페이지"><a class="anchor" href="#e6-저장소-메서드-만들기--이름으로-쿼리query페이지" aria-hidden="true">#</a>E6. 저장소 메서드 만들기 — 이름으로 쿼리·@Query·페이지</h1>
+<blockquote>
+<p>개념 레슨 · 40분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p><a href="E3-what-is-jpa.html">E3</a>에서 <code>TagRepository</code>에 <code>Optional&lt;Tag&gt; findByName(String name);</code> 한 줄을 적었더니 <code>where name = ?</code> 쿼리가 생겼다. 이번에는 그 규칙을 끝까지 본다. 저장소에 조회 메서드를 만드는 길은 세 가지다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>길</th>
+<th>쓰는 법</th>
+<th>쿼리는 누가 만드나</th>
+<th>언제</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>① 물려받은 메서드</td>
+<td><code>extends JpaRepository&lt;Post, Long&gt;</code>만 쓴다</td>
+<td>Spring Data JPA가 이미 갖고 있다</td>
+<td>번호로 하나 찾기, 전부, 개수, 저장·삭제</td>
+</tr>
+<tr>
+<td>② 이름 규칙(파생 쿼리)</td>
+<td><code>findByStatus(String status)</code>처럼 <strong>이름만</strong> 선언</td>
+<td>메서드 이름을 읽고 만든다</td>
+<td>조건이 한두 개인 단순 조회</td>
+</tr>
+<tr>
+<td>③ <code>@Query</code></td>
+<td>메서드 위에 쿼리를 직접 적는다</td>
+<td>내가 쓴다(JPQL 또는 SQL)</td>
+<td>이름이 너무 길어질 때, 이름 규칙으로 못 쓰는 조회</td>
+</tr>
+</tbody></table></div>
+<h3 id="이름-한-줄을-뜯어-보기"><a class="anchor" href="#이름-한-줄을-뜯어-보기" aria-hidden="true">#</a>이름 한 줄을 뜯어 보기</h3>
+<pre><code class="language-text">find  Top3  By  Status  OrderBy  ViewCount  Desc
+ │     │    │     │        │         │        └ 내림차순
+ │     │    │     │        └─────────┴ 정렬 기준 필드
+ │     │    │     └ 조건: status = ?
+ │     │    └ 여기부터 조건
+ │     └ 최대 3개 (limit 3)
+ └ 무엇을 할지: find(찾기) · count(세기) · exists(있나) · delete(지우기)</code></pre>
+<ul>
+<li><code>By</code> 앞은 <strong>무엇을 할지</strong>, 뒤는 <strong>어떤 행을</strong>이다. <code>find</code>와 <code>By</code> 사이에 다른 낱말(<code>findSliceByBoardId</code>의 <code>Slice</code>)을 넣어도 Spring Data는 무시한다. 사람이 읽으라고 붙이는 이름표다(E4의 <code>WithAuthor</code>와 같다).</li>
+<li>조건 이름은 <strong>엔티티의 필드 이름</strong>이다. 열 이름(<code>view_count</code>)이 아니라 필드 이름(<code>viewCount</code>)을 쓴다. E3에서 오타를 내 봤다.</li>
+<li>조건 여러 개는 <code>And</code>·<code>Or</code>로 잇는다. 필드 이름 뒤에 키워드(<code>Containing</code>, <code>Between</code>, <code>In</code>, <code>IsNull</code>…)를 붙이면 <code>=</code> 대신 다른 비교가 된다.</li>
+</ul>
+<p>이름은 <strong>서버가 켜질 때</strong> 한 번 읽힌다. 규칙에 안 맞으면 서버가 아예 안 뜬다. 컴파일은 통과하니 &quot;컴파일 됐으니 됐다&quot;가 통하지 않는다(일부러 틀려 보기).</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<p><code>practice</code> DB의 <code>post</code> 테이블(E4에서 쓴 학습용 DB)을 읽기만 한다. 이번엔 이름 규칙에 집중하려고 게시판·작성자를 객체가 아닌 <strong>번호 필드</strong>로 두었다.</p>
+<pre><code class="language-java">@Entity
+@Table(name = &quot;post&quot;)
+public class Post {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = &quot;board_id&quot;)
+    private Long boardId;          // E4처럼 객체로 이어도 되지만, 이번엔 이름 규칙에 집중하려고 번호로 둔다
+
+    @Column(name = &quot;author_id&quot;)
+    private Long authorId;
+
+    private String title;
+    private String status;         // PUBLISHED · DRAFT · HIDDEN
+
+    @Column(name = &quot;view_count&quot;)
+    private int viewCount;
+
+    @Column(name = &quot;published_at&quot;)
+    private LocalDateTime publishedAt;   // 임시저장 글은 null
+
+    protected Post() {}
+
+    public Long getId() { return id; }
+    public Long getBoardId() { return boardId; }
+    public Long getAuthorId() { return authorId; }
+    public String getTitle() { return title; }
+    public String getStatus() { return status; }
+    public int getViewCount() { return viewCount; }
+    public LocalDateTime getPublishedAt() { return publishedAt; }
+
+    @Override
+    public String toString() {
+        return &quot;#&quot; + id + &quot; &quot; + title;
+    }
+}</code></pre>
+<pre><code class="language-java">// 목록 응답에 필요한 세 칸만 담는 DTO
+public record PostSummary(Long id, String title, int viewCount) {}</code></pre>
+<pre><code class="language-java">public interface PostRepository extends JpaRepository&lt;Post, Long&gt; {
+
+    // 주어 + By + 조건
+    List&lt;Post&gt; findByStatus(String status);
+    long countByStatus(String status);
+    boolean existsByTitle(String title);
+
+    // 조건 두 개 잇기
+    List&lt;Post&gt; findByBoardIdAndStatus(Long boardId, String status);
+    List&lt;Post&gt; findByBoardIdOrAuthorId(Long boardId, Long authorId);
+
+    // 조건 키워드
+    List&lt;Post&gt; findByTitleContaining(String word);
+    List&lt;Post&gt; findByTitleLike(String pattern);
+    List&lt;Post&gt; findByPublishedAtBetween(LocalDateTime from, LocalDateTime to);
+    List&lt;Post&gt; findByBoardIdIn(Collection&lt;Long&gt; boardIds);
+    List&lt;Post&gt; findByPublishedAtIsNull();
+
+    // 정렬 · 개수 제한
+    List&lt;Post&gt; findByBoardIdOrderByViewCountDesc(Long boardId);
+    List&lt;Post&gt; findTop3ByStatusOrderByViewCountDesc(String status);
+    Optional&lt;Post&gt; findFirstByStatusOrderByViewCountDesc(String status);
+    Optional&lt;Post&gt; findTopByOrderByViewCountDesc();
+
+    // 한 건만 기대하는 반환 타입
+    Optional&lt;Post&gt; findByTitle(String title);
+
+    // 페이지 · 정렬을 호출하는 쪽이 정한다
+    Page&lt;Post&gt; findByBoardId(Long boardId, Pageable pageable);
+    Slice&lt;Post&gt; findSliceByBoardId(Long boardId, Pageable pageable);
+    List&lt;Post&gt; findByStatus(String status, Sort sort);
+
+    // JPQL — 엔티티 이름(Post)과 필드 이름(viewCount)으로 쓴다
+    @Query(&quot;select p from Post p where p.status = :status and p.viewCount &gt;= :minViews order by p.viewCount desc&quot;)
+    List&lt;Post&gt; findPopular(@Param(&quot;status&quot;) String status, @Param(&quot;minViews&quot;) int minViews);
+
+    // 네이티브 SQL — 테이블 이름(post)과 열 이름(view_count)으로 쓴다
+    @Query(value = &quot;select * from post where status = :status and view_count &gt;= :minViews order by view_count desc&quot;,
+           nativeQuery = true)
+    List&lt;Post&gt; findPopularNative(@Param(&quot;status&quot;) String status, @Param(&quot;minViews&quot;) int minViews);
+
+    // DTO로 받기 — 필요한 열만 SELECT 한다
+    @Query(&quot;select new org.example.e6.PostSummary(p.id, p.title, p.viewCount) from Post p where p.boardId = :boardId order by p.viewCount desc&quot;)
+    List&lt;PostSummary&gt; findSummaries(@Param(&quot;boardId&quot;) Long boardId);
+
+    List&lt;PostSummary&gt; findSummaryByBoardIdAndStatus(Long boardId, String status);
+
+    Page&lt;PostSummary&gt; findByStatusAndTitleContaining(String status, String word, Pageable pageable);
+}</code></pre>
+<p>import는 <code>jakarta.persistence.*</code>, <code>org.springframework.data.domain.*</code>(<code>Page</code>·<code>Pageable</code>·<code>Slice</code>·<code>Sort</code>), <code>org.springframework.data.jpa.repository.*</code>(<code>JpaRepository</code>·<code>Query</code>), <code>org.springframework.data.repository.query.Param</code>, <code>java.time.LocalDateTime</code>, <code>java.util.*</code>다.</p>
+<p>아래 표의 SQL은 전부 따라 해 보기에서 <strong>실제로 나간 것</strong>이다. <code>Post</code>를 통째로 읽는 메서드는 SELECT 목록이 늘 <code>p1_0.id,p1_0.author_id,p1_0.board_id,p1_0.published_at,p1_0.status,p1_0.title,p1_0.view_count</code>로 같아서 <code>select …</code>로 줄였다. <code>?</code>에 들어간 값은 <code>binding parameter</code> 줄에서 옮겼다.</p>
+<h3 id="①-물려받은-메서드"><a class="anchor" href="#①-물려받은-메서드" aria-hidden="true">#</a>① 물려받은 메서드</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>호출</th>
+<th>실제 SQL</th>
+<th>돌려준 값</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>findById(5L)</code></td>
+<td><code>select … from post p1_0 where p1_0.id=?</code> ← <code>5</code></td>
+<td><code>Optional[#5 JPA N+1 문제 비교해보기]</code></td>
+</tr>
+<tr>
+<td><code>findById(9999L)</code></td>
+<td>같은 SQL ← <code>9999</code></td>
+<td><code>Optional.empty</code> — 없으면 빈 <code>Optional</code>, 예외가 아니다</td>
+</tr>
+<tr>
+<td><code>count()</code></td>
+<td><code>select count(*) from post p1_0</code></td>
+<td><code>145</code> (<code>long</code>)</td>
+</tr>
+<tr>
+<td><code>existsById(5L)</code></td>
+<td><code>select count(*) from post p1_0 where p1_0.id=?</code></td>
+<td><code>true</code> (<code>boolean</code>)</td>
+</tr>
+</tbody></table></div>
+<p><code>save</code>·<code>saveAll</code>·<code>findAll</code>·<code>delete</code>·<code>deleteById</code>도 같이 물려받는다. 저장·삭제가 내는 SQL은 E7에서 본다.</p>
+<h3 id="②-이름-규칙--메서드마다-나간-sql"><a class="anchor" href="#②-이름-규칙--메서드마다-나간-sql" aria-hidden="true">#</a>② 이름 규칙 — 메서드마다 나간 SQL</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>메서드(넘긴 값)</th>
+<th>실제 SQL의 뒷부분</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>findByStatus(&quot;DRAFT&quot;)</code></td>
+<td><code>where p1_0.status=?</code></td>
+<td>7개</td>
+</tr>
+<tr>
+<td><code>countByStatus(&quot;HIDDEN&quot;)</code></td>
+<td><code>select count(p1_0.id) from post p1_0 where p1_0.status=?</code></td>
+<td><code>4</code></td>
+</tr>
+<tr>
+<td><code>existsByTitle(&quot;JPA N+1 문제 비교해보기&quot;)</code></td>
+<td><code>select p1_0.id from post p1_0 where p1_0.title=? limit ?</code> ← <code>1</code></td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td><code>findByBoardIdAndStatus(2L, &quot;PUBLISHED&quot;)</code></td>
+<td><code>where p1_0.board_id=? and p1_0.status=?</code></td>
+<td>59개</td>
+</tr>
+<tr>
+<td><code>findByBoardIdOrAuthorId(1L, 4L)</code></td>
+<td><code>where p1_0.board_id=? or p1_0.author_id=?</code></td>
+<td>25개</td>
+</tr>
+<tr>
+<td><code>findByTitleContaining(&quot;JPA&quot;)</code></td>
+<td><code>where p1_0.title like ? escape &#39;\\&#39;</code> ← <code>%JPA%</code></td>
+<td>11개</td>
+</tr>
+<tr>
+<td><code>findByTitleLike(&quot;JPA&quot;)</code></td>
+<td>같은 SQL ← <code>JPA</code></td>
+<td><strong>0개</strong></td>
+</tr>
+<tr>
+<td><code>findByTitleLike(&quot;%JPA%&quot;)</code></td>
+<td>같은 SQL ← <code>%JPA%</code></td>
+<td>11개</td>
+</tr>
+<tr>
+<td><code>findByTitleContaining(&quot;%&quot;)</code></td>
+<td>같은 SQL ← <code>%\%%</code></td>
+<td>0개</td>
+</tr>
+<tr>
+<td><code>findByPublishedAtBetween(7/1 0시, 7/3 23:59:59)</code></td>
+<td><code>where p1_0.published_at between ? and ?</code></td>
+<td><code>#1</code>~`#8` 중 7개</td>
+</tr>
+<tr>
+<td><code>findByBoardIdIn(List.of(1L, 2L))</code></td>
+<td><code>where p1_0.board_id in (?,?)</code></td>
+<td>68개</td>
+</tr>
+<tr>
+<td><code>findByPublishedAtIsNull()</code></td>
+<td><code>where p1_0.published_at is null</code> — <code>?</code>가 없다</td>
+<td>7개</td>
+</tr>
+<tr>
+<td><code>findByBoardIdOrderByViewCountDesc(4L)</code></td>
+<td><code>where p1_0.board_id=? order by p1_0.view_count desc</code></td>
+<td>조회수 순 전부</td>
+</tr>
+<tr>
+<td><code>findTop3ByStatusOrderByViewCountDesc(&quot;PUBLISHED&quot;)</code></td>
+<td><code>where p1_0.status=? order by p1_0.view_count desc limit ?</code> ← <code>3</code></td>
+<td>3개</td>
+</tr>
+<tr>
+<td><code>findFirstByStatusOrderByViewCountDesc(&quot;PUBLISHED&quot;)</code></td>
+<td>같은 SQL ← <code>1</code></td>
+<td><code>Optional[#18 …]</code></td>
+</tr>
+<tr>
+<td><code>findTopByOrderByViewCountDesc()</code></td>
+<td><code>order by p1_0.view_count desc limit ?</code> ← <code>1</code></td>
+<td><code>Optional[#18 …]</code></td>
+</tr>
+</tbody></table></div>
+<p>읽을 것.</p>
+<ul>
+<li><strong><code>count…By</code>와 <code>exists…By</code>도 이름 규칙이다.</strong> <code>countBy</code>는 <code>count(p1_0.id)</code>, <code>existsBy</code>는 id 하나만 <code>limit 1</code>로 읽는다. 물려받은 <code>existsById</code>는 <code>count(*)</code>라서 둘의 SQL이 다르다. 결과(<code>true</code>/<code>false</code>)는 같다.</li>
+<li><strong><code>Containing</code>과 <code>Like</code>는 SQL이 같고 넘기는 값이 다르다.</strong> <code>Containing</code>은 양쪽에 <code>%</code>를 붙여 준다. <code>Like</code>는 준 값을 그대로 패턴으로 쓴다. <code>findByTitleLike(&quot;JPA&quot;)</code>는 제목이 정확히 <code>JPA</code>인 글을 찾으니 0개다.</li>
+<li><strong><code>Containing</code>은 사용자가 넣은 <code>%</code>를 글자로 바꾼다.</strong> <code>%</code> 하나로 검색하면 <code>%\%%</code>가 들어간다. &quot;<code>%</code>라는 글자를 포함한 제목&quot;이라 0개다. <code>?q=%</code>만 보내서 전체 글을 긁어 가는 요청을 막아 준다.</li>
+<li><strong><code>Top</code>·<code>First</code>는 같은 뜻이고 숫자가 없으면 1개다.</strong> <code>limit ?</code>에 <code>3</code>, <code>1</code>이 들어간다. 1개만 읽으니 <code>Optional</code>로 받을 수 있다.</li>
+<li><code>IsNull</code>처럼 값이 필요 없는 키워드는 매개변수도 없다.</li>
+</ul>
+<p>자주 쓰는 키워드를 더 꼽으면 <code>StartingWith</code>(뒤에만 <code>%</code>), <code>LessThan</code>(<code>&lt;</code>), <code>GreaterThanEqual</code>(<code>&gt;=</code>), <code>IsNotNull</code>, <code>IgnoreCase</code>(대소문자 무시)가 있다. 목록 전체는 더 깊이의 공식 문서 표에 있다.</p>
+<h3 id="반환-타입--몇-개가-올-수-있나"><a class="anchor" href="#반환-타입--몇-개가-올-수-있나" aria-hidden="true">#</a>반환 타입 — 몇 개가 올 수 있나</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>반환 타입</th>
+<th>뜻</th>
+<th>결과가 0개면</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>List&lt;Post&gt;</code></td>
+<td>여러 개</td>
+<td>빈 리스트</td>
+</tr>
+<tr>
+<td><code>Optional&lt;Post&gt;</code></td>
+<td><strong>0개 또는 1개</strong></td>
+<td><code>Optional.empty</code></td>
+</tr>
+<tr>
+<td><code>long</code> (<code>countBy</code>) · <code>boolean</code> (<code>existsBy</code>)</td>
+<td>개수 · 있나</td>
+<td><code>0</code> · <code>false</code></td>
+</tr>
+<tr>
+<td><code>Page&lt;Post&gt;</code></td>
+<td>한 쪽 + 전체 개수·쪽 수</td>
+<td>빈 쪽</td>
+</tr>
+<tr>
+<td><code>Slice&lt;Post&gt;</code></td>
+<td>한 쪽 + 다음 쪽이 있나</td>
+<td>빈 쪽</td>
+</tr>
+</tbody></table></div>
+<p><code>Optional</code>은 &quot;하나 아니면 없음&quot;이다. <strong>여러 행이 걸리면 예외</strong>다. 제목 <code>MySQL 인덱스 설계 질문드립니다</code>는 실습 DB에 3개 있다.</p>
+<pre><code class="language-text">SQL: select … from post p1_0 where p1_0.title=?
+[17] org.springframework.dao.IncorrectResultSizeDataAccessException: Query did not return a unique result: 3 results were returned</code></pre>
+<p>SQL은 정상으로 나갔고, 결과를 <code>Optional</code> 하나에 담다가 터졌다. 서버를 켤 때가 아니라 <strong>그 데이터가 들어온 순간</strong> 터진다. 하나만 원하면 <code>findFirstBy…OrderBy…</code>로 &quot;1개만&quot;을 이름에 적거나, DB에 <code>UNIQUE</code> 제약이 있는 열(이메일, 닉네임)로만 <code>Optional</code>을 쓴다.</p>
+<h3 id="페이지와-정렬--pageablesort"><a class="anchor" href="#페이지와-정렬--pageablesort" aria-hidden="true">#</a>페이지와 정렬 — <code>Pageable</code>·<code>Sort</code></h3>
+<p>&quot;몇 쪽, 몇 개씩, 무슨 순서로&quot;를 메서드 이름에 박지 않고 <strong>호출할 때</strong> 넘기려면 마지막 매개변수를 <code>Pageable</code>로 둔다.</p>
+<pre><code class="language-java">Pageable firstPage = PageRequest.of(0, 3, Sort.by(Sort.Direction.DESC, &quot;viewCount&quot;));  // 0쪽(첫 쪽), 3개씩, 조회수 내림차순
+Page&lt;Post&gt; page = posts.findByBoardId(2L, firstPage);
+Slice&lt;Post&gt; slice = posts.findSliceByBoardId(2L, firstPage);</code></pre>
+<ul>
+<li>쪽 번호는 <strong>0부터</strong>다. 첫 쪽이 <code>0</code>이다.</li>
+<li>정렬 기준은 필드 이름(<code>&quot;viewCount&quot;</code>)이다. 열 이름이 아니다.</li>
+</ul>
+<p>같은 조건인데 나간 SQL 수가 다르다.</p>
+<pre><code class="language-text">SQL: select … from post p1_0 where p1_0.board_id=? order by p1_0.view_count desc limit ?
+bind: (2:INTEGER) &lt;- [3]
+SQL: select count(p1_0.id) from post p1_0 where p1_0.board_id=?
+[18] Page: [#18 JPA N+1 문제 비교해보기, #145 스프링 트랜잭션 전파 삽질기, #10 Stream API 활용 실전 적용 후기] / 전체 63개, 21쪽, 다음 쪽? true
+SQL: select … from post p1_0 where p1_0.board_id=? order by p1_0.view_count desc limit ?
+bind: (2:INTEGER) &lt;- [4]
+[19] Slice: [#18 JPA N+1 문제 비교해보기, #145 스프링 트랜잭션 전파 삽질기, #10 Stream API 활용 실전 적용 후기] / 다음 쪽? true</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>SQL</th>
+<th>아는 것</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Page</code></td>
+<td>목록(<code>limit 3</code>) + <strong><code>count</code> 한 번 더</strong></td>
+<td>전체 63개, 21쪽</td>
+</tr>
+<tr>
+<td><code>Slice</code></td>
+<td>목록 한 번, 그런데 <code>limit 4</code></td>
+<td>3개를 돌려주고, 4번째가 있었으니 &quot;다음 쪽 있음&quot;</td>
+</tr>
+</tbody></table></div>
+<p>응답에 전체 쪽 수(<code>totalPages</code>)를 넣어야 하면 <code>Page</code>, &quot;다음 쪽이 있나&quot;(<code>hasNext</code>)만 넣으면 되면 <code>count</code>가 없는 <code>Slice</code>다. 쪽 번호가 필요 없고 정렬만 바꾸고 싶으면 <code>Sort</code>만 받는다. <code>findByStatus(&quot;HIDDEN&quot;, Sort.by(&quot;title&quot;))</code> → <code>where p1_0.status=? order by p1_0.title</code>.</p>
+<p>두 번째 쪽부터는 <code>limit ?,?</code>(건너뛸 수, 가져올 수)가 되고, 마지막 쪽에서 <code>count</code>를 건너뛰는 경우도 있다. 페이지 계산과 잘못된 <code>page</code>·<code>size</code> 처리는 G1에서 다룬다.</p>
+<h3 id="이름이-길어지면--query"><a class="anchor" href="#이름이-길어지면--query" aria-hidden="true">#</a>이름이 길어지면 — <code>@Query</code></h3>
+<p>&quot;공개 글 중 조회수 150 이상, 조회수 순&quot;을 이름으로 쓰면 <code>findByStatusAndViewCountGreaterThanEqualOrderByViewCountDesc</code>가 된다. 읽기도 고치기도 힘들다. 이럴 때 쿼리를 직접 적는다.</p>
+<pre><code class="language-java">@Query(&quot;select p from Post p where p.status = :status and p.viewCount &gt;= :minViews order by p.viewCount desc&quot;)
+List&lt;Post&gt; findPopular(@Param(&quot;status&quot;) String status, @Param(&quot;minViews&quot;) int minViews);</code></pre>
+<p>이 글은 SQL이 아니라 <strong>JPQL</strong>이다. 생김새는 SQL과 거의 같은데 대상이 다르다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>JPQL (<code>@Query</code> 기본)</th>
+<th>네이티브 SQL (<code>nativeQuery = true</code>)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>from</code> 뒤</td>
+<td>엔티티 이름 <code>Post</code></td>
+<td>테이블 이름 <code>post</code></td>
+</tr>
+<tr>
+<td>조건에 쓰는 이름</td>
+<td>필드 <code>p.viewCount</code></td>
+<td>열 <code>view_count</code></td>
+</tr>
+<tr>
+<td>누가 SQL로 바꾸나</td>
+<td>Hibernate가 번역한다</td>
+<td>그대로 DB로 간다</td>
+</tr>
+<tr>
+<td>틀리면</td>
+<td><strong>서버가 안 뜬다</strong></td>
+<td>서버는 뜨고, <strong>부를 때</strong> 터진다</td>
+</tr>
+</tbody></table></div>
+<p><code>:status</code>는 이름 있는 자리다. <code>@Param(&quot;status&quot;)</code>가 붙은 인자 값이 들어간다. 실제로 나간 SQL이다.</p>
+<pre><code class="language-text">[21] JPQL      SQL: select … from post p1_0 where p1_0.status=? and p1_0.view_count&gt;=? order by p1_0.view_count desc
+[22] native    SQL: select * from post where status = ? and view_count &gt;= ? order by view_count desc</code></pre>
+<p>JPQL은 Hibernate가 <code>p1_0</code> 별칭을 붙여 다시 썼고, 네이티브는 내가 쓴 글자 그대로다. 둘 다 8개가 나왔다. <code>:status</code>가 <code>?</code>로 바뀌고 값은 따로 들어가는 것도 같다. 문자열을 이어 붙이지 않으니 SQL 주입 걱정이 없다.</p>
+<p><code>@Param</code>을 지워도 이 프로젝트에서는 동작했다. Spring Boot의 Gradle 플러그인이 매개변수 이름을 컴파일 결과에 남기기 때문이다. 그래도 이름과 인자를 눈으로 맞춰 볼 수 있게 붙여 두는 편이 읽기 좋다.</p>
+<p>네이티브 SQL은 JPQL로 쓸 수 없는 DB 전용 문법이 꼭 필요할 때 쓴다. 대신 Hibernate가 미리 검사해 주지 않는다.</p>
+<h3 id="dtorecord로-받기--필요한-열만"><a class="anchor" href="#dtorecord로-받기--필요한-열만" aria-hidden="true">#</a>DTO(record)로 받기 — 필요한 열만</h3>
+<p>목록 응답에는 번호·제목·조회수만 있으면 된다. 엔티티 대신 record로 받으면 SELECT 목록도 줄어든다.</p>
+<pre><code class="language-text">[23] select new         SQL: select p1_0.id,p1_0.title,p1_0.view_count from post p1_0 where p1_0.board_id=? order by p1_0.view_count desc
+     → [PostSummary[id=134, title=오늘 회고, viewCount=138], PostSummary[id=23, title=좋은 키보드 추천, viewCount=107]]
+[24] 이름 규칙 + record  SQL: select p1_0.id,p1_0.title,p1_0.view_count from post p1_0 where p1_0.board_id=? and p1_0.status=?
+     → [PostSummary[id=99, title=오늘 회고, viewCount=43]]</code></pre>
+<ul>
+<li>JPQL에서는 <code>select new 패키지.클래스(값, 값, …)</code>로 생성자를 부른다. 패키지까지 쓴 전체 이름이어야 하고, 인자 순서·타입이 record 선언과 맞아야 한다.</li>
+<li>이름 규칙 메서드도 반환 타입을 <code>List&lt;PostSummary&gt;</code>로 두면 record 생성자 인자 이름(<code>id</code>·<code>title</code>·<code>viewCount</code>)과 같은 필드만 SELECT 했다. <code>findSummaryByBoardIdAndStatus</code>의 <code>Summary</code>는 사람이 읽는 이름표다.</li>
+<li>이렇게 받은 record는 엔티티가 아니다. Hibernate가 들고 있지 않으니 E7의 변경 감지(고친 값을 저장해 주는 일)와 상관이 없다. 읽기 전용 목록에 쓴다.</li>
+</ul>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>15분. E4처럼 연습 프로젝트를 하나 만든다. E4 프로젝트에는 이미 <code>Post</code> 엔티티가 있으니 새로 만든다.</p>
+<p><strong>1. 프로젝트.</strong> start.spring.io에서 Gradle·Java 21·Spring Boot 4.1.1, 의존성 <strong>Spring Web · Spring Data JPA · MySQL Driver</strong>. 메인 클래스는 <code>org.example</code>에, 오늘 파일은 <code>org.example.e6</code>에 둔다. <code>application.yml</code>은 이렇게 둔다.</p>
+<pre><code class="language-yaml">server:
+  port: 18280
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/practice?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul
+    username: community
+    password: community
+  jpa:
+    hibernate:
+      ddl-auto: none        # 테이블은 건드리지 않는다
+    open-in-view: false
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace    # ?에 들어간 값까지 본다</code></pre>
+<p><strong>2. 파일.</strong> 예시의 <code>Post</code>·<code>PostSummary</code>·<code>PostRepository</code>와 아래 연습 파일을 만든다.</p>
+<pre><code class="language-java">package org.example.e6;
+
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.data.domain.*;
+import org.springframework.stereotype.Component;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+// 연습용 — 서버가 뜰 때 한 번 실행된다. 다 보고 나면 지운다
+@Component
+public class E6Playground implements CommandLineRunner {
+    private final PostRepository posts;
+    public E6Playground(PostRepository posts) { this.posts = posts; }
+
+    private static void p(String s) { System.out.println(s); }
+
+    @Override
+    public void run(String... args) {
+        // 물려받은 기본 메서드
+        p(&quot;[A] findById(5): &quot; + posts.findById(5L));
+        p(&quot;[B] findById(9999): &quot; + posts.findById(9999L));
+        p(&quot;[C] count(): &quot; + posts.count());
+        p(&quot;[D] existsById(5): &quot; + posts.existsById(5L));
+
+        // 이름 규칙
+        p(&quot;[1] findByStatus: &quot; + posts.findByStatus(&quot;DRAFT&quot;).size() + &quot;개&quot;);
+        p(&quot;[2] countByStatus: &quot; + posts.countByStatus(&quot;HIDDEN&quot;));
+        p(&quot;[3] existsByTitle: &quot; + posts.existsByTitle(&quot;JPA N+1 문제 비교해보기&quot;));
+        p(&quot;[4] findByBoardIdAndStatus: &quot; + posts.findByBoardIdAndStatus(2L, &quot;PUBLISHED&quot;).size() + &quot;개&quot;);
+        p(&quot;[5] findByBoardIdOrAuthorId: &quot; + posts.findByBoardIdOrAuthorId(1L, 4L).size() + &quot;개&quot;);
+        p(&quot;[6] findByTitleContaining(JPA): &quot; + posts.findByTitleContaining(&quot;JPA&quot;).size() + &quot;개&quot;);
+        p(&quot;[7] findByTitleLike(JPA): &quot; + posts.findByTitleLike(&quot;JPA&quot;).size() + &quot;개&quot;);
+        p(&quot;[8] findByTitleLike(%JPA%): &quot; + posts.findByTitleLike(&quot;%JPA%&quot;).size() + &quot;개&quot;);
+        p(&quot;[9] findByTitleContaining(%): &quot; + posts.findByTitleContaining(&quot;%&quot;).size() + &quot;개&quot;);
+        p(&quot;[10] findByPublishedAtBetween: &quot; + posts.findByPublishedAtBetween(
+                LocalDateTime.of(2026, 7, 1, 0, 0), LocalDateTime.of(2026, 7, 3, 23, 59, 59)));
+        p(&quot;[11] findByBoardIdIn: &quot; + posts.findByBoardIdIn(List.of(1L, 2L)).size() + &quot;개&quot;);
+        p(&quot;[12] findByPublishedAtIsNull: &quot; + posts.findByPublishedAtIsNull().size() + &quot;개&quot;);
+        p(&quot;[13] findByBoardIdOrderByViewCountDesc: &quot; + posts.findByBoardIdOrderByViewCountDesc(4L).subList(0, 3));
+        p(&quot;[14] findTop3ByStatusOrderByViewCountDesc: &quot; + posts.findTop3ByStatusOrderByViewCountDesc(&quot;PUBLISHED&quot;));
+        p(&quot;[15] findFirstByStatusOrderByViewCountDesc: &quot; + posts.findFirstByStatusOrderByViewCountDesc(&quot;PUBLISHED&quot;));
+        p(&quot;[16] findTopByOrderByViewCountDesc: &quot; + posts.findTopByOrderByViewCountDesc());
+
+        // 반환 타입 — Optional인데 여러 행이면?
+        try {
+            p(&quot;[17] findByTitle: &quot; + posts.findByTitle(&quot;MySQL 인덱스 설계 질문드립니다&quot;));
+        } catch (Exception e) {
+            p(&quot;[17] &quot; + e);
+        }
+
+        // 페이지 · 정렬
+        Pageable firstPage = PageRequest.of(0, 3, Sort.by(Sort.Direction.DESC, &quot;viewCount&quot;));
+        Page&lt;Post&gt; page = posts.findByBoardId(2L, firstPage);
+        p(&quot;[18] Page: &quot; + page.getContent() + &quot; / 전체 &quot; + page.getTotalElements() + &quot;개, &quot;
+                + page.getTotalPages() + &quot;쪽, 다음 쪽? &quot; + page.hasNext());
+        Slice&lt;Post&gt; slice = posts.findSliceByBoardId(2L, firstPage);
+        p(&quot;[19] Slice: &quot; + slice.getContent() + &quot; / 다음 쪽? &quot; + slice.hasNext());
+        p(&quot;[20] findByStatus + Sort: &quot; + posts.findByStatus(&quot;HIDDEN&quot;, Sort.by(&quot;title&quot;)));
+
+        // @Query · DTO
+        p(&quot;[21] @Query JPQL: &quot; + posts.findPopular(&quot;PUBLISHED&quot;, 150).size() + &quot;개&quot;);
+        p(&quot;[22] nativeQuery: &quot; + posts.findPopularNative(&quot;PUBLISHED&quot;, 150).size() + &quot;개&quot;);
+        p(&quot;[23] select new: &quot; + posts.findSummaries(4L).subList(0, 2));
+        p(&quot;[24] 이름 규칙 + record: &quot; + posts.findSummaryByBoardIdAndStatus(4L, &quot;HIDDEN&quot;));
+    }
+}</code></pre>
+<p><strong>3. 켜고 <code>[번호]</code> 바로 위의 SQL을 읽는다.</strong> 예시의 표와 같은 SQL이 나와야 한다. 개수는 시드 그대로인 DB에서 나온 값이다. 특히 이 다섯 곳을 본다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>번호</th>
+<th>볼 것</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>[3]</td>
+<td><code>existsBy</code>는 <code>select p1_0.id … limit ?</code>, [D]의 <code>existsById</code>는 <code>count(*)</code></td>
+</tr>
+<tr>
+<td>[6]~[9]</td>
+<td>SQL은 넷 다 <code>like ? escape &#39;\\&#39;</code>. 다른 건 <code>binding parameter</code> 값(<code>%JPA%</code> · <code>JPA</code> · <code>%\%%</code>)</td>
+</tr>
+<tr>
+<td>[14]~[16]</td>
+<td><code>limit ?</code>에 <code>3</code>·<code>1</code>·<code>1</code></td>
+</tr>
+<tr>
+<td>[17]</td>
+<td>SQL은 나갔는데 <code>IncorrectResultSizeDataAccessException</code></td>
+</tr>
+<tr>
+<td>[18]·[19]</td>
+<td><code>Page</code>는 SQL 2개(<code>count</code> 포함), <code>Slice</code>는 1개에 <code>limit</code>이 4</td>
+</tr>
+</tbody></table></div>
+<p><strong>4. API로 불러 본다.</strong> 검색어로 공개 글을 찾고 한 쪽씩 돌려주는 컨트롤러다. 엔티티나 <code>Page</code>를 그대로 내보내지 않고 응답 record로 옮긴다.</p>
+<pre><code class="language-java">@RestController
+public class PostSearchController {
+
+    private final PostRepository posts;
+
+    public PostSearchController(PostRepository posts) {
+        this.posts = posts;
+    }
+
+    public record SearchResponse(List&lt;PostSummary&gt; items, long totalElements, int totalPages, boolean hasNext) {}
+
+    // GET /e6/posts/search?q=JPA&amp;page=0&amp;size=3 — 공개 글 중 제목 검색, 조회수 많은 순
+    @GetMapping(&quot;/e6/posts/search&quot;)
+    public SearchResponse search(@RequestParam String q,
+                                 @RequestParam(defaultValue = &quot;0&quot;) int page,
+                                 @RequestParam(defaultValue = &quot;3&quot;) int size) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, &quot;viewCount&quot;));
+        Page&lt;PostSummary&gt; result = posts.findByStatusAndTitleContaining(&quot;PUBLISHED&quot;, q, pageable);
+        return new SearchResponse(result.getContent(), result.getTotalElements(), result.getTotalPages(), result.hasNext());
+    }
+}</code></pre>
+<pre><code class="language-text">$ curl -s 'localhost:18280/e6/posts/search?q=JPA&amp;page=0&amp;size=3'
+{&quot;items&quot;:[{&quot;id&quot;:18,&quot;title&quot;:&quot;JPA N+1 문제 비교해보기&quot;,&quot;viewCount&quot;:242},{&quot;id&quot;:71,&quot;title&quot;:&quot;JPA N+1 문제 초보 가이드&quot;,&quot;viewCount&quot;:175},{&quot;id&quot;:98,&quot;title&quot;:&quot;JPA N+1 문제 삽질기&quot;,&quot;viewCount&quot;:117}],&quot;totalElements&quot;:10,&quot;totalPages&quot;:4,&quot;hasNext&quot;:true}</code></pre>
+<p>서버 로그에는 SQL이 두 줄 나온다. 이름 규칙(<code>StatusAndTitleContaining</code>) + record 반환 + <code>Pageable</code>이 한 메서드에 다 들어갔다.</p>
+<pre><code class="language-text">SQL: select p1_0.id,p1_0.title,p1_0.view_count from post p1_0 where p1_0.status=? and p1_0.title like ? escape '\\' order by p1_0.view_count desc limit ?
+SQL: select count(p1_0.id) from post p1_0 where p1_0.status=? and p1_0.title like ? escape '\\'</code></pre>
+<p><code>page=1</code>로 다시 부르면 첫 줄 끝이 <code>limit ?,?</code>로 바뀌고(<code>3</code>, <code>3</code> — 3개 건너뛰고 3개) 결과가 <code>#118</code>·<code>#74</code>·<code>#69</code>로 넘어간다.</p>
+<p>참고로 이 연습 엔티티는 <code>deleted_at</code>(지운 글 표시)을 보지 않아서 지운 글도 검색된다. 지운 글 거르기는 E7과 3-2에서 한다.</p>
+<p><strong>5. <code>E6Playground.java</code>를 지운다.</strong> 서버를 켤 때마다 SQL 30개 가까이가 쏟아진다. E7에서 이 프로젝트를 이어 쓴다.</p>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p>메시지는 Spring Boot 4.1.1 · Spring Data JPA 4.1.1 · Hibernate 7.4.5에서 재현한 원문이다. 필드 이름 오타(<code>findByNmae</code>)는 <a href="E3-what-is-jpa.html#일부러-틀려-보기">E3</a>에서 봤다.</p>
+<p><code>PostRepository</code>는 그대로 두고, 망가뜨리기 전용 저장소를 하나 더 만든다. 아래 메서드를 <strong>한 번에 하나씩</strong> 넣고 서버를 켜 본 뒤 지우고 다음 것을 넣는다. 1~3은 <strong>서버가 안 뜬다.</strong> 맨 아래 <code>Caused by:</code>부터 읽는다.</p>
+<pre><code class="language-java">public interface BrokenRepository extends JpaRepository&lt;Post, Long&gt; {
+    // 여기에 아래 1~4의 메서드를 하나씩
+}</code></pre>
+<p><strong>1. 키워드 철자를 틀린다</strong> — <code>findByTitleContaining</code> → <code>findByTitleContain</code></p>
+<pre><code class="language-text">Caused by: org.springframework.data.repository.query.QueryCreationException: Cannot create query for method [BrokenRepository.findByTitleContain(java.lang.String)]; No property 'contain' found for type 'String'; Traversed path: Post.title
+Caused by: org.springframework.data.core.PropertyReferenceException: No property 'contain' found for type 'String'; Traversed path: Post.title</code></pre>
+<p><code>Contain</code>을 키워드로 못 알아보니 Spring Data는 &quot;<code>title</code> 필드 <strong>안의</strong> <code>contain</code> 필드&quot;로 읽었다(<code>Traversed path: Post.title</code>). <code>title</code>은 <code>String</code>이고 <code>String</code>에 <code>contain</code> 필드는 없다. 키워드는 정해진 철자(<code>Containing</code>)만 통한다.</p>
+<p><strong>2. 열 이름을 쓴다</strong> — <code>List&lt;Post&gt; findByView_count(int v);</code></p>
+<pre><code class="language-text">Caused by: org.springframework.data.core.PropertyReferenceException: No property 'view' found for type 'Post'</code></pre>
+<p>이름 규칙에서 <code>_</code>는 &quot;안쪽 필드로 들어가라&quot;는 표시다. <code>view</code>를 찾다가 없어서 멈췄다. 필드 이름 <code>ViewCount</code>로 쓴다.</p>
+<p><strong>3. JPQL에 오타를 낸다</strong> — <code>@Query(&quot;select p from Post p where p.titel = :title&quot;) List&lt;Post&gt; search(@Param(&quot;title&quot;) String title);</code></p>
+<pre><code class="language-text">Caused by: org.springframework.data.repository.query.QueryCreationException: Cannot create query for method [BrokenRepository.search(java.lang.String)]; Query validation failed for 'select p from Post p where p.titel = :title'
+…
+Caused by: org.hibernate.query.sqm.UnknownPathException: Could not resolve attribute 'titel' of 'org.example.e6.Post' [select p from Post p where p.titel = :title]</code></pre>
+<p>JPQL은 Hibernate가 서버를 켤 때 엔티티와 맞춰 본다. <code>Post</code>에 <code>titel</code> 필드가 없으니 기동 실패다. <code>@Query(&quot;select * from post where title = :title&quot;)</code>처럼 <strong>SQL을 JPQL 자리에</strong> 써도 서버가 안 뜬다(<code>BadJpqlGrammarException: At 1:7 and token &#39;*&#39;, extraneous input &#39;*&#39; expecting …</code>). JPQL에는 <code>*</code>가 없고 <code>select p</code>처럼 별칭을 쓴다.</p>
+<p><strong>4. 네이티브 SQL에 같은 오타를 낸다</strong> — <code>@Query(value = &quot;select * from post where titel = :title&quot;, nativeQuery = true) List&lt;Post&gt; searchNative(String title);</code></p>
+<p>서버는 <strong>멀쩡히 뜬다.</strong> 따라 해 보기의 <code>E6Playground</code>처럼 <code>CommandLineRunner</code>를 잠깐 만들어 <code>brokenRepository.searchNative(&quot;오늘 회고&quot;)</code>를 부르면, 그 순간 DB가 거절한다.</p>
+<pre><code class="language-text">SQL: select * from post where titel = ?
+WARN  o.h.orm.jdbc.error : HHH000247: ErrorCode: 1054, SQLState: 42S22
+WARN  o.h.orm.jdbc.error : Unknown column 'titel' in 'where clause'
+org.springframework.dao.InvalidDataAccessResourceUsageException: JDBC exception executing SQL [Unknown column 'titel' in 'where clause'] [select * from post where titel = ?]; SQL [select * from post where titel = ?]</code></pre>
+<p><code>Unknown column</code>은 MySQL이 보낸 말이다(<code>ErrorCode: 1054</code>). 3과 4의 차이가 <code>@Query</code> 기본값을 JPQL로 두는 이유다. 틀린 쿼리를 서버를 켤 때 잡아 준다. 네이티브 쿼리는 테스트나 직접 호출로 한 번은 꼭 실행해 본다.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> <code>List&lt;Post&gt; findTop5ByBoardIdOrderByPublishedAtDesc(Long boardId);</code>가 만드는 SQL의 <code>where</code> 뒤를 써 보라.</p>
+<details>
+<summary>정답</summary>
+
+<p><code>where p1_0.board_id=? order by p1_0.published_at desc limit ?</code> — <code>limit</code>에는 <code>5</code>가 들어간다. <code>Top5</code>가 개수, <code>By</code> 뒤 <code>BoardId</code>가 조건, <code>OrderBy</code> 뒤 <code>PublishedAtDesc</code>가 정렬이다. 필드 이름 <code>publishedAt</code>이 열 이름 <code>published_at</code>으로 바뀐다.</p>
+</details>
+
+<p><strong>2.</strong> 검색어 <code>q</code>로 <code>JPA</code>가 오면 <code>findByTitleLike(q)</code>는 0개, <code>findByTitleContaining(q)</code>는 11개였다. 왜 다른가? <code>q</code>로 <code>%</code>만 오면 각각 어떻게 되나?</p>
+<details>
+<summary>정답</summary>
+
+<p>SQL은 둘 다 <code>title like ?</code>로 같다. 넘어간 값이 다르다. <code>Containing</code>은 <code>%JPA%</code>로 감싸서 &quot;포함&quot;, <code>Like</code>는 <code>JPA</code> 그대로라서 &quot;정확히 JPA&quot;다. <code>%</code>만 넣으면 <code>Containing</code>은 <code>%\%%</code>(<code>%</code> 글자를 포함)로 바꿔서 0개지만, <code>Like</code>는 <code>%</code> 그대로 &quot;아무 글자&quot;가 되어 <strong>전부</strong> 나온다. 사용자 입력을 받는 검색에는 <code>Containing</code>을 쓴다.</p>
+</details>
+
+<p><strong>3.</strong> 같은 조건, 같은 <code>PageRequest.of(0, 3, …)</code>인데 <code>Page</code>와 <code>Slice</code>는 SQL이 몇 번씩 나갔나? <code>Slice</code>의 <code>limit</code>은 왜 4인가?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>Page</code>는 2번(목록 + <code>select count(…)</code>), <code>Slice</code>는 1번이다. <code>Slice</code>는 전체 개수를 세지 않는 대신 한 개를 더(3+1=4) 읽어 본다. 4번째가 있으면 &quot;다음 쪽 있음&quot;으로 답하고 3개만 돌려준다. 응답에 전체 쪽 수가 필요 없고 <code>hasNext</code>만 있으면 되는 목록에 쓴다.</p>
+</details>
+
+<p><strong>4.</strong> <code>Optional&lt;Post&gt; findByTitle(String title)</code>은 서버를 켤 때 에러가 났나? 언제, 어떤 에러가 났나?</p>
+<details>
+<summary>정답</summary>
+
+<p>켤 때는 멀쩡했다(이름 규칙은 맞다). <strong>같은 제목 글이 여러 개인 데이터로 부른 순간</strong> <code>IncorrectResultSizeDataAccessException: Query did not return a unique result: 3 results were returned</code>가 났다. <code>Optional</code>은 0개 또는 1개만 담는다. 여러 개일 수 있으면 <code>List</code>로 받거나, 하나만 원하면 <code>findFirstBy…OrderBy…</code>로 개수를 이름에 박는다.</p>
+</details>
+
+<p><strong>5.</strong> <code>@Query</code>에서 <code>p.titel</code>(JPQL)과 <code>titel</code>(<code>nativeQuery = true</code>)은 각각 언제 에러가 나나? 이 차이 때문에 어느 쪽을 기본으로 쓰나?</p>
+<details>
+<summary>정답</summary>
+
+<p>JPQL은 <strong>서버를 켤 때</strong> Hibernate가 엔티티와 맞춰 보다가 <code>UnknownPathException: Could not resolve attribute &#39;titel&#39;</code>로 기동을 막는다. 네이티브는 서버는 뜨고 <strong>그 메서드를 부를 때</strong> MySQL이 <code>Unknown column &#39;titel&#39;</code>로 거절한다. 실수를 일찍 잡아 주는 JPQL(<code>@Query</code> 기본값)을 먼저 쓰고, DB 전용 문법이 꼭 필요할 때만 네이티브를 쓴다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/S10-spring-data-query.html#리포지토리-메서드는-sql로-바로-치환되지-않는다">S10 — 리포지토리 메서드는 SQL로 바로 치환되지 않는다</a> — 이름 해석, <code>@Query</code>, projection</li>
+<li><a href="../docs/knowledge/S10-spring-data-query.html#페이징은-정렬과-건수-계산의-계약이다">S10 — 페이징은 정렬과 건수 계산의 계약이다</a> · <a href="../docs/knowledge/W15-paging-offset-vs-cursor.html">W15 페이징 — OFFSET vs 커서</a></li>
+<li><a href="../docs/knowledge/W09-why-dto.html">W09 DTO는 왜 쓰나</a> — 엔티티·<code>Page</code>를 그대로 응답하지 않는 이유</li>
+<li>원문: <a href="https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html" target="_blank" rel="noopener">Spring Data JPA — JPA Query Methods</a> — 키워드 전체 표·<code>@Query</code>·네이티브 쿼리 · <a href="https://docs.spring.io/spring-data/commons/reference/repositories/query-methods-details.html" target="_blank" rel="noopener">Defining Query Methods</a> — 이름 해석 규칙·<code>Top</code>/<code>First</code>·반환 타입·<code>Page</code>/<code>Slice</code> · <a href="https://docs.spring.io/spring-data/commons/reference/repositories/projections.html" target="_blank" rel="noopener">Projections</a> — 인터페이스·record로 받기 · <a href="https://docs.spring.io/spring-data/jpa/reference/api/java/org/springframework/data/jpa/repository/JpaRepository.html" target="_blank" rel="noopener"><code>JpaRepository</code> API</a> · <a href="https://docs.spring.io/spring-data/commons/reference/api/java/org/springframework/data/domain/PageRequest.html" target="_blank" rel="noopener"><code>PageRequest</code> API</a></li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li>레슨: <a href="E7-jpa-update-delete.html">E7. JPA로 수정·삭제하기</a> — 같은 프로젝트에서 고치고 지운다.</li>
+<li>실습: <a href="../scenario/ch2-read-post/2-1-get-one.html">2-1. 단건 조회와 404</a> — <code>findById</code>와 <code>Optional</code>로 없는 글을 404로.</li>
+<li>실습: <a href="../scenario/ch2-read-post/2-2-board-list.html">2-2. 게시판 목록과 페이징</a> — 오늘의 <code>Pageable</code>·<code>Page</code>를 목록 API로. 레슨 <a href="G1-paging-and-sorting.html">G1</a>을 먼저 보면 좋다.</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

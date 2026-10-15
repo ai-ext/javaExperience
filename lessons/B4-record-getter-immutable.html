@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B4. record·getter·불변 — DTO가 record인 이유</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="b4-recordgetter불변--dto가-record인-이유"><a class="anchor" href="#b4-recordgetter불변--dto가-record인-이유" aria-hidden="true">#</a>B4. record·getter·불변 — DTO가 record인 이유</h1>
+<blockquote>
+<p>개념 레슨 · 30분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>0-1의 <code>Greeting</code>처럼, API가 주고받는 값의 모양은 <strong>record</strong>로 적는다(Java 16+).</p>
+<pre><code class="language-java">public record MemberResponse(String name, int age) {
+}</code></pre>
+<p>이 한 줄로 Java가 <strong>저절로</strong> 만드는 것:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>생기는 것</th>
+<th>모양</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>필드</td>
+<td><code>private final String name;</code> <code>private final int age;</code></td>
+<td><code>final</code> — 한 번 넣으면 못 바꾼다</td>
+</tr>
+<tr>
+<td>생성자</td>
+<td><code>new MemberResponse(&quot;김자바&quot;, 20)</code></td>
+<td>괄호 안 순서 그대로 받는다</td>
+</tr>
+<tr>
+<td>꺼내는 메서드</td>
+<td><code>name()</code>, <code>age()</code></td>
+<td><strong><code>getName()</code>이 아니다.</strong> 이름 그대로 + 괄호</td>
+</tr>
+<tr>
+<td><code>equals</code></td>
+<td>값이 모두 같으면 같다</td>
+<td>보통 클래스는 직접 써야 한다(B2의 <code>==</code> 이야기)</td>
+</tr>
+<tr>
+<td><code>toString</code></td>
+<td><code>MemberResponse[name=김자바, age=20]</code></td>
+<td>로그에 찍기 좋다</td>
+</tr>
+</tbody></table></div>
+<p>record는 모양만 적은 이름이 아니라 <strong>진짜 클래스</strong>다. 그래서 Jackson(JSON 변환기)이 실행 중에 record를 보고 JSON을 만들고, JSON에서 record를 만든다.</p>
+<h3 id="불변immutable"><a class="anchor" href="#불변immutable" aria-hidden="true">#</a>불변(immutable)</h3>
+<p>record에는 setter가 없고 필드가 <code>final</code>이다. 한번 만든 값을 바꿀 수 없다. 바꾸고 싶으면 <strong>새로 만든다</strong>(<code>new MemberResponse(a.name(), a.age() + 1)</code>).</p>
+<p>DTO가 불변이면 좋은 점: 컨트롤러·서비스를 지나가는 동안 누가 몰래 값을 바꿀 수 없다. 받은 그대로, 만든 그대로다.</p>
+<h3 id="getter가-json이-되는-길"><a class="anchor" href="#getter가-json이-되는-길" aria-hidden="true">#</a>getter가 JSON이 되는 길</h3>
+<p>컨트롤러가 객체를 <code>return</code>하면 Jackson이 그 객체를 JSON으로 바꾼다. 이때 Jackson은 <strong>필드를 직접 보지 않는다</strong>(private이라 못 본다). 대신 <strong>꺼내는 메서드</strong>를 찾는다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>객체에 있는 메서드</th>
+<th>JSON 키</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>record의 <code>name()</code></td>
+<td><code>&quot;name&quot;</code></td>
+</tr>
+<tr>
+<td><code>getName()</code></td>
+<td><code>&quot;name&quot;</code> (<code>get</code>을 떼고 첫 글자를 소문자로)</td>
+</tr>
+<tr>
+<td><code>boolean isAdult()</code></td>
+<td><code>&quot;adult&quot;</code> (<code>boolean</code>은 <code>is</code>도 된다)</td>
+</tr>
+<tr>
+<td>아무것도 없음(private 필드만)</td>
+<td>없음 → <code>{}</code></td>
+</tr>
+</tbody></table></div>
+<p>즉 <strong>getter가 곧 JSON 키 목록</strong>이다. 필드가 없어도 getter가 있으면 키가 생기고, 필드가 있어도 getter가 없으면 키가 없다. 요청 쪽은 반대 방향이다. JSON → 객체로 만들 때 record는 생성자로 한 번에 넣는다. 보통 클래스는 빈 생성자로 만든 뒤 setter로 채운다(B2의 기본 생성자 이야기).</p>
+<h3 id="그래서-dto는-record로"><a class="anchor" href="#그래서-dto는-record로" aria-hidden="true">#</a>그래서 DTO는 record로</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>DTO에 필요한 것</th>
+<th>record</th>
+<th>보통 클래스로 하려면</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Jackson이 만들 수 있다(요청)</td>
+<td>생성자 자동, 안쪽에 둬도 자동 static(B3)</td>
+<td>기본 생성자 + setter, 안쪽이면 <code>static</code></td>
+</tr>
+<tr>
+<td>Jackson이 꺼낼 수 있다(응답)</td>
+<td><code>name()</code> 자동</td>
+<td>getter를 필드마다</td>
+</tr>
+<tr>
+<td>값이 안 바뀐다</td>
+<td>자동</td>
+<td><code>final</code> + setter 없음</td>
+</tr>
+<tr>
+<td>로그에 찍으면 읽힌다</td>
+<td><code>toString</code> 자동</td>
+<td>직접 작성</td>
+</tr>
+</tbody></table></div>
+<p>record 한 줄이 이 네 가지를 한 번에 지킨다. 이 과정의 DTO가 모두 record인 이유다. 단, JPA 엔티티(DB 테이블과 짝인 클래스)는 값을 바꿔 가며 쓰기 때문에 record로 만들지 않는다(E3).</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<h3 id="①-record와-보통-클래스--recorddemojava"><a class="anchor" href="#①-record와-보통-클래스--recorddemojava" aria-hidden="true">#</a>① record와 보통 클래스 — <code>RecordDemo.java</code></h3>
+<pre><code class="language-java">public class RecordDemo {
+
+    // 한 줄로 끝. 필드(private final)·생성자·name()·age()·equals·hashCode·toString이 저절로 생긴다
+    record MemberResponse(String name, int age) {
+    }
+
+    // 같은 것을 보통 클래스로 쓰면 — getter만 만들고 equals·toString은 생략했다
+    static class MemberClass {
+        private final String name;
+        private final int age;
+
+        MemberClass(String name, int age) {
+            this.name = name;
+            this.age = age;
+        }
+
+        public String getName() { return name; }
+        public int getAge() { return age; }
+    }
+
+    public static void main(String[] args) {
+        MemberResponse a = new MemberResponse(&quot;김자바&quot;, 20);
+        MemberResponse b = new MemberResponse(&quot;김자바&quot;, 20);
+
+        System.out.println(a);                    // toString
+        System.out.println(a.name() + &quot;, &quot; + a.age());   // 꺼내기 — getName()이 아니라 name()
+        System.out.println(a.equals(b));          // 값이 같으면 같다
+        System.out.println(a == b);               // 그래도 객체는 둘
+
+        MemberResponse older = new MemberResponse(a.name(), a.age() + 1);  // 바꾸지 않고 새로 만든다
+        System.out.println(a + &quot; → &quot; + older);
+
+        MemberClass c = new MemberClass(&quot;김자바&quot;, 20);
+        System.out.println(c.getName() + &quot;, &quot; + c.getAge());
+        System.out.println(c);                    // toString을 안 만들면 클래스이름@해시
+    }
+}</code></pre>
+<pre><code class="language-text">$ java RecordDemo.java
+MemberResponse[name=김자바, age=20]
+김자바, 20
+true
+false
+MemberResponse[name=김자바, age=20] → MemberResponse[name=김자바, age=21]
+김자바, 20
+RecordDemo$MemberClass@7d3a22a9</code></pre>
+<p>마지막 줄의 <code>@</code> 뒤 숫자는 실행할 때마다 다르다.</p>
+<h3 id="②-spring-앱에서--무엇이-json이-되나"><a class="anchor" href="#②-spring-앱에서--무엇이-json이-되나" aria-hidden="true">#</a>② Spring 앱에서 — 무엇이 JSON이 되나</h3>
+<p>Boot 4.1(Jackson 3.1.5)에서 실행했다.</p>
+<pre><code class="language-java">package org.example.lesson;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class MemberLessonController {
+
+    // ① record — name()·age()가 저절로 생긴다
+    public record MemberRecord(String name, int age) {
+    }
+
+    // ② 보통 클래스 + getter
+    public static class MemberWithGetter {
+        private final String name;
+        private final int age;
+
+        public MemberWithGetter(String name, int age) {
+            this.name = name;
+            this.age = age;
+        }
+
+        public String getName() { return name; }
+        public int getAge() { return age; }
+        public boolean isAdult() { return age &gt;= 19; }   // 필드는 없지만 getter가 있다
+    }
+
+    // ③ 보통 클래스, getter 없음
+    public static class MemberNoGetter {
+        private final String name;
+        private final int age;
+
+        public MemberNoGetter(String name, int age) {
+            this.name = name;
+            this.age = age;
+        }
+    }
+
+    @GetMapping(&quot;/api/lesson/b4/record&quot;)
+    public MemberRecord record() {
+        return new MemberRecord(&quot;김자바&quot;, 20);
+    }
+
+    @GetMapping(&quot;/api/lesson/b4/getter&quot;)
+    public MemberWithGetter getter() {
+        return new MemberWithGetter(&quot;김자바&quot;, 20);
+    }
+
+    @GetMapping(&quot;/api/lesson/b4/no-getter&quot;)
+    public MemberNoGetter noGetter() {
+        return new MemberNoGetter(&quot;김자바&quot;, 20);
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>요청</th>
+<th>응답(모두 <code>200</code>, <code>Content-Type: application/json</code>)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GET /api/lesson/b4/record</code></td>
+<td><code>{&quot;name&quot;:&quot;김자바&quot;,&quot;age&quot;:20}</code></td>
+</tr>
+<tr>
+<td><code>GET /api/lesson/b4/getter</code></td>
+<td><code>{&quot;name&quot;:&quot;김자바&quot;,&quot;age&quot;:20,&quot;adult&quot;:true}</code></td>
+</tr>
+<tr>
+<td><code>GET /api/lesson/b4/no-getter</code></td>
+<td><code>{}</code></td>
+</tr>
+</tbody></table></div>
+<ul>
+<li><code>getter</code>의 <code>&quot;adult&quot;</code> — <code>adult</code>라는 필드는 없다. <code>isAdult()</code> 메서드가 있어서 키가 생겼다.</li>
+<li><code>no-getter</code>의 <code>{}</code> — 필드에 값이 다 있는데 JSON이 비었다. 에러도 로그도 없다.</li>
+</ul>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>15분.</p>
+<ol>
+<li><code>RecordDemo.java</code>를 만들고 <code>java RecordDemo.java</code> → 일곱 줄이 예시와 같은지 본다(마지막 줄 숫자만 다르다).</li>
+<li><code>main</code> 끝에 <code>System.out.println(a.hashCode() == b.hashCode());</code>를 넣어 본다. <code>true</code> — <code>equals</code>가 같으면 <code>hashCode</code>도 같게 만들어진다. <code>Map</code>의 키로 쓸 때 필요하다(B6).</li>
+<li>javaExperience의 <code>org.example.lesson</code> 패키지(B3에서 만든 곳)에 <code>MemberLessonController.java</code>를 그대로 넣고 앱을 띄운다.</li>
+<li>세 요청을 보낸다.</li>
+</ol>
+<pre><code class="language-bash">BASE=http://localhost:8080
+curl -i &quot;$BASE/api/lesson/b4/record&quot;
+curl -i &quot;$BASE/api/lesson/b4/getter&quot;
+curl -i &quot;$BASE/api/lesson/b4/no-getter&quot;</code></pre>
+<p>기대: 위 표와 같은 본문 세 개.</p>
+<ol start="5">
+<li><code>MemberWithGetter</code>에 <code>public String getGreeting() { return name + &quot;님&quot;; }</code>을 추가하고 다시 띄워 <code>getter</code>를 부른다. 응답이 <code>{&quot;name&quot;:&quot;김자바&quot;,&quot;age&quot;:20,&quot;adult&quot;:true,&quot;greeting&quot;:&quot;김자바님&quot;}</code>처럼 키가 하나 더 생기는지 본다(실측). getter 이름이 곧 키라는 것을 확인하는 단계다.</li>
+</ol>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<h3 id="①-record의-값을-바꾼다"><a class="anchor" href="#①-record의-값을-바꾼다" aria-hidden="true">#</a>① record의 값을 바꾼다</h3>
+<p><code>RecordDemo.java</code>의 <code>System.out.println(a.equals(b));</code> 위에 <code>a.age = 21;</code>을 넣는다.</p>
+<pre><code class="language-text">RecordDemo.java:27: error: cannot assign a value to final variable age
+        a.age = 21;                               // 나이를 바꿔 보자
+         ^
+1 error
+error: compilation failed</code></pre>
+<p>record의 필드는 <code>final</code>이다. <strong>고치기</strong>: <code>new MemberResponse(a.name(), 21)</code>처럼 새로 만든다.</p>
+<h3 id="②-record에-getname을-부른다"><a class="anchor" href="#②-record에-getname을-부른다" aria-hidden="true">#</a>② record에 <code>getName()</code>을 부른다</h3>
+<p><code>a.name()</code>을 <code>a.getName()</code>으로 바꾼다. 보통 클래스 습관이나 Lombok 코드를 보고 흔히 쓰는 실수다.</p>
+<pre><code class="language-text">RecordDemo.java:26: error: cannot find symbol
+        System.out.println(a.getName());
+                            ^
+  symbol:   method getName()
+  location: variable a of type MemberResponse
+1 error
+error: compilation failed</code></pre>
+<p><strong>고치기</strong>: record는 <code>name()</code>. 보통 클래스는 <code>getName()</code>. 둘을 섞지 않는다.</p>
+<h3 id="③-getter-없는-응답-클래스--에러-없이-"><a class="anchor" href="#③-getter-없는-응답-클래스--에러-없이-" aria-hidden="true">#</a>③ getter 없는 응답 클래스 — 에러 없이 <code>{}</code></h3>
+<p>위 <code>no-getter</code>가 이 경우다. 서버 로그에도 아무것도 없어서 찾기 어렵다. 응답 본문이 <code>{}</code>이면 이걸 먼저 의심한다. <strong>고치기</strong>: record로 바꾼다. 클래스로 둬야 하면 필드마다 getter를 만든다. 에러 도감: <a href="../errors.html#응답이-빈-">응답이 빈 {}</a>.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> <code>record PostResponse(Long id, String title)</code>가 저절로 만드는 것 네 가지를 말하라.</p>
+<details>
+<summary>정답</summary>
+
+<p><code>private final</code> 필드 <code>id</code>·<code>title</code>, 두 값을 받는 생성자, 꺼내는 메서드 <code>id()</code>·<code>title()</code>, 그리고 <code>equals</code>·<code>hashCode</code>·<code>toString</code>. setter는 만들지 않는다.</p>
+</details>
+
+<p><strong>2.</strong> 보통 클래스에 <code>private String title;</code>만 있고 getter가 없다. 이 객체를 컨트롤러에서 돌려주면 응답은?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>{}</code>(200). Jackson은 private 필드를 직접 보지 않고 getter(또는 record의 꺼내는 메서드)로 키를 찾는다. 찾을 게 없으니 빈 객체가 된다. Boot 4(Jackson 3)에서는 에러 없이 <code>{}</code>가 나온다.</p>
+</details>
+
+<p><strong>3.</strong> 클래스에 필드 <code>name</code>·<code>age</code>, 메서드 <code>getName()</code>·<code>getAge()</code>·<code>isAdult()</code>가 있다. <code>adult</code>라는 필드는 없다. 이 객체를 돌려주면 응답 JSON의 키는?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>name</code>·<code>age</code>·<code>adult</code> 세 개다. 실측 <code>{&quot;name&quot;:&quot;김자바&quot;,&quot;age&quot;:20,&quot;adult&quot;:true}</code>. 메서드 이름 <code>isAdult</code>에서 <code>is</code>를 떼고 소문자로 시작한 <code>adult</code>가 키가 된다. 키를 정하는 건 필드가 아니라 메서드다.</p>
+</details>
+
+<p><strong>4.</strong> record의 나이를 한 살 올리려면 어떻게 하나? 왜 이렇게 만들었을까?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>new MemberResponse(m.name(), m.age() + 1)</code>처럼 새 객체를 만든다. record는 불변이라 바꿀 수 없다. 여러 곳을 지나가는 DTO가 도중에 바뀌지 않으니 &quot;받은 그대로·만든 그대로&quot;를 믿을 수 있다.</p>
+</details>
+
+<p><strong>5.</strong> record에 값을 꺼낼 때 <code>m.getName()</code>이 아니라 <code>m.name()</code>인데, 그러면 Jackson은 JSON 키를 <code>&quot;name&quot;</code>으로 어떻게 아나?</p>
+<details>
+<summary>정답</summary>
+
+<p>Jackson은 record를 알아본다. record의 구성 요소 이름(<code>name</code>, <code>age</code>)을 키로 쓰고, 값은 <code>name()</code>·<code>age()</code>로 꺼낸다. 실측 <code>{&quot;name&quot;:&quot;김자바&quot;,&quot;age&quot;:20}</code>.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/W09-why-dto.html">W09 DTO는 왜 쓰나</a> — 엔티티를 그대로 돌려주면 생기는 일</li>
+<li><a href="../docs/knowledge/P16-json-jackson-practical.html">P16 JSON·Jackson 실무</a> — 키 이름 바꾸기·날짜·null 처리</li>
+<li><a href="../docs/knowledge/J05-modern-syntax.html">J05 모던 문법</a> — record와 함께 들어온 문법들</li>
+<li><a href="../docs/knowledge/W19-lombok-or-not.html">W19 Lombok을 쓸까 말까</a> — 실무 코드의 <code>@Getter</code>·<code>@Data</code>가 만드는 것</li>
+<li><a href="../scenario/ch0-first-steps/0-4-dto-rules.html#dto-규칙-세-가지">0-4 DTO 만들기</a> — DTO 규칙 세 가지를 고장 내며 확인</li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<p><a href="B5-interfaces.html">B5. 인터페이스와 구현</a> — Spring 코드에 <code>PostRepository</code>가 왜 클래스가 아니라 인터페이스인지.</p>
+
+
+</main>
+
+
+</body>
+</html>

@@ -1,0 +1,36 @@
+package org.example.board.post;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import org.example.board.comment.CommentResponse;
+
+public record PostDetailResponse(
+        Long id,
+        String title,
+        String content,
+        Visibility visibility,
+        int viewCount,
+        int likeCount,
+        boolean liked,
+        AuthorResponse author,
+        List<String> tags,
+        List<CommentResponse> comments,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt,
+        // 작성·수정 응답에만 — 목록 화면이 다시 조회하지 않고 바로 끼울 카드(목록 항목과 같은 모양, MyBatis로 읽는다)
+        @JsonInclude(JsonInclude.Include.NON_NULL) PostListItemResponse listItem) {
+
+    public static PostDetailResponse of(Post post, int viewCount, boolean liked, List<CommentResponse> comments) {
+        return new PostDetailResponse(post.getId(), post.getTitle(), post.getContent(), post.getVisibility(),
+                viewCount, post.getLikeCount(), liked, AuthorResponse.from(post.getAuthor()),
+                post.getTags().stream().map(Tag::getName).sorted().toList(),
+                comments, post.getCreatedAt(), post.getUpdatedAt(), null);
+    }
+
+    public PostDetailResponse withListItem(PostListItemResponse item) {
+        return new PostDetailResponse(id, title, content, visibility, viewCount, likeCount, liked, author, tags,
+                comments, createdAt, updatedAt, item);
+    }
+}

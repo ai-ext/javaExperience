@@ -1,0 +1,83 @@
+package org.example.bookmark;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@Transactional
+class BookmarkMemoPatchControllerTest {
+    @Autowired MockMvc mockMvc;
+
+    @Test
+    void distinguishesMissingNullAndTextWithoutMovingFolder() throws Exception {
+        mockMvc.perform(put("/api/posts/2/bookmark")
+                .header("Authorization", "Bearer tok-kimjava")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"memo\":\"처음\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/posts/2/bookmark")
+                .header("Authorization", "Bearer tok-kimjava")
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.memo").value("처음"));
+
+        // 내부 플래그 이름을 클라이언트가 보내도 memo 필드가 없으면 변경되지 않는다.
+        mockMvc.perform(patch("/api/posts/2/bookmark")
+                .header("Authorization", "Bearer tok-kimjava")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"memoPresent\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.memo").value("처음"));
+
+        mockMvc.perform(patch("/api/posts/2/bookmark")
+                .header("Authorization", "Bearer tok-kimjava")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"memo\":null}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.memo").value((Object) null));
+
+        mockMvc.perform(patch("/api/posts/2/bookmark")
+                .header("Authorization", "Bearer tok-kimjava")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"memo\":\"다시 읽기\",\"folderId\":123}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.memo").value("다시 읽기"))
+                .andExpect(jsonPath("$.folderId").value((Object) null));
+
+        mockMvc.perform(patch("/api/posts/2/bookmark")
+                .header("Authorization", "Bearer tok-kimjava")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"memo\":\"순서1\",\"memoPresent\":false}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.memo").value("순서1"));
+
+        mockMvc.perform(patch("/api/posts/2/bookmark")
+                .header("Authorization", "Bearer tok-kimjava")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"memoPresent\":false,\"memo\":\"순서2\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.memo").value("순서2"));
+    }
+
+    @Test
+    void rejectsInvalidMemoAndUnknownBookmark() throws Exception {
+        mockMvc.perform(put("/api/posts/2/bookmark")
+                .header("Authorization", "Bearer tok-kimjava")
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(patch("/api/posts/2/bookmark")
+                .header("Authorization", "Bearer tok-kimjava")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"memo\":42}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(patch("/api/posts/999999/bookmark")
+                .header("Authorization", "Bearer tok-kimjava")
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(patch("/api/posts/2/bookmark")
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+}

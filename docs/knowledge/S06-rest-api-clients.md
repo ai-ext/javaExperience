@@ -65,7 +65,9 @@
 
 Spring MVC의 <code>ApiVersionStrategy</code>는 resolver로 요청 버전을 추출하고 parser로 비교 가능한 값으로 바꿔 컨트롤러 매핑과 대조한다. 미지원 버전과 기본 설정의 누락 버전은 400이다. 버전을 선택사항으로 두거나 기본값을 지정할 수 있고, 폐기는 <code>Deprecation</code>, <code>Sunset</code>, <code>Link</code> 헤더로 알린다.
 
-Spring <code>RestClient</code>는 메서드·URI·헤더·본문을 fluent 요청으로 조립하고, terminal body/entity 변환에서 전송과 메시지 변환을 수행한다. <code>WebClient</code>는 reactive publisher 흐름과 스트리밍에 맞는다. HTTP Interface 프록시는 설정한 클라이언트 어댑터로 요청을 보낸다. 기본 URL·공통 헤더는 클라이언트에, 서비스별 정책은 호출 경계에 둔다.
+Spring <code>RestClient</code>는 메서드·URI·헤더·본문을 fluent 요청으로 조립하고, terminal body/entity 변환에서 전송과 메시지 변환을 수행한다. <code>WebClient</code>는 reactive publisher 흐름과 스트리밍에 맞는다.
+
+HTTP Interface 프록시는 설정한 클라이언트 어댑터로 요청을 보낸다. 기본 URL·공통 헤더는 클라이언트에, 서비스별 정책은 호출 경계에 둔다.
 
 재시도는 타임아웃과 별개다. 타임아웃은 서버 작업 취소를 뜻하지 않는다. 멱등 메서드라도 횟수·대기 간격·총 deadline을 제한한다. POST는 idempotency key와 서버측 결과 저장 계약 없이는 자동 재시도하지 않는다.
 
@@ -241,7 +243,9 @@ interface InventoryApi {
 
 ### HTTP 캐시와 조건부 GET (보강)
 
-HTTP 캐싱은 응답의 저장 허용 여부와 저장한 표현을 다시 쓸 수 있는 시점을 `Cache-Control`로 정하고, 응답 검증자(validator)로 원본의 변경 여부를 확인하는 계약이다. API는 JSON 본문뿐 아니라 이 헤더와 304 응답까지 함께 설계해야 한다. `max-age=N`은 응답이 N초 동안 fresh 상태라는 뜻이며, `max-age=0`은 저장 금지가 아니라 저장 후 즉시 재검증이 필요하다는 뜻이다. 만료된 항목을 원본 확인 없이 쓰지 않게 하려면 `must-revalidate`도 설정한다.
+HTTP 캐싱은 응답의 저장 허용 여부와 저장한 표현을 다시 쓸 수 있는 시점을 `Cache-Control`로 정하고, 응답 검증자(validator)로 원본의 변경 여부를 확인하는 계약이다. API는 JSON 본문뿐 아니라 이 헤더와 304 응답까지 함께 설계해야 한다.
+
+`max-age=N`은 응답이 N초 동안 fresh 상태라는 뜻이며, `max-age=0`은 저장 금지가 아니라 저장 후 즉시 재검증이 필요하다는 뜻이다. 만료된 항목을 원본 확인 없이 쓰지 않게 하려면 `must-revalidate`도 설정한다.
 
 정책은 응답의 사용자 범위로 고른다.
 
@@ -249,9 +253,13 @@ HTTP 캐싱은 응답의 저장 허용 여부와 저장한 표현을 다시 쓸 
 - `Cache-Control: private, max-age=0, must-revalidate`는 브라우저 같은 개인 캐시에만 저장하게 하고 매번 서버에서 유효성을 확인하게 한다. 로그인한 사용자 프로필 등 개인별 표현에 적합하다. `private`만으로 브라우저 안의 계정 전환까지 분리되는 것은 아니므로 서버는 현재 인증 주체의 표현과 검증자를 비교해야 한다.
 - `Cache-Control: no-store`는 개인·공유 캐시 모두 저장하지 말라는 지시다. 비밀 정보나 저장 자체를 피해야 하는 응답에 사용한다. `no-cache`는 저장을 막는 말이 아니라 재사용 전 검증을 요구하는 지시이므로 둘을 혼동하지 않는다.
 
-ETag는 선택한 표현의 버전을 나타내는 불투명한 토큰이며, 응답 값은 따옴표로 감싼다. 표현 데이터가 바뀔 때마다 바뀌는 강한 ETag(`"profile-v42"`)를 쓰면 바이트 단위 표현의 변경도 잡을 수 있다. 바이트가 달라도 의미상 같은 표현을 허용할 때만 약한 ETag(`W/"profile-v42"`)를 고려한다. Last-Modified는 수정 시각을 HTTP 날짜로 제공하는 대안이다. HTTP 날짜는 초 단위라 같은 초에 여러 번 수정되는 데이터에는 변경을 놓칠 수 있으므로 ETag가 더 정확하다.
+ETag는 선택한 표현의 버전을 나타내는 불투명한 토큰이며, 응답 값은 따옴표로 감싼다. 표현 데이터가 바뀔 때마다 바뀌는 강한 ETag(`"profile-v42"`)를 쓰면 바이트 단위 표현의 변경도 잡을 수 있다. 바이트가 달라도 의미상 같은 표현을 허용할 때만 약한 ETag(`W/"profile-v42"`)를 고려한다.
 
-클라이언트는 저장해 둔 응답을 확인하려고 `If-None-Match: "profile-v42"` 또는 `If-Modified-Since: <Last-Modified 값>`을 보낸다. 서버가 현재 표현과 같다고 판단한 GET/HEAD에는 `304 Not Modified`와 본문 없는 응답을 돌려준다. 클라이언트는 보관 중인 본문을 재사용한다. 바뀌었다면 `200 OK`와 새 본문, 새 ETag 및 Last-Modified를 반환한다. 두 조건 헤더가 함께 오면 정확도가 더 높은 `If-None-Match`를 우선하고 `If-Modified-Since`는 무시한다. 따라서 ETag가 있으면 날짜 검증을 함께 지원해도 ETag 비교가 최종 기준이다.
+Last-Modified는 수정 시각을 HTTP 날짜로 제공하는 대안이다. HTTP 날짜는 초 단위라 같은 초에 여러 번 수정되는 데이터에는 변경을 놓칠 수 있으므로 ETag가 더 정확하다.
+
+클라이언트는 저장해 둔 응답을 확인하려고 `If-None-Match: "profile-v42"` 또는 `If-Modified-Since: <Last-Modified 값>`을 보낸다. 서버가 현재 표현과 같다고 판단한 GET/HEAD에는 `304 Not Modified`와 본문 없는 응답을 돌려준다. 클라이언트는 보관 중인 본문을 재사용한다.
+
+바뀌었다면 `200 OK`와 새 본문, 새 ETag 및 Last-Modified를 반환한다. 두 조건 헤더가 함께 오면 정확도가 더 높은 `If-None-Match`를 우선하고 `If-Modified-Since`는 무시한다. 따라서 ETag가 있으면 날짜 검증을 함께 지원해도 ETag 비교가 최종 기준이다.
 
 Spring Boot 4.1 / Spring Framework 7, Java 25 기준으로 Spring MVC 컨트롤러에서는 `WebRequest.checkNotModified(etag, lastModified)`가 두 조건 헤더를 처리하고, 변경되지 않은 GET을 304로 표시한다. 다음 예는 현재 인증 사용자의 프로필 표현 버전을 ETag로 쓰고, 그 사용자의 마지막 수정 시각도 함께 보낸다. `ProfileSnapshot`은 DTO와 표현 버전을 원자적으로 제공한다고 가정한다.
 
@@ -285,9 +293,13 @@ class ProfileController {
 }
 ```
 
-실제 첫 응답에는 `Cache-Control: private, max-age=0, must-revalidate`, `ETag`, `Last-Modified`가 붙는다. 다음 요청은 예를 들어 `If-None-Match: "profile-42"`를 보내며, 서버가 여전히 같은 인증 사용자의 같은 표현 버전을 찾으면 304를 돌려준다. 조건이 맞지 않으면 전체 최신 프로필을 200으로 응답한다. Spring MVC는 `CacheControl.noStore()`도 제공하며, `CacheControl.maxAge(...).cachePublic()`은 실제로 공유 가능한 표현에만 사용한다.
+실제 첫 응답에는 `Cache-Control: private, max-age=0, must-revalidate`, `ETag`, `Last-Modified`가 붙는다. 다음 요청은 예를 들어 `If-None-Match: "profile-42"`를 보내며, 서버가 여전히 같은 인증 사용자의 같은 표현 버전을 찾으면 304를 돌려준다.
 
-**함정:** 개인 API를 `public`으로 표시하면 공유 캐시가 사용자 간에 응답을 재사용할 수 있다. 쿠키 기반 인증이라고 공유 캐시가 자동으로 모든 응답을 차단한다고 가정하지 말고, 사용자 응답에는 `private` 또는 저장 금지가 필요한 경우 `no-store`를 명시한다. `Vary: Cookie`는 쿠키 전체를 캐시 키로 만들 뿐 개인 정보 보호 정책을 대체하지 않는다. 또한 ETag를 사용자 ID가 아닌 공통 레코드 버전만으로 만들면 두 계정의 검증자가 우연히 같아져 이전 계정의 캐시 본문에 304를 허용할 수 있다. 검증자는 인증 후 선택된 표현의 실제 버전을 반영하고, 표현이 바뀌면 반드시 바뀌게 한다. 응답 변환·권한에 따라 본문이 달라진다면 그 차이도 검증자 계산에 반영한다.
+조건이 맞지 않으면 전체 최신 프로필을 200으로 응답한다. Spring MVC는 `CacheControl.noStore()`도 제공하며, `CacheControl.maxAge(...).cachePublic()`은 실제로 공유 가능한 표현에만 사용한다.
+
+**함정:** 개인 API를 `public`으로 표시하면 공유 캐시가 사용자 간에 응답을 재사용할 수 있다. 쿠키 기반 인증이라고 공유 캐시가 자동으로 모든 응답을 차단한다고 가정하지 말고, 사용자 응답에는 `private` 또는 저장 금지가 필요한 경우 `no-store`를 명시한다. `Vary: Cookie`는 쿠키 전체를 캐시 키로 만들 뿐 개인 정보 보호 정책을 대체하지 않는다.
+
+또한 ETag를 사용자 ID가 아닌 공통 레코드 버전만으로 만들면 두 계정의 검증자가 우연히 같아져 이전 계정의 캐시 본문에 304를 허용할 수 있다. 검증자는 인증 후 선택된 표현의 실제 버전을 반영하고, 표현이 바뀌면 반드시 바뀌게 한다. 응답 변환·권한에 따라 본문이 달라진다면 그 차이도 검증자 계산에 반영한다.
 
 참고: HTTP Caching — https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-caching.html
 참고: RFC 9110: HTTP Semantics — https://www.rfc-editor.org/rfc/rfc9110.html

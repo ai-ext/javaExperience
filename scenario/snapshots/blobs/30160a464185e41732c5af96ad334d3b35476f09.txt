@@ -1,0 +1,26 @@
+package org.example.poll;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface PollRepository extends JpaRepository<Poll, Long> {
+
+    Optional<Poll> findByPost_Id(Long postId);
+
+    boolean existsByPost_Id(Long postId);
+
+    // 선택지별 표 수 — LEFT JOIN이라 표가 없는 선택지도 0으로 나온다. 순서는 만든 순서(position)
+    @Query(nativeQuery = true, value = """
+            SELECT o.id AS id, o.label AS label, COUNT(v.id) AS votes
+              FROM poll_option o
+              LEFT JOIN poll_vote v ON v.option_id = o.id
+             WHERE o.poll_id = :pollId
+             GROUP BY o.id, o.label, o.position
+             ORDER BY o.position
+            """)
+    List<PollOptionRow> tally(@Param("pollId") Long pollId);
+}

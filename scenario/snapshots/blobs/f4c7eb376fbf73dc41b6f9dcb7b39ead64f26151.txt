@@ -1,0 +1,51 @@
+package org.example.social;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.member.MemberNotFoundException;
+import org.example.member.MemberRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+
+// 12-5 뮤트 — 팔로우(12-4)와 같은 모양의 멱등 PUT/DELETE. 차단 관계여도 된다(내 피드만 바뀐다)
+@Service
+public class MuteService {
+
+    private static final String WITHDRAWN = "WITHDRAWN";
+
+    private final MemberMuteRepository memberMuteRepository;
+    private final MemberRepository memberRepository;
+    private final Clock clock;
+
+    public MuteService(MemberMuteRepository memberMuteRepository, MemberRepository memberRepository, Clock clock) {
+        this.memberMuteRepository = memberMuteRepository;
+        this.memberRepository = memberRepository;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public MuteResponse mute(AuthenticatedMember me, Long targetId) {
+        Long id = checkTarget(me, targetId);
+        memberMuteRepository.insertIgnore(me.id(), id, LocalDateTime.now(clock));
+        return new MuteResponse(id, true);
+    }
+
+    @Transactional
+    public MuteResponse unmute(AuthenticatedMember me, Long targetId) {
+        Long id = checkTarget(me, targetId);
+        memberMuteRepository.deleteRelation(me.id(), id);
+        return new MuteResponse(id, false);
+    }
+
+    private Long checkTarget(AuthenticatedMember me, Long targetId) {
+        if (me.id().equals(targetId)) {
+            throw new SelfMuteNotAllowedException();
+        }
+        return memberRepository.findById(targetId)
+                .filter(m -> !WITHDRAWN.equals(m.getMemberStatus()) && m.getDeletedAt() == null)
+                .orElseThrow(MemberNotFoundException::new)
+                .getId();
+    }
+}

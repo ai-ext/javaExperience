@@ -1,0 +1,41 @@
+package org.example.post;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import tools.jackson.databind.JsonNode;
+
+import java.util.List;
+
+// 게시글 작성 요청 — Bean Validation으로 저장 전에 막는다
+public record PostCreateRequest(
+        @NotBlank(message = "게시판을 선택해 주세요.")
+        String boardSlug,
+
+        @NotBlank(message = "제목을 입력해 주세요.")
+        @Size(max = 200, message = "제목은 200자 이하여야 합니다.")
+        String title,
+
+        @NotBlank(message = "본문을 입력해 주세요.")
+        String content,
+
+        @Size(max = 5, message = "태그는 5개까지입니다.")
+        List<@NotNull @Size(min = 1, max = 30, message = "태그 이름은 1~30자여야 합니다.") String> tags,
+
+        @Pattern(regexp = "PUBLIC|FOLLOWERS", message = "공개 범위는 PUBLIC 또는 FOLLOWERS여야 합니다.")
+        String visibility,
+
+        // 11-1 임시저장 — 생략하면 PUBLISHED(바로 발행)
+        @Pattern(regexp = "DRAFT|PUBLISHED", message = "상태는 DRAFT 또는 PUBLISHED여야 합니다.")
+        String status,
+
+        // 11-2 먼저 올려 둔 이미지(POST /api/images)의 id — 이 글에 붙인다
+        JsonNode imageIds,
+
+        // 15-3 예약 발행 시각(선택) — 있으면 SCHEDULED로 저장. "지금보다 뒤 ~ 30일 안" 규칙은 지금(Clock)이
+        // 필요해서 애노테이션이 아니라 PostService에서 확인한다. 원문 타입·형식도 서비스에서 400(errors에 publishAt)으로 막는다.
+        // JsonNode로 원문 타입을 보존한다. 배열·숫자·빈 문자열도 모두 명시적으로 400 처리한다.
+        JsonNode publishAt
+) {
+}

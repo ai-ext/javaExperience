@@ -8,6 +8,177 @@
 
 > "매일 새벽 4시에 숫자를 실제 개수로 맞춰 주세요. 운영자가 바로 돌릴 수 있는 버튼도요. 몇 번을 돌려도 결과가 같아야 해요."
 
+## 화면 시나리오
+
+사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.
+
+```screen
+{
+  "title": "운영 도구 — 숫자 다시 맞추기",
+  "summary": "비정규화 숫자(like_count·comment_count)를 실제 행 수로 맞춘다. 매일 04:00에도 같은 메서드가 돈다.",
+  "screen": [
+    {
+      "type": "bar",
+      "id": "bar",
+      "label": "운영 도구",
+      "right": "운영자"
+    },
+    {
+      "type": "actions",
+      "id": "buttons",
+      "items": [
+        {
+          "id": "recount",
+          "label": "숫자 다시 맞추기",
+          "variant": "primary"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": "fixed",
+      "label": "고친 글",
+      "items": [
+        {
+          "id": "f93",
+          "title": "#93 좋아요 6 → 4"
+        },
+        {
+          "id": "f119",
+          "title": "#119 좋아요 10 → 5"
+        },
+        {
+          "id": "f120",
+          "title": "#120 좋아요 3 → 4"
+        },
+        {
+          "id": "f22",
+          "title": "#22 댓글 9 → 8"
+        },
+        {
+          "id": "f75",
+          "title": "#75 댓글 2 → 4"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "nothing",
+      "value": "고칠 게 없어요",
+      "emphasis": "caption",
+      "tone": "muted"
+    }
+  ],
+  "flows": [
+    {
+      "name": "처음 실행",
+      "steps": [
+        {
+          "kind": "user",
+          "text": "[숫자 다시 맞추기]를 누른다",
+          "focus": [
+            "recount"
+          ]
+        },
+        {
+          "kind": "request",
+          "method": "POST",
+          "path": "/api/admin/recount",
+          "headers": [
+            "Authorization: Bearer tok-p01"
+          ]
+        },
+        {
+          "kind": "db",
+          "sql": "SELECT p.id, p.like_count, COALESCE(l.cnt, 0) FROM post p LEFT JOIN (SELECT post_id, COUNT(*) cnt FROM post_like GROUP BY post_id) l ON l.post_id = p.id WHERE p.deleted_at IS NULL AND p.like_count <> COALESCE(l.cnt, 0)",
+          "note": "고칠 목록을 먼저 얻는다"
+        },
+        {
+          "kind": "db",
+          "sql": "UPDATE post p LEFT JOIN (SELECT post_id, COUNT(*) cnt FROM post_like GROUP BY post_id) l ON l.post_id = p.id SET p.like_count = COALESCE(l.cnt, 0) WHERE p.deleted_at IS NULL AND p.like_count <> COALESCE(l.cnt, 0)",
+          "note": "글마다 엔티티를 불러 고치지 않고 집합으로 한 번에"
+        },
+        {
+          "kind": "response",
+          "status": 200,
+          "headers": [
+            "Content-Type: application/json"
+          ],
+          "body": "{\"likeFixed\": [{\"postId\": 93, \"before\": 6, \"after\": 4}, …], \"commentFixed\": [{\"postId\": 22, \"before\": 9, \"after\": 8}, …]}"
+        },
+        {
+          "kind": "screen",
+          "text": "고친 글과 전후 값",
+          "focus": [
+            "fixed"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "한 번 더",
+      "steps": [
+        {
+          "kind": "user",
+          "text": "바로 한 번 더 누른다",
+          "focus": [
+            "recount"
+          ]
+        },
+        {
+          "kind": "request",
+          "method": "POST",
+          "path": "/api/admin/recount",
+          "headers": [
+            "Authorization: Bearer tok-p01"
+          ]
+        },
+        {
+          "kind": "response",
+          "status": 200,
+          "headers": [
+            "Content-Type: application/json"
+          ],
+          "body": "{\"likeFixed\": [], \"commentFixed\": []}"
+        },
+        {
+          "kind": "screen",
+          "text": "몇 번을 돌려도 결과가 같다(멱등)",
+          "focus": [
+            "nothing"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "일반 회원",
+      "steps": [
+        {
+          "kind": "user",
+          "text": "일반 회원이 주소를 직접 친다"
+        },
+        {
+          "kind": "request",
+          "method": "POST",
+          "path": "/api/admin/recount",
+          "headers": [
+            "Authorization: Bearer tok-p02"
+          ]
+        },
+        {
+          "kind": "response",
+          "status": 403
+        },
+        {
+          "kind": "screen",
+          "text": "운영자만"
+        }
+      ]
+    }
+  ]
+}
+```
+
 ## 만들 것
 
 | 항목 | 내용 |
@@ -25,14 +196,322 @@
 }
 ```
 
+## 구현 가이드
+
+이 단계의 화면·DB 흐름을 아래 참조 파일과 연결한다. 요구 계약을 먼저 구현하고, 필요한 파일 역할만 펼쳐 전체 코드와 비교한다.
+
+구현 순서에서 확인할 흐름:
+- 고칠 목록을 먼저 얻는다
+- 글마다 엔티티를 불러 고치지 않고 집합으로 한 번에
+
+<details>
+<summary>Controller / HTTP</summary>
+
+`AdminController.java`: HTTP 매핑과 입력·응답을 **만들 것**의 계약과 대조한다.
+
+```java
+@PostMapping("/api/admin/recount")
+public RecountResponse recount(@LoginMember AuthenticatedMember me) {
+    if (!"ADMIN".equals(me.role())) {
+        throw new AdminOnlyException();
+    }
+    return recountService.recount();
+}
+```
+
+스케줄러는 로그인 회원이 없으므로 권한 확인은 Controller에 둔다. 토큰이 없으면 선행 인증 인터셉터가 401을 반환한다.
+
+</details>
+
+<details>
+<summary>예외 처리 / 실패 응답</summary>
+
+`AdminOnlyException.java`, `ApiExceptionHandler.java`: 실패 상태와 응답 본문을 계약과 대조한다.
+
+```java
+@ExceptionHandler(AdminOnlyException.class)
+public ProblemDetail handleAdminOnly(AdminOnlyException ex, HttpServletRequest request) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    problem.setInstance(URI.create(request.getRequestURI()));
+    return problem;
+}
+```
+
+</details>
+
+<details>
+<summary>설정 / 스케줄러 활성화</summary>
+
+`SchedulingConfig.java`: 예약 실행을 켜는 설정이다.
+
+```java
+@Configuration
+@EnableScheduling
+public class SchedulingConfig {}
+```
+
+</details>
+
+<details>
+<summary>DTO / 집계 결과와 응답</summary>
+
+`CountMismatchRow.java`, `CountFix.java`, `RecountResponse.java`: DB 조회 결과를 응답 항목으로 옮긴다. 필드 이름·타입을 응답 예시와 대조한다.
+
+```java
+// JPA native query의 postId·beforeCount·afterCount 별칭을 읽는다.
+public interface CountMismatchRow {
+    Long getPostId();
+    Long getBeforeCount();
+    Long getAfterCount();
+}
+
+public record CountFix(Long postId, long before, long after) {}
+
+public record RecountResponse(List<CountFix> likeFixed, List<CountFix> commentFixed) {}
+```
+
+</details>
+
+<details>
+<summary>JPA / Repository·SQL</summary>
+
+`RecountRepository.java`: JPA 조회 조건을 DB 예시와 대조한다.
+
+```sql
+SELECT p.id AS postId, p.like_count AS beforeCount, COALESCE(l.cnt, 0) AS afterCount
+FROM post p
+LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM post_like GROUP BY post_id) l
+       ON l.post_id = p.id
+WHERE p.deleted_at IS NULL AND p.like_count <> COALESCE(l.cnt, 0)
+ORDER BY p.id;
+
+UPDATE post p
+LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM post_like GROUP BY post_id) l
+       ON l.post_id = p.id
+SET p.like_count = COALESCE(l.cnt, 0)
+WHERE p.deleted_at IS NULL AND p.like_count <> COALESCE(l.cnt, 0);
+```
+
+댓글은 `comment.deleted_at IS NULL`을 집계 조건에 추가한다. `LEFT JOIN`과 `COALESCE`가 있어야 좋아요·댓글이 0건인 글도 0으로 고칠 수 있다. 실제 `@Query`·`@Modifying` 전문은 아래 역할별 코드에 있다.
+
+</details>
+
+<details>
+<summary>Scheduler / 배치</summary>
+
+`RecountScheduler.java`: 실행 주기와 재실행 결과를 확인한다.
+
+```java
+@Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
+public void recountDaily() {
+    recountService.recount();
+}
+```
+
+</details>
+
+<details>
+<summary>Service / 규칙·트랜잭션</summary>
+
+`RecountService.java`: 조회·검증·상태 변경의 순서를 화면 흐름과 대조한다.
+
+```java
+@Transactional
+public RecountResponse recount() {
+    List<CountFix> likeFixed = toFixes(recountRepository.findLikeCountMismatches());
+    List<CountFix> commentFixed = toFixes(recountRepository.findCommentCountMismatches());
+    if (!likeFixed.isEmpty()) recountRepository.fixLikeCounts();
+    if (!commentFixed.isEmpty()) recountRepository.fixCommentCounts();
+    likeFixed.forEach(f -> log.info("like_count 보정 postId={} {} -> {}", f.postId(), f.before(), f.after()));
+    commentFixed.forEach(f -> log.info("comment_count 보정 postId={} {} -> {}", f.postId(), f.before(), f.after()));
+    return new RecountResponse(likeFixed, commentFixed);
+}
+```
+
+실제 구현은 배치 완료 건수도 로그로 남긴다. 조회와 UPDATE는 한 트랜잭션 안에서 실행한다.
+
+</details>
+
+<details>
+<summary>MyBatis / Mapper·Service 선택 경로</summary>
+
+같은 API와 응답을 Mapper Java/XML로 구현할 때 `CountMismatchRow`는 SQL 결과를 받는 클래스로 바뀐다. `RecountService`는 `MyBatisRecountMapper`를 주입받되 Controller·Scheduler는 그대로 둔다.
+
+```java
+@Mapper
+public interface MyBatisRecountMapper {
+    List<CountMismatchRow> findLikeCountMismatches();
+    List<CountMismatchRow> findCommentCountMismatches();
+    int fixLikeCounts();
+    int fixCommentCounts();
+}
+```
+
+`MyBatisRecountMapper.xml`은 JPA의 SELECT·UPDATE와 같은 `LEFT JOIN` 집계를 사용한다. 아래 **MyBatis 대체 구현 코드**에서 Mapper XML·Service·DTO와 이전 단계 누적 코드를 모두 펼쳐 볼 수 있다.
+
+</details>
+
 ## 직접 확인
 
-```bash
-BASE=http://localhost:8080
-curl -s -X POST "$BASE/api/admin/recount" -H 'Authorization: Bearer tok-p01'; echo     # X1 첫 실행
-curl -s -X POST "$BASE/api/admin/recount" -H 'Authorization: Bearer tok-p01'; echo     # X2 한 번 더
-curl -i -X POST "$BASE/api/admin/recount" -H 'Authorization: Bearer tok-p02'          # X3 일반 회원
-curl -i -X POST "$BASE/api/admin/recount"                                             # X4 토큰 없음
+API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아래 실행 패널에서 요청을 보내고 응답과 채점 기준을 확인한다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
+
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
+
+```check
+{
+  "requests": [
+    {
+      "id": "X1",
+      "title": "첫 실행",
+      "method": "POST",
+      "path": "/api/admin/recount",
+      "headers": {
+        "Authorization": "Bearer tok-p01"
+      }
+    },
+    {
+      "id": "X2",
+      "title": "한 번 더",
+      "method": "POST",
+      "path": "/api/admin/recount",
+      "headers": {
+        "Authorization": "Bearer tok-p01"
+      }
+    },
+    {
+      "id": "X3",
+      "title": "일반 회원",
+      "method": "POST",
+      "path": "/api/admin/recount",
+      "headers": {
+        "Authorization": "Bearer tok-p02"
+      }
+    },
+    {
+      "id": "X4",
+      "title": "토큰 없음",
+      "method": "POST",
+      "path": "/api/admin/recount"
+    }
+  ],
+  "checks": [
+    {
+      "id": "C1",
+      "request": "X1",
+      "expect": {
+        "status": 200,
+        "anyOf": [
+          {
+            "json": [
+              {
+                "path": "$.likeFixed",
+                "length": 3
+              },
+              {
+                "path": "$.likeFixed",
+                "contains": {
+                  "postId": 93,
+                  "before": 6,
+                  "after": 4
+                }
+              },
+              {
+                "path": "$.likeFixed",
+                "contains": {
+                  "postId": 119,
+                  "before": 10,
+                  "after": 5
+                }
+              },
+              {
+                "path": "$.likeFixed",
+                "contains": {
+                  "postId": 120,
+                  "before": 3,
+                  "after": 4
+                }
+              },
+              {
+                "path": "$.commentFixed",
+                "length": 2
+              },
+              {
+                "path": "$.commentFixed",
+                "contains": {
+                  "postId": 22,
+                  "before": 9,
+                  "after": 8
+                }
+              },
+              {
+                "path": "$.commentFixed",
+                "contains": {
+                  "postId": 75,
+                  "before": 2,
+                  "after": 4
+                }
+              }
+            ]
+          },
+          {
+            "json": [
+              {
+                "path": "$.likeFixed",
+                "type": "array"
+              },
+              {
+                "path": "$.likeFixed",
+                "length": 0
+              },
+              {
+                "path": "$.commentFixed",
+                "type": "array"
+              },
+              {
+                "path": "$.commentFixed",
+                "length": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "C2",
+      "request": "X2",
+      "expect": {
+        "status": 200,
+        "json": [
+          {
+            "path": "$.likeFixed",
+            "length": 0
+          },
+          {
+            "path": "$.commentFixed",
+            "length": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "C3",
+      "all": [
+        {
+          "request": "X3",
+          "expect": {
+            "status": 403
+          }
+        },
+        {
+          "request": "X4",
+          "expect": {
+            "status": 401
+          }
+        }
+      ]
+    }
+  ]
+}
 ```
 
 ## 채점 기준

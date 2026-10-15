@@ -48,7 +48,9 @@ sequenceDiagram
     Converter-->>Client: "직렬화된 JSON 또는 오류"
 ```
 
-**생명주기 문제.** JPA 지연 연관은 영속성 컨텍스트가 닫힌 뒤 초기화하려 하면 실패한다. Spring Boot의 spring.jpa.open-in-view 설정은 요청 처리 전체에 EntityManager를 바인딩하는 인터셉터를 등록한다. 켜져 있으면 직렬화 시점에도 조회가 가능해 예외가 잠복하는 대신 변환 단계에서 쿼리가 실행되어 위치와 개수가 잘 보이지 않는다. Hibernate는 필요한 연관을 컨텍스트가 닫히기 전에 조회하라고 안내한다. hibernate.enable_lazy_load_no_trans는 기본 비활성화이며 안전하지 않은 설정이다. OSIV나 전역 eager 변경보다 유스케이스에 맞는 조회 범위를 명시한다.
+**생명주기 문제.** JPA 지연 연관은 영속성 컨텍스트가 닫힌 뒤 초기화하려 하면 실패한다. Spring Boot의 spring.jpa.open-in-view 설정은 요청 처리 전체에 EntityManager를 바인딩하는 인터셉터를 등록한다. 켜져 있으면 직렬화 시점에도 조회가 가능해 예외가 잠복하는 대신 변환 단계에서 쿼리가 실행되어 위치와 개수가 잘 보이지 않는다.
+
+Hibernate는 필요한 연관을 컨텍스트가 닫히기 전에 조회하라고 안내한다. hibernate.enable_lazy_load_no_trans는 기본 비활성화이며 안전하지 않은 설정이다. OSIV나 전역 eager 변경보다 유스케이스에 맞는 조회 범위를 명시한다.
 
 **객체 그래프와 계약 문제.** 엔티티 연관관계는 객체 탐색과 DB 관계를 표현하지만 HTTP 응답은 클라이언트가 소비할 문서다. 양방향 탐색은 순환할 수 있고 내부 필드도 같은 객체에 있다. @JsonIgnore로 특정 API 문제를 엔티티에 막으면 직렬화 정책이 영속성 모델에 스며든다. DTO는 응답 필드를 API 경계에 고정해 엔티티 필드 추가가 자동 공개되지 않게 한다.
 
@@ -228,7 +230,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface OrderRepository extends JpaRepository<OrderEntity, Long> {}
 ~~~
 
-코드에서 OrderRepository는 JpaRepository<OrderEntity, Long>을 상속한다. 응답 JSON은 customer와 items에 접근하면서 지연 조회를 일으킬 수 있고, 항목의 order를 따라가면 순환할 수 있다. CustomerEntity.email과 internalMemo도 같은 직렬화 대상으로 보일 수 있다. 실제로 노출될 필드는 serializer 설정 및 연관 상태에 따라 다르므로, “현재 JSON에서 안 보인다”는 사실은 보안 경계가 아니다.
+코드에서 OrderRepository는 JpaRepository<OrderEntity, Long>을 상속한다. 응답 JSON은 customer와 items에 접근하면서 지연 조회를 일으킬 수 있고, 항목의 order를 따라가면 순환할 수 있다.
+
+CustomerEntity.email과 internalMemo도 같은 직렬화 대상으로 보일 수 있다. 실제로 노출될 필드는 serializer 설정 및 연관 상태에 따라 다르므로, “현재 JSON에서 안 보인다”는 사실은 보안 경계가 아니다.
 
 **선택 A — 직접 매핑.** 전송할 필드와 조합 로직이 한 곳에서 명확하다. 짧은 필드 목록에는 가장 단순한 방법이다.
 
@@ -331,12 +335,16 @@ public interface OrderSummaryRepository
 ## 8. 자가점검 Q&A (면접 대비)
 
 **Q1. 엔티티를 JSON으로 반환할 때 운영에서만 실패할 수 있는 이유는?**  
-JSON 변환은 Controller가 반환한 뒤 getter를 따라가며 진행된다. 이때 지연 필드가 초기화되지 않았다면 영속성 컨텍스트가 닫힌 상태에서 예외가 난다. 요청 범위 EntityManager가 열려 있으면 반대로 변환 중 SQL이 실행되어 느려질 수 있다.  
+JSON 변환은 Controller가 반환한 뒤 getter를 따라가며 진행된다. 이때 지연 필드가 초기화되지 않았다면 영속성 컨텍스트가 닫힌 상태에서 예외가 난다.
+
+요청 범위 EntityManager가 열려 있으면 반대로 변환 중 SQL이 실행되어 느려질 수 있다.
 꼬리질문: 어디서 고칠까?  
 답: 필요한 데이터와 트랜잭션 범위를 정하고, DTO 또는 projection으로 API 응답을 구성한다.
 
 **Q2. 응답 DTO와 JPA 프로젝션은 같은 것인가?**  
-응답 DTO는 외부로 전달할 데이터 계약이고, 프로젝션은 조회 결과의 필드 집합을 제한하는 방식이다. 같은 DTO 클래스를 repository projection 결과로 쓸 수 있다. 모든 DTO가 쿼리 projection인 것은 아니다.  
+응답 DTO는 외부로 전달할 데이터 계약이고, 프로젝션은 조회 결과의 필드 집합을 제한하는 방식이다. 같은 DTO 클래스를 repository projection 결과로 쓸 수 있다.
+
+모든 DTO가 쿼리 projection인 것은 아니다.
 꼬리질문: 목록 API에서 projection을 고려할 이유는?  
 답: 엔티티 그래프 대신 응답에 필요한 값만 조회해 불필요한 로딩을 줄일 수 있다.
 
@@ -346,17 +354,24 @@ JSON 변환은 Controller가 반환한 뒤 getter를 따라가며 진행된다. 
 답: DTO projection, fetch join, batch fetch 등으로 목록 전체의 조회 계획을 먼저 정한다.
 
 **Q4. 변환을 Controller와 Service 중 어디에 두나?**  
-HTTP에 가까운 이름 변경·응답 조립은 Controller가 적절할 수 있다. 트랜잭션 안에서 엔티티 상태와 관계를 해석하거나 유스케이스 규칙을 적용한다면 Service/조회 컴포넌트가 낫다. 핵심은 Controller가 응답 생성 중 DB를 건드리지 않게 하는 것이다.  
+HTTP에 가까운 이름 변경·응답 조립은 Controller가 적절할 수 있다. 트랜잭션 안에서 엔티티 상태와 관계를 해석하거나 유스케이스 규칙을 적용한다면 Service/조회 컴포넌트가 낫다.
+
+핵심은 Controller가 응답 생성 중 DB를 건드리지 않게 하는 것이다.
 꼬리질문: 어떤 선택을 기본으로 권하나?  
 답: 단순 mapping은 API 경계에 가깝게, 쿼리 최적화가 필요한 읽기 응답은 조회 계층에서 완성한다.
 
 **Q5. 수동 매핑, MapStruct, ModelMapper 중 무엇을 고르나?**  
-필드가 적으면 수동 또는 정적 팩토리가 가장 투명하다. 반복 타입이 많으면 컴파일 시 구현을 만드는 MapStruct가 매핑 코드를 일관되게 관리하기 쉽다. 런타임 이름 매칭은 편하지만 숨은 규칙과 잘못된 필드 연결 위험을 감수해야 한다.  
-꼬리질문: MapStruct가 DTO 설계를 대신하나?  
+필드가 적으면 수동 또는 정적 팩토리가 가장 투명하다. 반복 타입이 많으면 컴파일 시 구현을 만드는 MapStruct가 매핑 코드를 일관되게 관리하기 쉽다.
+
+런타임 이름 매칭은 편하지만 숨은 규칙과 잘못된 필드 연결 위험을 감수해야 한다.
+꼬리질문: MapStruct가 DTO 설계를 대신하나?
+
 답: 아니다. 어느 필드를 공개할지와 쿼리를 어떻게 할지는 개발자가 결정한다.
 
 **Q6. API별 DTO를 만들면 DTO 남발인가?**  
-외부 입력 필드와 출력 필드의 보안·버전 요구가 다르면 별도 타입이 분리 이유를 갖는다. 단순히 Controller/Service/Repository마다 동일한 필드를 복제하는 건 변환만 늘린다. 타입의 변경 이유가 다른지 기준으로 판단한다.  
+외부 입력 필드와 출력 필드의 보안·버전 요구가 다르면 별도 타입이 분리 이유를 갖는다. 단순히 Controller/Service/Repository마다 동일한 필드를 복제하는 건 변환만 늘린다.
+
+타입의 변경 이유가 다른지 기준으로 판단한다.
 꼬리질문: 요청 DTO와 엔티티를 분리하면 얻는 안전성은?  
 답: 사용자가 제출 가능한 값의 목록을 제한해 내부 상태나 권한 필드가 자동 바인딩되는 것을 막는다.
 

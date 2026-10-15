@@ -37,7 +37,9 @@
 | Hikari `connection-timeout` | 풀에서 커넥션을 얻기 위해 기다리는 시간 | 이미 얻은 커넥션으로 실행하는 쿼리의 시간 |
 | 요청 처리 deadline | 애플리케이션이 한 요청에 허용하는 전체 예산 | 그 요청을 호출한 클라이언트 자체의 대기 제한 |
 
-Spring Boot 4.1.1의 공통 속성 문서에서 Tomcat worker 기본값은 `server.tomcat.threads.max=200`, `min-spare=10`이다. `max-queue-capacity`의 문서 기본값은 2147483647이며 0보다 큰 값에서 설정이 적용된다. 이는 운영에서 대기열을 사실상 무제한으로 열어 두라는 권고가 아니다. 큐가 쌓이면 완료율은 늘지 않은 채 대기 시간과 메모리 점유가 늘 수 있으므로 실제 부하와 실패 동작을 보고 제한한다. 값은 [공통 속성 문서](https://docs.spring.io/spring-boot/appendix/application-properties/index.html)의 현재 버전을 기준으로 삼고, 배포 버전에서 다시 확인한다.
+Spring Boot 4.1.1의 공통 속성 문서에서 Tomcat worker 기본값은 `server.tomcat.threads.max=200`, `min-spare=10`이다. `max-queue-capacity`의 문서 기본값은 2147483647이며 0보다 큰 값에서 설정이 적용된다. 이는 운영에서 대기열을 사실상 무제한으로 열어 두라는 권고가 아니다.
+
+큐가 쌓이면 완료율은 늘지 않은 채 대기 시간과 메모리 점유가 늘 수 있으므로 실제 부하와 실패 동작을 보고 제한한다. 값은 [공통 속성 문서](https://docs.spring.io/spring-boot/appendix/application-properties/index.html)의 현재 버전을 기준으로 삼고, 배포 버전에서 다시 확인한다.
 
 ## 3. 내부 동작·원리
 
@@ -62,7 +64,9 @@ DB ── CPU·디스크·락·동시 세션 한도
 
 Tomcat worker가 늘면 대기 요청 중 더 많은 수가 애플리케이션 코드를 실행할 수 있다. 요청 대부분이 CPU 작업이라면 코어보다 훨씬 많은 플랫폼 스레드는 문맥 교환 비용을 높인다. 요청 대부분이 블로킹 I/O라면 실행 스레드는 I/O 완료를 기다리며 다른 작업에 CPU를 양보하므로 코어 수보다 많은 worker가 유리할 수 있다. 그러나 이 효과도 DB와 외부 서비스의 동시 처리 능력 안에서만 유효하다.
 
-Hikari 풀 크기는 “요청 스레드 수와 같게” 정하는 값이 아니다. DB는 CPU, 저장장치, 네트워크, 락 경합과 쿼리 특성에 따라 동시에 효율적으로 처리할 수 있는 양이 달라진다. 풀을 크게 하면 더 많은 SQL이 동시에 DB로 들어가 경합, 컨텍스트 전환, 캐시 압박을 높일 수 있다. HikariCP의 pool sizing 문서는 Oracle Real-World Performance 시연에서 풀을 줄인 특정 조건에 응답 시간이 약 100ms에서 2ms로 줄었다는 사례를 소개한다. 이는 블로그/영상 인용 사례이지 일반적인 보장값이 아니다. 핵심은 작은 풀부터 실제 쿼리 부하로 확인하는 것이다.
+Hikari 풀 크기는 “요청 스레드 수와 같게” 정하는 값이 아니다. DB는 CPU, 저장장치, 네트워크, 락 경합과 쿼리 특성에 따라 동시에 효율적으로 처리할 수 있는 양이 달라진다. 풀을 크게 하면 더 많은 SQL이 동시에 DB로 들어가 경합, 컨텍스트 전환, 캐시 압박을 높일 수 있다.
+
+HikariCP의 pool sizing 문서는 Oracle Real-World Performance 시연에서 풀을 줄인 특정 조건에 응답 시간이 약 100ms에서 2ms로 줄었다는 사례를 소개한다. 이는 블로그/영상 인용 사례이지 일반적인 보장값이 아니다. 핵심은 작은 풀부터 실제 쿼리 부하로 확인하는 것이다.
 
 전체 연결 예산은 인스턴스별 값으로 계산한다.
 
@@ -83,7 +87,9 @@ DB 쿼리 제한 < 애플리케이션 요청 예산 < 프록시 응답 제한 < 
 
 바깥 제한에는 애플리케이션이 오류를 전달할 여유를 둔다. 순차 DB·HTTP 호출의 제한 합계는 요청 예산 안에 두고, 외부 호출은 남은 deadline 이내로 제한한다. 모든 계층이 같은 값이면 정리할 시간이 없고 실패 지점도 알기 어렵다.
 
-Tomcat의 `connection-timeout`, 애플리케이션의 요청 deadline, Hikari의 커넥션 획득 제한, JDBC/DB의 쿼리 제한은 서로 다른 단계다. DB 드라이버나 데이터베이스가 쿼리 취소를 어떻게 처리하는지는 사용하는 드라이버·DB와 설정에 달려 있다. 애플리케이션이 클라이언트 연결 종료를 알아차렸다는 이유만으로 이미 시작한 모든 JDBC 작업이 즉시 중단된다고 가정하지 않는다. 재시도는 실패를 더 빠르게 만들 수도 있지만, 원래 요청이 계속 실행 중이면 DB 부하를 중복시킨다.
+Tomcat의 `connection-timeout`, 애플리케이션의 요청 deadline, Hikari의 커넥션 획득 제한, JDBC/DB의 쿼리 제한은 서로 다른 단계다. DB 드라이버나 데이터베이스가 쿼리 취소를 어떻게 처리하는지는 사용하는 드라이버·DB와 설정에 달려 있다.
+
+애플리케이션이 클라이언트 연결 종료를 알아차렸다는 이유만으로 이미 시작한 모든 JDBC 작업이 즉시 중단된다고 가정하지 않는다. 재시도는 실패를 더 빠르게 만들 수도 있지만, 원래 요청이 계속 실행 중이면 DB 부하를 중복시킨다.
 
 ### 기동 시간 계측과 lazy initialization
 
@@ -99,7 +105,9 @@ SpringApplication 로그는 전체 시작 시간만 보여 주므로 느린 빈�
 4. 프로세스 RSS 또는 컨테이너 메모리만 늘고 heap 사용이 설명하지 못하면 direct buffer, 스레드 스택, 메타데이터와 JVM 밖 메모리 등 heap 외부를 조사한다. 컨테이너 메모리 한도와 JVM heap 한도는 같은 값이 아니다.
 5. 변경 전후 같은 부하에서 메모리 기울기, GC 후 생존량, 요청 지연과 오류율을 비교한다. 힙을 무조건 키우면 컨테이너 OOM을 해결하는 게 아니라 늦출 수 있다.
 
-Actuator/Micrometer는 메트릭을 레지스트리에 연결해 시간에 따른 JVM과 프로세스 상태를 관측하는 기반을 제공한다. 진단 endpoint를 켜는 것과 HTTP로 외부에 노출하는 것은 별도 설정으로 확인한다. Boot endpoint 문서는 웹 애플리케이션에서 `heapdump`를 제공하며 endpoint 접근 정책상 기본 unrestricted 예외에 해당한다고 설명한다. 그렇다고 모든 애플리케이션에서 자동으로 외부 공개된다는 뜻은 아니지만, 운영 노출 목록과 인증·접근 제어를 반드시 확인해야 한다.
+Actuator/Micrometer는 메트릭을 레지스트리에 연결해 시간에 따른 JVM과 프로세스 상태를 관측하는 기반을 제공한다. 진단 endpoint를 켜는 것과 HTTP로 외부에 노출하는 것은 별도 설정으로 확인한다.
+
+Boot endpoint 문서는 웹 애플리케이션에서 `heapdump`를 제공하며 endpoint 접근 정책상 기본 unrestricted 예외에 해당한다고 설명한다. 그렇다고 모든 애플리케이션에서 자동으로 외부 공개된다는 뜻은 아니지만, 운영 노출 목록과 인증·접근 제어를 반드시 확인해야 한다.
 
 ## 4. 코드로 확인
 
@@ -130,7 +138,9 @@ spring:
       validation-timeout: 1000ms
 ```
 
-`connection-timeout: 5s`는 요청 전체 처리 deadline이 아니다. MVC async 제한은 비동기 응답 처리에 대한 제한이며 일반 동기 Controller의 SQL 실행 제한으로 오해하면 안 된다. Hikari의 `connection-timeout`은 풀에서 연결을 기다리는 단계다. 쿼리 실행에는 DB/JDBC 쿼리 제한을 별도로 적용하고, 요청의 남은 예산과 일치시킨다. 예시의 16개 풀을 replica 5개가 쓰면 애플리케이션만으로 최대 80개 연결을 점유할 수 있으므로 DB 전체 예산과 비교해야 한다.
+`connection-timeout: 5s`는 요청 전체 처리 deadline이 아니다. MVC async 제한은 비동기 응답 처리에 대한 제한이며 일반 동기 Controller의 SQL 실행 제한으로 오해하면 안 된다. Hikari의 `connection-timeout`은 풀에서 연결을 기다리는 단계다.
+
+쿼리 실행에는 DB/JDBC 쿼리 제한을 별도로 적용하고, 요청의 남은 예산과 일치시킨다. 예시의 16개 풀을 replica 5개가 쓰면 애플리케이션만으로 최대 80개 연결을 점유할 수 있으므로 DB 전체 예산과 비교해야 한다.
 
 ### 예제 2 — 단계별 Spring 기동 기록
 
@@ -184,7 +194,9 @@ export default function () {
 }
 ```
 
-예를 들어 `BASE_URL=https://staging.example.com k6 run load.js`처럼 실행한다. 50 req/s와 임계값은 문법 예시일 뿐 서비스 SLO나 목표 부하가 아니다. 시나리오 executor는 고정 VU, 반복 수, 도착률 등 서로 다른 부하 형태를 모델링한다. 고정 도착률은 요청 처리 시간이 늘어도 시작 요청률을 유지하려는 부하에 적합하지만, 생성기 자체가 충분한 VU와 자원을 확보했는지 확인해야 한다. threshold는 시험 결과를 성공/실패로 판정해 CI에서 SLO를 강제하는 기준이 된다.
+예를 들어 `BASE_URL=https://staging.example.com k6 run load.js`처럼 실행한다. 50 req/s와 임계값은 문법 예시일 뿐 서비스 SLO나 목표 부하가 아니다. 시나리오 executor는 고정 VU, 반복 수, 도착률 등 서로 다른 부하 형태를 모델링한다.
+
+고정 도착률은 요청 처리 시간이 늘어도 시작 요청률을 유지하려는 부하에 적합하지만, 생성기 자체가 충분한 VU와 자원을 확보했는지 확인해야 한다. threshold는 시험 결과를 성공/실패로 판정해 CI에서 SLO를 강제하는 기준이 된다.
 
 ## 5. 버전별 변화 — 왜 바뀌었나
 
@@ -210,7 +222,9 @@ export default function () {
 2. 기준·목표·한계·급증·장시간 안정성 부하를 구분하고, 매번 설정 하나만 바꾼다. 처리량, p50/p95/p99, 오류율, Tomcat worker·queue, Hikari active/idle/pending, DB CPU·대기·락, 메모리를 같은 시간축으로 본다.
 3. 시험 후 큐·커넥션 대기·메모리가 정상으로 돌아오는지 확인한다. 회복되지 않으면 누수, 재시도 폭주, 정리 지연이 남았을 수 있다.
 
-k6은 JavaScript 시나리오에 executor와 metric threshold를 선언하는 방식이라 작은 스크립트와 CI 성능 게이트를 만들기 쉽다. Gatling은 시뮬레이션에 `injectOpen` 또는 `injectClosed` 프로파일을 설정하고 주입 단계를 순서대로 조합하며 Java, Kotlin, Scala, JavaScript API를 제공한다. open 모델은 사용자 도착률을 고정하는 서비스 트래픽에, closed 모델은 동시 사용자 수와 사용자 think time이 부하를 정하는 경우에 가깝다. 어떤 도구든 스크립트가 실제 사용자 경로, 인증, 데이터 분포, think time을 대표하는지가 결과 신뢰도를 좌우한다.
+k6은 JavaScript 시나리오에 executor와 metric threshold를 선언하는 방식이라 작은 스크립트와 CI 성능 게이트를 만들기 쉽다. Gatling은 시뮬레이션에 `injectOpen` 또는 `injectClosed` 프로파일을 설정하고 주입 단계를 순서대로 조합하며 Java, Kotlin, Scala, JavaScript API를 제공한다.
+
+open 모델은 사용자 도착률을 고정하는 서비스 트래픽에, closed 모델은 동시 사용자 수와 사용자 think time이 부하를 정하는 경우에 가깝다. 어떤 도구든 스크립트가 실제 사용자 경로, 인증, 데이터 분포, think time을 대표하는지가 결과 신뢰도를 좌우한다.
 
 ## 7. 함정·안티패턴
 

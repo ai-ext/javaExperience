@@ -1,0 +1,44 @@
+package org.example.pin;
+
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+import java.time.LocalDateTime;
+
+public interface BoardPinRepository extends JpaRepository<BoardPin, Long> {
+
+    // 같은 글을 동시에 고정해도 UNIQUE(post_id) 충돌을 성공한 멱등 요청으로 처리한다.
+    @Modifying
+    @Query(nativeQuery = true, value = """
+            INSERT INTO board_pin (board_id, post_id, pinned_by, created_at)
+            VALUES (:boardId, :postId, :memberId, :now)
+            ON DUPLICATE KEY UPDATE id = id
+            """)
+    int insertIfAbsent(@Param("boardId") Long boardId, @Param("postId") Long postId,
+                       @Param("memberId") Long memberId, @Param("now") LocalDateTime now);
+
+    // 고정 순서대로, 글·작성자까지 한 번에(목록에서 글마다 쿼리를 보내지 않는다)
+    // 쓰기 직후 같은 트랜잭션의 오래된 REPEATABLE READ 스냅샷 대신 최신 커밋 행을 본다.
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("""
+            SELECT bp FROM BoardPin bp
+            JOIN FETCH bp.post p
+            JOIN FETCH p.author
+            WHERE bp.board.id = :boardId
+            ORDER BY bp.createdAt ASC, bp.id ASC
+            """)
+    List<BoardPin> findByBoardInOrder(@Param("boardId") Long boardId);
+
+    long countByBoard_Id(Long boardId);
+
+    boolean existsByPost_Id(Long postId);
+
+    @Modifying
+    @Query("DELETE FROM BoardPin bp WHERE bp.board.id = :boardId AND bp.post.id = :postId")
+    int deleteByBoardAndPost(@Param("boardId") Long boardId, @Param("postId") Long postId);
+}

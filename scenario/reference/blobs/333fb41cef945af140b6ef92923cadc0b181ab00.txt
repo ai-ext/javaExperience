@@ -1,0 +1,91 @@
+-- V63.1 — practice 전용 시드(15-4 휴지통 비우기 연습용). application-practice.yml의 flyway.locations로만 실행된다.
+-- community DB·테스트 DB에는 들어가지 않는다(테스트 시드 db/testdata와 같은 방식).
+--
+-- 삭제된 글 2,420개와 그 자식 행(좋아요 2·댓글 1+답글 1·북마크 1·태그 1, 일부는 알림 2)을 만든다.
+--   2,400개 : 2026-09-05 00:00 전에 삭제됨 → 지금(2026-10-05) 기준 30일 지남, 영구 삭제 대상
+--             (그중 1개는 경계값 2026-09-04 23:59:59)
+--      20개 : 그 뒤에 삭제됨 → 아직 휴지통에 남는다(그중 1개는 경계값 2026-09-05 00:00:00 — 정확히 30일, 남는다)
+-- 작성자·좋아요·댓글 회원은 8-1 채점이 숫자를 보는 회원(1·2·3·4·5·12·22·26·28·29·30)을 피해 고른다.
+-- 1000행을 넘기므로 재귀 CTE(cte_max_recursion_depth 기본 1000) 대신 숫자 표를 CROSS JOIN 한다.
+
+-- 1) 글 — 제목 앞머리 '[휴지통 시드]'로 자식 행을 붙일 때 찾는다
+INSERT INTO post (board_id, author_id, title, content, excerpt, status, visibility, view_count, like_count, comment_count,
+                  published_at, created_at, updated_at, deleted_at)
+SELECT 2 + (s.n MOD 3),
+       ELT(1 + (s.n MOD 19), 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 27),
+       CONCAT('[휴지통 시드] ', s.n),
+       '삭제된 연습용 글입니다.',
+       '삭제된 연습용 글입니다.',
+       'PUBLISHED', 'PUBLIC', 0, 2, 2,
+       s.deleted_at - INTERVAL 10 DAY, s.deleted_at - INTERVAL 10 DAY, s.deleted_at, s.deleted_at
+  FROM (SELECT d.n,
+               CASE
+                   WHEN d.n = 2400 THEN TIMESTAMP('2026-09-04 23:59:59')
+                   WHEN d.n = 2401 THEN TIMESTAMP('2026-09-05 00:00:00')
+                   WHEN d.n < 2400 THEN TIMESTAMP('2026-07-01 00:00:00') + INTERVAL (d.n MOD 60) DAY + INTERVAL d.n SECOND
+                   ELSE TIMESTAMP('2026-09-06 00:00:00') + INTERVAL (d.n - 2402) DAY + INTERVAL 3 HOUR
+               END AS deleted_at
+          FROM (SELECT a.d + b.d * 10 + c.d * 100 + e.d * 1000 + 1 AS n
+                  FROM (SELECT 0 d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+                        UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) a
+                 CROSS JOIN (SELECT 0 d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+                        UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) b
+                 CROSS JOIN (SELECT 0 d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+                        UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) c
+                 CROSS JOIN (SELECT 0 d UNION ALL SELECT 1 UNION ALL SELECT 2) e) d
+         WHERE d.n <= 2420) s
+ ORDER BY s.n;
+
+-- 시드 글과 번호(n)를 잇는 임시 표 — 아래 자식 행이 같은 회원 규칙을 쓴다
+CREATE TEMPORARY TABLE seed_trash AS
+SELECT p.id AS post_id,
+       CAST(SUBSTRING(p.title, 10) AS UNSIGNED) AS n,
+       p.author_id,
+       p.created_at
+  FROM post p
+ WHERE p.title LIKE '[휴지통 시드] %';
+
+-- 2) 좋아요 2개 — 작성자 다음 두 회원
+INSERT INTO post_like (post_id, member_id, created_at)
+SELECT t.post_id, ELT(1 + ((t.n + k.k) MOD 19), 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 27),
+       t.created_at + INTERVAL k.k HOUR
+  FROM seed_trash t CROSS JOIN (SELECT 1 k UNION ALL SELECT 2) k;
+
+-- 3) 댓글 1개 + 그 댓글의 답글 1개 — 답글이 원댓글을 참조한다(fk_comment_parent)
+INSERT INTO comment (post_id, member_id, parent_id, content, created_at, updated_at, deleted_at)
+SELECT t.post_id, ELT(1 + ((t.n + 1) MOD 19), 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 27),
+       NULL, '연습용 댓글', t.created_at + INTERVAL 3 HOUR, t.created_at + INTERVAL 3 HOUR, NULL
+  FROM seed_trash t;
+
+INSERT INTO comment (post_id, member_id, parent_id, content, created_at, updated_at, deleted_at)
+SELECT c.post_id, ELT(1 + ((t.n + 2) MOD 19), 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 27),
+       c.id, '연습용 답글', t.created_at + INTERVAL 4 HOUR, t.created_at + INTERVAL 4 HOUR, NULL
+  FROM seed_trash t
+  JOIN comment c ON c.post_id = t.post_id AND c.parent_id IS NULL;
+
+-- 4) 북마크 1개 — 시각은 원래 데이터의 어떤 북마크보다도 이르게(2026-06-01) 둔다.
+--    "내 북마크" 목록이 최신순이라, 그러지 않으면 9-5처럼 회원의 북마크 순서를 보는 채점이 밀린다
+INSERT INTO bookmark (member_id, post_id, folder_id, created_at, updated_at)
+SELECT ELT(1 + ((t.n + 1) MOD 19), 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 27),
+       t.post_id, NULL, TIMESTAMP('2026-06-01 00:00:00') + INTERVAL t.n SECOND,
+       TIMESTAMP('2026-06-01 00:00:00') + INTERVAL t.n SECOND
+  FROM seed_trash t;
+
+-- 5) 태그 1개(java·spring·jpa·mysql·docker 중)
+INSERT INTO post_tag (post_id, tag_id)
+SELECT t.post_id, 1 + (t.n MOD 5) FROM seed_trash t;
+
+-- 6) 알림 — 10개 중 1개 글에 좋아요 알림·댓글 알림(comment_id가 댓글을 참조한다 → 댓글보다 먼저 지워야 한다)
+INSERT INTO notification (member_id, actor_id, type, post_id, comment_id, read_at, created_at)
+SELECT t.author_id, c.member_id, 'COMMENT', t.post_id, c.id, NULL, c.created_at
+  FROM seed_trash t
+  JOIN comment c ON c.post_id = t.post_id AND c.parent_id IS NULL
+ WHERE t.n MOD 10 = 0;
+
+INSERT INTO notification (member_id, actor_id, type, post_id, comment_id, read_at, created_at)
+SELECT t.author_id, l.member_id, 'LIKE', t.post_id, NULL, NULL, l.created_at
+  FROM seed_trash t
+  JOIN post_like l ON l.post_id = t.post_id
+ WHERE t.n MOD 10 = 0 AND l.created_at = t.created_at + INTERVAL 1 HOUR;
+
+DROP TEMPORARY TABLE seed_trash;

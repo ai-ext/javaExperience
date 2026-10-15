@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E1. 계층을 나누는 이유</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="e1-계층을-나누는-이유"><a class="anchor" href="#e1-계층을-나누는-이유" aria-hidden="true">#</a>E1. 계층을 나누는 이유</h1>
+<blockquote>
+<p>개념 레슨 · 30분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>글 하나를 저장하는 API도 하는 일이 세 가지다.</p>
+<ol>
+<li><strong>HTTP 다루기</strong> — 본문 JSON을 객체로 받고, <code>201</code>·<code>Location</code>으로 돌려준다.</li>
+<li><strong>규칙 지키기</strong> — 제목이 비면 안 된다, 작성 시각은 서버 시계로 정한다.</li>
+<li><strong>보관하기</strong> — 메모리든 DB든 어딘가에 넣고 번호를 붙인다.</li>
+</ol>
+<p>이 셋을 한 메서드에 다 넣어도 돌아간다. 문제는 <strong>고칠 때</strong>다. 세 가지는 바뀌는 이유가 서로 다르다. 그래서 백엔드는 보통 세 층으로 나눈다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>층</th>
+<th>이름(관례)</th>
+<th>바뀌는 이유</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>HTTP 층</td>
+<td><code>PostController</code></td>
+<td>URL·상태 코드·헤더 같은 API 모양이 바뀔 때</td>
+</tr>
+<tr>
+<td>규칙 층</td>
+<td><code>PostService</code></td>
+<td>업무 규칙이 바뀔 때(&quot;하루 10개까지만&quot;)</td>
+</tr>
+<tr>
+<td>보관 층</td>
+<td><code>PostRepository</code></td>
+<td>저장 방식이 바뀔 때(메모리 → MySQL)</td>
+</tr>
+</tbody></table></div>
+<p>왜 나누는지는 <a href="../scenario/ch1-create-post/1-3-service-layer.html#왜-나누나">1-3 단계의 &quot;왜 나누나&quot;</a>에서도 본다. 이 레슨은 나눈 뒤에 생기는 질문 하나를 다룬다. <strong>나눠진 조각을 누가 이어 붙이나?</strong></p>
+<h3 id="의존성과-주입"><a class="anchor" href="#의존성과-주입" aria-hidden="true">#</a>의존성과 주입</h3>
+<ul>
+<li><strong>의존성</strong>: A가 일하려면 B가 있어야 하면 &quot;A는 B에 의존한다&quot;고 한다. 서비스는 저장소가 있어야 글을 저장할 수 있다. 그러니 서비스는 저장소에 의존한다.</li>
+<li><strong>주입</strong>: A가 B를 <strong>자기 안에서 만들지 않는다.</strong> 바깥에서 만들어 A에게 넣어 준다.</li>
+</ul>
+<p>서비스가 안에서 <code>new MemoryPostRepository()</code>를 하면, 저장소를 MySQL용으로 바꾸거나 테스트용 가짜로 바꿀 때마다 서비스 코드를 고쳐야 한다. 그래서 서비스는 <strong>생성자 인자</strong>로 저장소를 받기만 하고(생성자 주입), 무엇을 넣을지는 바깥이 정한다. 넣어 주는 쪽만 바꾸면 서비스는 그대로다.</p>
+<p>그 &quot;바깥&quot;이 <strong>Spring 컨테이너</strong>다. 서버를 켤 때 객체를 만들고, 생성자 인자를 보고 필요한 객체를 넣어 준다. 컨테이너가 만든 객체 하나를 필요한 모든 곳이 같이 쓴다.</p>
+<ul>
+<li><strong>빈(bean)</strong>: Spring이 만들어 보관하는 객체. <code>@Service</code>·<code>@Repository</code>·<code>@RestController</code>가 붙은 클래스는 서버를 켤 때 하나씩 만들어진다.</li>
+<li><strong>방향은 한쪽</strong>: 컨트롤러 → 서비스 → 저장소. 아래층은 위층을 모른다. 저장소가 서비스를 부르면 순서가 꼬여서 서버가 뜨지 않는다.</li>
+</ul>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<p>Spring 없이 <strong>손으로</strong> 조립해 본다. Spring이 대신 해 주는 일이 무엇인지 먼저 보려는 것이다. JDK 21의 <code>jshell</code>에서 실행한 그대로다.</p>
+<pre><code class="language-java">import java.util.*;
+
+record Post(Long id, String title) {}
+
+// 보관 층의 약속 — 몸통 없이 &quot;이런 메서드가 있다&quot;만 적는다
+interface PostRepository {
+    Post save(String title);
+    List&lt;Post&gt; findAll();
+}
+
+// 약속의 메모리 구현
+class MemoryPostRepository implements PostRepository {
+    private final List&lt;Post&gt; store = new ArrayList&lt;&gt;();
+    public Post save(String title) {
+        Post p = new Post((long) store.size() + 1, title);
+        store.add(p);
+        return p;
+    }
+    public List&lt;Post&gt; findAll() { return store; }
+}
+
+// 규칙 층 — 저장소를 직접 만들지 않고 생성자로 받는다
+class PostService {
+    private final PostRepository repo;
+    PostService(PostRepository repo) { this.repo = repo; }
+    Post create(String title) {
+        if (title.isBlank()) throw new IllegalArgumentException(&quot;제목이 비었다&quot;);
+        return repo.save(title.strip());
+    }
+    List&lt;Post&gt; list() { return repo.findAll(); }
+}</code></pre>
+<p>이제 조립한다. <strong>저장소를 먼저 만들고, 그것을 넣어 서비스를 만든다.</strong></p>
+<pre><code class="language-text">jshell&gt; PostRepository repo = new MemoryPostRepository()
+repo ==&gt; MemoryPostRepository@6a4f787b
+
+jshell&gt; PostService service = new PostService(repo)
+service ==&gt; PostService@7cd62f43
+
+jshell&gt; service.create(&quot;  첫 글  &quot;)
+$8 ==&gt; Post[id=1, title=첫 글]
+
+jshell&gt; service.list()
+$9 ==&gt; [Post[id=1, title=첫 글]]</code></pre>
+<p><code>@6a4f787b</code> 같은 뒷자리와 <code>$8</code> 같은 번호는 실행할 때마다 다르다.</p>
+<p>Spring을 쓰면 위의 조립 두 줄을 직접 쓰지 않는다. 클래스에 표시만 해 둔다.</p>
+<pre><code class="language-java">@Repository
+public class MemoryPostRepository implements PostRepository { ... }
+
+@Service
+public class PostService {
+    private final PostRepository postRepository;
+
+    // 생성자가 하나면 Spring이 이 인자를 보고 PostRepository 빈을 넣어 준다
+    public PostService(PostRepository postRepository) {
+        this.postRepository = postRepository;
+    }
+}</code></pre>
+<p>서버를 켤 때 Spring은 손으로 조립할 때와 같은 순서로 일한다. 저장소를 만들고, 그것을 넣어 서비스를 만들고, 그 서비스를 넣어 컨트롤러를 만든다. 실제 Spring 코드와 실행 결과는 <a href="../scenario/ch1-create-post/1-3-service-layer.html#따라-치기">1-3 단계의 따라 치기</a>에 있다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>10분. 터미널에서 <code>jshell</code>을 연다(JDK 21. <code>jshell --version</code>이 21이 아니면 IntelliJ가 쓰는 JDK의 <code>bin/jshell</code>을 쓴다).</p>
+<p><strong>1. 위 예시를 붙여 넣고 조립한다.</strong> <code>record</code>부터 <code>class PostService</code>까지 한 덩어리씩 붙여 넣는다. 그다음 <code>repo</code>·<code>service</code>를 만들고 <code>service.create(&quot;  첫 글  &quot;)</code>를 실행한다. <code>Post[id=1, title=첫 글]</code>이 나와야 한다. 앞뒤 공백이 빠진 건 서비스의 규칙(<code>strip()</code>) 덕분이다.</p>
+<p><strong>2. 저장소를 하나 더 만들어 본다.</strong></p>
+<pre><code class="language-text">jshell&gt; PostService other = new PostService(new MemoryPostRepository())
+other ==&gt; PostService@5649fd9b
+
+jshell&gt; other.list()
+$11 ==&gt; []</code></pre>
+<p>방금 저장한 글이 <code>other</code>에서는 안 보인다. <code>other</code>는 <strong>다른 저장소 객체</strong>를 받았기 때문이다. 이 실수를 막으려고 Spring은 빈을 <strong>하나만</strong> 만들어 필요한 모든 곳에 같은 객체를 넣는다. 서비스 안에서 <code>new MemoryPostRepository()</code>를 하면 안 되는 이유가 이것이다.</p>
+<p><strong>3. 구현을 갈아 끼운다.</strong> 서비스는 한 글자도 안 고치고, 넣어 주는 저장소만 바꾼다.</p>
+<pre><code class="language-java">class LoggingPostRepository implements PostRepository {
+    private final List&lt;Post&gt; store = new ArrayList&lt;&gt;();
+    public Post save(String title) {
+        System.out.println(&quot;[저장소] INSERT 대신 로그: &quot; + title);
+        Post p = new Post((long) store.size() + 100, title);
+        store.add(p);
+        return p;
+    }
+    public List&lt;Post&gt; findAll() { return store; }
+}</code></pre>
+<pre><code class="language-text">jshell&gt; PostService swapped = new PostService(new LoggingPostRepository())
+swapped ==&gt; PostService@20322d26
+
+jshell&gt; swapped.create(&quot;둘째 글&quot;)
+[저장소] INSERT 대신 로그: 둘째 글
+$14 ==&gt; Post[id=100, title=둘째 글]</code></pre>
+<p>실습(1-2부터)에서는 이 &quot;구현&quot;을 Spring Data JPA가 만들어 넣는다. 서비스는 <code>PostRepository</code>라는 <strong>인터페이스</strong>에만 기대므로, 테스트에서 가짜 저장소로 바꿔 넣는 일(7-2)도 이것과 같다.</p>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p><strong>1. 규칙을 어겨 본다.</strong></p>
+<pre><code class="language-text">jshell&gt; service.create(&quot;   &quot;)
+|  Exception java.lang.IllegalArgumentException: 제목이 비었다
+|        at PostService.create (#5:5)
+|        at (#10:1)</code></pre>
+<p>규칙은 서비스에 있다. 그래서 컨트롤러를 거치든, 나중에 관리자 화면에서 부르든 똑같이 막힌다. (실제 API에서 이 실패를 <code>400</code>으로 돌려주는 일은 F1에서 한다.)</p>
+<p><strong>2. 저장소 없이 서비스를 만들어 본다.</strong></p>
+<pre><code class="language-text">jshell&gt; new PostService()
+|  Error:
+|  constructor PostService in class PostService cannot be applied to given types;
+|    required: PostRepository
+|    found:    no arguments
+|    reason: actual and formal argument lists differ in length</code></pre>
+<p>생성자가 저장소를 요구하니, 저장소 없이 서비스를 만들 방법이 없다. 이게 생성자 주입의 장점이다. 빠뜨리면 실행 전에 막힌다. Spring 프로젝트에서도 같은 메시지가 나온다. → <a href="../errors.html#생성자-인자-불일치">에러 도감: 생성자 인자 불일치</a></p>
+<p>Spring에서 표시(<code>@Service</code>)를 빠뜨리면 &quot;빈을 찾을 수 없음&quot;이 난다. 방향을 거꾸로 하면 &quot;순환 참조&quot;가 난다. 둘 다 1-3 단계의 &quot;일부러 망가뜨리기&quot;에서 직접 낸다. → <a href="../errors.html#빈을-찾을-수-없음">빈을 찾을 수 없음</a> · <a href="../errors.html#빈-순환-참조">빈 순환 참조</a></p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> 글 목록 응답에 전체 개수를 알려 주는 헤더 <code>X-Total-Count</code>를 추가하기로 했다. 어느 층을 고치나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>컨트롤러.</strong> 헤더는 HTTP의 일이다. 서비스는 &quot;전체 개수&quot;라는 값을 돌려줄 수는 있지만, 그것을 헤더에 실을지 본문에 실을지는 모른다.</p>
+</details>
+
+<p><strong>2.</strong> &quot;한 회원은 1분에 글을 3개까지만 쓸 수 있다&quot;는 규칙이 생겼다. 어느 층에 넣나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>서비스.</strong> 업무 규칙이다. 컨트롤러에 넣으면 같은 기능을 다른 경로(관리자 API, 배치 작업)로 부를 때 규칙이 빠진다. 저장소는 &quot;어디에 어떻게 보관하나&quot;만 안다.</p>
+</details>
+
+<p><strong>3.</strong> 따라 해 보기 2번에서 <code>other.list()</code>가 <code>[]</code>였다. 왜인가? Spring은 이 문제를 어떻게 막나?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>other</code>는 새로 만든 <strong>다른</strong> <code>MemoryPostRepository</code>를 받았다. 저장소 객체가 둘이면 보관함도 둘이다. Spring은 <code>@Repository</code> 클래스로 빈을 <strong>하나</strong> 만들어 두고, 그 저장소가 필요한 모든 생성자에 <strong>같은 객체</strong>를 넣는다. 그래서 다른 빈은 직접 <code>new</code> 하지 않고 생성자로 받는다.</p>
+</details>
+
+<p><strong>4.</strong> 저장소를 메모리에서 MySQL로 바꿀 때 <code>PostService</code> 코드를 고쳐야 하나?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>안 고친다.</strong> 서비스는 <code>PostRepository</code> 인터페이스 타입으로 받는다. 구현이 <code>MemoryPostRepository</code>에서 JPA 구현으로 바뀌어도, 서비스가 부르는 <code>save</code>라는 약속은 같다. 따라 해 보기 3번에서 <code>LoggingPostRepository</code>로 바꿀 때 서비스를 안 고친 것과 같다.</p>
+</details>
+
+<p><strong>5.</strong> 저장소 안에서 &quot;글을 저장하면 알림을 보내자&quot;며 <code>PostService</code>를 생성자로 받게 했다. 무엇이 문제인가?</p>
+<details>
+<summary>정답</summary>
+
+<p><strong>방향이 거꾸로다.</strong> 서비스는 저장소를 받고 저장소는 서비스를 받으니, 둘 다 서로가 먼저 있어야 만들어진다. Spring은 <code>The dependencies of some of the beans in the application context form a cycle</code>로 서버를 띄우지 않는다. 알림은 서비스가 저장 <strong>다음에</strong> 부른다. 저장소는 위층을 몰라야 한다.</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/W02-why-layers.html">W02 왜 Controller·Service·Repository로 나누나</a> — 안 나눴을 때와 나눴을 때의 코드 비교</li>
+<li><a href="../docs/knowledge/W12-why-interfaces.html">W12 인터페이스는 왜 만드나</a> — 구현을 갈아 끼우는 이유</li>
+<li><a href="../docs/knowledge/P12-why-beans-ioc-intro.html">P12 왜 빈과 IoC인가</a> — <code>new</code>를 직접 안 쓰는 이유</li>
+<li><a href="../docs/knowledge/P11-bean-registration-di.html">P11 빈 등록과 의존성 주입</a> — <code>@Service</code>·<code>@Repository</code>와 생성자 주입</li>
+<li><a href="../docs/knowledge/S01-ioc-di.html">S01 IoC와 DI</a> — 컨테이너가 빈을 만드는 순서(심화)</li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<ul>
+<li>실습: <a href="../scenario/ch1-create-post/1-3-service-layer.html">1-3. 서비스로 나누기</a> — 컨트롤러에서 서비스를 떼어 내 태그까지 한 트랜잭션으로 저장하고, 일부러 망가뜨려 본다.</li>
+<li>레슨: <a href="E2-db-sql-basics.html">E2. DB와 테이블·SQL 기초</a> — 1-2에서 저장할 곳(MySQL)을 먼저 둘러본다.</li>
+</ul>
+
+
+</main>
+
+
+</body>
+</html>

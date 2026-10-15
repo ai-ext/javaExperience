@@ -1,0 +1,102 @@
+package org.example.post;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.board.Board;
+import org.example.board.BoardNotFoundException;
+import org.example.board.BoardRepository;
+import org.example.tag.Tag;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+// 글 조회 전용 서비스 — 1-3/1-4의 PostService(쓰기)와 책임을 나눈다
+@Service
+public class PostQueryService {
+
+    private final PostRepository postRepository;
+    private final BoardRepository boardRepository;
+    private final PostAccessPolicy accessPolicy;
+
+    public PostQueryService(PostRepository postRepository, BoardRepository boardRepository,
+                             PostAccessPolicy accessPolicy) {
+        this.postRepository = postRepository;
+        this.boardRepository = boardRepository;
+        this.accessPolicy = accessPolicy;
+    }
+
+    @Transactional
+    public PostDetailResponse getDetail(Long id, AuthenticatedMember viewer) {
+        Post post = postRepository.findById(id)
+                .orElseThrow(PostNotFoundException::new);
+
+        // 볼 수 없으면 403이 아니라 404 — 글이 있다는 사실도 숨긴다. 조회수도 올리지 않는다.
+        if (!accessPolicy.canView(viewer, post)) {
+            throw new PostNotFoundException();
+        }
+
+        post.increaseViewCount();
+        return toDetailResponse(post);
+    }
+
+    @Transactional(readOnly = true)
+    public PostListResponse list(String boardSlug, int page, int size, AuthenticatedMember viewer) {
+        Board board = boardRepository.findBySlug(boardSlug)
+                .orElseThrow(() -> new BoardNotFoundException(boardSlug));
+
+        Long viewerId = viewer == null ? null : viewer.id();
+
+        PageRequest pageRequest = PageRequest.of(page, size,
+                Sort.by(Sort.Order.desc("publishedAt"), Sort.Order.desc("id")));
+        List<Post> content = postRepository.findViewableByBoard(board, viewerId, pageRequest);
+        long total = postRepository.countViewableByBoard(board, viewerId);
+        Page<Post> result = new PageImpl<>(content, pageRequest, total);
+
+        List<PostListItemResponse> items = result.getContent().stream()
+                .map(this::toListItem)
+                .toList();
+
+        return new PostListResponse(
+                items,
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages(),
+                result.hasNext()
+        );
+    }
+
+    private PostListItemResponse toListItem(Post post) {
+        return new PostListItemResponse(
+                post.getId(),
+                post.getTitle(),
+                new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+                post.getTags().stream().map(Tag::getName).toList(),
+                post.getLikeCount(),
+                post.getCommentCount(),
+                post.getViewCount(),
+                post.getPublishedAt()
+        );
+    }
+
+    private PostDetailResponse toDetailResponse(Post post) {
+        // 트랜잭션 안에서 지연 로딩 연관을 읽어 DTO로 옮긴다(open-in-view: false)
+        return new PostDetailResponse(
+                post.getId(),
+                post.getBoard().getSlug(),
+                post.getTitle(),
+                post.getContent(),
+                post.getTags().stream().map(Tag::getName).toList(),
+                post.getVisibility(),
+                new AuthorResponse(post.getAuthor().getId(), post.getAuthor().getNickname()),
+                post.getViewCount(),
+                post.getLikeCount(),
+                post.getCommentCount(),
+                post.getCreatedAt()
+        );
+    }
+}

@@ -1,0 +1,46 @@
+package org.example.board.post;
+
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+import org.example.board.common.ApiException;
+import org.example.board.common.ErrorCode;
+import org.example.board.user.User;
+import org.example.board.user.UserRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+// 게시글 쓰기 — JPA
+@Service
+public class PostService {
+
+    private final PostRepository postRepository;
+    private final TagRepository tagRepository;
+    private final UserRepository userRepository;
+
+    public PostService(PostRepository postRepository, TagRepository tagRepository, UserRepository userRepository) {
+        this.postRepository = postRepository;
+        this.tagRepository = tagRepository;
+        this.userRepository = userRepository;
+    }
+
+    @Transactional
+    public PostResponse create(Long userId, PostCreateRequest request) {
+        User author = userRepository.findById(userId)
+                .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHORIZED));
+        Post post = new Post(author, request.title(), request.content(),
+                Visibility.valueOf(request.visibility()), findOrCreateTags(request.tags()));
+        postRepository.save(post);
+        return PostResponse.from(post);
+    }
+
+    // 이름으로 찾고, 없으면 새로 만든다(tags.name은 UNIQUE)
+    private Set<Tag> findOrCreateTags(List<String> names) {
+        Set<Tag> tags = new LinkedHashSet<>();
+        for (String name : names) {
+            tags.add(tagRepository.findByName(name).orElseGet(() -> tagRepository.save(new Tag(name))));
+        }
+        return tags;
+    }
+}

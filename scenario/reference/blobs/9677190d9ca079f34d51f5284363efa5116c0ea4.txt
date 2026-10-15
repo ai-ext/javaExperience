@@ -1,0 +1,57 @@
+package org.example.batch;
+
+import org.example.notification.Notification;
+import org.example.notification.NotificationRepository;
+import org.example.post.Post;
+import org.example.post.PostRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+// 15-5 좋아요 달성 축하 — 10·50·100개에 처음 닿은 글의 작성자에게 알림을 한 번씩.
+// 기록(like_milestone)과 알림을 같은 트랜잭션에 넣는다 — 기록만 되고 알림이 없거나, 알림만 두 번 가는 일이 없다.
+@Service
+public class LikeMilestoneService {
+
+    public static final int[] MILESTONES = {10, 50, 100};
+    private static final Logger log = LoggerFactory.getLogger(LikeMilestoneService.class);
+
+    private final LikeMilestoneRepository likeMilestoneRepository;
+    private final PostRepository postRepository;
+    private final NotificationRepository notificationRepository;
+    private final Clock clock;
+
+    public LikeMilestoneService(LikeMilestoneRepository likeMilestoneRepository, PostRepository postRepository,
+                                NotificationRepository notificationRepository, Clock clock) {
+        this.likeMilestoneRepository = likeMilestoneRepository;
+        this.postRepository = postRepository;
+        this.notificationRepository = notificationRepository;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public LikeMilestoneResponse run() {
+        LocalDateTime now = LocalDateTime.now(clock);
+        List<LikeMilestoneResponse.Reached> added = new ArrayList<>();
+        for (MilestoneCandidateRow row : likeMilestoneRepository.findCandidates(MILESTONES[0])) {
+            for (int milestone : MILESTONES) {
+                if (row.getLikes() < milestone) {
+                    break;
+                }
+                if (likeMilestoneRepository.insertIgnore(row.getPostId(), milestone, row.getLikes(), now) == 1) {
+                    Post post = postRepository.getReferenceById(row.getPostId());
+                    notificationRepository.save(Notification.likeMilestone(post.getAuthor(), post, milestone, now));
+                    added.add(new LikeMilestoneResponse.Reached(row.getPostId(), milestone, row.getLikes()));
+                }
+            }
+        }
+        log.info("좋아요 달성 알림 {}건 {}", added.size(), added);
+        return new LikeMilestoneResponse(added);
+    }
+}

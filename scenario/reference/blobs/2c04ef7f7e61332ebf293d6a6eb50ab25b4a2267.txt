@@ -1,0 +1,33 @@
+package org.example.push;
+
+import org.example.admin.AdminOnlyException;
+import org.example.auth.AuthenticatedMember;
+import org.example.auth.LoginMember;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
+
+// 16-2 연습용 — 가짜 푸시 서버의 지연·실패를 운영자만 바꾼다(PUT이라 토큰 없음은 인터셉터가 401)
+@RestController
+public class FakePushController {
+
+    private static final String ADMIN_ROLE = "ADMIN";
+
+    private final FakePushSender fakePushSender;
+
+    public FakePushController(FakePushSender fakePushSender) {
+        this.fakePushSender = fakePushSender;
+    }
+
+    @PutMapping("/api/admin/fake-push")
+    public FakePushSettingsResponse update(@LoginMember AuthenticatedMember me,
+                                           @RequestBody JsonNode body) {
+        if (!ADMIN_ROLE.equals(me.role())) {
+            throw new AdminOnlyException();
+        }
+        FakePushSettingsRequest request = FakePushSettingsRequest.parse(body);
+        FakePushSender.Settings s = fakePushSender.update(request.delayMs(), request.failMemberIds());
+        return new FakePushSettingsResponse(s.delayMs(), s.failMemberIds().stream().sorted().toList());
+    }
+}

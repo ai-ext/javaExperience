@@ -6,7 +6,152 @@
 
 > "내 글에 좋아요나 댓글이 달리면 알림을 주세요. 안 읽은 알림 개수도 보여 주고, 누르면 읽음 처리요."
 
-새 기능에는 새 테이블이 필요하다. 테이블을 마이그레이션으로 만들고, **기존 기능(좋아요·댓글)이 성공할 때 알림이 함께 생기게** 연결한다. 기존 기능을 건드리는 일이라, 알림 때문에 좋아요가 실패하거나 같은 알림이 두 번 생기면 안 된다.
+새 기능에는 새 테이블이 필요하다. 테이블을 마이그레이션으로 만들고, **기존 기능(좋아요·댓글)이 성공할 때 알림이 함께 생기게** 연결한다.
+
+기존 기능을 건드리는 일이라 같은 알림이 두 번 생기면 안 된다. 이 단계는 알림을 좋아요·댓글과 **같은 트랜잭션에서 함께 저장**하는 것까지다 — 그래서 알림 저장이 실패하면 좋아요도 함께 되돌려진다. "알림이 실패해도 좋아요는 성공"으로 떼어 내는 일(커밋 뒤 이벤트·별도 트랜잭션·재시도)은 R1에서 차이를 설명하는 데까지만 보고, 구현은 다음 과제로 남긴다.
+
+## 화면 시나리오
+
+사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.
+
+```screen
+{
+  "title": "알림",
+  "summary": "새 테이블(notification) + API. 좋아요·댓글이 '새로' 생길 때만 알림을 만든다.",
+  "screen": [
+    {
+      "type": "bar",
+      "id": "bar",
+      "label": "알림",
+      "right": "코딩하는고양이 · 🔔 2"
+    },
+    {
+      "type": "list",
+      "id": "noti",
+      "items": [
+        {
+          "id": "n-comment",
+          "title": "자바초보탈출님이 댓글을 남겼어요",
+          "meta": "방금 전",
+          "badge": "안 읽음"
+        },
+        {
+          "id": "n-like",
+          "title": "자바초보탈출님이 좋아요를 눌렀어요",
+          "meta": "방금 전",
+          "badge": "안 읽음"
+        }
+      ]
+    },
+    {
+      "type": "stats",
+      "id": "badge",
+      "items": [
+        {
+          "id": "unread",
+          "label": "안 읽은 알림",
+          "value": "2"
+        }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "name": "남이 내 글에 좋아요",
+      "steps": [
+        {
+          "kind": "user",
+          "text": "회원 3이 회원 2의 글(12번)에 하트를 누른다"
+        },
+        {
+          "kind": "request",
+          "method": "PUT",
+          "path": "/api/posts/12/like",
+          "headers": [
+            "Authorization: Bearer tok-p03"
+          ]
+        },
+        {
+          "kind": "server",
+          "text": "좋아요가 새로 생김 → 같은 트랜잭션의 동기 이벤트 리스너에서 알림 저장. 이미 좋아요였으면 알림도 없다"
+        },
+        {
+          "kind": "db",
+          "sql": "INSERT INTO post_like ...; INSERT INTO notification (member_id, actor_id, type, post_id, created_at) VALUES (2, 3, 'LIKE', 12, NOW())"
+        },
+        {
+          "kind": "response",
+          "status": 200,
+          "headers": [
+            "Content-Type: application/json"
+          ],
+          "body": "{\"liked\": true, ...}"
+        },
+        {
+          "kind": "screen",
+          "text": "회원 2의 종에 숫자가 붙는다",
+          "focus": [
+            "unread"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "알림 열고 읽기",
+      "steps": [
+        {
+          "kind": "user",
+          "text": "회원 2가 종을 눌러 알림을 열고 하나를 누른다",
+          "focus": [
+            "noti"
+          ]
+        },
+        {
+          "kind": "request",
+          "method": "GET",
+          "path": "/api/me/notifications?size=20",
+          "headers": [
+            "Authorization: Bearer tok-p02"
+          ]
+        },
+        {
+          "kind": "db",
+          "sql": "SELECT ... FROM notification WHERE member_id = 2 ORDER BY created_at DESC, id DESC LIMIT 20; SELECT COUNT(*) FROM notification WHERE member_id = 2 AND read_at IS NULL",
+          "note": "(member_id, read_at, created_at, id) 인덱스"
+        },
+        {
+          "kind": "response",
+          "status": 200,
+          "headers": [
+            "Content-Type: application/json"
+          ],
+          "body": "{\"items\": [{\"type\": \"COMMENT\", ...}, {\"type\": \"LIKE\", ...}], \"unreadCount\": 2}"
+        },
+        {
+          "kind": "request",
+          "method": "PATCH",
+          "path": "/api/me/notifications/31/read",
+          "headers": [
+            "Authorization: Bearer tok-p02"
+          ]
+        },
+        {
+          "kind": "response",
+          "status": 204
+        },
+        {
+          "kind": "screen",
+          "text": "읽은 알림은 '안 읽음' 표시가 빠지고 숫자가 줄어든다",
+          "focus": [
+            "n-like",
+            "unread"
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
 
 ## 만들 것
 
@@ -41,26 +186,359 @@
 | `GET /api/me/notifications?unreadOnly=false&size=20` | `200` `{ "items": [ { "id", "type", "actor": { "id", "nickname" }, "postId", "commentId", "read", "createdAt" } ], "unreadCount": 3 }` — 최신순 |
 | `PATCH /api/me/notifications/{id}/read` | `204`. 남의 알림·없는 알림 `404` |
 
+**필드 규칙** — 읽음 처리는 본문이 없다. 입력은 경로의 알림 id 하나다
+
+| 필드 | 필수 | null·빈 값 | 길이·범위 | 형식 | 기본값 | 틀렸을 때 |
+|---|---|---|---|---|---|---|
+| `{id}`(경로) | 필수 | — | — | 숫자 | — | 숫자가 아니면(`abc`) `400`, 없는 알림·남의 알림 `404` |
+| 본문 | 없음 | — | — | — | — | 보내도 읽지 않는다 |
+
+## 구현 가이드
+
+화면 시나리오의 서버·DB 흐름을 이 단계에서 바뀐 파일에 연결한다. 먼저 **만들 것**의 계약대로 직접 작성하고, 필요한 역할만 펼쳐 파일 전문과 비교한다.
+
+이 단계의 처리 흐름:
+- 좋아요가 새로 생기면 같은 트랜잭션의 동기 이벤트 리스너가 알림을 저장한다. 이미 좋아요였으면 알림도 없다. 알림 저장이 실패하면 좋아요와 숫자 증가도 롤백된다.
+- (member_id, read_at, created_at, id) 인덱스
+
+<details>
+<summary>Controller — HTTP 연결</summary>
+
+`NotificationController.java`. `GET`은 인증된 회원의 목록과 미읽음 개수를 반환하고, `PATCH`는 본문 없이 자신의 알림만 읽음 처리해 `204`를 반환한다.
+
+```java
+@GetMapping("/api/me/notifications")
+public NotificationListResponse list(@RequestParam(defaultValue = "false") boolean unreadOnly,
+                                     @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+                                     @LoginMember AuthenticatedMember me) {
+    if (me == null) throw new AuthenticationRequiredException("인증이 필요합니다.");
+    return notificationService.list(me, unreadOnly, size);
+}
+```
+
+</details>
+
+<details>
+<summary>DTO — 요청·응답 필드</summary>
+
+`NotificationListResponse.java`, `NotificationResponse.java`. `items`와 `unreadCount`, 각 항목의 `actor`·`postId`·`commentId`·`read`를 화면 응답과 대조한다.
+
+</details>
+
+<details>
+<summary>Service — 처리 순서</summary>
+
+`LikeService`는 `INSERT IGNORE`가 실제 새 좋아요일 때만 이벤트를 발행한다. `CommentService`는 댓글 저장·개수 증가 뒤 이벤트를 발행한다.
+
+`NotificationEventListener`의 `@EventListener`가 즉시 실행되고 `NotificationService.notifyLike/notifyComment`의 `Propagation.MANDATORY`가 기존 트랜잭션을 요구한다. 리스너가 예외를 삼키지 않으므로 알림 저장 실패 시 원래 작업도 롤백된다.
+
+```java
+if (inserted > 0) {
+    postRepository.incrementLikeCount(postId);
+    eventPublisher.publishEvent(new PostLikedEvent(postId, loginMember.id()));
+}
+```
+
+</details>
+
+<details>
+<summary>JPA / Repository — DB 조건</summary>
+
+`NotificationRepository.java`. `findMine`은 `memberId`로 범위를 제한하고 `createdAt DESC, id DESC`로 정렬한다. `countByMember_IdAndReadAtIsNull`은 목록 크기와 별도로 미읽음 총수를 센다. `findByIdAndMember_Id`는 남의 알림 ID를 `404`로 처리할 조건이다.
+
+</details>
+
+<details>
+<summary>MyBatis Mapper — 알림 저장·목록·읽음</summary>
+
+`MyBatisNotificationMapper.java`와 `MyBatisNotificationMapper.xml`은 알림 테이블을 직접 읽고 쓴다. `MyBatisLikeService`와 `MyBatisCommentService`는 관계 행이 새로 생겼을 때만 동기 이벤트를 발행한다.
+
+`NotificationService`가 Mapper로 `member_id`를 제한한 목록·미읽음 개수·소유자 확인 후 읽음 처리를 실행한다. 알림 생성의 예외가 원래 트랜잭션으로 전파되는지 확인한다. 이 대체 앱의 일부 선행 글 작성 기능은 JPA 경로를 계속 사용한다.
+
+```xml
+<select id="findMine" resultType="org.example.notification.NotificationRow">
+    SELECT n.id, n.type, a.id AS actorId, a.nickname AS actorNickname,
+           n.post_id AS postId, n.comment_id AS commentId,
+           n.read_at AS readAt, n.created_at AS createdAt
+    FROM notification n JOIN member a ON a.id = n.actor_id
+    WHERE n.member_id = #{memberId}
+    <if test="unreadOnly">AND n.read_at IS NULL</if>
+    ORDER BY n.created_at DESC, n.id DESC
+    LIMIT #{size}
+</select>
+```
+
+</details>
+
+<details>
+<summary>Entity — 테이블·상태</summary>
+
+`Notification.java`. `member`는 받는 회원, `actor`는 사건을 만든 회원이다. `markRead`는 이미 읽은 알림을 다시 눌러도 `readAt`을 덮어쓰지 않는다.
+
+</details>
+
+<details>
+<summary>Flyway / SQL — 스키마 변경</summary>
+
+`V4__create_notification.sql`. `member_id`·`actor_id`·`post_id`·`comment_id`의 외래키와 `type` 제약, `(member_id, read_at, created_at, id)` 인덱스를 확인한다.
+
+</details>
+
+<details>
+<summary>예외 처리 — 실패 응답</summary>
+
+`ApiExceptionHandler.java`, `NotificationNotFoundException.java`. 예외가 어떤 HTTP 상태와 오류 본문으로 바뀌는지 실패 계약과 대조한다. 변경된 메서드: `handleNotificationNotFound`.
+
+</details>
+
+<details>
+<summary>설정·보조 코드</summary>
+
+`CommentCreatedEvent.java`, `PostLikedEvent.java`는 사건의 ID만 전달한다. `NotificationEventListener.java`의 `@EventListener`는 발행한 트랜잭션 안에서 동기로 실행된다. 커밋 뒤 알림은 R1에서 비교할 다음 과제다.
+
+```java
+@EventListener
+public void onPostLiked(PostLikedEvent event) {
+    notificationService.notifyLike(event.postId(), event.actorId());
+}
+```
+
+</details>
+
+<details>
+<summary>테스트 — 계약 확인</summary>
+
+`LikeServiceTest.java`는 새 좋아요와 중복 PUT의 발행 횟수를 확인한다. `NotificationRollbackIntegrationTest.java`는 알림 저장 예외를 주입한 뒤 좋아요 행과 `like_count`가 둘 다 0으로 롤백됐는지 실제 MySQL에서 확인한다.
+
+</details>
+
 ## 직접 확인
 
 학습용 DB의 12번 글은 회원 2가 썼다. 회원 3(`tok-p03`)이 좋아요와 댓글을 단다.
 
-```bash
-BASE=http://localhost:8080
-A='Authorization: Bearer tok-p02'; B='Authorization: Bearer tok-p03'; C='Authorization: Bearer tok-p05'; J='Content-Type: application/json'
-cnt() { docker compose exec -T mysql mysql -ucommunity -pcommunity practice -N -e "SELECT COUNT(*) FROM notification WHERE member_id = 2" 2>/dev/null; }
+알림 행 수는 DB에서 비교한다. 먼저 아래 SQL로 현재 수를 기록하고, 실행 패널에서 Y0~Y3을 순서대로 보낸 뒤 같은 SQL을 다시 실행한다. Y1은 알림을 추가하고 Y2는 중복 알림을 만들지 않으며 Y3은 댓글 알림을 추가해야 한다. 나머지 Y4~Y7·V1~V2 요청은 실행 패널에서 확인한다. API 주소는 페이지 상단 공통 입력을 사용하고 Postman 설정은 접어서 확인할 수 있다.
 
-curl -s -X DELETE "$BASE/api/posts/12/like" -H "$B" > /dev/null      # Y0 처음 상태로
-cnt                                                                   # 전
-curl -s -X PUT "$BASE/api/posts/12/like" -H "$B"; echo               # Y1 좋아요 → 알림 1
-curl -s -X PUT "$BASE/api/posts/12/like" -H "$B"; echo               # Y2 또 → 알림 없음
-curl -s -X POST "$BASE/api/posts/12/comments" -H "$B" -H "$J" -d '{"content":"[채점] 알림 확인 댓글"}'; echo   # Y3 댓글 → 알림 1
-cnt                                                                   # 후
-curl -s -H "$A" "$BASE/api/me/notifications?size=2"; echo            # Y4
-NID=$(curl -s -H "$A" "$BASE/api/me/notifications?size=1" | python3 -c 'import sys,json; print(json.load(sys.stdin)["items"][0]["id"])')
-curl -i -X PATCH "$BASE/api/me/notifications/$NID/read" -H "$C"      # Y5 남의 알림
-curl -i -X PATCH "$BASE/api/me/notifications/$NID/read" -H "$A"      # Y6 내 알림
-curl -s -H "$A" "$BASE/api/me/notifications?unreadOnly=true&size=50" | python3 -c "import sys,json; print($NID in [i['id'] for i in json.load(sys.stdin)['items']])"   # Y7
+API 서버 주소는 페이지 상단 공통 입력에서 설정한다. 먼저 아래 SQL로 현재 수를 기록하고, 실행 패널에서 Y0~Y3을 순서대로 보낸 뒤 같은 SQL을 다시 실행한다. Y1은 알림을 추가하고 Y2는 중복 알림을 만들지 않으며 Y3은 댓글 알림을 추가해야 한다. 나머지 Y4~Y7·V1~V2 요청은 실행 패널에서 확인한다. Postman 설정은 접어서 볼 수 있다.
+
+```bash
+cnt() { docker compose exec -T mysql mysql -ucommunity -pcommunity practice -N -e "SELECT COUNT(*) FROM notification WHERE member_id = 2" 2>/dev/null; }
+cnt  # Y0~Y3 요청 전
+# 실행 패널에서 Y0~Y3을 순서대로 보낸 다음 다시 실행한다.
+cnt  # 요청 후
+```
+
+버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
+
+```check
+{
+  "requests": [
+    {
+      "id": "Y0",
+      "title": "처음 상태로(회원 3의 좋아요 취소)",
+      "method": "DELETE",
+      "path": "/api/posts/12/like",
+      "headers": {
+        "Authorization": "Bearer tok-p03"
+      }
+    },
+    {
+      "id": "Y1",
+      "title": "회원 3이 좋아요",
+      "method": "PUT",
+      "path": "/api/posts/12/like",
+      "headers": {
+        "Authorization": "Bearer tok-p03"
+      }
+    },
+    {
+      "id": "Y2",
+      "title": "또 좋아요",
+      "method": "PUT",
+      "path": "/api/posts/12/like",
+      "headers": {
+        "Authorization": "Bearer tok-p03"
+      }
+    },
+    {
+      "id": "Y3",
+      "title": "회원 3이 댓글",
+      "method": "POST",
+      "path": "/api/posts/12/comments",
+      "headers": {
+        "Authorization": "Bearer tok-p03"
+      },
+      "body": {
+        "content": "[채점] 알림 확인 댓글"
+      }
+    },
+    {
+      "id": "Y4",
+      "title": "회원 2의 알림(size=2)",
+      "method": "GET",
+      "path": "/api/me/notifications?size=2",
+      "headers": {
+        "Authorization": "Bearer tok-p02"
+      }
+    },
+    {
+      "id": "N",
+      "title": "최신 알림 id",
+      "method": "GET",
+      "path": "/api/me/notifications?size=1",
+      "headers": {
+        "Authorization": "Bearer tok-p02"
+      }
+    },
+    {
+      "id": "Y5",
+      "title": "남의 알림 읽음(회원 5)",
+      "method": "PATCH",
+      "path": "/api/me/notifications/{{N.body.items[0].id}}/read",
+      "headers": {
+        "Authorization": "Bearer tok-p05"
+      }
+    },
+    {
+      "id": "Y6",
+      "title": "내 알림 읽음",
+      "method": "PATCH",
+      "path": "/api/me/notifications/{{N.body.items[0].id}}/read",
+      "headers": {
+        "Authorization": "Bearer tok-p02"
+      }
+    },
+    {
+      "id": "V1",
+      "title": "V1 알림 id가 숫자가 아님",
+      "method": "PATCH",
+      "path": "/api/me/notifications/abc/read",
+      "headers": {
+        "Authorization": "Bearer tok-p02"
+      }
+    },
+    {
+      "id": "V2",
+      "title": "V2 없는 알림",
+      "method": "PATCH",
+      "path": "/api/me/notifications/999999/read",
+      "headers": {
+        "Authorization": "Bearer tok-p02"
+      }
+    },
+    {
+      "id": "Y7",
+      "title": "안 읽은 알림",
+      "method": "GET",
+      "path": "/api/me/notifications?unreadOnly=true&size=50",
+      "headers": {
+        "Authorization": "Bearer tok-p02"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "C1",
+      "request": "Y4",
+      "expect": {
+        "status": 200,
+        "json": [
+          {
+            "path": "$.items[0].type",
+            "equals": "COMMENT"
+          },
+          {
+            "path": "$.items[0].actor.id",
+            "equals": 3
+          },
+          {
+            "path": "$.items[0].postId",
+            "equals": 12
+          },
+          {
+            "path": "$.items[1].type",
+            "equals": "LIKE"
+          },
+          {
+            "path": "$.unreadCount",
+            "gte": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "C2",
+      "all": [
+        {
+          "request": "Y5",
+          "expect": {
+            "status": 404
+          }
+        },
+        {
+          "request": "Y6",
+          "expect": {
+            "status": 204
+          }
+        }
+      ]
+    },
+    {
+      "id": "C3",
+      "all": [
+        {
+          "request": "N",
+          "expect": {
+            "status": 200,
+            "json": [
+              {
+                "path": "$.items[0].id",
+                "type": "number"
+              }
+            ]
+          }
+        },
+        {
+          "request": "Y7",
+          "expect": {
+            "status": 200,
+            "json": [
+              {
+                "path": "$.items",
+                "type": "array"
+              },
+              {
+                "path": "$.items[*].id",
+                "notContains": "{{N.body.items[0].id}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "C4",
+      "all": [
+        {
+          "request": "V1",
+          "expect": {
+            "status": 400
+          }
+        },
+        {
+          "request": "V2",
+          "expect": {
+            "status": 404,
+            "headers": {
+              "Content-Type": {
+                "contains": "application/problem+json"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
 ```
 
 ## 채점 기준
@@ -76,7 +554,8 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 | C1 | Y4 | `200`, 첫 항목 `type`=`COMMENT`·`actor.id`=3·`postId`=12, 둘째 항목 `type`=`LIKE`, `unreadCount` ≥ 2 |
 | C2 | Y5 / Y6 | `404` / `204` |
 | C3 | Y7 | `False` — 읽은 알림은 안 읽은 목록에서 빠진다 |
-| R1 | 연결 방식 | 알림 생성을 좋아요·댓글 서비스 안에서 바로 부르는지, 이벤트(`ApplicationEventPublisher` + `@TransactionalEventListener(AFTER_COMMIT)`)로 떼어 냈는지, 그 차이(알림 실패가 좋아요를 되돌리나?)를 설명할 수 있다 |
+| C4 | V1 / V2 | 경로 `abc` `400` / 없는 알림 `404`(`application/problem+json`) — `500`이 아니다 |
+| R1 | 연결 방식 | 이번 구현의 동기 `@EventListener`는 알림 실패 시 좋아요도 되돌린다. 커밋 뒤 `@TransactionalEventListener(AFTER_COMMIT)`와 별도 트랜잭션으로 떼면 무엇이 달라지는지 설명할 수 있다 |
 | R2 | 중복 없음 | "새로 생겼을 때만" 알림을 만든다 — 4-1의 멱등 판단 결과를 재사용한다 |
 | R3 | 소유자 | 읽음 처리가 "내 알림인가"를 확인한다(IDOR) |
 | R4 | 개수 | `unreadCount`를 목록을 다 읽어 세지 않고 `COUNT` 쿼리(인덱스 사용)로 구한다 |

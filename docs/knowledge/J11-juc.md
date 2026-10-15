@@ -47,7 +47,9 @@ worker < core?  ─예→ 새 worker가 실행
 worker < max? ─예→ worker 추가 / 아니오→ reject
 ```
 
-무한 `LinkedBlockingQueue`는 코어 스레드가 바쁜 동안 계속 쌓이므로 `maximumPoolSize`가 사실상 작동하지 않고, 장기 과부하가 메모리 고갈과 긴 대기로 바뀐다. `ArrayBlockingQueue`는 백로그 크기를 제한하고, `SynchronousQueue`는 저장하지 않고 작업자에게 넘긴다. `AbortPolicy`는 예외로 실패를 알리고, `CallerRunsPolicy`는 풀 종료 전 제출 스레드가 작업해 입력을 늦춘다. 후자는 요청 스레드 지연이나 잠금 내 실행을 만들 수 있다. `DiscardPolicy`/`DiscardOldestPolicy`는 버려진 작업의 `Future`를 영원히 미완료로 둘 수 있어 완료를 기다리는 업무에는 피한다.
+무한 `LinkedBlockingQueue`는 코어 스레드가 바쁜 동안 계속 쌓이므로 `maximumPoolSize`가 사실상 작동하지 않고, 장기 과부하가 메모리 고갈과 긴 대기로 바뀐다. `ArrayBlockingQueue`는 백로그 크기를 제한하고, `SynchronousQueue`는 저장하지 않고 작업자에게 넘긴다. `AbortPolicy`는 예외로 실패를 알리고, `CallerRunsPolicy`는 풀 종료 전 제출 스레드가 작업해 입력을 늦춘다.
+
+후자는 요청 스레드 지연이나 잠금 내 실행을 만들 수 있다. `DiscardPolicy`/`DiscardOldestPolicy`는 버려진 작업의 `Future`를 영원히 미완료로 둘 수 있어 완료를 기다리는 업무에는 피한다.
 
 `shutdown()`은 새 작업을 거부하고 제출된 작업을 끝낸 뒤 종료한다. `shutdownNow()`는 대기 작업을 반환하고 실행 중 작업에는 interrupt를 요청할 뿐, 강제 종료하지 않는다. 종료 대기와 interrupt 협력을 작업 코드까지 설계한다.
 
@@ -60,7 +62,9 @@ supplyAsync → thenApply(값 변환) → thenCompose(비동기 결과 평탄화
       └─ 실패 → exceptionally(복구) / handle(변환) / whenComplete(관찰)
 ```
 
-`thenApply` 함수가 다른 Future를 반환하면 중첩되므로 비동기 다음 단계에는 `thenCompose`를 쓴다. `exceptionally`는 실패를 값으로 복구하고, `handle`은 성공·실패 양쪽을 새 값으로 바꾸며, `whenComplete`는 결과를 관찰한다. `join()`은 unchecked `CompletionException`, `get()`은 `ExecutionException`과 `InterruptedException`을 노출한다. `allOf()`는 완료 장벽이며 결과 컬렉션은 반환하지 않는다.
+`thenApply` 함수가 다른 Future를 반환하면 중첩되므로 비동기 다음 단계에는 `thenCompose`를 쓴다. `exceptionally`는 실패를 값으로 복구하고, `handle`은 성공·실패 양쪽을 새 값으로 바꾸며, `whenComplete`는 결과를 관찰한다.
+
+`join()`은 unchecked `CompletionException`, `get()`은 `ExecutionException`과 `InterruptedException`을 노출한다. `allOf()`는 완료 장벽이며 결과 컬렉션은 반환하지 않는다.
 
 ### 잠금, CAS, 고경합 카운터
 
@@ -72,7 +76,11 @@ CAS는 “현재 값이 예상값과 같을 때 교체”를 원자적으로 한
 
 ### `ConcurrentHashMap`, 큐와 조정 도구
 
-Java 8 이후 `ConcurrentHashMap`은 segment 대신 power-of-two bin 테이블을 사용한다. 빈 bin 삽입에는 CAS를 쓰고 충돌 bin은 선두 노드 중심으로 갱신한다. 조회는 테이블 전체 잠금을 요구하지 않는다. 긴 충돌 bin은 트리화하고, resize 중 `MOVED` forwarding node를 두어 작업자들이 bin 이동에 참여할 수 있다. 따라서 동시 갱신 중 `size()`·순회는 전체 원자 스냅샷이 아니다. `computeIfAbsent`/`merge`는 키 단위 복합 갱신을 원자화하지만 매핑 함수에 느린 I/O나 같은 맵의 재귀 갱신을 넣지 않는다. null 키·값은 허용되지 않는다.
+Java 8 이후 `ConcurrentHashMap`은 segment 대신 power-of-two bin 테이블을 사용한다. 빈 bin 삽입에는 CAS를 쓰고 충돌 bin은 선두 노드 중심으로 갱신한다. 조회는 테이블 전체 잠금을 요구하지 않는다.
+
+긴 충돌 bin은 트리화하고, resize 중 `MOVED` forwarding node를 두어 작업자들이 bin 이동에 참여할 수 있다. 따라서 동시 갱신 중 `size()`·순회는 전체 원자 스냅샷이 아니다.
+
+`computeIfAbsent`/`merge`는 키 단위 복합 갱신을 원자화하지만 매핑 함수에 느린 I/O나 같은 맵의 재귀 갱신을 넣지 않는다. null 키·값은 허용되지 않는다.
 
 `BlockingQueue.put/take`는 가득 참·비어 있음에서 기다리고, `offer/poll`은 즉시 또는 제한 시간 내 결과를 준다. 큐 삽입 전 생산자의 동작은 다른 스레드의 해당 원소 접근 이후와 happens-before 관계를 가진다.
 

@@ -1,0 +1,56 @@
+package org.example.report;
+
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
+import org.example.post.InvalidParametersException;
+import tools.jackson.databind.JsonNode;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public record ResolveRequest(
+        @NotNull(message = "대상 종류를 적어 주세요.")
+        @Pattern(regexp = "POST|COMMENT", message = "대상 종류는 POST 또는 COMMENT입니다.")
+        String targetType,
+
+        @NotNull(message = "대상 번호가 필요합니다.")
+        @Positive(message = "대상 번호는 1 이상이어야 합니다.")
+        Long targetId,
+
+        @NotNull(message = "처리 방법을 골라 주세요.")
+        @Pattern(regexp = "HIDE|REJECT", message = "처리 방법은 HIDE 또는 REJECT입니다.")
+        String action
+) {
+    public static Parsed parse(JsonNode body) {
+        if (body == null || !body.isObject()) {
+            throw new InvalidParametersException(Map.of("body", "JSON 객체가 필요합니다."));
+        }
+        Map<String, String> errors = new LinkedHashMap<>();
+        String targetType = text(body.get("targetType"), "targetType", errors);
+        Long targetId = targetId(body.get("targetId"), errors);
+        String action = text(body.get("action"), "action", errors);
+        return new Parsed(new ResolveRequest(targetType, targetId, action), Map.copyOf(errors));
+    }
+
+    public record Parsed(ResolveRequest request, Map<String, String> errors) {
+    }
+
+    private static String text(JsonNode value, String field, Map<String, String> errors) {
+        if (value == null || value.isNull()) return null;
+        if (!value.isTextual()) {
+            errors.put(field, field + "은 문자열이어야 합니다.");
+            return null;
+        }
+        return value.asText();
+    }
+
+    private static Long targetId(JsonNode value, Map<String, String> errors) {
+        if (value == null || value.isNull()) return null;
+        if (!value.isIntegralNumber() || !value.canConvertToLong()) {
+            errors.put("targetId", "targetId는 정수여야 합니다.");
+            return null;
+        }
+        return value.longValue();
+    }
+}

@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B8. 어노테이션은 무엇인가 — 붙여 둔 표시, 읽는 쪽은 따로 있다</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=c65755111d62">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+</head>
+<body>
+<header class="topbar"><a href="../index.html">javaExperience</a><a href="../scenario/README.html">시나리오</a><a href="../practice/MISSIONS.html">학습용 미션</a><a href="../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="b8-어노테이션은-무엇인가--붙여-둔-표시-읽는-쪽은-따로-있다"><a class="anchor" href="#b8-어노테이션은-무엇인가--붙여-둔-표시-읽는-쪽은-따로-있다" aria-hidden="true">#</a>B8. 어노테이션은 무엇인가 — 붙여 둔 표시, 읽는 쪽은 따로 있다</h1>
+<blockquote>
+<p>개념 레슨 · 30분</p>
+</blockquote>
+<h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
+<p>Spring 코드는 <code>@</code>투성이다. <code>@RestController</code>, <code>@GetMapping(&quot;/posts&quot;)</code>, <code>@RequestBody</code>, <code>@Service</code>, <code>@Override</code>, <code>@JsonProperty</code>… 이것들을 <strong>어노테이션</strong>(annotation, &quot;주석을 단다&quot;)이라고 한다.</p>
+<p>결론부터 말하면 <strong>어노테이션은 표시(라벨)일 뿐이다. 그 자체로는 아무 일도 하지 않는다.</strong> 택배 상자에 붙인 &quot;취급 주의&quot; 스티커와 같다. 스티커가 상자를 지켜 주지는 않는다. 그 스티커를 <strong>읽는 사람</strong>(배달 기사)이 조심해서 다룰 뿐이다. 어노테이션도 누군가 읽어야 의미가 생긴다.</p>
+<h3 id="함수가-아니라-데이터다"><a class="anchor" href="#함수가-아니라-데이터다" aria-hidden="true">#</a>함수가 아니라 데이터다</h3>
+<p><code>@GetMapping(&quot;/posts&quot;)</code>는 괄호까지 있어서 함수 호출처럼 보인다. 하지만 Java 어노테이션은 함수가 아니다. 클래스·메서드·매개변수에 <strong>데이터를 붙여 둘 뿐</strong>이다. 실행되는 코드는 어노테이션 안이 아니라 <strong>그것을 읽는 쪽</strong>에 있다.</p>
+<h3 id="누가-읽나"><a class="anchor" href="#누가-읽나" aria-hidden="true">#</a>누가 읽나</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>읽는 쪽</th>
+<th>언제</th>
+<th>예</th>
+<th>표시가 없으면</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>컴파일러</strong>(javac)</td>
+<td>컴파일할 때</td>
+<td><code>@Override</code> — &quot;부모의 메서드를 덮어쓴다. 아니면 에러를 내 줘&quot;</td>
+<td>오타가 있어도 조용히 컴파일된다</td>
+</tr>
+<tr>
+<td><strong>컴파일 도구</strong>(어노테이션 프로세서)</td>
+<td>컴파일할 때, 코드를 만들어 넣음</td>
+<td>Lombok의 <code>@Getter</code>·<code>@RequiredArgsConstructor</code> — getter·생성자를 대신 써 준다</td>
+<td>그 메서드가 없다</td>
+</tr>
+<tr>
+<td><strong>Spring</strong></td>
+<td>앱을 띄울 때</td>
+<td><code>@RestController</code>·<code>@Service</code> — &quot;이 클래스의 객체를 만들어 관리해라&quot;, <code>@GetMapping(&quot;/posts&quot;)</code> — &quot;이 주소는 이 메서드로&quot;</td>
+<td>객체를 안 만든다. 주소표에 없다 → <code>404</code></td>
+</tr>
+<tr>
+<td><strong>Spring</strong>(요청마다)</td>
+<td>요청이 올 때</td>
+<td><code>@RequestBody</code> — &quot;본문 JSON을 이 매개변수로&quot;, <code>@PathVariable</code> — &quot;경로의 이 부분을 이 매개변수로&quot;</td>
+<td>본문·경로에서 값을 가져오지 않는다</td>
+</tr>
+<tr>
+<td><strong>Jackson</strong></td>
+<td>JSON으로 바꿀 때</td>
+<td><code>@JsonProperty(&quot;user_name&quot;)</code> — &quot;키 이름을 이걸로&quot;, <code>@JsonIgnore</code> — &quot;이건 빼라&quot;</td>
+<td>getter·record 이름 그대로(B4)</td>
+</tr>
+<tr>
+<td><strong>JPA</strong></td>
+<td>앱을 띄울 때·DB에 갈 때</td>
+<td><code>@Entity</code>·<code>@Id</code>·<code>@Column</code></td>
+<td>테이블과 짝을 안 짓는다</td>
+</tr>
+</tbody></table></div>
+<p>실행 중에 읽는 쪽(Spring·Jackson·JPA)은 <strong>리플렉션</strong>으로 읽는다. 리플렉션은 &quot;실행 중에 클래스를 들여다보는 기능&quot;이다. &quot;이 클래스에 어떤 메서드가 있고, 각각 어떤 어노테이션이 붙어 있나&quot;를 코드로 물어볼 수 있다. 아래 예시에서 직접 해 본다.</p>
+<h3 id="괄호-안의-값"><a class="anchor" href="#괄호-안의-값" aria-hidden="true">#</a>괄호 안의 값</h3>
+<p><code>@GetMapping(&quot;/posts&quot;)</code>, <code>@RequestParam(defaultValue = &quot;1&quot;)</code>처럼 괄호 안에 값을 넣을 수 있다. 이 값도 읽는 쪽이 꺼내 쓰는 데이터다. 이름 없이 하나만 쓰면 <code>value</code>라는 이름의 값이다.</p>
+<h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
+<h3 id="①-내-어노테이션을-만들고-내가-읽는다--annotationdemojava"><a class="anchor" href="#①-내-어노테이션을-만들고-내가-읽는다--annotationdemojava" aria-hidden="true">#</a>① 내 어노테이션을 만들고 내가 읽는다 — <code>AnnotationDemo.java</code></h3>
+<p>Spring이 <code>@GetMapping</code>을 읽는 방식을 아주 작게 흉내 낸다.</p>
+<pre><code class="language-java">import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.Comparator;
+
+public class AnnotationDemo {
+
+    // 내 어노테이션 만들기 — &quot;이 메서드는 주소 path를 맡는다&quot;는 표시
+    @Retention(RetentionPolicy.RUNTIME)   // 실행 중에도 남겨 둔다(그래야 읽을 수 있다)
+    @interface Route {
+        String value();
+    }
+
+    static class PostController {
+        @Route(&quot;/posts&quot;)
+        public String list() {
+            return &quot;글 목록&quot;;
+        }
+
+        @Route(&quot;/posts/new&quot;)
+        public String form() {
+            return &quot;글쓰기 화면&quot;;
+        }
+
+        public String helper() {           // 표시 없음
+            return &quot;도우미&quot;;
+        }
+
+        @Override                          // 컴파일러에게: 부모(Object)의 toString을 덮어쓴다
+        public String toString() {
+            return &quot;PostController&quot;;
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        PostController controller = new PostController();
+        System.out.println(&quot;객체: &quot; + controller);   // toString()이 불린다
+
+        // 어노테이션은 붙여 두기만 해서는 아무 일도 안 한다. 누군가 읽어야 한다 — 여기서는 내가 읽는다
+        Method[] methods = PostController.class.getDeclaredMethods();
+        Arrays.sort(methods, Comparator.comparing(Method::getName));   // 이름순으로(순서를 고정하려고)
+        for (Method m : methods) {
+            Route route = m.getAnnotation(Route.class);
+            if (route != null) {
+                System.out.println(route.value() + &quot; → &quot; + m.getName() + &quot;() → &quot; + m.invoke(controller));
+            } else {
+                System.out.println(&quot;(표시 없음) &quot; + m.getName() + &quot;()&quot;);
+            }
+        }
+    }
+}</code></pre>
+<pre><code class="language-text">$ java AnnotationDemo.java
+객체: PostController
+/posts/new → form() → 글쓰기 화면
+(표시 없음) helper()
+/posts → list() → 글 목록
+(표시 없음) toString()</code></pre>
+<ul>
+<li><code>@interface Route</code> — 어노테이션을 만드는 문법이다. <code>String value();</code>는 괄호 안에 넣을 값이다.</li>
+<li><code>PostController.class.getDeclaredMethods()</code> — 리플렉션. &quot;이 클래스의 메서드 목록을 줘&quot;.</li>
+<li><code>m.getAnnotation(Route.class)</code> — &quot;이 메서드에 <code>@Route</code>가 붙어 있나? 있으면 줘&quot;. 없으면 <code>null</code>.</li>
+<li><code>@Route</code>가 붙은 메서드만 주소와 함께 실행됐다. Spring도 같은 일을 한다. 앱을 띄울 때 <code>@RestController</code>가 붙은 클래스를 찾고, 그 안에서 <code>@GetMapping</code>이 붙은 메서드를 찾아 &quot;주소 → 메서드&quot; 표를 만든다.</li>
+</ul>
+<h3 id="②-jackson이-읽는-어노테이션--spring-앱에서"><a class="anchor" href="#②-jackson이-읽는-어노테이션--spring-앱에서" aria-hidden="true">#</a>② Jackson이 읽는 어노테이션 — Spring 앱에서</h3>
+<p>Boot 4.1(Jackson 3.1.5)에서 실행했다. Boot 4의 Jackson 3는 패키지가 <code>tools.jackson</code>으로 바뀌었지만, **어노테이션은 그대로 <code>com.fasterxml.jackson.annotation</code>**이다(아래 import로 컴파일·실행 확인).</p>
+<pre><code class="language-java">package org.example.lesson;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class AnnotationLessonController {
+
+    public record UserResponse(
+            @JsonProperty(&quot;user_name&quot;) String userName,   // JSON 키를 user_name으로
+            @JsonIgnore String password,                  // JSON에서 뺀다
+            int age) {
+    }
+
+    public record PlainUserResponse(String userName, String password, int age) {
+    }
+
+    @GetMapping(&quot;/api/lesson/b8/user&quot;)
+    public UserResponse user() {
+        return new UserResponse(&quot;김자바&quot;, &quot;secret123&quot;, 20);
+    }
+
+    @GetMapping(&quot;/api/lesson/b8/plain-user&quot;)
+    public PlainUserResponse plainUser() {
+        return new PlainUserResponse(&quot;김자바&quot;, &quot;secret123&quot;, 20);
+    }
+}</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>요청</th>
+<th>응답(<code>200</code>)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GET /api/lesson/b8/plain-user</code></td>
+<td><code>{&quot;userName&quot;:&quot;김자바&quot;,&quot;password&quot;:&quot;secret123&quot;,&quot;age&quot;:20}</code></td>
+</tr>
+<tr>
+<td><code>GET /api/lesson/b8/user</code></td>
+<td><code>{&quot;user_name&quot;:&quot;김자바&quot;,&quot;age&quot;:20}</code></td>
+</tr>
+</tbody></table></div>
+<p>같은 값인데 어노테이션 두 개로 키 이름이 바뀌고 <code>password</code>가 빠졌다. Java 코드의 <code>userName()</code>은 그대로다. 바뀐 것은 Jackson이 JSON을 만드는 방식뿐이다.</p>
+<h3 id="③-spring이-읽는-어노테이션--없으면-spring이-모른다"><a class="anchor" href="#③-spring이-읽는-어노테이션--없으면-spring이-모른다" aria-hidden="true">#</a>③ Spring이 읽는 어노테이션 — 없으면 Spring이 모른다</h3>
+<pre><code class="language-java">package org.example.lesson;
+
+import org.springframework.web.bind.annotation.GetMapping;
+
+// @RestController가 없다 — Spring이 이 클래스를 모른다
+public class NoAnnotationController {
+
+    @GetMapping(&quot;/api/lesson/b8/hello&quot;)
+    public String hello() {
+        return &quot;hello&quot;;
+    }
+}</code></pre>
+<p><code>GET /api/lesson/b8/hello</code> → <strong><code>404</code></strong> <code>{&quot;timestamp&quot;:&quot;…&quot;,&quot;status&quot;:404,&quot;error&quot;:&quot;Not Found&quot;,&quot;path&quot;:&quot;/api/lesson/b8/hello&quot;}</code>. 서버 로그에는 아무것도 없다. <code>@GetMapping</code>은 붙어 있지만, Spring은 <code>@RestController</code>(또는 <code>@Controller</code>)가 붙은 클래스 안에서만 <code>@GetMapping</code>을 찾는다. 이 클래스는 아예 들여다보지 않는다.</p>
+<h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
+<p>15분.</p>
+<ol>
+<li><code>AnnotationDemo.java</code>를 만들고 <code>java AnnotationDemo.java</code> → 다섯 줄이 같은지 본다.</li>
+<li><code>helper()</code> 위에 <code>@Route(&quot;/help&quot;)</code>를 붙이고 다시 실행한다. <code>(표시 없음) helper()</code>가 <code>/help → helper() → 도우미</code>로 바뀐다. 메서드 안의 코드는 하나도 안 바꿨다. <strong>읽는 쪽</strong>이 표시를 보고 다르게 다뤘을 뿐이다.</li>
+<li>javaExperience의 <code>org.example.lesson</code> 패키지에 <code>AnnotationLessonController.java</code>와 <code>NoAnnotationController.java</code>를 그대로 넣고 앱을 띄운다.</li>
+</ol>
+<pre><code class="language-bash">BASE=http://localhost:8080
+curl -i &quot;$BASE/api/lesson/b8/plain-user&quot;
+curl -i &quot;$BASE/api/lesson/b8/user&quot;
+curl -i &quot;$BASE/api/lesson/b8/hello&quot;</code></pre>
+<p>기대: 위 표의 두 본문, 그리고 <code>hello</code>는 <code>404</code>.</p>
+<ol start="4">
+<li><code>NoAnnotationController</code>의 <code>public class</code> 바로 위에 <code>@RestController</code>를 붙이고(import <code>org.springframework.web.bind.annotation.RestController</code>) 다시 띄운다. <code>hello</code>가 <code>200</code> <code>hello</code>로 바뀐다.</li>
+<li>지금까지 B 레슨에서 쓴 어노테이션을 하나씩 짚어 &quot;누가 읽나&quot;를 말해 본다: <code>@Override</code>(컴파일러), <code>@RestController</code>·<code>@GetMapping</code>·<code>@PostMapping</code>·<code>@RequestBody</code>·<code>@PathVariable</code>·<code>@ExceptionHandler</code>(Spring), <code>@JsonProperty</code>·<code>@JsonIgnore</code>(Jackson).</li>
+</ol>
+<h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
+<p>줄 번호는 고친 파일 기준이다.</p>
+<h3 id="①-override를-붙인-채-이름을-틀린다"><a class="anchor" href="#①-override를-붙인-채-이름을-틀린다" aria-hidden="true">#</a>① <code>@Override</code>를 붙인 채 이름을 틀린다</h3>
+<p><code>AnnotationDemo.java</code>의 <code>toString()</code>을 <code>tostring()</code>(소문자 s)으로 바꾼다.</p>
+<pre><code class="language-text">AnnotationDemo.java:30: error: method does not override or implement a method from a supertype
+        @Override                          // 컴파일러에게: 부모(Object)의 toString을 덮어쓴다
+        ^
+1 error
+error: compilation failed</code></pre>
+<p>컴파일러가 <code>@Override</code>를 읽고 &quot;덮어쓴다더니 부모에 <code>tostring</code>이 없다&quot;고 알려 준다.</p>
+<p>이번엔 <code>@Override</code> 줄도 지우고 실행한다(<code>tostring()</code> 그대로).</p>
+<pre><code class="language-text">$ java AnnotationDemo.java
+객체: AnnotationDemo$PostController@6ca8564a
+/posts/new → form() → 글쓰기 화면
+(표시 없음) helper()
+/posts → list() → 글 목록
+(표시 없음) tostring()</code></pre>
+<p>에러 없이 실행된다. 하지만 첫 줄이 <code>객체: PostController</code>가 아니다. <code>tostring()</code>은 덮어쓰기가 아니라 새 메서드가 됐고, <code>toString()</code>은 원래 것(<code>클래스이름@번호</code>)이 불렸다. <code>@Override</code>는 이런 <strong>조용한 실수</strong>를 컴파일 에러로 바꿔 주는 표시다. <strong>고치기</strong>: 이름을 <code>toString</code>으로 고치고 <code>@Override</code>를 다시 붙인다.</p>
+<h3 id="②-retention을-지운다"><a class="anchor" href="#②-retention을-지운다" aria-hidden="true">#</a>② <code>@Retention</code>을 지운다</h3>
+<p><code>@Retention(RetentionPolicy.RUNTIME)</code> 줄을 지우고 실행한다.</p>
+<pre><code class="language-text">$ java AnnotationDemo.java
+객체: PostController
+(표시 없음) form()
+(표시 없음) helper()
+(표시 없음) list()
+(표시 없음) toString()</code></pre>
+<p><code>@Route</code>가 분명히 붙어 있는데 하나도 못 읽었다. <code>@Retention</code>을 안 쓰면 어노테이션은 클래스 파일에는 남지만 <strong>실행 중에는 보이지 않는다</strong>. 실행 중에 읽어야 하는 어노테이션(Spring·Jackson·JPA가 읽는 것들)은 모두 <code>RUNTIME</code>으로 만들어져 있다. <strong>고치기</strong>: 줄을 되돌린다.</p>
+<h3 id="③-restcontroller를-빠뜨린다"><a class="anchor" href="#③-restcontroller를-빠뜨린다" aria-hidden="true">#</a>③ <code>@RestController</code>를 빠뜨린다</h3>
+<p>위 <a href="#예시">예시</a>의 ③ <code>NoAnnotationController</code>가 이 경우다. <code>404</code>이고 로그가 없어서 경로 오타와 구별이 안 된다. 0-2에서 이 고장을 하나씩 내 본다. 에러 도감: <a href="../errors.html#경로-오타-404">경로 오타 (404)</a>.</p>
+<h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
+<p><strong>1.</strong> &quot;어노테이션을 붙이면 그 코드가 실행된다&quot;는 말은 맞나?</p>
+<details>
+<summary>정답</summary>
+
+<p>틀리다. 어노테이션은 표시(데이터)일 뿐이다. 그것을 읽는 쪽(컴파일러·Lombok·Spring·Jackson·JPA)이 있어야 의미가 생긴다. 예시에서도 <code>@Route</code>를 붙였을 뿐인 메서드가 실행된 건, <code>main</code>의 리플렉션 코드가 그 표시를 찾아 불렀기 때문이다. 어노테이션 스스로 실행되는 코드는 없다.</p>
+</details>
+
+<p><strong>2.</strong> 다음 어노테이션은 각각 누가 읽나? <code>@Override</code>, <code>@GetMapping</code>, <code>@JsonProperty</code>, <code>@Getter</code>(Lombok)</p>
+<details>
+<summary>정답</summary>
+
+<p><code>@Override</code> — 컴파일러(컴파일할 때 검사). <code>@GetMapping</code> — Spring(앱을 띄울 때 주소표를 만든다). <code>@JsonProperty</code> — Jackson(JSON으로 바꿀 때 키 이름). <code>@Getter</code> — Lombok 어노테이션 프로세서(컴파일할 때 getter 코드를 만들어 넣는다).</p>
+</details>
+
+<p><strong>3.</strong> <code>@Override</code> 없이 <code>public String tostring()</code>을 쓰면 무슨 일이 생기나?</p>
+<details>
+<summary>정답</summary>
+
+<p>컴파일도 실행도 된다. 하지만 <code>toString</code>을 덮어쓴 게 아니라 이름이 비슷한 새 메서드가 생긴다. 객체를 출력하면 원래 <code>toString</code>이 불려 <code>AnnotationDemo$PostController@6ca8564a</code> 같은 값이 나온다(실측). <code>@Override</code>를 붙였다면 <code>method does not override or implement a method from a supertype</code>으로 컴파일 단계에서 잡혔다.</p>
+</details>
+
+<p><strong>4.</strong> 응답 record의 <code>String userName</code>을 JSON에서 <code>user_name</code>으로 내보내고 싶다. 무엇을 붙이나? Java 코드에서 값을 꺼내는 메서드 이름도 바뀌나?</p>
+<details>
+<summary>정답</summary>
+
+<p><code>@JsonProperty(&quot;user_name&quot;) String userName</code>. 실측 응답 <code>{&quot;user_name&quot;:&quot;김자바&quot;,&quot;age&quot;:20}</code>. Java 쪽 메서드는 그대로 <code>userName()</code>이다. 어노테이션은 Jackson이 JSON을 만드는 방식만 바꾼다.</p>
+</details>
+
+<p><strong>5.</strong> 클래스에 <code>@GetMapping(&quot;/api/x&quot;)</code> 메서드가 있는데 요청하면 <code>404</code>다. 로그에는 아무것도 없다. 가장 먼저 무엇을 보나?</p>
+<details>
+<summary>정답</summary>
+
+<p>클래스에 <code>@RestController</code>가 붙어 있는지 본다. Spring은 <code>@RestController</code>(또는 <code>@Controller</code>)가 붙은 클래스에서만 <code>@GetMapping</code>을 찾는다. 실측에서 <code>@RestController</code> 없는 클래스의 주소는 <code>404</code>였다. 그다음은 경로 오타, 클래스가 <code>org.example</code> 패키지 밖에 있는지(0-2).</p>
+</details>
+
+<h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
+<ul>
+<li><a href="../docs/knowledge/P03-annotations-cheatsheet.html">P03 애노테이션이란 — 실무에서 매일 쓰는 것 총정리</a></li>
+<li><a href="../docs/knowledge/P27-annotations-when-how.html">P27 애노테이션은 누가·언제 실행하나</a> — 컴파일 시점·기동 시점·요청 시점 지도</li>
+<li><a href="../docs/knowledge/J06-enum-annotation-reflection.html">J06 enum·애노테이션·리플렉션</a> — <code>@Retention</code>·<code>@Target</code>과 리플렉션의 원리</li>
+<li><a href="../docs/knowledge/W19-lombok-or-not.html">W19 Lombok을 쓸까 말까</a> — 컴파일할 때 코드를 만들어 넣는 어노테이션</li>
+<li><a href="../scenario/ch0-first-steps/0-2-annotations.html">0-2 어노테이션은 무엇인가</a> — <code>@RestController</code>·<code>@GetMapping</code>을 떼어 보는 실습</li>
+</ul>
+<h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
+<p>다음은 실습 <a href="../scenario/ch0-first-steps/0-4-dto-rules.html">0-4. DTO 만들기</a> — B2~B4에서 본 생성자·<code>static</code>·record 규칙을 DTO에 그대로 써 보고, 일부러 고장 내 실제 에러를 본다.</p>
+
+
+</main>
+
+
+</body>
+</html>

@@ -51,7 +51,9 @@ HTTP 연결
 
 서블릿 모델은 보통 요청을 스레드 하나로 실행하고, I/O 대기 중에도 그 스레드를 점유한다. VT를 요청 executor에 연결하면 대기 비용은 낮아져도 DB 작업 시간은 사라지지 않는다. 따라서 DB 커넥션·쿼리 동시 수와 외부 호출을 제한한다.
 
-`spring.threads.virtual.enabled`는 Boot가 관리하는 작업 실행·예약 구성에 영향을 준다. Boot의 `AsyncTaskExecutor`는 `@EnableAsync`, MVC 비동기 처리 등에 연결되며, 사용자 `Executor`나 `AsyncConfigurer`가 있으면 자동 구성 조건이 달라진다. 이 목록이 Tomcat connector executor까지 자동 변경한다는 뜻은 아니다. 요청 스레드에 VT를 쓰려면 Tomcat executor를 따로 설정한다. Tomcat 11은 작업마다 VT를 만드는 `VirtualThreadExecutor`를 제공한다. [2][7]
+`spring.threads.virtual.enabled`는 Boot가 관리하는 작업 실행·예약 구성에 영향을 준다. Boot의 `AsyncTaskExecutor`는 `@EnableAsync`, MVC 비동기 처리 등에 연결되며, 사용자 `Executor`나 `AsyncConfigurer`가 있으면 자동 구성 조건이 달라진다. 이 목록이 Tomcat connector executor까지 자동 변경한다는 뜻은 아니다.
+
+요청 스레드에 VT를 쓰려면 Tomcat executor를 따로 설정한다. Tomcat 11은 작업마다 VT를 만드는 `VirtualThreadExecutor`를 제공한다. [2][7]
 
 ### 3.2 WebFlux 요청과 Reactive Streams 수요
 

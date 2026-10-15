@@ -30,7 +30,9 @@
 
 반면 `LocalDateTime`은 연-월-일과 시-분-초만 가진다. 값 `2026-07-01T09:00`만으로는 그 순간이 UTC인지, 서울인지, LA인지 알 수 없다. 이를 `Instant`로 바꾸려면 외부에서 `ZoneId` 또는 `ZoneOffset`을 공급해야 한다. 누락된 정보는 변환 함수가 추측할 수 없으며, `ZoneId.systemDefault()`를 대신 넣으면 서버 설정이 도메인 규칙이 된다.
 
-`OffsetDateTime`은 벽시계 값과 고정 UTC 오프셋을 함께 가진다. `+09:00`은 그 순간과의 관계를 알려주지만 “서울” 같은 지역 규칙은 담지 않는다. 오프셋만으로는 다음 해에 그 지역의 서머타임 규칙이 바뀌어도 따라갈 수 없다. `ZonedDateTime`은 `ZoneId`와 해당 규칙 데이터까지 함께 쓴다. 같은 지역은 역사와 미래 규칙에 따라 오프셋이 달라질 수 있다. Java API 문서는 `Instant`를 타임스탬프와 로그·저장에, `LocalDateTime`을 타임존 없는 날짜·시간에, `ZonedDateTime`을 지역 규칙을 고려한 계산에 대응시킨다.[1]
+`OffsetDateTime`은 벽시계 값과 고정 UTC 오프셋을 함께 가진다. `+09:00`은 그 순간과의 관계를 알려주지만 “서울” 같은 지역 규칙은 담지 않는다. 오프셋만으로는 다음 해에 그 지역의 서머타임 규칙이 바뀌어도 따라갈 수 없다.
+
+`ZonedDateTime`은 `ZoneId`와 해당 규칙 데이터까지 함께 쓴다. 같은 지역은 역사와 미래 규칙에 따라 오프셋이 달라질 수 있다. Java API 문서는 `Instant`를 타임스탬프와 로그·저장에, `LocalDateTime`을 타임존 없는 날짜·시간에, `ZonedDateTime`을 지역 규칙을 고려한 계산에 대응시킨다.[1]
 
 ```mermaid
 flowchart TD
@@ -69,7 +71,9 @@ Java 8 이전의 `Date`/`Calendar` 계열은 가변적이고 사용 의도를 �
 | `OffsetDateTime` | 로컬 날짜·시간 + 고정 오프셋 | JSON 경계에서 오프셋을 명시하며 순간 비교 가능 | `+09:00`만으로 `Asia/Seoul` 규칙을 보존하지 못함 | 외부 시스템이 오프셋 포함 시각을 보냈고 그 값의 오프셋도 계약상 보존할 때 | 빈도 통계 미확인 |
 | `ZonedDateTime` | 날짜·시간 + 지역 `ZoneId` 규칙과 현재 오프셋 | DST·지역 달력 계산 가능 | DB/JSON이 지역 ID를 보존하지 않을 수 있고 규칙 변경·중복 정책을 다뤄야 함 | 예약 시각 계산, 지역 반복 일정 | 빈도 통계 미확인 |
 
-Java 타입이 DB 컬럼 타입을 그대로 결정하지는 않는다. JDBC 드라이버와 Hibernate Dialect가 Java 타입을 JDBC/SQL 타입으로 매핑한다. Hibernate 7.0 가이드에서 `Instant`는 `TIMESTAMP_UTC`, `LocalDateTime`은 `TIMESTAMP`, `OffsetDateTime`은 Dialect에 따라 `TIMESTAMP` 또는 `TIMESTAMP_WITH_TIMEZONE`에 대응한다. 실제 컬럼과 오프셋 보존은 DB 기능 및 Hibernate 저장 전략에 달려 있다.[3]
+Java 타입이 DB 컬럼 타입을 그대로 결정하지는 않는다. JDBC 드라이버와 Hibernate Dialect가 Java 타입을 JDBC/SQL 타입으로 매핑한다.
+
+Hibernate 7.0 가이드에서 `Instant`는 `TIMESTAMP_UTC`, `LocalDateTime`은 `TIMESTAMP`, `OffsetDateTime`은 Dialect에 따라 `TIMESTAMP` 또는 `TIMESTAMP_WITH_TIMEZONE`에 대응한다. 실제 컬럼과 오프셋 보존은 DB 기능 및 Hibernate 저장 전략에 달려 있다.[3]
 
 | MySQL 타입 | 저장·조회 시 타임존 처리 | 장점 | 단점 | 선택 기준 |
 |---|---|---|---|---|
@@ -249,7 +253,9 @@ spring:
 
 `hibernate.jdbc.time_zone`은 JDBC `Timestamp`/`Time` 바인딩·조회용 `Calendar` 존이며 기본은 JVM 존이다. 이것만으로 MySQL 세션 `time_zone`을 바꾸지는 않는다.[3] `TIMESTAMP`는 매 연결을 UTC로 고정하고, UTC 인코딩 `DATETIME(6)`은 앱 전체가 그 규칙을 지킨다. Dialect와 마이그레이션의 SQL 타입·정밀도도 통합 환경에서 맞춘다.
 
-JSON 경계에서는 `Instant`를 ISO 문자열 `2026-07-01T00:00:00Z`로, 오프셋 의미가 필요한 `OffsetDateTime`은 `2026-07-01T09:00:00+09:00`처럼 표현할 수 있다. `LocalDateTime`의 `2026-07-01T09:00:00`에는 타임존 정보가 없다는 점을 API 명세에 적어야 한다. Jackson 설정은 문자열/숫자 표현, 정밀도, 존 ID 포함에 영향을 주므로 DTO 필드 타입만 정하고 계약을 생략하지 않는다. 직렬화 상세는 P16 참조.
+JSON 경계에서는 `Instant`를 ISO 문자열 `2026-07-01T00:00:00Z`로, 오프셋 의미가 필요한 `OffsetDateTime`은 `2026-07-01T09:00:00+09:00`처럼 표현할 수 있다. `LocalDateTime`의 `2026-07-01T09:00:00`에는 타임존 정보가 없다는 점을 API 명세에 적어야 한다.
+
+Jackson 설정은 문자열/숫자 표현, 정밀도, 존 ID 포함에 영향을 주므로 DTO 필드 타입만 정하고 계약을 생략하지 않는다. 직렬화 상세는 P16 참조.
 
 ## 6. 실무에서는 실제로
 

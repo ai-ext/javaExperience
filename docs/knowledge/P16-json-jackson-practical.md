@@ -37,7 +37,9 @@ class MemberController {
 
 ### 2.2 `@RequestBody`가 동작하는 지점
 
-`@RequestBody`는 Jackson 호출 자체가 아니다. `RequestMappingHandlerAdapter`가 요청의 `Content-Type`과 대상 Java 타입을 보고 등록된 `HttpMessageConverter`를 선택한다. JSON이면 Jackson 기반 converter가 body의 `InputStream`을 DTO로 읽는다. 메서드 반환값에 `@ResponseBody`가 있거나 컨트롤러가 `@RestController`이면 같은 계열의 converter가 반환 객체를 JSON으로 쓴다.
+`@RequestBody`는 Jackson 호출 자체가 아니다. `RequestMappingHandlerAdapter`가 요청의 `Content-Type`과 대상 Java 타입을 보고 등록된 `HttpMessageConverter`를 선택한다.
+
+JSON이면 Jackson 기반 converter가 body의 `InputStream`을 DTO로 읽는다. 메서드 반환값에 `@ResponseBody`가 있거나 컨트롤러가 `@RestController`이면 같은 계열의 converter가 반환 객체를 JSON으로 쓴다.
 
 따라서 다음 세 가지가 맞아야 한다.
 
@@ -280,7 +282,9 @@ Jackson 2의 core/databind는 `com.fasterxml.jackson...`, Jackson 3는 `tools.ja
 
 ## 6. 한 단계 더
 
-변환 흐름은 `HTTP bytes → Content-Type 협상 → HttpMessageConverter → JsonMapper → DTO 생성`이고 응답은 역순이다. mapper는 getter·constructor·record metadata를 보고 프로퍼티를 결정한다. Jackson 3는 Java 17 기준, `tools.jackson` 패키지, 2.x와 비호환인 API를 택했다. Boot 4는 이를 자동 구성하고 Jackson 2는 마이그레이션용으로만 둔다.
+변환 흐름은 `HTTP bytes → Content-Type 협상 → HttpMessageConverter → JsonMapper → DTO 생성`이고 응답은 역순이다. mapper는 getter·constructor·record metadata를 보고 프로퍼티를 결정한다.
+
+Jackson 3는 Java 17 기준, `tools.jackson` 패키지, 2.x와 비호환인 API를 택했다. Boot 4는 이를 자동 구성하고 Jackson 2는 마이그레이션용으로만 둔다.
 
 심화는 MVC 요청 흐름 → S05, REST 계약 → S06, 엔티티·지연 로딩 → S09, Boot 자동 구성 → S03을 참조한다.
 
@@ -308,7 +312,8 @@ Jackson 2의 core/databind는 `com.fasterxml.jackson...`, Jackson 3는 `tools.ja
 
 ### Q5. getter가 없고 기본 생성자도 없는 클래스는 어떻게 읽나?
 
-Jackson이 사용할 creator를 명시한다. record는 canonical constructor가 있어 간단하고, 일반 불변 클래스는 `@JsonCreator`와 `@JsonProperty`를 사용한다. private 필드 자동 접근을 전역으로 열지 않는다.  
+Jackson이 사용할 creator를 명시한다. record는 canonical constructor가 있어 간단하고, 일반 불변 클래스는 `@JsonCreator`와 `@JsonProperty`를 사용한다. private 필드 자동 접근을 전역으로 열지 않는다.
+
 꼬리질문: setter를 만들면 해결되지 않나?  
 가능하지만 mutable 객체가 된다. 입력 검증과 불변성을 constructor 경계에서 보장할 수 있으면 creator가 더 명확하다.
 

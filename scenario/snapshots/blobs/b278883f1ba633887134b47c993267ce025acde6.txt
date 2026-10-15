@@ -1,0 +1,70 @@
+package org.example.recent;
+
+import org.example.auth.AuthenticatedMember;
+import org.example.member.MemberRepository;
+import org.example.post.Post;
+import org.example.post.PostAccessPolicy;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.function.Predicate;
+
+// 최근 본 글 — 상세 조회(GET /api/posts/{id})가 성공할 때 기록한다. 회원마다 최근 20개
+@Service
+public class RecentViewService {
+
+    static final int KEEP = 20;
+
+    private final RecentViewRepository repository;
+    private final MemberRepository memberRepository;
+    private final PostAccessPolicy accessPolicy;
+    private final Clock clock;
+
+    public RecentViewService(RecentViewRepository repository, MemberRepository memberRepository,
+                             PostAccessPolicy accessPolicy, Clock clock) {
+        this.repository = repository;
+        this.memberRepository = memberRepository;
+        this.accessPolicy = accessPolicy;
+        this.clock = clock;
+    }
+
+    // 상세 조회 트랜잭션 안에서 불린다(볼 수 있는 글일 때만). 같은 글이면 맨 앞으로, 21번째부터는 지운다
+    @Transactional
+    public void record(Long memberId, Long postId) {
+        // 회원 행 하나로 같은 회원의 다른 글 조회를 직렬화한다. 20개 정리와 시각 순서를 함께 보장한다.
+        memberRepository.findByIdForUpdate(memberId).orElseThrow();
+        LocalDateTime now = LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
+        LocalDateTime latest = repository.findLatestViewedAt(memberId);
+        if (latest != null && !now.isAfter(latest)) {
+            now = latest.plus(1, ChronoUnit.MICROS);
+        }
+        repository.upsert(memberId, postId, now);
+        repository.trim(memberId, KEEP);
+    }
+
+    // 기록한 뒤에 지워지거나 숨겨진 글, 차단 등으로 지금은 볼 수 없는 글은 빼고 보여 준다(행은 남는다)
+    @Transactional(readOnly = true)
+    public RecentPostsResponse list(AuthenticatedMember me, int size) {
+        Predicate<Post> viewable = accessPolicy.viewableBy(me);
+        List<RecentPostsResponse.Item> items = repository.findLatest(me.id()).stream()
+                .filter(rv -> viewable.test(rv.getPost()))
+                .limit(size)
+                .map(rv -> new RecentPostsResponse.Item(rv.getPost().getId(), rv.getPost().getTitle(), rv.getViewedAt()))
+                .toList();
+        return new RecentPostsResponse(items);
+    }
+
+    @Transactional
+    public void clear(AuthenticatedMember me) {
+        repository.deleteAllOf(me.id());
+    }
+
+    @Transactional
+    public void remove(AuthenticatedMember me, Long postId) {
+        repository.deleteOne(me.id(), postId);
+    }
+}

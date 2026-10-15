@@ -1,0 +1,32 @@
+package org.example.post;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.List;
+
+// 최근 N일 인기글 — "지금"은 LocalDateTime.now()가 아니라 주입받은 Clock에서 얻는다
+// (practice 프로파일은 app.fixed-now로 2026-10-05 00:00에 고정)
+@Service
+public class PopularPostService {
+
+    private final PostRepository postRepository;
+    private final Clock clock;
+
+    public PopularPostService(PostRepository postRepository, Clock clock) {
+        this.postRepository = postRepository;
+        this.clock = clock;
+    }
+
+    // 기간은 [지금 - days, 지금) — 끝(지금)은 포함하지 않는다
+    @Transactional(readOnly = true)
+    public List<PopularPostResponse> popular(int days, int limit) {
+        LocalDateTime to = LocalDateTime.now(clock);
+        LocalDateTime from = to.minusDays(days);
+        return postRepository.findPopular(from, to, limit).stream()
+                .map(r -> new PopularPostResponse(r.getPostId(), r.getTitle(), r.getScore(), r.getLikes(), r.getComments()))
+                .toList();
+    }
+}

@@ -1,0 +1,28 @@
+package org.example.bookmark;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.Optional;
+
+public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
+    Optional<Bookmark> findByMember_IdAndPost_Id(Long memberId, Long postId);
+
+    // UNIQUE(member_id,post_id)를 이용해 동시 반복 PUT도 한 행으로 합친다.
+    @Modifying
+    @Query(value = """
+            INSERT INTO bookmark(member_id, post_id, folder_id, memo, created_at, updated_at)
+            VALUES (:memberId, :postId, :folderId, :memo, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE id = id
+            """, nativeQuery = true)
+    int insertIfAbsent(@Param("memberId") Long memberId, @Param("postId") Long postId,
+                       @Param("folderId") Long folderId, @Param("memo") String memo);
+
+    // REPEATABLE_READ의 이전 스냅샷이 아닌 현재 행을 읽는다.
+    @Query(value = "SELECT * FROM bookmark WHERE member_id = :memberId AND post_id = :postId FOR UPDATE",
+            nativeQuery = true)
+    Optional<Bookmark> findCurrentForUpdate(@Param("memberId") Long memberId,
+                                             @Param("postId") Long postId);
+}

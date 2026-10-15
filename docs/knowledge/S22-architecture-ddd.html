@@ -4,20 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>S22. 아키텍처 스타일과 DDD 기초 — 코드를 어떻게 나눌까</title>
-<link rel="stylesheet" href="../../tools/site/site.css">
+<link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=600678cfa7dd">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
-<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
-<main>
+<header class="topbar"><a href="../../index.html">javaExperience</a><a href="../../scenario/README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="README.html">공부자료</a></header>
+<main class="knowledge-main">
 
-<h1 id="s22-아키텍처-스타일과-ddd-기초--코드를-어떻게-나눌까"><a class="anchor" href="#s22-아키텍처-스타일과-ddd-기초--코드를-어떻게-나눌까" aria-hidden="true">#</a>S22. 아키텍처 스타일과 DDD 기초 — 코드를 어떻게 나눌까</h1>
+<h1 id="s22-아키텍처-스타일과-ddd-기초--코드를-어떻게-나눌까"><a class="anchor" href="#s22-아키텍처-스타일과-ddd-기초--코드를-어떻게-나눌까" aria-hidden="true">#</a>S22. 아키텍처 스타일과 DDD 기초 — 코드를 어떻게 나눌까</h1><section class="knowledge-page-map" aria-label="문서 읽기 지도"><div class="knowledge-page-map-head"><div><p class="knowledge-page-map-kicker">Spring framework <span>· S22</span></p><h2>이 문서에서 볼 내용</h2><p>Spring의 실행 흐름과 기능</p></div><span class="knowledge-page-map-count">9개 주제</span></div><nav class="knowledge-page-steps" aria-label="문서의 실제 절로 이동"><a class="knowledge-page-step" href="#1-왜-알아야-하나"><span class="knowledge-page-step-no">01</span><span>1. 왜 알아야 하나</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#2-핵심-개념"><span class="knowledge-page-step-no">02</span><span>2. 핵심 개념</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#3-내부-동작원리"><span class="knowledge-page-step-no">03</span><span>3. 내부 동작·원리</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#4-코드로-확인"><span class="knowledge-page-step-no">04</span><span>4. 코드로 확인</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#5-버전별-변화--왜-바뀌었나"><span class="knowledge-page-step-no">05</span><span>5. 버전별 변화 — 왜 바뀌었나</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#6-실무-가이드"><span class="knowledge-page-step-no">06</span><span>6. 실무 가이드</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#7-함정안티패턴"><span class="knowledge-page-step-no">07</span><span>7. 함정·안티패턴</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#8-자가점검-qa-면접-대비"><span class="knowledge-page-step-no">08</span><span>8. 자가점검 Q&amp;A (면접 대비)</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#9-참고문헌"><span class="knowledge-page-step-no">09</span><span>9. 참고문헌</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a></nav></section>
 <blockquote>
 <p>레이어드의 핵심 문제는 레이어 수가 아니라 비즈니스 규칙이 <code>Service</code>와 ORM 모델에 흩어지고 의존성 방향이 뒤엉키는 데 있다.
 헥사고날·클린 아키텍처는 도메인/유스케이스가 기술 세부사항을 모르도록 포트와 의존성 방향을 정한다.
 DDD는 모든 CRUD에 적용하는 장식이 아니라, 경계·언어·불변식이 복잡한 영역을 모듈러 모놀리스로 먼저 견고하게 만드는 도구다.</p>
 </blockquote>
-<h2 id="1-왜-알아야-하나"><a class="anchor" href="#1-왜-알아야-하나" aria-hidden="true">#</a>1. 왜 알아야 하나</h2>
-<p>주문 취소 규칙이 바뀌었는데 <code>OrderService.cancel()</code>, 환불 배치, 관리자 Controller의 세 곳에 조건문이 따로 있다면 한 곳을 빠뜨린 순간 상태가 갈라진다. <code>Order</code>가 JPA 엔티티라서 어디서나 setter를 호출할 수 있으면 <code>CONFIRMED</code> 주문에 상품을 추가하는 코드도 컴파일되고, 장애는 커밋 시점이나 다음 조회 때 드러난다. 이것은 “Service가 있으니 계층형”인 문제 해결이 아니다. 규칙을 소유하는 객체와 변경 가능한 경계를 정하지 않은 문제다.</p>
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<p>주문 취소 규칙이 바뀌었는데 <code>OrderService.cancel()</code>, 환불 배치, 관리자 Controller의 세 곳에 조건문이 따로 있다면 한 곳을 빠뜨린 순간 상태가 갈라진다. <code>Order</code>가 JPA 엔티티라서 어디서나 setter를 호출할 수 있으면 <code>CONFIRMED</code> 주문에 상품을 추가하는 코드도 컴파일되고, 장애는 커밋 시점이나 다음 조회 때 드러난다.</p>
+<p>이것은 “Service가 있으니 계층형”인 문제 해결이 아니다. 규칙을 소유하는 객체와 변경 가능한 경계를 정하지 않은 문제다.</p>
 <p>또 다른 흔한 사고는 내부 패키지의 구현 클래스를 다른 기능이 직접 주입하는 것이다. 처음에는 빠르지만 결제 DB 교체, 테스트용 저장소, 메시지 발행 방식 변경이 도메인 코드까지 번진다. 레이어드 구조에서 <code>service -&gt; repository</code>는 지켜도 <code>order.service -&gt; payment.service -&gt; order.repository</code> 같은 양방향 기능 의존성이 생기면 순환과 변경 전파를 막지 못한다.</p>
 <p>면접에서 헥사고날을 육각형 폴더나 DDD를 애노테이션으로 설명하면 부족하다. 판단 기준은 다음 세 가지다.</p>
 <ol>
@@ -26,8 +29,8 @@ DDD는 모든 CRUD에 적용하는 장식이 아니라, 경계·언어·불변�
 <li>모듈 사이 접근을 코드 리뷰가 아니라 자동 검증으로 막을 수 있는가?</li>
 </ol>
 <p>MVC의 Controller·Service·Repository 기초는 <a class="docref" href="P02-mvc-layered-architecture.html">P02</a>, 메시징 운영은 <a class="docref" href="S14-messaging.html">S14</a>, MSA 운영 패턴은 <a class="docref" href="S20-spring-cloud-msa.html">S20</a>에서 다룬다. 여기서는 그 위에서 업무 경계를 설계하는 문제만 다룬다.</p>
-<h2 id="2-핵심-개념"><a class="anchor" href="#2-핵심-개념" aria-hidden="true">#</a>2. 핵심 개념</h2>
-<h3 id="용어-정리"><a class="anchor" href="#용어-정리" aria-hidden="true">#</a>용어 정리</h3>
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">2. 핵심 개념</strong><small>용어 정리 · 레이어드, 헥사고날, 클린 비교</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="용어-정리" aria-label="용어 정리 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">용어 정리</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -97,7 +100,7 @@ DDD는 모든 CRUD에 적용하는 장식이 아니라, 경계·언어·불변�
 <td><code>JpaOrderRepositoryAdapter</code></td>
 </tr>
 </tbody></table></div>
-<h3 id="레이어드-헥사고날-클린-비교"><a class="anchor" href="#레이어드-헥사고날-클린-비교" aria-hidden="true">#</a>레이어드, 헥사고날, 클린 비교</h3>
+</div></details><details class="knowledge-topic"><summary id="레이어드-헥사고날-클린-비교" aria-label="레이어드, 헥사고날, 클린 비교 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">레이어드, 헥사고날, 클린 비교</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -138,14 +141,14 @@ DDD는 모든 CRUD에 적용하는 장식이 아니라, 경계·언어·불변�
 </tr>
 </tbody></table></div>
 <p>헥사고날과 클린은 서로 다른 제품이 아니다. 둘 다 핵심은 육각형 그림이 아니라 컴파일 가능한 의존성 방향이다.</p>
-<h2 id="3-내부-동작원리"><a class="anchor" href="#3-내부-동작원리" aria-hidden="true">#</a>3. 내부 동작·원리</h2>
-<h3 id="레이어드가-비대해지는-과정"><a class="anchor" href="#레이어드가-비대해지는-과정" aria-hidden="true">#</a>레이어드가 비대해지는 과정</h3>
+</div></details></div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 내부 동작·원리</strong><small>레이어드가 비대해지는 과정 · 포트·어댑터 호출 흐름 · 패키지 예시: 기능 중심 + 내부 은닉 · Spring Modulith의 모듈 경계 검증</small></span><span class="knowledge-chapter-meta">4개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="레이어드가-비대해지는-과정" aria-label="레이어드가 비대해지는 과정 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">레이어드가 비대해지는 과정</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-text">HTTP Controller ──&gt; OrderService ──&gt; OrderRepository ──&gt; JPA/DB
                          │  ▲
                          │  └── PaymentService / CouponService
                          └── 조건·계산·트랜잭션·DTO 변환이 계속 유입</code></pre>
 <p>처음에는 요청 하나가 <code>Service</code> 하나로 끝난다. 그러나 업무 규칙이 여러 유스케이스에서 공유되면서 Service가 모든 엔티티를 읽고, 조건을 계산하고, 상태를 직접 바꾸고, 외부 API를 호출한다. 서비스끼리 서로 호출하면 순환이 생기고, Repository 인터페이스가 JPA 타입을 반환하면 저장 기술이 위로 새어 나온다. 레이어는 물리적 폴더가 아니라 “누가 어떤 정책을 소유하는가”를 제한해야 한다.</p>
-<h3 id="포트어댑터-호출-흐름"><a class="anchor" href="#포트어댑터-호출-흐름" aria-hidden="true">#</a>포트·어댑터 호출 흐름</h3>
+</div></details><details class="knowledge-topic"><summary id="포트어댑터-호출-흐름" aria-label="포트·어댑터 호출 흐름 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">포트·어댑터 호출 흐름</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-text">[Web Adapter]
 POST /orders
    │  Command 변환
@@ -161,7 +164,7 @@ POST /orders
                                                    ▲
                            [JPA Adapter]     [HTTP Adapter]</code></pre>
 <p>실제 런타임에는 Spring이 어댑터 Bean을 생성하고 생성자 주입으로 포트에 연결한다. Controller는 입력 포트를 호출하고, 유스케이스는 트랜잭션을 조정하며, 도메인 객체가 규칙을 실행한다. <code>OrderRepository</code>의 구현체가 JPA인지 메모리인지 안쪽은 알지 못한다. 테스트 대상이 기술이 아닌 의미 있는 포트에 의존하므로 테스트에 유리하다.</p>
-<h3 id="패키지-예시-기능-중심--내부-은닉"><a class="anchor" href="#패키지-예시-기능-중심--내부-은닉" aria-hidden="true">#</a>패키지 예시: 기능 중심 + 내부 은닉</h3>
+</div></details><details class="knowledge-topic"><summary id="패키지-예시-기능-중심--내부-은닉" aria-label="패키지 예시: 기능 중심 + 내부 은닉 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">패키지 예시: 기능 중심 + 내부 은닉</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-text">com.acme.shop
 ├─ ShopApplication.java
 ├─ order
@@ -183,15 +186,15 @@ POST /orders
 └─ shared
    └─ ClockPort.java                # 정말 여러 모듈의 언어일 때만</code></pre>
 <p>기능별 패키지는 변경 이유를 모은다. 기술별 최상위 패키지(<code>controller</code>, <code>service</code>, <code>repository</code>)는 파일을 흩어 놓고 모듈 경계를 흐리기 쉽다. 단순 CRUD라면 레이어드로 시작해도 된다.</p>
-<h3 id="spring-modulith의-모듈-경계-검증"><a class="anchor" href="#spring-modulith의-모듈-경계-검증" aria-hidden="true">#</a>Spring Modulith의 모듈 경계 검증</h3>
+</div></details><details class="knowledge-topic"><summary id="spring-modulith의-모듈-경계-검증" aria-label="Spring Modulith의 모듈 경계 검증 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">Spring Modulith의 모듈 경계 검증</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>Spring Modulith는 Spring Boot 앱의 직접 하위 패키지를 기본 애플리케이션 모듈로 간주하고, 모듈의 공개 API와 내부 구현을 구분한다. <code>ApplicationModules.of(Application.class)</code>가 코드베이스의 모듈 모델을 만들고 <code>.verify()</code>가 다음을 검사한다.</p>
 <pre><code class="language-java">@Test
 void modules_are_well_formed() {
     ApplicationModules.of(ShopApplication.class).verify();
 }</code></pre>
 <p>검증 대상은 모듈 의존성 그래프의 순환, 다른 모듈의 내부 패키지 참조, 설정한 허용 의존성 위반이다. 위반 시 예외가 나므로 빌드 테스트에 넣을 수 있다. <code>internal</code>이라는 이름만으로는 부족하며 공개 인터페이스와 검증 규칙도 필요하다. <code>detectViolations()</code>를 쓰면 위반 목록을 필터링할 수 있다.</p>
-<h2 id="4-코드로-확인"><a class="anchor" href="#4-코드로-확인" aria-hidden="true">#</a>4. 코드로 확인</h2>
-<h3 id="예제-1--풍부한-애그리거트와-값-객체"><a class="anchor" href="#예제-1--풍부한-애그리거트와-값-객체" aria-hidden="true">#</a>예제 1 — 풍부한 애그리거트와 값 객체</h3>
+</div></details></div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">4. 코드로 확인</strong><small>예제 1 — 풍부한 애그리거트와 값 객체 · 예제 2 — Spring Boot 4.1용 포트와 어댑터 · 빈약한 모델과 풍부한 모델</small></span><span class="knowledge-chapter-meta">3개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="예제-1--풍부한-애그리거트와-값-객체" aria-label="예제 1 — 풍부한 애그리거트와 값 객체 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">예제 1 — 풍부한 애그리거트와 값 객체</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>다음은 Java 21에서 실행한 순수 Java 예제다. <code>Order</code>가 상태 변경과 한도 불변식을 소유하고 <code>Money</code>가 산술을 소유한다. <code>OrderConfirmed</code>는 루트가 발행한 도메인 이벤트의 최소 형태다.</p>
 <pre><code class="language-java">// _scratch/S22/OrderDemo.java
 import java.math.BigDecimal;
@@ -251,7 +254,7 @@ public class OrderDemo {
 <pre><code class="language-text">CONFIRMED / 2900 / events=1
 confirmed order cannot change</code></pre>
 <p>애플리케이션 서비스는 <code>confirm()</code> 호출 순서만 조정하고, “확정 후 변경 금지”는 루트 경계가 소유한다. 이벤트의 커밋 연계나 outbox는 별도 결정이며 메시징 운영은 <a class="docref" href="S14-messaging.html">S14</a> 범위다.</p>
-<h3 id="예제-2--spring-boot-41용-포트와-어댑터"><a class="anchor" href="#예제-2--spring-boot-41용-포트와-어댑터" aria-hidden="true">#</a>예제 2 — Spring Boot 4.1용 포트와 어댑터</h3>
+</div></details><details class="knowledge-topic"><summary id="예제-2--spring-boot-41용-포트와-어댑터" aria-label="예제 2 — Spring Boot 4.1용 포트와 어댑터 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">예제 2 — Spring Boot 4.1용 포트와 어댑터</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>다음은 실행 가능한 전체 앱이 아니라 핵심 Spring 구조 예시이며, Boot 4.1 / Framework 7 기준 설계 스케치다. 사용자가 만든 입력 포트와 저장 포트를 Spring Bean으로 조립하고, JPA 구현은 <code>internal</code>에 둔다.</p>
 <pre><code class="language-java">// order/api/PlaceOrder.java
 public interface PlaceOrder {
@@ -287,16 +290,16 @@ final class JpaOrderRepository implements OrderRepository {
 }</code></pre>
 <p>JPA의 기본 생성자·식별자·지연 로딩은 도메인 캡슐화와 충돌한다. <code>@Entity</code>를 직접 붙이면 매핑 비용은 줄지만 프록시·컬렉션·setter가 모델을 오염시킬 수 있고, 분리하면 변환 비용이 생긴다. 규칙이 복잡하면 분리 매핑, 단순 CRUD면 공개 setter를 없앤 동일 클래스를 기본으로 삼는다.</p>
 <p>값 객체는 JPA <code>@Embeddable</code>/<code>@Embedded</code>로 저장할 수 있지만, 컬럼 변경이 도메인 값 전체 변경과 같은 의미인지 확인한다. <code>@OneToMany</code> 컬렉션도 외부에 직접 노출하지 말고 루트 명령 메서드만 공개한다. 여러 리포지토리를 묶는 유스케이스의 <code>@Transactional</code> 경계가 원자성을 결정한다.</p>
-<h3 id="빈약한-모델과-풍부한-모델"><a class="anchor" href="#빈약한-모델과-풍부한-모델" aria-hidden="true">#</a>빈약한 모델과 풍부한 모델</h3>
+</div></details><details class="knowledge-topic"><summary id="빈약한-모델과-풍부한-모델" aria-label="빈약한 모델과 풍부한 모델 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">빈약한 모델과 풍부한 모델</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>빈약한 모델은 <code>Order</code>가 getter/setter만 제공하고 <code>OrderService</code>가 계산·상태 전이·검사를 모두 한다. 풍부한 모델은 <code>order.confirm()</code>, <code>order.cancel(reason)</code>, <code>money.add()</code>처럼 행동과 불변식을 함께 둔다. 조회 DTO에 억지로 행동을 넣을 필요는 없다. 빈약한 모델은 ORM 비용은 지면서 행동 조직화 이점은 잃는다.</p>
-<h2 id="5-버전별-변화--왜-바뀌었나"><a class="anchor" href="#5-버전별-변화--왜-바뀌었나" aria-hidden="true">#</a>5. 버전별 변화 — 왜 바뀌었나</h2>
+</div></details></div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>2005년 Cockburn의 “Hexagonal (Ports &amp; Adapters)” 원문은 UI와 DB에 묶인 로직을 자동 회귀 테스트와 교체 가능한 어댑터로부터 분리하는 문제를 정리했다. 이전 레이어가 외부 기술과 업무 규칙의 얽힘을 막지 못했기 때문에 “안쪽/바깥쪽” 비대칭과 포트가 제안됐다. 근거: 원문 URL은 참고문헌에 있다.</li>
 <li>2003년 Fowler의 Anemic Domain Model 논의는 getter/setter 객체와 모든 규칙을 담은 서비스가 객체지향 모델의 비용만 남기는 문제를 설명했다. 단순 서비스 계층이 도메인 행동을 대체하던 한계가 풍부한 모델 논쟁을 낳았다.</li>
 <li>Spring Modulith 1.x~2.x 계열은 Spring Boot 안에서 논리 모듈을 구조적으로 검증·문서화·테스트하는 도구로 발전했다. 마이크로서비스로 바로 쪼개 배포하는 비용을 감당하기 전에 패키지 경계를 검증해야 한다는 요구가 배경이다. 확인한 공식 문서는 현재 stable <code>2.1.1</code>과 호환성 매트릭스 링크를 제시한다. 이 작업 기준의 Spring Boot 4.1과 정확한 Modulith 호환 조합은 매트릭스에서 프로젝트 시점에 확인해야 하며, 여기서는 <code>(미확인)</code>으로 둔다.</li>
 <li>기준 버전은 Java 25, Spring Boot 4.1.x, Spring Framework 7.0.x다. 이 문서의 순수 Java 예제는 Java 21에서도 동작하는 문법만 사용했다. 이 주제에서 Java 25 전용 문법을 사용할 이유는 없으므로 해당 JEP 변화는 큰 변화 없음이다.</li>
 </ul>
-<h2 id="6-실무-가이드"><a class="anchor" href="#6-실무-가이드" aria-hidden="true">#</a>6. 실무 가이드</h2>
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>기본값 추천은 “기능 중심 모듈러 모놀리스 + 얇은 애플리케이션 서비스 + 복잡한 규칙만 풍부한 도메인 모델”이다.</p>
 <ul>
 <li>규칙이 한 애그리거트의 상태와 함께 항상 참이어야 하면 → 애그리거트 루트의 명령 메서드로 둬라, 여러 서비스가 같은 불변식을 복제하지 않게 하기 위해서다.</li>
@@ -309,7 +312,7 @@ final class JpaOrderRepository implements OrderRepository {
 <li>규칙이 두 컨텍스트에서 같은 단어지만 의미가 다르면 → 바운디드 컨텍스트별 모델을 만들고 변환 지점을 명시하라, 전역 <code>Order</code> 하나가 서로 다른 의미를 떠안지 않게 하기 위해서다.</li>
 <li>MSA 분리를 언젠가 고려한다면 → 먼저 모듈러 모놀리스에서 API와 이벤트를 통해 모듈을 연결하라, 네트워크·운영 장애까지 한 번에 도입하지 않고 경계의 유효성을 검증할 수 있기 때문이다.</li>
 </ul>
-<h2 id="7-함정안티패턴"><a class="anchor" href="#7-함정안티패턴" aria-hidden="true">#</a>7. 함정·안티패턴</h2>
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li>증상: <code>OrderService</code>가 800줄이고 할인·재고·환불 규칙이 한 메서드에 섞인다 → 원인: 엔티티를 데이터 가방으로 두고 모든 행동을 서비스에 집중했다 → 대처: 함께 참이어야 하는 규칙을 애그리거트 명령으로 옮기고 서비스는 포트 조정만 한다.</li>
 <li>증상: <code>order.internal.JpaOrderRepository</code>를 결제 모듈이 직접 주입한다 → 원인: 패키지를 나눴지만 공개 API와 자동 검증이 없다 → 대처: API 패키지만 공개하고 <code>ApplicationModules.verify()</code>를 CI에서 실행한다.</li>
@@ -318,32 +321,32 @@ final class JpaOrderRepository implements OrderRepository {
 <li>증상: JPA 저장 후 도메인 이벤트가 발행됐지만 트랜잭션 롤백 뒤에도 소비자가 처리한다 → 원인: 이벤트를 커밋과 독립된 시점에 발행했다 → 대처: 트랜잭션 경계와 이벤트 전달 보장을 설계하고 필요하면 outbox를 적용한다. 메시지 전달 세부사항은 <a class="docref" href="S14-messaging.html">S14</a>를 참조한다.</li>
 <li>증상: 모든 클래스마다 <code>FooPort</code>, <code>FooAdapter</code>, <code>FooMapper</code>가 생겼지만 테스트와 변경 속도는 나아지지 않는다 → 원인: 외부 변화 가능성과 규칙 복잡도를 평가하지 않고 패턴 이름을 복제했다 → 대처: 교체 가능성·독립 테스트·팀 경계 중 하나도 없으면 단순 구현을 유지한다.</li>
 </ol>
-<h2 id="8-자가점검-qa-면접-대비"><a class="anchor" href="#8-자가점검-qa-면접-대비" aria-hidden="true">#</a>8. 자가점검 Q&amp;A (면접 대비)</h2>
-<h3 id="q1-헥사고날-아키텍처에서-포트와-어댑터의-방향은"><a class="anchor" href="#q1-헥사고날-아키텍처에서-포트와-어댑터의-방향은" aria-hidden="true">#</a>Q1. 헥사고날 아키텍처에서 포트와 어댑터의 방향은?</h3>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. 헥사고날 아키텍처에서 포트와 어댑터의 방향은? · Q2. 애그리거트와 단순 엔티티의 차이는? · Q3. 도메인 서비스와 애플리케이션 서비스는 어떻게 구분하나? · Q4. JPA 엔티티와 도메인 엔티티를 분리할 때의 비용과 이익은?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="q1-헥사고날-아키텍처에서-포트와-어댑터의-방향은" aria-label="Q1. 헥사고날 아키텍처에서 포트와 어댑터의 방향은? 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">Q1. 헥사고날 아키텍처에서 포트와 어댑터의 방향은?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>포트는 안쪽이 외부와 맺는 의미 있는 계약이고 어댑터는 기술별 구현이다. HTTP Controller는 입력 포트를 호출하는 driving adapter, JPA 저장소는 출력 포트를 구현하는 driven adapter다. 안쪽은 JPA나 HTTP 클래스를 import하지 않아야 한다.</p>
 <p>꼬리질문: 인터페이스를 모든 클래스에 만들면 더 헥사고날인가? 아니다. 교체되거나 격리할 경계에만 포트를 둬야 한다.</p>
-<h3 id="q2-애그리거트와-단순-엔티티의-차이는"><a class="anchor" href="#q2-애그리거트와-단순-엔티티의-차이는" aria-hidden="true">#</a>Q2. 애그리거트와 단순 엔티티의 차이는?</h3>
+</div></details><details class="knowledge-topic"><summary id="q2-애그리거트와-단순-엔티티의-차이는" aria-label="Q2. 애그리거트와 단순 엔티티의 차이는? 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">Q2. 애그리거트와 단순 엔티티의 차이는?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>애그리거트는 함께 변경되어야 하는 불변식과 트랜잭션 경계를 기준으로 묶은 단위다. 루트 외부에서 내부 엔티티를 직접 조회·변경하지 않는다. 테이블 관계나 객체 그래프가 크다는 이유만으로 하나의 애그리거트가 되지는 않는다.</p>
 <p>꼬리질문: Order가 모든 OrderLine을 항상 한 트랜잭션으로 가져야 하나? 아니며, 함께 검증해야 하는 규칙이 있는 범위까지만 묶는다.</p>
-<h3 id="q3-도메인-서비스와-애플리케이션-서비스는-어떻게-구분하나"><a class="anchor" href="#q3-도메인-서비스와-애플리케이션-서비스는-어떻게-구분하나" aria-hidden="true">#</a>Q3. 도메인 서비스와 애플리케이션 서비스는 어떻게 구분하나?</h3>
+</div></details><details class="knowledge-topic"><summary id="q3-도메인-서비스와-애플리케이션-서비스는-어떻게-구분하나" aria-label="Q3. 도메인 서비스와 애플리케이션 서비스는 어떻게 구분하나? 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">Q3. 도메인 서비스와 애플리케이션 서비스는 어떻게 구분하나?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>애플리케이션 서비스는 유스케이스를 시작하고 트랜잭션·포트 호출·작업 순서를 조정한다. 도메인 서비스는 여러 도메인 객체에 걸치지만 특정 객체 하나에 자연스럽게 속하지 않는 업무 규칙을 표현한다. 애플리케이션 서비스에 계산 규칙이 계속 늘면 빈약한 모델 신호다.</p>
 <p>꼬리질문: 도메인 서비스가 Repository를 직접 호출해도 되나? 가능하지만 도메인 정책과 저장 기술을 섞지 않도록 도메인 포트만 의존하게 한다.</p>
-<h3 id="q4-jpa-엔티티와-도메인-엔티티를-분리할-때의-비용과-이익은"><a class="anchor" href="#q4-jpa-엔티티와-도메인-엔티티를-분리할-때의-비용과-이익은" aria-hidden="true">#</a>Q4. JPA 엔티티와 도메인 엔티티를 분리할 때의 비용과 이익은?</h3>
+</div></details><details class="knowledge-topic"><summary id="q4-jpa-엔티티와-도메인-엔티티를-분리할-때의-비용과-이익은" aria-label="Q4. JPA 엔티티와 도메인 엔티티를 분리할 때의 비용과 이익은? 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">Q4. JPA 엔티티와 도메인 엔티티를 분리할 때의 비용과 이익은?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>분리하면 ORM 프록시와 도메인 캡슐화를 독립적으로 설계할 수 있지만 변환 비용이 생긴다. 규칙이 복잡하면 분리하고, 단순 CRUD면 같은 클래스를 제한적으로 사용한다.</p>
 <p>꼬리질문: <code>@Entity</code>에 setter를 모두 열면 왜 위험한가? 어떤 호출자도 불변식을 거치지 않고 상태를 바꿀 수 있기 때문이다.</p>
-<h3 id="q5-모듈러-모놀리스가-msa와-다른-점은"><a class="anchor" href="#q5-모듈러-모놀리스가-msa와-다른-점은" aria-hidden="true">#</a>Q5. 모듈러 모놀리스가 MSA와 다른 점은?</h3>
+</div></details><details class="knowledge-topic"><summary id="q5-모듈러-모놀리스가-msa와-다른-점은" aria-label="Q5. 모듈러 모놀리스가 MSA와 다른 점은? 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">Q5. 모듈러 모놀리스가 MSA와 다른 점은?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>모듈러 모놀리스는 한 프로세스·배포 단위 안에서 업무 경계와 의존성 규칙을 지킨다. MSA는 네트워크 호출, 독립 배포, 장애 격리, 데이터 소유권까지 추가한다. 따라서 모듈 경계를 먼저 검증한 뒤 운영상 독립 배포 이익이 분명한 모듈만 분리한다.</p>
 <p>꼬리질문: 패키지 분리만으로 모듈러 모놀리스인가? 아니다. 공개 API와 내부 은닉, 순환 금지, 자동 검증이 필요하다.</p>
-<h3 id="q6-바운디드-컨텍스트가-필요한-신호는"><a class="anchor" href="#q6-바운디드-컨텍스트가-필요한-신호는" aria-hidden="true">#</a>Q6. 바운디드 컨텍스트가 필요한 신호는?</h3>
+</div></details><details class="knowledge-topic"><summary id="q6-바운디드-컨텍스트가-필요한-신호는" aria-label="Q6. 바운디드 컨텍스트가 필요한 신호는? 펼치기"><span class="knowledge-topic-no">06</span><strong role="heading" aria-level="3">Q6. 바운디드 컨텍스트가 필요한 신호는?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>같은 <code>Customer</code>, <code>Order</code>, <code>Status</code>라는 단어가 팀마다 다른 규칙과 생명주기를 뜻하면 경계를 의심한다. 컨텍스트별 유비쿼터스 언어를 코드에 반영하고, 경계 사이에는 변환 모델이나 명시적 계약을 둔다. 전역 공통 모델을 만들면 의미 차이가 nullable 필드와 조건문으로 누적된다.</p>
 <p>꼬리질문: 모든 팀/테이블마다 컨텍스트를 나누나? 아니다. 의미와 변경 이유가 실제로 갈라질 때만 나눈다.</p>
-<h3 id="q7-applicationmodulesverify가-잡는-것은"><a class="anchor" href="#q7-applicationmodulesverify가-잡는-것은" aria-hidden="true">#</a>Q7. <code>ApplicationModules.verify()</code>가 잡는 것은?</h3>
+</div></details><details class="knowledge-topic"><summary id="q7-applicationmodulesverify가-잡는-것은" aria-label="Q7. ApplicationModules.verify()가 잡는 것은? 펼치기"><span class="knowledge-topic-no">07</span><strong role="heading" aria-level="3">Q7. ApplicationModules.verify()가 잡는 것은?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>공식 검증은 모듈 간 순환, 다른 모듈 내부 패키지 접근, 설정한 허용 의존성 위반을 검사한다. 실패하면 예외가 발생하므로 테스트에 넣어 구조 회귀를 막을 수 있다. 업무 불변식이나 DB 정합성 검증을 대신하지는 않는다.</p>
 <p>꼬리질문: 모듈 간 통신을 모두 이벤트로 바꾸면 해결되나? 아니다. 동기 응답이 필요한 공개 API까지 이벤트로 바꾸면 추적성과 일관성 비용이 커진다.</p>
-<h3 id="q8-ddd를-도입하면-안-되는-경우는"><a class="anchor" href="#q8-ddd를-도입하면-안-되는-경우는" aria-hidden="true">#</a>Q8. DDD를 도입하면 안 되는 경우는?</h3>
+</div></details><details class="knowledge-topic"><summary id="q8-ddd를-도입하면-안-되는-경우는" aria-label="Q8. DDD를 도입하면 안 되는 경우는? 펼치기"><span class="knowledge-topic-no">08</span><strong role="heading" aria-level="3">Q8. DDD를 도입하면 안 되는 경우는?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>화면 CRUD와 단순 조회처럼 규칙·상태 전이가 거의 없고 팀 규모도 작다면 풍부한 애그리거트와 다중 매핑은 비용만 늘린다. 이때는 명확한 레이어드 구조와 트랜잭션 서비스가 낫다. 반대로 규칙이 자주 바뀌고 여러 유스케이스에서 충돌하며 용어 합의가 필요한 영역이면 선택 가치가 있다.</p>
 <p>꼬리질문: DDD의 최소 도입 단위는? 전 시스템이 아니라 가장 복잡한 한 바운디드 컨텍스트와 그 안의 핵심 애그리거트부터다.</p>
-<h2 id="9-참고문헌"><a class="anchor" href="#9-참고문헌" aria-hidden="true">#</a>9. 참고문헌</h2>
+</div></details></div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Hexagonal architecture — <a href="https://alistair.cockburn.us/hexagonal-architecture/" target="_blank" rel="noopener">https://alistair.cockburn.us/hexagonal-architecture/</a> — 포트·어댑터의 목적, 외부 장치와 애플리케이션 로직 분리.</li>
 <li>Spring Modulith 개요 — <a href="https://docs.spring.io/spring-modulith/reference/" target="_blank" rel="noopener">https://docs.spring.io/spring-modulith/reference/</a> — Spring Boot 기반 도메인 중심 모듈화와 버전 메타데이터.</li>
@@ -355,9 +358,31 @@ final class JpaOrderRepository implements OrderRepository {
 <li>Transactionality — <a href="https://docs.spring.io/spring-data/jpa/reference/jpa/transactions.html" target="_blank" rel="noopener">https://docs.spring.io/spring-data/jpa/reference/jpa/transactions.html</a> — Repository 기본 트랜잭션과 여러 Repository를 묶는 서비스 경계.</li>
 <li>Jakarta Persistence 3.2 Specification — <a href="https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2.html" target="_blank" rel="noopener">https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2.html</a> — Entity·Embeddable 및 ORM 매핑 규격.</li>
 </ul>
-
+</div></details></div><script>
+(() => {
+  const reveal = (hash) => {
+    if (!hash || hash.length < 2) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    let parent = target?.closest('details.knowledge-topic, details.knowledge-chapter');
+    while (parent) {
+      parent.open = true;
+      parent = parent.parentElement?.closest('details.knowledge-topic, details.knowledge-chapter');
+    }
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }));
+  };
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (link) reveal(link.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => reveal(location.hash));
+  reveal(location.hash);
+})();
+</script>
 
 </main>
+
 
 </body>
 </html>
