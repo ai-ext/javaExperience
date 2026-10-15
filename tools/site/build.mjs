@@ -135,17 +135,21 @@ function autolinkDocIds(html, abs) {
 // ---------------------------------------------------------------- 결과 테스트 프롬프트
 function promptTemplate(lv) {
   const mdPath = rel(lv.abs);
+  const db = lv.db || lv.chapter.db || 'community';
+  const dbNote = db === 'practice'
+    ? "\n이 단계는 학습용 DB(practice)를 쓴다. 앱이 practice 프로파일로 떠 있어야 한다(README의 \"학습용 데이터로 앱 실행\"). 아니면 그 방법만 알려 주고 멈춰라."
+    : '';
   return `[javaExperience 결과 테스트] ${lv.id}. ${lv.title}
 레포 경로: {{REPO}}
 서버 주소: {{BASE}}
 
-너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.
+너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.${dbNote}
 지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.
 
 1. {{REPO_STEP}} \`${mdPath}\` 를 읽어라. 그 파일의 "채점 기준" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.
 2. \`curl -s -o /dev/null -w '%{http_code}' {{BASE}}/\` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 "실행" 방법만 알려 주고 멈춰라.
 3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 "직접 확인"에 있는 curl 명령을 그대로 쓰되 \`BASE\`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 \`-i\`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.
-4. D 항목(DB)은 레포 루트에서 \`docker compose exec -T mysql mysql -ucommunity -pcommunity community -e "<SELECT 문>"\` 으로 조회만 해라. "요청 전후"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.
+4. D 항목(DB)은 레포 루트에서 \`docker compose exec -T mysql mysql -ucommunity -pcommunity ${db} -e "<SELECT 문>"\` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). "요청 전후"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.
 5. T 항목(테스트)은 레포 루트에서 표에 적힌 \`./gradlew test --tests ...\` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.
 6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 \`파일:줄\`을 붙여라.
 7. 아래 형식으로만 답해라.

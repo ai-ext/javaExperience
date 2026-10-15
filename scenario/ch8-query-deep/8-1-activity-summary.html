@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>8-1. 회원별 활동 요약 — LEFT JOIN과 집계</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 8장. 쿼리 심화 — 학습용 데이터(practice) › 8-1</p>
+<h1 id="8-1-회원별-활동-요약--left-join과-집계"><a class="anchor" href="#8-1-회원별-활동-요약--left-join과-집계" aria-hidden="true">#</a>8-1. 회원별 활동 요약 — LEFT JOIN과 집계</h1>
+<blockquote>
+<p><strong>8장은 학습용 DB(<code>practice</code>)를 쓴다.</strong> 앱을 <code>./gradlew bootRun --args=&#39;--spring.profiles.active=practice&#39;</code>로 띄운다(IntelliJ: Active profiles에 <code>practice</code>). 회원 30명·글 145·좋아요 568에 함정이 섞여 있다(<a href="../../practice/MISSIONS.html">학습용 미션</a>의 &quot;데이터에 숨겨 둔 함정&quot;). 토큰은 <code>tok-p01</code><del><code>tok-p30</code>(번호 = 회원 id), 운영자는 <code>tok-p01</code>. 2</del>6장에서 만든 API와 규칙(볼 수 있는 글만 등)이 그대로 동작한다고 가정한다.</p>
+</blockquote>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<blockquote>
+<p>&quot;관리자 화면에 회원별 활동 요약 표를 넣어 주세요. 쓴 글, 쓴 댓글, 받은 좋아요, 누른 좋아요요. 활동이 없는 회원도 0으로 나와야 해요.&quot;</p>
+</blockquote>
+<p>여러 테이블을 묶어 세는 <strong>집계 쿼리</strong>다. 8장부터는 순서를 바꾼다. <strong>SQL을 먼저 완성하고</strong>(CloudBeaver의 <code>practice (학습용)</code> 연결), 그다음 API로 옮긴다.</p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>메서드·경로</td>
+<td><code>GET /api/stats/member-activity</code></td>
+</tr>
+<tr>
+<td>인증</td>
+<td>필요 없음</td>
+</tr>
+<tr>
+<td>응답</td>
+<td>회원 30명 전부의 배열, <code>likesReceived</code> 많은 순, 같으면 <code>memberId</code> 작은 순</td>
+</tr>
+<tr>
+<td>SQL 파일</td>
+<td>먼저 짠 SQL을 <code>sql/8-1-member-activity.sql</code>(레포 루트의 <code>sql/</code> 폴더)에 남긴다 — 리뷰에 쓴다</td>
+</tr>
+</tbody></table></div>
+<pre><code class="language-json">[ { &quot;memberId&quot;: 2, &quot;nickname&quot;: &quot;코딩하는고양이&quot;, &quot;posts&quot;: 13, &quot;comments&quot;: 13, &quot;likesReceived&quot;: 74, &quot;likesGiven&quot;: 18 } ]</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>칸</th>
+<th>세는 것</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>posts</code></td>
+<td>그 회원이 쓴 글 중 <code>PUBLISHED</code>이고 삭제되지 않은 글</td>
+</tr>
+<tr>
+<td><code>comments</code></td>
+<td>그 회원이 쓴 댓글 중 삭제되지 않았고, 달린 글도 삭제되지 않은 것</td>
+</tr>
+<tr>
+<td><code>likesReceived</code></td>
+<td>그 회원이 쓴 <strong>삭제되지 않은 글</strong>에 달린 좋아요 <strong>행 수</strong>(<code>post.like_count</code>가 아니다)</td>
+</tr>
+<tr>
+<td><code>likesGiven</code></td>
+<td>그 회원이 누른 좋아요 행 수</td>
+</tr>
+<tr>
+<td><code>nickname</code></td>
+<td>탈퇴(<code>WITHDRAWN</code>) 회원은 <code>&quot;탈퇴한 회원&quot;</code></td>
+</tr>
+</tbody></table></div>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">BASE=http://localhost:8080
+curl -s &quot;$BASE/api/stats/member-activity&quot; | python3 -c '
+import sys,json; d=json.load(sys.stdin); print(len(d))
+for r in d[:5]: print(r)
+print([r for r in d if r[&quot;memberId&quot;] in (12, 26, 29, 30)])'</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), R = 코드 리뷰(피드백용). 값은 (memberId, nickname, posts, comments, likesReceived, likesGiven) 순서다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>위 요청</td>
+<td><code>200</code>, 30개</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>앞 5개</td>
+<td><code>(2, 코딩하는고양이, 13, 13, 74, 18)</code> <code>(4, 스프링요정, 19, 19, 60, 23)</code> <code>(3, 자바초보탈출, 12, 16, 55, 15)</code> <code>(5, 쿼리장인, 9, 14, 40, 12)</code> <code>(22, 야근없는팀, 5, 10, 39, 24)</code></td>
+</tr>
+<tr>
+<td>C3</td>
+<td>회원 30 / 26 / 29</td>
+<td><code>(30, 새로온회원, 0, 0, 0, 0)</code> / <code>(26, 조용한독자, 0, 9, 0, 23)</code> / <code>(29, 탈퇴한 회원, 3, 10, 13, 14)</code></td>
+</tr>
+<tr>
+<td>C4</td>
+<td>회원 12</td>
+<td><code>(12, …, 6, 12, 10, 29)</code> — <code>likesReceived</code>가 10이다(<code>like_count</code>를 더하면 9가 나와 틀린다)</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>SQL 파일</td>
+<td><code>sql/8-1-member-activity.sql</code>이 있고, API가 같은 결과를 낸다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>곱해지는 JOIN</td>
+<td>글·댓글·좋아요를 한 번에 LEFT JOIN 한 뒤 <code>COUNT</code>하면 행이 곱해져 숫자가 부풀어 오른다(회원 2만 해도 182가 나온다). 서브쿼리나 미리 집계한 파생 테이블로 피했다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>쿼리 수</td>
+<td>회원마다 쿼리를 따로 날리지 않는다(30명 × 4 = 120번). 한두 번의 쿼리로 끝낸다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>방식 선택</td>
+<td>이런 통계는 엔티티 조회보다 네이티브 SQL·JPQL DTO 조회·QueryDSL 프로젝션이 맞다. 고른 이유를 설명할 수 있다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/R04-sql-crud-join.html">R04 SQL로 데이터 다루기 — JOIN·집계</a></li>
+<li><a href="../../docs/knowledge/W03-db-access-comparison.html">W03 DB 접근 방식 총비교</a> — 엔티티 vs DTO vs 네이티브</li>
+<li><a href="../../docs/knowledge/W05-jpa-vs-mybatis-strategy.html">W05 JPA vs MyBatis</a> — 통계 쿼리를 어디서 짜나</li>
+<li><a href="../../docs/knowledge/S10-spring-data-query.html#query는-선언-시점에-쿼리를-분리한다">S10 — <code>@Query</code>는 선언 시점에 쿼리를 분리한다</a></li>
+</ul>
+<h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
+<details>
+<summary>힌트 — 곱해지지 않게</summary>
+
+<p><code>member</code>를 기준으로 두고, 각 숫자를 상관 서브쿼리 <code>(SELECT COUNT(*) FROM ... WHERE ... = m.id)</code>로 따로 세거나, <code>(SELECT author_id, COUNT(*) cnt FROM post ... GROUP BY author_id) p</code>처럼 미리 집계한 결과를 LEFT JOIN한 뒤 <code>COALESCE(p.cnt, 0)</code>. 결과는 <code>record</code>/인터페이스 프로젝션으로 받는다.</p>
+</details>
+
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="8-2-popular-ranking.html">8-2. 최근 N일 인기글 랭킹</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 8-1. 회원별 활동 요약 — LEFT JOIN과 집계\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n이 단계는 학습용 DB(practice)를 쓴다. 앱이 practice 프로파일로 떠 있어야 한다(README의 \"학습용 데이터로 앱 실행\"). 아니면 그 방법만 알려 주고 멈춰라.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch8-query-deep/8-1-activity-summary.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity practice -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="../ch7-tests/7-3-integration.html">← 이전 7-3. 통합 테스트 — Testcontainers</a><a href="8-2-popular-ranking.html">다음 → 8-2. 최근 N일 인기글 랭킹 — 조건부 집계와 고정 시계</a></nav>
+</main>
+
+</body>
+</html>

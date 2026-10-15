@@ -63,7 +63,7 @@ docker compose down -v && docker compose up -d   # 데이터를 처음 상태로
 
 **R4. 정렬·페이지**: 최신순 = `published_at DESC, id DESC`(동시각 대비). 목록은 커서(keyset) 페이지네이션.
 
-**R5. 로그인 대신** 요청 헤더 `X-Member-Id: 7`로 회원을 정한다(인증은 나중에).
+**R5. 로그인 대신** 요청 헤더 `X-Member-Id: 7`로 회원을 정한다. 1-6처럼 토큰을 쓰고 싶으면 `Authorization: Bearer tok-p07`(번호 = 회원 id, `tok-p01`~`tok-p30`)도 들어 있다. 이 미션 일부는 채점할 수 있는 단계로 [시나리오 8장](../scenario/ch8-query-deep/8-1-activity-summary.md)에 옮겨 두었다.
 
 ## 데이터에 숨겨 둔 함정
 

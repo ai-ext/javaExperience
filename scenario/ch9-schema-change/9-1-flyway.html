@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>9-1. Flyway 도입 — 지금 스키마를 기준선으로</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 9장. 스키마 변경 — 데이터가 이미 있을 때 › 9-1</p>
+<h1 id="9-1-flyway-도입--지금-스키마를-기준선으로"><a class="anchor" href="#9-1-flyway-도입--지금-스키마를-기준선으로" aria-hidden="true">#</a>9-1. Flyway 도입 — 지금 스키마를 기준선으로</h1>
+<blockquote>
+<p><strong>9장은 학습용 DB(<code>practice</code>)로 채점한다.</strong> 앱을 <code>practice</code> 프로파일로 띄운다(8-1 참고). 9장에서 만드는 마이그레이션은 <code>community</code>에도 똑같이 적용된다(두 DB는 같은 스키마). 스키마를 처음으로 되돌리려면 <code>docker compose down -v &amp;&amp; docker compose up -d</code>.</p>
+</blockquote>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p>지금까지 테이블은 Docker가 처음 뜰 때 dump로 만들었다. 운영 DB는 그렇게 다시 만들 수 없다. 데이터가 이미 있기 때문이다. 앞으로 스키마를 바꾸려면 <strong>&quot;어떤 변경이 어느 DB에 적용됐는지&quot;를 기록하면서 순서대로</strong> 적용해야 한다. 그 일을 하는 도구가 Flyway다.</p>
+<p>이미 테이블과 데이터가 있는 DB에 Flyway를 붙이는 것부터 한다. 지금 스키마를 <strong>V1(기준선)</strong> 으로 정하고, 이미 있는 DB에서는 V1을 건너뛰게 한다.</p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>할 일</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>의존성</td>
+<td><code>implementation &#39;org.springframework.boot:spring-boot-starter-flyway&#39;</code> + <code>runtimeOnly &#39;org.flywaydb:flyway-mysql&#39;</code>(버전은 Boot가 관리, Flyway 12.4)</td>
+</tr>
+<tr>
+<td>V1</td>
+<td><code>src/main/resources/db/migration/V1__init.sql</code> — 지금 스키마(테이블만, 데이터 없음). 아래 명령으로 만든 뒤 앞에 <code>SET FOREIGN_KEY_CHECKS = 0;</code>, 끝에 <code>SET FOREIGN_KEY_CHECKS = 1;</code>을 붙인다</td>
+</tr>
+<tr>
+<td>기존 DB</td>
+<td><code>spring.flyway.baseline-on-migrate: true</code>, <code>baseline-version: 1</code> — 테이블이 이미 있는 DB는 V1을 실행하지 않고 &quot;V1까지 됐다&quot;고만 기록한다</td>
+</tr>
+<tr>
+<td>JPA</td>
+<td><code>ddl-auto: validate</code> 그대로 — 스키마는 Flyway만 바꾼다</td>
+</tr>
+<tr>
+<td>테스트</td>
+<td>빈 DB에 Flyway가 V1을 실행한 <strong>다음</strong> 시드 데이터가 들어가야 한다. <code>application-test.yml</code>의 <code>spring.sql.init</code>을 지우고, 시드 데이터를 테스트 전용 마이그레이션 <code>src/test/resources/db/testdata/V1_1__community_seed.sql</code>로 옮긴 뒤 <code>spring.flyway.locations: classpath:db/migration,classpath:db/testdata</code></td>
+</tr>
+</tbody></table></div>
+<pre><code class="language-bash"># V1: 테이블 구조만
+docker compose exec -T mysql mysqldump -uroot -proot --no-data --compact --skip-add-drop-table community \
+  &gt; src/main/resources/db/migration/V1__init.sql
+# 테스트 시드: 데이터만
+docker compose exec -T mysql mysqldump -uroot -proot --no-create-info --compact --skip-extended-insert community \
+  &gt; src/test/resources/db/testdata/V1_1__community_seed.sql</code></pre>
+<p>시드 dump에는 다른 장에서 쌓인 채점 데이터가 섞이지 않도록 <strong>DB를 초기화한 직후</strong>에 뜬다(<code>docker compose down -v &amp;&amp; docker compose up -d</code>). 데이터 파일 앞에도 <code>SET FOREIGN_KEY_CHECKS = 0;</code>을 붙인다.</p>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<pre><code class="language-bash">./gradlew bootRun --args='--spring.profiles.active=practice'      # 로그에 &quot;Successfully baselined schema with version: 1&quot;
+docker compose exec -T mysql mysql -ucommunity -pcommunity practice -e &quot;SELECT installed_rank, version, type, success FROM flyway_schema_history&quot;
+./gradlew test</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>D = DB 확인(필수, SELECT만), T = 테스트 실행(필수), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>D1</td>
+<td><code>SELECT version, type, success FROM flyway_schema_history ORDER BY installed_rank LIMIT 1</code></td>
+<td><code>1</code>, <code>BASELINE</code>, <code>1</code></td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT COUNT(*) FROM post</code></td>
+<td><code>145</code> 이상 — 기존 데이터가 그대로 있다(V1이 기존 DB에서 실행되지 않았다)</td>
+</tr>
+<tr>
+<td>T1</td>
+<td><code>./gradlew test</code></td>
+<td>통과 — 빈 테스트 DB에서는 V1이 실제로 실행되고 그 위에 시드가 들어간다</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>한 가지 도구</td>
+<td>스키마를 만드는 길이 Flyway 하나다. <code>spring.sql.init</code>·<code>ddl-auto: update/create</code>가 함께 쓰이지 않는다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>기준선</td>
+<td>왜 <code>baseline-on-migrate</code>가 필요한지(이미 있는 DB에서 V1의 <code>CREATE TABLE</code>이 실패) 설명할 수 있다</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>고치지 않기</td>
+<td>적용된 마이그레이션 파일은 고치지 않고 새 버전을 추가한다는 규칙과 그 이유(체크섬 검증)를 안다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>테스트 데이터 위치</td>
+<td>시드 데이터가 운영용 마이그레이션 폴더(<code>db/migration</code>)에 섞이지 않았다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/S11-cache-redis-migration.html">S11 캐시·Redis·DB 마이그레이션</a> — Flyway의 원리</li>
+<li><a href="../../docs/knowledge/P19-mysql-jpa-setup.html#24-ddl-auto는-환경별-정책이다">P19 — <code>ddl-auto</code>는 환경별 정책이다</a></li>
+<li><a href="../../docs/knowledge/V04-test-db-strategy.html">V04 테스트 DB 전략</a></li>
+<li><a href="../../docs/knowledge/R07-backup-restore.html">R07 백업과 복원</a> — 스키마를 바꾸기 전에</li>
+</ul>
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p><a href="9-2-index-explain.html">9-2. 인덱스와 실행 계획</a></p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 9-1. Flyway 도입 — 지금 스키마를 기준선으로\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n이 단계는 학습용 DB(practice)를 쓴다. 앱이 practice 프로파일로 떠 있어야 한다(README의 \"학습용 데이터로 앱 실행\"). 아니면 그 방법만 알려 주고 멈춰라.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch9-schema-change/9-1-flyway.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity practice -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="../ch8-query-deep/8-5-recount-batch.html">← 이전 8-5. 정합성 배치 — 어긋난 숫자 찾아 고치기</a><a href="9-2-index-explain.html">다음 → 9-2. 인덱스와 실행 계획</a></nav>
+</main>
+
+</body>
+</html>

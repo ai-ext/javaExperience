@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>9-5. 서비스를 멈추지 않는 이름 변경 — expand와 contract</title>
+<link rel="stylesheet" href="../../tools/site/site.css">
+</head>
+<body>
+<header class="topbar"><a href="../../README.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+<p class="crumbs"><a href="../README.html">시나리오</a> › 9장. 스키마 변경 — 데이터가 이미 있을 때 › 9-5</p>
+<h1 id="9-5-서비스를-멈추지-않는-이름-변경--expand와-contract"><a class="anchor" href="#9-5-서비스를-멈추지-않는-이름-변경--expand와-contract" aria-hidden="true">#</a>9-5. 서비스를 멈추지 않는 이름 변경 — expand와 contract</h1>
+<blockquote>
+<p>학습용 DB(<code>practice</code>) — 앱을 <code>practice</code> 프로파일로 띄운다.</p>
+</blockquote>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<blockquote>
+<p>&quot;<code>bookmark.memo</code> 컬럼 이름을 <code>note</code>로 바꾸기로 했어요. 근데 서버를 멈출 수는 없어요.&quot;</p>
+</blockquote>
+<p><code>ALTER TABLE … RENAME COLUMN</code> 한 줄이면 이름은 바뀐다. 문제는 <strong>배포하는 동안</strong> 생긴다. 서버가 여러 대면 새 코드와 옛 코드가 잠깐 함께 돈다. 이름을 바꾸는 순간 옛 서버는 <code>memo</code>를 찾다가 전부 실패한다.</p>
+<p>그래서 이름 변경을 <strong>넓히기(expand) → 옮기기 → 좁히기(contract)</strong> 로 나눠 배포한다. 그리고 바깥 계약(API JSON의 <code>memo</code> 필드)은 바뀌지 않는다는 것도 확인한다. 컬럼 이름과 API 필드 이름은 다른 것이다.</p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>순서</th>
+<th>마이그레이션·코드</th>
+<th>그 시점에 옛 서버는?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1. 넓히기</td>
+<td><code>V5__add_bookmark_note.sql</code> — <code>note VARCHAR(200) NULL</code> 추가 + <code>UPDATE bookmark SET note = memo</code></td>
+<td><code>memo</code>만 읽고 쓴다 — 문제없음</td>
+</tr>
+<tr>
+<td>2. 양쪽 쓰기</td>
+<td>코드: 쓸 때 <code>memo</code>와 <code>note</code>에 <strong>둘 다</strong> 쓰고, 읽을 때는 <code>note</code>를 읽는다</td>
+<td>옛 서버가 <code>memo</code>에 쓴 값도 남아 있다</td>
+</tr>
+<tr>
+<td>3. 다시 채우기</td>
+<td>2를 배포하는 동안 옛 서버가 <code>memo</code>에만 쓴 행을 맞춘다 — <code>V6</code>에 <code>UPDATE bookmark SET note = memo WHERE note IS NULL AND memo IS NOT NULL</code></td>
+<td>모든 서버가 새 코드</td>
+</tr>
+<tr>
+<td>4. 좁히기</td>
+<td><code>V6__drop_bookmark_memo.sql</code> — 3의 UPDATE 다음에 <code>ALTER TABLE bookmark DROP COLUMN memo</code>. 코드에서 <code>memo</code> 매핑 제거</td>
+<td>없음</td>
+</tr>
+</tbody></table></div>
+<p>실습에서는 서버가 한 대라 V5와 V6을 차례로 적용하면 된다. 다만 <strong>V5와 V6은 반드시 따로</strong>(한 파일에 합치지 않는다) 두고, 2의 코드가 V6 전에도 동작하게 만든다.</p>
+<ul>
+<li>API(6-1·6-3)의 JSON 필드 이름은 계속 <code>memo</code>다.</li>
+</ul>
+<h2 id="직접-확인"><a class="anchor" href="#직접-확인" aria-hidden="true">#</a>직접 확인</h2>
+<p>학습용 DB에는 메모가 있는 북마크가 51개 있다. 9번 북마크(회원 10)의 메모는 <code>예제 따라 해 보기</code>.</p>
+<pre><code class="language-bash">BASE=http://localhost:8080
+T='Authorization: Bearer tok-p10'; J='Content-Type: application/json'
+curl -s -H &quot;$T&quot; &quot;$BASE/api/me/bookmarks?size=100&quot; | python3 -c 'import sys,json; print([(i[&quot;bookmarkId&quot;], i[&quot;memo&quot;]) for i in json.load(sys.stdin)[&quot;items&quot;] if i[&quot;bookmarkId&quot;] == 9])'   # Q1
+curl -s -X PUT &quot;$BASE/api/posts/2/bookmark&quot; -H &quot;$T&quot; -H &quot;$J&quot; -d '{&quot;memo&quot;:&quot;[채점] 이름 변경 뒤&quot;}'; echo                                                                    # Q2</code></pre>
+<h2 id="채점-기준"><a class="anchor" href="#채점-기준" aria-hidden="true">#</a>채점 기준</h2>
+<p>C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피드백용).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>확인 방법</th>
+<th>기대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>D1</td>
+<td><code>SELECT GROUP_CONCAT(column_name ORDER BY column_name) FROM information_schema.columns WHERE table_schema = &#39;practice&#39; AND table_name = &#39;bookmark&#39; AND column_name IN (&#39;memo&#39;, &#39;note&#39;)</code></td>
+<td><code>note</code> — <code>memo</code>는 없다</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>SELECT note FROM bookmark WHERE id = 9</code></td>
+<td><code>예제 따라 해 보기</code> — 옛 값이 옮겨졌다</td>
+</tr>
+<tr>
+<td>D3</td>
+<td><code>SELECT COUNT(*) FROM bookmark WHERE note IS NOT NULL</code></td>
+<td><code>51</code> 이상</td>
+</tr>
+<tr>
+<td>D4</td>
+<td><code>SELECT GROUP_CONCAT(version ORDER BY installed_rank) FROM flyway_schema_history WHERE success = 1</code></td>
+<td><code>1,2,3,4,5,6</code>(앞에 <code>1</code>은 기준선) — V5·V6이 따로 있다</td>
+</tr>
+<tr>
+<td>C1</td>
+<td>Q1</td>
+<td><code>[(9, &#39;예제 따라 해 보기&#39;)]</code> — API 필드 이름은 여전히 <code>memo</code></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>Q2</td>
+<td><code>200</code>, <code>memo</code>=<code>[채점] 이름 변경 뒤</code></td>
+</tr>
+<tr>
+<td>D5</td>
+<td>Q2 뒤 <code>SELECT note FROM bookmark WHERE member_id = 10 AND post_id = 2</code></td>
+<td><code>[채점] 이름 변경 뒤</code></td>
+</tr>
+<tr>
+<td>R1</td>
+<td>단계 이유</td>
+<td>한 번에 이름을 바꾸면 배포 중에 무엇이 깨지는지, 각 단계가 그걸 어떻게 막는지 설명할 수 있다</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>양쪽 쓰기 흔적</td>
+<td>2단계(양쪽 쓰기) 코드를 거쳤다는 것이 커밋 기록이나 설명으로 남아 있다(바로 4단계로 건너뛰지 않았다)</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>계약 분리</td>
+<td>DTO 필드(<code>memo</code>)와 엔티티 컬럼(<code>note</code>)이 분리되어 있어서 API 사용자는 아무것도 바꿀 필요가 없다</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>되돌리기</td>
+<td>4단계(DROP) 뒤에는 데이터 없이 되돌릴 수 없다는 것과, 그 전에 백업·확인을 하는 이유를 안다</td>
+</tr>
+</tbody></table></div>
+<h2 id="필요한-지식"><a class="anchor" href="#필요한-지식" aria-hidden="true">#</a>필요한 지식</h2>
+<ul>
+<li><a href="../../docs/knowledge/S11-cache-redis-migration.html">S11 캐시·Redis·DB 마이그레이션</a></li>
+<li><a href="../../docs/knowledge/D06-deployment-concepts.html">D06 배포 개념</a> — 무중단 배포(롤링)</li>
+<li><a href="../../docs/knowledge/W09-why-dto.html">W09 DTO는 왜 쓰나</a> — 저장 구조와 API 계약 분리</li>
+<li><a href="../../docs/knowledge/R07-backup-restore.html">R07 백업과 복원</a></li>
+</ul>
+<h2 id="다음-단계"><a class="anchor" href="#다음-단계" aria-hidden="true">#</a>다음 단계</h2>
+<p>끝. 9장까지 오면 API를 만들고, 쿼리를 키우고, 데이터가 이미 있는 DB의 구조를 안전하게 바꾸는 데까지 해 본 것이다.</p>
+
+<section class="grader" id="result-test">
+  <h2>결과 테스트 프롬프트</h2>
+  <p>다 만들었으면 <strong>서버를 띄운 채로</strong> 아래 프롬프트를 복사해 Claude Code에 붙여 넣으세요. Claude가 API를 직접 호출하고 DB를 조회한 뒤 채점표와 피드백을 줍니다. 코드는 고치지 않습니다.</p>
+  <div class="grader-inputs">
+    <label>레포 경로 <input id="repo" autocomplete="off" placeholder="비워 두면 Claude를 연 폴더(레포 루트)를 쓴다 — 예: ~/IdeaProjects/javaExperience"></label>
+    <label>서버 주소 <input id="base" autocomplete="off" placeholder="http://localhost:8080"></label>
+  </div>
+  <textarea id="prompt" readonly rows="20" aria-label="결과 테스트 프롬프트"></textarea>
+  <div class="grader-actions"><button type="button" id="copy">프롬프트 복사</button><span id="copied" role="status"></span></div>
+  <script type="application/json" id="prompt-template">"[javaExperience 결과 테스트] 9-5. 서비스를 멈추지 않는 이름 변경 — expand와 contract\n레포 경로: {{REPO}}\n서버 주소: {{BASE}}\n\n너는 이 레포로 Spring Boot 백엔드를 배우는 사람의 리뷰어다.\n이 단계는 학습용 DB(practice)를 쓴다. 앱이 practice 프로파일로 떠 있어야 한다(README의 \"학습용 데이터로 앱 실행\"). 아니면 그 방법만 알려 주고 멈춰라.\n지킬 것: 코드는 절대 수정하지 마라. DB는 SELECT만 한다. 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.\n\n1. {{REPO_STEP}} `scenario/ch9-schema-change/9-5-expand-contract.md` 를 읽어라. 그 파일의 \"채점 기준\" 표가 통과/실패의 유일한 기준이다. 표에 없는 것으로 실패 처리하지 말고, 다른 단계의 기준은 보지 마라.\n2. `curl -s -o /dev/null -w '%{http_code}' {{BASE}}/` 로 서버가 응답하는지 확인해라(000이면 꺼진 것). 꺼져 있으면 README의 \"실행\" 방법만 알려 주고 멈춰라.\n3. C 항목(HTTP)을 표의 순서대로 확인해라. 요청은 단계 파일 \"직접 확인\"에 있는 curl 명령을 그대로 쓰되 `BASE`만 위 서버 주소로 바꾼다(본문·제목의 [채점] 접두어는 그대로). 응답은 `-i`로 헤더까지 받아 상태코드·헤더·본문을 기대값과 비교해라.\n4. D 항목(DB)은 레포 루트에서 `docker compose exec -T mysql mysql -ucommunity -pcommunity practice -e \"\u003cSELECT 문>\"` 으로 조회만 해라(SELECT·SHOW·EXPLAIN만, 바꾸는 문장 금지). \"요청 전후\"를 비교하는 항목은 해당 C 요청을 보내기 전에 먼저 조회해 둔다.\n5. T 항목(테스트)은 레포 루트에서 표에 적힌 `./gradlew test --tests ...` 명령을 실행해 통과 여부를 본다. 실패하면 실패한 테스트 이름과 이유를 적는다. 테스트 코드도 고치지 마라.\n6. R 항목(코드 리뷰)은 관련 코드를 찾아 읽고 판단해라. 지적할 때는 `파일:줄`을 붙여라.\n7. 아래 형식으로만 답해라.\n   ① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)\n   ② 잘한 점\n   ③ 부족한 점과 이유 — 실패한 C·D·T 항목부터\n   ④ 다음 단계 전에 고칠 것 — 우선순위순, 3개 이내\n   ⑤ 더 볼 문서 — 단계 파일의 \"필요한 지식\" 중 부족한 점과 관련된 것만(파일 경로로)\n   마지막 줄: `결과: 필수 N/M 통과` (필수 = C·D·T 항목)"</script>
+</section>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const tpl = JSON.parse($('prompt-template').textContent);
+  const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                  set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  $('repo').value = store.get('jx.repo');
+  $('base').value = store.get('jx.base');
+  function fill() {
+    const repo = $('repo').value.trim();
+    const base = ($('base').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+    $('prompt').value = tpl
+      .replaceAll('{{REPO}}', repo || '(Claude를 연 폴더 = 레포 루트)')
+      .replaceAll('{{REPO_STEP}}', repo ? '레포 경로로 이동(cd)한 뒤' : '지금 작업 폴더(레포 루트)에서')
+      .replaceAll('{{BASE}}', base);
+    store.set('jx.repo', repo);
+    store.set('jx.base', $('base').value.trim());
+  }
+  $('repo').addEventListener('input', fill);
+  $('base').addEventListener('input', fill);
+  fill();
+  $('copy').addEventListener('click', async () => {
+    const text = $('prompt').value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+    if (!ok) { $('prompt').select(); try { ok = document.execCommand('copy'); } catch {} }
+    $('copied').textContent = ok ? '복사했어요. Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 위 칸을 전체 선택(⌘A)해서 복사하세요.';
+  });
+})();
+</script>
+<nav class="pager"><a href="9-4-notifications.html">← 이전 9-4. 새 테이블과 API — 알림</a><span></span></nav>
+</main>
+
+</body>
+</html>
