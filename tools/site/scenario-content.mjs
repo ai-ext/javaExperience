@@ -34,12 +34,24 @@ function widget(item) {
     return `<div class="mock-actions" ${focus}>${buttons}</div>`;
   }
   if (type === 'chips') return `<div class="mock-chip-group" ${focus}>${heading}${(item.items || []).map((chip) => `<span class="mock-chip">${esc(valueText(chip))}</span>`).join('')}</div>`;
-  if (type === 'stats' || type === 'list') {
+  if (type === 'list') {
     const items = (item.items || []).map((entry) => {
-      if (entry && typeof entry === 'object') return `<div class="mock-${type}-item" ${entry.id ? `data-screen-id="${esc(entry.id)}"` : ''}><span>${esc(entry.label || entry.title || entry.name || '')}</span><strong>${esc(valueText(entry.value ?? entry.right ?? entry.text ?? ''))}</strong></div>`;
-      return `<div class="mock-${type}-item"><span>${esc(valueText(entry))}</span></div>`;
+      if (entry && typeof entry === 'object') {
+        const title = entry.title || entry.label || entry.name || valueText(entry.value ?? entry.text ?? '');
+        const meta = entry.meta || '';
+        const badge = entry.badge || entry.right || '';
+        return `<div class="mock-list-item tone-${esc(entry.tone || 'default')}" ${entry.id ? `data-screen-id="${esc(entry.id)}"` : ''}><span class="mock-list-main"><strong>${esc(title)}</strong>${meta ? `<small>${esc(valueText(meta))}</small>` : ''}</span>${badge ? `<span class="mock-list-badge">${esc(valueText(badge))}</span>` : ''}</div>`;
+      }
+      return `<div class="mock-list-item"><span class="mock-list-main"><strong>${esc(valueText(entry))}</strong></span></div>`;
     }).join('');
-    return `<div class="mock-${type}" ${focus}>${heading}${items}</div>`;
+    return `<div class="mock-list" ${focus}>${heading}${items}</div>`;
+  }
+  if (type === 'stats') {
+    const items = (item.items || []).map((entry) => {
+      if (entry && typeof entry === 'object') return `<div class="mock-stats-item" ${entry.id ? `data-screen-id="${esc(entry.id)}"` : ''}><span>${esc(entry.label || entry.title || entry.name || '')}</span><strong>${esc(valueText(entry.value ?? entry.right ?? entry.text ?? ''))}</strong></div>`;
+      return `<div class="mock-stats-item"><span>${esc(valueText(entry))}</span></div>`;
+    }).join('');
+    return `<div class="mock-stats" ${focus}>${heading}${items}</div>`;
   }
   if (type === 'code') return `<div class="mock-code" ${focus}>${heading}<pre>${esc(value)}</pre></div>`;
   if (type === 'toast') return `<div class="mock-toast tone-${esc(item.tone || 'neutral')}" ${focus}><span class="mock-toast-icon" aria-hidden="true">${item.tone === 'error' ? '!' : item.tone === 'success' ? '✓' : 'i'}</span><span>${esc(value)}</span></div>`;
@@ -64,26 +76,53 @@ function architectureNodes(step, context = {}) {
   else if (/jpa|hibernate/i.test(knownText)) detected.push('jpa');
   else if (/repository|레포지토리/i.test(knownText)) detected.push('repository');
   if (/mysql|my\s*sql|database|데이터베이스|테이블/i.test(knownText)) detected.push('mysql');
-  return detected.length ? detected : ['controller'];
+  if (/server|서버/i.test(knownText) && !detected.length) detected.push('server');
+  return detected;
+}
+
+function implementationRoute(files, scene) {
+  if (!Array.isArray(files) || !files.length) return '';
+  const groups = [
+    ['Scheduler / 배치', 'Scheduler'], ['Controller / 요청', 'Controller'],
+    ['DTO', 'DTO'], ['Service / 규칙', 'Service'],
+    ['Repository / DB 접근', 'Repository'], ['MyBatis / Mapper', 'MyBatis Mapper'],
+    ['MyBatis / XML', 'MyBatis SQL'],
+  ];
+  const stages = groups.map(([role, label]) => {
+    const names = [...new Set(files.filter((file) => roleOf(file) === role)
+      .map((file) => path.basename(file.path)))];
+    return names.length ? { label, names } : null;
+  }).filter(Boolean);
+  if (!stages.length) {
+    const fileCards = files.map((file) => `<div class="implementation-node"><strong>${esc(roleOf(file))}</strong><small>${esc(file.path)}</small></div>`).join('');
+    return `<section class="implementation-route" aria-label="이번 단계 작업 파일"><div class="implementation-route-heading"><div><span class="scenario-kicker">실제 정답 파일 기준</span><h5>이번 단계 작업 파일</h5></div><a href="#전체-구현-코드">코드 보기 ↗</a></div><div class="implementation-nodes">${fileCards}</div><p class="implementation-disclaimer">이 단계는 API 요청 계층보다 파일·SQL·테스트 작업을 중심으로 진행합니다.</p></section>`;
+  }
+  const jpa = files.some((file) => /extends\s+(?:JpaRepository|CrudRepository)|@PersistenceContext|EntityManager\b/.test(file.content || ''));
+  const hasDb = (scene.flows || []).some((flow) => (flow.steps || []).some((step) => step.kind === 'db'));
+  if (jpa) stages.push({ label: 'JPA · 영속성 컨텍스트', names: ['런타임 · Repository 구현 뒤에서 동작'] });
+  if (hasDb) stages.push({ label: 'MySQL', names: ['시나리오 SQL의 대상 DB'] });
+  const entities = [...new Set(files.filter((file) => roleOf(file) === 'Entity').map((file) => path.basename(file.path)))];
+  const cards = stages.map((stage, index) => `${index ? '<span class="implementation-arrow" aria-hidden="true">→</span>' : ''}<div class="implementation-node"><strong>${esc(stage.label)}</strong><small>${stage.names.map(esc).join(' · ')}</small></div>`).join('');
+  return `<section class="implementation-route" aria-label="완성 코드의 역할별 구성"><div class="implementation-route-heading"><div><span class="scenario-kicker">실제 정답 파일 기준</span><h5>이 단계에서 만나는 Java 구성요소</h5></div><a href="#전체-구현-코드">코드 보기 ↗</a></div><div class="implementation-nodes">${cards}</div>${entities.length ? `<p class="implementation-entities"><b>Entity 모델</b> ${entities.map(esc).join(' · ')} <span>· 흐름의 실행 단계가 아니라 DB 테이블과 매핑되는 객체입니다.</span></p>` : ''}<p class="implementation-disclaimer">파일의 역할 지도입니다. 위 흐름은 화면 JSON의 단계이며, 요청별 실제 호출 여부를 서버에서 추적한 결과는 아닙니다.</p></section>`;
 }
 
 /** Studymate의 screen JSON을 로그인 없이 읽을 수 있는 정적 화면·흐름으로 그린다. */
 export function renderScreen(text, context = {}) {
   const scene = JSON.parse(text);
   const widgets = (scene.screen || []).map(widget).join('');
-  const stageVisual = /^[a-z0-9-]+$/.test(context.stageId || '')
-    ? `<details class="stage-sketch"><summary>이 단계의 이미지 시안 보기</summary><img src="../visuals/${esc(context.stageId)}.svg" alt="${esc(scene.title || '시나리오')}의 화면 이미지 시안" loading="lazy"></details>`
-    : '';
   const allNodes = [
-    ['client', 'React / 화면'], ['request', 'HTTP 요청'], ['controller', 'Controller'],
+    ['client', '사용자 화면'], ['request', 'HTTP 요청'], ['server', '서버'], ['controller', 'Controller'],
     ['dto', 'DTO'], ['service', 'Service'], ['repository', 'Repository'],
     ['jpa', 'JPA'], ['mybatis', 'MyBatis'], ['mysql', 'MySQL'],
     ['response', 'HTTP 응답'], ['screen', '응답 반영'],
   ];
   const usedNodes = new Set((scene.flows || []).flatMap((flow) => (flow.steps || []).flatMap((step) => architectureNodes(step, context))));
-  const nodes = allNodes.filter(([id]) => usedNodes.has(id));
   const hasDatabaseWork = usedNodes.has('mysql');
-  const path = nodes.map(([id, label], index) => `<span class="flow-node" data-node="${id}" data-index="${index}"><span class="flow-node-number">${index + 1}</span>${label}</span>`).join('');
+  const nodeLabels = new Map(allNodes);
+  const path = (scene.flows || []).map((flow) => {
+    const ordered = [...new Set((flow.steps || []).flatMap((step) => architectureNodes(step, context)))];
+    return `<div class="flow-route" aria-label="${esc(flow.name || '요청 경로')}">${ordered.map((id, index) => `<span class="flow-node" data-node="${id}" data-index="${index}"><span class="flow-node-number">${index + 1}</span>${nodeLabels.get(id) || id}</span>`).join('')}</div>`;
+  }).join('');
   const flows = (scene.flows || []).map((flow, flowIndex) => {
     const steps = (flow.steps || []).map((step) => {
       const title = labels[step.kind] || step.kind;
@@ -92,24 +131,26 @@ export function renderScreen(text, context = {}) {
         .map(([key, value]) => `<span class="flow-step-detail"><b>${esc(key)}</b> ${esc(valueText(value))}</span>`).join('');
       const stepNodes = architectureNodes(step, context);
       const node = stepNodes[0];
+      const layers = stepNodes.map((id) => `<span class="flow-layer" data-node="${id}">${esc(nodeLabels.get(id) || id)}</span>`).join('');
       const method = step.method ? `<span class="flow-method method-${esc(step.method.toLowerCase())}">${esc(step.method)}</span>` : '';
       const pathText = step.path ? `<code class="flow-path">${esc(step.path)}</code>` : '';
       const payload = step.body != null ? `<details class="flow-payload"><summary>본문 예시 보기</summary><pre>${esc(step.body)}</pre></details>` : '';
-      return `<li><button type="button" class="flow-step" data-node="${node}" data-nodes="${stepNodes.join(' ')}" data-method="${esc(step.method || '')}" data-path="${esc(step.path || '')}" data-focus="${esc(Array.isArray(step.focus) ? step.focus.join('|') : '')}" aria-pressed="false"><span class="flow-step-meta">${method}<span class="flow-kind">${esc(title)}</span>${pathText}</span><span class="flow-step-text">${esc(primary)}</span>${rest ? `<span class="flow-step-details">${rest}</span>` : ''}</button>${payload}</li>`;
+      return `<li><button type="button" class="flow-step" data-node="${node || ''}" data-nodes="${stepNodes.join(' ')}" data-method="${esc(step.method || '')}" data-path="${esc(step.path || '')}" data-focus="${esc(Array.isArray(step.focus) ? step.focus.join('|') : '')}" aria-pressed="false"><span class="flow-step-meta">${method}<span class="flow-kind">${esc(title)}</span>${pathText}</span>${layers ? `<span class="flow-layers">${layers}</span>` : ''}${primary ? `<span class="flow-step-text">${esc(primary)}</span>` : ''}${rest ? `<span class="flow-step-details">${rest}</span>` : ''}</button>${payload}</li>`;
     }).join('');
-    return `<details class="scenario-flow"${flowIndex === 0 ? ' open' : ''}><summary>${esc(flow.name || '흐름 보기')}<span class="scenario-flow-count">${(flow.steps || []).length}단계</span></summary><ol>${steps}</ol></details>`;
+    return `<section class="scenario-flow" aria-label="${esc(flow.name || '시나리오 흐름')}" data-flow-index="${flowIndex}"><h5>${esc(flow.name || '요청 흐름')}<span class="scenario-flow-count">${(flow.steps || []).length}단계</span></h5><ol>${steps}</ol></section>`;
   }).join('');
   const architecture = context.architecture;
   const optional = Array.isArray(architecture) ? architecture.map((node) => `<span class="architecture-context">${esc(valueText(node))}</span>`).join('') : '';
   const dbeaver = hasDatabaseWork ? `<aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside>` : '';
-  return `<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>화면 미리보기</span><span class="mockup-live"><i></i> 예시</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">화면 상태</span><h3>${esc(scene.title || '화면')}</h3><p>${esc(scene.summary || '')}</p></div></div><div class="mock-screen" aria-label="${esc(scene.title || '화면')} 미리보기">${widgets || '<p class="mock-empty">화면 요소가 없습니다.</p>'}</div>${stageVisual}</div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">요청의 여정</span><h4>단계를 선택해 경로 따라가기</h4></div><span class="flow-hint">빛의 이동은 이 시나리오에 적힌 예상 계층을 보여줍니다. 응답 상태는 실제 브라우저 요청 결과입니다.</span></div><div class="flow-track" aria-label="요청 처리 경로">${path}</div>${dbeaver}${optional ? `<div class="architecture-context-list" aria-label="전달된 아키텍처 정보">${optional}</div>` : ''}<p class="flow-selection-status" role="status" aria-live="polite">흐름의 한 단계를 선택하면 관련 경로를 표시합니다.</p><div class="scenario-flows">${flows}</div></div></section><script>
+  const codeRoute = implementationRoute(context.answerFiles, scene);
+  return `<section class="scenario-preview" aria-label="화면 시나리오"><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>시나리오 화면</span><span class="mockup-live"><i></i> 단계 시안</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">사용자에게 보이는 상태</span><h3>${esc(scene.title || '화면')}</h3><p>${esc(scene.summary || '')}</p></div></div><div class="mock-screen" aria-label="${esc(scene.title || '화면')} 미리보기">${widgets || '<p class="mock-empty">화면 요소가 없습니다.</p>'}</div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">화면 뒤에서 일어나는 일</span><h4>요청부터 응답까지</h4></div><span class="flow-hint">이 단계에 기록된 처리 순서를 보여줍니다.</span></div><div class="flow-tracks" aria-label="흐름별 요청 처리 경로">${path}</div><p class="flow-swipe-hint">좌우로 밀어 전체 경로 보기 →</p>${codeRoute}${dbeaver}${optional ? `<div class="architecture-context-list" aria-label="전달된 아키텍처 정보">${optional}</div>` : ''}<p class="flow-selection-status" role="status" aria-live="polite">카드를 선택하면 화면의 관련 요소와 계층이 강조됩니다.</p><div class="scenario-flows">${flows}</div></div></section><script>
 (() => {
   for (const preview of document.querySelectorAll('.scenario-preview:not([data-flow-ready])')) {
     preview.dataset.flowReady = 'true';
     const buttons = [...preview.querySelectorAll('.flow-step')];
     const nodes = [...preview.querySelectorAll('.flow-node')];
     const status = preview.querySelector('.flow-selection-status');
-    const labels = { client: 'React / 화면', request: 'HTTP 요청', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
+    const labels = { client: '사용자 화면', request: 'HTTP 요청', server: '서버', controller: 'Controller', dto: 'DTO', service: 'Service', repository: 'Repository', jpa: 'JPA', mybatis: 'MyBatis', mysql: 'MySQL', response: 'HTTP 응답', screen: '응답 반영' };
     let animation;
     const stopAnimation = () => { if (animation) clearInterval(animation); animation = null; };
     const normalize = (path) => (path || '').split('?')[0].split('/').map((part) => part.startsWith('{') || /^[0-9]+$/.test(part) ? '{}' : part).join('/');
@@ -118,9 +159,9 @@ export function renderScreen(text, context = {}) {
       const request = buttons.find((button) => button.dataset.node === 'request' && button.dataset.method === detail.method && normalize(button.dataset.path) === normalize(detail.path));
       if (!request) return;
       stopAnimation();
-      request.closest('.scenario-flow').open = true;
+      request.closest('.scenario-flow').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       const flowButtons = [...request.closest('ol').querySelectorAll('.flow-step')];
-      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
+      const relevant = flowButtons.flatMap((button) => (button.dataset.nodes || button.dataset.node || '').split(' ').filter(Boolean)).filter((id) => ['client', 'request', 'server', 'controller', 'dto', 'service', 'repository', 'jpa', 'mybatis', 'mysql', 'response', 'screen'].includes(id));
       buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === request)));
       nodes.forEach((node) => node.classList.remove('is-active', 'is-past', 'is-expected', 'is-error'));
       if (detail.phase === 'start') {
@@ -164,7 +205,7 @@ export function renderScreen(text, context = {}) {
       for (const id of (button.dataset.focus || '').split('|').filter(Boolean)) {
         preview.querySelectorAll('[data-screen-id]').forEach((item) => { if (item.dataset.screenId === id) item.classList.add('is-focus'); });
       }
-      status.textContent = labels[selected] + ' 단계 · ' + button.querySelector('.flow-step-text').textContent.trim();
+      status.textContent = (labels[selected] || button.querySelector('.flow-kind')?.textContent || '시나리오') + ' 단계 · ' + (button.querySelector('.flow-step-text')?.textContent.trim() || '세부 내용은 아래 설명을 확인하세요.');
     }));
   }
 })();
@@ -179,10 +220,10 @@ function roleOf(file) {
   if (/Mapper\.java$/.test(name)) return 'MyBatis / Mapper';
   if (/Scheduler\.java$/.test(name)) return 'Scheduler / 배치';
   if (/Controller/.test(name)) return 'Controller / 요청';
-  if (/Request|Response|Dto|DTO|Row|Projection|Condition|Query/.test(name) && name.endsWith('.java')) return 'DTO';
   if (/Service|Policy|Validator|Gate/.test(name)) return 'Service / 규칙';
   if (/Repository/.test(name)) return 'Repository / DB 접근';
   if (/\.java$/.test(name) && /@(?:Entity|Embeddable|MappedSuperclass)\b/.test(file.content)) return 'Entity';
+  if (/Request|Response|Dto|DTO|Row|Projection|Condition|Query/.test(name) && name.endsWith('.java')) return 'DTO';
   if (/Config\.java$/.test(name)) return '설정';
   if (name.endsWith('.java')) return 'Java / 보조 코드';
   return '설정 / 기타';

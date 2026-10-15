@@ -19,6 +19,7 @@ import { renderKnowledgePageVisual } from './knowledge-page-visual.mjs';
 import { renderMissionVisual } from './mission-visual.mjs';
 import { renderMissionDetails } from './mission-detail-visual.mjs';
 import { renderHomeVisual } from './home-visual.mjs';
+import { renderLessonAtlas } from './lesson-atlas.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const rel = (p) => path.relative(ROOT, p).split(path.sep).join('/');
@@ -127,7 +128,13 @@ function render(abs) {
       code({ text, lang }) {
         if ((lang || '').trim() === 'check') return renderRequests(text, ++requestBlockCount, abs);
         if ((lang || '').trim() === 'manual-command') return `<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>${escapeHtml(text)}</code></pre></details>\n`;
-        if ((lang || '').trim() === 'screen') return renderScreen(text, { stageId: LEVEL_BY_ABS.get(abs)?.id });
+        if ((lang || '').trim() === 'screen') {
+          const stageId = LEVEL_BY_ABS.get(abs)?.id;
+          const answerPath = stageId && path.join(ROOT, 'scenario/answers', `${stageId}.json`);
+          const answerFiles = answerPath && fs.existsSync(answerPath)
+            ? JSON.parse(fs.readFileSync(answerPath, 'utf8')).files : [];
+          return renderScreen(text, { stageId, answerFiles });
+        }
         if ((lang || '').trim() === 'mermaid') {
           hasMermaid = true;
           return `<pre class="mermaid">${escapeHtml(text)}</pre>\n`;
@@ -314,6 +321,7 @@ function page({ abs, title, body, hasMermaid }) {
     if (directCheck < 0) throw new Error(`${lv.id}: 직접 확인 구간이 없다`);
     body = body.slice(0, directCheck) + requestPageTools(body.includes('class="api-practice"'))
       + body.slice(directCheck) + graderPanel(lv);
+    body = renderLessonAtlas(body, lv.id);
   }
   if (lab) {
     crumbs = `<p class="crumbs"><a href="${up('scenario/README.html')}">시나리오</a> › 쿼리 설계 연습 › ${escapeHtml(lab.id)}</p>`;
@@ -367,7 +375,7 @@ mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</sc
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <link rel="stylesheet" href="${assetUrl('tools/site/site.css', path.dirname(abs))}">
-${lv || lab || abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/api-architecture.css', path.dirname(abs))}">\n` : ''}${lv ? `<link rel="stylesheet" href="${assetUrl('tools/site/scenario-visual.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/learning-journey.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'docs/knowledge/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/knowledge-visual.css', path.dirname(abs))}">\n` : ''}${abs.startsWith(`${DOC_DIR}${path.sep}`) && path.basename(abs).match(/^[A-Z]\d{2}-.*\.md$/) ? `<link rel="stylesheet" href="${assetUrl('tools/site/knowledge-page-visual.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'practice/MISSIONS.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/mission-visual.css', path.dirname(abs))}">\n<link rel="stylesheet" href="${assetUrl('tools/site/mission-detail-visual.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/home-visual.css', path.dirname(abs))}">\n` : ''}<script src="${assetUrl('tools/site/syntax-highlight.js', path.dirname(abs))}" defer></script>
+${lv || lab || abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/api-architecture.css', path.dirname(abs))}">\n` : ''}${lv ? `<link rel="stylesheet" href="${assetUrl('tools/site/scenario-visual.css', path.dirname(abs))}">\n<link rel="stylesheet" href="${assetUrl('tools/site/lesson-atlas.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/learning-journey.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'docs/knowledge/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/knowledge-visual.css', path.dirname(abs))}">\n` : ''}${abs.startsWith(`${DOC_DIR}${path.sep}`) && path.basename(abs).match(/^[A-Z]\d{2}-.*\.md$/) ? `<link rel="stylesheet" href="${assetUrl('tools/site/knowledge-page-visual.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'practice/MISSIONS.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/mission-visual.css', path.dirname(abs))}">\n<link rel="stylesheet" href="${assetUrl('tools/site/mission-detail-visual.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/home-visual.css', path.dirname(abs))}">\n` : ''}<script src="${assetUrl('tools/site/syntax-highlight.js', path.dirname(abs))}" defer></script>
 </head>
 <body>
 <header class="topbar"><a href="${up('index.html')}">javaExperience</a><a href="${up('scenario/README.html')}">시나리오</a><a href="${up('practice/MISSIONS.html')}">학습용 미션</a><a href="${up('docs/knowledge/README.html')}">공부자료</a></header>
