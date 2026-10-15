@@ -76,6 +76,12 @@ for (const chapter of manifest.chapters) for (const level of chapter.levels) {
     }
   }
   const codeFiles = [...html.matchAll(/<details class="code-file">([\s\S]*?)<\/details>/g)];
+  const workbenches = (html.match(/class="code-workbench" data-code-workbench/g) || []).length;
+  const expectedWorkbenchCount = 1 + Number(fs.existsSync(mybatisPath)) + (level.id === '9-5' ? 6 : 0);
+  if (workbenches !== expectedWorkbenchCount)
+    failures.push(`${level.id}: 코드 워크벤치 ${workbenches}/${expectedWorkbenchCount}`);
+  if (!html.includes('class="cumulative-code"') || !html.includes('scenario-code-workbench.js'))
+    failures.push(`${level.id}: 누적 코드 워크벤치 또는 상호작용 스크립트 누락`);
   if (roleMaps !== 1) failures.push(`${level.id}: 정답 파일 역할 지도 ${roleMaps}개`);
   if (lessonCards < 4) failures.push(`${level.id}: 학습 절 카드 ${lessonCards}개`);
   if (codeFiles.length !== expectedFiles.length) failures.push(`${level.id}: 전체 파일 코드 ${codeFiles.length}/${expectedFiles.length}`);
@@ -105,6 +111,7 @@ for (const chapter of manifest.chapters) for (const level of chapter.levels) {
     roleMaps,
     lessonCards,
     codeFiles: codeFiles.length,
+    codeWorkbenches: workbenches,
     exactCodeFiles,
     requestPractice: requestButtons ? 'browser_button' : requestSteps ? 'manual_or_test_flow' : 'no_http_request',
   });
@@ -122,6 +129,7 @@ const totals = {
   roleMaps: items.reduce((sum, item) => sum + item.roleMaps, 0),
   lessonCards: items.reduce((sum, item) => sum + item.lessonCards, 0),
   codeFiles: items.reduce((sum, item) => sum + item.codeFiles, 0),
+  codeWorkbenches: items.reduce((sum, item) => sum + item.codeWorkbenches, 0),
   exactCodeFiles: items.reduce((sum, item) => sum + item.exactCodeFiles, 0),
   knowledgeDocs: knowledgeDocs.length,
   knowledgeSections: knowledgeDocs.reduce((sum, doc) => sum + doc.sections, 0),
@@ -129,10 +137,16 @@ const totals = {
   manualOrTestFlowLevels: items.filter((item) => item.requestPractice === 'manual_or_test_flow').map((item) => item.id),
 };
 if (items.length !== 101) failures.push(`단계 수 ${items.length}/101`);
+const imagegenMockups = [
+  { path: 'docs/design/hibernate-knowledge-screen-v1.png', appliedTo: 'docs/knowledge/S09-jpa-hibernate.html', pattern: '버전 비교 카드와 원문 표' },
+  { path: 'docs/design/scenario-code-workbench-v1.png', appliedTo: 'scenario/ch1-create-post/1-1-receive-request.html', pattern: '역할별 코드 탐색기와 누적 코드' },
+];
+for (const mockup of imagegenMockups) if (!fs.existsSync(path.join(root, mockup.path))) failures.push(`imagegen 시안 없음: ${mockup.path}`);
 const report = {
   schemaVersion: 2,
   status: failures.length ? 'failed' : 'verified',
   scope: '101개 단계 화면의 시안·요소·흐름·전체 코드·학습 카드와 전체 공부자료 주제 지도의 정적 대조',
+  imagegenMockups,
   design: [
     '단계 본문은 화면 JSON에서 그린 실제 DOM 시안과 선택 가능한 요청 흐름을 나란히 보여준다.',
     '정답 변경 파일의 역할 지도는 화면 시나리오와 구분하고, DBeaver는 MySQL 직접 접속의 별도 경로로 둔다.',

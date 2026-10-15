@@ -30,7 +30,7 @@ export function renderKnowledgePageSections(html) {
   const before = html.slice(0, headings[0].index);
   const cards = headings.map((match, index) => {
     const next = headings[index + 1]?.index ?? html.length;
-    const section = html.slice(match.index + match[0].length, next);
+    const section = transformVersionTables(html.slice(match.index + match[0].length, next));
     const id = match[0].match(/\bid="([^"]+)"/)?.[1] || `knowledge-section-${index + 1}`;
     const title = textOnly(match[0]).replace(/^#\s*/, '');
     const subtopics = [...section.matchAll(/<h3\b[^>]*>([\s\S]*?)<\/h3>/g)]
@@ -68,6 +68,20 @@ export function renderKnowledgePageSections(html) {
   reveal(location.hash);
 })();
 </script>`;
+}
+
+/** 버전 비교 표는 내용을 유지한 채 배경과 실무 영향을 나눈 카드로 보여 준다. */
+export function transformVersionTables(section) {
+  return section.replace(/<div class="table-wrap"><table>([\s\S]*?)<\/table><\/div>/g, (whole, table) => {
+    const rows = [...table.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map((row) =>
+      [...row[1].matchAll(/<t[hd]\b[^>]*>([\s\S]*?)<\/t[hd]>/g)].map((cell) => cell[1].trim()));
+    if (rows.length < 3 || rows[0].length !== 3 || rows.slice(1).some((row) => row.length !== 3)) return whole;
+    const headers = rows[0].map((cell) => textOnly(cell));
+    if (!/시기|버전/i.test(headers[0]) || !/변화|배경|이유/i.test(headers[1]) || !/영향|실무|근거/i.test(headers[2])) return whole;
+    const cards = rows.slice(1).map(([period, why, impact], index) =>
+      `<article class="version-card"><header><span class="version-card-index">${String(index + 1).padStart(2, '0')}</span><h4>${period}</h4></header><section class="version-card-why"><h5><span aria-hidden="true">↗</span> 왜 바뀌었나</h5><div>${why}</div></section><section class="version-card-impact"><h5><span aria-hidden="true">✓</span> 실무에서 확인</h5><div>${impact}</div></section></article>`).join('');
+    return `<section class="version-cards" aria-label="버전별 변화 카드"><div class="version-card-grid">${cards}</div><details class="version-original"><summary>원문 표 보기 <span>버전별 주요 변경 사항 전체 표</span></summary>${whole}</details></section>`;
+  });
 }
 
 const JPA_CARDS = {
