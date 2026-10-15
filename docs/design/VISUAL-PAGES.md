@@ -1,15 +1,20 @@
 # 화면별 시각 개편 체크리스트
 
-저자 원문과 생성 HTML이 함께 있는 323개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 42,644개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
+저자 원문과 생성 HTML이 함께 있는 328개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 42,809개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
 
 체크는 해당 화면의 모든 개별 항목이 `verified`일 때만 자동으로 붙는다. `imagegen` 시안 또는 공통 컴포넌트 한 개를 적용한 상태는 완료가 아니다.
 
-## 홈·목차·미션·기타 (4)
+## 홈·목차·미션·기타 (9)
 
 - [ ] [README.md](../../README.html) — 항목 30, 긴 산문 1, 토글 1, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [errors.md](../../errors.html) — 항목 261, 긴 산문 1, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
-- [ ] [practice/MISSIONS.md](../../practice/MISSIONS.html) — 항목 96, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [scenario/README.md](../../scenario/README.html) — 항목 366, 긴 산문 0, 토글 195, 최대 접기 깊이 4; 상태: unreviewed
+- [ ] [practice/MISSIONS.md](../../practice/MISSIONS.html) — 항목 97, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [scenario/README.md](../../scenario/README.html) — 항목 368, 긴 산문 1, 토글 195, 최대 접기 깊이 4; 상태: unreviewed
+- [ ] [scenario/db-query-journey/DB-10-performance-fixture.md](../../scenario/db-query-journey/DB-10-performance-fixture.html) — 항목 25, 긴 산문 1, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [scenario/db-query-journey/db-01-response-to-query.md](../../scenario/db-query-journey/db-01-response-to-query.html) — 항목 35, 긴 산문 1, 토글 2, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [scenario/db-query-journey/db-02-select-cursor.md](../../scenario/db-query-journey/db-02-select-cursor.html) — 항목 18, 긴 산문 0, 토글 1, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [scenario/db-query-journey/db-03-detail-join.md](../../scenario/db-query-journey/db-03-detail-join.html) — 항목 27, 긴 산문 0, 토글 2, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [scenario/db-query-journey/db-06-exists-not-exists.md](../../scenario/db-query-journey/db-06-exists-not-exists.html) — 항목 25, 긴 산문 0, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
 
 ## 공부자료 (135)
 
@@ -88,7 +93,7 @@
 - [ ] [docs/knowledge/R02-rdb-vs-nosql.md](../../docs/knowledge/R02-rdb-vs-nosql.html) — 항목 143, 긴 산문 0, 토글 26, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/R03-schema-types-constraints.md](../../docs/knowledge/R03-schema-types-constraints.html) — 항목 89, 긴 산문 0, 토글 12, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/R04-sql-crud-join.md](../../docs/knowledge/R04-sql-crud-join.html) — 항목 99, 긴 산문 0, 토글 13, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/R05-index-btree.md](../../docs/knowledge/R05-index-btree.html) — 항목 78, 긴 산문 0, 토글 12, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/R05-index-btree.md](../../docs/knowledge/R05-index-btree.html) — 항목 93, 긴 산문 0, 토글 14, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/R06-db-client-tools.md](../../docs/knowledge/R06-db-client-tools.html) — 항목 127, 긴 산문 0, 토글 21, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/R07-backup-restore.md](../../docs/knowledge/R07-backup-restore.html) — 항목 95, 긴 산문 0, 토글 13, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/R08-app-to-db-connection.md](../../docs/knowledge/R08-app-to-db-connection.html) — 항목 129, 긴 산문 0, 토글 25, 최대 접기 깊이 2; 상태: unreviewed
@@ -301,7 +306,7 @@
 - [ ] [scenario/ch8-query-deep/8-4-dynamic-search.md](../../scenario/ch8-query-deep/8-4-dynamic-search.html) — 항목 211, 긴 산문 0, 토글 131, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [scenario/ch8-query-deep/8-5-recount-batch.md](../../scenario/ch8-query-deep/8-5-recount-batch.html) — 항목 201, 긴 산문 0, 토글 116, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [scenario/ch9-schema-change/9-1-flyway.md](../../scenario/ch9-schema-change/9-1-flyway.html) — 항목 163, 긴 산문 0, 토글 99, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [scenario/ch9-schema-change/9-2-index-explain.md](../../scenario/ch9-schema-change/9-2-index-explain.html) — 항목 173, 긴 산문 0, 토글 103, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [scenario/ch9-schema-change/9-2-index-explain.md](../../scenario/ch9-schema-change/9-2-index-explain.html) — 항목 190, 긴 산문 1, 토글 104, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [scenario/ch9-schema-change/9-3-add-column-backfill.md](../../scenario/ch9-schema-change/9-3-add-column-backfill.html) — 항목 194, 긴 산문 1, 토글 125, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [scenario/ch9-schema-change/9-4-notifications.md](../../scenario/ch9-schema-change/9-4-notifications.html) — 항목 238, 긴 산문 0, 토글 151, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [scenario/ch9-schema-change/9-5-expand-contract.md](../../scenario/ch9-schema-change/9-5-expand-contract.html) — 항목 212, 긴 산문 1, 토글 132, 최대 접기 깊이 2; 상태: unreviewed

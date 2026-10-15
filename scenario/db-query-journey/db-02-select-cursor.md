@@ -1,0 +1,79 @@
+# DB-02. 목록 SQL에 조건·정렬·커서 붙이기 — 기초
+
+<style>
+main:has(.db02){max-width:1500px}.db02{--ink:#172d50;--muted:#60738a;--line:#d8e3f0;--blue:#2563eb;--teal:#0f8b8d;color:var(--fg)}.db02 *{box-sizing:border-box}.db02 .intro{font-size:1rem;line-height:1.55;color:var(--fg)}.db02 .contract{display:flex;flex-wrap:wrap;gap:9px;align-items:center;padding:12px 15px;border:1px solid #93c5fd;border-radius:14px;background:linear-gradient(100deg,#eff6ff,#f0fdfa);color:#13294b}.db02 .method{font-weight:900;color:#087857;background:#d1fae5;padding:5px 9px;border-radius:8px}.db02 .path{font:800 .9rem ui-monospace,monospace;overflow-wrap:anywhere}.db02 .flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:15px 0}.db02 .step{position:relative;padding:14px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(150deg,#fff,#f2f8ff);min-width:0}.db02 .step:not(:last-child):after{content:'→';position:absolute;right:-15px;top:45%;z-index:1;color:#0f9ba8;font-size:1.2rem;font-weight:900}.db02 .step h2{font-size:.94rem;margin:0 0 8px;color:var(--ink)}.db02 .step p{font-size:.82rem;line-height:1.5;color:var(--muted);margin:5px 0}.db02 .chip{display:inline-block;border-radius:7px;background:#fff;padding:4px 7px;margin:3px 2px;color:#344c6c;font:700 .72rem ui-monospace,monospace}.db02 .rows{font-size:.75rem}.db02 .row{display:grid;grid-template-columns:44px 1fr;gap:4px;padding:6px 4px;border-bottom:1px solid var(--line);color:#344c6c}.db02 .row:first-child{font-size:.68rem;font-weight:800;color:var(--muted)}.db02 .row.current{background:#dcfce7;color:#14532d;font-weight:800}.db02 .cursor{padding:10px;border-radius:10px;background:#11243c;color:#e0edff;font: .72rem/1.6 ui-monospace,monospace;overflow-wrap:anywhere}.db02 .controls{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.db02 button{padding:8px 12px;border:1px solid #bfd4ec;border-radius:10px;background:#fff;color:#1d4ed8;font-weight:800;cursor:pointer}.db02 button[aria-pressed=true]{background:#1d4ed8;color:#fff}.db02 .hint{padding:12px 14px;border-left:4px solid #e4a23a;border-radius:9px;background:#fff4d8;color:#603d11;line-height:1.55}.db02 details{margin:16px 0}.db02 summary{cursor:pointer;color:var(--blue);font-weight:800}.db02 pre{overflow:auto;padding:14px;border-radius:12px;background:#11243c;color:#e0edff;font-size:.78rem;line-height:1.55}.db02 .small{font-size:.78rem;color:var(--muted)}@media(max-width:850px){.db02 .flow{grid-template-columns:repeat(2,minmax(0,1fr))}.db02 .step:nth-child(2):after{content:'↓';right:48%;top:auto;bottom:-17px}}@media(max-width:520px){.db02 .flow{grid-template-columns:1fr;gap:9px}.db02 .step:not(:last-child):after,.db02 .step:nth-child(2):after{content:'↓';right:48%;top:auto;bottom:-17px}.db02 .path{font-size:.75rem}}
+</style>
+
+<section class="db02" aria-label="목록 쿼리의 커서 페이지 흐름">
+<p class="intro"><a href="db-01-response-to-query.html">DB-01</a>에서 고른 같은 목록 API를 이어갑니다. 이번에는 <strong>어떤 행부터 다음 페이지인지</strong> SQL 조건으로 표현합니다.</p>
+<div class="contract"><span class="method">GET</span><span class="path">/api/boards/dev/posts?size=2&amp;cursor={마지막 발행시각,id}</span><span class="small">practice seed · 비로그인 · PUBLISHED / 미삭제 / PUBLIC</span></div>
+<div class="flow" aria-label="요청부터 다음 페이지까지">
+<section class="step"><h2>① 첫 페이지</h2><p>정렬 키 두 개를 함께 고정합니다.</p><span class="chip">published_at DESC</span><span class="chip">id DESC</span><p><code>id</code>는 발행 시각이 같은 행의 순서를 고정합니다.</p></section>
+<section class="step"><h2>② 실제 행 순서</h2><p>첫 네 행은 시드에서 확인한 순서입니다.</p><div class="rows" role="table" aria-label="게시글 발행 순서"><div class="row" role="row"><span role="columnheader">ID</span><span role="columnheader">발행 시각</span></div><div class="row current" role="row" data-page="1"><span role="cell">145</span><span role="cell">10-03 10:10:08</span></div><div class="row current" role="row" data-page="1"><span role="cell">144</span><span role="cell">10-02 21:57:53</span></div><div class="row" role="row" data-page="2"><span role="cell">143</span><span role="cell">10-02 08:42:47</span></div><div class="row" role="row" data-page="2"><span role="cell">140</span><span role="cell">09-26 13:03:17</span></div></div><p class="small">날짜는 시드의 <code>DATETIME</code> 값을 그대로 표시합니다.</p></section>
+<section class="step"><h2>③ 커서 만들기</h2><p>페이지에서 실제로 반환한 마지막 행 144의 두 값을 가져옵니다.</p><div class="cursor">cursorPublishedAt = 2026-10-02 21:57:53<br>cursorId = 144</div><p>불투명한 문자열로 인코딩해도 서버는 이 두 값을 복원합니다.</p></section>
+<section class="step"><h2>④ 다음 페이지 조건</h2><p>정렬이 내림차순이므로 커서보다 <strong>뒤에 있는</strong> 행은 더 작은 튜플입니다.</p><div class="cursor">published_at &lt; cursorTime<br>OR (published_at = cursorTime AND id &lt; cursorId)</div><p>결과는 143, 140 순서로 이어지고 앞 페이지 행은 반복되지 않습니다.</p></section>
+</div>
+<div class="controls" role="group" aria-label="페이지 흐름 예시"><button type="button" data-page-button="1" aria-pressed="true">1페이지 · 145, 144</button><button type="button" data-page-button="2" aria-pressed="false">다음 페이지 · 143, 140</button></div>
+<p class="hint" id="db02-state" aria-live="polite">1페이지를 반환하면 마지막 행 144의 (published_at, id)를 다음 요청의 커서로 보냅니다.</p>
+</section>
+<script>
+(() => {
+ const root=document.querySelector('.db02'); if(!root)return;
+ const buttons=[...root.querySelectorAll('[data-page-button]')];
+ buttons.forEach(button=>button.addEventListener('click',()=>{
+  const page=button.dataset.pageButton;
+  buttons.forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
+  root.querySelectorAll('[data-page]').forEach(row=>row.classList.toggle('current',row.dataset.page===page));
+  root.querySelector('#db02-state').textContent=page==='1'
+   ? '1페이지를 반환하면 마지막 행 144의 (published_at, id)를 다음 요청의 커서로 보냅니다.'
+   : '2페이지는 144보다 뒤의 행 143, 140입니다. 마지막 행 140의 키로 다음 요청을 이어갑니다.';
+ }));
+})();
+</script>
+
+## 먼저 SQL을 직접 확장하기
+
+DB-01의 조건은 유지하고, `cursor`가 비어 있지 않을 때만 마지막 행보다 뒤인 조건을 추가합니다. `published_at`은 발행된 글에서 NULL이 아니며, 순서가 같은 행은 `id`로 정합니다.
+
+```sql
+SELECT p.id, p.title, p.published_at
+FROM board b
+JOIN post p ON p.board_id = b.id
+WHERE b.slug = 'dev'
+  AND p.status = 'PUBLISHED'
+  AND p.deleted_at IS NULL
+  AND p.visibility = 'PUBLIC'
+  AND (
+      p.published_at < '2026-10-02 21:57:53'
+      OR (p.published_at = '2026-10-02 21:57:53' AND p.id < 144)
+  )
+ORDER BY p.published_at DESC, p.id DESC
+LIMIT 3;
+```
+
+이 예시는 `size=2`에 다음 행이 있는지 확인할 한 행을 더해 `LIMIT 3`으로 읽습니다. 세 번째 행은 `hasNext` 판정에 쓰고 응답에는 넣지 않습니다. 응답의 마지막 행은 140이므로 다음 커서는 140의 키여야 합니다. 실제 구현에서 페이지 크기는 요청값에 맞춰 제한하고 SQL 바인딩 파라미터를 사용하세요.
+
+<details>
+<summary>커서 조건을 왜 두 열로 비교하나요?</summary>
+<p>`published_at`만 조건으로 쓰면 같은 시각의 행 일부를 건너뛰거나 반복할 수 있습니다. 정렬에 사용한 모든 열을 커서에도 담아야 정렬 순서와 다음 페이지 경계가 일치합니다.</p>
+<p>두 열이 모두 DESC이므로 비교는 `<`입니다. 정렬 방향이 섞이면 각 열의 방향에 따라 조건을 풀어 써야 합니다. MySQL row constructor 비교도 가능하지만, 학습과 이식성을 위해 동등 조건을 명시한 형태부터 사용합니다.</p>
+</details>
+
+## 같은 데이터에서 offset과 비교하기
+
+`OFFSET 2 LIMIT 2`도 현재 시드에서는 143, 140을 반환합니다. 하지만 첫 페이지를 읽은 사이 새 글이 맨 앞에 추가되면 offset 2는 이전 마지막 글 144를 다시 포함할 수 있습니다. 커서는 마지막으로 본 정렬 키 뒤부터 찾으므로 앞에 추가된 행이 다음 페이지를 밀어내지 않습니다.
+
+| 방식 | 다음 페이지 기준 | 앞쪽에 새 글 삽입 | 큰 페이지 번호 |
+|---|---|---|---|
+| offset | 앞에서 몇 행 건너뛸지 | 행 위치가 밀려 중복·누락 가능 | 건너뛸 행을 따라가야 함 |
+| cursor | 마지막 행의 정렬 키 | 이미 본 경계 뒤를 계속 조회 | 앞 행 수를 세지 않음 |
+
+> **연습:** 첫 페이지 크기를 2로 두고 실제 SQL을 실행하세요. 다음 요청의 커서를 145가 아닌 144에서 가져오는 이유를 말하고, `ORDER BY p.published_at DESC`에서 `id`를 빼면 결과가 왜 불안정해지는지 설명해 보세요.
+
+## 실행 위치와 계약 근거
+
+`docker compose up -d` 후 CloudBeaver에서 `practice (학습용)`을 선택합니다. 위 SQL의 보드·상태·삭제·공개 조건은 M1의 비로그인 계약입니다. 첫 네 ID와 발행 시각은 `docker/mysql/init/02-practice.sql`의 시드 행에서 확인했습니다. API 구현 자체는 현재 미션의 학습자가 작성합니다. 이 페이지는 읽기 전용으로 SQL을 확인하며 요청을 보내지 않습니다.
+
+- 앞 단계: [DB-01 — 응답 필드에서 첫 SQL 찾기](db-01-response-to-query.md)
+- 기능 정답 계약: [M1 — 게시판 글 목록·상세](../../practice/MISSIONS.md)
+- 다음에 이어질 주제: DB-03 — 상세 조회의 JOIN (현재 계획 단계)

@@ -469,4 +469,4 @@ C = HTTP 확인(필수), R = 코드 리뷰(피드백용).
 
 ## 다음 단계
 
-[2-3. 볼 수 있는 글만](2-3-visibility.md)
+[DB-01. 응답 필드에서 첫 SQL 찾기](../db-query-journey/db-01-response-to-query.md)에서 API 응답을 테이블·열과 연결한 뒤, [2-3. 볼 수 있는 글만](2-3-visibility.md)에서 목록에 적용할 접근 규칙을 이어서 확인한다.

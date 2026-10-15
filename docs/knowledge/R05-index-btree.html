@@ -55,7 +55,7 @@ WHERE ordered_at &gt;= '2026-08-15 00:00:00'
 <li><p><strong><code>EXPLAIN</code>은 실행 시간표가 아니라 계획과 추정치다.</strong> 우선 <code>key</code>(택한 인덱스), <code>type</code>(접근 방법), <code>rows</code>(읽을 행 수 추정), <code>Extra</code>를 읽는다. <code>possible_keys</code>는 후보 목록이라 실제 사용을 보장하지 않는다. <code>rows</code>는 초가 아니며, <code>type=ALL</code>도 작은 테이블에서 합리적일 수 있다. 성능 문제는 실제 데이터 규모와 실행 지표를 함께 본다.</p>
 </li>
 </ol>
-</div></details><details class="knowledge-chapter"><summary id="3-따라-하기" aria-label="3. 따라 하기 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 따라 하기</strong><small>1단계: 기준 계획을 확인한다 · 2단계: 후보 인덱스를 만들고 계획을 비교한다 · 3단계: 조회 모양을 바꿔 기존 복합 인덱스도 읽는다 · 4단계: 실습 인덱스를 제거한다</small></span><span class="knowledge-chapter-meta">4개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="3-따라-하기" aria-label="3. 따라 하기 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 따라 하기</strong><small>1단계: 기준 계획을 확인한다 · 2단계: 후보 인덱스를 만들고 계획을 비교한다 · 3단계: 조회 모양을 바꿔 기존 복합 인덱스도 읽는다 · 4단계: 추정 계획과 실제 실행을 비교한다</small></span><span class="knowledge-chapter-meta">6개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>연습 DB는 <code>ds_practice</code>의 MySQL 8.4 스키마를 사용한다. 아래 <code>product.name</code>은 스키마에서 인덱스를 두지 않은 열이고, 상품 행은 80개다. 그 정도로 작은 테이블에서는 인덱스를 추가해도 옵티마이저가 전체 스캔을 고를 수 있으므로, 강제 인덱스 계획과 자연 선택 계획을 모두 확인한다.</p>
 <p>DDL은 트랜잭션 롤백 대상이 아니므로 마지막 <code>DROP INDEX</code>까지 같은 DB 세션에서 실행한다. 이 실습 SQL은 직접 실행하지 않았다. 결과는 모두 예상이다.</p>
 <details class="knowledge-topic"><summary id="1단계-기준-계획을-확인한다" aria-label="1단계: 기준 계획을 확인한다 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">1단계: 기준 계획을 확인한다</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
@@ -95,11 +95,39 @@ WHERE member_id = 42
   AND ordered_at &lt;  '2026-09-01 00:00:00'
 ORDER BY ordered_at DESC;</code></pre>
 <p><strong>확인 방법 (예상):</strong> <code>key</code>가 <code>ix_orders_member_date</code>인지, <code>type</code>이 <code>range</code> 등 범위 접근인지 확인한다. <code>id</code>와 정렬·조건 열이 보조 인덱스에 있으므로 <code>Using index</code>가 가능한 모양이다. 다른 회원 ID나 데이터 분포에서는 <code>rows</code> 추정치가 달라진다. <code>key</code>가 다르면 <code>SHOW INDEX</code>와 전체 조건·반환 열을 다시 대조한다.</p>
-</div></details><details class="knowledge-topic"><summary id="4단계-실습-인덱스를-제거한다" aria-label="4단계: 실습 인덱스를 제거한다 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">4단계: 실습 인덱스를 제거한다</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
-<pre><code class="language-sql">DROP INDEX ix_r05_product_name_demo ON product;
+</div></details><details class="knowledge-topic"><summary id="4단계-추정-계획과-실제-실행을-비교한다" aria-label="4단계: 추정 계획과 실제 실행을 비교한다 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">4단계: 추정 계획과 실제 실행을 비교한다</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
+<p><code>EXPLAIN</code>은 옵티마이저 계획과 추정치를 보고, <code>EXPLAIN ANALYZE</code>는 뒤의 읽기 전용 SELECT를 실제 실행해 iterator별 actual time·rows·loops를 보여 준다. 결과 형식은 TREE이며 쿼리가 실행되므로 <code>UPDATE</code>, <code>DELETE</code>, 운영에서 비용이 큰 조회를 붙이지 않는다.</p>
+<pre><code class="language-sql">EXPLAIN
+SELECT id, name FROM product WHERE name = '연습용 상품';
 
-SHOW INDEX FROM product;</code></pre>
-<p><strong>확인 방법 (예상):</strong> <code>ix_r05_product_name_demo</code>가 목록에서 사라진다. CREATE 문을 다시 실행했는데 <code>Duplicate key name</code> 오류가 나면 이전 실행에서 DROP을 건너뛰었는지 먼저 <code>SHOW INDEX</code>로 확인한다. 실습 인덱스를 임의의 운영 테이블에서 지우지 않는다.</p>
+EXPLAIN ANALYZE
+SELECT id, name FROM product WHERE name = '연습용 상품';</code></pre>
+<p>비교표에는 <code>key</code>, 추정 rows, actual rows, loops, actual time을 직접 옮긴다. 이 테이블은 80행뿐이라 실제 시간이 의미 있게 달라지지 않을 수 있다. 측정값을 미리 정답으로 정하지 말고, 데이터 크기와 캐시 상태를 함께 적는다. <code>ANALYZE TABLE product;</code>는 옵티마이저 통계 갱신 명령이다. <code>EXPLAIN ANALYZE</code>처럼 SELECT를 실행해 측정하는 기능이 아니다.</p>
+</div></details><details class="knowledge-topic"><summary id="5단계-인덱스-가시성을-바꿔-계획을-관찰한다" aria-label="5단계: 인덱스 가시성을 바꿔 계획을 관찰한다 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">5단계: 인덱스 가시성을 바꿔 계획을 관찰한다</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
+<p>아래 실습 인덱스만 대상으로 한다. Invisible index는 테이블에 남고 쓰기 때 계속 유지되지만, 옵티마이저의 기본 선택에서 제외된다. <code>PRIMARY</code> 키나 외래키가 의존하는 인덱스를 대상으로 하지 않는다.</p>
+<pre><code class="language-sql">-- 인덱스가 없다면 생성 (2단계에서 이미 만들었다면 다시 만들지 않는다)
+CREATE INDEX ix_r05_product_name_demo ON product (name);
+
+-- 자연 계획을 기록한 뒤 옵티마이저 선택에서 제외
+ALTER TABLE product ALTER INDEX ix_r05_product_name_demo INVISIBLE;
+EXPLAIN SELECT id, name FROM product WHERE name = '연습용 상품';
+
+-- 복원: 다시 옵티마이저 선택 후보로 돌린다
+ALTER TABLE product ALTER INDEX ix_r05_product_name_demo VISIBLE;
+EXPLAIN SELECT id, name FROM product WHERE name = '연습용 상품';</code></pre>
+<p>80행에서는 visible 상태에서도 MySQL이 테이블 스캔을 선택할 수 있고, invisible 전환 전후 계획이 같을 수도 있다. <code>FORCE INDEX</code>는 인덱스 사용 가능성을 따로 확인하는 도구이며, 자연 계획의 성능 증거가 아니다. <code>ANALYZE TABLE product;</code>를 실행했다면 통계 갱신 사실도 별도로 기록한다.</p>
+</div></details><details class="knowledge-topic"><summary id="6단계-삭제와-복구를-연습한다" aria-label="6단계: 삭제와 복구를 연습한다 펼치기"><span class="knowledge-topic-no">06</span><strong role="heading" aria-level="3">6단계: 삭제와 복구를 연습한다</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
+<p><code>DROP INDEX</code>는 트랜잭션 롤백으로 복구되지 않는다. 이 문서의 <code>ds_practice.product</code> 실습 인덱스만 제거하고, 필요하면 같은 DDL로 다시 만든다. 실행 전에 <code>SHOW INDEX</code>로 이름과 테이블을 확인한다.</p>
+<pre><code class="language-sql">-- 정리
+DROP INDEX ix_r05_product_name_demo ON product;
+SHOW INDEX FROM product;
+
+-- 다시 실습할 때 복구
+CREATE INDEX ix_r05_product_name_demo ON product (name);
+
+-- 실습 DB에서 원래 인덱스가 없던 상태로 되돌리기
+DROP INDEX ix_r05_product_name_demo ON product;</code></pre>
+<p>현재 상태가 헷갈리면 먼저 <code>SHOW INDEX FROM product;</code>를 실행한다. 이미 존재할 때 CREATE를 반복하지 않고, DROP 후에는 이 문서가 만든 인덱스만 복구한다. 공유·운영 DB에서는 이 정리 SQL을 실행하지 않는다.</p>
 </div></details></div></details><details class="knowledge-chapter"><summary id="4-치트시트" aria-label="4. 치트시트 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">4. 치트시트</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
@@ -217,6 +245,10 @@ SHOW INDEX FROM product;</code></pre>
 <li>MySQL 8.4, Multiple-Column Indexes — <a href="https://dev.mysql.com/doc/refman/8.4/en/multiple-column-indexes.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.4/en/multiple-column-indexes.html</a> — 복합 인덱스 왼쪽 접두 및 조건 예제를 확인했다.</li>
 <li>MySQL 8.4, How MySQL Uses Indexes — <a href="https://dev.mysql.com/doc/refman/8.4/en/mysql-indexes.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.4/en/mysql-indexes.html</a> — 커버링 조회와 작은 테이블·대량 조회에서 인덱스 이득이 줄 수 있음을 확인했다.</li>
 <li>MySQL 8.4, EXPLAIN Output Format — <a href="https://dev.mysql.com/doc/refman/8.4/en/explain-output.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.4/en/explain-output.html</a> — <code>type</code>, <code>key</code>, <code>rows</code>, <code>Extra</code> 및 전체 스캔·정렬 관련 설명을 확인했다.</li>
+<li>MySQL 8.4, EXPLAIN Statement — <a href="https://dev.mysql.com/doc/refman/8.4/en/explain.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.4/en/explain.html</a> — <code>EXPLAIN ANALYZE</code>의 실제 실행과 TREE 출력의 actual time·rows·loops를 확인했다.</li>
+<li>MySQL 8.4, Invisible Indexes — <a href="https://dev.mysql.com/doc/refman/8.4/en/invisible-indexes.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.4/en/invisible-indexes.html</a> — 보조 인덱스의 INVISIBLE/VISIBLE 전환과 옵티마이저의 기본 선택 제외를 확인했다.</li>
+<li>MySQL 8.4, ANALYZE TABLE — <a href="https://dev.mysql.com/doc/refman/8.4/en/analyze-table.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.4/en/analyze-table.html</a> — 테이블 통계 갱신 동작을 확인했다.</li>
+<li>MySQL 8.4, DROP INDEX — <a href="https://dev.mysql.com/doc/refman/8.4/en/drop-index.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.4/en/drop-index.html</a> — 인덱스 삭제 문법을 확인했다.</li>
 <li>MySQL 8.4, Optimization and Indexes — <a href="https://dev.mysql.com/doc/refman/8.4/en/optimization-indexes.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.4/en/optimization-indexes.html</a> — 불필요한 인덱스의 공간·쓰기 비용을 확인했다.</li>
 <li>Use The Index, Luke!, The Search Tree (B-Tree) Makes the Index Fast — <a href="https://use-the-index-luke.com/sql/anatomy/the-tree" target="_blank" rel="noopener">https://use-the-index-luke.com/sql/anatomy/the-tree</a> — 루트·분기·리프와 리프 연결, 균형 트리 탐색을 확인했다.</li>
 <li>PostgreSQL 18, Index Types — <a href="https://www.postgresql.org/docs/current/indexes-types.html" target="_blank" rel="noopener">https://www.postgresql.org/docs/current/indexes-types.html</a> — B-Tree의 동등·범위 검색과 다른 인덱스 종류를 비교 확인했다.</li>

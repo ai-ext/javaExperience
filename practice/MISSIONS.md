@@ -96,6 +96,7 @@ docker compose down -v && docker compose up -d   # 데이터를 처음 상태로
   - 글 7(DRAFT, 작성자 5): 5번만 200, 나머지 404 / 글 36(HIDDEN): 1번만 200 / 글 42(삭제): 모두 404
   - 글 15(FOLLOWERS, 작성자 2): 2번 팔로워만 200
 - 덤: 목록 20개를 가져올 때 SQL이 몇 번 나가는지 세기(작성자·태그 N+1)
+- API 응답 필드에서 테이블과 SQL을 찾아가는 첫 연습은 [DB-01](../scenario/db-query-journey/db-01-response-to-query.md)에서 이어간다.
 
 ### M2. 좋아요·취소와 동시성
 - `PUT /api/posts/{id}/like`, `DELETE /api/posts/{id}/like` → `{liked, likeCount}`

@@ -4,6 +4,8 @@
 
 **처음 시작하기:** [0-1 Java 첫 API부터](ch0-first-steps/0-1-ts-to-java.md) · [바로 게시글 API 만들기](ch1-create-post/1-1-receive-request.md) · [진행 방법 보기](#진행-방법)
 
+**DB 학습 경로:** [DB-01 응답→테이블](db-query-journey/db-01-response-to-query.md) → [DB-02 SELECT·WHERE·커서](db-query-journey/db-02-select-cursor.md) → [DB-03 상세 JOIN](db-query-journey/db-03-detail-join.md)으로 같은 게시판 데이터의 조회를 확장합니다. [DB-06 좋아요와 북마크의 NOT EXISTS](db-query-journey/db-06-exists-not-exists.md)에서 관계 제외 조건을 연습하고, [DB-10 성능 실험용 데이터 준비](db-query-journey/DB-10-performance-fixture.md)에서 EXPLAIN·인덱스 비교용 분리 데이터를 준비합니다.
+
 각 단계에서 API 서버 주소를 확인하고 요청 버튼을 누르면 브라우저에서 응답을 볼 수 있다.
 
 ## 목차
@@ -258,6 +260,8 @@ PUT 전체 교체와 PATCH 부분 수정 뒤 본인 글을 지운다. 지운 글
 ## 쿼리 설계 18개 연습
 
 기존 게시판 기능으로 만든 데이터를 같은 ID로 계속 조회하고 검색한다. [L12: 파생 쿼리·MyBatis 8개](labs/l12-query-methods/README.md) → [L13: `@Query`·동적 SQL 6개](labs/l13-declared-queries/README.md) → [L14: QueryDSL 4개](labs/l14-querydsl-extension/README.md) 순서다.
+
+각 연습의 API와 SQL을 연결하기 전에 [DB-01](db-query-journey/db-01-response-to-query.md)에서 응답 필드의 테이블을 찾고 [DB-02](db-query-journey/db-02-select-cursor.md)에서 WHERE·정렬·커서 페이지를 이어 만드세요. 느린 쿼리와 인덱스 실험을 준비하려면 [DB-10](db-query-journey/DB-10-performance-fixture.md)으로 이어집니다.
 
 각 Q 시나리오에 Controller·Service·DTO·Repository·Mapper 코드 접기가 있다. 이 연습용 완성 프로젝트는 `python3 tools/materialize-query-practice.py --output /tmp/query-practice`로 별도 폴더에 복원할 수 있다.
 

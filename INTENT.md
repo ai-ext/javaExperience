@@ -15,6 +15,7 @@
 5. DBeaver/CloudBeaver는 앱의 처리 경로가 아닌 별도 관찰 도구로 무엇을 볼 수 있는가?
 6. 앞 단계에서 만든 데이터가 다음 POST/GET/PUT/PATCH/DELETE에서 어떻게 이어지는가?
 7. 직접 버튼을 눌렀을 때 기대 응답과 실제 응답을 어떻게 비교하는가?
+8. API 응답 필드에서 필요한 테이블·열·WHERE·JOIN·정렬을 어떻게 유도하고, 작성한 SQL과 실제 실행 계획을 어떻게 검증하는가?
 
 ## 콘텐츠와 시각 설계 원칙
 
@@ -24,6 +25,7 @@
 - 시각 자료는 실제 `imagegen` 시안을 먼저 만들고, 이미지의 잘못된 글자·코드·기술 표현은 구현 전에 원문과 대조한다. 시안은 방향이고 기술 사실의 근거가 아니다.
 - 모든 화면·절·산문·표·코드·토글은 `docs/design/visual-inventory.jsonl`에 식별한다. 상태는 증거에 따라 `unreviewed → mockup_ready → implemented → verified`로만 올린다. 공통 컴포넌트 하나를 적용했다고 모든 개별 화면을 완료로 표시하지 않는다.
 - 정답 코드와 채점 기준, API 계약은 UI 재구성 중 손상하지 않는다. 예상 흐름 애니메이션을 실제 서버 계측으로 표현하지 않는다.
+- DB 학습은 [DB 시나리오 확장 계획](docs/design/DB-SCENARIO-PLAN.md)의 연속 경로로 설계한다. `EXPLAIN` 추정, `EXPLAIN ANALYZE` 실측, `ANALYZE TABLE` 통계 갱신을 분리하고 기존 `practice` 정답 데이터는 보존한다.
 
 ## 현재 확인된 상태
 

@@ -20,6 +20,7 @@ import { renderMissionVisual } from './mission-visual.mjs';
 import { renderMissionDetails } from './mission-detail-visual.mjs';
 import { renderHomeVisual } from './home-visual.mjs';
 import { renderLessonAtlas } from './lesson-atlas.mjs';
+import { renderDbIndexExperiment } from './db-index-experiment.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const rel = (p) => path.relative(ROOT, p).split(path.sep).join('/');
@@ -112,6 +113,7 @@ function render(abs) {
   const links = []; // {href, target, hash}
   const seen = new Map();
   let hasMermaid = false;
+  let hasDbIndexExperiment = false;
   let requestBlockCount = 0;
   const marked = new Marked({ gfm: true });
   marked.use({
@@ -127,6 +129,10 @@ function render(abs) {
       },
       code({ text, lang }) {
         if ((lang || '').trim() === 'check') return renderRequests(text, ++requestBlockCount, abs);
+        if ((lang || '').trim() === 'db-index-experiment') {
+          hasDbIndexExperiment = true;
+          return renderDbIndexExperiment();
+        }
         if ((lang || '').trim() === 'manual-command') return `<details class="manual-command"><summary>터미널 명령어 참고</summary><pre><code>${escapeHtml(text)}</code></pre></details>\n`;
         if ((lang || '').trim() === 'screen') {
           const stageId = LEVEL_BY_ABS.get(abs)?.id;
@@ -171,7 +177,7 @@ function render(abs) {
     html = collapseSection(html, '브라우저에서 API 요청 보내기', '요청이 안 될 때 · 로컬 서버와 CORS 설정');
   }
   html = autolinkDocIds(html, abs);
-  return { html, anchors, links, hasMermaid };
+  return { html, anchors, links, hasMermaid, hasDbIndexExperiment };
 }
 
 function collapseSection(html, headingText, summary) {
@@ -289,7 +295,7 @@ function graderPanel(lv) {
 }
 
 // ---------------------------------------------------------------- 페이지 틀
-function page({ abs, title, body, hasMermaid }) {
+function page({ abs, title, body, hasMermaid, hasDbIndexExperiment }) {
   const up = (p) => path.relative(path.dirname(abs), path.join(ROOT, p)).split(path.sep).join('/') || '.';
   const levelHref = (id) => {
     const target = STAGE_BY_ID.get(id)?.abs;
@@ -379,17 +385,17 @@ mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });</sc
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <link rel="stylesheet" href="${assetUrl('tools/site/site.css', path.dirname(abs))}">
-${lv || lab || abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/api-architecture.css', path.dirname(abs))}">\n` : ''}${lv ? `<link rel="stylesheet" href="${assetUrl('tools/site/scenario-visual.css', path.dirname(abs))}">\n<link rel="stylesheet" href="${assetUrl('tools/site/scenario-code-workbench.css', path.dirname(abs))}">\n<link rel="stylesheet" href="${assetUrl('tools/site/lesson-atlas.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/learning-journey.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'docs/knowledge/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/knowledge-visual.css', path.dirname(abs))}">\n` : ''}${abs.startsWith(`${DOC_DIR}${path.sep}`) && path.basename(abs).match(/^[A-Z]\d{2}-.*\.md$/) ? `<link rel="stylesheet" href="${assetUrl('tools/site/knowledge-page-visual.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'practice/MISSIONS.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/mission-visual.css', path.dirname(abs))}">\n<link rel="stylesheet" href="${assetUrl('tools/site/mission-detail-visual.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/home-visual.css', path.dirname(abs))}">\n` : ''}<script src="${assetUrl('tools/site/syntax-highlight.js', path.dirname(abs))}" defer></script>
+${lv || lab || abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/api-architecture.css', path.dirname(abs))}">\n` : ''}${lv ? `<link rel="stylesheet" href="${assetUrl('tools/site/scenario-visual.css', path.dirname(abs))}">\n<link rel="stylesheet" href="${assetUrl('tools/site/scenario-code-workbench.css', path.dirname(abs))}">\n<link rel="stylesheet" href="${assetUrl('tools/site/lesson-atlas.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'scenario/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/learning-journey.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'docs/knowledge/README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/knowledge-visual.css', path.dirname(abs))}">\n` : ''}${abs.startsWith(`${DOC_DIR}${path.sep}`) && path.basename(abs).match(/^[A-Z]\d{2}-.*\.md$/) ? `<link rel="stylesheet" href="${assetUrl('tools/site/knowledge-page-visual.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'practice/MISSIONS.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/mission-visual.css', path.dirname(abs))}">\n<link rel="stylesheet" href="${assetUrl('tools/site/mission-detail-visual.css', path.dirname(abs))}">\n` : ''}${abs === path.join(ROOT, 'README.md') ? `<link rel="stylesheet" href="${assetUrl('tools/site/home-visual.css', path.dirname(abs))}">\n` : ''}${hasDbIndexExperiment ? `<link rel="stylesheet" href="${assetUrl('tools/site/db-index-experiment.css', path.dirname(abs))}">\n` : ''}<script src="${assetUrl('tools/site/syntax-highlight.js', path.dirname(abs))}" defer></script>
 </head>
 <body>
 <header class="topbar"><a href="${up('index.html')}">javaExperience</a><a href="${up('scenario/README.html')}">시나리오</a><a href="${up('practice/MISSIONS.html')}">학습용 미션</a><a href="${up('docs/knowledge/README.html')}">공부자료</a></header>
-<main${abs.startsWith(`${DOC_DIR}${path.sep}`) && /^[A-Z]\d{2}-.*\.md$/.test(path.basename(abs)) ? ' class="knowledge-main"' : ''}>
+<main${hasDbIndexExperiment ? ' class="db-index-main"' : abs.startsWith(`${DOC_DIR}${path.sep}`) && /^[A-Z]\d{2}-.*\.md$/.test(path.basename(abs)) ? ' class="knowledge-main"' : ''}>
 ${crumbs}
 ${body}
 ${pager}
 </main>
 ${mermaid}
-${lv || lab ? `<script src="${assetUrl('tools/site/scenario-runner.js', path.dirname(abs))}" defer></script>` : ''}${lv ? `<script src="${assetUrl('tools/site/scenario-code-workbench.js', path.dirname(abs))}" defer></script>` : ''}
+${lv || lab ? `<script src="${assetUrl('tools/site/scenario-runner.js', path.dirname(abs))}" defer></script>` : ''}${lv ? `<script src="${assetUrl('tools/site/scenario-code-workbench.js', path.dirname(abs))}" defer></script>` : ''}${hasDbIndexExperiment ? `<script src="${assetUrl('tools/site/db-index-experiment.js', path.dirname(abs))}" defer></script>` : ''}
 </body>
 </html>
 `;
@@ -467,7 +473,7 @@ if (errors.length) {
 }
 for (const [f, r] of results) {
   const title = (read(f).match(/^# (.+)$/m)?.[1] ?? path.basename(f)).replace(/[`*]/g, '');
-  fs.writeFileSync(f.replace(/\.md$/, '.html'), page({ abs: f, title, body: r.html, hasMermaid: r.hasMermaid }));
+  fs.writeFileSync(f.replace(/\.md$/, '.html'), page({ abs: f, title, body: r.html, hasMermaid: r.hasMermaid, hasDbIndexExperiment: r.hasDbIndexExperiment }));
 }
 fs.copyFileSync(path.join(ROOT, 'README.html'), path.join(ROOT, 'index.html'));
 console.log(`HTML ${results.size}개 생성 · 시나리오 단계 ${LEVELS.length}개 · 링크 오류 0`);

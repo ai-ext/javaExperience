@@ -34,7 +34,7 @@ function sectionCard(heading, content, index) {
   const summary = preview(content);
   const open = /^(만들 것|직접 확인)$/.test(title) ? ' open' : '';
   return `<details class="lesson-scene lesson-${kind}" data-lesson-kind="${kind}"${open}>
-    <summary id="${esc(id)}" aria-label="${esc(title)} 내용 펼치기"><span class="lesson-scene-index">${String(index + 1).padStart(2, '0')}</span><span class="lesson-scene-glyph" aria-hidden="true">${glyph}</span><span class="lesson-scene-title"><small>${phase}</small><strong>${esc(title)}</strong>${summary ? `<em>${esc(summary)}</em>` : ''}</span><span class="lesson-scene-count">${codeCount ? `${codeCount}개 코드 · ` : ''}열기 ↓</span></summary>
+    <summary id="${esc(id)}" aria-label="${esc(title)} 내용 펼치기"><span class="lesson-scene-index">${String(index + 1).padStart(2, '0')}</span><span class="lesson-scene-glyph" aria-hidden="true">${glyph}</span><span class="lesson-scene-title"><small>${phase}</small><strong>${esc(title)}</strong>${summary ? `<em>${summary}</em>` : ''}</span><span class="lesson-scene-count">${codeCount ? `${codeCount}개 코드 · ` : ''}열기 ↓</span></summary>
     <div class="lesson-scene-content">${subtopics.length ? `<div class="lesson-scene-topics" aria-label="이 절의 세부 주제">${subtopics.map((topic) => `<span>${esc(topic)}</span>`).join('')}</div>` : ''}${content}</div>
   </details>`;
 }
