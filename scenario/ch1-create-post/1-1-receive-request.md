@@ -12,6 +12,87 @@
 
 사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름의 단계를 누르면 관련된 화면 요소가 강조된다.
 
+<section class="first-request-journey" aria-labelledby="first-request-journey-title">
+  <div class="first-request-journey__heading">
+    <p class="first-request-journey__eyebrow">POST /api/posts · 첫 요청의 여정</p>
+    <h3 id="first-request-journey-title">저장을 눌렀지만, 아직 DB에는 저장되지 않았어요</h3>
+    <p>같은 게시글 한 건이 화면 입력에서 HTTP 응답까지 어떻게 옮겨 가는지 따라가 보세요.</p>
+  </div>
+  <ol class="first-request-scenes" aria-label="게시글 요청의 네 장면">
+    <li class="first-request-scene">
+      <span class="first-request-scene__number" aria-hidden="true">01</span>
+      <div class="first-request-scene__body">
+        <h4>저장 버튼을 눌러요</h4>
+        <p>화면에서 작성한 제목과 본문, 태그가 요청 데이터가 됩니다.</p>
+        <div class="first-request-scene__visual first-request-form" aria-label="작성 화면의 값">
+          <span class="first-request-form__top"><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i> 새 글 작성</span>
+          <span><small>제목</small><strong>[채점] 첫 게시글</strong></span>
+          <span><small>본문</small>Spring Boot로 만든 첫 게시글입니다.</span>
+          <span><small>게시판 · 태그 · 공개 범위</small>dev · spring, jpa · PUBLIC</span>
+          <span class="first-request-button">저장</span>
+        </div>
+      </div>
+      <p class="first-request-scene__note">아직 저장 전</p>
+    </li>
+    <li class="first-request-scene">
+      <span class="first-request-scene__number" aria-hidden="true">02</span>
+      <div class="first-request-scene__body">
+        <h4>값이 JSON으로 전송돼요</h4>
+        <p>브라우저는 <code>POST</code> 요청 본문에 필드를 담아 서버로 보냅니다.</p>
+        <div class="first-request-scene__visual first-request-packet">
+          <div class="first-request-packet__meta"><strong>POST</strong><code>/api/posts</code><span>Content-Type: application/json</span></div>
+          <pre aria-label="전송되는 JSON"><code>{
+  "boardSlug": "dev",
+  "title": "[채점] 첫 게시글",
+  "content": "Spring Boot로 만든 첫 게시글입니다.",
+  "tags": ["spring", "jpa"],
+  "visibility": "PUBLIC"
+}</code></pre>
+          <span class="first-request-packet__destination" aria-hidden="true">→ 서버</span>
+        </div>
+      </div>
+      <p class="first-request-scene__note">JSON 요청 본문</p>
+    </li>
+    <li class="first-request-scene">
+      <span class="first-request-scene__number" aria-hidden="true">03</span>
+      <div class="first-request-scene__body">
+        <h4>Spring이 DTO로 바꿔 Controller에 전달해요</h4>
+        <p><code>HttpMessageConverter</code>가 JSON 필드를 <code>PostCreateRequest</code>의 구성 요소에 맞춥니다. 본문 변환에 실패하면 Controller 메서드까지 오지 않아요.</p>
+        <div class="first-request-scene__visual first-request-conversion" aria-label="JSON 본문에서 Controller까지의 변환">
+          <div><span>JSON 본문</span><code>title: "[채점] 첫 게시글"</code></div>
+          <span class="first-request-conversion__arrow" aria-hidden="true">→</span>
+          <div><span>HttpMessageConverter</span><small>JSON 읽기</small></div>
+          <span class="first-request-conversion__arrow" aria-hidden="true">→</span>
+          <div><span>PostCreateRequest</span><code>title = "[채점] 첫 게시글"</code></div>
+          <span class="first-request-conversion__arrow" aria-hidden="true">→</span>
+          <div class="first-request-conversion__controller"><span>PostController</span><code>create(request)</code></div>
+        </div>
+        <p class="first-request-scene__subflow"><span>Spring 내부 연결</span>DispatcherServlet → HandlerAdapter → 본문 변환 → Controller</p>
+      </div>
+      <p class="first-request-scene__note">DTO는 요청 모양을 담아요</p>
+    </li>
+    <li class="first-request-scene first-request-scene--response">
+      <span class="first-request-scene__number" aria-hidden="true">04</span>
+      <div class="first-request-scene__body">
+        <h4><code>success</code> 응답이 돌아와요</h4>
+        <p>Controller가 제목을 로그로 남긴 뒤 문자열을 반환합니다. 화면에는 요청 완료 알림을 띄울 수 있지만, 글의 ID나 저장 결과는 아직 알 수 없어요.</p>
+        <div class="first-request-scene__visual first-request-result">
+          <div class="first-request-result__http"><strong>HTTP 200 OK</strong><span>Content-Type: text/plain;charset=UTF-8</span><code>success</code></div>
+          <span class="first-request-result__arrow" aria-hidden="true">←</span>
+          <div class="first-request-result__screen"><strong>✓ 요청을 받았어요</strong><span>새 글 작성 화면</span></div>
+          <div class="first-request-result__db"><span aria-hidden="true">▤</span><strong>DB 저장 없음</strong></div>
+        </div>
+      </div>
+      <p class="first-request-scene__note">응답 확인 ≠ 저장 완료</p>
+    </li>
+  </ol>
+  <p class="first-request-journey__takeaway"><strong>이 단계의 경계</strong><span>Controller + 요청 DTO까지만 구현합니다. Service·Repository·MySQL 저장은 다음 단계들에서 추가합니다.</span></p>
+</section>
+
+### 요청 화면과 서버 흐름을 연결해서 보기
+
+아래 화면 시나리오에서 단계를 선택하면 요청 요소와 서버 흐름이 함께 강조됩니다. 위 네 장면은 요청의 큰 흐름을 먼저 보여 주고, 아래에서는 실패·CORS 상황까지 살펴봅니다.
+
 ```screen
 {
   "title": "글쓰기 화면",

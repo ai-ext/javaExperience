@@ -1,5 +1,83 @@
 # P02. MVC 패턴과 계층형 구조 — Controller·Service·Repository
 
+<section class="p02-visual" aria-labelledby="p02-visual-title">
+  <div class="p02-visual-heading">
+    <p class="p02-kicker">01 · 한 게시글로 보는 MVC</p>
+    <div class="p02-visual-title" id="p02-visual-title" role="heading" aria-level="2">MVC는 무엇을 나누는 걸까요?</div>
+    <p>같은 게시글도 <strong>데이터</strong>, <strong>보이는 모습</strong>, <strong>사용자 행동</strong>은 서로 다른 역할입니다.</p>
+    <p class="p02-example-note">게시글·작성자·숫자와 PATCH 경로는 모두 역할 설명용 예시입니다. 실제 API 계약이나 DB 조회 결과가 아닙니다.</p>
+  </div>
+  <div class="p02-post-scene" aria-label="게시글 데이터와 화면, 수정 요청을 각 MVC 역할에 연결한 예시">
+    <article class="p02-role p02-model">
+      <span class="p02-role-index">01</span>
+      <h3>Model</h3>
+      <p>화면에 보여줄 게시글 데이터와 상태</p>
+      <pre><code>{
+  "title": "첫 글",
+  "author": "김자바"
+}</code></pre>
+    </article>
+    <article class="p02-post-card">
+      <div class="p02-post-meta"><span>자바 이야기</span><span>예시 데이터</span></div>
+      <h3>첫 글</h3>
+      <p class="p02-author">김자바 · 2026. 10. 15.</p>
+      <p class="p02-post-body">Spring MVC의 역할을 데이터와 화면으로 나눠 봅니다.</p>
+      <div class="p02-post-actions"><span>♡ 5</span><span>댓글 2</span><span class="p02-edit-action">수정 요청 →</span></div>
+    </article>
+    <div class="p02-role-stack">
+      <article class="p02-role p02-controller">
+        <span class="p02-role-index">02</span>
+        <h3>Controller</h3>
+        <p>HTTP 요청을 받아 알맞은 동작에 연결</p>
+        <code>PATCH /api/posts/42</code>
+      </article>
+      <article class="p02-role p02-view">
+        <span class="p02-role-index">03</span>
+        <h3>View</h3>
+        <p>Model 데이터를 사용자에게 보이는 형태로 표현</p>
+        <div class="p02-browser-preview" aria-hidden="true"><i></i><i></i><i></i><b></b><b></b></div>
+      </article>
+    </div>
+  </div>
+  <div class="p02-change-scene">
+    <div>
+      <p class="p02-kicker">같은 데이터, 바뀐 값</p>
+      <h3>제목을 수정하면?</h3>
+      <div class="p02-value-change"><code>"첫 글"</code><span aria-hidden="true">→</span><code>"수정한 글"</code></div>
+    </div>
+    <div>
+      <p class="p02-kicker">화면은 데이터를 표현</p>
+      <h3>Model이 바뀌면 화면의 제목도 바뀝니다</h3>
+      <div class="p02-title-change"><span>첫 글</span><span aria-hidden="true">→</span><strong>수정한 글</strong></div>
+    </div>
+  </div>
+  <div class="p02-response-compare">
+    <div class="p02-compare-title"><p class="p02-kicker">Spring MVC의 응답 경로</p><h3>화면을 그릴지, JSON 데이터를 보낼지 선택합니다</h3></div>
+    <article class="p02-response-card p02-html">
+      <h4>HTML 화면</h4><span class="p02-response-badge">Model + View</span>
+      <p>Controller가 화면에 필요한 Model을 준비하고, View 기술이 HTML을 렌더링합니다.</p>
+      <code>Model → Thymeleaf → HTML</code>
+    </article>
+    <article class="p02-response-card p02-json">
+      <h4>JSON API</h4><span class="p02-response-badge">응답 DTO</span>
+      <p>응답 객체는 메시지 변환기가 JSON 본문으로 직렬화합니다. 서버가 HTML View를 렌더링하는 경로는 거치지 않습니다.</p>
+      <code>응답 DTO → HttpMessageConverter → JSON</code>
+    </article>
+  </div>
+  <div class="p02-boundary">
+    <h3>MVC와 Controller · Service · Repository는 서로 다른 분류입니다</h3>
+    <div class="p02-boundary-columns">
+      <div><p class="p02-kicker">웹 표현을 보는 MVC 관점</p><div class="p02-pills"><span>Model</span><span>View</span><span>Controller</span></div></div>
+      <div><p class="p02-kicker">애플리케이션 책임을 나누는 계층 관점</p><div class="p02-pills p02-layer-pills"><span>Controller<br><small>HTTP 경계</small></span><span>Service<br><small>유스케이스·규칙</small></span><span>Repository<br><small>저장소 접근</small></span></div></div>
+    </div>
+    <p class="p02-boundary-note">둘은 일부 이름이 겹쳐도 같은 목록이 아닙니다. Spring MVC Controller가 계층 구조의 Controller 역할도 맡을 수 있습니다.</p>
+  </div>
+  <details class="p02-check">
+    <summary>직접 확인: 제목을 바꾸는 기능에서 View와 Repository 중 무엇을 바꿀까요?</summary>
+    <p><strong>화면 표시 방식만 바꾼다면 View 쪽을 확인합니다.</strong> 저장 위치나 조회 방식만 바꾼다면 Repository 쪽을 확인합니다. 실제 업무 규칙은 Service가 맡으며, Controller는 HTTP 요청을 연결합니다.</p>
+  </details>
+</section>
+
 > MVC는 HTTP 요청과 응답을 다루는 표현 계층의 방식이다.  
 > Controller는 HTTP 경계를, Service는 유스케이스와 업무 규칙을, Repository는 저장소 접근을 맡긴다.  
 > 요청·응답 DTO와 내부 도메인 객체를 분리하고, Controller → Service → Repository 방향을 지킨다.

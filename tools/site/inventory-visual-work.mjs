@@ -46,7 +46,7 @@ function writePageChecklist(summary) {
     }
     lines.push('');
   }
-  fs.writeFileSync(checklistPath, `${lines.join('\n')}\n`);
+  fs.writeFileSync(checklistPath, `${lines.join('\n').trimEnd()}\n`);
 }
 
 const args = process.argv.slice(2);

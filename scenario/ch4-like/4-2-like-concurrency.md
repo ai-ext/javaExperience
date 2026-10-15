@@ -6,9 +6,31 @@
 
 **동시에 와도 `like_count` = 실제 좋아요 행 수**가 되게 고치고, 이를 테스트로 재현·고정한다.
 
+
+
 ## 화면 시나리오
 
 사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.
+
+<section class="like-race-story" aria-labelledby="like-race-title">
+  <div class="like-race-heading">
+    <span class="like-race-kicker">설명용 장면 · 실제 글 16의 초기값은 0</span>
+    <div class="like-race-title" id="like-race-title" role="heading" aria-level="2">두 번 눌렀는데, 왜 숫자는 한 번만 늘었을까요?</div>
+    <p>서로 다른 두 회원이 같은 글을 누릅니다. 아래의 5는 원리를 보여 주기 위한 값입니다.</p>
+  </div>
+  <div class="like-race-post" aria-label="예시 게시글의 시작 좋아요 수"><span>게시글 · 첫 글</span><strong>♥ <span>5</span></strong></div>
+  <div class="like-race-timeline" role="group" aria-label="읽고 더한 값을 저장할 때의 네 순간">
+    <div class="like-race-timeline-head" aria-hidden="true"><span>시간</span><span>요청 A</span><span>DB like_count</span><span>요청 B</span></div>
+    <div class="like-race-moment" id="like-race-t1"><span class="like-race-time">t1</span><span class="like-race-action a">5 읽기 → 6 계산</span><span class="like-race-db">5</span><span class="like-race-quiet">대기</span></div>
+    <div class="like-race-moment" id="like-race-t2"><span class="like-race-time">t2</span><span class="like-race-quiet">아직 저장 전</span><span class="like-race-db">5</span><span class="like-race-action b">5 읽기 → 6 계산</span></div>
+    <div class="like-race-moment" id="like-race-t3"><span class="like-race-time">t3</span><span class="like-race-action a">6 저장</span><span class="like-race-db changed">6</span><span class="like-race-quiet">저장 전</span></div>
+    <div class="like-race-moment is-loss" id="like-race-t4"><span class="like-race-time">t4</span><span class="like-race-quiet">완료</span><span class="like-race-db changed">6</span><span class="like-race-action b">6 저장 · A의 증가분 덮음</span></div>
+  </div>
+  <div class="like-race-result"><div><small>두 명이 눌렀으니</small><strong>기대 7</strong></div><div><small>읽고 +1 저장하면</small><strong>실제 6</strong></div><p>두 요청이 모두 처음 값 5를 읽었기 때문에 두 번째 저장이 첫 번째 증가를 잃게 합니다.</p></div>
+  <div class="like-race-fix"><div><span class="like-race-kicker">고치는 방법 1 · 서로 다른 회원</span><h3>더하기를 DB에서 한 번에</h3><p><code>UPDATE post SET like_count = like_count + 1 WHERE id = 16</code></p><div class="like-race-fixed-path" aria-label="각 원자 갱신이 DB의 현재 값에 더함"><span>요청 A</span><span>DB 5 → 6</span><span>요청 B</span><span>DB 6 → 7</span></div></div><div><span class="like-race-kicker">고치는 방법 2 · 같은 회원 연타</span><h3>중복 행도 막아야 합니다</h3><p><code>UNIQUE(post_id, member_id)</code>로 한 회원의 좋아요 행을 하나만 허용하고, 중복 시도는 이미 좋아요한 상태로 응답합니다.</p></div></div>
+  <p class="like-race-caveat">원자 UPDATE만으로 기능이 완성되지는 않습니다. 좋아요 행 INSERT의 성공 여부에 따라 카운트를 갱신하고, 트랜잭션·중복 키·교착 재시도를 함께 검증합니다.</p>
+  <a class="like-race-next" href="#만들-것">이제 20명 동시 요청의 완료 기준 보기 →</a>
+</section>
 
 ```screen
 {
