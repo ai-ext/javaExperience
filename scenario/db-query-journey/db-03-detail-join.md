@@ -97,6 +97,6 @@ MySQL의 Boolean 표현은 이 SELECT에서 `1`/`0`으로 나타납니다. 실�
 
 ## 다음 미션
 
-- 다음 계획: DB-04 — JOIN 결과가 여러 행으로 늘어나는 이유와 태그 집계. 상세에 댓글·태그처럼 여러 건 관계를 붙일 때 중복 행을 살펴봅니다.
+- 다음: [DB-04 — 태그 JOIN과 EXISTS에서 중복 행을 다루기](db-04-tag-filter-and-exists.md). 상세에 댓글·태그처럼 여러 건 관계를 붙일 때 결과의 한 행이 무엇을 뜻하는지 확인합니다.
 - 기능 계약: [M1 — 게시판 글 목록·상세](../../practice/MISSIONS.md)
 - 이전 쿼리 흐름: [DB-01 — API 응답에서 첫 SQL까지](db-01-response-to-query.md) · [DB-02 — 커서 목록 SQL](db-02-select-cursor.md)

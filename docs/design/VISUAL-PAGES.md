@@ -1,20 +1,25 @@
 # 화면별 시각 개편 체크리스트
 
-저자 원문과 생성 HTML이 함께 있는 328개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 42,809개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
+저자 원문과 생성 HTML이 함께 있는 333개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 42,990개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
 
 체크는 해당 화면의 모든 개별 항목이 `verified`일 때만 자동으로 붙는다. `imagegen` 시안 또는 공통 컴포넌트 한 개를 적용한 상태는 완료가 아니다.
 
-## 홈·목차·미션·기타 (9)
+## 홈·목차·미션·기타 (14)
 
 - [ ] [README.md](../../README.html) — 항목 30, 긴 산문 1, 토글 1, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [errors.md](../../errors.html) — 항목 261, 긴 산문 1, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [practice/MISSIONS.md](../../practice/MISSIONS.html) — 항목 97, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [scenario/README.md](../../scenario/README.html) — 항목 368, 긴 산문 1, 토글 195, 최대 접기 깊이 4; 상태: unreviewed
+- [ ] [scenario/db-query-journey/DB-07-same-api-five-query-styles.md](../../scenario/db-query-journey/DB-07-same-api-five-query-styles.html) — 항목 68, 긴 산문 0, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [scenario/db-query-journey/DB-10-performance-fixture.md](../../scenario/db-query-journey/DB-10-performance-fixture.html) — 항목 25, 긴 산문 1, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [scenario/db-query-journey/db-01-response-to-query.md](../../scenario/db-query-journey/db-01-response-to-query.html) — 항목 35, 긴 산문 1, 토글 2, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [scenario/db-query-journey/db-02-select-cursor.md](../../scenario/db-query-journey/db-02-select-cursor.html) — 항목 18, 긴 산문 0, 토글 1, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [scenario/db-query-journey/db-03-detail-join.md](../../scenario/db-query-journey/db-03-detail-join.html) — 항목 27, 긴 산문 0, 토글 2, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [scenario/db-query-journey/db-04-tag-filter-and-exists.md](../../scenario/db-query-journey/db-04-tag-filter-and-exists.html) — 항목 23, 긴 산문 0, 토글 3, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [scenario/db-query-journey/db-05-aggregate-fanout.md](../../scenario/db-query-journey/db-05-aggregate-fanout.html) — 항목 28, 긴 산문 0, 토글 4, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [scenario/db-query-journey/db-06-exists-not-exists.md](../../scenario/db-query-journey/db-06-exists-not-exists.html) — 항목 25, 긴 산문 0, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [scenario/db-query-journey/db-12-join-exists-explain.md](../../scenario/db-query-journey/db-12-join-exists-explain.html) — 항목 29, 긴 산문 2, 토글 1, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [scenario/db-query-journey/db-13-list-api-n-plus-one.md](../../scenario/db-query-journey/db-13-list-api-n-plus-one.html) — 항목 33, 긴 산문 1, 토글 1, 최대 접기 깊이 1; 상태: unreviewed
 
 ## 공부자료 (135)
 
