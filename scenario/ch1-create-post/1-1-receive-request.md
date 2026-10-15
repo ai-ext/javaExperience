@@ -291,37 +291,20 @@
 ```
 
 ## 만들 것
-
-| 항목 | 내용 |
-|---|---|
-| 메서드·경로 | `POST /api/posts` |
-| 요청 헤더 | `Content-Type: application/json` |
-| 요청 본문 | 아래 JSON — 전용 요청 클래스로 받는다 |
-| 응답 | 상태 `200`, 본문은 문자열 `success` |
-| 그 밖에 | 받은 제목(title)을 로그로 남긴다 |
-| CORS | `/api/**`를 studymate 화면(다른 출처)에 연다 — 아래 [CORS 열기](#cors-열기) |
-
-요청 본문:
-
-```json
-{
+<section class="first-request-build" aria-label="요청을 받고 success로 응답하는 구현 흐름"><p class="first-request-build__eyebrow">1-1 구현 범위 · POST /api/posts</p><div class="first-request-build__steps"><article class="first-request-build__step"><span class="first-request-build__number">01</span><div class="first-request-build__step-title"><h3>클라이언트가 요청</h3><p>JSON 본문을 전용 요청 DTO로 보냅니다.</p></div><div class="first-request-build__request"><div class="first-request-build__request-head"><strong>POST</strong><code>/api/posts</code></div><p>Content-Type: application/json</p><pre><code>{
   "boardSlug": "dev",
   "title": "[채점] 첫 게시글",
   "content": "Spring Boot로 만든 첫 게시글입니다.",
   "tags": ["spring", "jpa"],
   "visibility": "PUBLIC"
-}
-```
-
-| 필드 | 타입 | 뜻 |
-|---|---|---|
-| `boardSlug` | 문자열 | 게시판 주소 이름 — `notice`, `dev`, `qna`, `free` |
-| `title` | 문자열 | 제목 |
-| `content` | 문자열 | 본문 |
-| `tags` | 문자열 배열 | 태그 이름들 |
-| `visibility` | 문자열 | 공개 범위 — `PUBLIC`(전체) 또는 `FOLLOWERS`(팔로워만) |
-
-이 단계에서는 값이 맞는지 검사하지 않는다(1-5에서 한다).
+}</code></pre></div></article><div class="first-request-build__connector" aria-hidden="true">→</div><article class="first-request-build__step"><span class="first-request-build__number first-request-build__number--teal">02</span><div class="first-request-build__step-title"><h3>JSON 필드를 DTO에 매핑</h3><p>필드 이름이 맞으면 Spring이 요청 객체를 만듭니다.</p></div><div class="first-request-build__mapping" aria-label="JSON 요청 필드와 PostCreateRequest 구성 요소 매핑"><div class="first-request-build__mapping-row"><code>boardSlug</code><span aria-hidden="true">→</span><code>String boardSlug</code><small>게시판 주소 이름: notice · dev · qna · free</small></div><div class="first-request-build__mapping-row"><code>title</code><span aria-hidden="true">→</span><code>String title</code><small>게시글 제목</small></div><div class="first-request-build__mapping-row"><code>content</code><span aria-hidden="true">→</span><code>String content</code><small>게시글 본문</small></div><div class="first-request-build__mapping-row"><code>tags</code><span aria-hidden="true">→</span><code>List&lt;String&gt; tags</code><small>태그 이름 배열: spring · jpa</small></div><div class="first-request-build__mapping-row"><code>visibility</code><span aria-hidden="true">→</span><code>String visibility</code><small>PUBLIC 전체 공개 · FOLLOWERS 팔로워만</small></div><p class="first-request-build__mapping-note">값 검증은 아직 하지 않습니다. 검증은 1-5에서 추가합니다.</p></div><pre class="first-request-build__dto"><code>public record PostCreateRequest(
+    String boardSlug, String title, String content,
+    List&lt;String&gt; tags, String visibility
+) { }</code></pre></article><div class="first-request-build__connector" aria-hidden="true">→</div><article class="first-request-build__step"><span class="first-request-build__number">03</span><div class="first-request-build__step-title"><h3>Controller가 요청을 받음</h3><p><code>@RequestBody</code>로 DTO를 받고 제목을 기록합니다.</p></div><div class="first-request-build__controller"><span>PostController.java</span><pre><code>@PostMapping("/api/posts")
+public String create(@RequestBody PostCreateRequest request) {
+    log.info("게시글 작성 요청: {}", request.title());
+    return "success";
+}</code></pre><a href="#구현-가이드">구현 가이드에서 전체 코드 보기 ↓</a></div></article></div><div class="first-request-build__outcomes"><article class="first-request-build__success"><p class="first-request-build__outcome-label">정상 요청의 응답</p><h3>HTTP 200 OK</h3><p>Content-Type: <code>text/plain;charset=UTF-8</code></p><pre><code>success</code></pre><p class="first-request-build__log"><strong>서버 로그</strong><code>게시글 작성 요청: [채점] 첫 게시글</code></p></article><article class="first-request-build__not-saved"><span aria-hidden="true">▤</span><h3>아직 DB에 저장하지 않아요</h3><p>이번 단계는 Controller와 요청 DTO까지만 만듭니다. Service·DB 저장은 다음 단계에서 다룹니다.</p></article></div><p class="first-request-build__cors">브라우저에서 다른 출처의 화면으로 요청하려면 <a href="#cors-열기">CORS 설정도 확인하세요</a>.</p></section>
 
 ## 구현 가이드
 
@@ -331,81 +314,19 @@
 
 <details>
 <summary>Controller — POST 요청을 받는 입구</summary>
-
-`org.example.post.PostController`에서 경로를 매핑한다. 1-2에서 응답을 `201`과 JSON으로 바꾸기 전까지는 문자열을 그대로 반환한다.
-
-```java
-@RestController
-public class PostController {
-    private static final Logger log = LoggerFactory.getLogger(PostController.class);
-
-    @PostMapping("/api/posts")
-    public String create(@RequestBody PostCreateRequest request) {
-        log.info("게시글 작성 요청: {}", request.title());
-        return "success";
-    }
-}
-```
-
-`@RestController`, `@PostMapping`, `@RequestBody`와 SLF4J `Logger`·`LoggerFactory`를 import한다. 잘못된 JSON은 메서드에 오기 전 변환 과정에서 `400`이 된다.
-
+<section class="first-request-controller-code" aria-label="POST 요청을 Controller가 처리하고 응답하는 흐름"><p class="first-request-controller-code__intro"><code>POST /api/posts</code> 요청은 DTO로 변환된 뒤 Controller 메서드에 도착합니다.</p><div class="first-request-controller-code__route"><article><span>01 · 요청</span><strong>POST /api/posts</strong><small>Content-Type: application/json</small></article><b aria-hidden="true">→</b><article><span>02 · 본문 변환</span><strong>@RequestBody</strong><small>PostCreateRequest request</small></article><b aria-hidden="true">→</b><article><span>03 · Controller 응답</span><strong>String</strong><small>200 · text/plain</small></article></div><div class="first-request-controller-code__editor"><header><strong>org.example.post.PostController.java</strong><span>실제 코드</span></header><pre><code class="language-java">package org.example.post;&#10;&#10;import org.slf4j.Logger;&#10;import org.slf4j.LoggerFactory;&#10;import org.springframework.web.bind.annotation.PostMapping;&#10;import org.springframework.web.bind.annotation.RequestBody;&#10;import org.springframework.web.bind.annotation.RestController;&#10;&#10;@RestController&#10;public class PostController {&#10;    private static final Logger log = LoggerFactory.getLogger(PostController.class);&#10;&#10;    @PostMapping("/api/posts")&#10;    public String create(@RequestBody PostCreateRequest request) {&#10;        log.info("게시글 작성 요청: {}", request.title());&#10;        return "success";&#10;    }&#10;}</code></pre></div><div class="first-request-controller-code__response"><strong>정상 요청</strong><span>HTTP 200 OK</span><code>Content-Type: text/plain;charset=UTF-8</code><pre><code>success</code></pre></div><div class="first-request-controller-code__error"><strong>본문 변환에 실패하면</strong><span>문법이 깨진 JSON 등은 Controller 메서드에 도착하기 전에 변환이 실패해 HTTP 400이 됩니다. 메서드는 실행되지 않습니다.</span><code>HttpMessageNotReadableException</code></div><p class="first-request-controller-code__boundary">이 단계에서는 Controller와 요청 DTO만 구현합니다. Service 호출과 DB 저장은 아직 없습니다. import는 위 코드에 적힌 Spring Web·SLF4J 타입을 사용합니다. 1-2에서 응답을 상태 201과 JSON으로 바꾸기 전까지는 문자열을 그대로 반환합니다.</p></section>
 </details>
 
 <details>
 <summary>DTO — JSON의 필드와 record 구성 요소</summary>
-
-`PostCreateRequest.java`를 만들고 JSON 키와 구성 요소 이름을 맞춘다. 이 단계에는 검증을 붙이지 않는다.
-
-```java
-public record PostCreateRequest(
-    String boardSlug,
-    String title,
-    String content,
-    List<String> tags,
-    String visibility
-) { }
-```
-
-`List`는 `java.util.List`를 import한다. 요청에서 `title`을 읽는 메서드는 `getTitle()`이 아니라 `title()`이다.
-
+<section class="first-request-dto-code" aria-label="요청 JSON 필드를 PostCreateRequest record에 매핑"><p class="first-request-dto-code__intro">JSON 키와 <code>record</code> 구성 요소 이름을 맞추면 Spring이 요청 본문을 객체로 변환합니다.</p><div class="first-request-dto-code__mapping" aria-label="JSON 필드와 record 필드 매핑"><div><code>boardSlug</code><span aria-hidden="true">→</span><strong>String boardSlug</strong><small>게시판 주소 이름</small></div><div><code>title</code><span aria-hidden="true">→</span><strong>String title</strong><small>제목</small></div><div><code>content</code><span aria-hidden="true">→</span><strong>String content</strong><small>본문</small></div><div><code>tags</code><span aria-hidden="true">→</span><strong>List&lt;String&gt; tags</strong><small>태그 이름 배열</small></div><div><code>visibility</code><span aria-hidden="true">→</span><strong>String visibility</strong><small>PUBLIC 또는 FOLLOWERS</small></div></div><div class="first-request-dto-code__record"><header><strong>PostCreateRequest.java</strong><span>요청 DTO · record</span></header><pre><code class="language-java">import java.util.List;&#10;&#10;public record PostCreateRequest(&#10;    String boardSlug,&#10;    String title,&#10;    String content,&#10;    List&lt;String&gt; tags,&#10;    String visibility&#10;) { }</code></pre></div><div class="first-request-dto-code__access"><strong>Controller에서 꺼내기</strong><code>request.title()</code><span>record 접근자는 <code>getTitle()</code>이 아니라 <code>title()</code>입니다.</span></div><div class="first-request-dto-code__caution"><strong>변환과 검증은 다른 단계예요</strong><span>이 단계에는 Bean Validation을 붙이지 않습니다. JSON 문법 오류나 대상 타입으로 변환할 수 없는 값은 변환 실패로 400이 될 수 있습니다. 필드 이름이 어긋났다고 매번 400이라고 단정하지 말고, JSON 키와 record 이름을 맞춰 필요한 값을 받으세요.</span></div></section>
 </details>
 
 ## CORS 열기
-
-studymate 화면의 실행 칸은 **브라우저가** 내 서버로 직접 요청을 보낸다. 그러려면 서버가 "이 출처에서 오는 요청은 읽어도 된다"고 허락해야 한다.
-
-0장에서 `CorsConfig`를 이미 만들었다면 그대로 둔다(0-3용 `X-Client` 헤더가 하나 더 들어 있다). `org.example` 아래 설정용 클래스 하나(예: `org.example.config.CorsConfig`)에서 `WebMvcConfigurer`를 구현하고 `addCorsMappings`를 재정의한다.
-
-| 설정 | 값 | 이유 |
-|---|---|---|
-| 경로 | `/api/**` | API만 연다. `/hello` 같은 다른 경로는 그대로 |
-| `allowedOriginPatterns` | `http://localhost:[*]`, `http://127.0.0.1:[*]` | studymate가 지금 뜨는 곳(로컬 `http://localhost:3000`). `[*]`라 포트가 바뀌어도 된다. **studymate를 배포하면 그 주소를 여기에 추가한다** |
-| `allowedMethods` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS` | 기본값은 `GET`·`HEAD`·`POST`뿐이다. 그대로 두면 3-1의 `PATCH`, 3-2의 `DELETE`가 preflight에서 막힌다 |
-| `allowedHeaders` | `Content-Type`, `Authorization`, `X-Client` | 앞 단계 `/api/echo`의 `X-Client` 허용을 유지하고, 글 API의 `Content-Type`·`Authorization`을 추가한다(`Authorization`은 1-6부터) |
-| `exposedHeaders` | `Location`, `WWW-Authenticate` | 기본값은 없음. 브라우저 코드는 노출된 응답 헤더만 읽는다. 빼면 1-2의 `Location`, 1-6의 `WWW-Authenticate` 확인이 **브라우저에서만** 실패한다(Postman은 헤더를 읽을 수 있다) |
-
-기본값은 Spring Framework 7.0(Spring Boot 4.1)의 `addMapping` 기준이다.
-
-#### 왜 필요한가
-
-- **출처(origin)** 는 프로토콜·호스트·포트 묶음이다. studymate 화면(`http://localhost:3000`)과 내 서버(`http://localhost:8080`)는 포트가 달라 **다른 출처**다.
-- 브라우저는 **같은 출처 정책**으로, 다른 출처의 응답을 페이지의 코드가 읽지 못하게 막는다. 서버가 응답 헤더 `Access-Control-Allow-Origin`으로 그 출처를 허락해야 읽힌다. 이 허락 규칙이 CORS다.
-- JSON 본문(`Content-Type: application/json`), `Authorization` 헤더, `PUT`·`PATCH`·`DELETE`가 들어간 요청은 "단순 요청"이 아니다. 브라우저는 본 요청 전에 `OPTIONS` 요청(**preflight**)으로 "이 출처에서 이 메서드·헤더로 보내도 되나"를 먼저 묻고, 허락이 없으면 본 요청을 **아예 보내지 않는다**. 요청 A도 JSON이라 preflight를 거친다.
-- Postman·IntelliJ HTTP Client는 브라우저가 아니라 CORS를 검사하지 않는다. 그래서 "curl로는 되는데 버튼만 실패"가 생긴다.
-- CORS는 보안 장치(로그인·권한 검사)가 아니다. 브라우저가 응답을 코드에 보여 줄지 정할 뿐이다.
-- **1-6에서 인터셉터로 토큰을 확인하게 되면** preflight `OPTIONS`도 그 인터셉터를 지나는데, 토큰 없이 온다. 인터셉터가 막으면(401·500) 브라우저의 요청이 전부 CORS로 실패한다. 인터셉터 맨 앞에서 `CorsUtils.isPreFlightRequest(request)`면 `true`를 돌려 통과시킨다.
+<section class="first-request-cors" aria-label="브라우저 CORS 요청 흐름과 서버 허용 설정"><p class="first-request-cors__eyebrow">브라우저 교차 출처 요청 · POST /api/posts</p><div class="first-request-cors__origins"><article><span>브라우저 · 학습 화면</span><strong>http://localhost:<b>3000</b></strong><small>화면 코드가 요청을 보냅니다</small></article><div class="first-request-cors__different"><strong>출처가 달라요</strong><span>포트가 다름</span><b aria-hidden="true">↔</b></div><article><span>Spring API 서버</span><strong>http://localhost:<b>8080</b></strong><small>게시글 API가 요청을 받습니다</small></article></div><p class="first-request-cors__definition">출처(origin)는 프로토콜·호스트·포트의 조합입니다. <code>localhost:3000</code>과 <code>localhost:8080</code>은 포트가 달라 다른 출처예요.</p><h3>JSON 요청은 먼저 허락을 확인해요</h3><ol class="first-request-cors__flow"><li><span class="first-request-cors__step">01</span><div><strong>브라우저가 OPTIONS preflight를 보냄</strong><code>OPTIONS /api/posts</code><small>Origin: http://localhost:3000 · Access-Control-Request-Method: POST · Access-Control-Request-Headers: content-type</small></div></li><li><span class="first-request-cors__step first-request-cors__step--green">02</span><div><strong>서버가 허용 헤더로 답함</strong><code>Access-Control-Allow-Origin: http://localhost:3000</code><small>Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS</small><small>이 요청의 Access-Control-Allow-Headers: content-type</small></div></li><li><span class="first-request-cors__step">03</span><div><strong>허락을 확인한 뒤 실제 POST 전송</strong><code>POST /api/posts</code><small>이 1-1 요청의 헤더는 Content-Type: application/json 입니다.</small></div></li></ol><div class="first-request-cors__blocked"><strong>허락 헤더가 없으면?</strong><span>preflight 응답에 <code>Access-Control-Allow-Origin</code>이 없으면 브라우저는 실제 <code>POST</code>를 보내지 않고 차단합니다. 서버가 OPTIONS에 200으로 답해도 허락 헤더가 빠지면 같은 결과입니다.</span></div><div class="first-request-cors__facts"><article><strong>CORS는 로그인이나 권한 검사가 아니에요</strong><p>브라우저가 다른 출처 응답을 페이지 코드에 보여 줄지 정하는 규칙입니다. 실제 인증·권한 처리는 서버가 따로 해야 합니다.</p></article><article><strong>Postman은 브라우저 CORS를 검사하지 않아요</strong><p>서버 응답 헤더를 직접 확인할 수 있어도, 브라우저가 응답을 읽을 수 있는지는 브라우저에서 확인해야 합니다.</p></article></div><h3>서버에서 허용할 범위</h3><div class="first-request-cors__settings" role="list" aria-label="CorsConfig 설정과 이유"><div role="listitem"><strong>경로</strong><code>/api/&#42;&#42;</code><small>API만 열고 <code>/hello</code> 같은 경로는 그대로 둡니다.</small></div><div role="listitem"><strong>allowedOriginPatterns</strong><code>http&#58;//localhost:&#91;&#42;&#93;</code><code>http&#58;//127.0.0.1:&#91;&#42;&#93;</code><small>로컬 화면의 포트가 달라도 허용합니다. 배포 뒤에는 배포한 화면 주소를 추가합니다.</small></div><div role="listitem"><strong>allowedMethods</strong><code>GET · POST · PUT · PATCH · DELETE · OPTIONS</code><small>기본은 GET·HEAD·POST뿐이라 이후 PATCH·DELETE 단계가 preflight에서 막힐 수 있습니다.</small></div><div role="listitem"><strong>allowedHeaders</strong><code>Content-Type · Authorization · X-Client</code><small><code>X-Client</code>는 0-3 설정을 유지하고, <code>Authorization</code>은 1-6부터 사용합니다.</small></div><div role="listitem"><strong>exposedHeaders</strong><code>Location · WWW-Authenticate</code><small>브라우저 코드에서 읽을 응답 헤더입니다. 1-2와 1-6의 헤더 확인에 필요합니다. Postman은 이 제한을 받지 않습니다.</small></div></div><p class="first-request-cors__existing">0장에서 <code>CorsConfig</code>를 만들었다면 기존 설정을 유지하고 필요한 값을 합치세요. 구현은 <code>org.example</code> 아래 설정 클래스에서 <code>WebMvcConfigurer</code>의 <code>addCorsMappings</code>를 재정의합니다. Spring Framework 7.0(Spring Boot 4.1)의 <code>addMapping</code> 기본값을 기준으로 설명합니다.</p><aside class="first-request-cors__interceptor"><strong>1-6 토큰 인터셉터 주의</strong><span><code>OPTIONS</code> preflight에는 토큰이 없습니다. 인터셉터가 이를 차단하면 브라우저는 CORS 실패처럼 보입니다. 인터셉터 맨 앞에서 <code>CorsUtils.isPreFlightRequest(request)</code>가 true이면 통과시키세요.</span></aside></section>
 
 ## 직접 확인
-
-API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 요청은 아래 실행 패널에서 순서대로 보낸다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
-
-
-
-브라우저로 확인 — 위쪽 **내 서버 주소**가 앱 주소와 같은지 보고 아래 실행 칸의 [전체 실행]을 누른다. C1·C2가 통과하면 브라우저에서도 CORS가 열린 것이다(요청 A는 preflight를 거친다).
-
-"CORS로 막혔어요"가 뜨면 [CORS 열기](#cors-열기)를 다시 본다. 개발자 도구(F12) → Network 탭에서 `OPTIONS /api/posts`(preflight)와 `POST /api/posts` 두 줄, 응답 헤더의 `Access-Control-Allow-Origin`을 볼 수 있다. C3·C4는 브라우저가 대신 보낼 수 없는 요청이라(코드는 `Origin` 헤더를 못 바꾼다) Postman에서 Origin과 preflight 헤더를 지정해 확인한다.
-
-버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다.
+<section class="first-request-check" aria-label="브라우저 요청 실행과 CORS 수동 확인 순서"><p class="first-request-check__intro">서버 주소를 확인하고 기존 요청 패널에서 A와 B를 실행하세요. 아래 요청 버튼과 실제 응답 패널은 그대로 사용합니다.</p><ol class="first-request-check__steps"><li><span>01</span><div><strong>서버 주소 확인</strong><p>페이지 상단의 <b>내 서버 주소</b>가 실행 중인 API 주소인지 확인합니다.</p></div></li><li><span>02</span><div><strong>브라우저에서 A → B 실행</strong><p>A는 정상 JSON 요청입니다. 브라우저 Network에서 <code>OPTIONS /api/posts</code> 뒤에 <code>POST /api/posts</code>가 보이는지 확인하세요. B는 깨진 JSON 요청입니다.</p></div></li><li><span>03</span><div><strong>예상 결과와 실제 응답 비교</strong><p>A의 기대값은 <code>200</code> + 본문 <code>success</code>, B는 <code>400</code>입니다. 실행 전 예상값과 실행 뒤 실제 응답을 구분해 확인합니다. 실제 결과는 요청을 보낸 뒤 응답 패널에 표시됩니다.</p></div></li></ol><div class="first-request-check__browser-note"><strong>브라우저가 막으면</strong><span>“CORS로 막혔어요”가 뜨면 Network에서 preflight 응답의 <code>Access-Control-Allow-Origin</code>을 확인하고 <a href="#cors-열기">CORS 설정</a>으로 돌아가세요.</span></div></section>
 
 ```check
 {
@@ -457,7 +378,7 @@ API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 
     },
     {
       "id": "C3",
-      "manual": "CORS preflight — 브라우저 코드는 Origin·Access-Control-Request-Method를 직접 못 붙인다. Postman 요청 C로 200, Access-Control-Allow-Origin: http://localhost:3000, Allow-Methods에 PATCH, Allow-Headers에 authorization이 있는지 본다"
+      "manual": "CORS preflight — 브라우저 코드는 Origin·Access-Control-Request-Method를 직접 못 붙인다. Postman 요청 C에 Access-Control-Request-Headers: content-type, authorization을 넣고 200, Access-Control-Allow-Origin: http://localhost:3000, Allow-Methods에 PATCH, Allow-Headers에 authorization이 있는지 본다"
     },
     {
       "id": "C4",
@@ -467,19 +388,10 @@ API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 
 }
 ```
 
+<section class="first-request-check__manual" aria-label="Postman에서만 확인하는 C3와 C4"><div class="first-request-check__manual-heading"><span>수동 확인 · Postman</span><p>브라우저 코드에서는 Origin과 preflight 요청 헤더를 직접 설정할 수 없어 C3·C4는 Postman에서 확인합니다.</p></div><article><strong>C3 · 요청 C · preflight</strong><p><code>OPTIONS /api/posts</code> 요청에 <code>Origin: http://localhost:3000</code>, <code>Access-Control-Request-Method: POST</code>, <code>Access-Control-Request-Headers: content-type, authorization</code>를 붙입니다. 기대값: <code>200</code>, <code>Access-Control-Allow-Origin: http://localhost:3000</code>, 허용 메서드에 <code>PATCH</code>, 허용 헤더에 <code>authorization</code>.</p></article><article><strong>C4 · 요청 D · 노출 헤더</strong><p>요청 A에 <code>Origin: http://localhost:3000</code>을 붙여 POST로 보냅니다. 기대값: <code>200</code>, 같은 allow-origin, <code>Access-Control-Expose-Headers</code>에 <code>Location</code>과 <code>WWW-Authenticate</code>.</p></article></section>
+
 ## 채점 기준
-
-C = HTTP 확인(필수), R = 코드 리뷰(피드백용 — 통과/실패에 넣지 않는다).
-
-| # | 확인 방법 | 기대 |
-|---|---|---|
-| C1 | 요청 A | 상태 `200`, 본문이 정확히 `success` |
-| C2 | 요청 B | 상태 `400` |
-| C3 | 요청 C (CORS preflight) | 상태 `200`, `Access-Control-Allow-Origin: http://localhost:3000`, `Access-Control-Allow-Methods`에 `PATCH`, `Access-Control-Allow-Headers`에 `authorization` |
-| C4 | 요청 D (`Origin`을 붙인 요청 A) | 상태 `200`, `Access-Control-Allow-Origin: http://localhost:3000`, `Access-Control-Expose-Headers`에 `Location`·`WWW-Authenticate` |
-| R1 | 컨트롤러 | `@RestController`이고 `POST /api/posts`에 매핑되어 있다(`@PostMapping`, 또는 클래스의 `@RequestMapping("/api/posts")` + `@PostMapping`) |
-| R2 | 요청 객체 | 본문을 `Map`이나 `String`이 아니라 전용 클래스(권장: `record`, 예: `PostCreateRequest`)로 받는다. 필드 이름이 JSON과 같다 |
-| R3 | 로그 | 받은 제목을 SLF4J 로거로 남긴다(`System.out.println`이 아님). 자리표시자 `{}`를 쓴다 |
+<section class="first-request-rubric" aria-label="필수 HTTP 확인 C1부터 C4와 피드백용 코드 리뷰 R1부터 R3"><div class="first-request-rubric__header"><p>C1–C4는 필수 HTTP 확인입니다. R1–R3는 코드 리뷰 피드백이며 통과·실패 판정에 넣지 않습니다.</p><aside>실행하기 전 기대값을 읽고, 요청을 보낸 뒤 실제 응답과 비교하세요.</aside></div><div class="first-request-rubric__columns"><section class="first-request-rubric__http" aria-label="필수 HTTP 확인"><h3>HTTP 확인 · 필수</h3><article><span>C1</span><div><strong>정상 요청 · A</strong><code>POST /api/posts</code><p>기대: 상태 <b>200</b>, 본문이 정확히 <code>success</code></p></div></article><article><span>C2</span><div><strong>깨진 JSON · B</strong><code>POST /api/posts</code><p>기대: 상태 <b>400</b></p></div></article><article><span>C3</span><div><strong>CORS preflight · 요청 C</strong><code>OPTIONS /api/posts</code><p>기대: 상태 <b>200</b>, <code>Access-Control-Allow-Origin: http://localhost:3000</code>; 허용 메서드에 <code>PATCH</code>, 허용 헤더에 <code>authorization</code></p><small>Origin·Access-Control-Request-Method 등은 Postman에서 지정합니다.</small></div></article><article><span>C4</span><div><strong>Origin 포함 요청 · D</strong><code>POST /api/posts</code><p>기대: 상태 <b>200</b>, 같은 allow-origin, <code>Access-Control-Expose-Headers</code>에 <code>Location</code>·<code>WWW-Authenticate</code></p><small>요청 A에 Origin: http://localhost:3000을 붙여 확인합니다.</small></div></article></section><section class="first-request-rubric__review" aria-label="피드백용 코드 리뷰"><h3>코드 리뷰 · 피드백용</h3><article><span>R1</span><div><strong>Controller 매핑</strong><p><code>@RestController</code>에서 <code>POST /api/posts</code>를 받는지 확인합니다. 메서드의 <code>@PostMapping</code> 또는 클래스의 <code>@RequestMapping("/api/posts")</code>와 메서드의 <code>@PostMapping</code> 조합이 가능합니다.</p><pre><code>@PostMapping("/api/posts")</code></pre></div></article><article><span>R2</span><div><strong>전용 요청 DTO</strong><p><code>@RequestBody PostCreateRequest</code>로 받고, DTO 필드명이 JSON 키와 같은지 봅니다. <code>Map</code>이나 <code>String</code>으로 직접 받지 않습니다.</p><pre><code>String boardSlug, String title,&#10;String content, List&lt;String&gt; tags,&#10;String visibility</code></pre></div></article><article><span>R3</span><div><strong>SLF4J 제목 로그</strong><p>받은 제목을 SLF4J로 기록하고 자리표시자 <code>{}</code>를 사용합니다. <code>System.out.println</code>은 사용하지 않습니다.</p><pre><code>log.info("게시글 작성 요청: {}", request.title());</code></pre></div></article></section></div><ol class="first-request-rubric__compare" aria-label="응답 확인 순서"><li><b>1</b><span>요청 보내기</span></li><li><b aria-hidden="true">→</b></li><li><b>2</b><span>실제 응답 확인</span></li><li><b aria-hidden="true">→</b></li><li><b>3</b><span>기대값과 비교</span></li></ol></section>
 
 ## 필요한 지식
 
@@ -494,55 +406,22 @@ C = HTTP 확인(필수), R = 코드 리뷰(피드백용 — 통과/실패에 넣
 
 <details>
 <summary>힌트 1 — 어떤 파일을 만들까</summary>
-
-`org.example` 아래에 게시글 기능용 패키지(예: `org.example.post`)를 하나 만들고, 컨트롤러 클래스 하나와 요청 `record` 하나로 시작한다. `HelloController`가 어떻게 생겼는지 먼저 보자.
+<section class="first-request-hint-files" aria-label="게시글 기능 파일을 만드는 세 단계"><p>기존 <code>HelloController</code>를 살펴본 뒤 같은 애플리케이션 안에 게시글 전용 패키지와 파일을 더합니다.</p><ol><li><span>1</span><div><strong>기존 파일 살펴보기</strong><code>HelloController.java</code><small>패키지와 Controller 구조를 참고합니다.</small></div></li><li><span>2</span><div><strong>기능 패키지 만들기</strong><code>src/main/java/org/example/post/</code><small>게시글 기능의 파일을 한곳에 둡니다.</small></div></li><li><span>3</span><div><strong>두 파일 추가</strong><code>PostController.java</code><code>PostCreateRequest.java</code><small>요청을 받을 Controller와 요청 record부터 만듭니다.</small></div></li></ol><aside><strong>이번 단계 범위</strong><span>Service나 Repository는 아직 만들지 않습니다.</span></aside></section>
 </details>
 
 <details>
 <summary>힌트 2 — 본문을 객체로 받기</summary>
-
-컨트롤러 메서드의 매개변수에 `@RequestBody`를 붙이면 Spring이 JSON을 그 타입으로 바꿔 준다. `record`의 구성 요소 이름이 JSON 필드 이름과 같아야 한다. 반환 타입이 `String`이면 그 문자열이 그대로 응답 본문이 된다.
+<section class="first-request-hint-request" aria-label="요청 본문이 Controller 매개변수가 되는 과정"><p>메서드 매개변수의 <code>@RequestBody</code>가 Spring에 JSON 본문을 어떤 Java 타입으로 바꿀지 알려 줍니다.</p><ol><li><span>요청 JSON · 5개 필드</span><pre><code>{"boardSlug":"dev","title":"[채점] 첫 게시글","content":"Spring Boot로 만든 첫 게시글입니다.","tags":["spring","jpa"],"visibility":"PUBLIC"}</code></pre></li><li><span>@RequestBody가 붙은 매개변수</span><code>PostCreateRequest request</code></li><li><span>record 구성 요소</span><code>String title</code></li><li><span>Controller에서 읽기</span><code>request.title()</code></li></ol><div class="first-request-hint-request__return"><strong>반환 타입이 String이면</strong><span><code>@RestController</code>에서 반환한 문자열이 HTTP 응답 본문으로 전달됩니다.</span></div><div class="first-request-hint-request__caution"><strong>이름과 타입을 함께 확인</strong><span>JSON 필드명과 record 이름을 맞추세요. 문법 오류나 호환되지 않는 타입으로 본문 변환이 실패하면 Controller 실행 전에 400이 될 수 있습니다. 이 단계에서는 Bean Validation을 적용하지 않습니다.</span></div></section>
 </details>
 
 <details>
 <summary>힌트 3 — SLF4J 로거</summary>
-
-`log.info(...)`를 호출하려면 먼저 `log`라는 로거 인스턴스가 있어야 한다. Lombok 없이 직접 선언하는 방법은 다음과 같다.
-
-~~~java
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-@RestController
-public class PostController {
-    private static final Logger log = LoggerFactory.getLogger(PostController.class);
-
-    // 메서드 안에서 log.info("게시글 작성 요청: {}", request.title());
-}
-~~~
-
-Lombok의 `@Slf4j`를 클래스에 붙이면 컴파일할 때 같은 이름의 `log` 필드를 만들어 주므로 import와 필드 선언을 생략할 수 있다. 이 학습 레포는 명시적 SLF4J 필드를 기본 예제로 사용한다. 필드 선언을 눈으로 확인하고 로거가 어디서 오는지 이해하기 쉽기 때문이다. 기존 프로젝트가 `@Slf4j`를 쓰면 그 관례에 맞추면 된다.
+<section class="first-request-hint-logger" aria-label="명시적 SLF4J와 Lombok 로거 선택"><p><code>log.info(...)</code>를 호출하기 전에 <code>log</code>라는 로거 인스턴스가 필요합니다.</p><div class="first-request-hint-logger__ways"><article><header><span>이 레포의 기본 예제</span><strong>직접 선언</strong></header><pre><code class="language-java">import org.slf4j.Logger;&#10;import org.slf4j.LoggerFactory;&#10;&#10;private static final Logger log =&#10;    LoggerFactory.getLogger(PostController.class);&#10;&#10;log.info("게시글 작성 요청: {}", request.title());</code></pre><p>로거 필드가 어디서 오는지 코드에서 확인할 수 있습니다.</p></article><article><header><span>기존 프로젝트 관례가 있으면</span><strong>Lombok 선택</strong></header><pre><code class="language-java">import lombok.extern.slf4j.Slf4j;&#10;&#10;@Slf4j&#10;public class PostController { ... }</code></pre><p><code>@Slf4j</code>가 컴파일할 때 같은 이름의 <code>log</code> 필드를 생성하므로 직접 선언과 import를 생략합니다.</p></article></div><aside><strong>두 방식은 모두 SLF4J 로깅입니다.</strong><span>이 학습 레포는 명시적 필드 선언을 기본으로 사용합니다. 기존 코드가 <code>@Slf4j</code>를 쓰면 그 관례를 따르면 됩니다. <code>System.out.println</code> 대신 로거를 사용하세요.</span></aside></section>
 </details>
 
 <details>
 <summary>힌트 4 — CORS 설정 코드</summary>
-
-```java
-@Configuration
-public class CorsConfig implements WebMvcConfigurer {
-
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/**")
-                .allowedOriginPatterns("http://localhost:[*]", "http://127.0.0.1:[*]")
-                .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-                .allowedHeaders("Content-Type", "Authorization", "X-Client")
-                .exposedHeaders("Location", "WWW-Authenticate");
-    }
-}
-```
-
-`allowedOrigins("*")`로 모두 열지 않는다. 고친 뒤에는 앱을 다시 띄워야 반영된다.
+<section class="first-request-hint-cors" aria-label="CorsConfig 코드와 설정값"><p>브라우저가 학습 화면에서 API 서버를 호출할 수 있도록 <code>org.example</code> 아래 설정 클래스를 둡니다.</p><div class="first-request-hint-cors__grid"><div class="first-request-hint-cors__editor"><header><strong>org.example.config.CorsConfig</strong><span>Spring MVC 설정</span></header><pre><code class="language-java">package org.example.config;&#10;&#10;import org.springframework.context.annotation.Configuration;&#10;import org.springframework.web.servlet.config.annotation.CorsRegistry;&#10;import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;&#10;&#10;@Configuration&#10;public class CorsConfig implements WebMvcConfigurer {&#10;    @Override&#10;    public void addCorsMappings(CorsRegistry registry) {&#10;        registry.addMapping("/api/&#42;&#42;")&#10;            .allowedOriginPatterns("http&#58;//localhost:&#91;&#42;&#93;", "http&#58;//127.0.0.1:&#91;&#42;&#93;")&#10;            .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")&#10;            .allowedHeaders("Content-Type", "Authorization", "X-Client")&#10;            .exposedHeaders("Location", "WWW-Authenticate");&#10;    }&#10;}</code></pre></div><div class="first-request-hint-cors__settings"><article><strong>경로</strong><code>/api/&#42;&#42;</code></article><article><strong>허용 출처 패턴</strong><code>http&#58;//localhost:&#91;&#42;&#93;</code><code>http&#58;//127.0.0.1:&#91;&#42;&#93;</code></article><article><strong>허용 메서드</strong><code>GET · POST · PUT · PATCH · DELETE · OPTIONS</code></article><article><strong>허용 요청 헤더</strong><code>Content-Type · Authorization · X-Client</code></article><article><strong>브라우저에 노출할 응답 헤더</strong><code>Location · WWW-Authenticate</code></article></div></div><aside><strong>적용할 때 확인하세요</strong><span><code>allowedOrigins("&#42;")</code>로 모두 열지 않습니다. 0장에서 만든 설정이 있다면 <code>X-Client</code> 허용을 포함해 유지하세요. 코드를 수정한 뒤에는 앱을 다시 띄워 반영합니다.</span></aside></section>
 </details>
 
 ## 다음 단계
