@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J12. Virtual Threads·Structured Concurrency·Scoped Values</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=be06fe764657">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,11 +18,11 @@
 스레드는 작업마다 만들고, DB·원격 API 같은 제한 자원은 커넥션 풀·세마포어로 별도 제한한다. 모니터 안 블로킹에 따른 pinning은 Java 24(JEP 491)에서 대부분 제거됐다.
 Scoped Values는 호출 구간에 불변 문맥을 전달하며 Java 25에서 정식화됐다. Structured Concurrency는 Java 27까지 프리뷰이므로 Java 25 기준 API와 프리뷰 옵션·버전을 확인한다.</p>
 </blockquote>
-<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>요청이 CPU로 5ms 일하고 DB를 150ms 기다리는 동기식 서버를 생각하자. 요청마다 플랫폼 스레드를 붙이면 CPU가 한가해도 스레드와 OS 자원이 먼저 차 대기열·timeout·재시도가 커진다. 풀만 늘리면 스택과 스케줄링 부담이 커지고, VT만 늘리면 DB 연결보다 많은 요청이 대기해 커넥션 대기와 메모리가 급증한다.</p>
 <p>“가볍다”를 “CPU 작업도 빠르다”로 오해해도 안 된다. 8코어에서 CPU 전용 작업을 10만 개 던져도 코어 수는 그대로며, 작업 객체와 대기 비용은 남는다.</p>
 <p>면접에서 “VT는 OS 스레드 없이 실행된다”, “모든 <code>synchronized</code>는 pinning된다”, “Structured Concurrency는 Java 25 정식 API다”라고 답하면 틀린다. 코드는 carrier에서 실행되고, JEP 491 이후 모니터 pinning은 대부분 사라졌으며, Structured Concurrency는 Java 27에서도 프리뷰다.</p>
-</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong><small>서로 헷갈리는 선택</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">2. 핵심 개념</strong><small>서로 헷갈리는 선택</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -77,7 +77,7 @@ Scoped Values는 호출 구간에 불변 문맥을 전달하며 Java 25에서 �
 <td>실패·취소·관측을 작업 트리 단위로 다룸. Java 27까지 프리뷰</td>
 </tr>
 </tbody></table></div>
-<h3 id="서로-헷갈리는-선택"><a class="anchor" href="#서로-헷갈리는-선택" aria-hidden="true">#</a>서로 헷갈리는 선택</h3>
+<details class="knowledge-topic"><summary id="서로-헷갈리는-선택" aria-label="서로 헷갈리는 선택 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">서로 헷갈리는 선택</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -112,8 +112,8 @@ Scoped Values는 호출 구간에 불변 문맥을 전달하며 Java 25에서 �
 <td>한 요청의 병렬 fan-out/fan-in이면 구조화된 범위가 더 잘 맞음</td>
 </tr>
 </tbody></table></div>
-</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>플랫폼 스레드의 한계에서 VT까지 · 어떤 블로킹은 양보하고 어떤 블로킹은 붙잡나 · 왜 풀링하지 않고 자원별로 제한하나 · ThreadLocal이 불편해지는 이유와 Scoped Values</small></span><span class="knowledge-chapter-meta">2개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
-<h3 id="플랫폼-스레드의-한계에서-vt까지"><a class="anchor" href="#플랫폼-스레드의-한계에서-vt까지" aria-hidden="true">#</a>플랫폼 스레드의 한계에서 VT까지</h3>
+</div></details></div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 내부 동작·원리</strong><small>플랫폼 스레드의 한계에서 VT까지 · 어떤 블로킹은 양보하고 어떤 블로킹은 붙잡나 · 왜 풀링하지 않고 자원별로 제한하나 · ThreadLocal이 불편해지는 이유와 Scoped Values</small></span><span class="knowledge-chapter-meta">2개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="플랫폼-스레드의-한계에서-vt까지" aria-label="플랫폼 스레드의 한계에서 VT까지 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">플랫폼 스레드의 한계에서 VT까지</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>플랫폼 스레드는 OS 스레드와 스택·커널 자원을 점유한다. 요청이 소켓이나 JDBC를 기다리는 동안 CPU가 놀아도 스레드는 점유되어, 동시 요청이 늘면 thread-per-request가 병목이 된다.</p>
 <p>Virtual thread도 <code>java.lang.Thread</code>다. JDK 스케줄러가 실행할 VT를 carrier에 올린다. 지원되는 블로킹 I/O에서 런타임은 호출 상태와 재개 지점을 보존(continuation)하고 VT를 suspend한다. 대기가 풀리면 다시 스케줄링해 어느 carrier에서든 실행을 잇는다.</p>
 <pre><code class="language-text">요청용 VT A ──실행──&gt; carrier P1(OS thread)
@@ -124,16 +124,16 @@ Scoped Values는 호출 구간에 불변 문맥을 전달하며 Java 25에서 �
      │
      └─ A의 I/O 완료 ──&gt; 스케줄러에 재제출 ──&gt; A를 carrier P2에 mount ──&gt; 재개</code></pre>
 <p>동시 VT 수가 carrier 수를 넘어도 CPU 코어가 늘지는 않는다. 긴 I/O 대기 중 carrier를 다른 요청에 써 처리량을 높일 수 있지만 개별 왕복시간을 줄이지는 않는다.</p>
-<h3 id="어떤-블로킹은-양보하고-어떤-블로킹은-붙잡나"><a class="anchor" href="#어떤-블로킹은-양보하고-어떤-블로킹은-붙잡나" aria-hidden="true">#</a>어떤 블로킹은 양보하고 어떤 블로킹은 붙잡나</h3>
+</div></details><details class="knowledge-topic"><summary id="어떤-블로킹은-양보하고-어떤-블로킹은-붙잡나" aria-label="어떤 블로킹은 양보하고 어떤 블로킹은 붙잡나 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">어떤 블로킹은 양보하고 어떤 블로킹은 붙잡나</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>지원 블로킹 연산은 VT를 unmount할 수 있지만, native 메서드 등 실행 프레임을 분리할 수 없는 곳에서 블로킹하면 pinning되어 carrier도 묶인다. VT 수만 늘려서는 이를 해결하지 못한다.</p>
 <p>Java 21에서는 모니터 안 블로킹이 주요 pinning 사례라 <code>synchronized</code>를 <code>ReentrantLock</code>으로 바꾸라는 조언이 흔했다. Java 24 JEP 491은 모니터 규약은 유지하면서 블로킹 VT가 carrier를 반납하게 해 이런 pinning 대부분을 없앴다. 남은 native·foreign 구간은 관측하고, 일괄 락 교체는 피한다.</p>
-<h3 id="왜-풀링하지-않고-자원별로-제한하나"><a class="anchor" href="#왜-풀링하지-않고-자원별로-제한하나" aria-hidden="true">#</a>왜 풀링하지 않고 자원별로 제한하나</h3>
+</div></details><details class="knowledge-topic"><summary id="왜-풀링하지-않고-자원별로-제한하나" aria-label="왜 풀링하지 않고 자원별로 제한하나 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">왜 풀링하지 않고 자원별로 제한하나</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>VT를 풀링하면 작업별 수명 모델을 잃고 풀 크기를 DB 용량 제한으로 오해하기 쉽다. 작업마다 만들고 DB pool·HTTP 연결 제한·rate limit은 실제 병목에 맞춘다.</p>
 <p>20-permit <code>Semaphore</code>는 외부 API 동시 진입을 20개로 제한한다. 대기 요청도 메모리와 timeout을 소비하므로 ingress·queue·backpressure도 정하고, 세마포어가 처리 용량 자체를 늘린다고 생각하지 않는다.</p>
-<h3 id="threadlocal이-불편해지는-이유와-scoped-values"><a class="anchor" href="#threadlocal이-불편해지는-이유와-scoped-values" aria-hidden="true">#</a>ThreadLocal이 불편해지는 이유와 Scoped Values</h3>
+</div></details><details class="knowledge-topic"><summary id="threadlocal이-불편해지는-이유와-scoped-values" aria-label="ThreadLocal이 불편해지는 이유와 Scoped Values 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">ThreadLocal이 불편해지는 이유와 Scoped Values</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p><code>ThreadLocal</code>은 스레드별 슬롯이다. VT 수가 많으면 map·값 메모리가 누적되고 <code>InheritableThreadLocal</code> 상속도 고려해야 한다. 작업별 VT는 풀 재사용에 따른 요청 간 값 누출을 줄이지만 mutable 값의 동기화 문제까지 없애지는 않는다.</p>
 <p><code>ScopedValue.where(KEY, value).run(...)</code>/<code>call(...)</code>은 동적 범위에 문맥을 바인딩한다. 하위 호출은 <code>KEY.get()</code>으로 읽고 범위가 끝나면 바인딩도 사라진다. 값 객체까지 immutable하게 만들지는 않는다. JEP 506은 Java 25 정식화이며 ThreadLocal을 대체·폐기하지 않는다.</p>
-<h3 id="structured-concurrency가-보장하려는-수명"><a class="anchor" href="#structured-concurrency가-보장하려는-수명" aria-hidden="true">#</a>Structured Concurrency가 보장하려는 수명</h3>
+</div></details><details class="knowledge-topic"><summary id="structured-concurrency가-보장하려는-수명" aria-label="Structured Concurrency가 보장하려는 수명 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">Structured Concurrency가 보장하려는 수명</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>첫 <code>Future.get()</code>이 실패해도 <code>ExecutorService</code>의 다른 작업은 계속될 수 있어 부모 종료 뒤 자식이 남는다. Structured Concurrency는 fork된 자식을 scope에 묶고 join·close로 종료를 정리한다. 실패 정책에 따라 자식을 취소·interrupt하지만, 인터럽트 무시 작업의 강제 종료까지 보장하지 않는다.</p>
 <pre><code class="language-text">요청 R: scope open
 ├─ 하위 작업 A (virtual thread) ── 결과 A / 실패
@@ -141,8 +141,8 @@ Scoped Values는 호출 구간에 불변 문맥을 전달하며 Java 25에서 �
 └─ join: 정책에 따라 완료·실패·취소 판단
    close: 미완료 자식 취소 및 종료 확인 → 요청 R 복귀</code></pre>
 <p>이는 <code>ExecutorService</code>를 대체하는 범용 API가 아니라 요청 fan-out 수명을 구조화하는 프리뷰다. 정책은 모두 성공, 하나 성공, 실패 즉시 취소 등 작업에 맞춘다. Java 25 JEP 505부터 정적 <code>open</code>을 쓰며, 다음 프리뷰와 API를 섞지 않는다.</p>
-</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1: 작업마다 가상 스레드 생성 · 예제 2: 외부 자원 동시성은 Semaphore로 제한 · 예제 3: 호출 범위에 Scoped Value 문맥 바인딩 · 예제 4: 요청 안의 병렬 하위 작업을 scope로 묶기</small></span><span class="knowledge-chapter-meta">6개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
-<h3 id="예제-1-작업마다-가상-스레드-생성"><a class="anchor" href="#예제-1-작업마다-가상-스레드-생성" aria-hidden="true">#</a>예제 1: 작업마다 가상 스레드 생성</h3>
+</div></details></div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">4. 코드로 확인</strong><small>예제 1: 작업마다 가상 스레드 생성 · 예제 2: 외부 자원 동시성은 Semaphore로 제한 · 예제 3: 호출 범위에 Scoped Value 문맥 바인딩 · 예제 4: 요청 안의 병렬 하위 작업을 scope로 묶기</small></span><span class="knowledge-chapter-meta">6개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="예제-1-작업마다-가상-스레드-생성" aria-label="예제 1: 작업마다 가상 스레드 생성 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">예제 1: 작업마다 가상 스레드 생성</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>아래 코드는 VT 8개가 동시에 대기 구간에 들어간 뒤 끝난다. <code>peakConcurrent</code>는 동시 작업 수이고, <code>Thread.isVirtual()</code>은 실행 중인 스레드가 VT인지 확인한다. 실행은 JDK 21.0.6에서 했다.</p>
 <pre><code class="language-java">import java.util.ArrayList;
 import java.util.List;
@@ -173,7 +173,7 @@ public class VirtualThreadFanOut {
 <p>JDK 21.0.6 실제 출력:</p>
 <pre><code class="language-text">tasks=8, virtual=8, peakConcurrent=8</code></pre>
 <p><code>Thread.startVirtualThread()</code>는 호출마다 VT를 시작한다. 운영 코드에서는 executor를 애플리케이션 수명에 맞춰 관리하고 종료 시 닫는다.</p>
-<h3 id="예제-2-외부-자원-동시성은-semaphore로-제한"><a class="anchor" href="#예제-2-외부-자원-동시성은-semaphore로-제한" aria-hidden="true">#</a>예제 2: 외부 자원 동시성은 Semaphore로 제한</h3>
+</div></details><details class="knowledge-topic"><summary id="예제-2-외부-자원-동시성은-semaphore로-제한" aria-label="예제 2: 외부 자원 동시성은 Semaphore로 제한 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">예제 2: 외부 자원 동시성은 Semaphore로 제한</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>스레드 수를 3개로 줄이지 않고도 동시에 외부 시스템에 들어가는 작업을 3개로 제한한다. 실제 서비스에서는 이미 존재하는 DB/HikariCP 연결 제한을 추가 세마포어로 중복 구현하지 않도록 기준을 정한다.</p>
 <pre><code class="language-java">import java.util.ArrayList;
 import java.util.List;
@@ -211,7 +211,7 @@ public class SemaphoreLimit {
 <p>JDK 21.0.6 실제 출력:</p>
 <pre><code class="language-text">tasks=12, maxDownstreamInFlight=3, permits=3</code></pre>
 <p>인터럽트·예외에서도 permit이 회수되도록 <code>finally</code>에서 해제한다. 이 간단한 출력 검증은 제한 논리를 보이는 예제이며 취소 경쟁·대기열·요청 timeout 정책까지 구현한 운영 라이브러리는 아니다.</p>
-<h3 id="예제-3-호출-범위에-scoped-value-문맥-바인딩"><a class="anchor" href="#예제-3-호출-범위에-scoped-value-문맥-바인딩" aria-hidden="true">#</a>예제 3: 호출 범위에 Scoped Value 문맥 바인딩</h3>
+</div></details><details class="knowledge-topic"><summary id="예제-3-호출-범위에-scoped-value-문맥-바인딩" aria-label="예제 3: 호출 범위에 Scoped Value 문맥 바인딩 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">예제 3: 호출 범위에 Scoped Value 문맥 바인딩</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-java">// Java 25+ (JEP 506)
 import java.lang.ScopedValue;
 
@@ -231,7 +231,7 @@ public class RequestContextExample {
     }
 }</code></pre>
 <p>(JDK 21 환경이라 미실행) JEP 506은 Java 25 정식화다. <code>get()</code>은 바인딩 범위 안에서 호출한다. preview 옵션은 필요 없다.</p>
-<h3 id="예제-4-요청-안의-병렬-하위-작업을-scope로-묶기"><a class="anchor" href="#예제-4-요청-안의-병렬-하위-작업을-scope로-묶기" aria-hidden="true">#</a>예제 4: 요청 안의 병렬 하위 작업을 scope로 묶기</h3>
+</div></details><details class="knowledge-topic"><summary id="예제-4-요청-안의-병렬-하위-작업을-scope로-묶기" aria-label="예제 4: 요청 안의 병렬 하위 작업을 scope로 묶기 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">예제 4: 요청 안의 병렬 하위 작업을 scope로 묶기</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-java">// Java 25+ (JEP 505)
 import java.util.concurrent.StructuredTaskScope;
 import java.util.concurrent.StructuredTaskScope.Subtask;
@@ -253,11 +253,11 @@ public class DashboardService {
     private int countOrders(String id) { return 12; }
 }</code></pre>
 <p>(JDK 21 환경이라 미실행) Java 25 프리뷰이므로 <code>javac --release 25 --enable-preview</code>와 <code>java --enable-preview</code>가 필요하다. Java 26·27은 해당 JEP의 변경을 반영한다. <code>join()</code> 전 <code>get()</code>을 호출하지 말고, 인터럽트 무시 자식의 종료 지연에 대비한다.</p>
-<h3 id="운영-관측"><a class="anchor" href="#운영-관측" aria-hidden="true">#</a>운영 관측</h3>
+</div></details><details class="knowledge-topic"><summary id="운영-관측" aria-label="운영 관측 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">운영 관측</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>JFR의 <code>jdk.VirtualThreadStart</code>, <code>jdk.VirtualThreadEnd</code>, <code>jdk.VirtualThreadPinned</code>, <code>jdk.VirtualThreadSubmitFailed</code>는 각각 시작·종료·pinning·scheduler 제출 실패를 살필 때 쓴다. pinning 진단 예: <code>jcmd &lt;pid&gt; JFR.start name=vt settings=profile duration=60s filename=vt.jfr</code>, 이어서 <code>jfr print --events jdk.VirtualThreadPinned vt.jfr</code>.</p>
 <p>활성 이벤트는 <code>jfr metadata vt.jfr</code>로 확인한다. Java 24 이후 남은 pinning 경로를 찾는 데 유용하다.</p>
 <p><code>jcmd &lt;pid&gt; Thread.dump_to_file -format=json threads.json</code>으로 VT 덤프도 확보한다. JFR 시간·덤프·요청 ID를 맞추고 녹화 이벤트와 기간을 필요한 만큼 설정한다.</p>
-</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -295,7 +295,7 @@ public class DashboardService {
 </tr>
 </tbody></table></div>
 <p>근거는 각 JEP에 둔다. Structured Concurrency는 기준일에 정식 기능이 아니므로 JDK별 preview 호환 정책을 확인한다.</p>
-</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>기본값 추천:</strong> 동시 요청이 많고 동기식 블로킹 I/O가 중심이면 작업별 VT를 선택한다. 대기 중 carrier를 반납하면서 요청별 동기 코드 흐름을 유지한다.</li>
 <li>대부분 CPU 계산이면 제한된 플랫폼 스레드 실행기를 택한다. VT는 코어 수나 계산 속도를 늘리지 않는다.</li>
@@ -306,7 +306,7 @@ public class DashboardService {
 <li>추적을 위해 JFR·VT-aware dump·요청 ID 로그를 함께 설계한다.</li>
 </ul>
 <p>Spring Boot에서 VT를 켜는 설정과 Servlet/WebFlux 선택은 이 문서 범위가 아니다(→ <a class="docref" href="S07-webflux-vs-vt.html">S07</a> 참조).</p>
-</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>VT 고정 크기 풀 →</strong> 풀 슬롯 대기가 생기고 자원 제한과 혼동된다 → 작업별 생성, permit·pool로 자원 제한.</li>
 <li><strong>CPU 가속으로 오해 →</strong> 코어는 늘지 않고 run queue·작업 메모리만 증가 → CPU 작업은 제한된 병렬성으로 처리.</li>
@@ -318,40 +318,40 @@ public class DashboardService {
 <li><strong>Structured Concurrency 프리뷰를 공용 API로 노출 →</strong> JDK마다 시그니처가 변함 → JDK·preview 정책 고정.</li>
 <li><strong>일반 스레드 덤프만 의존 →</strong> 대규모 VT 관측을 놓침 → JFR·<code>jcmd</code> JSON 덤프·요청 ID 병행.</li>
 </ol>
-</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. Virtual thread가 플랫폼 스레드보다 빨라지는가? · Q2. VT는 OS 스레드 없이 실행되는가? · Q3. Java 21에서 synchronized가 pinning 이슈였다면 Java 24에서도 피해야 하는가? · Q4. 왜 virtual-thread-per-task executor 대신 VT 풀을 만들지 않는가?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
-<h3 id="q1-virtual-thread가-플랫폼-스레드보다-빨라지는가"><a class="anchor" href="#q1-virtual-thread가-플랫폼-스레드보다-빨라지는가" aria-hidden="true">#</a>Q1. Virtual thread가 플랫폼 스레드보다 빨라지는가?</h3>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. Virtual thread가 플랫폼 스레드보다 빨라지는가? · Q2. VT는 OS 스레드 없이 실행되는가? · Q3. Java 21에서 synchronized가 pinning 이슈였다면 Java 24에서도 피해야 하는가? · Q4. 왜 virtual-thread-per-task executor 대신 VT 풀을 만들지 않는가?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="q1-virtual-thread가-플랫폼-스레드보다-빨라지는가" aria-label="Q1. Virtual thread가 플랫폼 스레드보다 빨라지는가? 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">Q1. Virtual thread가 플랫폼 스레드보다 빨라지는가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>아니다. CPU 명령을 더 빨리 실행하지 않는다. I/O 대기 중 carrier를 반납해 적은 플랫폼 스레드로 더 많은 작업을 겹쳐 처리할 수 있지만 CPU-bound는 코어가 한계다.</p>
 <p><strong>꼬리질문:</strong> 대기 시간이 길어도 throughput이 오르지 않을 수 있는 이유는?</p>
 <p>DB나 원격 서비스가 포화됐거나 pinning·메모리·유입량이 병목일 수 있다. VT는 그 용량을 늘리지 않으므로 자원별 동시성을 제한한다.</p>
-<h3 id="q2-vt는-os-스레드-없이-실행되는가"><a class="anchor" href="#q2-vt는-os-스레드-없이-실행되는가" aria-hidden="true">#</a>Q2. VT는 OS 스레드 없이 실행되는가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q2-vt는-os-스레드-없이-실행되는가" aria-label="Q2. VT는 OS 스레드 없이 실행되는가? 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">Q2. VT는 OS 스레드 없이 실행되는가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>아니다. 실행 순간 carrier 플랫폼 스레드 위에서 돈다. 지원되는 블로킹에 unmount하고, 깨어나면 다른 carrier에 mount될 수 있다.</p>
 <p><strong>꼬리질문:</strong> continuation은 무엇을 이어 주는가?</p>
 <p>중단 호출 위치와 상태를 보존해 그 다음 코드부터 잇게 한다. 애플리케이션은 동기식 호출·예외 흐름으로 작성한다.</p>
-<h3 id="q3-java-21에서-synchronized가-pinning-이슈였다면-java-24에서도-피해야-하는가"><a class="anchor" href="#q3-java-21에서-synchronized가-pinning-이슈였다면-java-24에서도-피해야-하는가" aria-hidden="true">#</a>Q3. Java 21에서 <code>synchronized</code>가 pinning 이슈였다면 Java 24에서도 피해야 하는가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q3-java-21에서-synchronized가-pinning-이슈였다면-java-24에서도-피해야-하는가" aria-label="Q3. Java 21에서 synchronized가 pinning 이슈였다면 Java 24에서도 피해야 하는가? 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">Q3. Java 21에서 synchronized가 pinning 이슈였다면 Java 24에서도 피해야 하는가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>Java 24 JEP 491은 모니터 보유 중에도 VT가 블로킹 시 carrier를 반납하게 했다. <code>synchronized</code>는 계속 유효하며 native·foreign pinning은 별도 진단한다.</p>
 <p><strong>꼬리질문:</strong> JEP 491이 pinning을 완전히 제거했는가?</p>
 <p>아니다. 대부분을 없앴지만 남은 경우가 있다. 실행 JDK의 JFR 이벤트와 호출 경로를 확인한다.</p>
-<h3 id="q4-왜-virtual-thread-per-task-executor-대신-vt-풀을-만들지-않는가"><a class="anchor" href="#q4-왜-virtual-thread-per-task-executor-대신-vt-풀을-만들지-않는가" aria-hidden="true">#</a>Q4. 왜 virtual-thread-per-task executor 대신 VT 풀을 만들지 않는가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q4-왜-virtual-thread-per-task-executor-대신-vt-풀을-만들지-않는가" aria-label="Q4. 왜 virtual-thread-per-task executor 대신 VT 풀을 만들지 않는가? 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">Q4. 왜 virtual-thread-per-task executor 대신 VT 풀을 만들지 않는가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>VT는 생성 부담이 낮아 작업마다 새로 만드는 것이 기본이다. 풀은 작업 동시성을 VT 수로 제한하고 스레드·작업 수명을 분리한다. 외부 자원은 별도 제한한다.</p>
 <p><strong>꼬리질문:</strong> downstream API가 초당 100건만 허용하면 어떻게 하는가?</p>
 <p>rate limiter는 초당 처리율, 세마포어는 in-flight 수를 제한한다. 둘은 다른 제약이므로 API 계약에 맞춰 적용한다.</p>
-<h3 id="q5-threadlocal을-scoped-value로-바꾸면-무엇이-좋아지는가"><a class="anchor" href="#q5-threadlocal을-scoped-value로-바꾸면-무엇이-좋아지는가" aria-hidden="true">#</a>Q5. <code>ThreadLocal</code>을 Scoped Value로 바꾸면 무엇이 좋아지는가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q5-threadlocal을-scoped-value로-바꾸면-무엇이-좋아지는가" aria-label="Q5. ThreadLocal을 Scoped Value로 바꾸면 무엇이 좋아지는가? 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">Q5. ThreadLocal을 Scoped Value로 바꾸면 무엇이 좋아지는가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>Scoped Value는 호출 범위와 값의 수명을 드러내 문맥 전달을 이해하기 쉽다. Java 25 정식 기능이며 ThreadLocal을 폐기하거나 mutable 객체를 immutable하게 바꾸지 않는다.</p>
 <p><strong>꼬리질문:</strong> ThreadLocal이 VT에서 금지인가?</p>
 <p>아니다. VT도 지원한다. 다만 스레드별 데이터 크기와 상속 비용을 따진다.</p>
-<h3 id="q6-executorservice로-future-두-개를-기다리는-코드와-structured-concurrency는-어떻게-다른가"><a class="anchor" href="#q6-executorservice로-future-두-개를-기다리는-코드와-structured-concurrency는-어떻게-다른가" aria-hidden="true">#</a>Q6. <code>ExecutorService</code>로 Future 두 개를 기다리는 코드와 Structured Concurrency는 어떻게 다른가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q6-executorservice로-future-두-개를-기다리는-코드와-structured-concurrency는-어떻게-다른가" aria-label="Q6. ExecutorService로 Future 두 개를 기다리는 코드와 Structured Concurrency는 어떻게 다른가? 펼치기"><span class="knowledge-topic-no">06</span><strong role="heading" aria-level="3">Q6. ExecutorService로 Future 두 개를 기다리는 코드와 Structured Concurrency는 어떻게 다른가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>ExecutorService는 실패한 부모가 다른 작업을 정리하는 생명주기를 직접 짜야 한다. Structured Concurrency는 관련 작업을 scope로 묶어 join·실패·취소를 부모와 연결한다. Java 27까지 프리뷰다.</p>
 <p><strong>꼬리질문:</strong> Structured Concurrency가 모든 비동기 코드에 더 좋은가?</p>
 <p>아니다. 요청 수명 밖의 백그라운드 작업은 그 요청의 자식이 아니다. 안정적 공개 API라면 프리뷰 여부를 먼저 판단한다.</p>
-<h3 id="q7-scope가-닫히면-느린-자식은-즉시-죽는가"><a class="anchor" href="#q7-scope가-닫히면-느린-자식은-즉시-죽는가" aria-hidden="true">#</a>Q7. Scope가 닫히면 느린 자식은 즉시 죽는가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q7-scope가-닫히면-느린-자식은-즉시-죽는가" aria-label="Q7. Scope가 닫히면 느린 자식은 즉시 죽는가? 펼치기"><span class="knowledge-topic-no">07</span><strong role="heading" aria-level="3">Q7. Scope가 닫히면 느린 자식은 즉시 죽는가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>보장되지 않는다. scope는 취소 인터럽트를 보내고 자식 종료를 기다린다. 자식이 무시하면 close가 지연되므로 timeout과 협조적 취소가 필요하다.</p>
 <p><strong>꼬리질문:</strong> 부모의 interrupt를 잡아서 무시하면?</p>
 <p>취소 전파가 끊길 수 있다. <code>InterruptedException</code>을 전파하거나 interrupt flag를 복구하고 자원을 정리한다.</p>
-<h3 id="q8-virtual-thread-pinning을-어떻게-찾는가"><a class="anchor" href="#q8-virtual-thread-pinning을-어떻게-찾는가" aria-hidden="true">#</a>Q8. Virtual thread pinning을 어떻게 찾는가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q8-virtual-thread-pinning을-어떻게-찾는가" aria-label="Q8. Virtual thread pinning을 어떻게 찾는가? 펼치기"><span class="knowledge-topic-no">08</span><strong role="heading" aria-level="3">Q8. Virtual thread pinning을 어떻게 찾는가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>JFR에서 <code>jdk.VirtualThreadPinned</code>를 수집하고 스레드 덤프·요청 ID와 대조한다. Java 24+는 남은 pinning 경로를 찾으며 이벤트 설정을 실행 JDK에서 검증한다.</p>
 <p><strong>꼬리질문:</strong> JFR 이벤트가 없으면 pinning은 없다고 결론 내려도 되는가?</p>
 <p>아니다. 이벤트가 녹화에서 활성화됐는지 확인하고 지연·carrier 포화 지표도 함께 본다.</p>
-</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>JEP 444: Virtual Threads — <a href="https://openjdk.org/jeps/444" target="_blank" rel="noopener">https://openjdk.org/jeps/444</a> — VT 정식화, 목표·플랫폼 스레드 대비 배경과 설계 근거.</li>
 <li>JEP 491: Synchronize Virtual Threads without Pinning — <a href="https://openjdk.org/jeps/491" target="_blank" rel="noopener">https://openjdk.org/jeps/491</a> — Java 24 모니터 pinning 제거와 남은 진단 필요성.</li>
@@ -371,8 +371,12 @@ public class DashboardService {
     let id;
     try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
     const target = document.getElementById(id);
-    const chapter = target?.closest('details.knowledge-chapter');
-    if (chapter) chapter.open = true;
+    let parent = target?.closest('details.knowledge-topic, details.knowledge-chapter');
+    while (parent) {
+      parent.open = true;
+      parent = parent.parentElement?.closest('details.knowledge-topic, details.knowledge-chapter');
+    }
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }));
   };
   document.addEventListener('click', (event) => {
     const link = event.target.closest('a[href^="#"]');

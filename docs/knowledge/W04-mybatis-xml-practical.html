@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>W04. MyBatis XML 쿼리 실무 — mapper·동적 SQL·#{}와 ${}</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=be06fe764657">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,13 +18,13 @@
 조건·조인·관계 매핑에는 XML이 리뷰하기 쉽다.
 기본은 Boot 4.1, Starter 4.1.0, Mapper XML, 서비스 @Transactional이다.</p>
 </blockquote>
-<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-질문" aria-label="1. 질문 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 질문</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-질문" aria-label="1. 질문 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">1. 질문</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li>Mapper 메서드에 구현이 없다. XML의 namespace와 id가 Java 인터페이스와 어떻게 연결되는가?</li>
 <li>선택 조건을 문자열로 붙였더니 WHERE AND와 끝 쉼표가 생긴다. 동적 태그는 SQL 모양을 어떻게 정리하며 조건이 비면 어떻게 되는가?</li>
 <li>ORDER BY의 컬럼은 왜 값처럼 바인딩할 수 없을까? 문자열 치환은 어떤 검증 뒤에 허용해야 하는가?</li>
 </ol>
-</div></details><details class="knowledge-chapter"><summary id="2-짧은-답" aria-label="2. 짧은 답 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 짧은 답</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="2-짧은-답" aria-label="2. 짧은 답 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">2. 짧은 답</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>SQL 값은 #{}가 기본이다. SQL 문법 요소만 동적 선택하고 허용 목록으로 제한한다.</li>
 <li>단순 SQL은 annotation, 조건·조인·재사용 조각이 커지면 XML을 기본으로 한다.</li>
@@ -32,8 +32,8 @@
 <li>한 DB는 LIMIT/OFFSET, 다중 방언이나 팀 표준이면 PageHelper를 검토한다.</li>
 <li>Boot 4.1 호환 Starter는 4.1.0이며 Mapper는 @MybatisTest로 검증한다.</li>
 </ul>
-</div></details><details class="knowledge-chapter"><summary id="3-왜-그런가--원리" aria-label="3. 왜 그런가 — 원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 왜 그런가 — 원리</strong><small>Mapper 메서드와 XML의 연결 · #{}와 ${}는 안전성 모델이 다르다 · 동적 태그가 줄이는 것과 줄이지 않는 것 · 결과 집합을 객체 관계로 바꾸기</small></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
-<h3 id="mapper-메서드와-xml의-연결"><a class="anchor" href="#mapper-메서드와-xml의-연결" aria-hidden="true">#</a>Mapper 메서드와 XML의 연결</h3>
+</div></details><details class="knowledge-chapter"><summary id="3-왜-그런가--원리" aria-label="3. 왜 그런가 — 원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 왜 그런가 — 원리</strong><small>Mapper 메서드와 XML의 연결 · #{}와 ${}는 안전성 모델이 다르다 · 동적 태그가 줄이는 것과 줄이지 않는 것 · 결과 집합을 객체 관계로 바꾸기</small></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="mapper-메서드와-xml의-연결" aria-label="Mapper 메서드와 XML의 연결 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">Mapper 메서드와 XML의 연결</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>Starter는 DataSource를 감지해 SqlSessionFactory와 SqlSessionTemplate을 만들고 Mapper 인터페이스를 Spring 빈으로 등록한다. 기본 스캔은 @Mapper를 찾고 직접 범위를 정하면 @MapperScan을 쓴다. Mapper 프록시가 메서드 호출을 MyBatis statement 실행으로 연결한다.</p>
 <p>일반적인 statement 키는 인터페이스의 완전한 이름 + 메서드 id다. com.example.book.BookMapper.findById라면 XML의 namespace는 com.example.book.BookMapper, id는 findById여야 한다. XML 파일은 mapper-locations에 포함해야 한다.</p>
 <pre class="mermaid">flowchart LR
@@ -44,18 +44,18 @@
   E --&gt; F[&quot;JDBC 드라이버와 DB&quot;]
   F --&gt; G[&quot;resultType 또는 resultMap&quot;]</pre>
 <p>XML은 SQL 중심 리뷰가 쉽지만 경로·이름 규칙이 추가된다. annotation은 단순 SQL을 찾기 쉽지만 복잡한 <script>는 읽기 어렵다. 양쪽은 같은 statement 엔진을 쓰므로 근거 없이 속도 차이를 단정하지 않는다.</p>
-<h3 id="와-는-안전성-모델이-다르다"><a class="anchor" href="#와-는-안전성-모델이-다르다" aria-hidden="true">#</a>#{}와 ${}는 안전성 모델이 다르다</h3>
+</div></details><details class="knowledge-topic"><summary id="와-는-안전성-모델이-다르다" aria-label="#{}와 ${}는 안전성 모델이 다르다 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">#{}와 ${}는 안전성 모델이 다르다</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>#{status}는 값을 SQL 문자열에 이어 붙이지 않는다. MyBatis는 PreparedStatement의 ? 표식을 만들고 JDBC 드라이버에 실제 값을 별도로 전달한다. DB는 값과 SQL 문법을 구분하므로 입력이 따옴표를 닫거나 OR 1=1을 실행하지 못한다. 값 비교·검색어·삽입·수정 값에는 #{}를 쓴다.</p>
 <p>${column}은 문자열을 SQL에 그대로 삽입한다. 파라미터 자리는 값에만 쓸 수 있어 ORDER BY ?에 컬럼명을 넣어도 식별자로 동작하지 않는다. 동적 식별자가 필요한 때만 문자열 치환이 필요하다. 입력 안전성은 MyBatis가 보장하지 않는다. name; DROP TABLE ...처럼 SQL 텍스트 자체를 바꿀 수 있다. 이스케이프·금칙어 차단 대신 enum이나 고정 Map으로 허용 이름을 열거한다.</p>
-<h3 id="동적-태그가-줄이는-것과-줄이지-않는-것"><a class="anchor" href="#동적-태그가-줄이는-것과-줄이지-않는-것" aria-hidden="true">#</a>동적 태그가 줄이는 것과 줄이지 않는 것</h3>
+</div></details><details class="knowledge-topic"><summary id="동적-태그가-줄이는-것과-줄이지-않는-것" aria-label="동적 태그가 줄이는 것과 줄이지 않는 것 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">동적 태그가 줄이는 것과 줄이지 않는 것</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>OGNL로 <if> 조건, <choose> 분기, <where>의 WHERE·선행 AND/OR, <set>의 SET·끝 쉼표, <trim> 접두·접미, <foreach> 목록(IN) 생성을 제어한다.</p>
 <p>태그는 SQL 모양을 정리할 뿐 업무 안전 조건을 강제하지 않는다. 검색 조건이 모두 빠지면 WHERE가 없어져 전체 조회가 될 수 있다. 빈 ID 목록도 결과 없음인지 필터 없음인지 호출 정책이 필요하다. 삭제·수정은 서비스에서 필수 조건과 빈 목록을 검사한다.</p>
-<h3 id="결과-집합을-객체-관계로-바꾸기"><a class="anchor" href="#결과-집합을-객체-관계로-바꾸기" aria-hidden="true">#</a>결과 집합을 객체 관계로 바꾸기</h3>
+</div></details><details class="knowledge-topic"><summary id="결과-집합을-객체-관계로-바꾸기" aria-label="결과 집합을 객체 관계로 바꾸기 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">결과 집합을 객체 관계로 바꾸기</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>resultType은 행의 자동 매핑이다. map-underscore-to-camel-case=true면 book_title과 bookTitle을 연결하며 MyBatis 기본값은 false다.</p>
 <p>조인 결과에서 부모 행이 자식 수만큼 반복되면 resultType은 그 행을 객체 그래프로 접지 않는다. resultMap으로 컬럼과 프로퍼티를 연결한다. <association>은 단일 객체, <collection>은 목록이다. 부모·자식 <id>를 지정하면 반복 행에서 동일 객체를 식별한다. 컬럼 alias로 id/name 충돌을 구분한다.</p>
-<h3 id="spring-트랜잭션이-mapper를-감싸는-이유"><a class="anchor" href="#spring-트랜잭션이-mapper를-감싸는-이유" aria-hidden="true">#</a>Spring 트랜잭션이 Mapper를 감싸는 이유</h3>
+</div></details><details class="knowledge-topic"><summary id="spring-트랜잭션이-mapper를-감싸는-이유" aria-label="Spring 트랜잭션이 Mapper를 감싸는 이유 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">Spring 트랜잭션이 Mapper를 감싸는 이유</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>SqlSessionTemplate은 Spring 트랜잭션에 참여한다. 원자적 Mapper 호출은 서비스의 @Transactional 경계에 둔다. self-invocation은 AOP 프록시를 거치지 않아 적용되지 않을 수 있다.</p>
-</div></details><details class="knowledge-chapter"><summary id="4-선택지-비교" aria-label="4. 선택지 비교 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 선택지 비교</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="4-선택지-비교" aria-label="4. 선택지 비교 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">4. 선택지 비교</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -117,9 +117,9 @@
 </tr>
 </tbody></table></div>
 <p><strong>기본값 추천:</strong> 신규 Boot 4.1 모듈은 Mapper 인터페이스 + XML, 값은 #{}, 단일 테이블은 resultType, 조인 그래프는 resultMap, 한 DB 페이징은 LIMIT/OFFSET으로 시작한다. 팀에 통일된 annotation이나 PageHelper 규칙이 있으면 따른다. 같은 SQL을 XML과 annotation에 중복 정의하지 않는다.</p>
-</div></details><details class="knowledge-chapter"><summary id="5-코드로-보기" aria-label="5. 코드로 보기 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 코드로 보기</strong><small>5.1 Mapper 인터페이스 ↔ XML CRUD (미실행) · 5.2 같은 검색: XML 동적 SQL과 annotation (미실행) · 5.3 조인 결과를 resultMap으로 만들기 (미실행) · 5.4 @MybatisTest로 Mapper 검증 (미실행)</small></span><span class="knowledge-chapter-meta">15개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="5-코드로-보기" aria-label="5. 코드로 보기 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">5. 코드로 보기</strong><small>5.1 Mapper 인터페이스 ↔ XML CRUD (미실행) · 5.2 같은 검색: XML 동적 SQL과 annotation (미실행) · 5.3 조인 결과를 resultMap으로 만들기 (미실행) · 5.4 @MybatisTest로 Mapper 검증 (미실행)</small></span><span class="knowledge-chapter-meta">15개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>Spring Boot 4.1.1, Java 25, Starter 4.1.0 기준이다. 실행하지 않아 Spring 예제는 **(미실행)**이며 드라이버·DDL은 DB에 맞춘다.</p>
-<h3 id="51-mapper-인터페이스--xml-crud-미실행"><a class="anchor" href="#51-mapper-인터페이스--xml-crud-미실행" aria-hidden="true">#</a>5.1 Mapper 인터페이스 ↔ XML CRUD (미실행)</h3>
+<details class="knowledge-topic"><summary id="51-mapper-인터페이스--xml-crud-미실행" aria-label="5.1 Mapper 인터페이스 ↔ XML CRUD (미실행) 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">5.1 Mapper 인터페이스 ↔ XML CRUD (미실행)</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-xml">&lt;!-- pom.xml --&gt;
 &lt;dependency&gt;
   &lt;groupId&gt;org.mybatis.spring.boot&lt;/groupId&gt;
@@ -189,7 +189,7 @@ public class BookService {
     }
 }</code></pre>
 <p>호환 JDBC 드라이버면 useGeneratedKeys가 키를 keyProperty에 넣는다. 미지원 DB는 selectKey 등을 쓴다. 저장 건수와 ID 반환은 통합 테스트로 확인한다.</p>
-<h3 id="52-같은-검색-xml-동적-sql과-annotation-미실행"><a class="anchor" href="#52-같은-검색-xml-동적-sql과-annotation-미실행" aria-hidden="true">#</a>5.2 같은 검색: XML 동적 SQL과 annotation (미실행)</h3>
+</div></details><details class="knowledge-topic"><summary id="52-같은-검색-xml-동적-sql과-annotation-미실행" aria-label="5.2 같은 검색: XML 동적 SQL과 annotation (미실행) 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">5.2 같은 검색: XML 동적 SQL과 annotation (미실행)</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>두 방식은 상태·최소 ID로 최근순 조회를 한다. 한 방식만 둔다. text block은 Java 15에 정식화됐다(JEP 378).</p>
 <pre><code class="language-java">package com.example.book.mapper;
 import com.example.book.domain.Book;
@@ -282,7 +282,7 @@ public class BookSortService {
     }
 }</code></pre>
 <p>valueOf 실패는 입력 오류로 처리한다. DB에 없는 컬럼은 목록에 넣지 않고 방향도 ASC/DESC로 제한한다.</p>
-<h3 id="53-조인-결과를-resultmap으로-만들기-미실행"><a class="anchor" href="#53-조인-결과를-resultmap으로-만들기-미실행" aria-hidden="true">#</a>5.3 조인 결과를 resultMap으로 만들기 (미실행)</h3>
+</div></details><details class="knowledge-topic"><summary id="53-조인-결과를-resultmap으로-만들기-미실행" aria-label="5.3 조인 결과를 resultMap으로 만들기 (미실행) 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">5.3 조인 결과를 resultMap으로 만들기 (미실행)</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>책 한 권에 저자가 한 명, 리뷰가 여러 개다. 조인 행이 반복되므로 alias와 부모·자식 ID를 구분한다.</p>
 <pre><code class="language-java">package com.example.book.mapper;
 import java.util.Map;
@@ -315,7 +315,7 @@ public interface BookDetailMapper {
 &lt;/select&gt;
 &lt;/mapper&gt;</code></pre>
 <p>예제는 Map을 썼다. 도메인 DTO를 쓰면 resultMap의 type/javaType/ofType과 getter/setter를 맞춘다. 리뷰가 없으면 review_id는 NULL이다. 중복은 alias와 <id>를 확인한다. 여러 1:N 조인은 행 수가 곱으로 늘 수 있다.</p>
-<h3 id="54-mybatistest로-mapper-검증-미실행"><a class="anchor" href="#54-mybatistest로-mapper-검증-미실행" aria-hidden="true">#</a>5.4 @MybatisTest로 Mapper 검증 (미실행)</h3>
+</div></details><details class="knowledge-topic"><summary id="54-mybatistest로-mapper-검증-미실행" aria-label="5.4 @MybatisTest로 Mapper 검증 (미실행) 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">5.4 @MybatisTest로 Mapper 검증 (미실행)</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>@MybatisTest는 Mapper·SqlSession slice와 embedded DB를 띄우고 테스트 종료 시 롤백한다. 일반 서비스 빈은 로드하지 않는다.</p>
 <pre><code class="language-xml">&lt;dependency&gt;
   &lt;groupId&gt;org.mybatis.spring.boot&lt;/groupId&gt;
@@ -354,7 +354,7 @@ class BookMapperTest {
     }
 }</code></pre>
 <p>H2와 운영 DB는 페이징, 타입 변환, 예약어, 생성 키가 다를 수 있다. 기본 매핑은 slice에서, DB 고유 SQL은 운영 엔진 통합 테스트에서 확인한다. 개발 프로필에서 Mapper namespace DEBUG 로그로 SQL을 본다. 바인딩 값에 개인정보·토큰이 있을 수 있어 운영 로그의 권한과 보존 기간을 제한하고 마스킹한다. STDOUT_LOGGING은 일시 디버깅에만 쓴다.</p>
-</div></details><details class="knowledge-chapter"><summary id="6-실무에서는-실제로" aria-label="6. 실무에서는 실제로 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무에서는 실제로</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="6-실무에서는-실제로" aria-label="6. 실무에서는 실제로 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">6. 실무에서는 실제로</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>신규 서비스</strong>: Starter 4.1.0과 Mapper XML을 기본으로 정하고 경로·namespace 규칙을 고정한다.</li>
 <li><strong>작은 도구</strong>: 단순 SQL은 annotation, 조건·조인이 늘면 XML로 옮긴다.</li>
@@ -364,7 +364,7 @@ class BookMapperTest {
 <li>한 DB면 LIMIT/OFFSET, 다중 방언이나 팀 표준이면 PageHelper.</li>
 <li>접근 비교 → <a class="docref" href="W03-db-access-comparison.html">W03</a>, JPA 혼용 → <a class="docref" href="W05-jpa-vs-mybatis-strategy.html">W05</a> 참조.</li>
 </ul>
-</div></details><details class="knowledge-chapter"><summary id="7-흔한-오해와-실수" aria-label="7. 흔한 오해와 실수 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 흔한 오해와 실수</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="7-흔한-오해와-실수" aria-label="7. 흔한 오해와 실수 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">7. 흔한 오해와 실수</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>메서드 SQL은 자동 연결된다 →</strong> namespace/id를 못 찾으면 Invalid bound statement (not found). → 완전한 인터페이스 이름, XML 경로/id, 빌드 산출물을 확인한다.</li>
 <li><strong>인자 이름은 늘 XML에서 보인다 →</strong> 이름 불일치면 BindingException: Parameter 'status' not found. → 여러 인자에 @Param을 명시한다.</li>
@@ -374,26 +374,26 @@ class BookMapperTest {
 <li><strong>resultMap 관계가 null/중복 →</strong> resultType은 행 단위이고 alias/property 오타가 원인일 수 있다. → <id>/<association>/<collection>을 확인한다.</li>
 <li><strong>단일 반환형이면 결과도 한 행이다 →</strong> 여러 행이면 TooManyResultsException. → 유일 조건을 확인하고 복수 결과는 List<T>로 반환한다.</li>
 </ol>
-</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. #{}와 ${}의 차이는? · Q2. Invalid bound statement (not found)는 어떻게 찾나? · Q3. resultType과 resultMap은 어떻게 고르나? · Q4. 가 해결하는 것과 못 하는 것은?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
-<h3 id="q1-와-의-차이는"><a class="anchor" href="#q1-와-의-차이는" aria-hidden="true">#</a>Q1. #{}와 ${}의 차이는?</h3>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. #{}와 ${}의 차이는? · Q2. Invalid bound statement (not found)는 어떻게 찾나? · Q3. resultType과 resultMap은 어떻게 고르나? · Q4. 가 해결하는 것과 못 하는 것은?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="q1-와-의-차이는" aria-label="Q1. #{}와 ${}의 차이는? 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">Q1. #{}와 ${}의 차이는?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>#{}는 PreparedStatement 값으로 전달되어 데이터와 SQL 문법을 구분한다. ${}는 문자열을 직접 치환해 식별자에만 제한한다. 일반 입력은 #{}가 기본이다.</p>
 <p><strong>꼬리질문:</strong> 정렬 컬럼은? → enum 허용 목록만 치환한다.</p>
-<h3 id="q2-invalid-bound-statement-not-found는-어떻게-찾나"><a class="anchor" href="#q2-invalid-bound-statement-not-found는-어떻게-찾나" aria-hidden="true">#</a>Q2. Invalid bound statement (not found)는 어떻게 찾나?</h3>
+</div></details><details class="knowledge-topic"><summary id="q2-invalid-bound-statement-not-found는-어떻게-찾나" aria-label="Q2. Invalid bound statement (not found)는 어떻게 찾나? 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">Q2. Invalid bound statement (not found)는 어떻게 찾나?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>Mapper 메서드와 XML id, 완전한 이름과 namespace를 대조한다. mapper-locations와 빌드 리소스 포함 여부, 중복 statement와 오타를 살핀다.</p>
 <p><strong>꼬리질문:</strong> 기동 때 항상 못 잡는 이유는? → statement 탐색이 호출 때 이뤄질 수 있다.</p>
-<h3 id="q3-resulttype과-resultmap은-어떻게-고르나"><a class="anchor" href="#q3-resulttype과-resultmap은-어떻게-고르나" aria-hidden="true">#</a>Q3. resultType과 resultMap은 어떻게 고르나?</h3>
+</div></details><details class="knowledge-topic"><summary id="q3-resulttype과-resultmap은-어떻게-고르나" aria-label="Q3. resultType과 resultMap은 어떻게 고르나? 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">Q3. resultType과 resultMap은 어떻게 고르나?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>단일 행 이름 매핑은 resultType이 짧다. 조인 행을 부모·자식 그래프로 묶으려면 resultMap을 명시한다. 한 statement에서 둘을 동시에 쓰지 않는다.</p>
 <p><strong>꼬리질문:</strong> collection이 중복이면? → ID와 alias를 확인한다.</p>
-<h3 id="q4-가-해결하는-것과-못-하는-것은"><a class="anchor" href="#q4-가-해결하는-것과-못-하는-것은" aria-hidden="true">#</a>Q4. <where>가 해결하는 것과 못 하는 것은?</h3>
+</div></details><details class="knowledge-topic"><summary id="q4-가-해결하는-것과-못-하는-것은" aria-label="Q4. 가 해결하는 것과 못 하는 것은? 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">Q4. 가 해결하는 것과 못 하는 것은?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>조건이 있을 때 WHERE와 AND/OR를 정리해 문법 실수를 줄인다. 조건이 없을 때 조회 범위는 제한하지 않는다. 정책은 서비스가 정한다.</p>
 <p><strong>꼬리질문:</strong> 한 분기만 적용하려면? → <choose>/<when>/<otherwise>를 쓴다.</p>
-<h3 id="q5-조인한-1n을-매핑하려면"><a class="anchor" href="#q5-조인한-1n을-매핑하려면" aria-hidden="true">#</a>Q5. 조인한 1:N을 매핑하려면?</h3>
+</div></details><details class="knowledge-topic"><summary id="q5-조인한-1n을-매핑하려면" aria-label="Q5. 조인한 1:N을 매핑하려면? 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">Q5. 조인한 1:N을 매핑하려면?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>부모·자식 ID와 alias를 구분한다. resultMap의 <collection>과 자식 <id>로 행을 부모 목록에 모은다. 단일 연관은 <association>이다.</p>
 <p><strong>꼬리질문:</strong> ID를 빼면? → 반복 행의 동일 객체를 판별하기 어려워 중복될 수 있다.</p>
-<h3 id="q6-transactional은-어디에-두나"><a class="anchor" href="#q6-transactional은-어디에-두나" aria-hidden="true">#</a>Q6. @Transactional은 어디에 두나?</h3>
+</div></details><details class="knowledge-topic"><summary id="q6-transactional은-어디에-두나" aria-label="Q6. @Transactional은 어디에 두나? 펼치기"><span class="knowledge-topic-no">06</span><strong role="heading" aria-level="3">Q6. @Transactional은 어디에 두나?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>여러 Mapper 호출이 한 업무 단위라면 서비스 경계에 둔다. Spring 프록시와 SqlSessionTemplate이 같은 DataSource 트랜잭션을 사용한다.</p>
 <p><strong>꼬리질문:</strong> 같은 클래스 내부 호출은? → self-invocation은 프록시를 건너뛴다.</p>
-</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>MyBatis Mapper XML Files — <a href="https://mybatis.org/mybatis-3/sqlmap-xml.html" target="_blank" rel="noopener">https://mybatis.org/mybatis-3/sqlmap-xml.html</a> — statement, 동적 식별자, resultMap, 생성 키.</li>
 <li>Dynamic SQL — <a href="https://mybatis.org/mybatis-3/dynamic-sql.html" target="_blank" rel="noopener">https://mybatis.org/mybatis-3/dynamic-sql.html</a> — 동적 XML 태그</li>
@@ -413,8 +413,12 @@ class BookMapperTest {
     let id;
     try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
     const target = document.getElementById(id);
-    const chapter = target?.closest('details.knowledge-chapter');
-    if (chapter) chapter.open = true;
+    let parent = target?.closest('details.knowledge-topic, details.knowledge-chapter');
+    while (parent) {
+      parent.open = true;
+      parent = parent.parentElement?.closest('details.knowledge-topic, details.knowledge-chapter');
+    }
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }));
   };
   document.addEventListener('click', (event) => {
     const link = event.target.closest('a[href^="#"]');

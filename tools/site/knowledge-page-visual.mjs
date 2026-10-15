@@ -36,7 +36,15 @@ export function renderKnowledgePageSections(html) {
     const subtopics = [...section.matchAll(/<h3\b[^>]*>([\s\S]*?)<\/h3>/g)]
       .map((part) => textOnly(part[1]).replace(/^#\s*/, '')).filter(Boolean).slice(0, 4);
     const codeCount = (section.match(/<pre\b/g) || []).length;
-    return `<details class="knowledge-chapter"><summary id="${esc(id)}" aria-label="${esc(title)} 펼치기"><span class="knowledge-chapter-number">${String(index + 1).padStart(2, '0')}</span><span class="knowledge-chapter-heading"><strong>${esc(title)}</strong>${subtopics.length ? `<small>${subtopics.map(esc).join(' · ')}</small>` : ''}</span><span class="knowledge-chapter-meta">${codeCount ? `${codeCount}개 코드 · ` : ''}열기 ↓</span></summary><div class="knowledge-chapter-body">${section}</div></details>`;
+    const topics = [...section.matchAll(/<h3\b[^>]*id="([^"]+)"[^>]*>[\s\S]*?<\/h3>/g)];
+    const introduction = topics.length ? section.slice(0, topics[0].index) : section;
+    const topicCards = topics.map((topic, topicIndex) => {
+      const end = topics[topicIndex + 1]?.index ?? section.length;
+      const body = section.slice(topic.index + topic[0].length, end);
+      const label = textOnly(topic[0]).replace(/^#\s*/, '');
+      return `<details class="knowledge-topic"><summary id="${esc(topic[1])}" aria-label="${esc(label)} 펼치기"><span class="knowledge-topic-no">${String(topicIndex + 1).padStart(2, '0')}</span><strong role="heading" aria-level="3">${esc(label)}</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">${body}</div></details>`;
+    }).join('');
+    return `<details class="knowledge-chapter"><summary id="${esc(id)}" aria-label="${esc(title)} 펼치기"><span class="knowledge-chapter-number">${String(index + 1).padStart(2, '0')}</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">${esc(title)}</strong>${subtopics.length ? `<small>${subtopics.map(esc).join(' · ')}</small>` : ''}</span><span class="knowledge-chapter-meta">${codeCount ? `${codeCount}개 코드 · ` : ''}열기 ↓</span></summary><div class="knowledge-chapter-body">${introduction}${topicCards}</div></details>`;
   }).join('');
   return `${before}<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기">${cards}</div><script>
 (() => {
@@ -45,8 +53,12 @@ export function renderKnowledgePageSections(html) {
     let id;
     try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
     const target = document.getElementById(id);
-    const chapter = target?.closest('details.knowledge-chapter');
-    if (chapter) chapter.open = true;
+    let parent = target?.closest('details.knowledge-topic, details.knowledge-chapter');
+    while (parent) {
+      parent.open = true;
+      parent = parent.parentElement?.closest('details.knowledge-topic, details.knowledge-chapter');
+    }
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }));
   };
   document.addEventListener('click', (event) => {
     const link = event.target.closest('a[href^="#"]');

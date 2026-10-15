@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>P25. 외부 API 연동 실무 — RestClient·HTTP Interface</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=be06fe764657">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,14 +18,14 @@
 HTTP Interface는 반복되는 URL·직렬화 코드를 Java 인터페이스로 숨기지만, 프록시 등록과 오류 정책은 애플리케이션이 책임진다.
 타임아웃·인증·4xx/5xx·재시도·민감정보 로깅을 함께 설계해야 “호출은 되는데 장애 때 멈추는” 클라이언트가 되지 않는다.</p>
 </blockquote>
-<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-한-줄로-말하면" aria-label="1. 한 줄로 말하면 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 한 줄로 말하면</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-한-줄로-말하면" aria-label="1. 한 줄로 말하면 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">1. 한 줄로 말하면</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>Spring의 외부 API 클라이언트는 HTTP 요청을 만들고 응답을 DTO로 변환하며 실패를 애플리케이션 예외로 바꾸는 경계 코드다. 일반적인 동기 MVC 서비스에서는 Spring Framework 6.1부터 제공된 <code>RestClient</code>를 기본으로 사용하고, WebFlux의 논블로킹 파이프라인에서는 <code>WebClient</code>를 사용한다. <code>RestTemplate</code>은 동기식이지만 새 코드에서는 <code>RestClient</code>로 대체하는 방향이고, HTTP Interface는 <code>@HttpExchange</code>가 붙은 인터페이스를 실행 가능한 프록시로 만든다.</p>
 <p>이 경계에서 타임아웃을 생략하면 스레드가 외부 서버를 기다리며 고갈된다. 상태 코드를 예외로 바꾸지 않으면 500 응답을 정상 DTO로 처리할 수 있고, 모든 예외를 재시도하면 결제·주문 같은 비멱등 요청이 중복 실행된다.</p>
-</div></details><details class="knowledge-chapter"><summary id="2-당장-알아야-할-것" aria-label="2. 당장 알아야 할 것 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 당장 알아야 할 것</strong><small>2.1 클라이언트 선택 · 2.2 의존성과 설정 · 2.3 RestClient 빈 구성 · 2.4 GET, POST, DTO, 상태 코드</small></span><span class="knowledge-chapter-meta">6개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
-<h3 id="21-클라이언트-선택"><a class="anchor" href="#21-클라이언트-선택" aria-hidden="true">#</a>2.1 클라이언트 선택</h3>
+</div></details><details class="knowledge-chapter"><summary id="2-당장-알아야-할-것" aria-label="2. 당장 알아야 할 것 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">2. 당장 알아야 할 것</strong><small>2.1 클라이언트 선택 · 2.2 의존성과 설정 · 2.3 RestClient 빈 구성 · 2.4 GET, POST, DTO, 상태 코드</small></span><span class="knowledge-chapter-meta">6개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="21-클라이언트-선택" aria-label="2.1 클라이언트 선택 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">2.1 클라이언트 선택</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>일반 Spring MVC의 동기 호출은 <code>RestClient</code>, WebFlux에서 끝까지 논블로킹인 흐름은 <code>WebClient</code>를 쓴다. 선언적 endpoint가 많으면 HTTP Interface를 고려하고, 기존 OpenFeign 조직은 팀 표준을 유지한다.</p>
 <p>WebFlux에서 <code>RestClient</code>를 직접 호출하거나 WebClient를 매번 <code>.block()</code>하면 각각 이벤트 루프를 막거나 논블로킹 이점을 잃는다. <code>RestTemplate</code>은 기존 코드 유지보수에만 두고 새 코드는 <code>RestClient</code> 기준으로 작성한다.</p>
-<h3 id="22-의존성과-설정"><a class="anchor" href="#22-의존성과-설정" aria-hidden="true">#</a>2.2 의존성과 설정</h3>
+</div></details><details class="knowledge-topic"><summary id="22-의존성과-설정" aria-label="2.2 의존성과 설정 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">2.2 의존성과 설정</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>Boot BOM이 관리하는 의존성에는 버전을 직접 쓰지 않는다. Boot 4.1의 Gradle Kotlin DSL 최소 설정은 다음과 같다.</p>
 <p><code>build.gradle.kts</code></p>
 <pre><code class="language-kotlin">plugins {
@@ -57,7 +57,7 @@ tasks.withType&lt;Test&gt; { useJUnitPlatform() }</code></pre>
   connect-timeout: 2s
   read-timeout: 3s</code></pre>
 <p>API 키를 YAML에 직접 커밋하지 않는다. 환경 변수·Secret manager에서 주입하고, 로그·예외 메시지·분산 추적 baggage에도 넣지 않는다.</p>
-<h3 id="23-restclient-빈-구성"><a class="anchor" href="#23-restclient-빈-구성" aria-hidden="true">#</a>2.3 <code>RestClient</code> 빈 구성</h3>
+</div></details><details class="knowledge-topic"><summary id="23-restclient-빈-구성" aria-label="2.3 RestClient 빈 구성 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">2.3 RestClient 빈 구성</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-java">package example.client;
 
 import java.net.http.HttpClient;
@@ -92,7 +92,7 @@ public class PartnerClientConfig {
 }</code></pre>
 <p><code>connectTimeout</code>은 TCP 연결을 기다리는 시간이고 <code>readTimeout</code>은 연결 후 응답 바이트를 기다리는 시간이다. 둘 중 하나만 설정하면 다른 단계에서 무한 대기가 남는다.</p>
 <p>Java 25의 JDK <code>HttpClient</code>를 쓰기 싫다면 <code>HttpComponentsClientHttpRequestFactory</code>를 선택하고 Apache HttpClient의 connection/request/response timeout을 명시한다. 기본 요청 팩토리의 구체 구현과 버전별 지원 여부를 가정하지 말고, 사용 중인 Spring Boot 문서와 Javadoc에서 확인한다.</p>
-<h3 id="24-get-post-dto-상태-코드"><a class="anchor" href="#24-get-post-dto-상태-코드" aria-hidden="true">#</a>2.4 GET, POST, DTO, 상태 코드</h3>
+</div></details><details class="knowledge-topic"><summary id="24-get-post-dto-상태-코드" aria-label="2.4 GET, POST, DTO, 상태 코드 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">2.4 GET, POST, DTO, 상태 코드</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-java">package example.client;
 
 import java.math.BigDecimal;
@@ -142,7 +142,7 @@ class PartnerUnavailableException extends RuntimeException {
 }</code></pre>
 <p><code>retrieve()</code> 뒤에 최종 연산인 <code>body</code>, <code>toEntity</code>, <code>toBodilessEntity</code> 등을 호출해야 실제 응답을 소비한다. 일치하는 <code>onStatus</code>가 없으면 400 이상은 <code>RestClientResponseException</code> 계열로 변환된다.</p>
 <p>호출부에서 <code>try { ... } catch (Exception e) { return null; }</code>처럼 뭉뚱그리지 말고, 재시도 가능한 장애·업무상 4xx·영구 실패를 구분한다. 헤더까지 필요하면 <code>toEntity(Product.class)</code>로 받는다.</p>
-<h3 id="25-http-interface"><a class="anchor" href="#25-http-interface" aria-hidden="true">#</a>2.5 HTTP Interface</h3>
+</div></details><details class="knowledge-topic"><summary id="25-http-interface" aria-label="2.5 HTTP Interface 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">2.5 HTTP Interface</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-java">package example.client;
 
 import org.springframework.web.service.annotation.GetExchange;
@@ -168,13 +168,13 @@ class ProductApiConfig {
 }</code></pre>
 <p>Spring Boot 4.1에서는 HTTP Service Client 자동 구성과 <code>@ImportHttpServices</code> 계열 등록을 사용할 수 있지만, 인터페이스를 만들었다고 모든 빈이 저절로 생기는 것은 아니다. 프로젝트의 Boot 4.1 reference에서 자동 구성 방식과 그룹별 <code>RestClient</code> 설정을 확인하고, 단순하고 예측 가능한 앱은 위 수동 등록을 기본으로 둔다.</p>
 <p>자동 구성을 쓸 때도 <code>baseUrl</code>, 인증 헤더, 타임아웃, 어떤 요청 팩토리인지 테스트로 고정한다. HTTP Interface는 메서드 선언을 줄여 줄 뿐, 오류 변환·재시도·관측 정책을 대신 결정하지 않는다.</p>
-<h3 id="26-인증과-로깅"><a class="anchor" href="#26-인증과-로깅" aria-hidden="true">#</a>2.6 인증과 로깅</h3>
+</div></details><details class="knowledge-topic"><summary id="26-인증과-로깅" aria-label="2.6 인증과 로깅 펼치기"><span class="knowledge-topic-no">06</span><strong role="heading" aria-level="3">2.6 인증과 로깅</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>API 키는 <code>.defaultHeader</code>, 만료되는 Bearer 토큰은 요청 시점에 토큰을 조회하는 <code>ClientHttpRequestInterceptor</code>로 넣는다. URL·method·status·소요 시간만 기록하고 <code>Authorization</code>, <code>Cookie</code>, API 키, 전체 body는 마스킹한다. body를 먼저 소비하면 DTO 변환이 실패하므로 운영 기본값은 메타데이터다.</p>
-<h3 id="27-재시도와-멱등성"><a class="anchor" href="#27-재시도와-멱등성" aria-hidden="true">#</a>2.7 재시도와 멱등성</h3>
+</div></details><details class="knowledge-topic"><summary id="27-재시도와-멱등성" aria-label="2.7 재시도와 멱등성 펼치기"><span class="knowledge-topic-no">07</span><strong role="heading" aria-level="3">2.7 재시도와 멱등성</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>재시도는 연결 실패·일시적 503·429처럼 일시적이고 재시도 가능한 경우에만 짧은 지수 백오프와 최대 횟수를 둔다. POST 결제처럼 서버가 처리했지만 응답만 유실된 상황에서는 클라이언트가 실패를 보았어도 이미 성공했을 수 있다.</p>
 <p><code>Idempotency-Key</code>를 서버가 지원할 때 같은 키로 재시도하고, 지원하지 않으면 자동 재시도하지 않는다. Spring Retry 또는 Resilience4j를 도입할 수 있지만 이 문서의 기본 추천은 “멱등 GET만 2~3회, 쓰기 요청은 명시적 정책 없이는 0회”다.</p>
-</div></details><details class="knowledge-chapter"><summary id="3-따라-하기" aria-label="3. 따라 하기 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 따라 하기</strong><small>3.1 실제 로컬 서버 띄우기 · 3.2 애플리케이션에서 호출하기 · 3.3 실패를 재현하고 테스트하기</small></span><span class="knowledge-chapter-meta">7개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
-<h3 id="31-실제-로컬-서버-띄우기"><a class="anchor" href="#31-실제-로컬-서버-띄우기" aria-hidden="true">#</a>3.1 실제 로컬 서버 띄우기</h3>
+</div></details></div></details><details class="knowledge-chapter"><summary id="3-따라-하기" aria-label="3. 따라 하기 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 따라 하기</strong><small>3.1 실제 로컬 서버 띄우기 · 3.2 애플리케이션에서 호출하기 · 3.3 실패를 재현하고 테스트하기</small></span><span class="knowledge-chapter-meta">7개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="31-실제-로컬-서버-띄우기" aria-label="3.1 실제 로컬 서버 띄우기 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">3.1 실제 로컬 서버 띄우기</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>프로젝트 루트에 다음 파일을 만든다.</p>
 <p><code>compose.yaml</code></p>
 <pre><code class="language-yaml">services:
@@ -197,7 +197,7 @@ class ProductApiConfig {
 <pre><code class="language-bash">docker compose up -d
 curl -i http://localhost:8089/products/p-1</code></pre>
 <p>확인 방법: <code>HTTP/1.1 200</code>과 JSON의 <code>&quot;id&quot;:&quot;p-1&quot;</code>가 보이면 서버와 stub이 준비된 것이다. 종료는 <code>docker compose down</code>이다.</p>
-<h3 id="32-애플리케이션에서-호출하기"><a class="anchor" href="#32-애플리케이션에서-호출하기" aria-hidden="true">#</a>3.2 애플리케이션에서 호출하기</h3>
+</div></details><details class="knowledge-topic"><summary id="32-애플리케이션에서-호출하기" aria-label="3.2 애플리케이션에서 호출하기 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">3.2 애플리케이션에서 호출하기</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>앞 절의 <code>build.gradle.kts</code>, <code>application.yml</code>, <code>PartnerClientConfig</code>, <code>PartnerClient</code>를 넣고 다음 controller를 추가한다.</p>
 <p><code>src/main/java/example/ApiApplication.java</code></p>
 <pre><code class="language-java">package example;
@@ -227,7 +227,7 @@ class ProductController {
 <pre><code class="language-bash">./gradlew bootRun
 curl -i http://localhost:8080/products/p-1</code></pre>
 <p>확인 방법: 응답에 <code>{&quot;id&quot;:&quot;p-1&quot;,&quot;name&quot;:&quot;Keyboard&quot;,&quot;price&quot;:49000}</code>가 나오고 WireMock 로그에 GET 요청이 남는다.</p>
-<h3 id="33-실패를-재현하고-테스트하기"><a class="anchor" href="#33-실패를-재현하고-테스트하기" aria-hidden="true">#</a>3.3 실패를 재현하고 테스트하기</h3>
+</div></details><details class="knowledge-topic"><summary id="33-실패를-재현하고-테스트하기" aria-label="3.3 실패를 재현하고 테스트하기 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">3.3 실패를 재현하고 테스트하기</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p><code>wiremock/mappings/partner-503.json</code>에 <code>/products/down</code> → status 503, <code>Content-Type: application/json</code>, <code>{&quot;code&quot;:&quot;TEMPORARY&quot;}</code>를 반환하는 stub을 추가한다.</p>
 <pre><code class="language-bash">curl -i http://localhost:8089/products/down
 curl -i http://localhost:8080/products/down</code></pre>
@@ -246,7 +246,7 @@ class PartnerClientTest {
     }
 }</code></pre>
 <p>확인 방법: <code>./gradlew test</code>가 통과하고 WireMock을 끄면 통합 테스트가 실패해야 한다. 단위 테스트는 URL·헤더·body·상태를 검증한다.</p>
-</div></details><details class="knowledge-chapter"><summary id="4-치트시트" aria-label="4. 치트시트 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 치트시트</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="4-치트시트" aria-label="4. 치트시트 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">4. 치트시트</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -286,7 +286,7 @@ class PartnerClientTest {
 <td>전자는 네트워크 재현, 후자는 빠름</td>
 </tr>
 </tbody></table></div>
-</div></details><details class="knowledge-chapter"><summary id="5-자주-나는-에러와-해결" aria-label="5. 자주 나는 에러와 해결 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 자주 나는 에러와 해결</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="5-자주-나는-에러와-해결" aria-label="5. 자주 나는 에러와 해결 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">5. 자주 나는 에러와 해결</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><p><code>java.net.http.HttpTimeoutException: request timed out</code> 또는 <code>Read timed out</code> → 연결은 됐지만 응답을 기다리는 시간이 제한을 넘었다 → <code>readTimeout</code>을 명시하고 외부 API의 p95 지연과 서버 처리 시간을 조사한다. 무작정 시간을 늘리지 말고 호출 예산과 재시도 횟수를 곱해 상위 요청 timeout 안에 들어오게 한다.</p>
 </li>
@@ -301,36 +301,36 @@ class PartnerClientTest {
 <li><p>응답은 200인데 DTO 변환이 실패한다 → JSON 계약이 DTO와 다르다 → 외부 DTO와 내부 모델을 분리하고 변환 오류를 숨기지 않는다(상세 Jackson은 → <a class="docref" href="P16-json-jackson-practical.html">P16</a> 참조).</p>
 </li>
 </ol>
-</div></details><details class="knowledge-chapter"><summary id="6-한-단계-더" aria-label="6. 한 단계 더 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 한 단계 더</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="6-한-단계-더" aria-label="6. 한 단계 더 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">6. 한 단계 더</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>요청은 <code>RestClient</code>의 fluent builder에서 URI·헤더·body를 만들고, 요청 팩토리가 실제 TCP/TLS를 수행하며, message converter가 JSON과 DTO를 변환한다. <code>retrieve()</code>는 상태 처리 규칙을 적용하고 최종 연산이 응답을 읽는다.</p>
 <p>HTTP Interface는 이 호출부를 프록시 생성 단계로 옮길 뿐 같은 요청 팩토리와 converter를 사용한다. 따라서 HTTP Interface로 바꿔도 timeout·인증·관측·재시도 정책은 그대로 검증해야 한다.</p>
 <p>외부 API의 설계·리소스 모델 비교는 → <a class="docref" href="S06-rest-api-clients.html">S06</a>, 장애 격리·bulkhead·circuit breaker는 → <a class="docref" href="S20-spring-cloud-msa.html">S20</a>, Jackson의 상세 변환 규칙은 → <a class="docref" href="P16-json-jackson-practical.html">P16</a> 참조. 이 문서에서는 그 주제를 다시 설명하지 않는다.</p>
-</div></details><details class="knowledge-chapter"><summary id="7-자가점검-qa-면접-대비" aria-label="7. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. MVC 애플리케이션에서 RestClient와 WebClient 중 무엇을 고르는가? · Q2. retrieve()와 exchange()의 차이는? · Q3. connect timeout과 read timeout은 왜 둘 다 필요한가? · Q4. 500이면 항상 재시도해도 되는가?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
-<h3 id="q1-mvc-애플리케이션에서-restclient와-webclient-중-무엇을-고르는가"><a class="anchor" href="#q1-mvc-애플리케이션에서-restclient와-webclient-중-무엇을-고르는가" aria-hidden="true">#</a>Q1. MVC 애플리케이션에서 <code>RestClient</code>와 <code>WebClient</code> 중 무엇을 고르는가?</h3>
+</div></details><details class="knowledge-chapter"><summary id="7-자가점검-qa-면접-대비" aria-label="7. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">7. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. MVC 애플리케이션에서 RestClient와 WebClient 중 무엇을 고르는가? · Q2. retrieve()와 exchange()의 차이는? · Q3. connect timeout과 read timeout은 왜 둘 다 필요한가? · Q4. 500이면 항상 재시도해도 되는가?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="q1-mvc-애플리케이션에서-restclient와-webclient-중-무엇을-고르는가" aria-label="Q1. MVC 애플리케이션에서 RestClient와 WebClient 중 무엇을 고르는가? 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">Q1. MVC 애플리케이션에서 RestClient와 WebClient 중 무엇을 고르는가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>동기 서비스 메서드가 즉시 DTO를 반환하면 <code>RestClient</code>를 기본으로 고른다. WebFlux 파이프라인에서 <code>Mono</code>/<code>Flux</code>를 끝까지 유지해야 하면 <code>WebClient</code>를 고른다. WebClient를 도입한 뒤 모든 곳에서 <code>.block()</code>하면 선택 근거가 사라진다.</p>
 <p>꼬리질문: RestClient를 WebFlux에서 써도 되는가?</p>
 <p>답: 블로킹 호출이므로 이벤트 루프에서 직접 호출하면 안 된다. 별도 bounded elastic scheduler로 격리하거나 WebClient로 바꾼다.</p>
-<h3 id="q2-retrieve와-exchange의-차이는"><a class="anchor" href="#q2-retrieve와-exchange의-차이는" aria-hidden="true">#</a>Q2. <code>retrieve()</code>와 <code>exchange()</code>의 차이는?</h3>
+</div></details><details class="knowledge-topic"><summary id="q2-retrieve와-exchange의-차이는" aria-label="Q2. retrieve()와 exchange()의 차이는? 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">Q2. retrieve()와 exchange()의 차이는?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p><code>retrieve()</code>는 일반적인 응답 추출과 상태 코드 처리를 간결하게 표현한다. <code>exchange()</code>는 <code>ClientHttpRequest</code>와 <code>ClientHttpResponse</code>를 직접 다뤄 상태·헤더·body를 한 번에 세밀하게 제어할 때 쓴다. 세밀한 제어가 필요 없는데 exchange를 남용하면 body 소비와 자원 처리 실수가 늘어난다.</p>
 <p>꼬리질문: 404를 null로 받고 싶다면?</p>
 <p>답: <code>onStatus</code>에서 404만 도메인 예외로 바꾸거나, 호출 경계에서 <code>Optional</code> 정책을 명시한다. 모든 4xx를 null로 만들면 인증 실패와 리소스 부재가 섞인다.</p>
-<h3 id="q3-connect-timeout과-read-timeout은-왜-둘-다-필요한가"><a class="anchor" href="#q3-connect-timeout과-read-timeout은-왜-둘-다-필요한가" aria-hidden="true">#</a>Q3. connect timeout과 read timeout은 왜 둘 다 필요한가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q3-connect-timeout과-read-timeout은-왜-둘-다-필요한가" aria-label="Q3. connect timeout과 read timeout은 왜 둘 다 필요한가? 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">Q3. connect timeout과 read timeout은 왜 둘 다 필요한가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>connect는 DNS 이후 TCP 연결 수립 단계의 대기이고 read는 연결 후 서버 응답을 기다리는 단계다. 연결은 성공했지만 서버가 처리하지 않는 장애는 read timeout이 없으면 계속 점유된다. 상위 HTTP 요청 timeout, 재시도 backoff까지 포함해 전체 시간 예산을 계산한다.</p>
 <p>꼬리질문: timeout을 1초로 무조건 줄이면 좋은가?</p>
 <p>답: 아니다. 정상적인 외부 API 지연 분포·네트워크 구간·업무 요구를 측정해 정한다. 너무 짧으면 정상 요청을 실패로 만들고, 너무 길면 스레드 고갈을 만든다.</p>
-<h3 id="q4-500이면-항상-재시도해도-되는가"><a class="anchor" href="#q4-500이면-항상-재시도해도-되는가" aria-hidden="true">#</a>Q4. 500이면 항상 재시도해도 되는가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q4-500이면-항상-재시도해도-되는가" aria-label="Q4. 500이면 항상 재시도해도 되는가? 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">Q4. 500이면 항상 재시도해도 되는가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>아니다. 서버가 이미 명령을 처리했는지 알 수 없고 POST라면 중복 부작용이 발생할 수 있다. GET처럼 멱등인 요청도 500의 원인이 영구 오류인지 확인하고, 일시 오류에만 제한된 횟수로 재시도한다.</p>
 <p>꼬리질문: 429는 무엇을 읽어야 하는가?</p>
 <p>답: <code>Retry-After</code>와 공급자 rate limit 계약을 읽고 backoff한다. 여러 인스턴스가 동시에 재시도하지 않도록 jitter를 둔다.</p>
-<h3 id="q5-httpexchange-인터페이스를-만들면-바로-주입되는가"><a class="anchor" href="#q5-httpexchange-인터페이스를-만들면-바로-주입되는가" aria-hidden="true">#</a>Q5. <code>@HttpExchange</code> 인터페이스를 만들면 바로 주입되는가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q5-httpexchange-인터페이스를-만들면-바로-주입되는가" aria-label="Q5. @HttpExchange 인터페이스를 만들면 바로 주입되는가? 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">Q5. @HttpExchange 인터페이스를 만들면 바로 주입되는가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>아니다. <code>HttpServiceProxyFactory</code>와 adapter로 프록시를 만들거나 Boot 4.1의 HTTP service client 등록 방식을 적용해야 한다. 등록된 프록시가 어떤 <code>RestClient</code>, base URL, 인증·timeout을 쓰는지 확인해야 한다.</p>
 <p>꼬리질문: 인터페이스가 RestClient보다 항상 좋은가?</p>
 <p>답: 반복적인 CRUD 호출에는 좋지만 복잡한 동적 body·스트리밍·특수 상태 처리에는 직접 RestClient가 더 명확할 수 있다.</p>
-<h3 id="q6-테스트에서-mockrestserviceserver와-wiremock을-어떻게-나누는가"><a class="anchor" href="#q6-테스트에서-mockrestserviceserver와-wiremock을-어떻게-나누는가" aria-hidden="true">#</a>Q6. 테스트에서 MockRestServiceServer와 WireMock을 어떻게 나누는가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q6-테스트에서-mockrestserviceserver와-wiremock을-어떻게-나누는가" aria-label="Q6. 테스트에서 MockRestServiceServer와 WireMock을 어떻게 나누는가? 펼치기"><span class="knowledge-topic-no">06</span><strong role="heading" aria-level="3">Q6. 테스트에서 MockRestServiceServer와 WireMock을 어떻게 나누는가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>요청 builder와 상태 변환을 빠르게 검증하는 단위 테스트에는 MockRestServiceServer를 쓴다. 실제 포트·HTTP client·지연·connection 문제까지 확인하려면 WireMock 같은 mock web server를 쓴다. Spring 문서도 transport layer와 network condition에는 mock web server를 권장한다.</p>
 <p>꼬리질문: 테스트에서 실제 공개 API를 호출하면 안 되는 이유는?</p>
 <p>답: 외부 상태·rate limit·네트워크에 의존해 재현성이 없고, 실수로 쓰기 요청을 보낼 위험이 있다. 계약 테스트나 WireMock fixture로 대체한다.</p>
-</div></details><details class="knowledge-chapter"><summary id="8-참고문헌" aria-label="8. 참고문헌 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="8-참고문헌" aria-label="8. 참고문헌 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">8. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>REST Clients — <a href="https://docs.spring.io/spring-framework/reference/integration/rest-clients.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/integration/rest-clients.html</a> — <code>RestClient</code>, <code>WebClient</code>, <code>RestTemplate</code>, HTTP Interface, request factory와 응답 처리 근거.</li>
 <li>Calling REST Services — <a href="https://docs.spring.io/spring-boot/reference/io/rest-client.html" target="_blank" rel="noopener">https://docs.spring.io/spring-boot/reference/io/rest-client.html</a> — Spring Boot의 REST client 선택 및 자동 구성 근거.</li>
@@ -347,8 +347,12 @@ class PartnerClientTest {
     let id;
     try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
     const target = document.getElementById(id);
-    const chapter = target?.closest('details.knowledge-chapter');
-    if (chapter) chapter.open = true;
+    let parent = target?.closest('details.knowledge-topic, details.knowledge-chapter');
+    while (parent) {
+      parent.open = true;
+      parent = parent.parentElement?.closest('details.knowledge-topic, details.knowledge-chapter');
+    }
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }));
   };
   document.addEventListener('click', (event) => {
     const link = event.target.closest('a[href^="#"]');

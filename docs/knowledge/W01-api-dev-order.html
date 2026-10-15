@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>W01. API 하나 만들 때 실제 작업 순서 — DB부터? 컨트롤러부터?</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=be06fe764657">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,12 +18,12 @@
 기본값은 <code>요구사항 → API 계약 → DB 설계 → 저장소·서비스·컨트롤러 수직 구현 → 예외·테스트·문서</code>다.
 이미 존재하는 DB가 있거나 화면 계약이 강하게 고정된 경우에는 시작점을 바꾸되, 계층 경계와 데이터 무결성은 유지한다.</p>
 </blockquote>
-<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-질문" aria-label="1. 질문 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 질문</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-질문" aria-label="1. 질문 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">1. 질문</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p><strong>신입이 게시글 좋아요 API를 맡았다고 하자. 어디서 시작해야 할까?</strong> 데이터베이스 담당자는 <code>post_like</code> 테이블부터 만들라고 하고, 프론트엔드 개발자는 <code>PUT /posts/{id}/likes/me</code>와 응답을 먼저 알려 달라고 한다. 백엔드 선배는 “컨트롤러부터 만들어 보면 감이 와”라고 한다. 다 그럴듯하지만 서로 다른 위험을 줄이려는 말이다.</p>
 <p>첫 장면은 <code>PostLike</code>를 먼저 만들고 그대로 반환한 경우다. 뒤늦게 회원 ID는 본문 대신 인증 정보에서 얻어야 한다는 요구가 나와도 여러 클라이언트가 엔티티 모양에 의존한다.</p>
 <p>둘째는 Controller부터 만든 경우다. 경로와 DTO는 빨리 나오지만 동시 클릭에서 중복 행을 허용하는지, 재요청을 성공으로 볼지 정하지 않았다. 화면은 성공인데 DB에는 중복이 생길 수 있다.</p>
 <p>DB부터 시작해도 프론트 응답이나 인증 방식이 뒤늦게 달라지면 배포된 스키마를 바꿔야 할 수 있다. 어느 시작점이든 다음 결정을 고정시키면 변경 비용이 커진다.</p>
-</div></details><details class="knowledge-chapter"><summary id="2-짧은-답" aria-label="2. 짧은 답 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 짧은 답</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="2-짧은-답" aria-label="2. 짧은 답 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">2. 짧은 답</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>요청 주체·성공·실패 조건부터 합의한다.</li>
 <li>API 계약에는 경로·메서드·요청/응답·상태 코드·인증·중복 의미를 적는다.</li>
@@ -33,7 +33,7 @@
 <li>레거시는 스키마를 먼저 읽고 계약을 맞춘다. 병렬 작업은 계약 초안을 공유한다.</li>
 <li>Controller 우선은 HTTP 확인에, DB 우선은 기존 모델·제약 확인에 유리하다.</li>
 </ul>
-</div></details><details class="knowledge-chapter"><summary id="3-왜-그런가--원리" aria-label="3. 왜 그런가 — 원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 왜 그런가 — 원리</strong></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="3-왜-그런가--원리" aria-label="3. 왜 그런가 — 원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 왜 그런가 — 원리</strong></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>작업 순서는 파일을 무엇부터 만들지보다 <strong>불확실성을 어디서 싸게 발견할지</strong>의 문제다. 요구가 불명확하면 구현자가 정책을 임의로 정하고, 계약이 없으면 클라이언트와 서버가 요청 형식을 따로 상상한다. DB 불변식이 빠지면 동시 요청에 데이터가 깨질 수 있고, DB를 과하게 먼저 고정하면 사용 사례가 스키마에 끌려간다.</p>
 <p>권장 순서의 각 단계는 다음 결정의 입력을 만든다.</p>
 <ol>
@@ -55,7 +55,7 @@
 <p>이 흐름은 워터폴이 아니다. 설계는 앞에서 하되 코드는 기능별로 연결한다.</p>
 <p>Spring MVC는 요청을 라우팅하고, <code>@RequestBody</code>는 <code>HttpMessageConverter</code>로 변환되며 <code>@Valid</code> 오류는 기본 400이 된다. Controller는 HTTP 경계이므로 데이터 모델과 정책의 유일한 출발점일 필요가 없다. (<a href="https://docs.spring.io/spring-framework/reference/web/webmvc.html" target="_blank" rel="noopener">MVC</a>, <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/requestbody.html" target="_blank" rel="noopener">요청 본문</a>, <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-validation.html" target="_blank" rel="noopener">검증</a>)</p>
 <p>서비스 계층은 여러 인터페이스가 같은 업무 동작을 호출할 때 규칙·응답 조정을 중복하지 않게 한다. <code>@Transactional</code>은 Spring의 선언적 경계이므로 HTTP 메서드보다 업무 동작을 수행하는 서비스에 두면 의도가 명확하다. 여러 HTTP 요청이나 외부 시스템까지 자동 원자화하지는 않는다. (<a href="https://martinfowler.com/eaaCatalog/serviceLayer.html" target="_blank" rel="noopener">Service Layer</a>, <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html" target="_blank" rel="noopener">@Transactional</a>)</p>
-</div></details><details class="knowledge-chapter"><summary id="4-선택지-비교" aria-label="4. 선택지 비교 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 선택지 비교</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="4-선택지-비교" aria-label="4. 선택지 비교 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">4. 선택지 비교</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -109,9 +109,9 @@
 </tr>
 </tbody></table></div>
 <p>“어디부터 코딩하나”와 “무엇을 먼저 결정하나”를 구분해야 한다. <strong>결정은 요구와 계약부터</strong>, 실제 구현은 상황에 맞게 Controller부터 또는 Repository부터 착수할 수 있다. 신규 기능에선 계약과 데이터 제약을 정한 다음 작은 수직 슬라이스로 검증하는 편이 정보 흐름을 짧게 만든다. 이미 배포된 DB 스키마가 있으면 이를 무시한 채 이상적인 새 테이블부터 만드는 것이 아니라, 현재 제약을 확인해 API와의 간격을 다룬다.</p>
-</div></details><details class="knowledge-chapter"><summary id="5-코드로-보기" aria-label="5. 코드로 보기 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 코드로 보기</strong><small>5.1 계약 우선: 호출자가 먼저 이해하는 API를 정한다 · 5.2 DB 우선: 데이터 불변식을 먼저 드러낸다 · 5.3 컨트롤러 우선: HTTP 경계를 빠르게 확인한다 · 5.4 권장 기본 흐름: 계약을 지키는 한 기능을 끝까지 연결한다</small></span><span class="knowledge-chapter-meta">9개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="5-코드로-보기" aria-label="5. 코드로 보기 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">5. 코드로 보기</strong><small>5.1 계약 우선: 호출자가 먼저 이해하는 API를 정한다 · 5.2 DB 우선: 데이터 불변식을 먼저 드러낸다 · 5.3 컨트롤러 우선: HTTP 경계를 빠르게 확인한다 · 5.4 권장 기본 흐름: 계약을 지키는 한 기능을 끝까지 연결한다</small></span><span class="knowledge-chapter-meta">9개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>아래는 모두 같은 좋아요 등록·취소 기능이다. 첫 산출물이 다른 선택지와 권장 흐름을 나란히 보인다. Spring 코드는 Boot 4.1 / Framework 7 기준이며 실행하지 않았다. <strong>(미실행)</strong></p>
-<h3 id="51-계약-우선-호출자가-먼저-이해하는-api를-정한다"><a class="anchor" href="#51-계약-우선-호출자가-먼저-이해하는-api를-정한다" aria-hidden="true">#</a>5.1 계약 우선: 호출자가 먼저 이해하는 API를 정한다</h3>
+<details class="knowledge-topic"><summary id="51-계약-우선-호출자가-먼저-이해하는-api를-정한다" aria-label="5.1 계약 우선: 호출자가 먼저 이해하는 API를 정한다 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">5.1 계약 우선: 호출자가 먼저 이해하는 API를 정한다</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>회원 ID를 본문에서 받으면 다른 사람을 대신해 좋아요를 누르는 취약점으로 이어질 수 있으므로, 인증 주체를 <code>me</code>로 표현한다. <code>PUT</code>과 <code>DELETE</code>는 원하는 상태를 설정·해제하는 의미를 명확히 하며, 같은 <code>PUT</code> 반복은 최종 상태가 같아야 한다.</p>
 <pre><code class="language-yaml">openapi: 3.1.0
 info:
@@ -142,7 +142,7 @@ paths:
         '401': { description: 인증 필요 }
         '404': { description: 게시글 없음 }</code></pre>
 <p>본문 없는 <code>204 No Content</code> 응답이다. 인증 실패·없는 게시글·중복 <code>PUT</code> 의미를 미리 합의한다. 계약 우선은 모든 응답을 고정한다는 뜻이 아니라 실제 사용 사례에 필요한 약속을 공유한다는 뜻이다.</p>
-<h3 id="52-db-우선-데이터-불변식을-먼저-드러낸다"><a class="anchor" href="#52-db-우선-데이터-불변식을-먼저-드러낸다" aria-hidden="true">#</a>5.2 DB 우선: 데이터 불변식을 먼저 드러낸다</h3>
+</div></details><details class="knowledge-topic"><summary id="52-db-우선-데이터-불변식을-먼저-드러낸다" aria-label="5.2 DB 우선: 데이터 불변식을 먼저 드러낸다 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">5.2 DB 우선: 데이터 불변식을 먼저 드러낸다</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>두 번의 동시 요청도 같은 회원·게시글 쌍을 두 행으로 만들지 않도록 유일 제약을 둔다. 애플리케이션에서 조회한 뒤 저장하는 두 단계만으로는 동시성 경쟁을 막을 수 없다.</p>
 <pre><code class="language-sql">-- PostgreSQL 예시. post(id), member(id)는 이미 존재한다고 가정한다.
 CREATE TABLE post_like (
@@ -156,7 +156,7 @@ CREATE TABLE post_like (
 -- 회원이 좋아요한 글을 찾는 조회 경로가 필요할 때 추가 여부를 검토한다.
 CREATE INDEX ix_post_like_member_post ON post_like (member_id, post_id);</code></pre>
 <p>유일 제약은 중복을 막는다. 회원별 목록 조회가 있다면 <code>(member_id, post_id)</code> 인덱스를 검토한다. 인덱스는 조회 패턴과 실행 계획에 맞추며, PostgreSQL <code>ON CONFLICT</code> 구현은 다른 DB에서 그대로 동작하지 않는다.</p>
-<h3 id="53-컨트롤러-우선-http-경계를-빠르게-확인한다"><a class="anchor" href="#53-컨트롤러-우선-http-경계를-빠르게-확인한다" aria-hidden="true">#</a>5.3 컨트롤러 우선: HTTP 경계를 빠르게 확인한다</h3>
+</div></details><details class="knowledge-topic"><summary id="53-컨트롤러-우선-http-경계를-빠르게-확인한다" aria-label="5.3 컨트롤러 우선: HTTP 경계를 빠르게 확인한다 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">5.3 컨트롤러 우선: HTTP 경계를 빠르게 확인한다</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>라우팅·인증 주체 전달·상태 코드를 먼저 시연할 수 있다. 아래 코드는 첫 화면 연동용 경계의 형태다. 서비스가 비어 있거나 DB 규칙이 빠진 채 끝나면 완성된 API가 아니다.</p>
 <pre><code class="language-java">import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -194,7 +194,7 @@ class PostLikeController {
 <p><code>MemberPrincipal</code>은 인증 과정에서 설정하는 고유 principal이며, 인증 설정이 이 타입을 제공해야 한다.</p>
 <pre><code class="language-java">record MemberPrincipal(long memberId) {}</code></pre>
 <p>Controller는 업무 규칙을 수행하지 않는다. 본문이 없어 DTO 변환·검증도 없으며, 게시글별 허용 정책은 Service에서 확인한다.</p>
-<h3 id="54-권장-기본-흐름-계약을-지키는-한-기능을-끝까지-연결한다"><a class="anchor" href="#54-권장-기본-흐름-계약을-지키는-한-기능을-끝까지-연결한다" aria-hidden="true">#</a>5.4 권장 기본 흐름: 계약을 지키는 한 기능을 끝까지 연결한다</h3>
+</div></details><details class="knowledge-topic"><summary id="54-권장-기본-흐름-계약을-지키는-한-기능을-끝까지-연결한다" aria-label="5.4 권장 기본 흐름: 계약을 지키는 한 기능을 끝까지 연결한다 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">5.4 권장 기본 흐름: 계약을 지키는 한 기능을 끝까지 연결한다</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>구조를 위한 예시다. 테이블은 앞의 PostgreSQL 마이그레이션으로 만들고, <code>Post</code>는 존재 확인용 최소 Entity다.</p>
 <pre><code class="language-java">import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -305,7 +305,7 @@ class PostNotFoundException extends RuntimeException {
     }
 }</code></pre>
 <p>정상 등록·해제, 미인증, 없는 게시글, 동시 중복 요청을 실제 HTTP 경로에서 확인한다. 규칙은 단위 테스트, 제약·upsert는 실제 DB 통합 테스트로 검증하고 문서의 상태 코드와 응답을 맞춘다. 테스트 코드는 생략했다.</p>
-</div></details><details class="knowledge-chapter"><summary id="6-실무에서는-실제로" aria-label="6. 실무에서는 실제로 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무에서는 실제로</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="6-실무에서는-실제로" aria-label="6. 실무에서는 실제로 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">6. 실무에서는 실제로</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>신규 서비스</strong>는 사례·계약을 합의하고 DB 제약을 정한 뒤 API 하나를 끝까지 연결한다. OpenAPI를 프론트와 공유하고 구현과 함께 갱신한다.</li>
 <li><strong>레거시</strong>는 스키마·FK·유일 제약·기존 데이터를 먼저 읽고 호환 구현이나 단계적 마이그레이션을 고른다. 구버전 호환을 확인하지 않은 운영 테이블 변경은 피한다.</li>
@@ -375,7 +375,7 @@ class PostNotFoundException extends RuntimeException {
 </tr>
 </tbody></table></div>
 <p>입력 검증과 업무 규칙은 같은 검사가 아니다. <code>postId</code>가 양수인지, JSON 필드가 비어 있지 않은지는 요청 경계에서 빠르게 거를 수 있다. “탈퇴 회원은 좋아요를 할 수 없다”나 “비공개 게시글은 작성자만 볼 수 있다”는 현재 데이터와 정책에 의존하므로 서비스/도메인에서 다시 판단한다. DB의 FK·유일 제약은 앞의 검사와 별도로 최종 무결성을 지킨다. 같은 규칙을 여러 층에서 반복하더라도 각 층의 목적을 구분한다.</p>
-</div></details><details class="knowledge-chapter"><summary id="7-흔한-오해와-실수" aria-label="7. 흔한 오해와 실수 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 흔한 오해와 실수</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="7-흔한-오해와-실수" aria-label="7. 흔한 오해와 실수 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">7. 흔한 오해와 실수</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>“엔티티를 먼저 만들면 요구도 보인다” → 저장 모양이 API를 결정한다.</strong> 불필요한 노출과 내부 키 결합을 막도록 요청·응답을 정하고 DTO와 Entity를 분리한다.</li>
 <li><strong>“Controller부터 만들면 API가 끝난다” → 라우팅은 경계의 일부다.</strong> 권한·트랜잭션·DB 제약을 검증하고 프로토타입과 완성을 구분한다.</li>
@@ -385,7 +385,7 @@ class PostNotFoundException extends RuntimeException {
 <li><strong>“트랜잭션이면 동시성도 해결된다” → 원자성이 유일성을 선언하지는 않는다.</strong> DB 제약과 원자적 연산을 함께 쓴다.</li>
 <li><strong>“요청 전체를 로그에 남기자” → 토큰·개인정보가 저장될 수 있다.</strong> 요청 ID와 안전한 요약만 남기고 민감값은 제외·마스킹한다.</li>
 </ol>
-</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">8. 자가점검 Q&amp;A (면접 대비)</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p><strong>Q1. API를 만들 때 DB와 Controller 중 무엇을 먼저 만들겠습니까?</strong></p>
 <p>요구와 API 계약을 먼저 합의하고 데이터 제약을 정하겠습니다. 구현은 API 하나를 저장부터 응답까지 연결합니다. 기존 DB가 있으면 시작점만 바꾸고 계약은 확인합니다.</p>
 <p>꼬리질문: 계약을 먼저 정하는 이유는?</p>
@@ -414,7 +414,7 @@ class PostNotFoundException extends RuntimeException {
 <p>DTO·오류 규약·트랜잭션·DB 제약을 먼저 맞춥니다. 실제 DB와 요청을 일찍 붙여 가정 차이를 찾습니다.</p>
 <p>꼬리질문: API 문서는 언제 갱신합니까?</p>
 <p>답: 계약 변경과 함께 갱신합니다. 문서·응답의 불일치는 테스트와 리뷰에서 확인합니다.</p>
-</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>Spring Web MVC — <a href="https://docs.spring.io/spring-framework/reference/web/webmvc.html" target="_blank" rel="noopener">https://docs.spring.io/spring-framework/reference/web/webmvc.html</a> — <code>DispatcherServlet</code>, MVC 기능 영역과 요청 처리 구조를 확인했다.</li>
 <li>Building REST services with Spring — <a href="https://spring.io/guides/tutorials/rest" target="_blank" rel="noopener">https://spring.io/guides/tutorials/rest</a> — HTTP가 제공하는 메서드·캐시·보안 등 REST API 설계의 배경과 Spring REST 구현 예를 읽었다.</li>
@@ -431,8 +431,12 @@ class PostNotFoundException extends RuntimeException {
     let id;
     try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
     const target = document.getElementById(id);
-    const chapter = target?.closest('details.knowledge-chapter');
-    if (chapter) chapter.open = true;
+    let parent = target?.closest('details.knowledge-topic, details.knowledge-chapter');
+    while (parent) {
+      parent.open = true;
+      parent = parent.parentElement?.closest('details.knowledge-topic, details.knowledge-chapter');
+    }
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }));
   };
   document.addEventListener('click', (event) => {
     const link = event.target.closest('a[href^="#"]');

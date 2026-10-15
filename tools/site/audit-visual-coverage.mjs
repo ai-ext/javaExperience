@@ -13,17 +13,27 @@ const decodeCode = (value) => value.replace(/&#10;/g, '\n').replace(/&quot;/g, '
 
 for (const filename of fs.readdirSync(path.join(root, 'docs/knowledge')).filter((name) => /^[A-Z]\d{2}-.*\.md$/.test(name))) {
   const sourcePath = path.join(root, 'docs/knowledge', filename);
+  let fenced = false;
+  let expectedTopics = 0;
+  for (const line of fs.readFileSync(sourcePath, 'utf8').split(/\r?\n/)) {
+    if (/^\s*(?:```|~~~)/.test(line)) { fenced = !fenced; continue; }
+    if (!fenced && /^### /.test(line)) expectedTopics++;
+  }
   const htmlPath = sourcePath.replace(/\.md$/, '.html');
   if (!fs.existsSync(htmlPath)) { failures.push(`${filename}: 공부자료 HTML 없음`); continue; }
   const html = fs.readFileSync(htmlPath, 'utf8');
-  const headings = [...html.matchAll(/<summary id="([^"]+)" aria-label="[^"]+ 펼치기"/g)];
+  const headings = [...html.matchAll(/<details class="knowledge-chapter"><summary id="([^"]+)"/g)];
+  const topics = [...html.matchAll(/<details class="knowledge-topic"><summary id="([^"]+)"/g)];
   const cards = (html.match(/<details class="knowledge-chapter">/g) || []).length;
   const mapSteps = (html.match(/class="knowledge-page-step"/g) || []).length;
   if (!cards || cards !== headings.length || cards !== mapSteps) failures.push(`${filename}: 공부자료 주제 지도 ${mapSteps}, 접기 카드 ${cards}, 앵커 ${headings.length}`);
+  if (topics.length !== expectedTopics) failures.push(`${filename}: 하위 주제 카드 ${topics.length}/${expectedTopics}`);
   for (const [, id] of headings) {
     if (!html.includes(`href="#${id}"`)) failures.push(`${filename}: ${id} 앵커 링크 없음`);
   }
-  knowledgeDocs.push({ id: filename.slice(0, 3), sections: cards });
+  if (new Set([...headings, ...topics].map(([, id]) => id)).size !== headings.length + topics.length)
+    failures.push(`${filename}: 주제 앵커가 중복됨`);
+  knowledgeDocs.push({ id: filename.slice(0, 3), sections: cards, topics: topics.length });
 }
 
 for (const chapter of manifest.chapters) for (const level of chapter.levels) {
@@ -115,6 +125,7 @@ const totals = {
   exactCodeFiles: items.reduce((sum, item) => sum + item.exactCodeFiles, 0),
   knowledgeDocs: knowledgeDocs.length,
   knowledgeSections: knowledgeDocs.reduce((sum, doc) => sum + doc.sections, 0),
+  knowledgeTopics: knowledgeDocs.reduce((sum, doc) => sum + doc.topics, 0),
   manualOrTestFlowLevels: items.filter((item) => item.requestPractice === 'manual_or_test_flow').map((item) => item.id),
 };
 if (items.length !== 101) failures.push(`단계 수 ${items.length}/101`);
@@ -128,7 +139,7 @@ const report = {
     '같은 SVG를 단계 화면에 중복하지 않고 카탈로그 미리보기에만 사용한다.',
     '장문 절은 단계별 카드에 넣고 요청 버튼·원문 코드·채점 기준을 보존한다.',
     '전체 코드 토글의 기본·MyBatis·배포 전환 파일을 모두 검사하고 삭제 파일을 제외한 코드를 원문과 문자 단위로 대조한다.',
-    '공부자료의 실제 절을 주제 지도와 접기 카드로 연결하고 원문 본문·코드·앵커를 보존한다.',
+    '공부자료의 실제 절과 하위 주제를 접기 카드로 연결하고 원문 본문·코드·앵커를 보존한다.',
   ],
   limits: [
     '빛으로 표시하는 계층은 시나리오의 예상 흐름이며 실제 Spring Boot 내부 호출 추적이 아니다.',

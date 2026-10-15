@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>W20. 시간·타임존은 왜 매번 문제인가</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=be06fe764657">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,11 +18,11 @@
 과거 사건·로그·만료 시점은 <code>Instant</code>로 표현하고 저장은 UTC로 정규화한 뒤, 사용자 타임존으로 표시한다.
 미래의 현지 약속은 예외다. <code>LocalDateTime</code>만 저장하지 말고 <code>ZoneId</code>와 함께 정책을 정하며, 기본값은 <code>Instant</code> + UTC다.</p>
 </blockquote>
-<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-질문" aria-label="1. 질문 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 질문</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-질문" aria-label="1. 질문 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">1. 질문</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>“시간을 UTC로 저장하라”는 말을 따라 <code>LocalDateTime.now()</code>를 DB에 넣었는데, 서버를 서울에서 미국 리전으로 옮기자 예약 시각이 16시간 밀린다. 코드는 그대로인데 JVM 기본 타임존이 달라졌기 때문이다.</p>
 <p>다른 팀은 API에서 <code>2026-07-01T09:00:00</code>을 받고 이를 “한국 오전 9시”라고 가정한다. 해외 고객이 같은 값을 보내면 어느 지역의 오전 9시인지 정보가 없다. 반대로 <code>Z</code>가 붙은 값을 받으면서 이를 한국 시간으로 다시 해석하면 같은 시간대 변환을 두 번 적용한다.</p>
 <p>세 번째 장면은 서머타임이 적용되는 지역의 예약이다. 새벽 2시 30분이 건너뛰어 존재하지 않거나, 가을에는 2시 30분이 두 번 온다. 달력에는 한 번만 보이는 시각인데 어느 실제 순간을 예약했는지 정하지 않으면 배치·알림이 한 시간씩 어긋난다.</p>
-</div></details><details class="knowledge-chapter"><summary id="2-짧은-답" aria-label="2. 짧은 답 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 짧은 답</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="2-짧은-답" aria-label="2. 짧은 답 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">2. 짧은 답</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>이미 발생한 사건, 감사 로그, 토큰 만료, 결제 승인 시각은 <code>Instant</code>로 표현한다.</li>
 <li>날짜만 의미하면 <code>LocalDate</code>, 지역 시계의 미래 약속이면 <code>LocalDateTime</code> + IANA <code>ZoneId</code>를 저장한다.</li>
@@ -32,8 +32,8 @@
 <li>테스트에서는 <code>Clock</code>을 주입한다. <code>now()</code>를 흩뿌리지 않으면 경계 시각을 고정해 검증할 수 있다.</li>
 <li>기본 추천: <strong>사건은 <code>Instant</code> + UTC 저장 + 화면에서 사용자 <code>ZoneId</code>로 변환</strong>. 반복 일정과 현지 약속은 별도 도메인 모델로 다룬다.</li>
 </ul>
-</div></details><details class="knowledge-chapter"><summary id="3-왜-그런가--원리" aria-label="3. 왜 그런가 — 원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 왜 그런가 — 원리</strong><small>“언제”와 “몇 시”는 다른 질문이다 · 서버·JVM·DB·클라이언트는 서로 다른 기본 시계를 가질 수 있다 · 서머타임은 변환 함수가 실제로 만나는 모호성이다 · API는 어떤 한계를 해결하며 발전했나</small></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
-<h3 id="언제와-몇-시는-다른-질문이다"><a class="anchor" href="#언제와-몇-시는-다른-질문이다" aria-hidden="true">#</a>“언제”와 “몇 시”는 다른 질문이다</h3>
+</div></details><details class="knowledge-chapter"><summary id="3-왜-그런가--원리" aria-label="3. 왜 그런가 — 원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 왜 그런가 — 원리</strong><small>“언제”와 “몇 시”는 다른 질문이다 · 서버·JVM·DB·클라이언트는 서로 다른 기본 시계를 가질 수 있다 · 서머타임은 변환 함수가 실제로 만나는 모호성이다 · API는 어떤 한계를 해결하며 발전했나</small></span><span class="knowledge-chapter-meta">1개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="언제와-몇-시는-다른-질문이다" aria-label="“언제”와 “몇 시”는 다른 질문이다 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">“언제”와 “몇 시”는 다른 질문이다</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>타임라인의 한 지점은 표준 시계에서 하나의 값이다. <code>Instant</code>는 UTC 기준 에포크 초와 나노초로 그 지점을 표현한다. 같은 <code>Instant</code>는 JVM의 기본 타임존·서버 위치·접속한 사용자와 관계없이 같은 사건이다.</p>
 <p>반면 <code>LocalDateTime</code>은 연-월-일과 시-분-초만 가진다. 값 <code>2026-07-01T09:00</code>만으로는 그 순간이 UTC인지, 서울인지, LA인지 알 수 없다. 이를 <code>Instant</code>로 바꾸려면 외부에서 <code>ZoneId</code> 또는 <code>ZoneOffset</code>을 공급해야 한다. 누락된 정보는 변환 함수가 추측할 수 없으며, <code>ZoneId.systemDefault()</code>를 대신 넣으면 서버 설정이 도메인 규칙이 된다.</p>
 <p><code>OffsetDateTime</code>은 벽시계 값과 고정 UTC 오프셋을 함께 가진다. <code>+09:00</code>은 그 순간과의 관계를 알려주지만 “서울” 같은 지역 규칙은 담지 않는다. 오프셋만으로는 다음 해에 그 지역의 서머타임 규칙이 바뀌어도 따라갈 수 없다.</p>
@@ -49,14 +49,14 @@
     G --&gt;|&quot;간격 또는 중복&quot;| I[&quot;업무 정책으로 선택 또는 거절&quot;]
     H --&gt; J[&quot;계산한 Instant와 원래 약속을 함께 관리&quot;]
     I --&gt; J</pre>
-<h3 id="서버jvmdb클라이언트는-서로-다른-기본-시계를-가질-수-있다"><a class="anchor" href="#서버jvmdb클라이언트는-서로-다른-기본-시계를-가질-수-있다" aria-hidden="true">#</a>서버·JVM·DB·클라이언트는 서로 다른 기본 시계를 가질 수 있다</h3>
+</div></details><details class="knowledge-topic"><summary id="서버jvmdb클라이언트는-서로-다른-기본-시계를-가질-수-있다" aria-label="서버·JVM·DB·클라이언트는 서로 다른 기본 시계를 가질 수 있다 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">서버·JVM·DB·클라이언트는 서로 다른 기본 시계를 가질 수 있다</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p><code>ZoneId.systemDefault()</code>는 OS/JVM 설정을 따르므로 개발 PC, 컨테이너, 클라우드 리전이 다르면 결과가 달라질 수 있다. SQL 연결 존도 DB 서버 존과 같다고 보장되지 않는다. 계층의 “기본값”을 상속하지 말고 경계에서 의미를 정한다.</p>
-<h3 id="서머타임은-변환-함수가-실제로-만나는-모호성이다"><a class="anchor" href="#서머타임은-변환-함수가-실제로-만나는-모호성이다" aria-hidden="true">#</a>서머타임은 변환 함수가 실제로 만나는 모호성이다</h3>
+</div></details><details class="knowledge-topic"><summary id="서머타임은-변환-함수가-실제로-만나는-모호성이다" aria-label="서머타임은 변환 함수가 실제로 만나는 모호성이다 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">서머타임은 변환 함수가 실제로 만나는 모호성이다</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>지역 타임존 규칙은 로컬 시각당 유효 오프셋을 결정한다. 보통 하나, 봄 gap에는 0개, 가을 overlap에는 2개다. <code>LocalDateTime.atZone(zone)</code>은 gap을 앞으로 보정하고 overlap에는 직전 오프셋 또는 기본적으로 이른 오프셋을 선택한다. 청구·예약처럼 조용한 보정이 위험하면 시각을 거절하거나 어느 오프셋을 쓸지 명시한다.[5][6]</p>
 <p>“내일 같은 시각”은 <code>plusDays(1)</code>, “24시간 뒤”는 <code>plusHours(24)</code>다. DST 경계에서는 결과가 한 시간 차이 날 수 있으므로 배치가 달력 주기인지 경과 시간 주기인지 정한다.</p>
-<h3 id="api는-어떤-한계를-해결하며-발전했나"><a class="anchor" href="#api는-어떤-한계를-해결하며-발전했나" aria-hidden="true">#</a>API는 어떤 한계를 해결하며 발전했나</h3>
+</div></details><details class="knowledge-topic"><summary id="api는-어떤-한계를-해결하며-발전했나" aria-label="API는 어떤 한계를 해결하며 발전했나 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">API는 어떤 한계를 해결하며 발전했나</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>Java 8 이전의 <code>Date</code>/<code>Calendar</code> 계열은 가변적이고 사용 의도를 드러내기 어려웠다. JEP 150은 이 한계를 줄이려고 JSR 310 기반의 불변 날짜·시간 API를 Java 8에 넣었다.[4] 같은 릴리스의 JEP 170(JDBC 4.2)은 새 타입을 DB로 전달할 일반 setter/update API를 추가해, 애플리케이션 타입과 JDBC 사이의 수동 변환 부담을 낮췄다.[8] Hibernate 문서는 <code>hibernate.jdbc.time_zone</code>이 5.2.3부터 제공되며, 값이 없으면 JVM 기본 존을 쓴다고 기록한다. 암묵적인 기본 존에서 오는 환경별 차이를 설정으로 고정할 수 있게 된 변화다.[3]</p>
-</div></details><details class="knowledge-chapter"><summary id="4-선택지-비교" aria-label="4. 선택지 비교 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 선택지 비교</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="4-선택지-비교" aria-label="4. 선택지 비교 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">4. 선택지 비교</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -129,8 +129,8 @@
 </tr>
 </tbody></table></div>
 <p>MySQL 8.4 매뉴얼은 <code>DATETIME</code>과 <code>TIMESTAMP</code> 모두 초 이하 최대 6자리 정밀도를 지원한다고 설명한다. <code>TIMESTAMP</code>는 UTC 저장과 연결 타임존 기준 입출력 변환을 하고, <code>DATETIME</code>에는 그 변환이 없다.[2] Java <code>Instant</code>의 나노초 정밀도와 컬럼 마이크로초 정밀도가 다르면 저장 과정에서 정밀도가 줄 수 있으므로 비교·재조회 테스트는 실제 스키마 정밀도까지 맞춰야 한다.</p>
-</div></details><details class="knowledge-chapter"><summary id="5-코드로-보기" aria-label="5. 코드로 보기 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 코드로 보기</strong><small>같은 입력을 타입별로 해석하기 — 순수 Java · DST의 빈 시각과 중복 시각 — 순수 Java · Clock으로 현재 시각을 주입하기 — Spring Boot 4.1 / Framework 7 기준 (미실행) · JPA 저장 기본값과 MySQL 연결 계약 (Spring 예시, 미실행)</small></span><span class="knowledge-chapter-meta">7개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
-<h3 id="같은-입력을-타입별로-해석하기--순수-java"><a class="anchor" href="#같은-입력을-타입별로-해석하기--순수-java" aria-hidden="true">#</a>같은 입력을 타입별로 해석하기 — 순수 Java</h3>
+</div></details><details class="knowledge-chapter"><summary id="5-코드로-보기" aria-label="5. 코드로 보기 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">5. 코드로 보기</strong><small>같은 입력을 타입별로 해석하기 — 순수 Java · DST의 빈 시각과 중복 시각 — 순수 Java · Clock으로 현재 시각을 주입하기 — Spring Boot 4.1 / Framework 7 기준 (미실행) · JPA 저장 기본값과 MySQL 연결 계약 (Spring 예시, 미실행)</small></span><span class="knowledge-chapter-meta">7개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="같은-입력을-타입별로-해석하기--순수-java" aria-label="같은 입력을 타입별로 해석하기 — 순수 Java 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">같은 입력을 타입별로 해석하기 — 순수 Java</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>첫 번째 프로그램은 같은 절대 시점의 서울/LA 표시를 비교하고, 오프셋이 빠진 입력을 서버 기본 존으로 바꿨을 때 결과가 달라지는 버그를 재현한다. JDK 21에서 실행했다.</p>
 <pre><code class="language-java">import java.time.Instant;
 import java.time.LocalDateTime;
@@ -167,7 +167,7 @@ los-angeles=2026-06-30T17:00-07:00[America/Los_Angeles]
 offset-api=2026-07-01T09:00+09:00
 same-local-with-system-zone=2026-07-01T16:00:00Z</code></pre>
 <p>같은 <code>2026-07-01T09:00:00</code> 입력도 서버 존에 따라 UTC 순간이 7시간 다르다. 지역 약속이면 사용자 <code>ZoneId</code>로 해석하고, 사건 시각 API는 오프셋 포함 값을 요구해 <code>Instant</code>로 바꾼다.</p>
-<h3 id="dst의-빈-시각과-중복-시각--순수-java"><a class="anchor" href="#dst의-빈-시각과-중복-시각--순수-java" aria-hidden="true">#</a>DST의 빈 시각과 중복 시각 — 순수 Java</h3>
+</div></details><details class="knowledge-topic"><summary id="dst의-빈-시각과-중복-시각--순수-java" aria-label="DST의 빈 시각과 중복 시각 — 순수 Java 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">DST의 빈 시각과 중복 시각 — 순수 Java</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>두 번째 프로그램은 베를린의 2026년 봄/가을 전환을 확인한다. <code>atZone</code>의 자동 보정과 명시 오프셋 사용 결과가 서로 다르다. JDK 21 실행 출력이다.</p>
 <pre><code class="language-java">import java.time.DateTimeException;
 import java.time.LocalDateTime;
@@ -208,7 +208,7 @@ overlap-valid-offsets=[+02:00, +01:00]
 overlap-default=2026-10-25T02:30+02:00[Europe/Berlin] -&gt; 2026-10-25T00:30:00Z
 overlap-later=2026-10-25T02:30+01:00[Europe/Berlin] -&gt; 2026-10-25T01:30:00Z</code></pre>
 <p>예약 입력에서 유효 오프셋이 0개면 대체 시각을 제안하거나 거절하고, 2개면 첫 번째/두 번째 시각을 선택받는다. 기본 보정을 숨기면 한 시간 다른 순간이 예약된다.</p>
-<h3 id="clock으로-현재-시각을-주입하기--spring-boot-41--framework-7-기준-미실행"><a class="anchor" href="#clock으로-현재-시각을-주입하기--spring-boot-41--framework-7-기준-미실행" aria-hidden="true">#</a><code>Clock</code>으로 현재 시각을 주입하기 — Spring Boot 4.1 / Framework 7 기준 (미실행)</h3>
+</div></details><details class="knowledge-topic"><summary id="clock으로-현재-시각을-주입하기--spring-boot-41--framework-7-기준-미실행" aria-label="Clock으로 현재 시각을 주입하기 — Spring Boot 4.1 / Framework 7 기준 (미실행) 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">Clock으로 현재 시각을 주입하기 — Spring Boot 4.1 / Framework 7 기준 (미실행)</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-java">import java.time.Clock;
 import java.time.Instant;
 
@@ -237,7 +237,7 @@ class ExpirationService {
     }
 }</code></pre>
 <p>테스트에서는 <code>Clock.fixed(Instant.parse(&quot;2026-07-01T00:00:00Z&quot;), ZoneOffset.UTC)</code>를 만들어 생성자에 전달하면 만료 직전·정각·직후를 재현할 수 있다. <code>Instant.now()</code>를 직접 호출하는 코드가 여러 곳에 흩어지면 테스트 실행 시각이 바뀌면서 경계가 흔들린다. <code>Clock</code>은 현재 시각이 필요한 메서드에 전달하도록 설계됐고, JDK 문서도 DI와 고정 시계를 테스트 용도로 설명한다.[7]</p>
-<h3 id="jpa-저장-기본값과-mysql-연결-계약-spring-예시-미실행"><a class="anchor" href="#jpa-저장-기본값과-mysql-연결-계약-spring-예시-미실행" aria-hidden="true">#</a>JPA 저장 기본값과 MySQL 연결 계약 (Spring 예시, 미실행)</h3>
+</div></details><details class="knowledge-topic"><summary id="jpa-저장-기본값과-mysql-연결-계약-spring-예시-미실행" aria-label="JPA 저장 기본값과 MySQL 연결 계약 (Spring 예시, 미실행) 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">JPA 저장 기본값과 MySQL 연결 계약 (Spring 예시, 미실행)</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-java">import java.time.Instant;
 
 import jakarta.persistence.Column;
@@ -270,7 +270,7 @@ class AuditEvent {
 <p><code>hibernate.jdbc.time_zone</code>은 JDBC <code>Timestamp</code>/<code>Time</code> 바인딩·조회용 <code>Calendar</code> 존이며 기본은 JVM 존이다. 이것만으로 MySQL 세션 <code>time_zone</code>을 바꾸지는 않는다.[3] <code>TIMESTAMP</code>는 매 연결을 UTC로 고정하고, UTC 인코딩 <code>DATETIME(6)</code>은 앱 전체가 그 규칙을 지킨다. Dialect와 마이그레이션의 SQL 타입·정밀도도 통합 환경에서 맞춘다.</p>
 <p>JSON 경계에서는 <code>Instant</code>를 ISO 문자열 <code>2026-07-01T00:00:00Z</code>로, 오프셋 의미가 필요한 <code>OffsetDateTime</code>은 <code>2026-07-01T09:00:00+09:00</code>처럼 표현할 수 있다. <code>LocalDateTime</code>의 <code>2026-07-01T09:00:00</code>에는 타임존 정보가 없다는 점을 API 명세에 적어야 한다.</p>
 <p>Jackson 설정은 문자열/숫자 표현, 정밀도, 존 ID 포함에 영향을 주므로 DTO 필드 타입만 정하고 계약을 생략하지 않는다. 직렬화 상세는 <a class="docref" href="P16-json-jackson-practical.html">P16</a> 참조.</p>
-</div></details><details class="knowledge-chapter"><summary id="6-실무에서는-실제로" aria-label="6. 실무에서는 실제로 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무에서는 실제로</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="6-실무에서는-실제로" aria-label="6. 실무에서는 실제로 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">6. 실무에서는 실제로</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -304,7 +304,7 @@ class AuditEvent {
 <p>미래 지역 일정은 규칙 데이터가 바뀔 수 있다. 확정 순간이 중요한 법률·항공 업무는 계산된 <code>Instant</code>를 보존하고, 사용자의 벽시계 약속이 기준이면 <code>LocalDateTime</code> + <code>ZoneId</code>를 원본으로 둔다. 알림 순간 재계산과 사용자 통지를 정책으로 정한다.</p>
 <p>지역 날짜 조회는 <code>date.atStartOfDay(zone)</code>부터 다음 날짜 시작까지의 반열림 구간(<code>[start, nextStart)</code>)을 쓴다. DST 날은 23/25시간일 수 있어 하루를 24시간으로 더하거나 나노초 끝값을 만들지 않는다.</p>
 <p>마이그레이션은 컬럼 의미·원천 존을 확인하고 UTC 새 컬럼과 대조한 뒤 구버전 쓰기를 제거한다. 원천 존을 모르는 과거 <code>LocalDateTime</code>은 <code>Instant</code>로 복구할 수 없으므로 임의 변환하지 않는다.</p>
-</div></details><details class="knowledge-chapter"><summary id="7-흔한-오해와-실수" aria-label="7. 흔한 오해와 실수 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 흔한 오해와 실수</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="7-흔한-오해와-실수" aria-label="7. 흔한 오해와 실수 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">7. 흔한 오해와 실수</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>오해: “서버가 UTC면 <code>LocalDateTime.now()</code>도 안전하다.”</strong> 증상 → 다른 서버/개발 환경에서 저장 시각이 다르다. 실제 → 타입에 존이 없고 시스템 기본 존을 변환에 넣은 것뿐이다. 대처 → 사건 시각은 <code>Instant.now(clock)</code>를 사용하고 JDBC 존과 DB 연결 존도 따로 설정한다.</li>
 <li><strong>오해: “ISO 문자열이면 타임존이 있다.”</strong> 증상 → <code>2026-07-01T09:00:00</code>을 클라이언트와 서버가 다르게 해석한다. 실제 → ISO-8601에서 이 문자열의 <code>LocalDateTime</code>은 오프셋 없는 값이다. 대처 → 절대 시점 계약은 <code>Z</code> 또는 명시 오프셋 필수로 검증한다.</li>
@@ -312,26 +312,26 @@ class AuditEvent {
 <li><strong>오해: “<code>atZone()</code>은 존재하지 않는 시각을 오류로 알려준다.”</strong> 증상 → 예약이 사용자가 고른 시각보다 앞으로 조용히 이동한다. 실제 → DST gap은 기본 API에서 간격 길이만큼 앞으로 보정한다. 대처 → <code>ZoneRules.getValidOffsets()</code>로 0/1/2개를 확인하고 업무상 자동 보정이 안 되면 명시 검증·선택을 받는다.[5][6]</li>
 <li><strong>오해: “DB 저장은 UTC 옵션 하나면 끝난다.”</strong> 증상 → JVM을 UTC로 고정하고도 읽기/쓰기 변환에서 차이가 난다. 실제 → <code>hibernate.jdbc.time_zone</code>, JDBC 드라이버, MySQL 세션 존, SQL 컬럼 변환은 서로 다른 층이다. 대처 → 실제 DB 연결에서 bind/read 왕복, <code>@@session.time_zone</code>, 컬럼 타입과 정밀도를 함께 검증한다.</li>
 </ol>
-</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. LocalDateTime과 Instant는 어떤 기준으로 고르나? · Q2. UTC로 저장하면 사용자 시간대 버그가 모두 사라지나? · Q3. OffsetDateTime과 ZonedDateTime은 어떻게 다른가? · Q4. MySQL DATETIME과 TIMESTAMP 중 무엇을 쓰나?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
-<h3 id="q1-localdatetime과-instant는-어떤-기준으로-고르나"><a class="anchor" href="#q1-localdatetime과-instant는-어떤-기준으로-고르나" aria-hidden="true">#</a>Q1. <code>LocalDateTime</code>과 <code>Instant</code>는 어떤 기준으로 고르나?</h3>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. LocalDateTime과 Instant는 어떤 기준으로 고르나? · Q2. UTC로 저장하면 사용자 시간대 버그가 모두 사라지나? · Q3. OffsetDateTime과 ZonedDateTime은 어떻게 다른가? · Q4. MySQL DATETIME과 TIMESTAMP 중 무엇을 쓰나?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="q1-localdatetime과-instant는-어떤-기준으로-고르나" aria-label="Q1. LocalDateTime과 Instant는 어떤 기준으로 고르나? 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">Q1. LocalDateTime과 Instant는 어떤 기준으로 고르나?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p><code>Instant</code>는 서버/사용자 존과 무관한 사건 시각이다. <code>LocalDateTime</code>은 지역 예약이나 영업시간처럼 벽시계 필드만 필요할 때 쓴다. 이를 <code>Instant</code>로 바꾸려면 지역 규칙을 추가한다.</p>
 <p><strong>꼬리질문: <code>LocalDateTime</code>을 바로 DB <code>TIMESTAMP</code>에 쓰면 안 되나?</strong> 시스템 존에 따라 다르게 해석될 수 있으므로 바인딩 존을 명시한다.</p>
-<h3 id="q2-utc로-저장하면-사용자-시간대-버그가-모두-사라지나"><a class="anchor" href="#q2-utc로-저장하면-사용자-시간대-버그가-모두-사라지나" aria-hidden="true">#</a>Q2. UTC로 저장하면 사용자 시간대 버그가 모두 사라지나?</h3>
+</div></details><details class="knowledge-topic"><summary id="q2-utc로-저장하면-사용자-시간대-버그가-모두-사라지나" aria-label="Q2. UTC로 저장하면 사용자 시간대 버그가 모두 사라지나? 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">Q2. UTC로 저장하면 사용자 시간대 버그가 모두 사라지나?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>사건의 비교·정렬은 일관돼지만 “매주 현지 오전 9시” 같은 약속의 지역 규칙은 <code>Instant</code>에 담기지 않는다. 표시에는 사용자 <code>ZoneId</code>를 적용한다.</p>
 <p><strong>꼬리질문: 미래 예약도 무조건 UTC로 저장해야 하나?</strong> 원래 벽시계 약속이 기준이면 <code>LocalDateTime</code>과 지역 <code>ZoneId</code>를 기준 데이터로 두고, 계산된 <code>Instant</code>를 보조 값으로 둘 수 있다.</p>
-<h3 id="q3-offsetdatetime과-zoneddatetime은-어떻게-다른가"><a class="anchor" href="#q3-offsetdatetime과-zoneddatetime은-어떻게-다른가" aria-hidden="true">#</a>Q3. <code>OffsetDateTime</code>과 <code>ZonedDateTime</code>은 어떻게 다른가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q3-offsetdatetime과-zoneddatetime은-어떻게-다른가" aria-label="Q3. OffsetDateTime과 ZonedDateTime은 어떻게 다른가? 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">Q3. OffsetDateTime과 ZonedDateTime은 어떻게 다른가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p><code>OffsetDateTime</code>은 고정 오프셋, <code>ZonedDateTime</code>은 지역 <code>ZoneId</code> 규칙을 쓴다. 순간과 입력 오프셋 보존에는 전자, 지역 규칙에 따른 반복 계산에는 후자나 지역 ID가 필요하다.</p>
 <p><strong>꼬리질문: <code>ZoneId</code> 이름만 저장하면 나중에도 동일한 현지 시각인가?</strong> 타임존 규칙 데이터가 바뀔 수 있어 같은 지역 ID도 미래 변환이 달라질 수 있다. 확정된 법적 순간이 중요하면 계산 시점의 <code>Instant</code>와 원래 지역 약속을 같이 남긴다.</p>
-<h3 id="q4-mysql-datetime과-timestamp-중-무엇을-쓰나"><a class="anchor" href="#q4-mysql-datetime과-timestamp-중-무엇을-쓰나" aria-hidden="true">#</a>Q4. MySQL <code>DATETIME</code>과 <code>TIMESTAMP</code> 중 무엇을 쓰나?</h3>
+</div></details><details class="knowledge-topic"><summary id="q4-mysql-datetime과-timestamp-중-무엇을-쓰나" aria-label="Q4. MySQL DATETIME과 TIMESTAMP 중 무엇을 쓰나? 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">Q4. MySQL DATETIME과 TIMESTAMP 중 무엇을 쓰나?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p><code>DATETIME</code>은 존 변환 없는 벽시계 값이고, <code>TIMESTAMP</code>는 연결 존을 통해 UTC 왕복 변환하며 2038년 범위 제한이 있다. MySQL 8.4에서 둘 다 초 이하 정밀도는 최대 6자리다.[2]</p>
 <p><strong>꼬리질문: <code>TIMESTAMP</code> 컬럼인데 연결 세션 존을 바꿔도 값은 같은가?</strong> 같은 순간의 로컬 표시가 바뀌며, 서로 다른 존으로 쓰고 읽으면 왕복 문자열이 달라질 수 있다. 모든 세션을 고정하거나 변환 계약을 명시해야 한다.</p>
-<h3 id="q5-dst의-중복-시각은-zoneddatetime이-알아서-처리하나"><a class="anchor" href="#q5-dst의-중복-시각은-zoneddatetime이-알아서-처리하나" aria-hidden="true">#</a>Q5. DST의 중복 시각은 <code>ZonedDateTime</code>이 알아서 처리하나?</h3>
+</div></details><details class="knowledge-topic"><summary id="q5-dst의-중복-시각은-zoneddatetime이-알아서-처리하나" aria-label="Q5. DST의 중복 시각은 ZonedDateTime이 알아서 처리하나? 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">Q5. DST의 중복 시각은 ZonedDateTime이 알아서 처리하나?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>API 기본값은 중복 시각의 오프셋을 선택하고 gap을 앞으로 보정한다. 예약에서 조용한 변경이 위험하면 유효 오프셋 개수를 보고 거절하거나 사용자가 선택하게 한다.</p>
 <p><strong>꼬리질문: 배치가 매일 24시간 간격이면 <code>plusDays(1)</code>인가?</strong> 실제 경과 시간이면 <code>Duration.ofHours(24)</code>, 지역 달력의 같은 시각이면 날짜를 늘려 존 규칙으로 다시 해석한다.</p>
-<h3 id="q6-테스트에서-현재-시간을-고정하는-가장-작은-변경은"><a class="anchor" href="#q6-테스트에서-현재-시간을-고정하는-가장-작은-변경은" aria-hidden="true">#</a>Q6. 테스트에서 현재 시간을 고정하는 가장 작은 변경은?</h3>
+</div></details><details class="knowledge-topic"><summary id="q6-테스트에서-현재-시간을-고정하는-가장-작은-변경은" aria-label="Q6. 테스트에서 현재 시간을 고정하는 가장 작은 변경은? 펼치기"><span class="knowledge-topic-no">06</span><strong role="heading" aria-level="3">Q6. 테스트에서 현재 시간을 고정하는 가장 작은 변경은?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>프로덕션 <code>Clock.systemUTC()</code>를 주입하고 테스트는 <code>Clock.fixed()</code>로 경계 시각을 고정한다. <code>Instant.now()</code> 직접 호출보다 실행 시점과 기본 존에 덜 흔들린다. JDK도 테스트 가능한 대체 시계를 용도로 든다.[7]</p>
 <p><strong>꼬리질문: 고정 시계를 써도 DST 테스트는 필요한가?</strong> 필요하다. 고정 순간 테스트와 지역 규칙의 gap/overlap 테스트는 다른 동작을 검증한다.</p>
-</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><code>java.time</code> 패키지 요약 — <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/time/package-summary.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/time/package-summary.html</a> — 각 타입의 의미와 시스템 경계에서 ISO-8601 사용 권고를 확인했다.</li>
 <li>MySQL 8.4 <code>DATE</code>, <code>DATETIME</code>, <code>TIMESTAMP</code> — <a href="https://dev.mysql.com/doc/refman/8.4/en/datetime.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/8.4/en/datetime.html</a> — 두 컬럼의 변환 차이, 범위, 최대 소수 초 정밀도를 확인했다. 본문은 Chrome으로 읽었다.</li>
@@ -350,8 +350,12 @@ class AuditEvent {
     let id;
     try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
     const target = document.getElementById(id);
-    const chapter = target?.closest('details.knowledge-chapter');
-    if (chapter) chapter.open = true;
+    let parent = target?.closest('details.knowledge-topic, details.knowledge-chapter');
+    while (parent) {
+      parent.open = true;
+      parent = parent.parentElement?.closest('details.knowledge-topic, details.knowledge-chapter');
+    }
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }));
   };
   document.addEventListener('click', (event) => {
     const link = event.target.closest('a[href^="#"]');

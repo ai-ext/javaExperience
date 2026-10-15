@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J09. Stream API</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
-<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=986a7e362721">
+<link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=be06fe764657">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 </head>
 <body>
@@ -18,11 +18,11 @@
 순차 스트림부터 정확한 결과와 가독성을 확보하고, 병렬화는 분할 가능성·연산 비용·결합 법칙이 맞을 때 측정 후 적용한다.
 <code>groupingBy</code>·<code>toMap</code>·<code>flatMap</code>으로 집계를 명시하고, Java 24의 Gatherers(JEP 485)는 기존 연산으로 어색한 사용자 정의 중간 변환에 쓴다.</p>
 </blockquote>
-<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong>1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-왜-알아야-하나" aria-label="1. 왜 알아야 하나 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">1. 왜 알아야 하나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>배치에 <code>.parallel()</code>을 덧붙였더니 DB 호출이 한꺼번에 몰려 풀이 막히고, 요청별 <code>ThreadLocal</code> 정보가 사라질 수 있다. <code>ArrayList</code>를 <code>reduce</code>에서 수정하거나 순서 의존 누산기를 병렬화하면 결과도 달라진다. <code>toMap</code>은 중복 키에서 기본 수집기가 예외를 내며, <code>peek</code> 로그는 최적화로 생략될 수 있다.</p>
 <p>Stream API를 단순히 “람다로 컬렉션을 도는 문법”으로 보면 이런 문제를 놓친다. 스트림은 값을 저장하지 않고 계산을 기술한다. 구현은 필요한 값만 읽거나, 여러 단계를 한 번에 수행하거나, 순차 연산을 생략할 수도 있다.</p>
 <p>병렬 모드에서는 입력을 분할해 여러 스레드에서 실행하고 부분 결과를 결합한다. 따라서 순서, 부수 효과, 연산의 결합 가능성, 소스의 분할 특성이 모두 결과와 성능에 영향을 준다. 람다와 함수형 인터페이스의 원리는 → <a class="docref" href="J08-lambda-functional.html">J08</a> 참조.</p>
-</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong>2. 핵심 개념</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="2-핵심-개념" aria-label="2. 핵심 개념 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">2. 핵심 개념</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>스트림은 소스의 원소를 파이프라인에 전달하는 1회성 계산 객체다. <code>Collection</code>처럼 원소를 보관하거나 인덱스로 조회하지 않는다. 소스는 컬렉션·배열·생성 함수·I/O 등일 수 있다.</p>
 <div class="table-wrap"><table>
 <thead>
@@ -106,8 +106,8 @@
 <p><code>collect</code>는 컬렉션처럼 변경 가능한 컨테이너를 만들고, 분할 처리 시 각 부분 컨테이너를 결합하는 용도다. 여러 스레드가 같은 <code>ArrayList</code>를 공유하도록 <code>reduce</code>하지 말고 <code>collect(Collectors.toList())</code>처럼 Collector의 생성·누적·결합 계약을 사용한다.</p>
 <p><strong>원시 스트림:</strong> <code>IntStream</code>, <code>LongStream</code>, <code>DoubleStream</code>은 기본형 특화 스트림이다. <code>mapToInt</code>, <code>sum</code>, <code>average</code>, <code>summaryStatistics</code>는 <code>Integer</code> 등의 박싱과 언박싱을 줄이고 수치 연산을 직접 표현한다.</p>
 <p><code>Stream&lt;T&gt;</code>에는 객체 참조, 원시 특화 스트림에는 해당 숫자형이 흐른다. Java는 <code>boolean</code>이나 <code>char</code>용 특화 스트림은 제공하지 않는다.</p>
-</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong>3. 내부 동작·원리</strong><small>파이프라인은 어떻게 실행되나 · 왜 부수 효과를 피해야 하나 · 병렬 스트림: 분할, 처리, 결합 · Stream Gatherers (JEP 485)</small></span><span class="knowledge-chapter-meta">2개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
-<h3 id="파이프라인은-어떻게-실행되나"><a class="anchor" href="#파이프라인은-어떻게-실행되나" aria-hidden="true">#</a>파이프라인은 어떻게 실행되나</h3>
+</div></details><details class="knowledge-chapter"><summary id="3-내부-동작원리" aria-label="3. 내부 동작·원리 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 내부 동작·원리</strong><small>파이프라인은 어떻게 실행되나 · 왜 부수 효과를 피해야 하나 · 병렬 스트림: 분할, 처리, 결합 · Stream Gatherers (JEP 485)</small></span><span class="knowledge-chapter-meta">2개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="파이프라인은-어떻게-실행되나" aria-label="파이프라인은 어떻게 실행되나 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">파이프라인은 어떻게 실행되나</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-text">소스(Collection / 배열 / 생성기 / I/O)
       │ Spliterator가 원소를 공급하고 필요하면 분할
       ▼
@@ -125,10 +125,10 @@
 <li>결과가 정해지면 단락 연산이 상류에 취소를 전파한다. 단, 앞선 stateful 연산이 전체 입력을 요구하면 소스 순회를 줄이지 못할 수 있다.</li>
 <li>스트림은 한 번만 소비한다. 닫아야 하는 I/O 스트림은 <code>try</code>-with-resources로 닫는다.</li>
 </ol>
-<h3 id="왜-부수-효과를-피해야-하나"><a class="anchor" href="#왜-부수-효과를-피해야-하나" aria-hidden="true">#</a>왜 부수 효과를 피해야 하나</h3>
+</div></details><details class="knowledge-topic"><summary id="왜-부수-효과를-피해야-하나" aria-label="왜 부수 효과를 피해야 하나 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">왜 부수 효과를 피해야 하나</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>Stream 구현은 결과에 영향 없는 단계를 생략할 수 있다. 크기를 아는 소스의 <code>map(...).count()</code>에서는 매핑 결과가 필요 없을 수 있으므로 람다 호출 횟수나 <code>peek</code> 출력을 보장으로 삼지 않는다. 파라미터는 결과값을 계산하게 하고 업무 상태 갱신·파일 쓰기는 숨기지 않는다. <code>peek</code>는 디버깅 보조다.</p>
 <p>처리 중 소스를 바꾸지 말고, 행동 파라미터에서 외부 변경 상태에 의존하지 않는다. <code>forEach</code>에 지정한 최종 효과와 중간 단계의 우연한 부수 효과를 구별한다.</p>
-<h3 id="병렬-스트림-분할-처리-결합"><a class="anchor" href="#병렬-스트림-분할-처리-결합" aria-hidden="true">#</a>병렬 스트림: 분할, 처리, 결합</h3>
+</div></details><details class="knowledge-topic"><summary id="병렬-스트림-분할-처리-결합" aria-label="병렬 스트림: 분할, 처리, 결합 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">병렬 스트림: 분할, 처리, 결합</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-text">                 source Spliterator
                    /           \
               분할 입력 A      분할 입력 B     ...
@@ -141,13 +141,13 @@
 <p>병렬 reduction은 분할별 부분 결과를 combiner로 합친다. 합계에는 자연스럽지만 순서 의존 연산에는 맞지 않을 수 있다. Collector의 <code>CONCURRENT</code> 특성이 없으면 작업들이 한 가변 컨테이너를 함께 갱신한다고 가정하지 않는다. <code>forEach</code>는 순서를 보장하지 않으므로 순서가 계약이면 <code>forEachOrdered</code>나 순차 처리를 쓴다.</p>
 <p>OpenJDK의 일반적인 병렬 Stream은 <code>ForkJoinPool</code> 공용 풀을 활용한다. 다른 Fork/Join 작업과 경쟁하며, 블로킹 I/O가 끼어도 워커 확장이 보장되지 않는다.</p>
 <p>JDBC·HTTP 호출을 넣지 말고, 트랜잭션·MDC·보안 문맥 등 <code>ThreadLocal</code> 상태의 전파도 가정하지 않는다. Stream API에는 실행기를 지정하는 메서드가 없으므로, 사용자 풀에 제출해 병렬 Stream을 실행하는 관행은 구현 의존으로 취급하고 계약으로 삼지 않는다.</p>
-<h3 id="stream-gatherers-jep-485"><a class="anchor" href="#stream-gatherers-jep-485" aria-hidden="true">#</a>Stream Gatherers (JEP 485)</h3>
+</div></details><details class="knowledge-topic"><summary id="stream-gatherers-jep-485" aria-label="Stream Gatherers (JEP 485) 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">Stream Gatherers (JEP 485)</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>Java 24에서 정식화된 Gatherers는 사용자 정의 <strong>중간 연산</strong>을 구성하는 API다. 기존 <code>map</code>, <code>filter</code>, <code>flatMap</code>만으로 어색했던 고정/슬라이딩 윈도, 연속 중복 제거, 누적 스캔 등을 <code>gather(gatherer)</code>로 파이프라인에 넣는다. 최종 연산인 <code>collect</code>와 역할이 다르다.</p>
 <p>Gatherer는 타입 <code>T</code>·<code>A</code>·<code>R</code>와 상태 초기화 <code>initializer</code>, 입력 통합 <code>integrator</code>, 부분 상태 결합 <code>combiner</code>, 종료 처리 <code>finisher</code>로 정의된다. 의미를 보존하는 combiner가 있을 때만 병렬화하고, 순서가 본질이면 순차 Gatherer를 쓴다.</p>
 <p><code>windowFixed(n)</code>은 겹치지 않는 창, <code>windowSliding(n)</code>은 겹치는 창을 만든다. 마지막 고정 창은 작을 수 있고 출력 목록은 수정 불가능하다. 큰 창은 메모리를 많이 쓸 수 있다. <code>mapConcurrent(maxConcurrency, mapper)</code>는 가상 스레드로 함수를 지정 한도까지 동시 실행한다. <code>parallel()</code>과 별개 기능이므로 중복 동시성을 주의한다.</p>
-</div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong>4. 코드로 확인</strong><small>예제 1 — 지연 평가와 단락 · 예제 2 — 그룹 집계, 중복 키 병합, 분할과 평탄화 · 예제 3 — 고정 창 Gatherer</small></span><span class="knowledge-chapter-meta">6개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="4-코드로-확인" aria-label="4. 코드로 확인 펼치기"><span class="knowledge-chapter-number">04</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">4. 코드로 확인</strong><small>예제 1 — 지연 평가와 단락 · 예제 2 — 그룹 집계, 중복 키 병합, 분할과 평탄화 · 예제 3 — 고정 창 Gatherer</small></span><span class="knowledge-chapter-meta">6개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>아래 첫 두 프로그램은 JDK 21.0.6에서 단일 파일 실행으로 확인했다. 세 번째는 Java 24 이상이 필요한 API 예제다.</p>
-<h3 id="예제-1--지연-평가와-단락"><a class="anchor" href="#예제-1--지연-평가와-단락" aria-hidden="true">#</a>예제 1 — 지연 평가와 단락</h3>
+<details class="knowledge-topic"><summary id="예제-1--지연-평가와-단락" aria-label="예제 1 — 지연 평가와 단락 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">예제 1 — 지연 평가와 단락</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-java">import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
@@ -169,7 +169,7 @@ public class LazyShortCircuitDemo {
 <pre><code class="language-text">before terminal=0
 result=[2, 4]
 generated=4</code></pre>
-<h3 id="예제-2--그룹-집계-중복-키-병합-분할과-평탄화"><a class="anchor" href="#예제-2--그룹-집계-중복-키-병합-분할과-평탄화" aria-hidden="true">#</a>예제 2 — 그룹 집계, 중복 키 병합, 분할과 평탄화</h3>
+</div></details><details class="knowledge-topic"><summary id="예제-2--그룹-집계-중복-키-병합-분할과-평탄화" aria-label="예제 2 — 그룹 집계, 중복 키 병합, 분할과 평탄화 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">예제 2 — 그룹 집계, 중복 키 병합, 분할과 평탄화</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-java">import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -207,7 +207,7 @@ public class CollectorCompositionDemo {
 sku totals={B1=5, B2=4, G1=6}
 large line counts=1/3
 flattened=[java, stream, collector]</code></pre>
-<h3 id="예제-3--고정-창-gatherer"><a class="anchor" href="#예제-3--고정-창-gatherer" aria-hidden="true">#</a>예제 3 — 고정 창 Gatherer</h3>
+</div></details><details class="knowledge-topic"><summary id="예제-3--고정-창-gatherer" aria-label="예제 3 — 고정 창 Gatherer 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">예제 3 — 고정 창 Gatherer</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-java">// Java 24+ (JEP 485)
 import java.util.List;
 import java.util.stream.Gatherers;
@@ -223,7 +223,7 @@ public class FixedWindowDemo {
 }</code></pre>
 <pre><code class="language-text">(JDK 21 환경이라 미실행)
 예상 출력: [[1, 2, 3], [4, 5, 6], [7, 8]]</code></pre>
-</div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong>5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="5-버전별-변화--왜-바뀌었나" aria-label="5. 버전별 변화 — 왜 바뀌었나 펼치기"><span class="knowledge-chapter-number">05</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">5. 버전별 변화 — 왜 바뀌었나</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -249,7 +249,7 @@ public class FixedWindowDemo {
 </tr>
 </tbody></table></div>
 <p>기준 버전 Java 25에서는 위 Gatherer API를 정식 API로 사용한다. 구체적인 변화는 해당 JEP와 Java SE API 문서에서 확인한다.</p>
-</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong>6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="6-실무-가이드" aria-label="6. 실무 가이드 펼치기"><span class="knowledge-chapter-number">06</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">6. 실무 가이드</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li><strong>기본값:</strong> 순차 스트림과 순수한 변환·집계를 먼저 선택한다. 코드가 짧다는 이유로 병렬 스트림을 기본값으로 두지 않는다.</li>
 <li>한 입력을 여러 출력으로 펼칠 때는 <code>flatMap</code>을 쓴다.</li>
@@ -291,7 +291,7 @@ public class FixedWindowDemo {
 </tr>
 </tbody></table></div>
 <p>stream이 for문보다 항상 빠르다는 규칙은 없다. 두 방식의 입력, 결과, 예외·순서 의미를 같게 맞춘 뒤 워밍업과 반복을 포함한 JMH 측정 및 운영 프로파일을 기준으로 고른다.</p>
-</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong>7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="7-함정안티패턴" aria-label="7. 함정·안티패턴 펼치기"><span class="knowledge-chapter-number">07</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">7. 함정·안티패턴</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ol>
 <li><strong>스트림 재사용</strong> — 두 번째 최종 연산이 예외를 내거나 구현별 오동작 위험 → 한 파이프라인은 한 번만 소비한다 → 다시 필요하면 <code>list.stream()</code>을 새로 호출하거나 <code>Supplier&lt;Stream&lt;T&gt;&gt;</code>를 둔다.</li>
 <li><strong><code>peek</code>로 업무 처리</strong> — <code>count()</code> 최적화 등으로 콜백이 실행되지 않아 상태 갱신·로그가 빠짐 → 중간 단계 부수 효과를 보장으로 착각 → 업무 부수 효과는 명시적인 최종 연산이나 별도 루프로 처리하고 <code>peek</code>는 진단용으로 제한한다.</li>
@@ -302,40 +302,40 @@ public class FixedWindowDemo {
 <li><strong>병렬 누산에서 비결합 연산 사용</strong> — 실행마다 합계/결과가 달라짐 → 분할별 계산 후 결합 순서는 고정이 아님 → <code>+</code> 같은 결합 가능한 누산을 사용하고 부동소수점 결과도 순서에 따른 미세 차이가 허용되는지 검토한다.</li>
 <li><strong>무한 소스 앞에 전체 정렬</strong> — <code>findFirst()</code>조차 끝나지 않음 → <code>sorted</code>가 전체 입력을 알아야 첫 결과를 정할 수 있음 → 유한성·정렬 필요를 먼저 확인하고, 입력 경계나 단락 가능한 연산을 앞에 둔다.</li>
 </ol>
-</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong>8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. 컬렉션과 스트림의 핵심 차이는? · Q2. 중간 연산은 모두 한 원소씩 바로 흘려보내나? · Q3. findFirst()와 findAny() 차이와 선택 기준은? · Q4. mutable reduction은 왜 reduce보다 collect에 맞나?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
-<h3 id="q1-컬렉션과-스트림의-핵심-차이는"><a class="anchor" href="#q1-컬렉션과-스트림의-핵심-차이는" aria-hidden="true">#</a>Q1. 컬렉션과 스트림의 핵심 차이는?</h3>
+</div></details><details class="knowledge-chapter"><summary id="8-자가점검-qa-면접-대비" aria-label="8. 자가점검 Q&amp;A (면접 대비) 펼치기"><span class="knowledge-chapter-number">08</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">8. 자가점검 Q&amp;A (면접 대비)</strong><small>Q1. 컬렉션과 스트림의 핵심 차이는? · Q2. 중간 연산은 모두 한 원소씩 바로 흘려보내나? · Q3. findFirst()와 findAny() 차이와 선택 기준은? · Q4. mutable reduction은 왜 reduce보다 collect에 맞나?</small></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+<details class="knowledge-topic"><summary id="q1-컬렉션과-스트림의-핵심-차이는" aria-label="Q1. 컬렉션과 스트림의 핵심 차이는? 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">Q1. 컬렉션과 스트림의 핵심 차이는?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>컬렉션은 원소를 저장하고 조회하는 데이터 구조다. 스트림은 원소를 저장하지 않고 소스에서 값을 흘려보내며 계산 단계를 연결한다. 스트림은 한 번만 소비하지만, 컬렉션은 새 스트림을 만들어 여러 번 처리할 수 있다.</p>
 <p><strong>꼬리질문:</strong> <code>list.stream().map(...);</code>만 호출하면 변환되나?</p>
 <p>아니다. <code>map</code>은 중간 연산이므로 최종 연산이 시작돼야 값이 요청된다.</p>
-<h3 id="q2-중간-연산은-모두-한-원소씩-바로-흘려보내나"><a class="anchor" href="#q2-중간-연산은-모두-한-원소씩-바로-흘려보내나" aria-hidden="true">#</a>Q2. 중간 연산은 모두 한 원소씩 바로 흘려보내나?</h3>
+</div></details><details class="knowledge-topic"><summary id="q2-중간-연산은-모두-한-원소씩-바로-흘려보내나" aria-label="Q2. 중간 연산은 모두 한 원소씩 바로 흘려보내나? 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">Q2. 중간 연산은 모두 한 원소씩 바로 흘려보내나?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>아니다. <code>filter</code>와 <code>map</code>은 대체로 stateless라 한 원소씩 연결 처리할 수 있다. <code>sorted</code>나 <code>distinct</code> 같은 stateful 연산은 전역 정보를 위해 원소를 저장하거나 상태를 유지할 수 있다. 따라서 모든 파이프라인이 일정한 메모리와 지연 시간이라고 단정하면 안 된다.</p>
 <p><strong>꼬리질문:</strong> 무한 스트림에 <code>sorted().limit(10)</code>을 적용하면?</p>
 <p>정렬하려면 끝을 알아야 하므로 무한 입력에서는 결과를 내기 전에 끝나지 않는다.</p>
-<h3 id="q3-findfirst와-findany-차이와-선택-기준은"><a class="anchor" href="#q3-findfirst와-findany-차이와-선택-기준은" aria-hidden="true">#</a>Q3. <code>findFirst()</code>와 <code>findAny()</code> 차이와 선택 기준은?</h3>
+</div></details><details class="knowledge-topic"><summary id="q3-findfirst와-findany-차이와-선택-기준은" aria-label="Q3. findFirst()와 findAny() 차이와 선택 기준은? 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">Q3. findFirst()와 findAny() 차이와 선택 기준은?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p><code>findFirst</code>는 encounter order가 있을 때 첫 원소를 보장한다. <code>findAny</code>는 어느 원소든 허용해 순서 제약을 덜어 주므로 병렬 처리에서 유리할 수 있다. 결과가 사용자에게 순서 의미를 가지면 <code>findFirst</code>를 택한다.</p>
 <p><strong>꼬리질문:</strong> 둘 다 최종 연산인가?</p>
 <p>그렇다. 둘 다 <code>Optional</code> 결과를 내며 필요한 값이 발견되면 입력 처리를 끝낼 수 있는 short-circuit 연산이다.</p>
-<h3 id="q4-mutable-reduction은-왜-reduce보다-collect에-맞나"><a class="anchor" href="#q4-mutable-reduction은-왜-reduce보다-collect에-맞나" aria-hidden="true">#</a>Q4. mutable reduction은 왜 <code>reduce</code>보다 <code>collect</code>에 맞나?</h3>
+</div></details><details class="knowledge-topic"><summary id="q4-mutable-reduction은-왜-reduce보다-collect에-맞나" aria-label="Q4. mutable reduction은 왜 reduce보다 collect에 맞나? 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">Q4. mutable reduction은 왜 reduce보다 collect에 맞나?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p><code>reduce</code>는 부분 결과를 값으로 결합하는 연산이다. <code>collect</code>는 각 부분 작업에 컨테이너를 제공하고 요소를 누적한 뒤 컨테이너를 결합하도록 설계됐다. 공유 <code>ArrayList</code>를 <code>reduce</code>에서 수정하면 병렬 분할 시 안전한 격리와 결합을 잃는다.</p>
 <p><strong>꼬리질문:</strong> 병렬 <code>collect</code>가 항상 하나의 동시성 컨테이너를 공유하나?</p>
 <p>아니다. Collector의 특성과 구현에 따라 부분 컨테이너를 따로 만들고 병합할 수 있다. <code>CONCURRENT</code> 계약 없이 동시 갱신을 가정하면 안 된다.</p>
-<h3 id="q5-groupingby-대신-tomap을-택할-때-확인할-점은"><a class="anchor" href="#q5-groupingby-대신-tomap을-택할-때-확인할-점은" aria-hidden="true">#</a>Q5. <code>groupingBy</code> 대신 <code>toMap</code>을 택할 때 확인할 점은?</h3>
+</div></details><details class="knowledge-topic"><summary id="q5-groupingby-대신-tomap을-택할-때-확인할-점은" aria-label="Q5. groupingBy 대신 toMap을 택할 때 확인할 점은? 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">Q5. groupingBy 대신 toMap을 택할 때 확인할 점은?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p><code>toMap</code>은 결과가 키당 값 하나인 사상이고 기본 오버로드는 중복 키를 병합하지 않는다. 중복 가능성이 있으면 merge 함수를 넣어 업무 규칙을 정의한다. 그룹 원소 전체나 downstream 집계가 목적이면 <code>groupingBy</code>가 더 정확하다.</p>
 <p><strong>꼬리질문:</strong> merge 함수는 병렬에서도 아무 방식이나 써도 되나?</p>
 <p>아니다. 결합 순서가 달라도 같은 의미를 내도록 연산을 설계해야 한다. “마지막 값” 같은 순서 의존 규칙은 병렬 스트림에서 의도한 값과 다를 수 있다.</p>
-<h3 id="q6-병렬-스트림이-빨라지는-조건은"><a class="anchor" href="#q6-병렬-스트림이-빨라지는-조건은" aria-hidden="true">#</a>Q6. 병렬 스트림이 빨라지는 조건은?</h3>
+</div></details><details class="knowledge-topic"><summary id="q6-병렬-스트림이-빨라지는-조건은" aria-label="Q6. 병렬 스트림이 빨라지는 조건은? 펼치기"><span class="knowledge-topic-no">06</span><strong role="heading" aria-level="3">Q6. 병렬 스트림이 빨라지는 조건은?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>큰 데이터, 균형 있게 분할 가능한 소스, 충분히 큰 CPU 작업, 병렬로 안전하고 결합 가능한 계산이 함께 있어야 이득을 기대할 수 있다. 작은 작업은 분할·스케줄링·병합 비용이 더 크다. 실제 데이터와 부하에서 순차 처리와 비교해야 한다.</p>
 <p><strong>꼬리질문:</strong> 외부 API 요청 목록을 병렬 스트림으로 호출하면 좋은가?</p>
 <p>대개 기본 선택으로는 부적절하다. 블로킹 요청이 공용 ForkJoinPool을 점유할 수 있고 외부 시스템의 허용 동시성을 제어하기 어렵다. 명시적인 동시성 한도와 I/O에 맞는 실행 모델을 사용한다.</p>
-<h3 id="q7-maptoint가-mapx---xgetcount보다-나을-수-있는-이유는"><a class="anchor" href="#q7-maptoint가-mapx---xgetcount보다-나을-수-있는-이유는" aria-hidden="true">#</a>Q7. <code>mapToInt</code>가 <code>map(x -&gt; x.getCount())</code>보다 나을 수 있는 이유는?</h3>
+</div></details><details class="knowledge-topic"><summary id="q7-maptoint가-mapx---xgetcount보다-나을-수-있는-이유는" aria-label="Q7. mapToInt가 map(x -&gt; x.getCount())보다 나을 수 있는 이유는? 펼치기"><span class="knowledge-topic-no">07</span><strong role="heading" aria-level="3">Q7. mapToInt가 map(x -&gt; x.getCount())보다 나을 수 있는 이유는?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p><code>mapToInt</code>는 <code>IntStream</code>으로 전환해 기본형 int 값을 전달한다. <code>map</code>은 보통 <code>Stream&lt;Integer&gt;</code>처럼 박싱된 객체 스트림을 만든다. 수치 집계에서는 특화 스트림의 <code>sum</code>·<code>average</code>·<code>summaryStatistics</code>로 객체 변환을 줄일 수 있다.</p>
 <p><strong>꼬리질문:</strong> 성능이 항상 더 빠른가?</p>
 <p>항상은 아니다. 작업량과 최적화 결과가 다르므로 핫 패스에서 동등한 계산을 벤치마크하고 프로파일링한다.</p>
-<h3 id="q8-gatherer는-collector와-무엇이-다른가"><a class="anchor" href="#q8-gatherer는-collector와-무엇이-다른가" aria-hidden="true">#</a>Q8. Gatherer는 Collector와 무엇이 다른가?</h3>
+</div></details><details class="knowledge-topic"><summary id="q8-gatherer는-collector와-무엇이-다른가" aria-label="Q8. Gatherer는 Collector와 무엇이 다른가? 펼치기"><span class="knowledge-topic-no">08</span><strong role="heading" aria-level="3">Q8. Gatherer는 Collector와 무엇이 다른가?</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>Gatherer는 <code>gather</code>로 연결하는 중간 연산이며 입력을 다른 출력 흐름으로 바꾼다. Collector는 <code>collect</code>에서 파이프라인을 종료하며 모든 원소를 최종 결과로 모은다. 윈도·증분 변환은 Gatherer, 그룹별 맵·목록·합계는 Collector가 자연스럽다.</p>
 <p><strong>꼬리질문:</strong> 사용자 정의 Gatherer를 병렬로 쓰려면?</p>
 <p>각 분할 상태의 결합 함수가 필요하고, 결합 결과가 순차 처리와 같은 의미를 보장해야 한다. 결합법칙을 정의할 수 없거나 encounter order가 핵심이면 순차 Gatherer로 제한한다.</p>
-</div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong>9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="9-참고문헌" aria-label="9. 참고문헌 펼치기"><span class="knowledge-chapter-number">09</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">9. 참고문헌</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <ul>
 <li>JEP 107: Bulk Data Operations for Collections — <a href="https://openjdk.org/jeps/107" target="_blank" rel="noopener">https://openjdk.org/jeps/107</a> — Java 8의 순차·병렬 대량 연산 도입 목표와 범위.</li>
 <li>Package <code>java.util.stream</code> (Java SE 25) — <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html" target="_blank" rel="noopener">https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html</a> — 스트림의 비저장성·지연성·1회 소비와 파이프라인 개념.</li>
@@ -356,8 +356,12 @@ Gatherer는 사용자 정의 중간 연산을 만드는 Java 24 API다. <code>ga
     let id;
     try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
     const target = document.getElementById(id);
-    const chapter = target?.closest('details.knowledge-chapter');
-    if (chapter) chapter.open = true;
+    let parent = target?.closest('details.knowledge-topic, details.knowledge-chapter');
+    while (parent) {
+      parent.open = true;
+      parent = parent.parentElement?.closest('details.knowledge-topic, details.knowledge-chapter');
+    }
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }));
   };
   document.addEventListener('click', (event) => {
     const link = event.target.closest('a[href^="#"]');
