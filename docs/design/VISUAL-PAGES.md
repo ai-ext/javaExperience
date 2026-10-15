@@ -354,4 +354,3 @@
 - [ ] [tickets/028-popular-cache.md](../../tickets/028-popular-cache.html) — 항목 69, 긴 산문 0, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [tickets/029-comment-body-mediumtext.md](../../tickets/029-comment-body-mediumtext.html) — 항목 67, 긴 산문 2, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [tickets/030-entity-out-of-controller.md](../../tickets/030-entity-out-of-controller.html) — 항목 63, 긴 산문 0, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
-
