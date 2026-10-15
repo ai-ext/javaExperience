@@ -23,7 +23,7 @@ Spring Boot 백엔드를 직접 구현하며 배우는 실습 레포다. 요구�
 
 ## 학습 화면과 공부자료를 설계할 때
 
-- 루트 `INTENT.md`의 교육 목표와 `docs/design/VISUAL-PLAN.md`의 체크리스트를 먼저 읽는다. 이 규칙은 학습 화면·문서 UI 작업에 적용하며, 학습자의 서버 구현 과제 범위를 늘리는 근거로 쓰지 않는다.
+- 루트 `intent.md`의 교육 목표와 `docs/design/VISUAL-PLAN.md`의 체크리스트를 먼저 읽는다. 이 규칙은 학습 화면·문서 UI 작업에 적용하며, 학습자의 서버 구현 과제 범위를 늘리는 근거로 쓰지 않는다.
 - 사용자가 **이미지 시안**을 요청하면 실제 `imagegen`으로 시안을 만든다. HTML·CSS·SVG만 만든 결과를 imagegen 시안이라고 부르지 않는다. 생성 이미지는 `docs/design/`에 저장하고 원본 사실·코드의 출처, 시안에서 구현한 범위, 아직 적용하지 않은 범위를 기록한다.
 - 시안 중심 화면 작업에는 로컬 Codex 스킬 `~/.codex/skills/javaexperience-visual-learning/SKILL.md`의 절차를 적용한다. 다른 환경에서 스킬이 없어도 이 파일과 `docs/design/VISUAL-PLAN.md`의 규칙을 따른다. `docs/design/visual-parity.jsonl`에 시안 파일, 같은 뷰포트의 실제 화면 캡처, 둘의 차이, 기술 사실 검증 결과를 기록하고 `npm run audit:parity`로 검사한다. 그 증거가 없는 항목은 `verified`로 올리지 않는다.
 - DB 시나리오 확장은 `docs/design/DB-SCENARIO-PLAN.md`에서 기존 M1~M10, 8장·9장, L12~L14와의 연결을 확인한다. `practice` 정답 데이터는 보존하고 대량 성능 실험은 별도 disposable 데이터에서 한다. 측정하지 않은 실행 계획·속도를 결과처럼 쓰지 않는다.
