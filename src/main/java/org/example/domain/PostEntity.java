@@ -64,7 +64,7 @@ public class PostEntity {
         return this.visibility;
     }
 
-    public boolean getLike(){
+    public boolean getHeart(){
         return this.heart;
     }
 
