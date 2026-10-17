@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderDb11FocusedJourney } from './db11-focused-journey.mjs';
+
+const root=new URL('../../',import.meta.url);
+const source=fs.readFileSync(new URL('scenario/db-query-journey/DB-11-index-lifecycle.md',root),'utf8');
+const markup=renderDb11FocusedJourney(source);
+assert.deepEqual([...markup.matchAll(/data-db11-panel="([^"]+)"/g)].map((match)=>match[1]),['scenario','inspect','create','visible','hide','compare','restore','finish']);
+const first=markup.slice(markup.indexOf('data-db11-panel="scenario"'),markup.indexOf('data-db11-panel="inspect"'));
+assert.match(first,/만들 것/);
+assert.match(first,/직접 할 것/);
+assert.doesNotMatch(first,/DROP INDEX|ALTER INDEX|SHOW INDEX|ANALYZE TABLE/);
+const sql=[...source.matchAll(/```sql\n([\s\S]*?)\n```/g)].map((match)=>match[1]);
+assert.equal(sql.length,6);
+for(const snippet of sql)assert.ok(markup.includes(snippet),'원문 SQL을 그대로 보여야 한다');
+assert.match(markup,/ANALYZE TABLE.*통계 갱신/s);
+assert.match(markup,/FORCE INDEX/);
+assert.match(markup,/Primary key에는 적용하지 않습니다/);
+assert.match(markup,/data-db11-drop hidden/);
+assert.match(markup,/data-db11-choice="keep" aria-pressed="true"/);
+const built=fs.readFileSync(new URL('scenario/db-query-journey/DB-11-index-lifecycle.html',root),'utf8');
+for(const asset of ['first-db-journey.css','db11-focused-journey.css','db11-focused-journey.js'])assert.ok(built.includes(asset));
+assert.equal((built.match(/data-db11-panel="/g)||[]).length,8);
+assert.match(built,/class="db11-original"/);
+console.log('DB-11 여덟 장면·원문 가시성 SQL·복원 우선 경계 검사 통과');

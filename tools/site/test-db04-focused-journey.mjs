@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderDb04FocusedJourney } from './db04-focused-journey.mjs';
+
+const root = new URL('../../', import.meta.url);
+const source = fs.readFileSync(new URL('scenario/db-query-journey/db-04-tag-filter-and-exists.md', root), 'utf8');
+const seed = fs.readFileSync(new URL('docker/mysql/init/01-community.sql', root), 'utf8');
+const markup = renderDb04FocusedJourney(source);
+assert.deepEqual([...markup.matchAll(/data-db04-panel="([^"]+)"/g)].map((match) => match[1]),
+  ['scenario', 'seed', 'join-rows', 'join-sql', 'exists', 'distinct', 'api']);
+const first = markup.slice(markup.indexOf('data-db04-panel="scenario"'), markup.indexOf('data-db04-panel="seed"'));
+assert.match(first, /만들 것/);
+assert.match(first, /직접 할 것/);
+assert.doesNotMatch(first, /post id 2|DISTINCT|EXISTS|성능|실제 응답/);
+assert.match(seed, /\(2,2\);/);
+assert.match(seed, /\(2,3\);/);
+assert.match(seed, /\(2,'spring'/);
+assert.match(seed, /\(3,'jpa'/);
+assert.match(seed, /\(2,2,3,'JPA 연관관계 매핑 정리'/);
+for (const text of ['(post_id 2, tag_id 2)', '(post_id 2, tag_id 3)', 'post 2 · spring', 'post 2 · jpa', '서로 다른 글은 1개', 'pt.post_id = p.id']) assert.ok(markup.includes(text));
+const codeBlocks = [...source.matchAll(/<pre class="sql"><code>([\s\S]*?)<\/code><\/pre>/g)].map((match) => match[1]);
+assert.equal(codeBlocks.length, 2);
+for (const sql of codeBlocks) assert.ok(markup.includes(sql), '원문의 SQL을 그대로 화면에 표시해야 한다');
+assert.match(markup, /data-db04-projection="post"/);
+assert.match(markup, /data-db04-projection="tag"/);
+assert.match(markup, /다대다 JOIN 뒤에 바로 <code>LIMIT<\/code>/);
+const built = fs.readFileSync(new URL('scenario/db-query-journey/db-04-tag-filter-and-exists.html', root), 'utf8');
+for (const asset of ['first-db-journey.css', 'db04-focused-journey.css', 'db04-focused-journey.js']) assert.ok(built.includes(asset));
+assert.equal((built.match(/data-db04-panel="/g) || []).length, 7);
+assert.match(built, /class="db04-original"/);
+assert.match(built, /API 계약으로 연결하기/);
+console.log('DB-04 일곱 장면·community seed·원문 SQL·API 목록 경계 검사 통과');

@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderAnnotationJourney } from './annotation-journey.mjs';
+
+const root = new URL('../../', import.meta.url);
+const source = fs.readFileSync(new URL('scenario/ch0-first-steps/0-2-annotations.md', root), 'utf8');
+const markup = renderAnnotationJourney(source);
+assert.deepEqual([...markup.matchAll(/data-first-java-panel="(\d+)"/g)].map((match) => Number(match[1])), Array.from({ length: 16 }, (_, index) => index));
+const first = markup.slice(markup.indexOf('data-first-java-panel="0"'), markup.indexOf('data-first-java-panel="1"'));
+for (const term of ['PingController.java', 'GET /api/start/ping']) assert.ok(first.includes(term));
+for (const term of ['404', '200', 'pong', '@RestController', '@GetMapping', '빈', 'DEBUG']) assert.ok(!first.includes(term), `첫 장면에 ${term}가 없어야 합니다`);
+for (const term of ['package org.example.start;', '@GetMapping(&quot;/api/start/ping&quot;)', 'return &quot;pong&quot;;', 'PingController.ping()', 'HTTP 200', 'HTTP 404', '/api/start/pong', 'No static resource api/start/ping', 'Mapped to org.example.start.PingController#ping()', 'Ambiguous mapping', 'ConflictingBeanDefinitionException']) assert.ok(markup.includes(term), `${term} 누락`);
+assert.equal((markup.match(/data-first-java-request="/g) || []).length, 2);
+assert.equal((markup.match(/mockups-2026-10-16-batch37\//g) || []).length, 16);
+const built = fs.readFileSync(new URL('scenario/ch0-first-steps/0-2-annotations.html', root), 'utf8');
+for (const file of ['first-java-journey.css', 'annotation-journey.css', 'first-java-journey.js']) assert.ok(built.includes(file));
+assert.match(built, /class="first-java-original"/);
+assert.equal((built.match(/data-first-java-panel="/g) || []).length, 16);
+assert.equal((built.match(/class="api-request" data-request-id="/g) || []).length, 2);
+assert.match(built, /id="scenario-base-url"/);
+const index = JSON.parse(fs.readFileSync(new URL('docs/design/mockups-2026-10-16-batch37/asset-index.json', root), 'utf8'));
+assert.equal(index.images.length, 16);
+for (const item of index.images) assert.ok(fs.existsSync(new URL(`docs/design/mockups-2026-10-16-batch37/${item.file}`, root)));
+console.log('0-2 16장면·첫 화면 경계·원문 어노테이션·요청 A/B·서로 다른 404/기동 실패 계약 통과');

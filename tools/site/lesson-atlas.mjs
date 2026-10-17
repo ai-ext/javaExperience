@@ -32,7 +32,7 @@ function sectionCard(heading, content, index) {
     .filter(Boolean).slice(0, 3);
   const codeCount = (content.match(/<pre\b/g) || []).length;
   const summary = preview(content);
-  const open = /^(만들 것|직접 확인)$/.test(title) ? ' open' : '';
+  const open = '';
   return `<details class="lesson-scene lesson-${kind}" data-lesson-kind="${kind}"${open}>
     <summary id="${esc(id)}" aria-label="${esc(title)} 내용 펼치기"><span class="lesson-scene-index">${String(index + 1).padStart(2, '0')}</span><span class="lesson-scene-glyph" aria-hidden="true">${glyph}</span><span class="lesson-scene-title"><small>${phase}</small><strong>${esc(title)}</strong>${summary ? `<em>${summary}</em>` : ''}</span><span class="lesson-scene-count">${codeCount ? `${codeCount}개 코드 · ` : ''}열기 ↓</span></summary>
     <div class="lesson-scene-content">${subtopics.length ? `<div class="lesson-scene-topics" aria-label="이 절의 세부 주제">${subtopics.map((topic) => `<span>${esc(topic)}</span>`).join('')}</div>` : ''}${content}</div>
@@ -62,6 +62,7 @@ export function renderLessonAtlas(body, stageId) {
     return `<a class="lesson-atlas-stop lesson-${kind}" href="#${esc(section.id)}"><b>${String(index + 1).padStart(2, '0')}</b><span aria-hidden="true">${glyph}</span><span><small>${phase}</small><strong>${esc(section.title)}</strong></span></a>`;
   }).join('')}</div></nav>`;
   const cards = sections.map((section, index) => sectionCard(section.heading, `${/직접 확인/.test(section.title) ? serverUrl : ''}${section.content}`, index)).join('');
-  before += atlas;
-  return before + intro + `<div class="lesson-scenes" aria-label="단계별 구현과 확인">${cards}</div>` + body.slice(end);
+  const content = `<details class="task-atlas-details"><summary>원문 목차 보기</summary>${atlas}</details>` + intro + `<div class="lesson-scenes" aria-label="단계별 구현과 확인">${cards}</div>`;
+  const sourceClass = stageId === '1-1' ? 'first-api-source' : 'lesson-source';
+  return before + `<details class="${sourceClass}"><summary>원문·코드·채점 기준 자세히 보기</summary>${content}</details>` + body.slice(end);
 }

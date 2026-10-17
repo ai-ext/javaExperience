@@ -2,6 +2,8 @@
 
 이 실습은 `GET /api/me/likes`에서 사용하는 정렬 조건을 작은 독립 데이터베이스로 살펴본다. 앱 전체의 권한 JOIN을 재현하는 실습은 아니며, `post_like`의 회원별 탐색과 최신순 정렬에 초점을 둔다. 기존 `practice` 데이터와 채점값은 사용하거나 변경하지 않는다.
 
+이번 단계의 첫 목표는 `(member_id, created_at, id)` 열 순서를 설계하고 같은 SELECT의 전후 계획·결과 ID 순서를 비교하는 것이다. 인덱스의 `INVISIBLE`·`VISIBLE`·`DROP` 생명주기는 [DB-11](DB-11-index-lifecycle.md)에서 별도 실습한다.
+
 ## 1. 격리된 MySQL 8.4 준비
 
 저장소 루트에서 실행한다.
@@ -11,6 +13,8 @@ tools/db-perf-fixture.sh up
 ```
 
 스크립트는 MySQL 8.4 컨테이너 하나를 `127.0.0.1:13319`에 띄우고 `javaexperience_perf` DB에 기본 500,000개의 좋아요 행을 만든다. 게시판·회원·게시글·댓글·태그 테이블도 함께 생성하며 FK와 좋아요 중복 방지 제약을 둔다. `compose.yaml`, `mysql-data`, `practice`의 데이터와 설정을 변경하지 않는다. 컨테이너가 이미 실행 중이면 `up`은 데이터를 다시 만들지 않는다.
+
+재실행할 때는 `SHOW INDEX FROM post_like;`로 현재 인덱스부터 확인한다. 앞선 실습에서 `ix_post_like_member_created`를 이미 만들었다면 `CREATE INDEX`를 다시 실행하지 않는다. 변경 전 계획을 새로 관찰하려면 [DB-11의 복원 절차](DB-11-index-lifecycle.md)를 먼저 읽는다.
 
 ```bash
 # 선택 환경변수

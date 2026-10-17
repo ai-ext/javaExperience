@@ -4,7 +4,7 @@
 
 **처음 시작하기:** [0-1 Java 첫 API부터](ch0-first-steps/0-1-ts-to-java.md) · [바로 게시글 API 만들기](ch1-create-post/1-1-receive-request.md) · [진행 방법 보기](#진행-방법)
 
-**DB 학습 경로:** [DB-01 응답→테이블](db-query-journey/db-01-response-to-query.md) → [DB-02 SELECT·WHERE·커서](db-query-journey/db-02-select-cursor.md) → [DB-03 상세 JOIN](db-query-journey/db-03-detail-join.md) → [DB-04 태그 JOIN·EXISTS](db-query-journey/db-04-tag-filter-and-exists.md) → [DB-05 집계 행 곱셈](db-query-journey/db-05-aggregate-fanout.md) → [DB-06 포함·제외](db-query-journey/db-06-exists-not-exists.md) → [DB-07 같은 API의 다섯 쿼리 방식](db-query-journey/DB-07-same-api-five-query-styles.md) 순서로 같은 게시판 데이터를 따라갑니다. [DB-10 성능 실험용 데이터 준비](db-query-journey/DB-10-performance-fixture.md)와 [9-2 EXPLAIN·인덱스 실습](ch9-schema-change/9-2-index-explain.md)에서 실행 계획을 직접 관찰한 뒤, [DB-12 JOIN·EXISTS 실행 계획 비교](db-query-journey/db-12-join-exists-explain.md), [DB-13 목록 API N+1 추적](db-query-journey/db-13-list-api-n-plus-one.md), [DB-14 실제 DB 스키마와 느린 쿼리](db-query-journey/db-14-live-schema-to-slow-query.md)로 확장합니다. DB-08·09·11은 현재 9-2와 R05의 연결 실습이며 독립 화면은 아직 없습니다.
+**DB 학습 경로:** [DB-01 응답→테이블](db-query-journey/db-01-response-to-query.md) → [DB-02 SELECT·WHERE·커서](db-query-journey/db-02-select-cursor.md) → [DB-03 상세 JOIN](db-query-journey/db-03-detail-join.md) → [DB-04 태그 JOIN·EXISTS](db-query-journey/db-04-tag-filter-and-exists.md) → [DB-05 집계 행 곱셈](db-query-journey/db-05-aggregate-fanout.md) → [DB-06 포함·제외](db-query-journey/db-06-exists-not-exists.md) → [DB-07 같은 API의 다섯 쿼리 방식](db-query-journey/DB-07-same-api-five-query-styles.md) 순서로 같은 게시판 데이터를 따라갑니다. 이후 격리된 성능 fixture에서 [DB-08 EXPLAIN 가설](db-query-journey/DB-08-explain-hypothesis.md) → [DB-09 EXPLAIN ANALYZE 실측](db-query-journey/DB-09-explain-analyze.md) → [DB-10 복합 인덱스 비교](db-query-journey/DB-10-performance-fixture.md) → [DB-11 인덱스 가시성·복원](db-query-journey/DB-11-index-lifecycle.md)을 한 장면씩 진행합니다. 전체 API/JOIN 연결은 [9-2](ch9-schema-change/9-2-index-explain.md)에 보존하고, [DB-12 JOIN·EXISTS 실행 계획 비교](db-query-journey/db-12-join-exists-explain.md), [DB-13 목록 API N+1 추적](db-query-journey/db-13-list-api-n-plus-one.md), [DB-14 실제 DB 스키마와 느린 쿼리](db-query-journey/db-14-live-schema-to-slow-query.md)로 확장합니다.
 
 각 단계에서 API 서버 주소를 확인하고 요청 버튼을 누르면 브라우저에서 응답을 볼 수 있다.
 
@@ -266,6 +266,11 @@ PUT 전체 교체와 PATCH 부분 수정 뒤 본인 글을 지운다. 지운 글
 각 Q 시나리오에 Controller·Service·DTO·Repository·Mapper 코드 접기가 있다. 이 연습용 완성 프로젝트는 `python3 tools/materialize-query-practice.py --output /tmp/query-practice`로 별도 폴더에 복원할 수 있다.
 
 
+
+## 선택 심화 실습 — 세션과 interface/impl
+
+- [L15 세션 인증: 로그인→쿠키 복원→로그아웃·만료](labs/l15-session-auth/README.md) — 10-4 JWT 로그인을 먼저 끝낸 뒤 별도 project DB 작업 브랜치에서 실행합니다. 두 방식의 로그인 상태 보관 위치를 직접 비교합니다.
+- [L16 interface/impl: JPA와 JDBC로 같은 공개 글 API 구현](labs/l16-interface-implementations/README.md) — 2-3 뒤 community DB에서 두 구현을 교체하고 같은 HTTP·DB 계약을 검증합니다.
 
 ## 브라우저에서 API 요청 보내기
 

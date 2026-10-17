@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderL12QueryJourney } from './l12-query-journey.mjs';
+
+const panels = ['scenario', 'derived', 'create', 'jpa-request', 'mybatis', 'mybatis-request', 'board', 'author', 'search', 'exists', 'count', 'page', 'hidden-rule', 'hide', 'hidden-get', 'restore'];
+const markup = renderL12QueryJourney();
+assert.deepEqual([...markup.matchAll(/data-l12-panel="([^"]+)"/g)].map((match) => match[1]), panels);
+const scenario = markup.slice(markup.indexOf('data-l12-panel="scenario"'), markup.indexOf('data-l12-panel="derived"'));
+assert.match(scenario, /사람의 상황/);
+assert.match(scenario, /만들 것/);
+assert.match(scenario, /보낼 것/);
+assert.doesNotMatch(scenario, /201|404|BasicPostMapper|HiddenAtIsNull/);
+for (const id of ['P', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']) assert.match(markup, new RegExp(`data-l12-request-slot="${id}"`));
+assert.match(markup, /findByIdAndDeletedAtIsNullAndHiddenAtIsNullAndStatusAndVisibility/);
+assert.match(markup, /p\.hidden_at IS NULL/);
+assert.match(markup, /p\.status = 'PUBLISHED'/);
+assert.match(markup, /p\.visibility = 'PUBLIC'/);
+assert.match(markup, /실제 응답은 왼쪽에서 요청한 뒤 확인/);
+
+const root = new URL('../../', import.meta.url);
+const html = fs.readFileSync(new URL('scenario/labs/l12-query-methods/README.html', root), 'utf8');
+const source = fs.readFileSync(new URL('scenario/labs/l12-query-methods/README.md', root), 'utf8');
+for (const asset of ['first-db-journey.css', 'l12-query-journey.css', 'l12-query-journey.js']) assert.ok(html.includes(asset), `asset missing: ${asset}`);
+assert.equal((html.match(/data-l12-panel="/g) || []).length, panels.length);
+assert.equal((html.match(/class="api-request"/g) || []).length, 12);
+for (const id of ['P', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']) assert.match(html, new RegExp(`data-request-id="${id}"`));
+assert.match(html, /class="l12-original"/);
+assert.match(html, /Q08\. 페이지/);
+assert.match(markup, /page=1 · size=2 · id DESC/);
+assert.match(markup, /P\.body\.author\.id/);
+assert.doesNotMatch(markup, /authorId=5/);
+assert.match(source, /"path": "\/api\/query-practice\/jpa\/posts\/\{\{P\.body\.id\}\}"/);
+assert.match(source, /"path": "\/api\/query-practice\/mybatis\/posts\/\{\{P\.body\.id\}\}"/);
+assert.match(source, /"status": "HIDDEN"/);
+assert.match(source, /"status": "PUBLISHED"/);
+console.log('L12 열여섯 장면·12개 요청·Q01–Q08 원문 보존 검사 통과');

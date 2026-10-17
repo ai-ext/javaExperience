@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DB-11. 인덱스를 숨기고 복원하고 제거하기</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=66591d230e46">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+<link rel="stylesheet" href="../../tools/site/first-db-journey.css?v=7410d282ba16">
+<link rel="stylesheet" href="../../tools/site/db11-focused-journey.css?v=dd025559f299">
+</head>
+<body class="db11-focused-page">
+<header class="topbar"><a href="../../index.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<main>
+
+<h1 id="db-11-인덱스를-숨기고-복원하고-제거하기"><a class="anchor" href="#db-11-인덱스를-숨기고-복원하고-제거하기" aria-hidden="true">#</a>DB-11. 인덱스를 숨기고 복원하고 제거하기</h1><section class="first-db-journey db11-focused" data-db11-screen="scenario" aria-label="DB-11 인덱스 가시성 실습">
+    <nav class="db11-progress" aria-label="DB-11 학습 장면"><button type="button" data-db11-go="scenario" aria-current="step"><b>01</b><span>상황</span></button><button type="button" data-db11-go="inspect" aria-current="false"><b>02</b><span>대상 확인</span></button><button type="button" data-db11-go="create" aria-current="false"><b>03</b><span>없으면 생성</span></button><button type="button" data-db11-go="visible" aria-current="false"><b>04</b><span>VISIBLE 기준</span></button><button type="button" data-db11-go="hide" aria-current="false"><b>05</b><span>잠시 숨김</span></button><button type="button" data-db11-go="compare" aria-current="false"><b>06</b><span>같은 계획</span></button><button type="button" data-db11-go="restore" aria-current="false"><b>07</b><span>복원</span></button><button type="button" data-db11-go="finish" aria-current="false"><b>08</b><span>유지·제거</span></button></nav>
+    <article class="db-journey-screen db11-screen" data-db11-panel="scenario" aria-labelledby="db11-scenario-title"><p class="db-journey-kicker">DB-11 · 같은 인덱스, 다른 가시성</p><h2 id="db11-scenario-title">“이 인덱스를 숨기면 DB의 선택이 달라질까요?”</h2><p class="db-journey-lead">전용 fixture에서 숨긴 뒤 같은 조회 계획을 비교하고 반드시 다시 보이게 합니다.</p><div class="db11-two"><div><small>만들 것</small><strong>VISIBLE / INVISIBLE 계획 비교 기록</strong></div><div><small>직접 할 것</small><strong>전용 fixture에서 숨기고 다시 복원</strong></div></div><p class="db11-note">대상은 <code>javaexperience_perf.post_like</code>의 실습용 보조 인덱스 하나입니다.</p><footer class="db-journey-actions db11-actions"><button type="button" class="db-journey-back" data-db11-go="scenario" disabled>← 이전</button><span>1 / 8</span><button type="button" class="db-journey-next" data-db11-go="inspect">대상 확인 →</button></footer></article>
+    <article class="db-journey-screen db11-screen" data-db11-panel="inspect" hidden aria-labelledby="db11-inspect-title"><p class="db-journey-kicker">DB-11 · 먼저 대상 확인</p><h2 id="db11-inspect-title">지금 어느 DB의 어떤 인덱스인가요?</h2><p class="db-journey-lead">인덱스 작업 전에 연결 DB와 현재 목록·가시성을 직접 확인하세요.</p><div class="db11-target"><div><small>DB</small><strong>javaexperience_perf</strong></div><div><small>TABLE</small><strong>post_like</strong></div><div><small>INDEX</small><strong>ix_post_like_member_created</strong></div></div><div class="db11-code"><header><strong>원문 대상 확인 SQL</strong><span>읽기 전용 · 직접 실행</span></header><pre><code data-db11-code="inspect">SELECT DATABASE();
+SHOW INDEX FROM post_like;</code></pre><button type="button" data-db11-copy="inspect">복사</button><p data-db11-copy-state="inspect" role="status" aria-live="polite"></p></div><label class="db11-field"><strong>현재 인덱스 상태</strong><small>SHOW INDEX의 존재·Visible 값을 적으세요.</small><textarea data-db11-record="current" rows="2" placeholder="내 실제 결과를 기록하세요"></textarea></label><p class="db11-note"><code>tools/db-perf-fixture.sh up</code>은 이미 실행 중인 컨테이너의 데이터를 다시 생성하지 않습니다.</p><footer class="db-journey-actions db11-actions"><button type="button" class="db-journey-back" data-db11-go="scenario">← 이전</button><span>2 / 8</span><button type="button" class="db-journey-next" data-db11-go="create">없으면 생성 →</button></footer></article>
+    <article class="db-journey-screen db11-screen" data-db11-panel="create" hidden aria-labelledby="db11-create-title"><p class="db-journey-kicker">DB-11 · 없을 때만</p><h2 id="db11-create-title">인덱스가 이미 있으면 CREATE를 건너뜁니다.</h2><p class="db-journey-lead">없는 경우에만 전용 fixture에 생성하고 통계를 갱신합니다.</p><div class="db11-choice"><div><strong>이미 있음</strong><span>CREATE 건너뛰기</span></div><div><strong>없음</strong><span>전용 fixture에 생성</span></div></div><div class="db11-code"><header><strong>원문 CREATE INDEX + ANALYZE TABLE</strong><span>전용 fixture 스키마 변경</span></header><pre><code data-db11-code="create">CREATE INDEX ix_post_like_member_created
+    ON post_like (member_id, created_at, id);
+ANALYZE TABLE post_like;</code></pre><button type="button" data-db11-copy="create">복사</button><p data-db11-copy-state="create" role="status" aria-live="polite"></p></div><p class="db11-note"><code>ANALYZE TABLE</code>은 통계 갱신입니다. SELECT를 실제 실행하는 <code>EXPLAIN ANALYZE</code>와 다릅니다.</p><footer class="db-journey-actions db11-actions"><button type="button" class="db-journey-back" data-db11-go="inspect">← 이전</button><span>3 / 8</span><button type="button" class="db-journey-next" data-db11-go="visible">VISIBLE 기준 →</button></footer></article>
+    <article class="db-journey-screen db11-screen" data-db11-panel="visible" hidden aria-labelledby="db11-visible-title"><p class="db-journey-kicker">DB-11 · 보이는 상태</p><h2 id="db11-visible-title">숨기기 전의 계획을 먼저 기록합니다.</h2><p class="db-journey-lead">VISIBLE이라고 반드시 이 인덱스가 선택되는 것은 아닙니다.</p><div class="db11-code"><header><strong>원문 동일 SELECT의 EXPLAIN</strong><span>읽기 전용 · 직접 실행</span></header><pre><code data-db11-code="visible">EXPLAIN
+SELECT l.id, l.post_id, l.created_at
+FROM post_like AS l
+WHERE l.member_id = 12
+ORDER BY l.created_at DESC, l.id DESC
+LIMIT 11;</code></pre><button type="button" data-db11-copy="visible">복사</button><p data-db11-copy-state="visible" role="status" aria-live="polite"></p></div><label class="db11-field"><strong>VISIBLE 계획</strong><small>내 EXPLAIN의 key · rows · Extra</small><textarea data-db11-record="visible-plan" rows="2" placeholder="내 실제 결과를 기록하세요"></textarea></label><label class="db11-field"><strong>SHOW INDEX 가시성</strong><small>대상 인덱스의 Visible 값을 적으세요.</small><textarea data-db11-record="visible-index" rows="2" placeholder="내 실제 결과를 기록하세요"></textarea></label><p class="db11-note">이 실습 SQL은 <code>FORCE INDEX</code>가 없는 핵심 fixture SELECT입니다.</p><footer class="db-journey-actions db11-actions"><button type="button" class="db-journey-back" data-db11-go="create">← 이전</button><span>4 / 8</span><button type="button" class="db-journey-next" data-db11-go="hide">잠시 숨김 →</button></footer></article>
+    <article class="db-journey-screen db11-screen" data-db11-panel="hide" hidden aria-labelledby="db11-hide-title"><p class="db-journey-kicker">DB-11 · 잠시 숨김</p><h2 id="db11-hide-title">인덱스를 지우지 않고 옵티마이저에서 숨깁니다.</h2><p class="db-journey-lead">보조 인덱스만 INVISIBLE로 전환합니다. 다음 화면에서 같은 SELECT로 비교하세요.</p><div class="db11-state"><span>VISIBLE</span><b>→</b><span>INVISIBLE</span></div><div class="db11-code"><header><strong>원문 ALTER INDEX INVISIBLE</strong><span>전용 fixture 스키마 변경</span></header><pre><code data-db11-code="hide">ALTER TABLE post_like
+    ALTER INDEX ix_post_like_member_created INVISIBLE;</code></pre><button type="button" data-db11-copy="hide">복사</button><p data-db11-copy-state="hide" role="status" aria-live="polite"></p></div><p class="db11-note">인덱스 자체는 남습니다. 기본 옵티마이저 선택 대상에서 제외됩니다. Primary key에는 적용하지 않습니다. 실험 후 반드시 VISIBLE로 복원하세요.</p><footer class="db-journey-actions db11-actions"><button type="button" class="db-journey-back" data-db11-go="visible">← 이전</button><span>5 / 8</span><button type="button" class="db-journey-next" data-db11-go="compare">같은 계획 →</button></footer></article>
+    <article class="db-journey-screen db11-screen" data-db11-panel="compare" hidden aria-labelledby="db11-compare-title"><p class="db-journey-kicker">DB-11 · 같은 SELECT</p><h2 id="db11-compare-title">숨긴 뒤 계획이 어떻게 달라졌나요?</h2><p class="db-journey-lead">DB-10의 같은 회원·정렬·LIMIT을 유지하고 key·rows·Extra를 나란히 기록합니다.</p><div class="db11-code"><header><strong>INVISIBLE 뒤에도 같은 EXPLAIN</strong><span>읽기 전용 · 직접 실행</span></header><pre><code data-db11-code="hidden-explain">EXPLAIN
+SELECT l.id, l.post_id, l.created_at
+FROM post_like AS l
+WHERE l.member_id = 12
+ORDER BY l.created_at DESC, l.id DESC
+LIMIT 11;</code></pre><button type="button" data-db11-copy="hidden-explain">복사</button><p data-db11-copy-state="hidden-explain" role="status" aria-live="polite"></p></div><div class="db11-two db11-observe"><label class="db11-field"><strong>VISIBLE 때 계획</strong><small>key · rows · Extra</small><textarea data-db11-record="visible-compare" rows="2" placeholder="내 실제 결과를 기록하세요"></textarea></label><label class="db11-field"><strong>INVISIBLE 때 계획</strong><small>key · rows · Extra</small><textarea data-db11-record="hidden-compare" rows="2" placeholder="내 실제 결과를 기록하세요"></textarea></label></div><p class="db11-note">계획 변화는 직접 확인해야 합니다. <a href="../ch9-schema-change/9-2-index-explain.html">9-2 전체 API</a>는 FORCE INDEX 경로이므로 이 상태로 호출해 비교하지 않습니다.</p><footer class="db-journey-actions db11-actions"><button type="button" class="db-journey-back" data-db11-go="hide">← 이전</button><span>6 / 8</span><button type="button" class="db-journey-next" data-db11-go="restore">복원 →</button></footer></article>
+    <article class="db-journey-screen db11-screen" data-db11-panel="restore" hidden aria-labelledby="db11-restore-title"><p class="db-journey-kicker">DB-11 · 반드시 원래대로</p><h2 id="db11-restore-title">숨긴 인덱스는 다시 보이게 합니다.</h2><p class="db-journey-lead">페이지를 떠나기 전에 SHOW INDEX와 EXPLAIN을 다시 확인하세요.</p><div class="db11-state"><span>INVISIBLE</span><b>→</b><span>VISIBLE</span></div><div class="db11-code"><header><strong>원문 ALTER INDEX VISIBLE</strong><span>전용 fixture 스키마 변경</span></header><pre><code data-db11-code="restore">ALTER TABLE post_like
+    ALTER INDEX ix_post_like_member_created VISIBLE;</code></pre><button type="button" data-db11-copy="restore">복사</button><p data-db11-copy-state="restore" role="status" aria-live="polite"></p></div><div class="db11-code"><header><strong>복원 확인</strong><span>읽기 전용 · 직접 실행</span></header><pre><code data-db11-code="verify">SHOW INDEX FROM post_like;
+EXPLAIN
+SELECT l.id, l.post_id, l.created_at
+FROM post_like AS l
+WHERE l.member_id = 12
+ORDER BY l.created_at DESC, l.id DESC
+LIMIT 11;</code></pre><button type="button" data-db11-copy="verify">복사</button><p data-db11-copy-state="verify" role="status" aria-live="polite"></p></div><label class="db11-field"><strong>복원 확인 결과</strong><small>Visible 값과 다시 본 계획을 적으세요.</small><textarea data-db11-record="restored" rows="2" placeholder="내 실제 결과를 기록하세요"></textarea></label><p class="db11-note">복원을 확인하기 전에는 이 실습을 끝낸 것으로 표시하지 않습니다.</p><footer class="db-journey-actions db11-actions"><button type="button" class="db-journey-back" data-db11-go="compare">← 이전</button><span>7 / 8</span><button type="button" class="db-journey-next" data-db11-go="finish">유지·제거 →</button></footer></article>
+    <article class="db-journey-screen db11-screen" data-db11-panel="finish" hidden aria-labelledby="db11-finish-title"><p class="db-journey-kicker">DB-11 · 마지막 선택</p><h2 id="db11-finish-title">실습용 인덱스를 유지할까요, 제거할까요?</h2><p class="db-journey-lead">유지하면 VISIBLE 상태를 확인하고, 제거한다면 전용 인덱스만 지웁니다.</p><div class="db11-end-choice" role="group" aria-label="마지막 인덱스 선택"><button type="button" data-db11-choice="keep" aria-pressed="true"><strong>유지</strong><span>VISIBLE 상태 확인</span></button><button type="button" data-db11-choice="drop" aria-pressed="false"><strong>제거</strong><span>ix_post_like_member_created만 DROP</span></button></div><div data-db11-drop hidden><div class="db11-code"><header><strong>원문 DROP INDEX + 통계 갱신</strong><span>전용 fixture 스키마 변경</span></header><pre><code data-db11-code="drop">DROP INDEX ix_post_like_member_created ON post_like;
+ANALYZE TABLE post_like;</code></pre><button type="button" data-db11-copy="drop">복사</button><p data-db11-copy-state="drop" role="status" aria-live="polite"></p></div></div><p class="db11-note">기본 FK·UNIQUE 인덱스는 지우지 않습니다. ANALYZE TABLE은 통계 갱신입니다.</p><label class="db11-field"><strong>최종 SHOW INDEX / EXPLAIN</strong><small>실제 선택한 상태와 계획을 적으세요.</small><textarea data-db11-record="final" rows="2" placeholder="내 실제 결과를 기록하세요"></textarea></label><footer class="db-journey-actions db11-actions"><button type="button" class="db-journey-back" data-db11-go="restore">← 이전</button><span>8 / 8</span><a class="db-journey-next" href="db-12-join-exists-explain.html">다음 · JOIN·EXISTS 계획 →</a></footer></article>
+    <details class="db-journey-reference"><summary>장면별 이미지 시안 8장 보기</summary><a href="../../docs/design/mockups-2026-10-16-batch32/01-scenario.png">01-scenario</a><a href="../../docs/design/mockups-2026-10-16-batch32/02-target-check.png">02-target-check</a><a href="../../docs/design/mockups-2026-10-16-batch32/03-create-if-missing.png">03-create-if-missing</a><a href="../../docs/design/mockups-2026-10-16-batch32/04-visible-baseline.png">04-visible-baseline</a><a href="../../docs/design/mockups-2026-10-16-batch32/05-invisible.png">05-invisible</a><a href="../../docs/design/mockups-2026-10-16-batch32/06-compare-plan.png">06-compare-plan</a><a href="../../docs/design/mockups-2026-10-16-batch32/07-restore-visible.png">07-restore-visible</a><a href="../../docs/design/mockups-2026-10-16-batch32/08-keep-or-drop.png">08-keep-or-drop</a></details>
+  </section><details class="db11-original" id="db11-original"><summary>원문 전체 · 대상·가시성·복원·삭제 SQL 펼치기</summary>
+<blockquote>
+<p>이번 시나리오: DB-10에서 설계한 <code>ix_post_like_member_created</code>가 <strong>보이는 상태와 숨긴 상태</strong>에서 실행 계획에 어떤 차이를 만드는지 격리 fixture에서 확인한다. 마지막에는 가시성을 되돌리고, 필요하면 이 실습용 인덱스를 제거한다. 기본 <code>practice</code> DB는 사용하지 않는다.</p>
+</blockquote>
+<h2 id="1-현재-db와-인덱스-확인"><a class="anchor" href="#1-현재-db와-인덱스-확인" aria-hidden="true">#</a>1. 현재 DB와 인덱스 확인</h2>
+<p>MySQL 8.4의 <code>127.0.0.1:13319</code>에 연결해 <code>javaexperience_perf</code> DB인지 먼저 확인한다. <code>post_like</code>의 인덱스 목록을 보고 <code>ix_post_like_member_created</code>가 이미 존재하는지, 보이는지 확인한다. DB-10을 마쳤다면 이미 존재할 수 있다. <code>tools/db-perf-fixture.sh up</code>은 실행 중인 컨테이너를 새로 만들지 않는다.</p>
+<pre><code class="language-sql">SELECT DATABASE();
+SHOW INDEX FROM post_like;</code></pre>
+<h2 id="2-없다면-전용-인덱스-만들기"><a class="anchor" href="#2-없다면-전용-인덱스-만들기" aria-hidden="true">#</a>2. 없다면 전용 인덱스 만들기</h2>
+<p>DB-10에서 인덱스를 만들지 않은 경우에만 다음 문장을 실행한다. 같은 이름이 이미 있으면 다시 만들지 않는다. 이 변경은 전용 fixture의 <code>post_like</code>에만 적용한다.</p>
+<pre><code class="language-sql">CREATE INDEX ix_post_like_member_created
+    ON post_like (member_id, created_at, id);
+ANALYZE TABLE post_like;</code></pre>
+<p><code>ANALYZE TABLE</code>은 테이블 통계를 갱신한다. 읽기 SELECT를 실제 실행하는 <code>EXPLAIN ANALYZE</code>와 다르다.</p>
+<h2 id="3-현재-보이는-인덱스의-계획-기록"><a class="anchor" href="#3-현재-보이는-인덱스의-계획-기록" aria-hidden="true">#</a>3. 현재 보이는 인덱스의 계획 기록</h2>
+<p>같은 회원 12, 최신순, <code>LIMIT 11</code>을 계속 사용한다. 먼저 <code>SHOW INDEX</code>의 상태와 다음 <code>EXPLAIN</code>의 <code>key</code>, <code>rows</code>, <code>Extra</code>를 기록한다. 인덱스가 보인다고 무조건 선택되는 것은 아니다.</p>
+<pre><code class="language-sql">EXPLAIN
+SELECT l.id, l.post_id, l.created_at
+FROM post_like AS l
+WHERE l.member_id = 12
+ORDER BY l.created_at DESC, l.id DESC
+LIMIT 11;</code></pre>
+<h2 id="4-옵티마이저에서-잠시-숨기기"><a class="anchor" href="#4-옵티마이저에서-잠시-숨기기" aria-hidden="true">#</a>4. 옵티마이저에서 잠시 숨기기</h2>
+<p>MySQL 8.4의 보조 인덱스 <code>ix_post_like_member_created</code>를 <code>INVISIBLE</code>로 바꾼다. 인덱스 자체는 유지되지만 기본적으로 옵티마이저의 선택 대상에서 빠진다. Primary key에는 이 실습을 적용하지 않는다.</p>
+<pre><code class="language-sql">ALTER TABLE post_like
+    ALTER INDEX ix_post_like_member_created INVISIBLE;</code></pre>
+<p>이 상태에서 <code>SHOW INDEX FROM post_like;</code>와 <strong>같은 EXPLAIN</strong>을 다시 실행해 현재 key·rows·Extra를 적는다. 계획이 달라지는지는 직접 관찰해야 한다. <a href="../ch9-schema-change/9-2-index-explain.html">9-2의 전체 API 실습</a>은 <code>FORCE INDEX</code>를 사용하므로 그 API를 <code>INVISIBLE</code> 상태에서 호출해 비교하지 않는다. 이 DB-11 실습은 FORCE INDEX 없는 전용 fixture 쿼리다.</p>
+<h2 id="5-반드시-가시성-복원"><a class="anchor" href="#5-반드시-가시성-복원" aria-hidden="true">#</a>5. 반드시 가시성 복원</h2>
+<p>비교가 끝나면 다음 SQL을 실행하고 <code>SHOW INDEX</code> 및 EXPLAIN으로 복원 여부를 확인한다. 페이지를 떠나기 전에 이 상태를 점검한다.</p>
+<pre><code class="language-sql">ALTER TABLE post_like
+    ALTER INDEX ix_post_like_member_created VISIBLE;</code></pre>
+<h2 id="6-실습용-인덱스를-제거하려면"><a class="anchor" href="#6-실습용-인덱스를-제거하려면" aria-hidden="true">#</a>6. 실습용 인덱스를 제거하려면</h2>
+<p>원래 fixture 인덱스 집합으로 돌릴 때만 다음 SQL을 실행한다. <code>VISIBLE</code>로 복원한 뒤 이 전용 인덱스를 제거한다. 기본 FK·UNIQUE 인덱스는 지우지 않는다. 다시 비교하려면 2단계부터 생성한다.</p>
+<pre><code class="language-sql">DROP INDEX ix_post_like_member_created ON post_like;
+ANALYZE TABLE post_like;</code></pre>
+<p>마지막으로 <code>SHOW INDEX FROM post_like;</code>와 같은 EXPLAIN을 실행해 현재 상태를 기록한다. <code>DROP INDEX</code>는 전용 fixture에서도 스키마 변경이다. 정말 제거할 때만 복사해 실행한다.</p>
+<h2 id="완료-기준"><a class="anchor" href="#완료-기준" aria-hidden="true">#</a>완료 기준</h2>
+<ul>
+<li>연결 DB와 인덱스 존재·가시성을 확인했다.</li>
+<li>VISIBLE → INVISIBLE → VISIBLE 각 상태의 계획을 같은 SELECT로 기록했다.</li>
+<li><code>ANALYZE TABLE</code>과 <code>EXPLAIN ANALYZE</code>의 차이를 설명할 수 있다.</li>
+<li>인덱스를 숨긴 채 실습을 끝내지 않았고, 제거를 선택했다면 전용 인덱스만 지웠다.</li>
+</ul>
+</details>
+
+</main>
+
+<script src="../../tools/site/db11-focused-journey.js?v=283db10b0825" defer></script>
+
+
+</body>
+</html>

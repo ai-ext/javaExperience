@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderDb03FocusedJourney } from './db03-focused-journey.mjs';
+
+const markup = renderDb03FocusedJourney();
+assert.deepEqual([...markup.matchAll(/data-db03-panel="([^"]+)"/g)].map((match) => match[1]), ['scenario', 'required', 'optional', 'sql', 'policy']);
+const first = markup.slice(markup.indexOf('data-db03-panel="scenario"'), markup.indexOf('data-db03-panel="required"'));
+assert.match(first, /만들 것/);
+assert.match(first, /직접 할 것/);
+assert.doesNotMatch(first, /LEFT JOIN|likedByMe 1|board\.id/);
+assert.match(markup, /post\.board_id/);
+assert.match(markup, /post\.author_id/);
+assert.match(markup, /JOIN board b ON b\.id = p\.board_id/);
+assert.match(markup, /JOIN member m ON m\.id = p\.author_id/);
+assert.match(markup, /LEFT JOIN post_like pl/);
+assert.match(markup, /LEFT JOIN bookmark bm/);
+assert.match(markup, /ON pl\.post_id = p\.id AND pl\.member_id = 7/);
+assert.match(markup, /ON bm\.post_id = p\.id AND bm\.member_id = 7/);
+assert.match(markup, /likedByMe 1 · bookmarkedByMe 0/);
+assert.match(markup, /PostAccessPolicy/);
+assert.match(markup, /현재 M1 API 실행 결과가 아닙니다/);
+
+const root = new URL('../../', import.meta.url);
+const built = fs.readFileSync(new URL('scenario/db-query-journey/db-03-detail-join.html', root), 'utf8');
+const source = fs.readFileSync(new URL('scenario/db-query-journey/db-03-detail-join.md', root), 'utf8');
+for (const asset of ['first-db-journey.css', 'db03-focused-journey.css', 'db03-focused-journey.js']) assert.ok(built.includes(asset));
+assert.equal((built.match(/data-db03-panel="/g) || []).length, 5);
+assert.match(built, /class="db03-original"/);
+assert.match(source, /post_like/);
+assert.match(source, /PostAccessPolicy/);
+assert.match(source, /<code>bookmark<\/code> 행은 없습니다/);
+console.log('DB-03 다섯 장면·필수/선택 JOIN·접근 정책·원문 보존 검사 통과');
