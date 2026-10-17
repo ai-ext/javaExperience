@@ -3,9 +3,13 @@
 ## 브랜치와 PR
 
 - 작업 트리: `$HOME/IdeaProjects/javaExperience-repo/.worktrees/visual-learning-next`
-- 브랜치: `docs/visual-learning-next` · HEAD `c90e2fe`, `origin/main`보다 로컬 커밋 2개 앞섬 · 기존 변경을 보존하며 작업 중
+- 브랜치: `docs/visual-learning-next` · 통합 전 HEAD `c90e2fe`, 당시 `origin/main`보다 로컬 커밋 2개 앞섬 · 기존 변경을 보존하며 작업 중
 - 원격: `ai-ext/javaExperience`
 - `git ls-remote --heads origin docs/visual-learning-next` 결과: **같은 이름의 원격 브랜치 없음**. `gh pr list --state all --head docs/visual-learning-next` 결과: **이 브랜치의 PR 없음**. 로컬 커밋 2개가 있고 이번 추가 변경은 미커밋이다. 이 상태는 조회 시점의 기록이며 원격 상태는 다시 확인할 수 있다.
+
+### 통합 후 확인
+
+위 문장은 통합 전 조회 기록이다. 이후 구현·생성 HTML·원문·시안·검증 기록 **1,172개 파일**을 `f9d1b9b`로 커밋해 `origin/docs/visual-learning-next`에 push했다. 원격 ref와 로컬 커밋의 전체 SHA `f9d1b9b8d9e52ff717b2b7c2b72a1be2cf3691ae`가 같았다. [전수 파일 목록](BRANCH-CONSOLIDATION-FILES-2026-10-17.tsv)의 `include` 1,172개와 이 커밋의 변경 경로 1,172개가 일치하며 누락·추가 모두 0개다. `work/` 임시 브라우저 전체 화면 원본·점검 스크립트 4개는 목록에 사유를 적고 원격에 올리지 않았다. push 뒤에도 이 브랜치의 PR 조회 결과는 빈 목록이다.
 
 ## 의도와 기록 위치
 
