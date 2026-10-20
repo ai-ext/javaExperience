@@ -3,16 +3,16 @@ package org.example.dto;
 import java.util.List;
 
 
-public class PostRequestDto {
+public class PostCreateRequestDto {
     public String boardSlug;
     public String title;
     public String content;
     public List<String> tags;
     public String visibility;
 
-    public PostRequestDto(){}
+    public PostCreateRequestDto(){}
 
-    public PostRequestDto(String boardSlug,
+    public PostCreateRequestDto(String boardSlug,
                           String title,
                           String content,
                           List<String> tags,

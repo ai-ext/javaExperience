@@ -1,4 +1,4 @@
-package org.example.domain;
+package org.example.domain.entity;
 
 import jakarta.persistence.*;
 
@@ -12,27 +12,28 @@ public class PostEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column
+    @Column(name = "board_slug")
     private String boardSlug;
 
-    @Column
+    @Column(name = "title")
     private String title;
 
-    @Column
+    @Column(name = "content")
     private String content;
 
-    @Column
-    private List<String> tags;
+    @OneToMany()
+    @JoinColumn(name = "post_id")
+    private List<TagsEntity> tags;
 
-    @Column
+    @Column(name = "visibility")
     private String visibility;
 
-    @Column
-    private Boolean heart;
+    @Column(name = "heart")
+    private boolean heart;
 
     public PostEntity(){};
 
-    public PostEntity(String boardSlug, String title,String content, List<String> tags, String visibility){
+    public PostEntity(String boardSlug, String title,String content, List<TagsEntity> tags, String visibility){
         this.boardSlug=boardSlug;
         this.title=title;
         this.content=content;
@@ -56,7 +57,7 @@ public class PostEntity {
         return this.content;
     }
 
-    public List<String> getTags(){
+    public List<TagsEntity> getTags(){
         return this.tags;
     }
 

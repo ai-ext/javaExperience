@@ -1,10 +1,12 @@
 package org.example.dto;
 
-import org.example.domain.PostEntity;
+import org.example.domain.entity.PostEntity;
+import org.example.domain.entity.TagsEntity;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
-public class ListResponseDto {
+public class PostResponseDto {
 
     public int id;
     public String boardSlug;
@@ -14,7 +16,7 @@ public class ListResponseDto {
     public boolean like;
     public List<String> tags;
 
-    public ListResponseDto(int id, String boardSlug, String title, String content, String visibility, boolean like){
+    public PostResponseDto(int id, String boardSlug, String title, String content, String visibility, boolean like){
         this.id =id;
         this.boardSlug =boardSlug;
         this.title =title;
@@ -24,14 +26,13 @@ public class ListResponseDto {
 
     }
 
-    public ListResponseDto(PostEntity postEntity){
+    public PostResponseDto(PostEntity postEntity){
         this.id=postEntity.getId();
         this.boardSlug=postEntity.getBoardSlug();
         this.title=postEntity.getTitle();
         this.content=postEntity.getContent();
-        this.tags=postEntity.getTags();
+        this.tags=postEntity.getTags().stream().map(TagsEntity::getTitle).collect(Collectors.toList());
         this.visibility=postEntity.getVisibility();
-        this.tags=postEntity.getTags();
         this.like=postEntity.getLike();
 
     }
