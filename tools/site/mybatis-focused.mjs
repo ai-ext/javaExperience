@@ -20,6 +20,6 @@ export function renderMybatisFocused() {
       <details class="mybatis-focus-alternative"><summary><code>&#36;{column}</code>은 언제 쓰나요?</summary><p>컬럼 이름처럼 SQL 문법 자체를 바꿔야 할 때만 씁니다. 값과 달리 SQL 글자로 치환되므로 외부 입력을 그대로 넣지 말고, 허용한 컬럼 이름만 선택하세요.</p></details>
       <footer class="mybatis-focus-actions"><button type="button" data-mybatis-go="mapping">← 메서드와 XML</button><a href="#와-는-안전성-모델이-다르다" data-mybatis-source="true">바인딩 원리 자세히 보기 ↗</a></footer>
     </article>
-    <details class="mybatis-focus-images"><summary>두 장면의 이미지 시안 보기</summary><a href="../design/mockups-2026-10-15-batch9/01-mybatis-mapper.png">Mapper와 XML</a><a href="../design/mockups-2026-10-15-batch9/02-mybatis-binding.png">값 바인딩</a></details>
+    <details class="mybatis-focus-images"><summary>두 장면의 이미지 시안 보기</summary><a href="../design/mockups-2026-10-15-batch9/01-mybatis-mapper.jpg">Mapper와 XML</a><a href="../design/mockups-2026-10-15-batch9/02-mybatis-binding.jpg">값 바인딩</a></details>
   </section>`;
 }

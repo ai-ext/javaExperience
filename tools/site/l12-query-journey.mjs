@@ -82,6 +82,6 @@ export function renderL12QueryJourney() {
       ${request('K', 'status = PUBLISHED', '<code>PATCH</code> 본문은 <code>{"status":"PUBLISHED"}</code>입니다. 실제 결과를 확인하세요.')}
       <p class="l12-note">여덟 과제의 구현 파일 전문과 수동 실행 준비는 아래 원문에서 확인할 수 있습니다. 화면은 요청 하나씩 나누었고 구현 깊이는 그대로 보존했습니다.</p>
     `)}
-    <details class="db-journey-reference"><summary>이번 장면의 이미지 시안 16장 보기</summary>${['01-l12-scenario','02-derived-method','05-create-post','06-get-jpa','03-mybatis-detail','07-get-mybatis','11-q03-board','12-q04-author','13-q05-search','14-q06-exists','15-q07-count','16-q08-page','04-hidden-state','08-hide-patch','09-get-hidden','10-restore-patch'].map((name) => `<a href="../../../docs/design/mockups-2026-10-16-batch22/${name}.png">${name}</a>`).join('')}</details>
+    <details class="db-journey-reference"><summary>이번 장면의 이미지 시안 16장 보기</summary>${['01-l12-scenario','02-derived-method','05-create-post','06-get-jpa','03-mybatis-detail','07-get-mybatis','11-q03-board','12-q04-author','13-q05-search','14-q06-exists','15-q07-count','16-q08-page','04-hidden-state','08-hide-patch','09-get-hidden','10-restore-patch'].map((name) => `<a href="../../../docs/design/mockups-2026-10-16-batch22/${name}.jpg">${name}</a>`).join('')}</details>
   </section>`;
 }

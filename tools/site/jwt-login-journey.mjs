@@ -116,7 +116,7 @@ Access-Control-Request-Headers: authorization</code></pre></div><div class="jwt-
     `)}
 
     <details class="db-journey-reference"><summary>장면별 이미지 시안 15장 보기</summary><p>예상값·설명용 그림과 내 서버 결과를 구분합니다. 원문 요청·코드가 정확성 기준입니다.</p>
-      ${['01-jwt-scenario', '14-dependencies', '15-config', '02-login-issue-flow', '03-login-request', '04-jwt-anatomy', '05-me-request', '06-login-failure', '07-email-normalize', '08-validation', '09-me-anonymous', '10-jwt-expired', '11-long-password', '12-bad-json', '13-preflight'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch18/${name}.png">${name}</a>`).join('')}
+      ${['01-jwt-scenario', '14-dependencies', '15-config', '02-login-issue-flow', '03-login-request', '04-jwt-anatomy', '05-me-request', '06-login-failure', '07-email-normalize', '08-validation', '09-me-anonymous', '10-jwt-expired', '11-long-password', '12-bad-json', '13-preflight'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch18/${name}.jpg">${name}</a>`).join('')}
     </details>
   </section>`.replace(/[ \t]+\n/g, '\n');
 }

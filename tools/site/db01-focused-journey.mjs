@@ -68,7 +68,7 @@ ORDER BY pt.post_id, t.name;</code></pre><button type="button" data-db01-copy="t
     `)}
 
     <details class="db-journey-reference"><summary>장면별 이미지 시안 6장 보기</summary><p>시안의 seed 값과 실행 전 기대값은 실제 API 응답이 아닙니다.</p>
-      ${['01-scenario','02-field-to-table','03-where-order','04-first-sql','05-seed-first-row','06-tags-batch'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch21/${name}.png">${name}</a>`).join('')}
+      ${['01-scenario','02-field-to-table','03-where-order','04-first-sql','05-seed-first-row','06-tags-batch'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch21/${name}.jpg">${name}</a>`).join('')}
     </details>
   </section>`.replace(/[ \t]+\n/g, '\n');
 }

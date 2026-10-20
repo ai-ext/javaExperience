@@ -1,6 +1,6 @@
 # L15. 세션 인증 — 쿠키 한 장으로 로그인 상태를 이어 보기
 
-<figure class="learning-mockup-figure"><a href="../../../docs/design/mockups-2026-10-15-batch5/08-session-selected.png" target="_blank" rel="noopener"><img src="../../../docs/design/mockups-2026-10-15-batch5/08-session-selected.png" alt="JWT 다음 실습에서 익명 CSRF 세션, 로그인 때 세션 id 회전, 서버 HttpSession의 회원 id, 쿠키로 이어지는 내 정보 요청을 비교하는 시안" loading="lazy"><span class="learning-mockup-zoom">원본 크기로 보기 ↗</span></a><figcaption>10-4 JWT를 먼저 마친 뒤 세션 방식과 비교합니다. 이미지의 작은 코드는 처리 순서 설명이며, 구현 계약은 아래 본문을 따릅니다.</figcaption></figure>
+<figure class="learning-mockup-figure"><a href="../../../docs/design/mockups-2026-10-15-batch5/08-session-selected.jpg" target="_blank" rel="noopener"><img src="../../../docs/design/mockups-2026-10-15-batch5/08-session-selected.jpg" alt="JWT 다음 실습에서 익명 CSRF 세션, 로그인 때 세션 id 회전, 서버 HttpSession의 회원 id, 쿠키로 이어지는 내 정보 요청을 비교하는 시안" loading="lazy"><span class="learning-mockup-zoom">원본 크기로 보기 ↗</span></a><figcaption>10-4 JWT를 먼저 마친 뒤 세션 방식과 비교합니다. 이미지의 작은 코드는 처리 순서 설명이며, 구현 계약은 아래 본문을 따릅니다.</figcaption></figure>
 
 > 선택 실습 · 10-4 JWT 로그인을 끝낸 **별도 project DB 작업 브랜치**에서 진행 · Spring MVC + Servlet `HttpSession`
 

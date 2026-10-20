@@ -86,7 +86,7 @@ export function renderSessionLabJourney() {
     `)}
 
     <details class="db-journey-reference"><summary>장면별 이미지 시안 12장 보기</summary><p>이미지는 흐름 설명용입니다. 실제 쿠키·CSRF·회원 id는 로컬 응답에서 확인하세요.</p>
-      ${['01-session-scenario','00-preparation','02-anonymous-csrf','07-csrf-failure','03-session-login','04-session-id-rotation','05-session-me','06-other-cookie','08-logout','10-jwt-session-lifetime','09-idle-timeout','11-cookie-csrf'].map((name) => `<a href="../../../docs/design/mockups-2026-10-16-batch19/${name}.png">${name}</a>`).join('')}
+      ${['01-session-scenario','00-preparation','02-anonymous-csrf','07-csrf-failure','03-session-login','04-session-id-rotation','05-session-me','06-other-cookie','08-logout','10-jwt-session-lifetime','09-idle-timeout','11-cookie-csrf'].map((name) => `<a href="../../../docs/design/mockups-2026-10-16-batch19/${name}.jpg">${name}</a>`).join('')}
     </details>
   </section>`.replace(/[ \t]+\n/g, '\n');
 }

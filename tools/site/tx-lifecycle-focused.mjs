@@ -25,6 +25,6 @@ export function renderTxLifecycleFocused() {
       <p class="tx-life-caveat">checked 예외는 기본 롤백 대상이 아닙니다. 필요하면 <code>rollbackFor</code> 등으로 규칙을 명시합니다.</p>
       <footer class="tx-why-actions"><button type="button" data-tx-life-go="commit">← 정상 종료</button><a href="#롤백-규칙-매칭" data-tx-life-source="true">트랜잭션 규칙 더 보기 ↗</a></footer>
     </article>
-    <details class="tx-why-reference"><summary>세 장면 이미지 시안 보기</summary><a href="../design/mockups-2026-10-15-batch14/01-transaction-start.png">시작</a><a href="../design/mockups-2026-10-15-batch14/02-normal-commit.png">commit</a><a href="../design/mockups-2026-10-15-batch14/03-runtime-rollback.png">rollback</a></details>
+    <details class="tx-why-reference"><summary>세 장면 이미지 시안 보기</summary><a href="../design/mockups-2026-10-15-batch14/01-transaction-start.jpg">시작</a><a href="../design/mockups-2026-10-15-batch14/02-normal-commit.jpg">commit</a><a href="../design/mockups-2026-10-15-batch14/03-runtime-rollback.jpg">rollback</a></details>
   </section>`;
 }

@@ -55,6 +55,6 @@ export function renderFirstApiJourney() {
         </article>
       </div>
     </div>
-    <details class="journey-reference"><summary>화면 시안과 전체 흐름 다시 보기</summary><p>작업과 요청을 해 본 뒤 각 시안과 전체 흐름을 되짚어 보세요.</p><a href="../../docs/design/mockups-2026-10-15-batch10/01-first-api-scenario.png" target="_blank" rel="noopener">시나리오 첫 화면 ↗</a> · <a href="../../docs/design/mockups-2026-10-15-batch6/04-build-focused.png" target="_blank" rel="noopener">코드 작성 화면 시안 ↗</a> · <a href="../../docs/design/mockups-2026-10-15-batch6/05-run-focused.png" target="_blank" rel="noopener">요청 확인 화면 시안 ↗</a> · <a href="../../docs/design/mockups-2026-10-15-batch4/03-first-api-rich.png" target="_blank" rel="noopener">전체 흐름 참조 ↗</a></details>
+    <details class="journey-reference"><summary>화면 시안과 전체 흐름 다시 보기</summary><p>작업과 요청을 해 본 뒤 각 시안과 전체 흐름을 되짚어 보세요.</p><a href="../../docs/design/mockups-2026-10-15-batch10/01-first-api-scenario.jpg" target="_blank" rel="noopener">시나리오 첫 화면 ↗</a> · <a href="../../docs/design/mockups-2026-10-15-batch6/04-build-focused.jpg" target="_blank" rel="noopener">코드 작성 화면 시안 ↗</a> · <a href="../../docs/design/mockups-2026-10-15-batch6/05-run-focused.jpg" target="_blank" rel="noopener">요청 확인 화면 시안 ↗</a> · <a href="../../docs/design/mockups-2026-10-15-batch4/03-first-api-rich.jpg" target="_blank" rel="noopener">전체 흐름 참조 ↗</a></details>
   </section>`;
 }

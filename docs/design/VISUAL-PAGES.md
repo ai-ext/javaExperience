@@ -1,12 +1,12 @@
 # 화면별 시각 개편 체크리스트
 
-저자 원문과 생성 HTML이 함께 있는 339개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 44,101개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
+저자 원문과 생성 HTML이 함께 있는 339개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 44,103개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
 
 체크는 해당 화면의 모든 개별 항목이 `verified`일 때만 자동으로 붙는다. `imagegen` 시안 또는 공통 컴포넌트 한 개를 적용한 상태는 완료가 아니다.
 
 ## 홈·목차·미션·기타 (18)
 
-- [ ] [README.md](../../README.html) — 항목 61, 긴 산문 1, 토글 9, 최대 접기 깊이 1; 상태: in_progress
+- [ ] [README.md](../../README.html) — 항목 63, 긴 산문 1, 토글 9, 최대 접기 깊이 1; 상태: in_progress
 - [ ] [errors.md](../../errors.html) — 항목 261, 긴 산문 1, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [practice/MISSIONS.md](../../practice/MISSIONS.html) — 항목 97, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [scenario/README.md](../../scenario/README.html) — 항목 371, 긴 산문 1, 토글 195, 최대 접기 깊이 4; 상태: unreviewed

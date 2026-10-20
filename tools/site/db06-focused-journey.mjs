@@ -60,6 +60,6 @@ export function renderDb06FocusedJourney(markdown) {
       <div class="db06-java"><div><small>Service</small><strong>인증된 memberId·페이지·정렬 전달</strong></div><div><small>JPA</small><strong>JPQL NOT EXISTS 또는 native query</strong></div><div><small>MyBatis</small><strong>Mapper XML SELECT + memberId 바인딩</strong></div></div>
       <p class="db06-note">이번 페이지는 SQL 연습이며 새 HTTP API를 만들거나 요청을 보내지 않습니다. 같은 조건의 Java 구현은 <a href="DB-07-same-api-five-query-styles.html">DB-07</a>에서 이어집니다.</p>
     `)}
-    <details class="db-journey-reference"><summary>장면별 이미지 시안 10장 보기</summary>${['01-db06-scenario','02-synthetic-difference','03-correlated-row','04-not-exists-plan','05-reverse-exists','06-not-in-schema','07-null-trap','08-left-join-anti','09-three-query-check','10-java-placement'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch27/${name}.png">${name}</a>`).join('')}</details>
+    <details class="db-journey-reference"><summary>장면별 이미지 시안 10장 보기</summary>${['01-db06-scenario','02-synthetic-difference','03-correlated-row','04-not-exists-plan','05-reverse-exists','06-not-in-schema','07-null-trap','08-left-join-anti','09-three-query-check','10-java-placement'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch27/${name}.jpg">${name}</a>`).join('')}</details>
   </section>`;
 }

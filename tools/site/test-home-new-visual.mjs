@@ -21,7 +21,7 @@ $('[data-object-scene="4"]').click();
 assert.equal($('[data-object-count]').textContent, '이 예제의 Greeting 객체 2개');
 assert.equal($('[data-object-second]').hidden, false);
 assert.equal($('[data-object-next]').disabled, true);
-assert.match($('[data-object-image]').getAttribute('src'), /new-05-another-v2\.png$/);
+assert.match($('[data-object-image]').getAttribute('src'), /new-05-another-v2\.jpg$/);
 assert.match($('[data-object-image]').alt, /another/);
 assert.equal($('[data-object-open-image]').getAttribute('href'), $('[data-object-image]').getAttribute('src'));
 assert.match($('[data-object-code]').textContent, /Greeting same = greeting;/);

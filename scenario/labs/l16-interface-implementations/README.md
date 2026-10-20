@@ -1,6 +1,6 @@
 # L16. interface와 impl — 같은 API를 JPA·JDBC 두 구현으로 읽기
 
-<figure class="learning-mockup-figure"><a href="../../../docs/design/mockups-2026-10-15-batch5/07-interface-selected.png" target="_blank" rel="noopener"><img src="../../../docs/design/mockups-2026-10-15-batch5/07-interface-selected.png" alt="PostSummaryReader 인터페이스를 받는 Service, 설정으로 하나만 선택되는 JPA·JDBC 구현체, 같은 post 2번 행과 동일한 JSON 응답을 보여 주는 시안" loading="lazy"><span class="learning-mockup-zoom">원본 크기로 보기 ↗</span></a><figcaption>두 구현체는 설정에 따라 하나씩 실행합니다. 화면의 코드 형태는 개념 시안이며, 실제 조건·SQL·합격 기준은 아래에서 확인합니다.</figcaption></figure>
+<figure class="learning-mockup-figure"><a href="../../../docs/design/mockups-2026-10-15-batch5/07-interface-selected.jpg" target="_blank" rel="noopener"><img src="../../../docs/design/mockups-2026-10-15-batch5/07-interface-selected.jpg" alt="PostSummaryReader 인터페이스를 받는 Service, 설정으로 하나만 선택되는 JPA·JDBC 구현체, 같은 post 2번 행과 동일한 JSON 응답을 보여 주는 시안" loading="lazy"><span class="learning-mockup-zoom">원본 크기로 보기 ↗</span></a><figcaption>두 구현체는 설정에 따라 하나씩 실행합니다. 화면의 코드 형태는 개념 시안이며, 실제 조건·SQL·합격 기준은 아래에서 확인합니다.</figcaption></figure>
 
 > 선택 실습 · 본편 2-3 뒤 `community` DB · Java interface/impl → Spring 빈 선택 → SQL/JPA 계약 검증
 

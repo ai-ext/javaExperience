@@ -35,7 +35,7 @@ export function renderJpaFocused() {
       <div class="jpa-lifecycle-picker" role="group" aria-label="Entity 상태 선택"><button type="button" data-jpa-life="new" aria-pressed="false">new</button><button type="button" data-jpa-life="managed" aria-pressed="true">managed</button><button type="button" data-jpa-life="detached" aria-pressed="false">detached</button><button type="button" data-jpa-life="merge" aria-pressed="false">merge 반환</button></div>
       <div class="jpa-lifecycle-view"><div><small data-jpa-life-state>현재 컨텍스트에서 관리</small><strong data-jpa-life-object>Post id=42 · managed</strong><code data-jpa-life-title>title = "기존 글"</code><p data-jpa-life-detail>find()로 읽은 이 객체는 현재 영속성 컨텍스트가 추적합니다.</p></div><div><small>SQL/DB 의미</small><strong data-jpa-life-sql>값을 바꾸면 flush 때 비교 대상</strong><p data-jpa-life-db>변경 전 DB 행 title은 “기존 글”입니다. 아직 SQL 실행이나 commit을 주장하지 않습니다.</p></div></div>
       <p class="jpa-focus-caveat">설명용 객체 상태입니다. <code>merge(detached)</code>는 원본을 managed로 만드는 것이 아니라 상태를 관리 객체에 복사하고 그 객체를 반환합니다. 실제 UPDATE는 flush·commit 조건에 따라 확인해야 합니다.</p>
-      <a class="jpa-image-link" href="../design/mockups-2026-10-15-batch2/20-managed-detached-v2.png">사용자 시안 20 보기 ↗</a>
+      <a class="jpa-image-link" href="../design/mockups-2026-10-15-batch2/20-managed-detached-v2.jpg">사용자 시안 20 보기 ↗</a>
       <footer class="jpa-focus-actions"><button type="button" data-jpa-go="flush">← flush/commit</button><button type="button" class="jpa-focus-primary" data-jpa-go="nplusone">다음: LAZY와 N+1 →</button></footer>
     </article>
     <article class="jpa-focus-screen jpa-image-screen" data-jpa-panel="nplusone" hidden aria-labelledby="jpa-nplusone-title">
@@ -44,9 +44,9 @@ export function renderJpaFocused() {
       <div class="jpa-nplus-choice" role="group" aria-label="조회 방식 선택"><button type="button" data-jpa-fetch="lazy" aria-pressed="true">기본 조회 · LAZY</button><button type="button" data-jpa-fetch="join" aria-pressed="false">fetch join 비교</button></div>
       <div class="jpa-nplus-grid"><div><small>게시글 목록 · 설명용</small><button type="button" data-jpa-author="0" aria-pressed="false">첫 글 <span>작성자 보기</span></button><button type="button" data-jpa-author="1" aria-pressed="false">두 번째 글 <span>작성자 보기</span></button><button type="button" data-jpa-author="2" aria-pressed="false">세 번째 글 <span>작성자 보기</span></button></div><div><small>예상 SELECT 수 · 실측 아님</small><strong data-jpa-sql-count>1회 · 글 목록만</strong><p data-jpa-sql-detail>현재는 목록만 읽었습니다. 작성자에 접근할 때마다 추가 SELECT가 발생할 수 있습니다.</p><code data-jpa-sql-formula>1 + 0</code></div></div>
       <p class="jpa-focus-caveat">이 수는 서로 다른 작성자 3명·캐시 미적중을 가정한 설명값입니다. 실제 SQL 수는 연관관계·캐시·조회 쿼리와 fetch 계획을 로그로 확인하세요. fetch join은 일대다에서 행 수를 늘릴 수 있습니다.</p>
-      <a class="jpa-image-link" href="../design/mockups-2026-10-15-batch2/21-lazy-n-plus-one-v4.png">사용자 시안 21 보기 ↗</a>
+      <a class="jpa-image-link" href="../design/mockups-2026-10-15-batch2/21-lazy-n-plus-one-v4.jpg">사용자 시안 21 보기 ↗</a>
       <footer class="jpa-focus-actions"><button type="button" data-jpa-go="lifecycle">← 상태 변화</button><a href="#3-내부-동작원리" data-jpa-source="true">원문에서 fetch 계획 더 읽기 ↗</a></footer>
     </article>
-    <details class="jpa-focus-images"><summary>집중·사용자 시안 보기</summary><a href="../design/mockups-2026-10-15-batch8/01-jpa-roles.png">역할</a><a href="../design/mockups-2026-10-15-batch8/02-persistence-context.png">영속성 컨텍스트</a><a href="../design/mockups-2026-10-15-batch8/03-flush-commit.png">flush·commit</a><a href="../design/mockups-2026-10-15-batch2/20-managed-detached-v2.png">사용자 20 · 준영속</a><a href="../design/mockups-2026-10-15-batch2/21-lazy-n-plus-one-v4.png">사용자 21 · N+1</a></details>
+    <details class="jpa-focus-images"><summary>집중·사용자 시안 보기</summary><a href="../design/mockups-2026-10-15-batch8/01-jpa-roles.jpg">역할</a><a href="../design/mockups-2026-10-15-batch8/02-persistence-context.jpg">영속성 컨텍스트</a><a href="../design/mockups-2026-10-15-batch8/03-flush-commit.jpg">flush·commit</a><a href="../design/mockups-2026-10-15-batch2/20-managed-detached-v2.jpg">사용자 20 · 준영속</a><a href="../design/mockups-2026-10-15-batch2/21-lazy-n-plus-one-v4.jpg">사용자 21 · N+1</a></details>
   </section>`;
 }

@@ -82,6 +82,6 @@ export function renderDb07FocusedJourney(markdown) {
       <div class="db07-cursor"><div><small>여기서 비교한 고정 첫 페이지 예시</small><strong>Top20</strong><strong>PageRequest.of(0, 20)</strong><strong>LIMIT 20</strong></div><div><small>실제 M1 계약에 더 필요한 것</small><strong>요청 size + opaque cursor</strong><span>DB-02의 keyset WHERE · 마지막 (published_at, id)</span><span>같은 7개 필드 DTO · 별도 tags[] 배치</span></div></div>
       <p class="db07-note">위 다섯 코드 조각 자체는 가변 size와 다음 페이지 cursor를 완성하지 않습니다. <a href="db-02-select-cursor.html">DB-02의 커서 SQL</a>을 선택한 구현 방식에 옮기세요.</p>
     `)}
-    <details class="db-journey-reference"><summary>장면별 이미지 시안 13장 보기</summary>${['01-db07-scenario','02-common-contract','03-baseline-sql','04-one-adapter','05-derived-method','06-jpql-projection','07-native-sql','08-mybatis-xml','09-querydsl','10-tags-batch','11-five-way-compare','12-sql-logs','13-cursor-extension'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch28/${name}.png">${name}</a>`).join('')}</details>
+    <details class="db-journey-reference"><summary>장면별 이미지 시안 13장 보기</summary>${['01-db07-scenario','02-common-contract','03-baseline-sql','04-one-adapter','05-derived-method','06-jpql-projection','07-native-sql','08-mybatis-xml','09-querydsl','10-tags-batch','11-five-way-compare','12-sql-logs','13-cursor-extension'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch28/${name}.jpg">${name}</a>`).join('')}</details>
   </section>`;
 }

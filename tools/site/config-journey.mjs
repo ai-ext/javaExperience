@@ -1,7 +1,7 @@
 /** 0-6 실습: 작성할 설정과 API 확인만 주 경로에 놓고 개념·고장 실험은 공부자료로 연결한다. */
 const esc = (value) => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 const labels = ['상황', '현재 파일 확인', 'YAML 값 추가', 'Controller 작성', '요청 A', '바꾸고 재시작', '정리'];
-const refs = [['01-scenario.png','상황'],['02-check-current-config.png','현재 파일 확인'],['11-edit-yml.png','YAML 값 추가'],['12-controller-constructor.png','Controller 작성'],['14-request-a.png','요청 A'],['15-change-restart.png','바꾸고 재시작'],['25-wrap-up.png','정리']];
+const refs = [['01-scenario.jpg','상황'],['02-check-current-config.jpg','현재 파일 확인'],['11-edit-yml.jpg','YAML 값 추가'],['12-controller-constructor.jpg','Controller 작성'],['14-request-a.jpg','요청 A'],['15-change-restart.jpg','바꾸고 재시작'],['25-wrap-up.jpg','정리']];
 const box = (title, body, tone = 'blue') => `<div class="config-box config-${tone}"><strong>${title}</strong>${body}</div>`;
 const pair = (a, b) => `<div class="config-pair">${a}${b}</div>`;
 const code = (title, value, note = '') => `<div class="first-java-code"><header><strong>${title}</strong><span>${note}</span></header><pre><code>${esc(value)}</code></pre><button type="button" data-first-java-copy="${esc(title)}">코드 복사</button><span class="first-java-copy-state" role="status" aria-live="polite"></span></div>`;

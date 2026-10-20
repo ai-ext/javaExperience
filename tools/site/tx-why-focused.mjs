@@ -17,6 +17,6 @@ export function renderTxWhyFocused() {
       <p class="tx-why-meaning">한 업무의 DB 저장을 Service 메서드 경계로 묶습니다. 다른 DB나 외부 메시지는 이 경계에 자동 포함되지 않습니다.</p>
       <footer class="tx-why-actions"><button type="button" data-tx-why-go="partial">← 묶기 전</button><a href="S08-transactions.html">다음: Spring은 경계를 언제 열고 닫을까? →</a></footer>
     </article>
-    <details class="tx-why-reference"><summary>두 장면 이미지 시안 보기</summary><a href="../design/mockups-2026-10-15-batch13/01-without-service-boundary.png">경계 없음</a><a href="../design/mockups-2026-10-15-batch13/02-with-service-boundary.png">Service 경계</a></details>
+    <details class="tx-why-reference"><summary>두 장면 이미지 시안 보기</summary><a href="../design/mockups-2026-10-15-batch13/01-without-service-boundary.jpg">경계 없음</a><a href="../design/mockups-2026-10-15-batch13/02-with-service-boundary.jpg">Service 경계</a></details>
   </section>`;
 }

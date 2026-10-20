@@ -39,7 +39,7 @@
 
 기술 동작은 [Jakarta Persistence 3.2 명세](https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2)와 [EntityManager API](https://jakarta.ee/specifications/persistence/3.2/apidocs/jakarta.persistence/jakarta/persistence/entitymanager)의 `find`·`flush` 설명에 대조한다. 별도 연결의 관찰은 실습 MySQL의 트랜잭션 격리와 조회 시작 시점을 함께 적는다.
 
-- [x] 실제 `imagegen`으로 [JPA 데이터 여정 시안](jpa-entity-db-journey-v1.png)을 생성한다. 예제는 게시글 `id=42`, 제목 `첫 글 → 수정된 글`이다.
+- [x] 실제 `imagegen`으로 [JPA 데이터 여정 시안](jpa-entity-db-journey-v1.jpg)을 생성한다. 예제는 게시글 `id=42`, 제목 `첫 글 → 수정된 글`이다.
 - [x] 시안의 오해 가능성 식별: commit/rollback은 순차 3·4단계가 아니라 **동일한 flush 뒤 갈림길**이다. 이미지 속 SQL/문구는 기술 근거가 아니다.
 - [x] S09에 조회 전 DB 행, `find()` 이후 Entity 인스턴스와 스냅샷, setter 이후 메모리 값, flush 뒤 트랜잭션 내부 행을 단계 선택으로 구현한다. commit/rollback 뒤 결과는 같은 flush의 두 분기 카드로 둔다.
 - [x] S09에서 `EntityManager`를 컨텍스트 조작 창구로, Hibernate를 SQL 생성·실행 구현체로 표시한다. Entity와 DB 행의 `id | title`을 별도 표로 비교한다.
@@ -50,7 +50,7 @@
 
 ### 1-1. P20 엔티티 필드에서 실제 DB 열까지
 
-- [x] 실제 P20 코드가 `Post`가 아니라 `Order`·`OrderLine`인 것을 대조한 뒤, 별도 `imagegen` [P20 Order 시안](p20-order-entity-mapping-v1.png)을 만든다.
+- [x] 실제 P20 코드가 `Post`가 아니라 `Order`·`OrderLine`인 것을 대조한 뒤, 별도 `imagegen` [P20 Order 시안](p20-order-entity-mapping-v1.jpg)을 만든다.
 - [x] `Order.id`, `ordererName`, `lines`와 `orders.id`, `orderer_name`, `order_lines.order_id`의 대응을 예시 행으로 보여 준다. 예시 키는 실제 DB 결과로 표기하지 않는다.
 - [x] `Order.create` → `addLine` → `EntityManager.persist` → 트랜잭션 안의 SQL → commit 뒤 별도 DB 조회를 원문 코드 기반으로 단계별 보여 준다. IDENTITY의 INSERT 시점과 실제 SQL의 차이는 설명한다.
 - [x] 실제 이미지 시안과 P20의 데스크톱·360px 화면을 비교했다. 필드와 열 강조, 2·3·4단계의 값 변화, 원문 앵커, 360px 가로 넘침 없음을 브라우저에서 확인했다. 시안의 밝은 전체 셸·모바일 세부 배치는 아직 동일하게 재현되지 않았다.
@@ -66,7 +66,7 @@
 
 ### 3. 화면별 적용 순서
 
-DB 조회·쿼리 실습은 [DB 시나리오 확장 계획](DB-SCENARIO-PLAN.md)의 DB-01~13을 기존 M1~M10·8장·9장·L12~L14에 연결한다. 현재는 기획 단계다. [첫 DB 화면 시안](db-api-query-journey-draft-v1.png)은 배치 초안으로만 기록했고, 잘못 생성된 SQL·스키마·파라미터·측정값을 확인해 구현 근거에서 제외했다.
+DB 조회·쿼리 실습은 [DB 시나리오 확장 계획](DB-SCENARIO-PLAN.md)의 DB-01~13을 기존 M1~M10·8장·9장·L12~L14에 연결한다. 현재는 기획 단계다. [첫 DB 화면 시안](db-api-query-journey-draft-v1.jpg)은 배치 초안으로만 기록했고, 잘못 생성된 SQL·스키마·파라미터·측정값을 확인해 구현 근거에서 제외했다.
 
 - [ ] **시나리오 101단계:** `1-2` 첫 INSERT → `1-4` 컬럼·DDL·실DB → `2-1` 조회 → `2-4` N+1 → `10-12` JPA/MyBatis flush부터 값 변화를 시각화한다. 이후 [101개 화면 목록](VISUAL-PAGES.md)의 각 항목을 순서대로 확인한다.
 - [ ] **공부자료 134개:** S09·P20·P19·S10부터 데이터/실행 흐름을 완성한다. 나머지는 상태 변화, 비교·선택, 절차·시간, 장애·운영 유형으로 나눠 각 문서의 고유 내용을 이미지 시안과 대조한다.

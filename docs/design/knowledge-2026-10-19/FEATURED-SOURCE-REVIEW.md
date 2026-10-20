@@ -14,10 +14,10 @@
 
 시안 파일:
 
-- [/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K01.png](/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K01.png)
-- [/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K02.png](/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K02.png)
-- [/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K03.png](/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K03.png)
-- [/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K06B-v2.png](/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K06B-v2.png)
+- [/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K01.png](/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K01.jpg)
+- [/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K02.png](/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K02.jpg)
+- [/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K03.png](/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K03.jpg)
+- [/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K06B-v2.png](/Users/ds/code/javaExperience/.worktrees/visual-learning-next/docs/design/knowledge-2026-10-19/K06B-v2.jpg)
 
 ## 2. 문서별 질문과 원문 예시
 

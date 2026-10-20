@@ -4,24 +4,24 @@
 
 | 시안 | 화면에서 검토할 배치 | 구현 대조 |
 | --- | --- | --- |
-| [Hibernate 공부자료](hibernate-knowledge-screen-v1.png) | 버전 4개 카드, `왜 바뀌었나`/`실무에서 확인`, 원문 표 접기, 근거 링크, JPA 경로, 모바일 1열 | S09의 버전 표를 원문 기반 카드로 변환한다. P19·P20·S09·S10 JPA 경로 그림은 기존 구현을 유지한다. |
-| [시나리오 전체 코드](scenario-code-workbench-v1.png) | 역할별 파일 목록, 선택한 파일의 구문 강조 코드, 변경 파일/현재 전체 코드, 모바일 역할 칩 | 101개 단계의 답안·누적 스냅샷과 대조해 표시한다. 이미지 속 예제 코드를 복사하지 않는다. |
-| [JPA Entity·DB 행 여정](jpa-entity-db-journey-v1.png) | 게시글 한 건의 DB 행과 Java 객체를 구분하고 조회·수정·flush·commit/rollback 결과를 나란히 본다 | S09 상단에 `id=42` 단계별 값 비교를 **부분 적용**했다. 다른 화면에 같은 시안을 그대로 이식하지는 않았다. |
-| [P20 Order 매핑 시안](p20-order-entity-mapping-v1.png) | 실제 P20의 `Order`·`OrderLine` 코드에서 `orders`·`order_lines` 행으로 필드와 외래 키를 연결하고, 생성 후 저장 흐름을 단계별로 보여 준다 | P20 상단의 객체·행 대응 화면에 **부분 적용**했다. 이미지의 ID·SQL은 실행 결과가 아닌 예시다. |
-| [DB API→쿼리 여정 초안](db-api-query-journey-draft-v1.png) | 요청, SQL 유도, 실행 계획, 응답을 한 줄로 잇고 우측에 인덱스 전후 관찰을 둔다 | **미적용 초안.** 배치 가능성만 검토한다. 이미지의 SQL·테이블·API 파라미터·막대 수치는 실제 레포와 다르므로 구현 원본으로 쓰지 않는다. |
-| [DB-01 텍스트 없는 화면 시안](db-01-query-workspace-mockup-v1.png) | 응답 필드 → 관계 → 조건 → 행을 4단으로 묶고 아래에 SQL과 결과 행을 병렬 배치한다 | DB-01 원문에 4단 흐름과 SQL·행 비교를 **부분 적용**했다. 밝은 셸·측면 코치·같은 뷰포트 비교는 미완료다. |
-| [DB-02 커서 경계 화면 시안](db-02-cursor-query-mockup-v1.png) | API → 결과 행 → 마지막 행의 커서 → 다음 SQL을 4단으로 연결하고 하단에 SQL·페이지 전환을 둔다 | 텍스트 없는 배치 시안이다. 실제 값·경로·SQL은 M1과 시드에서 따로 확정했다. HTML과 같은 뷰포트 대조는 진행 중이다. |
-| [DB-03 상세 JOIN 시안](db-03-detail-join-mockup-v1.png) | 필수 board/member 선과 선택 좋아요/북마크 점선을 한 글의 결과 행으로 모은다 | 구조 참고 시안이다. 글 145·viewer 7의 실제 관계와 SQL은 시드에서 확인하고 구현한다. |
-| [DB-06 NOT EXISTS 시안](db-06-exists-mockup-v1.png) | 좋아요 행과 북마크 행을 짝짓고 남는 행, 별도의 NULL 함정을 보여 준다 | 구조 참고 시안이다. 이미지의 임의 행을 실제 practice 정답으로 읽지 않도록 원문과 구분한다. |
-| [DB 인덱스 실험 초안](db-index-experiment-draft-v1.png) | 같은 `GET /api/me/likes`를 기존·인덱스 추가·INVISIBLE 상태로 비교하고, 추정 계획과 실제 실행을 분리하며 DBeaver를 관찰 경로 밖에 둔다 | 9-2에 3상태·계획/실측 탭·기록란을 **부분 적용**했다. 실제 화면은 어두운 테마이며 모바일 시안 대조와 실제 API 실행은 남았다. |
+| [Hibernate 공부자료](hibernate-knowledge-screen-v1.jpg) | 버전 4개 카드, `왜 바뀌었나`/`실무에서 확인`, 원문 표 접기, 근거 링크, JPA 경로, 모바일 1열 | S09의 버전 표를 원문 기반 카드로 변환한다. P19·P20·S09·S10 JPA 경로 그림은 기존 구현을 유지한다. |
+| [시나리오 전체 코드](scenario-code-workbench-v1.jpg) | 역할별 파일 목록, 선택한 파일의 구문 강조 코드, 변경 파일/현재 전체 코드, 모바일 역할 칩 | 101개 단계의 답안·누적 스냅샷과 대조해 표시한다. 이미지 속 예제 코드를 복사하지 않는다. |
+| [JPA Entity·DB 행 여정](jpa-entity-db-journey-v1.jpg) | 게시글 한 건의 DB 행과 Java 객체를 구분하고 조회·수정·flush·commit/rollback 결과를 나란히 본다 | S09 상단에 `id=42` 단계별 값 비교를 **부분 적용**했다. 다른 화면에 같은 시안을 그대로 이식하지는 않았다. |
+| [P20 Order 매핑 시안](p20-order-entity-mapping-v1.jpg) | 실제 P20의 `Order`·`OrderLine` 코드에서 `orders`·`order_lines` 행으로 필드와 외래 키를 연결하고, 생성 후 저장 흐름을 단계별로 보여 준다 | P20 상단의 객체·행 대응 화면에 **부분 적용**했다. 이미지의 ID·SQL은 실행 결과가 아닌 예시다. |
+| [DB API→쿼리 여정 초안](db-api-query-journey-draft-v1.jpg) | 요청, SQL 유도, 실행 계획, 응답을 한 줄로 잇고 우측에 인덱스 전후 관찰을 둔다 | **미적용 초안.** 배치 가능성만 검토한다. 이미지의 SQL·테이블·API 파라미터·막대 수치는 실제 레포와 다르므로 구현 원본으로 쓰지 않는다. |
+| [DB-01 텍스트 없는 화면 시안](db-01-query-workspace-mockup-v1.jpg) | 응답 필드 → 관계 → 조건 → 행을 4단으로 묶고 아래에 SQL과 결과 행을 병렬 배치한다 | DB-01 원문에 4단 흐름과 SQL·행 비교를 **부분 적용**했다. 밝은 셸·측면 코치·같은 뷰포트 비교는 미완료다. |
+| [DB-02 커서 경계 화면 시안](db-02-cursor-query-mockup-v1.jpg) | API → 결과 행 → 마지막 행의 커서 → 다음 SQL을 4단으로 연결하고 하단에 SQL·페이지 전환을 둔다 | 텍스트 없는 배치 시안이다. 실제 값·경로·SQL은 M1과 시드에서 따로 확정했다. HTML과 같은 뷰포트 대조는 진행 중이다. |
+| [DB-03 상세 JOIN 시안](db-03-detail-join-mockup-v1.jpg) | 필수 board/member 선과 선택 좋아요/북마크 점선을 한 글의 결과 행으로 모은다 | 구조 참고 시안이다. 글 145·viewer 7의 실제 관계와 SQL은 시드에서 확인하고 구현한다. |
+| [DB-06 NOT EXISTS 시안](db-06-exists-mockup-v1.jpg) | 좋아요 행과 북마크 행을 짝짓고 남는 행, 별도의 NULL 함정을 보여 준다 | 구조 참고 시안이다. 이미지의 임의 행을 실제 practice 정답으로 읽지 않도록 원문과 구분한다. |
+| [DB 인덱스 실험 초안](db-index-experiment-draft-v1.jpg) | 같은 `GET /api/me/likes`를 기존·인덱스 추가·INVISIBLE 상태로 비교하고, 추정 계획과 실제 실행을 분리하며 DBeaver를 관찰 경로 밖에 둔다 | 9-2에 3상태·계획/실측 탭·기록란을 **부분 적용**했다. 실제 화면은 어두운 테마이며 모바일 시안 대조와 실제 API 실행은 남았다. |
 
-| [DB-04 태그 JOIN 시안](db-04-tag-join-mockup-v1.png) | 글 하나에서 조건 태그 둘로 갈라진 행과 EXISTS 한 행 비교 | 실제 글 2의 두 태그를 seed와 대조했다. 화면에는 JOIN 중복과 EXISTS 결과를 구현했고 같은 뷰포트 캡처 비교는 대기한다. |
-| [DB-05 집계 행 곱셈 시안](db-05-aggregate-mockup-v1.png) | 좋아요·댓글의 원시 JOIN과 사전 집계의 대비 | 이미지의 아이콘 개수는 기술 수치가 아니다. 화면은 별도 합성 데이터 2×3=6으로 정확한 행 수를 설명한다. |
-| [DB-07 다섯 쿼리 방식 시안](db-07-query-styles-mockup-v1.png) | 하나의 API가 다섯 구현 방식으로 갈라져 동일 응답으로 모인다 | 이 이미지의 코드는 추상 획이다. L12~L14 복원 실습과 루트 앱 구현 범위를 별도로 표시한다. |
-| [DB-12 JOIN·EXISTS 계획 비교 시안](db-12-join-exists-plan-mockup-v1.png) | 두 SQL의 결과 동일성 점검 후 실행 계획을 비교한다 | 이미지 막대는 측정치가 아니다. 쿼리 결과·계획은 실제 MySQL에서 직접 기록한다. |
-| [DB-13 N+1 추적 시안](db-13-n-plus-one-trace-mockup-v1.png) | GET 요청의 계층 흐름과 반복 SQL 대 일괄 조회를 비교한다 | 시안의 반복 수·막대는 설명 배치다. M1 실제 쿼리 횟수는 아직 계측하지 않았다. |
-| [DB-14 실제 스키마 탐색 시안](db-14-live-schema-mockup-v1.png) | 관계 그래프·API 요구사항·DBeaver/CloudBeaver 탐색을 3열로 보고 순서대로 실행한다 | `board`, `post`, `member`와 FK 8개를 실제 fixture DDL과 대조했다. 화면 첫 부분에 3열·5단 진행 경로를 적용했다. |
-| [DB-14 실행 계획 비교 시안](db-14-plan-comparison-mockup-v1.png) | 인덱스 전후 행 흐름, 결과 확인, 인덱스 제거를 한 작업 공간에 놓는다 | 원문의 전후 계획 카드·같은 결과 확인·복구 절차에 일부 반영했다. 이미지의 막대·화살표는 실행 시간이나 행 수가 아니다. |
+| [DB-04 태그 JOIN 시안](db-04-tag-join-mockup-v1.jpg) | 글 하나에서 조건 태그 둘로 갈라진 행과 EXISTS 한 행 비교 | 실제 글 2의 두 태그를 seed와 대조했다. 화면에는 JOIN 중복과 EXISTS 결과를 구현했고 같은 뷰포트 캡처 비교는 대기한다. |
+| [DB-05 집계 행 곱셈 시안](db-05-aggregate-mockup-v1.jpg) | 좋아요·댓글의 원시 JOIN과 사전 집계의 대비 | 이미지의 아이콘 개수는 기술 수치가 아니다. 화면은 별도 합성 데이터 2×3=6으로 정확한 행 수를 설명한다. |
+| [DB-07 다섯 쿼리 방식 시안](db-07-query-styles-mockup-v1.jpg) | 하나의 API가 다섯 구현 방식으로 갈라져 동일 응답으로 모인다 | 이 이미지의 코드는 추상 획이다. L12~L14 복원 실습과 루트 앱 구현 범위를 별도로 표시한다. |
+| [DB-12 JOIN·EXISTS 계획 비교 시안](db-12-join-exists-plan-mockup-v1.jpg) | 두 SQL의 결과 동일성 점검 후 실행 계획을 비교한다 | 이미지 막대는 측정치가 아니다. 쿼리 결과·계획은 실제 MySQL에서 직접 기록한다. |
+| [DB-13 N+1 추적 시안](db-13-n-plus-one-trace-mockup-v1.jpg) | GET 요청의 계층 흐름과 반복 SQL 대 일괄 조회를 비교한다 | 시안의 반복 수·막대는 설명 배치다. M1 실제 쿼리 횟수는 아직 계측하지 않았다. |
+| [DB-14 실제 스키마 탐색 시안](db-14-live-schema-mockup-v1.jpg) | 관계 그래프·API 요구사항·DBeaver/CloudBeaver 탐색을 3열로 보고 순서대로 실행한다 | `board`, `post`, `member`와 FK 8개를 실제 fixture DDL과 대조했다. 화면 첫 부분에 3열·5단 진행 경로를 적용했다. |
+| [DB-14 실행 계획 비교 시안](db-14-plan-comparison-mockup-v1.jpg) | 인덱스 전후 행 흐름, 결과 확인, 인덱스 제거를 한 작업 공간에 놓는다 | 원문의 전후 계획 카드·같은 결과 확인·복구 절차에 일부 반영했다. 이미지의 막대·화살표는 실행 시간이나 행 수가 아니다. |
 
 ## 이미지 생성 지시
 

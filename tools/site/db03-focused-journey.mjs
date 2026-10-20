@@ -48,6 +48,6 @@ export function renderDb03FocusedJourney() {
       <p class="db03-note">허용되지 않은 글의 내용은 HTTP 응답에 섞지 않습니다. 이 흐름은 설명용이며 현재 M1 API 실행 결과가 아닙니다.</p>
       <a class="db03-source" href="#권한-판정은-쿼리-결과-뒤에-이어진다" data-db03-source>접근 정책 원문 열기 ↗</a>
     `)}
-    <details class="db-journey-reference"><summary>장면별 이미지 시안 5장 보기</summary>${['01-db03-scenario','02-required-joins','03-optional-left-joins','04-join-sql-check','05-access-policy'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch24/${name}.png">${name}</a>`).join('')}</details>
+    <details class="db-journey-reference"><summary>장면별 이미지 시안 5장 보기</summary>${['01-db03-scenario','02-required-joins','03-optional-left-joins','04-join-sql-check','05-access-policy'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch24/${name}.jpg">${name}</a>`).join('')}</details>
   </section>`;
 }

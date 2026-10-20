@@ -45,6 +45,6 @@ LIMIT 3;</code></pre><button type="button" data-db02-copy>SQL 복사</button><p 
       <p class="db02-note">두 방식 모두 <code>published_at DESC, id DESC</code>라는 안정적인 정렬 기준으로 비교합니다. 성능 수치는 측정하지 않았습니다.</p>
       <a class="db02-source" href="#같은-데이터에서-offset과-비교하기" data-db02-source>offset 비교 원문 열기 ↗</a>
     `)}
-    <details class="db-journey-reference"><summary>장면별 이미지 시안 5장 보기</summary>${['01-db02-scenario','02-sort-rows','03-cursor-boundary','04-next-page-sql','05-offset-insert'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch23/${name}.png">${name}</a>`).join('')}</details>
+    <details class="db-journey-reference"><summary>장면별 이미지 시안 5장 보기</summary>${['01-db02-scenario','02-sort-rows','03-cursor-boundary','04-next-page-sql','05-offset-insert'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch23/${name}.jpg">${name}</a>`).join('')}</details>
   </section>`;
 }

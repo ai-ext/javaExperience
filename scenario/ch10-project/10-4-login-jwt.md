@@ -1,6 +1,6 @@
 # 10-4. 로그인과 JWT — 인터셉터와 @LoginUser, 내 정보
 
-<figure class="learning-mockup-figure"><a href="../../docs/design/mockups-2026-10-15-batch5/04-jwt-corrected.png" target="_blank" rel="noopener"><img src="../../docs/design/mockups-2026-10-15-batch5/04-jwt-corrected.png" alt="로그인 요청에서 users 이메일 조회와 비밀번호 검증, JWT 발급, 다음 Bearer 요청에서 서명 검증과 회원 id 조회를 분리해 보여 주는 시안" loading="lazy"><span class="learning-mockup-zoom">원본 크기로 보기 ↗</span></a><figcaption>JWT를 먼저 구현합니다. 이 이미지는 예상 흐름 시안이며, 아래의 API 계약·코드가 정확한 실습 기준입니다.</figcaption></figure>
+<figure class="learning-mockup-figure"><a href="../../docs/design/mockups-2026-10-15-batch5/04-jwt-corrected.jpg" target="_blank" rel="noopener"><img src="../../docs/design/mockups-2026-10-15-batch5/04-jwt-corrected.jpg" alt="로그인 요청에서 users 이메일 조회와 비밀번호 검증, JWT 발급, 다음 Bearer 요청에서 서명 검증과 회원 id 조회를 분리해 보여 주는 시안" loading="lazy"><span class="learning-mockup-zoom">원본 크기로 보기 ↗</span></a><figcaption>JWT를 먼저 구현합니다. 이 이미지는 예상 흐름 시안이며, 아래의 API 계약·코드가 정확한 실습 기준입니다.</figcaption></figure>
 
 ## 상황
 

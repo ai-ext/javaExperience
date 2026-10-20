@@ -57,6 +57,6 @@ export function renderDb05FocusedJourney(markdown) {
       <label class="db05-observation">내 SQL·DB 관찰 기록<textarea data-db05-observation rows="4" placeholder="실제로 실행한 SQL, 원본 행 수, JOIN 뒤 행 수를 적어 보세요. 이 내용은 서버에 저장되지 않습니다."></textarea></label>
       <p class="db05-note"><code>COUNT(DISTINCT ...)</code>는 개수만 보정할 수 있습니다. 임의의 SUM·가중치 점수를 자동으로 바로잡지 않습니다.</p>
     `)}
-    <details class="db-journey-reference"><summary>장면별 이미지 시안 9장 보기</summary>${['01-db05-scenario','02-synthetic-inputs','03-fanout-matrix','04-count-distortion','05-scratch-select','06-preaggregate','07-m6-period-score','08-m9-activity','09-debugging-gate'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch26/${name}.png">${name}</a>`).join('')}</details>
+    <details class="db-journey-reference"><summary>장면별 이미지 시안 9장 보기</summary>${['01-db05-scenario','02-synthetic-inputs','03-fanout-matrix','04-count-distortion','05-scratch-select','06-preaggregate','07-m6-period-score','08-m9-activity','09-debugging-gate'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch26/${name}.jpg">${name}</a>`).join('')}</details>
   </section>`;
 }

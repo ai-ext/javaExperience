@@ -86,7 +86,7 @@ export function renderTokenAuthorJourney() {
     `)}
 
     <details class="db-journey-reference"><summary>장면별 이미지 시안 10장 보기</summary><p>시안의 값은 초기 데이터 또는 실행 전 기대값입니다. 실제 서버·DB 결과는 직접 확인합니다.</p>
-      ${['01-token-author-scenario', '02-interceptor-flow', '03-normal-author', '04-untrusted-author-id', '05-unauthorized', '06-auth-before-json', '07-suspended', '08-notice-role', '09-db-proof', '10-preflight'].map((name) => `<a href="../../docs/design/mockups-2026-10-15-batch17/${name}.png">${name}</a>`).join('')}
+      ${['01-token-author-scenario', '02-interceptor-flow', '03-normal-author', '04-untrusted-author-id', '05-unauthorized', '06-auth-before-json', '07-suspended', '08-notice-role', '09-db-proof', '10-preflight'].map((name) => `<a href="../../docs/design/mockups-2026-10-15-batch17/${name}.jpg">${name}</a>`).join('')}
     </details>
   </section>`.replace(/[ \t]+\n/g, '\n');
 }

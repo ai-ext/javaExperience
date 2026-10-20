@@ -7,7 +7,7 @@ const source = fs.readFileSync(new URL('docs/knowledge/S09-jpa-hibernate.md', ro
 const html = renderJpaFocused();
 assert.deepEqual([...html.matchAll(/data-jpa-panel="([^"]+)"/g)].map((item) => item[1]), ['roles','context','flush','lifecycle','nplusone']);
 for (const term of ['준영속', 'merge(detached)', 'LAZY', 'fetch join', '실측 아님', '서로 다른 작성자 3명']) assert.ok(html.includes(term));
-for (const file of ['20-managed-detached-v2.png','21-lazy-n-plus-one-v4.png']) {
+for (const file of ['20-managed-detached-v2.jpg','21-lazy-n-plus-one-v4.jpg']) {
   assert.ok(html.includes(file));
   assert.ok(fs.existsSync(new URL(`docs/design/mockups-2026-10-15-batch2/${file}`, root)));
 }

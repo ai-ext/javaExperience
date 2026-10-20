@@ -107,7 +107,7 @@ WHERE id IN (2,6,7,8,10);</code></pre><button type="button" data-reader-copy-sql
     `)}
 
     <details class="db-journey-reference"><summary>장면별 이미지 시안 15장 보기</summary><p>시안의 예시·기대값은 실제 실행 결과가 아닙니다.</p>
-      ${['01-interface-scenario','02-reader-contract','03-jpa-reader','04-jdbc-reader','05-bean-selection','06-two-beans','07-zero-beans','08-run-jpa','09-run-jdbc','10-public-only-404','11-invalid-id','12-db-seed-proof','13-contract-tests','15-unit-fake','14-board-slug-extension'].map((name) => `<a href="../../../docs/design/mockups-2026-10-16-batch20/${name}.png">${name}</a>`).join('')}
+      ${['01-interface-scenario','02-reader-contract','03-jpa-reader','04-jdbc-reader','05-bean-selection','06-two-beans','07-zero-beans','08-run-jpa','09-run-jdbc','10-public-only-404','11-invalid-id','12-db-seed-proof','13-contract-tests','15-unit-fake','14-board-slug-extension'].map((name) => `<a href="../../../docs/design/mockups-2026-10-16-batch20/${name}.jpg">${name}</a>`).join('')}
     </details>
   </section>`.replace(/[ \t]+\n/g, '\n');
 }

@@ -46,6 +46,6 @@ export function renderDb04FocusedJourney(markdown) {
       <div class="db04-cautions"><p>다대다 JOIN 뒤에 바로 <code>LIMIT</code>을 걸면 같은 글이 여러 행을 차지해 페이지 경계가 깨질 수 있습니다.</p><p>글마다 태그를 따로 조회하면 N+1이 생길 수 있습니다. 실제 SQL 로그로 확인해야 합니다.</p></div>
       <p class="db04-note">M1의 실제 목록 API 응답과 SQL 횟수는 아직 관찰하지 않았습니다. <a href="db-01-response-to-query.html">DB-01의 태그 일괄 조회</a>로 돌아가 이어 볼 수 있습니다.</p>
     `)}
-    <details class="db-journey-reference"><summary>장면별 이미지 시안 7장 보기</summary>${['01-db04-scenario','02-seed-relationship','03-join-duplicates','04-join-distinct-plan','05-exists-once','06-distinct-columns','07-page-then-tags'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch25/${name}.png">${name}</a>`).join('')}</details>
+    <details class="db-journey-reference"><summary>장면별 이미지 시안 7장 보기</summary>${['01-db04-scenario','02-seed-relationship','03-join-duplicates','04-join-distinct-plan','05-exists-once','06-distinct-columns','07-page-then-tags'].map((name) => `<a href="../../docs/design/mockups-2026-10-16-batch25/${name}.jpg">${name}</a>`).join('')}</details>
   </section>`;
 }

@@ -107,7 +107,7 @@ class ApiExceptionHandler {
     `)}
 
     <details class="db-journey-reference"><summary>장면별 이미지 시안 12장 보기</summary><p>시안은 설명용입니다. 실행 결과는 내 서버 응답과 DB 조회로 확인합니다.</p>
-      ${['01-scenario', '02-dto-basic', '03-dto-tags', '04-problem-detail', '05-v1', '06-v3', '07-no-write', '08-default', '09-board-error', '10-boundary', '11-null-tag', '12-case-tag'].map((name) => `<a href="../../docs/design/mockups-2026-10-15-batch16/${name}.png">${name}</a>`).join('')}
+      ${['01-scenario', '02-dto-basic', '03-dto-tags', '04-problem-detail', '05-v1', '06-v3', '07-no-write', '08-default', '09-board-error', '10-boundary', '11-null-tag', '12-case-tag'].map((name) => `<a href="../../docs/design/mockups-2026-10-15-batch16/${name}.jpg">${name}</a>`).join('')}
     </details>
   </section>`.replace(/[ \t]+\n/g, '\n');
 }
