@@ -1,0 +1,43 @@
+import path from 'node:path';
+
+const spaces = [
+  { label: '홈', target: 'index.html' },
+  { label: '서비스 만들기', target: 'scenario/README.html' },
+  { label: '실전 미션', target: 'practice/MISSIONS.html' },
+  { label: '개념 학습', target: 'docs/knowledge/README.html' },
+];
+
+// 문서 제목 대신 소속 폴더로 판별한다. 예외 문서를 홈으로 표시하지 않는다.
+export function siteSection(sourcePath) {
+  if (sourcePath === 'README.md') return '홈';
+  if (sourcePath.startsWith('scenario/')) return '서비스 만들기';
+  if (/^(practice|tickets)\//.test(sourcePath)) return '실전 미션';
+  if (/^(docs\/knowledge|lessons)\//.test(sourcePath)) return '개념 학습';
+  return null;
+}
+
+export function renderSiteNavigation(sourcePath) {
+  const current = siteSection(sourcePath);
+  const href = (target) => path.posix.relative(path.posix.dirname(sourcePath), target);
+  const links = spaces.map(({ label, target }) => `<a href="${href(target)}"${label === current ? ' aria-current="page"' : ''}>${label}</a>`).join('');
+  const setup = current === '홈' ? '<a class="home-header-setup" href="#home-environment">개발 환경 ↗</a>' : '';
+  return `<header class="topbar site-topbar"><a class="home-brand" href="${href('index.html')}"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴">${links}</nav>${setup}</header>`;
+}
+
+const catalogNames = {
+  'scenario/README.md': ['시나리오', '서비스 만들기'],
+  'practice/MISSIONS.md': ['학습용 미션', '실전 미션'],
+  'docs/knowledge/README.md': ['공부자료', '개념 학습'],
+};
+export function catalogPageTitle(sourcePath, original) {
+  const names = catalogNames[sourcePath];
+  return names && original.startsWith(names[0]) ? names[1] + original.slice(names[0].length) : original;
+}
+// 표시 이름만 맞춘다. 기존 원문 제목의 id와 permalink는 바꾸지 않는다.
+export function renderCatalogHeading(sourcePath, html) {
+  if (!Object.hasOwn(catalogNames, sourcePath)) return html;
+  return html.replace(/(<h1\b[^>]*>)([\s\S]*?)(<\/h1>)/, (_, open, content, close) => {
+    const anchor = content.match(/^<a\b[^>]*class="anchor"[^>]*>[\s\S]*?<\/a>/)?.[0] || '';
+    return open + anchor + catalogPageTitle(sourcePath, content.slice(anchor.length)) + close;
+  });
+}
