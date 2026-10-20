@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderDb08FocusedJourney } from './db08-focused-journey.mjs';
+
+const root = new URL('../../', import.meta.url);
+const source = fs.readFileSync(new URL('scenario/db-query-journey/DB-08-explain-hypothesis.md', root), 'utf8');
+const markup = renderDb08FocusedJourney(source);
+const panels = [...markup.matchAll(/data-db08-panel="([^"]+)"/g)].map((match)=>match[1]);
+assert.deepEqual(panels,['scenario','fixture','query','explain','indexes','estimate','extra','hypothesis']);
+const first = markup.slice(markup.indexOf('data-db08-panel="scenario"'),markup.indexOf('data-db08-panel="fixture"'));
+assert.match(first,/만들 것/);
+assert.match(first,/직접 할 것/);
+assert.doesNotMatch(first,/500,000|possible_keys|Using filesort|ANALYZE TABLE|CREATE INDEX/);
+const snippets=[...source.matchAll(/```(?:sql|bash)\n([\s\S]*?)\n```/g)].map((match)=>match[1]);
+assert.equal(snippets.length,3);
+for (const snippet of snippets) assert.ok(markup.includes(snippet.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')),'원문 SQL/명령을 그대로 보여야 한다');
+assert.equal(snippets[2],`EXPLAIN\n${snippets[1]}`);
+assert.match(markup,/GET \/api\/me\/likes\?size=10/);
+assert.match(markup,/possible_keys/);
+assert.match(markup,/추정치/);
+assert.match(markup,/디스크 정렬이나 API 지연을 곧바로 뜻하지 않습니다/);
+assert.equal((markup.match(/data-db08-panel="/g)||[]).length,8);
+const built=fs.readFileSync(new URL('scenario/db-query-journey/DB-08-explain-hypothesis.html',root),'utf8');
+for (const asset of ['first-db-journey.css','db08-focused-journey.css','db08-focused-journey.js']) assert.ok(built.includes(asset));
+assert.match(built,/class="db08-original"/);
+assert.equal((built.match(/data-db08-panel="/g)||[]).length,8);
+console.log('DB-08 여덟 장면·원문 SELECT/EXPLAIN·추정 계획 경계 검사 통과');

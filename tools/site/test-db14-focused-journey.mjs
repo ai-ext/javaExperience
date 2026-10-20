@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderDb14FocusedJourney } from './db14-focused-journey.mjs';
+
+const root=new URL('../../',import.meta.url);
+const source=fs.readFileSync(new URL('scenario/db-query-journey/db-14-live-schema-to-slow-query.md',root),'utf8');
+const markup=renderDb14FocusedJourney(source);
+assert.deepEqual([...markup.matchAll(/data-db14-panel="([^"]+)"/g)].map((match)=>match[1]),['scenario','fixture','connection','database','ddl','fk','constraints','contract','filters','join','baseline','plans','index-design','create','compare','restore']);
+const first=markup.slice(markup.indexOf('data-db14-panel="scenario"'),markup.indexOf('data-db14-panel="fixture"'));
+assert.match(first,/만들 것/);
+assert.match(first,/직접 할 것/);
+assert.doesNotMatch(first,/SHOW TABLES|CREATE INDEX|DROP INDEX|EXPLAIN|500,000/);
+const blocks=[...source.matchAll(/```(?:bash|sql)\n([\s\S]*?)\n```/g)].map((match)=>match[1]);
+assert.equal(blocks.length,10);
+for(const term of ['tools/db-perf-fixture.sh up','SELECT DATABASE()','SHOW CREATE TABLE post;','referenced_table_name',"b.slug = 'board-03'",'EXPLAIN ANALYZE','ix_post_board_status_deleted_created','DROP INDEX ix_post_board_status_deleted_created ON post;'])assert.ok(markup.includes(term));
+assert.match(markup,/post\.board_id<\/strong><b>→ FK →<\/b><strong>board\.id/);
+assert.match(markup,/post\.author_id<\/strong><b>→ FK →<\/b><strong>member\.id/);
+assert.match(markup,/visibility<\/code>\/R1 전체 권한과 실제 서버 API는 별도/);
+assert.match(markup,/ANALYZE TABLE post;/);
+assert.match(markup,/EXPLAIN ANALYZE와 다른 명령/);
+assert.equal((markup.match(/data-db14-record="/g)||[]).length,15);
+assert.equal((markup.match(/data-db14-copy="/g)||[]).length,15);
+assert.equal((markup.match(/mockups-2026-10-16-batch35\//g)||[]).length,16);
+const built=fs.readFileSync(new URL('scenario/db-query-journey/db-14-live-schema-to-slow-query.html',root),'utf8');
+for(const asset of ['first-db-journey.css','db14-focused-journey.css','db14-focused-journey.js'])assert.ok(built.includes(asset));
+assert.equal((built.match(/data-db14-panel="/g)||[]).length,16);
+assert.match(built,/class="db14-original"/);
+console.log('DB-14 열여섯 장면·격리 DDL·원문 SQL·전후 결과·복원 경계 검사 통과');

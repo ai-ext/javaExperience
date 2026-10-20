@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderDb10FocusedJourney } from './db10-focused-journey.mjs';
+
+const root=new URL('../../',import.meta.url);
+const source=fs.readFileSync(new URL('scenario/db-query-journey/DB-10-performance-fixture.md',root),'utf8');
+const markup=renderDb10FocusedJourney(source);
+assert.deepEqual([...markup.matchAll(/data-db10-panel="([^"]+)"/g)].map((match)=>match[1]),['scenario','contract','prefix','baseline','create','after','same-result','evidence']);
+const first=markup.slice(markup.indexOf('data-db10-panel="scenario"'),markup.indexOf('data-db10-panel="contract"'));
+assert.match(first,/만들 것/);
+assert.match(first,/직접 확인할 것/);
+assert.doesNotMatch(first,/SHOW INDEX|CREATE INDEX|500,000|145|Using filesort/);
+const blocks=[...source.matchAll(/```sql\n([\s\S]*?)\n```/g)].map((match)=>match[1]);
+assert.equal(blocks.length,3);
+assert.ok(markup.includes(blocks[0]),'원문 핵심 SELECT는 그대로 보여야 한다');
+assert.match(markup,/CREATE INDEX ix_post_like_member_created\n    ON post_like \(member_id, created_at, id\);\nANALYZE TABLE post_like;/);
+assert.match(markup,/SHOW INDEX FROM post_like;/);
+assert.match(markup,/EXPLAIN ANALYZE/);
+assert.match(markup,/좋아요 ID 순서/);
+assert.equal((markup.match(/data-db10-record="/g)||[]).length,9);
+const built=fs.readFileSync(new URL('scenario/db-query-journey/DB-10-performance-fixture.html',root),'utf8');
+for(const asset of ['first-db-journey.css','db10-focused-journey.css','db10-focused-journey.js'])assert.ok(built.includes(asset));
+assert.equal((built.match(/data-db10-panel="/g)||[]).length,8);
+assert.match(built,/class="db10-original"/);
+console.log('DB-10 여덟 장면·원문 복합 인덱스·전후 조건·ID 비교 검사 통과');

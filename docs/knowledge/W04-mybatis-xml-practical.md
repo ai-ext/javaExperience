@@ -36,7 +36,7 @@ flowchart LR
   F --> G["resultType 또는 resultMap"]
 ~~~
 
-XML은 SQL 중심 리뷰가 쉽지만 경로·이름 규칙이 추가된다. annotation은 단순 SQL을 찾기 쉽지만 복잡한 <script>는 읽기 어렵다. 양쪽은 같은 statement 엔진을 쓰므로 근거 없이 속도 차이를 단정하지 않는다.
+XML은 SQL 중심 리뷰가 쉽지만 경로·이름 규칙이 추가된다. annotation은 단순 SQL을 찾기 쉽지만 복잡한 `<script>`는 읽기 어렵다. 양쪽은 같은 statement 엔진을 쓰므로 근거 없이 속도 차이를 단정하지 않는다.
 
 ### #{}와 ${}는 안전성 모델이 다르다
 
@@ -65,7 +65,7 @@ SqlSessionTemplate은 Spring 트랜잭션에 참여한다. 원자적 Mapper 호�
 | 선택지 | 어떻게 동작 | 장점 | 단점 | 언제 쓰나 | 국내 실무에서 흔한가(근거 있으면) |
 |---|---|---|---|---|---|
 | Mapper XML | 메서드와 namespace/id statement 연결 | 동적 SQL·조인·resultMap을 SQL 중심으로 리뷰 | 경로 오타가 런타임 오류가 될 수 있음 | 검색, 복합 조인, 공통 SQL | 국내 통계 미확인 |
-| Mapper annotation | @Select 등으로 인터페이스에 SQL 작성 | 단순 문장과 메서드가 가까움 | 복잡 <script>는 문자열 안에서 읽기 어려움 | 작은 CRUD, 고정 조건 | 국내 통계 미확인 |
+| Mapper annotation | @Select 등으로 인터페이스에 SQL 작성 | 단순 문장과 메서드가 가까움 | 복잡 `<script>`는 문자열 안에서 읽기 어려움 | 작은 CRUD, 고정 조건 | 국내 통계 미확인 |
 | #{} 바인딩 | PreparedStatement 값 파라미터 | 데이터와 SQL 문법 분리 | 식별자 변경 불가 | 거의 모든 입력값 | 공식 기본 방식 |
 | ${} 치환 | 문자열을 SQL 텍스트에 삽입 | 동적 컬럼·테이블 지원 | 외부 입력은 인젝션 위험 | 허용 목록 정렬 키 | 사용률 미확인 |
 | resultType/resultMap | 자동 이름 매핑/선언형 관계 매핑 | 간결/복합 관계가 명확 | resultMap 작성량과 오타 가능성 | 단순 행/조인 그래프 | 국내 통계 미확인 |

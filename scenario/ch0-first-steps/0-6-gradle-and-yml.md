@@ -6,6 +6,8 @@
 
 이 단계에서는 두 파일을 한 줄씩 읽는다. 그다음 `application.yml`에 내 설정 값을 넣고, 그 값을 코드로 읽어 돌려주는 API를 만든다. 의존성 한 줄, 설정 한 글자를 일부러 틀려서 어떤 에러가 나는지도 본다.
 
+**시작 전 실제 파일을 먼저 확인한다.** 아래 `build.gradle`과 `application.yml` 전문은 이 단계를 설명하는 **완성 예시**다. 저장소의 현재 연습용 파일에는 H2 의존성이 더 있거나, MySQL 포트·`ddl-auto` 값이 다르거나, `spring.application.name`이 빠져 있을 수 있다. 예시를 통째로 덮어쓰지 말고 `spring.application.name`, `spring.datasource.url`, `spring.jpa.hibernate.ddl-auto`를 실제 파일과 비교한다. 이 단계의 응답에 필요한 `spring.application.name: javaExperience`가 없다면 추가한다. MySQL로 실행한다면 URL 포트가 `compose.yaml`의 공개 포트와 일치해야 한다. 기존 학습 데이터를 지우는 DB 재설정은 이 실습의 일부가 아니다.
+
 ## 화면 시나리오
 
 사용자가 화면에서 무엇을 하면 어떤 요청이 서버로 가고, 서버·DB에서 무슨 일이 일어나 어떤 응답이 돌아와 화면이 어떻게 바뀌는지다. 흐름을 펼치면 사용자 행동부터 응답까지 차례대로 볼 수 있다.
@@ -52,6 +54,7 @@
 | 항목 | 내용 |
 |---|---|
 | 설정 | `application.yml` 맨 아래에 `start.greeting`=`반가워요, 백엔드!`, `start.max-items`=`5` |
+| 앱 이름 선행 확인 | `spring.application.name`이 `javaExperience`인지 확인하고, 없으면 추가한다 |
 | 메서드·경로 | `GET /api/start/config` |
 | 응답 | 상태 `200`, `{ "appName": "javaExperience", "greeting": "반가워요, 백엔드!", "maxItems": 5 }` |
 | 읽는 법 | `@Value("${설정 키}")`로 읽는다. `appName`은 이미 있는 `spring.application.name` |
@@ -60,7 +63,7 @@
 
 ### build.gradle 한 줄씩
 
-레포 맨 위의 `build.gradle`이다. **고치지 말고 읽기만 한다.**
+이 단계에서 읽을 `build.gradle`의 기준 예시다. 실제 파일에는 다른 연습용 의존성이 있을 수 있다. **지금은 고치지 말고 읽기만 한다.**
 
 ```groovy
 plugins {
@@ -132,7 +135,7 @@ tasks.named('test') {
 
 ### application.yml 한 줄씩
 
-`src/main/resources/application.yml`에 맨 아래 네 줄(25~28)을 **새로 더한다**. 나머지는 원래 있던 것이다.
+`src/main/resources/application.yml`에서 기존 `spring.application.name`을 먼저 확인하고, 없으면 추가한다. 그 뒤 맨 아래에 `start:` 묶음을 **새로 더한다**. 다음 전문은 이 장의 완성 예시이며, 나머지 설정이 실제 파일과 다르면 자신의 DB 실행 환경에 맞는 값을 유지한다.
 
 ```yaml
 spring:

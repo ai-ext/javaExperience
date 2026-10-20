@@ -16,7 +16,8 @@ JOIN post p
   ON p.id = l.post_id
 WHERE l.member_id = :memberId
   AND p.status = 'PUBLISHED'
-  AND p.deleted_at IS NULL</code></pre></div>
+  AND p.deleted_at IS NULL
+  AND p.visibility = 'PUBLIC'</code></pre></div>
   </section>
   <div class="versus" aria-hidden="true">비교</div>
   <section class="query-card exists">
@@ -28,6 +29,7 @@ WHERE l.member_id = :memberId
     WHERE p.id = l.post_id
       AND p.status = 'PUBLISHED'
       AND p.deleted_at IS NULL
+      AND p.visibility = 'PUBLIC'
   )</code></pre></div>
   </section>
 </div>

@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderInterfaceImplJourney } from './interface-impl-journey.mjs';
+
+const markup = renderInterfaceImplJourney();
+assert.deepEqual([...markup.matchAll(/data-reader-panel="([^"]+)"/g)].map((match) => match[1]),
+  ['scenario', 'contract', 'jpa', 'jdbc', 'bean-selection', 'two-beans', 'zero-beans', 'run-jpa', 'run-jdbc', 'public-404', 'invalid-id', 'db-proof', 'contract-test', 'unit-fake', 'extension']);
+const first = markup.slice(markup.indexOf('data-reader-panel="scenario"'), markup.indexOf('data-reader-panel="contract"'));
+assert.match(first, /만들 것/);
+assert.match(first, /보낼 것/);
+assert.doesNotMatch(first, /HTTP 200|404|400|@ConditionalOnProperty|SELECT/);
+assert.match(markup, /Optional&lt;PostSummary&gt; findPublic\(long id\)/);
+assert.match(markup, /PostSummaryService\(PostSummaryReader reader\)/);
+assert.match(markup, /JpaPostSummaryReader/);
+assert.match(markup, /JdbcPostSummaryReader/);
+assert.match(markup, /WHERE id = \?/);
+assert.match(markup, /deleted_at IS NULL/);
+assert.match(markup, /status = 'PUBLISHED'/);
+assert.match(markup, /visibility = 'PUBLIC'/);
+assert.match(markup, /후보 2개/);
+assert.match(markup, /후보 0개/);
+assert.match(markup, /앱 시작 실패/);
+assert.match(markup, /bootRun --args='--app\.post-summary\.reader=jpa'/);
+assert.match(markup, /bootRun --args='--app\.post-summary\.reader=jdbc'/);
+assert.match(markup, /SELECT id,title,status,visibility,deleted_at/);
+assert.match(markup, /Optional\.empty\(\)/);
+assert.match(markup, /boardSlug/);
+assert.equal((markup.match(/data-reader-command="/g) || []).length, 6);
+
+const root = new URL('../../', import.meta.url);
+const built = fs.readFileSync(new URL('scenario/labs/l16-interface-implementations/README.html', root), 'utf8');
+for (const asset of ['first-db-journey.css', 'interface-impl-journey.css', 'interface-impl-journey.js']) assert.ok(built.includes(asset), `asset missing: ${asset}`);
+assert.equal((built.match(/data-reader-panel="/g) || []).length, 15);
+assert.match(built, /class="reader-lab-original"/);
+const ddl = fs.readFileSync(new URL('docker/mysql/init/01-community.sql', root), 'utf8');
+assert.match(ddl, /\(2,2,3,'JPA 연관관계 매핑 정리'.*'PUBLISHED','PUBLIC'.*NULL\);/);
+assert.match(ddl, /\(6,4,3,.*'PUBLISHED','FOLLOWERS'/);
+assert.match(ddl, /\(7,4,4,.*'DRAFT','PUBLIC'/);
+assert.match(ddl, /\(8,4,3,.*'PUBLISHED','PUBLIC'.*'2026-09-24 09:00:00'\);/);
+assert.match(ddl, /\(10,4,4,.*'HIDDEN','PUBLIC'/);
+console.log('L16 15장면·JPA/JDBC 계약·seed 경계·원문 보존 검사 통과');

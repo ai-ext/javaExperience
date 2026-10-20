@@ -4,19 +4,64 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DB-10. 좋아요 조회를 EXPLAIN으로 개선하기</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=c65755111d62">
+<link rel="stylesheet" href="../../tools/site/site.css?v=53f71b596d04">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+<link rel="stylesheet" href="../../tools/site/first-db-journey.css?v=7410d282ba16">
+<link rel="stylesheet" href="../../tools/site/db10-focused-journey.css?v=0424848a6ecf">
 </head>
-<body>
-<header class="topbar"><a href="../../index.html">javaExperience</a><a href="../README.html">시나리오</a><a href="../../practice/MISSIONS.html">학습용 미션</a><a href="../../docs/knowledge/README.html">공부자료</a></header>
+<body class="db10-focused-page">
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../README.html" aria-current="page">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
 <main>
 
-<h1 id="db-10-좋아요-조회를-explain으로-개선하기"><a class="anchor" href="#db-10-좋아요-조회를-explain으로-개선하기" aria-hidden="true">#</a>DB-10. 좋아요 조회를 EXPLAIN으로 개선하기</h1>
+<h1 id="db-10-좋아요-조회를-explain으로-개선하기"><a class="anchor" href="#db-10-좋아요-조회를-explain으로-개선하기" aria-hidden="true">#</a>DB-10. 좋아요 조회를 EXPLAIN으로 개선하기</h1><section class="first-db-journey db10-focused" data-db10-screen="scenario" aria-label="DB-10 복합 인덱스 설계와 비교">
+    <nav class="db10-progress" aria-label="DB-10 학습 장면"><button type="button" data-db10-go="scenario" aria-current="step"><b>01</b><span>상황</span></button><button type="button" data-db10-go="contract" aria-current="false"><b>02</b><span>조회 조건</span></button><button type="button" data-db10-go="prefix" aria-current="false"><b>03</b><span>열 순서</span></button><button type="button" data-db10-go="baseline" aria-current="false"><b>04</b><span>변경 전</span></button><button type="button" data-db10-go="create" aria-current="false"><b>05</b><span>인덱스 추가</span></button><button type="button" data-db10-go="after" aria-current="false"><b>06</b><span>변경 후</span></button><button type="button" data-db10-go="same-result" aria-current="false"><b>07</b><span>결과 동일</span></button><button type="button" data-db10-go="evidence" aria-current="false"><b>08</b><span>근거</span></button></nav>
+    <article class="db-journey-screen db10-screen" data-db10-panel="scenario" aria-labelledby="db10-scenario-title"><p class="db-journey-kicker">DB-10 · 같은 답을 더 적은 작업으로</p><h2 id="db10-scenario-title">“좋아요 목록의 회원 조건과 최신순 정렬을 함께 살펴보고 싶어요.”</h2><p class="db-journey-lead">한 번에 인덱스 설계와 전후 검증만 합니다.</p><div class="db10-two"><div><small>만들 것</small><strong>(member_id, created_at, id) 복합 인덱스</strong></div><div><small>직접 확인할 것</small><strong>전후 계획과 좋아요 ID 순서</strong></div></div><p class="db10-note">이 실습은 격리된 <code>javaexperience_perf</code>의 <code>post_like</code> 핵심 조회입니다. 앱 API 전체의 측정값은 아닙니다.</p><footer class="db-journey-actions db10-actions"><button type="button" class="db-journey-back" data-db10-go="scenario" disabled>← 이전</button><span>1 / 8</span><button type="button" class="db-journey-next" data-db10-go="contract">조회 조건 →</button></footer></article>
+    <article class="db-journey-screen db10-screen" data-db10-panel="contract" hidden aria-labelledby="db10-contract-title"><p class="db-journey-kicker">DB-10 · 조회가 요구하는 순서</p><h2 id="db10-contract-title">회원으로 좁히고 최신순으로 읽습니다.</h2><p class="db-journey-lead">GET /api/me/likes?size=10의 핵심 읽기는 size+1인 11행을 요청합니다.</p><div class="db10-flow"><span><small>WHERE</small><strong>member_id = 12</strong></span><b>→</b><span><small>ORDER BY</small><strong>created_at DESC · id DESC</strong></span><b>→</b><span><small>LIMIT</small><strong>11</strong></span></div><div class="db10-code"><header><strong>DB-10 원문 핵심 SELECT</strong><span>읽기 전용 · 직접 실행</span></header><pre><code data-db10-code="select">SELECT l.id, l.post_id, l.created_at
+FROM post_like AS l
+WHERE l.member_id = 12
+ORDER BY l.created_at DESC, l.id DESC
+LIMIT 11;</code></pre><button type="button" data-db10-copy="select">복사</button><p data-db10-copy-state="select" role="status" aria-live="polite"></p></div><p class="db10-note">전체 API의 권한 JOIN과 응답 DTO는 이 fixture 쿼리의 범위 밖입니다.</p><footer class="db-journey-actions db10-actions"><button type="button" class="db-journey-back" data-db10-go="scenario">← 이전</button><span>2 / 8</span><button type="button" class="db-journey-next" data-db10-go="prefix">열 순서 →</button></footer></article>
+    <article class="db-journey-screen db10-screen" data-db10-panel="prefix" hidden aria-labelledby="db10-prefix-title"><p class="db-journey-kicker">DB-10 · 왼쪽부터</p><h2 id="db10-prefix-title">왜 member_id가 인덱스의 첫 열일까요?</h2><p class="db-journey-lead">회원 조건으로 탐색 범위를 좁히고, 뒤의 두 정렬 열을 함께 고려합니다.</p><div class="db10-index"><div><small>01 · WHERE</small><strong>member_id</strong></div><div><small>02 · 정렬</small><strong>created_at</strong></div><div><small>03 · 동률 정렬</small><strong>id</strong></div></div><div class="db10-prefix"><span>왼쪽 접두사: (member_id)</span><span>(member_id, created_at)</span><span>전체 키: (member_id, created_at, id)</span></div><p class="db10-note">인덱스를 만들었다고 항상 선택되는 것은 아닙니다. 실제 <code>key</code>와 정렬 단계는 내 EXPLAIN에서 확인합니다.</p><footer class="db-journey-actions db10-actions"><button type="button" class="db-journey-back" data-db10-go="contract">← 이전</button><span>3 / 8</span><button type="button" class="db-journey-next" data-db10-go="baseline">변경 전 →</button></footer></article>
+    <article class="db-journey-screen db10-screen" data-db10-panel="baseline" hidden aria-labelledby="db10-baseline-title"><p class="db-journey-kicker">DB-10 · 먼저 기록</p><h2 id="db10-baseline-title">변경 전 계획과 실제 실행 트리를 저장하세요.</h2><p class="db-journey-lead">데이터·회원·정렬·LIMIT을 고정하고 지금 상태를 기준선으로 둡니다.</p><div class="db10-code"><header><strong>변경 전 EXPLAIN</strong><span>읽기 전용 · 직접 실행</span></header><pre><code data-db10-code="before-explain">EXPLAIN
+SELECT l.id, l.post_id, l.created_at
+FROM post_like AS l
+WHERE l.member_id = 12
+ORDER BY l.created_at DESC, l.id DESC
+LIMIT 11;</code></pre><button type="button" data-db10-copy="before-explain">복사</button><p data-db10-copy-state="before-explain" role="status" aria-live="polite"></p></div><details class="db10-more-sql"><summary>변경 전 EXPLAIN ANALYZE · 실제 SELECT 실행</summary><div class="db10-code"><header><strong>DB-09와 같은 읽기 SELECT</strong><span>읽기 전용 · 직접 실행</span></header><pre><code data-db10-code="before-analyze">EXPLAIN ANALYZE
+SELECT l.id, l.post_id, l.created_at
+FROM post_like AS l
+WHERE l.member_id = 12
+ORDER BY l.created_at DESC, l.id DESC
+LIMIT 11;</code></pre><button type="button" data-db10-copy="before-analyze">복사</button><p data-db10-copy-state="before-analyze" role="status" aria-live="polite"></p></div></details><div class="db10-two db10-observe"><label class="db10-field"><strong>변경 전 계획</strong><small>key · rows · Extra</small><textarea data-db10-record="before-plan" rows="2" placeholder="내 실제 실행 결과를 기록하세요"></textarea></label><label class="db10-field"><strong>변경 전 실제 실행</strong><small>노드별 actual rows · loops · actual time</small><textarea data-db10-record="before-tree" rows="2" placeholder="내 실제 실행 결과를 기록하세요"></textarea></label></div><p class="db10-note"><code>EXPLAIN ANALYZE</code>는 SELECT를 실제 실행합니다. <a href="DB-09-explain-analyze.html">DB-09</a>에서 실행 범위를 먼저 확인하세요.</p><footer class="db-journey-actions db10-actions"><button type="button" class="db-journey-back" data-db10-go="prefix">← 이전</button><span>4 / 8</span><button type="button" class="db-journey-next" data-db10-go="create">인덱스 추가 →</button></footer></article>
+    <article class="db-journey-screen db10-screen" data-db10-panel="create" hidden aria-labelledby="db10-create-title"><p class="db-journey-kicker">DB-10 · 전용 fixture 변경</p><h2 id="db10-create-title">회원 조건과 정렬 열을 한 인덱스에 놓습니다.</h2><p class="db-journey-lead">현재 <code>SHOW INDEX FROM post_like;</code>를 확인하고 인덱스가 없다면 생성하세요.</p><div class="db10-code"><header><strong>먼저 현재 인덱스 확인</strong><span>읽기 전용 · 직접 실행</span></header><pre><code data-db10-code="show-index">SHOW INDEX FROM post_like;</code></pre><button type="button" data-db10-copy="show-index">복사</button><p data-db10-copy-state="show-index" role="status" aria-live="polite"></p></div><div class="db10-code"><header><strong>원문 CREATE INDEX + 통계 갱신</strong><span>전용 fixture에서만 실행</span></header><pre><code data-db10-code="create">CREATE INDEX ix_post_like_member_created
+    ON post_like (member_id, created_at, id);
+ANALYZE TABLE post_like;</code></pre><button type="button" data-db10-copy="create">복사</button><p data-db10-copy-state="create" role="status" aria-live="polite"></p></div><div class="db10-stat"><strong>ANALYZE TABLE post_like</strong><span>테이블 통계 갱신입니다. SELECT를 실제 실행하는 EXPLAIN ANALYZE와 다릅니다.</span></div><p class="db10-note">이미 같은 이름의 인덱스가 있다면 다시 만들지 않습니다. 전용 <code>javaexperience_perf</code>에서만 실행합니다.</p><footer class="db-journey-actions db10-actions"><button type="button" class="db-journey-back" data-db10-go="baseline">← 이전</button><span>5 / 8</span><button type="button" class="db-journey-next" data-db10-go="after">변경 후 →</button></footer></article>
+    <article class="db-journey-screen db10-screen" data-db10-panel="after" hidden aria-labelledby="db10-after-title"><p class="db-journey-kicker">DB-10 · 같은 조회를 다시</p><h2 id="db10-after-title">변경 후에도 정확히 같은 SELECT를 실행합니다.</h2><p class="db-journey-lead">내 계획의 key·rows·Extra와 실제 TREE 노드가 어떻게 달라졌는지 기록하세요.</p><div class="db10-code"><header><strong>변경 후 EXPLAIN</strong><span>읽기 전용 · 직접 실행</span></header><pre><code data-db10-code="after-explain">EXPLAIN
+SELECT l.id, l.post_id, l.created_at
+FROM post_like AS l
+WHERE l.member_id = 12
+ORDER BY l.created_at DESC, l.id DESC
+LIMIT 11;</code></pre><button type="button" data-db10-copy="after-explain">복사</button><p data-db10-copy-state="after-explain" role="status" aria-live="polite"></p></div><details class="db10-more-sql"><summary>변경 후 EXPLAIN ANALYZE · 실제 SELECT 실행</summary><div class="db10-code"><header><strong>같은 읽기 SELECT</strong><span>읽기 전용 · 직접 실행</span></header><pre><code data-db10-code="after-analyze">EXPLAIN ANALYZE
+SELECT l.id, l.post_id, l.created_at
+FROM post_like AS l
+WHERE l.member_id = 12
+ORDER BY l.created_at DESC, l.id DESC
+LIMIT 11;</code></pre><button type="button" data-db10-copy="after-analyze">복사</button><p data-db10-copy-state="after-analyze" role="status" aria-live="polite"></p></div></details><div class="db10-two db10-observe"><label class="db10-field"><strong>변경 후 계획</strong><small>key · rows · Extra</small><textarea data-db10-record="after-plan" rows="2" placeholder="내 실제 실행 결과를 기록하세요"></textarea></label><label class="db10-field"><strong>변경 후 실제 실행</strong><small>노드별 actual rows · loops · actual time</small><textarea data-db10-record="after-tree" rows="2" placeholder="내 실제 실행 결과를 기록하세요"></textarea></label></div><p class="db10-note">복합 인덱스 선택·정렬 처리·실제 작업량은 환경에 따라 달라집니다. 이 화면은 결과를 미리 채우지 않습니다.</p><footer class="db-journey-actions db10-actions"><button type="button" class="db-journey-back" data-db10-go="create">← 이전</button><span>6 / 8</span><button type="button" class="db-journey-next" data-db10-go="same-result">결과 동일 →</button></footer></article>
+    <article class="db-journey-screen db10-screen" data-db10-panel="same-result" hidden aria-labelledby="db10-same-result-title"><p class="db-journey-kicker">DB-10 · 빠르더라도 같은 답</p><h2 id="db10-same-result-title">조회 결과의 ID와 순서가 그대로인가요?</h2><p class="db-journey-lead">인덱스 전후에 같은 SELECT를 별도로 실행해 좋아요 ID를 순서대로 기록합니다.</p><div class="db10-two db10-observe"><label class="db10-field"><strong>변경 전 좋아요 ID 순서</strong><small>같은 데이터·회원·정렬·LIMIT의 SELECT 결과</small><textarea data-db10-record="before-ids" rows="2" placeholder="내 실제 실행 결과를 기록하세요"></textarea></label><label class="db10-field"><strong>변경 후 좋아요 ID 순서</strong><small>같은 SELECT 결과의 ID를 같은 형식으로 기록</small><textarea data-db10-record="after-ids" rows="2" placeholder="내 실제 실행 결과를 기록하세요"></textarea></label></div><p class="db10-status" data-db10-compare-status role="status" aria-live="polite">전후 ID를 실제 실행해 기록하세요.</p><p class="db10-note">입력한 기록만 비교합니다. 서버나 DB 쿼리를 자동 실행하지 않습니다.</p><footer class="db-journey-actions db10-actions"><button type="button" class="db-journey-back" data-db10-go="after">← 이전</button><span>7 / 8</span><button type="button" class="db-journey-next" data-db10-go="evidence">근거 →</button></footer></article>
+    <article class="db-journey-screen db10-screen" data-db10-panel="evidence" hidden aria-labelledby="db10-evidence-title"><p class="db-journey-kicker">DB-10 · 개선 근거</p><h2 id="db10-evidence-title">무엇이 달라졌는지 세 갈래로 설명합니다.</h2><p class="db-journey-lead">결과가 같고 계획·작업량이 실제로 달라졌을 때만 근거를 세웁니다.</p><div class="db10-three"><label class="db10-field"><strong>결과 동일</strong><small>ID와 순서의 대조</small><textarea data-db10-record="same-proof" rows="2" placeholder="내 실제 실행 결과를 기록하세요"></textarea></label><label class="db10-field"><strong>계획 변화</strong><small>선택 key·정렬 처리·예상 rows</small><textarea data-db10-record="plan-proof" rows="2" placeholder="내 실제 실행 결과를 기록하세요"></textarea></label><label class="db10-field"><strong>실제 작업량</strong><small>노드별 actual rows·loops와 반복 측정</small><textarea data-db10-record="work-proof" rows="2" placeholder="내 실제 실행 결과를 기록하세요"></textarea></label></div><p class="db10-note">한 번의 시간 차이나 작은 표본만으로 성능 향상을 단정하지 않습니다. 다음 단계에서 인덱스를 숨기고 복원해 봅니다.</p><footer class="db-journey-actions db10-actions"><button type="button" class="db-journey-back" data-db10-go="same-result">← 이전</button><span>8 / 8</span><a class="db-journey-next" href="DB-11-index-lifecycle.html">다음 · 인덱스 복원과 가시성 →</a></footer></article>
+    <details class="db-journey-reference"><summary>장면별 이미지 시안 8장 보기</summary><a href="../../docs/design/mockups-2026-10-16-batch31/01-scenario.png">01-scenario</a><a href="../../docs/design/mockups-2026-10-16-batch31/02-query-contract.png">02-query-contract</a><a href="../../docs/design/mockups-2026-10-16-batch31/03-left-prefix.png">03-left-prefix</a><a href="../../docs/design/mockups-2026-10-16-batch31/04-before-plan.png">04-before-plan</a><a href="../../docs/design/mockups-2026-10-16-batch31/05-create-index.png">05-create-index</a><a href="../../docs/design/mockups-2026-10-16-batch31/06-after-plan.png">06-after-plan</a><a href="../../docs/design/mockups-2026-10-16-batch31/07-same-result.png">07-same-result</a><a href="../../docs/design/mockups-2026-10-16-batch31/08-evidence.png">08-evidence</a></details>
+  </section><details class="db10-original" id="db10-original"><summary>원문 전체 · fixture·전후 SQL·복원 절차 펼치기</summary>
 <p>이 실습은 <code>GET /api/me/likes</code>에서 사용하는 정렬 조건을 작은 독립 데이터베이스로 살펴본다. 앱 전체의 권한 JOIN을 재현하는 실습은 아니며, <code>post_like</code>의 회원별 탐색과 최신순 정렬에 초점을 둔다. 기존 <code>practice</code> 데이터와 채점값은 사용하거나 변경하지 않는다.</p>
+<p>이번 단계의 첫 목표는 <code>(member_id, created_at, id)</code> 열 순서를 설계하고 같은 SELECT의 전후 계획·결과 ID 순서를 비교하는 것이다. 인덱스의 <code>INVISIBLE</code>·<code>VISIBLE</code>·<code>DROP</code> 생명주기는 <a href="DB-11-index-lifecycle.html">DB-11</a>에서 별도 실습한다.</p>
 <h2 id="1-격리된-mysql-84-준비"><a class="anchor" href="#1-격리된-mysql-84-준비" aria-hidden="true">#</a>1. 격리된 MySQL 8.4 준비</h2>
 <p>저장소 루트에서 실행한다.</p>
 <pre><code class="language-bash">tools/db-perf-fixture.sh up</code></pre>
 <p>스크립트는 MySQL 8.4 컨테이너 하나를 <code>127.0.0.1:13319</code>에 띄우고 <code>javaexperience_perf</code> DB에 기본 500,000개의 좋아요 행을 만든다. 게시판·회원·게시글·댓글·태그 테이블도 함께 생성하며 FK와 좋아요 중복 방지 제약을 둔다. <code>compose.yaml</code>, <code>mysql-data</code>, <code>practice</code>의 데이터와 설정을 변경하지 않는다. 컨테이너가 이미 실행 중이면 <code>up</code>은 데이터를 다시 만들지 않는다.</p>
+<p>재실행할 때는 <code>SHOW INDEX FROM post_like;</code>로 현재 인덱스부터 확인한다. 앞선 실습에서 <code>ix_post_like_member_created</code>를 이미 만들었다면 <code>CREATE INDEX</code>를 다시 실행하지 않는다. 변경 전 계획을 새로 관찰하려면 <a href="DB-11-index-lifecycle.html">DB-11의 복원 절차</a>를 먼저 읽는다.</p>
 <pre><code class="language-bash"># 선택 환경변수
 PERF_DB_PORT=13319 PERF_ROW_COUNT=500000 tools/db-perf-fixture.sh up
 
@@ -100,9 +145,12 @@ ANALYZE TABLE post_like;</code></pre>
 <li>실습이 끝나면 <code>tools/db-perf-fixture.sh down</code>으로 전용 컨테이너를 제거한다. 이 컨테이너에는 호스트 디렉터리나 compose named volume을 연결하지 않았다.</li>
 </ul>
 <p>전용 fixture는 <code>9-2-index-explain.md</code>의 전체 API/JPA/MyBatis JOIN 쿼리와 분리된 측정용 테이블이다. 실제 앱 쿼리의 최종 계획은 9-2의 <code>post_like</code>와 <code>post</code> JOIN에서도 별도로 확인한다.</p>
-
+</details>
 
 </main>
+
+<script src="../../tools/site/db10-focused-journey.js?v=9369b81e8e3a" defer></script>
+
 
 
 </body>

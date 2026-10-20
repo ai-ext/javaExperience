@@ -2,7 +2,7 @@ const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, 
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 const story = [
-  { step: '01', method: 'POST', label: '게시글 작성', detail: '새 글을 저장하고 id를 받는다', stage: '1-1' },
+  { step: '01', method: 'POST', label: '게시글 저장', detail: '1-2에서 저장하고 새 id를 받는다', stage: '1-2' },
   { step: '02', method: 'GET', label: '게시글 조회', detail: '같은 id로 저장 결과를 읽는다', stage: '2-1' },
   { step: '03', method: 'PATCH', label: '게시글 수정', detail: '작성한 글의 일부를 바꾼다', stage: '3-1' },
   { step: '04', method: 'PUT', label: '좋아요', detail: '그 글에 회원의 반응을 남긴다', stage: '4-1' },
@@ -46,6 +46,9 @@ export function renderLearningJourney(manifest, catalog, levelHref) {
     return { project, groups };
   });
   const routesCount = catalog.projects.reduce((total, project) => total + project.routes.length, 0);
+  const firstJavaHref = levelHref('0-1');
+  const firstPostHref = levelHref('1-1');
+  if (!firstJavaHref || !firstPostHref) throw new Error('처음 시작할 0-1·1-1 단계 링크가 없다');
   const gradeOrder = ['basic', 'intermediate', 'advanced'];
   const gradeLabels = { basic: '기초', intermediate: '중급', advanced: '고급' };
   const gradeCounts = Object.fromEntries(gradeOrder.map((grade) => [grade,
@@ -102,10 +105,11 @@ export function renderLearningJourney(manifest, catalog, levelHref) {
     return `<section class="journey-project" aria-label="${esc(project.label)}"><h4>${esc(project.label)}</h4><p>${esc(project.description || '')}</p>${features}</section>`;
   }).join('');
   return `<section class="learning-journey" aria-labelledby="journey-title">
+    <section class="journey-entry" aria-labelledby="journey-entry-title"><div><p class="journey-eyebrow">START · 첫 실습</p><h2 id="journey-entry-title">처음이면 작은 API 하나부터 만드세요</h2><p>0-1에서 Java와 요청을 익힙니다. 이미 익숙하면 1-1의 <code>success</code> 응답부터 시작하세요. DB 조회는 별도 SQL 경로로 연습할 수 있습니다.</p></div><nav aria-label="첫 실습 선택"><a class="journey-entry-primary" href="${esc(firstJavaHref)}">0-1 첫 API 만들기 →</a><a href="${esc(firstPostHref)}">1-1 게시글 요청부터 →</a><a href="db-query-journey/db-01-response-to-query.html">DB-01 SQL부터 →</a></nav></section>
     <div class="journey-dashboard">
       <aside class="journey-learning-nav" aria-label="학습 경로 탐색"><a class="journey-nav-brand" href="../index.html"><span aria-hidden="true">⌘</span><span><b>학습 경로</b><small>게시판 API를 단계별로 만들어요</small></span></a><div class="journey-grade-nav" aria-label="난이도별 단계">${gradeNav}</div><nav class="journey-chapter-nav" aria-label="장별 학습 경로">${chapterNav}</nav><a class="journey-nav-all" href="#visual-catalog">전체 ${count}단계 시안 보기 <span aria-hidden="true">→</span></a></aside>
       <div class="journey-workspace">
-        <header class="journey-page-heading"><div><p class="journey-eyebrow">${chapters.length}개의 기능 묶음 · ${routesCount}개의 API 경로</p><h2 id="journey-title">하나의 게시글이 이어지는 API 여정</h2><p>작성 응답의 <code>id</code>를 받아 조회하고, 같은 글에 수정과 반응을 이어 붙입니다.</p></div><a href="#journey-all-apis">API 찾아보기 <span aria-hidden="true">↗</span></a></header>
+        <header class="journey-page-heading"><div><p class="journey-eyebrow">${chapters.length}개의 기능 묶음 · ${routesCount}개의 API 경로</p><h2 id="journey-title">하나의 게시글이 이어지는 API 여정</h2><p>1-1은 <code>success</code>만 응답하고 DB에 저장하지 않습니다. 1-2에서 받은 새 <code>id</code>로 조회·수정·반응을 이어갑니다.</p></div><a href="#journey-all-apis">API 찾아보기 <span aria-hidden="true">↗</span></a></header>
         <div class="journey-workbench"><section class="journey-story-panel" aria-labelledby="journey-story-title"><div class="journey-story-head"><div><p class="journey-eyebrow">ONE POST · MANY FEATURES</p><h3 id="journey-story-title">한 게시글로 이어지는 기능</h3></div><a href="#journey-all-apis">전체 API 보기 ↓</a></div><div class="journey-flow-canvas"><div class="journey-create-node">${storyItems[0]}</div><span class="journey-flow-bridge" aria-hidden="true"><i></i></span><article class="journey-post" aria-label="여러 API가 함께 다루는 게시글"><span class="journey-post-top">POST RESPONSE · 201 CREATED</span><strong>나의 첫 Spring 게시글</strong><p><code>id</code>가 생기면 다음 API의 <code>/posts/{id}</code>에서 다시 사용합니다.</p><div><span>♡ 좋아요</span><span>▤ 댓글</span><span>♧ 북마크</span></div><b class="journey-post-id">postId: 응답에서 받기</b></article><div class="journey-branch-label">같은 글에 연결되는 API</div><div class="journey-story">${storyItems.slice(1).join('')}</div></div></section>
           <aside class="journey-architecture-panel" aria-label="요청이 처리되는 서버 흐름"><div class="journey-architecture-head"><span aria-hidden="true">▣</span><div><p class="journey-eyebrow">API REQUEST FLOW</p><h3>요청 흐름 미리보기</h3></div><span class="journey-architecture-method">POST</span></div><p class="journey-architecture-caption">계층별로 담당하는 일을 눈으로 따라가 보세요.</p><ol class="journey-architecture"><li class="flow-client"><b>① Browser · Postman</b><small>HTTP 요청과 JSON 본문을 보냅니다.</small></li><li class="flow-controller"><b>② Controller</b><small>경로와 입력값을 확인하고 호출합니다.</small></li><li class="flow-dto"><b>③ Request DTO</b><small>요청 JSON을 Java 객체로 받습니다.</small></li><li class="flow-service"><b>④ Service</b><small>게시글 규칙과 트랜잭션을 처리합니다.</small></li><li class="flow-repository"><b>⑤ Repository · JPA</b><small>엔티티를 저장하도록 DB에 요청합니다.</small></li><li class="flow-mysql"><b>⑥ MySQL</b><small>테이블에 게시글을 기록합니다.</small></li></ol><div class="journey-db-client"><span class="journey-db-client-icon" aria-hidden="true">⌕</span><span><b>DBeaver</b><small>SQL로 DB에 직접 연결해 저장 결과를 확인합니다.</small></span><span class="journey-db-direct">↗ MySQL 직접 연결</span></div><p class="journey-architecture-foot">실제 API를 호출하면 시나리오 화면에서 응답 결과와 흐름을 확인할 수 있습니다.</p></aside></div>
         <section class="journey-concept-section" aria-label="백엔드 용어 지도"><div class="journey-concept-heading"><div><p class="journey-eyebrow">BACKEND TERM MAP</p><h3>도구와 개념을 제자리에 놓아보기</h3></div><p>Browser·Postman은 API를 호출하고, DBeaver는 MySQL에 직접 연결합니다. 카드를 눌러 각 개념을 더 살펴보세요.</p></div><div class="journey-concepts">${conceptMarkup}</div></section>
