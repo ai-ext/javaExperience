@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderDb05FocusedJourney } from './db05-focused-journey.mjs';
+
+const root = new URL('../../', import.meta.url);
+const source = fs.readFileSync(new URL('scenario/db-query-journey/db-05-aggregate-fanout.md', root), 'utf8');
+const markup = renderDb05FocusedJourney(source);
+assert.deepEqual([...markup.matchAll(/data-db05-panel="([^"]+)"/g)].map((match) => match[1]),
+  ['scenario', 'inputs', 'fanout', 'wrong-count', 'scratch', 'preaggregate', 'm6', 'm9', 'debug']);
+const first = markup.slice(markup.indexOf('data-db05-panel="scenario"'), markup.indexOf('data-db05-panel="inputs"'));
+assert.match(first, /만들 것/);
+assert.match(first, /직접 할 것/);
+assert.doesNotMatch(first, /2×3|COUNT\(|like 41|comment 71|SQL 복사/);
+for (const pair of ['41 × 71', '41 × 72', '41 × 73', '42 × 71', '42 × 72', '42 × 73']) assert.ok(markup.includes(pair));
+assert.match(markup, /COUNT\(pl\.id\) = 6/);
+assert.match(markup, /COUNT\(c\.id\) = 6/);
+assert.match(markup, /좋아요 = 2/);
+assert.match(markup, /댓글 = 3/);
+const scratch = source.match(/<!-- DB05_SYNTHETIC_SQL -->\s*```sql\n([\s\S]*?)\n```/)?.[1];
+assert.ok(scratch);
+assert.ok(markup.includes(scratch), '새 합성 SQL은 원문에서 그대로 가져와야 한다');
+for (const key of ['scratch', 'safe', 'm6']) assert.match(markup, new RegExp(`data-db05-sql="${key}"`));
+assert.match(markup, /sample_likes/);
+assert.match(markup, /sample_comments/);
+assert.match(markup, /COALESCE\(NULL, 0\)/);
+assert.match(markup, /likes_in_period × 3 \+ comments_in_period/);
+assert.match(markup, /M9-1 기대 계약 · 회원 30/);
+assert.match(markup, /COUNT\(DISTINCT \.\.\.\)/);
+const built = fs.readFileSync(new URL('scenario/db-query-journey/db-05-aggregate-fanout.html', root), 'utf8');
+for (const asset of ['first-db-journey.css', 'db05-focused-journey.css', 'db05-focused-journey.js']) assert.ok(built.includes(asset));
+assert.equal((built.match(/data-db05-panel="/g) || []).length, 9);
+assert.match(built, /class="db05-original"/);
+assert.match(built, /미션과 연결/);
+console.log('DB-05 아홉 장면·합성 CTE·원문 집계·M6/M9 경계 검사 통과');

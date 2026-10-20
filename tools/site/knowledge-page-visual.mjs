@@ -1,3 +1,9 @@
+import { renderJpaFocused } from './jpa-focused.mjs';
+import { renderMybatisFocused } from './mybatis-focused.mjs';
+import { renderTxWhyFocused } from './tx-why-focused.mjs';
+import { renderTxLifecycleFocused } from './tx-lifecycle-focused.mjs';
+import { renderEventScenes, renderCacheScenes, renderAuthScenes } from './concept-scenes.mjs';
+
 const ESCAPE = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ESCAPE[ch]);
 const textOnly = (html) => html.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
@@ -19,9 +25,13 @@ export function renderKnowledgePageVisual(abs, html) {
   if (!headings.length) return '';
   const [group, description] = GROUPS[id[0]] || ['Backend knowledge', '백엔드 공부자료'];
   const steps = headings.map((heading, index) => `<a class="knowledge-page-step" href="#${esc(heading.id)}"><span class="knowledge-page-step-no">${String(index + 1).padStart(2, '0')}</span><span>${esc(heading.label)}</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a>`).join('');
-  const concept = renderJpaConcept(id);
+  const concept = id === 'S09'
+    ? renderJpaFocused() + `<details class="jpa-focus-deep"><summary>객체·스냅샷·SQL·DB 전체 시뮬레이션 펼치기</summary>${renderJpaConcept(id)}</details>`
+    : id === 'W04' ? renderMybatisFocused() : id === 'W11' ? renderTxWhyFocused() : id === 'S08' ? renderTxLifecycleFocused()
+      : id === 'S14' ? renderEventScenes() : id === 'W23' ? renderCacheScenes() : id === 'S12' ? renderAuthScenes() : renderJpaConcept(id);
   const entityTable = id === 'P20' ? renderP20EntityTable() : '';
-  return `${entityTable}${concept}<section class="knowledge-page-map" aria-label="문서 읽기 지도"><div class="knowledge-page-map-head"><div><p class="knowledge-page-map-kicker">${esc(group)} <span>· ${esc(id)}</span></p><h2>이 문서에서 볼 내용</h2><p>${esc(description)}</p></div><span class="knowledge-page-map-count">${headings.length}개 주제</span></div><nav class="knowledge-page-steps" aria-label="문서의 실제 절로 이동">${steps}</nav></section>`;
+  const map = `<section class="knowledge-page-map" aria-label="문서 읽기 지도"><div class="knowledge-page-map-head"><div><p class="knowledge-page-map-kicker">${esc(group)} <span>· ${esc(id)}</span></p><h2>이 문서에서 볼 내용</h2><p>${esc(description)}</p></div><span class="knowledge-page-map-count">${headings.length}개 주제</span></div><nav class="knowledge-page-steps" aria-label="문서의 실제 절로 이동">${steps}</nav></section>`;
+  return `${entityTable}${concept}${id === 'S09' ? `<details class="jpa-focus-deep"><summary>원문 절 목록 보기</summary>${map}</details>` : id === 'W04' ? `<details class="mybatis-focus-deep"><summary>원문 절 목록 보기</summary>${map}</details>` : id === 'W11' ? `<details class="tx-why-map"><summary>원문 절 목록 보기</summary>${map}</details>` : id === 'S08' ? `<details class="tx-life-map"><summary>원문 절 목록 보기</summary>${map}</details>` : ['S14', 'W23', 'S12'].includes(id) ? `<details class="concept-original-map"><summary>원문 절 목록 보기</summary>${map}</details>` : map}`;
 }
 
 /** 원문의 제목과 코드를 보존하면서 공부자료 본문을 순서대로 펼쳐 읽게 한다. */

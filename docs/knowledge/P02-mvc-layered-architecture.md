@@ -1,5 +1,83 @@
 # P02. MVC 패턴과 계층형 구조 — Controller·Service·Repository
 
+<section class="p02-visual" aria-labelledby="p02-visual-title">
+  <div class="p02-visual-heading">
+    <p class="p02-kicker">01 · 한 게시글로 보는 MVC</p>
+    <div class="p02-visual-title" id="p02-visual-title" role="heading" aria-level="2">MVC는 무엇을 나누는 걸까요?</div>
+    <p>같은 게시글도 <strong>데이터</strong>, <strong>보이는 모습</strong>, <strong>사용자 행동</strong>은 서로 다른 역할입니다.</p>
+    <p class="p02-example-note">게시글·작성자·숫자와 PATCH 경로는 모두 역할 설명용 예시입니다. 실제 API 계약이나 DB 조회 결과가 아닙니다.</p>
+  </div>
+  <div class="p02-post-scene" aria-label="게시글 데이터와 화면, 수정 요청을 각 MVC 역할에 연결한 예시">
+    <article class="p02-role p02-model">
+      <span class="p02-role-index">01</span>
+      <h3>Model</h3>
+      <p>화면에 보여줄 게시글 데이터와 상태</p>
+      <pre><code>{
+  "title": "첫 글",
+  "author": "김자바"
+}</code></pre>
+    </article>
+    <article class="p02-post-card">
+      <div class="p02-post-meta"><span>자바 이야기</span><span>예시 데이터</span></div>
+      <h3>첫 글</h3>
+      <p class="p02-author">김자바 · 2026. 10. 15.</p>
+      <p class="p02-post-body">Spring MVC의 역할을 데이터와 화면으로 나눠 봅니다.</p>
+      <div class="p02-post-actions"><span>♡ 5</span><span>댓글 2</span><span class="p02-edit-action">수정 요청 →</span></div>
+    </article>
+    <div class="p02-role-stack">
+      <article class="p02-role p02-controller">
+        <span class="p02-role-index">02</span>
+        <h3>Controller</h3>
+        <p>HTTP 요청을 받아 알맞은 동작에 연결</p>
+        <code>PATCH /api/posts/42</code>
+      </article>
+      <article class="p02-role p02-view">
+        <span class="p02-role-index">03</span>
+        <h3>View</h3>
+        <p>Model 데이터를 사용자에게 보이는 형태로 표현</p>
+        <div class="p02-browser-preview" aria-hidden="true"><i></i><i></i><i></i><b></b><b></b></div>
+      </article>
+    </div>
+  </div>
+  <div class="p02-change-scene">
+    <div>
+      <p class="p02-kicker">같은 데이터, 바뀐 값</p>
+      <h3>제목을 수정하면?</h3>
+      <div class="p02-value-change"><code>"첫 글"</code><span aria-hidden="true">→</span><code>"수정한 글"</code></div>
+    </div>
+    <div>
+      <p class="p02-kicker">화면은 데이터를 표현</p>
+      <h3>Model이 바뀌면 화면의 제목도 바뀝니다</h3>
+      <div class="p02-title-change"><span>첫 글</span><span aria-hidden="true">→</span><strong>수정한 글</strong></div>
+    </div>
+  </div>
+  <div class="p02-response-compare">
+    <div class="p02-compare-title"><p class="p02-kicker">Spring MVC의 응답 경로</p><h3>화면을 그릴지, JSON 데이터를 보낼지 선택합니다</h3></div>
+    <article class="p02-response-card p02-html">
+      <h4>HTML 화면</h4><span class="p02-response-badge">Model + View</span>
+      <p>Controller가 화면에 필요한 Model을 준비하고, View 기술이 HTML을 렌더링합니다.</p>
+      <code>Model → Thymeleaf → HTML</code>
+    </article>
+    <article class="p02-response-card p02-json">
+      <h4>JSON API</h4><span class="p02-response-badge">응답 DTO</span>
+      <p>응답 객체는 메시지 변환기가 JSON 본문으로 직렬화합니다. 서버가 HTML View를 렌더링하는 경로는 거치지 않습니다.</p>
+      <code>응답 DTO → HttpMessageConverter → JSON</code>
+    </article>
+  </div>
+  <div class="p02-boundary">
+    <h3>MVC와 Controller · Service · Repository는 서로 다른 분류입니다</h3>
+    <div class="p02-boundary-columns">
+      <div><p class="p02-kicker">웹 표현을 보는 MVC 관점</p><div class="p02-pills"><span>Model</span><span>View</span><span>Controller</span></div></div>
+      <div><p class="p02-kicker">애플리케이션 책임을 나누는 계층 관점</p><div class="p02-pills p02-layer-pills"><span>Controller<br><small>HTTP 경계</small></span><span>Service<br><small>유스케이스·규칙</small></span><span>Repository<br><small>저장소 접근</small></span></div></div>
+    </div>
+    <p class="p02-boundary-note">둘은 일부 이름이 겹쳐도 같은 목록이 아닙니다. Spring MVC Controller가 계층 구조의 Controller 역할도 맡을 수 있습니다.</p>
+  </div>
+  <details class="p02-check">
+    <summary>직접 확인: 제목을 바꾸는 기능에서 View와 Repository 중 무엇을 바꿀까요?</summary>
+    <p><strong>화면 표시 방식만 바꾼다면 View 쪽을 확인합니다.</strong> 저장 위치나 조회 방식만 바꾼다면 Repository 쪽을 확인합니다. 실제 업무 규칙은 Service가 맡으며, Controller는 HTTP 요청을 연결합니다.</p>
+  </details>
+</section>
+
 > MVC는 HTTP 요청과 응답을 다루는 표현 계층의 방식이다.  
 > Controller는 HTTP 경계를, Service는 유스케이스와 업무 규칙을, Repository는 저장소 접근을 맡긴다.  
 > 요청·응답 DTO와 내부 도메인 객체를 분리하고, Controller → Service → Repository 방향을 지킨다.
@@ -28,36 +106,149 @@ Spring MVC는 웹 처리 프레임워크다. Controller·Service·Repository는 
 
 ### 2.4 Controller
 
-경로·HTTP 메서드를 매핑하고 요청 DTO를 받아 Service를 호출한다. 응답 상태와 DTO를 정하되 업무 규칙과 SQL은 두지 않는다. 예: `@PostMapping` + `@RequestBody`.
+<section class="p02-topic-visual p02-controller-scene" aria-label="POST 요청이 Controller를 거쳐 응답되는 흐름">
+<p class="p02-topic-kicker">2.4 · 요청을 받는 경계</p>
+<p class="p02-topic-lead"><code>POST /api/memos</code>의 JSON은 <code>MemoCreateRequest</code>로 변환되어 Controller에 도착합니다. Controller는 Service를 호출하고 <code>201 Created</code>와 응답 DTO를 돌려줍니다.</p>
+<div class="p02-controller-flow" role="group" aria-label="JSON 요청에서 201 JSON 응답까지">
+<article class="p02-flow-card p02-flow-client"><span class="p02-flow-step">01 · 클라이언트</span><strong>POST /api/memos</strong><code>{ title, content }</code><small>Content-Type: application/json</small></article>
+<span class="p02-flow-arrow" aria-hidden="true">→</span>
+<article class="p02-flow-card p02-flow-request"><span class="p02-flow-step">02 · 요청 객체</span><strong>MemoCreateRequest</strong><code>title · content</code><small>Spring이 JSON을 객체로 변환</small></article>
+<span class="p02-flow-arrow" aria-hidden="true">→</span>
+<article class="p02-flow-card p02-flow-controller"><span class="p02-flow-step">03 · HTTP 경계</span><strong>MemoController</strong><code>service.create(request)</code><small>경로 매핑 · 입출력 연결</small></article>
+<span class="p02-flow-arrow" aria-hidden="true">→</span>
+<article class="p02-flow-card p02-flow-service"><span class="p02-flow-step">04 · 업무 처리</span><strong>MemoService</strong><code>create(request)</code><small>저장 요청과 응답 DTO 변환</small></article>
+<span class="p02-flow-arrow" aria-hidden="true">→</span>
+<article class="p02-flow-card p02-flow-response"><span class="p02-flow-step">05 · HTTP 응답</span><strong>201 Created</strong><code>{ id, title, content }</code><small>MemoResponse JSON</small></article>
+</div>
+<div class="p02-controller-code-grid"><div><p class="p02-topic-label">Controller의 역할</p><ul class="p02-role-list"><li>경로와 HTTP 메서드를 매핑합니다.</li><li>요청 DTO를 받아 Service에 전달합니다.</li><li>상태 코드와 응답 DTO를 정합니다.</li><li>업무 규칙과 SQL은 여기에 두지 않습니다.</li></ul></div><div><p class="p02-topic-label">실제 예제 코드 · 3.4 발췌</p><pre><code class="language-java">@PostMapping
+public ResponseEntity&lt;MemoResponse&gt; create(
+        @RequestBody MemoCreateRequest request) {
+    MemoResponse created = service.create(request);
+    return ResponseEntity.status(HttpStatus.CREATED).body(created);
+}</code></pre></div></div>
+</section>
 
 ### 2.5 Service
 
-유스케이스와 업무 규칙, 여러 저장 동작의 순서를 소유한다. Controller에 규칙을 두면 다른 진입점에서 중복되므로 업무 판단을 Service에 둔다.
+<section class="p02-topic-visual p02-service-scene" aria-label="MemoService의 메모 생성 유스케이스">
+<p class="p02-topic-kicker">2.5 · 요청 하나를 유스케이스로 처리</p>
+<p class="p02-topic-lead">현재 예제의 <code>create</code>는 요청 값을 저장소에 전달하고, 저장된 <code>Memo</code>를 <code>MemoResponse</code>로 바꿉니다. 공통 업무 규칙이 필요해지면 그 판단을 Service에 추가합니다.</p>
+<div class="p02-service-flow" role="group" aria-label="입력 받기, 저장 요청, 응답 DTO 변환의 세 단계">
+<article class="p02-service-step"><span>01 · 요청 받기</span><strong>MemoCreateRequest</strong><code>title · content</code><small>Controller가 전달</small></article>
+<span class="p02-flow-arrow" aria-hidden="true">→</span>
+<article class="p02-service-step p02-service-action"><span>02 · 저장 요청</span><strong>repository.save(...)</strong><code>request.title(), request.content()</code><small>Repository 계약 호출</small></article>
+<span class="p02-flow-arrow" aria-hidden="true">→</span>
+<article class="p02-service-step"><span>03 · 응답으로 변환</span><strong>toResponse(saved)</strong><code>MemoResponse</code><small>저장된 id · title · content</small></article>
+</div>
+<div class="p02-service-code-grid"><div><p class="p02-topic-label">실제 코드 · MemoService.create</p><pre><code class="language-java">public MemoResponse create(MemoCreateRequest request) {
+    Memo saved = repository.save(request.title(), request.content());
+    return toResponse(saved);
+}
+private MemoResponse toResponse(Memo memo) {
+    return new MemoResponse(memo.id(), memo.title(), memo.content());
+}</code></pre></div><aside class="p02-service-note"><strong>현재 예제의 범위</strong><span>지금 구현은 간단한 저장과 DTO 변환입니다. 유효성·중복 검사처럼 여러 진입점에서 함께 적용할 업무 판단은 필요해질 때 Service에 둘 수 있습니다. 현재 코드에 해당 규칙이나 스케줄러, DB는 구현되어 있지 않습니다.</span></aside></div>
+</section>
 
 ### 2.6 Repository
 
-저장·조회 계약을 제공하고 DB 접근 구현을 감춘다. 쿼리는 맡지만 업무 허용 여부를 결정하지 않는다. 예: `MemoRepository.save(...)`.
+<section class="p02-topic-visual p02-repository-scene" aria-label="MemoRepository 계약과 인메모리 구현의 저장 및 조회 흐름">
+<p class="p02-topic-kicker">2.6 · 저장과 조회를 맡는 경계</p>
+<p class="p02-topic-lead">Repository는 저장·조회 계약을 제공하고 구현을 감춥니다. 이 예제는 DB 쿼리 대신 <code>ConcurrentHashMap</code>에 보관하므로 앱을 다시 시작하면 데이터가 사라집니다.</p>
+<div class="p02-repository-flows" role="group" aria-label="save 저장 흐름과 findAll 조회 흐름">
+<article class="p02-repository-flow p02-repository-save"><header><span class="p02-repo-number">01</span><div><strong>저장 · save</strong><small>Service가 계약을 호출하고 인메모리 구현이 ID를 붙여 보관</small></div></header><div class="p02-repo-path"><span>MemoService</span><b aria-hidden="true">→</b><code>MemoRepository.save(String title, String content)</code><b aria-hidden="true">→</b><span>AtomicLong로 id 생성</span><b aria-hidden="true">→</b><code>new Memo(id, title, content)</code><b aria-hidden="true">→</b><span>ConcurrentHashMap에 저장</span></div><pre><code class="language-java">long id = sequence.incrementAndGet();
+Memo memo = new Memo(id, title, content);
+memos.put(id, memo);
+return memo;</code></pre></article>
+<article class="p02-repository-flow p02-repository-find"><header><span class="p02-repo-number">02</span><div><strong>전체 조회 · findAll</strong><small>저장된 값을 id 오름차순으로 정렬해 목록 반환</small></div></header><div class="p02-repo-path"><span>MemoService</span><b aria-hidden="true">→</b><code>MemoRepository.findAll()</code><b aria-hidden="true">→</b><span>Map 값 모으기</span><b aria-hidden="true">→</b><code>Memo::id 오름차순</code><b aria-hidden="true">→</b><span>List&lt;Memo&gt;</span></div><pre><code class="language-java">return memos.values().stream()
+        .sorted(Comparator.comparingLong(Memo::id))
+        .toList();</code></pre></article>
+</div>
+<div class="p02-repository-contract"><strong>인터페이스 계약</strong><code>Memo save(String title, String content);</code><code>List&lt;Memo&gt; findAll();</code><span><code>Memo</code>는 <code>record</code>라 변환할 때 <code>memo.title()</code>과 <code>memo.content()</code> 접근자를 사용합니다.</span></div>
+<aside class="p02-repository-note"><strong>역할 경계</strong><span>Repository는 저장·조회만 담당합니다. 사용자가 메모를 만들거나 조회할 수 있는지 같은 업무 판단은 Service에 둡니다.</span></aside>
+</section>
 
 ### 2.7 DTO와 Entity
 
-요청 DTO는 입력 허용 필드, 응답 DTO는 공개 필드, Entity/도메인 객체는 내부 데이터와 업무 개념이다. Entity를 외부에 노출하면 내부 필드가 계약이 되고, 요청으로 받으면 대량 할당 위험이 생긴다. 간단한 변환은 Service, 반복되면 Mapper에 둔다.
+<section class="p02-topic-visual p02-dto-scene" aria-label="요청 DTO, 내부 Memo 도메인 객체, 응답 DTO의 필드 비교">
+<p class="p02-topic-kicker">2.7 · 경계마다 필요한 필드만 전달</p>
+<p class="p02-topic-lead">요청 DTO는 입력을 제한하고 응답 DTO는 공개할 값을 고릅니다. 이 실습의 <code>Memo</code>는 JPA Entity가 아니라 메모리 저장소에서 쓰는 도메인 <code>record</code>입니다.</p>
+<div class="p02-dto-flow" role="group" aria-label="title과 content 입력이 Memo에 저장된 뒤 id와 함께 응답되는 흐름">
+<article class="p02-dto-card p02-dto-input"><span class="p02-flow-step">요청 DTO · 입력 허용</span><strong>MemoCreateRequest</strong><div class="p02-field-list"><span><b>title</b><small>입력 허용</small></span><span><b>content</b><small>입력 허용</small></span></div><code>record MemoCreateRequest(
+    String title, String content) {}</code></article>
+<span class="p02-flow-arrow" aria-hidden="true">→</span>
+<article class="p02-dto-card p02-dto-domain"><span class="p02-flow-step">내부 도메인 객체 · InMemory</span><strong>Memo</strong><div class="p02-field-list"><span><b>id</b><small>저장 시 생성</small></span><span><b>title</b><small>내부 값</small></span><span><b>content</b><small>내부 값</small></span></div><code>record Memo(long id,
+    String title, String content) {}</code></article>
+<span class="p02-flow-arrow" aria-hidden="true">→</span>
+<article class="p02-dto-card p02-dto-output"><span class="p02-flow-step">응답 DTO · 공개 필드</span><strong>MemoResponse</strong><div class="p02-field-list"><span><b>id</b><small>응답에 포함</small></span><span><b>title</b><small>응답에 포함</small></span><span><b>content</b><small>응답에 포함</small></span></div><code>record MemoResponse(long id,
+    String title, String content) {}</code></article>
+</div>
+<div class="p02-mapping-strip"><span>request.title(), request.content()</span><b aria-hidden="true">→</b><span>repository.save(...)</span><b aria-hidden="true">→</b><span>new MemoResponse(id, title, content)</span></div>
+<p class="p02-mapping-caption">이 예제는 Service에서 변환하며, 반복되는 변환은 Mapper로 분리할 수 있습니다.</p>
+<aside class="p02-exposure-note"><strong>외부 Entity 직접 노출을 피하는 이유</strong><span>내부 필드가 API 응답에 섞이면 공개 계약이 의도치 않게 바뀔 수 있습니다. 요청에서 Entity를 그대로 받으면 허용하지 않은 필드까지 수정되는 대량 할당 위험이 생깁니다.</span></aside>
+</section>
 
 ### 2.8 DTO에 `record`
 
-`record MemoResponse(long id, String title)`처럼 불변 데이터를 선언한다. 접근자와 생성자를 제공하며 Java 16에 정식화됐다(JEP 395). 변경 가능한 상태가 필요하면 일반 클래스를 쓴다.
+<section class="p02-topic-visual p02-record-scene" aria-label="같은 데이터 구조를 일반 Java 클래스와 record로 표현하기">
+<p class="p02-topic-kicker">2.8 · DTO를 선언하는 두 방식</p>
+<p class="p02-topic-lead"><code>record</code>는 값 전달용 타입을 짧게 선언하는 방법이며 Java 16에서 정식화됐습니다(JEP 395). 컴포넌트 참조는 재할당할 수 없지만, 그 안에 든 객체까지 자동으로 깊은 불변이 되는 것은 아닙니다.</p>
+<div class="p02-record-compare" role="group" aria-label="일반 클래스와 record 선언 비교">
+<article class="p02-record-card p02-record-class"><header><strong>일반 클래스 · 별도 파일</strong><small>필드·생성자·접근자를 직접 선언</small></header><pre><code class="language-java">// MemoResponse.java
+public class MemoResponse {
+    private final long id;
+    private final String title;
+    public MemoResponse(long id, String title) {
+        this.id = id;
+        this.title = title;
+    }
+    public long id() { return id; }
+    public String title() { return title; }
+}</code></pre></article>
+<article class="p02-record-card p02-record-record"><header><strong>record · 별도 파일</strong><small>같은 두 값을 간결하게 선언</small></header><pre><code class="language-java">// MemoResponse.java
+public record MemoResponse(long id, String title) {}</code></pre><ul><li>생성자·접근자와 <code>equals</code>·<code>hashCode</code>·<code>toString</code>을 제공합니다.</li><li>컴포넌트 값은 생성 뒤 다시 대입할 수 없습니다.</li><li>값 전달 DTO를 간결하게 표현하기 좋습니다.</li></ul></article>
+</div>
+<p class="p02-record-class-note">상태 변경이 필요하면 일반 클래스로 가변 상태를 직접 설계할 수 있습니다. 비교용 클래스 예시는 같은 값들을 final 필드로 담았습니다.</p>
+<div class="p02-record-json"><strong>Jackson 직렬화 개념 예시</strong><code>new MemoResponse(1, "첫 메모")</code><b aria-hidden="true">→</b><code>{ "id": 1, "title": "첫 메모" }</code><span>개념 예시이며, 현재 P02 실습의 <code>MemoResponse</code>는 <code>id · title · content</code> 세 필드를 가집니다.</span></div>
+</section>
 
 ### 2.9 패키지 구조
 
-| 방식 | 예시 | 특징 |
-|---|---|---|
-| 계층별 | `controller/`, `service/` | 작을 땐 단순, 기능이 늘면 관련 파일이 흩어짐 |
-| 기능별 | `memo/api/`, `memo/application/` | 관련 코드가 모여 기능별 변경에 유리 |
-
-기본값은 **기능별 최상위 패키지 안에서 역할별로 분리**다. 시작 클래스는 컴포넌트의 상위 패키지에 두고 기본 패키지는 피한다.
+<section class="p02-topic-visual p02-package-scene" aria-label="계층별과 기능별 패키지 구조 비교 및 컴포넌트 스캔 범위">
+<p class="p02-topic-kicker">2.9 · 역할로 나누거나 기능으로 모으기</p>
+<p class="p02-topic-lead">패키지는 정답 하나가 아니라 프로젝트와 팀 상황에 맞춰 고릅니다. 아래 기능별 예시는 실제 실습 경로인 <code>com.example.memo</code> 바로 아래에 역할별 하위 패키지를 둡니다.</p>
+<div class="p02-package-compare" role="group" aria-label="계층별 및 기능별 패키지 구성의 장단점">
+<article class="p02-package-card p02-package-layer"><header><strong>계층별 · 작은 프로젝트에 단순</strong><small>역할에 따라 파일을 모읍니다</small></header><ul class="p02-tree"><li><code>com.example.memo</code><ul><li><code>MemoApplication.java</code></li><li><code>controller/</code><ul><li><code>MemoController.java</code></li></ul></li><li><code>service/</code><ul><li><code>MemoService.java</code></li></ul></li><li><code>repository/</code><ul><li><code>MemoRepository.java</code></li><li><code>InMemoryMemo<wbr>Repository.java</code></li></ul></li></ul></li></ul><p>파일 수가 늘면 한 기능의 코드가 여러 폴더로 흩어질 수 있습니다.</p></article>
+<article class="p02-package-card p02-package-feature"><header><strong>기능별 최상위 + 역할별 분리</strong><small>기능 관련 코드를 가까이 둡니다 · 이 실습의 구성</small></header><ul class="p02-tree"><li><code>com.example.memo</code><ul><li><code>MemoApplication.java</code></li><li><code>api/</code><ul><li><code>MemoController.java</code></li><li><code>MemoCreateRequest.java</code></li><li><code>MemoResponse.java</code></li></ul></li><li><code>application/</code><ul><li><code>MemoService.java</code></li></ul></li><li><code>domain/</code><ul><li><code>Memo.java</code></li></ul></li><li><code>repository/</code><ul><li><code>MemoRepository.java</code></li><li><code>InMemoryMemo<wbr>Repository.java</code></li></ul></li></ul></li></ul><p>기능 단위로 관련 파일을 찾고 함께 변경하기 편합니다.</p></article>
+</div>
+<aside class="p02-package-scan"><strong>컴포넌트 스캔 기준</strong><span><code>@SpringBootApplication</code>이 있는 <code>com.example.memo</code>에서 하위 패키지를 스캔합니다. 시작 클래스는 컴포넌트의 공통 상위 패키지에 두고 기본 패키지는 피합니다.</span></aside>
+</section>
 
 ### 2.10 의존 방향
 
-Controller → Service → Repository로 흐르게 한다. 순환 호출을 막고 생성자 주입으로 의존성을 드러낸다. 구현체를 직접 `new` 하면 교체·격리하기 어렵다.
+<section class="p02-topic-visual p02-dependency-scene" aria-label="생성자 주입으로 이어지는 Controller, Service, Repository 의존 방향">
+<p class="p02-topic-kicker">2.10 · 한 방향으로 의존하고 생성자로 주입</p>
+<p class="p02-topic-lead">요청 처리 의존성은 <code>Controller → Service → Repository</code>로 흐릅니다. Spring이 등록된 구현체를 생성자에 전달해 각 클래스의 의존 관계를 드러냅니다.</p>
+<div class="p02-dependency-flow" role="group" aria-label="Controller가 Service를, Service가 Repository 계약을 생성자 주입 받는 구조">
+<article class="p02-dependency-card p02-dependency-controller"><span>@RestController</span><strong>MemoController</strong><code>MemoController(MemoService service)</code><small>Service를 생성자 주입 받음</small></article>
+<span class="p02-dependency-arrow" aria-hidden="true">→</span>
+<article class="p02-dependency-card p02-dependency-service"><span>@Service</span><strong>MemoService</strong><code>MemoService(MemoRepository repository)</code><small>Repository 인터페이스에 의존</small></article>
+<span class="p02-dependency-arrow" aria-hidden="true">→</span>
+<article class="p02-dependency-card p02-dependency-repository"><span>@Repository · 구현체</span><strong>InMemoryMemoRepository</strong><code>implements MemoRepository</code><small>Map 기반 저장소 구현</small></article>
+</div>
+<div class="p02-injection-note"><strong>Spring 컨테이너가 연결합니다</strong><span><code>MemoRepository</code> 인터페이스 자체를 만드는 것이 아닙니다. 등록된 <code>InMemoryMemoRepository</code> 구현 객체를 생성자 매개변수의 인터페이스 타입에 주입합니다.</span></div>
+<div class="p02-dependency-code-grid"><article><p class="p02-topic-label">실제 생성자 · Controller / Service</p><pre><code class="language-java">public MemoController(MemoService service) {
+    this.service = service;
+}
+public MemoService(MemoRepository repository) {
+    this.repository = repository;
+}</code></pre></article><article><p class="p02-topic-label">실제 저장소 구현</p><pre><code class="language-java">@Repository
+public class InMemoryMemoRepository
+        implements MemoRepository {
+    private final ConcurrentHashMap&lt;Long, Memo&gt; memos
+            = new ConcurrentHashMap&lt;&gt;();
+}</code></pre></article></div>
+<aside class="p02-dependency-warning"><strong>피할 구조</strong><span>구현체를 직접 <code>new</code> 하면 교체와 테스트 격리가 어려워집니다. 양쪽 클래스가 서로 부르는 순환 의존도 책임과 테스트 경계를 흐립니다.</span><span class="p02-cycle" aria-label="순환 의존 예시">Controller ↔ Service</span></aside>
+</section>
 
 ## 3. 따라 하기
 

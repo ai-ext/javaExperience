@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderDb09FocusedJourney } from './db09-focused-journey.mjs';
+
+const root=new URL('../../',import.meta.url);
+const source=fs.readFileSync(new URL('scenario/db-query-journey/DB-09-explain-analyze.md',root),'utf8');
+const db08=fs.readFileSync(new URL('scenario/db-query-journey/DB-08-explain-hypothesis.md',root),'utf8');
+const markup=renderDb09FocusedJourney(source);
+assert.deepEqual([...markup.matchAll(/data-db09-panel="([^"]+)"/g)].map((match)=>match[1]),['scenario','safety','compare','run','tree','conditions','conclusion']);
+const first=markup.slice(markup.indexOf('data-db09-panel="scenario"'),markup.indexOf('data-db09-panel="safety"'));
+assert.match(first,/만들 것/);
+assert.match(first,/직접 할 것/);
+assert.doesNotMatch(first,/actual rows|인덱스 생성|500,000/);
+const analyze=source.match(/```sql\n([\s\S]*?)\n```/)?.[1];
+const estimate=db08.match(/```sql\n([\s\S]*?)\n```/g)?.[1]?.replace(/^```sql\n|\n```$/g,'');
+assert.ok(analyze&&estimate);
+assert.equal(analyze.replace(/^EXPLAIN ANALYZE/,'EXPLAIN'),estimate);
+assert.ok(markup.includes(analyze));
+for(const term of ['TREE','actual rows','loops','actual time','SELECT를 실제 실행','한 번의 시간 차이'])assert.ok(markup.includes(term));
+assert.doesNotMatch(markup,/SELECT \* FROM employees|실제 결과 \(Rows\)/);
+const built=fs.readFileSync(new URL('scenario/db-query-journey/DB-09-explain-analyze.html',root),'utf8');
+for(const asset of ['first-db-journey.css','db09-focused-journey.css','db09-focused-journey.js'])assert.ok(built.includes(asset));
+assert.equal((built.match(/data-db09-panel="/g)||[]).length,7);
+assert.match(built,/class="db09-original"/);
+console.log('DB-09 일곱 장면·동일 SELECT·실제 TREE 실행 경계 검사 통과');

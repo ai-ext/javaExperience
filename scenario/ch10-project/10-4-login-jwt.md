@@ -1,5 +1,7 @@
 # 10-4. 로그인과 JWT — 인터셉터와 @LoginUser, 내 정보
 
+<figure class="learning-mockup-figure"><a href="../../docs/design/mockups-2026-10-15-batch5/04-jwt-corrected.jpg" target="_blank" rel="noopener"><img src="../../docs/design/mockups-2026-10-15-batch5/04-jwt-corrected.jpg" alt="로그인 요청에서 users 이메일 조회와 비밀번호 검증, JWT 발급, 다음 Bearer 요청에서 서명 검증과 회원 id 조회를 분리해 보여 주는 시안" loading="lazy"><span class="learning-mockup-zoom">원본 크기로 보기 ↗</span></a><figcaption>JWT를 먼저 구현합니다. 이 이미지는 예상 흐름 시안이며, 아래의 API 계약·코드가 정확한 실습 기준입니다.</figcaption></figure>
+
 ## 상황
 
 이제부터 글쓰기·수정·댓글은 "누가" 하는지 알아야 한다. 명세서는 이렇게 정했다.
@@ -473,3 +475,5 @@ public boolean preHandle(HttpServletRequest request, HttpServletResponse respons
 ## 다음 단계
 
 [10-5. 게시글 작성](10-5-create-post.md) — 토큰 주인을 작성자로 글을 저장한다. 처음으로 JPA 연관관계(작성자·태그)를 쓴다.
+
+JWT를 먼저 구현한 뒤 인증 상태의 보관 위치를 직접 비교하려면 [L15. 세션 인증](../labs/l15-session-auth/README.md)을 진행한다. 같은 가입 회원을 사용하지만 `JSESSIONID`와 서버 세션을 따로 만든다.

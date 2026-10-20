@@ -40,7 +40,7 @@ for (Post post : posts) {
 
 ## 한 번의 조회로 작성자 DTO 만들기
 
-작성자 이름이 응답에 필요하다면 Repository의 projection query에서 게시글과 작성자를 JOIN해 필요한 열만 바로 읽을 수 있습니다. 아래는 SQL 구조 예시입니다. R1 접근 조건, 커서 조건, 전체 응답 카운트, 태그 배열은 API 구현 계약에 맞춰 추가해야 합니다.
+작성자 이름이 응답에 필요하다면 Repository의 projection query에서 게시글과 작성자를 JOIN해 필요한 열만 바로 읽을 수 있습니다. 아래는 **비로그인 공개 글**을 가정한 SQL 구조 예시입니다. 로그인 사용자의 R1 접근 조건, 커서 조건, 전체 응답 카운트, 태그 배열은 API 구현 계약에 맞춰 추가해야 합니다.
 
 ```sql
 SELECT p.id,
@@ -55,6 +55,7 @@ JOIN member AS m ON m.id = p.author_id
 WHERE b.slug = :board_slug
   AND p.status = 'PUBLISHED'
   AND p.deleted_at IS NULL
+  AND p.visibility = 'PUBLIC'
 ORDER BY p.published_at DESC, p.id DESC
 LIMIT :size_plus_one;
 ```
@@ -80,7 +81,7 @@ ORDER BY pt.post_id, t.name;
 5. 페이지 크기만 바꾸어 다시 요청합니다. 쿼리 수가 페이지 크기와 함께 늘어나는지 확인합니다.
 6. JOIN projection 또는 두 번의 고정 조회로 바꾼 뒤 같은 요청을 반복하고, JSON 결과와 SQL 수를 모두 비교합니다.
 
-저장소의 기존 계측 예시는 [5-3 댓글 목록의 `PostListQueryCountTest`](../ch5-comment/5-3-comment-list-delete.md)에서 확인할 수 있습니다. 그 테스트는 MyBatis `Executor`에서 실제 SELECT 문장을 세고 서로 다른 페이지 크기에서 수가 일정한지 검사합니다. **그 테스트 경로의 로그가 이 M1 API의 측정 결과를 대신하지는 않습니다.** 현재 M1 구현의 실제 수치는 해당 경로를 계측해 얻어야 합니다. JPA만 사용한다면 Hibernate SQL 로그나 Hibernate Statistics를 쓰고, MyBatis가 포함되면 MyBatis Executor 또는 datasource 레벨 계측을 사용합니다.
+[2-4 N+1 시나리오](../ch2-read-post/2-4-n-plus-1.md)의 `PostListQueryCountTest`는 학습자가 만들어 실행할 계측 테스트 예시입니다. 그 문서의 MyBatis 대체 구현은 `Executor`에서 SELECT를 세지만, 현재 루트 `src/test`에 이 테스트가 완성되어 있다는 뜻은 아닙니다. **그 시나리오의 관찰값이 이 M1 API의 측정 결과를 대신하지는 않습니다.** 현재 M1 구현의 실제 수치는 해당 경로를 계측해 얻어야 합니다. JPA만 사용한다면 Hibernate SQL 로그나 Hibernate Statistics를 쓰고, MyBatis가 포함되면 MyBatis Executor 또는 datasource 레벨 계측을 사용합니다. `Page`의 마지막 페이지에서 count SQL이 생략되면 큰 size의 문장 수가 더 적을 수도 있으므로 항상 정확히 같은 수라고 강제하지 않습니다.
 
 <details>
 <summary>왜 모든 관계를 EAGER로 바꾸면 안 되나요?</summary>

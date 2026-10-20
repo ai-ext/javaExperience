@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderSessionLabJourney } from './session-lab-journey.mjs';
+
+const markup = renderSessionLabJourney();
+const panels = [...markup.matchAll(/data-session-panel="([^"]+)"/g)].map((match) => match[1]);
+assert.deepEqual(panels, ['scenario', 'prepare', 'csrf', 'login', 'rotation', 'me', 'other-cookie', 'csrf-failure', 'logout', 'idle', 'comparison', 'cookie-security']);
+const first = markup.slice(markup.indexOf('data-session-panel="scenario"'), markup.indexOf('data-session-panel="prepare"'));
+assert.match(first, /만들 것/);
+assert.match(first, /먼저 보낼 것/);
+assert.doesNotMatch(first, /200|401|403|204|csrfToken|JSESSIONID/);
+const csrf = markup.slice(markup.indexOf('data-session-panel="csrf"'), markup.indexOf('data-session-panel="login"'));
+const csrfFailure = markup.slice(markup.indexOf('data-session-panel="csrf-failure"'), markup.indexOf('data-session-panel="logout"'));
+assert.match(csrf, /data-session-go="csrf-failure"/);
+assert.match(csrfFailure, /data-session-go="login"/);
+assert.equal((markup.match(/class="session-command"/g) || []).length, 9);
+for (const path of ['/api/v1/session/csrf', '/api/v1/session/login', '/api/v1/session/me', '/api/v1/session/logout', '/api/v1/users/me']) assert.ok(markup.includes(path), path);
+for (const item of ['getSession(true)', 'getSession(false)', 'changeSessionId()', 'session.invalidate()', 'X-CSRF-Token', 'session-before.jar', 'session-after.jar']) assert.ok(markup.includes(item), item);
+assert.match(markup, /세션 로그아웃이 이미 발급한 JWT를 없애지는 않습니다/);
+assert.match(markup, /저장소 밖의 임시 폴더/);
+assert.match(markup, /JWT·세션 ID·CSRF 원문은 이 페이지에 입력하지 마세요/);
+assert.match(markup, /HttpOnly/);
+assert.match(markup, /SameSite=Lax/);
+
+const root = new URL('../../', import.meta.url);
+const html = fs.readFileSync(new URL('scenario/labs/l15-session-auth/README.html', root), 'utf8');
+for (const asset of ['first-db-journey.css', 'session-lab-journey.css', 'session-lab-journey.js']) assert.ok(html.includes(asset), `asset missing: ${asset}`);
+assert.equal((html.match(/data-session-panel="/g) || []).length, 12);
+assert.match(html, /class="session-lab-original"/);
+assert.match(html, /원문 계약·수동 명령·합격 기준 펼치기/);
+console.log('L15 12장면·쿠키/CSRF/로그아웃/JWT 비교·원문 보존 검사 통과');

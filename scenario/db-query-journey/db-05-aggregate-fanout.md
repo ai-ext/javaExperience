@@ -16,6 +16,28 @@ main:has(.db05){max-width:1420px}.db05{--ink:#173253;--muted:#5f7288;--line:#d8e
 
 <div class="note"><strong>행 단위 점검:</strong> JOIN 직후 결과의 한 행은 게시글이 아니라 “좋아요 한 건 × 댓글 한 건”의 조합입니다. 이 상태에서 COUNT나 SUM을 하면 원래 업무 수치와 달라집니다.</div>
 
+## 합성 2×3을 직접 SELECT로 확인하기
+
+아래 CTE는 실제 `post_like`·`comment` 행을 읽거나 수정하지 않습니다. 좋아요 ID 41·42와 댓글 ID 71·72·73을 쿼리 안에서만 만든 **설명용 합성 데이터**입니다. community DB의 SQL 편집기에서 읽기 전용으로 실행하고, 반환된 `(like_id, comment_id)` 여섯 쌍을 위 그림과 대조하세요. 특정 게시글의 실제 집계 결과로 사용하지 않습니다.
+
+<!-- DB05_SYNTHETIC_SQL -->
+```sql
+WITH sample_likes AS (
+    SELECT 41 AS like_id, 'synthetic' AS post_key
+    UNION ALL SELECT 42, 'synthetic'
+), sample_comments AS (
+    SELECT 71 AS comment_id, 'synthetic' AS post_key
+    UNION ALL SELECT 72, 'synthetic'
+    UNION ALL SELECT 73, 'synthetic'
+)
+SELECT l.like_id, c.comment_id
+FROM sample_likes AS l
+JOIN sample_comments AS c ON c.post_key = l.post_key
+ORDER BY l.like_id, c.comment_id;
+```
+
+두 관계의 행 수는 각각 2와 3인데 JOIN 결과는 6행입니다. 이 쿼리를 실행해 보지 않았다면 여섯 쌍은 **기대값**일 뿐 실제 관찰 결과가 아닙니다.
+
 <details>
 <summary>잘못된 쿼리 — 두 1:N 관계를 바로 연결</summary>
 <pre class="sql"><code>-- 설명용 구조: 실제 인기 점수 쿼리로 쓰면 안 됩니다.

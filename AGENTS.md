@@ -2,6 +2,15 @@
 
 Spring Boot 백엔드를 직접 구현하며 배우는 실습 레포다. 요구사항과 채점 기준은 `scenario/README.md`에서 시작해 각 장의 문서를 따른다. 학습자의 코드가 일부러 미완성일 수 있으므로, 요청받은 범위 밖의 정답 코드나 리팩터링을 선제적으로 넣지 않는다.
 
+## 공통 학습 기반과 후속 통합
+
+- 공개용 공통 기반은 `64b9a0a2aac819a669eadd92a97f928185325ea9`이다. 홈·공통 메뉴·개념 목록·검색과 P16 대표 상세를 포함하며, 별도로 진행한 개념별 상세 확장과 CRUD 5과제 개편은 후속 통합 대상이다. 이를 이번 공통 기반에 포함됐다고 표시하지 않는다.
+- 이 기반은 기존 공통 스냅샷 `aed347fc216b46641c271418553ffa7e1a57690b`에서 공개 제외 캡처를 제거해 만든 정제 이력이다. 원본 스냅샷을 조상으로 가진 개념·CRUD 브랜치를 공개 브랜치에 그대로 merge하지 않는다. 후속 변경을 정제 기반에 옮기고 최종 파일뿐 아니라 공개할 전체 이력도 검사한다.
+- 공개 제외 대상은 `work/browser-qa/4-2-desktop-full`, `work/browser-qa/4-2-p2-desktop-final-full`, `work/browser-qa/4-2-p2-desktop-full`의 PNG·JPG다. `.gitignore` 규칙을 유지하고 재추가하거나 공개 이력에 되살리지 않는다.
+- 후속 통합 전 현재 Git 상태와 각 작업의 기록을 다시 확인한다. 원본 브랜치·미커밋·미추적 파일을 보존하고, 공통 스냅샷 이후의 변경이 다른 작업 공간에 자동 공유된다고 가정하지 않는다.
+- 양쪽에서 바꾼 `tools/site/build.mjs`, `tools/site/inventory-visual-work.mjs`, `tools/site/package.json`과 시각화 장부는 한쪽 파일로 덮어쓰지 않는다. 기능·검사·원문 보존·이미지 경로와 출처 기록을 함께 대조하고, 통합한 소스로 HTML을 다시 생성한다.
+- 통합·push·PR·merge·worktree 제거 여부는 실제 Git·원격 상태로 확인하고 현재 요청에서 승인된 작업만 수행한다.
+
 ## 작업 전 확인
 
 - 현재 브랜치와 작업 트리 변경사항을 확인한다. 사용자의 미완성 코드는 보존한다.
@@ -25,10 +34,11 @@ Spring Boot 백엔드를 직접 구현하며 배우는 실습 레포다. 요구�
 
 - 루트 `intent.md`의 교육 목표와 `docs/design/VISUAL-PLAN.md`의 체크리스트를 먼저 읽는다. 이 규칙은 학습 화면·문서 UI 작업에 적용하며, 학습자의 서버 구현 과제 범위를 늘리는 근거로 쓰지 않는다.
 - 사용자가 **이미지 시안**을 요청하면 실제 `imagegen`으로 시안을 만든다. HTML·CSS·SVG만 만든 결과를 imagegen 시안이라고 부르지 않는다. 생성 이미지는 `docs/design/`에 저장하고 원본 사실·코드의 출처, 시안에서 구현한 범위, 아직 적용하지 않은 범위를 기록한다.
-- 시안 중심 화면 작업에는 로컬 Codex 스킬 `~/.codex/skills/javaexperience-visual-learning/SKILL.md`의 절차를 적용한다. 다른 환경에서 스킬이 없어도 이 파일과 `docs/design/VISUAL-PLAN.md`의 규칙을 따른다. `docs/design/visual-parity.jsonl`에 시안 파일, 같은 뷰포트의 실제 화면 캡처, 둘의 차이, 기술 사실 검증 결과를 기록하고 `npm run audit:parity`로 검사한다. 그 증거가 없는 항목은 `verified`로 올리지 않는다.
+- 시안 중심 화면 작업에는 통합 `~/.codex/skills/gpt-image-prompt/SKILL.md` 하나를 적용한다. 기존 정교한 이미지 제작 기준과 한 작업에 집중한 학습 화면 기준을 이 스킬 안에서 선택한다. 한 화면에는 현재 만들 파일·요청·확인 결과를 우선하고, 전체 기술 깊이는 다음 화면과 이름이 분명한 심화 영역으로 이어 준다. 다른 환경에서 스킬이 없어도 이 파일과 `docs/design/VISUAL-PLAN.md`의 규칙을 따른다. `docs/design/visual-parity.jsonl`에 시안 파일, 같은 뷰포트의 실제 화면 캡처, 둘의 차이, 기술 사실 검증 결과를 기록하고 `npm run audit:parity`로 검사한다. 그 증거가 없는 항목은 `verified`로 올리지 않는다.
 - DB 시나리오 확장은 `docs/design/DB-SCENARIO-PLAN.md`에서 기존 M1~M10, 8장·9장, L12~L14와의 연결을 확인한다. `practice` 정답 데이터는 보존하고 대량 성능 실험은 별도 disposable 데이터에서 한다. 측정하지 않은 실행 계획·속도를 결과처럼 쓰지 않는다.
 - 각 화면과 내부의 긴 산문·표·코드·토글을 `docs/design/visual-inventory.jsonl`에서 하나씩 확인한다. `node tools/site/inventory-visual-work.mjs`로 목록을 갱신한다. 새 항목은 미검토로 남기고, 이미지 제작·구현·검증을 했다는 근거가 있을 때만 상태를 올린다.
 - 구성도만으로 개념 이해를 완료했다고 표시하지 않는다. 한 데이터가 Java 객체, 영속성 컨텍스트, SQL, MySQL 행에서 **언제 어떤 값인지** 보여 주고, `flush`/`commit`/`rollback`과 별도 DB 클라이언트의 관찰 시점을 구분한다. 기술 사실은 원문·실행 결과·공식 근거와 대조한다.
 - 처음 읽는 학습자가 핵심을 볼 수 있게 짧은 설명과 시각적 사례를 먼저 놓는다. 정답·긴 코드·원시 로그·Postman 설정처럼 필요할 때 보는 자료에만 접기 UI를 쓴다. 접힌 영역 안에 핵심 개념이 모두 숨어 있지 않은지 확인한다.
+- 프론트 화면을 다듬을 때는 설치된 `taste-skill`에서 이 정적 문서 사이트에 맞는 타이포·재질·상태·모바일 점검을 적용한다. `shadcn` 스킬은 `components.json`과 React/Tailwind 구성이 있는 프로젝트의 실제 컴포넌트 작업에 적용한다. 현재 문서 사이트에 해당 구성을 임의로 추가하거나 React로 옮기지 않는다.
 - UI 구현은 작은 범위로 나눠 서브에이전트에 맡길 수 있다. 메인 담당자는 시안과 실제 화면을 비교하고 원문 보존, 모바일 배치, 링크·코드·브라우저 동작을 검증한 뒤 상태를 갱신한다.
 - 생성 HTML까지 바뀌는 변경은 `cd tools/site && npm run build && npm run audit:visual && npm run audit:version-cards && npm run audit:parity`로 검증한다. 새 체크가 생기면 해당 화면의 사실 관계와 조작 흐름을 확인하는 검사도 추가한다. PR 업데이트는 검증된 변경을 묶어 올려 불필요한 CI 실행을 줄인다.

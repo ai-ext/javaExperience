@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderCompletePostMappingJourney } from './complete-post-mapping-journey.mjs';
+
+const source = fs.readFileSync(new URL('../../scenario/ch1-create-post/1-4-save-to-db.md', import.meta.url), 'utf8');
+const ddl = fs.readFileSync(new URL('../../docker/mysql/init/01-community.sql', import.meta.url), 'utf8');
+const html = renderCompletePostMappingJourney();
+assert.deepEqual([...html.matchAll(/data-mapping-panel="([^"]+)"/g)].map((item) => item[1]),
+  ['scenario', 'mapping', 'validate', 'author', 'run', 'time', 'values', 'default', 'observation', 'logs']);
+const first = html.slice(html.indexOf('data-mapping-panel="scenario"'), html.indexOf('data-mapping-panel="mapping"'));
+assert.match(first, /만들 것/);
+assert.match(first, /보낼 것/);
+assert.doesNotMatch(first, /201 Created|COUNT\(\*\)|500|채점 기준/);
+assert.match(source, /published_at = created_at AS same_time/);
+assert.match(ddl, /`published_at` datetime DEFAULT NULL/);
+assert.match(ddl, /`updated_at` datetime NOT NULL/);
+assert.match(html, /published_at = created_at/);
+assert.match(html, /@ManyToOne\(fetch = LAZY\)/);
+assert.match(html, /@JoinColumn\(name = "author_id"\)/);
+assert.match(html, /INSERT에 NULL 포함/);
+assert.match(html, /DB 기본값 대신 NOT NULL 오류/);
+assert.match(html, /13개 매핑 컬럼/);
+assert.equal((html.match(/data-mapping-image-field="/g) || []).length, 5);
+assert.match(html, /data-mapping-image-java>Member author/);
+assert.match(html, /data-mapping-image-column>author_id · BIGINT/);
+assert.match(html, /data-mapping-image-unknown hidden/);
+assert.match(html, /updated_at · DATETIME NOT NULL · 기본값 없음/);
+assert.match(html, /18-post-column-map-v2\.jpg/);
+assert.match(html, /19-ddl-validate-gap-v2\.jpg/);
+const client = fs.readFileSync(new URL('complete-post-mapping-journey.js', import.meta.url), 'utf8');
+assert.match(client, /status: \['String status'/);
+assert.match(client, /viewCount: \['Integer viewCount'/);
+assert.match(client, /mapping-image-unknown/);
+assert.match(html, /원문 정답 코드의 재현 로그 개념/);
+assert.doesNotMatch(html, /HTTP 5000|id = 22|published_at = '2026-/);
+console.log('1-4 장면 경계·DDL·동적 SQL·기본값 계약 검사 통과');

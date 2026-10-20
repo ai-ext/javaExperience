@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderFirstTransactionJourney } from './first-transaction-journey.mjs';
+
+const source = fs.readFileSync(new URL('../../scenario/ch1-create-post/1-3-service-layer.md', import.meta.url), 'utf8');
+const html = renderFirstTransactionJourney();
+const panels = [...html.matchAll(/data-tx-panel="([^"]+)"/g)].map((match) => match[1]);
+assert.deepEqual(panels, ['scenario', 'service', 'tags', 'run', 'links', 'count', 'failure', 'rollback']);
+assert.match(source, /public Post create\(PostCreateRequest request\)/);
+assert.match(html, /public Post create\(PostCreateRequest request\)/);
+assert.match(source, /"spring",\s*"채점태그",\s*"spring"/);
+assert.match(html, /post_tag pt JOIN tag t ON t.id = pt.tag_id/);
+assert.match(html, /SELECT COUNT\(\*\) FROM tag WHERE name = '채점태그'/);
+assert.match(html, /SELECT COUNT\(\*\) FROM tag WHERE name = '\[채점\]롤백태그'/);
+assert.match(html, /HTTP 500만으로는 롤백을 증명할 수 없습니다/);
+const intro = html.slice(html.indexOf('data-tx-panel="scenario"'), html.indexOf('data-tx-panel="service"'));
+assert.match(intro, /만들 것/);
+assert.match(intro, /보낼 것/);
+assert.doesNotMatch(intro, /201 Created|COUNT\(\*\)|채점 기준/);
+assert.doesNotMatch(html, /id = 22|post_id = 22|HTTP 5000/);
+console.log('1-3 장면 경계·요청/SQL 계약 검사 통과');

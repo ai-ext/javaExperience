@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DB-08. 좋아요 목록의 실행 계획을 읽고 가설 세우기</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=53f71b596d04">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+<link rel="stylesheet" href="../../tools/site/first-db-journey.css?v=7410d282ba16">
+<link rel="stylesheet" href="../../tools/site/db08-focused-journey.css?v=4b81ad10c8a8">
+</head>
+<body class="db08-focused-page">
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../README.html" aria-current="page">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<h1 id="db-08-좋아요-목록의-실행-계획을-읽고-가설-세우기"><a class="anchor" href="#db-08-좋아요-목록의-실행-계획을-읽고-가설-세우기" aria-hidden="true">#</a>DB-08. 좋아요 목록의 실행 계획을 읽고 가설 세우기</h1><section class="first-db-journey db08-focused" data-db08-screen="scenario" aria-label="DB-08 실행 계획을 읽고 가설 세우기">
+    <div class="db08-progress" aria-label="DB-08 학습 장면"><button type="button" data-db08-go="scenario" aria-current="step"><b>01</b><span>상황</span></button><button type="button" data-db08-go="fixture" aria-current="false"><b>02</b><span>실습 DB</span></button><button type="button" data-db08-go="query" aria-current="false"><b>03</b><span>핵심 SELECT</span></button><button type="button" data-db08-go="explain" aria-current="false"><b>04</b><span>EXPLAIN</span></button><button type="button" data-db08-go="indexes" aria-current="false"><b>05</b><span>인덱스 선택</span></button><button type="button" data-db08-go="estimate" aria-current="false"><b>06</b><span>접근·추정</span></button><button type="button" data-db08-go="extra" aria-current="false"><b>07</b><span>정렬 신호</span></button><button type="button" data-db08-go="hypothesis" aria-current="false"><b>08</b><span>가설</span></button></div>
+    <article class="db-journey-screen db08-screen" data-db08-panel="scenario" aria-labelledby="db08-scenario-title"><p class="db-journey-kicker">DB-08 · 먼저 사람의 문제</p><h2 id="db08-scenario-title">“내가 좋아요한 글 목록이 어디서 느려지는지 알고 싶어요.”</h2><p class="db-journey-lead">회원 12의 좋아요 목록을 읽는 핵심 SELECT의 계획을 보고 병목 가설을 한 줄로 적습니다.</p><div class="db08-intent"><div><small>만들 것</small><strong>실행 계획에 근거한 병목 가설 한 줄</strong></div><div><small>직접 할 것</small><strong>같은 SELECT에 EXPLAIN을 붙여 확인</strong></div></div><p class="db08-note"><code>GET /api/me/likes?size=10</code>을 위한 실습입니다. 이 페이지는 앱 API 호출이나 성능을 자동 측정하지 않습니다.</p><footer class="db-journey-actions db08-actions"><button type="button" class="db-journey-back" data-db08-go="scenario" disabled>← 이전</button><span>1 / 8</span><button type="button" class="db-journey-next" data-db08-go="fixture">실습 DB →</button></footer></article>
+    <article class="db-journey-screen db08-screen" data-db08-panel="fixture" hidden aria-labelledby="db08-fixture-title"><p class="db-journey-kicker">DB-08 · 격리 실습</p><h2 id="db08-fixture-title">내 기존 practice DB와 별개로 준비합니다.</h2><p class="db-journey-lead">전용 MySQL 8.4 컨테이너의 연결 대상을 확인한 뒤 읽기 전용 SELECT를 실행하세요.</p><div class="db08-fixture"><div><small>호스트·포트</small><strong>127.0.0.1:13319</strong></div><div><small>데이터베이스</small><strong>javaexperience_perf</strong></div><div><small>기본 합성 데이터</small><strong>post_like 500,000행</strong></div></div><div class="db08-code"><header><strong>저장소 루트 · fixture 시작</strong><span>읽기 전용 · 직접 실행</span></header><pre><code data-db08-code="fixture">tools/db-perf-fixture.sh up</code></pre><button type="button" data-db08-copy="fixture">복사</button><p data-db08-copy-state="fixture" role="status" aria-live="polite"></p></div><p class="db08-note">이미 실행 중이면 <code>up</code>은 데이터를 다시 만들지 않습니다. 연결·정리는 <a href="DB-10-performance-fixture.html">DB-10 fixture 원문</a>을 확인하세요.</p><footer class="db-journey-actions db08-actions"><button type="button" class="db-journey-back" data-db08-go="scenario">← 이전</button><span>2 / 8</span><button type="button" class="db-journey-next" data-db08-go="query">핵심 SELECT →</button></footer></article>
+    <article class="db-journey-screen db08-screen" data-db08-panel="query" hidden aria-labelledby="db08-query-title"><p class="db-journey-kicker">DB-08 · API에서 SQL로</p><h2 id="db08-query-title">좋아요 목록의 핵심 SELECT는 어떤 행을 읽나요?</h2><p class="db-journey-lead">회원 12의 좋아요를 최신순으로 11행 읽습니다. size 10에 한 행을 더해 다음 페이지 여부를 판단합니다.</p><div class="db08-contract"><span>GET /api/me/likes?size=10</span><b>→</b><span>member_id = 12</span><b>→</b><span>created_at DESC · id DESC</span><b>→</b><span>LIMIT 11</span></div><div class="db08-code"><header><strong>post_like 핵심 읽기 SQL · 원문</strong><span>읽기 전용 · 직접 실행</span></header><pre><code data-db08-code="query">SELECT l.id, l.post_id, l.created_at
+FROM post_like AS l
+WHERE l.member_id = 12
+ORDER BY l.created_at DESC, l.id DESC
+LIMIT 11;</code></pre><button type="button" data-db08-copy="query">복사</button><p data-db08-copy-state="query" role="status" aria-live="polite"></p></div><p class="db08-note">전체 API의 권한 JOIN·응답은 여기서 재현하지 않습니다. 실제 SELECT 결과와 API 응답은 별도로 확인합니다.</p><footer class="db-journey-actions db08-actions"><button type="button" class="db-journey-back" data-db08-go="fixture">← 이전</button><span>3 / 8</span><button type="button" class="db-journey-next" data-db08-go="explain">EXPLAIN →</button></footer></article>
+    <article class="db-journey-screen db08-screen" data-db08-panel="explain" hidden aria-labelledby="db08-explain-title"><p class="db-journey-kicker">DB-08 · 실행 전 계획</p><h2 id="db08-explain-title">같은 SELECT 앞에 EXPLAIN을 붙입니다.</h2><p class="db-journey-lead">내 DB에서 실행한 계획의 다섯 칸을 기록하세요. 처음에는 어떤 값도 채워져 있지 않습니다.</p><div class="db08-code"><header><strong>DB-08 원문 EXPLAIN · 읽기 전용</strong><span>읽기 전용 · 직접 실행</span></header><pre><code data-db08-code="explain">EXPLAIN
+SELECT l.id, l.post_id, l.created_at
+FROM post_like AS l
+WHERE l.member_id = 12
+ORDER BY l.created_at DESC, l.id DESC
+LIMIT 11;</code></pre><button type="button" data-db08-copy="explain">복사</button><p data-db08-copy-state="explain" role="status" aria-live="polite"></p></div><div class="db08-plan" role="table" aria-label="내 EXPLAIN 계획 기록"><div role="row"><strong role="columnheader">type</strong><strong role="columnheader">possible_keys</strong><strong role="columnheader">key</strong><strong role="columnheader">rows</strong><strong role="columnheader">Extra</strong></div><div role="row"><label role="cell"><span class="sr-only">type</span><input data-db08-record="type" aria-label="type 결과" placeholder="실행 후 기록"></label><label role="cell"><span class="sr-only">possible_keys</span><input data-db08-record="possible_keys" aria-label="possible_keys 결과" placeholder="실행 후 기록"></label><label role="cell"><span class="sr-only">key</span><input data-db08-record="key" aria-label="key 결과" placeholder="실행 후 기록"></label><label role="cell"><span class="sr-only">rows</span><input data-db08-record="rows" aria-label="rows 결과" placeholder="실행 후 기록"></label><label role="cell"><span class="sr-only">extra</span><input data-db08-record="extra" aria-label="extra 결과" placeholder="실행 후 기록"></label></div></div><p class="db08-note">EXPLAIN은 옵티마이저의 계획과 추정치입니다. SELECT 결과 행이나 실제 실행 시간이 아닙니다.</p><footer class="db-journey-actions db08-actions"><button type="button" class="db-journey-back" data-db08-go="query">← 이전</button><span>4 / 8</span><button type="button" class="db-journey-next" data-db08-go="indexes">인덱스 선택 →</button></footer></article>
+    <article class="db-journey-screen db08-screen" data-db08-panel="indexes" hidden aria-labelledby="db08-indexes-title"><p class="db-journey-kicker">DB-08 · 후보와 선택</p><h2 id="db08-indexes-title">possible_keys와 key는 같은 뜻이 아닙니다.</h2><p class="db-journey-lead">사용할 수 있다고 본 후보와 실제 선택된 인덱스를 나란히 읽으세요.</p><div class="db08-two"><div><small>possible_keys</small><strong>사용 가능하다고 본 후보</strong><span>후보가 여러 개일 수 있습니다.</span></div><div><small>key</small><strong>실제로 선택한 인덱스</strong><span>비어 있다면 조건과 통계도 함께 확인합니다.</span></div></div><label class="db08-field"><strong>내 선택 이유 가설</strong><small>계획에 표시된 후보와 선택을 보고 적으세요.</small><textarea data-db08-record="index-reason" rows="2" placeholder="내 실제 EXPLAIN 결과를 적으세요"></textarea></label><p class="db08-note">인덱스 이름을 외워 적지 마세요. 내 EXPLAIN 값을 먼저 확인합니다.</p><footer class="db-journey-actions db08-actions"><button type="button" class="db-journey-back" data-db08-go="explain">← 이전</button><span>5 / 8</span><button type="button" class="db-journey-next" data-db08-go="estimate">접근·추정 →</button></footer></article>
+    <article class="db-journey-screen db08-screen" data-db08-panel="estimate" hidden aria-labelledby="db08-estimate-title"><p class="db-journey-kicker">DB-08 · 추정 행 수</p><h2 id="db08-estimate-title">얼마나 읽을 거라고 예상할까요?</h2><p class="db-journey-lead">type은 접근 방식, rows는 그 단계에서 읽을 것으로 추정하는 행 수입니다.</p><div class="db08-two"><div><small>type</small><strong>데이터에 접근하는 방식</strong><span>내 EXPLAIN의 type을 확인합니다.</span></div><div><small>rows</small><strong>예상 읽기 행 수</strong><span>실제 실행 행 수와 다를 수 있습니다.</span></div></div><label class="db08-field"><strong>내 해석</strong><small>type과 rows를 함께 보고 예상 근거를 적으세요.</small><textarea data-db08-record="estimate-reason" rows="2" placeholder="내 실제 EXPLAIN 결과를 적으세요"></textarea></label><p class="db08-note"><code>rows</code>는 추정치입니다. 실제 읽은 행 수와 시간은 다음 단계의 EXPLAIN ANALYZE에서 구분해 확인합니다.</p><footer class="db-journey-actions db08-actions"><button type="button" class="db-journey-back" data-db08-go="indexes">← 이전</button><span>6 / 8</span><button type="button" class="db-journey-next" data-db08-go="extra">정렬 신호 →</button></footer></article>
+    <article class="db-journey-screen db08-screen" data-db08-panel="extra" hidden aria-labelledby="db08-extra-title"><p class="db-journey-kicker">DB-08 · 정렬 신호</p><h2 id="db08-extra-title">Extra에 정렬 단계가 보이나요?</h2><p class="db-journey-lead">Using filesort가 보인다면 별도 정렬 작업 가능성을 가설로 세웁니다.</p><div class="db08-two"><div><small>내 Extra</small><strong>EXPLAIN에서 확인해 기록</strong><span>표시된 문자열을 그대로 적습니다.</span></div><div><small>Using filesort</small><strong>별도 정렬 단계의 신호</strong><span>디스크 정렬이나 API 지연을 곧바로 뜻하지 않습니다.</span></div></div><label class="db08-field"><strong>내 정렬 가설</strong><small>표시 여부와 ORDER BY 조건을 함께 기록하세요.</small><textarea data-db08-record="sort-reason" rows="2" placeholder="내 실제 EXPLAIN 결과를 적으세요"></textarea></label><p class="db08-note">계획에 없다면 없다고 적습니다. 먼저 결과를 만든 뒤 해석하세요.</p><footer class="db-journey-actions db08-actions"><button type="button" class="db-journey-back" data-db08-go="estimate">← 이전</button><span>7 / 8</span><button type="button" class="db-journey-next" data-db08-go="hypothesis">가설 →</button></footer></article>
+    <article class="db-journey-screen db08-screen" data-db08-panel="hypothesis" hidden aria-labelledby="db08-hypothesis-title"><p class="db-journey-kicker">DB-08 · 한 문장 가설</p><h2 id="db08-hypothesis-title">계획에서 본 사실과 의심을 분리해 적습니다.</h2><p class="db-journey-lead">추정 계획을 바탕으로 다음 비교 대상을 정하세요. 실제 실행 확인은 다음 단계입니다.</p><div class="db08-records"><label class="db08-field"><strong>계획에서 본 사실</strong><small>내 EXPLAIN의 type·key·rows·Extra 중 근거를 적으세요.</small><textarea data-db08-record="fact" rows="2" placeholder="내 실제 EXPLAIN 결과를 적으세요"></textarea></label> <label class="db08-field"><strong>내가 의심하는 이유</strong><small>회원 조건과 정렬 조건을 연결해 설명하세요.</small><textarea data-db08-record="cause" rows="2" placeholder="내 실제 EXPLAIN 결과를 적으세요"></textarea></label> <label class="db08-field"><strong>다음에 비교할 것</strong><small>EXPLAIN ANALYZE에서 actual rows·loops·시간을 비교하세요.</small><textarea data-db08-record="next" rows="2" placeholder="내 실제 EXPLAIN 결과를 적으세요"></textarea></label></div><p class="db08-note"><strong>다음:</strong> EXPLAIN ANALYZE는 SELECT를 실제로 실행합니다. 인덱스 추가·숨김·복원·삭제는 전용 fixture에서만 수행합니다.</p><footer class="db-journey-actions db08-actions"><button type="button" class="db-journey-back" data-db08-go="extra">← 이전</button><span>8 / 8</span><a class="db-journey-next" href="DB-09-explain-analyze.html">다음 · EXPLAIN ANALYZE 실측 →</a></footer></article>
+    <details class="db-journey-reference"><summary>장면별 이미지 시안 8장 보기</summary><a href="../../docs/design/mockups-2026-10-16-batch29/01-scenario.jpg">01-scenario</a><a href="../../docs/design/mockups-2026-10-16-batch29/02-isolated-fixture.jpg">02-isolated-fixture</a><a href="../../docs/design/mockups-2026-10-16-batch29/03-api-to-select.jpg">03-api-to-select</a><a href="../../docs/design/mockups-2026-10-16-batch29/04-explain-plan.jpg">04-explain-plan</a><a href="../../docs/design/mockups-2026-10-16-batch29/05-possible-vs-key.jpg">05-possible-vs-key</a><a href="../../docs/design/mockups-2026-10-16-batch29/06-type-and-rows.jpg">06-type-and-rows</a><a href="../../docs/design/mockups-2026-10-16-batch29/07-extra-filesort.jpg">07-extra-filesort</a><a href="../../docs/design/mockups-2026-10-16-batch29/08-hypothesis.jpg">08-hypothesis</a></details>
+  </section><details class="db08-original" id="db08-original"><summary>원문 전체 · fixture·SELECT·EXPLAIN·완료 기준 펼치기</summary>
+<blockquote>
+<p>이번 시나리오: <code>GET /api/me/likes?size=10</code>의 핵심 조회가 어디에서 비효율적일지 <strong>EXPLAIN 계획을 읽고 한 문장으로 가설을 쓴다.</strong> 실제 성능과 인덱스 전후 비교는 다음 실습으로 나눈다.</p>
+</blockquote>
+<h2 id="1-상황과-범위"><a class="anchor" href="#1-상황과-범위" aria-hidden="true">#</a>1. 상황과 범위</h2>
+<p>“내가 좋아요한 글 목록이 느린 것 같아요. DB가 어디를 읽을지 먼저 알고 싶어요.”</p>
+<p>회원 12의 좋아요를 최신순으로 조회한다. 여기서는 <code>post_like</code> 테이블의 회원별 탐색과 정렬에만 초점을 둔다. 이 SELECT는 전체 API의 권한 JOIN이나 HTTP 응답을 재현하지 않는다. 현재 루트 앱의 API 구현·실행 여부도 이 페이지가 보증하지 않는다.</p>
+<h2 id="2-격리된-데이터-준비"><a class="anchor" href="#2-격리된-데이터-준비" aria-hidden="true">#</a>2. 격리된 데이터 준비</h2>
+<p>저장소 루트에서 <code>tools/db-perf-fixture.sh up</code>을 실행한다. 전용 MySQL 8.4 컨테이너는 <code>127.0.0.1:13319</code>, DB 이름은 <code>javaexperience_perf</code>다. 기본 합성 <code>post_like</code> 데이터는 500,000행이며 기존 <code>practice</code> DB와 분리된다. <strong>이미 컨테이너가 실행 중이면 <code>up</code>은 데이터를 다시 생성하지 않는다.</strong> <a href="DB-10-performance-fixture.html">DB-10 fixture 원문</a>에서 연결·스키마와 정리 절차를 확인한다.</p>
+<pre><code class="language-bash">tools/db-perf-fixture.sh up</code></pre>
+<p>실행한 적이 없다면 결과값은 아직 모른다. 연결한 DB가 <code>javaexperience_perf</code>인지 확인한 후 아래 읽기 전용 SQL을 실행한다.</p>
+<h2 id="3-api-요구를-핵심-select로-옮기기"><a class="anchor" href="#3-api-요구를-핵심-select로-옮기기" aria-hidden="true">#</a>3. API 요구를 핵심 SELECT로 옮기기</h2>
+<p><code>size=10</code>인 페이지의 <code>hasNext</code>를 판별할 수 있도록 <code>size + 1</code>, 즉 11행을 읽는다. 정렬 키는 좋아요 생성 시각과 ID다.</p>
+<pre><code class="language-sql">SELECT l.id, l.post_id, l.created_at
+FROM post_like AS l
+WHERE l.member_id = 12
+ORDER BY l.created_at DESC, l.id DESC
+LIMIT 11;</code></pre>
+<h2 id="4-같은-select의-explain"><a class="anchor" href="#4-같은-select의-explain" aria-hidden="true">#</a>4. 같은 SELECT의 EXPLAIN</h2>
+<pre><code class="language-sql">EXPLAIN
+SELECT l.id, l.post_id, l.created_at
+FROM post_like AS l
+WHERE l.member_id = 12
+ORDER BY l.created_at DESC, l.id DESC
+LIMIT 11;</code></pre>
+<p><code>EXPLAIN</code>은 옵티마이저의 계획과 추정치를 보여 준다. SELECT 결과 행이나 실제 걸린 시간은 아니다. 계획의 <code>type</code>, <code>possible_keys</code>, <code>key</code>, <code>rows</code>, <code>Extra</code>를 자신의 결과로 채운다. <code>possible_keys</code>는 후보, <code>key</code>는 실제 선택된 인덱스다. <code>rows</code>는 예상 행 수이며 실제 읽은 행 수가 아니다. <code>Extra</code>의 <code>Using filesort</code>는 별도 정렬 단계의 신호로 읽되, 디스크 정렬이나 API 지연이 확정됐다고 단정하지 않는다.</p>
+<h2 id="5-한-문장-가설"><a class="anchor" href="#5-한-문장-가설" aria-hidden="true">#</a>5. 한 문장 가설</h2>
+<p>내 계획에서 본 사실, 의심하는 이유, 다음에 비교할 것을 각각 적는다. “회원 조건으로 찾은 뒤 최신순 정렬에 추가 작업이 필요할 수 있다”처럼 실제 계획에 근거한 한 문장으로 좁힌다. <code>EXPLAIN ANALYZE</code>는 SELECT를 <strong>실제로 실행</strong>하므로 다음 단계에서 별도로 다룬다. 인덱스 생성과 복원도 전용 fixture에서만 수행한다. <a href="../ch9-schema-change/9-2-index-explain.html">9-2 전체 API 실습</a>의 <code>FORCE INDEX</code> 경로와 인덱스 <code>INVISIBLE</code> 실험을 섞지 않는다.</p>
+<h2 id="완료-기준"><a class="anchor" href="#완료-기준" aria-hidden="true">#</a>완료 기준</h2>
+<ul>
+<li>격리된 <code>javaexperience_perf</code> 연결 대상을 확인했다.</li>
+<li>위 SELECT와 같은 조건의 EXPLAIN 결과에서 <code>type</code>, <code>possible_keys</code>, <code>key</code>, <code>rows</code>, <code>Extra</code>를 기록했다.</li>
+<li>관측한 계획을 바탕으로 병목 가설과 다음 비교 방법을 한 문장씩 적었다.</li>
+<li>추정 계획과 실제 실행 측정을 구분해 설명할 수 있다.</li>
+</ul>
+</details>
+
+</main>
+
+<script src="../../tools/site/db08-focused-journey.js?v=6655aa440674" defer></script>
+
+
+
+</body>
+</html>

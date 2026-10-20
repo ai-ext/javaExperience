@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderConfigJourney } from './config-journey.mjs';
+
+const root = new URL('../../', import.meta.url);
+const source = fs.readFileSync(new URL('scenario/ch0-first-steps/0-6-gradle-and-yml.md', root), 'utf8');
+const html = renderConfigJourney(source);
+const panel = (index) => html.slice(html.indexOf(`data-first-java-panel="${index}"`), html.indexOf(`data-first-java-panel="${index + 1}"`) > -1 ? html.indexOf(`data-first-java-panel="${index + 1}"`) : undefined);
+assert.deepEqual([...html.matchAll(/data-first-java-panel="(\d+)"/g)].map((match) => Number(match[1])), [0,1,2,3,4,5,6]);
+for (const term of ['application.yml', 'ConfigController.java', 'GET /api/start/config']) assert.ok(panel(0).includes(term));
+for (const term of ['HTTP 200', 'maxItems', 'Caused by', 'YAML', 'JPA', '드라이버', '포트']) assert.ok(!panel(0).includes(term), `첫 장면 ${term} 누출`);
+assert.match(panel(1), /spring\.application\.name/);
+assert.match(panel(1), /기존 DB 설정을 임의로 교체하지/);
+assert.match(panel(2), /greeting: 반가워요, 백엔드!/);
+assert.match(panel(3), /public ConfigController\(@Value/);
+assert.match(panel(4), /data-first-java-request="A"/);
+assert.match(panel(4), /"maxItems":5/);
+assert.match(panel(5), /자동 채점은 원래 인사말을 기대/);
+assert.equal((html.match(/mockups-2026-10-16-batch41\//g) || []).length, 7);
+const index = JSON.parse(fs.readFileSync(new URL('docs/design/mockups-2026-10-16-batch41/asset-index.json', root), 'utf8'));
+assert.equal(index.images.filter((item) => item.role === 'scenario').length, 7);
+for (const item of index.images.filter((item) => item.role === 'scenario')) assert.ok(fs.existsSync(new URL(`docs/design/mockups-2026-10-16-batch41/${item.file}`, root)));
+const built = fs.readFileSync(new URL('scenario/ch0-first-steps/0-6-gradle-and-yml.html', root), 'utf8');
+for (const file of ['first-java-journey.css', 'config-journey.css', 'first-java-journey.js']) assert.ok(built.includes(file));
+assert.match(built, /class="first-java-original"/);
+assert.equal((built.match(/data-first-java-panel="/g) || []).length, 7);
+console.log('0-6 실습 7장면·현재 파일 경계·YAML·생성자·요청 A·재시작 계약 통과');

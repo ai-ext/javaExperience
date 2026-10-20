@@ -1,6 +1,6 @@
 # DB 시나리오 확장 계획
 
-> 상태: DB-01~07·12~14의 원문을 작성했고, DB-08~11은 9-2/R05와 격리 fixture에 연결했다. DB-14는 실제 스키마 조사와 게시판 목록 쿼리 실습을 추가했다. 새 화면의 시안 대조와 실제 API 검증은 진행 중이다.
+> 상태: DB-01~14의 원문을 작성하고 각 DB 시나리오의 집중 화면·장면별 이미지 시안을 구현했다. 이는 전수 화면 완료가 아니다. 동일 뷰포트 시안 대조와 실제 API 검증은 미완료이며, 격리 DB에서 검증한 SQL 범위만 별도로 기록한다.
 > 대상: javaExperience의 API·DB 학습 경로. 기존 `practice` 정답 데이터와 채점값은 유지한다.
 
 ## 목표
@@ -41,20 +41,20 @@ API 계약 → 응답 필드 → 테이블·관계 → 필터·정렬·조인 �
 
 | 단계 | 기획 | 원문/HTML | 이미지 시안 | 화면 구현 | DB·브라우저 검증 |
 |---|---|---|---|---|---|
-| DB-01 API 응답→테이블 | 완료 | 원문·HTML 생성 | 텍스트 없는 시안 1장·사실 대조 | 4단 흐름·SQL/행 비교 구현 | 데스크톱·360px 표시 확인, 실제 API 미확인·시안 대조 미완료 |
-| DB-02 SELECT·WHERE·커서 | 완료 | 원문·HTML 생성 | 텍스트 없는 imagegen 시안 1장·오류 검토 | 4단 커서 흐름·페이지 전환 구현 | practice seed 대조, 데스크톱·360px 표시와 전환 확인; 실제 API 미확인 |
-| DB-03 상세 JOIN | 완료 | 원문·HTML 생성 | 텍스트 없는 imagegen 시안 1장 | 4단 JOIN 흐름·접힌 SQL 구현 | seed 대조·데스크톱 토글 확인, 모바일·실제 API 미확인 |
-| DB-04 태그 JOIN·EXISTS | 완료 | 원문·HTML 생성 | 텍스트 없는 시안 1장 | 관계 행·중복·EXISTS 첫 화면 구현 | 데스크톱·360px 배치 확인, 실제 SQL 미확인 |
-| DB-05 집계·JOIN 곱셈 | 완료 | 원문·HTML 생성 | 텍스트 없는 시안 1장 | 2×3 행 곱셈 첫 화면 구현 | 데스크톱·360px 배치 확인, 실제 SQL 미확인 |
-| DB-06 포함·제외 서브쿼리 | 완료 | 원문·HTML 생성 | 텍스트 없는 imagegen 시안 1장 | 좋아요/북마크 행 비교·SQL 접기 구현 | 스키마 대조·데스크톱/360px 표시 확인, 실제 SQL 미확인 |
-| DB-07 JPA·MyBatis·QueryDSL | 완료 | 원문·HTML 생성 | 텍스트 없는 시안 1장 | 5방식 분기·역할별 코드 접기 구현 | 데스크톱·360px 배치 확인, 실행 코드 미확인 |
-| DB-08 EXPLAIN 가설 | 완료 | 9-2/R05 보강·HTML 생성 | 초안 1장·오류 검토 | 3상태 비교 교구 구현 | 데스크톱 상태·입력과 360px 배치 확인, 실제 API 미확인 |
-| DB-09 EXPLAIN ANALYZE 실측 | 완료 | 9-2/R05 보강·HTML 생성 | DB-08과 공통 초안 | 추정/실측 탭 구현 | 전용 fixture 10만 행 SQL 확인, 실제 API 미확인 |
-| DB-10 복합 인덱스 | 완료 | 9-2 보강·HTML 생성, 전용 fixture 실습 추가 | DB-08과 공통 초안 | 3상태 비교 교구 구현 | 전용 fixture 10만 행 계획·결과 확인, 실제 API 미확인 |
-| DB-11 추가·가시성·삭제 | 완료 | R05 독립 실습·전용 fixture 추가, 게시판 연속 실습 대기 | DB-08과 공통 초안 | 3상태 비교 교구 구현 | 전용 fixture CREATE/INVISIBLE/VISIBLE/DROP 확인, 360px 배치 확인, 실제 API 미확인 |
-| DB-12 JOIN·서브쿼리 계획 | 완료 | 원문·HTML 생성 | 텍스트 없는 시안 1장 | JOIN/EXISTS 대조·동일 결과 게이트·4단 흐름 구현 | 데스크톱·360px 배치 확인, 실제 EXPLAIN 미확인 |
-| DB-13 전체 추적·N+1 | 완료 | 원문·HTML 생성 | 텍스트 없는 시안 1장 | 5단 경로·쿼리 수 대비 구현 | 데스크톱·360px 배치 확인, 실제 API 계측 대기 |
-| DB-14 실제 스키마→느린 쿼리 | 완료 | 원문·HTML 생성 | imagegen 시안 2장 | 관계·요구사항·DB 탐색 3열과 계획 비교 구현 | 10만·50만 좋아요, FK·실행 계획·동일 결과 확인; 데스크톱·360px 배치 확인, 서버 API 미구현·캡처 대조 대기 |
+| DB-01 API 응답→테이블 | 완료 | 원문·HTML 재구성 | batch21 imagegen 6장 | 상황·필드 출처·WHERE/ORDER·메인 SQL·seed 첫 행·태그 배치 6장면 | seed·정적 계약 검사 통과, 실제 M1 API/동일 뷰포트 대조 미완료 |
+| DB-02 SELECT·WHERE·커서 | 완료 | 원문·HTML 재구성 | batch23 imagegen 5장 | 정렬 행·커서 두 키·SQL·offset/cursor 비교 5장면 | practice seed·정적 계약 통과, 새 집중 화면 실제 API/동일 뷰포트 미검증 |
+| DB-03 상세 JOIN | 완료 | 원문·HTML 재구성 | batch24 imagegen 5장 | 요구·필수/선택 JOIN·SQL·접근 정책 5장면 | seed·정적 계약 통과, 새 집중 화면 실제 API/동일 뷰포트 미검증 |
+| DB-04 태그 JOIN·EXISTS | 완료 | 원문·HTML 재구성 | batch25 imagegen 7장 | 관계·JOIN 중복·DISTINCT·EXISTS·태그 조립 7장면 | community seed·정적 SQL 검사 통과, MySQL/동일 뷰포트 미검증 |
+| DB-05 집계·JOIN 곱셈 | 완료 | 원문·HTML 재구성 | batch26 imagegen 9장 | 합성 2×3·COUNT 왜곡·CTE·사전 집계·M6/M9 9장면 | SQLite 합성 CTE 확인, MySQL/API·동일 뷰포트 미검증 |
+| DB-06 포함·제외 서브쿼리 | 완료 | 원문·HTML 재구성 | batch27 imagegen 10장 | NOT EXISTS/IN/LEFT JOIN·NULL 예외·결과 기록 10장면 | 스키마·인메모리 가상 SQL 확인, practice MySQL/동일 뷰포트 미검증 |
+| DB-07 JPA·MyBatis·QueryDSL | 완료 | 원문·HTML 생성 | batch28 imagegen 집중 시안 13장 | 공통 M1 계약·기준 SQL·다섯 대체 구현·태그/로그/cursor 13장면 | 정적 계약 검사 통과, 실제 overlay/루트 API·동일 뷰포트 대조 미완료 |
+| DB-08 EXPLAIN 가설 | 부분 구현 | 독립 원문·HTML 생성 | batch29 imagegen 8장 | 격리 fixture→원문 SELECT→EXPLAIN→열별 해석→가설 8장면 | 정적 계약·격리 MySQL 10만 행 1회 확인, API·동일 뷰포트 미검증 |
+| DB-09 EXPLAIN ANALYZE 실측 | 부분 구현 | 독립 원문·HTML 생성 | batch30 imagegen 7장 | 안전 범위→추정/실측 구분→TREE 출력→노드→동일 조건→결론 7장면 | 정적 계약·격리 MySQL 10만 행 TREE 확인, API·동일 뷰포트 미검증 |
+| DB-10 복합 인덱스 | 부분 구현 | fixture 원문·HTML 확장 | batch31 imagegen 8장 | 열 순서→변경 전→CREATE/통계→변경 후→ID·근거 8장면 | 정적 계약·격리 MySQL 10만 행 1회 확인, 기본 50만 행/API 결과 아님 |
+| DB-11 추가·가시성·삭제 | 부분 구현 | 독립 원문·HTML 생성 | batch32 imagegen 8장 | 대상→없으면 생성→VISIBLE→INVISIBLE→비교→복원→선택 제거 8장면 | 정적 계약·격리 MySQL 10만 행에서 숨김/복원/삭제 확인, API·동일 뷰포트 미검증 |
+| DB-12 JOIN·서브쿼리 계획 | 부분 구현 | 원문·HTML 재구성 | batch33 imagegen 집중 시안 12장 | M3 공개 글 SQL 쌍·결과 게이트 → M1 태그 확장 SQL 쌍·결과 게이트 → 네 계획·결론 12장면 | 일회용 practice 시드 복사본에서 두 쌍 결과 일치·4개 EXPLAIN·대표 ANALYZE 확인, 새 집중 화면 동일 뷰포트 미검증 |
+| DB-13 전체 추적·N+1 | 부분 구현 | 원문·HTML 재구성 | batch34 imagegen 집중 시안 12장 | M1 계약→Controller/Service/Repository→반복 조회→계측→작성자 projection·태그 일괄→응답·SQL 수 재확인 12장면 | 예시 SQL은 일회용 practice 복사본에서 확인, 실제 M1 API 계측·새 화면 동일 뷰포트 대조 미완료 |
+| DB-14 실제 스키마→느린 쿼리 | 부분 구현 | 원문·HTML 재구성 | 기존 2장 + batch35 imagegen 집중 시안 16장 | fixture→접속·DDL/FK→요구·JOIN→기준선→EXPLAIN/ANALYZE→복합 인덱스→결과·복원 16장면 | 격리 MySQL 10만 행에서 7테이블·FK 8개·전후/복원 동일 결과 확인, 새 화면 같은 뷰포트·실제 API 미검증 |
 
 ### 입문 — API에서 쿼리를 찾아낸다
 
@@ -209,4 +209,44 @@ DB 시나리오도 산문·긴 SQL을 단순히 토글로 쌓지 않는다. 각 
 
 ## 남은 검증
 
-DB-04·05·07·12·13·14의 HTML과 데스크톱·360px 브라우저 배치는 확인했다. imagegen 시안과 같은 뷰포트의 캡처 파일을 저장해 나란히 대조하는 일은 남았다. DB-08·09·11은 기존 9-2/R05와 연결되어 있으며 독립 단계 화면은 미완료다. 실제 M1/M3/M6 API의 실행과 SQL 로그 계측은 해당 API가 아직 루트 앱에 구현되지 않아 수행하지 못했다. 격리 fixture에서 확인한 인덱스 결과를 그 API의 성능 결과로 대체하지 않는다.
+DB-08~11 독립 집중 화면과 imagegen 시안은 구현했지만 이 화면들의 동일 뷰포트 데스크톱·360px 캡처 대조는 미완료다. 이전에 다른 DB 장면에서 수행한 브라우저 배치 확인을 새 화면의 검증으로 옮겨 표시하지 않는다. 실제 M1/M3/M6 API 실행과 SQL 로그 계측은 현재 루트 앱 구현 상태를 별도로 확인해야 하며, 이번 DB-08~11 작업에서 실행하지 않았다. 별도 격리 fixture 10만 행을 한 번 실행해 [확인 기록](DB08-11-FIXTURE-CHECK-2026-10-16.md)을 남겼지만 기본 50만 행 실측이나 API 성능 결과로 대체하지 않는다.
+
+## 2026-10-16 집중 화면 진행
+
+DB-01은 원문·HTML의 기존 4단 흐름 위에 imagegen batch21의 6개 집중 장면을 구현했다. API 응답의 `authorNickname`을 `post.author_id → member.id → member.nickname`으로 따라가고, 첫 페이지의 WHERE/ORDER, 메인 SQL, practice seed id145와 태그 일괄 조회를 각각 독립 화면으로 옮겼다. 원문 깊이는 접어 보존했다. 현재 체크아웃에는 M1 목록 API 구현이 없으므로 HTTP 실행은 하지 않았고 실제 DB SELECT 및 동일 뷰포트 이미지 대조도 미완료다. 별도 practice DB의 L12는 batch22 16개 시안으로 Q01–Q08의 API/쿼리 실습을 장면별 구현했다. 실제 서버·DB 실행과 같은 뷰포트 시각 대조는 미완료다.
+
+## DB-02 집중 화면 진행 (2026-10-16)
+
+DB-02에 batch23의 source-checked imagegen 시안 5장과 5개 DOM 장면을 구현했다. 정렬된 practice seed의 145→144→143→140, 마지막 반환 행 144의 `(published_at,id)` 커서, `LIMIT size+1`, 앞쪽 삽입을 가정한 offset 중복을 분리했다. 원문은 보존하고 가상 삽입과 실제 DB 결과를 구분한다. 빌드·정적 seed/SQL 검사는 통과했으나 실제 DB 실행·같은 뷰포트 대조는 미완료다.
+
+## DB-03 집중 화면 진행 (2026-10-16)
+
+DB-03에 batch24의 source-checked imagegen 시안 5장과 5개 DOM 장면을 구현했다. 글 145의 게시판 2/dev·작성자 6/밤샘개발자, viewer 7의 좋아요 존재·북마크 부재는 원문 seed 기준이며 실제 조회 결과로 표시하지 않는다. 선택 관계의 viewer 조건을 `ON`에 두는 이유와 SQL 이후 `PostAccessPolicy` 판정을 분리했다. 빌드·정적 계약 검사는 통과했으나 실제 DB/API·시각 대조는 미완료다.
+
+## DB-04·05 집중 화면 진행 (2026-10-16)
+
+DB-04에 batch25 imagegen 시안 7장과 JOIN 중복·DISTINCT 투영·EXISTS·목록 태그 조립의 7개 DOM 장면을 구현했다. community seed의 글 2번과 태그 spring/jpa만 기대값으로 사용한다. DB-05에 batch26 9장과 합성 2×3→COUNT 왜곡→사전 집계→M6/M9 응용을 구현했다. 2×3은 practice seed가 아니며, 새 읽기 전용 CTE를 SQLite 인메모리에서 실행해 여섯 쌍을 재현했다. MySQL과 M1/M6 서버 실측·동일 뷰포트 시각 대조는 미완료다.
+
+## DB-06 집중 화면 진행 (2026-10-16)
+
+DB-06에 batch27의 source-checked imagegen 시안 10장과 10개 DOM 장면을 구현했다. 실제 `bookmark.post_id`/`member_id`는 NOT NULL이고 `(member_id,post_id)`는 UNIQUE이므로 현재 스키마의 NOT IN 비교와 NULL 가상 예시를 분리했다. 회원 12의 실제 반환 ID는 만들지 않고 학습자가 네 SQL을 실행해 기록하도록 한다. 인메모리 가상 데이터로 SQL 의미를 확인했으나 MySQL practice seed·API/브라우저 검증은 미완료다.
+
+## DB-07 집중 화면 진행 (2026-10-16)
+
+DB-07에 batch28 실제 imagegen 시안 13장과 13개 DOM 장면을 구현했다. 원문 공통 SQL 및 파생·JPQL·native·MyBatis·QueryDSL 코드 조각을 그대로 사용한다. 다섯 방식은 대체 구현이며 한 요청에서 동시에 호출하지 않는다. 기준 첫 페이지의 Top20/PageRequest/LIMIT 예시와 M1의 가변 size·opaque cursor 완성 계약을 분리했다. 다섯 방식 실행 기록은 학습자가 입력한 ID만 서로 비교하며 실제 M1 API·L12–L14 overlay·MySQL 로그 실행은 미완료다.
+
+## DB-08~11 집중 화면 진행 (2026-10-16)
+
+DB-08 batch29 8장, DB-09 batch30 7장, DB-10 batch31 8장, DB-11 batch32 8장의 실제 imagegen 선택본과 각각의 DOM 장면을 구현했다. DB-08은 EXPLAIN 추정 계획과 가설, DB-09는 실제 실행되는 EXPLAIN ANALYZE TREE, DB-10은 `(member_id, created_at, id)` 인덱스 전후의 계획·ID 순서, DB-11은 인덱스 존재 확인·INVISIBLE·VISIBLE 복원·선택적 DROP으로 나눴다. 원문 SQL을 복사 가능한 코드로 가져오고 결과 칸은 비웠다. 이미지 초안의 잘못된 테이블·SQL·결과표·인덱스 이름은 제외했다. 격리 MySQL 10만 행의 계획·TREE·인덱스 가시성 전환은 [단일 실행 기록](DB08-11-FIXTURE-CHECK-2026-10-16.md)에 확인했고 전용 컨테이너를 제거했다. 실제 API와 동일 뷰포트 캡처는 확인하지 못했으므로 화면 상태는 `implemented`이며 페이지 전체 `verified`는 0이다.
+
+## DB-12 집중 화면 진행 (2026-10-16)
+
+DB-12에 [batch33](mockups-2026-10-16-batch33/asset-index.json) 실제 imagegen 선택 시안 12장과 12개 DOM 장면을 구현했다. 첫 화면은 상황·만들 SQL 두 가지·practice DB에서 직접 비교할 일만 두고, M3 공개 조건 쌍과 M1 태그 확장 쌍을 분리했다. 기존 상단 축약 쿼리의 누락된 `p.visibility = PUBLIC`도 원문 상세 SQL과 맞췄다. 네 원문 SELECT와 계획 명령은 코드 복사가 가능하며 결과·계획 입력은 실행 전 빈 상태다. [일회용 MySQL 확인](DB12-PRACTICE-COPY-CHECK-2026-10-16.md)에서는 M3 21행, 태그 16행의 JOIN/EXISTS 결과와 순서가 각각 같고, 네 EXPLAIN 및 대표 EXPLAIN ANALYZE가 실행됨을 확인했다. 이 실행은 전체 R1 권한이나 실제 M3/M1 API가 아니다. 새 집중 화면의 동일 뷰포트·모바일/브라우저 조작 대조는 미완료이며 parity 상태는 `implemented`다.
+
+## DB-13 집중 화면 진행 (2026-10-16)
+
+DB-13에 [batch34](mockups-2026-10-16-batch34/asset-index.json) 실제 imagegen 선택 시안 12장과 12개 DOM 장면을 구현했다. M1 첫 화면에는 사람의 문제·만들 기록·보낼 GET만 두고, 응답 7필드·Controller 입력·계층 역할·반복 조회의 1+N(+N) 설명·JPA/MyBatis 계측 방법·size 5/20 기록·작성자 projection·태그 일괄·컬렉션 fetch join 주의·변경 전후 응답/SQL 수·결론을 나눴다. `1+N(+N)`과 로그 수치는 실측으로 꾸미지 않는다. 2-4의 PostListQueryCountTest는 학습자 실습 예시이며 현재 루트 M1 측정 결과가 아니라는 점을 원문에서 분명히 했다. projection SQL에는 비로그인 PUBLIC 조건을 추가하고, 태그 ID 목록은 프레임워크에서 펼쳐 바인딩해야 한다고 설명했다. [일회용 MySQL 확인](DB13-PRACTICE-COPY-CHECK-2026-10-16.md)에서는 공개 글 projection 6행, 첫 다섯 글의 태그 batch 7행을 확인했다. 실제 M1 HTTP·N+1 계측, 동일 뷰포트·브라우저/모바일 확인은 미완료다.
+
+## DB-14 집중 화면 진행 (2026-10-16)
+
+DB-14에 [batch35](mockups-2026-10-16-batch35/asset-index.json) 선택 시안 16장과 16개 집중 DOM 장면을 구현했다. 첫 장면은 board-03의 목록 SELECT와 먼저 확인할 격리 DB 구조만 보여 주고, fixture 시작·DB 도구 접속·DATABASE()/테이블 확인·실제 DDL·FK와 열 이름 구분·UNIQUE/FK·응답 출처·WHERE/ORDER/LIMIT·JOIN SQL·기준 결과·EXPLAIN/EXPLAIN ANALYZE·인덱스 열 순서·CREATE/ANALYZE TABLE·전후 결과·DROP 복원을 순서대로 분리했다. 원문 전체와 이전 50만 행 단일 관찰은 접어 보존하고, 새 학습자 입력은 빈 상태다. [새 10만 행 fixture 확인](DB14-FIXTURE-CHECK-2026-10-16.md)에서 7테이블·FK 참조 8개, board-03 목록·JOIN 20행, 인덱스 전후 및 제거 후 같은 ID/응답·계획 복원을 확인하고 컨테이너를 제거했다. 이는 전체 visibility/R1 또는 HTTP API 실행이 아니다. 새 집중 화면의 동일 뷰포트·브라우저/모바일 조작 대조는 남았다.

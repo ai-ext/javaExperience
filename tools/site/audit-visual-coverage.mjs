@@ -138,8 +138,8 @@ const totals = {
 };
 if (items.length !== 101) failures.push(`단계 수 ${items.length}/101`);
 const imagegenMockups = [
-  { path: 'docs/design/hibernate-knowledge-screen-v1.png', appliedTo: 'docs/knowledge/S09-jpa-hibernate.html', pattern: '버전 비교 카드와 원문 표' },
-  { path: 'docs/design/scenario-code-workbench-v1.png', appliedTo: 'scenario/ch1-create-post/1-1-receive-request.html', pattern: '역할별 코드 탐색기와 누적 코드' },
+  { path: 'docs/design/hibernate-knowledge-screen-v1.jpg', appliedTo: 'docs/knowledge/S09-jpa-hibernate.html', pattern: '버전 비교 카드와 원문 표' },
+  { path: 'docs/design/scenario-code-workbench-v1.jpg', appliedTo: 'scenario/ch1-create-post/1-1-receive-request.html', pattern: '역할별 코드 탐색기와 누적 코드' },
 ];
 for (const mockup of imagegenMockups) if (!fs.existsSync(path.join(root, mockup.path))) failures.push(`imagegen 시안 없음: ${mockup.path}`);
 const report = {

@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { renderFirstJavaJourney } from './first-java-journey.mjs';
+
+const root = new URL('../../', import.meta.url);
+const source = fs.readFileSync(new URL('scenario/ch0-first-steps/0-1-ts-to-java.md', root), 'utf8');
+const markup = renderFirstJavaJourney(source);
+const panels = [...markup.matchAll(/data-first-java-panel="(\d+)"/g)];
+assert.deepEqual(panels.map((match) => Number(match[1])), Array.from({ length: 20 }, (_, index) => index));
+const first = markup.slice(markup.indexOf('data-first-java-panel="0"'), markup.indexOf('data-first-java-panel="1"'));
+for (const term of ['Greeting.java', 'GreetingController.java', 'GET /api/start/hello?name=김자바']) assert.ok(first.includes(term));
+for (const term of ['200', 'JSON', 'CORS', 'jdbc:', 'String name', '컴파일', '오류']) assert.ok(!first.includes(term), `첫 장면에 ${term}가 없어야 합니다`);
+for (const term of ['docker compose ps mysql', 'CorsConfig.java', 'record Greeting', '@RestController', '@GetMapping', '@RequestParam(defaultValue', 'String message', 'int nameLength', 'nameLength', 'required: String,String,int', 'MissingServletRequestParameterException']) assert.ok(markup.includes(term), `${term} 누락`);
+assert.equal((markup.match(/mockups-2026-10-16-batch36\//g) || []).length, 20);
+assert.equal((markup.match(/data-first-java-request="/g) || []).length, 2);
+assert.match(markup, /data-first-java-request="A"/);
+assert.match(markup, /data-first-java-request="B"/);
+const built = fs.readFileSync(new URL('scenario/ch0-first-steps/0-1-ts-to-java.html', root), 'utf8');
+for (const asset of ['first-java-journey.css', 'first-java-journey.js']) assert.ok(built.includes(asset));
+assert.match(built, /class="first-java-original"/);
+assert.equal((built.match(/data-first-java-panel="/g) || []).length, 20);
+assert.equal((built.match(/class="api-request" data-request-id="/g) || []).length, 2);
+assert.match(built, /id="scenario-base-url"/);
+const assetIndex = JSON.parse(fs.readFileSync(new URL('docs/design/mockups-2026-10-16-batch36/asset-index.json', root), 'utf8'));
+assert.equal(assetIndex.images.length, 20);
+for (const asset of assetIndex.images) assert.ok(fs.existsSync(new URL(`docs/design/mockups-2026-10-16-batch36/${asset.file}`, root)));
+console.log('0-1 스무 장면·첫 화면 정보 경계·원문 Java 코드·요청 A/B·이미지 연결 검사 통과');

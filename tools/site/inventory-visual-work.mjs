@@ -46,7 +46,7 @@ function writePageChecklist(summary) {
     }
     lines.push('');
   }
-  fs.writeFileSync(checklistPath, `${lines.join('\n')}\n`);
+  fs.writeFileSync(checklistPath, `${lines.join('\n').trimEnd()}\n`);
 }
 
 const args = process.argv.slice(2);
@@ -164,8 +164,14 @@ function collectHtml(page, html) {
   }
   // 새 시각 교구도 접기 UI와 별도 항목으로 남긴다. 같은 공통 구현이라도 페이지별 검증 상태는 독립적이다.
   const visualClasses = new Set(['jpa-journey', 'jpa-journey-step', 'jpa-journey-panel', 'jpa-journey-outcomes',
-    'p20-entity-map', 'p20-field-link', 'p20-runtime', 'p20-stage-button']);
-  for (const match of html.matchAll(/<(?:section|div|nav|button)\b([^>]*\bclass="([^"]+)"[^>]*)>/g)) {
+    'p20-entity-map', 'p20-field-link', 'p20-runtime', 'p20-stage-button',
+    'home-intro', 'home-task', 'home-preview', 'home-roadmap', 'home-method-grid', 'home-explore-grid',
+    'home-faq', 'home-environment', 'home-dialog', 'home-concept-thumbnail', 'home-object-stage',
+    'home-demo-result', 'home-cursor-preview', 'home-service-section', 'home-service-board',
+    'kc-catalog', 'kc-hero', 'kc-context', 'kc-browse', 'kc-empty', 'kc-sequence', 'kc-original-link', 'kc-detail-navigation',
+    'p16-json-visual', 'p16-navigation', 'p16-scene', 'p16-pair', 'p16-code-location', 'p16-actions',
+    'home-new-visual', 'home-new-stepper', 'home-new-plate', 'home-prepare-shortcut', 'home-return-work', 'home-preparation-steps']);
+  for (const match of html.matchAll(/<(?:section|header|footer|div|nav|button|article|aside|dialog|figure|p|ol)\b([^>]*\bclass="([^"]+)"[^>]*)>/g)) {
     const classes = match[2].split(/\s+/);
     for (const component of classes) {
       if (!visualClasses.has(component)) continue;

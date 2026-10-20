@@ -82,12 +82,13 @@ A0에서는 코드를 "이렇게 쓴다"로만 따라 쳤다. 이제 그 코드�
 
 ### 준비
 
-**① DB가 떠 있는지 본다.** 실습 레포에는 DB를 쓰는 라이브러리(JPA)가 이미 들어 있다. 그래서 0장처럼 DB를 안 쓰는 코드만 있어도, DB가 꺼져 있으면 앱이 아예 뜨지 않는다.
+**① 앱이 실제로 연결할 DB 주소와 컨테이너 상태를 맞춘다.** 실습 레포에는 DB를 쓰는 라이브러리(JPA)가 이미 들어 있다. 그래서 이 API 자체가 DB 행을 저장하지 않아도, 활성 datasource가 MySQL을 가리키는데 DB에 연결할 수 없으면 앱이 뜨지 않는다.
 
-실습 DB는 javaExperience MySQL(`localhost:13308`) 안에 있다([시작하기](../../README.md)에서 `application.yml`을 이 DB로 맞췄다). javaExperience DB 컨테이너가 떠 있으면 된다.
+현재 작업 트리의 `application.yml` 활성 URL은 `jdbc:mysql://localhost:3306/community`이고, [Compose](../../compose.yaml)의 기본 **호스트** 포트는 `13308`이다. Compose MySQL을 사용할 때는 `application.yml`의 포트를 실제 노출 포트(`13308`, `DB_PORT`를 바꿨다면 그 값)에 맞춰야 한다. 이 불일치는 코드의 정답이나 인사 API 로직과 별개인 **시작 설정**이다. H2 설정을 의도적으로 활성화했다면 MySQL 준비가 필요 없는지 활성 설정을 확인한다.
 
 ```bash
-docker compose ps mysql   # STATUS가 Up … (healthy)면 준비 끝
+docker compose up -d mysql  # 실행 중인 볼륨은 보존한다
+docker compose ps mysql     # STATUS가 Up … (healthy)인지 확인
 ```
 
 이걸 빼먹고 `Main`을 실행하면 로그 맨 아래에 이런 줄이 나오고 앱이 꺼진다(실측, Boot 4.1.1). 왜 그런지는 0-6에서 본다.
@@ -113,7 +114,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-// 브라우저 화면가 다른 출처인 이 서버의 응답을 읽도록 허락한다. 자세한 이유는 1-1
+// 브라우저 화면과 다른 출처인 이 서버의 응답을 읽도록 허락한다. 자세한 이유는 1-1
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
 

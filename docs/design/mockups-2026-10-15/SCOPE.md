@@ -129,9 +129,9 @@ MVC 문서 하나도 상단 그림 한 장으로 끝내지 않는다. 화면 전
 
 | 시안 | 상태 | 확인한 내용 |
 |---|---|---|
-| [MVC의 의미](01-mvc-meaning-v1.png) | mockup_ready | Model·View·Controller와 계층형 구조 구분, HTML·JSON 응답 비교 |
-| [요청과 응답](02-request-story-v2.png) | mockup_ready | 잘못 생성된 JSON 응답을 plain text success로 교정, 실제 단계명 교정 |
-| [JPA 상태 비교](03-jpa-state-v3.png) | mockup_ready | setter/flush 값, commit·rollback 분기, 별도 DB 연결, 격리 조건 |
-| [동시성 시간선](04-concurrency-timeline-v1.png) | mockup_ready | 두 요청이 같은 5를 읽고 6으로 덮는 순서, 원자 UPDATE와 중복 방지 구분 |
+| [MVC의 의미](01-mvc-meaning-v1.jpg) | mockup_ready | Model·View·Controller와 계층형 구조 구분, HTML·JSON 응답 비교 |
+| [요청과 응답](02-request-story-v2.jpg) | mockup_ready | 잘못 생성된 JSON 응답을 plain text success로 교정, 실제 단계명 교정 |
+| [JPA 상태 비교](03-jpa-state-v3.jpg) | mockup_ready | setter/flush 값, commit·rollback 분기, 별도 DB 연결, 격리 조건 |
+| [동시성 시간선](04-concurrency-timeline-v1.jpg) | mockup_ready | 두 요청이 같은 5를 읽고 6으로 덮는 순서, 원자 UPDATE와 중복 방지 구분 |
 
 생성 이미지를 직접 보고 핵심 문구·값·분기를 원문과 대조했다. 4장의 버튼·애니메이션·모바일·학습 성취는 아직 검증하지 않았다. 기존 visual-inventory의 구현/verified 상태는 변경하지 않았다. 전체 프롬프트, 수정 지시, 파일 해시와 상태는 함께 저장한 JSON 파일에 남겼다.
