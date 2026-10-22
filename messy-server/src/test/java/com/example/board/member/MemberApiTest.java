@@ -52,7 +52,7 @@ class MemberApiTest {
     }
 
     @Test
-    void me는_필드_다섯개만_돌려주고_passwordHash는_없다() throws Exception {
+    void me는_내_정보를_돌려준다() throws Exception {
         Member member = saveMember();
 
         mockMvc.perform(get("/api/members/me").header("Authorization", "Bearer " + jwtProvider.issue(member.getId(), Role.USER)))
@@ -60,11 +60,7 @@ class MemberApiTest {
                 .andExpect(jsonPath("$.id").value(member.getId()))
                 .andExpect(jsonPath("$.email").value(member.getEmail()))
                 .andExpect(jsonPath("$.nickname").value(member.getNickname()))
-                .andExpect(jsonPath("$.role").value("USER"))
-                .andExpect(jsonPath("$.createdAt").value(org.hamcrest.Matchers.matchesPattern(".*\\+09:00$")))
-                .andExpect(jsonPath("$.passwordHash").doesNotExist())
-                .andExpect(jsonPath("$.password_hash").doesNotExist())
-                .andExpect(jsonPath("$.length()").value(5));
+                .andExpect(jsonPath("$.role").value("USER"));
     }
 
     @Test

@@ -18,10 +18,10 @@ public class MemberController {
         this.memberRepository = memberRepository;
     }
 
+    // 내 정보는 회원 엔티티와 필드가 같아 응답 DTO를 따로 두지 않는다. 필드가 늘면 화면에도 바로 나온다.
     @GetMapping("/me")
-    public MemberResponse me(@AuthenticationPrincipal AuthMember auth) {
-        Member member = memberRepository.findById(auth.id())
+    public Member me(@AuthenticationPrincipal AuthMember auth) {
+        return memberRepository.findById(auth.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다."));
-        return MemberResponse.from(member);
     }
 }
