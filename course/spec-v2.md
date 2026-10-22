@@ -31,8 +31,9 @@
 | `instance` | string | 요청 경로 |
 | `errors[]` | array | 필드 검증 실패 목록. 항목은 `{field, reason}` |
 
-- 상태 코드: 400 검증 실패, 401 인증 없음·만료, 403 권한 없음, 404 대상 없음, 409 중복·충돌, 422 같은 `Idempotency-Key`에 다른 본문, 429 시도 횟수 초과, 502/504 PG 오류·시간 초과.
+- 상태 코드: 400 검증 실패, 401 인증 없음·만료, 403 권한 없음, 404 대상 없음, 409 중복·충돌, 422 같은 `Idempotency-Key`에 다른 본문, 429 시도 횟수 초과, 502 PG 거절·PG에 닿지 못함, 504 PG 결과 불명(시간 초과·5xx 재시도 소진).
 - 401·403도 같은 ProblemDetail 형식이다(`SecurityFilterChain`의 진입점·거부 핸들러에서 만든다).
+- 예외: 허용 목록 밖 출처의 CORS 요청(preflight 포함) 거부는 Spring CORS 처리기의 기본 응답(403, `text/plain` `Invalid CORS request`)이다. 브라우저는 CORS 거부 응답의 본문을 스크립트에 넘기지 않으므로 ProblemDetail로 바꾸지 않는다.
 - 시간은 ISO-8601 KST 오프셋 문자열이다. 예: `2026-10-22T09:30:00+09:00`.
 - 목록은 커서 방식이다. 요청 파라미터는 `cursor`(생략하면 처음부터), `size`(기본 20, 최대 50)이다. 응답은 `items`와 `nextCursor`이며, 마지막 쪽이면 `nextCursor`는 `null`이다.
 - `size`가 1 미만이거나 50 초과면 400이다.
@@ -162,7 +163,8 @@
 | POST /api/me/points/charges | `Idempotency-Key` | header | O | 8~64자, 영문·숫자·`-` | 400 `/errors/validation` |
 | POST /api/me/points/charges | `amount` | int | O | 1,000~1,000,000, 1,000 단위 | 400 `/errors/validation` |
 | POST /api/me/points/charges | (PG 시간 초과) | - | - | 결과 불명, `pg_payment` 상태 `UNKNOWN`으로 남긴다 | 504 `/errors/pg-timeout` |
-| POST /api/me/points/charges | (PG 거절) | - | - | 승인 실패 | 502 `/errors/pg-declined` |
+| POST /api/me/points/charges | (PG 5xx, 재시도 소진) | - | - | 결과 불명(PG가 처리했을 수 있다), `UNKNOWN`으로 남긴다 | 504 `/errors/pg-timeout` |
+| POST /api/me/points/charges | (PG 거절·PG에 닿지 못함) | - | - | 승인 실패(4xx 거절, 연결 실패·커넥션 풀 대기 초과), `FAILED`로 남긴다 | 502 `/errors/pg-declined` |
 | POST /api/pg/callbacks | `X-PG-Signature` | header | O | 7절 서명 규칙 | 401 `/errors/invalid-signature` |
 | POST /api/pg/callbacks | `orderId` | string | O | 기존 `pg_payment.order_id`와 같아야 함 | 404 `/errors/not-found` |
 | POST /api/pg/callbacks | `paymentKey` | string | O | 1~64자 | 400 `/errors/validation` |
@@ -170,6 +172,8 @@
 | POST /api/pg/callbacks | `amount` | int | O | 양수, 저장된 충전 금액과 같아야 함 | 400 `/errors/validation` |
 
 같은 `paymentKey`의 콜백이 여러 번 와도 포인트는 한 번만 적립한다.
+
+같은 `Idempotency-Key`로 다시 보내면 PG를 다시 부르지 않고 저장된 상태로 답한다(`DONE`은 처음 응답, `FAILED`는 502, `REQUESTED`·`UNKNOWN`은 504).
 
 `UNKNOWN` 충전은 콜백이나 `GET /pg/v1/payments?orderId={orderId}` 조회(예: 재처리 워커)로만 확정하고, 추측으로 성공·실패를 정하지 않는다.
 
