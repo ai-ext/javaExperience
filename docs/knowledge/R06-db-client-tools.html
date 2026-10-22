@@ -50,7 +50,7 @@ Database: ds_practice   User: practice</code></pre>
 <li><p><strong>DBeaver는 앱의 DB 드라이버 설정을 대신하지 않는다.</strong> 앱 연결은 별도 빌드 설정이다. Gradle Kotlin DSL은 <code>runtimeOnly(&quot;com.mysql:mysql-connector-j&quot;)</code>, Maven은 같은 좌표의 <code>&lt;dependency&gt;</code>를 쓴다. 버전과 접속 설정은 → <a class="docref" href="P19-mysql-jpa-setup.html">P19</a> 참조. DBeaver만 쓸 때 앱 빌드는 바꾸지 않는다.</p>
 </li>
 </ol>
-</div></details><details class="knowledge-chapter"><summary id="3-따라-하기" aria-label="3. 따라 하기 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 따라 하기</strong><small>1단계 — 실행 중인 연습 DB의 포트와 계정 확인 · 2단계 — DBeaver에서 연결 만들기 · 3단계 — 문자셋과 로컬 공개키 검색 옵션 · 4단계 — 테이블을 살펴보고 쿼리 결과 읽기</small></span><span class="knowledge-chapter-meta">6개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details><details class="knowledge-chapter"><summary id="3-따라-하기" aria-label="3. 따라 하기 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 따라 하기</strong><small>1단계 — 실행 중인 연습 DB의 포트와 계정 확인 · 2단계 — DBeaver에서 연결 만들기 · 3단계 — 문자셋과 로컬 공개키 검색 옵션 · 4단계 — 테이블을 살펴보고 쿼리 결과 읽기</small></span><span class="knowledge-chapter-meta">8개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>아래는 Spring Boot 4.1 / Java 25 앱 변경이 아닌 로컬 DB 클라이언트 실습이다. 연습 DB는 <code>ds_practice</code>이며 SQL 결과는 **(예상)**이다. MySQL·Docker는 실행하지 않았다.</p>
 <pre class="mermaid">flowchart LR
   A[&quot;DBeaver 화면&quot;] --&gt; B[&quot;JDBC API 호출&quot;]
@@ -157,6 +157,12 @@ FROM member
 WHERE member_status = 'ACTIVE'
 ORDER BY created_at DESC
 LIMIT 20;</code></pre>
+<p>이 저장소의 <code>practice</code> DB에는 <code>login_id</code>·<code>name</code> 열이 없다(<code>member</code>는 <code>email</code>·<code>nickname</code>). 그쪽에 연결했다면 아래처럼 바꿔 실행한다.</p>
+<pre><code class="language-sql">SELECT id, email, nickname, member_status, created_at
+FROM member
+WHERE member_status = 'ACTIVE'
+ORDER BY created_at DESC
+LIMIT 20;</code></pre>
 <p><strong>(예상)</strong> 결과 그리드에 활성 회원의 최대 20행이 표시된다. 행을 더블클릭하면 데이터 편집기가 열리지만, 이 조회에서는 값을 바꾸지 않는다. 컬럼 헤더 정렬이나 필터를 사용해도 SQL이 어떻게 바뀌었는지 확인하면 학습에 도움이 된다.</p>
 <p><strong>확인 방법:</strong> 행 수와 컬럼명을 본다. 제한을 늘릴 때는 WHERE와 조회 컬럼을 먼저 좁히고 무제한 <code>SELECT *</code>를 피한다.</p>
 </div></details><details class="knowledge-topic"><summary id="5단계--안전하게-데이터-편집-연습하기" aria-label="5단계 — 안전하게 데이터 편집 연습하기 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">5단계 — 안전하게 데이터 편집 연습하기</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
@@ -172,7 +178,19 @@ FROM product
 WHERE id = 1;
 
 ROLLBACK;</code></pre>
-<p><strong>(예상)</strong> 조회 중에는 재고가 1 증가한 것처럼 보이고 <code>ROLLBACK</code> 후에는 원래 값으로 돌아간다. 실제로 이 SQL을 문서 검수 과정에서 실행하지 않았다. DDL처럼 MySQL에서 암묵적으로 커밋될 수 있는 문장은 롤백 보호로 간주하지 않는다. 운영 데이터는 이 실습을 실행하지 말고 승인된 절차를 따른다.</p>
+<p>이 저장소의 <code>practice</code> DB에는 <code>product</code>가 없다. 그쪽에서는 글 조회수로 같은 연습을 한다.</p>
+<pre><code class="language-sql">START TRANSACTION;
+
+UPDATE post
+SET view_count = view_count + 1
+WHERE id = 1;
+
+SELECT id, title, view_count
+FROM post
+WHERE id = 1;
+
+ROLLBACK;</code></pre>
+<p><strong>(예상)</strong> 조회 중에는 재고(이 저장소에서는 조회수)가 1 증가한 것처럼 보이고 <code>ROLLBACK</code> 후에는 원래 값으로 돌아간다. 실제로 이 SQL을 문서 검수 과정에서 실행하지 않았다. DDL처럼 MySQL에서 암묵적으로 커밋될 수 있는 문장은 롤백 보호로 간주하지 않는다. 운영 데이터는 이 실습을 실행하지 말고 승인된 절차를 따른다.</p>
 <p><strong>확인 방법:</strong> UPDATE 행 수와 최종 <code>ROLLBACK</code>을 확인한다. auto-commit off여도 <code>COMMIT</code>을 누르면 변경은 확정된다.</p>
 </div></details><details class="knowledge-topic"><summary id="6단계--erd와-csv-내보내기" aria-label="6단계 — ERD와 CSV 내보내기 펼치기"><span class="knowledge-topic-no">06</span><strong role="heading" aria-level="3">6단계 — ERD와 CSV 내보내기</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <ol>
@@ -180,7 +198,7 @@ ROLLBACK;</code></pre>
 <li>결과 그리드 또는 테이블에서 <strong>Export Data</strong>를 선택한다.</li>
 <li>필요한 행과 컬럼만 선택하고 CSV 같은 형식을 고른다. 저장 위치, 문자 인코딩, 헤더 포함 여부를 확인한 뒤 내보낸다.</li>
 </ol>
-<p><strong>확인 방법:</strong> ERD에서 <code>orders → order_item</code>의 외래 키를 확인한다. CSV는 직접 열어 컬럼명과 한글이 올바르게 표시되는지 확인하되, <code>member.email</code>, <code>member.phone</code>, 배송 주소처럼 개인을 식별할 수 있는 데이터는 업무 승인 없이 로컬 파일이나 공유 폴더로 내보내지 않는다.</p>
+<p><strong>확인 방법:</strong> ERD에서 <code>orders → order_item</code>의 외래 키를 확인한다(이 저장소 <code>practice</code> DB라면 <code>post → member</code>의 <code>fk_post_author</code>). CSV는 직접 열어 컬럼명과 한글이 올바르게 표시되는지 확인하되, <code>member.email</code>, <code>member.phone</code>, 배송 주소처럼 개인을 식별할 수 있는 데이터는 업무 승인 없이 로컬 파일이나 공유 폴더로 내보내지 않는다.</p>
 </div></details><details class="knowledge-topic"><summary id="원격-db--ssh-터널과-tls" aria-label="원격 DB — SSH 터널과 TLS 펼치기"><span class="knowledge-topic-no">07</span><strong role="heading" aria-level="3">원격 DB — SSH 터널과 TLS</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>원격 DB 포트를 인터넷에 직접 열어 두는 대신 SSH 터널을 쓸 수 있다. Connection 설정의 <strong>SSH</strong> 탭에서 점프 서버의 주소·포트(보통 SSH 서비스 포트)·사용자와 SSH 키를 지정한다. DB 탭에는 점프 서버에서 도달할 수 있는 DB의 사설 주소와 DB 포트를 입력한다. SSH 계정은 DB 계정과 별개다.</p>
 <pre class="mermaid">flowchart LR

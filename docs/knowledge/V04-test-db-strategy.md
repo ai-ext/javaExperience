@@ -24,7 +24,7 @@
 
    이 스키마는 MySQL 8.4의 `utf8mb4_0900_ai_ci`, `CHECK`, `AUTO_INCREMENT`를 쓴다. 대소문자 정렬 규칙이나 MySQL 함수·`ON DUPLICATE KEY UPDATE`·`SELECT ... FOR UPDATE`를 확인하려면 H2 `MODE=MySQL`이 아니라 MySQL 컨테이너에서 검증한다. 호환 모드는 MySQL 서버 자체가 아니다.
 3. **`@DataJpaTest` 기본값에 주의한다.** JPA slice만 올리고 테스트마다 롤백하며 임베디드 DB가 있으면 DataSource를 교체한다. 실 DB를 쓰려면 `@AutoConfigureTestDatabase(replace = Replace.NONE)`를 둔다. Boot 4 import는 `org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest`, `org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase`다.
-4. **연결 정보·버전:** `@ServiceConnection`으로 컨테이너 연결을 자동 설정한다. 이 프로젝트는 `spring-boot-starter-data-jpa-test`, `spring-boot-testcontainers`, `testcontainers-mysql`, `testcontainers-junit-jupiter`를 Boot 4.1.1 관리 버전(Testcontainers 2.0.5)으로 쓴다.
+4. **연결 정보·버전:** `@ServiceConnection`으로 컨테이너 연결을 자동 설정한다. 원래 공부자료의 예제 프로젝트(`practice/starter`, 이 저장소에는 없다)는 `spring-boot-starter-data-jpa-test`, `spring-boot-testcontainers`, `testcontainers-mysql`, `testcontainers-junit-jupiter`를 Boot 4.1.1 관리 버전(Testcontainers 2.0.5)으로 쓴다. 이 저장소 루트 `build.gradle`에는 그중 `spring-boot-starter-data-jpa-test`와 `testcontainers-mysql`이 있다.
 5. **작은 fixture부터 준비한다.** 고정 시드는 통계·페이지 총계처럼 넓은 데이터가 필요할 때만 쓴다. 한 테스트에 필요한 행은 테스트 본문/팩토리로 만들고, 정적 SQL은 `@Sql`, 공통 기반 데이터는 시드 파일로 둔다.
 6. **초기화와 fixture를 분리한다.** `spring.sql.init.*`는 컨텍스트의 스키마·공통 시드, `@Sql`은 메서드 전후의 테스트별 SQL에 쓴다. 트랜잭션에 참여한 SQL은 롤백되지만 별도 커밋·연결은 정리 대상이다.
 7. **SQL 시점을 확인한다.** JPA는 flush 때 쓰기를 모아 보낼 수 있으므로 제약 위반/쿼리 오류를 잡을 때 `entityManager.flush()`를 사용한다. 단 `Product`의 `IDENTITY` 키처럼 `save()` 때 일찍 INSERT하는 전략도 있다.

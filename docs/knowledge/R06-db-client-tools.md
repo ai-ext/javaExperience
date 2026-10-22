@@ -123,6 +123,16 @@ ORDER BY created_at DESC
 LIMIT 20;
 ```
 
+이 저장소의 `practice` DB에는 `login_id`·`name` 열이 없다(`member`는 `email`·`nickname`). 그쪽에 연결했다면 아래처럼 바꿔 실행한다.
+
+```sql
+SELECT id, email, nickname, member_status, created_at
+FROM member
+WHERE member_status = 'ACTIVE'
+ORDER BY created_at DESC
+LIMIT 20;
+```
+
 **(예상)** 결과 그리드에 활성 회원의 최대 20행이 표시된다. 행을 더블클릭하면 데이터 편집기가 열리지만, 이 조회에서는 값을 바꾸지 않는다. 컬럼 헤더 정렬이나 필터를 사용해도 SQL이 어떻게 바뀌었는지 확인하면 학습에 도움이 된다.
 
 **확인 방법:** 행 수와 컬럼명을 본다. 제한을 늘릴 때는 WHERE와 조회 컬럼을 먼저 좁히고 무제한 `SELECT *`를 피한다.
@@ -145,7 +155,23 @@ WHERE id = 1;
 ROLLBACK;
 ```
 
-**(예상)** 조회 중에는 재고가 1 증가한 것처럼 보이고 `ROLLBACK` 후에는 원래 값으로 돌아간다. 실제로 이 SQL을 문서 검수 과정에서 실행하지 않았다. DDL처럼 MySQL에서 암묵적으로 커밋될 수 있는 문장은 롤백 보호로 간주하지 않는다. 운영 데이터는 이 실습을 실행하지 말고 승인된 절차를 따른다.
+이 저장소의 `practice` DB에는 `product`가 없다. 그쪽에서는 글 조회수로 같은 연습을 한다.
+
+```sql
+START TRANSACTION;
+
+UPDATE post
+SET view_count = view_count + 1
+WHERE id = 1;
+
+SELECT id, title, view_count
+FROM post
+WHERE id = 1;
+
+ROLLBACK;
+```
+
+**(예상)** 조회 중에는 재고(이 저장소에서는 조회수)가 1 증가한 것처럼 보이고 `ROLLBACK` 후에는 원래 값으로 돌아간다. 실제로 이 SQL을 문서 검수 과정에서 실행하지 않았다. DDL처럼 MySQL에서 암묵적으로 커밋될 수 있는 문장은 롤백 보호로 간주하지 않는다. 운영 데이터는 이 실습을 실행하지 말고 승인된 절차를 따른다.
 
 **확인 방법:** UPDATE 행 수와 최종 `ROLLBACK`을 확인한다. auto-commit off여도 `COMMIT`을 누르면 변경은 확정된다.
 
@@ -155,7 +181,7 @@ ROLLBACK;
 2. 결과 그리드 또는 테이블에서 **Export Data**를 선택한다.
 3. 필요한 행과 컬럼만 선택하고 CSV 같은 형식을 고른다. 저장 위치, 문자 인코딩, 헤더 포함 여부를 확인한 뒤 내보낸다.
 
-**확인 방법:** ERD에서 `orders → order_item`의 외래 키를 확인한다. CSV는 직접 열어 컬럼명과 한글이 올바르게 표시되는지 확인하되, `member.email`, `member.phone`, 배송 주소처럼 개인을 식별할 수 있는 데이터는 업무 승인 없이 로컬 파일이나 공유 폴더로 내보내지 않는다.
+**확인 방법:** ERD에서 `orders → order_item`의 외래 키를 확인한다(이 저장소 `practice` DB라면 `post → member`의 `fk_post_author`). CSV는 직접 열어 컬럼명과 한글이 올바르게 표시되는지 확인하되, `member.email`, `member.phone`, 배송 주소처럼 개인을 식별할 수 있는 데이터는 업무 승인 없이 로컬 파일이나 공유 폴더로 내보내지 않는다.
 
 ### 원격 DB — SSH 터널과 TLS
 
