@@ -15,6 +15,11 @@
 #   그 순간 SHOW PROCESSLIST에 ALTER가 `Waiting for table metadata lock`, 뒤의 쿼리들도 같은 상태로 줄 서 있고,
 #   맨 앞에는 아무 쿼리도 실행하지 않는(Sleep) 트랜잭션이 있다(information_schema.innodb_trx로 확인).
 # 수정 뒤: ALTER가 바로 끝나고 ③은 평소처럼 응답한다(③도 커밋 뒤 알림 때문에 응답은 늦을 수 있으니 주문 반영 시각을 본다).
+#
+# 진단 조회 권한: 앱 계정(board)은 board 스키마 권한만 있고 PROCESS 권한이 없다(mysql:8.4에서 확인).
+#   - information_schema.processlist는 board 계정의 세션만 보인다(앱·이 스크립트의 ALTER가 모두 board라 여기서는 충분하다)
+#   - information_schema.innodb_trx, SHOW ENGINE INNODB STATUS는 1227(PROCESS 필요), performance_schema.metadata_locks는 1142로 거부된다
+#   그래서 진단 조회는 root로 한다(compose의 DB_ROOT_PASSWORD, 기본 root). 실패하면 오류를 그대로 보여 준다.
 set -euo pipefail
 
 BASE=${BASE:-http://localhost:8080}
@@ -24,6 +29,8 @@ if ! curl -sf -o /dev/null "$BASE/actuator/health"; then
 fi
 WIREMOCK=${WIREMOCK:-http://localhost:18081}
 sql() { docker compose exec -T mysql mysql -uboard -pboard board -e "$1" 2>/dev/null; }
+# root 진단 조회. 비밀번호 경고만 지우고 오류는 그대로 보인다.
+rootsql() { docker compose exec -T mysql mysql -uroot -p"${DB_ROOT_PASSWORD:-root}" -e "$1" 2> >(grep -v 'Using a password' >&2); }
 
 cleanup() {
   curl -s -X DELETE "$WIREMOCK/__admin/mappings/b0600000-0000-0000-0000-000000000006" >/dev/null || true
@@ -61,8 +68,12 @@ sleep 1
 echo "--- 상품 목록(1초 안에 와야 정상)"
 curl -s -o /dev/null -m 15 -w "GET /api/shop/items %{http_code} %{time_total}s\n" "$BASE/api/shop/items" &
 sleep 1
-echo "--- SHOW PROCESSLIST"
-sql "SELECT id, command, time, state, LEFT(info, 60) AS info FROM information_schema.processlist WHERE db = 'board' ORDER BY time DESC"
-echo "--- 열린 트랜잭션"
-sql "SELECT trx_mysql_thread_id, trx_started, trx_state, LEFT(trx_query, 60) FROM information_schema.innodb_trx"
+echo "--- SHOW PROCESSLIST (root)"
+rootsql "SELECT id, command, time, state, LEFT(info, 60) AS info FROM information_schema.processlist WHERE db = 'board' ORDER BY time DESC"
+echo "--- 열린 트랜잭션 (root)"
+rootsql "SELECT trx_mysql_thread_id, trx_started, trx_state, LEFT(trx_query, 60) AS trx_query FROM information_schema.innodb_trx"
+echo "--- shop_item 메타데이터 락 (root)"
+rootsql "SELECT t.processlist_id, m.lock_type, m.lock_status FROM performance_schema.metadata_locks m
+  JOIN performance_schema.threads t ON t.thread_id = m.owner_thread_id
+  WHERE m.object_schema = 'board' AND m.object_name = 'shop_item' ORDER BY m.lock_status, t.processlist_id"
 wait
