@@ -48,17 +48,38 @@ tools/tickets/verify.sh             티켓 정답 검증: 복사본에서 ① �
 
 ## 담당과 파일 소유 (병행 — 같은 worktree, 파일이 겹치지 않게)
 
-- **S (보안·설정·Redis 설정)**: B08, B11, B12, B13, B14, B16. 소유: `config/**`, `member/**`, `common/GlobalExceptionHandler.java`, `common/ErrorCode.java`, `src/main/resources/application*.yml`, `compose.yaml`.
-- **T (트랜잭션·결제·상점·쿠폰·포인트)**: B01, B03, B05, B06, B07, B10. 소유: `payment/**`, `shop/**`, `coupon/**`, `point/**`. `schema.sql` 수정 금지.
-- **P (글·스키마·캐시·신규 기능)**: B02, B04, B09, B15. 소유: `post/**`, `comment/**`, `admin/**`, `src/main/resources/schema.sql`, `src/main/resources/mapper/**`, 신규 패키지(`notification/**`, `attendance/**`). 포인트 적립은 `PointService`를 호출만 한다(수정은 T 소유).
+- **S (보안·설정·Redis 설정·장애 훈련)**: B08, B11, B12, B13, B14, B16, 그리고 D14-6 장애 훈련 준비. 소유: `config/**`, `member/**`, `common/GlobalExceptionHandler.java`, `common/ErrorCode.java`, `src/main/resources/application*.yml`, `compose.yaml`, `toxiproxy.json`, `drills/**`. 예외: B13 때문에 깨지는 `payment/PgCallback*Test`, B16 때문에 깨지는 `post/PopularPostFallbackTest`는 S가 약화·삭제한다(그 테스트 파일만).
+- **T (트랜잭션·결제·상점·쿠폰·포인트)**: B01, B03, B05, B06, B07, B10. 소유: `payment/**`, `shop/**`, `coupon/**`, `point/**`(단 `point/Attendance*`는 P), `common/ForbiddenWord*`(B05, roadmap 파일). `schema.sql` 수정 금지 — 스키마 변경이 꼭 필요하면 설계를 바꾼다.
+- **P (글·스키마·캐시·신규 기능)**: B02, B04, B09, B15, E01(D14-5 고도화). 소유: `post/**`(단 `PopularPostFallbackTest`는 S와 위 예외), `comment/**`, `admin/**`, `src/main/resources/schema.sql`, `src/main/resources/mapper/**`, `src/main/resources/data-local.sql`, 신규 `notification/**`, `point/Attendance*`(roadmap 경로 `point.AttendanceService`). 포인트 적립은 `PointService.earn`을 호출만 한다.
 - 공용 테스트 지원(`ApiTestSupport`, `TestcontainersConfig`, `PgContainers`, `RedisContainers`)은 수정하지 않는다. 꼭 필요하면 보고한다.
 - 테스트 삭제·약화는 자기 소유 영역의 테스트만.
 - 커밋은 반드시 경로를 지정한 `git commit -m "…" -- <경로들>`로 한다(다른 담당이 스테이징한 파일이 섞이지 않게). `git add -A`, `git commit -a`, stash, rebase, reset 금지.
 - **Gradle은 `messy-server/`에서 직접 돌리지 않는다**(같은 build 디렉터리를 세 담당이 공유하면 깨진다). 자기 복사본에서 돌린다: `rsync -a --delete --exclude build --exclude .gradle --exclude tickets messy-server/ <내 작업 디렉터리>/` 후 그 안에서 `./gradlew test`. 티켓 검증은 `TICKET_WORK_DIR=<내 작업 디렉터리>/tickets tools/tickets/verify.sh Bnn`.
 
+## codex 계획 리뷰 반영 (2026-10-23, gpt-6-astra, FAIL → 아래로 확정)
+
+- verify.sh: 티켓 0개·B 16개 미만이면 실패, 판정은 JUnit XML(결함 상태는 단언 실패만 인정·error는 거부, 수정 후 tests>0·실패 0), 복사본을 독립 git 저장소로, 작업 디렉터리는 리포 밖, 단계별 로그·결과 보관, `--full`은 환경 한정 2건만 허용, `--all-fixes`로 모든 fix.patch 누적 적용 + 전체 테스트. 샘플 티켓으로 정상 경로·누적 경로 확인함.
+- 티켓 ID: `B01~B16`(결함) + `E01`(D14-5 고도화 — 인기글 재적재 단일화). messy-server에서는 정답의 스탬피드 락을 제거해 둔다(P, E01).
+- B02: `(id, status)`만으로 풀스캔이 보장되지 않는다. 분포를 고정한 fixture에서 실제 매퍼 SQL의 `EXPLAIN ANALYZE`를 먼저 재 보고, 읽은 행 수·접근 경로가 확실히 나빠지는 인덱스 결함을 고른다. 확인 테스트는 실행 시간이 아니라 읽은 행 수·접근 경로·결과 동일성으로 판정.
+- B03: 정답은 `TransactionTemplate`이라 애노테이션만 붙여서는 결함이 안 생긴다. self-invocation 경로와 별도 빈 REQUIRED 실패(rollback-only)를 각각 의도적으로 만든다. 테스트에 바깥 트랜잭션 없이 주문·재고·잔액 최종 상태로 판정.
+- B04: 정상 알림 기능을 먼저 추가(GREEN) → 비대 `PostService` + 필드 주입 순환 주입. 순환은 `spring.main.allow-circular-references`(기본 false)를 건드리지 않고 `@Lazy` 필드 주입으로 기동되게 한다(흔한 땜질). ArchUnit 의존성은 학습자 수정(fix.patch) 쪽에 둔다(D11-4). 확인 테스트: 알림 동작 보존 + 필드 주입 없음 + 의존 순환 없음.
+- B05: 부하만으로는 확정적 RED가 안 된다. 공유 필드 쓰기→다른 요청 덮어쓰기→첫 요청 읽기 순서를 동기화 지점으로 제어해 매번 재현. 부하 스크립트는 repro.sh 보조.
+- B06: 실제 주문 경로가 트랜잭션 안에서 대기하도록(예: 외부 알림·검증 대기) 만들고, 별도 연결 ALTER가 MDL 대기에 걸려 뒤 주문까지 멈추는 것을 관측. 수정 후에는 같은 대기 지점에서 트랜잭션이 이미 끝나 ALTER가 진행. `lock_wait_timeout` 등 대기 상한·연결 정리 필수.
+- B07: 쿠폰 "사용"은 기존 행 조건부 UPDATE라 gap lock이 안 생긴다. roadmap 파일(`CouponService`)대로 **발급 경로**에 없는 행 `SELECT … FOR UPDATE` → INSERT 패턴을 넣어 gap lock 데드락을 만든다. 티켓 문장은 "선착순 쿠폰을 동시에 받을 때 가끔 실패한다"로 고친다(Ruling, 컨트롤러가 roadmap·설계 문구도 맞춘다). 결함 상태에서 실제 deadlock 증거(1213/`ER_LOCK_DEADLOCK`)를 확인하고 UNIQUE 위반과 구분.
+- B09: 업무 날짜는 KST. 같은 KST 날짜 반복 1회, 자정을 넘기면 날짜별 1회(합계 2회가 정상), 같은 KST 날짜의 UTC 경계(08:59:59→09:00:00 KST)는 1회. 결함은 UTC(또는 시스템 기본 시간대) 날짜로 판정해 같은 KST 날짜에 두 번 쌓이게 한다. 정상 기능 GREEN → 결함 RED → 수정 GREEN.
+- B10: 멱등 키만 지워서는 재현되지 않는다(재시도 대상·markDone·스텁 매칭). 승인은 됐는데 응답이 유실되는 상태 있는 PG 모형(WireMock scenario 등)을 만들고, 응답 타임아웃도 재시도하게 바꾸고 PG에 같은 키를 안 보내 **PG 승인 2건 + 내부 적립 2건**이 되게 한다. HTTP 요청 수·승인 수·원장 건수·잔액을 따로 검증.
+- B12: 허용 출처 누락(CORS 거부)과 preflight가 인증 필터에 막힘(401)은 다른 경로다. 증상은 "새 프론트 도메인에서만"이므로 새 출처 누락 + (선택) preflight 순서 결함. `Origin`·`Access-Control-Request-Method`·요청 헤더를 넣고 새·기존·금지 출처와 응답 헤더를 검사.
+- B13·B14: B14의 넓은 permitAll로 B13이 가려지지 않게 규칙을 설계. B14 확인 테스트는 무인증 401과 권한 있는 접근을 함께 본다.
+- B15: 삭제→이전 값 재적재→커밋 순서를 동기화 지점으로 제어해 재현(TTL을 기다리지 않는다). 수정 후 커밋 뒤 무효화·롤백 시 캐시 보존.
+- B16: 연결 거부와 응답 지연을 구분. 기존 proxy 경로로 3초 지연, 워밍업 후 HTTP 응답 측정, 매 실행 전 guard 초기화·종료 시 proxy 복구. 결함은 명령 타임아웃 제거·guard 우회로 캐시 실패가 글쓰기로 번지게.
+- D14-6 장애 훈련: S가 Redis용 Toxiproxy 프록시(compose·toxiproxy.json), 장애 주입·복구 스크립트(`drills/`), 회고 양식(`course/tickets/drill.md`)을 만든다.
+- 학습 범위(Ruling): 제작·검증은 16개 전부. 학습자는 필수 B01~B04 + 선택 1건 이상(설계 §5-3). 일자 페이지(P5)는 그날 배정 티켓을 필수/선택 표시와 함께 보여 준다. roadmap D11의 B08·B11·B14는 인수인계 중 "리뷰로 찾아 고치기" 과제로 둔다.
+- 규모(Ruling): 설계의 "파일 100~150개"는 운영 Java 소스 기준으로 본다(복사본 145개).
+- 패치 충돌: 같은 파일을 고치는 티켓들(B01/B10, B03/B06, B12/B13/B14)의 fix.patch는 서로 다른 줄을 고치게 하고, 컨트롤러가 `--all-fixes`로 누적 적용을 확인한다.
+
 ## 결함 하나를 만드는 절차
 
-1. 정답 동작을 고정하는 확인 테스트 `tickets/Bnn/answer/BnnConfirmTest.java`를 먼저 쓴다(지금 messy-server = 정답 상태라 통과해야 한다 — 복사본에서 확인).
+1. 정답 동작을 고정하는 확인 테스트 `tickets/Bnn/answer/BnnConfirmTest.java`를 먼저 쓴다(지금 messy-server = 정답 상태라 통과해야 한다 — 복사본에서 확인). 신규 기능(B04 알림, B09 출석)은 정상 기능을 먼저 추가해 확인 테스트가 통과하는 것부터 본다.
 2. 결함을 심는다. 결함을 드러내는 기존 테스트는 지우거나 약하게 바꾼다. 복사본에서 messy-server 전체 테스트가 통과하는지 확인한다(환경 한정 `PgClientRetryTest` 연결 실패 2건 제외).
 3. 결함 상태에서 확인 테스트가 **실패**하는지 확인한다.
 4. 정답 수정 `tickets/Bnn/answer/fix.patch`를 만든다(결함 직전 상태로 되돌리는 것이 아니라 학습자가 할 법한 올바른 수정. 정답 서버 코드와 같아도 된다). `tools/tickets/verify.sh --full Bnn`이 OK인지 확인한다.
