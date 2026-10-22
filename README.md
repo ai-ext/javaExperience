@@ -2,6 +2,8 @@
 
 Spring Boot 백엔드를 **직접 만들면서** 배우는 공개 실습 레포다. 게시판 API 101단계를 이어서 만들고, Codex 또는 Claude Code로 단계별 채점과 피드백을 받을 수 있다. 시나리오와 HTML은 GitHub 로그인 없이 읽거나 다운로드할 수 있다.
 
+> 과정 v2(일자 페이지 D00~D15·Java 트랙·2단계 티켓)는 [과정 안내](course/README.md)와 [학습 홈](index.html)에서 시작한다. 아래 `scenario/`·`practice/`·`docs/knowledge/`·`tickets/`는 그 과정에서 찾아보는 참고 도감이다.
+
 | 폴더 | 내용 |
 |---|---|
 | [`index.html`](index.html) | 학습 홈 — 시작점 선택, 6개 과제의 진도·마지막 장면 이어하기, 게시판 예시와 환경 준비 안내 |

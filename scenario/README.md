@@ -2,6 +2,8 @@
 
 이 공개 저장소에는 **101개 단계의 요구사항과 HTML**, 각 단계의 구현 가이드·역할별 전체 코드 접기, JPA/MyBatis 대체 코드, 쿼리 연습 18개가 들어 있다. GitHub 로그인 없이 저장소를 다운로드해 따라갈 수 있다. 정답 코드는 직접 구현해 본 뒤 접기를 열어 비교한다.
 
+**과정 v2와의 관계:** 이 시나리오는 과정 v2의 참고 도감이다. 일자별 과정(D00~D15·Java 트랙·2단계 티켓)은 [과정 안내](../course/README.md)와 [학습 홈](../index.html)에서 시작하고, 일자 페이지의 "참고 도감" 접기가 여기의 단계·공부자료를 가리킨다.
+
 **처음 시작하기:** [0-1 Java 첫 API부터](ch0-first-steps/0-1-ts-to-java.md) · [바로 게시글 API 만들기](ch1-create-post/1-1-receive-request.md) · [진행 방법 보기](#진행-방법)
 
 **DB 학습 경로:** [DB-01 응답→테이블](db-query-journey/db-01-response-to-query.md) → [DB-02 SELECT·WHERE·커서](db-query-journey/db-02-select-cursor.md) → [DB-03 상세 JOIN](db-query-journey/db-03-detail-join.md) → [DB-04 태그 JOIN·EXISTS](db-query-journey/db-04-tag-filter-and-exists.md) → [DB-05 집계 행 곱셈](db-query-journey/db-05-aggregate-fanout.md) → [DB-06 포함·제외](db-query-journey/db-06-exists-not-exists.md) → [DB-07 같은 API의 다섯 쿼리 방식](db-query-journey/DB-07-same-api-five-query-styles.md) 순서로 같은 게시판 데이터를 따라갑니다. 이후 격리된 성능 fixture에서 [DB-08 EXPLAIN 가설](db-query-journey/DB-08-explain-hypothesis.md) → [DB-09 EXPLAIN ANALYZE 실측](db-query-journey/DB-09-explain-analyze.md) → [DB-10 복합 인덱스 비교](db-query-journey/DB-10-performance-fixture.md) → [DB-11 인덱스 가시성·복원](db-query-journey/DB-11-index-lifecycle.md)을 한 장면씩 진행합니다. 전체 API/JOIN 연결은 [9-2](ch9-schema-change/9-2-index-explain.md)에 보존하고, [DB-12 JOIN·EXISTS 실행 계획 비교](db-query-journey/db-12-join-exists-explain.md), [DB-13 목록 API N+1 추적](db-query-journey/db-13-list-api-n-plus-one.md), [DB-14 실제 DB 스키마와 느린 쿼리](db-query-journey/db-14-live-schema-to-slow-query.md)로 확장합니다.
