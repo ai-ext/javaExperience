@@ -219,7 +219,7 @@ WARN … org.hibernate.orm.jdbc.error : Access denied for user 'community'@'%' t
 Caused by: java.sql.SQLSyntaxErrorException: Access denied for user 'community'@'%' to database 'comunity'
 ```
 
-비밀번호를 틀렸을 때(`192.168.65.1`은 Docker Desktop이 보는 내 PC 주소라 환경마다 다르다)
+비밀번호를 틀렸을 때(`192.168.65.1`은 Docker 런타임(VM) 쪽에서 보이는 내 PC 주소라 런타임(Colima 등)·환경마다 다르다)
 
 ```text
 WARN … org.hibernate.orm.jdbc.error : HHH000247: ErrorCode: 1045, SQLState: 28000

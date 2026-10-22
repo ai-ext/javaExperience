@@ -214,7 +214,7 @@ export default function () {
 }
 ```
 
-`load.js`로 저장해 실행한다. Docker Desktop은 보통 `host.docker.internal`을 제공한다. Linux에서 해석되지 않으면 `--add-host=host.docker.internal:host-gateway`를 추가한다.
+`load.js`로 저장해 실행한다. Mac·Windows의 Docker 런타임은 보통 `host.docker.internal`을 제공한다. 이 이름이 해석되지 않으면(Linux 등) `--add-host=host.docker.internal:host-gateway`를 추가한다.
 
 ```bash
 docker run --rm -v "$PWD/load.js:/scripts/load.js:ro" -w /scripts grafana/k6 run load.js

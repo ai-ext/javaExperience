@@ -211,7 +211,7 @@ docker compose exec mysql mysql -upractice -ppractice ds_practice -e "SHOW PROCE
 
 - **앱이 뜨자마자 커넥션 10개가 이미 열려 있다.** Hikari `minimumIdle`을 따로 주지 않으면 `maximumPoolSize`(10)와 같아서, 기동 시 10개를 채워 둔다.
 - **요청을 보내도 DB 연결 수는 늘지 않는다.** 요청은 열려 있던 10개 중 하나를 빌렸다 돌려준다. 이게 풀을 쓰는 이유다.
-- Host가 `192.168.65.1`인 것은 앱이 호스트(맥)에서 돌고 DB가 Docker 안에 있어서다. DB 입장에서는 Docker Desktop 내부 네트워크 주소에서 들어온 연결로 보인다(포트 포워딩 경유).
+- Host가 `192.168.65.1`인 것은 앱이 호스트(맥)에서 돌고 DB가 Docker 안에 있어서다. DB 입장에서는 Docker 런타임(VM) 내부 네트워크 주소에서 들어온 연결로 보인다(포트 포워딩 경유). 이 주소는 런타임(Colima 등)과 환경마다 다르다.
 
 ### 단계 4 — 풀 메트릭과 쿼리 맞춰 보기
 

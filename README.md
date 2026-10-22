@@ -14,7 +14,7 @@ Spring Boot 백엔드를 **직접 만들면서** 배우는 공개 실습 레포�
 
 ## 시작하기
 
-준비물: Docker Desktop, IntelliJ IDEA, JDK 21(없으면 Gradle이 찾는다 — `gradle/gradle-daemon-jvm.properties`). AI 채점을 원하면 Codex 또는 Claude Code를 선택해 쓸 수 있다.
+준비물: Docker 런타임(사내 표준은 Colima. `docker`·`docker compose` 명령이 동작하면 된다), IntelliJ IDEA, JDK 21(없으면 Gradle이 찾는다 — `gradle/gradle-daemon-jvm.properties`). AI 채점을 원하면 Codex 또는 Claude Code를 선택해 쓸 수 있다.
 
 ```bash
 git clone https://github.com/ai-ext/javaExperience.git
@@ -82,7 +82,7 @@ python3 -m http.server 8765 --bind 127.0.0.1
 
 ## 테스트
 
-`./gradlew test`는 위 DB를 쓰지 않는다. Testcontainers가 일회용 MySQL 8.4 컨테이너를 띄우고, 시나리오용 dump(`docker/mysql/init/01-community.sql`)를 넣은 뒤 테스트한다(`src/test/resources/application-test.yml`). 그래서 테스트가 개발용 데이터를 망가뜨리지 않는다. Docker Desktop이 꺼져 있으면 실패한다.
+`./gradlew test`는 위 DB를 쓰지 않는다. Testcontainers가 일회용 MySQL 8.4 컨테이너를 띄우고, 시나리오용 dump(`docker/mysql/init/01-community.sql`)를 넣은 뒤 테스트한다(`src/test/resources/application-test.yml`). 그래서 테스트가 개발용 데이터를 망가뜨리지 않는다. Docker 런타임(Colima 등)이 꺼져 있으면 실패한다. Colima에서 Testcontainers가 Docker를 찾지 못하면 Testcontainers 문서의 Colima 안내대로 `DOCKER_HOST=unix://$HOME/.colima/default/docker.sock`와 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`를 설정한다.
 
 ## 작업 방식
 
