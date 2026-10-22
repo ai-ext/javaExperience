@@ -171,3 +171,24 @@ CREATE TABLE IF NOT EXISTS shop_order (
     -- 같은 멱등 키의 중복 주문을 막는 최종 방어선
     UNIQUE KEY uk_shop_order_member_key (member_id, idempotency_key)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS pg_payment (
+    id              BIGINT      NOT NULL AUTO_INCREMENT,
+    member_id       BIGINT      NOT NULL,
+    order_id        VARCHAR(40) NOT NULL,
+    amount          INT         NOT NULL,
+    payment_key     VARCHAR(64) NULL,
+    status          VARCHAR(10) NOT NULL,
+    idempotency_key VARCHAR(64) NOT NULL,
+    requested_at    DATETIME(6) NOT NULL,
+    responded_at    DATETIME(6) NULL,
+    created_at      DATETIME(6) NOT NULL,
+    updated_at      DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_pg_payment_member FOREIGN KEY (member_id) REFERENCES member (id),
+    -- 같은 멱등 키로 두 번 결제 요청을 남기지 않는 최종 방어선
+    UNIQUE KEY uk_pg_payment_idempotency_key (idempotency_key),
+    UNIQUE KEY uk_pg_payment_order_id (order_id),
+    -- 승인 전에는 NULL이다. MySQL UNIQUE는 NULL 여러 개를 허용한다.
+    UNIQUE KEY uk_pg_payment_payment_key (payment_key)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
