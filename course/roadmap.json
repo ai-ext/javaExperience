@@ -12,12 +12,12 @@
           "title": "start.spring.io로 프로젝트 만들고 헬스 체크 열기 (Java 21, Boot 4.1, 의존성은 Web·Actuator·Validation·Lombok만)",
           "files": [
             "build.gradle",
-            "src/main/java/com/example/board/BoardApplication.java",
+            "src/main/resources/application.yml",
             "src/test/java/com/example/board/BoardApplicationTests.java"
           ],
           "done": [
-            "`./gradlew bootRun`으로 기동",
-            "`GET /actuator/health` → 200 `{\"status\":\"UP\"}`"
+            "`./gradlew bootRun`으로 기동 (D01 ③에서 datasource를 `local` 프로파일로 옮긴 뒤로는 `./gradlew bootRun --args='--spring.profiles.active=local'`로 띄운다)",
+            "`GET /actuator/health` → 200, 본문의 `status`가 `UP` (Boot 4는 `groups`도 함께 준다)"
           ],
           "trap": "헬스 체크(liveness)에 DB 확인을 넣으면 DB가 잠깐 끊길 때 모든 인스턴스가 재시작돼 장애가 커진다.",
           "specRefs": [
@@ -27,11 +27,11 @@
         },
         {
           "no": 2,
-          "title": "Colima에서 MySQL 8.4를 띄우고 JPA 연결하기 (`build.gradle`에 JPA·MySQL 의존성 추가, 스키마는 `src/main/resources/schema.sql`로 관리하고 Flyway는 쓰지 않는다)",
+          "title": "Colima에서 MySQL 8.4를 띄우고 JPA 연결하기 (`compose.yaml`은 출발 자료에서 복사, `build.gradle`에 JPA·MySQL 의존성 추가, 스키마는 `src/main/resources/schema.sql`로 관리하고 Flyway는 쓰지 않는다, 테스트 DB는 Testcontainers `TestcontainersConfig`)",
           "files": [
-            "compose.yaml",
             "src/main/resources/application.yml",
-            "src/main/resources/schema.sql"
+            "src/main/resources/schema.sql",
+            "src/test/java/com/example/board/TestcontainersConfig.java"
           ],
           "done": [
             "`docker compose up -d` 뒤 기동 로그에 `HikariPool-1 - Start completed`",
@@ -46,11 +46,11 @@
         },
         {
           "no": 3,
-          "title": "프로파일을 local·prod로 나누고 비밀값은 자리표시자로만 두기",
+          "title": "프로파일을 local·prod로 나누고 비밀값은 자리표시자로만 두기 (datasource는 `application.yml`에서 `application-local.yml`로 옮긴다)",
           "files": [
             "src/main/resources/application-local.yml",
             "src/main/resources/application-prod.yml",
-            "src/main/resources/application.yml"
+            "src/main/java/com/example/board/config/ProdSecretsCheck.java"
           ],
           "done": [
             "`--spring.profiles.active=local` 기동 로그에 `The following 1 profile is active: \"local\"`",
@@ -73,8 +73,8 @@
           ],
           "done": [
             "`GET /actuator/health` → 200, 응답 헤더에 `X-Request-Id`",
-            "같은 요청의 로그 줄마다 같은 요청 ID가 찍힌다",
-            "동시에 보낸 3건의 로그를 요청 ID로 나눠 볼 수 있다"
+            "같은 요청의 로그 줄마다 같은 요청 ID가 찍힌다 (기본 INFO에서는 헬스 요청이 로그 줄을 남기지 않으므로 `--args='--spring.profiles.active=local --logging.level.org.springframework.web.servlet.DispatcherServlet=DEBUG'`로 띄워 요청 안 로그 줄을 만든다)",
+            "동시에 보낸 3건의 로그를 요청 ID로 나눠 볼 수 있다 (위와 같이 `DispatcherServlet` DEBUG로 띄운 기동 로그에서)"
           ],
           "trap": "MDC를 `finally`에서 지우지 않으면 톰캣이 재사용하는 스레드의 다음 요청 로그에 이전 요청 ID가 남는다.",
           "specRefs": [
@@ -119,14 +119,14 @@
         },
         {
           "no": 2,
-          "title": "`BaseEntity`(생성·수정 시각 Auditing)와 Testcontainers 테스트 기반",
+          "title": "`BaseEntity`(생성·수정 시각 Auditing)와 Testcontainers MySQL 문자셋 고정(utf8mb4)",
           "files": [
             "src/main/java/com/example/board/common/BaseEntity.java",
             "src/main/java/com/example/board/config/JpaConfig.java",
             "src/test/java/com/example/board/TestcontainersConfig.java"
           ],
           "done": [
-            "`BoardApplicationTests` 통과: Testcontainers MySQL로 컨텍스트 기동",
+            "`JpaAuditingTest` 통과: `@EnableJpaAuditing`이 켜져 있고 `BaseEntity`에 감사 리스너가 달려 있다",
             "`GET /actuator/health` → 200 (`@EnableJpaAuditing` 포함)"
           ],
           "trap": "`@EnableJpaAuditing`을 빠뜨리면 `created_at`이 null로 들어가 NOT NULL 제약 위반이 난다.",
@@ -392,7 +392,7 @@
           "done": [
             "`PostServiceImplTest` 통과: 중복 태그는 한 번만 저장한다"
           ],
-          "trap": "구현이 하나뿐인 곳마다 인터페이스를 만들면 과잉이므로, 교체나 테스트 대역이 실제로 필요한 경계에만 둔다.",
+          "trap": "인터페이스를 두면 그 이유(팀 관례·교체·테스트 대역)를 말할 수 있어야 한다. 근거 없이 모든 클래스에 인터페이스·구현 쌍을 두면 과잉이다.",
           "specRefs": [
             "POST /api/posts"
           ],
@@ -432,7 +432,7 @@
       "steps": [
         {
           "no": 1,
-          "title": "글 상세 조회 API",
+          "title": "글 상세 조회 API (`PostRepository`에 상세 조회 메서드, `GlobalExceptionHandler`에 경로 변수 검증 400 추가)",
           "files": [
             "src/main/java/com/example/board/post/PostDetailResponse.java",
             "src/main/java/com/example/board/post/PostServiceImpl.java",
@@ -564,7 +564,7 @@
       "steps": [
         {
           "no": 1,
-          "title": "MyBatis 연결과 첫 목록 쿼리 (쓰기는 JPA, 목록·검색은 MyBatis)",
+          "title": "MyBatis 연결과 첫 목록 쿼리 (쓰기는 JPA, 목록·검색은 MyBatis, `application.yml`에 `mybatis.*` 설정)",
           "files": [
             "build.gradle",
             "src/main/java/com/example/board/post/PostQueryMapper.java",
@@ -641,7 +641,7 @@
           ],
           "done": [
             "`PostListExplainTest` 통과: 목록 쿼리 EXPLAIN의 `key`가 `idx_post_status_id`(컬럼 순서 `status`, `id`)이고 `Using filesort`가 없다",
-            "인덱스를 지운 뒤 EXPLAIN의 `key`는 `PRIMARY`이고, 지우기 전후 `GET /api/posts` 응답은 같다"
+            "인덱스를 지운 뒤 EXPLAIN의 `key`는 `idx_post_status_id`가 아니고(보통 `PRIMARY` 역순 스캔), 지우기 전후 `GET /api/posts` 응답은 같다"
           ],
           "trap": "인덱스 컬럼 순서를 (`id`, `status`)로 잡으면 `WHERE status = ? ORDER BY id DESC` 목록에서 인덱스를 제대로 쓰지 못한다.",
           "specRefs": [
@@ -673,7 +673,7 @@
             "src/main/resources/schema.sql"
           ],
           "done": [
-            "`PointServiceConcurrencyTest`가 \"조회 후 저장\" 방식에서 먼저 실패하는 것(50건 동시 적립 후 잔액 < 합계)을 보고, 원자적 UPDATE로 바꾼 뒤 통과: 잔액 = `point_ledger` 합",
+            "`PointConcurrencyTest`가 \"조회 후 저장\" 방식에서 먼저 실패하는 것(50건 동시 적립 후 잔액 < 합계)을 보고, 원자적 UPDATE로 바꾼 뒤 통과: 잔액 = `point_ledger` 합",
             "USER 토큰으로 `POST /api/posts` → 201 뒤 작성자 잔액이 늘어난다"
           ],
           "trap": "잔액을 읽어 더한 뒤 저장하면 동시 적립에서 갱신이 사라지므로 `UPDATE member SET point_balance = point_balance + ?`로 바꾼다.",
@@ -696,7 +696,7 @@
             "`GET /api/me/points/history?size=20` → 200 `{items, nextCursor}`",
             "토큰 없음 → 401"
           ],
-          "trap": "이력이 없는 회원의 `SUM`은 null이라 `resultType=\"long\"`이나 `long` 변수로 받으면 언박싱 NPE가 난다.",
+          "trap": "잔액을 `point_ledger`의 `SUM`으로 구하면 이력 0건 회원에서 null이 나온다. MyBatis `resultType=\"long\"`은 `java.lang.Long`이라 null을 담지만 그 값을 기본형 `long` 변수로 받으면 언박싱 NPE가 나고, 매퍼 메서드 반환 타입을 기본형 `long`으로 두면 `BindingException`이 난다. 잔액은 `member.point_balance`에서 읽고, 이력 0건 회원에게도 200 `{balance: 0}`과 `items: []`를 준다.",
           "specRefs": [
             "GET /api/me/points",
             "GET /api/me/points/history"
@@ -804,7 +804,7 @@
             "src/main/java/com/example/board/payment/PgClient.java"
           ],
           "done": [
-            "`PgClientTest` 통과: WireMock 4초 지연 → 3초에 응답 타임아웃 예외, 닫힌 포트 → 1초 안에 연결 타임아웃 예외, 풀 대기 2초 초과 → 예외"
+            "`PgClientTest` 통과: WireMock 4초 지연 → 3초에 응답 타임아웃 예외, 닫힌 포트 → 즉시 연결 실패(연결 거부), 응답 없는 주소 → 1초에 연결 타임아웃 예외, 풀 대기 2초 초과 → 예외"
           ],
           "trap": "타임아웃을 정하지 않으면 PG가 멈출 때 우리 요청 스레드도 끝없이 함께 기다린다.",
           "specRefs": [
@@ -840,7 +840,7 @@
           "done": [
             "`POST /api/me/points/charges` + `Idempotency-Key` → 201, 잔액 증가",
             "WireMock 4초 지연 → 504 `/errors/pg-timeout`, `pg_payment.status` = `UNKNOWN`, 잔액 그대로",
-            "WireMock 거절 → 502 `/errors/pg-declined`",
+            "WireMock 거절 → 502 `/errors/pg-declined`, PG가 5xx만 돌려주면 결과 불명이라 504 `/errors/pg-timeout`, `pg_payment.status` = `UNKNOWN`",
             "`amount` = 1500 → 400"
           ],
           "trap": "PG 호출을 `@Transactional` 안에서 하면 PG가 느릴 때 DB 커넥션을 쥔 채 기다려 Hikari 풀(10)이 바닥난다.",
@@ -857,8 +857,8 @@
             "src/test/java/com/example/board/payment/PgClientRetryTest.java"
           ],
           "done": [
-            "`PgClientRetryTest` 통과: 연결 실패만 같은 `Idempotency-Key`로 최대 2회 재시도(백오프 200ms·400ms), 거절은 재시도하지 않는다",
-            "응답 타임아웃 건은 재시도 대신 `UNKNOWN`으로 남는다"
+            "`PgClientRetryTest` 통과: 연결 실패와 5xx만 같은 `Idempotency-Key`로 최대 2회 재시도(백오프 200ms·400ms), 거절(4xx)은 재시도하지 않는다",
+            "응답 타임아웃 건은 재시도 대신 `UNKNOWN`으로 남는다. 5xx로 재시도를 다 써도 `UNKNOWN`과 504다"
           ],
           "trap": "\"우리는 타임아웃인데 PG는 승인 완료\"일 수 있으므로 타임아웃을 실패로 단정하거나 멱등 키 없이 재시도하면 두 번 결제된다.",
           "specRefs": [
@@ -976,7 +976,7 @@
         },
         {
           "no": 5,
-          "title": "활동 랭킹 (Sorted Set)",
+          "title": "활동 랭킹 (Sorted Set, 댓글 작성 2점 적립도 여기서 `CommentService`에 추가)",
           "files": [
             "src/main/java/com/example/board/point/ActivityRankingService.java",
             "src/main/java/com/example/board/point/RankingController.java"
@@ -1639,7 +1639,7 @@
       "optional": false,
       "topic": "enum, 불변 객체, `equals`/`hashCode`: `Role` enum과 권한 판정 메서드",
       "basics": "역할별 회원 수 세기, 공백만 있는 닉네임을 `isBlank`로 거절하기",
-      "typeCut": "오토박싱·언박싱 NPE(`Long` → `long`): ① 집계 결과가 없을 때 `SUM`이 null(MyBatis `resultType=\"long\"`, JPA `Long` 반환을 `long`으로 받음) ② `Map.get()`이 null ③ 저장 전 엔티티의 id가 null — 포인트 합계 조회, 캐시 조회, 저장 직후 id 사용",
+      "typeCut": "오토박싱·언박싱 NPE(`Long` → `long`): ① 집계 결과가 없을 때 `SUM`이 null(MyBatis `resultType=\"long\"`은 `Long`이라 null을 담고, 그 값이나 JPA `Long` 반환을 기본형 `long`으로 받을 때 NPE. 매퍼 반환 타입을 `long`으로 두면 `BindingException`) ② `Map.get()`이 null ③ 저장 전 엔티티의 id가 null — 포인트 합계 조회, 캐시 조회, 저장 직후 id 사용",
       "habit": "null 다루는 습관: `Objects.requireNonNull`, `Objects.equals`, 컬렉션은 null 대신 빈 리스트를 반환"
     },
     {
