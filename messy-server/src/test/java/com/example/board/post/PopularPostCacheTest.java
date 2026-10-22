@@ -1,12 +1,5 @@
 package com.example.board.post;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -140,42 +133,5 @@ class PopularPostCacheTest extends ApiTestSupport {
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/posts/popular")).andExpect(jsonPath("$.items[0].title").value("새 제목"));
-    }
-
-    // 함정: TTL이 끝난 순간 동시 요청이 모두 DB로 몰리는 스탬피드
-    @Test
-    void 캐시가_빈_순간_동시_요청_20개가_와도_DB_조회는_1번이다() throws Exception {
-        postWithLikes("글", 1);
-        List<Callable<Integer>> tasks = new ArrayList<>();
-        for (int i = 0; i < 20; i++) {
-            tasks.add(() -> mockMvc.perform(get("/api/posts/popular")).andReturn().getResponse().getStatus());
-        }
-
-        List<Integer> statuses = runConcurrently(tasks);
-
-        assertThat(statuses).containsOnly(200);
-        assertThat(queries.count("findPopular")).isEqualTo(1);
-    }
-
-    private static List<Integer> runConcurrently(List<Callable<Integer>> tasks) throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(tasks.size());
-        CountDownLatch start = new CountDownLatch(1);
-        try {
-            List<Future<Integer>> futures = new ArrayList<>();
-            for (Callable<Integer> t : tasks) {
-                futures.add(pool.submit(() -> {
-                    start.await();
-                    return t.call();
-                }));
-            }
-            start.countDown();
-            List<Integer> result = new ArrayList<>();
-            for (Future<Integer> f : futures) {
-                result.add(f.get(10, TimeUnit.SECONDS));
-            }
-            return result;
-        } finally {
-            pool.shutdownNow();
-        }
     }
 }

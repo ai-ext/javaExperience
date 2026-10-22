@@ -3,7 +3,6 @@ package com.example.board.post;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,10 +36,6 @@ public class PopularPostService {
     private final JsonMapper json;
     private final RedisGuard guard;
 
-    // 스탬피드 방지(single-flight). 캐시가 빈 순간 서버 한 대 안에서는 한 요청만 DB를 읽고 나머지는 그 결과를 기다린다.
-    // Redis SET NX 락 대신 JVM 락을 쓴 이유: DB 조회가 많아도 서버 대수만큼이라 충분하고, Redis 장애 때 락까지 함께 잃지 않는다.
-    private final ReentrantLock loadLock = new ReentrantLock();
-
     public PopularPostService(PostQueryMapper mapper, StringRedisTemplate redis, JsonMapper json, RedisGuard guard) {
         this.mapper = mapper;
         this.redis = redis;
@@ -53,21 +48,12 @@ public class PopularPostService {
         if (cached != null) {
             return cached;
         }
-        loadLock.lock();
-        try {
-            // 락을 기다리는 동안 앞 요청이 채웠을 수 있다. 다시 보지 않으면 줄 선 요청이 모두 DB를 읽는다.
-            cached = readCache();
-            if (cached != null) {
-                return cached;
-            }
-            List<PopularPost> loaded = mapper.findPopular(LIMIT).stream().map(PopularPost::from).toList();
-            String value = json.writeValueAsString(loaded);
-            guard.run("인기글 캐시 저장", () -> redis.opsForValue().set(KEY, value, TTL));
-            log.info("인기글 캐시 적재 {}건 (DB 조회)", loaded.size());
-            return loaded;
-        } finally {
-            loadLock.unlock();
-        }
+        // 캐시가 비는 건 60초에 한 번이고 상위 20개 조회라 가볍다. 락 없이 읽어 채운다(락 대기로 응답이 밀리는 것보다 낫다).
+        List<PopularPost> loaded = mapper.findPopular(LIMIT).stream().map(PopularPost::from).toList();
+        String value = json.writeValueAsString(loaded);
+        guard.run("인기글 캐시 저장", () -> redis.opsForValue().set(KEY, value, TTL));
+        log.info("인기글 캐시 적재 {}건 (DB 조회)", loaded.size());
+        return loaded;
     }
 
     /** 글 변경이 커밋된 뒤 부른다. 실패해도 TTL(60초) 뒤에는 새 값이 되므로 경고만 남긴다. */

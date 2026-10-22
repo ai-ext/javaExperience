@@ -1,0 +1,142 @@
+diff --git a/src/main/java/com/example/board/post/PopularPostService.java b/src/main/java/com/example/board/post/PopularPostService.java
+index 69d2e94..b4a0ae9 100644
+--- a/src/main/java/com/example/board/post/PopularPostService.java
++++ b/src/main/java/com/example/board/post/PopularPostService.java
+@@ -3,6 +3,11 @@ package com.example.board.post;
+ import java.time.Duration;
+ import java.time.ZoneId;
+ import java.util.List;
++import java.util.concurrent.CompletableFuture;
++import java.util.concurrent.ExecutionException;
++import java.util.concurrent.TimeUnit;
++import java.util.concurrent.TimeoutException;
++import java.util.concurrent.atomic.AtomicReference;
+ 
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+@@ -36,6 +41,11 @@ public class PopularPostService {
+     private final JsonMapper json;
+     private final RedisGuard guard;
+ 
++    // 스탬피드 방지(single-flight). 캐시가 빈 순간 서버 한 대 안에서는 한 요청만 DB를 읽고, 나머지는 그 결과를 함께 받는다.
++    // 기다림에는 상한(LOAD_WAIT)을 둔다. 적재하는 요청이 Redis·DB 지연에 걸려도 기다리던 요청이 끝없이 멈추지 않고 직접 읽는다.
++    static final Duration LOAD_WAIT = Duration.ofSeconds(1);
++    private final AtomicReference<CompletableFuture<List<PopularPost>>> loading = new AtomicReference<>();
++
+     public PopularPostService(PostQueryMapper mapper, StringRedisTemplate redis, JsonMapper json, RedisGuard guard) {
+         this.mapper = mapper;
+         this.redis = redis;
+@@ -48,14 +58,49 @@ public class PopularPostService {
+         if (cached != null) {
+             return cached;
+         }
+-        // 캐시가 비는 건 60초에 한 번이고 상위 20개 조회라 가볍다. 락 없이 읽어 채운다(락 대기로 응답이 밀리는 것보다 낫다).
+-        List<PopularPost> loaded = mapper.findPopular(LIMIT).stream().map(PopularPost::from).toList();
++        CompletableFuture<List<PopularPost>> mine = new CompletableFuture<>();
++        CompletableFuture<List<PopularPost>> running = loading.compareAndExchange(null, mine);
++        if (running != null) {
++            return awaitOrLoad(running);
++        }
++        try {
++            // 앞 요청이 방금 채우고 자리를 비웠을 수 있다. 다시 보지 않으면 한 박자 늦은 요청이 또 DB를 읽는다.
++            cached = readCache();
++            List<PopularPost> result = cached != null ? cached : loadAndCache();
++            mine.complete(result);
++            return result;
++        } catch (RuntimeException e) {
++            mine.completeExceptionally(e);
++            throw e;
++        } finally {
++            loading.compareAndSet(mine, null);
++        }
++    }
++
++    private List<PopularPost> awaitOrLoad(CompletableFuture<List<PopularPost>> running) {
++        try {
++            return running.get(LOAD_WAIT.toMillis(), TimeUnit.MILLISECONDS);
++        } catch (TimeoutException | ExecutionException e) {
++            // 적재가 늦거나 실패했다. 캐시는 그 요청에 맡기고 이 요청은 DB에서 바로 읽는다.
++            return loadFromDb();
++        } catch (InterruptedException e) {
++            Thread.currentThread().interrupt();
++            return loadFromDb();
++        }
++    }
++
++    private List<PopularPost> loadAndCache() {
++        List<PopularPost> loaded = loadFromDb();
+         String value = json.writeValueAsString(loaded);
+         guard.run("인기글 캐시 저장", () -> redis.opsForValue().set(KEY, value, TTL));
+         log.info("인기글 캐시 적재 {}건 (DB 조회)", loaded.size());
+         return loaded;
+     }
+ 
++    private List<PopularPost> loadFromDb() {
++        return mapper.findPopular(LIMIT).stream().map(PopularPost::from).toList();
++    }
++
+     /** 글 변경이 커밋된 뒤 부른다. 실패해도 TTL(60초) 뒤에는 새 값이 되므로 경고만 남긴다. */
+     public void evict() {
+         guard.run("인기글 캐시 삭제", () -> redis.delete(KEY));
+diff --git a/src/test/java/com/example/board/post/PopularPostStampedeTest.java b/src/test/java/com/example/board/post/PopularPostStampedeTest.java
+new file mode 100644
+index 0000000..35cd68e
+--- /dev/null
++++ b/src/test/java/com/example/board/post/PopularPostStampedeTest.java
+@@ -0,0 +1,56 @@
++package com.example.board.post;
++
++import java.util.ArrayList;
++import java.util.List;
++import java.util.concurrent.CountDownLatch;
++import java.util.concurrent.ExecutorService;
++import java.util.concurrent.Executors;
++import java.util.concurrent.Future;
++import java.util.concurrent.TimeUnit;
++
++import org.apache.ibatis.session.SqlSessionFactory;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++
++import com.example.board.ApiTestSupport;
++import com.example.board.MyBatisQueryCounter;
++import com.example.board.member.Role;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++
++/** TTL이 끝난 순간 동시 요청이 모두 DB로 몰리는 스탬피드를 막는다. */
++class PopularPostStampedeTest extends ApiTestSupport {
++
++    @Autowired
++    SqlSessionFactory sqlSessionFactory;
++
++    @Test
++    void 캐시가_빈_순간_동시_100요청에도_DB_조회는_1번이다() throws Exception {
++        clearPosts();
++        newPost(newMember(Role.USER));
++        MyBatisQueryCounter queries = MyBatisQueryCounter.attach(sqlSessionFactory);
++        queries.clear();
++
++        ExecutorService pool = Executors.newFixedThreadPool(100);
++        CountDownLatch start = new CountDownLatch(1);
++        List<Future<Integer>> futures = new ArrayList<>();
++        try {
++            for (int i = 0; i < 100; i++) {
++                futures.add(pool.submit(() -> {
++                    start.await();
++                    return mockMvc.perform(get("/api/posts/popular")).andReturn().getResponse().getStatus();
++                }));
++            }
++            start.countDown();
++            for (Future<Integer> f : futures) {
++                assertThat(f.get(30, TimeUnit.SECONDS)).isEqualTo(200);
++            }
++        } finally {
++            pool.shutdown();
++            pool.awaitTermination(30, TimeUnit.SECONDS);
++        }
++
++        assertThat(queries.count("findPopular")).isEqualTo(1);
++    }
++}
