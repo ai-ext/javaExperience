@@ -81,3 +81,16 @@ CREATE TABLE IF NOT EXISTS comment (
     -- 글별 댓글 목록(id 커서)용
     KEY idx_comment_post_id (post_id, id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS post_like (
+    id         BIGINT      NOT NULL AUTO_INCREMENT,
+    post_id    BIGINT      NOT NULL,
+    member_id  BIGINT      NOT NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_post_like_post FOREIGN KEY (post_id) REFERENCES post (id),
+    CONSTRAINT fk_post_like_member FOREIGN KEY (member_id) REFERENCES member (id),
+    -- 동시 좋아요의 최종 방어선. "조회 후 없으면 저장"만으로는 두 요청이 모두 통과한다.
+    UNIQUE KEY uk_post_like_post_member (post_id, member_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
