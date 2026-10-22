@@ -46,7 +46,7 @@ class J05DtoMappingTest {
     }
 
     @Test
-    void 사용_가능한_쿠폰은_미사용이고_만료_전이고_최소_주문_금액을_넘는_것이다() {
+    void 사용_가능한_쿠폰은_미사용이고_만료_전이고_최소_주문_금액_이상인_것이다() {
         List<MemberCoupon> coupons = List.of(
                 new MemberCoupon(1, "웰컴", CouponStatus.UNUSED, TODAY.plusDays(7), 0),
                 new MemberCoupon(2, "이미 씀", CouponStatus.USED, TODAY.plusDays(7), 0),
