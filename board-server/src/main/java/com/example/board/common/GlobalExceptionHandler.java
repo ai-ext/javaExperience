@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
@@ -94,6 +95,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                                 "reason", String.valueOf(e.getDefaultMessage()))))
                 .toList();
         pd.setProperty("errors", errors);
+        return ResponseEntity.badRequest().body(pd);
+    }
+
+    // 서블릿 업로드 한도(spring.servlet.multipart) 초과. 상위 클래스 기본은 413이지만 spec-v2 5-6은 400 /errors/validation이다.
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION.type(), ErrorCode.VALIDATION.title(),
+                "파일은 최대 5MB입니다.", path(request));
+        pd.setProperty("errors", List.of(Map.of("field", "file", "reason", "최대 5MB")));
         return ResponseEntity.badRequest().body(pd);
     }
 

@@ -35,6 +35,9 @@ class AdminApiTest extends ApiTestSupport {
     @Autowired
     AdminService adminService;
 
+    @Autowired
+    CouponBulkIssueService couponBulkIssueService;
+
     @AfterEach
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
@@ -294,15 +297,19 @@ class AdminApiTest extends ApiTestSupport {
 
     // 함정 가드: @PreAuthorize를 안쪽 메서드로 옮겨 같은 클래스 안에서 부르게 바꾸면 public 진입점이 USER에게 열려 이 테스트가 실패한다
     @Test
-    void USER로_AdminService의_public_메서드를_직접_부르면_모두_막힌다() throws Exception {
+    void USER로_관리자_서비스의_public_메서드를_직접_부르면_모두_막힌다() throws Exception {
         Long postId = newPost(newMember(Role.USER));
         authenticate(Role.USER);
 
-        List<Method> methods = publicMethods(AdminService.class);
-        assertThat(methods).isNotEmpty();
-        for (Method m : methods) {
-            Throwable thrown = catchThrowable(() -> invokeWithDefaults(adminService, m, postId));
-            assertThat(thrown).as(m.getName()).isInstanceOf(AccessDeniedException.class);
+        for (Object service : new Object[] {adminService, couponBulkIssueService}) {
+            Class<?> type = org.springframework.aop.support.AopUtils.getTargetClass(service);
+            List<Method> methods = publicMethods(type);
+            assertThat(methods).as(type.getSimpleName()).isNotEmpty();
+            for (Method m : methods) {
+                Throwable thrown = catchThrowable(() -> invokeWithDefaults(service, m, postId));
+                assertThat(thrown).as(type.getSimpleName() + "." + m.getName())
+                        .isInstanceOf(AccessDeniedException.class);
+            }
         }
         assertThat(postStatus(postId)).isEqualTo("ACTIVE");
     }

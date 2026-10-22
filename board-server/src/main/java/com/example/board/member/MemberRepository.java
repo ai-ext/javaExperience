@@ -1,5 +1,7 @@
 package com.example.board.member;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import jakarta.persistence.LockModeType;
@@ -36,4 +38,8 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from Member m where m.id = :id")
     Optional<Member> findByIdForUpdate(@Param("id") Long id);
+
+    /** 있는 회원 id만 돌려준다. 대량 지급에서 파일의 id를 한 번에 확인할 때 쓴다(행마다 조회하지 않는다). */
+    @Query("select m.id from Member m where m.id in :ids")
+    List<Long> findExistingIds(@Param("ids") Collection<Long> ids);
 }
