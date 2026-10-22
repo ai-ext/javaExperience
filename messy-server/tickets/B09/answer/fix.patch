@@ -1,0 +1,133 @@
+diff --git a/src/main/java/com/example/board/point/AttendanceService.java b/src/main/java/com/example/board/point/AttendanceService.java
+index 9910ddb..be4669d 100644
+--- a/src/main/java/com/example/board/point/AttendanceService.java
++++ b/src/main/java/com/example/board/point/AttendanceService.java
+@@ -2,6 +2,7 @@ package com.example.board.point;
+ 
+ import java.time.Clock;
+ import java.time.LocalDate;
++import java.time.ZoneId;
+ 
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+@@ -10,11 +11,13 @@ import com.example.board.common.BusinessException;
+ import com.example.board.common.ErrorCode;
+ import com.example.board.member.MemberRepository;
+ 
+-/** 하루 한 번 출석하면 포인트를 적립한다. */
++/** 하루 한 번 출석하면 포인트를 적립한다. "하루"는 서비스 기준(KST) 날짜다. */
+ @Service
+ public class AttendanceService {
+ 
+     static final int ATTENDANCE_POINTS = 10;
++    // 회원이 보는 날짜 경계. 서버 시계(Clock)의 시간대와 상관없이 이 기준으로 자른다.
++    private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
+ 
+     private final AttendanceRepository attendanceRepository;
+     private final MemberRepository memberRepository;
+@@ -31,8 +34,7 @@ public class AttendanceService {
+ 
+     @Transactional
+     public AttendanceResponse attend(Long memberId) {
+-        // 테스트에서 날짜를 바꿔 끼울 수 있게 LocalDate.now() 대신 주입받은 시계로 오늘을 구한다
+-        LocalDate today = LocalDate.now(clock);
++        LocalDate today = LocalDate.ofInstant(clock.instant(), SERVICE_ZONE);
+         // 같은 회원의 동시 출석을 줄 세운다. 출석 INSERT(FK 공유 잠금)와 잔액 UPDATE 사이의 교착도 막는다.
+         memberRepository.findByIdForUpdate(memberId)
+                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다."));
+diff --git a/src/test/java/com/example/board/point/AttendanceServiceTest.java b/src/test/java/com/example/board/point/AttendanceServiceTest.java
+new file mode 100644
+index 0000000..6a80a80
+--- /dev/null
++++ b/src/test/java/com/example/board/point/AttendanceServiceTest.java
+@@ -0,0 +1,90 @@
++package com.example.board.point;
++
++import java.time.Clock;
++import java.time.Instant;
++import java.time.LocalDate;
++import java.time.LocalDateTime;
++import java.time.ZoneId;
++import java.time.ZoneOffset;
++import java.util.concurrent.atomic.AtomicReference;
++
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.TestConfiguration;
++import org.springframework.context.annotation.Bean;
++import org.springframework.context.annotation.Primary;
++
++import com.example.board.ApiTestSupport;
++import com.example.board.common.BusinessException;
++import com.example.board.member.Member;
++import com.example.board.member.Role;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.assertj.core.api.Assertions.assertThatThrownBy;
++
++/** 서버 시계는 운영처럼 UTC 영역. 출석 날짜는 KST로 잘라야 한다. */
++class AttendanceServiceTest extends ApiTestSupport {
++
++    static final ZoneId KST = ZoneId.of("Asia/Seoul");
++    static final AtomicReference<Instant> NOW = new AtomicReference<>(Instant.now());
++
++    @TestConfiguration(proxyBeanMethods = false)
++    static class ClockConfig {
++        @Bean
++        @Primary
++        Clock fixedUtcClock() {
++            return new Clock() {
++                @Override
++                public ZoneId getZone() {
++                    return ZoneOffset.UTC;
++                }
++
++                @Override
++                public Clock withZone(ZoneId zone) {
++                    return Clock.fixed(NOW.get(), zone);
++                }
++
++                @Override
++                public Instant instant() {
++                    return NOW.get();
++                }
++            };
++        }
++    }
++
++    @Autowired
++    AttendanceService attendanceService;
++
++    static void at(String kst) {
++        NOW.set(LocalDateTime.parse(kst).atZone(KST).toInstant());
++    }
++
++    long attendanceCount(Member m) {
++        return jdbc.queryForObject("SELECT COUNT(*) FROM point_ledger WHERE member_id = ? AND ref_type = 'ATTENDANCE'",
++                Long.class, m.getId());
++    }
++
++    @Test
++    void KST_23시59분59초와_00시는_다른_날이라_각각_적립된다() {
++        Member m = newMember(Role.USER);
++
++        at("2026-10-23T23:59:59");
++        assertThat(attendanceService.attend(m.getId()).attendedOn()).isEqualTo(LocalDate.of(2026, 10, 23));
++        at("2026-10-24T00:00:00");
++        assertThat(attendanceService.attend(m.getId()).attendedOn()).isEqualTo(LocalDate.of(2026, 10, 24));
++
++        assertThat(attendanceCount(m)).isEqualTo(2);
++    }
++
++    @Test
++    void UTC_자정인_KST_09시_앞뒤는_같은_날이라_한_번만_적립된다() {
++        Member m = newMember(Role.USER);
++
++        at("2026-10-23T08:59:59");
++        attendanceService.attend(m.getId());
++        at("2026-10-23T09:00:00");
++        assertThatThrownBy(() -> attendanceService.attend(m.getId())).isInstanceOf(BusinessException.class);
++
++        assertThat(attendanceCount(m)).isEqualTo(1);
++    }
++}

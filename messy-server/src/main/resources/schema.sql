@@ -128,6 +128,18 @@ CREATE TABLE IF NOT EXISTS point_ledger (
     KEY idx_point_ledger_member_id (member_id, id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
+CREATE TABLE IF NOT EXISTS attendance (
+    id          BIGINT      NOT NULL AUTO_INCREMENT,
+    member_id   BIGINT      NOT NULL,
+    attended_on DATE        NOT NULL,
+    created_at  DATETIME(6) NOT NULL,
+    updated_at  DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_attendance_member FOREIGN KEY (member_id) REFERENCES member (id),
+    -- 하루 한 번 출석의 최종 방어선
+    UNIQUE KEY uk_attendance_member_date (member_id, attended_on)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
 CREATE TABLE IF NOT EXISTS coupon (
     id              BIGINT       NOT NULL AUTO_INCREMENT,
     name            VARCHAR(100) NOT NULL,
