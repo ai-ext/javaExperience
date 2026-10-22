@@ -13,11 +13,12 @@ services:
       interval: 5s
       retries: 20
 
-  # 인기글 캐시·쿠폰 수량·랭킹·로그인 제한. 서버는 localhost:16380로 붙는다.
+  # 인기글 캐시·쿠폰 수량·랭킹·로그인 제한. 서버는 Toxiproxy(16380)를 거쳐 붙는다.
+  # redis-cli로 Redis에 바로 붙을 때는 16379.
   redis:
     image: redis:7.4
     ports:
-      - "16380:6379"
+      - "16379:6379"
 
   # PG 모의. 스텁은 테스트와 같은 디렉터리를 쓴다(금액 999000은 항상 거절).
   wiremock:
@@ -27,15 +28,18 @@ services:
     volumes:
       - ./src/test/resources/wiremock:/home/wiremock:ro
 
-  # 서버는 Toxiproxy(18667)를 거쳐 WireMock을 부른다. 지연 주입 예:
-  # curl -X POST localhost:8475/proxies/pg/toxics -d '{"type":"latency","attributes":{"latency":5000}}'
+  # 서버는 Toxiproxy를 거쳐 WireMock(PG, 18667)과 Redis(16380)를 부른다. 프록시 이름은 pg, redis(toxiproxy.json).
+  # PG 지연 주입 예: curl -X POST localhost:8475/proxies/pg/toxics -d '{"type":"latency","attributes":{"latency":5000}}'
+  # Redis 장애 훈련(지연·끊김 주입과 복구)은 drills/ 스크립트로 한다.
   toxiproxy:
     image: ghcr.io/shopify/toxiproxy:2.12.0
     command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
     ports:
       - "8475:8474"
       - "18667:8666"
+      - "16380:6380"
     volumes:
       - ./toxiproxy.json:/config/toxiproxy.json:ro
     depends_on:
       - wiremock
+      - redis
