@@ -12,7 +12,7 @@ package com.example.javatrack.j02;
  *     public void issue() { ... }
  * }
  * </pre>
- * setter와 public 생성자가 없다. 값은 빌더(→ private 생성자의 검사)로만 넣고, 발급 수량은 {@link #issue()}로만 바뀐다.
+ * setter와 public 생성자가 없다. 값은 빌더와 학습용 팩토리({@link #create})로만 넣고, 둘 다 같은 private 생성자의 검사를 거친다. 발급 수량은 {@link #issue()}로만 바뀐다.
  * 빌더({@link #builder()}·{@link CouponBuilder})는 선택 과제다. 기본 과제의 테스트는 주어진 {@link #create}로 쿠폰을 만든다.
  */
 public class Coupon {

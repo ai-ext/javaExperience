@@ -14,7 +14,8 @@ import java.time.Duration;
  *   <li>대상이 던진 예외는 포장하지 않고 그대로 던진다(리플렉션이 감싼 InvocationTargetException을 벗긴다)</li>
  *   <li>{@code equals}·{@code hashCode}·{@code toString}도 프록시로 들어온다(Method의 선언 클래스가 Object).
  *       target에 넘기지 않고 프록시 자신을 기준으로 답한다: equals는 같은 프록시일 때만 true,
- *       hashCode는 {@code System.identityHashCode(프록시)}. 기록하지 않는다</li>
+ *       hashCode는 {@code System.identityHashCode(프록시)}, toString은 target의 toString을 부르지 않고
+ *       프록시 identity와 target 클래스 이름으로 만든다. 기록하지 않는다</li>
  * </ul>
  */
 public final class TimedProxy {
@@ -60,12 +61,14 @@ public final class TimedProxy {
         }
     }
 
-    /** 프록시 자신의 참조로 답한다. 같은 프록시끼리만 같고, hashCode는 그와 맞는 identityHashCode다. */
+    /** 프록시 자신의 참조로 답한다. 같은 프록시끼리만 같고, hashCode는 그와 맞는 identityHashCode다. target의 메서드는 부르지 않는다. */
     private static Object objectMethod(Object self, Object target, Method method, Object[] args) {
         return switch (method.getName()) {
             case "equals" -> self == args[0];
             case "hashCode" -> System.identityHashCode(self);
-            case "toString" -> "TimedProxy(" + target + ")";
+            // target + "" 는 target.toString()을 부른다. 클래스 이름만 쓰고 프록시 자신의 identity로 구분한다
+            case "toString" -> "TimedProxy@" + Integer.toHexString(System.identityHashCode(self))
+                    + "(" + target.getClass().getName() + ")";
             default -> throw new IllegalStateException("프록시로 들어올 수 없는 Object 메서드: " + method);
         };
     }

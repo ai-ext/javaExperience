@@ -119,6 +119,23 @@ class J10TimedProxyTest {
         // Object 메서드는 기록하지도, target에 넘기지도 않는다
         assertThat(log.methodNames()).isEmpty();
         assertThat(target.calls()).isEmpty();
+
+        // toString도 target에 넘기지 않는다. "..." + target 같은 문자열 연결도 target.toString()을 부른다
+        ToStringRecordingTarget recording = new ToStringRecordingTarget();
+        AdminActions recordingProxy = TimedProxy.wrap(AdminActions.class, recording, log);
+        assertThat(recordingProxy.toString()).isNotBlank();
+        assertThat(recording.toStringCalls).isZero();
+    }
+
+    /** toString이 불린 횟수를 세는 테스트 전용 대상. FakeAdminActions의 calls()는 toString을 기록하지 않는다. */
+    private static final class ToStringRecordingTarget extends FakeAdminActions {
+        int toStringCalls;
+
+        @Override
+        public String toString() {
+            toStringCalls++;
+            return "ToStringRecordingTarget";
+        }
     }
 
     @Test
