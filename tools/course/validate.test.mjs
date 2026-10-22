@@ -143,3 +143,21 @@ test('실제 spec-v2는 엔드포인트 30개', () => {
   assert.ok(eps.includes('GET /api/posts/{postId}'));
   assert.equal(new Set(eps).size, eps.length);
 });
+
+test('실제 카드 문서는 일자마다 3~5장', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const ids = parseTalkCardIds(fs.readFileSync(path.join(root, 'course/talk-cards.md'), 'utf8'));
+  assert.equal(new Set(ids).size, ids.length, '카드 ID 중복');
+  const byDay = new Map();
+  for (const id of ids) {
+    assert.match(id, /^TC-D\d{2}-\d$/);
+    const d = id.slice(3, 6);
+    byDay.set(d, (byDay.get(d) ?? 0) + 1);
+  }
+  assert.equal(byDay.size, 15);
+  for (let n = 1; n <= 15; n++) {
+    const d = `D${String(n).padStart(2, '0')}`;
+    const c = byDay.get(d) ?? 0;
+    assert.ok(c >= 3 && c <= 5, `${d}: ${c}장`);
+  }
+});
