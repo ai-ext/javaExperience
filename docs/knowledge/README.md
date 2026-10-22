@@ -4,7 +4,7 @@
 
 > **읽기 전에** — 이 문서들은 Java 25 · Spring Boot 4.1 기준으로 따로 정리한 자료를 옮겨 온 것이다.
 > 문서 안에 나오는 `practice/starter`(상품 API 예제 프로젝트), `ds_practice`(쇼핑몰 연습 DB), `_scratch/`, `_data/`는 원래 작업공간의 파일이라 **이 레포에는 없다.**
-> 이 레포에서는 javaExperience 자체가 실습 프로젝트이고, DB는 `community`(시나리오)·`practice`(학습용)이다. 개념과 코드 패턴은 그대로 적용된다.
+> 이 레포에서는 javaExperience 자체가 실습 프로젝트이고, DB는 루트 `compose.yaml`의 `community`(시나리오)·`practice`(학습용)·`project`(10장)이다(호스트 `localhost:13308`, 계정 `community`/`community`). 개념과 코드 패턴은 그대로 적용된다.
 
 ## P — 실무 따라 하기 — 당장 개발할 때 필요한 것
 

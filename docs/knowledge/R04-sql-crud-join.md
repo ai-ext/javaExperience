@@ -10,6 +10,8 @@ SQL은 관계형 데이터베이스에서 행을 추가(`INSERT`), 조회(`SELEC
 
 ## 2. 당장 알아야 할 것
 
+> **이 저장소에 없는 실습 환경** — 이 문서의 예제는 원래 공부자료가 전제한 쇼핑몰 연습 DB `ds_practice`(`practice/schema/schema.sql`·`seed.sql`로 만드는 `member`·`product`·`orders` 등)를 쓴다. 그 파일과 DB는 이 저장소에 없다. 그대로 따라 하려면 그런 MySQL을 직접 준비해야 하고, 명령에 적힌 포트(`3306` 등)·계정도 그때 정한 값으로 바꾼다. 이 저장소에서 바로 쓸 수 있는 DB는 루트 `compose.yaml`의 MySQL(`docker compose up -d` — 호스트 `localhost:13308`, 계정 `community`/`community`, DB `community`·`practice`·`project`)이고, 테이블은 게시판용(`member`·`post`·`comment`·`tag` 등)이라 이름과 열이 다르다.
+
 1. **SELECT 열·조건·정렬·건수를 명시한다.** `SELECT *`는 피하고 필요한 열을 쓴다. `ORDER BY` 없이는 순서가 보장되지 않는다.
 
    ```sql
@@ -66,6 +68,7 @@ SQL은 관계형 데이터베이스에서 행을 추가(`INSERT`), 조회(`SELEC
 ### 1단계: 접속하고 스키마 확인
 
 ```bash
+# 직접 준비한 MySQL의 예시 값(포트 3306·계정 devuser·DB ds_practice) — 이 저장소 compose는 13308·community·practice
 mysql --host=127.0.0.1 --port=3306 --user=devuser --password \
   --default-character-set=utf8mb4 ds_practice
 ```
@@ -102,6 +105,7 @@ dependencies {
 ```yaml
 spring:
   datasource:
+    # 직접 준비한 MySQL 예시(3306·ds_practice). 이 저장소 compose라면 localhost:13308/practice
     url: jdbc:mysql://localhost:3306/ds_practice?characterEncoding=UTF-8
     username: ${DB_USER}
     password: ${DB_PASSWORD}
@@ -219,6 +223,7 @@ LIMIT 20;
 다음 SQL 전체를 `practice/sql/R04-demo.sql`에 저장한다. INSERT 다중 행·UPSERT·INSERT SELECT, 대상 사전 확인, 변경, 롤백까지 포함한다.
 
 ```bash
+# 직접 준비한 MySQL의 예시 값(포트 3306·계정 devuser·DB ds_practice) — 이 저장소 compose는 13308·community·practice
 mysql --host=127.0.0.1 --port=3306 --user=devuser --password \
   --default-character-set=utf8mb4 ds_practice < practice/sql/R04-demo.sql
 ```

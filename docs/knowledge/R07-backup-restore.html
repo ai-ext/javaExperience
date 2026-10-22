@@ -27,6 +27,9 @@
 <div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-한-줄로-말하면" aria-label="1. 한 줄로 말하면 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">1. 한 줄로 말하면</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>백업은 장애·삭제·훼손 뒤 필요한 데이터와 실행 환경을 복구할 수 있도록 복사본과 변경 로그를 보관하고, 복원 절차를 검증하는 일이다. 복구 목표는 RPO(허용할 데이터 손실 구간)와 RTO(서비스 중단 허용 시간)로 정한다. DB 파일을 복사해 둔 것만으로는 애플리케이션 파일이나 설정, 또는 원하는 시점의 데이터까지 돌아온다고 보장할 수 없다.</p>
 </div></details><details class="knowledge-chapter"><summary id="2-당장-알아야-할-것" aria-label="2. 당장 알아야 할 것 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">2. 당장 알아야 할 것</strong></span><span class="knowledge-chapter-meta">5개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<blockquote>
+<p><strong>이 저장소에 없는 실습 환경</strong> — 이 문서의 예제는 원래 공부자료가 전제한 쇼핑몰 연습 DB <code>ds_practice</code>(<code>practice/schema/schema.sql</code>·<code>seed.sql</code>로 만드는 <code>member</code>·<code>product</code>·<code>orders</code> 등)를 쓴다. 그 파일과 DB는 이 저장소에 없다. 그대로 따라 하려면 그런 MySQL을 직접 준비해야 하고, 명령에 적힌 포트(<code>3306</code> 등)·계정도 그때 정한 값으로 바꾼다. 이 저장소에서 바로 쓸 수 있는 DB는 루트 <code>compose.yaml</code>의 MySQL(<code>docker compose up -d</code> — 호스트 <code>localhost:13308</code>, 계정 <code>community</code>/<code>community</code>, DB <code>community</code>·<code>practice</code>·<code>project</code>)이고, 테이블은 게시판용(<code>member</code>·<code>post</code>·<code>comment</code>·<code>tag</code> 등)이라 이름과 열이 다르다. 이 저장소의 compose DB를 SQL 파일로 떠 두는 스크립트는 <code>docker/mysql/dump.sh</code>다.</p>
+</blockquote>
 <ol>
 <li><p><strong>RPO와 RTO를 먼저 정한다.</strong> RPO는 허용하는 데이터 손실 구간, RTO는 장애부터 서비스 복구까지 허용하는 최대 시간이다. RPO가 15분이면 일일 덤프만으로 부족하다. 두 목표는 조직이 정한다.</p>
 <pre><code class="language-text">예: RPO 15분 / RTO 2시간</code></pre>
@@ -91,9 +94,9 @@ mysqlbinlog --stop-datetime=&quot;2026-10-04 10:14:59&quot; binlog.000123 binlog
 </li>
 </ol>
 </div></details><details class="knowledge-chapter"><summary id="3-따라-하기" aria-label="3. 따라 하기 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 따라 하기</strong><small>1단계: 연습 DB 준비 · 2단계: 논리 백업 파일 만들기 · 3단계: 실수 DELETE를 안전하게 재현 · 4단계: 새 DB에 복원</small></span><span class="knowledge-chapter-meta">6개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
-<p>다음 예는 로컬 MySQL 8.4 컨테이너 <code>ds-mysql</code>과 <code>ds_practice</code>를 쓴다. 저장소의 <code>schema.sql</code>과 <code>README.md</code>에 맞췄다. 안내용 명령만 작성했고 Docker·MySQL은 실행하지 않았다. <code>local</code>은 로컬 연습 전용 비밀번호다.</p>
+<p>다음 예는 로컬 MySQL 8.4 컨테이너 <code>ds-mysql</code>과 <code>ds_practice</code>를 쓴다. 원래 공부자료 저장소의 <code>practice/schema/schema.sql</code>과 README에 맞췄다(이 저장소에는 없다). 안내용 명령만 작성했고 Docker·MySQL은 실행하지 않았다. <code>local</code>은 로컬 연습 전용 비밀번호다.</p>
 <details class="knowledge-topic"><summary id="1단계-연습-db-준비" aria-label="1단계: 연습 DB 준비 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">1단계: 연습 DB 준비</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
-<p>컨테이너가 아직 없다면 시작하고, 저장소 루트에서 스키마와 시드를 넣는다. <code>schema.sql</code>은 <code>DROP DATABASE IF EXISTS ds_practice</code>를 포함하므로 이미 데이터가 든 DB에서 다시 실행하지 않는다.</p>
+<p>컨테이너가 아직 없다면 시작하고, <code>practice/schema/</code>가 있는 그 저장소 루트에서 스키마와 시드를 넣는다. <code>schema.sql</code>은 <code>DROP DATABASE IF EXISTS ds_practice</code>를 포함하므로 이미 데이터가 든 DB에서 다시 실행하지 않는다.</p>
 <pre><code class="language-bash">docker run --name ds-mysql -e MYSQL_ROOT_PASSWORD=local -p 3306:3306 -d mysql:8.4
 until docker exec ds-mysql mysqladmin ping -uroot -plocal --silent; do sleep 2; done
 docker exec -i ds-mysql mysql -uroot -plocal &lt; practice/schema/schema.sql

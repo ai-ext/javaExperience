@@ -25,6 +25,9 @@ JOIN은 연결된 행 수만큼 결과를 만든다. 1:N 관계에서 부모 열
 <div class="knowledge-chapters" aria-label="공부자료 내용 펼쳐 읽기"><details class="knowledge-chapter"><summary id="1-한-줄로-말하면" aria-label="1. 한 줄로 말하면 펼치기"><span class="knowledge-chapter-number">01</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">1. 한 줄로 말하면</strong></span><span class="knowledge-chapter-meta">열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>SQL은 관계형 데이터베이스에서 행을 추가(<code>INSERT</code>), 조회(<code>SELECT</code>), 수정(<code>UPDATE</code>), 삭제(<code>DELETE</code>)하는 선언형 언어다. <code>JOIN</code>은 조건에 맞는 테이블 행을 결합하고, 트랜잭션은 여러 변경을 한 단위로 확정하거나 취소한다. 조건 누락, JOIN 중복, NULL, 바인딩을 놓치면 운영 데이터 손상과 잘못된 응답으로 이어진다.</p>
 </div></details><details class="knowledge-chapter"><summary id="2-당장-알아야-할-것" aria-label="2. 당장 알아야 할 것 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">2. 당장 알아야 할 것</strong></span><span class="knowledge-chapter-meta">2개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<blockquote>
+<p><strong>이 저장소에 없는 실습 환경</strong> — 이 문서의 예제는 원래 공부자료가 전제한 쇼핑몰 연습 DB <code>ds_practice</code>(<code>practice/schema/schema.sql</code>·<code>seed.sql</code>로 만드는 <code>member</code>·<code>product</code>·<code>orders</code> 등)를 쓴다. 그 파일과 DB는 이 저장소에 없다. 그대로 따라 하려면 그런 MySQL을 직접 준비해야 하고, 명령에 적힌 포트(<code>3306</code> 등)·계정도 그때 정한 값으로 바꾼다. 이 저장소에서 바로 쓸 수 있는 DB는 루트 <code>compose.yaml</code>의 MySQL(<code>docker compose up -d</code> — 호스트 <code>localhost:13308</code>, 계정 <code>community</code>/<code>community</code>, DB <code>community</code>·<code>practice</code>·<code>project</code>)이고, 테이블은 게시판용(<code>member</code>·<code>post</code>·<code>comment</code>·<code>tag</code> 등)이라 이름과 열이 다르다.</p>
+</blockquote>
 <ol>
 <li><p><strong>SELECT 열·조건·정렬·건수를 명시한다.</strong> <code>SELECT *</code>는 피하고 필요한 열을 쓴다. <code>ORDER BY</code> 없이는 순서가 보장되지 않는다.</p>
 <pre><code class="language-sql">SELECT id, order_no, total_amount
@@ -91,7 +94,8 @@ LIMIT 20 OFFSET 0;</code></pre>
 </div></details><details class="knowledge-chapter"><summary id="3-따라-하기" aria-label="3. 따라 하기 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 따라 하기</strong><small>1단계: 접속하고 스키마 확인 · 2단계: Spring JDBC에서 값을 바인딩 · 3단계: JOIN 결과 확인 · 4단계: 1:N 합계 함정 확인</small></span><span class="knowledge-chapter-meta">11개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <p>실습 DB는 <code>practice/schema/schema.sql</code>로 만든 MySQL 8.4 <code>ds_practice</code>다. 아래 결과는 **(예상)**이며 Docker와 MySQL을 여기서 실행하지 않았다. 모든 변경 예제는 끝에서 <code>ROLLBACK</code>한다.</p>
 <details class="knowledge-topic"><summary id="1단계-접속하고-스키마-확인" aria-label="1단계: 접속하고 스키마 확인 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">1단계: 접속하고 스키마 확인</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
-<pre><code class="language-bash">mysql --host=127.0.0.1 --port=3306 --user=devuser --password \
+<pre><code class="language-bash"># 직접 준비한 MySQL의 예시 값(포트 3306·계정 devuser·DB ds_practice) — 이 저장소 compose는 13308·community·practice
+mysql --host=127.0.0.1 --port=3306 --user=devuser --password \
   --default-character-set=utf8mb4 ds_practice</code></pre>
 <pre><code class="language-sql">SHOW TABLES;
 DESCRIBE orders;
@@ -113,6 +117,7 @@ dependencies {
 <p><code>src/main/resources/application.yml</code>:</p>
 <pre><code class="language-yaml">spring:
   datasource:
+    # 직접 준비한 MySQL 예시(3306·ds_practice). 이 저장소 compose라면 localhost:13308/practice
     url: jdbc:mysql://localhost:3306/ds_practice?characterEncoding=UTF-8
     username: ${DB_USER}
     password: ${DB_PASSWORD}</code></pre>
@@ -204,7 +209,8 @@ ORDER BY order_total DESC, member_id
 LIMIT 20;</code></pre>
 </div></details><details class="knowledge-topic"><summary id="5단계-insertupdatedelete를-안전하게-실습" aria-label="5단계: INSERT·UPDATE·DELETE를 안전하게 실습 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">5단계: INSERT·UPDATE·DELETE를 안전하게 실습</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>다음 SQL 전체를 <code>practice/sql/R04-demo.sql</code>에 저장한다. INSERT 다중 행·UPSERT·INSERT SELECT, 대상 사전 확인, 변경, 롤백까지 포함한다.</p>
-<pre><code class="language-bash">mysql --host=127.0.0.1 --port=3306 --user=devuser --password \
+<pre><code class="language-bash"># 직접 준비한 MySQL의 예시 값(포트 3306·계정 devuser·DB ds_practice) — 이 저장소 compose는 13308·community·practice
+mysql --host=127.0.0.1 --port=3306 --user=devuser --password \
   --default-character-set=utf8mb4 ds_practice &lt; practice/sql/R04-demo.sql</code></pre>
 <pre><code class="language-sql">START TRANSACTION;
 

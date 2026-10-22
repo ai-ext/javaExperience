@@ -80,6 +80,8 @@ assertThat(page.items()).as("요청한 페이지의 상품 순서")
 
 ## 3. 따라 하기
 
+> **이 저장소에 없는 예제 프로젝트** — `practice/starter`는 원래 공부자료가 쓰던 상품 API 예제 프로젝트다(자체 `compose.yaml`: 호스트 `13307` → 컨테이너 `3306`, DB `ds_practice`, 계정 `practice`/`practice`). 이 저장소에는 없으므로 아래 경로·명령은 그런 프로젝트를 직접 만들었을 때의 예시로 읽는다. 이 저장소에서는 루트 프로젝트에 같은 패턴을 적용한다 — `./gradlew test`는 Testcontainers의 일회용 MySQL을 쓰고, 개발 DB는 루트 `compose.yaml`(호스트 `localhost:13308`, 계정 `community`/`community`)이다.
+
 예제는 `practice/starter`의 실제 상품 API를 따르며 Java 25 전용 문법 없이 Boot 4.1.1 기준 **(미실행)**이다. README에는 JDK 21·Gradle 9.8.0·Boot 4.1.1로 테스트 2개가 통과한 기록이 있다.
 
 ### 1단계: 기존 구현과 테스트를 읽는다

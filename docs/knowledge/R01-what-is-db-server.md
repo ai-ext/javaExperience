@@ -16,9 +16,9 @@
 
 2. **MySQL과 PostgreSQL에서 `schema`의 위치가 다르다.** MySQL은 `CREATE SCHEMA`가 `CREATE DATABASE`의 별칭이다. PostgreSQL은 `server/cluster → database → schema → table` 구조다. PostgreSQL의 한 연결은 한 database를 선택하고, 그 안의 다른 schema는 권한과 `search_path`에 따라 함께 조회할 수 있다.
 
-3. **테이블은 열과 행으로 데이터를 표현한다.** `member`의 열은 `id`, `login_id`, `name`처럼 속성이고, 한 행은 한 회원 레코드다. `DESCRIBE member;`는 열 구성을 확인한다. 타입·키·제약 설계는 → R03.
+3. **테이블은 열과 행으로 데이터를 표현한다.** `member`의 열은 `id`, `email`, `nickname`처럼 속성이고, 한 행은 한 회원 레코드다. `DESCRIBE member;`는 열 구성을 확인한다. 타입·키·제약 설계는 → R03.
 
-4. **앱도 DB 클라이언트다.** Spring Boot 애플리케이션, DBeaver, `mysql`, `psql`은 접속 방식만 다를 뿐 서버로 SQL을 보내는 클라이언트다. 로컬 기본 포트는 MySQL `3306`, PostgreSQL `5432`지만 설정으로 바꿀 수 있다. 실제 값은 해당 서버에 질의한다.
+4. **앱도 DB 클라이언트다.** Spring Boot 애플리케이션, DBeaver, `mysql`, `psql`은 접속 방식만 다를 뿐 서버로 SQL을 보내는 클라이언트다. 로컬 기본 포트는 MySQL `3306`, PostgreSQL `5432`지만 설정으로 바꿀 수 있다(이 저장소 compose는 호스트에 `13308`로 공개한다). 실제 값은 해당 서버에 질의한다.
 
 5. **연결 성공은 인증과 세션 생성까지 확인한 것이다.** TCP 연결 뒤 사용자 인증을 거쳐 세션이 생긴다. database 선택·권한 오류는 별도로 발생한다. 상세 설정은 → P19.
 
@@ -32,7 +32,7 @@
 
 ## 3. 따라 하기
 
-실습 기준은 Java 25, Spring Boot 4.1.1, MySQL 8.4, 연습 DB `ds_practice`다. `practice/schema/schema.sql`과 `seed.sql`이 적재된 인스턴스를 전제로 한다. `schema.sql`은 첫 부분에서 `DROP DATABASE IF EXISTS ds_practice`를 실행하므로 공유·보존 DB에 그대로 적재하지 않는다. 여기서는 DB나 Docker를 실행하지 않는다.
+실습 기준은 Java 25, Spring Boot 4.1.1, MySQL 8.4이고, 이 저장소 루트 `compose.yaml`의 MySQL을 쓴다(`docker compose up -d` — 호스트 `localhost:13308`, 계정 `community`/`community`, 학습용 DB `practice`). 데이터는 `docker/mysql/init/02-practice.sql`에서 처음 한 번 적재된다. 아래 결과는 그 처음 상태 기준 **(예상)**이며, 이 문서를 쓰며 DB를 실행해 보지는 않았다.
 
 ```mermaid
 flowchart LR
@@ -48,36 +48,37 @@ PostgreSQL은 연결마다 서버 프로세스를 두고, MySQL은 다중 스레
 
 ### 단계 1 — 어떤 서버에 접속했는지 확인
 
-터미널에서 서버 주소와 포트를 지정하고 `mysql` 클라이언트를 실행한다. `--password` 뒤에 값을 적지 않으면 비밀번호를 프롬프트로 입력한다.
+터미널에서 서버 주소와 포트를 지정하고 `mysql` 클라이언트를 실행한다. `--password` 뒤에 값을 적지 않으면 비밀번호(`community`)를 프롬프트로 입력한다. 내 컴퓨터에 `mysql` 클라이언트가 없으면 두 번째 줄처럼 컨테이너 안의 클라이언트를 쓴다(이때는 호스트 포트를 거치지 않는다).
 
 ```bash
-mysql --host=127.0.0.1 --port=3306 --user=practice_user --password ds_practice
+mysql --host=127.0.0.1 --port=13308 --user=community --password practice
+docker compose exec mysql mysql --user=community --password practice   # 저장소 루트에서, 클라이언트가 없을 때
 ```
 
 접속 후 다음 읽기 전용 SQL을 실행한다.
 
 ```sql
 SELECT VERSION() AS server_version, DATABASE() AS current_database;
-SHOW DATABASES LIKE 'ds_practice';
+SHOW DATABASES LIKE 'practice';
 SHOW VARIABLES WHERE Variable_name IN ('port', 'datadir', 'default_storage_engine');
 ```
 
-**확인 방법 (예상)**: `current_database`가 `ds_practice`이고, 포트·데이터 디렉터리·기본 엔진 변수가 한 행씩 표시된다. `server_version`은 설치된 8.4 패치 버전에 따라 달라진다. 접속이 안 되면 다음 단계 전에 서버 주소, 실제 포트, 실행 상태를 확인한다.
+**확인 방법 (예상)**: `current_database`가 `practice`이고, 포트·데이터 디렉터리·기본 엔진 변수가 한 행씩 표시된다. `port`는 `13308`이 아니라 `3306`이다 — 서버는 컨테이너 안에서 3306으로 받고, 호스트의 13308을 Docker가 그쪽으로 전달한다. `datadir`은 컨테이너 안 경로 `/var/lib/mysql/`, 기본 엔진은 `InnoDB`다. `server_version`은 이미지의 8.4 패치 버전에 따라 달라진다. 접속이 안 되면 다음 단계 전에 서버 주소, 실제 포트, 실행 상태를 확인한다.
 
 ### 단계 2 — database 안의 테이블과 데이터 확인
 
 ```sql
 SHOW TABLES;
 DESCRIBE member;
-SELECT id, login_id, member_status, created_at
+SELECT id, email, nickname, member_status, created_at
 FROM member
 ORDER BY id
 LIMIT 3;
 ```
 
-**확인 방법 (예상)**: `SHOW TABLES`에 `member`, `product`, `orders`, `order_item`, `payment` 등이 나온다. `member`에는 `id`, `login_id`, `name`, `email`, `phone`, `member_status`, `deleted_at`, `created_at`, `updated_at` 열이 있다.
+**확인 방법 (예상)**: `SHOW TABLES`에 `api_token`, `board`, `bookmark`, `bookmark_folder`, `comment`, `follow`, `member`, `member_block`, `post`, `post_like`, `post_tag`, `tag` 12개가 나온다(앱을 `practice` 프로파일로 띄운 적이 있으면 Flyway가 만든 `flyway_schema_history` 등이 더 보일 수 있다). `member`에는 `id`, `email`, `nickname`, `role`, `member_status`, `created_at`, `updated_at`, `deleted_at` 열이 있다.
 
-마지막 SELECT의 실제 행 값은 시드 데이터에서 온다. 이 쿼리들은 DB를 변경하지 않는다.
+마지막 SELECT의 행 값은 시드 데이터에서 온다. 처음 상태라면 id 1~3이 `운영자`·`코딩하는고양이`·`자바초보탈출`이다. 이 쿼리들은 DB를 변경하지 않는다.
 
 ### 단계 3 — MySQL에서 DATABASE와 SCHEMA 확인
 
@@ -86,11 +87,11 @@ LIMIT 3;
 ```sql
 SELECT DATABASE();
 SHOW DATABASES;
-SHOW CREATE DATABASE ds_practice;
-SHOW TABLES FROM ds_practice;
+SHOW CREATE DATABASE practice;
+SHOW TABLES FROM practice;
 ```
 
-**확인 방법 (예상)**: `DATABASE()`는 `ds_practice`; `SHOW TABLES FROM ds_practice`는 해당 database의 테이블 목록을 반환한다. MySQL 매뉴얼에서 아래 두 구문은 동의어라고 정의한다. 다음은 설명용 구문이며, 주석을 풀어 실행하면 database를 실제 생성한다. MySQL의 `CREATE DATABASE`는 트랜잭션으로 되돌릴 수 없으므로 이 실습에서는 생성하지 않는다.
+**확인 방법 (예상)**: `DATABASE()`는 `practice`; `SHOW DATABASES`에는 `community`·`practice`·`project`와 시스템 database `information_schema`가 보인다(`community` 계정은 권한을 받은 database만 본다). `SHOW TABLES FROM practice`는 해당 database의 테이블 목록을 반환한다. MySQL 매뉴얼에서 아래 두 구문은 동의어라고 정의한다. 다음은 설명용 구문이며, 주석을 풀어 실행하면 database를 실제 생성한다. MySQL의 `CREATE DATABASE`는 트랜잭션으로 되돌릴 수 없으므로 이 실습에서는 생성하지 않는다.
 
 ```sql
 -- MySQL에서 아래 두 문장은 같은 동작이다. 실행하지 않는다.
@@ -168,11 +169,11 @@ Maven에서는 `org.springframework.boot:spring-boot-starter-jdbc`와 `com.mysql
 | 이름 | 용도 | 예시 | 주의 |
 |---|---|---|---|
 | DBMS | 데이터 저장·조회·복구 소프트웨어 | MySQL Server, PostgreSQL | DB 서버 프로세스와 구분 |
-| DB 서버 | DBMS가 연결을 받는 실행 환경 | `127.0.0.1:3306` | 주소·포트가 맞아도 인증 실패 가능 |
-| Database | 논리적 데이터 묶음 | MySQL `ds_practice`; PostgreSQL `postgres` | PostgreSQL에서는 schema보다 상위 |
+| DB 서버 | DBMS가 연결을 받는 실행 환경 | `127.0.0.1:13308`(이 저장소 compose의 호스트 포트) | 주소·포트가 맞아도 인증 실패 가능 |
+| Database | 논리적 데이터 묶음 | MySQL `practice`; PostgreSQL `postgres` | PostgreSQL에서는 schema보다 상위 |
 | Schema | 객체 이름 공간 | PostgreSQL `public.member` | MySQL에선 database와 동의어 |
-| Table | 행과 열로 된 관계형 데이터 객체 | `ds_practice.member` | MySQL 엔진에 따라 저장·기능 차이 |
-| Row / Column | 레코드 / 속성 | 회원 한 명 / `login_id` | 구체 타입·제약은 → R03 |
+| Table | 행과 열로 된 관계형 데이터 객체 | `practice.member` | MySQL 엔진에 따라 저장·기능 차이 |
+| Row / Column | 레코드 / 속성 | 회원 한 명 / `email` | 구체 타입·제약은 → R03 |
 | MySQL 포트 | 기본 TCP 접속 포트 | `3306`, `SHOW VARIABLES LIKE 'port'` | `--port`나 서버 설정으로 변경 가능 |
 | PostgreSQL 포트 | 기본 TCP 접속 포트 | `5432`, `SHOW port` | 클러스터 안 모든 database가 공유 |
 | 현재 대상 확인 | 실수로 다른 DB를 조회하지 않게 확인 | MySQL `SELECT DATABASE()`; PG `SELECT current_database()` | 접속 성공 후 첫 확인으로 사용 |
@@ -197,11 +198,11 @@ Maven에서는 `org.springframework.boot:spring-boot-starter-jdbc`와 `com.mysql
 
 ## 5. 자주 나는 에러와 해결
 
-1. **`ERROR 1049 (42000): Unknown database 'ds_practice'`** → 접속한 MySQL 인스턴스에 그 이름이 없거나 다른 서버에 붙었다. → `SELECT @@hostname, @@port;`로 서버를 확인하고 `SHOW DATABASES;` 목록·적재 여부를 점검한다.
+1. **`ERROR 1049 (42000): Unknown database 'practice'`** → 접속한 MySQL 인스턴스에 그 이름이 없거나 다른 서버에 붙었다. → `SELECT @@hostname, @@port;`로 서버를 확인하고 `SHOW DATABASES;` 목록·적재 여부를 점검한다.
 
 2. **`ERROR 1045 (28000): Access denied for user ...`** → 암호 오류, 해당 출발 호스트에 대한 권한 부재, 또는 계정 이름 오기다. → 계정·비밀번호·접속 호스트와 GRANT 범위를 확인한다. 암호를 SQL이나 셸 기록에 평문으로 남기지 않는다.
 
-3. **`ERROR 2002 (HY000): Can't connect to local MySQL server through socket ...`** → 소켓 연결을 시도했지만 로컬 서버가 실행 중이 아니거나 클라이언트 기본 소켓 경로와 서버 경로가 다르다. → 서버 상태를 확인하고 TCP 접속을 `--host=127.0.0.1 --port=3306`처럼 명시한다.
+3. **`ERROR 2002 (HY000): Can't connect to local MySQL server through socket ...`** → 소켓 연결을 시도했지만 로컬 서버가 실행 중이 아니거나 클라이언트 기본 소켓 경로와 서버 경로가 다르다. → 서버 상태(`docker compose ps mysql`)를 확인하고 TCP 접속을 `--host=127.0.0.1 --port=13308`처럼 명시한다. `--host`를 빼면 `localhost`로 보고 소켓을 찾는다.
 
 4. **`FATAL: database "app" does not exist`** → PostgreSQL 서버에는 연결했지만 `app`이라는 database가 없다. 이것은 schema나 table 오류가 아니다. → `\l`로 database 목록을 보고 올바른 `--dbname`을 지정한다.
 

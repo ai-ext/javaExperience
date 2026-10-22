@@ -12,14 +12,16 @@ DBeaver는 DB 서버에 네트워크로 접속해 SQL을 보내고, 결과와 �
 
 ## 2. 당장 알아야 할 것
 
-1. **연결 정보는 서버의 주소와 계정이다.** 로컬 DB라면 `127.0.0.1`은 내 컴퓨터를 뜻하고 포트는 호스트에 공개된 포트다. 컨테이너 안의 MySQL 포트 `3306`과 내 컴퓨터의 공개 포트가 같다는 보장은 없다. 저장소의 연습용 Compose는 `13307:3306`으로 공개한다.
+> **이 저장소에 없는 실습 환경** — 이 문서의 연결 예시는 원래 공부자료의 예제 프로젝트 `practice/starter`가 띄우는 연습 DB(자체 `compose.yaml`: 호스트 `13307` → 컨테이너 `3306`, DB `ds_practice`, 계정 `practice`/`practice`, 쇼핑몰 테이블 `member`·`product`·`orders` 등)를 기준으로 한다. 그 프로젝트와 DB는 이 저장소에 없다. 이 저장소에서 바로 쓸 수 있는 DB는 루트 `compose.yaml`의 MySQL(`docker compose up -d` — 호스트 `localhost:13308`, 계정 `community`/`community`, DB `community`·`practice`·`project`)이고, 테이블은 게시판용(`member`·`post`·`comment`·`tag` 등)이라 이름과 열이 다르다. 이 저장소의 compose에는 웹 DB 클라이언트 CloudBeaver(`http://localhost:8978`, `cbadmin`/`Admin1234`)도 들어 있어 세 DB 연결이 미리 만들어져 있다.
+
+1. **연결 정보는 서버의 주소와 계정이다.** 로컬 DB라면 `127.0.0.1`은 내 컴퓨터를 뜻하고 포트는 호스트에 공개된 포트다. 컨테이너 안의 MySQL 포트 `3306`과 내 컴퓨터의 공개 포트가 같다는 보장은 없다. 이 문서가 기준으로 삼는 starter Compose는 `13307:3306`, 이 저장소 루트 `compose.yaml`은 `13308:3306`으로 공개한다.
 
    ```text
    Host: 127.0.0.1   Port: (호스트에 공개된 포트)
    Database: ds_practice   User: practice
    ```
 
-   브리프가 지정한 접속 예시는 포트 `13306`이다. 저장소의 `practice/starter/compose.yaml`을 실행한 경우 실제 공개 포트는 `13307`이므로 그 환경에서는 `13307`을 입력한다. 다른 포트로 설정된 MySQL을 `13306`으로 접속하면 연결 실패가 정상이다.
+   포트에는 지금 실행 중인 환경이 실제로 공개한 값을 넣는다. starter Compose라면 `13307`, 이 저장소 루트 `compose.yaml`이라면 `13308`이다. 다른 포트로 공개된 MySQL에 엉뚱한 포트로 접속하면 연결 실패가 정상이다.
 
 2. **드라이버는 DB 종류별 통역기이자 네트워크 클라이언트 코드다.** DBeaver에서 MySQL 연결을 처음 만들면 Connector/J가 없을 때 내려받도록 안내한다. PostgreSQL에는 PostgreSQL JDBC 드라이버, Oracle에는 Oracle JDBC 드라이버가 필요하다. 드라이버는 SQL 문법을 하나로 통일하지 않는다. DB별 SQL 차이, 인증, 데이터 형식은 그대로 남는다.
 
@@ -54,19 +56,19 @@ flowchart LR
 
 ### 1단계 — 실행 중인 연습 DB의 포트와 계정 확인
 
-이 저장소의 `practice/starter/compose.yaml`에는 아래 값이 설정되어 있다.
+starter의 `practice/starter/compose.yaml`(이 저장소에는 없다)과 이 저장소 루트 `compose.yaml`의 값은 아래와 같다.
 
-| 항목 | 값 | 의미 |
-|---|---|---|
-| DB 이름 | `ds_practice` | 연결 후 선택할 데이터베이스 |
-| 사용자 | `practice` | 연습용 일반 계정 |
-| 비밀번호 | `practice` | 로컬 연습 전용, 운영에 재사용 금지 |
-| 호스트 공개 포트 | `13307` | `13307:3306` 중 왼쪽 값 |
-| 컨테이너 포트 | `3306` | MySQL 서버가 컨테이너 안에서 받는 포트 |
+| 항목 | starter Compose | 이 저장소 루트 `compose.yaml` | 의미 |
+|---|---|---|---|
+| DB 이름 | `ds_practice` | `practice`(학습용) · `community`(시나리오) · `project`(10장) | 연결 후 선택할 데이터베이스 |
+| 사용자 | `practice` | `community` | 연습용 일반 계정 |
+| 비밀번호 | `practice` | `community` | 로컬 연습 전용, 운영에 재사용 금지 |
+| 호스트 공개 포트 | `13307` | `13308`(`DB_PORT`로 바꿀 수 있다) | `13307:3306`·`13308:3306` 중 왼쪽 값 |
+| 컨테이너 포트 | `3306` | `3306` | MySQL 서버가 컨테이너 안에서 받는 포트 |
 
-브리프 예시 `13306`은 해당 포트가 실제 공개된 환경에서 쓴다. starter Compose를 실행했다면 `13307`을 입력한다. 현재 포트 매핑을 기준으로 선택한다.
+starter Compose를 실행했다면 `13307`, 이 저장소 루트 compose라면 `13308`을 입력한다. 현재 포트 매핑을 기준으로 선택한다.
 
-**확인 방법:** Compose 설정의 `ports`가 `"13307:3306"`이면 DBeaver에는 `13307`을 입력한다. 이 문서에서는 컨테이너 시작이나 `mysql` CLI 실행을 요구하지 않는다.
+**확인 방법:** Compose 설정의 `ports`가 `"13307:3306"`이면 DBeaver에는 `13307`을 입력한다(이 저장소 루트 compose의 `"${DB_PORT:-13308}:3306"`이면 `13308`). 이 문서에서는 컨테이너 시작이나 `mysql` CLI 실행을 요구하지 않는다.
 
 ### 2단계 — DBeaver에서 연결 만들기
 
@@ -77,9 +79,9 @@ flowchart LR
    | 필드 | 입력 |
    |---|---|
    | Host | `127.0.0.1` |
-   | Port | 브리프 예시 `13306` 또는 starter Compose 사용 시 `13307` |
-   | Database | `ds_practice` |
-   | Username / Password | starter Compose 기준 `practice` / `practice` |
+   | Port | starter Compose 사용 시 `13307`, 이 저장소 루트 compose 사용 시 `13308` |
+   | Database | starter는 `ds_practice`, 이 저장소는 `practice` |
+   | Username / Password | starter는 `practice` / `practice`, 이 저장소는 `community` / `community` |
 
 5. **Test Connection**을 누른다. 성공하면 마법사를 완료하고 Navigator에서 연결을 펼친다. 실패하면 에러와 포트 매핑을 대조한다.
 
@@ -100,10 +102,10 @@ SELECT DATABASE() AS current_database,
 MySQL 8 인증에서 아래 오류가 나오고 TLS를 사용하지 않는 로컬 연습 환경이라면 **Driver Properties**에서 `allowPublicKeyRetrieval=true`를 설정한 뒤 다시 테스트할 수 있다. 드라이버 속성 목록에 없으면 연결 URL의 query parameter로 추가한다.
 
 ```text
-jdbc:mysql://127.0.0.1:13306/ds_practice?characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+jdbc:mysql://127.0.0.1:13307/ds_practice?characterEncoding=UTF-8&allowPublicKeyRetrieval=true
 ```
 
-위 URL은 브리프의 `13306` 예시다. 실제 starter Compose에는 `13307`을 넣는다. MySQL Connector/J에서 `allowPublicKeyRetrieval` 기본값은 `false`다.
+위 URL은 starter Compose 기준이다. 이 저장소 루트 compose라면 `jdbc:mysql://127.0.0.1:13308/practice?characterEncoding=UTF-8&allowPublicKeyRetrieval=true`다. MySQL Connector/J에서 `allowPublicKeyRetrieval` 기본값은 `false`다.
 
 이 옵션은 TLS 없이 인증할 때 서버에서 RSA 공개키를 가져오는 handshake를 허용하므로 운영 연결에 습관처럼 켜지 않는다. 운영은 검증 가능한 인증서가 설정된 TLS를 구성하고, 공개키 검색을 허용하지 않아도 되는 인증 구성을 사용한다.
 
@@ -191,7 +193,7 @@ SSH는 네트워크 경로를 보호하지만 DB TLS와 계정 권한을 대신�
 
 2. **`Access denied for user '...'@'...'` →** 사용자명·암호가 다르거나, 그 계정이 접속 출처 또는 `ds_practice` 권한을 갖지 않는다 → 실제 환경의 자격 증명을 확인하고 최소 권한을 부여받는다. 권한 문제를 root 접속으로 우회하지 않는다.
 
-3. **`Communications link failure` / `Connection refused` →** 서버가 꺼져 있거나 주소·포트가 다르거나, 컨테이너 포트가 호스트로 공개되지 않았다 → 브리프 예시 `13306`과 Compose의 `13307:3306`을 구분하고, 현재 실행 환경이 공개한 포트를 사용한다. 로컬 DB 접속에서 `localhost` 대신 `127.0.0.1`을 지정하면 주소 해석 혼선을 줄일 수 있다.
+3. **`Communications link failure` / `Connection refused` →** 서버가 꺼져 있거나 주소·포트가 다르거나, 컨테이너 포트가 호스트로 공개되지 않았다 → starter Compose의 `13307:3306`, 이 저장소 루트 compose의 `13308:3306`처럼 실행 중인 환경의 매핑을 확인하고, 그 환경이 공개한 포트를 사용한다. 로컬 DB 접속에서 `localhost` 대신 `127.0.0.1`을 지정하면 주소 해석 혼선을 줄일 수 있다.
 
 4. **`Public Key Retrieval` 대신 `No suitable driver` / 드라이버 다운로드 실패 →** 드라이버 라이브러리가 없거나 네트워크·프록시가 Maven 저장소 접근을 막는다 → DBeaver Driver Manager에서 MySQL 드라이버 상태와 프록시 설정을 확인하고, 조직이 승인한 경로에서만 드라이버를 설치한다.
 
@@ -243,7 +245,7 @@ ERD는 스키마 메타데이터를 보여 주며 서버 스키마를 대신 정
 
 **답:** 포트 매핑의 왼쪽은 호스트 포트, 오른쪽은 컨테이너 포트다. `13307:3306`이면 호스트의 `127.0.0.1:13307`로 들어온 요청이 컨테이너 `3306`에 전달된다. 같은 컴퓨터에서 실행하는 GUI는 호스트 쪽 공개 포트를 사용한다. 실제 포트 매핑을 확인하고 입력한다.
 
-**꼬리질문:** starter Compose에서 사용할 포트는? → 현재 설정 기준 `13307`이며, `13306`은 실행 환경이 그 포트를 공개했을 때 사용한다.
+**꼬리질문:** starter Compose와 이 저장소 루트 compose에서 사용할 포트는? → starter는 `13307`, 이 저장소는 `13308`이다. 둘 다 컨테이너 안에서는 `3306`이다.
 
 ### Q5. DBeaver의 read-only와 auto-commit off 중 무엇이 운영 안전을 보장하는가?
 
