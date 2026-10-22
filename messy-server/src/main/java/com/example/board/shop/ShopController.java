@@ -22,10 +22,13 @@ public class ShopController {
 
     private final ShopItemRepository shopItemRepository;
     private final OrderService orderService;
+    private final OrderNotifier orderNotifier;
 
-    public ShopController(ShopItemRepository shopItemRepository, OrderService orderService) {
+    public ShopController(ShopItemRepository shopItemRepository, OrderService orderService,
+            OrderNotifier orderNotifier) {
         this.shopItemRepository = shopItemRepository;
         this.orderService = orderService;
+        this.orderNotifier = orderNotifier;
     }
 
     @GetMapping("/items")
@@ -37,6 +40,8 @@ public class ShopController {
     public ResponseEntity<OrderResponse> order(@AuthenticationPrincipal AuthMember auth,
             @RequestHeader("Idempotency-Key") @Pattern(regexp = "[A-Za-z0-9-]{8,64}") String idempotencyKey,
             @Valid @RequestBody OrderRequest request) {
-        return ResponseEntity.status(201).body(orderService.order(auth.id(), idempotencyKey, request));
+        OrderResponse response = orderService.order(auth.id(), idempotencyKey, request);
+        orderNotifier.notifyOrdered(response.orderId());
+        return ResponseEntity.status(201).body(response);
     }
 }
