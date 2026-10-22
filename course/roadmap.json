@@ -1,0 +1,1750 @@
+{
+  "version": 1,
+  "days": [
+    {
+      "id": "D01",
+      "phase": "build",
+      "title": "프로젝트 뼈대",
+      "java": "J01",
+      "steps": [
+        {
+          "no": 1,
+          "title": "start.spring.io로 프로젝트 만들고 헬스 체크 열기 (Java 21, Boot 4.1, 의존성은 Web·Actuator·Validation·Lombok만)",
+          "files": [
+            "build.gradle",
+            "src/main/java/com/example/board/BoardApplication.java",
+            "src/test/java/com/example/board/BoardApplicationTests.java"
+          ],
+          "done": [
+            "`./gradlew bootRun`으로 기동",
+            "`GET /actuator/health` → 200 `{\"status\":\"UP\"}`"
+          ],
+          "trap": "헬스 체크(liveness)에 DB 확인을 넣으면 DB가 잠깐 끊길 때 모든 인스턴스가 재시작돼 장애가 커진다.",
+          "specRefs": [
+            "GET /actuator/health"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 2,
+          "title": "Colima에서 MySQL 8.4를 띄우고 JPA 연결하기 (스키마는 `src/main/resources/schema.sql`로 관리하고 Flyway는 쓰지 않는다)",
+          "files": [
+            "compose.yaml",
+            "build.gradle",
+            "src/main/resources/application.yml"
+          ],
+          "done": [
+            "`docker compose up -d` 뒤 기동 로그에 `HikariPool-1 - Start completed`",
+            "`GET /actuator/health` → 200",
+            "`application.yml`에 `---`로 나눈 `test` 프로파일 문서가 있다"
+          ],
+          "trap": "MySQL 같은 외부 DB에서는 `spring.sql.init.mode=always`를 켜지 않으면 `schema.sql`이 실행되지 않아 테이블 없이 기동된다.",
+          "specRefs": [
+            "GET /actuator/health"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 3,
+          "title": "프로파일을 local·prod로 나누고 비밀값은 자리표시자로만 두기",
+          "files": [
+            "src/main/resources/application-local.yml",
+            "src/main/resources/application-prod.yml",
+            "src/main/resources/application.yml"
+          ],
+          "done": [
+            "`--spring.profiles.active=local` 기동 로그에 `The following 1 profile is active: \"local\"`",
+            "`SERVER_PORT=8081`로 실행하면 yml의 `server.port`보다 환경 변수가 이긴다: `GET http://localhost:8081/actuator/health` → 200",
+            "prod 프로파일은 `DB_PASSWORD` 환경 변수 없이 기동하면 실패한다",
+            "`GET /actuator/env` → 404 (HTTP로는 `health`만 노출)"
+          ],
+          "trap": "DB 비밀번호를 yml에 적어 커밋하면 파일에서 지워도 git 이력에 남으므로 yml에는 `${DB_PASSWORD}` 자리표시자만 둔다.",
+          "specRefs": [
+            "GET /actuator/health"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 4,
+          "title": "logback 패턴에 요청 ID를 넣고 MDC 요청 ID 필터 만들기",
+          "files": [
+            "src/main/resources/logback-spring.xml",
+            "src/main/java/com/example/board/common/RequestIdFilter.java"
+          ],
+          "done": [
+            "`GET /actuator/health` → 200, 응답 헤더에 `X-Request-Id`",
+            "같은 요청의 로그 줄마다 같은 요청 ID가 찍힌다",
+            "동시에 보낸 3건의 로그를 요청 ID로 나눠 볼 수 있다"
+          ],
+          "trap": "MDC를 `finally`에서 지우지 않으면 톰캣이 재사용하는 스레드의 다음 요청 로그에 이전 요청 ID가 남는다.",
+          "specRefs": [
+            "GET /actuator/health"
+          ],
+          "tickets": []
+        }
+      ],
+      "talkCards": [
+        "TC-D01-1",
+        "TC-D01-2",
+        "TC-D01-3",
+        "TC-D01-4",
+        "TC-D01-5"
+      ],
+      "tomorrow": "D02는 오늘 만든 `application.yml`에 `board.*` 설정을 더하고, 요청 ID 필터가 찍는 로그로 예외를 추적한다."
+    },
+    {
+      "id": "D02",
+      "phase": "build",
+      "title": "공통 기반",
+      "java": "J02",
+      "steps": [
+        {
+          "no": 1,
+          "title": "공통 에러 체계: `ErrorCode`, `BusinessException`, ProblemDetail을 만드는 전역 예외 처리기",
+          "files": [
+            "src/main/java/com/example/board/common/ErrorCode.java",
+            "src/main/java/com/example/board/common/BusinessException.java",
+            "src/main/java/com/example/board/common/GlobalExceptionHandler.java"
+          ],
+          "done": [
+            "`GET /api/unknown` → 404 `application/problem+json`, `instance` = `/api/unknown`",
+            "`GlobalExceptionHandlerTest` 통과: `BusinessException(ErrorCode.NOT_FOUND)` → 404 `type` `/errors/not-found`",
+            "`GET /actuator/health` → 200"
+          ],
+          "trap": "`IllegalArgumentException`을 전부 400으로 바꾸면 서버 코드의 버그까지 클라이언트 잘못으로 보고돼 장애가 숨는다.",
+          "specRefs": [
+            "GET /actuator/health"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 2,
+          "title": "`BaseEntity`(생성·수정 시각 Auditing)와 Testcontainers 테스트 기반",
+          "files": [
+            "src/main/java/com/example/board/common/BaseEntity.java",
+            "src/main/java/com/example/board/config/JpaConfig.java",
+            "src/test/java/com/example/board/TestcontainersConfig.java"
+          ],
+          "done": [
+            "`BoardApplicationTests` 통과: Testcontainers MySQL로 컨텍스트 기동",
+            "`GET /actuator/health` → 200 (`@EnableJpaAuditing` 포함)"
+          ],
+          "trap": "`@EnableJpaAuditing`을 빠뜨리면 `created_at`이 null로 들어가 NOT NULL 제약 위반이 난다.",
+          "specRefs": [
+            "GET /actuator/health"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 3,
+          "title": "흩어진 설정을 `@ConfigurationProperties` 하나로 묶기 (`board.*`)",
+          "files": [
+            "src/main/java/com/example/board/config/BoardProperties.java",
+            "src/main/resources/application.yml"
+          ],
+          "done": [
+            "`BoardPropertiesTest` 통과: `board.forbidden-words.*` 값이 객체로 바인딩된다",
+            "필수 값을 비우면 `@Validated` 때문에 기동이 실패한다",
+            "정상 값으로 기동하면 `GET /actuator/health` → 200"
+          ],
+          "trap": "기본값을 붙인 `@Value(\"${...:기본값}\")`로 여러 클래스에서 읽으면 키 오타가 기동 때 잡히지 않고 기본값으로 조용히 넘어간다.",
+          "specRefs": [
+            "GET /actuator/health"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 4,
+          "title": "금칙어 검사기는 빈으로, 닉네임 정규화는 static 유틸로 나누기",
+          "files": [
+            "src/main/java/com/example/board/common/ForbiddenWordChecker.java",
+            "src/main/java/com/example/board/common/NicknameNormalizer.java"
+          ],
+          "done": [
+            "`ForbiddenWordCheckerTest` 통과",
+            "`NicknameNormalizerTest` 통과: 앞뒤 공백 제거·소문자화",
+            "`ForbiddenWordChecker`에 요청마다 바뀌는 필드가 없다(리뷰 체크)"
+          ],
+          "trap": "싱글톤 빈인 검사기에 `lastMatched` 같은 상태 필드를 두면 동시 요청끼리 값이 섞인다.",
+          "specRefs": [
+            "GET /actuator/health"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 5,
+          "title": "기동이 끝난 뒤(`ApplicationReadyEvent`) 금칙어·공통코드를 메모리에 적재하기",
+          "files": [
+            "src/main/java/com/example/board/common/ForbiddenWordLoader.java"
+          ],
+          "done": [
+            "기동 로그에서 `Started BoardApplication` 다음에 `금칙어 N건 적재`",
+            "`GET /actuator/health` → 200"
+          ],
+          "trap": "`@PostConstruct`는 빈 하나가 초기화되는 시점이라 트랜잭션 프록시나 다른 빈이 아직 준비되지 않았을 수 있으므로, 애플리케이션 준비가 끝난 `ApplicationReadyEvent`에서 적재한다.",
+          "specRefs": [
+            "GET /actuator/health"
+          ],
+          "tickets": []
+        }
+      ],
+      "talkCards": [
+        "TC-D02-1",
+        "TC-D02-2",
+        "TC-D02-3",
+        "TC-D02-4",
+        "TC-D02-5"
+      ],
+      "tomorrow": "D03은 오늘 만든 `ErrorCode`·`GlobalExceptionHandler`로 401·403·409를 ProblemDetail로 내고, `BaseEntity`를 `Member`가 처음 상속한다."
+    },
+    {
+      "id": "D03",
+      "phase": "build",
+      "title": "회원·인증",
+      "java": "J03",
+      "steps": [
+        {
+          "no": 1,
+          "title": "Spring Security를 켜고 경로별 공개 범위 표를 규칙으로 옮기기 (BCrypt `PasswordEncoder` 빈, 401·403 ProblemDetail 핸들러)",
+          "files": [
+            "build.gradle",
+            "src/main/java/com/example/board/config/SecurityConfig.java",
+            "src/main/java/com/example/board/config/ProblemDetailSecurityHandler.java"
+          ],
+          "done": [
+            "토큰 없이 `GET /actuator/health` → 200",
+            "토큰 없이 `GET /api/members/me` → 401 `application/problem+json`, `type` `/errors/unauthorized`",
+            "`GET /actuator/env` → 401 (health 외 actuator 비공개)"
+          ],
+          "trap": "인가 규칙은 위에서부터 처음 매치된 것만 적용되므로 넓은 `permitAll`을 앞에 두면 뒤의 ADMIN 규칙이 무력해진다.",
+          "specRefs": [
+            "GET /actuator/health",
+            "GET /api/members/me"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 2,
+          "title": "`Member` 엔티티와 `Role` (`schema.sql`에 `member` 테이블, `BaseEntity` 상속)",
+          "files": [
+            "src/main/java/com/example/board/member/Member.java",
+            "src/main/java/com/example/board/member/Role.java",
+            "src/main/java/com/example/board/member/MemberRepository.java"
+          ],
+          "done": [
+            "`MemberRepositoryTest` 통과: 같은 `email`로 두 번 저장하면 `DataIntegrityViolationException`"
+          ],
+          "trap": "`email` 중복을 `existsByEmail` 조회로만 막으면 동시 가입 두 건이 모두 통과하므로 UNIQUE 제약을 최종 방어선으로 둔다.",
+          "specRefs": [
+            "POST /api/auth/signup"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 3,
+          "title": "회원 가입 API (닉네임은 `NicknameNormalizer`로 정규화, 비밀번호는 BCrypt 해시로 저장)",
+          "files": [
+            "src/main/java/com/example/board/member/SignupRequest.java",
+            "src/main/java/com/example/board/member/AuthService.java",
+            "src/main/java/com/example/board/member/AuthController.java"
+          ],
+          "done": [
+            "`POST /api/auth/signup` → 201",
+            "같은 `email`로 다시 → 409 `/errors/duplicate`",
+            "`password` 7자 → 400 `/errors/validation`, `errors[0].field` = `password`"
+          ],
+          "trap": "응답 DTO 대신 `Member` 엔티티를 그대로 돌려주면 `password_hash`가 응답에 실린다.",
+          "specRefs": [
+            "POST /api/auth/signup"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 4,
+          "title": "로그인과 JWT 발급·검증 필터 (서명 키는 `JWT_SECRET` 환경 변수)",
+          "files": [
+            "src/main/java/com/example/board/config/JwtProvider.java",
+            "src/main/java/com/example/board/config/JwtAuthenticationFilter.java",
+            "src/main/java/com/example/board/member/LoginRequest.java"
+          ],
+          "done": [
+            "`POST /api/auth/login` → 200 `{accessToken, tokenType: \"Bearer\", expiresIn}`",
+            "틀린 비밀번호와 없는 이메일 → 둘 다 같은 401 `/errors/unauthorized`"
+          ],
+          "trap": "JWT 필터가 토큰이 없을 때 401을 직접 내면 공개 경로까지 막히므로 다음 필터로 넘기고 판단은 인가 규칙에 맡긴다.",
+          "specRefs": [
+            "POST /api/auth/login"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 5,
+          "title": "내 정보 조회 API와 응답 DTO",
+          "files": [
+            "src/main/java/com/example/board/member/MemberResponse.java",
+            "src/main/java/com/example/board/member/MemberController.java"
+          ],
+          "done": [
+            "USER 토큰으로 `GET /api/members/me` → 200 `{id, email, nickname, role, createdAt}`, `passwordHash` 없음",
+            "토큰 없음·만료 토큰 → 401",
+            "USER 토큰으로 `GET /api/admin/reports` → 403 `/errors/forbidden` (컨트롤러는 D10에 만들지만 규칙은 지금 막는다)"
+          ],
+          "trap": "401·403을 컨트롤러에서 만들면 필터 단계에서 막힌 요청은 다른 형식이 나가므로 Security의 진입점·거부 핸들러에서 만든다.",
+          "specRefs": [
+            "GET /api/members/me"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 6,
+          "title": "CORS 허용 출처 설정과 preflight를 인증보다 먼저 처리하기",
+          "files": [
+            "src/main/java/com/example/board/config/CorsConfig.java",
+            "src/main/java/com/example/board/config/SecurityConfig.java"
+          ],
+          "done": [
+            "`OPTIONS /api/auth/login` + `Origin: http://localhost:3000` → 200, `Access-Control-Allow-Origin: http://localhost:3000`",
+            "`Origin: http://evil.example` → 403",
+            "브라우저(`http://127.0.0.1:8765`)에서 `POST /api/auth/login` → 200"
+          ],
+          "trap": "preflight가 인증 필터에 걸리면 curl은 되는데 브라우저에서만 요청이 막힌다.",
+          "specRefs": [
+            "POST /api/auth/login"
+          ],
+          "tickets": []
+        }
+      ],
+      "talkCards": [
+        "TC-D03-1",
+        "TC-D03-2",
+        "TC-D03-3",
+        "TC-D03-4",
+        "TC-D03-5"
+      ],
+      "tomorrow": "D04는 오늘 만든 JWT 인증으로 로그인한 회원을 글 작성자로 쓴다."
+    },
+    {
+      "id": "D04",
+      "phase": "build",
+      "title": "게시글 쓰기 (JPA)",
+      "java": "J04",
+      "steps": [
+        {
+          "no": 1,
+          "title": "`Post` 엔티티와 `PostStatus` (`schema.sql`에 `post` 테이블)",
+          "files": [
+            "src/main/java/com/example/board/post/Post.java",
+            "src/main/java/com/example/board/post/PostStatus.java",
+            "src/main/java/com/example/board/post/PostRepository.java"
+          ],
+          "done": [
+            "`PostRepositoryTest` 통과: 저장한 글의 `status` 컬럼 값이 문자열 `ACTIVE`"
+          ],
+          "trap": "`@Enumerated`를 기본값(ORDINAL)으로 두면 enum 앞에 값을 끼울 때 기존 글의 상태가 전부 바뀌어 보인다.",
+          "specRefs": [
+            "POST /api/posts"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 2,
+          "title": "`Tag`와 `PostTag` (`schema.sql`에 `tag`, `post_tag` 테이블)",
+          "files": [
+            "src/main/java/com/example/board/post/Tag.java",
+            "src/main/java/com/example/board/post/PostTag.java",
+            "src/main/java/com/example/board/post/TagRepository.java"
+          ],
+          "done": [
+            "`TagRepositoryTest` 통과: 같은 이름의 태그는 새로 만들지 않고 재사용한다"
+          ],
+          "trap": "엔티티에 `@Setter`·`@AllArgsConstructor`를 열어 두면 아무 곳에서나 상태가 바뀌므로 `protected` 기본 생성자와 정적 팩토리만 둔다.",
+          "specRefs": [
+            "POST /api/posts"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 3,
+          "title": "글 작성 요청·응답 DTO와 검증 규칙",
+          "files": [
+            "src/main/java/com/example/board/post/PostCreateRequest.java",
+            "src/main/java/com/example/board/post/PostResponse.java"
+          ],
+          "done": [
+            "`PostCreateRequestTest` 통과: 공백만 있는 제목, 태그 6개, 21자 태그를 거절한다"
+          ],
+          "trap": "`@NotEmpty`는 공백만 있는 제목을 통과시키므로 `@NotBlank`를 쓴다.",
+          "specRefs": [
+            "POST /api/posts"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 4,
+          "title": "`PostService` 인터페이스와 `PostServiceImpl` (작성자는 로그인 회원)",
+          "files": [
+            "src/main/java/com/example/board/post/PostService.java",
+            "src/main/java/com/example/board/post/PostServiceImpl.java"
+          ],
+          "done": [
+            "`PostServiceImplTest` 통과: 중복 태그는 한 번만 저장한다"
+          ],
+          "trap": "구현이 하나뿐인 곳마다 인터페이스를 만들면 과잉이므로, 교체나 테스트 대역이 실제로 필요한 경계에만 둔다.",
+          "specRefs": [
+            "POST /api/posts"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 5,
+          "title": "글 작성 API와 검증 오류 `errors[]` 응답 (`GlobalExceptionHandler`에 검증 예외 처리 추가)",
+          "files": [
+            "src/main/java/com/example/board/post/PostController.java",
+            "src/main/java/com/example/board/common/GlobalExceptionHandler.java"
+          ],
+          "done": [
+            "USER 토큰으로 `POST /api/posts` → 201, `Location: /api/posts/{postId}`",
+            "토큰 없음 → 401",
+            "제목이 공백만 → 400 `/errors/validation`, `errors[]`에 `{field: \"title\"}`"
+          ],
+          "trap": "컨트롤러 매개변수에 `@Valid`를 빠뜨리면 DTO에 검증 애노테이션이 있어도 아무 검사 없이 저장된다.",
+          "specRefs": [
+            "POST /api/posts"
+          ],
+          "tickets": []
+        }
+      ],
+      "talkCards": [
+        "TC-D04-1",
+        "TC-D04-2",
+        "TC-D04-3",
+        "TC-D04-4"
+      ],
+      "tomorrow": "D05는 오늘 만든 `Post` 엔티티와 `PostService`에 조회·수정·삭제를 더하고, 작성자 정보로 권한을 판단한다."
+    },
+    {
+      "id": "D05",
+      "phase": "build",
+      "title": "조회·수정·삭제 (JPA)",
+      "java": "J05",
+      "steps": [
+        {
+          "no": 1,
+          "title": "글 상세 조회 API",
+          "files": [
+            "src/main/java/com/example/board/post/PostDetailResponse.java",
+            "src/main/java/com/example/board/post/PostServiceImpl.java",
+            "src/main/java/com/example/board/post/PostController.java"
+          ],
+          "done": [
+            "토큰 없이 `GET /api/posts/{postId}` → 200",
+            "없는 글 → 404 `/errors/not-found`",
+            "`postId` = 0 → 400 `/errors/validation`"
+          ],
+          "trap": "응답 DTO를 만들며 지연 로딩 연관(작성자·태그)을 건드리면 쿼리가 추가로 나가므로 SQL 로그로 쿼리 수를 센다.",
+          "specRefs": [
+            "GET /api/posts/{postId}"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 2,
+          "title": "글 전체·부분 수정과 소프트 삭제, 작성자 검증",
+          "files": [
+            "src/main/java/com/example/board/post/PostUpdateRequest.java",
+            "src/main/java/com/example/board/post/PostPatchRequest.java",
+            "src/main/java/com/example/board/post/Post.java"
+          ],
+          "done": [
+            "작성자 토큰으로 `PUT /api/posts/{postId}` → 200",
+            "`PATCH /api/posts/{postId}` 제목만 → 200, 본문은 그대로",
+            "`PATCH` 본문 `{}` → 400",
+            "`DELETE /api/posts/{postId}` → 204, 이후 `GET` → 404",
+            "다른 회원 토큰으로 `PUT` → 403 `/errors/forbidden`, 삭제된 글에 `PUT` → 404"
+          ],
+          "trap": "`save()`를 부르지 않아도 변경 감지로 UPDATE가 커밋(flush) 시점에 나가므로 SQL 로그로 flush 시점을 확인한다.",
+          "specRefs": [
+            "PUT /api/posts/{postId}",
+            "PATCH /api/posts/{postId}",
+            "DELETE /api/posts/{postId}"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 3,
+          "title": "`Comment` 엔티티와 댓글 서비스 (`schema.sql`에 `comment` 테이블)",
+          "files": [
+            "src/main/java/com/example/board/comment/Comment.java",
+            "src/main/java/com/example/board/comment/CommentRepository.java",
+            "src/main/java/com/example/board/comment/CommentService.java"
+          ],
+          "done": [
+            "`CommentServiceTest` 통과: 삭제된 글에 댓글을 달면 `/errors/not-found` 예외"
+          ],
+          "trap": "대상 존재(404)보다 작성자(403)를 먼저 검사하면 삭제된 글의 존재가 권한 오류로 드러난다.",
+          "specRefs": [
+            "POST /api/posts/{postId}/comments"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 4,
+          "title": "댓글 작성·목록·삭제 API와 N+1 제거 (`CommentRepository`에 fetch join 조회 추가)",
+          "files": [
+            "src/main/java/com/example/board/comment/CommentController.java",
+            "src/main/java/com/example/board/comment/CommentResponse.java",
+            "src/main/java/com/example/board/comment/CommentRepository.java"
+          ],
+          "done": [
+            "`POST /api/posts/{postId}/comments` → 201",
+            "토큰 없이 `GET /api/posts/{postId}/comments` → 200, 댓글 20개에 SQL 2번 이하",
+            "`DELETE /api/comments/{commentId}`: 작성자 204, 다른 USER 403, ADMIN 204"
+          ],
+          "trap": "댓글마다 작성자 닉네임을 지연 로딩하면 댓글 20개에 SQL이 21번 나간다(N+1).",
+          "specRefs": [
+            "POST /api/posts/{postId}/comments",
+            "GET /api/posts/{postId}/comments",
+            "DELETE /api/comments/{commentId}"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 5,
+          "title": "`PostLike` 엔티티 (`schema.sql`에 `post_like` 테이블, UNIQUE(`post_id`, `member_id`))",
+          "files": [
+            "src/main/java/com/example/board/post/PostLike.java",
+            "src/main/java/com/example/board/post/PostLikeRepository.java"
+          ],
+          "done": [
+            "`PostLikeRepositoryTest` 통과: 같은 (글, 회원) 쌍을 두 번 저장하면 예외"
+          ],
+          "trap": "중복 좋아요를 \"조회해서 없으면 저장\"으로만 막으면 동시 요청 두 건이 모두 들어간다.",
+          "specRefs": [
+            "PUT /api/posts/{postId}/like"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 6,
+          "title": "좋아요 등록·취소 API (멱등)",
+          "files": [
+            "src/main/java/com/example/board/post/PostLikeService.java",
+            "src/main/java/com/example/board/post/PostLikeController.java"
+          ],
+          "done": [
+            "`PUT /api/posts/{postId}/like` → 204, 다시 `PUT` → 204이고 `like_count`는 1",
+            "`DELETE /api/posts/{postId}/like` → 204, 다시 `DELETE` → 204"
+          ],
+          "trap": "UNIQUE 위반 예외를 같은 트랜잭션 안에서 잡으면 트랜잭션이 rollback-only로 표시돼 204 대신 500이 난다.",
+          "specRefs": [
+            "PUT /api/posts/{postId}/like",
+            "DELETE /api/posts/{postId}/like"
+          ],
+          "tickets": []
+        }
+      ],
+      "talkCards": [
+        "TC-D05-1",
+        "TC-D05-2",
+        "TC-D05-3",
+        "TC-D05-4",
+        "TC-D05-5"
+      ],
+      "tomorrow": "D06은 오늘 쌓은 글·태그·좋아요 데이터를 MyBatis 목록 쿼리로 읽는다."
+    },
+    {
+      "id": "D06",
+      "phase": "build",
+      "title": "목록·검색 (MyBatis)",
+      "java": "J06",
+      "steps": [
+        {
+          "no": 1,
+          "title": "MyBatis 연결과 첫 목록 쿼리 (쓰기는 JPA, 목록·검색은 MyBatis)",
+          "files": [
+            "build.gradle",
+            "src/main/java/com/example/board/post/PostQueryMapper.java",
+            "src/main/resources/mapper/PostQueryMapper.xml"
+          ],
+          "done": [
+            "`PostQueryMapperTest` 통과: `ACTIVE` 글만 최신순 20건"
+          ],
+          "trap": "XML `namespace`가 매퍼 인터페이스의 전체 이름과 다르면 기동은 되고 호출할 때 `BindingException`이 난다.",
+          "specRefs": [
+            "GET /api/posts"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 2,
+          "title": "`resultMap`으로 글과 태그를 한 번에 매핑",
+          "files": [
+            "src/main/java/com/example/board/post/PostSummary.java",
+            "src/main/resources/mapper/PostQueryMapper.xml"
+          ],
+          "done": [
+            "`PostQueryMapperTest` 통과: 글 20건과 각 글의 태그를 쿼리 1번으로 매핑"
+          ],
+          "trap": "`<collection select=\"...\">`로 태그를 따로 가져오면 글 수만큼 쿼리가 늘어 MyBatis에서도 N+1이 생긴다.",
+          "specRefs": [
+            "GET /api/posts"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 3,
+          "title": "커서 페이징과 동적 검색 조건(`<where>`·`<if>`)",
+          "files": [
+            "src/main/java/com/example/board/common/CursorPage.java",
+            "src/main/java/com/example/board/post/PostSearchCondition.java",
+            "src/main/java/com/example/board/post/PostQueryService.java"
+          ],
+          "done": [
+            "`PostQueryServiceTest` 통과: 21건일 때 첫 쪽 20건과 `nextCursor`, 둘째 쪽 1건과 `nextCursor = null`",
+            "`keyword`·`tag`가 없으면 그 조건이 SQL에서 빠진다"
+          ],
+          "trap": "검색어나 정렬 값을 `${}`로 넣으면 문자열이 SQL에 그대로 붙어 인젝션이 되므로 값은 `#{}`로, 정렬은 허용 목록에서 고른다.",
+          "specRefs": [
+            "GET /api/posts"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 4,
+          "title": "글 목록·검색 API",
+          "files": [
+            "src/main/java/com/example/board/post/PostListRequest.java",
+            "src/main/java/com/example/board/post/PostController.java"
+          ],
+          "done": [
+            "`GET /api/posts` → 200 `{items, nextCursor}`",
+            "`GET /api/posts?size=51` → 400",
+            "`GET /api/posts?keyword=a` → 400",
+            "`GET /api/posts?sort=title` → 400",
+            "`GET /api/posts?tag=spring` → 200, 그 태그의 글만"
+          ],
+          "trap": "같은 트랜잭션에서 JPA로 고친 직후 MyBatis로 읽으면 아직 flush 전이라 옛 값이 보인다.",
+          "specRefs": [
+            "GET /api/posts"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 5,
+          "title": "`schema.sql`에 (`status`, `id`) 복합 인덱스를 넣고 EXPLAIN 전후 비교",
+          "files": [
+            "src/test/java/com/example/board/post/PostListExplainTest.java"
+          ],
+          "done": [
+            "`PostListExplainTest` 통과: 목록 쿼리 EXPLAIN의 `key`가 (`status`, `id`) 인덱스이고 `Using filesort`가 없다",
+            "인덱스 전후 `GET /api/posts` 응답은 같다"
+          ],
+          "trap": "인덱스 컬럼 순서를 (`id`, `status`)로 잡으면 `WHERE status = ? ORDER BY id DESC` 목록에서 인덱스를 제대로 쓰지 못한다.",
+          "specRefs": [
+            "GET /api/posts"
+          ],
+          "tickets": []
+        }
+      ],
+      "talkCards": [
+        "TC-D06-1",
+        "TC-D06-2",
+        "TC-D06-3",
+        "TC-D06-4"
+      ],
+      "tomorrow": "D07은 오늘 만든 `CursorPage`와 MyBatis 목록 방식을 포인트 이력 조회에 그대로 쓴다."
+    },
+    {
+      "id": "D07",
+      "phase": "build",
+      "title": "포인트·쿠폰 상점",
+      "java": "J07",
+      "steps": [
+        {
+          "no": 1,
+          "title": "포인트 원장과 원자적 적립 (`schema.sql`에 `point_ledger`, `MemberRepository`에 잔액 `UPDATE` 추가, 글 작성 시 활동 포인트 적립)",
+          "files": [
+            "src/main/java/com/example/board/point/PointLedger.java",
+            "src/main/java/com/example/board/point/PointLedgerRepository.java",
+            "src/main/java/com/example/board/point/PointService.java"
+          ],
+          "done": [
+            "`PointServiceConcurrencyTest`가 \"조회 후 저장\" 방식에서 먼저 실패하는 것(50건 동시 적립 후 잔액 < 합계)을 보고, 원자적 UPDATE로 바꾼 뒤 통과: 잔액 = `point_ledger` 합",
+            "USER 토큰으로 `POST /api/posts` → 201 뒤 작성자 잔액이 늘어난다"
+          ],
+          "trap": "잔액을 읽어 더한 뒤 저장하면 동시 적립에서 갱신이 사라지므로 `UPDATE member SET point_balance = point_balance + ?`로 바꾼다.",
+          "specRefs": [
+            "GET /api/me/points",
+            "POST /api/posts"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 2,
+          "title": "내 포인트 잔액·이력 API (이력은 MyBatis 커서 목록)",
+          "files": [
+            "src/main/java/com/example/board/point/PointController.java",
+            "src/main/java/com/example/board/point/PointHistoryMapper.java",
+            "src/main/resources/mapper/PointHistoryMapper.xml"
+          ],
+          "done": [
+            "`GET /api/me/points` → 200 `{balance}`",
+            "`GET /api/me/points/history?size=20` → 200 `{items, nextCursor}`",
+            "토큰 없음 → 401"
+          ],
+          "trap": "이력이 없는 회원의 `SUM`은 null이라 `resultType=\"long\"`이나 `long` 변수로 받으면 언박싱 NPE가 난다.",
+          "specRefs": [
+            "GET /api/me/points",
+            "GET /api/me/points/history"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 3,
+          "title": "`Coupon`과 `MemberCoupon` (`schema.sql`에 `coupon`, `member_coupon` UNIQUE(`coupon_id`, `member_id`), 수량은 조건부 `UPDATE`)",
+          "files": [
+            "src/main/java/com/example/board/coupon/Coupon.java",
+            "src/main/java/com/example/board/coupon/CouponRepository.java",
+            "src/main/java/com/example/board/coupon/MemberCoupon.java"
+          ],
+          "done": [
+            "`CouponRepositoryTest` 통과: `issued_quantity < total_quantity`일 때만 1 증가하고 영향 행 수로 판정한다"
+          ],
+          "trap": "남은 수량을 읽어 확인한 뒤 증가시키면 동시 발급에서 총 수량을 넘는다.",
+          "specRefs": [
+            "POST /api/coupons/{couponId}/issue"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 4,
+          "title": "쿠폰 발급(1인 1매)과 내 쿠폰 목록 API",
+          "files": [
+            "src/main/java/com/example/board/coupon/MemberCouponRepository.java",
+            "src/main/java/com/example/board/coupon/CouponService.java",
+            "src/main/java/com/example/board/coupon/CouponController.java"
+          ],
+          "done": [
+            "`POST /api/coupons/{couponId}/issue` → 201",
+            "같은 회원이 다시 → 409 `/errors/duplicate`",
+            "수량 소진 뒤 → 409 `/errors/coupon-exhausted`",
+            "`GET /api/me/coupons` → 200"
+          ],
+          "trap": "발급 버튼 연타로 두 요청이 동시에 오면 \"이미 받았나\" 조회가 둘 다 통과하므로 UNIQUE 위반을 409로 바꿔 막는다.",
+          "specRefs": [
+            "POST /api/coupons/{couponId}/issue",
+            "GET /api/me/coupons"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 5,
+          "title": "상점 아이템 목록 API (`schema.sql`에 `shop_item`, 재고는 `WHERE stock >= ?` 조건부 차감)",
+          "files": [
+            "src/main/java/com/example/board/shop/ShopItem.java",
+            "src/main/java/com/example/board/shop/ShopItemRepository.java",
+            "src/main/java/com/example/board/shop/ShopController.java"
+          ],
+          "done": [
+            "토큰 없이 `GET /api/shop/items` → 200"
+          ],
+          "trap": "재고를 조회한 뒤 차감하면 동시 구매에서 `stock`이 음수가 된다.",
+          "specRefs": [
+            "GET /api/shop/items"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 6,
+          "title": "쿠폰·포인트 구매와 `Idempotency-Key` (`schema.sql`에 `shop_order` UNIQUE(`member_id`, `idempotency_key`), `ShopController`에 `POST` 추가)",
+          "files": [
+            "src/main/java/com/example/board/shop/ShopOrder.java",
+            "src/main/java/com/example/board/shop/ShopOrderRepository.java",
+            "src/main/java/com/example/board/shop/OrderService.java"
+          ],
+          "done": [
+            "`POST /api/shop/orders` + `Idempotency-Key` → 201",
+            "같은 키·같은 본문 다시 → 처음과 같은 응답",
+            "같은 키·다른 본문 → 422",
+            "키 없음 → 400",
+            "잔액 부족 → 409 `/errors/insufficient-points`",
+            "남의 쿠폰 → 409 `/errors/coupon-unusable`"
+          ],
+          "trap": "데드락 재시도를 `@Transactional` 메서드 안에 두면 이미 rollback-only가 된 같은 트랜잭션을 다시 쓰게 되므로 재시도는 트랜잭션 밖에서 한다.",
+          "specRefs": [
+            "POST /api/shop/orders"
+          ],
+          "tickets": []
+        }
+      ],
+      "talkCards": [
+        "TC-D07-1",
+        "TC-D07-2",
+        "TC-D07-3",
+        "TC-D07-4"
+      ],
+      "tomorrow": "D08은 오늘 만든 원자적 잔액 갱신과 `point_ledger` 적립을 충전 성공 처리에 그대로 쓴다."
+    },
+    {
+      "id": "D08",
+      "phase": "build",
+      "title": "포인트 충전 (외부 PG 모의)",
+      "java": "J08",
+      "steps": [
+        {
+          "no": 1,
+          "title": "PG 클라이언트와 타임아웃 3종 (`compose.yaml`에 WireMock·Toxiproxy, `BoardProperties`에 `board.pg.*`)",
+          "files": [
+            "compose.yaml",
+            "src/main/java/com/example/board/config/PgClientConfig.java",
+            "src/main/java/com/example/board/payment/PgClient.java"
+          ],
+          "done": [
+            "`PgClientTest` 통과: WireMock 4초 지연 → 3초에 응답 타임아웃 예외, 닫힌 포트 → 1초 안에 연결 타임아웃 예외, 풀 대기 2초 초과 → 예외"
+          ],
+          "trap": "타임아웃을 정하지 않으면 PG가 멈출 때 우리 요청 스레드도 끝없이 함께 기다린다.",
+          "specRefs": [
+            "POST /api/me/points/charges"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 2,
+          "title": "연계 로그 `pg_payment` (`schema.sql`에 테이블, UNIQUE `idempotency_key`·`order_id`·`payment_key`)",
+          "files": [
+            "src/main/java/com/example/board/payment/PgPayment.java",
+            "src/main/java/com/example/board/payment/PgPaymentStatus.java",
+            "src/main/java/com/example/board/payment/PgPaymentRepository.java"
+          ],
+          "done": [
+            "`PgPaymentRepositoryTest` 통과: 같은 `idempotency_key`로 두 번 저장하면 예외, `order_id`는 `CHG-` + UUID"
+          ],
+          "trap": "PG 결과가 나온 뒤에만 연계 로그를 남기면 타임아웃 건은 흔적이 없으므로 호출 전에 `REQUESTED`로 먼저 남긴다.",
+          "specRefs": [
+            "POST /api/me/points/charges"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 3,
+          "title": "포인트 충전 API: 트랜잭션을 나누고 PG 호출은 트랜잭션 밖에서",
+          "files": [
+            "src/main/java/com/example/board/payment/ChargeRequest.java",
+            "src/main/java/com/example/board/payment/ChargeService.java",
+            "src/main/java/com/example/board/payment/ChargeController.java"
+          ],
+          "done": [
+            "`POST /api/me/points/charges` + `Idempotency-Key` → 201, 잔액 증가",
+            "WireMock 4초 지연 → 504 `/errors/pg-timeout`, `pg_payment.status` = `UNKNOWN`, 잔액 그대로",
+            "WireMock 거절 → 502 `/errors/pg-declined`",
+            "`amount` = 1500 → 400"
+          ],
+          "trap": "PG 호출을 `@Transactional` 안에서 하면 PG가 느릴 때 DB 커넥션을 쥔 채 기다려 Hikari 풀(10)이 바닥난다.",
+          "specRefs": [
+            "POST /api/me/points/charges"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 4,
+          "title": "재시도와 백오프: 무엇을 다시 보내고 무엇을 보내지 않는가",
+          "files": [
+            "src/main/java/com/example/board/payment/PgRetryPolicy.java",
+            "src/test/java/com/example/board/payment/PgClientRetryTest.java"
+          ],
+          "done": [
+            "`PgClientRetryTest` 통과: 연결 실패만 같은 `Idempotency-Key`로 최대 2회 재시도(백오프 200ms·400ms), 거절은 재시도하지 않는다",
+            "응답 타임아웃 건은 재시도 대신 `UNKNOWN`으로 남는다"
+          ],
+          "trap": "\"우리는 타임아웃인데 PG는 승인 완료\"일 수 있으므로 타임아웃을 실패로 단정하거나 멱등 키 없이 재시도하면 두 번 결제된다.",
+          "specRefs": [
+            "POST /api/me/points/charges"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 5,
+          "title": "PG 결제 완료 콜백: 경로는 공개하고 원문 바이트 HMAC 서명으로 보호 (비밀키는 `PG_SECRET` 환경 변수)",
+          "files": [
+            "src/main/java/com/example/board/payment/PgSignatureVerifier.java",
+            "src/main/java/com/example/board/payment/PgCallbackController.java",
+            "src/main/java/com/example/board/config/SecurityConfig.java"
+          ],
+          "done": [
+            "서명이 맞는 `POST /api/pg/callbacks` → 200, `UNKNOWN` 충전이 `DONE`이 되고 포인트 1회 적립",
+            "같은 `paymentKey` 콜백 재전송 → 200, 잔액 그대로",
+            "서명 틀림 → 401 `/errors/invalid-signature`",
+            "없는 `orderId` → 404"
+          ],
+          "trap": "본문을 객체로 파싱한 뒤 다시 직렬화해 서명을 계산하면 바이트가 달라져 정상 콜백도 401이 된다.",
+          "specRefs": [
+            "POST /api/pg/callbacks"
+          ],
+          "tickets": []
+        }
+      ],
+      "talkCards": [
+        "TC-D08-1",
+        "TC-D08-2",
+        "TC-D08-3",
+        "TC-D08-4",
+        "TC-D08-5"
+      ],
+      "tomorrow": "D09는 오늘 정한 외부 호출 타임아웃 원칙을 Redis에도 적용하고, D07 쿠폰 발급 앞단에 Redis 잔여 수량을 붙인다."
+    },
+    {
+      "id": "D09",
+      "phase": "build",
+      "title": "Redis",
+      "java": "J09",
+      "steps": [
+        {
+          "no": 1,
+          "title": "Redis를 띄우고 인기글 캐시 만들기 (TTL 60s, 명령 타임아웃 500ms, `PostController`에 `GET /api/posts/popular`)",
+          "files": [
+            "compose.yaml",
+            "src/main/java/com/example/board/config/RedisConfig.java",
+            "src/main/java/com/example/board/post/PopularPostService.java"
+          ],
+          "done": [
+            "`GET /api/posts/popular` → 200",
+            "60초 안에 다시 부르면 SQL 로그에 목록 쿼리가 없다",
+            "`redis-cli TTL` 값이 60 이하"
+          ],
+          "trap": "TTL이 끝나는 순간 동시 요청이 모두 DB로 몰리는 스탬피드가 생긴다.",
+          "specRefs": [
+            "GET /api/posts/popular"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 2,
+          "title": "Redis 지연·장애 때 DB로 폴백하기",
+          "files": [
+            "src/main/java/com/example/board/post/PopularPostService.java",
+            "src/test/java/com/example/board/post/PopularPostFallbackTest.java"
+          ],
+          "done": [
+            "`PopularPostFallbackTest` 통과: Toxiproxy로 Redis 3초 지연 중에도 0.5초 타임아웃 뒤 DB 결과로 응답",
+            "Redis를 멈춘 상태에서 `GET /api/posts/popular` → 200, `POST /api/posts` → 201"
+          ],
+          "trap": "Redis 타임아웃을 두지 않거나 캐시 예외를 그대로 던지면 캐시 장애가 글쓰기 같은 핵심 경로까지 번진다.",
+          "specRefs": [
+            "GET /api/posts/popular",
+            "POST /api/posts"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 3,
+          "title": "글 변경 이벤트를 커밋 뒤에 받아 인기글 캐시 지우기 (`PostServiceImpl`에서 이벤트 발행)",
+          "files": [
+            "src/main/java/com/example/board/post/PostChangedEvent.java",
+            "src/main/java/com/example/board/post/PostCacheEvictListener.java"
+          ],
+          "done": [
+            "`DELETE /api/posts/{postId}` → 204 직후 `GET /api/posts/popular`에 그 글이 없다",
+            "`PostCacheEvictListenerTest` 통과: 롤백된 트랜잭션에서는 캐시를 지우지 않는다"
+          ],
+          "trap": "커밋 전에 캐시를 지우면 그 사이 다른 요청이 옛 값을 다시 적재해 TTL 동안 남는다.",
+          "specRefs": [
+            "DELETE /api/posts/{postId}",
+            "GET /api/posts/popular"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 4,
+          "title": "선착순 쿠폰 잔여 수량을 Redis 원자적 감소로 거르기 (기준 데이터는 DB)",
+          "files": [
+            "src/main/java/com/example/board/coupon/CouponStockCounter.java",
+            "src/main/java/com/example/board/coupon/CouponService.java",
+            "src/test/java/com/example/board/coupon/CouponIssueConcurrencyTest.java"
+          ],
+          "done": [
+            "`CouponIssueConcurrencyTest` 통과: 수량 10장에 100명 동시 요청 → 정확히 10장, DB `issued_quantity` = 10",
+            "11번째 `POST /api/coupons/{couponId}/issue` → 409 `/errors/coupon-exhausted`"
+          ],
+          "trap": "Redis `DECR` 값과 DB `issued_quantity`가 어긋나면 DB를 기준으로 삼고 Redis는 앞단 거름망으로만 쓴다.",
+          "specRefs": [
+            "POST /api/coupons/{couponId}/issue"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 5,
+          "title": "활동 랭킹 (Sorted Set)",
+          "files": [
+            "src/main/java/com/example/board/point/ActivityRankingService.java",
+            "src/main/java/com/example/board/point/RankingController.java"
+          ],
+          "done": [
+            "글·댓글 작성 뒤 `GET /api/rankings/activity` → 200, 점수 높은 순",
+            "`GET /api/rankings/activity?size=51` → 400"
+          ],
+          "trap": "랭킹 점수를 Redis에만 쌓으면 Redis 데이터가 사라질 때 되살릴 원천이 없으므로 `point_ledger`에서 다시 만들 수 있게 한다.",
+          "specRefs": [
+            "GET /api/rankings/activity"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 6,
+          "title": "로그인 시도 횟수 제한 (Redis, 10분 5회)",
+          "files": [
+            "src/main/java/com/example/board/member/LoginAttemptLimiter.java",
+            "src/main/java/com/example/board/member/AuthService.java"
+          ],
+          "done": [
+            "틀린 비밀번호로 `POST /api/auth/login` 5회 뒤 6번째 → 429 `/errors/too-many-attempts`",
+            "키 TTL(10분)이 지나면 다시 시도할 수 있다"
+          ],
+          "trap": "시도 횟수를 서버 메모리에 두면 인스턴스마다 따로 세어 서버 수만큼 더 시도할 수 있다.",
+          "specRefs": [
+            "POST /api/auth/login"
+          ],
+          "tickets": []
+        }
+      ],
+      "talkCards": [
+        "TC-D09-1",
+        "TC-D09-2",
+        "TC-D09-3",
+        "TC-D09-4",
+        "TC-D09-5"
+      ],
+      "tomorrow": "D10은 오늘 만든 커밋 후 캐시 무효화를 관리자 글 숨김에서 그대로 쓴다."
+    },
+    {
+      "id": "D10",
+      "phase": "build",
+      "title": "관리자 · AOP · 테스트",
+      "java": "J10",
+      "steps": [
+        {
+          "no": 1,
+          "title": "`Report` 엔티티와 신고 서비스 (`schema.sql`에 `report` 테이블, UNIQUE(`post_id`, `reporter_id`))",
+          "files": [
+            "src/main/java/com/example/board/admin/Report.java",
+            "src/main/java/com/example/board/admin/ReportRepository.java",
+            "src/main/java/com/example/board/admin/ReportService.java"
+          ],
+          "done": [
+            "`ReportServiceTest` 통과: 같은 회원이 같은 글을 다시 신고하면 `/errors/duplicate` 예외"
+          ],
+          "trap": "서비스 테스트에서 저장소까지 전부 목으로 바꾸면 UNIQUE 제약 위반 같은 DB 동작을 확인하지 못한다.",
+          "specRefs": [
+            "POST /api/posts/{postId}/reports"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 2,
+          "title": "신고 API와 관리자 신고 목록·글 숨김 (`SecurityConfig`에 `@EnableMethodSecurity`, `AdminService`에 `@PreAuthorize`)",
+          "files": [
+            "src/main/java/com/example/board/admin/ReportController.java",
+            "src/main/java/com/example/board/admin/AdminService.java",
+            "src/main/java/com/example/board/admin/AdminController.java"
+          ],
+          "done": [
+            "`POST /api/posts/{postId}/reports` → 201, 다시 → 409",
+            "ADMIN 토큰으로 `GET /api/admin/reports` → 200, USER 토큰 → 403",
+            "`POST /api/admin/posts/{postId}/hide` → 200, 이후 `GET /api/posts/{postId}` → 404, 연결한 신고는 `RESOLVED`, 인기글에서도 바로 빠진다"
+          ],
+          "trap": "같은 클래스 안에서 `@PreAuthorize` 메서드를 부르면 프록시를 거치지 않아 USER도 통과한다.",
+          "specRefs": [
+            "POST /api/posts/{postId}/reports",
+            "GET /api/admin/reports",
+            "POST /api/admin/posts/{postId}/hide"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 3,
+          "title": "감사 로그 테이블과 표시 애노테이션 (`schema.sql`에 `audit_log`, 추가 전용)",
+          "files": [
+            "src/main/java/com/example/board/admin/AuditLog.java",
+            "src/main/java/com/example/board/admin/AuditLogRepository.java",
+            "src/main/java/com/example/board/admin/Audited.java"
+          ],
+          "done": [
+            "`AuditLogRepositoryTest` 통과: 저장과 커서 조회만 있고 수정·삭제 메서드가 없다"
+          ],
+          "trap": "감사 로그를 업무와 같은 트랜잭션에 쓰면 업무가 롤백될 때 \"시도했다\"는 기록까지 함께 사라진다.",
+          "specRefs": [
+            "GET /api/admin/audit-logs"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 4,
+          "title": "감사 로그 AOP와 감사 로그 조회 API",
+          "files": [
+            "src/main/java/com/example/board/admin/AuditLogAspect.java",
+            "src/main/java/com/example/board/admin/AdminController.java"
+          ],
+          "done": [
+            "`POST /api/admin/posts/{postId}/hide` 뒤 `GET /api/admin/audit-logs` → 200, `action` = `HIDE_POST` 1건",
+            "USER 토큰으로 `GET /api/admin/audit-logs` → 403"
+          ],
+          "trap": "같은 클래스 안 호출이나 `private` 메서드에 `@Audited`를 붙이면 프록시를 거치지 않아 감사 로그가 남지 않는다.",
+          "specRefs": [
+            "GET /api/admin/audit-logs",
+            "POST /api/admin/posts/{postId}/hide"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 5,
+          "title": "쿠폰 대량 지급: 엑셀 업로드를 행 단위로 처리 (`build.gradle`에 Apache POI, `AdminController`에 multipart 추가)",
+          "files": [
+            "build.gradle",
+            "src/main/java/com/example/board/admin/ExcelMemberIdReader.java",
+            "src/main/java/com/example/board/admin/CouponBulkIssueService.java"
+          ],
+          "done": [
+            "`POST /api/admin/coupons/{couponId}/bulk-issue` (`.xlsx` 1,000행) → 200 `{issued, skipped[]}`",
+            "없는 회원·이미 보유한 행은 `skipped[]`에 들어가고 나머지는 지급된다",
+            "6MB 파일 → 400, USER 토큰 → 403",
+            "`GET /api/admin/audit-logs`에 `BULK_ISSUE_COUPON` 1건"
+          ],
+          "trap": "1,000행을 트랜잭션 하나로 묶으면 한 행의 실패로 전체가 롤백된다.",
+          "specRefs": [
+            "POST /api/admin/coupons/{couponId}/bulk-issue",
+            "GET /api/admin/audit-logs"
+          ],
+          "tickets": []
+        },
+        {
+          "no": 6,
+          "title": "관리자 권한 슬라이스 테스트와 신고→숨김→감사 로그 통합 테스트",
+          "files": [
+            "src/test/java/com/example/board/admin/AdminControllerTest.java",
+            "src/test/java/com/example/board/admin/AdminFlowIntegrationTest.java"
+          ],
+          "done": [
+            "`AdminControllerTest` 통과 (`@WebMvcTest`: USER 토큰으로 `GET /api/admin/reports` → 403)",
+            "`AdminFlowIntegrationTest` 통과 (Testcontainers MySQL, 테스트 메서드에 `@Transactional` 없이 신고 → 숨김 → 감사 로그)"
+          ],
+          "trap": "테스트에 `@Transactional`을 붙이면 영속성 컨텍스트가 테스트 끝까지 열려 있어 운영에서 나는 `LazyInitializationException`이 숨는다.",
+          "specRefs": [
+            "GET /api/admin/reports",
+            "POST /api/admin/posts/{postId}/hide"
+          ],
+          "tickets": []
+        }
+      ],
+      "talkCards": [
+        "TC-D10-1",
+        "TC-D10-2",
+        "TC-D10-3",
+        "TC-D10-4",
+        "TC-D10-5"
+      ],
+      "tomorrow": "D11은 오늘까지 만든 1단계 서버에 결함을 심은 코드를 넘겨받아, 오늘 쓴 슬라이스·통합 테스트 방식으로 특성화 테스트를 쓴다."
+    },
+    {
+      "id": "D11",
+      "phase": "maintain",
+      "title": "인수인계",
+      "java": "J11",
+      "steps": [
+        {
+          "no": 1,
+          "title": "코드 읽기: 진입점 → 필터 체인 → 컨트롤러 → 서비스 → 저장소 지도 그리기, 설정·보안 규칙 점검",
+          "files": [
+            "src/main/java/com/example/board/config/SecurityConfig.java",
+            "src/main/resources/application.yml",
+            "src/main/resources/application-prod.yml"
+          ],
+          "done": [
+            "패키지·요청 흐름 지도 1장과 읽은 순서 기록",
+            "B14 재현: prod 프로파일에서 토큰 없이 `GET /actuator/env` → 200",
+            "B11 재현: prod에서 바뀌지 않는 키가 어느 출처에서 오는지 로컬 `/actuator/env`의 `propertySources`로 찾는다"
+          ],
+          "trap": "yml 파일만 읽고 값을 추측하면 환경 변수나 프로파일 문서가 이긴 실제 값을 놓친다.",
+          "specRefs": [
+            "GET /actuator/health"
+          ],
+          "tickets": [
+            "B11",
+            "B14"
+          ]
+        },
+        {
+          "no": 2,
+          "title": "특성화 테스트로 지금 동작 고정하기",
+          "files": [
+            "src/test/java/com/example/board/post/PostServiceCharacterizationTest.java",
+            "src/test/java/com/example/board/member/MemberApiCharacterizationTest.java"
+          ],
+          "done": [
+            "`PostServiceCharacterizationTest` 통과: 글 작성·수정·삭제의 현재 동작(알림 호출 포함)을 고정",
+            "`MemberApiCharacterizationTest` 통과: 지금의 `GET /api/members/me` 응답 필드를 그대로 고정 (`passwordHash`가 보이는 것이 B08의 증거)"
+          ],
+          "trap": "특성화 테스트에 \"옳은 동작\"을 적으면 고치기 전부터 실패해 동작을 고정하지 못하므로 지금 나오는 값을 그대로 적는다.",
+          "specRefs": [
+            "POST /api/posts",
+            "GET /api/members/me"
+          ],
+          "tickets": [
+            "B04",
+            "B08"
+          ]
+        },
+        {
+          "no": 3,
+          "title": "구조·컨벤션 리뷰 메모 쓰고 B08·B11·B14 고치기",
+          "files": [
+            "src/main/java/com/example/board/member/MemberController.java",
+            "src/main/java/com/example/board/config/SecurityConfig.java",
+            "src/main/resources/application-prod.yml"
+          ],
+          "done": [
+            "리뷰 메모: 구조·컨벤션 지적 5개 이상, 티켓마다 원인 서술 + 재현 테스트 + 수정",
+            "`GET /api/members/me` → 200, 응답에 `passwordHash` 없음 (특성화 테스트를 새 기대값으로 갱신)",
+            "prod 프로파일에서 토큰 없이 `GET /actuator/env` → 401",
+            "prod에서 고친 설정값이 기동 로그와 `/actuator/env`에 반영된다"
+          ],
+          "trap": "B11을 yml 수정만으로 고치면 같은 키를 덮는 환경 변수가 남아 있어 여전히 반영되지 않는다.",
+          "specRefs": [
+            "GET /api/members/me",
+            "GET /actuator/health"
+          ],
+          "tickets": [
+            "B08",
+            "B11",
+            "B14"
+          ]
+        },
+        {
+          "no": 4,
+          "title": "ArchUnit 규칙 1개(필드 주입 금지)로 B04 재발 막기",
+          "files": [
+            "src/test/java/com/example/board/ArchitectureTest.java",
+            "src/main/java/com/example/board/post/PostServiceImpl.java"
+          ],
+          "done": [
+            "`ArchitectureTest`가 먼저 실패하는 것을 확인",
+            "`PostServiceImpl`을 생성자 주입으로 바꾸고 알림 전송을 분리한 뒤 `ArchitectureTest`·`PostServiceCharacterizationTest` 통과",
+            "알림 채널을 하나 더해도 고칠 파일이 한 곳이다"
+          ],
+          "trap": "필드 주입은 순환 의존을 기동 때 숨기므로 생성자 주입으로 바꾸면 그동안 감춰진 순환이 드러난다.",
+          "specRefs": [
+            "POST /api/posts"
+          ],
+          "tickets": [
+            "B04"
+          ]
+        }
+      ],
+      "talkCards": [
+        "TC-D11-1",
+        "TC-D11-2",
+        "TC-D11-3",
+        "TC-D11-4"
+      ],
+      "tomorrow": "D12는 오늘 쓴 특성화 테스트와 코드 지도를 안전망 삼아 B01·B02·B03·B05를 고친다."
+    },
+    {
+      "id": "D12",
+      "phase": "maintain",
+      "title": "티켓 처리 1",
+      "java": "J12",
+      "steps": [
+        {
+          "no": 1,
+          "title": "B01 \"PG가 느린 날 글 목록까지 멈춘다\": Hikari 메트릭과 스레드 덤프로 진단",
+          "files": [
+            "src/main/java/com/example/board/payment/ChargeService.java",
+            "src/test/java/com/example/board/payment/ChargePoolExhaustionTest.java"
+          ],
+          "done": [
+            "Hikari 메트릭(`hikaricp.connections.pending`)과 스레드 덤프에서 PG 응답을 기다리며 커넥션을 쥔 스레드를 찾는다",
+            "`ChargePoolExhaustionTest` 통과: Toxiproxy로 PG 5초 지연 중에도 `GET /api/posts` → 200, 1초 이내"
+          ],
+          "trap": "\"글 목록이 멈춘다\"는 증상만 보고 목록 쿼리와 인덱스부터 의심하면 트랜잭션 안의 PG 호출을 놓친다.",
+          "specRefs": [
+            "POST /api/me/points/charges",
+            "GET /api/posts"
+          ],
+          "tickets": [
+            "B01"
+          ]
+        },
+        {
+          "no": 2,
+          "title": "B02 \"글 목록이 어느 날부터 느리다\": slow log → EXPLAIN ANALYZE (`schema.sql` 인덱스 순서 수정)",
+          "files": [
+            "src/main/resources/mapper/PostQueryMapper.xml",
+            "src/test/java/com/example/board/post/PostListExplainTest.java"
+          ],
+          "done": [
+            "slow query log에서 목록 쿼리를 찾는다",
+            "EXPLAIN ANALYZE에서 풀스캔을 확인하고 인덱스를 고친 뒤 `PostListExplainTest` 통과"
+          ],
+          "trap": "데이터가 적은 로컬에서는 풀스캔도 빨라 재현되지 않으므로 데이터를 늘린 뒤 EXPLAIN ANALYZE로 본다.",
+          "specRefs": [
+            "GET /api/posts"
+          ],
+          "tickets": [
+            "B02"
+          ]
+        },
+        {
+          "no": 3,
+          "title": "B03 \"예외를 잡았는데도 구매가 롤백된다 / 안 된다\": 트랜잭션 로그와 디버거",
+          "files": [
+            "src/main/java/com/example/board/shop/OrderService.java",
+            "src/test/java/com/example/board/shop/OrderRollbackTest.java"
+          ],
+          "done": [
+            "트랜잭션 로그(`org.springframework.transaction` DEBUG)로 rollback-only 표시 시점을 찾는다",
+            "`OrderRollbackTest` 통과: rollback-only로 롤백되던 경우와 self-invocation으로 롤백되지 않던 경우 둘 다"
+          ],
+          "trap": "예외를 catch했으니 롤백되지 않으리라 믿으면 안쪽 `@Transactional`이 이미 rollback-only로 표시한 것을 놓친다.",
+          "specRefs": [
+            "POST /api/shop/orders"
+          ],
+          "tickets": [
+            "B03"
+          ]
+        },
+        {
+          "no": 4,
+          "title": "B05 \"부하 때만 다른 사람 값이 섞인다\": 부하 스크립트로 재현",
+          "files": [
+            "src/main/java/com/example/board/common/ForbiddenWordChecker.java",
+            "src/test/java/com/example/board/common/ForbiddenWordCheckerConcurrencyTest.java"
+          ],
+          "done": [
+            "동시 50요청 부하로 다른 회원 요청의 결과가 섞이는 것을 재현",
+            "`ForbiddenWordCheckerConcurrencyTest` 통과: 상태 필드를 지역 변수로 바꾼 뒤 결과가 섞이지 않는다"
+          ],
+          "trap": "혼자 요청할 때는 재현되지 않아 \"가끔 생기는 버그\"로 넘기기 쉽지만, 싱글톤 빈의 필드는 모든 요청이 함께 쓴다.",
+          "specRefs": [
+            "POST /api/posts"
+          ],
+          "tickets": [
+            "B05"
+          ]
+        }
+      ],
+      "talkCards": [
+        "TC-D12-1",
+        "TC-D12-2",
+        "TC-D12-3",
+        "TC-D12-4"
+      ],
+      "tomorrow": "D13은 오늘 익힌 \"원인 서술 + 재현 테스트 + 수정\" 3점 세트를 DB 락·시간·멱등 티켓에 그대로 쓴다."
+    },
+    {
+      "id": "D13",
+      "phase": "maintain",
+      "title": "티켓 처리 2",
+      "java": "J13",
+      "steps": [
+        {
+          "no": 1,
+          "title": "B06 \"컬럼 하나 추가했더니 상점 전체가 멈췄다\": `SHOW PROCESSLIST`로 MDL 대기 찾기",
+          "files": [
+            "src/main/java/com/example/board/shop/OrderService.java"
+          ],
+          "done": [
+            "`SHOW PROCESSLIST`에서 `Waiting for table metadata lock`과 그 앞의 긴 트랜잭션을 찾는다",
+            "긴 트랜잭션을 짧게 고치고 `lock_wait_timeout`을 짧게 둔 ALTER를 다시 실행하는 동안에도 `POST /api/shop/orders` → 201"
+          ],
+          "trap": "ALTER 자체가 느리다고 오진하기 쉽지만, 실제로는 ALTER가 긴 트랜잭션의 메타데이터 락을 기다리며 뒤 요청을 줄 세운다.",
+          "specRefs": [
+            "POST /api/shop/orders"
+          ],
+          "tickets": [
+            "B06"
+          ]
+        },
+        {
+          "no": 2,
+          "title": "B07 \"쿠폰 동시 사용에서 가끔 실패한다\": `SHOW ENGINE INNODB STATUS`로 데드락 읽기",
+          "files": [
+            "src/main/java/com/example/board/coupon/CouponService.java",
+            "src/test/java/com/example/board/coupon/CouponUseDeadlockTest.java"
+          ],
+          "done": [
+            "`SHOW ENGINE INNODB STATUS`의 `LATEST DETECTED DEADLOCK`에서 gap lock을 확인",
+            "`CouponUseDeadlockTest` 통과: 동시 쿠폰 사용 20건이 성공하거나 정해진 409로 끝난다"
+          ],
+          "trap": "없는 행을 `SELECT ... FOR UPDATE`로 잠그면 gap lock끼리 엇갈려 데드락이 난다.",
+          "specRefs": [
+            "POST /api/shop/orders"
+          ],
+          "tickets": [
+            "B07"
+          ]
+        },
+        {
+          "no": 3,
+          "title": "B09 \"자정 전후 출석 포인트가 두 번 쌓인다\": `Clock`을 고정한 재현 테스트",
+          "files": [
+            "src/main/java/com/example/board/point/AttendanceService.java",
+            "src/test/java/com/example/board/point/AttendanceServiceTest.java"
+          ],
+          "done": [
+            "`AttendanceServiceTest` 통과: `Clock`을 KST 23:59:59와 00:00:00으로 고정해 하루 1회만 적립",
+            "`GET /api/me/points/history`에 출석 적립이 하루 1건"
+          ],
+          "trap": "서버 기본 시간대가 UTC인 채로 `LocalDate.now()`를 부르면 KST 자정과 날짜 경계가 9시간 어긋난다.",
+          "specRefs": [
+            "GET /api/me/points/history"
+          ],
+          "tickets": [
+            "B09"
+          ]
+        },
+        {
+          "no": 4,
+          "title": "B10 \"포인트 충전이 가끔 두 번 된다\": 연계 로그와 WireMock으로 재현",
+          "files": [
+            "src/main/java/com/example/board/payment/ChargeService.java",
+            "src/main/java/com/example/board/payment/PgClient.java",
+            "src/test/java/com/example/board/payment/ChargeIdempotencyTest.java"
+          ],
+          "done": [
+            "`pg_payment`에서 같은 충전 요청에 승인 2건을 확인",
+            "`ChargeIdempotencyTest` 통과: WireMock 첫 응답 지연 뒤 재시도해도 같은 `Idempotency-Key`라 승인 1건, 포인트 1회"
+          ],
+          "trap": "재시도 횟수만 줄이면 증상은 줄어도 재시도마다 멱등 키를 새로 만드는 원인은 그대로 남는다.",
+          "specRefs": [
+            "POST /api/me/points/charges"
+          ],
+          "tickets": [
+            "B10"
+          ]
+        }
+      ],
+      "talkCards": [
+        "TC-D13-1",
+        "TC-D13-2",
+        "TC-D13-3",
+        "TC-D13-4"
+      ],
+      "tomorrow": "D14는 오늘 고친 충전 멱등 처리를 전제로 PG 콜백(B13)과 캐시 장애 훈련을 진행한다."
+    },
+    {
+      "id": "D14",
+      "phase": "maintain",
+      "title": "고도화와 모의 장애 훈련",
+      "java": "J14",
+      "steps": [
+        {
+          "no": 1,
+          "title": "B12 \"새 프론트 도메인에서만 호출이 실패한다\": 브라우저 개발자 도구로 preflight 확인",
+          "files": [
+            "src/main/java/com/example/board/config/CorsConfig.java",
+            "src/main/java/com/example/board/config/SecurityConfig.java"
+          ],
+          "done": [
+            "개발자 도구 Network 탭에서 실패한 `OPTIONS` preflight를 확인한다(서버 에러 로그 없음)",
+            "`OPTIONS /api/posts` + `Origin: http://127.0.0.1:8765` → 200, `Access-Control-Allow-Origin` 포함"
+          ],
+          "trap": "서버 로그에 에러가 없다고 서버 문제가 아니라고 오진하기 쉽지만, preflight는 인증 필터에서 막혀 컨트롤러까지 오지 않는다.",
+          "specRefs": [
+            "POST /api/posts"
+          ],
+          "tickets": [
+            "B12"
+          ]
+        },
+        {
+          "no": 2,
+          "title": "B13 \"PG 결제 완료 콜백이 전부 401\": Security debug 로그로 막힌 필터 찾기",
+          "files": [
+            "src/main/java/com/example/board/config/SecurityConfig.java"
+          ],
+          "done": [
+            "Security debug 로그에서 콜백 요청이 인증 필터에 막히는 것을 확인",
+            "서명이 맞는 `POST /api/pg/callbacks` → 200, 서명 틀림 → 401 `/errors/invalid-signature`"
+          ],
+          "trap": "콜백 경로를 `permitAll`로 여는 것만으로 끝내면 서명 검증까지 빠진 공개 경로가 된다.",
+          "specRefs": [
+            "POST /api/pg/callbacks"
+          ],
+          "tickets": [
+            "B13"
+          ]
+        },
+        {
+          "no": 3,
+          "title": "B15 \"숨긴 글이 인기글에 1분간 계속 보인다\": 로그 타임라인으로 순서 확인",
+          "files": [
+            "src/main/java/com/example/board/post/PostCacheEvictListener.java",
+            "src/main/java/com/example/board/admin/AdminService.java"
+          ],
+          "done": [
+            "로그 타임라인에서 \"캐시 삭제 → 다른 요청의 재적재 → 커밋\" 순서를 찾는다",
+            "`POST /api/admin/posts/{postId}/hide` 직후 `GET /api/posts/popular`에 그 글이 없다"
+          ],
+          "trap": "TTL만 줄이면 증상은 짧아져도 커밋 전 삭제 뒤 옛 값이 재적재되는 순서 문제는 남는다.",
+          "specRefs": [
+            "POST /api/admin/posts/{postId}/hide",
+            "GET /api/posts/popular"
+          ],
+          "tickets": [
+            "B15"
+          ]
+        },
+        {
+          "no": 4,
+          "title": "B16 \"Redis 점검 시간에 글쓰기까지 멈췄다\": 스레드 덤프로 대기 지점 찾기",
+          "files": [
+            "src/main/java/com/example/board/config/RedisConfig.java",
+            "src/main/java/com/example/board/post/PopularPostService.java"
+          ],
+          "done": [
+            "스레드 덤프에서 요청 스레드가 Redis 응답을 기다리며 멈춘 것을 확인",
+            "Redis를 멈춘 상태에서 `POST /api/posts` → 201, 1초 이내"
+          ],
+          "trap": "캐시 서버만 멈췄는데 글쓰기가 멈춘 원인은 Redis 타임아웃 미설정과 캐시 예외 전파이지 DB가 아니다.",
+          "specRefs": [
+            "POST /api/posts",
+            "GET /api/posts/popular"
+          ],
+          "tickets": [
+            "B16"
+          ]
+        },
+        {
+          "no": 5,
+          "title": "고도화 1건: 인기글 캐시 재적재를 한 요청만 하도록 (스탬피드 방지)",
+          "files": [
+            "src/main/java/com/example/board/post/PopularPostService.java",
+            "src/test/java/com/example/board/post/PopularPostStampedeTest.java"
+          ],
+          "done": [
+            "`PopularPostStampedeTest` 통과: TTL 만료 순간 동시 100요청에도 DB 목록 쿼리 1회",
+            "`GET /api/posts/popular` 응답 형식은 그대로"
+          ],
+          "trap": "재적재를 락으로 막으면서 락 대기에 타임아웃을 두지 않으면 Redis가 느릴 때 모든 요청이 락 앞에서 멈춘다.",
+          "specRefs": [
+            "GET /api/posts/popular"
+          ],
+          "tickets": [
+            "B15"
+          ]
+        },
+        {
+          "no": 6,
+          "title": "모의 장애 훈련: 장애 주입 스크립트 → 대응 → 회고 문서 (`compose.yaml`에 Redis용 Toxiproxy 프록시)",
+          "files": [
+            "compose.yaml"
+          ],
+          "done": [
+            "장애 주입 스크립트로 Toxiproxy에 Redis 지연 3초를 넣는다",
+            "로그·메트릭·스레드 덤프로 장애를 알아차린 시각과 원인을 지목한 시각을 기록한다",
+            "주입 중에도 `POST /api/posts` → 201, `GET /api/posts/popular` → 200",
+            "회고 문서: 타임라인, 원인, 조치, 재발 방지"
+          ],
+          "trap": "증상이 보이자마자 재시작부터 하면 스레드 덤프 같은 증거가 사라져 원인을 지목할 수 없다.",
+          "specRefs": [
+            "POST /api/posts",
+            "GET /api/posts/popular"
+          ],
+          "tickets": [
+            "B16"
+          ]
+        }
+      ],
+      "talkCards": [
+        "TC-D14-1",
+        "TC-D14-2",
+        "TC-D14-3",
+        "TC-D14-4"
+      ],
+      "tomorrow": "D15는 오늘 쓴 장애 회고 문서와 그동안 티켓마다 남긴 원인·재현 테스트·수정을 설명 세션 재료로 쓴다."
+    },
+    {
+      "id": "D15",
+      "phase": "wrap",
+      "title": "설명 세션",
+      "java": "J15",
+      "steps": [
+        {
+          "no": 1,
+          "title": "설명 세션: 말하기 카드 전체에서 무작위 10문항 설명하기",
+          "files": [],
+          "done": [
+            "10문항을 \"문제 상황 → 원인 → 선택 → 결과\" 순서로 문항당 2분 안에 답한다",
+            "AI 채점 프롬프트로 1차 확인하고, \"답에 들어가야 할 것\" 3줄을 모두 채운 문항 수를 기록한다"
+          ],
+          "trap": "코드 순서대로 설명하면 2분 안에 원인과 선택까지 가지 못하므로 원인부터 말한다.",
+          "specRefs": [],
+          "tickets": []
+        },
+        {
+          "no": 2,
+          "title": "회고 문서 \"내가 겪은 문제 5개\" 쓰기",
+          "files": [],
+          "done": [
+            "문제마다 증상, 처음 진단, 실제 원인, 근거(테스트·로그), 다시 만든다면 바꿀 것 1줄"
+          ],
+          "trap": "겪은 일을 시간순 일기로 쓰면 무엇을 배웠는지 드러나지 않으므로 문제마다 원인과 선택을 적는다.",
+          "specRefs": [],
+          "tickets": []
+        }
+      ],
+      "talkCards": [
+        "TC-D15-1",
+        "TC-D15-2",
+        "TC-D15-3",
+        "TC-D15-4",
+        "TC-D15-5"
+      ],
+      "tomorrow": "다음 날은 없다. 오늘 쓴 회고 문서 \"내가 겪은 문제 5개\"가 과정의 마지막 산출물이다."
+    }
+  ],
+  "java": [
+    {
+      "id": "J00",
+      "day": null,
+      "optional": true,
+      "topic": "워밍업: 메서드 만들기(매개변수·반환 타입·`return`), 필드 선언과 초기화, `for`·향상된 for, 값 전달(기본형은 값 복사, 객체는 참조 복사), 컬렉션에 담고 꺼내기, 제네릭 타입 읽기(`List<Post>`), 반복문을 stream으로 옮기기",
+      "basics": "값 전달 테스트 3개: 메서드 안에서 `int`를 바꾸면 호출한 쪽은 그대로, 객체 필드를 바꾸면 호출한 쪽도 바뀜, 매개변수에 새 객체를 대입하면 호출한 쪽은 그대로",
+      "typeCut": null,
+      "habit": null
+    },
+    {
+      "id": "J01",
+      "day": "D01",
+      "optional": false,
+      "topic": "클래스·생성자·필드·접근제어자·record, 값 전달(객체 참조 복사): `Member`를 만들고 생성자에서 잘못된 값을 거절하며, 메서드에 넘긴 `Member`를 바꾸면 원본이 바뀌는지 테스트로 확인",
+      "basics": "회원 목록을 for로 돌며 닉네임이 2~20자인 회원 수를 세는 메서드(매개변수·`return`)",
+      "typeCut": "`int` vs `Integer`: 기본형과 래퍼, null 가능 여부, 기본값(0과 null) — 요청 DTO에서 \"값 없음\"과 \"0\"을 구분해야 하는 이유",
+      "habit": "불변 컬렉션과 방어적 복사: `List.of()`에 `add`하면 예외가 나고, getter가 내부 리스트를 그대로 내주면 밖에서 엔티티가 바뀐다(참조 복사의 실전판)"
+    },
+    {
+      "id": "J02",
+      "day": "D02",
+      "optional": false,
+      "topic": "static과 인스턴스, 상속, 예외 계층, 제네릭 클래스: `BusinessException` 계층과 성공 값·에러 코드를 담는 제네릭 `Result<T>` (명세 v2에는 응답 래퍼가 없으므로 `ApiResponse<T>` 대신 쓴다)",
+      "basics": "글 목록의 좋아요 수 단순 합계(for와 stream 두 가지), 쉼표로 이어진 태그 문자열을 `split`·`strip`으로 나누기",
+      "typeCut": "`long` vs `Long`: 엔티티 id는 왜 `Long`인가(null이면 아직 저장 전) — BaseEntity, JPA의 신규·기존 판단",
+      "habit": "Lombok이 만드는 코드: `@Getter`·`@RequiredArgsConstructor`·`@Builder`가 생성하는 코드를 직접 확인하고, 엔티티에서 `@AllArgsConstructor`·`@Setter`를 피하는 이유"
+    },
+    {
+      "id": "J03",
+      "day": "D03",
+      "optional": false,
+      "topic": "enum, 불변 객체, `equals`/`hashCode`: `Role` enum과 권한 판정 메서드",
+      "basics": "역할별 회원 수 세기, 공백만 있는 닉네임을 `isBlank`로 거절하기",
+      "typeCut": "오토박싱·언박싱 NPE(`Long` → `long`): ① 집계 결과가 없을 때 `SUM`이 null(MyBatis `resultType=\"long\"`, JPA `Long` 반환을 `long`으로 받음) ② `Map.get()`이 null ③ 저장 전 엔티티의 id가 null — 포인트 합계 조회, 캐시 조회, 저장 직후 id 사용",
+      "habit": "null 다루는 습관: `Objects.requireNonNull`, `Objects.equals`, 컬렉션은 null 대신 빈 리스트를 반환"
+    },
+    {
+      "id": "J04",
+      "day": "D04",
+      "optional": false,
+      "topic": "인터페이스와 구현, 선언 타입과 실제 타입, 추상 클래스와 인터페이스 비교: `DiscountPolicy policy = new RateDiscountPolicy()`일 때 어떤 메서드가 불리는가",
+      "basics": "태그 목록에서 빈 문자열·공백을 지우고 중복을 제거해 최대 5개만 남기는 메서드",
+      "typeCut": "`==` vs `equals`: `Integer` 캐시(-128~127) 때문에 작은 수는 `==`도 맞아 보인다 — id 비교 버그",
+      "habit": null
+    },
+    {
+      "id": "J05",
+      "day": "D05",
+      "optional": false,
+      "topic": "`List`/`ArrayList`, `new`로 만들어 담기, for에서 stream(`map`·`filter`·`collect`)으로, `Optional`: 엔티티 목록을 DTO 목록으로 바꾸기, 사용 가능한 쿠폰만 거르기",
+      "basics": "작성자별 좋아요 합계(`groupingBy`)",
+      "typeCut": "제네릭에는 왜 래퍼만 쓰나(`List<int>` 불가), `IntStream`·`mapToLong` — 합계 stream",
+      "habit": "Map 실무 API: `getOrDefault`·`computeIfAbsent`·`merge`"
+    },
+    {
+      "id": "J06",
+      "day": "D06",
+      "optional": false,
+      "topic": "제네릭 메서드·와일드카드, `Comparator` 정렬: `CursorPage<T>`(D06 커서 응답과 같은 모양), 커서 비교기",
+      "basics": "태그별 글 수를 세어 많은 순으로, 같은 수는 태그 이름순으로 정렬(`Comparator.thenComparing`)",
+      "typeCut": "`Optional`: `orElse`와 `orElseGet`의 차이(`orElse`는 값이 있어도 인자를 먼저 실행한다), `orElseThrow`, 반환 타입에는 쓰고 필드·매개변수에는 쓰지 않는 이유 — 단건 조회 404 처리, 쿠폰 조회",
+      "habit": null
+    },
+    {
+      "id": "J07",
+      "day": "D07",
+      "optional": false,
+      "topic": "`Map`·`Set`, 스레드와 공유 상태, `AtomicInteger`, `synchronized`: 잔액 갱신 손실을 순수 Java로 재현하고 고치기",
+      "basics": "회원별 포인트 이력을 `Map<Long, List<PointEntry>>`로 묶고 회원별 잔액 계산",
+      "typeCut": "`boolean` vs `Boolean`, `is` 접두어와 JSON 직렬화 — 응답 필드 이름이 바뀌는 문제",
+      "habit": "Map 함정: `toMap` 중복 키 예외, `HashMap`은 순서를 보장하지 않는다"
+    },
+    {
+      "id": "J08",
+      "day": "D08",
+      "optional": false,
+      "topic": "체크 예외와 언체크 예외, try-with-resources, 람다와 함수형 인터페이스: 재시도 함수 `retry(Supplier<T>, int)`",
+      "basics": "충전 요청 목록을 검증해 실패 건을 모아 하나의 예외로 반환",
+      "typeCut": "`String` 불변, `+` 결합과 `StringBuilder`, `String.format` — 로그 메시지, 외부 API URL 조립",
+      "habit": "예외 원인 연결과 삼키기: `new XxxException(msg, e)`로 원인을 남기고, 빈 catch가 장애 때 무엇을 숨기는지 확인"
+    },
+    {
+      "id": "J09",
+      "day": "D09",
+      "optional": false,
+      "topic": "`LocalDateTime`·`ZonedDateTime`·`Clock`, `Duration`: TTL 계산, 자정 경계 테스트",
+      "basics": "출석 기록 목록에서 KST 날짜별 첫 출석만 남기기(`Clock` 주입)",
+      "typeCut": "`LocalDate`·`LocalDateTime`·`Instant`·`ZonedDateTime`의 차이 — 출석 자정 경계, 토큰 만료",
+      "habit": null
+    },
+    {
+      "id": "J10",
+      "day": "D10",
+      "optional": false,
+      "topic": "어노테이션과 리플렉션, JDK 동적 프록시: 어노테이션이 붙은 메서드만 실행 시간을 로깅하는 프록시를 직접 만들고(AOP의 원리), 같은 객체 안에서 호출하면 프록시를 거치지 않는 것을 테스트로 확인",
+      "basics": "감사 로그 목록에서 `action`별 건수를 집계해 불변 `Map`으로 반환",
+      "typeCut": "`final`·`var`·`static final` 상수 — 설정 상수, 불변 필드",
+      "habit": null
+    },
+    {
+      "id": "J11",
+      "day": "D11",
+      "optional": false,
+      "topic": "리팩터링 ①: 특성화 테스트 쓰기 — 동작이 이상한 레거시 포인트 계산 메서드의 현재 출력을 테스트로 고정한다 (선택: ThreadLocal로 트랜잭션·SecurityContext·MDC가 스레드에 붙는 원리)",
+      "basics": "레거시 메서드의 입력 조합을 for로 만들어 결과를 `List`에 모으고 한 번에 단정하기",
+      "typeCut": "배열 vs `List`: 고정 길이·공변성, `Arrays.asList`의 크기 고정 — 레거시 코드의 배열 반환",
+      "habit": null
+    },
+    {
+      "id": "J12",
+      "day": "D12",
+      "optional": false,
+      "topic": "리팩터링 ②: 긴 메서드 나누기 — 80줄 구매 처리 메서드를 검증·계산·저장으로 나누고 특성화 테스트를 그대로 통과시킨다 (선택: 정규식 기초)",
+      "basics": "나눈 검증 메서드가 실패 사유를 `List<String>`으로 모아 반환하게 하기",
+      "typeCut": "`enum` 확장: 필드·생성자·메서드를 가진 enum, 상수별 메서드 구현 — 상태별 분기 정리",
+      "habit": null
+    },
+    {
+      "id": "J13",
+      "day": "D13",
+      "optional": false,
+      "topic": "리팩터링 ③: 조건문을 전략으로 바꾸기 — 쿠폰 종류별 `if-else` 할인 계산을 `DiscountPolicy` 구현으로 옮긴다 (선택: switch 식, record 패턴, text block)",
+      "basics": "정책 목록을 stream으로 돌며 적용 가능한 정책 중 할인액이 가장 큰 것을 고르기",
+      "typeCut": "`record`: 불변 데이터 운반 객체, 압축 생성자 검증 — DTO와 값 객체",
+      "habit": null
+    },
+    {
+      "id": "J14",
+      "day": "D14",
+      "optional": false,
+      "topic": "리팩터링 ④: null 처리 — null을 돌려주는 조회 메서드를 `Optional`과 빈 컬렉션으로 바꾸고 호출부의 NPE를 없앤다 (선택: JVM 메모리 기초 — 힙·스택·GC·OOM)",
+      "basics": "null이 섞인 회원 목록에서 null을 거르고 닉네임을 정렬해 `String.join`으로 잇기",
+      "typeCut": "(선택) `double` vs `BigDecimal`: 0.1 + 0.2, 금액 계산과 반올림 — 포인트·결제 금액",
+      "habit": null
+    },
+    {
+      "id": "J15",
+      "day": "D15",
+      "optional": false,
+      "topic": "종합: 작은 쿠폰 할인 계산기를 처음부터 만들기(인터페이스, 제네릭, stream, 예외, 테스트를 모두 사용)",
+      "basics": "주문 목록의 할인 전·후 합계를 stream으로 계산하고, 실패한 주문은 모아서 예외로 반환",
+      "typeCut": "정리 퀴즈: J1~J14 타입 한 컷 전체에서 문항을 골라 확인 테스트로 답하기",
+      "habit": null
+    }
+  ]
+}

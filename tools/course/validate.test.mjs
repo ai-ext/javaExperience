@@ -161,3 +161,17 @@ test('실제 카드 문서는 일자마다 3~5장', () => {
     assert.ok(c >= 3 && c <= 5, `${d}: ${c}장`);
   }
 });
+
+test('실제 course 파일 전체가 검증을 통과한다', () => {
+  const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'course');
+  const courseFiles = {};
+  for (const f of fs.readdirSync(dir)) if (/\.(md|json)$/.test(f)) courseFiles[f] = fs.readFileSync(path.join(dir, f), 'utf8');
+  assert.ok('roadmap.json' in courseFiles, 'course/roadmap.json이 없다');
+  const errs = validate({
+    spec: courseFiles['spec-v2.md'],
+    roadmap: JSON.parse(courseFiles['roadmap.json']),
+    cards: courseFiles['talk-cards.md'],
+    courseFiles,
+  });
+  assert.deepEqual(errs, []);
+});
