@@ -34,8 +34,9 @@
 |---|---|---|---|
 | 일자 페이지 D01~D10 [오늘 흐름] | `course/flows/days.json` | `tools/site/course-flow.mjs` `renderDayFlow` (자리: `section.day-java` 바로 뒤) | 대표 요청 1개의 노드 지도(그날 만든 층은 "오늘 만듦"), 재생 조작(이전·재생/일시정지·다음·0.5/1/2배속·단계 수), 지금 단계 카드, 정지 상태 단계 목록(단계마다 위치·관찰 시점·값과 꼬리표 예시/코드/대표) |
 | 일자 페이지 D11~D14 | `course/flows/tickets.json` + roadmap 티켓 | `renderDayTicketLinks` | 그날 티켓의 장애 흐름으로 가는 목록. 증상 단계 수만 보여 주고, 원문이 커밋되지 않은 티켓은 "준비 중" |
-| 티켓 페이지 [장애 흐름] | `course/flows/tickets.json` | `injectTicketFlow` (빌드 때 '받은 티켓' 다음에 넣음, 원문은 고치지 않음) | 증상·관찰 지점 단계는 펼쳐 둔다. 원인 단계는 닫힌 접기 안에만 있다. 펼치면 재생 순서에 끼어든다 |
+| 티켓 페이지 [장애 흐름] | `course/flows/tickets.json` | `injectTicketFlow` (빌드 때 '받은 티켓' 다음에 넣음, 원문은 고치지 않음) | 증상·관찰 지점 단계는 펼쳐 둔다. 원인 단계는 닫힌 접기 안에만 있다. 원인 단계만 지나는 지도 노드는 "원인 쪽 · 펼치면 보임"으로 가린다. 펼치면 재생 순서에 원인 단계가 끼어들고, 가린 노드에 이름이 채워진다 |
 
+- 390px 이하에서는 노드를 세로 한 줄로 쌓고, 세로 점선으로 잇는다.
 - D00·D15는 흐름이 없다(빈 자리 유지). D11~D14는 요청 흐름 대신 티켓 흐름으로 잇는다(Ruling).
 - 시각 요소의 출처와 판단: [COURSE-V2-MIRICANVAS-2026-10-23.md](COURSE-V2-MIRICANVAS-2026-10-23.md)
 - 확인: `npm run test:course-pages`

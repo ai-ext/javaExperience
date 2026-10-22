@@ -38,7 +38,11 @@ const ICON_PATHS = {
   thread: '<path d="M4 6h10M4 12h16M4 18h7"/><path d="m16 4 3 2-3 2M14 16l3 2-3 2"/>',
   clock: '<circle cx="12" cy="12" r="8.2"/><path d="M12 7.5V12l3 2"/>',
   search: '<circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5M8 12.5v-2M10.5 12.5V8.5M13 12.5v-3"/>',
+  mask: '<rect x="4.5" y="4.5" width="15" height="15" rx="2" stroke-dasharray="3 2.4"/><path d="M10 10a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3M12 15.6v.1"/>',
 };
+// 티켓 지도에서 원인 단계만 지나는 노드는 이름을 가린다. 이름 자체가 원인을 말하는 경우가 많다(예: "금칙어 검사기 · 싱글톤 빈").
+export const MASK_LABEL = '원인 쪽';
+const MASK_SUB = '펼치면 보임';
 export const FLOW_ICONS = Object.keys(ICON_PATHS);
 const icon = (name) => `<svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICON_PATHS[name]}</svg>`;
 
@@ -100,11 +104,20 @@ export function loadFlows(root, course) {
 }
 
 // ---------------------------------------------------------------- 마크업
+// 원인 단계만 지나는 노드 id. 일자 흐름은 비어 있다.
+export function maskedNodes(flow) {
+  if (flow.kind !== 'ticket') return new Set();
+  const open = new Set(flow.steps.filter((s) => s.side === 'open').map((s) => s.node));
+  return new Set(flow.nodes.map((n) => n.id).filter((id) => !open.has(id)));
+}
+
 function nodeMap(flow, prefix) {
-  const items = flow.nodes.map((n, i) => `<li class="flow-node${n.isNew ? ' is-new' : ''}" data-node="${esc(n.id)}" data-index="${i}">`
+  const masked = maskedNodes(flow);
+  const shown = flow.nodes.map((n) => (masked.has(n.id) ? { ...n, label: MASK_LABEL, sub: MASK_SUB, icon: 'mask', isNew: false } : n));
+  const items = shown.map((n, i) => `<li class="flow-node${n.isNew ? ' is-new' : ''}${masked.has(n.id) ? ' is-masked' : ''}" data-node="${esc(n.id)}" data-index="${i}">`
     + `<span class="flow-tile">${icon(n.icon)}</span><span class="flow-node-text"><b>${esc(n.label)}</b>${n.sub ? `<small>${inline(n.sub)}</small>` : ''}</span>`
     + `${n.isNew ? '<em class="flow-new">오늘 만듦</em>' : ''}</li>`).join('');
-  return `<ol class="flow-nodes" aria-label="${esc(prefix)} 지도: ${esc(flow.nodes.map((n) => n.label).join(' → '))}">${items}</ol>`;
+  return `<ol class="flow-nodes" aria-label="${esc(prefix)} 지도: ${esc(shown.map((n) => n.label).join(' → '))}">${items}</ol>`;
 }
 
 function stepItem(flow, step, order, label, idBase) {

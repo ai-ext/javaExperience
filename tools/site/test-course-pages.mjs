@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { JSDOM } from 'jsdom';
 import { loadCourse, shortTitle, mapNodes } from './course-pages.mjs';
+import { maskedNodes, MASK_LABEL } from './course-flow.mjs';
 
 const root = new URL('../../', import.meta.url);
 const rootPath = new URL('.', root).pathname;
@@ -303,6 +304,18 @@ for (const day of course.days) {
     for (const s of flow.steps.filter((x) => x.side === 'cause')) {
       for (const piece of [s.title, ...s.values.map((v) => v[1])]) assert.ok(!visible.includes(plainText(piece)), `${id}: 원인 문장 "${plainText(piece)}"이 접기 밖에 보인다`);
     }
+    assert.ok(!visible.includes(plainText(flow.title)), `${id}: 흐름 제목(원인을 말할 수 있다)은 화면에 싣지 않는다`);
+    // 원인 단계만 지나는 노드는 이름·설명을 가린다(타일과 지도 aria-label 모두). 이름이 원인을 말하는 경우가 많다.
+    const masked = maskedNodes(flow);
+    const openLabels = new Set(flow.nodes.filter((n) => !masked.has(n.id)).flatMap((n) => [n.label, n.sub]));
+    const mapLabel = section.querySelector('.flow-nodes').getAttribute('aria-label');
+    for (const n of flow.nodes.filter((x) => masked.has(x.id))) {
+      const tile = section.querySelector(`.flow-node[data-node="${n.id}"]`);
+      assert.ok(tile.classList.contains('is-masked') && text(tile.querySelector('b')) === MASK_LABEL, `${id}: 원인 쪽 노드 ${n.id}는 가린다`);
+      for (const piece of [n.label, n.sub].filter((x) => x && !openLabels.has(x))) {
+        assert.ok(!text(tile).includes(plainText(piece)) && !mapLabel.includes(plainText(piece)), `${id}: 원인 쪽 노드 이름 "${piece}"이 지도에 보인다`);
+      }
+    }
     assert.ok(!/<script type="application\/json"[^>]*flow/.test(html), `${id}: 원인 단계를 데이터로 따로 싣지 않는다`);
   }
   // 5) 조작: 이전·다음·끝·처음, 재생은 속도대로 넘어가고 마지막에서 멈춘다, 키보드, 원인 접기를 열면 재생 순서에 끼어든다.
@@ -364,7 +377,10 @@ for (const day of course.days) {
   assert.equal(tcount().split(' / ')[1], String(course.flows.tickets.get('B01').steps.length), '펼치면 원인 단계가 끼어든다');
   tsec.querySelector('[data-flow-prev]').click(); tsec.querySelector('[data-flow-prev]').click();
   assert.ok(tsec.querySelector('.flow-step.is-current').classList.contains('is-cause') || tsec.querySelector('.flow-step.is-current'), '펼친 뒤 원인 단계로 이동');
+  const poolTile = tsec.querySelector('.flow-node[data-node="pool"]');
+  assert.ok(poolTile.classList.contains('is-revealed') && text(poolTile.querySelector('b')) === 'Hikari 풀', '펼치면 원인 쪽 노드 이름을 접기 안 단계에서 가져와 보여 준다');
   fold.open = false; fold.dispatchEvent(new b01.window.Event('toggle'));
+  assert.equal(text(poolTile.querySelector('b')), MASK_LABEL, '접으면 다시 가린다');
   assert.equal(tcount().split(' / ')[1], String(openSteps), '다시 접으면 증상 단계만');
   assert.ok(!tsec.querySelector('.flow-step.is-current').classList.contains('is-cause'), '접으면 지금 단계가 증상 쪽으로 옮겨 간다');
   console.log(`흐름 재생: 일자 ${course.flows.days.size}개·티켓 ${course.flows.tickets.size}개, 근거 문자열 ${checkedEvidence}개, 조작·누출 검사 통과`);

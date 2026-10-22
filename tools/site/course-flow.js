@@ -123,9 +123,25 @@
       e.preventDefault();
       go(to);
     });
+    // 원인 쪽 노드 이름: 접기가 열려 있을 때만 접기 안 원인 단계의 위치 이름을 지도에 보여 준다(다른 곳에 따로 싣지 않는다).
+    var masked = nodes.filter(function (n) { return n.classList.contains('is-masked'); }).map(function (n) {
+      var b = n.querySelector('.flow-node-text b');
+      var small = n.querySelector('.flow-node-text small');
+      return { node: n, b: b, small: small, label: b.textContent, sub: small ? small.textContent : '' };
+    });
+    function revealNodes() {
+      var open = causes.some(function (d) { return d.open; });
+      masked.forEach(function (m) {
+        var source = open ? root.querySelector('details.flow-cause[open] .flow-step[data-node="' + m.node.dataset.node + '"] .flow-step-node') : null;
+        m.node.classList.toggle('is-revealed', Boolean(source));
+        m.b.textContent = source ? source.textContent : m.label;
+        if (m.small) m.small.textContent = source ? '원인 단계' : m.sub;
+      });
+    }
     // 원인 접기를 열고 닫으면 재생 순서가 바뀐다. 지금 단계가 숨으면 가장 가까운 앞 단계로 옮긴다.
     causes.forEach(function (d) {
       d.addEventListener('toggle', function () {
+        revealNodes();
         var current = steps[index];
         collect();
         var keep = steps.indexOf(current);
