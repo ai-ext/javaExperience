@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.method.ParameterErrors;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -60,9 +61,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION.type(), ErrorCode.VALIDATION.title(),
                 "요청 값이 올바르지 않습니다.", path(request));
         List<Map<String, String>> errors = ex.getParameterValidationResults().stream()
-                .flatMap(r -> r.getResolvableErrors().stream().map(e -> Map.of(
-                        "field", r.getMethodParameter().getParameterName() == null ? "" : r.getMethodParameter().getParameterName(),
-                        "reason", String.valueOf(e.getDefaultMessage()))))
+                .flatMap(r -> r instanceof ParameterErrors pe
+                        // @Valid 본문은 필드 이름을, 경로·쿼리 파라미터는 파라미터 이름을 field로 쓴다
+                        ? pe.getFieldErrors().stream().map(GlobalExceptionHandler::toError)
+                        : r.getResolvableErrors().stream().map(e -> Map.of(
+                                "field", String.valueOf(r.getMethodParameter().getParameterName()),
+                                "reason", String.valueOf(e.getDefaultMessage()))))
                 .toList();
         pd.setProperty("errors", errors);
         return ResponseEntity.badRequest().body(pd);

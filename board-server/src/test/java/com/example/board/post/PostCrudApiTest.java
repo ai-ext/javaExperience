@@ -176,4 +176,16 @@ class PostCrudApiTest extends ApiTestSupport {
                 .content("{\"title\":\"t\",\"content\":\"c\"}"))
                 .andExpect(status().isUnauthorized());
     }
+
+    // 경로 변수 검증(@Positive)이 있는 메서드는 본문 검증 오류도 같은 형식(field=필드명)이어야 한다
+    @Test
+    void PUT_공백_제목은_400이고_errors의_field는_title() throws Exception {
+        Member author = newMember(Role.USER);
+        Long postId = newPost(author);
+
+        mockMvc.perform(put("/api/posts/{id}", postId).header("Authorization", bearer(author))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"  \",\"content\":\"c\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("title"));
+    }
 }

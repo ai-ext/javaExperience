@@ -17,4 +17,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             where p.id = :id and p.status = com.example.board.post.PostStatus.ACTIVE
             """)
     Optional<Post> findActiveDetail(@Param("id") Long id);
+
+    boolean existsByIdAndStatus(Long id, PostStatus status);
 }
