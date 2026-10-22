@@ -10,31 +10,40 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.board.common.BusinessException;
 import com.example.board.common.ErrorCode;
+import com.example.board.member.Member;
 import com.example.board.member.MemberRepository;
 import com.example.board.member.Role;
+import com.example.board.point.PointService;
 import com.example.board.post.PostRepository;
 import com.example.board.post.PostStatus;
 
 @Service
 public class CommentService {
 
+    private static final int COMMENT_EARN_POINTS = 2;
+
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
     private final MemberRepository memberRepository;
+    private final PointService pointService;
 
     public CommentService(CommentRepository commentRepository, PostRepository postRepository,
-            MemberRepository memberRepository) {
+            MemberRepository memberRepository, PointService pointService) {
         this.commentRepository = commentRepository;
         this.postRepository = postRepository;
         this.memberRepository = memberRepository;
+        this.pointService = pointService;
     }
 
     @Transactional
     public CommentResponse create(Long postId, Long memberId, String content) {
         requireActivePost(postId);
-        Comment saved = commentRepository.save(Comment.create(postRepository.getReferenceById(postId),
-                memberRepository.getReferenceById(memberId), content));
-        // 응답에 작성자 닉네임이 필요해서 member를 실제로 읽는다(작성 1건이라 N+1이 아니다)
+        // 댓글 INSERT가 회원 행에 FK 공유 잠금을 걸기 전에 배타 잠금을 먼저 잡는다(잔액 UPDATE와의 교착 방지)
+        Member member = memberRepository.findByIdForUpdate(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다."));
+        Comment saved = commentRepository.save(Comment.create(postRepository.getReferenceById(postId), member,
+                content));
+        pointService.earn(memberId, COMMENT_EARN_POINTS, "COMMENT", saved.getId());
         return CommentResponse.from(saved);
     }
 

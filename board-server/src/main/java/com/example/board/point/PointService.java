@@ -2,6 +2,7 @@ package com.example.board.point;
 
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,12 +18,14 @@ public class PointService {
     private final MemberRepository memberRepository;
     private final PointLedgerRepository ledgerRepository;
     private final PointHistoryMapper historyMapper;
+    private final ApplicationEventPublisher events;
 
     public PointService(MemberRepository memberRepository, PointLedgerRepository ledgerRepository,
-            PointHistoryMapper historyMapper) {
+            PointHistoryMapper historyMapper, ApplicationEventPublisher events) {
         this.memberRepository = memberRepository;
         this.ledgerRepository = ledgerRepository;
         this.historyMapper = historyMapper;
+        this.events = events;
     }
 
     @Transactional
@@ -31,6 +34,8 @@ public class PointService {
             throw new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다.");
         }
         record(memberId, PointLedgerType.EARN, amount, refType, refId);
+        // 활동 랭킹은 원장과 같은 값으로 커밋 뒤에 올린다(ActivityRankingService)
+        events.publishEvent(new PointEarnedEvent(memberId, amount, refType));
     }
 
     /** PG 승인이 확정된 충전 적립. 호출자가 같은 결제로 두 번 부르지 않도록 상태 전이로 막는다. */

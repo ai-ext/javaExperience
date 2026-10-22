@@ -96,6 +96,22 @@ class PopularPostFallbackTest {
             assertThat(created.millis()).as("POST /api/posts").isLessThan(BUDGET_MILLIS);
             assertThat(popular.millis()).as("GET /api/posts/popular").isLessThan(BUDGET_MILLIS);
         }
+
+        @Test
+        void 지연_중_활동_랭킹은_원장_합계로_1초_안에_응답한다() throws Exception {
+            // 같은 컨텍스트의 다른 테스트도 글을 쓰므로(10점) 두 편을 써서 1등을 확실히 한다
+            Member writer = newMember(Role.USER);
+            createPost(mockMvc, bearer(writer)).andExpect(status().isCreated());
+            createPost(mockMvc, bearer(writer)).andExpect(status().isCreated());
+            slowRedis();
+
+            Timed<ResultActions> r = timed(() -> mockMvc.perform(get("/api/rankings/activity")));
+
+            r.value().andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items[0].memberId").value(writer.getId()))
+                    .andExpect(jsonPath("$.items[0].score").value(20));
+            assertThat(r.millis()).isLessThan(BUDGET_MILLIS);
+        }
     }
 
     /** Review Focus 4: Redis가 아예 없는(연결 거부) 상태로 기동해도 캐시만 빠진 채 동작한다. */
