@@ -16,9 +16,10 @@ public class TagIndex {
         postIdsByTag.computeIfAbsent(tag, key -> new ArrayList<>()).add(postId);
     }
 
-    /** 태그가 붙은 글 id 목록(넣은 순서). 없는 태그면 빈 리스트. */
+    /** 태그가 붙은 글 id 목록(넣은 순서)의 고칠 수 없는 복사본. 없는 태그면 빈 리스트. 돌려준 목록을 고쳐도 색인은 그대로다. */
     public List<Long> postIdsOf(String tag) {
-        return postIdsByTag.getOrDefault(tag, List.of());
+        // 내부 리스트를 그대로 내주면 밖에서 clear·add로 색인을 바꿀 수 있다(J01에서 막은 내부 리스트 노출). 복사본을 준다
+        return List.copyOf(postIdsByTag.getOrDefault(tag, List.of()));
     }
 
     /** 글 목록에서 태그별로 몇 번 나왔는지 센다. */

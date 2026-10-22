@@ -10,6 +10,21 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** 타입 한 컷: int vs Integer — 요청 DTO에서 "값 없음"(null)과 "0"을 구분한다. */
 class J01TypeCutTest {
 
+    /** 값을 넣지 않은 필드가 무엇으로 시작하는지 보려는 작은 예. 생성자도 대입도 없다. */
+    static class UnsetFields {
+        int primitiveSize;
+        Integer wrapperSize;
+    }
+
+    @Test
+    void 대입하지_않은_필드는_int면_0이고_Integer면_null이다() {
+        UnsetFields fields = new UnsetFields();
+
+        // int는 "보내지 않음"도 0으로 시작해서 "0을 보냄"과 구분할 수 없다. Integer는 null로 시작한다
+        assertThat(fields.primitiveSize).isZero();
+        assertThat(fields.wrapperSize).isNull();
+    }
+
     @Test
     void size를_보내지_않으면_null로_받고_기본값_20을_쓴다() {
         PostListRequest request = new PostListRequest(null);

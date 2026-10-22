@@ -199,7 +199,7 @@ public static Map&lt;String, Integer&gt; likesByAuthor(List&lt;Post&gt; posts)</
 <td>넉넉하다</td>
 </tr>
 </tbody></table></div>
-<p>제네릭(<code>List&lt;T&gt;</code>, <code>Map&lt;K, V&gt;</code>)의 <code>T</code>에는 객체만 들어간다. 그래서 <code>List&lt;int&gt;</code>는 만들 수 없고 <code>List&lt;Integer&gt;</code>로 담는다. 숫자를 많이 다룰 때는 박싱이 없는 <code>IntStream</code>·<code>LongStream</code>으로 바꿔 계산한다.</p>
+<p>제네릭(<code>List&lt;T&gt;</code>, <code>Map&lt;K, V&gt;</code>)의 <code>T</code>에는 객체만 들어간다. 그래서 <code>List&lt;int&gt;</code>는 만들 수 없고 <code>List&lt;Integer&gt;</code>로 담는다(컴파일 오류라 테스트로 확인하지 않고 <strong>설명으로 다룬다</strong>). 숫자를 많이 다룰 때는 박싱이 없는 <code>IntStream</code>·<code>LongStream</code>으로 바꿔 계산한다.</p>
 <p>함정: <code>List&lt;Integer&gt;</code>의 <code>remove</code>는 두 개다. <code>remove(int index)</code>는 <strong>위치</strong>로, <code>remove(Object o)</code>는 <strong>값</strong>으로 지운다. <code>counts.remove(0)</code>은 값 0이 아니라 0번 자리를 지운다.</p>
 <p>과제: <code>LikeSums.totalLikes</code>(넘치지 않게 <code>long</code>으로)와 <code>LikeSums.removeValue</code>(값으로 지우기)를 채운다.</p>
 <p>확인 테스트 — <code>J05TypeCutTest</code>:</p>
@@ -234,17 +234,18 @@ public static Map&lt;String, Integer&gt; likesByAuthor(List&lt;Post&gt; posts)</
 <td><code>map.merge(k, 1, Integer::sum)</code></td>
 </tr>
 </tbody></table></div>
-<p>과제: <code>TagIndex</code>를 채운다. <code>add</code>는 태그별 글 id 목록에 더하고, <code>postIdsOf</code>는 없는 태그면 빈 리스트를, <code>countTags</code>는 태그별 등장 횟수를 돌려준다.</p>
+<p>과제: <code>TagIndex</code>를 채운다. <code>add</code>는 태그별 글 id 목록에 더하고, <code>postIdsOf</code>는 목록의 고칠 수 없는 복사본(<code>List.copyOf</code>)을, 없는 태그면 빈 리스트를, <code>countTags</code>는 태그별 등장 횟수를 돌려준다. 내부 리스트를 그대로 내주면 받은 쪽의 <code>clear()</code> 한 번에 색인이 비워진다(<a class="docref" href="../../docs/knowledge/J01-types-string.html">J01</a>에서 막은 내부 리스트 노출과 같은 함정).</p>
 <p>테스트 — <code>J05HabitTest</code>:</p>
 <ul>
 <li><code>함정_처음_보는_키를_get으로_꺼내_add하면_NPE다_computeIfAbsent는_리스트를_만든다</code></li>
 <li><code>computeIfAbsent는_있는_키에는_새로_만들지_않고_이어_붙인다</code></li>
 <li><code>없는_태그를_찾으면_getOrDefault로_빈_리스트를_돌려준다</code></li>
+<li><code>돌려준_목록을_고쳐도_색인_안의_목록은_바뀌지_않는다</code></li>
 <li><code>함정_get에_1을_더해_넣으면_처음_보는_키에서_NPE다_merge는_없으면_1로_넣는다</code></li>
 </ul>
 <h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2>
 <pre><code class="language-bash">./gradlew :java-track:test --tests 'J05*'</code></pre>
-<p>16개가 모두 <code>PASSED</code>면 끝이다.</p>
+<p>17개가 모두 <code>PASSED</code>면 끝이다.</p>
 <h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2>
 <details>
 <summary>펼치기</summary>
@@ -314,7 +315,8 @@ public void add(String tag, long postId) {
 }
 
 public List&lt;Long&gt; postIdsOf(String tag) {
-    return postIdsByTag.getOrDefault(tag, List.of());
+    // 내부 리스트를 그대로 내주면 밖에서 clear·add로 색인을 바꿀 수 있다(J01에서 막은 내부 리스트 노출). 복사본을 준다
+    return List.copyOf(postIdsByTag.getOrDefault(tag, List.of()));
 }
 
 public static Map&lt;String, Integer&gt; countTags(List&lt;Post&gt; posts) {

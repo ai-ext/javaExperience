@@ -35,7 +35,7 @@ class J05TypeCutTest {
 
     @Test
     void 함정_List_Integer의_remove에_int를_넘기면_값이_아니라_위치를_지운다() {
-        // List<int>는 만들 수 없다. 제네릭에는 객체만 들어가므로 Integer로 담는다
+        // List<int>는 만들 수 없다(컴파일 오류라 테스트로 확인하지 않고 페이지 설명으로 다룬다). 제네릭에는 객체만 들어가므로 Integer로 담는다
         List<Integer> leaky = new ArrayList<>(List.of(10, 20, 0, 30));
         leaky.remove(0); // remove(int index)가 불려 0번 자리(10)가 지워진다
         assertThat(leaky).containsExactly(20, 0, 30);
