@@ -125,3 +125,4 @@ DNN ② … (board-server의 실제 파일 경로를 적는다. 예: board-serve
 - Ruling: J12~J14는 특성화(동작) 테스트는 뼈대에서도 통과하고, 클래스마다 구조 테스트가 뼈대에서 실패하게 함.
 - Ruling: J02 Lombok 습관 칸은 Lombok 의존 없이 delombok 출력과 같은 손 코드로 비교. J07 동시성은 CountDownLatch로 매번 재현. J07 타입 한 컷은 Jackson 대신 `java.beans.Introspector`.
 - minor: J02·J03 분량이 60분을 넘을 수 있음 / J09·J15는 테스트 중 JVM 기본 시간대를 바꿈(병렬 실행 시 주의) / J11MutantTest는 작업 디렉터리가 java-track이어야 함(IDE 러너 주의) / J11 정답이 `src/answerTest`에 있어 P5 추출 시 함께 볼 것.
+- Review (2026-10-23): codex(gpt-6-astra) 사후 리뷰 — FAIL, major 7(J04·J15 할인 오버플로, J10 프록시 equals 계약, J13 로케일 의존 toUpperCase, J07 이름 변환이 JavaBeans 규칙과 다르고 필드 순서 가정, verifySkeleton이 부분 실행 결과도 통과, J04 Integer 캐시 미검사·범위 밖 동일성을 보장처럼 설명, J14 선택 과제가 필수 완료 조건), minor 6 → 수정 담당 dispatch
