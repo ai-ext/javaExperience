@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ROOT, EXTRA_COMMITS, buildAll, listAnswerCommits, commitFiles, collectAnswers, specLinks, parseSpecSections, fence } from './build-days.mjs';
+import { ROOT, EXTRA_COMMITS, HEADER, buildAll, listAnswerCommits, commitFiles, collectAnswers, specLinks, parseSpecSections, parseTalkCards, renderDay, fence } from './build-days.mjs';
 import { stripFences, parseDayPage } from './validate.mjs';
 
 const roadmap = JSON.parse(fs.readFileSync(path.join(ROOT, 'course/roadmap.json'), 'utf8'));
@@ -12,6 +12,7 @@ const built = buildAll(ROOT);
 const readyDays = roadmap.days.filter((d) => hints.days[d.id]);
 const page = (id) => built.files.get(`course/spring/${id}.md`);
 const allCommits = listAnswerCommits(ROOT);
+const stepCommits = allCommits.filter((c) => c.kind === 'answer');
 
 test('정답 커밋이 있고 생성을 건너뛰지 않는다', () => {
   assert.equal(built.skipped, null);
@@ -63,13 +64,13 @@ test('일자 페이지의 순서 수·제목·카드가 roadmap과 같다', () =
 
 test('정답 커밋 매핑: D04 순서 수 = answer(D04-*) 커밋 수', () => {
   const d04 = roadmap.days.find((d) => d.id === 'D04');
-  const commits = listAnswerCommits(ROOT).filter((c) => c.day === 'D04');
+  const commits = stepCommits.filter((c) => c.day === 'D04');
   assert.equal(commits.length, d04.steps.length);
   assert.deepEqual(commits.map((c) => c.m), d04.steps.map((s) => s.no));
 });
 
 test('정답 커밋 매핑: 순서와 어긋난 커밋은 허용 목록(D01-0, D08-6)뿐이다', () => {
-  const commits = listAnswerCommits(ROOT);
+  const commits = stepCommits;
   const stray = commits.filter((c) => !roadmap.days.find((d) => d.id === c.day).steps.some((s) => s.no === c.m)).map((c) => `${c.day}-${c.m}`);
   assert.deepEqual(stray.sort(), Object.keys(EXTRA_COMMITS).sort());
   for (const d of readyDays) {
@@ -77,8 +78,8 @@ test('정답 커밋 매핑: 순서와 어긋난 커밋은 허용 목록(D01-0, D
     assert.equal(commits.filter((c) => c.day === d.id).length, d.steps.length + extras, d.id);
   }
   const answers = collectAnswers(roadmap, ROOT);
-  assert.deepEqual(answers.get('D01').steps.get(1).map((c) => c.m), [0, 1]);
-  assert.deepEqual(answers.get('D08').extras.map((c) => c.m), [6]);
+  assert.deepEqual(answers.get('D01').steps.get(1).filter((c) => c.kind === 'answer').map((c) => c.m), [0, 1]);
+  assert.deepEqual([...answers.get('D08').extras.keys()], ['D08-6']);
 });
 
 test('정답 블록은 그 순서 커밋의 board-server 파일만 담는다', () => {
@@ -154,4 +155,62 @@ test('정답 커밋을 찾지 못하면 아무것도 쓰지 않고 건너뛴다'
   assert.ok(r.skipped);
   assert.equal(r.files.size, 0);
   fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('2단계·마무리 날도 hints가 생기면 완성 페이지로 만든다(정답 커밋 없이)', () => {
+  const ctxFor = (day) => ({
+    root: ROOT, roadmap, hints, ready: true, answers: null, filesOf: () => [], lastTouch: () => null,
+    hintsDay: { steps: Object.fromEntries(day.steps.map((s) => [String(s.no), ['방향 힌트']])), grader: { focus: ['초점'] } },
+    cards: parseTalkCards(fs.readFileSync(path.join(ROOT, 'course/talk-cards.md'), 'utf8')),
+    specSections: parseSpecSections(fs.readFileSync(path.join(ROOT, 'course/spec-v2.md'), 'utf8')),
+  });
+  const d12 = roadmap.days.find((d) => d.id === 'D12');
+  const md12 = renderDay(d12, ctxFor(d12));
+  assert.ok(!md12.includes('class="step-answer"'));
+  assert.ok(md12.includes('](../tickets/B01.md)'));
+  assert.ok(md12.includes('## AI 채점 프롬프트'));
+  assert.ok(!md12.includes('## 날짜별 snapshot'));
+  const d15 = roadmap.days.find((d) => d.id === 'D15');
+  const md15 = renderDay(d15, ctxFor(d15));
+  assert.ok(!md15.includes('class="step-answer"'));
+  assert.ok(!md15.includes('../tickets/'));
+  assert.deepEqual(parseDayPage(md15).cards, d15.talkCards);
+});
+
+test('answer-fix(Dnn-m)는 순서 수에 넣지 않고, 그 순서 원래 커밋 뒤에 보완으로 붙고, snapshot은 가장 나중 커밋이다', () => {
+  const fix = { sha: 'f'.repeat(40), subject: 'answer-fix(D09-3): 리뷰 반영', kind: 'fix', day: 'D09', m: 3, title: '리뷰 반영' };
+  const fixExtra = { sha: 'e'.repeat(40), subject: 'answer-fix(D08-6): 리뷰 반영', kind: 'fix', day: 'D08', m: 6, title: '리뷰 반영' };
+  const list = [...allCommits, fix, fixExtra];
+  // 순서 수는 answer만 센다
+  const d09 = roadmap.days.find((d) => d.id === 'D09');
+  assert.equal(list.filter((c) => c.day === 'D09' && c.kind === 'answer').length, d09.steps.length);
+  const answers = collectAnswers(roadmap, ROOT, list);
+  const step3 = answers.get('D09').steps.get(3);
+  assert.equal(step3[0].kind, 'answer');
+  assert.equal(step3.at(-1).sha, fix.sha);
+  assert.equal(answers.get('D09').last.sha, fix.sha);
+  assert.equal(answers.get('D08').extras.get('D08-6').at(-1).sha, fixExtra.sha);
+  // 렌더링: 원래 커밋 코드 다음에 "보완"
+  const cache = new Map();
+  const filesOf = (sha) => sha === fix.sha
+    ? [{ path: 'src/main/java/com/example/board/post/PostCacheEvictListener.java', status: 'M', binary: false, generated: false, diff: '@@ -1 +1 @@\n-a\n+b\n' }]
+    : (cache.get(sha) ?? cache.set(sha, commitFiles(sha, ROOT)).get(sha));
+  const md = renderDay(d09, {
+    root: ROOT, roadmap, hints, hintsDay: hints.days.D09, ready: true, answers: answers.get('D09'), filesOf, lastTouch: () => null,
+    cards: parseTalkCards(fs.readFileSync(path.join(ROOT, 'course/talk-cards.md'), 'utf8')),
+    specSections: parseSpecSections(fs.readFileSync(path.join(ROOT, 'course/spec-v2.md'), 'utf8')),
+  });
+  const block = md.match(/<details class="step-answer" data-step="D09-3"[\s\S]*?\n<\/details>/)[0];
+  assert.ok(block.includes('<summary>정답 보기 · answer(D09-3) + 보완 1개'));
+  const orig = block.indexOf(step3[0].sha.slice(0, 8));
+  const extra = block.indexOf('**보완**');
+  assert.ok(orig >= 0 && extra > orig, '보완은 원래 커밋 코드 뒤에 온다');
+  assert.ok(md.includes(`/tree/${fix.sha}/board-server`), 'snapshot은 가장 나중 커밋');
+  // 원래 커밋 없이 answer-fix만 있으면 멈춘다
+  const orphan = list.filter((c) => !(c.day === 'D09' && c.m === 3 && c.kind === 'answer'));
+  assert.throws(() => collectAnswers(roadmap, ROOT, orphan.filter((c) => c.day !== 'D09' || c.m !== 3 || c.kind === 'fix')), /answer-fix/);
+});
+
+test('생성 페이지 맨 위에 생성물 표시가 있다', () => {
+  for (const [rel, md] of built.files) assert.ok(md.startsWith(HEADER), rel);
 });

@@ -49,15 +49,18 @@ function git(root, args) {
   return execFileSync('git', [...GIT_FLAGS, ...args], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
-// 정답 커밋 목록: [{ sha, subject, day, m }] (오래된 것부터)
+// 정답 커밋 목록: [{ sha, subject, kind, day, m }] (오래된 것부터)
+// kind: 'answer' = 순서 커밋 answer(Dnn-m), 'fix' = 리뷰 반영 커밋 answer-fix(Dnn-m). 순서 수는 answer만 센다.
+// git 저장소가 아니면(압축본 등) 빈 목록. 그 밖의 git 오류는 숨기지 않고 던진다.
+// --grep은 사용자의 grep.patternType 설정에 따라 괄호 해석이 달라지므로 쓰지 않고 JS 정규식으로 거른다.
 export function listAnswerCommits(root = ROOT) {
-  let out = '';
-  try { out = git(root, ['log', '--reverse', '--format=%H%x09%s', '--grep=^answer(D', 'HEAD']); } catch { return []; }
+  try { git(root, ['rev-parse', '--is-inside-work-tree']); } catch { return []; }
+  const out = git(root, ['log', '--reverse', '--format=%H%x09%s', 'HEAD']);
   const list = [];
   for (const line of out.split('\n')) {
     const [sha, subject] = line.split('\t');
-    const m = subject?.match(/^answer\((D\d{2})-(\d+)\):\s*(.+)$/);
-    if (m) list.push({ sha, subject, day: m[1], m: Number(m[2]), title: m[3] });
+    const m = subject?.match(/^answer(-fix)?\((D\d{2})-(\d+)\):\s*(.+)$/);
+    if (m) list.push({ sha, subject, kind: m[1] ? 'fix' : 'answer', day: m[2], m: Number(m[3]), title: m[4] });
   }
   return list;
 }
@@ -75,7 +78,7 @@ export function commitFiles(sha, root = ROOT) {
     if (!f.binary && !f.generated) {
       if (f.status === 'A') f.content = git(root, ['show', `${sha}:${full}`]);
       else if (f.status === 'M') {
-        const raw = git(root, ['show', '--format=', '--no-renames', '--no-ext-diff', '-U3', sha, '--', full]);
+        const raw = git(root, ['show', '--format=', '--no-renames', '--no-ext-diff', '--diff-algorithm=myers', '--indent-heuristic', '--inter-hunk-context=0', '-U3', sha, '--', full]);
         f.diff = raw.slice(raw.indexOf('\n@@') + 1);
       }
     }
@@ -84,26 +87,35 @@ export function commitFiles(sha, root = ROOT) {
   return files;
 }
 
-// 일자별 정답: Map(day → { steps: Map(no → [commit]), extras: [commit], last: commit })
-export function collectAnswers(roadmap, root = ROOT) {
-  const commits = listAnswerCommits(root);
+// 일자별 정답: Map(day → { steps: Map(no → [commit]), extras: Map(Dnn-m → [commit]), last: commit })
+// 한 순서의 커밋 목록은 원래 answer 커밋(들) 다음에 같은 Dnn-m의 answer-fix 커밋이 시간순으로 붙는다.
+// last는 그날 answer·answer-fix 중 가장 나중 커밋(snapshot 기준)이다.
+export function collectAnswers(roadmap, root = ROOT, commits = listAnswerCommits(root)) {
   const byDay = new Map();
   for (const c of commits) {
     const day = roadmap.days.find((d) => d.id === c.day);
     if (!day) throw new Error(`roadmap에 없는 날의 정답 커밋: ${c.subject}`);
-    if (!byDay.has(c.day)) byDay.set(c.day, { steps: new Map(), extras: [], last: null });
+    if (!byDay.has(c.day)) byDay.set(c.day, { steps: new Map(), extras: new Map(), last: null });
     const entry = byDay.get(c.day);
     const key = stepId(c.day, c.m);
     const rule = EXTRA_COMMITS[key];
     const stepNos = day.steps.map((s) => s.no);
-    if (rule?.extra) entry.extras.push({ ...c, rule });
-    else {
+    if (rule?.extra) {
+      if (!entry.extras.has(key)) entry.extras.set(key, []);
+      entry.extras.get(key).push({ ...c, rule });
+    } else {
       const no = rule?.attachTo ?? c.m;
       if (!stepNos.includes(no)) throw new Error(`순서와 맞지 않는 정답 커밋: ${c.subject} (EXTRA_COMMITS에 규칙이 없다)`);
       if (!entry.steps.has(no)) entry.steps.set(no, []);
       entry.steps.get(no).push({ ...c, rule });
     }
     entry.last = c;
+  }
+  // answer-fix가 원래 answer 커밋보다 앞에 오지 않게 한다(원래 커밋 → 보완 순서)
+  for (const entry of byDay.values()) {
+    for (const list of [...entry.steps.values(), ...entry.extras.values()]) {
+      if (list[0]?.kind === 'fix') throw new Error(`answer-fix 커밋이 원래 answer 커밋보다 먼저 있다: ${list[0].subject}`);
+    }
   }
   return byDay;
 }
@@ -193,7 +205,8 @@ function renderFile(f) {
 
 function renderCommitAnswer(commit, files, stepFiles) {
   const sorted = [...files].sort(fileOrder(stepFiles));
-  const lines = [`커밋 [\`${commit.sha.slice(0, 8)}\`](${REPO_URL}/commit/${commit.sha}) — ${commit.subject}`];
+  const link = `커밋 [\`${commit.sha.slice(0, 8)}\`](${REPO_URL}/commit/${commit.sha}) — ${commit.subject}`;
+  const lines = commit.kind === 'fix' ? [`**보완** — 리뷰를 반영해 이 순서의 코드를 고친 커밋이다.`, '', link] : [link];
   if (commit.rule?.note) lines.push('', commit.rule.note);
   for (const f of sorted) lines.push('', renderFile(f));
   return lines.join('\n');
@@ -201,7 +214,9 @@ function renderCommitAnswer(commit, files, stepFiles) {
 
 function answerBlock(dataStep, commits, stepFiles, filesOf, lastTouch) {
   const all = commits.flatMap((c) => filesOf(c.sha));
-  const names = commits.map((c) => `answer(${stepId(c.day, c.m)})`).join(' + ');
+  const originals = commits.filter((c) => c.kind !== 'fix');
+  const fixes = commits.length - originals.length;
+  const names = originals.map((c) => `answer(${stepId(c.day, c.m)})`).join(' + ') + (fixes ? ` + 보완 ${fixes}개` : '');
   const touched = new Set(all.map((f) => f.path));
   const untouched = stepFiles.filter((f) => !touched.has(f)).map((f) => {
     const prev = lastTouch?.(commits[0].sha, f);
@@ -322,17 +337,25 @@ function stepSection(day, s, ctx) {
     const hints = ctx.hintsDay.steps?.[String(s.no)];
     if (!hints?.length) throw new Error(`hints.json: ${id} 힌트가 없다`);
     lines.push(hintBlock(id, hints), '');
-    const commits = ctx.answers?.steps.get(s.no);
-    if (!commits?.length) throw new Error(`${id}: 정답 커밋 answer(${id})이 없다`);
-    lines.push(answerBlock(id, commits, s.files, ctx.filesOf, ctx.lastTouch), '');
+    if (day.phase === 'build') {
+      // 1단계: 그 순서 커밋의 정답을 인라인으로 싣는다
+      const commits = ctx.answers?.steps.get(s.no);
+      if (!commits?.length) throw new Error(`${id}: 정답 커밋 answer(${id})이 없다`);
+      lines.push(answerBlock(id, commits, s.files, ctx.filesOf, ctx.lastTouch), '');
+    } else if (day.phase === 'maintain' && s.tickets?.length) {
+      // 2단계: 티켓 정답은 티켓 페이지에만 둔다(마크다운 링크라 빌드 링크 검사가 티켓 페이지 누락을 잡는다)
+      lines.push(`**원인과 정답** ${s.tickets.map((t) => `[${t} 티켓 페이지](../tickets/${t}.md)`).join(' · ')}의 "원인과 정답" 접기에 있다.`, '');
+    }
+    // 마무리(wrap): 정답 칸이 없다
   } else {
-    lines.push('> 준비 중: 이 순서의 만들 파일·겪을 것·완료 조건·힌트·정답은 2단계 티켓 페이지와 함께 채운다.', '');
+    lines.push(`> 준비 중: 이 순서의 만들 파일·겪을 것·완료 조건·힌트${day.phase === 'maintain' ? '·정답은 2단계 티켓 페이지와 함께' : '는 마무리 자료와 함께'} 채운다.`, '');
   }
   lines.push('</section>');
   return lines.join('\n');
 }
 
-function extraSection(day, commit, ctx) {
+function extraSection(day, commits, ctx) {
+  const commit = commits[0];
   const id = stepId(day.id, commit.m);
   return [
     `<section class="day-step-extra" id="extra-${day.id.toLowerCase()}-${commit.m}" data-commit="${id}">`,
@@ -341,7 +364,7 @@ function extraSection(day, commit, ctx) {
     '',
     commit.rule.note,
     '',
-    answerBlock(id, [commit], [], ctx.filesOf),
+    answerBlock(id, commits, [], ctx.filesOf),
     '',
     '</section>',
   ].join('\n');
@@ -354,7 +377,7 @@ export function renderDay(day, ctx) {
   if (!ctx.ready) parts.push('> 이 날은 아직 준비 중이다. 순서 제목과 말하기 카드만 먼저 싣고, 티켓 페이지·힌트·채점 프롬프트는 2단계 자료가 끝난 뒤 채운다.');
   parts.push('## 오늘 순서', checklist(day, day.steps), javaSection(java, roadmapJava), '---');
   for (const s of day.steps) parts.push(stepSection(day, s, ctx));
-  for (const c of ctx.answers?.extras ?? []) parts.push(extraSection(day, c, ctx));
+  for (const group of ctx.answers?.extras.values() ?? []) parts.push(extraSection(day, group, ctx));
   parts.push('---', '## 말하기 카드', '하루가 끝나면 질문에 "문제 상황 → 원인 → 선택 → 결과" 순서로 소리 내어 답한 뒤, 접힌 "답에 들어가야 할 것"과 비교한다. 세 줄이 모두 나오면 통과다.');
   for (const id of day.talkCards) {
     const card = ctx.cards.get(id);
@@ -456,8 +479,8 @@ export function buildAll(root = ROOT) {
   // 그 커밋 전에 파일을 마지막으로 바꾼 정답 커밋 이름(예: answer(D03-3))
   const lastTouch = (sha, file) => {
     const out = git(root, ['log', '--format=%s', `${sha}^`, '--', SERVER_DIR + file]);
-    const m = out.split('\n').map((l) => l.match(/^answer\((D\d{2}-\d+)\):/)).find(Boolean);
-    return m ? `answer(${m[1]})` : null;
+    const m = out.split('\n').map((l) => l.match(/^(answer(?:-fix)?)\((D\d{2}-\d+)\):/)).find(Boolean);
+    return m ? `${m[1]}(${m[2]})` : null;
   };
   const warnings = [];
   const files = new Map();
@@ -466,7 +489,7 @@ export function buildAll(root = ROOT) {
     const hintsDay = hints.days[day.id];
     const ready = Boolean(hintsDay);
     const dayAnswers = answers.get(day.id);
-    if (ready) {
+    if (ready && day.phase === 'build') {
       for (const s of day.steps) {
         const commitsOf = dayAnswers?.steps.get(s.no) ?? [];
         if (!commitsOf.length) throw new Error(`${stepId(day.id, s.no)}: 정답 커밋이 없다`);
@@ -474,7 +497,7 @@ export function buildAll(root = ROOT) {
         for (const f of s.files) if (!touched.has(f)) warnings.push(`${stepId(day.id, s.no)}: roadmap 파일 ${f}을 정답 커밋이 건드리지 않는다`);
       }
     }
-    files.set(`course/spring/${day.id}.md`, renderDay(day, { root, roadmap, hints, hintsDay: hintsDay ?? {}, cards, specSections, answers: ready ? dayAnswers : null, filesOf, lastTouch, ready }));
+    files.set(`course/spring/${day.id}.md`, renderDay(day, { root, roadmap, hints, hintsDay: hintsDay ?? {}, cards, specSections, answers: ready && day.phase === 'build' ? dayAnswers : null, filesOf, lastTouch, ready }));
   }
   files.set('course/spring/README.md', renderIndex(roadmap, hints));
   return { files, skipped: null, warnings };
