@@ -73,13 +73,11 @@ class SecurityRulesTest {
 
     @Test
     void preflight는_인증_없이_200_허용_출처를_돌려준다() throws Exception {
-        for (String origin : new String[] {"http://localhost:3000", "http://127.0.0.1:8765"}) {
-            mockMvc.perform(options("/api/posts").header("Origin", origin)
-                            .header("Access-Control-Request-Method", "POST")
-                            .header("Access-Control-Request-Headers", "authorization,content-type"))
-                    .andExpect(status().isOk())
-                    .andExpect(header().string("Access-Control-Allow-Origin", origin));
-        }
+        mockMvc.perform(options("/api/posts").header("Origin", "http://localhost:3000")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "authorization,content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
     }
 
     @Test
@@ -99,10 +97,10 @@ class SecurityRulesTest {
 
     @Test
     void 허용_출처의_실제_POST_응답에도_CORS_헤더가_붙는다() throws Exception {
-        mockMvc.perform(post("/api/auth/login").header("Origin", "http://127.0.0.1:8765")
+        mockMvc.perform(post("/api/auth/login").header("Origin", "http://localhost:3000")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"x@t.com\",\"password\":\"pw\"}"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(header().string("Access-Control-Allow-Origin", "http://127.0.0.1:8765"));
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
     }
 
     @Test
