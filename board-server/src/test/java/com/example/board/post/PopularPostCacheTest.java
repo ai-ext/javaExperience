@@ -124,6 +124,67 @@ class PopularPostCacheTest extends ApiTestSupport {
         mockMvc.perform(get("/api/posts/popular").param("cursor", "!!!")).andExpect(status().isBadRequest());
     }
 
+    // 명세 2절·5-3: 인기글도 커서 목록이다. 상위 20개 안에서 작은 size로 끝까지 넘길 수 있어야 한다.
+    @Test
+    void size_1로_커서를_따라가면_상위_목록을_중복_누락_없이_끝까지_읽는다() throws Exception {
+        List<Long> expected = new ArrayList<>();
+        for (int i = 1; i <= 3; i++) {
+            expected.add(0, postWithLikes("글" + i, i)); // 좋아요 내림차순 = 나중에 넣은 글이 앞
+        }
+
+        assertThat(walk(1)).containsExactlyElementsOf(expected);
+    }
+
+    @Test
+    void 상위_20개를_size_7로_넘기면_7_7_6건이고_마지막_쪽의_nextCursor는_null이다() throws Exception {
+        List<Long> expected = new ArrayList<>();
+        for (int i = 1; i <= 25; i++) {
+            expected.add(0, postWithLikes("글" + i, i));
+        }
+
+        List<Integer> sizes = new ArrayList<>();
+        List<Long> ids = walk(7, sizes);
+
+        assertThat(sizes).containsExactly(7, 7, 6);
+        assertThat(ids).containsExactlyElementsOf(expected.subList(0, 20));
+    }
+
+    @Test
+    void 목록_끝을_넘는_커서는_빈_목록과_null이다() throws Exception {
+        postWithLikes("글", 1);
+
+        mockMvc.perform(get("/api/posts/popular").param("cursor", com.example.board.common.CursorPage.encode(100)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.nextCursor").doesNotExist());
+    }
+
+    private List<Long> walk(int size) throws Exception {
+        return walk(size, new ArrayList<>());
+    }
+
+    /** nextCursor가 null이 될 때까지 따라가며 id를 모은다. 쪽마다 받은 개수를 sizes에 남긴다. */
+    private List<Long> walk(int size, List<Integer> sizes) throws Exception {
+        List<Long> ids = new ArrayList<>();
+        String cursor = null;
+        for (int page = 0; page < 30; page++) {
+            var request = get("/api/posts/popular").param("size", String.valueOf(size));
+            if (cursor != null) {
+                request.param("cursor", cursor);
+            }
+            String body = mockMvc.perform(request).andExpect(status().isOk()).andReturn().getResponse()
+                    .getContentAsString();
+            List<Number> pageIds = com.jayway.jsonpath.JsonPath.read(body, "$.items[*].id");
+            sizes.add(pageIds.size());
+            pageIds.forEach(n -> ids.add(n.longValue()));
+            cursor = com.jayway.jsonpath.JsonPath.read(body, "$.nextCursor");
+            if (cursor == null) {
+                return ids;
+            }
+        }
+        throw new AssertionError("nextCursor가 끝나지 않는다: " + ids);
+    }
+
     @Test
     void 글을_삭제해_커밋하면_바로_다음_인기글_조회에_그_글이_없다() throws Exception {
         Long gone = postWithLikes("지울 글", 50);

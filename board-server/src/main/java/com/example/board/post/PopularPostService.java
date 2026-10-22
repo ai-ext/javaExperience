@@ -96,12 +96,17 @@ public class PopularPostService {
         guard.run("인기글 캐시 삭제", () -> redis.execute(BUMP_AND_DELETE, List.of(KEY, GEN_KEY)));
     }
 
-    /** 상위 20개 고정 목록이라 한 쪽뿐이다. size만큼 앞에서 자르고 nextCursor는 항상 null이다. */
+    /**
+     * 상위 20개 안에서 커서로 넘긴다(spec-v2 2절·5-3). 커서는 랭킹과 같이 다음 쪽이 시작하는 위치(0부터)다.
+     * 쪽 사이에 캐시가 새로 적재되면(무효화·TTL) 순위가 바뀐 만큼 겹치거나 빠질 수 있다. 순위 목록의 위치 커서가 가진 한계다.
+     */
     public CursorPage<PopularPost> page(String cursor, int size) {
-        // 커서 형식만 검사한다(서버가 준 적 없는 값은 400). 다음 쪽이 없으니 위치로는 쓰지 않는다.
-        CursorPage.decode(cursor);
+        Long after = CursorPage.decode(cursor);
         List<PopularPost> all = getPopular();
-        return new CursorPage<>(all.subList(0, Math.min(size, all.size())), null);
+        // 서버가 준 커서라도 그 사이 목록이 줄었을 수 있다. 끝을 넘으면 빈 마지막 쪽이다.
+        int from = (int) Math.min(after == null ? 0 : after, all.size());
+        int to = Math.min(from + size, all.size());
+        return new CursorPage<>(all.subList(from, to), to < all.size() ? CursorPage.encode(to) : null);
     }
 
     /** 없거나 Redis 장애면 null(= DB에서 읽는다). */
