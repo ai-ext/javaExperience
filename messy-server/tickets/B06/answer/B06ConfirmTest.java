@@ -93,8 +93,7 @@ class B06ConfirmTest extends ApiTestSupport {
         Member second = memberWithPoints(1000);
 
         Future<Integer> firstOrder = pool.submit(() -> order(first, itemId));
-        assertThat(waitUntil(5000, () -> webhookCalls.get() >= 1))
-                .as("준비 실패: 첫 주문의 구매 알림이 알림 서버에 닿지 않았다").isTrue();
+        require(waitUntil(5000, () -> webhookCalls.get() >= 1), "첫 주문의 구매 알림이 알림 서버에 닿지 않았다");
 
         Future<?> alter = pool.submit(() -> {
             try (Connection c = dataSource.getConnection(); Statement st = c.createStatement()) {
@@ -104,8 +103,8 @@ class B06ConfirmTest extends ApiTestSupport {
             return null;
         });
         // ALTER가 이미 끝났거나(락을 쥔 트랜잭션이 없음) 메타데이터 락을 기다리는 중이어야 "ALTER 뒤의 주문"을 볼 수 있다
-        assertThat(waitUntil(3000, () -> alter.isDone() || alterWaitingForMetadataLock()))
-                .as("준비 실패: ALTER가 끝나지도, 메타데이터 락 대기에 들어가지도 않았다").isTrue();
+        require(waitUntil(3000, () -> alter.isDone() || alterWaitingForMetadataLock()),
+                "ALTER가 끝나지도, 메타데이터 락 대기에 들어가지도 않았다");
 
         long start = System.nanoTime();
         Future<Integer> secondOrder = pool.submit(() -> order(second, itemId));
@@ -114,8 +113,8 @@ class B06ConfirmTest extends ApiTestSupport {
         long heldMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - firstWebhookAt.get());
         boolean alterWaiting = !alter.isDone() && alterWaitingForMetadataLock();
 
-        assertThat(heldMillis).as("준비 실패: 판정 시점에 첫 알림이 아직 응답을 기다리는 중이어야 한다(붙잡은 시간 ms)")
-                .isLessThan(HOLD_LIMIT_MILLIS);
+        require(heldMillis < HOLD_LIMIT_MILLIS,
+                "판정 시점에 첫 알림이 아직 응답을 기다리는 중이어야 한다(붙잡은 시간 %dms)".formatted(heldMillis));
         assertThat(applied)
                 .as("첫 주문의 알림이 끝나지 않은 동안 ALTER 뒤에 온 다른 회원의 주문이 4초 안에 반영됐다"
                         + "(기다린 시간 %dms, 판정 시점 ALTER 메타데이터 락 대기 중=%s)", elapsedMillis, alterWaiting)
@@ -125,6 +124,13 @@ class B06ConfirmTest extends ApiTestSupport {
         assertThat(secondOrder.get(20, TimeUnit.SECONDS)).as("다른 회원 주문 응답 코드").isEqualTo(201);
         assertThat(firstOrder.get(20, TimeUnit.SECONDS)).as("첫 주문 응답 코드").isEqualTo(201);
         alter.get(20, TimeUnit.SECONDS);
+    }
+
+    /** 준비 조건. 단언 실패(결함 증상)와 구분되도록 단언이 아닌 예외로 끝낸다. */
+    private static void require(boolean ok, String message) {
+        if (!ok) {
+            throw new IllegalStateException("준비 실패: " + message);
+        }
     }
 
     /** 알림 서버: 요청을 세고, 해제 신호가 올 때까지(최대 HOLD_LIMIT) 응답하지 않는다. */
