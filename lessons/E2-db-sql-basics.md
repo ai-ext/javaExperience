@@ -63,7 +63,7 @@ sql() { docker compose exec -T mysql mysql --default-character-set=utf8mb4 -t -u
 
 실행할 때마다 `mysql: [Warning] Using a password on the command line interface can be insecure.`가 한 줄 나온다. 비밀번호를 명령에 적었다는 경고일 뿐이라 무시해도 된다.
 
-아래 결과는 모두 **처음 상태(시드) 그대로인 DB**에서 실행한 것이다. 1-2 이후 단계를 하면서 글을 넣었다면 `dev`·`notice` 게시판 글과 `id`가 더 늘어 있을 수 있다. 처음 상태로 되돌리려면 이 저장소 루트에서 `docker compose down -v && docker compose up -d`(`community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`).
+아래 결과는 모두 **처음 상태(시드) 그대로인 DB**에서 실행한 것이다. 1-2 이후 단계를 하면서 글을 넣었다면 `dev`·`notice` 게시판 글과 `id`가 더 늘어 있을 수 있다. 처음 상태로 되돌리려면 이 저장소 루트에서 `docker compose down -v && docker compose up -d`(`community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다).
 
 ### 테이블 모양 보기
 

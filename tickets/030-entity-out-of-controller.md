@@ -10,7 +10,7 @@
 - 정리하면서 **글 작성 응답을 상세 응답과 같은 모양**으로 바꿔 주세요(조회·좋아요·댓글 수 포함). 그 외 모든 API의 동작·응답은 그대로여야 합니다.
 - **완료 조건**: 작성 응답이 상세 모양이고, 아래 회귀 가드가 전부 그대로 통과하고, 기존 테스트가 (필요한 만큼만 고쳐서) 통과한다.
 
-**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 김자바(`tok-kimjava`)가 자유 게시판에 글을 쓰고, 이스프링(`tok-lee`)이 댓글을 단다.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 김자바(`tok-kimjava`)가 자유 게시판에 글을 쓰고, 이스프링(`tok-lee`)이 댓글을 단다.
 
 ## 지금 코드
 

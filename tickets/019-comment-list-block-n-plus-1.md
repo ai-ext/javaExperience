@@ -10,7 +10,7 @@
 - 쿼리 수가 다시 늘지 않게 테스트로 고정해 주세요. 이번 티켓은 그 테스트(T1)까지가 완료 조건입니다.
 - **완료 조건**: 로그인 사용자가 댓글 8개짜리 글의 목록을 열 때 SQL 문장이 지금 20개 → 6개 이하, 댓글이 늘어도 그대로. 차단 규칙 결과는 지금과 같다.
 
-**DB 시작 상태**: `practice` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드를 practice 프로파일로 켜면(`./gradlew bootRun --args='--spring.profiles.active=practice'`) Flyway가 V2~V6을 적용한다. 글 97(작성자 회원 4)에 댓글 8개(최상위 6·답글 2)가 있다. 회원 7은 회원 2를, 14는 3을 차단했고 10↔11은 서로 차단했다. 토큰은 `tok-p07`처럼 `tok-p` + 회원 번호 두 자리.
+**DB 시작 상태**: `practice` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드를 practice 프로파일로 켜면(`./gradlew bootRun --args='--spring.profiles.active=practice'`) Flyway가 V2~V6을 적용한다. 글 97(작성자 회원 4)에 댓글 8개(최상위 6·답글 2)가 있다. 회원 7은 회원 2를, 14는 3을 차단했고 10↔11은 서로 차단했다. 토큰은 `tok-p07`처럼 `tok-p` + 회원 번호 두 자리.
 
 ## 지금 코드
 

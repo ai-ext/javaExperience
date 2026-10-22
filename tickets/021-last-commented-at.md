@@ -11,7 +11,7 @@
 - 댓글이 달리거나 지워질 때 값이 맞게 바뀌어야 합니다 — 가장 최근 댓글이 지워지면 그 전 댓글 시각으로 돌아갑니다.
 - **완료 조건**: 마이그레이션 직후와 댓글 작성·삭제 뒤 어느 시점에 봐도 모든 글의 값이 "살아 있는 댓글의 최댓값"과 같다.
 
-**DB 시작 상태**: `practice` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드를 practice 프로파일로 켜면 Flyway가 V2~V6을 적용한다 — **다음 마이그레이션 번호는 V7**. 댓글 351개 중 25개가 삭제돼 있고, 글 29처럼 **댓글이 지워진 것뿐인 글**이 5개, 글 100처럼 **가장 최근 댓글만 지워진 글**도 있다. 글 138은 댓글이 없다.
+**DB 시작 상태**: `practice` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드를 practice 프로파일로 켜면 Flyway가 V2~V6을 적용한다 — **다음 마이그레이션 번호는 V7**. 댓글 351개 중 25개가 삭제돼 있고, 글 29처럼 **댓글이 지워진 것뿐인 글**이 5개, 글 100처럼 **가장 최근 댓글만 지워진 글**도 있다. 글 138은 댓글이 없다.
 
 ## 지금 코드
 

@@ -11,7 +11,7 @@
 - 원인을 로그와 DB 잠금 정보로 설명해 주세요 — "동시에 와서"가 아니라 **어떤 잠금 두 개가 서로를 기다렸는지**.
 - **완료 조건**: 서로 다른 회원 8명이 같은 글에 동시에 댓글을 달면 8개 모두 `201`, 댓글 수가 정확히 8 오른다.
 
-**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 글 14(자유 게시판, 이스프링의 공개 글)에 동시성 회원 `tok-c01`~`tok-c08`이 댓글을 단다.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 글 14(자유 게시판, 이스프링의 공개 글)에 동시성 회원 `tok-c01`~`tok-c08`이 댓글을 단다.
 
 ## 지금 코드
 

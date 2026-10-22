@@ -12,7 +12,7 @@
 - 기존 댓글 옮기기(백필)는 **마이그레이션 안에서 한 번에 하지 말고**, 운영자가 여러 번 나눠 부를 수 있는 API로: 한 번에 몇 행 옮겼는지, 몇 행 남았는지 알려 주세요. 다시 불러도 안전해야 합니다.
 - **완료 조건**: 백필 API를 남은 행이 0이 될 때까지 부르면 끝, 1,200자 댓글이 그대로 저장·조회되고, 옛 컬럼에는 그 앞 1000자가 있다.
 
-**DB 시작 상태**: `practice` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드를 practice 프로파일로 켜면 Flyway가 V2~V6을 적용한다 — **다음 마이그레이션 번호는 V7**. 댓글 351개. 운영자는 `tok-p01`, 댓글은 리액트에서왔어요(`tok-p07`)가 댓글 없는 글 138에 단다(마지막에 지운다).
+**DB 시작 상태**: `practice` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드를 practice 프로파일로 켜면 Flyway가 V2~V6을 적용한다 — **다음 마이그레이션 번호는 V7**. 댓글 351개. 운영자는 `tok-p01`, 댓글은 리액트에서왔어요(`tok-p07`)가 댓글 없는 글 138에 단다(마지막에 지운다).
 
 ## 지금 코드
 

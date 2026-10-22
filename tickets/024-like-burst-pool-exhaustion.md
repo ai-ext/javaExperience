@@ -10,7 +10,7 @@
 - 좋아요·댓글 알림은 계속 만들어져야 합니다. 좋아요가 롤백되면 알림을 만들지 않는 규칙, 알림 저장이 실패해도 좋아요는 성공하는 규칙도 그대로입니다.
 - **완료 조건**: 회원 20명이 글 두 개에 동시에 좋아요(서로 다른 40건)를 눌러도 모두 몇 초 안에 `200`, 두 글의 좋아요 수가 각각 20, 잠시 뒤 알림이 40개 생긴다.
 
-**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 박디비(회원 4)의 글 15·17(자유글 04·06, 처음 좋아요 0)에 동시성 회원 `tok-c01`~`tok-c20`이 좋아요를 누른다. 커넥션 풀은 Spring Boot 기본(HikariCP 최대 10개)이다.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 박디비(회원 4)의 글 15·17(자유글 04·06, 처음 좋아요 0)에 동시성 회원 `tok-c01`~`tok-c20`이 좋아요를 누른다. 커넥션 풀은 Spring Boot 기본(HikariCP 최대 10개)이다.
 
 ## 지금 코드
 

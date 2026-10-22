@@ -233,7 +233,7 @@ Caused by: java.sql.SQLException: Access denied for user 'community'@'192.168.65
 
 **원인** — `community` 계정은 `community`·`practice` 두 DB만 쓸 수 있다. 없는 DB 이름은 "권한 없는 DB"로 취급되어 1044가 난다. 비밀번호가 틀리면 로그인 자체가 거절되어 1045가 난다.
 
-**고치는 법** — `url`의 `/community?` 부분 철자를 확인한다. `username`·`password`는 `community`/`community`다. 계정이 아예 없다고 나오면 먼저 `url`의 포트가 `13308`인지 본다. 다른 포트(예: `3306`)에 떠 있는 다른 MySQL에 붙으면 `community` 계정이 없다. 포트가 맞는데도 계정이 없으면 DB 볼륨이 이 저장소의 초기 데이터로 만들어지지 않은 것이다. 이 저장소 루트에서 `docker compose down -v && docker compose up -d`로 새로 만든다(그동안의 데이터가 지워진다. 남길 것이 있으면 먼저 `./docker/mysql/dump.sh`).
+**고치는 법** — `url`의 `/community?` 부분 철자를 확인한다. `username`·`password`는 `community`/`community`다. 계정이 아예 없다고 나오면 먼저 `url`의 포트가 `13308`인지 본다. 다른 포트(예: `3306`)에 떠 있는 다른 MySQL에 붙으면 `community` 계정이 없다. 포트가 맞는데도 계정이 없으면 DB 볼륨이 이 저장소의 초기 데이터로 만들어지지 않은 것이다. 이 저장소 루트에서 `docker compose down -v && docker compose up -d`로 새로 만든다(`community`·`practice`·`project` 세 DB와 CloudBeaver 작업 공간이 지워진다. 남길 것이 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않는다).
 
 **관련 단계** — [1-2 일부러 망가뜨리기](scenario/ch1-create-post/1-2-dto-response.md#일부러-망가뜨리기) · [R08 앱 서버와 DB 서버는 어떻게 연결되나](docs/knowledge/R08-app-to-db-connection.md)
 
