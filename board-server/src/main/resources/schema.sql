@@ -210,3 +210,17 @@ CREATE TABLE IF NOT EXISTS report (
     -- 관리자 신고 목록(status 필터 + id 커서)용
     KEY idx_report_status_id (status, id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id          BIGINT       NOT NULL AUTO_INCREMENT,
+    actor_id    BIGINT       NOT NULL,
+    action      VARCHAR(50)  NOT NULL,
+    target_type VARCHAR(30)  NOT NULL,
+    target_id   BIGINT       NULL,
+    detail      VARCHAR(500) NULL,
+    created_at  DATETIME(6)  NOT NULL,
+    updated_at  DATETIME(6)  NOT NULL,
+    -- 조회는 id 내림차순 커서뿐이라 PK 인덱스로 충분하다. 추가만 하고 수정·삭제하지 않는다.
+    -- 회원·글 FK는 두지 않는다. 기록은 대상 행이 바뀌거나 지워져도 그대로 남아야 한다.
+    PRIMARY KEY (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
