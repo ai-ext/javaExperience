@@ -8,11 +8,12 @@
 //                             같은 이름이라 answerTest 실행에서 classpath 맨 앞에 두면 학습자 자리를 가린다
 //
 // 태스크
-//   :java-track:test           main 기준 실행. 뼈대면 실패한다(학습자가 통과시킬 대상)
+//   :java-track:test           main 기준 실행. 뼈대면 실패한다(학습자가 통과시킬 대상). @Tag("optional") 선택 과제는 뺀다
+//   :java-track:optionalTest   main 기준으로 @Tag("optional") 선택 과제만 실행한다(J02·J07·J14)
 //   :java-track:answerTest     같은 테스트를 answer 클래스로 실행. 전부 통과해야 한다
 //   :java-track:skeletonTest   main 기준 실행을 실패 무시로 돌려 결과 XML만 남긴다(verifySkeleton 입력)
-//   :java-track:verifySkeleton J 테스트 클래스마다 뼈대 상태에서 실패가 1개 이상인지 확인
-//   :java-track:check          answerTest + verifySkeleton (test는 넣지 않는다)
+//   :java-track:verifySkeleton src/test의 J 테스트 클래스가 모두 실행됐고, 클래스마다 뼈대 상태에서 진짜 실패가 1개 이상인지 확인
+//   :java-track:check          answerTest + verifySkeleton (test는 넣지 않는다). 두 태스크 모두 선택 과제까지 실행한다
 
 plugins {
     id 'java'
@@ -72,6 +73,24 @@ tasks.withType(Test).configureEach {
     }
 }
 
+// 기본 완료 조건(`:java-track:test --tests 'J14*'`)에는 선택 과제를 넣지 않는다.
+tasks.named('test', Test) {
+    useJUnitPlatform {
+        excludeTags 'optional'
+    }
+}
+
+// 선택 과제만 따로 돌린다. 예: `./gradlew :java-track:optionalTest --tests 'J14*'`
+tasks.register('optionalTest', Test) {
+    description = '학습자 상태(main) 기준으로 @Tag("optional") 선택 과제만 실행한다.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'optional'
+    }
+}
+
 // answer 클래스를 main 클래스보다 앞에 둔다. 같은 이름의 클래스는 앞쪽이 로드되므로 정답이 뼈대를 가린다.
 // 테스트 바이트코드는 main 시그니처로 컴파일됐으므로 정답 시그니처가 다르면 NoSuchMethodError로 드러난다.
 // 정답 테스트(answerTest 소스 세트)는 그보다 더 앞에 둔다. 실행할 클래스 목록은 testClassesDirs(src/test)에서 정하고,
@@ -99,28 +118,95 @@ def skeletonTest = tasks.register('skeletonTest', Test) {
     }
 }
 
+// 뼈대 실패로 인정하지 않는 실패: 클래스를 올리거나 초기화하다 깨진 것. 학습 메서드가 미구현이라 난 실패가 아니다
+def notSkeletonFailureTypes = [
+        'java.lang.ExceptionInInitializerError',
+        'java.lang.NoClassDefFoundError',
+        'java.lang.ClassNotFoundException',
+        'java.lang.NoSuchMethodError',
+        'java.lang.NoSuchFieldError',
+        'java.lang.LinkageError',
+        'java.lang.VerifyError',
+] as Set
+// JUnit이 클래스 단위 실패(@BeforeAll 등)를 보고할 때 쓰는 가짜 테스트 이름
+def containerFailureNames = ['initializationError', 'classMethod', 'executionError'] as Set
+def testSourceDir = file('src/test/java')
+
 def verifySkeleton = tasks.register('verifySkeleton') {
-    description = 'J 테스트 클래스마다 뼈대 상태에서 실패가 1개 이상인지 확인한다(뼈대가 실수로 정답이 되지 않게).'
+    description = 'src/test의 J 테스트 클래스가 전부 뼈대 기준으로 실행됐고, 클래스마다 진짜 실패가 1개 이상인지 확인한다(뼈대가 실수로 정답이 되지 않게).'
     group = 'verification'
     dependsOn skeletonTest
+    inputs.dir(testSourceDir)
     doLast {
-        // 클래스(최상위 이름)마다 실패+오류 수를 모은다
-        def failuresByClass = [:].withDefault { 0 }
+        // 1) 필터를 건 skeletonTest 결과는 전체 검증이 아니다
+        def skeletonTask = skeletonTest.get()
+        def patterns = skeletonTask.filter.commandLineIncludePatterns + skeletonTask.filter.includePatterns
+        if (!patterns.isEmpty()) {
+            throw new GradleException("verifySkeleton: skeletonTest에 테스트 필터가 걸려 있습니다(${patterns.join(', ')}). 필터 없이 `:java-track:check`로 실행하세요.")
+        }
+
+        // 2) 기대 클래스 집합: src/test 안의 JNN…Test.java 파일 이름
+        def expected = [] as SortedSet
+        testSourceDir.eachFileRecurse(groovy.io.FileType.FILES) { file ->
+            def m = file.name =~ /^(J\d\d\w*Test)\.java$/
+            if (m.matches()) {
+                expected << m.group(1)
+            }
+        }
+        if (expected.isEmpty()) {
+            throw new GradleException('verifySkeleton: src/test에 J로 시작하는 테스트 클래스가 없습니다.')
+        }
+
+        // 3) XML에서 클래스(최상위 이름)마다 실행·건너뜀·진짜 실패 수를 모은다
+        def executed = [:].withDefault { 0 }
+        def skipped = [:].withDefault { 0 }
+        def realFailures = [:].withDefault { 0 }
         skeletonResultsDir.get().asFile.eachFileMatch(~/TEST-.*\.xml/) { file ->
             def suite = new groovy.xml.XmlSlurper().parse(file)
             def simpleName = suite.@name.toString().tokenize('.').last().tokenize('$').first()
-            if (simpleName ==~ /J\d\d.*/) {
-                failuresByClass[simpleName] += suite.@failures.toInteger() + suite.@errors.toInteger()
+            if (!(simpleName ==~ /J\d\d.*/)) {
+                return
+            }
+            executed[simpleName] += suite.@tests.toInteger()
+            skipped[simpleName] += suite.@skipped.toInteger()
+            suite.testcase.each { testcase ->
+                def caseName = testcase.@name.toString().replaceAll(/\(.*$/, '')
+                def problems = testcase.failure.list() + testcase.error.list()
+                def real = !containerFailureNames.contains(caseName) && problems.any { problem ->
+                    !notSkeletonFailureTypes.contains(problem.@type.toString())
+                }
+                if (real) {
+                    realFailures[simpleName] += 1
+                }
             }
         }
-        if (failuresByClass.isEmpty()) {
-            throw new GradleException('verifySkeleton: J로 시작하는 테스트 클래스 결과가 없습니다.')
+
+        def problems = []
+        def missing = expected - executed.keySet()
+        if (!missing.isEmpty()) {
+            problems << "결과가 없는 클래스(전체 실행이 아니거나 클래스가 올라가지 않음): ${missing.join(', ')}"
         }
-        def passedOnSkeleton = failuresByClass.findAll { it.value == 0 }.keySet().sort()
+        def unexpected = executed.keySet() - expected
+        if (!unexpected.isEmpty()) {
+            problems << "src/test에 없는 클래스의 결과(오래된 결과일 수 있음): ${unexpected.sort().join(', ')}"
+        }
+        def skippedClasses = expected.findAll { executed.containsKey(it) && skipped[it] > 0 }
+        if (!skippedClasses.isEmpty()) {
+            problems << "건너뛴 테스트가 있는 클래스: ${skippedClasses.join(', ')}"
+        }
+        def emptyClasses = expected.findAll { executed.containsKey(it) && executed[it] == skipped[it] }
+        if (!emptyClasses.isEmpty()) {
+            problems << "실행한 테스트가 없는 클래스: ${emptyClasses.join(', ')}"
+        }
+        def passedOnSkeleton = expected.findAll { executed.containsKey(it) && realFailures[it] == 0 }
         if (!passedOnSkeleton.isEmpty()) {
-            throw new GradleException("verifySkeleton: 뼈대 상태에서 실패가 하나도 없는 클래스가 있습니다(뼈대가 정답이 됐는지 확인): ${passedOnSkeleton.join(', ')}")
+            problems << "뼈대 상태에서 진짜 실패가 하나도 없는 클래스(뼈대가 정답이 됐거나 초기화 오류뿐): ${passedOnSkeleton.join(', ')}"
         }
-        logger.lifecycle("verifySkeleton: J 테스트 클래스 ${failuresByClass.size()}개 모두 뼈대 상태에서 실패함")
+        if (!problems.isEmpty()) {
+            throw new GradleException('verifySkeleton:\n  - ' + problems.join('\n  - '))
+        }
+        def totalFailures = realFailures.values().sum()
+        logger.lifecycle("verifySkeleton: J 테스트 클래스 ${expected.size()}개(src/test 기준) 모두 실행됐고, 모두 뼈대 상태에서 실패함(진짜 실패 ${totalFailures}건)")
     }
 }
 

@@ -119,7 +119,7 @@
 </tr>
 <tr>
 <td><code>Coupon.java</code></td>
-<td>private 생성자, <code>builder</code>, <code>issue</code>, <code>CouponBuilder</code>의 필드·메서드</td>
+<td>private 생성자, <code>issue</code> (기본) · <code>builder</code>, <code>CouponBuilder</code>의 필드·메서드 (선택)</td>
 <td>실무 습관</td>
 </tr>
 <tr>
@@ -280,21 +280,29 @@ public static List&lt;String&gt; splitTags(String raw)</code></pre>
 <p>주어진 <code>LeakyCoupon</code>은 <code>@Getter @Setter @NoArgsConstructor @AllArgsConstructor</code>를 붙인 쿠폰 엔티티를 delombok한 코드다. <code>new LeakyCoupon(1L, &quot;웰컴 쿠폰&quot;, 10, 50)</code>도, <code>setIssuedQuantity(999)</code>도 막지 못해 총량보다 많이 발급된 쿠폰이 생긴다.</p>
 <p>과제:</p>
 <ol>
-<li><code>Coupon</code>을 <code>@Getter @NoArgsConstructor(access = PROTECTED)</code> + private 생성자에 <code>@Builder</code>를 붙인 모양으로 손으로 채운다. 검사는 private 생성자 한 곳에 둔다(이름이 비었거나 총량이 1보다 작으면 <code>IllegalArgumentException</code>). 발급 수량은 <code>issue()</code>로만 바뀐다(소진이면 <code>IllegalStateException</code>).</li>
+<li><code>Coupon</code>을 <code>@Getter @NoArgsConstructor(access = PROTECTED)</code> + private 생성자 모양으로 손으로 채운다. 검사는 private 생성자 한 곳에 둔다(이름이 비었거나 총량이 1보다 작으면 <code>IllegalArgumentException</code>). 발급 수량은 <code>issue()</code>로만 바뀐다(소진이면 <code>IllegalStateException</code>). 기본 과제의 테스트는 주어진 같은 패키지 전용 팩토리 <code>Coupon.create(name, totalQuantity)</code>로 쿠폰을 만든다(Lombok에는 없는 메서드다. 빌더를 채우지 않아도 기본 과제를 풀 수 있게 둔 것이다).</li>
 <li><code>CouponIssueService</code>를 <code>@RequiredArgsConstructor</code>가 만들 모양으로 채운다. 쿠폰은 생성자로 받고, 받은 회원 id 집합은 선언에서 바로 만든다. <code>issue(memberId)</code>는 1인 1매다.</li>
+<li>(선택) <code>@Builder</code>가 private 생성자에 붙었을 때 만들 코드 — <code>public static CouponBuilder builder()</code>와 중첩 클래스 <code>CouponBuilder</code> — 를 손으로 채운다.</li>
 </ol>
 <p>테스트 — <code>J02HabitTest</code>:</p>
 <ul>
 <li><code>Setter와_전체_생성자가_열린_쿠폰은_총량을_넘는_발급_수량을_막지_못한다_Coupon은_막는다</code></li>
-<li><code>Coupon에는_public_생성자와_setter가_없고_빌더로만_만든다</code></li>
-<li><code>빌더는_이름을_붙여_값을_넣고_발급_수량은_0에서_시작한다</code></li>
-<li><code>빌더에서_총량을_빠뜨리면_0이_들어가_생성자_검사에_걸린다</code></li>
+<li><code>쿠폰은_이름과_총량을_검사해_만들고_발급_수량은_0에서_시작한다</code></li>
+<li><code>Coupon에는_public_생성자와_setter가_없다</code></li>
 <li><code>RequiredArgsConstructor는_선언에서_초기화하지_않은_final_필드만_받는다</code></li>
 <li><code>한_회원에게는_한_번만_발급한다</code></li>
 </ul>
+<p>선택 과제 테스트(<code>@Tag(&quot;optional&quot;)</code>, <code>./gradlew :java-track:optionalTest --tests &#39;J02*&#39;</code>):</p>
+<ul>
+<li><code>선택_빌더는_이름을_붙여_값을_넣고_발급_수량은_0에서_시작한다</code></li>
+<li><code>선택_빌더에서_총량을_빠뜨리면_0이_들어가_생성자_검사에_걸린다</code></li>
+</ul>
 <h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2>
 <pre><code class="language-bash">./gradlew :java-track:test --tests 'J02*'</code></pre>
-<p>23개가 모두 <code>PASSED</code>면 끝이다.</p>
+<p>22개가 모두 <code>PASSED</code>면 끝이다(빌더 선택 과제 테스트는 이 실행에서 빠진다).</p>
+<p>선택 과제는 따로 돌린다(기본 완료 조건에는 들어가지 않는다):</p>
+<pre><code class="language-bash">./gradlew :java-track:optionalTest --tests 'J02*'</code></pre>
+<p>2개가 모두 <code>PASSED</code>면 선택 과제도 끝이다.</p>
 <h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2>
 <details>
 <summary>펼치기</summary>
@@ -396,8 +404,9 @@ private Coupon(String name, int totalQuantity) {
     this.totalQuantity = totalQuantity;
 }
 
-public static CouponBuilder builder() {
-    return new CouponBuilder();
+// 주어진 코드(고치지 않는다): 기본 과제 테스트가 빌더 없이 쿠폰을 만드는 같은 패키지 전용 팩토리
+static Coupon create(String name, int totalQuantity) {
+    return new Coupon(name, totalQuantity);
 }
 
 public void issue() {
@@ -405,6 +414,11 @@ public void issue() {
         throw new IllegalStateException(&quot;쿠폰이 모두 소진되었습니다&quot;);
     }
     issuedQuantity++;
+}
+
+// 아래는 선택 과제(@Builder가 만드는 코드)
+public static CouponBuilder builder() {
+    return new CouponBuilder();
 }
 
 public static class CouponBuilder {

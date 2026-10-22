@@ -11,9 +11,14 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** 실무 습관: Lombok이 만드는 코드를 손으로 써 보고, 엔티티에서 @Setter·@AllArgsConstructor를 피하는 이유를 확인한다. */
+/**
+ * 실무 습관: Lombok이 만드는 코드를 손으로 써 보고, 엔티티에서 @Setter·@AllArgsConstructor를 피하는 이유를 확인한다.
+ * 빌더(@Builder) 테스트는 선택 과제다(@Tag("optional")). 기본 실행 {@code :java-track:test}에서는 빠지고
+ * {@code :java-track:optionalTest --tests 'J02*'}로 따로 돌린다. 기본 과제는 주어진 {@code Coupon.create}로 쿠폰을 만든다.
+ */
 class J02HabitTest {
 
     @Test
@@ -24,7 +29,7 @@ class J02HabitTest {
         leaky.setIssuedQuantity(999);
         assertThat(leaky.getIssuedQuantity()).isGreaterThan(leaky.getTotalQuantity());
 
-        Coupon coupon = Coupon.builder().name("웰컴 쿠폰").totalQuantity(1).build();
+        Coupon coupon = Coupon.create("웰컴 쿠폰", 1);
         coupon.issue();
 
         assertThatThrownBy(coupon::issue).isInstanceOf(IllegalStateException.class);
@@ -32,8 +37,21 @@ class J02HabitTest {
     }
 
     @Test
-    void Coupon에는_public_생성자와_setter가_없고_빌더로만_만든다() {
-        Coupon coupon = Coupon.builder().name("웰컴 쿠폰").totalQuantity(10).build();
+    void 쿠폰은_이름과_총량을_검사해_만들고_발급_수량은_0에서_시작한다() {
+        Coupon coupon = Coupon.create("웰컴 쿠폰", 10);
+
+        assertThat(coupon.getName()).isEqualTo("웰컴 쿠폰");
+        assertThat(coupon.getTotalQuantity()).isEqualTo(10);
+        assertThat(coupon.getIssuedQuantity()).isZero();
+        assertThat(coupon.getId()).isNull();
+        assertThatThrownBy(() -> Coupon.create(null, 10)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Coupon.create("  ", 10)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Coupon.create("웰컴 쿠폰", 0)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void Coupon에는_public_생성자와_setter가_없다() {
+        Coupon coupon = Coupon.create("웰컴 쿠폰", 10);
         assertThat(coupon.getName()).isEqualTo("웰컴 쿠폰");
 
         List<Constructor<?>> publicConstructors = Arrays.stream(Coupon.class.getDeclaredConstructors())
@@ -49,7 +67,8 @@ class J02HabitTest {
     }
 
     @Test
-    void 빌더는_이름을_붙여_값을_넣고_발급_수량은_0에서_시작한다() {
+    @Tag("optional")
+    void 선택_빌더는_이름을_붙여_값을_넣고_발급_수량은_0에서_시작한다() {
         // 생성자 new Coupon("웰컴 쿠폰", 10)과 달리, 어느 값이 이름이고 어느 값이 총량인지 호출부에 드러난다
         Coupon coupon = Coupon.builder()
                 .totalQuantity(10)
@@ -63,7 +82,8 @@ class J02HabitTest {
     }
 
     @Test
-    void 빌더에서_총량을_빠뜨리면_0이_들어가_생성자_검사에_걸린다() {
+    @Tag("optional")
+    void 선택_빌더에서_총량을_빠뜨리면_0이_들어가_생성자_검사에_걸린다() {
         Coupon.CouponBuilder builder = Coupon.builder().name("웰컴 쿠폰");
 
         // 빌더는 빠뜨린 값을 알려 주지 않는다. int 필드의 기본값 0이 그대로 생성자로 간다
@@ -72,7 +92,7 @@ class J02HabitTest {
 
     @Test
     void RequiredArgsConstructor는_선언에서_초기화하지_않은_final_필드만_받는다() {
-        Coupon coupon = Coupon.builder().name("웰컴 쿠폰").totalQuantity(10).build();
+        Coupon coupon = Coupon.create("웰컴 쿠폰", 10);
         CouponIssueService service = new CouponIssueService(coupon);
         assertThat(service.issue(1L)).isTrue();
 
@@ -93,7 +113,7 @@ class J02HabitTest {
 
     @Test
     void 한_회원에게는_한_번만_발급한다() {
-        Coupon coupon = Coupon.builder().name("웰컴 쿠폰").totalQuantity(10).build();
+        Coupon coupon = Coupon.create("웰컴 쿠폰", 10);
         CouponIssueService service = new CouponIssueService(coupon);
 
         assertThat(service.issue(1L)).isTrue();

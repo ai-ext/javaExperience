@@ -41,7 +41,7 @@ class J07HabitTest {
     void 결과를_돌면_닉네임이_처음_나온_순서대로_나온다() {
         Map<String, Long> ids = NicknameIndex.firstIdByNickname(ROWS);
 
-        // toMap의 기본 Map(HashMap)은 순서를 약속하지 않는다. 넣은 순서가 필요하면 그런 Map을 직접 고른다
+        // toMap은 어떤 Map을 돌려줄지 약속하지 않는다(지금 JDK는 HashMap이라 순서도 없다). 넣은 순서가 필요하면 그런 Map을 직접 고른다
         assertThat(ids.keySet()).containsExactly("자바초보", "스프링입문", "운영자");
     }
 

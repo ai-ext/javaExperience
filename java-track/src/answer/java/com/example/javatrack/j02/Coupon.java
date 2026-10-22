@@ -13,6 +13,7 @@ package com.example.javatrack.j02;
  * }
  * </pre>
  * setter와 public 생성자가 없다. 값은 빌더(→ private 생성자의 검사)로만 넣고, 발급 수량은 {@link #issue()}로만 바뀐다.
+ * 빌더({@link #builder()}·{@link CouponBuilder})는 선택 과제다. 기본 과제의 테스트는 주어진 {@link #create}로 쿠폰을 만든다.
  */
 public class Coupon {
 
@@ -38,7 +39,15 @@ public class Coupon {
         this.totalQuantity = totalQuantity;
     }
 
-    // @Builder가 만드는 static 메서드
+    /**
+     * 주어진 코드: 고치지 않는다. Lombok에는 없는 메서드로, 빌더(선택 과제)를 채우지 않아도 기본 과제를 풀 수 있게 둔
+     * 같은 패키지 전용 팩토리다. private 생성자를 부르므로 생성자의 검사를 그대로 거친다.
+     */
+    static Coupon create(String name, int totalQuantity) {
+        return new Coupon(name, totalQuantity);
+    }
+
+    // @Builder가 만드는 static 메서드(선택 과제)
     public static CouponBuilder builder() {
         return new CouponBuilder();
     }
@@ -68,7 +77,7 @@ public class Coupon {
         return issuedQuantity;
     }
 
-    /** {@code @Builder}가 만드는 중첩 클래스. 생성자 매개변수마다 필드와 같은 이름의 메서드가 있다. */
+    /** {@code @Builder}가 만드는 중첩 클래스(선택 과제). 생성자 매개변수마다 필드와 같은 이름의 메서드가 있다. */
     public static class CouponBuilder {
 
         private String name;

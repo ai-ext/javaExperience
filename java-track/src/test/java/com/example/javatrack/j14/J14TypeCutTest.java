@@ -4,9 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** 타입 한 컷(선택): double vs BigDecimal — 0.1 + 0.2, 금액 계산과 반올림. */
+/**
+ * 타입 한 컷(선택): double vs BigDecimal — 0.1 + 0.2, 금액 계산과 반올림.
+ * 선택 과제라 기본 실행({@code :java-track:test --tests 'J14*'})에서는 빠진다. {@code :java-track:optionalTest --tests 'J14*'}로 돌린다.
+ */
+@Tag("optional")
 class J14TypeCutTest {
 
     @Test
