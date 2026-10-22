@@ -95,4 +95,44 @@ class AuthApiTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].field").value("password"));
     }
+
+    ResultActions login(String email, String password) throws Exception {
+        String body = "{\"email\":\"%s\",\"password\":\"%s\"}".formatted(email, password);
+        return mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    @Test
+    void 로그인은_200_토큰을_돌려준다() throws Exception {
+        String email = email();
+        signup(email, "password1", nick()).andExpect(status().isCreated());
+
+        login(email, "password1")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.expiresIn").value(3600));
+    }
+
+    @Test
+    void 틀린_비밀번호와_없는_이메일은_같은_401() throws Exception {
+        String email = email();
+        signup(email, "password1", nick()).andExpect(status().isCreated());
+
+        String wrongPassword = login(email, "wrongpass1").andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("/errors/unauthorized"))
+                .andReturn().getResponse().getContentAsString();
+        String unknownEmail = login(email(), "password1").andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("/errors/unauthorized"))
+                .andReturn().getResponse().getContentAsString();
+
+        // detail까지 같아야 응답만으로 이메일 존재를 알 수 없다
+        assertThat(com.jayway.jsonpath.JsonPath.<String>read(wrongPassword, "$.detail"))
+                .isEqualTo(com.jayway.jsonpath.JsonPath.<String>read(unknownEmail, "$.detail"));
+    }
+
+    @Test
+    void 로그인_본문이_비면_400() throws Exception {
+        login("not-an-email", "").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("/errors/validation"));
+    }
 }

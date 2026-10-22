@@ -9,6 +9,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 public class SecurityConfig {
@@ -19,13 +20,15 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http, ProblemDetailSecurityHandler handler) throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity http, ProblemDetailSecurityHandler handler, JwtProvider jwtProvider)
+            throws Exception {
         http
                 // 토큰 기반 무상태 API라 세션·CSRF·기본 로그인 화면을 쓰지 않는다
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .addFilterBefore(new JwtAuthenticationFilter(jwtProvider), UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(e -> e.authenticationEntryPoint(handler).accessDeniedHandler(handler))
                 // 위에서부터 처음 매치된 규칙만 적용된다. 구체적인 규칙을 먼저, 마지막은 deny-by-default.
                 .authorizeHttpRequests(auth -> auth

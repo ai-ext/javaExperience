@@ -50,4 +50,17 @@ class SecurityRulesTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("/errors/unauthorized"));
     }
+
+    @Test
+    void 잘못된_토큰이어도_공개_경로는_통과한다() throws Exception {
+        mockMvc.perform(get("/actuator/health").header("Authorization", "Bearer garbage"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void 잘못된_토큰으로_보호_경로는_401() throws Exception {
+        mockMvc.perform(get("/api/members/me").header("Authorization", "Bearer garbage"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("/errors/unauthorized"));
+    }
 }

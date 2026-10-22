@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.board.common.BusinessException;
+import com.example.board.config.JwtProvider;
 import com.example.board.common.ErrorCode;
 import com.example.board.common.NicknameNormalizer;
 
@@ -14,10 +15,28 @@ public class AuthService {
 
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtProvider jwtProvider;
 
-    public AuthService(MemberRepository memberRepository, PasswordEncoder passwordEncoder) {
+    // 없는 이메일에도 해시 비교를 한 번 하도록 둔 더미 해시(응답 시간으로 이메일 존재를 추측하지 못하게)
+    private final String dummyHash;
+
+    public AuthService(MemberRepository memberRepository, PasswordEncoder passwordEncoder, JwtProvider jwtProvider) {
         this.memberRepository = memberRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtProvider = jwtProvider;
+        this.dummyHash = passwordEncoder.encode("dummy-password");
+    }
+
+    @Transactional(readOnly = true)
+    public TokenResponse login(LoginRequest request) {
+        Member member = memberRepository.findByEmail(request.email()).orElse(null);
+        boolean matches = passwordEncoder.matches(request.password(), member == null ? dummyHash : member.getPasswordHash());
+        if (member == null || !matches) {
+            // 이메일·비밀번호 중 무엇이 틀렸는지 알리지 않는다
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다.");
+        }
+        return new TokenResponse(jwtProvider.issue(member.getId(), member.getRole()), "Bearer",
+                jwtProvider.expiresInSeconds());
     }
 
     @Transactional

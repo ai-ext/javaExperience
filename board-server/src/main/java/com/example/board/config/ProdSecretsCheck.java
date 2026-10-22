@@ -14,7 +14,7 @@ import org.springframework.core.env.Environment;
 @Profile("prod")
 public class ProdSecretsCheck {
 
-    private static final String[] REQUIRED_KEYS = {"spring.datasource.password"};
+    private static final String[] REQUIRED_KEYS = {"spring.datasource.password", "board.jwt.secret"};
 
     @Bean
     static BeanFactoryPostProcessor requiredSecretsCheck(Environment env) {

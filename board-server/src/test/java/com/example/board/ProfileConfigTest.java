@@ -55,6 +55,18 @@ class ProfileConfigTest {
     }
 
     @Test
+    void prod는_BOARD_JWT_SECRET_없이_기동하면_실패한다() {
+        assumeTrue(System.getenv("BOARD_JWT_SECRET") == null, "BOARD_JWT_SECRET이 설정된 환경에서는 건너뛴다");
+
+        assertThatThrownBy(() -> new SpringApplicationBuilder(BoardApplication.class)
+                .profiles("prod")
+                .web(WebApplicationType.NONE)
+                .run("--spring.main.banner-mode=off", "--DB_URL=jdbc:mysql://localhost:1/x", "--DB_USERNAME=u",
+                        "--DB_PASSWORD=p"))
+                .hasStackTraceContaining("Could not resolve placeholder 'BOARD_JWT_SECRET'");
+    }
+
+    @Test
     void local_yml에_server_port가_있다() throws Exception {
         assertThat(flatten("/application-local.yml")).containsKey("server.port");
     }

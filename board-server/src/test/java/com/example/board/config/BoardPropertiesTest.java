@@ -18,7 +18,8 @@ class BoardPropertiesTest {
 
     @Test
     void forbidden_words_값이_객체로_바인딩된다() {
-        runner.withPropertyValues("board.forbidden-words.ignore-case=true")
+        runner.withPropertyValues("board.forbidden-words.ignore-case=true",
+                        "board.jwt.secret=0123456789abcdef0123456789abcdef", "board.jwt.expires-in-seconds=3600")
                 .run(ctx -> {
                     assertThat(ctx).hasNotFailed();
                     assertThat(ctx.getBean(BoardProperties.class).forbiddenWords().ignoreCase()).isTrue();
