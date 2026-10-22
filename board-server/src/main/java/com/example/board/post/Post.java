@@ -1,5 +1,9 @@
 package com.example.board.post;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,6 +14,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 import com.example.board.common.BaseEntity;
@@ -47,6 +52,9 @@ public class Post extends BaseEntity {
     @Column(name = "like_count", nullable = false)
     private int likeCount;
 
+    @OneToMany(mappedBy = "post", cascade = CascadeType.PERSIST)
+    private List<PostTag> postTags = new ArrayList<>();
+
     private Post(Member member, String title, String content) {
         this.member = member;
         this.title = title;
@@ -56,5 +64,9 @@ public class Post extends BaseEntity {
 
     public static Post create(Member member, String title, String content) {
         return new Post(member, title, content);
+    }
+
+    public void addTag(Tag tag) {
+        postTags.add(PostTag.create(this, tag));
     }
 }

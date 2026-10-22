@@ -45,3 +45,24 @@ CREATE TABLE IF NOT EXISTS post (
     -- 목록 조회(status 필터 + id 커서)용
     KEY idx_post_status_id (status, id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS tag (
+    id         BIGINT      NOT NULL AUTO_INCREMENT,
+    name       VARCHAR(20) NOT NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_tag_name (name)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS post_tag (
+    id         BIGINT      NOT NULL AUTO_INCREMENT,
+    post_id    BIGINT      NOT NULL,
+    tag_id     BIGINT      NOT NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_post_tag_post FOREIGN KEY (post_id) REFERENCES post (id),
+    CONSTRAINT fk_post_tag_tag FOREIGN KEY (tag_id) REFERENCES tag (id),
+    UNIQUE KEY uk_post_tag_post_tag (post_id, tag_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
