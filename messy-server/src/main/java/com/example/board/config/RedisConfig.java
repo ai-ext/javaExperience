@@ -7,8 +7,8 @@ import org.springframework.context.annotation.Configuration;
 import io.lettuce.core.ClientOptions;
 
 /**
- * Lettuce 연결 동작. 명령 타임아웃(500ms)·연결 타임아웃은 application.yml의 spring.data.redis.* 값이다.
- * Redis는 캐시·거름망이라 없어도 서비스가 돌아야 한다. 그래서 기다리지 않고 빨리 실패하게 둔다.
+ * Lettuce 연결 동작. 연결 타임아웃은 application.yml의 spring.data.redis.connect-timeout 값이다.
+ * Redis는 캐시·거름망이라 없어도 서비스가 돌아야 한다. 그래서 붙지 못하면 기다리지 않고 빨리 실패하게 둔다.
  */
 @Configuration
 public class RedisConfig {

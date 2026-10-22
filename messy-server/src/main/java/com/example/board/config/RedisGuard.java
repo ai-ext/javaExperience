@@ -5,13 +5,12 @@ import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.stereotype.Component;
 
 /**
- * Redis 호출을 감싸 실패를 호출자에게 올리지 않고 폴백 값으로 바꾼다(경고 로그만 남긴다).
- * 한 번 실패하면 잠시 Redis를 부르지 않는다. 지연 장애 때 명령마다 타임아웃(500ms)을 기다리면
- * 글 작성처럼 Redis를 여러 번 부르는 요청이 1초를 넘기고, 끊김 장애는 REJECT_COMMANDS로 이미 바로 실패한다.
+ * Redis에 붙지 못할 때 호출을 폴백 값으로 바꾼다(경고 로그만 남긴다). 한 번 연결에 실패하면 잠시 Redis를 부르지 않는다.
+ * 연결 실패만 삼키고 나머지 명령 오류는 그대로 올린다. 데이터·스크립트 문제까지 삼키면 캐시가 조용히 틀어진 채로 남는다.
  */
 @Component
 public class RedisGuard {
@@ -28,7 +27,7 @@ public class RedisGuard {
         }
         try {
             return action.get();
-        } catch (DataAccessException e) {
+        } catch (RedisConnectionFailureException e) {
             skipUntil = System.nanoTime() + SKIP_AFTER_FAILURE.toNanos();
             log.warn("Redis {} 실패, {}초 동안 Redis 없이 처리한다: {}", operation, SKIP_AFTER_FAILURE.toSeconds(),
                     e.toString());
