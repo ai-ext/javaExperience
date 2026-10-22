@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { ROOT, EXTRA_COMMITS, HEADER, buildAll, listAnswerCommits, commitFiles, netFixFiles, collectAnswers, specLinks, parseSpecSections, parseTalkCards, renderDay, fence, stepId } from './build-days.mjs';
+import { ROOT, EXTRA_COMMITS, DEFERRED_FIXES, HEADER, buildAll, fixPlacementErrors, publicBasis, listAnswerCommits, commitFiles, netFixFiles, collectAnswers, specLinks, parseSpecSections, parseTalkCards, renderDay, fence, stepId } from './build-days.mjs';
 import { stripFences, parseDayPage } from './validate.mjs';
 
 const roadmap = JSON.parse(fs.readFileSync(path.join(ROOT, 'course/roadmap.json'), 'utf8'));
@@ -125,7 +125,8 @@ test('정답 블록은 그 순서(Dnn-m) 커밋의 board-server 파일과 내용
   for (const d of readyDays) {
     const { blocks, errs } = answerBlockErrors(d.id, page(d.id));
     const extras = Object.keys(EXTRA_COMMITS).filter((k) => k.startsWith(`${d.id}-`) && EXTRA_COMMITS[k].extra).length;
-    assert.equal(blocks, d.steps.length + extras, `${d.id}: 정답 블록 수`);
+    const deferred = Object.keys(DEFERRED_FIXES).filter((k) => k.startsWith(`${d.id}-`)).length;
+    assert.equal(blocks, d.steps.length + extras + deferred, `${d.id}: 정답 블록 수`);
     assert.deepEqual(errs, [], d.id);
   }
 });
@@ -222,7 +223,7 @@ test('2단계·마무리 날도 hints가 생기면 완성 페이지로 만든다
   assert.deepEqual(parseDayPage(md15).cards, d15.talkCards);
 });
 
-test('answer-fix(Dnn-m)는 순서 수에 넣지 않고, 그 순서 원래 커밋 뒤에 보완으로 붙고, snapshot은 가장 나중 커밋이다', () => {
+test('answer-fix(Dnn-m)는 순서 수에 넣지 않고, 그 순서 원래 커밋 뒤에 보완으로 붙고, snapshot은 그날 마지막 answer 커밋이다', () => {
   const fix = { sha: 'f'.repeat(40), subject: 'answer-fix(D09-3): 리뷰 반영', kind: 'fix', day: 'D09', m: 3, title: '리뷰 반영' };
   const fixExtra = { sha: 'e'.repeat(40), subject: 'answer-fix(D08-6): 리뷰 반영', kind: 'fix', day: 'D08', m: 6, title: '리뷰 반영' };
   const list = [...allCommits, fix, fixExtra];
@@ -233,7 +234,10 @@ test('answer-fix(Dnn-m)는 순서 수에 넣지 않고, 그 순서 원래 커밋
   const step3 = answers.get('D09').steps.get(3);
   assert.equal(step3[0].kind, 'answer');
   assert.equal(step3.at(-1).sha, fix.sha);
-  assert.equal(answers.get('D09').last.sha, fix.sha);
+  // snapshot 기준은 answer 커밋만 본다. answer-fix 트리에는 뒤 날 코드가 섞인다
+  const lastAnswer = list.filter((c) => c.day === 'D09' && c.kind === 'answer').at(-1);
+  assert.equal(answers.get('D09').last.sha, lastAnswer.sha);
+  assert.equal(answers.get('D09').lastFix.sha, fix.sha);
   assert.equal(answers.get('D08').extras.get('D08-6').at(-1).sha, fixExtra.sha);
   // 렌더링: 원래 커밋 코드 다음에 "보완"
   const cache = new Map();
@@ -255,7 +259,9 @@ test('answer-fix(Dnn-m)는 순서 수에 넣지 않고, 그 순서 원래 커밋
   assert.ok(orig >= 0 && extra > orig, '보완은 원래 커밋 코드 뒤에 온다');
   assert.ok(block.indexOf(`- [\`${fix.sha.slice(0, 8)}\`](`) > extra, '보완 커밋은 보완 이력 목록에 남는다');
   assert.ok(block.includes('PostCacheEvictListener.java` (바뀐 부분)\n\n```diff\n@@ -1 +1 @@\n-a\n+b'), '보완 코드는 순 변경으로 싣는다');
-  assert.ok(md.includes(`/tree/${fix.sha}/board-server`), 'snapshot은 가장 나중 커밋');
+  assert.ok(md.includes(`/tree/${lastAnswer.sha}/board-server`), 'snapshot은 그날 마지막 answer 커밋');
+  assert.ok(!md.includes(`/tree/${fix.sha}/`), 'answer-fix 커밋을 snapshot으로 쓰지 않는다');
+  assert.ok(md.includes('[보완 반영 최신 코드: main의 board-server]('), '보완이 있는 날은 최신 코드 링크를 따로 둔다');
   // 원래 커밋 없이 answer-fix만 있으면 멈춘다
   const orphan = list.filter((c) => !(c.day === 'D09' && c.m === 3 && c.kind === 'answer'));
   assert.throws(() => collectAnswers(roadmap, ROOT, orphan.filter((c) => c.day !== 'D09' || c.m !== 3 || c.kind === 'fix')), /answer-fix/);
@@ -389,4 +395,67 @@ test('보완 패치가 다른 순서 커밋과 겹쳐 적용되지 않으면 생
   ], (repo, commits) => {
     assert.throws(() => netFixFiles(commits.filter((c) => c.kind === 'fix' && c.m === 1), repo), /D09-1: answer-fix [0-9a-f]{8}\(answer-fix\(D09-1\): 셋째 줄\)의 패치/);
   });
+});
+
+test('snapshot: 보완이 있는 날도 그날 마지막 answer 커밋(태그 answer-dNN)을 가리키고, 보완 없는 날에는 최신 코드 안내가 없다', () => {
+  const answers = collectAnswers(roadmap, ROOT);
+  const g = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
+  for (const d of readyDays) {
+    const entry = answers.get(d.id);
+    const md = page(d.id);
+    const snap = md.slice(md.indexOf('## 날짜별 snapshot'));
+    assert.equal(entry.last.kind, 'answer', d.id);
+    assert.ok(snap.includes(`/tree/${entry.last.sha}/board-server`), `${d.id}: snapshot 링크`);
+    assert.equal(snap.includes('보완 반영 최신 코드'), Boolean(entry.lastFix), `${d.id}: 최신 코드 안내`);
+    // 태그가 문서 커밋을 가리키는 날(D06)도 있으므로 board-server 트리로 비교한다
+    let tag = null;
+    try { tag = g(['rev-parse', '--verify', '-q', `answer-${d.id.toLowerCase()}^{commit}:board-server`]); } catch { /* 태그 없는 복제 */ }
+    if (tag) assert.equal(g(['rev-parse', `${entry.last.sha}:board-server`]), tag, `${d.id}: snapshot과 태그 answer-${d.id.toLowerCase()}의 board-server`);
+  }
+});
+
+test('뒤 순서 코드에 기대는 보완(D09-1)은 원래 순서 칸에서 빼고 after 순서 칸 뒤에 싣는다', () => {
+  const md = page('D09');
+  const rule = DEFERRED_FIXES['D09-1'];
+  const fixes = allCommits.filter((c) => c.kind === 'fix' && c.day === 'D09' && c.m === 1);
+  assert.ok(fixes.length >= 1);
+  const own = md.match(/<details class="step-answer" data-step="D09-1" data-commits="([^"]+)">([\s\S]*?)\n<\/details>/);
+  for (const c of fixes) assert.ok(!own[1].includes(c.sha), '원래 순서 칸에는 보완 커밋이 없다');
+  assert.ok(!own[2].includes('**보완 이력**'));
+  assert.ok(own[2].includes('](#fix-d09-1)'), '원래 순서 칸이 보완 칸을 가리킨다');
+  const sec = md.indexOf('<section class="day-step-extra" id="fix-d09-1" data-commit="D09-1">');
+  const after = md.indexOf(`<section class="day-step" id="step-d09-${rule.after}"`);
+  const next = md.indexOf(`<section class="day-step" id="step-d09-${rule.after + 1}"`);
+  assert.ok(after >= 0 && sec > after && (next < 0 || sec < next), 'after 순서 칸 바로 뒤');
+  const block = md.slice(sec).match(/<details class="step-answer" data-step="D09-1" data-commits="([^"]+)">/);
+  assert.deepEqual(block[1].split(' '), fixes.map((c) => c.sha));
+  // 규칙이 없으면 생성기 검사가 잡는다: 그 보완은 D09-1 시점 코드에 붙지 않는다
+  const answers = collectAnswers(roadmap, ROOT);
+  assert.deepEqual(fixPlacementErrors('D09', answers.get('D09'), ROOT), []);
+  const errs = fixPlacementErrors('D09', answers.get('D09'), ROOT, {});
+  assert.equal(errs.length, 1);
+  assert.match(errs[0], /^D09-1: answer-fix [0-9a-f]{8}.*DEFERRED_FIXES/);
+});
+
+test('보완 적용 시점 검사: 뒤 순서 코드를 문맥으로 쓰는 보완은 규칙 없이 멈추고, after 규칙이 있으면 통과한다', () => {
+  tempRepo([
+    ['answer(D09-1): 시작', { 'a.txt': lines() }],
+    ['answer(D09-2): 다른 파일', { 'b.txt': 'b\n' }],
+    ['answer(D09-3): 열째 줄', { 'a.txt': lines({ 10: 'Z10' }) }],
+    ['answer-fix(D09-1): 열한째 줄(③의 열째 줄이 문맥)', { 'a.txt': lines({ 10: 'Z10', 11: 'X11' }) }],
+  ], (repo, commits) => {
+    const day = { id: 'D09', steps: [1, 2, 3].map((no) => ({ no })) };
+    const entry = collectAnswers({ days: [day] }, repo, commits).get('D09');
+    assert.match(fixPlacementErrors('D09', entry, repo, {}).join('\n'), /^D09-1: answer-fix/);
+    assert.deepEqual(fixPlacementErrors('D09', entry, repo, { 'D09-1': { after: 3, note: '' } }), []);
+    assert.match(fixPlacementErrors('D09', entry, repo, { 'D09-1': { after: 1, note: '' } }).join('\n'), /뒤 순서여야/);
+  });
+});
+
+test('말하기 카드 근거는 페이지에 명세 절만 싣는다(저장소 밖 자료 번호는 뺀다)', () => {
+  assert.equal(publicBasis('10 §8, spec-v2 §5-5, spec-v2 §7'), 'spec-v2 §5-5, spec-v2 §7');
+  assert.equal(publicBasis('06 §15'), '');
+  for (const d of readyDays) {
+    for (const [, basis] of page(d.id).matchAll(/^\*\*근거\*\* (.+)$/gm)) assert.match(basis, /^spec-v2 §[\d-]+(, spec-v2 §[\d-]+)*$/, d.id);
+  }
 });

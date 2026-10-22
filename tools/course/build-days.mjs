@@ -21,6 +21,12 @@ export const EXTRA_COMMITS = {
   'D08-6': { extra: true, title: '보충: Hikari 운영 값과 타임아웃 테스트 안정화', note: '순서표에 없는 보충 커밋이다. 명세 8절의 Hikari 운영 값을 설정에 옮기고 타임아웃 테스트를 안정화한다.' },
 };
 
+// 보완(answer-fix)이 뒤 순서 코드에 기대고 있어 그 순서 시점 코드에 붙지 않는 경우: after 순서 칸 뒤에 따로 싣는다.
+// 여기 없는 보완이 제 순서 시점 코드에 붙지 않으면 생성기가 멈춘다(fixPlacementErrors).
+export const DEFERRED_FIXES = {
+  'D09-1': { after: 3, note: '이 diff는 ③의 보완(옛 인기글 목록 다시 쓰기 막기)에서 생기는 `GEN_KEY`·`BUMP_AND_DELETE`와 ③의 삭제 테스트를 문맥 줄로 쓴다.' },
+};
+
 // Gradle이 만드는 실행 스크립트는 내용을 싣지 않는다.
 const GENERATED_FILES = new Set(['gradlew', 'gradlew.bat']);
 
@@ -144,15 +150,16 @@ export function netFixFiles(fixes, root = ROOT) {
   }
 }
 
-// 일자별 정답: Map(day → { steps: Map(no → [commit]), extras: Map(Dnn-m → [commit]), last: commit })
+// 일자별 정답: Map(day → { steps: Map(no → [commit]), extras: Map(Dnn-m → [commit]), last: commit, lastFix: commit | null })
 // 한 순서의 커밋 목록은 원래 answer 커밋(들) 다음에 같은 Dnn-m의 answer-fix 커밋이 시간순으로 붙는다.
-// last는 그날 answer·answer-fix 중 가장 나중 커밋(snapshot 기준)이다.
+// last는 그날 answer 커밋 중 가장 나중 커밋(snapshot 기준)이다. answer-fix는 다음 날 이후 커밋 뒤에 만들어질 수 있어
+// 그 트리에는 뒤 날 코드가 섞이므로 snapshot으로 쓰지 않는다. lastFix는 그날 순서의 answer-fix 중 가장 나중 커밋이다.
 export function collectAnswers(roadmap, root = ROOT, commits = listAnswerCommits(root)) {
   const byDay = new Map();
   for (const c of commits) {
     const day = roadmap.days.find((d) => d.id === c.day);
     if (!day) throw new Error(`roadmap에 없는 날의 정답 커밋: ${c.subject}`);
-    if (!byDay.has(c.day)) byDay.set(c.day, { steps: new Map(), extras: new Map(), last: null });
+    if (!byDay.has(c.day)) byDay.set(c.day, { steps: new Map(), extras: new Map(), last: null, lastFix: null });
     const entry = byDay.get(c.day);
     const key = stepId(c.day, c.m);
     const rule = EXTRA_COMMITS[key];
@@ -166,7 +173,8 @@ export function collectAnswers(roadmap, root = ROOT, commits = listAnswerCommits
       if (!entry.steps.has(no)) entry.steps.set(no, []);
       entry.steps.get(no).push({ ...c, rule });
     }
-    entry.last = c;
+    if (c.kind === 'fix') entry.lastFix = c;
+    else entry.last = c;
   }
   // answer-fix가 원래 answer 커밋보다 앞에 오지 않게 한다(원래 커밋 → 보완 순서)
   for (const entry of byDay.values()) {
@@ -175,6 +183,55 @@ export function collectAnswers(roadmap, root = ROOT, commits = listAnswerCommits
     }
   }
   return byDay;
+}
+
+// 보완을 싣는 자리(순서 번호): DEFERRED_FIXES가 있으면 after, 없으면 제 순서
+export const fixPlace = (day, no, deferred = DEFERRED_FIXES) => deferred[stepId(day, no)]?.after ?? no;
+
+// 순서마다 보완(answer-fix)이 싣는 자리 시점 코드에 붙는지 검사해 오류 목록을 돌려준다.
+// 시점 코드 = 그 자리 순서의 마지막 answer 커밋 트리 + 같은 날 자리가 그 순서 이하인 보완들(시간순).
+// 붙지 않으면 그 보완 diff의 문맥이 아직 없는 뒤 순서 코드라는 뜻이다. 작업 트리·저장소 index는 건드리지 않는다.
+export function fixPlacementErrors(dayId, entry, root = ROOT, deferred = DEFERRED_FIXES) {
+  const errs = [];
+  const fixesOf = (no) => (entry.steps.get(no) ?? []).filter((c) => c.kind === 'fix');
+  const withFixes = [...entry.steps.keys()].filter((no) => fixesOf(no).length);
+  for (const [key, rule] of Object.entries(deferred)) {
+    if (!key.startsWith(`${dayId}-`)) continue;
+    const no = Number(key.split('-')[1]);
+    if (!fixesOf(no).length) errs.push(`${key}: DEFERRED_FIXES에 있지만 보완 커밋이 없다`);
+    if (!entry.steps.has(rule.after) || rule.after <= no) errs.push(`${key}: DEFERRED_FIXES.after(${rule.after})는 뒤 순서여야 한다`);
+  }
+  if (errs.length) return errs;
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'build-days-place-'));
+  try {
+    const env = { ...process.env, GIT_INDEX_FILE: path.join(tmp, 'index') };
+    const order = new Map(listAnswerCommits(root).map((c, i) => [c.sha, i]));
+    for (const no of withFixes) {
+      const place = fixPlace(dayId, no, deferred);
+      const base = entry.steps.get(place).filter((c) => c.kind !== 'fix').at(-1);
+      const fixes = withFixes.filter((n) => fixPlace(dayId, n, deferred) <= place).flatMap(fixesOf);
+      fixes.sort((a, b) => order.get(a.sha) - order.get(b.sha));
+      git(root, ['read-tree', base.sha], env);
+      for (const c of fixes) {
+        const patch = git(root, ['show', '--format=', '--no-renames', '--no-ext-diff', '--no-textconv', '--no-color', '--binary', '--full-index', '--diff-algorithm=myers', '-U3', c.sha, '--', SERVER_DIR]);
+        if (!patch.trim()) continue;
+        const file = path.join(tmp, 'patch');
+        fs.writeFileSync(file, patch);
+        try {
+          git(root, ['apply', '--cached', '--whitespace=nowarn', file], env);
+        } catch {
+          const own = c.m === no;
+          errs.push(own
+            ? `${stepId(dayId, no)}: answer-fix ${c.sha.slice(0, 8)}(${c.subject})가 ${place === no ? '이 순서' : `${circled(place)}`}까지의 코드에 붙지 않는다(뒤 순서 코드에 기댄다). DEFERRED_FIXES에 적용 시점(after)을 적는다`
+            : `${stepId(dayId, no)}: 앞서 적용할 보완 ${c.sha.slice(0, 8)}(${c.subject})가 ${circled(place)} 시점 코드에 붙지 않는다`);
+          break;
+        }
+      }
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+  return errs;
 }
 
 // ---------------------------------------------------------------- 재료 읽기
@@ -283,22 +340,26 @@ function renderFixAnswer(fixes, files, stepFiles) {
   return lines.join('\n');
 }
 
-function answerBlock(dataStep, commits, stepFiles, filesOf, lastTouch, fixFilesOf) {
+// deferred: 이 순서 보완을 뒤 순서 칸 뒤에 따로 싣는 경우 { after, note }. 이 블록에는 원래 커밋만 싣고 그 칸을 가리킨다.
+function answerBlock(dataStep, commits, stepFiles, filesOf, lastTouch, fixFilesOf, deferred) {
   const originals = commits.filter((c) => c.kind !== 'fix');
-  const fixes = commits.filter((c) => c.kind === 'fix');
+  const fixes = deferred ? [] : commits.filter((c) => c.kind === 'fix');
   const fixFiles = fixes.length ? fixFilesOf(fixes) : [];
   const all = [...originals.flatMap((c) => filesOf(c.sha)), ...fixFiles];
   const names = originals.map((c) => `answer(${stepId(c.day, c.m)})`).join(' + ') + (fixes.length ? ` + 보완 ${fixes.length}개` : '');
-  const touched = new Set(all.map((f) => f.path));
+  // 보완을 뒤로 미룬 순서도 "만들 파일" 대조는 원래 커밋과 그 보완을 함께 본다
+  const touched = new Set([...all, ...(deferred ? fixFilesOf(commits.filter((c) => c.kind === 'fix')) : [])].map((f) => f.path));
   const untouched = stepFiles.filter((f) => !touched.has(f)).map((f) => {
     const prev = lastTouch?.(commits[0].sha, f);
     return `- \`${f}\` — 이 순서에서는 바뀌지 않는다. ${prev ? `앞선 ${prev}에서 만든 코드를 그대로 쓴다.` : '앞선 순서에서 만든 코드를 그대로 쓴다.'}`;
   });
+  const shown = [...originals, ...fixes];
   return [
-    `<details class="step-answer" data-step="${dataStep}" data-commits="${commits.map((c) => c.sha).join(' ')}">`,
+    `<details class="step-answer" data-step="${dataStep}" data-commits="${shown.map((c) => c.sha).join(' ')}">`,
     `<summary>정답 보기 · ${names} · board-server 파일 ${all.length}개</summary>`,
     '',
     [...originals.map((c) => renderCommitAnswer(c, filesOf(c.sha), stepFiles)), ...(fixes.length ? [renderFixAnswer(fixes, fixFiles, stepFiles)] : [])].join('\n\n---\n\n'),
+    ...(deferred ? ['', `**보완** — 이 순서의 보완은 뒤 순서 코드에 맞춘 diff라 [${circled(deferred.after)} 뒤 보완 칸](#${fixAnchor(dataStep)})에 따로 싣는다.`] : []),
     ...(untouched.length ? ['', '**만들 파일 중 이 커밋에 없는 것**', '', ...untouched] : []),
     '',
     '</details>',
@@ -316,7 +377,11 @@ function hintBlock(dataStep, hints) {
   ].join('\n');
 }
 
+// 카드 근거 중 학습자가 열 수 있는 명세 절(spec-v2 §…)만 페이지에 싣는다. 숫자 번호(예: 06 §15)는 저장소 밖 작성 자료다.
+export const publicBasis = (basis) => basis.split(/,\s*/).filter((b) => b.startsWith('spec-v2')).join(', ');
+
 function cardBlock(card) {
+  const basis = publicBasis(card.basis);
   return [
     `### ${card.id}`,
     '',
@@ -327,7 +392,7 @@ function cardBlock(card) {
     '',
     ...card.answers.map((a) => `- ${a}`),
     '',
-    card.basis ? `**근거** ${card.basis}` : '',
+    basis ? `**근거** ${basis}` : '',
     '',
     '</details>',
   ].filter((l, i, a) => !(l === '' && a[i - 1] === '')).join('\n');
@@ -413,7 +478,7 @@ function stepSection(day, s, ctx) {
       // 1단계: 그 순서 커밋의 정답을 인라인으로 싣는다
       const commits = ctx.answers?.steps.get(s.no);
       if (!commits?.length) throw new Error(`${id}: 정답 커밋 answer(${id})이 없다`);
-      lines.push(answerBlock(id, commits, s.files, ctx.filesOf, ctx.lastTouch, ctx.fixFilesOf), '');
+      lines.push(answerBlock(id, commits, s.files, ctx.filesOf, ctx.lastTouch, ctx.fixFilesOf, (ctx.deferred ?? DEFERRED_FIXES)[id]), '');
     } else if (day.phase === 'maintain' && s.tickets?.length) {
       // 2단계: 티켓 정답은 티켓 페이지에만 둔다(마크다운 링크라 빌드 링크 검사가 티켓 페이지 누락을 잡는다)
       lines.push(`**원인과 정답** ${s.tickets.map((t) => `[${t} 티켓 페이지](../tickets/${t}.md)`).join(' · ')}의 "원인과 정답" 접기에 있다.`, '');
@@ -442,13 +507,44 @@ function extraSection(day, commits, ctx) {
   ].join('\n');
 }
 
+const fixAnchor = (id) => `fix-${id.toLowerCase()}`;
+
+// 뒤로 미룬 보완: 그 순서(Dnn-m)의 보완만 담은 정답 블록을 after 순서 칸 뒤에 둔다
+function deferredFixSection(day, no, rule, ctx) {
+  const id = stepId(day.id, no);
+  const step = day.steps.find((s) => s.no === no);
+  const fixes = ctx.answers.steps.get(no).filter((c) => c.kind === 'fix');
+  const files = ctx.fixFilesOf(fixes);
+  return [
+    `<section class="day-step-extra" id="${fixAnchor(id)}" data-commit="${id}">`,
+    '',
+    `## 보완: ${circled(no)} ${step.title}`,
+    '',
+    `${circled(rule.after)}까지(그 순서의 보완 포함) 만들었으면 [${circled(no)}](#${stepAnchor(day.id, no)})의 보완을 적용한다. ${rule.note}`,
+    '',
+    `<details class="step-answer" data-step="${id}" data-commits="${fixes.map((c) => c.sha).join(' ')}">`,
+    `<summary>정답 보기 · answer(${id}) 보완 ${fixes.length}개 · board-server 파일 ${files.length}개</summary>`,
+    '',
+    renderFixAnswer(fixes, files, step.files),
+    '',
+    '</details>',
+    '',
+    '</section>',
+  ].join('\n');
+}
+
 export function renderDay(day, ctx) {
   const java = javaInfo(day.java, ctx.root);
   const roadmapJava = ctx.roadmap.java.find((j) => j.id === day.java);
   const parts = [dayHeader(day, java, ctx.ready ? '' : ' · **준비 중**')];
   if (!ctx.ready) parts.push('> 이 날은 아직 준비 중이다. 순서 제목과 말하기 카드만 먼저 싣고, 티켓 페이지·힌트·채점 프롬프트는 2단계 자료가 끝난 뒤 채운다.');
   parts.push('## 오늘 순서', checklist(day, day.steps), javaSection(java, roadmapJava), '---');
-  for (const s of day.steps) parts.push(stepSection(day, s, ctx));
+  const deferred = Object.entries(ctx.deferred ?? DEFERRED_FIXES).filter(([k]) => k.startsWith(`${day.id}-`));
+  for (const s of day.steps) {
+    parts.push(stepSection(day, s, ctx));
+    if (!ctx.answers) continue;
+    for (const [k, rule] of deferred) if (rule.after === s.no) parts.push(deferredFixSection(day, Number(k.split('-')[1]), rule, ctx));
+  }
   for (const group of ctx.answers?.extras.values() ?? []) parts.push(extraSection(day, group, ctx));
   parts.push('---', '## 말하기 카드', '하루가 끝나면 질문에 "문제 상황 → 원인 → 선택 → 결과" 순서로 소리 내어 답한 뒤, 접힌 "답에 들어가야 할 것"과 비교한다. 세 줄이 모두 나오면 통과다.');
   for (const id of day.talkCards) {
@@ -463,7 +559,9 @@ export function renderDay(day, ctx) {
   parts.push('## 내일 미리보기', day.tomorrow);
   if (ctx.ready && ctx.answers?.last) {
     const sha = ctx.answers.last.sha;
-    parts.push('## 날짜별 snapshot', `오늘 마지막 정답 커밋은 \`${sha.slice(0, 8)}\`(${ctx.answers.last.subject})이다. [이 시점의 board-server 전체 보기](${REPO_URL}/tree/${sha}/board-server). 기준은 위 순서 칸의 인라인 정답이고, 이 링크는 보조다(PR 병합 방식에 따라 커밋이 사라질 수 있다).`);
+    const lines = [`오늘 마지막 정답 커밋은 \`${sha.slice(0, 8)}\`(${ctx.answers.last.subject})이다. [이 시점의 board-server 전체 보기](${REPO_URL}/tree/${sha}/board-server). 기준은 위 순서 칸의 인라인 정답이고, 이 링크는 보조다(PR 병합 방식에 따라 커밋이 사라질 수 있다).`];
+    if (ctx.answers.lastFix) lines.push('', `오늘 순서의 보완(answer-fix)은 뒤 날 정답까지 만든 뒤에 커밋했으므로 위 링크에는 없다. 보완을 반영한 코드는 순서 칸의 "보완"에서 보고, 보완이 모두 들어간 최신 코드는 [보완 반영 최신 코드: main의 board-server](${REPO_URL}/tree/main/board-server)에서 본다(뒤 날 코드도 함께 들어 있다).`);
+    parts.push('## 날짜별 snapshot', lines.join('\n'));
   }
   const refs = ctx.hintsDay?.refs ?? [];
   if (refs.length) {
@@ -494,7 +592,7 @@ export function renderD00(roadmap, root) {
     '## 오늘 할 것',
     '',
     `1. [${java.title}](../java/J00.md) — ${java.duration}`,
-    `2. [출발 자료](../start/README.md)로 JDK 21·Colima·IntelliJ를 준비하고 compose가 뜨는지 확인한다`,
+    `2. [출발 자료](../start/README.md)로 JDK 21·Colima·IntelliJ를 준비한다. compose는 D01 ①에서 프로젝트를 만든 뒤 출발 자료의 파일 3개(\`compose.yaml\`, \`toxiproxy.json\`, WireMock 스텁)를 먼저 복사하고 띄운다. 복사하기 전에 띄우면 \`toxiproxy.json\`이 빈 디렉터리로 생긴다`,
     '',
     '## 워밍업 주제',
     '',
@@ -546,6 +644,8 @@ export function buildAll(root = ROOT) {
   const commits = listAnswerCommits(root);
   if (!commits.length) return { files: new Map(), skipped: 'answer(Dnn-m) 정답 커밋을 찾지 못했다(얕은 복제 또는 squash 병합). 커밋된 일자 페이지를 그대로 둔다.', warnings: [] };
   const answers = collectAnswers(roadmap, root);
+  const placeErrs = [...answers].flatMap(([dayId, entry]) => fixPlacementErrors(dayId, entry, root));
+  if (placeErrs.length) throw new Error(`보완 적용 시점 오류:\n${placeErrs.join('\n')}`);
   const cache = new Map();
   const filesOf = (sha) => { if (!cache.has(sha)) cache.set(sha, commitFiles(sha, root)); return cache.get(sha); };
   const fixFilesOf = (fixes) => netFixFiles(fixes, root);
