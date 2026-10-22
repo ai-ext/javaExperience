@@ -38,4 +38,11 @@ public class PostServiceImpl implements PostService {
         }
         return postRepository.save(post).getId();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PostDetailResponse getDetail(Long postId) {
+        return PostDetailResponse.from(postRepository.findActiveDetail(postId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "글을 찾을 수 없습니다.")));
+    }
 }

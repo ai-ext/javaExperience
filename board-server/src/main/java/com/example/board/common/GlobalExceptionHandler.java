@@ -18,6 +18,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
@@ -47,6 +48,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "요청 값이 올바르지 않습니다.", path(request));
         List<Map<String, String>> errors = ex.getBindingResult().getFieldErrors().stream()
                 .map(GlobalExceptionHandler::toError)
+                .toList();
+        pd.setProperty("errors", errors);
+        return ResponseEntity.badRequest().body(pd);
+    }
+
+    // 경로·쿼리 파라미터 검증(@Positive 등) 실패도 본문 검증과 같은 400 형식으로 맞춘다
+    @Override
+    protected ResponseEntity<Object> handleHandlerMethodValidationException(HandlerMethodValidationException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION.type(), ErrorCode.VALIDATION.title(),
+                "요청 값이 올바르지 않습니다.", path(request));
+        List<Map<String, String>> errors = ex.getParameterValidationResults().stream()
+                .flatMap(r -> r.getResolvableErrors().stream().map(e -> Map.of(
+                        "field", r.getMethodParameter().getParameterName() == null ? "" : r.getMethodParameter().getParameterName(),
+                        "reason", String.valueOf(e.getDefaultMessage()))))
                 .toList();
         pd.setProperty("errors", errors);
         return ResponseEntity.badRequest().body(pd);
