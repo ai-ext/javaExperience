@@ -30,6 +30,11 @@ public class ActivityRankingService {
     private static final String REBUILD_KEY = KEY + ":rebuild";
     // 랭킹에 들어가는 적립 종류. 원장 합산(rebuild)과 증분(add)이 같은 기준을 쓴다.
     static final Set<String> SCORED_REF_TYPES = Set.of("POST", "COMMENT");
+    // 동점 규칙: 점수 내림차순 → memberId 내림차순. Redis(ZREVRANGE)와 원장 합계(sumActivityScores)가 같아야 한다.
+    // 커서가 순위 위치라서, 쪽 사이에 Redis 장애로 원천이 바뀔 때 규칙이 다르면 같은 회원이 두 번 나오고 다른 회원이 빠진다.
+    // Redis는 동점을 member 문자열의 사전순 역순으로 두므로 member를 19자리(long 최대 자릿수) 0패딩 문자열로 저장해
+    // 사전순 = 숫자순으로 맞춘다("9" > "10"인 문제). 오름차순으로 맞추려면 점수를 음수로 저장해야 해 내림차순을 택했다.
+    private static final String MEMBER_FORMAT = "%019d";
 
     private final StringRedisTemplate redis;
     private final PointLedgerRepository ledgerRepository;
@@ -45,7 +50,7 @@ public class ActivityRankingService {
     }
 
     public void add(Long memberId, int score) {
-        guard.run("랭킹 가산", () -> redis.opsForZSet().incrementScore(KEY, memberId.toString(), score));
+        guard.run("랭킹 가산", () -> redis.opsForZSet().incrementScore(KEY, member(memberId), score));
     }
 
     /** 원장 기록이 커밋된 뒤에만 올린다. 롤백된 적립이 점수로 남지 않고, 트랜잭션 안에서 Redis를 부르지 않는다. */
@@ -87,11 +92,16 @@ public class ActivityRankingService {
             return 0;
         }
         Set<TypedTuple<String>> tuples = scores.stream()
-                .map(s -> TypedTuple.of(s.memberId().toString(), s.score().doubleValue()))
+                .map(s -> TypedTuple.of(member(s.memberId()), s.score().doubleValue()))
                 .collect(Collectors.toSet());
         redis.opsForZSet().add(REBUILD_KEY, tuples);
         redis.rename(REBUILD_KEY, KEY);
         return scores.size();
+    }
+
+    /** 랭킹 Sorted Set의 member 값. 위 동점 규칙 때문에 고정 길이로 맞춘다. */
+    static String member(Long memberId) {
+        return String.format(MEMBER_FORMAT, memberId);
     }
 
     private List<MemberScore> fromRedis(long offset, int count) {

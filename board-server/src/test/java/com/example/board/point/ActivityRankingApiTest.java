@@ -10,10 +10,12 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.example.board.ApiTestSupport;
+import com.example.board.config.RedisGuard;
 import com.example.board.member.Member;
 import com.example.board.member.Role;
 
@@ -33,6 +35,9 @@ class ActivityRankingApiTest extends ApiTestSupport {
 
     @Autowired
     TransactionTemplate tx;
+
+    @Autowired
+    RedisGuard guard;
 
     Long writePost(Member m) throws Exception {
         String location = mockMvc.perform(post("/api/posts").header("Authorization", bearer(m))
@@ -123,6 +128,48 @@ class ActivityRankingApiTest extends ApiTestSupport {
                 .andExpect(jsonPath("$.nextCursor").doesNotExist());
     }
 
+    // 동점 규칙(점수 내림차순 → memberId 내림차순)은 Redis와 원장 합계가 같아야 한다. 커서가 순위 위치라서
+    // 쪽 사이에 Redis 장애로 원천이 바뀌면 규칙이 다른 만큼 같은 회원이 두 번 나오고 다른 회원이 빠진다.
+    @Test
+    void 동점에서_Redis로_첫_쪽을_읽고_장애로_원장으로_넘어가도_중복_누락이_없다() throws Exception {
+        Member a = newMember(Role.USER);
+        Member b = newMember(Role.USER);
+        // 다른 테스트의 회원보다 확실히 위에 오도록 큰 점수로 동점을 만든다(커밋 뒤 Redis에도 오른다)
+        pointService.earn(a.getId(), 1_000_000, "POST", 1L);
+        pointService.earn(b.getId(), 1_000_000, "POST", 1L);
+
+        String body = mockMvc.perform(get("/api/rankings/activity").param("size", "1"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        Number first = com.jayway.jsonpath.JsonPath.read(body, "$.items[0].memberId");
+        String next = com.jayway.jsonpath.JsonPath.read(body, "$.nextCursor");
+
+        Number second;
+        try {
+            // Redis 장애를 주입한다. RedisGuard가 실패 뒤 5초 동안 Redis를 건너뛰므로 다음 조회는 원장 합계에서 나온다.
+            guard.call("테스트 장애 주입", () -> {
+                throw new RedisConnectionFailureException("주입한 장애");
+            }, () -> null);
+            String fallback = mockMvc.perform(get("/api/rankings/activity").param("size", "1").param("cursor", next))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            second = com.jayway.jsonpath.JsonPath.read(fallback, "$.items[0].memberId");
+        } finally {
+            guard.reset();
+        }
+
+        long hi = Math.max(a.getId(), b.getId());
+        long lo = Math.min(a.getId(), b.getId());
+        assertThat(List.of(first.longValue(), second.longValue())).containsExactly(hi, lo);
+    }
+
+    // Redis는 동점을 member 문자열의 사전순 역순으로 둔다. "9" > "10"이라 자릿수가 다르면 숫자 순서와 어긋난다.
+    @Test
+    void 동점이면_Redis에서도_자릿수와_상관없이_memberId_내림차순이다() {
+        rankingService.add(9L, 5_000_000);
+        rankingService.add(10L, 5_000_000);
+
+        assertThat(rankingService.top(null, 2).items()).extracting(ActivityRank::memberId).containsExactly(10L, 9L);
+    }
+
     // 함정: 점수를 Redis에만 쌓으면 Redis 데이터가 사라질 때 되살릴 원천이 없다
     @Test
     void 랭킹_키가_사라져도_point_ledger에서_같은_점수로_다시_만든다() throws Exception {
@@ -135,16 +182,18 @@ class ActivityRankingApiTest extends ApiTestSupport {
         // 충전·구매 같은 활동 아닌 원장 행은 랭킹에 들어가지 않는다
         jdbc.update("INSERT INTO point_ledger (member_id, type, amount, balance_after, ref_type, ref_id, created_at,"
                 + " updated_at) VALUES (?, 'CHARGE', 5000, 5000, 'PG', 1, NOW(6), NOW(6))", b.getId());
-        Double aBefore = redis.opsForZSet().score("ranking:activity", a.getId().toString());
-        Double bBefore = redis.opsForZSet().score("ranking:activity", b.getId().toString());
+        Double aBefore = redis.opsForZSet().score("ranking:activity", ActivityRankingService.member(a.getId()));
+        Double bBefore = redis.opsForZSet().score("ranking:activity", ActivityRankingService.member(b.getId()));
 
         redis.delete("ranking:activity");
         int rebuilt = rankingService.rebuild();
 
         // 같은 DB를 쓰는 다른 테스트의 회원도 원장에 있으므로 이 테스트의 회원만 비교한다
         assertThat(rebuilt).isGreaterThanOrEqualTo(2);
-        assertThat(redis.opsForZSet().score("ranking:activity", a.getId().toString())).isEqualTo(aBefore).isEqualTo(12.0);
-        assertThat(redis.opsForZSet().score("ranking:activity", b.getId().toString())).isEqualTo(bBefore).isEqualTo(4.0);
+        assertThat(redis.opsForZSet().score("ranking:activity", ActivityRankingService.member(a.getId())))
+                .isEqualTo(aBefore).isEqualTo(12.0);
+        assertThat(redis.opsForZSet().score("ranking:activity", ActivityRankingService.member(b.getId())))
+                .isEqualTo(bBefore).isEqualTo(4.0);
     }
 
     @Test
@@ -156,7 +205,7 @@ class ActivityRankingApiTest extends ApiTestSupport {
             s.setRollbackOnly();
         });
 
-        assertThat(redis.opsForZSet().score("ranking:activity", m.getId().toString())).isNull();
+        assertThat(redis.opsForZSet().score("ranking:activity", ActivityRankingService.member(m.getId()))).isNull();
     }
 
     // 댓글 INSERT(회원 FK 공유 잠금) 뒤 잔액 UPDATE(배타 잠금)를 하면 동시 요청끼리 교착이 난다
@@ -185,6 +234,6 @@ class ActivityRankingApiTest extends ApiTestSupport {
         }
 
         assertThat(balance(m)).isEqualTo(40);
-        assertThat(redis.opsForZSet().score("ranking:activity", m.getId().toString())).isEqualTo(40.0);
+        assertThat(redis.opsForZSet().score("ranking:activity", ActivityRankingService.member(m.getId()))).isEqualTo(40.0);
     }
 }
