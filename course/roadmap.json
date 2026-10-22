@@ -1352,7 +1352,8 @@
           "no": 1,
           "title": "B06 \"컬럼 하나 추가했더니 상점 전체가 멈췄다\": `SHOW PROCESSLIST`로 MDL 대기 찾기",
           "files": [
-            "src/main/java/com/example/board/shop/OrderService.java"
+            "src/main/java/com/example/board/shop/OrderNotifier.java",
+            "src/main/java/com/example/board/shop/ShopController.java"
           ],
           "done": [
             "`SHOW PROCESSLIST`에서 `Waiting for table metadata lock`과 그 앞의 긴 트랜잭션을 찾는다",
@@ -1368,18 +1369,18 @@
         },
         {
           "no": 2,
-          "title": "B07 \"쿠폰 동시 사용에서 가끔 실패한다\": `SHOW ENGINE INNODB STATUS`로 데드락 읽기",
+          "title": "B07 \"선착순 쿠폰을 동시에 받을 때 가끔 실패한다\": `SHOW ENGINE INNODB STATUS`로 데드락 읽기",
           "files": [
             "src/main/java/com/example/board/coupon/CouponService.java",
-            "src/test/java/com/example/board/coupon/CouponUseDeadlockTest.java"
+            "src/main/java/com/example/board/coupon/MemberCouponRepository.java"
           ],
           "done": [
             "`SHOW ENGINE INNODB STATUS`의 `LATEST DETECTED DEADLOCK`에서 gap lock을 확인",
-            "`CouponUseDeadlockTest` 통과: 동시 쿠폰 사용 20건이 성공하거나 정해진 409로 끝난다"
+            "동시 쿠폰 발급 20건이 모두 201이거나 정해진 409로 끝난다(데드락 1213 없음)를 재현 테스트로 고정"
           ],
           "trap": "없는 행을 `SELECT ... FOR UPDATE`로 잠그면 gap lock끼리 엇갈려 데드락이 난다.",
           "specRefs": [
-            "POST /api/shop/orders"
+            "POST /api/coupons/{couponId}/issue"
           ],
           "tickets": [
             "B07"
@@ -1408,13 +1409,11 @@
           "no": 4,
           "title": "B10 \"포인트 충전이 가끔 두 번 된다\": 연계 로그와 WireMock으로 재현",
           "files": [
-            "src/main/java/com/example/board/payment/ChargeService.java",
-            "src/main/java/com/example/board/payment/PgClient.java",
-            "src/test/java/com/example/board/payment/ChargeIdempotencyTest.java"
+            "src/main/java/com/example/board/payment/ChargeService.java"
           ],
           "done": [
             "`pg_payment`에서 같은 충전 요청에 승인 2건을 확인",
-            "`ChargeIdempotencyTest` 통과: WireMock 첫 응답 지연 뒤 재시도해도 같은 `Idempotency-Key`라 승인 1건, 포인트 1회"
+            "재현 테스트 통과: WireMock 첫 응답이 늦어도 PG 승인 1건, 포인트 1회(응답 타임아웃은 재시도하지 않거나, 재시도해도 같은 `Idempotency-Key`를 쓴다)"
           ],
           "trap": "재시도 횟수만 줄이면 증상은 줄어도 재시도마다 멱등 키를 새로 만드는 원인은 그대로 남는다.",
           "specRefs": [
