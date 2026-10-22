@@ -93,7 +93,9 @@ class J12PurchaseTest {
 
         PurchaseResult result = swapped.purchase(new PurchaseRequest(MEMBER, "BOOK", 1, null, 0));
 
-        assertThat(result).isEqualTo(new PurchaseResult(false, null, 0, "테스트가 심은 사유 1, 테스트가 심은 사유 2"));
+        assertThat(result)
+                .as("purchase가 직접 검증하지 말고 validate()가 돌려준 사유로 실패를 만들어야 합니다")
+                .isEqualTo(new PurchaseResult(false, null, 0, "테스트가 심은 사유 1, 테스트가 심은 사유 2"));
         assertThat(store.orders()).isEmpty();
     }
 
@@ -108,7 +110,9 @@ class J12PurchaseTest {
 
         PurchaseResult result = swapped.purchase(new PurchaseRequest(MEMBER, "BOOK", 1, null, 0));
 
-        assertThat(result.paidAmount()).isEqualTo(900);
+        assertThat(result.paidAmount())
+                .as("purchase가 직접 계산하지 말고 calculate()가 돌려준 Payment로 저장해야 합니다")
+                .isEqualTo(900);
         assertThat(store.orders()).containsExactly(new PurchaseOrder(MEMBER, "BOOK", 1, 1000, 100, 0, 900));
     }
 
@@ -123,7 +127,9 @@ class J12PurchaseTest {
 
         PurchaseResult result = swapped.purchase(new PurchaseRequest(MEMBER, "BOOK", 1, null, 0));
 
-        assertThat(result).isEqualTo(new PurchaseResult(true, 777L, 12000, "구매 완료"));
+        assertThat(result)
+                .as("purchase가 직접 저장하지 말고 save()가 돌려준 주문 번호로 결과를 만들어야 합니다")
+                .isEqualTo(new PurchaseResult(true, 777L, 12000, "구매 완료"));
         // 저장은 save가 맡으므로, save를 바꿔 끼우면 아무것도 저장되지 않는다
         assertThat(store.orders()).isEmpty();
         assertThat(store.findItem("BOOK").stock()).isEqualTo(5);

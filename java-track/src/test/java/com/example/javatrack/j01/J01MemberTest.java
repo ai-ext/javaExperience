@@ -64,10 +64,15 @@ class J01MemberTest {
                 .filter(field -> !Modifier.isStatic(field.getModifiers()))
                 .toList();
 
-        assertThat(instanceFields).isNotEmpty()
+        assertThat(instanceFields)
+                .as("Member에 이메일·닉네임 인스턴스 필드(email·nickname)를 선언하세요")
+                .isNotEmpty()
                 .allSatisfy(field -> assertThat(Modifier.isPrivate(field.getModifiers()))
                         .as("%s 필드는 private이어야 한다", field.getName())
                         .isTrue());
+        assertThat(instanceFields).extracting(Field::getName)
+                .as("이메일 필드 이름은 email이어야 합니다(페이지 규칙)")
+                .contains("email");
         assertThat(Modifier.isFinal(Member.class.getDeclaredField("email").getModifiers()))
                 .as("email 필드는 final이어야 한다")
                 .isTrue();

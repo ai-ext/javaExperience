@@ -14,7 +14,7 @@ public class Member {
     public static final int NICKNAME_MIN_LENGTH = 2;
     public static final int NICKNAME_MAX_LENGTH = 20;
 
-    // TODO: 이메일·닉네임 필드를 선언하세요(밖에서 직접 못 건드리게, 이메일은 다시 대입할 수 없게)
+    // TODO: 이메일·닉네임 필드를 선언하세요. 이름은 email·nickname(밖에서 직접 못 건드리게, 이메일은 다시 대입할 수 없게)
 
     public Member(String email, String nickname) {
         throw new UnsupportedOperationException("J01: Member 생성자 — 이메일·닉네임을 검사하고 필드에 담으세요");

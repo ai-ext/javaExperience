@@ -60,13 +60,17 @@ class J14NullRefactorTest {
 
     @Test
     void 내역이_없는_회원도_NPE_없이_0P를_보여_준다() {
-        assertThatCode(() -> service.report("new@example.com")).doesNotThrowAnyException();
+        assertThatCode(() -> service.report("new@example.com"))
+                .as("findHistories가 빈 목록을 돌려주게 하고, report가 내역 없는 회원도 NPE 없이 0P로 보여 주게 하세요")
+                .doesNotThrowAnyException();
         assertThat(service.report("new@example.com")).isEqualTo("새회원: 0P");
     }
 
     @Test
     void 없는_회원이나_내역이_없는_회원의_합계는_NPE_없이_0이다() {
-        assertThatCode(() -> service.totalPoints("nobody@example.com")).doesNotThrowAnyException();
+        assertThatCode(() -> service.totalPoints("nobody@example.com"))
+                .as("저장소가 Optional·빈 목록을 돌려주게 하고, totalPoints가 없는 회원과 내역 없는 회원을 NPE 없이 0으로 처리하게 하세요")
+                .doesNotThrowAnyException();
         assertThat(service.totalPoints("nobody@example.com")).isZero();
         assertThat(service.totalPoints("new@example.com")).isZero();
     }
@@ -78,9 +82,11 @@ class J14NullRefactorTest {
         Method method = MemberRepository.class.getMethod("findByEmail", String.class);
         Type returnType = method.getGenericReturnType();
 
-        assertThat(method.getReturnType()).isEqualTo(Optional.class);
-        assertThat(returnType).isInstanceOf(ParameterizedType.class);
-        assertThat(((ParameterizedType) returnType).getActualTypeArguments()).containsExactly(Member.class);
+        assertThat(method.getReturnType()).as("findByEmail의 반환 타입을 Optional<Member>로 바꾸세요").isEqualTo(Optional.class);
+        assertThat(returnType).as("findByEmail의 반환 타입을 Optional<Member>로 바꾸세요").isInstanceOf(ParameterizedType.class);
+        assertThat(((ParameterizedType) returnType).getActualTypeArguments())
+                .as("findByEmail의 반환 타입을 Optional<Member>로 바꾸세요")
+                .containsExactly(Member.class);
     }
 
     @Test
@@ -88,13 +94,15 @@ class J14NullRefactorTest {
         Object found = findByEmail("java@example.com");
         Object missing = findByEmail("nobody@example.com");
 
-        assertThat(found).isEqualTo(Optional.of(JAVA));
+        assertThat(found).as("findByEmail은 찾은 회원을 Optional로 감싸 돌려줘야 합니다").isEqualTo(Optional.of(JAVA));
         assertThat(missing).isNotNull().isEqualTo(Optional.empty());
     }
 
     @Test
     void findHistories는_내역이_없으면_null이_아니라_빈_목록이다() {
-        assertThat(repository.findHistories(NEW.id())).isNotNull().isEmpty();
+        assertThat(repository.findHistories(NEW.id()))
+                .as("findHistories는 내역이 없으면 null 대신 빈 목록(List.of())을 돌려줘야 합니다")
+                .isNotNull().isEmpty();
         assertThat(repository.findHistories(99L)).isNotNull().isEmpty();
         assertThat(repository.findHistories(JAVA.id())).hasSize(3);
     }

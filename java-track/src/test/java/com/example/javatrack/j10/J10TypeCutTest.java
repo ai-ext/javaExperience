@@ -43,7 +43,7 @@ class J10TypeCutTest {
     void 인스턴스_필드는_모두_private_final이다() {
         List<Field> instanceFields = fields(UploadLimits.class, false);
 
-        assertThat(instanceFields).isNotEmpty();
+        assertThat(instanceFields).as("UploadLimits에 한도 값을 담을 인스턴스 필드를 선언하세요").isNotEmpty();
         assertThat(instanceFields).allSatisfy(f -> {
             assertThat(Modifier.isPrivate(f.getModifiers())).as(f.getName() + "는 private").isTrue();
             assertThat(Modifier.isFinal(f.getModifiers())).as(f.getName() + "는 final").isTrue();
