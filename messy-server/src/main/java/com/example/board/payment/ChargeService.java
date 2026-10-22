@@ -13,8 +13,8 @@ import com.example.board.member.MemberRepository;
 import com.example.board.point.PointService;
 
 /**
- * 충전은 세 단계다: REQUESTED 저장(트랜잭션 1) → PG 승인(트랜잭션 밖) → 결과 반영(트랜잭션 2).
- * 이 클래스에 @Transactional을 두지 않는다. 두면 PG를 기다리는 동안 DB 커넥션을 쥐어 Hikari 풀이 바닥난다.
+ * 충전은 두 단계다: REQUESTED 저장(트랜잭션 1) → PG 승인과 결과 반영(트랜잭션 2).
+ * REQUESTED를 먼저 커밋해 두므로 PG가 실패해도 연계 로그는 남는다.
  */
 @Service
 public class ChargeService {
@@ -44,13 +44,12 @@ public class ChargeService {
             return replay(payment);
         }
 
-        PgApproval approval;
         try {
-            approval = pgClient.approve(payment.getOrderId(), amount, idempotencyKey);
+            // 승인과 결과 반영을 한 트랜잭션으로 묶는다. PG는 승인했는데 우리 쪽 반영이 빠지는 틈을 없앤다.
+            return tx.execute(s -> apply(payment, pgClient.approve(payment.getOrderId(), amount, idempotencyKey)));
         } catch (PgException e) {
             throw fail(payment, e);
         }
-        return apply(payment, approval);
     }
 
     /**
