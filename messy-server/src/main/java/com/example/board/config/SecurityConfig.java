@@ -1,5 +1,6 @@
 package com.example.board.config;
 
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -39,8 +40,11 @@ public class SecurityConfig {
                 // 위에서부터 처음 매치된 규칙만 적용된다. 구체적인 규칙을 먼저, 마지막은 deny-by-default.
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // 운영 모니터링(로드밸런서 헬스 체크·지표 수집기)은 토큰 없이 붙는다
+                        .requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll()
+                        // 설정 확인(env)은 관리자만
+                        .requestMatchers(EndpointRequest.to("env")).hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts", "/api/posts/popular", "/api/posts/{postId}",
                                 "/api/posts/{postId}/comments", "/api/rankings/activity", "/api/shop/items").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
