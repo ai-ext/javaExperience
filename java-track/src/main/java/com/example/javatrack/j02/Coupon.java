@@ -13,7 +13,8 @@ package com.example.javatrack.j02;
  * }
  * </pre>
  * setter와 public 생성자가 없다. 값은 빌더와 학습용 팩토리({@link #create})로만 넣고, 둘 다 같은 private 생성자의 검사를 거친다. 발급 수량은 {@link #issue()}로만 바뀐다.
- * 빌더({@link #builder()}·{@link CouponBuilder})는 선택 과제다. 기본 과제의 테스트는 주어진 {@link #create}로 쿠폰을 만든다.
+ * 이 클래스는 실무 습관 칸(선택 과제)이다. 기본 실행 {@code :java-track:test --tests 'J02*'}에는 들어가지 않는다.
+ * 선택 과제 테스트는 빌더({@link #builder()}·{@link CouponBuilder})를 채우지 않아도 되게 주어진 {@link #create}로 쿠폰을 만든다(빌더 테스트만 빼고).
  */
 public class Coupon {
 
@@ -28,7 +29,7 @@ public class Coupon {
 
     /** 이름이 null이거나 공백뿐이면, 총량이 1보다 작으면 IllegalArgumentException. 발급 수량은 0에서 시작한다. */
     private Coupon(String name, int totalQuantity) {
-        throw new UnsupportedOperationException("J02: Coupon 생성자 — 이름·총량을 검사하고 필드에 담으세요");
+        throw new UnsupportedOperationException("J02(선택): Coupon 생성자 — 이름·총량을 검사하고 필드에 담으세요");
     }
 
     /**
@@ -41,12 +42,12 @@ public class Coupon {
 
     // @Builder가 만드는 static 메서드(선택 과제)
     public static CouponBuilder builder() {
-        throw new UnsupportedOperationException("J02: Coupon.builder — 새 CouponBuilder를 돌려주세요");
+        throw new UnsupportedOperationException("J02(선택): Coupon.builder — 새 CouponBuilder를 돌려주세요");
     }
 
     /** 1장 발급한다. 이미 총량만큼 발급했으면 IllegalStateException. */
     public void issue() {
-        throw new UnsupportedOperationException("J02: Coupon.issue — 남은 수량이 있으면 발급 수량을 1 올리세요");
+        throw new UnsupportedOperationException("J02(선택): Coupon.issue — 남은 수량이 있으면 발급 수량을 1 올리세요");
     }
 
     // @Getter가 만드는 코드
@@ -76,16 +77,16 @@ public class Coupon {
 
         /** 값을 담고 자기 자신을 돌려준다(이어서 부를 수 있게). */
         public CouponBuilder name(String name) {
-            throw new UnsupportedOperationException("J02: CouponBuilder.name — 값을 담고 this를 돌려주세요");
+            throw new UnsupportedOperationException("J02(선택): CouponBuilder.name — 값을 담고 this를 돌려주세요");
         }
 
         public CouponBuilder totalQuantity(int totalQuantity) {
-            throw new UnsupportedOperationException("J02: CouponBuilder.totalQuantity — 값을 담고 this를 돌려주세요");
+            throw new UnsupportedOperationException("J02(선택): CouponBuilder.totalQuantity — 값을 담고 this를 돌려주세요");
         }
 
         /** 담아 둔 값으로 private 생성자를 부른다. 넣지 않은 값은 필드 기본값(null·0)이 그대로 넘어간다. */
         public Coupon build() {
-            throw new UnsupportedOperationException("J02: CouponBuilder.build — 담아 둔 값으로 Coupon 생성자를 부르세요");
+            throw new UnsupportedOperationException("J02(선택): CouponBuilder.build — 담아 둔 값으로 Coupon 생성자를 부르세요");
         }
     }
 }

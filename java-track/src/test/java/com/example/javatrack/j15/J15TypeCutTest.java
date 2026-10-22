@@ -15,9 +15,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** 타입 한 컷 정리 퀴즈: J1~J14 타입 한 컷에서 고른 문항. 각 테스트가 함정을 먼저 보여 주고 학습자 답을 확인한다. */
+/**
+ * 타입 한 컷 정리 퀴즈(선택 과제): J1~J14 타입 한 컷에서 고른 문항. 각 테스트가 함정을 먼저 보여 주고 학습자 답을 확인한다.
+ * 선택 과제라 기본 실행({@code :java-track:test --tests 'J15*'})에서는 빠진다. {@code :java-track:optionalTest --tests 'J15*'}로 돌린다.
+ */
+@Tag("optional")
 class J15TypeCutTest {
 
     // 기본 시간대를 KST가 아닌 곳으로 바꿔 둔다. ZoneId.systemDefault()에 기대는 답이

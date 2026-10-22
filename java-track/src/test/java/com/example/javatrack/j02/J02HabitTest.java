@@ -15,10 +15,11 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * 실무 습관: Lombok이 만드는 코드를 손으로 써 보고, 엔티티에서 @Setter·@AllArgsConstructor를 피하는 이유를 확인한다.
- * 빌더(@Builder) 테스트는 선택 과제다(@Tag("optional")). 기본 실행 {@code :java-track:test}에서는 빠지고
- * {@code :java-track:optionalTest --tests 'J02*'}로 따로 돌린다. 기본 과제는 주어진 {@code Coupon.create}로 쿠폰을 만든다.
+ * 실무 습관(선택 과제): Lombok이 만드는 코드를 손으로 써 보고, 엔티티에서 @Setter·@AllArgsConstructor를 피하는 이유를 확인한다.
+ * 클래스 전체가 선택 과제다(@Tag("optional")). 기본 실행 {@code :java-track:test --tests 'J02*'}에서는 빠지고
+ * {@code :java-track:optionalTest --tests 'J02*'}로 따로 돌린다. 빌더 테스트(선택_…) 말고는 주어진 {@code Coupon.create}로 쿠폰을 만든다.
  */
+@Tag("optional")
 class J02HabitTest {
 
     @Test
@@ -67,7 +68,6 @@ class J02HabitTest {
     }
 
     @Test
-    @Tag("optional")
     void 선택_빌더는_이름을_붙여_값을_넣고_발급_수량은_0에서_시작한다() {
         // 생성자 new Coupon("웰컴 쿠폰", 10)과 달리, 어느 값이 이름이고 어느 값이 총량인지 호출부에 드러난다
         Coupon coupon = Coupon.builder()
@@ -82,7 +82,6 @@ class J02HabitTest {
     }
 
     @Test
-    @Tag("optional")
     void 선택_빌더에서_총량을_빠뜨리면_0이_들어가_생성자_검사에_걸린다() {
         Coupon.CouponBuilder builder = Coupon.builder().name("웰컴 쿠폰");
 
