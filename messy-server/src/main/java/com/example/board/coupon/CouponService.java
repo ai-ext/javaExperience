@@ -85,6 +85,22 @@ public class CouponService {
         return memberCouponRepository.findAllWithCoupon(memberId).stream().map(MemberCouponResponse::from).toList();
     }
 
+    /**
+     * 이벤트·보상 지급. 회원이 누르는 선착순 발급과 달리 Redis 거름망 없이 DB 기준으로 바로 준다.
+     * 남은 수량이 없으면 COUPON_EXHAUSTED, 이미 받았으면 DUPLICATE.
+     */
+    @Transactional
+    public Long grant(Long couponId, Long memberId) {
+        if (memberCouponRepository.existsByCouponIdAndMemberId(couponId, memberId)) {
+            throw duplicate();
+        }
+        if (couponRepository.increaseIssued(couponId) == 0) {
+            throw exhausted();
+        }
+        return memberCouponRepository.saveAndFlush(MemberCoupon.create(
+                couponRepository.getReferenceById(couponId), memberRepository.getReferenceById(memberId))).getId();
+    }
+
     private static BusinessException exhausted() {
         return new BusinessException(ErrorCode.COUPON_EXHAUSTED, "쿠폰이 모두 소진되었습니다.");
     }

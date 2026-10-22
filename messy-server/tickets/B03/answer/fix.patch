@@ -1,0 +1,160 @@
+diff --git a/src/main/java/com/example/board/coupon/CouponService.java b/src/main/java/com/example/board/coupon/CouponService.java
+index 80e1a8b..50a33b3 100644
+--- a/src/main/java/com/example/board/coupon/CouponService.java
++++ b/src/main/java/com/example/board/coupon/CouponService.java
+@@ -85,22 +85,6 @@ public class CouponService {
+         return memberCouponRepository.findAllWithCoupon(memberId).stream().map(MemberCouponResponse::from).toList();
+     }
+ 
+-    /**
+-     * 이벤트·보상 지급. 회원이 누르는 선착순 발급과 달리 Redis 거름망 없이 DB 기준으로 바로 준다.
+-     * 남은 수량이 없으면 COUPON_EXHAUSTED, 이미 받았으면 DUPLICATE.
+-     */
+-    @Transactional
+-    public Long grant(Long couponId, Long memberId) {
+-        if (memberCouponRepository.existsByCouponIdAndMemberId(couponId, memberId)) {
+-            throw duplicate();
+-        }
+-        if (couponRepository.increaseIssued(couponId) == 0) {
+-            throw exhausted();
+-        }
+-        return memberCouponRepository.saveAndFlush(MemberCoupon.create(
+-                couponRepository.getReferenceById(couponId), memberRepository.getReferenceById(memberId))).getId();
+-    }
+-
+     private static BusinessException exhausted() {
+         return new BusinessException(ErrorCode.COUPON_EXHAUSTED, "쿠폰이 모두 소진되었습니다.");
+     }
+diff --git a/src/main/java/com/example/board/shop/OrderService.java b/src/main/java/com/example/board/shop/OrderService.java
+index f7848b4..d0aa652 100644
+--- a/src/main/java/com/example/board/shop/OrderService.java
++++ b/src/main/java/com/example/board/shop/OrderService.java
+@@ -7,7 +7,7 @@ import java.util.Optional;
+ import org.springframework.dao.DataIntegrityViolationException;
+ import org.springframework.dao.PessimisticLockingFailureException;
+ import org.springframework.stereotype.Service;
+-import org.springframework.transaction.annotation.Transactional;
++import org.springframework.transaction.support.TransactionTemplate;
+ 
+ import com.example.board.common.BusinessException;
+ import com.example.board.common.ErrorCode;
+@@ -17,8 +17,10 @@ import com.example.board.member.MemberRepository;
+ import com.example.board.point.PointService;
+ 
+ /**
+- * 상점 주문. 주문 한 건(재고·쿠폰·주문·포인트)은 placeOnce 트랜잭션 하나로 묶고,
++ * 상점 주문. 주문 한 건(재고·쿠폰·주문·포인트)은 placeOnce의 트랜잭션 하나로 묶고,
+  * 데드락이면 트랜잭션 밖(order)에서 다시 시도한다.
++ * 트랜잭션은 TransactionTemplate으로 연다. 같은 클래스 안에서 부르는 메서드에 @Transactional을 붙이면
++ * 프록시를 거치지 않아 트랜잭션이 아예 열리지 않는다.
+  */
+ @Service
+ public class OrderService {
+@@ -33,16 +35,18 @@ public class OrderService {
+     private final MemberRepository memberRepository;
+     private final PointService pointService;
+     private final ThanksCouponService thanksCouponService;
++    private final TransactionTemplate tx;
+ 
+     public OrderService(ShopItemRepository shopItemRepository, ShopOrderRepository shopOrderRepository,
+             MemberCouponRepository memberCouponRepository, MemberRepository memberRepository,
+-            PointService pointService, ThanksCouponService thanksCouponService) {
++            PointService pointService, ThanksCouponService thanksCouponService, TransactionTemplate tx) {
+         this.shopItemRepository = shopItemRepository;
+         this.shopOrderRepository = shopOrderRepository;
+         this.memberCouponRepository = memberCouponRepository;
+         this.memberRepository = memberRepository;
+         this.pointService = pointService;
+         this.thanksCouponService = thanksCouponService;
++        this.tx = tx;
+     }
+ 
+     public OrderResponse order(Long memberId, String idempotencyKey, OrderRequest request) {
+@@ -57,19 +61,19 @@ public class OrderService {
+         }
+     }
+ 
+-    @Transactional
+-    public OrderResponse placeOnce(Long memberId, String idempotencyKey, OrderRequest request) {
++    private OrderResponse placeOnce(Long memberId, String idempotencyKey, OrderRequest request) {
+         try {
+-            return place(memberId, idempotencyKey, request);
++            return tx.execute(s -> place(memberId, idempotencyKey, request));
+         } catch (DataIntegrityViolationException duplicateKey) {
+             // UNIQUE(member_id, idempotency_key) 위반 = 같은 키의 주문이 먼저 커밋됐다. 처음 응답을 돌려준다.
+-            return findReplay(memberId, idempotencyKey, request).orElseThrow(() -> duplicateKey);
++            return tx.execute(s -> findReplay(memberId, idempotencyKey, request).orElseThrow(() -> duplicateKey));
+         }
+     }
+ 
+     private OrderResponse place(Long memberId, String idempotencyKey, OrderRequest request) {
+-        // 같은 키로 다시 온 요청은 아래 조회로 처음 주문을 돌려준다(동시에 오면 UNIQUE가 막는다)
+-        Member member = memberRepository.findById(memberId)
++        // 회원 행을 먼저 잠가 같은 회원의 주문을 직렬화한다. 같은 키의 동시 요청도 여기서 순서가 정해지고,
++        // 뒤에 온 요청은 잠금을 얻은 뒤 아래 조회로 먼저 커밋된 주문을 본다.
++        Member member = memberRepository.findByIdForUpdate(memberId)
+                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다."));
+         Optional<OrderResponse> replay = findReplay(memberId, idempotencyKey, request);
+         if (replay.isPresent()) {
+diff --git a/src/main/java/com/example/board/shop/ThanksCouponService.java b/src/main/java/com/example/board/shop/ThanksCouponService.java
+index 75af7bb..881ac41 100644
+--- a/src/main/java/com/example/board/shop/ThanksCouponService.java
++++ b/src/main/java/com/example/board/shop/ThanksCouponService.java
+@@ -6,9 +6,10 @@ import org.springframework.beans.factory.annotation.Value;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+-import com.example.board.common.BusinessException;
+-import com.example.board.coupon.CouponService;
++import com.example.board.coupon.CouponRepository;
++import com.example.board.coupon.MemberCoupon;
+ import com.example.board.coupon.MemberCouponRepository;
++import com.example.board.member.MemberRepository;
+ 
+ /**
+  * 구매 감사 쿠폰(선착순 이벤트). 구매할 때마다 이벤트 쿠폰을 한 장씩, 1인 1매로 준다.
+@@ -19,28 +20,34 @@ public class ThanksCouponService {
+ 
+     private static final Logger log = LoggerFactory.getLogger(ThanksCouponService.class);
+ 
+-    private final CouponService couponService;
++    private final CouponRepository couponRepository;
+     private final MemberCouponRepository memberCouponRepository;
++    private final MemberRepository memberRepository;
+     private final long thanksCouponId;
+ 
+-    public ThanksCouponService(CouponService couponService, MemberCouponRepository memberCouponRepository,
+-            @Value("${board.shop.thanks-coupon-id:0}") long thanksCouponId) {
+-        this.couponService = couponService;
++    public ThanksCouponService(CouponRepository couponRepository, MemberCouponRepository memberCouponRepository,
++            MemberRepository memberRepository, @Value("${board.shop.thanks-coupon-id:0}") long thanksCouponId) {
++        this.couponRepository = couponRepository;
+         this.memberCouponRepository = memberCouponRepository;
++        this.memberRepository = memberRepository;
+         this.thanksCouponId = thanksCouponId;
+     }
+ 
+-    /** 받았는지 확인과 지급을 한 트랜잭션에서 한다. */
++    /**
++     * 주문 트랜잭션에 참여한다(같은 회원의 주문은 회원 행 잠금으로 직렬화돼 있다).
++     * 소진은 예외로 알리지 않고 영향 행 수로 판단한다. 같은 트랜잭션 안에서 @Transactional 메서드가 예외를 던지면
++     * 바깥에서 잡아도 트랜잭션이 rollback-only로 표시돼 구매까지 롤백된다.
++     */
+     @Transactional
+     public void giveAfterPurchase(Long memberId) {
+         if (thanksCouponId <= 0 || memberCouponRepository.existsByCouponIdAndMemberId(thanksCouponId, memberId)) {
+             return;
+         }
+-        try {
+-            couponService.grant(thanksCouponId, memberId);
+-        } catch (BusinessException e) {
+-            // 선착순이라 떨어지는 것이 정상이다. 쿠폰을 못 받아도 구매는 성공해야 하므로 기록만 남기고 넘어간다.
+-            log.info("구매 감사 쿠폰 미지급 memberId={} 사유={}", memberId, e.getMessage());
++        if (couponRepository.increaseIssued(thanksCouponId) == 0) {
++            log.info("구매 감사 쿠폰 소진 memberId={}", memberId);
++            return;
+         }
++        memberCouponRepository.saveAndFlush(MemberCoupon.create(couponRepository.getReferenceById(thanksCouponId),
++                memberRepository.getReferenceById(memberId)));
+     }
+ }

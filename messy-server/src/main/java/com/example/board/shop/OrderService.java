@@ -7,7 +7,7 @@ import java.util.Optional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.example.board.common.BusinessException;
 import com.example.board.common.ErrorCode;
@@ -17,8 +17,8 @@ import com.example.board.member.MemberRepository;
 import com.example.board.point.PointService;
 
 /**
- * 이 클래스에는 @Transactional을 두지 않는다. 데드락 재시도는 트랜잭션 밖에서 해야
- * rollback-only가 된 트랜잭션을 다시 쓰지 않는다.
+ * 상점 주문. 주문 한 건(재고·쿠폰·주문·포인트)은 placeOnce 트랜잭션 하나로 묶고,
+ * 데드락이면 트랜잭션 밖(order)에서 다시 시도한다.
  */
 @Service
 public class OrderService {
@@ -32,17 +32,17 @@ public class OrderService {
     private final MemberCouponRepository memberCouponRepository;
     private final MemberRepository memberRepository;
     private final PointService pointService;
-    private final TransactionTemplate tx;
+    private final ThanksCouponService thanksCouponService;
 
     public OrderService(ShopItemRepository shopItemRepository, ShopOrderRepository shopOrderRepository,
             MemberCouponRepository memberCouponRepository, MemberRepository memberRepository,
-            PointService pointService, TransactionTemplate tx) {
+            PointService pointService, ThanksCouponService thanksCouponService) {
         this.shopItemRepository = shopItemRepository;
         this.shopOrderRepository = shopOrderRepository;
         this.memberCouponRepository = memberCouponRepository;
         this.memberRepository = memberRepository;
         this.pointService = pointService;
-        this.tx = tx;
+        this.thanksCouponService = thanksCouponService;
     }
 
     public OrderResponse order(Long memberId, String idempotencyKey, OrderRequest request) {
@@ -57,19 +57,19 @@ public class OrderService {
         }
     }
 
-    private OrderResponse placeOnce(Long memberId, String idempotencyKey, OrderRequest request) {
+    @Transactional
+    public OrderResponse placeOnce(Long memberId, String idempotencyKey, OrderRequest request) {
         try {
-            return tx.execute(s -> place(memberId, idempotencyKey, request));
+            return place(memberId, idempotencyKey, request);
         } catch (DataIntegrityViolationException duplicateKey) {
             // UNIQUE(member_id, idempotency_key) 위반 = 같은 키의 주문이 먼저 커밋됐다. 처음 응답을 돌려준다.
-            return tx.execute(s -> findReplay(memberId, idempotencyKey, request).orElseThrow(() -> duplicateKey));
+            return findReplay(memberId, idempotencyKey, request).orElseThrow(() -> duplicateKey);
         }
     }
 
     private OrderResponse place(Long memberId, String idempotencyKey, OrderRequest request) {
-        // 회원 행을 먼저 잠가 같은 회원의 주문을 직렬화한다. 같은 키의 동시 요청도 여기서 순서가 정해지고,
-        // 뒤에 온 요청은 잠금을 얻은 뒤 아래 조회로 먼저 커밋된 주문을 본다.
-        Member member = memberRepository.findByIdForUpdate(memberId)
+        // 같은 키로 다시 온 요청은 아래 조회로 처음 주문을 돌려준다(동시에 오면 UNIQUE가 막는다)
+        Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다."));
         Optional<OrderResponse> replay = findReplay(memberId, idempotencyKey, request);
         if (replay.isPresent()) {
@@ -96,6 +96,8 @@ public class OrderService {
         if (paid > 0) {
             pointService.spend(memberId, Math.toIntExact(paid), "ORDER", order.getId());
         }
+        // 구매 감사 쿠폰(이벤트 기간에만). 쿠폰이 떨어졌거나 이미 받았으면 그냥 넘어간다.
+        thanksCouponService.giveAfterPurchase(memberId);
         return OrderResponse.from(order);
     }
 
