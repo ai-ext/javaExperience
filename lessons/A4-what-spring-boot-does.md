@@ -145,7 +145,7 @@ jar 전체는 약 54MB이고, 라이브러리 jar 71개가 `BOOT-INF/lib/`에 �
 
 ## 따라 해 보기
 
-15분. 실습 레포 폴더에서 한다. DB는 studymate MySQL(3306) — studymate가 떠 있으면 된다.
+15분. 실습 레포 폴더에서 한다. DB는 이 저장소 compose의 MySQL(호스트 13308) — 저장소 루트에서 `docker compose up -d`로 띄워 두면 된다. `application.yml`의 포트가 `13308`인지도 본다([README — DB 접속 정보](../README.md#db-접속-정보)).
 
 **① 스타터가 끌고 오는 것 보기**
 

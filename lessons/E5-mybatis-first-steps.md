@@ -171,7 +171,7 @@ public interface PostMapper {
 **1. 연습 테이블을 만든다.** E2의 `sql` 함수는 `community` DB용이라 `practice`용을 하나 더 만든다.
 
 ```bash
-sqlp() { docker exec -i studymate-mysql-1 mysql --default-character-set=utf8mb4 -t -ucommunity -pcommunity practice -e "$1"; }
+sqlp() { docker compose exec -T mysql mysql --default-character-set=utf8mb4 -t -ucommunity -pcommunity practice -e "$1"; }
 sqlp "CREATE TABLE lesson_post (id BIGINT AUTO_INCREMENT PRIMARY KEY, author_id BIGINT NOT NULL, title VARCHAR(200) NOT NULL)"
 ```
 

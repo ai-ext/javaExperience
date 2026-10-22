@@ -170,7 +170,7 @@ sql "CREATE TABLE lesson_counter (id BIGINT PRIMARY KEY, like_count INT NOT NULL
 터미널 두 개(A·B)를 열고 각각 `mysql`에 들어간다(G3의 접속 명령).
 
 ```bash
-docker exec -it -e LANG=C.UTF-8 studymate-mysql-1 mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community
+docker compose exec -e LANG=C.UTF-8 mysql mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community
 ```
 
 **(가) 읽고 +1 해서 쓰기.** 아래 순서대로 친다. 둘 다 `0`을 읽었으니 둘 다 `1`을 쓴다.

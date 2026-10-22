@@ -43,7 +43,7 @@ RuntimeException이 나면 → ROLLBACK, 그리고 예외를 그대로 위로 �
 트랜잭션을 눈으로 보려면 **한 접속**에서 여러 문장을 차례로 쳐야 한다. 그래서 이번에는 E2의 `sql` 함수(한 번 치고 끊는다) 대신 `mysql` 클라이언트에 들어가서 친다.
 
 ```bash
-docker exec -it -e LANG=C.UTF-8 studymate-mysql-1 mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community
+docker compose exec -e LANG=C.UTF-8 mysql mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community
 ```
 
 시드 데이터를 건드리지 않도록 **임시 테이블**(`TEMPORARY`)을 만든다. 임시 테이블은 이 접속에서만 보이고, 접속을 끊으면 사라진다. 태그 이름 칸은 10글자까지만 들어가게 했다.

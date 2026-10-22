@@ -10,7 +10,7 @@
 - 서버에서도 알림마다 글을 따로 조회하지 않게 해 주세요(목록 한 번에 쿼리 수가 알림 수에 따라 늘면 안 됩니다).
 - **완료 조건**: 기존 필드는 그대로, `postTitle`만 추가된다.
 
-**DB 시작 상태**: `community` 처음 상태(`bash scripts/java-db.sh --reset`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 알림 테이블(V4)은 비어 있다 — 아래 요청 A·B가 회원 3(이스프링)의 글 2에 좋아요·댓글을 달아 알림을 만든다.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 처음 덤프로 다시 만든다. 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 알림 테이블(V4)은 비어 있다 — 아래 요청 A·B가 회원 3(이스프링)의 글 2에 좋아요·댓글을 달아 알림을 만든다.
 
 ## 지금 코드
 

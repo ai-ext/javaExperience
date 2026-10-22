@@ -12,7 +12,7 @@
 - 구버전 앱은 버전을 보내지 않습니다. 버전이 없는 수정 요청은 지금처럼 받습니다.
 - **완료 조건**: 같은 버전으로 두 번 저장하면 첫 번째만 반영되고 두 번째는 `409`, 그사이 동시 조회가 몇 번 있어도 결과는 같다.
 
-**DB 시작 상태**: `community` 처음 상태(`bash scripts/java-db.sh --reset`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다 — **다음 마이그레이션 번호는 V7**. 이스프링(`tok-lee`)의 글 18(자유글 07)을 쓴다.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 처음 덤프로 다시 만든다. 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다 — **다음 마이그레이션 번호는 V7**. 이스프링(`tok-lee`)의 글 18(자유글 07)을 쓴다.
 
 ## 지금 코드
 

@@ -11,7 +11,7 @@
 - 처리하지 못한 예외(500)는 내부 메시지·예외 이름을 응답에 내보내지 않고 로그에만 남깁니다.
 - **완료 조건**: 아래 표의 에러가 모두 `status`·`detail`·`code`를 가진 같은 모양이고, 기존 상태 코드는 그대로다.
 
-**DB 시작 상태**: `community` 처음 상태(`bash scripts/java-db.sh --reset`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 이스프링(`tok-lee`)은 북마크 폴더 `스프링 공부`를 이미 갖고 있고, `tok-choi`는 정지 회원, 글 1은 운영자의 글이다.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 처음 덤프로 다시 만든다. 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 이스프링(`tok-lee`)은 북마크 폴더 `스프링 공부`를 이미 갖고 있고, `tok-choi`는 정지 회원, 글 1은 운영자의 글이다.
 
 ## 지금 코드
 

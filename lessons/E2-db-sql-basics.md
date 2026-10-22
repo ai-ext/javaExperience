@@ -46,24 +46,24 @@ LIMIT 3;
 
 ### 어디서 실행하나 — 두 가지
 
-**① CloudBeaver(웹 DB 도구)** — `http://localhost:8978`에 로그인한다. 왼쪽 목록에서 `community (Java 시나리오)`를 누르고, 위쪽 막대의 **SQL** 버튼을 눌러 편집기를 연다. 쿼리를 쓰고 실행(`Ctrl+Enter`)하면 커서가 있는 문장 하나가 실행되고, 결과가 아래 표로 나온다. 바꾸는 문장(`INSERT`·`UPDATE`·`DELETE`)은 실행하는 순간 바로 확정된다(자동 커밋).
+**① CloudBeaver(웹 DB 도구)** — `http://localhost:8978`에 로그인한다. 왼쪽 목록에서 `community (시나리오)`를 누르고, 위쪽 막대의 **SQL** 버튼을 눌러 편집기를 연다. 쿼리를 쓰고 실행(`Ctrl+Enter`)하면 커서가 있는 문장 하나가 실행되고, 결과가 아래 표로 나온다. 바꾸는 문장(`INSERT`·`UPDATE`·`DELETE`)은 실행하는 순간 바로 확정된다(자동 커밋).
 
-**② 터미널** — studymate의 MySQL 컨테이너 안에 있는 `mysql` 클라이언트를 쓴다. 매번 길게 치기 싫으니 함수로 만든다(zsh·bash 둘 다 된다).
+**② 터미널** — 이 저장소 compose의 MySQL 컨테이너(`mysql` 서비스) 안에 있는 `mysql` 클라이언트를 쓴다. 저장소 루트(`compose.yaml`이 있는 폴더)에서 실행한다. 매번 길게 치기 싫으니 함수로 만든다(zsh·bash 둘 다 된다).
 
 ```bash
-sql() { docker exec -i studymate-mysql-1 mysql --default-character-set=utf8mb4 -t -ucommunity -pcommunity community -e "$1"; }
+sql() { docker compose exec -T mysql mysql --default-character-set=utf8mb4 -t -ucommunity -pcommunity community -e "$1"; }
 ```
 
 | 부분 | 뜻 |
 |---|---|
-| `docker exec -i studymate-mysql-1` | 실행 중인 MySQL 컨테이너 안에서 명령을 돌린다 |
+| `docker compose exec -T mysql` | compose의 `mysql` 서비스 컨테이너 안에서 명령을 돌린다. `-T`는 터미널 없이 결과만 받는다 |
 | `--default-character-set=utf8mb4` | **꼭 붙인다.** 빼면 한글이 `???`로 나온다(아래 "일부러 틀려 보기") |
 | `-t` | 결과를 표 모양으로. 빼면 탭으로 구분된 글자로 나온다 |
 | `-ucommunity -pcommunity community` | 계정 `community`, 비밀번호 `community`, DB `community` |
 
 실행할 때마다 `mysql: [Warning] Using a password on the command line interface can be insecure.`가 한 줄 나온다. 비밀번호를 명령에 적었다는 경고일 뿐이라 무시해도 된다.
 
-아래 결과는 모두 **처음 상태(시드) 그대로인 DB**에서 실행한 것이다. 1-2 이후 단계를 하면서 글을 넣었다면 `dev`·`notice` 게시판 글과 `id`가 더 늘어 있을 수 있다. 처음 상태로 되돌리려면 studymate 레포 루트에서 `bash scripts/java-db.sh --reset`.
+아래 결과는 모두 **처음 상태(시드) 그대로인 DB**에서 실행한 것이다. 1-2 이후 단계를 하면서 글을 넣었다면 `dev`·`notice` 게시판 글과 `id`가 더 늘어 있을 수 있다. 처음 상태로 되돌리려면 이 저장소 루트에서 `docker compose down -v && docker compose up -d`(`community`·`practice`·`project` 세 DB를 모두 지우고 처음 덤프로 다시 만든다. 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`).
 
 ### 테이블 모양 보기
 
@@ -285,7 +285,7 @@ ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the ma
 **6. `--default-character-set=utf8mb4`를 뺀다**
 
 ```text
-$ docker exec -i studymate-mysql-1 mysql -ucommunity -pcommunity community -e "SELECT id, nickname FROM member WHERE id <= 3"
+$ docker compose exec -T mysql mysql -ucommunity -pcommunity community -e "SELECT id, nickname FROM member WHERE id <= 3"
 id	nickname
 1	???
 2	???
@@ -369,7 +369,7 @@ SQL에서 `NULL`은 "값을 모름"이다. `deleted_at = NULL`은 참도 거짓�
 <details>
 <summary>정답</summary>
 
-모든 글의 제목이 `앗`으로 **확정**된다. SQL로는 원래 제목을 알 수 없으니 되돌릴 방법이 없다. 이 실습 DB라면 studymate 레포 루트에서 `bash scripts/java-db.sh --reset`으로 처음 상태로 돌린다. 운영 DB라면 백업에서 복구해야 하는 사고다. 그래서 `UPDATE`·`DELETE`는 같은 `WHERE`로 `SELECT`를 먼저 해서 몇 행이 걸리는지 확인하는 습관을 들인다.
+모든 글의 제목이 `앗`으로 **확정**된다. SQL로는 원래 제목을 알 수 없으니 되돌릴 방법이 없다. 이 실습 DB라면 이 저장소 루트에서 `docker compose down -v && docker compose up -d`로 처음 상태로 돌린다(세 DB가 모두 처음 덤프로 돌아간다). 운영 DB라면 백업에서 복구해야 하는 사고다. 그래서 `UPDATE`·`DELETE`는 같은 `WHERE`로 `SELECT`를 먼저 해서 몇 행이 걸리는지 확인하는 습관을 들인다.
 </details>
 
 ## 더 깊이

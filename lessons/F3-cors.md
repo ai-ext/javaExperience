@@ -4,7 +4,7 @@
 
 ## 이게 뭐냐
 
-curl로는 잘 되는데 studymate 실행 칸 버튼만 실패하고, 콘솔에 `blocked by CORS policy`가 뜬다. 서버 로그에는 에러가 없다. 막은 건 서버가 아니라 **브라우저**다.
+curl로는 잘 되는데 문서 사이트 실행 칸 버튼만 실패하고, 콘솔에 `blocked by CORS policy`가 뜬다. 서버 로그에는 에러가 없다. 막은 건 서버가 아니라 **브라우저**다.
 
 ### 출처(origin)
 
@@ -13,11 +13,11 @@ curl로는 잘 되는데 studymate 실행 칸 버튼만 실패하고, 콘솔에 
 | 페이지 | 요청 대상 | 같은 출처? | 다른 곳 |
 |---|---|---|---|
 | `http://localhost:3000` | `http://localhost:3000/api/posts` | 같다 | — |
-| `http://localhost:3000` (studymate) | `http://localhost:8080/api/posts` (내 서버) | **다르다** | 포트 |
+| `http://localhost:3000` (프론트 화면) | `http://localhost:8080/api/posts` (내 서버) | **다르다** | 포트 |
 | `http://localhost:8080` | `http://127.0.0.1:8080/api/posts` | **다르다** | 호스트(같은 컴퓨터여도 이름이 다르면 다르다) |
 | `http://localhost:8080` | `https://localhost:8080` | **다르다** | 프로토콜 |
 
-studymate 실행 칸은 `http://localhost:3000`에 뜬 페이지가 브라우저에서 `http://localhost:8080/api/posts`로 요청을 보낸다. 포트가 다르니 다른 출처다.
+프론트 화면은 `http://localhost:3000`에 뜬 페이지가 브라우저에서 `http://localhost:8080/api/posts`로 요청을 보낸다. 포트가 다르니 다른 출처다. 이 저장소의 문서 사이트 실행 칸(`http://127.0.0.1:8765`)도 호스트와 포트가 달라 다른 출처다.
 
 ### 같은 출처 정책 — 왜 브라우저가 막나
 
@@ -49,7 +49,7 @@ studymate 실행 칸은 `http://localhost:3000`에 뜬 페이지가 브라우저
 
 ## 예시
 
-실측 방법: 서버 하나(1-5 정답 코드, 8209 포트)를 띄우고, 브라우저(Chromium)로 `http://localhost:8209`의 페이지를 연 뒤 그 안에서 `http://127.0.0.1:8209/api/posts`로 요청을 보냈다. 호스트 이름이 달라 **다른 출처**가 된다. 아래 결과는 브라우저 콘솔과 요청 결과를 그대로 옮긴 것이다. 학습자 환경이라면 `localhost:3000`(studymate) → `localhost:8080`(내 서버)이 같은 모양이 된다.
+실측 방법: 서버 하나(1-5 정답 코드, 8209 포트)를 띄우고, 브라우저(Chromium)로 `http://localhost:8209`의 페이지를 연 뒤 그 안에서 `http://127.0.0.1:8209/api/posts`로 요청을 보냈다. 호스트 이름이 달라 **다른 출처**가 된다. 아래 결과는 브라우저 콘솔과 요청 결과를 그대로 옮긴 것이다. 학습자 환경이라면 `127.0.0.1:8765`(문서 사이트 실행 칸) → `localhost:8080`(내 서버)이 같은 모양이 된다.
 
 ### ① CORS 설정이 없을 때 — JSON POST
 
@@ -134,7 +134,7 @@ Invalid CORS request
 
 **1. preflight를 curl로 흉내 낸다.** 1-1의 "직접 확인"에 있는 요청 C(`OPTIONS` + `Origin` + `Access-Control-Request-Method: PATCH`)를 보내고, 응답에서 `Access-Control-Allow-Origin`·`Access-Control-Allow-Methods`에 `PATCH`가 있는지 본다.
 
-**2. 브라우저에서 두 번 오가는 걸 본다.** studymate의 1-1 실행 칸을 열고 개발자 도구 **Network** 탭에서 **Disable cache**를 켠 채 버튼을 누른다. `posts` 요청이 두 줄 생긴다. 하나는 `OPTIONS`(preflight), 하나는 `POST`다. `OPTIONS` 줄을 눌러 응답 헤더의 `Access-Control-Allow-Origin`을 찾는다.
+**2. 브라우저에서 두 번 오가는 걸 본다.** 문서 사이트(`http://127.0.0.1:8765`)의 1-1 실행 칸을 열고 개발자 도구 **Network** 탭에서 **Disable cache**를 켠 채 버튼을 누른다. `posts` 요청이 두 줄 생긴다. 하나는 `OPTIONS`(preflight), 하나는 `POST`다. `OPTIONS` 줄을 눌러 응답 헤더의 `Access-Control-Allow-Origin`을 찾는다.
 
 Disable cache를 끄고 다시 누르면 `POST` 한 줄만 보일 수 있다. 응답의 `Access-Control-Max-Age: 1800` 때문에 브라우저가 30분 동안 preflight 답을 기억해 두고 다시 묻지 않는 것이다.
 
@@ -194,7 +194,7 @@ if (CorsUtils.isPreFlightRequest(request)) {   // org.springframework.web.cors.C
 **㉠만.** 경로(`/api`)는 출처에 들어가지 않는다. ㉡은 포트, ㉢은 호스트 이름, ㉣은 프로토콜이 다르다. `localhost`와 `127.0.0.1`은 같은 컴퓨터를 가리키지만 **글자가 다르면 다른 출처**다.
 </details>
 
-**2.** curl로는 `201`인데 studymate 실행 칸 버튼만 실패한다. 서버 로그에는 아무 에러가 없다. 무엇을 의심하고, 어디를 보나?
+**2.** curl로는 `201`인데 문서 사이트 실행 칸 버튼만 실패한다. 서버 로그에는 아무 에러가 없다. 무엇을 의심하고, 어디를 보나?
 
 <details>
 <summary>정답</summary>

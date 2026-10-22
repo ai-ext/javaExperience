@@ -406,7 +406,7 @@ SQL: update lesson_post lp1_0 set view_count=(lp1_0.view_count+1) where lp1_0.bo
 **1. 연습 테이블을 만든다.** E2의 `sql` 함수는 `community` DB를 본다. 맨 끝 DB 이름만 `practice`로 바꾼 `sqlp`를 하나 더 만든다.
 
 ```bash
-sqlp() { docker exec -i studymate-mysql-1 mysql --default-character-set=utf8mb4 -t -ucommunity -pcommunity practice -e "$1"; }
+sqlp() { docker compose exec -T mysql mysql --default-character-set=utf8mb4 -t -ucommunity -pcommunity practice -e "$1"; }
 sqlp "DROP TABLE IF EXISTS lesson_post, lesson_board; CREATE TABLE lesson_post LIKE post; INSERT INTO lesson_post SELECT * FROM post WHERE id <= 10; CREATE TABLE lesson_board LIKE board; INSERT INTO lesson_board SELECT * FROM board"
 ```
 

@@ -173,12 +173,12 @@ Caused by: java.net.ConnectException: Connection refused</code></pre>
 <p>로그 맨 끝(<code>Application run failed</code>)의 마지막 <code>Caused by:</code>는 이렇게 나온다.</p>
 <pre><code class="language-text">Caused by: org.hibernate.HibernateException: Unable to determine Dialect without JDBC metadata (please set 'jakarta.persistence.jdbc.url' for common cases or 'hibernate.dialect' when a custom Dialect implementation must be provided)</code></pre>
 <p><strong>로그에서 볼 줄</strong> — 주의할 곳이다. <strong>맨 아래 <code>Caused by:</code>(Dialect 어쩌고)는 진짜 원인이 아니다.</strong> DB에 못 붙어서 DB 종류를 알아내지 못했다는 뒤따른 결과일 뿐이다. 로그 <strong>위쪽</strong>의 <code>WARN … Communications link failure</code>와 그 밑 <code>Caused by: java.net.ConnectException: Connection refused</code>가 원인이다. &quot;그 주소에서 아무도 대답하지 않는다&quot;는 뜻이다.</p>
-<p><strong>원인</strong> — 앱이 <code>url</code>에 적힌 호스트·포트로 TCP 연결을 열지 못했다. MySQL 컨테이너가 꺼져 있거나, 포트 번호가 다르다. 예를 들면 studymate가 꺼져 있거나, <code>application.yml</code>의 <code>url</code>을 <a href="./README.html">시작하기</a>대로 <code>localhost:3306</code>(studymate MySQL)으로 바꾸지 않은 경우다.</p>
+<p><strong>원인</strong> — 앱이 <code>url</code>에 적힌 호스트·포트로 TCP 연결을 열지 못했다. MySQL 컨테이너가 꺼져 있거나, 포트 번호가 다르다. 예를 들면 이 저장소의 DB 컨테이너가 꺼져 있거나, <code>application.yml</code>의 <code>url</code> 포트가 compose의 호스트 포트 <code>13308</code>(<a href="./README.html#db-접속-정보">README — DB 접속 정보</a>)과 다른 경우다. 지금 main의 <code>application.yml</code>은 <code>localhost:3306</code>을 가리키므로 compose DB를 쓰려면 <code>13308</code>로 바꾼다.</p>
 <p><strong>고치는 법</strong></p>
 <ol>
-<li>studymate 레포 루트에서 <code>docker compose ps mysql</code> → <code>healthy</code>인지 본다. 꺼져 있으면 <code>docker compose up -d</code>.</li>
-<li><code>application.yml</code>의 <code>url</code> 포트가 <code>3306</code>인지 본다.</li>
-<li>그래도 안 되면 <code>docker exec -i studymate-mysql-1 mysql -ucommunity -pcommunity community -e &quot;SELECT 1&quot;</code>로 DB 자체가 응답하는지 확인한다.</li>
+<li>이 저장소 루트에서 <code>docker compose ps mysql</code> → <code>healthy</code>인지 본다. 꺼져 있으면 <code>docker compose up -d</code>.</li>
+<li><code>application.yml</code>의 <code>url</code> 포트가 <code>13308</code>(<code>DB_PORT</code>를 바꿨다면 그 값)인지 본다.</li>
+<li>그래도 안 되면 <code>docker compose exec -T mysql mysql -ucommunity -pcommunity community -e &quot;SELECT 1&quot;</code>로 DB 자체가 응답하는지 확인한다.</li>
 </ol>
 <p><strong>관련 단계</strong> — <a href="scenario/ch1-create-post/1-2-dto-response.html#일부러-망가뜨리기">1-2 일부러 망가뜨리기</a> · <a href="docs/knowledge/R08-app-to-db-connection.html">R08 앱 서버와 DB 서버는 어떻게 연결되나</a></p>
 <h2 id="db-이름이나-계정이-틀림"><a class="anchor" href="#db-이름이나-계정이-틀림" aria-hidden="true">#</a>DB 이름이나 계정이 틀림</h2>
@@ -195,7 +195,7 @@ Caused by: java.sql.SQLException: Access denied for user 'community'@'192.168.65
 <p>두 경우 모두 맨 끝 <code>Caused by:</code>는 <a href="#db에-연결-못-함">DB에 연결 못 함</a>과 같은 <code>Unable to determine Dialect without JDBC metadata</code>다.</p>
 <p><strong>로그에서 볼 줄</strong> — 위쪽 <code>WARN</code>의 <code>Access denied …</code> 줄이다. <code>to database &#39;…&#39;</code>가 붙어 있으면(1044) <strong>DB 이름</strong>을, <code>(using password: YES)</code>가 붙어 있으면(1045) <strong>계정·비밀번호</strong>를 본다.</p>
 <p><strong>원인</strong> — <code>community</code> 계정은 <code>community</code>·<code>practice</code> 두 DB만 쓸 수 있다. 없는 DB 이름은 &quot;권한 없는 DB&quot;로 취급되어 1044가 난다. 비밀번호가 틀리면 로그인 자체가 거절되어 1045가 난다.</p>
-<p><strong>고치는 법</strong> — <code>url</code>의 <code>/community?</code> 부분 철자를 확인한다. <code>username</code>·<code>password</code>는 <code>community</code>/<code>community</code>다. 계정이 아예 없다고 나오면 studymate 레포 루트에서 <code>bash scripts/java-db.sh</code>를 한 번 돌린다.</p>
+<p><strong>고치는 법</strong> — <code>url</code>의 <code>/community?</code> 부분 철자를 확인한다. <code>username</code>·<code>password</code>는 <code>community</code>/<code>community</code>다. 계정이 아예 없다고 나오면 먼저 <code>url</code>의 포트가 <code>13308</code>인지 본다. 다른 포트(예: <code>3306</code>)에 떠 있는 다른 MySQL에 붙으면 <code>community</code> 계정이 없다. 포트가 맞는데도 계정이 없으면 DB 볼륨이 이 저장소의 초기 데이터로 만들어지지 않은 것이다. 이 저장소 루트에서 <code>docker compose down -v &amp;&amp; docker compose up -d</code>로 새로 만든다(그동안의 데이터가 지워진다. 남길 것이 있으면 먼저 <code>./docker/mysql/dump.sh</code>).</p>
 <p><strong>관련 단계</strong> — <a href="scenario/ch1-create-post/1-2-dto-response.html#일부러-망가뜨리기">1-2 일부러 망가뜨리기</a> · <a href="docs/knowledge/R08-app-to-db-connection.html">R08 앱 서버와 DB 서버는 어떻게 연결되나</a></p>
 <h2 id="mysql-드라이버-없음"><a class="anchor" href="#mysql-드라이버-없음" aria-hidden="true">#</a>MySQL 드라이버 없음</h2>
 <p><strong>찾는 말</strong> — <code>Failed to load driver class com.mysql.cj.jdbc.Driver</code> · <code>ClassNotFoundException: com.mysql.cj.jdbc.Driver</code></p>

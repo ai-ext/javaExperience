@@ -41,7 +41,7 @@ API가 느릴 때 원인이 쿼리라면, 감으로 고치지 않고 어디서 �
 8·9장의 학습용 DB `practice`(글 145개)에서 실행한 그대로다. 터미널에서는 E2의 `sql` 함수를 DB 이름만 바꿔 하나 더 만든다.
 
 ```bash
-sqlp() { docker exec -i studymate-mysql-1 mysql --default-character-set=utf8mb4 -t -ucommunity -pcommunity practice -e "$1"; }
+sqlp() { docker compose exec -T mysql mysql --default-character-set=utf8mb4 -t -ucommunity -pcommunity practice -e "$1"; }
 ```
 
 CloudBeaver라면 `practice (Java 학습용)` 연결에서 실행한다. 이 DB의 `post` 테이블에는 인덱스가 셋 있다. 기본 키(`PRIMARY`, `id`), 작성자(`fk_post_author`, `author_id`), 게시판 목록용(`ix_post_board_published`, `board_id, published_at, id`).

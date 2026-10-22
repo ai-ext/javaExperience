@@ -97,7 +97,7 @@ public class HelloController {
 
 **③ 실행 (3분)**
 
-1. `⌥F12`로 터미널을 열고 `docker ps --filter name=studymate-mysql`로 DB(studymate MySQL)가 `healthy`인지 본다.
+1. `⌥F12`로 터미널을 열고 `docker compose ps mysql`로 DB(이 저장소 compose의 MySQL)가 `healthy`인지 본다.
 2. `⌘O` → `Main` → 열린 파일의 `public static void main` 줄 옆 초록 ▶ → **Run 'Main.main()'**.
 3. Run 창(`⌘4`)에 `Started Main`이 찍히면 터미널에서:
 
@@ -126,7 +126,7 @@ public class HelloController {
 | ▶가 안 보이거나 회색이다 | 아직 인덱싱 중이다. 진행 막대가 끝날 때까지 기다린다 |
 | 중단점에서 안 멈춘다 | 🐞가 아니라 ▶로 띄웠다. 또는 코드를 고친 뒤 다시 띄우지 않았다 |
 | `Port 8080 was already in use` | 이미 하나 떠 있다(A3). Run·Debug 창 탭을 보고 남은 것을 ■로 끈다 |
-| `Communications link failure`·`Unable to determine Dialect` | DB가 꺼져 있다. studymate를 띄운다(studymate 레포에서 `COMPOSE_PROJECT_NAME=studymate docker compose up -d`) |
+| `Communications link failure`·`Unable to determine Dialect` | DB가 꺼져 있다. 이 저장소 루트에서 `docker compose up -d`로 띄운다 |
 
 ## 확인 문제
 

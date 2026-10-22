@@ -224,7 +224,7 @@ id  board_id  author_id  title          status     visibility  published_at  vie
 **지켜야 할 것**
 
 - 테이블을 바꾸지 말고 엔티티를 테이블에 맞춘다. `application.yml`의 `ddl-auto: validate`는 그대로 둔다.
-- 테이블은 CloudBeaver(`http://localhost:8978`)의 `community (Java 시나리오)` 연결, 아래 `SHOW CREATE TABLE`, dump 파일 중 편한 것으로 본다.
+- 테이블은 CloudBeaver(`http://localhost:8978`)의 `community (시나리오)` 연결, 아래 `SHOW CREATE TABLE`, dump 파일 중 편한 것으로 본다.
 
 ```bash
 docker compose exec -T mysql mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community -e "SHOW CREATE TABLE post\G"
@@ -350,7 +350,7 @@ VALUES (2, 2, 'SQL로 넣은 글', '터미널에서 INSERT', 'PUBLISHED', 'PUBLI
 SELECT LAST_INSERT_ID();"
 ```
 
-CloudBeaver(`http://localhost:8978`)라면 `community (Java 시나리오)` 연결 → SQL 편집기에 `INSERT …` 문만 붙여 넣고 실행한다.
+CloudBeaver(`http://localhost:8978`)라면 `community (시나리오)` 연결 → SQL 편집기에 `INSERT …` 문만 붙여 넣고 실행한다.
 
 SQL로 넣어 보면 JPA가 대신 해 주던 일이 다 내 몫이다.
 

@@ -123,7 +123,7 @@ INFO 6336 --- [javaExperience] [tomcat-shutdown] o.s.boot.tomcat.GracefulShutdow
 **① 터미널 1 — 서버 띄우기**
 
 ```bash
-docker ps --filter name=studymate-mysql   # DB(studymate MySQL)가 healthy인지 본다(DB가 없으면 앱이 안 뜬다 — 이유는 0-6)
+docker compose ps mysql   # DB(이 저장소 compose의 MySQL)가 healthy인지 본다(DB가 없으면 앱이 안 뜬다 — 이유는 0-6)
 ./gradlew bootRun
 ```
 

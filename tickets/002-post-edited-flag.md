@@ -10,7 +10,7 @@
 - 조회수·좋아요가 늘어난 건 "수정"이 아닙니다.
 - **완료 조건**: 기존 필드는 그대로 두고 두 필드만 추가된다.
 
-**DB 시작 상태**: `community` 처음 상태(`bash scripts/java-db.sh --reset`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 글 2는 한 번도 고친 적 없는 글, 글 6(이스프링의 팔로워 공개 글)은 작성 뒤에 고친 글이다.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 처음 덤프로 다시 만든다. 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 글 2는 한 번도 고친 적 없는 글, 글 6(이스프링의 팔로워 공개 글)은 작성 뒤에 고친 글이다.
 
 ## 지금 코드
 
