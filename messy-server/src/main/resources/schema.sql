@@ -42,8 +42,8 @@ CREATE TABLE IF NOT EXISTS post (
     updated_at DATETIME(6)   NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT fk_post_member FOREIGN KEY (member_id) REFERENCES member (id),
-    -- 목록 조회(status 필터 + id 커서)용
-    KEY idx_post_status_id (status, id)
+    -- 목록 조회용. 커서(id < ?)로 범위를 먼저 좁히고 status로 거른다
+    KEY idx_post_id_status (id, status)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS tag (

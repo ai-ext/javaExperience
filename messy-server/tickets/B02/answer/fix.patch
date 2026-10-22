@@ -1,0 +1,111 @@
+diff --git a/src/main/resources/schema.sql b/src/main/resources/schema.sql
+index 2655574..9f53073 100644
+--- a/src/main/resources/schema.sql
++++ b/src/main/resources/schema.sql
+@@ -42,8 +42,9 @@ CREATE TABLE IF NOT EXISTS post (
+     updated_at DATETIME(6)   NOT NULL,
+     PRIMARY KEY (id),
+     CONSTRAINT fk_post_member FOREIGN KEY (member_id) REFERENCES member (id),
+-    -- 목록 조회용. 커서(id < ?)로 범위를 먼저 좁히고 status로 거른다
+-    KEY idx_post_id_status (id, status)
++    -- 목록 조회용. WHERE status = ? ORDER BY id DESC를 인덱스 순서 그대로 읽으려면 등호 조건(status)이 앞, 정렬(id)이 뒤다.
++    -- (id, status)는 PRIMARY와 같은 순서라 쓰이지 않고, 최근 글이 숨김으로 쏠리면 PK를 거꾸로 훑으며 버리는 행이 늘어난다.
++    KEY idx_post_status_id (status, id)
+ ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+ 
+ CREATE TABLE IF NOT EXISTS tag (
+diff --git a/src/test/java/com/example/board/post/PostListExplainTest.java b/src/test/java/com/example/board/post/PostListExplainTest.java
+new file mode 100644
+index 0000000..9ef5be7
+--- /dev/null
++++ b/src/test/java/com/example/board/post/PostListExplainTest.java
+@@ -0,0 +1,89 @@
++package com.example.board.post;
++
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++import java.util.regex.Matcher;
++import java.util.regex.Pattern;
++
++import org.apache.ibatis.mapping.BoundSql;
++import org.apache.ibatis.mapping.ParameterMapping;
++import org.apache.ibatis.session.SqlSessionFactory;
++import org.junit.jupiter.api.AfterEach;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++
++import com.example.board.ApiTestSupport;
++import com.example.board.member.Member;
++import com.example.board.member.Role;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++/**
++ * 목록 쿼리가 "최근 글이 대부분 숨김"인 분포에서도 첫 쪽을 인덱스로 짚어 읽는지 EXPLAIN ANALYZE로 본다.
++ * ACTIVE가 촘촘한 데이터에서는 PK를 거꾸로 훑어도 21건 근처에서 멈춰 차이가 안 보인다. 그래서 분포를 고정한다.
++ */
++class PostListExplainTest extends ApiTestSupport {
++
++    static final Pattern POST_ACCESS = Pattern.compile(
++            "->[^\\n]*\\bon post\\b(?!_)[^\\n]*\\(actual time=[^ ]+ rows=([0-9.e+-]+) loops=([0-9]+)\\)");
++
++    @Autowired
++    SqlSessionFactory sqlSessionFactory;
++
++    @BeforeEach
++    void setUp() {
++        clearPosts();
++        Member m = newMember(Role.USER);
++        String numbers = "WITH RECURSIVE d(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM d WHERE i < 99)"
++                + " SELECT a.i * 100 + b.i AS n FROM d a CROSS JOIN d b";
++        // 오래된 글 4,000건(ACTIVE 절반) 위에 스팸 일괄 숨김 4,000건
++        jdbc.update("INSERT INTO post (member_id, title, content, status, like_count, created_at, updated_at)"
++                + " SELECT ?, CONCAT('글', n), '내용', IF(n % 2 = 0, 'ACTIVE', 'DELETED'), 0, NOW(6), NOW(6)"
++                + " FROM (" + numbers + ") t WHERE n < 4000 ORDER BY n", m.getId());
++        jdbc.update("INSERT INTO post (member_id, title, content, status, like_count, created_at, updated_at)"
++                + " SELECT ?, CONCAT('스팸', n), '광고', 'HIDDEN', 0, NOW(6), NOW(6)"
++                + " FROM (" + numbers + ") t WHERE n < 4000 ORDER BY n", m.getId());
++        jdbc.execute("ANALYZE TABLE post");
++    }
++
++    @AfterEach
++    void tearDown() {
++        clearPosts();
++    }
++
++    @Test
++    void 숨김_글이_최근에_몰려도_첫_쪽은_post를_21행만_읽는다() {
++        String plan = explainAnalyzeFirstPage();
++
++        // 결함 상태: "Index scan on post using PRIMARY (reverse) ... rows=4042"
++        assertThat(maxRowsRead(plan)).as(plan).isLessThanOrEqualTo(21);
++        assertThat(plan).doesNotContain("Table scan on post");
++    }
++
++    private String explainAnalyzeFirstPage() {
++        Map<String, Object> params = new HashMap<>();
++        params.put("cond", new PostSearchCondition(null, null));
++        params.put("afterId", null);
++        params.put("limit", 21);
++        BoundSql bound = sqlSessionFactory.getConfiguration()
++                .getMappedStatement("com.example.board.post.PostQueryMapper.search").getBoundSql(params);
++        String sql = bound.getSql();
++        for (ParameterMapping p : bound.getParameterMappings()) {
++            sql = sql.replaceFirst("\\?", String.valueOf(params.get(p.getProperty())));
++        }
++        List<Map<String, Object>> rows = jdbc.queryForList("EXPLAIN ANALYZE " + sql.replaceAll("\\s+", " "));
++        return String.valueOf(rows.get(0).values().iterator().next());
++    }
++
++    private static double maxRowsRead(String plan) {
++        Matcher m = POST_ACCESS.matcher(plan);
++        double max = -1;
++        while (m.find()) {
++            max = Math.max(max, Double.parseDouble(m.group(1)) * Integer.parseInt(m.group(2)));
++        }
++        assertThat(max).as("post 접근 줄이 없다: " + plan).isGreaterThanOrEqualTo(0);
++        return max;
++    }
++}
