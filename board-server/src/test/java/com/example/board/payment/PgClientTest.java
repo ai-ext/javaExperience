@@ -30,7 +30,7 @@ class PgClientTest {
 
     PgClient client(String baseUrl, int maxConnections) {
         BoardProperties.Pg pg = new BoardProperties.Pg(baseUrl, Duration.ofSeconds(1), Duration.ofSeconds(3),
-                Duration.ofSeconds(2), maxConnections);
+                Duration.ofSeconds(2), maxConnections, "test-only-pg-secret-test-only-pg-secret");
         // 타임아웃 자체만 보려고 재시도는 끈다(재시도는 PgClientRetryTest)
         return new PgClient(PgClientConfig.pgRestClient(pg), new PgRetryPolicy(1));
     }

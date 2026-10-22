@@ -75,6 +75,25 @@ public class ChargeService {
         return tx.execute(s -> reload(payment).getStatus());
     }
 
+    /**
+     * PG 콜백 반영. 승인 응답·조회와 같은 조건부 전이를 쓰므로 어느 쪽이 먼저 와도 적립은 한 번이다.
+     * 이미 확정된 건의 재전송은 아무것도 바꾸지 않고 성공으로 끝낸다(PG가 재전송을 멈추도록).
+     */
+    public void applyCallback(PgCallbackRequest callback) {
+        tx.executeWithoutResult(s -> {
+            PgPayment payment = paymentRepository.findByOrderId(callback.orderId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "충전 기록이 없습니다."));
+            if (payment.getAmount() != callback.amount()) {
+                throw new BusinessException(ErrorCode.VALIDATION, "금액이 충전 요청과 다릅니다.");
+            }
+            if ("DONE".equals(callback.status())) {
+                settleDone(payment, callback.paymentKey());
+            } else {
+                paymentRepository.markFailed(payment.getId(), callback.paymentKey(), now());
+            }
+        });
+    }
+
     /** 트랜잭션 1: 호출 전에 REQUESTED를 커밋해 둔다. 같은 키가 이미 있으면 그 기록을 돌려준다. */
     private Started start(Long memberId, String idempotencyKey, int amount) {
         try {

@@ -24,8 +24,10 @@ public record BoardProperties(@Valid @NotNull ForbiddenWords forbiddenWords, @Va
     public record Jwt(@NotBlank @Size(min = 32) String secret, @Positive long expiresInSeconds) {
     }
 
-    // 타임아웃 셋 중 하나라도 비면 그 구간에서 요청 스레드가 끝없이 묶일 수 있어 모두 필수다
+    // 타임아웃 셋 중 하나라도 비면 그 구간에서 요청 스레드가 끝없이 묶일 수 있어 모두 필수다.
+    // secret은 콜백 서명(HMAC-SHA256) 키이고 환경 변수 BOARD_PG_SECRET으로만 주입한다.
     public record Pg(@NotBlank String baseUrl, @NotNull Duration connectTimeout, @NotNull Duration responseTimeout,
-            @NotNull Duration connectionRequestTimeout, @Positive int maxConnections) {
+            @NotNull Duration connectionRequestTimeout, @Positive int maxConnections,
+            @NotBlank @Size(min = 32) String secret) {
     }
 }

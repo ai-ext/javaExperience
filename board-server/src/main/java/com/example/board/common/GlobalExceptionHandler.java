@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +33,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail handleBusiness(BusinessException e, HttpServletRequest request) {
         ErrorCode code = e.errorCode();
         return problem(code.status(), code.type(), code.title(), e.getMessage(), request.getRequestURI());
+    }
+
+    // 직접 검증한 본문(PG 콜백처럼 원문을 먼저 봐야 하는 경우)도 같은 errors[] 형식으로 맞춘다
+    @ExceptionHandler(ConstraintViolationException.class)
+    ProblemDetail handleConstraintViolation(ConstraintViolationException e, HttpServletRequest request) {
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION.type(), ErrorCode.VALIDATION.title(),
+                "요청 값이 올바르지 않습니다.", request.getRequestURI());
+        List<Map<String, String>> errors = e.getConstraintViolations().stream()
+                .map(v -> {
+                    String path = v.getPropertyPath().toString();
+                    return Map.of("field", path.substring(path.lastIndexOf('.') + 1), "reason", v.getMessage());
+                })
+                .toList();
+        pd.setProperty("errors", errors);
+        return pd;
     }
 
     // IllegalArgumentException 등을 400으로 바꾸지 않는다. 서버 버그가 클라이언트 잘못으로 보이면 장애가 숨는다.

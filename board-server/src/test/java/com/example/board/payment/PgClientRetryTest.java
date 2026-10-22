@@ -30,7 +30,7 @@ class PgClientRetryTest {
 
     PgClient client() {
         BoardProperties.Pg pg = new BoardProperties.Pg(PgContainers.baseUrl(), Duration.ofSeconds(1),
-                Duration.ofSeconds(3), Duration.ofSeconds(2), 10);
+                Duration.ofSeconds(3), Duration.ofSeconds(2), 10, "test-only-pg-secret-test-only-pg-secret");
         return new PgClient(PgClientConfig.pgRestClient(pg), new PgRetryPolicy());
     }
 

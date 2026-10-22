@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClient;
 
 import com.example.board.payment.PgClient;
 import com.example.board.payment.PgRetryPolicy;
+import com.example.board.payment.PgSignatureVerifier;
 
 @Configuration(proxyBeanMethods = false)
 public class PgClientConfig {
@@ -22,6 +23,11 @@ public class PgClientConfig {
     @Bean
     PgClient pgClient(BoardProperties properties) {
         return new PgClient(pgRestClient(properties.pg()), new PgRetryPolicy());
+    }
+
+    @Bean
+    PgSignatureVerifier pgSignatureVerifier(BoardProperties properties) {
+        return new PgSignatureVerifier(properties.pg().secret());
     }
 
     /** 연결·응답·풀 대기 타임아웃을 따로 건다. 테스트가 풀 크기를 바꿔 만들 수 있게 정적 메서드로 둔다. */
