@@ -36,3 +36,22 @@ $ tools/course/gradle-docker.sh board-server bootRun --args=--spring.profiles.ac
 ... PlaceholderResolutionException: Could not resolve placeholder 'DB_PASSWORD' in value "${DB_PASSWORD}"
 BUILD FAILED
 ```
+
+## D01-4
+
+`local` 프로파일로 기동하고 요청 3건을 동시에 보냈다. 요청마다 `X-Request-Id`를 달리 줬고, `DispatcherServlet` 로그를 DEBUG로 켜서 요청 안의 로그 줄을 만들었다.
+
+```
+$ tools/course/gradle-docker.sh board-server bootRun \
+    --args="--spring.profiles.active=local --logging.level.org.springframework.web.servlet.DispatcherServlet=DEBUG"
+$ for i in 1 2 3; do curl -s -o /dev/null -H "X-Request-Id: req-$i" localhost:8080/actuator/health & done; wait
+... DEBUG [req-1] [http-nio-8080-exec-1] o.s.web.servlet.DispatcherServlet : GET "/actuator/health", parameters={}
+... DEBUG [req-1] [http-nio-8080-exec-1] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+... DEBUG [req-2] [http-nio-8080-exec-2] o.s.web.servlet.DispatcherServlet : GET "/actuator/health", parameters={}
+... DEBUG [req-2] [http-nio-8080-exec-2] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+... DEBUG [req-3] [http-nio-8080-exec-3] o.s.web.servlet.DispatcherServlet : GET "/actuator/health", parameters={}
+... DEBUG [req-3] [http-nio-8080-exec-3] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+$ curl -i localhost:8080/actuator/health        # 헤더 없이
+HTTP/1.1 200
+X-Request-Id: d7d72884-12b1-4475-8674-2525718ffbc7
+```
