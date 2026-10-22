@@ -116,7 +116,7 @@
 | POST /api/posts, PUT /api/posts/{postId} | `title` | string | O | 1~100자, 공백만 불가 | 400 `/errors/validation` |
 | POST /api/posts, PUT /api/posts/{postId} | `content` | string | O | 1~5000자 | 400 `/errors/validation` |
 | POST /api/posts, PUT /api/posts/{postId} | `tags` | string[] | X | 최대 5개, 각 1~20자, 중복 제거 | 400 `/errors/validation` |
-| PATCH /api/posts/{postId} | `title`, `content`, `tags` | 위와 같음 | X | 보낸 필드만 위 규칙으로 검증, 전부 없으면 불가 | 400 `/errors/validation` |
+| PATCH /api/posts/{postId} | `title`, `content`, `tags` | 위와 같음 | X | 보낸 필드만 위 규칙으로 검증, 전부 없으면 불가. 생략한 필드와 `null`인 필드는 둘 다 바꾸지 않는다 | 400 `/errors/validation` |
 | POST /api/posts/{postId}/comments | `content` | string | O | 1~500자 | 400 `/errors/validation` |
 | (경로) | `postId`, `commentId` | long | O | 양수 | 400 `/errors/validation` |
 | (대상 없음) | - | - | - | 없는 글·댓글, 삭제·숨김 처리된 글 | 404 `/errors/not-found` |
