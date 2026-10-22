@@ -114,3 +114,14 @@ DNN ② … (board-server의 실제 파일 경로를 적는다. 예: board-serve
 - `--tests 'J05*'`가 J05 클래스만 잡는다.
 - `cd tools/site && npm run build` 후 `course/java` 렌더링 여부 확인(렌더러 연결은 P5 범위 — 여기서는 깨지지 않는지만).
 - `grep -rn 'Docker Desktop\|studymate' java-track course/java` → 0건.
+
+## 실행 기록 (2026-10-22)
+
+- 1차(뼈대·J00·J01) → 컨트롤러 검증 후 템플릿 확정. 2차 A(J02~J07)·B(J08~J10·J15)·C(J11~J14)를 별도 worktree에서 병행, 각 `:java-track:check` 통과 확인 후 PR 브랜치에 J 번호 순으로 cherry-pick(B의 J09 수정 커밋은 J09에 합침).
+- 합친 뒤: `:java-track:check --rerun-tasks` 통과(J 테스트 클래스 55개 모두 뼈대 실패, 정답 전부 통과), `--tests 'J05*'`는 J05 4개 클래스만, 루트 `test`에서 java-track 태스크 7개 skip, 사이트 빌드 HTML 358개·링크 오류 0, audit 3종 통과.
+- Ruling: answerTest는 테스트를 두 번 컴파일하지 않고 classpath 가리기(answer 출력이 main 앞) — 정답 시그니처가 다르면 NoSuchMethodError로 드러남.
+- Ruling: java-track 태스크는 `:java-track`을 명시하거나 java-track 디렉터리 안에서 실행할 때만 동작(루트 레거시 앱 빌드에 실패가 섞이지 않게).
+- Ruling: J11 정답 특성화 테스트는 `src/answerTest`에 같은 이름으로 두어 가리고, `J11MutantTest`가 결함 변형 3개(소스 한 곳 치환 후 javac)를 정답 테스트가 잡는지 확인.
+- Ruling: J12~J14는 특성화(동작) 테스트는 뼈대에서도 통과하고, 클래스마다 구조 테스트가 뼈대에서 실패하게 함.
+- Ruling: J02 Lombok 습관 칸은 Lombok 의존 없이 delombok 출력과 같은 손 코드로 비교. J07 동시성은 CountDownLatch로 매번 재현. J07 타입 한 컷은 Jackson 대신 `java.beans.Introspector`.
+- minor: J02·J03 분량이 60분을 넘을 수 있음 / J09·J15는 테스트 중 JVM 기본 시간대를 바꿈(병렬 실행 시 주의) / J11MutantTest는 작업 디렉터리가 java-track이어야 함(IDE 러너 주의) / J11 정답이 `src/answerTest`에 있어 P5 추출 시 함께 볼 것.

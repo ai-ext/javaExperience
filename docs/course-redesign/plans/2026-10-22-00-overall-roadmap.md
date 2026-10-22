@@ -7,8 +7,8 @@
 | # | 계획 | 결과물 | 선행 | 상태 |
 |---|---|---|---|---|
 | P1 | 명세서 v2 · D1~D15 순서표 · 말하기 카드 | `course/spec-v2.md`, `course/roadmap.json`, `course/talk-cards.md`, 검증기 `tools/course/` | — | **완료** — 브랜치 `course/p1-spec-roadmap` (9 commits, 로컬), 원장 `2026-10-22-p1-ledger.md` |
-| P2 | 1단계 정답 서버 (D1~D10) | `board-server/` 정답 프로젝트, 순서별 커밋, 태그 `answer-d01~d10`, Colima 테스트 통과 | P1 | 계획 작성·실행 중 (`2026-10-22-p2-answer-server.md`) |
-| P3 | Java 트랙 J0~J15 | `java-track/` Gradle 모듈, 학습 테스트, `course/java/J00~J15.md` | P1 | 미작성 |
+| P2 | 1단계 정답 서버 (D1~D10) | `board-server/` 정답 프로젝트, 순서별 커밋, 태그 `answer-d01~d10`, Colima 테스트 통과 | P1 | **완료** — 태그 `answer-d01`~`answer-d10`(로컬), 원장 `2026-10-22-p2-ledger.md` |
+| P3 | Java 트랙 J0~J15 | `java-track/` Gradle 모듈, 학습 테스트, `course/java/J00~J15.md` | P1 | **완료** — 계획 `2026-10-22-p3-java-track.md`, `:java-track:check` 통과 |
 | P4 | 2단계 어수선한 서버와 티켓 B1~B16 | 브랜치 `messy`, 결함별 재현 스크립트·확인 테스트, `course/tickets/B01~B16.md` | P2 | 미작성 |
 | P5 | 일자 페이지와 화면 | `course/spring/D01~D15.md`, 빌드 렌더러(오늘 순서 우선), 홈 재구성, 과정 지도·요청 흐름·장애 흐름 재생(devops-repo-map 참고), 미캔 MCP 요소 탐색·적용 | P1·P2·P3 | 미작성 |
 | P6 | 기존 문서 정리 | `studymate`·포트·Docker Desktop 문구, 깨진 셸 예시, 10장 v2 안내, 참고 도감 링크 | P5 | 미작성 |

@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>J09. Clock 주입과 Duration — TTL과 KST 자정 경계</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=53f71b596d04">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<h1 id="j09-clock-주입과-duration--ttl과-kst-자정-경계"><a class="anchor" href="#j09-clock-주입과-duration--ttl과-kst-자정-경계" aria-hidden="true">#</a>J09. Clock 주입과 Duration — TTL과 KST 자정 경계</h1>
+<blockquote>
+<p>같은 날: <a class="docref" href="../../docs/knowledge/D09-operations-observability.html">D09</a> · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests &#39;J09*&#39;</code></p>
+</blockquote>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p><a class="docref" href="../../docs/knowledge/D09-operations-observability.html">D09</a>는 Redis를 붙이는 날이다. <a class="docref" href="../../docs/knowledge/D09-operations-observability.html">D09</a> ① 인기글 캐시는 TTL 60초, <a class="docref" href="../../docs/knowledge/D09-operations-observability.html">D09</a> ⑥ 로그인 시도 제한은 &quot;10분 5회&quot;라서 시간이 지나면 키가 사라진다. <a class="docref" href="../../docs/knowledge/D03-rest-api-dev-process.html">D03</a> ④ <code>JwtProvider</code>는 만료 토큰을 테스트하려고 <code>Clock</code>을 주입받는다. 그리고 <a class="docref" href="../../docs/knowledge/D13-backend-glossary.html">D13</a> ③에서는 &quot;자정 전후 출석 포인트가 두 번 쌓인다&quot;를 <code>Clock</code>을 고정한 테스트로 재현한다.
+오늘은 Spring 없이 시간을 다룬다. &quot;지금&quot;을 <code>Instant.now()</code>로 직접 읽지 않고 주입받은 <code>Clock</code>에서 읽으면, 테스트가 <code>Clock.fixed</code>로 만료 시각 1초 전과 KST 자정 정각을 정확히 만들 수 있다.</p>
+<h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>서버 코드</th>
+<th>테스트</th>
+<th>TS로 치면</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>지금 읽기</td>
+<td><code>clock.instant()</code></td>
+<td><code>Clock.fixed(Instant.parse(&quot;2026-10-22T14:59:59Z&quot;), ZoneOffset.UTC)</code></td>
+<td><code>Date.now()</code> 대신 <code>now()</code> 함수를 주입</td>
+</tr>
+<tr>
+<td>시간 흐름</td>
+<td>진짜로 흐른다</td>
+<td>&quot;지금&quot;만 다른 시계를 하나 더 만든다</td>
+<td><code>jest.useFakeTimers()</code> + <code>setSystemTime</code></td>
+</tr>
+<tr>
+<td>길이</td>
+<td><code>Duration.ofSeconds(60)</code></td>
+<td><code>Duration.between(a, b)</code></td>
+<td>밀리초 <code>number</code></td>
+</tr>
+</tbody></table></div>
+<pre><code>UTC  ... 14:59:59 | 15:00:00 ...          (같은 10월 22일)
+KST  ... 23:59:59 | 00:00:00 (10월 23일)
+                  ↑ KST 자정 = UTC 15:00</code></pre>
+<p>흔한 착각: &quot;<code>LocalDate.now(clock)</code>이면 시계를 주입했으니 안전하다&quot;. <code>LocalDate.now(clock)</code>는 <strong>시계의 zone</strong>으로 날짜를 자른다. 운영 서버 시계가 UTC면 KST 00:00~08:59 사이의 출석이 전날로 잡힌다. 날짜를 자를 때는 KST를 직접 지정한다(<code>clock.instant().atZone(KST)</code>). 그래서 오늘 테스트의 시계는 모두 일부러 UTC로 두고, 테스트하는 동안 JVM 기본 시간대도 <code>America/New_York</code>으로 바꿔 둔다(<code>@BeforeEach</code>에서 바꾸고 <code>@AfterEach</code>에서 되돌린다). 개발 PC의 기본 시간대가 KST라서 <code>ZoneId.systemDefault()</code>나 시계의 zone에 기대는 코드가 우연히 맞는 것을 잡아내려는 것이다.</p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<details>
+<summary>펼치기</summary>
+
+<p>채울 파일(<code>java-track/src/main/java/com/example/javatrack/j09/</code>):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>파일</th>
+<th>채울 것</th>
+<th>칸</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TokenIssuer.java</code></td>
+<td>시계·TTL 필드, 생성자 검사, <code>issue</code>·<code>isExpired</code>·<code>remaining</code></td>
+<td>주제 과제</td>
+</tr>
+<tr>
+<td><code>MidnightTtl.java</code></td>
+<td><code>untilNextKstMidnight</code></td>
+<td>주제 과제</td>
+</tr>
+<tr>
+<td><code>AttendanceBook.java</code></td>
+<td><code>firstPerKstDay</code></td>
+<td>기본기 반복</td>
+</tr>
+<tr>
+<td><code>KstTime.java</code></td>
+<td><code>today</code>·<code>toKstLocalDateTime</code>·<code>fromKstLocalDateTime</code>·<code>toOffsetString</code></td>
+<td>타입 한 컷</td>
+</tr>
+<tr>
+<td><code>Token.java</code>·<code>Attendance.java</code></td>
+<td>주어진 코드. 고치지 않는다</td>
+<td>-</td>
+</tr>
+</tbody></table></div>
+<p>규칙:</p>
+<ul>
+<li><code>TokenIssuer</code>: TTL이 null이거나 0 이하면 <code>IllegalArgumentException</code>. 만료 시각 = 발급 시각 + TTL. <strong>지금이 만료 시각과 같거나 지났으면 만료</strong>다(JWT <code>exp</code>와 같다). 남은 시간은 이미 지났으면 <code>Duration.ZERO</code>(음수를 내주지 않는다).</li>
+<li><code>MidnightTtl.untilNextKstMidnight</code>: 시계의 zone과 상관없이 KST로 다음 자정까지 센다. KST 23:59:59이면 1초, KST 00:00:00 정각이면 24시간이다.</li>
+</ul>
+<p>뼈대 발췌:</p>
+<pre><code class="language-java">public class TokenIssuer {
+
+    // TODO: 시계와 TTL 필드를 선언하세요(만든 뒤 바뀌지 않게)
+
+    public TokenIssuer(Clock clock, Duration ttl) {
+        throw new UnsupportedOperationException(&quot;J09: TokenIssuer 생성자 — ttl을 검사하고 시계·TTL을 필드에 담으세요&quot;);
+    }
+
+    /** 지금이 만료 시각과 같거나 지났으면 true. */
+    public boolean isExpired(Token token) {
+        throw new UnsupportedOperationException(&quot;J09: TokenIssuer.isExpired — 지금과 만료 시각을 비교하세요&quot;);
+    }
+
+    /** 만료까지 남은 시간. 이미 만료됐으면 Duration.ZERO. */
+    public Duration remaining(Token token) {
+        throw new UnsupportedOperationException(&quot;J09: TokenIssuer.remaining — Duration.between으로 남은 시간을 구하세요&quot;);
+    }
+    // issue도 같은 모양
+}
+
+public final class MidnightTtl {
+
+    public static final ZoneId KST = ZoneId.of(&quot;Asia/Seoul&quot;);
+
+    public static Duration untilNextKstMidnight(Clock clock) {
+        throw new UnsupportedOperationException(&quot;J09: MidnightTtl.untilNextKstMidnight — KST 지금 시각에서 다음 날 0시까지의 Duration을 구하세요&quot;);
+    }
+}</code></pre>
+<p><code>Clock.fixed</code>는 멈춘 시계라 시간이 흐르지 않는다. 테스트는 &quot;지금&quot;만 다른 <code>TokenIssuer</code>를 하나 더 만들어 시간이 흐른 상황을 흉내 낸다(같은 TTL, 다른 시계).</p>
+<p>통과시킬 테스트(주제 과제) — <code>J09TtlTest</code>:</p>
+<ul>
+<li><code>발급_시각은_주입한_시계에서_읽고_만료_시각은_발급_시각에_TTL을_더한다</code></li>
+<li><code>만료_시각_1초_전에는_유효하고_만료_시각_정각부터는_만료다</code></li>
+<li><code>남은_시간은_만료까지의_Duration이고_이미_지났으면_0이다</code></li>
+<li><code>TTL이_null이거나_0이거나_음수이면_거절한다</code></li>
+<li><code>KST_자정_1초_전이면_다음_자정까지_1초가_남는다</code></li>
+<li><code>KST_자정_정각이면_새_날이_시작됐으므로_24시간이_남는다</code></li>
+<li><code>UTC_자정은_KST_오전_9시라_KST_자정까지_15시간이_남는다</code></li>
+<li><code>시계의_zone이_무엇이든_같은_순간이면_같은_TTL이다</code> (UTC·뉴욕·서울 시계)</li>
+</ul>
+</details>
+
+<h2 id="기본기-반복"><a class="anchor" href="#기본기-반복" aria-hidden="true">#</a>기본기 반복</h2>
+<p>출석 기록 목록에서 회원마다, KST 날짜마다 가장 이른 출석 하나만 남긴다. 기록은 주어진 <code>Attendance.at(memberId, clock)</code>이 주입받은 시계로 찍는다(테스트는 <code>Clock.fixed</code>를 넘긴다). 정렬, <code>Map</code>에 처음 것만 담기(<code>putIfAbsent</code>), for를 다시 쓴다.</p>
+<pre><code class="language-java">/** 회원·KST 날짜마다 가장 이른 출석만. 결과는 시각이 이른 순. 입력 순서는 뒤섞여 있을 수 있다. */
+public static List&lt;Attendance&gt; firstPerKstDay(List&lt;Attendance&gt; records)</code></pre>
+<p>테스트 — <code>J09BasicsTest</code>:</p>
+<ul>
+<li><code>KST_날짜마다_가장_이른_출석만_남긴다</code></li>
+<li><code>UTC로는_같은_날이어도_KST_자정을_넘었으면_다른_날이다</code> (14:59:59Z와 15:00:00Z)</li>
+<li><code>UTC로는_다른_날이어도_KST로_같은_날이면_첫_출석만_남는다</code></li>
+<li><code>회원마다_따로_센다</code></li>
+<li><code>순서가_뒤섞여_들어와도_가장_이른_출석을_남기고_시각_순으로_돌려준다</code></li>
+<li><code>빈_목록이면_빈_목록을_돌려준다</code></li>
+</ul>
+<h2 id="타입-한-컷"><a class="anchor" href="#타입-한-컷" aria-hidden="true">#</a>타입 한 컷</h2>
+<p><code>LocalDate</code>·<code>LocalDateTime</code>·<code>Instant</code>·<code>ZonedDateTime</code>의 차이 — 출석 자정 경계, 토큰 만료.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>담는 것</th>
+<th>시간대</th>
+<th>어울리는 곳</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Instant</code></td>
+<td>타임라인 위의 한 점(UTC 기준 초·나노초)</td>
+<td>없음. 어디서 봐도 같은 순간</td>
+<td>토큰 만료, TTL 계산, &quot;몇 초 남았나&quot;</td>
+</tr>
+<tr>
+<td><code>ZonedDateTime</code></td>
+<td>날짜·시각 + zone(<code>Asia/Seoul</code>)</td>
+<td>있음</td>
+<td>&quot;KST로 오늘 자정은 언제인가&quot; 같은 달력 계산</td>
+</tr>
+<tr>
+<td><code>LocalDateTime</code></td>
+<td>날짜·시각(벽시계 숫자)</td>
+<td><strong>없음</strong></td>
+<td>DB <code>DATETIME</code>(KST로 저장한다는 약속이 따로 있어야 의미가 있다)</td>
+</tr>
+<tr>
+<td><code>LocalDate</code></td>
+<td>날짜만</td>
+<td>없음</td>
+<td>출석 날짜, &quot;하루 한 번&quot;</td>
+</tr>
+</tbody></table></div>
+<p>함정: 같은 <code>Instant</code>라도 어느 zone으로 보느냐에 따라 <code>LocalDate</code>가 달라진다. <code>LocalDate.now(utcClock)</code>는 KST 00:30을 <strong>전날</strong>로 본다. 반대로 <code>LocalDateTime</code>에는 zone이 없으므로 <code>Instant</code>로 되돌릴 때는 &quot;이 값은 KST다&quot;를 직접 붙여야 한다(<code>atZone(KST)</code>).</p>
+<p>과제: <code>KstTime</code>을 채운다. <code>today(clock)</code>은 시계 zone을 무시하고 KST 날짜를, <code>toOffsetString</code>은 응답용 <code>2026-10-22T09:30:00+09:00</code>(초가 0이어도 초까지)을 만든다.</p>
+<p>확인 테스트 — <code>J09TypeCutTest</code>:</p>
+<ul>
+<li><code>today는_시계의_zone이_아니라_KST_날짜를_돌려준다</code></li>
+<li><code>함정_UTC_시계로_LocalDate_now를_부르면_KST_자정_직후가_어제가_된다</code></li>
+<li><code>같은_Instant도_어느_zone으로_보느냐에_따라_LocalDateTime이_다르다</code></li>
+<li><code>LocalDateTime에는_시간대가_없어_KST라는_zone을_붙여야_Instant로_되돌아간다</code></li>
+<li><code>응답에는_KST_오프셋을_붙인_ISO_문자열로_내보낸다</code></li>
+</ul>
+<h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2>
+<pre><code class="language-bash">./gradlew :java-track:test --tests 'J09*'</code></pre>
+<p>19개가 모두 <code>PASSED</code>면 끝이다.</p>
+<h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2>
+<details>
+<summary>펼치기</summary>
+
+<pre><code class="language-java">// TokenIssuer
+private final Clock clock;
+private final Duration ttl;
+
+public TokenIssuer(Clock clock, Duration ttl) {
+    if (ttl == null || ttl.isZero() || ttl.isNegative()) {
+        throw new IllegalArgumentException(&quot;TTL은 0보다 커야 합니다: &quot; + ttl);
+    }
+    this.clock = clock;
+    this.ttl = ttl;
+}
+
+public Token issue(Long memberId) {
+    Instant now = clock.instant();
+    return new Token(memberId, now, now.plus(ttl));
+}
+
+public boolean isExpired(Token token) {
+    // &quot;지금이 만료 시각 전인가&quot;의 반대. isAfter로 쓰면 만료 시각 정각을 유효로 잘못 본다
+    return !clock.instant().isBefore(token.expiresAt());
+}
+
+public Duration remaining(Token token) {
+    Duration left = Duration.between(clock.instant(), token.expiresAt());
+    return left.isNegative() ? Duration.ZERO : left;
+}</code></pre>
+<pre><code class="language-java">// MidnightTtl
+public static Duration untilNextKstMidnight(Clock clock) {
+    // 시계의 zone을 쓰지 않고 순간(Instant)만 꺼내 KST로 본다
+    ZonedDateTime now = clock.instant().atZone(KST);
+    ZonedDateTime nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay(KST);
+    return Duration.between(now, nextMidnight);
+}</code></pre>
+<pre><code class="language-java">// AttendanceBook
+public static List&lt;Attendance&gt; firstPerKstDay(List&lt;Attendance&gt; records) {
+    // 먼저 시각 순으로 정렬해 두면 &quot;처음 본 것&quot;이 곧 &quot;가장 이른 것&quot;이다
+    List&lt;Attendance&gt; sorted = new ArrayList&lt;&gt;(records);
+    sorted.sort(Comparator.comparing(Attendance::checkedAt));
+
+    Map&lt;String, Attendance&gt; firstByMemberAndDay = new LinkedHashMap&lt;&gt;();
+    for (Attendance attendance : sorted) {
+        LocalDate kstDate = attendance.checkedAt().atZone(KST).toLocalDate();
+        firstByMemberAndDay.putIfAbsent(attendance.memberId() + &quot;@&quot; + kstDate, attendance);
+    }
+    return new ArrayList&lt;&gt;(firstByMemberAndDay.values());
+}</code></pre>
+<pre><code class="language-java">// KstTime
+public static LocalDate today(Clock clock) {
+    // LocalDate.now(clock)는 시계의 zone으로 자른다. zone을 KST로 바꾼 시계를 넘긴다
+    return LocalDate.now(clock.withZone(KST));
+}
+
+public static LocalDateTime toKstLocalDateTime(Instant instant) {
+    return LocalDateTime.ofInstant(instant, KST);
+}
+
+public static Instant fromKstLocalDateTime(LocalDateTime kstDateTime) {
+    return kstDateTime.atZone(KST).toInstant();
+}
+
+public static String toOffsetString(Instant instant) {
+    // OffsetDateTime.toString()은 초가 0이면 &quot;09:30+09:00&quot;처럼 초를 뺀다. 형식을 고정하려고 포매터를 쓴다
+    return instant.atZone(KST).toOffsetDateTime().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+}</code></pre>
+<p>왜 이렇게 쓰나:</p>
+<ol>
+<li>&quot;지금&quot;을 한 곳(<code>Clock</code>)에서만 읽으면 테스트가 경계 시각(만료 1초 전, 자정 정각)을 정확히 만들 수 있다. <code>Instant.now()</code>가 코드 곳곳에 흩어져 있으면 자정 경계 버그는 자정에 테스트를 돌려야만 보인다.</li>
+<li>만료와 TTL은 시간대와 상관없는 <code>Instant</code>·<code>Duration</code>으로 계산하고, &quot;오늘&quot;이 필요한 곳에서만 KST <code>ZonedDateTime</code>으로 바꾼다. 날짜를 자르는 zone은 시계나 서버 설정에 맡기지 않고 <code>KST</code> 상수로 못 박는다.</li>
+<li>경계는 &quot;같거나 지나면 만료&quot;처럼 한쪽을 포함하는 규칙으로 정하고, 테스트로 정각 케이스를 고정한다. <code>isAfter</code>와 <code>!isBefore</code>는 정각에서만 다르게 동작한다.</li>
+</ol>
+</details>
+
+<h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2>
+<ul>
+<li><a class="docref" href="../../docs/knowledge/D02-server-network-basics.html">D02</a> ② <code>board-server/src/main/java/com/example/board/config/JpaConfig.java</code> — 감사 필드(<code>created_at</code>)의 시각을 <code>LocalDateTime.now(ZoneId.of(&quot;Asia/Seoul&quot;))</code>로 만든다. zone 없는 <code>LocalDateTime</code>을 &quot;KST로 저장한다&quot;는 약속으로 쓰는 자리다.</li>
+<li><a class="docref" href="../../docs/knowledge/D03-rest-api-dev-process.html">D03</a> ④ <code>board-server/src/main/java/com/example/board/config/JwtProvider.java</code> — 생성자로 <code>Clock</code>을 주입받아(기본은 <code>Clock.systemUTC()</code>) 발급 시각과 만료를 계산하고, 파싱할 때도 같은 시계로 만료를 판단한다. 오늘 만든 <code>TokenIssuer</code>와 같은 모양이다.</li>
+<li><a class="docref" href="../../docs/knowledge/D09-operations-observability.html">D09</a> ① <code>board-server/src/main/java/com/example/board/post/PopularPostService.java</code> — <code>static final Duration TTL = Duration.ofSeconds(60)</code>으로 캐시 TTL을 정하고, 응답 시각은 <code>atZoneSameInstant(KST).toOffsetDateTime()</code>으로 KST 오프셋을 붙인다.</li>
+<li><a class="docref" href="../../docs/knowledge/D09-operations-observability.html">D09</a> ⑥ <code>board-server/src/main/java/com/example/board/member/LoginAttemptLimiter.java</code> — <code>Duration WINDOW = Duration.ofMinutes(10)</code>을 Redis <code>EXPIRE</code>에 <code>WINDOW.toSeconds()</code>로 넘긴다.</li>
+</ul>
+
+
+</main>
+
+
+
+
+
+</body>
+</html>

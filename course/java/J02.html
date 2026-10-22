@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>J02. 예외 계층과 제네릭 Result, Lombok이 만드는 코드</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=53f71b596d04">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<h1 id="j02-예외-계층과-제네릭-result-lombok이-만드는-코드"><a class="anchor" href="#j02-예외-계층과-제네릭-result-lombok이-만드는-코드" aria-hidden="true">#</a>J02. 예외 계층과 제네릭 Result, Lombok이 만드는 코드</h1>
+<blockquote>
+<p>같은 날: <a class="docref" href="../../docs/knowledge/D02-server-network-basics.html">D02</a> · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests &#39;J02*&#39;</code></p>
+</blockquote>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p><a class="docref" href="../../docs/knowledge/D02-server-network-basics.html">D02</a>는 공통 기반을 세우는 날이다. ① <code>ErrorCode</code>와 <code>BusinessException</code>을 만들어 전역 예외 처리기가 코드 하나로 404·409를 내게 하고, ② <code>BaseEntity</code>를 만들며, ④ 상태 없는 닉네임 정규화는 static 유틸로 둔다.
+오늘은 Spring 없이 예외 계층(<code>BusinessException</code> ← <code>NotFoundException</code>)과 성공 값·에러 코드를 담는 제네릭 <code>Result&lt;T&gt;</code>를 만든다. 엔티티 id가 왜 <code>Long</code>인지, <a class="docref" href="../../docs/knowledge/D03-rest-api-dev-process.html">D03</a>부터 엔티티에 붙는 Lombok 애노테이션이 실제로 어떤 코드를 만드는지도 직접 써서 확인한다.</p>
+<h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>static</th>
+<th>인스턴스</th>
+<th>TS로 치면</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>어디에 붙나</td>
+<td>클래스 하나에 하나</td>
+<td><code>new</code>로 만든 객체마다</td>
+<td><code>static</code> 멤버 / 일반 멤버</td>
+</tr>
+<tr>
+<td>부르는 법</td>
+<td><code>Result.success(&quot;값&quot;)</code></td>
+<td><code>result.isSuccess()</code></td>
+<td><code>Result.success()</code> / <code>result.isSuccess()</code></td>
+</tr>
+<tr>
+<td><code>this</code>를 쓸 수 있나</td>
+<td>없다</td>
+<td>있다</td>
+<td>같다</td>
+</tr>
+<tr>
+<td>쓰는 곳</td>
+<td>객체를 만드는 팩토리, 상태 없는 유틸(<code>NicknameNormalizer</code>)</td>
+<td>객체가 가진 값으로 답하는 메서드</td>
+<td></td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>예외 계층</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>RuntimeException</code> ← <code>BusinessException</code></td>
+<td>언체크 예외. <code>throws</code>를 적지 않아도 던질 수 있다</td>
+</tr>
+<tr>
+<td><code>BusinessException</code> ← <code>NotFoundException</code></td>
+<td>자식은 부모 생성자(<code>super(...)</code>)에 코드와 메시지를 넘긴다. <code>catch (BusinessException e)</code>가 자식도 잡는다</td>
+</tr>
+</tbody></table></div>
+<p>흔한 착각: &quot;<code>Result&lt;T&gt;</code>의 <code>T</code>는 실행할 때 정해진다&quot;. <code>T</code>는 <strong>컴파일할 때</strong> 정해진다. <code>Result&lt;Integer&gt;</code>의 <code>value()</code>는 컴파일러가 <code>Integer</code>로 알고 있어서 형변환 없이 <code>int</code>로 쓸 수 있다. 실행 중에는 <code>T</code> 정보가 지워진다(<code>Result&lt;Integer&gt;</code>와 <code>Result&lt;String&gt;</code>이 같은 클래스다).</p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<details>
+<summary>펼치기</summary>
+
+<p>채울 파일(<code>java-track/src/main/java/com/example/javatrack/j02/</code>):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>파일</th>
+<th>채울 것</th>
+<th>칸</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>BusinessException.java</code></td>
+<td>필드 선언, 생성자, <code>errorCode</code></td>
+<td>주제 과제</td>
+</tr>
+<tr>
+<td><code>NotFoundException.java</code></td>
+<td>생성자(<code>super</code> 호출)</td>
+<td>주제 과제</td>
+</tr>
+<tr>
+<td><code>Result.java</code></td>
+<td>필드 선언, 생성자, <code>success</code>·<code>failure</code>·<code>isSuccess</code>·<code>value</code>·<code>errorCode</code>·<code>message</code></td>
+<td>주제 과제</td>
+</tr>
+<tr>
+<td><code>PostBasics.java</code></td>
+<td><code>sumLikesWithFor</code>·<code>sumLikesWithStream</code>·<code>splitTags</code></td>
+<td>기본기 반복</td>
+</tr>
+<tr>
+<td><code>BaseEntity.java</code></td>
+<td><code>isNew</code></td>
+<td>타입 한 컷</td>
+</tr>
+<tr>
+<td><code>PostRepository.java</code></td>
+<td><code>save</code></td>
+<td>타입 한 컷</td>
+</tr>
+<tr>
+<td><code>Coupon.java</code></td>
+<td>private 생성자, <code>builder</code>, <code>issue</code>, <code>CouponBuilder</code>의 필드·메서드</td>
+<td>실무 습관</td>
+</tr>
+<tr>
+<td><code>CouponIssueService.java</code></td>
+<td>필드 선언, 생성자, <code>issue</code></td>
+<td>실무 습관</td>
+</tr>
+<tr>
+<td><code>ErrorCode.java</code>·<code>PostRow.java</code>·<code>Post.java</code>·<code>PrimitiveIdPost.java</code>·<code>LeakyCoupon.java</code></td>
+<td>주어진 코드. 고치지 않는다</td>
+<td>-</td>
+</tr>
+</tbody></table></div>
+<p>규칙:</p>
+<ul>
+<li><code>BusinessException</code>은 <code>RuntimeException</code>을 상속한다. 메시지(<code>detail</code>)는 부모에게 넘기고, <code>ErrorCode</code>는 자기 필드에 담는다.</li>
+<li><code>NotFoundException(target, id)</code>의 코드는 언제나 <code>NOT_FOUND</code>, 메시지는 <code>&quot;찾을 수 없습니다: &quot; + target + &quot; id=&quot; + id</code>다.</li>
+<li><code>Result</code>는 생성자가 private이고 static 팩토리로만 만든다. 성공이면 <code>errorCode()</code>·<code>message()</code>가 null이고, 실패한 결과에서 <code>value()</code>를 꺼내면 <code>IllegalStateException</code>이다.</li>
+</ul>
+<p>뼈대 발췌:</p>
+<pre><code class="language-java">public class NotFoundException extends BusinessException {
+
+    public NotFoundException(String target, long id) {
+        // TODO: 부모 생성자에 알맞은 ErrorCode와 메시지를 넘기세요(super 호출은 생성자의 첫 줄이어야 한다)
+        super(null, null);
+        throw new UnsupportedOperationException(&quot;J02: NotFoundException 생성자 — NOT_FOUND와 메시지를 부모 생성자에 넘기세요&quot;);
+    }
+}
+
+public final class Result&lt;T&gt; {
+
+    // TODO: 성공 값·에러 코드·메시지 필드를 선언하세요(만든 뒤 바뀌지 않게)
+
+    private Result(T value, ErrorCode errorCode, String message) { … }
+
+    /** 성공 결과를 만든다. 인스턴스가 없어도 부를 수 있도록 static이다. */
+    public static &lt;T&gt; Result&lt;T&gt; success(T value) { … }
+
+    /** 예외가 가진 에러 코드와 메시지로 실패 결과를 만든다. BusinessException의 자식(NotFoundException 등)도 받는다. */
+    public static &lt;T&gt; Result&lt;T&gt; failure(BusinessException e) { … }
+
+    public boolean isSuccess() { … }
+
+    /** 성공 값을 돌려준다. 실패한 결과면 IllegalStateException. */
+    public T value() { … }
+    // errorCode · message도 같은 모양
+}</code></pre>
+<p><code>NotFoundException</code>의 <code>super(null, null)</code>은 컴파일되게 하려고 둔 자리다. <code>BusinessException</code>을 먼저 채우고, 이 줄을 알맞은 값으로 바꾼다.</p>
+<p>통과시킬 테스트(주제 과제) — <code>J02ResultTest</code>:</p>
+<ul>
+<li><code>BusinessException은_에러_코드와_메시지를_담는다</code></li>
+<li><code>NotFoundException은_NOT_FOUND와_대상_id를_담은_메시지를_만든다</code></li>
+<li><code>NotFoundException은_부모_타입_BusinessException으로_잡힌다</code></li>
+<li><code>성공_결과는_값을_돌려주고_에러_코드는_null이다</code></li>
+<li><code>실패_결과는_자식_예외의_에러_코드와_메시지를_담는다</code></li>
+<li><code>실패_결과에서_값을_꺼내면_IllegalStateException이_난다</code></li>
+<li><code>Result는_생성자를_숨기고_static_팩토리로만_만든다</code></li>
+<li><code>제네릭_덕분에_꺼낸_값을_형변환_없이_쓴다</code></li>
+</ul>
+</details>
+
+<h2 id="기본기-반복"><a class="anchor" href="#기본기-반복" aria-hidden="true">#</a>기본기 반복</h2>
+<p>글 목록의 좋아요 수를 for와 stream 두 가지로 더한다. 쉼표로 이어진 태그 문자열(<code>&quot; java, spring ,jpa &quot;</code>)을 <code>split</code>으로 나누고 <code>strip</code>으로 앞뒤 공백을 지운다. 빈 조각은 버린다.</p>
+<pre><code class="language-java">public static int sumLikesWithFor(List&lt;PostRow&gt; rows)
+public static int sumLikesWithStream(List&lt;PostRow&gt; rows)
+/** null이거나 공백뿐인 문자열이면 빈 리스트를 돌려준다. */
+public static List&lt;String&gt; splitTags(String raw)</code></pre>
+<p><code>trim()</code>과 <code>strip()</code>은 다르다. <code>trim()</code>은 코드값이 <code>&#39; &#39;</code> 이하인 문자만 지우고, <code>strip()</code>은 전각 공백(<code>　</code>) 같은 유니코드 공백도 지운다. 한글 입력기에서 들어온 공백은 <code>strip()</code>으로 지운다.</p>
+<p>테스트 — <code>J02BasicsTest</code>:</p>
+<ul>
+<li><code>좋아요_합계를_for와_stream으로_구해도_같다</code></li>
+<li><code>빈_목록의_좋아요_합계는_0이다</code></li>
+<li><code>쉼표로_나눈_태그의_앞뒤_공백을_지운다</code></li>
+<li><code>strip은_전각_공백도_지우지만_trim은_못_지운다</code></li>
+<li><code>빈_조각은_버리고_null이나_공백뿐인_문자열이면_빈_리스트다</code></li>
+</ul>
+<h2 id="타입-한-컷"><a class="anchor" href="#타입-한-컷" aria-hidden="true">#</a>타입 한 컷</h2>
+<p><code>long</code> vs <code>Long</code> — 엔티티 id는 왜 <code>Long</code>인가.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th><code>long</code> (기본형)</th>
+<th><code>Long</code> (래퍼)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>저장 전 id 값</td>
+<td><code>0</code> (기본값)</td>
+<td><code>null</code></td>
+</tr>
+<tr>
+<td>&quot;아직 저장 전&quot;을 표현</td>
+<td>못 한다. 0이 저장 전인지 0번 글인지 모른다</td>
+<td><code>id == null</code>이면 저장 전</td>
+</tr>
+<tr>
+<td>JPA(Spring Data)의 신규 판단</td>
+<td>기본형이면 0을 신규로 본다(규칙을 외워야 한다)</td>
+<td>null이면 신규 → INSERT, 아니면 기존 → 병합</td>
+</tr>
+<tr>
+<td>담을 수 있는 곳</td>
+<td>필드·지역 변수</td>
+<td>필드·지역 변수·제네릭(<code>Map&lt;Long, Post&gt;</code>)</td>
+</tr>
+</tbody></table></div>
+<p>함정: id를 <code>long</code>으로 선언하면(<code>PrimitiveIdPost</code>) 저장 전에도 <code>getId()</code>가 0이다. &quot;아직 저장 전&quot;이라는 상태를 타입이 표현하지 못한다.</p>
+<p>과제: <code>BaseEntity.isNew()</code>(id가 null이면 저장 전)와 <code>PostRepository.save()</code>를 채운다. 새 글이면 sequence를 1 올려 id로 매기고 추가한다. 이미 id가 있으면 같은 칸을 덮어쓴다(개수가 늘지 않는다). Spring Data JPA의 <code>save</code>가 하는 신규·기존 판단과 같다.</p>
+<p>확인 테스트 — <code>J02TypeCutTest</code>:</p>
+<ul>
+<li><code>새로_만든_글은_id가_null이고_새_엔티티다</code></li>
+<li><code>저장하면_id가_1부터_매겨지고_새_엔티티가_아니게_된다</code></li>
+<li><code>id가_있는_글을_다시_저장하면_추가하지_않고_덮어쓴다</code></li>
+<li><code>함정_long_id는_저장_전에도_0이라_저장_전인지_알_수_없다</code></li>
+</ul>
+<h2 id="실무-습관"><a class="anchor" href="#실무-습관" aria-hidden="true">#</a>실무 습관</h2>
+<p>Lombok이 만드는 코드. 이 모듈은 Lombok을 쓰지 않는다. 대신 애노테이션이 만들어 주는 코드를 손으로 써 본다. 아래 표의 &quot;만들어지는 코드&quot;는 Lombok 1.18.46의 <code>delombok</code> 출력에서 <code>@Generated</code> 같은 표시만 걷어 낸 것이다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>애노테이션</th>
+<th>만들어지는 코드</th>
+<th>주의</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@Getter</code></td>
+<td>필드마다 <code>public 타입 getX() { return this.x; }</code></td>
+<td><code>boolean</code> 필드는 <code>isX()</code>. 필드 이름이 <code>isOpen</code>이면 <code>isIsOpen</code>이 아니라 <code>isOpen()</code>. <code>Boolean</code>(래퍼) 필드는 <code>getX()</code></td>
+</tr>
+<tr>
+<td><code>@RequiredArgsConstructor</code></td>
+<td><strong>final이고 선언에서 초기화하지 않은</strong> 필드만 선언 순서대로 받는 public 생성자</td>
+<td><code>private final Set&lt;Long&gt; ids = new HashSet&lt;&gt;();</code>처럼 초기화한 final 필드와 final이 아닌 필드는 받지 않는다</td>
+</tr>
+<tr>
+<td><code>@Builder</code> (생성자에 붙임)</td>
+<td><code>public static XBuilder builder()</code>, 중첩 클래스 <code>XBuilder</code>(매개변수마다 같은 이름의 필드와 <code>this</code>를 돌려주는 메서드, <code>build()</code>)</td>
+<td>빌더에서 넣지 않은 값은 오류 없이 <code>null</code>·<code>0</code>이 된다. 검사는 생성자에 둔다</td>
+</tr>
+<tr>
+<td><code>@NoArgsConstructor(access = PROTECTED)</code></td>
+<td><code>protected X() {}</code></td>
+<td>JPA가 리플렉션으로 쓰는 빈 생성자. 밖에서 <code>new X()</code>를 막는다</td>
+</tr>
+<tr>
+<td><code>@Setter</code></td>
+<td>필드마다 <code>public void setX(타입 x)</code></td>
+<td>엔티티 규칙을 거치지 않고 아무 곳에서나 값을 바꾼다</td>
+</tr>
+<tr>
+<td><code>@AllArgsConstructor</code></td>
+<td>모든 필드를 받는 public 생성자</td>
+<td>id·발급 수량처럼 밖에서 정하면 안 되는 값까지 받는다</td>
+</tr>
+</tbody></table></div>
+<p>주어진 <code>LeakyCoupon</code>은 <code>@Getter @Setter @NoArgsConstructor @AllArgsConstructor</code>를 붙인 쿠폰 엔티티를 delombok한 코드다. <code>new LeakyCoupon(1L, &quot;웰컴 쿠폰&quot;, 10, 50)</code>도, <code>setIssuedQuantity(999)</code>도 막지 못해 총량보다 많이 발급된 쿠폰이 생긴다.</p>
+<p>과제:</p>
+<ol>
+<li><code>Coupon</code>을 <code>@Getter @NoArgsConstructor(access = PROTECTED)</code> + private 생성자에 <code>@Builder</code>를 붙인 모양으로 손으로 채운다. 검사는 private 생성자 한 곳에 둔다(이름이 비었거나 총량이 1보다 작으면 <code>IllegalArgumentException</code>). 발급 수량은 <code>issue()</code>로만 바뀐다(소진이면 <code>IllegalStateException</code>).</li>
+<li><code>CouponIssueService</code>를 <code>@RequiredArgsConstructor</code>가 만들 모양으로 채운다. 쿠폰은 생성자로 받고, 받은 회원 id 집합은 선언에서 바로 만든다. <code>issue(memberId)</code>는 1인 1매다.</li>
+</ol>
+<p>테스트 — <code>J02HabitTest</code>:</p>
+<ul>
+<li><code>Setter와_전체_생성자가_열린_쿠폰은_총량을_넘는_발급_수량을_막지_못한다_Coupon은_막는다</code></li>
+<li><code>Coupon에는_public_생성자와_setter가_없고_빌더로만_만든다</code></li>
+<li><code>빌더는_이름을_붙여_값을_넣고_발급_수량은_0에서_시작한다</code></li>
+<li><code>빌더에서_총량을_빠뜨리면_0이_들어가_생성자_검사에_걸린다</code></li>
+<li><code>RequiredArgsConstructor는_선언에서_초기화하지_않은_final_필드만_받는다</code></li>
+<li><code>한_회원에게는_한_번만_발급한다</code></li>
+</ul>
+<h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2>
+<pre><code class="language-bash">./gradlew :java-track:test --tests 'J02*'</code></pre>
+<p>23개가 모두 <code>PASSED</code>면 끝이다.</p>
+<h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2>
+<details>
+<summary>펼치기</summary>
+
+<pre><code class="language-java">// BusinessException
+private final ErrorCode errorCode;
+
+public BusinessException(ErrorCode errorCode, String detail) {
+    // 메시지는 부모(RuntimeException)가 보관한다. super 호출은 생성자의 첫 줄이어야 한다
+    super(detail);
+    this.errorCode = errorCode;
+}
+
+// NotFoundException
+public NotFoundException(String target, long id) {
+    super(ErrorCode.NOT_FOUND, &quot;찾을 수 없습니다: &quot; + target + &quot; id=&quot; + id);
+}</code></pre>
+<pre><code class="language-java">// Result
+private final T value;
+private final ErrorCode errorCode;
+private final String message;
+
+private Result(T value, ErrorCode errorCode, String message) {
+    this.value = value;
+    this.errorCode = errorCode;
+    this.message = message;
+}
+
+public static &lt;T&gt; Result&lt;T&gt; success(T value) {
+    return new Result&lt;&gt;(value, null, null);
+}
+
+public static &lt;T&gt; Result&lt;T&gt; failure(BusinessException e) {
+    // 매개변수 타입이 부모라서 자식 예외도 그대로 들어온다. errorCode()는 부모에 정의돼 있다
+    return new Result&lt;&gt;(null, e.errorCode(), e.getMessage());
+}
+
+public boolean isSuccess() {
+    return errorCode == null;
+}
+
+public T value() {
+    if (!isSuccess()) {
+        throw new IllegalStateException(&quot;실패한 결과에는 값이 없습니다: &quot; + errorCode);
+    }
+    return value;
+}</code></pre>
+<pre><code class="language-java">// PostBasics
+public static int sumLikesWithFor(List&lt;PostRow&gt; rows) {
+    int sum = 0;
+    for (PostRow row : rows) {
+        sum += row.likeCount();
+    }
+    return sum;
+}
+
+public static int sumLikesWithStream(List&lt;PostRow&gt; rows) {
+    // Stream&lt;PostRow&gt; → IntStream으로 바꿔야 sum()이 있다
+    return rows.stream().mapToInt(PostRow::likeCount).sum();
+}
+
+public static List&lt;String&gt; splitTags(String raw) {
+    List&lt;String&gt; tags = new ArrayList&lt;&gt;();
+    if (raw == null) {
+        return tags;
+    }
+    for (String piece : raw.split(&quot;,&quot;)) {
+        String tag = piece.strip();
+        if (!tag.isEmpty()) {
+            tags.add(tag);
+        }
+    }
+    return tags;
+}</code></pre>
+<pre><code class="language-java">// BaseEntity
+public boolean isNew() {
+    return id == null;
+}
+
+// PostRepository
+public Post save(Post post) {
+    if (post.isNew()) {
+        post.assignId(++sequence);
+    }
+    // 새 글이면 새 칸에, 저장된 글이면 같은 id 칸에 들어간다
+    store.put(post.getId(), post);
+    return post;
+}</code></pre>
+<pre><code class="language-java">// Coupon
+private Coupon(String name, int totalQuantity) {
+    // 빌더도 결국 이 생성자를 부르므로 검사는 여기 한 곳에 둔다
+    if (name == null || name.isBlank()) {
+        throw new IllegalArgumentException(&quot;쿠폰 이름이 비었습니다&quot;);
+    }
+    if (totalQuantity &lt; 1) {
+        throw new IllegalArgumentException(&quot;총량은 1 이상이어야 합니다: &quot; + totalQuantity);
+    }
+    this.name = name;
+    this.totalQuantity = totalQuantity;
+}
+
+public static CouponBuilder builder() {
+    return new CouponBuilder();
+}
+
+public void issue() {
+    if (issuedQuantity &gt;= totalQuantity) {
+        throw new IllegalStateException(&quot;쿠폰이 모두 소진되었습니다&quot;);
+    }
+    issuedQuantity++;
+}
+
+public static class CouponBuilder {
+
+    private String name;
+    private int totalQuantity;
+
+    CouponBuilder() {
+    }
+
+    public CouponBuilder name(String name) {
+        this.name = name;
+        return this;
+    }
+
+    public CouponBuilder totalQuantity(int totalQuantity) {
+        this.totalQuantity = totalQuantity;
+        return this;
+    }
+
+    public Coupon build() {
+        // 중첩 클래스는 바깥 클래스의 private 생성자를 부를 수 있다
+        return new Coupon(name, totalQuantity);
+    }
+}</code></pre>
+<pre><code class="language-java">// CouponIssueService
+private final Coupon coupon;
+private final Set&lt;Long&gt; issuedMemberIds = new HashSet&lt;&gt;();
+
+public CouponIssueService(Coupon coupon) {
+    this.coupon = coupon;
+}
+
+public boolean issue(long memberId) {
+    if (issuedMemberIds.contains(memberId)) {
+        return false;
+    }
+    // 소진이면 여기서 예외가 나고, 회원은 기록되지 않는다
+    coupon.issue();
+    issuedMemberIds.add(memberId);
+    return true;
+}</code></pre>
+<p>왜 이렇게 쓰나:</p>
+<ol>
+<li>예외마다 <code>ErrorCode</code>를 들려 보내면 받는 쪽은 <code>BusinessException</code> 하나만 잡고 코드로 응답을 고른다. 자식 예외(<code>NotFoundException</code>)는 코드를 생성자에서 정해 두므로 던지는 쪽은 대상과 id만 안다.</li>
+<li><code>Result</code>는 생성자를 숨기고 이름 있는 static 팩토리(<code>success</code>·<code>failure</code>)로만 만든다. &quot;값도 있고 에러 코드도 있는&quot; 잘못된 조합을 만들 길이 없다. 엔티티 id를 <code>Long</code>으로 두는 것도 같은 생각이다. &quot;아직 없음&quot;을 null이라는 값으로 표현할 수 있어야 저장소가 신규와 기존을 가른다.</li>
+<li>엔티티에는 <code>@Setter</code>·<code>@AllArgsConstructor</code>를 열지 않는다. 생성은 검사가 있는 생성자(빌더나 정적 팩토리를 거쳐)로, 변경은 <code>issue()</code> 같은 의도가 드러나는 메서드로만 한다. Lombok을 쓸 때도 이 모양이 나오도록 애노테이션을 고른다.</li>
+</ol>
+</details>
+
+<h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2>
+<ul>
+<li><a class="docref" href="../../docs/knowledge/D02-server-network-basics.html">D02</a> ① <code>board-server/src/main/java/com/example/board/common/ErrorCode.java</code> — 오늘 받은 <code>ErrorCode</code>의 원본. 상태는 <code>HttpStatus</code>, 유형은 <code>/errors/...</code> 경로로 들고 있다.</li>
+<li><a class="docref" href="../../docs/knowledge/D02-server-network-basics.html">D02</a> ① <code>board-server/src/main/java/com/example/board/common/BusinessException.java</code> — <code>RuntimeException</code>을 상속하고 <code>super(detail)</code>로 메시지를 넘긴다. 오늘 만든 것과 같은 모양이다. board-server에는 <code>NotFoundException</code> 같은 자식 클래스가 없고, <code>new BusinessException(ErrorCode.NOT_FOUND, &quot;글을 찾을 수 없습니다.&quot;)</code>처럼 코드를 직접 넘긴다.</li>
+<li><a class="docref" href="../../docs/knowledge/D02-server-network-basics.html">D02</a> ① <code>board-server/src/main/java/com/example/board/common/GlobalExceptionHandler.java</code> — <code>@ExceptionHandler(BusinessException.class)</code> 하나가 모든 업무 예외를 받아 <code>e.errorCode()</code>로 ProblemDetail을 만든다. 명세 v2는 응답 래퍼를 두지 않아서 <code>Result&lt;T&gt;</code> 같은 클래스는 board-server에 없다.</li>
+<li><a class="docref" href="../../docs/knowledge/D02-server-network-basics.html">D02</a> ② <code>board-server/src/main/java/com/example/board/common/BaseEntity.java</code> — <code>@MappedSuperclass</code>로 생성·수정 시각만 물려준다. id는 오늘과 달리 엔티티마다 <code>private Long id;</code>로 둔다.</li>
+<li><a class="docref" href="../../docs/knowledge/D02-server-network-basics.html">D02</a> ④ <code>board-server/src/main/java/com/example/board/common/NicknameNormalizer.java</code> — 상태가 없어 private 생성자 + static 메서드로 만든 유틸. 닉네임을 <code>strip()</code>으로 다듬는다.</li>
+<li><a class="docref" href="../../docs/knowledge/D03-rest-api-dev-process.html">D03</a> ② <code>board-server/src/main/java/com/example/board/member/Member.java</code> — <code>@Getter</code>·<code>@NoArgsConstructor(access = AccessLevel.PROTECTED)</code>, <code>@GeneratedValue</code>로 DB가 매기는 <code>Long id</code>, private 생성자 + <code>Member.create(...)</code>. <code>@Setter</code>·<code>@AllArgsConstructor</code>가 없다.</li>
+<li><a class="docref" href="../../docs/knowledge/D04-build-pipeline-explained.html">D04</a> ② <code>board-server/src/main/java/com/example/board/post/Tag.java</code> — 이날 함정이 &quot;엔티티에 <code>@Setter</code>·<code>@AllArgsConstructor</code>를 열어 두면 아무 곳에서나 상태가 바뀐다&quot;이다. <code>protected</code> 기본 생성자와 <code>Tag.create(name)</code>만 있다.</li>
+<li><a class="docref" href="../../docs/knowledge/D04-build-pipeline-explained.html">D04</a> ④ <code>board-server/src/main/java/com/example/board/post/PostServiceImpl.java</code> — <code>private final</code> 필드 다섯 개를 받는 생성자를 손으로 썼다. <code>@RequiredArgsConstructor</code>를 붙였다면 만들어졌을 코드와 같다(board-server는 생성자 애노테이션을 쓰지 않는다).</li>
+</ul>
+
+
+</main>
+
+
+
+
+
+</body>
+</html>

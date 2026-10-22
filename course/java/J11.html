@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>J11. 리팩터링 ①: 특성화 테스트로 레거시 동작 고정하기</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=53f71b596d04">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<h1 id="j11-리팩터링-①-특성화-테스트로-레거시-동작-고정하기"><a class="anchor" href="#j11-리팩터링-①-특성화-테스트로-레거시-동작-고정하기" aria-hidden="true">#</a>J11. 리팩터링 ①: 특성화 테스트로 레거시 동작 고정하기</h1>
+<blockquote>
+<p>같은 날: <a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests &#39;J11*&#39;</code></p>
+</blockquote>
+<h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
+<p><a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a>부터는 남이 만든 코드를 넘겨받는다. <a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> ②에서 글 작성·수정·삭제와 <code>GET /api/members/me</code>의 <strong>지금 동작</strong>을 특성화 테스트로 고정한다. 그다음 ③④에서 버그를 고치고 구조를 바꾼다. 고정한 테스트가 안전망이 되어, 고치는 동안 다른 동작이 바뀌면 바로 드러난다.
+오늘은 Spring 없이 같은 일을 해 본다. 문서 없이 조건이 덧붙은 레거시 포인트 계산 메서드가 있다. 이 메서드가 지금 돌려주는 값을 테스트로 고정한다. 이 테스트가 정말 동작을 고정했는지는 메서드를 일부러 한 곳씩 망가뜨린 변형으로 확인한다.</p>
+<h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>보통 테스트(명세)</th>
+<th>특성화 테스트</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>기대값의 출처</td>
+<td>요구사항, &quot;이래야 한다&quot;</td>
+<td>지금 코드를 불러서 <strong>나온 값</strong></td>
+</tr>
+<tr>
+<td>이상한 동작을 만나면</td>
+<td>버그로 보고 실패시킨다</td>
+<td>그대로 적는다. 고치는 것은 나중 일이다</td>
+</tr>
+<tr>
+<td>목적</td>
+<td>새 기능이 맞는지 확인</td>
+<td>리팩터링 중에 동작이 바뀌지 않았는지 감지</td>
+</tr>
+<tr>
+<td>일상 비유</td>
+<td>설계도대로 지었는지 검사</td>
+<td>이사 전에 방마다 사진을 찍어 두기</td>
+</tr>
+</tbody></table></div>
+<p>흔한 착각: &quot;특성화 테스트에도 옳은 값을 적어야 한다&quot;. 옳은 값을 적으면 고치기 전부터 실패한다. 그러면 테스트가 지금 동작을 고정하지 못하고 안전망 역할도 못 한다(<a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> ②의 함정). <code>VIP</code>는 5만 원 보너스가 없다. 이 규칙이 이상해 보여도 지금 그렇게 돌아가고 있으므로 그대로 적는다.</p>
+<h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
+<details>
+<summary>펼치기</summary>
+
+<p>채울 파일(<code>java-track/src/</code>):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>파일</th>
+<th>채울 것</th>
+<th>칸</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>test/java/com/example/javatrack/j11/J11CharacterizationTest.java</code></td>
+<td><strong>테스트를 쓴다.</strong> <code>LegacyPointCalculator.calculate</code>의 지금 동작을 고정</td>
+<td>주제 과제</td>
+</tr>
+<tr>
+<td><code>main/java/com/example/javatrack/j11/PointTable.java</code></td>
+<td><code>describeAll</code></td>
+<td>기본기 반복</td>
+</tr>
+<tr>
+<td><code>main/java/com/example/javatrack/j11/GradeLists.java</code></td>
+<td><code>toModifiableList</code>·<code>toIntegerList</code></td>
+<td>타입 한 컷</td>
+</tr>
+<tr>
+<td><code>main/java/com/example/javatrack/j11/LegacyPointCalculator.java</code></td>
+<td>주어진 레거시 코드. 고치지 않는다</td>
+<td>-</td>
+</tr>
+<tr>
+<td><code>test/java/com/example/javatrack/j11/J11MutantTest.java</code>·<code>LegacyPointCalculatorMutant.java</code></td>
+<td>주어진 확인 코드. 고치지 않는다</td>
+<td>-</td>
+</tr>
+</tbody></table></div>
+<p>오늘의 주제 과제는 코드가 아니라 테스트를 쓰는 것이다. <code>J11CharacterizationTest</code>에는 <code>fail(&quot;특성화 테스트를 채우세요&quot;)</code> 하나만 있다. 이 메서드를 지우고 테스트를 채운다.</p>
+<p>레거시 코드(주어진 것):</p>
+<pre><code class="language-java">public int calculate(int amount, String grade, boolean couponUsed) {
+    if (amount &lt; 0) {
+        return -1;
+    }
+    if (amount &lt; 1000) {
+        return 0;
+    }
+    int rate;
+    if (&quot;VIP&quot;.equals(grade)) {
+        rate = 5;
+    } else if (&quot;GOLD&quot;.equals(grade)) {
+        rate = 3;
+    } else {
+        rate = 1;
+    }
+    int point = amount * rate / 100;
+    // 2021 여름 이벤트: 5만 원 이상 구매 보너스
+    if (amount &gt;= 50000) {
+        if (!&quot;VIP&quot;.equals(grade)) {
+            point = point + 500;
+        }
+    }
+    if (point &gt; 3000) {
+        point = 3000;
+    }
+    // 쿠폰을 쓰면 적립은 절반
+    if (couponUsed) {
+        point = point / 2;
+    }
+    return point;
+}</code></pre>
+<p>학습자 자리(뼈대):</p>
+<pre><code class="language-java">class J11CharacterizationTest {
+
+    private final LegacyPointCalculator calculator = new LegacyPointCalculator();
+
+    @Test
+    void 특성화_테스트를_채우세요() {
+        // TODO: 이 메서드를 지우고, 입력 조합마다 지금 나오는 포인트를 고정하는 테스트를 쓰세요
+        fail(&quot;특성화 테스트를 채우세요&quot;);
+    }
+}</code></pre>
+<p>쓰는 순서:</p>
+<ol>
+<li>분기마다 경계 양쪽 값을 고른다. 대상은 <code>if</code> 하나하나, <code>&gt;=</code>인지 <code>&gt;</code>인지, 나눗셈의 소수점 처리, null과 대소문자다.</li>
+<li>그 값으로 <code>calculate</code>를 불러 <strong>나온 값을 그대로</strong> 기대값에 적는다. <code>@ParameterizedTest</code>·<code>@CsvSource</code>를 쓰면 표처럼 쓸 수 있다.</li>
+<li>기본기 반복의 <code>PointTable.describeAll</code>을 먼저 채웠다면 조합 표 전체를 한 번에 고정할 수도 있다.</li>
+</ol>
+<p>통과시킬 테스트(주제 과제):</p>
+<ul>
+<li><code>J11CharacterizationTest</code> — 네가 쓴 테스트가 원본에서 모두 통과한다.</li>
+<li><code>J11MutantTest</code> — 네 테스트를 원본과 변형 3개에 돌려 본다. 변형은 원본에서 한 곳만 바꾼 것이다.<ul>
+<li><code>원본_레거시에서는_특성화_테스트가_모두_통과한다</code></li>
+<li><code>한_곳을_바꾼_변형에서는_특성화_테스트가_실패한다</code> (변형마다 하나씩, 3개)</li>
+</ul>
+</li>
+</ul>
+<p>변형이 무엇을 바꿨는지는 <code>LegacyPointCalculatorMutant.java</code>에 있다. 먼저 보지 말고 테스트를 써 본다. 그다음 <code>J11MutantTest</code>의 실패 메시지(<code>변형 [...]에서도 특성화 테스트가 모두 통과합니다</code>)를 보고 빠진 경우를 더한다. 해피 패스만 확인하는 테스트로는 변형이 잡히지 않는다.</p>
+</details>
+
+<h2 id="기본기-반복"><a class="anchor" href="#기본기-반복" aria-hidden="true">#</a>기본기 반복</h2>
+<p>레거시 메서드의 입력 조합을 for 세 겹으로 만들어 결과를 <code>List&lt;String&gt;</code>에 모은다. 단정은 목록 하나로 한 번에 한다. 조합이 30개여도 단정문은 하나다. 어느 줄이 달라졌는지는 실패 메시지에 함께 나온다.</p>
+<pre><code class="language-java">/**
+ * 금액 × 등급 × 쿠폰 여부(false, true 순)의 모든 조합으로 calculator를 불러 한 줄씩 모은다.
+ * 한 줄은 &quot;등급/금액/쿠폰=포인트&quot; 모양이다. 예: &quot;GOLD/50000/-=2000&quot;, &quot;null/1000/쿠폰=5&quot;
+ */
+public static List&lt;String&gt; describeAll(LegacyPointCalculator calculator, int[] amounts, String[] grades)</code></pre>
+<p>테스트 — <code>J11BasicsTest</code>:</p>
+<ul>
+<li><code>금액_등급_쿠폰_조합을_순서대로_모아_한_번에_단정한다</code></li>
+<li><code>조합_수는_금액_수_곱하기_등급_수_곱하기_2다</code></li>
+<li><code>금액이나_등급이_비어_있으면_빈_목록이다</code></li>
+</ul>
+<h2 id="타입-한-컷"><a class="anchor" href="#타입-한-컷" aria-hidden="true">#</a>타입 한 컷</h2>
+<p>배열 vs <code>List</code>. 레거시 코드는 <code>String[] gradeNames()</code>, <code>int[] gradeRates()</code>처럼 배열을 돌려준다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>배열 <code>String[]</code></th>
+<th><code>List&lt;String&gt;</code> (<code>ArrayList</code>)</th>
+<th><code>Arrays.asList(배열)</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>길이</td>
+<td>만들 때 고정</td>
+<td>늘고 준다</td>
+<td><strong>고정</strong>(<code>add</code>하면 <code>UnsupportedOperationException</code>)</td>
+</tr>
+<tr>
+<td>원소 바꾸기</td>
+<td>된다</td>
+<td>된다</td>
+<td>된다. <strong>원본 배열도 같이 바뀐다</strong>(배열 위의 뷰)</td>
+</tr>
+<tr>
+<td>공변성</td>
+<td><code>String[]</code>을 <code>Object[]</code>에 대입 가능. 잘못 넣으면 실행 중 <code>ArrayStoreException</code></td>
+<td><code>List&lt;String&gt;</code>을 <code>List&lt;Object&gt;</code>에 대입 불가. 컴파일에서 막는다</td>
+<td>List와 같다</td>
+</tr>
+<tr>
+<td>기본형</td>
+<td><code>int[]</code> 가능</td>
+<td><code>List&lt;int&gt;</code> 불가(<code>List&lt;Integer&gt;</code>)</td>
+<td><code>Arrays.asList(int[])</code>는 <code>List&lt;int[]&gt;</code>, 원소 1개</td>
+</tr>
+</tbody></table></div>
+<p>함정: 배열을 List로 바꿀 때 <code>Arrays.asList</code>를 그대로 쓰면 두 가지가 터진다. ① 나중에 <code>add</code>하면 예외가 난다. ② 그 List를 고치면 레거시가 들고 있는 배열까지 바뀐다. 그래서 <code>new ArrayList&lt;&gt;(Arrays.asList(배열))</code>로 한 번 더 복사한다. <code>int[]</code>는 <code>Arrays.stream(values).boxed()</code>로 옮긴다.</p>
+<p>과제: <code>GradeLists.toModifiableList(String[])</code>과 <code>GradeLists.toIntegerList(int[])</code>를 채운다.</p>
+<p>확인 테스트 — <code>J11TypeCutTest</code>:</p>
+<ul>
+<li><code>배열은_길이가_고정이고_List는_늘어난다</code></li>
+<li><code>함정_Arrays_asList는_크기가_고정이고_원본_배열과_연결돼_있다</code></li>
+<li><code>배열은_공변이라_잘못된_원소가_실행_중에야_터진다</code></li>
+<li><code>함정_int_배열을_Arrays_asList에_넣으면_원소가_하나다</code></li>
+</ul>
+<h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2>
+<pre><code class="language-bash">./gradlew :java-track:test --tests 'J11*'</code></pre>
+<p><code>J11BasicsTest</code> 3개, <code>J11TypeCutTest</code> 4개, 네가 쓴 <code>J11CharacterizationTest</code>, 그리고 <code>J11MutantTest</code> 4개(원본 1 + 변형 3)가 모두 <code>PASSED</code>면 끝이다.</p>
+<h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2>
+<details>
+<summary>펼치기</summary>
+
+<pre><code class="language-java">// J11CharacterizationTest (정답은 java-track/src/answerTest/java/…/j11/J11CharacterizationTest.java)
+@ParameterizedTest
+@ValueSource(ints = {-1, -50000})
+void 음수_금액은_마이너스_1을_돌려준다(int amount) {
+    assertThat(calculator.calculate(amount, &quot;GOLD&quot;, false)).isEqualTo(-1);
+}
+
+@Test
+void 천_원_미만은_0이고_천_원부터_적립한다() {
+    assertThat(calculator.calculate(999, &quot;VIP&quot;, false)).isZero();
+    assertThat(calculator.calculate(1000, &quot;VIP&quot;, false)).isEqualTo(50);
+}
+
+@ParameterizedTest
+@CsvSource({&quot;VIP, 500&quot;, &quot;GOLD, 300&quot;, &quot;BASIC, 100&quot;, &quot;vip, 100&quot;, &quot;SILVER, 100&quot;})
+void 등급별_적립률은_VIP_5_GOLD_3_나머지는_1이고_대소문자를_가린다(String grade, int expected) {
+    assertThat(calculator.calculate(10000, grade, false)).isEqualTo(expected);
+}
+
+@ParameterizedTest
+@NullSource
+void 등급이_null이면_예외_없이_일반_적립률이다(String grade) {
+    assertThat(calculator.calculate(10000, grade, false)).isEqualTo(100);
+}
+
+@Test
+void 오만_원부터_보너스_500을_더한다() {
+    assertThat(calculator.calculate(49999, &quot;GOLD&quot;, false)).isEqualTo(1499);
+    assertThat(calculator.calculate(50000, &quot;GOLD&quot;, false)).isEqualTo(2000);
+}
+
+@Test
+void VIP는_오만_원을_넘어도_보너스가_없다() {
+    assertThat(calculator.calculate(50000, &quot;VIP&quot;, false)).isEqualTo(2500);
+}
+
+@Test
+void 적립은_3000에서_자르고_쿠폰을_쓰면_자른_값의_절반이다() {
+    assertThat(calculator.calculate(100000, &quot;VIP&quot;, false)).isEqualTo(3000);
+    assertThat(calculator.calculate(100000, &quot;VIP&quot;, true)).isEqualTo(1500);
+}
+
+@Test
+void 쿠폰을_쓰면_절반에서_소수점을_버린다() {
+    // 15포인트의 절반 7.5 → 7
+    assertThat(calculator.calculate(1500, &quot;BASIC&quot;, true)).isEqualTo(7);
+}
+
+// 그리고 PointTable.describeAll로 금액 5개 × 등급 3개 × 쿠폰 2가지 = 30줄을 containsExactly 하나로 고정한다</code></pre>
+<pre><code class="language-java">// PointTable
+public static List&lt;String&gt; describeAll(LegacyPointCalculator calculator, int[] amounts, String[] grades) {
+    List&lt;String&gt; lines = new ArrayList&lt;&gt;();
+    for (int amount : amounts) {
+        for (String grade : grades) {
+            for (boolean couponUsed : new boolean[] {false, true}) {
+                int point = calculator.calculate(amount, grade, couponUsed);
+                // 문자열 + 결합은 null을 &quot;null&quot;로 적는다
+                lines.add(grade + &quot;/&quot; + amount + &quot;/&quot; + (couponUsed ? &quot;쿠폰&quot; : &quot;-&quot;) + &quot;=&quot; + point);
+            }
+        }
+    }
+    return lines;
+}</code></pre>
+<pre><code class="language-java">// GradeLists
+public static List&lt;String&gt; toModifiableList(String[] names) {
+    // Arrays.asList는 배열 위에 씌운 고정 크기 뷰다. ArrayList로 한 번 더 복사해 배열과 연결을 끊는다
+    return new ArrayList&lt;&gt;(Arrays.asList(names));
+}
+
+public static List&lt;Integer&gt; toIntegerList(int[] values) {
+    // Arrays.asList(int[])는 List&lt;int[]&gt;(원소 1개)가 된다. 기본형 배열은 stream으로 하나씩 박싱한다
+    return Arrays.stream(values).boxed().toList();
+}</code></pre>
+<p>왜 이렇게 쓰나:</p>
+<ol>
+<li>분기마다 경계 양쪽(<code>49999</code>/<code>50000</code>, <code>999</code>/<code>1000</code>)과 이상한 규칙(VIP 보너스 없음, 소문자 등급, 내림)을 하나씩 고정해야 변형이 잡힌다. 변형 3개는 각각 다른 테스트가 잡는다. <code>&gt;=</code>→<code>&gt;</code>는 50000 경계가, VIP 예외 삭제는 VIP 50000이, 내림→반올림은 홀수 포인트에 쿠폰을 쓴 경우가 잡는다.</li>
+<li>조합 표(골든 마스터)는 빠뜨린 분기를 메워 준다. 하지만 어떤 규칙이 깨졌는지 이름으로 알려 주지는 못한다. 그래서 이름 붙인 경계 테스트와 같이 둔다.</li>
+<li>레거시가 돌려준 배열은 들고 있지 말고 내 List로 복사한다. 그래야 레거시 쪽 배열과 내 List가 서로를 바꾸지 않는다.</li>
+</ol>
+</details>
+
+<h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2>
+<ul>
+<li><a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> ② <code>board-server/src/test/java/com/example/board/post/PostServiceCharacterizationTest.java</code> — 글 작성·수정·삭제의 지금 동작을 고정한다. 알림 호출도 포함한다. 오늘 한 것과 같은 일을 서비스 단위로 한다.</li>
+<li><a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> ② <code>board-server/src/test/java/com/example/board/member/MemberApiCharacterizationTest.java</code> — <code>GET /api/members/me</code> 응답 필드를 지금 모양 그대로 고정한다. <code>passwordHash</code>가 보이는 것도 그대로 적는다. 이상한 동작도 그대로 적는 것이 특성화다.</li>
+<li><a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> ③ <code>board-server/src/main/java/com/example/board/member/MemberController.java</code> — B08을 고친 뒤 특성화 테스트를 새 기대값으로 <strong>의도적으로</strong> 갱신한다. 동작을 바꾸기로 결정한 곳만 기대값을 바꾼다.</li>
+<li><a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> ④ <code>board-server/src/main/java/com/example/board/post/PostServiceImpl.java</code> — 생성자 주입으로 바꾸고 알림 전송을 분리하는 동안 <code>PostServiceCharacterizationTest</code>가 안전망이다(<a class="docref" href="../../docs/knowledge/J12-virtual-threads.html">J12</a>의 긴 메서드 나누기와 같은 생각).</li>
+</ul>
+
+
+</main>
+
+
+
+
+
+</body>
+</html>
