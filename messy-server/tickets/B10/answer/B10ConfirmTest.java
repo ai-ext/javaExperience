@@ -1,5 +1,9 @@
 package com.example.board.tickets;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +20,9 @@ import com.example.board.PgContainers;
 import com.example.board.member.Member;
 import com.example.board.member.Role;
 import com.example.board.payment.ChargeService;
+
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -47,13 +54,13 @@ class B10ConfirmTest extends ApiTestSupport {
                 .content("{\"amount\":" + AMOUNT + "}").header("Authorization", bearer(m))
                 .header("Idempotency-Key", UUID.randomUUID().toString())).andReturn();
 
-        // PG가 받은 승인 요청(= PG가 승인한 건)을 재처리 워커가 확정한다
+        // PG가 받은 승인 요청(= PG가 승인한 건)의 orderId로, 결과 불명 건을 재처리 워커가 확정한다
         List<String> pgKeys = PgContainers.approveIdempotencyKeys();
+        Set<String> approvedOrderIds = approvedOrderIds();
         for (Map<String, Object> row : jdbc.queryForList(
-                "SELECT order_id, idempotency_key FROM pg_payment WHERE member_id = ? AND status IN ('REQUESTED', 'UNKNOWN')",
-                m.getId())) {
-            if (pgKeys.contains((String) row.get("idempotency_key"))) {
-                String orderId = (String) row.get("order_id");
+                "SELECT order_id FROM pg_payment WHERE member_id = ? AND status IN ('REQUESTED', 'UNKNOWN')", m.getId())) {
+            String orderId = (String) row.get("order_id");
+            if (approvedOrderIds.contains(orderId)) {
                 PgContainers.stubLookupDone(orderId, AMOUNT);
                 chargeService.reconcile(orderId);
             }
@@ -65,6 +72,22 @@ class B10ConfirmTest extends ApiTestSupport {
                 Integer.class, m.getId())).as("충전 적립 원장 건수").isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT point_balance FROM member WHERE id = ?", Long.class, m.getId()))
                 .as("잔액").isEqualTo(AMOUNT);
+    }
+
+    /** PG 모의가 받은 승인 요청 본문의 orderId들. WireMock 관리 API는 Toxiproxy를 거쳐서도 닿는다(IPv4로 고정). */
+    private static Set<String> approvedOrderIds() throws Exception {
+        String base = PgContainers.baseUrl().replace("://localhost:", "://127.0.0.1:");
+        HttpRequest request = HttpRequest.newBuilder(URI.create(base + "/__admin/requests/find"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"method\":\"POST\",\"urlPath\":\"/pg/v1/payments\"}"))
+                .build();
+        JsonMapper json = JsonMapper.builder().build();
+        JsonNode found = json.readTree(HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString()).body());
+        Set<String> orderIds = new HashSet<>();
+        for (JsonNode r : found.get("requests")) {
+            orderIds.add(json.readTree(r.get("body").asString()).get("orderId").asString());
+        }
+        return orderIds;
     }
 
     /** 첫 승인 요청: 승인하지만 4초 뒤에 답한다(응답 유실). 이후 요청: 바로 승인. paymentKey는 pk-{orderId}. */
