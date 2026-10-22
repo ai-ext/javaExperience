@@ -20,6 +20,7 @@ import org.springframework.context.annotation.Bean;
 
 import com.example.board.TestcontainersConfig;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -65,7 +66,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 없는_경로는_404_problem_json() throws Exception {
-        mockMvc.perform(get("/api/unknown"))
+        mockMvc.perform(get("/api/unknown").with(user("u")))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.instance").value("/api/unknown"));
@@ -73,7 +74,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void BusinessException_NOT_FOUND는_404_type() throws Exception {
-        mockMvc.perform(get("/test/not-found"))
+        mockMvc.perform(get("/test/not-found").with(user("u")))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("/errors/not-found"))
@@ -83,7 +84,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 검증_실패는_400_errors_배열() throws Exception {
-        mockMvc.perform(post("/test/validate").contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"\"}"))
+        mockMvc.perform(post("/test/validate").with(user("u")).contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("/errors/validation"))
                 .andExpect(jsonPath("$.errors[0].field").value("title"))
@@ -92,7 +93,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void IllegalArgumentException은_400이_아니라_500() throws Exception {
-        mockMvc.perform(get("/test/illegal"))
+        mockMvc.perform(get("/test/illegal").with(user("u")))
                 .andExpect(status().isInternalServerError())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
     }

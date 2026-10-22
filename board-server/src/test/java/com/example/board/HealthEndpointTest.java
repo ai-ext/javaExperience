@@ -36,7 +36,7 @@ class HealthEndpointTest {
     @Test
     void env_비노출() throws Exception {
         mockMvc.perform(get("/actuator/env"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
