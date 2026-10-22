@@ -192,3 +192,21 @@ CREATE TABLE IF NOT EXISTS pg_payment (
     -- 승인 전에는 NULL이다. MySQL UNIQUE는 NULL 여러 개를 허용한다.
     UNIQUE KEY uk_pg_payment_payment_key (payment_key)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS report (
+    id          BIGINT       NOT NULL AUTO_INCREMENT,
+    post_id     BIGINT       NOT NULL,
+    reporter_id BIGINT       NOT NULL,
+    reason      VARCHAR(10)  NOT NULL,
+    detail      VARCHAR(300) NULL,
+    status      VARCHAR(10)  NOT NULL,
+    created_at  DATETIME(6)  NOT NULL,
+    updated_at  DATETIME(6)  NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_report_post FOREIGN KEY (post_id) REFERENCES post (id),
+    CONSTRAINT fk_report_reporter FOREIGN KEY (reporter_id) REFERENCES member (id),
+    -- 같은 회원의 재신고를 막는 최종 방어선. exists 조회만으로는 동시 요청이 모두 통과한다.
+    UNIQUE KEY uk_report_post_reporter (post_id, reporter_id),
+    -- 관리자 신고 목록(status 필터 + id 커서)용
+    KEY idx_report_status_id (status, id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;

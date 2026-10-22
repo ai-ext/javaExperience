@@ -28,7 +28,7 @@ class EntityRulesTest {
 
     @Test
     void 엔티티를_하나_이상_찾는다() throws Exception {
-        assertThat(entities()).extracting(Class::getSimpleName).contains("Member", "Post", "Tag", "PostTag");
+        assertThat(entities()).extracting(Class::getSimpleName).contains("Member", "Post", "Tag", "PostTag", "Report");
     }
 
     @Test

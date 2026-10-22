@@ -77,6 +77,7 @@ public abstract class ApiTestSupport {
 
     /** 목록 테스트가 이전 테스트의 글에 흔들리지 않도록 글 관련 행을 모두 지운다. */
     protected void clearPosts() {
+        jdbc.update("DELETE FROM report");
         jdbc.update("DELETE FROM post_like");
         jdbc.update("DELETE FROM comment");
         jdbc.update("DELETE FROM post_tag");
