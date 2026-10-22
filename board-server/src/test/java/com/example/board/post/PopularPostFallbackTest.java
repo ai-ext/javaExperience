@@ -14,6 +14,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -131,6 +132,9 @@ class PopularPostFallbackTest {
         @Autowired
         JwtProvider jwtProvider;
 
+        @Autowired
+        PasswordEncoder passwordEncoder;
+
         @Test
         void 컨텍스트가_뜨고_글_작성_201과_인기글_200이_각각_1초_안이다() throws Exception {
             Member m = memberRepository.saveAndFlush(Member.create(UUID.randomUUID() + "@t.com", "hash",
@@ -144,6 +148,23 @@ class PopularPostFallbackTest {
             popular.value().andExpect(status().isOk()).andExpect(jsonPath("$.items").isArray());
             assertThat(created.millis()).as("POST /api/posts").isLessThan(BUDGET_MILLIS);
             assertThat(popular.millis()).as("GET /api/posts/popular").isLessThan(BUDGET_MILLIS);
+        }
+
+        // 로그인 제한은 fail-open이다. Redis 장애가 모든 회원의 로그인 장애가 되지 않게 한다.
+        @Test
+        void 로그인은_시도_제한_없이_동작한다() throws Exception {
+            String email = "f" + UUID.randomUUID().toString().substring(0, 8) + "@t.com";
+            memberRepository.saveAndFlush(Member.create(email, passwordEncoder.encode("password1"),
+                    "m" + UUID.randomUUID().toString().replace("-", "").substring(0, 10), Role.USER));
+            String wrong = "{\"email\":\"%s\",\"password\":\"wrongpass1\"}".formatted(email);
+            for (int i = 0; i < 6; i++) {
+                mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(wrong))
+                        .andExpect(status().isUnauthorized());
+            }
+
+            mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"%s\",\"password\":\"password1\"}".formatted(email)))
+                    .andExpect(status().isOk());
         }
 
         @Test
