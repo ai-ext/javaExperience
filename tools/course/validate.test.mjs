@@ -175,3 +175,13 @@ test('실제 course 파일 전체가 검증을 통과한다', () => {
   });
   assert.deepEqual(errs, []);
 });
+
+test('README 일정표가 roadmap과 일치', () => {
+  const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'course');
+  const readme = fs.readFileSync(path.join(dir, 'README.md'), 'utf8');
+  const roadmap = JSON.parse(fs.readFileSync(path.join(dir, 'roadmap.json'), 'utf8'));
+  const rows = [...readme.matchAll(/^\|\s*(D\d{2})\s*\|\s*([^|]+?)\s*\|\s*(J\d{2})\s*\|\s*(\d+)\s*\|/gm)]
+    .map((m) => [m[1], m[2], m[3], Number(m[4])]);
+  const want = roadmap.days.map((d) => [d.id, d.title, d.java, d.talkCards.length]);
+  assert.deepEqual(rows, want);
+});
