@@ -130,3 +130,4 @@ DNN ② … (board-server의 실제 파일 경로를 적는다. 예: board-serve
 - 변경된 규칙: verifySkeleton은 기대 클래스 집합(src/test의 JNN…Test.java)과 XML 집합 일치·필터 거부·건너뜀/미실행 거부·초기화 오류(ExceptionInInitializerError 등)를 뼈대 실패로 안 셈. 선택 과제는 `@Tag("optional")` — 기본 `test`에서 빠지고 `:java-track:optionalTest --tests 'JNN*'`로 실행, answerTest·skeletonTest(check)는 선택까지 실행. J07 CAS 테스트는 CyclicBarrier로 첫 읽기 정렬 + 재시도 1회 단언(이전 기록의 CountDownLatch 설명을 대체).
 - Ruling: J02 빌더를 선택으로 돌리며 같은 패키지 전용 팩토리 `Coupon.create`를 주어진 코드로 둠(Lombok에는 없는 메서드임을 페이지에 밝힘) / J15 정률 할인은 몫·나머지 분해 / J13 동률은 "앞의 쿠폰" 업무 규칙을 reduce로 명시
 - 남김: 메서드 단위 뼈대 미구현 검증 없음(클래스 단위), src/answerTest에만 있는 새 이름 테스트는 answerTest가 못 찾음, onlyIf가 프로젝트 약어 호출을 놓칠 수 있음
+- Review (2026-10-23): codex 재검증 — 이전 ①~⑬ 중 고쳐짐 11·부분 2(⑤·⑬)·안 고쳐짐 0. 남은 major: verifySkeleton이 개별 테스트 누락·exclude/태그 필터·준비 단계 오류를 통과시킴, minor: J10 toString이 target 호출, J02 주석 → 2차 수정 dispatch. ⑬(30~60분 적합성)은 실측이 필요해 P7 재검증으로 넘김
