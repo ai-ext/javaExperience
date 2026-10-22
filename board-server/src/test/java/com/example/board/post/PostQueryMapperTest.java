@@ -31,11 +31,40 @@ class PostQueryMapperTest extends ApiTestSupport {
         insertPost(m, "숨김", "내용", "HIDDEN");
         insertPost(m, "삭제", "내용", "DELETED");
 
-        List<Long> ids = mapper.findLatestIds(20);
+        List<Long> ids = mapper.findLatest(20).stream().map(PostSummary::getId).toList();
 
         assertThat(ids).hasSize(20).isSortedAccordingTo(java.util.Comparator.reverseOrder());
         assertThat(jdbc.queryForList("SELECT status FROM post WHERE id IN ("
                 + ids.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(",")) + ")",
                 String.class)).containsOnly("ACTIVE");
+    }
+
+    @Test
+    void 글_20건과_태그를_쿼리_1번으로_매핑() {
+        Member m = newMember(Role.USER);
+        for (int i = 0; i < 25; i++) {
+            Long id = insertPost(m, "제목" + i, "내용", "ACTIVE");
+            if (i % 2 == 0) {
+                attachTag(id, "spring");
+                attachTag(id, "java" + i);
+            }
+        }
+        long before = selectCount();
+
+        List<PostSummary> rows = mapper.findLatest(20);
+
+        assertThat(selectCount() - before).isEqualTo(1);
+        assertThat(rows).hasSize(20);
+        PostSummary withTags = rows.stream().filter(r -> r.getTitle().equals("제목24")).findFirst().orElseThrow();
+        assertThat(withTags.getTags()).containsExactly("spring", "java24");
+        assertThat(withTags.getAuthorId()).isEqualTo(m.getId());
+        assertThat(withTags.getAuthorNickname()).isEqualTo(m.getNickname());
+        PostSummary noTags = rows.stream().filter(r -> r.getTitle().equals("제목23")).findFirst().orElseThrow();
+        assertThat(noTags.getTags()).isEmpty();
+    }
+
+    /** 서버가 실행한 SELECT 누적 횟수. 이 테스트 외에는 쿼리를 보내지 않는다. */
+    private long selectCount() {
+        return Long.parseLong((String) jdbc.queryForMap("SHOW GLOBAL STATUS LIKE 'Com_select'").get("Value"));
     }
 }

@@ -8,5 +8,5 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface PostQueryMapper {
 
-    List<Long> findLatestIds(int limit);
+    List<PostSummary> findLatest(int limit);
 }
