@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,7 @@ import com.example.board.member.MemberRepository;
 import com.example.board.member.Role;
 import com.example.board.point.PointService;
 import com.example.board.post.PostRepository;
+import com.example.board.post.PostServiceImpl;
 import com.example.board.post.PostStatus;
 
 @Service
@@ -26,6 +28,10 @@ public class CommentService {
     private final PostRepository postRepository;
     private final MemberRepository memberRepository;
     private final PointService pointService;
+
+    // 댓글 알림은 글 알림과 같은 규칙이라 PostServiceImpl의 것을 쓴다
+    @Autowired
+    private PostServiceImpl postService;
 
     public CommentService(CommentRepository commentRepository, PostRepository postRepository,
             MemberRepository memberRepository, PointService pointService) {
@@ -44,7 +50,14 @@ public class CommentService {
         Comment saved = commentRepository.save(Comment.create(postRepository.getReferenceById(postId), member,
                 content));
         pointService.earn(memberId, COMMENT_EARN_POINTS, "COMMENT", saved.getId());
+        postService.notifyCommentAdded(postId, member, content);
         return CommentResponse.from(saved);
+    }
+
+    /** 이 글에 (지우지 않은) 댓글을 단 회원 id. 글 삭제 알림 대상이다. */
+    @Transactional(readOnly = true)
+    public List<Long> commenterIdsOf(Long postId) {
+        return commentRepository.findCommenterIds(postId);
     }
 
     @Transactional(readOnly = true)

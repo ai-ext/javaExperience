@@ -1,0 +1,674 @@
+diff --git a/build.gradle b/build.gradle
+index 40e804b..afc1876 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -50,6 +50,8 @@ dependencies {
+     testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+     testImplementation 'org.testcontainers:testcontainers-mysql'
+     testImplementation 'org.testcontainers:testcontainers-toxiproxy'
++    // 구조 규칙(필드 주입 금지)을 테스트로 고정한다
++    testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.1'
+     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+ }
+ 
+diff --git a/src/main/java/com/example/board/comment/CommentService.java b/src/main/java/com/example/board/comment/CommentService.java
+index eafdbd0..3dfafb2 100644
+--- a/src/main/java/com/example/board/comment/CommentService.java
++++ b/src/main/java/com/example/board/comment/CommentService.java
+@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets;
+ import java.util.Base64;
+ import java.util.List;
+ 
+-import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.data.domain.PageRequest;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+@@ -14,9 +13,12 @@ import com.example.board.common.ErrorCode;
+ import com.example.board.member.Member;
+ import com.example.board.member.MemberRepository;
+ import com.example.board.member.Role;
++import com.example.board.notification.NotificationMessage;
++import com.example.board.notification.NotificationService;
++import com.example.board.notification.NotificationType;
+ import com.example.board.point.PointService;
++import com.example.board.post.Post;
+ import com.example.board.post.PostRepository;
+-import com.example.board.post.PostServiceImpl;
+ import com.example.board.post.PostStatus;
+ 
+ @Service
+@@ -28,17 +30,15 @@ public class CommentService {
+     private final PostRepository postRepository;
+     private final MemberRepository memberRepository;
+     private final PointService pointService;
+-
+-    // 댓글 알림은 글 알림과 같은 규칙이라 PostServiceImpl의 것을 쓴다
+-    @Autowired
+-    private PostServiceImpl postService;
++    private final NotificationService notificationService;
+ 
+     public CommentService(CommentRepository commentRepository, PostRepository postRepository,
+-            MemberRepository memberRepository, PointService pointService) {
++            MemberRepository memberRepository, PointService pointService, NotificationService notificationService) {
+         this.commentRepository = commentRepository;
+         this.postRepository = postRepository;
+         this.memberRepository = memberRepository;
+         this.pointService = pointService;
++        this.notificationService = notificationService;
+     }
+ 
+     @Transactional
+@@ -50,14 +50,19 @@ public class CommentService {
+         Comment saved = commentRepository.save(Comment.create(postRepository.getReferenceById(postId), member,
+                 content));
+         pointService.earn(memberId, COMMENT_EARN_POINTS, "COMMENT", saved.getId());
+-        postService.notifyCommentAdded(postId, member, content);
++        notifyPostAuthor(postId, member, content);
+         return CommentResponse.from(saved);
+     }
+ 
+-    /** 이 글에 (지우지 않은) 댓글을 단 회원 id. 글 삭제 알림 대상이다. */
+-    @Transactional(readOnly = true)
+-    public List<Long> commenterIdsOf(Long postId) {
+-        return commentRepository.findCommenterIds(postId);
++    /** 내 글에 남이 댓글을 달면 글 작성자에게 알린다. 자기 글에 단 댓글은 알리지 않는다. */
++    private void notifyPostAuthor(Long postId, Member commenter, String content) {
++        Post post = postRepository.findById(postId).orElseThrow();
++        Long authorId = post.getMember().getId();
++        if (authorId.equals(commenter.getId())) {
++            return;
++        }
++        notificationService.notify(new NotificationMessage(authorId, NotificationType.COMMENT_ADDED,
++                "내 글에 새 댓글이 달렸습니다", commenter.getNickname() + "님: " + content, postId));
+     }
+ 
+     @Transactional(readOnly = true)
+diff --git a/src/main/java/com/example/board/notification/EmailNotificationSender.java b/src/main/java/com/example/board/notification/EmailNotificationSender.java
+new file mode 100644
+index 0000000..12330d1
+--- /dev/null
++++ b/src/main/java/com/example/board/notification/EmailNotificationSender.java
+@@ -0,0 +1,28 @@
++package com.example.board.notification;
++
++import org.springframework.stereotype.Component;
++
++/** 메일 대기열. 제목에 서비스 머리말을, 본문 끝에 발신 전용 안내를 붙인다. */
++@Component
++public class EmailNotificationSender implements NotificationSender {
++
++    static final String SUBJECT_PREFIX = "[게시판] ";
++    static final String FOOTER = "\n\n이 메일은 발신 전용입니다. 알림 설정은 내 정보에서 바꿀 수 있습니다.";
++
++    private final NotificationRepository repository;
++
++    public EmailNotificationSender(NotificationRepository repository) {
++        this.repository = repository;
++    }
++
++    @Override
++    public NotificationChannel channel() {
++        return NotificationChannel.EMAIL;
++    }
++
++    @Override
++    public void send(NotificationMessage m) {
++        repository.save(Notification.create(m.recipientId(), channel(), m.type(), SUBJECT_PREFIX + m.title(),
++                m.body() + FOOTER, m.refId()));
++    }
++}
+diff --git a/src/main/java/com/example/board/notification/InAppNotificationSender.java b/src/main/java/com/example/board/notification/InAppNotificationSender.java
+new file mode 100644
+index 0000000..3afa4fe
+--- /dev/null
++++ b/src/main/java/com/example/board/notification/InAppNotificationSender.java
+@@ -0,0 +1,24 @@
++package com.example.board.notification;
++
++import org.springframework.stereotype.Component;
++
++/** 알림함. 제목·본문을 그대로 쓴다. */
++@Component
++public class InAppNotificationSender implements NotificationSender {
++
++    private final NotificationRepository repository;
++
++    public InAppNotificationSender(NotificationRepository repository) {
++        this.repository = repository;
++    }
++
++    @Override
++    public NotificationChannel channel() {
++        return NotificationChannel.IN_APP;
++    }
++
++    @Override
++    public void send(NotificationMessage m) {
++        repository.save(Notification.create(m.recipientId(), channel(), m.type(), m.title(), m.body(), m.refId()));
++    }
++}
+diff --git a/src/main/java/com/example/board/notification/NotificationMessage.java b/src/main/java/com/example/board/notification/NotificationMessage.java
+new file mode 100644
+index 0000000..6a9f64b
+--- /dev/null
++++ b/src/main/java/com/example/board/notification/NotificationMessage.java
+@@ -0,0 +1,5 @@
++package com.example.board.notification;
++
++/** 채널과 상관없는 알림 내용. 채널별 모양(제목 머리말, 길이 제한)은 각 NotificationSender가 정한다. */
++public record NotificationMessage(Long recipientId, NotificationType type, String title, String body, Long refId) {
++}
+diff --git a/src/main/java/com/example/board/notification/NotificationSender.java b/src/main/java/com/example/board/notification/NotificationSender.java
+new file mode 100644
+index 0000000..1f85651
+--- /dev/null
++++ b/src/main/java/com/example/board/notification/NotificationSender.java
+@@ -0,0 +1,9 @@
++package com.example.board.notification;
++
++/** 채널 하나. 빈으로 등록하면 NotificationService가 모아서 쓴다. */
++public interface NotificationSender {
++
++    NotificationChannel channel();
++
++    void send(NotificationMessage message);
++}
+diff --git a/src/main/java/com/example/board/notification/NotificationService.java b/src/main/java/com/example/board/notification/NotificationService.java
+new file mode 100644
+index 0000000..69a020a
+--- /dev/null
++++ b/src/main/java/com/example/board/notification/NotificationService.java
+@@ -0,0 +1,35 @@
++package com.example.board.notification;
++
++import java.util.Collection;
++import java.util.List;
++
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Transactional;
++
++/** 알림 종류에 맞는 채널로 내보낸다. 호출자의 트랜잭션에 함께 묶인다(롤백되면 알림도 없다). */
++@Service
++public class NotificationService {
++
++    private final List<NotificationSender> senders;
++
++    public NotificationService(List<NotificationSender> senders) {
++        this.senders = senders;
++    }
++
++    @Transactional
++    public void notify(NotificationMessage message) {
++        for (NotificationSender sender : senders) {
++            if (message.type().sendsTo(sender.channel())) {
++                sender.send(message);
++            }
++        }
++    }
++
++    @Transactional
++    public void notifyAll(Collection<Long> recipientIds, NotificationType type, String title, String body,
++            Long refId) {
++        for (Long recipientId : recipientIds) {
++            notify(new NotificationMessage(recipientId, type, title, body, refId));
++        }
++    }
++}
+diff --git a/src/main/java/com/example/board/notification/NotificationType.java b/src/main/java/com/example/board/notification/NotificationType.java
+index fd7a80f..a1f626a 100644
+--- a/src/main/java/com/example/board/notification/NotificationType.java
++++ b/src/main/java/com/example/board/notification/NotificationType.java
+@@ -1,5 +1,24 @@
+ package com.example.board.notification;
+ 
++import java.util.Set;
++
++import static com.example.board.notification.NotificationChannel.EMAIL;
++import static com.example.board.notification.NotificationChannel.IN_APP;
++import static com.example.board.notification.NotificationChannel.PUSH;
++
++/** 알림 종류와 그 종류를 내보낼 채널. 채널을 더하면 여기와 새 NotificationSender 하나만 고친다. */
+ public enum NotificationType {
+-    POST_CREATED, POST_DELETED, COMMENT_ADDED
++    POST_CREATED(Set.of(IN_APP, PUSH)),
++    POST_DELETED(Set.of(IN_APP, EMAIL)),
++    COMMENT_ADDED(Set.of(IN_APP, PUSH, EMAIL));
++
++    private final Set<NotificationChannel> channels;
++
++    NotificationType(Set<NotificationChannel> channels) {
++        this.channels = channels;
++    }
++
++    public boolean sendsTo(NotificationChannel channel) {
++        return channels.contains(channel);
++    }
+ }
+diff --git a/src/main/java/com/example/board/notification/PushNotificationSender.java b/src/main/java/com/example/board/notification/PushNotificationSender.java
+new file mode 100644
+index 0000000..8882474
+--- /dev/null
++++ b/src/main/java/com/example/board/notification/PushNotificationSender.java
+@@ -0,0 +1,34 @@
++package com.example.board.notification;
++
++import org.springframework.stereotype.Component;
++
++/** 앱 푸시 대기열. 잠금 화면에 두 줄만 보이므로 본문을 40자로 자른다. */
++@Component
++public class PushNotificationSender implements NotificationSender {
++
++    static final int MAX_BODY = 40;
++
++    private final NotificationRepository repository;
++
++    public PushNotificationSender(NotificationRepository repository) {
++        this.repository = repository;
++    }
++
++    @Override
++    public NotificationChannel channel() {
++        return NotificationChannel.PUSH;
++    }
++
++    @Override
++    public void send(NotificationMessage m) {
++        repository.save(Notification.create(m.recipientId(), channel(), m.type(), m.title(), shorten(m.body()),
++                m.refId()));
++    }
++
++    private static String shorten(String body) {
++        if (body.codePointCount(0, body.length()) <= MAX_BODY) {
++            return body;
++        }
++        return body.substring(0, body.offsetByCodePoints(0, MAX_BODY - 1)) + "…";
++    }
++}
+diff --git a/src/main/java/com/example/board/post/PostServiceImpl.java b/src/main/java/com/example/board/post/PostServiceImpl.java
+index 2154ac0..89eeeba 100644
+--- a/src/main/java/com/example/board/post/PostServiceImpl.java
++++ b/src/main/java/com/example/board/post/PostServiceImpl.java
+@@ -1,147 +1,73 @@
+ package com.example.board.post;
+ 
+-import java.util.ArrayList;
+ import java.util.LinkedHashSet;
+ import java.util.List;
+-import java.util.Optional;
+ 
+-import org.slf4j.Logger;
+-import org.slf4j.LoggerFactory;
+-import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.context.ApplicationEventPublisher;
+-import org.springframework.context.annotation.Lazy;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+-import com.example.board.comment.CommentService;
++import com.example.board.comment.CommentRepository;
+ import com.example.board.common.BusinessException;
+ import com.example.board.common.ErrorCode;
+ import com.example.board.common.ForbiddenWordChecker;
+ import com.example.board.member.Member;
+ import com.example.board.member.MemberRepository;
+-import com.example.board.notification.Notification;
+-import com.example.board.notification.NotificationChannel;
+-import com.example.board.notification.NotificationRepository;
++import com.example.board.notification.NotificationMessage;
++import com.example.board.notification.NotificationService;
+ import com.example.board.notification.NotificationType;
+ import com.example.board.point.PointService;
+ 
+-/**
+- * 글 작성·조회·수정·삭제와 글에 딸린 알림(알림함·푸시·메일)을 처리한다.
+- * 알림은 글 저장과 같은 트랜잭션에 notification 표로 쌓는다(푸시·메일은 발송 배치가 읽어 보낸다).
+- *
+- * 댓글 알림도 글 알림과 문구·채널 규칙이 같아서 여기서 같이 보낸다(CommentService가 notifyCommentAdded를 부른다).
+- */
+ @Service
+ public class PostServiceImpl implements PostService {
+ 
+-    private static final Logger log = LoggerFactory.getLogger(PostServiceImpl.class);
+-
+     private static final int POST_EARN_POINTS = 10;
+ 
+-    // 푸시는 잠금 화면에 두 줄만 보인다
+-    private static final int PUSH_MAX_BODY = 40;
+-    private static final String PUSH_ELLIPSIS = "…";
+-
+-    private static final String EMAIL_SUBJECT_PREFIX = "[게시판] ";
+-    private static final String EMAIL_FOOTER = "\n\n이 메일은 발신 전용입니다. 알림 설정은 내 정보에서 바꿀 수 있습니다.";
+-
+-    private static final String FORBIDDEN_MESSAGE = "금칙어가 포함되어 있습니다.";
+-
+-    @Autowired
+-    private PostRepository postRepository;
+-
+-    @Autowired
+-    private MemberRepository memberRepository;
+-
+-    @Autowired
+-    private TagRepository tagRepository;
+-
+-    @Autowired
+-    private PointService pointService;
+-
+-    @Autowired
+-    private ApplicationEventPublisher events;
+-
+-    @Autowired
+-    private ForbiddenWordChecker forbiddenWordChecker;
+-
+-    @Autowired
+-    private NotificationRepository notificationRepository;
+-
+-    // CommentService도 이 클래스를 쓴다(댓글 알림). 서로 물려 기동이 안 돼서 @Lazy로 늦춰 받는다.
+-    @Autowired
+-    @Lazy
+-    private CommentService commentService;
+-
+-    // ===================================================================================
+-    // 작성
+-    // ===================================================================================
++    private final PostRepository postRepository;
++    private final MemberRepository memberRepository;
++    private final TagRepository tagRepository;
++    private final PointService pointService;
++    private final ApplicationEventPublisher events;
++    private final ForbiddenWordChecker forbiddenWords;
++    private final NotificationService notificationService;
++    private final CommentRepository commentRepository;
++
++    public PostServiceImpl(PostRepository postRepository, MemberRepository memberRepository,
++            TagRepository tagRepository, PointService pointService, ApplicationEventPublisher events,
++            ForbiddenWordChecker forbiddenWords, NotificationService notificationService,
++            CommentRepository commentRepository) {
++        this.postRepository = postRepository;
++        this.memberRepository = memberRepository;
++        this.tagRepository = tagRepository;
++        this.pointService = pointService;
++        this.events = events;
++        this.forbiddenWords = forbiddenWords;
++        this.notificationService = notificationService;
++        this.commentRepository = commentRepository;
++    }
+ 
+     @Override
+     @Transactional
+     public Long create(Long memberId, PostCreateRequest request) {
+-        // 금칙어 검사. 제목과 본문 둘 다 본다.
+-        if (request.title() != null && forbiddenWordChecker.contains(request.title())) {
+-            log.info("금칙어 글 작성 거부 memberId={}", memberId);
+-            throw new BusinessException(ErrorCode.VALIDATION, FORBIDDEN_MESSAGE);
+-        }
+-        if (request.content() != null && forbiddenWordChecker.contains(request.content())) {
+-            log.info("금칙어 글 작성 거부 memberId={}", memberId);
+-            throw new BusinessException(ErrorCode.VALIDATION, FORBIDDEN_MESSAGE);
+-        }
+-
++        rejectForbiddenWords(request.title(), request.content());
+         // 글 INSERT가 회원 행에 FK 공유 잠금을 걸기 전에 배타 잠금을 먼저 잡는다(잔액 UPDATE와의 교착 방지)
+         Member member = memberRepository.findByIdForUpdate(memberId)
+                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다."));
+         Post post = Post.create(member, request.title(), request.content());
+-
+         // 입력 순서를 유지하며 중복을 제거한다. post_tag UNIQUE(post_id, tag_id)에 걸리기 전에 막는다.
+         List<String> names = request.tags() == null ? List.of() : List.copyOf(new LinkedHashSet<>(request.tags()));
+         for (String name : names) {
+-            Optional<Tag> found = tagRepository.findByName(name);
+-            if (found.isPresent()) {
+-                post.addTag(found.get());
+-            } else {
+-                post.addTag(tagRepository.save(Tag.create(name)));
+-            }
++            post.addTag(tagRepository.findByName(name).orElseGet(() -> tagRepository.save(Tag.create(name))));
+         }
+         Long postId = postRepository.save(post).getId();
+-
+         pointService.earn(memberId, POST_EARN_POINTS, "POST", postId);
+-
+-        // 작성자에게 등록·적립 알림
+-        String title = "글이 등록되었습니다";
+-        String body = "'" + post.getTitle() + "' 글이 등록되어 " + POST_EARN_POINTS + "포인트가 적립되었습니다.";
+-        for (NotificationChannel channel : NotificationChannel.values()) {
+-            switch (channel) {
+-                case IN_APP -> notificationRepository.save(Notification.create(memberId, NotificationChannel.IN_APP,
+-                        NotificationType.POST_CREATED, title, body, postId));
+-                case PUSH -> {
+-                    String pushBody = body;
+-                    if (pushBody.codePointCount(0, pushBody.length()) > PUSH_MAX_BODY) {
+-                        pushBody = pushBody.substring(0, pushBody.offsetByCodePoints(0, PUSH_MAX_BODY - 1))
+-                                + PUSH_ELLIPSIS;
+-                    }
+-                    notificationRepository.save(Notification.create(memberId, NotificationChannel.PUSH,
+-                            NotificationType.POST_CREATED, title, pushBody, postId));
+-                }
+-                case EMAIL -> {
+-                    // 글 등록은 메일로 보내지 않는다(기획: 메일은 남이 한 일만)
+-                }
+-                default -> throw new IllegalStateException("알 수 없는 알림 채널: " + channel);
+-            }
+-        }
+-
++        notificationService.notify(new NotificationMessage(memberId, NotificationType.POST_CREATED, "글이 등록되었습니다",
++                "'" + post.getTitle() + "' 글이 등록되어 " + POST_EARN_POINTS + "포인트가 적립되었습니다.", postId));
+         // 인기글 캐시는 커밋 뒤 리스너가 지운다(PostCacheEvictListener). 여기서 Redis를 부르지 않는다.
+         events.publishEvent(new PostChangedEvent(postId));
+-        log.info("글 작성 postId={} memberId={} tags={}", postId, memberId, names.size());
+         return postId;
+     }
+ 
+-    // ===================================================================================
+-    // 조회
+-    // ===================================================================================
+-
+     @Override
+     @Transactional(readOnly = true)
+     public PostDetailResponse getDetail(Long postId) {
+@@ -149,144 +75,71 @@ public class PostServiceImpl implements PostService {
+                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "글을 찾을 수 없습니다.")));
+     }
+ 
+-    // ===================================================================================
+-    // 수정
+-    // ===================================================================================
+-
+     @Override
+     @Transactional
+     public PostDetailResponse update(Long postId, Long memberId, PostUpdateRequest request) {
+-        if (request.title() != null && forbiddenWordChecker.contains(request.title())) {
+-            log.info("금칙어 글 수정 거부 postId={} memberId={}", postId, memberId);
+-            throw new BusinessException(ErrorCode.VALIDATION, FORBIDDEN_MESSAGE);
+-        }
+-        if (request.content() != null && forbiddenWordChecker.contains(request.content())) {
+-            log.info("금칙어 글 수정 거부 postId={} memberId={}", postId, memberId);
+-            throw new BusinessException(ErrorCode.VALIDATION, FORBIDDEN_MESSAGE);
+-        }
+-        Post post = postRepository.findActiveDetail(postId)
+-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "글을 찾을 수 없습니다."));
+-        if (!post.isWrittenBy(memberId)) {
+-            throw new BusinessException(ErrorCode.FORBIDDEN, "작성자만 수정·삭제할 수 있습니다.");
+-        }
++        rejectForbiddenWords(request.title(), request.content());
++        Post post = findOwned(postId, memberId);
+         post.update(request.title(), request.content());
+-        List<Tag> tags = new ArrayList<>();
+-        if (request.tags() != null) {
+-            for (String name : new LinkedHashSet<>(request.tags())) {
+-                tags.add(tagRepository.findByName(name).orElseGet(() -> tagRepository.save(Tag.create(name))));
+-            }
+-        }
+-        post.replaceTags(tags);
++        post.replaceTags(resolveTags(request.tags()));
+         events.publishEvent(new PostChangedEvent(postId));
+-        // 응답의 updatedAt이 감사 필드 갱신 이후 값이 되도록 먼저 flush 한다
+-        postRepository.flush();
+-        return PostDetailResponse.from(post);
++        return flushAndRespond(post);
+     }
+ 
+     @Override
+     @Transactional
+     public PostDetailResponse patch(Long postId, Long memberId, PostPatchRequest request) {
+-        if (request.title() != null && forbiddenWordChecker.contains(request.title())) {
+-            log.info("금칙어 글 수정 거부 postId={} memberId={}", postId, memberId);
+-            throw new BusinessException(ErrorCode.VALIDATION, FORBIDDEN_MESSAGE);
+-        }
+-        if (request.content() != null && forbiddenWordChecker.contains(request.content())) {
+-            log.info("금칙어 글 수정 거부 postId={} memberId={}", postId, memberId);
+-            throw new BusinessException(ErrorCode.VALIDATION, FORBIDDEN_MESSAGE);
+-        }
+-        Post post = postRepository.findActiveDetail(postId)
+-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "글을 찾을 수 없습니다."));
+-        if (!post.isWrittenBy(memberId)) {
+-            throw new BusinessException(ErrorCode.FORBIDDEN, "작성자만 수정·삭제할 수 있습니다.");
+-        }
++        rejectForbiddenWords(request.title(), request.content());
++        Post post = findOwned(postId, memberId);
+         post.patch(request.title(), request.content());
+         if (request.tags() != null) {
+-            List<Tag> tags = new ArrayList<>();
+-            for (String name : new LinkedHashSet<>(request.tags())) {
+-                tags.add(tagRepository.findByName(name).orElseGet(() -> tagRepository.save(Tag.create(name))));
+-            }
+-            post.replaceTags(tags);
++            post.replaceTags(resolveTags(request.tags()));
+         }
+         events.publishEvent(new PostChangedEvent(postId));
+-        postRepository.flush();
+-        return PostDetailResponse.from(post);
++        return flushAndRespond(post);
+     }
+ 
+-    // ===================================================================================
+-    // 삭제
+-    // ===================================================================================
+-
+     @Override
+     @Transactional
+     public void delete(Long postId, Long memberId) {
+-        Post post = postRepository.findActiveDetail(postId)
+-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "글을 찾을 수 없습니다."));
+-        if (!post.isWrittenBy(memberId)) {
+-            throw new BusinessException(ErrorCode.FORBIDDEN, "작성자만 수정·삭제할 수 있습니다.");
+-        }
+         // save()를 부르지 않는다. 영속 상태 엔티티의 변경은 커밋 시점에 UPDATE로 나간다.
++        Post post = findOwned(postId, memberId);
+         post.delete();
+         events.publishEvent(new PostChangedEvent(postId));
++        List<Long> commenters = commentRepository.findCommenterIds(postId).stream()
++                .filter(id -> !id.equals(memberId)).toList();
++        notificationService.notifyAll(commenters, NotificationType.POST_DELETED, "댓글을 단 글이 삭제되었습니다",
++                "댓글을 단 글 '" + post.getTitle() + "'이(가) 작성자에 의해 삭제되었습니다.", postId);
++    }
+ 
+-        // 댓글을 단 사람들에게 글 삭제 알림(작성자 본인 제외)
+-        List<Long> commenterIds = commentService.commenterIdsOf(postId);
+-        String title = "댓글을 단 글이 삭제되었습니다";
+-        String body = "댓글을 단 글 '" + post.getTitle() + "'이(가) 작성자에 의해 삭제되었습니다.";
+-        int sent = 0;
+-        for (Long commenterId : commenterIds) {
+-            if (commenterId.equals(memberId)) {
+-                continue;
+-            }
+-            for (NotificationChannel channel : NotificationChannel.values()) {
+-                switch (channel) {
+-                    case IN_APP -> notificationRepository.save(Notification.create(commenterId,
+-                            NotificationChannel.IN_APP, NotificationType.POST_DELETED, title, body, postId));
+-                    case PUSH -> {
+-                        // 삭제는 푸시하지 않는다(새벽에 울리면 항의가 온다)
+-                    }
+-                    case EMAIL -> notificationRepository.save(Notification.create(commenterId,
+-                            NotificationChannel.EMAIL, NotificationType.POST_DELETED, EMAIL_SUBJECT_PREFIX + title,
+-                            body + EMAIL_FOOTER, postId));
+-                    default -> throw new IllegalStateException("알 수 없는 알림 채널: " + channel);
+-                }
+-            }
+-            sent++;
++    /** 제목·본문 중 하나라도 금칙어가 있으면 400. null(PATCH에서 안 보낸 필드)은 검사하지 않는다. */
++    private void rejectForbiddenWords(String title, String content) {
++        if (forbiddenWords.contains(title) || forbiddenWords.contains(content)) {
++            throw new BusinessException(ErrorCode.VALIDATION, "금칙어가 포함되어 있습니다.");
+         }
+-        log.info("글 삭제 postId={} memberId={} 알림 대상={}", postId, memberId, sent);
+     }
+ 
+-    // ===================================================================================
+-    // 댓글 알림 (CommentService에서 호출)
+-    // ===================================================================================
+-
+-    /** 남의 글에 댓글이 달리면 글 작성자에게 세 채널로 알린다. 자기 글에 단 댓글은 알리지 않는다. */
+-    @Transactional
+-    public void notifyCommentAdded(Long postId, Member commenter, String content) {
+-        Post post = postRepository.findById(postId)
++    private Post findOwned(Long postId, Long memberId) {
++        Post post = postRepository.findActiveDetail(postId)
+                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "글을 찾을 수 없습니다."));
+-        Long authorId = post.getMember().getId();
+-        if (authorId.equals(commenter.getId())) {
+-            return;
++        if (!post.isWrittenBy(memberId)) {
++            throw new BusinessException(ErrorCode.FORBIDDEN, "작성자만 수정·삭제할 수 있습니다.");
+         }
+-        String title = "내 글에 새 댓글이 달렸습니다";
+-        String body = commenter.getNickname() + "님: " + content;
+-        for (NotificationChannel channel : NotificationChannel.values()) {
+-            switch (channel) {
+-                case IN_APP -> notificationRepository.save(Notification.create(authorId, NotificationChannel.IN_APP,
+-                        NotificationType.COMMENT_ADDED, title, body, postId));
+-                case PUSH -> {
+-                    String pushBody = body;
+-                    if (pushBody.codePointCount(0, pushBody.length()) > PUSH_MAX_BODY) {
+-                        pushBody = pushBody.substring(0, pushBody.offsetByCodePoints(0, PUSH_MAX_BODY - 1))
+-                                + PUSH_ELLIPSIS;
+-                    }
+-                    notificationRepository.save(Notification.create(authorId, NotificationChannel.PUSH,
+-                            NotificationType.COMMENT_ADDED, title, pushBody, postId));
+-                }
+-                case EMAIL -> notificationRepository.save(Notification.create(authorId, NotificationChannel.EMAIL,
+-                        NotificationType.COMMENT_ADDED, EMAIL_SUBJECT_PREFIX + title, body + EMAIL_FOOTER, postId));
+-                default -> throw new IllegalStateException("알 수 없는 알림 채널: " + channel);
+-            }
++        return post;
++    }
++
++    private List<Tag> resolveTags(List<String> names) {
++        if (names == null) {
++            return List.of();
+         }
++        return new LinkedHashSet<>(names).stream()
++                .map(name -> tagRepository.findByName(name).orElseGet(() -> tagRepository.save(Tag.create(name))))
++                .toList();
++    }
++
++    // 응답의 updatedAt이 감사 필드 갱신 이후 값이 되도록 먼저 flush 한다
++    private PostDetailResponse flushAndRespond(Post post) {
++        postRepository.flush();
++        return PostDetailResponse.from(post);
+     }
+ }
+diff --git a/src/test/java/com/example/board/ArchitectureTest.java b/src/test/java/com/example/board/ArchitectureTest.java
+new file mode 100644
+index 0000000..150d10b
+--- /dev/null
++++ b/src/test/java/com/example/board/ArchitectureTest.java
+@@ -0,0 +1,19 @@
++package com.example.board;
++
++import com.tngtech.archunit.core.importer.ImportOption;
++import com.tngtech.archunit.junit.AnalyzeClasses;
++import com.tngtech.archunit.junit.ArchTest;
++import com.tngtech.archunit.lang.ArchRule;
++
++import static com.tngtech.archunit.library.GeneralCodingRules.NO_CLASSES_SHOULD_USE_FIELD_INJECTION;
++
++/**
++ * 필드 주입 금지. 필드 주입은 빈 사이 순환을 기동 때 숨기고(@Lazy 땜질), 테스트에서 의존을 바꿔 끼우기 어렵게 한다.
++ * 생성자 주입으로 바꾸면 순환은 기동 실패로 바로 드러난다.
++ */
++@AnalyzeClasses(packages = "com.example.board", importOptions = ImportOption.DoNotIncludeTests.class)
++class ArchitectureTest {
++
++    @ArchTest
++    static final ArchRule 필드_주입을_쓰지_않는다 = NO_CLASSES_SHOULD_USE_FIELD_INJECTION;
++}

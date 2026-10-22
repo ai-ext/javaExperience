@@ -95,6 +95,22 @@ CREATE TABLE IF NOT EXISTS post_like (
     UNIQUE KEY uk_post_like_post_member (post_id, member_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
+CREATE TABLE IF NOT EXISTS notification (
+    id         BIGINT        NOT NULL AUTO_INCREMENT,
+    member_id  BIGINT        NOT NULL,
+    channel    VARCHAR(10)   NOT NULL,
+    type       VARCHAR(20)   NOT NULL,
+    title      VARCHAR(100)  NOT NULL,
+    body       VARCHAR(1000) NOT NULL,
+    ref_id     BIGINT        NULL,
+    created_at DATETIME(6)   NOT NULL,
+    updated_at DATETIME(6)   NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_notification_member FOREIGN KEY (member_id) REFERENCES member (id),
+    -- 내 알림함(IN_APP) 최신순 조회용
+    KEY idx_notification_member_channel_id (member_id, channel, id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
 CREATE TABLE IF NOT EXISTS point_ledger (
     id            BIGINT      NOT NULL AUTO_INCREMENT,
     member_id     BIGINT      NOT NULL,

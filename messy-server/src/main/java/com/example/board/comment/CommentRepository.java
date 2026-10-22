@@ -22,4 +22,8 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     List<Comment> findPage(@Param("postId") Long postId, @Param("afterId") long afterId, Pageable pageable);
 
     Optional<Comment> findByIdAndDeletedFalse(Long id);
+
+    /** 이 글에 (지우지 않은) 댓글을 단 회원 id. 글이 지워질 때 알림 대상이다. */
+    @Query("select distinct c.member.id from Comment c where c.post.id = :postId and c.deleted = false")
+    List<Long> findCommenterIds(@Param("postId") Long postId);
 }
