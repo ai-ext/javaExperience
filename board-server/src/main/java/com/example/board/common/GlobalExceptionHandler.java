@@ -18,6 +18,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.method.ParameterErrors;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
@@ -81,6 +83,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .map(GlobalExceptionHandler::toError)
                 .toList();
         pd.setProperty("errors", errors);
+        return ResponseEntity.badRequest().body(pd);
+    }
+
+    // 필수 헤더(Idempotency-Key 등)가 빠진 것도 검증 실패다. 상위 클래스 기본은 errors[] 없이 제목이 "Bad Request"라
+    // 형식이 틀린 헤더(아래 파라미터 검증)와 같은 field 이름·제목으로 맞춘다.
+    @Override
+    protected ResponseEntity<Object> handleServletRequestBindingException(ServletRequestBindingException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        if (!(ex instanceof MissingRequestHeaderException missing)) {
+            return super.handleServletRequestBindingException(ex, headers, status, request);
+        }
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION.type(), ErrorCode.VALIDATION.title(),
+                "요청 값이 올바르지 않습니다.", path(request));
+        pd.setProperty("errors", List.of(Map.of("field", String.valueOf(missing.getParameter().getParameterName()),
+                "reason", missing.getHeaderName() + " 헤더가 필요합니다.")));
         return ResponseEntity.badRequest().body(pd);
     }
 

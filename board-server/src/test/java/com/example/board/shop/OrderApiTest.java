@@ -180,8 +180,12 @@ class OrderApiTest extends ApiTestSupport {
         ShopItem item = item(100, 10);
 
         order(m, null, body(item.getId(), 1, null)).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value("/errors/validation"));
-        order(m, "short", body(item.getId(), 1, null)).andExpect(status().isBadRequest());
+                .andExpect(jsonPath("$.type").value("/errors/validation"))
+                .andExpect(jsonPath("$.title").value("검증 실패"))
+                .andExpect(jsonPath("$.errors[0].field").value("idempotencyKey"));
+        // 형식이 틀린 키도 같은 field 이름으로 알린다
+        order(m, "short", body(item.getId(), 1, null)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("idempotencyKey"));
         order(m, "a".repeat(65), body(item.getId(), 1, null)).andExpect(status().isBadRequest());
         order(m, "has space in it", body(item.getId(), 1, null)).andExpect(status().isBadRequest());
 
