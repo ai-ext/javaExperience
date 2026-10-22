@@ -10,25 +10,31 @@ import com.example.board.common.BusinessException;
 import com.example.board.common.ErrorCode;
 import com.example.board.member.Member;
 import com.example.board.member.MemberRepository;
+import com.example.board.point.PointService;
 
 @Service
 public class PostServiceImpl implements PostService {
 
+    private static final int POST_EARN_POINTS = 10;
+
     private final PostRepository postRepository;
     private final MemberRepository memberRepository;
     private final TagRepository tagRepository;
+    private final PointService pointService;
 
     public PostServiceImpl(PostRepository postRepository, MemberRepository memberRepository,
-            TagRepository tagRepository) {
+            TagRepository tagRepository, PointService pointService) {
         this.postRepository = postRepository;
         this.memberRepository = memberRepository;
         this.tagRepository = tagRepository;
+        this.pointService = pointService;
     }
 
     @Override
     @Transactional
     public Long create(Long memberId, PostCreateRequest request) {
-        Member member = memberRepository.findById(memberId)
+        // 글 INSERT가 회원 행에 FK 공유 잠금을 걸기 전에 배타 잠금을 먼저 잡는다(잔액 UPDATE와의 교착 방지)
+        Member member = memberRepository.findByIdForUpdate(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다."));
         Post post = Post.create(member, request.title(), request.content());
         // 입력 순서를 유지하며 중복을 제거한다. post_tag UNIQUE(post_id, tag_id)에 걸리기 전에 막는다.
@@ -36,7 +42,9 @@ public class PostServiceImpl implements PostService {
         for (String name : names) {
             post.addTag(tagRepository.findByName(name).orElseGet(() -> tagRepository.save(Tag.create(name))));
         }
-        return postRepository.save(post).getId();
+        Long postId = postRepository.save(post).getId();
+        pointService.earn(memberId, POST_EARN_POINTS, "POST", postId);
+        return postId;
     }
 
     @Override

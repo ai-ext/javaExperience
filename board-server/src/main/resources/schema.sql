@@ -94,3 +94,20 @@ CREATE TABLE IF NOT EXISTS post_like (
     -- 동시 좋아요의 최종 방어선. "조회 후 없으면 저장"만으로는 두 요청이 모두 통과한다.
     UNIQUE KEY uk_post_like_post_member (post_id, member_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS point_ledger (
+    id            BIGINT      NOT NULL AUTO_INCREMENT,
+    member_id     BIGINT      NOT NULL,
+    type          VARCHAR(10) NOT NULL,
+    -- 적립은 양수, 차감은 음수. 합계가 member.point_balance와 같아야 한다.
+    amount        BIGINT      NOT NULL,
+    balance_after BIGINT      NOT NULL,
+    ref_type      VARCHAR(30) NOT NULL,
+    ref_id        BIGINT      NULL,
+    created_at    DATETIME(6) NOT NULL,
+    updated_at    DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_point_ledger_member FOREIGN KEY (member_id) REFERENCES member (id),
+    -- 이력 목록(id 커서)용. 행은 추가만 하고 수정·삭제하지 않는다.
+    KEY idx_point_ledger_member_id (member_id, id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
