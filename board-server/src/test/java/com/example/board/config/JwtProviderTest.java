@@ -19,7 +19,7 @@ class JwtProviderTest {
     private static final String SECRET = "0123456789abcdef0123456789abcdef";
 
     private static BoardProperties props(String secret) {
-        return new BoardProperties(new BoardProperties.ForbiddenWords(true), new BoardProperties.Jwt(secret, 3600));
+        return new BoardProperties(new BoardProperties.ForbiddenWords(true), new BoardProperties.Jwt(secret, 3600), null);
     }
 
     @Test

@@ -12,3 +12,24 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
       interval: 5s
       retries: 20
+
+  # PG 모의. 스텁은 테스트와 같은 디렉터리를 쓴다(금액 999000은 항상 거절).
+  wiremock:
+    image: wiremock/wiremock:3.13.1
+    ports:
+      - "18080:8080"
+    volumes:
+      - ./src/test/resources/wiremock:/home/wiremock:ro
+
+  # 서버는 Toxiproxy(18666)를 거쳐 WireMock을 부른다. 지연 주입 예:
+  # curl -X POST localhost:8474/proxies/pg/toxics -d '{"type":"latency","attributes":{"latency":5000}}'
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.12.0
+    command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
+    ports:
+      - "8474:8474"
+      - "18666:8666"
+    volumes:
+      - ./toxiproxy.json:/config/toxiproxy.json:ro
+    depends_on:
+      - wiremock

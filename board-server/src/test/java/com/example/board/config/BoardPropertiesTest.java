@@ -19,10 +19,13 @@ class BoardPropertiesTest {
     @Test
     void forbidden_words_값이_객체로_바인딩된다() {
         runner.withPropertyValues("board.forbidden-words.ignore-case=true",
-                        "board.jwt.secret=0123456789abcdef0123456789abcdef", "board.jwt.expires-in-seconds=3600")
+                        "board.jwt.secret=0123456789abcdef0123456789abcdef", "board.jwt.expires-in-seconds=3600",
+                        "board.pg.base-url=http://pg", "board.pg.connect-timeout=1s", "board.pg.response-timeout=3s",
+                        "board.pg.connection-request-timeout=2s", "board.pg.max-connections=20")
                 .run(ctx -> {
                     assertThat(ctx).hasNotFailed();
                     assertThat(ctx.getBean(BoardProperties.class).forbiddenWords().ignoreCase()).isTrue();
+                    assertThat(ctx.getBean(BoardProperties.class).pg().responseTimeout()).hasSeconds(3);
                 });
     }
 

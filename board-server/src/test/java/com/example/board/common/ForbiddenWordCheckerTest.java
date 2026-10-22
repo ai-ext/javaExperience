@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ForbiddenWordCheckerTest {
 
     private ForbiddenWordChecker checker(boolean ignoreCase) {
-        return new ForbiddenWordChecker(new BoardProperties(new BoardProperties.ForbiddenWords(ignoreCase), null));
+        return new ForbiddenWordChecker(new BoardProperties(new BoardProperties.ForbiddenWords(ignoreCase), null, null));
     }
 
     @Test
