@@ -26,26 +26,31 @@
     try { store.setItem(KEY, JSON.stringify({ version: 1, steps: steps })); return true; } catch (e) { return false; }
   }
   // 오늘 할 일: 체크가 있는 가장 늦은 날이 덜 끝났으면 그날, 다 끝났으면 다음 날. 체크가 없으면 첫날.
+  // 마지막 날까지 끝냈는데 앞에 덜 끝낸 날이 있으면 그 첫 날로 돌아간다. 모든 순서를 끝냈을 때만 complete다.
   function nextDay(days, done) {
+    var finished = function (day) { return day.steps.every(function (s) { return done.has(s.id); }); };
     var last = -1;
     days.forEach(function (day, index) { if (day.steps.some(function (s) { return done.has(s.id); })) last = index; });
     if (last < 0) return { day: days[0], mode: 'first' };
     var current = days[last];
-    var finished = current.steps.every(function (s) { return done.has(s.id); });
-    if (!finished) return { day: current, mode: 'continue' };
+    if (!finished(current)) return { day: current, mode: 'continue' };
     if (last + 1 < days.length) return { day: days[last + 1], mode: 'next' };
+    for (var i = 0; i < days.length; i++) if (!finished(days[i])) return { day: days[i], mode: 'remaining' };
     return { day: current, mode: 'complete' };
   }
-  function storageNote(ok) {
-    document.querySelectorAll('[data-course-storage]').forEach(function (node) {
-      node.textContent = ok ? '' : '지금 브라우저에서는 저장소를 쓸 수 없어 체크가 새로고침하면 사라집니다.';
-    });
+  // reason: '' = 저장됨, 'blocked' = 저장소를 아예 못 씀, 'unsaved' = 쓰기만 실패해 이 화면에만 남은 체크가 있음
+  function storageNote(reason) {
+    var text = reason === 'blocked' ? '지금 브라우저에서는 저장소를 쓸 수 없어 체크가 새로고침하면 사라집니다.'
+      : reason === 'unsaved' ? '체크를 저장하지 못했습니다. 이 화면에는 남아 있지만 새로고침하거나 다른 탭에서 열면 사라집니다.' : '';
+    document.querySelectorAll('[data-course-storage]').forEach(function (node) { node.textContent = text; });
   }
 
   // ------------------------------------------------------------ 일자 페이지
   function initDay(page) {
     var store = storage();
     var state = readProgress(store);
+    // 쓰기에 실패한 체크가 있으면 true. 그동안은 저장값으로 화면을 덮지 않는다(덮으면 방금 한 체크가 사라진다).
+    var unsaved = false;
     var inputs = Array.prototype.slice.call(page.querySelectorAll('input.step-check[data-step]'));
     var ids = [];
     inputs.forEach(function (input) { if (ids.indexOf(input.dataset.step) < 0) ids.push(input.dataset.step); });
@@ -57,18 +62,26 @@
       });
       var count = ids.filter(function (id) { return state.done.has(id); }).length;
       if (counter) counter.textContent = count + '/' + ids.length + ' 끝냄';
-      storageNote(state.ok);
+      storageNote(!state.ok ? 'blocked' : unsaved ? 'unsaved' : '');
+    }
+    // 저장값을 다시 읽는다(다른 탭의 체크 반영). 이 화면에 저장 못 한 체크가 있으면 읽지 않는다.
+    function reload() {
+      if (unsaved) return;
+      var latest = readProgress(store);
+      if (latest.ok) state = latest;
     }
     inputs.forEach(function (input) {
       input.addEventListener('change', function () {
-        var latest = readProgress(store);
-        if (latest.ok) state = latest;
+        reload();
         if (input.checked) state.done.add(input.dataset.step); else state.done.delete(input.dataset.step);
-        state.ok = writeProgress(store, state.done);
+        var saved = writeProgress(store, state.done);
+        // 저장소 자체를 못 쓰는 경우(state.ok=false)와 쓰기만 실패한 경우를 나눈다. 둘 다 메모리의 체크는 지킨다.
+        if (state.ok) unsaved = !saved;
         paint();
       });
     });
-    window.addEventListener('pageshow', function () { var latest = readProgress(store); if (latest.ok) state = latest; paint(); });
+    window.addEventListener('pageshow', function () { reload(); paint(); });
+    window.addEventListener('storage', function (e) { if (e.key !== null && e.key !== KEY) return; reload(); paint(); });
     paint();
 
     // 정답은 펼칠 때만 하이라이트한다. syntax-highlight.js가 새로 붙은 code 노드를 처리하도록 노드를 바꿔 끼운다.
@@ -133,7 +146,7 @@
       var state = readProgress(store);
       var pick = nextDay(days, state.done);
       var day = pick.day;
-      var tags = { first: '오늘 할 일 · 처음 시작', continue: '오늘 할 일 · 이어서', next: '오늘 할 일 · 다음 날', complete: '15일 과정 · 모두 체크함' };
+      var tags = { first: '오늘 할 일 · 처음 시작', continue: '오늘 할 일 · 이어서', next: '오늘 할 일 · 다음 날', remaining: '오늘 할 일 · 남은 순서가 있는 날', complete: '15일 과정 · 모두 체크함' };
       $('[data-today-tag]').textContent = tags[pick.mode];
       $('[data-today-id]').textContent = day.id;
       $('[data-today-title]').textContent = day.title;
@@ -169,9 +182,11 @@
         if (bar) bar.style.width = Math.round((n / d.steps.length) * 100) + '%';
       });
       $('[data-progress-summary]').textContent = '체크한 순서 ' + checked + '/' + total;
-      storageNote(state.ok);
+      storageNote(state.ok ? '' : 'blocked');
     }
     window.addEventListener('pageshow', render);
+    // 다른 탭(일자 페이지)에서 체크하면 열린 홈의 오늘 할 일·진도도 다시 그린다. 홈은 저장값을 쓰지 않으므로 덮을 변경이 없다.
+    window.addEventListener('storage', function (e) { if (e.key === null || e.key === KEY) render(); });
     render();
   }
 

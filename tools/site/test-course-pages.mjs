@@ -12,14 +12,15 @@ const courseScript = fs.readFileSync(new URL('course.js', import.meta.url), 'utf
 const mapScript = fs.readFileSync(new URL('course-map.js', import.meta.url), 'utf8');
 const flowScript = fs.readFileSync(new URL('course-flow.js', import.meta.url), 'utf8');
 const KEY = 'javaexperience.course.progress.v1';
+const trackedTickets = new Set(execFileSync('git', ['ls-files', '--', 'course/tickets'], { cwd: rootPath, encoding: 'utf8' }).split('\n').filter(Boolean));
 
 // JSDOM은 생성 직후 readyState가 loading이라, 스크립트의 DOMContentLoaded 초기화를 기다린다.
 async function open(file, { saved, brokenStorage = false, script = courseScript, before } = {}) {
   const dom = new JSDOM(fs.readFileSync(new URL(file, root), 'utf8'), { url: `https://learn.example/${file}`, runScripts: 'outside-only', pretendToBeVisual: true });
   const { window } = dom;
   window.matchMedia = window.matchMedia || (() => ({ matches: false, addEventListener() {} }));
-  if (before) before(window);
   if (saved) window.localStorage.setItem(KEY, saved);
+  if (before) before(window);
   if (brokenStorage) Object.defineProperty(window, 'localStorage', { get() { throw new window.DOMException('blocked', 'SecurityError'); } });
   window.eval(script);
   await new Promise((resolve) => (window.document.readyState === 'complete' ? resolve() : window.addEventListener('load', resolve)));
@@ -73,7 +74,11 @@ for (const day of course.days) {
     const ids = day.steps.flatMap((s) => s.tickets);
     const badges = $$('.fact-tickets .ticket-badge b').map((b) => b.textContent);
     assert.deepEqual(badges, ids, `${day.id}: 티켓 배지 = roadmap 티켓`);
-    for (const a of $$('a.ticket-badge')) assert.ok(fs.existsSync(new URL(a.getAttribute('href').replace(/\.html$/, '.md'), `${root.href}${file}`)), `${day.id}: 티켓 링크 ${a.getAttribute('href')}`);
+    for (const a of $$('a.ticket-badge, .flow-link-list a')) {
+      const md = `course/tickets/${a.getAttribute('href').match(/([BE]\d{2})\.html/)[1]}.md`;
+      assert.ok(trackedTickets.has(md), `${day.id}: 티켓 링크 ${a.getAttribute('href')}는 커밋된 원문만(P5-2 리뷰 ③)`);
+    }
+    for (const span of $$('.ticket-badge.is-pending b')) assert.ok(!trackedTickets.has(`course/tickets/${span.textContent}.md`), `${day.id}: ${span.textContent}는 커밋됐는데 준비 중으로 보인다`);
   }
 }
 
@@ -106,6 +111,39 @@ for (const day of course.days) {
   const corrupt = await open('course/spring/D04.html', { saved: '{not json' });
   assert.equal(corrupt.$$('input.step-check:checked').length, 0, '망가진 저장값은 비운 상태로');
 }
+// 읽기는 되는데 쓰기만 실패하면: 연속 체크·해제·pageshow·다른 탭 알림이 와도 이 화면의 체크를 지키고 안내한다(P5-2 리뷰 ①④).
+{
+  const page = await open('course/spring/D04.html', {
+    saved: JSON.stringify({ version: 1, steps: { 'D04-5': true } }),
+    before: (win) => { win.Storage.prototype.setItem = function () { throw new win.DOMException('full', 'QuotaExceededError'); }; },
+  });
+  const check = (id, on) => { const el = page.$(`input.step-check[data-step="${id}"]`); el.checked = on; el.dispatchEvent(new page.window.Event('change', { bubbles: true })); };
+  assert.equal(page.$('[data-day-progress]').textContent, '1/5 끝냄', '저장값은 읽힌다');
+  check('D04-1', true);
+  check('D04-2', true);
+  assert.equal(page.$('[data-day-progress]').textContent, '3/5 끝냄', '쓰기 실패 뒤 다음 체크가 앞 체크를 지우지 않는다');
+  check('D04-5', false);
+  assert.equal(page.$('[data-day-progress]').textContent, '2/5 끝냄', '해제도 이 화면에 남는다');
+  page.window.dispatchEvent(new page.window.Event('pageshow'));
+  page.window.dispatchEvent(new page.window.StorageEvent('storage', { key: KEY }));
+  assert.equal(page.$('[data-day-progress]').textContent, '2/5 끝냄', 'pageshow·storage가 저장 못 한 체크를 덮지 않는다');
+  assert.deepEqual(page.$$('.day-chips input.step-check:checked').map((i) => i.dataset.step), ['D04-1', 'D04-2']);
+  assert.match(page.$('[data-course-storage]').textContent, /저장하지 못했습니다/, '저장 실패 안내');
+}
+// 다른 탭에서 체크하면 열린 일자 화면·홈이 storage 이벤트로 다시 그린다(P5-2 리뷰 ④).
+{
+  const day = await open('course/spring/D04.html');
+  day.window.localStorage.setItem(KEY, JSON.stringify({ version: 1, steps: { 'D04-1': true } }));
+  day.window.dispatchEvent(new day.window.StorageEvent('storage', { key: 'other.key' }));
+  assert.equal(day.$('[data-day-progress]').textContent, '0/5 끝냄', '다른 키는 무시');
+  day.window.dispatchEvent(new day.window.StorageEvent('storage', { key: KEY }));
+  assert.equal(day.$('[data-day-progress]').textContent, '1/5 끝냄', '같은 키면 다시 그린다');
+  const home = await open('index.html');
+  assert.equal(home.$('[data-today-id]').textContent, 'D01');
+  home.window.localStorage.setItem(KEY, JSON.stringify({ version: 1, steps: { 'D06-1': true } }));
+  home.window.dispatchEvent(new home.window.StorageEvent('storage', { key: KEY }));
+  assert.equal(home.$('[data-today-id]').textContent, 'D06', '열린 홈의 오늘 할 일이 바뀐다');
+}
 
 // ---------------------------------------------------------------- 홈
 {
@@ -117,6 +155,14 @@ for (const day of course.days) {
   assert.equal(nextDay(days, set('D04-1')).day.id, 'D04', '체크가 있는 가장 늦은 날이 덜 끝났으면 그날');
   assert.equal(nextDay(days, set(...days[0].steps.map((s) => s.id))).day.id, 'D02', '다 끝냈으면 다음 날');
   assert.equal(nextDay(days, set(...days.flatMap((d) => d.steps.map((s) => s.id)))).mode, 'complete');
+  // 마지막 날만 끝냈으면 완료가 아니다. 덜 끝낸 첫 날로 안내한다(P5-2 리뷰 ②).
+  const lastOnly = nextDay(days, set(...days[days.length - 1].steps.map((s) => s.id)));
+  assert.equal(lastOnly.mode, 'remaining'); assert.equal(lastOnly.day.id, 'D01');
+  const allButD03 = nextDay(days, set(...days.filter((d) => d.id !== 'D03').flatMap((d) => d.steps.map((s) => s.id))));
+  assert.deepEqual([allButD03.mode, allButD03.day.id], ['remaining', 'D03']);
+  const d15only = await open('index.html', { saved: JSON.stringify({ version: 1, steps: Object.fromEntries(days[days.length - 1].steps.map((s) => [s.id, true])) }) });
+  assert.doesNotMatch(d15only.$('[data-today-tag]').textContent, /모두 체크함/, '마지막 날만 끝내도 과정 완료로 보이지 않는다');
+  assert.equal(d15only.$('[data-today-id]').textContent, 'D01');
 
   const home = await open('index.html');
   assert.ok(home.$('main').firstElementChild.matches('section.course-home'), '과정 v2가 첫 화면');
@@ -183,6 +229,10 @@ for (const day of course.days) {
   assert.ok(!map.$('.cm-node[data-node="B06"]').classList.contains('is-related'));
   assert.match(map.$('[data-cm-status]').textContent, /D12 · 직접 연결/);
   assert.equal(map.$('[data-cm-detail]').hidden, false);
+  // 관계 밖 노드는 버튼으로 남아 있으므로 불투명도로 글자·초점 테두리를 흐리지 않는다(P5-2 리뷰 ⑤).
+  const css = fs.readFileSync(new URL('course.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css, /has-selection[^{]*\.cm-node[^{]*\{[^}]*opacity/, '비강조 노드에 opacity를 쓰지 않는다');
+  assert.match(css, /has-selection[^{]*\.cm-node[^{]*:focus-visible/, '비강조 노드도 초점이 오면 원래 모습');
   map.$('[data-cm-clear]').click();
   assert.equal(map.$('[data-cm-detail]').hidden, true);
 }

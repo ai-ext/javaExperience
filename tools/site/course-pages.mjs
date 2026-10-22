@@ -1,6 +1,7 @@
 // 과정 v2 화면 렌더러 — 일자 페이지(course/spring/Dnn.md) 배치, 홈의 과정 진입 영역, 과정 지도(course/map.md).
 // build.mjs가 marked로 만든 HTML을 받아 과정 전용 배치로 바꾼다. 다른 페이지에는 쓰지 않는다.
 // 빌드가 주입하는 href는 marked 링크 검사를 거치지 않으므로, 여기서 대상 파일·앵커가 있는지 직접 확인한다.
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadFlows, renderDayFlow, renderDayTicketLinks } from './course-flow.mjs';
@@ -44,13 +45,19 @@ export function loadCourse(root) {
       steps: d.steps.map((s) => ({ id: `${d.id}-${s.no}`, no: s.no, title: s.title, short: shortTitle(s.title), tickets: s.tickets || [] })) })),
   ].map((d) => ({ ...d, page: `course/spring/${d.id}.html`, source: `course/spring/${d.id}.md` }));
   for (const d of days) if (!exists(d.source)) throw new Error(`과정 데이터: ${d.source}가 없다`);
+  // 티켓 페이지는 원문(md)이 git에 커밋돼 있을 때만 "준비됨"으로 잇는다. 작업 중인 원문(미추적)을 링크하면
+  // 그 커밋 스냅샷에는 없는 페이지를 가리키게 된다. git이 없는 환경(압축본)에서는 파일이 있으면 준비됨으로 본다.
+  const tracked = (() => {
+    try { return new Set(execFileSync('git', ['ls-files', '-z', '--', 'course/tickets'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\0').filter(Boolean)); } catch { return null; }
+  })();
+  const ticketReady = (p) => exists(p) && (!tracked || tracked.has(p));
   const areaIds = new Set(meta.areas.map((a) => a.id));
   const tickets = meta.tickets.map((t) => {
     for (const a of t.areas) if (!areaIds.has(a)) throw new Error(`map-tickets.json: ${t.id}의 결함 영역 ${a}가 areas에 없다`);
-    const pageTitle = h1(`course/tickets/${t.id}.md`);
+    const pageTitle = ticketReady(`course/tickets/${t.id}.md`) ? h1(`course/tickets/${t.id}.md`) : null;
     const stepTitle = days.flatMap((d) => d.steps).find((s) => s.tickets.includes(t.id) && s.title.startsWith(`${t.id} "`))?.title.match(/^B\d{2} "([^"]+)"/)?.[1];
     const title = pageTitle ? pageTitle.replace(/^[BE]\d{2}\.\s*/, '') : stepTitle || t.title;
-    const page = exists(`course/tickets/${t.id}.md`) ? `course/tickets/${t.id}.html` : null;
+    const page = ticketReady(`course/tickets/${t.id}.md`) ? `course/tickets/${t.id}.html` : null;
     return { ...t, title, page };
   });
   // 관계: J→D(같은 날 먼저 연습), D→B(그날 다루는 티켓), B→영역(결함 영역). 방향이 "영향 주는/받는 쪽"을 정한다.
@@ -85,7 +92,7 @@ function ticketBadge(ticket, fromRel, course) {
   const kind = ticket.required ? '필수' : ticket.enhancement ? '고도화' : '선택';
   const inner = `<b>${esc(ticket.id)}</b><span>${kind}</span>`;
   const cls = `ticket-badge${ticket.required ? ' is-required' : ''}`;
-  return ticket.page && course.exists(ticket.page.replace(/\.html$/, '.md'))
+  return ticket.page
     ? `<a class="${cls}" href="${esc(relHref(fromRel, ticket.page))}" title="${esc(ticket.title)}">${inner}</a>`
     : `<span class="${cls} is-pending" title="${esc(ticket.title)} · 티켓 페이지 준비 중">${inner}<small>페이지 준비 중</small></span>`;
 }

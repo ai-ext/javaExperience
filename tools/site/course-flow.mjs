@@ -179,8 +179,7 @@ export function renderDayTicketLinks(day, course, flows, fromRel) {
   const items = ids.map((id) => {
     const t = course.tickets.find((x) => x.id === id);
     const flow = flows.tickets.get(id);
-    const md = `course/tickets/${id}.md`;
-    const ready = flow && course.exists(md);
+    const ready = flow && t.page;
     const openSteps = flow ? flow.steps.filter((s) => s.side === 'open').length : 0;
     const body = `<b>${esc(id)}</b><span>${esc(t.title)}</span><small>${ready ? `증상 단계 ${openSteps}개 · 원인 단계는 티켓 페이지에서 펼침` : '티켓 페이지·흐름 준비 중'}</small>`;
     return `<li${ready ? '' : ' class="is-pending"'}>${ready ? `<a href="${esc(rel(`course/tickets/${id}.html`))}#flow-${id.toLowerCase()}">${body}</a>` : body}</li>`;

@@ -697,9 +697,31 @@ if (errors.length) {
   console.error(`깨진 링크 ${errors.length}개:\n` + errors.join('\n'));
   process.exit(1);
 }
+const outputs = new Map();
 for (const [f, r] of results) {
   const title = (read(f).match(/^# (.+)$/m)?.[1] ?? path.basename(f)).replace(/[`*]/g, '');
-  fs.writeFileSync(f.replace(/\.md$/, '.html'), page({ abs: f, title, body: r.html, hasMermaid: r.hasMermaid, hasDbIndexExperiment: r.hasDbIndexExperiment }));
+  outputs.set(f.replace(/\.md$/, '.html'), page({ abs: f, title, body: r.html, hasMermaid: r.hasMermaid, hasDbIndexExperiment: r.hasDbIndexExperiment }));
 }
+// 과정 v2 렌더러가 넣은 링크(홈 진입·지도·이전/다음·티켓 배지·흐름 목록, JSON 데이터의 href)는 위 marked 링크 검사를 거치지 않는다.
+// 홈과 course/ 아래 페이지의 최종 HTML에서 파일·앵커를 다시 검사한다. 이번 빌드가 쓸 페이지도 있는 것으로 본다.
+const injectedErrors = [];
+for (const [out, html] of outputs) {
+  const relOut = rel(out);
+  if (relOut !== 'README.html' && !relOut.startsWith('course/')) continue;
+  const hrefs = [...html.matchAll(/\shref="([^"]+)"/g), ...html.matchAll(/"href":"([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, '&'));
+  for (const href of new Set(hrefs)) {
+    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href)) continue;
+    const [pathPart, hash] = href.split('#');
+    const target = pathPart ? path.resolve(path.dirname(out), pathPart.split('?')[0]) : out;
+    const targetHtml = outputs.get(target) ?? (target.endsWith('.html') && fs.existsSync(target) ? read(target) : null);
+    if (!outputs.has(target) && !fs.existsSync(target)) { injectedErrors.push(`${relOut}: 없는 파일 → ${href}`); continue; }
+    if (hash && targetHtml !== null && !targetHtml.includes(`id="${decodeURIComponent(hash)}"`)) injectedErrors.push(`${relOut}: 없는 앵커 → ${href}`);
+  }
+}
+if (injectedErrors.length) {
+  console.error(`렌더러가 넣은 링크 중 깨진 것 ${injectedErrors.length}개:\n` + injectedErrors.join('\n'));
+  process.exit(1);
+}
+for (const [out, html] of outputs) fs.writeFileSync(out, html);
 fs.copyFileSync(path.join(ROOT, 'README.html'), path.join(ROOT, 'index.html'));
 console.log(`HTML ${results.size}개 생성 · 시나리오 단계 ${LEVELS.length}개 · 링크 오류 0`);
