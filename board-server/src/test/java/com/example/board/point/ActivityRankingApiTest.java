@@ -170,6 +170,56 @@ class ActivityRankingApiTest extends ApiTestSupport {
         assertThat(rankingService.top(null, 2).items()).extracting(ActivityRank::memberId).containsExactly(10L, 9L);
     }
 
+    // 0패딩 전에는 member가 "9"였다. 같은 키에 옛 형식이 남아 있으면 새 형식 가산이 별도 member가 되어
+    // 같은 회원이 10점·2점으로 두 번 나온다. 쓰기 때 옛 형식 점수를 새 형식으로 옮겨 합친다.
+    @Test
+    void 옛_형식_member가_남아_있으면_가산할_때_새_형식으로_옮겨_합친다() {
+        redis.opsForZSet().add("ranking:activity", "9", 10);
+
+        rankingService.add(9L, 2);
+
+        assertThat(rankingService.top(null, 10).items()).extracting(ActivityRank::memberId, ActivityRank::score)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(9L, 12L));
+        assertThat(redis.opsForZSet().score("ranking:activity", "9")).isNull();
+        assertThat(redis.opsForZSet().score("ranking:activity", ActivityRankingService.member(9L))).isEqualTo(12.0);
+    }
+
+    // 이 수정 전 버전이 이미 새 형식으로 가산했다면 두 형식이 함께 있다(그 회원의 다음 가산 전까지).
+    @Test
+    void 두_형식이_한_쪽에_함께_있으면_조회에서_한_번으로_합친다() {
+        redis.opsForZSet().add("ranking:activity", "9", 10);
+        redis.opsForZSet().add("ranking:activity", ActivityRankingService.member(9L), 2);
+        redis.opsForZSet().add("ranking:activity", ActivityRankingService.member(10L), 11);
+
+        assertThat(rankingService.top(null, 10).items()).extracting(ActivityRank::memberId, ActivityRank::score)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(9L, 12L),
+                        org.assertj.core.groups.Tuple.tuple(10L, 11L));
+    }
+
+    // 위치 커서는 양수 long이면 디코더를 통과한다. 원장 폴백이 offset + count를 int로 자르면 음수 쪽 크기로 500이 났다.
+    @Test
+    void 끝을_넘는_큰_위치_커서는_Redis_정상과_장애_모두_200_빈_목록이다() throws Exception {
+        rankingService.add(9L, 1);
+        for (long position : new long[] {Integer.MAX_VALUE, Long.MAX_VALUE}) {
+            String cursor = com.example.board.common.CursorPage.encode(position);
+            mockMvc.perform(get("/api/rankings/activity").param("size", "1").param("cursor", cursor))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items.length()").value(0))
+                    .andExpect(jsonPath("$.nextCursor").doesNotExist());
+            try {
+                guard.call("테스트 장애 주입", () -> {
+                    throw new RedisConnectionFailureException("주입한 장애");
+                }, () -> null);
+                mockMvc.perform(get("/api/rankings/activity").param("size", "1").param("cursor", cursor))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.items.length()").value(0))
+                        .andExpect(jsonPath("$.nextCursor").doesNotExist());
+            } finally {
+                guard.reset();
+            }
+        }
+    }
+
     // 함정: 점수를 Redis에만 쌓으면 Redis 데이터가 사라질 때 되살릴 원천이 없다
     @Test
     void 랭킹_키가_사라져도_point_ledger에서_같은_점수로_다시_만든다() throws Exception {
