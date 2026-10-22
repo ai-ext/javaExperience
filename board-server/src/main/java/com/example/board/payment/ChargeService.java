@@ -150,9 +150,11 @@ public class ChargeService {
                 markUnknown(payment);
                 yield timeout(payment);
             }
+            // 5xx는 PG가 요청을 받은 뒤 났을 수 있어 승인 여부를 모른다. 타임아웃과 같은 결과 불명(504)으로 답해야
+            // 같은 키 재요청(UNKNOWN → 504)과 응답이 같고, 뒤에 콜백이 DONE으로 와도 "실패" 안내와 어긋나지 않는다.
             case SERVER_ERROR -> {
                 markUnknown(payment);
-                yield declined(payment);
+                yield timeout(payment);
             }
             // PG에 닿지 않았거나 PG가 명시적으로 거절했다
             case UNREACHABLE, POOL_TIMEOUT, DECLINED -> {

@@ -59,6 +59,28 @@ class ChargeApiTest extends PgApiTestSupport {
     }
 
     @Test
+    void PG가_5xx로만_답하면_504이고_UNKNOWN으로_남고_같은_키_재요청도_504() throws Exception {
+        // 승인 요청은 언제나 503. 승인 여부를 모르므로 실패(502)로 단정하지 않는다
+        PgContainers.stub("""
+                {"priority":1,"request":{"method":"POST","urlPath":"/pg/v1/payments"},"response":{"status":503}}
+                """);
+        Member m = newMember(Role.USER);
+        String key = newKey();
+
+        charge(m, key, 5000)
+                .andExpect(status().isGatewayTimeout())
+                .andExpect(jsonPath("$.type").value("/errors/pg-timeout"));
+
+        assertThat(paymentStatus(key)).isEqualTo("UNKNOWN");
+        assertThat(balance(m)).isZero();
+        int calls = PgContainers.approveRequestCount();
+        charge(m, key, 5000)
+                .andExpect(status().isGatewayTimeout())
+                .andExpect(jsonPath("$.type").value("/errors/pg-timeout"));
+        assertThat(PgContainers.approveRequestCount()).isEqualTo(calls);
+    }
+
+    @Test
     void 금액이_1000_단위가_아니거나_범위_밖이면_400() throws Exception {
         Member m = newMember(Role.USER);
 
