@@ -381,7 +381,7 @@
 <p><strong>질문</strong> 선착순 쿠폰 잔여 수량을 Redis <code>DECR</code>로 관리합니다. Redis 값과 DB의 <code>issued_quantity</code>가 다르면 무엇을 믿나요?
 <strong>답에 들어가야 할 것</strong></p>
 <ul>
-<li><code>DECR</code>은 원자적이라 동시 요청에서도 정확히 하나씩 줄고, 결과가 0보다 작으면 소진으로 보고 <code>INCR</code>로 되돌린다</li>
+<li>남은 수량 확인과 감소를 원자적으로 묶어(Lua 스크립트 등) 0 아래로 내려가지 않게 한다. <code>DECR</code> 뒤 음수면 <code>INCR</code>로 되돌리는 방식은 초과 요청과 DB 실패 되돌리기가 겹치면 수량이 어긋날 수 있다</li>
 <li>발급의 최종 기준은 DB(<code>member_coupon</code> UNIQUE, <code>issued_quantity</code> &lt;= <code>total_quantity</code>)이고, Redis는 DB 앞에서 요청을 거르는 장치다</li>
 <li>Redis에서 차감한 뒤 DB 저장이 실패하면 Redis 수량을 되돌리거나 DB 기준으로 다시 맞추는 절차가 있어야 한다
 <strong>근거</strong> 10 §4, spec-v2 §6</li>
@@ -489,7 +489,7 @@
 </ul>
 <h2 id="d12-티켓-처리-1"><a class="anchor" href="#d12-티켓-처리-1" aria-hidden="true">#</a>D12 티켓 처리 1</h2>
 <h3 id="tc-d12-1"><a class="anchor" href="#tc-d12-1" aria-hidden="true">#</a>TC-D12-1</h3>
-<p><strong>질문</strong> (<a class="docref" href="../docs/knowledge/B01-account-lifecycle.html">B01</a>) &quot;PG가 느린 날 글 목록까지 멈춘다.&quot; 상관없어 보이는 두 기능이 왜 같이 멈췄나요?
+<p><strong>질문</strong> (B01) &quot;PG가 느린 날 글 목록까지 멈춘다.&quot; 상관없어 보이는 두 기능이 왜 같이 멈췄나요?
 <strong>답에 들어가야 할 것</strong></p>
 <ul>
 <li>충전 서비스가 <code>@Transactional</code> 안에서 PG를 호출해, PG가 느린 동안 DB 커넥션을 쥔 채 기다렸다</li>
