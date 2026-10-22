@@ -61,7 +61,8 @@ public class CouponService {
     private Long issueInDb(Long couponId, Long memberId) {
         try {
             return tx.execute(s -> {
-                if (memberCouponRepository.existsByCouponIdAndMemberId(couponId, memberId)) {
+                // 연타·동시 요청이 둘 다 "아직 안 받음"을 보고 지나가지 않게 발급 행을 잠그고 확인한다
+                if (memberCouponRepository.findByCouponIdAndMemberIdForUpdate(couponId, memberId).isPresent()) {
                     throw duplicate();
                 }
                 if (couponRepository.increaseIssued(couponId) == 0) {

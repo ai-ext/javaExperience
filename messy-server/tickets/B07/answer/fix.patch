@@ -1,0 +1,47 @@
+diff --git a/src/main/java/com/example/board/coupon/CouponService.java b/src/main/java/com/example/board/coupon/CouponService.java
+index 7002e76..0c7ec86 100644
+--- a/src/main/java/com/example/board/coupon/CouponService.java
++++ b/src/main/java/com/example/board/coupon/CouponService.java
+@@ -61,8 +61,10 @@ public class CouponService {
+     private Long issueInDb(Long couponId, Long memberId) {
+         try {
+             return tx.execute(s -> {
+-                // 연타·동시 요청이 둘 다 "아직 안 받음"을 보고 지나가지 않게 발급 행을 잠그고 확인한다
+-                if (memberCouponRepository.findByCouponIdAndMemberIdForUpdate(couponId, memberId).isPresent()) {
++                // 이미 받았는지는 잠그지 않고 본다. 없는 행을 SELECT ... FOR UPDATE로 잠그면 그 자리의 갭 락을
++                // 동시 요청끼리 나눠 갖고, 서로의 INSERT(삽입 의도 락)를 막아 데드락이 난다.
++                // 동시에 둘 다 통과해도 UNIQUE(coupon_id, member_id)가 하나를 막고 아래 catch가 409로 바꾼다.
++                if (memberCouponRepository.existsByCouponIdAndMemberId(couponId, memberId)) {
+                     throw duplicate();
+                 }
+                 if (couponRepository.increaseIssued(couponId) == 0) {
+diff --git a/src/main/java/com/example/board/coupon/MemberCouponRepository.java b/src/main/java/com/example/board/coupon/MemberCouponRepository.java
+index 9626834..1cabb3a 100644
+--- a/src/main/java/com/example/board/coupon/MemberCouponRepository.java
++++ b/src/main/java/com/example/board/coupon/MemberCouponRepository.java
+@@ -2,12 +2,8 @@ package com.example.board.coupon;
+ 
+ import java.time.LocalDateTime;
+ import java.util.List;
+-import java.util.Optional;
+-
+-import jakarta.persistence.LockModeType;
+ 
+ import org.springframework.data.jpa.repository.JpaRepository;
+-import org.springframework.data.jpa.repository.Lock;
+ import org.springframework.data.jpa.repository.Modifying;
+ import org.springframework.data.jpa.repository.Query;
+ import org.springframework.data.repository.query.Param;
+@@ -17,12 +13,6 @@ public interface MemberCouponRepository extends JpaRepository<MemberCoupon, Long
+ 
+     boolean existsByCouponIdAndMemberId(Long couponId, Long memberId);
+ 
+-    /** 발급 직전 확인용 잠금 조회(SELECT ... FOR UPDATE). 같은 회원의 동시 발급을 줄 세운다. */
+-    @Lock(LockModeType.PESSIMISTIC_WRITE)
+-    @Query("select mc from MemberCoupon mc where mc.coupon.id = :couponId and mc.member.id = :memberId")
+-    Optional<MemberCoupon> findByCouponIdAndMemberIdForUpdate(@Param("couponId") Long couponId,
+-            @Param("memberId") Long memberId);
+-
+     /** 쿠폰 이름·만료일을 한 번에 읽는다(N+1 방지). */
+     @Query("select mc from MemberCoupon mc join fetch mc.coupon where mc.member.id = :memberId order by mc.id desc")
+     List<MemberCoupon> findAllWithCoupon(@Param("memberId") Long memberId);
