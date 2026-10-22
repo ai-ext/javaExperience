@@ -3,6 +3,7 @@ package com.example.board.post;
 import java.util.LinkedHashSet;
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,13 +22,15 @@ public class PostServiceImpl implements PostService {
     private final MemberRepository memberRepository;
     private final TagRepository tagRepository;
     private final PointService pointService;
+    private final ApplicationEventPublisher events;
 
     public PostServiceImpl(PostRepository postRepository, MemberRepository memberRepository,
-            TagRepository tagRepository, PointService pointService) {
+            TagRepository tagRepository, PointService pointService, ApplicationEventPublisher events) {
         this.postRepository = postRepository;
         this.memberRepository = memberRepository;
         this.tagRepository = tagRepository;
         this.pointService = pointService;
+        this.events = events;
     }
 
     @Override
@@ -44,6 +47,8 @@ public class PostServiceImpl implements PostService {
         }
         Long postId = postRepository.save(post).getId();
         pointService.earn(memberId, POST_EARN_POINTS, "POST", postId);
+        // 인기글 캐시는 커밋 뒤 리스너가 지운다(PostCacheEvictListener). 여기서 Redis를 부르지 않는다.
+        events.publishEvent(new PostChangedEvent(postId));
         return postId;
     }
 
@@ -60,6 +65,7 @@ public class PostServiceImpl implements PostService {
         Post post = findOwned(postId, memberId);
         post.update(request.title(), request.content());
         post.replaceTags(resolveTags(request.tags()));
+        events.publishEvent(new PostChangedEvent(postId));
         return flushAndRespond(post);
     }
 
@@ -71,6 +77,7 @@ public class PostServiceImpl implements PostService {
         if (request.tags() != null) {
             post.replaceTags(resolveTags(request.tags()));
         }
+        events.publishEvent(new PostChangedEvent(postId));
         return flushAndRespond(post);
     }
 
@@ -79,6 +86,7 @@ public class PostServiceImpl implements PostService {
     public void delete(Long postId, Long memberId) {
         // save()를 부르지 않는다. 영속 상태 엔티티의 변경은 커밋 시점에 UPDATE로 나간다.
         findOwned(postId, memberId).delete();
+        events.publishEvent(new PostChangedEvent(postId));
     }
 
     private Post findOwned(Long postId, Long memberId) {

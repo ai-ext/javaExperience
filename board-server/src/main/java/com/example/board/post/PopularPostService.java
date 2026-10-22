@@ -65,6 +65,11 @@ public class PopularPostService {
         }
     }
 
+    /** 글 변경이 커밋된 뒤 부른다. 실패해도 TTL(60초) 뒤에는 새 값이 되므로 경고만 남긴다. */
+    public void evict() {
+        guard.run("인기글 캐시 삭제", () -> redis.delete(KEY));
+    }
+
     /** 상위 20개 고정 목록이라 한 쪽뿐이다. size만큼 앞에서 자르고 nextCursor는 항상 null이다. */
     public CursorPage<PopularPost> page(String cursor, int size) {
         // 커서 형식만 검사한다(서버가 준 적 없는 값은 400). 다음 쪽이 없으니 위치로는 쓰지 않는다.

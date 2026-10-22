@@ -13,6 +13,7 @@ import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 
 import com.example.board.ApiTestSupport;
 import com.example.board.MyBatisQueryCounter;
@@ -20,7 +21,9 @@ import com.example.board.member.Member;
 import com.example.board.member.Role;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -110,6 +113,33 @@ class PopularPostCacheTest extends ApiTestSupport {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.type").value("/errors/validation"));
         mockMvc.perform(get("/api/posts/popular").param("size", "0")).andExpect(status().isBadRequest());
         mockMvc.perform(get("/api/posts/popular").param("cursor", "!!!")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 글을_삭제해_커밋하면_바로_다음_인기글_조회에_그_글이_없다() throws Exception {
+        Long gone = postWithLikes("지울 글", 50);
+        postWithLikes("남을 글", 1);
+        mockMvc.perform(get("/api/posts/popular")).andExpect(jsonPath("$.items[0].id").value(gone));
+
+        mockMvc.perform(delete("/api/posts/{id}", gone).header("Authorization", bearer(author)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/posts/popular"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].title").value("남을 글"));
+    }
+
+    @Test
+    void 글을_고쳐_커밋하면_인기글에_새_제목이_나온다() throws Exception {
+        Long id = postWithLikes("옛 제목", 5);
+        mockMvc.perform(get("/api/posts/popular")).andExpect(jsonPath("$.items[0].title").value("옛 제목"));
+
+        mockMvc.perform(patch("/api/posts/{id}", id).header("Authorization", bearer(author))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"새 제목\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/posts/popular")).andExpect(jsonPath("$.items[0].title").value("새 제목"));
     }
 
     // 함정: TTL이 끝난 순간 동시 요청이 모두 DB로 몰리는 스탬피드
