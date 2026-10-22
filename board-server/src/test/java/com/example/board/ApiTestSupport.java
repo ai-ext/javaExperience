@@ -59,4 +59,25 @@ public abstract class ApiTestSupport {
                 + " VALUES (?, '제목', '내용', 'ACTIVE', 0, NOW(6), NOW(6))", author.getId());
         return jdbc.queryForObject("SELECT MAX(id) FROM post WHERE member_id = ?", Long.class, author.getId());
     }
+
+    /** 목록 테스트가 이전 테스트의 글에 흔들리지 않도록 글 관련 행을 모두 지운다. */
+    protected void clearPosts() {
+        jdbc.update("DELETE FROM post_like");
+        jdbc.update("DELETE FROM comment");
+        jdbc.update("DELETE FROM post_tag");
+        jdbc.update("DELETE FROM post");
+    }
+
+    protected Long insertPost(Member author, String title, String content, String status) {
+        jdbc.update("INSERT INTO post (member_id, title, content, status, like_count, created_at, updated_at)"
+                + " VALUES (?, ?, ?, ?, 0, NOW(6), NOW(6))", author.getId(), title, content, status);
+        return jdbc.queryForObject("SELECT MAX(id) FROM post", Long.class);
+    }
+
+    protected void attachTag(Long postId, String tagName) {
+        jdbc.update("INSERT IGNORE INTO tag (name, created_at, updated_at) VALUES (?, NOW(6), NOW(6))", tagName);
+        Long tagId = jdbc.queryForObject("SELECT id FROM tag WHERE name = ?", Long.class, tagName);
+        jdbc.update("INSERT INTO post_tag (post_id, tag_id, created_at, updated_at) VALUES (?, ?, NOW(6), NOW(6))",
+                postId, tagId);
+    }
 }
