@@ -74,7 +74,7 @@ function listMd() {
     }
   };
   out.push(path.join(ROOT, 'errors.md'));
-  for (const d of ['docs/knowledge', 'scenario', 'practice', 'lessons', 'tickets']) walk(path.join(ROOT, d));
+  for (const d of ['docs/knowledge', 'scenario', 'practice', 'lessons', 'tickets', 'course']) if (fs.existsSync(path.join(ROOT, d))) walk(path.join(ROOT, d));
   return out;
 }
 
