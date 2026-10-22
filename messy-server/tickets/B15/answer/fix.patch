@@ -59,14 +59,15 @@ index e660ac4..58dfa38 100644
      }
 diff --git a/src/test/java/com/example/board/admin/HidePostCacheRaceTest.java b/src/test/java/com/example/board/admin/HidePostCacheRaceTest.java
 new file mode 100644
-index 0000000..572df15
+index 0000000..8a38a69
 --- /dev/null
 +++ b/src/test/java/com/example/board/admin/HidePostCacheRaceTest.java
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,103 @@
 +package com.example.board.admin;
 +
 +import java.sql.Connection;
 +import java.sql.PreparedStatement;
++import java.sql.ResultSet;
 +import java.util.List;
 +import java.util.concurrent.ExecutorService;
 +import java.util.concurrent.Executors;
@@ -77,6 +78,9 @@ index 0000000..572df15
 +
 +import org.junit.jupiter.api.Test;
 +import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.datasource.DriverManagerDataSource;
++import org.testcontainers.mysql.MySQLContainer;
 +
 +import com.example.board.ApiTestSupport;
 +import com.example.board.member.Member;
@@ -89,16 +93,30 @@ index 0000000..572df15
 +
 +/**
 + * 로그 타임라인 "캐시 삭제 → 다른 요청의 재적재 → 커밋"을 테스트로 고정한다.
-+ * 글 행을 다른 커넥션이 FOR UPDATE로 잡고 있으면 숨김 요청은 커밋 직전 UPDATE에서 기다린다. 그 사이에 인기글을 읽는다.
++ * 글 행을 다른 커넥션이 FOR UPDATE로 잡고 있으면 숨김 요청은 커밋 전에 그 행 잠금에서 기다린다. 그 사이에 인기글을 읽는다.
++ * 기다리는지는 잠금 표(performance_schema.data_lock_waits)로 본다. 모든 대기에는 상한을 둔다.
 + */
 +class HidePostCacheRaceTest extends ApiTestSupport {
 +
 +    @Autowired
 +    DataSource dataSource;
 +
++    @Autowired
++    MySQLContainer mysql;
++
 +    List<Long> popularIds() throws Exception {
 +        String body = mockMvc.perform(get("/api/posts/popular")).andReturn().getResponse().getContentAsString();
 +        return JsonPath.<List<Number>>read(body, "$.items[*].id").stream().map(Number::longValue).toList();
++    }
++
++    /** locker 연결이 잡은 post 행 잠금을 기다리는 트랜잭션 수. 잠금 표는 PROCESS 권한이 필요해 root로 읽는다. */
++    long waitersOn(long lockerId) {
++        JdbcTemplate root = new JdbcTemplate(
++                new DriverManagerDataSource(mysql.getJdbcUrl(), "root", mysql.getPassword()));
++        return root.queryForObject("SELECT COUNT(*) FROM performance_schema.data_lock_waits w"
++                + " JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID = w.REQUESTING_ENGINE_LOCK_ID"
++                + " JOIN performance_schema.threads t ON t.THREAD_ID = w.BLOCKING_THREAD_ID"
++                + " WHERE t.PROCESSLIST_ID = ? AND l.OBJECT_NAME = 'post'", Long.class, lockerId);
 +    }
 +
 +    @Test
@@ -112,6 +130,11 @@ index 0000000..572df15
 +        ExecutorService pool = Executors.newSingleThreadExecutor();
 +        try (Connection locker = dataSource.getConnection()) {
 +            locker.setAutoCommit(false);
++            long lockerId;
++            try (ResultSet rs = locker.createStatement().executeQuery("SELECT CONNECTION_ID()")) {
++                rs.next();
++                lockerId = rs.getLong(1);
++            }
 +            try (PreparedStatement ps = locker.prepareStatement("SELECT id FROM post WHERE id = ? FOR UPDATE")) {
 +                ps.setLong(1, postId);
 +                ps.executeQuery().close();
@@ -120,17 +143,22 @@ index 0000000..572df15
 +                    .perform(post("/api/admin/posts/{id}/hide", postId).header("Authorization", bearer(admin)))
 +                    .andReturn().getResponse().getStatus());
 +            try {
-+                // 숨김 요청의 UPDATE가 글 행 잠금을 기다릴 때까지(같은 계정 연결은 PROCESS 권한 없이 보인다)
-+                while (jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.PROCESSLIST"
-+                        + " WHERE COMMAND = 'Query' AND INFO LIKE 'update post%'", Long.class) == 0) {
++                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
++                while (waitersOn(lockerId) == 0 && !hide.isDone() && System.nanoTime() < deadline) {
 +                    Thread.sleep(20);
 +                }
++                if (hide.isDone()) {
++                    // 잠금을 기다리지 않고 끝났다면 원인(응답 코드나 예외)을 그대로 보여 준다
++                    assertThat(hide.get()).as("숨김 요청이 글 행 잠금을 기다리지 않고 끝났다").isNegative();
++                }
++                assertThat(waitersOn(lockerId)).as("10초 안에 숨김 요청이 글 행 잠금을 기다려야 한다").isPositive();
 +                popularIds(); // 커밋 전의 다른 요청
 +            } finally {
 +                locker.rollback();
 +            }
 +            assertThat(hide.get(10, TimeUnit.SECONDS)).isEqualTo(200);
 +        } finally {
++            // 끼어들기(interrupt)로 끝내면 진행 중인 Redis 명령이 실패해 다음 테스트까지 캐시가 꺼진다
 +            pool.shutdown();
 +            pool.awaitTermination(10, TimeUnit.SECONDS);
 +        }

@@ -2,6 +2,8 @@ package com.example.board.tickets;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -15,10 +17,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.testcontainers.mysql.MySQLContainer;
 
 import com.example.board.ApiTestSupport;
 import com.example.board.admin.AdminService;
@@ -33,7 +38,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 /**
  * B15 확인 테스트: 숨긴 글은 숨김이 커밋된 바로 다음 인기글 조회부터 빠진다.
  * "캐시 삭제 → 다른 요청의 재적재 → 커밋" 순서를 TTL을 기다리지 않고 매번 만든다.
- * 별도 커넥션이 그 글 행을 FOR UPDATE로 잡아 두면 숨김 요청은 커밋 직전 UPDATE에서 멈춘다. 그 틈에 인기글을 읽는다.
+ * 별도 커넥션이 그 글 행을 FOR UPDATE로 잡아 두면 숨김 요청은 커밋 전에 그 행 잠금에서 멈춘다. 그 틈에 인기글을 읽는다.
+ * 멈춘 것은 SQL 문장 모양이 아니라 잠금 대기(performance_schema.data_lock_waits)로 확인한다. 숨김 쪽이 UPDATE에서
+ * 기다리든 SELECT … FOR UPDATE에서 기다리든 같다. 모든 대기에는 상한이 있다.
  */
 class B15ConfirmTest extends ApiTestSupport {
 
@@ -45,6 +52,9 @@ class B15ConfirmTest extends ApiTestSupport {
 
     @Autowired
     TransactionTemplate tx;
+
+    @Autowired
+    MySQLContainer mysql;
 
     Member admin;
     Long hidden;
@@ -74,10 +84,32 @@ class B15ConfirmTest extends ApiTestSupport {
                 .map(Number::longValue).toList();
     }
 
-    /** 글 행 UPDATE가 잠금을 기다리는 연결 수. 같은 DB 계정의 연결은 PROCESS 권한 없이도 보인다. */
-    long blockedPostUpdates() {
-        return jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.PROCESSLIST"
-                + " WHERE COMMAND = 'Query' AND INFO LIKE 'update post%'", Long.class);
+    static long connectionId(Connection c) throws SQLException {
+        try (ResultSet rs = c.createStatement().executeQuery("SELECT CONNECTION_ID()")) {
+            rs.next();
+            return rs.getLong(1);
+        }
+    }
+
+    /**
+     * locker 연결이 잡은 post 행 잠금을 기다리는 다른 트랜잭션 수. 잠금 표는 PROCESS 권한이 있어야 보여서
+     * 테스트 DB 계정 대신 컨테이너의 root로 읽는다.
+     */
+    long waitersOnPostLockOf(long lockerConnectionId) {
+        JdbcTemplate root = new JdbcTemplate(
+                new DriverManagerDataSource(mysql.getJdbcUrl(), "root", mysql.getPassword()));
+        return root.queryForObject("SELECT COUNT(*) FROM performance_schema.data_lock_waits w"
+                + " JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID = w.REQUESTING_ENGINE_LOCK_ID"
+                + " JOIN performance_schema.threads t ON t.THREAD_ID = w.BLOCKING_THREAD_ID"
+                + " WHERE t.PROCESSLIST_ID = ? AND l.OBJECT_NAME = 'post'", Long.class, lockerConnectionId);
+    }
+
+    static String outcome(Future<Integer> f) {
+        try {
+            return "응답 " + f.get(0, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            return "예외 " + e;
+        }
     }
 
     @Test
@@ -85,6 +117,7 @@ class B15ConfirmTest extends ApiTestSupport {
         ExecutorService pool = Executors.newSingleThreadExecutor();
         try (Connection locker = dataSource.getConnection()) {
             locker.setAutoCommit(false);
+            long lockerId = connectionId(locker);
             try (PreparedStatement ps = locker.prepareStatement("SELECT id FROM post WHERE id = ? FOR UPDATE")) {
                 ps.setLong(1, hidden);
                 ps.executeQuery().close();
@@ -93,12 +126,14 @@ class B15ConfirmTest extends ApiTestSupport {
                     .perform(post("/api/admin/posts/{id}/hide", hidden).header("Authorization", bearer(admin)))
                     .andReturn().getResponse().getStatus());
             try {
-                // 숨김 요청이 글 행 잠금을 기다릴 때까지(= 숨김 트랜잭션이 아직 커밋 전) 기다린다
+                // 숨김 요청이 글 행 잠금을 기다릴 때까지(= 숨김 트랜잭션이 아직 커밋 전) 기다린다. 상한 10초.
                 long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-                while (blockedPostUpdates() == 0 && !hide.isDone() && System.nanoTime() < deadline) {
+                while (waitersOnPostLockOf(lockerId) == 0 && !hide.isDone() && System.nanoTime() < deadline) {
                     Thread.sleep(20);
                 }
-                assertThat(blockedPostUpdates()).as("숨김 요청이 커밋 전 글 행 잠금에서 기다려야 한다").isPositive();
+                assertThat(hide.isDone()).as("숨김 요청이 글 행 잠금을 기다리지 않고 끝났다: %s", outcome(hide)).isFalse();
+                assertThat(waitersOnPostLockOf(lockerId)).as("숨김 요청이 10초 안에 글 행 잠금 대기에 들어가야 한다")
+                        .isPositive();
 
                 // 커밋 전의 다른 요청. 이 시점의 DB에서는 아직 ACTIVE다.
                 CompletableFuture.supplyAsync(() -> {
