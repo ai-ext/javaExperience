@@ -1,7 +1,9 @@
 package com.example.board.post;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -52,7 +54,7 @@ public class Post extends BaseEntity {
     @Column(name = "like_count", nullable = false)
     private int likeCount;
 
-    @OneToMany(mappedBy = "post", cascade = CascadeType.PERSIST)
+    @OneToMany(mappedBy = "post", cascade = CascadeType.PERSIST, orphanRemoval = true)
     private List<PostTag> postTags = new ArrayList<>();
 
     private Post(Member member, String title, String content) {
@@ -68,5 +70,36 @@ public class Post extends BaseEntity {
 
     public void addTag(Tag tag) {
         postTags.add(PostTag.create(this, tag));
+    }
+
+    public void update(String title, String content) {
+        this.title = title;
+        this.content = content;
+    }
+
+    /** null인 인자는 바꾸지 않는다. */
+    public void patch(String title, String content) {
+        if (title != null) {
+            this.title = title;
+        }
+        if (content != null) {
+            this.content = content;
+        }
+    }
+
+    /** 겹치는 태그는 그대로 두고 차이만 반영한다. 지우고 다시 넣으면 INSERT가 DELETE보다 먼저 나가 UNIQUE에 걸린다. */
+    public void replaceTags(List<Tag> tags) {
+        Set<Tag> wanted = new HashSet<>(tags);
+        postTags.removeIf(pt -> !wanted.contains(pt.getTag()));
+        wanted.removeAll(postTags.stream().map(PostTag::getTag).toList());
+        tags.stream().filter(wanted::contains).forEach(this::addTag);
+    }
+
+    public void delete() {
+        this.status = PostStatus.DELETED;
+    }
+
+    public boolean isWrittenBy(Long memberId) {
+        return member.getId().equals(memberId);
     }
 }

@@ -45,4 +45,55 @@ public class PostServiceImpl implements PostService {
         return PostDetailResponse.from(postRepository.findActiveDetail(postId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "글을 찾을 수 없습니다.")));
     }
+
+    @Override
+    @Transactional
+    public PostDetailResponse update(Long postId, Long memberId, PostUpdateRequest request) {
+        Post post = findOwned(postId, memberId);
+        post.update(request.title(), request.content());
+        post.replaceTags(resolveTags(request.tags()));
+        return flushAndRespond(post);
+    }
+
+    @Override
+    @Transactional
+    public PostDetailResponse patch(Long postId, Long memberId, PostPatchRequest request) {
+        Post post = findOwned(postId, memberId);
+        post.patch(request.title(), request.content());
+        if (request.tags() != null) {
+            post.replaceTags(resolveTags(request.tags()));
+        }
+        return flushAndRespond(post);
+    }
+
+    @Override
+    @Transactional
+    public void delete(Long postId, Long memberId) {
+        // save()를 부르지 않는다. 영속 상태 엔티티의 변경은 커밋 시점에 UPDATE로 나간다.
+        findOwned(postId, memberId).delete();
+    }
+
+    private Post findOwned(Long postId, Long memberId) {
+        Post post = postRepository.findActiveDetail(postId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "글을 찾을 수 없습니다."));
+        if (!post.isWrittenBy(memberId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "작성자만 수정·삭제할 수 있습니다.");
+        }
+        return post;
+    }
+
+    private List<Tag> resolveTags(List<String> names) {
+        if (names == null) {
+            return List.of();
+        }
+        return new LinkedHashSet<>(names).stream()
+                .map(name -> tagRepository.findByName(name).orElseGet(() -> tagRepository.save(Tag.create(name))))
+                .toList();
+    }
+
+    // 응답의 updatedAt이 감사 필드 갱신 이후 값이 되도록 먼저 flush 한다
+    private PostDetailResponse flushAndRespond(Post post) {
+        postRepository.flush();
+        return PostDetailResponse.from(post);
+    }
 }
