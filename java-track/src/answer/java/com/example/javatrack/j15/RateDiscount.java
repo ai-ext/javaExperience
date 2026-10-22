@@ -19,7 +19,10 @@ public class RateDiscount implements DiscountPolicy {
 
     @Override
     public long discountOf(long price) {
-        // long 정수 나눗셈은 소수점 아래를 버린다(9,999 × 10 / 100 = 999)
-        return Math.min(price * percent / 100, maxDiscount);
+        // price × percent를 먼저 곱하면 아주 큰 price에서 long이 넘친다. 100으로 나눈 몫과 나머지로 나눠 계산한다:
+        // price × percent / 100 = (price / 100) × percent + (price % 100) × percent / 100
+        // 앞 항은 price 이하라 넘치지 않고, 뒤 항은 99 × 100 이하다. 정수 나눗셈이라 원 단위 아래는 버린다(9,999 → 999)
+        long discount = price / 100 * percent + price % 100 * percent / 100;
+        return Math.min(discount, maxDiscount);
     }
 }

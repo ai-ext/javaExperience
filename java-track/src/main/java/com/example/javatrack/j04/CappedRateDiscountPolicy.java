@@ -13,7 +13,7 @@ public class CappedRateDiscountPolicy extends CappedDiscountPolicy {
 
     @Override
     protected int rawDiscount(int price) {
-        throw new UnsupportedOperationException("J04: CappedRateDiscountPolicy.rawDiscount — 상한 없이 price * 할인율 / 100");
+        throw new UnsupportedOperationException("J04: CappedRateDiscountPolicy.rawDiscount — 상한 없이 정률 계산(long으로 곱한 뒤 / 100)");
     }
 
     /** 예: "정률 10% (최대 3000원)" */

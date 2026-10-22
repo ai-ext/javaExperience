@@ -49,7 +49,7 @@
 </tr>
 <tr>
 <td>구현 메서드</td>
-<td><code>default</code> 메서드만</td>
+<td><code>default</code>·<code>static</code>·<code>private</code> 메서드(Java 9부터 <code>private</code>도). 그 밖의 메서드는 몸통 없는 추상 메서드</td>
 <td>일반·<code>final</code> 메서드</td>
 <td></td>
 </tr>
@@ -85,7 +85,7 @@
 <td><strong>변수의 선언 타입</strong></td>
 </tr>
 </tbody></table></div>
-<p>흔한 착각: &quot;<code>DiscountPolicy</code>로 선언했으니 인터페이스의 메서드가 불린다&quot;. 인터페이스에는 몸통이 없다. 실행되는 것은 언제나 실제 객체(<code>RateDiscountPolicy</code>)의 <code>discount</code>다. 반대로 오버로딩된 메서드에 넘길 때는 선언 타입이 고르는 기준이라 <code>describe(policy)</code>가 <code>describe(DiscountPolicy)</code> 쪽으로 간다.</p>
+<p>흔한 착각: &quot;<code>DiscountPolicy</code>로 선언했으니 인터페이스의 메서드가 불린다&quot;. <code>discount</code>는 인터페이스에서 몸통 없는 추상 메서드다. 실행되는 것은 언제나 실제 객체(<code>RateDiscountPolicy</code>)의 <code>discount</code>다. 반대로 오버로딩된 메서드에 넘길 때는 선언 타입이 고르는 기준이라 <code>describe(policy)</code>가 <code>describe(DiscountPolicy)</code> 쪽으로 간다.</p>
 <h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
 <details>
 <summary>펼치기</summary>
@@ -137,9 +137,9 @@
 </tbody></table></div>
 <p>규칙:</p>
 <ul>
-<li>정률: 가격의 <code>ratePercent</code>%를 깎고 원 단위 아래는 버린다(정수 나눗셈). 할인율은 0~100. 이름은 <code>&quot;정률 10%&quot;</code>.</li>
+<li>정률: 가격의 <code>ratePercent</code>%를 깎고 원 단위 아래는 버린다(정수 나눗셈). 할인율은 0~100. 이름은 <code>&quot;정률 10%&quot;</code>. 3천만 원 × 100처럼 곱한 값이 <code>int</code> 최댓값(약 21억)을 넘어도 맞아야 한다 — 곱하기를 <code>long</code>으로 한다.</li>
 <li>정액: <code>amount</code>원을 깎되 가격보다 많이 깎지 않는다. 음수 거절. 이름은 <code>&quot;정액 3000원&quot;</code>.</li>
-<li>상한 정률: 상한은 부모 <code>CappedDiscountPolicy</code>의 <code>final discount</code>가 적용한다. 자식은 상한 전 할인액(<code>rawDiscount</code>)만 채운다. 이름은 <code>&quot;정률 10% (최대 3000원)&quot;</code>.</li>
+<li>상한 정률: 상한은 부모 <code>CappedDiscountPolicy</code>의 <code>final discount</code>가 적용한다. 자식은 상한 전 할인액(<code>rawDiscount</code>)만 채운다(여기서 넘쳐 음수가 되면 상한이 소용없다). 이름은 <code>&quot;정률 10% (최대 3000원)&quot;</code>.</li>
 <li><code>bestPrice</code>: 정책마다 <code>apply</code>한 가격 중 가장 작은 값. 정책이 없으면 가격 그대로.</li>
 </ul>
 <p>주어진 인터페이스와 추상 클래스:</p>
@@ -189,6 +189,7 @@ public abstract class CappedDiscountPolicy implements DiscountPolicy {
 <p>통과시킬 테스트(주제 과제) — <code>J04DiscountPolicyTest</code>:</p>
 <ul>
 <li><code>정률_할인은_가격의_비율만큼_깎고_원_단위_아래는_버린다</code></li>
+<li><code>큰_금액도_곱하는_중간에_int를_넘치지_않고_정확히_깎는다</code></li>
 <li><code>정액_할인은_가격보다_많이_깎지_않는다</code></li>
 <li><code>할인율이_0에서_100을_벗어나거나_정액이_음수면_거절한다</code></li>
 <li><code>선언_타입이_인터페이스여도_실제_객체의_메서드가_불린다</code></li>
@@ -228,30 +229,37 @@ public abstract class CappedDiscountPolicy implements DiscountPolicy {
 <td>값</td>
 </tr>
 <tr>
-<td><code>100L</code>과 <code>100L</code></td>
+<td><code>100L</code>과 <code>100L</code>(오토박싱)</td>
 <td>true</td>
-<td>true (캐시된 같은 객체)</td>
+<td>true (캐시된 같은 객체임이 <strong>보장</strong>된다)</td>
 <td>true</td>
 </tr>
 <tr>
-<td><code>128L</code>과 <code>128L</code></td>
+<td><code>128L</code>과 <code>128L</code>(오토박싱)</td>
 <td>true</td>
+<td><strong>보장되지 않는다</strong> (지금 JDK는 보통 false)</td>
+<td>true</td>
+</tr>
+<tr>
+<td><code>new Long(128)</code> 두 개</td>
+<td>-</td>
 <td><strong>false</strong> (서로 다른 객체)</td>
 <td>true</td>
 </tr>
 </tbody></table></div>
-<p>오토박싱은 <code>Long.valueOf</code>·<code>Integer.valueOf</code>를 쓰고, 이 메서드는 -128~127 범위를 미리 만들어 둔 객체로 돌려준다. 그래서 작은 수는 <code>==</code>도 맞아 보인다.</p>
-<p>함정: 주어진 <code>LeakyAuthorCheck.isWrittenBy(Long, Long)</code>는 <code>writerId == memberId</code>로 비교한다. 개발 DB처럼 id가 작을 때는 통과하다가, 운영에서 id가 128을 넘으면 &quot;작성자인데 403&quot;이 난다.</p>
+<p>오토박싱은 <code>Long.valueOf</code>·<code>Integer.valueOf</code>를 쓴다. 이 메서드는 -128~127 범위를 미리 만들어 둔 같은 객체로 돌려준다고 API가 약속한다. 그 밖의 값은 캐시할 수도, 안 할 수도 있다(약속이 없다). 그래서 작은 수는 <code>==</code>도 맞아 보이고, 큰 수는 맞을지 틀릴지 모른다. 어느 쪽이든 <code>==</code>에 기대는 코드는 틀린 코드다.</p>
+<p>함정: 주어진 <code>LeakyAuthorCheck.isWrittenBy(Long, Long)</code>는 <code>writerId == memberId</code>로 비교한다. 개발 DB처럼 id가 작을 때는 통과하다가, 운영에서 id가 커지면 &quot;작성자인데 403&quot;이 날 수 있다. 테스트는 &quot;같은 값, 다른 객체&quot;를 확실히 만들려고 <code>new Long(128)</code>을 쓴다(없어질 예정인 생성자라 테스트에서만 쓴다).</p>
 <p>과제: <code>AuthorCheck.isWrittenBy</code>를 <code>equals</code>로 채운다. 두 id 중 하나라도 null이면 false다.</p>
 <p>확인 테스트 — <code>J04TypeCutTest</code>:</p>
 <ul>
+<li><code>Integer와_Long_오토박싱은_마이너스128부터_127까지_같은_객체임이_보장된다</code> (관찰. 처음부터 통과한다)</li>
 <li><code>함정_작은_id는_캐시된_같은_객체라_참조_비교도_맞아_보인다</code></li>
-<li><code>함정_128부터는_값이_같아도_다른_객체라_참조_비교가_틀린다</code></li>
+<li><code>함정_캐시_범위_밖은_같은_객체라는_보장이_없다_다른_객체면_참조_비교가_틀린다</code></li>
 <li><code>다른_id거나_null이면_false다</code></li>
 </ul>
 <h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2>
 <pre><code class="language-bash">./gradlew :java-track:test --tests 'J04*'</code></pre>
-<p>15개가 모두 <code>PASSED</code>면 끝이다.</p>
+<p>17개가 모두 <code>PASSED</code>면 끝이다.</p>
 <h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2>
 <details>
 <summary>펼치기</summary>
@@ -268,8 +276,10 @@ public RateDiscountPolicy(int ratePercent) {
 
 @Override
 public int discount(int price) {
-    // 곱하기를 먼저 해야 한다. price / 100 * rate는 999원에서 0이 된다
-    return price * ratePercent / 100;
+    // 곱하기를 먼저 해야 한다. 999원 10%를 price / 100 * rate로 하면 99가 아니라 90이 된다.
+    // 곱하기는 long으로 한다. int끼리 곱하면 3천만 원 × 100에서 int 범위를 넘어 음수가 된다.
+    // 결과는 price 이하라 int로 돌려도 넘치지 않는다
+    return (int) ((long) price * ratePercent / 100);
 }
 
 @Override
@@ -309,7 +319,8 @@ public CappedRateDiscountPolicy(int ratePercent, int maxDiscount) {
 
 @Override
 protected int rawDiscount(int price) {
-    return price * ratePercent / 100;
+    // 상한은 부모가 나중에 적용한다. 그 전에 넘쳐 음수가 되면 상한이 소용없으므로 long으로 곱한다
+    return (int) ((long) price * ratePercent / 100);
 }
 
 @Override
@@ -350,7 +361,7 @@ public static boolean isWrittenBy(Long writerId, Long memberId) {
 <ol>
 <li>쓰는 쪽(<code>DiscountSelector</code>)은 <code>DiscountPolicy</code>만 안다. 정책이 하나 늘어도 고칠 곳은 새 구현 클래스 하나다. 실행되는 메서드는 실제 객체가 정하기 때문이다.</li>
 <li>모든 자식이 지켜야 하는 규칙(상한)은 추상 클래스의 <code>final</code> 메서드에 두고, 자식은 달라지는 계산만 채운다. 상태도 공통 흐름도 없는 약속이면 인터페이스로 충분하다.</li>
-<li>id처럼 래퍼 타입인 값은 언제나 <code>equals</code>로 비교한다. <code>==</code>는 작은 값에서만 우연히 맞는다.</li>
+<li>id처럼 래퍼 타입인 값은 언제나 <code>equals</code>로 비교한다. <code>==</code>가 맞는다고 보장되는 것은 -128~127뿐이다. 금액 계산은 곱한 값이 <code>int</code>를 넘지 않는지도 함께 본다.</li>
 </ol>
 </details>
 

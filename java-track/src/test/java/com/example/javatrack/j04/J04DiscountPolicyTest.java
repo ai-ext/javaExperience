@@ -21,6 +21,17 @@ class J04DiscountPolicyTest {
     }
 
     @Test
+    void 큰_금액도_곱하는_중간에_int를_넘치지_않고_정확히_깎는다() {
+        // 30,000,000 × 100은 int 최댓값(2,147,483,647)을 넘는다. int로 곱하면 오류 없이 음수가 된다
+        assertThat(new RateDiscountPolicy(100).discount(30_000_000)).isEqualTo(30_000_000);
+        assertThat(new RateDiscountPolicy(10).discount(Integer.MAX_VALUE)).isEqualTo(214_748_364);
+        assertThat(new RateDiscountPolicy(100).apply(30_000_000)).isZero();
+        // 상한 정률도 상한을 적용하기 전 계산에서 넘치면 음수 할인이 상한을 지나쳐 버린다
+        assertThat(new CappedRateDiscountPolicy(100, 3_000).discount(30_000_000)).isEqualTo(3_000);
+        assertThat(new CappedRateDiscountPolicy(10, Integer.MAX_VALUE).discount(Integer.MAX_VALUE)).isEqualTo(214_748_364);
+    }
+
+    @Test
     void 정액_할인은_가격보다_많이_깎지_않는다() {
         FixedDiscountPolicy policy = new FixedDiscountPolicy(3_000);
 

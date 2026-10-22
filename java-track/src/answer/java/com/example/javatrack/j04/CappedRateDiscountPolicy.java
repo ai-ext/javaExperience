@@ -17,7 +17,8 @@ public class CappedRateDiscountPolicy extends CappedDiscountPolicy {
 
     @Override
     protected int rawDiscount(int price) {
-        return price * ratePercent / 100;
+        // 상한은 부모가 나중에 적용한다. 그 전에 넘쳐 음수가 되면 상한이 소용없으므로 long으로 곱한다
+        return (int) ((long) price * ratePercent / 100);
     }
 
     /** 예: "정률 10% (최대 3000원)" */

@@ -55,12 +55,13 @@ class J15TypeCutTest {
     }
 
     @Test
-    void 퀴즈3_J04_Long을_등호로_비교하면_128부터_틀린다() {
+    @SuppressWarnings("removal") // new Long은 없어질 예정이지만, 서로 다른 객체를 확실히 만드는 방법이라 여기서만 쓴다
+    void 퀴즈3_J04_Long을_등호로_비교하면_값이_같아도_다른_객체일_때_틀린다() {
         Long small1 = 127L;
         Long small2 = 127L;
-        Long big1 = 128L;
-        Long big2 = 128L;
-        // -128~127은 캐시된 같은 객체라 ==도 맞아 보인다
+        // -128~127은 캐시된 같은 객체임이 보장되어 ==도 맞아 보인다. 그 밖의 값은 같은 객체라는 보장이 없다
+        Long big1 = new Long(128);
+        Long big2 = new Long(128);
         assertThat(small1 == small2).isTrue();
         assertThat(big1 == big2).isFalse();
 

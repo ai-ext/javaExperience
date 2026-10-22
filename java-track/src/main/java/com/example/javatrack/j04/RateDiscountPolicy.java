@@ -12,7 +12,7 @@ public class RateDiscountPolicy implements DiscountPolicy {
 
     @Override
     public int discount(int price) {
-        throw new UnsupportedOperationException("J04: RateDiscountPolicy.discount — price * 할인율 / 100");
+        throw new UnsupportedOperationException("J04: RateDiscountPolicy.discount — 곱하기 먼저, 큰 금액에서 int가 넘치지 않게 long으로 곱한 뒤 / 100");
     }
 
     /** 예: "정률 10%" */

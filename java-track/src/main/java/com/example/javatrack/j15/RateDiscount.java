@@ -14,6 +14,6 @@ public class RateDiscount implements DiscountPolicy {
 
     @Override
     public long discountOf(long price) {
-        throw new UnsupportedOperationException("J15: RateDiscount.discountOf — 비율로 계산해 내림하고 상한을 넘지 않게 하세요");
+        throw new UnsupportedOperationException("J15: RateDiscount.discountOf — 비율로 계산해 내림하고 상한을 넘지 않게 하세요(price × percent를 그대로 곱하면 아주 큰 price에서 long이 넘칩니다)");
     }
 }

@@ -3,6 +3,7 @@ package com.example.javatrack.j15;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.math.BigInteger;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,17 @@ class J15CouponCalculatorTest {
         assertThat(rate.discountOf(9_999)).isEqualTo(999);       // 999.9 → 999
         assertThat(rate.discountOf(50_000)).isEqualTo(5_000);    // 상한과 같다
         assertThat(rate.discountOf(100_000)).isEqualTo(5_000);   // 10,000 → 상한 5,000
+    }
+
+    @Test
+    void 정률_할인은_아주_큰_가격에서도_곱하다_넘치지_않는다() {
+        // Long.MAX_VALUE × 100은 long 범위를 넘는다. 그대로 곱하면 음수 할인액(-1)이 나와 상한도 소용없다
+        assertThat(new RateDiscount(100, 5_000).discountOf(Long.MAX_VALUE)).isEqualTo(5_000);
+        assertThat(new RateDiscount(100, Long.MAX_VALUE).discountOf(Long.MAX_VALUE)).isEqualTo(Long.MAX_VALUE);
+        assertThat(new RateDiscount(10, Long.MAX_VALUE).discountOf(Long.MAX_VALUE)).isEqualTo(Long.MAX_VALUE / 10);
+        assertThat(new RateDiscount(33, Long.MAX_VALUE).discountOf(Long.MAX_VALUE - 1))
+                .isEqualTo(BigInteger.valueOf(Long.MAX_VALUE - 1).multiply(BigInteger.valueOf(33))
+                        .divide(BigInteger.valueOf(100)).longValueExact());
     }
 
     @Test

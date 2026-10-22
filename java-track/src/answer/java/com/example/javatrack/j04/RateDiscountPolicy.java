@@ -15,8 +15,10 @@ public class RateDiscountPolicy implements DiscountPolicy {
 
     @Override
     public int discount(int price) {
-        // 곱하기를 먼저 해야 한다. price / 100 * rate는 999원에서 0이 된다
-        return price * ratePercent / 100;
+        // 곱하기를 먼저 해야 한다. 999원 10%를 price / 100 * rate로 하면 99가 아니라 90이 된다.
+        // 곱하기는 long으로 한다. int끼리 곱하면 3천만 원 × 100에서 int 범위를 넘어 음수가 된다.
+        // 결과는 price 이하라 int로 돌려도 넘치지 않는다
+        return (int) ((long) price * ratePercent / 100);
     }
 
     /** 예: "정률 10%" */

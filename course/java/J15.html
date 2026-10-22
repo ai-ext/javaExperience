@@ -87,7 +87,7 @@
 <ul>
 <li><code>DiscountPolicy.discountOf(price)</code>는 0 이상 price 이하의 할인액을 돌려준다. 쿠폰 조건에 맞지 않으면 <code>InvalidCouponException</code>을 던진다.</li>
 <li><code>FixedAmountDiscount(amount, minOrderPrice)</code>: amount원을 빼되 가격까지만 뺀다. 가격이 <code>minOrderPrice</code>보다 작으면 쓸 수 없다. <code>amount &lt; 1</code>이거나 <code>minOrderPrice &lt; 0</code>이면 생성자가 <code>IllegalArgumentException</code>을 던진다.</li>
-<li><code>RateDiscount(percent, maxDiscount)</code>: <code>price * percent / 100</code>을 빼되 원 단위 아래는 버리고(9,999원의 10% = 999원) <code>maxDiscount</code>를 넘지 않는다. percent가 1~100이 아니거나 <code>maxDiscount &lt; 1</code>이면 <code>IllegalArgumentException</code>.</li>
+<li><code>RateDiscount(percent, maxDiscount)</code>: price × percent / 100을 빼되 원 단위 아래는 버리고(9,999원의 10% = 999원) <code>maxDiscount</code>를 넘지 않는다. <code>Long.MAX_VALUE</code> 같은 아주 큰 price에서도 계산 중간에 <code>long</code>이 넘치면 안 된다(그대로 곱하면 할인액이 -1이 된다). percent가 1~100이 아니거나 <code>maxDiscount &lt; 1</code>이면 <code>IllegalArgumentException</code>.</li>
 <li><code>CouponBook&lt;P&gt;</code>: 같은 코드를 두 번 등록하면 <code>IllegalArgumentException</code>. 없는 코드는 빈 <code>Optional</code>.</li>
 <li><code>DiscountCalculator.priceAfterDiscount(order)</code>: 쿠폰이 null이면 가격 그대로. 가격이 음수면 <code>IllegalArgumentException</code>, 없는 쿠폰이면 <code>InvalidCouponException</code>.</li>
 </ul>
@@ -129,6 +129,7 @@ public class DiscountCalculator {
 <li><code>정액_할인은_금액만큼_빼고_가격보다_크면_가격까지만_뺀다</code></li>
 <li><code>정액_할인은_최소_주문_금액에_못_미치면_쓸_수_없다</code></li>
 <li><code>정률_할인은_원_단위_아래를_버리고_상한을_넘지_않는다</code></li>
+<li><code>정률_할인은_아주_큰_가격에서도_곱하다_넘치지_않는다</code></li>
 <li><code>할인_정책은_만들_때_잘못된_값을_거절한다</code></li>
 <li><code>선언_타입이_DiscountPolicy면_실제_구현의_discountOf가_불린다</code></li>
 <li><code>쿠폰북은_등록한_타입_그대로_꺼내고_없는_코드는_빈_Optional이다</code></li>
@@ -176,7 +177,7 @@ public OrderSummary summarize(List&lt;Order&gt; orders)</code></pre>
 <tr>
 <td>3 <code>sameId</code></td>
 <td><a class="docref" href="../../docs/knowledge/J04-exceptions.html">J04</a> <code>==</code> vs <code>equals</code></td>
-<td><code>Long</code> 127까지는 <code>==</code>도 맞아 보인다</td>
+<td><code>Long</code> 127까지는 같은 객체임이 보장돼 <code>==</code>도 맞아 보인다. 그 밖은 보장이 없다</td>
 <td><code>Objects.equals</code></td>
 </tr>
 <tr>
@@ -214,7 +215,7 @@ public OrderSummary summarize(List&lt;Order&gt; orders)</code></pre>
 <ul>
 <li><code>퀴즈1_J01_보내지_않은_Integer는_null이라_기본값을_쓴다</code></li>
 <li><code>퀴즈2_J03_Map_get이_null이면_long으로_받는_순간_NPE다</code></li>
-<li><code>퀴즈3_J04_Long을_등호로_비교하면_128부터_틀린다</code></li>
+<li><code>퀴즈3_J04_Long을_등호로_비교하면_값이_같아도_다른_객체일_때_틀린다</code></li>
 <li><code>퀴즈4_J05_int로_더하면_넘치므로_mapToLong으로_더한다</code></li>
 <li><code>퀴즈5_J06_값이_있으면_loader를_부르지_않는다</code></li>
 <li><code>퀴즈6_J09_UTC_15시는_KST로_다음_날이다</code></li>
@@ -223,7 +224,7 @@ public OrderSummary summarize(List&lt;Order&gt; orders)</code></pre>
 </ul>
 <h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2>
 <pre><code class="language-bash">./gradlew :java-track:test --tests 'J15*'</code></pre>
-<p>21개가 모두 <code>PASSED</code>면 Java 트랙 끝이다.</p>
+<p>22개가 모두 <code>PASSED</code>면 Java 트랙 끝이다.</p>
 <h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2>
 <details>
 <summary>펼치기</summary>
@@ -251,8 +252,11 @@ public long discountOf(long price) {
 <pre><code class="language-java">// RateDiscount (생성자는 같은 모양으로 percent 1~100, maxDiscount &gt;= 1 검사)
 @Override
 public long discountOf(long price) {
-    // long 정수 나눗셈은 소수점 아래를 버린다(9,999 × 10 / 100 = 999)
-    return Math.min(price * percent / 100, maxDiscount);
+    // price × percent를 먼저 곱하면 아주 큰 price에서 long이 넘친다. 100으로 나눈 몫과 나머지로 나눠 계산한다:
+    // price × percent / 100 = (price / 100) × percent + (price % 100) × percent / 100
+    // 앞 항은 price 이하라 넘치지 않고, 뒤 항은 99 × 100 이하다. 정수 나눗셈이라 원 단위 아래는 버린다(9,999 → 999)
+    long discount = price / 100 * percent + price % 100 * percent / 100;
+    return Math.min(discount, maxDiscount);
 }</code></pre>
 <pre><code class="language-java">// CouponBook
 private final Map&lt;String, P&gt; policies = new HashMap&lt;&gt;();
