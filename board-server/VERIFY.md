@@ -55,3 +55,21 @@ $ curl -i localhost:8080/actuator/health        # 헤더 없이
 HTTP/1.1 200
 X-Request-Id: d7d72884-12b1-4475-8674-2525718ffbc7
 ```
+
+## D03-6
+
+compose의 MySQL과 `local` 프로파일 bootRun(포트 8082)을 띄우고, `127.0.0.1:8765`에서 서빙한 HTML의 `fetch`로 로그인했다.
+브라우저는 gstack browse를 썼다.
+
+```
+$ curl -si -X OPTIONS localhost:8082/api/auth/login -H 'Origin: http://localhost:3000' -H 'Access-Control-Request-Method: POST'
+HTTP/1.1 200
+Access-Control-Allow-Origin: http://localhost:3000
+Access-Control-Allow-Methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+$ curl -si -X OPTIONS localhost:8082/api/auth/login -H 'Origin: http://evil.example' -H 'Access-Control-Request-Method: POST' | head -1
+HTTP/1.1 403
+$ (127.0.0.1:8765 페이지에서) fetch('http://localhost:8082/api/auth/login', {method:'POST', ...})
+status=200 tokenType=Bearer expiresIn=3600
+$ browse console --errors
+(no console errors)
+```

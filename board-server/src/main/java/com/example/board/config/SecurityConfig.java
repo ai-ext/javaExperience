@@ -3,6 +3,7 @@ package com.example.board.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -24,6 +25,8 @@ public class SecurityConfig {
             throws Exception {
         http
                 // 토큰 기반 무상태 API라 세션·CSRF·기본 로그인 화면을 쓰지 않는다
+                // CorsFilter를 인증 필터보다 앞에 둬서 preflight(OPTIONS)가 인증에 걸리지 않게 한다
+                .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
