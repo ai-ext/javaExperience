@@ -132,3 +132,5 @@ DNN ② … (board-server의 실제 파일 경로를 적는다. 예: board-serve
 - 남김: 메서드 단위 뼈대 미구현 검증 없음(클래스 단위), src/answerTest에만 있는 새 이름 테스트는 answerTest가 못 찾음, onlyIf가 프로젝트 약어 호출을 놓칠 수 있음
 - Review (2026-10-23): codex 재검증 — 이전 ①~⑬ 중 고쳐짐 11·부분 2(⑤·⑬)·안 고쳐짐 0. 남은 major: verifySkeleton이 개별 테스트 누락·exclude/태그 필터·준비 단계 오류를 통과시킴, minor: J10 toString이 target 호출, J02 주석 → 2차 수정 dispatch. ⑬(30~60분 적합성)은 실측이 필요해 P7 재검증으로 넘김
 - Fix (2026-10-23, 2차): 819f72d5 verifySkeleton 개별 테스트 식별자(classname#name, 매개변수 케이스 포함) 비교·필터(include/exclude/태그/엔진) 거부·의도한 실패 판정(JNN 뼈대 예외 또는 AssertionError 계열만), 924b31ba J10 toString이 target을 부르지 않음·J02 주석 — 컨트롤러 확인 check 통과(개별 테스트 320개, 의도한 실패 302)
+- Fix (2026-10-23, P7 R3): 578c385f·674c45ae·fdba7303·1bc60640 — J02 실무 습관·J15 정리 퀴즈를 선택 과제로(기본 분량 45~60분), J11~J14 2단계 경로를 messy-server로, J11 변형 3개 추가(7개), 날짜·MyBatis 설명 정정, 설명 없는 단언에 as(). 현재 수치: 개별 테스트 323개, 의도한 실패 305건, 선택 과제 J02·J07·J14·J15
+- Fix: 26c83fc3 컨트롤러가 J11~J14 "다시 만나는 곳"에서 2단계 티켓 원인 서술(B01·B03·B04·B07·B08·E01)을 빼고 경로·읽는 관점만 남김 — 티켓은 증상만 공개 원칙
