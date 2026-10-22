@@ -90,10 +90,16 @@ run_tests() {
 # XML 요약: "tests failures errors skipped" 와 실패한 "클래스단순명.메서드" 목록
 summarize() {
   python3 - "$1" "${2:-}" <<'PY'
-import sys, glob, xml.etree.ElementTree as ET
+import sys, glob, re, xml.etree.ElementTree as ET
 d, prefix = sys.argv[1], sys.argv[2]
 t = f = e = s = 0
 bad = []
+counts = {}
+ASSERTION_TYPES = {"AssertionError", "AssertionFailedError", "MultipleFailuresError",
+                   "AssertJMultipleFailuresError", "SoftAssertionError", "ComparisonFailure"}
+ENV_PAT = re.compile(r"Failed to load ApplicationContext|ApplicationContext failure threshold|"
+                     r"Could not find a valid Docker environment|ContainerLaunchException|"
+                     r"Error creating bean with name|UnsatisfiedDependencyException|NoSuchBeanDefinitionException")
 for p in glob.glob(d + "/*.xml"):
     r = ET.parse(p).getroot()
     cls = r.get("name", "")
@@ -101,10 +107,20 @@ for p in glob.glob(d + "/*.xml"):
         continue
     t += int(r.get("tests", 0)); f += int(r.get("failures", 0)); e += int(r.get("errors", 0)); s += int(r.get("skipped", 0))
     for c in r.findall("testcase"):
-        kind = "failure" if c.find("failure") is not None else ("error" if c.find("error") is not None else None)
-        if kind:
-            bad.append(f"{kind}:{c.get('classname','').split('.')[-1]}.{c.get('name','').split('(')[0]}")
-print(t, f, e, s)
+        el = c.find("failure") if c.find("failure") is not None else c.find("error")
+        if el is None:
+            continue
+        kind = el.tag
+        typ = (el.get("type") or "").split(".")[-1]
+        text = (el.get("message") or "") + "\n" + (el.text or "")[:4000]
+        # JUnit은 컨텍스트 로드 실패·환경 오류도 failure로 기록한다. 단언 실패와 구분한다.
+        if ENV_PAT.search(text):
+            kind = "env"
+        elif typ in ASSERTION_TYPES:
+            kind = "assert"
+        bad.append(f"{kind}:{c.get('classname','').split('.')[-1]}.{c.get('name','').split('(')[0]}")
+        counts[kind] = counts.get(kind, 0) + 1
+print(t, f, e, s, counts.get("assert", 0), counts.get("env", 0))
 for b in bad:
     print(b)
 PY
@@ -114,15 +130,18 @@ check_red() {
   local copy=$1 t=$2
   run_tests "$copy" red --tests "com.example.board.tickets.${t}*"
   local out; out=$(summarize "$copy/results-red" "com.example.board.tickets.$t")
-  read -r tests failures errors skipped <<<"$(head -1 <<<"$out")"
+  read -r tests failures errors skipped asserts envs <<<"$(head -1 <<<"$out")"
   if [ "$tests" -eq 0 ]; then
     echo "$t: 결함 상태에서 확인 테스트가 하나도 돌지 않았다(컴파일·환경 오류?) — $copy/red.log" >&2; return 1
   fi
-  if [ "$errors" -gt 0 ]; then
-    echo "$t: 결함 상태 실패가 단언 실패가 아니라 오류(error ${errors}건: 컨텍스트·환경·예외) — $copy/results-red" >&2; return 1
+  if [ "$errors" -gt 0 ] || [ "$envs" -gt 0 ]; then
+    echo "$t: 결함 상태 실패에 컨텍스트·환경 오류가 섞였다(error ${errors}건, 환경 ${envs}건) — $copy/results-red" >&2; return 1
   fi
   if [ "$failures" -eq 0 ]; then
     echo "$t: 결함 상태인데 확인 테스트가 통과했다 — $copy/red.log" >&2; return 1
+  fi
+  if [ "$asserts" -eq 0 ]; then
+    echo "$t: 결함 상태 실패 중 단언 실패(AssertionError 계열)가 없다 — $(tail -n +2 <<<"$out" | tr '\n' ' ') — $copy/results-red" >&2; return 1
   fi
 }
 
@@ -130,7 +149,7 @@ check_green() {
   local copy=$1 t=$2 stage=$3
   run_tests "$copy" "$stage" --tests "com.example.board.tickets.${t}*"
   local out; out=$(summarize "$copy/results-$stage" "com.example.board.tickets.$t")
-  read -r tests failures errors skipped <<<"$(head -1 <<<"$out")"
+  read -r tests failures errors skipped _asserts _envs <<<"$(head -1 <<<"$out")"
   if [ "$tests" -eq 0 ] || [ "$skipped" -eq "$tests" ] || [ $((failures + errors)) -gt 0 ]; then
     echo "$t: 수정 뒤 확인 테스트 실패(tests=$tests failures=$failures errors=$errors skipped=$skipped) — $copy/$stage.log" >&2; return 1
   fi
@@ -140,7 +159,7 @@ check_full() {
   local copy=$1 label=$2
   run_tests "$copy" full
   local out; out=$(summarize "$copy/results-full")
-  read -r tests failures errors skipped <<<"$(head -1 <<<"$out")"
+  read -r tests failures errors skipped _asserts _envs <<<"$(head -1 <<<"$out")"
   [ "$tests" -gt 0 ] || { echo "$label: 전체 테스트가 돌지 않았다 — $copy/full.log" >&2; return 1; }
   local unexpected=()
   while read -r line; do
