@@ -33,6 +33,15 @@ public class PointService {
         record(memberId, PointLedgerType.EARN, amount, refType, refId);
     }
 
+    /** PG 승인이 확정된 충전 적립. 호출자가 같은 결제로 두 번 부르지 않도록 상태 전이로 막는다. */
+    @Transactional
+    public void charge(Long memberId, int amount, String refType, Long refId) {
+        if (memberRepository.addBalance(memberId, amount) == 0) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다.");
+        }
+        record(memberId, PointLedgerType.CHARGE, amount, refType, refId);
+    }
+
     @Transactional
     public void spend(Long memberId, int amount, String refType, Long refId) {
         if (memberRepository.subtractBalanceIfEnough(memberId, amount) == 0) {

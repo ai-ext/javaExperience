@@ -88,6 +88,26 @@ public final class PgContainers {
         admin("POST", "/__admin/mappings", mappingJson);
     }
 
+    /** 승인을 millis만큼 늦게 DONE으로 돌려준다. paymentKey는 파일 스텁과 같은 규칙(pk-{orderId})이다. */
+    public static void stubApproveDelay(int millis) {
+        stub("""
+                {"priority":1,"request":{"method":"POST","urlPath":"/pg/v1/payments"},
+                 "response":{"status":200,"fixedDelayMilliseconds":%d,"headers":{"Content-Type":"application/json"},
+                  "body":"{\\"paymentKey\\":\\"pk-{{jsonPath request.body '$.orderId'}}\\",\\"status\\":\\"DONE\\",\\"amount\\":{{jsonPath request.body '$.amount'}},\\"approvedAt\\":\\"{{now}}\\"}",
+                  "transformers":["response-template"]}}
+                """.formatted(millis));
+    }
+
+    /** GET /pg/v1/payments?orderId= 조회가 DONE을 돌려주게 한다. */
+    public static void stubLookupDone(String orderId, int amount) {
+        stub("""
+                {"priority":1,"request":{"method":"GET","urlPath":"/pg/v1/payments",
+                  "queryParameters":{"orderId":{"equalTo":"%s"}}},
+                 "response":{"status":200,"headers":{"Content-Type":"application/json"},
+                  "jsonBody":{"paymentKey":"pk-%s","status":"DONE","amount":%d,"approvedAt":"2026-10-22T09:30:00+09:00"}}}
+                """.formatted(orderId, orderId, amount));
+    }
+
     /** POST /pg/v1/payments 로 받은 요청의 Idempotency-Key 목록(받은 순서). */
     public static List<String> approveIdempotencyKeys() {
         JsonNode found = JSON.readTree(admin("POST", "/__admin/requests/find",
