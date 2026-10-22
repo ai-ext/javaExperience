@@ -116,7 +116,9 @@ class SecurityRulesTest {
     void 공개_GET은_토큰_없이_인증에_막히지_않는다() throws Exception {
         for (String path : new String[] {"/api/posts", "/api/posts/popular", "/api/posts/1", "/api/posts/1/comments",
                 "/api/rankings/activity", "/api/shop/items"}) {
-            mockMvc.perform(get(path)).andExpect(status().isNotFound());
+            // 컨트롤러가 생기면 404가 405 등으로 바뀐다. 401·403이 아니면 인증은 통과한 것이다
+            int status = mockMvc.perform(get(path)).andReturn().getResponse().getStatus();
+            org.assertj.core.api.Assertions.assertThat(status).as(path).isNotIn(401, 403);
         }
     }
 
