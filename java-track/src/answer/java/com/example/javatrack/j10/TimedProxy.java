@@ -12,6 +12,9 @@ import java.time.Duration;
  *   <li>{@link Timed}는 인터페이스 메서드와 target 클래스의 같은 메서드 중 어느 쪽에 붙어 있어도 찾는다</li>
  *   <li>기록은 {@code new Timing(메서드 이름, 걸린 시간)}. 대상이 예외를 던져도 기록한다</li>
  *   <li>대상이 던진 예외는 포장하지 않고 그대로 던진다(리플렉션이 감싼 InvocationTargetException을 벗긴다)</li>
+ *   <li>{@code equals}·{@code hashCode}·{@code toString}도 프록시로 들어온다(Method의 선언 클래스가 Object).
+ *       target에 넘기지 않고 프록시 자신을 기준으로 답한다: equals는 같은 프록시일 때만 true,
+ *       hashCode는 {@code System.identityHashCode(프록시)}. 기록하지 않는다</li>
  * </ul>
  */
 public final class TimedProxy {
@@ -22,6 +25,10 @@ public final class TimedProxy {
     /** target을 감싼 프록시를 type으로 돌려준다. type은 인터페이스여야 한다. */
     public static <T> T wrap(Class<T> type, T target, TimingLog log) {
         Object proxy = Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, (self, method, args) -> {
+            if (method.getDeclaringClass() == Object.class) {
+                // equals·hashCode·toString. target에 넘기면 proxy.equals(proxy)가 target.equals(proxy) = false가 된다
+                return objectMethod(self, target, method, args);
+            }
             if (!isTimed(method, target.getClass())) {
                 return invoke(target, method, args);
             }
@@ -51,6 +58,16 @@ public final class TimedProxy {
         } catch (NoSuchMethodException e) {
             return false;
         }
+    }
+
+    /** 프록시 자신의 참조로 답한다. 같은 프록시끼리만 같고, hashCode는 그와 맞는 identityHashCode다. */
+    private static Object objectMethod(Object self, Object target, Method method, Object[] args) {
+        return switch (method.getName()) {
+            case "equals" -> self == args[0];
+            case "hashCode" -> System.identityHashCode(self);
+            case "toString" -> "TimedProxy(" + target + ")";
+            default -> throw new IllegalStateException("프록시로 들어올 수 없는 Object 메서드: " + method);
+        };
     }
 
     private static Object invoke(Object target, Method method, Object[] args) throws Throwable {

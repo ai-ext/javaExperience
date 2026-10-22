@@ -1,6 +1,5 @@
 package com.example.javatrack.j13;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,9 +42,10 @@ public class DiscountCalculator {
 
     /** 가진 쿠폰 중 이 주문에서 할인액이 가장 큰 쿠폰. 할인액이 0인 쿠폰은 고르지 않는다. 같으면 앞의 쿠폰. */
     public Optional<Coupon> bestCoupon(List<Coupon> coupons, Order order) {
-        // Stream.max는 같은 값이면 먼저 나온 원소를 남긴다
+        // 동률 규칙(앞의 쿠폰)을 코드에 적는다. Stream.max는 같은 값일 때 어느 쪽을 남길지 약속하지 않는다.
+        // 뒤 쿠폰이 "더 클 때만" 바꾸므로 같으면 앞의 쿠폰이 남는다
         return coupons.stream()
                 .filter(coupon -> discount(coupon, order) > 0)
-                .max(Comparator.comparingInt(coupon -> discount(coupon, order)));
+                .reduce((best, next) -> discount(next, order) > discount(best, order) ? next : best);
     }
 }

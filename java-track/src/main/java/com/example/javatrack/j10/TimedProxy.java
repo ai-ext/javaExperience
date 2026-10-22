@@ -9,6 +9,9 @@ import java.lang.reflect.Method;
  *   <li>{@link Timed}는 인터페이스 메서드와 target 클래스의 같은 메서드 중 어느 쪽에 붙어 있어도 찾는다</li>
  *   <li>기록은 {@code new Timing(메서드 이름, 걸린 시간)}. 대상이 예외를 던져도 기록한다</li>
  *   <li>대상이 던진 예외는 포장하지 않고 그대로 던진다(리플렉션이 감싼 InvocationTargetException을 벗긴다)</li>
+ *   <li>{@code equals}·{@code hashCode}·{@code toString}도 프록시로 들어온다(Method의 선언 클래스가 Object).
+ *       target에 넘기지 않고 프록시 자신을 기준으로 답한다: equals는 같은 프록시일 때만 true,
+ *       hashCode는 {@code System.identityHashCode(프록시)}. 기록하지 않는다</li>
  * </ul>
  */
 public final class TimedProxy {

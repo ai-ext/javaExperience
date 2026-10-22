@@ -158,7 +158,7 @@ public class DiscountCalculator {
 <p>가진 쿠폰 목록을 stream으로 돌며 이 주문에서 쓸 수 있는(할인액이 0보다 큰) 쿠폰 중 할인액이 가장 큰 것을 고른다. 없을 수 있으므로 <code>Optional&lt;Coupon&gt;</code>을 돌려준다.</p>
 <pre><code class="language-java">/** 가진 쿠폰 중 이 주문에서 할인액이 가장 큰 쿠폰. 할인액이 0인 쿠폰은 고르지 않는다. 같으면 앞의 쿠폰. */
 public Optional&lt;Coupon&gt; bestCoupon(List&lt;Coupon&gt; coupons, Order order)</code></pre>
-<p><code>filter</code>로 거르고 <code>max(Comparator.comparingInt(…))</code>로 고른다. <code>Stream.max</code>는 같은 값이면 먼저 나온 원소를 남긴다.</p>
+<p><code>filter</code>로 거른 뒤 가장 큰 쿠폰을 고른다. &quot;같으면 앞의 쿠폰&quot;은 업무 규칙이므로 코드에 직접 적는다. <code>Stream.max</code>는 같은 값일 때 어느 원소를 남길지 약속하지 않는다(지금 구현이 어떻게 동작하든 계약이 아니다). <code>reduce((best, next) -&gt; 뒤가 더 클 때만 next, 아니면 best)</code>처럼 &quot;더 클 때만 바꾼다&quot;를 써 두면 같을 때 앞의 쿠폰이 남는다.</p>
 <p>테스트 — <code>J13BasicsTest</code>:</p>
 <ul>
 <li><code>할인액이_가장_큰_쿠폰을_고른다</code></li>
@@ -203,10 +203,11 @@ public Optional&lt;Coupon&gt; bestCoupon(List&lt;Coupon&gt; coupons, Order order
 </tr>
 </tbody></table></div>
 <p>함정: compact 생성자 안에서는 <code>this.value = …</code>를 쓸 수 없다(컴파일 에러). 대신 <strong>매개변수 <code>value</code>에 다시 대입</strong>하면 생성자 끝에서 그 값이 필드에 담긴다. 그리고 record의 불변은 얕다. 구성 요소가 <code>List</code>면 compact 생성자에서 <code>List.copyOf</code>로 복사해야 한다(<a class="docref" href="../../docs/knowledge/J01-types-string.html">J01</a>의 방어적 복사).</p>
-<p>과제: <code>CouponCode</code>의 compact 생성자를 채운다. 앞뒤 공백을 지우고 대문자로 바꾼 뒤, 영문 대문자·숫자만 6~12자인지 검사한다. 아니면(null 포함) <code>IllegalArgumentException</code>을 던진다.</p>
+<p>과제: <code>CouponCode</code>의 compact 생성자를 채운다. 앞뒤 공백을 지우고 대문자로 바꾼 뒤(<code>toUpperCase(Locale.ROOT)</code> — 인자 없는 <code>toUpperCase()</code>는 서버 기본 로케일을 따라 터키어 로케일에서 <code>&quot;i&quot;</code>를 <code>&quot;İ&quot;</code>로 바꾼다), 영문 대문자·숫자만 6~12자인지 검사한다. 아니면(null 포함) <code>IllegalArgumentException</code>을 던진다.</p>
 <p>확인 테스트 — <code>J13TypeCutTest</code>:</p>
 <ul>
 <li><code>앞뒤_공백과_대소문자를_정규화해_담는다</code></li>
+<li><code>정규화는_서버_기본_로케일과_상관없이_같다</code> (테스트 안에서 기본 로케일을 <code>tr-TR</code>로 바꿨다가 되돌린다)</li>
 <li><code>규칙에_맞지_않으면_만들_수_없다</code> (null, 빈 문자열, 공백만, 4자, 13자, <code>-</code> 포함, 한글)</li>
 <li><code>경계_6자와_12자는_받아들인다</code></li>
 <li><code>정규화한_값이_같으면_equals로_같고_Set에_하나만_남는다</code></li>
@@ -214,7 +215,7 @@ public Optional&lt;Coupon&gt; bestCoupon(List&lt;Coupon&gt; coupons, Order order
 </ul>
 <h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2>
 <pre><code class="language-bash">./gradlew :java-track:test --tests 'J13*'</code></pre>
-<p>23개(매개변수 테스트는 값마다 하나로 센다)가 모두 <code>PASSED</code>면 끝이다. 시작할 때부터 초록인 <code>특성화_</code> 테스트 4개는 끝날 때까지 초록이어야 한다.</p>
+<p>24개(매개변수 테스트는 값마다 하나로 센다)가 모두 <code>PASSED</code>면 끝이다. 시작할 때부터 초록인 <code>특성화_</code> 테스트 4개는 끝날 때까지 초록이어야 한다.</p>
 <h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2>
 <details>
 <summary>펼치기</summary>
@@ -264,10 +265,11 @@ public int discount(Coupon coupon, Order order) {
 }
 
 public Optional&lt;Coupon&gt; bestCoupon(List&lt;Coupon&gt; coupons, Order order) {
-    // Stream.max는 같은 값이면 먼저 나온 원소를 남긴다
+    // 동률 규칙(앞의 쿠폰)을 코드에 적는다. Stream.max는 같은 값일 때 어느 쪽을 남길지 약속하지 않는다.
+    // 뒤 쿠폰이 &quot;더 클 때만&quot; 바꾸므로 같으면 앞의 쿠폰이 남는다
     return coupons.stream()
             .filter(coupon -&gt; discount(coupon, order) &gt; 0)
-            .max(Comparator.comparingInt(coupon -&gt; discount(coupon, order)));
+            .reduce((best, next) -&gt; discount(next, order) &gt; discount(best, order) ? next : best);
 }</code></pre>
 <pre><code class="language-java">// CouponCode
 public CouponCode {
@@ -275,7 +277,8 @@ public CouponCode {
         throw new IllegalArgumentException(&quot;쿠폰 코드가 없습니다&quot;);
     }
     // this.value = …는 쓸 수 없다. 매개변수에 대입하면 compact 생성자 끝에서 그 값이 필드에 담긴다
-    value = value.strip().toUpperCase();
+    // 인자 없는 toUpperCase()는 서버 기본 로케일을 쓴다. 터키어 로케일이면 &quot;i&quot;가 &quot;İ&quot;가 되므로 Locale.ROOT로 고정한다
+    value = value.strip().toUpperCase(Locale.ROOT);
     if (value.length() &lt; MIN_LENGTH || value.length() &gt; MAX_LENGTH || !isUpperAlphanumeric(value)) {
         throw new IllegalArgumentException(&quot;쿠폰 코드는 영문·숫자 6~12자여야 합니다: &quot; + value);
     }

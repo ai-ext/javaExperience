@@ -103,6 +103,25 @@ class J10TimedProxyTest {
     }
 
     @Test
+    void equals_hashCode_toString은_Object_메서드라_target에_넘기지_않고_프록시_자신을_기준으로_답한다() {
+        AdminActions proxy = TimedProxy.wrap(AdminActions.class, target, log);
+        AdminActions other = TimedProxy.wrap(AdminActions.class, target, log);
+
+        // 반사성: 자기 자신과는 같다. target에 넘기면 target.equals(proxy)가 되어 false가 나온다
+        assertThat(proxy.equals(proxy)).isTrue();
+        // 대칭성: target.equals(proxy)는 false이므로 proxy.equals(target)도 false여야 한다
+        assertThat(target.equals(proxy)).isFalse();
+        assertThat(proxy.equals(target)).isFalse();
+        // 같은 target을 감싸도 프록시가 다르면 다른 객체다(참조 동등성)
+        assertThat(proxy.equals(other)).isFalse();
+        assertThat(proxy.hashCode()).isEqualTo(System.identityHashCode(proxy));
+        assertThat(proxy.toString()).isNotBlank();
+        // Object 메서드는 기록하지도, target에 넘기지도 않는다
+        assertThat(log.methodNames()).isEmpty();
+        assertThat(target.calls()).isEmpty();
+    }
+
+    @Test
     void 프록시가_받는_Method는_인터페이스_메서드라_구현_클래스의_어노테이션은_따로_찾아야_한다() throws Exception {
         Method hidePost = AdminActions.class.getMethod("hidePost", Long.class);
         Method countReports = AdminActions.class.getMethod("countReports");

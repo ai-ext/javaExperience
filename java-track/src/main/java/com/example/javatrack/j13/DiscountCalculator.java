@@ -59,6 +59,6 @@ public class DiscountCalculator {
 
     /** 가진 쿠폰 중 이 주문에서 할인액이 가장 큰 쿠폰. 할인액이 0인 쿠폰은 고르지 않는다. 같으면 앞의 쿠폰. */
     public Optional<Coupon> bestCoupon(List<Coupon> coupons, Order order) {
-        throw new UnsupportedOperationException("J13: DiscountCalculator.bestCoupon — stream으로 할인액이 0보다 큰 쿠폰 중 가장 큰 것을 고르세요");
+        throw new UnsupportedOperationException("J13: DiscountCalculator.bestCoupon — stream으로 할인액이 0보다 큰 쿠폰 중 가장 큰 것을 고르세요(같으면 앞의 쿠폰이 남게 규칙을 직접 쓰세요)");
     }
 }

@@ -99,10 +99,11 @@
 </tbody></table></div>
 <p><code>TimedProxy</code> 규칙:</p>
 <ul>
-<li><code>Proxy.newProxyInstance(type.getClassLoader(), new Class&lt;?&gt;[] {type}, handler)</code>로 <code>type</code> 인터페이스의 프록시를 만들고, 모든 호출을 <code>target</code>에 넘긴다.</li>
+<li><code>Proxy.newProxyInstance(type.getClassLoader(), new Class&lt;?&gt;[] {type}, handler)</code>로 <code>type</code> 인터페이스의 프록시를 만들고, 인터페이스 메서드 호출을 <code>target</code>에 넘긴다.</li>
 <li><code>@Timed</code>가 붙은 메서드만 <code>new Timing(메서드 이름, 걸린 시간)</code>을 <code>log</code>에 남긴다. 대상이 예외를 던져도 남긴다.</li>
 <li><code>@Timed</code>는 인터페이스 메서드(<code>bulkIssueCoupon</code>)에 붙어 있을 수도, 구현 클래스 메서드(<code>FakeAdminActions.hidePost</code>)에 붙어 있을 수도 있다. 둘 다 찾는다.</li>
 <li>대상이 던진 예외는 포장하지 않고 그대로 던진다.</li>
+<li><code>equals</code>·<code>hashCode</code>·<code>toString</code>도 프록시로 들어온다. 이 셋은 <code>target</code>에 넘기지 않고 프록시 자신을 기준으로 답한다: <code>equals</code>는 같은 프록시일 때만 true(<code>self == args[0]</code>), <code>hashCode</code>는 <code>System.identityHashCode(self)</code>, <code>toString</code>은 자유. 기록하지 않는다.</li>
 </ul>
 <p>뼈대 발췌:</p>
 <pre><code class="language-java">public final class TimedProxy {
@@ -130,7 +131,7 @@ public class FakeAdminActions implements AdminActions {   // 주어진 코드
 }</code></pre>
 <p>막히는 곳 두 군데:</p>
 <ol>
-<li><code>InvocationHandler.invoke</code>가 받는 <code>Method</code>는 <strong>인터페이스의</strong> 메서드다. 구현 클래스에 붙인 <code>@Timed</code>는 거기서 보이지 않는다. <code>targetClass.getMethod(이름, 매개변수 타입)</code>으로 구현 메서드를 찾아 확인한다.</li>
+<li><code>InvocationHandler.invoke</code>가 받는 <code>Method</code>는 <strong>인터페이스의</strong> 메서드다. 구현 클래스에 붙인 <code>@Timed</code>는 거기서 보이지 않는다. <code>targetClass.getMethod(이름, 매개변수 타입)</code>으로 구현 메서드를 찾아 확인한다. 예외가 하나 있다: 프록시에 부른 <code>equals</code>·<code>hashCode</code>·<code>toString</code>은 선언 클래스가 <code>Object</code>인 <code>Method</code>로 들어온다(<code>method.getDeclaringClass() == Object.class</code>). 이것까지 <code>target</code>에 넘기면 <code>proxy.equals(proxy)</code>가 <code>target.equals(proxy)</code>로 바뀌어 false가 된다 — 자기 자신과 같지 않은 객체가 생긴다.</li>
 <li><code>method.invoke(target, args)</code>는 대상이 던진 예외를 <code>InvocationTargetException</code>으로 감싼다. 그대로 두면 호출한 쪽은 <code>UndeclaredThrowableException</code>을 받는다. <code>e.getCause()</code>를 꺼내 던진다.</li>
 </ol>
 <p>통과시킬 테스트(주제 과제) — <code>J10TimedProxyTest</code>. 실행 시간 값은 단언하지 않는다(돌릴 때마다 다르다). 기록이 남았는지, 어떤 메서드 이름인지를 본다.</p>
@@ -142,6 +143,7 @@ public class FakeAdminActions implements AdminActions {   // 주어진 코드
 <li><code>대상이_던진_예외는_포장되지_않고_그대로_나오며_실패한_호출도_기록된다</code></li>
 <li><code>같은_객체_안에서_this로_부르면_프록시를_거치지_않아_기록되지_않는다</code></li>
 <li><code>리텐션이_CLASS인_어노테이션은_실행_중에_보이지_않아_기록되지_않는다</code></li>
+<li><code>equals_hashCode_toString은_Object_메서드라_target에_넘기지_않고_프록시_자신을_기준으로_답한다</code></li>
 <li><code>프록시가_받는_Method는_인터페이스_메서드라_구현_클래스의_어노테이션은_따로_찾아야_한다</code></li>
 </ul>
 </details>
@@ -150,7 +152,7 @@ public class FakeAdminActions implements AdminActions {   // 주어진 코드
 <p>감사 로그 목록에서 <code>action</code>별 건수를 stream으로 세어 <strong>고칠 수 없는</strong> <code>Map</code>으로 돌려준다. <code>action</code>이 생기기 전에 쌓인 옛 기록은 <code>action</code>이 null이라 건너뛴다.</p>
 <pre><code class="language-java">/** action별 건수. action이 null이면 건너뛴다. 돌려주는 Map에 put하면 UnsupportedOperationException. */
 public static Map&lt;String, Long&gt; countByAction(List&lt;AuditEntry&gt; entries)</code></pre>
-<p>함정 두 개: <code>Collectors.groupingBy</code>는 분류 키가 null이면 <code>NullPointerException</code>을 던진다. 그리고 <code>groupingBy</code>가 만든 것은 가변 <code>HashMap</code>이라 그대로 내주면 밖에서 숫자를 고칠 수 있다.</p>
+<p>함정 두 개: <code>Collectors.groupingBy</code>는 분류 키가 null이면 <code>NullPointerException</code>을 던진다. 그리고 <code>groupingBy</code>는 돌려주는 <code>Map</code>의 종류도, 고칠 수 없는지도 약속하지 않는다(지금 JDK는 가변 <code>HashMap</code>을 준다). 그대로 내주면 밖에서 숫자를 고칠 수 있으니 <code>Map.copyOf</code>로 불변을 직접 만든다.</p>
 <p>테스트 — <code>J10BasicsTest</code>:</p>
 <ul>
 <li><code>action별_건수를_센다</code></li>
@@ -206,7 +208,7 @@ public static Map&lt;String, Long&gt; countByAction(List&lt;AuditEntry&gt; entri
 </ul>
 <h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2>
 <pre><code class="language-bash">./gradlew :java-track:test --tests 'J10*'</code></pre>
-<p>17개가 모두 <code>PASSED</code>면 끝이다.</p>
+<p>18개가 모두 <code>PASSED</code>면 끝이다.</p>
 <h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2>
 <details>
 <summary>펼치기</summary>
@@ -214,6 +216,10 @@ public static Map&lt;String, Long&gt; countByAction(List&lt;AuditEntry&gt; entri
 <pre><code class="language-java">// TimedProxy
 public static &lt;T&gt; T wrap(Class&lt;T&gt; type, T target, TimingLog log) {
     Object proxy = Proxy.newProxyInstance(type.getClassLoader(), new Class&lt;?&gt;[] {type}, (self, method, args) -&gt; {
+        if (method.getDeclaringClass() == Object.class) {
+            // equals·hashCode·toString. target에 넘기면 proxy.equals(proxy)가 target.equals(proxy) = false가 된다
+            return objectMethod(self, target, method, args);
+        }
         if (!isTimed(method, target.getClass())) {
             return invoke(target, method, args);
         }
@@ -241,6 +247,16 @@ public static boolean isTimed(Method interfaceMethod, Class&lt;?&gt; targetClass
     }
 }
 
+/** 프록시 자신의 참조로 답한다. 같은 프록시끼리만 같고, hashCode는 그와 맞는 identityHashCode다. */
+private static Object objectMethod(Object self, Object target, Method method, Object[] args) {
+    return switch (method.getName()) {
+        case &quot;equals&quot; -&gt; self == args[0];
+        case &quot;hashCode&quot; -&gt; System.identityHashCode(self);
+        case &quot;toString&quot; -&gt; &quot;TimedProxy(&quot; + target + &quot;)&quot;;
+        default -&gt; throw new IllegalStateException(&quot;프록시로 들어올 수 없는 Object 메서드: &quot; + method);
+    };
+}
+
 private static Object invoke(Object target, Method method, Object[] args) throws Throwable {
     try {
         return method.invoke(target, args);
@@ -256,7 +272,7 @@ public static Map&lt;String, Long&gt; countByAction(List&lt;AuditEntry&gt; entri
             // groupingBy는 null 키에서 NPE를 던지므로 먼저 거른다
             .filter(Objects::nonNull)
             .collect(Collectors.groupingBy(action -&gt; action, Collectors.counting()));
-    // groupingBy가 만든 것은 가변 HashMap이다. 복사해 불변으로 내준다
+    // groupingBy는 Map의 종류·불변 여부를 약속하지 않는다(지금 JDK는 가변 HashMap). 복사해 불변으로 내준다
     return Map.copyOf(counts);
 }</code></pre>
 <pre><code class="language-java">// UploadLimits

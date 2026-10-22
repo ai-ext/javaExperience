@@ -21,7 +21,7 @@ public final class AuditStats {
                 // groupingBy는 null 키에서 NPE를 던지므로 먼저 거른다
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(action -> action, Collectors.counting()));
-        // groupingBy가 만든 것은 가변 HashMap이다. 복사해 불변으로 내준다
+        // groupingBy는 Map의 종류·불변 여부를 약속하지 않는다(지금 JDK는 가변 HashMap). 복사해 불변으로 내준다
         return Map.copyOf(counts);
     }
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,20 @@ class J13TypeCutTest {
         CouponCode code = new CouponCode("  sale2024 ");
 
         assertThat(code.value()).isEqualTo("SALE2024");
+    }
+
+    @Test
+    void 정규화는_서버_기본_로케일과_상관없이_같다() {
+        Locale saved = Locale.getDefault();
+        try {
+            // 터키어 로케일에서 "i".toUpperCase()는 점 있는 대문자 İ(U+0130)가 되어 영문 규칙 검사에 걸린다
+            Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+            assertThat("indirim".toUpperCase()).isNotEqualTo("INDIRIM");
+
+            assertThat(new CouponCode("indirim").value()).isEqualTo("INDIRIM");
+        } finally {
+            Locale.setDefault(saved);
+        }
     }
 
     @ParameterizedTest
