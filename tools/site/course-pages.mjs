@@ -3,6 +3,7 @@
 // 빌드가 주입하는 href는 marked 링크 검사를 거치지 않으므로, 여기서 대상 파일·앵커가 있는지 직접 확인한다.
 import fs from 'node:fs';
 import path from 'node:path';
+import { loadFlows, renderDayFlow, renderDayTicketLinks } from './course-flow.mjs';
 
 const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const PHASE = { warmup: '선택 · Java 워밍업', build: '1단계 · 빈 프로젝트로 서버 만들기', maintain: '2단계 · 어수선한 서버 넘겨받기', wrap: '마무리 · 설명 세션' };
@@ -61,7 +62,10 @@ export function loadCourse(root) {
   for (const t of tickets) for (const a of t.areas) add(t.id, a, 'area');
   const ticketIds = new Set(tickets.map((t) => t.id));
   for (const e of edges) if (e.kind === 'ticket' && !ticketIds.has(e.to)) throw new Error(`roadmap.json의 티켓 ${e.to}가 map-tickets.json에 없다`);
-  return { days, java, tickets, areas: meta.areas, edges, exists };
+  const course = { days, java, tickets, areas: meta.areas, edges, exists };
+  // 흐름 재생 데이터(course/flows/*.json). 일자 페이지 [오늘 흐름]과 티켓 페이지 [장애 흐름]이 쓴다.
+  course.flows = loadFlows(root, course);
+  return course;
 }
 
 const relHref = (fromRel, target) => path.posix.relative(path.posix.dirname(fromRel), target);
@@ -174,9 +178,11 @@ export function renderDayPage(sourceRel, body, course) {
       + html.slice(steps.end);
   } else fail('오늘 순서가 없다');
 
-  // 3) 오늘의 Java → 카드, 그 아래 흐름 재생 자리(P5-3이 채운다. 지금은 보이지 않는 마크업만 둔다)
+  // 3) 오늘의 Java → 카드, 그 아래 [오늘 흐름]. 1단계는 요청 흐름 재생, 2단계는 그날 티켓의 장애 흐름으로 잇는다. 흐름이 없는 날(D00·D15)은 빈 자리만 둔다.
   const javaBlock = between(html, /<h2 id="오늘의-java"/, /<hr>|<h2 /);
-  const flowSlot = `<div class="day-flow" data-flow-day="${day.id}" hidden></div>\n`;
+  const dayFlow = course.flows.days.get(day.id);
+  const flowSlot = dayFlow ? renderDayFlow(dayFlow)
+    : (day.phase === 'maintain' && renderDayTicketLinks(day, course, course.flows, sourceRel)) || `<div class="day-flow" data-flow-day="${day.id}" hidden></div>\n`;
   if (javaBlock) {
     // 본문 첫 링크(Jnn. 제목 — 30~60분)가 여는 동작이라, 같은 목적의 버튼을 따로 두지 않는다.
     html = html.slice(0, javaBlock.start) + `<section class="day-java" aria-labelledby="오늘의-java">${javaBlock.text}</section>\n${flowSlot}` + html.slice(javaBlock.end);

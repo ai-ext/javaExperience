@@ -175,7 +175,9 @@ function collectHtml(page, html) {
     // 과정 v2(P5-2): 홈 과정 영역·참고 도감, 일자 페이지 배치, 과정 지도
     'course-home', 'ch-today', 'ch-progress', 'ch-entries', 'home-reference',
     'day-head', 'day-today', 'day-java', 'step-facts', 'copy-row', 'day-pager',
-    'course-map', 'cm-legend', 'cm-toolbar', 'cm-board', 'cm-detail', 'cm-tables']);
+    'course-map', 'cm-legend', 'cm-toolbar', 'cm-board', 'cm-detail', 'cm-tables',
+    // 과정 v2(P5-3): 일자 [오늘 흐름]·티켓 [장애 흐름] 재생, 2단계 일자의 티켓 흐름 목록
+    'flow', 'flow-links']);
   for (const match of html.matchAll(/<(?:section|header|footer|div|nav|button|article|aside|dialog|figure|p|ol)\b([^>]*\bclass="([^"]+)"[^>]*)>/g)) {
     const classes = match[2].split(/\s+/);
     for (const component of classes) {
