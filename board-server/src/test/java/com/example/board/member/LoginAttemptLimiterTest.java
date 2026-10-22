@@ -1,6 +1,12 @@
 package com.example.board.member;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -64,6 +70,35 @@ class LoginAttemptLimiterTest extends ApiTestSupport {
         redis.opsForValue().set("login:fail:" + email, "5", 10, TimeUnit.MINUTES);
 
         login(email, "password1").andExpect(status().isTooManyRequests());
+    }
+
+    // 함정: 횟수 확인(GET)과 실패 기록(INCR)이 떨어져 있으면, 4회 실패 상태의 동시 요청이 모두 확인을 통과해
+    // 남은 1회보다 많은 비밀번호를 검증해 볼 수 있다. 401 = 비밀번호 검증까지 간 요청이다.
+    @Test
+    void 실패_4회_상태에서_동시_요청_20개가_와도_비밀번호_검증은_1번만_한다() throws Exception {
+        failTimes(email, 4);
+        ExecutorService pool = Executors.newFixedThreadPool(20);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Integer> statuses = new ArrayList<>();
+        try {
+            List<Future<Integer>> futures = new ArrayList<>();
+            for (int i = 0; i < 20; i++) {
+                futures.add(pool.submit(() -> {
+                    start.await();
+                    return login(email, "wrongpass1").andReturn().getResponse().getStatus();
+                }));
+            }
+            start.countDown();
+            for (Future<Integer> f : futures) {
+                statuses.add(f.get(30, TimeUnit.SECONDS));
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(statuses).filteredOn(s -> s == 401).hasSize(1);
+        assertThat(statuses).filteredOn(s -> s == 429).hasSize(19);
+        assertThat(redis.opsForValue().get("login:fail:" + email)).isEqualTo("5");
     }
 
     @Test

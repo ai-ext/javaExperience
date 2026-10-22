@@ -24,10 +24,13 @@ public class LoginAttemptLimiter {
     static final int MAX_FAILURES = 5;
     static final Duration WINDOW = Duration.ofMinutes(10);
 
-    // 첫 실패에만 만료를 건다(첫 실패부터 10분). INCR과 EXPIRE 사이에 죽어 만료 없는 키가 남지 않게 한 번에 실행한다.
-    private static final RedisScript<Long> INCREMENT = new DefaultRedisScript<>("""
+    // 확인과 예약을 Lua 한 번으로 원자 실행한다. GET으로 확인하고 비밀번호가 틀린 뒤에 INCR하면, 4회 실패 상태의
+    // 동시 요청이 모두 확인을 통과해 남은 1회보다 많이 검증해 본다. 그래서 검증 전에 1회를 먼저 쓰고(성공하면 reset이 지운다),
+    // 한도에 닿았으면 INCR하지 않고 -1을 돌려준다. 첫 시도에만 만료를 건다(첫 시도부터 10분).
+    private static final RedisScript<Long> RESERVE = new DefaultRedisScript<>("""
+            if tonumber(redis.call('GET', KEYS[1]) or '0') >= tonumber(ARGV[1]) then return -1 end
             local n = redis.call('INCR', KEYS[1])
-            if n == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+            if n == 1 then redis.call('EXPIRE', KEYS[1], ARGV[2]) end
             return n
             """, Long.class);
 
@@ -39,17 +42,16 @@ public class LoginAttemptLimiter {
         this.guard = guard;
     }
 
-    /** 이미 5번 실패했으면 비밀번호를 확인하지 않고 429. */
-    public void check(String email) {
-        String count = guard.call("로그인 실패 횟수 조회", () -> redis.opsForValue().get(key(email)), () -> null);
-        if (count != null && Integer.parseInt(count) >= MAX_FAILURES) {
+    /**
+     * 비밀번호를 확인하기 전에 시도 1회를 예약한다. 이미 5회를 썼으면 비밀번호를 확인하지 않고 429.
+     * 예약한 시도는 실패로 남고, 로그인에 성공하면 reset으로 지운다.
+     */
+    public void reserve(String email) {
+        Long n = guard.call("로그인 시도 예약", () -> redis.execute(RESERVE, List.of(key(email)),
+                String.valueOf(MAX_FAILURES), String.valueOf(WINDOW.toSeconds())), () -> null);
+        if (n != null && n < 0) {
             throw new BusinessException(ErrorCode.TOO_MANY_ATTEMPTS, "로그인 시도 횟수를 넘었습니다. 잠시 뒤 다시 시도하세요.");
         }
-    }
-
-    public void recordFailure(String email) {
-        guard.run("로그인 실패 기록",
-                () -> redis.execute(INCREMENT, List.of(key(email)), String.valueOf(WINDOW.toSeconds())));
     }
 
     public void reset(String email) {

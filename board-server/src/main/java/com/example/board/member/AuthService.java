@@ -32,12 +32,12 @@ public class AuthService {
 
     // 트랜잭션을 두지 않는다. 실패 횟수 제한(Redis)을 트랜잭션 안에서 부르지 않기 위해서다. 조회는 저장소가 따로 연다.
     public TokenResponse login(LoginRequest request) {
-        loginAttemptLimiter.check(request.email());
+        // 검증 전에 시도를 예약한다. 틀리면 예약한 1회가 그대로 실패로 남는다.
+        loginAttemptLimiter.reserve(request.email());
         Member member = memberRepository.findByEmail(request.email()).orElse(null);
         boolean matches = passwordEncoder.matches(request.password(), member == null ? dummyHash : member.getPasswordHash());
         if (member == null || !matches) {
-            // 없는 이메일도 같이 센다. 응답만으로 이메일이 있는지 알 수 없게 한다.
-            loginAttemptLimiter.recordFailure(request.email());
+            // 없는 이메일도 같이 센다(예약에서 이미 셌다). 응답만으로 이메일이 있는지 알 수 없게 한다.
             // 이메일·비밀번호 중 무엇이 틀렸는지 알리지 않는다
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다.");
         }
