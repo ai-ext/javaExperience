@@ -1,0 +1,2972 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D08. 포인트 충전 (외부 PG 모의)</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=53f71b596d04">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<!-- 생성물: tools/course/build-days.mjs가 만든다. 직접 고치지 마라 -->
+
+<h1 id="d08-포인트-충전-외부-pg-모의"><a class="anchor" href="#d08-포인트-충전-외부-pg-모의" aria-hidden="true">#</a>D08. 포인트 충전 (외부 PG 모의)</h1>
+<blockquote>
+<p>1단계 · 빈 프로젝트로 서버 만들기 · 오늘의 Java <a href="../java/J08.html">J08</a> · 순서 5개 · 말하기 카드 5장</p>
+</blockquote>
+<h2 id="오늘-순서"><a class="anchor" href="#오늘-순서" aria-hidden="true">#</a>오늘 순서</h2>
+<ol class="day-steps" data-day="D08">
+<li data-step="D08-1"><label><input type="checkbox" class="step-check" data-step="D08-1"> <a href="#step-d08-1">① PG 클라이언트와 타임아웃 3종 (<code>compose.yaml</code>에 WireMock·Toxiproxy, <code>BoardProperties</code>에 <code>board.pg.*</code>)</a></label></li>
+<li data-step="D08-2"><label><input type="checkbox" class="step-check" data-step="D08-2"> <a href="#step-d08-2">② 연계 로그 <code>pg_payment</code>와 <code>PgPaymentStatus</code> enum(<code>payment/PgPaymentStatus.java</code>) (<code>schema.sql</code>에 테이블, UNIQUE <code>idempotency_key</code>·<code>order_id</code>·<code>payment_key</code>)</a></label></li>
+<li data-step="D08-3"><label><input type="checkbox" class="step-check" data-step="D08-3"> <a href="#step-d08-3">③ 포인트 충전 API: 트랜잭션을 나누고 PG 호출은 트랜잭션 밖에서</a></label></li>
+<li data-step="D08-4"><label><input type="checkbox" class="step-check" data-step="D08-4"> <a href="#step-d08-4">④ 재시도와 백오프: 무엇을 다시 보내고 무엇을 보내지 않는가</a></label></li>
+<li data-step="D08-5"><label><input type="checkbox" class="step-check" data-step="D08-5"> <a href="#step-d08-5">⑤ PG 결제 완료 콜백: 경로는 공개하고 원문 바이트 HMAC 서명으로 보호 (비밀키는 <code>BOARD_PG_SECRET</code> 환경 변수)</a></label></li>
+</ol>
+
+<h2 id="오늘의-java"><a class="anchor" href="#오늘의-java" aria-hidden="true">#</a>오늘의 Java</h2>
+<p><a href="../java/J08.html">J08. 예외·try-with-resources·람다로 만드는 재시도 함수</a> — 30~60분. Spring 순서를 시작하기 전에 오늘 쓰는 Java를 먼저 연습한다.</p>
+<ul>
+<li>주제: 체크 예외와 언체크 예외, try-with-resources, 람다와 함수형 인터페이스: 재시도 함수 <code>retry(Supplier&lt;T&gt;, int)</code></li>
+</ul>
+<hr>
+<section class="day-step" id="step-d08-1" data-step="D08-1">
+
+<h2 id="①-pg-클라이언트와-타임아웃-3종-composeyaml에-wiremocktoxiproxy-boardproperties에-boardpg"><a class="anchor" href="#①-pg-클라이언트와-타임아웃-3종-composeyaml에-wiremocktoxiproxy-boardproperties에-boardpg" aria-hidden="true">#</a>① PG 클라이언트와 타임아웃 3종 (<code>compose.yaml</code>에 WireMock·Toxiproxy, <code>BoardProperties</code>에 <code>board.pg.*</code>)</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>compose.yaml</code></li>
+<li><code>src/main/java/com/example/board/config/PgClientConfig.java</code></li>
+<li><code>src/main/java/com/example/board/payment/PgClient.java</code></li>
+</ul>
+<p><strong>겪을 것</strong> 타임아웃을 정하지 않으면 PG가 멈출 때 우리 요청 스레드도 끝없이 함께 기다린다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li><code>PgClientTest</code> 통과: WireMock 4초 지연 → 3초에 응답 타임아웃 예외, 닫힌 포트 → 1초 안에 연결 타임아웃 예외, 풀 대기 2초 초과 → 예외</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>POST /api/me/points/charges</code></a> (<a href="../spec-v2.html#5-5-포인트-충전pg-콜백">5-5. 포인트 충전·PG 콜백</a>)</p>
+<details class="step-hint" data-step="D08-1">
+<summary>막히면</summary>
+
+<ul>
+<li>Apache HttpClient 5의 <code>ConnectionConfig</code>(connect timeout)·<code>RequestConfig</code>(response timeout, connection request timeout)와 <code>RestClient</code> + <code>HttpComponentsClientHttpRequestFactory</code>를 찾아본다.</li>
+<li>WireMock 지연은 매핑 JSON의 <code>fixedDelayMilliseconds</code>로 준다. 어떤 타임아웃이 났는지는 예외 클래스 이름으로 구분한다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D08-1" data-commits="1b68560db5aa87bd70eff0d8e57f4a2033018d7c">
+<summary>정답 보기 · answer(D08-1) · board-server 파일 18개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/1b68560db5aa87bd70eff0d8e57f4a2033018d7c" target="_blank" rel="noopener"><code>1b68560d</code></a> — answer(D08-1): PG 클라이언트와 타임아웃 3종</p>
+<p><strong>수정</strong> <code>compose.yaml</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -12,3 +12,24 @@ services:
+       test: [&quot;CMD&quot;, &quot;mysqladmin&quot;, &quot;ping&quot;, &quot;-h&quot;, &quot;127.0.0.1&quot;]
+       interval: 5s
+       retries: 20
++
++  # PG 모의. 스텁은 테스트와 같은 디렉터리를 쓴다(금액 999000은 항상 거절).
++  wiremock:
++    image: wiremock/wiremock:3.13.1
++    ports:
++      - &quot;18080:8080&quot;
++    volumes:
++      - ./src/test/resources/wiremock:/home/wiremock:ro
++
++  # 서버는 Toxiproxy(18666)를 거쳐 WireMock을 부른다. 지연 주입 예:
++  # curl -X POST localhost:8474/proxies/pg/toxics -d '{&quot;type&quot;:&quot;latency&quot;,&quot;attributes&quot;:{&quot;latency&quot;:5000}}'
++  toxiproxy:
++    image: ghcr.io/shopify/toxiproxy:2.12.0
++    command: [&quot;-host=0.0.0.0&quot;, &quot;-config=/config/toxiproxy.json&quot;]
++    ports:
++      - &quot;8474:8474&quot;
++      - &quot;18666:8666&quot;
++    volumes:
++      - ./toxiproxy.json:/config/toxiproxy.json:ro
++    depends_on:
++      - wiremock</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/config/PgClientConfig.java</code></p>
+<pre><code class="language-java">package com.example.board.config;
+
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.core5.util.Timeout;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
+
+import com.example.board.payment.PgClient;
+
+@Configuration(proxyBeanMethods = false)
+public class PgClientConfig {
+
+    @Bean
+    PgClient pgClient(BoardProperties properties) {
+        return new PgClient(pgRestClient(properties.pg()));
+    }
+
+    /** 연결·응답·풀 대기 타임아웃을 따로 건다. 테스트가 풀 크기를 바꿔 만들 수 있게 정적 메서드로 둔다. */
+    public static RestClient pgRestClient(BoardProperties.Pg pg) {
+        PoolingHttpClientConnectionManager pool = PoolingHttpClientConnectionManagerBuilder.create()
+                .setDefaultConnectionConfig(ConnectionConfig.custom()
+                        .setConnectTimeout(Timeout.of(pg.connectTimeout()))
+                        .setSocketTimeout(Timeout.of(pg.responseTimeout()))
+                        .build())
+                .setMaxConnTotal(pg.maxConnections())
+                .setMaxConnPerRoute(pg.maxConnections())
+                .build();
+        CloseableHttpClient httpClient = HttpClients.custom()
+                .setConnectionManager(pool)
+                .setDefaultRequestConfig(RequestConfig.custom()
+                        .setConnectionRequestTimeout(Timeout.of(pg.connectionRequestTimeout()))
+                        .setResponseTimeout(Timeout.of(pg.responseTimeout()))
+                        .build())
+                // 재시도는 우리 정책 한 곳에서만 한다. 클라이언트 기본 재시도가 겹치면 횟수를 셀 수 없다.
+                .disableAutomaticRetries()
+                .build();
+        return RestClient.builder()
+                .baseUrl(pg.baseUrl())
+                .requestFactory(new HttpComponentsClientHttpRequestFactory(httpClient))
+                .build();
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/payment/PgClient.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.net.ConnectException;
+import java.net.NoRouteToHostException;
+import java.net.UnknownHostException;
+
+import org.apache.hc.client5.http.ConnectTimeoutException;
+import org.apache.hc.core5.http.ConnectionRequestTimeoutException;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
+
+/** 외부 PG 호출. DB 트랜잭션 안에서 부르지 않는다(spec-v2 §8). */
+public class PgClient {
+
+    private final RestClient restClient;
+
+    public PgClient(RestClient restClient) {
+        this.restClient = restClient;
+    }
+
+    public PgApproval approve(String orderId, int amount, String idempotencyKey) {
+        try {
+            return restClient.post()
+                    .uri(&quot;/pg/v1/payments&quot;)
+                    .header(&quot;Idempotency-Key&quot;, idempotencyKey)
+                    .body(new ApproveRequest(orderId, amount))
+                    .retrieve()
+                    .body(PgApproval.class);
+        } catch (RuntimeException e) {
+            throw translate(e);
+        }
+    }
+
+    private record ApproveRequest(String orderId, int amount) {
+    }
+
+    static PgException translate(RuntimeException e) {
+        if (e instanceof HttpServerErrorException) {
+            return new PgException(PgException.Kind.SERVER_ERROR, &quot;PG 서버 오류&quot;, e);
+        }
+        if (e instanceof HttpClientErrorException) {
+            return new PgException(PgException.Kind.DECLINED, &quot;PG 승인 거절&quot;, e);
+        }
+        if (e instanceof ResourceAccessException) {
+            Throwable cause = e.getCause();
+            if (cause instanceof ConnectionRequestTimeoutException) {
+                return new PgException(PgException.Kind.POOL_TIMEOUT, &quot;PG 커넥션 풀 대기 시간 초과&quot;, e);
+            }
+            if (cause instanceof ConnectException || cause instanceof ConnectTimeoutException
+                    || cause instanceof NoRouteToHostException || cause instanceof UnknownHostException) {
+                return new PgException(PgException.Kind.UNREACHABLE, &quot;PG 연결 실패&quot;, e);
+            }
+            // 응답 타임아웃과 응답 도중 끊김은 모두 결과 불명이다
+            return new PgException(PgException.Kind.TIMEOUT, &quot;PG 응답 없음&quot;, e);
+        }
+        throw e;
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/config/BoardProperties.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -1,5 +1,7 @@
+ package com.example.board.config;
+ 
++import java.time.Duration;
++
+ import jakarta.validation.Valid;
+ import jakarta.validation.constraints.NotBlank;
+ import jakarta.validation.constraints.NotNull;
+@@ -12,7 +14,8 @@ import org.springframework.validation.annotation.Validated;
+ // 설정은 이 클래스로만 읽는다. @Value 기본값은 키 오타를 기동 때 못 잡는다.
+ @Validated
+ @ConfigurationProperties(&quot;board&quot;)
+-public record BoardProperties(@Valid @NotNull ForbiddenWords forbiddenWords, @Valid @NotNull Jwt jwt) {
++public record BoardProperties(@Valid @NotNull ForbiddenWords forbiddenWords, @Valid @NotNull Jwt jwt,
++        @Valid @NotNull Pg pg) {
+ 
+     public record ForbiddenWords(@NotNull Boolean ignoreCase) {
+     }
+@@ -20,4 +23,9 @@ public record BoardProperties(@Valid @NotNull ForbiddenWords forbiddenWords, @Va
+     // HS256은 키가 256비트(32바이트) 이상이어야 한다
+     public record Jwt(@NotBlank @Size(min = 32) String secret, @Positive long expiresInSeconds) {
+     }
++
++    // 타임아웃 셋 중 하나라도 비면 그 구간에서 요청 스레드가 끝없이 묶일 수 있어 모두 필수다
++    public record Pg(@NotBlank String baseUrl, @NotNull Duration connectTimeout, @NotNull Duration responseTimeout,
++            @NotNull Duration connectionRequestTimeout, @Positive int maxConnections) {
++    }
+ }</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/payment/PgApproval.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+/** PG 승인·조회 응답. spec-v2 §7. */
+public record PgApproval(String paymentKey, Status status, int amount, String approvedAt) {
+
+    public enum Status {
+        DONE, FAILED, PENDING
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/payment/PgException.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+/** PG 호출 실패를 &quot;요청이 PG에 닿았는가&quot;로 나눈다. 재시도와 상태 결정이 이 구분에 달려 있다. */
+public class PgException extends RuntimeException {
+
+    public enum Kind {
+        /** 연결을 맺지 못했다. PG는 요청을 받지 않았다. */
+        UNREACHABLE,
+        /** 우리 커넥션 풀에서 빈 커넥션을 얻지 못했다. 요청을 보내지 않았다. */
+        POOL_TIMEOUT,
+        /** 요청은 보냈지만 응답을 받지 못했다. PG는 승인했을 수 있다(결과 불명). */
+        TIMEOUT,
+        /** PG가 5xx로 답했다. */
+        SERVER_ERROR,
+        /** PG가 4xx로 거절했다. 같은 요청은 같은 실패를 낸다. */
+        DECLINED
+    }
+
+    private final Kind kind;
+
+    public PgException(Kind kind, String message, Throwable cause) {
+        super(message, cause);
+        this.kind = kind;
+    }
+
+    public Kind kind() {
+        return kind;
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/resources/application-prod.yml</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -7,3 +7,5 @@ spring:
+ board:
+   jwt:
+     secret: ${BOARD_JWT_SECRET}
++  pg:
++    base-url: ${BOARD_PG_BASE_URL}</code></pre>
+<p><strong>수정</strong> <code>src/main/resources/application.yml</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -20,6 +20,14 @@ board:
+     ignore-case: true
+   jwt:
+     expires-in-seconds: 3600
++  pg:
++    # compose의 Toxiproxy(→ WireMock). 운영은 환경 변수로 덮는다.
++    base-url: ${BOARD_PG_BASE_URL:http://localhost:18666}
++    # spec-v2 §8 운영 값
++    connect-timeout: 1s
++    response-timeout: 3s
++    connection-request-timeout: 2s
++    max-connections: 20
+ 
+ management:
+   endpoints:</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/PgContainers.java</code></p>
+<pre><code class="language-java">package com.example.board;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.toxiproxy.ToxiproxyContainer;
+import org.testcontainers.utility.MountableFile;
+
+import eu.rekawek.toxiproxy.Proxy;
+import eu.rekawek.toxiproxy.ToxiproxyClient;
+import eu.rekawek.toxiproxy.model.Toxic;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
+/**
+ * PG 모의(WireMock)와 그 앞단 Toxiproxy. JVM 안에서 한 번만 띄워 모든 테스트가 같이 쓴다.
+ * 서버는 Toxiproxy를 거쳐 WireMock에 닿으므로 지연·연결 끊김을 주입할 수 있다.
+ */
+public final class PgContainers {
+
+    private static final int PROXY_PORT = 8666;
+    private static final Network NETWORK = Network.newNetwork();
+    private static final GenericContainer&lt;?&gt; WIREMOCK = new GenericContainer&lt;&gt;(&quot;wiremock/wiremock:3.13.1&quot;)
+            .withNetwork(NETWORK)
+            .withNetworkAliases(&quot;wiremock&quot;)
+            .withExposedPorts(8080)
+            .withCopyFileToContainer(MountableFile.forClasspathResource(&quot;wiremock&quot;), &quot;/home/wiremock&quot;)
+            .waitingFor(Wait.forHttp(&quot;/__admin/mappings&quot;).forStatusCode(200));
+    private static final ToxiproxyContainer TOXIPROXY = new ToxiproxyContainer(&quot;ghcr.io/shopify/toxiproxy:2.12.0&quot;)
+            .withNetwork(NETWORK);
+    private static final HttpClient HTTP = HttpClient.newHttpClient();
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
+    private static Proxy proxy;
+
+    private PgContainers() {
+    }
+
+    public static synchronized void start() {
+        if (proxy != null) {
+            return;
+        }
+        WIREMOCK.start();
+        TOXIPROXY.start();
+        try {
+            proxy = new ToxiproxyClient(TOXIPROXY.getHost(), TOXIPROXY.getControlPort())
+                    .createProxy(&quot;pg&quot;, &quot;0.0.0.0:&quot; + PROXY_PORT, &quot;wiremock:8080&quot;);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** 서버가 쓰는 PG 주소(Toxiproxy 경유). */
+    public static String baseUrl() {
+        start();
+        return &quot;http://&quot; + TOXIPROXY.getHost() + &quot;:&quot; + TOXIPROXY.getMappedPort(PROXY_PORT);
+    }
+
+    public static Proxy proxy() {
+        start();
+        return proxy;
+    }
+
+    /** 테스트마다 지연 주입·임시 스텁·요청 기록을 지우고 파일 스텁만 남긴다. */
+    public static void reset() {
+        start();
+        try {
+            for (Toxic toxic : proxy.toxics().getAll()) {
+                toxic.remove();
+            }
+            proxy.enable();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        admin(&quot;POST&quot;, &quot;/__admin/reset&quot;, &quot;&quot;);
+    }
+
+    /** WireMock 스텁 JSON을 등록한다. 파일 스텁보다 먼저 맞도록 priority를 낮게 준다. */
+    public static void stub(String mappingJson) {
+        admin(&quot;POST&quot;, &quot;/__admin/mappings&quot;, mappingJson);
+    }
+
+    /** POST /pg/v1/payments 로 받은 요청의 Idempotency-Key 목록(받은 순서). */
+    public static List&lt;String&gt; approveIdempotencyKeys() {
+        JsonNode found = JSON.readTree(admin(&quot;POST&quot;, &quot;/__admin/requests/find&quot;,
+                &quot;{\&quot;method\&quot;:\&quot;POST\&quot;,\&quot;urlPath\&quot;:\&quot;/pg/v1/payments\&quot;}&quot;));
+        List&lt;String&gt; keys = new ArrayList&lt;&gt;();
+        for (JsonNode r : found.get(&quot;requests&quot;)) {
+            keys.add(r.get(&quot;headers&quot;).get(&quot;Idempotency-Key&quot;).asString());
+        }
+        return keys.reversed();
+    }
+
+    public static int approveRequestCount() {
+        return approveIdempotencyKeys().size();
+    }
+
+    private static String admin(String method, String path, String body) {
+        start();
+        URI uri = URI.create(&quot;http://&quot; + WIREMOCK.getHost() + &quot;:&quot; + WIREMOCK.getMappedPort(8080) + path);
+        HttpRequest request = HttpRequest.newBuilder(uri)
+                .header(&quot;Content-Type&quot;, &quot;application/json&quot;)
+                .method(method, HttpRequest.BodyPublishers.ofString(body))
+                .build();
+        try {
+            HttpResponse&lt;String&gt; response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() &gt;= 300) {
+                throw new IllegalStateException(path + &quot; -&gt; &quot; + response.statusCode() + &quot; &quot; + response.body());
+            }
+            return response.body();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/TestcontainersConfig.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -3,6 +3,7 @@ package com.example.board;
+ import org.springframework.boot.test.context.TestConfiguration;
+ import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+ import org.springframework.context.annotation.Bean;
++import org.springframework.test.context.DynamicPropertyRegistrar;
+ import org.testcontainers.mysql.MySQLContainer;
+ 
+ @TestConfiguration(proxyBeanMethods = false)
+@@ -15,4 +16,10 @@ public class TestcontainersConfig {
+         return new MySQLContainer(&quot;mysql:8.4&quot;)
+                 .withCommand(&quot;--character-set-server=utf8mb4&quot;, &quot;--collation-server=utf8mb4_0900_ai_ci&quot;);
+     }
++
++    // PG 모의는 JVM에 하나만 띄우고, 서버는 Toxiproxy 주소로 부른다
++    @Bean
++    DynamicPropertyRegistrar pgProperties() {
++        return registry -&gt; registry.add(&quot;board.pg.base-url&quot;, PgContainers::baseUrl);
++    }
+ }</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/common/ForbiddenWordCheckerTest.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
+ class ForbiddenWordCheckerTest {
+ 
+     private ForbiddenWordChecker checker(boolean ignoreCase) {
+-        return new ForbiddenWordChecker(new BoardProperties(new BoardProperties.ForbiddenWords(ignoreCase), null));
++        return new ForbiddenWordChecker(new BoardProperties(new BoardProperties.ForbiddenWords(ignoreCase), null, null));
+     }
+ 
+     @Test</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/config/BoardPropertiesTest.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -19,10 +19,13 @@ class BoardPropertiesTest {
+     @Test
+     void forbidden_words_값이_객체로_바인딩된다() {
+         runner.withPropertyValues(&quot;board.forbidden-words.ignore-case=true&quot;,
+-                        &quot;board.jwt.secret=0123456789abcdef0123456789abcdef&quot;, &quot;board.jwt.expires-in-seconds=3600&quot;)
++                        &quot;board.jwt.secret=0123456789abcdef0123456789abcdef&quot;, &quot;board.jwt.expires-in-seconds=3600&quot;,
++                        &quot;board.pg.base-url=http://pg&quot;, &quot;board.pg.connect-timeout=1s&quot;, &quot;board.pg.response-timeout=3s&quot;,
++                        &quot;board.pg.connection-request-timeout=2s&quot;, &quot;board.pg.max-connections=20&quot;)
+                 .run(ctx -&gt; {
+                     assertThat(ctx).hasNotFailed();
+                     assertThat(ctx.getBean(BoardProperties.class).forbiddenWords().ignoreCase()).isTrue();
++                    assertThat(ctx.getBean(BoardProperties.class).pg().responseTimeout()).hasSeconds(3);
+                 });
+     }
+ </code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/config/JwtProviderTest.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -19,7 +19,7 @@ class JwtProviderTest {
+     private static final String SECRET = &quot;0123456789abcdef0123456789abcdef&quot;;
+ 
+     private static BoardProperties props(String secret) {
+-        return new BoardProperties(new BoardProperties.ForbiddenWords(true), new BoardProperties.Jwt(secret, 3600));
++        return new BoardProperties(new BoardProperties.ForbiddenWords(true), new BoardProperties.Jwt(secret, 3600), null);
+     }
+ 
+     @Test</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/payment/PgClientTest.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.time.Duration;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+import com.example.board.PgContainers;
+import com.example.board.config.BoardProperties;
+import com.example.board.config.PgClientConfig;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
+
+class PgClientTest {
+
+    @BeforeAll
+    static void up() {
+        PgContainers.start();
+    }
+
+    @AfterEach
+    void reset() {
+        PgContainers.reset();
+    }
+
+    PgClient client(String baseUrl, int maxConnections) {
+        BoardProperties.Pg pg = new BoardProperties.Pg(baseUrl, Duration.ofSeconds(1), Duration.ofSeconds(3),
+                Duration.ofSeconds(2), maxConnections);
+        return new PgClient(PgClientConfig.pgRestClient(pg));
+    }
+
+    String orderId() {
+        return &quot;CHG-&quot; + UUID.randomUUID();
+    }
+
+    void delayApprove(int millis) {
+        PgContainers.stub(&quot;&quot;&quot;
+                {&quot;priority&quot;:1,&quot;request&quot;:{&quot;method&quot;:&quot;POST&quot;,&quot;urlPath&quot;:&quot;/pg/v1/payments&quot;},
+                 &quot;response&quot;:{&quot;status&quot;:200,&quot;fixedDelayMilliseconds&quot;:%d,&quot;headers&quot;:{&quot;Content-Type&quot;:&quot;application/json&quot;},
+                  &quot;jsonBody&quot;:{&quot;paymentKey&quot;:&quot;pk-slow&quot;,&quot;status&quot;:&quot;DONE&quot;,&quot;amount&quot;:1000}}}
+                &quot;&quot;&quot;.formatted(millis));
+    }
+
+    @Test
+    void 승인_응답을_PgApproval로_받는다() {
+        String orderId = orderId();
+
+        PgApproval approval = client(PgContainers.baseUrl(), 10).approve(orderId, 5000, &quot;key-&quot; + orderId);
+
+        assertThat(approval.paymentKey()).isEqualTo(&quot;pk-&quot; + orderId);
+        assertThat(approval.status()).isEqualTo(PgApproval.Status.DONE);
+        assertThat(approval.amount()).isEqualTo(5000);
+        assertThat(PgContainers.approveIdempotencyKeys()).containsExactly(&quot;key-&quot; + orderId);
+    }
+
+    @Test
+    void 응답이_4초_걸리면_3초에_응답_타임아웃() {
+        delayApprove(4000);
+        long start = System.nanoTime();
+
+        PgException e = catchThrowableOfType(PgException.class,
+                () -&gt; client(PgContainers.baseUrl(), 10).approve(orderId(), 1000, &quot;key-timeout-1&quot;));
+
+        long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+        assertThat(e.kind()).isEqualTo(PgException.Kind.TIMEOUT);
+        assertThat(elapsed).isBetween(2900L, 3800L);
+    }
+
+    @Test
+    void 닫힌_포트는_1초_안에_연결_실패() {
+        long start = System.nanoTime();
+
+        PgException e = catchThrowableOfType(PgException.class,
+                () -&gt; client(&quot;http://127.0.0.1:1&quot;, 10).approve(orderId(), 1000, &quot;key-closed-1&quot;));
+
+        long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+        assertThat(e.kind()).isEqualTo(PgException.Kind.UNREACHABLE);
+        assertThat(elapsed).isLessThan(1000L);
+    }
+
+    @Test
+    void SYN에_답이_없는_주소는_1초에_연결_타임아웃() {
+        long start = System.nanoTime();
+
+        // 10.255.255.1은 라우팅되지만 아무도 응답하지 않아 SYN이 버려진다
+        PgException e = catchThrowableOfType(PgException.class,
+                () -&gt; client(&quot;http://10.255.255.1:81&quot;, 10).approve(orderId(), 1000, &quot;key-blackhole-1&quot;));
+
+        long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+        assertThat(e.kind()).isEqualTo(PgException.Kind.UNREACHABLE);
+        assertThat(elapsed).isBetween(900L, 1800L);
+    }
+
+    @Test
+    void 풀이_가득_차면_2초_대기_후_예외() throws Exception {
+        delayApprove(4000);
+        PgClient single = client(PgContainers.baseUrl(), 1);
+        // 하나뿐인 커넥션을 3초(응답 타임아웃) 동안 붙잡아 둔다
+        CompletableFuture&lt;Void&gt; holder = CompletableFuture.runAsync(() -&gt; {
+            try {
+                single.approve(orderId(), 1000, &quot;key-hold-1&quot;);
+            } catch (PgException ignored) {
+                // 응답 타임아웃이 정상 결과다
+            }
+        });
+        Thread.sleep(300);
+        long start = System.nanoTime();
+
+        PgException e = catchThrowableOfType(PgException.class,
+                () -&gt; single.approve(orderId(), 1000, &quot;key-wait-1&quot;));
+
+        long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+        assertThat(e.kind()).isEqualTo(PgException.Kind.POOL_TIMEOUT);
+        assertThat(elapsed).isBetween(1900L, 2700L);
+        holder.get(5, TimeUnit.SECONDS);
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/test/resources/wiremock/mappings/pg-approve-declined.json</code></p>
+<pre><code class="language-json">{
+  &quot;priority&quot;: 1,
+  &quot;request&quot;: {
+    &quot;method&quot;: &quot;POST&quot;,
+    &quot;urlPath&quot;: &quot;/pg/v1/payments&quot;,
+    &quot;bodyPatterns&quot;: [{ &quot;matchesJsonPath&quot;: &quot;$[?(@.amount == 999000)]&quot; }]
+  },
+  &quot;response&quot;: {
+    &quot;status&quot;: 400,
+    &quot;headers&quot;: { &quot;Content-Type&quot;: &quot;application/json&quot; },
+    &quot;jsonBody&quot;: { &quot;code&quot;: &quot;REJECTED&quot;, &quot;message&quot;: &quot;한도 초과(모의: 금액 999000은 항상 거절)&quot; }
+  }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/test/resources/wiremock/mappings/pg-approve.json</code></p>
+<pre><code class="language-json">{
+  &quot;priority&quot;: 10,
+  &quot;request&quot;: {
+    &quot;method&quot;: &quot;POST&quot;,
+    &quot;urlPath&quot;: &quot;/pg/v1/payments&quot;,
+    &quot;headers&quot;: { &quot;Idempotency-Key&quot;: { &quot;matches&quot;: &quot;.+&quot; } }
+  },
+  &quot;response&quot;: {
+    &quot;status&quot;: 200,
+    &quot;headers&quot;: { &quot;Content-Type&quot;: &quot;application/json&quot; },
+    &quot;body&quot;: &quot;{\&quot;paymentKey\&quot;:\&quot;pk-{{jsonPath request.body '$.orderId'}}\&quot;,\&quot;status\&quot;:\&quot;DONE\&quot;,\&quot;amount\&quot;:{{jsonPath request.body '$.amount'}},\&quot;approvedAt\&quot;:\&quot;{{now}}\&quot;}&quot;,
+    &quot;transformers&quot;: [&quot;response-template&quot;]
+  }
+}</code></pre>
+<p><strong>수정</strong> <code>build.gradle</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -29,6 +29,8 @@ dependencies {
+     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
+     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
+     runtimeOnly 'com.mysql:mysql-connector-j'
++    // PG 호출용 풀링 HTTP 클라이언트(연결·응답·풀 대기 타임아웃을 따로 건다)
++    implementation 'org.apache.httpcomponents.client5:httpclient5'
+ 
+     compileOnly 'org.projectlombok:lombok'
+     annotationProcessor 'org.projectlombok:lombok'
+@@ -41,6 +43,7 @@ dependencies {
+     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+     testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+     testImplementation 'org.testcontainers:testcontainers-mysql'
++    testImplementation 'org.testcontainers:testcontainers-toxiproxy'
+     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+ }
+ </code></pre>
+<p><strong>새 파일</strong> <code>toxiproxy.json</code></p>
+<pre><code class="language-json">[
+  {
+    &quot;name&quot;: &quot;pg&quot;,
+    &quot;listen&quot;: &quot;0.0.0.0:8666&quot;,
+    &quot;upstream&quot;: &quot;wiremock:8080&quot;,
+    &quot;enabled&quot;: true
+  }
+]</code></pre>
+</details>
+
+</section>
+
+<section class="day-step" id="step-d08-2" data-step="D08-2">
+
+<h2 id="②-연계-로그-pg_payment와-pgpaymentstatus-enumpaymentpgpaymentstatusjava-schemasql에-테이블-unique-idempotency_keyorder_idpayment_key"><a class="anchor" href="#②-연계-로그-pg_payment와-pgpaymentstatus-enumpaymentpgpaymentstatusjava-schemasql에-테이블-unique-idempotency_keyorder_idpayment_key" aria-hidden="true">#</a>② 연계 로그 <code>pg_payment</code>와 <code>PgPaymentStatus</code> enum(<code>payment/PgPaymentStatus.java</code>) (<code>schema.sql</code>에 테이블, UNIQUE <code>idempotency_key</code>·<code>order_id</code>·<code>payment_key</code>)</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/payment/PgPayment.java</code></li>
+<li><code>src/main/java/com/example/board/payment/PgPaymentRepository.java</code></li>
+<li><code>src/main/resources/schema.sql</code></li>
+</ul>
+<p><strong>겪을 것</strong> PG 결과가 나온 뒤에만 연계 로그를 남기면 타임아웃 건은 흔적이 없으므로 호출 전에 <code>REQUESTED</code>로 먼저 남긴다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li><code>PgPaymentRepositoryTest</code> 통과: 같은 <code>idempotency_key</code>로 두 번 저장하면 예외, <code>order_id</code>는 <code>CHG-</code> + UUID</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>POST /api/me/points/charges</code></a> (<a href="../spec-v2.html#5-5-포인트-충전pg-콜백">5-5. 포인트 충전·PG 콜백</a>)</p>
+<details class="step-hint" data-step="D08-2">
+<summary>막히면</summary>
+
+<ul>
+<li><code>order_id</code>는 서버가 <code>CHG-</code> + <code>UUID.randomUUID()</code>로 만든다. 상태 enum은 <code>@Enumerated(EnumType.STRING)</code>으로 저장한다.</li>
+<li>PG를 부르기 전에 <code>REQUESTED</code> 행을 먼저 저장해야 타임아웃 건도 흔적이 남는다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D08-2" data-commits="f4a89b432dc5adecb3b647d979f7e3d300377010">
+<summary>정답 보기 · answer(D08-2) · board-server 파일 5개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/f4a89b432dc5adecb3b647d979f7e3d300377010" target="_blank" rel="noopener"><code>f4a89b43</code></a> — answer(D08-2): 연계 로그 pg_payment와 PgPaymentStatus</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/payment/PgPayment.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+
+import com.example.board.common.BaseEntity;
+import com.example.board.member.Member;
+
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+/** PG 연계 로그. 호출 전에 REQUESTED로 먼저 남겨야 타임아웃 건도 흔적이 남는다. 상태 변경은 저장소의 조건부 UPDATE로만 한다. */
+@Getter
+@Entity
+@Table(name = &quot;pg_payment&quot;)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class PgPayment extends BaseEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = &quot;member_id&quot;, nullable = false)
+    private Member member;
+
+    @Column(name = &quot;order_id&quot;, nullable = false, length = 40)
+    private String orderId;
+
+    @Column(nullable = false)
+    private int amount;
+
+    @Column(name = &quot;payment_key&quot;, length = 64)
+    private String paymentKey;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private PgPaymentStatus status;
+
+    @Column(name = &quot;idempotency_key&quot;, nullable = false, length = 64)
+    private String idempotencyKey;
+
+    @Column(name = &quot;requested_at&quot;, nullable = false)
+    private LocalDateTime requestedAt;
+
+    @Column(name = &quot;responded_at&quot;)
+    private LocalDateTime respondedAt;
+
+    private PgPayment(Member member, int amount, String idempotencyKey, LocalDateTime requestedAt) {
+        this.member = member;
+        // PG에 보내는 주문 번호는 서버가 만든다. 클라이언트 값을 그대로 쓰면 회원 간에 겹칠 수 있다.
+        this.orderId = &quot;CHG-&quot; + UUID.randomUUID();
+        this.amount = amount;
+        this.status = PgPaymentStatus.REQUESTED;
+        this.idempotencyKey = idempotencyKey;
+        this.requestedAt = requestedAt;
+    }
+
+    public static PgPayment request(Member member, int amount, String idempotencyKey, LocalDateTime requestedAt) {
+        return new PgPayment(member, amount, idempotencyKey, requestedAt);
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/payment/PgPaymentRepository.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+/**
+ * 상태 전이는 &quot;현재 상태가 이것일 때만&quot; 바꾸는 조건부 UPDATE다. 영향 행 수 1인 쪽만 후속 처리(적립)를 한다.
+ * 승인 응답과 콜백이 동시에 와도 행 잠금으로 순서가 정해져 둘 중 하나만 1을 받는다.
+ */
+public interface PgPaymentRepository extends JpaRepository&lt;PgPayment, Long&gt; {
+
+    Optional&lt;PgPayment&gt; findByIdempotencyKey(String idempotencyKey);
+
+    Optional&lt;PgPayment&gt; findByOrderId(String orderId);
+
+    @Modifying(clearAutomatically = true)
+    @Query(&quot;update PgPayment p set p.status = com.example.board.payment.PgPaymentStatus.DONE,&quot;
+            + &quot; p.paymentKey = :paymentKey, p.respondedAt = :now, p.updatedAt = :now&quot;
+            + &quot; where p.id = :id and p.status in (com.example.board.payment.PgPaymentStatus.REQUESTED,&quot;
+            + &quot; com.example.board.payment.PgPaymentStatus.UNKNOWN)&quot;)
+    int markDone(@Param(&quot;id&quot;) Long id, @Param(&quot;paymentKey&quot;) String paymentKey, @Param(&quot;now&quot;) LocalDateTime now);
+
+    @Modifying(clearAutomatically = true)
+    @Query(&quot;update PgPayment p set p.status = com.example.board.payment.PgPaymentStatus.FAILED,&quot;
+            + &quot; p.paymentKey = coalesce(:paymentKey, p.paymentKey), p.respondedAt = :now, p.updatedAt = :now&quot;
+            + &quot; where p.id = :id and p.status in (com.example.board.payment.PgPaymentStatus.REQUESTED,&quot;
+            + &quot; com.example.board.payment.PgPaymentStatus.UNKNOWN)&quot;)
+    int markFailed(@Param(&quot;id&quot;) Long id, @Param(&quot;paymentKey&quot;) String paymentKey, @Param(&quot;now&quot;) LocalDateTime now);
+
+    /** REQUESTED에서만 UNKNOWN으로 간다. 콜백이 먼저 DONE으로 바꿨다면 그대로 둔다. */
+    @Modifying(clearAutomatically = true)
+    @Query(&quot;update PgPayment p set p.status = com.example.board.payment.PgPaymentStatus.UNKNOWN,&quot;
+            + &quot; p.respondedAt = :now, p.updatedAt = :now&quot;
+            + &quot; where p.id = :id and p.status = com.example.board.payment.PgPaymentStatus.REQUESTED&quot;)
+    int markUnknown(@Param(&quot;id&quot;) Long id, @Param(&quot;now&quot;) LocalDateTime now);
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/resources/schema.sql</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -171,3 +171,24 @@ CREATE TABLE IF NOT EXISTS shop_order (
+     -- 같은 멱등 키의 중복 주문을 막는 최종 방어선
+     UNIQUE KEY uk_shop_order_member_key (member_id, idempotency_key)
+ ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
++
++CREATE TABLE IF NOT EXISTS pg_payment (
++    id              BIGINT      NOT NULL AUTO_INCREMENT,
++    member_id       BIGINT      NOT NULL,
++    order_id        VARCHAR(40) NOT NULL,
++    amount          INT         NOT NULL,
++    payment_key     VARCHAR(64) NULL,
++    status          VARCHAR(10) NOT NULL,
++    idempotency_key VARCHAR(64) NOT NULL,
++    requested_at    DATETIME(6) NOT NULL,
++    responded_at    DATETIME(6) NULL,
++    created_at      DATETIME(6) NOT NULL,
++    updated_at      DATETIME(6) NOT NULL,
++    PRIMARY KEY (id),
++    CONSTRAINT fk_pg_payment_member FOREIGN KEY (member_id) REFERENCES member (id),
++    -- 같은 멱등 키로 두 번 결제 요청을 남기지 않는 최종 방어선
++    UNIQUE KEY uk_pg_payment_idempotency_key (idempotency_key),
++    UNIQUE KEY uk_pg_payment_order_id (order_id),
++    -- 승인 전에는 NULL이다. MySQL UNIQUE는 NULL 여러 개를 허용한다.
++    UNIQUE KEY uk_pg_payment_payment_key (payment_key)
++) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/payment/PgPaymentStatus.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+/** UNKNOWN은 실패가 아니라 결과 불명이다. 콜백이나 PG 조회로만 확정한다. */
+public enum PgPaymentStatus {
+    REQUESTED, DONE, FAILED, UNKNOWN
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/payment/PgPaymentRepositoryTest.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import com.example.board.ApiTestSupport;
+import com.example.board.member.Member;
+import com.example.board.member.Role;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class PgPaymentRepositoryTest extends ApiTestSupport {
+
+    @Autowired
+    PgPaymentRepository repository;
+
+    @Autowired
+    TransactionTemplate tx;
+
+    PgPayment requested(Member m, String key) {
+        return repository.saveAndFlush(PgPayment.request(m, 5000, key, LocalDateTime.now()));
+    }
+
+    String key() {
+        return &quot;key-&quot; + UUID.randomUUID();
+    }
+
+    String status(PgPayment p) {
+        return jdbc.queryForObject(&quot;SELECT status FROM pg_payment WHERE id = ?&quot;, String.class, p.getId());
+    }
+
+    int done(PgPayment p) {
+        return tx.execute(s -&gt; repository.markDone(p.getId(), &quot;pk-&quot; + p.getOrderId(), LocalDateTime.now()));
+    }
+
+    int unknown(PgPayment p) {
+        return tx.execute(s -&gt; repository.markUnknown(p.getId(), LocalDateTime.now()));
+    }
+
+    int failed(PgPayment p) {
+        return tx.execute(s -&gt; repository.markFailed(p.getId(), null, LocalDateTime.now()));
+    }
+
+    @Test
+    void 요청_기록은_REQUESTED이고_order_id는_CHG_UUID다() {
+        PgPayment p = requested(newMember(Role.USER), key());
+
+        assertThat(status(p)).isEqualTo(&quot;REQUESTED&quot;);
+        assertThat(p.getOrderId()).matches(&quot;CHG-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}&quot;);
+        assertThat(p.getRequestedAt()).isNotNull();
+        assertThat(p.getPaymentKey()).isNull();
+    }
+
+    @Test
+    void 같은_idempotency_key로_두_번_저장하면_UNIQUE_위반이다() {
+        Member m = newMember(Role.USER);
+        String key = key();
+        requested(m, key);
+
+        assertThatThrownBy(() -&gt; requested(m, key)).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void 같은_payment_key는_두_결제에_쓸_수_없다() {
+        Member m = newMember(Role.USER);
+        PgPayment a = requested(m, key());
+        PgPayment b = requested(m, key());
+        tx.executeWithoutResult(s -&gt; repository.markDone(a.getId(), &quot;pk-dup&quot;, LocalDateTime.now()));
+
+        assertThatThrownBy(() -&gt; tx.executeWithoutResult(
+                s -&gt; repository.markDone(b.getId(), &quot;pk-dup&quot;, LocalDateTime.now())))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void DONE_전이는_REQUESTED나_UNKNOWN에서_한_번만_성공한다() {
+        Member m = newMember(Role.USER);
+        PgPayment p = requested(m, key());
+
+        int first = done(p);
+        int second = done(p);
+
+        assertThat(first).isEqualTo(1);
+        assertThat(second).isZero();
+        assertThat(status(p)).isEqualTo(&quot;DONE&quot;);
+
+        PgPayment unknown = requested(m, key());
+        assertThat(unknown(unknown)).isEqualTo(1);
+        assertThat(done(unknown)).isEqualTo(1);
+    }
+
+    @Test
+    void 이미_확정된_결제는_UNKNOWN이나_FAILED로_되돌아가지_않는다() {
+        PgPayment p = requested(newMember(Role.USER), key());
+        done(p);
+
+        assertThat(unknown(p)).isZero();
+        assertThat(failed(p)).isZero();
+        assertThat(status(p)).isEqualTo(&quot;DONE&quot;);
+    }
+}</code></pre>
+</details>
+
+</section>
+
+<section class="day-step" id="step-d08-3" data-step="D08-3">
+
+<h2 id="③-포인트-충전-api-트랜잭션을-나누고-pg-호출은-트랜잭션-밖에서"><a class="anchor" href="#③-포인트-충전-api-트랜잭션을-나누고-pg-호출은-트랜잭션-밖에서" aria-hidden="true">#</a>③ 포인트 충전 API: 트랜잭션을 나누고 PG 호출은 트랜잭션 밖에서</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/payment/ChargeRequest.java</code></li>
+<li><code>src/main/java/com/example/board/payment/ChargeService.java</code></li>
+<li><code>src/main/java/com/example/board/payment/ChargeController.java</code></li>
+</ul>
+<p><strong>겪을 것</strong> PG 호출을 <code>@Transactional</code> 안에서 하면 PG가 느릴 때 DB 커넥션을 쥔 채 기다려 Hikari 풀(10)이 바닥난다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li><code>POST /api/me/points/charges</code> + <code>Idempotency-Key</code> → 201, 잔액 증가</li>
+<li>WireMock 4초 지연 → 504 <code>/errors/pg-timeout</code>, <code>pg_payment.status</code> = <code>UNKNOWN</code>, 잔액 그대로</li>
+<li>WireMock 거절 → 502 <code>/errors/pg-declined</code></li>
+<li><code>amount</code> = 1500 → 400</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>POST /api/me/points/charges</code></a> (<a href="../spec-v2.html#5-5-포인트-충전pg-콜백">5-5. 포인트 충전·PG 콜백</a>)</p>
+<details class="step-hint" data-step="D08-3">
+<summary>막히면</summary>
+
+<ul>
+<li>&quot;요청 기록 저장(트랜잭션 1) → PG 호출(트랜잭션 없음) → 결과 반영(트랜잭션 2)&quot;로 나눈다. 같은 클래스 안에서 <code>@Transactional</code> 메서드를 부르면 프록시를 거치지 않는다는 점을 확인한다.</li>
+<li>트랜잭션 경계는 <code>logging.level.org.springframework.transaction=DEBUG</code>의 <code>Creating new transaction</code>·<code>Committing</code> 줄로 본다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D08-3" data-commits="b4922754d3b460e56a03b4165a5c3c3f0e87355d">
+<summary>정답 보기 · answer(D08-3) · board-server 파일 10개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/b4922754d3b460e56a03b4165a5c3c3f0e87355d" target="_blank" rel="noopener"><code>b4922754</code></a> — answer(D08-3): 포인트 충전 API, PG 호출은 트랜잭션 밖에서</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/payment/ChargeRequest.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+
+import com.example.board.common.MultipleOf;
+
+public record ChargeRequest(@NotNull @Min(1000) @Max(1000000) @MultipleOf(1000) Integer amount) {
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/payment/ChargeService.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import com.example.board.common.BusinessException;
+import com.example.board.common.ErrorCode;
+import com.example.board.member.MemberRepository;
+import com.example.board.point.PointService;
+
+/**
+ * 충전은 세 단계다: REQUESTED 저장(트랜잭션 1) → PG 승인(트랜잭션 밖) → 결과 반영(트랜잭션 2).
+ * 이 클래스에 @Transactional을 두지 않는다. 두면 PG를 기다리는 동안 DB 커넥션을 쥐어 Hikari 풀이 바닥난다.
+ */
+@Service
+public class ChargeService {
+
+    private static final ZoneId KST = ZoneId.of(&quot;Asia/Seoul&quot;);
+    private static final String REF_TYPE = &quot;PG_PAYMENT&quot;;
+
+    private final PgPaymentRepository paymentRepository;
+    private final MemberRepository memberRepository;
+    private final PointService pointService;
+    private final PgClient pgClient;
+    private final TransactionTemplate tx;
+
+    public ChargeService(PgPaymentRepository paymentRepository, MemberRepository memberRepository,
+            PointService pointService, PgClient pgClient, TransactionTemplate tx) {
+        this.paymentRepository = paymentRepository;
+        this.memberRepository = memberRepository;
+        this.pointService = pointService;
+        this.pgClient = pgClient;
+        this.tx = tx;
+    }
+
+    public ChargeResponse charge(Long memberId, String idempotencyKey, int amount) {
+        Started started = start(memberId, idempotencyKey, amount);
+        PgPayment payment = started.payment();
+        if (!started.fresh()) {
+            return replay(payment);
+        }
+
+        PgApproval approval;
+        try {
+            approval = pgClient.approve(payment.getOrderId(), amount, idempotencyKey);
+        } catch (PgException e) {
+            throw fail(payment, e);
+        }
+        return apply(payment, approval);
+    }
+
+    /** 트랜잭션 1: 호출 전에 REQUESTED를 커밋해 둔다. 같은 키가 이미 있으면 그 기록을 돌려준다. */
+    private Started start(Long memberId, String idempotencyKey, int amount) {
+        try {
+            return tx.execute(s -&gt; paymentRepository.findByIdempotencyKey(idempotencyKey)
+                    .map(existing -&gt; new Started(sameRequest(existing, memberId, amount), false))
+                    .orElseGet(() -&gt; new Started(paymentRepository.saveAndFlush(PgPayment.request(
+                            memberRepository.getReferenceById(memberId), amount, idempotencyKey, now())), true)));
+        } catch (DataIntegrityViolationException duplicateKey) {
+            // UNIQUE(idempotency_key) 위반 = 같은 키의 요청이 먼저 커밋됐다
+            return tx.execute(s -&gt; paymentRepository.findByIdempotencyKey(idempotencyKey)
+                    .map(existing -&gt; new Started(sameRequest(existing, memberId, amount), false))
+                    .orElseThrow(() -&gt; duplicateKey));
+        }
+    }
+
+    private PgPayment sameRequest(PgPayment existing, Long memberId, int amount) {
+        if (!existing.getMember().getId().equals(memberId) || existing.getAmount() != amount) {
+            throw new BusinessException(ErrorCode.IDEMPOTENCY_MISMATCH, &quot;같은 Idempotency-Key에 다른 요청 본문입니다.&quot;);
+        }
+        return existing;
+    }
+
+    /** 같은 키의 재요청은 PG를 다시 부르지 않는다. 결과 불명 건은 콜백·조회로만 확정한다. */
+    private ChargeResponse replay(PgPayment payment) {
+        return switch (payment.getStatus()) {
+            case DONE -&gt; response(payment);
+            case FAILED -&gt; throw declined(payment);
+            case REQUESTED, UNKNOWN -&gt; throw timeout(payment);
+        };
+    }
+
+    /** 트랜잭션 2: 승인 결과를 반영한다. */
+    private ChargeResponse apply(PgPayment payment, PgApproval approval) {
+        return switch (approval.status()) {
+            case DONE -&gt; tx.execute(s -&gt; {
+                settleDone(payment, approval.paymentKey());
+                return response(reload(payment));
+            });
+            case FAILED -&gt; {
+                tx.executeWithoutResult(s -&gt; paymentRepository.markFailed(payment.getId(), approval.paymentKey(), now()));
+                throw declined(payment);
+            }
+            case PENDING -&gt; tx.execute(s -&gt; {
+                paymentRepository.markUnknown(payment.getId(), now());
+                return response(reload(payment));
+            });
+        };
+    }
+
+    private BusinessException fail(PgPayment payment, PgException e) {
+        return switch (e.kind()) {
+            // 요청을 보냈지만 답을 못 받았다. 실패로 단정하지 않는다.
+            case TIMEOUT -&gt; {
+                markUnknown(payment);
+                yield timeout(payment);
+            }
+            case SERVER_ERROR -&gt; {
+                markUnknown(payment);
+                yield declined(payment);
+            }
+            // PG에 닿지 않았거나 PG가 명시적으로 거절했다
+            case UNREACHABLE, POOL_TIMEOUT, DECLINED -&gt; {
+                tx.executeWithoutResult(s -&gt; paymentRepository.markFailed(payment.getId(), null, now()));
+                yield declined(payment);
+            }
+        };
+    }
+
+    /** 영향 행 수 1일 때만 적립한다. 승인 응답·콜백·조회 중 먼저 온 하나만 1을 받는다. */
+    void settleDone(PgPayment payment, String paymentKey) {
+        if (paymentRepository.markDone(payment.getId(), paymentKey, now()) == 1) {
+            pointService.charge(payment.getMember().getId(), payment.getAmount(), REF_TYPE, payment.getId());
+        }
+    }
+
+    private void markUnknown(PgPayment payment) {
+        tx.executeWithoutResult(s -&gt; paymentRepository.markUnknown(payment.getId(), now()));
+    }
+
+    private PgPayment reload(PgPayment payment) {
+        return paymentRepository.findById(payment.getId()).orElseThrow();
+    }
+
+    private ChargeResponse response(PgPayment payment) {
+        Long memberId = payment.getMember().getId();
+        return new ChargeResponse(payment.getOrderId(), payment.getAmount(), payment.getStatus(),
+                pointService.getBalance(memberId));
+    }
+
+    private static BusinessException timeout(PgPayment payment) {
+        return new BusinessException(ErrorCode.PG_TIMEOUT,
+                &quot;PG 응답을 받지 못했습니다. 결과를 확인 중입니다. orderId=&quot; + payment.getOrderId());
+    }
+
+    private static BusinessException declined(PgPayment payment) {
+        return new BusinessException(ErrorCode.PG_DECLINED, &quot;PG 승인에 실패했습니다. orderId=&quot; + payment.getOrderId());
+    }
+
+    private static LocalDateTime now() {
+        return LocalDateTime.now(KST);
+    }
+
+    private record Started(PgPayment payment, boolean fresh) {
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/payment/ChargeController.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.board.member.AuthMember;
+
+@RestController
+public class ChargeController {
+
+    private final ChargeService chargeService;
+
+    public ChargeController(ChargeService chargeService) {
+        this.chargeService = chargeService;
+    }
+
+    @PostMapping(&quot;/api/me/points/charges&quot;)
+    public ResponseEntity&lt;ChargeResponse&gt; charge(@AuthenticationPrincipal AuthMember auth,
+            @RequestHeader(&quot;Idempotency-Key&quot;) @Pattern(regexp = &quot;[A-Za-z0-9-]{8,64}&quot;) String idempotencyKey,
+            @Valid @RequestBody ChargeRequest request) {
+        ChargeResponse response = chargeService.charge(auth.id(), idempotencyKey, request.amount());
+        // PG가 PENDING으로 답하면 아직 확정 전이라 202다
+        HttpStatus status = response.status() == PgPaymentStatus.DONE ? HttpStatus.CREATED : HttpStatus.ACCEPTED;
+        return ResponseEntity.status(status).body(response);
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/common/MultipleOf.java</code></p>
+<pre><code class="language-java">package com.example.board.common;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+import jakarta.validation.Constraint;
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.ConstraintValidatorContext;
+import jakarta.validation.Payload;
+
+/** 정수가 value의 배수인지 본다. null은 @NotNull에 맡긴다. */
+@Target({ElementType.FIELD, ElementType.RECORD_COMPONENT, ElementType.PARAMETER})
+@Retention(RetentionPolicy.RUNTIME)
+@Constraint(validatedBy = MultipleOf.Validator.class)
+public @interface MultipleOf {
+
+    int value();
+
+    String message() default &quot;{value}의 배수여야 합니다&quot;;
+
+    Class&lt;?&gt;[] groups() default {};
+
+    Class&lt;? extends Payload&gt;[] payload() default {};
+
+    class Validator implements ConstraintValidator&lt;MultipleOf, Integer&gt; {
+
+        private int divisor;
+
+        @Override
+        public void initialize(MultipleOf annotation) {
+            this.divisor = annotation.value();
+        }
+
+        @Override
+        public boolean isValid(Integer value, ConstraintValidatorContext context) {
+            return value == null || value % divisor == 0;
+        }
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/payment/ChargeResponse.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+public record ChargeResponse(String orderId, int amount, PgPaymentStatus status, long balance) {
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/point/PointService.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -33,6 +33,15 @@ public class PointService {
+         record(memberId, PointLedgerType.EARN, amount, refType, refId);
+     }
+ 
++    /** PG 승인이 확정된 충전 적립. 호출자가 같은 결제로 두 번 부르지 않도록 상태 전이로 막는다. */
++    @Transactional
++    public void charge(Long memberId, int amount, String refType, Long refId) {
++        if (memberRepository.addBalance(memberId, amount) == 0) {
++            throw new BusinessException(ErrorCode.NOT_FOUND, &quot;회원을 찾을 수 없습니다.&quot;);
++        }
++        record(memberId, PointLedgerType.CHARGE, amount, refType, refId);
++    }
++
+     @Transactional
+     public void spend(Long memberId, int amount, String refType, Long refId) {
+         if (memberRepository.subtractBalanceIfEnough(memberId, amount) == 0) {</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/PgContainers.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -88,6 +88,26 @@ public final class PgContainers {
+         admin(&quot;POST&quot;, &quot;/__admin/mappings&quot;, mappingJson);
+     }
+ 
++    /** 승인을 millis만큼 늦게 DONE으로 돌려준다. paymentKey는 파일 스텁과 같은 규칙(pk-{orderId})이다. */
++    public static void stubApproveDelay(int millis) {
++        stub(&quot;&quot;&quot;
++                {&quot;priority&quot;:1,&quot;request&quot;:{&quot;method&quot;:&quot;POST&quot;,&quot;urlPath&quot;:&quot;/pg/v1/payments&quot;},
++                 &quot;response&quot;:{&quot;status&quot;:200,&quot;fixedDelayMilliseconds&quot;:%d,&quot;headers&quot;:{&quot;Content-Type&quot;:&quot;application/json&quot;},
++                  &quot;body&quot;:&quot;{\\&quot;paymentKey\\&quot;:\\&quot;pk-{{jsonPath request.body '$.orderId'}}\\&quot;,\\&quot;status\\&quot;:\\&quot;DONE\\&quot;,\\&quot;amount\\&quot;:{{jsonPath request.body '$.amount'}},\\&quot;approvedAt\\&quot;:\\&quot;{{now}}\\&quot;}&quot;,
++                  &quot;transformers&quot;:[&quot;response-template&quot;]}}
++                &quot;&quot;&quot;.formatted(millis));
++    }
++
++    /** GET /pg/v1/payments?orderId= 조회가 DONE을 돌려주게 한다. */
++    public static void stubLookupDone(String orderId, int amount) {
++        stub(&quot;&quot;&quot;
++                {&quot;priority&quot;:1,&quot;request&quot;:{&quot;method&quot;:&quot;GET&quot;,&quot;urlPath&quot;:&quot;/pg/v1/payments&quot;,
++                  &quot;queryParameters&quot;:{&quot;orderId&quot;:{&quot;equalTo&quot;:&quot;%s&quot;}}},
++                 &quot;response&quot;:{&quot;status&quot;:200,&quot;headers&quot;:{&quot;Content-Type&quot;:&quot;application/json&quot;},
++                  &quot;jsonBody&quot;:{&quot;paymentKey&quot;:&quot;pk-%s&quot;,&quot;status&quot;:&quot;DONE&quot;,&quot;amount&quot;:%d,&quot;approvedAt&quot;:&quot;2026-10-22T09:30:00+09:00&quot;}}}
++                &quot;&quot;&quot;.formatted(orderId, orderId, amount));
++    }
++
+     /** POST /pg/v1/payments 로 받은 요청의 Idempotency-Key 목록(받은 순서). */
+     public static List&lt;String&gt; approveIdempotencyKeys() {
+         JsonNode found = JSON.readTree(admin(&quot;POST&quot;, &quot;/__admin/requests/find&quot;,</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/payment/ChargeApiTest.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import org.junit.jupiter.api.Test;
+
+import com.example.board.PgContainers;
+import com.example.board.member.Member;
+import com.example.board.member.Role;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+class ChargeApiTest extends PgApiTestSupport {
+
+    @Test
+    void 충전하면_201이고_잔액이_늘며_연계_로그는_DONE() throws Exception {
+        Member m = newMember(Role.USER);
+        String key = newKey();
+
+        charge(m, key, 5000)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath(&quot;$.orderId&quot;).value(orderId(key)))
+                .andExpect(jsonPath(&quot;$.amount&quot;).value(5000))
+                .andExpect(jsonPath(&quot;$.status&quot;).value(&quot;DONE&quot;))
+                .andExpect(jsonPath(&quot;$.balance&quot;).value(5000));
+
+        assertThat(balance(m)).isEqualTo(5000);
+        assertThat(paymentStatus(key)).isEqualTo(&quot;DONE&quot;);
+        assertThat(chargeLedgers(m)).isEqualTo(1);
+        assertThat(PgContainers.approveIdempotencyKeys()).containsExactly(key);
+    }
+
+    @Test
+    void PG가_4초_늦으면_504이고_UNKNOWN으로_남고_잔액은_그대로() throws Exception {
+        PgContainers.stubApproveDelay(4000);
+        Member m = newMember(Role.USER);
+        String key = newKey();
+
+        charge(m, key, 5000)
+                .andExpect(status().isGatewayTimeout())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/pg-timeout&quot;));
+
+        assertThat(paymentStatus(key)).isEqualTo(&quot;UNKNOWN&quot;);
+        assertThat(balance(m)).isZero();
+    }
+
+    @Test
+    void PG가_거절하면_502이고_FAILED() throws Exception {
+        Member m = newMember(Role.USER);
+        String key = newKey();
+
+        // 파일 스텁: 금액 999000은 항상 거절(400)
+        charge(m, key, 999000)
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/pg-declined&quot;));
+
+        assertThat(paymentStatus(key)).isEqualTo(&quot;FAILED&quot;);
+        assertThat(balance(m)).isZero();
+    }
+
+    @Test
+    void 금액이_1000_단위가_아니거나_범위_밖이면_400() throws Exception {
+        Member m = newMember(Role.USER);
+
+        for (int amount : new int[] {1500, 999, 0, 1001000}) {
+            charge(m, newKey(), amount)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/validation&quot;))
+                    .andExpect(jsonPath(&quot;$.errors[0].field&quot;).value(&quot;amount&quot;));
+        }
+        assertThat(PgContainers.approveRequestCount()).isZero();
+    }
+
+    @Test
+    void Idempotency_Key가_없거나_형식이_틀리면_400() throws Exception {
+        Member m = newMember(Role.USER);
+
+        charge(m, null, 5000).andExpect(status().isBadRequest());
+        charge(m, &quot;short&quot;, 5000).andExpect(status().isBadRequest())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/validation&quot;));
+    }
+
+    @Test
+    void 같은_키로_다시_보내면_처음_결과를_돌려주고_PG는_한_번만_부른다() throws Exception {
+        Member m = newMember(Role.USER);
+        String key = newKey();
+        charge(m, key, 5000).andExpect(status().isCreated());
+
+        charge(m, key, 5000)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath(&quot;$.orderId&quot;).value(orderId(key)))
+                .andExpect(jsonPath(&quot;$.status&quot;).value(&quot;DONE&quot;));
+
+        assertThat(balance(m)).isEqualTo(5000);
+        assertThat(PgContainers.approveRequestCount()).isEqualTo(1);
+    }
+
+    @Test
+    void 같은_키에_다른_금액이면_422() throws Exception {
+        Member m = newMember(Role.USER);
+        String key = newKey();
+        charge(m, key, 5000).andExpect(status().isCreated());
+
+        charge(m, key, 6000).andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void 로그인하지_않으면_401() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post(&quot;/api/me/points/charges&quot;).contentType(&quot;application/json&quot;).content(&quot;{\&quot;amount\&quot;:5000}&quot;)
+                        .header(&quot;Idempotency-Key&quot;, newKey()))
+                .andExpect(status().isUnauthorized());
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/payment/ChargeTransactionBoundaryTest.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+import javax.sql.DataSource;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.web.servlet.MvcResult;
+
+import com.example.board.PgContainers;
+import com.example.board.member.Member;
+import com.example.board.member.Role;
+import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class ChargeTransactionBoundaryTest extends PgApiTestSupport {
+
+    @Autowired
+    DataSource dataSource;
+
+    @Test
+    void PG를_기다리는_동안_DB_커넥션을_쥐지_않는다() throws Exception {
+        PgContainers.stubApproveDelay(1500);
+        HikariPoolMXBean pool = dataSource.unwrap(HikariDataSource.class).getHikariPoolMXBean();
+        Member m = newMember(Role.USER);
+        String key = newKey();
+
+        CompletableFuture&lt;MvcResult&gt; inFlight = CompletableFuture.supplyAsync(() -&gt; {
+            try {
+                return charge(m, key, 5000).andReturn();
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        // PG가 요청을 받은 뒤(= 지연 구간)부터 활성 커넥션 수를 잰다
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        while (PgContainers.approveRequestCount() == 0 &amp;&amp; System.nanoTime() &lt; deadline) {
+            Thread.onSpinWait();
+        }
+        int maxActive = 0;
+        for (int i = 0; i &lt; 10; i++) {
+            maxActive = Math.max(maxActive, pool.getActiveConnections());
+            Thread.sleep(50);
+        }
+
+        assertThat(inFlight.get(5, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(201);
+        assertThat(PgContainers.approveRequestCount()).isEqualTo(1);
+        assertThat(maxActive).as(&quot;PG 지연 중 Hikari active&quot;).isZero();
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/payment/PgApiTestSupport.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.util.UUID;
+
+import org.junit.jupiter.api.AfterEach;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.ResultActions;
+
+import com.example.board.ApiTestSupport;
+import com.example.board.PgContainers;
+import com.example.board.member.Member;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+
+/** 충전·콜백 테스트 공통. 테스트마다 PG 모의의 지연·임시 스텁·요청 기록을 지운다. */
+abstract class PgApiTestSupport extends ApiTestSupport {
+
+    @AfterEach
+    void resetPg() {
+        PgContainers.reset();
+    }
+
+    String newKey() {
+        return UUID.randomUUID().toString();
+    }
+
+    ResultActions charge(Member m, String key, int amount) throws Exception {
+        return charge(m, key, &quot;{\&quot;amount\&quot;:&quot; + amount + &quot;}&quot;);
+    }
+
+    ResultActions charge(Member m, String key, String body) throws Exception {
+        var req = post(&quot;/api/me/points/charges&quot;).contentType(MediaType.APPLICATION_JSON).content(body)
+                .header(&quot;Authorization&quot;, bearer(m));
+        if (key != null) {
+            req = req.header(&quot;Idempotency-Key&quot;, key);
+        }
+        return mockMvc.perform(req);
+    }
+
+    long balance(Member m) {
+        return jdbc.queryForObject(&quot;SELECT point_balance FROM member WHERE id = ?&quot;, Long.class, m.getId());
+    }
+
+    int chargeLedgers(Member m) {
+        return jdbc.queryForObject(&quot;SELECT COUNT(*) FROM point_ledger WHERE member_id = ? AND type = 'CHARGE'&quot;,
+                Integer.class, m.getId());
+    }
+
+    String paymentStatus(String key) {
+        return jdbc.queryForObject(&quot;SELECT status FROM pg_payment WHERE idempotency_key = ?&quot;, String.class, key);
+    }
+
+    String orderId(String key) {
+        return jdbc.queryForObject(&quot;SELECT order_id FROM pg_payment WHERE idempotency_key = ?&quot;, String.class, key);
+    }
+}</code></pre>
+</details>
+
+</section>
+
+<section class="day-step" id="step-d08-4" data-step="D08-4">
+
+<h2 id="④-재시도와-백오프-무엇을-다시-보내고-무엇을-보내지-않는가"><a class="anchor" href="#④-재시도와-백오프-무엇을-다시-보내고-무엇을-보내지-않는가" aria-hidden="true">#</a>④ 재시도와 백오프: 무엇을 다시 보내고 무엇을 보내지 않는가</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/payment/PgRetryPolicy.java</code></li>
+<li><code>src/test/java/com/example/board/payment/PgClientRetryTest.java</code></li>
+</ul>
+<p><strong>겪을 것</strong> &quot;우리는 타임아웃인데 PG는 승인 완료&quot;일 수 있으므로 타임아웃을 실패로 단정하거나 멱등 키 없이 재시도하면 두 번 결제된다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li><code>PgClientRetryTest</code> 통과: 연결 실패만 같은 <code>Idempotency-Key</code>로 최대 2회 재시도(백오프 200ms·400ms), 거절은 재시도하지 않는다</li>
+<li>응답 타임아웃 건은 재시도 대신 <code>UNKNOWN</code>으로 남는다</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>POST /api/me/points/charges</code></a> (<a href="../spec-v2.html#5-5-포인트-충전pg-콜백">5-5. 포인트 충전·PG 콜백</a>)</p>
+<details class="step-hint" data-step="D08-4">
+<summary>막히면</summary>
+
+<ul>
+<li>재시도 대상은 연결 실패(요청이 PG에 닿지 않은 경우)만이다. 응답 타임아웃은 PG가 처리했을 수 있으니 <code>GET /pg/v1/payments?orderId=</code>로 결과를 확인하는 쪽으로 간다.</li>
+<li>백오프 간격과 최대 시도 횟수는 상수로 두고, 재시도 대상 여부는 예외 타입(연결 실패·응답 타임아웃·거절)으로 나눈다. 테스트는 WireMock 시나리오(<code>inScenario</code>)로 &quot;처음 실패, 다음 성공&quot;을 만든다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D08-4" data-commits="2790da3dc7b150bfa349772c38a0a09f60a9f6a8">
+<summary>정답 보기 · answer(D08-4) · board-server 파일 8개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/2790da3dc7b150bfa349772c38a0a09f60a9f6a8" target="_blank" rel="noopener"><code>2790da3d</code></a> — answer(D08-4): 재시도와 백오프, 결과 불명 건은 orderId 조회로 확정</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/payment/PgRetryPolicy.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
+
+/**
+ * 연결 실패와 5xx만 다시 보낸다. 최대 3회(첫 시도 포함), 백오프 200ms·400ms + 지터 0~100ms.
+ * 응답 타임아웃은 PG가 이미 승인했을 수 있으므로 재시도하지 않고 결과 불명으로 넘긴다.
+ * 4xx 거절은 같은 요청이 같은 실패를 내므로 재시도하지 않는다.
+ */
+public class PgRetryPolicy {
+
+    private static final int DEFAULT_MAX_ATTEMPTS = 3;
+    private static final long[] BACKOFF_MILLIS = {200, 400};
+    private static final int MAX_JITTER_MILLIS = 100;
+
+    private final int maxAttempts;
+
+    public PgRetryPolicy() {
+        this(DEFAULT_MAX_ATTEMPTS);
+    }
+
+    public PgRetryPolicy(int maxAttempts) {
+        if (maxAttempts &lt; 1 || maxAttempts &gt; BACKOFF_MILLIS.length + 1) {
+            throw new IllegalArgumentException(&quot;maxAttempts: &quot; + maxAttempts);
+        }
+        this.maxAttempts = maxAttempts;
+    }
+
+    public &lt;T&gt; T execute(Supplier&lt;T&gt; call) {
+        for (int attempt = 1;; attempt++) {
+            try {
+                return call.get();
+            } catch (PgException e) {
+                if (!retryable(e) || attempt &gt;= maxAttempts) {
+                    throw e;
+                }
+                sleep(BACKOFF_MILLIS[attempt - 1] + ThreadLocalRandom.current().nextInt(MAX_JITTER_MILLIS + 1), e);
+            }
+        }
+    }
+
+    static boolean retryable(PgException e) {
+        return e.kind() == PgException.Kind.UNREACHABLE || e.kind() == PgException.Kind.SERVER_ERROR;
+    }
+
+    private static void sleep(long millis, PgException last) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw last;
+        }
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/payment/PgClientRetryTest.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.time.Duration;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+import com.example.board.PgContainers;
+import com.example.board.config.BoardProperties;
+import com.example.board.config.PgClientConfig;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
+
+class PgClientRetryTest {
+
+    @BeforeAll
+    static void up() {
+        PgContainers.start();
+    }
+
+    @AfterEach
+    void reset() {
+        PgContainers.reset();
+    }
+
+    PgClient client() {
+        BoardProperties.Pg pg = new BoardProperties.Pg(PgContainers.baseUrl(), Duration.ofSeconds(1),
+                Duration.ofSeconds(3), Duration.ofSeconds(2), 10);
+        return new PgClient(PgClientConfig.pgRestClient(pg), new PgRetryPolicy());
+    }
+
+    String orderId() {
+        return &quot;CHG-&quot; + UUID.randomUUID();
+    }
+
+    void stubStatusSequence(int first, int second) {
+        PgContainers.stub(scenario(&quot;Started&quot;, &quot;second&quot;, first));
+        PgContainers.stub(scenario(&quot;second&quot;, &quot;third&quot;, second));
+        PgContainers.stub(&quot;&quot;&quot;
+                {&quot;priority&quot;:1,&quot;scenarioName&quot;:&quot;retry&quot;,&quot;requiredScenarioState&quot;:&quot;third&quot;,
+                 &quot;request&quot;:{&quot;method&quot;:&quot;POST&quot;,&quot;urlPath&quot;:&quot;/pg/v1/payments&quot;},
+                 &quot;response&quot;:{&quot;status&quot;:200,&quot;headers&quot;:{&quot;Content-Type&quot;:&quot;application/json&quot;},
+                  &quot;jsonBody&quot;:{&quot;paymentKey&quot;:&quot;pk-retry&quot;,&quot;status&quot;:&quot;DONE&quot;,&quot;amount&quot;:1000}}}
+                &quot;&quot;&quot;);
+    }
+
+    String scenario(String state, String next, int status) {
+        return &quot;&quot;&quot;
+                {&quot;priority&quot;:1,&quot;scenarioName&quot;:&quot;retry&quot;,&quot;requiredScenarioState&quot;:&quot;%s&quot;,&quot;newScenarioState&quot;:&quot;%s&quot;,
+                 &quot;request&quot;:{&quot;method&quot;:&quot;POST&quot;,&quot;urlPath&quot;:&quot;/pg/v1/payments&quot;},&quot;response&quot;:{&quot;status&quot;:%d}}
+                &quot;&quot;&quot;.formatted(state, next, status);
+    }
+
+    long millisSince(long start) {
+        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+    }
+
+    @Test
+    void _503_두_번_뒤_200이면_성공하고_PG는_같은_키로_3번_받는다() {
+        stubStatusSequence(503, 503);
+        long start = System.nanoTime();
+
+        PgApproval approval = client().approve(orderId(), 1000, &quot;key-retry-503&quot;);
+
+        assertThat(approval.status()).isEqualTo(PgApproval.Status.DONE);
+        assertThat(PgContainers.approveIdempotencyKeys()).containsExactly(&quot;key-retry-503&quot;, &quot;key-retry-503&quot;,
+                &quot;key-retry-503&quot;);
+        // 백오프 200ms + 400ms (+ 지터 0~100ms씩)
+        assertThat(millisSince(start)).isGreaterThanOrEqualTo(600L);
+    }
+
+    @Test
+    void _5xx가_계속되면_3번_보내고_포기한다() {
+        stubStatusSequence(500, 500);
+        PgContainers.stub(&quot;&quot;&quot;
+                {&quot;priority&quot;:0,&quot;scenarioName&quot;:&quot;retry&quot;,&quot;requiredScenarioState&quot;:&quot;third&quot;,
+                 &quot;request&quot;:{&quot;method&quot;:&quot;POST&quot;,&quot;urlPath&quot;:&quot;/pg/v1/payments&quot;},&quot;response&quot;:{&quot;status&quot;:500}}
+                &quot;&quot;&quot;);
+
+        PgException e = catchThrowableOfType(PgException.class, () -&gt; client().approve(orderId(), 1000, &quot;key-5xx-1&quot;));
+
+        assertThat(e.kind()).isEqualTo(PgException.Kind.SERVER_ERROR);
+        assertThat(PgContainers.approveRequestCount()).isEqualTo(3);
+    }
+
+    @Test
+    void 거절_400은_재시도하지_않는다() {
+        // 파일 스텁: 금액 999000은 항상 거절(400)
+        PgException e = catchThrowableOfType(PgException.class,
+                () -&gt; client().approve(orderId(), 999000, &quot;key-declined-1&quot;));
+
+        assertThat(e.kind()).isEqualTo(PgException.Kind.DECLINED);
+        assertThat(PgContainers.approveRequestCount()).isEqualTo(1);
+    }
+
+    @Test
+    void 응답_타임아웃은_재시도하지_않는다() {
+        PgContainers.stubApproveDelay(4000);
+        long start = System.nanoTime();
+
+        PgException e = catchThrowableOfType(PgException.class,
+                () -&gt; client().approve(orderId(), 1000, &quot;key-timeout-2&quot;));
+
+        assertThat(e.kind()).isEqualTo(PgException.Kind.TIMEOUT);
+        assertThat(millisSince(start)).isLessThan(3800L);
+        assertThat(PgContainers.approveRequestCount()).isEqualTo(1);
+    }
+
+    @Test
+    void 연결_실패는_재시도하고_복구되면_성공한다() throws Exception {
+        PgContainers.proxy().disable();
+        long start = System.nanoTime();
+        CompletableFuture&lt;PgApproval&gt; call = CompletableFuture.supplyAsync(
+                () -&gt; client().approve(orderId(), 1000, &quot;key-reconnect-1&quot;));
+        Thread.sleep(100);
+        PgContainers.proxy().enable();
+
+        PgApproval approval = call.get(5, TimeUnit.SECONDS);
+
+        assertThat(approval.status()).isEqualTo(PgApproval.Status.DONE);
+        // 첫 시도는 PG에 닿지 않았으므로 PG가 받은 요청은 1번이다
+        assertThat(PgContainers.approveIdempotencyKeys()).containsExactly(&quot;key-reconnect-1&quot;);
+        assertThat(millisSince(start)).isGreaterThanOrEqualTo(200L);
+    }
+
+    @Test
+    void 연결_실패가_계속되면_백오프_후_3번째에_포기한다() throws Exception {
+        PgContainers.proxy().disable();
+        long start = System.nanoTime();
+
+        PgException e = catchThrowableOfType(PgException.class,
+                () -&gt; client().approve(orderId(), 1000, &quot;key-unreachable-1&quot;));
+
+        assertThat(e.kind()).isEqualTo(PgException.Kind.UNREACHABLE);
+        assertThat(millisSince(start)).isBetween(600L, 1500L);
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/config/PgClientConfig.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -6,6 +6,7 @@ import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+ import org.apache.hc.client5.http.impl.classic.HttpClients;
+ import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+ import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
++import org.apache.hc.core5.util.TimeValue;
+ import org.apache.hc.core5.util.Timeout;
+ import org.springframework.context.annotation.Bean;
+ import org.springframework.context.annotation.Configuration;
+@@ -13,13 +14,14 @@ import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+ import org.springframework.web.client.RestClient;
+ 
+ import com.example.board.payment.PgClient;
++import com.example.board.payment.PgRetryPolicy;
+ 
+ @Configuration(proxyBeanMethods = false)
+ public class PgClientConfig {
+ 
+     @Bean
+     PgClient pgClient(BoardProperties properties) {
+-        return new PgClient(pgRestClient(properties.pg()));
++        return new PgClient(pgRestClient(properties.pg()), new PgRetryPolicy());
+     }
+ 
+     /** 연결·응답·풀 대기 타임아웃을 따로 건다. 테스트가 풀 크기를 바꿔 만들 수 있게 정적 메서드로 둔다. */
+@@ -28,6 +30,8 @@ public class PgClientConfig {
+                 .setDefaultConnectionConfig(ConnectionConfig.custom()
+                         .setConnectTimeout(Timeout.of(pg.connectTimeout()))
+                         .setSocketTimeout(Timeout.of(pg.responseTimeout()))
++                        // PG가 먼저 끊은 keep-alive 커넥션에 요청을 쓰면 &quot;응답 없음&quot;(결과 불명)이 된다. 빌려줄 때마다 끊김을 확인한다.
++                        .setValidateAfterInactivity(TimeValue.ZERO_MILLISECONDS)
+                         .build())
+                 .setMaxConnTotal(pg.maxConnections())
+                 .setMaxConnPerRoute(pg.maxConnections())</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/payment/ChargeService.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -53,6 +53,28 @@ public class ChargeService {
+         return apply(payment, approval);
+     }
+ 
++    /**
++     * 결과 불명 건을 PG 조회로 확정한다(재처리 워커가 부른다). 추측으로 정하지 않고, PG에 없으면 그대로 둔다.
++     * 조회도 외부 호출이라 트랜잭션 밖에서 한다.
++     */
++    public PgPaymentStatus reconcile(String orderId) {
++        PgPayment payment = tx.execute(s -&gt; paymentRepository.findByOrderId(orderId))
++                .orElseThrow(() -&gt; new BusinessException(ErrorCode.NOT_FOUND, &quot;충전 기록이 없습니다.&quot;));
++        if (payment.getStatus() == PgPaymentStatus.DONE || payment.getStatus() == PgPaymentStatus.FAILED) {
++            return payment.getStatus();
++        }
++        pgClient.findByOrderId(orderId).ifPresent(found -&gt; tx.executeWithoutResult(s -&gt; {
++            switch (found.status()) {
++                case DONE -&gt; settleDone(payment, found.paymentKey());
++                case FAILED -&gt; paymentRepository.markFailed(payment.getId(), found.paymentKey(), now());
++                case PENDING -&gt; {
++                    // 아직 PG도 처리 중이다
++                }
++            }
++        }));
++        return tx.execute(s -&gt; reload(payment).getStatus());
++    }
++
+     /** 트랜잭션 1: 호출 전에 REQUESTED를 커밋해 둔다. 같은 키가 이미 있으면 그 기록을 돌려준다. */
+     private Started start(Long memberId, String idempotencyKey, int amount) {
+         try {</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/payment/PgClient.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -3,6 +3,8 @@ package com.example.board.payment;
+ import java.net.ConnectException;
+ import java.net.NoRouteToHostException;
+ import java.net.UnknownHostException;
++import java.util.Optional;
++import java.util.function.Supplier;
+ 
+ import org.apache.hc.client5.http.ConnectTimeoutException;
+ import org.apache.hc.core5.http.ConnectionRequestTimeoutException;
+@@ -15,19 +17,40 @@ import org.springframework.web.client.RestClient;
+ public class PgClient {
+ 
+     private final RestClient restClient;
++    private final PgRetryPolicy retryPolicy;
+ 
+-    public PgClient(RestClient restClient) {
++    public PgClient(RestClient restClient, PgRetryPolicy retryPolicy) {
+         this.restClient = restClient;
++        this.retryPolicy = retryPolicy;
+     }
+ 
++    /** 재시도해도 같은 Idempotency-Key를 보내므로 PG는 처음 결과를 돌려준다(이중 승인 없음). */
+     public PgApproval approve(String orderId, int amount, String idempotencyKey) {
++        return retryPolicy.execute(() -&gt; call(() -&gt; restClient.post()
++                .uri(&quot;/pg/v1/payments&quot;)
++                .header(&quot;Idempotency-Key&quot;, idempotencyKey)
++                .body(new ApproveRequest(orderId, amount))
++                .retrieve()
++                .body(PgApproval.class)));
++    }
++
++    /** 응답을 못 받은 건의 결과를 우리 orderId로 확인한다. PG에 없으면 비어 있다. */
++    public Optional&lt;PgApproval&gt; findByOrderId(String orderId) {
++        return retryPolicy.execute(() -&gt; call(() -&gt; {
++            try {
++                return Optional.ofNullable(restClient.get()
++                        .uri(b -&gt; b.path(&quot;/pg/v1/payments&quot;).queryParam(&quot;orderId&quot;, orderId).build())
++                        .retrieve()
++                        .body(PgApproval.class));
++            } catch (HttpClientErrorException.NotFound notFound) {
++                return Optional.empty();
++            }
++        }));
++    }
++
++    private static &lt;T&gt; T call(Supplier&lt;T&gt; request) {
+         try {
+-            return restClient.post()
+-                    .uri(&quot;/pg/v1/payments&quot;)
+-                    .header(&quot;Idempotency-Key&quot;, idempotencyKey)
+-                    .body(new ApproveRequest(orderId, amount))
+-                    .retrieve()
+-                    .body(PgApproval.class);
++            return request.get();
+         } catch (RuntimeException e) {
+             throw translate(e);
+         }</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/PgContainers.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -16,7 +16,6 @@ import org.testcontainers.utility.MountableFile;
+ 
+ import eu.rekawek.toxiproxy.Proxy;
+ import eu.rekawek.toxiproxy.ToxiproxyClient;
+-import eu.rekawek.toxiproxy.model.Toxic;
+ import tools.jackson.databind.JsonNode;
+ import tools.jackson.databind.json.JsonMapper;
+ 
+@@ -39,6 +38,7 @@ public final class PgContainers {
+     private static final HttpClient HTTP = HttpClient.newHttpClient();
+     private static final JsonMapper JSON = JsonMapper.builder().build();
+ 
++    private static ToxiproxyClient toxiproxyClient;
+     private static Proxy proxy;
+ 
+     private PgContainers() {
+@@ -50,14 +50,32 @@ public final class PgContainers {
+         }
+         WIREMOCK.start();
+         TOXIPROXY.start();
++        toxiproxyClient = new ToxiproxyClient(TOXIPROXY.getHost(), TOXIPROXY.getControlPort());
++        createProxy();
++    }
++
++    private static void createProxy() {
+         try {
+-            proxy = new ToxiproxyClient(TOXIPROXY.getHost(), TOXIPROXY.getControlPort())
+-                    .createProxy(&quot;pg&quot;, &quot;0.0.0.0:&quot; + PROXY_PORT, &quot;wiremock:8080&quot;);
++            proxy = toxiproxyClient.createProxy(&quot;pg&quot;, &quot;0.0.0.0:&quot; + PROXY_PORT, &quot;wiremock:8080&quot;);
+         } catch (IOException e) {
+             throw new IllegalStateException(e);
+         }
+     }
+ 
++    /**
++     * 지연 독성(toxic)을 걷고 프록시를 다시 연다. 지연 중인 연결이 남아 있으면 toxic 삭제가 지연 시간만큼 막히므로
++     * 프록시째 지우고 같은 포트로 다시 만든다.
++     */
++    public static synchronized void healProxy() {
++        start();
++        try {
++            proxy.delete();
++        } catch (IOException e) {
++            throw new IllegalStateException(e);
++        }
++        createProxy();
++    }
++
+     /** 서버가 쓰는 PG 주소(Toxiproxy 경유). */
+     public static String baseUrl() {
+         start();
+@@ -71,15 +89,7 @@ public final class PgContainers {
+ 
+     /** 테스트마다 지연 주입·임시 스텁·요청 기록을 지우고 파일 스텁만 남긴다. */
+     public static void reset() {
+-        start();
+-        try {
+-            for (Toxic toxic : proxy.toxics().getAll()) {
+-                toxic.remove();
+-            }
+-            proxy.enable();
+-        } catch (IOException e) {
+-            throw new IllegalStateException(e);
+-        }
++        healProxy();
+         admin(&quot;POST&quot;, &quot;/__admin/reset&quot;, &quot;&quot;);
+     }
+ </code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/payment/PgClientTest.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -31,7 +31,8 @@ class PgClientTest {
+     PgClient client(String baseUrl, int maxConnections) {
+         BoardProperties.Pg pg = new BoardProperties.Pg(baseUrl, Duration.ofSeconds(1), Duration.ofSeconds(3),
+                 Duration.ofSeconds(2), maxConnections);
+-        return new PgClient(PgClientConfig.pgRestClient(pg));
++        // 타임아웃 자체만 보려고 재시도는 끈다(재시도는 PgClientRetryTest)
++        return new PgClient(PgClientConfig.pgRestClient(pg), new PgRetryPolicy(1));
+     }
+ 
+     String orderId() {
+@@ -58,6 +59,18 @@ class PgClientTest {
+         assertThat(PgContainers.approveIdempotencyKeys()).containsExactly(&quot;key-&quot; + orderId);
+     }
+ 
++    @Test
++    void PG가_끊은_keep_alive_커넥션은_버리고_새로_연결한다() {
++        PgClient pgClient = client(PgContainers.baseUrl(), 10);
++        pgClient.approve(orderId(), 1000, &quot;key-keepalive-1&quot;);
++        // 프록시를 다시 만들면 풀에 남은 커넥션이 서버 쪽에서 끊긴다
++        PgContainers.healProxy();
++
++        PgApproval approval = pgClient.approve(orderId(), 1000, &quot;key-keepalive-2&quot;);
++
++        assertThat(approval.status()).isEqualTo(PgApproval.Status.DONE);
++    }
++
+     @Test
+     void 응답이_4초_걸리면_3초에_응답_타임아웃() {
+         delayApprove(4000);</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/payment/PgTimeoutTest.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.example.board.PgContainers;
+import com.example.board.member.Member;
+import com.example.board.member.Role;
+
+import eu.rekawek.toxiproxy.model.ToxicDirection;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+class PgTimeoutTest extends PgApiTestSupport {
+
+    @Autowired
+    ChargeService chargeService;
+
+    /** Toxiproxy로 PG 응답을 5초 늦추고 충전한다. 끝나면 지연을 걷는다. */
+    String chargeWithSlowPg(Member m, int amount) throws Exception {
+        String key = newKey();
+        PgContainers.proxy().toxics().latency(&quot;pg-latency&quot;, ToxicDirection.DOWNSTREAM, 5000);
+        long start = System.nanoTime();
+
+        charge(m, key, amount)
+                .andExpect(status().isGatewayTimeout())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/pg-timeout&quot;));
+
+        assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)).isLessThan(3500L);
+        PgContainers.healProxy();
+        return key;
+    }
+
+    @Test
+    void PG가_5초_늦으면_3_5초_안에_504이고_UNKNOWN이며_재시도하지_않는다() throws Exception {
+        Member m = newMember(Role.USER);
+
+        String key = chargeWithSlowPg(m, 7000);
+
+        assertThat(paymentStatus(key)).isEqualTo(&quot;UNKNOWN&quot;);
+        assertThat(balance(m)).isZero();
+        assertThat(PgContainers.approveIdempotencyKeys()).containsExactly(key);
+    }
+
+    @Test
+    void UNKNOWN은_orderId_조회로_DONE이_되고_적립은_한_번이다() throws Exception {
+        Member m = newMember(Role.USER);
+        String key = chargeWithSlowPg(m, 7000);
+        String orderId = orderId(key);
+        PgContainers.stubLookupDone(orderId, 7000);
+
+        assertThat(chargeService.reconcile(orderId)).isEqualTo(PgPaymentStatus.DONE);
+        assertThat(chargeService.reconcile(orderId)).isEqualTo(PgPaymentStatus.DONE);
+
+        assertThat(paymentStatus(key)).isEqualTo(&quot;DONE&quot;);
+        assertThat(balance(m)).isEqualTo(7000);
+        assertThat(chargeLedgers(m)).isEqualTo(1);
+        // 확정된 뒤 같은 키로 다시 보내면 처음 결과(DONE)를 돌려준다
+        charge(m, key, 7000).andExpect(status().isCreated()).andExpect(jsonPath(&quot;$.status&quot;).value(&quot;DONE&quot;));
+        assertThat(balance(m)).isEqualTo(7000);
+    }
+
+    @Test
+    void 확정_전에_같은_키로_다시_보내면_PG를_다시_부르지_않고_504() throws Exception {
+        Member m = newMember(Role.USER);
+        String key = chargeWithSlowPg(m, 7000);
+
+        charge(m, key, 7000).andExpect(status().isGatewayTimeout());
+
+        assertThat(PgContainers.approveRequestCount()).isEqualTo(1);
+        assertThat(paymentStatus(key)).isEqualTo(&quot;UNKNOWN&quot;);
+    }
+
+    @Test
+    void PG_조회에_결과가_없으면_UNKNOWN을_그대로_둔다() throws Exception {
+        Member m = newMember(Role.USER);
+        String key = chargeWithSlowPg(m, 7000);
+
+        // 조회 스텁이 없으면 WireMock은 404다
+        assertThat(chargeService.reconcile(orderId(key))).isEqualTo(PgPaymentStatus.UNKNOWN);
+        assertThat(balance(m)).isZero();
+    }
+}</code></pre>
+</details>
+
+</section>
+
+<section class="day-step" id="step-d08-5" data-step="D08-5">
+
+<h2 id="⑤-pg-결제-완료-콜백-경로는-공개하고-원문-바이트-hmac-서명으로-보호-비밀키는-board_pg_secret-환경-변수"><a class="anchor" href="#⑤-pg-결제-완료-콜백-경로는-공개하고-원문-바이트-hmac-서명으로-보호-비밀키는-board_pg_secret-환경-변수" aria-hidden="true">#</a>⑤ PG 결제 완료 콜백: 경로는 공개하고 원문 바이트 HMAC 서명으로 보호 (비밀키는 <code>BOARD_PG_SECRET</code> 환경 변수)</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/payment/PgSignatureVerifier.java</code></li>
+<li><code>src/main/java/com/example/board/payment/PgCallbackController.java</code></li>
+<li><code>src/main/java/com/example/board/config/SecurityConfig.java</code></li>
+</ul>
+<p><strong>겪을 것</strong> 본문을 객체로 파싱한 뒤 다시 직렬화해 서명을 계산하면 바이트가 달라져 정상 콜백도 401이 된다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li>서명이 맞는 <code>POST /api/pg/callbacks</code> → 200, <code>UNKNOWN</code> 충전이 <code>DONE</code>이 되고 포인트 1회 적립</li>
+<li>같은 <code>paymentKey</code> 콜백 재전송 → 200, 잔액 그대로</li>
+<li>서명 틀림 → 401 <code>/errors/invalid-signature</code></li>
+<li>없는 <code>orderId</code> → 404</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>POST /api/pg/callbacks</code></a> (<a href="../spec-v2.html#5-5-포인트-충전pg-콜백">5-5. 포인트 충전·PG 콜백</a>, <a href="../spec-v2.html#7-외부-pg-계약-wiremock">7. 외부 PG 계약 (WireMock)</a>)</p>
+<details class="step-hint" data-step="D08-5">
+<summary>막히면</summary>
+
+<ul>
+<li>서명은 <code>javax.crypto.Mac</code>(<code>HmacSHA256</code>)으로 계산하고 비교는 <code>MessageDigest.isEqual</code>로 한다. 원문 바이트는 <code>@RequestBody byte[]</code>로 받는다.</li>
+<li>콜백 경로는 공개 범위 규칙에 넣되, 같은 <code>paymentKey</code>가 다시 와도 포인트가 한 번만 적립되는지 상태 전이 조건으로 확인한다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D08-5" data-commits="eb4ce903a28e75468f9b456ba60f5eac4c2957d3">
+<summary>정답 보기 · answer(D08-5) · board-server 파일 21개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/eb4ce903a28e75468f9b456ba60f5eac4c2957d3" target="_blank" rel="noopener"><code>eb4ce903</code></a> — answer(D08-5): PG 결제 완료 콜백, 원문 바이트 HMAC 서명으로 보호</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/payment/PgSignatureVerifier.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.util.HexFormat;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+/** X-PG-Signature = 본문 원문 바이트의 HMAC-SHA256, 16진 소문자(spec-v2 §7). */
+public class PgSignatureVerifier {
+
+    private static final String ALGORITHM = &quot;HmacSHA256&quot;;
+
+    private final SecretKeySpec key;
+
+    public PgSignatureVerifier(String secret) {
+        this.key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), ALGORITHM);
+    }
+
+    /** 반드시 파싱 전 원문으로 부른다. 파싱 후 다시 직렬화하면 공백·필드 순서가 바뀌어 바이트가 달라진다. */
+    public boolean verify(byte[] rawBody, String signatureHex) {
+        if (signatureHex == null || signatureHex.isEmpty()) {
+            return false;
+        }
+        byte[] expected = HexFormat.of().formatHex(hmac(rawBody)).getBytes(StandardCharsets.US_ASCII);
+        // equals는 첫 불일치에서 멈춰 응답 시간으로 서명을 한 글자씩 추측할 수 있다. 상수 시간 비교를 쓴다.
+        return MessageDigest.isEqual(expected, signatureHex.getBytes(StandardCharsets.US_ASCII));
+    }
+
+    private byte[] hmac(byte[] body) {
+        try {
+            Mac mac = Mac.getInstance(ALGORITHM);
+            mac.init(key);
+            return mac.doFinal(body);
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/payment/PgCallbackController.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.util.Set;
+
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
+
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.board.common.BusinessException;
+import com.example.board.common.ErrorCode;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
+
+/** 공개 경로(SecurityConfig permitAll)다. JWT 대신 서명으로 보호한다. */
+@RestController
+public class PgCallbackController {
+
+    private final PgSignatureVerifier signatureVerifier;
+    private final ChargeService chargeService;
+    private final JsonMapper jsonMapper;
+    private final Validator validator;
+
+    public PgCallbackController(PgSignatureVerifier signatureVerifier, ChargeService chargeService,
+            JsonMapper jsonMapper, Validator validator) {
+        this.signatureVerifier = signatureVerifier;
+        this.chargeService = chargeService;
+        this.jsonMapper = jsonMapper;
+        this.validator = validator;
+    }
+
+    // 본문을 byte[]로 받는다. @RequestBody DTO로 받으면 서명을 확인할 원문이 이미 사라진다.
+    @PostMapping(path = &quot;/api/pg/callbacks&quot;, consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity&lt;Void&gt; callback(@RequestBody byte[] rawBody,
+            @RequestHeader(value = &quot;X-PG-Signature&quot;, required = false) String signature) {
+        if (!signatureVerifier.verify(rawBody, signature)) {
+            throw new BusinessException(ErrorCode.INVALID_SIGNATURE, &quot;서명이 올바르지 않습니다.&quot;);
+        }
+        chargeService.applyCallback(parse(rawBody));
+        return ResponseEntity.ok().build();
+    }
+
+    private PgCallbackRequest parse(byte[] rawBody) {
+        PgCallbackRequest request;
+        try {
+            request = jsonMapper.readValue(rawBody, PgCallbackRequest.class);
+        } catch (JacksonException e) {
+            throw new BusinessException(ErrorCode.VALIDATION, &quot;본문을 읽을 수 없습니다.&quot;);
+        }
+        Set&lt;ConstraintViolation&lt;PgCallbackRequest&gt;&gt; violations = validator.validate(request);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
+        return request;
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/common/GlobalExceptionHandler.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -5,6 +5,7 @@ import java.util.List;
+ import java.util.Map;
+ 
+ import jakarta.servlet.http.HttpServletRequest;
++import jakarta.validation.ConstraintViolationException;
+ 
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+@@ -34,6 +35,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+         return problem(code.status(), code.type(), code.title(), e.getMessage(), request.getRequestURI());
+     }
+ 
++    // 직접 검증한 본문(PG 콜백처럼 원문을 먼저 봐야 하는 경우)도 같은 errors[] 형식으로 맞춘다
++    @ExceptionHandler(ConstraintViolationException.class)
++    ProblemDetail handleConstraintViolation(ConstraintViolationException e, HttpServletRequest request) {
++        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION.type(), ErrorCode.VALIDATION.title(),
++                &quot;요청 값이 올바르지 않습니다.&quot;, request.getRequestURI());
++        List&lt;Map&lt;String, String&gt;&gt; errors = e.getConstraintViolations().stream()
++                .map(v -&gt; {
++                    String path = v.getPropertyPath().toString();
++                    return Map.of(&quot;field&quot;, path.substring(path.lastIndexOf('.') + 1), &quot;reason&quot;, v.getMessage());
++                })
++                .toList();
++        pd.setProperty(&quot;errors&quot;, errors);
++        return pd;
++    }
++
+     // IllegalArgumentException 등을 400으로 바꾸지 않는다. 서버 버그가 클라이언트 잘못으로 보이면 장애가 숨는다.
+     @ExceptionHandler(Exception.class)
+     ProblemDetail handleUnexpected(Exception e, HttpServletRequest request) {</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/config/BoardProperties.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -24,8 +24,10 @@ public record BoardProperties(@Valid @NotNull ForbiddenWords forbiddenWords, @Va
+     public record Jwt(@NotBlank @Size(min = 32) String secret, @Positive long expiresInSeconds) {
+     }
+ 
+-    // 타임아웃 셋 중 하나라도 비면 그 구간에서 요청 스레드가 끝없이 묶일 수 있어 모두 필수다
++    // 타임아웃 셋 중 하나라도 비면 그 구간에서 요청 스레드가 끝없이 묶일 수 있어 모두 필수다.
++    // secret은 콜백 서명(HMAC-SHA256) 키이고 환경 변수 BOARD_PG_SECRET으로만 주입한다.
+     public record Pg(@NotBlank String baseUrl, @NotNull Duration connectTimeout, @NotNull Duration responseTimeout,
+-            @NotNull Duration connectionRequestTimeout, @Positive int maxConnections) {
++            @NotNull Duration connectionRequestTimeout, @Positive int maxConnections,
++            @NotBlank @Size(min = 32) String secret) {
+     }
+ }</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/config/PgClientConfig.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClient;
+ 
+ import com.example.board.payment.PgClient;
+ import com.example.board.payment.PgRetryPolicy;
++import com.example.board.payment.PgSignatureVerifier;
+ 
+ @Configuration(proxyBeanMethods = false)
+ public class PgClientConfig {
+@@ -24,6 +25,11 @@ public class PgClientConfig {
+         return new PgClient(pgRestClient(properties.pg()), new PgRetryPolicy());
+     }
+ 
++    @Bean
++    PgSignatureVerifier pgSignatureVerifier(BoardProperties properties) {
++        return new PgSignatureVerifier(properties.pg().secret());
++    }
++
+     /** 연결·응답·풀 대기 타임아웃을 따로 건다. 테스트가 풀 크기를 바꿔 만들 수 있게 정적 메서드로 둔다. */
+     public static RestClient pgRestClient(BoardProperties.Pg pg) {
+         PoolingHttpClientConnectionManager pool = PoolingHttpClientConnectionManagerBuilder.create()</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/config/ProdSecretsCheck.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -14,7 +14,8 @@ import org.springframework.core.env.Environment;
+ @Profile(&quot;prod&quot;)
+ public class ProdSecretsCheck {
+ 
+-    private static final String[] REQUIRED_KEYS = {&quot;spring.datasource.password&quot;, &quot;board.jwt.secret&quot;};
++    private static final String[] REQUIRED_KEYS = {&quot;spring.datasource.password&quot;, &quot;board.jwt.secret&quot;,
++            &quot;board.pg.secret&quot;};
+ 
+     @Bean
+     static BeanFactoryPostProcessor requiredSecretsCheck(Environment env) {</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/payment/ChargeService.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -75,6 +75,25 @@ public class ChargeService {
+         return tx.execute(s -&gt; reload(payment).getStatus());
+     }
+ 
++    /**
++     * PG 콜백 반영. 승인 응답·조회와 같은 조건부 전이를 쓰므로 어느 쪽이 먼저 와도 적립은 한 번이다.
++     * 이미 확정된 건의 재전송은 아무것도 바꾸지 않고 성공으로 끝낸다(PG가 재전송을 멈추도록).
++     */
++    public void applyCallback(PgCallbackRequest callback) {
++        tx.executeWithoutResult(s -&gt; {
++            PgPayment payment = paymentRepository.findByOrderId(callback.orderId())
++                    .orElseThrow(() -&gt; new BusinessException(ErrorCode.NOT_FOUND, &quot;충전 기록이 없습니다.&quot;));
++            if (payment.getAmount() != callback.amount()) {
++                throw new BusinessException(ErrorCode.VALIDATION, &quot;금액이 충전 요청과 다릅니다.&quot;);
++            }
++            if (&quot;DONE&quot;.equals(callback.status())) {
++                settleDone(payment, callback.paymentKey());
++            } else {
++                paymentRepository.markFailed(payment.getId(), callback.paymentKey(), now());
++            }
++        });
++    }
++
+     /** 트랜잭션 1: 호출 전에 REQUESTED를 커밋해 둔다. 같은 키가 이미 있으면 그 기록을 돌려준다. */
+     private Started start(Long memberId, String idempotencyKey, int amount) {
+         try {</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/payment/PgCallbackRequest.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+
+public record PgCallbackRequest(
+        @NotBlank String orderId,
+        @NotBlank @Size(max = 64) String paymentKey,
+        @NotNull @Pattern(regexp = &quot;DONE|FAILED&quot;) String status,
+        @NotNull @Positive Integer amount) {
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/resources/application-local.yml</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -13,3 +13,5 @@ spring:
+ board:
+   jwt:
+     secret: ${BOARD_JWT_SECRET:local-dev-only-secret-local-dev-only-secret}
++  pg:
++    secret: ${BOARD_PG_SECRET:local-dev-only-pg-secret-local-dev-only}</code></pre>
+<p><strong>수정</strong> <code>src/main/resources/application-prod.yml</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -9,3 +9,4 @@ board:
+     secret: ${BOARD_JWT_SECRET}
+   pg:
+     base-url: ${BOARD_PG_BASE_URL}
++    secret: ${BOARD_PG_SECRET}</code></pre>
+<p><strong>수정</strong> <code>src/main/resources/application.yml</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -51,3 +51,5 @@ spring:
+ board:
+   jwt:
+     secret: ${BOARD_JWT_SECRET:test-only-secret-test-only-secret-0123}
++  pg:
++    secret: ${BOARD_PG_SECRET:test-only-pg-secret-test-only-pg-secret}</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/ProfileConfigTest.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -66,6 +66,18 @@ class ProfileConfigTest {
+                 .hasStackTraceContaining(&quot;Could not resolve placeholder 'BOARD_JWT_SECRET'&quot;);
+     }
+ 
++    @Test
++    void prod는_BOARD_PG_SECRET_없이_기동하면_실패한다() {
++        assumeTrue(System.getenv(&quot;BOARD_PG_SECRET&quot;) == null, &quot;BOARD_PG_SECRET이 설정된 환경에서는 건너뛴다&quot;);
++
++        assertThatThrownBy(() -&gt; new SpringApplicationBuilder(BoardApplication.class)
++                .profiles(&quot;prod&quot;)
++                .web(WebApplicationType.NONE)
++                .run(&quot;--spring.main.banner-mode=off&quot;, &quot;--DB_URL=jdbc:mysql://localhost:1/x&quot;, &quot;--DB_USERNAME=u&quot;,
++                        &quot;--DB_PASSWORD=p&quot;, &quot;--BOARD_JWT_SECRET=0123456789abcdef0123456789abcdef&quot;))
++                .hasStackTraceContaining(&quot;Could not resolve placeholder 'BOARD_PG_SECRET'&quot;);
++    }
++
+     @Test
+     void local_yml에_server_port가_있다() throws Exception {
+         assertThat(flatten(&quot;/application-local.yml&quot;)).containsKey(&quot;server.port&quot;);</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/config/BoardPropertiesTest.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -21,7 +21,8 @@ class BoardPropertiesTest {
+         runner.withPropertyValues(&quot;board.forbidden-words.ignore-case=true&quot;,
+                         &quot;board.jwt.secret=0123456789abcdef0123456789abcdef&quot;, &quot;board.jwt.expires-in-seconds=3600&quot;,
+                         &quot;board.pg.base-url=http://pg&quot;, &quot;board.pg.connect-timeout=1s&quot;, &quot;board.pg.response-timeout=3s&quot;,
+-                        &quot;board.pg.connection-request-timeout=2s&quot;, &quot;board.pg.max-connections=20&quot;)
++                        &quot;board.pg.connection-request-timeout=2s&quot;, &quot;board.pg.max-connections=20&quot;,
++                        &quot;board.pg.secret=0123456789abcdef0123456789abcdef&quot;)
+                 .run(ctx -&gt; {
+                     assertThat(ctx).hasNotFailed();
+                     assertThat(ctx.getBean(BoardProperties.class).forbiddenWords().ignoreCase()).isTrue();</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/payment/PgApiTestSupport.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -1,8 +1,10 @@
+ package com.example.board.payment;
+ 
++import java.nio.charset.StandardCharsets;
+ import java.util.UUID;
+ 
+ import org.junit.jupiter.api.AfterEach;
++import org.springframework.beans.factory.annotation.Value;
+ import org.springframework.http.MediaType;
+ import org.springframework.test.web.servlet.ResultActions;
+ 
+@@ -15,6 +17,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
+ /** 충전·콜백 테스트 공통. 테스트마다 PG 모의의 지연·임시 스텁·요청 기록을 지운다. */
+ abstract class PgApiTestSupport extends ApiTestSupport {
+ 
++    @Value(&quot;${board.pg.secret}&quot;)
++    String pgSecret;
++
+     @AfterEach
+     void resetPg() {
+         PgContainers.reset();
+@@ -37,6 +42,25 @@ abstract class PgApiTestSupport extends ApiTestSupport {
+         return mockMvc.perform(req);
+     }
+ 
++    /** PG가 보내는 것처럼 원문 바이트에 서명해 콜백을 보낸다. 인증 헤더는 없다. */
++    ResultActions callback(String rawBody, String signature) throws Exception {
++        var req = post(&quot;/api/pg/callbacks&quot;).contentType(MediaType.APPLICATION_JSON)
++                .content(rawBody.getBytes(StandardCharsets.UTF_8));
++        if (signature != null) {
++            req = req.header(&quot;X-PG-Signature&quot;, signature);
++        }
++        return mockMvc.perform(req);
++    }
++
++    ResultActions signedCallback(String rawBody) throws Exception {
++        return callback(rawBody, PgSignatures.sign(pgSecret, rawBody.getBytes(StandardCharsets.UTF_8)));
++    }
++
++    static String callbackBody(String orderId, String status, int amount) {
++        return &quot;{\&quot;orderId\&quot;:\&quot;&quot; + orderId + &quot;\&quot;,\&quot;paymentKey\&quot;:\&quot;pk-&quot; + orderId + &quot;\&quot;,\&quot;status\&quot;:\&quot;&quot; + status
++                + &quot;\&quot;,\&quot;amount\&quot;:&quot; + amount + &quot;}&quot;;
++    }
++
+     long balance(Member m) {
+         return jdbc.queryForObject(&quot;SELECT point_balance FROM member WHERE id = ?&quot;, Long.class, m.getId());
+     }</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/payment/PgCallbackApiTest.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.time.LocalDateTime;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import com.example.board.member.Member;
+import com.example.board.member.Role;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+class PgCallbackApiTest extends PgApiTestSupport {
+
+    @Autowired
+    PgPaymentRepository paymentRepository;
+
+    @Autowired
+    TransactionTemplate tx;
+
+    /** 시간 초과로 결과 불명이 된 충전 기록을 바로 만든다. */
+    PgPayment unknownCharge(Member m, int amount) {
+        PgPayment p = paymentRepository.saveAndFlush(PgPayment.request(m, amount, newKey(), LocalDateTime.now()));
+        tx.executeWithoutResult(s -&gt; paymentRepository.markUnknown(p.getId(), LocalDateTime.now()));
+        return p;
+    }
+
+    String statusOf(PgPayment p) {
+        return jdbc.queryForObject(&quot;SELECT status FROM pg_payment WHERE id = ?&quot;, String.class, p.getId());
+    }
+
+    @Test
+    void 서명이_맞으면_200이고_UNKNOWN이_DONE이_되며_한_번_적립한다() throws Exception {
+        Member m = newMember(Role.USER);
+        PgPayment p = unknownCharge(m, 7000);
+
+        // 인증 헤더 없이 서명만으로 통과한다
+        signedCallback(callbackBody(p.getOrderId(), &quot;DONE&quot;, 7000)).andExpect(status().isOk());
+
+        assertThat(statusOf(p)).isEqualTo(&quot;DONE&quot;);
+        assertThat(balance(m)).isEqualTo(7000);
+        assertThat(chargeLedgers(m)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(&quot;SELECT payment_key FROM pg_payment WHERE id = ?&quot;, String.class, p.getId()))
+                .isEqualTo(&quot;pk-&quot; + p.getOrderId());
+    }
+
+    @Test
+    void 같은_paymentKey_콜백을_다시_받아도_200이고_잔액은_그대로() throws Exception {
+        Member m = newMember(Role.USER);
+        PgPayment p = unknownCharge(m, 7000);
+        String body = callbackBody(p.getOrderId(), &quot;DONE&quot;, 7000);
+        signedCallback(body).andExpect(status().isOk());
+
+        signedCallback(body).andExpect(status().isOk());
+
+        assertThat(balance(m)).isEqualTo(7000);
+        assertThat(chargeLedgers(m)).isEqualTo(1);
+    }
+
+    @Test
+    void 서명이_틀리거나_없으면_401() throws Exception {
+        Member m = newMember(Role.USER);
+        PgPayment p = unknownCharge(m, 7000);
+        String body = callbackBody(p.getOrderId(), &quot;DONE&quot;, 7000);
+
+        callback(body, PgSignatures.sign(&quot;wrong-secret-wrong-secret-wrong-secret&quot;, body.getBytes()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/invalid-signature&quot;));
+        callback(body, null)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/invalid-signature&quot;));
+
+        assertThat(statusOf(p)).isEqualTo(&quot;UNKNOWN&quot;);
+        assertThat(balance(m)).isZero();
+    }
+
+    @Test
+    void 서명은_원문_바이트로_확인한다_공백과_필드_순서가_달라도_통과() throws Exception {
+        Member m = newMember(Role.USER);
+        PgPayment p = unknownCharge(m, 7000);
+        String raw = &quot;{ \&quot;amount\&quot; : 7000,\n  \&quot;status\&quot;:\&quot;DONE\&quot;, \&quot;paymentKey\&quot;:\&quot;pk-&quot; + p.getOrderId()
+                + &quot;\&quot;, \&quot;orderId\&quot;:\&quot;&quot; + p.getOrderId() + &quot;\&quot; }&quot;;
+
+        signedCallback(raw).andExpect(status().isOk());
+
+        assertThat(statusOf(p)).isEqualTo(&quot;DONE&quot;);
+    }
+
+    @Test
+    void 없는_orderId면_404() throws Exception {
+        signedCallback(callbackBody(&quot;CHG-00000000-0000-0000-0000-000000000000&quot;, &quot;DONE&quot;, 7000))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/not-found&quot;));
+    }
+
+    @Test
+    void 금액이_저장된_충전_금액과_다르면_400이고_상태는_그대로() throws Exception {
+        Member m = newMember(Role.USER);
+        PgPayment p = unknownCharge(m, 7000);
+
+        signedCallback(callbackBody(p.getOrderId(), &quot;DONE&quot;, 70000))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/validation&quot;));
+
+        assertThat(statusOf(p)).isEqualTo(&quot;UNKNOWN&quot;);
+        assertThat(balance(m)).isZero();
+    }
+
+    @Test
+    void 필드_규칙을_어기면_400_errors() throws Exception {
+        Member m = newMember(Role.USER);
+        PgPayment p = unknownCharge(m, 7000);
+
+        signedCallback(callbackBody(p.getOrderId(), &quot;CANCELED&quot;, 7000))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/validation&quot;))
+                .andExpect(jsonPath(&quot;$.errors[0].field&quot;).value(&quot;status&quot;));
+        signedCallback(&quot;not-json&quot;)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/validation&quot;));
+    }
+
+    @Test
+    void FAILED_콜백이면_FAILED이고_적립하지_않는다() throws Exception {
+        Member m = newMember(Role.USER);
+        PgPayment p = unknownCharge(m, 7000);
+
+        signedCallback(callbackBody(p.getOrderId(), &quot;FAILED&quot;, 7000)).andExpect(status().isOk());
+
+        assertThat(statusOf(p)).isEqualTo(&quot;FAILED&quot;);
+        assertThat(balance(m)).isZero();
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/payment/PgCallbackOrderingTest.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.test.web.servlet.MvcResult;
+
+import com.example.board.PgContainers;
+import com.example.board.member.Member;
+import com.example.board.member.Role;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+class PgCallbackOrderingTest extends PgApiTestSupport {
+
+    @Test
+    void 콜백이_승인_응답보다_먼저_와도_적립은_한_번이고_최종_DONE() throws Exception {
+        PgContainers.stubApproveDelay(1500);
+        Member m = newMember(Role.USER);
+        String key = newKey();
+
+        CompletableFuture&lt;MvcResult&gt; inFlight = CompletableFuture.supplyAsync(() -&gt; {
+            try {
+                return charge(m, key, 9000).andReturn();
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        // PG가 승인 요청을 받았지만 아직 응답하지 않은 구간에 콜백을 보낸다
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        while (PgContainers.approveRequestCount() == 0 &amp;&amp; System.nanoTime() &lt; deadline) {
+            Thread.onSpinWait();
+        }
+        String orderId = orderId(key);
+        signedCallback(callbackBody(orderId, &quot;DONE&quot;, 9000)).andExpect(status().isOk());
+        assertThat(inFlight.isDone()).as(&quot;콜백이 승인 응답보다 먼저 처리됐다&quot;).isFalse();
+        assertThat(balance(m)).isEqualTo(9000);
+
+        MvcResult result = inFlight.get(5, TimeUnit.SECONDS);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(201);
+        assertThat(result.getResponse().getContentAsString()).contains(&quot;\&quot;status\&quot;:\&quot;DONE\&quot;&quot;);
+        assertThat(paymentStatus(key)).isEqualTo(&quot;DONE&quot;);
+        assertThat(balance(m)).isEqualTo(9000);
+        assertThat(chargeLedgers(m)).isEqualTo(1);
+    }
+
+    @Test
+    void 승인_응답_뒤에_온_콜백은_적립하지_않는다() throws Exception {
+        Member m = newMember(Role.USER);
+        String key = newKey();
+        charge(m, key, 9000).andExpect(status().isCreated());
+
+        signedCallback(callbackBody(orderId(key), &quot;DONE&quot;, 9000)).andExpect(status().isOk());
+
+        assertThat(balance(m)).isEqualTo(9000);
+        assertThat(chargeLedgers(m)).isEqualTo(1);
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/payment/PgClientRetryTest.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -30,7 +30,7 @@ class PgClientRetryTest {
+ 
+     PgClient client() {
+         BoardProperties.Pg pg = new BoardProperties.Pg(PgContainers.baseUrl(), Duration.ofSeconds(1),
+-                Duration.ofSeconds(3), Duration.ofSeconds(2), 10);
++                Duration.ofSeconds(3), Duration.ofSeconds(2), 10, &quot;test-only-pg-secret-test-only-pg-secret&quot;);
+         return new PgClient(PgClientConfig.pgRestClient(pg), new PgRetryPolicy());
+     }
+ </code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/payment/PgClientTest.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -30,7 +30,7 @@ class PgClientTest {
+ 
+     PgClient client(String baseUrl, int maxConnections) {
+         BoardProperties.Pg pg = new BoardProperties.Pg(baseUrl, Duration.ofSeconds(1), Duration.ofSeconds(3),
+-                Duration.ofSeconds(2), maxConnections);
++                Duration.ofSeconds(2), maxConnections, &quot;test-only-pg-secret-test-only-pg-secret&quot;);
+         // 타임아웃 자체만 보려고 재시도는 끈다(재시도는 PgClientRetryTest)
+         return new PgClient(PgClientConfig.pgRestClient(pg), new PgRetryPolicy(1));
+     }</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/payment/PgSignatureVerifierTest.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.nio.charset.StandardCharsets;
+
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class PgSignatureVerifierTest {
+
+    static final String SECRET = &quot;test-only-pg-secret-test-only-pg-secret&quot;;
+    final PgSignatureVerifier verifier = new PgSignatureVerifier(SECRET);
+    final byte[] body = &quot;{\&quot;orderId\&quot;:\&quot;CHG-1\&quot;,\&quot;paymentKey\&quot;:\&quot;pk-1\&quot;,\&quot;status\&quot;:\&quot;DONE\&quot;,\&quot;amount\&quot;:1000}&quot;
+            .getBytes(StandardCharsets.UTF_8);
+
+    @Test
+    void 원문_바이트의_HMAC_SHA256_소문자_16진수면_통과() {
+        assertThat(verifier.verify(body, PgSignatures.sign(SECRET, body))).isTrue();
+    }
+
+    @Test
+    void 본문이_한_바이트라도_다르면_실패() {
+        String signature = PgSignatures.sign(SECRET, body);
+        byte[] tampered = new String(body, StandardCharsets.UTF_8).replace(&quot;1000&quot;, &quot;9000&quot;)
+                .getBytes(StandardCharsets.UTF_8);
+
+        assertThat(verifier.verify(tampered, signature)).isFalse();
+    }
+
+    @Test
+    void 다른_키로_만든_서명_대문자_서명_빈_서명은_실패() {
+        assertThat(verifier.verify(body, PgSignatures.sign(&quot;other-secret-other-secret-other-secret&quot;, body))).isFalse();
+        assertThat(verifier.verify(body, PgSignatures.sign(SECRET, body).toUpperCase())).isFalse();
+        assertThat(verifier.verify(body, null)).isFalse();
+        assertThat(verifier.verify(body, &quot;&quot;)).isFalse();
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/payment/PgSignatures.java</code></p>
+<pre><code class="language-java">package com.example.board.payment;
+
+import java.security.GeneralSecurityException;
+import java.util.HexFormat;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+/** 테스트에서 PG 쪽 서명을 만든다. 서버 구현(PgSignatureVerifier)을 쓰지 않고 따로 계산한다. */
+final class PgSignatures {
+
+    private PgSignatures() {
+    }
+
+    static String sign(String secret, byte[] body) {
+        try {
+            Mac mac = Mac.getInstance(&quot;HmacSHA256&quot;);
+            mac.init(new SecretKeySpec(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8), &quot;HmacSHA256&quot;));
+            return HexFormat.of().formatHex(mac.doFinal(body));
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/payment/PgTimeoutTest.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -64,6 +64,22 @@ class PgTimeoutTest extends PgApiTestSupport {
+         assertThat(balance(m)).isEqualTo(7000);
+     }
+ 
++    @Test
++    void UNKNOWN은_서명된_콜백_하나로_DONE이_되고_적립은_한_번이다() throws Exception {
++        Member m = newMember(Role.USER);
++        String key = chargeWithSlowPg(m, 7000);
++        String orderId = orderId(key);
++
++        signedCallback(callbackBody(orderId, &quot;DONE&quot;, 7000)).andExpect(status().isOk());
++        // 콜백 뒤에 재처리 워커가 조회해도 다시 적립하지 않는다
++        PgContainers.stubLookupDone(orderId, 7000);
++        chargeService.reconcile(orderId);
++
++        assertThat(paymentStatus(key)).isEqualTo(&quot;DONE&quot;);
++        assertThat(balance(m)).isEqualTo(7000);
++        assertThat(chargeLedgers(m)).isEqualTo(1);
++    }
++
+     @Test
+     void 확정_전에_같은_키로_다시_보내면_PG를_다시_부르지_않고_504() throws Exception {
+         Member m = newMember(Role.USER);</code></pre>
+<p><strong>만들 파일 중 이 커밋에 없는 것</strong></p>
+<ul>
+<li><code>src/main/java/com/example/board/config/SecurityConfig.java</code> — 이 순서에서는 바뀌지 않는다. 앞선 answer(<a class="docref" href="../../docs/knowledge/D03-rest-api-dev-process.html">D03</a>-6)에서 만든 코드를 그대로 쓴다.</li>
+</ul>
+</details>
+
+</section>
+
+<section class="day-step-extra" id="extra-d08-6" data-commit="D08-6">
+
+<h2 id="보충-hikari-운영-값과-타임아웃-테스트-안정화"><a class="anchor" href="#보충-hikari-운영-값과-타임아웃-테스트-안정화" aria-hidden="true">#</a>보충: Hikari 운영 값과 타임아웃 테스트 안정화</h2>
+<p>순서표에 없는 보충 커밋이다. 명세 8절의 Hikari 운영 값을 설정에 옮기고 타임아웃 테스트를 안정화한다.</p>
+<details class="step-answer" data-step="D08-6" data-commits="692b2cf7347b115c158f7e8c2a0469c9f67eb254">
+<summary>정답 보기 · answer(D08-6) · board-server 파일 3개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/692b2cf7347b115c158f7e8c2a0469c9f67eb254" target="_blank" rel="noopener"><code>692b2cf7</code></a> — answer(D08-6): Hikari 운영 값과 타임아웃 테스트 안정화</p>
+<p>순서표에 없는 보충 커밋이다. 명세 8절의 Hikari 운영 값을 설정에 옮기고 타임아웃 테스트를 안정화한다.</p>
+<p><strong>수정</strong> <code>src/main/resources/application.yml</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -1,6 +1,11 @@
+ spring:
+   application:
+     name: board-server
++  datasource:
++    hikari:
++      # spec-v2 §8 운영 값. 풀이 바닥나면 2초 안에 실패시켜 요청 스레드가 끝없이 기다리지 않게 한다.
++      maximum-pool-size: 10
++      connection-timeout: 2000
+   jpa:
+     hibernate:
+       ddl-auto: validate
+@@ -45,9 +50,6 @@ spring:
+     properties:
+       # 테스트에서 SQL 실행 횟수(N+1)를 세기 위해서만 켠다
+       hibernate.generate_statistics: true
+-  datasource:
+-    hikari:
+-      maximum-pool-size: 5
+ board:
+   jwt:
+     secret: ${BOARD_JWT_SECRET:test-only-secret-test-only-secret-0123}</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/config/HikariPoolConfigTest.java</code></p>
+<pre><code class="language-java">package com.example.board.config;
+
+import javax.sql.DataSource;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.example.board.ApiTestSupport;
+import com.zaxxer.hikari.HikariDataSource;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class HikariPoolConfigTest extends ApiTestSupport {
+
+    @Autowired
+    DataSource dataSource;
+
+    @Test
+    void 실행_중인_풀은_명세_운영_값을_쓴다() throws Exception {
+        HikariDataSource hikari = dataSource.unwrap(HikariDataSource.class);
+
+        // spec-v2 §8: maximum-pool-size 10, connection-timeout 2000ms
+        assertThat(hikari.getMaximumPoolSize()).isEqualTo(10);
+        assertThat(hikari.getConnectionTimeout()).isEqualTo(2000L);
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/payment/PgTimeoutTest.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -30,13 +30,14 @@ class PgTimeoutTest extends PgApiTestSupport {
+                 .andExpect(status().isGatewayTimeout())
+                 .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/pg-timeout&quot;));
+ 
+-        assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)).isLessThan(3500L);
++        // 3초 응답 타임아웃이 끊었다는 증거로 하한도 본다(빠른 실패였다면 3초 미만). 상한은 JVM 예열 여유를 둔다.
++        assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)).isBetween(3000L, 4499L);
+         PgContainers.healProxy();
+         return key;
+     }
+ 
+     @Test
+-    void PG가_5초_늦으면_3_5초_안에_504이고_UNKNOWN이며_재시도하지_않는다() throws Exception {
++    void PG가_5초_늦으면_3초_타임아웃으로_504이고_UNKNOWN이며_재시도하지_않는다() throws Exception {
+         Member m = newMember(Role.USER);
+ 
+         String key = chargeWithSlowPg(m, 7000);</code></pre>
+</details>
+
+</section>
+
+<hr>
+<h2 id="말하기-카드"><a class="anchor" href="#말하기-카드" aria-hidden="true">#</a>말하기 카드</h2>
+<p>하루가 끝나면 질문에 &quot;문제 상황 → 원인 → 선택 → 결과&quot; 순서로 소리 내어 답한 뒤, 접힌 &quot;답에 들어가야 할 것&quot;과 비교한다. 세 줄이 모두 나오면 통과다.</p>
+<h3 id="tc-d08-1"><a class="anchor" href="#tc-d08-1" aria-hidden="true">#</a>TC-D08-1</h3>
+<p><strong>질문</strong> PG 클라이언트에 연결 1s, 응답 3s, 커넥션 풀 대기 2s를 따로 두었습니다. 셋은 각각 무엇을 막나요?</p>
+<details class="card-answer" data-card="TC-D08-1">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li>연결 타임아웃은 TCP 연결을 맺는 시간, 응답 타임아웃은 요청 후 응답을 기다리는 시간, 풀 대기 타임아웃은 클라이언트 풀에서 빈 커넥션을 얻는 시간이다</li>
+<li>셋 중 하나라도 비어 있으면 그 구간에서 요청 스레드가 오래(클라이언트에 따라 무한히) 묶일 수 있다</li>
+<li>값은 명세 운영 값을 쓰고, WireMock·Toxiproxy로 지연을 주입해 각 타임아웃이 어떤 예외로 나는지 직접 확인한다</li>
+</ul>
+<p><strong>근거</strong> 10 §8, spec-v2 §8</p>
+</details>
+
+<h3 id="tc-d08-2"><a class="anchor" href="#tc-d08-2" aria-hidden="true">#</a>TC-D08-2</h3>
+<p><strong>질문</strong> 포인트 충전 흐름을 트랜잭션 몇 개로 나눴나요? 왜 그렇게 나눴나요?</p>
+<details class="card-answer" data-card="TC-D08-2">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li><code>pg_payment</code>를 <code>REQUESTED</code>로 저장하는 짧은 트랜잭션 → 트랜잭션 밖에서 PG 호출 → 결과로 상태를 바꾸고 포인트를 적립하는 짧은 트랜잭션, 세 단계다</li>
+<li>요청 기록을 먼저 커밋해 두어야 PG 호출 중 서버가 죽어도 무엇을 보냈는지 남는다</li>
+<li>PG를 기다리는 동안 DB 커넥션을 쥐지 않으므로, PG가 느려도 Hikari 풀(10)이 고갈되지 않는다</li>
+</ul>
+<p><strong>근거</strong> 10 §8, spec-v2 §8</p>
+</details>
+
+<h3 id="tc-d08-3"><a class="anchor" href="#tc-d08-3" aria-hidden="true">#</a>TC-D08-3</h3>
+<p><strong>질문</strong> PG 응답이 3초를 넘겨 타임아웃이 났습니다. 사용자에게 &quot;충전 실패&quot;라고 보여 주면 왜 안 되나요?</p>
+<details class="card-answer" data-card="TC-D08-3">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li>타임아웃은 실패가 아니라 결과 불명이다. PG는 승인을 끝냈을 수 있다</li>
+<li><code>pg_payment</code>를 <code>UNKNOWN</code>으로 남기고 504 <code>/errors/pg-timeout</code>을 돌려준다</li>
+<li>상태는 <code>orderId</code>가 담긴 PG 콜백이나 <code>GET /pg/v1/payments?orderId=</code> 조회(재처리 워커)로 확정한다. 같은 <code>Idempotency-Key</code>로 승인을 다시 요청해도 PG는 처음 결과를 돌려준다</li>
+</ul>
+<p><strong>근거</strong> 10 §8, spec-v2 §5-5, spec-v2 §7</p>
+</details>
+
+<h3 id="tc-d08-4"><a class="anchor" href="#tc-d08-4" aria-hidden="true">#</a>TC-D08-4</h3>
+<p><strong>질문</strong> PG 호출이 실패하면 무조건 세 번 재시도하게 했다가 리뷰에서 지적을 받았습니다. 무엇을 재시도하고 무엇을 하지 않나요?</p>
+<details class="card-answer" data-card="TC-D08-4">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li>연결 실패·타임아웃·5xx는 재시도 후보지만, 400·401 같은 4xx는 같은 요청이 같은 실패를 내므로 재시도하지 않는다</li>
+<li>결제 같은 POST는 같은 멱등 키로 재시도할 때만 이중 승인이 생기지 않는다</li>
+<li>재시도 간격은 지수 백오프와 지터로 늘리고, 전체 시간이 상위 요청의 시간 예산을 넘지 않게 횟수를 제한한다</li>
+</ul>
+<p><strong>근거</strong> 10 §8, 10 §5</p>
+</details>
+
+<h3 id="tc-d08-5"><a class="anchor" href="#tc-d08-5" aria-hidden="true">#</a>TC-D08-5</h3>
+<p><strong>질문</strong> PG 콜백 경로는 인증 없이 공개했습니다. 그러면 아무나 &quot;결제 완료&quot;를 보내 포인트를 받을 수 있지 않나요?</p>
+<details class="card-answer" data-card="TC-D08-5">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li>공개 경로라도 서버가 본문 원문 바이트를 같은 비밀키로 HMAC-SHA256해 <code>X-PG-Signature</code>와 상수 시간으로 비교하고, 다르면 401을 낸다</li>
+<li>서명은 파싱 전 원문으로 계산한다. JSON을 파싱해 다시 직렬화하면 공백이나 필드 순서가 바뀌어 바이트가 달라질 수 있다</li>
+<li>같은 <code>paymentKey</code> 콜백이 여러 번 와도 한 번만 적립하고, <code>amount</code>가 저장된 충전 금액과 다르면 거부한다</li>
+</ul>
+<p><strong>근거</strong> spec-v2 §5-5, spec-v2 §7</p>
+</details>
+
+<h2 id="ai-채점-프롬프트"><a class="anchor" href="#ai-채점-프롬프트" aria-hidden="true">#</a>AI 채점 프롬프트</h2>
+<p>오늘 순서를 다 만들었으면 서버를 띄운 채로 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣는다. 에이전트가 완료 조건·함정·말하기 카드로 채점표를 준다. 코드는 고치지 않는다.</p>
+<pre><code class="language-text">[javaExperience 일자 채점] D08. 포인트 충전 (외부 PG 모의)
+레포 경로: 내 프로젝트 루트(이 프롬프트를 붙여 넣은 에이전트를 연 폴더)
+서버 주소: http://localhost:8080
+
+너는 Java·Spring 온보딩 과정 v2로 백엔드를 배우는 사람의 리뷰어다. 학습자는 빈 프로젝트에서 명세서 v2의 서버를 하루씩 만들고 있고, 오늘은 D08다.
+지킬 것: 코드는 절대 수정하지 마라. DB는 조회만 한다(SELECT·SHOW·EXPLAIN). 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.
+
+1. 서버 주소의 `GET /actuator/health`로 응답 가능 여부를 확인해라. 꺼져 있으면 `./gradlew bootRun`으로 띄우라고만 알려 주고 멈춰라.
+2. 아래 &quot;채점 기준&quot;이 통과/실패의 유일한 기준이다. 기준에 없는 것으로 실패 처리하지 말고, 다른 날의 기준은 보지 마라.
+3. [C] 항목: HTTP 요청은 서버 주소로 직접 보내 상태 코드·응답 헤더·본문을 기대값과 비교한다. 테스트 이름이 적힌 항목은 레포 루트에서 `./gradlew test --tests '&lt;테스트 클래스 이름&gt;'`으로 실행해 통과 여부를 본다(테스트 코드도 고치지 마라). 로그 항목은 기동 로그에서 찾거나 학습자에게 해당 줄을 붙여 달라고 한다. DB 확인이 필요하면 `docker compose exec -T mysql mysql -uboard -pboard board -e &quot;&lt;SELECT 문&gt;&quot;`으로 조회만 한다.
+4. [R] 항목: 관련 코드를 찾아 읽고 그 함정을 피했는지 판단해라. 지적할 때는 `파일:줄`을 붙여라.
+5. 말하기 카드: 학습자에게 카드 질문마다 답을 말하거나 적어 달라고 해라. &quot;답에 들어가야 할 것&quot;(· 표시) 세 줄이 모두 나오면 통과다. 빠진 줄은 정답 문장을 먼저 말하지 말고 되묻는 질문으로 끌어내라.
+6. 리뷰 초점은 채점표에 넣지 말고 ②·③에 적어라.
+
+채점 기준
+① PG 클라이언트와 타임아웃 3종 (compose.yaml에 WireMock·Toxiproxy, BoardProperties에 board.pg.*)
+  - [C1-1] PgClientTest 통과: WireMock 4초 지연 → 3초에 응답 타임아웃 예외, 닫힌 포트 → 1초 안에 연결 타임아웃 예외, 풀 대기 2초 초과 → 예외
+  - [R1] 함정을 피했는지 코드로 확인: 타임아웃을 정하지 않으면 PG가 멈출 때 우리 요청 스레드도 끝없이 함께 기다린다.
+② 연계 로그 pg_payment와 PgPaymentStatus enum(payment/PgPaymentStatus.java) (schema.sql에 테이블, UNIQUE idempotency_key·order_id·payment_key)
+  - [C2-1] PgPaymentRepositoryTest 통과: 같은 idempotency_key로 두 번 저장하면 예외, order_id는 CHG- + UUID
+  - [R2] 함정을 피했는지 코드로 확인: PG 결과가 나온 뒤에만 연계 로그를 남기면 타임아웃 건은 흔적이 없으므로 호출 전에 REQUESTED로 먼저 남긴다.
+③ 포인트 충전 API: 트랜잭션을 나누고 PG 호출은 트랜잭션 밖에서
+  - [C3-1] POST /api/me/points/charges + Idempotency-Key → 201, 잔액 증가
+  - [C3-2] WireMock 4초 지연 → 504 /errors/pg-timeout, pg_payment.status = UNKNOWN, 잔액 그대로
+  - [C3-3] WireMock 거절 → 502 /errors/pg-declined
+  - [C3-4] amount = 1500 → 400
+  - [R3] 함정을 피했는지 코드로 확인: PG 호출을 @Transactional 안에서 하면 PG가 느릴 때 DB 커넥션을 쥔 채 기다려 Hikari 풀(10)이 바닥난다.
+④ 재시도와 백오프: 무엇을 다시 보내고 무엇을 보내지 않는가
+  - [C4-1] PgClientRetryTest 통과: 연결 실패만 같은 Idempotency-Key로 최대 2회 재시도(백오프 200ms·400ms), 거절은 재시도하지 않는다
+  - [C4-2] 응답 타임아웃 건은 재시도 대신 UNKNOWN으로 남는다
+  - [R4] 함정을 피했는지 코드로 확인: &quot;우리는 타임아웃인데 PG는 승인 완료&quot;일 수 있으므로 타임아웃을 실패로 단정하거나 멱등 키 없이 재시도하면 두 번 결제된다.
+⑤ PG 결제 완료 콜백: 경로는 공개하고 원문 바이트 HMAC 서명으로 보호 (비밀키는 BOARD_PG_SECRET 환경 변수)
+  - [C5-1] 서명이 맞는 POST /api/pg/callbacks → 200, UNKNOWN 충전이 DONE이 되고 포인트 1회 적립
+  - [C5-2] 같은 paymentKey 콜백 재전송 → 200, 잔액 그대로
+  - [C5-3] 서명 틀림 → 401 /errors/invalid-signature
+  - [C5-4] 없는 orderId → 404
+  - [R5] 함정을 피했는지 코드로 확인: 본문을 객체로 파싱한 뒤 다시 직렬화해 서명을 계산하면 바이트가 달라져 정상 콜백도 401이 된다.
+
+말하기 카드
+- [TC-D08-1] PG 클라이언트에 연결 1s, 응답 3s, 커넥션 풀 대기 2s를 따로 두었습니다. 셋은 각각 무엇을 막나요?
+    · 연결 타임아웃은 TCP 연결을 맺는 시간, 응답 타임아웃은 요청 후 응답을 기다리는 시간, 풀 대기 타임아웃은 클라이언트 풀에서 빈 커넥션을 얻는 시간이다
+    · 셋 중 하나라도 비어 있으면 그 구간에서 요청 스레드가 오래(클라이언트에 따라 무한히) 묶일 수 있다
+    · 값은 명세 운영 값을 쓰고, WireMock·Toxiproxy로 지연을 주입해 각 타임아웃이 어떤 예외로 나는지 직접 확인한다
+- [TC-D08-2] 포인트 충전 흐름을 트랜잭션 몇 개로 나눴나요? 왜 그렇게 나눴나요?
+    · pg_payment를 REQUESTED로 저장하는 짧은 트랜잭션 → 트랜잭션 밖에서 PG 호출 → 결과로 상태를 바꾸고 포인트를 적립하는 짧은 트랜잭션, 세 단계다
+    · 요청 기록을 먼저 커밋해 두어야 PG 호출 중 서버가 죽어도 무엇을 보냈는지 남는다
+    · PG를 기다리는 동안 DB 커넥션을 쥐지 않으므로, PG가 느려도 Hikari 풀(10)이 고갈되지 않는다
+- [TC-D08-3] PG 응답이 3초를 넘겨 타임아웃이 났습니다. 사용자에게 &quot;충전 실패&quot;라고 보여 주면 왜 안 되나요?
+    · 타임아웃은 실패가 아니라 결과 불명이다. PG는 승인을 끝냈을 수 있다
+    · pg_payment를 UNKNOWN으로 남기고 504 /errors/pg-timeout을 돌려준다
+    · 상태는 orderId가 담긴 PG 콜백이나 GET /pg/v1/payments?orderId= 조회(재처리 워커)로 확정한다. 같은 Idempotency-Key로 승인을 다시 요청해도 PG는 처음 결과를 돌려준다
+- [TC-D08-4] PG 호출이 실패하면 무조건 세 번 재시도하게 했다가 리뷰에서 지적을 받았습니다. 무엇을 재시도하고 무엇을 하지 않나요?
+    · 연결 실패·타임아웃·5xx는 재시도 후보지만, 400·401 같은 4xx는 같은 요청이 같은 실패를 내므로 재시도하지 않는다
+    · 결제 같은 POST는 같은 멱등 키로 재시도할 때만 이중 승인이 생기지 않는다
+    · 재시도 간격은 지수 백오프와 지터로 늘리고, 전체 시간이 상위 요청의 시간 예산을 넘지 않게 횟수를 제한한다
+- [TC-D08-5] PG 콜백 경로는 인증 없이 공개했습니다. 그러면 아무나 &quot;결제 완료&quot;를 보내 포인트를 받을 수 있지 않나요?
+    · 공개 경로라도 서버가 본문 원문 바이트를 같은 비밀키로 HMAC-SHA256해 X-PG-Signature와 상수 시간으로 비교하고, 다르면 401을 낸다
+    · 서명은 파싱 전 원문으로 계산한다. JSON을 파싱해 다시 직렬화하면 공백이나 필드 순서가 바뀌어 바이트가 달라질 수 있다
+    · 같은 paymentKey 콜백이 여러 번 와도 한 번만 적립하고, amount가 저장된 충전 금액과 다르면 거부한다
+
+리뷰 초점
+- PG 호출이 `@Transactional` 범위 밖에서 일어나는지(트랜잭션 로그로 확인)
+- PG 비밀키가 코드·yml에 없고 `BOARD_PG_SECRET` 환경 변수로 들어오는지
+- 결과 불명(`UNKNOWN`) 건을 실패로 단정해 포인트를 지급·환불하지 않는지
+
+아래 형식으로만 답해라.
+① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)
+② 잘한 점
+③ 부족한 점과 이유 — 실패한 C 항목부터
+④ 내일 전에 고칠 것 — 우선순위순, 3개 이내
+⑤ 말하기 카드 — | 카드 | 빠진 줄 | 결과 |
+마지막 줄: `결과: 필수 N/M 통과 · 말하기 카드 K/L 통과` (필수 = C 항목, R은 참고)</code></pre>
+<h2 id="내일-미리보기"><a class="anchor" href="#내일-미리보기" aria-hidden="true">#</a>내일 미리보기</h2>
+<p><a class="docref" href="../../docs/knowledge/D09-operations-observability.html">D09</a>는 오늘 정한 외부 호출 타임아웃 원칙을 Redis에도 적용하고, <a class="docref" href="../../docs/knowledge/D07-onprem-vs-cloud.html">D07</a> 쿠폰 발급 앞단에 Redis 잔여 수량을 붙인다.</p>
+<h2 id="날짜별-snapshot"><a class="anchor" href="#날짜별-snapshot" aria-hidden="true">#</a>날짜별 snapshot</h2>
+<p>오늘 마지막 정답 커밋은 <code>692b2cf7</code>(answer(D08-6): Hikari 운영 값과 타임아웃 테스트 안정화)이다. <a href="https://github.com/ai-ext/javaExperience/tree/692b2cf7347b115c158f7e8c2a0469c9f67eb254/board-server" target="_blank" rel="noopener">이 시점의 board-server 전체 보기</a>. 기준은 위 순서 칸의 인라인 정답이고, 이 링크는 보조다(PR 병합 방식에 따라 커밋이 사라질 수 있다).</p>
+<h2 id="참고-자료"><a class="anchor" href="#참고-자료" aria-hidden="true">#</a>참고 자료</h2>
+<details class="day-refs">
+<summary>기존 시나리오·공부자료 (참고 도감)</summary>
+
+<ul>
+<li><a href="../../docs/knowledge/P25-external-api-client.html">P25. 외부 API 연동 실무 — RestClient·HTTP Interface</a></li>
+<li><a href="../../docs/knowledge/S06-rest-api-clients.html">S06. REST API 설계와 HTTP 클라이언트</a></li>
+<li><a href="../../docs/knowledge/W11-why-tx-in-service.html">W11. 트랜잭션은 왜 서비스 계층에 거나</a></li>
+<li><a href="../../docs/knowledge/W14-sync-async-blocking.html">W14. 동기 vs 비동기, 블로킹 vs 논블로킹 — 백엔드에서 언제</a></li>
+</ul>
+</details>
+
+<p><a href="D07.html">← D07</a> · <a href="README.html">일자 목록</a> · <a href="D09.html">D09 →</a></p>
+
+
+</main>
+
+
+
+
+
+</body>
+</html>

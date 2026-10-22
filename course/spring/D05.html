@@ -1,0 +1,1989 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D05. 조회·수정·삭제 (JPA)</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=53f71b596d04">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<!-- 생성물: tools/course/build-days.mjs가 만든다. 직접 고치지 마라 -->
+
+<h1 id="d05-조회수정삭제-jpa"><a class="anchor" href="#d05-조회수정삭제-jpa" aria-hidden="true">#</a>D05. 조회·수정·삭제 (JPA)</h1>
+<blockquote>
+<p>1단계 · 빈 프로젝트로 서버 만들기 · 오늘의 Java <a href="../java/J05.html">J05</a> · 순서 6개 · 말하기 카드 5장</p>
+</blockquote>
+<h2 id="오늘-순서"><a class="anchor" href="#오늘-순서" aria-hidden="true">#</a>오늘 순서</h2>
+<ol class="day-steps" data-day="D05">
+<li data-step="D05-1"><label><input type="checkbox" class="step-check" data-step="D05-1"> <a href="#step-d05-1">① 글 상세 조회 API</a></label></li>
+<li data-step="D05-2"><label><input type="checkbox" class="step-check" data-step="D05-2"> <a href="#step-d05-2">② 글 전체·부분 수정과 소프트 삭제, 작성자 검증</a></label></li>
+<li data-step="D05-3"><label><input type="checkbox" class="step-check" data-step="D05-3"> <a href="#step-d05-3">③ <code>Comment</code> 엔티티 (<code>schema.sql</code>에 <code>comment</code> 테이블, 인덱스(<code>post_id</code>, <code>id</code>))</a></label></li>
+<li data-step="D05-4"><label><input type="checkbox" class="step-check" data-step="D05-4"> <a href="#step-d05-4">④ 댓글 서비스와 작성·목록·삭제 API, N+1 제거 (<code>CommentRepository</code>에 fetch join 조회 추가, 대상 존재(404)를 작성자(403)보다 먼저 검사)</a></label></li>
+<li data-step="D05-5"><label><input type="checkbox" class="step-check" data-step="D05-5"> <a href="#step-d05-5">⑤ <code>PostLike</code> 엔티티 (<code>schema.sql</code>에 <code>post_like</code> 테이블, UNIQUE(<code>post_id</code>, <code>member_id</code>))</a></label></li>
+<li data-step="D05-6"><label><input type="checkbox" class="step-check" data-step="D05-6"> <a href="#step-d05-6">⑥ 좋아요 등록·취소 API (멱등)</a></label></li>
+</ol>
+
+<h2 id="오늘의-java"><a class="anchor" href="#오늘의-java" aria-hidden="true">#</a>오늘의 Java</h2>
+<p><a href="../java/J05.html">J05. List와 stream으로 DTO 변환, Optional</a> — 30~60분. Spring 순서를 시작하기 전에 오늘 쓰는 Java를 먼저 연습한다.</p>
+<ul>
+<li>주제: <code>List</code>/<code>ArrayList</code>, <code>new</code>로 만들어 담기, for에서 stream(<code>map</code>·<code>filter</code>·<code>collect</code>)으로, <code>Optional</code>: 엔티티 목록을 DTO 목록으로 바꾸기, 사용 가능한 쿠폰만 거르기</li>
+</ul>
+<hr>
+<section class="day-step" id="step-d05-1" data-step="D05-1">
+
+<h2 id="①-글-상세-조회-api"><a class="anchor" href="#①-글-상세-조회-api" aria-hidden="true">#</a>① 글 상세 조회 API</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/post/PostDetailResponse.java</code></li>
+<li><code>src/main/java/com/example/board/post/PostServiceImpl.java</code></li>
+<li><code>src/main/java/com/example/board/post/PostController.java</code></li>
+</ul>
+<p><strong>겪을 것</strong> 응답 DTO를 만들며 지연 로딩 연관(작성자·태그)을 건드리면 쿼리가 추가로 나가므로 SQL 로그로 쿼리 수를 센다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li>토큰 없이 <code>GET /api/posts/{postId}</code> → 200</li>
+<li>없는 글 → 404 <code>/errors/not-found</code></li>
+<li><code>postId</code> = 0 → 400 <code>/errors/validation</code></li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>GET /api/posts/{postId}</code></a></p>
+<details class="step-hint" data-step="D05-1">
+<summary>막히면</summary>
+
+<ul>
+<li><code>@PathVariable</code>에 <code>@Positive</code>를 걸려면 컨트롤러에 메서드 검증이 켜져야 한다. 발생하는 예외(<code>HandlerMethodValidationException</code>)를 전역 처리기에서 400으로 바꾼다.</li>
+<li><code>spring.jpa.show-sql</code> 또는 <code>logging.level.org.hibernate.SQL=DEBUG</code>로 조회 한 번에 SQL이 몇 번 나가는지 센다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D05-1" data-commits="317e02eb29a982ab8aea61eefa57a5c8d2c7b3c8">
+<summary>정답 보기 · answer(D05-1) · board-server 파일 9개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/317e02eb29a982ab8aea61eefa57a5c8d2c7b3c8" target="_blank" rel="noopener"><code>317e02eb</code></a> — answer(D05-1): 글 상세 조회 API</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/post/PostDetailResponse.java</code></p>
+<pre><code class="language-java">package com.example.board.post;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.util.List;
+
+/** 호출하는 쪽에서 member·postTags가 이미 로딩돼 있어야 한다(fetch join). */
+public record PostDetailResponse(Long id, Long authorId, String authorNickname, String title, String content,
+        List&lt;String&gt; tags, int likeCount, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
+
+    private static final ZoneId KST = ZoneId.of(&quot;Asia/Seoul&quot;);
+
+    public static PostDetailResponse from(Post post) {
+        List&lt;String&gt; tags = post.getPostTags().stream().map(pt -&gt; pt.getTag().getName()).toList();
+        return new PostDetailResponse(post.getId(), post.getMember().getId(), post.getMember().getNickname(),
+                post.getTitle(), post.getContent(), tags, post.getLikeCount(),
+                post.getCreatedAt().atZone(KST).toOffsetDateTime(), post.getUpdatedAt().atZone(KST).toOffsetDateTime());
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PostServiceImpl.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -38,4 +38,11 @@ public class PostServiceImpl implements PostService {
+         }
+         return postRepository.save(post).getId();
+     }
++
++    @Override
++    @Transactional(readOnly = true)
++    public PostDetailResponse getDetail(Long postId) {
++        return PostDetailResponse.from(postRepository.findActiveDetail(postId)
++                .orElseThrow(() -&gt; new BusinessException(ErrorCode.NOT_FOUND, &quot;글을 찾을 수 없습니다.&quot;)));
++    }
+ }</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PostController.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -3,9 +3,12 @@ package com.example.board.post;
+ import java.net.URI;
+ 
+ import jakarta.validation.Valid;
++import jakarta.validation.constraints.Positive;
+ 
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.core.annotation.AuthenticationPrincipal;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
+ import org.springframework.web.bind.annotation.PostMapping;
+ import org.springframework.web.bind.annotation.RequestBody;
+ import org.springframework.web.bind.annotation.RequestMapping;
+@@ -29,4 +32,9 @@ public class PostController {
+         Long postId = postService.create(auth.id(), request);
+         return ResponseEntity.created(URI.create(&quot;/api/posts/&quot; + postId)).build();
+     }
++
++    @GetMapping(&quot;/{postId}&quot;)
++    public PostDetailResponse detail(@PathVariable @Positive Long postId) {
++        return postService.getDetail(postId);
++    }
+ }</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/common/GlobalExceptionHandler.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -18,6 +18,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
+ import org.springframework.web.bind.annotation.ExceptionHandler;
+ import org.springframework.web.bind.annotation.RestControllerAdvice;
+ import org.springframework.web.context.request.ServletWebRequest;
++import org.springframework.web.method.annotation.HandlerMethodValidationException;
+ import org.springframework.web.context.request.WebRequest;
+ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+ 
+@@ -52,6 +53,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+         return ResponseEntity.badRequest().body(pd);
+     }
+ 
++    // 경로·쿼리 파라미터 검증(@Positive 등) 실패도 본문 검증과 같은 400 형식으로 맞춘다
++    @Override
++    protected ResponseEntity&lt;Object&gt; handleHandlerMethodValidationException(HandlerMethodValidationException ex,
++            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
++        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION.type(), ErrorCode.VALIDATION.title(),
++                &quot;요청 값이 올바르지 않습니다.&quot;, path(request));
++        List&lt;Map&lt;String, String&gt;&gt; errors = ex.getParameterValidationResults().stream()
++                .flatMap(r -&gt; r.getResolvableErrors().stream().map(e -&gt; Map.of(
++                        &quot;field&quot;, r.getMethodParameter().getParameterName() == null ? &quot;&quot; : r.getMethodParameter().getParameterName(),
++                        &quot;reason&quot;, String.valueOf(e.getDefaultMessage()))))
++                .toList();
++        pd.setProperty(&quot;errors&quot;, errors);
++        return ResponseEntity.badRequest().body(pd);
++    }
++
+     // 나머지 Spring MVC 예외(404, 405, 본문 파싱 실패 등)는 상위 클래스가 ProblemDetail로 만든다. instance와 type만 맞춘다.
+     @Override
+     protected ResponseEntity&lt;Object&gt; handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PostRepository.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -1,6 +1,20 @@
+ package com.example.board.post;
+ 
++import java.util.Optional;
++
+ import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.Query;
++import org.springframework.data.repository.query.Param;
+ 
+ public interface PostRepository extends JpaRepository&lt;Post, Long&gt; {
++
++    /** 작성자·태그를 한 번에 읽는다. ACTIVE가 아닌 글(삭제·숨김)은 없는 글로 취급한다. */
++    @Query(&quot;&quot;&quot;
++            select p from Post p
++            join fetch p.member
++            left join fetch p.postTags pt
++            left join fetch pt.tag
++            where p.id = :id and p.status = com.example.board.post.PostStatus.ACTIVE
++            &quot;&quot;&quot;)
++    Optional&lt;Post&gt; findActiveDetail(@Param(&quot;id&quot;) Long id);
+ }</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PostService.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -4,4 +4,7 @@ public interface PostService {
+ 
+     /** 로그인 회원 명의로 글을 만들고 id를 돌려준다. */
+     Long create(Long memberId, PostCreateRequest request);
++
++    /** ACTIVE 글만 돌려준다. 없거나 삭제·숨김이면 404. */
++    PostDetailResponse getDetail(Long postId);
+ }</code></pre>
+<p><strong>수정</strong> <code>src/main/resources/application.yml</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -28,6 +28,10 @@ spring:
+   config:
+     activate:
+       on-profile: test
++  jpa:
++    properties:
++      # 테스트에서 SQL 실행 횟수(N+1)를 세기 위해서만 켠다
++      hibernate.generate_statistics: true
+   datasource:
+     hikari:
+       maximum-pool-size: 5</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/ApiTestSupport.java</code></p>
+<pre><code class="language-java">package com.example.board;
+
+import java.util.UUID;
+
+import jakarta.persistence.EntityManagerFactory;
+
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+
+import com.example.board.config.JwtProvider;
+import com.example.board.member.Member;
+import com.example.board.member.MemberRepository;
+import com.example.board.member.Role;
+
+/** D05 이후 API 테스트가 공유하는 도우미. 회원·토큰 생성과 SQL 횟수 측정을 제공한다. */
+@SpringBootTest
+@Import(TestcontainersConfig.class)
+@ActiveProfiles(&quot;test&quot;)
+@AutoConfigureMockMvc
+public abstract class ApiTestSupport {
+
+    @Autowired
+    protected MockMvc mockMvc;
+
+    @Autowired
+    protected MemberRepository memberRepository;
+
+    @Autowired
+    protected JwtProvider jwtProvider;
+
+    @Autowired
+    protected JdbcTemplate jdbc;
+
+    @Autowired
+    protected EntityManagerFactory emf;
+
+    protected Member newMember(Role role) {
+        return memberRepository.saveAndFlush(Member.create(UUID.randomUUID() + &quot;@t.com&quot;, &quot;hash&quot;,
+                &quot;m&quot; + UUID.randomUUID().toString().replace(&quot;-&quot;, &quot;&quot;).substring(0, 10), role));
+    }
+
+    protected String bearer(Member member) {
+        return &quot;Bearer &quot; + jwtProvider.issue(member.getId(), member.getRole());
+    }
+
+    protected Statistics statistics() {
+        return emf.unwrap(SessionFactory.class).getStatistics();
+    }
+
+    protected Long newPost(Member author) {
+        jdbc.update(&quot;INSERT INTO post (member_id, title, content, status, like_count, created_at, updated_at)&quot;
+                + &quot; VALUES (?, '제목', '내용', 'ACTIVE', 0, NOW(6), NOW(6))&quot;, author.getId());
+        return jdbc.queryForObject(&quot;SELECT MAX(id) FROM post WHERE member_id = ?&quot;, Long.class, author.getId());
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/post/PostCrudApiTest.java</code></p>
+<pre><code class="language-java">package com.example.board.post;
+
+import org.junit.jupiter.api.Test;
+
+import com.example.board.ApiTestSupport;
+import com.example.board.member.Member;
+import com.example.board.member.Role;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+class PostCrudApiTest extends ApiTestSupport {
+
+    @Test
+    void 토큰_없이_상세_조회는_200() throws Exception {
+        Member author = newMember(Role.USER);
+        Long postId = newPost(author);
+
+        mockMvc.perform(get(&quot;/api/posts/{id}&quot;, postId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(&quot;$.id&quot;).value(postId))
+                .andExpect(jsonPath(&quot;$.authorId&quot;).value(author.getId()))
+                .andExpect(jsonPath(&quot;$.title&quot;).value(&quot;제목&quot;));
+    }
+
+    @Test
+    void 없는_글은_404() throws Exception {
+        mockMvc.perform(get(&quot;/api/posts/{id}&quot;, 999_999_999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/not-found&quot;));
+    }
+
+    @Test
+    void postId_0은_400() throws Exception {
+        mockMvc.perform(get(&quot;/api/posts/0&quot;))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/validation&quot;));
+    }
+
+    // 함정: 작성자·태그를 지연 로딩하면 쿼리가 추가로 나간다. fetch join 한 번이어야 한다.
+    @Test
+    void 태그가_여럿인_글_상세도_SQL_1번() throws Exception {
+        Member author = newMember(Role.USER);
+        Long postId = newPost(author);
+        for (String name : new String[] {&quot;a1&quot;, &quot;b1&quot;, &quot;c1&quot;}) {
+            jdbc.update(&quot;INSERT IGNORE INTO tag (name, created_at, updated_at) VALUES (?, NOW(6), NOW(6))&quot;, name);
+            jdbc.update(&quot;INSERT INTO post_tag (post_id, tag_id, created_at, updated_at)&quot;
+                    + &quot; SELECT ?, id, NOW(6), NOW(6) FROM tag WHERE name = ?&quot;, postId, name);
+        }
+        statistics().clear();
+
+        mockMvc.perform(get(&quot;/api/posts/{id}&quot;, postId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(&quot;$.tags.length()&quot;).value(3));
+
+        assertThat(statistics().getPrepareStatementCount()).isEqualTo(1);
+    }
+}</code></pre>
+</details>
+
+</section>
+
+<section class="day-step" id="step-d05-2" data-step="D05-2">
+
+<h2 id="②-글-전체부분-수정과-소프트-삭제-작성자-검증"><a class="anchor" href="#②-글-전체부분-수정과-소프트-삭제-작성자-검증" aria-hidden="true">#</a>② 글 전체·부분 수정과 소프트 삭제, 작성자 검증</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/post/PostUpdateRequest.java</code></li>
+<li><code>src/main/java/com/example/board/post/PostPatchRequest.java</code></li>
+<li><code>src/main/java/com/example/board/post/Post.java</code></li>
+</ul>
+<p><strong>겪을 것</strong> <code>save()</code>를 부르지 않아도 변경 감지로 UPDATE가 커밋(flush) 시점에 나가므로 SQL 로그로 flush 시점을 확인한다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li>작성자 토큰으로 <code>PUT /api/posts/{postId}</code> → 200</li>
+<li><code>PATCH /api/posts/{postId}</code> 제목만 → 200, 본문은 그대로</li>
+<li><code>PATCH</code> 본문 <code>{}</code> → 400</li>
+<li><code>DELETE /api/posts/{postId}</code> → 204, 이후 <code>GET</code> → 404</li>
+<li>다른 회원 토큰으로 <code>PUT</code> → 403 <code>/errors/forbidden</code>, 삭제된 글에 <code>PUT</code> → 404</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>PUT /api/posts/{postId}</code></a> (<a href="../spec-v2.html#5-2-글댓글좋아요">5-2. 글·댓글·좋아요</a>) · <a href="../spec-v2.html#4-엔드포인트"><code>PATCH /api/posts/{postId}</code></a> (<a href="../spec-v2.html#5-2-글댓글좋아요">5-2. 글·댓글·좋아요</a>) · <a href="../spec-v2.html#4-엔드포인트"><code>DELETE /api/posts/{postId}</code></a></p>
+<details class="step-hint" data-step="D05-2">
+<summary>막히면</summary>
+
+<ul>
+<li>엔티티에 <code>update</code>·<code>patch</code>·<code>delete</code> 같은 의도가 드러나는 메서드를 두고, 서비스에서는 찾은 엔티티의 메서드만 부른다(변경 감지).</li>
+<li>PATCH는 &quot;보내지 않은 필드&quot;와 &quot;null을 보낸 필드&quot;를 구분해야 한다. 요청 DTO의 필드가 모두 null인지 확인하는 검증을 찾아본다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D05-2" data-commits="f5163f43c441cd08ed08a3b185bfb46ec1bb5181">
+<summary>정답 보기 · answer(D05-2) · board-server 파일 7개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/f5163f43c441cd08ed08a3b185bfb46ec1bb5181" target="_blank" rel="noopener"><code>f5163f43</code></a> — answer(D05-2): 글 전체·부분 수정과 소프트 삭제, 작성자 검증</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/post/PostUpdateRequest.java</code></p>
+<pre><code class="language-java">package com.example.board.post;
+
+import java.util.List;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+/** PUT은 전체 교체라 생성 요청과 규칙이 같다. */
+public record PostUpdateRequest(
+        @NotBlank @Size(max = 100) String title,
+        @NotNull @Size(min = 1, max = 5000) String content,
+        @Size(max = 5) List&lt;@NotBlank @Size(max = 20) String&gt; tags) {
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/post/PostPatchRequest.java</code></p>
+<pre><code class="language-java">package com.example.board.post;
+
+import java.util.List;
+
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
+/** null은 &quot;바꾸지 않음&quot;이다. 보낸 필드만 검증한다. */
+public record PostPatchRequest(
+        @Size(max = 100) @Pattern(regexp = &quot;[\\s\\S]*\\S[\\s\\S]*&quot;, message = &quot;공백만 입력할 수 없습니다&quot;) String title,
+        @Size(min = 1, max = 5000) String content,
+        @Size(max = 5) List&lt;@NotBlank @Size(max = 20) String&gt; tags) {
+
+    @AssertTrue(message = &quot;변경할 필드가 하나 이상 필요합니다&quot;)
+    public boolean isAnyFieldPresent() {
+        return title != null || content != null || tags != null;
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/post/Post.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -1,7 +1,9 @@
+ package com.example.board.post;
+ 
+ import java.util.ArrayList;
++import java.util.HashSet;
+ import java.util.List;
++import java.util.Set;
+ 
+ import jakarta.persistence.CascadeType;
+ import jakarta.persistence.Column;
+@@ -52,7 +54,7 @@ public class Post extends BaseEntity {
+     @Column(name = &quot;like_count&quot;, nullable = false)
+     private int likeCount;
+ 
+-    @OneToMany(mappedBy = &quot;post&quot;, cascade = CascadeType.PERSIST)
++    @OneToMany(mappedBy = &quot;post&quot;, cascade = CascadeType.PERSIST, orphanRemoval = true)
+     private List&lt;PostTag&gt; postTags = new ArrayList&lt;&gt;();
+ 
+     private Post(Member member, String title, String content) {
+@@ -69,4 +71,35 @@ public class Post extends BaseEntity {
+     public void addTag(Tag tag) {
+         postTags.add(PostTag.create(this, tag));
+     }
++
++    public void update(String title, String content) {
++        this.title = title;
++        this.content = content;
++    }
++
++    /** null인 인자는 바꾸지 않는다. */
++    public void patch(String title, String content) {
++        if (title != null) {
++            this.title = title;
++        }
++        if (content != null) {
++            this.content = content;
++        }
++    }
++
++    /** 겹치는 태그는 그대로 두고 차이만 반영한다. 지우고 다시 넣으면 INSERT가 DELETE보다 먼저 나가 UNIQUE에 걸린다. */
++    public void replaceTags(List&lt;Tag&gt; tags) {
++        Set&lt;Tag&gt; wanted = new HashSet&lt;&gt;(tags);
++        postTags.removeIf(pt -&gt; !wanted.contains(pt.getTag()));
++        wanted.removeAll(postTags.stream().map(PostTag::getTag).toList());
++        tags.stream().filter(wanted::contains).forEach(this::addTag);
++    }
++
++    public void delete() {
++        this.status = PostStatus.DELETED;
++    }
++
++    public boolean isWrittenBy(Long memberId) {
++        return member.getId().equals(memberId);
++    }
+ }</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PostController.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -7,9 +7,12 @@ import jakarta.validation.constraints.Positive;
+ 
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.core.annotation.AuthenticationPrincipal;
++import org.springframework.web.bind.annotation.DeleteMapping;
+ import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PatchMapping;
+ import org.springframework.web.bind.annotation.PathVariable;
+ import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.PutMapping;
+ import org.springframework.web.bind.annotation.RequestBody;
+ import org.springframework.web.bind.annotation.RequestMapping;
+ import org.springframework.web.bind.annotation.RestController;
+@@ -37,4 +40,22 @@ public class PostController {
+     public PostDetailResponse detail(@PathVariable @Positive Long postId) {
+         return postService.getDetail(postId);
+     }
++
++    @PutMapping(&quot;/{postId}&quot;)
++    public PostDetailResponse update(@AuthenticationPrincipal AuthMember auth, @PathVariable @Positive Long postId,
++            @Valid @RequestBody PostUpdateRequest request) {
++        return postService.update(postId, auth.id(), request);
++    }
++
++    @PatchMapping(&quot;/{postId}&quot;)
++    public PostDetailResponse patch(@AuthenticationPrincipal AuthMember auth, @PathVariable @Positive Long postId,
++            @Valid @RequestBody PostPatchRequest request) {
++        return postService.patch(postId, auth.id(), request);
++    }
++
++    @DeleteMapping(&quot;/{postId}&quot;)
++    public ResponseEntity&lt;Void&gt; delete(@AuthenticationPrincipal AuthMember auth, @PathVariable @Positive Long postId) {
++        postService.delete(postId, auth.id());
++        return ResponseEntity.noContent().build();
++    }
+ }</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PostService.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -7,4 +7,12 @@ public interface PostService {
+ 
+     /** ACTIVE 글만 돌려준다. 없거나 삭제·숨김이면 404. */
+     PostDetailResponse getDetail(Long postId);
++
++    /** 작성자만 가능. 대상 없음(404)을 작성자 아님(403)보다 먼저 검사한다. */
++    PostDetailResponse update(Long postId, Long memberId, PostUpdateRequest request);
++
++    PostDetailResponse patch(Long postId, Long memberId, PostPatchRequest request);
++
++    /** 소프트 삭제(status=DELETED). */
++    void delete(Long postId, Long memberId);
+ }</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PostServiceImpl.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -45,4 +45,55 @@ public class PostServiceImpl implements PostService {
+         return PostDetailResponse.from(postRepository.findActiveDetail(postId)
+                 .orElseThrow(() -&gt; new BusinessException(ErrorCode.NOT_FOUND, &quot;글을 찾을 수 없습니다.&quot;)));
+     }
++
++    @Override
++    @Transactional
++    public PostDetailResponse update(Long postId, Long memberId, PostUpdateRequest request) {
++        Post post = findOwned(postId, memberId);
++        post.update(request.title(), request.content());
++        post.replaceTags(resolveTags(request.tags()));
++        return flushAndRespond(post);
++    }
++
++    @Override
++    @Transactional
++    public PostDetailResponse patch(Long postId, Long memberId, PostPatchRequest request) {
++        Post post = findOwned(postId, memberId);
++        post.patch(request.title(), request.content());
++        if (request.tags() != null) {
++            post.replaceTags(resolveTags(request.tags()));
++        }
++        return flushAndRespond(post);
++    }
++
++    @Override
++    @Transactional
++    public void delete(Long postId, Long memberId) {
++        // save()를 부르지 않는다. 영속 상태 엔티티의 변경은 커밋 시점에 UPDATE로 나간다.
++        findOwned(postId, memberId).delete();
++    }
++
++    private Post findOwned(Long postId, Long memberId) {
++        Post post = postRepository.findActiveDetail(postId)
++                .orElseThrow(() -&gt; new BusinessException(ErrorCode.NOT_FOUND, &quot;글을 찾을 수 없습니다.&quot;));
++        if (!post.isWrittenBy(memberId)) {
++            throw new BusinessException(ErrorCode.FORBIDDEN, &quot;작성자만 수정·삭제할 수 있습니다.&quot;);
++        }
++        return post;
++    }
++
++    private List&lt;Tag&gt; resolveTags(List&lt;String&gt; names) {
++        if (names == null) {
++            return List.of();
++        }
++        return new LinkedHashSet&lt;&gt;(names).stream()
++                .map(name -&gt; tagRepository.findByName(name).orElseGet(() -&gt; tagRepository.save(Tag.create(name))))
++                .toList();
++    }
++
++    // 응답의 updatedAt이 감사 필드 갱신 이후 값이 되도록 먼저 flush 한다
++    private PostDetailResponse flushAndRespond(Post post) {
++        postRepository.flush();
++        return PostDetailResponse.from(post);
++    }
+ }</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/post/PostCrudApiTest.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -1,13 +1,17 @@
+ package com.example.board.post;
+ 
+ import org.junit.jupiter.api.Test;
++import org.springframework.http.MediaType;
+ 
+ import com.example.board.ApiTestSupport;
+ import com.example.board.member.Member;
+ import com.example.board.member.Role;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+ 
+@@ -57,4 +61,119 @@ class PostCrudApiTest extends ApiTestSupport {
+ 
+         assertThat(statistics().getPrepareStatementCount()).isEqualTo(1);
+     }
++
++    @Test
++    void 작성자의_PUT은_200이고_DB에_반영된다() throws Exception {
++        Member author = newMember(Role.USER);
++        Long postId = newPost(author);
++
++        mockMvc.perform(put(&quot;/api/posts/{id}&quot;, postId).header(&quot;Authorization&quot;, bearer(author))
++                .contentType(MediaType.APPLICATION_JSON)
++                .content(&quot;{\&quot;title\&quot;:\&quot;새 제목\&quot;,\&quot;content\&quot;:\&quot;새 내용\&quot;,\&quot;tags\&quot;:[\&quot;x1\&quot;,\&quot;y1\&quot;]}&quot;))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath(&quot;$.title&quot;).value(&quot;새 제목&quot;))
++                .andExpect(jsonPath(&quot;$.tags.length()&quot;).value(2));
++
++        // save()를 부르지 않아도 변경 감지로 커밋 시점에 UPDATE가 나간다
++        assertThat(jdbc.queryForObject(&quot;SELECT title FROM post WHERE id = ?&quot;, String.class, postId)).isEqualTo(&quot;새 제목&quot;);
++        assertThat(jdbc.queryForObject(&quot;SELECT COUNT(*) FROM post_tag WHERE post_id = ?&quot;, Integer.class, postId))
++                .isEqualTo(2);
++    }
++
++    @Test
++    void PUT으로_태그를_바꿔도_겹치는_태그는_유지된다() throws Exception {
++        Member author = newMember(Role.USER);
++        Long postId = newPost(author);
++        String h = bearer(author);
++        for (String body : new String[] {&quot;{\&quot;title\&quot;:\&quot;t\&quot;,\&quot;content\&quot;:\&quot;c\&quot;,\&quot;tags\&quot;:[\&quot;k1\&quot;,\&quot;k2\&quot;]}&quot;,
++                &quot;{\&quot;title\&quot;:\&quot;t\&quot;,\&quot;content\&quot;:\&quot;c\&quot;,\&quot;tags\&quot;:[\&quot;k2\&quot;,\&quot;k3\&quot;]}&quot;}) {
++            mockMvc.perform(put(&quot;/api/posts/{id}&quot;, postId).header(&quot;Authorization&quot;, h)
++                    .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk());
++        }
++        assertThat(jdbc.queryForList(&quot;SELECT t.name FROM post_tag pt JOIN tag t ON t.id = pt.tag_id&quot;
++                + &quot; WHERE pt.post_id = ? ORDER BY t.name&quot;, String.class, postId)).containsExactly(&quot;k2&quot;, &quot;k3&quot;);
++    }
++
++    @Test
++    void PATCH는_제목만_바꾸고_본문은_그대로() throws Exception {
++        Member author = newMember(Role.USER);
++        Long postId = newPost(author);
++
++        mockMvc.perform(patch(&quot;/api/posts/{id}&quot;, postId).header(&quot;Authorization&quot;, bearer(author))
++                .contentType(MediaType.APPLICATION_JSON).content(&quot;{\&quot;title\&quot;:\&quot;바뀐 제목\&quot;}&quot;))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath(&quot;$.title&quot;).value(&quot;바뀐 제목&quot;))
++                .andExpect(jsonPath(&quot;$.content&quot;).value(&quot;내용&quot;));
++    }
++
++    @Test
++    void PATCH_빈_본문은_400() throws Exception {
++        Member author = newMember(Role.USER);
++        Long postId = newPost(author);
++
++        mockMvc.perform(patch(&quot;/api/posts/{id}&quot;, postId).header(&quot;Authorization&quot;, bearer(author))
++                .contentType(MediaType.APPLICATION_JSON).content(&quot;{}&quot;))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/validation&quot;));
++    }
++
++    @Test
++    void PATCH_공백_제목은_400() throws Exception {
++        Member author = newMember(Role.USER);
++        Long postId = newPost(author);
++
++        mockMvc.perform(patch(&quot;/api/posts/{id}&quot;, postId).header(&quot;Authorization&quot;, bearer(author))
++                .contentType(MediaType.APPLICATION_JSON).content(&quot;{\&quot;title\&quot;:\&quot;  \&quot;}&quot;))
++                .andExpect(status().isBadRequest());
++    }
++
++    @Test
++    void DELETE는_204이고_이후_GET은_404() throws Exception {
++        Member author = newMember(Role.USER);
++        Long postId = newPost(author);
++
++        mockMvc.perform(delete(&quot;/api/posts/{id}&quot;, postId).header(&quot;Authorization&quot;, bearer(author)))
++                .andExpect(status().isNoContent());
++        mockMvc.perform(get(&quot;/api/posts/{id}&quot;, postId)).andExpect(status().isNotFound());
++        // 소프트 삭제라 행은 남는다
++        assertThat(jdbc.queryForObject(&quot;SELECT status FROM post WHERE id = ?&quot;, String.class, postId))
++                .isEqualTo(&quot;DELETED&quot;);
++    }
++
++    @Test
++    void 남의_글_PUT은_403() throws Exception {
++        Long postId = newPost(newMember(Role.USER));
++
++        mockMvc.perform(put(&quot;/api/posts/{id}&quot;, postId).header(&quot;Authorization&quot;, bearer(newMember(Role.USER)))
++                .contentType(MediaType.APPLICATION_JSON).content(&quot;{\&quot;title\&quot;:\&quot;t\&quot;,\&quot;content\&quot;:\&quot;c\&quot;}&quot;))
++                .andExpect(status().isForbidden())
++                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/forbidden&quot;));
++    }
++
++    @Test
++    void 남의_글_DELETE는_403() throws Exception {
++        Long postId = newPost(newMember(Role.USER));
++
++        mockMvc.perform(delete(&quot;/api/posts/{id}&quot;, postId).header(&quot;Authorization&quot;, bearer(newMember(Role.USER))))
++                .andExpect(status().isForbidden());
++    }
++
++    @Test
++    void 삭제된_글_PUT은_404() throws Exception {
++        Member author = newMember(Role.USER);
++        Long postId = newPost(author);
++        jdbc.update(&quot;UPDATE post SET status = 'DELETED' WHERE id = ?&quot;, postId);
++
++        mockMvc.perform(put(&quot;/api/posts/{id}&quot;, postId).header(&quot;Authorization&quot;, bearer(author))
++                .contentType(MediaType.APPLICATION_JSON).content(&quot;{\&quot;title\&quot;:\&quot;t\&quot;,\&quot;content\&quot;:\&quot;c\&quot;}&quot;))
++                .andExpect(status().isNotFound())
++                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/not-found&quot;));
++    }
++
++    @Test
++    void 토큰_없는_PUT은_401() throws Exception {
++        mockMvc.perform(put(&quot;/api/posts/1&quot;).contentType(MediaType.APPLICATION_JSON)
++                .content(&quot;{\&quot;title\&quot;:\&quot;t\&quot;,\&quot;content\&quot;:\&quot;c\&quot;}&quot;))
++                .andExpect(status().isUnauthorized());
++    }
+ }</code></pre>
+</details>
+
+</section>
+
+<section class="day-step" id="step-d05-3" data-step="D05-3">
+
+<h2 id="③-comment-엔티티-schemasql에-comment-테이블-인덱스post_id-id"><a class="anchor" href="#③-comment-엔티티-schemasql에-comment-테이블-인덱스post_id-id" aria-hidden="true">#</a>③ <code>Comment</code> 엔티티 (<code>schema.sql</code>에 <code>comment</code> 테이블, 인덱스(<code>post_id</code>, <code>id</code>))</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/comment/Comment.java</code></li>
+<li><code>src/main/java/com/example/board/comment/CommentRepository.java</code></li>
+<li><code>src/main/resources/schema.sql</code></li>
+</ul>
+<p><strong>겪을 것</strong> <code>@ManyToOne</code>을 기본값(EAGER)으로 두면 댓글 하나를 읽을 때도 글·작성자 쿼리가 따라 나가므로 <code>fetch = LAZY</code>로 둔다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li><code>CommentRepositoryTest</code> 통과: 한 글의 댓글을 <code>id</code> 순으로 조회한다</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>POST /api/posts/{postId}/comments</code></a> (<a href="../spec-v2.html#5-2-글댓글좋아요">5-2. 글·댓글·좋아요</a>)</p>
+<details class="step-hint" data-step="D05-3">
+<summary>막히면</summary>
+
+<ul>
+<li><code>@ManyToOne</code>의 기본 fetch 값을 확인하고 <code>LAZY</code>로 바꾼다. 정렬 조회는 쿼리 메서드 이름의 <code>OrderByIdAsc</code>를 찾아본다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D05-3" data-commits="db6156e9bb8086919b3b4b2a590fa1adb003837a">
+<summary>정답 보기 · answer(D05-3) · board-server 파일 4개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/db6156e9bb8086919b3b4b2a590fa1adb003837a" target="_blank" rel="noopener"><code>db6156e9</code></a> — answer(D05-3): Comment 엔티티와 comment 테이블</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/comment/Comment.java</code></p>
+<pre><code class="language-java">package com.example.board.comment;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+
+import com.example.board.common.BaseEntity;
+import com.example.board.member.Member;
+import com.example.board.post.Post;
+
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Getter
+@Entity
+@Table(name = &quot;comment&quot;)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Comment extends BaseEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    // 기본값(EAGER)이면 댓글 하나를 읽을 때도 글·작성자 쿼리가 따라 나간다
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = &quot;post_id&quot;, nullable = false)
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = &quot;member_id&quot;, nullable = false)
+    private Member member;
+
+    @Column(nullable = false, length = 500)
+    private String content;
+
+    @Column(nullable = false)
+    private boolean deleted;
+
+    private Comment(Post post, Member member, String content) {
+        this.post = post;
+        this.member = member;
+        this.content = content;
+    }
+
+    public static Comment create(Post post, Member member, String content) {
+        return new Comment(post, member, content);
+    }
+
+    public void delete() {
+        this.deleted = true;
+    }
+
+    public boolean isWrittenBy(Long memberId) {
+        return member.getId().equals(memberId);
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/comment/CommentRepository.java</code></p>
+<pre><code class="language-java">package com.example.board.comment;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface CommentRepository extends JpaRepository&lt;Comment, Long&gt; {
+
+    List&lt;Comment&gt; findByPostIdOrderByIdAsc(Long postId);
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/resources/schema.sql</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -66,3 +66,18 @@ CREATE TABLE IF NOT EXISTS post_tag (
+     CONSTRAINT fk_post_tag_tag FOREIGN KEY (tag_id) REFERENCES tag (id),
+     UNIQUE KEY uk_post_tag_post_tag (post_id, tag_id)
+ ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
++
++CREATE TABLE IF NOT EXISTS comment (
++    id         BIGINT       NOT NULL AUTO_INCREMENT,
++    post_id    BIGINT       NOT NULL,
++    member_id  BIGINT       NOT NULL,
++    content    VARCHAR(500) NOT NULL,
++    deleted    BOOLEAN      NOT NULL DEFAULT FALSE,
++    created_at DATETIME(6)  NOT NULL,
++    updated_at DATETIME(6)  NOT NULL,
++    PRIMARY KEY (id),
++    CONSTRAINT fk_comment_post FOREIGN KEY (post_id) REFERENCES post (id),
++    CONSTRAINT fk_comment_member FOREIGN KEY (member_id) REFERENCES member (id),
++    -- 글별 댓글 목록(id 커서)용
++    KEY idx_comment_post_id (post_id, id)
++) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/comment/CommentRepositoryTest.java</code></p>
+<pre><code class="language-java">package com.example.board.comment;
+
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import com.example.board.ApiTestSupport;
+import com.example.board.member.Member;
+import com.example.board.member.Role;
+import com.example.board.post.Post;
+import com.example.board.post.PostRepository;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class CommentRepositoryTest extends ApiTestSupport {
+
+    @Autowired
+    CommentRepository commentRepository;
+
+    @Autowired
+    PostRepository postRepository;
+
+    @Autowired
+    TransactionTemplate tx;
+
+    @Test
+    void 한_글의_댓글을_id_순으로_조회한다() {
+        Member m = newMember(Role.USER);
+        Post post = postRepository.saveAndFlush(Post.create(m, &quot;제목&quot;, &quot;내용&quot;));
+        Post other = postRepository.saveAndFlush(Post.create(m, &quot;다른 글&quot;, &quot;내용&quot;));
+        Comment c1 = commentRepository.save(Comment.create(post, m, &quot;첫째&quot;));
+        commentRepository.save(Comment.create(other, m, &quot;다른 글 댓글&quot;));
+        Comment c2 = commentRepository.save(Comment.create(post, m, &quot;둘째&quot;));
+
+        List&lt;Comment&gt; result = commentRepository.findByPostIdOrderByIdAsc(post.getId());
+
+        assertThat(result).extracting(Comment::getId).containsExactly(c1.getId(), c2.getId());
+    }
+
+    // 함정: @ManyToOne 기본값(EAGER)이면 댓글만 읽어도 글·작성자가 따라 로딩된다
+    @Test
+    void 댓글만_읽으면_글과_작성자는_로딩되지_않는다() {
+        Member m = newMember(Role.USER);
+        Post post = postRepository.saveAndFlush(Post.create(m, &quot;제목&quot;, &quot;내용&quot;));
+        Long id = commentRepository.saveAndFlush(Comment.create(post, m, &quot;내용&quot;)).getId();
+
+        tx.executeWithoutResult(s -&gt; {
+            Comment found = commentRepository.findById(id).orElseThrow();
+            var util = emf.getPersistenceUnitUtil();
+            assertThat(util.isLoaded(found, &quot;post&quot;)).isFalse();
+            assertThat(util.isLoaded(found, &quot;member&quot;)).isFalse();
+        });
+    }
+}</code></pre>
+</details>
+
+</section>
+
+<section class="day-step" id="step-d05-4" data-step="D05-4">
+
+<h2 id="④-댓글-서비스와-작성목록삭제-api-n1-제거-commentrepository에-fetch-join-조회-추가-대상-존재404를-작성자403보다-먼저-검사"><a class="anchor" href="#④-댓글-서비스와-작성목록삭제-api-n1-제거-commentrepository에-fetch-join-조회-추가-대상-존재404를-작성자403보다-먼저-검사" aria-hidden="true">#</a>④ 댓글 서비스와 작성·목록·삭제 API, N+1 제거 (<code>CommentRepository</code>에 fetch join 조회 추가, 대상 존재(404)를 작성자(403)보다 먼저 검사)</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/comment/CommentService.java</code></li>
+<li><code>src/main/java/com/example/board/comment/CommentController.java</code></li>
+<li><code>src/main/java/com/example/board/comment/CommentResponse.java</code></li>
+</ul>
+<p><strong>겪을 것</strong> 댓글마다 작성자 닉네임을 지연 로딩하면 댓글 20개에 SQL이 21번 나간다(N+1).</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li><code>POST /api/posts/{postId}/comments</code> → 201</li>
+<li>삭제된 글에 댓글 작성 → 404 <code>/errors/not-found</code></li>
+<li>토큰 없이 <code>GET /api/posts/{postId}/comments</code> → 200, 댓글 20개에 SQL 2번 이하</li>
+<li><code>DELETE /api/comments/{commentId}</code>: 작성자 204, 다른 USER 403, ADMIN 204</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>POST /api/posts/{postId}/comments</code></a> (<a href="../spec-v2.html#5-2-글댓글좋아요">5-2. 글·댓글·좋아요</a>) · <a href="../spec-v2.html#4-엔드포인트"><code>GET /api/posts/{postId}/comments</code></a> (<a href="../spec-v2.html#5-3-목록검색">5-3. 목록·검색</a>) · <a href="../spec-v2.html#4-엔드포인트"><code>DELETE /api/comments/{commentId}</code></a></p>
+<details class="step-hint" data-step="D05-4">
+<summary>막히면</summary>
+
+<ul>
+<li>JPQL <code>join fetch</code> 또는 <code>@EntityGraph</code>를 찾아본다. 쿼리 수는 SQL 로그나 Hibernate <code>Statistics</code>로 센다.</li>
+<li>삭제 권한은 글 존재(404) → 작성자 또는 ADMIN(403) 순서로 검사한다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D05-4" data-commits="4bffbbc03c32da0ba01044ec7b7187d096968a7c">
+<summary>정답 보기 · answer(D05-4) · board-server 파일 10개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/4bffbbc03c32da0ba01044ec7b7187d096968a7c" target="_blank" rel="noopener"><code>4bffbbc0</code></a> — answer(D05-4): 댓글 서비스와 작성·목록·삭제 API, N+1 제거</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/comment/CommentService.java</code></p>
+<pre><code class="language-java">package com.example.board.comment;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.List;
+
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.example.board.common.BusinessException;
+import com.example.board.common.ErrorCode;
+import com.example.board.member.MemberRepository;
+import com.example.board.member.Role;
+import com.example.board.post.PostRepository;
+import com.example.board.post.PostStatus;
+
+@Service
+public class CommentService {
+
+    private final CommentRepository commentRepository;
+    private final PostRepository postRepository;
+    private final MemberRepository memberRepository;
+
+    public CommentService(CommentRepository commentRepository, PostRepository postRepository,
+            MemberRepository memberRepository) {
+        this.commentRepository = commentRepository;
+        this.postRepository = postRepository;
+        this.memberRepository = memberRepository;
+    }
+
+    @Transactional
+    public CommentResponse create(Long postId, Long memberId, String content) {
+        requireActivePost(postId);
+        Comment saved = commentRepository.save(Comment.create(postRepository.getReferenceById(postId),
+                memberRepository.getReferenceById(memberId), content));
+        // 응답에 작성자 닉네임이 필요해서 member를 실제로 읽는다(작성 1건이라 N+1이 아니다)
+        return CommentResponse.from(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public CommentPage list(Long postId, String cursor, int size) {
+        long afterId = decode(cursor);
+        requireActivePost(postId);
+        List&lt;Comment&gt; rows = commentRepository.findPage(postId, afterId, PageRequest.of(0, size + 1));
+        boolean hasNext = rows.size() &gt; size;
+        List&lt;Comment&gt; page = hasNext ? rows.subList(0, size) : rows;
+        String next = hasNext ? encode(page.get(page.size() - 1).getId()) : null;
+        return new CommentPage(page.stream().map(CommentResponse::from).toList(), next);
+    }
+
+    /** 대상 없음(404)을 작성자 검사(403)보다 먼저 한다. */
+    @Transactional
+    public void delete(Long commentId, Long memberId, Role role) {
+        Comment comment = commentRepository.findByIdAndDeletedFalse(commentId)
+                .orElseThrow(() -&gt; new BusinessException(ErrorCode.NOT_FOUND, &quot;댓글을 찾을 수 없습니다.&quot;));
+        if (role != Role.ADMIN &amp;&amp; !comment.isWrittenBy(memberId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, &quot;작성자만 삭제할 수 있습니다.&quot;);
+        }
+        comment.delete();
+    }
+
+    private void requireActivePost(Long postId) {
+        if (!postRepository.existsByIdAndStatus(postId, PostStatus.ACTIVE)) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, &quot;글을 찾을 수 없습니다.&quot;);
+        }
+    }
+
+    private static String encode(Long id) {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(id.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static long decode(String cursor) {
+        if (cursor == null || cursor.isEmpty()) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8));
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.VALIDATION, &quot;cursor가 올바르지 않습니다.&quot;);
+        }
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/comment/CommentController.java</code></p>
+<pre><code class="language-java">package com.example.board.comment;
+
+import java.net.URI;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.board.member.AuthMember;
+
+@RestController
+public class CommentController {
+
+    private final CommentService commentService;
+
+    public CommentController(CommentService commentService) {
+        this.commentService = commentService;
+    }
+
+    @PostMapping(&quot;/api/posts/{postId}/comments&quot;)
+    public ResponseEntity&lt;CommentResponse&gt; create(@AuthenticationPrincipal AuthMember auth,
+            @PathVariable @Positive Long postId, @Valid @RequestBody CommentRequest request) {
+        CommentResponse body = commentService.create(postId, auth.id(), request.content());
+        return ResponseEntity.created(URI.create(&quot;/api/comments/&quot; + body.id())).body(body);
+    }
+
+    @GetMapping(&quot;/api/posts/{postId}/comments&quot;)
+    public CommentPage list(@PathVariable @Positive Long postId, @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = &quot;20&quot;) @Min(1) @Max(50) int size) {
+        return commentService.list(postId, cursor, size);
+    }
+
+    @DeleteMapping(&quot;/api/comments/{commentId}&quot;)
+    public ResponseEntity&lt;Void&gt; delete(@AuthenticationPrincipal AuthMember auth,
+            @PathVariable @Positive Long commentId) {
+        commentService.delete(commentId, auth.id(), auth.role());
+        return ResponseEntity.noContent().build();
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/comment/CommentResponse.java</code></p>
+<pre><code class="language-java">package com.example.board.comment;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+
+/** 호출하는 쪽에서 member를 fetch join 해 둬야 한다. 안 그러면 댓글마다 쿼리가 나간다. */
+public record CommentResponse(Long id, Long authorId, String authorNickname, String content,
+        OffsetDateTime createdAt) {
+
+    private static final ZoneId KST = ZoneId.of(&quot;Asia/Seoul&quot;);
+
+    public static CommentResponse from(Comment c) {
+        return new CommentResponse(c.getId(), c.getMember().getId(), c.getMember().getNickname(), c.getContent(),
+                c.getCreatedAt().atZone(KST).toOffsetDateTime());
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/comment/CommentPage.java</code></p>
+<pre><code class="language-java">package com.example.board.comment;
+
+import java.util.List;
+
+public record CommentPage(List&lt;CommentResponse&gt; items, String nextCursor) {
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/comment/CommentRepository.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -1,10 +1,25 @@
+ package com.example.board.comment;
+ 
+ import java.util.List;
++import java.util.Optional;
+ 
++import org.springframework.data.domain.Pageable;
+ import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.Query;
++import org.springframework.data.repository.query.Param;
+ 
+ public interface CommentRepository extends JpaRepository&lt;Comment, Long&gt; {
+ 
+     List&lt;Comment&gt; findByPostIdOrderByIdAsc(Long postId);
++
++    /** 작성자를 fetch join 해서 목록 한 번에 읽는다(N+1 방지). */
++    @Query(&quot;&quot;&quot;
++            select c from Comment c
++            join fetch c.member
++            where c.post.id = :postId and c.deleted = false and c.id &gt; :afterId
++            order by c.id asc
++            &quot;&quot;&quot;)
++    List&lt;Comment&gt; findPage(@Param(&quot;postId&quot;) Long postId, @Param(&quot;afterId&quot;) long afterId, Pageable pageable);
++
++    Optional&lt;Comment&gt; findByIdAndDeletedFalse(Long id);
+ }</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/comment/CommentRequest.java</code></p>
+<pre><code class="language-java">package com.example.board.comment;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+public record CommentRequest(@NotBlank @Size(max = 500) String content) {
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/common/GlobalExceptionHandler.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatusCode;
+ import org.springframework.http.ProblemDetail;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.validation.FieldError;
++import org.springframework.validation.method.ParameterErrors;
+ import org.springframework.web.bind.MethodArgumentNotValidException;
+ import org.springframework.web.bind.annotation.ExceptionHandler;
+ import org.springframework.web.bind.annotation.RestControllerAdvice;
+@@ -60,9 +61,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION.type(), ErrorCode.VALIDATION.title(),
+                 &quot;요청 값이 올바르지 않습니다.&quot;, path(request));
+         List&lt;Map&lt;String, String&gt;&gt; errors = ex.getParameterValidationResults().stream()
+-                .flatMap(r -&gt; r.getResolvableErrors().stream().map(e -&gt; Map.of(
+-                        &quot;field&quot;, r.getMethodParameter().getParameterName() == null ? &quot;&quot; : r.getMethodParameter().getParameterName(),
+-                        &quot;reason&quot;, String.valueOf(e.getDefaultMessage()))))
++                .flatMap(r -&gt; r instanceof ParameterErrors pe
++                        // @Valid 본문은 필드 이름을, 경로·쿼리 파라미터는 파라미터 이름을 field로 쓴다
++                        ? pe.getFieldErrors().stream().map(GlobalExceptionHandler::toError)
++                        : r.getResolvableErrors().stream().map(e -&gt; Map.of(
++                                &quot;field&quot;, String.valueOf(r.getMethodParameter().getParameterName()),
++                                &quot;reason&quot;, String.valueOf(e.getDefaultMessage()))))
+                 .toList();
+         pd.setProperty(&quot;errors&quot;, errors);
+         return ResponseEntity.badRequest().body(pd);</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PostRepository.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -17,4 +17,6 @@ public interface PostRepository extends JpaRepository&lt;Post, Long&gt; {
+             where p.id = :id and p.status = com.example.board.post.PostStatus.ACTIVE
+             &quot;&quot;&quot;)
+     Optional&lt;Post&gt; findActiveDetail(@Param(&quot;id&quot;) Long id);
++
++    boolean existsByIdAndStatus(Long id, PostStatus status);
+ }</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/comment/CommentApiTest.java</code></p>
+<pre><code class="language-java">package com.example.board.comment;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+
+import com.example.board.ApiTestSupport;
+import com.example.board.member.Member;
+import com.example.board.member.Role;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+class CommentApiTest extends ApiTestSupport {
+
+    org.springframework.test.web.servlet.ResultActions write(Long postId, Member who, String body) throws Exception {
+        var req = post(&quot;/api/posts/{id}/comments&quot;, postId).contentType(MediaType.APPLICATION_JSON).content(body);
+        if (who != null) {
+            req = req.header(&quot;Authorization&quot;, bearer(who));
+        }
+        return mockMvc.perform(req);
+    }
+
+    Long newComment(Long postId, Member who) {
+        jdbc.update(&quot;INSERT INTO comment (post_id, member_id, content, deleted, created_at, updated_at)&quot;
+                + &quot; VALUES (?, ?, '댓글', FALSE, NOW(6), NOW(6))&quot;, postId, who.getId());
+        return jdbc.queryForObject(&quot;SELECT MAX(id) FROM comment WHERE post_id = ?&quot;, Long.class, postId);
+    }
+
+    @Test
+    void 댓글_작성은_201() throws Exception {
+        Member m = newMember(Role.USER);
+        Long postId = newPost(newMember(Role.USER));
+
+        write(postId, m, &quot;{\&quot;content\&quot;:\&quot;안녕\&quot;}&quot;)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath(&quot;$.content&quot;).value(&quot;안녕&quot;))
+                .andExpect(jsonPath(&quot;$.authorId&quot;).value(m.getId()));
+        assertThat(jdbc.queryForObject(&quot;SELECT COUNT(*) FROM comment WHERE post_id = ?&quot;, Integer.class, postId))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void 댓글_501자는_400이고_빈_내용도_400() throws Exception {
+        Member m = newMember(Role.USER);
+        Long postId = newPost(m);
+
+        write(postId, m, &quot;{\&quot;content\&quot;:\&quot;&quot; + &quot;a&quot;.repeat(501) + &quot;\&quot;}&quot;).andExpect(status().isBadRequest());
+        write(postId, m, &quot;{\&quot;content\&quot;:\&quot;\&quot;}&quot;).andExpect(status().isBadRequest())
+                .andExpect(jsonPath(&quot;$.errors[0].field&quot;).value(&quot;content&quot;));
+        write(postId, m, &quot;{\&quot;content\&quot;:\&quot;&quot; + &quot;a&quot;.repeat(500) + &quot;\&quot;}&quot;).andExpect(status().isCreated());
+    }
+
+    @Test
+    void 토큰_없는_댓글_작성은_401() throws Exception {
+        write(newPost(newMember(Role.USER)), null, &quot;{\&quot;content\&quot;:\&quot;x\&quot;}&quot;).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 삭제된_글에_댓글_작성은_404() throws Exception {
+        Member m = newMember(Role.USER);
+        Long postId = newPost(m);
+        jdbc.update(&quot;UPDATE post SET status = 'DELETED' WHERE id = ?&quot;, postId);
+
+        write(postId, m, &quot;{\&quot;content\&quot;:\&quot;x\&quot;}&quot;).andExpect(status().isNotFound())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/not-found&quot;));
+    }
+
+    @Test
+    void 없는_글에_댓글_작성은_404() throws Exception {
+        write(999_999_999L, newMember(Role.USER), &quot;{\&quot;content\&quot;:\&quot;x\&quot;}&quot;).andExpect(status().isNotFound());
+    }
+
+    // 함정: 댓글마다 작성자를 지연 로딩하면 20개에 SQL 21번(N+1). 작성자가 모두 달라야 드러난다.
+    @Test
+    void 토큰_없이_댓글_20개_목록은_200이고_SQL_2번_이하() throws Exception {
+        Long postId = newPost(newMember(Role.USER));
+        for (int i = 0; i &lt; 20; i++) {
+            newComment(postId, newMember(Role.USER));
+        }
+        statistics().clear();
+
+        mockMvc.perform(get(&quot;/api/posts/{id}/comments&quot;, postId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(&quot;$.items.length()&quot;).value(20))
+                .andExpect(jsonPath(&quot;$.items[0].authorNickname&quot;).isNotEmpty())
+                .andExpect(jsonPath(&quot;$.nextCursor&quot;).value((Object) null));
+
+        assertThat(statistics().getPrepareStatementCount()).isLessThanOrEqualTo(2);
+    }
+
+    @Test
+    void 커서로_이어_읽고_삭제된_댓글은_빠진다() throws Exception {
+        Member m = newMember(Role.USER);
+        Long postId = newPost(m);
+        Long c1 = newComment(postId, m);
+        Long c2 = newComment(postId, m);
+        Long c3 = newComment(postId, m);
+        jdbc.update(&quot;UPDATE comment SET deleted = TRUE WHERE id = ?&quot;, c2);
+
+        String body = mockMvc.perform(get(&quot;/api/posts/{id}/comments?size=1&quot;, postId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(&quot;$.items.length()&quot;).value(1))
+                .andExpect(jsonPath(&quot;$.items[0].id&quot;).value(c1))
+                .andReturn().getResponse().getContentAsString();
+        String cursor = com.jayway.jsonpath.JsonPath.read(body, &quot;$.nextCursor&quot;);
+
+        mockMvc.perform(get(&quot;/api/posts/{id}/comments?size=1&amp;cursor={c}&quot;, postId, cursor))
+                .andExpect(jsonPath(&quot;$.items[0].id&quot;).value(c3))
+                .andExpect(jsonPath(&quot;$.nextCursor&quot;).value((Object) null));
+    }
+
+    @Test
+    void 목록_size_0이나_잘못된_cursor는_400() throws Exception {
+        Long postId = newPost(newMember(Role.USER));
+        mockMvc.perform(get(&quot;/api/posts/{id}/comments?size=0&quot;, postId)).andExpect(status().isBadRequest());
+        mockMvc.perform(get(&quot;/api/posts/{id}/comments?size=51&quot;, postId)).andExpect(status().isBadRequest());
+        mockMvc.perform(get(&quot;/api/posts/{id}/comments?cursor=!!&quot;, postId)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/validation&quot;));
+    }
+
+    @Test
+    void 삭제된_글의_댓글_목록은_404() throws Exception {
+        Long postId = newPost(newMember(Role.USER));
+        jdbc.update(&quot;UPDATE post SET status = 'HIDDEN' WHERE id = ?&quot;, postId);
+        mockMvc.perform(get(&quot;/api/posts/{id}/comments&quot;, postId)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 댓글_삭제는_작성자_204_다른_USER_403_ADMIN_204() throws Exception {
+        Member author = newMember(Role.USER);
+        Long postId = newPost(author);
+        Long mine = newComment(postId, author);
+        Long other = newComment(postId, author);
+
+        mockMvc.perform(delete(&quot;/api/comments/{id}&quot;, other).header(&quot;Authorization&quot;, bearer(newMember(Role.USER))))
+                .andExpect(status().isForbidden()).andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/forbidden&quot;));
+        mockMvc.perform(delete(&quot;/api/comments/{id}&quot;, mine).header(&quot;Authorization&quot;, bearer(author)))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete(&quot;/api/comments/{id}&quot;, other).header(&quot;Authorization&quot;, bearer(newMember(Role.ADMIN))))
+                .andExpect(status().isNoContent());
+
+        assertThat(jdbc.queryForObject(&quot;SELECT COUNT(*) FROM comment WHERE post_id = ? AND deleted = TRUE&quot;,
+                Integer.class, postId)).isEqualTo(2);
+    }
+
+    @Test
+    void 없는_댓글_삭제는_404이고_이미_삭제된_댓글도_404() throws Exception {
+        Member m = newMember(Role.USER);
+        Long c = newComment(newPost(m), m);
+        mockMvc.perform(delete(&quot;/api/comments/{id}&quot;, 999_999_999L).header(&quot;Authorization&quot;, bearer(m)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(delete(&quot;/api/comments/{id}&quot;, c).header(&quot;Authorization&quot;, bearer(m)))
+                .andExpect(status().isNoContent());
+        // 대상 없음(404)이 작성자 검사(403)보다 먼저다
+        mockMvc.perform(delete(&quot;/api/comments/{id}&quot;, c).header(&quot;Authorization&quot;, bearer(newMember(Role.USER))))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 토큰_없는_댓글_삭제는_401() throws Exception {
+        mockMvc.perform(delete(&quot;/api/comments/1&quot;)).andExpect(status().isUnauthorized());
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/post/PostCrudApiTest.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -176,4 +176,16 @@ class PostCrudApiTest extends ApiTestSupport {
+                 .content(&quot;{\&quot;title\&quot;:\&quot;t\&quot;,\&quot;content\&quot;:\&quot;c\&quot;}&quot;))
+                 .andExpect(status().isUnauthorized());
+     }
++
++    // 경로 변수 검증(@Positive)이 있는 메서드는 본문 검증 오류도 같은 형식(field=필드명)이어야 한다
++    @Test
++    void PUT_공백_제목은_400이고_errors의_field는_title() throws Exception {
++        Member author = newMember(Role.USER);
++        Long postId = newPost(author);
++
++        mockMvc.perform(put(&quot;/api/posts/{id}&quot;, postId).header(&quot;Authorization&quot;, bearer(author))
++                .contentType(MediaType.APPLICATION_JSON).content(&quot;{\&quot;title\&quot;:\&quot;  \&quot;,\&quot;content\&quot;:\&quot;c\&quot;}&quot;))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath(&quot;$.errors[0].field&quot;).value(&quot;title&quot;));
++    }
+ }</code></pre>
+</details>
+
+</section>
+
+<section class="day-step" id="step-d05-5" data-step="D05-5">
+
+<h2 id="⑤-postlike-엔티티-schemasql에-post_like-테이블-uniquepost_id-member_id"><a class="anchor" href="#⑤-postlike-엔티티-schemasql에-post_like-테이블-uniquepost_id-member_id" aria-hidden="true">#</a>⑤ <code>PostLike</code> 엔티티 (<code>schema.sql</code>에 <code>post_like</code> 테이블, UNIQUE(<code>post_id</code>, <code>member_id</code>))</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/post/PostLike.java</code></li>
+<li><code>src/main/java/com/example/board/post/PostLikeRepository.java</code></li>
+<li><code>src/main/resources/schema.sql</code></li>
+</ul>
+<p><strong>겪을 것</strong> 중복 좋아요를 &quot;조회해서 없으면 저장&quot;으로만 막으면 동시 요청 두 건이 모두 들어간다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li><code>PostLikeRepositoryTest</code> 통과: 같은 (글, 회원) 쌍을 두 번 저장하면 예외</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>PUT /api/posts/{postId}/like</code></a></p>
+<details class="step-hint" data-step="D05-5">
+<summary>막히면</summary>
+
+<ul>
+<li>UNIQUE는 <code>schema.sql</code>의 <code>UNIQUE KEY</code>와 엔티티의 <code>@Table(uniqueConstraints = ...)</code>에 같이 적는다. 테스트는 <code>saveAndFlush</code>로 예외를 확인한다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D05-5" data-commits="5d8c48425c40261e47f1b487ef12b231fba11602">
+<summary>정답 보기 · answer(D05-5) · board-server 파일 4개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/5d8c48425c40261e47f1b487ef12b231fba11602" target="_blank" rel="noopener"><code>5d8c4842</code></a> — answer(D05-5): PostLike 엔티티와 post_like 테이블</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/post/PostLike.java</code></p>
+<pre><code class="language-java">package com.example.board.post;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+
+import com.example.board.common.BaseEntity;
+import com.example.board.member.Member;
+
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Getter
+@Entity
+@Table(name = &quot;post_like&quot;)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class PostLike extends BaseEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = &quot;post_id&quot;, nullable = false)
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = &quot;member_id&quot;, nullable = false)
+    private Member member;
+
+    private PostLike(Post post, Member member) {
+        this.post = post;
+        this.member = member;
+    }
+
+    public static PostLike create(Post post, Member member) {
+        return new PostLike(post, member);
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/post/PostLikeRepository.java</code></p>
+<pre><code class="language-java">package com.example.board.post;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface PostLikeRepository extends JpaRepository&lt;PostLike, Long&gt; {
+
+    /** 지운 행 수를 돌려준다. 0이면 원래 없던 좋아요다. */
+    @Modifying
+    @Query(&quot;delete from PostLike l where l.post.id = :postId and l.member.id = :memberId&quot;)
+    int deleteByPostAndMember(@Param(&quot;postId&quot;) Long postId, @Param(&quot;memberId&quot;) Long memberId);
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/resources/schema.sql</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -81,3 +81,16 @@ CREATE TABLE IF NOT EXISTS comment (
+     -- 글별 댓글 목록(id 커서)용
+     KEY idx_comment_post_id (post_id, id)
+ ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
++
++CREATE TABLE IF NOT EXISTS post_like (
++    id         BIGINT      NOT NULL AUTO_INCREMENT,
++    post_id    BIGINT      NOT NULL,
++    member_id  BIGINT      NOT NULL,
++    created_at DATETIME(6) NOT NULL,
++    updated_at DATETIME(6) NOT NULL,
++    PRIMARY KEY (id),
++    CONSTRAINT fk_post_like_post FOREIGN KEY (post_id) REFERENCES post (id),
++    CONSTRAINT fk_post_like_member FOREIGN KEY (member_id) REFERENCES member (id),
++    -- 동시 좋아요의 최종 방어선. &quot;조회 후 없으면 저장&quot;만으로는 두 요청이 모두 통과한다.
++    UNIQUE KEY uk_post_like_post_member (post_id, member_id)
++) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/post/PostLikeRepositoryTest.java</code></p>
+<pre><code class="language-java">package com.example.board.post;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+
+import com.example.board.ApiTestSupport;
+import com.example.board.member.Member;
+import com.example.board.member.Role;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class PostLikeRepositoryTest extends ApiTestSupport {
+
+    @Autowired
+    PostRepository postRepository;
+
+    @Autowired
+    PostLikeRepository postLikeRepository;
+
+    @Test
+    void 같은_글_회원_쌍을_두_번_저장하면_예외() {
+        Member m = newMember(Role.USER);
+        Post post = postRepository.saveAndFlush(Post.create(m, &quot;제목&quot;, &quot;내용&quot;));
+        postLikeRepository.saveAndFlush(PostLike.create(post, m));
+
+        assertThatThrownBy(() -&gt; postLikeRepository.saveAndFlush(PostLike.create(post, m)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void 다른_회원이면_같은_글에_저장된다() {
+        Member a = newMember(Role.USER);
+        Member b = newMember(Role.USER);
+        Post post = postRepository.saveAndFlush(Post.create(a, &quot;제목&quot;, &quot;내용&quot;));
+
+        postLikeRepository.saveAndFlush(PostLike.create(post, a));
+        postLikeRepository.saveAndFlush(PostLike.create(post, b));
+
+        assertThat(jdbc.queryForObject(&quot;SELECT COUNT(*) FROM post_like WHERE post_id = ?&quot;, Integer.class,
+                post.getId())).isEqualTo(2);
+    }
+}</code></pre>
+</details>
+
+</section>
+
+<section class="day-step" id="step-d05-6" data-step="D05-6">
+
+<h2 id="⑥-좋아요-등록취소-api-멱등"><a class="anchor" href="#⑥-좋아요-등록취소-api-멱등" aria-hidden="true">#</a>⑥ 좋아요 등록·취소 API (멱등)</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/post/PostLikeService.java</code></li>
+<li><code>src/main/java/com/example/board/post/PostLikeController.java</code></li>
+</ul>
+<p><strong>겪을 것</strong> UNIQUE 위반 예외를 같은 트랜잭션 안에서 잡으면 트랜잭션이 rollback-only로 표시돼 204 대신 500이 난다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li><code>PUT /api/posts/{postId}/like</code> → 204, 다시 <code>PUT</code> → 204이고 <code>like_count</code>는 1</li>
+<li><code>DELETE /api/posts/{postId}/like</code> → 204, 다시 <code>DELETE</code> → 204</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>PUT /api/posts/{postId}/like</code></a> · <a href="../spec-v2.html#4-엔드포인트"><code>DELETE /api/posts/{postId}/like</code></a></p>
+<details class="step-hint" data-step="D05-6">
+<summary>막히면</summary>
+
+<ul>
+<li>멱등은 &quot;이미 있으면 그대로 204&quot;다. INSERT 실패를 같은 트랜잭션 안에서 잡으면 rollback-only가 되므로, 트랜잭션 경계를 안쪽(<code>TransactionTemplate</code> 등)에 두고 중복 예외는 그 바깥에서 잡는 구조를 찾아본다.</li>
+<li><code>like_count</code>는 읽어서 더하지 말고 <code>UPDATE ... SET like_count = like_count + 1</code>을 <code>@Modifying</code> 쿼리로 찾아본다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D05-6" data-commits="826d0e92f93c207335b24e5fad73a819e6af2e1f">
+<summary>정답 보기 · answer(D05-6) · board-server 파일 4개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/826d0e92f93c207335b24e5fad73a819e6af2e1f" target="_blank" rel="noopener"><code>826d0e92</code></a> — answer(D05-6): 좋아요 등록·취소 API (멱등)</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/post/PostLikeService.java</code></p>
+<pre><code class="language-java">package com.example.board.post;
+
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import com.example.board.common.BusinessException;
+import com.example.board.common.ErrorCode;
+import com.example.board.member.MemberRepository;
+
+/** 이 클래스에는 @Transactional을 두지 않는다. 트랜잭션 경계를 안쪽(TransactionTemplate)에 두고 중복 예외를 바깥에서 잡기 위해서다. */
+@Service
+public class PostLikeService {
+
+    private final PostRepository postRepository;
+    private final PostLikeRepository postLikeRepository;
+    private final MemberRepository memberRepository;
+    private final TransactionTemplate tx;
+
+    public PostLikeService(PostRepository postRepository, PostLikeRepository postLikeRepository,
+            MemberRepository memberRepository, TransactionTemplate tx) {
+        this.postRepository = postRepository;
+        this.postLikeRepository = postLikeRepository;
+        this.memberRepository = memberRepository;
+        this.tx = tx;
+    }
+
+    /** 이미 눌렀으면 아무 일도 하지 않는다(멱등). */
+    public void like(Long postId, Long memberId) {
+        try {
+            tx.executeWithoutResult(s -&gt; {
+                // 글 행을 먼저 잠그고(+1) 그 뒤에 좋아요 행을 넣는다. 중복이면 INSERT 예외로 +1도 함께 롤백된다.
+                if (postRepository.increaseLikeCount(postId) == 0) {
+                    throw new BusinessException(ErrorCode.NOT_FOUND, &quot;글을 찾을 수 없습니다.&quot;);
+                }
+                postLikeRepository.saveAndFlush(PostLike.create(postRepository.getReferenceById(postId),
+                        memberRepository.getReferenceById(memberId)));
+            });
+        } catch (DataIntegrityViolationException duplicate) {
+            // UNIQUE(post_id, member_id) 위반 = 이미 누른 상태. 트랜잭션은 이미 롤백됐으므로 여기서 삼켜도 안전하다.
+        }
+    }
+
+    /** 누른 적이 없으면 아무 일도 하지 않는다(멱등). */
+    public void unlike(Long postId, Long memberId) {
+        tx.executeWithoutResult(s -&gt; {
+            postRepository.lockActiveId(postId)
+                    .orElseThrow(() -&gt; new BusinessException(ErrorCode.NOT_FOUND, &quot;글을 찾을 수 없습니다.&quot;));
+            // 지운 행이 있을 때만 줄인다. 같은 쌍의 동시 취소 중 한 건만 지우므로 카운트가 두 번 줄지 않는다.
+            if (postLikeRepository.deleteByPostAndMember(postId, memberId) &gt; 0) {
+                postRepository.decreaseLikeCount(postId);
+            }
+        });
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/post/PostLikeController.java</code></p>
+<pre><code class="language-java">package com.example.board.post;
+
+import jakarta.validation.constraints.Positive;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.board.member.AuthMember;
+
+@RestController
+public class PostLikeController {
+
+    private final PostLikeService postLikeService;
+
+    public PostLikeController(PostLikeService postLikeService) {
+        this.postLikeService = postLikeService;
+    }
+
+    @PutMapping(&quot;/api/posts/{postId}/like&quot;)
+    public ResponseEntity&lt;Void&gt; like(@AuthenticationPrincipal AuthMember auth, @PathVariable @Positive Long postId) {
+        postLikeService.like(postId, auth.id());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping(&quot;/api/posts/{postId}/like&quot;)
+    public ResponseEntity&lt;Void&gt; unlike(@AuthenticationPrincipal AuthMember auth, @PathVariable @Positive Long postId) {
+        postLikeService.unlike(postId, auth.id());
+        return ResponseEntity.noContent().build();
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PostRepository.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -3,6 +3,7 @@ package com.example.board.post;
+ import java.util.Optional;
+ 
+ import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.Modifying;
+ import org.springframework.data.jpa.repository.Query;
+ import org.springframework.data.repository.query.Param;
+ 
+@@ -19,4 +20,17 @@ public interface PostRepository extends JpaRepository&lt;Post, Long&gt; {
+     Optional&lt;Post&gt; findActiveDetail(@Param(&quot;id&quot;) Long id);
+ 
+     boolean existsByIdAndStatus(Long id, PostStatus status);
++
++    /** DB가 한 문장으로 더한다. 읽고 +1 해서 저장하면 동시 요청에서 갱신이 유실된다. ACTIVE가 아니면 0을 돌려준다. */
++    @Modifying
++    @Query(&quot;update Post p set p.likeCount = p.likeCount + 1 where p.id = :id and p.status = com.example.board.post.PostStatus.ACTIVE&quot;)
++    int increaseLikeCount(@Param(&quot;id&quot;) Long id);
++
++    @Modifying
++    @Query(&quot;update Post p set p.likeCount = p.likeCount - 1 where p.id = :id and p.likeCount &gt; 0&quot;)
++    int decreaseLikeCount(@Param(&quot;id&quot;) Long id);
++
++    /** 글 행을 잠근다. 좋아요 등록(글 UPDATE 후 INSERT)과 같은 순서로 잠가야 교착이 나지 않는다. */
++    @Query(value = &quot;select id from post where id = :id and status = 'ACTIVE' for update&quot;, nativeQuery = true)
++    Optional&lt;Long&gt; lockActiveId(@Param(&quot;id&quot;) Long id);
+ }</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/post/PostLikeApiTest.java</code></p>
+<pre><code class="language-java">package com.example.board.post;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+import org.junit.jupiter.api.Test;
+
+import com.example.board.ApiTestSupport;
+import com.example.board.member.Member;
+import com.example.board.member.Role;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+class PostLikeApiTest extends ApiTestSupport {
+
+    int likeCount(Long postId) {
+        return jdbc.queryForObject(&quot;SELECT like_count FROM post WHERE id = ?&quot;, Integer.class, postId);
+    }
+
+    int likeRows(Long postId) {
+        return jdbc.queryForObject(&quot;SELECT COUNT(*) FROM post_like WHERE post_id = ?&quot;, Integer.class, postId);
+    }
+
+    int putStatus(Long postId, Member m) throws Exception {
+        return mockMvc.perform(put(&quot;/api/posts/{id}/like&quot;, postId).header(&quot;Authorization&quot;, bearer(m)))
+                .andReturn().getResponse().getStatus();
+    }
+
+    @Test
+    void PUT은_204이고_다시_PUT도_204에_like_count는_1() throws Exception {
+        Member m = newMember(Role.USER);
+        Long postId = newPost(newMember(Role.USER));
+
+        mockMvc.perform(put(&quot;/api/posts/{id}/like&quot;, postId).header(&quot;Authorization&quot;, bearer(m)))
+                .andExpect(status().isNoContent());
+        // 같은 트랜잭션에서 UNIQUE 위반을 잡으면 rollback-only로 500이 난다
+        mockMvc.perform(put(&quot;/api/posts/{id}/like&quot;, postId).header(&quot;Authorization&quot;, bearer(m)))
+                .andExpect(status().isNoContent());
+
+        assertThat(likeCount(postId)).isEqualTo(1);
+        assertThat(likeRows(postId)).isEqualTo(1);
+    }
+
+    @Test
+    void DELETE는_204이고_다시_DELETE도_204에_count는_0_아래로_내려가지_않는다() throws Exception {
+        Member m = newMember(Role.USER);
+        Member other = newMember(Role.USER);
+        Long postId = newPost(newMember(Role.USER));
+        putStatus(postId, m);
+        putStatus(postId, other);
+
+        mockMvc.perform(delete(&quot;/api/posts/{id}/like&quot;, postId).header(&quot;Authorization&quot;, bearer(m)))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete(&quot;/api/posts/{id}/like&quot;, postId).header(&quot;Authorization&quot;, bearer(m)))
+                .andExpect(status().isNoContent());
+
+        assertThat(likeCount(postId)).isEqualTo(1);
+        assertThat(likeRows(postId)).isEqualTo(1);
+    }
+
+    @Test
+    void 안_눌렀던_글_DELETE도_204이고_count는_그대로() throws Exception {
+        Long postId = newPost(newMember(Role.USER));
+        mockMvc.perform(delete(&quot;/api/posts/{id}/like&quot;, postId).header(&quot;Authorization&quot;, bearer(newMember(Role.USER))))
+                .andExpect(status().isNoContent());
+        assertThat(likeCount(postId)).isZero();
+    }
+
+    @Test
+    void 없는_글과_삭제된_글은_404() throws Exception {
+        Member m = newMember(Role.USER);
+        Long postId = newPost(m);
+        jdbc.update(&quot;UPDATE post SET status = 'DELETED' WHERE id = ?&quot;, postId);
+
+        mockMvc.perform(put(&quot;/api/posts/{id}/like&quot;, postId).header(&quot;Authorization&quot;, bearer(m)))
+                .andExpect(status().isNotFound()).andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/not-found&quot;));
+        mockMvc.perform(delete(&quot;/api/posts/{id}/like&quot;, 999_999_999L).header(&quot;Authorization&quot;, bearer(m)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 토큰_없으면_401() throws Exception {
+        mockMvc.perform(put(&quot;/api/posts/1/like&quot;)).andExpect(status().isUnauthorized());
+        mockMvc.perform(delete(&quot;/api/posts/1/like&quot;)).andExpect(status().isUnauthorized());
+    }
+
+    // 함정: like_count를 읽고 +1 해서 저장하면 동시 요청에서 갱신이 유실된다
+    @Test
+    void 서로_다른_회원_20명이_동시에_좋아요하면_like_count는_20() throws Exception {
+        Long postId = newPost(newMember(Role.USER));
+        List&lt;Member&gt; members = new ArrayList&lt;&gt;();
+        for (int i = 0; i &lt; 20; i++) {
+            members.add(newMember(Role.USER));
+        }
+        List&lt;Integer&gt; statuses = runConcurrently(members.stream().map(m -&gt; (Task) () -&gt; putStatus(postId, m)).toList());
+
+        assertThat(statuses).containsOnly(204);
+        assertThat(likeRows(postId)).isEqualTo(20);
+        assertThat(likeCount(postId)).isEqualTo(20);
+    }
+
+    // 함정: &quot;조회 후 없으면 저장&quot;만으로는 같은 회원의 동시 요청 두 건이 모두 저장된다
+    @Test
+    void 같은_회원이_동시에_10번_PUT해도_좋아요는_한_건() throws Exception {
+        Long postId = newPost(newMember(Role.USER));
+        Member m = newMember(Role.USER);
+        List&lt;Integer&gt; statuses = runConcurrently(java.util.Collections.nCopies(10, (Task) () -&gt; putStatus(postId, m)));
+
+        assertThat(statuses).containsOnly(204);
+        assertThat(likeRows(postId)).isEqualTo(1);
+        assertThat(likeCount(postId)).isEqualTo(1);
+    }
+
+    @Test
+    void 동시에_좋아요와_취소가_섞여도_like_count는_행_수와_같다() throws Exception {
+        Long postId = newPost(newMember(Role.USER));
+        List&lt;Member&gt; members = new ArrayList&lt;&gt;();
+        for (int i = 0; i &lt; 10; i++) {
+            members.add(newMember(Role.USER));
+        }
+        members.forEach(m -&gt; {
+            try {
+                putStatus(postId, m);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        List&lt;Task&gt; tasks = new ArrayList&lt;&gt;();
+        for (Member m : members) {
+            tasks.add(() -&gt; mockMvc.perform(delete(&quot;/api/posts/{id}/like&quot;, postId).header(&quot;Authorization&quot;, bearer(m)))
+                    .andReturn().getResponse().getStatus());
+            tasks.add(() -&gt; mockMvc.perform(delete(&quot;/api/posts/{id}/like&quot;, postId).header(&quot;Authorization&quot;, bearer(m)))
+                    .andReturn().getResponse().getStatus());
+        }
+
+        assertThat(runConcurrently(tasks)).containsOnly(204);
+        assertThat(likeRows(postId)).isZero();
+        assertThat(likeCount(postId)).isZero();
+    }
+
+    interface Task {
+        int run() throws Exception;
+    }
+
+    private List&lt;Integer&gt; runConcurrently(List&lt;Task&gt; tasks) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(tasks.size());
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List&lt;Future&lt;Integer&gt;&gt; futures = new ArrayList&lt;&gt;();
+            for (Task t : tasks) {
+                futures.add(pool.submit(() -&gt; {
+                    start.await();
+                    return t.run();
+                }));
+            }
+            start.countDown();
+            List&lt;Integer&gt; result = new ArrayList&lt;&gt;();
+            for (Future&lt;Integer&gt; f : futures) {
+                result.add(f.get());
+            }
+            return result;
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+}</code></pre>
+</details>
+
+</section>
+
+<hr>
+<h2 id="말하기-카드"><a class="anchor" href="#말하기-카드" aria-hidden="true">#</a>말하기 카드</h2>
+<p>하루가 끝나면 질문에 &quot;문제 상황 → 원인 → 선택 → 결과&quot; 순서로 소리 내어 답한 뒤, 접힌 &quot;답에 들어가야 할 것&quot;과 비교한다. 세 줄이 모두 나오면 통과다.</p>
+<h3 id="tc-d05-1"><a class="anchor" href="#tc-d05-1" aria-hidden="true">#</a>TC-D05-1</h3>
+<p><strong>질문</strong> 글 수정 서비스에서 <code>save()</code>를 부르지 않았는데 UPDATE가 나갑니다. 왜 그런가요?</p>
+<details class="card-answer" data-card="TC-D05-1">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li>트랜잭션 안에서 조회한 엔티티는 영속성 컨텍스트가 관리하며, 조회 시점의 상태를 따로 가지고 있다</li>
+<li>flush 시점(커밋 직전, 또는 관련 테이블을 읽는 JPQL 실행 직전)에 그 상태와 비교해 바뀐 필드를 UPDATE로 보낸다</li>
+<li>그래서 변경은 <code>@Transactional</code> 서비스 메서드 안에서 엔티티 메서드로 하고, SQL 로그로 UPDATE가 나가는 시점을 확인한다</li>
+</ul>
+<p><strong>근거</strong> 05 §3-4, 06 §16</p>
+</details>
+
+<h3 id="tc-d05-2"><a class="anchor" href="#tc-d05-2" aria-hidden="true">#</a>TC-D05-2</h3>
+<p><strong>질문</strong> 댓글 목록 API에서 댓글 20개의 작성자 닉네임을 보여 주는데 SQL이 21번 나갑니다. 원인과 해결은?</p>
+<details class="card-answer" data-card="TC-D05-2">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li>댓글을 한 번 조회한 뒤, 지연 로딩인 <code>member</code>를 댓글마다 접근하면서 작성자마다 회원 조회가 한 번씩 더 나간다(N+1)</li>
+<li><code>join fetch</code>(또는 <code>@EntityGraph</code>)로 작성자를 함께 가져오거나, 필요한 컬럼만 DTO로 조회한다</li>
+<li>SQL 로그나 Hibernate 통계로 쿼리 수를 세고, 그 수를 테스트로 고정한다</li>
+</ul>
+<p><strong>근거</strong> 05 §3-4, 06 §16</p>
+</details>
+
+<h3 id="tc-d05-3"><a class="anchor" href="#tc-d05-3" aria-hidden="true">#</a>TC-D05-3</h3>
+<p><strong>질문</strong> 남의 글을 수정하려는 요청과 삭제된 글을 수정하려는 요청에 각각 무엇을 돌려주고, 어떤 순서로 검사하나요?</p>
+<details class="card-answer" data-card="TC-D05-3">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li>대상이 없거나 삭제·숨김 상태면 404 <code>/errors/not-found</code>다</li>
+<li>대상은 있지만 요청자가 작성자가 아니면 403 <code>/errors/forbidden</code>이다</li>
+<li>존재 여부를 먼저 보고 그다음 작성자를 검사하며, 작성자는 요청 본문이 아니라 토큰의 회원 ID와 글의 <code>member_id</code>로 비교한다</li>
+</ul>
+<p><strong>근거</strong> spec-v2 §5-2, 05 §3-3</p>
+</details>
+
+<h3 id="tc-d05-4"><a class="anchor" href="#tc-d05-4" aria-hidden="true">#</a>TC-D05-4</h3>
+<p><strong>질문</strong> 좋아요 <code>PUT</code>을 두 번 보내도 204이고 수는 한 번만 오릅니다. 동시에 두 번 와도 그런가요? 어떻게 보장했나요?</p>
+<details class="card-answer" data-card="TC-D05-4">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li><code>post_like</code>의 UNIQUE(<code>post_id</code>, <code>member_id</code>)가 DB에서 중복 행을 막는다</li>
+<li>동시 요청 중 하나가 중복 키 예외를 받으면 이미 눌린 상태로 보고 204를 돌려준다</li>
+<li><code>like_count</code>는 읽고 더해서 저장하지 않고, 새 행이 실제로 들어갔을 때만 <code>like_count = like_count + 1</code> UPDATE로 올린다</li>
+</ul>
+<p><strong>근거</strong> spec-v2 §5-2, 07 #12</p>
+</details>
+
+<h3 id="tc-d05-5"><a class="anchor" href="#tc-d05-5" aria-hidden="true">#</a>TC-D05-5</h3>
+<p><strong>질문</strong> 글 삭제를 행 삭제 대신 <code>status = DELETED</code>로 바꾸는 소프트 삭제로 했습니다. 이유와 대가는?</p>
+<details class="card-answer" data-card="TC-D05-5">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li>신고(<code>report</code>)와 감사 로그가 글을 가리키므로, 행을 남겨야 나중에 추적할 수 있다</li>
+<li>대가는 모든 조회에 상태 조건을 빠뜨리지 않아야 한다는 것이다. 하나라도 빠지면 삭제된 글이 노출된다</li>
+<li>목록 인덱스를 (<code>status</code>, <code>id</code>)로 둔 것도 모든 목록 조회에 이 상태 조건이 붙기 때문이다</li>
+</ul>
+<p><strong>근거</strong> spec-v2 §6</p>
+</details>
+
+<h2 id="ai-채점-프롬프트"><a class="anchor" href="#ai-채점-프롬프트" aria-hidden="true">#</a>AI 채점 프롬프트</h2>
+<p>오늘 순서를 다 만들었으면 서버를 띄운 채로 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣는다. 에이전트가 완료 조건·함정·말하기 카드로 채점표를 준다. 코드는 고치지 않는다.</p>
+<pre><code class="language-text">[javaExperience 일자 채점] D05. 조회·수정·삭제 (JPA)
+레포 경로: 내 프로젝트 루트(이 프롬프트를 붙여 넣은 에이전트를 연 폴더)
+서버 주소: http://localhost:8080
+
+너는 Java·Spring 온보딩 과정 v2로 백엔드를 배우는 사람의 리뷰어다. 학습자는 빈 프로젝트에서 명세서 v2의 서버를 하루씩 만들고 있고, 오늘은 D05다.
+지킬 것: 코드는 절대 수정하지 마라. DB는 조회만 한다(SELECT·SHOW·EXPLAIN). 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.
+
+1. 서버 주소의 `GET /actuator/health`로 응답 가능 여부를 확인해라. 꺼져 있으면 `./gradlew bootRun`으로 띄우라고만 알려 주고 멈춰라.
+2. 아래 &quot;채점 기준&quot;이 통과/실패의 유일한 기준이다. 기준에 없는 것으로 실패 처리하지 말고, 다른 날의 기준은 보지 마라.
+3. [C] 항목: HTTP 요청은 서버 주소로 직접 보내 상태 코드·응답 헤더·본문을 기대값과 비교한다. 테스트 이름이 적힌 항목은 레포 루트에서 `./gradlew test --tests '&lt;테스트 클래스 이름&gt;'`으로 실행해 통과 여부를 본다(테스트 코드도 고치지 마라). 로그 항목은 기동 로그에서 찾거나 학습자에게 해당 줄을 붙여 달라고 한다. DB 확인이 필요하면 `docker compose exec -T mysql mysql -uboard -pboard board -e &quot;&lt;SELECT 문&gt;&quot;`으로 조회만 한다.
+4. [R] 항목: 관련 코드를 찾아 읽고 그 함정을 피했는지 판단해라. 지적할 때는 `파일:줄`을 붙여라.
+5. 말하기 카드: 학습자에게 카드 질문마다 답을 말하거나 적어 달라고 해라. &quot;답에 들어가야 할 것&quot;(· 표시) 세 줄이 모두 나오면 통과다. 빠진 줄은 정답 문장을 먼저 말하지 말고 되묻는 질문으로 끌어내라.
+6. 리뷰 초점은 채점표에 넣지 말고 ②·③에 적어라.
+
+채점 기준
+① 글 상세 조회 API
+  - [C1-1] 토큰 없이 GET /api/posts/{postId} → 200
+  - [C1-2] 없는 글 → 404 /errors/not-found
+  - [C1-3] postId = 0 → 400 /errors/validation
+  - [R1] 함정을 피했는지 코드로 확인: 응답 DTO를 만들며 지연 로딩 연관(작성자·태그)을 건드리면 쿼리가 추가로 나가므로 SQL 로그로 쿼리 수를 센다.
+② 글 전체·부분 수정과 소프트 삭제, 작성자 검증
+  - [C2-1] 작성자 토큰으로 PUT /api/posts/{postId} → 200
+  - [C2-2] PATCH /api/posts/{postId} 제목만 → 200, 본문은 그대로
+  - [C2-3] PATCH 본문 {} → 400
+  - [C2-4] DELETE /api/posts/{postId} → 204, 이후 GET → 404
+  - [C2-5] 다른 회원 토큰으로 PUT → 403 /errors/forbidden, 삭제된 글에 PUT → 404
+  - [R2] 함정을 피했는지 코드로 확인: save()를 부르지 않아도 변경 감지로 UPDATE가 커밋(flush) 시점에 나가므로 SQL 로그로 flush 시점을 확인한다.
+③ Comment 엔티티 (schema.sql에 comment 테이블, 인덱스(post_id, id))
+  - [C3-1] CommentRepositoryTest 통과: 한 글의 댓글을 id 순으로 조회한다
+  - [R3] 함정을 피했는지 코드로 확인: @ManyToOne을 기본값(EAGER)으로 두면 댓글 하나를 읽을 때도 글·작성자 쿼리가 따라 나가므로 fetch = LAZY로 둔다.
+④ 댓글 서비스와 작성·목록·삭제 API, N+1 제거 (CommentRepository에 fetch join 조회 추가, 대상 존재(404)를 작성자(403)보다 먼저 검사)
+  - [C4-1] POST /api/posts/{postId}/comments → 201
+  - [C4-2] 삭제된 글에 댓글 작성 → 404 /errors/not-found
+  - [C4-3] 토큰 없이 GET /api/posts/{postId}/comments → 200, 댓글 20개에 SQL 2번 이하
+  - [C4-4] DELETE /api/comments/{commentId}: 작성자 204, 다른 USER 403, ADMIN 204
+  - [R4] 함정을 피했는지 코드로 확인: 댓글마다 작성자 닉네임을 지연 로딩하면 댓글 20개에 SQL이 21번 나간다(N+1).
+⑤ PostLike 엔티티 (schema.sql에 post_like 테이블, UNIQUE(post_id, member_id))
+  - [C5-1] PostLikeRepositoryTest 통과: 같은 (글, 회원) 쌍을 두 번 저장하면 예외
+  - [R5] 함정을 피했는지 코드로 확인: 중복 좋아요를 &quot;조회해서 없으면 저장&quot;으로만 막으면 동시 요청 두 건이 모두 들어간다.
+⑥ 좋아요 등록·취소 API (멱등)
+  - [C6-1] PUT /api/posts/{postId}/like → 204, 다시 PUT → 204이고 like_count는 1
+  - [C6-2] DELETE /api/posts/{postId}/like → 204, 다시 DELETE → 204
+  - [R6] 함정을 피했는지 코드로 확인: UNIQUE 위반 예외를 같은 트랜잭션 안에서 잡으면 트랜잭션이 rollback-only로 표시돼 204 대신 500이 난다.
+
+말하기 카드
+- [TC-D05-1] 글 수정 서비스에서 save()를 부르지 않았는데 UPDATE가 나갑니다. 왜 그런가요?
+    · 트랜잭션 안에서 조회한 엔티티는 영속성 컨텍스트가 관리하며, 조회 시점의 상태를 따로 가지고 있다
+    · flush 시점(커밋 직전, 또는 관련 테이블을 읽는 JPQL 실행 직전)에 그 상태와 비교해 바뀐 필드를 UPDATE로 보낸다
+    · 그래서 변경은 @Transactional 서비스 메서드 안에서 엔티티 메서드로 하고, SQL 로그로 UPDATE가 나가는 시점을 확인한다
+- [TC-D05-2] 댓글 목록 API에서 댓글 20개의 작성자 닉네임을 보여 주는데 SQL이 21번 나갑니다. 원인과 해결은?
+    · 댓글을 한 번 조회한 뒤, 지연 로딩인 member를 댓글마다 접근하면서 작성자마다 회원 조회가 한 번씩 더 나간다(N+1)
+    · join fetch(또는 @EntityGraph)로 작성자를 함께 가져오거나, 필요한 컬럼만 DTO로 조회한다
+    · SQL 로그나 Hibernate 통계로 쿼리 수를 세고, 그 수를 테스트로 고정한다
+- [TC-D05-3] 남의 글을 수정하려는 요청과 삭제된 글을 수정하려는 요청에 각각 무엇을 돌려주고, 어떤 순서로 검사하나요?
+    · 대상이 없거나 삭제·숨김 상태면 404 /errors/not-found다
+    · 대상은 있지만 요청자가 작성자가 아니면 403 /errors/forbidden이다
+    · 존재 여부를 먼저 보고 그다음 작성자를 검사하며, 작성자는 요청 본문이 아니라 토큰의 회원 ID와 글의 member_id로 비교한다
+- [TC-D05-4] 좋아요 PUT을 두 번 보내도 204이고 수는 한 번만 오릅니다. 동시에 두 번 와도 그런가요? 어떻게 보장했나요?
+    · post_like의 UNIQUE(post_id, member_id)가 DB에서 중복 행을 막는다
+    · 동시 요청 중 하나가 중복 키 예외를 받으면 이미 눌린 상태로 보고 204를 돌려준다
+    · like_count는 읽고 더해서 저장하지 않고, 새 행이 실제로 들어갔을 때만 like_count = like_count + 1 UPDATE로 올린다
+- [TC-D05-5] 글 삭제를 행 삭제 대신 status = DELETED로 바꾸는 소프트 삭제로 했습니다. 이유와 대가는?
+    · 신고(report)와 감사 로그가 글을 가리키므로, 행을 남겨야 나중에 추적할 수 있다
+    · 대가는 모든 조회에 상태 조건을 빠뜨리지 않아야 한다는 것이다. 하나라도 빠지면 삭제된 글이 노출된다
+    · 목록 인덱스를 (status, id)로 둔 것도 모든 목록 조회에 이 상태 조건이 붙기 때문이다
+
+리뷰 초점
+- 삭제된 글이 상세·수정·댓글 작성에서 모두 404로 막히는지
+- 좋아요 수를 엔티티 필드에 읽어 더해 저장하지 않는지(동시 요청에서 갱신이 사라진다)
+
+아래 형식으로만 답해라.
+① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)
+② 잘한 점
+③ 부족한 점과 이유 — 실패한 C 항목부터
+④ 내일 전에 고칠 것 — 우선순위순, 3개 이내
+⑤ 말하기 카드 — | 카드 | 빠진 줄 | 결과 |
+마지막 줄: `결과: 필수 N/M 통과 · 말하기 카드 K/L 통과` (필수 = C 항목, R은 참고)</code></pre>
+<h2 id="내일-미리보기"><a class="anchor" href="#내일-미리보기" aria-hidden="true">#</a>내일 미리보기</h2>
+<p><a class="docref" href="../../docs/knowledge/D06-deployment-concepts.html">D06</a>은 오늘 쌓은 글·태그·좋아요 데이터를 MyBatis 목록 쿼리로 읽는다.</p>
+<h2 id="날짜별-snapshot"><a class="anchor" href="#날짜별-snapshot" aria-hidden="true">#</a>날짜별 snapshot</h2>
+<p>오늘 마지막 정답 커밋은 <code>826d0e92</code>(answer(D05-6): 좋아요 등록·취소 API (멱등))이다. <a href="https://github.com/ai-ext/javaExperience/tree/826d0e92f93c207335b24e5fad73a819e6af2e1f/board-server" target="_blank" rel="noopener">이 시점의 board-server 전체 보기</a>. 기준은 위 순서 칸의 인라인 정답이고, 이 링크는 보조다(PR 병합 방식에 따라 커밋이 사라질 수 있다).</p>
+<h2 id="참고-자료"><a class="anchor" href="#참고-자료" aria-hidden="true">#</a>참고 자료</h2>
+<details class="day-refs">
+<summary>기존 시나리오·공부자료 (참고 도감)</summary>
+
+<ul>
+<li><a href="../../scenario/ch2-read-post/2-1-get-one.html">2-1. 단건 조회와 404</a></li>
+<li><a href="../../scenario/ch3-update-delete/3-1-patch.html">3-1. 부분 수정(PATCH)과 본인 확인</a></li>
+<li><a href="../../scenario/ch3-update-delete/3-2-soft-delete.html">3-2. 삭제 — soft delete</a></li>
+<li><a href="../../scenario/ch2-read-post/2-4-n-plus-1.html">2-4. 쿼리 수 줄이기(N+1)</a></li>
+<li><a href="../../scenario/ch4-like/4-2-like-concurrency.html">4-2. 동시에 눌러도 맞는 like_count</a></li>
+</ul>
+</details>
+
+<p><a href="D04.html">← D04</a> · <a href="README.html">일자 목록</a> · <a href="D06.html">D06 →</a></p>
+
+
+</main>
+
+
+
+
+
+</body>
+</html>

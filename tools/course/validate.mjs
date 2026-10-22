@@ -99,6 +99,72 @@ export function validate({ spec, roadmap, cards, courseFiles }) {
   return errs;
 }
 
+// ---------------------------------------------------------------- 일자 페이지(course/spring)
+const DAY_HEADER = '<!-- 생성물: tools/course/build-days.mjs가 만든다. 직접 고치지 마라 -->';
+const CIRCLED = '⓪①②③④⑤⑥⑦⑧⑨';
+
+// 펜스 코드 블록을 지운다(정답 코드 안의 `## `·`### TC-` 줄을 페이지 구조로 읽지 않기 위해)
+export function stripFences(md) {
+  const out = [];
+  let fence = null;
+  for (const line of md.split('\n')) {
+    const m = line.match(/^(`{3,}|~{3,})/);
+    if (fence) { if (m && m[1][0] === fence[0] && m[1].length >= fence.length && line.trim() === m[1]) fence = null; continue; }
+    if (m) { fence = m[1]; continue; }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+export function parseDayPage(md) {
+  const body = stripFences(md);
+  const steps = [...body.matchAll(/^## ([⓪①②③④⑤⑥⑦⑧⑨]) (.+)$/gm)].map((m) => ({ no: CIRCLED.indexOf(m[1]), title: m[2].trim() }));
+  const sections = [...body.matchAll(/<section class="day-step" [^>]*data-step="(D\d{2})-(\d+)"/g)].map((m) => Number(m[2]));
+  const checks = [...body.matchAll(/<input type="checkbox" class="step-check" data-step="(D\d{2})-(\d+)"/g)].map((m) => Number(m[2]));
+  const cards = [...body.matchAll(/^### (TC-\S+)/gm)].map((m) => m[1]);
+  const java = [...body.matchAll(/\]\(\.\.\/java\/(J\d{2})\.md\)/g)].map((m) => m[1]);
+  return { steps, sections, checks, cards, java, generated: md.startsWith(DAY_HEADER) };
+}
+
+// pages: { 'D01.md': 본문, ... } (course/spring의 파일)
+export function validateDayPages({ roadmap, pages }) {
+  const errs = [];
+  for (const f of ['D00.md', 'README.md']) if (!(f in pages)) errs.push(`course/spring/${f}이 없다`);
+  for (const day of roadmap.days ?? []) {
+    const f = `${day.id}.md`;
+    if (!(f in pages)) { errs.push(`course/spring/${f}이 없다`); continue; }
+    const p = parseDayPage(pages[f]);
+    const at = `course/spring/${f}`;
+    if (!p.generated) errs.push(`${at}: 생성물 표시 주석이 맨 위에 없다`);
+    const want = (day.steps ?? []).map((s) => ({ no: s.no, title: s.title }));
+    if (p.steps.length !== want.length) errs.push(`${at}: 순서 수 ${p.steps.length}가 roadmap ${want.length}와 다르다`);
+    want.forEach((w, i) => {
+      const got = p.steps[i];
+      if (got && (got.no !== w.no || got.title !== w.title)) errs.push(`${at}: 순서 ${w.no} 제목이 roadmap과 다르다(${got.no} ${got.title})`);
+    });
+    const nos = want.map((w) => w.no).join(',');
+    if (p.sections.join(',') !== nos) errs.push(`${at}: 순서 칸(data-step)이 roadmap 순서와 다르다(${p.sections.join(',')})`);
+    if (p.checks.join(',') !== nos) errs.push(`${at}: 오늘 순서 체크(data-step)가 roadmap 순서와 다르다(${p.checks.join(',')})`);
+    if (p.cards.join(',') !== (day.talkCards ?? []).join(',')) errs.push(`${at}: 말하기 카드 ${p.cards.join(',')}가 roadmap talkCards ${(day.talkCards ?? []).join(',')}와 다르다`);
+    if (!p.java.includes(day.java)) errs.push(`${at}: 오늘의 Java ${day.java} 링크가 없다`);
+  }
+  return errs;
+}
+
+function readTextFiles(dir, re) {
+  const out = {};
+  if (!fs.existsSync(dir)) return out;
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (re.test(e.name)) out[path.relative(dir, p).split(path.sep).join('/')] = fs.readFileSync(p, 'utf8');
+    }
+  };
+  walk(dir);
+  return out;
+}
+
 function cli() {
   const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'course');
   const errs = [];
@@ -112,9 +178,18 @@ function cli() {
     let roadmap;
     try { roadmap = JSON.parse(courseFiles['roadmap.json']); } catch (e) { errs.push(`course/roadmap.json 파싱 실패: ${e.message}`); }
     if (roadmap) {
-      result = validate({ spec: courseFiles['spec-v2.md'], roadmap, cards: courseFiles['talk-cards.md'], courseFiles });
+      const pages = readTextFiles(path.join(dir, 'spring'), /\.md$/);
+      // 금지어 검사는 일자 페이지·출발 자료까지 넓힌다
+      const extraFiles = {};
+      for (const [sub, re] of [['spring', /\.(md|html)$/], ['start', /\.(md|html|json|yaml|yml)$/]]) {
+        for (const [f, text] of Object.entries(readTextFiles(path.join(dir, sub), re))) extraFiles[`${sub}/${f}`] = text;
+      }
+      result = [
+        ...validate({ spec: courseFiles['spec-v2.md'], roadmap, cards: courseFiles['talk-cards.md'], courseFiles: { ...courseFiles, ...extraFiles } }),
+        ...validateDayPages({ roadmap, pages }),
+      ];
       if (!result.length) {
-        console.log(`course OK: ${parseSpecEndpoints(courseFiles['spec-v2.md']).length} endpoints, ${roadmap.days.length} days, ${parseTalkCardIds(courseFiles['talk-cards.md']).length} cards`);
+        console.log(`course OK: ${parseSpecEndpoints(courseFiles['spec-v2.md']).length} endpoints, ${roadmap.days.length} days, ${parseTalkCardIds(courseFiles['talk-cards.md']).length} cards, ${Object.keys(pages).length} day pages`);
         return;
       }
     }

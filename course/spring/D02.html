@@ -1,0 +1,1173 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D02. 공통 기반</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=53f71b596d04">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<!-- 생성물: tools/course/build-days.mjs가 만든다. 직접 고치지 마라 -->
+
+<h1 id="d02-공통-기반"><a class="anchor" href="#d02-공통-기반" aria-hidden="true">#</a>D02. 공통 기반</h1>
+<blockquote>
+<p>1단계 · 빈 프로젝트로 서버 만들기 · 오늘의 Java <a href="../java/J02.html">J02</a> · 순서 5개 · 말하기 카드 5장</p>
+</blockquote>
+<h2 id="오늘-순서"><a class="anchor" href="#오늘-순서" aria-hidden="true">#</a>오늘 순서</h2>
+<ol class="day-steps" data-day="D02">
+<li data-step="D02-1"><label><input type="checkbox" class="step-check" data-step="D02-1"> <a href="#step-d02-1">① 공통 에러 체계: <code>ErrorCode</code>, <code>BusinessException</code>, ProblemDetail을 만드는 전역 예외 처리기</a></label></li>
+<li data-step="D02-2"><label><input type="checkbox" class="step-check" data-step="D02-2"> <a href="#step-d02-2">② <code>BaseEntity</code>(생성·수정 시각 Auditing)와 Testcontainers 테스트 기반</a></label></li>
+<li data-step="D02-3"><label><input type="checkbox" class="step-check" data-step="D02-3"> <a href="#step-d02-3">③ 흩어진 설정을 <code>@ConfigurationProperties</code> 하나로 묶기 (<code>board.*</code>)</a></label></li>
+<li data-step="D02-4"><label><input type="checkbox" class="step-check" data-step="D02-4"> <a href="#step-d02-4">④ 금칙어 검사기는 빈으로, 닉네임 정규화는 static 유틸로 나누기</a></label></li>
+<li data-step="D02-5"><label><input type="checkbox" class="step-check" data-step="D02-5"> <a href="#step-d02-5">⑤ 기동이 끝난 뒤(<code>ApplicationReadyEvent</code>) DB의 금칙어(<code>banned_word</code>)·공통코드(<code>common_code</code>)를 <code>JdbcClient</code>로 읽어 메모리에 적재하기 (<code>schema.sql</code>에 두 테이블 추가)</a></label></li>
+</ol>
+
+<h2 id="오늘의-java"><a class="anchor" href="#오늘의-java" aria-hidden="true">#</a>오늘의 Java</h2>
+<p><a href="../java/J02.html">J02. 예외 계층과 제네릭 Result, Lombok이 만드는 코드</a> — 30~60분. Spring 순서를 시작하기 전에 오늘 쓰는 Java를 먼저 연습한다.</p>
+<ul>
+<li>주제: static과 인스턴스, 상속, 예외 계층, 제네릭 클래스: <code>BusinessException</code> 계층과 성공 값·에러 코드를 담는 제네릭 <code>Result&lt;T&gt;</code> (명세 v2에는 응답 래퍼가 없으므로 <code>ApiResponse&lt;T&gt;</code> 대신 쓴다)</li>
+</ul>
+<hr>
+<section class="day-step" id="step-d02-1" data-step="D02-1">
+
+<h2 id="①-공통-에러-체계-errorcode-businessexception-problemdetail을-만드는-전역-예외-처리기"><a class="anchor" href="#①-공통-에러-체계-errorcode-businessexception-problemdetail을-만드는-전역-예외-처리기" aria-hidden="true">#</a>① 공통 에러 체계: <code>ErrorCode</code>, <code>BusinessException</code>, ProblemDetail을 만드는 전역 예외 처리기</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/common/ErrorCode.java</code></li>
+<li><code>src/main/java/com/example/board/common/BusinessException.java</code></li>
+<li><code>src/main/java/com/example/board/common/GlobalExceptionHandler.java</code></li>
+</ul>
+<p><strong>겪을 것</strong> <code>IllegalArgumentException</code>을 전부 400으로 바꾸면 서버 코드의 버그까지 클라이언트 잘못으로 보고돼 장애가 숨는다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li><code>GET /api/unknown</code> → 404 <code>application/problem+json</code>, <code>instance</code> = <code>/api/unknown</code></li>
+<li><code>GlobalExceptionHandlerTest</code> 통과: <code>BusinessException(ErrorCode.NOT_FOUND)</code> → 404 <code>type</code> <code>/errors/not-found</code></li>
+<li><code>GET /actuator/health</code> → 200</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>GET /actuator/health</code></a></p>
+<details class="step-hint" data-step="D02-1">
+<summary>막히면</summary>
+
+<ul>
+<li><code>@RestControllerAdvice</code>와 Spring의 <code>ProblemDetail</code>(<code>ProblemDetail.forStatusAndDetail</code>)을 찾아본다. 응답 <code>Content-Type</code>이 <code>application/problem+json</code>인지 curl <code>-i</code>로 확인한다.</li>
+<li>없는 경로 404를 처리기에서 받으려면 <code>NoResourceFoundException</code>이 어디서 던져지는지 본다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D02-1" data-commits="0a8caba33df65a77624fa83159ed1eaddaa344da">
+<summary>정답 보기 · answer(D02-1) · board-server 파일 4개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/0a8caba33df65a77624fa83159ed1eaddaa344da" target="_blank" rel="noopener"><code>0a8caba3</code></a> — answer(D02-1): 공통 에러 체계</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/common/ErrorCode.java</code></p>
+<pre><code class="language-java">package com.example.board.common;
+
+import org.springframework.http.HttpStatus;
+
+/** 에러 종류. type URI는 spec-v2 §5와 같다. */
+public enum ErrorCode {
+    VALIDATION(HttpStatus.BAD_REQUEST, &quot;/errors/validation&quot;, &quot;검증 실패&quot;),
+    NOT_FOUND(HttpStatus.NOT_FOUND, &quot;/errors/not-found&quot;, &quot;대상 없음&quot;),
+    FORBIDDEN(HttpStatus.FORBIDDEN, &quot;/errors/forbidden&quot;, &quot;권한 없음&quot;),
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, &quot;/errors/unauthorized&quot;, &quot;인증 필요&quot;),
+    DUPLICATE(HttpStatus.CONFLICT, &quot;/errors/duplicate&quot;, &quot;중복&quot;),
+    TOO_MANY_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS, &quot;/errors/too-many-attempts&quot;, &quot;시도 횟수 초과&quot;),
+    COUPON_EXHAUSTED(HttpStatus.CONFLICT, &quot;/errors/coupon-exhausted&quot;, &quot;쿠폰 소진&quot;),
+    COUPON_UNUSABLE(HttpStatus.CONFLICT, &quot;/errors/coupon-unusable&quot;, &quot;쿠폰 사용 불가&quot;),
+    INSUFFICIENT_POINTS(HttpStatus.CONFLICT, &quot;/errors/insufficient-points&quot;, &quot;포인트 부족&quot;),
+    IDEMPOTENCY_MISMATCH(HttpStatus.UNPROCESSABLE_ENTITY, &quot;/errors/idempotency-mismatch&quot;, &quot;멱등 키 본문 불일치&quot;),
+    PG_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, &quot;/errors/pg-timeout&quot;, &quot;PG 시간 초과&quot;),
+    PG_DECLINED(HttpStatus.BAD_GATEWAY, &quot;/errors/pg-declined&quot;, &quot;PG 승인 거절&quot;),
+    INVALID_SIGNATURE(HttpStatus.UNAUTHORIZED, &quot;/errors/invalid-signature&quot;, &quot;서명 불일치&quot;);
+
+    private final HttpStatus status;
+    private final String type;
+    private final String title;
+
+    ErrorCode(HttpStatus status, String type, String title) {
+        this.status = status;
+        this.type = type;
+        this.title = title;
+    }
+
+    public HttpStatus status() {
+        return status;
+    }
+
+    public String type() {
+        return type;
+    }
+
+    public String title() {
+        return title;
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/common/BusinessException.java</code></p>
+<pre><code class="language-java">package com.example.board.common;
+
+public class BusinessException extends RuntimeException {
+
+    private final ErrorCode errorCode;
+
+    public BusinessException(ErrorCode errorCode, String detail) {
+        super(detail);
+        this.errorCode = errorCode;
+    }
+
+    public ErrorCode errorCode() {
+        return errorCode;
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/common/GlobalExceptionHandler.java</code></p>
+<pre><code class="language-java">package com.example.board.common;
+
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+
+import jakarta.servlet.http.HttpServletRequest;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(BusinessException.class)
+    ProblemDetail handleBusiness(BusinessException e, HttpServletRequest request) {
+        ErrorCode code = e.errorCode();
+        return problem(code.status(), code.type(), code.title(), e.getMessage(), request.getRequestURI());
+    }
+
+    // IllegalArgumentException 등을 400으로 바꾸지 않는다. 서버 버그가 클라이언트 잘못으로 보이면 장애가 숨는다.
+    @ExceptionHandler(Exception.class)
+    ProblemDetail handleUnexpected(Exception e, HttpServletRequest request) {
+        log.error(&quot;처리되지 않은 예외&quot;, e);
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, &quot;/errors/internal&quot;, &quot;서버 오류&quot;,
+                &quot;요청을 처리하지 못했습니다.&quot;, request.getRequestURI());
+    }
+
+    @Override
+    protected ResponseEntity&lt;Object&gt; handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION.type(), ErrorCode.VALIDATION.title(),
+                &quot;요청 값이 올바르지 않습니다.&quot;, path(request));
+        List&lt;Map&lt;String, String&gt;&gt; errors = ex.getBindingResult().getFieldErrors().stream()
+                .map(GlobalExceptionHandler::toError)
+                .toList();
+        pd.setProperty(&quot;errors&quot;, errors);
+        return ResponseEntity.badRequest().body(pd);
+    }
+
+    // 나머지 Spring MVC 예외(404, 405, 본문 파싱 실패 등)는 상위 클래스가 ProblemDetail로 만든다. instance와 type만 맞춘다.
+    @Override
+    protected ResponseEntity&lt;Object&gt; handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
+            HttpStatusCode statusCode, WebRequest request) {
+        if (body instanceof ProblemDetail pd) {
+            pd.setInstance(URI.create(path(request)));
+            pd.setType(typeOf(statusCode));
+        }
+        return super.handleExceptionInternal(ex, body, headers, statusCode, request);
+    }
+
+    private static URI typeOf(HttpStatusCode status) {
+        return URI.create(switch (status.value()) {
+            case 404 -&gt; ErrorCode.NOT_FOUND.type();
+            case 400 -&gt; ErrorCode.VALIDATION.type();
+            default -&gt; &quot;about:blank&quot;;
+        });
+    }
+
+    private static Map&lt;String, String&gt; toError(FieldError fe) {
+        return Map.of(&quot;field&quot;, fe.getField(), &quot;reason&quot;, String.valueOf(fe.getDefaultMessage()));
+    }
+
+    private static String path(WebRequest request) {
+        return ((ServletWebRequest) request).getRequest().getRequestURI();
+    }
+
+    private static ProblemDetail problem(HttpStatus status, String type, String title, String detail, String instance) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, detail);
+        pd.setType(URI.create(type));
+        pd.setTitle(title);
+        pd.setInstance(URI.create(instance));
+        return pd;
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/common/GlobalExceptionHandlerTest.java</code></p>
+<pre><code class="language-java">package com.example.board.common;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+
+import com.example.board.TestcontainersConfig;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@Import({TestcontainersConfig.class, GlobalExceptionHandlerTest.Probe.class})
+@ActiveProfiles(&quot;test&quot;)
+@AutoConfigureMockMvc
+class GlobalExceptionHandlerTest {
+
+    @Autowired
+    MockMvc mockMvc;
+
+    record Body(@NotBlank String title) {
+    }
+
+    @RestController
+    static class ProbeController {
+        @GetMapping(&quot;/test/not-found&quot;)
+        void notFound() {
+            throw new BusinessException(ErrorCode.NOT_FOUND, &quot;없음&quot;);
+        }
+
+        @GetMapping(&quot;/test/illegal&quot;)
+        void illegal() {
+            throw new IllegalArgumentException(&quot;서버 버그&quot;);
+        }
+
+        @PostMapping(&quot;/test/validate&quot;)
+        void validate(@Valid @RequestBody Body body) {
+        }
+    }
+
+    @TestConfiguration
+    static class Probe {
+        @Bean
+        ProbeController probeController() {
+            return new ProbeController();
+        }
+    }
+
+    @Test
+    void 없는_경로는_404_problem_json() throws Exception {
+        mockMvc.perform(get(&quot;/api/unknown&quot;))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath(&quot;$.instance&quot;).value(&quot;/api/unknown&quot;));
+    }
+
+    @Test
+    void BusinessException_NOT_FOUND는_404_type() throws Exception {
+        mockMvc.perform(get(&quot;/test/not-found&quot;))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/not-found&quot;))
+                .andExpect(jsonPath(&quot;$.detail&quot;).value(&quot;없음&quot;))
+                .andExpect(jsonPath(&quot;$.instance&quot;).value(&quot;/test/not-found&quot;));
+    }
+
+    @Test
+    void 검증_실패는_400_errors_배열() throws Exception {
+        mockMvc.perform(post(&quot;/test/validate&quot;).contentType(MediaType.APPLICATION_JSON).content(&quot;{\&quot;title\&quot;:\&quot;\&quot;}&quot;))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/validation&quot;))
+                .andExpect(jsonPath(&quot;$.errors[0].field&quot;).value(&quot;title&quot;))
+                .andExpect(jsonPath(&quot;$.errors[0].reason&quot;).isNotEmpty());
+    }
+
+    @Test
+    void IllegalArgumentException은_400이_아니라_500() throws Exception {
+        mockMvc.perform(get(&quot;/test/illegal&quot;))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    @Test
+    void health_200() throws Exception {
+        mockMvc.perform(get(&quot;/actuator/health&quot;)).andExpect(status().isOk());
+    }
+}</code></pre>
+</details>
+
+</section>
+
+<section class="day-step" id="step-d02-2" data-step="D02-2">
+
+<h2 id="②-baseentity생성수정-시각-auditing와-testcontainers-테스트-기반"><a class="anchor" href="#②-baseentity생성수정-시각-auditing와-testcontainers-테스트-기반" aria-hidden="true">#</a>② <code>BaseEntity</code>(생성·수정 시각 Auditing)와 Testcontainers 테스트 기반</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/common/BaseEntity.java</code></li>
+<li><code>src/main/java/com/example/board/config/JpaConfig.java</code></li>
+<li><code>src/test/java/com/example/board/TestcontainersConfig.java</code></li>
+</ul>
+<p><strong>겪을 것</strong> <code>@EnableJpaAuditing</code>을 빠뜨리면 <code>created_at</code>이 null로 들어가 NOT NULL 제약 위반이 난다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li><code>BoardApplicationTests</code> 통과: Testcontainers MySQL로 컨텍스트 기동</li>
+<li><code>GET /actuator/health</code> → 200 (<code>@EnableJpaAuditing</code> 포함)</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>GET /actuator/health</code></a></p>
+<details class="step-hint" data-step="D02-2">
+<summary>막히면</summary>
+
+<ul>
+<li><code>@MappedSuperclass</code>, <code>@EntityListeners(AuditingEntityListener.class)</code>, <code>@CreatedDate</code>·<code>@LastModifiedDate</code>, 그리고 이를 켜는 설정 어노테이션을 찾아본다.</li>
+<li>Testcontainers는 <code>@ServiceConnection</code>으로 datasource를 자동 연결한다. 컨테이너가 안 뜨면 <code>docker ps</code>와 Colima 상태부터 본다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D02-2" data-commits="e03d2d08529e95b40d9e97b6a02b7f3264887fa4">
+<summary>정답 보기 · answer(D02-2) · board-server 파일 4개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/e03d2d08529e95b40d9e97b6a02b7f3264887fa4" target="_blank" rel="noopener"><code>e03d2d08</code></a> — answer(D02-2): BaseEntity 감사 필드와 Testcontainers 기반</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/common/BaseEntity.java</code></p>
+<pre><code class="language-java">package com.example.board.common;
+
+import java.time.LocalDateTime;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.MappedSuperclass;
+
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import lombok.Getter;
+
+@Getter
+@MappedSuperclass
+@EntityListeners(AuditingEntityListener.class)
+public abstract class BaseEntity {
+
+    @CreatedDate
+    @Column(name = &quot;created_at&quot;, nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    @Column(name = &quot;updated_at&quot;, nullable = false)
+    private LocalDateTime updatedAt;
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/config/JpaConfig.java</code></p>
+<pre><code class="language-java">package com.example.board.config;
+
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Optional;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.auditing.DateTimeProvider;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+
+@Configuration
+@EnableJpaAuditing(dateTimeProviderRef = &quot;kstDateTimeProvider&quot;)
+public class JpaConfig {
+
+    // 컨테이너 기본 시간대가 UTC여도 저장 시각은 KST로 맞춘다
+    @Bean
+    DateTimeProvider kstDateTimeProvider() {
+        return () -&gt; Optional.of(LocalDateTime.now(ZoneId.of(&quot;Asia/Seoul&quot;)));
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/TestcontainersConfig.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -11,6 +11,8 @@ public class TestcontainersConfig {
+     @Bean
+     @ServiceConnection
+     MySQLContainer mysqlContainer() {
+-        return new MySQLContainer(&quot;mysql:8.4&quot;);
++        // 한글 금칙어·닉네임이 깨지지 않도록 서버 문자셋을 고정한다
++        return new MySQLContainer(&quot;mysql:8.4&quot;)
++                .withCommand(&quot;--character-set-server=utf8mb4&quot;, &quot;--collation-server=utf8mb4_0900_ai_ci&quot;);
+     }
+ }</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/common/JpaAuditingTest.java</code></p>
+<pre><code class="language-java">package com.example.board.common;
+
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.MappedSuperclass;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.springframework.test.context.ActiveProfiles;
+
+import com.example.board.TestcontainersConfig;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@SpringBootTest
+@Import(TestcontainersConfig.class)
+@ActiveProfiles(&quot;test&quot;)
+class JpaAuditingTest {
+
+    @Autowired
+    ApplicationContext context;
+
+    @Test
+    void JpaAuditing이_켜져_있다() {
+        // @EnableJpaAuditing이 없으면 이 빈이 없고 created_at이 null로 들어간다
+        assertThat(context.containsBean(&quot;jpaAuditingHandler&quot;)).isTrue();
+    }
+
+    @Test
+    void BaseEntity는_감사_리스너를_단_매핑_슈퍼클래스다() {
+        assertThat(BaseEntity.class).hasAnnotation(MappedSuperclass.class);
+        assertThat(BaseEntity.class.getAnnotation(EntityListeners.class).value())
+                .containsExactly(AuditingEntityListener.class);
+    }
+}</code></pre>
+</details>
+
+</section>
+
+<section class="day-step" id="step-d02-3" data-step="D02-3">
+
+<h2 id="③-흩어진-설정을-configurationproperties-하나로-묶기-board"><a class="anchor" href="#③-흩어진-설정을-configurationproperties-하나로-묶기-board" aria-hidden="true">#</a>③ 흩어진 설정을 <code>@ConfigurationProperties</code> 하나로 묶기 (<code>board.*</code>)</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/config/BoardProperties.java</code></li>
+<li><code>src/main/resources/application.yml</code></li>
+</ul>
+<p><strong>겪을 것</strong> 기본값을 붙인 <code>@Value(&quot;${...:기본값}&quot;)</code>로 여러 클래스에서 읽으면 키 오타가 기동 때 잡히지 않고 기본값으로 조용히 넘어간다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li><code>BoardPropertiesTest</code> 통과: <code>board.forbidden-words.*</code> 값이 객체로 바인딩된다</li>
+<li>필수 값을 비우면 <code>@Validated</code> 때문에 기동이 실패한다</li>
+<li>정상 값으로 기동하면 <code>GET /actuator/health</code> → 200</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>GET /actuator/health</code></a></p>
+<details class="step-hint" data-step="D02-3">
+<summary>막히면</summary>
+
+<ul>
+<li><code>@ConfigurationProperties(prefix = &quot;board&quot;)</code>를 record로 만들고 <code>@Validated</code>와 <code>@NotBlank</code>·<code>@NotEmpty</code>로 필수 값을 표시한다. 등록은 <code>@ConfigurationPropertiesScan</code>을 찾아본다.</li>
+<li>바인딩이 안 되면 yml 키의 kebab-case(<code>forbidden-words</code>)와 필드 이름(camelCase)이 relaxed binding으로 이어지는지 확인한다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D02-3" data-commits="eec6f02bbf53a8f3bab362450f8beb2b3360f1cf">
+<summary>정답 보기 · answer(D02-3) · board-server 파일 5개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/eec6f02bbf53a8f3bab362450f8beb2b3360f1cf" target="_blank" rel="noopener"><code>eec6f02b</code></a> — answer(D02-3): BoardProperties(board.*) 바인딩</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/config/BoardProperties.java</code></p>
+<pre><code class="language-java">package com.example.board.config;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
+
+// 설정은 이 클래스로만 읽는다. @Value 기본값은 키 오타를 기동 때 못 잡는다.
+@Validated
+@ConfigurationProperties(&quot;board&quot;)
+public record BoardProperties(@Valid @NotNull ForbiddenWords forbiddenWords) {
+
+    public record ForbiddenWords(@NotNull Boolean ignoreCase) {
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/resources/application.yml</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -10,6 +10,10 @@ spring:
+       # MySQL 같은 외부 DB는 always가 아니면 schema.sql을 실행하지 않는다
+       mode: always
+ 
++board:
++  forbidden-words:
++    ignore-case: true
++
+ management:
+   endpoints:
+     web:</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/BoardApplication.java</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -2,8 +2,10 @@ package com.example.board;
+ 
+ import org.springframework.boot.SpringApplication;
+ import org.springframework.boot.autoconfigure.SpringBootApplication;
++import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+ 
+ @SpringBootApplication
++@ConfigurationPropertiesScan
+ public class BoardApplication {
+ 
+     public static void main(String[] args) {</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/config/BoardPropertiesBootTest.java</code></p>
+<pre><code class="language-java">package com.example.board.config;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+
+import com.example.board.TestcontainersConfig;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@Import(TestcontainersConfig.class)
+@ActiveProfiles(&quot;test&quot;)
+@AutoConfigureMockMvc
+class BoardPropertiesBootTest {
+
+    @Autowired
+    BoardProperties properties;
+
+    @Autowired
+    MockMvc mockMvc;
+
+    @Test
+    void application_yml_값으로_정상_기동한다() throws Exception {
+        assertThat(properties.forbiddenWords().ignoreCase()).isTrue();
+        mockMvc.perform(get(&quot;/actuator/health&quot;)).andExpect(status().isOk());
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/config/BoardPropertiesTest.java</code></p>
+<pre><code class="language-java">package com.example.board.config;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Configuration;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class BoardPropertiesTest {
+
+    @Configuration
+    @EnableConfigurationProperties(BoardProperties.class)
+    static class Config {
+    }
+
+    private final ApplicationContextRunner runner = new ApplicationContextRunner().withUserConfiguration(Config.class);
+
+    @Test
+    void forbidden_words_값이_객체로_바인딩된다() {
+        runner.withPropertyValues(&quot;board.forbidden-words.ignore-case=true&quot;)
+                .run(ctx -&gt; {
+                    assertThat(ctx).hasNotFailed();
+                    assertThat(ctx.getBean(BoardProperties.class).forbiddenWords().ignoreCase()).isTrue();
+                });
+    }
+
+    @Test
+    void 필수_값을_비우면_기동이_실패한다() {
+        runner.run(ctx -&gt; assertThat(ctx).hasFailed());
+    }
+}</code></pre>
+</details>
+
+</section>
+
+<section class="day-step" id="step-d02-4" data-step="D02-4">
+
+<h2 id="④-금칙어-검사기는-빈으로-닉네임-정규화는-static-유틸로-나누기"><a class="anchor" href="#④-금칙어-검사기는-빈으로-닉네임-정규화는-static-유틸로-나누기" aria-hidden="true">#</a>④ 금칙어 검사기는 빈으로, 닉네임 정규화는 static 유틸로 나누기</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/common/ForbiddenWordChecker.java</code></li>
+<li><code>src/main/java/com/example/board/common/NicknameNormalizer.java</code></li>
+</ul>
+<p><strong>겪을 것</strong> 싱글톤 빈인 검사기에 <code>lastMatched</code> 같은 상태 필드를 두면 동시 요청끼리 값이 섞인다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li><code>ForbiddenWordCheckerTest</code> 통과</li>
+<li><code>NicknameNormalizerTest</code> 통과: 앞뒤 공백 제거·소문자화</li>
+<li><code>ForbiddenWordChecker</code>에 요청마다 바뀌는 필드가 없다(리뷰 체크)</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>GET /actuator/health</code></a></p>
+<details class="step-hint" data-step="D02-4">
+<summary>막히면</summary>
+
+<ul>
+<li>검사기는 <code>@Component</code>로 등록하고 생성자 주입으로 설정 값을 받는다. 요청마다 달라지는 값은 필드가 아니라 지역 변수와 반환값으로만 다룬다.</li>
+<li>정규화처럼 상태도 의존도 없는 계산은 <code>private</code> 생성자를 둔 <code>final</code> 클래스의 static 메서드로 둔다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D02-4" data-commits="72b1a0b90b2caf8fdcdbb670674cde7c2c6fa978">
+<summary>정답 보기 · answer(D02-4) · board-server 파일 4개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/72b1a0b90b2caf8fdcdbb670674cde7c2c6fa978" target="_blank" rel="noopener"><code>72b1a0b9</code></a> — answer(D02-4): 금칙어 검사기 빈과 닉네임 정규화 유틸</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/common/ForbiddenWordChecker.java</code></p>
+<pre><code class="language-java">package com.example.board.common;
+
+import java.util.Collection;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Component;
+
+import com.example.board.config.BoardProperties;
+
+@Component
+public class ForbiddenWordChecker {
+
+    private final boolean ignoreCase;
+    // 적재 시 통째로 교체하는 불변 집합. 요청별 상태는 두지 않는다.
+    private volatile Set&lt;String&gt; words = Set.of();
+
+    public ForbiddenWordChecker(BoardProperties properties) {
+        this.ignoreCase = properties.forbiddenWords().ignoreCase();
+    }
+
+    public void replaceWords(Collection&lt;String&gt; newWords) {
+        this.words = newWords.stream().map(this::fold).collect(Collectors.toUnmodifiableSet());
+    }
+
+    public int size() {
+        return words.size();
+    }
+
+    public boolean contains(String text) {
+        if (text == null || text.isEmpty()) {
+            return false;
+        }
+        String target = fold(text);
+        return words.stream().anyMatch(target::contains);
+    }
+
+    private String fold(String s) {
+        return ignoreCase ? s.toLowerCase(Locale.ROOT) : s;
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/common/NicknameNormalizer.java</code></p>
+<pre><code class="language-java">package com.example.board.common;
+
+import java.util.Locale;
+
+/** 상태가 없는 순수 함수라 빈이 아니라 static 유틸로 둔다. */
+public final class NicknameNormalizer {
+
+    private NicknameNormalizer() {
+    }
+
+    public static String normalize(String nickname) {
+        if (nickname == null) {
+            return &quot;&quot;;
+        }
+        return nickname.strip().replaceAll(&quot;\\s+&quot;, &quot; &quot;).toLowerCase(Locale.ROOT);
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/common/ForbiddenWordCheckerTest.java</code></p>
+<pre><code class="language-java">package com.example.board.common;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.Test;
+
+import com.example.board.config.BoardProperties;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class ForbiddenWordCheckerTest {
+
+    private ForbiddenWordChecker checker(boolean ignoreCase) {
+        return new ForbiddenWordChecker(new BoardProperties(new BoardProperties.ForbiddenWords(ignoreCase)));
+    }
+
+    @Test
+    void 금칙어가_포함되면_true() {
+        ForbiddenWordChecker c = checker(true);
+        c.replaceWords(List.of(&quot;욕설&quot;, &quot;Spam&quot;));
+
+        assertThat(c.contains(&quot;이건 욕설 입니다&quot;)).isTrue();
+        assertThat(c.contains(&quot;SPAM mail&quot;)).isTrue();
+        assertThat(c.contains(&quot;깨끗한 글&quot;)).isFalse();
+    }
+
+    @Test
+    void 대소문자_구분_설정을_따른다() {
+        ForbiddenWordChecker c = checker(false);
+        c.replaceWords(List.of(&quot;spam&quot;));
+
+        assertThat(c.contains(&quot;SPAM&quot;)).isFalse();
+        assertThat(c.contains(&quot;spam&quot;)).isTrue();
+    }
+
+    @Test
+    void null과_빈_문자열은_false() {
+        ForbiddenWordChecker c = checker(true);
+        c.replaceWords(List.of(&quot;x&quot;));
+
+        assertThat(c.contains(null)).isFalse();
+        assertThat(c.contains(&quot;&quot;)).isFalse();
+    }
+
+    @Test
+    void 요청마다_바뀌는_상태_필드가_없다() {
+        // 싱글톤 빈에 lastMatched 같은 필드를 두면 동시 요청끼리 섞인다
+        Set&lt;String&gt; mutable = Stream.of(ForbiddenWordChecker.class.getDeclaredFields())
+                .filter(f -&gt; !Modifier.isStatic(f.getModifiers()))
+                .filter(f -&gt; !Modifier.isFinal(f.getModifiers()) &amp;&amp; !Modifier.isVolatile(f.getModifiers()))
+                .map(Field::getName)
+                .collect(Collectors.toSet());
+
+        assertThat(mutable).isEmpty();
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/common/NicknameNormalizerTest.java</code></p>
+<pre><code class="language-java">package com.example.board.common;
+
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class NicknameNormalizerTest {
+
+    @Test
+    void 앞뒤_공백을_제거한다() {
+        assertThat(NicknameNormalizer.normalize(&quot;  홍길동  &quot;)).isEqualTo(&quot;홍길동&quot;);
+    }
+
+    @Test
+    void 연속_공백을_하나로_줄인다() {
+        assertThat(NicknameNormalizer.normalize(&quot;a   b \t c&quot;)).isEqualTo(&quot;a b c&quot;);
+    }
+
+    @Test
+    void 소문자로_바꾼다() {
+        assertThat(NicknameNormalizer.normalize(&quot;  BoArD  &quot;)).isEqualTo(&quot;board&quot;);
+    }
+
+    @Test
+    void null은_빈_문자열() {
+        assertThat(NicknameNormalizer.normalize(null)).isEmpty();
+    }
+}</code></pre>
+</details>
+
+</section>
+
+<section class="day-step" id="step-d02-5" data-step="D02-5">
+
+<h2 id="⑤-기동이-끝난-뒤applicationreadyevent-db의-금칙어banned_word공통코드common_code를-jdbcclient로-읽어-메모리에-적재하기-schemasql에-두-테이블-추가"><a class="anchor" href="#⑤-기동이-끝난-뒤applicationreadyevent-db의-금칙어banned_word공통코드common_code를-jdbcclient로-읽어-메모리에-적재하기-schemasql에-두-테이블-추가" aria-hidden="true">#</a>⑤ 기동이 끝난 뒤(<code>ApplicationReadyEvent</code>) DB의 금칙어(<code>banned_word</code>)·공통코드(<code>common_code</code>)를 <code>JdbcClient</code>로 읽어 메모리에 적재하기 (<code>schema.sql</code>에 두 테이블 추가)</h2>
+<p><strong>만들 파일</strong> (board-server 기준)</p>
+<ul>
+<li><code>src/main/java/com/example/board/common/ForbiddenWordLoader.java</code></li>
+<li><code>src/main/java/com/example/board/common/CommonCodeRegistry.java</code></li>
+<li><code>src/main/resources/schema.sql</code></li>
+</ul>
+<p><strong>겪을 것</strong> <code>@PostConstruct</code>는 빈 하나가 초기화되는 시점이라 트랜잭션 프록시나 다른 빈이 아직 준비되지 않았을 수 있으므로, 애플리케이션 준비가 끝난 <code>ApplicationReadyEvent</code>에서 적재한다.</p>
+<p><strong>완료 조건</strong></p>
+<ul>
+<li>기동 로그에서 <code>Started BoardApplication</code> 다음에 <code>금칙어 N건, 공통코드 M건 적재</code></li>
+<li><code>banned_word</code>에 행을 넣고 재기동하면 적재 건수가 늘어난다</li>
+<li><code>GET /actuator/health</code> → 200</li>
+</ul>
+<p><strong>명세</strong> <a href="../spec-v2.html#4-엔드포인트"><code>GET /actuator/health</code></a></p>
+<details class="step-hint" data-step="D02-5">
+<summary>막히면</summary>
+
+<ul>
+<li><code>@EventListener(ApplicationReadyEvent.class)</code>와 Spring 6.1의 <code>JdbcClient</code>(<code>sql(...).query(...)</code>)를 찾아본다.</li>
+<li>적재 로그 순서는 기동 로그에서 <code>Started BoardApplication</code> 줄과 비교한다. 테이블이 없다는 오류면 <code>schema.sql</code>의 <code>CREATE TABLE IF NOT EXISTS</code>를 확인한다.</li>
+</ul>
+</details>
+
+<details class="step-answer" data-step="D02-5" data-commits="3c956e54c28ad38d3ac4073f102d6329592014bc">
+<summary>정답 보기 · answer(D02-5) · board-server 파일 4개</summary>
+
+<p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/3c956e54c28ad38d3ac4073f102d6329592014bc" target="_blank" rel="noopener"><code>3c956e54</code></a> — answer(D02-5): ApplicationReadyEvent에서 금칙어·공통코드 적재와 schema.sql</p>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/common/ForbiddenWordLoader.java</code></p>
+<pre><code class="language-java">package com.example.board.common;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Component;
+
+@Component
+public class ForbiddenWordLoader {
+
+    private static final Logger log = LoggerFactory.getLogger(ForbiddenWordLoader.class);
+
+    private final JdbcClient jdbc;
+    private final ForbiddenWordChecker checker;
+    private final CommonCodeRegistry registry;
+
+    public ForbiddenWordLoader(JdbcClient jdbc, ForbiddenWordChecker checker, CommonCodeRegistry registry) {
+        this.jdbc = jdbc;
+        this.checker = checker;
+        this.registry = registry;
+    }
+
+    // @PostConstruct는 빈 하나의 초기화 시점이라 다른 빈·프록시가 덜 준비됐을 수 있다. 준비가 끝난 뒤 적재한다.
+    @EventListener(ApplicationReadyEvent.class)
+    void onReady() {
+        load();
+    }
+
+    public void load() {
+        List&lt;String&gt; words = jdbc.sql(&quot;SELECT word FROM banned_word&quot;).query(String.class).list();
+        Map&lt;String, String&gt; codes = new HashMap&lt;&gt;();
+        jdbc.sql(&quot;SELECT group_code, code, name FROM common_code&quot;)
+                .query((rs, i) -&gt; {
+                    codes.put(CommonCodeRegistry.key(rs.getString(&quot;group_code&quot;), rs.getString(&quot;code&quot;)),
+                            rs.getString(&quot;name&quot;));
+                    return null;
+                }).list();
+
+        checker.replaceWords(words);
+        registry.replace(codes);
+        log.info(&quot;금칙어 {}건, 공통코드 {}건 적재&quot;, checker.size(), registry.size());
+    }
+}</code></pre>
+<p><strong>새 파일</strong> <code>src/main/java/com/example/board/common/CommonCodeRegistry.java</code></p>
+<pre><code class="language-java">package com.example.board.common;
+
+import java.util.Map;
+import java.util.Optional;
+
+import org.springframework.stereotype.Component;
+
+@Component
+public class CommonCodeRegistry {
+
+    // &quot;group:code&quot; -&gt; name. 적재 때 통째로 교체한다.
+    private volatile Map&lt;String, String&gt; names = Map.of();
+
+    void replace(Map&lt;String, String&gt; newNames) {
+        this.names = Map.copyOf(newNames);
+    }
+
+    public int size() {
+        return names.size();
+    }
+
+    public Optional&lt;String&gt; name(String group, String code) {
+        return Optional.ofNullable(names.get(key(group, code)));
+    }
+
+    static String key(String group, String code) {
+        return group + &quot;:&quot; + code;
+    }
+}</code></pre>
+<p><strong>수정</strong> <code>src/main/resources/schema.sql</code> (바뀐 부분)</p>
+<pre><code class="language-diff">@@ -1,3 +1,17 @@
+--- 스키마는 이 파일 하나로 관리한다 (Flyway 미사용). 테이블은 D04부터 추가한다.
+--- 주석뿐인 스크립트는 Spring이 거부하므로 D04 전까지 no-op 문장을 둔다.
+-SELECT 1;
++-- 스키마는 이 파일 하나로 관리한다 (Flyway 미사용). 재기동해도 실행되므로 IF NOT EXISTS를 쓴다.
++
++CREATE TABLE IF NOT EXISTS banned_word (
++    id   BIGINT       NOT NULL AUTO_INCREMENT,
++    word VARCHAR(50)  NOT NULL,
++    PRIMARY KEY (id),
++    UNIQUE KEY uk_banned_word_word (word)
++) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
++
++CREATE TABLE IF NOT EXISTS common_code (
++    id         BIGINT       NOT NULL AUTO_INCREMENT,
++    group_code VARCHAR(30)  NOT NULL,
++    code       VARCHAR(30)  NOT NULL,
++    name       VARCHAR(100) NOT NULL,
++    PRIMARY KEY (id),
++    UNIQUE KEY uk_common_code_group_code (group_code, code)
++) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;</code></pre>
+<p><strong>새 파일</strong> <code>src/test/java/com/example/board/common/ForbiddenWordLoaderTest.java</code></p>
+<pre><code class="language-java">package com.example.board.common;
+
+import java.lang.reflect.Method;
+import java.util.Optional;
+
+import jakarta.annotation.PostConstruct;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.event.EventListener;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.annotation.DirtiesContext;
+
+import com.example.board.TestcontainersConfig;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@ExtendWith(OutputCaptureExtension.class)
+@SpringBootTest
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
+@Import(TestcontainersConfig.class)
+@ActiveProfiles(&quot;test&quot;)
+class ForbiddenWordLoaderTest {
+
+    @Autowired
+    ForbiddenWordLoader loader;
+    @Autowired
+    ForbiddenWordChecker checker;
+    @Autowired
+    CommonCodeRegistry registry;
+    @Autowired
+    JdbcClient jdbc;
+
+    @Test
+    void 적재는_ApplicationReadyEvent_리스너에서_일어난다() throws Exception {
+        Method m = loader.getClass().getDeclaredMethod(&quot;onReady&quot;);
+
+        assertThat(m.getAnnotation(EventListener.class).value()).containsExactly(ApplicationReadyEvent.class);
+        assertThat(m.isAnnotationPresent(PostConstruct.class)).isFalse();
+    }
+
+    @Test
+    void 기동_로그는_Started_다음에_적재_건수가_나온다(CapturedOutput output) {
+        String log = output.getAll();
+        int started = log.indexOf(&quot;Started &quot;);
+        int loaded = log.indexOf(&quot;금칙어 &quot;);
+
+        assertThat(started).isNotNegative();
+        assertThat(loaded).isGreaterThan(started);
+        assertThat(log).containsPattern(&quot;금칙어 \\d+건, 공통코드 \\d+건 적재&quot;);
+    }
+
+    @Test
+    void banned_word에_넣은_단어를_재적재하면_감지한다() {
+        jdbc.sql(&quot;INSERT INTO banned_word (word) VALUES (:w)&quot;).param(&quot;w&quot;, &quot;테스트금칙어&quot;).update();
+        assertThat(checker.contains(&quot;테스트금칙어 포함&quot;)).isFalse();
+
+        loader.load();
+
+        assertThat(checker.contains(&quot;테스트금칙어 포함&quot;)).isTrue();
+    }
+
+    @Test
+    void common_code를_이름으로_조회한다() {
+        jdbc.sql(&quot;INSERT INTO common_code (group_code, code, name) VALUES ('REPORT_STATUS', 'OPEN', '접수')&quot;).update();
+
+        loader.load();
+
+        assertThat(registry.name(&quot;REPORT_STATUS&quot;, &quot;OPEN&quot;)).isEqualTo(Optional.of(&quot;접수&quot;));
+        assertThat(registry.name(&quot;REPORT_STATUS&quot;, &quot;NOPE&quot;)).isEmpty();
+    }
+}</code></pre>
+</details>
+
+</section>
+
+<hr>
+<h2 id="말하기-카드"><a class="anchor" href="#말하기-카드" aria-hidden="true">#</a>말하기 카드</h2>
+<p>하루가 끝나면 질문에 &quot;문제 상황 → 원인 → 선택 → 결과&quot; 순서로 소리 내어 답한 뒤, 접힌 &quot;답에 들어가야 할 것&quot;과 비교한다. 세 줄이 모두 나오면 통과다.</p>
+<h3 id="tc-d02-1"><a class="anchor" href="#tc-d02-1" aria-hidden="true">#</a>TC-D02-1</h3>
+<p><strong>질문</strong> 금칙어 목록을 DB에서 읽어 메모리에 올리는 코드를 <code>@PostConstruct</code>가 아니라 <code>ApplicationReadyEvent</code>에 둔 이유는?</p>
+<details class="card-answer" data-card="TC-D02-1">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li><code>@PostConstruct</code>는 빈을 만드는 도중(싱글톤 생성 락 안)에 실행되므로, 여기서 DB 적재 같은 무거운 일을 하면 그만큼 기동이 늦어진다</li>
+<li><code>@PostConstruct</code> 안에서 같은 클래스의 <code>@Transactional</code> 메서드를 불러도 프록시를 거치지 않아 트랜잭션이 걸리지 않는다</li>
+<li><code>ApplicationReadyEvent</code>는 컨텍스트 refresh와 runner 실행이 끝난 뒤 발행되므로 기동 후 적재는 여기나 <code>ApplicationRunner</code>에 둔다</li>
+</ul>
+<p><strong>근거</strong> 06 §14</p>
+</details>
+
+<h3 id="tc-d02-2"><a class="anchor" href="#tc-d02-2" aria-hidden="true">#</a>TC-D02-2</h3>
+<p><strong>질문</strong> 금칙어 검사기에 마지막 검사 결과를 담는 필드 <code>lastMatched</code>를 두자는 코드가 올라왔습니다. 리뷰에서 뭐라고 하나요?</p>
+<details class="card-answer" data-card="TC-D02-2">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li>Spring 빈의 기본 스코프는 singleton이라 모든 요청 스레드가 같은 인스턴스를 공유한다</li>
+<li>요청마다 바뀌는 값을 인스턴스 필드에 쓰면 동시 요청끼리 덮어써 다른 사용자의 값이 섞인다</li>
+<li>요청별 값은 지역 변수·인자·반환값으로 다루고, 필드에는 <code>final</code> 의존성과 불변 설정만 둔다</li>
+</ul>
+<p><strong>근거</strong> 06 §1</p>
+</details>
+
+<h3 id="tc-d02-3"><a class="anchor" href="#tc-d02-3" aria-hidden="true">#</a>TC-D02-3</h3>
+<p><strong>질문</strong> 닉네임 정규화 함수는 static 유틸로, 금칙어 검사기는 빈으로 만들었습니다. 무엇을 기준으로 나눴나요?</p>
+<details class="card-answer" data-card="TC-D02-3">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li>입력만 받아 결과를 돌려주고 외부 자원이 없는 순수 함수는 static 유틸로 둔다</li>
+<li>DB·설정·다른 빈에 의존하거나 트랜잭션·AOP가 필요한 것은 빈으로 만들어 주입받는다</li>
+<li>빈은 생성자 주입으로 테스트 대역을 넣을 수 있지만, static 호출은 대역으로 바꾸기 어렵다</li>
+</ul>
+<p><strong>근거</strong> 06 §1</p>
+</details>
+
+<h3 id="tc-d02-4"><a class="anchor" href="#tc-d02-4" aria-hidden="true">#</a>TC-D02-4</h3>
+<p><strong>질문</strong> 전역 예외 처리기에서 <code>IllegalArgumentException</code>을 전부 400으로 바꾸자는 제안이 있습니다. 어떻게 답하나요?</p>
+<details class="card-answer" data-card="TC-D02-4">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li><code>IllegalArgumentException</code>은 서버 버그에서도 나므로, 일괄 400으로 바꾸면 서버 결함이 클라이언트 잘못으로 보이고 5xx 지표에서 사라진다</li>
+<li>클라이언트 잘못이 명백한 경우만 도메인 예외로 정의해 4xx로 매핑하고, 예상하지 못한 예외는 500으로 둔다</li>
+<li>모든 에러는 ProblemDetail(<code>application/problem+json</code>)로 내고, 클라이언트는 <code>type</code>으로 분기한다</li>
+</ul>
+<p><strong>근거</strong> 06 §10, spec-v2 §2</p>
+</details>
+
+<h3 id="tc-d02-5"><a class="anchor" href="#tc-d02-5" aria-hidden="true">#</a>TC-D02-5</h3>
+<p><strong>질문</strong> 여러 클래스에서 <code>@Value</code>로 읽던 금칙어 설정을 <code>@ConfigurationProperties</code> 하나로 묶었습니다. 무엇이 좋아졌나요?</p>
+<details class="card-answer" data-card="TC-D02-5">
+<summary>답에 들어가야 할 것</summary>
+
+<ul>
+<li>관련 설정이 한 타입에 모이고, <code>@Validated</code>를 붙이면 잘못된 값이 기동 시점에 실패한다</li>
+<li>relaxed binding으로 kebab-case, camelCase, 환경 변수 표기를 모두 받는다</li>
+<li><code>@Value</code>는 relaxed binding이 제한적이라, 키를 정규형(kebab-case)으로 쓰지 않으면 다른 표기의 값을 못 찾을 수 있다</li>
+</ul>
+<p><strong>근거</strong> 06 §14</p>
+</details>
+
+<h2 id="ai-채점-프롬프트"><a class="anchor" href="#ai-채점-프롬프트" aria-hidden="true">#</a>AI 채점 프롬프트</h2>
+<p>오늘 순서를 다 만들었으면 서버를 띄운 채로 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣는다. 에이전트가 완료 조건·함정·말하기 카드로 채점표를 준다. 코드는 고치지 않는다.</p>
+<pre><code class="language-text">[javaExperience 일자 채점] D02. 공통 기반
+레포 경로: 내 프로젝트 루트(이 프롬프트를 붙여 넣은 에이전트를 연 폴더)
+서버 주소: http://localhost:8080
+
+너는 Java·Spring 온보딩 과정 v2로 백엔드를 배우는 사람의 리뷰어다. 학습자는 빈 프로젝트에서 명세서 v2의 서버를 하루씩 만들고 있고, 오늘은 D02다.
+지킬 것: 코드는 절대 수정하지 마라. DB는 조회만 한다(SELECT·SHOW·EXPLAIN). 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.
+
+1. 서버 주소의 `GET /actuator/health`로 응답 가능 여부를 확인해라. 꺼져 있으면 `./gradlew bootRun`으로 띄우라고만 알려 주고 멈춰라.
+2. 아래 &quot;채점 기준&quot;이 통과/실패의 유일한 기준이다. 기준에 없는 것으로 실패 처리하지 말고, 다른 날의 기준은 보지 마라.
+3. [C] 항목: HTTP 요청은 서버 주소로 직접 보내 상태 코드·응답 헤더·본문을 기대값과 비교한다. 테스트 이름이 적힌 항목은 레포 루트에서 `./gradlew test --tests '&lt;테스트 클래스 이름&gt;'`으로 실행해 통과 여부를 본다(테스트 코드도 고치지 마라). 로그 항목은 기동 로그에서 찾거나 학습자에게 해당 줄을 붙여 달라고 한다. DB 확인이 필요하면 `docker compose exec -T mysql mysql -uboard -pboard board -e &quot;&lt;SELECT 문&gt;&quot;`으로 조회만 한다.
+4. [R] 항목: 관련 코드를 찾아 읽고 그 함정을 피했는지 판단해라. 지적할 때는 `파일:줄`을 붙여라.
+5. 말하기 카드: 학습자에게 카드 질문마다 답을 말하거나 적어 달라고 해라. &quot;답에 들어가야 할 것&quot;(· 표시) 세 줄이 모두 나오면 통과다. 빠진 줄은 정답 문장을 먼저 말하지 말고 되묻는 질문으로 끌어내라.
+6. 리뷰 초점은 채점표에 넣지 말고 ②·③에 적어라.
+
+채점 기준
+① 공통 에러 체계: ErrorCode, BusinessException, ProblemDetail을 만드는 전역 예외 처리기
+  - [C1-1] GET /api/unknown → 404 application/problem+json, instance = /api/unknown
+  - [C1-2] GlobalExceptionHandlerTest 통과: BusinessException(ErrorCode.NOT_FOUND) → 404 type /errors/not-found
+  - [C1-3] GET /actuator/health → 200
+  - [R1] 함정을 피했는지 코드로 확인: IllegalArgumentException을 전부 400으로 바꾸면 서버 코드의 버그까지 클라이언트 잘못으로 보고돼 장애가 숨는다.
+② BaseEntity(생성·수정 시각 Auditing)와 Testcontainers 테스트 기반
+  - [C2-1] BoardApplicationTests 통과: Testcontainers MySQL로 컨텍스트 기동
+  - [C2-2] GET /actuator/health → 200 (@EnableJpaAuditing 포함)
+  - [R2] 함정을 피했는지 코드로 확인: @EnableJpaAuditing을 빠뜨리면 created_at이 null로 들어가 NOT NULL 제약 위반이 난다.
+③ 흩어진 설정을 @ConfigurationProperties 하나로 묶기 (board.*)
+  - [C3-1] BoardPropertiesTest 통과: board.forbidden-words.* 값이 객체로 바인딩된다
+  - [C3-2] 필수 값을 비우면 @Validated 때문에 기동이 실패한다
+  - [C3-3] 정상 값으로 기동하면 GET /actuator/health → 200
+  - [R3] 함정을 피했는지 코드로 확인: 기본값을 붙인 @Value(&quot;${...:기본값}&quot;)로 여러 클래스에서 읽으면 키 오타가 기동 때 잡히지 않고 기본값으로 조용히 넘어간다.
+④ 금칙어 검사기는 빈으로, 닉네임 정규화는 static 유틸로 나누기
+  - [C4-1] ForbiddenWordCheckerTest 통과
+  - [C4-2] NicknameNormalizerTest 통과: 앞뒤 공백 제거·소문자화
+  - [C4-3] ForbiddenWordChecker에 요청마다 바뀌는 필드가 없다(리뷰 체크)
+  - [R4] 함정을 피했는지 코드로 확인: 싱글톤 빈인 검사기에 lastMatched 같은 상태 필드를 두면 동시 요청끼리 값이 섞인다.
+⑤ 기동이 끝난 뒤(ApplicationReadyEvent) DB의 금칙어(banned_word)·공통코드(common_code)를 JdbcClient로 읽어 메모리에 적재하기 (schema.sql에 두 테이블 추가)
+  - [C5-1] 기동 로그에서 Started BoardApplication 다음에 금칙어 N건, 공통코드 M건 적재
+  - [C5-2] banned_word에 행을 넣고 재기동하면 적재 건수가 늘어난다
+  - [C5-3] GET /actuator/health → 200
+  - [R5] 함정을 피했는지 코드로 확인: @PostConstruct는 빈 하나가 초기화되는 시점이라 트랜잭션 프록시나 다른 빈이 아직 준비되지 않았을 수 있으므로, 애플리케이션 준비가 끝난 ApplicationReadyEvent에서 적재한다.
+
+말하기 카드
+- [TC-D02-1] 금칙어 목록을 DB에서 읽어 메모리에 올리는 코드를 @PostConstruct가 아니라 ApplicationReadyEvent에 둔 이유는?
+    · @PostConstruct는 빈을 만드는 도중(싱글톤 생성 락 안)에 실행되므로, 여기서 DB 적재 같은 무거운 일을 하면 그만큼 기동이 늦어진다
+    · @PostConstruct 안에서 같은 클래스의 @Transactional 메서드를 불러도 프록시를 거치지 않아 트랜잭션이 걸리지 않는다
+    · ApplicationReadyEvent는 컨텍스트 refresh와 runner 실행이 끝난 뒤 발행되므로 기동 후 적재는 여기나 ApplicationRunner에 둔다
+- [TC-D02-2] 금칙어 검사기에 마지막 검사 결과를 담는 필드 lastMatched를 두자는 코드가 올라왔습니다. 리뷰에서 뭐라고 하나요?
+    · Spring 빈의 기본 스코프는 singleton이라 모든 요청 스레드가 같은 인스턴스를 공유한다
+    · 요청마다 바뀌는 값을 인스턴스 필드에 쓰면 동시 요청끼리 덮어써 다른 사용자의 값이 섞인다
+    · 요청별 값은 지역 변수·인자·반환값으로 다루고, 필드에는 final 의존성과 불변 설정만 둔다
+- [TC-D02-3] 닉네임 정규화 함수는 static 유틸로, 금칙어 검사기는 빈으로 만들었습니다. 무엇을 기준으로 나눴나요?
+    · 입력만 받아 결과를 돌려주고 외부 자원이 없는 순수 함수는 static 유틸로 둔다
+    · DB·설정·다른 빈에 의존하거나 트랜잭션·AOP가 필요한 것은 빈으로 만들어 주입받는다
+    · 빈은 생성자 주입으로 테스트 대역을 넣을 수 있지만, static 호출은 대역으로 바꾸기 어렵다
+- [TC-D02-4] 전역 예외 처리기에서 IllegalArgumentException을 전부 400으로 바꾸자는 제안이 있습니다. 어떻게 답하나요?
+    · IllegalArgumentException은 서버 버그에서도 나므로, 일괄 400으로 바꾸면 서버 결함이 클라이언트 잘못으로 보이고 5xx 지표에서 사라진다
+    · 클라이언트 잘못이 명백한 경우만 도메인 예외로 정의해 4xx로 매핑하고, 예상하지 못한 예외는 500으로 둔다
+    · 모든 에러는 ProblemDetail(application/problem+json)로 내고, 클라이언트는 type으로 분기한다
+- [TC-D02-5] 여러 클래스에서 @Value로 읽던 금칙어 설정을 @ConfigurationProperties 하나로 묶었습니다. 무엇이 좋아졌나요?
+    · 관련 설정이 한 타입에 모이고, @Validated를 붙이면 잘못된 값이 기동 시점에 실패한다
+    · relaxed binding으로 kebab-case, camelCase, 환경 변수 표기를 모두 받는다
+    · @Value는 relaxed binding이 제한적이라, 키를 정규형(kebab-case)으로 쓰지 않으면 다른 표기의 값을 못 찾을 수 있다
+
+리뷰 초점
+- 모든 오류 응답이 같은 ProblemDetail 형식(`type`·`title`·`status`·`detail`·`instance`)으로 나가는지
+- 서버 버그(NPE 등)가 4xx로 바뀌어 숨지 않고 500으로 남는지
+
+아래 형식으로만 답해라.
+① 채점표 — | 항목 | 기대 | 실제 | 결과 |  (결과: 통과 / 실패 / 확인 불가)
+② 잘한 점
+③ 부족한 점과 이유 — 실패한 C 항목부터
+④ 내일 전에 고칠 것 — 우선순위순, 3개 이내
+⑤ 말하기 카드 — | 카드 | 빠진 줄 | 결과 |
+마지막 줄: `결과: 필수 N/M 통과 · 말하기 카드 K/L 통과` (필수 = C 항목, R은 참고)</code></pre>
+<h2 id="내일-미리보기"><a class="anchor" href="#내일-미리보기" aria-hidden="true">#</a>내일 미리보기</h2>
+<p><a class="docref" href="../../docs/knowledge/D03-rest-api-dev-process.html">D03</a>은 오늘 만든 <code>ErrorCode</code>·<code>GlobalExceptionHandler</code>로 401·403·409를 ProblemDetail로 내고, <code>BaseEntity</code>를 <code>Member</code>가 처음 상속한다.</p>
+<h2 id="날짜별-snapshot"><a class="anchor" href="#날짜별-snapshot" aria-hidden="true">#</a>날짜별 snapshot</h2>
+<p>오늘 마지막 정답 커밋은 <code>3c956e54</code>(answer(D02-5): ApplicationReadyEvent에서 금칙어·공통코드 적재와 schema.sql)이다. <a href="https://github.com/ai-ext/javaExperience/tree/3c956e54c28ad38d3ac4073f102d6329592014bc/board-server" target="_blank" rel="noopener">이 시점의 board-server 전체 보기</a>. 기준은 위 순서 칸의 인라인 정답이고, 이 링크는 보조다(PR 병합 방식에 따라 커밋이 사라질 수 있다).</p>
+<h2 id="참고-자료"><a class="anchor" href="#참고-자료" aria-hidden="true">#</a>참고 자료</h2>
+<details class="day-refs">
+<summary>기존 시나리오·공부자료 (참고 도감)</summary>
+
+<ul>
+<li><a href="../../scenario/ch10-project/10-2-common-response.html">10-2. 공통 응답 틀과 전역 예외 처리</a></li>
+<li><a href="../../docs/knowledge/W08-where-to-handle-exceptions.html">W08. 예외는 어디서 잡나 — 계층별 처리와 전역 핸들러</a></li>
+<li><a href="../../docs/knowledge/P11-bean-registration-di.html">P11. 빈 등록과 의존성 주입 따라 하기 — @Component부터 private final + @RequiredArgsConstructor까지</a></li>
+<li><a href="../../docs/knowledge/P29-static-complete.html">P29. static 완전 정리 — 클래스 변수·정적 메서드·상수, 그리고 Spring에서의 static</a></li>
+<li><a href="../../scenario/ch13-operations/13-4-banned-words.html">13-4. 금칙어 필터</a></li>
+</ul>
+</details>
+
+<p><a href="D01.html">← D01</a> · <a href="README.html">일자 목록</a> · <a href="D03.html">D03 →</a></p>
+
+
+</main>
+
+
+
+
+
+</body>
+</html>

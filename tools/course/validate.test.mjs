@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseSpecEndpoints, parseTalkCardIds, validate } from './validate.mjs';
+import { parseSpecEndpoints, parseTalkCardIds, validate, validateDayPages } from './validate.mjs';
 
 const FX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures');
 const load = () => ({
@@ -184,4 +184,71 @@ test('README 일정표가 roadmap과 일치', () => {
     .map((m) => [m[1], m[2], m[3], Number(m[4])]);
   const want = roadmap.days.map((d) => [d.id, d.title, d.java, d.talkCards.length]);
   assert.deepEqual(rows, want);
+});
+
+// ---------------------------------------------------------------- 일자 페이지
+const CIRCLE = '⓪①②③④⑤⑥⑦⑧⑨';
+const DAY_HEAD = '<!-- 생성물: tools/course/build-days.mjs가 만든다. 직접 고치지 마라 -->';
+function fakePage(day) {
+  const checks = day.steps.map((s) => `<li><input type="checkbox" class="step-check" data-step="${day.id}-${s.no}"></li>`).join('\n');
+  const steps = day.steps.map((s) => `<section class="day-step" id="step-${s.no}" data-step="${day.id}-${s.no}">\n\n## ${CIRCLE[s.no]} ${s.title}\n\n</section>`).join('\n\n');
+  const cards = day.talkCards.map((c) => `### ${c}\n\n**질문** q`).join('\n\n');
+  return `${DAY_HEAD}\n\n# ${day.id}. ${day.title}\n\n> [${day.java}](../java/${day.java}.md)\n\n${checks}\n\n${steps}\n\n## 말하기 카드\n\n${cards}\n`;
+}
+const loadPages = () => {
+  const { roadmap } = load();
+  const pages = { 'D00.md': `${DAY_HEAD}\n# D00`, 'README.md': `${DAY_HEAD}\n# 목록` };
+  for (const d of roadmap.days) pages[`${d.id}.md`] = fakePage(d);
+  return { roadmap, pages };
+};
+
+test('정상 일자 페이지는 오류가 없다', () => {
+  assert.deepEqual(validateDayPages(loadPages()), []);
+});
+
+test('D15 페이지가 없으면 오류', () => {
+  const i = loadPages();
+  delete i.pages['D15.md'];
+  assert.ok(has(validateDayPages(i), 'D15.md'));
+});
+
+test('일자 페이지의 순서 수가 roadmap과 다르면 오류', () => {
+  const i = loadPages();
+  i.roadmap.days[3].steps.push({ no: 4, title: '새 순서', files: [], done: [], specRefs: [], tickets: [] });
+  assert.ok(has(validateDayPages(i), 'D04.md', '순서 수'));
+});
+
+test('일자 페이지의 순서 제목이 roadmap과 다르면 오류', () => {
+  const i = loadPages();
+  i.pages['D02.md'] = i.pages['D02.md'].replace(`## ① ${i.roadmap.days[1].steps[0].title}`, '## ① 다른 제목');
+  assert.ok(has(validateDayPages(i), 'D02.md', '순서 1'));
+});
+
+test('일자 페이지의 말하기 카드가 roadmap talkCards와 다르면 오류', () => {
+  const i = loadPages();
+  i.roadmap.days[0].talkCards = [...i.roadmap.days[0].talkCards].reverse();
+  assert.ok(has(validateDayPages(i), 'D01.md', '말하기 카드'));
+});
+
+test('코드 블록 안의 제목 줄은 순서·카드로 세지 않는다', () => {
+  const i = loadPages();
+  i.pages['D03.md'] += '\n````markdown\n## ① 정답 코드 속 제목\n### TC-D03-9\n```\n안쪽 펜스\n```\n````\n';
+  assert.deepEqual(validateDayPages(i), []);
+});
+
+test('생성물 표시가 없거나 오늘의 Java 링크가 없으면 오류', () => {
+  const i = loadPages();
+  i.pages['D05.md'] = i.pages['D05.md'].replace(DAY_HEAD, '').replace('(../java/J05.md)', '(../java/J04.md)');
+  const errs = validateDayPages(i);
+  assert.ok(has(errs, 'D05.md', '생성물'));
+  assert.ok(has(errs, 'D05.md', 'J05'));
+});
+
+test('실제 course/spring 일자 페이지가 roadmap과 일치한다', () => {
+  const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'course');
+  const roadmap = JSON.parse(fs.readFileSync(path.join(dir, 'roadmap.json'), 'utf8'));
+  const spring = path.join(dir, 'spring');
+  const pages = {};
+  for (const f of fs.readdirSync(spring)) if (f.endsWith('.md')) pages[f] = fs.readFileSync(path.join(spring, f), 'utf8');
+  assert.deepEqual(validateDayPages({ roadmap, pages }), []);
 });
