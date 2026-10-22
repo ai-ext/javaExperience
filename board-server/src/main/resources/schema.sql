@@ -141,3 +141,15 @@ CREATE TABLE IF NOT EXISTS member_coupon (
     -- 내 쿠폰 목록용
     KEY idx_member_coupon_member (member_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS shop_item (
+    id         BIGINT       NOT NULL AUTO_INCREMENT,
+    name       VARCHAR(100) NOT NULL,
+    price      BIGINT       NOT NULL,
+    stock      INT          NOT NULL,
+    created_at DATETIME(6)  NOT NULL,
+    updated_at DATETIME(6)  NOT NULL,
+    PRIMARY KEY (id),
+    -- 재고 음수의 최종 방어선
+    CONSTRAINT ck_shop_item_stock CHECK (stock >= 0)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
