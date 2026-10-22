@@ -1597,7 +1597,7 @@ public interface NotificationWriteMapper {
 
 회원 3(`tok-p03`)은 팔로워 16명 중 15명이 활동 중이다(회원 28은 정지). 그중 회원 26의 푸시가 실패하게 한다. 회원 1(`tok-p01`)은 운영자다.
 
-가짜 푸시 설정과 게시글 요청은 실행 패널의 T4와 P를 순서대로 보낸다. P 직후 SQL 집계를 확인하고 4초 뒤 다시 확인한다. 이때 `NULL`이 `SENT 14, FAILED 1`로 바뀌어야 한다. API 주소는 페이지 상단 공통 입력을 사용하고 Postman 설정은 접어서 확인할 수 있다.
+가짜 푸시 설정과 게시글 요청은 실행 패널의 T6와 P를 순서대로 보낸다. P 직후 SQL 집계를 확인하고 4초 뒤 다시 확인한다. 이때 `NULL`이 `SENT 14, FAILED 1`로 바뀌어야 한다. API 주소는 페이지 상단 공통 입력을 사용하고 Postman 설정은 접어서 확인할 수 있다.
 
 ```bash
 sql() { docker compose exec -T mysql mysql -ucommunity -pcommunity practice -N -e "$1" 2>/dev/null; }
