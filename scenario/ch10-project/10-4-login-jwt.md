@@ -263,6 +263,8 @@ String subject = Jwts.parser().verifyWith(key).build()
 API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 요청은 아래 실행 패널에서 순서대로 보낸다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 ```bash
+BASE=http://localhost:8080
+login() { curl -s -i -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' -d "$1"; echo; echo ----; }
 
 login '{"email":"kim@example.com","password":"password1234"}'        # L 로그인
 login '{"email":"kim@example.com","password":"wrong-pass"}'          # W 틀린 비밀번호
@@ -271,9 +273,15 @@ login '{"email":" KIM@Example.com ","password":"password1234"}'     # K 대소�
 login '{"email":"kim@example.com"}'                                  # V 비밀번호 빠짐
 login '{"email":"kim@example.com","password":"가가가가가가가가가가가가가가가가가가가가가가가가가"}'  # P 한글 25자(75바이트)
 
+TOKEN=$(curl -s -X POST "$BASE/api/v1/auth/login" -H 'Content-Type: application/json' \
+  -d '{"email":"kim@example.com","password":"password1234"}' | sed -E 's/.*"accessToken":"([^"]+)".*/\1/')
+curl -s -i "$BASE/api/v1/users/me" -H "Authorization: Bearer $TOKEN"; echo   # M 내 정보
+curl -s -i "$BASE/api/v1/users/me"; echo                                     # M0 헤더 없음
+curl -s -i "$BASE/api/v1/users/me" -H 'Authorization: Token abc'; echo      # M1 Bearer 아님
 
 # M5 — preflight(브라우저가 Authorization을 싣기 전에 묻는 요청)는 토큰 없이도 통과해야 한다
-
+curl -i -X OPTIONS "$BASE/api/v1/users/me" -H 'Origin: http://localhost:3000' \
+  -H 'Access-Control-Request-Method: GET' -H 'Access-Control-Request-Headers: authorization'
 ```
 
 버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. M2(서명 틀림)는 다른 키로, M3(만료)는 예시 키로 미리 서명해 둔 토큰이다.

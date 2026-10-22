@@ -356,16 +356,31 @@ public void save(String storedName, byte[] bytes) {
 API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 요청은 아래 실행 패널에서 순서대로 보낸다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 ```bash
+BASE=http://localhost:8080
+K='Authorization: Bearer tok-kimjava'; L='Authorization: Bearer tok-lee'; J='Content-Type: application/json'
 jget() { python3 -c "import sys,json; print(json.load(sys.stdin)['$1'])"; }
 
 printf 'GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;' > dot.gif   # 1×1 GIF
 echo hello > fake.png
 head -c 1200000 /dev/urandom > big.gif                                  # 1.2MB
 
+curl -s -X POST "$BASE/api/images" -H "$K" -F "file=@dot.gif" | tee up.json; echo     # I0 (-F가 multipart로 보낸다)
 F=$(jget fileName < up.json); IMG=$(jget id < up.json)
+curl -s -D - -o got.gif "$BASE/api/images/$F" | grep -i content-type; cmp dot.gif got.gif && echo 같은파일   # I1
+curl -i -X POST "$BASE/api/images" -H "$K" -F "file=@fake.png;type=image/png"        # I2
+curl -i -X POST "$BASE/api/images" -F "file=@dot.gif"                                # I3 토큰 없음
+curl -i -X POST "$BASE/api/images" -H "$K" -F "file=@big.gif"                        # I4 1MB 초과
+P=$(curl -s -X POST "$BASE/api/posts" -H "$K" -H "$J" \
+  -d "{\"boardSlug\":\"free\",\"title\":\"[채점] 사진 글\",\"content\":\"사진 첨부\",\"imageIds\":[$IMG]}" | jget id); echo "P=$P"   # I5
+curl -s "$BASE/api/posts/$P"; echo                                                   # I6
+curl -i -X POST "$BASE/api/posts" -H "$K" -H "$J" \
+  -d "{\"boardSlug\":\"free\",\"title\":\"[채점] 같은 사진 또\",\"content\":\"x\",\"imageIds\":[$IMG]}"   # I7 이미 붙은 이미지
+# 잘못된 입력 — 모두 400(또는 415), 500이 아니어야 한다
+: > empty.gif; curl -s -X POST "$BASE/api/images" -H "$K" -F "file=@empty.gif"; echo                # E1 0바이트
+curl -s -X POST "$BASE/api/images" -H "$K" -H "$J" -d '{"file":"dot.gif"}'; echo                       # E2 JSON으로 보냄
 for ids in '[null]' '["abc"]' '[99999999]' '[1,2,3,4,5,6,7,8,9,10,11]'; do
+  curl -s -X POST "$BASE/api/posts" -H "$K" -H "$J" -d "{\"boardSlug\":\"free\",\"title\":\"[채점] 잘못된 이미지\",\"content\":\"x\",\"imageIds\":$ids}"; echo   # E3~E6
 done
-
 ```
 
 버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 실행 칸은 파일을 고를 수 없어서 `multipart/form-data` 본문을 글자로 직접 적어 보낸다(경계 `jx11`, 줄바꿈은 `\r\n`).
