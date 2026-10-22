@@ -149,6 +149,9 @@
 | POST /api/shop/orders | `quantity` | int | O | 1~10 | 400 `/errors/validation` |
 | POST /api/shop/orders | `memberCouponId` | long | X | 본인 소유·미사용·유효기간 내 | 409 `/errors/coupon-unusable` |
 | POST /api/shop/orders | (잔액 부족) | - | - | 포인트 < 결제 금액 | 409 `/errors/insufficient-points` |
+| POST /api/shop/orders | (재고 부족) | - | - | `shop_item.stock` < `quantity` | 409 `/errors/out-of-stock` |
+
+결제 금액은 `price × quantity`이고, 쿠폰을 쓰면 10% 할인한다(할인액은 소수점 이하 버림).
 
 같은 `Idempotency-Key`로 같은 본문을 다시 보내면 처음 응답을 그대로 돌려준다. 같은 키에 다른 본문이면 422다.
 
