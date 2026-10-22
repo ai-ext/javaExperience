@@ -126,3 +126,7 @@ DNN ② … (board-server의 실제 파일 경로를 적는다. 예: board-serve
 - Ruling: J02 Lombok 습관 칸은 Lombok 의존 없이 delombok 출력과 같은 손 코드로 비교. J07 동시성은 CountDownLatch로 매번 재현. J07 타입 한 컷은 Jackson 대신 `java.beans.Introspector`.
 - minor: J02·J03 분량이 60분을 넘을 수 있음 / J09·J15는 테스트 중 JVM 기본 시간대를 바꿈(병렬 실행 시 주의) / J11MutantTest는 작업 디렉터리가 java-track이어야 함(IDE 러너 주의) / J11 정답이 `src/answerTest`에 있어 P5 추출 시 함께 볼 것.
 - Review (2026-10-23): codex(gpt-6-astra) 사후 리뷰 — FAIL, major 7(J04·J15 할인 오버플로, J10 프록시 equals 계약, J13 로케일 의존 toUpperCase, J07 이름 변환이 JavaBeans 규칙과 다르고 필드 순서 가정, verifySkeleton이 부분 실행 결과도 통과, J04 Integer 캐시 미검사·범위 밖 동일성을 보장처럼 설명, J14 선택 과제가 필수 완료 조건), minor 6 → 수정 담당 dispatch
+- Fix (2026-10-23): 사후 리뷰 ①~⑬ 반영 커밋 6개(6fdfd023..d68ceff6). 컨트롤러 확인: `:java-track:check --rerun-tasks` 통과 — verifySkeleton "J 테스트 클래스 55개(src/test 기준) 모두 실행됐고, 모두 뼈대 상태에서 실패함(진짜 실패 302건)", 커밋 범위 java-track·course/java만.
+- 변경된 규칙: verifySkeleton은 기대 클래스 집합(src/test의 JNN…Test.java)과 XML 집합 일치·필터 거부·건너뜀/미실행 거부·초기화 오류(ExceptionInInitializerError 등)를 뼈대 실패로 안 셈. 선택 과제는 `@Tag("optional")` — 기본 `test`에서 빠지고 `:java-track:optionalTest --tests 'JNN*'`로 실행, answerTest·skeletonTest(check)는 선택까지 실행. J07 CAS 테스트는 CyclicBarrier로 첫 읽기 정렬 + 재시도 1회 단언(이전 기록의 CountDownLatch 설명을 대체).
+- Ruling: J02 빌더를 선택으로 돌리며 같은 패키지 전용 팩토리 `Coupon.create`를 주어진 코드로 둠(Lombok에는 없는 메서드임을 페이지에 밝힘) / J15 정률 할인은 몫·나머지 분해 / J13 동률은 "앞의 쿠폰" 업무 규칙을 reduce로 명시
+- 남김: 메서드 단위 뼈대 미구현 검증 없음(클래스 단위), src/answerTest에만 있는 새 이름 테스트는 answerTest가 못 찾음, onlyIf가 프로젝트 약어 호출을 놓칠 수 있음
