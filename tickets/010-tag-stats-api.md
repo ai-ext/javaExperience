@@ -10,7 +10,7 @@
 - 글이 하나도 없는 태그는 안 보여 줍니다. 몇 개까지 받을지는 프론트가 정합니다(기본 10개, 최대 50개).
 - **완료 조건**: 글 수가 많은 순, 같으면 태그 이름 순. 숫자는 DB에서 센다(목록을 다 읽어 자바에서 세지 않는다).
 
-**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 처음 덤프로 다시 만든다. 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 공개 글에 달린 태그는 `mysql` 6 · `java` 5 · `spring` 3 · `질문` 2 · `jpa` 1 · `회고` 1이고, `docker`·`테스트`는 글이 없다.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 공개 글에 달린 태그는 `mysql` 6 · `java` 5 · `spring` 3 · `질문` 2 · `jpa` 1 · `회고` 1이고, `docker`·`테스트`는 글이 없다.
 
 ## 지금 코드
 

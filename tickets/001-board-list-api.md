@@ -10,7 +10,7 @@
 - 공지사항처럼 운영자만 글을 쓸 수 있는 게시판은 드롭다운에서 비활성으로 보여 줄 거라, 그걸 알 수 있는 값도 필요합니다.
 - **완료 조건**: 로그인 없이 호출할 수 있고, 아래 "만들 것"의 모양과 순서로 내려온다.
 
-**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 처음 덤프로 다시 만든다. 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V1을 기준선으로 적고 V2~V6을 적용한다(다음 마이그레이션 번호는 V7).
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V1을 기준선으로 적고 V2~V6을 적용한다(다음 마이그레이션 번호는 V7).
 
 ## 지금 코드
 

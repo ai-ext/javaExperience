@@ -63,7 +63,7 @@ sql() { docker compose exec -T mysql mysql --default-character-set=utf8mb4 -t -u
 
 실행할 때마다 `mysql: [Warning] Using a password on the command line interface can be insecure.`가 한 줄 나온다. 비밀번호를 명령에 적었다는 경고일 뿐이라 무시해도 된다.
 
-아래 결과는 모두 **처음 상태(시드) 그대로인 DB**에서 실행한 것이다. 1-2 이후 단계를 하면서 글을 넣었다면 `dev`·`notice` 게시판 글과 `id`가 더 늘어 있을 수 있다. 처음 상태로 되돌리려면 이 저장소 루트에서 `docker compose down -v && docker compose up -d`(`community`·`practice`·`project` 세 DB를 모두 지우고 처음 덤프로 다시 만든다. 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`).
+아래 결과는 모두 **처음 상태(시드) 그대로인 DB**에서 실행한 것이다. 1-2 이후 단계를 하면서 글을 넣었다면 `dev`·`notice` 게시판 글과 `id`가 더 늘어 있을 수 있다. 처음 상태로 되돌리려면 이 저장소 루트에서 `docker compose down -v && docker compose up -d`(`community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`).
 
 ### 테이블 모양 보기
 
@@ -369,7 +369,7 @@ SQL에서 `NULL`은 "값을 모름"이다. `deleted_at = NULL`은 참도 거짓�
 <details>
 <summary>정답</summary>
 
-모든 글의 제목이 `앗`으로 **확정**된다. SQL로는 원래 제목을 알 수 없으니 되돌릴 방법이 없다. 이 실습 DB라면 이 저장소 루트에서 `docker compose down -v && docker compose up -d`로 처음 상태로 돌린다(세 DB가 모두 처음 덤프로 돌아간다). 운영 DB라면 백업에서 복구해야 하는 사고다. 그래서 `UPDATE`·`DELETE`는 같은 `WHERE`로 `SELECT`를 먼저 해서 몇 행이 걸리는지 확인하는 습관을 들인다.
+모든 글의 제목이 `앗`으로 **확정**된다. SQL로는 원래 제목을 알 수 없으니 되돌릴 방법이 없다. 이 실습 DB라면 이 저장소 루트에서 `docker compose down -v && docker compose up -d`로 처음 상태로 돌린다(세 DB가 모두 `docker/mysql/init/`의 처음 상태로 돌아간다). 운영 DB라면 백업에서 복구해야 하는 사고다. 그래서 `UPDATE`·`DELETE`는 같은 `WHERE`로 `SELECT`를 먼저 해서 몇 행이 걸리는지 확인하는 습관을 들인다.
 </details>
 
 ## 더 깊이

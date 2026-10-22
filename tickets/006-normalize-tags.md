@@ -11,7 +11,7 @@
 - 정리하고 나니 빈 이름(`"  "`, `"#"`)이면 400으로 거절합니다. 이미 잘못 저장된 태그 정리(데이터 보정)는 이 티켓 범위가 아닙니다.
 - **완료 조건**: 작성(POST)·수정(PATCH) 어느 쪽으로 들어와도 같은 규칙이 적용된다.
 
-**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 처음 덤프로 다시 만든다. 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 태그는 `java`·`spring`·`jpa`·`mysql`·`docker`·`테스트`·`회고`·`질문` 8개.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 태그는 `java`·`spring`·`jpa`·`mysql`·`docker`·`테스트`·`회고`·`질문` 8개.
 
 ## 지금 코드
 

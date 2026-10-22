@@ -11,7 +11,7 @@
 - 모르는 정렬 값은 조용히 무시하지 말고 400으로 알려 주세요(프론트 오타를 바로 알 수 있게).
 - **완료 조건**: 정렬만 바뀌고 "볼 수 있는 글" 조건·전체 건수·페이지 응답 모양은 그대로다.
 
-**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 처음 덤프로 다시 만든다. 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 자유 게시판(`free`)에서 비로그인이 볼 수 있는 글은 13개다.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 자유 게시판(`free`)에서 비로그인이 볼 수 있는 글은 13개다.
 
 ## 지금 코드
 
@@ -94,7 +94,7 @@ curl -s "$BASE/api/boards/free/posts?size=5"                      # 요청 D —
 curl -i "$BASE/api/boards/free/posts?sort=hot"                    # 요청 E — 모르는 값
 ```
 
-> 이 확인은 **처음 데이터**의 좋아요 수·조회수·글 수를 기대값으로 쓴다. 작업하면서 글을 열어 보거나(조회수 +1) 좋아요·글쓰기를 했다면 먼저 이 저장소 루트에서 `docker compose down -v && docker compose up -d`로 되돌린 뒤 누른다(세 DB가 모두 처음 덤프로 돌아간다).
+> 이 확인은 **처음 데이터**의 좋아요 수·조회수·글 수를 기대값으로 쓴다. 작업하면서 글을 열어 보거나(조회수 +1) 좋아요·글쓰기를 했다면 먼저 이 저장소 루트에서 `docker compose down -v && docker compose up -d`로 되돌린 뒤 누른다(세 DB가 모두 `docker/mysql/init/`의 처음 상태로 돌아간다).
 
 버튼으로 확인 — 아래 실행 칸이 위 요청을 그대로 보내고 채점 기준의 C 항목을 대조한다.
 

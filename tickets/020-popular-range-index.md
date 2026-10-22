@@ -11,7 +11,7 @@
 - 고치기 전후 실행 계획(`EXPLAIN`)을 남겨 리뷰에 붙여 주세요. 학습용 데이터(practice)는 작지만 실행 계획은 같은 모양으로 바뀐다.
 - **완료 조건**: 두 집계 서브쿼리의 실행 계획이 `type=range` + 새 인덱스 + `Using index`(테이블 행을 읽지 않음)로 바뀌고, 응답은 그대로다.
 
-**DB 시작 상태**: `practice` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 처음 덤프로 다시 만든다. 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드를 practice 프로파일로 켜면 Flyway가 V2~V6을 적용한다 — **다음 마이그레이션 번호는 V7**. practice 프로파일은 "지금"이 2026-10-05 00:00으로 고정이라 최근 7일은 `[2026-09-28, 2026-10-05)`, 그 안의 좋아요는 568행 중 53행, 댓글은 351행 중 18행이다.
+**DB 시작 상태**: `practice` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`). 기준 코드를 practice 프로파일로 켜면 Flyway가 V2~V6을 적용한다 — **다음 마이그레이션 번호는 V7**. practice 프로파일은 "지금"이 2026-10-05 00:00으로 고정이라 최근 7일은 `[2026-09-28, 2026-10-05)`, 그 안의 좋아요는 568행 중 53행, 댓글은 351행 중 18행이다.
 
 ## 지금 코드
 
