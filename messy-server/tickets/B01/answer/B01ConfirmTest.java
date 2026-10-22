@@ -56,12 +56,12 @@ class B01ConfirmTest extends ApiTestSupport {
                         .header("Authorization", bearer(m))
                         .header("Idempotency-Key", UUID.randomUUID().toString())).andReturn()));
             }
-            // PG가 충전 요청을 10건 이상 받은 뒤(= 모두 PG 응답을 기다리는 구간)에 글 목록을 부른다
+            // PG가 충전 요청을 10건 이상 받을 때까지(= 충전들이 PG 응답을 기다리는 구간) 최대 3초 기다린 뒤 글 목록을 부른다.
+            // PG 호출 수를 제한하는 수정(벌크헤드 등)이면 10건에 못 미칠 수 있어 단언하지 않는다.
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
             while (PgContainers.approveRequestCount() < 10 && System.nanoTime() < deadline) {
                 Thread.sleep(20);
             }
-            assertThat(PgContainers.approveRequestCount()).as("PG가 받은 충전 요청 수").isGreaterThanOrEqualTo(10);
 
             long start = System.nanoTime();
             int status = mockMvc.perform(get("/api/posts")).andReturn().getResponse().getStatus();
