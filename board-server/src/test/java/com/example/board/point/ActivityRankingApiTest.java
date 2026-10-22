@@ -128,72 +128,92 @@ class ActivityRankingApiTest extends ApiTestSupport {
                 .andExpect(jsonPath("$.nextCursor").doesNotExist());
     }
 
-    // 동점 규칙(점수 내림차순 → memberId 내림차순)은 Redis와 원장 합계가 같아야 한다. 커서가 순위 위치라서
+    @Autowired
+    PointLedgerRepository ledgerRepository;
+
+    /** 지금 회원 id보다 큰 10의 거듭제곱. 자릿수가 다른 id를 기존 회원과 겹치지 않게 만들 때 쓴다. */
+    long powerOfTenAboveMaxMemberId() {
+        Long max = jdbc.queryForObject("SELECT COALESCE(MAX(id), 0) FROM member", Long.class);
+        long p = 10;
+        while (p <= max) {
+            p *= 10;
+        }
+        return p;
+    }
+
+    void insertMember(long id) {
+        jdbc.update("INSERT INTO member (id, email, password_hash, nickname, role, point_balance, created_at, updated_at)"
+                + " VALUES (?, ?, 'hash', ?, 'USER', 0, NOW(6), NOW(6))", id, "r" + id + "@t.com", "r" + id);
+    }
+
+    // 동점 규칙(점수 내림차순 → member 문자열 내림차순)은 Redis와 원장 합계가 같아야 한다. 커서가 순위 위치라서
     // 쪽 사이에 Redis 장애로 원천이 바뀌면 규칙이 다른 만큼 같은 회원이 두 번 나오고 다른 회원이 빠진다.
+    // id는 자릿수를 걸쳐 숫자 오름차순·내림차순 어느 쪽과도 다른 순서가 되게 고른다.
     @Test
     void 동점에서_Redis로_첫_쪽을_읽고_장애로_원장으로_넘어가도_중복_누락이_없다() throws Exception {
-        Member a = newMember(Role.USER);
-        Member b = newMember(Role.USER);
-        // 다른 테스트의 회원보다 확실히 위에 오도록 큰 점수로 동점을 만든다(커밋 뒤 Redis에도 오른다)
-        pointService.earn(a.getId(), 1_000_000, "POST", 1L);
-        pointService.earn(b.getId(), 1_000_000, "POST", 1L);
+        long p = powerOfTenAboveMaxMemberId();
+        long nine = 9 * p;
+        long ten = 10 * p;
+        long tenPlusOne = 10 * p + 1;
+        for (long id : new long[] {nine, ten, tenPlusOne}) {
+            insertMember(id);
+            // 다른 테스트의 회원보다 확실히 위에 오도록 큰 점수로 동점을 만든다(커밋 뒤 Redis에도 오른다)
+            pointService.earn(id, 1_000_000, "POST", 1L);
+        }
 
         String body = mockMvc.perform(get("/api/rankings/activity").param("size", "1"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         Number first = com.jayway.jsonpath.JsonPath.read(body, "$.items[0].memberId");
         String next = com.jayway.jsonpath.JsonPath.read(body, "$.nextCursor");
 
-        Number second;
+        List<Number> rest;
         try {
             // Redis 장애를 주입한다. RedisGuard가 실패 뒤 5초 동안 Redis를 건너뛰므로 다음 조회는 원장 합계에서 나온다.
             guard.call("테스트 장애 주입", () -> {
                 throw new RedisConnectionFailureException("주입한 장애");
             }, () -> null);
-            String fallback = mockMvc.perform(get("/api/rankings/activity").param("size", "1").param("cursor", next))
+            String fallback = mockMvc.perform(get("/api/rankings/activity").param("size", "2").param("cursor", next))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-            second = com.jayway.jsonpath.JsonPath.read(fallback, "$.items[0].memberId");
+            rest = com.jayway.jsonpath.JsonPath.read(fallback, "$.items[*].memberId");
         } finally {
             guard.reset();
         }
 
-        long hi = Math.max(a.getId(), b.getId());
-        long lo = Math.min(a.getId(), b.getId());
-        assertThat(List.of(first.longValue(), second.longValue())).containsExactly(hi, lo);
+        List<Long> ids = new ArrayList<>(List.of(first.longValue()));
+        rest.forEach(n -> ids.add(n.longValue()));
+        // "9000…" > "10000…1" > "10000…0"
+        assertThat(ids).containsExactly(nine, tenPlusOne, ten);
     }
 
-    // Redis는 동점을 member 문자열의 사전순 역순으로 둔다. "9" > "10"이라 자릿수가 다르면 숫자 순서와 어긋난다.
+    // Redis는 동점을 member 문자열의 사전순 역순으로 둔다. "9" > "10"이라 숫자 순서와 다르다.
     @Test
-    void 동점이면_Redis에서도_자릿수와_상관없이_memberId_내림차순이다() {
+    void 동점이면_Redis는_member_문자열_역순이라_9가_10보다_앞이다() {
         rankingService.add(9L, 5_000_000);
         rankingService.add(10L, 5_000_000);
 
-        assertThat(rankingService.top(null, 2).items()).extracting(ActivityRank::memberId).containsExactly(10L, 9L);
+        assertThat(rankingService.top(null, 2).items()).extracting(ActivityRank::memberId).containsExactly(9L, 10L);
     }
 
-    // 0패딩 전에는 member가 "9"였다. 같은 키에 옛 형식이 남아 있으면 새 형식 가산이 별도 member가 되어
-    // 같은 회원이 10점·2점으로 두 번 나온다. 쓰기 때 옛 형식 점수를 새 형식으로 옮겨 합친다.
+    // 원장 합계의 동점 정렬(MySQL 문자열 비교)이 Redis 바이트 비교와 같은 순서인지 고정한다.
+    // 9와 10, 2와 19(첫 글자가 이긴다), 1과 10(앞부분이 같으면 짧은 쪽이 작다)을 자릿수만 키워 같은 점수로 둔다.
     @Test
-    void 옛_형식_member가_남아_있으면_가산할_때_새_형식으로_옮겨_합친다() {
-        redis.opsForZSet().add("ranking:activity", "9", 10);
+    void 동점_순서는_Redis와_원장_합계가_숫자_문자열에서_같다() {
+        long p = powerOfTenAboveMaxMemberId();
+        List<Long> ids = List.of(p, 2 * p, 9 * p, 10 * p, 19 * p);
+        for (long id : ids) {
+            insertMember(id);
+            pointService.earn(id, 3, "COMMENT", 1L);
+        }
+        List<Long> expected = List.of(9 * p, 2 * p, 19 * p, 10 * p, p);
 
-        rankingService.add(9L, 2);
-
-        assertThat(rankingService.top(null, 10).items()).extracting(ActivityRank::memberId, ActivityRank::score)
-                .containsExactly(org.assertj.core.groups.Tuple.tuple(9L, 12L));
-        assertThat(redis.opsForZSet().score("ranking:activity", "9")).isNull();
-        assertThat(redis.opsForZSet().score("ranking:activity", ActivityRankingService.member(9L))).isEqualTo(12.0);
-    }
-
-    // 이 수정 전 버전이 이미 새 형식으로 가산했다면 두 형식이 함께 있다(그 회원의 다음 가산 전까지).
-    @Test
-    void 두_형식이_한_쪽에_함께_있으면_조회에서_한_번으로_합친다() {
-        redis.opsForZSet().add("ranking:activity", "9", 10);
-        redis.opsForZSet().add("ranking:activity", ActivityRankingService.member(9L), 2);
-        redis.opsForZSet().add("ranking:activity", ActivityRankingService.member(10L), 11);
-
-        assertThat(rankingService.top(null, 10).items()).extracting(ActivityRank::memberId, ActivityRank::score)
-                .containsExactly(org.assertj.core.groups.Tuple.tuple(9L, 12L),
-                        org.assertj.core.groups.Tuple.tuple(10L, 11L));
+        // Redis는 테스트마다 비우므로 이 테스트의 회원만 있다
+        assertThat(rankingService.top(null, 50).items()).extracting(ActivityRank::memberId)
+                .containsExactlyElementsOf(expected);
+        // 원장에는 다른 테스트의 3점 회원도 있으므로 이 테스트의 회원만 상대 순서를 본다
+        assertThat(ledgerRepository.sumActivityScores(ActivityRankingService.SCORED_REF_TYPES,
+                        org.springframework.data.domain.Pageable.unpaged()).stream()
+                .map(MemberScore::memberId).filter(ids::contains).toList())
+                .containsExactlyElementsOf(expected);
     }
 
     // 위치 커서는 양수 long이면 디코더를 통과한다. 원장 폴백이 offset + count를 int로 자르면 음수 쪽 크기로 500이 났다.
@@ -232,17 +252,17 @@ class ActivityRankingApiTest extends ApiTestSupport {
         // 충전·구매 같은 활동 아닌 원장 행은 랭킹에 들어가지 않는다
         jdbc.update("INSERT INTO point_ledger (member_id, type, amount, balance_after, ref_type, ref_id, created_at,"
                 + " updated_at) VALUES (?, 'CHARGE', 5000, 5000, 'PG', 1, NOW(6), NOW(6))", b.getId());
-        Double aBefore = redis.opsForZSet().score("ranking:activity", ActivityRankingService.member(a.getId()));
-        Double bBefore = redis.opsForZSet().score("ranking:activity", ActivityRankingService.member(b.getId()));
+        Double aBefore = redis.opsForZSet().score("ranking:activity", a.getId().toString());
+        Double bBefore = redis.opsForZSet().score("ranking:activity", b.getId().toString());
 
         redis.delete("ranking:activity");
         int rebuilt = rankingService.rebuild();
 
         // 같은 DB를 쓰는 다른 테스트의 회원도 원장에 있으므로 이 테스트의 회원만 비교한다
         assertThat(rebuilt).isGreaterThanOrEqualTo(2);
-        assertThat(redis.opsForZSet().score("ranking:activity", ActivityRankingService.member(a.getId())))
+        assertThat(redis.opsForZSet().score("ranking:activity", a.getId().toString()))
                 .isEqualTo(aBefore).isEqualTo(12.0);
-        assertThat(redis.opsForZSet().score("ranking:activity", ActivityRankingService.member(b.getId())))
+        assertThat(redis.opsForZSet().score("ranking:activity", b.getId().toString()))
                 .isEqualTo(bBefore).isEqualTo(4.0);
     }
 
@@ -255,7 +275,7 @@ class ActivityRankingApiTest extends ApiTestSupport {
             s.setRollbackOnly();
         });
 
-        assertThat(redis.opsForZSet().score("ranking:activity", ActivityRankingService.member(m.getId()))).isNull();
+        assertThat(redis.opsForZSet().score("ranking:activity", m.getId().toString())).isNull();
     }
 
     // 댓글 INSERT(회원 FK 공유 잠금) 뒤 잔액 UPDATE(배타 잠금)를 하면 동시 요청끼리 교착이 난다
@@ -284,6 +304,6 @@ class ActivityRankingApiTest extends ApiTestSupport {
         }
 
         assertThat(balance(m)).isEqualTo(40);
-        assertThat(redis.opsForZSet().score("ranking:activity", ActivityRankingService.member(m.getId()))).isEqualTo(40.0);
+        assertThat(redis.opsForZSet().score("ranking:activity", m.getId().toString())).isEqualTo(40.0);
     }
 }
