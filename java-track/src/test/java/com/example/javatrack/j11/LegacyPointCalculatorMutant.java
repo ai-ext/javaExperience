@@ -8,7 +8,10 @@ enum LegacyPointCalculatorMutant {
 
     보너스_경계를_5만원_초과로_옮김("amount >= 50000", "amount > 50000"),
     VIP_보너스_제외_규칙을_지움("if (!\"VIP\".equals(grade)) {", "if (true) {"),
-    쿠폰_절반을_반올림으로_바꿈("point = point / 2;", "point = (point + 1) / 2;");
+    쿠폰_절반을_반올림으로_바꿈("point = point / 2;", "point = (point + 1) / 2;"),
+    천_원_경계를_1000원_이하로_옮김("amount < 1000", "amount <= 1000"),
+    상한에서_자른_값을_3500으로_바꿈("point = 3000;", "point = 3500;"),
+    등급_비교에서_대소문자를_무시함("if (\"VIP\".equals(grade)) {", "if (\"VIP\".equalsIgnoreCase(grade)) {");
 
     private final String original;
     private final String mutated;
