@@ -22,4 +22,13 @@ public class TestcontainersConfig {
     DynamicPropertyRegistrar pgProperties() {
         return registry -> registry.add("board.pg.base-url", PgContainers::baseUrl);
     }
+
+    // Redis도 JVM에 하나만 띄운다. 컨텍스트마다 MySQL은 따로라 키가 섞이지 않게 Redis 테스트는 시작할 때 비운다.
+    @Bean
+    DynamicPropertyRegistrar redisProperties() {
+        return registry -> {
+            registry.add("spring.data.redis.host", RedisContainers::host);
+            registry.add("spring.data.redis.port", RedisContainers::port);
+        };
+    }
 }

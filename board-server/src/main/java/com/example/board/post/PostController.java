@@ -26,10 +26,13 @@ public class PostController {
 
     private final PostService postService;
     private final PostQueryService postQueryService;
+    private final PopularPostService popularPostService;
 
-    public PostController(PostService postService, PostQueryService postQueryService) {
+    public PostController(PostService postService, PostQueryService postQueryService,
+            PopularPostService popularPostService) {
         this.postService = postService;
         this.postQueryService = postQueryService;
+        this.popularPostService = popularPostService;
     }
 
     @PostMapping
@@ -42,6 +45,12 @@ public class PostController {
     @GetMapping
     public CursorPage<PostSummary> list(@Valid PostListRequest request) {
         return postQueryService.search(request.toCondition(), request.cursor(), request.size());
+    }
+
+    // 문자 그대로인 경로가 /{postId} 패턴보다 먼저 매치된다
+    @GetMapping("/popular")
+    public CursorPage<PopularPost> popular(@Valid PopularPostRequest request) {
+        return popularPostService.page(request.cursor(), request.size());
     }
 
     @GetMapping("/{postId}")
