@@ -134,3 +134,12 @@ test('다른 날 카드를 참조하면 오류', () => {
   i.roadmap.days[4].talkCards[0] = 'TC-D03-1';
   assert.ok(has(validate(i), 'D05', 'TC-D03-1'));
 });
+
+test('실제 spec-v2는 엔드포인트 30개', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const eps = parseSpecEndpoints(fs.readFileSync(path.join(root, 'course/spec-v2.md'), 'utf8'));
+  assert.equal(eps.length, 30);
+  assert.ok(eps.includes('POST /api/pg/callbacks'));
+  assert.ok(eps.includes('GET /api/posts/{postId}'));
+  assert.equal(new Set(eps).size, eps.length);
+});
