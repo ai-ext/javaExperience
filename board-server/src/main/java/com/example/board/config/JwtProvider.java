@@ -32,7 +32,7 @@ public class JwtProvider {
     }
 
     // 만료 토큰 테스트를 위해 시계를 주입할 수 있게 둔다
-    JwtProvider(BoardProperties properties, Clock clock) {
+    public JwtProvider(BoardProperties properties, Clock clock) {
         this.key = Keys.hmacShaKeyFor(properties.jwt().secret().getBytes(StandardCharsets.UTF_8));
         this.expiresInSeconds = properties.jwt().expiresInSeconds();
         this.clock = clock;
