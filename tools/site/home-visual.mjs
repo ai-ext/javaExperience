@@ -59,7 +59,7 @@ export function renderHomeVisual(root, fromAbs, renderedHtml) {
     <details><summary>여기서 코드를 작성하고 실행하나요?</summary><p>코드는 내 IDE에서 작성하고 서버도 직접 실행합니다. 학습 화면에서 요구사항과 가이드를 확인하고, 과제의 요청 도구로 내 서버에 요청을 보냅니다. 홈의 미리보기는 예시 데이터로 동작합니다.</p></details>
     <details><summary>학습 기록과 완료 표시는 어떻게 남나요?</summary><p>직접 시작한 과제의 마지막 학습 장면을 이 브라우저에 저장합니다. 현재 이어하기는 Java·게시글 API·DB 시작 경로와 각각의 다음 과제, 총 6개 과제에서 지원합니다. 과제를 구경하거나 개념 설명을 열어도 하던 작업은 바뀌지 않습니다. ‘직접 확인 완료’는 본인의 확인 기록이며 자동 채점 결과가 아닙니다. 브라우저 데이터를 지우면 기록도 사라집니다.</p></details>
   </section>
-  <section class="home-environment" id="home-environment"><div><p class="home-eyebrow">첫 실행을 위한 준비</p><h2>개발 환경이 아직이라면</h2><p>Docker Desktop · IntelliJ IDEA · JDK 21<br>설치부터 서버 실행, DB 접속까지 차례로 확인하세요.</p></div><a class="home-text-button" href="#전체-안내" data-home-setup>개발 환경 안내 보기 →</a></section>
+  <section class="home-environment" id="home-environment"><div><p class="home-eyebrow">첫 실행을 위한 준비</p><h2>개발 환경이 아직이라면</h2><p>Docker 런타임(Colima 등) · IntelliJ IDEA · JDK 21<br>설치부터 서버 실행, DB 접속까지 차례로 확인하세요.</p></div><a class="home-text-button" href="#전체-안내" data-home-setup>개발 환경 안내 보기 →</a></section>
   <details class="home-original" id="전체-안내"><summary><span><strong>설치·실행과 전체 안내</strong><small>원문 README · DB 접속 · 테스트 · 작업 방식</small></span><span aria-hidden="true">＋</span></summary><div class="home-original-content">${renderedHtml}</div></details>
   <footer class="home-footer"><a href="index.html">javaExperience</a><span>한 번에 기능 하나씩, 직접 만들며 배웁니다.</span><a href="https://github.com/ai-ext/javaExperience">GitHub ↗</a></footer>
   <p class="home-progress-note" data-home-storage role="status"></p>
