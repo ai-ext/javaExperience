@@ -4,17 +4,22 @@
 # 전제
 #   1) messy-server에서 `docker compose up -d` (MySQL 13311, WireMock 18081, Toxiproxy PG 프록시 18667)
 #   2) `./gradlew bootRun --args='--spring.profiles.active=local'` (포트 8080, PG 응답 타임아웃 3초)
-#   3) curl, jq, uuidgen, docker compose(MySQL 셸 접속용)
+#   3) curl, jq, uuidgen, openssl, docker compose(MySQL 셸 접속용)
 #
-# 실행: bash tickets/B10/repro.sh
+# 실행: bash tickets/B10/repro.sh   (서명 키는 local 프로파일 기본값. BOARD_PG_SECRET을 바꿨다면 PG_SECRET으로 넘긴다)
 #
-# 하는 일: WireMock을 "첫 승인 요청은 승인하되 5초 뒤에 답하고(우리 서버는 3초에 포기), 그다음부터는 바로 답하는" PG로 바꾼 뒤
-#          Idempotency-Key 하나로 7000포인트를 한 번 충전한다. PG가 받은 승인 요청과 우리 연계 로그(pg_payment)를 출력한다.
-# 기대 증상(결함 상태): 충전 한 번인데 PG가 받은 승인 요청이 서로 다른 Idempotency-Key로 2건(= PG 승인 2건, 카드 결제 2번),
-#   pg_payment에 같은 회원·같은 금액 행이 2개(UNKNOWN 1, DONE 1). UNKNOWN 건은 PG 콜백이나 재처리 워커(ChargeService.reconcile)가
-#   PG 조회로 DONE이 되면서 한 번 더 적립된다 → 포인트 두 번.
-#   (이 서버는 콜백 경로에 다른 문제가 있을 수 있어 스크립트는 콜백을 보내지 않는다. 확인 테스트는 reconcile로 확정한다.)
-# 수정 뒤: PG 승인 요청의 키는 1개, pg_payment 행도 1개(UNKNOWN, 504로 응답)이고 확정 뒤 적립은 한 번이다.
+# 두 단계로 나눠 보여 준다.
+#   1단계 "승인 요청이 두 번 간다": WireMock을 "첫 승인 요청은 승인하되 5초 뒤에 답하고(우리 서버는 3초에 포기), 그다음부터는 바로 답하는"
+#     PG로 바꾼 뒤 Idempotency-Key 하나로 7000포인트를 한 번 충전한다. PG가 받은 승인 요청과 우리 연계 로그(pg_payment)를 출력한다.
+#     기대 증상(결함 상태): 충전 한 번인데 PG가 받은 승인 요청이 서로 다른 Idempotency-Key로 2건(= PG 승인 2건, 카드 결제 2번),
+#     pg_payment에 같은 회원·같은 금액 행이 2개(UNKNOWN 1, DONE 1). 이 시점 잔액은 아직 7000이다(DONE 행만 적립).
+#   2단계 "정산하면 포인트가 두 번 쌓인다": PG는 첫 요청도 승인했으므로, PG가 하듯 결과 불명(UNKNOWN) 행의 orderId로
+#     서명(HMAC-SHA256)을 붙인 결제 완료 콜백(DONE)을 보낸다. 기대 증상(결함 상태): 잔액 14000, 충전 원장 2건.
+#     이 서버에는 지금 토큰 없는 콜백이 401로 막히는 다른 증상(티켓 B13 "PG 결제 완료 콜백이 전부 401")이 있어,
+#     재현에서는 회원 토큰을 붙여 그 문제를 비켜 간다(서명 검증과 반영 로직은 그대로 거친다).
+#     결과 불명 건을 PG 조회로 확정하는 ChargeService.reconcile은 이 서버에서 부르는 곳(워커·API)이 없다. 확인 테스트는 reconcile을 직접 부른다.
+# 수정 뒤: 1단계에서 PG 승인 요청의 키는 1개, pg_payment 행도 1개(UNKNOWN, 504로 응답).
+#   2단계 콜백으로 그 행이 DONE이 되며 적립은 한 번(잔액 7000, 충전 원장 1건)이다.
 set -euo pipefail
 
 BASE=${BASE:-http://localhost:8080}
@@ -24,6 +29,8 @@ if ! curl -sf -o /dev/null "$BASE/actuator/health"; then
 fi
 WIREMOCK=${WIREMOCK:-http://localhost:18081}
 sql() { docker compose exec -T mysql mysql -uboard -pboard board -e "$1" 2>/dev/null; }
+sqln() { docker compose exec -T mysql mysql -uboard -pboard board -N -e "$1" 2>/dev/null; }
+PG_SECRET=${PG_SECRET:-local-dev-only-pg-secret-local-dev-only}
 
 cleanup() {
   for id in b1000000-0000-0000-0000-000000000001 b1000000-0000-0000-0000-000000000002; do
@@ -55,6 +62,7 @@ token=$(curl -s -X POST "$BASE/api/auth/login" -H 'Content-Type: application/jso
 mid=$(curl -s "$BASE/api/members/me" -H "Authorization: Bearer $token" | jq -r .id)
 key=$(uuidgen)
 
+echo "=== 1단계: 충전 한 번 → PG 승인 요청이 몇 번 갔나"
 echo "충전 요청(Idempotency-Key=$key)"
 curl -s -w '\n-> %{http_code} %{time_total}s\n' -X POST "$BASE/api/me/points/charges" -H "Authorization: Bearer $token" \
   -H "Idempotency-Key: $key" -H 'Content-Type: application/json' -d '{"amount":7000}'
@@ -64,5 +72,23 @@ curl -s -X POST "$WIREMOCK/__admin/requests/find" -d '{"method":"POST","urlPath"
   | jq -r '.requests[].headers["Idempotency-Key"]'
 echo "--- 우리 연계 로그(pg_payment)"
 sql "SELECT id, order_id, idempotency_key, status, amount FROM pg_payment WHERE member_id = $mid ORDER BY id"
-echo "--- 잔액·충전 원장"
-sql "SELECT point_balance FROM member WHERE id = $mid; SELECT COUNT(*) AS charge_ledgers FROM point_ledger WHERE member_id = $mid AND type = 'CHARGE'"
+balance() {
+  echo "잔액 $(sqln "SELECT point_balance FROM member WHERE id = $mid"), 충전 원장 $(sqln "SELECT COUNT(*) FROM point_ledger WHERE member_id = $mid AND type = 'CHARGE'")건"
+}
+echo "--- 1단계 뒤 $(balance)"
+
+echo
+echo "=== 2단계: 결과 불명(UNKNOWN) 건을 PG의 결제 완료 콜백으로 확정한다"
+orders=$(sqln "SELECT order_id FROM pg_payment WHERE member_id = $mid AND status = 'UNKNOWN' ORDER BY id")
+if [ -z "$orders" ]; then
+  echo "결과 불명 행이 없다(1단계 출력을 확인하라)."
+fi
+for oid in $orders; do
+  body="{\"orderId\":\"$oid\",\"paymentKey\":\"pk-$oid\",\"status\":\"DONE\",\"amount\":7000}"
+  sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$PG_SECRET" | awk '{print $NF}')
+  curl -s -o /dev/null -w "콜백 orderId=$oid -> %{http_code}\n" -X POST "$BASE/api/pg/callbacks" \
+    -H 'Content-Type: application/json' -H "X-PG-Signature: $sig" -H "Authorization: Bearer $token" --data-binary "$body"
+done
+echo "--- 우리 연계 로그(pg_payment)"
+sql "SELECT id, order_id, idempotency_key, status, amount FROM pg_payment WHERE member_id = $mid ORDER BY id"
+echo "--- 2단계 뒤 $(balance)   (7000을 한 번 충전했으니 기대값은 잔액 7000, 원장 1건)"

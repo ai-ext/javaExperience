@@ -31,7 +31,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * B10 확인 테스트: PG가 승인은 했는데 응답이 늦어(3초 응답 타임아웃 초과) 우리 서버가 못 받은 경우에도
  * 충전 한 번은 PG 승인 한 건, 포인트 적립 한 번이다.
  * PG 모의는 상태가 있다: 첫 승인 요청은 승인하되 4초 늦게 답하고, 그 뒤 요청은 바로 답한다.
- * 결과 불명으로 남은 건은 재처리 워커(reconcile)가 PG 조회로 확정한다(PG는 받은 승인 요청을 모두 승인했다).
+ * 결과 불명으로 남은 건은 재처리(ChargeService.reconcile)로 PG 조회해 확정한다(PG는 받은 승인 요청을 모두 승인했다).
+ * 이 서버에는 reconcile을 부르는 워커가 없어 테스트가 직접 부른다.
  */
 class B10ConfirmTest extends ApiTestSupport {
 
@@ -54,7 +55,7 @@ class B10ConfirmTest extends ApiTestSupport {
                 .content("{\"amount\":" + AMOUNT + "}").header("Authorization", bearer(m))
                 .header("Idempotency-Key", UUID.randomUUID().toString())).andReturn();
 
-        // PG가 받은 승인 요청(= PG가 승인한 건)의 orderId로, 결과 불명 건을 재처리 워커가 확정한다
+        // PG가 받은 승인 요청(= PG가 승인한 건)의 orderId로, 결과 불명 건을 재처리(reconcile)로 확정한다
         List<String> pgKeys = PgContainers.approveIdempotencyKeys();
         Set<String> approvedOrderIds = approvedOrderIds();
         for (Map<String, Object> row : jdbc.queryForList(
