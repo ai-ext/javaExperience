@@ -1,0 +1,160 @@
+// 과정 지도 동작 — 노드를 고르면 관계 보기(직접 연결·상하류 전체·영향 주는 쪽·영향 받는 쪽)에 맞는 노드만 밝히고,
+// 넓은 화면에서는 레인 사이 연결선을 그린다. 스크립트가 없어도 아래 관계 표에 모든 연결이 있다.
+(function () {
+  'use strict';
+  var root = document.querySelector('[data-course-map]');
+  var dataNode = document.getElementById('course-map-data');
+  if (!root || !dataNode) return;
+  var graph;
+  try { graph = JSON.parse(dataNode.textContent); } catch (e) { return; }
+  var SVG = 'http://www.w3.org/2000/svg';
+  var board = root.querySelector('[data-cm-board]');
+  var svg = root.querySelector('[data-cm-lines]');
+  var status = root.querySelector('[data-cm-status]');
+  var detail = root.querySelector('[data-cm-detail]');
+  var buttons = Array.prototype.slice.call(root.querySelectorAll('.cm-node[data-node]'));
+  var nodeById = {};
+  graph.nodes.forEach(function (n) { nodeById[n.id] = n; });
+  var VIEW_LABEL = { direct: '직접 연결', both: '상·하류 전체', up: '영향 주는 쪽', down: '영향 받는 쪽' };
+  var EDGE_LABEL = { practice: '같은 날 먼저 연습', ticket: '그날 다루는 티켓', area: '결함 영역' };
+  var selected = null;
+
+  function name(id) { var n = nodeById[id]; return n.kind === 'area' ? n.title : n.id; }
+  function walk(start, forward) {
+    var seen = new Set(), queue = [start];
+    while (queue.length) {
+      var id = queue.shift();
+      graph.edges.forEach(function (e) {
+        var next = forward ? (e.from === id ? e.to : null) : (e.to === id ? e.from : null);
+        if (next && !seen.has(next) && next !== start) { seen.add(next); queue.push(next); }
+      });
+    }
+    return seen;
+  }
+  // 반환: 밝힐 노드 집합과 밝힐 연결선 집합
+  function related(id, view) {
+    var nodes = new Set();
+    if (view === 'direct') {
+      graph.edges.forEach(function (e) { if (e.from === id) nodes.add(e.to); if (e.to === id) nodes.add(e.from); });
+    } else {
+      if (view === 'up' || view === 'both') walk(id, false).forEach(function (n) { nodes.add(n); });
+      if (view === 'down' || view === 'both') walk(id, true).forEach(function (n) { nodes.add(n); });
+    }
+    // 상류 집합 안의 연결, 하류 집합 안의 연결만 밝힌다(층이 J → D → 티켓 → 영역으로 한 방향이라 경로 밖 연결이 섞이지 않는다).
+    function inside(set) { return function (e) { return set.has(e.from) && set.has(e.to); }; }
+    var edges;
+    if (view === 'direct') edges = graph.edges.filter(function (e) { return e.from === id || e.to === id; });
+    else {
+      var upAll = walk(id, false); upAll.add(id);
+      var downAll = walk(id, true); downAll.add(id);
+      edges = graph.edges.filter(function (e) {
+        return ((view === 'up' || view === 'both') && inside(upAll)(e)) || ((view === 'down' || view === 'both') && inside(downAll)(e));
+      });
+    }
+    return { nodes: nodes, edges: edges };
+  }
+  function view() { var checked = root.querySelector('input[name="cm-view"]:checked'); return checked ? checked.value : 'direct'; }
+
+  function draw(highlight) {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    if (!window.matchMedia('(min-width: 900px)').matches) return;
+    var box = board.getBoundingClientRect();
+    svg.setAttribute('viewBox', '0 0 ' + box.width + ' ' + box.height);
+    var defs = document.createElementNS(SVG, 'defs');
+    ['practice', 'ticket', 'area'].forEach(function (kind) {
+      var marker = document.createElementNS(SVG, 'marker');
+      marker.setAttribute('id', 'cm-arrow-' + kind);
+      marker.setAttribute('viewBox', '0 0 8 8'); marker.setAttribute('refX', '7'); marker.setAttribute('refY', '4');
+      marker.setAttribute('markerWidth', '8'); marker.setAttribute('markerHeight', '8'); marker.setAttribute('orient', 'auto');
+      marker.setAttribute('markerUnits', 'userSpaceOnUse');
+      var path = document.createElementNS(SVG, 'path');
+      path.setAttribute('d', 'M0 0 L8 4 L0 8 Z'); path.setAttribute('class', 'cm-arrow edge-' + kind);
+      marker.appendChild(path); defs.appendChild(marker);
+    });
+    svg.appendChild(defs);
+    graph.edges.forEach(function (e) {
+      var a = root.querySelector('.cm-node[data-node="' + e.from + '"]');
+      var b = root.querySelector('.cm-node[data-node="' + e.to + '"]');
+      if (!a || !b) return;
+      var ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+      var x1 = ra.right - box.left, y1 = ra.top + ra.height / 2 - box.top;
+      var x2 = rb.left - box.left - 2, y2 = rb.top + rb.height / 2 - box.top;
+      var mid = (x1 + x2) / 2;
+      var line = document.createElementNS(SVG, 'path');
+      line.setAttribute('d', 'M' + x1 + ' ' + y1 + ' C' + mid + ' ' + y1 + ' ' + mid + ' ' + y2 + ' ' + x2 + ' ' + y2);
+      var on = highlight ? highlight.some(function (h) { return h.from === e.from && h.to === e.to; }) : false;
+      line.setAttribute('class', 'cm-edge edge-' + e.kind + (highlight ? (on ? ' is-on' : ' is-dim') : ''));
+      line.setAttribute('marker-end', 'url(#cm-arrow-' + e.kind + ')');
+      svg.appendChild(line);
+    });
+  }
+
+  function link(id) {
+    var n = nodeById[id];
+    var text = name(id) + (n.kind === 'area' ? '' : ' ' + n.title);
+    if (!n.href) { var span = document.createElement('span'); span.textContent = text; return span; }
+    var a = document.createElement('a'); a.href = n.href; a.textContent = text; return a;
+  }
+  function relationList(title, edges, pick) {
+    var wrap = document.createElement('div');
+    var h = document.createElement('p'); h.className = 'cm-detail-label'; h.textContent = title; wrap.appendChild(h);
+    if (!edges.length) { var none = document.createElement('p'); none.className = 'cm-none'; none.textContent = '없음'; wrap.appendChild(none); return wrap; }
+    var ul = document.createElement('ul');
+    edges.forEach(function (e) {
+      var li = document.createElement('li');
+      li.appendChild(link(pick(e)));
+      var small = document.createElement('small'); small.textContent = ' · ' + EDGE_LABEL[e.kind]; li.appendChild(small);
+      ul.appendChild(li);
+    });
+    wrap.appendChild(ul);
+    return wrap;
+  }
+  function renderDetail(id) {
+    detail.replaceChildren();
+    if (!id) { detail.hidden = true; return; }
+    var n = nodeById[id];
+    var head = document.createElement('p'); head.className = 'cm-detail-title';
+    var strong = document.createElement('strong'); strong.textContent = name(id); head.appendChild(strong);
+    head.append(' ' + (n.kind === 'area' ? '결함 영역' : n.title) + (n.note ? ' · ' + n.note : ''));
+    detail.appendChild(head);
+    if (n.href) { var open = document.createElement('a'); open.className = 'cm-detail-open'; open.href = n.href; open.textContent = name(id) + ' 페이지 열기 →'; detail.appendChild(open); }
+    detail.appendChild(relationList('영향 주는 쪽 (들어오는 연결)', graph.edges.filter(function (e) { return e.to === id; }), function (e) { return e.from; }));
+    detail.appendChild(relationList('영향 받는 쪽 (나가는 연결)', graph.edges.filter(function (e) { return e.from === id; }), function (e) { return e.to; }));
+    detail.hidden = false;
+  }
+
+  function apply() {
+    var v = view();
+    if (!selected) {
+      board.classList.remove('has-selection');
+      buttons.forEach(function (b) { b.classList.remove('is-related', 'is-selected'); b.setAttribute('aria-pressed', 'false'); });
+      status.textContent = '노드를 고르면 관계 보기에 맞는 노드만 밝힙니다. 아래 관계 표에 모든 연결이 글로 있습니다.';
+      renderDetail(null);
+      draw(null);
+      return;
+    }
+    var rel = related(selected, v);
+    board.classList.add('has-selection');
+    buttons.forEach(function (b) {
+      var id = b.dataset.node;
+      b.classList.toggle('is-selected', id === selected);
+      b.classList.toggle('is-related', rel.nodes.has(id));
+      b.setAttribute('aria-pressed', String(id === selected));
+    });
+    var names = []; rel.nodes.forEach(function (id) { names.push(name(id)); });
+    status.textContent = name(selected) + ' · ' + VIEW_LABEL[v] + ': ' + (names.length ? names.length + '개 (' + names.join(', ') + ')' : '연결 없음');
+    renderDetail(selected);
+    draw(rel.edges);
+  }
+
+  buttons.forEach(function (b) {
+    b.addEventListener('click', function () { selected = selected === b.dataset.node ? null : b.dataset.node; apply(); });
+  });
+  root.querySelectorAll('input[name="cm-view"]').forEach(function (input) { input.addEventListener('change', apply); });
+  root.querySelector('[data-cm-clear]').addEventListener('click', function () { selected = null; apply(); });
+  var pending = 0;
+  window.addEventListener('resize', function () { cancelAnimationFrame(pending); pending = requestAnimationFrame(apply); });
+  window.addEventListener('load', apply);
+  window.jxCourseMap = { related: related };
+  apply();
+})();
