@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ROOT, EXTRA_COMMITS, HEADER, buildAll, listAnswerCommits, commitFiles, collectAnswers, specLinks, parseSpecSections, parseTalkCards, renderDay, fence } from './build-days.mjs';
+import { execFileSync } from 'node:child_process';
+import { ROOT, EXTRA_COMMITS, HEADER, buildAll, listAnswerCommits, commitFiles, collectAnswers, specLinks, parseSpecSections, parseTalkCards, renderDay, fence, stepId } from './build-days.mjs';
 import { stripFences, parseDayPage } from './validate.mjs';
 
 const roadmap = JSON.parse(fs.readFileSync(path.join(ROOT, 'course/roadmap.json'), 'utf8'));
@@ -82,24 +83,61 @@ test('정답 커밋 매핑: 순서와 어긋난 커밋은 허용 목록(D01-0, D
   assert.deepEqual([...answers.get('D08').extras.keys()], ['D08-6']);
 });
 
-test('정답 블록은 그 순서 커밋의 board-server 파일만 담는다', () => {
-  for (const d of readyDays) {
-    const body = page(d.id);
-    const blocks = [...body.matchAll(/<details class="step-answer" data-step="([^"]+)" data-commits="([^"]+)">([\s\S]*?)\n<\/details>/g)];
-    const extras = Object.keys(EXTRA_COMMITS).filter((k) => k.startsWith(`${d.id}-`) && EXTRA_COMMITS[k].extra).length;
-    assert.equal(blocks.length, d.steps.length + extras, `${d.id}: 정답 블록 수`);
-    for (const [, step, shas, inner] of blocks) {
-      const want = new Set(shas.split(' ').flatMap((sha) => commitFiles(sha, ROOT).map((f) => f.path)));
-      const shown = new Set([...stripFences(inner).matchAll(/^\*\*(?:새 파일|수정|삭제)\*\* `([^`]+)`/gm)].map((m) => m[1]));
-      assert.deepEqual([...shown].sort(), [...want].sort(), `${step}: 정답 블록 파일`);
-      for (const p of shown) assert.ok(!p.startsWith('tools/') && !p.startsWith('board-server/'), `${step}: ${p}`);
-      // 커밋 SHA는 실제 정답 커밋이고, 그 순서(또는 허용 목록) 커밋이다
-      for (const sha of shas.split(' ')) {
-        const c = allCommits.find((x) => x.sha === sha);
-        assert.ok(c && c.day === d.id, `${step}: ${sha}`);
+// 일자 페이지 본문의 정답 블록을 커밋과 대조해 오류 목록을 돌려준다.
+// - 블록의 data-step(Dnn-m)과 커밋의 Dnn-m(EXTRA_COMMITS 부착 규칙 반영)이 같아야 한다
+// - 블록의 파일 목록은 그 커밋들의 board-server 파일과 같고, 내용(새 파일 전체·수정 diff)도 같아야 한다
+const fileCache = new Map();
+const filesOfSha = (sha) => fileCache.get(sha) ?? fileCache.set(sha, commitFiles(sha, ROOT)).get(sha);
+function answerBlockErrors(dayId, body) {
+  const errs = [];
+  const blocks = [...body.matchAll(/<details class="step-answer" data-step="([^"]+)" data-commits="([^"]+)">([\s\S]*?)\n<\/details>/g)];
+  for (const [, step, shas, inner] of blocks) {
+    if (!step.startsWith(`${dayId}-`)) errs.push(`${step}: ${dayId} 페이지에 다른 날 정답 블록`);
+    const want = new Set();
+    for (const sha of shas.split(' ')) {
+      const c = allCommits.find((x) => x.sha === sha);
+      if (!c) { errs.push(`${step}: 정답 커밋이 아니다 ${sha}`); continue; }
+      const key = stepId(c.day, c.m);
+      const expected = stepId(c.day, EXTRA_COMMITS[key]?.attachTo ?? c.m);
+      if (expected !== step) errs.push(`${step}: 커밋 ${c.subject}은 ${expected} 순서다`);
+      for (const f of filesOfSha(sha)) {
+        want.add(f.path);
+        const text = f.content ?? f.diff;
+        // 펜스 여는 줄 다음부터 닫는 줄까지가 그대로 있어야 한다
+        if (text != null && !inner.includes(`\n${fence(text).split('\n').slice(1).join('\n')}`)) errs.push(`${step}: ${f.path} 내용이 커밋(${sha.slice(0, 8)})과 다르다`);
       }
     }
+    const shown = new Set([...stripFences(inner).matchAll(/^\*\*(?:새 파일|수정|삭제)\*\* `([^`]+)`/gm)].map((m) => m[1]));
+    if ([...shown].sort().join('\n') !== [...want].sort().join('\n')) errs.push(`${step}: 정답 블록 파일 목록이 커밋과 다르다`);
+    for (const p of shown) if (p.startsWith('tools/') || p.startsWith('board-server/')) errs.push(`${step}: ${p}`);
   }
+  return { blocks: blocks.length, errs };
+}
+
+test('정답 블록은 그 순서(Dnn-m) 커밋의 board-server 파일과 내용만 담는다', () => {
+  for (const d of readyDays) {
+    const { blocks, errs } = answerBlockErrors(d.id, page(d.id));
+    const extras = Object.keys(EXTRA_COMMITS).filter((k) => k.startsWith(`${d.id}-`) && EXTRA_COMMITS[k].extra).length;
+    assert.equal(blocks, d.steps.length + extras, `${d.id}: 정답 블록 수`);
+    assert.deepEqual(errs, [], d.id);
+  }
+});
+
+test('정답 블록 대조는 다른 날·같은 날 순서 교환·코드 훼손을 거부한다', () => {
+  const md = page('D05');
+  const commitsOf = (step) => md.match(new RegExp(`data-step="${step}" data-commits="([^"]+)"`))[1];
+  const [c1, c2] = [commitsOf('D05-1'), commitsOf('D05-2')];
+  const swapped = md.replace(`data-step="D05-1" data-commits="${c1}"`, 'SWAP1').replace(`data-step="D05-2" data-commits="${c2}"`, `data-step="D05-2" data-commits="${c1}"`).replace('SWAP1', `data-step="D05-1" data-commits="${c2}"`);
+  assert.ok(answerBlockErrors('D05', swapped).errs.some((e) => e.startsWith('D05-1: 커밋') && e.includes('D05-2 순서')));
+  const otherDay = md.replaceAll('data-step="D05-', 'data-step="D99-');
+  assert.ok(answerBlockErrors('D05', otherDay).errs.some((e) => e.includes('다른 날')));
+  assert.ok(answerBlockErrors('D05', otherDay).errs.some((e) => e.includes('D05-1 순서')));
+  // 첫 정답 블록의 첫 코드 줄을 바꾼다
+  const start = md.indexOf('<details class="step-answer"');
+  const open = md.indexOf('\n```', start) + 1;
+  const lineStart = md.indexOf('\n', open) + 1;
+  const tampered = `${md.slice(0, lineStart)}// 훼손${md.slice(lineStart)}`;
+  assert.ok(answerBlockErrors('D05', tampered).errs.some((e) => e.includes('내용이 커밋')));
 });
 
 test('정답 블록: 새 파일은 전체 내용, 수정 파일은 diff로 싣는다', () => {
@@ -201,7 +239,9 @@ test('answer-fix(Dnn-m)는 순서 수에 넣지 않고, 그 순서 원래 커밋
     specSections: parseSpecSections(fs.readFileSync(path.join(ROOT, 'course/spec-v2.md'), 'utf8')),
   });
   const block = md.match(/<details class="step-answer" data-step="D09-3"[\s\S]*?\n<\/details>/)[0];
-  assert.ok(block.includes('<summary>정답 보기 · answer(D09-3) + 보완 1개'));
+  // 실제 이력의 answer-fix(D09-3)에 합성 커밋 하나가 더해진다
+  const fixes = step3.filter((c) => c.kind === 'fix').length;
+  assert.ok(block.includes(`<summary>정답 보기 · answer(D09-3) + 보완 ${fixes}개`));
   const orig = block.indexOf(step3[0].sha.slice(0, 8));
   const extra = block.indexOf('**보완**');
   assert.ok(orig >= 0 && extra > orig, '보완은 원래 커밋 코드 뒤에 온다');
@@ -213,4 +253,48 @@ test('answer-fix(Dnn-m)는 순서 수에 넣지 않고, 그 순서 원래 커밋
 
 test('생성 페이지 맨 위에 생성물 표시가 있다', () => {
   for (const [rel, md] of built.files) assert.ok(md.startsWith(HEADER), rel);
+});
+
+// GIT_CONFIG_COUNT/KEY/VALUE로 사용자 설정을 흉내 내 주입하고, 끝나면 원래 환경으로 돌린다
+function withGitConfig(pairs, fn) {
+  const keys = ['GIT_CONFIG_COUNT', ...pairs.flatMap((_, i) => [`GIT_CONFIG_KEY_${i}`, `GIT_CONFIG_VALUE_${i}`])];
+  const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  process.env.GIT_CONFIG_COUNT = String(pairs.length);
+  pairs.forEach(([k, v], i) => { process.env[`GIT_CONFIG_KEY_${i}`] = k; process.env[`GIT_CONFIG_VALUE_${i}`] = v; });
+  try { return fn(); } finally {
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
+}
+
+test('diff 출력에 영향을 주는 git 설정이 달라도 생성 결과가 같다', () => {
+  const hostile = [
+    ['diff.suppressBlankEmpty', 'true'], ['color.ui', 'always'], ['color.diff', 'always'],
+    ['diff.noprefix', 'true'], ['diff.mnemonicPrefix', 'true'], ['diff.relative', 'true'],
+    ['diff.renames', 'copies'], ['core.quotePath', 'true'], ['diff.algorithm', 'patience'],
+    ['diff.indentHeuristic', 'false'], ['diff.context', '10'], ['diff.interHunkContext', '10'],
+    ['log.showSignature', 'true'], ['i18n.logOutputEncoding', 'ISO-8859-1'],
+  ];
+  // 주입이 실제로 git에 닿는지 먼저 확인한다
+  withGitConfig(hostile, () => {
+    assert.equal(execFileSync('git', ['config', 'diff.suppressBlankEmpty'], { cwd: ROOT, encoding: 'utf8' }).trim(), 'true');
+    const again = buildAll(ROOT);
+    assert.deepEqual([...again.files.keys()], [...built.files.keys()]);
+    for (const [k, v] of built.files) assert.equal(again.files.get(k), v, k);
+  });
+});
+
+test('저장소가 아니면 빈 목록이지만, git 실행 실패는 숨기지 않고 던진다', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'build-days-nogit-'));
+  try {
+    assert.deepEqual(listAnswerCommits(tmp), []);
+    // git 실행 파일을 찾지 못하는 경우
+    const savedPath = process.env.PATH;
+    process.env.PATH = tmp;
+    try { assert.throws(() => listAnswerCommits(ROOT)); } finally { process.env.PATH = savedPath; }
+    // 저장소 안에서 git이 다른 이유(설정 오류)로 실패하는 경우: 종료 코드 128이어도 저장소 부재가 아니다
+    withGitConfig([['', '']], () => {
+      delete process.env.GIT_CONFIG_KEY_0;
+      assert.throws(() => listAnswerCommits(ROOT), /GIT_CONFIG_KEY_0|config/);
+    });
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });

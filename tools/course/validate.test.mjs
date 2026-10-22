@@ -244,6 +244,29 @@ test('생성물 표시가 없거나 오늘의 Java 링크가 없으면 오류', 
   assert.ok(has(errs, 'D05.md', 'J05'));
 });
 
+test('data-step의 일자가 다르면 오류(D05 → D99)', () => {
+  const i = loadPages();
+  i.pages['D05.md'] = i.pages['D05.md'].replaceAll('data-step="D05-', 'data-step="D99-');
+  const errs = validateDayPages(i);
+  assert.ok(has(errs, 'D05.md', '순서 칸'));
+  assert.ok(has(errs, 'D05.md', '오늘 순서 체크'));
+  assert.ok(has(errs, 'D05.md', 'D99-1'));
+});
+
+test('같은 날 순서 칸의 data-step을 서로 바꾸면 오류', () => {
+  const i = loadPages();
+  i.pages['D05.md'] = i.pages['D05.md'].replace('class="day-step" id="step-1" data-step="D05-1"', 'SWAP').replace('class="day-step" id="step-2" data-step="D05-2"', 'class="day-step" id="step-2" data-step="D05-1"').replace('SWAP', 'class="day-step" id="step-1" data-step="D05-2"');
+  const errs = validateDayPages(i);
+  assert.ok(has(errs, 'D05.md', '순서 칸'));
+  assert.ok(has(errs, 'D05.md', '제목 번호'));
+});
+
+test('순서 칸 안의 힌트·정답 블록이 다른 순서(같은 날)를 가리키면 오류', () => {
+  const i = loadPages();
+  i.pages['D05.md'] = i.pages['D05.md'].replace(/(data-step="D05-1">\n\n## ① [^\n]+\n)/, '$1\n<details class="step-answer" data-step="D05-2" data-commits="x">\n</details>\n');
+  assert.ok(has(validateDayPages(i), 'D05.md', 'D05-1 칸 안'));
+});
+
 test('실제 course/spring 일자 페이지가 roadmap과 일치한다', () => {
   const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'course');
   const roadmap = JSON.parse(fs.readFileSync(path.join(dir, 'roadmap.json'), 'utf8'));

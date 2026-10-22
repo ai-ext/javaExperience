@@ -119,11 +119,18 @@ export function stripFences(md) {
 export function parseDayPage(md) {
   const body = stripFences(md);
   const steps = [...body.matchAll(/^## ([⓪①②③④⑤⑥⑦⑧⑨]) (.+)$/gm)].map((m) => ({ no: CIRCLED.indexOf(m[1]), title: m[2].trim() }));
-  const sections = [...body.matchAll(/<section class="day-step" [^>]*data-step="(D\d{2})-(\d+)"/g)].map((m) => Number(m[2]));
-  const checks = [...body.matchAll(/<input type="checkbox" class="step-check" data-step="(D\d{2})-(\d+)"/g)].map((m) => Number(m[2]));
+  // data-step은 일자까지 포함한 전체 ID(Dnn-m)로 읽는다
+  const blocks = [...body.matchAll(/<section class="day-step" [^>]*data-step="([^"]+)"[^>]*>([\s\S]*?)<\/section>/g)].map((m) => ({
+    id: m[1],
+    headingNo: CIRCLED.indexOf(m[2].match(/^## ([⓪①②③④⑤⑥⑦⑧⑨]) /m)?.[1] ?? '?'),
+    innerSteps: [...m[2].matchAll(/data-step="([^"]+)"/g)].map((x) => x[1]),
+  }));
+  const sections = blocks.map((b) => b.id);
+  const checks = [...body.matchAll(/<input type="checkbox" class="step-check" data-step="([^"]+)"/g)].map((m) => m[1]);
+  const allSteps = [...body.matchAll(/data-step="([^"]+)"/g)].map((m) => m[1]);
   const cards = [...body.matchAll(/^### (TC-\S+)/gm)].map((m) => m[1]);
   const java = [...body.matchAll(/\]\(\.\.\/java\/(J\d{2})\.md\)/g)].map((m) => m[1]);
-  return { steps, sections, checks, cards, java, generated: md.startsWith(DAY_HEADER) };
+  return { steps, sections, blocks, checks, allSteps, cards, java, generated: md.startsWith(DAY_HEADER) };
 }
 
 // pages: { 'D01.md': 본문, ... } (course/spring의 파일)
@@ -142,9 +149,14 @@ export function validateDayPages({ roadmap, pages }) {
       const got = p.steps[i];
       if (got && (got.no !== w.no || got.title !== w.title)) errs.push(`${at}: 순서 ${w.no} 제목이 roadmap과 다르다(${got.no} ${got.title})`);
     });
-    const nos = want.map((w) => w.no).join(',');
-    if (p.sections.join(',') !== nos) errs.push(`${at}: 순서 칸(data-step)이 roadmap 순서와 다르다(${p.sections.join(',')})`);
-    if (p.checks.join(',') !== nos) errs.push(`${at}: 오늘 순서 체크(data-step)가 roadmap 순서와 다르다(${p.checks.join(',')})`);
+    const ids = want.map((w) => `${day.id}-${w.no}`).join(',');
+    if (p.sections.join(',') !== ids) errs.push(`${at}: 순서 칸(data-step)이 roadmap 순서 ${ids}와 다르다(${p.sections.join(',')})`);
+    if (p.checks.join(',') !== ids) errs.push(`${at}: 오늘 순서 체크(data-step)가 roadmap 순서 ${ids}와 다르다(${p.checks.join(',')})`);
+    for (const b of p.blocks) {
+      if (b.id !== `${day.id}-${b.headingNo}`) errs.push(`${at}: 순서 칸 ${b.id}의 제목 번호(${b.headingNo})가 data-step과 다르다`);
+      for (const s of b.innerSteps) if (s !== b.id) errs.push(`${at}: ${b.id} 칸 안에 ${s} 블록이 있다`);
+    }
+    for (const s of new Set(p.allSteps)) if (!s.startsWith(`${day.id}-`)) errs.push(`${at}: 다른 날의 data-step ${s}`);
     if (p.cards.join(',') !== (day.talkCards ?? []).join(',')) errs.push(`${at}: 말하기 카드 ${p.cards.join(',')}가 roadmap talkCards ${(day.talkCards ?? []).join(',')}와 다르다`);
     if (!p.java.includes(day.java)) errs.push(`${at}: 오늘의 Java ${day.java} 링크가 없다`);
   }

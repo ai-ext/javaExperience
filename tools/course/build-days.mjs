@@ -5,6 +5,7 @@
 // - hints.json에 항목이 있는 날만 완성 페이지로 만들고, 없는 날은 "준비 중" 자리표시 페이지로 만든다.
 // - 정답 커밋을 하나도 찾지 못하면(얕은 복제·squash 병합) 아무것도 쓰지 않고 끝낸다. 커밋된 페이지의 인라인 정답을 지키기 위해서다.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -44,9 +45,27 @@ export const stepId = (day, no) => `${day}-${no}`;
 export const stepAnchor = (day, no) => `step-${day.toLowerCase()}-${no}`;
 
 // ---------------------------------------------------------------- git
-const GIT_FLAGS = ['-c', 'color.ui=never', '-c', 'diff.noprefix=false', '-c', 'diff.mnemonicPrefix=false', '-c', 'core.quotepath=off', '-c', 'diff.renames=false'];
-function git(root, args) {
-  return execFileSync('git', [...GIT_FLAGS, ...args], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+// 출력에 영향을 주는 사용자 git 설정을 모두 명령줄에서 고정한다(-c는 전역·저장소·GIT_CONFIG_* 설정보다 우선한다).
+// diff 알고리즘·문맥 줄 수는 commitFiles의 show 옵션으로 고정한다.
+const GIT_FLAGS = [
+  'color.ui=never', 'color.diff=never', 'diff.noprefix=false', 'diff.mnemonicPrefix=false', 'diff.relative=false',
+  'diff.renames=false', 'diff.suppressBlankEmpty=false', 'core.quotepath=off', 'log.showSignature=false',
+  'i18n.logOutputEncoding=UTF-8', `core.attributesFile=${os.devNull}`,
+].flatMap((kv) => ['-c', kv]);
+function git(root, args, env = process.env) {
+  return execFileSync('git', [...GIT_FLAGS, ...args], { cwd: root, env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+}
+
+// 저장소 안인지 확인한다. 저장소가 아니면 false, 그 밖의 실패(git 실행 파일 없음·권한·설정 오류·소유자 확인 등)는 던진다.
+// 오류 문구로 구분하므로 메시지 번역을 끈다.
+function insideRepo(root) {
+  try {
+    git(root, ['rev-parse', '--is-inside-work-tree'], { ...process.env, LC_ALL: 'C', LANGUAGE: 'C' });
+    return true;
+  } catch (e) {
+    if (e.status === 128 && /not a git repository/i.test(String(e.stderr ?? ''))) return false;
+    throw e;
+  }
 }
 
 // 정답 커밋 목록: [{ sha, subject, kind, day, m }] (오래된 것부터)
@@ -54,7 +73,7 @@ function git(root, args) {
 // git 저장소가 아니면(압축본 등) 빈 목록. 그 밖의 git 오류는 숨기지 않고 던진다.
 // --grep은 사용자의 grep.patternType 설정에 따라 괄호 해석이 달라지므로 쓰지 않고 JS 정규식으로 거른다.
 export function listAnswerCommits(root = ROOT) {
-  try { git(root, ['rev-parse', '--is-inside-work-tree']); } catch { return []; }
+  if (!insideRepo(root)) return [];
   const out = git(root, ['log', '--reverse', '--format=%H%x09%s', 'HEAD']);
   const list = [];
   for (const line of out.split('\n')) {
@@ -78,7 +97,7 @@ export function commitFiles(sha, root = ROOT) {
     if (!f.binary && !f.generated) {
       if (f.status === 'A') f.content = git(root, ['show', `${sha}:${full}`]);
       else if (f.status === 'M') {
-        const raw = git(root, ['show', '--format=', '--no-renames', '--no-ext-diff', '--diff-algorithm=myers', '--indent-heuristic', '--inter-hunk-context=0', '-U3', sha, '--', full]);
+        const raw = git(root, ['show', '--format=', '--no-renames', '--no-ext-diff', '--no-textconv', '--no-color', '--diff-algorithm=myers', '--indent-heuristic', '--inter-hunk-context=0', '-U3', sha, '--', full]);
         f.diff = raw.slice(raw.indexOf('\n@@') + 1);
       }
     }
