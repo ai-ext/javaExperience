@@ -27,11 +27,11 @@
         },
         {
           "no": 2,
-          "title": "Colima에서 MySQL 8.4를 띄우고 JPA 연결하기 (스키마는 `src/main/resources/schema.sql`로 관리하고 Flyway는 쓰지 않는다)",
+          "title": "Colima에서 MySQL 8.4를 띄우고 JPA 연결하기 (`build.gradle`에 JPA·MySQL 의존성 추가, 스키마는 `src/main/resources/schema.sql`로 관리하고 Flyway는 쓰지 않는다)",
           "files": [
             "compose.yaml",
-            "build.gradle",
-            "src/main/resources/application.yml"
+            "src/main/resources/application.yml",
+            "src/main/resources/schema.sql"
           ],
           "done": [
             "`docker compose up -d` 뒤 기동 로그에 `HikariPool-1 - Start completed`",
@@ -173,12 +173,15 @@
         },
         {
           "no": 5,
-          "title": "기동이 끝난 뒤(`ApplicationReadyEvent`) 금칙어·공통코드를 메모리에 적재하기",
+          "title": "기동이 끝난 뒤(`ApplicationReadyEvent`) DB의 금칙어(`banned_word`)·공통코드(`common_code`)를 `JdbcClient`로 읽어 메모리에 적재하기 (`schema.sql`에 두 테이블 추가)",
           "files": [
-            "src/main/java/com/example/board/common/ForbiddenWordLoader.java"
+            "src/main/java/com/example/board/common/ForbiddenWordLoader.java",
+            "src/main/java/com/example/board/common/CommonCodeRegistry.java",
+            "src/main/resources/schema.sql"
           ],
           "done": [
-            "기동 로그에서 `Started BoardApplication` 다음에 `금칙어 N건 적재`",
+            "기동 로그에서 `Started BoardApplication` 다음에 `금칙어 N건, 공통코드 M건 적재`",
+            "`banned_word`에 행을 넣고 재기동하면 적재 건수가 늘어난다",
             "`GET /actuator/health` → 200"
           ],
           "trap": "`@PostConstruct`는 빈 하나가 초기화되는 시점이라 트랜잭션 프록시나 다른 빈이 아직 준비되지 않았을 수 있으므로, 애플리케이션 준비가 끝난 `ApplicationReadyEvent`에서 적재한다.",
@@ -225,11 +228,11 @@
         },
         {
           "no": 2,
-          "title": "`Member` 엔티티와 `Role` (`schema.sql`에 `member` 테이블, `BaseEntity` 상속)",
+          "title": "`Member` 엔티티와 `Role` enum(`member/Role.java`) (`schema.sql`에 `member` 테이블, `BaseEntity` 상속)",
           "files": [
             "src/main/java/com/example/board/member/Member.java",
-            "src/main/java/com/example/board/member/Role.java",
-            "src/main/java/com/example/board/member/MemberRepository.java"
+            "src/main/java/com/example/board/member/MemberRepository.java",
+            "src/main/resources/schema.sql"
           ],
           "done": [
             "`MemberRepositoryTest` 통과: 같은 `email`로 두 번 저장하면 `DataIntegrityViolationException`"
@@ -331,11 +334,11 @@
       "steps": [
         {
           "no": 1,
-          "title": "`Post` 엔티티와 `PostStatus` (`schema.sql`에 `post` 테이블)",
+          "title": "`Post` 엔티티와 `PostStatus` enum(`post/PostStatus.java`) (`schema.sql`에 `post` 테이블)",
           "files": [
             "src/main/java/com/example/board/post/Post.java",
-            "src/main/java/com/example/board/post/PostStatus.java",
-            "src/main/java/com/example/board/post/PostRepository.java"
+            "src/main/java/com/example/board/post/PostRepository.java",
+            "src/main/resources/schema.sql"
           ],
           "done": [
             "`PostRepositoryTest` 통과: 저장한 글의 `status` 컬럼 값이 문자열 `ACTIVE`"
@@ -348,11 +351,11 @@
         },
         {
           "no": 2,
-          "title": "`Tag`와 `PostTag` (`schema.sql`에 `tag`, `post_tag` 테이블)",
+          "title": "`Tag`와 `PostTag`, 이름으로 찾는 `TagRepository`(`post/TagRepository.java`) (`schema.sql`에 `tag`, `post_tag` 테이블)",
           "files": [
             "src/main/java/com/example/board/post/Tag.java",
             "src/main/java/com/example/board/post/PostTag.java",
-            "src/main/java/com/example/board/post/TagRepository.java"
+            "src/main/resources/schema.sql"
           ],
           "done": [
             "`TagRepositoryTest` 통과: 같은 이름의 태그는 새로 만들지 않고 재사용한다"
@@ -472,16 +475,16 @@
         },
         {
           "no": 3,
-          "title": "`Comment` 엔티티와 댓글 서비스 (`schema.sql`에 `comment` 테이블)",
+          "title": "`Comment` 엔티티 (`schema.sql`에 `comment` 테이블, 인덱스(`post_id`, `id`))",
           "files": [
             "src/main/java/com/example/board/comment/Comment.java",
             "src/main/java/com/example/board/comment/CommentRepository.java",
-            "src/main/java/com/example/board/comment/CommentService.java"
+            "src/main/resources/schema.sql"
           ],
           "done": [
-            "`CommentServiceTest` 통과: 삭제된 글에 댓글을 달면 `/errors/not-found` 예외"
+            "`CommentRepositoryTest` 통과: 한 글의 댓글을 `id` 순으로 조회한다"
           ],
-          "trap": "대상 존재(404)보다 작성자(403)를 먼저 검사하면 삭제된 글의 존재가 권한 오류로 드러난다.",
+          "trap": "`@ManyToOne`을 기본값(EAGER)으로 두면 댓글 하나를 읽을 때도 글·작성자 쿼리가 따라 나가므로 `fetch = LAZY`로 둔다.",
           "specRefs": [
             "POST /api/posts/{postId}/comments"
           ],
@@ -489,14 +492,15 @@
         },
         {
           "no": 4,
-          "title": "댓글 작성·목록·삭제 API와 N+1 제거 (`CommentRepository`에 fetch join 조회 추가)",
+          "title": "댓글 서비스와 작성·목록·삭제 API, N+1 제거 (`CommentRepository`에 fetch join 조회 추가, 대상 존재(404)를 작성자(403)보다 먼저 검사)",
           "files": [
+            "src/main/java/com/example/board/comment/CommentService.java",
             "src/main/java/com/example/board/comment/CommentController.java",
-            "src/main/java/com/example/board/comment/CommentResponse.java",
-            "src/main/java/com/example/board/comment/CommentRepository.java"
+            "src/main/java/com/example/board/comment/CommentResponse.java"
           ],
           "done": [
             "`POST /api/posts/{postId}/comments` → 201",
+            "삭제된 글에 댓글 작성 → 404 `/errors/not-found`",
             "토큰 없이 `GET /api/posts/{postId}/comments` → 200, 댓글 20개에 SQL 2번 이하",
             "`DELETE /api/comments/{commentId}`: 작성자 204, 다른 USER 403, ADMIN 204"
           ],
@@ -513,7 +517,8 @@
           "title": "`PostLike` 엔티티 (`schema.sql`에 `post_like` 테이블, UNIQUE(`post_id`, `member_id`))",
           "files": [
             "src/main/java/com/example/board/post/PostLike.java",
-            "src/main/java/com/example/board/post/PostLikeRepository.java"
+            "src/main/java/com/example/board/post/PostLikeRepository.java",
+            "src/main/resources/schema.sql"
           ],
           "done": [
             "`PostLikeRepositoryTest` 통과: 같은 (글, 회원) 쌍을 두 번 저장하면 예외"
@@ -633,6 +638,7 @@
           "no": 5,
           "title": "`schema.sql`에 (`status`, `id`) 복합 인덱스를 넣고 EXPLAIN 전후 비교",
           "files": [
+            "src/main/resources/schema.sql",
             "src/test/java/com/example/board/post/PostListExplainTest.java"
           ],
           "done": [
@@ -662,11 +668,11 @@
       "steps": [
         {
           "no": 1,
-          "title": "포인트 원장과 원자적 적립 (`schema.sql`에 `point_ledger`, `MemberRepository`에 잔액 `UPDATE` 추가, 글 작성 시 활동 포인트 적립)",
+          "title": "포인트 원장과 원자적 적립 (`schema.sql`에 `point_ledger`, `point/PointLedgerRepository.java` 추가, `MemberRepository`에 잔액 `UPDATE` 추가, 글 작성 시 활동 포인트 적립)",
           "files": [
             "src/main/java/com/example/board/point/PointLedger.java",
-            "src/main/java/com/example/board/point/PointLedgerRepository.java",
-            "src/main/java/com/example/board/point/PointService.java"
+            "src/main/java/com/example/board/point/PointService.java",
+            "src/main/resources/schema.sql"
           ],
           "done": [
             "`PointServiceConcurrencyTest`가 \"조회 후 저장\" 방식에서 먼저 실패하는 것(50건 동시 적립 후 잔액 < 합계)을 보고, 원자적 UPDATE로 바꾼 뒤 통과: 잔액 = `point_ledger` 합",
@@ -705,7 +711,7 @@
           "files": [
             "src/main/java/com/example/board/coupon/Coupon.java",
             "src/main/java/com/example/board/coupon/CouponRepository.java",
-            "src/main/java/com/example/board/coupon/MemberCoupon.java"
+            "src/main/resources/schema.sql"
           ],
           "done": [
             "`CouponRepositoryTest` 통과: `issued_quantity < total_quantity`일 때만 1 증가하고 영향 행 수로 판정한다"
@@ -718,9 +724,9 @@
         },
         {
           "no": 4,
-          "title": "쿠폰 발급(1인 1매)과 내 쿠폰 목록 API",
+          "title": "쿠폰 발급(1인 1매)과 내 쿠폰 목록 API (`coupon/MemberCouponRepository.java` 추가)",
           "files": [
-            "src/main/java/com/example/board/coupon/MemberCouponRepository.java",
+            "src/main/java/com/example/board/coupon/MemberCoupon.java",
             "src/main/java/com/example/board/coupon/CouponService.java",
             "src/main/java/com/example/board/coupon/CouponController.java"
           ],
@@ -739,11 +745,11 @@
         },
         {
           "no": 5,
-          "title": "상점 아이템 목록 API (`schema.sql`에 `shop_item`, 재고는 `WHERE stock >= ?` 조건부 차감)",
+          "title": "상점 아이템 목록 API (`schema.sql`에 `shop_item`, `shop/ShopItemRepository.java` 추가, 재고는 `WHERE stock >= ?` 조건부 차감)",
           "files": [
             "src/main/java/com/example/board/shop/ShopItem.java",
-            "src/main/java/com/example/board/shop/ShopItemRepository.java",
-            "src/main/java/com/example/board/shop/ShopController.java"
+            "src/main/java/com/example/board/shop/ShopController.java",
+            "src/main/resources/schema.sql"
           ],
           "done": [
             "토큰 없이 `GET /api/shop/items` → 200"
@@ -756,11 +762,11 @@
         },
         {
           "no": 6,
-          "title": "쿠폰·포인트 구매와 `Idempotency-Key` (`schema.sql`에 `shop_order` UNIQUE(`member_id`, `idempotency_key`), `ShopController`에 `POST` 추가)",
+          "title": "쿠폰·포인트 구매와 `Idempotency-Key` (`schema.sql`에 `shop_order` UNIQUE(`member_id`, `idempotency_key`), `shop/ShopOrderRepository.java` 추가, `ShopController`에 `POST` 추가)",
           "files": [
             "src/main/java/com/example/board/shop/ShopOrder.java",
-            "src/main/java/com/example/board/shop/ShopOrderRepository.java",
-            "src/main/java/com/example/board/shop/OrderService.java"
+            "src/main/java/com/example/board/shop/OrderService.java",
+            "src/main/resources/schema.sql"
           ],
           "done": [
             "`POST /api/shop/orders` + `Idempotency-Key` → 201",
@@ -810,11 +816,11 @@
         },
         {
           "no": 2,
-          "title": "연계 로그 `pg_payment` (`schema.sql`에 테이블, UNIQUE `idempotency_key`·`order_id`·`payment_key`)",
+          "title": "연계 로그 `pg_payment`와 `PgPaymentStatus` enum(`payment/PgPaymentStatus.java`) (`schema.sql`에 테이블, UNIQUE `idempotency_key`·`order_id`·`payment_key`)",
           "files": [
             "src/main/java/com/example/board/payment/PgPayment.java",
-            "src/main/java/com/example/board/payment/PgPaymentStatus.java",
-            "src/main/java/com/example/board/payment/PgPaymentRepository.java"
+            "src/main/java/com/example/board/payment/PgPaymentRepository.java",
+            "src/main/resources/schema.sql"
           ],
           "done": [
             "`PgPaymentRepositoryTest` 통과: 같은 `idempotency_key`로 두 번 저장하면 예외, `order_id`는 `CHG-` + UUID"
@@ -1023,11 +1029,11 @@
       "steps": [
         {
           "no": 1,
-          "title": "`Report` 엔티티와 신고 서비스 (`schema.sql`에 `report` 테이블, UNIQUE(`post_id`, `reporter_id`))",
+          "title": "`Report` 엔티티와 신고 서비스 (`schema.sql`에 `report` 테이블, UNIQUE(`post_id`, `reporter_id`), `admin/ReportRepository.java` 추가)",
           "files": [
             "src/main/java/com/example/board/admin/Report.java",
-            "src/main/java/com/example/board/admin/ReportRepository.java",
-            "src/main/java/com/example/board/admin/ReportService.java"
+            "src/main/java/com/example/board/admin/ReportService.java",
+            "src/main/resources/schema.sql"
           ],
           "done": [
             "`ReportServiceTest` 통과: 같은 회원이 같은 글을 다시 신고하면 `/errors/duplicate` 예외"
@@ -1061,11 +1067,11 @@
         },
         {
           "no": 3,
-          "title": "감사 로그 테이블과 표시 애노테이션 (`schema.sql`에 `audit_log`, 추가 전용)",
+          "title": "감사 로그 테이블과 표시 애노테이션 (`schema.sql`에 `audit_log`, 추가 전용, `admin/AuditLogRepository.java` 추가)",
           "files": [
             "src/main/java/com/example/board/admin/AuditLog.java",
-            "src/main/java/com/example/board/admin/AuditLogRepository.java",
-            "src/main/java/com/example/board/admin/Audited.java"
+            "src/main/java/com/example/board/admin/Audited.java",
+            "src/main/resources/schema.sql"
           ],
           "done": [
             "`AuditLogRepositoryTest` 통과: 저장과 커서 조회만 있고 수정·삭제 메서드가 없다"
@@ -1276,6 +1282,7 @@
           "no": 2,
           "title": "B02 \"글 목록이 어느 날부터 느리다\": slow log → EXPLAIN ANALYZE (`schema.sql` 인덱스 순서 수정)",
           "files": [
+            "src/main/resources/schema.sql",
             "src/main/resources/mapper/PostQueryMapper.xml",
             "src/test/java/com/example/board/post/PostListExplainTest.java"
           ],

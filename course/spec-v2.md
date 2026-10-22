@@ -205,6 +205,8 @@
 | `pg_payment` | `member_id`, `order_id`(서버가 만든 문자열, 예: `CHG-` + UUID), `amount`, `payment_key`, `status`(`REQUESTED`/`DONE`/`FAILED`/`UNKNOWN`), `idempotency_key`, `requested_at`, `responded_at` | **UNIQUE(`idempotency_key`)**, UNIQUE(`order_id`), UNIQUE(`payment_key`) |
 | `report` | `post_id`, `reporter_id`, `reason`, `detail`, `status` | UNIQUE(`post_id`, `reporter_id`) |
 | `audit_log` | `actor_id`, `action`, `target_type`, `target_id`, `detail`, `created_at` | 관리자 동작 기록, 추가 전용, 인덱스(`id`) |
+| `banned_word` | `word` | UNIQUE(`word`). 기동 시(`ApplicationReadyEvent`) 메모리에 적재하는 금칙어(D02) |
+| `common_code` | `group_code`, `code`, `name` | UNIQUE(`group_code`, `code`). 기동 시 메모리에 적재하는 공통코드(D02) |
 
 포인트 잔액은 `member.point_balance` 컬럼을 원자적 `UPDATE`로 갱신하고, 같은 트랜잭션에서 `point_ledger`에 이력을 쌓는다. 잔액과 이력의 합은 항상 일치해야 한다.
 
