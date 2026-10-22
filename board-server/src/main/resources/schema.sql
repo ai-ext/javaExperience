@@ -30,3 +30,18 @@ CREATE TABLE IF NOT EXISTS member (
     UNIQUE KEY uk_member_email (email),
     UNIQUE KEY uk_member_nickname (nickname)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS post (
+    id         BIGINT        NOT NULL AUTO_INCREMENT,
+    member_id  BIGINT        NOT NULL,
+    title      VARCHAR(100)  NOT NULL,
+    content    VARCHAR(5000) NOT NULL,
+    status     VARCHAR(10)   NOT NULL,
+    like_count INT           NOT NULL DEFAULT 0,
+    created_at DATETIME(6)   NOT NULL,
+    updated_at DATETIME(6)   NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_post_member FOREIGN KEY (member_id) REFERENCES member (id),
+    -- 목록 조회(status 필터 + id 커서)용
+    KEY idx_post_status_id (status, id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
