@@ -45,7 +45,7 @@ import { renderDb12FocusedJourney } from './db12-focused-journey.mjs';
 import { renderDb13FocusedJourney } from './db13-focused-journey.mjs';
 import { renderDb14FocusedJourney } from './db14-focused-journey.mjs';
 import { renderL12QueryJourney } from './l12-query-journey.mjs';
-import { loadCourse, renderDayPage, dayCrumbs, renderCourseHome, renderHomeReference, renderCourseMap, mapCrumbs, DAY_PAGE, MAP_PAGE } from './course-pages.mjs';
+import { loadCourse, renderDayPage, dayCrumbs, renderCourseHome, renderHomeReference, renderCourseMap, mapCrumbs, findInjectedLinkErrors, DAY_PAGE, MAP_PAGE } from './course-pages.mjs';
 import { injectTicketFlow } from './course-flow.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -704,20 +704,7 @@ for (const [f, r] of results) {
 }
 // 과정 v2 렌더러가 넣은 링크(홈 진입·지도·이전/다음·티켓 배지·흐름 목록, JSON 데이터의 href)는 위 marked 링크 검사를 거치지 않는다.
 // 홈과 course/ 아래 페이지의 최종 HTML에서 파일·앵커를 다시 검사한다. 이번 빌드가 쓸 페이지도 있는 것으로 본다.
-const injectedErrors = [];
-for (const [out, html] of outputs) {
-  const relOut = rel(out);
-  if (relOut !== 'README.html' && !relOut.startsWith('course/')) continue;
-  const hrefs = [...html.matchAll(/\shref="([^"]+)"/g), ...html.matchAll(/"href":"([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, '&'));
-  for (const href of new Set(hrefs)) {
-    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href)) continue;
-    const [pathPart, hash] = href.split('#');
-    const target = pathPart ? path.resolve(path.dirname(out), pathPart.split('?')[0]) : out;
-    const targetHtml = outputs.get(target) ?? (target.endsWith('.html') && fs.existsSync(target) ? read(target) : null);
-    if (!outputs.has(target) && !fs.existsSync(target)) { injectedErrors.push(`${relOut}: 없는 파일 → ${href}`); continue; }
-    if (hash && targetHtml !== null && !targetHtml.includes(`id="${decodeURIComponent(hash)}"`)) injectedErrors.push(`${relOut}: 없는 앵커 → ${href}`);
-  }
-}
+const injectedErrors = findInjectedLinkErrors(outputs, ROOT);
 if (injectedErrors.length) {
   console.error(`렌더러가 넣은 링크 중 깨진 것 ${injectedErrors.length}개:\n` + injectedErrors.join('\n'));
   process.exit(1);

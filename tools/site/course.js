@@ -49,8 +49,9 @@
   function initDay(page) {
     var store = storage();
     var state = readProgress(store);
-    // 쓰기에 실패한 체크가 있으면 true. 그동안은 저장값으로 화면을 덮지 않는다(덮으면 방금 한 체크가 사라진다).
-    var unsaved = false;
+    // 쓰기에 실패해 저장값에 아직 없는 이 화면의 체크·해제(id → true/false). 저장에 성공하면 비운다.
+    // 저장값을 다시 읽을 때 이 키만 덮고 나머지 키(다른 탭이 저장한 진도)는 그대로 둔다.
+    var pending = {};
     var inputs = Array.prototype.slice.call(page.querySelectorAll('input.step-check[data-step]'));
     var ids = [];
     inputs.forEach(function (input) { if (ids.indexOf(input.dataset.step) < 0) ids.push(input.dataset.step); });
@@ -62,21 +63,21 @@
       });
       var count = ids.filter(function (id) { return state.done.has(id); }).length;
       if (counter) counter.textContent = count + '/' + ids.length + ' 끝냄';
-      storageNote(!state.ok ? 'blocked' : unsaved ? 'unsaved' : '');
+      storageNote(!state.ok ? 'blocked' : Object.keys(pending).length ? 'unsaved' : '');
     }
-    // 저장값을 다시 읽는다(다른 탭의 체크 반영). 이 화면에 저장 못 한 체크가 있으면 읽지 않는다.
+    // 최신 저장값(다른 탭의 체크 포함)을 다시 읽고 그 위에 이 화면의 미저장 변경을 얹는다.
+    // 읽기에 실패하면 지금 화면 상태를 기준으로 한다.
     function reload() {
-      if (unsaved) return;
       var latest = readProgress(store);
-      if (latest.ok) state = latest;
+      if (latest.ok || !state.ok) state = latest;
+      Object.keys(pending).forEach(function (id) { if (pending[id]) state.done.add(id); else state.done.delete(id); });
     }
     inputs.forEach(function (input) {
       input.addEventListener('change', function () {
+        pending[input.dataset.step] = input.checked;
         reload();
-        if (input.checked) state.done.add(input.dataset.step); else state.done.delete(input.dataset.step);
-        var saved = writeProgress(store, state.done);
-        // 저장소 자체를 못 쓰는 경우(state.ok=false)와 쓰기만 실패한 경우를 나눈다. 둘 다 메모리의 체크는 지킨다.
-        if (state.ok) unsaved = !saved;
+        // 저장소 자체를 못 쓰는 경우(state.ok=false)와 쓰기만 실패한 경우 모두 미저장 변경을 지켜 다음 저장 때 다시 얹는다.
+        if (writeProgress(store, state.done)) pending = {};
         paint();
       });
     });

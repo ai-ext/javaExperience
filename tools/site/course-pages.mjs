@@ -4,6 +4,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { JSDOM } from 'jsdom';
 import { loadFlows, renderDayFlow, renderDayTicketLinks } from './course-flow.mjs';
 
 const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -352,4 +353,38 @@ export function renderCourseMap(course, fromRel = MAP_PAGE) {
 
 export function mapCrumbs() {
   return '<nav class="course-crumbs" aria-label="현재 위치"><p class="crumbs"><a href="README.html">과정 v2</a> › 과정 지도</p></nav>';
+}
+
+// 문서를 파싱해 실제 요소의 id만 모은다. data-id·주석·스크립트 문자열 속 id="…"는 앵커가 아니다(P5-3 리뷰 ④).
+export function htmlIds(html) {
+  const { window } = new JSDOM(html);
+  const ids = new Set([...window.document.querySelectorAll('[id]')].map((el) => el.id));
+  window.close();
+  return ids;
+}
+
+// 과정 v2 렌더러가 넣은 링크(홈 진입·지도·이전/다음·티켓 배지·흐름 목록, JSON 데이터의 href)를 최종 HTML에서 검사한다.
+// outputs: 이번 빌드가 쓸 페이지(절대 경로 → HTML). 이 페이지들은 있는 것으로 보고, 나머지는 디스크에서 읽는다.
+export function findInjectedLinkErrors(outputs, root) {
+  const rel = (p) => path.relative(root, p).split(path.sep).join('/');
+  const idCache = new Map();
+  const idsOf = (target, html) => {
+    if (!idCache.has(target)) idCache.set(target, htmlIds(html));
+    return idCache.get(target);
+  };
+  const errors = [];
+  for (const [out, html] of outputs) {
+    const relOut = rel(out);
+    if (relOut !== 'README.html' && !relOut.startsWith('course/')) continue;
+    const hrefs = [...html.matchAll(/\shref="([^"]+)"/g), ...html.matchAll(/"href":"([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, '&'));
+    for (const href of new Set(hrefs)) {
+      if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href)) continue;
+      const [pathPart, hash] = href.split('#');
+      const target = pathPart ? path.resolve(path.dirname(out), pathPart.split('?')[0]) : out;
+      if (!outputs.has(target) && !fs.existsSync(target)) { errors.push(`${relOut}: 없는 파일 → ${href}`); continue; }
+      const targetHtml = outputs.get(target) ?? (target.endsWith('.html') ? fs.readFileSync(target, 'utf8') : null);
+      if (hash && targetHtml !== null && !idsOf(target, targetHtml).has(decodeURIComponent(hash))) errors.push(`${relOut}: 없는 앵커 → ${href}`);
+    }
+  }
+  return errors;
 }

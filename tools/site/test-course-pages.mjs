@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { JSDOM } from 'jsdom';
-import { loadCourse, shortTitle, mapNodes } from './course-pages.mjs';
+import { loadCourse, shortTitle, mapNodes, findInjectedLinkErrors } from './course-pages.mjs';
 import { maskedNodes, MASK_LABEL } from './course-flow.mjs';
 
 const root = new URL('../../', import.meta.url);
@@ -32,6 +32,20 @@ async function open(file, { saved, brokenStorage = false, script = courseScript,
 assert.equal(shortTitle('`Post` 엔티티와 `PostStatus` enum(`post/PostStatus.java`) (`schema.sql`에 `post` 테이블) · 목록 조회용 (`status`, `id`) 인덱스 포함'), '`Post` 엔티티와 `PostStatus` enum');
 assert.equal(shortTitle('`@Transactional(readOnly = true)` 붙이기'), '`@Transactional(readOnly = true)` 붙이기', '코드 안 괄호는 지킨다');
 assert.equal(shortTitle('(전부 괄호)'), '(전부 괄호)', '비면 원래 제목');
+
+// ---------------------------------------------------------------- 주입 링크 검사
+// 앵커는 대상 HTML을 파싱한 실제 요소의 id로만 인정한다. data-id·주석 속 문자열은 통과시키지 않는다(P5-3 리뷰 ④).
+{
+  const fake = '/virtual-site';
+  const target = '<!doctype html><p id="real">진짜</p><p data-id="dataOnly">x</p><!-- id="commentOnly" --><script>const s = \'<a id="scriptOnly">\';</script>';
+  const outputs = new Map([
+    [`${fake}/course/spring/D99.html`, ['real', 'dataOnly', 'commentOnly', 'scriptOnly', 'absent'].map((h) => `<a href="../tickets/T01.html#${h}">${h}</a>`).join('') + '<a href="#self">self</a><p id="self"></p>'],
+    [`${fake}/course/tickets/T01.html`, target],
+  ]);
+  assert.deepEqual(findInjectedLinkErrors(outputs, fake), ['dataOnly', 'commentOnly', 'scriptOnly', 'absent'].map((h) => `course/spring/D99.html: 없는 앵커 → ../tickets/T01.html#${h}`), '실제 id만 앵커로 인정');
+  outputs.set(`${fake}/course/spring/D98.html`, '<a href="../tickets/T02.html">없는 파일</a>');
+  assert.ok(findInjectedLinkErrors(outputs, fake).includes('course/spring/D98.html: 없는 파일 → ../tickets/T02.html'), '없는 파일도 잡는다');
+}
 
 // ---------------------------------------------------------------- 일자 페이지
 for (const day of course.days) {
@@ -130,6 +144,39 @@ for (const day of course.days) {
   assert.equal(page.$('[data-day-progress]').textContent, '2/5 끝냄', 'pageshow·storage가 저장 못 한 체크를 덮지 않는다');
   assert.deepEqual(page.$$('.day-chips input.step-check:checked').map((i) => i.dataset.step), ['D04-1', 'D04-2']);
   assert.match(page.$('[data-course-storage]').textContent, /저장하지 못했습니다/, '저장 실패 안내');
+}
+// 저장 실패 중 다른 탭이 저장한 진도는, 복구 뒤 이 화면이 저장해도 지우지 않는다. 이 화면의 미저장 체크·해제만 키별로 덮는다(P5-3 리뷰 ②).
+{
+  const page = await open('course/spring/D04.html', {
+    saved: JSON.stringify({ version: 1, steps: { 'D04-3': true } }),
+    before: (win) => {
+      const real = win.Storage.prototype.setItem;
+      win.failWrites = true;
+      win.otherTabWrite = (value) => real.call(win.localStorage, KEY, value);
+      win.Storage.prototype.setItem = function (...args) {
+        if (win.failWrites) throw new win.DOMException('full', 'QuotaExceededError');
+        return real.apply(this, args);
+      };
+    },
+  });
+  const check = (id, on) => { const el = page.$(`input.step-check[data-step="${id}"]`); el.checked = on; el.dispatchEvent(new page.window.Event('change', { bubbles: true })); };
+  const checked = () => page.$$('.day-chips input.step-check:checked').map((i) => i.dataset.step);
+  check('D04-1', true); // 1. A 탭: 저장 실패, 메모리에만
+  check('D04-3', false); //    해제도 미저장 변경
+  // 2. B 탭이 D05-1·D04-4를 저장(D04-3은 그대로 체크) → A에 storage 이벤트
+  page.window.otherTabWrite(JSON.stringify({ version: 1, steps: { 'D04-3': true, 'D04-4': true, 'D05-1': true } }));
+  page.window.dispatchEvent(new page.window.StorageEvent('storage', { key: KEY }));
+  assert.deepEqual(checked(), ['D04-1', 'D04-4'], '미저장 중에도 다른 탭 체크는 반영하고, 이 화면의 체크·해제는 지킨다');
+  assert.match(page.$('[data-course-storage]').textContent, /저장하지 못했습니다/, '미저장 안내는 남는다');
+  // 3. 저장 복구 뒤 A에서 D04-2 체크
+  page.window.failWrites = false;
+  check('D04-2', true);
+  assert.deepEqual(JSON.parse(page.window.localStorage.getItem(KEY)), { version: 1, steps: { 'D04-1': true, 'D04-2': true, 'D04-4': true, 'D05-1': true } }, '다른 탭의 D05-1·D04-4를 지우지 않고, 이 화면의 D04-3 해제는 반영');
+  assert.equal(page.$('[data-course-storage]').textContent, '', '저장되면 안내가 사라진다');
+  // 저장된 뒤에는 미저장 변경이 남지 않아, 다른 탭이 D04-1을 해제하면 그대로 따른다.
+  page.window.otherTabWrite(JSON.stringify({ version: 1, steps: { 'D04-2': true } }));
+  page.window.dispatchEvent(new page.window.StorageEvent('storage', { key: KEY }));
+  assert.deepEqual(checked(), ['D04-2'], '저장 뒤에는 최신 저장값을 그대로 따른다');
 }
 // 다른 탭에서 체크하면 열린 일자 화면·홈이 storage 이벤트로 다시 그린다(P5-2 리뷰 ④).
 {
