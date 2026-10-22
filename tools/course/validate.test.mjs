@@ -94,3 +94,43 @@ test('금지어가 course 파일에 있으면 오류', () => {
     assert.ok(has(validate(i), 'bad.md'), bad);
   }
 });
+
+test('하루 카드가 5개 초과면 오류', () => {
+  const i = load();
+  for (let n = 4; n <= 6; n++) {
+    i.roadmap.days[0].talkCards.push(`TC-D01-${n}`);
+    i.cards += `\n### TC-D01-${n}\n\n본문\n`;
+  }
+  assert.ok(has(validate(i), 'D01', '5'));
+});
+
+test('D11이 build면 오류', () => {
+  const i = load();
+  i.roadmap.days[10].phase = 'build';
+  assert.ok(has(validate(i), 'D11', 'maintain'));
+});
+
+test('일자 ID 순서가 어긋나면 오류', () => {
+  const i = load();
+  const d = i.roadmap.days;
+  [d[1], d[2]] = [d[2], d[1]];
+  assert.ok(has(validate(i), 'D02'));
+});
+
+test('java 배열에 J07이 없으면 오류', () => {
+  const i = load();
+  i.roadmap.java = i.roadmap.java.filter((j) => j.id !== 'J07');
+  assert.ok(has(validate(i), 'J07'));
+});
+
+test('J05의 day가 D04면 오류', () => {
+  const i = load();
+  i.roadmap.java.find((j) => j.id === 'J05').day = 'D04';
+  assert.ok(has(validate(i), 'J05', 'D05'));
+});
+
+test('다른 날 카드를 참조하면 오류', () => {
+  const i = load();
+  i.roadmap.days[4].talkCards[0] = 'TC-D03-1';
+  assert.ok(has(validate(i), 'D05', 'TC-D03-1'));
+});

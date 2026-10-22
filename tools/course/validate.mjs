@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 
 const FORBIDDEN = [/Docker Desktop/, /studymate/i, /3주 만에 3~6년차/];
 const CARD_RE = /^TC-D\d{2}-\d$/;
-const PHASES = ['build', 'maintain', 'wrap'];
 
 // 표 머리가 `| 메서드 | 경로 |`인 표의 행만 읽는다
 export function parseSpecEndpoints(md) {
@@ -41,13 +40,20 @@ export function validate({ spec, roadmap, cards, courseFiles }) {
 
   const usedRefs = new Set();
   const tickets = new Set();
-  for (const day of days) {
+  for (const [idx, day] of days.entries()) {
     const d = day.id;
-    if (!PHASES.includes(day.phase)) errs.push(`${d}: 알 수 없는 phase ${day.phase}`);
+    const num = idx + 1;
+    const expectId = `D${String(num).padStart(2, '0')}`;
+    if (d !== expectId) errs.push(`${idx + 1}번째 일자 ID가 ${expectId}가 아니다: ${d}`);
+    const expectPhase = num <= 10 ? 'build' : num <= 14 ? 'maintain' : 'wrap';
+    if (day.phase !== expectPhase) errs.push(`${d}: phase는 ${expectPhase}여야 한다(${day.phase})`);
     if (day.java !== `J${String(d).slice(1)}`) errs.push(`${d}: java ${day.java}가 ${d}와 짝이 아니다`);
     const tc = day.talkCards ?? [];
-    if (tc.length < 3) errs.push(`${d}: talkCards가 3개 미만(${tc.length})`);
-    for (const c of tc) if (!seen.has(c)) errs.push(`${d}: talkCards ${c}가 카드 문서에 없다`);
+    if (tc.length < 3 || tc.length > 5) errs.push(`${d}: talkCards는 3~5개(${tc.length})`);
+    for (const c of tc) {
+      if (!seen.has(c)) errs.push(`${d}: talkCards ${c}가 카드 문서에 없다`);
+      if (!c.startsWith(`TC-${d}-`)) errs.push(`${d}: 다른 날 카드를 참조한다 ${c}`);
+    }
 
     const steps = day.steps ?? [];
     if (day.phase === 'build' && (steps.length < 3 || steps.length > 6)) errs.push(`${d}: build 단계 steps는 3~6개(${steps.length})`);
@@ -69,6 +75,16 @@ export function validate({ spec, roadmap, cards, courseFiles }) {
       }
       if (day.phase === 'maintain') for (const t of s.tickets ?? []) tickets.add(t);
     }
+  }
+
+  const javaById = new Map((roadmap.java ?? []).map((j) => [j.id, j]));
+  const j0 = javaById.get('J00');
+  if (!j0 || j0.optional !== true) errs.push('java: J00(optional: true)이 없다');
+  for (let n = 1; n <= 15; n++) {
+    const nn = String(n).padStart(2, '0');
+    const j = javaById.get(`J${nn}`);
+    if (!j) errs.push(`java: J${nn}이 없다`);
+    else if (j.day !== `D${nn}`) errs.push(`java: J${nn}의 day는 D${nn}여야 한다(${j.day})`);
   }
 
   for (const e of endpoints) if (!usedRefs.has(e)) errs.push(`미사용 엔드포인트: ${e}`);
