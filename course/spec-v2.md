@@ -31,7 +31,7 @@
 | `instance` | string | 요청 경로 |
 | `errors[]` | array | 필드 검증 실패 목록. 항목은 `{field, reason}` |
 
-- 상태 코드: 400 검증 실패, 401 인증 없음·만료, 403 권한 없음, 404 대상 없음, 409 중복·충돌, 429 시도 횟수 초과, 502/504 PG 오류·시간 초과.
+- 상태 코드: 400 검증 실패, 401 인증 없음·만료, 403 권한 없음, 404 대상 없음, 409 중복·충돌, 422 같은 `Idempotency-Key`에 다른 본문, 429 시도 횟수 초과, 502/504 PG 오류·시간 초과.
 - 401·403도 같은 ProblemDetail 형식이다(`SecurityFilterChain`의 진입점·거부 핸들러에서 만든다).
 - 시간은 ISO-8601 KST 오프셋 문자열이다. 예: `2026-10-22T09:30:00+09:00`.
 - 목록은 커서 방식이다. 요청 파라미터는 `cursor`(생략하면 처음부터), `size`(기본 20, 최대 50)이다. 응답은 `items`와 `nextCursor`이며, 마지막 쪽이면 `nextCursor`는 `null`이다.
@@ -161,11 +161,14 @@
 | POST /api/me/points/charges | (PG 시간 초과) | - | - | 결과 불명, `pg_payment` 상태 `UNKNOWN`으로 남긴다 | 504 `/errors/pg-timeout` |
 | POST /api/me/points/charges | (PG 거절) | - | - | 승인 실패 | 502 `/errors/pg-declined` |
 | POST /api/pg/callbacks | `X-PG-Signature` | header | O | 7절 서명 규칙 | 401 `/errors/invalid-signature` |
+| POST /api/pg/callbacks | `orderId` | string | O | 기존 `pg_payment.order_id`와 같아야 함 | 404 `/errors/not-found` |
 | POST /api/pg/callbacks | `paymentKey` | string | O | 1~64자 | 400 `/errors/validation` |
 | POST /api/pg/callbacks | `status` | string | O | `DONE`, `FAILED` 중 하나 | 400 `/errors/validation` |
 | POST /api/pg/callbacks | `amount` | int | O | 양수, 저장된 충전 금액과 같아야 함 | 400 `/errors/validation` |
 
 같은 `paymentKey`의 콜백이 여러 번 와도 포인트는 한 번만 적립한다.
+
+`UNKNOWN` 충전은 콜백이나 `GET /pg/v1/payments?orderId={orderId}` 조회(예: 재처리 워커)로만 확정하고, 추측으로 성공·실패를 정하지 않는다.
 
 ### 5-6. 신고·관리자
 
@@ -199,7 +202,7 @@
 | `point_ledger` | `member_id`, `type`(`EARN`/`SPEND`/`CHARGE`), `amount`, `balance_after`, `ref_type`, `ref_id` | 적립·차감 이력, 행은 수정·삭제하지 않는다. 인덱스(`member_id`, `id`) |
 | `shop_item` | `name`, `price`, `stock` | `stock` >= 0 |
 | `shop_order` | `member_id`, `item_id`, `quantity`, `paid_amount`, `member_coupon_id`, `idempotency_key` | UNIQUE(`member_id`, `idempotency_key`) |
-| `pg_payment` | `member_id`, `amount`, `payment_key`, `status`(`REQUESTED`/`DONE`/`FAILED`/`UNKNOWN`), `idempotency_key`, `requested_at`, `responded_at` | **UNIQUE(`idempotency_key`)**, UNIQUE(`payment_key`) |
+| `pg_payment` | `member_id`, `order_id`(서버가 만든 문자열, 예: `CHG-` + UUID), `amount`, `payment_key`, `status`(`REQUESTED`/`DONE`/`FAILED`/`UNKNOWN`), `idempotency_key`, `requested_at`, `responded_at` | **UNIQUE(`idempotency_key`)**, UNIQUE(`order_id`), UNIQUE(`payment_key`) |
 | `report` | `post_id`, `reporter_id`, `reason`, `detail`, `status` | UNIQUE(`post_id`, `reporter_id`) |
 | `audit_log` | `actor_id`, `action`, `target_type`, `target_id`, `detail`, `created_at` | 관리자 동작 기록, 추가 전용, 인덱스(`id`) |
 
@@ -211,11 +214,12 @@
 
 | 호출 | 대상 | 설명 |
 |---|---|---|
-| POST | `/pg/v1/payments` | 승인 요청. 본문 `{orderId, amount}`, 헤더 `Idempotency-Key`. 응답 `{paymentKey, status, amount, approvedAt}` |
-| GET | `/pg/v1/payments/{paymentKey}` | 결제 조회. 시간 초과 뒤 결과를 확인할 때 쓴다 |
+| POST | `/pg/v1/payments` | 승인 요청. 본문 `{orderId, amount}`이며 `orderId`는 `pg_payment.order_id`다. 헤더 `Idempotency-Key`. 응답 `{paymentKey, status, amount, approvedAt}` |
+| GET | `/pg/v1/payments?orderId={orderId}` | 우리 `orderId`로 결제 조회. 시간 초과로 `paymentKey`를 받지 못했을 때 결과를 확인하는 데 쓴다 |
+| GET | `/pg/v1/payments/{paymentKey}` | `paymentKey`로 결제 조회 |
 
 - 승인 응답 `status`는 `DONE`, `FAILED`, `PENDING` 중 하나다. 같은 `Idempotency-Key`의 승인 재요청은 처음 결과를 돌려준다.
-- 콜백은 PG가 `POST /api/pg/callbacks`로 보낸다. 서명 헤더는 `X-PG-Signature`이며, 값은 요청 **본문 원문 바이트**를 PG 비밀키로 HMAC-SHA256한 결과의 16진 소문자 문자열이다.
+- 콜백은 PG가 `POST /api/pg/callbacks`로 보낸다. 본문은 `{orderId, paymentKey, status, amount}`다. 서명 헤더는 `X-PG-Signature`이며, 값은 요청 **본문 원문 바이트**를 PG 비밀키로 HMAC-SHA256한 결과의 16진 소문자 문자열이다.
 - 서버는 본문을 파싱하기 전에 원문으로 서명을 계산해 상수 시간 비교로 확인한다. 불일치하면 401이다.
 - 비밀키는 설정 파일에 두지 않고 환경 변수로 주입한다.
 

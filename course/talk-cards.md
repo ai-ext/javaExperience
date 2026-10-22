@@ -295,7 +295,7 @@
 **답에 들어가야 할 것**
 - 타임아웃은 실패가 아니라 결과 불명이다. PG는 승인을 끝냈을 수 있다
 - `pg_payment`를 `UNKNOWN`으로 남기고 504 `/errors/pg-timeout`을 돌려준다
-- 같은 `Idempotency-Key`로 승인을 다시 요청하면 PG가 처음 결과를 돌려주므로, 그 결과나 콜백으로 상태를 확정한다
+- 상태는 `orderId`가 담긴 PG 콜백이나 `GET /pg/v1/payments?orderId=` 조회(재처리 워커)로 확정한다. 같은 `Idempotency-Key`로 승인을 다시 요청해도 PG는 처음 결과를 돌려준다
 **근거** 10 §8, spec-v2 §5-5, spec-v2 §7
 
 ### TC-D08-4
