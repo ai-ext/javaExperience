@@ -26,12 +26,14 @@ public class AdminService {
 
     private final ReportRepository reportRepository;
     private final PostRepository postRepository;
+    private final AuditLogRepository auditLogRepository;
     private final ApplicationEventPublisher events;
 
     public AdminService(ReportRepository reportRepository, PostRepository postRepository,
-            ApplicationEventPublisher events) {
+            AuditLogRepository auditLogRepository, ApplicationEventPublisher events) {
         this.reportRepository = reportRepository;
         this.postRepository = postRepository;
+        this.auditLogRepository = auditLogRepository;
         this.events = events;
     }
 
@@ -52,6 +54,7 @@ public class AdminService {
      * reportId가 없거나 다른 글의 신고면 404이고 아무것도 바꾸지 않는다.
      * 트랜잭션이 있어야 PostChangedEvent가 커밋 뒤 리스너(인기글 캐시 삭제)에 닿는다.
      */
+    @Audited(action = "HIDE_POST", targetType = "POST")
     @Transactional
     public HidePostResponse hidePost(Long postId, Long reportId) {
         Post post = postRepository.findById(postId)
@@ -69,5 +72,15 @@ public class AdminService {
         }
         events.publishEvent(new PostChangedEvent(postId));
         return new HidePostResponse(postId, post.getStatus(), reportId);
+    }
+
+    @Transactional(readOnly = true)
+    public CursorPage<AuditLogResponse> auditLogs(String cursor, int size) {
+        Long afterId = CursorPage.decode(cursor);
+        List<AuditLog> rows = auditLogRepository.findPage(afterId, PageRequest.of(0, size + 1));
+        boolean hasNext = rows.size() > size;
+        List<AuditLog> page = hasNext ? rows.subList(0, size) : rows;
+        String next = hasNext ? CursorPage.encode(page.get(page.size() - 1).getId()) : null;
+        return new CursorPage<>(page.stream().map(AuditLogResponse::from).toList(), next);
     }
 }

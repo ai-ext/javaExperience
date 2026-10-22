@@ -33,4 +33,9 @@ public class AdminController {
             @Valid @RequestBody(required = false) HidePostRequest request) {
         return adminService.hidePost(postId, request == null ? null : request.reportId());
     }
+
+    @GetMapping("/audit-logs")
+    public CursorPage<AuditLogResponse> auditLogs(@Valid AuditLogListRequest request) {
+        return adminService.auditLogs(request.cursor(), request.size());
+    }
 }

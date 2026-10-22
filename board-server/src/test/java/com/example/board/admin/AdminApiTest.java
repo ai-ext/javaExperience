@@ -232,6 +232,64 @@ class AdminApiTest extends ApiTestSupport {
         assertThat(postStatus(postId)).isEqualTo("ACTIVE");
     }
 
+    // --- 감사 로그 ---
+
+    @Test
+    void 숨긴_뒤_감사_로그에_HIDE_POST가_1건_남는다() throws Exception {
+        Long postId = newPost(newMember(Role.USER));
+        Member admin = newMember(Role.ADMIN);
+        mockMvc.perform(post("/api/admin/posts/{id}/hide", postId).header("Authorization", bearer(admin)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/admin/audit-logs").param("size", "50").header("Authorization", bearer(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[?(@.action == 'HIDE_POST' && @.targetId == %d)]", postId).value(
+                        org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.items[0].action").value("HIDE_POST"))
+                .andExpect(jsonPath("$.items[0].targetType").value("POST"))
+                .andExpect(jsonPath("$.items[0].targetId").value(postId))
+                .andExpect(jsonPath("$.items[0].actorId").value(admin.getId()))
+                .andExpect(jsonPath("$.items[0].detail").value("result=SUCCESS"))
+                .andExpect(jsonPath("$.items[0].createdAt").isString());
+    }
+
+    @Test
+    void 감사_로그는_id_내림차순_커서로_읽는다() throws Exception {
+        String token = admin();
+        Long p1 = newPost(newMember(Role.USER));
+        Long p2 = newPost(newMember(Role.USER));
+        mockMvc.perform(post("/api/admin/posts/{id}/hide", p1).header("Authorization", token));
+        mockMvc.perform(post("/api/admin/posts/{id}/hide", p2).header("Authorization", token));
+
+        String body = mockMvc.perform(get("/api/admin/audit-logs").param("size", "1").header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].targetId").value(p2))
+                .andReturn().getResponse().getContentAsString();
+        String cursor = com.jayway.jsonpath.JsonPath.read(body, "$.nextCursor");
+
+        mockMvc.perform(get("/api/admin/audit-logs").param("size", "1").param("cursor", cursor)
+                        .header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].targetId").value(p1));
+    }
+
+    @Test
+    void 감사_로그의_잘못된_size_cursor는_400() throws Exception {
+        String token = admin();
+        mockMvc.perform(get("/api/admin/audit-logs").param("size", "51").header("Authorization", token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("/errors/validation"));
+        mockMvc.perform(get("/api/admin/audit-logs").param("cursor", "!!").header("Authorization", token))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void USER_토큰으로_감사_로그는_403() throws Exception {
+        mockMvc.perform(get("/api/admin/audit-logs").header("Authorization", bearer(newMember(Role.USER))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("/errors/forbidden"));
+    }
+
     // --- 메서드 보안 (URL 규칙과 이중 방어) ---
 
     // 함정 가드: @PreAuthorize를 안쪽 메서드로 옮겨 같은 클래스 안에서 부르게 바꾸면 public 진입점이 USER에게 열려 이 테스트가 실패한다
