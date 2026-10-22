@@ -111,3 +111,33 @@ CREATE TABLE IF NOT EXISTS point_ledger (
     -- 이력 목록(id 커서)용. 행은 추가만 하고 수정·삭제하지 않는다.
     KEY idx_point_ledger_member_id (member_id, id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS coupon (
+    id              BIGINT       NOT NULL AUTO_INCREMENT,
+    name            VARCHAR(100) NOT NULL,
+    total_quantity  INT          NOT NULL,
+    issued_quantity INT          NOT NULL DEFAULT 0,
+    expires_at      DATETIME(6)  NOT NULL,
+    created_at      DATETIME(6)  NOT NULL,
+    updated_at      DATETIME(6)  NOT NULL,
+    PRIMARY KEY (id),
+    -- 총 수량 초과 발급의 최종 방어선
+    CONSTRAINT ck_coupon_issued CHECK (issued_quantity >= 0 AND issued_quantity <= total_quantity)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS member_coupon (
+    id         BIGINT      NOT NULL AUTO_INCREMENT,
+    coupon_id  BIGINT      NOT NULL,
+    member_id  BIGINT      NOT NULL,
+    status     VARCHAR(10) NOT NULL,
+    used_at    DATETIME(6) NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_member_coupon_coupon FOREIGN KEY (coupon_id) REFERENCES coupon (id),
+    CONSTRAINT fk_member_coupon_member FOREIGN KEY (member_id) REFERENCES member (id),
+    -- 1인 1매의 최종 방어선. "이미 받았나" 조회만으로는 두 요청이 모두 통과한다.
+    UNIQUE KEY uk_member_coupon_coupon_member (coupon_id, member_id),
+    -- 내 쿠폰 목록용
+    KEY idx_member_coupon_member (member_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
