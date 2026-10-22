@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.board.common.CursorPage;
 import com.example.board.member.AuthMember;
 
 @RestController
@@ -24,9 +25,11 @@ import com.example.board.member.AuthMember;
 public class PostController {
 
     private final PostService postService;
+    private final PostQueryService postQueryService;
 
-    public PostController(PostService postService) {
+    public PostController(PostService postService, PostQueryService postQueryService) {
         this.postService = postService;
+        this.postQueryService = postQueryService;
     }
 
     @PostMapping
@@ -34,6 +37,11 @@ public class PostController {
             @Valid @RequestBody PostCreateRequest request) {
         Long postId = postService.create(auth.id(), request);
         return ResponseEntity.created(URI.create("/api/posts/" + postId)).build();
+    }
+
+    @GetMapping
+    public CursorPage<PostSummary> list(@Valid PostListRequest request) {
+        return postQueryService.search(request.toCondition(), request.cursor(), request.size());
     }
 
     @GetMapping("/{postId}")

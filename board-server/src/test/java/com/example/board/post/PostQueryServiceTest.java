@@ -8,6 +8,7 @@ import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.example.board.ApiTestSupport;
 import com.example.board.common.BusinessException;
@@ -26,6 +27,9 @@ class PostQueryServiceTest extends ApiTestSupport {
 
     @Autowired
     SqlSessionFactory sqlSessionFactory;
+
+    @Autowired
+    PostRepository postRepository;
 
     Member author;
 
@@ -123,5 +127,16 @@ class PostQueryServiceTest extends ApiTestSupport {
         params.put("afterId", 5L);
         String full = sqlSessionFactory.getConfiguration().getMappedStatement(id).getBoundSql(params).getSql();
         assertThat(full).contains("LIKE").contains("EXISTS").contains("id <");
+    }
+
+    /** JPA로 고쳤지만 flush 전인 값도 MyBatis 읽기에 보여야 한다. 서비스가 읽기 전에 flush하지 않으면 옛 값이 나온다. */
+    @Test
+    @Transactional
+    void 같은_트랜잭션에서_JPA로_고친_직후에도_검색에_반영된다() {
+        Post post = postRepository.saveAndFlush(Post.create(author, "옛 제목", "내용"));
+        post.update("새 제목", "내용");
+
+        assertThat(service.search(new PostSearchCondition("새 제목", null), null, 20).items())
+                .extracting(PostSummary::getId).containsExactly(post.getId());
     }
 }
