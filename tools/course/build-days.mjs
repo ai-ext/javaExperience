@@ -359,7 +359,7 @@ function answerBlock(dataStep, commits, stepFiles, filesOf, lastTouch, fixFilesO
     `<summary>정답 보기 · ${names} · board-server 파일 ${all.length}개</summary>`,
     '',
     [...originals.map((c) => renderCommitAnswer(c, filesOf(c.sha), stepFiles)), ...(fixes.length ? [renderFixAnswer(fixes, fixFiles, stepFiles)] : [])].join('\n\n---\n\n'),
-    ...(deferred ? ['', `**보완** — 이 순서의 보완은 뒤 순서 코드에 맞춘 diff라 [${circled(deferred.after)} 뒤 보완 칸](#${fixAnchor(dataStep)})에 따로 싣는다.`] : []),
+    ...(deferred ? ['', `**보완** — 이 순서의 보완은 뒤 순서 코드에 맞춘 diff라 <a href="#${fixAnchor(dataStep)}">${circled(deferred.after)} 뒤 보완 칸</a>에 따로 싣는다.`] : []),
     ...(untouched.length ? ['', '**만들 파일 중 이 커밋에 없는 것**', '', ...untouched] : []),
     '',
     '</details>',
@@ -507,6 +507,7 @@ function extraSection(day, commits, ctx) {
   ].join('\n');
 }
 
+// 순서 칸·보완 칸의 id는 raw HTML이라 사이트 빌드의 마크다운 앵커 검사(제목 앵커만 안다)를 통과하지 못한다. 이 id로는 <a href>만 쓴다.
 const fixAnchor = (id) => `fix-${id.toLowerCase()}`;
 
 // 뒤로 미룬 보완: 그 순서(Dnn-m)의 보완만 담은 정답 블록을 after 순서 칸 뒤에 둔다
@@ -520,7 +521,7 @@ function deferredFixSection(day, no, rule, ctx) {
     '',
     `## 보완: ${circled(no)} ${step.title}`,
     '',
-    `${circled(rule.after)}까지(그 순서의 보완 포함) 만들었으면 [${circled(no)}](#${stepAnchor(day.id, no)})의 보완을 적용한다. ${rule.note}`,
+    `${circled(rule.after)}까지(그 순서의 보완 포함) 만들었으면 <a href="#${stepAnchor(day.id, no)}">${circled(no)}</a>의 보완을 적용한다. ${rule.note}`,
     '',
     `<details class="step-answer" data-step="${id}" data-commits="${fixes.map((c) => c.sha).join(' ')}">`,
     `<summary>정답 보기 · answer(${id}) 보완 ${fixes.length}개 · board-server 파일 ${files.length}개</summary>`,

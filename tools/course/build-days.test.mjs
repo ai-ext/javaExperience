@@ -158,6 +158,8 @@ test('페이지 안 #step 링크는 모두 실제 순서 칸을 가리킨다', (
   for (const [rel, md] of built.files) {
     const ids = new Set([...md.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]));
     for (const [, target] of md.matchAll(/href="#([^"]+)"/g)) assert.ok(ids.has(target), `${rel}: #${target}`);
+    // 사이트 빌드는 마크다운 링크의 #앵커를 제목 앵커와만 대조하므로, raw HTML id를 마크다운 링크로 가리키면 빌드가 깨진다
+    for (const [, target] of stripFences(md).matchAll(/\]\(#([^)]+)\)/g)) assert.ok(!ids.has(target), `${rel}: raw HTML id #${target}를 마크다운 링크로 가리킨다(<a href>로 쓴다)`);
   }
 });
 
@@ -422,7 +424,7 @@ test('뒤 순서 코드에 기대는 보완(D09-1)은 원래 순서 칸에서 �
   const own = md.match(/<details class="step-answer" data-step="D09-1" data-commits="([^"]+)">([\s\S]*?)\n<\/details>/);
   for (const c of fixes) assert.ok(!own[1].includes(c.sha), '원래 순서 칸에는 보완 커밋이 없다');
   assert.ok(!own[2].includes('**보완 이력**'));
-  assert.ok(own[2].includes('](#fix-d09-1)'), '원래 순서 칸이 보완 칸을 가리킨다');
+  assert.ok(own[2].includes('<a href="#fix-d09-1">'), '원래 순서 칸이 보완 칸을 가리킨다');
   const sec = md.indexOf('<section class="day-step-extra" id="fix-d09-1" data-commit="D09-1">');
   const after = md.indexOf(`<section class="day-step" id="step-d09-${rule.after}"`);
   const next = md.indexOf(`<section class="day-step" id="step-d09-${rule.after + 1}"`);
