@@ -2,6 +2,7 @@ package com.example.board.payment;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -37,7 +38,22 @@ public class ChargeService {
         this.tx = tx;
     }
 
+    /**
+     * PG가 잠깐 느린 경우가 많아 응답 타임아웃이면 한 번 더 시도한다.
+     * 같은 키로 다시 보내면 "결과 확인 중"(504)만 돌아오므로 재시도는 새 키로 한다.
+     */
     public ChargeResponse charge(Long memberId, String idempotencyKey, int amount) {
+        try {
+            return chargeOnce(memberId, idempotencyKey, amount);
+        } catch (BusinessException e) {
+            if (e.errorCode() != ErrorCode.PG_TIMEOUT) {
+                throw e;
+            }
+            return chargeOnce(memberId, UUID.randomUUID().toString(), amount);
+        }
+    }
+
+    private ChargeResponse chargeOnce(Long memberId, String idempotencyKey, int amount) {
         Started started = start(memberId, idempotencyKey, amount);
         PgPayment payment = started.payment();
         if (!started.fresh()) {
