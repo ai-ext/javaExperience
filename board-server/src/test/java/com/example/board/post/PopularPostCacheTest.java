@@ -8,7 +8,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.ibatis.executor.Executor;
+import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.plugin.Interceptor;
+import org.apache.ibatis.plugin.Intercepts;
+import org.apache.ibatis.plugin.Invocation;
+import org.apache.ibatis.plugin.Signature;
+import org.apache.ibatis.session.ResultHandler;
+import org.apache.ibatis.session.RowBounds;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -142,6 +151,35 @@ class PopularPostCacheTest extends ApiTestSupport {
         mockMvc.perform(get("/api/posts/popular")).andExpect(jsonPath("$.items[0].title").value("새 제목"));
     }
 
+    // 함정: 무효화를 커밋 뒤에 해도, DB를 먼저 읽은 적재 요청이 삭제·무효화 뒤에 옛 목록을 저장하면 TTL 동안 다시 보인다.
+    // 순서를 latch로 고정한다: A가 DB 조회 → 글 삭제 커밋·캐시 삭제 → A가 캐시 저장.
+    @Test
+    void 적재_도중_글이_삭제되면_옛_목록을_캐시에_다시_쓰지_않는다() throws Exception {
+        Long gone = postWithLikes("지울 글", 50);
+        postWithLikes("남을 글", 1);
+        PauseAfterQuery pause = PauseAfterQuery.attach(sqlSessionFactory);
+        pause.arm("findPopular");
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            Future<Integer> loading = pool.submit(
+                    () -> mockMvc.perform(get("/api/posts/popular")).andReturn().getResponse().getStatus());
+            assertThat(pause.awaitPaused()).as("A가 DB 조회 뒤 멈춤").isTrue();
+
+            mockMvc.perform(delete("/api/posts/{id}", gone).header("Authorization", bearer(author)))
+                    .andExpect(status().isNoContent());
+            pause.release();
+            assertThat(loading.get(10, TimeUnit.SECONDS)).isEqualTo(200);
+        } finally {
+            pause.release();
+            pool.shutdownNow();
+        }
+
+        mockMvc.perform(get("/api/posts/popular"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].title").value("남을 글"));
+    }
+
     // 함정: TTL이 끝난 순간 동시 요청이 모두 DB로 몰리는 스탬피드
     @Test
     void 캐시가_빈_순간_동시_요청_20개가_와도_DB_조회는_1번이다() throws Exception {
@@ -176,6 +214,58 @@ class PopularPostCacheTest extends ApiTestSupport {
             return result;
         } finally {
             pool.shutdownNow();
+        }
+    }
+
+    /**
+     * 지정한 매퍼 메서드의 DB 조회가 끝난 직후 한 번 멈춘다(결과를 받은 뒤, 호출자에게 돌려주기 전).
+     * 빈으로 등록하면 컨텍스트가 하나 더 뜨므로 MyBatisQueryCounter처럼 이미 뜬 SqlSessionFactory에 붙인다.
+     */
+    @Intercepts(@Signature(type = Executor.class, method = "query",
+            args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class}))
+    static final class PauseAfterQuery implements Interceptor {
+
+        private final AtomicBoolean armed = new AtomicBoolean();
+        private volatile String method;
+        private volatile CountDownLatch paused = new CountDownLatch(1);
+        private volatile CountDownLatch released = new CountDownLatch(1);
+
+        static synchronized PauseAfterQuery attach(SqlSessionFactory factory) {
+            for (Interceptor i : factory.getConfiguration().getInterceptors()) {
+                if (i instanceof PauseAfterQuery p) {
+                    return p;
+                }
+            }
+            PauseAfterQuery p = new PauseAfterQuery();
+            factory.getConfiguration().addInterceptor(p);
+            return p;
+        }
+
+        void arm(String methodName) {
+            method = methodName;
+            paused = new CountDownLatch(1);
+            released = new CountDownLatch(1);
+            armed.set(true);
+        }
+
+        boolean awaitPaused() throws InterruptedException {
+            return paused.await(10, TimeUnit.SECONDS);
+        }
+
+        void release() {
+            armed.set(false);
+            released.countDown();
+        }
+
+        @Override
+        public Object intercept(Invocation invocation) throws Throwable {
+            Object result = invocation.proceed();
+            MappedStatement ms = (MappedStatement) invocation.getArgs()[0];
+            if (ms.getId().endsWith("." + method) && armed.compareAndSet(true, false)) {
+                paused.countDown();
+                released.await(10, TimeUnit.SECONDS);
+            }
+            return result;
         }
     }
 }
