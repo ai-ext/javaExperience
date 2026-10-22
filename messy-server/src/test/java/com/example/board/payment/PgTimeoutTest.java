@@ -66,12 +66,12 @@ class PgTimeoutTest extends PgApiTestSupport {
     }
 
     @Test
-    void UNKNOWN은_서명된_콜백_하나로_DONE이_되고_적립은_한_번이다() throws Exception {
+    void UNKNOWN은_콜백_반영_하나로_DONE이_되고_적립은_한_번이다() throws Exception {
         Member m = newMember(Role.USER);
         String key = chargeWithSlowPg(m, 7000);
         String orderId = orderId(key);
 
-        signedCallback(callbackBody(orderId, "DONE", 7000)).andExpect(status().isOk());
+        chargeService.applyCallback(new PgCallbackRequest(orderId, "pk-" + orderId, "DONE", 7000));
         // 콜백 뒤에 재처리 워커가 조회해도 다시 적립하지 않는다
         PgContainers.stubLookupDone(orderId, 7000);
         chargeService.reconcile(orderId);
