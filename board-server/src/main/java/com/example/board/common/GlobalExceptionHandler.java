@@ -76,11 +76,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
             HttpStatusCode statusCode, WebRequest request) {
-        if (body instanceof ProblemDetail pd) {
+        ResponseEntity<Object> response = super.handleExceptionInternal(ex, body, headers, statusCode, request);
+        // body가 null이면 상위 클래스가 ErrorResponse에서 ProblemDetail을 만들어 응답에 넣으므로 결과에서 꺼내 맞춘다
+        if (response != null && response.getBody() instanceof ProblemDetail pd) {
             pd.setInstance(URI.create(path(request)));
             pd.setType(typeOf(statusCode));
         }
-        return super.handleExceptionInternal(ex, body, headers, statusCode, request);
+        return response;
     }
 
     private static URI typeOf(HttpStatusCode status) {

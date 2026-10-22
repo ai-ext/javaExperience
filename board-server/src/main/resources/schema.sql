@@ -153,3 +153,21 @@ CREATE TABLE IF NOT EXISTS shop_item (
     -- 재고 음수의 최종 방어선
     CONSTRAINT ck_shop_item_stock CHECK (stock >= 0)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS shop_order (
+    id               BIGINT       NOT NULL AUTO_INCREMENT,
+    member_id        BIGINT       NOT NULL,
+    item_id          BIGINT       NOT NULL,
+    quantity         INT          NOT NULL,
+    paid_amount      BIGINT       NOT NULL,
+    member_coupon_id BIGINT       NULL,
+    idempotency_key  VARCHAR(64)  NOT NULL,
+    created_at       DATETIME(6)  NOT NULL,
+    updated_at       DATETIME(6)  NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_shop_order_member FOREIGN KEY (member_id) REFERENCES member (id),
+    CONSTRAINT fk_shop_order_item FOREIGN KEY (item_id) REFERENCES shop_item (id),
+    CONSTRAINT fk_shop_order_member_coupon FOREIGN KEY (member_coupon_id) REFERENCES member_coupon (id),
+    -- 같은 멱등 키의 중복 주문을 막는 최종 방어선
+    UNIQUE KEY uk_shop_order_member_key (member_id, idempotency_key)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;

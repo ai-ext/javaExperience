@@ -12,6 +12,7 @@ public enum ErrorCode {
     TOO_MANY_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS, "/errors/too-many-attempts", "시도 횟수 초과"),
     COUPON_EXHAUSTED(HttpStatus.CONFLICT, "/errors/coupon-exhausted", "쿠폰 소진"),
     COUPON_UNUSABLE(HttpStatus.CONFLICT, "/errors/coupon-unusable", "쿠폰 사용 불가"),
+    OUT_OF_STOCK(HttpStatus.CONFLICT, "/errors/out-of-stock", "재고 부족"),
     INSUFFICIENT_POINTS(HttpStatus.CONFLICT, "/errors/insufficient-points", "포인트 부족"),
     IDEMPOTENCY_MISMATCH(HttpStatus.UNPROCESSABLE_ENTITY, "/errors/idempotency-mismatch", "멱등 키 본문 불일치"),
     PG_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "/errors/pg-timeout", "PG 시간 초과"),
