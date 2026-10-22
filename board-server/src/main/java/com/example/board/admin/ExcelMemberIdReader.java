@@ -141,7 +141,8 @@ public class ExcelMemberIdReader {
         return cell.getCellType() == CellType.STRING && cell.getStringCellValue().trim().equalsIgnoreCase(HEADER);
     }
 
+    // 파일 오류는 모두 file 필드의 검증 실패로 errors[]에 담는다(서블릿 용량 초과 응답과 같은 모양)
     private static BusinessException invalid(String detail) {
-        return new BusinessException(ErrorCode.VALIDATION, detail);
+        return new BusinessException(ErrorCode.VALIDATION, detail, "file");
     }
 }

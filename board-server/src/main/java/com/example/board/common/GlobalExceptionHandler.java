@@ -34,7 +34,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     ProblemDetail handleBusiness(BusinessException e, HttpServletRequest request) {
         ErrorCode code = e.errorCode();
-        return problem(code.status(), code.type(), code.title(), e.getMessage(), request.getRequestURI());
+        ProblemDetail pd = problem(code.status(), code.type(), code.title(), e.getMessage(), request.getRequestURI());
+        if (e.field() != null) {
+            pd.setProperty("errors", List.of(Map.of("field", e.field(), "reason", e.getMessage())));
+        }
+        return pd;
     }
 
     // 직접 검증한 본문(PG 콜백처럼 원문을 먼저 봐야 하는 경우)도 같은 errors[] 형식으로 맞춘다

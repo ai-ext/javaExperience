@@ -164,7 +164,9 @@ class CouponBulkIssueApiTest extends ApiTestSupport {
 
         upload(couponId, file("members.xlsx", new byte[6 * 1024 * 1024]), bearer(newMember(Role.ADMIN)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value("/errors/validation"));
+                .andExpect(jsonPath("$.type").value("/errors/validation"))
+                .andExpect(jsonPath("$.errors[0].field").value("file"))
+                .andExpect(jsonPath("$.errors[0].reason").value("파일은 최대 5MB입니다."));
         assertThat(audit(couponId)).containsExactly("result=FAILURE, error=VALIDATION");
     }
 
@@ -174,12 +176,33 @@ class CouponBulkIssueApiTest extends ApiTestSupport {
         String token = bearer(newMember(Role.ADMIN));
         List<Long> ids = newMembers(1001);
 
+        // 검증 실패는 spec-v2 5절대로 errors[{field, reason}]를 담는다
         upload(couponId, file("members.xls", xls(List.of(ids.get(0)))), token)
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value("/errors/validation"));
+                .andExpect(jsonPath("$.type").value("/errors/validation"))
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value("file"))
+                .andExpect(jsonPath("$.errors[0].reason").value(".xlsx 파일만 받습니다."));
         upload(couponId, file("members.xlsx", xlsx(withHeader(ids))), token)
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value("/errors/validation"));
+                .andExpect(jsonPath("$.type").value("/errors/validation"))
+                .andExpect(jsonPath("$.errors[0].field").value("file"))
+                .andExpect(jsonPath("$.errors[0].reason").value("최대 1,000행까지 받습니다."));
+        assertThat(owned(couponId)).isZero();
+    }
+
+    @Test
+    void 이름만_xlsx이고_내용이_엑셀이_아니면_400이고_errors에_file이_있다() throws Exception {
+        Long couponId = newCoupon(10);
+
+        upload(couponId, file("members.xlsx", xls(List.of(1))), bearer(newMember(Role.ADMIN)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("/errors/validation"))
+                .andExpect(jsonPath("$.errors[0].field").value("file"))
+                .andExpect(jsonPath("$.errors[0].reason").value(".xlsx 형식이 아닙니다."));
+        upload(couponId, file("members.xlsx", "memberId\n1\n".getBytes()), bearer(newMember(Role.ADMIN)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("file"));
         assertThat(owned(couponId)).isZero();
     }
 
