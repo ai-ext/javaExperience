@@ -30,13 +30,14 @@ class PgTimeoutTest extends PgApiTestSupport {
                 .andExpect(status().isGatewayTimeout())
                 .andExpect(jsonPath("$.type").value("/errors/pg-timeout"));
 
-        assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)).isLessThan(3500L);
+        // 3초 응답 타임아웃이 끊었다는 증거로 하한도 본다(빠른 실패였다면 3초 미만). 상한은 JVM 예열 여유를 둔다.
+        assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)).isBetween(3000L, 4499L);
         PgContainers.healProxy();
         return key;
     }
 
     @Test
-    void PG가_5초_늦으면_3_5초_안에_504이고_UNKNOWN이며_재시도하지_않는다() throws Exception {
+    void PG가_5초_늦으면_3초_타임아웃으로_504이고_UNKNOWN이며_재시도하지_않는다() throws Exception {
         Member m = newMember(Role.USER);
 
         String key = chargeWithSlowPg(m, 7000);
