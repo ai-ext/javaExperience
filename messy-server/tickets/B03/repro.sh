@@ -19,6 +19,10 @@
 set -euo pipefail
 
 BASE=${BASE:-http://localhost:8080}
+if ! curl -sf -o /dev/null "$BASE/actuator/health"; then
+  echo "서버($BASE)에 닿지 않는다. 맨 위 주석의 전제(docker compose up -d, bootRun)를 먼저 확인하라." >&2
+  exit 1
+fi
 sql() { docker compose exec -T mysql mysql -uboard -pboard board -N -e "$1" 2>/dev/null; }
 
 token_for() {

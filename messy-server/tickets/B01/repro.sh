@@ -16,6 +16,10 @@
 set -euo pipefail
 
 BASE=${BASE:-http://localhost:8080}
+if ! curl -sf -o /dev/null "$BASE/actuator/health"; then
+  echo "서버($BASE)에 닿지 않는다. 맨 위 주석의 전제(docker compose up -d, bootRun)를 먼저 확인하라." >&2
+  exit 1
+fi
 TOXI=${TOXI:-http://localhost:8475}
 N=${N:-12}
 
@@ -32,7 +36,7 @@ token_for() {
     -d "{\"email\":\"$email\",\"password\":\"passw0rd1\"}" | jq -r .accessToken
 }
 
-echo "회원 $N명 준비"
+echo "회원 ${N}명 준비"
 tokens=()
 for i in $(seq 1 "$N"); do tokens+=("$(token_for "$i")"); done
 
