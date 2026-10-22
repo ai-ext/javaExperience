@@ -1,0 +1,97 @@
+package com.example.javatrack.j02;
+
+/**
+ * 쿠폰 엔티티. Lombok으로 쓰면 아래 모양이다. 애노테이션이 만들어 줄 코드를 손으로 쓴다.
+ * <pre>
+ * {@literal @}Getter
+ * {@literal @}NoArgsConstructor(access = AccessLevel.PROTECTED)
+ * public class Coupon {
+ *     ...
+ *     {@literal @}Builder
+ *     private Coupon(String name, int totalQuantity) { 검사 후 대입 }
+ *     public void issue() { ... }
+ * }
+ * </pre>
+ * setter와 public 생성자가 없다. 값은 빌더(→ private 생성자의 검사)로만 넣고, 발급 수량은 {@link #issue()}로만 바뀐다.
+ */
+public class Coupon {
+
+    private Long id;
+    private String name;
+    private int totalQuantity;
+    private int issuedQuantity;
+
+    // @NoArgsConstructor(access = AccessLevel.PROTECTED): JPA가 리플렉션으로 쓰는 빈 생성자. 밖에서는 못 쓴다
+    protected Coupon() {
+    }
+
+    /** 이름이 null이거나 공백뿐이면, 총량이 1보다 작으면 IllegalArgumentException. 발급 수량은 0에서 시작한다. */
+    private Coupon(String name, int totalQuantity) {
+        // 빌더도 결국 이 생성자를 부르므로 검사는 여기 한 곳에 둔다
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("쿠폰 이름이 비었습니다");
+        }
+        if (totalQuantity < 1) {
+            throw new IllegalArgumentException("총량은 1 이상이어야 합니다: " + totalQuantity);
+        }
+        this.name = name;
+        this.totalQuantity = totalQuantity;
+    }
+
+    // @Builder가 만드는 static 메서드
+    public static CouponBuilder builder() {
+        return new CouponBuilder();
+    }
+
+    /** 1장 발급한다. 이미 총량만큼 발급했으면 IllegalStateException. */
+    public void issue() {
+        if (issuedQuantity >= totalQuantity) {
+            throw new IllegalStateException("쿠폰이 모두 소진되었습니다");
+        }
+        issuedQuantity++;
+    }
+
+    // @Getter가 만드는 코드
+    public Long getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getTotalQuantity() {
+        return totalQuantity;
+    }
+
+    public int getIssuedQuantity() {
+        return issuedQuantity;
+    }
+
+    /** {@code @Builder}가 만드는 중첩 클래스. 생성자 매개변수마다 필드와 같은 이름의 메서드가 있다. */
+    public static class CouponBuilder {
+
+        private String name;
+        private int totalQuantity;
+
+        CouponBuilder() {
+        }
+
+        /** 값을 담고 자기 자신을 돌려준다(이어서 부를 수 있게). */
+        public CouponBuilder name(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public CouponBuilder totalQuantity(int totalQuantity) {
+            this.totalQuantity = totalQuantity;
+            return this;
+        }
+
+        /** 담아 둔 값으로 private 생성자를 부른다. 넣지 않은 값은 필드 기본값(null·0)이 그대로 넘어간다. */
+        public Coupon build() {
+            // 중첩 클래스는 바깥 클래스의 private 생성자를 부를 수 있다
+            return new Coupon(name, totalQuantity);
+        }
+    }
+}
