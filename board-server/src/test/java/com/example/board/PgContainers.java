@@ -16,7 +16,6 @@ import org.testcontainers.utility.MountableFile;
 
 import eu.rekawek.toxiproxy.Proxy;
 import eu.rekawek.toxiproxy.ToxiproxyClient;
-import eu.rekawek.toxiproxy.model.Toxic;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -39,6 +38,7 @@ public final class PgContainers {
     private static final HttpClient HTTP = HttpClient.newHttpClient();
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
+    private static ToxiproxyClient toxiproxyClient;
     private static Proxy proxy;
 
     private PgContainers() {
@@ -50,12 +50,30 @@ public final class PgContainers {
         }
         WIREMOCK.start();
         TOXIPROXY.start();
+        toxiproxyClient = new ToxiproxyClient(TOXIPROXY.getHost(), TOXIPROXY.getControlPort());
+        createProxy();
+    }
+
+    private static void createProxy() {
         try {
-            proxy = new ToxiproxyClient(TOXIPROXY.getHost(), TOXIPROXY.getControlPort())
-                    .createProxy("pg", "0.0.0.0:" + PROXY_PORT, "wiremock:8080");
+            proxy = toxiproxyClient.createProxy("pg", "0.0.0.0:" + PROXY_PORT, "wiremock:8080");
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    /**
+     * 지연 독성(toxic)을 걷고 프록시를 다시 연다. 지연 중인 연결이 남아 있으면 toxic 삭제가 지연 시간만큼 막히므로
+     * 프록시째 지우고 같은 포트로 다시 만든다.
+     */
+    public static synchronized void healProxy() {
+        start();
+        try {
+            proxy.delete();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        createProxy();
     }
 
     /** 서버가 쓰는 PG 주소(Toxiproxy 경유). */
@@ -71,15 +89,7 @@ public final class PgContainers {
 
     /** 테스트마다 지연 주입·임시 스텁·요청 기록을 지우고 파일 스텁만 남긴다. */
     public static void reset() {
-        start();
-        try {
-            for (Toxic toxic : proxy.toxics().getAll()) {
-                toxic.remove();
-            }
-            proxy.enable();
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        }
+        healProxy();
         admin("POST", "/__admin/reset", "");
     }
 

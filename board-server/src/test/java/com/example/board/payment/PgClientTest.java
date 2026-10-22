@@ -31,7 +31,8 @@ class PgClientTest {
     PgClient client(String baseUrl, int maxConnections) {
         BoardProperties.Pg pg = new BoardProperties.Pg(baseUrl, Duration.ofSeconds(1), Duration.ofSeconds(3),
                 Duration.ofSeconds(2), maxConnections);
-        return new PgClient(PgClientConfig.pgRestClient(pg));
+        // 타임아웃 자체만 보려고 재시도는 끈다(재시도는 PgClientRetryTest)
+        return new PgClient(PgClientConfig.pgRestClient(pg), new PgRetryPolicy(1));
     }
 
     String orderId() {
@@ -56,6 +57,18 @@ class PgClientTest {
         assertThat(approval.status()).isEqualTo(PgApproval.Status.DONE);
         assertThat(approval.amount()).isEqualTo(5000);
         assertThat(PgContainers.approveIdempotencyKeys()).containsExactly("key-" + orderId);
+    }
+
+    @Test
+    void PG가_끊은_keep_alive_커넥션은_버리고_새로_연결한다() {
+        PgClient pgClient = client(PgContainers.baseUrl(), 10);
+        pgClient.approve(orderId(), 1000, "key-keepalive-1");
+        // 프록시를 다시 만들면 풀에 남은 커넥션이 서버 쪽에서 끊긴다
+        PgContainers.healProxy();
+
+        PgApproval approval = pgClient.approve(orderId(), 1000, "key-keepalive-2");
+
+        assertThat(approval.status()).isEqualTo(PgApproval.Status.DONE);
     }
 
     @Test

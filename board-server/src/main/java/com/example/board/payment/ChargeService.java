@@ -53,6 +53,28 @@ public class ChargeService {
         return apply(payment, approval);
     }
 
+    /**
+     * 결과 불명 건을 PG 조회로 확정한다(재처리 워커가 부른다). 추측으로 정하지 않고, PG에 없으면 그대로 둔다.
+     * 조회도 외부 호출이라 트랜잭션 밖에서 한다.
+     */
+    public PgPaymentStatus reconcile(String orderId) {
+        PgPayment payment = tx.execute(s -> paymentRepository.findByOrderId(orderId))
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "충전 기록이 없습니다."));
+        if (payment.getStatus() == PgPaymentStatus.DONE || payment.getStatus() == PgPaymentStatus.FAILED) {
+            return payment.getStatus();
+        }
+        pgClient.findByOrderId(orderId).ifPresent(found -> tx.executeWithoutResult(s -> {
+            switch (found.status()) {
+                case DONE -> settleDone(payment, found.paymentKey());
+                case FAILED -> paymentRepository.markFailed(payment.getId(), found.paymentKey(), now());
+                case PENDING -> {
+                    // 아직 PG도 처리 중이다
+                }
+            }
+        }));
+        return tx.execute(s -> reload(payment).getStatus());
+    }
+
     /** 트랜잭션 1: 호출 전에 REQUESTED를 커밋해 둔다. 같은 키가 이미 있으면 그 기록을 돌려준다. */
     private Started start(Long memberId, String idempotencyKey, int amount) {
         try {

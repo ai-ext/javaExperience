@@ -3,6 +3,8 @@ package com.example.board.payment;
 import java.net.ConnectException;
 import java.net.NoRouteToHostException;
 import java.net.UnknownHostException;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 import org.apache.hc.client5.http.ConnectTimeoutException;
 import org.apache.hc.core5.http.ConnectionRequestTimeoutException;
@@ -15,19 +17,40 @@ import org.springframework.web.client.RestClient;
 public class PgClient {
 
     private final RestClient restClient;
+    private final PgRetryPolicy retryPolicy;
 
-    public PgClient(RestClient restClient) {
+    public PgClient(RestClient restClient, PgRetryPolicy retryPolicy) {
         this.restClient = restClient;
+        this.retryPolicy = retryPolicy;
     }
 
+    /** 재시도해도 같은 Idempotency-Key를 보내므로 PG는 처음 결과를 돌려준다(이중 승인 없음). */
     public PgApproval approve(String orderId, int amount, String idempotencyKey) {
+        return retryPolicy.execute(() -> call(() -> restClient.post()
+                .uri("/pg/v1/payments")
+                .header("Idempotency-Key", idempotencyKey)
+                .body(new ApproveRequest(orderId, amount))
+                .retrieve()
+                .body(PgApproval.class)));
+    }
+
+    /** 응답을 못 받은 건의 결과를 우리 orderId로 확인한다. PG에 없으면 비어 있다. */
+    public Optional<PgApproval> findByOrderId(String orderId) {
+        return retryPolicy.execute(() -> call(() -> {
+            try {
+                return Optional.ofNullable(restClient.get()
+                        .uri(b -> b.path("/pg/v1/payments").queryParam("orderId", orderId).build())
+                        .retrieve()
+                        .body(PgApproval.class));
+            } catch (HttpClientErrorException.NotFound notFound) {
+                return Optional.empty();
+            }
+        }));
+    }
+
+    private static <T> T call(Supplier<T> request) {
         try {
-            return restClient.post()
-                    .uri("/pg/v1/payments")
-                    .header("Idempotency-Key", idempotencyKey)
-                    .body(new ApproveRequest(orderId, amount))
-                    .retrieve()
-                    .body(PgApproval.class);
+            return request.get();
         } catch (RuntimeException e) {
             throw translate(e);
         }
