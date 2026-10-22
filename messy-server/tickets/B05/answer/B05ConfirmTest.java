@@ -93,11 +93,18 @@ class B05ConfirmTest {
         }
 
         // 두 검사가 실제로 함께 돌았어야 판정이 의미 있다(한쪽이 한 번도 못 돌았으면 끼어들 상대가 없다)
-        assertThat(cleanCalls.get()).as("깨끗한 글 검사 횟수").isPositive();
-        assertThat(dirtyCalls.get()).as("금칙어 글 검사 횟수").isPositive();
+        require(cleanCalls.get() > 0 && dirtyCalls.get() > 0,
+                "두 검사가 함께 돌지 않았다(깨끗한 글 %d회, 금칙어 글 %d회)".formatted(cleanCalls.get(), dirtyCalls.get()));
         assertThat(cleanWrong.get() + dirtyWrong.get())
                 .as("동시 검사 %dms 동안 다른 글의 결과가 섞인 횟수(깨끗한 글 %d회 중 금칙어로 판정 %d, 금칙어 글 %d회 중 통과 %d)",
                         BUDGET_MILLIS, cleanCalls.get(), cleanWrong.get(), dirtyCalls.get(), dirtyWrong.get())
                 .isZero();
+    }
+
+    /** 준비 조건. 단언 실패(결함 증상)와 구분되도록 단언이 아닌 예외로 끝낸다. */
+    private static void require(boolean ok, String message) {
+        if (!ok) {
+            throw new IllegalStateException("준비 실패: " + message);
+        }
     }
 }
