@@ -16,3 +16,23 @@ $ curl -i localhost:8080/actuator/health
 HTTP/1.1 200
 {"groups":["liveness","readiness"],"status":"UP"}
 ```
+
+## D01-3
+
+compose의 MySQL을 띄운 상태에서 실행했다 (`SERVER_PORT`, `DB_*`는 스크립트가 컨테이너로 전달한다).
+
+```
+$ SERVER_PORT=8081 tools/course/gradle-docker.sh board-server bootRun --args=--spring.profiles.active=local
+... BoardApplication : The following 1 profile is active: "local"
+... TomcatWebServer  : Tomcat started on port 8081 (http) with context path '/'
+$ curl localhost:8081/actuator/health   -> 200   (yml의 server.port 8080보다 환경 변수가 이긴다)
+$ curl localhost:8081/actuator/env      -> 404
+$ curl localhost:8080/actuator/health   -> 연결 실패 (8080은 열리지 않았다)
+```
+
+```
+$ tools/course/gradle-docker.sh board-server bootRun --args=--spring.profiles.active=prod   (DB_PASSWORD 없음)
+... The following 1 profile is active: "prod"
+... PlaceholderResolutionException: Could not resolve placeholder 'DB_PASSWORD' in value "${DB_PASSWORD}"
+BUILD FAILED
+```
