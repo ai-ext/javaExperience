@@ -35,13 +35,21 @@ token=$(curl -s -X POST "$BASE/api/auth/login" -H 'Content-Type: application/jso
   -d "{\"email\":\"$email\",\"password\":\"passw0rd1\"}" | jq -r .accessToken)
 
 write() {
-  curl -s -o /dev/null --max-time 15 -w "POST /api/posts → %{http_code} %{time_total}s\n" -X POST "$BASE/api/posts" \
-    -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{"title":"점검 중 글","content":"내용"}' \
-    || echo "POST /api/posts → 15초 안에 응답 없음"
+  local out
+  if out=$(curl -s -o /dev/null --max-time 15 -w '%{http_code} %{time_total}s' -X POST "$BASE/api/posts" \
+      -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{"title":"점검 중 글","content":"내용"}'); then
+    echo "POST /api/posts → ${out}"
+  else
+    echo "POST /api/posts → 15초 안에 응답 없음"
+  fi
 }
 popular() {
-  curl -s -o /dev/null --max-time 15 -w "GET /api/posts/popular → %{http_code} %{time_total}s\n" "$BASE/api/posts/popular" \
-    || echo "GET /api/posts/popular → 15초 안에 응답 없음"
+  local out
+  if out=$(curl -s -o /dev/null --max-time 15 -w '%{http_code} %{time_total}s' "$BASE/api/posts/popular"); then
+    echo "GET /api/posts/popular → ${out}"
+  else
+    echo "GET /api/posts/popular → 15초 안에 응답 없음"
+  fi
 }
 
 echo "== 평소"
@@ -49,10 +57,10 @@ write; popular
 
 if [ "$MODE" = stop ]; then
   echo "== Redis 내림(docker compose stop redis)"
-  docker compose stop redis >/dev/null
+  docker compose stop redis >/dev/null 2>&1
 else
   echo "== Redis 일시 정지(docker compose pause redis)"
   echo "   (멈춘 동안 다른 터미널에서: jcmd \$(pgrep -f BoardApplication) Thread.print | grep -B2 -A30 'http-nio.*exec')"
-  docker compose pause redis >/dev/null
+  docker compose pause redis >/dev/null 2>&1
 fi
 write; popular
