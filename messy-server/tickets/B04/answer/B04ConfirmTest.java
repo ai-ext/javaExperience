@@ -1,9 +1,16 @@
 package com.example.board.tickets;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -14,7 +21,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -22,13 +31,26 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ResolvableType;
+import org.springframework.asm.ClassReader;
+import org.springframework.asm.ClassVisitor;
+import org.springframework.asm.Handle;
+import org.springframework.asm.MethodVisitor;
+import org.springframework.asm.Opcodes;
+import org.springframework.asm.SpringAsmInfo;
+import org.springframework.asm.Type;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.util.ClassUtils;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.HandlerExecutionChain;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
+import org.springframework.web.util.ServletRequestPathUtils;
 
 import com.example.board.ApiTestSupport;
 import com.example.board.common.ForbiddenWordLoader;
 import com.example.board.member.Member;
 import com.example.board.member.Role;
+import com.example.board.notification.NotificationChannel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -43,6 +65,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * B04 확인 테스트. 리팩터링 뒤에도 바깥 동작(알림 행·금칙어 400)은 그대로이고, 구조는 고쳐져 있어야 한다.
  * - 알림: notification 표에 쌓이는 (받는 사람, 채널, 종류, 제목, 본문, 대상 글)이 리팩터링 전과 같다.
  * - 구조: 애플리케이션 빈에 필드 주입이 없고, 빈 사이 의존에 순환이 없다(@Lazy로 기동만 되게 가린 순환도 순환이다).
+ * - 채널 추가: 채널을 하나 더해도 글·댓글 쪽은 고칠 필요가 없다. 글 작성·댓글 작성·글 삭제 API를 처리하는 빈은 개별 채널을
+ *   모르고, 채널별로 갈라지는 분기(채널 switch, 채널 값 여럿과의 비교)는 앱 전체에 한 곳을 넘지 않는다.
+ *   클래스 이름·파일 수는 보지 않는다. 컴파일된 main 클래스의 바이트코드를 읽어 판정한다.
  */
 class B04ConfirmTest extends ApiTestSupport {
 
@@ -307,5 +332,186 @@ class B04ConfirmTest extends ApiTestSupport {
         onPath.remove(node);
         done.add(node);
         return List.of();
+    }
+
+    // ---- 채널 추가 ----
+
+    static final String CHANNEL = Type.getInternalName(NotificationChannel.class);
+    static final String SWITCH_MAP = "$SwitchMap$" + NotificationChannel.class.getName().replace('.', '$');
+
+    /** 이 요청을 처리하는 컨트롤러 클래스. */
+    Class<?> controllerOf(String method, String uri) throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(method, uri);
+        ServletRequestPathUtils.parseAndCache(request);
+        // MVC 요청 처리기(액추에이터용 처리기 매핑도 같은 타입이라 이름으로 고른다)
+        HandlerExecutionChain chain = context.getBean("requestMappingHandlerMapping",
+                RequestMappingHandlerMapping.class).getHandler(request);
+        assertThat(chain).as(method + " " + uri + " 처리기").isNotNull();
+        return ClassUtils.getUserClass(((HandlerMethod) chain.getHandler()).getBeanType());
+    }
+
+    @Test
+    void 글_댓글_API를_처리하는_빈은_개별_알림_채널을_모른다() throws Exception {
+        Map<String, Class<?>> beans = applicationBeans();
+        Set<Class<?>> handling = new LinkedHashSet<>();
+        for (String[] api : new String[][] {{"POST", "/api/posts"}, {"POST", "/api/posts/1/comments"},
+                {"DELETE", "/api/posts/1"}}) {
+            Class<?> controller = controllerOf(api[0], api[1]);
+            handling.add(controller);
+            // 컨트롤러가 직접 받는 애플리케이션 빈(글·댓글 서비스)
+            for (ResolvableType t : dependencyTypes(controller)) {
+                for (String target : context.getBeanNamesForType(t, true, false)) {
+                    if (beans.containsKey(target)) {
+                        handling.add(beans.get(target));
+                    }
+                }
+            }
+        }
+
+        Set<String> offenders = new TreeSet<>();
+        for (Class<?> c : handling) {
+            for (Path file : classFilesOf(c)) {
+                String bytes = new String(Files.readAllBytes(file), StandardCharsets.ISO_8859_1);
+                if (bytes.contains(CHANNEL) || bytes.contains(SWITCH_MAP)) {
+                    offenders.add(file.getFileName().toString());
+                }
+            }
+        }
+        assertThat(offenders)
+                .as("글 작성·댓글 작성·글 삭제를 처리하는 클래스 %s 중 NotificationChannel을 직접 다루는 것"
+                        + "(채널을 더할 때마다 이 클래스를 고쳐야 한다)", handling.stream().map(Class::getSimpleName).toList())
+                .isEmpty();
+    }
+
+    @Test
+    void 알림_채널별로_갈라지는_분기는_한_곳을_넘지_않는다() throws Exception {
+        Set<String> sites = new TreeSet<>();
+        try (Stream<Path> files = Files.walk(mainClassesDir())) {
+            for (Path file : files.filter(f -> f.toString().endsWith(".class")).toList()) {
+                sites.addAll(channelBranchSites(file));
+            }
+        }
+        assertThat(sites).as("채널별 분기(채널 switch, 채널 값 둘 이상과 비교)가 있는 메서드 — 채널을 더할 때 고칠 곳")
+                .hasSizeLessThanOrEqualTo(1);
+    }
+
+    static Path mainClassesDir() throws URISyntaxException {
+        return Path.of(NotificationChannel.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+    }
+
+    /** 클래스와 그 안쪽 클래스(익명·switch 보조 클래스 포함)의 .class 파일. */
+    static List<Path> classFilesOf(Class<?> c) throws Exception {
+        Path dir = mainClassesDir().resolve(c.getPackageName().replace('.', '/'));
+        String simple = c.getName().substring(c.getName().lastIndexOf('.') + 1);
+        try (Stream<Path> files = Files.list(dir)) {
+            return files.filter(f -> {
+                String n = f.getFileName().toString();
+                return n.equals(simple + ".class") || (n.startsWith(simple + "$") && n.endsWith(".class"));
+            }).toList();
+        }
+    }
+
+    /** 이 클래스 파일에서 채널별로 갈라지는 메서드("클래스#메서드"). 정적 초기화(종류별 채널 표 등)와 채널 enum 자신은 뺀다. */
+    static Set<String> channelBranchSites(Path file) {
+        ClassReader reader;
+        try (InputStream in = Files.newInputStream(file)) {
+            reader = new ClassReader(in);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        Set<String> sites = new TreeSet<>();
+        if (reader.getClassName().equals(CHANNEL)) {
+            return sites;
+        }
+        String owner = reader.getClassName().substring(reader.getClassName().lastIndexOf('/') + 1);
+        reader.accept(new ClassVisitor(SpringAsmInfo.ASM_VERSION) {
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature,
+                    String[] exceptions) {
+                if (name.equals("<clinit>")) {
+                    return null;
+                }
+                return new MethodVisitor(SpringAsmInfo.ASM_VERSION) {
+                    final Set<String> compared = new HashSet<>();
+                    String lastConstant;
+                    int sinceConstant = 99;
+                    boolean switches;
+
+                    void step() {
+                        sinceConstant++;
+                    }
+
+                    @Override
+                    public void visitFieldInsn(int opcode, String fieldOwner, String field, String desc) {
+                        step();
+                        if (field.equals(SWITCH_MAP)) {
+                            switches = true; // switch (channel) — javac가 만든 보조 클래스의 표를 읽는다
+                        } else if (opcode == Opcodes.GETSTATIC && fieldOwner.equals(CHANNEL)
+                                && desc.equals("L" + CHANNEL + ";")) {
+                            lastConstant = field;
+                            sinceConstant = 0;
+                        }
+                    }
+
+                    @Override
+                    public void visitInvokeDynamicInsn(String n, String desc, Handle bsm, Object... args) {
+                        step();
+                        if (bsm.getOwner().equals("java/lang/runtime/SwitchBootstraps")
+                                && (desc.contains(CHANNEL) || List.of(args).toString().contains(CHANNEL))) {
+                            switches = true; // 패턴 switch
+                        }
+                    }
+
+                    @Override
+                    public void visitJumpInsn(int opcode, org.springframework.asm.Label label) {
+                        if ((opcode == Opcodes.IF_ACMPEQ || opcode == Opcodes.IF_ACMPNE) && sinceConstant <= 1) {
+                            compared.add(lastConstant); // channel == NotificationChannel.X
+                        }
+                        step();
+                    }
+
+                    @Override
+                    public void visitMethodInsn(int opcode, String o, String n, String d, boolean itf) {
+                        if (n.equals("equals") && sinceConstant <= 1) {
+                            compared.add(lastConstant); // X.equals(channel) / Objects.equals(channel, X)
+                        }
+                        step();
+                    }
+
+                    @Override
+                    public void visitVarInsn(int opcode, int var) {
+                        // channel == X 와 X == channel 둘 다 잡도록 변수 읽기 한 번은 건너뛴다
+                    }
+
+                    @Override
+                    public void visitInsn(int opcode) {
+                        step();
+                    }
+
+                    @Override
+                    public void visitTypeInsn(int opcode, String type) {
+                        step();
+                    }
+
+                    @Override
+                    public void visitLdcInsn(Object value) {
+                        step();
+                    }
+
+                    @Override
+                    public void visitIntInsn(int opcode, int operand) {
+                        step();
+                    }
+
+                    @Override
+                    public void visitEnd() {
+                        if (switches || compared.size() >= 2) {
+                            sites.add(owner + "#" + name);
+                        }
+                    }
+                };
+            }
+        }, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+        return sites;
     }
 }

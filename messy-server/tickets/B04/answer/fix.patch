@@ -12,7 +12,7 @@ index 40e804b..afc1876 100644
  }
  
 diff --git a/src/main/java/com/example/board/comment/CommentService.java b/src/main/java/com/example/board/comment/CommentService.java
-index eafdbd0..3dfafb2 100644
+index bd8889a..fc48510 100644
 --- a/src/main/java/com/example/board/comment/CommentService.java
 +++ b/src/main/java/com/example/board/comment/CommentService.java
 @@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets;
@@ -37,7 +37,7 @@ index eafdbd0..3dfafb2 100644
  import com.example.board.post.PostStatus;
  
  @Service
-@@ -28,17 +30,15 @@ public class CommentService {
+@@ -28,27 +30,30 @@ public class CommentService {
      private final PostRepository postRepository;
      private final MemberRepository memberRepository;
      private final PointService pointService;
@@ -58,31 +58,38 @@ index eafdbd0..3dfafb2 100644
      }
  
      @Transactional
-@@ -50,14 +50,19 @@ public class CommentService {
-         Comment saved = commentRepository.save(Comment.create(postRepository.getReferenceById(postId), member,
-                 content));
+     public CommentResponse create(Long postId, Long memberId, String content) {
+         requireActivePost(postId);
+-        Member member = lockCommenterAndAuthor(memberId, postRepository.getReferenceById(postId).getMember().getId());
+-        Comment saved = commentRepository.save(Comment.create(postRepository.getReferenceById(postId), member,
+-                content));
++        Post post = postRepository.getReferenceById(postId);
++        Long authorId = post.getMember().getId();
++        Member member = lockCommenterAndAuthor(memberId, authorId);
++        Comment saved = commentRepository.save(Comment.create(post, member, content));
          pointService.earn(memberId, COMMENT_EARN_POINTS, "COMMENT", saved.getId());
 -        postService.notifyCommentAdded(postId, member, content);
-+        notifyPostAuthor(postId, member, content);
++        // 내 글에 남이 댓글을 달면 글 작성자에게 알린다. 자기 글에 단 댓글은 알리지 않는다.
++        if (!authorId.equals(memberId)) {
++            notificationService.notify(new NotificationMessage(authorId, NotificationType.COMMENT_ADDED,
++                    "내 글에 새 댓글이 달렸습니다", member.getNickname() + "님: " + content, postId));
++        }
          return CommentResponse.from(saved);
+     }
+ 
+@@ -69,12 +74,6 @@ public class CommentService {
+         return member;
      }
  
 -    /** 이 글에 (지우지 않은) 댓글을 단 회원 id. 글 삭제 알림 대상이다. */
 -    @Transactional(readOnly = true)
 -    public List<Long> commenterIdsOf(Long postId) {
 -        return commentRepository.findCommenterIds(postId);
-+    /** 내 글에 남이 댓글을 달면 글 작성자에게 알린다. 자기 글에 단 댓글은 알리지 않는다. */
-+    private void notifyPostAuthor(Long postId, Member commenter, String content) {
-+        Post post = postRepository.findById(postId).orElseThrow();
-+        Long authorId = post.getMember().getId();
-+        if (authorId.equals(commenter.getId())) {
-+            return;
-+        }
-+        notificationService.notify(new NotificationMessage(authorId, NotificationType.COMMENT_ADDED,
-+                "내 글에 새 댓글이 달렸습니다", commenter.getNickname() + "님: " + content, postId));
-     }
- 
+-    }
+-
      @Transactional(readOnly = true)
+     public CommentPage list(Long postId, String cursor, int size) {
+         long afterId = decode(cursor);
 diff --git a/src/main/java/com/example/board/notification/EmailNotificationSender.java b/src/main/java/com/example/board/notification/EmailNotificationSender.java
 new file mode 100644
 index 0000000..12330d1

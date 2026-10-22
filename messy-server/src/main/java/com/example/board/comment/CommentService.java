@@ -44,14 +44,29 @@ public class CommentService {
     @Transactional
     public CommentResponse create(Long postId, Long memberId, String content) {
         requireActivePost(postId);
-        // 댓글 INSERT가 회원 행에 FK 공유 잠금을 걸기 전에 배타 잠금을 먼저 잡는다(잔액 UPDATE와의 교착 방지)
-        Member member = memberRepository.findByIdForUpdate(memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다."));
+        Member member = lockCommenterAndAuthor(memberId, postRepository.getReferenceById(postId).getMember().getId());
         Comment saved = commentRepository.save(Comment.create(postRepository.getReferenceById(postId), member,
                 content));
         pointService.earn(memberId, COMMENT_EARN_POINTS, "COMMENT", saved.getId());
         postService.notifyCommentAdded(postId, member, content);
         return CommentResponse.from(saved);
+    }
+
+    /**
+     * 댓글 INSERT·적립은 댓글 쓴 회원 행을, 글쓴이에게 가는 알림 INSERT는 글쓴이 회원 행을 FK 공유 잠금으로 건드린다.
+     * 서로의 글에 동시에 댓글을 달면 각자 자기 행을 잡은 채 상대 행을 기다려 교착이 나므로, 두 행을 id 순서로 먼저 잡는다.
+     * 댓글 쓴 회원 행은 FK 공유 잠금보다 먼저 배타 잠금으로 잡는다(잔액 UPDATE와의 교착 방지).
+     */
+    private Member lockCommenterAndAuthor(Long memberId, Long authorId) {
+        if (authorId < memberId) {
+            memberRepository.findByIdForUpdate(authorId);
+        }
+        Member member = memberRepository.findByIdForUpdate(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다."));
+        if (authorId > memberId) {
+            memberRepository.findByIdForUpdate(authorId);
+        }
+        return member;
     }
 
     /** 이 글에 (지우지 않은) 댓글을 단 회원 id. 글 삭제 알림 대상이다. */
