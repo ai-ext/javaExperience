@@ -76,4 +76,4 @@ LIMIT 3;
 
 - 앞 단계: [DB-01 — 응답 필드에서 첫 SQL 찾기](db-01-response-to-query.md)
 - 기능 정답 계약: [M1 — 게시판 글 목록·상세](../../practice/MISSIONS.md)
-- 다음에 이어질 주제: DB-03 — 상세 조회의 JOIN (현재 계획 단계)
+- 다음 단계: [DB-03 — 상세 API의 JOIN](db-03-detail-join.md)
