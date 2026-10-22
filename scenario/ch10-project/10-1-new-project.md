@@ -288,7 +288,7 @@ spring:
   application:
     name: board-api
   datasource:
-    # javaExperience MySQL(호스트 3306)의 project DB. 빈 DB면 Flyway가 V1으로 테이블·시드를 만든다
+    # compose.yaml의 mysql(호스트 13308 → 컨테이너 3306)의 project DB. 빈 DB면 Flyway가 V1으로 테이블·시드를 만든다
     url: jdbc:mysql://localhost:13308/project?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
     username: community
     password: community
@@ -301,7 +301,7 @@ spring:
 
 | 코드 | 설명 |
 |---|---|
-| `url: jdbc:mysql://localhost:13308/project?...` | javaExperience MySQL(호스트 3306)의 `project` DB. `characterEncoding=UTF-8`은 한글, `serverTimezone`은 시각 변환 기준 |
+| `url: jdbc:mysql://localhost:13308/project?...` | compose.yaml의 mysql(호스트 13308 → 컨테이너 3306)의 `project` DB. `characterEncoding=UTF-8`은 한글, `serverTimezone`은 시각 변환 기준 |
 | `username` · `password` | 실습 계정. 이 계정은 `community`·`practice`·`project` 세 DB에만 권한이 있다 |
 | `ddl-auto: validate` | Hibernate가 테이블을 **만들거나 고치지 않고**, 엔티티와 테이블이 맞는지 확인만 한다. 테이블은 Flyway만 만든다 |
 | `open-in-view: false` | DB 연결을 트랜잭션이 끝나면 바로 돌려준다(응답 JSON을 만드는 동안 붙잡지 않음) |

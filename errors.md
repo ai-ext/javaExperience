@@ -161,7 +161,7 @@ Consider the following:
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/community?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
     username: community
     password: community
 ```

@@ -56,9 +56,11 @@ python3 -m http.server 8765 --bind 127.0.0.1
 
 | 항목 | 값 |
 |---|---|
-| 호스트·포트 | `localhost` · `13308` |
+| 호스트·포트 | `localhost` · `13308` (컨테이너 안에서는 `3306`) |
 | 계정 | `community` / `community` |
 | DB | `community` — 본편 기본 DB · `practice` — 쿼리·배치용 학습 데이터 · `project` — 10장 별도 프로젝트(빈 DB) |
+
+지금 main의 `src/main/resources/application.yml`은 활성 URL이 `jdbc:mysql://localhost:3306/community`다(학습자가 이어서 고치는 연습 코드라 그대로 둔다). 위 compose DB를 쓰려면 이 포트를 `13308`(`DB_PORT`를 바꿨다면 그 값)로 바꾼다. `practice`·`project` 프로파일 파일(`application-practice.yml`·`application-project.yml`)은 이미 `13308`이다.
 
 느린 쿼리와 인덱스 실습은 별도 `javaexperience_perf` DB를 쓴다. [DB-14 실제 스키마부터 느린 쿼리까지](scenario/db-query-journey/db-14-live-schema-to-slow-query.md)에서 DBeaver/CloudBeaver로 열·인덱스·FK를 직접 확인하고, 같은 목록 쿼리의 실행 계획을 인덱스 전후로 비교한다. 이 DB는 `127.0.0.1:13319`의 전용 임시 컨테이너이며 `practice` 데이터와 분리된다.
 

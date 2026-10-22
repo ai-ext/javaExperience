@@ -53,7 +53,7 @@ server:
 # 실행: ./gradlew bootRun --args='--spring.profiles.active=practice'  (IntelliJ: Active profiles에 practice)
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/practice?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+    url: jdbc:mysql://localhost:13308/practice?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
 ```
 
 ### 누가 이기나 — 우선순위
@@ -177,7 +177,7 @@ IntelliJ로 띄울 때는 Run → Edit Configurations → `Main` → Program arg
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/community
+    url: jdbc:mysql://localhost:13308/community
     username: community
     password: community
 ```
