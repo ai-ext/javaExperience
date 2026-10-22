@@ -5,6 +5,8 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +22,8 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Service
 public class PopularPostService {
+
+    private static final Logger log = LoggerFactory.getLogger(PopularPostService.class);
 
     static final String KEY = "popular:posts";
     static final Duration TTL = Duration.ofSeconds(60);
@@ -59,6 +63,7 @@ public class PopularPostService {
             List<PopularPost> loaded = mapper.findPopular(LIMIT).stream().map(PopularPost::from).toList();
             String value = json.writeValueAsString(loaded);
             guard.run("인기글 캐시 저장", () -> redis.opsForValue().set(KEY, value, TTL));
+            log.info("인기글 캐시 적재 {}건 (DB 조회)", loaded.size());
             return loaded;
         } finally {
             loadLock.unlock();
@@ -68,6 +73,7 @@ public class PopularPostService {
     /** 글 변경이 커밋된 뒤 부른다. 실패해도 TTL(60초) 뒤에는 새 값이 되므로 경고만 남긴다. */
     public void evict() {
         guard.run("인기글 캐시 삭제", () -> redis.delete(KEY));
+        log.info("인기글 캐시 삭제");
     }
 
     /** 상위 20개 고정 목록이라 한 쪽뿐이다. size만큼 앞에서 자르고 nextCursor는 항상 null이다. */

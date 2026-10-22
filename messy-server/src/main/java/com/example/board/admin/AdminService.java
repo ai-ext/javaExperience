@@ -2,7 +2,8 @@ package com.example.board.admin;
 
 import java.util.List;
 
-import org.springframework.context.ApplicationEventPublisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -11,8 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.board.common.BusinessException;
 import com.example.board.common.CursorPage;
 import com.example.board.common.ErrorCode;
+import com.example.board.post.PopularPostService;
 import com.example.board.post.Post;
-import com.example.board.post.PostChangedEvent;
 import com.example.board.post.PostRepository;
 import com.example.board.post.PostStatus;
 
@@ -24,17 +25,19 @@ import com.example.board.post.PostStatus;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminService {
 
+    private static final Logger log = LoggerFactory.getLogger(AdminService.class);
+
     private final ReportRepository reportRepository;
     private final PostRepository postRepository;
     private final AuditLogRepository auditLogRepository;
-    private final ApplicationEventPublisher events;
+    private final PopularPostService popularPostService;
 
     public AdminService(ReportRepository reportRepository, PostRepository postRepository,
-            AuditLogRepository auditLogRepository, ApplicationEventPublisher events) {
+            AuditLogRepository auditLogRepository, PopularPostService popularPostService) {
         this.reportRepository = reportRepository;
         this.postRepository = postRepository;
         this.auditLogRepository = auditLogRepository;
-        this.events = events;
+        this.popularPostService = popularPostService;
     }
 
     /** 응답 DTO 변환까지 트랜잭션 안에서 한다. 엔티티를 밖으로 내보내면 LAZY 연관에서 LazyInitializationException이 난다. */
@@ -52,7 +55,7 @@ public class AdminService {
     /**
      * 없는 글·삭제된 글은 404. 이미 숨긴 글은 다시 숨겨도 200이다(같은 글의 다른 신고를 처리할 수 있게).
      * reportId가 없거나 다른 글의 신고면 404이고 아무것도 바꾸지 않는다.
-     * 트랜잭션이 있어야 PostChangedEvent가 커밋 뒤 리스너(인기글 캐시 삭제)에 닿는다.
+     * 신고로 숨긴 글은 인기글에서 바로 내려야 해서, 이벤트(커밋 뒤 리스너)를 거치지 않고 숨기는 자리에서 캐시를 지운다.
      */
     @Audited(action = "HIDE_POST", targetType = "POST")
     @Transactional
@@ -70,7 +73,8 @@ public class AdminService {
         if (report != null) {
             report.resolve();
         }
-        events.publishEvent(new PostChangedEvent(postId));
+        popularPostService.evict();
+        log.info("글 숨김 postId={} reportId={}", postId, reportId);
         return new HidePostResponse(postId, post.getStatus(), reportId);
     }
 
