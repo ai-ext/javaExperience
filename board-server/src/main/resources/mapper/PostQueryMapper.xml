@@ -16,12 +16,25 @@
         </collection>
     </resultMap>
 
+    <!-- 값은 모두 샵 중괄호(#{})로 바인딩한다. 달러 중괄호 치환은 문자열이 SQL에 그대로 붙어 인젝션이 된다. 정렬은 id DESC 고정이다. -->
     <!-- LIMIT은 글에만 걸어야 한다. 태그와 조인한 결과에 걸면 글 수가 아니라 행 수로 잘린다. -->
-    <select id="findLatest" resultMap="postSummaryMap">
+    <select id="search" resultMap="postSummaryMap">
         SELECT p.id, p.member_id, m.nickname, p.title, p.like_count, p.created_at, t.name AS tag_name
         FROM (SELECT id, member_id, title, like_count, created_at
               FROM post
-              WHERE status = 'ACTIVE'
+              <where>
+                  status = 'ACTIVE'
+                  <if test="afterId != null">
+                      AND id &lt; #{afterId}
+                  </if>
+                  <if test="cond.keyword != null">
+                      AND (title LIKE CONCAT('%', #{cond.keyword}, '%') OR content LIKE CONCAT('%', #{cond.keyword}, '%'))
+                  </if>
+                  <if test="cond.tag != null">
+                      AND EXISTS (SELECT 1 FROM post_tag f JOIN tag ft ON ft.id = f.tag_id
+                                  WHERE f.post_id = post.id AND ft.name = #{cond.tag})
+                  </if>
+              </where>
               ORDER BY id DESC
               LIMIT #{limit}) p
         JOIN member m ON m.id = p.member_id

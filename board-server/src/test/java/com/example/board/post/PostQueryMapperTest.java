@@ -31,7 +31,7 @@ class PostQueryMapperTest extends ApiTestSupport {
         insertPost(m, "숨김", "내용", "HIDDEN");
         insertPost(m, "삭제", "내용", "DELETED");
 
-        List<Long> ids = mapper.findLatest(20).stream().map(PostSummary::getId).toList();
+        List<Long> ids = mapper.search(new PostSearchCondition(null, null), null, 20).stream().map(PostSummary::getId).toList();
 
         assertThat(ids).hasSize(20).isSortedAccordingTo(java.util.Comparator.reverseOrder());
         assertThat(jdbc.queryForList("SELECT status FROM post WHERE id IN ("
@@ -51,7 +51,7 @@ class PostQueryMapperTest extends ApiTestSupport {
         }
         long before = selectCount();
 
-        List<PostSummary> rows = mapper.findLatest(20);
+        List<PostSummary> rows = mapper.search(new PostSearchCondition(null, null), null, 20);
 
         assertThat(selectCount() - before).isEqualTo(1);
         assertThat(rows).hasSize(20);
