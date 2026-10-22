@@ -1,5 +1,7 @@
 # 10-1. 새 프로젝트 시작 — 명세서 읽기, project DB·Flyway, 헬스 체크
 
+> **과정 v2와 다른 점** — 10장은 과정 v2 이전의 참고 자료라 원문을 그대로 둔다. 과정 v2의 [명세서 v2](../../course/spec-v2.md)와는 응답 형식이 다르다. 10장은 성공·실패를 모두 `ApiResponse`(`{status, message, data}`)로 감싸지만, 명세서 v2는 성공 응답을 래퍼 없이 리소스 그대로 돌려주고 에러는 ProblemDetail(`application/problem+json`)로 통일한다. 인증도 10장은 JWT 인터셉터, 명세서 v2는 Spring Security 필터 체인이다. 과정 v2를 진행 중이라면 응답·에러 모양은 명세서 v2를 기준으로 한다.
+
 ## 상황
 
 1~9장에서는 이미 있는 레포(javaExperience)에 기능을 하나씩 붙였다. 회사에서는 이런 일도 자주 생긴다. 팀장이 **명세서 한 장**을 주며 말한다.
