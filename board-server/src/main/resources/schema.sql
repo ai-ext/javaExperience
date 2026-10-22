@@ -66,3 +66,18 @@ CREATE TABLE IF NOT EXISTS post_tag (
     CONSTRAINT fk_post_tag_tag FOREIGN KEY (tag_id) REFERENCES tag (id),
     UNIQUE KEY uk_post_tag_post_tag (post_id, tag_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS comment (
+    id         BIGINT       NOT NULL AUTO_INCREMENT,
+    post_id    BIGINT       NOT NULL,
+    member_id  BIGINT       NOT NULL,
+    content    VARCHAR(500) NOT NULL,
+    deleted    BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at DATETIME(6)  NOT NULL,
+    updated_at DATETIME(6)  NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_comment_post FOREIGN KEY (post_id) REFERENCES post (id),
+    CONSTRAINT fk_comment_member FOREIGN KEY (member_id) REFERENCES member (id),
+    -- 글별 댓글 목록(id 커서)용
+    KEY idx_comment_post_id (post_id, id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
