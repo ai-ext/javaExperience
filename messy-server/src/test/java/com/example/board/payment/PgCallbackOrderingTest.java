@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.security.test.context.support.WithMockUser;
 
 import com.example.board.PgContainers;
 import com.example.board.member.Member;
@@ -13,6 +14,7 @@ import com.example.board.member.Role;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@WithMockUser
 class PgCallbackOrderingTest extends PgApiTestSupport {
 
     @Test

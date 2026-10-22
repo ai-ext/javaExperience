@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.security.test.context.support.WithMockUser;
 
 import com.example.board.member.Member;
 import com.example.board.member.Role;
@@ -13,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@WithMockUser
 class PgCallbackApiTest extends PgApiTestSupport {
 
     @Autowired

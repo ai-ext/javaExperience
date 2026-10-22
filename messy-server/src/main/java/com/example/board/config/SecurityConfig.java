@@ -44,6 +44,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/posts", "/api/posts/popular", "/api/posts/{postId}",
                                 "/api/posts/{postId}/comments", "/api/rankings/activity", "/api/shop/items").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        // 회원 전용 쓰기 API(글·댓글·좋아요·충전·주문 …). 토큰 없는 쓰기는 여기서 모두 막는다
+                        .requestMatchers(HttpMethod.POST, "/api/**").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/**").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/**").authenticated()
+                        // PG 서버가 보내는 결제 완료 통지. 토큰이 없고 서명(X-PG-Signature)으로 확인한다
                         .requestMatchers(HttpMethod.POST, "/api/pg/callbacks").permitAll()
                         .anyRequest().authenticated());
         return http.build();
