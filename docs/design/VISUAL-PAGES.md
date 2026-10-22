@@ -1,12 +1,12 @@
 # 화면별 시각 개편 체크리스트
 
-저자 원문과 생성 HTML이 함께 있는 339개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 44,103개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
+저자 원문과 생성 HTML이 함께 있는 359개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 47,009개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
 
 체크는 해당 화면의 모든 개별 항목이 `verified`일 때만 자동으로 붙는다. `imagegen` 시안 또는 공통 컴포넌트 한 개를 적용한 상태는 완료가 아니다.
 
 ## 홈·목차·미션·기타 (18)
 
-- [ ] [README.md](../../README.html) — 항목 63, 긴 산문 1, 토글 9, 최대 접기 깊이 1; 상태: in_progress
+- [ ] [README.md](../../README.html) — 항목 68, 긴 산문 1, 토글 9, 최대 접기 깊이 1; 상태: in_progress
 - [ ] [errors.md](../../errors.html) — 항목 261, 긴 산문 1, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [practice/MISSIONS.md](../../practice/MISSIONS.html) — 항목 97, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [scenario/README.md](../../scenario/README.html) — 항목 371, 긴 산문 1, 토글 195, 최대 접기 깊이 4; 상태: unreviewed
@@ -24,6 +24,29 @@
 - [ ] [scenario/db-query-journey/db-12-join-exists-explain.md](../../scenario/db-query-journey/db-12-join-exists-explain.html) — 항목 33, 긴 산문 2, 토글 5, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [scenario/db-query-journey/db-13-list-api-n-plus-one.md](../../scenario/db-query-journey/db-13-list-api-n-plus-one.html) — 항목 36, 긴 산문 1, 토글 4, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [scenario/db-query-journey/db-14-live-schema-to-slow-query.md](../../scenario/db-query-journey/db-14-live-schema-to-slow-query.html) — 항목 67, 긴 산문 0, 토글 4, 최대 접기 깊이 2; 상태: unreviewed
+
+## 과정 v2 (20)
+
+- [ ] [course/README.md](../../course/README.html) — 항목 24, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [course/map.md](../../course/map.html) — 항목 12, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [course/spring/D00.md](../../course/spring/D00.html) — 항목 14, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [course/spring/D01.md](../../course/spring/D01.html) — 항목 206, 긴 산문 0, 토글 14, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D02.md](../../course/spring/D02.html) — 항목 204, 긴 산문 0, 토글 16, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D03.md](../../course/spring/D03.html) — 항목 267, 긴 산문 0, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D04.md](../../course/spring/D04.html) — 항목 187, 긴 산문 0, 토글 15, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D05.md](../../course/spring/D05.html) — 항목 255, 긴 산문 0, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D06.md](../../course/spring/D06.html) — 항목 199, 긴 산문 0, 토글 15, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D07.md](../../course/spring/D07.html) — 항목 273, 긴 산문 0, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D08.md](../../course/spring/D08.html) — 항목 295, 긴 산문 0, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D09.md](../../course/spring/D09.html) — 항목 292, 긴 산문 0, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D10.md](../../course/spring/D10.html) — 항목 312, 긴 산문 1, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D11.md](../../course/spring/D11.html) — 항목 65, 긴 산문 0, 토글 4, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D12.md](../../course/spring/D12.html) — 항목 65, 긴 산문 0, 토글 4, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D13.md](../../course/spring/D13.html) — 항목 65, 긴 산문 0, 토글 4, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D14.md](../../course/spring/D14.html) — 항목 73, 긴 산문 0, 토글 4, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D15.md](../../course/spring/D15.html) — 항목 61, 긴 산문 0, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/README.md](../../course/spring/README.html) — 항목 7, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [course/start/README.md](../../course/start/README.html) — 항목 25, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 
 ## 공부자료 (135)
 
