@@ -51,6 +51,8 @@ const GIT_FLAGS = [
   'color.ui=never', 'color.diff=never', 'diff.noprefix=false', 'diff.mnemonicPrefix=false', 'diff.relative=false',
   'diff.renames=false', 'diff.suppressBlankEmpty=false', 'core.quotepath=off', 'log.showSignature=false',
   'i18n.logOutputEncoding=UTF-8', `core.attributesFile=${os.devNull}`,
+  // 보완 순 변경 계산(git apply)이 사용자 설정으로 내용을 고치지 않게 한다
+  'apply.whitespace=nowarn', 'core.autocrlf=false',
 ].flatMap((kv) => ['-c', kv]);
 function git(root, args, env = process.env) {
   return execFileSync('git', [...GIT_FLAGS, ...args], { cwd: root, env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -86,8 +88,13 @@ export function listAnswerCommits(root = ROOT) {
 
 // 커밋 하나의 board-server 변경: [{ path, status, binary, generated, content | diff, lines }]
 export function commitFiles(sha, root = ROOT) {
-  const statusOut = git(root, ['show', '--format=', '--no-renames', '--name-status', sha, '--', SERVER_DIR]);
-  const numOut = git(root, ['show', '--format=', '--no-renames', '--numstat', sha, '--', SERVER_DIR]);
+  return serverFiles(root, ['show', '--format=', sha], sha);
+}
+
+// diffCmd(['show', '--format=', sha] 또는 ['diff', from, to])가 만드는 board-server 변경. 새 파일 내용은 toRev에서 읽는다.
+function serverFiles(root, diffCmd, toRev) {
+  const statusOut = git(root, [...diffCmd, '--no-renames', '--name-status', '--', SERVER_DIR]);
+  const numOut = git(root, [...diffCmd, '--no-renames', '--numstat', '--', SERVER_DIR]);
   const binary = new Set(numOut.split('\n').filter(Boolean).map((l) => l.split('\t')).filter((c) => c[0] === '-').map((c) => c[2]));
   const files = [];
   for (const line of statusOut.split('\n').filter(Boolean)) {
@@ -95,15 +102,46 @@ export function commitFiles(sha, root = ROOT) {
     const rel = full.slice(SERVER_DIR.length);
     const f = { path: rel, status: status[0], binary: binary.has(full), generated: GENERATED_FILES.has(rel) };
     if (!f.binary && !f.generated) {
-      if (f.status === 'A') f.content = git(root, ['show', `${sha}:${full}`]);
+      if (f.status === 'A') f.content = git(root, ['show', `${toRev}:${full}`]);
       else if (f.status === 'M') {
-        const raw = git(root, ['show', '--format=', '--no-renames', '--no-ext-diff', '--no-textconv', '--no-color', '--diff-algorithm=myers', '--indent-heuristic', '--inter-hunk-context=0', '-U3', sha, '--', full]);
+        const raw = git(root, [...diffCmd, '--no-renames', '--no-ext-diff', '--no-textconv', '--no-color', '--diff-algorithm=myers', '--indent-heuristic', '--inter-hunk-context=0', '-U3', '--', full]);
         f.diff = raw.slice(raw.indexOf('\n@@') + 1);
       }
     }
     files.push(f);
   }
   return files;
+}
+
+// 한 순서의 answer-fix 커밋들(시간순)을 합친 순 변경: commitFiles와 같은 모양의 목록.
+// 첫 answer-fix의 부모 트리를 임시 index에 읽고, 이 순서 fix 커밋들의 board-server 패치만 차례로 git apply --cached 한 뒤
+// 시작 트리와 결과 트리를 비교한다. 그 사이 다른 순서 커밋이 같은 파일을 바꿨어도 그 변경은 섞이지 않는다.
+// 패치가 맞지 않으면(다른 커밋과 겹침) 어림 적용하지 않고 던진다. 되돌려서 원상복구된 파일은 목록에서 빠진다.
+// 작업 트리·저장소 index는 건드리지 않는다(임시 index만 쓴다).
+export function netFixFiles(fixes, root = ROOT) {
+  if (!fixes.length) return [];
+  const id = stepId(fixes[0].day, fixes[0].m);
+  const base = git(root, ['rev-parse', '--verify', `${fixes[0].sha}^`]).trim();
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'build-days-fix-'));
+  try {
+    const env = { ...process.env, GIT_INDEX_FILE: path.join(tmp, 'index') };
+    git(root, ['read-tree', base], env);
+    for (const c of fixes) {
+      const patch = git(root, ['show', '--format=', '--no-renames', '--no-ext-diff', '--no-textconv', '--no-color', '--binary', '--full-index', '--diff-algorithm=myers', '-U3', c.sha, '--', SERVER_DIR]);
+      if (!patch.trim()) continue;
+      const file = path.join(tmp, 'patch');
+      fs.writeFileSync(file, patch);
+      try {
+        git(root, ['apply', '--cached', '--whitespace=nowarn', file], env);
+      } catch (e) {
+        throw new Error(`${id}: answer-fix ${c.sha.slice(0, 8)}(${c.subject})의 패치를 이 순서 보완만 적용한 코드에 맞출 수 없다. 다른 순서 커밋이 같은 줄을 바꿨는지 확인한다.\n${String(e.stderr ?? e.message).trim()}`);
+      }
+    }
+    const tree = git(root, ['write-tree'], env).trim();
+    return serverFiles(root, ['diff', base, tree], tree);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 // 일자별 정답: Map(day → { steps: Map(no → [commit]), extras: Map(Dnn-m → [commit]), last: commit })
@@ -224,18 +262,33 @@ function renderFile(f) {
 
 function renderCommitAnswer(commit, files, stepFiles) {
   const sorted = [...files].sort(fileOrder(stepFiles));
-  const link = `커밋 [\`${commit.sha.slice(0, 8)}\`](${REPO_URL}/commit/${commit.sha}) — ${commit.subject}`;
-  const lines = commit.kind === 'fix' ? [`**보완** — 리뷰를 반영해 이 순서의 코드를 고친 커밋이다.`, '', link] : [link];
+  const lines = [`커밋 [\`${commit.sha.slice(0, 8)}\`](${REPO_URL}/commit/${commit.sha}) — ${commit.subject}`];
   if (commit.rule?.note) lines.push('', commit.rule.note);
   for (const f of sorted) lines.push('', renderFile(f));
   return lines.join('\n');
 }
 
-function answerBlock(dataStep, commits, stepFiles, filesOf, lastTouch) {
-  const all = commits.flatMap((c) => filesOf(c.sha));
+// 보완: 커밋 목록은 이력으로만 남기고, 코드는 그 커밋들을 합친 순 변경(files)만 싣는다
+function renderFixAnswer(fixes, files, stepFiles) {
+  const sorted = [...files].sort(fileOrder(stepFiles));
+  const many = fixes.length > 1;
+  const lines = [
+    `**보완** — 리뷰를 반영해 이 순서의 코드를 고친 ${many ? `커밋 ${fixes.length}개다.` : '커밋이다.'}${many && files.length ? ' 아래 코드는 이 커밋들을 차례로 적용한 최종 변경만 싣는다.' : ''}`,
+    '',
+    '**보완 이력**',
+    '',
+    ...fixes.map((c) => `- [\`${c.sha.slice(0, 8)}\`](${REPO_URL}/commit/${c.sha}) ${c.subject}`),
+  ];
+  for (const f of sorted) lines.push('', renderFile(f));
+  return lines.join('\n');
+}
+
+function answerBlock(dataStep, commits, stepFiles, filesOf, lastTouch, fixFilesOf) {
   const originals = commits.filter((c) => c.kind !== 'fix');
-  const fixes = commits.length - originals.length;
-  const names = originals.map((c) => `answer(${stepId(c.day, c.m)})`).join(' + ') + (fixes ? ` + 보완 ${fixes}개` : '');
+  const fixes = commits.filter((c) => c.kind === 'fix');
+  const fixFiles = fixes.length ? fixFilesOf(fixes) : [];
+  const all = [...originals.flatMap((c) => filesOf(c.sha)), ...fixFiles];
+  const names = originals.map((c) => `answer(${stepId(c.day, c.m)})`).join(' + ') + (fixes.length ? ` + 보완 ${fixes.length}개` : '');
   const touched = new Set(all.map((f) => f.path));
   const untouched = stepFiles.filter((f) => !touched.has(f)).map((f) => {
     const prev = lastTouch?.(commits[0].sha, f);
@@ -245,7 +298,7 @@ function answerBlock(dataStep, commits, stepFiles, filesOf, lastTouch) {
     `<details class="step-answer" data-step="${dataStep}" data-commits="${commits.map((c) => c.sha).join(' ')}">`,
     `<summary>정답 보기 · ${names} · board-server 파일 ${all.length}개</summary>`,
     '',
-    commits.map((c) => renderCommitAnswer(c, filesOf(c.sha), stepFiles)).join('\n\n---\n\n'),
+    [...originals.map((c) => renderCommitAnswer(c, filesOf(c.sha), stepFiles)), ...(fixes.length ? [renderFixAnswer(fixes, fixFiles, stepFiles)] : [])].join('\n\n---\n\n'),
     ...(untouched.length ? ['', '**만들 파일 중 이 커밋에 없는 것**', '', ...untouched] : []),
     '',
     '</details>',
@@ -360,7 +413,7 @@ function stepSection(day, s, ctx) {
       // 1단계: 그 순서 커밋의 정답을 인라인으로 싣는다
       const commits = ctx.answers?.steps.get(s.no);
       if (!commits?.length) throw new Error(`${id}: 정답 커밋 answer(${id})이 없다`);
-      lines.push(answerBlock(id, commits, s.files, ctx.filesOf, ctx.lastTouch), '');
+      lines.push(answerBlock(id, commits, s.files, ctx.filesOf, ctx.lastTouch, ctx.fixFilesOf), '');
     } else if (day.phase === 'maintain' && s.tickets?.length) {
       // 2단계: 티켓 정답은 티켓 페이지에만 둔다(마크다운 링크라 빌드 링크 검사가 티켓 페이지 누락을 잡는다)
       lines.push(`**원인과 정답** ${s.tickets.map((t) => `[${t} 티켓 페이지](../tickets/${t}.md)`).join(' · ')}의 "원인과 정답" 접기에 있다.`, '');
@@ -383,7 +436,7 @@ function extraSection(day, commits, ctx) {
     '',
     commit.rule.note,
     '',
-    answerBlock(id, commits, [], ctx.filesOf),
+    answerBlock(id, commits, [], ctx.filesOf, undefined, ctx.fixFilesOf),
     '',
     '</section>',
   ].join('\n');
@@ -495,6 +548,7 @@ export function buildAll(root = ROOT) {
   const answers = collectAnswers(roadmap, root);
   const cache = new Map();
   const filesOf = (sha) => { if (!cache.has(sha)) cache.set(sha, commitFiles(sha, root)); return cache.get(sha); };
+  const fixFilesOf = (fixes) => netFixFiles(fixes, root);
   // 그 커밋 전에 파일을 마지막으로 바꾼 정답 커밋 이름(예: answer(D03-3))
   const lastTouch = (sha, file) => {
     const out = git(root, ['log', '--format=%s', `${sha}^`, '--', SERVER_DIR + file]);
@@ -516,7 +570,7 @@ export function buildAll(root = ROOT) {
         for (const f of s.files) if (!touched.has(f)) warnings.push(`${stepId(day.id, s.no)}: roadmap 파일 ${f}을 정답 커밋이 건드리지 않는다`);
       }
     }
-    files.set(`course/spring/${day.id}.md`, renderDay(day, { root, roadmap, hints, hintsDay: hintsDay ?? {}, cards, specSections, answers: ready && day.phase === 'build' ? dayAnswers : null, filesOf, lastTouch, ready }));
+    files.set(`course/spring/${day.id}.md`, renderDay(day, { root, roadmap, hints, hintsDay: hintsDay ?? {}, cards, specSections, answers: ready && day.phase === 'build' ? dayAnswers : null, filesOf, fixFilesOf, lastTouch, ready }));
   }
   files.set('course/spring/README.md', renderIndex(roadmap, hints));
   return { files, skipped: null, warnings };

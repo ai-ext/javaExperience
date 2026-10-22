@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { ROOT, EXTRA_COMMITS, HEADER, buildAll, listAnswerCommits, commitFiles, collectAnswers, specLinks, parseSpecSections, parseTalkCards, renderDay, fence, stepId } from './build-days.mjs';
+import { ROOT, EXTRA_COMMITS, HEADER, buildAll, listAnswerCommits, commitFiles, netFixFiles, collectAnswers, specLinks, parseSpecSections, parseTalkCards, renderDay, fence, stepId } from './build-days.mjs';
 import { stripFences, parseDayPage } from './validate.mjs';
 
 const roadmap = JSON.parse(fs.readFileSync(path.join(ROOT, 'course/roadmap.json'), 'utf8'));
@@ -85,7 +85,7 @@ test('정답 커밋 매핑: 순서와 어긋난 커밋은 허용 목록(D01-0, D
 
 // 일자 페이지 본문의 정답 블록을 커밋과 대조해 오류 목록을 돌려준다.
 // - 블록의 data-step(Dnn-m)과 커밋의 Dnn-m(EXTRA_COMMITS 부착 규칙 반영)이 같아야 한다
-// - 블록의 파일 목록은 그 커밋들의 board-server 파일과 같고, 내용(새 파일 전체·수정 diff)도 같아야 한다
+// - 블록의 파일 목록은 answer 커밋들의 board-server 파일 + answer-fix들의 순 변경 파일과 같고, 내용(새 파일 전체·수정 diff)도 같아야 한다
 const fileCache = new Map();
 const filesOfSha = (sha) => fileCache.get(sha) ?? fileCache.set(sha, commitFiles(sha, ROOT)).get(sha);
 function answerBlockErrors(dayId, body) {
@@ -94,18 +94,25 @@ function answerBlockErrors(dayId, body) {
   for (const [, step, shas, inner] of blocks) {
     if (!step.startsWith(`${dayId}-`)) errs.push(`${step}: ${dayId} 페이지에 다른 날 정답 블록`);
     const want = new Set();
+    // 펜스 여는 줄 다음부터 닫는 줄까지가 그대로 있어야 한다
+    const check = (f, from) => {
+      want.add(f.path);
+      const text = f.content ?? f.diff;
+      if (text != null && !inner.includes(`\n${fence(text).split('\n').slice(1).join('\n')}`)) errs.push(`${step}: ${f.path} 내용이 ${from}과 다르다`);
+    };
+    const fixes = [];
     for (const sha of shas.split(' ')) {
       const c = allCommits.find((x) => x.sha === sha);
       if (!c) { errs.push(`${step}: 정답 커밋이 아니다 ${sha}`); continue; }
       const key = stepId(c.day, c.m);
       const expected = stepId(c.day, EXTRA_COMMITS[key]?.attachTo ?? c.m);
       if (expected !== step) errs.push(`${step}: 커밋 ${c.subject}은 ${expected} 순서다`);
-      for (const f of filesOfSha(sha)) {
-        want.add(f.path);
-        const text = f.content ?? f.diff;
-        // 펜스 여는 줄 다음부터 닫는 줄까지가 그대로 있어야 한다
-        if (text != null && !inner.includes(`\n${fence(text).split('\n').slice(1).join('\n')}`)) errs.push(`${step}: ${f.path} 내용이 커밋(${sha.slice(0, 8)})과 다르다`);
-      }
+      if (c.kind === 'fix') { fixes.push(c); continue; }
+      for (const f of filesOfSha(sha)) check(f, `커밋(${sha.slice(0, 8)})`);
+    }
+    if (fixes.length) {
+      for (const f of netFixFiles(fixes, ROOT)) check(f, '보완 순 변경');
+      for (const c of fixes) if (!inner.includes(`- [\`${c.sha.slice(0, 8)}\`](`)) errs.push(`${step}: 보완 이력에 ${c.sha.slice(0, 8)}이 없다`);
     }
     const shown = new Set([...stripFences(inner).matchAll(/^\*\*(?:새 파일|수정|삭제)\*\* `([^`]+)`/gm)].map((m) => m[1]));
     if ([...shown].sort().join('\n') !== [...want].sort().join('\n')) errs.push(`${step}: 정답 블록 파일 목록이 커밋과 다르다`);
@@ -233,8 +240,9 @@ test('answer-fix(Dnn-m)는 순서 수에 넣지 않고, 그 순서 원래 커밋
   const filesOf = (sha) => sha === fix.sha
     ? [{ path: 'src/main/java/com/example/board/post/PostCacheEvictListener.java', status: 'M', binary: false, generated: false, diff: '@@ -1 +1 @@\n-a\n+b\n' }]
     : (cache.get(sha) ?? cache.set(sha, commitFiles(sha, ROOT)).get(sha));
+  const fixFilesOf = (fixes) => fixes.some((c) => c.sha === fix.sha) ? filesOf(fix.sha) : netFixFiles(fixes, ROOT);
   const md = renderDay(d09, {
-    root: ROOT, roadmap, hints, hintsDay: hints.days.D09, ready: true, answers: answers.get('D09'), filesOf, lastTouch: () => null,
+    root: ROOT, roadmap, hints, hintsDay: hints.days.D09, ready: true, answers: answers.get('D09'), filesOf, fixFilesOf, lastTouch: () => null,
     cards: parseTalkCards(fs.readFileSync(path.join(ROOT, 'course/talk-cards.md'), 'utf8')),
     specSections: parseSpecSections(fs.readFileSync(path.join(ROOT, 'course/spec-v2.md'), 'utf8')),
   });
@@ -245,6 +253,8 @@ test('answer-fix(Dnn-m)는 순서 수에 넣지 않고, 그 순서 원래 커밋
   const orig = block.indexOf(step3[0].sha.slice(0, 8));
   const extra = block.indexOf('**보완**');
   assert.ok(orig >= 0 && extra > orig, '보완은 원래 커밋 코드 뒤에 온다');
+  assert.ok(block.indexOf(`- [\`${fix.sha.slice(0, 8)}\`](`) > extra, '보완 커밋은 보완 이력 목록에 남는다');
+  assert.ok(block.includes('PostCacheEvictListener.java` (바뀐 부분)\n\n```diff\n@@ -1 +1 @@\n-a\n+b'), '보완 코드는 순 변경으로 싣는다');
   assert.ok(md.includes(`/tree/${fix.sha}/board-server`), 'snapshot은 가장 나중 커밋');
   // 원래 커밋 없이 answer-fix만 있으면 멈춘다
   const orphan = list.filter((c) => !(c.day === 'D09' && c.m === 3 && c.kind === 'answer'));
@@ -273,6 +283,7 @@ test('diff 출력에 영향을 주는 git 설정이 달라도 생성 결과가 �
     ['diff.renames', 'copies'], ['core.quotePath', 'true'], ['diff.algorithm', 'patience'],
     ['diff.indentHeuristic', 'false'], ['diff.context', '10'], ['diff.interHunkContext', '10'],
     ['log.showSignature', 'true'], ['i18n.logOutputEncoding', 'ISO-8859-1'],
+    ['apply.whitespace', 'fix'], ['core.autocrlf', 'true'],
   ];
   // 주입이 실제로 git에 닿는지 먼저 확인한다
   withGitConfig(hostile, () => {
@@ -297,4 +308,85 @@ test('저장소가 아니면 빈 목록이지만, git 실행 실패는 숨기지
       assert.throws(() => listAnswerCommits(ROOT), /GIT_CONFIG_KEY_0|config/);
     });
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test('보완은 순서별 순 변경이다: D09-5는 0패딩·Lua 이전 없이 마지막 상태(DB 문자열 정렬)만 싣는다', () => {
+  const md = page('D09');
+  const block = md.match(/<details class="step-answer" data-step="D09-5"[\s\S]*?\n<\/details>/)[0];
+  const fixes = allCommits.filter((c) => c.kind === 'fix' && c.day === 'D09' && c.m === 5);
+  assert.ok(fixes.length >= 3);
+  for (const c of fixes) assert.ok(block.includes(c.sha), `data-commits에 ${c.sha.slice(0, 8)}`);
+  const extra = block.slice(block.indexOf('**보완**'));
+  assert.ok(extra.length < block.length);
+  for (const gone of ['%019d', 'MEMBER_FORMAT', 'MIGRATE_AND_INCR']) assert.ok(!extra.includes(gone), `보완 블록에 ${gone}`);
+  assert.ok(extra.includes('cast(l.member.id as string) desc'));
+  assert.equal((extra.match(/^- \[`[0-9a-f]{8}`\]\(/gm) ?? []).length, fixes.length, '보완 이력은 커밋마다 한 줄');
+  // 구간 안에는 다른 순서 fix(D10-5)도 있지만 D09-5 fix 파일은 이 순서 커밋만 바꿨으므로,
+  // 그 파일들의 순 변경 = 첫 fix 부모 → 마지막 fix 사이 diff
+  const base = `${fixes[0].sha}^`;
+  const last = fixes.at(-1).sha;
+  const g = (args) => execFileSync('git', ['-c', 'color.ui=never', '-c', 'diff.noprefix=false', '-c', `core.attributesFile=${os.devNull}`, ...args], { cwd: ROOT, encoding: 'utf8' });
+  const touched = [...new Set(fixes.flatMap((c) => commitFiles(c.sha, ROOT).map((f) => f.path)))].sort();
+  for (const p of touched) assert.deepEqual(g(['log', '--format=%H', `${base}..${last}`, '--', `board-server/${p}`]).split('\n').filter(Boolean).sort(), fixes.filter((c) => commitFiles(c.sha, ROOT).some((f) => f.path === p)).map((c) => c.sha).sort(), p);
+  const net = netFixFiles(fixes, ROOT);
+  assert.deepEqual(net.map((f) => f.path).sort(), touched);
+  for (const f of net) {
+    assert.equal(f.status, 'M', f.path);
+    const raw = g(['diff', '--no-renames', '--no-color', '--diff-algorithm=myers', '--indent-heuristic', '--inter-hunk-context=0', '-U3', base, last, '--', `board-server/${f.path}`]);
+    assert.equal(f.diff, raw.slice(raw.indexOf('\n@@') + 1), f.path);
+  }
+  // 커밋 하나씩 이어 붙이지 않는다(중간 커밋 제목 줄이 없다)
+  assert.ok(!/^커밋 \[`[0-9a-f]{8}`\][^\n]*answer-fix/m.test(block));
+});
+
+// 작은 임시 저장소: steps = [[제목, { 경로: 내용 | null(삭제) }], ...]
+function tempRepo(steps, fn) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'build-days-repo-'));
+  const env = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t', GIT_AUTHOR_DATE: '2026-01-01T00:00:00Z', GIT_COMMITTER_DATE: '2026-01-01T00:00:00Z' };
+  const g = (...args) => execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', `core.hooksPath=${os.devNull}`, '-c', 'init.defaultBranch=main', ...args], { cwd: tmp, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  try {
+    g('init', '-q');
+    for (const [subject, files] of steps) {
+      for (const [rel, text] of Object.entries(files)) {
+        const abs = path.join(tmp, 'board-server', rel);
+        if (text == null) fs.rmSync(abs);
+        else { fs.mkdirSync(path.dirname(abs), { recursive: true }); fs.writeFileSync(abs, text); }
+      }
+      g('add', '-A');
+      g('commit', '-q', '-m', subject);
+    }
+    return fn(tmp, listAnswerCommits(tmp));
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+const lines = (edit = {}) => `${Array.from({ length: 20 }, (_, i) => edit[i + 1] ?? `L${i + 1}`).join('\n')}\n`;
+
+test('보완 순 변경에 다른 순서 fix가 같은 파일을 바꾼 내용은 섞이지 않고, 되돌린 파일은 빠진다', () => {
+  tempRepo([
+    ['answer(D09-1): 시작', { 'a.txt': lines() }],
+    ['answer-fix(D09-1): 둘째 줄', { 'a.txt': lines({ 2: 'X2' }), 'tmp.txt': '임시\n' }],
+    ['answer-fix(D09-2): 다른 순서', { 'a.txt': lines({ 2: 'X2', 18: 'Y18' }) }],
+    ['answer-fix(D09-1): 셋째 줄, 임시 파일 되돌림', { 'a.txt': lines({ 2: 'X2', 3: 'X3', 18: 'Y18' }), 'tmp.txt': null }],
+  ], (repo, commits) => {
+    const own = commits.filter((c) => c.kind === 'fix' && c.m === 1);
+    const net = netFixFiles(own, repo);
+    assert.deepEqual(net.map((f) => [f.path, f.status]), [['a.txt', 'M']], '되돌린 tmp.txt는 빠진다');
+    assert.match(net[0].diff, /^\+X2$/m);
+    assert.match(net[0].diff, /^\+X3$/m);
+    assert.ok(!net[0].diff.includes('Y18'), '다른 순서 fix의 변경이 섞였다');
+    const other = netFixFiles(commits.filter((c) => c.m === 2), repo);
+    assert.ok(other[0].diff.includes('+Y18') && !other[0].diff.includes('+X3'));
+    // 같은 입력이면 같은 결과
+    assert.deepEqual(netFixFiles(own, repo), net);
+  });
+});
+
+test('보완 패치가 다른 순서 커밋과 겹쳐 적용되지 않으면 생성기가 멈춘다', () => {
+  tempRepo([
+    ['answer(D09-1): 시작', { 'a.txt': lines() }],
+    ['answer-fix(D09-1): 둘째 줄', { 'a.txt': lines({ 2: 'X2' }) }],
+    ['answer-fix(D09-2): 다섯째 줄', { 'a.txt': lines({ 2: 'X2', 5: 'Y5' }) }],
+    ['answer-fix(D09-1): 셋째 줄', { 'a.txt': lines({ 2: 'X2', 3: 'X3', 5: 'Y5' }) }],
+  ], (repo, commits) => {
+    assert.throws(() => netFixFiles(commits.filter((c) => c.kind === 'fix' && c.m === 1), repo), /D09-1: answer-fix [0-9a-f]{8}\(answer-fix\(D09-1\): 셋째 줄\)의 패치/);
+  });
 });
