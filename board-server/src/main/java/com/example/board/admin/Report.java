@@ -60,4 +60,12 @@ public class Report extends BaseEntity {
     public static Report create(Post post, Member reporter, ReportReason reason, String detail) {
         return new Report(post, reporter, reason, detail);
     }
+
+    public void resolve() {
+        this.status = ReportStatus.RESOLVED;
+    }
+
+    public boolean isAbout(Long postId) {
+        return post.getId().equals(postId);
+    }
 }

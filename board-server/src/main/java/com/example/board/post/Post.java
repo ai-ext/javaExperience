@@ -99,6 +99,11 @@ public class Post extends BaseEntity {
         this.status = PostStatus.DELETED;
     }
 
+    /** 관리자 숨김. 상세·목록·인기글은 ACTIVE만 보여 주므로 없는 글처럼 된다. */
+    public void hide() {
+        this.status = PostStatus.HIDDEN;
+    }
+
     public boolean isWrittenBy(Long memberId) {
         return member.getId().equals(memberId);
     }

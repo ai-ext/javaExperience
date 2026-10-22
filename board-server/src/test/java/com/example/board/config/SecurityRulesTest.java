@@ -107,9 +107,8 @@ class SecurityRulesTest {
 
     @Test
     void ADMIN_토큰은_admin_경로의_인가를_통과한다() throws Exception {
-        // 컨트롤러는 D10에 생기므로 지금은 404. 401·403이 아니면 인가는 통과한 것이다
         mockMvc.perform(get("/api/admin/reports").header("Authorization", "Bearer " + jwtProvider.issue(1L, Role.ADMIN)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk());
     }
 
     @Test

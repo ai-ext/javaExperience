@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.method.ParameterErrors;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -48,6 +49,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .toList();
         pd.setProperty("errors", errors);
         return pd;
+    }
+
+    // 메서드 보안(@PreAuthorize) 거부는 필터가 아니라 컨트롤러 안에서 난다. 아래 Exception 핸들러에 먹혀 500이 되지 않게
+    // 필터 단계 403(ProblemDetailSecurityHandler)과 같은 형식으로 내보낸다.
+    @ExceptionHandler(AccessDeniedException.class)
+    ProblemDetail handleAccessDenied(AccessDeniedException e, HttpServletRequest request) {
+        ErrorCode code = ErrorCode.FORBIDDEN;
+        return problem(code.status(), code.type(), code.title(), "접근 권한이 없습니다.", request.getRequestURI());
     }
 
     // IllegalArgumentException 등을 400으로 바꾸지 않는다. 서버 버그가 클라이언트 잘못으로 보이면 장애가 숨는다.

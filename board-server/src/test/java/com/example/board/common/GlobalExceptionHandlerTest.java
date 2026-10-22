@@ -19,6 +19,8 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 
 import com.example.board.TestcontainersConfig;
+import com.example.board.admin.AdminService;
+import com.example.board.admin.ReportStatus;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -41,6 +43,18 @@ class GlobalExceptionHandlerTest {
 
     @RestController
     static class ProbeController {
+
+        private final AdminService adminService;
+
+        ProbeController(AdminService adminService) {
+            this.adminService = adminService;
+        }
+
+        // URL 규칙(/api/admin/**)이 아니라 메서드 보안(@PreAuthorize)에서 막히는 경로
+        @GetMapping("/test/method-security")
+        Object methodSecurity() {
+            return adminService.reports(ReportStatus.OPEN, null, 20);
+        }
         @GetMapping("/test/not-found")
         void notFound() {
             throw new BusinessException(ErrorCode.NOT_FOUND, "없음");
@@ -59,8 +73,8 @@ class GlobalExceptionHandlerTest {
     @TestConfiguration
     static class Probe {
         @Bean
-        ProbeController probeController() {
-            return new ProbeController();
+        ProbeController probeController(AdminService adminService) {
+            return new ProbeController(adminService);
         }
     }
 
@@ -96,6 +110,17 @@ class GlobalExceptionHandlerTest {
         mockMvc.perform(get("/test/illegal").with(user("u")))
                 .andExpect(status().isInternalServerError())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    // 메서드 보안 거부는 컨트롤러 안에서 난다. Exception 핸들러에 먹히면 500이 된다.
+    @Test
+    void 메서드_보안에서_막히면_403_problem_json() throws Exception {
+        mockMvc.perform(get("/test/method-security").with(user("u").roles("USER")))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("/errors/forbidden"))
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.instance").value("/test/method-security"));
     }
 
     @Test
