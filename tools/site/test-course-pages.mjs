@@ -365,6 +365,39 @@ for (const day of course.days) {
     }
     assert.ok(!/<script type="application\/json"[^>]*flow/.test(html), `${id}: 원인 단계를 데이터로 따로 싣지 않는다`);
   }
+  // 4-1) 접힌 힌트의 제목(summary)은 접혀 있어도 보인다. 어디를 볼지는 말해도 원인·고칠 방법은 말하지 않는다.
+  // 낱말은 그 티켓 "원인과 정답" 접기에서 고른 핵심어다(거기 없으면 목록이 낡은 것이라 실패시킨다).
+  const causeTerms = {
+    B01: ['tx.execute', 'PG 대기', '풀 크기'],
+    B02: ['(id, status)', '(status, id)', '죽은 인덱스', '분포'],
+    B03: ['self-invocation', 'rollback-only', '프록시', 'UnexpectedRollbackException'],
+    B04: ['순환', '필드 주입', '@Lazy', '분기', 'switch'],
+    B05: ['싱글톤', '인스턴스 필드', 'lastFolded'],
+    B06: ['메타데이터 락', 'readOnly', '웹훅 응답'],
+    B07: ['갭 락', '없는', '순환 대기', 'FOR UPDATE'],
+    B08: ['엔티티', 'DTO', 'Jackson', 'getter'],
+    B09: ['UTC', 'systemUTC', 'LocalDate.now'],
+    B10: ['randomUUID', '새 키', '재시도'],
+    B11: ['우선순위', '환경 변수', 'board.env'],
+    B12: ['corsConfigurationSource', 'CorsFilter', 'addCorsMappings', '필터 체인'],
+    B13: ['permitAll', '위에서부터', '@WithMockUser', '처음 매치'],
+    B14: ['toAnyEndpoint', 'permitAll', 'show-values'],
+    B15: ['evict', '커밋 전', 'afterCommit', 'PostChangedEvent'],
+    B16: ['타임아웃', 'RedisGuard', 'Lettuce'],
+    E01: ['세대', 'Lua', '늦은 저장', 'ConcurrentHashMap'],
+  };
+  assert.deepEqual(Object.keys(causeTerms).sort(), [...course.flows.tickets.keys()].sort(), '티켓마다 원인 핵심어 목록');
+  for (const [id, terms] of Object.entries(causeTerms)) {
+    const md = fs.readFileSync(new URL(`course/tickets/${id}.md`, root), 'utf8');
+    const at = md.indexOf('## 원인과 정답');
+    const answer = md.slice(at, md.indexOf('</details>', at));
+    for (const term of terms) assert.ok(answer.includes(term), `${id}: 핵심어 "${term}"가 원인과 정답에 있다`);
+    const doc = new JSDOM(fs.readFileSync(new URL(`course/tickets/${id}.html`, root), 'utf8')).window.document;
+    for (const summary of doc.querySelectorAll('summary')) {
+      const title = text(summary);
+      for (const term of terms) assert.ok(!title.includes(term), `${id}: 접기 제목 "${title}"이 원인 핵심어 "${term}"를 드러낸다`);
+    }
+  }
   // 5) 조작: 이전·다음·끝·처음, 재생은 속도대로 넘어가고 마지막에서 멈춘다, 키보드, 원인 접기를 열면 재생 순서에 끼어든다.
   const fakeTimers = (win) => {
     win.__timers = [];
