@@ -387,6 +387,7 @@ for (const day of course.days) {
     E01: ['세대', 'Lua', '늦은 저장', 'ConcurrentHashMap'],
   };
   assert.deepEqual(Object.keys(causeTerms).sort(), [...course.flows.tickets.keys()].sort(), '티켓마다 원인 핵심어 목록');
+  const ticketLeaks = [];
   for (const [id, terms] of Object.entries(causeTerms)) {
     const md = fs.readFileSync(new URL(`course/tickets/${id}.md`, root), 'utf8');
     const at = md.indexOf('## 원인과 정답');
@@ -397,7 +398,17 @@ for (const day of course.days) {
       const title = text(summary);
       for (const term of terms) assert.ok(!title.includes(term), `${id}: 접기 제목 "${title}"이 원인 핵심어 "${term}"를 드러낸다`);
     }
+    // 접기 밖 본문 전체(받은 티켓·환경과 재현·제출물·흐름 증상 단계·aria-label·title)도 원인 핵심어를 쓰지 않는다. 티켓 제목(증상 문장)만 뺀다.
+    const bare = doc.body.cloneNode(true);
+    bare.querySelectorAll('details').forEach((d) => d.remove());
+    const symptom = plainText(doc.querySelector('h1')?.textContent.replace(/^#\s*/, '') ?? '');
+    const visible = plainText(bare.textContent + [...bare.querySelectorAll('[aria-label],[title]')].map((e) => ` ${e.getAttribute('aria-label')} ${e.getAttribute('title')}`).join('')).split(symptom).join(' ');
+    for (const term of terms) {
+      const at = visible.indexOf(plainText(term));
+      if (at >= 0) ticketLeaks.push(`${id} "${term}": …${visible.slice(Math.max(0, at - 40), at + 30)}…`);
+    }
   }
+  assert.deepEqual(ticketLeaks, [], `티켓 페이지 접기 밖 원인 핵심어 ${ticketLeaks.length}건`);
   // 4-2) 2단계·마무리 일자 페이지: 자리표시가 없고, 순서마다 닫힌 힌트가 있고, 티켓 순서는 티켓 페이지 "원인과 정답" 절로 잇는다.
   // hints.json에서 온 문장(힌트·리뷰 초점)도, 접기 밖에 보이는 글 전체도 그날 티켓의 원인 핵심어를 쓰지 않는다.
   const hintsData = JSON.parse(fs.readFileSync(new URL('course/hints.json', root), 'utf8'));
