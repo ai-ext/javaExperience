@@ -25,10 +25,15 @@
     done.forEach(function (id) { steps[id] = true; });
     try { store.setItem(KEY, JSON.stringify({ version: 1, steps: steps })); return true; } catch (e) { return false; }
   }
+  // 진도로 세는 순서: 선택·연습 티켓만 다루는 추가 순서(extra)를 뺀 나머지. 그날 순서가 모두 추가면 전부 센다.
+  function coreSteps(day) {
+    var core = day.steps.filter(function (s) { return !s.extra; });
+    return core.length ? core : day.steps;
+  }
   // 오늘 할 일: 체크가 있는 가장 늦은 날이 덜 끝났으면 그날, 다 끝났으면 다음 날. 체크가 없으면 첫날.
-  // 마지막 날까지 끝냈는데 앞에 덜 끝낸 날이 있으면 그 첫 날로 돌아간다. 모든 순서를 끝냈을 때만 complete다.
+  // 마지막 날까지 끝냈는데 앞에 덜 끝낸 날이 있으면 그 첫 날로 돌아간다. 진도로 세는 순서를 모두 끝냈을 때만 complete다.
   function nextDay(days, done) {
-    var finished = function (day) { return day.steps.every(function (s) { return done.has(s.id); }); };
+    var finished = function (day) { return coreSteps(day).every(function (s) { return done.has(s.id); }); };
     var last = -1;
     days.forEach(function (day, index) { if (day.steps.some(function (s) { return done.has(s.id); })) last = index; });
     if (last < 0) return { day: days[0], mode: 'first' };
@@ -151,8 +156,11 @@
       $('[data-today-tag]').textContent = tags[pick.mode];
       $('[data-today-id]').textContent = day.id;
       $('[data-today-title]').textContent = day.title;
-      var doneHere = day.steps.filter(function (s) { return state.done.has(s.id); }).length;
-      $('[data-today-meta]').textContent = day.phaseLabel + ' · 순서 ' + day.steps.length + '개' + (doneHere ? ' 중 ' + doneHere + '개 끝냄' : '') + ' · 오늘의 Java ' + day.java;
+      var core = coreSteps(day);
+      var extraCount = day.steps.length - core.length;
+      var doneHere = core.filter(function (s) { return state.done.has(s.id); }).length;
+      $('[data-today-meta]').textContent = day.phaseLabel + ' · 순서 ' + core.length + '개' + (doneHere ? ' 중 ' + doneHere + '개 끝냄' : '')
+        + (extraCount ? ' · 선택·연습 ' + extraCount + '개' : '') + ' · 오늘의 Java ' + day.java;
       var list = $('[data-today-steps]');
       list.replaceChildren.apply(list, day.steps.map(function (s, i) {
         var li = document.createElement('li');
@@ -160,7 +168,7 @@
         var no = document.createElement('span');
         no.setAttribute('aria-hidden', 'true');
         no.textContent = NUMS[i] || String(i + 1);
-        li.append(no, ' ' + s.title + (state.done.has(s.id) ? ' (끝냄)' : ''));
+        li.append(no, ' ' + s.title + (s.extra && core.length < day.steps.length ? ' (선택·연습)' : '') + (state.done.has(s.id) ? ' (끝냄)' : ''));
         return li;
       }));
       var open = $('[data-today-open]');
@@ -171,16 +179,17 @@
       $('[data-today-note]').hidden = pick.mode !== 'first';
       var total = 0, checked = 0;
       days.forEach(function (d) {
-        var n = d.steps.filter(function (s) { return state.done.has(s.id); }).length;
-        total += d.steps.length; checked += n;
+        var counted = coreSteps(d);
+        var n = counted.filter(function (s) { return state.done.has(s.id); }).length;
+        total += counted.length; checked += n;
         var cell = home.querySelector('.ch-day[data-day="' + d.id + '"]');
         if (!cell) return;
         cell.classList.toggle('is-today', d.id === day.id);
-        cell.classList.toggle('is-done', n === d.steps.length);
+        cell.classList.toggle('is-done', n === counted.length);
         var count = cell.querySelector('[data-day-count]');
-        if (count) count.textContent = n + '/' + d.steps.length;
+        if (count) count.textContent = n + '/' + counted.length;
         var bar = cell.querySelector('.ch-bar i');
-        if (bar) bar.style.width = Math.round((n / d.steps.length) * 100) + '%';
+        if (bar) bar.style.width = Math.round((n / counted.length) * 100) + '%';
       });
       $('[data-progress-summary]').textContent = '체크한 순서 ' + checked + '/' + total;
       storageNote(state.ok ? '' : 'blocked');

@@ -12,7 +12,7 @@
 # 하는 일: Toxiproxy로 PG 응답을 5초 늦춘 뒤 서로 다른 회원 12명이 동시에 포인트를 충전한다.
 #          그동안 충전과 상관없는 GET /api/posts를 부르고 응답 코드·시간과 Hikari 지표를 찍는다.
 # 기대 증상(결함 상태): GET /api/posts가 2초쯤 기다린 뒤 500으로 끝난다(또는 수 초 걸린다).
-#                       hikaricp.connections.active=10, pending>0. 수정 뒤에는 1초 안에 200이다.
+#                       hikaricp.connections.active=10, pending>0. 수정 뒤에는 1.5초 안에 200이다.
 set -euo pipefail
 
 BASE=${BASE:-http://localhost:8080}

@@ -90,6 +90,16 @@ function between(html, startRe, endRe) {
 
 // 티켓 구분은 일자 페이지 생성기(build-days.mjs)의 ticketKind와 같다: 필수·선택(Security·Redis 후보)·고도화·연습
 const ticketKind = (t) => (t.required ? '필수' : t.enhancement ? '고도화' : t.pool ? '선택' : '연습');
+// 홈 진도에서 빼는 추가 순서: 티켓 하나를 처리하는 순서(제목이 `Bnn "`로 시작)인데 그 티켓이 모두 선택·연습이다.
+// 진도는 모두가 하는 순서(필수 티켓·고도화·훈련·코드 읽기 등)로만 세고, 고른 선택 1건은 채점이 확인한다(P8-4 리뷰 ②).
+export function isExtraStep(step, course) {
+  if (!/^B\d{2} "/.test(step.title) || !step.tickets.length) return false;
+  return step.tickets.every((id) => {
+    const ticket = course.tickets.find((t) => t.id === id);
+    if (!ticket) throw new Error(`${step.id}: 티켓 ${id}가 map-tickets.json에 없다`);
+    return ['선택', '연습'].includes(ticketKind(ticket));
+  });
+}
 
 function ticketBadge(ticket, fromRel, course) {
   if (!ticket) return '';
@@ -235,13 +245,14 @@ export function renderCourseHome(course) {
   const href = (target) => relHref(from, target);
   const main = course.days.filter((d) => d.id !== 'D00');
   const first = main[0];
-  const stepTotal = main.reduce((n, d) => n + d.steps.length, 0);
+  const coreCount = (d) => d.steps.filter((s) => !isExtraStep(s, course)).length || d.steps.length;
+  const stepTotal = main.reduce((n, d) => n + coreCount(d), 0);
   const data = course.days.map((d) => ({ id: d.id, title: d.title, phase: d.phase, phaseLabel: PHASE[d.phase], java: d.java, href: href(d.page),
     javaHref: course.java.find((j) => j.id === d.java)?.page ? href(course.java.find((j) => j.id === d.java).page) : null,
-    steps: d.steps.map((s) => ({ id: s.id, title: plain(s.short) })) }));
+    steps: d.steps.map((s) => ({ id: s.id, title: plain(s.short), ...(isExtraStep(s, course) ? { extra: true } : {}) })) }));
   const todaySteps = (d) => d.steps.map((s, i) => `<li><span aria-hidden="true">${NUMS[i]}</span> ${inline(s.short)}</li>`).join('');
   const phases = [['build', '1단계 · 만들기'], ['maintain', '2단계 · 넘겨받기'], ['wrap', '마무리']];
-  const dayCell = (d) => `<li class="ch-day" data-day="${d.id}"><a href="${esc(href(d.page))}"><b>${d.id}</b><span class="ch-day-title">${esc(d.title)}</span><span class="ch-bar" aria-hidden="true"><i style="width:0%"></i></span><small data-day-count>0/${d.steps.length}</small></a></li>`;
+  const dayCell = (d) => `<li class="ch-day" data-day="${d.id}"><a href="${esc(href(d.page))}"><b>${d.id}</b><span class="ch-day-title">${esc(d.title)}</span><span class="ch-bar" aria-hidden="true"><i style="width:0%"></i></span><small data-day-count>0/${coreCount(d)}</small></a></li>`;
   const javaChips = course.java.map((j) => (j.page
     ? `<a href="${esc(href(j.page))}" title="${esc(j.title)}">${j.id}${j.optional ? '<small>선택</small>' : ''}</a>`
     : `<span>${j.id}</span>`)).join('');

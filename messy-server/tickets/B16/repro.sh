@@ -13,7 +13,7 @@
 #
 # 기대 증상(결함 상태)
 #   pause: POST /api/posts와 GET /api/posts/popular가 15초 안에 끝나지 않는다(curl --max-time 15 초과).
-#          그동안 `jcmd $(pgrep -f BoardApplication) Thread.print`에서 http-nio 스레드가 Lettuce 응답을 기다리는 스택이 보인다.
+#          그동안 `"${JAVA_HOME:+$JAVA_HOME/bin/}jcmd" $(pgrep -f BoardApplication) Thread.print`에서 http-nio 스레드가 Lettuce 응답을 기다리는 스택이 보인다.
 #   stop:  글쓰기는 201이지만 GET /api/posts/popular가 500이다. 로그에 RedisSystemException(Currently not connected)이 남는다.
 #   수정 뒤: 두 모드 모두 글쓰기 201, 인기글 200이 각각 1초 안이다.
 set -euo pipefail

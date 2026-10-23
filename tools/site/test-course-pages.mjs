@@ -236,7 +236,23 @@ for (const day of course.days) {
   assert.equal(resumed.$('[data-today-note]').hidden, true);
   assert.equal(resumed.$('.ch-day[data-day="D04"] [data-day-count]').textContent, '2/5');
   assert.ok(resumed.$('.ch-day[data-day="D04"]').classList.contains('is-today'));
-  assert.equal(resumed.$('[data-progress-summary]').textContent, `체크한 순서 2/${days.reduce((n, d) => n + d.steps.length, 0)}`);
+  assert.equal(resumed.$('[data-progress-summary]').textContent, `체크한 순서 2/${JSON.parse(resumed.$('#course-days-data').textContent).filter((d) => d.steps.length).reduce((n, d) => n + (d.steps.filter((s) => !s.extra).length || d.steps.length), 0)}`);
+  // 선택·연습 티켓만 다루는 순서는 진도에서 뺀다. 필수 B03만 끝낸 D13은 끝난 날이다(P8-4 리뷰 ②).
+  const homeDays = JSON.parse(home.$('#course-days-data').textContent).filter((d) => d.steps.length);
+  const extraIds = homeDays.flatMap((d) => d.steps.filter((s) => s.extra).map((s) => s.id));
+  assert.deepEqual(extraIds, ['D12-4', 'D13-2', 'D13-3', 'D13-4', 'D13-5', 'D14-1', 'D14-2', 'D14-3', 'D14-4'], '추가 순서는 선택·연습 티켓 순서뿐');
+  const coreUpToD13 = homeDays.filter((d) => d.id <= 'D13').flatMap((d) => d.steps.filter((s) => !s.extra).map((s) => s.id));
+  const afterD13 = nextDay(homeDays, set(...coreUpToD13));
+  assert.deepEqual([afterD13.mode, afterD13.day.id], ['next', 'D14'], '연습을 안 해도 다음 날로 넘어간다');
+  const allCore = homeDays.flatMap((d) => d.steps.filter((s) => !s.extra).map((s) => s.id));
+  assert.equal(nextDay(homeDays, set(...allCore)).mode, 'complete', '추가 순서 없이도 과정 완료');
+  const d13 = await open('index.html', { saved: JSON.stringify({ version: 1, steps: Object.fromEntries(coreUpToD13.map((id) => [id, true])) }) });
+  assert.equal(d13.$('.ch-day[data-day="D13"] [data-day-count]').textContent, '1/1');
+  assert.ok(d13.$('.ch-day[data-day="D13"]').classList.contains('is-done'));
+  assert.equal(d13.$('[data-today-id]').textContent, 'D14');
+  assert.match(d13.$('[data-today-meta]').textContent, /순서 2개 · 선택·연습 4개/);
+  assert.equal(d13.$('[data-progress-summary]').textContent, `체크한 순서 ${coreUpToD13.length}/${allCore.length}`);
+  assert.equal(home.$('.ch-day[data-day="D13"] [data-day-count]').textContent, '0/1', '처음 그린 칸도 진도로 세는 순서 수');
   const blocked = await open('index.html', { brokenStorage: true });
   assert.equal(blocked.$('[data-today-id]').textContent, 'D01', '저장소가 막혀도 기본 화면');
 }
