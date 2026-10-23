@@ -86,7 +86,7 @@
 <details>
 <summary>3. 기다림에 상한을 둔다</summary>
 
-<p>적재하는 요청이 Redis 지연(명령 타임아웃 500ms)이나 DB 지연에 걸리면, 상한 없는 <code>lock()</code>·<code>get()</code> 앞에서 모든 요청이 함께 멈춘다.
+<p>적재하는 요청이 Redis 지연(명령 타임아웃: B16을 고쳤으면 500ms, 고치지 않았으면 Lettuce 기본 60초)이나 DB 지연에 걸리면, 상한 없는 <code>lock()</code>·<code>get()</code> 앞에서 모든 요청이 함께 멈춘다.
 <code>tryLock(시간)</code>이나 <code>future.get(시간)</code>으로 상한을 두고, 넘으면 DB에서 바로 읽어 응답한다(캐시는 적재하는 요청에 맡긴다).
 상한은 응답 예산(인기글 1초)과 Redis 타임아웃을 함께 보고 정한다. 첫 적재가 예외로 끝나면 기다리던 요청에 그 예외를 그대로 넘기지 않는다.</p>
 </details>
@@ -114,7 +114,7 @@ single-flight를 더하면 한 가지가 더 생긴다. 무효화 뒤에 온 요
 <li>진행 중인 적재를 세대별로 하나씩 담는 <code>ConcurrentHashMap&lt;세대, CompletableFuture&lt;List&lt;PopularPost&gt;&gt;&gt;</code>를 둔다. 같은 세대의 요청만 결과를 함께 받는다. 무효화 뒤에 온 요청은 새 세대라 따로 읽는다.</li>
 <li>자리를 차지한 한 요청만 캐시를 한 번 더 보고, DB를 읽어 (세대가 같으면) 캐시에 쓴 뒤 결과를 <code>complete</code>한다. 끝나면 자리를 비운다.</li>
 <li>나머지 요청은 <code>get(1초)</code>로 그 결과를 받는다. 1초가 넘거나 적재가 실패하면 DB에서 바로 읽는다.</li>
-<li>Redis 장애 때는 캐시 읽기·쓰기가 <code>RedisGuard</code>로 건너뛰어진다. 그때도 동시 요청은 한 번의 DB 조회를 함께 받는다.</li>
+<li><code>RedisGuard</code>가 처리하는 연결 실패는 캐시 읽기·쓰기를 건너뛰어 DB로 진행한다. B16 수정 전에는 명령 타임아웃(기본 60초)·명령 거절이 그대로 전파되므로 E01만으로 장애 폴백을 보장하지 않는다. B16을 고치면 이 예외도 폴백한다. single-flight의 공유 범위는 같은 세대이며, 대기 상한을 넘긴 요청은 별도로 DB를 읽을 수 있다.</li>
 <li><code>PopularPostStampedeTest</code>를 추가했다.</li>
 </ul>
 <p>다른 정답도 된다. 상한을 둔 <code>ReentrantLock.tryLock</code> + 락 안 재확인, 또는 서버가 여러 대이고 DB 부하가 문제라면 Redis <code>SET NX PX</code> 락 + 짧은 대기 + 폴백이다. 어느 쪽이든 늦은 저장을 막는 장치(세대 비교 저장 등)는 따로 있어야 한다.
