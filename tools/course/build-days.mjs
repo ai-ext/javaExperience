@@ -443,9 +443,20 @@ function navLine(day, roadmap) {
 
 export function graderPrompt(day, cards, hintsDay, template, root = ROOT) {
   const criteria = [];
+  // 2단계: C 항목마다 담당 티켓(고르지 않은 선택 티켓이면 채점에서 뺀다)과 "기록으로 확인"(수정 전 증거) 표시를 붙인다
+  const g = hintsDay.grader ?? {};
+  const allIds = day.steps.flatMap((s) => s.done.map((_, i) => `C${s.no}-${i + 1}`));
+  for (const id of [...(g.fromRecords ?? []), ...Object.keys(g.itemTickets ?? {})]) if (!allIds.includes(id)) throw new Error(`hints.json: ${day.id} 채점 표시가 없는 항목을 가리킨다 → ${id}`);
+  const tagOf = (s, id) => {
+    if (day.phase !== 'maintain') return '';
+    const ticket = id in (g.itemTickets ?? {}) ? g.itemTickets[id] : (s.tickets?.length === 1 ? s.tickets[0] : '');
+    if (ticket && !s.tickets.includes(ticket)) throw new Error(`hints.json: ${day.id} ${id}의 티켓 ${ticket}이 그 순서 티켓이 아니다`);
+    const tags = [ticket, (g.fromRecords ?? []).includes(id) ? '기록으로 확인' : ''].filter(Boolean);
+    return tags.length ? `(${tags.join(' · ')}) ` : '';
+  };
   for (const s of day.steps) {
     criteria.push(`${circled(s.no)} ${stripMd(s.title)}`);
-    s.done.forEach((d, i) => criteria.push(`  - [C${s.no}-${i + 1}] ${stripMd(d)}`));
+    s.done.forEach((d, i) => criteria.push(`  - [C${s.no}-${i + 1}] ${tagOf(s, `C${s.no}-${i + 1}`)}${stripMd(d)}`));
     if (s.trap) criteria.push(`  - [R${s.no}] 함정을 피했는지 코드로 확인: ${stripMd(s.trap)}`);
   }
   const cardLines = [];

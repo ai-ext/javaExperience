@@ -367,6 +367,28 @@ for (const day of course.days) {
   }
   // 4-1) 접힌 힌트의 제목(summary)은 접혀 있어도 보인다. 어디를 볼지는 말해도 원인·고칠 방법은 말하지 않는다.
   // 낱말은 그 티켓 "원인과 정답" 접기에서 고른 핵심어다(거기 없으면 목록이 낡은 것이라 실패시킨다).
+  // 접기 밖에 보이는 글: details를 뺀 본문 + 접기 제목(summary) 글 + 그 둘에 속한 요소의 aria-label·title.
+  // 속성은 details를 지우기 전에 모은다. summary와 그 자식은 접혀 있어도 보이거나 읽힌다.
+  const visibleOf = (doc) => {
+    const shown = (e) => !e.closest('details') || Boolean(e.closest('summary'));
+    const attrs = [...doc.body.querySelectorAll('[aria-label],[title]')].filter(shown).map((e) => ` ${e.getAttribute('aria-label') ?? ''} ${e.getAttribute('title') ?? ''}`).join('');
+    const summaries = [...doc.body.querySelectorAll('summary')].map((e) => ` ${e.textContent}`).join('');
+    const bare = doc.body.cloneNode(true);
+    bare.querySelectorAll('details').forEach((d) => d.remove());
+    return plainText(bare.textContent + summaries + attrs);
+  };
+  // 낱말 목록이 놓친 해법·메커니즘 문구(codex P8-3 리뷰 ①)와 동의 표현. 진단 도구 이름은 넣지 않는다.
+  // ticketFixPhrases는 티켓 페이지와 그 티켓을 다루는 일자 페이지 모두, dayFixPhrases는 일자 페이지에만 건다(티켓 제출물 질문이 쓰는 말이 있어서).
+  const ticketFixPhrases = {
+    B02: ['ALTER TABLE', '인덱스를 바꾸', '인덱스를 고치'],
+    B09: ['누구의 자정', '시간대의 "오늘"'],
+    B10: ['서로 다른 Idempotency-Key', '3초에 포기'],
+    B15: ['다시 캐시에', '다시 들어가', '다시 채워', '재적재되'],
+  };
+  const dayFixPhrases = {
+    B01: ['무엇을 붙잡고'], B03: ['이미 일어난'], B04: ['기동만 되게'], B06: ['기다리는 중인지', '무엇을 기다리는지'],
+    B07: ['쥔 락', '무엇을 쥐고'], B10: ['횟수 설정'], B12: ['컨트롤러까지 오지'], B13: ['아무나 콜백'], B15: ['옛 값'], B16: ['무엇을 기다리는지'],
+  };
   const causeTerms = {
     B01: ['tx.execute', 'PG 대기', '풀 크기'],
     B02: ['(id, status)', '(status, id)', '죽은 인덱스', '분포'],
@@ -399,16 +421,13 @@ for (const day of course.days) {
       for (const term of terms) assert.ok(!title.includes(term), `${id}: 접기 제목 "${title}"이 원인 핵심어 "${term}"를 드러낸다`);
     }
     // 접기 밖 본문 전체(받은 티켓·환경과 재현·제출물·흐름 증상 단계·aria-label·title)도 원인 핵심어를 쓰지 않는다. 티켓 제목(증상 문장)만 뺀다.
-    const bare = doc.body.cloneNode(true);
-    bare.querySelectorAll('details').forEach((d) => d.remove());
     const symptom = plainText(doc.querySelector('h1')?.textContent.replace(/^#\s*/, '') ?? '');
-    const visible = plainText(bare.textContent + [...bare.querySelectorAll('[aria-label],[title]')].map((e) => ` ${e.getAttribute('aria-label')} ${e.getAttribute('title')}`).join('')).split(symptom).join(' ');
-    for (const term of terms) {
+    const visible = visibleOf(doc).split(symptom).join(' ');
+    for (const term of [...terms, ...(ticketFixPhrases[id] ?? [])]) {
       const at = visible.indexOf(plainText(term));
       if (at >= 0) ticketLeaks.push(`${id} "${term}": …${visible.slice(Math.max(0, at - 40), at + 30)}…`);
     }
   }
-  assert.deepEqual(ticketLeaks, [], `티켓 페이지 접기 밖 원인 핵심어 ${ticketLeaks.length}건`);
   // 4-2) 2단계·마무리 일자 페이지: 자리표시가 없고, 순서마다 닫힌 힌트가 있고, 티켓 순서는 티켓 페이지 "원인과 정답" 절로 잇는다.
   // hints.json에서 온 문장(힌트·리뷰 초점)도, 접기 밖에 보이는 글 전체도 그날 티켓의 원인 핵심어를 쓰지 않는다.
   const hintsData = JSON.parse(fs.readFileSync(new URL('course/hints.json', root), 'utf8'));
@@ -451,16 +470,20 @@ for (const day of course.days) {
     }
     for (const line of hintsDay.grader?.focus ?? []) for (const term of terms) assert.ok(!plainText(line).includes(plainText(term)), `${day.id}: 리뷰 초점이 원인 핵심어 "${term}"를 말한다`);
     for (const summary of doc.querySelectorAll('summary')) for (const term of terms) assert.ok(!text(summary).includes(term), `${day.id}: 접기 제목 "${text(summary)}"이 원인 핵심어 "${term}"를 드러낸다`);
-    const bare = doc.body.cloneNode(true);
-    bare.querySelectorAll('details').forEach((d) => d.remove());
-    const visible = plainText(bare.textContent + [...bare.querySelectorAll('[aria-label],[title]')].map((e) => ` ${e.getAttribute('aria-label')} ${e.getAttribute('title')}`).join(''));
+    const visible = visibleOf(doc);
     // 접기 밖(순서 제목·완료 조건·겪을 것·채점 프롬프트·카드 질문·배지 title 포함)에는 그날 티켓의 원인 핵심어가 한 번도 나오지 않는다
-    for (const t of dayTickets) for (const term of [...(causeTerms[t] ?? []), ...(dayCauseTerms[t] ?? [])]) {
+    for (const t of dayTickets) for (const term of [...(causeTerms[t] ?? []), ...(dayCauseTerms[t] ?? []), ...(ticketFixPhrases[t] ?? []), ...(dayFixPhrases[t] ?? [])]) {
       const at = visible.indexOf(plainText(term));
       if (at >= 0) visibleLeaks.push(`${day.id} ${t} "${term}": …${visible.slice(Math.max(0, at - 40), at + 30)}…`);
     }
   }
-  assert.deepEqual(visibleLeaks, [], `2단계 일자 페이지 접기 밖 원인 핵심어 ${visibleLeaks.length}건`);
+  assert.deepEqual([...ticketLeaks, ...visibleLeaks], [], `접기 밖 원인·해법 문구 — 티켓 페이지 ${ticketLeaks.length}건, 2단계 일자 페이지 ${visibleLeaks.length}건`);
+  // 접기 제목(summary)과 그 자식의 aria-label·title은 접혀 있어도 보이거나 읽힌다(codex P8-3 리뷰 ④)
+  {
+    const injected = new JSDOM('<body><details><summary aria-label="Hikari 풀 고갈">막히면</summary><p>안</p></details></body>').window.document;
+    assert.ok(visibleOf(injected).includes('Hikari 풀 고갈'), 'summary의 aria-label도 접기 밖 글로 검사한다');
+    assert.ok(!visibleOf(injected).includes('안'), '접기 본문은 접기 밖 글이 아니다');
+  }
   // 5) 조작: 이전·다음·끝·처음, 재생은 속도대로 넘어가고 마지막에서 멈춘다, 키보드, 원인 접기를 열면 재생 순서에 끼어든다.
   const fakeTimers = (win) => {
     win.__timers = [];

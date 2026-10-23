@@ -225,6 +225,31 @@ test('2단계 채점 프롬프트는 티켓마다 3점 세트를, 마무리는 �
   assert.ok(!p15.includes('[T-'), 'D15: 티켓 3점 세트 없음');
 });
 
+test('2단계 채점: 고른 티켓을 먼저 적고, 고르지 않은 티켓의 C 항목은 빼고, 수정 전 증거는 기록으로 확인한다', () => {
+  const prompt = (id) => { const md = page(id); return md.slice(md.indexOf('## AI 채점 프롬프트'), md.indexOf('## 내일 미리보기')); };
+  const required = new Set(['B01', 'B02', 'B03', 'B04']);
+  for (const d of roadmap.days.filter((x) => x.phase === 'maintain')) {
+    const p = prompt(d.id);
+    assert.ok(p.includes('B01·B02·B03·B04') && p.includes('고른 티켓'), `${d.id}: 필수 티켓과 고른 티켓 기록`);
+    assert.match(p, /제외/, `${d.id}: 고르지 않은 티켓 항목 제외 규칙`);
+    assert.match(p, /\(기록으로 확인\)/, `${d.id}: 수정 전 증거는 기록으로`);
+    const g = hints.days[d.id].grader;
+    for (const s of d.steps) s.done.forEach((_, i) => {
+      const id = `C${s.no}-${i + 1}`;
+      const line = p.split('\n').find((l) => l.includes(`[${id}]`));
+      const ticket = id in (g.itemTickets ?? {}) ? g.itemTickets[id] : (s.tickets.length === 1 ? s.tickets[0] : '');
+      if (ticket && !required.has(ticket)) assert.ok(line.includes(`(${ticket}`), `${d.id} ${id}: 선택 티켓 ${ticket} 표시`);
+      assert.equal(line.includes('기록으로 확인'), (g.fromRecords ?? []).includes(id), `${d.id} ${id}: 기록 표시`);
+    });
+  }
+  // 같은 서버에 수정 전·후를 함께 요구하지 않는다: D11 env 200(수정 전)은 기록, 401(수정 후)은 지금 서버
+  const d11 = prompt('D11').split('\n');
+  assert.ok(d11.find((l) => l.includes('[C1-2]')).includes('기록으로 확인'));
+  assert.ok(!d11.find((l) => l.includes('[C3-3]')).includes('기록으로 확인'));
+  assert.ok(d11.find((l) => l.includes('[C2-2]')).includes('기록으로 확인'), 'B08 특성화(수정 전 응답 고정)는 기록');
+  for (const l of prompt('D13').split('\n').filter((x) => /^ {2}- \[C\d/.test(x))) assert.match(l, /\((B06|B07|B09|B10)/, `D13 선택 티켓 표시: ${l}`);
+});
+
 test('모든 완성 순서에 힌트가 1~2줄 있다', () => {
   for (const d of readyDays) for (const s of d.steps) {
     const h = hints.days[d.id].steps[String(s.no)];
