@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>모의 장애 훈련: Redis 장애 대응과 회고</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=53f71b596d04">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<h1 id="모의-장애-훈련-redis-장애-대응과-회고"><a class="anchor" href="#모의-장애-훈련-redis-장애-대응과-회고" aria-hidden="true">#</a>모의 장애 훈련: Redis 장애 대응과 회고</h1>
+<blockquote>
+<p>같은 날: D14 ⑥ · 앞선 단계: B16(Redis 타임아웃·폴백)을 고친 서버로 한다 · 도구: <code>messy-server/drills/</code>, 스레드 덤프, 서버 로그</p>
+</blockquote>
+<p>훈련의 목표는 &quot;고쳤다&quot;를 장애 상황에서 다시 증명하는 것이다. 장애를 넣는 쪽과 대응하는 쪽을 나누면 좋다(혼자라면 <code>start.sh</code>가 주입 시각을 숨겨 준다).
+증상이 보이자마자 재시작하지 않는다. 재시작하면 스레드 덤프 같은 증거가 사라져 원인을 지목할 수 없다.</p>
+<h2 id="준비"><a class="anchor" href="#준비" aria-hidden="true">#</a>준비</h2>
+<ol>
+<li><code>messy-server</code>에서 <code>docker compose up -d</code><ul>
+<li>서버는 Toxiproxy(16380)를 거쳐 Redis에 붙는다(<code>compose.yaml</code>, <code>toxiproxy.json</code>의 <code>redis</code> 프록시). <code>redis-cli</code>로 Redis에 바로 붙을 때는 16381(또는 <code>docker compose exec redis redis-cli</code>).</li>
+</ul>
+</li>
+<li>서버를 띄우고 로그를 파일로도 남긴다:
+<code>mkdir -p /tmp/board-drill &amp;&amp; ./gradlew bootRun --args=&#39;--spring.profiles.active=local&#39; 2&gt;&amp;1 | tee /tmp/board-drill/server.log</code></li>
+<li>다른 터미널에서 <code>bash drills/probe.sh</code> — 1초마다 글쓰기·인기글을 부르고 코드·시간을 찍는다. 1초를 넘기거나 코드가 다르면 <code>!!</code>.</li>
+</ol>
+<h2 id="스크립트"><a class="anchor" href="#스크립트" aria-hidden="true">#</a>스크립트</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>스크립트</th>
+<th>하는 일</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>drills/start.sh</code></td>
+<td>10~90초 뒤 무작위 시각에 장애를 한 번 넣는다(기본 지연 3초, <code>FAULT=down</code>이면 연결 끊김). 시각은 알려 주지 않는다</td>
+</tr>
+<tr>
+<td><code>drills/inject.sh latency [ms]</code> / <code>down</code> / <code>status</code></td>
+<td>바로 주입한다(지연 기본 3000ms / 프록시 닫기 / 상태 보기)</td>
+</tr>
+<tr>
+<td><code>drills/probe.sh</code></td>
+<td>사용자 흉내 요청과 응답 시간 기록(<code>/tmp/board-drill/probe-*.log</code>)</td>
+</tr>
+<tr>
+<td><code>drills/evidence.sh</code></td>
+<td>복구 전에 증거를 남긴다: 스레드 덤프 3장(2초 간격), 헬스, Toxiproxy 상태. Redis를 기다리는 요청 스레드를 추려 보여 준다</td>
+</tr>
+<tr>
+<td><code>drills/recover.sh</code></td>
+<td>장애를 걷고 프록시를 다시 연다. 주입·복구 기록(실제 주입 시각)을 보여 준다</td>
+</tr>
+</tbody></table></div>
+<p>기록은 모두 <code>/tmp/board-drill/</code>(<code>DRILL_OUT</code>으로 바꿀 수 있다)에 남는다.</p>
+<h2 id="진행"><a class="anchor" href="#진행" aria-hidden="true">#</a>진행</h2>
+<ol>
+<li><code>bash drills/start.sh</code> → <code>probe.sh</code> 출력과 서버 로그를 지켜본다.</li>
+<li>이상을 알아차린 순간의 시각을 적는다(무엇을 보고 알았는가: <code>!!</code>, 경고 로그 <code>Redis … 실패, 5초 동안 Redis 없이 처리한다</code>, 지표).</li>
+<li><code>bash drills/evidence.sh</code>로 증거부터 남긴다. 스레드 덤프에서 요청 스레드가 어디서 기다리는지 본다.</li>
+<li>원인을 지목한 시각과 근거를 적는다. 조치(복구)는 그다음이다: <code>bash drills/recover.sh</code>.</li>
+<li>합격 기준: 주입 중에도 <code>probe.sh</code>의 글쓰기가 201, 인기글이 200이고 둘 다 1초 안이다. 경고 로그는 남되 요청은 실패하지 않는다.
+B16을 고치기 전 서버라면 여기서 글쓰기가 수 초씩 걸리거나(지연) 인기글이 500이다(끊김). 그 차이가 회고의 핵심 증거다.</li>
+<li>지연과 끊김을 한 번씩 해 본다(<code>FAULT=down bash drills/start.sh</code>).</li>
+</ol>
+<h2 id="회고-양식"><a class="anchor" href="#회고-양식" aria-hidden="true">#</a>회고 양식</h2>
+<p>아래를 복사해 채운다. 시각은 <code>probe-*.log</code>·<code>injections.log</code>·서버 로그에서 가져온다(기억으로 적지 않는다).</p>
+<pre><code class="language-markdown"># 장애 회고: Redis &lt;지연 3초 | 연결 끊김&gt; 훈련 (YYYY-MM-DD)
+
+## 요약
+- 한 줄 요약:
+- 영향: (글쓰기·인기글·로그인·랭킹 중 무엇이, 몇 분, 얼마나 느리거나 실패했나)
+- 심각도: (사용자 요청 실패 / 지연만 / 영향 없음)
+
+## 타임라인 (시:분:초)
+| 시각 | 일 | 근거(로그 줄·파일) |
+|---|---|---|
+|  | 장애 주입(recover.sh가 보여 준 실제 시각) | injections.log |
+|  | 첫 이상 징후 (probe `!!` 또는 경고 로그) | |
+|  | 알아차림(내가 이상을 인지한 시각) | |
+|  | 증거 수집(evidence.sh) | evidence-*/ |
+|  | 원인 지목 | |
+|  | 복구(recover.sh) | |
+|  | 정상 확인(probe 정상 복귀) | |
+
+- 알아차리기까지 걸린 시간(주입 → 알아차림):
+- 원인 지목까지 걸린 시간(알아차림 → 지목):
+
+## 원인
+- 직접 원인: (무엇이 요청 스레드를 붙잡았나 / 무엇이 예외로 올라왔나)
+- 근거: (스레드 덤프의 스택 몇 줄, 로그 몇 줄을 그대로 붙인다)
+- 왜 캐시 장애가 핵심 경로로 번졌거나 번지지 않았나: (타임아웃 값, 폴백이 잡는 예외 범위, 건너뛰기)
+
+## 조치
+- 장애 중 한 일과 그 결과:
+- 하지 않은 일과 이유: (예: 재시작하지 않음 — 증거 보존)
+
+## 재발 방지
+| 항목 | 담당 | 기한 | 확인 방법(테스트·지표·알림) |
+|---|---|---|---|
+|  |  |  |  |
+
+## 잘된 점 / 아쉬운 점
+- 잘된 점:
+- 아쉬운 점(알아차리는 데 오래 걸린 이유, 빠진 지표·로그):</code></pre>
+<h2 id="더-해-보기"><a class="anchor" href="#더-해-보기" aria-hidden="true">#</a>더 해 보기</h2>
+<ul>
+<li>지연 시간을 400ms·1000ms·5000ms로 바꿔 가며 응답 시간이 어떻게 변하는지 표로 남긴다(타임아웃 500ms와 비교).</li>
+<li><code>drills/inject.sh latency 3000</code>을 넣은 채 로그인을 해 본다. 로그인 시도 제한(fail-open)은 Redis 없이도 통과하는가.</li>
+<li>인기글 캐시를 비운 상태(<code>docker compose exec redis redis-cli DEL popular:posts</code>)에서 지연을 넣고, 캐시 재적재가 DB에 몰리는지 본다(D14 ⑤ 고도화와 연결).</li>
+</ul>
+
+
+</main>
+
+
+
+
+
+</body>
+</html>

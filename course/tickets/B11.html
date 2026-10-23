@@ -44,12 +44,12 @@
   <ol class="flow-steps"><li class="flow-step" id="flow-b11-1" data-order="1" data-node="config"><p class="flow-step-head"><span class="flow-step-no">1</span><span class="flow-step-node">application-prod.yml</span></p><p class="flow-step-title"><code>application-prod.yml</code>에 1800을 넣어 배포했다</p><dl class="flow-values"><div><dt>변경</dt><dd><code>expires-in-seconds: 1800</code></dd></div><div><dt>확인</dt><dd>jar는 새 것이 맞다</dd></div></dl></li><li class="flow-step" id="flow-b11-4" data-order="4" data-node="symptom"><p class="flow-step-head"><span class="flow-step-no">2</span><span class="flow-step-node">로그인 응답</span></p><p class="flow-step-title">운영에서 로그인하면 <code>expiresIn</code>이 여전히 7200</p><dl class="flow-values"><div><dt>티켓</dt><dd>1800도 3600도 아니고 7200</dd></div></dl></li><li class="flow-step" id="flow-b11-5" data-order="5" data-node="observe"><p class="flow-step-head"><span class="flow-step-no">3</span><span class="flow-step-node">관찰 지점</span></p><p class="flow-step-title">이 키를 누가 이겼는지 본다</p><dl class="flow-values"><div><dt>재현</dt><dd><code>/actuator/env/board.jwt.expires-in-seconds</code>의 출처 목록 맨 위가 <code>application-prod.yml</code>이 아니다</dd></div></dl></li></ol>
   <details class="flow-cause"><summary>원인 쪽 단계 2개 펼치기 — "원인과 정답"과 같은 수준</summary>
   <p class="flow-cause-note">원인 서술을 먼저 써 본 뒤 펼치세요. 단계 번호는 위 증상 단계와 섞인 실제 순서로 재생됩니다.</p>
-  <ol class="flow-steps is-cause"><li class="flow-step is-cause" id="flow-b11-2" data-order="2" data-node="data"><p class="flow-step-head"><span class="flow-step-no">원인 1</span><span class="flow-step-node">환경 변수 파일</span></p><p class="flow-step-title">환경 변수 파일에 6월에 넣은 값이 남아 있다</p><dl class="flow-values"><div><dt>줄</dt><dd><code>BOARD_JWT_EXPIRESINSECONDS=7200</code> (&quot;로그인 유지&quot; 임시 연장)</dd></div></dl></li><li class="flow-step is-cause" id="flow-b11-3" data-order="3" data-node="code"><p class="flow-step-head"><span class="flow-step-no">원인 2</span><span class="flow-step-node">설정 우선순위</span></p><p class="flow-step-title">OS 환경 변수는 어떤 <code>application*.yml</code>보다 우선한다</p><dl class="flow-values"><div><dt>착각</dt><dd>&quot;프로파일 전용 yml이 마지막에 덮는다&quot; — yml끼리만 맞다</dd></div></dl></li></ol></details>
+  <ol class="flow-steps is-cause"><li class="flow-step is-cause" id="flow-b11-2" data-order="2" data-node="data"><p class="flow-step-head"><span class="flow-step-no">원인 1</span><span class="flow-step-node">환경 변수 파일</span></p><p class="flow-step-title">환경 변수 파일에 6월에 넣은 값이 남아 있다</p><dl class="flow-values"><div><dt>줄</dt><dd><code>BOARD_JWT_EXPIRES_IN_SECONDS=7200</code> (&quot;로그인 유지&quot; 임시 연장)</dd></div></dl></li><li class="flow-step is-cause" id="flow-b11-3" data-order="3" data-node="code"><p class="flow-step-head"><span class="flow-step-no">원인 2</span><span class="flow-step-node">설정 우선순위</span></p><p class="flow-step-title">OS 환경 변수는 어떤 <code>application*.yml</code>보다 우선한다</p><dl class="flow-values"><div><dt>착각</dt><dd>&quot;프로파일 전용 yml이 마지막에 덮는다&quot; — yml끼리만 맞다</dd></div></dl></li></ol></details>
 </section>
 <h2 id="환경과-재현"><a class="anchor" href="#환경과-재현" aria-hidden="true">#</a>환경과 재현</h2>
 <ol>
 <li><code>messy-server</code>에서 <code>docker compose up -d</code></li>
-<li><code>bash tickets/B11/repro.sh</code> (8088 포트로 서버를 직접 띄우고 끝나면 내린다)<ul>
+<li><code>bash tickets/B11/repro.sh</code> (bootJar로 만든 jar를 8088 포트에 띄우고, 끝나면 그 프로세스만 내린다. 포트가 이미 쓰이면 시작하지 않는다)<ul>
 <li>운영 서버가 읽는 환경 변수 파일 <code>deploy/board.env</code>를 그대로 읽고, 접속 정보·비밀값만 로컬 값으로 바꿔 <code>prod</code> 프로파일로 띄운다.</li>
 <li>로그인 응답의 <code>expiresIn</code>과 <code>/actuator/env/board.jwt.expires-in-seconds</code>를 찍는다.</li>
 <li>기대 증상: <code>expiresIn</code>이 7200이다. <code>/actuator/env</code>가 보여 주는 이 키의 출처 목록에서 맨 위(이긴 값)가 <code>application-prod.yml</code>이 아니다.</li>
@@ -74,7 +74,7 @@
 <summary>2. Spring Boot의 설정 우선순위</summary>
 
 <p>뒤에 오는 것이 이긴다: jar 안 <code>application.yml</code> → jar 안 <code>application-{profile}.yml</code> → … → <strong>OS 환경 변수</strong> → Java 시스템 프로퍼티 → 커맨드라인 인자.
-환경 변수는 느슨한 바인딩(relaxed binding)으로 키에 붙는다. <code>BOARD_JWT_EXPIRESINSECONDS</code>는 <code>board.jwt.expires-in-seconds</code>와 같은 키다.
+환경 변수는 느슨한 바인딩(relaxed binding)으로 키에 붙는다. 점을 밑줄로 바꾸고 대문자로 쓴 <code>BOARD_JWT_EXPIRES_IN_SECONDS</code>는 <code>board.jwt.expires-in-seconds</code>와 같은 키다.
 리포에서 <code>7200</code>과 <code>EXPIRES</code>를 찾아본다(<code>grep -rn</code>). 소스 밖 파일도 본다.</p>
 </details>
 
@@ -89,7 +89,7 @@
 <details>
 <summary>펼치기</summary>
 
-<p><strong>원인.</strong> 운영 서버 환경 변수 파일 <code>deploy/board.env</code>에 6월에 넣은 <code>BOARD_JWT_EXPIRESINSECONDS=7200</code>(&quot;로그인 유지&quot; 임시 연장)이 남아 있다.
+<p><strong>원인.</strong> 운영 서버 환경 변수 파일 <code>deploy/board.env</code>에 6월에 넣은 <code>BOARD_JWT_EXPIRES_IN_SECONDS=7200</code>(&quot;로그인 유지&quot; 임시 연장)이 남아 있다.
 OS 환경 변수는 어떤 <code>application*.yml</code>보다 우선순위가 높으므로, <code>application-prod.yml</code>에 1800을 넣어도 환경 변수 7200이 이긴다.
 &quot;프로파일 전용 yml이 마지막에 덮는다&quot;는 착각이 원인이다. yml끼리는 맞지만 환경 변수·시스템 프로퍼티·커맨드라인 인자는 그보다 위다.
 yml만 고치면 몇 번을 배포해도 그대로다(로드맵 함정).</p>
@@ -98,7 +98,8 @@ yml만 고치면 몇 번을 배포해도 그대로다(로드맵 함정).</p>
 고친 뒤 <code>/actuator/env/board.jwt.expires-in-seconds</code>의 이긴 출처가 <code>application-prod.yml</code>이고, 로그인 응답 <code>expiresIn</code>이 1800인지 확인한다.</p>
 <p><strong>확인 테스트.</strong> <code>tickets/B11/answer/B11ConfirmTest.java</code> — <code>운영_배포_환경_변수로_띄우면_토큰_만료는_1800초다</code>, <code>환경_변수가_없는_로컬은_기본값_3600초다</code></p>
 <p><strong>1단계 정답 서버는?</strong> <code>board-server/src/main/resources/application-prod.yml</code>은 비밀값·접속 정보를 기본값 없는 자리표시자(<code>${DB_URL}</code> 등)로만 두고,
-동작값은 <code>application.yml</code>에 둔다. 환경 변수로 들어오는 것은 자리표시자가 가리키는 이름뿐이라 같은 키가 두 출처에 겹치지 않는다.</p>
+동작값은 <code>application.yml</code>에 둔다. 정답 서버도 같은 <code>@ConfigurationProperties(&quot;board&quot;)</code> 바인딩을 쓰므로 환경 변수는 여전히 어떤 키든 덮어쓸 수 있다.
+차이는 배포 구성에 있다. 정답 서버의 운영 구성에서 환경 변수로 넣는 것은 자리표시자가 가리키는 이름(<code>DB_URL</code>, <code>BOARD_JWT_SECRET</code> 등)뿐이고 동작값 키를 넣는 환경 변수는 없어서, 같은 키가 두 출처에 겹치지 않는다. 자리표시자가 덮어쓰기를 막아 주는 것은 아니다. 누가 <code>BOARD_JWT_EXPIRES_IN_SECONDS</code>를 넣으면 정답 서버에서도 그 값이 이긴다.</p>
 </details>
 
 
