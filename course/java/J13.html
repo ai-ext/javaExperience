@@ -17,11 +17,11 @@
 
 <h1 id="j13-리팩터링-③-쿠폰-종류별-if-else를-discountpolicy-전략으로"><a class="anchor" href="#j13-리팩터링-③-쿠폰-종류별-if-else를-discountpolicy-전략으로" aria-hidden="true">#</a>J13. 리팩터링 ③: 쿠폰 종류별 if-else를 DiscountPolicy 전략으로</h1>
 <blockquote>
-<p>같은 날: <a class="docref" href="../../docs/knowledge/D13-backend-glossary.html">D13</a> · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests &#39;J13*&#39;</code></p>
+<p>같은 날: D13 · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests &#39;J13*&#39;</code></p>
 </blockquote>
 <h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
-<p><a class="docref" href="../../docs/knowledge/D13-backend-glossary.html">D13</a>은 쿠폰 동시 사용(B07)과 충전 재시도(B10)를 고치는 날이다. 지금 board-server의 쿠폰 할인은 <code>OrderService</code>의 &quot;10% 한 가지&quot;뿐이다. 하지만 쿠폰 종류가 늘면 계산 메서드에 <code>if-else</code>가 하나씩 붙는다. <a class="docref" href="../../docs/knowledge/D13-backend-glossary.html">D13</a> ④의 <code>PgClient</code>는 재시도 규칙을 메서드 안의 조건문으로 두지 않는다. <code>PgRetryPolicy</code> 객체로 받는다. 규칙을 객체로 빼 두면 바꿔 끼울 수 있다.
-오늘은 Spring 없이 종류별 if-else로 된 할인 계산을 <code>DiscountPolicy</code> 구현 클래스로 옮긴다. 할인액은 한 원도 바뀌면 안 된다. <a class="docref" href="../../docs/knowledge/J11-juc.html">J11</a>·<a class="docref" href="../../docs/knowledge/J12-virtual-threads.html">J12</a>처럼 특성화 테스트가 이것을 지킨다.</p>
+<p>D13은 쿠폰 동시 사용(B07)과 충전 재시도(B10)를 고치는 날이다. 지금 서버(board-server·messy-server 둘 다)의 쿠폰 할인은 <code>OrderService</code>의 &quot;10% 한 가지&quot;뿐이다. 하지만 쿠폰 종류가 늘면 계산 메서드에 <code>if-else</code>가 하나씩 붙는다. D13 ④의 <code>PgClient</code>는 재시도 규칙을 메서드 안의 조건문으로 두지 않는다. <code>PgRetryPolicy</code> 객체로 받는다. 규칙을 객체로 빼 두면 바꿔 끼울 수 있다.
+오늘은 Spring 없이 종류별 if-else로 된 할인 계산을 <code>DiscountPolicy</code> 구현 클래스로 옮긴다. 할인액은 한 원도 바뀌면 안 된다. J11·J12처럼 특성화 테스트가 이것을 지킨다.</p>
 <h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -202,7 +202,7 @@ public Optional&lt;Coupon&gt; bestCoupon(List&lt;Coupon&gt; coupons, Order order
 <td>요청·응답 DTO, 값 객체</td>
 </tr>
 </tbody></table></div>
-<p>함정: compact 생성자 안에서는 <code>this.value = …</code>를 쓸 수 없다(컴파일 에러). 대신 <strong>매개변수 <code>value</code>에 다시 대입</strong>하면 생성자 끝에서 그 값이 필드에 담긴다. 그리고 record의 불변은 얕다. 구성 요소가 <code>List</code>면 compact 생성자에서 <code>List.copyOf</code>로 복사해야 한다(<a class="docref" href="../../docs/knowledge/J01-types-string.html">J01</a>의 방어적 복사).</p>
+<p>함정: compact 생성자 안에서는 <code>this.value = …</code>를 쓸 수 없다(컴파일 에러). 대신 <strong>매개변수 <code>value</code>에 다시 대입</strong>하면 생성자 끝에서 그 값이 필드에 담긴다. 그리고 record의 불변은 얕다. 구성 요소가 <code>List</code>면 compact 생성자에서 <code>List.copyOf</code>로 복사해야 한다(J01의 방어적 복사).</p>
 <p>과제: <code>CouponCode</code>의 compact 생성자를 채운다. 앞뒤 공백을 지우고 대문자로 바꾼 뒤(<code>toUpperCase(Locale.ROOT)</code> — 인자 없는 <code>toUpperCase()</code>는 서버 기본 로케일을 따라 터키어 로케일에서 <code>&quot;i&quot;</code>를 <code>&quot;İ&quot;</code>로 바꾼다), 영문 대문자·숫자만 6~12자인지 검사한다. 아니면(null 포함) <code>IllegalArgumentException</code>을 던진다.</p>
 <p>확인 테스트 — <code>J13TypeCutTest</code>:</p>
 <ul>
@@ -292,11 +292,12 @@ public CouponCode {
 </details>
 
 <h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2>
+<p>2단계(D11~D14)에서 진단하고 고치는 곳은 넘겨받은 <code>messy-server</code>다. <code>board-server</code>의 같은 이름 파일은 고친 뒤의 모습(정답 모양)이라 내용이 다르다. 아래는 어느 쪽을 보는지 경로에 적었다.</p>
 <ul>
-<li><a class="docref" href="../../docs/knowledge/D13-backend-glossary.html">D13</a> ① <code>board-server/src/main/java/com/example/board/shop/OrderService.java</code> — 쿠폰 할인이 <code>COUPON_DISCOUNT_PERCENT = 10</code> 한 가지 규칙으로 <code>place</code> 안에 들어 있다. 쿠폰 종류가 늘면 이 줄이 오늘의 if-else가 될 자리다. 그때 <code>List&lt;DiscountPolicy&gt;</code>를 주입받아 맡기면 된다.</li>
-<li><a class="docref" href="../../docs/knowledge/D13-backend-glossary.html">D13</a> ② <code>board-server/src/main/java/com/example/board/coupon/CouponService.java</code> — 쿠폰 발급·사용. 동시 사용 데드락(B07)을 고칠 때 할인 규칙이 이 서비스에 섞여 있지 않아야 잠금 순서만 따로 볼 수 있다.</li>
-<li><a class="docref" href="../../docs/knowledge/D13-backend-glossary.html">D13</a> ④ <code>board-server/src/main/java/com/example/board/payment/PgClient.java</code> — 재시도 규칙을 메서드 안에 조건문으로 두지 않고 생성자로 받은 <code>PgRetryPolicy</code>에 맡긴다. <code>new PgRetryPolicy(maxAttempts)</code>로 시도 횟수가 다른 정책을 만들어 끼울 수 있다(오늘 <code>DiscountCalculator(List&lt;DiscountPolicy&gt;)</code>와 같은 생각).</li>
-<li><a class="docref" href="../../docs/knowledge/D13-backend-glossary.html">D13</a> ④ <code>board-server/src/main/java/com/example/board/payment/ChargeService.java</code> — <code>apply</code>가 PG 승인 상태(<code>DONE</code>·<code>FAILED</code>·<code>PENDING</code>)를 switch 식(<code>case DONE -&gt; …</code>)으로 가른다. 분기가 한 곳에 모여 있고 enum 상수라 오타가 없다(선택: switch 식).</li>
+<li>D07 ⑥ (참고) <code>board-server/src/main/java/com/example/board/shop/OrderService.java</code> — 쿠폰 할인이 <code>COUPON_DISCOUNT_PERCENT = 10</code> 한 가지 규칙으로 <code>place</code> 안에 들어 있다(<code>messy-server</code>의 같은 파일도 같다). 쿠폰 종류가 늘면 이 줄이 오늘의 if-else가 될 자리다. 그때 <code>List&lt;DiscountPolicy&gt;</code>를 주입받아 맡기면 된다.</li>
+<li>D13 ② <code>messy-server/src/main/java/com/example/board/coupon/CouponService.java</code> — 쿠폰 발급. 고친 뒤 모습은 <code>board-server</code>의 같은 파일이다. B07을 고칠 때 할인 규칙 같은 다른 관심사가 이 서비스에 섞여 있지 않아야 고칠 곳만 따로 볼 수 있다.</li>
+<li>D08 ①④ (참고) <code>board-server/src/main/java/com/example/board/payment/PgClient.java</code> — 재시도 규칙을 메서드 안에 조건문으로 두지 않고 생성자로 받은 <code>PgRetryPolicy</code>에 맡긴다. <code>new PgRetryPolicy(maxAttempts)</code>로 시도 횟수가 다른 정책을 만들어 끼울 수 있다(오늘 <code>DiscountCalculator(List&lt;DiscountPolicy&gt;)</code>와 같은 생각).</li>
+<li>D13 ④ <code>board-server/src/main/java/com/example/board/payment/ChargeService.java</code> (고친 뒤 모습. B10을 고치는 <code>messy-server</code>의 같은 파일도 이 switch는 같다) — <code>apply</code>가 PG 승인 상태(<code>DONE</code>·<code>FAILED</code>·<code>PENDING</code>)를 switch 식(<code>case DONE -&gt; …</code>)으로 가른다. 분기가 한 곳에 모여 있고 enum 상수라 오타가 없다(선택: switch 식).</li>
 </ul>
 
 

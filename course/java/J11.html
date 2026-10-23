@@ -17,10 +17,10 @@
 
 <h1 id="j11-리팩터링-①-특성화-테스트로-레거시-동작-고정하기"><a class="anchor" href="#j11-리팩터링-①-특성화-테스트로-레거시-동작-고정하기" aria-hidden="true">#</a>J11. 리팩터링 ①: 특성화 테스트로 레거시 동작 고정하기</h1>
 <blockquote>
-<p>같은 날: <a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests &#39;J11*&#39;</code></p>
+<p>같은 날: D11 · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests &#39;J11*&#39;</code></p>
 </blockquote>
 <h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
-<p><a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a>부터는 남이 만든 코드를 넘겨받는다. <a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> ②에서 글 작성·수정·삭제와 <code>GET /api/members/me</code>의 <strong>지금 동작</strong>을 특성화 테스트로 고정한다. 그다음 ③④에서 버그를 고치고 구조를 바꾼다. 고정한 테스트가 안전망이 되어, 고치는 동안 다른 동작이 바뀌면 바로 드러난다.
+<p>D11부터는 남이 만든 코드를 넘겨받는다. D11 ②에서 글 작성·수정·삭제와 <code>GET /api/members/me</code>의 <strong>지금 동작</strong>을 특성화 테스트로 고정한다. 그다음 ③④에서 버그를 고치고 구조를 바꾼다. 고정한 테스트가 안전망이 되어, 고치는 동안 다른 동작이 바뀌면 바로 드러난다.
 오늘은 Spring 없이 같은 일을 해 본다. 문서 없이 조건이 덧붙은 레거시 포인트 계산 메서드가 있다. 이 메서드가 지금 돌려주는 값을 테스트로 고정한다. 이 테스트가 정말 동작을 고정했는지는 메서드를 일부러 한 곳씩 망가뜨린 변형으로 확인한다.</p>
 <h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2>
 <div class="table-wrap"><table>
@@ -52,7 +52,7 @@
 <td>이사 전에 방마다 사진을 찍어 두기</td>
 </tr>
 </tbody></table></div>
-<p>흔한 착각: &quot;특성화 테스트에도 옳은 값을 적어야 한다&quot;. 옳은 값을 적으면 고치기 전부터 실패한다. 그러면 테스트가 지금 동작을 고정하지 못하고 안전망 역할도 못 한다(<a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> ②의 함정). <code>VIP</code>는 5만 원 보너스가 없다. 이 규칙이 이상해 보여도 지금 그렇게 돌아가고 있으므로 그대로 적는다.</p>
+<p>흔한 착각: &quot;특성화 테스트에도 옳은 값을 적어야 한다&quot;. 옳은 값을 적으면 고치기 전부터 실패한다. 그러면 테스트가 지금 동작을 고정하지 못하고 안전망 역할도 못 한다(D11 ②의 함정). <code>VIP</code>는 5만 원 보너스가 없다. 이 규칙이 이상해 보여도 지금 그렇게 돌아가고 있으므로 그대로 적는다.</p>
 <h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
 <details>
 <summary>펼치기</summary>
@@ -145,13 +145,14 @@
 <p>통과시킬 테스트(주제 과제):</p>
 <ul>
 <li><code>J11CharacterizationTest</code> — 네가 쓴 테스트가 원본에서 모두 통과한다.</li>
-<li><code>J11MutantTest</code> — 네 테스트를 원본과 변형 3개에 돌려 본다. 변형은 원본에서 한 곳만 바꾼 것이다.<ul>
+<li><code>J11MutantTest</code> — 네 테스트를 원본과 변형 6개에 돌려 본다. 변형은 원본에서 한 곳만 바꾼 것이다.<ul>
 <li><code>원본_레거시에서는_특성화_테스트가_모두_통과한다</code></li>
-<li><code>한_곳을_바꾼_변형에서는_특성화_테스트가_실패한다</code> (변형마다 하나씩, 3개)</li>
+<li><code>한_곳을_바꾼_변형에서는_특성화_테스트가_실패한다</code> (변형마다 하나씩, 6개)</li>
 </ul>
 </li>
 </ul>
 <p>변형이 무엇을 바꿨는지는 <code>LegacyPointCalculatorMutant.java</code>에 있다. 먼저 보지 말고 테스트를 써 본다. 그다음 <code>J11MutantTest</code>의 실패 메시지(<code>변형 [...]에서도 특성화 테스트가 모두 통과합니다</code>)를 보고 빠진 경우를 더한다. 해피 패스만 확인하는 테스트로는 변형이 잡히지 않는다.</p>
+<p>변형이 검사하는 것은 경계 일부다(5만 원·1000원 경계, 3000 상한, VIP 예외, 대소문자, 내림). 변형 6개를 다 잡아도 음수 금액(-1)·null 등급 같은 경우는 아무도 검사하지 않는다. 완료 조건 밖이지만 &quot;분기마다 경계 양쪽&quot; 목록은 스스로 끝까지 채운다. 리팩터링할 때 안전망이 되는 것은 변형 테스트가 아니라 네가 고정한 경우들이다.</p>
 </details>
 
 <h2 id="기본기-반복"><a class="anchor" href="#기본기-반복" aria-hidden="true">#</a>기본기 반복</h2>
@@ -214,7 +215,7 @@ public static List&lt;String&gt; describeAll(LegacyPointCalculator calculator, i
 </ul>
 <h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2>
 <pre><code class="language-bash">./gradlew :java-track:test --tests 'J11*'</code></pre>
-<p><code>J11BasicsTest</code> 3개, <code>J11TypeCutTest</code> 4개, 네가 쓴 <code>J11CharacterizationTest</code>, 그리고 <code>J11MutantTest</code> 4개(원본 1 + 변형 3)가 모두 <code>PASSED</code>면 끝이다.</p>
+<p><code>J11BasicsTest</code> 3개, <code>J11TypeCutTest</code> 4개, 네가 쓴 <code>J11CharacterizationTest</code>, 그리고 <code>J11MutantTest</code> 7개(원본 1 + 변형 6)가 모두 <code>PASSED</code>면 끝이다.</p>
 <h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2>
 <details>
 <summary>펼치기</summary>
@@ -294,18 +295,19 @@ public static List&lt;Integer&gt; toIntegerList(int[] values) {
 }</code></pre>
 <p>왜 이렇게 쓰나:</p>
 <ol>
-<li>분기마다 경계 양쪽(<code>49999</code>/<code>50000</code>, <code>999</code>/<code>1000</code>)과 이상한 규칙(VIP 보너스 없음, 소문자 등급, 내림)을 하나씩 고정해야 변형이 잡힌다. 변형 3개는 각각 다른 테스트가 잡는다. <code>&gt;=</code>→<code>&gt;</code>는 50000 경계가, VIP 예외 삭제는 VIP 50000이, 내림→반올림은 홀수 포인트에 쿠폰을 쓴 경우가 잡는다.</li>
+<li>분기마다 경계 양쪽(<code>49999</code>/<code>50000</code>, <code>999</code>/<code>1000</code>)과 이상한 규칙(VIP 보너스 없음, 소문자 등급, 내림)을 하나씩 고정해야 변형이 잡힌다. 변형 6개는 각각 다른 테스트가 잡는다. <code>&gt;=</code>→<code>&gt;</code>는 50000 경계가, VIP 예외 삭제는 VIP 50000이, 내림→반올림은 홀수 포인트에 쿠폰을 쓴 경우가, <code>&lt;</code>→<code>&lt;=</code>는 1000원이, 상한 값 변경은 3000에서 잘린 경우가, <code>equalsIgnoreCase</code>는 소문자 <code>vip</code>가 잡는다. 음수와 null 등급은 변형이 없어도 같이 고정한다.</li>
 <li>조합 표(골든 마스터)는 빠뜨린 분기를 메워 준다. 하지만 어떤 규칙이 깨졌는지 이름으로 알려 주지는 못한다. 그래서 이름 붙인 경계 테스트와 같이 둔다.</li>
 <li>레거시가 돌려준 배열은 들고 있지 말고 내 List로 복사한다. 그래야 레거시 쪽 배열과 내 List가 서로를 바꾸지 않는다.</li>
 </ol>
 </details>
 
 <h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2>
+<p>2단계(D11~D14)에서 고치고 테스트를 쓰는 곳은 넘겨받은 <code>messy-server</code>다. <code>board-server</code>에 같은 이름의 파일이 있지만 그쪽은 고친 뒤의 모습(정답 모양)이다.</p>
 <ul>
-<li><a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> ② <code>board-server/src/test/java/com/example/board/post/PostServiceCharacterizationTest.java</code> (<strong><a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> ②에서 작성할 예정</strong> — 아직 없는 파일이다) — 글 작성·수정·삭제의 지금 동작을 고정한다. 알림 호출도 포함한다. 오늘 한 것과 같은 일을 서비스 단위로 한다.</li>
-<li><a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> ② <code>board-server/src/test/java/com/example/board/member/MemberApiCharacterizationTest.java</code> (<strong><a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> ②에서 작성할 예정</strong> — 아직 없는 파일이다) — <code>GET /api/members/me</code> 응답 필드를 지금 모양 그대로 고정한다. <code>passwordHash</code>가 보이는 것도 그대로 적는다. 이상한 동작도 그대로 적는 것이 특성화다.</li>
-<li><a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> ③ <code>board-server/src/main/java/com/example/board/member/MemberController.java</code> — B08을 고친 뒤 특성화 테스트를 새 기대값으로 <strong>의도적으로</strong> 갱신한다. 동작을 바꾸기로 결정한 곳만 기대값을 바꾼다.</li>
-<li><a class="docref" href="../../docs/knowledge/D11-web-security-basics.html">D11</a> ④ <code>board-server/src/main/java/com/example/board/post/PostServiceImpl.java</code> — 생성자 주입으로 바꾸고 알림 전송을 분리하는 동안 ②에서 작성할 <code>PostServiceCharacterizationTest</code>가 안전망이다(<a class="docref" href="../../docs/knowledge/J12-virtual-threads.html">J12</a>의 긴 메서드 나누기와 같은 생각).</li>
+<li>D11 ② <code>messy-server/src/test/java/com/example/board/post/PostServiceCharacterizationTest.java</code> (<strong>D11 ②에서 작성할 예정</strong> — 아직 없는 파일이다) — 글 작성·수정·삭제의 지금 동작을 고정한다. 알림 호출도 포함한다. 오늘 한 것과 같은 일을 서비스 단위로 한다.</li>
+<li>D11 ② <code>messy-server/src/test/java/com/example/board/member/MemberApiCharacterizationTest.java</code> (<strong>D11 ②에서 작성할 예정</strong> — 아직 없는 파일이다) — <code>GET /api/members/me</code> 응답 필드를 지금 모양 그대로 고정한다. <code>passwordHash</code>가 보이는 것도 그대로 적는다. 이상한 동작도 그대로 적는 것이 특성화다.</li>
+<li>D11 ③ <code>messy-server/src/main/java/com/example/board/member/MemberController.java</code> — ②에서 고정한 <code>GET /api/members/me</code> 응답을 B08 티켓에 따라 바꾸는 곳이다. 고친 뒤 특성화 테스트를 새 기대값으로 <strong>의도적으로</strong> 갱신한다. 동작을 바꾸기로 결정한 곳만 기대값을 바꾼다.</li>
+<li>D11 ④ <code>messy-server/src/main/java/com/example/board/post/PostServiceImpl.java</code> — B04 티켓에 따라 구조를 고치는 곳이다. 고치는 동안 ②에서 작성할 <code>PostServiceCharacterizationTest</code>가 안전망이다(J12의 긴 메서드 나누기와 같은 생각).</li>
 </ul>
 
 

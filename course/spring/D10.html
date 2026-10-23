@@ -3536,7 +3536,6 @@ class AdminFlowIntegrationTest extends ApiTestSupport {
 <li><code>@PreAuthorize</code>는 <code>@EnableMethodSecurity</code>를 켜야 동작하므로, 붙였는데 아무도 막지 않으면 이것부터 확인한다</li>
 <li>보호할 메서드는 바깥에서 직접 부르는 진입점에 두거나 별도 빈으로 빼고, URL 규칙(<code>/api/admin/**</code>는 ADMIN)을 첫 방어선으로 함께 둔다</li>
 </ul>
-<p><strong>근거</strong> 06 §7, 06 §6</p>
 </details>
 
 <h3 id="tc-d10-2"><a class="anchor" href="#tc-d10-2" aria-hidden="true">#</a>TC-D10-2</h3>
@@ -3549,7 +3548,6 @@ class AdminFlowIntegrationTest extends ApiTestSupport {
 <li>그래서 서비스에 <code>@Transactional</code>이 빠져 있어도 테스트에서는 영속성 컨텍스트가 열려 있어 지연 로딩과 변경 감지가 동작한다</li>
 <li>서비스 동작을 검증하는 통합 테스트는 테스트 트랜잭션 없이 돌리고, 데이터는 테스트가 끝난 뒤 직접 정리한다</li>
 </ul>
-<p><strong>근거</strong> 06 §11</p>
 </details>
 
 <h3 id="tc-d10-3"><a class="anchor" href="#tc-d10-3" aria-hidden="true">#</a>TC-D10-3</h3>
@@ -3562,7 +3560,7 @@ class AdminFlowIntegrationTest extends ApiTestSupport {
 <li>감사 로그를 업무 트랜잭션 안에서 쓰면 업무가 롤백될 때 로그도 함께 사라진다. 실패한 시도까지 남기려면 별도 빈의 <code>REQUIRES_NEW</code> 트랜잭션으로 쓴다</li>
 <li>기록할 값(<code>actor_id</code>, <code>action</code>, <code>target_type</code>, <code>target_id</code>)은 메서드 인자와 <code>SecurityContext</code>에서 얻는다</li>
 </ul>
-<p><strong>근거</strong> 06 §7, 05 §3-1, spec-v2 §6</p>
+<p><strong>근거</strong> spec-v2 §6</p>
 </details>
 
 <h3 id="tc-d10-4"><a class="anchor" href="#tc-d10-4" aria-hidden="true">#</a>TC-D10-4</h3>
@@ -3573,9 +3571,9 @@ class AdminFlowIntegrationTest extends ApiTestSupport {
 <ul>
 <li>명세는 부분 성공이다. 없는 회원이나 이미 보유한 행은 건너뛰고 <code>{issued, skipped[]}</code>로 알린다</li>
 <li>한 트랜잭션에서 행마다 중복 키 예외를 잡고 계속해도 JPA에서는 그 트랜잭션을 살려 쓸 수 없어(rollback-only 표시 또는 flush 시점 실패) 전체가 롤백된다</li>
-<li>그래서 보유 여부를 미리 조회해 건너뛰고, 경합으로 들어오는 중복은 UNIQUE가 막게 한다. 같은 파일을 다시 올려도 중복 지급되지 않는다</li>
+<li>그래서 대량 지급 메서드에는 <code>@Transactional</code>을 두지 않고 행마다 짧은 트랜잭션(<code>CouponService.issue</code>)으로 지급한다. 중복(UNIQUE)·소진은 그 행만 건너뛰므로 같은 파일을 다시 올려도 중복 지급되지 않는다</li>
 </ul>
-<p><strong>근거</strong> spec-v2 §5-6, 06 §7</p>
+<p><strong>근거</strong> spec-v2 §5-6</p>
 </details>
 
 <h3 id="tc-d10-5"><a class="anchor" href="#tc-d10-5" aria-hidden="true">#</a>TC-D10-5</h3>
@@ -3588,7 +3586,6 @@ class AdminFlowIntegrationTest extends ApiTestSupport {
 <li>테스트 컨텍스트에 실제 <code>SecurityFilterChain</code>과 JWT 필터가 올라와 있는지 확인한다. 보안 설정이 빠진 테스트는 아무것도 검증하지 않는다</li>
 <li><code>@WithMockUser</code>는 <code>SecurityContext</code>를 직접 채우므로 JWT 파싱 경로는 검증되지 않는다. JWT 필터는 실제 토큰으로 따로 확인한다</li>
 </ul>
-<p><strong>근거</strong> 06 §6, 06 §11</p>
 </details>
 
 <h2 id="ai-채점-프롬프트"><a class="anchor" href="#ai-채점-프롬프트" aria-hidden="true">#</a>AI 채점 프롬프트</h2>
@@ -3600,7 +3597,7 @@ class AdminFlowIntegrationTest extends ApiTestSupport {
 너는 Java·Spring 온보딩 과정 v2로 백엔드를 배우는 사람의 리뷰어다. 학습자는 빈 프로젝트에서 명세서 v2의 서버를 하루씩 만들고 있고, 오늘은 D10다.
 지킬 것: 코드는 절대 수정하지 마라. DB는 조회만 한다(SELECT·SHOW·EXPLAIN). 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.
 
-1. 서버 주소의 `GET /actuator/health`로 응답 가능 여부를 확인해라. 꺼져 있으면 `./gradlew bootRun`으로 띄우라고만 알려 주고 멈춰라.
+1. 서버 주소의 `GET /actuator/health`로 응답 가능 여부를 확인해라. 꺼져 있으면 `./gradlew bootRun --args='--spring.profiles.active=local'`(또는 `SPRING_PROFILES_ACTIVE=local ./gradlew bootRun`)으로 띄우라고만 알려 주고 멈춰라. D01 ③부터 DB 설정이 `local` 프로파일에 있어 프로파일 없이는 기동에 실패한다.
 2. 아래 &quot;채점 기준&quot;이 통과/실패의 유일한 기준이다. 기준에 없는 것으로 실패 처리하지 말고, 다른 날의 기준은 보지 마라.
 3. [C] 항목: HTTP 요청은 서버 주소로 직접 보내 상태 코드·응답 헤더·본문을 기대값과 비교한다. 테스트 이름이 적힌 항목은 레포 루트에서 `./gradlew test --tests '&lt;테스트 클래스 이름&gt;'`으로 실행해 통과 여부를 본다(테스트 코드도 고치지 마라). 로그 항목은 기동 로그에서 찾거나 학습자에게 해당 줄을 붙여 달라고 한다. DB 확인이 필요하면 `docker compose exec -T mysql mysql -uboard -pboard board -e &quot;&lt;SELECT 문&gt;&quot;`으로 조회만 한다.
 4. [R] 항목: 관련 코드를 찾아 읽고 그 함정을 피했는지 판단해라. 지적할 때는 `파일:줄`을 붙여라.
@@ -3650,7 +3647,7 @@ class AdminFlowIntegrationTest extends ApiTestSupport {
 - [TC-D10-4] 1,000행 엑셀로 쿠폰을 대량 지급하다 한 행이 실패하면 어떻게 되나요?
     · 명세는 부분 성공이다. 없는 회원이나 이미 보유한 행은 건너뛰고 {issued, skipped[]}로 알린다
     · 한 트랜잭션에서 행마다 중복 키 예외를 잡고 계속해도 JPA에서는 그 트랜잭션을 살려 쓸 수 없어(rollback-only 표시 또는 flush 시점 실패) 전체가 롤백된다
-    · 그래서 보유 여부를 미리 조회해 건너뛰고, 경합으로 들어오는 중복은 UNIQUE가 막게 한다. 같은 파일을 다시 올려도 중복 지급되지 않는다
+    · 그래서 대량 지급 메서드에는 @Transactional을 두지 않고 행마다 짧은 트랜잭션(CouponService.issue)으로 지급한다. 중복(UNIQUE)·소진은 그 행만 건너뛰므로 같은 파일을 다시 올려도 중복 지급되지 않는다
 - [TC-D10-5] &quot;신고 목록은 ADMIN만&quot; 규칙을 어떤 테스트로 고정했나요?
     · 토큰 없음(401), USER(403), ADMIN(200) 세 경우를 모두 보낸다. 성공 한 경우만 보면 규칙이 열려 있어도 통과한다
     · 테스트 컨텍스트에 실제 SecurityFilterChain과 JWT 필터가 올라와 있는지 확인한다. 보안 설정이 빠진 테스트는 아무것도 검증하지 않는다
@@ -3670,7 +3667,8 @@ class AdminFlowIntegrationTest extends ApiTestSupport {
 <h2 id="내일-미리보기"><a class="anchor" href="#내일-미리보기" aria-hidden="true">#</a>내일 미리보기</h2>
 <p>D11은 오늘까지 만든 1단계 서버에 결함을 심은 코드를 넘겨받아, 오늘 쓴 슬라이스·통합 테스트 방식으로 특성화 테스트를 쓴다.</p>
 <h2 id="날짜별-snapshot"><a class="anchor" href="#날짜별-snapshot" aria-hidden="true">#</a>날짜별 snapshot</h2>
-<p>오늘 마지막 정답 커밋은 <code>cea84ac5</code>(answer-fix(D10-5): 업로드 파일 검증 실패에도 errors[{field:file, reason}]를 담는다)이다. <a href="https://github.com/ai-ext/javaExperience/tree/cea84ac5d8eb219c2557762a290953497490de89/board-server" target="_blank" rel="noopener">이 시점의 board-server 전체 보기</a>. 기준은 위 순서 칸의 인라인 정답이고, 이 링크는 보조다(PR 병합 방식에 따라 커밋이 사라질 수 있다).</p>
+<p>오늘 마지막 정답 커밋은 <code>04539277</code>(answer(D10-6): 관리자 권한 슬라이스 테스트와 신고→숨김→감사 로그 통합 테스트)이다. <a href="https://github.com/ai-ext/javaExperience/tree/04539277d623351d74311b2063066fb1a8a68b6f/board-server" target="_blank" rel="noopener">이 시점의 board-server 전체 보기</a>. 기준은 위 순서 칸의 인라인 정답이고, 이 링크는 보조다(PR 병합 방식에 따라 커밋이 사라질 수 있다).</p>
+<p>오늘 순서의 보완(answer-fix)은 뒤 날 정답까지 만든 뒤에 커밋했으므로 위 링크에는 없다. 보완을 반영한 코드는 순서 칸의 &quot;보완&quot;에서 보고, 보완이 모두 들어간 최신 코드는 <a href="https://github.com/ai-ext/javaExperience/tree/main/board-server" target="_blank" rel="noopener">보완 반영 최신 코드: main의 board-server</a>에서 본다(뒤 날 코드도 함께 들어 있다).</p>
 <h2 id="참고-자료"><a class="anchor" href="#참고-자료" aria-hidden="true">#</a>참고 자료</h2>
 <details class="day-refs">
 <summary>기존 시나리오·공부자료 (참고 도감)</summary>

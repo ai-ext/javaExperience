@@ -17,10 +17,10 @@
 
 <h1 id="j07-mapset과-스레드-잔액-갱신-손실-재현하고-고치기"><a class="anchor" href="#j07-mapset과-스레드-잔액-갱신-손실-재현하고-고치기" aria-hidden="true">#</a>J07. Map·Set과 스레드: 잔액 갱신 손실 재현하고 고치기</h1>
 <blockquote>
-<p>같은 날: <a class="docref" href="../../docs/knowledge/D07-onprem-vs-cloud.html">D07</a> · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests &#39;J07*&#39;</code></p>
+<p>같은 날: D07 · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests &#39;J07*&#39;</code></p>
 </blockquote>
 <h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
-<p><a class="docref" href="../../docs/knowledge/D07-onprem-vs-cloud.html">D07</a>은 포인트·쿠폰 상점을 만드는 날이다. ① 포인트를 적립할 때 &quot;잔액을 읽어 더한 뒤 저장&quot;하면 동시 적립에서 갱신이 사라지므로 <code>UPDATE … SET point_balance = point_balance + ?</code>로 바꾼다. ④ 쿠폰 발급 버튼을 연타하면 &quot;이미 받았나&quot; 조회가 두 요청 모두 통과한다.
+<p>D07은 포인트·쿠폰 상점을 만드는 날이다. ① 포인트를 적립할 때 &quot;잔액을 읽어 더한 뒤 저장&quot;하면 동시 적립에서 갱신이 사라지므로 <code>UPDATE … SET point_balance = point_balance + ?</code>로 바꾼다. ④ 쿠폰 발급 버튼을 연타하면 &quot;이미 받았나&quot; 조회가 두 요청 모두 통과한다.
 오늘은 DB 없이 같은 사고를 순수 Java로 재현한다. 두 스레드가 같은 잔액을 읽게 만들어 적립 하나가 사라지는 것을 확실히 보고, <code>synchronized</code>와 <code>AtomicInteger</code>로 고친다. 여러 스레드가 함께 쓰는 <code>Map</code>·<code>Set</code>도 같은 원리로 고른다.</p>
 <h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2>
 <pre><code>스레드 A: 잔액 읽기(0) ─────────────── 0+10 쓰기 → 10
@@ -163,7 +163,7 @@ public class CouponIssuer {
 </details>
 
 <h2 id="기본기-반복"><a class="anchor" href="#기본기-반복" aria-hidden="true">#</a>기본기 반복</h2>
-<p>회원별 포인트 이력을 <code>Map&lt;Long, List&lt;PointEntry&gt;&gt;</code>로 묶고, 묶은 것으로 회원별 잔액을 계산한다. <a class="docref" href="../../docs/knowledge/J05-modern-syntax.html">J05</a>의 <code>computeIfAbsent</code>를 기본기로 다시 쓴다.</p>
+<p>회원별 포인트 이력을 <code>Map&lt;Long, List&lt;PointEntry&gt;&gt;</code>로 묶고, 묶은 것으로 회원별 잔액을 계산한다. J05의 <code>computeIfAbsent</code>를 기본기로 다시 쓴다.</p>
 <pre><code class="language-java">/** 회원 id별로 이력을 묶는다. 한 회원의 목록은 들어온 순서를 지킨다. */
 public static Map&lt;Long, List&lt;PointEntry&gt;&gt; groupByMember(List&lt;PointEntry&gt; entries)
 /** 묶인 이력으로 회원별 잔액(amount 합)을 구한다. */
@@ -431,14 +431,14 @@ public static Map&lt;Long, Long&gt; sortedById(Map&lt;Long, Long&gt; balances) {
 
 <h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2>
 <ul>
-<li><a class="docref" href="../../docs/knowledge/D02-server-network-basics.html">D02</a> ③ <code>board-server/src/main/java/com/example/board/config/BoardProperties.java</code> — <code>record ForbiddenWords(@NotNull Boolean ignoreCase)</code>. 설정을 빠뜨리면 <code>boolean</code>은 조용히 false가 되지만, <code>Boolean</code>은 null이 되어 <code>@NotNull</code>이 기동을 막는다.</li>
-<li><a class="docref" href="../../docs/knowledge/D02-server-network-basics.html">D02</a> ④ <code>board-server/src/main/java/com/example/board/common/ForbiddenWordChecker.java</code> — 싱글톤 빈이라 모든 요청 스레드가 같은 객체를 쓴다. 요청마다 바뀌는 필드를 두지 않고, 금칙어 집합은 <code>volatile</code> 필드에 불변 <code>Set</code>을 통째로 바꿔 끼운다.</li>
-<li><a class="docref" href="../../docs/knowledge/D03-rest-api-dev-process.html">D03</a> ① <code>board-server/src/main/java/com/example/board/config/ProblemDetailSecurityHandler.java</code> — 401·403 응답 본문을 <code>new LinkedHashMap&lt;&gt;()</code>에 담는다. JSON 필드가 넣은 순서(<code>type</code>, <code>title</code>, <code>status</code>…)대로 나간다.</li>
-<li><a class="docref" href="../../docs/knowledge/D05-debugging-methodology.html">D05</a> ② <code>board-server/src/main/java/com/example/board/post/PostPatchRequest.java</code> — <code>@AssertTrue public boolean isAnyFieldPresent()</code>. <code>is</code>로 시작하는 boolean 메서드라 JavaBeans getter 규칙에 맞는다. Bean Validation은 메서드 검증 애노테이션을 getter에 붙였을 때 프로퍼티로 보고 검사한다(<code>checkAnyField()</code>처럼 getter 규칙에 맞지 않는 이름이면 빈 검증 대상이 아니다).</li>
-<li><a class="docref" href="../../docs/knowledge/D07-onprem-vs-cloud.html">D07</a> ① <code>board-server/src/main/java/com/example/board/point/PointService.java</code> — <code>earn</code>이 <code>memberRepository.addBalance(memberId, amount)</code>(한 문장 <code>UPDATE … SET pointBalance = pointBalance + :amount</code>)로 더한다. 오늘 <code>LeakyPointWallet</code>의 &quot;읽고 더해 쓰기&quot;를 DB가 한 번에 하게 바꾼 것이다.</li>
-<li><a class="docref" href="../../docs/knowledge/D07-onprem-vs-cloud.html">D07</a> ③ <code>board-server/src/main/java/com/example/board/coupon/CouponRepository.java</code> — 발급 수량을 <code>issued_quantity &lt; total_quantity</code>일 때만 올리고 영향 행 수로 판정한다. <code>compareAndSet</code>처럼 &quot;조건이 맞을 때만 바꾸고, 바뀌었는지로 판단&quot;한다.</li>
-<li><a class="docref" href="../../docs/knowledge/D07-onprem-vs-cloud.html">D07</a> ④ <code>board-server/src/main/java/com/example/board/coupon/CouponService.java</code> — 1인 1매를 UNIQUE(<code>coupon_id</code>, <code>member_id</code>) 위반으로 막고 409로 바꾼다. 오늘 <code>Set.add</code>가 false를 돌려주는 것과 같은 판단을 DB 제약이 한다.</li>
-<li><a class="docref" href="../../docs/knowledge/D09-operations-observability.html">D09</a> ⑤ <code>board-server/src/main/java/com/example/board/point/ActivityRankingService.java</code> — <code>Collectors.toMap(Member::getId, Member::getNickname)</code>. 키가 회원 id라 중복이 없으므로 합치는 함수 없이 쓴다. 키가 닉네임이었다면 오늘의 함정에 걸린다.</li>
+<li>D02 ③ <code>board-server/src/main/java/com/example/board/config/BoardProperties.java</code> — <code>record ForbiddenWords(@NotNull Boolean ignoreCase)</code>. 설정을 빠뜨리면 <code>boolean</code>은 조용히 false가 되지만, <code>Boolean</code>은 null이 되어 <code>@NotNull</code>이 기동을 막는다.</li>
+<li>D02 ④ <code>board-server/src/main/java/com/example/board/common/ForbiddenWordChecker.java</code> — 싱글톤 빈이라 모든 요청 스레드가 같은 객체를 쓴다. 요청마다 바뀌는 필드를 두지 않고, 금칙어 집합은 <code>volatile</code> 필드에 불변 <code>Set</code>을 통째로 바꿔 끼운다.</li>
+<li>D03 ① <code>board-server/src/main/java/com/example/board/config/ProblemDetailSecurityHandler.java</code> — 401·403 응답 본문을 <code>new LinkedHashMap&lt;&gt;()</code>에 담는다. JSON 필드가 넣은 순서(<code>type</code>, <code>title</code>, <code>status</code>…)대로 나간다.</li>
+<li>D05 ② <code>board-server/src/main/java/com/example/board/post/PostPatchRequest.java</code> — <code>@AssertTrue public boolean isAnyFieldPresent()</code>. <code>is</code>로 시작하는 boolean 메서드라 JavaBeans getter 규칙에 맞는다. Bean Validation은 메서드 검증 애노테이션을 getter에 붙였을 때 프로퍼티로 보고 검사한다(<code>checkAnyField()</code>처럼 getter 규칙에 맞지 않는 이름이면 빈 검증 대상이 아니다).</li>
+<li>D07 ① <code>board-server/src/main/java/com/example/board/point/PointService.java</code> — <code>earn</code>이 <code>memberRepository.addBalance(memberId, amount)</code>(한 문장 <code>UPDATE … SET pointBalance = pointBalance + :amount</code>)로 더한다. 오늘 <code>LeakyPointWallet</code>의 &quot;읽고 더해 쓰기&quot;를 DB가 한 번에 하게 바꾼 것이다.</li>
+<li>D07 ③ <code>board-server/src/main/java/com/example/board/coupon/CouponRepository.java</code> — 발급 수량을 <code>issued_quantity &lt; total_quantity</code>일 때만 올리고 영향 행 수로 판정한다. <code>compareAndSet</code>처럼 &quot;조건이 맞을 때만 바꾸고, 바뀌었는지로 판단&quot;한다.</li>
+<li>D07 ④ <code>board-server/src/main/java/com/example/board/coupon/CouponService.java</code> — 1인 1매를 UNIQUE(<code>coupon_id</code>, <code>member_id</code>) 위반으로 막고 409로 바꾼다. 오늘 <code>Set.add</code>가 false를 돌려주는 것과 같은 판단을 DB 제약이 한다.</li>
+<li>D09 ⑤ <code>board-server/src/main/java/com/example/board/point/ActivityRankingService.java</code> — <code>Collectors.toMap(Member::getId, Member::getNickname)</code>. 키가 회원 id라 중복이 없으므로 합치는 함수 없이 쓴다. 키가 닉네임이었다면 오늘의 함정에 걸린다.</li>
 </ul>
 
 

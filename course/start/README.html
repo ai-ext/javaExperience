@@ -98,6 +98,12 @@
 <td>21</td>
 </tr>
 </tbody></table></div>
+<p><strong>받은 뒤 바꿀 것</strong></p>
+<ul>
+<li>Configuration을 YAML로 고르면 <code>src/main/resources/application.yaml</code>이 생긴다. 과정·정답·정답 테스트(<code>ApplicationYmlTest</code> 등)는 <code>application.yml</code>을 읽으므로 <strong><code>application.yml</code>로 이름을 바꾼다</strong>. 두 파일을 함께 두면 둘 다 적재되어 어느 값이 이기는지 헷갈린다.</li>
+<li>Artifact를 <code>board</code>로 두면 <code>settings.gradle</code>의 <code>rootProject.name</code>과 <code>spring.application.name</code>이 <code>board</code>다. 정답은 <code>board-server</code>다. 동작에는 차이가 없으니 그대로 둬도 되고, 정답과 맞추려면 두 곳을 <code>board-server</code>로 바꾼다.</li>
+<li>생성된 <code>build.gradle</code>에는 <code>spring-boot-starter-actuator-test</code>·<code>spring-boot-starter-validation-test</code> 같은 테스트 스타터가 더 들어 있을 수 있다. 동작에는 영향이 없으니 그대로 둔다.</li>
+</ul>
 <p><strong>처음 넣을 의존성(D01 순서 ①)</strong>: Spring Web, Spring Boot Actuator, Validation, Lombok 네 개만 넣는다. Boot 4에서는 Spring Web이 <code>spring-boot-starter-webmvc</code>로 들어간다.</p>
 <p>나머지 의존성은 그 기능을 만드는 날 <code>build.gradle</code>에 직접 추가한다. 미리 넣으면 아직 설정하지 않은 자동 구성(예: DB 연결)이 기동을 막는다.</p>
 <div class="table-wrap"><table>
@@ -141,9 +147,14 @@
 </tr>
 </tbody></table></div>
 <h2 id="3-compose-실행"><a class="anchor" href="#3-compose-실행" aria-hidden="true">#</a>3. compose 실행</h2>
-<p><code>compose.yaml</code>, <code>toxiproxy.json</code>을 프로젝트 루트에, 스텁 두 개를 <code>src/test/resources/wiremock/mappings/</code>에 복사한 뒤 프로젝트 루트에서 실행한다.</p>
+<p>D01 ①에서 프로젝트를 만든 뒤, <strong>파일 3개를 먼저 복사하고</strong> 프로젝트 루트에서 실행한다. <code>compose.yaml</code>, <code>toxiproxy.json</code>은 프로젝트 루트에, 스텁 두 개는 <code>src/test/resources/wiremock/mappings/</code>에 둔다.</p>
 <pre><code class="language-bash">docker compose up -d --wait
-docker compose ps</code></pre>
+docker compose ps
+curl -s localhost:8474/proxies   # &quot;pg&quot; 프록시가 보여야 한다</code></pre>
+<ul>
+<li>순서가 중요하다. compose는 <code>./toxiproxy.json</code>과 <code>./src/test/resources/wiremock</code>을 그대로 마운트하므로, 복사하기 전에 띄우면 둘이 <strong>빈 디렉터리</strong>로 생긴다. 그러면 Toxiproxy에 <code>pg</code> 프록시가 없고(<code>curl localhost:8474/proxies</code> → <code>{}</code>), 그 뒤 <code>cp</code>도 <code>Is a directory</code>로 실패한다.</li>
+<li>이미 그렇게 됐다면 <code>docker compose down</code> → 생긴 빈 디렉터리 <code>toxiproxy.json</code>을 지우고(<code>rmdir toxiproxy.json</code>) → 파일 3개를 다시 복사한 뒤 → <code>docker compose up -d --wait</code>로 다시 띄운다.</li>
+</ul>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -180,7 +191,7 @@ docker compose ps</code></pre>
 </tbody></table></div>
 <ul>
 <li>포트·계정은 정답 서버(<code>board-server</code>)와 같다. 그래야 순서 칸의 정답 설정을 그대로 붙여도 연결된다. 그래서 <code>board-server/compose.yaml</code>과 동시에 띄우지 않는다.</li>
-<li>D01 ②의 만들 파일에 <code>compose.yaml</code>이 있다. 이 파일을 그대로 복사해 써도 되고, MySQL만 먼저 쓰고 D08 ①에 WireMock·Toxiproxy를, D09 ①에 Redis를 옮겨 붙여도 된다. 완료 조건은 어느 쪽이든 같다.</li>
+<li>D01 ②부터 이 <code>compose.yaml</code>을 쓴다. 그대로 복사해 써도 되고, MySQL만 먼저 쓰고 D08 ①에 WireMock·Toxiproxy를, D09 ①에 Redis를 옮겨 붙여도 된다. 완료 조건은 어느 쪽이든 같다. 나눠 붙일 때도 <code>toxiproxy.json</code>과 스텁은 Toxiproxy·WireMock을 처음 띄우기 전에 복사한다.</li>
 <li>지연을 주입할 때는 <code>curl -X POST localhost:8474/proxies/pg/toxics -d &#39;{&quot;type&quot;:&quot;latency&quot;,&quot;attributes&quot;:{&quot;latency&quot;:5000}}&#39;</code>, 지울 때는 <code>curl -X DELETE localhost:8474/proxies/pg/toxics/latency_downstream</code>.</li>
 <li>멈출 때는 <code>docker compose down</code>, 데이터까지 지울 때는 <code>docker compose down -v</code>.</li>
 </ul>

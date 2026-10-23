@@ -17,10 +17,10 @@
 
 <h1 id="j03-enum과-불변-객체-equalshashcode"><a class="anchor" href="#j03-enum과-불변-객체-equalshashcode" aria-hidden="true">#</a>J03. enum과 불변 객체, equals/hashCode</h1>
 <blockquote>
-<p>같은 날: <a class="docref" href="../../docs/knowledge/D03-rest-api-dev-process.html">D03</a> · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests &#39;J03*&#39;</code></p>
+<p>같은 날: D03 · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests &#39;J03*&#39;</code></p>
 </blockquote>
 <h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
-<p><a class="docref" href="../../docs/knowledge/D03-rest-api-dev-process.html">D03</a>은 회원·인증을 만드는 날이다. ② <code>Member</code> 엔티티에 <code>Role</code> enum을 붙이고, ④ JWT를 검증해 토큰 속 <code>&quot;role&quot;</code> 문자열을 다시 <code>Role</code>로 바꾸며, 인증된 요청의 주체를 값 객체로 넘긴다. <a class="docref" href="../../docs/knowledge/D05-debugging-methodology.html">D05</a>에서는 이 역할로 &quot;작성자 본인이나 관리자만 삭제&quot;를 판정한다.
+<p>D03은 회원·인증을 만드는 날이다. ② <code>Member</code> 엔티티에 <code>Role</code> enum을 붙이고, ④ JWT를 검증해 토큰 속 <code>&quot;role&quot;</code> 문자열을 다시 <code>Role</code>로 바꾸며, 인증된 요청의 주체를 값 객체로 넘긴다. D05에서는 이 역할로 &quot;작성자 본인이나 관리자만 삭제&quot;를 판정한다.
 오늘은 Spring 없이 <code>Role</code> enum과 권한 판정 메서드를 가진 불변 객체 <code>AuthMember</code>를 만든다. <code>HashSet</code>에 넣었을 때 같은 회원으로 찾아지려면 <code>equals</code>와 <code>hashCode</code>를 함께 고쳐야 한다는 것도 확인한다.</p>
 <h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2>
 <div class="table-wrap"><table>
@@ -73,7 +73,7 @@
 <td>같은 칸에서 찾는다</td>
 </tr>
 </tbody></table></div>
-<p>흔한 착각: &quot;<code>equals</code>를 고쳤으니 컬렉션에서도 같은 객체로 본다&quot;. 해시 컬렉션은 <code>hashCode</code>가 같은 것끼리만 <code>equals</code>를 부른다. 그래서 규칙은 &quot;equals가 true면 hashCode도 같아야 한다&quot;이다. record는 둘을 모든 필드로 함께 만들어 준다(<a class="docref" href="../../docs/knowledge/J01-types-string.html">J01</a>).</p>
+<p>흔한 착각: &quot;<code>equals</code>를 고쳤으니 컬렉션에서도 같은 객체로 본다&quot;. 해시 컬렉션은 <code>hashCode</code>가 같은 것끼리만 <code>equals</code>를 부른다. 그래서 규칙은 &quot;equals가 true면 hashCode도 같아야 한다&quot;이다. record는 둘을 모든 필드로 함께 만들어 준다(J01).</p>
 <h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
 <details>
 <summary>펼치기</summary>
@@ -200,14 +200,14 @@ public static String requireNickname(String nickname)</code></pre>
 <tbody><tr>
 <td>① 합계 조회</td>
 <td>행이 없으면 SQL <code>SUM</code>은 0이 아니라 <code>NULL</code></td>
-<td><code>long sum = mapper.sumByMember(id);</code> (MyBatis <code>resultType=&quot;long&quot;</code>, JPA <code>Long</code> 반환을 <code>long</code>으로 받음)</td>
+<td><code>long sum = mapper.sumByMember(id);</code> (매퍼·저장소 메서드가 돌려준 <code>Long</code>을 <code>long</code> 변수로 받음)</td>
 <td><code>Long</code>으로 받아 null이면 0</td>
 </tr>
 <tr>
 <td>② 캐시 조회</td>
 <td><code>Map.get</code>은 키가 없으면 null</td>
 <td><code>long cached = cache.get(id);</code></td>
-<td>null이면 0 (<a class="docref" href="../../docs/knowledge/J05-modern-syntax.html">J05</a>에서 <code>getOrDefault</code>)</td>
+<td>null이면 0 (J05에서 <code>getOrDefault</code>)</td>
 </tr>
 <tr>
 <td>③ 저장 직후 id</td>
@@ -216,6 +216,7 @@ public static String requireNickname(String nickname)</code></pre>
 <td>null이면 원인을 적은 <code>IllegalStateException</code></td>
 </tr>
 </tbody></table></div>
+<p>①의 MyBatis 쪽 주의: 별칭 <code>resultType=&quot;long&quot;</code>은 <code>java.lang.Long</code>이라(기본형은 <code>_long</code>) null을 그대로 담는다. NPE는 그 <code>Long</code>을 호출부에서 <code>long</code> 변수로 받을 때 난다. 매퍼 메서드의 반환 타입 자체를 기본형 <code>long</code>으로 선언하면 NPE가 아니라 MyBatis가 <code>BindingException</code>(&quot;attempted to return null from a method with a primitive return type&quot;)을 던진다. 어느 쪽이든 반환 타입을 <code>Long</code>(또는 <code>Optional&lt;Long&gt;</code>)으로 두고 null을 처리한다.</p>
 <p>함정: 세 코드 모두 컴파일은 된다. 값이 있는 회원으로만 테스트하면 통과하고, 이력이 없는 신규 회원이 처음 조회할 때 터진다.</p>
 <p>과제: <code>PointLookup</code>의 세 메서드를 채운다. 값은 <code>Long</code>으로 먼저 받고 null을 처리한 뒤 <code>long</code>으로 돌려준다.</p>
 <p>확인 테스트 — <code>J03TypeCutTest</code>:</p>
@@ -388,14 +389,14 @@ public boolean hasNickname(long id, String nickname) {
 
 <h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2>
 <ul>
-<li><a class="docref" href="../../docs/knowledge/D03-rest-api-dev-process.html">D03</a> ② <code>board-server/src/main/java/com/example/board/member/Member.java</code> — <code>@Enumerated(EnumType.STRING) private Role role;</code>. enum을 순서 번호가 아니라 이름(<code>&quot;USER&quot;</code>)으로 저장한다. <code>role</code>은 <code>Member.create(…)</code>로만 정해진다.</li>
-<li><a class="docref" href="../../docs/knowledge/D03-rest-api-dev-process.html">D03</a> ② <code>board-server/src/main/java/com/example/board/member/MemberRepository.java</code> — <a class="docref" href="../../docs/knowledge/D07-onprem-vs-cloud.html">D07</a>에 더해지는 잔액 조회 <code>findBalance</code>가 <code>long</code>이 아니라 <code>Optional&lt;Long&gt;</code>을 돌려준다. 없는 회원을 언박싱 NPE가 아니라 빈 값으로 받는다.</li>
-<li><a class="docref" href="../../docs/knowledge/D03-rest-api-dev-process.html">D03</a> ③ <code>board-server/src/main/java/com/example/board/member/AuthService.java</code> — 가입할 때 <code>Role.USER</code>를 넣는다. 닉네임은 <code>NicknameNormalizer</code>로 정규화한다.</li>
-<li><a class="docref" href="../../docs/knowledge/D03-rest-api-dev-process.html">D03</a> ④ <code>board-server/src/main/java/com/example/board/config/JwtProvider.java</code> — 발급할 때 <code>role.name()</code>을 토큰에 넣고, 검증할 때 <code>Role.valueOf(...)</code>로 되돌린다. 토큰은 서버가 만든 값이라 <code>valueOf</code>로 충분하지만, 요청에서 온 문자열이라면 오늘의 <code>from</code>처럼 받아야 한다. 결과는 <code>AuthMember</code>(record라 <code>equals</code>·<code>hashCode</code>가 자동이다)로 넘긴다.</li>
-<li><a class="docref" href="../../docs/knowledge/D04-build-pipeline-explained.html">D04</a> ④ <code>board-server/src/main/java/com/example/board/post/PostServiceImpl.java</code> — <code>request.tags() == null ? List.of() : …</code>. 태그가 없으면 null 대신 빈 리스트로 바꿔 for를 돈다.</li>
-<li><a class="docref" href="../../docs/knowledge/D05-debugging-methodology.html">D05</a> ④ <code>board-server/src/main/java/com/example/board/comment/CommentService.java</code> — <code>role != Role.ADMIN &amp;&amp; !comment.isWrittenBy(memberId)</code>이면 403. 오늘 <code>canModify</code>와 같은 판정을 enum <code>!=</code>로 한다.</li>
-<li><a class="docref" href="../../docs/knowledge/D07-onprem-vs-cloud.html">D07</a> ② <code>board-server/src/main/java/com/example/board/point/PointHistoryMapper.java</code> — 이날 함정이 &quot;이력이 없는 회원의 <code>SUM</code>은 null이라 <code>resultType=&quot;long&quot;</code>이나 <code>long</code> 변수로 받으면 언박싱 NPE&quot;이다. 오늘 함정 ①과 같다.</li>
-<li><a class="docref" href="../../docs/knowledge/D07-onprem-vs-cloud.html">D07</a> ⑥ <code>board-server/src/main/java/com/example/board/shop/ShopOrder.java</code> — 같은 주문 재요청인지 볼 때 null일 수 있는 쿠폰 id를 <code>Objects.equals(ownCoupon, memberCouponId)</code>로 비교한다.</li>
+<li>D03 ② <code>board-server/src/main/java/com/example/board/member/Member.java</code> — <code>@Enumerated(EnumType.STRING) private Role role;</code>. enum을 순서 번호가 아니라 이름(<code>&quot;USER&quot;</code>)으로 저장한다. <code>role</code>은 <code>Member.create(…)</code>로만 정해진다.</li>
+<li>D03 ② <code>board-server/src/main/java/com/example/board/member/MemberRepository.java</code> — D07에 더해지는 잔액 조회 <code>findBalance</code>가 <code>long</code>이 아니라 <code>Optional&lt;Long&gt;</code>을 돌려준다. 없는 회원을 언박싱 NPE가 아니라 빈 값으로 받는다.</li>
+<li>D03 ③ <code>board-server/src/main/java/com/example/board/member/AuthService.java</code> — 가입할 때 <code>Role.USER</code>를 넣는다. 닉네임은 <code>NicknameNormalizer</code>로 정규화한다.</li>
+<li>D03 ④ <code>board-server/src/main/java/com/example/board/config/JwtProvider.java</code> — 발급할 때 <code>role.name()</code>을 토큰에 넣고, 검증할 때 <code>Role.valueOf(...)</code>로 되돌린다. 토큰은 서버가 만든 값이라 <code>valueOf</code>로 충분하지만, 요청에서 온 문자열이라면 오늘의 <code>from</code>처럼 받아야 한다. 결과는 <code>AuthMember</code>(record라 <code>equals</code>·<code>hashCode</code>가 자동이다)로 넘긴다.</li>
+<li>D04 ④ <code>board-server/src/main/java/com/example/board/post/PostServiceImpl.java</code> — <code>request.tags() == null ? List.of() : …</code>. 태그가 없으면 null 대신 빈 리스트로 바꿔 for를 돈다.</li>
+<li>D05 ④ <code>board-server/src/main/java/com/example/board/comment/CommentService.java</code> — <code>role != Role.ADMIN &amp;&amp; !comment.isWrittenBy(memberId)</code>이면 403. 오늘 <code>canModify</code>와 같은 판정을 enum <code>!=</code>로 한다.</li>
+<li>D07 ② <code>board-server/src/test/java/com/example/board/point/PointApiTest.java</code> — <code>이력이_없는_회원도_200이고_잔액_0_이력_빈_목록</code>. 이날 함정이 &quot;이력이 없는 회원의 <code>SUM</code>은 null&quot;이고, 오늘 함정 ①과 같은 자리다. board-server는 잔액을 <code>SUM</code>으로 구하지 않고 <code>member.point_balance</code> 컬럼을 <code>MemberRepository.findBalance</code>(<code>Optional&lt;Long&gt;</code>)로 읽어 이 함정을 피했다. 이 테스트가 이력 없는 회원의 잔액 0을 고정한다.</li>
+<li>D07 ⑥ <code>board-server/src/main/java/com/example/board/shop/ShopOrder.java</code> — 같은 주문 재요청인지 볼 때 null일 수 있는 쿠폰 id를 <code>Objects.equals(ownCoupon, memberCouponId)</code>로 비교한다.</li>
 </ul>
 
 

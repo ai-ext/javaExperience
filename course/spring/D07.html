@@ -52,7 +52,7 @@
 <li><code>src/main/java/com/example/board/point/PointService.java</code></li>
 <li><code>src/main/resources/schema.sql</code></li>
 </ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>잔액을 읽어 더한 뒤 저장하면 동시 적립에서 갱신이 사라지므로 <code>UPDATE member SET point_balance = point_balance + ?</code>로 바꾼다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
-<li><code>PointServiceConcurrencyTest</code>가 &quot;조회 후 저장&quot; 방식에서 먼저 실패하는 것(50건 동시 적립 후 잔액 &lt; 합계)을 보고, 원자적 UPDATE로 바꾼 뒤 통과: 잔액 = <code>point_ledger</code> 합</li>
+<li><code>PointConcurrencyTest</code>가 &quot;조회 후 저장&quot; 방식에서 먼저 실패하는 것(50건 동시 적립 후 잔액 &lt; 합계)을 보고, 원자적 UPDATE로 바꾼 뒤 통과: 잔액 = <code>point_ledger</code> 합</li>
 <li>USER 토큰으로 <code>POST /api/posts</code> → 201 뒤 작성자 잔액이 늘어난다</li>
 </ul></div><div class="step-fact fact-spec"><p class="fact-label">명세</p><p><a href="../spec-v2.html#4-엔드포인트"><code>GET /api/me/points</code></a> · <a href="../spec-v2.html#4-엔드포인트"><code>POST /api/posts</code></a> (<a href="../spec-v2.html#5-2-글댓글좋아요">5-2. 글·댓글·좋아요</a>)</p></div></div><details class="step-hint" data-step="D07-1">
 <summary>막히면</summary>
@@ -511,7 +511,7 @@ class PostEarnApiTest extends ApiTestSupport {
 <li><code>src/main/java/com/example/board/point/PointController.java</code></li>
 <li><code>src/main/java/com/example/board/point/PointHistoryMapper.java</code></li>
 <li><code>src/main/resources/mapper/PointHistoryMapper.xml</code></li>
-</ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>이력이 없는 회원의 <code>SUM</code>은 null이라 <code>resultType=&quot;long&quot;</code>이나 <code>long</code> 변수로 받으면 언박싱 NPE가 난다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
+</ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>잔액을 <code>point_ledger</code>의 <code>SUM</code>으로 구하면 이력 0건 회원에서 null이 나온다. MyBatis <code>resultType=&quot;long&quot;</code>은 <code>java.lang.Long</code>이라 null을 담지만 그 값을 기본형 <code>long</code> 변수로 받으면 언박싱 NPE가 나고, 매퍼 메서드 반환 타입을 기본형 <code>long</code>으로 두면 <code>BindingException</code>이 난다. 잔액은 <code>member.point_balance</code>에서 읽고, 이력 0건 회원에게도 200 <code>{balance: 0}</code>과 <code>items: []</code>를 준다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
 <li><code>GET /api/me/points</code> → 200 <code>{balance}</code></li>
 <li><code>GET /api/me/points/history?size=20</code> → 200 <code>{items, nextCursor}</code></li>
 <li>토큰 없음 → 401</li>
@@ -519,7 +519,7 @@ class PostEarnApiTest extends ApiTestSupport {
 <summary>막히면</summary>
 
 <ul>
-<li>잔액은 JPA로, 이력은 D06의 커서 목록 방식으로 MyBatis에서 읽는다. 집계 결과는 <code>Long</code> 같은 래퍼나 <code>COALESCE</code>로 null을 다룬다.</li>
+<li>잔액은 <code>member.point_balance</code>를 JPA로 읽고, 이력은 D06의 커서 목록 방식으로 MyBatis에서 읽는다. 합계를 SQL로 구한다면 <code>SUM</code>은 null일 수 있으니 반환 타입을 <code>Long</code>으로 두거나 <code>COALESCE</code>로 0을 만든다.</li>
 </ul>
 </details>
 
@@ -1735,8 +1735,8 @@ class ShopItemTest extends ApiTestSupport {
 </ul>
 </details>
 
-<details class="step-answer" data-step="D07-6" data-commits="3e6e7c2a10fb1f9cd3d2a62c657d170d7931e754">
-<summary>정답 보기 · answer(D07-6) · board-server 파일 14개</summary>
+<details class="step-answer" data-step="D07-6" data-commits="3e6e7c2a10fb1f9cd3d2a62c657d170d7931e754 554e76796285bb32460c71d4973c04c663693b33">
+<summary>정답 보기 · answer(D07-6) + 보완 1개 · board-server 파일 16개</summary>
 
 <p>커밋 <a href="https://github.com/ai-ext/javaExperience/commit/3e6e7c2a10fb1f9cd3d2a62c657d170d7931e754" target="_blank" rel="noopener"><code>3e6e7c2a</code></a> — answer(D07-6): 쿠폰·포인트 구매와 Idempotency-Key</p>
 <p><strong>새 파일</strong> <code>src/main/java/com/example/board/shop/ShopOrder.java</code></p>
@@ -2554,6 +2554,60 @@ class ShopOrderRepositoryTest extends ApiTestSupport {
                 &quot;key-12345678&quot;))).isInstanceOf(DataIntegrityViolationException.class);
     }
 }</code></pre>
+<hr>
+<p><strong>보완</strong> — 리뷰를 반영해 이 순서의 코드를 고친 커밋이다.</p>
+<p><strong>보완 이력</strong></p>
+<ul>
+<li><a href="https://github.com/ai-ext/javaExperience/commit/554e76796285bb32460c71d4973c04c663693b33" target="_blank" rel="noopener"><code>554e7679</code></a> answer-fix(D07-6): 필수 헤더가 빠진 400에도 검증 실패 제목과 errors[]를 담는다</li>
+</ul>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/common/GlobalExceptionHandler.java</code> (바뀐 부분)</p>
+<pre><code data-lazy-lang="diff">@@ -18,6 +18,8 @@ import org.springframework.security.access.AccessDeniedException;
+ import org.springframework.validation.FieldError;
+ import org.springframework.validation.method.ParameterErrors;
+ import org.springframework.web.bind.MethodArgumentNotValidException;
++import org.springframework.web.bind.MissingRequestHeaderException;
++import org.springframework.web.bind.ServletRequestBindingException;
+ import org.springframework.web.bind.annotation.ExceptionHandler;
+ import org.springframework.web.bind.annotation.RestControllerAdvice;
+ import org.springframework.web.context.request.ServletWebRequest;
+@@ -84,6 +86,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+         return ResponseEntity.badRequest().body(pd);
+     }
+ 
++    // 필수 헤더(Idempotency-Key 등)가 빠진 것도 검증 실패다. 상위 클래스 기본은 errors[] 없이 제목이 &quot;Bad Request&quot;라
++    // 형식이 틀린 헤더(아래 파라미터 검증)와 같은 field 이름·제목으로 맞춘다.
++    @Override
++    protected ResponseEntity&lt;Object&gt; handleServletRequestBindingException(ServletRequestBindingException ex,
++            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
++        if (!(ex instanceof MissingRequestHeaderException missing)) {
++            return super.handleServletRequestBindingException(ex, headers, status, request);
++        }
++        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION.type(), ErrorCode.VALIDATION.title(),
++                &quot;요청 값이 올바르지 않습니다.&quot;, path(request));
++        pd.setProperty(&quot;errors&quot;, List.of(Map.of(&quot;field&quot;, String.valueOf(missing.getParameter().getParameterName()),
++                &quot;reason&quot;, missing.getHeaderName() + &quot; 헤더가 필요합니다.&quot;)));
++        return ResponseEntity.badRequest().body(pd);
++    }
++
+     // 경로·쿼리 파라미터 검증(@Positive 등) 실패도 본문 검증과 같은 400 형식으로 맞춘다
+     @Override
+     protected ResponseEntity&lt;Object&gt; handleHandlerMethodValidationException(HandlerMethodValidationException ex,</code></pre>
+<p><strong>수정</strong> <code>src/test/java/com/example/board/shop/OrderApiTest.java</code> (바뀐 부분)</p>
+<pre><code data-lazy-lang="diff">@@ -180,8 +180,12 @@ class OrderApiTest extends ApiTestSupport {
+         ShopItem item = item(100, 10);
+ 
+         order(m, null, body(item.getId(), 1, null)).andExpect(status().isBadRequest())
+-                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/validation&quot;));
+-        order(m, &quot;short&quot;, body(item.getId(), 1, null)).andExpect(status().isBadRequest());
++                .andExpect(jsonPath(&quot;$.type&quot;).value(&quot;/errors/validation&quot;))
++                .andExpect(jsonPath(&quot;$.title&quot;).value(&quot;검증 실패&quot;))
++                .andExpect(jsonPath(&quot;$.errors[0].field&quot;).value(&quot;idempotencyKey&quot;));
++        // 형식이 틀린 키도 같은 field 이름으로 알린다
++        order(m, &quot;short&quot;, body(item.getId(), 1, null)).andExpect(status().isBadRequest())
++                .andExpect(jsonPath(&quot;$.errors[0].field&quot;).value(&quot;idempotencyKey&quot;));
+         order(m, &quot;a&quot;.repeat(65), body(item.getId(), 1, null)).andExpect(status().isBadRequest());
+         order(m, &quot;has space in it&quot;, body(item.getId(), 1, null)).andExpect(status().isBadRequest());
+ </code></pre>
 </details>
 
 <p class="step-done"><label><input type="checkbox" class="step-check" data-step="D07-6"> 이 순서를 끝냈다</label></p></section>
@@ -2571,7 +2625,7 @@ class ShopOrderRepositoryTest extends ApiTestSupport {
 <li><code>UPDATE member SET point_balance = point_balance - ? WHERE id = ? AND point_balance &gt;= ?</code>로 DB가 원자적으로 계산하게 하고, 바뀐 행이 0이면 409 <code>/errors/insufficient-points</code>로 처리한다</li>
 <li>같은 트랜잭션에서 <code>point_ledger</code>에 이력을 쌓아 잔액과 이력의 합이 항상 맞게 한다</li>
 </ul>
-<p><strong>근거</strong> 05 §3-6, spec-v2 §6</p>
+<p><strong>근거</strong> spec-v2 §6</p>
 </details>
 
 <h3 id="tc-d07-2"><a class="anchor" href="#tc-d07-2" aria-hidden="true">#</a>TC-D07-2</h3>
@@ -2584,7 +2638,7 @@ class ShopOrderRepositoryTest extends ApiTestSupport {
 <li><code>member_coupon</code>의 UNIQUE(<code>coupon_id</code>, <code>member_id</code>)로 DB가 두 번째 INSERT를 거부하게 하고, 중복 키 예외를 409 <code>/errors/duplicate</code>로 바꾼다</li>
 <li>중복 키 오류가 난 INSERT는 기존 행에 공유 락을 걸기 때문에 동시 INSERT가 많으면 데드락이 날 수 있어, 예외 처리를 함께 설계한다</li>
 </ul>
-<p><strong>근거</strong> 07 #13, spec-v2 §5-4</p>
+<p><strong>근거</strong> spec-v2 §5-4</p>
 </details>
 
 <h3 id="tc-d07-3"><a class="anchor" href="#tc-d07-3" aria-hidden="true">#</a>TC-D07-3</h3>
@@ -2597,7 +2651,6 @@ class ShopOrderRepositoryTest extends ApiTestSupport {
 <li>같은 트랜잭션·영속성 컨텍스트 안에서 다시 시도하면 이미 롤백된 작업을 이어 가게 되므로, 재시도는 바깥에서 새 트랜잭션으로 한다</li>
 <li>여러 행을 잠글 때는 순서(예: id 오름차순)를 통일해 데드락 자체를 줄이고, 재시도에는 횟수 상한을 둔다</li>
 </ul>
-<p><strong>근거</strong> 07 §6, 07 #3</p>
 </details>
 
 <h3 id="tc-d07-4"><a class="anchor" href="#tc-d07-4" aria-hidden="true">#</a>TC-D07-4</h3>
@@ -2610,7 +2663,7 @@ class ShopOrderRepositoryTest extends ApiTestSupport {
 <li><code>shop_order</code>의 UNIQUE(<code>member_id</code>, <code>idempotency_key</code>)로 두 번째 주문 생성을 막고, 같은 키·같은 본문이면 처음 응답을 그대로 돌려준다</li>
 <li>같은 키에 다른 본문이 오면 422로 거부한다</li>
 </ul>
-<p><strong>근거</strong> spec-v2 §5-4, 05 §3-2</p>
+<p><strong>근거</strong> spec-v2 §5-4</p>
 </details>
 
 <h2 id="ai-채점-프롬프트"><a class="anchor" href="#ai-채점-프롬프트" aria-hidden="true">#</a>AI 채점 프롬프트</h2>
@@ -2622,7 +2675,7 @@ class ShopOrderRepositoryTest extends ApiTestSupport {
 너는 Java·Spring 온보딩 과정 v2로 백엔드를 배우는 사람의 리뷰어다. 학습자는 빈 프로젝트에서 명세서 v2의 서버를 하루씩 만들고 있고, 오늘은 D07다.
 지킬 것: 코드는 절대 수정하지 마라. DB는 조회만 한다(SELECT·SHOW·EXPLAIN). 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.
 
-1. 서버 주소의 `GET /actuator/health`로 응답 가능 여부를 확인해라. 꺼져 있으면 `./gradlew bootRun`으로 띄우라고만 알려 주고 멈춰라.
+1. 서버 주소의 `GET /actuator/health`로 응답 가능 여부를 확인해라. 꺼져 있으면 `./gradlew bootRun --args='--spring.profiles.active=local'`(또는 `SPRING_PROFILES_ACTIVE=local ./gradlew bootRun`)으로 띄우라고만 알려 주고 멈춰라. D01 ③부터 DB 설정이 `local` 프로파일에 있어 프로파일 없이는 기동에 실패한다.
 2. 아래 &quot;채점 기준&quot;이 통과/실패의 유일한 기준이다. 기준에 없는 것으로 실패 처리하지 말고, 다른 날의 기준은 보지 마라.
 3. [C] 항목: HTTP 요청은 서버 주소로 직접 보내 상태 코드·응답 헤더·본문을 기대값과 비교한다. 테스트 이름이 적힌 항목은 레포 루트에서 `./gradlew test --tests '&lt;테스트 클래스 이름&gt;'`으로 실행해 통과 여부를 본다(테스트 코드도 고치지 마라). 로그 항목은 기동 로그에서 찾거나 학습자에게 해당 줄을 붙여 달라고 한다. DB 확인이 필요하면 `docker compose exec -T mysql mysql -uboard -pboard board -e &quot;&lt;SELECT 문&gt;&quot;`으로 조회만 한다.
 4. [R] 항목: 관련 코드를 찾아 읽고 그 함정을 피했는지 판단해라. 지적할 때는 `파일:줄`을 붙여라.
@@ -2631,14 +2684,14 @@ class ShopOrderRepositoryTest extends ApiTestSupport {
 
 채점 기준
 ① 포인트 원장과 원자적 적립 (schema.sql에 point_ledger, point/PointLedgerRepository.java 추가, MemberRepository에 잔액 UPDATE 추가, 글 작성 시 활동 포인트 적립)
-  - [C1-1] PointServiceConcurrencyTest가 &quot;조회 후 저장&quot; 방식에서 먼저 실패하는 것(50건 동시 적립 후 잔액 &lt; 합계)을 보고, 원자적 UPDATE로 바꾼 뒤 통과: 잔액 = point_ledger 합
+  - [C1-1] PointConcurrencyTest가 &quot;조회 후 저장&quot; 방식에서 먼저 실패하는 것(50건 동시 적립 후 잔액 &lt; 합계)을 보고, 원자적 UPDATE로 바꾼 뒤 통과: 잔액 = point_ledger 합
   - [C1-2] USER 토큰으로 POST /api/posts → 201 뒤 작성자 잔액이 늘어난다
   - [R1] 함정을 피했는지 코드로 확인: 잔액을 읽어 더한 뒤 저장하면 동시 적립에서 갱신이 사라지므로 UPDATE member SET point_balance = point_balance + ?로 바꾼다.
 ② 내 포인트 잔액·이력 API (이력은 MyBatis 커서 목록)
   - [C2-1] GET /api/me/points → 200 {balance}
   - [C2-2] GET /api/me/points/history?size=20 → 200 {items, nextCursor}
   - [C2-3] 토큰 없음 → 401
-  - [R2] 함정을 피했는지 코드로 확인: 이력이 없는 회원의 SUM은 null이라 resultType=&quot;long&quot;이나 long 변수로 받으면 언박싱 NPE가 난다.
+  - [R2] 함정을 피했는지 코드로 확인: 잔액을 point_ledger의 SUM으로 구하면 이력 0건 회원에서 null이 나온다. MyBatis resultType=&quot;long&quot;은 java.lang.Long이라 null을 담지만 그 값을 기본형 long 변수로 받으면 언박싱 NPE가 나고, 매퍼 메서드 반환 타입을 기본형 long으로 두면 BindingException이 난다. 잔액은 member.point_balance에서 읽고, 이력 0건 회원에게도 200 {balance: 0}과 items: []를 준다.
 ③ Coupon과 MemberCoupon (schema.sql에 coupon, member_coupon UNIQUE(coupon_id, member_id), 수량은 조건부 UPDATE)
   - [C3-1] CouponRepositoryTest 통과: issued_quantity &lt; total_quantity일 때만 1 증가하고 영향 행 수로 판정한다
   - [R3] 함정을 피했는지 코드로 확인: 남은 수량을 읽어 확인한 뒤 증가시키면 동시 발급에서 총 수량을 넘는다.
@@ -2693,6 +2746,7 @@ class ShopOrderRepositoryTest extends ApiTestSupport {
 <p>D08은 오늘 만든 원자적 잔액 갱신과 <code>point_ledger</code> 적립을 충전 성공 처리에 그대로 쓴다.</p>
 <h2 id="날짜별-snapshot"><a class="anchor" href="#날짜별-snapshot" aria-hidden="true">#</a>날짜별 snapshot</h2>
 <p>오늘 마지막 정답 커밋은 <code>3e6e7c2a</code>(answer(D07-6): 쿠폰·포인트 구매와 Idempotency-Key)이다. <a href="https://github.com/ai-ext/javaExperience/tree/3e6e7c2a10fb1f9cd3d2a62c657d170d7931e754/board-server" target="_blank" rel="noopener">이 시점의 board-server 전체 보기</a>. 기준은 위 순서 칸의 인라인 정답이고, 이 링크는 보조다(PR 병합 방식에 따라 커밋이 사라질 수 있다).</p>
+<p>오늘 순서의 보완(answer-fix)은 뒤 날 정답까지 만든 뒤에 커밋했으므로 위 링크에는 없다. 보완을 반영한 코드는 순서 칸의 &quot;보완&quot;에서 보고, 보완이 모두 들어간 최신 코드는 <a href="https://github.com/ai-ext/javaExperience/tree/main/board-server" target="_blank" rel="noopener">보완 반영 최신 코드: main의 board-server</a>에서 본다(뒤 날 코드도 함께 들어 있다).</p>
 <h2 id="참고-자료"><a class="anchor" href="#참고-자료" aria-hidden="true">#</a>참고 자료</h2>
 <details class="day-refs">
 <summary>기존 시나리오·공부자료 (참고 도감)</summary>

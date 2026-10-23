@@ -16,7 +16,7 @@
 <main>
 
 <h1 id="말하기-카드"><a class="anchor" href="#말하기-카드" aria-hidden="true">#</a>말하기 카드</h1>
-<p>리뷰어가 그날 묻는 질문이다. &quot;문제 상황 → 원인 → 선택 → 결과&quot; 순서로 답한다. <strong>답에 들어가야 할 것</strong>의 세 줄이 모두 나오면 통과다. <strong>근거</strong>는 <code>~/research/java-onboarding/</code>의 문서 번호와 절, 또는 <code>course/spec-v2.md</code>의 절이다.</p>
+<p>리뷰어가 그날 묻는 질문이다. &quot;문제 상황 → 원인 → 선택 → 결과&quot; 순서로 답한다. <strong>답에 들어가야 할 것</strong>의 세 줄이 모두 나오면 통과다. <strong>근거</strong>의 <code>spec-v2 §…</code>는 <a href="spec-v2.html">명세서 v2</a>의 절이다. 숫자 번호(예: <code>06 §15</code>)는 카드를 쓸 때 참고한 저장소 밖 작성 자료의 번호라 학습자는 열 수 없고, 일자 페이지에는 명세 절만 싣는다.</p>
 <h2 id="d01-프로젝트-뼈대"><a class="anchor" href="#d01-프로젝트-뼈대" aria-hidden="true">#</a>D01 프로젝트 뼈대</h2>
 <h3 id="tc-d01-1"><a class="anchor" href="#tc-d01-1" aria-hidden="true">#</a>TC-D01-1</h3>
 <p><strong>질문</strong> <code>application.yml</code>의 <code>server.port</code>를 바꿨는데 서버가 예전 포트로 뜹니다. 어디부터 확인하나요?
@@ -68,7 +68,7 @@
 <p><strong>질문</strong> 금칙어 목록을 DB에서 읽어 메모리에 올리는 코드를 <code>@PostConstruct</code>가 아니라 <code>ApplicationReadyEvent</code>에 둔 이유는?
 <strong>답에 들어가야 할 것</strong></p>
 <ul>
-<li><code>@PostConstruct</code>는 빈을 만드는 도중(싱글톤 생성 락 안)에 실행되므로, 여기서 DB 적재 같은 무거운 일을 하면 그만큼 기동이 늦어진다</li>
+<li><code>@PostConstruct</code>는 빈 하나를 초기화하는 도중에 실행되므로, 그 시점에는 다른 빈이나 트랜잭션 프록시가 아직 준비되지 않았을 수 있다</li>
 <li><code>@PostConstruct</code> 안에서 같은 클래스의 <code>@Transactional</code> 메서드를 불러도 프록시를 거치지 않아 트랜잭션이 걸리지 않는다</li>
 <li><code>ApplicationReadyEvent</code>는 컨텍스트 refresh와 runner 실행이 끝난 뒤 발행되므로 기동 후 적재는 여기나 <code>ApplicationRunner</code>에 둔다
 <strong>근거</strong> 06 §14</li>
@@ -226,7 +226,7 @@
 <ul>
 <li><code>post_like</code>의 UNIQUE(<code>post_id</code>, <code>member_id</code>)가 DB에서 중복 행을 막는다</li>
 <li>동시 요청 중 하나가 중복 키 예외를 받으면 이미 눌린 상태로 보고 204를 돌려준다</li>
-<li><code>like_count</code>는 읽고 더해서 저장하지 않고, 새 행이 실제로 들어갔을 때만 <code>like_count = like_count + 1</code> UPDATE로 올린다
+<li><code>like_count</code>는 읽고 더해서 저장하지 않고 <code>like_count = like_count + 1</code> UPDATE로 올린다. +1 UPDATE와 INSERT를 한 트랜잭션에 두고(글 행을 먼저 잠가 교착을 피한다) 중복이면 트랜잭션째 롤백해 +1도 취소한다
 <strong>근거</strong> spec-v2 §5-2, 07 #12</li>
 </ul>
 <h3 id="tc-d05-5"><a class="anchor" href="#tc-d05-5" aria-hidden="true">#</a>TC-D05-5</h3>
@@ -272,7 +272,7 @@
 <ul>
 <li>중첩 select는 부모 행마다 쿼리를 따로 실행하므로 글 20개면 태그 쿼리가 20번 나간다</li>
 <li>JOIN 한 번으로 가져와 <code>resultMap</code>의 중첩 결과로 묶고, <code>&lt;id&gt;</code>를 선언해 같은 글의 행을 합친다</li>
-<li>다만 1:N JOIN에 LIMIT을 걸면 글이 아니라 행 기준으로 잘리므로, 글 ID를 먼저 커서로 뽑고 태그는 <code>IN</code>으로 따로 가져온다
+<li>다만 1:N JOIN 결과에 LIMIT을 걸면 글이 아니라 행 기준으로 잘리므로, 글에만 LIMIT을 거는 파생 테이블로 먼저 자르고 바깥에서 태그를 JOIN한다(글 ID 목록을 뽑은 뒤 <code>IN</code>으로 두 번 조회하는 것도 대안)
 <strong>근거</strong> 06 §16</li>
 </ul>
 <h2 id="d07-포인트쿠폰-상점"><a class="anchor" href="#d07-포인트쿠폰-상점" aria-hidden="true">#</a>D07 포인트·쿠폰 상점</h2>
@@ -344,7 +344,7 @@
 <p><strong>질문</strong> PG 호출이 실패하면 무조건 세 번 재시도하게 했다가 리뷰에서 지적을 받았습니다. 무엇을 재시도하고 무엇을 하지 않나요?
 <strong>답에 들어가야 할 것</strong></p>
 <ul>
-<li>연결 실패·타임아웃·5xx는 재시도 후보지만, 400·401 같은 4xx는 같은 요청이 같은 실패를 내므로 재시도하지 않는다</li>
+<li>연결 실패·5xx는 같은 멱등 키로 재시도하고, 응답 타임아웃은 PG가 처리했을 수 있어 재시도하지 않고 조회·콜백으로 결과를 확인한다. 400·401 같은 4xx는 같은 요청이 같은 실패를 내므로 재시도하지 않는다</li>
 <li>결제 같은 POST는 같은 멱등 키로 재시도할 때만 이중 승인이 생기지 않는다</li>
 <li>재시도 간격은 지수 백오프와 지터로 늘리고, 전체 시간이 상위 요청의 시간 예산을 넘지 않게 횟수를 제한한다
 <strong>근거</strong> 10 §8, 10 §5</li>
@@ -364,8 +364,8 @@
 <strong>답에 들어가야 할 것</strong></p>
 <ul>
 <li>키가 만료된 순간 들어온 요청이 모두 캐시 미스를 보고 동시에 DB를 조회한다(스탬피드)</li>
-<li>짧은 TTL의 락 키(<code>SET NX</code>)를 잡은 요청 하나만 다시 계산하게 하거나, 만료 전에 미리 갱신한다</li>
-<li><code>@Cacheable(sync = true)</code>는 기본적으로 한 인스턴스(JVM) 안의 요청만 합치므로, 인스턴스가 여럿이면 이것만으로는 막지 못한다
+<li>한 요청만 다시 계산하고 나머지는 그 결과를 기다리게 한다(single-flight). 방법은 인스턴스 안의 JVM 락(<code>ReentrantLock</code>, <code>@Cacheable(sync = true)</code>)이나 분산 락(<code>SET NX</code>), 만료 전 선갱신이 있다</li>
+<li>무엇을 골랐고 왜인지 말한다. JVM 락이면 서버 대수만큼 DB 조회가 남는 한계가 있고(정답은 이 정도면 충분하고 Redis 장애 때 락까지 잃지 않아 JVM 락을 골랐다), 분산 락이면 Redis 장애 때 락도 함께 잃는다
 <strong>근거</strong> 10 §3</li>
 </ul>
 <h3 id="tc-d09-2"><a class="anchor" href="#tc-d09-2" aria-hidden="true">#</a>TC-D09-2</h3>
@@ -374,7 +374,7 @@
 <ul>
 <li>Redis 명령 타임아웃을 500ms로 둬서 Redis 지연이 요청 스레드를 오래 잡지 않게 한다</li>
 <li>캐시 조회 실패는 경고 로그를 남기고 DB 조회로 폴백한다</li>
-<li>Spring Cache를 쓰면 <code>CacheErrorHandler</code>를 등록해 조회 오류를 캐시 미스로 처리한다. 기본 처리기는 예외를 그대로 던진다
+<li>캐시 호출을 직접 감쌌다면 예외를 잡아 폴백한다(정답 <code>RedisGuard</code>). Spring Cache를 쓴다면 <code>CacheErrorHandler</code>를 등록해 조회 오류를 캐시 미스로 처리한다(기본 처리기는 예외를 그대로 던진다)
 <strong>근거</strong> spec-v2 §8, 10 §3</li>
 </ul>
 <h3 id="tc-d09-3"><a class="anchor" href="#tc-d09-3" aria-hidden="true">#</a>TC-D09-3</h3>
@@ -438,7 +438,7 @@
 <ul>
 <li>명세는 부분 성공이다. 없는 회원이나 이미 보유한 행은 건너뛰고 <code>{issued, skipped[]}</code>로 알린다</li>
 <li>한 트랜잭션에서 행마다 중복 키 예외를 잡고 계속해도 JPA에서는 그 트랜잭션을 살려 쓸 수 없어(rollback-only 표시 또는 flush 시점 실패) 전체가 롤백된다</li>
-<li>그래서 보유 여부를 미리 조회해 건너뛰고, 경합으로 들어오는 중복은 UNIQUE가 막게 한다. 같은 파일을 다시 올려도 중복 지급되지 않는다
+<li>그래서 대량 지급 메서드에는 <code>@Transactional</code>을 두지 않고 행마다 짧은 트랜잭션(<code>CouponService.issue</code>)으로 지급한다. 중복(UNIQUE)·소진은 그 행만 건너뛰므로 같은 파일을 다시 올려도 중복 지급되지 않는다
 <strong>근거</strong> spec-v2 §5-6, 06 §7</li>
 </ul>
 <h3 id="tc-d10-5"><a class="anchor" href="#tc-d10-5" aria-hidden="true">#</a>TC-D10-5</h3>

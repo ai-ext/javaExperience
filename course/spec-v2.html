@@ -89,8 +89,9 @@
 </tr>
 </tbody></table></div>
 <ul>
-<li>상태 코드: 400 검증 실패, 401 인증 없음·만료, 403 권한 없음, 404 대상 없음, 409 중복·충돌, 422 같은 <code>Idempotency-Key</code>에 다른 본문, 429 시도 횟수 초과, 502/504 PG 오류·시간 초과.</li>
+<li>상태 코드: 400 검증 실패, 401 인증 없음·만료, 403 권한 없음, 404 대상 없음, 409 중복·충돌, 422 같은 <code>Idempotency-Key</code>에 다른 본문, 429 시도 횟수 초과, 502 PG 거절·PG에 닿지 못함, 504 PG 결과 불명(시간 초과·5xx 재시도 소진).</li>
 <li>401·403도 같은 ProblemDetail 형식이다(<code>SecurityFilterChain</code>의 진입점·거부 핸들러에서 만든다).</li>
+<li>예외: 허용 목록 밖 출처의 CORS 요청(preflight 포함) 거부는 Spring CORS 처리기의 기본 응답(403, <code>text/plain</code> <code>Invalid CORS request</code>)이다. 브라우저는 CORS 거부 응답의 본문을 스크립트에 넘기지 않으므로 ProblemDetail로 바꾸지 않는다.</li>
 <li>시간은 ISO-8601 KST 오프셋 문자열이다. 예: <code>2026-10-22T09:30:00+09:00</code>.</li>
 <li>목록은 커서 방식이다. 요청 파라미터는 <code>cursor</code>(생략하면 처음부터), <code>size</code>(기본 20, 최대 50)이다. 응답은 <code>items</code>와 <code>nextCursor</code>이며, 마지막 쪽이면 <code>nextCursor</code>는 <code>null</code>이다.</li>
 <li><code>size</code>가 1 미만이거나 50 초과면 400이다.</li>
@@ -673,10 +674,18 @@
 </tr>
 <tr>
 <td>POST /api/me/points/charges</td>
-<td>(PG 거절)</td>
+<td>(PG 5xx, 재시도 소진)</td>
 <td>-</td>
 <td>-</td>
-<td>승인 실패</td>
+<td>결과 불명(PG가 처리했을 수 있다), <code>UNKNOWN</code>으로 남긴다</td>
+<td>504 <code>/errors/pg-timeout</code></td>
+</tr>
+<tr>
+<td>POST /api/me/points/charges</td>
+<td>(PG 거절·PG에 닿지 못함)</td>
+<td>-</td>
+<td>-</td>
+<td>승인 실패(4xx 거절, 연결 실패·커넥션 풀 대기 초과), <code>FAILED</code>로 남긴다</td>
 <td>502 <code>/errors/pg-declined</code></td>
 </tr>
 <tr>
@@ -721,6 +730,7 @@
 </tr>
 </tbody></table></div>
 <p>같은 <code>paymentKey</code>의 콜백이 여러 번 와도 포인트는 한 번만 적립한다.</p>
+<p>같은 <code>Idempotency-Key</code>로 다시 보내면 PG를 다시 부르지 않고 저장된 상태로 답한다(<code>DONE</code>은 처음 응답, <code>FAILED</code>는 502, <code>REQUESTED</code>·<code>UNKNOWN</code>은 504).</p>
 <p><code>UNKNOWN</code> 충전은 콜백이나 <code>GET /pg/v1/payments?orderId={orderId}</code> 조회(예: 재처리 워커)로만 확정하고, 추측으로 성공·실패를 정하지 않는다.</p>
 <h3 id="5-6-신고관리자"><a class="anchor" href="#5-6-신고관리자" aria-hidden="true">#</a>5-6. 신고·관리자</h3>
 <div class="table-wrap"><table>

@@ -17,10 +17,10 @@
 
 <h1 id="j14-리팩터링-④-null-반환을-optional과-빈-컬렉션으로"><a class="anchor" href="#j14-리팩터링-④-null-반환을-optional과-빈-컬렉션으로" aria-hidden="true">#</a>J14. 리팩터링 ④: null 반환을 Optional과 빈 컬렉션으로</h1>
 <blockquote>
-<p>같은 날: <a class="docref" href="../../docs/knowledge/D14-os-basics-backend.html">D14</a> · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests &#39;J14*&#39;</code></p>
+<p>같은 날: D14 · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests &#39;J14*&#39;</code></p>
 </blockquote>
 <h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
-<p><a class="docref" href="../../docs/knowledge/D14-os-basics-backend.html">D14</a>는 장애 훈련 날이다. Redis를 멈추거나 느리게 만든 상태에서도 글쓰기와 인기글이 돌아가야 한다. <a class="docref" href="../../docs/knowledge/D14-os-basics-backend.html">D14</a> ④⑤의 <code>PopularPostService</code>는 캐시가 없거나 Redis가 죽으면 <code>readCache()</code>가 null을 돌려준다. 호출부는 매번 <code>cached != null</code>을 확인하고 DB로 간다. 이 검사를 한 곳이라도 빠뜨리면 장애 때만 NPE가 터진다.
+<p>D14는 장애 훈련 날이다. Redis를 멈추거나 느리게 만든 상태에서도 글쓰기와 인기글이 돌아가야 한다. D14 ④⑤의 <code>PopularPostService</code>는 캐시가 없거나 Redis가 죽으면 <code>readCache()</code>가 null을 돌려준다. 호출부는 매번 <code>cached != null</code>을 확인하고 DB로 간다. 이 검사를 한 곳이라도 빠뜨리면 장애 때만 NPE가 터진다.
 오늘은 Spring 없이 null을 돌려주는 조회 메서드를 고친다. 단건 조회는 <code>Optional</code>로, 목록 조회는 빈 목록으로 바꾼다. 그리고 호출부에서 터지던 NPE를 없앤다.</p>
 <h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2>
 <div class="table-wrap"><table>
@@ -57,7 +57,7 @@
 <td><code>[]</code></td>
 </tr>
 </tbody></table></div>
-<p>흔한 착각: &quot;목록도 <code>Optional&lt;List&lt;…&gt;&gt;</code>로 감싸면 더 안전하다&quot;. 목록의 &quot;없음&quot;은 빈 목록이면 충분하다. 감싸면 호출부가 두 겹을 풀어야 한다. <code>Optional</code>은 단건 조회의 반환 타입에만 쓴다. 필드·매개변수에는 쓰지 않는다(<a class="docref" href="../../docs/knowledge/J06-enum-annotation-reflection.html">J06</a>). 예외는 &quot;캐시에 없음&quot;과 &quot;캐시에 빈 목록이 들어 있음&quot;을 구분해야 할 때다(아래 <a class="docref" href="../../docs/knowledge/D14-os-basics-backend.html">D14</a> ④).</p>
+<p>흔한 착각: &quot;목록도 <code>Optional&lt;List&lt;…&gt;&gt;</code>로 감싸면 더 안전하다&quot;. 목록의 &quot;없음&quot;은 빈 목록이면 충분하다. 감싸면 호출부가 두 겹을 풀어야 한다. <code>Optional</code>은 단건 조회의 반환 타입에만 쓴다. 필드·매개변수에는 쓰지 않는다(J06). 예외는 &quot;캐시에 없음&quot;과 &quot;캐시에 빈 목록이 들어 있음&quot;을 구분해야 할 때다(아래 D14 ④).</p>
 <h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2>
 <details>
 <summary>펼치기</summary>
@@ -282,9 +282,10 @@ public static boolean sameAmount(BigDecimal a, BigDecimal b) {
 </details>
 
 <h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2>
+<p>2단계(D11~D14)에서 진단하고 고치는 곳은 넘겨받은 <code>messy-server</code>다. <code>board-server</code>의 같은 이름 파일은 고친 뒤의 모습(정답 모양)이라 내용이 다르다. 아래는 어느 쪽을 보는지 경로에 적었다.</p>
 <ul>
-<li><a class="docref" href="../../docs/knowledge/D14-os-basics-backend.html">D14</a> ③ <code>board-server/src/main/java/com/example/board/admin/AdminService.java</code> — <code>hidePost</code>가 <code>postRepository.findById(postId).filter(…).orElseThrow(…)</code>로 &quot;없거나 삭제된 글&quot;을 한 식에서 404로 바꾼다. 선택 매개변수 <code>reportId</code>는 null일 수 있어 지역 변수 <code>Report report = null</code>로 받는다. 매개변수에 <code>Optional</code>을 쓰지 않는 예다.</li>
-<li><a class="docref" href="../../docs/knowledge/D14-os-basics-backend.html">D14</a> ④⑤ <code>board-server/src/main/java/com/example/board/post/PopularPostService.java</code> — <code>readCache()</code>가 &quot;캐시에 없음 또는 Redis 장애&quot;를 null로 돌려주고, <code>getPopular</code>가 <code>cached != null</code>을 두 번 확인한다. 여기서 빈 목록으로 바꾸면 안 된다. 빈 목록은 &quot;인기글 0건이 캐시돼 있음&quot;과 구분되지 않는다. 바꾼다면 <code>Optional&lt;List&lt;PopularPost&gt;&gt;</code>가 맞는 드문 자리다.</li>
+<li>D14 ③ <code>messy-server/src/main/java/com/example/board/admin/AdminService.java</code> (<code>board-server</code>의 같은 파일도 이 부분은 같다) — <code>hidePost</code>가 <code>postRepository.findById(postId).filter(…).orElseThrow(…)</code>로 &quot;없거나 삭제된 글&quot;을 한 식에서 404로 바꾼다. 선택 매개변수 <code>reportId</code>는 null일 수 있어 지역 변수 <code>Report report = null</code>로 받는다. 매개변수에 <code>Optional</code>을 쓰지 않는 예다.</li>
+<li>D14 ④⑤ <code>board-server/src/main/java/com/example/board/post/PopularPostService.java</code> (D14 ⑤ 고도화까지 마친 뒤 모습) — <code>readCache()</code>가 &quot;캐시에 없음 또는 Redis 장애&quot;를 null로 돌려주고, <code>getPopular</code>가 그 null을 확인한다. 여기서 빈 목록으로 바꾸면 안 된다. 빈 목록은 &quot;인기글 0건이 캐시돼 있음&quot;과 구분되지 않는다. 바꾼다면 <code>Optional&lt;List&lt;PopularPost&gt;&gt;</code>가 맞는 드문 자리다.</li>
 </ul>
 
 

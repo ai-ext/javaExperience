@@ -47,7 +47,7 @@
 <hr>
 <section class="day-step" id="step-d06-1" data-step="D06-1">
 
-<h2 id="①-mybatis-연결과-첫-목록-쿼리-쓰기는-jpa-목록검색은-mybatis"><a class="anchor" href="#①-mybatis-연결과-첫-목록-쿼리-쓰기는-jpa-목록검색은-mybatis" aria-hidden="true">#</a>① MyBatis 연결과 첫 목록 쿼리 (쓰기는 JPA, 목록·검색은 MyBatis)</h2><div class="step-facts"><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(board-server 기준)</small></p><ul>
+<h2 id="①-mybatis-연결과-첫-목록-쿼리-쓰기는-jpa-목록검색은-mybatis-applicationyml에-mybatis-설정"><a class="anchor" href="#①-mybatis-연결과-첫-목록-쿼리-쓰기는-jpa-목록검색은-mybatis-applicationyml에-mybatis-설정" aria-hidden="true">#</a>① MyBatis 연결과 첫 목록 쿼리 (쓰기는 JPA, 목록·검색은 MyBatis, <code>application.yml</code>에 <code>mybatis.*</code> 설정)</h2><div class="step-facts"><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(board-server 기준)</small></p><ul>
 <li><code>build.gradle</code></li>
 <li><code>src/main/java/com/example/board/post/PostQueryMapper.java</code></li>
 <li><code>src/main/resources/mapper/PostQueryMapper.xml</code></li>
@@ -961,7 +961,7 @@ class PostListApiTest extends ApiTestSupport {
 <li><code>src/test/java/com/example/board/post/PostListExplainTest.java</code></li>
 </ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>인덱스 컬럼 순서를 (<code>id</code>, <code>status</code>)로 잡으면 <code>WHERE status = ? ORDER BY id DESC</code> 목록에서 인덱스를 제대로 쓰지 못한다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
 <li><code>PostListExplainTest</code> 통과: 목록 쿼리 EXPLAIN의 <code>key</code>가 <code>idx_post_status_id</code>(컬럼 순서 <code>status</code>, <code>id</code>)이고 <code>Using filesort</code>가 없다</li>
-<li>인덱스를 지운 뒤 EXPLAIN의 <code>key</code>는 <code>PRIMARY</code>이고, 지우기 전후 <code>GET /api/posts</code> 응답은 같다</li>
+<li>인덱스를 지운 뒤 EXPLAIN의 <code>key</code>는 <code>idx_post_status_id</code>가 아니고(보통 <code>PRIMARY</code> 역순 스캔), 지우기 전후 <code>GET /api/posts</code> 응답은 같다</li>
 </ul></div><div class="step-fact fact-spec"><p class="fact-label">명세</p><p><a href="../spec-v2.html#4-엔드포인트"><code>GET /api/posts</code></a> (<a href="../spec-v2.html#5-3-목록검색">5-3. 목록·검색</a>)</p></div></div><details class="step-hint" data-step="D06-5">
 <summary>막히면</summary>
 
@@ -1113,7 +1113,7 @@ class PostListExplainTest extends ApiTestSupport {
 <li><code>#{}</code>는 PreparedStatement 파라미터로 바인딩돼 안전하지만, 값으로만 들어가므로 컬럼명이나 <code>ORDER BY</code> 대상에는 쓸 수 없다</li>
 <li>정렬은 허용 목록(명세상 <code>latest</code>만)으로 받고, 서버가 고정된 SQL 조각을 고른다</li>
 </ul>
-<p><strong>근거</strong> 06 §16, spec-v2 §5-3</p>
+<p><strong>근거</strong> spec-v2 §5-3</p>
 </details>
 
 <h3 id="tc-d06-2"><a class="anchor" href="#tc-d06-2" aria-hidden="true">#</a>TC-D06-2</h3>
@@ -1126,7 +1126,6 @@ class PostListExplainTest extends ApiTestSupport {
 <li>EXPLAIN의 <code>type</code>, <code>key</code>, <code>rows</code>, <code>Extra</code>(Using filesort 여부)를 인덱스 전후로 비교하고, <code>EXPLAIN ANALYZE</code>로 실제 읽은 행 수를 본다</li>
 <li>커서 페이징은 <code>id &lt; 마지막 id</code>로 이어 읽어, offset처럼 앞쪽 행을 읽고 버리지 않는다</li>
 </ul>
-<p><strong>근거</strong> 07 §2, 07 §5</p>
 </details>
 
 <h3 id="tc-d06-3"><a class="anchor" href="#tc-d06-3" aria-hidden="true">#</a>TC-D06-3</h3>
@@ -1139,7 +1138,6 @@ class PostListExplainTest extends ApiTestSupport {
 <li>Hibernate의 자동 flush는 JPQL 실행 전에 일어나며, MyBatis가 JDBC로 직접 보내는 SQL은 Hibernate가 모르므로 flush를 일으키지 않는다</li>
 <li>MyBatis 조회 전에 명시적으로 flush하고, 두 도구가 같은 트랜잭션(같은 커넥션)에 참여하는지 실험으로 확인한다</li>
 </ul>
-<p><strong>근거</strong> 06 §16</p>
 </details>
 
 <h3 id="tc-d06-4"><a class="anchor" href="#tc-d06-4" aria-hidden="true">#</a>TC-D06-4</h3>
@@ -1150,9 +1148,8 @@ class PostListExplainTest extends ApiTestSupport {
 <ul>
 <li>중첩 select는 부모 행마다 쿼리를 따로 실행하므로 글 20개면 태그 쿼리가 20번 나간다</li>
 <li>JOIN 한 번으로 가져와 <code>resultMap</code>의 중첩 결과로 묶고, <code>&lt;id&gt;</code>를 선언해 같은 글의 행을 합친다</li>
-<li>다만 1:N JOIN에 LIMIT을 걸면 글이 아니라 행 기준으로 잘리므로, 글 ID를 먼저 커서로 뽑고 태그는 <code>IN</code>으로 따로 가져온다</li>
+<li>다만 1:N JOIN 결과에 LIMIT을 걸면 글이 아니라 행 기준으로 잘리므로, 글에만 LIMIT을 거는 파생 테이블로 먼저 자르고 바깥에서 태그를 JOIN한다(글 ID 목록을 뽑은 뒤 <code>IN</code>으로 두 번 조회하는 것도 대안)</li>
 </ul>
-<p><strong>근거</strong> 06 §16</p>
 </details>
 
 <h2 id="ai-채점-프롬프트"><a class="anchor" href="#ai-채점-프롬프트" aria-hidden="true">#</a>AI 채점 프롬프트</h2>
@@ -1164,7 +1161,7 @@ class PostListExplainTest extends ApiTestSupport {
 너는 Java·Spring 온보딩 과정 v2로 백엔드를 배우는 사람의 리뷰어다. 학습자는 빈 프로젝트에서 명세서 v2의 서버를 하루씩 만들고 있고, 오늘은 D06다.
 지킬 것: 코드는 절대 수정하지 마라. DB는 조회만 한다(SELECT·SHOW·EXPLAIN). 서버를 대신 띄우거나 끄지 마라. 정답 코드를 통째로 주지 말고 방향과 힌트로 알려 줘라.
 
-1. 서버 주소의 `GET /actuator/health`로 응답 가능 여부를 확인해라. 꺼져 있으면 `./gradlew bootRun`으로 띄우라고만 알려 주고 멈춰라.
+1. 서버 주소의 `GET /actuator/health`로 응답 가능 여부를 확인해라. 꺼져 있으면 `./gradlew bootRun --args='--spring.profiles.active=local'`(또는 `SPRING_PROFILES_ACTIVE=local ./gradlew bootRun`)으로 띄우라고만 알려 주고 멈춰라. D01 ③부터 DB 설정이 `local` 프로파일에 있어 프로파일 없이는 기동에 실패한다.
 2. 아래 &quot;채점 기준&quot;이 통과/실패의 유일한 기준이다. 기준에 없는 것으로 실패 처리하지 말고, 다른 날의 기준은 보지 마라.
 3. [C] 항목: HTTP 요청은 서버 주소로 직접 보내 상태 코드·응답 헤더·본문을 기대값과 비교한다. 테스트 이름이 적힌 항목은 레포 루트에서 `./gradlew test --tests '&lt;테스트 클래스 이름&gt;'`으로 실행해 통과 여부를 본다(테스트 코드도 고치지 마라). 로그 항목은 기동 로그에서 찾거나 학습자에게 해당 줄을 붙여 달라고 한다. DB 확인이 필요하면 `docker compose exec -T mysql mysql -uboard -pboard board -e &quot;&lt;SELECT 문&gt;&quot;`으로 조회만 한다.
 4. [R] 항목: 관련 코드를 찾아 읽고 그 함정을 피했는지 판단해라. 지적할 때는 `파일:줄`을 붙여라.
@@ -1172,7 +1169,7 @@ class PostListExplainTest extends ApiTestSupport {
 6. 리뷰 초점은 채점표에 넣지 말고 ②·③에 적어라.
 
 채점 기준
-① MyBatis 연결과 첫 목록 쿼리 (쓰기는 JPA, 목록·검색은 MyBatis)
+① MyBatis 연결과 첫 목록 쿼리 (쓰기는 JPA, 목록·검색은 MyBatis, application.yml에 mybatis.* 설정)
   - [C1-1] PostQueryMapperTest 통과: ACTIVE 글만 최신순 20건
   - [R1] 함정을 피했는지 코드로 확인: XML namespace가 매퍼 인터페이스의 전체 이름과 다르면 기동은 되고 호출할 때 BindingException이 난다.
 ② resultMap으로 글과 태그를 한 번에 매핑
@@ -1191,7 +1188,7 @@ class PostListExplainTest extends ApiTestSupport {
   - [R4] 함정을 피했는지 코드로 확인: 같은 트랜잭션에서 JPA로 고친 직후 MyBatis로 읽으면 아직 flush 전이라 옛 값이 보인다.
 ⑤ D04에 만든 (status, id) 복합 인덱스를 SQL로 지웠다가 다시 만들며 EXPLAIN 전후 비교 (schema.sql은 그대로 둔다)
   - [C5-1] PostListExplainTest 통과: 목록 쿼리 EXPLAIN의 key가 idx_post_status_id(컬럼 순서 status, id)이고 Using filesort가 없다
-  - [C5-2] 인덱스를 지운 뒤 EXPLAIN의 key는 PRIMARY이고, 지우기 전후 GET /api/posts 응답은 같다
+  - [C5-2] 인덱스를 지운 뒤 EXPLAIN의 key는 idx_post_status_id가 아니고(보통 PRIMARY 역순 스캔), 지우기 전후 GET /api/posts 응답은 같다
   - [R5] 함정을 피했는지 코드로 확인: 인덱스 컬럼 순서를 (id, status)로 잡으면 WHERE status = ? ORDER BY id DESC 목록에서 인덱스를 제대로 쓰지 못한다.
 
 말하기 카드
@@ -1210,7 +1207,7 @@ class PostListExplainTest extends ApiTestSupport {
 - [TC-D06-4] MyBatis 목록에서 글마다 태그를 &lt;collection select=&quot;...&quot;&gt;로 가져왔더니 쿼리가 글 수만큼 늘었습니다. 어떻게 고치나요?
     · 중첩 select는 부모 행마다 쿼리를 따로 실행하므로 글 20개면 태그 쿼리가 20번 나간다
     · JOIN 한 번으로 가져와 resultMap의 중첩 결과로 묶고, &lt;id&gt;를 선언해 같은 글의 행을 합친다
-    · 다만 1:N JOIN에 LIMIT을 걸면 글이 아니라 행 기준으로 잘리므로, 글 ID를 먼저 커서로 뽑고 태그는 IN으로 따로 가져온다
+    · 다만 1:N JOIN 결과에 LIMIT을 걸면 글이 아니라 행 기준으로 잘리므로, 글에만 LIMIT을 거는 파생 테이블로 먼저 자르고 바깥에서 태그를 JOIN한다(글 ID 목록을 뽑은 뒤 IN으로 두 번 조회하는 것도 대안)
 
 리뷰 초점
 - 매퍼 XML에 `${}`로 사용자 입력이 들어가는 곳이 없는지
