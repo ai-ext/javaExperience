@@ -13,44 +13,21 @@
 | P1 명세·순서표·말하기 카드 | 완료 | |
 | P2 1단계 정답 서버 `board-server/` | 완료 | 테스트 377개(집 장비 375 통과, 아래 환경 한정 2건) |
 | P3 Java 트랙 `java-track/` | 완료 | `:java-track:check` 통과, 개별 테스트 323개 |
-| P4 2단계 `messy-server/` + 티켓 B01~B16·E01 | **마무리 중** | P·T 영역 끝. **S 영역(B08·B11·B12·B13·B14·B16·장애 훈련) 리뷰 반영이 중간에 멈춤** → 2절 |
+| P4 2단계 `messy-server/` + 티켓 B01~B16·E01 | 완료 | P·T·S 영역 끝. S 영역 리뷰 반영은 2026-10-23 회사 장비에서 마침 → 2절 |
 | P5 일자 페이지·화면 | 완료 | 티켓 흐름 데이터 B04 동기화 1건 남음 → 3절 2번 |
 | P6 기존 문서 정리 | 완료 | |
 | P7 전체 재검증 | **진행 중** | R1(1단계)·R3(Java) 검증·반영 끝. R2(2단계·티켓)·R4(화면) 남음 |
 
-## 2. 멈춘 작업: P4 S 영역 리뷰 반영 (미커밋 → 패치로 보관)
+## 2. P4 S 영역 리뷰 반영 — 완료 (2026-10-23)
 
-codex 리뷰 [reviews/p4-S.md](handoff/reviews/p4-S.md)의 9건을 S 담당이 반영하던 중 멈췄다. 반영 중이던 변경은 **검증하지 않은 상태**로 [handoff/p4-S-wip.patch](handoff/p4-S-wip.patch)에 보관했다(14파일, HEAD에 `git apply --check` 통과 확인). 9건과 반영 상태(멈춘 시점 추정):
+codex 리뷰 [reviews/p4-S.md](handoff/reviews/p4-S.md)의 9건을 모두 반영했다. 집 장비에서 멈췄을 때 보관한 미완성 패치는 회사 장비에서 적용해 마무리했고, 적용이 끝나 리포에서 지웠다.
 
-| # | 내용 | 상태 |
-|---|---|---|
-| 1 | `messy-server/compose.yaml` redis가 호스트 16379를 공개해 정답 서버 compose와 충돌 | 패치에 수정 있음 — 확인 필요 |
-| 2 | `drills/probe.sh`가 curl 실패 시 종료 | 패치에 수정 있음 — 확인 필요 |
-| 3 | 장애 예약 중복 실행 시 복구 뒤 재주입 | 패치에 수정 있음 — 확인 필요 |
-| 4 | 장애 삭제 실패를 복구 성공으로 기록 | 패치에 수정 있음 — 확인 필요 |
-| 5 | B16 인기글 검사가 앞선 글쓰기의 RedisGuard 상태에 가려짐 | 패치에 B16ConfirmTest 수정 있음 — 확인 필요 |
-| 6 | B14 확인 테스트가 정답 일부를 놓침 | **멈춘 지점**(B14ConfirmTest 수정 중) |
-| 7 | B11·B14 repro가 다른 프로세스를 종료할 수 있음(자기가 띄운 PID만) | 패치에 repro 수정 있음 — 확인 필요 |
-| 8 | B12 제출물 문구가 원인 노출 | 패치에 B12.md 수정 있음 — 확인 필요 |
-| 9 | B11 정답 서버 설명 정정 | 패치에 B11.md 수정 있음 — 확인 필요 |
-
-이어서 하는 법:
-
-```bash
-git pull
-git apply docs/course-redesign/handoff/p4-S-wip.patch      # 작업 트리에 적용(커밋 안 됨)
-git diff --stat                                             # 14파일 확인
-# 리뷰 9건을 하나씩 대조해 마저 고친 뒤, 티켓 단위로 커밋:
-#   git commit -m "messy(B14): …" -- messy-server/tickets/B14 course/tickets/B14.md
-TICKET_WORK_DIR=/tmp/tk tools/tickets/verify.sh --full B08 B11 B12 B13 B14 B16
-bash -n messy-server/drills/*.sh                            # 장애 훈련 스크립트 문법, 가능하면 주입·복구 1회 실제 실행
-```
-
-(집 장비 작업 트리에는 이 변경이 그대로 남아 있다. 회사 장비에서는 위처럼 패치를 적용한다.)
+- 커밋: `83b4647`(장애 훈련 도구·compose Redis 16381), `2dc8dc1` B11, `50751f7` B12, `f79fdc5` B14, `d8a3a6a` B16, `27591ee` 원장. 독립 리뷰 minor 4건 반영은 그 뒤 커밋(P8 원장)
+- 검증: `verify.sh --full B08 B11 B12 B13 B14 B16` OK, 장애 훈련 주입·복구 실제 실행. 결과·Ruling은 [P4 원장](plans/2026-10-23-p4-ledger.md) 끝, [P8 원장](plans/2026-10-23-p8-ledger.md)
 
 ## 3. 남은 일 (순서대로)
 
-1. **P4 S 마무리** — 2절.
+1. ~~**P4 S 마무리**~~ — 완료(2절).
 2. **티켓 전체 재검증과 흐름 데이터 동기화**
    - `TICKET_WORK_DIR=/tmp/tk tools/tickets/verify.sh --full` (17개 전부: 결함 상태에서 단언 실패 → 정답 패치 후 통과 → 전체 테스트 통과)
    - `TICKET_WORK_DIR=/tmp/tk tools/tickets/verify.sh --all-fixes` (정답 패치 17개 누적 적용 + 전체 테스트)
@@ -75,7 +52,7 @@ bash -n messy-server/drills/*.sh                            # 장애 훈련 스�
 |---|---|
 | JDK | 호스트 JDK 21로 `./gradlew` 직접 실행. 셸 기본 `JAVA_HOME`이 11일 수 있으니 확인(`verify.sh`는 `TICKET_JAVA_HOME`, 기본값은 집 장비 경로 — 회사에서는 `TICKET_JAVA_HOME=<JDK21>`로 덮는다) |
 | Docker | 집 장비는 Colima가 아닌 다른 로컬 Docker 런타임이었다(파일 공유가 `~/code` 아래만 됨 → 리포를 `~/code` 아래에 둬야 Testcontainers bind mount가 된다). 회사가 Colima면 `tools/course/gradle-docker.sh`(컨테이너 안 Gradle)도 쓸 수 있다 |
-| 환경 한정 실패 | `PgClientRetryTest`의 연결 실패 2건(`연결_실패는_재시도하고_복구되면_성공한다`, `연결_실패가_계속되면_백오프_후_3번째에_포기한다`)은 집 장비 포트 포워더가 끊긴 프록시 연결을 받아 둬서 항상 실패했다. Colima·Linux에서는 통과할 것으로 본다 — 회사에서 확인해 원장에 적는다. `verify.sh --full`은 이 2건만 허용한다 |
+| 환경 한정 실패 | `PgClientRetryTest`의 연결 실패 2건(`연결_실패는_재시도하고_복구되면_성공한다`, `연결_실패가_계속되면_백오프_후_3번째에_포기한다`)은 집 장비 포트 포워더가 끊긴 프록시 연결을 받아 둬서 항상 실패했다. 회사 장비 Colima에서도 같은 이유(TIMEOUT)로 실패한다(P4 원장). `verify.sh --full`은 이 2건만 허용한다 |
 | 디스크 | 집 장비에서 디스크 99%로 Docker VM이 멈춘 적이 있다. Testcontainers 잔여 컨테이너·익명 볼륨이 쌓이면 `docker container prune --filter label=org.testcontainers=true`, `docker volume prune`(이름 없는 볼륨만)으로 정리 |
 | bash | macOS 기본 bash 3.2 — `mapfile` 없음. 스크립트에서 `$N명`처럼 변수 뒤에 한글이 붙으면 변수 이름으로 읽혀 `set -u`에서 멈춘다 → `${N}명` |
 | 사이트 | `cd tools/site && npm install` 먼저(새 장비). 빌드 `npm run build`, 검사 `test:course`·`validate:course`·`test:course-pages`·`audit:visual`·`audit:version-cards`·`audit:parity` |
