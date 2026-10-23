@@ -1,6 +1,16 @@
 package com.example.board.payment;
 
+import java.io.Closeable;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -97,16 +107,53 @@ class PgClientTest {
     }
 
     @Test
-    void SYN에_답이_없는_주소는_1초에_연결_타임아웃() {
-        long start = System.nanoTime();
+    void SYN에_답이_없는_주소는_1초에_연결_타임아웃() throws IOException {
+        List<Closeable> resources = new ArrayList<>();
+        try {
+            String baseUrl = unansweredBaseUrl(resources);
+            long start = System.nanoTime();
 
-        // 10.255.255.1은 라우팅되지만 아무도 응답하지 않아 SYN이 버려진다
-        PgException e = catchThrowableOfType(PgException.class,
-                () -> client("http://10.255.255.1:81", 10).approve(orderId(), 1000, "key-blackhole-1"));
+            PgException e = catchThrowableOfType(PgException.class,
+                    () -> client(baseUrl, 10).approve(orderId(), 1000, "key-blackhole-1"));
 
-        long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-        assertThat(e.kind()).isEqualTo(PgException.Kind.UNREACHABLE);
-        assertThat(elapsed).isBetween(900L, 1800L);
+            long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            assertThat(e.kind()).isEqualTo(PgException.Kind.UNREACHABLE);
+            assertThat(elapsed).isBetween(900L, 1800L);
+        } finally {
+            for (Closeable resource : resources) {
+                resource.close();
+            }
+        }
+    }
+
+    /**
+     * SYN에 답이 없는 로컬 주소. "응답 없는 외부 주소"는 망마다 다르게 군다(사내망은 바로 거절하거나 프록시가 받는다).
+     * Linux: backlog 1로 열고 accept하지 않는 리스너의 대기열을 채우면 그 뒤 SYN은 버려진다.
+     * macOS: 대기열이 넘치면 RST를 보내므로, lo0에 붙지 않은 루프백 주소(127.0.0.2)를 쓴다. 그 주소로 간 SYN은 버려진다.
+     * 어느 쪽이든 200ms 안에 연결이 붙지 않는 것을 확인한 주소만 돌려준다.
+     */
+    static String unansweredBaseUrl(List<Closeable> resources) throws IOException {
+        ServerSocket listener = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"));
+        resources.add(listener);
+        for (int i = 0; i < 64; i++) {
+            Socket filler = new Socket();
+            resources.add(filler);
+            try {
+                filler.connect(listener.getLocalSocketAddress(), 200);
+            } catch (SocketTimeoutException queueFull) {
+                return "http://127.0.0.1:" + listener.getLocalPort();
+            } catch (SocketException reset) {
+                break;
+            }
+        }
+        try (Socket probe = new Socket()) {
+            probe.connect(new InetSocketAddress("127.0.0.2", listener.getLocalPort()), 200);
+        } catch (SocketTimeoutException dropped) {
+            return "http://127.0.0.2:" + listener.getLocalPort();
+        } catch (IOException refused) {
+            // 127.0.0.2가 로컬 주소인 OS(Linux)는 바로 거절한다. 아래에서 실패로 알린다
+        }
+        throw new IllegalStateException("SYN에 답이 없는 로컬 주소를 만들지 못했다");
     }
 
     @Test
