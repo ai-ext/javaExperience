@@ -8,7 +8,7 @@
 ## 준비
 
 1. `messy-server`에서 `docker compose up -d`
-   - 서버는 Toxiproxy(16380)를 거쳐 Redis에 붙는다(`compose.yaml`, `toxiproxy.json`의 `redis` 프록시). `redis-cli`로 Redis에 바로 붙을 때는 16379.
+   - 서버는 Toxiproxy(16380)를 거쳐 Redis에 붙는다(`compose.yaml`, `toxiproxy.json`의 `redis` 프록시). `redis-cli`로 Redis에 바로 붙을 때는 16381(또는 `docker compose exec redis redis-cli`).
 2. 서버를 띄우고 로그를 파일로도 남긴다:
    `mkdir -p /tmp/board-drill && ./gradlew bootRun --args='--spring.profiles.active=local' 2>&1 | tee /tmp/board-drill/server.log`
 3. 다른 터미널에서 `bash drills/probe.sh` — 1초마다 글쓰기·인기글을 부르고 코드·시간을 찍는다. 1초를 넘기거나 코드가 다르면 `!!`.
@@ -84,4 +84,4 @@
 
 - 지연 시간을 400ms·1000ms·5000ms로 바꿔 가며 응답 시간이 어떻게 변하는지 표로 남긴다(타임아웃 500ms와 비교).
 - `drills/inject.sh latency 3000`을 넣은 채 로그인을 해 본다. 로그인 시도 제한(fail-open)은 Redis 없이도 통과하는가.
-- 인기글 캐시를 비운 상태(`redis-cli -p 16379 DEL popular:posts`)에서 지연을 넣고, 캐시 재적재가 DB에 몰리는지 본다(D14 ⑤ 고도화와 연결).
+- 인기글 캐시를 비운 상태(`docker compose exec redis redis-cli DEL popular:posts`)에서 지연을 넣고, 캐시 재적재가 DB에 몰리는지 본다(D14 ⑤ 고도화와 연결).

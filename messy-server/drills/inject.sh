@@ -21,17 +21,17 @@ record() { echo "$(now) $*" | tee -a "$OUT/injections.log" >/dev/null; }
 case "${1:-}" in
   latency)
     ms=${2:-3000}
-    curl -sf -X DELETE "$TOXI/proxies/$PROXY/toxics/drill-latency" >/dev/null 2>&1 || true
-    curl -sf -X POST "$TOXI/proxies/$PROXY/toxics" \
+    curl -sf --max-time 5 -X DELETE "$TOXI/proxies/$PROXY/toxics/drill-latency" >/dev/null 2>&1 || true
+    curl -sf --max-time 5 -X POST "$TOXI/proxies/$PROXY/toxics" \
       -d "{\"name\":\"drill-latency\",\"type\":\"latency\",\"stream\":\"downstream\",\"attributes\":{\"latency\":$ms}}" >/dev/null
     record "주입: $PROXY 응답 지연 ${ms}ms"
     ;;
   down)
-    curl -sf -X POST "$TOXI/proxies/$PROXY" -d '{"enabled":false}' >/dev/null
+    curl -sf --max-time 5 -X POST "$TOXI/proxies/$PROXY" -d '{"enabled":false}' >/dev/null
     record "주입: $PROXY 연결 끊김(프록시 닫음)"
     ;;
   status)
-    curl -sf "$TOXI/proxies/$PROXY" | (command -v jq >/dev/null && jq '{name, listen, upstream, enabled, toxics}' || cat)
+    curl -sf --max-time 5 "$TOXI/proxies/$PROXY" | (command -v jq >/dev/null && jq '{name, listen, upstream, enabled, toxics}' || cat)
     exit 0
     ;;
   *)
