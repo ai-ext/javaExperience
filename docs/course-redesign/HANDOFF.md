@@ -52,7 +52,7 @@ codex 리뷰 [reviews/p4-S.md](handoff/reviews/p4-S.md)의 9건을 모두 반영
 |---|---|
 | JDK | 호스트 JDK 21로 `./gradlew` 직접 실행. 셸 기본 `JAVA_HOME`이 11일 수 있으니 확인(`verify.sh`는 `TICKET_JAVA_HOME`, 기본값은 집 장비 경로 — 회사에서는 `TICKET_JAVA_HOME=<JDK21>`로 덮는다) |
 | Docker | 집 장비는 Colima가 아닌 다른 로컬 Docker 런타임이었다(파일 공유가 `~/code` 아래만 됨 → 리포를 `~/code` 아래에 둬야 Testcontainers bind mount가 된다). 회사가 Colima면 `tools/course/gradle-docker.sh`(컨테이너 안 Gradle)도 쓸 수 있다 |
-| 환경 한정 실패 | `PgClientRetryTest`의 연결 실패 2건(`연결_실패는_재시도하고_복구되면_성공한다`, `연결_실패가_계속되면_백오프_후_3번째에_포기한다`)은 집 장비 포트 포워더가 끊긴 프록시 연결을 받아 둬서 항상 실패했다. 회사 장비 Colima에서도 같은 이유(TIMEOUT)로 실패한다(P4 원장). `verify.sh --full`은 이 2건만 허용한다 |
+| 환경 한정 실패 | `PgClientRetryTest`의 연결 실패 2건(`연결_실패는_재시도하고_복구되면_성공한다`, `연결_실패가_계속되면_백오프_후_3번째에_포기한다`)은 집 장비 포트 포워더가 끊긴 프록시 연결을 받아 둬서 항상 실패했다. 회사 장비에서도 호스트 Gradle(Docker 포트 포워더 경유)로 돌리면 같은 이유(TIMEOUT)로 실패하고, Colima VM 안(`tools/course/gradle-docker.sh`, `--network host`)에서 돌리면 통과한다(P8 원장). `verify.sh --full`은 이 2건만 허용한다 |
 | 디스크 | 집 장비에서 디스크 99%로 Docker VM이 멈춘 적이 있다. Testcontainers 잔여 컨테이너·익명 볼륨이 쌓이면 `docker container prune --filter label=org.testcontainers=true`, `docker volume prune`(이름 없는 볼륨만)으로 정리 |
 | bash | macOS 기본 bash 3.2 — `mapfile` 없음. 스크립트에서 `$N명`처럼 변수 뒤에 한글이 붙으면 변수 이름으로 읽혀 `set -u`에서 멈춘다 → `${N}명` |
 | 사이트 | `cd tools/site && npm install` 먼저(새 장비). 빌드 `npm run build`, 검사 `test:course`·`validate:course`·`test:course-pages`·`audit:visual`·`audit:version-cards`·`audit:parity` |
