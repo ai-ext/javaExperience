@@ -5,7 +5,7 @@ now() { date '+%Y-%m-%d %H:%M:%S %z'; }
 
 LOCK="$OUT/toxiproxy.lock"
 
-# 주입과 복구가 Toxiproxy를 동시에 바꾸지 않게 한다. 10초 안에 못 잡으면 실패.
+# 예약 등록·주입·복구가 동시에 끼어들지 않게 한다. 10초 안에 못 잡으면 실패.
 lock() {
   local holder
   for _ in $(seq 1 100); do
@@ -29,7 +29,3 @@ unlock() {
   return 0
 }
 
-# PID가 아직 start.sh의 예약 프로세스인지 본다(남은 pid 파일의 번호가 다른 프로세스에 재사용됐을 수 있다)
-is_scheduler() {
-  ps -p "$1" -o command= 2>/dev/null | grep -q 'start\.sh'
-}

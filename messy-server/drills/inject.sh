@@ -52,3 +52,6 @@ case "${1:-}" in
     exit 1
     ;;
 esac
+
+# 예약으로 넣은 주입이 끝났다. 잠금 안이라 그 사이 다른 예약으로 바뀌었을 일이 없다.
+[ -z "${DRILL_TOKEN:-}" ] || rm -f "$OUT/scheduled.id"
