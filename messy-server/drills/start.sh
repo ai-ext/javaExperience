@@ -15,28 +15,42 @@ OUT=${DRILL_OUT:-/tmp/board-drill}
 FAULT=${FAULT:-latency}
 LATENCY_MS=${LATENCY_MS:-3000}
 mkdir -p "$OUT"
+# shellcheck source=lib.sh
+. ./lib.sh
 
-if [ -f "$OUT/scheduled.pid" ] && kill -0 "$(cat "$OUT/scheduled.pid")" 2>/dev/null; then
-  echo "이미 예약된 훈련이 있다(pid $(cat "$OUT/scheduled.pid")). bash drills/recover.sh로 정리한 뒤 다시 시작한다." >&2
-  exit 1
+if [ -f "$OUT/scheduled.pid" ]; then
+  pid=$(cat "$OUT/scheduled.pid")
+  if is_scheduler "$pid"; then
+    echo "이미 예약된 훈련이 있다(pid $pid). bash drills/recover.sh로 정리한 뒤 다시 시작한다." >&2
+    exit 1
+  fi
 fi
-rm -f "$OUT/scheduled.pid" "$OUT/scheduled.cancel"
+rm -f "$OUT/scheduled.pid" "$OUT/scheduled.id"
 
 bash ./inject.sh status >/dev/null || { echo "Toxiproxy redis 프록시가 없다. messy-server에서 docker compose up -d부터." >&2; exit 1; }
 
+# 예약 표시. recover.sh가 이 파일을 지우면 예약은 주입하지 않고 끝난다(inject.sh도 잠금을 잡은 뒤 다시 본다).
+token="$(date +%s)-$$-$RANDOM"
+echo "$token" >"$OUT/scheduled.id"
+
 delay=$((10 + RANDOM % 81))
-echo "$(date '+%Y-%m-%d %H:%M:%S %z') 훈련 시작(장애 종류는 $FAULT, 주입 시각은 비공개)" | tee -a "$OUT/injections.log"
+echo "$(now) 훈련 시작(장애 종류는 $FAULT, 주입 시각은 비공개)" | tee -a "$OUT/injections.log"
 (
-  # 1초마다 취소 표시를 본다. recover.sh가 취소하면 주입하지 않고 끝난다.
+  alive() { [ "$(cat "$OUT/scheduled.id" 2>/dev/null)" = "$token" ]; }
   for _ in $(seq 1 "$delay"); do
-    [ -f "$OUT/scheduled.cancel" ] && exit 0
+    alive || exit 0
     sleep 1
   done
-  [ -f "$OUT/scheduled.cancel" ] && exit 0
-  if [ "$FAULT" = down ]; then bash ./inject.sh down; else bash ./inject.sh latency "$LATENCY_MS"; fi
+  alive || exit 0
+  if [ "$FAULT" = down ]; then
+    DRILL_TOKEN=$token bash ./inject.sh down
+  else
+    DRILL_TOKEN=$token bash ./inject.sh latency "$LATENCY_MS"
+  fi
   # 자기 예약 파일일 때만 지운다. macOS 기본 bash 3.2에는 BASHPID가 없어 exec한 sh의 부모 PID로 자기 PID를 얻는다.
   self=$(exec sh -c 'echo $PPID')
   [ "$(cat "$OUT/scheduled.pid" 2>/dev/null)" = "$self" ] && rm -f "$OUT/scheduled.pid"
+  alive && rm -f "$OUT/scheduled.id"
 ) >/dev/null 2>&1 &
 echo $! >"$OUT/scheduled.pid"
 

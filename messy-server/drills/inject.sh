@@ -14,9 +14,22 @@ TOXI=${TOXI:-http://localhost:8475}
 PROXY=${PROXY:-redis}
 OUT=${DRILL_OUT:-/tmp/board-drill}
 mkdir -p "$OUT"
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
 
-now() { date '+%Y-%m-%d %H:%M:%S %z'; }
 record() { echo "$(now) $*" | tee -a "$OUT/injections.log" >/dev/null; }
+
+case "${1:-}" in
+  latency | down)
+    lock || { echo "다른 주입·복구가 진행 중이다($LOCK). 끝난 뒤 다시 실행한다." >&2; exit 1; }
+    trap unlock EXIT
+    # start.sh 예약으로 불린 주입은 잠금을 잡은 뒤 예약이 아직 살아 있는지 다시 본다.
+    # recover.sh가 먼저 예약을 지웠으면 주입하지 않는다(복구 뒤에 장애가 다시 걸리지 않게).
+    if [ -n "${DRILL_TOKEN:-}" ] && [ "$(cat "$OUT/scheduled.id" 2>/dev/null)" != "$DRILL_TOKEN" ]; then
+      exit 0
+    fi
+    ;;
+esac
 
 case "${1:-}" in
   latency)

@@ -21,12 +21,10 @@ token=$(curl -s -X POST "$BASE/api/auth/login" -H 'Content-Type: application/jso
 call() {
   local expect=$1; shift
   local out code t flag=""
-  # curl은 실패해도 -w 출력을 남기므로 성공·실패를 나눠 코드와 시간을 한 번만 정한다
-  if out=$(curl -s -o /dev/null --max-time "$MAX" -w '%{http_code} %{time_total}' "$@"); then
-    code=${out% *}; t=${out#* }
-  else
-    code="000"; t=$MAX
-  fi
+  # curl은 실패해도 -w를 한 번 찍는다(코드 000, 실제 걸린 시간). 바로 거절돼도 그 시간이 남는다. 아무것도 못 찍었을 때만 MAX로 둔다.
+  out=$(curl -s -o /dev/null --max-time "$MAX" -w '%{http_code} %{time_total}' "$@") || true
+  [ -n "$out" ] || out="000 $MAX"
+  code=${out% *}; t=${out#* }
   if [ "$code" != "$expect" ] || awk -v t="$t" 'BEGIN { exit !(t >= 1.0) }'; then flag=" !!"; fi
   printf '%s %5.2fs%s' "$code" "$t" "$flag"
 }
