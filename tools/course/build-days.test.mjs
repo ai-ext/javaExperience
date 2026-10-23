@@ -11,6 +11,8 @@ const roadmap = JSON.parse(fs.readFileSync(path.join(ROOT, 'course/roadmap.json'
 const hints = JSON.parse(fs.readFileSync(path.join(ROOT, 'course/hints.json'), 'utf8'));
 const built = buildAll(ROOT);
 const readyDays = roadmap.days.filter((d) => hints.days[d.id]);
+// 정답 커밋(answer(Dnn-m))이 있는 날은 1단계뿐이다
+const answerDays = readyDays.filter((d) => d.phase === 'build');
 const page = (id) => built.files.get(`course/spring/${id}.md`);
 const allCommits = listAnswerCommits(ROOT);
 const stepCommits = allCommits.filter((c) => c.kind === 'answer');
@@ -40,19 +42,35 @@ test('D00~D15와 README를 모두 만든다', () => {
   assert.deepEqual(names, want);
 });
 
-test('D01~D10은 완성 페이지, D11~D15는 준비 중 페이지다', () => {
-  assert.deepEqual(readyDays.map((d) => d.id), ['D01', 'D02', 'D03', 'D04', 'D05', 'D06', 'D07', 'D08', 'D09', 'D10']);
+test('D01~D15 모두 완성 페이지다(snapshot은 1단계만)', () => {
+  assert.deepEqual(readyDays.map((d) => d.id), roadmap.days.map((d) => d.id));
   for (const d of roadmap.days) {
     const md = page(d.id);
-    if (hints.days[d.id]) {
-      assert.ok(md.includes('## AI 채점 프롬프트'), `${d.id}: 채점 프롬프트`);
-      assert.ok(md.includes('## 날짜별 snapshot'), `${d.id}: snapshot`);
-      assert.ok(!md.includes('준비 중'), `${d.id}: 준비 중 표시`);
-    } else {
-      assert.ok(md.includes('**준비 중**'), `${d.id}: 준비 중 표시`);
-      assert.ok(!md.includes('class="step-answer"'), `${d.id}: 정답이 들어가면 안 된다`);
+    assert.ok(md.includes('## AI 채점 프롬프트'), `${d.id}: 채점 프롬프트`);
+    assert.ok(!md.includes('준비 중'), `${d.id}: 준비 중 표시`);
+    assert.equal(md.includes('## 날짜별 snapshot'), d.phase === 'build', `${d.id}: snapshot은 1단계만`);
+    if (d.phase !== 'build') assert.ok(!md.includes('class="step-answer"'), `${d.id}: 2단계·마무리 정답은 티켓 페이지에만`);
+  }
+  assert.ok(!page('README').includes('준비 중'), '일자 목록 상태');
+});
+
+test('2단계 순서 칸은 티켓마다 티켓 페이지 "원인과 정답" 절로 잇고, 훈련 순서는 훈련 페이지로 잇는다', () => {
+  for (const d of roadmap.days.filter((x) => x.phase === 'maintain')) {
+    const md = page(d.id);
+    for (const s of d.steps) {
+      const section = md.slice(md.indexOf(`id="step-${d.id.toLowerCase()}-${s.no}"`), md.indexOf('</section>', md.indexOf(`id="step-${d.id.toLowerCase()}-${s.no}"`)));
+      const line = section.split('\n').find((l) => l.startsWith('**원인과 정답**'));
+      assert.ok(line, `${d.id}-${s.no}: 원인과 정답 줄`);
+      assert.ok(section.indexOf(line) < section.indexOf('class="step-hint"'), `${d.id}-${s.no}: 링크는 힌트 접기 앞(사실 칸)에`);
+      for (const t of s.tickets) {
+        assert.ok(line.includes(`](../tickets/${t}.md#원인과-정답)`), `${d.id}-${s.no}: ${t} 링크`);
+        assert.match(fs.readFileSync(path.join(ROOT, `course/tickets/${t}.md`), 'utf8'), /^## 원인과 정답$/m, `${t}: 원인과 정답 절`);
+      }
     }
   }
+  const d14 = page('D14');
+  const drill = d14.slice(d14.indexOf('id="step-d14-6"'), d14.indexOf('</section>', d14.indexOf('id="step-d14-6"')));
+  assert.ok(drill.includes('](../tickets/drill.md)'), 'D14 ⑥: 모의 장애 훈련 페이지');
 });
 
 test('일자 페이지의 순서 수·제목·카드가 roadmap과 같다', () => {
@@ -74,7 +92,7 @@ test('정답 커밋 매핑: 순서와 어긋난 커밋은 허용 목록(D01-0, D
   const commits = stepCommits;
   const stray = commits.filter((c) => !roadmap.days.find((d) => d.id === c.day).steps.some((s) => s.no === c.m)).map((c) => `${c.day}-${c.m}`);
   assert.deepEqual(stray.sort(), Object.keys(EXTRA_COMMITS).sort());
-  for (const d of readyDays) {
+  for (const d of answerDays) {
     const extras = Object.keys(EXTRA_COMMITS).filter((k) => k.startsWith(`${d.id}-`)).length;
     assert.equal(commits.filter((c) => c.day === d.id).length, d.steps.length + extras, d.id);
   }
@@ -122,7 +140,7 @@ function answerBlockErrors(dayId, body) {
 }
 
 test('정답 블록은 그 순서(Dnn-m) 커밋의 board-server 파일과 내용만 담는다', () => {
-  for (const d of readyDays) {
+  for (const d of answerDays) {
     const { blocks, errs } = answerBlockErrors(d.id, page(d.id));
     const extras = Object.keys(EXTRA_COMMITS).filter((k) => k.startsWith(`${d.id}-`) && EXTRA_COMMITS[k].extra).length;
     const deferred = Object.keys(DEFERRED_FIXES).filter((k) => k.startsWith(`${d.id}-`)).length;
@@ -183,6 +201,30 @@ test('채점 프롬프트에 그날 완료 조건과 말하기 카드가 모두 
   assert.ok(!prompt.includes('{{'), '치환되지 않은 자리표시자');
 });
 
+test('2단계 채점 프롬프트는 티켓마다 3점 세트를, 마무리는 설명 세션·회고를 채점한다', () => {
+  const talkCards = parseTalkCards(fs.readFileSync(path.join(ROOT, 'course/talk-cards.md'), 'utf8'));
+  const prompt = (id) => { const md = page(id); return md.slice(md.indexOf('## AI 채점 프롬프트'), md.indexOf('## 내일 미리보기')); };
+  for (const d of roadmap.days.filter((x) => x.phase !== 'build')) {
+    const p = prompt(d.id);
+    assert.ok(!p.includes('{{'), `${d.id}: 치환되지 않은 자리표시자`);
+    for (const s of d.steps) s.done.forEach((_, i) => assert.ok(p.includes(`[C${s.no}-${i + 1}]`), `${d.id}: C${s.no}-${i + 1}`));
+    for (const id of d.talkCards) assert.ok(p.includes(`[${id}]`), `${d.id}: ${id}`);
+  }
+  for (const d of roadmap.days.filter((x) => x.phase === 'maintain')) {
+    const p = prompt(d.id);
+    assert.match(p, /원인 서술 \+ 재현 테스트 \+ 수정/, `${d.id}: 3점 세트`);
+    // 2단계 카드 답은 티켓 원인이라 화면의 프롬프트에 싣지 않는다(에이전트가 talk-cards.md에서 읽는다)
+    for (const id of d.talkCards) for (const a of talkCards.get(id).answers) assert.ok(!p.includes(a.replace(/`/g, '')), `${d.id}: ${id} 답 줄이 프롬프트에 보인다`);
+    for (const t of new Set(d.steps.flatMap((s) => s.tickets))) {
+      assert.ok(p.includes(`[T-${t}]`) && p.includes(`tickets/${t}/answer/`), `${d.id}: ${t} 3점 세트와 대조 자료`);
+    }
+  }
+  const p15 = prompt('D15');
+  assert.ok(p15.includes('무작위로 10문항') && p15.includes('course/talk-cards.md'), 'D15: 카드 전체에서 10문항');
+  assert.ok(p15.includes('내가 겪은 문제 5개'), 'D15: 회고 문서');
+  assert.ok(!p15.includes('[T-'), 'D15: 티켓 3점 세트 없음');
+});
+
 test('모든 완성 순서에 힌트가 1~2줄 있다', () => {
   for (const d of readyDays) for (const s of d.steps) {
     const h = hints.days[d.id].steps[String(s.no)];
@@ -215,7 +257,7 @@ test('2단계·마무리 날도 hints가 생기면 완성 페이지로 만든다
   const d12 = roadmap.days.find((d) => d.id === 'D12');
   const md12 = renderDay(d12, ctxFor(d12));
   assert.ok(!md12.includes('class="step-answer"'));
-  assert.ok(md12.includes('](../tickets/B01.md)'));
+  assert.ok(md12.includes('](../tickets/B01.md#원인과-정답)'));
   assert.ok(md12.includes('## AI 채점 프롬프트'));
   assert.ok(!md12.includes('## 날짜별 snapshot'));
   const d15 = roadmap.days.find((d) => d.id === 'D15');
@@ -402,7 +444,7 @@ test('보완 패치가 다른 순서 커밋과 겹쳐 적용되지 않으면 생
 test('snapshot: 보완이 있는 날도 그날 마지막 answer 커밋(태그 answer-dNN)을 가리키고, 보완 없는 날에는 최신 코드 안내가 없다', () => {
   const answers = collectAnswers(roadmap, ROOT);
   const g = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
-  for (const d of readyDays) {
+  for (const d of answerDays) {
     const entry = answers.get(d.id);
     const md = page(d.id);
     const snap = md.slice(md.indexOf('## 날짜별 snapshot'));

@@ -398,6 +398,43 @@ for (const day of course.days) {
       for (const term of terms) assert.ok(!title.includes(term), `${id}: 접기 제목 "${title}"이 원인 핵심어 "${term}"를 드러낸다`);
     }
   }
+  // 4-2) 2단계·마무리 일자 페이지: 자리표시가 없고, 순서마다 닫힌 힌트가 있고, 티켓 순서는 티켓 페이지 "원인과 정답" 절로 잇는다.
+  // hints.json에서 온 문장(힌트·리뷰 초점)은 그날 티켓의 원인 핵심어를 쓰지 않고, 접기 밖에는 roadmap·카드 질문·티켓 제목에 없던 핵심어가 새로 생기지 않는다.
+  const hintsData = JSON.parse(fs.readFileSync(new URL('course/hints.json', root), 'utf8'));
+  const roadmapData = JSON.parse(fs.readFileSync(new URL('course/roadmap.json', root), 'utf8'));
+  const cardQuestions = fs.readFileSync(new URL('course/talk-cards.md', root), 'utf8').split('\n').filter((l) => l.startsWith('**질문**')).join('\n');
+  for (const day of course.days.filter((d) => d.phase === 'maintain' || d.phase === 'wrap')) {
+    const file = `course/spring/${day.id}.html`;
+    const html = fs.readFileSync(new URL(file, root), 'utf8');
+    assert.doesNotMatch(fs.readFileSync(new URL(`course/spring/${day.id}.md`, root), 'utf8'), /준비 중/, `${day.id}: 자리표시 원문`);
+    assert.doesNotMatch(html, /준비 중/, `${day.id}: 자리표시 화면`);
+    const doc = new JSDOM(html).window.document;
+    assert.ok(doc.querySelector('button.copy-button[data-copy-target="day-grader-prompt"]') && doc.querySelector('pre#day-grader-prompt'), `${day.id}: 채점 프롬프트 복사`);
+    const hintsDay = hintsData.days[day.id];
+    const dayTickets = [...new Set(day.steps.flatMap((s) => s.tickets))];
+    const terms = dayTickets.flatMap((t) => causeTerms[t] ?? []);
+    for (const s of day.steps) {
+      const section = doc.getElementById(`step-${s.id.toLowerCase()}`);
+      const hint = section.querySelector(`details.step-hint[data-step="${s.id}"]`);
+      assert.ok(hint && !hint.open && hint.querySelectorAll('li').length >= 1, `${s.id}: 닫힌 힌트`);
+      for (const line of hintsDay.steps[String(s.no)]) for (const term of terms) assert.ok(!plainText(line).includes(plainText(term)), `${s.id}: 힌트가 원인 핵심어 "${term}"를 말한다`);
+      if (day.phase !== 'maintain') continue;
+      const links = [...section.querySelectorAll('.step-facts > .fact-answer-link a')].map((a) => a.getAttribute('href'));
+      for (const t of s.tickets) {
+        const href = `../tickets/${t}.html#${encodeURIComponent('원인과-정답')}`;
+        assert.ok(links.some((h) => h === href || h === `../tickets/${t}.html#원인과-정답`), `${s.id}: ${t} 원인과 정답 링크(${links.join(', ')})`);
+        const target = new JSDOM(fs.readFileSync(new URL(`course/tickets/${t}.html`, root), 'utf8')).window.document;
+        assert.ok(target.getElementById('원인과-정답')?.nextElementSibling?.matches('details'), `${t}: 원인과 정답 절 다음이 접기`);
+      }
+    }
+    for (const line of hintsDay.grader?.focus ?? []) for (const term of terms) assert.ok(!plainText(line).includes(plainText(term)), `${day.id}: 리뷰 초점이 원인 핵심어 "${term}"를 말한다`);
+    for (const summary of doc.querySelectorAll('summary')) for (const term of terms) assert.ok(!text(summary).includes(term), `${day.id}: 접기 제목 "${text(summary)}"이 원인 핵심어 "${term}"를 드러낸다`);
+    const bare = doc.body.cloneNode(true);
+    bare.querySelectorAll('details').forEach((d) => d.remove());
+    const visible = plainText(bare.textContent + [...bare.querySelectorAll('[aria-label],[title]')].map((e) => ` ${e.getAttribute('aria-label')} ${e.getAttribute('title')}`).join(''));
+    const allowed = plainText(JSON.stringify(roadmapData.days.find((d) => d.id === day.id)) + cardQuestions + dayTickets.map((t) => course.tickets.find((x) => x.id === t).title).join(' '));
+    for (const term of terms) assert.ok(!visible.includes(plainText(term)) || allowed.includes(plainText(term)), `${day.id}: 접기 밖에 roadmap에 없던 원인 핵심어 "${term}"가 보인다`);
+  }
   // 5) 조작: 이전·다음·끝·처음, 재생은 속도대로 넘어가고 마지막에서 멈춘다, 키보드, 원인 접기를 열면 재생 순서에 끼어든다.
   const fakeTimers = (win) => {
     win.__timers = [];

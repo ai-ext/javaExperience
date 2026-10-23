@@ -35,6 +35,19 @@ const PHASE = {
   maintain: '2단계 · 어수선한 서버 넘겨받기',
   wrap: '마무리 · 설명 세션',
 };
+// 티켓 페이지의 "## 원인과 정답" 제목 앵커(사이트 빌드와 같은 slugify)
+const ANSWER_ANCHOR = '원인과-정답';
+// 채점 프롬프트 앞 안내. 템플릿은 hints.json의 graderTemplate(1단계)·graderTemplates.<단계>(2단계·마무리)
+const GRADER_INTRO = {
+  build: '오늘 순서를 다 만들었으면 서버를 띄운 채로 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣는다. 에이전트가 완료 조건·함정·말하기 카드로 채점표를 준다. 코드는 고치지 않는다.',
+  maintain: '오늘 티켓을 다 처리했으면 `messy-server`를 띄운 채로 아래 프롬프트를 복사해 `messy-server` 폴더에서 연 Codex 또는 Claude Code에 붙여 넣는다. 에이전트가 완료 조건·함정·티켓 3점 세트(원인 서술·재현 테스트·수정)·말하기 카드로 채점표를 준다. 코드는 고치지 않는다.',
+  wrap: '설명 세션을 시작할 때 아래 프롬프트를 복사해 javaExperience 저장소 루트에서 연 Codex 또는 Claude Code에 붙여 넣는다. 에이전트가 말하기 카드 전체에서 10문항을 골라 묻고, 회고 문서와 함께 채점표를 준다. 파일은 고치지 않는다.',
+};
+const graderTemplate = (hints, phase) => {
+  const t = phase === 'build' ? hints.graderTemplate : hints.graderTemplates?.[phase];
+  if (!t) throw new Error(`hints.json: ${phase} 단계 채점 프롬프트 템플릿이 없다`);
+  return t;
+};
 const CIRCLED = ['⓪', '①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
 export const circled = (n) => CIRCLED[n] ?? `(${n})`;
 
@@ -286,6 +299,21 @@ function javaInfo(id, root) {
   return { id, title, duration };
 }
 
+// 채점 프롬프트에 싣는 티켓 이름과 구분(필수·선택·고도화)
+function ticketInfo(id, root) {
+  const title = read(path.join(root, 'course/tickets', `${id}.md`)).match(/^# (?:[BE]\d{2}\. )?(.+)$/m)[1].trim();
+  const meta = JSON.parse(read(path.join(root, 'course/map-tickets.json'))).tickets.find((t) => t.id === id);
+  if (!meta) throw new Error(`map-tickets.json에 티켓 ${id}가 없다`);
+  return { id, title: stripMd(title), kind: meta.required ? '필수' : meta.enhancement ? '고도화' : '선택' };
+}
+
+// 저장소 기준 경로 문서의 제목. 없으면 멈춘다(hints.json의 refs·guides).
+function docTitle(p, root, dayId) {
+  const abs = path.join(root, p);
+  if (!fs.existsSync(abs)) throw new Error(`hints.json: ${dayId} 참고 자료가 없다 → ${p}`);
+  return stripMd(read(abs).match(/^# (.+)$/m)?.[1].trim() ?? path.basename(p));
+}
+
 // ---------------------------------------------------------------- 마크다운 조각
 const LANG = { java: 'java', yml: 'yaml', yaml: 'yaml', xml: 'xml', sql: 'sql', gradle: 'groovy', md: 'markdown', json: 'json', properties: 'properties', sh: 'bash', http: 'http' };
 export function fence(text, lang = '') {
@@ -413,7 +441,7 @@ function navLine(day, roadmap) {
   return [prev, '[일자 목록](README.md)', next].filter(Boolean).join(' · ');
 }
 
-export function graderPrompt(day, cards, hintsDay, template) {
+export function graderPrompt(day, cards, hintsDay, template, root = ROOT) {
   const criteria = [];
   for (const s of day.steps) {
     criteria.push(`${circled(s.no)} ${stripMd(s.title)}`);
@@ -427,11 +455,20 @@ export function graderPrompt(day, cards, hintsDay, template) {
     c.answers.forEach((a) => cardLines.push(`    · ${stripMd(a)}`));
   }
   const focus = (hintsDay.grader?.focus ?? []).map((f) => `- ${f}`).join('\n') || '- (없음)';
+  const ticketIds = [...new Set(day.steps.flatMap((s) => s.tickets ?? []))];
+  const tickets = ticketIds.map((id) => {
+    const t = ticketInfo(id, root);
+    const at = day.steps.filter((s) => s.tickets?.includes(id)).map((s) => circled(s.no)).join('');
+    return `- [T-${id}] ${id}. ${t.title} (${t.kind} · ${at}) — 티켓 페이지 ../course/tickets/${id}.md · 대조 자료 tickets/${id}/answer/`;
+  });
   return template
     .replaceAll('{{DAY}}', day.id)
     .replaceAll('{{TITLE}}', day.title)
     .replaceAll('{{CRITERIA}}', criteria.join('\n'))
     .replaceAll('{{CARDS}}', cardLines.join('\n'))
+    // 2단계 카드의 "답에 들어가야 할 것"은 티켓 원인이라, 화면에 보이는 프롬프트에는 질문만 싣고 답은 에이전트가 원문에서 읽게 한다
+    .replaceAll('{{CARD_QUESTIONS}}', day.talkCards.map((id) => `- [${id}] ${stripMd(cards.get(id).question)}`).join('\n'))
+    .replaceAll('{{TICKETS}}', tickets.join('\n') || '- (없음)')
     .replaceAll('{{FOCUS}}', focus);
 }
 
@@ -458,7 +495,7 @@ function javaSection(java, roadmapJava) {
 function stepSection(day, s, ctx) {
   const id = stepId(day.id, s.no);
   const lines = [`<section class="day-step" id="${stepAnchor(day.id, s.no)}" data-step="${id}">`, '', `## ${circled(s.no)} ${s.title}`, ''];
-  if (ctx.ready && s.files.length) lines.push('**만들 파일** (board-server 기준)', '', ...s.files.map((f) => `- \`${f}\``), '');
+  if (ctx.ready && s.files.length) lines.push(`**만들 파일** (${day.phase === 'maintain' ? 'messy-server' : 'board-server'} 기준)`, '', ...s.files.map((f) => `- \`${f}\``), '');
   if (s.tickets?.length) lines.push(`**티켓** ${s.tickets.map((t) => `\`${t}\``).join(' · ')}`, '');
   if (ctx.ready) {
     if (s.trap) lines.push(`**겪을 것** ${s.trap}`, '');
@@ -471,6 +508,12 @@ function stepSection(day, s, ctx) {
       });
       lines.push(`**명세** ${refs.join(' · ')}`, '');
     }
+    if (day.phase === 'maintain' && s.tickets?.length) {
+      // 2단계: 티켓 정답은 티켓 페이지에만 둔다(마크다운 링크라 빌드 링크 검사가 티켓 페이지·절 누락을 잡는다).
+      // 힌트 접기보다 앞에 둬야 사이트 빌드가 사실 칸(원인과 정답)으로 묶는다.
+      const guides = (ctx.hintsDay.guides?.[String(s.no)] ?? []).map((p) => `[${docTitle(p, ctx.root, day.id)}](${path.posix.relative('course/spring', p)})`);
+      lines.push(`**원인과 정답** ${s.tickets.map((t) => `[${t} 티켓 페이지](../tickets/${t}.md#${ANSWER_ANCHOR})`).join(' · ')}의 "원인과 정답" 접기에 있다.${guides.length ? ` 진행 순서와 양식은 ${guides.join(' · ')}에 있다.` : ''}`, '');
+    }
     const hints = ctx.hintsDay.steps?.[String(s.no)];
     if (!hints?.length) throw new Error(`hints.json: ${id} 힌트가 없다`);
     lines.push(hintBlock(id, hints), '');
@@ -479,9 +522,6 @@ function stepSection(day, s, ctx) {
       const commits = ctx.answers?.steps.get(s.no);
       if (!commits?.length) throw new Error(`${id}: 정답 커밋 answer(${id})이 없다`);
       lines.push(answerBlock(id, commits, s.files, ctx.filesOf, ctx.lastTouch, ctx.fixFilesOf, (ctx.deferred ?? DEFERRED_FIXES)[id]), '');
-    } else if (day.phase === 'maintain' && s.tickets?.length) {
-      // 2단계: 티켓 정답은 티켓 페이지에만 둔다(마크다운 링크라 빌드 링크 검사가 티켓 페이지 누락을 잡는다)
-      lines.push(`**원인과 정답** ${s.tickets.map((t) => `[${t} 티켓 페이지](../tickets/${t}.md)`).join(' · ')}의 "원인과 정답" 접기에 있다.`, '');
     }
     // 마무리(wrap): 정답 칸이 없다
   } else {
@@ -554,8 +594,8 @@ export function renderDay(day, ctx) {
     parts.push(cardBlock(card));
   }
   if (ctx.ready) {
-    parts.push('## AI 채점 프롬프트', '오늘 순서를 다 만들었으면 서버를 띄운 채로 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣는다. 에이전트가 완료 조건·함정·말하기 카드로 채점표를 준다. 코드는 고치지 않는다.');
-    parts.push(fence(graderPrompt(day, ctx.cards, ctx.hintsDay, ctx.hints.graderTemplate), 'text'));
+    parts.push('## AI 채점 프롬프트', GRADER_INTRO[day.phase]);
+    parts.push(fence(graderPrompt(day, ctx.cards, ctx.hintsDay, graderTemplate(ctx.hints, day.phase), ctx.root), 'text'));
   }
   parts.push('## 내일 미리보기', day.tomorrow);
   if (ctx.ready && ctx.answers?.last) {
@@ -566,12 +606,7 @@ export function renderDay(day, ctx) {
   }
   const refs = ctx.hintsDay?.refs ?? [];
   if (refs.length) {
-    const items = refs.map((p) => {
-      const abs = path.join(ctx.root, p);
-      if (!fs.existsSync(abs)) throw new Error(`hints.json: ${day.id} 참고 자료가 없다 → ${p}`);
-      const label = stripMd(read(abs).match(/^# (.+)$/m)?.[1].trim() ?? path.basename(p));
-      return `- [${label}](../../${p})`;
-    });
+    const items = refs.map((p) => `- [${docTitle(p, ctx.root, day.id)}](../../${p})`);
     parts.push('## 참고 자료', '<details class="day-refs">\n<summary>기존 시나리오·공부자료 (참고 도감)</summary>\n\n' + items.join('\n') + '\n\n</details>');
   }
   parts.push(navLine(day, ctx.roadmap));
