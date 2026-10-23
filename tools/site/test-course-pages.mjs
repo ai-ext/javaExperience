@@ -399,10 +399,16 @@ for (const day of course.days) {
     }
   }
   // 4-2) 2단계·마무리 일자 페이지: 자리표시가 없고, 순서마다 닫힌 힌트가 있고, 티켓 순서는 티켓 페이지 "원인과 정답" 절로 잇는다.
-  // hints.json에서 온 문장(힌트·리뷰 초점)은 그날 티켓의 원인 핵심어를 쓰지 않고, 접기 밖에는 roadmap·카드 질문·티켓 제목에 없던 핵심어가 새로 생기지 않는다.
+  // hints.json에서 온 문장(힌트·리뷰 초점)도, 접기 밖에 보이는 글 전체도 그날 티켓의 원인 핵심어를 쓰지 않는다.
   const hintsData = JSON.parse(fs.readFileSync(new URL('course/hints.json', root), 'utf8'));
-  const roadmapData = JSON.parse(fs.readFileSync(new URL('course/roadmap.json', root), 'utf8'));
-  const cardQuestions = fs.readFileSync(new URL('course/talk-cards.md', root), 'utf8').split('\n').filter((l) => l.startsWith('**질문**')).join('\n');
+  const visibleLeaks = [];
+  // 일자 페이지 접기 밖에만 더 거는 핵심어. 티켓 페이지에서는 힌트 제목(어디를 볼지)에 쓰여 causeTerms에 넣지 않는다(예: B07 "데드락 기록을 읽는다").
+  const dayCauseTerms = { B01: ['Hikari'], B04: ['생성자 주입'], B05: ['지역 변수'], B07: ['데드락'], B10: ['Idempotency-Key'], B12: ['preflight', '인증 필터'], B15: ['옛 값'] };
+  for (const [id, extra] of Object.entries(dayCauseTerms)) {
+    const md = fs.readFileSync(new URL(`course/tickets/${id}.md`, root), 'utf8');
+    const at = md.indexOf('## 원인과 정답');
+    for (const term of extra) assert.ok(md.slice(at, md.indexOf('</details>', at)).includes(term), `${id}: 일자 핵심어 "${term}"가 원인과 정답에 있다`);
+  }
   for (const day of course.days.filter((d) => d.phase === 'maintain' || d.phase === 'wrap')) {
     const file = `course/spring/${day.id}.html`;
     const html = fs.readFileSync(new URL(file, root), 'utf8');
@@ -419,6 +425,11 @@ for (const day of course.days) {
       assert.ok(hint && !hint.open && hint.querySelectorAll('li').length >= 1, `${s.id}: 닫힌 힌트`);
       for (const line of hintsDay.steps[String(s.no)]) for (const term of terms) assert.ok(!plainText(line).includes(plainText(term)), `${s.id}: 힌트가 원인 핵심어 "${term}"를 말한다`);
       if (day.phase !== 'maintain') continue;
+      const named = s.title.match(/^([BE]\d{2}) "([^"]+)"/);
+      if (named) {
+        const h1 = fs.readFileSync(new URL(`course/tickets/${named[1]}.md`, root), 'utf8').match(/^# [BE]\d{2}\. (.+)$/m)[1];
+        assert.equal(named[2], h1.replace(/`/g, ''), `${s.id}: 순서 제목의 증상 문장은 티켓 페이지 제목 그대로`);
+      }
       const links = [...section.querySelectorAll('.step-facts > .fact-answer-link a')].map((a) => a.getAttribute('href'));
       for (const t of s.tickets) {
         const href = `../tickets/${t}.html#${encodeURIComponent('원인과-정답')}`;
@@ -432,9 +443,13 @@ for (const day of course.days) {
     const bare = doc.body.cloneNode(true);
     bare.querySelectorAll('details').forEach((d) => d.remove());
     const visible = plainText(bare.textContent + [...bare.querySelectorAll('[aria-label],[title]')].map((e) => ` ${e.getAttribute('aria-label')} ${e.getAttribute('title')}`).join(''));
-    const allowed = plainText(JSON.stringify(roadmapData.days.find((d) => d.id === day.id)) + cardQuestions + dayTickets.map((t) => course.tickets.find((x) => x.id === t).title).join(' '));
-    for (const term of terms) assert.ok(!visible.includes(plainText(term)) || allowed.includes(plainText(term)), `${day.id}: 접기 밖에 roadmap에 없던 원인 핵심어 "${term}"가 보인다`);
+    // 접기 밖(순서 제목·완료 조건·겪을 것·채점 프롬프트·카드 질문·배지 title 포함)에는 그날 티켓의 원인 핵심어가 한 번도 나오지 않는다
+    for (const t of dayTickets) for (const term of [...(causeTerms[t] ?? []), ...(dayCauseTerms[t] ?? [])]) {
+      const at = visible.indexOf(plainText(term));
+      if (at >= 0) visibleLeaks.push(`${day.id} ${t} "${term}": …${visible.slice(Math.max(0, at - 40), at + 30)}…`);
+    }
   }
+  assert.deepEqual(visibleLeaks, [], `2단계 일자 페이지 접기 밖 원인 핵심어 ${visibleLeaks.length}건`);
   // 5) 조작: 이전·다음·끝·처음, 재생은 속도대로 넘어가고 마지막에서 멈춘다, 키보드, 원인 접기를 열면 재생 순서에 끼어든다.
   const fakeTimers = (win) => {
     win.__timers = [];

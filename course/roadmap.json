@@ -1165,7 +1165,7 @@
             "B14 재현: prod 프로파일에서 토큰 없이 `GET /actuator/env` → 200",
             "B11 재현: prod에서 바뀌지 않는 키가 어느 출처에서 오는지 로컬 `/actuator/env`의 `propertySources`로 찾는다"
           ],
-          "trap": "yml 파일만 읽고 값을 추측하면 환경 변수나 프로파일 문서가 이긴 실제 값을 놓친다.",
+          "trap": "yml 파일만 읽고 값을 추측하면 실제로 쓰이는 값과 그 값을 준 곳을 놓친다.",
           "specRefs": [
             "GET /actuator/health"
           ],
@@ -1209,7 +1209,7 @@
             "prod 프로파일에서 토큰 없이 `GET /actuator/env` → 401",
             "prod에서 고친 설정값이 기동 로그와 `/actuator/env`에 반영된다"
           ],
-          "trap": "B11을 yml 수정만으로 고치면 같은 키를 덮는 환경 변수가 남아 있어 여전히 반영되지 않는다.",
+          "trap": "B11을 yml 수정만으로 끝내면 prod에서 여전히 반영되지 않을 수 있으므로, 고친 뒤 `/actuator/env`로 그 키의 실제 값과 출처를 다시 확인한다.",
           "specRefs": [
             "GET /api/members/me",
             "GET /actuator/health"
@@ -1222,17 +1222,17 @@
         },
         {
           "no": 4,
-          "title": "ArchUnit 규칙 1개(필드 주입 금지)로 B04 재발 막기",
+          "title": "B04 \"알림 채널 하나 추가하는데 세 군데가 깨진다\": ArchUnit 규칙 1개로 이번에 찾은 구조 문제의 재발 막기",
           "files": [
             "src/test/java/com/example/board/ArchitectureTest.java",
             "src/main/java/com/example/board/post/PostServiceImpl.java"
           ],
           "done": [
             "`ArchitectureTest`가 먼저 실패하는 것을 확인",
-            "`PostServiceImpl`을 생성자 주입으로 바꾸고 알림 전송을 분리한 뒤 `ArchitectureTest`·`PostServiceCharacterizationTest` 통과",
+            "B04를 고친 뒤 `ArchitectureTest`·`PostServiceCharacterizationTest` 통과",
             "알림 채널을 하나 더해도 고칠 파일이 한 곳이다"
           ],
-          "trap": "필드 주입은 순환 의존을 기동 때 숨기므로 생성자 주입으로 바꾸면 그동안 감춰진 순환이 드러난다.",
+          "trap": "구조를 바꾸는 도중 기동이 실패하면 설정으로 기동만 되게 덮고 싶어지지만, 그 실패 메시지가 이번 구조 문제의 증거다.",
           "specRefs": [
             "POST /api/posts"
           ],
@@ -1257,16 +1257,16 @@
       "steps": [
         {
           "no": 1,
-          "title": "B01 \"PG가 느린 날 글 목록까지 멈춘다\": Hikari 메트릭과 스레드 덤프로 진단",
+          "title": "B01 \"PG가 느린 날 글 목록까지 멈춘다\": 스레드 덤프로 진단",
           "files": [
             "src/main/java/com/example/board/payment/ChargeService.java",
-            "src/test/java/com/example/board/payment/ChargePoolExhaustionTest.java"
+            "src/test/java/com/example/board/payment/PostListDuringSlowPgTest.java"
           ],
           "done": [
-            "Hikari 메트릭(`hikaricp.connections.pending`)과 스레드 덤프에서 PG 응답을 기다리며 커넥션을 쥔 스레드를 찾는다",
-            "`ChargePoolExhaustionTest` 통과: Toxiproxy로 PG 5초 지연 중에도 `GET /api/posts` → 200, 1초 이내"
+            "재현 중 `/actuator/metrics`와 스레드 덤프로 글 목록 요청이 무엇을 기다리는지 찾아 근거로 남긴다",
+            "`PostListDuringSlowPgTest` 통과: Toxiproxy로 PG 5초 지연 중에도 `GET /api/posts` → 200, 1초 이내"
           ],
-          "trap": "\"글 목록이 멈춘다\"는 증상만 보고 목록 쿼리와 인덱스부터 의심하면 트랜잭션 안의 PG 호출을 놓친다.",
+          "trap": "\"글 목록이 멈춘다\"는 증상만 보고 목록 쿼리부터 의심하면, 글 목록과 상관없어 보이는 요청이 무엇을 붙잡고 있는지 놓친다.",
           "specRefs": [
             "POST /api/me/points/charges",
             "GET /api/posts"
@@ -1277,7 +1277,7 @@
         },
         {
           "no": 2,
-          "title": "B02 \"글 목록이 어느 날부터 느리다\": slow log → EXPLAIN ANALYZE (`schema.sql` 인덱스 순서 수정)",
+          "title": "B02 \"글 목록이 어느 날부터 느리다\": slow log → EXPLAIN ANALYZE",
           "files": [
             "src/main/resources/schema.sql",
             "src/main/resources/mapper/PostQueryMapper.xml",
@@ -1285,9 +1285,9 @@
           ],
           "done": [
             "slow query log에서 목록 쿼리를 찾는다",
-            "EXPLAIN ANALYZE에서 풀스캔을 확인하고 인덱스를 고친 뒤 `PostListExplainTest` 통과"
+            "EXPLAIN ANALYZE의 읽은 행 수와 돌려준 행 수를 근거로 남기고, 고친 뒤 `PostListExplainTest` 통과"
           ],
-          "trap": "데이터가 적은 로컬에서는 풀스캔도 빨라 재현되지 않으므로 데이터를 늘린 뒤 EXPLAIN ANALYZE로 본다.",
+          "trap": "데이터가 적은 로컬에서는 느린 쿼리도 빨라 보여 재현되지 않으므로, `repro.sh`로 데이터를 늘린 뒤 EXPLAIN ANALYZE로 본다.",
           "specRefs": [
             "GET /api/posts"
           ],
@@ -1303,10 +1303,10 @@
             "src/test/java/com/example/board/shop/OrderRollbackTest.java"
           ],
           "done": [
-            "트랜잭션 로그(`org.springframework.transaction` DEBUG)로 rollback-only 표시 시점을 찾는다",
-            "`OrderRollbackTest` 통과: rollback-only로 롤백되던 경우와 self-invocation으로 롤백되지 않던 경우 둘 다"
+            "트랜잭션 로그(`org.springframework.transaction` DEBUG)로 구매 한 번에서 트랜잭션이 열리고 끝나는 순서를 찾는다",
+            "`OrderRollbackTest` 통과: 예외를 잡았는데 롤백되던 경우와 롤백돼야 하는데 안 되던 경우 둘 다"
           ],
-          "trap": "예외를 catch했으니 롤백되지 않으리라 믿으면 안쪽 `@Transactional`이 이미 rollback-only로 표시한 것을 놓친다.",
+          "trap": "예외를 catch했으니 롤백되지 않으리라 믿으면, 예외를 잡기 전에 트랜잭션에 이미 일어난 일을 놓친다.",
           "specRefs": [
             "POST /api/shop/orders"
           ],
@@ -1323,9 +1323,9 @@
           ],
           "done": [
             "동시 50요청 부하로 다른 회원 요청의 결과가 섞이는 것을 재현",
-            "`ForbiddenWordCheckerConcurrencyTest` 통과: 상태 필드를 지역 변수로 바꾼 뒤 결과가 섞이지 않는다"
+            "`ForbiddenWordCheckerConcurrencyTest` 통과: 고친 뒤 동시 요청에서도 결과가 섞이지 않는다"
           ],
-          "trap": "혼자 요청할 때는 재현되지 않아 \"가끔 생기는 버그\"로 넘기기 쉽지만, 싱글톤 빈의 필드는 모든 요청이 함께 쓴다.",
+          "trap": "혼자 요청할 때는 재현되지 않아 \"가끔 생기는 버그\"로 넘기기 쉽지만, 동시에 몰아 보내면 거의 매번 재현된다.",
           "specRefs": [
             "POST /api/posts"
           ],
@@ -1340,7 +1340,7 @@
         "TC-D12-3",
         "TC-D12-4"
       ],
-      "tomorrow": "D13은 오늘 익힌 \"원인 서술 + 재현 테스트 + 수정\" 3점 세트를 DB 락·시간·멱등 티켓에 그대로 쓴다."
+      "tomorrow": "D13은 오늘 익힌 \"원인 서술 + 재현 테스트 + 수정\" 3점 세트를 DB·시간·외부 연동 티켓에 그대로 쓴다."
     },
     {
       "id": "D13",
@@ -1350,16 +1350,16 @@
       "steps": [
         {
           "no": 1,
-          "title": "B06 \"컬럼 하나 추가했더니 상점 전체가 멈췄다\": `SHOW PROCESSLIST`로 MDL 대기 찾기",
+          "title": "B06 \"컬럼 하나 추가했더니 상점 전체가 멈췄다\": `SHOW PROCESSLIST`로 멈춘 세션 찾기",
           "files": [
             "src/main/java/com/example/board/shop/OrderNotifier.java",
             "src/main/java/com/example/board/shop/ShopController.java"
           ],
           "done": [
-            "`SHOW PROCESSLIST`에서 `Waiting for table metadata lock`과 그 앞의 긴 트랜잭션을 찾는다",
-            "긴 트랜잭션을 짧게 고치고 `lock_wait_timeout`을 짧게 둔 ALTER를 다시 실행하는 동안에도 `POST /api/shop/orders` → 201"
+            "`SHOW PROCESSLIST`와 `information_schema.innodb_trx`로 ALTER가 무엇을 기다리는지, 그 앞에 어떤 세션이 있는지 찾아 근거로 남긴다",
+            "고친 뒤 ALTER를 다시 실행하는 동안에도 `POST /api/shop/orders` → 201"
           ],
-          "trap": "ALTER 자체가 느리다고 오진하기 쉽지만, 실제로는 ALTER가 긴 트랜잭션의 메타데이터 락을 기다리며 뒤 요청을 줄 세운다.",
+          "trap": "ALTER 자체가 느리다고 오진하기 쉽지만, ALTER가 일하는 중인지 무언가를 기다리는 중인지부터 구분해야 한다.",
           "specRefs": [
             "POST /api/shop/orders"
           ],
@@ -1369,16 +1369,16 @@
         },
         {
           "no": 2,
-          "title": "B07 \"선착순 쿠폰을 동시에 받을 때 가끔 실패한다\": `SHOW ENGINE INNODB STATUS`로 데드락 읽기",
+          "title": "B07 \"선착순 쿠폰을 동시에 받을 때 가끔 실패한다\": `SHOW ENGINE INNODB STATUS` 읽기",
           "files": [
             "src/main/java/com/example/board/coupon/CouponService.java",
             "src/main/java/com/example/board/coupon/MemberCouponRepository.java"
           ],
           "done": [
-            "`SHOW ENGINE INNODB STATUS`의 `LATEST DETECTED DEADLOCK`에서 gap lock을 확인",
-            "동시 쿠폰 발급 20건이 모두 201이거나 정해진 409로 끝난다(데드락 1213 없음)를 재현 테스트로 고정"
+            "`SHOW ENGINE INNODB STATUS`에서 실패한 두 트랜잭션이 각각 쥔 락과 기다린 락을 표로 남긴다",
+            "동시 쿠폰 발급 20건이 모두 201 또는 정해진 409로 끝나고 500이 없음을 재현 테스트로 고정"
           ],
-          "trap": "없는 행을 `SELECT ... FOR UPDATE`로 잠그면 gap lock끼리 엇갈려 데드락이 난다.",
+          "trap": "500을 일시적인 DB 오류로 넘기면, 두 요청이 무엇을 쥐고 무엇을 기다렸는지 확인하지 않은 채로 남는다.",
           "specRefs": [
             "POST /api/coupons/{couponId}/issue"
           ],
@@ -1397,7 +1397,7 @@
             "`AttendanceServiceTest` 통과: `Clock`을 KST 23:59:59와 00:00:00으로 고정해 하루 1회만 적립",
             "`GET /api/me/points/history`에 출석 적립이 하루 1건"
           ],
-          "trap": "서버 기본 시간대가 UTC인 채로 `LocalDate.now()`를 부르면 KST 자정과 날짜 경계가 9시간 어긋난다.",
+          "trap": "로컬 PC에서 자정 무렵 직접 눌러 보면 재현되지 않으므로, 운영 서버와 같은 조건을 테스트에서 시계로 고정한다.",
           "specRefs": [
             "GET /api/me/points/history"
           ],
@@ -1413,9 +1413,9 @@
           ],
           "done": [
             "`pg_payment`에서 같은 충전 요청에 승인 2건을 확인",
-            "재현 테스트 통과: WireMock 첫 응답이 늦어도 PG 승인 1건, 포인트 1회(응답 타임아웃은 재시도하지 않거나, 재시도해도 같은 `Idempotency-Key`를 쓴다)"
+            "재현 테스트 통과: WireMock 첫 응답이 늦어도 PG 승인 1건, 포인트 1회"
           ],
-          "trap": "재시도 횟수만 줄이면 증상은 줄어도 재시도마다 멱등 키를 새로 만드는 원인은 그대로 남는다.",
+          "trap": "PG 호출 횟수 설정만 줄이면 증상은 드물어져도 같은 충전이 두 번 승인되는 길은 그대로 남는다.",
           "specRefs": [
             "POST /api/me/points/charges"
           ],
@@ -1430,7 +1430,7 @@
         "TC-D13-3",
         "TC-D13-4"
       ],
-      "tomorrow": "D14는 오늘 고친 충전 멱등 처리를 전제로 PG 콜백(B13)과 캐시 장애 훈련을 진행한다."
+      "tomorrow": "D14는 오늘 고친 충전 처리를 전제로 PG 콜백(B13)과 캐시 장애 훈련을 진행한다."
     },
     {
       "id": "D14",
@@ -1440,16 +1440,16 @@
       "steps": [
         {
           "no": 1,
-          "title": "B12 \"새 프론트 도메인에서만 호출이 실패한다\": 브라우저 개발자 도구로 preflight 확인",
+          "title": "B12 \"새 프론트 도메인에서만 호출이 실패한다\": 브라우저 개발자 도구로 실패한 요청 확인",
           "files": [
             "src/main/java/com/example/board/config/CorsConfig.java",
             "src/main/java/com/example/board/config/SecurityConfig.java"
           ],
           "done": [
-            "개발자 도구 Network 탭에서 실패한 `OPTIONS` preflight를 확인한다(서버 에러 로그 없음)",
+            "개발자 도구 Network 탭에서 실패한 요청과 그 상태 코드·응답 헤더를 근거로 남긴다(서버 에러 로그 없음)",
             "`OPTIONS /api/posts` + `Origin: http://127.0.0.1:8765` → 200, `Access-Control-Allow-Origin` 포함"
           ],
-          "trap": "서버 로그에 에러가 없다고 서버 문제가 아니라고 오진하기 쉽지만, preflight는 인증 필터에서 막혀 컨트롤러까지 오지 않는다.",
+          "trap": "서버 로그에 에러가 없다고 서버 문제가 아니라고 오진하기 쉽지만, 컨트롤러까지 오지 못한 요청은 컨트롤러 로그에 남지 않는다.",
           "specRefs": [
             "POST /api/posts"
           ],
@@ -1459,15 +1459,15 @@
         },
         {
           "no": 2,
-          "title": "B13 \"PG 결제 완료 콜백이 전부 401\": Security debug 로그로 막힌 필터 찾기",
+          "title": "B13 \"PG 결제 완료 콜백이 전부 401\": Security debug 로그 읽기",
           "files": [
             "src/main/java/com/example/board/config/SecurityConfig.java"
           ],
           "done": [
-            "Security debug 로그에서 콜백 요청이 인증 필터에 막히는 것을 확인",
+            "Security debug 로그에서 콜백 요청의 401이 어디서 만들어지는지 찾아 근거로 남긴다",
             "서명이 맞는 `POST /api/pg/callbacks` → 200, 서명 틀림 → 401 `/errors/invalid-signature`"
           ],
-          "trap": "콜백 경로를 `permitAll`로 여는 것만으로 끝내면 서명 검증까지 빠진 공개 경로가 된다.",
+          "trap": "401을 없애는 데만 집중하면 아무나 콜백을 보낼 수 있는 경로가 된다. 서명이 틀린 콜백이 여전히 거절되는지 함께 확인한다.",
           "specRefs": [
             "POST /api/pg/callbacks"
           ],
@@ -1483,10 +1483,10 @@
             "src/main/java/com/example/board/admin/AdminService.java"
           ],
           "done": [
-            "로그 타임라인에서 \"캐시 삭제 → 다른 요청의 재적재 → 커밋\" 순서를 찾는다",
+            "요청 ID별 로그 타임라인에 숨김 요청과 인기글 조회의 캐시·트랜잭션 로그를 시간순으로 놓고 근거로 남긴다",
             "`POST /api/admin/posts/{postId}/hide` 직후 `GET /api/posts/popular`에 그 글이 없다"
           ],
-          "trap": "TTL만 줄이면 증상은 짧아져도 커밋 전 삭제 뒤 옛 값이 재적재되는 순서 문제는 남는다.",
+          "trap": "TTL만 줄이면 증상은 짧아져도, 숨긴 글이 왜 다시 캐시에 들어가는지는 그대로 남는다.",
           "specRefs": [
             "POST /api/admin/posts/{postId}/hide",
             "GET /api/posts/popular"
@@ -1503,10 +1503,10 @@
             "src/main/java/com/example/board/post/PopularPostService.java"
           ],
           "done": [
-            "스레드 덤프에서 요청 스레드가 Redis 응답을 기다리며 멈춘 것을 확인",
+            "스레드 덤프에서 글쓰기 요청 스레드가 멈춘 지점을 찾아 근거로 남긴다",
             "Redis를 멈춘 상태에서 `POST /api/posts` → 201, 1초 이내"
           ],
-          "trap": "캐시 서버만 멈췄는데 글쓰기가 멈춘 원인은 Redis 타임아웃 미설정과 캐시 예외 전파이지 DB가 아니다.",
+          "trap": "글쓰기가 멈췄다고 DB부터 의심하기 쉽지만, 멈춘 스레드가 실제로 무엇을 기다리는지부터 본다.",
           "specRefs": [
             "POST /api/posts",
             "GET /api/posts/popular"
@@ -1526,7 +1526,7 @@
             "`PopularPostStampedeTest` 통과: TTL 만료 순간 동시 100요청에도 DB 목록 쿼리 1회",
             "`GET /api/posts/popular` 응답 형식은 그대로"
           ],
-          "trap": "재적재를 락으로 막으면서 락 대기에 타임아웃을 두지 않으면 Redis가 느릴 때 모든 요청이 락 앞에서 멈춘다.",
+          "trap": "재적재를 락으로 막으면서 락 대기에 상한을 두지 않으면 Redis가 느릴 때 모든 요청이 락 앞에서 멈춘다.",
           "specRefs": [
             "GET /api/posts/popular"
           ],
