@@ -189,13 +189,18 @@ export function renderDayPage(sourceRel, body, course) {
     const chipList = day.steps.map((s, i) => {
       const anchor = `step-${s.id.toLowerCase()}`;
       if (!html.includes(`<section class="day-step" id="${anchor}"`)) throw new Error(`${sourceRel}: 순서 칸 #${anchor}가 없다`);
-      return `<li class="day-chip" data-step="${s.id}"><input type="checkbox" class="step-check" data-step="${s.id}" id="check-${s.id.toLowerCase()}" aria-label="${NUMS[i]} ${esc(plain(s.short))} 끝냄"><a href="#${anchor}"><span class="chip-no" aria-hidden="true">${NUMS[i]}</span><span class="chip-title">${inline(s.short)}</span></a></li>`;
+      return `<li class="day-chip" data-step="${s.id}"><input type="checkbox" class="step-check" data-step="${s.id}"${isExtraStep(s, course) ? ' data-extra' : ''} id="check-${s.id.toLowerCase()}" aria-label="${NUMS[i]} ${esc(plain(s.short))} 끝냄"><a href="#${anchor}"><span class="chip-no" aria-hidden="true">${NUMS[i]}</span><span class="chip-title">${inline(s.short)}</span></a></li>`;
     }).join('');
     const heading = steps.text.match(/<h2[\s\S]*?<\/h2>/)[0];
+    // 홈 진도와 같은 기준: 선택·연습 티켓 순서는 따로 센다(course.js initDay의 진도 문구와 같다)
+    const extraCount = day.steps.filter((s) => isExtraStep(s, course)).length;
+    const coreCount = day.steps.length - extraCount || day.steps.length;
+    const progress = `0/${coreCount} 끝냄${extraCount && extraCount < day.steps.length ? ` · 선택·연습 0/${extraCount}` : ''}`;
+    const extraNote = extraCount && extraCount < day.steps.length ? ' 선택·연습 티켓 순서는 진도에 세지 않습니다.' : '';
     html = html.slice(0, steps.start)
-      + `<section class="day-today" aria-labelledby="오늘-순서"><div class="day-today-head">${heading}<p class="day-progress" data-day-progress aria-live="polite">0/${day.steps.length} 끝냄</p></div>`
+      + `<section class="day-today" aria-labelledby="오늘-순서"><div class="day-today-head">${heading}<p class="day-progress" data-day-progress aria-live="polite">${progress}</p></div>`
       + `<ol class="day-steps day-chips" data-day="${day.id}">${chipList}</ol>`
-      + `<p class="day-progress-note">체크는 이 브라우저에만 저장되고, 홈의 "오늘 할 일"이 이 체크로 다음 날을 고릅니다. <span data-course-storage></span></p></section>\n`
+      + `<p class="day-progress-note">체크는 이 브라우저에만 저장되고, 홈의 "오늘 할 일"이 이 체크로 다음 날을 고릅니다.${extraNote} <span data-course-storage></span></p></section>\n`
       + html.slice(steps.end);
   } else fail('오늘 순서가 없다');
 

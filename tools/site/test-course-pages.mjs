@@ -252,7 +252,27 @@ for (const day of course.days) {
   assert.equal(d13.$('[data-today-id]').textContent, 'D14');
   assert.match(d13.$('[data-today-meta]').textContent, /순서 2개 · 선택·연습 4개/);
   assert.equal(d13.$('[data-progress-summary]').textContent, `체크한 순서 ${coreUpToD13.length}/${allCore.length}`);
-  assert.equal(home.$('.ch-day[data-day="D13"] [data-day-count]').textContent, '0/1', '처음 그린 칸도 진도로 세는 순서 수');
+  // JS 없이 서버가 처음 그린 숫자도 같은 기준이다(재검토 지적: JS가 고쳐 그리면 초기 HTML 회귀를 못 잡는다)
+  const rawHome = await open('index.html', { script: '' });
+  assert.equal(rawHome.$('.ch-day[data-day="D13"] [data-day-count]').textContent, '0/1', '처음 그린 칸도 진도로 세는 순서 수');
+  assert.equal(rawHome.$('[data-progress-summary]').textContent, `체크한 순서 0/${allCore.length}`);
+  // 일자 페이지도 홈과 같은 저장값을 같은 기준으로 센다(P8-4 재검토 ①)
+  const savedUpToD13 = JSON.stringify({ version: 1, steps: Object.fromEntries(coreUpToD13.map((id) => [id, true])) });
+  const d13page = await open('course/spring/D13.html', { saved: savedUpToD13 });
+  assert.equal(d13page.$('[data-day-progress]').textContent, '1/1 끝냄 · 선택·연습 0/4');
+  assert.match(d13page.$('.day-progress-note').textContent, /선택·연습 티켓 순서는 진도에 세지 않습니다/);
+  assert.deepEqual(d13page.$$('.day-chip input[data-extra]').map((i) => i.dataset.step), ['D13-2', 'D13-3', 'D13-4', 'D13-5']);
+  assert.equal((await open('course/spring/D13.html', { script: '' })).$('[data-day-progress]').textContent, '0/1 끝냄 · 선택·연습 0/4', '처음 그린 일자 진도');
+  for (const id of ['D12', 'D14']) {
+    const d = homeDays.find((x) => x.id === id);
+    const page = await open(`course/spring/${id}.html`, { saved: savedUpToD13 });
+    const core = d.steps.filter((x) => !x.extra), extra = d.steps.filter((x) => x.extra);
+    const n = core.filter((x) => coreUpToD13.includes(x.id)).length;
+    assert.equal(page.$('[data-day-progress]').textContent, `${n}/${core.length} 끝냄 · 선택·연습 0/${extra.length}`, `${id} 일자 진도 = 홈 칸 ${d13.$(`.ch-day[data-day="${id}"] [data-day-count]`).textContent}`);
+    assert.equal(d13.$(`.ch-day[data-day="${id}"] [data-day-count]`).textContent, `${n}/${core.length}`);
+  }
+  const d04page = await open('course/spring/D04.html', { saved: savedUpToD13 });
+  assert.doesNotMatch(d04page.$('[data-day-progress]').textContent, /선택·연습/, '추가 순서가 없는 날은 예전 표시 그대로');
   const blocked = await open('index.html', { brokenStorage: true });
   assert.equal(blocked.$('[data-today-id]').textContent, 'D01', '저장소가 막혀도 기본 화면');
 }

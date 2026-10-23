@@ -60,14 +60,20 @@
     var inputs = Array.prototype.slice.call(page.querySelectorAll('input.step-check[data-step]'));
     var ids = [];
     inputs.forEach(function (input) { if (ids.indexOf(input.dataset.step) < 0) ids.push(input.dataset.step); });
+    // 홈 진도와 같은 기준: 선택·연습 티켓 순서(data-extra)는 따로 센다. 그날 순서가 모두 추가면 전부 센다.
+    var extraIds = [];
+    inputs.forEach(function (input) { if (input.hasAttribute('data-extra') && extraIds.indexOf(input.dataset.step) < 0) extraIds.push(input.dataset.step); });
+    if (extraIds.length === ids.length) extraIds = [];
+    var coreIds = ids.filter(function (id) { return extraIds.indexOf(id) < 0; });
     var counter = page.querySelector('[data-day-progress]');
     function paint() {
       inputs.forEach(function (input) { input.checked = state.done.has(input.dataset.step); });
       page.querySelectorAll('.day-chip[data-step], .day-step[data-step]').forEach(function (node) {
         node.classList.toggle('is-done', state.done.has(node.dataset.step));
       });
-      var count = ids.filter(function (id) { return state.done.has(id); }).length;
-      if (counter) counter.textContent = count + '/' + ids.length + ' 끝냄';
+      var doneOf = function (list) { return list.filter(function (id) { return state.done.has(id); }).length; };
+      if (counter) counter.textContent = doneOf(coreIds) + '/' + coreIds.length + ' 끝냄'
+        + (extraIds.length ? ' · 선택·연습 ' + doneOf(extraIds) + '/' + extraIds.length : '');
       storageNote(!state.ok ? 'blocked' : Object.keys(pending).length ? 'unsaved' : '');
     }
     // 최신 저장값(다른 탭의 체크 포함)을 다시 읽고 그 위에 이 화면의 미저장 변경을 얹는다.
