@@ -250,6 +250,40 @@ test('2단계 채점: 고른 티켓을 먼저 적고, 고르지 않은 티켓의
   for (const l of prompt('D13').split('\n').filter((x) => /^ {2}- \[C\d/.test(x))) assert.match(l, /\((B06|B07|B09|B10)/, `D13 선택 티켓 표시: ${l}`);
 });
 
+test('2단계 채점: 제외는 고르지 않은 선택 티켓에만 걸고, 필수 B01~B04·E01 항목은 분모에 남는다', () => {
+  const prompt = (id) => { const md = page(id); return md.slice(md.indexOf('## AI 채점 프롬프트'), md.indexOf('## 내일 미리보기')); };
+  const meta = JSON.parse(fs.readFileSync(path.join(ROOT, 'course/map-tickets.json'), 'utf8')).tickets;
+  const optional = new Set(meta.filter((t) => !t.required && !t.enhancement).map((t) => t.id));
+  const mustCount = new Set(['B01', 'B02', 'B03', 'B04', 'E01']);
+  const seen = new Set();
+  for (const d of roadmap.days.filter((x) => x.phase === 'maintain')) {
+    const p = prompt(d.id);
+    assert.match(p, /B01~B04\(필수\) \+ 학습자가 고른 선택 티켓 1건 \+ E01 \+ 모의 장애 훈련/, `${d.id}: 채점 대상 집합을 적는다`);
+    const clause = p.match(/이 날 제외할 수 있는 선택 티켓: ([^)]+)\)/);
+    assert.ok(clause, `${d.id}: 제외 조항이 제외할 수 있는 선택 티켓을 적는다`);
+    const excludable = clause[1] === '없음' ? [] : clause[1].split('·');
+    for (const t of excludable) assert.ok(optional.has(t), `${d.id}: 제외 조항에 선택이 아닌 티켓 ${t}`);
+    const dayOptional = [...new Set(d.steps.flatMap((s) => s.tickets))].filter((t) => optional.has(t));
+    assert.deepEqual([...excludable].sort(), dayOptional.sort(), `${d.id}: 그날 선택 티켓 전부`);
+    const items = p.split('\n').filter((l) => /^ {2}- \[C\d+-\d+\]/.test(l)).map((l) => {
+      const m = l.match(/^ {2}- \[C\d+-\d+\] \(([BE]\d{2})(?: (필수|선택|고도화))?/);
+      return { line: l, ticket: m?.[1] ?? '', kind: m?.[2] ?? '' };
+    });
+    for (const it of items.filter((x) => x.ticket)) {
+      const want = optional.has(it.ticket) ? '선택' : it.ticket === 'E01' ? '고도화' : '필수';
+      assert.equal(it.kind, want, `${d.id}: 티켓 구분 표시 → ${it.line}`);
+    }
+    // 고른 선택 티켓이 {B14}일 때 문언대로 제외해도 필수·E01 항목은 분모에 남는다
+    const chosen = new Set(['B14']);
+    const counted = items.filter((it) => !(it.kind === '선택' && excludable.includes(it.ticket) && !chosen.has(it.ticket)));
+    for (const it of items.filter((x) => mustCount.has(x.ticket))) {
+      assert.ok(counted.includes(it), `${d.id}: 필수 항목이 제외됨 → ${it.line}`);
+      seen.add(it.ticket);
+    }
+  }
+  assert.deepEqual([...seen].sort(), ['B01', 'B02', 'B03', 'B04', 'E01'], '필수·E01 항목을 모두 확인했다');
+});
+
 test('모든 완성 순서에 힌트가 1~2줄 있다', () => {
   for (const d of readyDays) for (const s of d.steps) {
     const h = hints.days[d.id].steps[String(s.no)];

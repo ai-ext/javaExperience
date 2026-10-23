@@ -451,7 +451,8 @@ export function graderPrompt(day, cards, hintsDay, template, root = ROOT) {
     if (day.phase !== 'maintain') return '';
     const ticket = id in (g.itemTickets ?? {}) ? g.itemTickets[id] : (s.tickets?.length === 1 ? s.tickets[0] : '');
     if (ticket && !s.tickets.includes(ticket)) throw new Error(`hints.json: ${day.id} ${id}의 티켓 ${ticket}이 그 순서 티켓이 아니다`);
-    const tags = [ticket, (g.fromRecords ?? []).includes(id) ? '기록으로 확인' : ''].filter(Boolean);
+    // 구분(필수·선택·고도화)을 붙여야 채점 에이전트가 선택 티켓 항목만 제외한다
+    const tags = [ticket && `${ticket} ${ticketInfo(ticket, root).kind}`, (g.fromRecords ?? []).includes(id) ? '기록으로 확인' : ''].filter(Boolean);
     return tags.length ? `(${tags.join(' · ')}) ` : '';
   };
   for (const s of day.steps) {
@@ -480,6 +481,7 @@ export function graderPrompt(day, cards, hintsDay, template, root = ROOT) {
     // 2단계 카드의 "답에 들어가야 할 것"은 티켓 원인이라, 화면에 보이는 프롬프트에는 질문만 싣고 답은 에이전트가 원문에서 읽게 한다
     .replaceAll('{{CARD_QUESTIONS}}', day.talkCards.map((id) => `- [${id}] ${stripMd(cards.get(id).question)}`).join('\n'))
     .replaceAll('{{TICKETS}}', tickets.join('\n') || '- (없음)')
+    .replaceAll('{{OPTIONAL}}', ticketIds.filter((id) => ticketInfo(id, root).kind === '선택').join('·') || '없음')
     .replaceAll('{{FOCUS}}', focus);
 }
 
