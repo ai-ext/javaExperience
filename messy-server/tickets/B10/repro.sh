@@ -3,23 +3,21 @@
 #
 # 전제
 #   1) messy-server에서 `docker compose up -d` (MySQL 13311, WireMock 18081, Toxiproxy PG 프록시 18667)
-#   2) `./gradlew bootRun --args='--spring.profiles.active=local'` (포트 8080, PG 응답 타임아웃 3초)
+#   2) `./gradlew bootRun --args='--spring.profiles.active=local'` (포트 8080)
 #   3) curl, jq, uuidgen, openssl, docker compose(MySQL 셸 접속용)
 #
 # 실행: bash tickets/B10/repro.sh   (서명 키는 local 프로파일 기본값. BOARD_PG_SECRET을 바꿨다면 PG_SECRET으로 넘긴다)
 #
 # 두 단계로 나눠 보여 준다.
-#   1단계 "승인 요청이 두 번 간다": WireMock을 "첫 승인 요청은 승인하되 5초 뒤에 답하고(우리 서버는 3초에 포기), 그다음부터는 바로 답하는"
+#   1단계 "승인 요청이 두 번 간다": WireMock을 "첫 승인 요청은 승인하되 5초 뒤에 답하고, 그다음부터는 바로 답하는"
 #     PG로 바꾼 뒤 Idempotency-Key 하나로 7000포인트를 한 번 충전한다. PG가 받은 승인 요청과 우리 연계 로그(pg_payment)를 출력한다.
-#     기대 증상(결함 상태): 충전 한 번인데 PG가 받은 승인 요청이 서로 다른 Idempotency-Key로 2건(= PG 승인 2건, 카드 결제 2번),
+#     기대 증상(결함 상태): 충전 한 번인데 PG가 받은 승인 요청이 2건(= PG 승인 2건, 카드 결제 2번. 요청마다 헤더를 함께 찍는다),
 #     pg_payment에 같은 회원·같은 금액 행이 2개(UNKNOWN 1, DONE 1). 이 시점 잔액은 아직 7000이다(DONE 행만 적립).
 #   2단계 "정산하면 포인트가 두 번 쌓인다": PG는 첫 요청도 승인했으므로, PG가 하듯 결과 불명(UNKNOWN) 행의 orderId로
 #     서명(HMAC-SHA256)을 붙인 결제 완료 콜백(DONE)을 보낸다. 기대 증상(결함 상태): 잔액 14000, 충전 원장 2건.
 #     이 서버에는 지금 토큰 없는 콜백이 401로 막히는 다른 증상(티켓 B13 "PG 결제 완료 콜백이 전부 401")이 있어,
 #     재현에서는 회원 토큰을 붙여 그 문제를 비켜 간다(서명 검증과 반영 로직은 그대로 거친다).
 #     결과 불명 건을 PG 조회로 확정하는 ChargeService.reconcile은 이 서버에서 부르는 곳(워커·API)이 없다. 확인 테스트는 reconcile을 직접 부른다.
-# 수정 뒤: 1단계에서 PG 승인 요청의 키는 1개, pg_payment 행도 1개(UNKNOWN, 504로 응답).
-#   2단계 콜백으로 그 행이 DONE이 되며 적립은 한 번(잔액 7000, 충전 원장 1건)이다.
 set -euo pipefail
 
 BASE=${BASE:-http://localhost:8080}

@@ -14,8 +14,7 @@
 #      그런데 재고가 1 줄고, 쿠폰은 USED, 주문 행도 남는다(롤백이 안 된다).
 #   B. 감사 쿠폰(9001)이 다 떨어진 상태에서 포인트가 충분한 회원이 주문 → 201이어야 하는데 500.
 #      그런데 주문 행은 생기고 포인트도 빠져 있다.
-#   서버 로그(`logging.level.org.springframework.transaction=DEBUG`를 붙이면 더 잘 보인다)에서
-#   `UnexpectedRollbackException: Transaction silently rolled back because it has been marked as rollback-only`를 찾는다.
+#   서버 로그(`logging.level.org.springframework.transaction=DEBUG`를 붙이면 더 잘 보인다)에서 B의 500을 만든 예외를 찾는다.
 set -euo pipefail
 
 BASE=${BASE:-http://localhost:8080}

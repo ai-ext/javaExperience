@@ -299,12 +299,23 @@ function javaInfo(id, root) {
   return { id, title, duration };
 }
 
-// 채점 프롬프트에 싣는 티켓 이름과 구분(필수·선택·고도화)
+// 티켓 구분: 필수(B01~B04), 선택(pool이 있는 Security·Redis 후보 — 이 중 1건을 골라 꼭 채점), 고도화(E01), 연습(나머지)
+export const ticketKind = (meta) => (meta.required ? '필수' : meta.enhancement ? '고도화' : meta.pool ? '선택' : '연습');
+const ticketMeta = (root) => JSON.parse(read(path.join(root, 'course/map-tickets.json'))).tickets;
+
+// 채점 프롬프트에 싣는 티켓 이름과 구분
 function ticketInfo(id, root) {
   const title = read(path.join(root, 'course/tickets', `${id}.md`)).match(/^# (?:[BE]\d{2}\. )?(.+)$/m)[1].trim();
-  const meta = JSON.parse(read(path.join(root, 'course/map-tickets.json'))).tickets.find((t) => t.id === id);
+  const meta = ticketMeta(root).find((t) => t.id === id);
   if (!meta) throw new Error(`map-tickets.json에 티켓 ${id}가 없다`);
-  return { id, title: stripMd(title), kind: meta.required ? '필수' : meta.enhancement ? '고도화' : '선택' };
+  return { id, title: stripMd(title), kind: ticketKind(meta) };
+}
+
+// 2단계 일자 페이지 머리에 싣는 티켓 규칙(설계 §5-3: 필수 4건 + Security·Redis에서 고른 선택 1건). 목록은 map-tickets.json에서 만든다.
+export function ticketRule(root = ROOT) {
+  const meta = ticketMeta(root);
+  const ids = (f) => meta.filter(f).map((t) => t.id).join('·');
+  return `**2단계 티켓 규칙** 필수는 ${ids((t) => t.required)} 4건이다. 선택 1건은 D11을 시작할 때 Security 후보(${ids((t) => t.pool === 'Security')})나 Redis 후보(${ids((t) => t.pool === 'Redis')})에서 골라 끝까지 처리한다. 고도화 E01과 D14 ⑥ 모의 장애 훈련은 모두 한다. 연습 티켓은 나머지 ${meta.filter((t) => ticketKind(t) === '연습').length}건(${ids((t) => ticketKind(t) === '연습')})이다. 연습 티켓과 고르지 않은 선택 후보는 했으면 채점 프롬프트에 알려 채점받고, 하지 않았으면 채점에서 빠진다. 필수·고른 선택·E01·훈련을 하지 않으면 그 항목은 실패다.`;
 }
 
 // 저장소 기준 경로 문서의 제목. 없으면 멈춘다(hints.json의 refs·guides).
@@ -458,7 +469,8 @@ export function graderPrompt(day, cards, hintsDay, template, root = ROOT) {
   for (const s of day.steps) {
     criteria.push(`${circled(s.no)} ${stripMd(s.title)}`);
     s.done.forEach((d, i) => criteria.push(`  - [C${s.no}-${i + 1}] ${tagOf(s, `C${s.no}-${i + 1}`)}${stripMd(d)}`));
-    if (s.trap) criteria.push(`  - [R${s.no}] 함정을 피했는지 코드로 확인: ${stripMd(s.trap)}`);
+    // 마무리(wrap)는 코드를 보지 않는 날이라 설명·회고에서 확인한다
+    if (s.trap) criteria.push(`  - [R${s.no}] 함정을 피했는지 ${day.phase === 'wrap' ? '설명·회고에서' : '코드로'} 확인: ${stripMd(s.trap)}`);
   }
   const cardLines = [];
   for (const id of day.talkCards) {
@@ -481,7 +493,7 @@ export function graderPrompt(day, cards, hintsDay, template, root = ROOT) {
     // 2단계 카드의 "답에 들어가야 할 것"은 티켓 원인이라, 화면에 보이는 프롬프트에는 질문만 싣고 답은 에이전트가 원문에서 읽게 한다
     .replaceAll('{{CARD_QUESTIONS}}', day.talkCards.map((id) => `- [${id}] ${stripMd(cards.get(id).question)}`).join('\n'))
     .replaceAll('{{TICKETS}}', tickets.join('\n') || '- (없음)')
-    .replaceAll('{{OPTIONAL}}', ticketIds.filter((id) => ticketInfo(id, root).kind === '선택').join('·') || '없음')
+    .replaceAll('{{OPTIONAL}}', ticketIds.filter((id) => ['선택', '연습'].includes(ticketInfo(id, root).kind)).join('·') || '없음')
     .replaceAll('{{FOCUS}}', focus);
 }
 
@@ -592,6 +604,10 @@ export function renderDay(day, ctx) {
   const roadmapJava = ctx.roadmap.java.find((j) => j.id === day.java);
   const parts = [dayHeader(day, java, ctx.ready ? '' : ' · **준비 중**')];
   if (!ctx.ready) parts.push('> 이 날은 아직 준비 중이다. 순서 제목과 말하기 카드만 먼저 싣고, 티켓 페이지·힌트·채점 프롬프트는 2단계 자료가 끝난 뒤 채운다.');
+  if (day.phase === 'maintain') {
+    parts.push(ticketRule(ctx.root));
+    if (day.note) parts.push(`**오늘** ${day.note}`);
+  }
   parts.push('## 오늘 순서', checklist(day, day.steps), javaSection(java, roadmapJava), '---');
   const deferred = Object.entries(ctx.deferred ?? DEFERRED_FIXES).filter(([k]) => k.startsWith(`${day.id}-`));
   for (const s of day.steps) {
@@ -670,7 +686,7 @@ export function renderIndex(roadmap, hints) {
     '하루 한 페이지다. 맨 위 [오늘 순서]대로 만들고, 막히면 순서 칸의 힌트를, 그래도 막히면 그 순서의 정답만 펼친다. 하루가 끝나면 말하기 카드에 답하고 AI 채점 프롬프트로 확인한다.',
     '',
     '- 1단계(D01~D10): 빈 프로젝트로 서버 만들기. 시작은 [출발 자료](../start/README.md)',
-    '- 2단계(D11~D14): 어수선한 서버 넘겨받기',
+    '- 2단계(D11~D14): 어수선한 서버 넘겨받기. 티켓은 필수 B01~B04 4건 + 선택 1건(Security·Redis 후보에서 고른다) + 고도화 E01 + 모의 장애 훈련이고, 나머지는 연습 티켓이다',
     '- 마무리(D15): 설명 세션',
     '',
     '| 일 | 단계 | 마일스톤 | 오늘의 Java | 순서 | 말하기 카드 | 상태 |',

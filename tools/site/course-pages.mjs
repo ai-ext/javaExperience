@@ -88,9 +88,12 @@ function between(html, startRe, endRe) {
   return { start, end, text: html.slice(start, end) };
 }
 
+// 티켓 구분은 일자 페이지 생성기(build-days.mjs)의 ticketKind와 같다: 필수·선택(Security·Redis 후보)·고도화·연습
+const ticketKind = (t) => (t.required ? '필수' : t.enhancement ? '고도화' : t.pool ? '선택' : '연습');
+
 function ticketBadge(ticket, fromRel, course) {
   if (!ticket) return '';
-  const kind = ticket.required ? '필수' : ticket.enhancement ? '고도화' : '선택';
+  const kind = ticketKind(ticket);
   const inner = `<b>${esc(ticket.id)}</b><span>${kind}</span>`;
   const cls = `ticket-badge${ticket.required ? ' is-required' : ''}`;
   return ticket.page
@@ -243,7 +246,7 @@ export function renderCourseHome(course) {
     ? `<a href="${esc(href(j.page))}" title="${esc(j.title)}">${j.id}${j.optional ? '<small>선택</small>' : ''}</a>`
     : `<span>${j.id}</span>`)).join('');
   const ticketChips = course.tickets.filter((t) => !t.enhancement).map((t) => {
-    const label = `<b>${t.id}</b>${t.required ? '<small>필수</small>' : ''}`;
+    const label = `<b>${t.id}</b>${t.required || t.pool ? `<small>${ticketKind(t)}</small>` : ''}`;
     return t.page ? `<a class="${t.required ? 'is-required' : ''}" href="${esc(href(t.page))}" title="${esc(t.title)}">${label}</a>` : `<span class="is-pending${t.required ? ' is-required' : ''}" title="${esc(t.title)} · 준비 중">${label}</span>`;
   }).join('');
   const readyTickets = course.tickets.filter((t) => t.page && !t.enhancement).length;
@@ -267,7 +270,7 @@ export function renderCourseHome(course) {
   <div class="ch-entries">
     <article class="ch-entry"><p class="home-eyebrow">Spring 트랙 · 메인</p><h3>일자 페이지 D00~D15</h3><p>오늘 순서 → 순서 칸(만들 파일·겪을 것·완료 조건) → 막히면 힌트 → 그 순서의 정답 → 말하기 카드와 AI 채점.</p><a href="${esc(href('course/spring/README.html'))}">일자 목록 열기 →</a></article>
     <article class="ch-entry"><p class="home-eyebrow">Java 트랙 · 매일 30~60분</p><h3>같은 날 쓰는 Java 먼저</h3><p class="ch-chips">${javaChips}</p></article>
-    <article class="ch-entry"><p class="home-eyebrow">2단계 티켓 · 필수 4건 + 선택 1건 이상</p><h3>증상만 적힌 티켓 B01~B16</h3><p class="ch-chips ch-ticket-chips">${ticketChips}</p><p class="ch-entry-note">티켓 페이지 ${readyTickets}/16 준비됨. 나머지는 D11~D14 일자 페이지에서 먼저 순서로 봅니다.</p></article>
+    <article class="ch-entry"><p class="home-eyebrow">2단계 티켓 · 필수 4건 + 선택 1건(Security·Redis 후보)</p><h3>증상만 적힌 티켓 B01~B16</h3><p class="ch-chips ch-ticket-chips">${ticketChips}</p><p class="ch-entry-note">필수 B01~B04 + 선택 1건(B12·B13·B14 또는 B15·B16) + <a href="${esc(href('course/tickets/E01.html'))}">고도화 E01</a> + <a href="${esc(href('course/tickets/drill.html'))}">모의 장애 훈련</a>. B05~B11과 고르지 않은 후보는 연습으로 하고, 처리한 것만 채점합니다. 티켓 페이지 ${readyTickets}/16 준비됨.</p></article>
     <article class="ch-entry ch-entry-map"><p class="home-eyebrow">과정 지도</p><h3>날·Java·티켓·결함 영역의 관계</h3><p>어느 날의 Java가 어떤 날을 받치고, 2단계 티켓이 어떤 결함 영역에 속하는지 한 장에서 봅니다.</p><a href="${esc(href('course/map.html'))}">과정 지도 열기 →</a></article>
   </div>
   <p class="ch-links"><a href="${esc(href('course/README.html'))}">과정 안내</a><a href="${esc(href('course/start/README.html'))}">1단계 출발 자료</a><a href="${esc(href('course/spec-v2.html'))}">명세서 v2</a><a href="${esc(href('course/talk-cards.html'))}">말하기 카드 전체</a></p>
@@ -294,7 +297,7 @@ export function mapNodes(course) {
     ...course.java.map((j) => ({ id: j.id, kind: 'java', title: j.title, page: j.page, note: j.optional ? '선택' : '' })),
     ...course.days.map((d) => ({ id: d.id, kind: 'day', title: d.title, page: d.page, note: PHASE_SHORT[d.phase] })),
     ...ticketOrder.map((id) => course.tickets.find((t) => t.id === id)).map((t) => ({ id: t.id, kind: 'ticket', title: t.title,
-      page: t.page || (t.day ? `${course.days.find((d) => d.id === t.day).page}#step-${t.day.toLowerCase()}-${t.step}` : null), note: t.required ? '필수' : t.enhancement ? '고도화' : '선택', pending: !t.page && !t.day })),
+      page: t.page || (t.day ? `${course.days.find((d) => d.id === t.day).page}#step-${t.day.toLowerCase()}-${t.step}` : null), note: ticketKind(t), pending: !t.page && !t.day })),
     ...course.areas.map((a) => ({ id: a.id, kind: 'area', title: a.label, page: null, note: '', desc: a.desc })),
   ];
 }

@@ -16,7 +16,13 @@ email="drill-$RANDOM$RANDOM@t.com"
 curl -s -X POST "$BASE/api/auth/signup" -H 'Content-Type: application/json' \
   -d "{\"email\":\"$email\",\"password\":\"passw0rd1\",\"nickname\":\"drill$RANDOM\"}" >/dev/null
 token=$(curl -s -X POST "$BASE/api/auth/login" -H 'Content-Type: application/json' \
-  -d "{\"email\":\"$email\",\"password\":\"passw0rd1\"}" | jq -r .accessToken)
+  -d "{\"email\":\"$email\",\"password\":\"passw0rd1\"}" | jq -r '.accessToken // empty' 2>/dev/null || true)
+# 토큰 없이 돌면 이후 줄이 모두 '글쓰기 401'로 찍혀 장애 증상과 섞인다
+if [ -z "$token" ]; then
+  echo "로그인에 실패해 토큰을 받지 못했다($BASE). Redis 장애 중이면(B16을 고치기 전) 로그인도 실패한다." >&2
+  echo "bash drills/recover.sh로 복구한 뒤 probe를 다시 켜고, 다음 주입은 probe를 켠 다음에 넣는다." >&2
+  exit 1
+fi
 
 call() {
   local expect=$1; shift

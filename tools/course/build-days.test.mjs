@@ -242,46 +242,88 @@ test('2단계 채점: 고른 티켓을 먼저 적고, 고르지 않은 티켓의
       assert.equal(line.includes('기록으로 확인'), (g.fromRecords ?? []).includes(id), `${d.id} ${id}: 기록 표시`);
     });
   }
-  // 같은 서버에 수정 전·후를 함께 요구하지 않는다: D11 env 200(수정 전)은 기록, 401(수정 후)은 지금 서버
+  // 같은 서버에 수정 전·후를 함께 요구하지 않는다: D11 env 200(수정 전)은 기록
   const d11 = prompt('D11').split('\n');
   assert.ok(d11.find((l) => l.includes('[C1-2]')).includes('기록으로 확인'));
-  assert.ok(!d11.find((l) => l.includes('[C3-3]')).includes('기록으로 확인'));
   assert.ok(d11.find((l) => l.includes('[C2-2]')).includes('기록으로 확인'), 'B08 특성화(수정 전 응답 고정)는 기록');
-  for (const l of prompt('D13').split('\n').filter((x) => /^ {2}- \[C\d/.test(x))) assert.match(l, /\((B06|B07|B09|B10)/, `D13 선택 티켓 표시: ${l}`);
+  // 채점 에이전트가 만들 수 없는 조건(prod 프로파일 서버·DDL·Redis 정지)의 수정 후 결과도 기록으로, 무슨 기록인지 적는다
+  const line = (day, id) => prompt(day).split('\n').find((l) => l.includes(`[${id}]`));
+  for (const [day, id, record] of [['D11', 'C3-3', 'tickets/B14/repro.sh'], ['D11', 'C3-4', 'tickets/B11/repro.sh'], ['D13', 'C5-2', 'tickets/B06/repro.sh'], ['D14', 'C4-2', 'tickets/B16/repro.sh']]) {
+    assert.ok(line(day, id).includes('기록으로 확인') && line(day, id).includes(record), `${day} ${id}: 기록과 그 기록(${record})`);
+  }
+  assert.ok(!line('D11', 'C3-4').includes('기동 로그'), 'messy-server는 그 값을 기동 로그에 남기지 않는다');
+  for (const l of prompt('D13').split('\n').filter((x) => /^ {2}- \[C\d/.test(x))) assert.match(l, /\((B03|B06|B07|B09|B10)/, `D13 담당 티켓 표시: ${l}`);
 });
 
 test('2단계 채점: 제외는 고르지 않은 선택 티켓에만 걸고, 필수 B01~B04·E01 항목은 분모에 남는다', () => {
   const prompt = (id) => { const md = page(id); return md.slice(md.indexOf('## AI 채점 프롬프트'), md.indexOf('## 내일 미리보기')); };
   const meta = JSON.parse(fs.readFileSync(path.join(ROOT, 'course/map-tickets.json'), 'utf8')).tickets;
   const optional = new Set(meta.filter((t) => !t.required && !t.enhancement).map((t) => t.id));
+  const pooled = new Set(meta.filter((t) => t.pool).map((t) => t.id));
+  assert.deepEqual([...pooled].sort(), ['B12', 'B13', 'B14', 'B15', 'B16'], '선택 1건 범위 = Security·Redis 후보(설계 §5-3)');
   const mustCount = new Set(['B01', 'B02', 'B03', 'B04', 'E01']);
   const seen = new Set();
   for (const d of roadmap.days.filter((x) => x.phase === 'maintain')) {
     const p = prompt(d.id);
     assert.match(p, /B01~B04\(필수\) \+ 학습자가 고른 선택 티켓 1건 \+ E01 \+ 모의 장애 훈련/, `${d.id}: 채점 대상 집합을 적는다`);
-    const clause = p.match(/이 날 제외할 수 있는 선택 티켓: ([^)]+)\)/);
-    assert.ok(clause, `${d.id}: 제외 조항이 제외할 수 있는 선택 티켓을 적는다`);
+    assert.match(p, /Security 후보\(B12·B13·B14\)나 Redis 후보\(B15·B16\)/, `${d.id}: 선택 1건을 고르는 범위가 하나다`);
+    assert.doesNotMatch(p, /나머지 B 티켓이고/, `${d.id}: 엇갈리는 선택 범위 문구`);
+    const clause = p.match(/이 날 제외할 수 있는 티켓: ([^)]+)\)/);
+    assert.ok(clause, `${d.id}: 제외 조항이 제외할 수 있는 티켓을 적는다`);
     const excludable = clause[1] === '없음' ? [] : clause[1].split('·');
     for (const t of excludable) assert.ok(optional.has(t), `${d.id}: 제외 조항에 선택이 아닌 티켓 ${t}`);
     const dayOptional = [...new Set(d.steps.flatMap((s) => s.tickets))].filter((t) => optional.has(t));
     assert.deepEqual([...excludable].sort(), dayOptional.sort(), `${d.id}: 그날 선택 티켓 전부`);
     const items = p.split('\n').filter((l) => /^ {2}- \[C\d+-\d+\]/.test(l)).map((l) => {
-      const m = l.match(/^ {2}- \[C\d+-\d+\] \(([BE]\d{2})(?: (필수|선택|고도화))?/);
+      const m = l.match(/^ {2}- \[C\d+-\d+\] \(([BE]\d{2})(?: (필수|선택|연습|고도화))?/);
       return { line: l, ticket: m?.[1] ?? '', kind: m?.[2] ?? '' };
     });
     for (const it of items.filter((x) => x.ticket)) {
-      const want = optional.has(it.ticket) ? '선택' : it.ticket === 'E01' ? '고도화' : '필수';
+      const want = optional.has(it.ticket) ? (pooled.has(it.ticket) ? '선택' : '연습') : it.ticket === 'E01' ? '고도화' : '필수';
       assert.equal(it.kind, want, `${d.id}: 티켓 구분 표시 → ${it.line}`);
     }
     // 고른 선택 티켓이 {B14}일 때 문언대로 제외해도 필수·E01 항목은 분모에 남는다
     const chosen = new Set(['B14']);
-    const counted = items.filter((it) => !(it.kind === '선택' && excludable.includes(it.ticket) && !chosen.has(it.ticket)));
+    const counted = items.filter((it) => !(['선택', '연습'].includes(it.kind) && excludable.includes(it.ticket) && !chosen.has(it.ticket)));
     for (const it of items.filter((x) => mustCount.has(x.ticket))) {
       assert.ok(counted.includes(it), `${d.id}: 필수 항목이 제외됨 → ${it.line}`);
       seen.add(it.ticket);
     }
   }
   assert.deepEqual([...seen].sort(), ['B01', 'B02', 'B03', 'B04', 'E01'], '필수·E01 항목을 모두 확인했다');
+});
+
+test('2단계 일자 페이지 머리에 티켓 규칙과 그날 구성이 보인다', () => {
+  for (const d of roadmap.days.filter((x) => x.phase === 'maintain')) {
+    const md = page(d.id);
+    const head = md.slice(0, md.indexOf('## 오늘 순서'));
+    assert.match(head, /\*\*2단계 티켓 규칙\*\* 필수는 B01·B02·B03·B04 4건이다\. 선택 1건은 D11을 시작할 때 Security 후보\(B12·B13·B14\)나 Redis 후보\(B15·B16\)/, `${d.id}: 티켓 규칙`);
+    assert.ok(d.note && head.includes(`**오늘** ${d.note}`), `${d.id}: 그날 구성`);
+  }
+  const d13 = roadmap.days.find((d) => d.id === 'D13');
+  assert.deepEqual(d13.steps[0].tickets, ['B03'], 'D13은 필수 B03 마무리부터');
+  assert.ok(d13.steps[0].done.some((x) => x.includes('같은 키 동시 주문')), 'B03 확인 테스트의 동시 주문 경계까지 한다');
+  assert.deepEqual(d13.steps.find((s) => s.no === 3).tickets, ['B09'], 'B09 ③ 번호 보존');
+  assert.deepEqual(d13.steps.find((s) => s.no === 5).tickets, ['B06'], 'B06은 빠뜨리지 않고 ⑤로 이동');
+  assert.match(built.files.get('course/spring/README.md'), /필수 B01~B04 4건 \+ 선택 1건/, '일자 목록: 티켓 규칙');
+});
+
+test('모의 장애 훈련: 201/200 유지는 B16을 처리한 경우만 보고, 나머지 항목은 모두에게 건다', () => {
+  const md = page('D14');
+  const p = md.slice(md.indexOf('## AI 채점 프롬프트'), md.indexOf('## 내일 미리보기')).split('\n');
+  const c6 = p.filter((l) => /^ {2}- \[C6-\d\]/.test(l));
+  assert.equal(c6.length, 4);
+  for (const l of c6) {
+    if (l.includes('[C6-3]')) assert.match(l, /\(B16 선택 · 기록으로 확인\) B16을 고친 서버/, l);
+    else assert.doesNotMatch(l, /\([BE]\d{2} /, `훈련 항목은 티켓과 무관하게 채점: ${l}`);
+  }
+});
+
+test('마무리 채점: 함정은 코드가 아니라 설명·회고에서 보고, 2단계 카드는 처리한 티켓의 카드에서만 고른다', () => {
+  const md = page('D15');
+  const p = md.slice(md.indexOf('## AI 채점 프롬프트'), md.indexOf('## 내일 미리보기'));
+  assert.ok(!p.includes('함정을 피했는지 코드로 확인') && p.includes('함정을 피했는지 설명·회고에서 확인'));
+  assert.ok(p.includes('처리한 티켓인 카드에서만 고른다'));
 });
 
 test('모든 완성 순서에 힌트가 1~2줄 있다', () => {
@@ -561,4 +603,13 @@ test('말하기 카드 근거는 페이지에 명세 절만 싣는다(저장소 
   for (const d of readyDays) {
     for (const [, basis] of page(d.id).matchAll(/^\*\*근거\*\* (.+)$/gm)) assert.match(basis, /^spec-v2 §[\d-]+(, spec-v2 §[\d-]+)*$/, d.id);
   }
+});
+
+test('B09 경계는 운영 UTC 시계로 재현하고 KST 날짜 세 경우를 구분한다', () => {
+  const step = roadmap.days.find((d) => d.id === 'D13').steps.find((s) => s.tickets.includes('B09'));
+  const done = step.done.join(' ');
+  for (const marker of ['같은 KST 날짜 반복은 1회', '08:59:59→09:00:00', '23:59:59→다음 날 00:00:00', '날마다 1회']) assert.ok(done.includes(marker), marker);
+  const hint = hints.days.D13.steps[String(step.no)].join(' ');
+  assert.ok(hint.includes('ZoneOffset.UTC') && hint.includes('UTC 자정') && hint.includes('결함이 가려진다'), '시계 영역을 KST로 바꿔 결함을 숨기지 않게 한다');
+  assert.ok(!done.includes('UTC'), 'UTC 시계 진단 단서는 닫힌 힌트에 둔다');
 });

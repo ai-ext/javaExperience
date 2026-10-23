@@ -60,7 +60,8 @@ if [ "$MODE" = stop ]; then
   docker compose stop redis >/dev/null 2>&1
 else
   echo "== Redis 일시 정지(docker compose pause redis)"
-  echo "   (멈춘 동안 다른 터미널에서: jcmd \$(pgrep -f BoardApplication) Thread.print | grep -B2 -A30 'http-nio.*exec')"
+  # PATH의 jcmd가 macOS 스텁일 수 있어 JAVA_HOME의 jcmd를 안내한다
+  echo "   (멈춘 동안 다른 터미널에서: \"${JAVA_HOME:+$JAVA_HOME/bin/}jcmd\" \$(pgrep -f BoardApplication) Thread.print | grep -B2 -A30 'http-nio.*exec')"
   docker compose pause redis >/dev/null 2>&1
 fi
 write; popular

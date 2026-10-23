@@ -428,6 +428,16 @@ for (const day of course.days) {
       if (at >= 0) ticketLeaks.push(`${id} "${term}": …${visible.slice(Math.max(0, at - 40), at + 30)}…`);
     }
   }
+  // R2 m8: 실행 전에 읽는 재현 스크립트의 머리 주석도 원인·해법을 숨긴다.
+  // 실행 코드 자체는 결함을 관찰할 입력을 만들어야 하므로 이 검사의 대상이 아니다.
+  for (const id of ['B02', 'B03', 'B04', 'B09', 'B10']) {
+    const script = fs.readFileSync(new URL(`messy-server/tickets/${id}/repro.sh`, root), 'utf8');
+    const header = script.match(/^#![^\n]*\n((?:#[^\n]*\n|\n)*)/)[1];
+    for (const term of [...causeTerms[id], ...(ticketFixPhrases[id] ?? [])]) {
+      assert.ok(!header.includes(term), `${id}: repro 머리 주석이 원인·해법 "${term}"를 드러낸다`);
+    }
+    assert.doesNotMatch(header, /수정 뒤/, `${id}: 머리 주석은 수정 후 해법 대신 재현 관찰만 싣는다`);
+  }
   // 4-2) 2단계·마무리 일자 페이지: 자리표시가 없고, 순서마다 닫힌 힌트가 있고, 티켓 순서는 티켓 페이지 "원인과 정답" 절로 잇는다.
   // hints.json에서 온 문장(힌트·리뷰 초점)도, 접기 밖에 보이는 글 전체도 그날 티켓의 원인 핵심어를 쓰지 않는다.
   const hintsData = JSON.parse(fs.readFileSync(new URL('course/hints.json', root), 'utf8'));
@@ -453,7 +463,12 @@ for (const day of course.days) {
       const section = doc.getElementById(`step-${s.id.toLowerCase()}`);
       const hint = section.querySelector(`details.step-hint[data-step="${s.id}"]`);
       assert.ok(hint && !hint.open && hint.querySelectorAll('li').length >= 1, `${s.id}: 닫힌 힌트`);
-      for (const line of hintsDay.steps[String(s.no)]) for (const term of terms) assert.ok(!plainText(line).includes(plainText(term)), `${s.id}: 힌트가 원인 핵심어 "${term}"를 말한다`);
+      for (const line of hintsDay.steps[String(s.no)]) for (const term of terms) {
+        // R2 M8: 닫힌 B09 힌트의 UTC는 재현 시계 입력이다. KST 시계로 바꿔 결함을 가리는 테스트를 막는다.
+        // 접기 밖 UTC 검사와 날짜 계산 코드(systemUTC·LocalDate.now) 검사는 유지한다.
+        if (s.tickets.includes('B09') && term === 'UTC') continue;
+        assert.ok(!plainText(line).includes(plainText(term)), `${s.id}: 힌트가 원인 핵심어 "${term}"를 말한다`);
+      }
       if (day.phase !== 'maintain') continue;
       const named = s.title.match(/^([BE]\d{2}) "([^"]+)"/);
       if (named) {

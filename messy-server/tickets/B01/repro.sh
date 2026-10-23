@@ -59,5 +59,6 @@ metric() {
 }
 echo "hikaricp.connections.active=$(metric hikaricp.connections.active) pending=$(metric hikaricp.connections.pending)"
 echo "PG 지연 중 GET /api/posts: $(curl -s -o /dev/null -w '%{http_code} %{time_total}s' "$BASE/api/posts")"
-echo "(이 순간 스레드 덤프: jcmd \$(pgrep -f BoardApplication) Thread.print | grep -B2 -A25 'PgClient')"
+# PATH의 jcmd가 macOS 스텁일 수 있어 JAVA_HOME의 jcmd를 안내한다
+echo "(이 순간 스레드 덤프: \"${JAVA_HOME:+$JAVA_HOME/bin/}jcmd\" \$(pgrep -f BoardApplication) Thread.print | grep -B2 -A25 'PgClient')"
 wait

@@ -5,8 +5,7 @@
 #   1) messy-server에서 `docker compose up -d` (MySQL 13311, root 비밀번호는 DB_ROOT_PASSWORD 또는 root)
 #   2) `./gradlew bootRun --args='--spring.profiles.active=local'` (포트 8080)
 #   3) curl
-#   주의: schema.sql은 CREATE TABLE IF NOT EXISTS라 이미 만들어진 로컬 DB의 인덱스는 바뀌지 않는다.
-#         고친 뒤 로컬에서 확인하려면 ALTER TABLE로 인덱스를 바꾸거나 MySQL 컨테이너 볼륨을 지우고 다시 띄운다.
+#   주의: 고친 뒤 로컬 DB에서 다시 확인하는 방법은 티켓 페이지 "원인과 정답"에 있다.
 #
 # 실행: bash tickets/B02/repro.sh            (글 OLD+SPAM건을 넣고 측정)
 #       REPRO_CLEAN=1 bash tickets/B02/repro.sh  (넣은 글만 지운다)
@@ -17,7 +16,6 @@
 #                       다음 쪽(커서)은 1ms 안쪽이다. rows_examined는 파생 테이블 안쪽을 세지 않아 40 남짓으로 작게 나온다(속지 말 것).
 #                       EXPLAIN ANALYZE에 "Index scan on post using PRIMARY (reverse) ... rows=<SPAM+42 안팎>",
 #                       Handler_read_prev도 같은 수만큼 오른다.
-#                       수정 뒤에는 "Index lookup on post using ... (status='ACTIVE') (reverse) ... rows=21", slow log에서 사라진다.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."

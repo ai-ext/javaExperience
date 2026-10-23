@@ -10,7 +10,7 @@
 # 하는 일: messy-server를 임시 디렉터리에 복사해 두 가지를 해 본다(원본은 건드리지 않는다).
 #   1) 기획 요청대로 NotificationChannel에 KAKAO(카카오 알림톡)를 하나 더하고, 일회용 테스트(B04ReproTest)로
 #      글 작성·댓글 작성·(댓글 달린) 글 삭제 API를 차례로 부른다.
-#   2) PostServiceImpl의 @Lazy 한 줄을 지우고 기동 테스트(BoardApplicationTests)를 돌린다.
+#   2) PostServiceImpl에서 기동을 살리려고 붙여 둔 어노테이션 한 줄을 지우고 기동 테스트(BoardApplicationTests)를 돌린다.
 # 기대 증상(고치기 전)
 #   1) "응답 코드: 글 작성=500 댓글 작성=500 글 삭제=500"과 로그의 예외 메시지(같은 예외가 세 번)
 #   2) 기동 테스트가 컨텍스트를 만들지 못해 실패한다. 출력되는 오류 메시지를 읽어 본다.
