@@ -20,7 +20,7 @@
 <p>같은 날: D12 · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests &#39;J12*&#39;</code></p>
 </blockquote>
 <h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2>
-<p>D12에서 고치는 티켓들은 모두 긴 서비스 메서드 안에 원인이 숨어 있다. D12 ①에서는 충전 처리 안에서 PG 호출이 트랜잭션에 묶여 있고, ③에서는 구매 처리 안의 예외 처리와 롤백 경계가 엉켜 있다. 고치려면 먼저 &quot;어디까지가 검증이고 어디부터가 저장인가&quot;가 보이도록 메서드를 나눠야 한다.
+<p>D12에서는 넘겨받은 서버의 티켓을 직접 진단한다. 여기서는 진단할 코드를 읽는 데 필요한 메서드 분리 연습을 먼저 한다. 실제 티켓과의 비교는 티켓을 마친 뒤 아래 접기에서 읽는다.
 오늘은 Spring 없이 76줄짜리 구매 처리 메서드를 검증·계산·저장 세 메서드로 나눈다. 나누기 전후에 동작이 같은지는 J11에서 익힌 특성화 테스트가 지킨다.</p>
 <h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2>
 <div class="table-wrap"><table>
@@ -325,12 +325,16 @@ public enum OrderStatus {
 </details>
 
 <h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2>
-<p>2단계(D11~D14)에서 진단하고 고치는 곳은 넘겨받은 <code>messy-server</code>다. <code>board-server</code>의 같은 이름 파일은 고친 뒤의 모습(정답 모양)이라 내용이 다르다. 아래는 어느 쪽을 보는지 경로에 적었다.</p>
+<details>
+<summary>티켓을 마친 뒤 읽기</summary>
+
+<p>2단계(D11~D14)에서 진단하고 고치는 곳은 넘겨받은 <code>messy-server</code>다. <code>board-server</code>의 같은 이름 파일은 비교할 구현 예시이라 내용이 다르다. 아래는 어느 쪽을 보는지 경로에 적었다.</p>
 <ul>
 <li>D12 ① <code>board-server/src/main/java/com/example/board/payment/ChargeService.java</code> (고친 뒤 모습) — <code>charge</code>가 <code>start</code>(결제 행 만들기) → PG 호출 → <code>apply</code>(결과 반영)로 나뉘어 있다. 메서드를 단계별로 나눠 두면 각 단계가 어떤 자원(트랜잭션·커넥션·외부 호출)을 쓰는지 한눈에 보인다. D12 ①(B01)에서는 <code>messy-server</code>의 같은 파일을 이 관점으로 읽는다.</li>
 <li>D12 ③ <code>board-server/src/main/java/com/example/board/shop/OrderService.java</code> (고친 뒤 모습) — <code>order</code> → <code>placeOnce</code> → <code>place</code>, <code>findReplay</code>로 나뉜 구매 처리. 데드락 재시도(<code>order</code>)는 트랜잭션 밖, 실제 처리(<code>place</code>)는 <code>TransactionTemplate</code> 안이라는 경계가 메서드 단위로 보인다. 메서드를 나눌 때는 트랜잭션 경계가 어디에 걸리는지도 같이 본다(J10의 프록시 내용과 이어진다). D12 ③(B03)에서는 <code>messy-server</code>의 같은 파일을 이 관점으로 읽는다.</li>
 <li>D12 ③ <code>messy-server/src/test/java/com/example/board/shop/OrderRollbackTest.java</code> (<strong>D12 ③에서 작성할 예정</strong> — 아직 없는 파일이다) — 메서드를 나누고 경계를 옮긴 뒤에도 롤백 동작을 테스트로 고정한다.</li>
 </ul>
+</details>
 
 
 </main>
