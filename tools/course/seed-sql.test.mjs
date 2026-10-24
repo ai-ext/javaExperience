@@ -1,3 +1,4 @@
+import { loadCourseSources } from './sources.mjs';
 // SQLite로 데이터 관계·집계를 검증한다. MySQL 문법·실행 계획 검증은 컨트롤러에서 별도 수행한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +10,7 @@ const read = name => fs.readFileSync(new URL(`../../${name}`, import.meta.url), 
 const schema = read('board-server/src/main/resources/schema.sql');
 const seed = read('course/start/dummy/seed.sql');
 const bulk = read('course/start/dummy/bulk.sql');
-const hints = JSON.parse(read('course/hints.json')).days;
+const hints = loadCourseSources().hints.days;
 function database() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys=ON;');

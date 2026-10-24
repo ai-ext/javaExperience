@@ -1,3 +1,4 @@
+import { loadCourseSources } from '../course/sources.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,7 +17,7 @@ async function open(file, saved, before) {
   return dom;
 }
 test('실행안 2: 파일 작업 구분이 생성된 각 순서에 보인다', () => {
-  const roadmap = JSON.parse(read('course/roadmap.json'));
+  const roadmap = loadCourseSources().roadmap;
   for (const d of roadmap.days.filter(d => d.phase === 'build')) {
     const doc = new JSDOM(read(`course/spring/${d.id}.html`)).window.document;
     for (const s of d.steps) {
@@ -88,7 +89,7 @@ test('실행안 5: 어디서나 일자 목록·지도로 이동하고 D11 준비
   assert.match(read('course/spring/D10.md'), /별도.*인수인계 서버/);
 });
 test('실행안 6: D02 최소 공유 설명과 D10 자기 서버 진단 도구 예행 관찰', () => {
-  const hints=JSON.parse(read('course/hints.json'));
+  const hints=loadCourseSources().hints;
   assert.match(hints.days.D02.steps['4'].join(' '), /싱글톤.*요청 스레드.*J07/);
   const day=read('course/spring/D10.md');
   for (const word of ['jcmd','/actuator/metrics','slow_query_log','EXPLAIN ANALYZE','내 서버']) assert.ok(day.includes(word),word);

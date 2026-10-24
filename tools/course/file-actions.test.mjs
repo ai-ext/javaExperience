@@ -1,9 +1,9 @@
+import { loadCourseSources } from './sources.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import * as validator from './validate.mjs';
 
-const roadmap = JSON.parse(fs.readFileSync(new URL('../../course/roadmap.json', import.meta.url), 'utf8'));
+const roadmap = loadCourseSources().roadmap;
 const step = (day, no) => roadmap.days.find(d => d.id === day).steps.find(s => s.no === no);
 const file = (name, area) => `src/main/java/com/example/board/${area}/${name}.java`;
 

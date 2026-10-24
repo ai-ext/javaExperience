@@ -1,3 +1,4 @@
+import { loadCourseSources } from './sources.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -167,7 +168,7 @@ test('실제 spec-v2는 엔드포인트 30개', () => {
 
 test('실제 카드 문서는 일자마다 3~5장', () => {
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-  const ids = parseTalkCardIds(fs.readFileSync(path.join(root, 'course/talk-cards.md'), 'utf8'));
+  const ids = parseTalkCardIds(loadCourseSources(root).cards);
   assert.equal(new Set(ids).size, ids.length, '카드 ID 중복');
   const byDay = new Map();
   for (const id of ids) {
@@ -186,13 +187,13 @@ test('실제 카드 문서는 일자마다 3~5장', () => {
 test('실제 course 파일 전체가 검증을 통과한다', () => {
   const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'course');
   const courseFiles = {};
-  for (const f of fs.readdirSync(dir)) if (/\.(md|json)$/.test(f)) courseFiles[f] = fs.readFileSync(path.join(dir, f), 'utf8');
-  assert.ok('roadmap.json' in courseFiles, 'course/roadmap.json이 없다');
+  for (const f of fs.readdirSync(dir)) if (/\.(md|json)$/.test(f) && !['roadmap.json', 'hints.json', 'talk-cards.md'].includes(f)) courseFiles[f] = fs.readFileSync(path.join(dir, f), 'utf8');
+  const { roadmap, cards } = loadCourseSources(path.dirname(dir));
   const errs = validate({
     spec: courseFiles['spec-v2.md'],
-    roadmap: JSON.parse(courseFiles['roadmap.json']),
-    cards: courseFiles['talk-cards.md'],
-    courseFiles,
+    roadmap,
+    cards,
+    courseFiles: { ...courseFiles, roadmap: JSON.stringify(roadmap), cards },
   });
   assert.deepEqual(errs, []);
 });
@@ -200,7 +201,7 @@ test('실제 course 파일 전체가 검증을 통과한다', () => {
 test('README 일정표가 roadmap과 일치', () => {
   const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'course');
   const readme = fs.readFileSync(path.join(dir, 'README.md'), 'utf8');
-  const roadmap = JSON.parse(fs.readFileSync(path.join(dir, 'roadmap.json'), 'utf8'));
+  const roadmap = loadCourseSources(path.dirname(dir)).roadmap;
   const rows = [...readme.matchAll(/^\|\s*(D\d{2})\s*\|\s*([^|]+?)\s*\|\s*(J\d{2})\s*\|\s*(\d+)\s*\|/gm)]
     .map((m) => [m[1], m[2], m[3], Number(m[4])]);
   const want = roadmap.days.map((d) => [d.id, d.title, d.java, d.talkCards.length]);
@@ -290,7 +291,7 @@ test('순서 칸 안의 힌트·정답 블록이 다른 순서(같은 날)를 �
 
 test('실제 course/spring 일자 페이지가 roadmap과 일치한다', () => {
   const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'course');
-  const roadmap = JSON.parse(fs.readFileSync(path.join(dir, 'roadmap.json'), 'utf8'));
+  const roadmap = loadCourseSources(path.dirname(dir)).roadmap;
   const spring = path.join(dir, 'spring');
   const pages = {};
   for (const f of fs.readdirSync(spring)) if (f.endsWith('.md')) pages[f] = fs.readFileSync(path.join(spring, f), 'utf8');

@@ -1,3 +1,4 @@
+import { loadCourseSources } from './sources.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -40,8 +41,8 @@ test('raw HTML 순서 앵커는 Markdown 제목 앵커 검사에 넣지 않는�
 });
 
 test('D13 카드의 과제 번호·티켓은 로드맵과 맞고 D05 인덱스 요구가 질문에 있다', () => {
-  const roadmap = JSON.parse(read('course/roadmap.json'));
-  const cards = parseTalkCards(read('course/talk-cards.md'));
+  const roadmap = loadCourseSources().roadmap;
+  const cards = parseTalkCards(loadCourseSources().cards);
   const day = roadmap.days.find(d => d.id === 'D13');
   for (const [id, no, ticket] of [['TC-D13-1',5,'B06'], ['TC-D13-2',2,'B07'], ['TC-D13-3',3,'B09'], ['TC-D13-4',4,'B10']]) {
     const step = day.steps.find(s => s.no === no);

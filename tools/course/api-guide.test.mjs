@@ -1,11 +1,12 @@
+import { loadCourseSources } from './sources.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import * as builder from './build-days.mjs';
 
 const read = p => fs.readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
-const roadmap = JSON.parse(read('course/roadmap.json'));
-const hints = JSON.parse(read('course/hints.json'));
+const roadmap = loadCourseSources().roadmap;
+const hints = loadCourseSources().hints;
 
 test('층은 파일 역할·직접 설계로 계산하고 테스트 파일 이름의 역할은 중복 계산하지 않는다', () => {
   assert.equal(typeof builder.stepLayers, 'function');

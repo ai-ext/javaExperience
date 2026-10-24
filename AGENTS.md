@@ -19,6 +19,7 @@ Spring Boot 백엔드를 직접 구현하며 배우는 실습 레포다. 요구�
 
 ## 구현과 피드백
 
+- 일자 내용(roadmap·Java 메타·힌트·SQL·관찰·채점 값·말하기 카드)은 `course/days/Dnn.json`만 고친다. 공통 값은 `course/days/_common.json`에서 관리한다. `course/spring/*.md`·`*.html`·합본 `course/roadmap.json`·`course/hints.json`·`course/talk-cards.md`는 생성물이므로 내용 편집을 위해 읽거나 고치지 말고 `cd tools/site && npm run build`로 만든다. 검증 도구의 생성물 대조는 허용한다. 구조·추가 절차는 `course/days/README.md`를 따른다.
 - 학습자가 구현을 요청하면 해당 단계의 요구사항만 변경하고, 원리와 선택 이유를 한국어로 설명한다.
 - 채점이나 리뷰를 요청하면 먼저 시나리오의 합격 기준과 실제 코드를 대조한다. 통과 여부, 근거가 되는 파일·라인, 재현 방법을 제시한다. 요청 없이 정답 코드를 대신 작성하지 않는다.
 - 테스트는 관련 범위부터 실행한다. `./gradlew test`는 Docker와 Testcontainers가 필요할 수 있다. 실행하지 못했으면 그 이유를 명시한다.

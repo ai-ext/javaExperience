@@ -1,3 +1,4 @@
+import { loadCourseSources } from './sources.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -8,8 +9,7 @@ import { ROOT, EXTRA_COMMITS, DEFERRED_FIXES, HEADER, buildAll, fixPlacementErro
 import { stripFences, parseDayPage } from './validate.mjs';
 import * as dayBuilder from './build-days.mjs';
 
-const roadmap = JSON.parse(fs.readFileSync(path.join(ROOT, 'course/roadmap.json'), 'utf8'));
-const hints = JSON.parse(fs.readFileSync(path.join(ROOT, 'course/hints.json'), 'utf8'));
+const { roadmap, hints } = loadCourseSources(ROOT);
 const built = buildAll(ROOT);
 const readyDays = roadmap.days.filter((d) => hints.days[d.id]);
 // 정답 커밋(answer(Dnn-m))이 있는 날은 1단계뿐이다
@@ -245,7 +245,7 @@ test('채점 프롬프트에 그날 완료 조건과 말하기 카드가 모두 
 });
 
 test('2단계 채점 프롬프트는 티켓마다 3점 세트를, 마무리는 설명 세션·회고를 채점한다', () => {
-  const talkCards = parseTalkCards(fs.readFileSync(path.join(ROOT, 'course/talk-cards.md'), 'utf8'));
+  const talkCards = parseTalkCards(loadCourseSources(ROOT).cards);
   const prompt = (id) => { const md = page(id); return md.slice(md.indexOf('## AI 채점 프롬프트'), md.indexOf('## 내일 미리보기')); };
   for (const d of roadmap.days.filter((x) => x.phase !== 'build')) {
     const p = prompt(d.id);
@@ -386,7 +386,8 @@ test('펜스는 내용 안의 가장 긴 백틱보다 길다', () => {
 test('정답 커밋을 찾지 못하면 아무것도 쓰지 않고 건너뛴다', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'build-days-'));
   fs.mkdirSync(path.join(tmp, 'course'));
-  for (const f of ['roadmap.json', 'hints.json', 'talk-cards.md', 'spec-v2.md']) fs.copyFileSync(path.join(ROOT, 'course', f), path.join(tmp, 'course', f));
+  fs.cpSync(path.join(ROOT, 'course/days'), path.join(tmp, 'course/days'), { recursive: true });
+  fs.copyFileSync(path.join(ROOT, 'course/spec-v2.md'), path.join(tmp, 'course/spec-v2.md'));
   const r = buildAll(tmp);
   assert.ok(r.skipped);
   assert.equal(r.files.size, 0);
@@ -397,7 +398,7 @@ test('2단계·마무리 날도 hints가 생기면 완성 페이지로 만든다
   const ctxFor = (day) => ({
     root: ROOT, roadmap, hints, ready: true, answers: null, filesOf: () => [], lastTouch: () => null,
     hintsDay: { sql: hints.days[day.id].sql, steps: Object.fromEntries(day.steps.map((s) => [String(s.no), ['방향 힌트']])), grader: { focus: ['초점'] } },
-    cards: parseTalkCards(fs.readFileSync(path.join(ROOT, 'course/talk-cards.md'), 'utf8')),
+    cards: parseTalkCards(loadCourseSources(ROOT).cards),
     specSections: parseSpecSections(fs.readFileSync(path.join(ROOT, 'course/spec-v2.md'), 'utf8')),
   });
   const d12 = roadmap.days.find((d) => d.id === 'D12');
@@ -437,7 +438,7 @@ test('answer-fix(Dnn-m)는 순서 수에 넣지 않고, 그 순서 원래 커밋
   const fixFilesOf = (fixes) => fixes.some((c) => c.sha === fix.sha) ? filesOf(fix.sha) : netFixFiles(fixes, ROOT);
   const md = renderDay(d09, {
     root: ROOT, roadmap, hints, hintsDay: hints.days.D09, ready: true, answers: answers.get('D09'), filesOf, fixFilesOf, lastTouch: () => null,
-    cards: parseTalkCards(fs.readFileSync(path.join(ROOT, 'course/talk-cards.md'), 'utf8')),
+    cards: parseTalkCards(loadCourseSources(ROOT).cards),
     specSections: parseSpecSections(fs.readFileSync(path.join(ROOT, 'course/spec-v2.md'), 'utf8')),
   });
   const block = md.match(/<details class="step-answer" data-step="D09-3"[\s\S]*?\n<\/details>/)[0];
@@ -660,7 +661,7 @@ test('B09 경계는 운영 UTC 시계로 재현하고 KST 날짜 세 경우를 �
 });
 
 test('P08: 실수가 없으면 배제·예방 근거로 D15 세 줄을 충족할 수 있다', () => {
-  const cards = fs.readFileSync(path.join(ROOT, 'course/talk-cards.md'), 'utf8');
+  const cards = loadCourseSources(ROOT).cards;
   for (const id of ['TC-D15-2', 'TC-D15-3']) {
     const card = cards.split(`### ${id}\n`)[1].split('### ')[0];
     assert.match(card, /없었다면/);
@@ -675,7 +676,7 @@ test('P08: 실수가 없으면 배제·예방 근거로 D15 세 줄을 충족할
 test('P09: D05는 flush의 SQL 발행과 commit의 확정을 구분한다', () => {
   assert.doesNotMatch(page('D05'), /커밋\(flush\)/);
   assert.match(page('D05'), /flush.*SQL.*commit.*확정/);
-  const cards = fs.readFileSync(path.join(ROOT, 'course/talk-cards.md'), 'utf8');
+  const cards = loadCourseSources(ROOT).cards;
   const card = cards.split('### TC-D05-1\n')[1].split('### ')[0];
   assert.match(card, /flush.*rollback/);
   assert.match(card, /별도 연결/);

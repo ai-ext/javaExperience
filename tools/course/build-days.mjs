@@ -1,14 +1,15 @@
-// 일자 페이지 생성기: course/roadmap.json + 정답 커밋 answer(Dnn-m) + course/talk-cards.md + course/hints.json
+// 일자 페이지 생성기: course/days/Dnn.json + _common.json + 정답 커밋 answer(Dnn-m)
 // → course/spring/D00~D15.md, course/spring/README.md
 //
 // - 같은 입력이면 같은 파일을 만든다(시각·환경 값을 쓰지 않는다).
-// - hints.json에 항목이 있는 날만 완성 페이지로 만들고, 없는 날은 "준비 중" 자리표시 페이지로 만든다.
+// - Dnn.json의 hints가 있는 날만 완성 페이지로 만들고, 없는 날은 "준비 중" 자리표시 페이지로 만든다.
 // - 정답 커밋을 하나도 찾지 못하면(얕은 복제·squash 병합) 아무것도 쓰지 않고 끝낸다. 커밋된 페이지의 인라인 정답을 지키기 위해서다.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { loadCourseSources } from './sources.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const HEADER = '<!-- 생성물: tools/course/build-days.mjs가 만든다. 직접 고치지 마라 -->';
@@ -37,7 +38,7 @@ const PHASE = {
 };
 // 티켓 페이지의 "## 원인과 정답" 제목 앵커(사이트 빌드와 같은 slugify)
 const ANSWER_ANCHOR = '원인과-정답';
-// 채점 프롬프트 앞 안내. 템플릿은 hints.json의 graderTemplate(1단계)·graderTemplates.<단계>(2단계·마무리)
+// 채점 프롬프트 앞 안내. 템플릿은 _common.json의 hints 안에 있는 graderTemplate(1단계)·graderTemplates.<단계>(2단계·마무리)
 const GRADER_INTRO = {
   build: '오늘 순서를 다 만들었으면 서버를 띄운 채로 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣는다. 에이전트가 완료 조건·함정·말하기 카드로 채점표를 준다. 코드는 고치지 않는다.',
   maintain: '오늘 티켓을 다 처리했으면 `messy-server`를 띄운 채로 아래 프롬프트를 복사해 `messy-server` 폴더에서 연 Codex 또는 Claude Code에 붙여 넣는다. 에이전트가 완료 조건·함정·티켓 3점 세트(원인 서술·재현 테스트·수정)·말하기 카드로 채점표를 준다. 코드는 고치지 않는다.',
@@ -45,7 +46,7 @@ const GRADER_INTRO = {
 };
 const graderTemplate = (hints, phase) => {
   const t = phase === 'build' ? hints.graderTemplate : hints.graderTemplates?.[phase];
-  if (!t) throw new Error(`hints.json: ${phase} 단계 채점 프롬프트 템플릿이 없다`);
+  if (!t) throw new Error(`_common.json: ${phase} 단계 채점 프롬프트 템플릿이 없다`);
   return t;
 };
 const CIRCLED = ['⓪', '①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
@@ -444,10 +445,10 @@ export function ticketRule(root = ROOT) {
   return `**2단계 티켓 규칙** 필수는 ${ids((t) => t.required)} 4건이다. 선택 1건은 D11을 시작할 때 Security 후보(${ids((t) => t.pool === 'Security')})나 Redis 후보(${ids((t) => t.pool === 'Redis')})에서 골라 끝까지 처리한다. 고도화 E01과 D14 ⑥ 모의 장애 훈련은 모두 한다. 연습 티켓은 나머지 ${meta.filter((t) => ticketKind(t) === '연습').length}건(${ids((t) => ticketKind(t) === '연습')})이다. 연습 티켓과 고르지 않은 선택 후보는 했으면 채점 프롬프트에 알려 채점받고, 하지 않았으면 채점에서 빠진다. 필수·고른 선택·E01·훈련을 하지 않으면 그 항목은 실패다.`;
 }
 
-// 저장소 기준 경로 문서의 제목. 없으면 멈춘다(hints.json의 refs·guides).
+// 저장소 기준 경로 문서의 제목. 없으면 멈춘다(Dnn.json의 hints.refs·guides).
 function docTitle(p, root, dayId) {
   const abs = path.join(root, p);
-  if (!fs.existsSync(abs)) throw new Error(`hints.json: ${dayId} 참고 자료가 없다 → ${p}`);
+  if (!fs.existsSync(abs)) throw new Error(`course/days/${dayId}.json: 참고 자료가 없다 → ${p}`);
   return stripMd(read(abs).match(/^# (.+)$/m)?.[1].trim() ?? path.basename(p));
 }
 
@@ -596,7 +597,7 @@ export function graderPrompt(day, cards, hintsDay, template, root = ROOT) {
   // 2단계: C 항목마다 담당 티켓(고르지 않은 선택 티켓이면 채점에서 뺀다)과 "기록으로 확인"(수정 전 증거) 표시를 붙인다
   const g = hintsDay.grader ?? {};
   const allIds = day.steps.flatMap((s) => s.done.map((_, i) => `C${s.no}-${i + 1}`));
-  for (const id of [...(g.fromRecords ?? []), ...Object.keys(g.itemTickets ?? {})]) if (!allIds.includes(id)) throw new Error(`hints.json: ${day.id} 채점 표시가 없는 항목을 가리킨다 → ${id}`);
+  for (const id of [...(g.fromRecords ?? []), ...Object.keys(g.itemTickets ?? {})]) if (!allIds.includes(id)) throw new Error(`course/days/${day.id}.json: 채점 표시가 없는 항목을 가리킨다 → ${id}`);
   const tagOf = (s, id) => {
     if (day.phase !== 'maintain') return '';
     const ticket = completionTicket(day, s, id, hintsDay);
@@ -659,7 +660,7 @@ function javaSection(java, roadmapJava) {
 function completionTicket(day, step, id, hintsDay) {
   const assignments = hintsDay.grader?.itemTickets ?? {};
   const ticket = id in assignments ? assignments[id] : (step.tickets?.length === 1 ? step.tickets[0] : '');
-  if (ticket && !step.tickets.includes(ticket)) throw new Error(`hints.json: ${day.id} ${id}의 티켓 ${ticket}이 그 순서 티켓이 아니다`);
+  if (ticket && !step.tickets.includes(ticket)) throw new Error(`course/days/${day.id}.json: ${id}의 티켓 ${ticket}이 그 순서 티켓이 아니다`);
   return ticket;
 }
 
@@ -709,7 +710,7 @@ function stepSection(day, s, ctx) {
       lines.push(`**원인과 정답** ${s.tickets.map((t) => `[${t} 티켓 페이지](../tickets/${t}.md#${ANSWER_ANCHOR})`).join(' · ')}의 "원인과 정답" 접기에 있다.${guides.length ? ` 진행 순서와 양식은 ${guides.join(' · ')}에 있다.` : ''}`, '');
     }
     const hints = ctx.hintsDay.steps?.[String(s.no)];
-    if (!hints?.length) throw new Error(`hints.json: ${id} 힌트가 없다`);
+    if (!hints?.length) throw new Error(`course/days/${id.split('-')[0]}.json: 힌트가 없다`);
     lines.push(hintBlock(id, hints), '');
     const observations = ctx.hintsDay.observations?.[String(s.no)];
     if (observations?.length) lines.push(observationBlock(id, observations), '');
@@ -849,7 +850,7 @@ export function renderDay(day, ctx) {
   parts.push('---', '## 말하기 카드', '하루가 끝나면 질문에 "문제 상황 → 원인 → 선택 → 결과" 순서로 소리 내어 답한 뒤, 접힌 "답에 들어가야 할 것"과 비교한다. 세 줄이 모두 나오면 통과다.');
   for (const id of day.talkCards) {
     const card = ctx.cards.get(id);
-    if (!card) throw new Error(`${day.id}: 말하기 카드 ${id}가 talk-cards.md에 없다`);
+    if (!card) throw new Error(`${day.id}: 말하기 카드 ${id}가 course/days/${day.id}.json의 cards에 없다`);
     const link = day.talkCardLinks?.[id];
     if (link) parts.push(`<p class="card-task-link"><a href="#${stepAnchor(day.id, link.step)}">${circled(link.step)} 과제 · ${link.ticket}</a>를 설명하는 카드</p>`);
     parts.push(cardBlock(card));
@@ -939,9 +940,8 @@ export function renderIndex(roadmap, hints) {
 // ---------------------------------------------------------------- 전체 생성
 // 반환: { files: Map(상대 경로 → 내용), skipped: 이유 | null, warnings: [] }
 export function buildAll(root = ROOT) {
-  const roadmap = JSON.parse(read(path.join(root, 'course/roadmap.json')));
-  const hints = JSON.parse(read(path.join(root, 'course/hints.json')));
-  const cards = parseTalkCards(read(path.join(root, 'course/talk-cards.md')));
+  const { roadmap, hints, cards: cardsText } = loadCourseSources(root);
+  const cards = parseTalkCards(cardsText);
   const specSections = parseSpecSections(read(path.join(root, 'course/spec-v2.md')));
   const commits = listAnswerCommits(root);
   if (!commits.length) return { files: new Map(), skipped: 'answer(Dnn-m) 정답 커밋을 찾지 못했다(얕은 복제 또는 squash 병합). 커밋된 일자 페이지를 그대로 둔다.', warnings: [] };

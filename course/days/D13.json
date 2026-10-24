@@ -1,0 +1,237 @@
+{
+  "id": "D13",
+  "roadmap": {
+    "id": "D13",
+    "phase": "maintain",
+    "title": "티켓 처리 2",
+    "note": "① 필수 B03부터 한다. D12에서 고친 두 실패 증상에 같은 키 동시 주문 테스트를 더해 마친다. ②~⑤ B07·B09·B10·B06은 연습 티켓으로, 처리한 것만 채점받는다. 오늘의 Java J13은 모두 한다.",
+    "java": "J13",
+    "steps": [
+      {
+        "no": 1,
+        "title": "B03 \"예외를 잡았는데도 구매가 롤백된다 / 안 된다\": 같은 키 동시 주문까지 검증",
+        "files": [
+          "src/main/java/com/example/board/shop/OrderService.java",
+          "src/main/java/com/example/board/shop/ThanksCouponService.java",
+          "src/test/java/com/example/board/shop/OrderRollbackTest.java"
+        ],
+        "done": [
+          "`OrderRollbackTest` 통과: D12의 두 실패 증상과 같은 키 동시 주문을 함께 검증한다",
+          "같은 회원·같은 키로 동시에 주문해도 두 요청은 201이고 주문·재고·잔액은 한 번만 반영된다"
+        ],
+        "trap": "순차 요청만 확인하면 같은 키를 동시에 보냈을 때의 주문·재고·잔액을 검증하지 못한다.",
+        "specRefs": [
+          "POST /api/shop/orders"
+        ],
+        "tickets": [
+          "B03"
+        ],
+        "fileActions": {
+          "create": [],
+          "modify": [
+            "src/main/java/com/example/board/shop/OrderService.java",
+            "src/main/java/com/example/board/shop/ThanksCouponService.java",
+            "src/test/java/com/example/board/shop/OrderRollbackTest.java"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 2,
+        "title": "B07 \"선착순 쿠폰을 동시에 받을 때 가끔 실패한다\": `SHOW ENGINE INNODB STATUS` 읽기",
+        "files": [
+          "src/main/java/com/example/board/coupon/CouponService.java",
+          "src/main/java/com/example/board/coupon/MemberCouponRepository.java"
+        ],
+        "done": [
+          "`SHOW ENGINE INNODB STATUS`에서 500이 난 순간의 기록을 찾아 근거로 남긴다",
+          "동시 쿠폰 발급 20건이 모두 201 또는 정해진 409로 끝나고 500이 없음을 재현 테스트로 고정"
+        ],
+        "trap": "500을 일시적인 DB 오류로 넘기면, 그 500을 만든 오류 코드와 DB 진단 기록을 확인하지 않은 채로 남는다.",
+        "specRefs": [
+          "POST /api/coupons/{couponId}/issue"
+        ],
+        "tickets": [
+          "B07"
+        ],
+        "fileActions": {
+          "create": [],
+          "modify": [
+            "src/main/java/com/example/board/coupon/CouponService.java",
+            "src/main/java/com/example/board/coupon/MemberCouponRepository.java"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 3,
+        "title": "B09 \"자정 전후 출석 포인트가 두 번 쌓인다\": `Clock`을 고정한 재현 테스트",
+        "files": [
+          "src/main/java/com/example/board/point/AttendanceService.java",
+          "src/test/java/com/example/board/point/AttendanceServiceTest.java"
+        ],
+        "done": [
+          "`AttendanceServiceTest` 통과: `Clock`은 운영 서버와 같은 시간대 설정을 유지하고 시각만 바꾼다. 같은 KST 날짜 반복은 1회, KST 08:59:59→09:00:00은 같은 날 1회, KST 23:59:59→다음 날 00:00:00은 날마다 1회 적립한다(고치기 전 경계 테스트 실패)",
+          "`GET /api/me/points/history`에 출석 적립이 하루 1건"
+        ],
+        "trap": "로컬 PC에서 자정 무렵 직접 눌러 보면 재현되지 않으므로, 운영 서버와 같은 조건을 테스트에서 시계로 고정한다.",
+        "specRefs": [
+          "GET /api/me/points/history"
+        ],
+        "tickets": [
+          "B09"
+        ],
+        "fileActions": {
+          "create": [
+            "src/test/java/com/example/board/point/AttendanceServiceTest.java"
+          ],
+          "modify": [
+            "src/main/java/com/example/board/point/AttendanceService.java"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 4,
+        "title": "B10 \"포인트 충전이 가끔 두 번 된다\": 연계 로그와 WireMock으로 재현",
+        "files": [
+          "src/main/java/com/example/board/payment/ChargeService.java"
+        ],
+        "done": [
+          "`pg_payment`에서 같은 충전 요청에 승인 2건을 확인",
+          "재현 테스트 통과: WireMock 첫 응답이 늦어도 PG 승인 1건, 포인트 1회"
+        ],
+        "trap": "증상이 가끔이라 숫자 설정만 바꿔 드물게 만들면, 같은 충전이 두 번 승인되는 경우는 그대로 남는다.",
+        "specRefs": [
+          "POST /api/me/points/charges"
+        ],
+        "tickets": [
+          "B10"
+        ],
+        "fileActions": {
+          "create": [],
+          "modify": [
+            "src/main/java/com/example/board/payment/ChargeService.java"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 5,
+        "title": "B06 \"컬럼 하나 추가했더니 상점 전체가 멈췄다\": `SHOW PROCESSLIST`로 멈춘 세션 찾기",
+        "files": [
+          "src/main/java/com/example/board/shop/OrderNotifier.java",
+          "src/main/java/com/example/board/shop/ShopController.java"
+        ],
+        "done": [
+          "`SHOW PROCESSLIST`와 `information_schema.innodb_trx`로 상점이 멈춘 동안 세션마다의 상태를 떠서 근거로 남긴다",
+          "고친 뒤 첫 주문이 느린 알림을 기다리는 동안 ALTER 뒤에 보낸 다른 회원의 주문이 곧바로 반영된다: 재현 테스트 통과 기록으로 확인한다. 보조로 고친 뒤 `bash tickets/B06/repro.sh` 출력에서 `SHOW PROCESSLIST`에 `Waiting for table metadata lock` 줄이 보이지 않고 `ALTER 끝`과 A·B 주문 201이 찍힌 것을 남긴다(두 주문 모두 알림 응답을 기다리므로 201이 찍히는 순서는 보지 않는다)"
+        ],
+        "trap": "ALTER 자체가 느리다고 오진하기 쉽지만, 멈춘 동안 ALTER와 다른 세션의 상태를 먼저 본다.",
+        "specRefs": [
+          "POST /api/shop/orders"
+        ],
+        "tickets": [
+          "B06"
+        ],
+        "fileActions": {
+          "create": [],
+          "modify": [
+            "src/main/java/com/example/board/shop/OrderNotifier.java",
+            "src/main/java/com/example/board/shop/ShopController.java"
+          ],
+          "inspect": []
+        }
+      }
+    ],
+    "talkCards": [
+      "TC-D13-1",
+      "TC-D13-2",
+      "TC-D13-3",
+      "TC-D13-4"
+    ],
+    "tomorrow": "D14는 Security·Redis 선택 후보 티켓(B12·B13·B15·B16)과 고도화 E01, 모두가 하는 모의 장애 훈련을 진행한다.",
+    "purpose": "구매의 남은 필수 검증을 마치고, 선택한 연습은 관찰 근거가 필요한 순서부터 진행한다.",
+    "talkCardLinks": {
+      "TC-D13-1": {
+        "step": 5,
+        "ticket": "B06"
+      },
+      "TC-D13-2": {
+        "step": 2,
+        "ticket": "B07"
+      },
+      "TC-D13-3": {
+        "step": 3,
+        "ticket": "B09"
+      },
+      "TC-D13-4": {
+        "step": 4,
+        "ticket": "B10"
+      }
+    }
+  },
+  "java": {
+    "id": "J13",
+    "day": "D13",
+    "optional": false,
+    "topic": "리팩터링 ③: 조건문을 전략으로 바꾸기 — 쿠폰 종류별 `if-else` 할인 계산을 `DiscountPolicy` 구현으로 옮긴다. `record`의 compact 생성자로 쿠폰 코드를 정규화·검증한다",
+    "basics": "정책 목록을 stream으로 돌며 적용 가능한 정책 중 할인액이 가장 큰 것을 고르기",
+    "typeCut": "`record`: 불변 데이터 운반 객체, 압축 생성자 검증 — DTO와 값 객체",
+    "habit": null
+  },
+  "hints": {
+    "steps": {
+      "1": [
+        "D12의 두 실패 증상 테스트를 유지하고, 같은 회원·같은 키 주문 두 건을 `CountDownLatch`로 동시에 출발시킨다. 응답 두 개와 주문 행 수·재고·잔액을 따로 단언하고, 티켓 페이지의 확인 테스트 세 경우와 대조한다."
+      ],
+      "2": [
+        "500 응답의 서버 로그에서 SQL 오류 코드를 먼저 확인하고, `SHOW ENGINE INNODB STATUS`의 `LATEST DETECTED DEADLOCK`에서 두 트랜잭션이 각각 쥔 락(`HOLDS THE LOCK(S)`)과 기다린 락(`WAITING FOR THIS LOCK TO BE GRANTED`)을 표로 옮긴다. 그 쿼리가 `CouponService`·`MemberCouponRepository`의 어느 메서드인지 짝짓는다."
+      ],
+      "3": [
+        "운영 로그 시각과 적립 기록의 날짜를 나란히 놓고 몇 시간 어긋나는지 본다. 테스트 시계는 `Clock`을 상속한 가변 시계를 `@Primary`로 두고 영역은 운영과 같은 `ZoneOffset.UTC`로 유지한다. 시각만 바꿔 같은 KST 날짜 반복(1회), KST 08:59:59→09:00:00(UTC 자정, 1회), KST 23:59:59→다음 날 00:00:00(날마다 1회)을 각각 단언한다. 시계 영역을 KST로 바꾸면 결함이 가려진다."
+      ],
+      "4": [
+        "`pg_payment`에서 같은 충전 요청의 행을 찾고, WireMock `/__admin/requests`에서 그 시각의 승인 요청이 몇 번, 어떤 헤더로 왔는지 맞춰 본다. 재현은 WireMock 시나리오(상태 있는 스텁)로 첫 응답만 늦춘다."
+      ],
+      "5": [
+        "ALTER가 멈춘 동안 다른 세션에서 `SHOW PROCESSLIST`를 떠서 `State`별로 줄을 세우고, `information_schema.innodb_trx`에서 가장 오래 열린 트랜잭션의 `trx_started`와 그 스레드가 실행한 쿼리를 찾는다. 그 트랜잭션이 서버 코드의 어디에서 열렸는지 따라간다."
+      ]
+    },
+    "grader": {
+      "focus": [
+        "원인 서술에 `SHOW PROCESSLIST`·`SHOW ENGINE INNODB STATUS`·로그 시각·`pg_payment` 같은 관찰 근거가 붙어 있는지",
+        "동시성·시각 재현 테스트가 우연에 기대지 않고(고정 `Clock`, 한꺼번에 출발시키는 래치, 상태 있는 WireMock 스텁) 매번 같은 결과를 내는지"
+      ],
+      "fromRecords": [
+        "C2-1",
+        "C4-1",
+        "C5-1",
+        "C5-2"
+      ]
+    },
+    "refs": [
+      "docs/knowledge/P18-concurrency-inventory.md",
+      "docs/knowledge/S08-transactions.md",
+      "docs/knowledge/W20-time-timezone.md",
+      "docs/knowledge/P25-external-api-client.md"
+    ],
+    "sql": {
+      "context": "messy-server DB(13311)의 실제 스키마와 티켓 재현 자료를 쓴다. 1단계 seed.sql·bulk.sql은 적재하지 않는다. 읽기 전용 진단 SQL·관찰 시각·실제 결과만 남긴다. 관찰 결과가 0행이어도 원인이나 정상 여부를 단정하지 않는다. 예시 SQL은 기존 서버 설계 기준이다.",
+      "questions": [
+        {
+          "task": "재현 중 DB의 대기 관계와 최근 엔진 진단 기록을 조회한다.",
+          "expect": "관찰한 식별 값·시각·출력을 그대로 저장한다. 행이 없으면 그 사실을 적고 원인으로 단정하지 않는다.",
+          "example": "SELECT * FROM performance_schema.data_lock_waits;\nSHOW ENGINE INNODB STATUS;"
+        },
+        {
+          "task": "주문 요청별 데이터 건수와 회원별 잔액·이력 합을 대조한다.",
+          "expect": "중복 또는 차이의 유무를 SQL 결과로 남긴다. 결과를 맞추려고 데이터를 수정하지 않는다.",
+          "example": "SELECT member_id,idempotency_key,COUNT(*) FROM shop_order GROUP BY member_id,idempotency_key HAVING COUNT(*)>1;\nSELECT m.id,m.point_balance,COALESCE(SUM(l.amount),0) AS ledger_sum FROM member m LEFT JOIN point_ledger l ON l.member_id=m.id GROUP BY m.id,m.point_balance HAVING m.point_balance<>ledger_sum;"
+        }
+      ],
+      "refs": []
+    }
+  },
+  "cards": "## D13 티켓 처리 2\n\n### TC-D13-1\n**질문** (D13 ⑤ · B06) \"컬럼 하나 추가했더니 상점 전체가 멈췄다.\" ALTER 한 줄이 왜 서비스를 멈췄나요?\n**답에 들어가야 할 것**\n- 커밋하지 않은 긴 트랜잭션이 그 테이블의 메타데이터 락(MDL)을 쥐고 있어, ALTER가 MDL을 얻지 못하고 기다렸다\n- 대기 중인 ALTER 뒤로 같은 테이블의 일반 쿼리까지 줄줄이 막혀 상점 전체가 멈췄다\n- `SHOW PROCESSLIST`의 `Waiting for table metadata lock`과 `information_schema.innodb_trx`로 오래된 트랜잭션을 찾고, DDL 세션에는 짧은 `lock_wait_timeout`을 걸어 무한 대기를 막는다\n**근거** 07 #1\n\n### TC-D13-2\n**질문** (D13 ② · B07) \"선착순 쿠폰을 동시에 받을 때 가끔 실패한다.\" 실패 원인이 무엇이었나요?\n**답에 들어가야 할 것**\n- REPEATABLE READ에서 `SELECT ... FOR UPDATE`로 없는 행을 확인하면, 결과가 없어도 그 구간에 gap lock이 걸린다\n- gap lock끼리는 충돌하지 않아 두 트랜잭션이 같은 구간을 잡는다. A는 쿠폰 행 락을 쥔 채 발급 행 INSERT(insert intention)가 B의 gap lock에 막히고, B는 A가 쥔 쿠폰 행 락을 기다려 순환 대기(데드락)가 된다\n- `SHOW ENGINE INNODB STATUS`의 `LATEST DETECTED DEADLOCK`에서 두 트랜잭션의 락을 읽고, 중복 확인용 `FOR UPDATE`를 빼고 UNIQUE 제약과 중복 키 처리로 바꾼다\n**근거** 07 #2\n\n### TC-D13-3\n**질문** (D13 ③ · B09) \"자정 전후 출석 포인트가 두 번 쌓인다.\" 원인과 재현 방법은?\n**답에 들어가야 할 것**\n- 출석 날짜를 `LocalDate.now(clock)`으로 구했는데 주입된 시계가 `Clock.systemUTC()`라 날짜가 UTC 기준으로 잘렸다. KST 08:59:59와 09:00:00(UTC 자정)이 다른 날이 되어 같은 KST 날짜에 두 번 적립됐다\n- 반대로 KST 23:59:59와 다음 날 00:00:00은 UTC로 같은 날이라 다음 날 첫 출석이 거절됐다. (회원, 날짜) UNIQUE는 같은 날짜 값의 중복만 막으므로 날짜 값 자체가 틀린 것은 막지 못한다\n- 업무 기준 시간대를 코드에 명시하고(`LocalDate.ofInstant(clock.instant(), ZoneId.of(\"Asia/Seoul\"))`), 영역은 UTC 그대로 시각만 바꾸는 가변 시계로 KST 08:59:59/09:00:00과 23:59:59/00:00:00을 고정한 테스트를 쓴다\n**근거** 08 #10\n\n### TC-D13-4\n**질문** (D13 ④ · B10) \"포인트 충전이 가끔 두 번 된다.\" 원인이 무엇이었나요?\n**답에 들어가야 할 것**\n- PG 응답 타임아웃 뒤 재시도가 새 멱등 키(`UUID.randomUUID()`)로 새 승인 요청을 보냈고, PG는 응답만 늦었을 뿐 첫 요청도 이미 승인했다\n- 새 키 = 새 `pg_payment` 행이라 행마다 \"한 번만 적립\"은 지켜져도 두 행이 각각 적립됐다. `idempotency_key` UNIQUE는 같은 키만 막으므로 새로 만든 키는 막지 못한다\n- 응답 타임아웃은 다시 보내지 않고 결과 불명(UNKNOWN)으로 남겨 콜백·재처리(`reconcile`)로 확정한다(다시 보내야 하면 같은 키로). WireMock 시나리오로 첫 응답만 늦춰 \"PG가 받은 서로 다른 키 1개, 충전 원장 1건\"을 테스트로 고정한다\n**근거** 10 §8, 10 §10\n\n"
+}

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadCourseSources, checkSourceBundles } from './sources.mjs';
 
 const FORBIDDEN = [/Docker Desktop/, /studymate/i, /3주 만에 3~6년차/];
 const CARD_RE = /^TC-D\d{2}-\d$/;
@@ -216,30 +217,33 @@ function cli() {
   const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'course');
   const errs = [];
   const courseFiles = {};
+  const bundles = new Set(['roadmap.json', 'hints.json', 'talk-cards.md']);
   if (fs.existsSync(dir)) {
-    for (const f of fs.readdirSync(dir)) if (/\.(md|json)$/.test(f)) courseFiles[f] = fs.readFileSync(path.join(dir, f), 'utf8');
+    for (const f of fs.readdirSync(dir)) if (/\.(md|json)$/.test(f) && !bundles.has(f)) courseFiles[f] = fs.readFileSync(path.join(dir, f), 'utf8');
   }
-  for (const f of ['spec-v2.md', 'roadmap.json', 'talk-cards.md']) if (!(f in courseFiles)) errs.push(`course/${f} 파일이 없다`);
+  if (!('spec-v2.md' in courseFiles)) errs.push('course/spec-v2.md 파일이 없다');
+  let data;
+  try {
+    data = loadCourseSources(path.dirname(dir));
+    for (const rel of checkSourceBundles(path.dirname(dir))) errs.push(`${rel}: 생성물이 날짜 원본과 다르다. 직접 고치지 말고 tools/site에서 npm run build를 실행한다`);
+  } catch (e) { errs.push(`course/days 원본 오류: ${e.message}`); }
   let result = errs;
   if (!errs.length) {
-    let roadmap;
-    try { roadmap = JSON.parse(courseFiles['roadmap.json']); } catch (e) { errs.push(`course/roadmap.json 파싱 실패: ${e.message}`); }
-    if (roadmap) {
-      const pages = readTextFiles(path.join(dir, 'spring'), /\.md$/);
-      // 금지어 검사는 일자 페이지·출발 자료까지 넓힌다
-      const extraFiles = {};
-      for (const [sub, re] of [['spring', /\.(md|html)$/], ['start', /\.(md|html|json|yaml|yml)$/]]) {
-        for (const [f, text] of Object.entries(readTextFiles(path.join(dir, sub), re))) extraFiles[`${sub}/${f}`] = text;
-      }
-      result = [
-        ...validate({ spec: courseFiles['spec-v2.md'], roadmap, cards: courseFiles['talk-cards.md'], courseFiles: { ...courseFiles, ...extraFiles } }),
-        ...validateDayPages({ roadmap, pages }),
-        ...validateSql({roadmap,hints:JSON.parse(courseFiles['hints.json'])}),
-      ];
-      if (!result.length) {
-        console.log(`course OK: ${parseSpecEndpoints(courseFiles['spec-v2.md']).length} endpoints, ${roadmap.days.length} days, ${parseTalkCardIds(courseFiles['talk-cards.md']).length} cards, ${Object.keys(pages).length} day pages`);
-        return;
-      }
+    const { roadmap, hints, cards } = data;
+    const pages = readTextFiles(path.join(dir, 'spring'), /\.md$/);
+    // 금지어 검사는 일자 페이지·출발 자료까지 넓힌다
+    const extraFiles = {};
+    for (const [sub, re] of [['spring', /\.(md|html)$/], ['start', /\.(md|html|json|yaml|yml)$/]]) {
+      for (const [f, text] of Object.entries(readTextFiles(path.join(dir, sub), re))) extraFiles[`${sub}/${f}`] = text;
+    }
+    result = [
+      ...validate({ spec: courseFiles['spec-v2.md'], roadmap, cards, courseFiles: { ...courseFiles, ...extraFiles, 'days/roadmap': JSON.stringify(roadmap), 'days/hints': JSON.stringify(hints), 'days/cards': cards } }),
+      ...validateDayPages({ roadmap, pages }),
+      ...validateSql({roadmap,hints}),
+    ];
+    if (!result.length) {
+      console.log(`course OK: ${parseSpecEndpoints(courseFiles['spec-v2.md']).length} endpoints, ${roadmap.days.length} days, ${parseTalkCardIds(cards).length} cards, ${Object.keys(pages).length} day pages`);
+      return;
     }
   }
   for (const e of result) console.log(e);

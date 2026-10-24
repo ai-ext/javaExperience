@@ -1,3 +1,4 @@
+import { loadCourseSources } from '../course/sources.mjs';
 // 과정 v2 화면 검사 — 일자 페이지 배치·진도 체크, 홈의 "오늘 할 일", 과정 지도의 관계. npm run build 뒤에 실행한다.
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -118,7 +119,7 @@ await test('이 날 데이터: 원본 날짜 집합·본문·버튼·복사·Blo
 });
 
 await test('길찾기: Java·티켓 머리와 끝은 roadmap의 일자·순서로 복귀한다', () => {
-  const roadmap = JSON.parse(fs.readFileSync(new URL('course/roadmap.json', root), 'utf8'));
+  const roadmap = loadCourseSources(rootPath).roadmap;
   const files = ['java', 'tickets'].flatMap((folder) => fs.readdirSync(new URL(`course/${folder}/`, root)).filter((f) => /^(?:J\d{2}|[BE]\d{2}|drill)\.md$/.test(f)).map((f) => `course/${folder}/${f}`));
   for (const file of files) {
     const id = file.split('/').at(-1).replace('.md', '');
@@ -755,8 +756,8 @@ for (const day of course.days) {
     assert.doesNotMatch(header, /수정 뒤/, `${id}: 머리 주석은 수정 후 해법 대신 재현 관찰만 싣는다`);
   }
   // 4-2) 2단계·마무리 일자 페이지: 자리표시가 없고, 순서마다 닫힌 힌트가 있고, 티켓 순서는 티켓 페이지 "원인과 정답" 절로 잇는다.
-  // hints.json에서 온 문장(힌트·리뷰 초점)도, 접기 밖에 보이는 글 전체도 그날 티켓의 원인 핵심어를 쓰지 않는다.
-  const hintsData = JSON.parse(fs.readFileSync(new URL('course/hints.json', root), 'utf8'));
+  // 날짜 원본 hints에서 온 문장(힌트·리뷰 초점)도, 접기 밖에 보이는 글 전체도 그날 티켓의 원인 핵심어를 쓰지 않는다.
+  const hintsData = loadCourseSources(rootPath).hints;
   const visibleLeaks = [];
   // 일자 페이지 접기 밖에만 더 거는 핵심어. 티켓 페이지에서는 힌트 제목(어디를 볼지)에 쓰여 causeTerms에 넣지 않는다(예: B07 "데드락 기록을 읽는다").
   const dayCauseTerms = { B01: ['Hikari'], B04: ['생성자 주입'], B05: ['지역 변수'], B07: ['데드락'], B10: ['Idempotency-Key'], B12: ['preflight', '인증 필터'], B15: ['옛 값'] };
@@ -904,7 +905,7 @@ for (const day of course.days) {
 console.log(`과정 화면: 일자 ${course.days.length}쪽 배치·진도 체크·저장 실패, 홈 오늘 할 일·15일 진도·진입, 지도 노드 ${mapNodes(course).length}·간선 ${course.edges.length} 검사 통과`);
 
 await test('매일 SQL: 전 일자 과제·기대 성질은 보이고 예시 SQL과 설계 흐름은 닫힌 접기에 있다', () => {
-  const hints = JSON.parse(fs.readFileSync(new URL('course/hints.json', root), 'utf8'));
+  const hints = loadCourseSources(rootPath).hints;
   for (const day of course.days.filter(d => d.id !== 'D00')) {
     const doc = new JSDOM(fs.readFileSync(new URL(day.page, root), 'utf8')).window.document;
     const section = doc.querySelector('.day-sql');
@@ -931,7 +932,7 @@ await test('매일 SQL: 전 일자 과제·기대 성질은 보이고 예시 SQL
 });
 
 await test('API 층은 순서별 독립 사실 칸에 있고 D04 가이드는 첫 순서보다 앞에 있다', async () => {
-  const roadmap = JSON.parse(fs.readFileSync(new URL('course/roadmap.json', root), 'utf8'));
+  const roadmap = loadCourseSources(rootPath).roadmap;
   for (const day of roadmap.days) {
     const page = await open(`course/spring/${day.id}.html`);
     for (const step of day.steps) {

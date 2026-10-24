@@ -1,0 +1,244 @@
+{
+  "id": "D02",
+  "roadmap": {
+    "id": "D02",
+    "phase": "build",
+    "title": "공통 기반",
+    "java": "J02",
+    "steps": [
+      {
+        "no": 1,
+        "title": "공통 에러 체계: `ErrorCode`, `BusinessException`, ProblemDetail을 만드는 전역 예외 처리기",
+        "files": [
+          "src/main/java/com/example/board/common/ErrorCode.java",
+          "src/main/java/com/example/board/common/BusinessException.java",
+          "src/main/java/com/example/board/common/GlobalExceptionHandler.java"
+        ],
+        "done": [
+          "`GET /api/unknown` → 404 `application/problem+json`, `instance` = `/api/unknown`",
+          "`GlobalExceptionHandlerTest` 통과: `BusinessException(ErrorCode.NOT_FOUND)` → 404 `type` `/errors/not-found`",
+          "`GET /actuator/health` → 200"
+        ],
+        "trap": "`IllegalArgumentException`을 전부 400으로 바꾸면 서버 코드의 버그까지 클라이언트 잘못으로 보고돼 장애가 숨는다.",
+        "specRefs": [
+          "GET /actuator/health"
+        ],
+        "tickets": [],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/common/ErrorCode.java",
+            "src/main/java/com/example/board/common/BusinessException.java",
+            "src/main/java/com/example/board/common/GlobalExceptionHandler.java"
+          ],
+          "modify": [],
+          "inspect": []
+        }
+      },
+      {
+        "no": 2,
+        "title": "`BaseEntity`(생성·수정 시각 Auditing)와 Testcontainers MySQL 문자셋 고정(utf8mb4)",
+        "files": [
+          "src/main/java/com/example/board/common/BaseEntity.java",
+          "src/main/java/com/example/board/config/JpaConfig.java",
+          "src/test/java/com/example/board/TestcontainersConfig.java"
+        ],
+        "done": [
+          "`JpaAuditingTest` 통과: `@EnableJpaAuditing`이 켜져 있고 `BaseEntity`에 감사 리스너가 달려 있다",
+          "`GET /actuator/health` → 200 (`@EnableJpaAuditing` 포함)"
+        ],
+        "trap": "`@EnableJpaAuditing`을 빠뜨리면 생성 시각 값이 null로 들어가 NOT NULL 제약 위반이 난다.",
+        "specRefs": [
+          "GET /actuator/health"
+        ],
+        "tickets": [],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/common/BaseEntity.java",
+            "src/main/java/com/example/board/config/JpaConfig.java"
+          ],
+          "modify": [
+            "src/test/java/com/example/board/TestcontainersConfig.java"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 3,
+        "title": "흩어진 설정을 `@ConfigurationProperties` 하나로 묶기 (`board.*`)",
+        "files": [
+          "src/main/java/com/example/board/config/BoardProperties.java",
+          "src/main/resources/application.yml"
+        ],
+        "done": [
+          "`BoardPropertiesTest` 통과: `board.forbidden-words.*` 값이 객체로 바인딩된다",
+          "필수 값을 비우면 `@Validated` 때문에 기동이 실패한다",
+          "정상 값으로 기동하면 `GET /actuator/health` → 200"
+        ],
+        "trap": "기본값을 붙인 `@Value(\"${...:기본값}\")`로 여러 클래스에서 읽으면 키 오타가 기동 때 잡히지 않고 기본값으로 조용히 넘어간다.",
+        "specRefs": [
+          "GET /actuator/health"
+        ],
+        "tickets": [],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/config/BoardProperties.java"
+          ],
+          "modify": [
+            "src/main/resources/application.yml"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 4,
+        "title": "금칙어 검사기는 빈으로, 닉네임 정규화는 static 유틸로 나누기",
+        "files": [
+          "src/main/java/com/example/board/common/ForbiddenWordChecker.java",
+          "src/main/java/com/example/board/common/NicknameNormalizer.java"
+        ],
+        "done": [
+          "`ForbiddenWordCheckerTest` 통과",
+          "`NicknameNormalizerTest` 통과: 앞뒤 공백 제거·소문자화",
+          "`ForbiddenWordChecker`에 요청마다 바뀌는 필드가 없다(리뷰 체크)"
+        ],
+        "trap": "싱글톤 빈인 검사기에 `lastMatched` 같은 상태 필드를 두면 동시 요청끼리 값이 섞인다. 선택 관찰: 후보 0/2개의 주입 실패와 prototype·request 대상 ID를 힌트에서 비교한다. 오늘은 선택 실험 중 하나만 골라도 되며 필수 채점에는 추가하지 않는다.",
+        "specRefs": [
+          "GET /actuator/health"
+        ],
+        "tickets": [],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/common/ForbiddenWordChecker.java",
+            "src/main/java/com/example/board/common/NicknameNormalizer.java"
+          ],
+          "modify": [],
+          "inspect": []
+        }
+      },
+      {
+        "no": 5,
+        "title": "기동 준비 뒤 금칙어·공통코드를 JdbcClient로 메모리에 적재하기 — 데이터 요구사항 §6-1을 만족하도록 테이블을 직접 설계·생성",
+        "files": [
+          "src/main/java/com/example/board/common/ForbiddenWordLoader.java",
+          "src/main/java/com/example/board/common/CommonCodeRegistry.java",
+          "src/main/resources/schema.sql"
+        ],
+        "done": [
+          "기동 로그에서 `Started BoardApplication` 다음에 `금칙어 N건, 공통코드 M건 적재`",
+          "금칙어 데이터를 추가하고 재기동하면 적재 건수가 늘어난다",
+          "`GET /actuator/health` → 200",
+          "설계 메모: 만든 테이블·키·제약·인덱스와 각각의 이유, 고려했다 버린 대안 1개를 기록한다.",
+          "DB 불변식 확인: 같은 금칙어와 같은 그룹·코드의 중복 INSERT가 거부된다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다."
+        ],
+        "trap": "`@PostConstruct`는 빈 하나가 초기화되는 시점이라 트랜잭션 프록시나 다른 빈이 아직 준비되지 않았을 수 있으므로, 애플리케이션 준비가 끝난 `ApplicationReadyEvent`에서 적재한다. 선택 관찰: 테스트 컨텍스트에서 초기화·종료 콜백과 prototype 정리 책임을 기록한다. 오늘은 선택 실험 중 하나만 골라도 되며 필수 채점에는 추가하지 않는다.",
+        "specRefs": [
+          "GET /actuator/health"
+        ],
+        "tickets": [],
+        "dataRefs": [
+          "6-1"
+        ],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/common/ForbiddenWordLoader.java",
+            "src/main/java/com/example/board/common/CommonCodeRegistry.java"
+          ],
+          "modify": [
+            "src/main/resources/schema.sql"
+          ],
+          "inspect": []
+        }
+      }
+    ],
+    "talkCards": [
+      "TC-D02-1",
+      "TC-D02-2",
+      "TC-D02-3",
+      "TC-D02-4",
+      "TC-D02-5"
+    ],
+    "tomorrow": "D03은 오늘 만든 `ErrorCode`·`GlobalExceptionHandler`로 401·403·409를 ProblemDetail로 내고, `BaseEntity`를 `Member`가 처음 상속한다.",
+    "purpose": "뒤의 API가 같은 예외 응답·설정·감사 시각을 쓰도록 공통 기반을 준비한다."
+  },
+  "java": {
+    "id": "J02",
+    "day": "D02",
+    "optional": false,
+    "topic": "static과 인스턴스, 상속, 예외 계층, 제네릭 클래스: `BusinessException` 계층과 성공 값·에러 코드를 담는 제네릭 `Result<T>` (명세 v2에는 응답 래퍼가 없으므로 `ApiResponse<T>` 대신 쓴다)",
+    "basics": "글 목록의 좋아요 수 단순 합계(for와 stream 두 가지), 쉼표로 이어진 태그 문자열을 `split`·`strip`으로 나누기",
+    "typeCut": "`long` vs `Long`: 엔티티 id는 왜 `Long`인가(null이면 아직 저장 전) — BaseEntity, JPA의 신규·기존 판단",
+    "habit": "Lombok이 만드는 코드: `@Getter`·`@RequiredArgsConstructor`·`@Builder`가 생성하는 코드를 직접 확인하고, 엔티티에서 `@AllArgsConstructor`·`@Setter`를 피하는 이유"
+  },
+  "hints": {
+    "steps": {
+      "1": [
+        "`@RestControllerAdvice`와 Spring의 `ProblemDetail`(`ProblemDetail.forStatusAndDetail`)을 찾아본다. 응답 `Content-Type`이 `application/problem+json`인지 curl `-i`로 확인한다.",
+        "없는 경로 404를 처리기에서 받으려면 `NoResourceFoundException`이 어디서 던져지는지 본다."
+      ],
+      "2": [
+        "`@MappedSuperclass`, `@EntityListeners(AuditingEntityListener.class)`, `@CreatedDate`·`@LastModifiedDate`, 그리고 이를 켜는 설정 어노테이션을 찾아본다.",
+        "Testcontainers는 `@ServiceConnection`으로 datasource를 자동 연결한다. 컨테이너가 안 뜨면 `docker ps`와 Colima 상태부터 본다."
+      ],
+      "3": [
+        "`@ConfigurationProperties(prefix = \"board\")`를 record로 만들고 `@Validated`와 `@NotBlank`·`@NotEmpty`로 필수 값을 표시한다. 등록은 `@ConfigurationPropertiesScan`을 찾아본다.",
+        "바인딩이 안 되면 yml 키의 kebab-case(`forbidden-words`)와 필드 이름(camelCase)이 relaxed binding으로 이어지는지 확인한다."
+      ],
+      "4": [
+        "Spring 싱글톤 빈은 기본적으로 하나의 객체를 여러 요청 스레드가 공유한다. 요청 A의 값을 필드에 쓰면 요청 B가 같은 필드를 읽거나 덮을 수 있다. 요청별 값은 지역 변수·인자·반환값으로 두고, 스레드와 공유 상태는 J07에서 자세히 실습한다. 검사기는 `@Component`로 등록하고 생성자 주입으로 설정 값을 받는다. 요청마다 달라지는 값은 필드가 아니라 지역 변수와 반환값으로만 다룬다.",
+        "정규화처럼 상태도 의존도 없는 계산은 `private` 생성자를 둔 `final` 클래스의 static 메서드로 둔다."
+      ],
+      "5": [
+        "`@EventListener(ApplicationReadyEvent.class)`와 Spring 6.1의 `JdbcClient`(`sql(...).query(...)`)를 찾아본다.",
+        "적재 로그 순서는 기동 로그에서 `Started BoardApplication` 줄과 비교한다. 테이블이 없다는 오류면 `schema.sql`의 `CREATE TABLE IF NOT EXISTS`를 확인한다."
+      ]
+    },
+    "grader": {
+      "focus": [
+        "모든 오류 응답이 같은 ProblemDetail 형식(`type`·`title`·`status`·`detail`·`instance`)으로 나가는지",
+        "서버 버그(NPE 등)가 4xx로 바뀌어 숨지 않고 500으로 남는지"
+      ]
+    },
+    "refs": [
+      "scenario/ch10-project/10-2-common-response.md",
+      "docs/knowledge/W08-where-to-handle-exceptions.md",
+      "docs/knowledge/P11-bean-registration-di.md",
+      "docs/knowledge/P29-static-complete.md",
+      "scenario/ch13-operations/13-4-banned-words.md"
+    ],
+    "observations": {
+      "4": [
+        {
+          "text": "선택 관찰 A(10분, C02): 업무 코드는 그대로 두고 학습자 서버의 src/test에 작은 AnnotationConfigApplicationContext를 만든다. 같은 Probe 인터페이스의 구현을 0개/1개/2개 등록하고, 생성자 인자가 Probe인 소비자 빈을 등록한 뒤 refresh한다. 0개는 UnsatisfiedDependencyException의 cause에서 NoSuchBeanDefinitionException, 2개는 NoUniqueBeanDefinitionException과 후보 이름을 기록한다. 1개는 실제 호출 결과를 확인한다. 2개 중 하나를 @Primary 또는 @Qualifier로 선택한 변형도 비교한다. 제출: 후보 이름·예외 cause·선택된 구현 표. 구현 개수가 아니라 필수 주입점의 후보 수를 진단한다.",
+          "required": false
+        },
+        {
+          "text": "선택 관찰 B(10분, C04): 별도 테스트 구성에서 UUID id()를 가진 prototype을 singleton 소비자에 직접 주입한 경우와 ObjectProvider.getObject()로 두 번 얻은 경우를 비교한다. 전자는 같은 필드 객체, 후자는 다른 대상 ID가 나오는지 확인한다. request scope는 @RequestScope 프록시를 주입한 테스트 전용 HTTP 경로에서 대상의 id()를 두 번 반환하게 해 요청 내 같음/두 요청 간 다름을 확인한다. 프록시 identity가 아니라 메서드가 반환한 대상 ID를 기록한다. 각 요청이 끝날 때 대상의 @PreDestroy 호출도 기록한다. 요청 없는 테스트 스레드에서 호출한 ScopeNotActiveException도 기록한다. request scope가 비동기 문맥 전달이나 동시성 안전을 보장하는지는 별도 문제다.",
+          "required": false
+        }
+      ],
+      "5": [
+        {
+          "text": "선택 관찰 C(10분, C03·C04): 별도 테스트 빈 하나에 생성자, 의존성 setter(@Autowired), @PostConstruct, InitializingBean.afterPropertiesSet, @Bean(initMethod=\"init\", destroyMethod=\"shutdown\"), @PreDestroy, DisposableBean.destroy를 각각 다른 메서드로 두고 리스트에 호출명을 쌓는다. AnnotationConfigApplicationContext.refresh 후 close 전후를 비교한다. 기대 순서는 생성자 → 의존성 설정 → @PostConstruct → afterPropertiesSet → init, 정상 close에는 @PreDestroy → destroy → shutdown이다. prototype 변형은 getBean을 두 번 호출해 초기화가 두 번이며 close만으로 종료 콜백이 자동 실행되지 않음을 확인하고, 사용자가 자원을 정리할 책임을 적는다. 서로 다른 빈 전체의 초기화 순서나 강제 종료까지 보장한다고 일반화하지 않는다.",
+          "required": false
+        }
+      ]
+    },
+    "sql": {
+      "context": "내 프로젝트 DB에서 오늘까지 만든 테이블을 쓴다. seed.sql의 D02까지 필요한 블록을 순서대로 붙여 넣는다. 이름이 다르면 INSERT·UPDATE·조회 이름을 바꾼다. 별도 실험 데이터에서 SQL·실제 결과를 저장한다.",
+      "questions": [
+        {
+          "task": "seed.sql의 D02 기준 데이터 블록을 붙여 넣고 금칙어·공통코드를 각각 센다.",
+          "expect": "seed D02 기준 3건·5건이다. 앱이 같은 기준 데이터를 먼저 넣었다면 중복 적재하지 말고 기존 내용을 대조한다.",
+          "example": "SELECT COUNT(*) FROM banned_word;\nSELECT COUNT(*) FROM common_code;"
+        },
+        {
+          "task": "같은 금칙어와 같은 그룹의 같은 코드 INSERT를 각각 시도한다.",
+          "expect": "seed D02 기준 두 중복은 DB에서 거부되고 3건·5건 그대로다. 별도 실험에서 수행 후 ROLLBACK한다.",
+          "example": "START TRANSACTION;\nINSERT INTO banned_word(word) SELECT word FROM banned_word LIMIT 1;\n-- 위 문장이 중복으로 실패한 뒤 별도로 실행\nROLLBACK;\nSTART TRANSACTION;\nINSERT INTO common_code(group_code,code,name) SELECT group_code,code,name FROM common_code LIMIT 1;\nROLLBACK;"
+        }
+      ],
+      "refs": []
+    }
+  },
+  "cards": "## D02 공통 기반\n\n### TC-D02-1\n**질문** 금칙어 목록을 DB에서 읽어 메모리에 올리는 코드를 `@PostConstruct`가 아니라 `ApplicationReadyEvent`에 둔 이유는?\n**답에 들어가야 할 것**\n- `@PostConstruct`는 빈 하나를 초기화하는 도중에 실행되므로, 그 시점에는 다른 빈이나 트랜잭션 프록시가 아직 준비되지 않았을 수 있다\n- `@PostConstruct` 안에서 같은 클래스의 `@Transactional` 메서드를 불러도 프록시를 거치지 않아 트랜잭션이 걸리지 않는다\n- `ApplicationReadyEvent`는 컨텍스트 refresh와 runner 실행이 끝난 뒤 발행되므로 기동 후 적재는 여기나 `ApplicationRunner`에 둔다\n**근거** 06 §14\n\n### TC-D02-2\n**질문** 금칙어 검사기에 마지막 검사 결과를 담는 필드 `lastMatched`를 두자는 코드가 올라왔습니다. 리뷰에서 뭐라고 하나요?\n**답에 들어가야 할 것**\n- Spring 빈의 기본 스코프는 singleton이라 모든 요청 스레드가 같은 인스턴스를 공유한다\n- 요청마다 바뀌는 값을 인스턴스 필드에 쓰면 동시 요청끼리 덮어써 다른 사용자의 값이 섞인다\n- 요청별 값은 지역 변수·인자·반환값으로 다루고, 필드에는 `final` 의존성과 불변 설정만 둔다\n**근거** 06 §1\n\n### TC-D02-3\n**질문** 닉네임 정규화 함수는 static 유틸로, 금칙어 검사기는 빈으로 만들었습니다. 무엇을 기준으로 나눴나요?\n**답에 들어가야 할 것**\n- 입력만 받아 결과를 돌려주고 외부 자원이 없는 순수 함수는 static 유틸로 둔다\n- DB·설정·다른 빈에 의존하거나 트랜잭션·AOP가 필요한 것은 빈으로 만들어 주입받는다\n- 빈은 생성자 주입으로 테스트 대역을 넣을 수 있지만, static 호출은 대역으로 바꾸기 어렵다\n**근거** 06 §1\n\n### TC-D02-4\n**질문** 전역 예외 처리기에서 `IllegalArgumentException`을 전부 400으로 바꾸자는 제안이 있습니다. 어떻게 답하나요?\n**답에 들어가야 할 것**\n- `IllegalArgumentException`은 서버 버그에서도 나므로, 일괄 400으로 바꾸면 서버 결함이 클라이언트 잘못으로 보이고 5xx 지표에서 사라진다\n- 클라이언트 잘못이 명백한 경우만 도메인 예외로 정의해 4xx로 매핑하고, 예상하지 못한 예외는 500으로 둔다\n- 모든 에러는 ProblemDetail(`application/problem+json`)로 내고, 클라이언트는 `type`으로 분기한다\n**근거** 06 §10, spec-v2 §2\n\n### TC-D02-5\n**질문** 여러 클래스에서 `@Value`로 읽던 금칙어 설정을 `@ConfigurationProperties` 하나로 묶었습니다. 무엇이 좋아졌나요?\n**답에 들어가야 할 것**\n- 관련 설정이 한 타입에 모이고, `@Validated`를 붙이면 잘못된 값이 기동 시점에 실패한다\n- relaxed binding으로 kebab-case, camelCase, 환경 변수 표기를 모두 받는다\n- `@Value`는 relaxed binding이 제한적이라, 키를 정규형(kebab-case)으로 쓰지 않으면 다른 표기의 값을 못 찾을 수 있다\n**근거** 06 §14\n\n"
+}

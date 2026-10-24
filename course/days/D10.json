@@ -1,0 +1,290 @@
+{
+  "id": "D10",
+  "roadmap": {
+    "id": "D10",
+    "phase": "build",
+    "title": "관리자 · AOP · 테스트",
+    "java": "J10",
+    "steps": [
+      {
+        "no": 1,
+        "title": "신고 정보와 신고 서비스 설계 — 데이터 요구사항 §6-8을 만족하도록 테이블을 직접 설계·생성",
+        "files": [
+          "src/main/java/com/example/board/admin/Report.java",
+          "src/main/java/com/example/board/admin/ReportService.java",
+          "src/main/resources/schema.sql",
+          "src/main/java/com/example/board/admin/ReportRepository.java"
+        ],
+        "done": [
+          "`ReportServiceTest` 통과: 같은 회원이 같은 글을 다시 신고하면 `/errors/duplicate` 예외",
+          "설계 메모: 만든 테이블·키·제약·인덱스와 각각의 이유, 고려했다 버린 대안 1개를 기록한다.",
+          "DB 불변식 확인: 같은 회원·같은 글 신고의 두 번째 INSERT와 존재하지 않는 대상 참조를 거부한다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다."
+        ],
+        "trap": "서비스 테스트에서 저장소까지 전부 목으로 바꾸면 UNIQUE 제약 위반 같은 DB 동작을 확인하지 못한다.",
+        "specRefs": [
+          "POST /api/posts/{postId}/reports"
+        ],
+        "tickets": [],
+        "dataRefs": [
+          "6-8"
+        ],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/admin/Report.java",
+            "src/main/java/com/example/board/admin/ReportService.java",
+            "src/main/java/com/example/board/admin/ReportRepository.java"
+          ],
+          "modify": [
+            "src/main/resources/schema.sql"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 2,
+        "title": "신고 API와 관리자 신고 목록·글 숨김 (`SecurityConfig`에 `@EnableMethodSecurity`, `AdminService`에 `@PreAuthorize`)",
+        "files": [
+          "src/main/java/com/example/board/admin/ReportController.java",
+          "src/main/java/com/example/board/admin/AdminService.java",
+          "src/main/java/com/example/board/admin/AdminController.java",
+          "src/main/java/com/example/board/config/SecurityConfig.java"
+        ],
+        "done": [
+          "`POST /api/posts/{postId}/reports` → 201, 다시 → 409",
+          "ADMIN 토큰으로 `GET /api/admin/reports` → 200, USER 토큰 → 403",
+          "`POST /api/admin/posts/{postId}/hide` → 200, 이후 `GET /api/posts/{postId}` → 404, 연결한 신고는 `RESOLVED`, 인기글에서도 바로 빠진다"
+        ],
+        "trap": "같은 클래스 안에서 `@PreAuthorize` 메서드를 부르면 프록시를 거치지 않아 USER도 통과한다.",
+        "specRefs": [
+          "POST /api/posts/{postId}/reports",
+          "GET /api/admin/reports",
+          "POST /api/admin/posts/{postId}/hide"
+        ],
+        "tickets": [],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/admin/ReportController.java",
+            "src/main/java/com/example/board/admin/AdminService.java",
+            "src/main/java/com/example/board/admin/AdminController.java"
+          ],
+          "modify": [
+            "src/main/java/com/example/board/config/SecurityConfig.java"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 3,
+        "title": "감사 기록과 표시 애노테이션 설계 — 데이터 요구사항 §6-8을 만족하도록 테이블을 직접 설계·생성",
+        "files": [
+          "src/main/java/com/example/board/admin/AuditLog.java",
+          "src/main/java/com/example/board/admin/Audited.java",
+          "src/main/resources/schema.sql",
+          "src/main/java/com/example/board/admin/AuditLogRepository.java"
+        ],
+        "done": [
+          "`AuditLogRepositoryTest` 통과: 저장과 커서 조회만 있고 수정·삭제 메서드가 없다",
+          "설계 메모: 만든 테이블·키·제약·인덱스와 각각의 이유, 고려했다 버린 대안 1개를 기록한다.",
+          "DB 불변식 확인: 감사 기록 수정·삭제를 저장소·권한 정책으로 막고 대상 변경 뒤에도 기록이 남음을 테스트한다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다."
+        ],
+        "trap": "감사 로그를 업무와 같은 트랜잭션에 쓰면 업무가 롤백될 때 \"시도했다\"는 기록까지 함께 사라진다.",
+        "specRefs": [
+          "GET /api/admin/audit-logs"
+        ],
+        "tickets": [],
+        "dataRefs": [
+          "6-8"
+        ],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/admin/AuditLog.java",
+            "src/main/java/com/example/board/admin/Audited.java",
+            "src/main/java/com/example/board/admin/AuditLogRepository.java"
+          ],
+          "modify": [
+            "src/main/resources/schema.sql"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 4,
+        "title": "감사 로그 AOP와 감사 로그 조회 API",
+        "files": [
+          "src/main/java/com/example/board/admin/AuditLogAspect.java",
+          "src/main/java/com/example/board/admin/AdminController.java"
+        ],
+        "done": [
+          "`POST /api/admin/posts/{postId}/hide` 뒤 `GET /api/admin/audit-logs` → 200, `action` = `HIDE_POST` 1건",
+          "USER 토큰으로 `GET /api/admin/audit-logs` → 403"
+        ],
+        "trap": "같은 클래스 안 호출이나 `private` 메서드에 `@Audited`를 붙이면 프록시를 거치지 않아 감사 로그가 남지 않는다.",
+        "specRefs": [
+          "GET /api/admin/audit-logs",
+          "POST /api/admin/posts/{postId}/hide"
+        ],
+        "tickets": [],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/admin/AuditLogAspect.java"
+          ],
+          "modify": [
+            "src/main/java/com/example/board/admin/AdminController.java"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 5,
+        "title": "쿠폰 대량 지급: 엑셀 업로드를 행 단위로 처리 (`build.gradle`에 Apache POI, `AdminController`에 multipart 추가)",
+        "files": [
+          "build.gradle",
+          "src/main/java/com/example/board/admin/ExcelMemberIdReader.java",
+          "src/main/java/com/example/board/admin/CouponBulkIssueService.java",
+          "src/main/java/com/example/board/member/MemberRepository.java",
+          "src/main/java/com/example/board/admin/AdminController.java"
+        ],
+        "done": [
+          "`POST /api/admin/coupons/{couponId}/bulk-issue` (`.xlsx` 1,000행) → 200 `{issued, skipped[]}`",
+          "없는 회원·이미 보유한 행은 `skipped[]`에 들어가고 나머지는 지급된다",
+          "6MB 파일 → 400, USER 토큰 → 403",
+          "`GET /api/admin/audit-logs`에 `BULK_ISSUE_COUPON` 1건"
+        ],
+        "trap": "1,000행을 트랜잭션 하나로 묶으면 한 행의 실패로 전체가 롤백된다.",
+        "specRefs": [
+          "POST /api/admin/coupons/{couponId}/bulk-issue",
+          "GET /api/admin/audit-logs"
+        ],
+        "tickets": [],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/admin/ExcelMemberIdReader.java",
+            "src/main/java/com/example/board/admin/CouponBulkIssueService.java"
+          ],
+          "modify": [
+            "build.gradle",
+            "src/main/java/com/example/board/member/MemberRepository.java",
+            "src/main/java/com/example/board/admin/AdminController.java"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 6,
+        "title": "관리자 권한 슬라이스 테스트와 신고→숨김→감사 로그 통합 테스트",
+        "files": [
+          "src/test/java/com/example/board/admin/AdminControllerTest.java",
+          "src/test/java/com/example/board/admin/AdminFlowIntegrationTest.java"
+        ],
+        "done": [
+          "`AdminControllerTest` 통과 (`@WebMvcTest`: USER 토큰으로 `GET /api/admin/reports` → 403)",
+          "`AdminFlowIntegrationTest` 통과 (Testcontainers MySQL, 테스트 메서드에 `@Transactional` 없이 신고 → 숨김 → 감사 로그)",
+          "내 서버의 스레드 덤프·메트릭·slow log·EXPLAIN ANALYZE를 한 번씩 관찰하고 각각 해석 한 문장과 로컬 임시 설정 복원 기록을 제출한다"
+        ],
+        "trap": "테스트에 `@Transactional`을 붙이면 영속성 컨텍스트가 테스트 끝까지 열려 있어 운영에서 나는 `LazyInitializationException`이 숨는다.",
+        "specRefs": [
+          "GET /api/admin/reports",
+          "POST /api/admin/posts/{postId}/hide"
+        ],
+        "tickets": [],
+        "fileActions": {
+          "create": [
+            "src/test/java/com/example/board/admin/AdminControllerTest.java",
+            "src/test/java/com/example/board/admin/AdminFlowIntegrationTest.java"
+          ],
+          "modify": [],
+          "inspect": []
+        }
+      }
+    ],
+    "talkCards": [
+      "TC-D10-1",
+      "TC-D10-2",
+      "TC-D10-3",
+      "TC-D10-4",
+      "TC-D10-5"
+    ],
+    "tomorrow": "오늘로 인증·게시판·상점·외부 결제·Redis·관리자 기능을 갖춘 1단계 서버를 완성했다. D11부터는 내 프로젝트를 이어 고치는 대신, 구현 예시를 바탕으로 결함을 심은 별도 인수인계 서버 `messy-server/`를 받는다. 작업 폴더·DB(13310 → 13311)·기준 테스트가 바뀌므로 D11의 준비 절차를 먼저 따른다.",
+    "purpose": "관리자 권한·감사·일괄 지급까지 연결해 1단계 서버를 완성하고 진단 관찰을 준비한다."
+  },
+  "java": {
+    "id": "J10",
+    "day": "D10",
+    "optional": false,
+    "topic": "어노테이션과 리플렉션, JDK 동적 프록시: 어노테이션이 붙은 메서드만 실행 시간을 로깅하는 프록시를 직접 만들고(AOP의 원리), 같은 객체 안에서 호출하면 프록시를 거치지 않는 것을 테스트로 확인",
+    "basics": "감사 로그 목록에서 `action`별 건수를 집계해 불변 `Map`으로 반환",
+    "typeCut": "`final`·`var`·`static final` 상수 — 설정 상수, 불변 필드",
+    "habit": null
+  },
+  "hints": {
+    "steps": {
+      "1": [
+        "이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 필요한 데이터의 관계와 제약을 정해 테이블을 만든다 → 업무 검증과 트랜잭션 경계를 연결한다. 앞서 만든 층은 재사용하고 이 순서에서 바꾸는 부분만 진행한다.",
+        "같은 회원의 같은 글 신고가 동시에 들어오면 앱 조회가 충분한지 고민한다. Testcontainers MySQL에서 실제 거부 결과를 확인한다."
+      ],
+      "2": [
+        "이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 기존 테이블과 제약을 확인한다 → 업무 검증과 트랜잭션 경계를 연결한다 → DTO와 응답 계약을 연결해 호출로 확인한다. 앞서 만든 층은 재사용하고 이 순서에서 바꾸는 부분만 진행한다.",
+        "`@EnableMethodSecurity`와 `@PreAuthorize`의 `hasRole` 표현식을 찾아본다. 숨김 뒤 인기글 캐시가 바로 빠지는지는 D09의 커밋 후 이벤트로 연결한다.",
+        "USER가 통과하면 `@PreAuthorize` 메서드를 같은 클래스 안에서 부르고 있지 않은지 본다."
+      ],
+      "3": [
+        "이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 이미 만든 층은 재사용하고 오늘 담당 파일만 연결한다.",
+        "`@Target(ElementType.METHOD)`·`@Retention(RetentionPolicy.RUNTIME)`으로 표시 애노테이션을 만든다. 저장소는 `Repository` 인터페이스를 직접 상속해 필요한 메서드만 연다."
+      ],
+      "4": [
+        "`@Aspect`·`@Around`와 애노테이션을 대상으로 잡는 `@annotation(...)` 포인트컷, `ProceedingJoinPoint`를 찾아본다. 감사 로그 저장을 업무 트랜잭션과 나눌지는 `Propagation` 값으로 정한다.",
+        "로그가 안 남으면 대상 메서드가 public이고 다른 빈에서 불리는지(프록시를 거치는지) 확인한다."
+      ],
+      "5": [
+        "이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 기존 테이블과 제약을 확인한다 → 필요한 저장·조회 조건을 저장소에서 먼저 확인한다 → 업무 검증과 트랜잭션 경계를 연결한다 → DTO와 응답 계약을 연결해 호출로 확인한다. 앞서 만든 층은 재사용하고 이 순서에서 바꾸는 부분만 진행한다.",
+        "Apache POI의 `XSSFWorkbook`·`Sheet`·`Row`·`Cell`과 `spring.servlet.multipart.max-file-size`를 찾아본다.",
+        "행 하나의 실패가 전체를 롤백하지 않도록 행 단위 처리 경계를 정하고, 건너뛴 행은 이유와 함께 모은다."
+      ],
+      "6": [
+        "슬라이스 테스트는 `@WebMvcTest`에 `@Import`로 보안 설정을 넣고 서비스는 `@MockitoBean`으로 바꾼다. 토큰은 테스트용 `JwtProvider`로 만든다.",
+        "통합 테스트에서 지연 로딩 예외가 숨지 않게 테스트 메서드에는 `@Transactional`을 붙이지 않는다. 롤백되지 않으므로 테스트마다 새 회원·글을 만들어 서로 겹치지 않게 한다."
+      ]
+    },
+    "grader": {
+      "focus": [
+        "관리자 API가 URL 규칙(`/api/admin/**`)과 메서드 보안 두 겹으로 막히는지",
+        "통합 테스트 메서드에 `@Transactional`이 붙어 있지 않은지",
+        "진단 도구 예행 관찰의 스레드·메트릭·slow log·EXPLAIN ANALYZE 증거와 해석 및 설정 복원 기록을 확인한다"
+      ]
+    },
+    "refs": [
+      "scenario/ch13-operations/13-1-roles-and-hide.md",
+      "scenario/ch13-operations/13-2-report-handling.md",
+      "docs/knowledge/S02-aop-proxy.md",
+      "docs/knowledge/S18-spring-testing.md",
+      "docs/knowledge/P17-file-upload-storage.md",
+      "scenario/ch7-tests/7-1-controller-slice.md"
+    ],
+    "sql": {
+      "context": "원래 seed DB에서 D10 신고·감사 블록까지 넣는다. 이름이 다르면 INSERT·UPDATE·조회 이름을 바꾼다. SQL·실제 결과를 저장한다.",
+      "questions": [
+        {
+          "task": "글별 신고 누적과 미처리 건수를 구한다.",
+          "expect": "seed D10 기준 신고 대상 글 2·3 각각 3건(OPEN 2건)이다. 결과 2행, 전체 합계 6, OPEN 합계 4다.",
+          "example": "SELECT post_id,COUNT(*) AS total,SUM(status='OPEN') AS open_count FROM report GROUP BY post_id;"
+        },
+        {
+          "task": "관리자 동작별 감사 건수와 최신 기록 20건을 조회한다.",
+          "expect": "seed D10 기준 BULK_ISSUE_COUPON 3건, 최신 목록도 3건이다(LIMIT 20의 상한 이내). 대상의 공개 여부와 무관하게 기록을 읽을 수 있다.",
+          "example": "SELECT action,COUNT(*) FROM audit_log GROUP BY action;\nSELECT id,actor_id,action,target_type,target_id,created_at FROM audit_log ORDER BY id DESC LIMIT 20;"
+        }
+      ],
+      "refs": []
+    },
+    "diagnostics": {
+      "intro": "1단계 내 서버에서 정상 요청 한 번을 관찰한다. 결함을 추측하기보다 도구가 무엇을 보여 주는지 기록하고 D12 B01·B02에서 같은 관찰법을 다시 쓴다.",
+      "tasks": [
+        "스레드 덤프: 같은 JDK의 `jcmd -l`로 내 서버 PID를 확인하고 `jcmd <PID> Thread.print > threads.txt`를 실행한다. `http-nio` 요청 스레드 하나의 이름·상태·스택을 골라 지금 실행 중인지 대기 중인지 한 문장으로 적는다.",
+        "메트릭: 내 서버의 로컬 프로필에서만 Actuator의 web exposure에 `health,metrics`를 임시로 넣고 로컬 접근 권한을 허용한다. `curl http://localhost:8080/actuator/metrics`와 `/actuator/metrics/http.server.requests`를 요청 전후 비교한다. 인증이 필요하면 관리자 자격으로 요청한다. count·단위·증가량을 기록하고 노출·보안 설정은 관찰 뒤 원래대로 되돌린다.",
+        "slow log: 내 로컬 disposable MySQL에서 `SHOW VARIABLES LIKE 'slow_query_log'`와 `SHOW VARIABLES LIKE 'long_query_time'`, `SHOW VARIABLES LIKE 'log_output'` 값을 먼저 저장한다. 관리자 연결에서 `SET GLOBAL log_output='TABLE'; SET GLOBAL slow_query_log=ON;` 후 관찰 연결에서 `SET SESSION long_query_time=0;`으로 두고 내 목록 SELECT를 한 번 실행한다. 관리자 연결에서 `SELECT start_time,query_time,rows_examined,sql_text FROM mysql.slow_log ORDER BY start_time DESC LIMIT 5;`로 대상 쿼리를 찾는다. 종료 후 GLOBAL 두 설정과 log_output을 기존 값으로 되돌리고 관찰 연결을 닫는다. 공유·운영 DB에서는 실행하지 않는다.",
+        "실행 계획: 같은 목록 SELECT 앞에 `EXPLAIN ANALYZE`를 붙인다(조회가 실제 실행된다). 실제 행 수·loops·시간을 읽고 slow log의 읽은 행 수와 함께 한 문장으로 해석한다. 측정값을 기록하며 빠르다는 결론을 미리 정하지 않는다."
+      ]
+    }
+  },
+  "cards": "## D10 관리자 · AOP · 테스트\n\n### TC-D10-1\n**질문** `AdminService`의 한 메서드가 같은 클래스의 `@PreAuthorize(\"hasRole('ADMIN')\")` 메서드를 부르는데, USER도 통과합니다. 왜 그런가요?\n**답에 들어가야 할 것**\n- `@PreAuthorize`, `@Transactional`, 감사 로그 AOP는 프록시로 들어온 호출에만 적용되고, `this`로 부른 내부 호출은 프록시를 거치지 않는다\n- `@PreAuthorize`는 `@EnableMethodSecurity`를 켜야 동작하므로, 붙였는데 아무도 막지 않으면 이것부터 확인한다\n- 보호할 메서드는 바깥에서 직접 부르는 진입점에 두거나 별도 빈으로 빼고, URL 규칙(`/api/admin/**`는 ADMIN)을 첫 방어선으로 함께 둔다\n**근거** 06 §7, 06 §6\n\n### TC-D10-2\n**질문** 서비스 테스트에 `@Transactional`을 붙였더니 통과했는데, 운영에서는 `LazyInitializationException`이 났습니다. 왜 그런가요?\n**답에 들어가야 할 것**\n- 테스트의 `@Transactional`은 테스트 메서드 전체를 한 트랜잭션으로 감싸고 끝에 롤백한다\n- 그래서 서비스에 `@Transactional`이 빠져 있어도 테스트에서는 영속성 컨텍스트가 열려 있어 지연 로딩과 변경 감지가 동작한다\n- 서비스 동작을 검증하는 통합 테스트는 테스트 트랜잭션 없이 돌리고, 데이터는 테스트가 끝난 뒤 직접 정리한다\n**근거** 06 §11\n\n### TC-D10-3\n**질문** 감사 로그를 서비스 코드에 직접 쓰지 않고 AOP로 뺐습니다. 감사 로그가 남지 않는 경우는 언제인가요?\n**답에 들어가야 할 것**\n- 대상 메서드가 같은 클래스 안에서 호출되거나 `private`·`final`이면 프록시가 가로채지 못해 남지 않는다\n- 감사 로그를 업무 트랜잭션 안에서 쓰면 업무가 롤백될 때 로그도 함께 사라진다. 실패한 시도까지 남기려면 별도 빈의 `REQUIRES_NEW` 트랜잭션으로 쓴다\n- 기록할 값(`actor_id`, `action`, `target_type`, `target_id`)은 메서드 인자와 `SecurityContext`에서 얻는다\n**근거** 06 §7, 05 §3-1, spec-v2 §6\n\n### TC-D10-4\n**질문** 1,000행 엑셀로 쿠폰을 대량 지급하다 한 행이 실패하면 어떻게 되나요?\n**답에 들어가야 할 것**\n- 명세는 부분 성공이다. 없는 회원이나 이미 보유한 행은 건너뛰고 `{issued, skipped[]}`로 알린다\n- 한 트랜잭션에서 행마다 중복 키 예외를 잡고 계속해도 JPA에서는 그 트랜잭션을 살려 쓸 수 없어(rollback-only 표시 또는 flush 시점 실패) 전체가 롤백된다\n- 그래서 대량 지급 메서드에는 `@Transactional`을 두지 않고 행마다 짧은 트랜잭션(`CouponService.issue`)으로 지급한다. 중복(UNIQUE)·소진은 그 행만 건너뛰므로 같은 파일을 다시 올려도 중복 지급되지 않는다\n**근거** spec-v2 §5-6, 06 §7\n\n### TC-D10-5\n**질문** \"신고 목록은 ADMIN만\" 규칙을 어떤 테스트로 고정했나요?\n**답에 들어가야 할 것**\n- 토큰 없음(401), USER(403), ADMIN(200) 세 경우를 모두 보낸다. 성공 한 경우만 보면 규칙이 열려 있어도 통과한다\n- 테스트 컨텍스트에 실제 `SecurityFilterChain`과 JWT 필터가 올라와 있는지 확인한다. 보안 설정이 빠진 테스트는 아무것도 검증하지 않는다\n- `@WithMockUser`는 `SecurityContext`를 직접 채우므로 JWT 파싱 경로는 검증되지 않는다. JWT 필터는 실제 토큰으로 따로 확인한다\n**근거** 06 §6, 06 §11\n\n"
+}

@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { JSDOM } from 'jsdom';
 import { loadFlows, renderDayFlow, renderDayTicketLinks } from './course-flow.mjs';
+import { loadCourseSources } from '../course/sources.mjs';
 
 const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const PHASE = { warmup: '선택 · Java 워밍업', build: '1단계 · 빈 프로젝트로 서버 만들기', maintain: '2단계 · 어수선한 서버 넘겨받기', wrap: '마무리 · 설명 세션' };
@@ -32,7 +33,7 @@ const inline = (markdown) => esc(markdown).replace(/`([^`]+)`/g, '<code>$1</code
 export function loadCourse(root) {
   const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
   const exists = (p) => fs.existsSync(path.join(root, p));
-  const roadmap = JSON.parse(read('course/roadmap.json'));
+  const { roadmap } = loadCourseSources(root);
   const meta = JSON.parse(read('course/map-tickets.json'));
   const h1 = (p) => (exists(p) ? read(p).match(/^# (.+)$/m)?.[1].replace(/[`*]/g, '').trim() : null);
   const java = roadmap.java.map((j) => {
@@ -69,7 +70,7 @@ export function loadCourse(root) {
   for (const t of tickets) if (t.day) add(t.day, t.id, 'ticket');
   for (const t of tickets) for (const a of t.areas) add(t.id, a, 'area');
   const ticketIds = new Set(tickets.map((t) => t.id));
-  for (const e of edges) if (e.kind === 'ticket' && !ticketIds.has(e.to)) throw new Error(`roadmap.json의 티켓 ${e.to}가 map-tickets.json에 없다`);
+  for (const e of edges) if (e.kind === 'ticket' && !ticketIds.has(e.to)) throw new Error(`course/days/의 티켓 ${e.to}가 map-tickets.json에 없다`);
   const course = { days, java, tickets, areas: meta.areas, edges, exists };
   // 흐름 재생 데이터(course/flows/*.json). 일자 페이지 [오늘 흐름]과 티켓 페이지 [장애 흐름]이 쓴다.
   course.flows = loadFlows(root, course);
