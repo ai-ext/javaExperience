@@ -126,24 +126,27 @@ class PostLikeApiTest extends ApiTestSupport {
         for (int i = 0; i < 10; i++) {
             members.add(newMember(Role.USER));
         }
-        members.forEach(m -> {
-            try {
-                putStatus(postId, m);
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
-            }
-        });
+        for (Member m : members) {
+            assertThat(putStatus(postId, m)).isEqualTo(204);
+        }
         List<Task> tasks = new ArrayList<>();
         for (Member m : members) {
-            tasks.add(() -> mockMvc.perform(delete("/api/posts/{id}/like", postId).header("Authorization", bearer(m)))
-                    .andReturn().getResponse().getStatus());
+            tasks.add(() -> putStatus(postId, m));
             tasks.add(() -> mockMvc.perform(delete("/api/posts/{id}/like", postId).header("Authorization", bearer(m)))
                     .andReturn().getResponse().getStatus());
         }
 
-        assertThat(runConcurrently(tasks)).containsOnly(204);
-        assertThat(likeRows(postId)).isZero();
-        assertThat(likeCount(postId)).isZero();
+        assertThat(runConcurrently(tasks)).hasSize(20).containsOnly(204);
+        // 같은 회원의 PUT/DELETE 중 마지막으로 처리된 요청에 따라 0건 또는 1건이다.
+        // 실행 순서를 가정하지 않고 관계의 멱등성과 집계 카운트의 일치를 검사한다.
+        for (Member m : members) {
+            int rows = jdbc.queryForObject("SELECT COUNT(*) FROM post_like WHERE post_id = ? AND member_id = ?",
+                    Integer.class, postId, m.getId());
+            assertThat(rows).isBetween(0, 1);
+        }
+        int rows = likeRows(postId);
+        assertThat(rows).isBetween(0, members.size());
+        assertThat(likeCount(postId)).isEqualTo(rows);
     }
 
     interface Task {
