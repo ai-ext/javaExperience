@@ -204,6 +204,41 @@ public static List&lt;Attendance&gt; firstPerKstDay(List&lt;Attendance&gt; recor
 <h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2>
 <pre><code class="language-bash">./gradlew :java-track:test --tests 'J09*'</code></pre>
 <p>19개가 모두 <code>PASSED</code>면 끝이다.</p>
+<h2 id="선택-관찰-금액과-시각의-저장-정밀도-10분"><a class="anchor" href="#선택-관찰-금액과-시각의-저장-정밀도-10분" aria-hidden="true">#</a>선택 관찰: 금액과 시각의 저장 정밀도 (10분)</h2>
+<p>시간대와 정밀도는 서로 다른 경계다. Clock을 고정해도 DB가 나노초를 모두 저장한다는 뜻은 아니다. D08에서 금액을 다뤘으므로, 오늘은 <strong>선택</strong>으로 문자열 금액 → Java 정책 → DB 재조회 경계를 확인한다. 오늘 시간이 없으면 J14의 선택 BigDecimal 과제 뒤에 돌아온다. 기존 19개 필수 테스트와 30~60분 분량에는 넣지 않는다.</p>
+<p>채울 파일은 <code>java-track/src/main/java/com/example/javatrack/j09/DecimalAmount.java</code>다. 이 작은 실험은 부호를 허용하는 <code>DECIMAL(5,2)</code>를 사용한다. 기존 상점의 정수 포인트·원화 API 계약을 바꾸는 과제가 아니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>입력·관찰</th>
+<th>이 실험의 계약</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>forStorage(&quot;1.005&quot;)</code>, <code>forStorage(&quot;-1.005&quot;)</code></td>
+<td>문자열로 만들고 scale 2, HALF_UP → <code>1.01</code>, <code>-1.01</code></td>
+</tr>
+<tr>
+<td><code>forStorage(&quot;1.0&quot;)</code></td>
+<td>저장 표현은 <code>1.00</code>. <code>equals(1.0)</code>은 false, <code>compareTo(1.0)</code>은 0</td>
+</tr>
+<tr>
+<td><code>999.994</code>, <code>999.995</code></td>
+<td>반올림 <strong>뒤</strong> 범위 검사: <code>999.99</code> 허용, <code>1000.00</code>은 IllegalArgumentException</td>
+</tr>
+<tr>
+<td><code>exact(&quot;1.230&quot;)</code>, <code>exact(&quot;1.231&quot;)</code></td>
+<td>scale 2로 손실 없이 표현. 앞은 허용, 뒤는 ArithmeticException</td>
+</tr>
+<tr>
+<td><code>new BigDecimal(0.1)</code>과 문자열 <code>&quot;0.1&quot;</code></td>
+<td>이진 부동소수점에서 넘어온 값과 정확한 십진수의 차이 비교</td>
+</tr>
+</tbody></table></div>
+<pre><code class="language-bash">./gradlew :java-track:optionalTest --tests 'J09DecimalAmountTest'</code></pre>
+<p><code>J09DecimalAmountTest</code> 5개를 통과시킨다. 기존 <code>check</code>는 선택 과제까지 정답 통과·뼈대 의도 실패를 검사한다. DB 없이 실행하는 이 테스트는 <strong>실제 MySQL 왕복을 증명하지 않는다</strong>.</p>
+<p>DB까지 확인하려면 <a href="../spring/D09.html">D09 ① 힌트</a>의 선택 관찰로 이어 간다. 같은 연결의 임시 <code>DECIMAL(5,2)</code>·<code>DATETIME(6)</code> 테이블에서 금액을 <code>setBigDecimal/getBigDecimal</code>로 왕복하고, <code>Clock.fixed</code>의 같은 순간을 UTC/서울로 표시한다. 나노초는 마이크로초로 명시적으로 줄인 뒤 비교한다. 제출 표는 <code>입력 → Java 값/scale → JDBC 바인딩 → DB 재조회 → 값·정밀도 비교</code>다. 실제 쿼리 결과와 실행하지 않은 예상값을 구분한다.</p>
+<p>금액 정답은 아래 접기 안에서 확인한다.</p>
 <h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2>
 <details>
 <summary>펼치기</summary>
@@ -271,6 +306,35 @@ public static Instant fromKstLocalDateTime(LocalDateTime kstDateTime) {
 public static String toOffsetString(Instant instant) {
     // OffsetDateTime.toString()은 초가 0이면 &quot;09:30+09:00&quot;처럼 초를 뺀다. 형식을 고정하려고 포매터를 쓴다
     return instant.atZone(KST).toOffsetDateTime().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+}</code></pre>
+<p>선택 금액 실험 정답:</p>
+<pre><code class="language-java">package com.example.javatrack.j09;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
+/** 선택: DECIMAL(5,2)에 넣기 전 명시적으로 적용하는 실험용 정책. */
+public final class DecimalAmount {
+    private static final BigDecimal MAX = new BigDecimal(&quot;999.99&quot;);
+
+    private DecimalAmount() {
+    }
+
+    public static BigDecimal forStorage(String text) {
+        return withinRange(new BigDecimal(text).setScale(2, RoundingMode.HALF_UP));
+    }
+
+    public static BigDecimal exact(String text) {
+        return withinRange(new BigDecimal(text).setScale(2, RoundingMode.UNNECESSARY));
+    }
+
+    private static BigDecimal withinRange(BigDecimal amount) {
+        // 반올림 때문에 정수 자릿수가 늘어날 수 있으므로 정규화 뒤 검사한다.
+        if (amount.abs().compareTo(MAX) &gt; 0) {
+            throw new IllegalArgumentException(&quot;DECIMAL(5,2) 범위 초과: &quot; + amount);
+        }
+        return amount;
+    }
 }</code></pre>
 <p>왜 이렇게 쓰나:</p>
 <ol>

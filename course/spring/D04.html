@@ -51,7 +51,7 @@
 <li><code>src/main/java/com/example/board/post/Post.java</code></li>
 <li><code>src/main/java/com/example/board/post/PostRepository.java</code></li>
 <li><code>src/main/resources/schema.sql</code></li>
-</ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p><code>@Enumerated</code>를 기본값(ORDINAL)으로 두면 enum 앞에 값을 끼울 때 기존 글의 상태가 전부 바뀌어 보인다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
+</ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p><code>@Enumerated</code>를 기본값(ORDINAL)으로 두면 enum 앞에 값을 끼울 때 기존 글의 상태가 전부 바뀌어 보인다. 선택 관찰: save의 신규 판단과 detached 입력·merge 반환 참조를 비교한다. 오늘은 선택 실험 중 하나만 골라도 되며 필수 채점에는 추가하지 않는다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
 <li><code>PostRepositoryTest</code> 통과: 저장한 글의 <code>status</code> 컬럼 값이 문자열 <code>ACTIVE</code></li>
 </ul></div><div class="step-fact fact-spec"><p class="fact-label">명세</p><p><a href="../spec-v2.html#4-엔드포인트"><code>POST /api/posts</code></a> (<a href="../spec-v2.html#5-2-글댓글좋아요">5-2. 글·댓글·좋아요</a>)</p></div></div><details class="step-hint" data-step="D04-1">
 <summary>막히면</summary>
@@ -59,6 +59,14 @@
 <ul>
 <li><code>@Enumerated</code>의 <code>EnumType</code> 두 값과 <code>@ManyToOne(fetch = FetchType.LAZY)</code>를 찾아본다. 인덱스는 <code>schema.sql</code>의 <code>INDEX</code>(<code>status</code>, <code>id</code>) 순서로 둔다.</li>
 <li>DB에 어떤 값이 들어갔는지는 테스트에서 <code>JdbcTemplate</code>으로 컬럼을 직접 읽거나 <code>docker compose exec mysql mysql ...</code>로 SELECT 해 확인한다.</li>
+</ul>
+</details>
+
+<details class="step-observations" data-step="D04-1">
+<summary>선택 관찰 실험 · 오늘은 하나만 골라도 됩니다</summary>
+
+<ul>
+<li>선택 관찰(10분, C20): 학습자 src/test의 작은 독립 엔티티로 save 신규 판단 표를 만든다. 현재 Spring Data 버전과 ID 전략을 적고 ① 생성 ID=null ② 할당 ID만 있음 ③ 할당 ID+nullable @Version=null ④ Persistable.isNew()=true를 각각 새 트랜잭션에서 save → flush한다. 반환 참조==입력, em.contains(입력/반환), SQL의 SELECT/INSERT/UPDATE, 최종 행을 기록한다. 기본 판단은 비primitive version이 있으면 그 null 여부를 먼저, 없으면 ID null 여부를 보며 Persistable은 isNew에 위임한다. ID 존재가 DB 행 존재를 증명하지 않는다. 별도 변형: 커밋해 실제 행을 만든 후 컨텍스트를 닫고 detached 객체를 새 tx에서 save한다. merge 반환은 관리 객체이며 입력 객체는 그대로 detached다. 반환값과 입력을 각각 바꾸고 flush/새 tx 조회를 비교한다. 없는 행의 merge 결과를 무조건 INSERT라고 단정하지 않는다.</li>
 </ul>
 </details>
 
@@ -217,7 +225,7 @@ class PostRepositoryTest {
 <li><code>src/main/java/com/example/board/post/Tag.java</code></li>
 <li><code>src/main/java/com/example/board/post/PostTag.java</code></li>
 <li><code>src/main/resources/schema.sql</code></li>
-</ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>엔티티에 <code>@Setter</code>·<code>@AllArgsConstructor</code>를 열어 두면 아무 곳에서나 상태가 바뀌므로 <code>protected</code> 기본 생성자와 정적 팩토리만 둔다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
+</ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>엔티티에 <code>@Setter</code>·<code>@AllArgsConstructor</code>를 열어 두면 아무 곳에서나 상태가 바뀌므로 <code>protected</code> 기본 생성자와 정적 팩토리만 둔다. 선택 관찰: 두 글의 태그 1행·연결 2행을 확인하고 수명 실험은 D05 ②로 이어 간다. 오늘은 선택 실험 중 하나만 골라도 되며 필수 채점에는 추가하지 않는다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
 <li><code>TagRepositoryTest</code> 통과: 같은 이름의 태그는 새로 만들지 않고 재사용한다</li>
 </ul></div><div class="step-fact fact-spec"><p class="fact-label">명세</p><p><a href="../spec-v2.html#4-엔드포인트"><code>POST /api/posts</code></a> (<a href="../spec-v2.html#5-2-글댓글좋아요">5-2. 글·댓글·좋아요</a>)</p></div></div><details class="step-hint" data-step="D04-2">
 <summary>막히면</summary>
@@ -225,6 +233,14 @@ class PostRepositoryTest {
 <ul>
 <li><code>PostTag</code>는 <code>post_id</code>·<code>tag_id</code> 두 <code>@ManyToOne</code>을 가진 연결 엔티티로 둔다. 이름으로 찾기는 Spring Data의 <code>findByName</code> 같은 쿼리 메서드를 찾아본다.</li>
 <li>엔티티는 <code>@NoArgsConstructor(access = AccessLevel.PROTECTED)</code>와 정적 팩토리 메서드로 만든다.</li>
+</ul>
+</details>
+
+<details class="step-observations" data-step="D04-2">
+<summary>선택 관찰 실험 · 오늘은 하나만 골라도 됩니다</summary>
+
+<ul>
+<li>선택 관찰(5분, I12): 서로 다른 회원 A/B의 글 두 개가 같은 새 태그를 순차 사용하게 하고 tag 1행·post_tag 2행을 확인한다. 이름이 공유되는 tag와 글마다 소유하는 연결행을 구분한다. 연결 해제·soft delete·후행 실패 rollback은 수정·삭제를 만드는 D05 ②의 선택 관찰로 이어 간다.</li>
 </ul>
 </details>
 
@@ -1032,10 +1048,10 @@ class PostCreateApiTest {
 채점 기준
 ① Post 엔티티와 PostStatus enum(post/PostStatus.java) (schema.sql에 post 테이블) · 목록 조회용 (status, id) 인덱스 포함
   - [C1-1] PostRepositoryTest 통과: 저장한 글의 status 컬럼 값이 문자열 ACTIVE
-  - [R1] 함정을 피했는지 코드로 확인: @Enumerated를 기본값(ORDINAL)으로 두면 enum 앞에 값을 끼울 때 기존 글의 상태가 전부 바뀌어 보인다.
+  - [R1] 함정을 피했는지 코드로 확인: @Enumerated를 기본값(ORDINAL)으로 두면 enum 앞에 값을 끼울 때 기존 글의 상태가 전부 바뀌어 보인다. 선택 관찰: save의 신규 판단과 detached 입력·merge 반환 참조를 비교한다. 오늘은 선택 실험 중 하나만 골라도 되며 필수 채점에는 추가하지 않는다.
 ② Tag와 PostTag, 이름으로 찾는 TagRepository(post/TagRepository.java) (schema.sql에 tag, post_tag 테이블)
   - [C2-1] TagRepositoryTest 통과: 같은 이름의 태그는 새로 만들지 않고 재사용한다
-  - [R2] 함정을 피했는지 코드로 확인: 엔티티에 @Setter·@AllArgsConstructor를 열어 두면 아무 곳에서나 상태가 바뀌므로 protected 기본 생성자와 정적 팩토리만 둔다.
+  - [R2] 함정을 피했는지 코드로 확인: 엔티티에 @Setter·@AllArgsConstructor를 열어 두면 아무 곳에서나 상태가 바뀌므로 protected 기본 생성자와 정적 팩토리만 둔다. 선택 관찰: 두 글의 태그 1행·연결 2행을 확인하고 수명 실험은 D05 ②로 이어 간다. 오늘은 선택 실험 중 하나만 골라도 되며 필수 채점에는 추가하지 않는다.
 ③ 글 작성 요청·응답 DTO와 검증 규칙
   - [C3-1] PostCreateRequestTest 통과: 공백만 있는 제목, 태그 6개, 21자 태그를 거절한다
   - [R3] 함정을 피했는지 코드로 확인: @NotEmpty는 공백만 있는 제목을 통과시키므로 @NotBlank를 쓴다.

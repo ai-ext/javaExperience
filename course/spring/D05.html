@@ -51,7 +51,7 @@
 <li><code>src/main/java/com/example/board/post/PostDetailResponse.java</code></li>
 <li><code>src/main/java/com/example/board/post/PostServiceImpl.java</code></li>
 <li><code>src/main/java/com/example/board/post/PostController.java</code></li>
-</ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>응답 DTO를 만들며 지연 로딩 연관(작성자·태그)을 건드리면 쿼리가 추가로 나가므로 SQL 로그로 쿼리 수를 센다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
+</ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>응답 DTO를 만들며 지연 로딩 연관(작성자·태그)을 건드리면 쿼리가 추가로 나가므로 SQL 로그로 쿼리 수를 센다. 선택 관찰: 주입 EM 프록시·실제 컨텍스트와 readOnly의 층별 동작을 각각 기록한다. 오늘은 선택 실험 중 하나만 골라도 되며 필수 채점에는 추가하지 않는다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
 <li>토큰 없이 <code>GET /api/posts/{postId}</code> → 200</li>
 <li>없는 글 → 404 <code>/errors/not-found</code></li>
 <li><code>postId</code> = 0 → 400 <code>/errors/validation</code></li>
@@ -61,6 +61,15 @@
 <ul>
 <li><code>@PathVariable</code>의 <code>@Positive</code>는 Spring 6.1부터 내장 메서드 검증이 처리한다. 컨트롤러 클래스에 <code>@Validated</code>를 붙이지 않는다(붙이면 AOP 검증으로 바뀌어 <code>ConstraintViolationException</code>이 난다). 내장 검증이 던지는 <code>HandlerMethodValidationException</code>을 전역 처리기에서 400으로 바꾼다.</li>
 <li><code>spring.jpa.show-sql</code> 또는 <code>logging.level.org.hibernate.SQL=DEBUG</code>로 조회 한 번에 SQL이 몇 번 나가는지 센다.</li>
+</ul>
+</details>
+
+<details class="step-observations" data-step="D05-1">
+<summary>선택 관찰 실험 · 오늘은 하나만 골라도 됩니다</summary>
+
+<ul>
+<li>선택 관찰 A(10분, C09): 테스트 메서드의 자동 @Transactional과 OSIV를 끈 독립 fixture에서 같은 singleton의 @PersistenceContext 참조를 두 개의 순차 TransactionTemplate 실행에 사용한다. 각 tx 안에서 EntityManagerProxy.getTargetEntityManager()로 얻은 실제 EM 참조, 같은 ID의 find 결과 두 개와 contains를 기록한다. 같은 tx의 두 find는 같은 관리 객체, 두 tx의 실제 EM·관리 객체는 서로 다른지 참조 비교한다. System.identityHashCode 로그만으로 동일성을 확정하지 않는다. 주입 프록시가 같아도 컨텍스트는 tx별로 바뀐다. 실제 EM을 worker 사이에 공유하지 않는다.</li>
+<li>선택 관찰 B(10분, C14): 현재 @Transactional의 완전한 import를 확인한다. jakarta.transaction.Transactional에는 readOnly 속성이 없으므로 org.springframework.transaction.annotation.Transactional을 사용하는 독립 테스트에서 ① 조회 후 관리 객체 변경 ② 신규 persist+flush(IDENTITY 포함) ③ 같은 tx에 참여하는 JdbcTemplate UPDATE ④ 바깥 read-write tx에 REQUIRED readOnly 메서드가 참여하는 경우를 하나씩 실행한다. 테스트 밖 새 tx로 행을 초기화하고, 별도 빈을 통해 호출한다. 매번 실제 tx의 readOnly 플래그·Hibernate flush mode·JDBC connection.isReadOnly·SQL·예외·쓰기 직후 같은 연결의 값·종료 후 새 연결의 값을 기록한다. 실험 쓰기는 rollback하고 데이터 확인은 별도 연결로 한다. 조회 최적화 힌트와 DB/driver의 쓰기 거절은 다른 층이며 readOnly를 쓰기 금지나 권한 검사로 취급하지 않는다. REQUIRED 참여가 기존 tx의 속성을 자동 변경한다고 가정하지 않는다. 환경별 실제 관측을 쓰고 특정 DML 성공/거절을 보편 결과로 적지 않는다.</li>
 </ul>
 </details>
 
@@ -333,7 +342,7 @@ class PostCrudApiTest extends ApiTestSupport {
 <li><code>src/main/java/com/example/board/post/PostUpdateRequest.java</code></li>
 <li><code>src/main/java/com/example/board/post/PostPatchRequest.java</code></li>
 <li><code>src/main/java/com/example/board/post/Post.java</code></li>
-</ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p><code>save()</code>를 부르지 않아도 변경 감지로 flush 때 UPDATE SQL이 발행된다. commit은 변경을 확정하며 flush 뒤에도 rollback할 수 있다. SQL 로그와 별도 연결의 commit 후 새 조회를 구분해 확인한다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
+</ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p><code>save()</code>를 부르지 않아도 변경 감지로 flush 때 UPDATE SQL이 발행된다. commit은 변경을 확정하며 flush 뒤에도 rollback할 수 있다. SQL 로그와 별도 연결의 commit 후 새 조회를 구분해 확인한다. 선택 관찰: Java 값·flush SQL·같은 연결·별도 연결을 commit/rollback 전후로 기록하거나 공유 태그의 연결 해제·실패 원복을 확인한다. 오늘은 선택 실험 중 하나만 골라도 되며 필수 채점에는 추가하지 않는다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
 <li>작성자 토큰으로 <code>PUT /api/posts/{postId}</code> → 200</li>
 <li><code>PATCH /api/posts/{postId}</code> 제목만 → 200, 본문은 그대로</li>
 <li><code>PATCH</code> 본문 <code>{}</code> → 400</li>
@@ -345,6 +354,15 @@ class PostCrudApiTest extends ApiTestSupport {
 <ul>
 <li>엔티티에 <code>update</code>·<code>patch</code>·<code>delete</code> 같은 의도가 드러나는 메서드를 두고, 서비스에서는 찾은 엔티티의 메서드만 부른다(변경 감지).</li>
 <li>명세 5-2는 PATCH에서 보낸 필드만 검증하고 전부 없으면 400이다. 이 과제는 보내지 않은 필드와 <code>null</code>을 보낸 필드를 똑같이 &quot;바꾸지 않음&quot;으로 본다. 그렇게 보고 &quot;전부 없음&quot;을 판정하려면 요청 DTO 단위의 검증을 어떻게 둘지 찾아본다.</li>
+</ul>
+</details>
+
+<details class="step-observations" data-step="D05-2">
+<summary>선택 관찰 실험 · 오늘은 하나만 골라도 됩니다</summary>
+
+<ul>
+<li>선택 관찰(10분, C11·C16): 커밋된 제목 old를 가진 독립 글을 준비한다. A tx에서 find → 제목을 local로 변경 → 명시 flush 순으로 Java 값·SQL·A 연결의 JDBC SELECT·별도 autocommit B의 일반 SELECT 값을 기록한다. 기대: Java/A는 local, commit 전 B는 old다(READ COMMITTED 또는 REPEATABLE READ의 비잠금 읽기). A를 rollback한 뒤 B의 새 조회는 old, 기존 Java 객체는 local일 수 있다. commit 변형은 새 fixture로 반복해 B의 새 조회가 local인지 본다. SQL 발행과 확정을 구분하고 열린 B의 snapshot은 새 조회와 구별한다. 관련 JPQL/무관 JPQL 앞 AUTO flush 비교는 추가 선택이며 이 결과를 모든 native SQL에 일반화하지 않는다.</li>
+<li>선택 관찰: 공유 수명(10분, I12·C17·C18): 새 회원 A/B의 글 두 개가 같은 새 태그를 순차 사용하게 한다. 기준은 tag 1행·post_tag 2행이다. A 글의 태그만 빈 목록으로 교체하면 tag 1행·연결 1행, B 글은 계속 조회 가능해야 한다. 이어 A 글 soft delete 전후도 비교하고 연결 보존 정책과 공유 태그 수명을 구분한다. 독립 fixture에서 글·새 태그·연결을 만든 직후 RuntimeException으로 rollback시켜 세 테이블이 원래 행 수로 돌아오는지 새 tx로 확인한다. FK/cascade REMOVE/orphanRemoval 설정을 읽고 연결 소유권과 공유 tag 삭제를 같은 뜻으로 두지 않는다. 서비스 수정은 이 관찰 과제의 필수 조건이 아니다.</li>
 </ul>
 </details>
 
@@ -1912,14 +1930,14 @@ class PostLikeApiTest extends ApiTestSupport {
   - [C1-1] 토큰 없이 GET /api/posts/{postId} → 200
   - [C1-2] 없는 글 → 404 /errors/not-found
   - [C1-3] postId = 0 → 400 /errors/validation
-  - [R1] 함정을 피했는지 코드로 확인: 응답 DTO를 만들며 지연 로딩 연관(작성자·태그)을 건드리면 쿼리가 추가로 나가므로 SQL 로그로 쿼리 수를 센다.
+  - [R1] 함정을 피했는지 코드로 확인: 응답 DTO를 만들며 지연 로딩 연관(작성자·태그)을 건드리면 쿼리가 추가로 나가므로 SQL 로그로 쿼리 수를 센다. 선택 관찰: 주입 EM 프록시·실제 컨텍스트와 readOnly의 층별 동작을 각각 기록한다. 오늘은 선택 실험 중 하나만 골라도 되며 필수 채점에는 추가하지 않는다.
 ② 글 전체·부분 수정과 소프트 삭제, 작성자 검증
   - [C2-1] 작성자 토큰으로 PUT /api/posts/{postId} → 200
   - [C2-2] PATCH /api/posts/{postId} 제목만 → 200, 본문은 그대로
   - [C2-3] PATCH 본문 {} → 400
   - [C2-4] DELETE /api/posts/{postId} → 204, 이후 GET → 404
   - [C2-5] 다른 회원 토큰으로 PUT → 403 /errors/forbidden, 삭제된 글에 PUT → 404
-  - [R2] 함정을 피했는지 코드로 확인: save()를 부르지 않아도 변경 감지로 flush 때 UPDATE SQL이 발행된다. commit은 변경을 확정하며 flush 뒤에도 rollback할 수 있다. SQL 로그와 별도 연결의 commit 후 새 조회를 구분해 확인한다.
+  - [R2] 함정을 피했는지 코드로 확인: save()를 부르지 않아도 변경 감지로 flush 때 UPDATE SQL이 발행된다. commit은 변경을 확정하며 flush 뒤에도 rollback할 수 있다. SQL 로그와 별도 연결의 commit 후 새 조회를 구분해 확인한다. 선택 관찰: Java 값·flush SQL·같은 연결·별도 연결을 commit/rollback 전후로 기록하거나 공유 태그의 연결 해제·실패 원복을 확인한다. 오늘은 선택 실험 중 하나만 골라도 되며 필수 채점에는 추가하지 않는다.
 ③ Comment 엔티티 (schema.sql에 comment 테이블, 인덱스(post_id, id))
   - [C3-1] CommentRepositoryTest 통과: 한 글의 댓글을 id 순으로 조회한다
   - [R3] 함정을 피했는지 코드로 확인: @ManyToOne을 기본값(EAGER)으로 두면 댓글 하나를 읽을 때도 글·작성자 쿼리가 따라 나가므로 fetch = LAZY로 둔다.
