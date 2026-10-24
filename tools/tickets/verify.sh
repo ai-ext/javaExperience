@@ -3,7 +3,7 @@
 #   tools/tickets/verify.sh [--full] [B01 E01 ...]   티켓별: 결함 상태에서 확인 테스트가 단언 실패 → fix.patch 적용 후 통과
 #   tools/tickets/verify.sh --all-fixes              모든 fix.patch를 번호 순으로 한 복사본에 누적 적용 → 확인 테스트 전부 + 전체 테스트 통과
 # 티켓을 안 적으면 messy-server/tickets/ 아래 전부(B01~B16 정확히 16개 + E01..)를 검사한다.
-# --full: 수정 뒤 전체 테스트도 통과해야 한다. 환경 한정 실패(ENV_FLAKY)만 허용한다.
+# --full: 수정 뒤 전체 테스트도 통과해야 한다. 지정 테스트의 연결 실패·타임아웃 원인만 환경 예외로 구분한다.
 # 판정은 종료 코드가 아니라 JUnit XML로 한다(테스트가 실제로 돌았는지, 실패가 단언 실패인지).
 # messy-server 원본은 건드리지 않는다. 작업 디렉터리는 TICKET_WORK_DIR(리포 밖, 기본: 새 임시 디렉터리).
 set -euo pipefail
@@ -32,12 +32,12 @@ if [ ! -d "$src/tickets" ]; then
 fi
 if [ $# -eq 0 ]; then
   ids=($(cd "$src/tickets" && ls -d [A-Z][0-9][0-9] 2>/dev/null | sort || true))
-  bcount=$(printf '%s\n' "${ids[@]:-}" | grep -c '^B' || true)
+  bcount=$(printf '%s\n' ${ids[@]+"${ids[@]}"} | grep -c '^B' || true)
   if [ "$bcount" -ne 16 ]; then
     echo "B 티켓이 16개가 아니다: ${bcount}개 (${ids[*]:-없음})" >&2
     exit 1
   fi
-  set -- "${ids[@]}"
+  set -- ${ids[@]+"${ids[@]}"}
 fi
 for t in "$@"; do
   [[ "$t" =~ ^[A-Z][0-9][0-9]$ ]] || { echo "티켓 이름이 이상하다: $t" >&2; exit 1; }
@@ -89,12 +89,18 @@ run_tests() {
 
 # XML 요약: "tests failures errors skipped" 와 실패한 "클래스단순명.메서드" 목록
 summarize() {
-  python3 - "$1" "${2:-}" <<'PY'
-import sys, glob, re, xml.etree.ElementTree as ET
+  ENV_FLAKY="$ENV_FLAKY" python3 - "$1" "${2:-}" <<'PY'
+import sys, glob, re, os, json, xml.etree.ElementTree as ET
 d, prefix = sys.argv[1], sys.argv[2]
 t = f = e = s = 0
 bad = []
 counts = {}
+allowed = set(os.environ.get("ENV_FLAKY", "").split())
+CONNECTION = re.compile(r"\b(?:ConnectException|SocketTimeoutException|ConnectTimeoutException|"
+                        r"HttpHostConnectException|HttpConnectTimeoutException|HttpTimeoutException|"
+                        r"TimeoutException|ConnectionRequestTimeoutException|NoHttpResponseException)\b|"
+                        r"connection (?:refused|reset|timed out)|connect timed out|read timed out|"
+                        r"연결 (?:실패|거부)|응답 타임아웃|but was:\s*<?(?:TIMEOUT|UNREACHABLE)>?\b", re.I)
 ASSERTION_TYPES = {"AssertionError", "AssertionFailedError", "MultipleFailuresError",
                    "AssertJMultipleFailuresError", "SoftAssertionError", "ComparisonFailure"}
 ENV_PAT = re.compile(r"Failed to load ApplicationContext|ApplicationContext failure threshold|"
@@ -112,13 +118,22 @@ for p in glob.glob(d + "/*.xml"):
             continue
         kind = el.tag
         typ = (el.get("type") or "").split(".")[-1]
-        text = (el.get("message") or "") + "\n" + (el.text or "")[:4000]
+        message = el.get("message") or ""
+        trace = el.text or ""
+        text = message + "\n" + trace
+        name = f"{c.get('classname','').split('.')[-1]}.{c.get('name','').split('(')[0]}"
+        # 메서드 이름·일반 stack frame은 근거가 아니다. 실패 메시지·예외 종류·원인 체인만 본다.
+        causes = "\n".join(line for line in trace.splitlines()
+                           if line.lstrip().startswith("Caused by:"))
+        reason = (el.get("type") or "") + " " + message + "\n" + causes
         # JUnit은 컨텍스트 로드 실패·환경 오류도 failure로 기록한다. 단언 실패와 구분한다.
         if ENV_PAT.search(text):
             kind = "env"
         elif typ in ASSERTION_TYPES:
             kind = "assert"
-        bad.append(f"{kind}:{c.get('classname','').split('.')[-1]}.{c.get('name','').split('(')[0]}")
+        if name in allowed and typ not in {"MultipleFailuresError", "AssertJMultipleFailuresError", "SoftAssertionError"} and CONNECTION.search(reason) and not ENV_PAT.search(reason):
+            kind = "env-exception"
+        bad.append(f"{kind}:{name}\t{json.dumps(reason, ensure_ascii=False)}")
         counts[kind] = counts.get(kind, 0) + 1
 print(t, f, e, s, counts.get("assert", 0), counts.get("env", 0))
 for b in bad:
@@ -161,15 +176,41 @@ check_full() {
   local out; out=$(summarize "$copy/results-full")
   read -r tests failures errors skipped _asserts _envs <<<"$(head -1 <<<"$out")"
   [ "$tests" -gt 0 ] || { echo "$label: 전체 테스트가 돌지 않았다 — $copy/full.log" >&2; return 1; }
-  local unexpected=()
-  while read -r line; do
+  local unexpected=() exceptions=()
+  # Bash 3.2의 nounset은 빈 배열의 길이 조회도 오류로 처리한다.
+  local unexpected_count=0 exception_count=0
+  local line reason name kind
+  while IFS=$'\t' read -r line reason; do
     [ -n "$line" ] || continue
-    local name=${line#*:}
-    [[ " $ENV_FLAKY " == *" $name "* ]] || unexpected+=("$line")
+    name=${line#*:}
+    kind=${line%%:*}
+    if [ "$kind" = env-exception ] && [[ " $ENV_FLAKY " == *" $name "* ]]; then
+      exceptions+=("$name ($reason)")
+      exception_count=$((exception_count + 1))
+    else
+      unexpected+=("$name ($reason)")
+      unexpected_count=$((unexpected_count + 1))
+    fi
   done < <(tail -n +2 <<<"$out")
-  if [ ${#unexpected[@]} -gt 0 ]; then
-    echo "$label: 전체 테스트 실패 ${#unexpected[@]}건: ${unexpected[*]} — $copy/results-full" >&2; return 1
+  local passed=$((tests - failures - errors - skipped))
+  echo "$label: 통과 ${passed}건 / 환경 예외 ${exception_count}건 / 실패 ${unexpected_count}건 / 건너뜀 ${skipped}건"
+  for reason in ${exceptions[@]+"${exceptions[@]}"}; do
+    echo "$label: 환경 예외 — $reason"
+  done
+  if [ "$skipped" -gt 0 ]; then
+    echo "$label: 건너뛴 테스트는 통과로 인정하지 않는다 — $copy/results-full" >&2
+    return 1
   fi
+  if [ "$unexpected_count" -gt 0 ]; then
+    echo "$label: 전체 테스트 실패 ${unexpected_count}건: ${unexpected[*]:-} — $copy/results-full" >&2
+    return 1
+  fi
+  if [ "$exception_count" -gt 0 ]; then
+    full_result="통과(환경 예외 ${exception_count}건: ${exceptions[*]:-})"
+  else
+    full_result="전체 통과"
+  fi
+  echo "$label: $full_result — $copy/results-full"
 }
 
 apply_fix() {
@@ -192,10 +233,10 @@ if $all_fixes; then
   for t in "$@"; do
     apply_fix "$copy" "$t" && (cd "$copy" && git add -A && git -c user.email=v@local -c user.name=verify commit -qm "$t") || failed+=("$t")
   done
-  if [ ${#failed[@]} -eq 0 ]; then
+  if [ -z "${failed[*]:-}" ]; then
     check_full "$copy" all-fixes || failed+=(all-fixes)
   fi
-  [ ${#failed[@]} -eq 0 ] && echo "all-fixes: OK (${*} 누적 적용, 확인 테스트 포함 전체 통과) — $copy"
+  [ -z "${failed[*]:-}" ] && echo "all-fixes: OK (${*} 누적 적용, 확인 테스트 포함 $full_result) — $copy"
 else
   for t in "$@"; do
     copy="$work/$t"
@@ -207,11 +248,11 @@ else
     if $full && ! check_full "$copy" "$t"; then
       failed+=("$t"); continue
     fi
-    echo "$t: OK (결함 상태 단언 실패 → 수정 후 통과$($full && echo ', 전체 테스트 통과' || true)) — $copy"
+    echo "$t: OK (결함 상태 단언 실패 → 수정 후 통과$($full && echo ", $full_result" || true)) — $copy"
   done
 fi
 
-if [ ${#failed[@]} -gt 0 ]; then
-  echo "실패: ${failed[*]}" >&2
+if [ -n "${failed[*]:-}" ]; then
+  echo "실패: ${failed[*]:-}" >&2
   exit 1
 fi

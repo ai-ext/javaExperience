@@ -58,6 +58,18 @@ await test('R4-01: 모든 지도 노드 title은 전체 이름과 같다', () =>
   assert.ok(!span['text-overflow'] && span.overflow !== 'hidden' && !span['-webkit-line-clamp'], '긴 이름도 높이 제한으로 자르지 않는다');
   assert.match(courseCss, /@media \(max-width: 899px\)[\s\S]*?\.cm-node span \{ display: none; \}/, '좁은 화면 칩 배치는 유지');
 });
+await test('P10: 홈 진도는 수동 체크이며 채점 결과가 아님을 알린다', async () => {
+  const home = await open('index.html');
+  assert.match(home.$('[data-progress-summary]').parentElement.parentElement.textContent, /직접 체크한 진도이며 채점 결과는 아니다/);
+});
+await test('R4-08: 390 폭에서 선 범례를 숨기고 노드 범례와 관계 표를 남긴다', async () => {
+  const map = await open('course/map.html', { script: mapScript });
+  assert.ok(map.$('.cm-line-legend'));
+  assert.equal(map.$$('.cm-line-legend .cm-line-sample').length, 3);
+  assert.match(courseCss, /@media \(max-width: 899px\)[\s\S]*?\.cm-line-legend \{ display: none; \}/);
+  assert.equal(map.$$('[data-cm-lines] .cm-edge').length, 0);
+  assert.ok(map.$('.cm-legend .cm-swatch') && map.$('.cm-tables'));
+});
 await test('R4-05: 일자 칩 체크박스의 누르는 면은 최소 24×24px', () => {
   const input = declarations(courseCss, '.day-chip input');
   for (const prop of ['width', 'height']) assert.ok(/^\d+px$/.test(input[prop]) && parseFloat(input[prop]) >= 24, `${prop}: ${input[prop]}`);
@@ -485,6 +497,8 @@ for (const day of course.days) {
   // 낱말 목록이 놓친 해법·메커니즘 문구(codex P8-3 리뷰 ①)와 동의 표현. 진단 도구 이름은 넣지 않는다.
   // ticketFixPhrases는 티켓 페이지와 그 티켓을 다루는 일자 페이지 모두, dayFixPhrases는 일자 페이지에만 건다(티켓 제출물 질문이 쓰는 말이 있어서).
   const ticketFixPhrases = {
+    B01: ['start → PG → apply', 'start(결제 행 만들기) → PG 호출 → apply', 'PG 호출이 트랜잭션에 묶여'],
+    B03: ['재시도는 트랜잭션 밖', '재시도(order)는 트랜잭션 밖'],
     B02: ['ALTER TABLE', '인덱스를 바꾸', '인덱스를 고치'],
     B09: ['누구의 자정', '시간대의 "오늘"'],
     B10: ['서로 다른 Idempotency-Key', '3초에 포기'],
@@ -533,6 +547,34 @@ for (const day of course.days) {
       if (at >= 0) ticketLeaks.push(`${id} "${term}": …${visible.slice(Math.max(0, at - 40), at + 30)}…`);
     }
   }
+  // P07: 모든 Java 페이지의 티켓 연결부와 2단계 일자·티켓을 직접 지목하는 문장을 검사한다.
+  // 일반 Java 예제의 프록시·재시도 같은 개념 낱말 자체는 금지하지 않는다.
+  const javaLeaks = [];
+  for (const file of fs.readdirSync(new URL('course/java/', root)).filter((f) => /^J\d+\.html$/.test(f))) {
+    const doc = new JSDOM(fs.readFileSync(new URL(`course/java/${file}`, root), 'utf8')).window.document;
+    const javaId = file.replace('.html', '');
+    const day = course.days.find((d) => d.java === javaId && d.phase === 'maintain');
+    const connection = doc.getElementById('오늘-spring에서-다시-만나는-곳');
+    const context = doc.createElement('body');
+    for (let node = connection?.nextElementSibling; node && node.tagName !== 'H2'; node = node.nextElementSibling) context.append(node.cloneNode(true));
+    const check = (visible, ids) => {
+      for (const id of new Set(ids)) for (const term of [...(causeTerms[id] ?? []), ...(ticketFixPhrases[id] ?? [])]) {
+        if (visible.includes(plainText(term))) javaLeaks.push(`${javaId} ${id}: ${term}`);
+      }
+    };
+    check(visibleOf({ body: context }), day?.steps.flatMap((s) => s.tickets) ?? []);
+    // 연결부 밖의 상황 설명·접기 제목·접근성 속성도 같은 방식으로 검사한다.
+    for (const node of doc.querySelectorAll('p, li, summary, [aria-label], [title]')) {
+      if (node.closest('details') && !node.closest('summary')) continue;
+      const visible = plainText(node.textContent + ' ' + (node.getAttribute('aria-label') ?? '') + ' ' + (node.getAttribute('title') ?? ''));
+      const ids = [...visible.matchAll(/\b(?:B\d{2}|E01)\b/g)].map((m) => m[0]);
+      for (const d of course.days.filter((d) => d.phase === 'maintain')) {
+        if (new RegExp(`${d.id}\\s*[①②③④⑤⑥⑦⑧⑨]`).test(visible)) ids.push(...d.steps.flatMap((s) => s.tickets));
+      }
+      check(visible, ids);
+    }
+  }
+  assert.deepEqual(javaLeaks, [], 'Java 페이지 접기 밖 원인·해법');
   // R2 m8: 실행 전에 읽는 재현 스크립트의 머리 주석도 원인·해법을 숨긴다.
   // 실행 코드 자체는 결함을 관찰할 입력을 만들어야 하므로 이 검사의 대상이 아니다.
   for (const id of ['B02', 'B03', 'B04', 'B09', 'B10']) {

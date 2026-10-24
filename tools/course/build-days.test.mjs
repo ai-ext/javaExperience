@@ -613,3 +613,29 @@ test('B09 경계는 운영 UTC 시계로 재현하고 KST 날짜 세 경우를 �
   assert.ok(hint.includes('ZoneOffset.UTC') && hint.includes('UTC 자정') && hint.includes('결함이 가려진다'), '시계 영역을 KST로 바꿔 결함을 숨기지 않게 한다');
   assert.ok(!done.includes('UTC'), 'UTC 시계 진단 단서는 닫힌 힌트에 둔다');
 });
+
+test('P08: 실수가 없으면 배제·예방 근거로 D15 세 줄을 충족할 수 있다', () => {
+  const cards = fs.readFileSync(path.join(ROOT, 'course/talk-cards.md'), 'utf8');
+  for (const id of ['TC-D15-2', 'TC-D15-3']) {
+    const card = cards.split(`### ${id}\n`)[1].split('### ')[0];
+    assert.match(card, /없었다면/);
+    assert.match(card, /배제|예방/);
+  }
+  assert.match(hints.graderTemplates.wrap, /없었다면/);
+  assert.match(hints.graderTemplates.wrap, /실수.*(?:요구하지|전제하지)/);
+  assert.match(page('D15'), /없었다면/);
+  assert.match(roadmap.days.find((d) => d.id === 'D15').steps[0].done.join(' '), /배제|예방/);
+});
+
+test('P09: D05는 flush의 SQL 발행과 commit의 확정을 구분한다', () => {
+  assert.doesNotMatch(page('D05'), /커밋\(flush\)/);
+  assert.match(page('D05'), /flush.*SQL.*commit.*확정/);
+  const cards = fs.readFileSync(path.join(ROOT, 'course/talk-cards.md'), 'utf8');
+  const card = cards.split('### TC-D05-1\n')[1].split('### ')[0];
+  assert.match(card, /flush.*rollback/);
+  assert.match(card, /별도 연결/);
+  const baseline = fs.readFileSync(path.join(ROOT, 'docs/course-redesign/research/05-competency-bar-3to6yrs.md'), 'utf8');
+  assert.doesNotMatch(baseline, /DB 락은 인스턴스 하나 안에서만/);
+  assert.match(baseline, /JVM.*synchronized/);
+  assert.match(baseline, /DB 락.*모든 인스턴스/);
+});

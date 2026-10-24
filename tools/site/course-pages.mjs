@@ -279,6 +279,7 @@ export function renderCourseHome(course) {
     </article>
     <section class="ch-progress" aria-labelledby="ch-progress-title">
       <div class="ch-progress-head"><h2 id="ch-progress-title">15일 진도</h2><p data-progress-summary>체크한 순서 0/${stepTotal}</p></div>
+      <p class="ch-progress-note">직접 체크한 진도이며 채점 결과는 아니다. Java·선택 티켓의 수행 여부와 역량은 별도로 확인한다.</p>
       ${phases.map(([phase, label]) => `<h3 class="ch-phase">${label}</h3><ol class="ch-days">${main.filter((d) => d.phase === phase).map(dayCell).join('')}</ol>`).join('')}
       <p class="ch-progress-note">일자 페이지의 순서 체크가 이 브라우저에 저장되고, 여기서 다음 날을 고릅니다. <span data-course-storage></span></p>
     </section>
@@ -342,7 +343,7 @@ export function renderCourseMap(course, fromRel = MAP_PAGE) {
   <h2 id="cm-title">관계 지도</h2>
   <div class="cm-legend" aria-label="범례">
     <div><p class="cm-legend-title">노드</p><ul>${['java', 'day', 'ticket', 'area'].map((k) => `<li><span class="cm-swatch kind-${k}" aria-hidden="true"></span>${KIND_LABEL[k]}</li>`).join('')}<li><span class="cm-swatch kind-ticket is-required" aria-hidden="true"></span>굵은 테두리 = 필수 티켓</li></ul></div>
-    <div><p class="cm-legend-title">연결선 (화살표 방향 = 영향이 흐르는 쪽)</p><ul>${Object.entries(EDGE_LABEL).map(([k, v]) => `<li><svg class="cm-line-sample" viewBox="0 0 44 10" aria-hidden="true"><line class="cm-edge edge-${k}" x1="2" y1="5" x2="36" y2="5"/><path class="cm-arrow edge-${k}" d="M36 1 L43 5 L36 9 Z"/></svg>${k === 'practice' ? 'J → D' : k === 'ticket' ? 'D → 티켓' : '티켓 → 영역'} · ${v}</li>`).join('')}</ul></div>
+    <div class="cm-line-legend"><p class="cm-legend-title">연결선 (화살표 방향 = 영향이 흐르는 쪽)</p><ul>${Object.entries(EDGE_LABEL).map(([k, v]) => `<li><svg class="cm-line-sample" viewBox="0 0 44 10" aria-hidden="true"><line class="cm-edge edge-${k}" x1="2" y1="5" x2="36" y2="5"/><path class="cm-arrow edge-${k}" d="M36 1 L43 5 L36 9 Z"/></svg>${k === 'practice' ? 'J → D' : k === 'ticket' ? 'D → 티켓' : '티켓 → 영역'} · ${v}</li>`).join('')}</ul></div>
   </div>
   <div class="cm-toolbar">
     <fieldset class="cm-views"><legend>관계 보기</legend>
