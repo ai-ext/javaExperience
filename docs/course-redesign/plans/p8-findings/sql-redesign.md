@@ -1,5 +1,7 @@
 # 과정 v2 데이터 설계·매일 SQL 개편
 
+> 이 문서의 기존 CSV 개편·검사 기록은 변경 전 이력이다. 현재 사용법·건수·검사 결과는 마지막 「더미 데이터 단순화」 절을 따른다.
+
 확인일: 2026-10-24. 대상: course/p1-spec-roadmap. 구현 전 작업 트리는 깨끗했다.
 
 ## 실행 계획
@@ -183,3 +185,132 @@ Git add/commit/stash/reset/checkout은 실행하지 않는다. board-server와 m
 - CloudBeaver/DBeaver의 실제 가져오기, 학습자 앱 로그인, 2단계 재현 스크립트·장애 훈련을 실행하지 않았다.
 - 이번 UI 검증은 생성 HTML/JSDOM 구조·조작 검사다. 실제 브라우저의 데스크톱·모바일 시각 대조 및 학습자 이해도는 미검증이다. 이미지 시안을 새로 제작하거나 새 inventory/parity 항목을 verified로 올리지 않았다.
 - 예시 서버 코드가 모든 불변식을 만족한다는 판정은 하지 않는다. 추가 전용 이력·감사 정책은 학습자가 실제 권한과 저장소 경계로 검증해야 한다.
+
+
+## 더미 데이터 단순화
+
+확인일: 2026-10-24. 현재 작업 공간은 `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap`, 브랜치 파일의 값은 `course/p1-spec-roadmap`, 읽은 ref는 `3397f80a6b3dd697a4dd44525575045107f6dbb0`이다. 위 CSV 방식·검사 결과는 변경 전 이력이며 이 절이 현재 SQL 방식의 기준이다.
+
+### 변경과 실행 계획
+
+1. 스키마·참조 문서·문항을 대조한다. → 실제 구현 예시의 16개 테이블·열과 seed/bulk 기준을 확정한다.
+2. CSV 적재 도구를 지우고 작은 INSERT와 대량 INSERT SELECT로 바꾼다. → 참조·중복·상태·잔액·재고와 예상 집계를 독립 계산한다.
+3. 생성기로 일자 Markdown·HTML을 다시 만들고 지정 검사를 실행한다. → 결과·미실행 범위를 아래에 기록한다.
+
+삭제: `course/start/dummy/`의 CSV 16종(합계 5,086,814바이트), `manifest.json`, `tools/course/gen-dummy.mjs`, `tools/course/gen-dummy.test.mjs`, `tools/course/verify-dummy.mjs`. 삭제한 CSV는 members·posts·tags·post-tags·comments·likes·coupons·member-coupons·items·orders·point-history·payments·banned-words·common-codes·reports·audit-events다.
+
+새 데이터 파일은 `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/start/dummy/seed.sql`과 `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/start/dummy/bulk.sql`이다. 스키마 출처는 `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/src/main/resources/schema.sql`이다. INSERT의 테이블·컬럼은 원본 그대로 사용한다. 복사해 실행하는 SQL만 배포하고 CSV 재생성·파일 업로드·LOAD DATA·외부 생성기를 요구하지 않는다.
+
+`course/hints.json`·과정/출발 README·루트 README·지도·일자 생성기·홈 렌더러의 안내를 SQL로 바꿨다. D00~D15와 일자 목록은 생성기로 갱신했다. D01의 local_infile 조회와 출발 compose의 `--local-infile=1`을 제거했다. 전체 도구와 package.json을 검색했으며 삭제 도구를 호출하는 스크립트는 없어서 package.json 변경은 불필요했다. 이전 CSV 테스트를 삭제하고 `tools/course/seed-sql.test.mjs`로 현재 데이터 관계·집계 회귀 검사를 추가했다. P8 장부에는 이 변경이 이전 CSV 기록을 대체한다고 덧붙였다.
+
+### 파일 크기와 블록별 행 수
+
+`seed.sql`: **39,315바이트**, `bulk.sql`: **2,296바이트**, SQL 합계 **41,611바이트**. seed는 50KB 미만이다. 둘 다 시각을 고정하고 무작위·현재 시각 함수를 사용하지 않는다.
+
+| 실행 블록 | 추가하는 행 | 블록 직후의 성질 |
+|---|---|---|
+| D02 기준 데이터 | banned_word 3, common_code 5 | 금칙어·그룹/코드 중복 없음 |
+| D03 회원 | member 20 | ADMIN 1·USER 19, 잔액 모두 0 |
+| D04 글·태그 | tag 4, post 100, post_tag 150 | ACTIVE 80·HIDDEN 10·DELETED 10, spring 100개 글 공유, sql 50개 글 공유 |
+| D05 댓글·좋아요 | comment 80, post_like 150 | 미삭제 댓글 72, 공개 글의 미삭제 댓글 60, 좋아요 카운터를 실제 관계 수로 갱신 |
+| D07 포인트·쿠폰·상점·주문 | coupon 2, shop_item 3, member_coupon 20, shop_order 20, point_ledger 40 | 쿠폰마다 보유/발급 10, 상품 재고 80·0·10, 모든 회원 잔액 900 |
+| D08 충전 | pg_payment 8, point_ledger 2 | 4상태 각각 2건, DONE 회원 1·5만 1,000씩 적립 |
+| D10 신고·감사 | report 6, audit_log 3 | 글 2·3 각각 신고 3(OPEN 2), BULK_ISSUE_COUPON 3 |
+
+seed 전체는 **616행**이다. 행 수는 INSERT만 센 값이며 D05의 카운터 UPDATE, D07·D08의 잔액 UPDATE는 추가 행이 아니다. 회원 비밀번호는 모두 Course1234이며 지정된 고정 해시의 접두어를 `$2a$`로 사용했다. `/usr/sbin/htpasswd -vb`로 이 해시와 비밀번호의 일치(exit 0)를 재확인했다. Spring 앱 로그인 실행과는 구분한다.
+
+D07 적립은 회원 1~19의 본인 글(id=회원 id), 회원 20의 본인 댓글(id=37)을 사유로 한다. 모든 회원에게 EARN +1,000과 ORDER에 연결된 SPEND -100이 하나씩 있다. 회원별 누적 잔액은 1,000 → 900이고 D08의 두 완료 회원만 1,900이 된다. 최종 잔액 총합은 20×900+2×1,000=20,000이며 이력 합과 같다. 주문은 상품 1을 20개 구매한 가상 스냅샷(개당 100)이며 재고는 이미 반영된 80이다. 상품 2의 재고 0은 품절 경계다.
+
+### bulk 결과와 계산 근거
+
+bulk는 seed D05까지 넣은 별도 DB에서 전체를 한 번 실행한다. `INSERT INTO ... WITH RECURSIVE ... SELECT`로 임시 숫자 테이블에 **101~20,100 양끝 포함 20,000개**를 만들고 여러 INSERT SELECT에 재사용한다. MySQL의 `WITH ... INSERT` 순서로 쓰지 않았다. `cte_max_recursion_depth`를 세션에서 20,100으로 높이고, 종료 후 이전 값으로 돌리며 임시 테이블을 제거한다. 실패 시 COMMIT 없이 ROLLBACK하고 파일 끝의 정리 문장을 같은 연결에서 실행하도록 안내했다.
+
+| 테이블·집계 | seed D05까지 | bulk 추가 | 합계 |
+|---|---:|---:|---:|
+| member | 20 | 0 | 20 |
+| post | 100 | 20,000 | 20,100 |
+| ACTIVE 글 | 80 | 16,000 | 16,080 |
+| HIDDEN 글 | 10 | 2,000 | 2,010 |
+| DELETED 글 | 10 | 2,000 | 2,010 |
+| tag | 4 | 0 | 4 |
+| post_tag | 150 | 30,000 | 30,150 |
+| comment | 80 | 40,000 | 40,080 |
+| 미삭제 comment | 72 | 36,000 | 36,072 |
+| post_like | 150 | 40,000 | 40,150 |
+| spring 태그 공개 글 | 80 | 16,000 | 16,080 |
+
+글 상태는 id % 10이 0이면 DELETED, 1이면 HIDDEN, 나머지는 ACTIVE다. seed 100개와 bulk 20,000개는 모두 10의 배수이므로 8:1:1이다. 모든 글에 spring, 짝수 글에 sql을 하나씩 연결하므로 bulk 관계는 20,000+10,000이다. 댓글은 bulk 글마다 2개이며 5의 배수 글의 둘째 댓글만 삭제(4,000개)하므로 40,000-4,000=36,000개가 미삭제다. 좋아요는 seed 글 id % 4개(한 주기 합 6, 25주기=150), bulk 글마다 서로 다른 회원 2명씩이다. 작성자 다음 회원부터 순환해 본인 좋아요도 만들지 않는다. 고정 post id와 회원 순환식으로 (글, 회원) 중복이 없으며 bulk 글의 저장 카운터도 2다. 태그·댓글·좋아요 PK는 seed 범위와 겹치지 않도록 151 또는 81에서 시작한다. bulk는 회원·금전 이력을 변경하지 않는다.
+
+### 문항별 기대값과 근거
+
+D04·D05는 seed만 기준이다. D06은 seed D05+bulk 기준이며 별도 실험 DB에서 수행한다. D07 이후는 원래 seed DB로 돌아간다. D11~D14는 기존 messy-server DB, D15는 선택한 실제 DB 기준이다. 아래 33개 문항은 현재 hints.json과 같은 순서다. MySQL의 key·rows·Extra·성능은 계산으로 확정하지 않는다.
+
+| 문항 | 데이터 기준 | 기대값 | 계산·판정 근거 |
+|---|---|---|---|
+| D01-1 | 적재 전 내 DB | DB·버전·문자셋 기록 | 연결된 서버에서 실제 조회; 고정 건수 없음 |
+| D01-2 | 적재 전 내 DB | 테이블 집합 일치(0개 허용) | SHOW TABLES와 information_schema의 현재 DB 조건 비교 |
+| D02-1 | seed D02 | 3건·5건 | 두 INSERT의 VALUES 3개·5개 |
+| D02-2 | seed D02 | 중복 두 종류 거부, 3·5 유지 | word UNIQUE, (group_code,code) UNIQUE, 시도 후 ROLLBACK |
+| D03-1 | seed D03 | 20명=ADMIN 1+USER 19, 잔액 0 | member id 1~20, id 1만 ADMIN |
+| D03-2 | seed D03 | 중복 두 종류 거부, 20명 유지 | email·nickname 각각 UNIQUE; 트랜잭션 원복 |
+| D04-1 | seed D04 | 공개 80, 첫 쪽 20, 마지막 id 76 | id % 10=2~9만 ACTIVE, DESC LIMIT 20 |
+| D04-2 | seed D04 | 20건, id 75~52, 앞쪽과 겹침 0 | ACTIVE 중 id<76, DESC LIMIT 20 |
+| D04-3 | seed D04 / 선택 대량 재실험 | 계획 실제 기록; 재실험 공개 16,080 | bulk는 별도 DB에 seed D05까지 넣은 뒤 추가; 80+16,000 |
+| D05-1 | seed D05 | 80행, 미삭제 댓글 합 60, 0댓글 공개 글 48 | 댓글은 글 1~40에 2개: 공개 32×2-삭제 4=60; 나머지 공개 48개 |
+| D05-2 | seed D05 | TOP 10 모두 3개; id 99,95,87,83,79,75,67,63,59,55 | ACTIVE 중 id % 4=3, 좋아요 DESC·id DESC; 실제 관계와 카운터 일치 |
+| D05-3 | seed D05 | 20행, 글 합 100, 회원 20은 0 | 작성자는 1+(id-1)%19; LEFT JOIN이 미작성 회원 포함 |
+| D06-1 | seed D05+bulk | 두 방식 모두 16,080행, 중복 0 | 모든 글이 spring을 공유; 공개 80+16,000 |
+| D06-2 | seed D05+bulk | 결과 동등, 계획은 실제 기록 | 16,080 id 집합·정렬을 대조한 뒤 EXPLAIN |
+| D07-1 | seed D07 | 불일치 0행, 모든 잔액 900 | 20명 각 +1,000-100; 미이력 회원의 0은 COALESCE |
+| D07-2 | seed D07 | 영향 0행, 재고 80 유지 | 상품 1 stock=80<101이므로 WHERE stock>=101 불성립 |
+| D07-3 | seed D07 | 불일치 0행; 2종 각 10 | 회원 id 홀짝으로 쿠폰 1·2에 10명씩; issued_quantity=10 |
+| D08-1 | seed D08 | 4행; 각 2건·금액 합 2,000 | 8개 요청에 DONE/FAILED/UNKNOWN/REQUESTED 주기, 각 amount=1,000 |
+| D08-2 | seed D08 | 두 불일치 조회 모두 0행, 완료/적립 각 2 | DONE id 1·5에만 CHARGE 1개씩; 잔액 1,900×2+900×18 |
+| D09-1 | seed D08까지 | 같은 정렬·시점의 DB 20건과 캐시 대조 | 공개 80건이므로 LIMIT 20은 20건; Redis 일치·TTL은 실제 앱 관찰 |
+| D09-2 | seed D08까지 | 20행, 모두 활동 점수 1,000 | 회원별 EARN 1개; 19 POST+1 COMMENT, SPEND·CHARGE 제외 |
+| D10-1 | seed D10 | 2행, 각 total 3/open 2; 전체 6/open 4 | report 6개를 post 2·3에 3개씩, 각 셋째만 RESOLVED |
+| D10-2 | seed D10 | 동작 집계 1행(3건), 최신 목록 3건 | audit_log 3개가 모두 BULK_ISSUE_COUPON; LIMIT 20은 상한 |
+| D11-1 | messy-server 현재 DB | 현재 열·제약 목록 기록 | 1단계 SQL 미적재; 실제 DB 관찰 |
+| D11-2 | messy-server 티켓 DB | 요청 전후 건수 실제 비교 | 고정 기대 건수 없음; 해당 티켓 재현 절차 |
+| D12-1 | messy-server 재현 중 | 현재 세션·열린 트랜잭션 기록 | 접근 권한과 관찰 시각에 따라 실제 결과 사용 |
+| D12-2 | messy-server 재현 중 | 관찰 쿼리·바인딩·계획·공개 글 수 기록 | 실제 티켓 DB이므로 seed 건수 적용 금지 |
+| D13-1 | messy-server 재현 중 | 대기·엔진 진단 실제 기록 | 0행을 원인 부재로 단정하지 않음 |
+| D13-2 | messy-server 재현 중 | 주문 중복·잔액 차이 유무 기록 | 현재 요청의 관계·부호 있는 이력 합으로 판정; 결과 수정 금지 |
+| D14-1 | messy-server 관찰 시각 | DB·API id 집합과 시각 기록 | 실제 공개 글·좋아요 정렬, 고정 건수 없음 |
+| D14-2 | messy-server 관찰 구간 | 같은 digest 누적값 차이 기록 | 동시 요청이 섞일 수 있음; 한 요청으로 단정하지 않음 |
+| D15-1 | 선택한 1·2단계 DB | 이전 대사와 비교 | seed D07/D08 직후 무변경이면 불일치 0; 이후는 실제 요청에 따라 판정 |
+| D15-2 | 선택한 1·2단계 DB | 행 수·계획과 이유 설명 | 선택한 SELECT·데이터셋·시각 기록; 고정 건수 없음 |
+
+### 문법·불변식 검토와 실행 한계
+
+- MySQL 원본 스키마의 테이블·열·NOT NULL·FK·UNIQUE·CHECK와 INSERT를 대조했다. NULL은 member_coupon.used_at·shop_order.member_coupon_id·미완료 결제 식별/응답 시각 등에만 사용한다. 문자 길이·상태 값·부호·사유 참조를 확인했다.
+- 재귀 CTE의 시작 101·종료 20,100과 재귀 증가 +1, INSERT 뒤 WITH의 MySQL 문법 위치, 임시 테이블 재사용, 세션 재귀 깊이 복원, 파생 테이블 copies의 별칭, ORDER BY와 트랜잭션 경계를 검토했다. 명시 ID를 사용하므로 AUTO_INCREMENT 진행이나 실행 순서의 우연에 기대지 않는다.
+- seed는 날별 블록마다 트랜잭션과 고정 시각을 선언한다. D03~D05에는 이력이 없어 잔액 0이고 D07~D08에서는 블록 완료 시점 잔액=이력 합이 성립한다. bulk도 글·댓글·관계·카운터를 한 트랜잭션으로 추가한다.
+- `node --test tools/course/seed-sql.test.mjs`: 2/2 통과. SQLite 메모리 DB에 원본 DDL의 열·PK·FK·UNIQUE·CHECK를 유지하고 MySQL 표기만 변환해 실행했다. seed 블록별 잔액, 최종 16테이블 건수, FK·중복·카운터·잔액/누적 잔액·주문 금액·재고·쿠폰량·충전 적립·EARN 작성자와 문항 집계를 검사했다. bulk를 새 DB에 두 번 실행해 증가량·삭제 집계·EXISTS/JOIN id 집합·순서가 같음을 확인했다. 이것은 MySQL 구문 실행을 대체하지 않는다.
+- 실제 MySQL·Docker·Spring 앱 로그인·Redis 캐시·EXPLAIN/속도는 실행하지 않았다. 사용자가 지정한 대로 실제 MySQL 실행은 컨트롤러가 담당한다. 새로운 이미지 생성·실제 브라우저 시각 대조 없이 parity/inventory 상태를 verified로 올리지 않는다.
+
+### 단순화 후 검사 결과
+
+아래 검사는 현재 SQL 방식의 소스·생성물을 대상으로 실행했으며 모두 exit 0이다.
+
+| 검사 | 결과 |
+|---|---|
+| `cd tools/site && npm run build` | 일자 Markdown 17개·HTML 396개, 링크 오류 0 |
+| `npm run test:course` | validate 테스트 36/36 통과 |
+| `npm run validate:course` | 30 endpoints·15 days·68 cards·17 day pages |
+| `npm run test:course-pages` | 10/10 통과; 전 일자 SQL 표시·예시 접기 검사 포함 |
+| `npm run audit:visual` | failures=[] |
+| `npm run audit:version-cards` | 4카드 검사 통과 |
+| `npm run audit:parity` | 446기록 검사 통과, verified 0 유지 |
+| `npm run test:navigation` | 공통 메뉴·생성물·목차 검사 통과 |
+| `npm run test:home` | 상태·DOM·다중 탭·이어하기·서비스 미리보기·환경 준비 검사 통과 |
+| 루트 `node --test tools/course/*.test.mjs` | 87/87 통과: build-days 49 + validate 36 + seed-sql 2. 요청한 build-days.test.mjs를 포함한 tools/course의 모든 테스트 실행 |
+| `node tools/site/inventory-visual-work.mjs` | 360화면·47,682항목: unreviewed 47,623·implemented 53·기존 verified 6. 새 verified 없음 |
+| 독립 파일 SHA-256 비교 | board-server 245개·messy-server 313개 파일이 작업 전과 모두 동일. 새 서버 파일도 없음 |
+| 삭제 참조·공백 검사 | 현행 course·도구에서 이전 CSV 안내·생성기/검증기 참조·local_infile 없음. 삭제한 파일 20개 부재, 수동 변경 원본 14개에 후행 공백 없음. 생성된 구현 예시 코드의 원문 공백은 보존 |
+
+빌드·테스트 환경에는 `GIT_OBJECT_DIRECTORY=/private/tmp/sql-redesign-objects`, `GIT_ALTERNATE_OBJECT_DIRECTORIES=/Users/ds/code/javaExperience/.git/objects`를 지정해 생성기의 임시 객체가 공유 .git에 쓰이지 않게 했다. 빌드에는 설치된 ARM esbuild의 `ESBUILD_BINARY_PATH=/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/tools/site/node_modules/@esbuild/darwin-arm64/bin/esbuild`를 지정했다. Git 명령을 직접 호출하지 않았고, 요청한 기존 빌드·테스트 도구가 내부에서 읽는 이력과 임시 fixture 작성은 그대로 사용했다. 생성 HTML·일자 Markdown은 손으로 편집하지 않았다. 장부는 inventory 생성기로만 갱신했으며 두 서버 코드는 수정하지 않았다.
+
+빌드를 처음 저장소 루트에서 호출한 실행은 package.json 부재로 실패했다. 요청한 `tools/site` 디렉터리로 바로잡은 빌드가 exit 0인 결과만 위 표에 기록했다. SQLite bulk 검사 초기에는 테스트 어댑터가 DROP TEMPORARY TABLE 표기를 변환하지 못해 실패했고, SQLite용 변환을 보완한 뒤 2/2 통과했다. 원본 MySQL SQL의 오류로 취급하지 않는다.
+
+세션 로그는 `/private/tmp/sql-redesign-build.log`, `/private/tmp/sql-redesign-course-tests.log`, `/private/tmp/sql-redesign-home.log`, `/private/tmp/sql-redesign-inventory.log`에 있다. 임시 로그를 영구 증거로 의존하지 말고 위 명령으로 재실행한다. 실제 MySQL 실행과 실측 계획은 이 표에 포함되지 않는다.

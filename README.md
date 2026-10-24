@@ -1,6 +1,6 @@
 # javaExperience
 
-Java·Spring 서버 전환 과정 v2다. 매일 **Java → Spring → 채점** 순서로 진행한다. Spring에서는 데이터 요구사항을 보고 테이블을 직접 설계하고 매일 SQL을 푼다. [더미 CSV](course/start/dummy/README.md)는 내 저장 구조로 매핑하며, board-server는 구현 예시로 비교한다.
+Java·Spring 서버 전환 과정 v2다. 매일 **Java → Spring → 채점** 순서로 진행한다. Spring에서는 데이터 요구사항을 보고 테이블을 직접 설계하고 매일 SQL을 푼다. [더미 SQL](course/start/dummy/README.md)은 내 테이블 이름에 맞춰 붙여 넣으며, board-server는 구현 예시로 비교한다.
 
 ## 과정 v2 시작하기
 

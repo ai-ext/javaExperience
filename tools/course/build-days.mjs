@@ -641,7 +641,7 @@ function sqlSection(day, sql, root) {
   });
   return [
     '<section class="day-sql">', '', '## 오늘의 SQL', '', sql.context, '',
-    ...(day.phase === 'build' ? ['[더미 데이터·열 매핑·적재 순서](../start/dummy/README.md)를 먼저 확인한다.', ''] : []),
+    ...(day.phase === 'build' ? ['[더미 SQL·붙여 넣는 순서](../start/dummy/README.md)를 먼저 확인한다.', ''] : []),
     '<ol class="sql-questions">', ...questions, '</ol>', '',
     '<details class="sql-answer">', '<summary>구현 예시 SQL · 직접 작성한 뒤 비교하기</summary>', '',
     'board-server의 설계 기준이다. 2단계에서는 같은 계열의 기존 스키마를 관찰한다. 내 물리 이름·키·정렬이 다르면 매핑해 비교한다. 아래 SQL은 실제 실행 결과가 아니며 예시 서버가 모든 불변식을 보장한다는 뜻도 아니다. 오류가 예상되는 문장은 하나씩 실행하고 실패 뒤 ROLLBACK을 별도로 보낸다.', '',
@@ -742,7 +742,7 @@ export function renderD00(roadmap, root) {
     `- ${j0.topic}`,
     j0.basics ? `- 기본기: ${j0.basics}` : '',
     '',
-    '데이터 요구사항을 보고 테이블·키·제약·인덱스는 직접 설계한다. D01부터 매일 SQL을 풀고, [더미 CSV](../start/dummy/README.md)는 내가 만든 테이블에 열을 매핑해 넣는다. board-server는 직접 설계한 뒤 비교할 구현 예시다.',
+    '데이터 요구사항을 보고 테이블·키·제약·인덱스는 직접 설계한다. D01부터 매일 SQL을 풀고, [더미 SQL](../start/dummy/README.md)은 내 테이블 이름에 맞춰 붙여 넣는다. board-server는 직접 설계한 뒤 비교할 구현 예시다.',
     '',
     '## 내일 미리보기',
     '',

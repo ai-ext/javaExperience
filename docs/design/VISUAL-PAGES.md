@@ -1,6 +1,6 @@
 # 화면별 시각 개편 체크리스트
 
-저자 원문과 생성 HTML이 함께 있는 360개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 47,717개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
+저자 원문과 생성 HTML이 함께 있는 360개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 47,682개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
 
 체크는 해당 화면의 모든 개별 항목이 `verified`일 때만 자동으로 붙는다. `imagegen` 시안 또는 공통 컴포넌트 한 개를 적용한 상태는 완료가 아니다.
 
@@ -47,7 +47,7 @@
 - [ ] [course/spring/D15.md](../../course/spring/D15.html) — 항목 87, 긴 산문 0, 토글 9, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/README.md](../../course/spring/README.html) — 항목 7, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [course/start/README.md](../../course/start/README.html) — 항목 34, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
-- [ ] [course/start/dummy/README.md](../../course/start/dummy/README.html) — 항목 47, 긴 산문 1, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [course/start/dummy/README.md](../../course/start/dummy/README.html) — 항목 12, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 
 ## 공부자료 (135)
 
