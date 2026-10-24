@@ -13,7 +13,7 @@
 
 </head>
 <body>
-<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../spring/README.html" aria-current="page">과정 v2 · 일자 목록</a><a href="../map.html">과정 지도</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
 <main>
 
 <h1 id="e01-고도화-인기글-캐시-재적재를-한-요청만-하도록-스탬피드-방지"><a class="anchor" href="#e01-고도화-인기글-캐시-재적재를-한-요청만-하도록-스탬피드-방지" aria-hidden="true">#</a>E01. 고도화: 인기글 캐시 재적재를 한 요청만 하도록 (스탬피드 방지)</h1>
@@ -48,6 +48,14 @@
   <p class="flow-cause-note">원인 서술을 먼저 써 본 뒤 펼치세요. 단계 번호는 위 증상 단계와 섞인 실제 순서로 재생됩니다.</p>
   <ol class="flow-steps is-cause"><li class="flow-step is-cause" id="flow-e01-3" data-order="3" data-node="client"><p class="flow-step-head"><span class="flow-step-no">원인 1</span><span class="flow-step-node">동시 요청</span></p><p class="flow-step-title">캐시 미스 때 재적재를 막는 장치가 없다</p><dl class="flow-values"><div><dt>결과</dt><dd>비는 그 순간 들어온 요청 수만큼 DB 조회가 겹친다</dd></div></dl></li><li class="flow-step is-cause" id="flow-e01-4" data-order="4" data-node="db"><p class="flow-step-head"><span class="flow-step-no">원인 2</span><span class="flow-step-node">인기글 쿼리</span></p><p class="flow-step-title">첫 적재를 멈춰 두면 그사이 요청마다 <code>findPopular</code>를 실행한다</p><dl class="flow-values"><div><dt>확인 테스트</dt><dd><code>findPopular</code>가 1번이 아니라 십수 번(커넥션 풀 크기에 따라 다르다)</dd></div><div><dt>무효화</dt><dd>글 변경 커밋마다도 같은 일이 생긴다</dd></div></dl></li></ol></details>
 </section>
+<h2 id="진행-순서와-선행-자료"><a class="anchor" href="#진행-순서와-선행-자료" aria-hidden="true">#</a>진행 순서와 선행 자료</h2>
+<p>먼저 <a href="../java/J07.html">J07의 공유 상태·동시 요청</a>, <a href="../java/J12.html">J12의 책임별 메서드 읽기</a>, <a href="../java/J14.html">J14의 값 없음과 빈 결과</a>, <a href="../spring/D09.html">D09의 캐시 조회·쓰기 계약</a>을 확인한다. <a href="B15.html">B15</a>·<a href="B16.html">B16</a>은 관련 증상과 현재 수정 여부를 확인할 자료이며, 선택하지 않은 티켓을 먼저 해결해야 하는 것은 아니다.</p>
+<ol>
+<li><strong>동시 적재</strong>: 캐시가 빈 순간 동시 100요청의 정상 응답 형식을 유지하면서 DB 목록 쿼리가 1회인지 확인한다.</li>
+<li><strong>대기 상한</strong>: 첫 적재가 늦거나 실패할 때도 정해 둔 상한 안에 나머지 요청이 200을 받는지 별도로 확인한다. 선택 티켓의 처리 여부와 현재 환경 조건을 기록한다.</li>
+<li><strong>무효화 경쟁</strong>: 적재 중 글을 삭제하는 순서를 고정하고, 삭제 응답 뒤 조회에 그 글이 없는지 확인한다. 앞 단계가 통과해도 이 조건은 따로 검증한다.</li>
+</ol>
+<p>각 단계의 실행 결과와 설명을 남긴다. 구현 방식은 정해져 있지 않으며, 아래 제출물의 결과 조건으로 확인한다.</p>
 <h2 id="환경과-재현"><a class="anchor" href="#환경과-재현" aria-hidden="true">#</a>환경과 재현</h2>
 <ol>
 <li><code>messy-server</code>에서 <code>docker compose up -d</code></li>
