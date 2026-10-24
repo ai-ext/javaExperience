@@ -17,7 +17,7 @@
 
 <link rel="stylesheet" href="../../tools/site/course-stepper.css?v=212f27ba9cd6">
 <link rel="stylesheet" href="../../tools/site/course-tokens.css?v=88a1cb1816cf">
-<link rel="stylesheet" href="../../tools/site/course-content.css?v=998e32f17288">
+<link rel="stylesheet" href="../../tools/site/course-content.css?v=35f34c292222">
 <link rel="stylesheet" href="../../tools/site/contrast.css?v=fa9b5b7d70bc">
 </head>
 <body class="course-page">
@@ -68,7 +68,7 @@
 </div>
   <h3 class="flow-list-title">보이는 증상과 관찰 지점 <small>3단계</small></h3>
   <ol class="flow-steps" data-content-kind="practice"><li class="flow-step" id="flow-b14-1" data-order="1" data-node="client"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">1</span><span class="flow-step-node">외부 요청</span></p><p class="flow-step-title" data-content-kind="practice">토큰 없이 actuator 세 경로를 부른다</p><dl class="flow-values"><div><dt>재현</dt><dd><code>/actuator/health</code>, <code>/actuator/metrics</code>, <code>/actuator/env</code></dd></div><div><dt>프로파일</dt><dd>prod (8089 포트)</dd></div></dl></li><li class="flow-step" id="flow-b14-4" data-order="4" data-node="symptom"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">2</span><span class="flow-step-node">/actuator/env 응답</span></p><p class="flow-step-title" data-content-kind="practice">세 경로 모두 200, env에 비밀값이 평문</p><dl class="flow-values"><div><dt>재현</dt><dd>env 응답에 <code>DB_PASSWORD</code>, <code>BOARD_JWT_SECRET</code> 값이 그대로</dd></div><div><dt>티켓</dt><dd>관리자만 보게 해 뒀다고 알고 있다</dd></div></dl></li><li class="flow-step" id="flow-b14-5" data-order="5" data-node="observe"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">3</span><span class="flow-step-node">관찰 지점</span></p><p class="flow-step-title" data-content-kind="practice">로컬에서는 401이라 기존 테스트로 보이지 않는다</p><dl class="flow-values"><div><dt>재현</dt><dd>로컬 프로파일(test·local)에서는 env가 노출되지 않아 401</dd></div><div><dt>도구</dt><dd><code>SecurityConfig</code> 인가 규칙 점검, prod 프로파일 기동 후 <code>curl</code></dd></div></dl></li></ol>
-  <details class="flow-cause" data-content-kind="practice"><summary>원인 쪽 단계 2개 펼치기 — "원인과 정답"과 같은 수준</summary>
+  <details class="flow-cause" data-content-kind="practice"><summary>원인 쪽 단계 2개 펼치기 — "원인과 구현 예시"과 같은 수준</summary>
   <p class="flow-cause-note" data-content-kind="practice">원인 서술을 먼저 써 본 뒤 펼치세요. 단계 번호는 위 증상 단계와 섞인 실제 순서로 재생됩니다.</p>
   <ol class="flow-steps is-cause" data-content-kind="practice"><li class="flow-step is-cause" id="flow-b14-2" data-order="2" data-node="rules"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">원인 1</span><span class="flow-step-node">인가 규칙</span></p><p class="flow-step-title" data-content-kind="practice"><code>toAnyEndpoint()</code> 공개 규칙이 env 관리자 규칙보다 위에 있다</p><dl class="flow-values"><div><dt>위</dt><dd><code>requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll()</code></dd></div><div><dt>아래</dt><dd><code>requestMatchers(EndpointRequest.to("env")).hasRole("ADMIN")</code></dd></div></dl></li><li class="flow-step is-cause" id="flow-b14-3" data-order="3" data-node="config"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">원인 2</span><span class="flow-step-node">노출 설정</span></p><p class="flow-step-title" data-content-kind="practice">prod가 env를 노출하며 값 가림을 껐다</p><dl class="flow-values"><div><dt>설정</dt><dd><code>show-values: always</code></dd></div></dl></li></ol></details>
 </section>
@@ -94,7 +94,7 @@ Spring Boot의 기본은 env 값을 <code>******</code>로 가린다(<code>never
 
 
 
-<section class="exercise-section exercise-answer" aria-labelledby="원인과-정답" data-content-kind="example"><span class="content-kind " data-kind-label="example"><span aria-hidden="true">{ }</span> 예시<small>내 구현과 비교</small></span><h2 id="원인과-정답"><a class="anchor" href="#원인과-정답" aria-hidden="true">#</a>원인과 정답</h2><details data-content-kind="example">
+<section class="exercise-section exercise-answer" aria-labelledby="원인과-정답" data-content-kind="example"><span class="content-kind " data-kind-label="example"><span aria-hidden="true">{ }</span> 구현 예시<small>내 구현과 비교</small></span><h2 id="원인과-정답"><a class="anchor" href="#원인과-정답" aria-hidden="true">#</a>원인과 구현 예시</h2><details data-content-kind="example">
 <summary>펼치기</summary>
 
 <p data-content-kind="example"><strong>원인.</strong> 두 가지가 겹쳤다.
@@ -102,10 +102,10 @@ Spring Boot의 기본은 env 값을 <code>******</code>로 가린다(<code>never
 <code>toAnyEndpoint()</code>는 노출된 모든 엔드포인트(env 포함)와 매치되므로 env 요청은 여기서 공개로 끝나고, 아래 관리자 규칙은 영원히 매치되지 않는다. metrics도 함께 공개된다.
 ② <code>application-prod.yml</code>(또는 <code>application-prod.properties</code>)이 env를 노출하면서 <code>show-values: always</code>로 값 가림을 껐다. 그래서 공개된 env에 비밀값이 평문으로 실린다.
 test 프로파일은 health만 노출하므로 <code>/actuator/env</code>가 아예 엔드포인트가 아니고, 마지막 <code>anyRequest().authenticated()</code>에 걸려 401이 난다. 기존 테스트가 통과한 이유다.</p>
-<p data-content-kind="example"><strong>정답 수정.</strong> health만 공개(<code>EndpointRequest.to("health")</code>)하고, 그다음에 나머지 노출 엔드포인트를 관리자 전용(<code>EndpointRequest.toAnyEndpoint()</code> → <code>hasRole("ADMIN")</code>)으로 둔다. 좁은 규칙을 먼저, 넓은 규칙을 나중에.
+<p data-content-kind="example"><strong>구현 예시 수정.</strong> health만 공개(<code>EndpointRequest.to("health")</code>)하고, 그다음에 나머지 노출 엔드포인트를 관리자 전용(<code>EndpointRequest.toAnyEndpoint()</code> → <code>hasRole("ADMIN")</code>)으로 둔다. 좁은 규칙을 먼저, 넓은 규칙을 나중에.
 <code>show-values: always</code>는 지운다(기본 <code>never</code>). 키와 출처 이름만으로도 설정 확인(B11)은 충분하다. 노출된 키는 교체해야 한다. (<code>tickets/B14/answer/fix.patch</code>)</p>
 <p data-content-kind="example"><strong>확인 테스트.</strong> <code>tickets/B14/answer/B14ConfirmTest.java</code> — 토큰 없는 env·metrics 401, 일반 회원 env·metrics 403, 관리자 env·metrics 200, 관리자 env 응답에도 비밀값 평문 없음, 토큰 없는 health 200</p>
-<p data-content-kind="example"><strong>1단계 정답 서버는?</strong> <code>board-server/src/main/resources/application.yml</code>(또는 <code>board-server/src/main/resources/application.properties</code>)(학습자 구현에서는 <code>board-server/src/main/resources/application.properties</code>도 인정)은 HTTP로 health만 노출하고(<code>exposure.include: health</code>),
+<p data-content-kind="example"><strong>1단계 구현 예시 서버는?</strong> <code>board-server/src/main/resources/application.yml</code>(또는 <code>board-server/src/main/resources/application.properties</code>)(학습자 구현에서는 <code>board-server/src/main/resources/application.properties</code>도 인정)은 HTTP로 health만 노출하고(<code>exposure.include: health</code>),
 <code>SecurityConfig</code>는 <code>GET /actuator/health</code>만 <code>permitAll</code>로 열어 나머지 <code>/actuator/**</code>는 <code>anyRequest().authenticated()</code>가 막는다(spec-v2 3절).</p>
 </details></section>
 
@@ -118,6 +118,7 @@ test 프로파일은 health만 노출하므로 <code>/actuator/env</code>가 아
 
 
 
+<script src="../../tools/site/course.js?v=a40c051bd7bd" defer></script>
 <script src="../../tools/site/course-flow.js?v=1684be5bc034" defer></script>
 </body>
 </html>

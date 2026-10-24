@@ -17,7 +17,7 @@
 
 <link rel="stylesheet" href="../../tools/site/course-stepper.css?v=212f27ba9cd6">
 <link rel="stylesheet" href="../../tools/site/course-tokens.css?v=88a1cb1816cf">
-<link rel="stylesheet" href="../../tools/site/course-content.css?v=998e32f17288">
+<link rel="stylesheet" href="../../tools/site/course-content.css?v=35f34c292222">
 <link rel="stylesheet" href="../../tools/site/contrast.css?v=fa9b5b7d70bc">
 </head>
 <body class="course-page">
@@ -69,7 +69,7 @@
 </div>
   <h3 class="flow-list-title">보이는 증상과 관찰 지점 <small>5단계</small></h3>
   <ol class="flow-steps" data-content-kind="practice"><li class="flow-step" id="flow-b10-1" data-order="1" data-node="pg"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">1</span><span class="flow-step-node">외부 PG</span></p><p class="flow-step-title" data-content-kind="practice">PG가 승인하되 5초 뒤에 답한다</p><dl class="flow-values"><div><dt>재현</dt><dd>첫 승인 요청은 승인하되 5초 뒤에 답하는 상태 있는 PG</dd></div><div><dt>운영</dt><dd>PG 응답이 느렸던 어제 저녁</dd></div></dl></li><li class="flow-step" id="flow-b10-2" data-order="2" data-node="api"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">2</span><span class="flow-step-node">충전 API</span></p><p class="flow-step-title" data-content-kind="practice">충전은 한 번만 보냈다</p><dl class="flow-values"><div><dt>앱</dt><dd>충전 버튼을 한 번만 보내도록 막혀 있다</dd></div><div><dt>재현</dt><dd>충전을 한 번 보낸다</dd></div></dl></li><li class="flow-step" id="flow-b10-4" data-order="4" data-node="data"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">3</span><span class="flow-step-node">연계 로그</span></p><p class="flow-step-title" data-content-kind="practice">PG가 받은 승인 요청 2건, 연계 로그 2행</p><dl class="flow-values"><div><dt>WireMock</dt><dd>승인 요청 2건</dd></div><div><dt>pg_payment</dt><dd>UNKNOWN 1, DONE 1</dd></div></dl></li><li class="flow-step" id="flow-b10-6" data-order="6" data-node="symptom"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">4</span><span class="flow-step-node">잔액</span></p><p class="flow-step-title" data-content-kind="practice">7,000포인트를 한 번 충전했는데 잔액은 14,000</p><dl class="flow-values"><div><dt>정산팀</dt><dd>같은 회원의 같은 금액 충전이 몇 초 간격으로 두 번씩 승인</dd></div><div><dt>재현</dt><dd>UNKNOWN 행의 <code>orderId</code>로 결제 완료 콜백(DONE)을 보내면 잔액 14000, 충전 원장 2건</dd></div></dl></li><li class="flow-step" id="flow-b10-7" data-order="7" data-node="observe"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">5</span><span class="flow-step-node">관찰 지점</span></p><p class="flow-step-title" data-content-kind="practice">연계 로그와 PG 요청 기록을 맞춰 본다</p><dl class="flow-values"><div><dt>도구</dt><dd>연계 로그(<code>pg_payment</code>), WireMock 요청 기록(<code>/__admin/requests</code>)과 시나리오(상태 있는 스텁)</dd></div></dl></li></ol>
-  <details class="flow-cause" data-content-kind="practice"><summary>원인 쪽 단계 2개 펼치기 — "원인과 정답"과 같은 수준</summary>
+  <details class="flow-cause" data-content-kind="practice"><summary>원인 쪽 단계 2개 펼치기 — "원인과 구현 예시"과 같은 수준</summary>
   <p class="flow-cause-note" data-content-kind="practice">원인 서술을 먼저 써 본 뒤 펼치세요. 단계 번호는 위 증상 단계와 섞인 실제 순서로 재생됩니다.</p>
   <ol class="flow-steps is-cause" data-content-kind="practice"><li class="flow-step is-cause" id="flow-b10-3" data-order="3" data-node="api"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">원인 1</span><span class="flow-step-node">충전 API</span></p><p class="flow-step-title" data-content-kind="practice"><code>PG_TIMEOUT</code>이면 한 번 더 시도하면서 재시도용 키를 새로 만든다</p><dl class="flow-values"><div><dt>코드</dt><dd><code>UUID.randomUUID()</code></dd></div><div><dt>결과</dt><dd>새 키 = 새 <code>pg_payment</code> 행 = 새 <code>orderId</code> → PG에는 별개의 결제</dd></div></dl></li><li class="flow-step is-cause" id="flow-b10-5" data-order="5" data-node="data"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">원인 2</span><span class="flow-step-node">연계 로그</span></p><p class="flow-step-title" data-content-kind="practice">행마다 한 번만 적립해도 행이 둘이라 적립도 둘이다</p><dl class="flow-values"><div><dt>두 번째</dt><dd>바로 DONE으로 적립</dd></div><div><dt>첫 번째</dt><dd>PG 콜백이 오거나 재처리(<code>ChargeService.reconcile</code>, PG 조회)로 DONE을 확인하는 순간 또 적립</dd></div></dl></li></ol></details>
 </section>
@@ -96,18 +96,18 @@ WireMock의 <code>POST /__admin/requests/find</code>로 PG가 받은 <code>Idemp
 
 
 
-<section class="exercise-section exercise-answer" aria-labelledby="원인과-정답" data-content-kind="example"><span class="content-kind " data-kind-label="example"><span aria-hidden="true">{ }</span> 예시<small>내 구현과 비교</small></span><h2 id="원인과-정답"><a class="anchor" href="#원인과-정답" aria-hidden="true">#</a>원인과 정답</h2><details data-content-kind="example">
+<section class="exercise-section exercise-answer" aria-labelledby="원인과-정답" data-content-kind="example"><span class="content-kind " data-kind-label="example"><span aria-hidden="true">{ }</span> 구현 예시<small>내 구현과 비교</small></span><h2 id="원인과-정답"><a class="anchor" href="#원인과-정답" aria-hidden="true">#</a>원인과 구현 예시</h2><details data-content-kind="example">
 <summary>펼치기</summary>
 
 <p data-content-kind="example"><strong>원인.</strong> <code>ChargeService.charge</code>가 "PG가 잠깐 느린 경우가 많다"며 <code>PG_TIMEOUT</code>이면 한 번 더 시도하는데, 같은 키로 다시 보내면 처음 기록(UNKNOWN)을 돌려주는 504만 나오니 <strong>재시도용 키를 새로 만든다</strong>(<code>UUID.randomUUID()</code>).
 새 키 = 새 <code>pg_payment</code> 행 = 새 <code>orderId</code>라 PG에는 별개의 결제 요청이다. 첫 요청은 PG가 이미 승인했고 응답만 늦었으므로 PG 승인은 2건이 된다.
 두 번째는 바로 DONE으로 적립되고, 첫 번째(UNKNOWN)는 PG 콜백이 오거나 재처리(<code>ChargeService.reconcile</code>, PG 조회)로 DONE을 확인하는 순간 또 적립된다. 행마다 "한 번만 적립"(조건부 상태 전이)은 지켜지지만 행이 둘이라 적립도 둘이다.
 클라이언트가 같은 키로 다시 보낸 경우에도 이 재시도가 새 키를 만든다. 재시도 횟수를 줄여도 키를 새로 만드는 한 줄어들 뿐 없어지지 않는다.</p>
-<p data-content-kind="example"><strong>정답 수정.</strong> 응답 타임아웃은 다시 보내지 않는다. 결과 불명(UNKNOWN)으로 남기고 504로 답한 뒤, 콜백·재처리(<code>reconcile</code>)가 같은 <code>orderId</code>로 확정한다(<code>tickets/B10/answer/fix.patch</code>).
+<p data-content-kind="example"><strong>구현 예시 수정.</strong> 응답 타임아웃은 다시 보내지 않는다. 결과 불명(UNKNOWN)으로 남기고 504로 답한 뒤, 콜백·재처리(<code>reconcile</code>)가 같은 <code>orderId</code>로 확정한다(<code>tickets/B10/answer/fix.patch</code>).
 꼭 다시 보내야 한다면 같은 Idempotency-Key(같은 <code>orderId</code>)로 보내 PG가 처음 결과를 돌려주게 한다. 클라이언트의 재요청도 같은 키면 서버가 처음 기록을 돌려준다.</p>
 <p data-content-kind="example"><strong>확인 테스트.</strong> <code>tickets/B10/answer/B10ConfirmTest.java</code> — <code>승인_응답이_늦게_와도_PG_승인은_한_건이고_포인트는_한_번_쌓인다</code>
 이 서버에는 <code>reconcile</code>을 주기적으로 부르는 워커가 아직 없어, 확인 테스트가 결과 불명 건마다 직접 부른다(운영이라면 워커나 PG 콜백이 그 역할을 한다).</p>
-<p data-content-kind="example"><strong>1단계 정답 서버는?</strong> <code>board-server/src/main/java/com/example/board/payment/PgRetryPolicy.java</code>는 연결 실패와 5xx만 재시도하고(응답 타임아웃은 결과 불명), <code>PgClient.approve</code>는 재시도해도 같은 키를 보낸다.
+<p data-content-kind="example"><strong>1단계 구현 예시 서버는?</strong> <code>board-server/src/main/java/com/example/board/payment/PgRetryPolicy.java</code>는 연결 실패와 5xx만 재시도하고(응답 타임아웃은 결과 불명), <code>PgClient.approve</code>는 재시도해도 같은 키를 보낸다.
 <code>ChargeService</code>는 한 요청에 <code>pg_payment</code> 한 행만 만든다. <code>PgTimeoutTest</code>가 "504이고 UNKNOWN이며 재시도하지 않는다"를 확인했는데, 이 서버에서는 그 단언들이 지워지거나 약해져 있다.</p>
 </details></section>
 
@@ -120,6 +120,7 @@ WireMock의 <code>POST /__admin/requests/find</code>로 PG가 받은 <code>Idemp
 
 
 
+<script src="../../tools/site/course.js?v=a40c051bd7bd" defer></script>
 <script src="../../tools/site/course-flow.js?v=1684be5bc034" defer></script>
 </body>
 </html>

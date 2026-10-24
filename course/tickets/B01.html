@@ -17,7 +17,7 @@
 
 <link rel="stylesheet" href="../../tools/site/course-stepper.css?v=212f27ba9cd6">
 <link rel="stylesheet" href="../../tools/site/course-tokens.css?v=88a1cb1816cf">
-<link rel="stylesheet" href="../../tools/site/course-content.css?v=998e32f17288">
+<link rel="stylesheet" href="../../tools/site/course-content.css?v=35f34c292222">
 <link rel="stylesheet" href="../../tools/site/contrast.css?v=fa9b5b7d70bc">
 </head>
 <body class="course-page">
@@ -68,7 +68,7 @@
 </div>
   <h3 class="flow-list-title">보이는 증상과 관찰 지점 <small>5단계</small></h3>
   <ol class="flow-steps" data-content-kind="practice"><li class="flow-step" id="flow-b01-1" data-order="1" data-node="pg"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">1</span><span class="flow-step-node">외부 PG</span></p><p class="flow-step-title" data-content-kind="practice">PG 응답이 느려진다</p><dl class="flow-values"><div><dt>운영</dt><dd>저녁 8시쯤 결제사(PG) 장애 공지</dd></div><div><dt>재현</dt><dd>Toxiproxy로 PG 응답을 5초 늦춘다</dd></div></dl></li><li class="flow-step" id="flow-b01-2" data-order="2" data-node="api"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">2</span><span class="flow-step-node">충전 API</span></p><p class="flow-step-title" data-content-kind="practice">그 사이 충전 요청이 몰린다</p><dl class="flow-values"><div><dt>재현</dt><dd>회원 12명이 동시에 충전</dd></div></dl></li><li class="flow-step" id="flow-b01-6" data-order="6" data-node="symptom"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">3</span><span class="flow-step-node">글 목록 API</span></p><p class="flow-step-title" data-content-kind="practice">결제와 상관없는 글 목록이 같이 멈춘다</p><dl class="flow-values"><div><dt>운영</dt><dd>10분 가까이 500 아니면 무한 로딩</dd></div><div><dt>재현</dt><dd>평소 수십 ms인 글 목록이 2초쯤 기다린 뒤 500</dd></div></dl></li><li class="flow-step" id="flow-b01-7" data-order="7" data-node="observe"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">4</span><span class="flow-step-node">관찰 지점</span></p><p class="flow-step-title" data-content-kind="practice">그 순간 Hikari 지표</p><dl class="flow-values"><div><dt>active</dt><dd><code>hikaricp.connections.active</code> = 10 (풀 최대)</dd></div><div><dt>pending</dt><dd><code>pending</code> &gt; 0</dd></div></dl></li><li class="flow-step" id="flow-b01-8" data-order="8" data-node="observe"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">5</span><span class="flow-step-node">관찰 지점</span></p><p class="flow-step-title" data-content-kind="practice">스레드 덤프를 뜰 도구</p><dl class="flow-values"><div><dt>명령</dt><dd><code>jcmd &lt;pid&gt; Thread.print</code></dd></div></dl></li></ol>
-  <details class="flow-cause" data-content-kind="practice"><summary>원인 쪽 단계 3개 펼치기 — "원인과 정답"과 같은 수준</summary>
+  <details class="flow-cause" data-content-kind="practice"><summary>원인 쪽 단계 3개 펼치기 — "원인과 구현 예시"과 같은 수준</summary>
   <p class="flow-cause-note" data-content-kind="practice">원인 서술을 먼저 써 본 뒤 펼치세요. 단계 번호는 위 증상 단계와 섞인 실제 순서로 재생됩니다.</p>
   <ol class="flow-steps is-cause" data-content-kind="practice"><li class="flow-step is-cause" id="flow-b01-3" data-order="3" data-node="api"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">원인 1</span><span class="flow-step-node">충전 API</span></p><p class="flow-step-title" data-content-kind="practice">충전이 PG 응답을 트랜잭션 안에서 기다린다</p><dl class="flow-values"><div><dt>코드</dt><dd><code>ChargeService.charge</code>가 <code>tx.execute(...)</code> 안에서 <code>pgClient.approve(...)</code>를 부른다</dd></div><div><dt>커넥션</dt><dd>JPA 트랜잭션은 시작할 때 커넥션을 얻는다 → PG를 기다리는 내내 1개를 쥔다</dd></div></dl></li><li class="flow-step is-cause" id="flow-b01-4" data-order="4" data-node="pool"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">원인 2</span><span class="flow-step-node">Hikari 풀</span></p><p class="flow-step-title" data-content-kind="practice">커넥션 10개가 모두 PG 대기에 묶인다</p><dl class="flow-values"><div><dt>풀</dt><dd>10개</dd></div><div><dt>계산</dt><dd>동시 충전 10건이면 바닥난다. 풀을 키워도 PG 지연 × 동시 충전 수만큼 다시 바닥난다</dd></div></dl></li><li class="flow-step is-cause" id="flow-b01-5" data-order="5" data-node="symptom"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">원인 3</span><span class="flow-step-node">글 목록 API</span></p><p class="flow-step-title" data-content-kind="practice">글 목록은 커넥션을 2초 기다리다 실패한다</p><dl class="flow-values"><div><dt>대기</dt><dd><code>connection-timeout</code> 2초</dd></div><div><dt>오진</dt><dd>쿼리가 느린 것이 아니라 커넥션을 얻지 못했다</dd></div></dl></li></ol></details>
 </section>
@@ -94,19 +94,19 @@ active가 최대치(10)이고 pending이 쌓이면 쿼리가 아니라 풀이 �
 
 
 
-<section class="exercise-section exercise-answer" aria-labelledby="원인과-정답" data-content-kind="example"><span class="content-kind " data-kind-label="example"><span aria-hidden="true">{ }</span> 예시<small>내 구현과 비교</small></span><h2 id="원인과-정답"><a class="anchor" href="#원인과-정답" aria-hidden="true">#</a>원인과 정답</h2><details data-content-kind="example">
+<section class="exercise-section exercise-answer" aria-labelledby="원인과-정답" data-content-kind="example"><span class="content-kind " data-kind-label="example"><span aria-hidden="true">{ }</span> 구현 예시<small>내 구현과 비교</small></span><h2 id="원인과-정답"><a class="anchor" href="#원인과-정답" aria-hidden="true">#</a>원인과 구현 예시</h2><details data-content-kind="example">
 <summary>펼치기</summary>
 
 <p data-content-kind="example"><strong>원인.</strong> <code>ChargeService.charge</code>가 "승인과 결과 반영을 한 트랜잭션으로" 묶으면서 <code>pgClient.approve(...)</code>를 <code>tx.execute(...)</code> 안에서 부른다.
 JPA 트랜잭션은 시작할 때 DB 커넥션을 얻으므로, PG 응답(최대 3초 응답 타임아웃)을 기다리는 내내 Hikari 커넥션 하나를 쥔다.
 PG가 느린 날 충전이 10건만 동시에 들어와도 풀(10개)이 모두 PG 대기에 묶이고, 충전과 상관없는 글 목록은 커넥션을 2초(<code>connection-timeout</code>) 기다리다 실패한다.
 "DB가 느리다"는 단서는 오진이다. 쿼리는 빠르고, 커넥션을 얻지 못한 것이다. 풀 크기를 늘려도 PG 지연 × 동시 충전 수만큼 다시 바닥난다.</p>
-<p data-content-kind="example"><strong>정답 수정.</strong> PG 호출을 트랜잭션 밖으로 뺀다. REQUESTED 저장(트랜잭션 1) → PG 승인(트랜잭션 밖) → 결과 반영(트랜잭션 2)로 나눈다.
+<p data-content-kind="example"><strong>구현 예시 수정.</strong> PG 호출을 트랜잭션 밖으로 뺀다. REQUESTED 저장(트랜잭션 1) → PG 승인(트랜잭션 밖) → 결과 반영(트랜잭션 2)로 나눈다.
 승인과 반영 사이의 틈은 트랜잭션으로 메우는 것이 아니라, REQUESTED를 먼저 커밋해 두고 콜백·조회(<code>reconcile</code>)의 조건부 상태 전이로 메운다. (<code>tickets/B01/answer/fix.patch</code>)</p>
 <p data-content-kind="example"><strong>확인 테스트.</strong> <code>tickets/B01/answer/B01ConfirmTest.java</code> — <code>PG가_6초_늦어_충전이_몰려도_글_목록은_곧바로_200이다</code>
 PG 응답을 6초 늦추고 이 테스트에서만 PG 응답 타임아웃을 10초로 늘려(타임아웃·재시도와 섞이지 않게) 충전 12건이 PG를 기다리게 한다. 준비 단언: PG에 닿은 충전이 1건 이상이고 글 목록을 부르는 동안 그 충전들이 아직 끝나지 않았다.
 판정: 글 목록 200·1.5초 안, 충전은 500 없이 PG에 닿은 건수 이상 성공. 메시지에 측정 직전 Hikari 사용 중·대기 수를 남긴다(결함 상태 실측: 사용 중 10·대기 2, 글 목록 500). PG 호출 수를 제한하는 벌크헤드 같은 수정도 통과한다.</p>
-<p data-content-kind="example"><strong>1단계 정답 서버는?</strong> <code>board-server/src/main/java/com/example/board/payment/ChargeService.java</code>는 클래스에 <code>@Transactional</code>을 두지 않고 <code>TransactionTemplate</code>으로 저장·반영만 짧게 감싼다.
+<p data-content-kind="example"><strong>1단계 구현 예시 서버는?</strong> <code>board-server/src/main/java/com/example/board/payment/ChargeService.java</code>는 클래스에 <code>@Transactional</code>을 두지 않고 <code>TransactionTemplate</code>으로 저장·반영만 짧게 감싼다.
 PG 호출은 두 트랜잭션 사이에 있다. <code>ChargeTransactionBoundaryTest</code>가 PG 지연 중 Hikari active가 0인지 확인했는데, 이 서버에서는 그 테스트가 지워져 있다.</p>
 </details></section>
 
@@ -119,6 +119,7 @@ PG 호출은 두 트랜잭션 사이에 있다. <code>ChargeTransactionBoundaryT
 
 
 
+<script src="../../tools/site/course.js?v=a40c051bd7bd" defer></script>
 <script src="../../tools/site/course-flow.js?v=1684be5bc034" defer></script>
 </body>
 </html>
