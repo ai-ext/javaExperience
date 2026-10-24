@@ -323,7 +323,7 @@ export function renderCourseMap(course, fromRel = MAP_PAGE) {
   const href = (target) => (target ? relHref(fromRel, target) : null);
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const label = (id) => (byId.get(id).kind === 'area' ? byId.get(id).title : id);
-  const nodeButton = (n) => `<button type="button" class="cm-node kind-${n.kind}${n.note === '필수' ? ' is-required' : ''}" data-node="${esc(n.id)}" aria-pressed="false"><b>${esc(n.kind === 'area' ? n.title : n.id)}</b>${n.kind === 'area' ? '' : `<span>${esc(n.title)}</span>`}${n.note ? `<small>${esc(n.note)}</small>` : ''}</button>`;
+  const nodeButton = (n) => `<button type="button" class="cm-node kind-${n.kind}${n.note === '필수' ? ' is-required' : ''}" data-node="${esc(n.id)}" title="${esc(n.title)}" aria-pressed="false"><b>${esc(n.kind === 'area' ? n.title : n.id)}</b>${n.kind === 'area' ? '' : `<span>${esc(n.title)}</span>`}${n.note ? `<small>${esc(n.note)}</small>` : ''}</button>`;
   const lanes = ['java', 'day', 'ticket', 'area'].map((kind) => `<div class="cm-lane lane-${kind}" data-lane="${kind}"><h3>${KIND_LABEL[kind]}</h3><div class="cm-lane-nodes">${nodes.filter((n) => n.kind === kind).map(nodeButton).join('')}</div></div>`).join('');
   const edgeChip = (e, show) => {
     const n = byId.get(show);

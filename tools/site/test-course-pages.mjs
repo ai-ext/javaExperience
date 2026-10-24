@@ -1,5 +1,6 @@
 // 과정 v2 화면 검사 — 일자 페이지 배치·진도 체크, 홈의 "오늘 할 일", 과정 지도의 관계. npm run build 뒤에 실행한다.
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { JSDOM } from 'jsdom';
@@ -27,6 +28,74 @@ async function open(file, { saved, brokenStorage = false, script = courseScript,
   await new Promise((resolve) => (window.document.readyState === 'complete' ? resolve() : window.addEventListener('load', resolve)));
   return { window, doc: window.document, $: (s) => window.document.querySelector(s), $$: (s) => [...window.document.querySelectorAll(s)] };
 }
+
+// R4: JSDOM은 배치를 계산하지 않으므로 크기·줄바꿈은 소스 규칙을, 이름은 생성 DOM을 검사한다.
+const courseCss = fs.readFileSync(new URL('course.css', import.meta.url), 'utf8');
+const flowCss = fs.readFileSync(new URL('course-flow.css', import.meta.url), 'utf8');
+const siteCss = fs.readFileSync(new URL('site.css', import.meta.url), 'utf8');
+const homeCss = fs.readFileSync(new URL('home-visual.css', import.meta.url), 'utf8');
+const serviceCss = fs.readFileSync(new URL('home-service-preview.css', import.meta.url), 'utf8');
+const declarations = (css, selector) => {
+  const rule = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)].find((m) => m[1].trim() === selector);
+  assert.ok(rule, `CSS 규칙 ${selector}`);
+  return Object.fromEntries(rule[2].split(';').filter((s) => s.includes(':')).map((s) => s.split(/:(.*)/s).slice(0, 2).map((v) => v.trim())));
+};
+// WCAG 상대 휘도: sRGB 선형화 → L = .2126R + .7152G + .0722B.
+function contrast(fg, bg) {
+  const luminance = (hex) => {
+    const rgb = hex.replace('#', '').match(/../g).map((c) => parseInt(c, 16) / 255)
+      .map((c) => c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4);
+    return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722;
+  };
+  const a = luminance(fg), b = luminance(bg);
+  return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+}
+await test('R4-01: 모든 지도 노드 title은 전체 이름과 같다', () => {
+  const doc = new JSDOM(fs.readFileSync(new URL('course/map.html', root), 'utf8')).window.document;
+  for (const n of mapNodes(course)) assert.equal(doc.querySelector(`.cm-node[data-node="${n.id}"]`).title, n.title, n.id);
+  const span = declarations(courseCss, '.cm-node span');
+  assert.equal(span['white-space'], 'normal');
+  assert.ok(!span['text-overflow'] && span.overflow !== 'hidden' && !span['-webkit-line-clamp'], '긴 이름도 높이 제한으로 자르지 않는다');
+  assert.match(courseCss, /@media \(max-width: 899px\)[\s\S]*?\.cm-node span \{ display: none; \}/, '좁은 화면 칩 배치는 유지');
+});
+await test('R4-05: 일자 칩 체크박스의 누르는 면은 최소 24×24px', () => {
+  const input = declarations(courseCss, '.day-chip input');
+  for (const prop of ['width', 'height']) assert.ok(/^\d+px$/.test(input[prop]) && parseFloat(input[prop]) >= 24, `${prop}: ${input[prop]}`);
+});
+await test('R4-06: 한국어 본문은 낱말을 지키고 코드는 긴 토큰을 줄바꿈한다', () => {
+  assert.equal(declarations(courseCss, '.course-day')['word-break'], 'keep-all');
+  assert.equal(declarations(flowCss, '.flow')['word-break'], 'keep-all');
+  for (const [css, selector] of [[courseCss, '.course-day pre, .course-day code'], [flowCss, '.flow pre, .flow code']]) {
+    const code = declarations(css, selector);
+    assert.equal(code['word-break'], 'normal');
+    assert.equal(code['overflow-wrap'], 'anywhere');
+  }
+});
+await test('R4-03: 홈 본문·서비스·아바타 글자 대비는 4.5 이상', () => {
+  const tokens = declarations(homeCss, 'body.home-page');
+  const pairs = [
+    [homeCss, 'body.home-page', '--muted', '#f7f9fc'],
+    ...['.home-method-grid p', '.home-explore-grid p', '.home-faq p', '.home-footer', '.home-roadmap'].map((s) => [homeCss, s, 'color', '#f7f9fc']),
+    [homeCss, '.home-progress-note', 'color', '#ffffff'],
+    ...['.home-service-excerpt', '.home-service-post-copy>small'].map((s) => [serviceCss, s, 'color', '#eef4ff']),
+    ...['.home-service-comment small', '.home-service-detail-byline small', '.home-service-compose label>span', '.home-service-compose input::placeholder,.home-service-compose textarea::placeholder'].map((s) => [serviceCss, s, 'color', '#ffffff']),
+    [serviceCss, '.home-service-section .home-service-scope', 'color', '#f7f9fc'],
+    [serviceCss, '.home-service-avatar-green', 'color', '#dff2ee'],
+    [serviceCss, '.home-service-avatar-purple', 'color', '#eee6fb'],
+  ];
+  for (const [css, selector, property, bg] of pairs) {
+    const raw = declarations(css, selector)[property];
+    const fg = raw === 'var(--muted)' ? tokens['--muted'] : raw;
+    assert.ok(contrast(fg, bg) >= 4.5, `${selector}: ${fg} / ${bg} = ${contrast(fg, bg).toFixed(4)}`);
+  }
+  assert.equal(tokens['color-scheme'], 'light', '홈 테마 정책(R4-02)은 이번 범위에서 바꾸지 않는다');
+});
+await test('R4-07: 라이트 주석 대비는 4.5 이상이고 다크 토큰은 보존한다', () => {
+  const colors = [...siteCss.matchAll(/--syntax-comment:\s*(#[0-9a-f]{6})/g)].map((m) => m[1]);
+  assert.ok(contrast(colors[0], '#f3f1ec') >= 4.5, `라이트: ${contrast(colors[0], '#f3f1ec').toFixed(4)}`);
+  assert.deepEqual(colors.slice(1), ['#89939e', '#89939e']);
+  assert.ok(contrast(colors[1], '#22262b') >= 4.5);
+});
 
 // ---------------------------------------------------------------- 칩 제목
 assert.equal(shortTitle('`Post` 엔티티와 `PostStatus` enum(`post/PostStatus.java`) (`schema.sql`에 `post` 테이블) · 목록 조회용 (`status`, `id`) 인덱스 포함'), '`Post` 엔티티와 `PostStatus` enum');
