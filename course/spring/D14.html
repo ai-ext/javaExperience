@@ -24,7 +24,7 @@
 <section class="day-java" aria-labelledby="오늘의-java"><h2 id="오늘의-java"><a class="anchor" href="#오늘의-java" aria-hidden="true">#</a>오늘의 Java</h2>
 <p><a href="../java/J14.html">J14. 리팩터링 ④: null 반환을 Optional과 빈 컬렉션으로</a> — 30~60분. Spring 순서를 시작하기 전에 오늘 쓰는 Java를 먼저 연습한다.</p>
 <ul>
-<li>주제: 리팩터링 ④: null 처리 — null을 돌려주는 조회 메서드를 <code>Optional</code>과 빈 컬렉션으로 바꾸고 호출부의 NPE를 없앤다 (선택: JVM 메모리 기초 — 힙·스택·GC·OOM)</li>
+<li>주제: 리팩터링 ④: null 처리 — 단건 조회를 <code>Optional</code>, 목록 조회를 빈 컬렉션으로 바꾸고 호출부의 NPE를 없앤다 (선택: <code>double</code>/<code>BigDecimal</code> 금액·포인트 계산과 값 비교)</li>
 </ul>
 </section>
 <section class="day-flow flow-links" data-flow-links="D14" aria-labelledby="flow-links-d14"><h2 id="flow-links-d14">오늘 티켓의 장애 흐름</h2><p>2단계는 요청 하나 대신 장애가 번지는 길을 따라갑니다. 티켓 페이지의 흐름은 증상 쪽만 먼저 보여 주고, 원인 쪽은 접혀 있습니다.</p><ul class="flow-link-list"><li><a href="../tickets/B12.html#flow-b12"><b>B12</b><span>새 프론트 도메인에서만 호출이 실패한다</span><small>증상 단계 4개 · 원인 단계는 티켓 페이지에서 펼침</small></a></li><li><a href="../tickets/B13.html#flow-b13"><b>B13</b><span>PG 결제 완료 콜백이 전부 401</span><small>증상 단계 3개 · 원인 단계는 티켓 페이지에서 펼침</small></a></li><li><a href="../tickets/B15.html#flow-b15"><b>B15</b><span>숨긴 글이 인기글에 1분간 계속 보인다</span><small>증상 단계 3개 · 원인 단계는 티켓 페이지에서 펼침</small></a></li><li><a href="../tickets/B16.html#flow-b16"><b>B16</b><span>Redis 점검 시간에 글쓰기까지 멈췄다</span><small>증상 단계 4개 · 원인 단계는 티켓 페이지에서 펼침</small></a></li><li><a href="../tickets/E01.html#flow-e01"><b>E01</b><span>고도화: 인기글 캐시 재적재를 한 요청만 하도록 (스탬피드 방지)</span><small>증상 단계 5개 · 원인 단계는 티켓 페이지에서 펼침</small></a></li></ul></section>
@@ -35,8 +35,8 @@
 <li><code>src/main/java/com/example/board/config/CorsConfig.java</code></li>
 <li><code>src/main/java/com/example/board/config/SecurityConfig.java</code></li>
 </ul></div><div class="step-fact fact-tickets"><p class="fact-label">티켓</p><p class="ticket-badges"><a class="ticket-badge" href="../tickets/B12.html" title="새 프론트 도메인에서만 호출이 실패한다"><b>B12</b><span>선택</span></a></p></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>서버 로그에 에러가 없다고 서버 문제가 아니라고 오진하기 쉽지만, 브라우저가 실제로 보낸 요청과 받은 응답부터 확인한다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
-<li>개발자 도구 Network 탭에서 실패한 요청과 그 상태 코드·응답 헤더를 근거로 남긴다(서버 에러 로그 없음)</li>
-<li><code>OPTIONS /api/posts</code> + <code>Origin: http://127.0.0.1:8765</code> → 200, <code>Access-Control-Allow-Origin</code> 포함</li>
+<li>[B12 선택] 개발자 도구 Network 탭에서 실패한 요청과 그 상태 코드·응답 헤더를 근거로 남긴다(서버 에러 로그 없음)</li>
+<li>[B12 선택] <code>OPTIONS /api/posts</code> + <code>Origin: http://127.0.0.1:8765</code> → 200, <code>Access-Control-Allow-Origin</code> 포함</li>
 </ul></div><div class="step-fact fact-spec"><p class="fact-label">명세</p><p><a href="../spec-v2.html#4-엔드포인트"><code>POST /api/posts</code></a> (<a href="../spec-v2.html#5-2-글댓글좋아요">5-2. 글·댓글·좋아요</a>)</p></div><div class="step-fact fact-answer-link"><p class="fact-label">원인과 정답</p><p><a href="../tickets/B12.html#원인과-정답">B12 티켓 페이지</a>의 &quot;원인과 정답&quot; 접기에 있다.</p></div></div><details class="step-hint" data-step="D14-1">
 <summary>막히면</summary>
 
@@ -52,8 +52,8 @@
 <h2 id="②-b13-pg-결제-완료-콜백이-전부-401-security-debug-로그-읽기"><a class="anchor" href="#②-b13-pg-결제-완료-콜백이-전부-401-security-debug-로그-읽기" aria-hidden="true">#</a>② B13 &quot;PG 결제 완료 콜백이 전부 401&quot;: Security debug 로그 읽기</h2><div class="step-facts"><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(messy-server 기준)</small></p><ul>
 <li><code>src/main/java/com/example/board/config/SecurityConfig.java</code></li>
 </ul></div><div class="step-fact fact-tickets"><p class="fact-label">티켓</p><p class="ticket-badges"><a class="ticket-badge" href="../tickets/B13.html" title="PG 결제 완료 콜백이 전부 401"><b>B13</b><span>선택</span></a></p></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>401만 사라지면 끝났다고 보기 쉽지만, 서명이 틀린 콜백이 여전히 거절되는지도 함께 확인한다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
-<li>Security debug 로그에서 콜백 요청의 401이 어디서 만들어지는지 찾아 근거로 남긴다</li>
-<li>서명이 맞는 <code>POST /api/pg/callbacks</code> → 200, 서명 틀림 → 401 <code>/errors/invalid-signature</code></li>
+<li>[B13 선택] Security debug 로그에서 콜백 요청의 401이 어디서 만들어지는지 찾아 근거로 남긴다</li>
+<li>[B13 선택] 서명이 맞는 <code>POST /api/pg/callbacks</code> → 200, 서명 틀림 → 401 <code>/errors/invalid-signature</code></li>
 </ul></div><div class="step-fact fact-spec"><p class="fact-label">명세</p><p><a href="../spec-v2.html#4-엔드포인트"><code>POST /api/pg/callbacks</code></a> (<a href="../spec-v2.html#5-5-포인트-충전pg-콜백">5-5. 포인트 충전·PG 콜백</a>, <a href="../spec-v2.html#7-외부-pg-계약-wiremock">7. 외부 PG 계약 (WireMock)</a>)</p></div><div class="step-fact fact-answer-link"><p class="fact-label">원인과 정답</p><p><a href="../tickets/B13.html#원인과-정답">B13 티켓 페이지</a>의 &quot;원인과 정답&quot; 접기에 있다.</p></div></div><details class="step-hint" data-step="D14-2">
 <summary>막히면</summary>
 
@@ -70,8 +70,8 @@
 <li><code>src/main/java/com/example/board/post/PostCacheEvictListener.java</code></li>
 <li><code>src/main/java/com/example/board/admin/AdminService.java</code></li>
 </ul></div><div class="step-fact fact-tickets"><p class="fact-label">티켓</p><p class="ticket-badges"><a class="ticket-badge" href="../tickets/B15.html" title="숨긴 글이 인기글에 1분간 계속 보인다"><b>B15</b><span>선택</span></a></p></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>TTL만 줄이면 숨긴 글이 보이는 시간은 짧아져도, 숨김 응답 직후 인기글에 그 글이 보이는 증상은 그대로 남는다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
-<li>요청 ID별 로그 타임라인에 숨김 요청과 인기글 조회의 캐시·트랜잭션 로그를 시간순으로 놓고 근거로 남긴다</li>
-<li><code>POST /api/admin/posts/{postId}/hide</code> 직후 <code>GET /api/posts/popular</code>에 그 글이 없다</li>
+<li>[B15 선택] 요청 ID별 로그 타임라인에 숨김 요청과 인기글 조회의 캐시·트랜잭션 로그를 시간순으로 놓고 근거로 남긴다</li>
+<li>[B15 선택] <code>POST /api/admin/posts/{postId}/hide</code> 직후 <code>GET /api/posts/popular</code>에 그 글이 없다</li>
 </ul></div><div class="step-fact fact-spec"><p class="fact-label">명세</p><p><a href="../spec-v2.html#4-엔드포인트"><code>POST /api/admin/posts/{postId}/hide</code></a> (<a href="../spec-v2.html#5-6-신고관리자">5-6. 신고·관리자</a>) · <a href="../spec-v2.html#4-엔드포인트"><code>GET /api/posts/popular</code></a> (<a href="../spec-v2.html#5-3-목록검색">5-3. 목록·검색</a>)</p></div><div class="step-fact fact-answer-link"><p class="fact-label">원인과 정답</p><p><a href="../tickets/B15.html#원인과-정답">B15 티켓 페이지</a>의 &quot;원인과 정답&quot; 접기에 있다.</p></div></div><details class="step-hint" data-step="D14-3">
 <summary>막히면</summary>
 
@@ -88,8 +88,8 @@
 <li><code>src/main/java/com/example/board/config/</code></li>
 <li><code>src/main/resources/application.yml</code></li>
 </ul></div><div class="step-fact fact-tickets"><p class="fact-label">티켓</p><p class="ticket-badges"><a class="ticket-badge" href="../tickets/B16.html" title="Redis 점검 시간에 글쓰기까지 멈췄다"><b>B16</b><span>선택</span></a></p></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>글쓰기가 멈췄다고 DB부터 의심하기 쉽지만, 스레드 덤프로 멈춘 지점부터 본다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
-<li>스레드 덤프에서 글쓰기 요청 스레드가 멈춘 지점을 찾아 근거로 남긴다</li>
-<li>Redis를 멈춘 상태에서 <code>POST /api/posts</code> → 201, 1초 이내 (고친 뒤 <code>bash tickets/B16/repro.sh</code>와 <code>bash tickets/B16/repro.sh stop</code> 출력을 남긴다)</li>
+<li>[B16 선택] 스레드 덤프에서 글쓰기 요청 스레드가 멈춘 지점을 찾아 근거로 남긴다</li>
+<li>[B16 선택] Redis를 멈춘 상태에서 <code>POST /api/posts</code> → 201, 1초 이내 (고친 뒤 <code>bash tickets/B16/repro.sh</code>와 <code>bash tickets/B16/repro.sh stop</code> 출력을 남긴다)</li>
 </ul></div><div class="step-fact fact-spec"><p class="fact-label">명세</p><p><a href="../spec-v2.html#4-엔드포인트"><code>POST /api/posts</code></a> (<a href="../spec-v2.html#5-2-글댓글좋아요">5-2. 글·댓글·좋아요</a>) · <a href="../spec-v2.html#4-엔드포인트"><code>GET /api/posts/popular</code></a> (<a href="../spec-v2.html#5-3-목록검색">5-3. 목록·검색</a>)</p></div><div class="step-fact fact-answer-link"><p class="fact-label">원인과 정답</p><p><a href="../tickets/B16.html#원인과-정답">B16 티켓 페이지</a>의 &quot;원인과 정답&quot; 접기에 있다.</p></div></div><details class="step-hint" data-step="D14-4">
 <summary>막히면</summary>
 
@@ -106,8 +106,9 @@
 <li><code>src/main/java/com/example/board/post/PopularPostService.java</code></li>
 <li><code>src/test/java/com/example/board/post/PopularPostStampedeTest.java</code></li>
 </ul></div><div class="step-fact fact-tickets"><p class="fact-label">티켓</p><p class="ticket-badges"><a class="ticket-badge" href="../tickets/E01.html" title="고도화: 인기글 캐시 재적재를 한 요청만 하도록 (스탬피드 방지)"><b>E01</b><span>고도화</span></a><a class="ticket-badge" href="../tickets/B15.html" title="숨긴 글이 인기글에 1분간 계속 보인다"><b>B15</b><span>선택</span></a></p></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>재적재를 락으로 막으면서 락 대기에 상한을 두지 않으면 Redis가 느릴 때 모든 요청이 락 앞에서 멈춘다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
-<li><code>PopularPostStampedeTest</code> 통과: TTL 만료 순간 동시 100요청에도 DB 목록 쿼리 1회</li>
-<li><code>GET /api/posts/popular</code> 응답 형식은 그대로</li>
+<li>[E01 고도화] <code>PopularPostStampedeTest</code> 통과: TTL 만료 순간 동시 100요청에도 DB 목록 쿼리 1회</li>
+<li>[E01 고도화] <code>GET /api/posts/popular</code> 응답 형식은 그대로</li>
+<li>[E01 고도화] <a href="../tickets/E01.html#제출물">티켓 E01의 제출물 체크리스트 전부</a>를 충족한다(설계 메모·테스트·수정 diff).</li>
 </ul></div><div class="step-fact fact-spec"><p class="fact-label">명세</p><p><a href="../spec-v2.html#4-엔드포인트"><code>GET /api/posts/popular</code></a> (<a href="../spec-v2.html#5-3-목록검색">5-3. 목록·검색</a>)</p></div><div class="step-fact fact-answer-link"><p class="fact-label">원인과 정답</p><p><a href="../tickets/E01.html#원인과-정답">E01 티켓 페이지</a> · <a href="../tickets/B15.html#원인과-정답">B15 티켓 페이지</a>의 &quot;원인과 정답&quot; 접기에 있다.</p></div></div><details class="step-hint" data-step="D14-5">
 <summary>막히면</summary>
 
@@ -123,10 +124,10 @@
 <h2 id="⑥-모의-장애-훈련-장애-주입-스크립트--대응--회고-문서"><a class="anchor" href="#⑥-모의-장애-훈련-장애-주입-스크립트--대응--회고-문서" aria-hidden="true">#</a>⑥ 모의 장애 훈련: 장애 주입 스크립트 → 대응 → 회고 문서</h2><div class="step-facts"><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(messy-server 기준)</small></p><ul>
 <li><code>docs/drill-retrospective.md</code></li>
 </ul></div><div class="step-fact fact-tickets"><p class="fact-label">티켓</p><p class="ticket-badges"><a class="ticket-badge" href="../tickets/B16.html" title="Redis 점검 시간에 글쓰기까지 멈췄다"><b>B16</b><span>선택</span></a></p></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>증상이 보이자마자 재시작부터 하면 스레드 덤프 같은 증거가 사라져 원인을 지목할 수 없다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
-<li>지연 3초와 연결 끊김을 한 번씩 주입한 <code>injections.log</code>와 복구 결과를 남긴다</li>
-<li>로그·메트릭·스레드 덤프(<code>evidence-*/</code>)와 <code>probe-*.log</code>로 장애를 알아차린 시각과 원인을 지목한 시각을 기록한다</li>
-<li>B16을 고친 서버: 주입 중에도 <code>POST /api/posts</code> → 201, <code>GET /api/posts/popular</code> → 200, 둘 다 1초 이내 (<code>probe-*.log</code>와 <code>injections.log</code>의 같은 주입 구간을 보여 준다)</li>
-<li>회고 문서: 타임라인, 원인(스레드 덤프·로그 근거), 조치, 재발 방지. 주입 중 응답 코드·시간은 <code>probe-*.log</code>에서 옮긴다</li>
+<li>[공통] 지연 3초와 연결 끊김을 한 번씩 주입한 <code>injections.log</code>와 복구 결과를 남긴다</li>
+<li>[공통] 로그·메트릭·스레드 덤프(<code>evidence-*/</code>)와 <code>probe-*.log</code>로 장애를 알아차린 시각과 원인을 지목한 시각을 기록한다</li>
+<li>[B16 선택] B16을 고친 서버: 주입 중에도 <code>POST /api/posts</code> → 201, <code>GET /api/posts/popular</code> → 200, 둘 다 1초 이내 (<code>probe-*.log</code>와 <code>injections.log</code>의 같은 주입 구간을 보여 준다)</li>
+<li>[공통] 회고 문서: 타임라인, 원인(스레드 덤프·로그 근거), 조치, 재발 방지. 주입 중 응답 코드·시간은 <code>probe-*.log</code>에서 옮긴다</li>
 </ul></div><div class="step-fact fact-spec"><p class="fact-label">명세</p><p><a href="../spec-v2.html#4-엔드포인트"><code>POST /api/posts</code></a> (<a href="../spec-v2.html#5-2-글댓글좋아요">5-2. 글·댓글·좋아요</a>) · <a href="../spec-v2.html#4-엔드포인트"><code>GET /api/posts/popular</code></a> (<a href="../spec-v2.html#5-3-목록검색">5-3. 목록·검색</a>)</p></div><div class="step-fact fact-answer-link"><p class="fact-label">원인과 정답</p><p><a href="../tickets/B16.html#원인과-정답">B16 티켓 페이지</a>의 &quot;원인과 정답&quot; 접기에 있다. 진행 순서와 양식은 <a href="../tickets/drill.html">모의 장애 훈련: Redis 장애 대응과 회고</a>에 있다.</p></div></div><details class="step-hint" data-step="D14-6">
 <summary>막히면</summary>
 
@@ -236,6 +237,7 @@
 ⑤ 고도화 1건: 인기글 캐시 재적재를 한 요청만 하도록 (스탬피드 방지)
   - [C5-1] (E01 고도화) PopularPostStampedeTest 통과: TTL 만료 순간 동시 100요청에도 DB 목록 쿼리 1회
   - [C5-2] (E01 고도화) GET /api/posts/popular 응답 형식은 그대로
+  - [C5-3] (E01 고도화) [티켓 E01의 제출물 체크리스트 전부](../tickets/E01.md#제출물)를 충족한다(설계 메모·테스트·수정 diff).
   - [R5] 함정을 피했는지 코드로 확인: 재적재를 락으로 막으면서 락 대기에 상한을 두지 않으면 Redis가 느릴 때 모든 요청이 락 앞에서 멈춘다.
 ⑥ 모의 장애 훈련: 장애 주입 스크립트 → 대응 → 회고 문서
   - [C6-1] (기록으로 확인) 지연 3초와 연결 끊김을 한 번씩 주입한 injections.log와 복구 결과를 남긴다
@@ -293,7 +295,7 @@
 
 
 
-<script src="../../tools/site/course.js?v=50a2b85c483c" defer></script>
+<script src="../../tools/site/course.js?v=a9c842ba77a0" defer></script>
 <script src="../../tools/site/course-flow.js?v=9fbc9e973408" defer></script>
 </body>
 </html>
