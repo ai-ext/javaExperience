@@ -8,16 +8,16 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S08-transactions.md:32](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S08-transactions.md:32) — 확인 범위 32–46행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S08-transactions.md:32](../../../../knowledge/S08-transactions.md) — 확인 범위 32–46행.
 
   발췌: `### 전파 7종  | 전파 | 기존 트랜잭션이 있을 때 | 없을 때 | 흔한 용도·주의 | |---|---|---|---|`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s08-lesson-data.mjs:1138](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s08-lesson-data.mjs:1138) — 확인 범위 1138–1140행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/s08-lesson-data.mjs:1138 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/s08-lesson-data.mjs:1138`) — 확인 범위 1138–1140행.
 
   발췌: `{id:'new',question:'REQUIRES_NEW의 안쪽 commit은 바깥 rollback과 같을까?',source:scope+' · 추가 REQUIRES_NEW 독립 경계',sourceNote:'추가 run의 tracked connection91(outer)과92(inner)를 비교합니다. 이 번호는 트래킹용 연결 식별자이며 DB 세션 번호나 풀 사용량 계측이 아닙니다.',note:'보류된 outer와 독립 inner의 물리 경계를 비교한 추가 실험입니다. 이 실행에서 풀 고갈·연결 지연시간을 측정하지 않았습니다. '+limits,stages:[     stage('new','outer','바깥 연결91에서 시작','추가 outer transaction이 outer 행을 INSERT하고 안쪽 프록시를 호출합니다. 바깥은 tracked connection91에 묶여 있습니다.','@Transactional public void newThenFail() {\n    jdbc`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s08-lesson-data.mjs:1143](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s08-lesson-data.mjs:1143) — 확인 범위 1143–1145행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/s08-lesson-data.mjs:1143 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/s08-lesson-data.mjs:1143`) — 확인 범위 1143–1145행.
 
   발췌: `{id:'nested',question:'NESTED의 부분 rollback은 독립 commit일까?',source:scope+' · 추가 JDBC savepoint 실험',sourceNote:'이 DataSourceTransactionManager/H2 조합의 NESTED 실측입니다. 다른 관리자·JPA·드라이버에서 같은 지원을 보장한 결과가 아닙니다.',note:'같은 tracked connection98 안에서 savepoint를 만들고 그 지점으로 rollback했습니다. 안쪽의 독립 commit이 아니라 바깥 물리 transaction의 부분 rollback입니다. '+limits,stages:[     stage('nested','same','안팎은 같은 연결98','outer-nested-start와 inner-nested는 같은 연결98에서 실행됐습니다. 안쪽은 NESTED 선언으로 savepoint 경계를 사용합니다.','@Transactional(propagatio`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s08-lesson-data.mjs:1148](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s08-lesson-data.mjs:1148) — 확인 범위 1148–1150행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/s08-lesson-data.mjs:1148 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/s08-lesson-data.mjs:1148`) — 확인 범위 1148–1150행.
 
   발췌: `{id:'contracts',question:'transaction active와 synchronization은 같은 뜻일까?',source:scope+' · 추가 SUPPORTS / MANDATORY / NOT_SUPPORTED / NEVER',sourceNote:'active는 실제 transaction 활성 표시이고 synchronization은 동기화 범위 표시입니다. active=false여도 sync=true일 수 있습니다.',note:'전파 계약은 이 Spring JDBC 관리자에서 관찰했습니다. 자원 정리 중 남은 thread-local 표시나 synchronization만으로 DB commit 여부를 판단하지 않습니다. '+limits,stages:[     stage('contracts','outside','바깥 transaction 없는 SUPPORTS','추가 inner.supports()는 기존 transaction 없이 호출됐습니다. active=false지`
 
@@ -43,7 +43,7 @@
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `spring-propagation` — [Transaction Propagation — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html)
 

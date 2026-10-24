@@ -2,12 +2,12 @@
 
 - 요청한 대화: https://chatgpt.com/c/6ad3294e-ed5c-83e8-9237-bccf275f7fe2
 - 사용자 지시로 기존 Pro 대화에 web-request.txt를 전송했다. 웹 응답은 66분 20초 처리 후 완료됐고, 이미지 12장과 개발 인계 ZIP을 실제 다운로드했다. 최종 선택 화면은 9장이다.
-- ZIP 보존: /Users/ds/research/javaExperience-chatgpt-design-handoff-2026-10-18/_data/javaExperience-v8-knowledge-package.zip
+- ZIP 보존: $USER_HOME/research/javaExperience-chatgpt-design-handoff-2026-10-18/_data/javaExperience-v8-knowledge-package.zip
 - ZIP SHA-256: 3299e91484380826bf22ed7a9c5e28f11d4484e3c349ba91ab0226d3a8df1b72
-- 화면·버튼별 인계 HTML: /Users/ds/html/javaExperience-knowledge-v8/javaExperience-v8-knowledge-handoff.html
-- 개념별 대기표 HTML: /Users/ds/html/javaExperience-knowledge-v8/javaExperience-v8-concept-queue.html
+- 화면·버튼별 인계 HTML: $USER_HOME/html/javaExperience-knowledge-v8/javaExperience-v8-knowledge-handoff.html
+- 개념별 대기표 HTML: $USER_HOME/html/javaExperience-knowledge-v8/javaExperience-v8-concept-queue.html
 - 원본 JSON·SVG·참고 검색 모듈: web-handoff/ 아래 보존. 외부 참고 검색 모듈을 그대로 실행하거나 기존 빌더를 덮어쓰지 않았다. 현재 Markdown을 읽는 기존 사이트에 필요한 데이터만 연결했다.
-- 실제 요청·최종 응답 DOM·수신 증거 캡처: /Users/ds/research/javaExperience-chatgpt-design-handoff-2026-10-18/_data/
+- 실제 요청·최종 응답 DOM·수신 증거 캡처: $USER_HOME/research/javaExperience-chatgpt-design-handoff-2026-10-18/_data/
 
 ## 원본 범위
 

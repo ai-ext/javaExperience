@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/F3-cors.md](../../../../../lessons/F3-cors.md)
 
 원문 SHA-256: `44f26f841ebb52a052c3ad2c9f4ba62e8e4b40c2f464f3c35fcd902d0a0ccfef`
 
@@ -26,7 +26,7 @@ curl OPTIONS와 browser Network, config/cache on/off를 비교한다.
 
 공백 또는 한계: cache 허가 후 POST 저장됐지만 JS가 읽지 못할 수 있음도 보인다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md:9) — 9~86행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F3-cors.md](../../../../../lessons/F3-cors.md) — 9~86행
 
 ### 2. allow origin/method/header/expose
 
@@ -36,7 +36,7 @@ curl OPTIONS와 browser Network, config/cache on/off를 비교한다.
 
 공백 또는 한계: localhost wildcard pattern은 dev 범위.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md:87) — 87~130행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F3-cors.md](../../../../../lessons/F3-cors.md) — 87~130행
 
 ### 3. preflight auth bypass, actual request auth
 
@@ -46,7 +46,7 @@ curl OPTIONS와 browser Network, config/cache on/off를 비교한다.
 
 공백 또는 한계: OPTIONS 예외처리는 인증을 우회하는 것이 아니다. 그 뒤의 실제 API 요청에서는 token을 확인한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md:155) — 155~185행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F3-cors.md](../../../../../lessons/F3-cors.md) — 155~185행
 
 ## 이번 실행 근거
 
@@ -74,7 +74,7 @@ localhost 임의 port origin pattern은 개발용이다. production allowlist/cr
 
 판정 범위: 레슨은 구현 예시와 실습 지시를 제공하며 이번 감사자가 실행/build한 것은 아니다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md:9) — 9~185행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F3-cors.md](../../../../../lessons/F3-cors.md) — 9~185행
 
 ## 확장 개발 명세
 
@@ -126,10 +126,10 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F3/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F3/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F3/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F3/screen.jpg`)
 - 관찰: 렌더 캡처가 제공되지 않아 시각 검토 대기.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F3/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F3/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F3/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F3/dom.txt`)
 
 - source: corpus latest_source 기록에 따름
 - html: source 동일, generated HTML hash 상이; screenshot 비교 대기
@@ -140,8 +140,8 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md:9) — 9~86행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md:87) — 87~130행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F3-cors.md:155) — 155~185행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F3-cors.md](../../../../../lessons/F3-cors.md) — 9~86행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F3-cors.md](../../../../../lessons/F3-cors.md) — 87~130행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F3-cors.md](../../../../../lessons/F3-cors.md) — 155~185행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-F3.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-F3.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-F3.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-F3.json`)

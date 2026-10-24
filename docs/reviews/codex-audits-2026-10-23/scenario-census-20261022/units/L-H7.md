@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H7-cache-cacheable-evict.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H7-cache-cacheable-evict.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/H7-cache-cacheable-evict.md](../../../../../lessons/H7-cache-cacheable-evict.md)
 
 원문 SHA-256: `52e957da57277124e52733108186560f8900ee71b7c179db8d42762bde83a4b6`
 
@@ -26,7 +26,7 @@ Spring method cache proxy와 key, provider, TTL/maximumSize, mutation eviction �
 
 공백 또는 한계: Caffeine/simple provider는 한 JVM의 local cache다. 동시 stale fill 및 여러 instance invalidation은 검증하지 않는다. 16-3는 same-JVM generation invalidation을 따로 구현한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H7-cache-cacheable-evict.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H7-cache-cacheable-evict.md:1) — 1~254행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H7-cache-cacheable-evict.md](../../../../../lessons/H7-cache-cacheable-evict.md) — 1~254행
 
 ## 이번 실행 근거
 
@@ -48,8 +48,8 @@ Cache hit는 DB read를 피하지만 cache eviction과 DB commit은 별개의 �
 
 판정 범위: 개념 레슨은 한 JVM cache를 설명한다. 분산 cache 일관성을 필수 구현으로 강제하지 않고 16-3/S11로 연결한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H7-cache-cacheable-evict.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H7-cache-cacheable-evict.md:37) — 37~59행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H7-cache-cacheable-evict.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H7-cache-cacheable-evict.md:159) — 159~194행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H7-cache-cacheable-evict.md](../../../../../lessons/H7-cache-cacheable-evict.md) — 37~59행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H7-cache-cacheable-evict.md](../../../../../lessons/H7-cache-cacheable-evict.md) — 159~194행
 
 ## 확장 개발 명세
 
@@ -116,14 +116,14 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H7/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H7/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H7/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H7/screen.jpg`)
 - 관찰: HTML/캡처를 열어 보지 않았다.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H7/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H7/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H7/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H7/dom.txt`)
 
-- source: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H7-cache-cacheable-evict.md](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H7-cache-cacheable-evict.md)
+- source: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H7-cache-cacheable-evict.md](../../../../../lessons/H7-cache-cacheable-evict.md)
 - source_same: 예
-- html: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H7-cache-cacheable-evict.html](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H7-cache-cacheable-evict.html)
+- html: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H7-cache-cacheable-evict.html](../../../../../lessons/H7-cache-cacheable-evict.html)
 - html_same: 아니오
 - difference: 원문은 동일하다고 corpus에 기록됐으며 HTML 차이 원인 및 화면은 미검토.
 
@@ -132,6 +132,6 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H7-cache-cacheable-evict.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H7-cache-cacheable-evict.md:1) — 1~254행 (원리·코드·저자 실행 기록·따라 하기·반례·확인 문제·후속 경로)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H7-cache-cacheable-evict.md](../../../../../lessons/H7-cache-cacheable-evict.md) — 1~254행 (원리·코드·저자 실행 기록·따라 하기·반례·확인 문제·후속 경로)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H7.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H7.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H7.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H7.json`)

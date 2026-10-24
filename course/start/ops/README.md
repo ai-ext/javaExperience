@@ -9,7 +9,7 @@ D26~D29·D33·D34·D38·D39에서 환경을 만드는 부분만 제공한다. �
 ```bash
 export JX_REPO=/absolute/path/to/javaExperience
 export LEARNER_PROJECT=/absolute/path/to/my-project
-export OPS_LAB=$(mktemp -d /tmp/jx-ops.XXXXXX)
+export OPS_LAB=$(mktemp -d "${TMPDIR:-/tmp}/jx-ops.XXXXXX")
 export OPS_LAB=$(cd "$OPS_LAB" && pwd -P)
 export COMPOSE_PROJECT_NAME=jx-ops-$(basename "$OPS_LAB" | tr '[:upper:].' '[:lower:]-')
 lsof -nP -iTCP:18996 -iTCP:18997 -iTCP:18998 -sTCP:LISTEN
@@ -274,5 +274,6 @@ docker compose down --volumes --remove-orphans
 docker image rm jx-ops:a jx-ops:b
 # 남아 있는 이 실험 전용 JVM/curl PID만 kill하고 wait한다. 공통 이름 pkill은 사용하지 않는다.
 # 실제 생성 경로를 확인한 뒤 OPS_LAB만 제거한다.
-case "$OPS_LAB" in /tmp/jx-ops.*|/private/tmp/jx-ops.*) rm -rf -- "$OPS_LAB" ;; *) echo '실습 경로 확인 필요' ;; esac
+OPS_TMP_ROOT=$(cd "${TMPDIR:-/tmp}" && pwd -P)
+case "$OPS_LAB" in "$OPS_TMP_ROOT"/jx-ops.*) rm -rf -- "$OPS_LAB" ;; *) echo '실습 경로 확인 필요' ;; esac
 ```

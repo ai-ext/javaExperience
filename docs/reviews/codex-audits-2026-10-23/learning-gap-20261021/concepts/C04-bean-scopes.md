@@ -8,16 +8,16 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S01-ioc-di.md:48](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S01-ioc-di.md:48) — 확인 범위 48–55행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S01-ioc-di.md:48](../../../../knowledge/S01-ioc-di.md) — 확인 범위 48–55행.
 
   발췌: `| Scope | 생존 범위와 주의 | |---|---| | singleton | 컨테이너 안 정의별 한 객체. 기본값이며 요청별 상태를 저장하지 않음 |`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S01-ioc-di.md:89](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S01-ioc-di.md:89) — 확인 범위 89–108행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S01-ioc-di.md:89](../../../../knowledge/S01-ioc-di.md) — 확인 범위 89–108행.
 
   발췌: `싱글턴 서비스는 보통 컨텍스트 시작 중 만들어지고, request 객체는 HTTP 요청 중 만들어진다. 범위 프록시는 주입 시점에는 대리 객체를 넣고 메서드 호출 때 현재 요청의 대상을 찾아 위임한다.  ~~~text singleton service → request-scope proxy → 현재 요청의 대상`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S01-ioc-di.md:170](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S01-ioc-di.md:170) — 확인 범위 170–211행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S01-ioc-di.md:170](../../../../knowledge/S01-ioc-di.md) — 확인 범위 170–211행.
 
   발췌: `@Component class RequestTrace {     private final String traceId = java.util.UUID.randomUUID().toString();`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W25-spring-multithreading.md:239](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W25-spring-multithreading.md:239) — 확인 범위 239–239행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/W25-spring-multithreading.md:239](../../../../knowledge/W25-spring-multithreading.md) — 확인 범위 239–239행.
 
   발췌: `요청 스코프는 객체 수명을 요청과 맞출 뿐, 같은 요청 내 병렬 접근이나 비동기 스레드의 문맥 전달을 보장하지 않는다. 문자열 하나라면 앞의 무상태 서비스가 단순하다.`
 
@@ -43,7 +43,7 @@ S01에 singleton에 prototype 직접 주입 시 한 인스턴스를 재사용한
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `spring-bean-scopes` — [Bean Scopes — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html)
 

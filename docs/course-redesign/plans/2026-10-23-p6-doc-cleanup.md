@@ -12,7 +12,7 @@
 |---|---|---|---|
 | 1 | 다른 저장소 흔적 `studymate`·`StudyMate` | 학습자가 읽는 문서: `scenario/**`, `lessons/**`, `tickets/**`, `docs/knowledge/**`, `README.md`, `errors.md`, `intent.md`, `practice/**` | 이 저장소 기준 명령·경로·컨테이너 이름으로 바꾼다(예: `docker exec studymate-mysql-1` → 이 저장소 `compose.yaml`의 서비스 기준 `docker compose exec mysql`). 티켓의 `scripts/java-db.sh --reset` 전제는 이 저장소에 있는 대체 수단(`docker compose down -v`·덤프 복원 안내, 또는 snapshot)으로 바꾸거나 "이 저장소에는 없다"고 명시 |
 | 2 | DB 포트 혼재 3306/13308 | 문서와 루트 `compose.yaml`·`src/main/resources/application.yml` | **호스트에서 접속하는 포트**는 루트 compose 기준(13308)으로 통일. 컨테이너 안 포트 3306(서비스 간 접속·`EXPOSE` 설명)은 맞는 문맥이면 그대로 둔다. 루트 `application.yml`이 3306을 가리키면 학습자 연습 코드라 고치지 않고(AGENTS.md "학습자 코드 보존"), 문서에 "compose를 쓰면 13308" 안내를 단다 — 이 판단을 Ruling으로 |
-| 3 | `Docker Desktop` 전제 | `README.md`, `errors.md`, `docs/knowledge/D07·D15·R08`, `scenario/db-query-journey/db-14-*` | 로컬 Docker 런타임 중립 문구(예: "Docker 런타임(Colima 등)")로. 사내 표준은 Colima. 특정 제품 설치 절차가 필요하면 Colima 기준 |
+| 3 | `Docker Desktop` 전제 | `README.md`, `errors.md`, `docs/knowledge/D07·D15·R08`, `scenario/db-query-journey/db-14-*` | 로컬 Docker 런타임 중립 문구로. `docker info`·`docker compose version`이 성공하는 환경을 기준으로 하고 제품별 설정은 기본 경로로 두지 않는다 |
 | 4 | 깨진 셸 예시 | `scenario/ch11-*/11-2*` 358~369행(for … do / done 사이 빔, `up.json` 만드는 줄 없음), `scenario/ch10-*/10-4*` 265행 | 실제로 실행 가능한 명령으로 고치고, 가능하면 `bash -n`으로 문법 확인 |
 | 5 | 지시 오기 | `scenario/ch16-*/16-2*` 1600행 "T4와 P" | 실제 항목(가짜 푸시 설정 요청은 마지막 항목)에 맞게 |
 | 6 | 초안 문구 | DB-01 259행 "아직 … 시안 비교를 마치지 않은 초안", DB-02 79행 "DB-03 (현재 계획 단계)" | 현재 상태에 맞게(DB-03이 있으면 링크, 없으면 문구 제거) |

@@ -4,7 +4,7 @@
 
 공개 공통 기반의134개 문서를 실제 Chrome에서 열어 데스크톱1536×1024 첫 화면, 모바일390×844 첫 화면, 기존 문서의 두 번째 핵심 절 앵커로 이동한 화면을 각각 저장했다. 개념 보강 작업의23개 문서도 같은3종을 별도 `-progress` 폴더로 저장했다. 전수 캡처는 문서당 세 관찰 상태이며 **모든 하위 토픽·모든 조작·모든 스크롤 위치 검증은 아니다**.
 
-캡처/DOM/측정 원자료는 /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/visual/ 및 /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/browser/ 에 있다. 각 Luna 담당자가 맡은 캡처를 실제 이미지로 열어 문서별 visual_review에 기록한다. 메인은 주요 쟁점과 보고서 불일치를 재검토한다.
+캡처/DOM/측정 원자료는 $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/visual/ 및 $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/browser/ 에 있다. 각 Luna 담당자가 맡은 캡처를 실제 이미지로 열어 문서별 visual_review에 기록한다. 메인은 주요 쟁점과 보고서 불일치를 재검토한다.
 
 ## 공통 화면에서 구별한 것
 
@@ -19,7 +19,7 @@
 
 P10 제목의 긴 `List·Set·Map·Queue·Deque·PriorityQueue` 부분이390px에서 오른쪽으로 잘린다. 실제 재확인에서 documentElement.scrollWidth는390이지만 body.scrollWidth는468이고 body의 overflow-x는clip이었다. 따라서 '페이지 가로 스크롤이 없음'만 검사하면 잘림을 놓칠 수 있다.
 
-근거: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/browser/P10-mobile-title.json 및 /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/visual/P10/mobile-title-recheck.jpg.
+근거: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/browser/P10-mobile-title.json 및 $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/visual/P10/mobile-title-recheck.jpg.
 
 ## 실제 검색16개 결과
 
@@ -30,7 +30,7 @@ P10 제목의 긴 `List·Set·Map·Queue·Deque·PriorityQueue` 부분이390px�
 - `UNIQUE`는 W10만 반환하고, 제약을 다루는 R03은 해당 검색에서 발견되지 않음.
 - `서비스에 뭘 써야 해`, `글 하나에 댓글 여러 개`는0개.
 
-이 값은 실제 검색 폼에 입력하고 제출한 뒤 화면의 결과 제목과 보이는 목록을 읽어 기록했다. 원자료: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/browser/search-runs.json.
+이 값은 실제 검색 폼에 입력하고 제출한 뒤 화면의 결과 제목과 보이는 목록을 읽어 기록했다. 원자료: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/browser/search-runs.json.
 
 현재 검색은 제목/Markdown h1~h3/등록 질문 중심이다. 용어가 본문에만 있으면 못 찾고, 공백·기호·영문/한글 표기와 의미가 다른 동음이의어에 취약하다. 자연어 질문을 단어별 부분 문자열 AND로 처리하면 기술명 자체를 모르는 사람에게 불리하다.
 

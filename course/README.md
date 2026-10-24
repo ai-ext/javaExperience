@@ -100,7 +100,7 @@ D0(J00)은 선택이다. D1 전에 반나절–1일로 Java 워밍업을 한다.
 ## 4. 준비물
 
 - JDK 21
-- Colima (docker CLI 런타임)
+- Docker 런타임(`docker`·`docker compose` 지원)
 - IntelliJ IDEA
 
 ## 5. 문서

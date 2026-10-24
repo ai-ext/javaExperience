@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A3-server-process-port.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A3-server-process-port.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/A3-server-process-port.md](../../../../../lessons/A3-server-process-port.md)
 
 원문 SHA-256: `cd6f101eb1f8e6c6df98abc3f1396bce1757c2571ba8bd774be4354442d7ce46`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: 126행 준비 검사가 studymate-mysql이름에 묶여 현재 프로젝트 compose와 어긋난다. 43행의 로그 없음=요청 미도달은 요청 로그가 설정되지 않은 정상 200/처리된 404에서도 성립하지 않을 수 있다는 반례를 다루지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A3-server-process-port.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A3-server-process-port.md:45) — 45~117행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/A3-server-process-port.md](../../../../../lessons/A3-server-process-port.md) — 45~117행
 
 ### 2. 두 서버 충돌 후 첫 서버 유지, 종료 후 연결 실패를 확인한다.
 
@@ -36,7 +36,7 @@
 
 공백 또는 한계: 126행 준비 검사가 studymate-mysql이름에 묶여 현재 프로젝트 compose와 어긋난다. 43행의 로그 없음=요청 미도달은 요청 로그가 설정되지 않은 정상 200/처리된 404에서도 성립하지 않을 수 있다는 반례를 다루지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A3-server-process-port.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A3-server-process-port.md:119) — 119~171행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/A3-server-process-port.md](../../../../../lessons/A3-server-process-port.md) — 119~171행
 
 ## 이번 실행 근거
 
@@ -59,7 +59,7 @@ DB/트랜잭션을 직접 다루는 레슨은 별도 행 비교를 기록한다.
 
 판정 범위: 해당 레슨과 명시한 후속 경로의 판정이며 전체 개념의 부재를 뜻하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A3-server-process-port.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A3-server-process-port.md)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/A3-server-process-port.md](../../../../../lessons/A3-server-process-port.md)
 
 ## 확장 개발 명세
 
@@ -111,10 +111,10 @@ P1
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A3/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A3/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A3/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A3/screen.jpg`)
 - 관찰: 없음
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A3/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A3/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A3/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A3/dom.txt`)
 
 - markdown_same: 예
 - html_same: 아니오
@@ -124,6 +124,6 @@ P1
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A3-server-process-port.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A3-server-process-port.md:1) — 1~216행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/A3-server-process-port.md](../../../../../lessons/A3-server-process-port.md) — 1~216행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-A3.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-A3.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-A3.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-A3.json`)

@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/G1-paging-and-sorting.md](../../../../../lessons/G1-paging-and-sorting.md)
 
 원문 SHA-256: `2adffa1526407223993d897a6506a7d0b6aa485124d2ad18303e658279477161`
 
@@ -26,7 +26,7 @@ community SQL, JDK21 PageInfo jshell, Spring Page first/last SQL을 비교하고
 
 공백 또는 한계: item/count WHERE 조건은 같아야 한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md:5) — 5~147행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G1-paging-and-sorting.md](../../../../../lessons/G1-paging-and-sorting.md) — 5~147행
 
 ### 2. published_at 동률에는 unique id를 추가해 전체 순서를 결정한다.
 
@@ -36,7 +36,7 @@ community SQL, JDK21 PageInfo jshell, Spring Page first/last SQL을 비교하고
 
 공백 또는 한계: DB plan이 달라지면 중복된 peer id는 다를 수 있지만 동률 순서는 보장되지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md:31) — 31~190행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G1-paging-and-sorting.md](../../../../../lessons/G1-paging-and-sorting.md) — 31~190행
 
 ### 3. 잘못된 page/size는 PageRequest error가 500으로 새기 전 400으로 거부한다.
 
@@ -46,7 +46,7 @@ community SQL, JDK21 PageInfo jshell, Spring Page first/last SQL을 비교하고
 
 공백 또는 한계: OFFSET 비용/동시 신규 row drift는 W15/4-3에서 다루며 본문에서 이미 연결한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md:153) — 153~228행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G1-paging-and-sorting.md](../../../../../lessons/G1-paging-and-sorting.md) — 153~228행
 
 ## 이번 실행 근거
 
@@ -74,7 +74,7 @@ deep OFFSET 비용 및 새 row가 페이지 사이에 들어올 때 생기는 dr
 
 판정 범위: source historical output은 이번 감사 실행이 아니다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md:5) — 5~228행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G1-paging-and-sorting.md](../../../../../lessons/G1-paging-and-sorting.md) — 5~228행
 
 ## 확장 개발 명세
 
@@ -127,10 +127,10 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G1/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G1/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G1/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G1/screen.jpg`)
 - 관찰: 렌더 캡처 미제공으로 시각 검토 대기.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G1/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G1/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G1/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G1/dom.txt`)
 
 원문: corpus의 latest_source_same=True. 최신 HTML byte 해시 다름; 실제 캡처 기반 렌더 비교 전이므로 시각 차이는 pending_render. 원문 SHA/HTML 차이만으로 UI의 정확성이나 시각 완료를 추정하지 않는다.
 
@@ -138,8 +138,8 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md:5) — 5~147행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md:31) — 31~190행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G1-paging-and-sorting.md:153) — 153~228행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G1-paging-and-sorting.md](../../../../../lessons/G1-paging-and-sorting.md) — 5~147행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G1-paging-and-sorting.md](../../../../../lessons/G1-paging-and-sorting.md) — 31~190행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G1-paging-and-sorting.md](../../../../../lessons/G1-paging-and-sorting.md) — 153~228행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-G1.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-G1.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-G1.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-G1.json`)

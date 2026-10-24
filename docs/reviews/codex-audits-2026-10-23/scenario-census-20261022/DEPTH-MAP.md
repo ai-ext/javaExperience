@@ -2,7 +2,7 @@
 
 확인일: 2026-10-22. 이 표는 개념 용어의 존재 여부가 아니라 **학습자가 직접 수행하고 결과를 판정할 수 있는 시나리오**를 기준으로 한다. 기초 단계에 고급 요구가 없다고 결함으로 세지 않는다. 같은 내용이 티켓·레슨·후속 장에 있으면 기존 경로를 재사용한다.
 
-ID별 원문·코드·검사 근거는 [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/UNIT-INDEX.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/UNIT-INDEX.md)에 있다. X01~X20은 개발 명세이며 새 실습이 구현됐다는 뜻이 아니다.
+ID별 원문·코드·검사 근거는 $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/UNIT-INDEX.md (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/UNIT-INDEX.md`)에 있다. X01~X20은 개발 명세이며 새 실습이 구현됐다는 뜻이 아니다.
 
 | 역량 | 이미 있는 실행 과제 | 현재 깊이의 한계 | 다음 개발 |
 |---|---|---|---|
@@ -52,4 +52,4 @@ ID별 원문·코드·검사 근거는 [/Users/ds/code/javaExperience/.worktrees
 
 빈 실습은 컨테이너·빈 정의별 singleton 공유 범위에서 출발한다. 이는 요청별 가변 상태를 안전하게 만들어 주는 계약이 아니므로 교차 요청 실험을 별도로 둔다. [Spring Framework Bean Scopes](https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html)
 
-기존 개념 문서의 실습도 누락 여부를 대조하는 보조 근거로 사용했다. 특히 R07의 기본 복원 절차를 없다고 세지 않았으며, 집합 연산 사용 예시와 독립 SQL 과제를 구분했다: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/docs/knowledge/R07-backup-restore.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/docs/knowledge/R07-backup-restore.md).
+기존 개념 문서의 실습도 누락 여부를 대조하는 보조 근거로 사용했다. 특히 R07의 기본 복원 절차를 없다고 세지 않았으며, 집합 연산 사용 예시와 독립 SQL 과제를 구분했다: [$WORKTREE_ROOT/concept-census-20261021/docs/knowledge/R07-backup-restore.md](../../../knowledge/R07-backup-restore.md).

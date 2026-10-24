@@ -7,10 +7,10 @@
 | # | 계획 | 결과물 | 선행 | 상태 |
 |---|---|---|---|---|
 | P1 | 명세서 v2 · D1~D15 순서표 · 말하기 카드 | `course/spec-v2.md`, `course/roadmap.json`, `course/talk-cards.md`, 검증기 `tools/course/` | — | **완료** — 브랜치 `course/p1-spec-roadmap` (9 commits, 로컬), 원장 `2026-10-22-p1-ledger.md` |
-| P2 | 1단계 정답 서버 (D1~D10) | `board-server/` 정답 프로젝트, 순서별 커밋, 태그 `answer-d01~d10`, Colima 테스트 통과 | P1 | **완료** — 태그 `answer-d01`~`answer-d10`(로컬), 원장 `2026-10-22-p2-ledger.md` |
+| P2 | 1단계 정답 서버 (D1~D10) | `board-server/` 정답 프로젝트, 순서별 커밋, 태그 `answer-d01~d10`, Docker 테스트 통과 | P1 | **완료** — 태그 `answer-d01`~`answer-d10`(로컬), 원장 `2026-10-22-p2-ledger.md` |
 | P3 | Java 트랙 J0~J15 | `java-track/` Gradle 모듈, 학습 테스트, `course/java/J00~J15.md` | P1 | **완료** — 계획 `2026-10-22-p3-java-track.md`, `:java-track:check` 통과 |
 | P4 | 2단계 어수선한 서버와 티켓 B1~B16 | 브랜치 `messy`, 결함별 재현 스크립트·확인 테스트, `course/tickets/B01~B16.md` | P2 | **마무리 중** — `messy-server/`(브랜치 대신 디렉터리, 브랜치 하나 원칙) 티켓 17개 커밋, S 영역 리뷰 반영 중 — [계획](2026-10-23-p4-messy-server.md) · [원장](2026-10-23-p4-ledger.md) |
-| P5 | 일자 페이지와 화면 | `course/spring/D01~D15.md`, 빌드 렌더러(오늘 순서 우선), 홈 재구성, 과정 지도·요청 흐름·장애 흐름 재생(devops-repo-map 참고), 미캔 MCP 요소 탐색·적용 | P1·P2·P3 | **완료** — [계획](2026-10-23-p5-day-pages.md) · [원장](2026-10-23-p5-ledger.md) |
+| P5 | 일자 페이지와 화면 | `course/spring/D01~D15.md`, 빌드 렌더러(오늘 순서 우선), 홈 재구성, 과정 지도·요청 흐름·장애 흐름 재생(devops-repo-map 참고), 디자인 참고 자료 요소 탐색·적용 | P1·P2·P3 | **완료** — [계획](2026-10-23-p5-day-pages.md) · [원장](2026-10-23-p5-ledger.md) |
 | P6 | 기존 문서 정리 | `studymate`·포트·Docker Desktop 문구, 깨진 셸 예시, 10장 v2 안내, 참고 도감 링크 | P5 | **완료** — [계획](2026-10-23-p6-doc-cleanup.md) · [원장](2026-10-23-p6-ledger.md) |
 
 각 계획은 앞 계획이 끝난 뒤, 그 결과를 보고 작성한다. P1이 확정하는 엔드포인트 이름과 일자 순서표를 P2~P5가 그대로 쓰기 때문이다.
@@ -24,7 +24,7 @@ P1~P6이 끝나면 학습자 입장에서 D0부터 D15까지, J0부터 J15까지
   - 명세서 v2·순서표·말하기 카드·정답 코드가 서로 맞는가.
   - 기술 사실에 오류는 없는가.
 - **실행**: 다음을 실제로 돌린다.
-  - 일자별 정답 snapshot에서 테스트가 통과하는지(Colima).
+  - 일자별 정답 snapshot에서 테스트가 통과하는지(Docker 런타임).
   - 페이지의 요청 예시가 정답 서버에서 기대 응답을 돌려주는지.
   - Java 학습 테스트에서 정답이 통과하고 빈칸 상태가 실패하는지.
   - 티켓 재현 스크립트가 증상을 재현하는지.

@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/J1-reading-explain.md](../../../../../lessons/J1-reading-explain.md)
 
 원문 SHA-256: `a61e373052a9cb1c518e118e355836a6717558a8f4fb99f0111eb1f7bf0d7795`
 
@@ -26,13 +26,13 @@ practice DB의 기본키/목록/LIKE/작성자 검색 계획을 읽고, 쿼리�
 
 공백 또는 한계: helper가 studymate-mysql-1을 지정하지만 이 worktree compose는 mysql 서비스를 정의하고 고정 container_name을 지정하지 않는다. 연결 schema를 확인하지 않은 계획은 이 저장소의 practice DB 결과라고 볼 수 없다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md:7) — 7~37행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md:39) — 39~103행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md:105) — 105~154행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md:156) — 156~194행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md:224) — 224~265행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md:275) — 275~278행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/compose.yaml](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/compose.yaml:15) — 15~35행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/J1-reading-explain.md](../../../../../lessons/J1-reading-explain.md) — 7~37행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/J1-reading-explain.md](../../../../../lessons/J1-reading-explain.md) — 39~103행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/J1-reading-explain.md](../../../../../lessons/J1-reading-explain.md) — 105~154행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/J1-reading-explain.md](../../../../../lessons/J1-reading-explain.md) — 156~194행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/J1-reading-explain.md](../../../../../lessons/J1-reading-explain.md) — 224~265행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/J1-reading-explain.md](../../../../../lessons/J1-reading-explain.md) — 275~278행
+- [$WORKTREE_ROOT/concept-census-20261021/compose.yaml](../../../../../compose.yaml) — 15~35행
 
 ## 이번 실행 근거
 
@@ -54,8 +54,8 @@ sqlp helper가 studymate-mysql-1 container를 지정하지만 현재 compose에�
 
 판정 범위: CloudBeaver 연결은 별도로 안내되어 있어 DB 이론/예시 자체와 helper 연결 오류를 구분한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md:39) — 39~47행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/compose.yaml](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/compose.yaml:15) — 15~35행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/J1-reading-explain.md](../../../../../lessons/J1-reading-explain.md) — 39~47행
+- [$WORKTREE_ROOT/concept-census-20261021/compose.yaml](../../../../../compose.yaml) — 15~35행
 
 ## 확장 개발 명세
 
@@ -114,14 +114,14 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J1/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J1/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J1/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J1/screen.jpg`)
 - 관찰: 레슨 HTML 시각 검토 전
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J1/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J1/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J1/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J1/dom.txt`)
 
-- source: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/J1-reading-explain.md](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/J1-reading-explain.md)
+- source: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/J1-reading-explain.md](../../../../../lessons/J1-reading-explain.md)
 - source_same: 예
-- html: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/J1-reading-explain.html](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/J1-reading-explain.html)
+- html: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/J1-reading-explain.html](../../../../../lessons/J1-reading-explain.html)
 - html_same: 아니오
 - difference: latest HTML未검토.
 
@@ -130,6 +130,6 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J1-reading-explain.md:1) — 1~278행 (개념, 예시, 따라하기, 일부러 틀려 보기 및 확인 문제)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/J1-reading-explain.md](../../../../../lessons/J1-reading-explain.md) — 1~278행 (개념, 예시, 따라하기, 일부러 틀려 보기 및 확인 문제)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-J1.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-J1.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-J1.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-J1.json`)

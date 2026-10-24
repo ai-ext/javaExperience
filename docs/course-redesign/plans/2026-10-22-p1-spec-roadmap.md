@@ -18,7 +18,7 @@
 - 저장소 `~/code/javaExperience`. 작업은 worktree `.worktrees/p1-spec-roadmap`, 브랜치 `course/p1-spec-roadmap`에서 한다. main에 직접 커밋하지 않는다. push와 PR은 사용자 승인 후에만 한다.
 - 문서는 한국어로 쓴다. 기술 용어·식별자는 원문 그대로 둔다. 코드 주석도 한글이다.
 - 스택 표기는 정확히 다음과 같다: Java 21, Spring Boot 4.1, Spring Security, JPA(Hibernate 7), MyBatis, MySQL 8.4, Redis(Spring Data Redis·Lettuce), Testcontainers, WireMock(+Toxiproxy).
-- `course/` 안에는 다음 문구를 쓰지 않는다: `Docker Desktop`, `studymate`, `3주 만에 3~6년차`. 로컬 환경은 Colima로 적는다.
+- `course/` 안에는 `studymate`, `3주 만에 3~6년차` 문구를 쓰지 않는다. 로컬 환경은 제품을 제한하지 않는 Docker 런타임으로 적는다.
 - 도메인은 커뮤니티 게시판 + 관리자 + 포인트·쿠폰 상점이다. 게임 운영 용어는 쓰지 않는다.
 - 일정은 D1~D15다. 1단계 D1~D10(build), 2단계 D11~D14(maintain), 마무리 D15(wrap). Java는 J0(선택)과 J1~J15이며, Jn은 Dn과 짝이다.
 - 1단계 각 순서(step)에서 만드는 파일은 1~3개다. 하루 순서는 3~6개, 하루 말하기 카드는 3~5개다.
@@ -264,7 +264,7 @@ git commit -m "chore: course 검증기와 사이트 빌드 연결"
 1. 이 과정이 약속하는 것. 설계 2절의 표현 "3~6년차가 쓰는 말과 판단을 직접 겪어 본 상태"를 그대로 쓴다.
 2. 일정표: D0(J0 선택) → D1~D15 표. 열은 일, 마일스톤, 오늘의 Java, 말하기 카드 수. `roadmap.json`과 값이 같아야 한다.
 3. 하루 진행 방법: 오늘 순서 → 확인 → 말하기 카드 → 채점 프롬프트.
-4. 준비물: JDK 21, Colima, IntelliJ.
+4. 준비물: JDK 21, Docker 런타임, IntelliJ.
 5. 링크: `spec-v2.md`, `talk-cards.md`, 기존 `scenario/`(참고 도감).
 
 - [ ] **Step 1: 실패하는 테스트 추가** — `README 일정표가 roadmap과 일치`: README의 일정표 행에서 `D\d{2}`와 마일스톤 제목을 뽑는다. 이것이 `roadmap.days[].title`과 같은지 확인한다.

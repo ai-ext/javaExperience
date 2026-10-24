@@ -8,7 +8,7 @@
 
 **① [major] B05 — CyclicBarrier가 결함 발생 순서를 보장하지 않는다**
 
-파일: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B05/answer/B05ConfirmTest.java:51](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B05/answer/B05ConfirmTest.java:51)
+파일: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/B05/answer/B05ConfirmTest.java:51](../../../../messy-server/tickets/B05/answer/B05ConfirmTest.java)
 
 ```java
 barrier.await(10, TimeUnit.SECONDS);
@@ -23,7 +23,7 @@ if (checker.contains(dirty ? DIRTY : CLEAN) != dirty) {
 
 **② [major] B01 — 충전 부하가 실제로 걸리지 않아도 통과할 수 있다**
 
-파일: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B01/answer/B01ConfirmTest.java:59](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B01/answer/B01ConfirmTest.java:59)
+파일: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/B01/answer/B01ConfirmTest.java:59](../../../../messy-server/tickets/B01/answer/B01ConfirmTest.java)
 
 ```java
 while (PgContainers.approveRequestCount() < 10 && System.nanoTime() < deadline) {
@@ -41,7 +41,7 @@ assertThat(elapsedMillis).isLessThan(1000);
 
 **③ [major] B06 — ALTER 관측 실패를 무시하고 다음 단계로 진행한다**
 
-파일: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B06/answer/B06ConfirmTest.java:89](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B06/answer/B06ConfirmTest.java:89)
+파일: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/B06/answer/B06ConfirmTest.java:89](../../../../messy-server/tickets/B06/answer/B06ConfirmTest.java)
 
 ```java
 waitUntil(1000, () -> alter.isDone() || alterWaitingForMetadataLock());
@@ -56,7 +56,7 @@ boolean applied = waitUntil(1500, () -> balance(second) == 900);
 
 **④ [major, 정적 추론] B06 — 기본 DB 계정으로 진단 조회가 실패할 가능성이 높다**
 
-파일: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B06/repro.sh:26](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B06/repro.sh:26), 같은 파일 67줄
+파일: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/B06/repro.sh:26](../../../../messy-server/tickets/B06/repro.sh), 같은 파일 67줄
 
 ```bash
 sql() { docker compose exec -T mysql mysql -uboard -pboard board -e "$1" 2>/dev/null; }
@@ -70,7 +70,7 @@ sql "SELECT trx_mysql_thread_id, trx_started, trx_state, LEFT(trx_query, 60) FRO
 
 **⑤ [minor] B07 — 자동 확인이 1213과 다른 실패를 구분하지 않는다**
 
-파일: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B07/answer/B07ConfirmTest.java:35](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B07/answer/B07ConfirmTest.java:35), 48줄
+파일: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/B07/answer/B07ConfirmTest.java:35](../../../../messy-server/tickets/B07/answer/B07ConfirmTest.java), 48줄
 
 ```java
 assertThat(statuses).containsOnly(201);
@@ -85,7 +85,7 @@ assertThat(statuses).containsOnly(201, 409);
 
 **⑥ [minor] B10 — 재현 스크립트는 ‘포인트 두 번 적립’까지 실행하지 않는다**
 
-파일: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B10/repro.sh:14](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B10/repro.sh:14)
+파일: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/B10/repro.sh:14](../../../../messy-server/tickets/B10/repro.sh)
 
 ```bash
 # UNKNOWN 건은 PG 콜백이나 재처리 워커(ChargeService.reconcile)가
@@ -99,7 +99,7 @@ assertThat(statuses).containsOnly(201, 409);
 
 **⑦ [minor] B05 — 제출물에 원인 단서가 접기 밖으로 노출된다**
 
-파일: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/tickets/B05.md:20](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/tickets/B05.md:20)
+파일: [$WORKTREE_ROOT/p1-spec-roadmap/course/tickets/B05.md:20](../../../../course/tickets/B05.md)
 
 > “어떤 값이 어디에 저장되어 다른 요청과 섞였는가, `volatile`은 왜 막지 못했는가”
 
@@ -108,7 +108,7 @@ assertThat(statuses).containsOnly(201, 409);
 
 **⑧ [minor] B07 — 일부 설명이 실제 코드·남아 있는 테스트와 다르다**
 
-파일: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/tickets/B07.md:37](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/tickets/B07.md:37), 62줄
+파일: [$WORKTREE_ROOT/p1-spec-roadmap/course/tickets/B07.md:37](../../../../course/tickets/B07.md), 62줄
 
 > “상대의 `insert intention`을 기다리는 모습”  
 > “동시 발급 테스트가 … 지워져 있다”

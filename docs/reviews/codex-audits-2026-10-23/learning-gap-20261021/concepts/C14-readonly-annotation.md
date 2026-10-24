@@ -8,19 +8,19 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S08-transactions.md:64](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S08-transactions.md:64) — 확인 범위 64–76행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S08-transactions.md:64](../../../../knowledge/S08-transactions.md) — 확인 범위 64–76행.
 
   발췌: `### ’@Transactional’ 속성  | 속성 | 의미와 실무 주의 | |---|---|`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S08-transactions.md:130](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S08-transactions.md:130) — 확인 범위 130–135행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S08-transactions.md:130](../../../../knowledge/S08-transactions.md) — 확인 범위 130–135행.
 
   발췌: `Spring 7 API 예제다. 저장소 구현·컨테이너·DB 구성에 연결해야 한다. **(미실행: Spring 컨테이너 및 DB 구성 필요)**  ’’’java import org.springframework.stereotype.Service;`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/G4-transaction-in-practice.md:154](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/G4-transaction-in-practice.md:154) — 확인 범위 154–180행.
+- [$WORKTREE_ROOT/concept-learning-night/lessons/G4-transaction-in-practice.md:154](../../../../../lessons/G4-transaction-in-practice.md) — 확인 범위 154–180행.
 
   발췌: `### ④ ’readOnly = true’에서 쓰면  ’’’java @Transactional(readOnly = true)`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/E7-jpa-update-delete.md:226](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/E7-jpa-update-delete.md:226) — 확인 범위 226–237행.
+- [$WORKTREE_ROOT/concept-learning-night/lessons/E7-jpa-update-delete.md:226](../../../../../lessons/E7-jpa-update-delete.md) — 확인 범위 226–237행.
 
   발췌: `### ⑤ ’@Transactional(readOnly = true)’에서 바꾸면  ’’’text TX: Creating new transaction with name [org.example.e7.LessonPostService.changeTitleReadOnly]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT,readOnly`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s08-lesson-data.mjs:1153](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s08-lesson-data.mjs:1153) — 확인 범위 1153–1155행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/s08-lesson-data.mjs:1153 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/s08-lesson-data.mjs:1153`) — 확인 범위 1153–1155행.
 
   발췌: `{id:'readonly',question:'readOnly=true면 이 DB의 쓰기를 막았을까?',source:scope+' · 추가 readOnlyWrite',sourceNote:'readOnly는 권한 규칙이 아닌 힌트입니다. 여기서는 setReadOnly(true) 호출과 H2의 실제 쓰기 결과를 각각 확인했습니다.',note:'추가 H2 JDBC 결과를 다른 DB·드라이버·JPA 최적화·보안 권한으로 일반화하지 않습니다. '+limits,stages:[     stage('readonly','hint','readOnly 표시와 JDBC 힌트','추가 readOnlyWrite 진입 시 readOnly=true였고 실제 연결 메서드 setReadOnly(true)가 기록됐습니다. 이 사실만으로 쓰기 차단을 주장하지 않습니다.','@Transactional(readOnly=true)\npublic void readOnlyWrite() {\n    snap("read-only-w`
 
@@ -46,16 +46,16 @@ S08은 readOnly 힌트, 최신 H2에서는 JDBC 쓰기 commit 관측을 갖는�
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `spring-tx-annotation` — [Using @Transactional — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html)
 - `jakarta-tx-annotation` — [Jakarta Transactions Transactional API](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/transaction/transactional)
 - `spring-jdbc-enforce-readonly` — [DataSourceTransactionManager Javadoc](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/jdbc/datasource/DataSourceTransactionManager.html)
 
-이번 전체 감사의 learner 격리 실행에서 jakarta.transaction.Transactional 서비스는 외부 transaction에 참여했고 RuntimeException 뒤 행0이 관찰됐다. annotation 선택 자체는 오답이 아니다. 실제 관찰: [/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/01-LEARNER-CODE.md](/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/01-LEARNER-CODE.md).
+이번 전체 감사의 learner 격리 실행에서 jakarta.transaction.Transactional 서비스는 외부 transaction에 참여했고 RuntimeException 뒤 행0이 관찰됐다. annotation 선택 자체는 오답이 아니다. 실제 관찰: $USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/01-LEARNER-CODE.md (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/01-LEARNER-CODE.md`).
 
 ## 병행 작업에 따른 스냅샷 한정
 
-감사 도중 common-learning-foundation worktree가 추가됐다. 여기의 learner NPE·annotation 관찰은 /Users/ds/code/javaExperience 의 main 스냅샷과 그 격리복사본 기준이며 새 worktree 소스 전체의 상태로 확대하지 않는다. 새 기반 소스 비교·검증은 메인 담당자의 /Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/common-foundation-comparison.json 및 전체 감사 보고서를 따른다.
+감사 도중 common-learning-foundation worktree가 추가됐다. 여기의 learner NPE·annotation 관찰은 $REPO_ROOT 의 main 스냅샷과 그 격리복사본 기준이며 새 worktree 소스 전체의 상태로 확대하지 않는다. 새 기반 소스 비교·검증은 메인 담당자의 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/common-foundation-comparison.json 및 전체 감사 보고서를 따른다.
 
 발췌 표기 안내: 위 짧은 발췌는 줄바꿈을 공백으로 합치고 Markdown backtick을 표시용 따옴표로 정리했다. 바이트 단위 인용본은 아니며 정확한 원문은 연결한 파일·행과 SCOPE-MANIFEST.json의 SHA를 기준으로 한다.

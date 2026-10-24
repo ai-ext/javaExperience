@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H3-scheduling.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H3-scheduling.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/H3-scheduling.md](../../../../../lessons/H3-scheduling.md)
 
 원문 SHA-256: `c0695de8207ace58442b66a323304299a98ffde7505a5ff14f98dc2feb9045f5`
 
@@ -26,7 +26,7 @@ cron/zone과 고정 시각, scheduling thread pool, 실패 후 회차, concurren
 
 공백 또는 한계: UNIQUE는 한 DB 결과행만 보장하고 여러 JVM이 같은 schedule을 실행하는 것, DB 밖 메일/API를 정확히 한 번 보내는 것은 보장하지 않는다. FAILED run 기록·재시도·다중 인스턴스 잠금은 15-6 등 후속이 담당한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H3-scheduling.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H3-scheduling.md:1) — 1~310행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H3-scheduling.md](../../../../../lessons/H3-scheduling.md) — 1~310행
 
 ## 이번 실행 근거
 
@@ -48,7 +48,7 @@ lesson_h3_digest의 UNIQUE(job_name,run_date)와 INSERT IGNORE는 INSERT idempot
 
 판정 범위: UNIQUE는 한 DB 결과행만 보장하고 여러 JVM이 같은 schedule을 실행하는 것, DB 밖 메일/API를 정확히 한 번 보내는 것은 보장하지 않는다. FAILED run 기록·재시도·다중 인스턴스 잠금은 15-6 등 후속이 담당한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H3-scheduling.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H3-scheduling.md:1) — 1~310행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H3-scheduling.md](../../../../../lessons/H3-scheduling.md) — 1~310행
 
 ## 확장 개발 명세
 
@@ -112,14 +112,14 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H3/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H3/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H3/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H3/screen.jpg`)
 - 관찰: HTML/캡처를 실제 열어 확인하지 않았다. source와 HTML 차이만으로 시각 검토를 완료하지 않는다.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H3/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H3/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H3/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H3/dom.txt`)
 
-- source: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H3-scheduling.md](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H3-scheduling.md)
+- source: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H3-scheduling.md](../../../../../lessons/H3-scheduling.md)
 - source_same: 예
-- html: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H3-scheduling.html](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H3-scheduling.html)
+- html: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H3-scheduling.html](../../../../../lessons/H3-scheduling.html)
 - html_same: 아니오
 - difference: source는 corpus에서 최신 원문과 동일하다고 기록되어 있다. HTML byte hash가 다르지만 화면/원인을 미검토했다.
 
@@ -128,6 +128,6 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H3-scheduling.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H3-scheduling.md:1) — 1~310행 (원리·코드 예시·기록된 저자 실행·따라 하기·실패 반례·정답과 후속 경로)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H3-scheduling.md](../../../../../lessons/H3-scheduling.md) — 1~310행 (원리·코드 예시·기록된 저자 실행·따라 하기·실패 반례·정답과 후속 경로)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H3.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H3.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H3.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H3.json`)

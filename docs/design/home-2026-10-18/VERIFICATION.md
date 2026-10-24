@@ -41,7 +41,7 @@ python3 -m http.server 8765 --bind 127.0.0.1
 
 ## 후속 개발 · 자료 정리 이후
 
-사용자 요청으로 과거 public-scenario-catalog의 미추적 90개(109860088 bytes)를 `/Users/ds/Documents/Codex/2026-10-15/sjsms/outputs/javaExperience-worktree-archive-2026-10-18`에 상대 경로 그대로 보관했다. `archive-manifest.json`에 원래 경로·크기·SHA-256을 기록하고 90개 일치를 재확인한 뒤 해당 worktree를 제거했다. 기존 생성 원본과 로컬·원격 브랜치는 유지한다. 기본 checkout과 visual-learning-next worktree만 남았다.
+사용자 요청으로 과거 public-scenario-catalog의 미추적 90개(109860088 bytes)를 `$USER_HOME/Documents/Codex/2026-10-15/sjsms/outputs/javaExperience-worktree-archive-2026-10-18`에 상대 경로 그대로 보관했다. `archive-manifest.json`에 원래 경로·크기·SHA-256을 기록하고 90개 일치를 재확인한 뒤 해당 worktree를 제거했다. 기존 생성 원본과 로컬·원격 브랜치는 유지한다. 기본 checkout과 visual-learning-next worktree만 남았다.
 
 홈에는 다음을 추가했다.
 

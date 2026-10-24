@@ -8,16 +8,16 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S08-transactions.md:110](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S08-transactions.md:110) — 확인 범위 110–118행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S08-transactions.md:110](../../../../knowledge/S08-transactions.md) — 확인 범위 110–118행.
 
   발췌: `### 롤백 규칙 매칭  기본 동작은 ’RuntimeException’과 ’Error’ 롤백, checked 예외 커밋이다. 따라서 업무 실패를 checked 예외로 표현한다면 ’rollbackFor = DomainException.class’처럼 타입을 구체적으로 선언한다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/G4-transaction-in-practice.md:202](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/G4-transaction-in-practice.md:202) — 확인 범위 202–240행.
+- [$WORKTREE_ROOT/concept-learning-night/lessons/G4-transaction-in-practice.md:202](../../../../../lessons/G4-transaction-in-practice.md) — 확인 범위 202–240행.
 
   발췌: `## 일부러 틀려 보기  **1. 내가 던진 예외를 내가 잡는다** — 커밋된다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s08-lesson-data.mjs:1118](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s08-lesson-data.mjs:1118) — 확인 범위 1118–1120행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/s08-lesson-data.mjs:1118 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/s08-lesson-data.mjs:1118`) — 확인 범위 1118–1120행.
 
   발췌: `{id:'rules',question:'예외를 던지면 언제나 rollback될까?',source:scope+' · 추가 ExtraRules',sourceNote:ruleNote,note:ruleNote+' 프록시 밖으로 나온 예외와 같은 메서드 안에서 잡은 예외를 구분합니다. '+limits,stages:[     stage('rules','checked','기본 checked 예외는 commit','추가 checked()가 ledger에 checked를 넣고 IOException을 던졌습니다. 기본 롤백 규칙에서는 checked가 대상이 아니어서 행이 남았습니다.','@Transactional public void checked() throws IOException {\n    jdbc.update("insert into ledger values(\'checked\')");\n    throw new IOException("checked");\n}',[['프록시 밖 예외','IOE`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s08-lesson-data.mjs:1133](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s08-lesson-data.mjs:1133) — 확인 범위 1133–1135행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/s08-lesson-data.mjs:1133 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/s08-lesson-data.mjs:1133`) — 확인 범위 1133–1135행.
 
   발췌: `{id:'required',question:'안쪽 예외를 잡았는데 왜 바깥 commit도 실패할까?',source:scope+' · 추가 Outer/Inner REQUIRED',sourceNote:'추가 Outer와 Inner를 각각 프록시로 호출합니다. 같은 메서드 내부 catch 예제와 달리 안쪽 프록시가 먼저 rollback-only를 표시합니다.',note:'inner.required 실패를 outer가 잡아도 같은 물리 transaction의 rollback-only가 남았습니다. 최종 UnexpectedRollbackException과 전체 rollback을 구분해 봅니다. '+limits,stages:[     stage('required','inner','두 논리 범위는 같은 연결','추가 outer-required-start와 inner-required는 모두 active=true이며 같은 tracked connection85였습니다. 각각 outer와 inner-r`
 
@@ -43,7 +43,7 @@ checked 기본 commit/rollbackFor, RuntimeException, noRollbackFor, 직접 던�
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `spring-tx-rollback` — [Rolling Back a Declarative Transaction — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/rolling-back.html)
 

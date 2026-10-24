@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/G3-first-transaction.md](../../../../../lessons/G3-first-transaction.md)
 
 원문 SHA-256: `edd046d8d2586cefe92e3109d9f4ad2e3fbce6322c752fa08cd240af98466921`
 
@@ -26,7 +26,7 @@ temporary MySQL tables로 transaction/rollback/commit/autocommit을 보고 stand
 
 공백 또는 한계: Repository save의 개별 transaction은 proxy를 거치는 call을 전제하며 self-call은 G4다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md:5) — 5~193행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G3-first-transaction.md](../../../../../lessons/G3-first-transaction.md) — 5~193행
 
 ### 2. 실패한 statement 하나는 열린 MySQL transaction의 이전 성공 statement를 자동으로 취소하지 않는다.
 
@@ -36,7 +36,7 @@ temporary MySQL tables로 transaction/rollback/commit/autocommit을 보고 stand
 
 공백 또는 한계: 동일 connection에서 실행해야 하며 temp table은 connection-local임을 lesson이 경고한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md:21) — 21~112행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G3-first-transaction.md](../../../../../lessons/G3-first-transaction.md) — 21~112행
 
 ### 3. Spring default rollback은 unchecked exception에 적용되며 rollback 뒤 auto_increment id는 재사용되지 않는다.
 
@@ -46,7 +46,7 @@ temporary MySQL tables로 transaction/rollback/commit/autocommit을 보고 stand
 
 공백 또는 한계: proxy/rollback-only/propagation은 G4가 이어받는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md:217) — 217~278행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G3-first-transaction.md](../../../../../lessons/G3-first-transaction.md) — 217~278행
 
 ## 이번 실행 근거
 
@@ -75,7 +75,7 @@ Standalone app observation은 자동 test가 아니며 현재 감사에서 재�
 
 판정 범위: source historical output은 이번 감사 실행이 아니다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md:5) — 5~278행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G3-first-transaction.md](../../../../../lessons/G3-first-transaction.md) — 5~278행
 
 ## 확장 개발 명세
 
@@ -128,10 +128,10 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G3/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G3/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G3/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G3/screen.jpg`)
 - 관찰: 렌더 캡처 대기 중.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G3/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G3/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G3/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G3/dom.txt`)
 
 원문: corpus의 latest_source_same=True. 최신 HTML byte 해시 다름; 실제 캡처 기반 렌더 비교 전이므로 시각 차이는 pending_render. 원문 SHA/HTML 차이만으로 UI의 정확성이나 시각 완료를 추정하지 않는다.
 
@@ -139,8 +139,8 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md:5) — 5~193행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md:21) — 21~112행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md:217) — 217~278행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G3-first-transaction.md](../../../../../lessons/G3-first-transaction.md) — 5~193행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G3-first-transaction.md](../../../../../lessons/G3-first-transaction.md) — 21~112행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G3-first-transaction.md](../../../../../lessons/G3-first-transaction.md) — 217~278행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-G3.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-G3.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-G3.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-G3.json`)

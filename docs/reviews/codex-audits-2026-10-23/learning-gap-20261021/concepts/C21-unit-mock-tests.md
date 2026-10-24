@@ -8,21 +8,21 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V01-what-and-how-to-test.md:15](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V01-what-and-how-to-test.md:15) — 확인 범위 15–37행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/V01-what-and-how-to-test.md:15](../../../../knowledge/V01-what-and-how-to-test.md) — 확인 범위 15–37행.
 
   발췌: `### 2.1 요구사항에서 테스트할 행동을 고른다  먼저 비즈니스 규칙, 경계값, 분기, 과거 버그, 외부 계약을 찾는다. 상품 API라면 “없는 ID는 404”, “삭제 상품은 일반 조회에서 제외”, “페이지 응답의 상품과 전체 건수가 맞다”가 후보다. 단순 getter/setter나 Spring 자체 기능은 애플리케이션이 보장하는 요구사항이 아니다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V01-what-and-how-to-test.md:81](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V01-what-and-how-to-test.md:81) — 확인 범위 81–94행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/V01-what-and-how-to-test.md:81](../../../../knowledge/V01-what-and-how-to-test.md) — 확인 범위 81–94행.
 
   발췌: `## 3. 따라 하기  예제는 ’practice/starter’의 실제 상품 API를 따르며 Java 25 전용 문법 없이 Boot 4.1.1 기준 **(미실행)**이다. README에는 JDK 21·Gradle 9.8.0·Boot 4.1.1로 테스트 2개가 통과한 기록이 있다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V03-mocking-in-practice.md:148](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V03-mocking-in-practice.md:148) — 확인 범위 148–189행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/V03-mocking-in-practice.md:148](../../../../knowledge/V03-mocking-in-practice.md) — 확인 범위 148–189행.
 
   발췌: `### 2.3 Boot 4 MVC 슬라이스는 Controller를 실물로 둔다  현재 실습 프로젝트의 정확한 import는 ’org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest’와 ’AutoConfigureMockMvc’다. ’@MockitoBean’은 ’org.springframework.test.context.bean.override.mockito.MockitoBean’이다. Controller·MVC 변환은 실제로 돌리고 다음 Service 경계를 mock한다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V03-mocking-in-practice.md:212](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V03-mocking-in-practice.md:212) — 확인 범위 212–214행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/V03-mocking-in-practice.md:212](../../../../knowledge/V03-mocking-in-practice.md) — 확인 범위 212–214행.
 
   발췌: `## 3. 따라 하기  실습은 Boot 4.1.1·Gradle 9.8·JDK 21인 ’practice/starter’ 상품 API를 쓴다. Java 25 호환 코드이며 새 예제는 실행하지 않았다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/source-proof/source.json:62](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/source-proof/source.json:62) — 확인 범위 62–84행.
+- $WORKTREE_ROOT/concept-learning-night/docs/design/v04-2026-10-20/source-proof/source.json:62 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/docs/design/v04-2026-10-20/source-proof/source.json:62`) — 확인 범위 62–84행.
 
-  발췌: `"externalStudyData": [     {       "source": "/Users/ds/research/java-spring/practice/starter/src/main/java/com/example/practice/product/Product.java",       "copy": "external/java/com/example/practice/product/Product.java",`
+  발췌: `"externalStudyData": [     {       "source": "$USER_HOME/research/java-spring/practice/starter/src/main/java/com/example/practice/product/Product.java",       "copy": "external/java/com/example/practice/product/Product.java",`
 
 V01은 위험·계약 기반 테스트 선정과 테스트 수준의 맹점을 설명한다. V03은 mock/stub/fake/spy, doReturn, 실제 서비스 생성자 주입, 시간/난수 통제까지 구체적이다. V04 보강은 외부 원본 unit2 실제 통과를 기록한다.
 
@@ -30,7 +30,7 @@ V01은 위험·계약 기반 테스트 선정과 테스트 수준의 맹점을 �
 
 ## 부족하거나 서로 어긋난 지점
 
-V01/V03은 현재 프로젝트의 practice/starter/ProductService를 전제로 cd와 파일읽기를 안내하지만 감사 대상 checkout의 practice에는 MISSIONS.md/html만 있다. 최신 V04는 원본이 /Users/ds/research/java-spring/practice/starter임을 source.json에 기록한다. 외부 자료 존재는 clone 학습자의 실행 가능성을 해결하지 않는다.
+V01/V03은 현재 프로젝트의 practice/starter/ProductService를 전제로 cd와 파일읽기를 안내하지만 감사 대상 checkout의 practice에는 MISSIONS.md/html만 있다. 최신 V04는 원본이 $USER_HOME/research/java-spring/practice/starter임을 source.json에 기록한다. 외부 자료 존재는 clone 학습자의 실행 가능성을 해결하지 않는다.
 
 ## 실습 수행 가능성과 보완 과제
 
@@ -46,7 +46,7 @@ V01/V03은 현재 프로젝트의 practice/starter/ProductService를 전제로 c
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `spring-di` — [Dependency Injection — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html)
 

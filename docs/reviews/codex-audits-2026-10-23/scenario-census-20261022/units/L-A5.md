@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A5-rest-api-design.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A5-rest-api-design.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/A5-rest-api-design.md](../../../../../lessons/A5-rest-api-design.md)
 
 원문 SHA-256: `e4f2d1b01dda60f1ef7e95d3f63170680d1997a5b3e268f8f3c68c3c7621d722`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: POST 응답 유실과 재전송은 설명하지만 이 레슨의 반복은 모두 순차 성공 응답이다. T-026에 이미 있는 멱등 키 심화로 직접 가는 링크는 없다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A5-rest-api-design.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A5-rest-api-design.md:122) — 122~247행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/A5-rest-api-design.md](../../../../../lessons/A5-rest-api-design.md) — 122~247행
 
 ### 2. PUT 누락 필드와 잘못된 경로 타입을 비교한다.
 
@@ -36,7 +36,7 @@
 
 공백 또는 한계: POST 응답 유실과 재전송은 설명하지만 이 레슨의 반복은 모두 순차 성공 응답이다. T-026에 이미 있는 멱등 키 심화로 직접 가는 링크는 없다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A5-rest-api-design.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A5-rest-api-design.md:249) — 249~273행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/A5-rest-api-design.md](../../../../../lessons/A5-rest-api-design.md) — 249~273행
 
 ### 3. 명세의 입력·상태·응답을 Spring 인자로 바꾸고10장으로 이동한다.
 
@@ -46,7 +46,7 @@
 
 공백 또는 한계: POST 응답 유실과 재전송은 설명하지만 이 레슨의 반복은 모두 순차 성공 응답이다. T-026에 이미 있는 멱등 키 심화로 직접 가는 링크는 없다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A5-rest-api-design.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A5-rest-api-design.md:275) — 275~350행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/A5-rest-api-design.md](../../../../../lessons/A5-rest-api-design.md) — 275~350행
 
 ## 이번 실행 근거
 
@@ -71,7 +71,7 @@ POST 응답 유실과 재전송은 설명하지만 이 레슨의 반복은 모�
 
 판정 범위: 해당 레슨과 명시한 후속 경로의 판정이며 전체 개념의 부재를 뜻하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A5-rest-api-design.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A5-rest-api-design.md)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/A5-rest-api-design.md](../../../../../lessons/A5-rest-api-design.md)
 
 ## 확장 개발 명세
 
@@ -125,10 +125,10 @@ P2
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A5/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A5/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A5/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A5/screen.jpg`)
 - 관찰: 없음
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A5/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A5/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A5/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A5/dom.txt`)
 
 - markdown_same: 예
 - html_same: 아니오
@@ -138,6 +138,6 @@ P2
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A5-rest-api-design.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A5-rest-api-design.md:1) — 1~350행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/A5-rest-api-design.md](../../../../../lessons/A5-rest-api-design.md) — 1~350행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-A5.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-A5.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-A5.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-A5.json`)

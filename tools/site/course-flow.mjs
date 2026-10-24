@@ -1,7 +1,7 @@
 // 흐름 재생 렌더러 — 일자 페이지의 [오늘 흐름](course/flows/days.json)과 티켓 페이지의 [장애 흐름](course/flows/tickets.json).
 // 정지 상태에서도 모든 단계와 값이 읽히도록 단계 목록을 HTML로 다 그리고, 재생 조작(course-flow.js)은 그 위에 얹기만 한다.
 // 티켓의 원인 쪽 단계(side=cause)는 "원인과 정답"과 같은 수준으로 접기 안에만 그린다. 지도·제목·aria 어디에도 원인 문장을 두지 않는다.
-// 노드 아이콘은 미리캔버스 템플릿(정보 시스템 개발 제안서)의 선 아이콘·타일 톤을 참고해 직접 그린 인라인 SVG다(docs/design/COURSE-V2-MIRICANVAS-2026-10-23.md).
+// 노드 아이콘은 디자인 참고 자료 템플릿(정보 시스템 개발 제안서)의 선 아이콘·타일 톤을 참고해 직접 그린 인라인 SVG다(docs/design/COURSE-V2-DESIGN-REFERENCE-2026-10-23.md).
 import fs from 'node:fs';
 import path from 'node:path';
 

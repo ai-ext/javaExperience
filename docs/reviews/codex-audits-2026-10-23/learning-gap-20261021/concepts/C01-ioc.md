@@ -8,16 +8,16 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P12-why-beans-ioc-intro.md:11](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P12-why-beans-ioc-intro.md:11) — 확인 범위 11–36행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/P12-why-beans-ioc-intro.md:11](../../../../knowledge/P12-why-beans-ioc-intro.md) — 확인 범위 11–36행.
 
   발췌: `’’’java class OrderService {     private final OrderRepository repository = new SqlOrderRepository(); }`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/E1-why-layers.md:23](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/E1-why-layers.md:23) — 확인 범위 23–33행.
+- [$WORKTREE_ROOT/concept-learning-night/lessons/E1-why-layers.md:23](../../../../../lessons/E1-why-layers.md) — 확인 범위 23–33행.
 
   발췌: `### 의존성과 주입  - **의존성**: A가 일하려면 B가 있어야 하면 "A는 B에 의존한다"고 한다. 서비스는 저장소가 있어야 글을 저장할 수 있다. 그러니 서비스는 저장소에 의존한다. - **주입**: A가 B를 **자기 안에서 만들지 않는다.** 바깥에서 만들어 A에게 넣어 준다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/E1-why-layers.md:116](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/E1-why-layers.md:116) — 확인 범위 116–152행.
+- [$WORKTREE_ROOT/concept-learning-night/lessons/E1-why-layers.md:116](../../../../../lessons/E1-why-layers.md) — 확인 범위 116–152행.
 
   발췌: `**2. 저장소를 하나 더 만들어 본다.**  ’’’text jshell> PostService other = new PostService(new MemoryPostRepository())`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S01-ioc-di.md:19](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S01-ioc-di.md:19) — 확인 범위 19–40행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S01-ioc-di.md:19](../../../../knowledge/S01-ioc-di.md) — 확인 범위 19–40행.
 
   발췌: `| 개념 | 정의와 구분 | |---|---| | IoC | 객체 생성·연결·생명주기 제어를 컨테이너로 옮기는 원칙 | | DI | 생성자·팩터리·프로퍼티로 협력 객체를 전달하는 조립 방식 |`
 
@@ -43,7 +43,7 @@ E1의 “저장소가 서비스를 부르면 ... 서버가 뜨지 않는다”�
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `spring-di` — [Dependency Injection — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html)
 - `spring-bean-scopes` — [Bean Scopes — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html)

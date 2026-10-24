@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H4-bulk-processing.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H4-bulk-processing.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/H4-bulk-processing.md](../../../../../lessons/H4-bulk-processing.md)
 
 원문 SHA-256: `715c29c7f9a2abce33f0bc7f57c8459075bb929bc0140a5e6e40bdbb49b1a1b8`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: 청크 루프는 0행까지 지우며 다시 실행 가능한 예지만, process 중단 checkpoint, 동시 cutoff 변경/행 삽입, 청크별 실패 후 운영 재개 정책은 별도 job 수준에서 다루지 않는다. 15-4가 실제 schema와 FK 전체/경계/cleanup을 맡는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H4-bulk-processing.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H4-bulk-processing.md:1) — 1~284행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H4-bulk-processing.md](../../../../../lessons/H4-bulk-processing.md) — 1~284행
 
 ## 이번 실행 근거
 
@@ -48,7 +48,7 @@ FK에서 child 먼저 삭제한다. DELETE LIMIT은 한 statement 최대 행 수
 
 판정 범위: 청크 루프는 0행까지 지우며 다시 실행 가능한 예지만, process 중단 checkpoint, 동시 cutoff 변경/행 삽입, 청크별 실패 후 운영 재개 정책은 별도 job 수준에서 다루지 않는다. 15-4가 실제 schema와 FK 전체/경계/cleanup을 맡는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H4-bulk-processing.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H4-bulk-processing.md:1) — 1~284행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H4-bulk-processing.md](../../../../../lessons/H4-bulk-processing.md) — 1~284행
 
 ## 확장 개발 명세
 
@@ -116,14 +116,14 @@ low
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H4/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H4/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H4/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H4/screen.jpg`)
 - 관찰: HTML/캡처를 실제 열어 보지 않았다. source와 HTML 차이만으로 시각 검토를 완료하지 않는다.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H4/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H4/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H4/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H4/dom.txt`)
 
-- source: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H4-bulk-processing.md](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H4-bulk-processing.md)
+- source: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H4-bulk-processing.md](../../../../../lessons/H4-bulk-processing.md)
 - source_same: 예
-- html: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H4-bulk-processing.html](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H4-bulk-processing.html)
+- html: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H4-bulk-processing.html](../../../../../lessons/H4-bulk-processing.html)
 - html_same: 아니오
 - difference: source는 corpus에서 최신 원문과 같다고 기록되어 있다. HTML byte hash가 다르지만 화면/원인을 미검토했다.
 
@@ -132,6 +132,6 @@ low
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H4-bulk-processing.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H4-bulk-processing.md:1) — 1~284행 (원리·코드 예시·기록된 저자 실행·따라 하기·실패 반례·답안·후속 경로)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H4-bulk-processing.md](../../../../../lessons/H4-bulk-processing.md) — 1~284행 (원리·코드 예시·기록된 저자 실행·따라 하기·실패 반례·답안·후속 경로)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H4.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H4.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H4.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H4.json`)

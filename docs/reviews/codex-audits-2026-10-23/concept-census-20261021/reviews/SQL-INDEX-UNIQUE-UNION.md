@@ -9,13 +9,13 @@
 - R03은 UNIQUE 제약과 NULL을 다룬다. UK라는 입력은 현재 실제 검색에서 결과0이다. 제약의 의미와 그 제약을 뒷받침하는 인덱스를 따로 배워야 한다.
 - R04 전문에는 SQL UNION/UNION ALL의 중복 처리 비교가 없다. 현재 실제 검색에서 UNION은 J22의 Union-Find만 반환한다. 이름이 비슷하지만 서로 다른 개념이므로 명확한 누락·오연결 후보다.
 
-원문: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/docs/knowledge/R05-index-btree.md, /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/docs/knowledge/R03-schema-types-constraints.md, /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/docs/knowledge/R04-sql-crud-join.md.
+원문: $WORKTREE_ROOT/concept-census-20261021/docs/knowledge/R05-index-btree.md, $WORKTREE_ROOT/concept-census-20261021/docs/knowledge/R03-schema-types-constraints.md, $WORKTREE_ROOT/concept-census-20261021/docs/knowledge/R04-sql-crud-join.md.
 
 ## 이번 일회용 MySQL 실행
 
 MySQL8.4.11 컨테이너를 network=none, tmpfs 데이터, 호스트 포트 없이 만들었다. 식별자는 d8378972bc249f1af0a8f4229aba1b25558ae2c22107cbca72071d3f8106e264 이며 작업 뒤 stop과 자동 제거를 확인했다. 다른 DB/컨테이너는 사용하거나 정리하지 않았다.
 
-원자료: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/sql-probe/results.json. 각 SQL과 stdout/stderr도 같은 폴더에 있다.
+원자료: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/sql-probe/results.json. 각 SQL과 stdout/stderr도 같은 폴더에 있다.
 
 | 확인할 개념 | 실행 조건 | 실제 관측 | 교육상 구분 |
 |---|---|---|---|

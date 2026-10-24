@@ -24,7 +24,7 @@
 ## Global Constraints
 
 - 작업 위치는 worktree `~/code/javaExperience/.worktrees/p1-spec-roadmap`, 브랜치 `course/p1-spec-roadmap`다(P1 위에 이어 쌓는다). push 금지. 태그는 로컬에만 단다.
-- 호스트에 JDK가 없다. Gradle은 반드시 `tools/course/gradle-docker.sh <프로젝트 디렉터리> <gradle 인자…>`로 실행한다(Task 1이 만든다). 이 스크립트는 `eclipse-temurin:21-jdk` 컨테이너를 쓰고, 옵션은 `--network host`, Colima 소켓 `/var/run/docker.sock` 마운트, 캐시 볼륨 `jx-gradle:/root/.gradle`, `TESTCONTAINERS_RYUK_DISABLED=true`다.
+- 호스트 JDK 21에서 `./gradlew`를 실행한다. JDK가 없으면 선택적으로 `tools/course/gradle-docker.sh <프로젝트 디렉터리> <gradle 인자…>`로 실행한다(Task 1이 만든다). 이 스크립트는 `eclipse-temurin:21-jdk` 컨테이너, `--network host`, Docker 데몬의 표준 소켓 `/var/run/docker.sock` 마운트, 캐시 볼륨 `jx-gradle:/root/.gradle`을 쓴다. 프로젝트 경로의 파일 공유와 host networking 지원이 필요하며, Docker Desktop은 host networking을 켜야 한다. Ryuk은 기본 동작을 유지한다.
 - 패키지 루트는 `com.example.board`이고 도메인형으로 나눈다(`member`, `post`, `comment`, `point`, `coupon`, `shop`, `payment`, `admin`, `common`, `config`). 파일 경로는 roadmap `files`를 그대로 따른다. 단계 제목에만 나오는 보조 파일(enum, DTO record, 저장소 인터페이스, 기존 파일의 작은 수정)도 그 순서 커밋에 함께 넣는다.
 - 엔드포인트 문자열, 상태 코드, ProblemDetail `type`, 필드 규칙, 운영 값은 `spec-v2.md`가 기준이다. 정답이 명세와 다르면 명세를 따른다.
 - 엔티티 규칙은 다음과 같다(설계 5-2 D4).
@@ -88,7 +88,7 @@
   - 요청 ID 헤더 `X-Request-Id`(없으면 UUID 생성), MDC 키 `requestId`
   - 프로파일 `local`·`test`·`prod`
 
-- [ ] **Step 1**: `tools/course/gradle-docker.sh` 작성. 디렉터리 인자가 `$HOME` 밖이면 오류로 끝낸다(Colima가 `$HOME`만 마운트한다). 확인: `tools/course/gradle-docker.sh board-server --version` → `Gradle 9.8`
+- [ ] **Step 1**: `tools/course/gradle-docker.sh` 작성. 프로젝트 디렉터리는 Docker 런타임이 공유할 수 있는 경로를 사용한다. `$HOME` 내부로 제한하지 않는다. 확인: `tools/course/gradle-docker.sh board-server --version` → `Gradle 9.8`
 - [ ] **Step 2**: D01-1. start.spring.io로 받은 구성과 같게 만든다. 의존성은 webmvc, actuator, validation, lombok뿐이고 JPA는 Step 3에서 넣는다. 테스트 `BoardApplicationTests.contextLoads`, `HealthEndpointTest.health_UP`(`GET /actuator/health` → 200 `{"status":"UP"}`)
 - [ ] **Step 3**: D01-2. JPA, MySQL, `compose.yaml`(mysql:8.4, 포트 `13310:3306`), `schema.sql`(빈 파일 허용). Testcontainers MySQL로 `contextLoads`가 통과한다.
 - [ ] **Step 4**: D01-3. `HealthEndpointTest.env_비노출`(`GET /actuator/env` → 404). prod yml에 비밀값 자리표시자만 있는지 확인하는 `ProfileConfigTest`

@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B4-record-getter-immutable.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B4-record-getter-immutable.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/B4-record-getter-immutable.md](../../../../../lessons/B4-record-getter-immutable.md)
 
 원문 SHA-256: `54ca5e95639cae85fcf785a91ee250d0b24dbce0981ef5a0e54b629a470e982f`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: 불변 설명과 실습은 String/int 구성요소만 사용한다. record가 List를 포함할 때 외부/반환 참조로 내용이 바뀌는 얕은 불변 반례가 없어 DTO 불변을 과하게 일반화하기 쉽다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B4-record-getter-immutable.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B4-record-getter-immutable.md:56) — 56~111행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B4-record-getter-immutable.md](../../../../../lessons/B4-record-getter-immutable.md) — 56~111행
 
 ### 2. record/getter/no-getter JSON 필드를 비교하고 getter를 추가한다.
 
@@ -36,7 +36,7 @@
 
 공백 또는 한계: 불변 설명과 실습은 String/int 구성요소만 사용한다. record가 List를 포함할 때 외부/반환 참조로 내용이 바뀌는 얕은 불변 반례가 없어 DTO 불변을 과하게 일반화하기 쉽다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B4-record-getter-immutable.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B4-record-getter-immutable.md:113) — 113~200행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B4-record-getter-immutable.md](../../../../../lessons/B4-record-getter-immutable.md) — 113~200행
 
 ### 3. record 필드 재할당과 잘못된 getter 호출을 실패시킨다.
 
@@ -46,13 +46,13 @@
 
 공백 또는 한계: 불변 설명과 실습은 String/int 구성요소만 사용한다. record가 List를 포함할 때 외부/반환 참조로 내용이 바뀌는 얕은 불변 반례가 없어 DTO 불변을 과하게 일반화하기 쉽다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B4-record-getter-immutable.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B4-record-getter-immutable.md:202) — 202~236행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B4-record-getter-immutable.md](../../../../../lessons/B4-record-getter-immutable.md) — 202~236행
 
 ## 이번 실행 근거
 
 이번 독립 Java 예시 1개를 실행해 예상 출력/예외를 확인했다. Spring·DB·IDE 실습 전체의 실행이 아니다.
 
-[/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json)
+$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json`)
 
 ## 쿼리·DB 깊이와 다음 단계
 
@@ -71,7 +71,7 @@ DB/트랜잭션을 직접 다루는 레슨은 별도 행 비교를 기록한다.
 
 판정 범위: 해당 레슨과 명시한 후속 경로의 판정이며 전체 개념의 부재를 뜻하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B4-record-getter-immutable.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B4-record-getter-immutable.md)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B4-record-getter-immutable.md](../../../../../lessons/B4-record-getter-immutable.md)
 
 ## 확장 개발 명세
 
@@ -123,10 +123,10 @@ P1
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B4/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B4/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B4/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B4/screen.jpg`)
 - 관찰: 없음
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B4/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B4/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B4/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B4/dom.txt`)
 
 - markdown_same: 예
 - html_same: 아니오
@@ -136,6 +136,6 @@ P1
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B4-record-getter-immutable.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B4-record-getter-immutable.md:1) — 1~290행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B4-record-getter-immutable.md](../../../../../lessons/B4-record-getter-immutable.md) — 1~290행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-B4.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-B4.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-B4.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-B4.json`)

@@ -10,10 +10,11 @@ set -euo pipefail
 
 root=$(cd "$(dirname "$0")/../.." && pwd -P)
 src="$root/messy-server"
-# 셸 기본 JAVA_HOME이 11일 수 있어 JDK 21을 따로 받는다(TICKET_JAVA_HOME으로 덮을 수 있다)
-JAVA_HOME="${TICKET_JAVA_HOME:-/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home}"
-export JAVA_HOME
-# 이 머신의 로컬 Docker 런타임에서만 실패하는 정답 서버 테스트(포트 포워더가 끊긴 프록시 연결을 받아 둔다)
+# 별도 JDK 경로가 있으면 우선하고, 없으면 JAVA_HOME 또는 PATH의 Java를 그대로 쓴다.
+if [ -n "${TICKET_JAVA_HOME:-}" ]; then
+  export JAVA_HOME="$TICKET_JAVA_HOME"
+fi
+# 일부 로컬 Docker 포트 포워더에서 관찰된 연결 실패 예외(지정 테스트와 원인만 허용).
 ENV_FLAKY="PgClientRetryTest.연결_실패는_재시도하고_복구되면_성공한다 PgClientRetryTest.연결_실패가_계속되면_백오프_후_3번째에_포기한다"
 
 full=false

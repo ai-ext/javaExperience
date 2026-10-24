@@ -32,11 +32,11 @@
 
 ## 읽는 순서
 
-1. 현재 역량별 범위와 개발 순서: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/DEPTH-MAP.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/DEPTH-MAP.md)
-2. 225개 개별 판정 파일: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/UNIT-INDEX.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/UNIT-INDEX.md)
-3. 이번 실제 실행과 한계: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/RUN-EVIDENCE.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/RUN-EVIDENCE.md)
-4. 최신 기능형7개와 기존 실행 기록: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/LATEST-FLOW-REVIEW.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/LATEST-FLOW-REVIEW.md)
-5. 구체 확장20개: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/EXPANSION-INDEX.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/EXPANSION-INDEX.md)
+1. 현재 역량별 범위와 개발 순서: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/DEPTH-MAP.md (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/DEPTH-MAP.md`)
+2. 225개 개별 판정 파일: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/UNIT-INDEX.md (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/UNIT-INDEX.md`)
+3. 이번 실제 실행과 한계: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/RUN-EVIDENCE.md (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/RUN-EVIDENCE.md`)
+4. 최신 기능형7개와 기존 실행 기록: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/LATEST-FLOW-REVIEW.md (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/LATEST-FLOW-REVIEW.md`)
+5. 구체 확장20개: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/EXPANSION-INDEX.md (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/EXPANSION-INDEX.md`)
 
 ## 실제 실행 요약
 

@@ -8,16 +8,16 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:50](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:50) — 확인 범위 50–74행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:50](../../../../knowledge/P20-jpa-entity-mapping.md) — 확인 범위 50–74행.
 
   발췌: `### 2.4 연관관계의 주인  FK가 ’order_line.order_id’라면 그 값을 바꾸는 것은 child의 ’OrderLine.order’다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/p20-lesson-data.mjs:378](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/p20-lesson-data.mjs:378) — 확인 범위 378–380행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/p20-lesson-data.mjs:378 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/p20-lesson-data.mjs:378`) — 확인 범위 378–380행.
 
   발췌: `"id": "inverse",     "question": "부모 컬렉션에만 넣으면 FK가 채워질까?",     "source": "추가 의도적실패fixture · 원문 OrderLine.order mapping 그대로",`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/p20-lesson-data.mjs:286](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/p20-lesson-data.mjs:286) — 확인 범위 286–288행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/p20-lesson-data.mjs:286 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/p20-lesson-data.mjs:286`) — 확인 범위 286–288행.
 
   발췌: `"id": "ownership",     "question": "addLine과 removeLine은 객체의 어느 쪽을 바꿀까?",     "source": "원문 §2.4 / §3.3 / §3.4 · 원문domain 순수Java 실행",`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/E4-jpa-associations.md:17](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/E4-jpa-associations.md:17) — 확인 범위 17–29행.
+- [$WORKTREE_ROOT/concept-learning-night/lessons/E4-jpa-associations.md:17](../../../../../lessons/E4-jpa-associations.md) — 확인 범위 17–29행.
 
   발췌: `### 연관관계의 주인 — 외래키 열을 누가 쓰나  ’comment.post_id’ 열은 댓글 테이블에 있다. 이 열과 짝인 자바 필드 ’Comment.post’(’@ManyToOne’)가 **주인**이다. 저장할 때 Hibernate는 주인 필드만 보고 ’post_id’를 채운다.`
 
@@ -43,7 +43,7 @@ E4 게시글→작성자, P20 주문→항목 두 모델에서 owning 필드를 
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `jakarta-persistence-spec` — [Jakarta Persistence 3.2 Specification](https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2.html)
 
@@ -53,10 +53,10 @@ E4 게시글→작성자, P20 주문→항목 두 모델에서 owning 필드를 
 
 메인 담당자가 common 기반의 새 learner 소스를 격리복사해 실행했다. 감사용 4개 테스트가 실패0으로 끝났으며, 실패 현상 자체를 기대값으로 확인한 테스트도 포함하므로 기능 전체 정상 판정이 아니다. 본 담당자는 다음 검사 코드·XML·복사 소스를 읽어 결과 범위를 확인했다.
 
-- [/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/test/java/org/example/CommonLearningGapAuditTest.java](/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/test/java/org/example/CommonLearningGapAuditTest.java)
-- [/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/build/test-results/test/TEST-org.example.CommonLearningGapAuditTest.xml](/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/build/test-results/test/TEST-org.example.CommonLearningGapAuditTest.xml)
-- 통합 설명: [/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/03-COMMON-LEARNER-CODE.md](/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/03-COMMON-LEARNER-CODE.md) — 메인 담당자의 완성 보고서를 추가로 읽고 대조했다.
+- $USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/test/java/org/example/CommonLearningGapAuditTest.java (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/test/java/org/example/CommonLearningGapAuditTest.java`)
+- $USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/build/test-results/test/TEST-org.example.CommonLearningGapAuditTest.xml (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/build/test-results/test/TEST-org.example.CommonLearningGapAuditTest.xml`)
+- 통합 설명: $USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/03-COMMON-LEARNER-CODE.md (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/03-COMMON-LEARNER-CODE.md`) — 메인 담당자의 완성 보고서를 추가로 읽고 대조했다.
 
-새 기반은 [/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/main/java/org/example/domain/entity/TagsEntity.java:14](/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/main/java/org/example/domain/entity/TagsEntity.java:14)의 tag.title을 저장하지만 기존 seed에는 tag.name NOT NULL이 있다. XML에 alter table tag add column title 뒤 insert into tag(title), Field name doesn’t have a default value가 기록됐고 비어 있지 않은 태그 저장은 DataIntegrityViolationException으로 실패했다. transaction 뒤 tag 수는 전과 같고 post_txt는0이었다. 이는 현재 실행환경의 **Entity 열 매핑과 기존 스키마 계약 불일치**이며 mappedBy 설명 자체의 오류나 연관관계 이론 부재로 확대하지 않는다. 빈 tags 사례만으로 관계 저장 성공을 판정하지 않는 보완 과제가 필요하다.
+새 기반은 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/main/java/org/example/domain/entity/TagsEntity.java:14 (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/main/java/org/example/domain/entity/TagsEntity.java:14`)의 tag.title을 저장하지만 기존 seed에는 tag.name NOT NULL이 있다. XML에 alter table tag add column title 뒤 insert into tag(title), Field name doesn’t have a default value가 기록됐고 비어 있지 않은 태그 저장은 DataIntegrityViolationException으로 실패했다. transaction 뒤 tag 수는 전과 같고 post_txt는0이었다. 이는 현재 실행환경의 **Entity 열 매핑과 기존 스키마 계약 불일치**이며 mappedBy 설명 자체의 오류나 연관관계 이론 부재로 확대하지 않는다. 빈 tags 사례만으로 관계 저장 성공을 판정하지 않는 보완 과제가 필요하다.
 
 common 실행의 DB는 저장소 seed를 사용한 일회용 MySQL이다. 개인 개발 DB의 스키마 변경 여부는 확인하지 않았으므로 개발 DB 전체가 같은 오류라고 단정하지 않는다.

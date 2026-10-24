@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/F1-validation-errors.md](../../../../../lessons/F1-validation-errors.md)
 
 원문 SHA-256: `b966815a72ede2c6292fbae91f5e76fed13280c8c9f62fd1e3990662b6bfb6f7`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: Advice 발췌는 전체 처리기가 아니다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md:63) — 63~171행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F1-validation-errors.md](../../../../../lessons/F1-validation-errors.md) — 63~171행
 
 ### 2. ProblemDetail status/title/detail/instance/errors와 400/401/403/404/500 구분
 
@@ -36,7 +36,7 @@
 
 공백 또는 한계: 실제 전체 error handler는 1-5에서 확인.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md:15) — 15~62행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F1-validation-errors.md](../../../../../lessons/F1-validation-errors.md) — 15~62행
 
 ### 3. 깨진 JSON은 validation 이전 별도 exception
 
@@ -46,7 +46,7 @@
 
 공백 또는 한계: 1-5에서 별도 handler 구성.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md:193) — 193~208행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F1-validation-errors.md](../../../../../lessons/F1-validation-errors.md) — 193~208행
 
 ## 이번 실행 근거
 
@@ -73,7 +73,7 @@
 
 판정 범위: 레슨은 구현 예시와 실습 지시를 제공하며 이번 감사자가 실행/build한 것은 아니다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md:15) — 15~208행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F1-validation-errors.md](../../../../../lessons/F1-validation-errors.md) — 15~208행
 
 ## 확장 개발 명세
 
@@ -125,10 +125,10 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F1/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F1/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F1/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F1/screen.jpg`)
 - 관찰: 렌더 캡처가 제공되지 않아 시각 검토 대기.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F1/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F1/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F1/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F1/dom.txt`)
 
 - source: corpus latest_source 기록에 따름
 - html: source 동일, generated HTML hash 상이; screenshot 비교 대기
@@ -139,8 +139,8 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md:63) — 63~171행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md:15) — 15~62행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F1-validation-errors.md:193) — 193~208행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F1-validation-errors.md](../../../../../lessons/F1-validation-errors.md) — 63~171행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F1-validation-errors.md](../../../../../lessons/F1-validation-errors.md) — 15~62행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F1-validation-errors.md](../../../../../lessons/F1-validation-errors.md) — 193~208행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-F1.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-F1.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-F1.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-F1.json`)

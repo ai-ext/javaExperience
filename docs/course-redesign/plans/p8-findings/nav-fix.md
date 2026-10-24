@@ -1,9 +1,9 @@
 # 길찾기 재평가 지적 반영
 
 - 확인일: 2026-10-24
-- 작업 공간: `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap`
+- 작업 공간: `$WORKTREE_ROOT/p1-spec-roadmap`
 - 브랜치: `course/p1-spec-roadmap`
-- 근거: `/Users/ds/.cache/jx-p8/reviews/scenario-eval2.md` 4절과 3절 7번. 아래 9개는 사용자가 지정한 구현 범위다.
+- 근거: `$USER_HOME$REVIEW_WORK_DIR/reviews/scenario-eval2.md` 4절과 3절 7번. 아래 9개는 사용자가 지정한 구현 범위다.
 - 시작 시 작업 트리는 깨끗했다. 저장소의 add·commit·stash·reset·checkout은 실행하지 않았다.
 
 ## 변경 소스
@@ -12,15 +12,15 @@
 
 | 기호 | 파일 |
 |---|---|
-| A | `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/README.md` |
-| B | `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/roadmap.json` |
-| C | `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/hints.json` |
-| D | `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/tools/course/build-days.mjs` |
-| E | `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/tools/site/course-pages.mjs` |
-| F | `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/tools/site/build.mjs` |
-| G | `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/tools/site/course.js` |
-| T1 | `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/tools/course/build-days.test.mjs` |
-| T2 | `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/tools/site/test-course-pages.mjs` |
+| A | `$WORKTREE_ROOT/p1-spec-roadmap/README.md` |
+| B | `$WORKTREE_ROOT/p1-spec-roadmap/course/roadmap.json` |
+| C | `$WORKTREE_ROOT/p1-spec-roadmap/course/hints.json` |
+| D | `$WORKTREE_ROOT/p1-spec-roadmap/tools/course/build-days.mjs` |
+| E | `$WORKTREE_ROOT/p1-spec-roadmap/tools/site/course-pages.mjs` |
+| F | `$WORKTREE_ROOT/p1-spec-roadmap/tools/site/build.mjs` |
+| G | `$WORKTREE_ROOT/p1-spec-roadmap/tools/site/course.js` |
+| T1 | `$WORKTREE_ROOT/p1-spec-roadmap/tools/course/build-days.test.mjs` |
+| T2 | `$WORKTREE_ROOT/p1-spec-roadmap/tools/site/test-course-pages.mjs` |
 
 ## 항목별 대조와 처리
 
@@ -38,20 +38,20 @@
 
 ## D11 명령 근거
 
-실제 `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/README.md`는 없다. 문서를 새로 만들거나 서버 코드를 고치지 않고 다음 파일과 대조했다.
+실제 `$WORKTREE_ROOT/p1-spec-roadmap/messy-server/README.md`는 없다. 문서를 새로 만들거나 서버 코드를 고치지 않고 다음 파일과 대조했다.
 
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/compose.yaml`: MySQL 13311, Redis·WireMock·Toxiproxy 서비스와 포트.
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/src/main/resources/application-local.yml`: 앱 8080, local datasource 13311/board.
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/build.gradle`: test의 JUnit Platform 설정.
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/src/test/java/com/example/board/TestcontainersConfig.java`: 테스트 DB 격리 설정.
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/tickets/E01.md`와 `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/tickets/drill.md`: compose와 local bootRun 실행 방식.
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/README.md`: 필수 B01~B04·선택 1건·E01·훈련 규칙.
+- `$WORKTREE_ROOT/p1-spec-roadmap/messy-server/compose.yaml`: MySQL 13311, Redis·WireMock·Toxiproxy 서비스와 포트.
+- `$WORKTREE_ROOT/p1-spec-roadmap/messy-server/src/main/resources/application-local.yml`: 앱 8080, local datasource 13311/board.
+- `$WORKTREE_ROOT/p1-spec-roadmap/messy-server/build.gradle`: test의 JUnit Platform 설정.
+- `$WORKTREE_ROOT/p1-spec-roadmap/messy-server/src/test/java/com/example/board/TestcontainersConfig.java`: 테스트 DB 격리 설정.
+- `$WORKTREE_ROOT/p1-spec-roadmap/course/tickets/E01.md`와 `$WORKTREE_ROOT/p1-spec-roadmap/course/tickets/drill.md`: compose와 local bootRun 실행 방식.
+- `$WORKTREE_ROOT/p1-spec-roadmap/course/README.md`: 필수 B01~B04·선택 1건·E01·훈련 규칙.
 
 기준 테스트는 “처음부터 모두 통과”라고 안내하지 않는다. 수정 전 성공·실패·로그를 남기고 수정 후와 비교하도록 안내한다. 1단계 종료 명령에는 볼륨 삭제 옵션을 넣지 않았다.
 
 ## Java 주제 설명 전수 대조
 
-입력은 `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/roadmap.json`의 java 항목, 대조 대상은 `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/java/J00.md`부터 `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/java/J15.md`까지의 상황·만들 것·타입 한 컷·확인 절이다.
+입력은 `$WORKTREE_ROOT/p1-spec-roadmap/course/roadmap.json`의 java 항목, 대조 대상은 `$WORKTREE_ROOT/p1-spec-roadmap/course/java/J00.md`부터 `$WORKTREE_ROOT/p1-spec-roadmap/course/java/J15.md`까지의 상황·만들 것·타입 한 컷·확인 절이다.
 
 | ID | 실제 주제·확인 대상 | 판정 |
 |---|---|---|
@@ -83,13 +83,13 @@ RED 확인:
 
 실행 환경 보정:
 
-- 임시 index를 쓰는 기존 검증기의 git apply가 기본 object 디렉터리에 쓰기를 시도해 sandbox에서 실패했다. `/tmp/jx-nav-objects`를 GIT_OBJECT_DIRECTORY로, `/Users/ds/code/javaExperience/.git/objects`를 GIT_ALTERNATE_OBJECT_DIRECTORIES로 지정했다. 저장소의 실제 index와 object는 수정하지 않는다.
+- 임시 index를 쓰는 기존 검증기의 git apply가 기본 object 디렉터리에 쓰기를 시도해 sandbox에서 실패했다. `/tmp/jx-nav-objects`를 GIT_OBJECT_DIRECTORY로, `$REPO_ROOT/.git/objects`를 GIT_ALTERNATE_OBJECT_DIRECTORIES로 지정했다. 저장소의 실제 index와 object는 수정하지 않는다.
 - npm 하위 실행이 x64 Node를 선택하여 arm64 esbuild와 충돌했다. PATH 맨 앞에 `/opt/homebrew/bin`을 두어 arm64 Node로 실행했다. 패키지·전역 설정은 바꾸지 않았다.
 
 최종 검사 상태: **요청한 9개 명령 모두 종료 코드 0**.
 
-사이트 명령 작업 위치: `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/tools/site`.
-루트 명령 작업 위치: `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap`.
+사이트 명령 작업 위치: `$WORKTREE_ROOT/p1-spec-roadmap/tools/site`.
+루트 명령 작업 위치: `$WORKTREE_ROOT/p1-spec-roadmap`.
 
 | 명령 | 결과 | 최종 로그 |
 |---|---|---|

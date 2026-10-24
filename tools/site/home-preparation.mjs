@@ -17,8 +17,8 @@ export function renderHomePreparation(root) {
   const localMysql = mysql && ['localhost', '127.0.0.1'].includes(mysql[1]);
   const mismatch = localMysql && dockerPort && appPort !== dockerPort;
   const dbDescription = mysql
-    ? `현재 기본 설정은 MySQL의 <code>${escapeHtml(mysql[1])}:${escapeHtml(appPort)}</code>에 연결합니다. Docker의 DB를 쓴다면 Docker 런타임(Colima 등)을 켜고 연결 포트를 확인하세요.`
-    : '현재 사용하는 DB 연결 설정을 확인하세요. Docker의 DB를 쓴다면 Docker 런타임(Colima 등)도 켜 두세요.';
+    ? `현재 기본 설정은 MySQL의 <code>${escapeHtml(mysql[1])}:${escapeHtml(appPort)}</code>에 연결합니다. Docker의 DB를 쓴다면 Docker 런타임을 켜고 연결 포트를 확인하세요.`
+    : '현재 사용하는 DB 연결 설정을 확인하세요. Docker의 DB를 쓴다면 Docker 런타임도 켜 두세요.';
   const portNotice = mismatch
     ? `<p class="home-preparation-port-note" data-home-port-mismatch><strong>DB 포트가 서로 달라요</strong>앱은 <code>localhost:${escapeHtml(appPort)}</code>, Compose 기본값은 <code>localhost:${escapeHtml(dockerPort)}</code>입니다. 이 Docker DB를 사용하려면 앱의 연결 포트를 맞추세요. 실행 중인 포트는 <code>docker compose ps</code>로 확인할 수 있어요.</p>`
     : '';
