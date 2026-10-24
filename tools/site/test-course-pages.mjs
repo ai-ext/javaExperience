@@ -60,7 +60,7 @@ await test('R4-01: 모든 지도 노드 title은 전체 이름과 같다', () =>
 });
 await test('P10: 홈 진도는 수동 체크이며 채점 결과가 아님을 알린다', async () => {
   const home = await open('index.html');
-  assert.match(home.$('[data-progress-summary]').parentElement.parentElement.textContent, /직접 체크한 진도이며 채점 결과는 아니다/);
+  assert.match(home.$('[data-progress-summary]').parentElement.parentElement.textContent, /직접 체크한 진도이며 채점 결과가 아닙니다\. Java·선택 티켓의 수행 여부와 역량은 따로 확인합니다\./);
 });
 await test('R4-08: 390 폭에서 선 범례를 숨기고 노드 범례와 관계 표를 남긴다', async () => {
   const map = await open('course/map.html', { script: mapScript });
@@ -610,6 +610,15 @@ for (const day of course.days) {
       const section = doc.getElementById(`step-${s.id.toLowerCase()}`);
       const hint = section.querySelector(`details.step-hint[data-step="${s.id}"]`);
       assert.ok(hint && !hint.open && hint.querySelectorAll('li').length >= 1, `${s.id}: 닫힌 힌트`);
+      const observations = hintsDay.observations?.[String(s.no)] ?? [];
+      const observationFold = section.querySelector(`details.step-observations[data-step="${s.id}"]`);
+      if (observations.length) {
+        assert.ok(observationFold && !observationFold.open, `${s.id}: 선택 관찰은 별도 닫힌 접기`);
+        assert.equal(observationFold.querySelectorAll('li').length, observations.length, `${s.id}: 관찰 개수`);
+        assert.match(observationFold.querySelector('summary').textContent, /선택 관찰 실험.*하나만/);
+      } else {
+        assert.equal(observationFold, null, `${s.id}: 등록하지 않은 관찰을 표시하지 않는다`);
+      }
       for (const line of hintsDay.steps[String(s.no)]) for (const term of terms) {
         // R2 M8: 닫힌 B09 힌트의 UTC는 재현 시계 입력이다. KST 시계로 바꿔 결함을 가리는 테스트를 막는다.
         // 접기 밖 UTC 검사와 날짜 계산 코드(systemUTC·LocalDate.now) 검사는 유지한다.

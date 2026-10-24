@@ -1,6 +1,6 @@
 # 화면별 시각 개편 체크리스트
 
-저자 원문과 생성 HTML이 함께 있는 359개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 47,372개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
+저자 원문과 생성 HTML이 함께 있는 359개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 47,406개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
 
 체크는 해당 화면의 모든 개별 항목이 `verified`일 때만 자동으로 붙는다. `imagegen` 시안 또는 공통 컴포넌트 한 개를 적용한 상태는 완료가 아니다.
 
@@ -31,14 +31,14 @@
 - [ ] [course/map.md](../../course/map.html) — 항목 12, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [course/spring/D00.md](../../course/spring/D00.html) — 항목 14, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [course/spring/D01.md](../../course/spring/D01.html) — 항목 204, 긴 산문 0, 토글 14, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D02.md](../../course/spring/D02.html) — 항목 201, 긴 산문 0, 토글 16, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D02.md](../../course/spring/D02.html) — 항목 208, 긴 산문 0, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/D03.md](../../course/spring/D03.html) — 항목 266, 긴 산문 0, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D04.md](../../course/spring/D04.html) — 항목 186, 긴 산문 0, 토글 15, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D05.md](../../course/spring/D05.html) — 항목 254, 긴 산문 0, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D04.md](../../course/spring/D04.html) — 항목 192, 긴 산문 0, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D05.md](../../course/spring/D05.html) — 항목 268, 긴 산문 0, 토글 20, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/D06.md](../../course/spring/D06.html) — 항목 197, 긴 산문 0, 토글 15, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D07.md](../../course/spring/D07.html) — 항목 281, 긴 산문 0, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D07.md](../../course/spring/D07.html) — 항목 285, 긴 산문 0, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/D08.md](../../course/spring/D08.html) — 항목 308, 긴 산문 0, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D09.md](../../course/spring/D09.html) — 항목 304, 긴 산문 0, 토글 19, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D09.md](../../course/spring/D09.html) — 항목 307, 긴 산문 0, 토글 20, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/D10.md](../../course/spring/D10.html) — 항목 312, 긴 산문 0, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/D11.md](../../course/spring/D11.html) — 항목 129, 긴 산문 1, 토글 9, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/D12.md](../../course/spring/D12.html) — 항목 124, 긴 산문 1, 토글 9, 최대 접기 깊이 1; 상태: unreviewed

@@ -416,6 +416,18 @@ function hintBlock(dataStep, hints) {
   ].join('\n');
 }
 
+// 필수 힌트와 별도로 고르는 관찰 실험. 기존 힌트의 개수·채점 조건은 유지한다.
+function observationBlock(dataStep, observations) {
+  return [
+    `<details class="step-observations" data-step="${dataStep}">`,
+    '<summary>선택 관찰 실험 · 오늘은 하나만 골라도 됩니다</summary>',
+    '',
+    ...observations.map((observation) => `- ${observation}`),
+    '',
+    '</details>',
+  ].join('\n');
+}
+
 // 카드 근거 중 학습자가 열 수 있는 명세 절(spec-v2 §…)만 페이지에 싣는다. 숫자 번호(예: 06 §15)는 저장소 밖 작성 자료다.
 export const publicBasis = (basis) => basis.split(/,\s*/).filter((b) => b.startsWith('spec-v2')).join(', ');
 
@@ -542,6 +554,8 @@ function stepSection(day, s, ctx) {
     const hints = ctx.hintsDay.steps?.[String(s.no)];
     if (!hints?.length) throw new Error(`hints.json: ${id} 힌트가 없다`);
     lines.push(hintBlock(id, hints), '');
+    const observations = ctx.hintsDay.observations?.[String(s.no)];
+    if (observations?.length) lines.push(observationBlock(id, observations), '');
     if (day.phase === 'build') {
       // 1단계: 그 순서 커밋의 정답을 인라인으로 싣는다
       const commits = ctx.answers?.steps.get(s.no);

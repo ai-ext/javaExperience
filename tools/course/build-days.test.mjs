@@ -639,3 +639,26 @@ test('P09: D05는 flush의 SQL 발행과 commit의 확정을 구분한다', () =
   assert.match(baseline, /JVM.*synchronized/);
   assert.match(baseline, /DB 락.*모든 인스턴스/);
 });
+
+// 필수 힌트 1~2개 규칙을 유지하면서 선택 실험을 별도로 제공한다.
+test('선택 관찰은 별도 접기이며 항목·순서가 입력과 같다', () => {
+  let count = 0;
+  for (const [day, data] of Object.entries(hints.days)) {
+    for (const [step, observations] of Object.entries(data.observations ?? {})) {
+      const id = `${day}-${step}`;
+      const md = page(day);
+      const block = md.match(new RegExp(`<details class="step-observations" data-step="${id}">([\\s\\S]*?)</details>`))?.[1];
+      assert.ok(block, `${id}: 선택 관찰 접기`);
+      assert.match(block, /선택 관찰 실험.*하나만/);
+      let previous = -1;
+      for (const observation of observations) {
+        const index = block.indexOf(observation);
+        assert.ok(index > previous, `${id}: 관찰 항목 원문·순서`);
+        previous = index;
+        count++;
+      }
+      assert.ok(md.indexOf(`class="step-hint" data-step="${id}"`) < md.indexOf(`class="step-observations" data-step="${id}"`), `${id}: 필수 힌트 뒤`);
+    }
+  }
+  assert.equal(count, 12);
+});

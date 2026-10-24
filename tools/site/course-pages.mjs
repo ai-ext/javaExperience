@@ -279,7 +279,7 @@ export function renderCourseHome(course) {
     </article>
     <section class="ch-progress" aria-labelledby="ch-progress-title">
       <div class="ch-progress-head"><h2 id="ch-progress-title">15일 진도</h2><p data-progress-summary>체크한 순서 0/${stepTotal}</p></div>
-      <p class="ch-progress-note">직접 체크한 진도이며 채점 결과는 아니다. Java·선택 티켓의 수행 여부와 역량은 별도로 확인한다.</p>
+      <p class="ch-progress-note">직접 체크한 진도이며 채점 결과가 아닙니다. Java·선택 티켓의 수행 여부와 역량은 따로 확인합니다.</p>
       ${phases.map(([phase, label]) => `<h3 class="ch-phase">${label}</h3><ol class="ch-days">${main.filter((d) => d.phase === phase).map(dayCell).join('')}</ol>`).join('')}
       <p class="ch-progress-note">일자 페이지의 순서 체크가 이 브라우저에 저장되고, 여기서 다음 날을 고릅니다. <span data-course-storage></span></p>
     </section>
