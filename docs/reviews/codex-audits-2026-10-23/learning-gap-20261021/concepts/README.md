@@ -18,6 +18,6 @@
 
 ## 병행 작업에 따른 스냅샷 한정
 
-감사 도중 common-learning-foundation worktree가 추가됐다. 여기의 learner NPE·annotation 관찰은 /Users/ds/code/javaExperience 의 main 스냅샷과 그 격리복사본 기준이며 새 worktree 소스 전체의 상태로 확대하지 않는다. 새 기반 소스 비교·검증은 메인 담당자의 /Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/common-foundation-comparison.json 및 전체 감사 보고서를 따른다.
+감사 도중 common-learning-foundation worktree가 추가됐다. 여기의 learner NPE·annotation 관찰은 $REPO_ROOT 의 main 스냅샷과 그 격리복사본 기준이며 새 worktree 소스 전체의 상태로 확대하지 않는다. 새 기반 소스 비교·검증은 메인 담당자의 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/common-foundation-comparison.json 및 전체 감사 보고서를 따른다.
 
 최종 추가 관측: common 기반에서는 primitive heart로 main의 NPE가 해소되어 빈 tags POST/목록 GET이200·like=false다. 요청 밖 Entity→DTO는 LazyInitializationException, nonempty tags는 tag.title/기존tag.name 제약 불일치가 재현됐다. C08/C17/C19/C25에 메인의 감사테스트·XML·복사본 소스를 연결했다. source-id로 확인한 일반계약과 환경별 미실행을 구분하도록 기존 보류 문구도 정리했다.

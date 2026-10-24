@@ -1,6 +1,6 @@
 # 이번 실행과 판정의 범위
 
-확인일: 2026-10-22. 기준 작업 공간은 /Users/ds/code/javaExperience/.worktrees/concept-census-20261021, 시작 HEAD는 `ac41c5ed24b883742821f55da4e68a0ffc215b79`이다. 문서·학습자 소스·정답 snapshot은 수정하지 않고 새 감사 폴더에만 결과를 추가했다.
+확인일: 2026-10-22. 기준 작업 공간은 $WORKTREE_ROOT/concept-census-20261021, 시작 HEAD는 `ac41c5ed24b883742821f55da4e68a0ffc215b79`이다. 문서·학습자 소스·정답 snapshot은 수정하지 않고 새 감사 폴더에만 결과를 추가했다.
 
 ## 실행 요약
 
@@ -18,7 +18,7 @@
 
 ## 환경과 격리
 
-- Java: `/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home`.
+- Java: `$USER_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home`.
 - MySQL 성능·대상 HTTP 실험에서 관측한 버전:8.4.11. 저장소가 사용하는 `mysql:8.4` 이미지다.
 - 본편 테스트는 임시 복사본의 datasource를 Testcontainers URL로 고정했다. 이 실행 환경 override를 적용한 결과이며 기존 개발 DB로 테스트한 것이 아니다.
 - 쿼리·대상 HTTP·성능 컨테이너에는 이번 감사 라벨과 고유 이름을 붙였다. 기존 compose 서비스/볼륨을 사용하거나 초기화하지 않았다.
@@ -38,7 +38,7 @@ S-2-2의 원래 snapshot을 복원한 격리 practice 앱에서 다음을 실행
 
 별도 SQL에서도 token 열의 `utf8mb4_0900_ai_ci` 비교가 대소문자 변형을 같게 보는 것을 확인했다. 토큰 값과 HTTP 인증 scheme 이름의 대소문자 규칙을 분리해 시나리오와 검사를 보강할 대상이다. 이것을 모든 인증 방식이 뚫린다는 주장으로 확대하지 않는다.
 
-근거: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-targeted-v2/S-2-2/result.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-targeted-v2/S-2-2/result.json), [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-query/token-collation.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-query/token-collation.txt).
+근거: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-targeted-v2/S-2-2/result.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-targeted-v2/S-2-2/result.json`), $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-query/token-collation.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-query/token-collation.txt`).
 
 ### 목록 파라미터 오류의 응답 형식
 
@@ -50,23 +50,23 @@ S-2-2의 `GET /api/boards/dev/posts`에 `page=-1`, `size=0`, `size=51`, `page=ab
 
 S-12-1에 대해 정적 대조 중 “삭제 guard가 없다”는 후보가 나왔으나 실제 Service의 `.filter(c -> c.getDeletedAt() == null)`를 다시 읽었다. HTTP로 댓글 생성201→삭제204→삭제 댓글 PATCH404를 확인했고 DB의 content/deleted_at/edited_at은 PATCH 전후 같았다. **이 결함 후보는 철회했다.** Repository의 `WHERE id`만으로 Service 전체의 정책 부재를 추론하면 안 된다.
 
-근거: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-targeted/S-12-1/result.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-targeted/S-12-1/result.json).
+근거: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-targeted/S-12-1/result.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-targeted/S-12-1/result.json`).
 
 ### 인덱스 비교
 
 50만 좋아요 행의 회원12 조회에서 기본 계획은 `ix_post_like_member`와 `Using filesort`, 복합 인덱스 후에는 `ix_post_like_member_created`와 `Backward index scan`을 사용했다. 같은11행의 값과 순서는 생성·INVISIBLE·VISIBLE·DROP 후 모두 같았다. 게시판3의 게시글/작성자 JOIN 비교도20행이 유지됐다. 각 조건의 `EXPLAIN ANALYZE`는3회 저장했다. 이 실험에서 속도 개선 비율을 일반화하거나 실제 API p95라고 표시하지 않았다.
 
-근거: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-db/summary.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-db/summary.json).
+근거: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-db/summary.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-db/summary.json`).
 
 ## 재실행 진입점
 
 모든 실행기는 이 감사 폴더에 보존했다. 기존 개발 DB를 향하지 않도록 실행기 안의 격리·소유권 조건을 확인하고 실행한다.
 
-- 본편: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/run_snapshots.py](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/run_snapshots.py)
-- 쿼리: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/run_query_labs.py](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/run_query_labs.py)
-- DB: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/run_db_experiments.py](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/run_db_experiments.py)
-- 대상 HTTP: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/run_targeted_http_v2.py](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/run_targeted_http_v2.py), 삭제 댓글은 앞선 run_targeted_http.py의 S-12-1 결과를 사용한다.
-- 독립 Java: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/run_lesson_java.py](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/run_lesson_java.py)
+- 본편: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/run_snapshots.py (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/run_snapshots.py`)
+- 쿼리: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/run_query_labs.py (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/run_query_labs.py`)
+- DB: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/run_db_experiments.py (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/run_db_experiments.py`)
+- 대상 HTTP: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/run_targeted_http_v2.py (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/run_targeted_http_v2.py`), 삭제 댓글은 앞선 run_targeted_http.py의 S-12-1 결과를 사용한다.
+- 독립 Java: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/run_lesson_java.py (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/run_lesson_java.py`)
 
 ## 이번에 실행하지 않은 범위
 
@@ -74,4 +74,4 @@ L15/L16의 학습자 구현, 독립 티켓30개의 수정 답안, 미션10개의
 
 ## 조사 경로
 
-원문 대조는 Luna 서브에이전트3명과 메인이 분담했고 메인이 실행·교차 검증을 했다. 공식 이론 조사는 외부 CLI 위임 스킬의 도움말/제공자 확인 절차를 거쳐 **OpenAI 제공자의 gpt-6-luna Codex CLI**로 직접 수행했다. LiteLLM을 사용하지 않았다. 첫 시도는 중첩 CLI 실행에서 실패했으며, 같은 모델의 현재 웹 도구를 직접 사용하도록 수정한 재시도에서 공식 문서 조사를 수행했다. 기록은 /Users/ds/research/javaexperience-scenario-census-20261022/_data/official-research에 보존했다.
+원문 대조는 Luna 서브에이전트3명과 메인이 분담했고 메인이 실행·교차 검증을 했다. 공식 이론 조사는 외부 CLI 위임 스킬의 도움말/제공자 확인 절차를 거쳐 **OpenAI 제공자의 gpt-6-luna Codex CLI**로 직접 수행했다. LiteLLM을 사용하지 않았다. 첫 시도는 중첩 CLI 실행에서 실패했으며, 같은 모델의 현재 웹 도구를 직접 사용하도록 수정한 재시도에서 공식 문서 조사를 수행했다. 기록은 $USER_HOME/research/javaexperience-scenario-census-20261022/_data/official-research에 보존했다.

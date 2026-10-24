@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E5-mybatis-first-steps.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E5-mybatis-first-steps.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/E5-mybatis-first-steps.md](../../../../../lessons/E5-mybatis-first-steps.md)
 
 원문 SHA-256: `da421179f34ab9cf42ed34a61a70ae55f45abac44f2e629239f1e7668ddcb26d`
 
@@ -26,7 +26,7 @@ SQL 매핑과진단은상세하다. 현행실행준비와 SQL 입력·혼합트�
 
 공백 또는 한계: 174행 studymate 컨테이너가고정되고 E4의 3306설정을재사용한다. L6/L7/L9심화는이름만있고실행링크가없다. 고정 lesson_post 테이블명이 E7과겹쳐시작/복구경계도명확히해야한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E5-mybatis-first-steps.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E5-mybatis-first-steps.md:54) — 54~165행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E5-mybatis-first-steps.md](../../../../../lessons/E5-mybatis-first-steps.md) — 54~165행
 
 ### 2. practice 읽기와 lesson_post 쓰기의결과/행수/생성 ID를확인한다.
 
@@ -36,7 +36,7 @@ SQL 매핑과진단은상세하다. 현행실행준비와 SQL 입력·혼합트�
 
 공백 또는 한계: 174행 studymate 컨테이너가고정되고 E4의 3306설정을재사용한다. L6/L7/L9심화는이름만있고실행링크가없다. 고정 lesson_post 테이블명이 E7과겹쳐시작/복구경계도명확히해야한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E5-mybatis-first-steps.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E5-mybatis-first-steps.md:167) — 167~238행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E5-mybatis-first-steps.md](../../../../../lessons/E5-mybatis-first-steps.md) — 167~238행
 
 ### 3. camel 설정·mapper 위치/id·alias·generatedkey 누락을진단한다.
 
@@ -46,7 +46,7 @@ SQL 매핑과진단은상세하다. 현행실행준비와 SQL 입력·혼합트�
 
 공백 또는 한계: 174행 studymate 컨테이너가고정되고 E4의 3306설정을재사용한다. L6/L7/L9심화는이름만있고실행링크가없다. 고정 lesson_post 테이블명이 E7과겹쳐시작/복구경계도명확히해야한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E5-mybatis-first-steps.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E5-mybatis-first-steps.md:240) — 240~278행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E5-mybatis-first-steps.md](../../../../../lessons/E5-mybatis-first-steps.md) — 240~278행
 
 ## 이번 실행 근거
 
@@ -72,7 +72,7 @@ DB/트랜잭션을 직접 다루는 레슨은 별도 행 비교를 기록한다.
 
 판정 범위: 해당 레슨과 명시한 후속 경로의 판정이며 전체 개념의 부재를 뜻하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E5-mybatis-first-steps.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E5-mybatis-first-steps.md)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E5-mybatis-first-steps.md](../../../../../lessons/E5-mybatis-first-steps.md)
 
 ## 확장 개발 명세
 
@@ -127,10 +127,10 @@ P2
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E5/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E5/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E5/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E5/screen.jpg`)
 - 관찰: 없음
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E5/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E5/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E5/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E5/dom.txt`)
 
 - markdown_same: 예
 - html_same: 아니오
@@ -140,6 +140,6 @@ P2
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E5-mybatis-first-steps.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E5-mybatis-first-steps.md:1) — 1~334행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E5-mybatis-first-steps.md](../../../../../lessons/E5-mybatis-first-steps.md) — 1~334행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-E5.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-E5.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-E5.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-E5.json`)

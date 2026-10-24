@@ -8,16 +8,16 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V04-test-db-strategy.md:3](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V04-test-db-strategy.md:3) — 확인 범위 3–31행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/V04-test-db-strategy.md:3](../../../../knowledge/V04-test-db-strategy.md) — 확인 범위 3–31행.
 
   발췌: `> 3줄 요약 — 서비스·도메인 로직은 DB 없이 빠르게 검증하고, SQL·제약·방언을 검증할 Repository/API 테스트에는 운영과 같은 DB 엔진을 쓴다. > Spring Boot 4.1의 ’@DataJpaTest’는 기본적으로 임베디드 DB로 바꾸고 테스트마다 트랜잭션을 롤백하므로, Testcontainers를 붙일 때는 DB 교체를 명시적으로 끈다. > 테스트 메서드의 ’@Transactional’은 편리한 격리 장치이자 현실과 다른 실행 조건이다. 지연 로딩·커밋 이벤트·flush·실제 HTTP 요청 경계를 별도로 검증한다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V04-test-db-strategy.md:57](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V04-test-db-strategy.md:57) — 확인 범위 57–108행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/V04-test-db-strategy.md:57](../../../../knowledge/V04-test-db-strategy.md) — 확인 범위 57–108행.
 
   발췌: `### 2단계 — Repository 테스트를 MySQL로 실행  ’src/test/java/com/example/practice/product/ProductRepositoryTest.java’는 실제 프로젝트의 패키지·메서드·시드에 맞춘 형태다. ’Replace.NONE’이 없으면 ’@DataJpaTest’가 임베디드 DB로 바꿀 수 있다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/v04-lesson-data.mjs:429](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/v04-lesson-data.mjs:429) — 확인 범위 429–431행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/v04-lesson-data.mjs:429 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/v04-lesson-data.mjs:429`) — 확인 범위 429–431행.
 
   발췌: `{id:'replace',question:'DataJpaTest는 항상 H2로 바꿀까?',source:'추가 Boot4.1.1 DataJpaTest 교체4조건 · ddl-auto=none',sourceNote:'원문의 항상 교체 설명을 보충합니다. Boot4.1.1 default는 NON_TEST이며 recognized test DB는 예외입니다. 여기의 dynamic URL은 DynamicPropertySource이지 Testcontainers가 아닙니다.',note:'네 조건 모두 자동 구성 DataSource와 ddl-auto=none으로 실제 엔진을 확인했습니다. 테스트 DB 교체를 Container/ServiceConnection 실행 성공으로 일반화하지 않습니다. '+limits,stages:[  stage('replace','static','default NON_TEST·static은 H2','일반 static URL을 지정한 추가 slice에서 default annot`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/v04-lesson-data.mjs:468](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/v04-lesson-data.mjs:468) — 확인 범위 468–470행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/v04-lesson-data.mjs:468 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/v04-lesson-data.mjs:468`) — 확인 범위 468–470행.
 
   발췌: `{id:'containers',question:'원문 Testcontainers class는 어디까지 검증됐을까?',source:'원문 complete TC Java compile-only / 추가 native·H2·Boot 실행 범위',sourceNote:'Docker socket은 접속거부였고 TC·ServiceConnection·container lifetime은 실행하지 않았습니다. 원문 전체 class는 변경 없이 컴파일만 통과했습니다.',note:'static class 범위 공유·container Bean context 수명·reuse는 문헌 설명이며 이 실행에서 runtime 검증한 항목이 아닙니다. 메타 ASSERT/JUnit/facts는 겹치는 검증 단위입니다. '+limits,stages:[  stage('containers','compile','원문 TC는 compile-only','원문 @Testcontainers/@ServiceConnection Produc`
 
@@ -43,7 +43,7 @@ V04 최신은 NON_TEST 기본값에서 static URL은H2, DynamicPropertySource는
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `spring-test-thread-bound` — [Transaction Management in TestContext Framework](https://docs.spring.io/spring-framework/reference/testing/testcontext-framework/tx.html)
 

@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B7-exceptions.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B7-exceptions.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/B7-exceptions.md](../../../../../lessons/B7-exceptions.md)
 
 원문 SHA-256: `e01061a8fb887858e00072a82f2e0202a1c4c9bd4cf69d3d9d729c498151f970`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: 예외를 잡고 계속 진행하는 것과 DB 롤백 의미는 이 레슨의 실험 범위가 아니다. 후속 G4가 다루지만 B7의 더깊이 링크는 해당 실습에 직접 이어지지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B7-exceptions.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B7-exceptions.md:56) — 56~131행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B7-exceptions.md](../../../../../lessons/B7-exceptions.md) — 56~131행
 
 ### 2. 동일 없음 상황을 미처리 500/ResponseStatus 404/커스텀 404로 비교한다.
 
@@ -36,7 +36,7 @@
 
 공백 또는 한계: 예외를 잡고 계속 진행하는 것과 DB 롤백 의미는 이 레슨의 실험 범위가 아니다. 후속 G4가 다루지만 B7의 더깊이 링크는 해당 실습에 직접 이어지지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B7-exceptions.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B7-exceptions.md:133) — 133~242행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B7-exceptions.md](../../../../../lessons/B7-exceptions.md) — 133~242행
 
 ### 3. 체크예외 미처리와 넓은 catch 우선의 컴파일 오류를 재현한다.
 
@@ -46,13 +46,13 @@
 
 공백 또는 한계: 예외를 잡고 계속 진행하는 것과 DB 롤백 의미는 이 레슨의 실험 범위가 아니다. 후속 G4가 다루지만 B7의 더깊이 링크는 해당 실습에 직접 이어지지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B7-exceptions.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B7-exceptions.md:244) — 244~282행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B7-exceptions.md](../../../../../lessons/B7-exceptions.md) — 244~282행
 
 ## 이번 실행 근거
 
 이번 독립 Java 예시 1개를 실행해 예상 출력/예외를 확인했다. Spring·DB·IDE 실습 전체의 실행이 아니다.
 
-[/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json)
+$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json`)
 
 ## 쿼리·DB 깊이와 다음 단계
 
@@ -72,7 +72,7 @@ DB/트랜잭션을 직접 다루는 레슨은 별도 행 비교를 기록한다.
 
 판정 범위: 해당 레슨과 명시한 후속 경로의 판정이며 전체 개념의 부재를 뜻하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B7-exceptions.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B7-exceptions.md)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B7-exceptions.md](../../../../../lessons/B7-exceptions.md)
 
 ## 확장 개발 명세
 
@@ -125,10 +125,10 @@ P2
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B7/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B7/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B7/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B7/screen.jpg`)
 - 관찰: 없음
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B7/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B7/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B7/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B7/dom.txt`)
 
 - markdown_same: 예
 - html_same: 아니오
@@ -138,6 +138,6 @@ P2
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B7-exceptions.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B7-exceptions.md:1) — 1~342행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B7-exceptions.md](../../../../../lessons/B7-exceptions.md) — 1~342행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-B7.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-B7.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-B7.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-B7.json`)

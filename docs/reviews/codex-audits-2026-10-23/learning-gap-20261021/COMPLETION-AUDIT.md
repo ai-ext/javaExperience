@@ -27,9 +27,9 @@
 실행 명령:
 
 ```bash
-python3 /Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/verify_audit.py
+python3 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/verify_audit.py
 ```
 
-이 검사는 45개 ID·파일, 공식 source ID, 보고서 링크, 근거 라인 범위, 원본/실행 복사본 해시, 실제 XML의 테스트 결과와 20라운드100호출 로그를 대조한다. 결과는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/final-verification.json 에 저장한다.
+이 검사는 45개 ID·파일, 공식 source ID, 보고서 링크, 근거 라인 범위, 원본/실행 복사본 해시, 실제 XML의 테스트 결과와 20라운드100호출 로그를 대조한다. 결과는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/final-verification.json 에 저장한다.
 
 이 자동 검사는 기술 내용의 의미 검토를 대신하지 않는다. 내용은 담당자의 직접 원문 검토와 메인의 쟁점 대조/실행, 공식 문헌 대조로 확인했고 각 파일에 그 범위를 적었다.

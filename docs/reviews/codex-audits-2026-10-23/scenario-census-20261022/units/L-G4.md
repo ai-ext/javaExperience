@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/G4-transaction-in-practice.md](../../../../../lessons/G4-transaction-in-practice.md)
 
 원문 SHA-256: `a56457819be1661e7c1dcd0ba96a34e59a215ccd3dd235381d5775895337569f`
 
@@ -26,7 +26,7 @@ Standalone Boot 4.1.1/JPA/MySQL 예제에서 tx name/state log와 final rows를 
 
 공백 또는 한계: 프록시를 통한 transactional call에서 적용되는 규칙이다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md:5) — 5~67행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G4-transaction-in-practice.md](../../../../../lessons/G4-transaction-in-practice.md) — 5~67행
 
 ### 2. proxy는 외부 call을 intercept하며 같은 객체 self-invocation은 inner @Transactional/REQUIRES_NEW를 적용하지 않는다.
 
@@ -36,7 +36,7 @@ Standalone Boot 4.1.1/JPA/MySQL 예제에서 tx name/state log와 final rows를 
 
 공백 또는 한계: 실제 proxy를 통과하는 bean boundary가 필요하다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md:17) — 17~153행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G4-transaction-in-practice.md](../../../../../lessons/G4-transaction-in-practice.md) — 17~153행
 
 ### 3. readOnly는 보편적인 write block이 아니며 JDBC 거부는 driver-specific, JPA dirty-check 변경은 저장되지 않을 수 있다.
 
@@ -46,7 +46,7 @@ Standalone Boot 4.1.1/JPA/MySQL 예제에서 tx name/state log와 final rows를 
 
 공백 또는 한계: readOnly를 authorization/integrity guard로 쓰면 안 된다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md:154) — 154~181행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G4-transaction-in-practice.md](../../../../../lessons/G4-transaction-in-practice.md) — 154~181행
 
 ## 이번 실행 근거
 
@@ -76,7 +76,7 @@ Standalone Boot 4.1.1/JPA/MySQL 예제에서 tx name/state log와 final rows를 
 
 판정 범위: source historical output은 이번 감사 실행이 아니다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md:5) — 5~181행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G4-transaction-in-practice.md](../../../../../lessons/G4-transaction-in-practice.md) — 5~181행
 
 ## 확장 개발 명세
 
@@ -129,10 +129,10 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G4/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G4/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G4/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G4/screen.jpg`)
 - 관찰: 렌더 캡처 대기 중.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G4/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G4/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G4/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G4/dom.txt`)
 
 원문: corpus의 latest_source_same=True. 최신 HTML byte 해시 다름; 실제 캡처 기반 렌더 비교 전이므로 시각 차이는 pending_render. 원문 SHA/HTML 차이만으로 UI의 정확성이나 시각 완료를 추정하지 않는다.
 
@@ -140,8 +140,8 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md:5) — 5~67행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md:17) — 17~153행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G4-transaction-in-practice.md:154) — 154~181행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G4-transaction-in-practice.md](../../../../../lessons/G4-transaction-in-practice.md) — 5~67행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G4-transaction-in-practice.md](../../../../../lessons/G4-transaction-in-practice.md) — 17~153행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G4-transaction-in-practice.md](../../../../../lessons/G4-transaction-in-practice.md) — 154~181행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-G4.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-G4.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-G4.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-G4.json`)

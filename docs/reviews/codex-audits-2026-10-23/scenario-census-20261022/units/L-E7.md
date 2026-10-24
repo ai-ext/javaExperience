@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E7-jpa-update-delete.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E7-jpa-update-delete.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/E7-jpa-update-delete.md](../../../../../lessons/E7-jpa-update-delete.md)
 
 원문 SHA-256: `910c56a24ecc64eb353c8f944bf4f1173459e045b963d6dc99dabeb61c8c06a3`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: 409행 studymate 접속과 공유 practice의 고정 lesson_post/lesson_board를 DROP 후 재생성하는 시작점이 현재 환경과 분리되어 있지 않다. 값 변경과 자동 flush 관찰은 깊지만 동시 writer/version 충돌은 이 레슨의실험 범위가 아니다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E7-jpa-update-delete.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E7-jpa-update-delete.md:109) — 109~237행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E7-jpa-update-delete.md](../../../../../lessons/E7-jpa-update-delete.md) — 109~237행
 
 ### 2. 삭제·softdelete·벌크후 stale 객체·flush/clear를비교한다.
 
@@ -36,7 +36,7 @@
 
 공백 또는 한계: 409행 studymate 접속과 공유 practice의 고정 lesson_post/lesson_board를 DROP 후 재생성하는 시작점이 현재 환경과 분리되어 있지 않다. 값 변경과 자동 flush 관찰은 깊지만 동시 writer/version 충돌은 이 레슨의실험 범위가 아니다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E7-jpa-update-delete.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E7-jpa-update-delete.md:290) — 290~400행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E7-jpa-update-delete.md](../../../../../lessons/E7-jpa-update-delete.md) — 290~400행
 
 ### 3. 복사테이블을만들고14실험·HTTP/별도 SELECT 결과를대조한다.
 
@@ -46,7 +46,7 @@
 
 공백 또는 한계: 409행 studymate 접속과 공유 practice의 고정 lesson_post/lesson_board를 DROP 후 재생성하는 시작점이 현재 환경과 분리되어 있지 않다. 값 변경과 자동 flush 관찰은 깊지만 동시 writer/version 충돌은 이 레슨의실험 범위가 아니다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E7-jpa-update-delete.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E7-jpa-update-delete.md:402) — 402~650행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E7-jpa-update-delete.md](../../../../../lessons/E7-jpa-update-delete.md) — 402~650행
 
 ### 4. enum 순서변경·Modifying/트랜잭션/Auditing 누락을실패시킨다.
 
@@ -56,7 +56,7 @@
 
 공백 또는 한계: 409행 studymate 접속과 공유 practice의 고정 lesson_post/lesson_board를 DROP 후 재생성하는 시작점이 현재 환경과 분리되어 있지 않다. 값 변경과 자동 flush 관찰은 깊지만 동시 writer/version 충돌은 이 레슨의실험 범위가 아니다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E7-jpa-update-delete.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E7-jpa-update-delete.md:652) — 652~772행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E7-jpa-update-delete.md](../../../../../lessons/E7-jpa-update-delete.md) — 652~772행
 
 ## 이번 실행 근거
 
@@ -83,7 +83,7 @@ DB/트랜잭션을 직접 다루는 레슨은 별도 행 비교를 기록한다.
 
 판정 범위: 해당 레슨과 명시한 후속 경로의 판정이며 전체 개념의 부재를 뜻하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E7-jpa-update-delete.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E7-jpa-update-delete.md)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E7-jpa-update-delete.md](../../../../../lessons/E7-jpa-update-delete.md)
 
 ## 확장 개발 명세
 
@@ -139,10 +139,10 @@ P2
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E7/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E7/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E7/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E7/screen.jpg`)
 - 관찰: 없음
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E7/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E7/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E7/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E7/dom.txt`)
 
 - markdown_same: 예
 - html_same: 아니오
@@ -152,6 +152,6 @@ P2
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E7-jpa-update-delete.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E7-jpa-update-delete.md:1) — 1~786행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E7-jpa-update-delete.md](../../../../../lessons/E7-jpa-update-delete.md) — 1~786행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-E7.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-E7.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-E7.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-E7.json`)

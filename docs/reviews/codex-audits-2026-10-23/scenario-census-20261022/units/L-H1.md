@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H1-concurrency-taste.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H1-concurrency-taste.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/H1-concurrency-taste.md](../../../../../lessons/H1-concurrency-taste.md)
 
 원문 SHA-256: `96f084cb80a6765e461737a0a9a08767dcef50ed67305df5eb2bb93d8b0d1665`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: H1은 E2의 sql 함수로 lesson_counter를 만든다고 하고 G3 terminal 명령을 안내하지만 현재 E2 helper와 G3 command는 모두 DB community를 선택한다. H1 문장의 practice 대상과 달라 생성한 표와 확인 접속이 다른 schema가 될 수 있다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H1-concurrency-taste.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H1-concurrency-taste.md:1) — 1~307행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H1-concurrency-taste.md](../../../../../lessons/H1-concurrency-taste.md) — 1~307행
 
 ## 이번 실행 근거
 
@@ -48,7 +48,7 @@
 
 판정 범위: H1은 E2의 sql 함수로 lesson_counter를 만든다고 하고 G3 terminal 명령을 안내하지만 현재 E2 helper와 G3 command는 모두 DB community를 선택한다. H1 문장의 practice 대상과 달라 생성한 표와 확인 접속이 다른 schema가 될 수 있다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H1-concurrency-taste.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H1-concurrency-taste.md:1) — 1~307행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H1-concurrency-taste.md](../../../../../lessons/H1-concurrency-taste.md) — 1~307행
 
 ## 확장 개발 명세
 
@@ -110,14 +110,14 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H1/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H1/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H1/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H1/screen.jpg`)
 - 관찰: HTML/캡처를 실제 열어 확인하지 않았다. source와 HTML 차이만으로 시각 검토를 완료하지 않는다.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H1/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H1/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H1/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H1/dom.txt`)
 
-- source: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H1-concurrency-taste.md](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H1-concurrency-taste.md)
+- source: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H1-concurrency-taste.md](../../../../../lessons/H1-concurrency-taste.md)
 - source_same: 예
-- html: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H1-concurrency-taste.html](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H1-concurrency-taste.html)
+- html: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H1-concurrency-taste.html](../../../../../lessons/H1-concurrency-taste.html)
 - html_same: 아니오
 - difference: source는 corpus에서 최신 원문과 동일하다고 기록되어 있다. HTML byte hash가 다르지만 화면/원인을 미검토했다.
 
@@ -126,9 +126,9 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H1-concurrency-taste.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H1-concurrency-taste.md:1) — 1~307행 (원리·코드 예시·기록된 저자 실행·따라 하기·실패 반례·정답과 후속 경로)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E2-db-sql-basics.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E2-db-sql-basics.md:54) — 54~54행 (E2 sql helper의 기본 database)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G3-first-transaction.md:46) — 46~46행 (G3 MySQL 접속 기본 database)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/scenario/ch4-like/4-2-like-concurrency.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/scenario/ch4-like/4-2-like-concurrency.md:169) — 169~177행 (후속 동시성 테스트 계약)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H1-concurrency-taste.md](../../../../../lessons/H1-concurrency-taste.md) — 1~307행 (원리·코드 예시·기록된 저자 실행·따라 하기·실패 반례·정답과 후속 경로)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E2-db-sql-basics.md](../../../../../lessons/E2-db-sql-basics.md) — 54~54행 (E2 sql helper의 기본 database)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G3-first-transaction.md](../../../../../lessons/G3-first-transaction.md) — 46~46행 (G3 MySQL 접속 기본 database)
+- [$WORKTREE_ROOT/concept-census-20261021/scenario/ch4-like/4-2-like-concurrency.md](../../../../../scenario/ch4-like/4-2-like-concurrency.md) — 169~177행 (후속 동시성 테스트 계약)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H1.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H1.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H1.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H1.json`)

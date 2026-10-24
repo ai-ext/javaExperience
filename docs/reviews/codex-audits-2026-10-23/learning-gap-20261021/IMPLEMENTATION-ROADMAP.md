@@ -12,7 +12,7 @@
 4. `실패실험`: 잘못된 입력·권한·후행 실패·중복·경쟁 중 해당하는 사례.
 5. `검증결과`: 실행 명령, 환경/fixture, 실제 관측, 아직 확인하지 않은 범위.
 
-감사 파일은 이미 /Users/ds/research/javaexperience-learning-gap-audit-20261021/concepts/ 및 /Users/ds/research/javaexperience-learning-gap-audit-20261021/implementation/ 에 주제별로 존재한다. 위 다섯 파일은 이후 학습 콘텐츠를 추가할 때의 구조 제안이다.
+감사 파일은 이미 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/concepts/ 및 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/implementation/ 에 주제별로 존재한다. 위 다섯 파일은 이후 학습 콘텐츠를 추가할 때의 구조 제안이다.
 
 ## 0. 시작점 고정과 틀린 설명 정정
 

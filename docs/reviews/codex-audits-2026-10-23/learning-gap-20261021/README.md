@@ -9,15 +9,15 @@
 ## 읽는 순서
 
 1. 이 보고서: 무엇이 충분하고 무엇을 먼저 보완할지.
-2. [/Users/ds/research/javaexperience-learning-gap-audit-20261021/COVERAGE.md](/Users/ds/research/javaexperience-learning-gap-audit-20261021/COVERAGE.md): 45개 항목 전체와 개별 파일.
-3. [/Users/ds/research/javaexperience-learning-gap-audit-20261021/IMPLEMENTATION-ROADMAP.md](/Users/ds/research/javaexperience-learning-gap-audit-20261021/IMPLEMENTATION-ROADMAP.md): 실제로 추가할 과제와 합격 조건.
-4. [/Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md](/Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md): 공식 기술 근거·버전·한계.
+2. $USER_HOME/research/javaexperience-learning-gap-audit-20261021/COVERAGE.md (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/COVERAGE.md`): 45개 항목 전체와 개별 파일.
+3. $USER_HOME/research/javaexperience-learning-gap-audit-20261021/IMPLEMENTATION-ROADMAP.md (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/IMPLEMENTATION-ROADMAP.md`): 실제로 추가할 과제와 합격 조건.
+4. $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md`): 공식 기술 근거·버전·한계.
 
 각 개별 감사 파일에는 검사 기준, 읽은 파일·라인, 이미 있는 내용, 부족한 연결, 추가할 과제, 기대 상태, 한계가 있다.
 
 ## 현재 코드 버전을 구분해야 한다
 
-감사 시작 시 main과 개념/CRUD/공통 원본의 추가 worktree 3개가 있었다. 도중에 다른 작업이 만든 `/Users/ds/code/javaExperience/.worktrees/common-learning-foundation`이 추가됐다. 이 새 기반의 학습자 소스도 읽고 실행해 결과를 갱신했다.
+감사 시작 시 main과 개념/CRUD/공통 원본의 추가 worktree 3개가 있었다. 도중에 다른 작업이 만든 `$WORKTREE_ROOT/common-learning-foundation`이 추가됐다. 이 새 기반의 학습자 소스도 읽고 실행해 결과를 갱신했다.
 
 - **초기 main**: DTO→Entity→save는 이미 구현돼 있었다. `Boolean heart`의 null 언박싱으로 저장 후 목록 변환이 실패했다.
 - **새 common 기반**: 태그 `@OneToMany`와 `TagsEntity`, 태그 저장 로직이 이미 추가됐고 `heart`가 primitive `boolean`이어서 앞의 null 원인은 해소됐다.
@@ -26,8 +26,8 @@
 
 기준 파일·SHA와 추가 대조:
 
-- [/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/baseline.json](/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/baseline.json)
-- [/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/common-foundation-comparison.json](/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/common-foundation-comparison.json)
+- $USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/baseline.json (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/baseline.json`)
+- $USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/common-foundation-comparison.json (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/common-foundation-comparison.json`)
 
 ## 이미 있는 내용을 인정한 판정
 
@@ -112,9 +112,9 @@
 
 실행 근거:
 
-- [/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/01-LEARNER-CODE.md](/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/01-LEARNER-CODE.md)
-- [/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/02-LIKE-CONCURRENCY.md](/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/02-LIKE-CONCURRENCY.md)
-- [/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/03-COMMON-LEARNER-CODE.md](/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/03-COMMON-LEARNER-CODE.md)
+- $USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/01-LEARNER-CODE.md (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/01-LEARNER-CODE.md`)
+- $USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/02-LIKE-CONCURRENCY.md (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/02-LIKE-CONCURRENCY.md`)
+- $USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/03-COMMON-LEARNER-CODE.md (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/03-COMMON-LEARNER-CODE.md`)
 
 ## 범위와 한계
 

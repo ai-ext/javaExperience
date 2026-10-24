@@ -4,7 +4,7 @@
 
 **Spec:** `course/roadmap.json`의 `java`(topic·basics·typeCut·habit), 설계 `docs/course-redesign/research/14-redesign-design.md` §5-5(J 페이지 구성, 기본기 반복 칸, 타입 한 컷, 실무 습관 칸), `course/spec-v2.md`(도메인 이름).
 
-**작업 위치:** worktree `~/code/javaExperience/.worktrees/p3-java-track`, 브랜치 `course/p3-java-track`(BASE `answer-d09`). push 금지. 실행은 호스트 JDK 21: `JAVA_HOME=/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home ./gradlew …` (리포 루트).
+**작업 위치:** worktree `~/code/javaExperience/.worktrees/p3-java-track`, 브랜치 `course/p3-java-track`(BASE `answer-d09`). push 금지. 실행은 호스트 JDK 21: `JAVA_HOME=<JDK21> ./gradlew …` (리포 루트).
 
 ## 구조 (확정)
 

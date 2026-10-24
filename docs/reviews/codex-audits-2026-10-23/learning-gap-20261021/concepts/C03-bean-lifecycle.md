@@ -8,13 +8,13 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S01-ioc-di.md:57](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S01-ioc-di.md:57) — 확인 범위 57–108행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S01-ioc-di.md:57](../../../../knowledge/S01-ioc-di.md) — 확인 범위 57–108행.
 
   발췌: `## 3. 내부 동작·원리  ### 컨텍스트 시작과 빈 하나의 생성`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S01-ioc-di.md:110](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S01-ioc-di.md:110) — 확인 범위 110–126행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S01-ioc-di.md:110](../../../../knowledge/S01-ioc-di.md) — 확인 범위 110–126행.
 
   발췌: `## 4. 코드로 확인  다음은 Boot 4.1 / Framework 7 프로젝트용 코드다. 실행 환경을 구성하지 않아 모두 (미실행)이다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S01-ioc-di.md:320](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S01-ioc-di.md:320) — 확인 범위 320–326행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S01-ioc-di.md:320](../../../../knowledge/S01-ioc-di.md) — 확인 범위 320–326행.
 
   발췌: `### Q7. @PostConstruct와 SmartLifecycle은 어떤 차이가 있는가?  @PostConstruct는 빈 의존성이 설정된 뒤 해당 빈을 초기화하는 콜백이다.   SmartLifecycle은 컨텍스트 시작·종료에 연동되는 컴포넌트의 자동 시작, 순서, 정지 완료를 다룬다.`
 
@@ -40,7 +40,7 @@ S01은 BeanDefinition/BFPP/BPP, PostConstruct→afterPropertiesSet→init, PreDe
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `spring-lifecycle` — [Customizing the Nature of a Bean — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/core/beans/factory-nature.html)
 

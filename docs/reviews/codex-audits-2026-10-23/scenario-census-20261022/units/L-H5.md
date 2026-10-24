@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H5-spring-events.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H5-spring-events.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/H5-spring-events.md](../../../../../lessons/H5-spring-events.md)
 
 원문 SHA-256: `e728ed4f665007e74a2f6c1bf363c4ed236b6812e5cae16e6ddfbb178a7fda66`
 
@@ -26,7 +26,7 @@ ApplicationEventPublisher, @EventListener, @TransactionalEventListener phase와 
 
 공백 또는 한계: AFTER_COMMIT callback은 primary data가 이미 commit된 뒤다. listener 실패가 나도 main POST는 되돌지 않고 retry/outbox가 자동으로 생기지 않는다. lesson은 이 한계를 설명하지만 durable delivery는 16-1/16-2 및 outbox 후속이다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H5-spring-events.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H5-spring-events.md:1) — 1~279행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H5-spring-events.md](../../../../../lessons/H5-spring-events.md) — 1~279행
 
 ## 이번 실행 근거
 
@@ -48,7 +48,7 @@ listener delivery의 durable retry/outbox를 구현하지 않는다. 커밋 후 
 
 판정 범위: AFTER_COMMIT callback은 primary data가 이미 commit된 뒤다. listener 실패가 나도 main POST는 되돌지 않고 retry/outbox가 자동으로 생기지 않는다. lesson은 이 한계를 설명하지만 durable delivery는 16-1/16-2 및 outbox 후속이다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H5-spring-events.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H5-spring-events.md:1) — 1~279행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H5-spring-events.md](../../../../../lessons/H5-spring-events.md) — 1~279행
 
 ## 확장 개발 명세
 
@@ -111,14 +111,14 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H5/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H5/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H5/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H5/screen.jpg`)
 - 관찰: HTML/캡처를 실제 열어 보지 않았다. source와 HTML 차이만으로 시각 검토를 완료하지 않는다.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H5/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H5/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H5/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H5/dom.txt`)
 
-- source: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H5-spring-events.md](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H5-spring-events.md)
+- source: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H5-spring-events.md](../../../../../lessons/H5-spring-events.md)
 - source_same: 예
-- html: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H5-spring-events.html](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H5-spring-events.html)
+- html: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H5-spring-events.html](../../../../../lessons/H5-spring-events.html)
 - html_same: 아니오
 - difference: source는 corpus에서 최신 원문과 같다고 기록되어 있다. HTML byte hash가 다르지만 화면/원인을 미검토했다.
 
@@ -127,6 +127,6 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H5-spring-events.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H5-spring-events.md:1) — 1~279행 (원리·코드 예시·기록된 저자 실행·따라 하기·실패 반례·답안·후속 경로)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H5-spring-events.md](../../../../../lessons/H5-spring-events.md) — 1~279행 (원리·코드 예시·기록된 저자 실행·따라 하기·실패 반례·답안·후속 경로)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H5.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H5.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H5.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H5.json`)

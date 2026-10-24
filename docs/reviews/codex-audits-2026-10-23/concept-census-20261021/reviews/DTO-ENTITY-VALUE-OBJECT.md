@@ -49,4 +49,4 @@
 
 실제 Chrome 검색에서 `DTO`는 P16/W09 등7개, `value object`는0개, `값 객체`는7개가 나왔다. 기술명 표기와 자연어 표현을 연결하지 않으면 내용이 있어도 찾을 수 없다. '요청으로 받은 필드를 전부 저장해도 되나', '같은 값을 담은 두 객체는 왜 다르다고 나오나', '응답에 DB 내부 필드가 왜 나오나'를 시작 질문으로 연결해야 한다.
 
-원문: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/docs/knowledge/W09-why-dto.md, /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/docs/knowledge/P20-jpa-entity-mapping.md, /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/docs/knowledge/S22-architecture-ddd.md, /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/docs/knowledge/J02-oop-object-contracts.md.
+원문: $WORKTREE_ROOT/concept-census-20261021/docs/knowledge/W09-why-dto.md, $WORKTREE_ROOT/concept-census-20261021/docs/knowledge/P20-jpa-entity-mapping.md, $WORKTREE_ROOT/concept-census-20261021/docs/knowledge/S22-architecture-ddd.md, $WORKTREE_ROOT/concept-census-20261021/docs/knowledge/J02-oop-object-contracts.md.

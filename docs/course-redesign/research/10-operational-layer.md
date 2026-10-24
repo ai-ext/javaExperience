@@ -1,6 +1,6 @@
 # 10. 게시판 서버 실습에 넣을 운영 계층 (비동기·장애 대응·관측성·외부 연동)
 
-> 작성일 2026-10-22. 대상: Java/Spring Boot 3.x~4.x, 로컬 docker compose(Colima, Docker Desktop 불가).
+> 작성일 2026-10-22. 대상: Java/Spring Boot 3.x~4.x, 로컬 Docker Compose(특정 런타임을 전제하지 않음).
 > 근거 표기: **[공식]** 공식 문서를 이번 조사에서 직접 열어 확인 / **[블로그]** 국내 기업 기술블로그(검색 결과로 존재·요지 확인, 본문 전체 정독은 아님) / **[일반]** 출처 없는 일반 지식(검증 전, 학습 자료에 넣기 전 확인 필요).
 > Spring Boot 4 기준 공식 문서는 4.1.x 페이지를 확인했다.
 
@@ -11,7 +11,7 @@
 - 경력 공고 25건 분석: 비동기·메시징 11/25, 장애 대응 9/25, 관측성 7/25. 기존 실습(CRUD 중심)에는 거의 없는 **운영 계층**이다.
 - 게시판 도메인에서 자연스럽게 걸리는 지점: 조회수(캐시·동시성), 알림(메시징), 인기글 집계(스케줄러·락), 첨부파일/푸시/이메일 같은 외부 API(장애 격리), 글 작성 후 검색 색인/통계 반영(아웃박스).
 - compose 기본 골격: `app` x2 인스턴스 + nginx(또는 traefik) + MySQL/PostgreSQL + Redis + Kafka(KRaft 단일 브로커) + Prometheus + Grafana + (Tempo 또는 Jaeger, Loki는 선택) + k6. 인스턴스 2개 이상이어야 4번 주제(분산 환경)가 의미를 가진다.
-- 로컬 자원 주의: Colima 기본 VM(2 CPU/2GB)로는 위 전체가 안 돈다. 미션별로 compose `profiles`를 나눠 필요한 것만 올리게 하고, `colima start --cpu 4 --memory 8` 정도를 안내한다. [일반]
+- 로컬 자원 주의: Docker 런타임에 2 CPU/2GB만 할당하면 위 전체를 실행하기 어렵다. 미션별로 compose `profiles`를 나눠 필요한 것만 올리게 하고, Docker 런타임 설정에서 4 CPU/8GB 정도를 할당하는 방법을 안내한다. [일반]
 
 ---
 
@@ -192,7 +192,7 @@
 
 ### 로컬 compose 학습 형태
 - 컨테이너: app x2 + nginx, k6(배포 중 지속 요청), docker compose `deploy.resources.limits.memory`로 메모리 제한.
-- 관찰: (a) k6로 지속 부하를 주며 `docker compose up -d --no-deps app1`로 재기동 → graceful on/off 별 에러 건수 비교. (b) 메모리 제한 512MB에서 `-Xmx512m` vs `MaxRAMPercentage=70`일 때 `docker inspect`의 OOMKilled 여부와 `docker stats`. (c) 같은 앱을 Dockerfile(레이어드)/Buildpacks/Jib로 빌드해 이미지 크기, 코드만 바꾼 재빌드 시간 비교. (d) 구/신 앱 버전을 동시에 띄우고 컬럼 이름 변경이 어떻게 깨지는지 재현. Colima에서는 `docker compose`가 동작하나 resource limit 적용·cgroup 버전은 VM 설정에 따라 다를 수 있어 확인 필요. [일반]
+- 관찰: (a) k6로 지속 부하를 주며 `docker compose up -d --no-deps app1`로 재기동 → graceful on/off 별 에러 건수 비교. (b) 메모리 제한 512MB에서 `-Xmx512m` vs `MaxRAMPercentage=70`일 때 `docker inspect`의 OOMKilled 여부와 `docker stats`. (c) 같은 앱을 Dockerfile(레이어드)/Buildpacks/Jib로 빌드해 이미지 크기, 코드만 바꾼 재빌드 시간 비교. (d) 구/신 앱 버전을 동시에 띄우고 컬럼 이름 변경이 어떻게 깨지는지 재현. Docker Compose의 resource limit 적용·cgroup 버전은 런타임 설정에 따라 다를 수 있어 확인 필요. [일반]
 
 ### 출처
 - [공식] https://docs.spring.io/spring-boot/reference/web/graceful-shutdown.html
@@ -432,7 +432,7 @@
 7. Buildpacks/Jib의 JVM 메모리 자동 계산 동작, Jib 공식 문서는 미확인.
 8. 토스페이먼츠 "에러 시 키만 바꿔 재시도는 위험", "승인 실패 시 조회 API로 상태 확인" 안내는 비공식 LLM 참고 문서(`/guides/v2/get-started/llms-quick-reference`)에서 나온 요약이라 공식 본문에서 재확인이 필요하다. 타임아웃 60초 권장은 공식 용어 페이지/검색 요약 기준.
 9. Redisson의 `leaseTime` 지정 시 watchdog 비활성 동작은 공식 페이지에서는 "leaseTime 후 자동 해제"만 확인했고 watchdog 비활성은 Medium 요약 주장.
-10. Colima에서의 compose resource limit 적용, cgroup v2 환경 JVM 한도 인식, Kafka KRaft 이미지 선택, k6→Prometheus 출력 옵션(`experimental-prometheus-rw`)은 실제로 돌려보지 않았다. 구현 전 PoC가 필요하다.
+10. Docker 런타임의 compose resource limit 적용, cgroup v2 환경 JVM 한도 인식, Kafka KRaft 이미지 선택, k6→Prometheus 출력 옵션(`experimental-prometheus-rw`)은 실제로 돌려보지 않았다. 구현 전 PoC가 필요하다.
 11. 영문 블로그(Thoughtworks 등), Medium 개인 글, 인프런 Q&A는 신뢰도가 낮아 참고용으로만 표기했다.
 12. RabbitMQ와 Kafka의 국내 사례 비교, Spring Session, Debezium CDC 아웃박스 세부는 이번 조사 범위에서 다루지 못했다.
 13. 커넥션 풀: Apache HttpClient 5의 `maxTotal`/`defaultMaxPerRoute`/connection request timeout 기본값, Apache·Reactor Netty 풀의 Micrometer 메트릭 바인딩 이름, MySQL `wait_timeout` 기본값, `spring.jpa.open-in-view` 기본값은 공식 페이지에서 확인하지 못했다([일반]로 표기). HikariCP 메트릭 이름(`hikaricp_connections_*`)도 Prometheus 출력으로 직접 확인하지 않았다.

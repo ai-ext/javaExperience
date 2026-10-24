@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E6-repository-methods.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E6-repository-methods.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/E6-repository-methods.md](../../../../../lessons/E6-repository-methods.md)
 
 원문 SHA-256: `8c49ca2e30b03ebf1c4f0cdba7c44ba06ea64670fca22a6cc1fe680725cb2a22`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: 291행시작 DB 포트가옛 3306이다. viewCount 단일정렬로 page를자르며동률경계검증은없다. 삭제행미필터는 426행의명시적교육범위라보안결함으로세지않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E6-repository-methods.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E6-repository-methods.md:83) — 83~198행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E6-repository-methods.md](../../../../../lessons/E6-repository-methods.md) — 83~198행
 
 ### 2. Page/Slice/count·JPQL/native/projection을비교한다.
 
@@ -36,7 +36,7 @@
 
 공백 또는 한계: 291행시작 DB 포트가옛 3306이다. viewCount 단일정렬로 page를자르며동률경계검증은없다. 삭제행미필터는 426행의명시적교육범위라보안결함으로세지않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E6-repository-methods.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E6-repository-methods.md:200) — 200~278행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E6-repository-methods.md](../../../../../lessons/E6-repository-methods.md) — 200~278행
 
 ### 3. 별도프로젝트에서조회 로그와검색 API를실행한다.
 
@@ -46,7 +46,7 @@
 
 공백 또는 한계: 291행시작 DB 포트가옛 3306이다. viewCount 단일정렬로 page를자르며동률경계검증은없다. 삭제행미필터는 426행의명시적교육범위라보안결함으로세지않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E6-repository-methods.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E6-repository-methods.md:280) — 280~428행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E6-repository-methods.md](../../../../../lessons/E6-repository-methods.md) — 280~428행
 
 ### 4. 이름/필드/JPQL/native 오타의실패시점을구분한다.
 
@@ -56,7 +56,7 @@
 
 공백 또는 한계: 291행시작 DB 포트가옛 3306이다. viewCount 단일정렬로 page를자르며동률경계검증은없다. 삭제행미필터는 426행의명시적교육범위라보안결함으로세지않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E6-repository-methods.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E6-repository-methods.md:430) — 430~480행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E6-repository-methods.md](../../../../../lessons/E6-repository-methods.md) — 430~480행
 
 ## 이번 실행 근거
 
@@ -82,7 +82,7 @@ DB/트랜잭션을 직접 다루는 레슨은 별도 행 비교를 기록한다.
 
 판정 범위: 해당 레슨과 명시한 후속 경로의 판정이며 전체 개념의 부재를 뜻하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E6-repository-methods.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E6-repository-methods.md)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E6-repository-methods.md](../../../../../lessons/E6-repository-methods.md)
 
 ## 확장 개발 명세
 
@@ -137,10 +137,10 @@ P2
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E6/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E6/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E6/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E6/screen.jpg`)
 - 관찰: 없음
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E6/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E6/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E6/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E6/dom.txt`)
 
 - markdown_same: 예
 - html_same: 아니오
@@ -150,6 +150,6 @@ P2
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E6-repository-methods.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E6-repository-methods.md:1) — 1~535행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E6-repository-methods.md](../../../../../lessons/E6-repository-methods.md) — 1~535행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-E6.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-E6.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-E6.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-E6.json`)

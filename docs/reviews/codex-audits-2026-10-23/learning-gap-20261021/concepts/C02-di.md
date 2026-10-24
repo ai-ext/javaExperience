@@ -8,13 +8,13 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P11-bean-registration-di.md:13](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P11-bean-registration-di.md:13) — 확인 범위 13–35행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/P11-bean-registration-di.md:13](../../../../knowledge/P11-bean-registration-di.md) — 확인 범위 13–35행.
 
   발췌: `1. **등록:** 직접 작성한 클래스는 ’@Component’ 계열, 라이브러리 객체는 ’@Configuration’ + ’@Bean’으로 등록한다. 기본 이름은 클래스명의 첫 글자 소문자 또는 메서드명이다. 자동 설정은 ’@ConditionalOnMissingBean’으로 대체를 허용한다. 2. **역할:** ’@Component’는 일반 클래스, ’@Service’ 서비스, ’@Repository’ 저장소(예외 변환 포함), ’@Controller’ MVC 계층이다. JSON API에는 ’@RestController’를 쓴다. 3. **스캔:** 메인 ’@SpringBootApplication’ 패키지와 하위만 기본 탐색한다. 형제 패키지는 공통 상위 패키지에 메인 클래스를 두거나 스캔 범위를 명시한다. 4. **생성자 주입:** 필수 의존성을 생성 시 전달해 ’final’로 둘 수 있고 단위 테스트도 간단하다. 생성자가 하나면 ’@Autowired’는 생략한다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P11-bean-registration-di.md:147](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P11-bean-registration-di.md:147) — 확인 범위 147–165행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/P11-bean-registration-di.md:147](../../../../knowledge/P11-bean-registration-di.md) — 확인 범위 147–165행.
 
   발췌: `’Clock’은 JDK 타입이라 그 클래스에 ’@Component’를 붙일 수 없다. ’src/main/java/com/example/catalog/TimeConfiguration.java’에서 ’@Bean’으로 등록한다.     ’’’java    package com.example.catalog;`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P12-why-beans-ioc-intro.md:63](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P12-why-beans-ioc-intro.md:63) — 확인 범위 63–75행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/P12-why-beans-ioc-intro.md:63](../../../../knowledge/P12-why-beans-ioc-intro.md) — 확인 범위 63–75행.
 
   발췌: `4. **필드가 아니라 생성자에 주입한다.** 생성자에 필수 의존성이 드러나고, ’final’로 만들 수 있으며, Spring 없이도 테스트에서 가짜를 넣을 수 있다. Spring Boot 문서도 일반적으로 생성자 주입을 권장한다.  5. **생성자가 하나면 보통 ’@Autowired’를 쓰지 않는다.** Spring은 그 유일한 생성자를 선택한다. 생성자가 여럿이면 사용할 생성자를 표시하거나 설계를 다시 단순하게 한다. 상세한 선택·모호성 해결은 → P11.`
 
@@ -40,7 +40,7 @@ Primary/Qualifier가 없다는 공백은 없다. 다만 예제는 별도 catalog
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `spring-di` — [Dependency Injection — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html)
 - `spring-bean-definition` — [Bean Overview — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/core/beans/definition.html)

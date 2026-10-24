@@ -34,14 +34,14 @@
 
 ## 근거: 절대경로와 라인
 
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/src/main/java/org/example/service/PostService.java:17](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/src/main/java/org/example/service/PostService.java:17) (L17–L26) — 실제 학습자 저장 구현
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/src/main/java/org/example/controller/PostController.java:30](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/src/main/java/org/example/controller/PostController.java:30) (L30–L56) — 실제 학습자 Controller
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/ch1-create-post/1-3-service-layer.md:3](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/ch1-create-post/1-3-service-layer.md:3) (L3–L39) — 직접 읽은 원문/코드
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/snapshots/blobs/716a2d3a39c1e7e2197ba89d3d0806d385e7f281.txt:33](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/snapshots/blobs/716a2d3a39c1e7e2197ba89d3d0806d385e7f281.txt:33) (L33–L58) — 1-3 정답의 src/main/java/org/example/post/PostService.java
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:37](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:37) (L37–L63) — 직접 읽은 원문/코드
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:17](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:17) (L17–L24) — functional 과제에서 이미 제공하는 부분
-- [/Users/ds/code/javaExperience/.worktrees/common-learning-foundation/src/main/java/org/example/service/PostService.java:24](/Users/ds/code/javaExperience/.worktrees/common-learning-foundation/src/main/java/org/example/service/PostService.java:24) (L24–L43) — 감사 중 확인한 common worktree 최신 학습자 Service
-- [/Users/ds/code/javaExperience/.worktrees/common-learning-foundation/src/main/java/org/example/domain/entity/PostEntity.java:24](/Users/ds/code/javaExperience/.worktrees/common-learning-foundation/src/main/java/org/example/domain/entity/PostEntity.java:24) (L24–L40) — common의 OneToMany 태그와 primitive heart
+- [$WORKTREE_ROOT/scenario-crud-redesign/src/main/java/org/example/service/PostService.java:17](../../../../../src/main/java/org/example/service/PostService.java) (L17–L26) — 실제 학습자 저장 구현
+- [$WORKTREE_ROOT/scenario-crud-redesign/src/main/java/org/example/controller/PostController.java:30](../../../../../src/main/java/org/example/controller/PostController.java) (L30–L56) — 실제 학습자 Controller
+- [$WORKTREE_ROOT/scenario-crud-redesign/scenario/ch1-create-post/1-3-service-layer.md:3](../../../../../scenario/ch1-create-post/1-3-service-layer.md) (L3–L39) — 직접 읽은 원문/코드
+- [$WORKTREE_ROOT/scenario-crud-redesign/scenario/snapshots/blobs/716a2d3a39c1e7e2197ba89d3d0806d385e7f281.txt:33](../../../../../scenario/snapshots/blobs/716a2d3a39c1e7e2197ba89d3d0806d385e7f281.txt) (L33–L58) — 1-3 정답의 src/main/java/org/example/post/PostService.java
+- $WORKTREE_ROOT/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:37 (기록 경로: `$WORKTREE_ROOT/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:37`) (L37–L63) — 직접 읽은 원문/코드
+- $WORKTREE_ROOT/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:17 (기록 경로: `$WORKTREE_ROOT/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:17`) (L17–L24) — functional 과제에서 이미 제공하는 부분
+- [$WORKTREE_ROOT/common-learning-foundation/src/main/java/org/example/service/PostService.java:24](../../../../../src/main/java/org/example/service/PostService.java) (L24–L43) — 감사 중 확인한 common worktree 최신 학습자 Service
+- [$WORKTREE_ROOT/common-learning-foundation/src/main/java/org/example/domain/entity/PostEntity.java:24](../../../../../src/main/java/org/example/domain/entity/PostEntity.java) (L24–L40) — common의 OneToMany 태그와 primitive heart
 
 ## 구분해서 읽기
 

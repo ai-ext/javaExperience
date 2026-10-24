@@ -8,16 +8,16 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:238](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:238) — 확인 범위 238–277행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:238](../../../../knowledge/P20-jpa-entity-mapping.md) — 확인 범위 238–277행.
 
   발췌: `@Entity @Table(name="order_lines") public class OrderLine {   @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;   @Column(nullable=false, length=120) private String productName;`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:314](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:314) — 확인 범위 314–330행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:314](../../../../knowledge/P20-jpa-entity-mapping.md) — 확인 범위 314–330행.
 
   발췌: `## 4. 치트시트  | 이름 | 용도 | 예시 | 주의 | |---|---|---|---|`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/p20-lesson-data.mjs:222](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/p20-lesson-data.mjs:222) — 확인 범위 222–289행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/p20-lesson-data.mjs:222 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/p20-lesson-data.mjs:222`) — 확인 범위 222–289행.
 
   발췌: `export const P20_LESSONS = [   {     "id": "compile",     "question": "원문 전체 코드는 왜 DTO에서 컴파일되지 않을까?",`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tickets/030-entity-out-of-controller.md:125](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tickets/030-entity-out-of-controller.md:125) — 확인 범위 125–141행.
+- [$WORKTREE_ROOT/concept-learning-night/tickets/030-entity-out-of-controller.md:125](../../../../../tickets/030-entity-out-of-controller.md) — 확인 범위 125–141행.
 
   발췌: `## 채점 기준  C = HTTP(필수), D = DB(필수, SELECT만), T = 테스트(선택), R = 코드 리뷰(피드백)`
 
@@ -43,7 +43,7 @@ P20 원문은 여전히 package-private enum 반환값에 다른 패키지 DTO�
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `jakarta-persistence-entity-class` — [Jakarta Persistence 3.2 Entity Class Requirements](https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2.html#the-entity-class)
 
@@ -53,10 +53,10 @@ P20 원문은 여전히 package-private enum 반환값에 다른 패키지 DTO�
 
 메인 담당자가 common 기반의 새 learner 소스를 격리복사해 실행했다. 감사용 4개 테스트가 실패0으로 끝났으며, 실패 현상 자체를 기대값으로 확인한 테스트도 포함하므로 기능 전체 정상 판정이 아니다. 본 담당자는 다음 검사 코드·XML·복사 소스를 읽어 결과 범위를 확인했다.
 
-- [/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/test/java/org/example/CommonLearningGapAuditTest.java](/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/test/java/org/example/CommonLearningGapAuditTest.java)
-- [/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/build/test-results/test/TEST-org.example.CommonLearningGapAuditTest.xml](/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/build/test-results/test/TEST-org.example.CommonLearningGapAuditTest.xml)
-- 통합 설명: [/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/03-COMMON-LEARNER-CODE.md](/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/03-COMMON-LEARNER-CODE.md) — 메인 담당자의 완성 보고서를 추가로 읽고 대조했다.
+- $USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/test/java/org/example/CommonLearningGapAuditTest.java (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/test/java/org/example/CommonLearningGapAuditTest.java`)
+- $USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/build/test-results/test/TEST-org.example.CommonLearningGapAuditTest.xml (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/build/test-results/test/TEST-org.example.CommonLearningGapAuditTest.xml`)
+- 통합 설명: $USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/03-COMMON-LEARNER-CODE.md (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/03-COMMON-LEARNER-CODE.md`) — 메인 담당자의 완성 보고서를 추가로 읽고 대조했다.
 
-새 기반 DTO도 Entity를 받고 [/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/main/java/org/example/dto/PostResponseDto.java:34](/Users/ds/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/main/java/org/example/dto/PostResponseDto.java:34)에서 LAZY tags를 순회한다. 메인 실행은 요청 밖의 Entity→DTO에서 LazyInitializationException을 관찰했다. P20의 package-private enum 컴파일 문제와는 별개인 런타임 변환 경계 문제다. 서비스 내부에서 필요한 조회와 DTO 완성을 끝내는 T030 과제를 현재 학습자 코드에 연결할 근거가 생겼다.
+새 기반 DTO도 Entity를 받고 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/main/java/org/example/dto/PostResponseDto.java:34 (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/runtime/common-learner-project/src/main/java/org/example/dto/PostResponseDto.java:34`)에서 LAZY tags를 순회한다. 메인 실행은 요청 밖의 Entity→DTO에서 LazyInitializationException을 관찰했다. P20의 package-private enum 컴파일 문제와는 별개인 런타임 변환 경계 문제다. 서비스 내부에서 필요한 조회와 DTO 완성을 끝내는 T030 과제를 현재 학습자 코드에 연결할 근거가 생겼다.
 
 common 실행의 DB는 저장소 seed를 사용한 일회용 MySQL이다. 개인 개발 DB의 스키마 변경 여부는 확인하지 않았으므로 개발 DB 전체가 같은 오류라고 단정하지 않는다.

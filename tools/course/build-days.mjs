@@ -10,6 +10,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadCourseSources } from './sources.mjs';
+import { withSpringConfigVariants } from './spring-config.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const HEADER = '<!-- 생성물: tools/course/build-days.mjs가 만든다. 직접 고치지 마라 -->';
@@ -147,6 +148,8 @@ function serverFiles(root, diffCmd, toRev) {
       else if (f.status === 'M') {
         const raw = git(root, [...diffCmd, '--no-renames', '--no-ext-diff', '--no-textconv', '--no-color', '--diff-algorithm=myers', '--indent-heuristic', '--inter-hunk-context=0', '-U3', '--', full]);
         f.diff = raw.slice(raw.indexOf('\n@@') + 1);
+        // 변경 diff는 보존하고 같은 시점의 Spring 설정 전체도 비교할 수 있게 한다.
+        if (/application(?:-[\w-]+)?\.ya?ml$/.test(rel)) f.configContent = git(root, ['show', `${toRev}:${full}`]);
       }
     }
     files.push(f);
@@ -481,8 +484,10 @@ function renderFile(f) {
   if (f.status === 'D') return `${head} — 이 커밋에서 지운다.`;
   if (f.binary) return `${head} — 바이너리 파일이라 내용은 싣지 않는다.`;
   if (f.generated) return `${head} — Gradle이 만드는 실행 스크립트라 내용은 싣지 않는다(\`gradle wrapper\`로 만들고, start.spring.io 압축에도 들어 있다).`;
-  if (f.status === 'A') return `${head}\n\n${fence(f.content, langOf(f.path))}`;
-  return `${head} (바뀐 부분)\n\n${fence(f.diff, 'diff')}`;
+  const yamlTestNote = /ApplicationYmlTest|ProfileConfigTest|LocalProfileSeedTest/.test(f.path) ? '\n\n이 예시는 YAML 원본을 읽는 검사다. properties를 선택했다면 같은 키·값과 프로파일 적용을 Spring Environment 또는 Properties 로딩으로 검증한다. YAML 파일 구조 자체를 제출 조건으로 요구하지 않는다.' : '';
+  if (f.status === 'A') return `${head}\n\n${fence(f.content, langOf(f.path))}${yamlTestNote}`;
+  const fullConfig = f.configContent === undefined ? '' : `\n\n**이 변경을 반영한 전체 설정** \`${f.path}\`\n\n${fence(f.configContent, 'yaml')}`;
+  return `${head} (바뀐 부분)\n\n${fence(f.diff, 'diff')}${fullConfig}${yamlTestNote}`;
 }
 
 function renderCommitAnswer(commit, files, stepFiles) {
@@ -894,7 +899,7 @@ export function renderDay(day, ctx) {
     parts.push('## 참고 자료', '<details class="day-refs">\n<summary>기존 시나리오·공부자료 (참고 도감)</summary>\n\n' + items.join('\n') + '\n\n</details>');
   }
   parts.push(navLine(day, ctx.roadmap));
-  return `${parts.join('\n\n')}\n`;
+  return withSpringConfigVariants(`${parts.join('\n\n')}\n`);
 }
 
 export function renderD00(roadmap, root) {
@@ -912,7 +917,7 @@ export function renderD00(roadmap, root) {
     '## 오늘 할 것',
     '',
     `1. [${java.title}](../java/J00.md) — ${java.duration}`,
-    `2. [출발 자료](../start/README.md)로 JDK 21·Colima·IntelliJ를 준비한다. compose는 D01 ①에서 프로젝트를 만든 뒤 출발 자료의 파일 3개(\`compose.yaml\`, \`toxiproxy.json\`, WireMock 스텁)를 먼저 복사하고 띄운다. 복사하기 전에 띄우면 \`toxiproxy.json\`이 빈 디렉터리로 생긴다`,
+    `2. [출발 자료](../start/README.md)로 JDK 21·Docker 런타임·IntelliJ를 준비한다. compose는 D01 ①에서 프로젝트를 만든 뒤 출발 자료의 파일 3개(\`compose.yaml\`, \`toxiproxy.json\`, WireMock 스텁)를 먼저 복사하고 띄운다. 복사하기 전에 띄우면 \`toxiproxy.json\`이 빈 디렉터리로 생긴다`,
     '',
     '## 워밍업 주제',
     '',

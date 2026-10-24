@@ -8,16 +8,16 @@ Java값/loadedState/같은 연결 행/별도 연결 행을 구분하고 flush가
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/E7-jpa-update-delete.md:9](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/E7-jpa-update-delete.md:9) — 확인 범위 9–17행.
+- [$WORKTREE_ROOT/concept-learning-night/lessons/E7-jpa-update-delete.md:9](../../../../../lessons/E7-jpa-update-delete.md) — 확인 범위 9–17행.
 
   발췌: `> **트랜잭션 안에서 읽어 온 엔티티의 값을 바꾸면, 트랜잭션이 끝날 때(커밋) Hibernate가 ’UPDATE’를 보낸다.**  이걸 **변경 감지**(dirty checking)라고 한다. 순서는 이렇다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:74](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:74) — 확인 범위 74–76행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:74](../../../../knowledge/S09-jpa-hibernate.md) — 확인 범위 74–76행.
 
   발췌: `영속성 컨텍스트는 ’(타입, 식별자)’마다 관리 인스턴스를 하나 둔다. 같은 컨텍스트의 두 번째 ’find()’는 캐시 객체를 줄 수 있지만, 컨텍스트 종료 후 공유되는 애플리케이션 캐시는 아니다.  ’persist()’와 변경은 쓰기 지연될 수 있다. ’FlushModeType.AUTO’이면 커밋 전, 결과와 겹치는 JPQL/HQL 실행 전 또는 명시적 ’flush()’에서 DML을 동기화한다. IDENTITY 생성 등은 더 일찍 INSERT가 필요할 수 있다. dirty checking은 현재 상태를 조회 당시 스냅샷과 비교한다. flush 후에도 트랜잭션은 rollback될 수 있으므로 flush는 커밋이 아니다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:576](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:576) — 확인 범위 576–578행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/s09-lesson-data.mjs:576 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/s09-lesson-data.mjs:576`) — 확인 범위 576–578행.
 
   발췌: `"id": "flush",     "question": "Java 값·loadedState·DB 행은 언제 같아질까?",     "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 ProbePost42 변경·commit / 별도 rollback DB",`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:1300](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:1300) — 확인 범위 1300–1302행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/s09-lesson-data.mjs:1300 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/s09-lesson-data.mjs:1300`) — 확인 범위 1300–1302행.
 
   발췌: `"id": "auto",     "question": "AUTO flush는 모든 조회 전에 UPDATE할까?",     "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 별도 s09_auto DB · 추가 ProbePost42와 원문 PurchaseOrder",`
 
@@ -43,7 +43,7 @@ E7 첫 설명의 “트랜잭션 하나에 하나씩”과 “커밋되기 직�
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `jakarta-entitymanager-api` — [EntityManager API Javadoc](https://jakarta.ee/specifications/persistence/3.2/apidocs/jakarta.persistence/jakarta/persistence/EntityManager.html)
 - `hibernate-7-4-user-guide` — [Hibernate ORM 7.4 User Guide](https://docs.hibernate.org/orm/7.4/userguide/html_single/)

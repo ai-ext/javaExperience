@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/F5-jwt-anatomy.md](../../../../../lessons/F5-jwt-anatomy.md)
 
 원문 SHA-256: `629afc479f7af2d70d99a84f07e5c866694734227c90bc290b63d1f42ac57437`
 
@@ -26,7 +26,7 @@ jjwt 0.13.0 예제로 토큰 발급/해독, payload/signature 변조, 만료, �
 
 공백 또는 한계: payload는 암호화되지 않으므로 비밀값을 넣지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md:5) — 5~129행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F5-jwt-anatomy.md](../../../../../lessons/F5-jwt-anatomy.md) — 5~129행
 
 ### 2. 서버가 허용 알고리즘을 정하고 서명·만료를 검사하며 HS256 키는 256비트 이상이어야 한다.
 
@@ -36,7 +36,7 @@ jjwt 0.13.0 예제로 토큰 발급/해독, payload/signature 변조, 만료, �
 
 공백 또는 한계: one HS256 signing key and expiry path only.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md:130) — 130~230행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F5-jwt-anatomy.md](../../../../../lessons/F5-jwt-anatomy.md) — 130~230행
 
 ### 3. 토큰 저장은 XSS/CSRF 상충관계가 있고 stateless JWT는 서버 상태 없이 만료 전에 즉시 폐기하기 어렵다.
 
@@ -46,7 +46,7 @@ jjwt 0.13.0 예제로 토큰 발급/해독, payload/signature 변조, 만료, �
 
 공백 또는 한계: follow-up auth lifecycle is in 10-4/S13.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md:49) — 49~61행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F5-jwt-anatomy.md](../../../../../lessons/F5-jwt-anatomy.md) — 49~61행
 
 ## 이번 실행 근거
 
@@ -74,7 +74,7 @@ jjwt 0.13.0 예제로 토큰 발급/해독, payload/signature 변조, 만료, �
 
 판정 범위: 예시/과거 관찰을 본편 구현 또는 이번 감사 실행으로 혼동하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md:5) — 5~230행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F5-jwt-anatomy.md](../../../../../lessons/F5-jwt-anatomy.md) — 5~230행
 
 ## 확장 개발 명세
 
@@ -127,10 +127,10 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F5/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F5/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F5/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F5/screen.jpg`)
 - 관찰: 렌더 캡처 미제공으로 검토 대기.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F5/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F5/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F5/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F5/dom.txt`)
 
 원문: corpus의 latest_source_same=True. 최신 HTML byte 해시 다름; 실제 캡처 기반 렌더 비교 전이므로 시각 차이는 pending_render. 원문 SHA/HTML 차이만으로 UI의 정확성이나 시각 완료를 추정하지 않는다.
 
@@ -138,8 +138,8 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md:5) — 5~129행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md:130) — 130~230행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F5-jwt-anatomy.md:49) — 49~61행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F5-jwt-anatomy.md](../../../../../lessons/F5-jwt-anatomy.md) — 5~129행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F5-jwt-anatomy.md](../../../../../lessons/F5-jwt-anatomy.md) — 130~230행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F5-jwt-anatomy.md](../../../../../lessons/F5-jwt-anatomy.md) — 49~61행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-F5.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-F5.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-F5.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-F5.json`)

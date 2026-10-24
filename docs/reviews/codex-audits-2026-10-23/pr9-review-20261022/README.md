@@ -74,7 +74,7 @@ Java의 문자열 Set은 대소문자를 구별하지만 테스트 DB의 collati
 
 원래 명령을 두 번 실행했고 모두 **252개 중250개 통과·2개 실패·skip0**이었다. `PgClientRetryTest`의 두 연결 실패 테스트다. `proxy.disable()` 뒤 연결 거부를 기대하지만 관측된 원인은 `NoHttpResponseException`이며 코드가 TIMEOUT으로 분류했다.
 
-이는 현재 환경에서 재현된 테스트 실패다. 작성자의 Colima 컨테이너 실행에서252개가 통과했다는 과거 기록을 거짓이라고 단정하지 않는다. 또한 “응답 없음”을 무조건 UNREACHABLE로 바꿔 녹색으로 만드는 것은 결제 안전성을 해칠 수 있다.
+이는 현재 환경에서 재현된 테스트 실패다. 작성자의 VM 기반 Docker 런타임 컨테이너 실행에서252개가 통과했다는 과거 기록을 거짓이라고 단정하지 않는다. 또한 “응답 없음”을 무조건 UNREACHABLE로 바꿔 녹색으로 만드는 것은 결제 안전성을 해칠 수 있다.
 
 **수정 방향:** 연결을 맺지 못한 실패와 전송 후 응답이 끊긴 실패를 안정적으로 구분하는 fixture를 사용한다. 지원 실행 환경에서 재현되는 CI 검사를 붙이고 결과를 갱신한다. 신뢰도10/10(이번 환경·명령의 반복 실패에 한정).
 
@@ -136,12 +136,12 @@ Java의 문자열 Set은 대소문자를 구별하지만 테스트 DB의 collati
 
 주요 증거:
 
-- [/Users/ds/research/javaexperience-pr9-review-20261022/_data/verification-summary.json](/Users/ds/research/javaexperience-pr9-review-20261022/_data/verification-summary.json)
-- [/Users/ds/research/javaexperience-pr9-review-20261022/_data/original-failures.json](/Users/ds/research/javaexperience-pr9-review-20261022/_data/original-failures.json)
-- [/Users/ds/research/javaexperience-pr9-review-20261022/_data/probe-tests/ReviewBoundaryProbeTest.java](/Users/ds/research/javaexperience-pr9-review-20261022/_data/probe-tests/ReviewBoundaryProbeTest.java)
-- [/Users/ds/research/javaexperience-pr9-review-20261022/_data/probe-tests/payment/ReviewPgProbeTest.java](/Users/ds/research/javaexperience-pr9-review-20261022/_data/probe-tests/payment/ReviewPgProbeTest.java)
-- [/Users/ds/research/javaexperience-pr9-review-20261022/curriculum-review.md](/Users/ds/research/javaexperience-pr9-review-20261022/curriculum-review.md)
-- [/Users/ds/research/javaexperience-pr9-review-20261022/contract-tests-review.md](/Users/ds/research/javaexperience-pr9-review-20261022/contract-tests-review.md)
-- [/Users/ds/research/javaexperience-pr9-review-20261022/adversarial-review.md](/Users/ds/research/javaexperience-pr9-review-20261022/adversarial-review.md)
+- $USER_HOME/research/javaexperience-pr9-review-20261022/_data/verification-summary.json (기록 경로: `$USER_HOME/research/javaexperience-pr9-review-20261022/_data/verification-summary.json`)
+- $USER_HOME/research/javaexperience-pr9-review-20261022/_data/original-failures.json (기록 경로: `$USER_HOME/research/javaexperience-pr9-review-20261022/_data/original-failures.json`)
+- $USER_HOME/research/javaexperience-pr9-review-20261022/_data/probe-tests/ReviewBoundaryProbeTest.java (기록 경로: `$USER_HOME/research/javaexperience-pr9-review-20261022/_data/probe-tests/ReviewBoundaryProbeTest.java`)
+- $USER_HOME/research/javaexperience-pr9-review-20261022/_data/probe-tests/payment/ReviewPgProbeTest.java (기록 경로: `$USER_HOME/research/javaexperience-pr9-review-20261022/_data/probe-tests/payment/ReviewPgProbeTest.java`)
+- $USER_HOME/research/javaexperience-pr9-review-20261022/curriculum-review.md (기록 경로: `$USER_HOME/research/javaexperience-pr9-review-20261022/curriculum-review.md`)
+- $USER_HOME/research/javaexperience-pr9-review-20261022/contract-tests-review.md (기록 경로: `$USER_HOME/research/javaexperience-pr9-review-20261022/contract-tests-review.md`)
+- $USER_HOME/research/javaexperience-pr9-review-20261022/adversarial-review.md (기록 경로: `$USER_HOME/research/javaexperience-pr9-review-20261022/adversarial-review.md`)
 
 보조 검토자의 “실행 미확인” 후보 중 F1~F4는 이후 메인의 위 실행으로 갱신했다. 상충하면 이 종합 보고서와 verification-summary의 실제 관측을 우선한다.

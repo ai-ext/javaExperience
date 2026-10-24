@@ -8,13 +8,13 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W25-spring-multithreading.md:59](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W25-spring-multithreading.md:59) — 확인 범위 59–83행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/W25-spring-multithreading.md:59](../../../../knowledge/W25-spring-multithreading.md) — 확인 범위 59–83행.
 
   발췌: `### 싱글턴은 한 객체를 공유한다  빈 스코프 표에서 ’singleton’은 기본 스코프이며 Spring IoC 컨테이너마다 빈 정의 하나에 객체 인스턴스 하나를 둔다. 같은 컨테이너에 들어온 요청들이 같은 컨트롤러·서비스 객체를 호출한다. 서버를 여러 인스턴스로 띄우면 인스턴스마다 컨테이너와 싱글턴 객체가 따로 생긴다. 따라서 “싱글턴”은 클러스터 전체에서 공유하는 전역 객체라는 뜻도 아니다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W25-spring-multithreading.md:100](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W25-spring-multithreading.md:100) — 확인 범위 100–161행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/W25-spring-multithreading.md:100](../../../../knowledge/W25-spring-multithreading.md) — 확인 범위 100–161행.
 
   발췌: `### 5.1 공유 싱글턴 필드에서 요청 상태가 섞이는 순수 Java 재현  실제 서비스에서 요청별 이름을 필드에 보관하는 잘못된 형태다. 두 요청의 순서를 래치로 고정하여 Alice가 자기 이름을 쓴 뒤 Bob이 덮어쓰고, Alice가 다시 필드를 읽게 했다. 래치가 스레드 순서를 정하므로 출력은 재현 가능하다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P12-why-beans-ioc-intro.md:69](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P12-why-beans-ioc-intro.md:69) — 확인 범위 69–75행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/P12-why-beans-ioc-intro.md:69](../../../../knowledge/P12-why-beans-ioc-intro.md) — 확인 범위 69–75행.
 
   발췌: `7. **’new’로 직접 만든 객체에는 Spring이 개입하지 않는다.** 클래스에 ’@Service’가 붙어 있어도 ’new OrderService(...)’로 만든 그 인스턴스를 컨테이너가 만든 건 아니다. 컨테이너의 의존성 주입, 초기화·종료 관리, 프록시 기반 기능은 그 객체에 자동으로 적용되지 않는다.  8. **Spring이 없는 곳에서는 계속 ’new’를 쓴다.** 순수 단위 테스트는 ’new OrderService(fakeRepository, fakePayment)’처럼 필요한 가짜를 직접 전달하면 된다. Spring을 띄우지 않아 빠르고 어떤 협력 객체를 쓸지 코드에서 분명하다.`
 
@@ -40,7 +40,7 @@ W25는 Alice/Bob 순서를 CountDownLatch로 고정한 누출 예제, stateless 
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `spring-bean-scopes` — [Bean Scopes — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html)
 - `spring-tx-thread-bound` — [Understanding Declarative Transaction Implementation — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-decl-explained.html)

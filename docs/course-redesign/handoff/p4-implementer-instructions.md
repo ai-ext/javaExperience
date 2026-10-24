@@ -1,19 +1,19 @@
 # P4 구현자 공통 지시 (결함 B01~B16 심기)
 
 ## 먼저 읽을 것 (끝까지)
-1. 계획서: `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/course-redesign/plans/2026-10-23-p4-messy-server.md` — 구조, 담당·파일 소유, 결함 하나를 만드는 절차, 티켓 페이지 형식. **반드시 그대로 따른다.**
+1. 계획서: `$WORKTREE_ROOT/p1-spec-roadmap/docs/course-redesign/plans/2026-10-23-p4-messy-server.md` — 구조, 담당·파일 소유, 결함 하나를 만드는 절차, 티켓 페이지 형식. **반드시 그대로 따른다.**
 2. 설계 §5-3: `docs/course-redesign/research/14-redesign-design.md` (105~146행 근처) — 티켓 표(증상·심은 원인·진단 도구·근거). 근거 문서(06·07·08·10·13 등)는 `docs/course-redesign/research/`에 있다. 네 결함의 근거 절을 읽고 그 장애 모양을 충실히 재현하라.
 3. `course/roadmap.json`의 days D11~D14 — 네 티켓이 배정된 날·단계 제목(티켓 페이지의 "같은 날").
-4. messy-server 코드(지금은 answer-d10 정답 상태): `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/`. 정답 서버의 원장 `docs/course-redesign/plans/2026-10-22-p2-ledger.md`(정답이 어떤 함정을 어떻게 피했는지 — 네가 심을 결함은 대개 그 반대다).
+4. messy-server 코드(지금은 answer-d10 정답 상태): `$WORKTREE_ROOT/p1-spec-roadmap/messy-server/`. 정답 서버의 원장 `docs/course-redesign/plans/2026-10-22-p2-ledger.md`(정답이 어떤 함정을 어떻게 피했는지 — 네가 심을 결함은 대개 그 반대다).
 5. 검증 도구: `tools/tickets/verify.sh` (읽어 보고 쓰는 법을 익혀라).
 
 ## 작업 위치와 실행 (고정)
-- 리포: `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap` (브랜치 `course/p1-spec-roadmap`). 다른 worktree를 만들지 마라.
+- 리포: `$WORKTREE_ROOT/p1-spec-roadmap` (브랜치 `course/p1-spec-roadmap`). 다른 worktree를 만들지 마라.
 - **다른 담당 2명이 같은 리포에서 동시에 일한다.** 너의 소유 파일만 고친다(계획서 "담당과 파일 소유"). 다른 담당 파일을 고쳐야 하면 고치지 말고 보고에 적어라.
 - **Gradle을 `messy-server/`에서 직접 돌리지 마라.** 네 전용 복사본에서 돌린다:
-  `C=<네 작업 디렉터리>; rsync -a --delete --exclude build --exclude .gradle --exclude tickets messy-server/ $C/base/ && cd $C/base && JAVA_HOME=/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home ./gradlew --console=plain test [--tests …]`
+  `C=<네 작업 디렉터리>; rsync -a --delete --exclude build --exclude .gradle --exclude tickets messy-server/ $C/base/ && cd $C/base && JAVA_HOME=<JDK21> ./gradlew --console=plain test [--tests …]`
   (`<네 작업 디렉터리>`는 아래 담당별로 정해 준다. 리포 밖이다.)
-- 티켓 검증: `cd /Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap && TICKET_WORK_DIR=<네 작업 디렉터리>/tickets tools/tickets/verify.sh --full Bnn` (JDK 21은 스크립트가 고정한다. JUnit XML로 판정: 결함 상태는 **단언 실패**만 인정하고 컨텍스트·환경 error는 거부, 수정 후 전부 통과, `--full`은 환경 한정 2건만 허용. 실패하면 메시지의 결과 디렉터리를 열어 원인을 본다)
+- 티켓 검증: `cd $WORKTREE_ROOT/p1-spec-roadmap && TICKET_WORK_DIR=<네 작업 디렉터리>/tickets tools/tickets/verify.sh --full Bnn` (JDK 21은 `TICKET_JAVA_HOME` 또는 `JAVA_HOME`으로 지정한다. JUnit XML로 판정: 결함 상태는 **단언 실패**만 인정하고 컨텍스트·환경 error는 거부, 수정 후 전부 통과, `--full`은 환경 한정 2건만 허용. 실패하면 메시지의 결과 디렉터리를 열어 원인을 본다)
 - 환경 한정 실패: `PgClientRetryTest`의 연결 실패 2건(`연결_실패는_재시도하고_복구되면_성공한다`, `연결_실패가_계속되면_백오프_후_3번째에_포기한다`)은 이 머신에서 항상 실패한다(로컬 Docker 포트 포워더). 그 2건 외에는 모두 통과해야 한다. (T 담당은 PgClientRetryTest를 건드리지 않는다.)
 - 시간 단언 테스트(`PgTimeoutTest`, `ChargeTransactionBoundaryTest`, Redis 1초 예산 테스트)는 다른 담당의 테스트와 CPU를 나눠 쓰면 흔들릴 수 있다. 한 번 실패하면 다시 돌려 판단하고, 흔들림이면 보고에 적어라.
 

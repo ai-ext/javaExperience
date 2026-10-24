@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J2-why-migrations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J2-why-migrations.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/J2-why-migrations.md](../../../../../lessons/J2-why-migrations.md)
 
 원문 SHA-256: `2595cf2883ca36b13adde16b6d0f0001db6ba654cdc0afd99def17d20d3599e9`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: 본문 예제는 한 번의 과거 앱 실행 기록이며 learner가 직접 재현할 프로젝트는 포함되지 않는다. lesson 안내 shell은 studymate-mysql-1을 하드코딩하지만 현재 compose에는 mysql 서비스만 있어 연결 대상 확인이 필요하다. baseline은 비어 있지 않은 잘못된 schema에도 적용될 위험을 별도 실습으로 다뤄야 한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J2-why-migrations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J2-why-migrations.md:1) — 1~284행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/J2-why-migrations.md](../../../../../lessons/J2-why-migrations.md) — 1~284행
 
 ## 이번 실행 근거
 
@@ -48,7 +48,7 @@
 
 판정 범위: 레슨 하나에 고급 주제 전부를 요구하지 않고, 해당 후속 시나리오를 링크한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J2-why-migrations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J2-why-migrations.md:1) — 1~284행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/J2-why-migrations.md](../../../../../lessons/J2-why-migrations.md) — 1~284행
 
 ## 확장 개발 명세
 
@@ -112,14 +112,14 @@ low
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J2/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J2/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J2/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J2/screen.jpg`)
 - 관찰: 레슨 HTML 시각 검토 전
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J2/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J2/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J2/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-J2/dom.txt`)
 
-- source: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/J2-why-migrations.md](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/J2-why-migrations.md)
+- source: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/J2-why-migrations.md](../../../../../lessons/J2-why-migrations.md)
 - source_same: 예
-- html: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/J2-why-migrations.html](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/J2-why-migrations.html)
+- html: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/J2-why-migrations.html](../../../../../lessons/J2-why-migrations.html)
 - html_same: 아니오
 - difference: latest HTML未검토.
 
@@ -128,6 +128,6 @@ low
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J2-why-migrations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/J2-why-migrations.md:1) — 1~284행 (개념, 예시, 따라하기, 일부러 틀려 보기 및 확인 문제)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/J2-why-migrations.md](../../../../../lessons/J2-why-migrations.md) — 1~284행 (개념, 예시, 따라하기, 일부러 틀려 보기 및 확인 문제)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-J2.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-J2.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-J2.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-J2.json`)

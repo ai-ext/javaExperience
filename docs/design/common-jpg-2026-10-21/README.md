@@ -10,4 +10,4 @@
 
 원문 변경4개는 기록된 이미지 링크만 달라졌고, 학생 서버 소스·build.gradle·compose.yaml을 바꾸지 않았다. 기존 HTML341개는 JPG 경로와 자산 cache hash만 정규화하면 기존과 같다. parity446개와 inventory44,101개는 항목 수·기존 상태를 그대로 유지하며 verified 승격은 없다.
 
-최초 검사에서 설정 개념 갤러리의 중첩 template 한 곳이 PNG 링크를 유지해 실패했다. 해당 링크를 고친 후 전체 검사를 다시 통과했고 처음 실패 로그도 보존했다. 전체 로그와 적용 스크립트는 `/Users/ds/research/javaexperience-main-preparation-2026-10-21/_data/jpg/`에 있다. 이 작업은 실제 브라우저 검증·commit·push·PR을 수행하지 않았다.
+최초 검사에서 설정 개념 갤러리의 중첩 template 한 곳이 PNG 링크를 유지해 실패했다. 해당 링크를 고친 후 전체 검사를 다시 통과했고 처음 실패 로그도 보존했다. 전체 로그와 적용 스크립트는 `$USER_HOME/research/javaexperience-main-preparation-2026-10-21/_data/jpg/`에 있다. 이 작업은 실제 브라우저 검증·commit·push·PR을 수행하지 않았다.

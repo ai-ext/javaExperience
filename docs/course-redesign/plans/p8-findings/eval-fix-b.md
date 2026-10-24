@@ -12,7 +12,7 @@
 
 ## 원 근거
 
-평가 원문 `/Users/ds/.cache/jx-p8/reviews/scenario-eval.md` 4절, 보관본 `docs/reviews/codex-audits-2026-10-23/learning-gap-20261021/COVERAGE.md` 및 `IMPLEMENTATION-ROADMAP.md` 1·4·5절을 우선 대조했다. 개별 C02/C03/C04/C09/C11/C14/C16/C17/C18/C20/C27 및 I12의 보완 과제도 대조했다. 과거 실행 로그는 이번 실행 결과로 승계하지 않는다.
+평가 원문 `$USER_HOME$REVIEW_WORK_DIR/reviews/scenario-eval.md` 4절, 보관본 `docs/reviews/codex-audits-2026-10-23/learning-gap-20261021/COVERAGE.md` 및 `IMPLEMENTATION-ROADMAP.md` 1·4·5절을 우선 대조했다. 개별 C02/C03/C04/C09/C11/C14/C16/C17/C18/C20/C27 및 I12의 보완 과제도 대조했다. 과거 실행 로그는 이번 실행 결과로 승계하지 않는다.
 
 ## 항목별 반영 위치와 이유
 
@@ -57,9 +57,9 @@
 
 ### Java
 
-요청한 JDK 21의 `JAVA_HOME=/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home`으로 루트 `./gradlew :java-track:check`를 시도했다.
+요청한 JDK 21의 `JAVA_HOME=<JDK21>`으로 루트 `./gradlew :java-track:check`를 시도했다.
 
-- 기본 경로: Gradle wrapper의 `/Users/ds/.gradle/wrapper/dists/gradle-9.8.0-bin/3m7h6ceboy5k31n8kzwzuxssm/gradle-9.8.0-bin.zip.lck` 생성이 샌드박스에서 `Operation not permitted`로 실패.
+- 기본 경로: Gradle wrapper의 `$USER_HOME/.gradle/wrapper/dists/gradle-9.8.0-bin/3m7h6ceboy5k31n8kzwzuxssm/gradle-9.8.0-bin.zip.lck` 생성이 샌드박스에서 `Operation not permitted`로 실패.
 - 쓰기 가능한 `GRADLE_USER_HOME=/tmp/jx-eval-b-gradle-home`으로 다시 실행: `https://services.gradle.org/distributions/gradle-9.8.0-bin.zip` 다운로드가 `UnknownHostException: services.gradle.org`로 실패.
 - **Gradle check는 미실행**이다. `answerTest`·`skeletonTest`·`verifySkeleton` 전체 통과를 주장하지 않는다.
 - 보조 검증: 이미 캐시된 JUnit 5.14.4·JUnit Platform 1.14.4·AssertJ 3.27.7을 읽어 같은 JDK 21의 javac/Java Launcher로 J09 테스트를 직접 실행했다. 신규 5개는 정답 작성 전 뼈대에서 5개 모두 의도한 `J09:` 미구현 예외로 실패, 정답 구현 후 5/5 통과. J09 전체는 정답 24/24 통과, 뼈대 24/24 실패를 확인했다. 이는 Gradle 소스 세트/태스크 연결의 전체 검증을 대체하지 않는다.
@@ -68,7 +68,7 @@
 
 ### 사이트 검사 환경
 
-- 일자 생성기는 임시 index에서 패치를 검사하면서 Git object를 쓴다. 기본 objects 경로의 쓰기 제한이 적용 시점 오류처럼 보고되는 것을 실제 `git apply` stderr로 확인했다. 실제 저장소 index는 건드리지 않고 `GIT_OBJECT_DIRECTORY=/tmp/jx-eval-b-git-objects`, `GIT_ALTERNATE_OBJECT_DIRECTORIES=/Users/ds/code/javaExperience/.git/objects`로 임시 객체만 분리해 실행했다. 검사를 생략하거나 보완 적용 규칙을 바꾸지 않았다.
+- 일자 생성기는 임시 index에서 패치를 검사하면서 Git object를 쓴다. 기본 objects 경로의 쓰기 제한이 적용 시점 오류처럼 보고되는 것을 실제 `git apply` stderr로 확인했다. 실제 저장소 index는 건드리지 않고 `GIT_OBJECT_DIRECTORY=/tmp/jx-eval-b-git-objects`, `GIT_ALTERNATE_OBJECT_DIRECTORIES=$REPO_ROOT/.git/objects`로 임시 객체만 분리해 실행했다. 검사를 생략하거나 보완 적용 규칙을 바꾸지 않았다.
 - 기본 npm 실행의 x64 Node와 설치된 arm64 esbuild가 불일치했다. 패키지를 재설치하지 않고 `PATH=/opt/homebrew/bin:$PATH`로 설치된 arm64 Node 26.0.0을 선택했다.
 - 첫 링크 검사에서 D09의 raw HTML section ID를 Markdown 앵커로 인정하지 않아 새 J09 링크가 실패했다. D09 페이지 링크와 '① 힌트' 문구로 안내해 해결했다.
 - 순서당 힌트 1~2개 검사 실패는 observations 분리로 해결했다. 제한을 완화하지 않았다. 관련 새 테스트의 실패→통과도 확인했다.

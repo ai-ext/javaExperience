@@ -4,7 +4,7 @@
 
 3~6년차 경력에 대한 공식 교육 표준을 확인한 것은 아니다. 이 범위는 javaExperience가 목표로 한 실무 과제 수준에 대한 프로젝트별 역량 루브릭으로 취급해야 한다. 이 파일은 출처 색인이고, 최종 공백 판정표가 아니다.
 
-전체 기계 판독 목록: [`/Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.json`](/Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.json). 프로젝트/버전 근거: [`/Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/LOCAL_BASELINE.json`](/Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/LOCAL_BASELINE.json). 원문 파일·SHA-256·다운로드 한계: [`/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/fetch-manifest.json`](/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/fetch-manifest.json). 로컬 파일 대조표: [`/Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/LOCAL-FINDINGS.md`](/Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/LOCAL-FINDINGS.md).
+전체 기계 판독 목록: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.json` (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.json`). 프로젝트/버전 근거: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/LOCAL_BASELINE.json` (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/LOCAL_BASELINE.json`). 원문 파일·SHA-256·다운로드 한계: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/fetch-manifest.json` (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/fetch-manifest.json`). 로컬 파일 대조표: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/LOCAL-FINDINGS.md` (기록 경로: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/LOCAL-FINDINGS.md`).
 
 ## 출처별 주장과 적용 한계
 
@@ -22,7 +22,7 @@
 - DI가 모든 테스트를 자동으로 단순하게 만들지는 않는다. 단위 테스트에서 직접 인스턴스화할 수 있다는 이점과 Spring 통합 테스트 필요를 구분한다.
 - 저장소→서비스 의존 자체가 항상 오류인 것은 아니다. 실제 등록된 빈 그래프가 순환할 때 런타임 순환 의존이다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-ioc-di.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-ioc-di.html`.
 
 ### spring-bean-definition — [Bean Overview — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/core/beans/definition.html)
 
@@ -35,7 +35,7 @@
 **주의/적용 한계**
 - 직접 new한 모든 Java 객체가 자동으로 Spring bean이 되는 것은 아니다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-bean-definition.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-bean-definition.html`.
 
 ### spring-bean-scopes — [Bean Scopes — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html)
 
@@ -50,7 +50,7 @@
 **주의/적용 한계**
 - 고정 singleton 수명과 요청별 state는 분리해야 한다. scope proxy, ObjectProvider 또는 명시적 메서드 인자가 필요한 경우가 있다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-bean-scopes.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-bean-scopes.html`.
 
 ### spring-lifecycle — [Customizing the Nature of a Bean — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/core/beans/factory-nature.html)
 
@@ -64,7 +64,7 @@
 **주의/적용 한계**
 - 정상 컨테이너 종료 시점의 lifecycle이며 강제 프로세스 종료까지 정리를 보장하지 않는다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-bean-lifecycle.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-bean-lifecycle.html`.
 
 ### spring-aop-proxy — [Proxying Mechanisms — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/core/aop/proxying.html)
 
@@ -78,7 +78,7 @@
 **주의/적용 한계**
 - AspectJ weaving은 proxy-based self-invocation 제한과 다르다. 이 프로젝트는 일반 Spring proxy 관례를 전제로 해야 한다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-aop-proxy.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-aop-proxy.html`.
 
 ### spring-tx-annotation — [Using @Transactional — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html)
 
@@ -93,7 +93,7 @@
 - Framework 6.2부터 ALL_EXCEPTIONS global rollback 기본을 선택 가능하므로 설정을 확인한다.
 - annotation 메타데이터만으로 실제 트랜잭션이 생기는 것이 아니라 proxy/interceptor와 transaction manager를 통한 호출이어야 한다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-tx-annotations.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-tx-annotations.html`.
 
 ### spring-tx-rollback — [Rolling Back a Declarative Transaction — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/rolling-back.html)
 
@@ -108,7 +108,7 @@
 - JDBC/Hibernate가 이미 transaction을 rollback-only로 표시한 데이터베이스 예외는 단순히 catch했다고 다시 사용 가능한 transaction이 되지 않는다.
 - 개별 rollback rule 및 global default는 적용 순서/설정을 확인한다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-tx-rollback.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-tx-rollback.html`.
 
 ### spring-propagation — [Transaction Propagation — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html)
 
@@ -125,7 +125,7 @@
 - Propagation의 동작은 transaction manager와 resource driver 지원에 따라 달라진다.
 - NESTED를 JPA 독립 transaction이나 REQUIRES_NEW와 혼동하면 안 된다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-tx-propagation.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-tx-propagation.html`.
 
 ### spring-tx-thread-bound — [Understanding Declarative Transaction Implementation — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-decl-explained.html)
 
@@ -139,7 +139,7 @@
 **주의/적용 한계**
 - Reactive transaction은 Reactor Context를 사용하므로 imperative thread-local 설명을 그대로 적용하지 않는다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-thread-bound-tx.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-thread-bound-tx.html`.
 
 ### spring-test-thread-bound — [Transaction Management in TestContext Framework](https://docs.spring.io/spring-framework/reference/testing/testcontext-framework/tx.html)
 
@@ -153,7 +153,7 @@
 **주의/적용 한계**
 - 문서는 preemptive timeout 사례를 예로 들지만 그 ThreadLocal 원리는 별도 worker thread에도 적용된다. 동시성 테스트는 cleanup/commit 관찰점을 별도 설계한다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-test-thread-tx.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-test-thread-tx.html`.
 
 ### spring-data-jpa-tx — [Transactionality — Spring Data JPA Reference](https://docs.spring.io/spring-data/jpa/reference/jpa/transactions.html)
 
@@ -167,7 +167,7 @@
 **주의/적용 한계**
 - provider/transaction manager/DB에 따라 실제 최적화·쓰기 제한은 다르다. 한 MySQL 버전/provider의 성능효과를 무측정으로 단정하지 않는다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-data-jpa-transactions.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-data-jpa-transactions.html`.
 
 ### spring-jdbc-enforce-readonly — [DataSourceTransactionManager Javadoc](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/jdbc/datasource/DataSourceTransactionManager.html)
 
@@ -180,7 +180,7 @@
 **주의/적용 한계**
 - Jdbc transaction manager 옵션으로 모든 JpaTransactionManager가 자동 적용한다고 일반화하지 않는다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-read-only-tx-manager.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-read-only-tx-manager.html`.
 
 ### jakarta-tx-annotation — [Jakarta Transactions Transactional API](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/transaction/transactional)
 
@@ -213,7 +213,7 @@
 - 명세는 provider-neutral이다. SQL 발생 시점, provider optimization, database lock 동작을 정하지 않는다.
 - EntityManagerFactory는 thread-safe일 수 있어도 개별 EntityManager/persistence context는 별도다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/jakarta-persistence-3-2-spec.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/jakarta-persistence-3-2-spec.html`.
 
 ### jakarta-entitymanager-api — [EntityManager API Javadoc](https://jakarta.ee/specifications/persistence/3.2/apidocs/jakarta.persistence/jakarta/persistence/EntityManager.html)
 
@@ -229,7 +229,7 @@
 **주의/적용 한계**
 - JPA API contract는 Hibernate/MySQL SQL 구체 동작을 규정하지 않는다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/jakarta-entitymanager-api.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/jakarta-entitymanager-api.html`.
 
 ### spring-data-new-state — [Entity State Detection Strategies — Spring Data JPA Reference](https://docs.spring.io/spring-data/jpa/reference/data-commons/is-new-state-detection.html)
 
@@ -244,7 +244,7 @@
 **주의/적용 한계**
 - merge 반환값을 사용해야 한다. merge는 request DTO를 덮어쓰듯 안전하게 patch하지 않는다.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-data-new-state.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-data-new-state.html`.
 
 ### spring-data-derived-delete — [Spring Data JPA 4.1.1 Query Methods](https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html)
 
@@ -258,7 +258,7 @@
 **주의/적용 한계**
 - 동시 delete race에서 두 번째 manager/provider SQL affected-row behavior, exception, rollback outcome는 실제 DB/provider에서 검증해야 한다. 카운터 감소는 이 return type을 affected-row evidence라고 단정하지 말아야 한다.
 - Confidence: high for implementation semantics; medium for race outcome.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-data-jpa-derived-delete.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-data-jpa-derived-delete.html`.
 - 구현 소스 URL: [https://github.com/spring-projects/spring-data-jpa/blob/4.1.1/spring-data-jpa/src/main/java/org/springframework/data/jpa/repository/query/JpaQueryExecution.java](https://github.com/spring-projects/spring-data-jpa/blob/4.1.1/spring-data-jpa/src/main/java/org/springframework/data/jpa/repository/query/JpaQueryExecution.java); pinned tag 4.1.1.
 
 ### spring-data-jpa-delete-code — [JpaQueryExecution.java at Spring Data JPA 4.1.1 tag](https://github.com/spring-projects/spring-data-jpa/blob/4.1.1/spring-data-jpa/src/main/java/org/springframework/data/jpa/repository/query/JpaQueryExecution.java)
@@ -272,7 +272,7 @@
 - This shows Spring Data's selected-result count contract, not committed SQL row count under a concurrent race.
 - Confidence: high.
 - Fetch 상태: official GitHub page fetched via web; raw source capture pending.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-data-jpa-deleteexecution-4.1.1.java`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-data-jpa-deleteexecution-4.1.1.java`.
 
 ### hibernate-7-4-user-guide — [Hibernate ORM 7.4 User Guide](https://docs.hibernate.org/orm/7.4/userguide/html_single/)
 
@@ -290,7 +290,7 @@
 - Fetched 7.4.13 guide is a later patch than the project's 7.4.5.Final. Use it for 7.4 concepts, but confirm patch-specific behavior against 7.4.5 source/repro.
 - Native Hibernate details are not necessarily portable JPA guarantees.
 - Confidence: high for 7.4 concepts; medium for exact patch behavior.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/hibernate-7-4-user-guide.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/hibernate-7-4-user-guide.html`.
 
 ### hibernate-7-4-intro — [A Short Guide to Hibernate 7](https://docs.hibernate.org/orm/7.4/introduction/html_single/)
 
@@ -302,7 +302,7 @@
 **주의/적용 한계**
 - Not a JPA standard; provider specifics require User Guide and exact version checks.
 - Confidence: medium.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/hibernate-7-4-introduction.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/hibernate-7-4-introduction.html`.
 
 ### spring-boot-bom — [Spring Boot 4.1.1 Managed Dependency Coordinates](https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html)
 
@@ -314,7 +314,7 @@
 **주의/적용 한계**
 - Project build declares versions; BOM managed versions are verified from official coordinates and the cached boot-dependencies POM. A running server version is independent from the JDBC driver version.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-boot-coordinates.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-boot-coordinates.html`.
 
 ### mysql-innodb-transactions — [InnoDB Locking and Transaction Model — MySQL 8.4 Manual](https://dev.mysql.com/doc/refman/8.4/en/innodb-locking-transaction-model.html)
 
@@ -451,7 +451,7 @@
 **주의/적용 한계**
 - A thread-safe proxy does not make an EntityManager or Hibernate Session concurrently usable. Jakarta Persistence forbids sharing one EM across concurrent threads.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-shared-entity-manager.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/spring-shared-entity-manager.html`.
 
 ### hibernate-basic-collections — [Hibernate ORM 7.4 User Guide, Basic collection mapping](https://docs.hibernate.org/orm/7.4/userguide/html_single/#basic-collection-mapping)
 
@@ -464,7 +464,7 @@
 **주의/적용 한계**
 - A context-load success or H2 schema is not proof of portable JPA mapping or MySQL 8.4 behavior. Parent reports a separate MySQL 8.4.11 isolated baseline context-load result; persistence/read/write behavior still needs MySQL-specific verification.
 - Confidence: high for Hibernate 7.4 mapping; medium for exact dialect behavior at pinned 7.4.5.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/hibernate-7-4-user-guide.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/hibernate-7-4-user-guide.html`.
 
 ### jakarta-persistence-entity-class — [Jakarta Persistence 3.2 Entity Class Requirements](https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2.html#the-entity-class)
 
@@ -476,7 +476,7 @@
 **주의/적용 한계**
 - Hibernate bytecode enhancement/proxy specifics are provider-specific, but these are portable spec requirements.
 - Confidence: high.
-- 원문 사본: `/Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/official/jakarta-persistence-3-2-spec.html`.
+- 원문 사본: `$USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/official/jakarta-persistence-3-2-spec.html`.
 
 ### spring-boot-circular-beans — [Spring Boot application-properties reference: allow-circular-references](https://docs.spring.io/spring-boot/appendix/application-properties/index.html)
 
@@ -493,8 +493,8 @@
 
 ## 프로젝트 버전과 구체 주의사항
 
-`/Users/ds/code/javaExperience/build.gradle`과 네 worktree의 `build.gradle`은 Spring Boot 4.1.1 / Java 21 toolchain을 선언한다. 캐시된 Boot 4.1.1 BOM POM은 Spring Framework 7.0.9, Hibernate ORM 7.4.5.Final, Jakarta Persistence 3.2.0, MySQL Connector/J 9.7.0을 관리한다. MySQL Connector/J는 드라이버 버전이며 MySQL Server 버전은 별개다.
-`/Users/ds/code/javaExperience/compose.yaml` 및 `/Users/ds/code/javaExperience/src/test/resources/application-test.yml`은 MySQL 8.4 계열을 선택한다. 메인 담당자가 별도 isolated copy 실행에서 server 8.4.11/JDK21을 확인했다고 전달했다. 이 조사자는 해당 실행을 재실행하지 않았다. 이 실행환경의 `java --version` 기본값은 Corretto 11.0.22지만 프로젝트 toolchain은 Java 21이다. H2 runtime 의존성이 존재한다는 사실은 MySQL 동시성·스키마 결과 증거가 아니다.
+`$REPO_ROOT/build.gradle`과 네 worktree의 `build.gradle`은 Spring Boot 4.1.1 / Java 21 toolchain을 선언한다. 캐시된 Boot 4.1.1 BOM POM은 Spring Framework 7.0.9, Hibernate ORM 7.4.5.Final, Jakarta Persistence 3.2.0, MySQL Connector/J 9.7.0을 관리한다. MySQL Connector/J는 드라이버 버전이며 MySQL Server 버전은 별개다.
+`$REPO_ROOT/compose.yaml` 및 `$REPO_ROOT/src/test/resources/application-test.yml`은 MySQL 8.4 계열을 선택한다. 메인 담당자가 별도 isolated copy 실행에서 server 8.4.11/JDK21을 확인했다고 전달했다. 이 조사자는 해당 실행을 재실행하지 않았다. 이 실행환경의 `java --version` 기본값은 Corretto 11.0.22지만 프로젝트 toolchain은 Java 21이다. H2 runtime 의존성이 존재한다는 사실은 MySQL 동시성·스키마 결과 증거가 아니다.
 Hibernate ORM 7.4 User Guide 페이지는 7.4.13.Final로 표시됐다. 프로젝트 BOM의 7.4.5.Final보다 후속 patch이므로 7.4 개념 근거로 사용하고, patch-specific behavior는 버전 고정 확인 또는 실행으로 검증해야 한다.
 공식 dev.mysql.com 8.4 문서는 web search와 page open으로 본문을 실제 확인했지만 자동 raw-download 요청은 HTTP 403이었다. Jakarta Transactions `@Transactional` Javadoc은 web fetch 성공, 직접 raw endpoint 404였다. 이 retrieval limitation을 JSON과 manifest에 남겼고 기억으로 대체하지 않았다.
 이 조사자는 repository/worktree를 수정하지 않았고 Gradle, Docker, Spring server, MySQL/H2 DB를 실행하지 않았다. exact effective runtime, schema, generated SQL, concurrency outcome는 main이 제공한 isolated test evidence 또는 별도 MySQL integration test로 한정한다.

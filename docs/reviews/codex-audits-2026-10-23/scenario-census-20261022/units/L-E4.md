@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E4-jpa-associations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E4-jpa-associations.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/E4-jpa-associations.md](../../../../../lessons/E4-jpa-associations.md)
 
 원문 SHA-256: `73080af0a1346cdf16718b4f3001eb1b4aa397741a513b7b13e6033bbfc31b29`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: 179행 DB는옛 3306이다. 심화로 적힌 L2/L3/L4b/L5/L10은 클릭가능한문서링크가아니며 현재 scenario/labs에는 L12~16만 있다. cascade/orphanRemoval과연결엔티티를 실제로 찾아가서 실행하는 경로를 이문서만으로 검증할수없다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E4-jpa-associations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E4-jpa-associations.md:17) — 17~53행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E4-jpa-associations.md](../../../../../lessons/E4-jpa-associations.md) — 17~53행
 
 ### 2. 목록 N+1·fetchjoin·EntityGraph·세션밖읽기를 비교한다.
 
@@ -36,7 +36,7 @@
 
 공백 또는 한계: 179행 DB는옛 3306이다. 심화로 적힌 L2/L3/L4b/L5/L10은 클릭가능한문서링크가아니며 현재 scenario/labs에는 L12~16만 있다. cascade/orphanRemoval과연결엔티티를 실제로 찾아가서 실행하는 경로를 이문서만으로 검증할수없다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E4-jpa-associations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E4-jpa-associations.md:120) — 120~269행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E4-jpa-associations.md](../../../../../lessons/E4-jpa-associations.md) — 120~269행
 
 ### 3. EAGER·mappedBy 오류·엔티티직렬화를 재현하고 DTO로 고친다.
 
@@ -46,7 +46,7 @@
 
 공백 또는 한계: 179행 DB는옛 3306이다. 심화로 적힌 L2/L3/L4b/L5/L10은 클릭가능한문서링크가아니며 현재 scenario/labs에는 L12~16만 있다. cascade/orphanRemoval과연결엔티티를 실제로 찾아가서 실행하는 경로를 이문서만으로 검증할수없다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E4-jpa-associations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E4-jpa-associations.md:271) — 271~338행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E4-jpa-associations.md](../../../../../lessons/E4-jpa-associations.md) — 271~338행
 
 ## 이번 실행 근거
 
@@ -74,7 +74,7 @@ DB/트랜잭션을 직접 다루는 레슨은 별도 행 비교를 기록한다.
 
 판정 범위: 해당 레슨과 명시한 후속 경로의 판정이며 전체 개념의 부재를 뜻하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E4-jpa-associations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E4-jpa-associations.md)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E4-jpa-associations.md](../../../../../lessons/E4-jpa-associations.md)
 
 ## 확장 개발 명세
 
@@ -130,10 +130,10 @@ P2
 ## 화면·최신 변형·검증 한계
 
 - 상태: inspected
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E4/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E4/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E4/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E4/screen.jpg`)
 - 관찰: - 메인이 실제 첫 화면에서 N:1/N:N/1:N 관계표·연관관계 주인 설명과 본문 가독성을 확인했다.
 - 검증 한계: 첫 화면만 관찰했다. 긴 본문 전체·모바일·Spring 실습 실행 검증이 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E4/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E4/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E4/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E4/dom.txt`)
 
 - markdown_same: 예
 - html_same: 아니오
@@ -143,6 +143,6 @@ P2
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E4-jpa-associations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E4-jpa-associations.md:1) — 1~394행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E4-jpa-associations.md](../../../../../lessons/E4-jpa-associations.md) — 1~394행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-E4.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-E4.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-E4.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-E4.json`)

@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H9-csv-and-time.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H9-csv-and-time.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/H9-csv-and-time.md](../../../../../lessons/H9-csv-and-time.md)
 
 원문 SHA-256: `f3fdc5a588b29f839882ec2dfa3fd05b0093e708cc4edf87ad551e0ddfd75ef8`
 
@@ -26,7 +26,7 @@ CSV 응답의 UTF-8/BOM, Content-Disposition, 따옴표 규칙, 스프레드시�
 
 공백 또는 한계: 예시는 전체 CSV를 StringBuilder/byte[]로 만들고 large export heap/connection lifetime을 측정하지 않는다. formula mitigation은 spreadsheet app별 차이가 있으며 source도 Excel 미검증/재저장 한계를 밝힌다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H9-csv-and-time.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H9-csv-and-time.md:1) — 1~274행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H9-csv-and-time.md](../../../../../lessons/H9-csv-and-time.md) — 1~274행
 
 ## 이번 실행 근거
 
@@ -48,8 +48,8 @@ Python csv parse는 CSV 문법을 확인하지만 Excel formula execution, local
 
 판정 범위: source는 Excel을 열지 않았고 StreamingResponseBody는 후속이라고 명시한다. 이를 확인 성공으로 포장하지 않고 13-6/운영 확장에 남긴다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H9-csv-and-time.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H9-csv-and-time.md:90) — 90~142행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H9-csv-and-time.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H9-csv-and-time.md:177) — 177~207행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H9-csv-and-time.md](../../../../../lessons/H9-csv-and-time.md) — 90~142행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H9-csv-and-time.md](../../../../../lessons/H9-csv-and-time.md) — 177~207행
 
 ## 확장 개발 명세
 
@@ -118,14 +118,14 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H9/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H9/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H9/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H9/screen.jpg`)
 - 관찰: HTML 및 캡처를 열어 보지 않았다.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H9/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H9/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H9/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H9/dom.txt`)
 
-- source: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H9-csv-and-time.md](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H9-csv-and-time.md)
+- source: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H9-csv-and-time.md](../../../../../lessons/H9-csv-and-time.md)
 - source_same: 예
-- html: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H9-csv-and-time.html](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H9-csv-and-time.html)
+- html: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H9-csv-and-time.html](../../../../../lessons/H9-csv-and-time.html)
 - html_same: 아니오
 - difference: source는 corpus상 동일. HTML 차이 원인과 실제 화면은 미검토.
 
@@ -134,6 +134,6 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H9-csv-and-time.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H9-csv-and-time.md:1) — 1~274행 (CSV/time 원리, 코드, byte/JSON/SQL 관찰, 고의 오류와 후속 경로)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H9-csv-and-time.md](../../../../../lessons/H9-csv-and-time.md) — 1~274행 (CSV/time 원리, 코드, byte/JSON/SQL 관찰, 고의 오류와 후속 경로)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H9.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H9.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H9.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H9.json`)

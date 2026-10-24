@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B8-annotations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B8-annotations.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/B8-annotations.md](../../../../../lessons/B8-annotations.md)
 
 원문 SHA-256: `296856ac08c47e1a34144439212d0eb13b33c13c083e383646c0b67c907bea96`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: 이 계약의 입문 목표에 대해 별도 공백을 확인하지 않았다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B8-annotations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B8-annotations.md:34) — 34~105행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B8-annotations.md](../../../../../lessons/B8-annotations.md) — 34~105행
 
 ### 2. JsonProperty/JsonIgnore·Controller 표시 유무를 HTTP 응답으로 비교한다.
 
@@ -36,7 +36,7 @@
 
 공백 또는 한계: 이 계약의 입문 목표에 대해 별도 공백을 확인하지 않았다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B8-annotations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B8-annotations.md:107) — 107~187행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B8-annotations.md](../../../../../lessons/B8-annotations.md) — 107~187행
 
 ### 3. Override 오타와 Retention 제거를 각각 컴파일/런타임 관찰로 구별한다.
 
@@ -46,13 +46,13 @@
 
 공백 또는 한계: 이 계약의 입문 목표에 대해 별도 공백을 확인하지 않았다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B8-annotations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B8-annotations.md:189) — 189~237행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B8-annotations.md](../../../../../lessons/B8-annotations.md) — 189~237행
 
 ## 이번 실행 근거
 
 이번 독립 Java 예시 1개를 실행해 예상 출력/예외를 확인했다. Spring·DB·IDE 실습 전체의 실행이 아니다.
 
-[/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json)
+$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json`)
 
 ## 쿼리·DB 깊이와 다음 단계
 
@@ -74,10 +74,10 @@ DB/트랜잭션을 직접 다루는 레슨은 별도 행 비교를 기록한다.
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B8/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B8/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B8/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B8/screen.jpg`)
 - 관찰: 없음
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B8/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B8/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B8/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B8/dom.txt`)
 
 - markdown_same: 예
 - html_same: 아니오
@@ -87,6 +87,6 @@ DB/트랜잭션을 직접 다루는 레슨은 별도 행 비교를 기록한다.
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B8-annotations.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B8-annotations.md:1) — 1~291행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B8-annotations.md](../../../../../lessons/B8-annotations.md) — 1~291행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-B8.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-B8.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-B8.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-B8.json`)

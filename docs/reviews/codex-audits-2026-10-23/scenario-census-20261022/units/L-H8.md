@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H8-rest-client-timeout.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H8-rest-client-timeout.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/H8-rest-client-timeout.md](../../../../../lessons/H8-rest-client-timeout.md)
 
 원문 SHA-256: `80b69911c479fd2a9f73cc84219bb5d98cc516c003c1f72eb1a4752a703c23b7`
 
@@ -26,7 +26,7 @@ RestClient의 동기 호출, 연결/읽기 timeout 설정, HTTP 상태 오류와
 
 공백 또는 한계: 사용자가 보낸 전체 URL을 서버가 fetch하는 경우는 SSRF 범위다. lesson은 timeout/client parsing을 가르치며 resolved destination/private IP/redirect/DNS policy를 구현하지 않는다. 16-4는 localhost fake site를 위해 실습에서 열어 둔다고 주석을 달고 D13 SSRF로 연결한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H8-rest-client-timeout.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H8-rest-client-timeout.md:1) — 1~266행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H8-rest-client-timeout.md](../../../../../lessons/H8-rest-client-timeout.md) — 1~266행
 
 ## 이번 실행 근거
 
@@ -48,9 +48,9 @@ RestClient는 blocking이므로 request thread가 response 또는 timeout까지 
 
 판정 범위: 16-4의 본문 주석은 내부 주소 차단이 필요하다고 밝히며 실습 localhost fake server를 허용한다. 문서가 client lesson인 범위를 유지하되 이 실습 설정을 production URL policy라고 오해하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H8-rest-client-timeout.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H8-rest-client-timeout.md:1) — 1~266행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/scenario/ch16-events-async-cache/16-4-link-preview.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/scenario/ch16-events-async-cache/16-4-link-preview.md:164) — 164~174행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/scenario/ch16-events-async-cache/16-4-link-preview.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/scenario/ch16-events-async-cache/16-4-link-preview.md:589) — 589~630행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H8-rest-client-timeout.md](../../../../../lessons/H8-rest-client-timeout.md) — 1~266행
+- [$WORKTREE_ROOT/concept-census-20261021/scenario/ch16-events-async-cache/16-4-link-preview.md](../../../../../scenario/ch16-events-async-cache/16-4-link-preview.md) — 164~174행
+- [$WORKTREE_ROOT/concept-census-20261021/scenario/ch16-events-async-cache/16-4-link-preview.md](../../../../../scenario/ch16-events-async-cache/16-4-link-preview.md) — 589~630행
 
 ## 확장 개발 명세
 
@@ -115,14 +115,14 @@ high
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H8/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H8/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H8/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H8/screen.jpg`)
 - 관찰: HTML/캡처를 실제로 열지 않았다.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H8/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H8/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H8/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H8/dom.txt`)
 
-- source: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H8-rest-client-timeout.md](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H8-rest-client-timeout.md)
+- source: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H8-rest-client-timeout.md](../../../../../lessons/H8-rest-client-timeout.md)
 - source_same: 예
-- html: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H8-rest-client-timeout.html](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H8-rest-client-timeout.html)
+- html: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H8-rest-client-timeout.html](../../../../../lessons/H8-rest-client-timeout.html)
 - html_same: 아니오
 - difference: 원문은 최신 source와 같다고 corpus가 기록한다. HTML byte diff의 원인/화면은 미검토.
 
@@ -131,6 +131,6 @@ high
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H8-rest-client-timeout.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H8-rest-client-timeout.md:1) — 1~266행 (원리·client/fake site 코드·기록된 실행 실패/응답·따라 하기·확인 문제)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H8-rest-client-timeout.md](../../../../../lessons/H8-rest-client-timeout.md) — 1~266행 (원리·client/fake site 코드·기록된 실행 실패/응답·따라 하기·확인 문제)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H8.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H8.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H8.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H8.json`)

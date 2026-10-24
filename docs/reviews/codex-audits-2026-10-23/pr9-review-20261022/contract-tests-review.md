@@ -3,7 +3,7 @@
 - 확인일: 2026-10-22
 - 검토 커밋: c9786af3b97c48ec118cade5777bc015fe282a88
 - 비교 기준: 1f443faae406324f8c5a3c87b2741ad0b74913a6
-- 코드 경로: /Users/ds/code/javaExperience/.worktrees/pr9-holistic-review-20261022
+- 코드 경로: $WORKTREE_ROOT/pr9-holistic-review-20261022
 - 범위: board-server 인증·회원·공통·설정·게시글·댓글, 테스트 구성·assertion·동시성·상태 복구, D01~D08 계약. 기존 루트 src 학습 코드 제외.
 - 방법/한계: 고정 커밋 git show로 정적 검토. 이 담당자는 서버/DB/테스트 실행을 하지 않았다. 아래 실행 후보는 메인 검토자의 재현 결과로 최종 확정해야 한다.
 

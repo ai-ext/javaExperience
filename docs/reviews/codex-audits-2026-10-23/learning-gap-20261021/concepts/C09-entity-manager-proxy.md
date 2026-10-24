@@ -8,16 +8,16 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:153](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:153) — 확인 범위 153–173행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:153](../../../../knowledge/S09-jpa-hibernate.md) — 확인 범위 153–173행.
 
   발췌: `import jakarta.persistence.EntityManager; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional;`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:184](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:184) — 확인 범위 184–203행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:184](../../../../knowledge/S09-jpa-hibernate.md) — 확인 범위 184–203행.
 
   발췌: `import jakarta.persistence.EntityManager; import jakarta.persistence.PersistenceContext; import java.util.List; import org.springframework.stereotype.Service;`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W25-spring-multithreading.md:79](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W25-spring-multithreading.md:79) — 확인 범위 79–83행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/W25-spring-multithreading.md:79](../../../../knowledge/W25-spring-multithreading.md) — 확인 범위 79–83행.
 
   발췌: `### ThreadLocal은 스레드별 칸이지 요청별 저장소가 아니다  ’ThreadLocal<T>’은 스레드마다 별도 값을 제공한다. Spring 트랜잭션은 ’TransactionSynchronizationManager’로 JDBC 자원을 현재 스레드에 바인딩한다. Spring Security의 ’SecurityContextHolder’는 인증 문맥을 제공하고, 전통적인 Servlet 설정은 스레드 로컬 전략을 쓴다. 로깅 MDC에도 요청 ID 등을 넣는다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P28-default-beans.md:26](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P28-default-beans.md:26) — 확인 범위 26–48행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/P28-default-beans.md:26](../../../../knowledge/P28-default-beans.md) — 확인 범위 26–48행.
 
   발췌: `| ’tomcatServletWebServerFactory’ | ’org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory’ | 내장 Tomcat 생성 | WebMVC와 Tomcat 자동 구성 | ’server.*’; 서버 교체는 의존성과 설정 점검 | | ’dispatcherServlet’ | ’org.springframework.web.servlet.DispatcherServlet’ | MVC 요청을 핸들러에 전달 | WebMVC 자동 구성 | 보통 컨트롤러·’WebMvcConfigurer’로 확장 | | ’requestMappingHandlerAdapter’ | ’org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter’ | 컨트롤러 호출과 요청·응답 변환 | WebMVC 자동 구성 | ’WebMvcConfigurer#e`
 
@@ -43,7 +43,7 @@ Spring 빈의 주입 EM proxy identity와 두 트랜잭션의 실제 delegate/ma
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `spring-shared-entitymanager` — [JPA — Spring Framework Reference](https://docs.spring.io/spring-framework/reference/data-access/orm/jpa.html)
 - `jakarta-persistence-spec` — [Jakarta Persistence 3.2 Specification](https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2.html)

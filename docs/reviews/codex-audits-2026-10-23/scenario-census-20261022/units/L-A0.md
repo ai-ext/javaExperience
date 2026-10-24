@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A0-first-api.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A0-first-api.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/A0-first-api.md](../../../../../lessons/A0-first-api.md)
 
 원문 SHA-256: `11c9d7abe047d2b602c773feb413e1ba0da7c8155380d2919ae423b2c8c17159`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: 199행 DB 조회 명령이 studymate-mysql-1 컨테이너를 고정한다. 현재 compose.yaml은 이 프로젝트의 mysql 서비스와 호스트 13308을 사용하므로 초보자가 그대로 실행할 시작 경로가 일치하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A0-first-api.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A0-first-api.md:15) — 15~89행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/A0-first-api.md](../../../../../lessons/A0-first-api.md) — 15~89행
 
 ### 2. 신규 /api/first/ping에서 GET 200 JSON, 재시작 전 404, POST 405를 비교한다.
 
@@ -36,7 +36,7 @@
 
 공백 또는 한계: 199행 DB 조회 명령이 studymate-mysql-1 컨테이너를 고정한다. 현재 compose.yaml은 이 프로젝트의 mysql 서비스와 호스트 13308을 사용하므로 초보자가 그대로 실행할 시작 경로가 일치하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A0-first-api.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A0-first-api.md:91) — 91~174행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/A0-first-api.md](../../../../../lessons/A0-first-api.md) — 91~174행
 
 ### 3. Controller→Service→Repository→DB와 다음 실습을 연결한다.
 
@@ -46,7 +46,7 @@
 
 공백 또는 한계: 199행 DB 조회 명령이 studymate-mysql-1 컨테이너를 고정한다. 현재 compose.yaml은 이 프로젝트의 mysql 서비스와 호스트 13308을 사용하므로 초보자가 그대로 실행할 시작 경로가 일치하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A0-first-api.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A0-first-api.md:176) — 176~219행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/A0-first-api.md](../../../../../lessons/A0-first-api.md) — 176~219행
 
 ## 이번 실행 근거
 
@@ -73,7 +73,7 @@ DB/트랜잭션을 직접 다루는 레슨은 별도 행 비교를 기록한다.
 
 판정 범위: 해당 레슨과 명시한 후속 경로의 판정이며 전체 개념의 부재를 뜻하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A0-first-api.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A0-first-api.md)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/A0-first-api.md](../../../../../lessons/A0-first-api.md)
 
 ## 확장 개발 명세
 
@@ -129,10 +129,10 @@ P1
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A0/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A0/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A0/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A0/screen.jpg`)
 - 관찰: 없음
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A0/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A0/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A0/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-A0/dom.txt`)
 
 - markdown_same: 예
 - html_same: 아니오
@@ -142,6 +142,6 @@ P1
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A0-first-api.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/A0-first-api.md:1) — 1~257행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/A0-first-api.md](../../../../../lessons/A0-first-api.md) — 1~257행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-A0.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-A0.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-A0.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-A0.json`)
