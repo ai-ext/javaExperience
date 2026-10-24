@@ -102,6 +102,7 @@ CONNECTION = re.compile(r"\b(?:ConnectException|SocketTimeoutException|ConnectTi
                         r"TimeoutException|ConnectionRequestTimeoutException|NoHttpResponseException)\b|"
                         r"connection (?:refused|reset|timed out)|connect timed out|read timed out|"
                         r"연결 (?:실패|거부)|응답 타임아웃|but was:\s*<?(?:TIMEOUT|UNREACHABLE)>?\b", re.I)
+SOCKET_CAUSE = re.compile(r"\bSocketException\s*:\s*(?:Broken pipe|Connection reset)\b", re.I)
 ASSERTION_TYPES = {"AssertionError", "AssertionFailedError", "MultipleFailuresError",
                    "AssertJMultipleFailuresError", "SoftAssertionError", "ComparisonFailure"}
 ENV_PAT = re.compile(r"Failed to load ApplicationContext|ApplicationContext failure threshold|"
@@ -132,7 +133,7 @@ for p in glob.glob(d + "/*.xml"):
             kind = "env"
         elif typ in ASSERTION_TYPES:
             kind = "assert"
-        if name in allowed and typ not in {"MultipleFailuresError", "AssertJMultipleFailuresError", "SoftAssertionError"} and CONNECTION.search(reason) and not ENV_PAT.search(reason):
+        if name in allowed and typ not in {"MultipleFailuresError", "AssertJMultipleFailuresError", "SoftAssertionError"} and (CONNECTION.search(reason) or SOCKET_CAUSE.search(causes)) and not ENV_PAT.search(reason):
             kind = "env-exception"
         bad.append(f"{kind}:{name}\t{json.dumps(reason, ensure_ascii=False)}")
         counts[kind] = counts.get(kind, 0) + 1

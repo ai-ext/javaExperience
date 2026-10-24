@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 const script = fs.readFileSync(new URL('./verify.sh', import.meta.url), 'utf8');
 const functions = script.slice(script.indexOf('summarize() {'), script.indexOf('apply_fix() {'));
 const known = '연결_실패가_계속되면_백오프_후_3번째에_포기한다';
+const recovery = '연결_실패는_재시도하고_복구되면_성공한다';
 const xmlEscape = (s) => s.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
 function check(cases, expectedTests = cases.length) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ticket-verifier-'));
@@ -16,7 +17,7 @@ function check(cases, expectedTests = cases.length) {
     const bad = cases.filter((c) => c.type);
     fs.writeFileSync(path.join(dir, 'results-full/TEST-fixture.xml'), `<testsuite name="com.example.PgClientRetryTest" tests="${expectedTests}" failures="${bad.length}" errors="0" skipped="0">${cases.map((c) => `<testcase classname="com.example.${c.cls ?? 'PgClientRetryTest'}" name="${c.name ?? known}()">${c.type ? `<failure type="${c.type}" message="${xmlEscape(c.message ?? '')}">${xmlEscape(c.trace ?? '')}</failure>` : ''}</testcase>`).join('')}</testsuite>`);
     const harness = path.join(dir, 'check.sh');
-    fs.writeFileSync(harness, `set -euo pipefail\nENV_FLAKY='PgClientRetryTest.${known}'\n${functions}\nrun_tests() { :; }\ncheck_full "$1" fixture\n`);
+    fs.writeFileSync(harness, `set -euo pipefail\nENV_FLAKY='PgClientRetryTest.${known} PgClientRetryTest.${recovery}'\n${functions}\nrun_tests() { :; }\ncheck_full "$1" fixture\n`);
     return spawnSync('/bin/bash', [harness, dir], { encoding: 'utf8' });
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
@@ -35,6 +36,9 @@ test('연결·타임아웃 원인이 있는 알려진 실패만 환경 예외다
   for (const c of [
     { type: 'java.net.ConnectException', message: 'Connection refused' },
     { type: 'java.util.concurrent.ExecutionException', trace: 'Caused by: java.net.SocketTimeoutException: Read timed out' },
+    { name: recovery, type: 'java.util.concurrent.ExecutionException', trace: 'Caused by: java.net.SocketException: Broken pipe' },
+    { type: 'java.util.concurrent.ExecutionException', trace: 'Caused by: java.net.SocketException: Connection reset' },
+    { type: 'org.apache.hc.core5.http.NoHttpResponseException', message: 'The target server failed to respond' },
     { type: 'org.opentest4j.AssertionFailedError', message: 'expected: UNREACHABLE\n but was: TIMEOUT' },
   ]) {
     const r = check([{}, c]);
@@ -48,6 +52,10 @@ test('연결·타임아웃 원인이 있는 알려진 실패만 환경 예외다
 test('다른 이름·기대값만 TIMEOUT·컨텍스트 실패·복합 실패는 면제하지 않는다', () => {
   for (const c of [
     { cls: 'OtherTest', type: 'java.net.ConnectException', message: 'Connection refused' },
+    { cls: 'OtherTest', type: 'java.net.SocketException', message: 'Broken pipe' },
+    { type: 'java.net.SocketException', message: 'unrelated socket failure' },
+    { type: 'java.lang.AssertionError', message: 'Broken pipe' },
+    { type: 'java.lang.AssertionError', message: 'SocketException: Broken pipe' },
     { type: 'org.opentest4j.AssertionFailedError', message: 'expected: TIMEOUT but was: DONE' },
     { type: 'java.lang.IllegalStateException', message: 'Failed to load ApplicationContext' },
     { type: 'org.opentest4j.MultipleFailuresError', message: 'Connection refused; count expected 1 but was 2' },
