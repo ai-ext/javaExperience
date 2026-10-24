@@ -177,8 +177,11 @@ function collectHtml(page, html) {
     'day-head', 'day-today', 'day-java', 'step-facts', 'copy-row', 'day-pager',
     'course-map', 'cm-legend', 'cm-toolbar', 'cm-board', 'cm-detail', 'cm-tables',
     // 과정 v2(P5-3): 일자 [오늘 흐름]·티켓 [장애 흐름] 재생, 2단계 일자의 티켓 흐름 목록
-    'flow', 'flow-links']);
-  for (const match of html.matchAll(/<(?:section|header|footer|div|nav|button|article|aside|dialog|figure|p|ol)\b([^>]*\bclass="([^"]+)"[^>]*)>/g)) {
+    'flow', 'flow-links',
+    // 콘텐츠 종류·파일 카드·관계·비교·절차를 페이지마다 독립적으로 추적한다.
+    'content-page-kind', 'visual-files', 'visual-file', 'visual-relations',
+    'visual-comparison', 'visual-procedure', 'visual-flow', 'visual-rules']);
+  for (const match of html.matchAll(/<(?:section|header|footer|div|nav|button|article|aside|dialog|figure|p|ol|ul)\b([^>]*\bclass="([^"]+)"[^>]*)>/g)) {
     const classes = match[2].split(/\s+/);
     for (const component of classes) {
       if (!visualClasses.has(component)) continue;
@@ -202,8 +205,8 @@ function markdownFiles(dir) {
   });
 }
 
-// 과정 v2는 이 렌더러가 배치하는 화면(과정 안내·지도·일자 페이지·출발 자료)만 넣는다. course/java·course/tickets는 각 담당이 넣는다.
-const courseFiles = ['course/README.md', 'course/map.md', ...['course/spring', 'course/start'].flatMap(markdownFiles)];
+// 과정 v2의 모든 종류를 포함한다. Java·티켓의 새 시각 블록도 개별 항목으로 남긴다.
+const courseFiles = ['course/README.md', 'course/map.md', ...['course/spring', 'course/start', 'course/java', 'course/tickets'].flatMap(markdownFiles)];
 const sourceFiles = ['README.md', 'errors.md', ...['scenario', 'practice', 'docs/knowledge', 'lessons', 'tickets'].flatMap(markdownFiles), ...courseFiles].sort();
 for (const file of sourceFiles) {
   const htmlFile = file.replace(/\.md$/, '.html');
