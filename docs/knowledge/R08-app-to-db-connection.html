@@ -27,7 +27,7 @@ Tomcat 스레드 수·Hikari 풀 크기·MySQL <code>max_connections</code>는 �
 <p>Spring Boot 앱은 JDBC 드라이버로 MySQL에 TCP 연결을 만들고, 요청 처리 중 HikariCP에서 커넥션을 빌려 SQL과 결과를 주고받는다. 보통 물리 연결은 매 요청마다 만들지 않고 풀에 보관해 재사용하며, 서비스 트랜잭션이 끝나면 연결을 닫는 대신 풀에 돌려준다. 이 흐름으로 주소·인증·풀·DB 한도 중 막힌 층을 구분한다.</p>
 </div></details><details class="knowledge-chapter"><summary id="2-당장-알아야-할-것" aria-label="2. 당장 알아야 할 것 펼치기"><span class="knowledge-chapter-number">02</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">2. 당장 알아야 할 것</strong><small>2.1 요청 하나의 길 · 2.2 주소는 앱이 있는 네트워크 위치에서 정한다 · 2.3 JDBC URL과 연결 옵션 · 2.4 풀은 연결을 재사용하고 동시 사용량을 제한한다</small></span><span class="knowledge-chapter-meta">5개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
 <blockquote>
-<p><strong>이 저장소에 없는 예제 프로젝트</strong> — <code>practice/starter</code>는 원래 공부자료가 쓰던 상품 API 예제 프로젝트다(자체 <code>compose.yaml</code>: 호스트 <code>13307</code> → 컨테이너 <code>3306</code>, DB <code>ds_practice</code>, 계정 <code>practice</code>/<code>practice</code>). 이 저장소에는 없으므로 아래 경로·명령은 그런 프로젝트를 직접 만들었을 때의 예시로 읽는다. 이 저장소에서는 루트 프로젝트에 같은 패턴을 적용한다 — <code>./gradlew test</code>는 Testcontainers의 일회용 MySQL을 쓰고, 개발 DB는 루트 <code>compose.yaml</code>(호스트 <code>localhost:13308</code>, 계정 <code>community</code>/<code>community</code>)이다.</p>
+<p><strong>이 저장소에 없는 예제 프로젝트</strong> — <code>practice/starter</code>는 원래 공부자료가 쓰던 상품 API 예제 프로젝트다(자체 <code>compose.yaml</code>: 호스트 <code>13307</code> → 컨테이너 <code>3306</code>, DB <code>ds_practice</code>, 계정 <code>practice</code>/<code>practice</code>). 이 저장소에는 없으므로 아래 경로·명령은 그런 프로젝트를 직접 만들었을 때의 예시로 읽는다. 이 저장소에서는 루트 프로젝트에 같은 패턴을 적용한다 — <code>./gradlew test</code>는 Testcontainers의 일회용 MySQL을 쓰고, 개발 DB는 루트 <a href="../../compose.yaml"><code>compose.yaml</code></a>(호스트 <code>localhost:13308</code>, 계정 <code>community</code>/<code>community</code>)이다.</p>
 </blockquote>
 <details class="knowledge-topic"><summary id="21-요청-하나의-길" aria-label="2.1 요청 하나의 길 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">2.1 요청 하나의 길</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre class="mermaid">sequenceDiagram
@@ -247,18 +247,24 @@ SHOW VARIABLES LIKE 'wait_timeout';</code></pre>
       exposure:
         include: health,metrics</code></pre>
 <p><code>/actuator/metrics/hikaricp.connections.active</code>로 확인한다. 운영에서는 인증과 네트워크 접근을 제한한다.</p>
-</div></details></div></details><details class="knowledge-chapter"><summary id="3-따라-하기" aria-label="3. 따라 하기 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 따라 하기</strong><small>단계 1 — DB 시작 · 단계 2 — 앱 시작 · 단계 3 — 요청 전후 DB 연결 보기 · 단계 4 — 풀 메트릭과 쿼리 맞춰 보기</small></span><span class="knowledge-chapter-meta">6개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+</div></details></div></details><details class="knowledge-chapter"><summary id="3-따라-하기" aria-label="3. 따라 하기 펼치기"><span class="knowledge-chapter-number">03</span><span class="knowledge-chapter-heading"><strong role="heading" aria-level="2">3. 따라 하기</strong><small>별도 상품 API 예제의 절차와 관찰 · 단계 1 — DB 시작 · 단계 2 — 앱 시작 · 단계 3 — 요청 전후 DB 연결 보기</small></span><span class="knowledge-chapter-meta">7개 코드 · 열기 ↓</span></summary><div class="knowledge-chapter-body">
+<p><strong>이 저장소에서 연결을 확인하려면</strong> javaExperience 레포 루트에서 실행한다. DB 설정 파일은 <a href="../../compose.yaml"><code>compose.yaml</code></a>이다.</p>
+<pre><code class="language-bash">docker compose up -d mysql
+docker compose ps
+docker compose exec -T mysql mysql -ucommunity -pcommunity practice -e &quot;SELECT DATABASE(); SELECT COUNT(*) FROM post;&quot;</code></pre>
+<p><code>mysql</code>이 <code>healthy</code>이고 <code>DATABASE()</code>가 <code>practice</code>인지 확인한다. 현재 저장소의 앱 연결은 <a href="../../README.html">실행 안내</a>를 따른다. 아래 상품 API·세션 수는 별도 예제 프로젝트의 절차·과거 관찰이며, 위 명령으로 그 상품 API가 준비되지는 않는다.</p>
+<details class="knowledge-topic"><summary id="별도-상품-api-예제의-절차와-관찰" aria-label="별도 상품 API 예제의 절차와 관찰 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">별도 상품 API 예제의 절차와 관찰</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p><code>practice/starter</code>는 호스트 <code>13307</code>→컨테이너 <code>3306</code>, DB <code>ds_practice</code>, 계정 <code>practice</code>/<code>practice</code>다. Boot 4.1.1이고 toolchain은 Java 21(신규 기준 Java 25)이다.</p>
-<details class="knowledge-topic"><summary id="단계-1--db-시작" aria-label="단계 1 — DB 시작 펼치기"><span class="knowledge-topic-no">01</span><strong role="heading" aria-level="3">단계 1 — DB 시작</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
+</div></details><details class="knowledge-topic"><summary id="단계-1--db-시작" aria-label="단계 1 — DB 시작 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">단계 1 — DB 시작</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-bash">cd practice/starter
 docker compose up -d mysql
 docker compose ps</code></pre>
 <p><strong>확인 방법:</strong> <code>mysql</code> 서비스가 <code>healthy</code>, 포트가 <code>13307-&gt;3306</code>인지 확인한다. 초기화가 늦으면 <code>docker compose logs --tail=50 mysql</code>을 본다.</p>
-</div></details><details class="knowledge-topic"><summary id="단계-2--앱-시작" aria-label="단계 2 — 앱 시작 펼치기"><span class="knowledge-topic-no">02</span><strong role="heading" aria-level="3">단계 2 — 앱 시작</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
+</div></details><details class="knowledge-topic"><summary id="단계-2--앱-시작" aria-label="단계 2 — 앱 시작 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">단계 2 — 앱 시작</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p><code>src/main/resources/application.yml</code>의 URL은 <code>jdbc:mysql://localhost:13307/ds_practice?characterEncoding=UTF-8&amp;serverTimezone=Asia/Seoul</code>이다.</p>
 <pre><code class="language-bash">./gradlew bootRun</code></pre>
 <p><strong>확인 방법:</strong> 기동 로그에서 Tomcat 8080과 시작 완료를 확인한다. 실패하면 오류 표의 호스트·포트·계정·DB명을 확인한다. Maven 대응 명령은 <code>mvn spring-boot:run</code>이다.</p>
-</div></details><details class="knowledge-topic"><summary id="단계-3--요청-전후-db-연결-보기" aria-label="단계 3 — 요청 전후 DB 연결 보기 펼치기"><span class="knowledge-topic-no">03</span><strong role="heading" aria-level="3">단계 3 — 요청 전후 DB 연결 보기</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
+</div></details><details class="knowledge-topic"><summary id="단계-3--요청-전후-db-연결-보기" aria-label="단계 3 — 요청 전후 DB 연결 보기 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">단계 3 — 요청 전후 DB 연결 보기</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <pre><code class="language-bash">docker compose exec mysql mysql -upractice -ppractice ds_practice -e &quot;SHOW PROCESSLIST; SHOW STATUS LIKE 'Threads_connected'; SHOW VARIABLES LIKE 'max_connections';&quot;
 curl -i http://localhost:8080/api/products/1
 docker compose exec mysql mysql -upractice -ppractice ds_practice -e &quot;SHOW PROCESSLIST; SHOW STATUS LIKE 'Threads_connected';&quot;</code></pre>
@@ -274,7 +280,7 @@ docker compose exec mysql mysql -upractice -ppractice ds_practice -e &quot;SHOW 
 <li><strong>요청을 보내도 DB 연결 수는 늘지 않는다.</strong> 요청은 열려 있던 10개 중 하나를 빌렸다 돌려준다. 이게 풀을 쓰는 이유다.</li>
 <li>Host가 <code>192.168.65.1</code>인 것은 앱이 호스트(맥)에서 돌고 DB가 Docker 안에 있어서다. DB 입장에서는 Docker 런타임(VM) 내부 네트워크 주소에서 들어온 연결로 보인다(포트 포워딩 경유). 이 주소는 런타임(Colima 등)과 환경마다 다르다.</li>
 </ul>
-</div></details><details class="knowledge-topic"><summary id="단계-4--풀-메트릭과-쿼리-맞춰-보기" aria-label="단계 4 — 풀 메트릭과 쿼리 맞춰 보기 펼치기"><span class="knowledge-topic-no">04</span><strong role="heading" aria-level="3">단계 4 — 풀 메트릭과 쿼리 맞춰 보기</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
+</div></details><details class="knowledge-topic"><summary id="단계-4--풀-메트릭과-쿼리-맞춰-보기" aria-label="단계 4 — 풀 메트릭과 쿼리 맞춰 보기 펼치기"><span class="knowledge-topic-no">05</span><strong role="heading" aria-level="3">단계 4 — 풀 메트릭과 쿼리 맞춰 보기</strong><span aria-hidden="true">↘</span></summary><div class="knowledge-topic-body">
 <p>개발 설정에 <code>management.endpoints.web.exposure.include: health,metrics</code>를 추가한 뒤 조회한다.</p>
 <pre><code class="language-bash">curl http://localhost:8080/actuator/metrics/hikaricp.connections.active
 curl http://localhost:8080/actuator/metrics/hikaricp.connections.pending</code></pre>
