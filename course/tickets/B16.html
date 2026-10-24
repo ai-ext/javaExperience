@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>B16. Redis 점검 시간에 글쓰기까지 멈췄다</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=6580290a3c9f">
-<link rel="stylesheet" href="../../tools/site/course-exercise.css?v=c30e18dc3d31">
-<link rel="stylesheet" href="../../tools/site/course.css?v=b6c93c158a77">
-<link rel="stylesheet" href="../../tools/site/course-flow.css?v=0d2a7c3a0db7">
+<link rel="stylesheet" href="../../tools/site/course-exercise.css?v=1a4aa4155ccc">
+<link rel="stylesheet" href="../../tools/site/course.css?v=0c6a1b167d4a">
+<link rel="stylesheet" href="../../tools/site/course-flow.css?v=2c0b7ed1bc70">
 <link rel="stylesheet" href="../../tools/site/course-tokens.css?v=90f7ed5128e9">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 
@@ -83,7 +83,7 @@ Redis는 캐시라서 점검 중에도 서비스는 된다고 들었는데요. A
 </details><details>
 <summary>2. 얼마나 기다리는가</summary>
 
-<p><code>application.yml</code>의 <code>spring.data.redis.*</code>를 spec-v2 8절의 운영 값과 비교한다. 명령 타임아웃을 주지 않으면 Lettuce 기본값(60초)을 쓴다.
+<p><code>application.yml</code>(또는 <code>application.properties</code>)의 <code>spring.data.redis.*</code>를 spec-v2 8절의 운영 값과 비교한다. 명령 타임아웃을 주지 않으면 Lettuce 기본값(60초)을 쓴다.
 글 하나 쓸 때 Redis를 몇 번 부르는지도 세어 본다(커밋 뒤 랭킹 가산, 인기글 캐시 삭제).</p>
 </details><details>
 <summary>3. 실패는 어디까지 올라가는가</summary>
@@ -109,7 +109,7 @@ Spring은 이를 <code>RedisSystemException</code>으로 바꾼다. 응답이 �
 <summary>펼치기</summary>
 
 <p><strong>원인.</strong> 두 가지가 겹쳤다.
-① <code>application.yml</code>에서 Redis 명령 타임아웃(<code>spring.data.redis.timeout</code>)을 지웠다("큰 명령이 중간에 끊기면 안 되므로 기본값"). Lettuce 기본값은 60초다.
+① <code>application.yml</code>(또는 <code>application.properties</code>)에서 Redis 명령 타임아웃(<code>spring.data.redis.timeout</code>)을 지웠다("큰 명령이 중간에 끊기면 안 되므로 기본값"). Lettuce 기본값은 60초다.
 Redis가 응답하지 않으면 글쓰기 커밋 뒤의 랭킹 가산·인기글 캐시 삭제가 각각 그만큼 요청 스레드를 붙잡고, 인기글 조회도 캐시 조회·저장에서 같은 시간을 기다린다.
 ② <code>RedisGuard</code>가 <code>RedisConnectionFailureException</code>(처음부터 붙지 못함)만 잡고 나머지는 올린다. 끊긴 연결의 명령 거절(<code>RedisSystemException</code>)과 명령 타임아웃(<code>QueryTimeoutException</code>)은 폴백되지 않아 인기글 조회가 500이 된다.
 기존 테스트는 "Redis 없이 기동"(처음부터 연결 거부)만 남아 있어 둘 다 보지 못했다. DB 락은 오진이다. 글은 이미 커밋됐고(커넥션도 커밋 직후 풀에 돌아간다), 커밋 뒤 동기화 콜백에서 Redis를 기다린 것이다.</p>
@@ -117,7 +117,7 @@ Redis가 응답하지 않으면 글쓰기 커밋 뒤의 랭킹 가산·인기글
 한 번 실패하면 5초 동안 Redis를 건너뛰는 기존 동작 덕분에 글 하나에 Redis 호출이 두 번이어도 타임아웃은 한 번만 기다린다.
 타임아웃만 고치면 인기글 500과 "500ms × 호출 수"가 남고, 예외만 고치면 지연 장애에서 60초를 그대로 기다린다. 둘 다 고쳐야 한다. (<code>tickets/B16/answer/fix.patch</code>)</p>
 <p><strong>확인 테스트.</strong> <code>tickets/B16/answer/B16ConfirmTest.java</code> — <code>Redis_응답이_3초씩_늦으면</code>·<code>Redis_연결이_끊기면</code> 각각 <code>장애_중에도_글쓰기_201과_그_뒤_인기글_200이_각각_1초_안이다</code>, <code>장애_뒤_첫_요청인_인기글도_1초_안에_DB_결과로_200이다</code></p>
-<p><strong>1단계 정답 서버는?</strong> <code>board-server/src/main/resources/application.yml</code>이 <code>timeout: 500ms</code>·<code>connect-timeout: 500ms</code>를 두고,
+<p><strong>1단계 정답 서버는?</strong> <code>board-server/src/main/resources/application.yml</code>(또는 <code>board-server/src/main/resources/application.properties</code>)(학습자 구현에서는 <code>board-server/src/main/resources/application.properties</code>도 인정)이 <code>timeout: 500ms</code>·<code>connect-timeout: 500ms</code>를 두고,
 <code>board-server/src/main/java/com/example/board/config/RedisGuard.java</code>가 <code>DataAccessException</code>을 잡아 폴백한 뒤 5초간 건너뛴다.
 <code>PopularPostFallbackTest</code>의 "Redis가 느리면" 테스트들이 지연 3초에서도 1초 안을 확인했는데, 이 서버에서는 지워져 있다.</p>
 </details></section>
