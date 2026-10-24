@@ -99,6 +99,25 @@ export function validate({ spec, roadmap, cards, courseFiles }) {
   return errs;
 }
 
+// 과제·결과의 성질·예시 답을 구분하고 2단계 SQL의 보이는 문구를 검사한다.
+export function validateSql({roadmap,hints}) {
+  const errors=[];
+  const leak=/rollback-only|self-invocation|커밋 전|afterCommit|갭 락|메타데이터 락|randomUUID|Lettuce|RedisGuard|ALTER TABLE|인덱스를 고치|인덱스를 바꾸|PG 호출이 트랜잭션에 묶여/;
+  for(const day of roadmap.days) {
+    const sql=hints.days?.[day.id]?.sql;
+    if(!sql?.questions?.length) {errors.push(`${day.id}: 오늘의 SQL이 없다`);continue;}
+    const n=sql.questions.length;
+    if(n<(day.phase==='wrap'?1:2)||n>(day.phase==='wrap'?2:4)) errors.push(`${day.id}: SQL 문항 수 오류`);
+    if(!sql.context) errors.push(`${day.id}: SQL 실행 대상이 없다`);
+    for(const q of sql.questions) {
+      if(!q.task||!q.expect||!q.example) errors.push(`${day.id}: SQL 과제·성질·예시가 필요하다`);
+      if(/```|<details|<pre/i.test((q.task??'')+(q.expect??''))) errors.push(`${day.id}: SQL 예시를 과제 문구에 섞지 않는다`);
+    }
+    if(day.phase==='maintain' && leak.test([sql.context,...sql.questions.flatMap(q=>[q.task,q.expect])].join(' '))) errors.push(`${day.id}: SQL 원인·해법 누출`);
+  }
+  return errors;
+}
+
 // ---------------------------------------------------------------- 일자 페이지(course/spring)
 const DAY_HEADER = '<!-- 생성물: tools/course/build-days.mjs가 만든다. 직접 고치지 마라 -->';
 const CIRCLED = '⓪①②③④⑤⑥⑦⑧⑨';
@@ -199,6 +218,7 @@ function cli() {
       result = [
         ...validate({ spec: courseFiles['spec-v2.md'], roadmap, cards: courseFiles['talk-cards.md'], courseFiles: { ...courseFiles, ...extraFiles } }),
         ...validateDayPages({ roadmap, pages }),
+        ...validateSql({roadmap,hints:JSON.parse(courseFiles['hints.json'])}),
       ];
       if (!result.length) {
         console.log(`course OK: ${parseSpecEndpoints(courseFiles['spec-v2.md']).length} endpoints, ${roadmap.days.length} days, ${parseTalkCardIds(courseFiles['talk-cards.md']).length} cards, ${Object.keys(pages).length} day pages`);

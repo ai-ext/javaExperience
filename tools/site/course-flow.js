@@ -31,7 +31,7 @@
       var all = Array.prototype.slice.call(root.querySelectorAll('.flow-steps > .flow-step'));
       steps = all.filter(function (li) {
         var fold = li.closest('details');
-        return !fold || fold.open;
+        return !fold || !root.contains(fold) || fold.open;
       }).sort(function (a, b) { return Number(a.dataset.order) - Number(b.dataset.order); });
     }
     function nodeIndex(id) {
@@ -157,6 +157,10 @@
     });
     document.addEventListener('visibilitychange', function () { if (document.hidden && timer) stop(); });
 
+    var implementationFold = root.closest('details.implementation-flow');
+    if (implementationFold) implementationFold.addEventListener('toggle', function () {
+      if (!implementationFold.open) stop();
+    });
     collect();
     if (!steps.length) return;
     if (reducedMotion()) root.classList.add('is-reduced-motion');

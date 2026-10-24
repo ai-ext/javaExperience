@@ -136,9 +136,9 @@ function ticketBadge(ticket, fromRel, course) {
     : `<span class="${cls} is-pending" title="${esc(ticket.title)} · 티켓 페이지 준비 중">${inner}<small>페이지 준비 중</small></span>`;
 }
 
-const FACTS = { '만들 파일': 'files', '겪을 것': 'trap', '완료 조건': 'done', '명세': 'spec', '티켓': 'tickets', '원인과 정답': 'answer-link' };
+const FACTS = { '만들 파일': 'files', '겪을 것': 'trap', '완료 조건': 'done', '명세': 'spec', '데이터 요구사항': 'data-spec', '티켓': 'tickets', '원인과 정답': 'answer-link' };
 function renderFacts(segment, fromRel, course) {
-  const parts = segment.split(/(?=<p><strong>(?:만들 파일|겪을 것|완료 조건|명세|티켓|원인과 정답)<\/strong>)/);
+  const parts = segment.split(/(?=<p><strong>(?:만들 파일|겪을 것|완료 조건|명세|데이터 요구사항|티켓|원인과 정답)<\/strong>)/);
   const lead = parts[0].startsWith('<p><strong>') ? '' : parts.shift();
   const facts = parts.map((part) => {
     const label = part.match(/^<p><strong>([^<]+)<\/strong>/)[1];
@@ -310,11 +310,12 @@ export function renderCourseHome(course) {
     </section>
   </div>
   <div class="ch-entries">
-    <article class="ch-entry"><p class="home-eyebrow">Spring 트랙 · 메인</p><h3>일자 페이지 D00~D15</h3><p>오늘 순서 → 순서 칸(만들 파일·겪을 것·완료 조건) → 막히면 힌트 → 그 순서의 정답 → 말하기 카드와 AI 채점.</p><a href="${esc(href('course/spring/README.html'))}">일자 목록 열기 →</a></article>
+    <article class="ch-entry"><p class="home-eyebrow">Spring 트랙 · 메인</p><h3>일자 페이지 D00~D15</h3><p>오늘 순서 → 순서 칸(만들 파일·겪을 것·완료 조건) → 막히면 힌트 → 그 순서의 구현 예시 → 오늘의 SQL → 말하기 카드와 AI 채점.</p><a href="${esc(href('course/spring/README.html'))}">일자 목록 열기 →</a></article>
     <article class="ch-entry"><p class="home-eyebrow">Java 트랙 · 매일 30~60분</p><h3>같은 날 쓰는 Java 먼저</h3><p class="ch-chips">${javaChips}</p></article>
     <article class="ch-entry"><p class="home-eyebrow">2단계 티켓 · 필수 4건 + 선택 1건(Security·Redis 후보)</p><h3>증상만 적힌 티켓 B01~B16</h3><p class="ch-chips ch-ticket-chips">${ticketChips}</p><p class="ch-entry-note">필수 B01~B04 + 선택 1건(B12·B13·B14 또는 B15·B16) + <a href="${esc(href('course/tickets/E01.html'))}">고도화 E01</a> + <a href="${esc(href('course/tickets/drill.html'))}">모의 장애 훈련</a>. B05~B11과 고르지 않은 후보는 연습으로 하고, 처리한 것만 채점합니다. 티켓 페이지 ${readyTickets}/16 준비됨.</p></article>
     <article class="ch-entry ch-entry-map"><p class="home-eyebrow">과정 지도</p><h3>날·Java·티켓·결함 영역의 관계</h3><p>어느 날의 Java가 어떤 날을 받치고, 2단계 티켓이 어떤 결함 영역에 속하는지 한 장에서 봅니다.</p><a href="${esc(href('course/map.html'))}">과정 지도 열기 →</a></article>
   </div>
+  <p>데이터 요구사항으로 테이블을 직접 설계하고 더미 CSV를 내 구조로 매핑합니다. SQL을 매일 풀고, board-server는 구현 예시로 비교합니다.</p>
   <p class="ch-links"><a href="${esc(href('course/README.html'))}">과정 안내</a><a href="${esc(href('course/start/README.html'))}">1단계 출발 자료</a><a href="${esc(href('course/spec-v2.html'))}">명세서 v2</a><a href="${esc(href('course/talk-cards.html'))}">말하기 카드 전체</a></p>
   <script type="application/json" id="course-days-data">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>
 </section>`;
@@ -324,7 +325,8 @@ export function renderCourseHome(course) {
 export function renderHomeReference(homeVisualHtml) {
   const demoted = homeVisualHtml.replace(/<h1 id="home-title"([^>]*)>([\s\S]*?)<\/h1>/, '<h2 id="home-title"$1>$2</h2>');
   if (demoted === homeVisualHtml) throw new Error('홈: 기존 제목(#home-title)을 찾지 못했다');
-  return `<section class="home-reference" aria-labelledby="home-reference-title"><div class="home-reference-head"><p class="home-eyebrow">참고 도감</p><h2 id="home-reference-title">기존 게시판 시나리오·실전 미션·개념 학습</h2><p>과정 v2 이전에 만든 101단계 시나리오와 공부자료입니다. 일자 페이지 맨 아래 "참고 자료"가 이곳의 문서로 이어집니다. 하던 시나리오 과제의 이어하기 기록도 그대로 남아 있습니다.</p><p class="ch-links"><a href="scenario/README.html">서비스 만들기(시나리오)</a><a href="practice/MISSIONS.html">실전 미션</a><a href="docs/knowledge/README.html">개념 학습</a><a href="errors.html">에러 도감</a></p></div>${demoted}</section>`;
+  return `<section class="home-reference" aria-labelledby="home-reference-title"><div class="home-reference-head"><p class="home-eyebrow">참고 도감</p><h2 id="home-reference-title">기존 게시판 시나리오·실전 미션·개념 학습</h2><p>과정 v2 이전에 만든 101단계 시나리오와 공부자료입니다. 일자 페이지 맨 아래 "참고 자료"가 이곳의 문서로 이어집니다. 하던 시나리오 과제의 이어하기 기록도 그대로 남아 있습니다.</p><p>데이터 요구사항으로 테이블을 직접 설계하고 더미 CSV를 내 구조로 매핑합니다. SQL을 매일 풀고, board-server는 구현 예시로 비교합니다.</p>
+  <p class="ch-links"><a href="scenario/README.html">서비스 만들기(시나리오)</a><a href="practice/MISSIONS.html">실전 미션</a><a href="docs/knowledge/README.html">개념 학습</a><a href="errors.html">에러 도감</a></p></div>${demoted}</section>`;
 }
 
 // ---------------------------------------------------------------- 과정 지도

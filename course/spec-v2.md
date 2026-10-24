@@ -123,7 +123,7 @@
 | (대상 없음) | - | - | - | 없는 글·댓글, 삭제·숨김 처리된 글 | 404 `/errors/not-found` |
 | (작성자 아님) | - | - | - | 수정·삭제를 작성자 외가 시도 | 403 `/errors/forbidden` |
 
-좋아요 `PUT`·`DELETE`는 본문이 없다. 이미 눌렀는데 또 `PUT`이어도 204이고 상태는 그대로다(`post_like` UNIQUE로 보장).
+좋아요 `PUT`·`DELETE`는 본문이 없다. 이미 눌렀는데 또 `PUT`이어도 204이고 상태는 그대로다(같은 회원·글의 중복 저장을 DB에서도 거부하도록 설계한다).
 
 ### 5-3. 목록·검색
 
@@ -150,7 +150,7 @@
 | POST /api/shop/orders | `quantity` | int | O | 1~10 | 400 `/errors/validation` |
 | POST /api/shop/orders | `memberCouponId` | long | X | 본인 소유·미사용·유효기간 내 | 409 `/errors/coupon-unusable` |
 | POST /api/shop/orders | (잔액 부족) | - | - | 포인트 < 결제 금액 | 409 `/errors/insufficient-points` |
-| POST /api/shop/orders | (재고 부족) | - | - | `shop_item.stock` < `quantity` | 409 `/errors/out-of-stock` |
+| POST /api/shop/orders | (재고 부족) | - | - | 남은 재고 < `quantity` | 409 `/errors/out-of-stock` |
 
 결제 금액은 `price × quantity`이고, 쿠폰을 쓰면 10% 할인한다(할인액은 소수점 이하 버림).
 
@@ -162,11 +162,11 @@
 |---|---|---|---|---|---|
 | POST /api/me/points/charges | `Idempotency-Key` | header | O | 8~64자, 영문·숫자·`-` | 400 `/errors/validation` |
 | POST /api/me/points/charges | `amount` | int | O | 1,000~1,000,000, 1,000 단위 | 400 `/errors/validation` |
-| POST /api/me/points/charges | (PG 시간 초과) | - | - | 결과 불명, `pg_payment` 상태 `UNKNOWN`으로 남긴다 | 504 `/errors/pg-timeout` |
+| POST /api/me/points/charges | (PG 시간 초과) | - | - | 결과 불명, 충전 요청의 상태 `UNKNOWN`으로 남긴다 | 504 `/errors/pg-timeout` |
 | POST /api/me/points/charges | (PG 5xx, 재시도 소진) | - | - | 결과 불명(PG가 처리했을 수 있다), `UNKNOWN`으로 남긴다 | 504 `/errors/pg-timeout` |
 | POST /api/me/points/charges | (PG 거절·PG에 닿지 못함) | - | - | 승인 실패(4xx 거절, 연결 실패·커넥션 풀 대기 초과), `FAILED`로 남긴다 | 502 `/errors/pg-declined` |
 | POST /api/pg/callbacks | `X-PG-Signature` | header | O | 7절 서명 규칙 | 401 `/errors/invalid-signature` |
-| POST /api/pg/callbacks | `orderId` | string | O | 기존 `pg_payment.order_id`와 같아야 함 | 404 `/errors/not-found` |
+| POST /api/pg/callbacks | `orderId` | string | O | 저장된 충전 요청의 `orderId`와 같아야 함 | 404 `/errors/not-found` |
 | POST /api/pg/callbacks | `paymentKey` | string | O | 1~64자 | 400 `/errors/validation` |
 | POST /api/pg/callbacks | `status` | string | O | `DONE`, `FAILED` 중 하나 | 400 `/errors/validation` |
 | POST /api/pg/callbacks | `amount` | int | O | 양수, 저장된 충전 금액과 같아야 함 | 400 `/errors/validation` |
@@ -190,9 +190,74 @@
 | POST /api/admin/coupons/{couponId}/bulk-issue | `file` | multipart | O | `.xlsx`, 최대 5MB, 최대 1,000행, 첫 열 `memberId` | 400 `/errors/validation` |
 | POST /api/admin/coupons/{couponId}/bulk-issue | (행 오류) | - | - | 없는 회원·이미 보유한 행은 건너뛰고 응답에 `{issued, skipped[]}`로 알린다 | 200 |
 
-관리자 동작(`hide`, `bulk-issue`)은 모두 `audit_log`에 남는다.
+관리자 동작(`hide`, `bulk-issue`)은 모두 감사 기록으로 남는다.
 
-## 6. 데이터 모델
+## 6. 데이터 요구사항
+
+테이블·컬럼·키·제약·인덱스는 학습자가 직접 설계한다. 아래는 저장할 사실과 지켜야 할 성질이며 물리 이름이나 테이블 분할을 지정하지 않는다. API 필드 이름·enum·오류 코드는 2~5절의 계약을 유지한다. `schema.sql`은 내 설계를 생성하는 파일로 쓴다.
+
+설계하는 순서마다 **설계 메모**를 남긴다: 만든 테이블·키·제약·인덱스와 각각의 이유, 고려했다 버린 대안 1개. DB가 직접 보장하는 불변식은 실패해야 할 INSERT·UPDATE와 실제 거부 결과로 확인한다. 여러 행의 합·추가 전용 정책처럼 단일 제약만으로 보장하기 어려운 성질은 트랜잭션·권한·애플리케이션의 책임을 구분하고 검증 쿼리·테스트로 확인한다. 예시 서버의 제약 구현이 모든 요구를 보장한다고 가정하지 않는다.
+
+### 6-1. 기동용 기준 데이터 (D02)
+
+- 저장할 사실: 금칙어 문자열, 공통코드의 그룹·코드·표시 이름.
+- 불변식: 같은 금칙어와 같은 그룹 안의 같은 코드는 중복되지 않는다.
+- 조회: 기동이 준비된 뒤 전체를 읽어 메모리에 적재한다. 변경 후 재기동으로 새 값을 확인한다.
+- 보존: 기준 데이터 변경이 과거 업무 이력의 의미를 바꾸거나 지우지 않도록 한다.
+
+### 6-2. 회원 (D03)
+
+- 저장할 사실: 회원 식별, 이메일, 비밀번호 해시, 닉네임, 역할(`USER`/`ADMIN`), 가입·변경 시각.
+- 불변식: 이메일·정규화한 닉네임은 각각 중복 불가다. 비밀번호 원문은 저장·응답하지 않는다. 참조 대상인 회원을 식별할 수 있어야 한다.
+- 조회: 이메일로 로그인 대상 찾기, 인증된 회원의 내 정보 조회.
+- 보존: 회원과 연결된 글·금전 이력·감사 기록을 임의 연쇄 삭제하지 않는다. 탈퇴 API는 이번 계약에 없다.
+
+### 6-3. 글·태그 (D04~D06)
+
+- 저장할 사실: 작성자, 제목, 본문, 공개 상태(`ACTIVE`/`HIDDEN`/`DELETED`), 작성·변경 시각, 태그 이름과 글에 붙은 태그, 좋아요 수(저장한다면 원본 관계와 일치).
+- 불변식: 작성자는 존재하는 회원이다. 같은 이름의 태그를 공유하고 한 글에 같은 태그를 중복 연결하지 않는다. 필드 길이·최대 5개 등은 5-2절과 같다.
+- 조회: 공개 글 최신순 20건과 커서 다음 쪽(동률에도 순서가 안정적이어야 함), 제목·본문 검색, 태그 필터, 작성자·태그를 포함한 상세, 좋아요가 많은 공개 글.
+- 보존: 삭제는 `DELETED`, 숨김은 `HIDDEN`으로 남긴다. 두 상태는 공개 상세·목록과 수정·댓글 작성 대상에서 제외한다. 글 하나에서 태그를 빼거나 글을 삭제해도 다른 글이 쓰는 태그를 지우지 않는다.
+
+### 6-4. 댓글·좋아요 (D05)
+
+- 저장할 사실: 어느 글에 누가 쓴 댓글인지, 내용·삭제 여부·시각, 어느 회원이 어느 글을 좋아하는지와 시각.
+- 불변식: 연결한 글·회원이 존재한다. 한 회원은 한 글에 좋아요 1번만 가능하다. 등록·취소 재요청에도 상태·합계는 한 번만 바뀐다.
+- 조회: 글별 댓글 목록(안정적인 커서 순서), 댓글 작성자, 글별 댓글·좋아요 수와 회원별 활동 집계.
+- 보존: 댓글은 삭제 여부를 남기고 공개 조회에서 제외한다. 글 소프트 삭제가 관련 사실의 물리 삭제를 뜻하지 않는다.
+
+### 6-5. 포인트 (D07)
+
+- 저장할 사실: 회원별 현재 잔액, 적립·차감·충전 이력(`EARN`/`SPEND`/`CHARGE`), 증감액, 반영 후 잔액, 발생 사유·참조 대상·시각.
+- 불변식: 잔액 = 부호 있는 이력 합, 차감은 음수, 잔액은 음수가 되지 않는다. 잔액과 이력은 함께 확정하거나 함께 취소한다. 이력은 추가 전용이며 수정·삭제하지 않는다.
+- 조회: 내 잔액(이력 0건이면 0), 회원별 최신 이력 커서 목록, 잔액 대사, 활동 적립만 집계한 랭킹 원천.
+- 보존: 업무 실패 때 부분 기록이 남지 않게 하고 확정된 이력은 과거 사실로 보존한다.
+
+### 6-6. 쿠폰·상점·주문 (D07)
+
+- 저장할 사실: 쿠폰 이름·총량·발급량·만료 시각, 회원별 보유 쿠폰과 사용 상태(`UNUSED`/`USED`)·사용 시각, 아이템 이름·가격·재고, 구매자·아이템·수량·실제 결제 금액·사용 쿠폰·요청 멱등 키·시각.
+- 불변식: 발급량은 0 이상 총량 이하, 같은 회원에게 같은 쿠폰은 1매, 재고 ≥ 0. 소유자·만료·미사용 조건과 가격·할인은 5-4절을 따른다. 같은 회원의 같은 `Idempotency-Key` 주문은 1건이다. 동일 키·동일 본문은 같은 결과, 다른 본문은 422다.
+- 조회: 아이템 목록, 회원별 보유 쿠폰, 멱등 재요청의 기존 주문, 수량·잔액·사용 상태 대사.
+- 보존: 주문과 포인트 차감·재고·쿠폰 사용은 함께 확정/취소한다. 확정된 구매 사실을 아이템 수정이나 숨김으로 잃지 않는다.
+
+### 6-7. 충전·외부 PG (D08)
+
+- 저장할 사실: 요청 회원, 서버가 만든 `orderId`, 요청 금액·멱등 키, PG의 `paymentKey`, 상태(`REQUESTED`/`DONE`/`FAILED`/`UNKNOWN`), 요청·응답 시각.
+- 불변식: 충전 멱등 키·`orderId`·값이 있는 `paymentKey`는 각각 중복 불가다. 승인 전에는 `paymentKey`가 없을 수 있다. 동일 결제의 성공 콜백이 반복되어도 충전 적립은 한 번이다. 상점 주문의 회원별 키 범위와 충전의 키 범위를 구분한다.
+- 조회: 키·`orderId`·`paymentKey`로 요청 추적, 상태별 건수·금액 집계, 미확정 요청 확인.
+- 보존: PG 호출 전 요청 사실을 남기고 결과 불명을 임의 성공·실패로 바꾸지 않는다. 5-5절의 전이·재요청 규칙을 따른다.
+
+### 6-8. 신고·감사 (D10)
+
+- 저장할 사실: 신고 대상 글·신고자·사유(`SPAM`/`ABUSE`/`ETC`)·상세·처리 상태(`OPEN`/`RESOLVED`)·시각, 관리자 행위자·동작·대상 종류·대상 식별·상세·시각.
+- 불변식: 같은 회원이 같은 글을 중복 신고할 수 없다. 감사 기록은 추가 전용이다. 숨김에 연결한 신고는 `RESOLVED`로 바뀐다.
+- 조회: 상태별 신고 커서 목록, 글별 신고 누적, 관리자 감사 로그 최신순 커서 목록.
+- 보존: 글이 숨겨지거나 대상이 바뀌어도 신고·감사 이력은 남는다. 감사 기록의 수정·삭제를 허용하지 않는 저장소·권한 정책과 확인 방법을 설계 메모에 남긴다.
+
+<details>
+<summary>구현 예시의 설계(board-server)</summary>
+
+직접 설계한 뒤 비교용으로 펼친다. 아래는 기존 구현 예시의 설계이며 정해진 정답이나 채점할 물리 이름이 아니다. 실제 정의는 [board-server의 schema.sql](../board-server/src/main/resources/schema.sql)에서 대조한다. 아래 공통 필드 설명과 달리 기준 데이터 등에는 감사 필드가 없는 예외도 있다.
 
 공통: 모든 테이블은 `id BIGINT PK AUTO_INCREMENT`, `created_at`, `updated_at`(BaseEntity 감사 필드)을 가진다. 시각 컬럼은 `DATETIME(6)`, 저장은 KST 기준이다. 열거형은 문자열(`@Enumerated(STRING)`)이다.
 
@@ -217,13 +282,15 @@
 
 포인트 잔액은 `member.point_balance` 컬럼을 원자적 `UPDATE`로 갱신하고, 같은 트랜잭션에서 `point_ledger`에 이력을 쌓는다. 잔액과 이력의 합은 항상 일치해야 한다.
 
+</details>
+
 ## 7. 외부 PG 계약 (WireMock)
 
 로컬·테스트에서 PG는 WireMock이 흉내 낸다. 시간 초과·지연 장애는 Toxiproxy로 주입한다. 아래 표는 외부 서버의 계약이며 우리 서버의 엔드포인트가 아니다.
 
 | 호출 | 대상 | 설명 |
 |---|---|---|
-| POST | `/pg/v1/payments` | 승인 요청. 본문 `{orderId, amount}`이며 `orderId`는 `pg_payment.order_id`다. 헤더 `Idempotency-Key`. 응답 `{paymentKey, status, amount, approvedAt}` |
+| POST | `/pg/v1/payments` | 승인 요청. 본문 `{orderId, amount}`이며 `orderId`는 저장된 충전 요청의 식별 값이다. 헤더 `Idempotency-Key`. 응답 `{paymentKey, status, amount, approvedAt}` |
 | GET | `/pg/v1/payments?orderId={orderId}` | 우리 `orderId`로 결제 조회. 시간 초과로 `paymentKey`를 받지 못했을 때 결과를 확인하는 데 쓴다 |
 | GET | `/pg/v1/payments/{paymentKey}` | `paymentKey`로 결제 조회 |
 

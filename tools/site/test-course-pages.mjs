@@ -179,7 +179,7 @@ for (const day of course.days) {
   if (course.flows.days.has(day.id)) assert.ok($(`section.day-flow.flow[data-flow="${day.id}"]`) && !$('.day-flow[hidden]'), `${day.id}: 오늘 흐름`);
   else if (day.phase === 'maintain') assert.ok($(`section.day-flow.flow-links[data-flow-links="${day.id}"]`), `${day.id}: 그날 티켓의 장애 흐름으로 잇기`);
   else assert.ok($('.day-flow[hidden]') && $('.day-flow').children.length === 0, `${day.id}: 흐름이 없는 날은 빈 자리`);
-  assert.ok(!$('section.day-java') || $('section.day-java + .day-flow'), `${day.id}: 흐름은 오늘의 Java 바로 뒤`);
+  assert.ok(!$('section.day-java') || $('section.day-java + .day-flow, section.day-java + details.implementation-flow > .day-flow'), `${day.id}: 흐름은 오늘의 Java 바로 뒤`);
   assert.ok($('nav.day-pager'), `${day.id}: 이전·다음 날`);
   for (const a of $$('.day-pager a, .course-crumbs a')) {
     const target = new URL(a.getAttribute('href'), `${root.href}${file}`);
@@ -739,6 +739,16 @@ for (const day of course.days) {
   assert.equal(play.getAttribute('aria-pressed'), 'false', '마지막에서 멈춘다(반복하지 않는다)');
   assert.match(play.textContent, /처음부터/);
   assert.equal(d04.window.scrollY || 0, 0, '재생은 페이지를 스크롤하지 않는다');
+  const implementationFold=sec.closest('details.implementation-flow');
+  assert.equal(implementationFold.open,false,'구현 예시는 처음에 닫힘');
+  implementationFold.open=true;
+  play.click();
+  assert.equal(play.getAttribute('aria-pressed'),'true');
+  implementationFold.open=false;
+  implementationFold.dispatchEvent(new d04.window.Event('toggle'));
+  assert.equal(play.getAttribute('aria-pressed'),'false','예시를 접으면 재생도 멈춤');
+  assert.equal(tick(d04.window),null);
+
 
   const b01 = await open('course/tickets/B01.html', { script: flowScript, before: fakeTimers });
   const tsec = b01.$('section.flow[data-flow="B01"]');
@@ -762,3 +772,30 @@ for (const day of course.days) {
   console.log(`흐름 재생: 일자 ${course.flows.days.size}개·티켓 ${course.flows.tickets.size}개, 근거 문자열 ${checkedEvidence}개, 조작·누출 검사 통과`);
 }
 console.log(`과정 화면: 일자 ${course.days.length}쪽 배치·진도 체크·저장 실패, 홈 오늘 할 일·15일 진도·진입, 지도 노드 ${mapNodes(course).length}·간선 ${course.edges.length} 검사 통과`);
+
+await test('매일 SQL: 전 일자 과제·기대 성질은 보이고 예시 SQL과 설계 흐름은 닫힌 접기에 있다', () => {
+  const hints = JSON.parse(fs.readFileSync(new URL('course/hints.json', root), 'utf8'));
+  for (const day of course.days.filter(d => d.id !== 'D00')) {
+    const doc = new JSDOM(fs.readFileSync(new URL(day.page, root), 'utf8')).window.document;
+    const section = doc.querySelector('.day-sql');
+    assert.ok(section, `${day.id}: 오늘의 SQL`);
+    assert.equal(section.querySelectorAll('h2').length, 1);
+    assert.equal(section.querySelectorAll('details.sql-answer').length, 1);
+    assert.equal(section.querySelectorAll('details[open]').length, 0);
+    assert.equal(section.querySelectorAll('.sql-questions > li').length, hints.days[day.id].sql.questions.length);
+    assert.ok(section.querySelectorAll('details.sql-answer pre code').length >= 1);
+    for (const code of section.querySelectorAll('pre code')) assert.ok(code.closest('details.sql-answer'));
+    const bare=section.cloneNode(true);
+    bare.querySelectorAll('details').forEach(d=>d.remove());
+    assert.doesNotMatch(bare.textContent, /idx_post|point_ledger|shop_order/);
+    if (day.phase === 'maintain') {
+      assert.match(bare.textContent, /messy-server/);
+      assert.doesNotMatch(bare.textContent, /rollback-only|self-invocation|커밋 전|afterCommit|갭 락|메타데이터 락|randomUUID|Lettuce|RedisGuard|ALTER TABLE|인덱스를 고치|인덱스를 바꾸/);
+    }
+    if(day.phase === 'build') {
+      const flow=doc.querySelector('.day-flow');
+      assert.ok(flow.closest('details.implementation-flow'));
+      assert.equal(flow.closest('details').open,false);
+    }
+  }
+});

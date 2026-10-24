@@ -130,7 +130,7 @@ function stepItem(flow, step, order, label, idBase) {
     + `${step.note ? `<p class="flow-step-note">${inline(step.note)}</p>` : ''}</li>`;
 }
 
-const LEGEND = '<p class="flow-legend"><span><span class="flow-new">오늘 만듦</span> 그날 새로 만드는 층</span><span><span class="flow-tag tag-code">코드</span> 정답 코드·설정에 있는 값</span><span><span class="flow-tag tag-example">예시</span> 설명용으로 고른 값</span><span><span class="flow-tag tag-repr">대표</span> 같은 뜻으로 줄여 쓴 SQL·동작</span></p>';
+const LEGEND = '<p class="flow-legend"><span><span class="flow-new">오늘 만듦</span> 그날 새로 만드는 층</span><span><span class="flow-tag tag-code">코드</span> 구현 예시 코드·설정에 있는 값</span><span><span class="flow-tag tag-example">예시</span> 설명용으로 고른 값</span><span><span class="flow-tag tag-repr">대표</span> 같은 뜻으로 줄여 쓴 SQL·동작</span></p>';
 
 function player(idBase) {
   return `<div class="flow-player" data-flow-player hidden>
@@ -149,7 +149,8 @@ function player(idBase) {
 export function renderDayFlow(flow) {
   const idBase = `flow-${flow.id.toLowerCase()}`;
   const steps = flow.steps.map((s, i) => stepItem(flow, s, i + 1, String(i + 1), idBase)).join('');
-  return `<section class="day-flow flow" data-flow="${esc(flow.id)}" data-flow-kind="day" id="${idBase}" aria-labelledby="${idBase}-title">
+  return `<details class="implementation-flow"><summary>구현 예시의 요청 흐름(board-server) · 직접 설계한 뒤 비교</summary>
+<section class="day-flow flow" data-flow="${esc(flow.id)}" data-flow-kind="day" id="${idBase}" aria-labelledby="${idBase}-title">
   <div class="flow-head"><p class="flow-eyebrow">오늘 흐름 · 요청 하나 따라가기 · <code>${esc(flow.request)}</code></p><h2 id="${idBase}-title">${inline(flow.title)}</h2><p class="flow-summary">${inline(flow.summary)}</p></div>
   ${nodeMap(flow, '오늘 흐름')}
   ${player(idBase)}
@@ -157,7 +158,7 @@ export function renderDayFlow(flow) {
   ${LEGEND}
   <ol class="flow-steps">${steps}</ol>
   ${flow.note ? `<p class="flow-foot">${inline(flow.note)}</p>` : ''}
-</section>\n`;
+</section>\n</details>\n`;
 }
 
 export function renderTicketFlow(flow) {

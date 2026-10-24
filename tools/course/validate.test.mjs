@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseSpecEndpoints, parseTalkCardIds, validate, validateDayPages } from './validate.mjs';
+import { parseSpecEndpoints, parseTalkCardIds, validate, validateDayPages, validateSql } from './validate.mjs';
 
 const FX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures');
 const load = () => ({
@@ -274,4 +274,18 @@ test('실제 course/spring 일자 페이지가 roadmap과 일치한다', () => {
   const pages = {};
   for (const f of fs.readdirSync(spring)) if (f.endsWith('.md')) pages[f] = fs.readFileSync(path.join(spring, f), 'utf8');
   assert.deepEqual(validateDayPages({ roadmap, pages }), []);
+});
+
+
+test('SQL 검증은 누락·예시 미분리·2단계 원인 누출을 거부한다', () => {
+  const roadmap = {days:[{id:'D11',phase:'maintain'}]};
+  const question={task:'실행 세션을 조사한다',expect:'시각과 실제 출력을 남긴다',example:'SHOW FULL PROCESSLIST;'};
+  const hints={days:{D11:{sql:{context:'messy-server에서 진단',questions:[{...question},{...question}]}}}};
+  assert.deepEqual(validateSql({roadmap,hints}),[]);
+  const bad=structuredClone(hints);delete bad.days.D11.sql;
+  assert.ok(validateSql({roadmap,hints:bad}).some(e=>e.includes('없다')));
+  const leak=structuredClone(hints);leak.days.D11.sql.questions[0].task='PG 호출이 트랜잭션에 묶여 있다';
+  assert.ok(validateSql({roadmap,hints:leak}).some(e=>e.includes('누출')));
+  const noExample=structuredClone(hints);delete noExample.days.D11.sql.questions[0].example;
+  assert.ok(validateSql({roadmap,hints:noExample}).some(e=>e.includes('예시')));
 });

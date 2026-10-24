@@ -395,7 +395,7 @@ function answerBlock(dataStep, commits, stepFiles, filesOf, lastTouch, fixFilesO
   const shown = [...originals, ...fixes];
   return [
     `<details class="step-answer" data-step="${dataStep}" data-commits="${shown.map((c) => c.sha).join(' ')}">`,
-    `<summary>정답 보기 · ${names} · board-server 파일 ${all.length}개</summary>`,
+    `<summary>구현 예시 보기 · ${names} · board-server 파일 ${all.length}개</summary>`,
     '',
     [...originals.map((c) => renderCommitAnswer(c, filesOf(c.sha), stepFiles)), ...(fixes.length ? [renderFixAnswer(fixes, fixFiles, stepFiles)] : [])].join('\n\n---\n\n'),
     ...(deferred ? ['', `**보완** — 이 순서의 보완은 뒤 순서 코드에 맞춘 diff라 <a href="#${fixAnchor(dataStep)}">${circled(deferred.after)} 뒤 보완 칸</a>에 따로 싣는다.`] : []),
@@ -540,7 +540,7 @@ function completionTicket(day, step, id, hintsDay) {
 function stepSection(day, s, ctx) {
   const id = stepId(day.id, s.no);
   const lines = [`<section class="day-step" id="${stepAnchor(day.id, s.no)}" data-step="${id}">`, '', `## ${circled(s.no)} ${s.title}`, ''];
-  if (ctx.ready && s.files.length) lines.push(`**만들 파일** (${day.phase === 'maintain' ? 'messy-server' : 'board-server'} 기준)`, '', ...s.files.map((f) => `- \`${f}\``), '');
+  if (ctx.ready && s.files.length) lines.push(`**만들 파일** (${day.phase === 'maintain' ? 'messy-server' : '내 프로젝트 · 경로는 구현 예시'} 기준)`, '', ...s.files.map((f) => `- \`${f}\``), '');
   if (s.tickets?.length) lines.push(`**티켓** ${s.tickets.map((t) => `\`${t}\``).join(' · ')}`, '');
   if (ctx.ready) {
     if (s.trap) lines.push(`**겪을 것** ${s.trap}`, '');
@@ -549,6 +549,11 @@ function stepSection(day, s, ctx) {
       const label = day.phase === 'maintain' ? `[${ticket ? `${ticket} ${ticketInfo(ticket, ctx.root).kind}` : '공통'}] ` : '';
       return `- ${label}${d}`;
     }), '');
+    if (s.dataRefs?.length) lines.push('**데이터 요구사항** ' + s.dataRefs.map(ref => {
+      const section = ctx.specSections.find(x => x.title.startsWith(ref + '.'));
+      if (!section) throw new Error(`${day.id}: 데이터 요구사항 ${ref} 없음`);
+      return `[§${ref}](../spec-v2.md#${section.id})`;
+    }).join(' · '), '');
     if (s.specRefs.length) {
       const refs = s.specRefs.map((r) => {
         const l = specLinks(r, ctx.specSections);
@@ -615,13 +620,35 @@ function deferredFixSection(day, no, rule, ctx) {
     `${circled(rule.after)}까지(그 순서의 보완 포함) 만들었으면 <a href="#${stepAnchor(day.id, no)}">${circled(no)}</a>의 보완을 적용한다. ${rule.note}`,
     '',
     `<details class="step-answer" data-step="${id}" data-commits="${fixes.map((c) => c.sha).join(' ')}">`,
-    `<summary>정답 보기 · answer(${id}) 보완 ${fixes.length}개 · board-server 파일 ${files.length}개</summary>`,
+    `<summary>구현 예시 보기 · answer(${id}) 보완 ${fixes.length}개 · board-server 파일 ${files.length}개</summary>`,
     '',
     renderFixAnswer(fixes, files, step.files),
     '',
     '</details>',
     '',
     '</section>',
+  ].join('\n');
+}
+
+// SQL 과제·기대 성질은 기본 노출하고 예시 답만 접는다.
+function sqlSection(day, sql, root) {
+  if (!sql?.questions?.length) throw new Error(`${day.id}: 오늘의 SQL이 없다`);
+  const count = sql.questions.length;
+  if (count < (day.id === 'D15' ? 1 : 2) || count > (day.id === 'D15' ? 2 : 4)) throw new Error(`${day.id}: SQL 문항 수 오류`);
+  const questions = sql.questions.map((q) => {
+    if (!q.task || !q.expect || !q.example) throw new Error(`${day.id}: SQL 과제·기대 성질·예시 필요`);
+    return `<li><p>${inlineHtml(q.task)}</p><p><strong>확인할 성질</strong> ${inlineHtml(q.expect)}</p></li>`;
+  });
+  return [
+    '<section class="day-sql">', '', '## 오늘의 SQL', '', sql.context, '',
+    ...(day.phase === 'build' ? ['[더미 데이터·열 매핑·적재 순서](../start/dummy/README.md)를 먼저 확인한다.', ''] : []),
+    '<ol class="sql-questions">', ...questions, '</ol>', '',
+    '<details class="sql-answer">', '<summary>구현 예시 SQL · 직접 작성한 뒤 비교하기</summary>', '',
+    'board-server의 설계 기준이다. 2단계에서는 같은 계열의 기존 스키마를 관찰한다. 내 물리 이름·키·정렬이 다르면 매핑해 비교한다. 아래 SQL은 실제 실행 결과가 아니며 예시 서버가 모든 불변식을 보장한다는 뜻도 아니다. 오류가 예상되는 문장은 하나씩 실행하고 실패 뒤 ROLLBACK을 별도로 보낸다.', '',
+    ...sql.questions.flatMap((q,i) => [`**문항 ${i+1} 구현 예시**`, '', fence(q.example,'sql'), '']),
+    '</details>', '',
+    ...((sql.refs ?? []).length ? ['**선택 자료** — 이전 과정은 별도 스키마(community·practice·성능 실험 DB)를 전제한다. 이름·필터를 내 설계로 옮겨 풀고 기존 DB를 덮어쓰지 않는다.', '', ...(sql.refs ?? []).map(p => `- [${docTitle(p,root,day.id)}](../../${p})`)] : []),
+    '', '</section>',
   ].join('\n');
 }
 
@@ -663,6 +690,7 @@ export function renderDay(day, ctx) {
     for (const [k, rule] of deferred) if (rule.after === s.no) parts.push(deferredFixSection(day, Number(k.split('-')[1]), rule, ctx));
   }
   for (const group of ctx.answers?.extras.values() ?? []) parts.push(extraSection(day, group, ctx));
+  if (ctx.ready) parts.push(sqlSection(day, ctx.hintsDay.sql, ctx.root));
   parts.push('---', '## 말하기 카드', '하루가 끝나면 질문에 "문제 상황 → 원인 → 선택 → 결과" 순서로 소리 내어 답한 뒤, 접힌 "답에 들어가야 할 것"과 비교한다. 세 줄이 모두 나오면 통과다.');
   for (const id of day.talkCards) {
     const card = ctx.cards.get(id);
@@ -679,7 +707,7 @@ export function renderDay(day, ctx) {
   parts.push('## 내일 미리보기', day.tomorrow);
   if (ctx.ready && ctx.answers?.last) {
     const sha = ctx.answers.last.sha;
-    const lines = [`오늘 마지막 정답 커밋은 \`${sha.slice(0, 8)}\`(${ctx.answers.last.subject})이다. [이 시점의 board-server 전체 보기](${REPO_URL}/tree/${sha}/board-server). 기준은 위 순서 칸의 인라인 정답이고, 이 링크는 보조다(PR 병합 방식에 따라 커밋이 사라질 수 있다).`];
+    const lines = [`오늘 마지막 구현 예시 커밋은 \`${sha.slice(0, 8)}\`(${ctx.answers.last.subject})이다. [이 시점의 board-server 전체 보기](${REPO_URL}/tree/${sha}/board-server). 직접 설계한 뒤 비교할 구현 예시는 위 순서 칸의 인라인 코드이며, 이 링크는 보조다(PR 병합 방식에 따라 커밋이 사라질 수 있다).`];
     if (ctx.answers.lastFix) lines.push('', `오늘 순서의 보완(answer-fix)은 뒤 날 정답까지 만든 뒤에 커밋했으므로 위 링크에는 없다. 보완을 반영한 코드는 순서 칸의 "보완"에서 보고, 보완이 모두 들어간 최신 코드는 [보완 반영 최신 코드: main의 board-server](${REPO_URL}/tree/main/board-server)에서 본다(뒤 날 코드도 함께 들어 있다).`);
     parts.push('## 날짜별 snapshot', lines.join('\n'));
   }
@@ -714,6 +742,8 @@ export function renderD00(roadmap, root) {
     `- ${j0.topic}`,
     j0.basics ? `- 기본기: ${j0.basics}` : '',
     '',
+    '데이터 요구사항을 보고 테이블·키·제약·인덱스는 직접 설계한다. D01부터 매일 SQL을 풀고, [더미 CSV](../start/dummy/README.md)는 내가 만든 테이블에 열을 매핑해 넣는다. board-server는 직접 설계한 뒤 비교할 구현 예시다.',
+    '',
     '## 내일 미리보기',
     '',
     `D01은 start.spring.io로 빈 프로젝트를 만들고 헬스 체크를 여는 것부터 시작한다. 오늘 연습한 메서드·필드·값 전달이 D01의 요청 ID 필터와 J01의 \`Member\` 클래스에서 바로 쓰인다.`,
@@ -733,9 +763,9 @@ export function renderIndex(roadmap, hints) {
     '',
     '# Spring 트랙 일자 페이지',
     '',
-    '하루 한 페이지다. 맨 위 [오늘 순서]대로 만들고, 막히면 순서 칸의 힌트를, 그래도 막히면 그 순서의 정답만 펼친다. 하루가 끝나면 말하기 카드에 답하고 AI 채점 프롬프트로 확인한다.',
+    '하루 한 페이지다. 맨 위 [오늘 순서]대로 만들고, 막히면 순서 칸의 힌트를, 그래도 막히면 그 순서의 구현 예시만 펼친다. 내 테이블에서 오늘의 SQL을 풀고, 하루가 끝나면 말하기 카드에 답하고 AI 채점 프롬프트로 확인한다.',
     '',
-    '- 1단계(D01~D10): 빈 프로젝트로 서버 만들기. 시작은 [출발 자료](../start/README.md)',
+    '- 1단계(D01~D10): 데이터 요구사항으로 테이블을 직접 설계하고 빈 프로젝트로 서버 만들기. 시작은 [출발 자료](../start/README.md)',
     '- 2단계(D11~D14): 어수선한 서버 넘겨받기. 티켓은 필수 B01~B04 4건 + 선택 1건(Security·Redis 후보에서 고른다) + 고도화 E01 + 모의 장애 훈련이고, 나머지는 연습 티켓이다',
     '- 마무리(D15): 설명 세션',
     '',

@@ -351,7 +351,7 @@ test('정답 커밋을 찾지 못하면 아무것도 쓰지 않고 건너뛴다'
 test('2단계·마무리 날도 hints가 생기면 완성 페이지로 만든다(정답 커밋 없이)', () => {
   const ctxFor = (day) => ({
     root: ROOT, roadmap, hints, ready: true, answers: null, filesOf: () => [], lastTouch: () => null,
-    hintsDay: { steps: Object.fromEntries(day.steps.map((s) => [String(s.no), ['방향 힌트']])), grader: { focus: ['초점'] } },
+    hintsDay: { sql: hints.days[day.id].sql, steps: Object.fromEntries(day.steps.map((s) => [String(s.no), ['방향 힌트']])), grader: { focus: ['초점'] } },
     cards: parseTalkCards(fs.readFileSync(path.join(ROOT, 'course/talk-cards.md'), 'utf8')),
     specSections: parseSpecSections(fs.readFileSync(path.join(ROOT, 'course/spec-v2.md'), 'utf8')),
   });
@@ -398,7 +398,7 @@ test('answer-fix(Dnn-m)는 순서 수에 넣지 않고, 그 순서 원래 커밋
   const block = md.match(/<details class="step-answer" data-step="D09-3"[\s\S]*?\n<\/details>/)[0];
   // 실제 이력의 answer-fix(D09-3)에 합성 커밋 하나가 더해진다
   const fixes = step3.filter((c) => c.kind === 'fix').length;
-  assert.ok(block.includes(`<summary>정답 보기 · answer(D09-3) + 보완 ${fixes}개`));
+  assert.ok(block.includes(`<summary>구현 예시 보기 · answer(D09-3) + 보완 ${fixes}개`));
   const orig = block.indexOf(step3[0].sha.slice(0, 8));
   const extra = block.indexOf('**보완**');
   assert.ok(orig >= 0 && extra > orig, '보완은 원래 커밋 코드 뒤에 온다');
@@ -735,4 +735,45 @@ test('꼭 할 관찰은 flush rollback·공유 태그 수명·1차 캐시와 RC/
     assert.doesNotMatch(step.trap, /하나만 골라도|필수 채점에는 추가하지/);
     assert.match(step.trap, /꼭 할 관찰/);
   }
+});
+
+test('매일 SQL: D01~D15에 과제와 닫힌 구현 예시를 순서 뒤에 둔다', () => {
+  for (const day of roadmap.days) {
+    const md = page(day.id);
+    const sql = hints.days[day.id].sql;
+    assert.ok(sql, `${day.id}: sql 데이터`);
+    assert.ok(sql.questions.length >= (day.id === 'D15' ? 1 : 2));
+    assert.ok(sql.questions.length <= (day.id === 'D15' ? 2 : 4));
+    assert.equal((md.match(/^## 오늘의 SQL$/gm) ?? []).length, 1, day.id);
+    assert.ok(md.indexOf('## 오늘의 SQL') > md.lastIndexOf('<section class="day-step"'));
+    assert.ok(md.indexOf('## 오늘의 SQL') < md.indexOf('## 말하기 카드'));
+    const block = md.slice(md.indexOf('## 오늘의 SQL'), md.indexOf('## 말하기 카드'));
+    assert.match(block, /<details class="sql-answer">/);
+    assert.doesNotMatch(block, /<details[^>]*\bopen\b/);
+    const visible = block.replace(/<details[\s\S]*?<\/details>/g, '');
+    assert.doesNotMatch(visible, /```sql|idx_post|point_ledger|shop_order/);
+    for (const q of sql.questions) assert.ok(block.includes(q.task));
+  }
+});
+
+test('데이터 요구사항은 직접 설계를 채점하고 기존 API·예시 표를 보존한다', () => {
+  const spec=fs.readFileSync(path.join(ROOT,'course/spec-v2.md'),'utf8');
+  const before=execFileSync('git',['show','HEAD:course/spec-v2.md'],{cwd:ROOT,encoding:'utf8'});
+  const endpoints=s=>[...s.matchAll(/^\| (GET|POST|PUT|PATCH|DELETE) \| (\/[^|]+?) \|/gm)].map(m=>m[0]);
+  assert.deepEqual(endpoints(spec),endpoints(before));
+  const oldTable=before.slice(before.indexOf('| 테이블 |'),before.indexOf('\n\n포인트 잔액은'));
+  const example=spec.match(/<details>\n<summary>구현 예시의 설계\(board-server\)<\/summary>([\s\S]*?)<\/details>/)?.[1];
+  assert.ok(example?.includes(oldTable));
+  const outside=spec.replace(/<details>[\s\S]*?<\/details>/g,'');
+  assert.doesNotMatch(outside, /idx_post|member\.point_balance|pg_payment\.|\| 테이블 \|/);
+  for(const day of roadmap.days.filter(d=>d.phase==='build')) {
+    for(const s of day.steps.filter(s=>s.dataRefs?.length)) {
+      assert.ok(s.done.some(d=>d.includes('설계 메모')&&d.includes('대안 1개')));
+      assert.ok(s.done.some(d=>d.includes('DB 불변식 확인')));
+      assert.match(page(day.id),new RegExp('\\*\\*데이터 요구사항\\*\\*'));
+    }
+    const visible=page(day.id).replace(/<details[\s\S]*?<\/details>/g,'');
+    assert.doesNotMatch(visible,/idx_post_status_id|UNIQUE\(`post_id`|\(`status`, `id`\)/);
+  }
+  assert.match(hints.graderTemplate,/이름은 학습자의 설계를 따른다/);
 });
