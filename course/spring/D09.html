@@ -49,10 +49,13 @@
 <hr>
 <section class="day-step" id="step-d09-1" data-step="D09-1">
 
-<h2 id="①-redis를-띄우고-인기글-캐시-만들기-ttl-60s-명령-타임아웃-500ms-postcontroller에-get-apipostspopular"><a class="anchor" href="#①-redis를-띄우고-인기글-캐시-만들기-ttl-60s-명령-타임아웃-500ms-postcontroller에-get-apipostspopular" aria-hidden="true">#</a>① Redis를 띄우고 인기글 캐시 만들기 (TTL 60s, 명령 타임아웃 500ms, <code>PostController</code>에 <code>GET /api/posts/popular</code>)</h2><div class="step-facts"><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(내 프로젝트 · 경로는 구현 예시 기준)</small></p><ul>
+<h2 id="①-redis를-띄우고-인기글-캐시-만들기-ttl-60s-명령-타임아웃-500ms-postcontroller에-get-apipostspopular"><a class="anchor" href="#①-redis를-띄우고-인기글-캐시-만들기-ttl-60s-명령-타임아웃-500ms-postcontroller에-get-apipostspopular" aria-hidden="true">#</a>① Redis를 띄우고 인기글 캐시 만들기 (TTL 60s, 명령 타임아웃 500ms, <code>PostController</code>에 <code>GET /api/posts/popular</code>)</h2><div class="step-facts"><div class="step-fact fact-layers"><p class="fact-label">이 순서에서 만들 층</p><p>쿼리 · 서비스 · 컨트롤러</p></div><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(내 프로젝트 · 경로는 구현 예시 기준)</small></p><ul>
 <li><code>compose.yaml</code></li>
 <li><code>src/main/java/com/example/board/config/RedisConfig.java</code></li>
 <li><code>src/main/java/com/example/board/post/PopularPostService.java</code></li>
+<li><code>src/main/java/com/example/board/post/PostQueryMapper.java</code></li>
+<li><code>src/main/resources/mapper/PostQueryMapper.xml</code></li>
+<li><code>src/main/java/com/example/board/post/PostController.java</code></li>
 </ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>TTL이 끝나는 순간 동시 요청이 모두 DB로 몰리는 스탬피드가 생긴다. 선택 관찰: J09 시간·금액을 MySQL DECIMAL(5,2)·DATETIME(6)에 왕복시켜 정밀도를 비교한다. 오늘은 선택 실험 중 하나만 골라도 되며 필수 채점에는 추가하지 않는다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
 <li><code>GET /api/posts/popular</code> → 200</li>
 <li>60초 안에 다시 부르면 SQL 로그에 목록 쿼리가 없다</li>
@@ -61,6 +64,7 @@
 <summary>막히면</summary>
 
 <ul>
+<li>이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 기존 테이블과 제약을 확인한다 → 필요한 저장·조회 조건을 저장소에서 먼저 확인한다 → 업무 검증과 트랜잭션 경계를 연결한다 → DTO와 응답 계약을 연결해 호출로 확인한다. 앞서 만든 층은 재사용하고 이 순서에서 바꾸는 부분만 진행한다.</li>
 <li><code>spring-boot-starter-data-redis</code>와 <code>spring.data.redis.timeout</code>, <code>StringRedisTemplate</code>의 <code>opsForValue().set(key, value, Duration)</code>을 찾아본다.</li>
 <li><code>docker compose exec redis redis-cli</code> 안에서 <code>KEYS *</code>와 <code>TTL &lt;키&gt;</code>로 캐시가 들어갔는지 본다.</li>
 </ul>
@@ -198,6 +202,64 @@ public class PopularPostService {
                 .toList();
     }
 }</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PostQueryMapper.java</code> (바뀐 부분)</p>
+<pre><code data-lazy-lang="diff">@@ -12,4 +12,7 @@ public interface PostQueryMapper {
+     /** afterId가 null이면 첫 쪽이다. 항상 id DESC(latest)이다. */
+     List&lt;PostSummary&gt; search(@Param(&quot;cond&quot;) PostSearchCondition cond, @Param(&quot;afterId&quot;) Long afterId,
+             @Param(&quot;limit&quot;) int limit);
++
++    /** ACTIVE 글을 좋아요 내림차순(같으면 최신 먼저)으로 limit개. */
++    List&lt;PostSummary&gt; findPopular(@Param(&quot;limit&quot;) int limit);
+ }</code></pre>
+<p><strong>수정</strong> <code>src/main/resources/mapper/PostQueryMapper.xml</code> (바뀐 부분)</p>
+<pre><code data-lazy-lang="diff">@@ -42,4 +42,18 @@
+         LEFT JOIN tag t ON t.id = pt.tag_id
+         ORDER BY p.id DESC, pt.id
+     &lt;/select&gt;
++
++    &lt;!-- 인기글은 캐시(60초)가 앞에 있어 자주 실행되지 않는다. like_count 인덱스 없이 정렬한다. --&gt;
++    &lt;select id=&quot;findPopular&quot; resultMap=&quot;postSummaryMap&quot;&gt;
++        SELECT p.id, p.member_id, m.nickname, p.title, p.like_count, p.created_at, t.name AS tag_name
++        FROM (SELECT id, member_id, title, like_count, created_at
++              FROM post
++              WHERE status = 'ACTIVE'
++              ORDER BY like_count DESC, id DESC
++              LIMIT #{limit}) p
++        JOIN member m ON m.id = p.member_id
++        LEFT JOIN post_tag pt ON pt.post_id = p.id
++        LEFT JOIN tag t ON t.id = pt.tag_id
++        ORDER BY p.like_count DESC, p.id DESC, pt.id
++    &lt;/select&gt;
+ &lt;/mapper&gt;</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PostController.java</code> (바뀐 부분)</p>
+<pre><code data-lazy-lang="diff">@@ -26,10 +26,13 @@ public class PostController {
+ 
+     private final PostService postService;
+     private final PostQueryService postQueryService;
++    private final PopularPostService popularPostService;
+ 
+-    public PostController(PostService postService, PostQueryService postQueryService) {
++    public PostController(PostService postService, PostQueryService postQueryService,
++            PopularPostService popularPostService) {
+         this.postService = postService;
+         this.postQueryService = postQueryService;
++        this.popularPostService = popularPostService;
+     }
+ 
+     @PostMapping
+@@ -44,6 +47,12 @@ public class PostController {
+         return postQueryService.search(request.toCondition(), request.cursor(), request.size());
+     }
+ 
++    // 문자 그대로인 경로가 /{postId} 패턴보다 먼저 매치된다
++    @GetMapping(&quot;/popular&quot;)
++    public CursorPage&lt;PopularPost&gt; popular(@Valid PopularPostRequest request) {
++        return popularPostService.page(request.cursor(), request.size());
++    }
++
+     @GetMapping(&quot;/{postId}&quot;)
+     public PostDetailResponse detail(@PathVariable @Positive Long postId) {
+         return postService.getDetail(postId);</code></pre>
 <p><strong>새 파일</strong> <code>src/main/java/com/example/board/post/PopularPost.java</code></p>
 <pre><code data-lazy-lang="java">package com.example.board.post;
 
@@ -228,44 +290,6 @@ public record PopularPostRequest(String cursor, @Min(1) @Max(50) Integer size) {
         }
     }
 }</code></pre>
-<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PostController.java</code> (바뀐 부분)</p>
-<pre><code data-lazy-lang="diff">@@ -26,10 +26,13 @@ public class PostController {
- 
-     private final PostService postService;
-     private final PostQueryService postQueryService;
-+    private final PopularPostService popularPostService;
- 
--    public PostController(PostService postService, PostQueryService postQueryService) {
-+    public PostController(PostService postService, PostQueryService postQueryService,
-+            PopularPostService popularPostService) {
-         this.postService = postService;
-         this.postQueryService = postQueryService;
-+        this.popularPostService = popularPostService;
-     }
- 
-     @PostMapping
-@@ -44,6 +47,12 @@ public class PostController {
-         return postQueryService.search(request.toCondition(), request.cursor(), request.size());
-     }
- 
-+    // 문자 그대로인 경로가 /{postId} 패턴보다 먼저 매치된다
-+    @GetMapping(&quot;/popular&quot;)
-+    public CursorPage&lt;PopularPost&gt; popular(@Valid PopularPostRequest request) {
-+        return popularPostService.page(request.cursor(), request.size());
-+    }
-+
-     @GetMapping(&quot;/{postId}&quot;)
-     public PostDetailResponse detail(@PathVariable @Positive Long postId) {
-         return postService.getDetail(postId);</code></pre>
-<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PostQueryMapper.java</code> (바뀐 부분)</p>
-<pre><code data-lazy-lang="diff">@@ -12,4 +12,7 @@ public interface PostQueryMapper {
-     /** afterId가 null이면 첫 쪽이다. 항상 id DESC(latest)이다. */
-     List&lt;PostSummary&gt; search(@Param(&quot;cond&quot;) PostSearchCondition cond, @Param(&quot;afterId&quot;) Long afterId,
-             @Param(&quot;limit&quot;) int limit);
-+
-+    /** ACTIVE 글을 좋아요 내림차순(같으면 최신 먼저)으로 limit개. */
-+    List&lt;PostSummary&gt; findPopular(@Param(&quot;limit&quot;) int limit);
- }</code></pre>
 <p><strong>수정</strong> <code>src/main/resources/application.yml</code> (바뀐 부분)</p>
 <pre><code data-lazy-lang="diff">@@ -6,6 +6,14 @@ spring:
        # spec-v2 §8 운영 값. 풀이 바닥나면 2초 안에 실패시켜 요청 스레드가 끝없이 기다리지 않게 한다.
@@ -282,26 +306,6 @@ public record PopularPostRequest(String cursor, @Min(1) @Max(50) Integer size) {
    jpa:
      hibernate:
        ddl-auto: validate</code></pre>
-<p><strong>수정</strong> <code>src/main/resources/mapper/PostQueryMapper.xml</code> (바뀐 부분)</p>
-<pre><code data-lazy-lang="diff">@@ -42,4 +42,18 @@
-         LEFT JOIN tag t ON t.id = pt.tag_id
-         ORDER BY p.id DESC, pt.id
-     &lt;/select&gt;
-+
-+    &lt;!-- 인기글은 캐시(60초)가 앞에 있어 자주 실행되지 않는다. like_count 인덱스 없이 정렬한다. --&gt;
-+    &lt;select id=&quot;findPopular&quot; resultMap=&quot;postSummaryMap&quot;&gt;
-+        SELECT p.id, p.member_id, m.nickname, p.title, p.like_count, p.created_at, t.name AS tag_name
-+        FROM (SELECT id, member_id, title, like_count, created_at
-+              FROM post
-+              WHERE status = 'ACTIVE'
-+              ORDER BY like_count DESC, id DESC
-+              LIMIT #{limit}) p
-+        JOIN member m ON m.id = p.member_id
-+        LEFT JOIN post_tag pt ON pt.post_id = p.id
-+        LEFT JOIN tag t ON t.id = pt.tag_id
-+        ORDER BY p.like_count DESC, p.id DESC, pt.id
-+    &lt;/select&gt;
- &lt;/mapper&gt;</code></pre>
 <p><strong>수정</strong> <code>src/test/java/com/example/board/ApiTestSupport.java</code> (바뀐 부분)</p>
 <pre><code data-lazy-lang="diff">@@ -6,10 +6,13 @@ import jakarta.persistence.EntityManagerFactory;
  
@@ -665,7 +669,7 @@ class PopularPostCacheTest extends ApiTestSupport {
 
 <section class="day-step" id="step-d09-2" data-step="D09-2">
 
-<h2 id="②-redis-지연장애-때-db로-폴백하기"><a class="anchor" href="#②-redis-지연장애-때-db로-폴백하기" aria-hidden="true">#</a>② Redis 지연·장애 때 DB로 폴백하기</h2><div class="step-facts"><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(내 프로젝트 · 경로는 구현 예시 기준)</small></p><ul>
+<h2 id="②-redis-지연장애-때-db로-폴백하기"><a class="anchor" href="#②-redis-지연장애-때-db로-폴백하기" aria-hidden="true">#</a>② Redis 지연·장애 때 DB로 폴백하기</h2><div class="step-facts"><div class="step-fact fact-layers"><p class="fact-label">이 순서에서 만들 층</p><p>서비스 · 테스트</p></div><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(내 프로젝트 · 경로는 구현 예시 기준)</small></p><ul>
 <li><code>src/main/java/com/example/board/post/PopularPostService.java</code></li>
 <li><code>src/test/java/com/example/board/post/PopularPostFallbackTest.java</code></li>
 </ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>Redis 타임아웃을 두지 않거나 캐시 예외를 그대로 던지면 캐시 장애가 글쓰기 같은 핵심 경로까지 번진다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
@@ -1039,9 +1043,10 @@ public class RedisGuard {
 
 <section class="day-step" id="step-d09-3" data-step="D09-3">
 
-<h2 id="③-글-변경-이벤트를-커밋-뒤에-받아-인기글-캐시-지우기-postserviceimpl에서-이벤트-발행"><a class="anchor" href="#③-글-변경-이벤트를-커밋-뒤에-받아-인기글-캐시-지우기-postserviceimpl에서-이벤트-발행" aria-hidden="true">#</a>③ 글 변경 이벤트를 커밋 뒤에 받아 인기글 캐시 지우기 (<code>PostServiceImpl</code>에서 이벤트 발행)</h2><div class="step-facts"><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(내 프로젝트 · 경로는 구현 예시 기준)</small></p><ul>
+<h2 id="③-글-변경-이벤트를-커밋-뒤에-받아-인기글-캐시-지우기-postserviceimpl에서-이벤트-발행"><a class="anchor" href="#③-글-변경-이벤트를-커밋-뒤에-받아-인기글-캐시-지우기-postserviceimpl에서-이벤트-발행" aria-hidden="true">#</a>③ 글 변경 이벤트를 커밋 뒤에 받아 인기글 캐시 지우기 (<code>PostServiceImpl</code>에서 이벤트 발행)</h2><div class="step-facts"><div class="step-fact fact-layers"><p class="fact-label">이 순서에서 만들 층</p><p>서비스</p></div><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(내 프로젝트 · 경로는 구현 예시 기준)</small></p><ul>
 <li><code>src/main/java/com/example/board/post/PostChangedEvent.java</code></li>
 <li><code>src/main/java/com/example/board/post/PostCacheEvictListener.java</code></li>
+<li><code>src/main/java/com/example/board/post/PostServiceImpl.java</code></li>
 </ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>커밋 전에 캐시를 지우면 그 사이 다른 요청이 옛 값을 다시 적재해 TTL 동안 남는다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
 <li><code>DELETE /api/posts/{postId}</code> → 204 직후 <code>GET /api/posts/popular</code>에 그 글이 없다</li>
 <li><code>PostCacheEvictListenerTest</code> 통과: 롤백된 트랜잭션에서는 캐시를 지우지 않는다</li>
@@ -1089,19 +1094,6 @@ public class PostCacheEvictListener {
         popularPostService.evict();
     }
 }</code></pre>
-<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PopularPostService.java</code> (바뀐 부분)</p>
-<pre><code data-lazy-lang="diff">@@ -65,6 +65,11 @@ public class PopularPostService {
-         }
-     }
- 
-+    /** 글 변경이 커밋된 뒤 부른다. 실패해도 TTL(60초) 뒤에는 새 값이 되므로 경고만 남긴다. */
-+    public void evict() {
-+        guard.run(&quot;인기글 캐시 삭제&quot;, () -&gt; redis.delete(KEY));
-+    }
-+
-     /** 상위 20개 고정 목록이라 한 쪽뿐이다. size만큼 앞에서 자르고 nextCursor는 항상 null이다. */
-     public CursorPage&lt;PopularPost&gt; page(String cursor, int size) {
-         // 커서 형식만 검사한다(서버가 준 적 없는 값은 400). 다음 쪽이 없으니 위치로는 쓰지 않는다.</code></pre>
 <p><strong>수정</strong> <code>src/main/java/com/example/board/post/PostServiceImpl.java</code> (바뀐 부분)</p>
 <pre><code data-lazy-lang="diff">@@ -3,6 +3,7 @@ package com.example.board.post;
  import java.util.LinkedHashSet;
@@ -1161,6 +1153,19 @@ public class PostCacheEvictListener {
      }
  
      private Post findOwned(Long postId, Long memberId) {</code></pre>
+<p><strong>수정</strong> <code>src/main/java/com/example/board/post/PopularPostService.java</code> (바뀐 부분)</p>
+<pre><code data-lazy-lang="diff">@@ -65,6 +65,11 @@ public class PopularPostService {
+         }
+     }
+ 
++    /** 글 변경이 커밋된 뒤 부른다. 실패해도 TTL(60초) 뒤에는 새 값이 되므로 경고만 남긴다. */
++    public void evict() {
++        guard.run(&quot;인기글 캐시 삭제&quot;, () -&gt; redis.delete(KEY));
++    }
++
+     /** 상위 20개 고정 목록이라 한 쪽뿐이다. size만큼 앞에서 자르고 nextCursor는 항상 null이다. */
+     public CursorPage&lt;PopularPost&gt; page(String cursor, int size) {
+         // 커서 형식만 검사한다(서버가 준 적 없는 값은 400). 다음 쪽이 없으니 위치로는 쓰지 않는다.</code></pre>
 <p><strong>수정</strong> <code>src/main/resources/application.yml</code> (바뀐 부분)</p>
 <pre><code data-lazy-lang="diff">@@ -18,6 +18,10 @@ spring:
      hibernate:
@@ -1604,7 +1609,7 @@ class PostCacheEvictListenerTest extends ApiTestSupport {
 
 <section class="day-step" id="step-d09-4" data-step="D09-4">
 
-<h2 id="④-선착순-쿠폰-잔여-수량을-redis-원자적-감소로-거르기-기준-데이터는-db"><a class="anchor" href="#④-선착순-쿠폰-잔여-수량을-redis-원자적-감소로-거르기-기준-데이터는-db" aria-hidden="true">#</a>④ 선착순 쿠폰 잔여 수량을 Redis 원자적 감소로 거르기 (기준 데이터는 DB)</h2><div class="step-facts"><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(내 프로젝트 · 경로는 구현 예시 기준)</small></p><ul>
+<h2 id="④-선착순-쿠폰-잔여-수량을-redis-원자적-감소로-거르기-기준-데이터는-db"><a class="anchor" href="#④-선착순-쿠폰-잔여-수량을-redis-원자적-감소로-거르기-기준-데이터는-db" aria-hidden="true">#</a>④ 선착순 쿠폰 잔여 수량을 Redis 원자적 감소로 거르기 (기준 데이터는 DB)</h2><div class="step-facts"><div class="step-fact fact-layers"><p class="fact-label">이 순서에서 만들 층</p><p>서비스 · 테스트</p></div><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(내 프로젝트 · 경로는 구현 예시 기준)</small></p><ul>
 <li><code>src/main/java/com/example/board/coupon/CouponStockCounter.java</code></li>
 <li><code>src/main/java/com/example/board/coupon/CouponService.java</code></li>
 <li><code>src/test/java/com/example/board/coupon/CouponIssueConcurrencyTest.java</code></li>
@@ -1951,7 +1956,7 @@ class CouponIssueConcurrencyTest extends ApiTestSupport {
 
 <section class="day-step" id="step-d09-5" data-step="D09-5">
 
-<h2 id="⑤-활동-랭킹-sorted-set-댓글-작성-2점-적립도-여기서-commentservice에-추가"><a class="anchor" href="#⑤-활동-랭킹-sorted-set-댓글-작성-2점-적립도-여기서-commentservice에-추가" aria-hidden="true">#</a>⑤ 활동 랭킹 (Sorted Set, 댓글 작성 2점 적립도 여기서 <code>CommentService</code>에 추가)</h2><div class="step-facts"><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(내 프로젝트 · 경로는 구현 예시 기준)</small></p><ul>
+<h2 id="⑤-활동-랭킹-sorted-set-댓글-작성-2점-적립도-여기서-commentservice에-추가"><a class="anchor" href="#⑤-활동-랭킹-sorted-set-댓글-작성-2점-적립도-여기서-commentservice에-추가" aria-hidden="true">#</a>⑤ 활동 랭킹 (Sorted Set, 댓글 작성 2점 적립도 여기서 <code>CommentService</code>에 추가)</h2><div class="step-facts"><div class="step-fact fact-layers"><p class="fact-label">이 순서에서 만들 층</p><p>서비스 · 컨트롤러</p></div><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(내 프로젝트 · 경로는 구현 예시 기준)</small></p><ul>
 <li><code>src/main/java/com/example/board/point/ActivityRankingService.java</code></li>
 <li><code>src/main/java/com/example/board/point/RankingController.java</code></li>
 </ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>랭킹 점수를 Redis에만 쌓으면 Redis 데이터가 사라질 때 되살릴 원천이 없으므로 포인트 이력에서 다시 만들 수 있게 한다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
@@ -1961,6 +1966,7 @@ class CouponIssueConcurrencyTest extends ApiTestSupport {
 <summary>막히면</summary>
 
 <ul>
+<li>이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 기존 테이블과 제약을 확인한다 → 업무 검증과 트랜잭션 경계를 연결한다 → DTO와 응답 계약을 연결해 호출로 확인한다. 앞서 만든 층은 재사용하고 이 순서에서 바꾸는 부분만 진행한다.</li>
 <li><code>opsForZSet().incrementScore</code>와 <code>reverseRangeWithScores</code>를 찾아본다. 점수 원천은 포인트 이력다.</li>
 </ul>
 </details>
@@ -2661,7 +2667,7 @@ class ActivityRankingApiTest extends ApiTestSupport {
 
 <section class="day-step" id="step-d09-6" data-step="D09-6">
 
-<h2 id="⑥-로그인-시도-횟수-제한-redis-10분-5회"><a class="anchor" href="#⑥-로그인-시도-횟수-제한-redis-10분-5회" aria-hidden="true">#</a>⑥ 로그인 시도 횟수 제한 (Redis, 10분 5회)</h2><div class="step-facts"><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(내 프로젝트 · 경로는 구현 예시 기준)</small></p><ul>
+<h2 id="⑥-로그인-시도-횟수-제한-redis-10분-5회"><a class="anchor" href="#⑥-로그인-시도-횟수-제한-redis-10분-5회" aria-hidden="true">#</a>⑥ 로그인 시도 횟수 제한 (Redis, 10분 5회)</h2><div class="step-facts"><div class="step-fact fact-layers"><p class="fact-label">이 순서에서 만들 층</p><p>서비스</p></div><div class="step-fact fact-files"><p class="fact-label">만들 파일 <small>(내 프로젝트 · 경로는 구현 예시 기준)</small></p><ul>
 <li><code>src/main/java/com/example/board/member/LoginAttemptLimiter.java</code></li>
 <li><code>src/main/java/com/example/board/member/AuthService.java</code></li>
 </ul></div><div class="step-fact fact-trap"><p class="fact-label">겪을 것</p><p>시도 횟수를 서버 메모리에 두면 인스턴스마다 따로 세어 서버 수만큼 더 시도할 수 있다.</p></div><div class="step-fact fact-done"><p class="fact-label">완료 조건</p><ul>
@@ -3250,7 +3256,7 @@ class LoginAttemptLimiterTest extends ApiTestSupport {
 
 
 
-<script src="../../tools/site/course.js?v=3c913b1d647c" defer></script>
+<script src="../../tools/site/course.js?v=61eb689f4e87" defer></script>
 <script src="../../tools/site/course-flow.js?v=1684be5bc034" defer></script>
 </body>
 </html>
