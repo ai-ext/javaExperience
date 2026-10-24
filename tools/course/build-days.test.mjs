@@ -354,7 +354,7 @@ test('2단계 일자 페이지 머리에 티켓 규칙과 그날 구성이 보�
   assert.ok(d13.steps[0].done.some((x) => x.includes('같은 키 동시 주문')), 'B03 확인 테스트의 동시 주문 경계까지 한다');
   assert.deepEqual(d13.steps.find((s) => s.no === 3).tickets, ['B09'], 'B09 ③ 번호 보존');
   assert.deepEqual(d13.steps.find((s) => s.no === 5).tickets, ['B06'], 'B06은 빠뜨리지 않고 ⑤로 이동');
-  assert.match(built.files.get('course/spring/README.md'), /필수 B01~B04 4건 \+ 선택 1건/, '일자 목록: 티켓 규칙');
+  assert.match(built.files.get('course/spring/README.md').replace(/\\~/g, '~'), /필수 B01~B04 4건 \+ 선택 1건/, '일자 목록: 티켓 규칙');
 });
 
 test('모의 장애 훈련: 201/200 유지는 B16을 처리한 경우만 보고, 나머지 항목은 모두에게 건다', () => {

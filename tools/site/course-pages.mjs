@@ -43,7 +43,7 @@ export function loadCourse(root) {
   const d00 = h1('course/spring/D00.md');
   const days = [
     { id: 'D00', phase: 'warmup', title: d00 ? d00.replace(/^D00\.\s*/, '') : 'Java 워밍업 (선택)', java: 'J00', steps: [], optional: true },
-    ...roadmap.days.map((d) => ({ id: d.id, phase: d.phase, title: d.title, java: d.java, tomorrow: d.tomorrow,
+    ...roadmap.days.map((d) => ({ id: d.id, phase: d.phase, title: d.title, java: d.java, tomorrow: d.tomorrow, transition: d.transition,
       steps: d.steps.map((s) => ({ id: `${d.id}-${s.no}`, no: s.no, title: s.title, short: shortTitle(s.title), tickets: s.tickets || [], guides: s.guides || [] })) })),
   ].map((d) => ({ ...d, page: `course/spring/${d.id}.html`, source: `course/spring/${d.id}.md` }));
   for (const d of days) if (!exists(d.source)) throw new Error(`과정 데이터: ${d.source}가 없다`);
@@ -103,7 +103,88 @@ export function renderExerciseNavigation(sourceRel, body, course) {
   const nav = `<nav class="course-exercise-nav" aria-label="연습에서 일자로 돌아가기"><p>이 연습을 쓰는 날: ${returns}</p>${java ? `<p>${location}</p>${timing}<p>${neighbors}</p>` : ''}</nav>`;
   const headEnd = body.indexOf('</h1>') + 5;
   if (headEnd < 5) throw new Error(`${sourceRel}: 제목이 없다`);
-  return `${body.slice(0, headEnd)}\n${nav}\n${body.slice(headEnd)}\n${nav}`;
+  return renderExerciseDocument(`${body.slice(0, headEnd)}\n${nav}\n${body.slice(headEnd)}\n${nav}`, id, Boolean(java));
+}
+
+// 기존 본문을 DOM 단위로 옮겨 원문·접기·앵커를 보존한다.
+function renderExerciseDocument(body, id, isJava) {
+  const doc = new JSDOM(`<article>${body}</article>`).window.document;
+  const article = doc.querySelector('article');
+  article.className = `exercise-sheet ${isJava ? 'exercise-java' : 'exercise-ticket'}`;
+  article.dataset.exercise = id;
+  const title = article.querySelector('h1');
+  const meta = article.querySelector(':scope > blockquote');
+  const head = doc.createElement('header');
+  head.className = 'exercise-head';
+  head.innerHTML = `<p class="exercise-kind"><b>${esc(id)}</b> ${isJava ? 'Java 연결 실험' : '2단계 · 티켓 작업서'}</p>`;
+  title.before(head);
+  head.append(title);
+  if (meta) { meta.className = 'exercise-meta'; head.append(meta); }
+
+  // 재현과 제출물을 긴 흐름 재생보다 먼저 둔다. 원인 단계는 이동한 section의 details 안에 그대로 남는다.
+  const flow = article.querySelector(':scope > .ticket-flow');
+  const submit = article.querySelector(':scope > h2[id="제출물"]');
+  if (flow && submit) {
+    let last = submit;
+    while (last.nextElementSibling && last.nextElementSibling.tagName !== 'H2') last = last.nextElementSibling;
+    last.after(flow);
+  }
+  const headings = [...article.querySelectorAll(':scope > h2')];
+  const primary = isJava
+    ? ['만들 파일과 실행 위치', '만들 것', '오늘 실험', '실행과 완료 조건', '오늘 Spring에서 다시 만나는 곳']
+    : id === 'drill' ? ['준비', '스크립트', '진행', '회고 양식'] : ['받은 티켓', '받은 요청', '환경과 재현', '제출물'];
+  const label = h => h.textContent.replace(/^#\s*/, '').trim();
+  const stops = headings.filter(h => primary.includes(label(h)));
+  const route = doc.createElement('nav');
+  route.className = 'exercise-route';
+  route.setAttribute('aria-label', isJava ? 'Java 실험 순서' : '티켓 처리 순서');
+  route.innerHTML = `<ol>${stops.map((h, i) => `<li><a href="#${esc(h.id)}"><b>${String(i + 1).padStart(2, '0')}</b><span>${esc(label(h) === '오늘 Spring에서 다시 만나는 곳' ? 'Spring 이어하기' : label(h))}</span></a></li>`).join('')}${flow ? `<li><a href="#${esc(flow.id)}"><b>04</b><span>흐름 재생</span></a></li>` : ''}</ol>`;
+  head.after(route);
+  for (const heading of headings) {
+    const section = doc.createElement('section');
+    section.className = 'exercise-section';
+    if (['받은-티켓', '받은-요청'].includes(heading.id)) section.classList.add('exercise-received');
+    if (heading.id === '환경과-재현') section.classList.add('exercise-repro');
+    if (heading.id === '제출물') section.classList.add('exercise-submission');
+    if (heading.id === '원인과-정답') section.classList.add('exercise-answer');
+    section.setAttribute('aria-labelledby', heading.id);
+    heading.before(section);
+    section.append(heading);
+    while (section.nextElementSibling && !section.nextElementSibling.matches('h2, .ticket-flow, .course-exercise-nav')) section.append(section.nextElementSibling);
+  }
+  for (const nav of article.querySelectorAll('.course-exercise-nav')) {
+    nav.classList.add('exercise-return');
+    const back = nav.querySelector('p');
+    back.className = 'exercise-return-links';
+    if (nav === article.lastElementChild) {
+      nav.insertAdjacentHTML('afterbegin', `<strong>${isJava ? '실험 결과를 남겼다면' : '제출물을 준비했다면'}</strong>`);
+      nav.insertAdjacentHTML('beforeend', '<p class="exercise-return-note">연결된 일자로 돌아가 완료 조건을 확인하고 진행 기록을 남기세요.</p>');
+    }
+  }
+  return article.outerHTML;
+}
+
+function renderStageTransition(day) {
+  const t = day.transition;
+  if (!t) return '';
+  return `<aside class="stage-transition" aria-label="${esc(t.label)}"><p class="stage-transition-label">${esc(t.label)}</p><h2>${esc(t.title)}</h2><p>${esc(t.description)}</p><ol>${t.actions.map((a, i) => `<li><a href="${esc(a.href)}"><b>${String(i + 1).padStart(2, '0')}</b><span>${esc(a.label)}</span></a></li>`).join('')}</ol></aside>`;
+}
+
+function frameHandoff(html) {
+  const doc = new JSDOM(`<div>${html}</div>`).window.document;
+  const root = doc.body.firstElementChild;
+  const heading = root.querySelector('#인수인계-시작');
+  if (!heading) throw new Error('D11: 인수인계 시작 절이 없다');
+  const sheet = doc.createElement('section');
+  sheet.className = 'handoff-sheet';
+  sheet.setAttribute('aria-labelledby', heading.id);
+  heading.before(sheet);
+  sheet.append(heading);
+  while (sheet.nextElementSibling && !sheet.nextElementSibling.matches('h2, hr, .day-step, .day-overview, .practice-panel')) sheet.append(sheet.nextElementSibling);
+  root.querySelector('.day-head').after(sheet);
+  const selection = root.querySelector('.ticket-selection');
+  if (selection) sheet.after(selection);
+  return root.innerHTML;
 }
 
 const relHref = (fromRel, target) => path.posix.relative(path.posix.dirname(fromRel), target);
@@ -157,9 +238,22 @@ function renderFacts(segment, fromRel, course) {
       const ids = [...rest.matchAll(/<code>([BE]\d{2})<\/code>/g)].map((m) => m[1]);
       rest = `<p class="ticket-badges">${ids.map((id) => ticketBadge(course.tickets.find((t) => t.id === id), fromRel, course)).join('')}</p>`;
     }
-    return `<div class="step-fact fact-${key}"><p class="fact-label">${label}${note}</p>${rest}</div>`;
+    if (key === 'files') {
+      // 전체 경로는 복사·검색 가능하게 지키고, 파일 이름에만 읽는 무게를 준다.
+      rest = rest.replace(/<code>([^<]*\/)([^/<]+)<\/code>/g, '<code><span class="file-directory">$1</span><b class="file-name">$2</b></code>');
+      rest = rest.replace(/<li><strong>(새로 만들기|기존 수정|확인만)<\/strong>:\s*([\s\S]*?)<\/li>/g, (_, action, files) =>
+        `<li class="file-action-row"><strong class="file-action">${action}</strong><span class="file-paths">${files.replace(/<\/code>\s*·\s*<code>/g, '</code><code>')}</span></li>`);
+    }
+    return { key, html: `<div class="step-fact fact-${key}"><p class="fact-label">${label}${note}</p>${rest}</div>` };
   });
-  return `${lead}${facts.length ? `<div class="step-facts">${facts.join('')}</div>` : ''}`;
+  // 명세를 읽은 뒤 작업하고 완료 조건을 대조한다. CSS 순서와 읽기 순서를 일치시킨다.
+  const order = ['layers', 'files', 'tickets', 'data-spec', 'spec', 'trap', 'done', 'answer-link'];
+  facts.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+  const refs = facts.filter(f => ['spec', 'data-spec'].includes(f.key));
+  const body = facts.filter(f => !['spec', 'data-spec'].includes(f.key));
+  const refAt = body.findIndex(f => ['trap', 'done', 'answer-link'].includes(f.key));
+  if (refs.length) body.splice(refAt < 0 ? body.length : refAt, 0, { html: `<div class="step-references">${refs.map(f => f.html).join('')}</div>` });
+  return `${lead}${facts.length ? `<div class="step-facts">${body.map(f => f.html).join('')}</div>` : ''}`;
 }
 
 function renderStepSection(section, fromRel, course, step) {
@@ -169,10 +263,19 @@ function renderStepSection(section, fromRel, course, step) {
     const candidates = ['<details', '<blockquote', '</section>'].map((tag) => section.indexOf(tag, headEnd)).filter((i) => i >= 0);
     return Math.min(...candidates);
   })();
-  const facts = renderFacts(section.slice(headEnd, bodyEnd).trim(), fromRel, course);
-  const tail = section.slice(bodyEnd).replace(/<\/section>\s*$/, '');
+  let facts = renderFacts(section.slice(headEnd, bodyEnd).trim(), fromRel, course);
+  let tail = section.slice(bodyEnd).replace(/<\/section>\s*$/, '');
+  const observationId = `observations-${step.id.toLowerCase()}`;
+  if (/<details class="step-observations"[^>]*>\s*<summary>꼭 할 관찰/.test(tail)) {
+    tail = tail.replace('<details class="step-observations"', `<details id="${observationId}" class="step-observations"`);
+    facts = facts.replace(/(<div class="step-fact fact-done">)([\s\S]*?)(<\/div>)/, `$1$2<p><a class="step-required" href="#${observationId}">꼭 할 관찰 절차와 제출 증거 확인 ↓</a></p>$3`);
+  }
+  const head = section.slice(0, headEnd).replace(/(<h2[^>]*>(?:<a\b[^>]*>[\s\S]*?<\/a>)?)([①②③④⑤⑥⑦⑧⑨⑩])\s*/, '$1<span class="step-number">$2</span> <span class="step-title">').replace('</h2>', '</span></h2>');
+  const day = course.days.find(d => d.steps.some(s => s.id === step.id));
+  const next = day.steps[day.steps.indexOf(step) + 1];
+  const nextLink = `<a class="step-next" href="${next ? `#step-${next.id.toLowerCase()}` : '#오늘-순서'}">${next ? `다음 순서 ${NUMS[next.no - 1]} →` : '오늘 순서로 돌아가기 ↑'}</a>`;
   const done = `<p class="step-done"><label><input type="checkbox" class="step-check" data-step="${esc(step.id)}"> 이 순서를 끝냈다</label></p>`;
-  return `${section.slice(0, headEnd)}${facts}${tail}${done}</section>`;
+  return `${head}${facts}<div class="step-help">${tail}</div><div class="step-footer">${done}${nextLink}</div></section>`;
 }
 
 function dayPager(day, fromRel, course) {
@@ -183,6 +286,36 @@ function dayPager(day, fromRel, course) {
   return `<nav class="day-pager" aria-label="이전·다음 날">${link(course.days[index - 1], 'prev')}<a class="day-pager-list" href="README.html">일자 목록</a>${link(course.days[index + 1], 'next')}</nav>`;
 }
 
+// 실습 후반부만 꾸민다. 원문·앵커·복사 대상은 그대로 두고 행동별 경계를 만든다.
+function renderPracticeFinish(html, day, course) {
+  const heading = (block, label) => block.replace(/(<h2\b[^>]*>[\s\S]*?<\/h2>)/, `<header class="practice-heading"><p class="practice-kicker">${label}</p>$1</header>`);
+  html = html.replace(/<section class="day-data">([\s\S]*?)<\/section>/, (_, body) => `<section class="day-data practice-panel" aria-labelledby="이-날-데이터-넣기">${heading(body, '준비 · 테이블을 만든 뒤')}</section>`);
+  html = html.replace(/<section class="day-sql">([\s\S]*?)<\/section>/, (_, body) => `<section class="day-sql practice-panel" aria-labelledby="오늘의-sql">${heading(body, '01 · 직접 풀기')}</section>`);
+  html = html.replace(/(<div class="day-data-file" data-day-sql="(seed|bulk)"[^>]*>)/g, (_, tag, kind) => `${tag}<p class="data-file-label">${kind === 'seed' ? '기본 데이터 · 전체 블록' : '별도 실험 · 대량 데이터'}</p>`);
+  // bulk는 기본 적재와 구분한다. D04의 실행 금지 안내는 접기 밖 원문에 남는다.
+  html = html.replace(/(<div class="day-data-file" data-day-sql="bulk"[\s\S]*?<\/details>\s*<\/div>)/g, '<details class="day-bulk"><summary>대량 실험 데이터 · 별도 DB에서만 사용</summary>$1</details>');
+
+  const talk = between(html, /<h2 id="말하기-카드"/, /<h2 /);
+  if (talk) {
+    const cards = talk.text.replace(/(<h3 id="tc-[^"]+"[\s\S]*?<\/details>)/g, '<div class="practice-talk-card">$1</div>');
+    html = html.slice(0, talk.start) + `<section class="day-talk practice-panel" aria-labelledby="말하기-카드">${heading(cards, '02 · 소리 내어 설명하기')}<p class="practice-next"><a href="#ai-채점-프롬프트">설명을 마쳤으면 AI 채점으로 <span aria-hidden="true">→</span></a></p></section>` + html.slice(talk.end);
+  }
+  const grade = between(html, /<h2 id="ai-채점-프롬프트"/, /<h2 /);
+  if (grade) {
+    const content = grade.text.replace(/(<pre class="grader-prompt"[\s\S]*?<\/pre>)/, '<details class="grader-source"><summary>채점 프롬프트 내용 확인</summary>$1</details>');
+    html = html.slice(0, grade.start) + `<section class="day-grade practice-panel" aria-labelledby="ai-채점-프롬프트">${heading(content, '03 · 결과 확인하기')}<p class="practice-grade-note">프롬프트를 복사한 뒤 에이전트에서 실행하고 채점표를 확인하세요. 복사와 구현 체크는 채점 완료가 아닙니다.</p></section>` + html.slice(grade.end);
+  }
+  const next = between(html, /<h2 id="내일-미리보기"/, /<h2 |<nav class="day-pager"/);
+  if (next) {
+    const index = course.days.indexOf(day);
+    const tomorrow = course.days[index + 1];
+    const title = tomorrow ? next.text : next.text.replace('내일 미리보기', '과정 마무리');
+    const link = tomorrow ? `<a class="practice-continue" href="${tomorrow.id}.html"><small>다음 날</small><span>${tomorrow.id} · ${esc(tomorrow.title)}</span><span aria-hidden="true">→</span></a>` : '<a class="practice-continue" href="README.html">일자 목록에서 복습할 날 고르기 <span aria-hidden="true">→</span></a>';
+    html = html.slice(0, next.start) + `<section class="day-finish practice-panel" aria-labelledby="내일-미리보기"><p class="practice-kicker">하루 마무리</p><nav class="practice-review" aria-label="하루 마무리 확인"><a href="#오늘의-sql">SQL 결과 확인</a><a href="#말하기-카드">말하기 답 기준 비교</a><a href="#ai-채점-프롬프트">AI 채점표 확인</a></nav>${title}${link}</section>` + html.slice(next.end);
+  }
+  return html;
+}
+
 export function dayCrumbs(sourceRel, course) {
   const id = path.posix.basename(sourceRel, '.md');
   const day = course.days.find((d) => d.id === id);
@@ -190,7 +323,7 @@ export function dayCrumbs(sourceRel, course) {
   const index = course.days.indexOf(day);
   const prev = course.days[index - 1];
   const next = course.days[index + 1];
-  return `<nav class="course-crumbs" aria-label="현재 위치"><p class="crumbs"><a href="../README.html">과정 v2</a> › <a href="README.html">Spring 일자</a> › ${esc(day.id)}</p><p class="course-crumbs-jump">${prev ? `<a href="${prev.id}.html">← ${prev.id}</a>` : ''}${next ? `<a href="${next.id}.html">${next.id} →</a>` : ''}</p></nav>`;
+  return `<nav class="course-crumbs day-crumbs" aria-label="현재 위치"><p class="crumbs"><a href="../README.html">과정 v2</a> <span aria-hidden="true">/</span> <a href="README.html">일자 목록</a> <span aria-hidden="true">/</span> <span aria-current="page">${esc(day.id)}</span></p><p class="course-crumbs-jump">${prev ? `<a href="${prev.id}.html" rel="prev" aria-label="이전 날 ${prev.id}: ${esc(prev.title)}">← 이전 ${prev.id}</a>` : ''}${next ? `<a href="${next.id}.html" rel="next" aria-label="다음 날 ${next.id}: ${esc(next.title)}">다음 ${next.id} →</a>` : ''}</p></nav>`;
 }
 
 export function renderDayPage(sourceRel, body, course) {
@@ -200,6 +333,7 @@ export function renderDayPage(sourceRel, body, course) {
   const strict = day.phase === 'build';
   const fail = (what) => { if (strict) throw new Error(`${sourceRel}: ${what}`); };
   let html = body.replace(/<!-- 생성물:[^>]*-->\s*/, '');
+  let todayPanel = '';
 
   // 1) 제목 + 요약 줄 → 머리
   const head = html.match(/(<h1\b[\s\S]*?<\/h1>)\s*<blockquote>\s*<p>([\s\S]*?)<\/p>\s*<\/blockquote>/);
@@ -229,21 +363,28 @@ export function renderDayPage(sourceRel, body, course) {
     const coreCount = day.steps.length - extraCount || day.steps.length;
     const progress = `0/${coreCount} 끝냄${extraCount && extraCount < day.steps.length ? ` · 선택·연습 0/${extraCount}` : ''}`;
     const extraNote = extraCount && extraCount < day.steps.length ? ' 선택·연습 티켓 순서는 진도에 세지 않습니다.' : '';
-    html = html.slice(0, steps.start)
-      + `<section class="day-today" aria-labelledby="오늘-순서"><div class="day-today-head">${heading}<p class="day-progress" data-day-progress aria-live="polite">${progress}</p></div>`
+    const firstCore = day.steps.find((s) => !isExtraStep(s, course)) || day.steps[0];
+    todayPanel = `<section class="day-today" aria-labelledby="오늘-순서"><div class="day-today-head"><div><p class="day-panel-label">Spring · 구현 체크</p>${heading}</div><p class="day-progress" data-day-progress aria-live="polite">${progress}</p></div>`
+      + `<progress class="day-progress-track" data-day-meter max="${coreCount}" value="0" aria-label="필수 구현 순서 진도"></progress>`
       + `<ol class="day-steps day-chips" data-day="${day.id}">${chipList}</ol>`
-      + `<p class="day-progress-note">구현 체크는 이 브라우저에만 저장되며 채점 결과가 아닙니다. SQL·말하기·채점도 확인하세요. 다른 기기·브라우저에서는 일자 목록에서 하던 날로 직접 재진입하세요.${extraNote} <span data-course-storage></span></p></section>\n`
-      + html.slice(steps.end);
+      + `<a class="day-resume" data-day-resume href="#step-${firstCore.id.toLowerCase()}">${NUMS[day.steps.indexOf(firstCore)]} 시작하기 →</a>`
+      + `<p class="day-progress-note">구현 체크는 이 브라우저에만 저장되며 채점 결과가 아닙니다. SQL·말하기·채점도 확인하세요. 다른 기기·브라우저에서는 일자 목록에서 하던 날로 직접 재진입하세요.${extraNote} <span data-course-storage></span></p></section>`;
+    html = html.slice(0, steps.start) + html.slice(steps.end);
   } else fail('오늘 순서가 없다');
 
-  // 3) 오늘의 Java → 카드, 그 아래 [오늘 흐름]. 1단계는 요청 흐름 재생, 2단계는 그날 티켓의 장애 흐름으로 잇는다. 흐름이 없는 날(D00·D15)은 빈 자리만 둔다.
+  // 3) Java·구현 목록 다음에 [오늘 흐름]을 둔다. 1단계는 요청 흐름 재생, 2단계는 그날 티켓의 장애 흐름으로 잇는다. 흐름이 없는 날(D00·D15)은 빈 자리만 둔다.
   const javaBlock = between(html, /<h2 id="오늘의-java"/, /<hr>|<h2 /);
   const dayFlow = course.flows.days.get(day.id);
   const flowSlot = dayFlow ? renderDayFlow(dayFlow)
     : (day.phase === 'maintain' && renderDayTicketLinks(day, course, course.flows, sourceRel)) || `<div class="day-flow" data-flow-day="${day.id}" hidden></div>\n`;
   if (javaBlock) {
     // 본문 첫 링크(Jnn. 제목 — 30~60분)가 여는 동작이라, 같은 목적의 버튼을 따로 두지 않는다.
-    html = html.slice(0, javaBlock.start) + `<section class="day-java" aria-labelledby="오늘의-java">${javaBlock.text}</section>\n${flowSlot}` + html.slice(javaBlock.end);
+    const timing = course.java.find((j) => j.id === day.java)?.timing;
+    const javaPanel = `<section class="day-java" aria-labelledby="오늘의-java"><p class="day-panel-label">${timing === 'during-or-after' ? '수행 중 · 사후 확인' : '먼저 연습하기'}</p>${javaBlock.text}</section>`;
+    const overview = `<div class="day-overview">${javaPanel}\n${todayPanel}${flowSlot}</div>`;
+    html = html.slice(0, javaBlock.start) + (todayPanel ? '' : `${javaPanel}\n${flowSlot}`) + html.slice(javaBlock.end);
+    // 긴 공통 안내 앞에 오늘의 작업대를 놓되, 안내·예시·과제 본문은 그대로 남긴다.
+    if (todayPanel) html = html.replace(/(<nav class="day-sections"[\s\S]*?<\/nav>)/, (_, nav) => `${nav}\n${overview}`);
   } else {
     fail('오늘의 Java가 없다');
     html = html.replace(/(<\/header>)/, `$1${flowSlot}`);
@@ -284,6 +425,11 @@ export function renderDayPage(sourceRel, body, course) {
   const pagerLine = /<p>(?:<a href="D\d{2}\.html">← D\d{2}[^<]*<\/a> · )?<a href="README\.html">일자 목록<\/a>(?: · <a href="D\d{2}\.html">D\d{2}[^<]*→<\/a>)?<\/p>\s*$/;
   if (!pagerLine.test(html)) throw new Error(`${sourceRel}: 맨 아래 이전·다음 줄을 찾지 못했다`);
   html = html.replace(pagerLine, dayPager(day, sourceRel, course));
+  if (day.id !== 'D00') html = renderPracticeFinish(html, day, course);
+  if (day.id === 'D11') html = frameHandoff(html);
+  const transition = renderStageTransition(day);
+  if (day.id === 'D10') html = html.replace('<nav class="day-pager"', `${transition}<nav class="day-pager"`);
+  else if (transition) html = html.replace('</header>', `</header>${transition}`);
   return `<article class="course-day" data-day-page="${day.id}">${html}</article>`;
 }
 
@@ -314,9 +460,9 @@ export function renderCourseHome(course) {
   const data = course.days.map((d) => ({ id: d.id, title: d.title, phase: d.phase, phaseLabel: PHASE[d.phase], java: d.java, javaTiming: course.java.find((j) => j.id === d.java)?.timing || 'before', href: href(d.page),
     javaHref: course.java.find((j) => j.id === d.java)?.page ? href(course.java.find((j) => j.id === d.java).page) : null,
     steps: d.steps.map((s) => ({ id: s.id, title: plain(s.short), ...(isExtraStep(s, course) ? { extra: true } : {}) })) }));
-  const todaySteps = (d) => d.steps.map((s, i) => `<li><span aria-hidden="true">${NUMS[i]}</span> ${inline(s.short)}</li>`).join('');
+  const todaySteps = (d) => d.steps.map((s, i) => `<li><span aria-hidden="true">${NUMS[i]}</span> <a href="${esc(href(d.page))}#step-${d.id.toLowerCase()}-${s.no}">${inline(s.short)}</a></li>`).join('');
   const phases = [['build', '1단계 · 만들기'], ['maintain', '2단계 · 넘겨받기'], ['wrap', '중간 점검'], ['extend', '3단계 · 설계·운영·업무 적용']];
-  const dayCell = (d) => `<li class="ch-day" data-day="${d.id}"><a href="${esc(href(d.page))}"><b>${d.id}</b><span class="ch-day-title">${esc(d.title)}</span><span class="ch-bar" aria-hidden="true"><i style="width:0%"></i></span><small data-day-count>0/${coreCount(d)}</small></a></li>`;
+  const dayCell = (d) => `<li class="ch-day" data-day="${d.id}"><a href="${esc(href(d.page))}" title="${esc(d.id + ' · ' + d.title)}"><b>${d.id}</b><span class="ch-day-title">${esc(d.title)}</span><span class="ch-bar" aria-hidden="true"><i style="width:0%"></i></span><small data-day-count>0/${coreCount(d)}</small></a></li>`;
   const javaChips = course.java.map((j) => (j.page
     ? `<a href="${esc(href(j.page))}" title="${esc(j.title)}">${j.id}${j.optional ? '<small>선택</small>' : ''}</a>`
     : `<span>${j.id}</span>`)).join('');
@@ -326,29 +472,44 @@ export function renderCourseHome(course) {
   }).join('');
   const readyTickets = course.tickets.filter((t) => t.page && !t.enhancement).length;
   return `<section class="course-home" data-course-home aria-labelledby="course-home-title">
-  <div class="ch-intro"><p class="home-eyebrow">Java·Spring 온보딩 과정 v2 · ${main.length}일</p><h1 id="course-home-title">빈 프로젝트로 서버를 만들고, <span>넘겨받은 서버를 고칩니다.</span></h1><p>1단계 10일은 게시판·상점·결제 연동 서버를 직접 만들고, 2단계 4일은 결함이 심어진 서버의 티켓을 처리합니다. D15에서 중간 점검하고, 3단계는 새 요구 설계·배포·재시작 작업·장애·회의를 검증합니다. 보통 Java를 먼저 연습하며 D44·D45는 요구 제시·초기 진단 뒤 증거로 연결합니다. 완료 조건을 체크한 만큼 다음 날로 갑니다.</p></div>
+  <div class="ch-intro"><p class="home-eyebrow">Java·Spring 온보딩 과정 v2 · ${main.length}일</p><h1 id="course-home-title">빈 프로젝트로 서버를 만들고, <span>넘겨받은 서버를 고칩니다.</span></h1><p>직접 만들기 → 티켓 처리 → 설계·운영·독립 수행. 오늘의 Java를 연습하고 Spring에서 구현한 뒤, SQL·말하기·채점으로 마무리하세요.</p></div>
   <div class="ch-hero">
     <article class="ch-today" aria-labelledby="ch-today-title">
       <p class="ch-tag" data-today-tag>오늘 할 일 · 처음 시작</p>
       <h2 id="ch-today-title"><b data-today-id>${first.id}</b> <span data-today-title>${esc(first.title)}</span></h2>
       <p class="ch-today-meta" data-today-meta>${esc(PHASE[first.phase])} · 구현 순서 ${first.steps.length}개 · 오늘의 Java ${esc(first.java)}</p>
-      <ol class="ch-today-steps" data-today-steps>${todaySteps(first)}</ol>
       <nav class="ch-actions" data-today-flow aria-label="오늘 진행 순서"><a class="ch-primary" data-today-java href="${esc(href(course.java.find((j) => j.id === first.java).page))}">Java ${esc(first.java)}</a><span aria-hidden="true">→</span><a class="ch-secondary" data-today-open href="${esc(href(first.page))}">Spring ${first.id}</a><span aria-hidden="true">→</span><a class="ch-secondary" data-today-grade href="${esc(href(first.page))}#ai-채점-프롬프트">채점</a></nav>
+      <p class="ch-flow-note">보통 Java 먼저 · D44·D45는 요구 제시·초기 진단 뒤 Java 증거 확인</p>
+      <h3 class="ch-steps-label">오늘의 구현 순서 <small>항목을 누르면 작업 위치로 이동합니다</small></h3>
+      <ol class="ch-today-steps" data-today-steps>${todaySteps(first)}</ol>
       <p data-course-wrapup></p>
       <p class="ch-note" data-today-note>Java가 처음이면 <a href="${esc(href('course/spring/D00.html'))}">D00 Java 워밍업(선택)</a>을 먼저 하세요.</p>
     </article>
+    <aside class="ch-route" aria-labelledby="ch-route-title">
+      <h2 id="ch-route-title">45일, 이렇게 이어집니다</h2>
+      <ol class="ch-milestones">
+        <li><b>01</b><div><small>D01–D10 · 만들기</small><strong>빈 프로젝트에서 서버까지</strong><p>게시판·상점·결제 연동을 직접 구현</p></div></li>
+        <li><b>02</b><div><small>D11–D15 · 넘겨받기와 점검</small><strong>결함을 찾고 근거로 고치기</strong><p>4일 티켓 처리 후 D15 중간 점검</p></div></li>
+        <li><b>03</b><div><small>D16–D45 · 설계·운영</small><strong>새 요구에서 독립 수행까지</strong><p>배포·재시작 작업·장애·회의 검증</p></div></li>
+      </ol>
+      <a href="course/map.html">Java·일자·티켓의 관계 지도 →</a>
+    </aside>
+  </div>
     <section class="ch-progress" aria-labelledby="ch-progress-title">
       <div class="ch-progress-head"><h2 id="ch-progress-title">${main.length}일 진도</h2><p data-progress-summary>체크한 순서 0/${stepTotal}</p></div>
       <p class="ch-progress-note">직접 체크한 진도이며 채점 결과가 아닙니다. Java·선택 티켓의 수행 여부와 역량은 따로 확인합니다.</p>
-      ${phases.map(([phase, label]) => `<h3 class="ch-phase">${label}</h3><ol class="ch-days">${main.filter((d) => d.phase === phase).map(dayCell).join('')}</ol>`).join('')}
+      <p class="ch-progress-key"><span class="ch-key-current">추천 구현일</span><span class="ch-key-done">구현 체크 끝</span><span>각 칸의 수치 = 체크한 순서 / 집계 순서</span></p>
+      ${phases.map(([phase, label]) => {
+        const days = main.filter(d => d.phase === phase);
+        return `<div class="ch-phase-row"><h3 class="ch-phase">${label}<small>${days[0].id}${days.length > 1 ? '–' + days.at(-1).id : ''}</small></h3><ol class="ch-days">${days.map(dayCell).join('')}</ol></div>`;
+      }).join('')}
       <p class="ch-progress-note">일자 페이지의 순서 체크가 이 브라우저에 저장되고, 여기서 다음 구현일을 추천합니다. 다른 기기·브라우저에서는 <a href="course/spring/README.html">일자 목록</a>에서 하던 날로 직접 재진입하세요. <span data-course-storage></span></p>
     </section>
-  </div>
-  ${renderTicketSelection(course, from)}
+  ${renderTicketSelection(course, from).replace('class="ticket-selection"', 'class="ticket-selection ch-ticket-summary"')}
   <div class="ch-entries">
     <article class="ch-entry"><p class="home-eyebrow">Spring 트랙 · 메인</p><h3>일자 페이지 D00~${main.at(-1).id}</h3><p>오늘 순서 → 순서 칸(만들 파일·겪을 것·완료 조건) → 막히면 힌트 → 필요한 구현 예시(1·2단계) → 오늘의 SQL → 말하기 카드와 AI 채점.</p><a href="${esc(href('course/spring/README.html'))}">일자 목록 열기 →</a></article>
-    <article class="ch-entry"><p class="home-eyebrow">Java 트랙 · 매일 30~60분</p><h3>같은 날 쓰는 Java 연결</h3><p>J16 이후는 기존 J 재사용과 오늘의 작은 경계 실험입니다. 보통 먼저 연습하고 J44·J45는 수행 중 증거·사후 확인으로 연결합니다. 실행 위치와 완료 조건을 확인하세요.</p><p class="ch-chips">${javaChips}</p></article>
-    <article class="ch-entry"><p class="home-eyebrow">2단계 티켓 · 필수 4건 + 선택 1건(Security·Redis 후보)</p><h3>증상만 적힌 티켓 B01~B16</h3><p class="ch-chips ch-ticket-chips">${ticketChips}</p><p class="ch-entry-note">필수 B01~B04 + 선택 1건(B12·B13·B14 또는 B15·B16) + <a href="${esc(href('course/tickets/E01.html'))}">고도화 E01</a> + <a href="${esc(href('course/tickets/drill.html'))}">모의 장애 훈련</a>. B05~B11과 고르지 않은 후보는 연습으로 하고, 처리한 것만 채점합니다. 티켓 문서 ${readyTickets}/16 제공 · 학습 완료 표시와 별개입니다.</p></article>
+    <article class="ch-entry"><p class="home-eyebrow">Java 트랙 · 매일 30~60분</p><h3>같은 날 쓰는 Java 연결</h3><p>J16 이후는 기존 J 재사용과 오늘의 작은 경계 실험입니다. 보통 먼저 연습하고 J44·J45는 수행 중 증거·사후 확인으로 연결합니다. 실행 위치와 완료 조건을 확인하세요.</p><details class="ch-catalog"><summary>Java 연결 ${course.java.length}개 찾아보기</summary><p class="ch-chips">${javaChips}</p></details></article>
+    <article class="ch-entry"><p class="home-eyebrow">2단계 티켓 · 필수 4건 + 선택 1건(Security·Redis 후보)</p><h3>증상만 적힌 티켓 B01~B16</h3><p class="ch-entry-note">필수 B01~B04 + 선택 1건(B12·B13·B14 또는 B15·B16) + <a href="${esc(href('course/tickets/E01.html'))}">고도화 E01</a> + <a href="${esc(href('course/tickets/drill.html'))}">모의 장애 훈련</a>. B05~B11과 고르지 않은 후보는 연습으로 하고, 처리한 것만 채점합니다. 티켓 문서 ${readyTickets}/16 제공 · 학습 완료 표시와 별개입니다.</p><details class="ch-catalog"><summary>티켓 16건 찾아보기</summary><p class="ch-chips ch-ticket-chips">${ticketChips}</p></details></article>
     <article class="ch-entry"><p class="home-eyebrow">3단계 · D16~${main.at(-1).id}</p><h3>설계에서 운영·회의·독립 수행까지</h3><p>미수행 개인 과제 → Java·DB 관찰 → 예약 쿠폰 → 배포·스키마·복원 → 계약·인증·재개 작업 → 새 업무·장애·회의 → 독립 평가. 실제 업무 이슈가 없어도 제공 변형으로 진행합니다.</p><a href="${esc(href('course/spring/D16.html'))}">D16 개인 경로 열기 →</a></article>
     <article class="ch-entry ch-entry-map"><p class="home-eyebrow">과정 지도</p><h3>날·Java·티켓·결함 영역의 관계</h3><p>어느 날의 Java가 어떤 날을 받치고, 2단계 티켓이 어떤 결함 영역에 속하는지 한 장에서 봅니다.</p><a href="${esc(href('course/map.html'))}">과정 지도 열기 →</a></article>
   </div>
@@ -419,8 +580,14 @@ export function renderCourseMap(course, fromRel = MAP_PAGE) {
     <button type="button" class="cm-clear" data-cm-clear>선택 해제</button>
   </div>
   <p class="cm-status" data-cm-status role="status" aria-live="polite">노드를 고르면 관계 보기에 맞는 노드만 밝힙니다. 아래 관계 표에 모든 연결이 글로 있습니다.</p>
-  <div class="cm-board" data-cm-board><svg class="cm-lines" data-cm-lines aria-hidden="true"></svg>${lanes}</div>
-  <div class="cm-detail" data-cm-detail hidden></div>
+  <div class="cm-workspace">
+    <div class="cm-board-scroll" tabindex="0" role="region" aria-label="전체 관계 노드 목록. 아래로 스크롤하면 나머지 일자가 나옵니다."><div class="cm-board" data-cm-board><svg class="cm-lines" data-cm-lines aria-hidden="true"></svg>${lanes}</div></div>
+    <aside class="cm-inspector" aria-label="선택한 노드의 관계와 페이지 이동">
+      <h3>선택한 연결</h3>
+      <div class="cm-empty"><b>노드 선택 → 관계 확인 → 페이지 열기</b><p>왼쪽에서 Java·일자·티켓을 고르세요. 연결된 학습과 이동 링크가 이곳에 표시됩니다.</p><p>지도는 관계를 선택하는 곳입니다. 문서로 이동하려면 ‘페이지 열기’를 누르세요.</p></div>
+      <div class="cm-detail" data-cm-detail hidden></div>
+    </aside>
+  </div>
   <script type="application/json" id="course-map-data">${JSON.stringify(graph).replace(/</g, '\\u003c')}</script>
 </section>
 <section class="cm-tables" aria-labelledby="cm-table-title">

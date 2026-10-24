@@ -152,7 +152,7 @@
       selected = selected === b.dataset.node ? null : b.dataset.node;
       apply();
       if (selected) {
-        detail.scrollIntoView({ behavior: 'instant', block: 'center' });
+        if (!window.matchMedia('(min-width: 1100px)').matches) detail.scrollIntoView({ behavior: 'instant', block: 'center' });
         var open = detail.querySelector('.cm-detail-open');
         if (open) open.focus({ preventScroll: true });
       }

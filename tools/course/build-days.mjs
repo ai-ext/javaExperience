@@ -811,7 +811,7 @@ export function renderDay(day, ctx) {
   const roadmapJava = ctx.roadmap.java.find((j) => j.id === day.java);
   const java = day.phase === 'extend' ? {id: day.java, title: `${day.java}. ${roadmapJava.title}`, duration: '20~40분 · 이미 증거가 있으면 확인 후 다음 순서'} : javaInfo(day.java, ctx.root);
   const data = ctx.hintsDay.dataSetup?.length ? ['<section class="day-data">', '', '## 이 날 데이터 넣기', '', ...ctx.hintsDay.dataSetup.map(x => `- ${x}`), '', `<a data-work-return href="#${stepAnchor(day.id,1)}">① 작업으로 복귀</a>`, '', '</section>'].join('\n') : dayDataSection(day, ctx.root);
-  const sections = [['오늘 순서','오늘-순서'], ...(data ? [['이 날 데이터 넣기','이-날-데이터-넣기']] : []), ['오늘의 SQL','오늘의-sql'], ['말하기','말하기-카드'], ['채점','ai-채점-프롬프트']];
+  const sections = [['Java','오늘의-java'], ['구현 순서','오늘-순서'], ...(data ? [['이 날 데이터 넣기','이-날-데이터-넣기']] : []), ['오늘의 SQL','오늘의-sql'], ['말하기','말하기-카드'], ['채점','ai-채점-프롬프트']];
   const parts = [dayHeader(day, java, ctx.ready ? '' : ' · **준비 중**')];
   if (day.purpose) parts.push(day.purpose);
   parts.push(`<nav class="day-sections" aria-label="오늘 섹션 바로가기">${sections.map(([label,id]) => `<a href="#${id}">${label}</a>`).join('')}</nav>`);
@@ -942,10 +942,10 @@ export function renderIndex(roadmap, hints) {
     '',
     '하루 한 페이지다. 맨 위 [오늘 순서]대로 만들고, 막히면 순서 칸의 힌트를, 그래도 막히면 그 순서의 구현 예시만 펼친다. 내 테이블에서 오늘의 SQL을 풀고, 하루가 끝나면 말하기 카드에 답하고 AI 채점 프롬프트로 확인한다.',
     '',
-    '- 1단계(D01~D10): 데이터 요구사항으로 테이블을 직접 설계하고 빈 프로젝트로 서버 만들기. 시작은 [출발 자료](../start/README.md)',
-    '- 2단계(D11~D14): 어수선한 서버 넘겨받기. 티켓은 필수 B01~B04 4건 + 선택 1건(Security·Redis 후보에서 고른다) + 고도화 E01 + 모의 장애 훈련이고, 나머지는 연습 티켓이다',
+    '- 1단계(D01\\~D10): 데이터 요구사항으로 테이블을 직접 설계하고 빈 프로젝트로 서버 만들기. 시작은 [출발 자료](../start/README.md)',
+    '- 2단계(D11\\~D14): 어수선한 서버 넘겨받기. 티켓은 필수 B01\\~B04 4건 + 선택 1건(Security·Redis 후보에서 고른다) + 고도화 E01 + 모의 장애 훈련이고, 나머지는 연습 티켓이다',
     '- 중간 점검(D15): 설명·회고를 남기고 D16 개인 경로로 연결',
-    `- 3단계(D16~${roadmap.days.at(-1).id}): 미수행 과제·설계·운영 변경·회의·새 사례 독립 평가. 하루 분량은 완료 조건 기준으로 조절한다`,
+    `- 3단계(D16\\~${roadmap.days.at(-1).id}): 미수행 과제·설계·운영 변경·회의·새 사례 독립 평가. 하루 분량은 완료 조건 기준으로 조절한다`,
     '',
     '| 일 | 단계 | 마일스톤 | 오늘의 Java | 순서 | 말하기 카드 | 상태 |',
     '|---|---|---|---|---|---|---|',

@@ -76,6 +76,8 @@
     if (extraIds.length === ids.length) extraIds = [];
     var coreIds = ids.filter(function (id) { return extraIds.indexOf(id) < 0; });
     var counter = page.querySelector('[data-day-progress]');
+    var meter = page.querySelector('[data-day-meter]');
+    var resume = page.querySelector('[data-day-resume]');
     function paint() {
       inputs.forEach(function (input) { input.checked = state.done.has(input.dataset.step); });
       page.querySelectorAll('.day-chip[data-step], .day-step[data-step]').forEach(function (node) {
@@ -84,6 +86,22 @@
       var doneOf = function (list) { return list.filter(function (id) { return state.done.has(id); }).length; };
       if (counter) counter.textContent = doneOf(coreIds) + '/' + coreIds.length + ' 끝냄'
         + (extraIds.length ? ' · 선택·연습 ' + doneOf(extraIds) + '/' + extraIds.length : '');
+      if (meter) meter.value = doneOf(coreIds);
+      // 선택 티켓도 실제로 고른 항목이면 이어하기에 포함한다. 진도 집계 기준은 유지한다.
+      var nextId = ids.find(function (id) {
+        if (state.done.has(id)) return false;
+        if (coreIds.indexOf(id) >= 0) return true;
+        var chip = page.querySelector('.day-chip[data-step="' + id + '"]');
+        return Boolean(state.selectedTicket && chip && (chip.dataset.choiceTickets || '').split(',').indexOf(state.selectedTicket) >= 0);
+      });
+      page.querySelectorAll('.day-chip[data-step]').forEach(function (node) {
+        node.classList.toggle('is-current', node.dataset.step === nextId);
+      });
+      if (resume) {
+        var nextChip = nextId && page.querySelector('.day-chip[data-step="' + nextId + '"]');
+        resume.href = nextChip ? nextChip.querySelector('a').getAttribute('href') : '#오늘의-sql';
+        resume.textContent = nextChip ? nextChip.querySelector('.chip-no').textContent + ' ' + (doneOf(coreIds) ? '이어서 하기' : '시작하기') + ' →' : '구현 체크 완료 · 오늘의 SQL 확인 →';
+      }
       storageNote(!state.ok ? 'blocked' : Object.keys(pending).length ? 'unsaved' : '');
     }
     // 최신 저장값(다른 탭의 체크 포함)을 다시 읽고 그 위에 이 화면의 미저장 변경을 얹는다.
@@ -180,6 +198,9 @@
         function fallback() {
           var ok = false;
           try {
+            // 접힌 프롬프트도 자동 복사가 막히면 펼쳐서 직접 선택할 수 있게 한다.
+            var fold = target.closest('details.grader-source');
+            if (fold) fold.open = true;
             var range = document.createRange();
             range.selectNodeContents(target);
             var selection = window.getSelection();
@@ -297,7 +318,10 @@
         var no = document.createElement('span');
         no.setAttribute('aria-hidden', 'true');
         no.textContent = NUMS[i] || String(i + 1);
-        li.append(no, ' ' + s.title + (s.extra && core.length < day.steps.length ? ' (선택·연습)' : '') + (state.done.has(s.id) ? ' (끝냄)' : ''));
+        var task = document.createElement('a');
+        task.href = day.href + '#step-' + s.id.toLowerCase();
+        task.textContent = s.title + (s.extra && core.length < day.steps.length ? ' (선택·연습)' : '') + (state.done.has(s.id) ? ' (끝냄)' : '');
+        li.append(no, ' ', task);
         return li;
       }));
       var open = $('[data-today-open]');

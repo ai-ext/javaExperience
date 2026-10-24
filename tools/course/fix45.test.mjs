@@ -138,16 +138,21 @@ test('fix45-8: D19~D22 SQL은 D23을 선행 조건으로 삼지 않는다', () =
   }
   assert.match(day(23).hints.sql.context,/D23에서 정한/);
 });
-test('fix45-9: 지도 노드 선택은 열기 링크가 있는 상세 패널로 이동한다', () => {
-  const dom = new JSDOM(read('course/map.html'), {runScripts:'outside-only',pretendToBeVisual:true});
-  let target;
-  dom.window.matchMedia=()=>({matches:true});
-  dom.window.HTMLElement.prototype.scrollIntoView=function(){target=this;};
-  dom.window.eval(read('tools/site/course-map.js'));
-  dom.window.document.querySelector('[data-node="D30"]').click();
-  assert.ok(target?.querySelector('a.cm-detail-open[href*="D30"]'));
-  assert.equal(dom.window.document.activeElement, target.querySelector('.cm-detail-open'));
-  dom.window.close();
+test('fix45-9: 지도 선택은 열기 링크에 초점을 주며, 나란한 PC 상세는 스크롤하지 않는다', () => {
+  for (const desktop of [false, true]) {
+    const dom = new JSDOM(read('course/map.html'), {runScripts:'outside-only',pretendToBeVisual:true});
+    let target;
+    dom.window.matchMedia=query=>({matches:query==='(min-width: 1100px)' ? desktop : true});
+    dom.window.HTMLElement.prototype.scrollIntoView=function(){target=this;};
+    dom.window.eval(read('tools/site/course-map.js'));
+    dom.window.document.querySelector('[data-node="D30"]').click();
+    const detail=dom.window.document.querySelector('[data-cm-detail]');
+    assert.equal(detail.hidden,false);
+    assert.ok(detail.querySelector('a.cm-detail-open[href*="D30"]'));
+    assert.equal(target,desktop ? undefined : detail, '작은 화면은 상세로 이동하고 PC는 지도 위치를 유지한다');
+    assert.equal(dom.window.document.activeElement,detail.querySelector('.cm-detail-open'), '두 배치 모두 페이지 열기로 키보드 초점 이동');
+    dom.window.close();
+  }
 });
 
 test('round2-weak: 이미 충족한 개인 과제는 미충족 새 계약을 먼저 합의한다', () => {

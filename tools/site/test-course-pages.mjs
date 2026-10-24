@@ -261,24 +261,25 @@ await test('R4-06: 한국어 본문은 낱말을 지키고 코드는 긴 토큰�
     assert.equal(code['overflow-wrap'], 'anywhere');
   }
 });
-await test('R4-03: 홈 본문·서비스·아바타 글자 대비는 4.5 이상', () => {
-  const tokens = declarations(homeCss, 'body.home-page');
+await test('R4-03: 공통 테마의 홈 본문·서비스·아바타 대비는 라이트·다크 모두 4.5 이상', () => {
   const pairs = [
-    [homeCss, 'body.home-page', '--muted', '#f7f9fc'],
-    ...['.home-method-grid p', '.home-explore-grid p', '.home-faq p', '.home-footer', '.home-roadmap'].map((s) => [homeCss, s, 'color', '#f7f9fc']),
-    [homeCss, '.home-progress-note', 'color', '#ffffff'],
-    ...['.home-service-excerpt', '.home-service-post-copy>small'].map((s) => [serviceCss, s, 'color', '#eef4ff']),
-    ...['.home-service-comment small', '.home-service-detail-byline small', '.home-service-compose label>span', '.home-service-compose input::placeholder,.home-service-compose textarea::placeholder'].map((s) => [serviceCss, s, 'color', '#ffffff']),
-    [serviceCss, '.home-service-section .home-service-scope', 'color', '#f7f9fc'],
-    [serviceCss, '.home-service-avatar-green', 'color', '#dff2ee'],
-    [serviceCss, '.home-service-avatar-purple', 'color', '#eee6fb'],
+    ...['.home-method-grid p', '.home-explore-grid p', '.home-faq p', '.home-footer', '.home-roadmap'].map(selector => [homeCss, selector, '--bg']),
+    [homeCss, '.home-progress-note', '--card'],
+    ...['.home-service-excerpt', '.home-service-post-copy>small'].map(selector => [serviceCss, selector, '--accent-soft']),
+    ...['.home-service-comment small', '.home-service-detail-byline small', '.home-service-compose label>span', '.home-service-compose input::placeholder,.home-service-compose textarea::placeholder'].map(selector => [serviceCss, selector, '--card']),
+    [serviceCss, '.home-service-section .home-service-scope', '--bg'],
+    [serviceCss, '.home-service-avatar-green', '--c-day-soft'],
+    [serviceCss, '.home-service-avatar-purple', '--c-area-soft'],
   ];
-  for (const [css, selector, property, bg] of pairs) {
-    const raw = declarations(css, selector)[property];
-    const fg = raw === 'var(--muted)' ? tokens['--muted'] : raw;
-    assert.ok(contrast(fg, bg) >= 4.5, `${selector}: ${fg} / ${bg} = ${contrast(fg, bg).toFixed(4)}`);
+  for (const theme of [':root', ':root[data-theme="dark"]']) {
+    const tokens = {...declarations(siteCss, theme), ...declarations(courseCss, theme)};
+    for (const [css, selector, background] of pairs) {
+      const raw = declarations(css, selector).color;
+      const fg = raw.replace(/var\((--[\w-]+)\)/g, (_, name) => tokens[name]);
+      assert.ok(contrast(fg, tokens[background]) >= 4.5, `${theme} ${selector}: ${fg} / ${tokens[background]}`);
+    }
   }
-  assert.equal(tokens['color-scheme'], 'light', '홈 테마 정책(R4-02)은 이번 범위에서 바꾸지 않는다');
+  assert.equal(declarations(homeCss, 'body.home-page')['color-scheme'], undefined, '홈도 공통 테마를 상속한다');
 });
 await test('R4-07: 라이트 주석 대비는 4.5 이상이고 다크 토큰은 보존한다', () => {
   const colors = [...siteCss.matchAll(/--syntax-comment:\s*(#[0-9a-f]{6})/g)].map((m) => m[1]);
@@ -318,7 +319,8 @@ for (const day of course.days) {
   if (course.flows.days.has(day.id)) assert.ok($(`section.day-flow.flow[data-flow="${day.id}"]`) && !$('.day-flow[hidden]'), `${day.id}: 오늘 흐름`);
   else if (day.phase === 'maintain') assert.ok($(`section.day-flow.flow-links[data-flow-links="${day.id}"]`), `${day.id}: 그날 티켓의 장애 흐름으로 잇기`);
   else assert.ok($('.day-flow[hidden]') && $('.day-flow').children.length === 0, `${day.id}: 흐름이 없는 날은 빈 자리`);
-  assert.ok(!$('section.day-java') || $('section.day-java + .day-flow, section.day-java + details.implementation-flow > .day-flow'), `${day.id}: 흐름은 오늘의 Java 바로 뒤`);
+  const flowPrevious = $('.day-overview') ? 'section.day-java + section.day-today' : 'section.day-java';
+  assert.ok(!$('section.day-java') || $(`${flowPrevious} + .day-flow, ${flowPrevious} + details.implementation-flow > .day-flow`), `${day.id}: 흐름은 Java·구현 목록 다음이며 DOM과 시각 순서를 맞춘다`);
   assert.ok($('nav.day-pager'), `${day.id}: 이전·다음 날`);
   for (const a of $$('.day-pager a, .course-crumbs a')) {
     const target = new URL(a.getAttribute('href'), `${root.href}${file}`);
@@ -340,7 +342,8 @@ for (const day of course.days) {
   if (day.phase === 'build') {
     assert.ok($(`section.day-java a[href="../java/${day.java}.html"]`), `${day.id}: 오늘의 Java 카드`);
     for (const s of $$('section.day-step')) {
-      for (const key of ['files', 'trap', 'done', 'spec']) assert.ok(s.querySelector(`.step-facts > .fact-${key}`), `${day.id} ${s.id}: ${key} 칸`);
+      for (const key of ['files', 'trap', 'done']) assert.ok(s.querySelector(`.step-facts > .fact-${key}`), `${day.id} ${s.id}: ${key} 칸`);
+      assert.ok(s.querySelector('.step-facts > .step-references > .fact-spec'), `${day.id} ${s.id}: 작업 전 읽는 spec 칸`);
     }
     assert.ok($('button.copy-button[data-copy-target="day-grader-prompt"]') && $('pre#day-grader-prompt'), `${day.id}: 채점 프롬프트 복사`);
   }
@@ -478,6 +481,11 @@ for (const day of course.days) {
   assert.equal(home.$('[data-today-id]').textContent, 'D01', '진도 없으면 D01');
   assert.equal(home.$('[data-today-note]').hidden, false, 'D00 워밍업 안내');
   assert.equal(home.$$('.ch-day').length, course.days.length - 1, '전체 일자 진도');
+  assert.equal(home.$$('.ch-milestones > li').length, 3, '홈에서 세 단계의 범위를 먼저 보여 준다');
+  assert.ok(!home.$('.ch-progress').closest('.ch-hero'), '전체 진도는 오늘 할 일 열과 분리한다');
+  for (const [i, a] of home.$$('[data-today-steps] a').entries()) {
+    assert.equal(a.getAttribute('href'), `course/spring/D01.html#step-d01-${i + 1}`, '첫 방문의 구현 항목이 작업 위치로 연결된다');
+  }
   assert.ok(home.$('.ch-entries a[href="course/spring/README.html"]') && home.$('.ch-entries a[href="course/map.html"]'), 'Spring 일자·지도 진입');
   assert.equal(home.$$('.ch-entries .ch-chips a[href^="course/java/J"]').length, course.java.length, '전체 Java 트랙 진입');
   assert.equal(home.$$('.ch-ticket-chips > *').length, 16, '2단계 티켓 B01~B16');
@@ -493,6 +501,8 @@ for (const day of course.days) {
   assert.equal(resumed.$('[data-today-open]').getAttribute('href'), 'course/spring/D04.html');
   assert.match(resumed.$('[data-today-tag]').textContent, /이어서/);
   assert.equal(resumed.$('[data-today-note]').hidden, true);
+  assert.equal(resumed.$$('[data-today-steps] a').length, course.days.find(d => d.id === 'D04').steps.length);
+  assert.equal(resumed.$('[data-today-steps] a').getAttribute('href'), 'course/spring/D04.html#step-d04-1', '이어하기로 날이 바뀌면 작업 링크도 바뀐다');
   assert.equal(resumed.$('.ch-day[data-day="D04"] [data-day-count]').textContent, '2/5');
   assert.ok(resumed.$('.ch-day[data-day="D04"]').classList.contains('is-today'));
   assert.equal(resumed.$('[data-progress-summary]').textContent, `체크한 순서 2/${JSON.parse(resumed.$('#course-days-data').textContent).filter((d) => d.steps.length).reduce((n, d) => n + (d.steps.filter((s) => !s.extra).length || d.steps.length), 0)}`);
@@ -572,6 +582,8 @@ for (const day of course.days) {
   assert.ok(!map.$('.cm-node[data-node="B06"]').classList.contains('is-related'));
   assert.match(map.$('[data-cm-status]').textContent, /D12 · 직접 연결/);
   assert.equal(map.$('[data-cm-detail]').hidden, false);
+  assert.ok(map.$('[data-cm-detail]').closest('.cm-inspector'), '상세는 노드 목록과 나란한 선택 영역에 있다');
+  assert.equal(map.$('.cm-detail-open').getAttribute('href'), 'spring/D12.html', '관계 선택 뒤 별도 링크로 페이지를 연다');
   // 관계 밖 노드는 버튼으로 남아 있으므로 불투명도로 글자·초점 테두리를 흐리지 않는다(P5-2 리뷰 ⑤).
   const css = fs.readFileSync(new URL('course.css', import.meta.url), 'utf8');
   assert.doesNotMatch(css, /has-selection[^{]*\.cm-node[^{]*\{[^}]*opacity/, '비강조 노드에 opacity를 쓰지 않는다');
