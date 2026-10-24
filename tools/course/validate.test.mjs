@@ -33,10 +33,16 @@ test('일자 수가 15가 아니면 오류', () => {
   assert.ok(has(validate(i), '15'));
 });
 
-test('build 단계 순서의 파일이 4개면 오류', () => {
+test('build 단계 순서에 파일이 없으면 오류', () => {
   const i = load();
-  i.roadmap.days[0].steps[0].files = ['a', 'b', 'c', 'd'];
+  i.roadmap.days[0].steps[0].files = [];
   assert.ok(has(validate(i), 'D01', 'step 1'));
+});
+
+test('build 단계는 실제 작업 층을 빠뜨리지 않도록 파일 4개 이상도 허용한다', () => {
+  const i = load();
+  i.roadmap.days[0].steps[0].files = ['Post.java', 'PostRepository.java', 'PostService.java', 'PostController.java', 'PostTest.java'];
+  assert.deepEqual(validate(i), []);
 });
 
 test('명세에 없는 specRef는 오류', () => {

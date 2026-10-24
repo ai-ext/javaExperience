@@ -62,7 +62,8 @@ export function validate({ spec, roadmap, cards, courseFiles }) {
       const at = `${d} step ${s.no}`;
       const nf = (s.files ?? []).length;
       if (day.phase === 'build') {
-        if (nf < 1 || nf > 3) errs.push(`${at}: build 단계 files는 1~3개(${nf})`);
+        // 층 표시는 files를 근거로 하므로 수정하는 파일을 개수 때문에 생략하지 않는다.
+        if (nf < 1) errs.push(`${at}: build 단계 files는 1개 이상(${nf})`);
         if ((s.specRefs ?? []).length < 1) errs.push(`${at}: build 단계 specRefs가 1개 이상 필요`);
       }
       if (day.phase === 'maintain') {

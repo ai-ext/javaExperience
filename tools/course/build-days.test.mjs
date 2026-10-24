@@ -367,10 +367,12 @@ test('마무리 채점: 함정은 코드가 아니라 설명·회고에서 보�
   assert.ok(p.includes('처리한 티켓인 카드에서만 고른다'));
 });
 
-test('모든 완성 순서에 힌트가 1~2줄 있다', () => {
+test('모든 완성 순서에 진행 순서 안내 외의 힌트가 1~2줄 있다', () => {
   for (const d of readyDays) for (const s of d.steps) {
     const h = hints.days[d.id].steps[String(s.no)];
-    assert.ok(Array.isArray(h) && h.length >= 1 && h.length <= 2, `${d.id}-${s.no}`);
+    assert.ok(Array.isArray(h), `${d.id}-${s.no}`);
+    const content = h[0].startsWith('이 순서는 DB →') ? h.slice(1) : h;
+    assert.ok(content.length >= 1 && content.length <= 2, `${d.id}-${s.no}`);
   }
 });
 
@@ -817,4 +819,20 @@ test('데이터 요구사항은 직접 설계를 채점하고 기존 API·예시
     assert.doesNotMatch(visible,/idx_post_status_id|UNIQUE\(`post_id`|\(`status`, `id`\)/);
   }
   assert.match(hints.graderTemplate,/이름은 학습자의 설계를 따른다/);
+});
+
+test('API 층 표시는 모든 specRefs 순서에만 나오고 D04 공통 가이드는 머리에 있다', () => {
+  for (const day of roadmap.days) {
+    const md = page(day.id);
+    const expected = day.phase === 'build' ? day.steps.filter(s => s.specRefs.length) : [];
+    assert.equal((md.match(/\*\*이 순서에서 만들 층\*\*/g) ?? []).length, expected.length, day.id);
+    for (const step of expected) {
+      const section = md.split(`id="step-${day.id.toLowerCase()}-${step.no}"`)[1].split('</section>')[0];
+      const label = dayBuilder.stepLayers(step).join(' · ') || '해당 없음 · 공통 설정·지원 코드';
+      assert.ok(section.includes(`**이 순서에서 만들 층** ${label}`), `${day.id}-${step.no}`);
+    }
+  }
+  const d04 = page('D04');
+  assert.ok(d04.includes(dayBuilder.apiGuide(hints.apiGuide)));
+  assert.ok(d04.indexOf('### API 하나 만드는 순서') < d04.indexOf('## 오늘 순서'));
 });

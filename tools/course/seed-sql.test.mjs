@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
+import { splitSeedTables } from './build-days.mjs';
 
 const read = name => fs.readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8');
 const schema = read('board-server/src/main/resources/schema.sql');
@@ -98,4 +99,19 @@ test('bulk의 결정적 증가량·댓글 삭제·공유 태그·좋아요 카�
   }
   assert.deepEqual(results[0], results[1]);
   assert.doesNotMatch(seed + bulk, /\b(?:RAND|NOW|CURRENT_TIMESTAMP)\s*\(/i);
+});
+
+
+test('테이블별 조각을 순서대로 실행하면 원본 블록의 행·카운터·잔액과 같다', () => {
+  const full = database(), fragments = database();
+  try {
+    for (const block of blocks) {
+      execute(full, block);
+      for (const chunk of splitSeedTables(block)) execute(fragments, chunk.sql);
+      invariants(fragments);
+      for (const { name } of full.prepare("SELECT name FROM sqlite_master WHERE type='table'").all()) {
+        assert.deepEqual(fragments.prepare(`SELECT * FROM ${name} ORDER BY id`).all(), full.prepare(`SELECT * FROM ${name} ORDER BY id`).all(), name);
+      }
+    }
+  } finally { full.close(); fragments.close(); }
 });

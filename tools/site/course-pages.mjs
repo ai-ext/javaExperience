@@ -136,9 +136,9 @@ function ticketBadge(ticket, fromRel, course) {
     : `<span class="${cls} is-pending" title="${esc(ticket.title)} · 티켓 페이지 준비 중">${inner}<small>페이지 준비 중</small></span>`;
 }
 
-const FACTS = { '만들 파일': 'files', '겪을 것': 'trap', '완료 조건': 'done', '명세': 'spec', '데이터 요구사항': 'data-spec', '티켓': 'tickets', '원인과 정답': 'answer-link' };
+const FACTS = { '이 순서에서 만들 층': 'layers', '만들 파일': 'files', '겪을 것': 'trap', '완료 조건': 'done', '명세': 'spec', '데이터 요구사항': 'data-spec', '티켓': 'tickets', '원인과 정답': 'answer-link' };
 function renderFacts(segment, fromRel, course) {
-  const parts = segment.split(/(?=<p><strong>(?:만들 파일|겪을 것|완료 조건|명세|데이터 요구사항|티켓|원인과 정답)<\/strong>)/);
+  const parts = segment.split(/(?=<p><strong>(?:이 순서에서 만들 층|만들 파일|겪을 것|완료 조건|명세|데이터 요구사항|티켓|원인과 정답)<\/strong>)/);
   const lead = parts[0].startsWith('<p><strong>') ? '' : parts.shift();
   const facts = parts.map((part) => {
     const label = part.match(/^<p><strong>([^<]+)<\/strong>/)[1];
@@ -258,6 +258,11 @@ export function renderDayPage(sourceRel, body, course) {
   html = html.replace(/(<div class="day-data-file" data-day-sql="(seed|bulk)"[^>]*>)/g, (head, tag, name) => {
     const target = `${day.id.toLowerCase()}-${name}-sql`;
     return `${tag}<div class="copy-row"><button type="button" class="copy-button" data-sql-copy="${target}">SQL 복사</button><button type="button" class="copy-button" data-sql-download="${target}">파일 받기</button><span class="copy-status" role="status" aria-live="polite"></span></div>`;
+  });
+
+  html = html.replace(/(<div class="day-data-table" data-sql-table="(\w+)"[^>]*>)/g, (_, tag, table) => {
+    const target = `${day.id.toLowerCase()}-seed-${table}-sql`;
+    return `${tag}<div class="copy-row"><button type="button" class="copy-button" data-table-copy="${table}" data-sql-copy="${target}">${table} 복사</button><span class="copy-status" role="status" aria-live="polite"></span></div>`;
   });
 
   // 6) AI 채점 프롬프트 복사

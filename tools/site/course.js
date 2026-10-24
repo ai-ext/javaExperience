@@ -153,25 +153,31 @@
       if (!copy || !download) return;
       var target = document.getElementById(copy.dataset.sqlCopy);
       if (!target) return;
-      function fallback() {
-        entry.querySelector('details').open = true;
-        var range = document.createRange();
-        range.selectNodeContents(target);
-        var selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-        status.textContent = '자동 복사가 막혔어요. 선택된 SQL을 직접 복사하세요(⌘C / Ctrl+C).';
-      }
-      copy.addEventListener('click', function () {
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(target.textContent).then(function () {
-              status.textContent = 'SQL을 복사했어요. MySQL 편집기에 붙여 넣으세요.';
-            }, fallback);
-            return;
-          }
-        } catch (e) { /* 선택으로 대체한다 */ }
-        fallback();
+      entry.querySelectorAll('[data-sql-copy]').forEach(function (button) {
+        var fragment = button.closest('[data-sql-table]') || entry;
+        var copyStatus = fragment.querySelector('[role="status"]');
+        var copyTarget = document.getElementById(button.dataset.sqlCopy);
+        if (!copyTarget) return;
+        function fallback() {
+          fragment.querySelector('details').open = true;
+          var range = document.createRange();
+          range.selectNodeContents(copyTarget);
+          var selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+          copyStatus.textContent = '자동 복사가 막혔어요. 선택된 SQL을 직접 복사하세요(⌘C / Ctrl+C).';
+        }
+        button.addEventListener('click', function () {
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(copyTarget.textContent).then(function () {
+                copyStatus.textContent = 'SQL을 복사했어요. MySQL 편집기에 붙여 넣으세요.';
+              }, fallback);
+              return;
+            }
+          } catch (e) { /* 선택으로 대체한다 */ }
+          fallback();
+        });
       });
       download.addEventListener('click', function () {
         var url;

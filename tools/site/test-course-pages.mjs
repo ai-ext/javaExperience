@@ -60,7 +60,7 @@ await test('이 날 데이터: 원본 날짜 집합·본문·버튼·복사·Blo
       assert.ok(expected, `${key}: 원본 날짜 블록`);
       assert.equal(entry.querySelector('pre code').textContent, expected);
       assert.equal(entry.querySelector('details').open, false);
-      const buttons = [...entry.querySelectorAll('button')];
+      const buttons = [...entry.querySelectorAll(':scope > .copy-row button')];
       assert.deepEqual(buttons.map((b) => b.textContent), ['SQL 복사', '파일 받기']);
       assert.ok(entry.querySelector('[aria-live="polite"]'));
       buttons[0].click();
@@ -89,6 +89,28 @@ await test('이 날 데이터: 원본 날짜 집합·본문·버튼·복사·Blo
       buttons[0].click();
       assert.equal(page.window.getSelection().toString(), expected);
       Object.defineProperty(page.window.navigator, 'clipboard', { value: { writeText: async (sql) => copies.push(sql) }, configurable: true });
+      const tables = [...new Set([...expected.matchAll(/INSERT INTO\s+(\w+)/g)].map(m => m[1]))];
+      const fragments = [...entry.querySelectorAll('[data-sql-table]')];
+      assert.equal(fragments.length, entry.dataset.daySql === 'seed' ? tables.length : 0, key);
+      assert.equal(entry.querySelectorAll('[data-table-copy]').length, fragments.length, key);
+      const copiedInserts = [];
+      for (const fragment of fragments) {
+        const table = fragment.dataset.sqlTable;
+        const button = fragment.querySelector('[data-table-copy]');
+        const sql = fragment.querySelector('code').textContent;
+        assert.equal(button.textContent, `${table} 복사`);
+        assert.deepEqual([...new Set([...sql.matchAll(/INSERT INTO\s+(\w+)/g)].map(m => m[1]))], [table]);
+        copiedInserts.push(...[...sql.matchAll(/INSERT INTO\s+\w+[\s\S]*?;/g)].map(m => m[0]));
+        button.click();
+        await Promise.resolve();
+        assert.equal(copies.at(-1), sql);
+        Object.defineProperty(page.window.navigator, 'clipboard', { value: undefined, configurable: true });
+        button.click();
+        assert.equal(fragment.querySelector('details').open, true);
+        assert.equal(page.window.getSelection().toString(), sql);
+        Object.defineProperty(page.window.navigator, 'clipboard', { value: { writeText: async (sql) => copies.push(sql) }, configurable: true });
+      }
+      if (entry.dataset.daySql === 'seed') assert.deepEqual(copiedInserts.sort(), [...expected.matchAll(/INSERT INTO\s+\w+[\s\S]*?;/g)].map(m => m[0]).sort());
     }
     page.window.close();
   }
@@ -863,5 +885,29 @@ await test('매일 SQL: 전 일자 과제·기대 성질은 보이고 예시 SQL
       assert.ok(flow.closest('details.implementation-flow'));
       assert.equal(flow.closest('details').open,false);
     }
+  }
+});
+
+await test('API 층은 순서별 독립 사실 칸에 있고 D04 가이드는 첫 순서보다 앞에 있다', async () => {
+  const roadmap = JSON.parse(fs.readFileSync(new URL('course/roadmap.json', root), 'utf8'));
+  for (const day of roadmap.days) {
+    const page = await open(`course/spring/${day.id}.html`);
+    for (const step of day.steps) {
+      const section = page.$(`#step-${day.id.toLowerCase()}-${step.no}`);
+      const fact = section.querySelector('.fact-layers');
+      assert.equal(Boolean(fact), day.phase === 'build' && step.specRefs.length > 0, `${day.id}-${step.no}`);
+      if (fact) {
+        assert.equal(fact.querySelector('.fact-label').textContent, '이 순서에서 만들 층');
+        assert.ok(fact.querySelector('p:not(.fact-label)').textContent.trim());
+        assert.ok(!fact.querySelector('ul'), '파일 목록을 층 칸에 섞지 않는다');
+      }
+    }
+    if (day.id === 'D04') {
+      const guide = page.$('#api-하나-만드는-순서');
+      assert.ok(guide);
+      assert.ok(guide.compareDocumentPosition(page.$('#step-d04-1')) & page.window.Node.DOCUMENT_POSITION_FOLLOWING);
+      assert.match(guide.nextElementSibling.textContent, /명세 확인.*테이블.*쿼리.*서비스.*컨트롤러.*테스트/s);
+    }
+    page.window.close();
   }
 });

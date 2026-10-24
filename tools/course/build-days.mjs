@@ -63,6 +63,25 @@ const dd = (n) => String(n).padStart(2, '0');
 export const stepId = (day, no) => `${day}-${no}`;
 export const stepAnchor = (day, no) => `step-${day.toLowerCase()}-${no}`;
 
+// API 순서의 층 판정은 이곳에서만 한다. 테스트 파일은 검증 대상의 이름으로 층을 중복 계산하지 않는다.
+export function stepLayers(step) {
+  const layers = new Set();
+  if (/직접 설계/.test(step.title)) layers.add('DB');
+  for (const file of step.files) {
+    const name = path.posix.basename(file);
+    if (/(?:^|\/)src\/test\//.test(file) || /Tests?\.[^.]+$/.test(name)) { layers.add('테스트'); continue; }
+    if (name === 'schema.sql') layers.add('DB');
+    if (/Repository|Mapper/.test(name) || (/\.xml$/.test(name) && !/^logback/.test(name))) layers.add('쿼리');
+    if (/Service/.test(name)) layers.add('서비스');
+    if (/Controller|(?:Request|Response)\.java$/.test(name)) layers.add('컨트롤러');
+  }
+  return ['DB', '쿼리', '서비스', '컨트롤러', '테스트'].filter(layer => layers.has(layer));
+}
+
+export function apiGuide(guide) {
+  return ['### API 하나 만드는 순서', '', ...guide.steps.map((line, i) => `${circled(i + 1)} ${line}<br>`), '', `**끝났는지 아는 법** ${guide.done}`].join('\n');
+}
+
 // ---------------------------------------------------------------- git
 // 출력에 영향을 주는 사용자 git 설정을 모두 명령줄에서 고정한다(-c는 전역·저장소·GIT_CONFIG_* 설정보다 우선한다).
 // diff 알고리즘·문맥 줄 수는 commitFiles의 show 옵션으로 고정한다.
@@ -262,6 +281,55 @@ export function parseDaySql(sql) {
   return days;
 }
 
+// seed.sql의 SQL 문 단위 분리. 문자열·식별자·주석 안의 세미콜론은 경계가 아니다.
+function sqlStatements(sql) {
+  const statements = [];
+  let start = 0, quote = '', comment = '';
+  for (let i = 0; i < sql.length; i++) {
+    const c = sql[i], next = sql[i + 1];
+    if (comment === 'line') { if (c === '\n') comment = ''; continue; }
+    if (comment === 'block') { if (c === '*' && next === '/') { comment = ''; i++; } continue; }
+    if (quote) {
+      if (c === '\\') { i++; continue; }
+      if (c === quote) { if (next === quote) i++; else quote = ''; }
+      continue;
+    }
+    if ((c === '-' && next === '-' && /\s/.test(sql[i + 2] ?? '')) || c === '#') { comment = 'line'; continue; }
+    if (c === '/' && next === '*') { comment = 'block'; i++; continue; }
+    if ("'\"`".includes(c)) { quote = c; continue; }
+    if (c === ';') { statements.push(sql.slice(start, i + 1).trim()); start = i + 1; }
+  }
+  if (quote || comment === 'block' || sql.slice(start).replace(/--[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\//g, '').trim()) throw new Error('seed SQL 문이 끝나지 않았다');
+  return statements;
+}
+
+export function splitSeedTables(sql) {
+  const chunks = new Map();
+  // 여러 날짜 블록이 연결돼도 각 블록의 SET 값과 트랜잭션을 유지한다.
+  for (const block of sql.split(/(?=^-- 이 블록을 쓰는 날:)/m)) {
+    const groups = new Map(), head = [], tail = [];
+    let previous;
+    for (const statement of sqlStatements(block)) {
+      const body = statement.replace(/^(?:\s|--[^\n]*(?:\n|$)|#[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)+/, '');
+      const insert = body.match(/^INSERT INTO\s+`?(\w+)`?\s/i);
+      if (insert) {
+        previous = insert[1];
+        if (!groups.has(previous)) groups.set(previous, []);
+        groups.get(previous).push(statement);
+      } else if (/^(SET\b|START TRANSACTION\b)/i.test(body) && !previous) head.push(statement);
+      else if (/^COMMIT\b/i.test(body)) tail.push(statement);
+      // 원본 seed에서 카운터·잔액 UPDATE는 바로 앞 INSERT의 파생 값 보정이다.
+      else if (/^UPDATE\b/i.test(body) && previous) groups.get(previous).push(statement);
+      else throw new Error(`테이블별 복사를 지원하지 않는 seed SQL: ${body.slice(0, 60)}`);
+    }
+    for (const [table, statements] of groups) {
+      const fragment = [...head, ...statements, ...tail].join('\n') + '\n';
+      chunks.set(table, (chunks.get(table) ?? '') + fragment);
+    }
+  }
+  return [...chunks].map(([table, sql]) => ({ table, sql }));
+}
+
 function dayDataSection(day, root) {
   const entries = ['seed', 'bulk'].flatMap((name) => {
     const blocks = parseDaySql(read(path.join(root, `course/start/dummy/${name}.sql`))).get(day.id);
@@ -271,7 +339,17 @@ function dayDataSection(day, root) {
       `<p><a href="../start/dummy/${name}.sql">원본 ${name}.sql</a> · ${name === 'bulk' ? '대량 재실험용 · seed D05까지 넣은 별도 DB에서 한 번 실행' : '기본 데이터 · 앞선 날 seed 블록을 순서대로 넣은 뒤 한 번 실행'}</p>`,
       '<details class="day-data-sql">', `<summary>${day.id} ${name} SQL 보기</summary>`,
       `<pre><code id="${day.id.toLowerCase()}-${name}-sql">${escapeHtml(blocks.join(''))}</code></pre>`,
-      '</details>', '</div>',
+      '</details>',
+      ...(name === 'seed' ? [
+        '<p>테이블별 복사에도 SET·트랜잭션과 필요한 카운터·잔액 보정을 포함합니다. 앞선 날 데이터와 참조할 테이블을 먼저 넣고, 아래 순서로 한 번씩 실행하세요. 전체 복사와 중복 실행하지 마세요. 실패하면 ROLLBACK 후 확인하세요.</p>',
+        ...splitSeedTables(blocks.join('')).map(({ table, sql }) => [
+          `<div class="day-data-table" data-sql-table="${table}">`,
+          '<details class="day-data-sql">', `<summary>${table} SQL 보기</summary>`,
+          `<pre><code id="${day.id.toLowerCase()}-${name}-${table}-sql">${escapeHtml(sql)}</code></pre>`,
+          '</details>', '</div>',
+        ].join('\n')),
+      ] : []),
+      '</div>',
     ].join('\n');
   });
   if (!entries.length) return '';
@@ -575,6 +653,10 @@ function completionTicket(day, step, id, hintsDay) {
 function stepSection(day, s, ctx) {
   const id = stepId(day.id, s.no);
   const lines = [`<section class="day-step" id="${stepAnchor(day.id, s.no)}" data-step="${id}">`, '', `## ${circled(s.no)} ${s.title}`, ''];
+  if (day.phase === 'build' && s.specRefs.length) {
+    const layers = stepLayers(s);
+    lines.push(`**이 순서에서 만들 층** ${layers.join(' · ') || '해당 없음 · 공통 설정·지원 코드'}`, '');
+  }
   if (ctx.ready && s.files.length) lines.push(`**만들 파일** (${day.phase === 'maintain' ? 'messy-server' : '내 프로젝트 · 경로는 구현 예시'} 기준)`, '', ...s.files.map((f) => `- \`${f}\``), '');
   if (s.tickets?.length) lines.push(`**티켓** ${s.tickets.map((t) => `\`${t}\``).join(' · ')}`, '');
   if (ctx.ready) {
@@ -704,6 +786,7 @@ export function renderDay(day, ctx) {
     '- [출발 자료에서 복사](../start/README.md): [compose.yaml](../start/compose.yaml) · [toxiproxy.json](../start/toxiproxy.json) → 내 프로젝트 루트.',
     '- [PG 승인 응답](../start/wiremock/mappings/pg-approve.json) · [PG 거절 응답](../start/wiremock/mappings/pg-approve-declined.json) → 내 프로젝트의 `src/test/resources/wiremock/mappings/`. 파일을 먼저 복사한 뒤 compose를 띄운다.',
   ].join('\n'));
+  if (day.id === 'D04') parts.push(apiGuide(ctx.hints.apiGuide));
   if (day.id === 'D11') parts.push([
     '## 인수인계 시작',
     '',
