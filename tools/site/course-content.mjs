@@ -8,7 +8,7 @@ export const CONTENT_KINDS = {
   action: { icon:'→', label:'행동', help:'오늘 할 일' },
   guide: { icon:'i', label:'가이드', help:'읽고 이해하기' },
   reference: { icon:'↗', label:'참고', help:'필요할 때 찾기' },
-  example: { icon:'{ }', label:'예시', help:'내 구현과 비교' },
+  example: { icon:'{ }', label:'구현 예시', help:'내 구현과 비교' },
   practice: { icon:'▷', label:'실습', help:'실행하고 관찰' },
   check: { icon:'✓', label:'확인', help:'끝났는지 판단' },
 };
@@ -115,6 +115,12 @@ export function renderContentKinds(source,html) {
   const preservedCode=[];
   const protectedHtml=html.replace(/(<pre\b[^>]*>)([\s\S]*?)(<\/pre>)/gi, (_,open,content,close)=>`${open}<!--course-preserved-code:${preservedCode.push(content)-1}-->${close}`);
   const dom=new JSDOM(`<div id="content-root">${protectedHtml}</div>`);const doc=dom.window.document,root=doc.getElementById('content-root');
+  const words = doc.createTreeWalker(root, 4);
+  let word;
+  while ((word = words.nextNode())) {
+    if (word.parentElement.closest('pre, code, script, textarea')) continue;
+    word.textContent = word.textContent.replace(/정답(은|을|과|으로|이라고|이나|이(?=\s))/g, (_, particle) => '구현 예시' + ({은:'는',을:'를',과:'와',으로:'로',이라고:'라고',이나:'나',이:'가'})[particle]).replace(/정답/g, '구현 예시').replace(/answer(?:-fix)?\((D\d{2}-\d+)\)/g, '$1').replace(/예시 · 구현 예시/g, '구현 예시');
+  }
   const h1=root.querySelector('h1');
   if(h1){const identity=doc.createElement('p');identity.className='content-page-kind';identity.dataset.contentKind=type.kind;identity.innerHTML=`${badge(type.kind)}<strong>${esc(type.label)}</strong><span>${esc(type.help)}</span>`;h1.before(identity);}
   // 핵심 만들 것·규칙은 노출하고 긴 코드·정답만 접는다. 티켓의 접기는 건드리지 않는다.

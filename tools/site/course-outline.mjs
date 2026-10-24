@@ -106,6 +106,13 @@ export function renderCourseOutline(source, html) {
     item.append(link);
     list.append(item);
   }
+  if (type.kind === 'days') {
+    for (const link of article.querySelectorAll('.course-outline h3 a[href]')) {
+      const item = doc.createElement('li');
+      item.append(link.cloneNode(true));
+      list.append(item);
+    }
+  }
   nav.append(list);
   if (list.children.length) rail.append(nav);
   const content = doc.createElement('div');

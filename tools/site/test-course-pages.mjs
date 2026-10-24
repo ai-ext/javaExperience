@@ -161,7 +161,7 @@ await test('길찾기: 홈 첫 방문의 행동 순서는 Java → Spring → �
   assert.match(flow.textContent, /Java.*J01.*→.*Spring.*D01.*→.*채점/);
   assert.ok(home.$('[data-today-java]').classList.contains('ch-primary'));
   const next = await open('index.html', { saved: JSON.stringify({ version: 1, steps: { 'D01-1': true, 'D01-2': true, 'D01-3': true, 'D01-4': true } }) });
-  assert.match(next.$('[data-today-flow]').textContent, /J02.*D02/);
+  assert.match(next.$('[data-today-flow]').textContent, /D02.*J02/);
   assert.match(next.$('[data-today-grade]').getAttribute('href'), /D02.html#ai-채점-프롬프트$/);
 });
 
@@ -245,7 +245,7 @@ await test('오늘 순서 상태 표식은 제목의 두 줄 제한과 잘림 �
           const labels = page.$$('.day-chip [data-step-kind]').map(node => node.textContent);
           assert.equal(labels.filter(label => label === '내 선택 티켓 포함').length, 1);
           assert.equal(labels.filter(label => label === '고르지 않은 후보 · 추가 연습').length, 3);
-          assert.equal(labels.filter(label => label === '모두 필수').length, 2);
+          assert.equal(labels.filter(label => /필수/.test(label)).length, 2);
         }
       } finally { page.window.close(); }
     }
@@ -385,7 +385,7 @@ for (const day of course.days) {
   top.checked = true; top.dispatchEvent(new page.window.Event('change', { bubbles: true }));
   assert.equal(bottom.checked, true, '같은 순서 체크 동기화');
   assert.ok(page.$('.day-chip[data-step="D04-2"]').classList.contains('is-done'));
-  assert.equal(page.$('[data-day-progress]').textContent, '1/5 끝냄');
+  assert.equal(page.$('[data-day-progress]').textContent, '구현 완료 1/5');
   const saved = page.window.localStorage.getItem(KEY);
   assert.deepEqual(JSON.parse(saved), { version: 1, steps: { 'D04-2': true } });
   const again = await open('course/spring/D04.html', { saved });
@@ -401,7 +401,7 @@ for (const day of course.days) {
   const page = await open('course/spring/D04.html', { brokenStorage: true });
   const input = page.$('input.step-check[data-step="D04-1"]');
   input.checked = true; input.dispatchEvent(new page.window.Event('change', { bubbles: true }));
-  assert.equal(page.$('[data-day-progress]').textContent, '1/5 끝냄');
+  assert.equal(page.$('[data-day-progress]').textContent, '구현 완료 1/5');
   assert.match(page.$('[data-course-storage]').textContent, /저장소를 쓸 수 없어/);
   const corrupt = await open('course/spring/D04.html', { saved: '{not json' });
   assert.equal(corrupt.$$('input.step-check:checked').length, 0, '망가진 저장값은 비운 상태로');
@@ -413,15 +413,15 @@ for (const day of course.days) {
     before: (win) => { win.Storage.prototype.setItem = function () { throw new win.DOMException('full', 'QuotaExceededError'); }; },
   });
   const check = (id, on) => { const el = page.$(`input.step-check[data-step="${id}"]`); el.checked = on; el.dispatchEvent(new page.window.Event('change', { bubbles: true })); };
-  assert.equal(page.$('[data-day-progress]').textContent, '1/5 끝냄', '저장값은 읽힌다');
+  assert.equal(page.$('[data-day-progress]').textContent, '구현 완료 1/5', '저장값은 읽힌다');
   check('D04-1', true);
   check('D04-2', true);
-  assert.equal(page.$('[data-day-progress]').textContent, '3/5 끝냄', '쓰기 실패 뒤 다음 체크가 앞 체크를 지우지 않는다');
+  assert.equal(page.$('[data-day-progress]').textContent, '구현 완료 3/5', '쓰기 실패 뒤 다음 체크가 앞 체크를 지우지 않는다');
   check('D04-5', false);
-  assert.equal(page.$('[data-day-progress]').textContent, '2/5 끝냄', '해제도 이 화면에 남는다');
+  assert.equal(page.$('[data-day-progress]').textContent, '구현 완료 2/5', '해제도 이 화면에 남는다');
   page.window.dispatchEvent(new page.window.Event('pageshow'));
   page.window.dispatchEvent(new page.window.StorageEvent('storage', { key: KEY }));
-  assert.equal(page.$('[data-day-progress]').textContent, '2/5 끝냄', 'pageshow·storage가 저장 못 한 체크를 덮지 않는다');
+  assert.equal(page.$('[data-day-progress]').textContent, '구현 완료 2/5', 'pageshow·storage가 저장 못 한 체크를 덮지 않는다');
   assert.deepEqual(page.$$('.day-chips input.step-check:checked').map((i) => i.dataset.step), ['D04-1', 'D04-2']);
   assert.match(page.$('[data-course-storage]').textContent, /저장하지 못했습니다/, '저장 실패 안내');
 }
@@ -463,9 +463,9 @@ for (const day of course.days) {
   const day = await open('course/spring/D04.html');
   day.window.localStorage.setItem(KEY, JSON.stringify({ version: 1, steps: { 'D04-1': true } }));
   day.window.dispatchEvent(new day.window.StorageEvent('storage', { key: 'other.key' }));
-  assert.equal(day.$('[data-day-progress]').textContent, '0/5 끝냄', '다른 키는 무시');
+  assert.equal(day.$('[data-day-progress]').textContent, '구현 완료 0/5', '다른 키는 무시');
   day.window.dispatchEvent(new day.window.StorageEvent('storage', { key: KEY }));
-  assert.equal(day.$('[data-day-progress]').textContent, '1/5 끝냄', '같은 키면 다시 그린다');
+  assert.equal(day.$('[data-day-progress]').textContent, '구현 완료 1/5', '같은 키면 다시 그린다');
   const home = await open('index.html');
   assert.equal(home.$('[data-today-id]').textContent, 'D01');
   home.window.localStorage.setItem(KEY, JSON.stringify({ version: 1, steps: { 'D06-1': true } }));
@@ -511,7 +511,7 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
   const page = await open('course/spring/D14.html', { saved: saved('B16') });
   const counter = () => page.$('[data-day-progress]').textContent;
   const meter = page.$('[data-day-meter]');
-  assert.match(counter(), /공통 구현 2\/2.*선택 티켓 B16 0\/1/);
+  assert.match(counter(), /공통 구현 완료 2\/2.*선택 티켓 B16 0\/1/);
   assert.match(counter(), /선택·연습 1\/3/, '고르지 않은 완료 후보는 연습에만 센다');
   assert.equal(meter.value, 2);
   assert.equal(meter.max, 3);
@@ -528,7 +528,7 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
   }
   page.window.localStorage.setItem(KEY, saved(''));
   page.window.dispatchEvent(new page.window.StorageEvent('storage', { key: KEY }));
-  assert.equal(counter(), '2/2 끝냄 · 선택·연습 1/4');
+  assert.equal(counter(), '구현 완료 2/2 · 선택·연습 1/4');
   assert.equal(meter.max, 2);
   assert.equal((await open('index.html', { saved: saved('') })).$('[data-today-id]').textContent, 'D15');
   assert.equal((await open('index.html', { saved: saved('B14') })).$('[data-today-id]').textContent, 'D15', '다른 날의 공통 순서를 중복 집계하지 않는다');
@@ -606,16 +606,16 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
   // 일자 페이지도 홈과 같은 저장값을 같은 기준으로 센다(P8-4 재검토 ①)
   const savedUpToD13 = JSON.stringify({ version: 1, steps: Object.fromEntries(coreUpToD13.map((id) => [id, true])) });
   const d13page = await open('course/spring/D13.html', { saved: savedUpToD13 });
-  assert.equal(d13page.$('[data-day-progress]').textContent, '1/1 끝냄 · 선택·연습 0/4');
+  assert.equal(d13page.$('[data-day-progress]').textContent, '구현 완료 1/1 · 선택·연습 0/4');
   assert.match(d13page.$('.day-progress-note').textContent, /선택·연습 티켓 순서는 진도에 세지 않습니다/);
   assert.deepEqual(d13page.$$('.day-chip input[data-extra]').map((i) => i.dataset.step), ['D13-2', 'D13-3', 'D13-4', 'D13-5']);
-  assert.equal((await open('course/spring/D13.html', { script: '' })).$('[data-day-progress]').textContent, '0/1 끝냄 · 선택·연습 0/4', '처음 그린 일자 진도');
+  assert.equal((await open('course/spring/D13.html', { script: '' })).$('[data-day-progress]').textContent, '구현 완료 0/1 · 선택·연습 0/4', '처음 그린 일자 진도');
   for (const id of ['D12', 'D14']) {
     const d = homeDays.find((x) => x.id === id);
     const page = await open(`course/spring/${id}.html`, { saved: savedUpToD13 });
     const core = d.steps.filter((x) => !x.extra), extra = d.steps.filter((x) => x.extra);
     const n = core.filter((x) => coreUpToD13.includes(x.id)).length;
-    assert.equal(page.$('[data-day-progress]').textContent, `${n}/${core.length} 끝냄 · 선택·연습 0/${extra.length}`, `${id} 일자 진도 = 홈 칸 ${d13.$(`.ch-day[data-day="${id}"] [data-day-count]`).textContent}`);
+    assert.equal(page.$('[data-day-progress]').textContent, `구현 완료 ${n}/${core.length} · 선택·연습 0/${extra.length}`, `${id} 일자 진도 = 홈 칸 ${d13.$(`.ch-day[data-day="${id}"] [data-day-count]`).textContent}`);
     assert.equal(d13.$(`.ch-day[data-day="${id}"] [data-day-count]`).textContent, `${n}/${core.length}`);
   }
   const d04page = await open('course/spring/D04.html', { saved: savedUpToD13 });

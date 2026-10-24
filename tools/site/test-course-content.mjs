@@ -83,3 +83,10 @@ test('코드의 엔티티와 공백 줄을 재직렬화하지 않고 바이트�
   const html=renderContentKinds('course/spring/D02.md','<h1>일정</h1><pre>'+code+'</pre>');
   assert.ok(html.includes(code));
 });
+
+test('구현 예시로 용어를 바꿀 때 한국어 조사와 기존 앵커를 보존한다', () => {
+ const doc=new JSDOM(renderContentKinds('course/README.md','<h1>안내</h1><h2 id="정답">정답</h2><p>정답은 하나가 아니다. 정답을 비교한다. 정답이 아니다. 정답과 비교한다. 정답으로 본다. 정답이라고 부른다. 정답이나 대안을 비교한다.</p>')).window.document;
+ assert.ok(doc.getElementById('정답'));
+ assert.match(doc.querySelector('p:last-child').textContent,/구현 예시는 하나가 아니다. 구현 예시를 비교한다. 구현 예시가 아니다. 구현 예시와 비교한다. 구현 예시로 본다. 구현 예시라고 부른다. 구현 예시나 대안을 비교한다./);
+ doc.defaultView.close();
+});
