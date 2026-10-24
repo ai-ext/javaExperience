@@ -4,10 +4,70 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { renderSiteNavigation } from './site-navigation.mjs';
-import { renderTicketSelection, loadCourse } from './course-pages.mjs';
+import { renderTicketSelection, loadCourse, renderDayPage } from './course-pages.mjs';
+import { renderD00 } from '../course/build-days.mjs';
+import { marked } from 'marked';
 const read = p => fs.readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 const script = read('tools/site/course.js');
 const KEY = 'javaexperience.course.progress.v1';
+
+test('선택 워밍업도 세 장면을 이동하며 원문·앵커·확인 기록을 지킨다', async () => {
+  const root = new URL('../../', import.meta.url).pathname;
+  const { roadmap } = loadCourseSources();
+  const original = marked.parse(renderD00(roadmap, root))
+    .replace(/href="([^"]+)\.md"/g, 'href="$1.html"')
+    .replace(/<h2>([^<]+)<\/h2>/g, (_, text) => `<h2 id="${text.replace(/\s+/g, '-')}">${text}</h2>`);
+  const rendered = renderDayPage('course/spring/D00.md', original, loadCourse(root));
+  const dom = new JSDOM(rendered, { url: 'https://learn.test/course/spring/D00.html', runScripts: 'outside-only' });
+  const doc = dom.window.document;
+  const panels = [...doc.querySelectorAll('.day-stepper-main > [data-day-panel]')];
+  assert.equal(panels.length, 3);
+  assert.ok(doc.querySelector('.day-stepper-layout > .day-today'));
+  assert.deepEqual(panels.map(p => p.querySelector('h2').textContent), ['오늘 할 것', '워밍업 주제', '내일 미리보기']);
+  for (const id of ['오늘-할-것', '워밍업-주제', '내일-미리보기']) assert.ok(doc.getElementById(id));
+  const source = new JSDOM(original).window.document;
+  for (const node of source.querySelectorAll('p:not(blockquote p), li')) {
+    if (node !== source.body.lastElementChild) assert.ok(doc.body.textContent.includes(node.textContent), node.textContent);
+  }
+  for (const link of source.querySelectorAll('a')) assert.ok([...doc.querySelectorAll('a')].some(a => a.getAttribute('href') === link.getAttribute('href')), link.getAttribute('href'));
+  for (const text of source.querySelector('blockquote').textContent.split(' · ')) assert.ok(doc.querySelector('.day-meta').textContent.includes(text.trim()));
+  assert.equal(doc.querySelectorAll('input.step-check, [data-day-meter]').length, 0, '선택 확인을 필수 구현 진도에 합산하지 않는다');
+  dom.window.eval(script);
+  await new Promise(resolve => dom.window.addEventListener('load', resolve));
+  const visible = () => panels.filter(panel => !panel.hidden);
+  assert.deepEqual(visible(), [panels[0]]);
+  doc.querySelector('.step-next').click();
+  await new Promise(resolve => dom.window.setTimeout(resolve, 10));
+  assert.deepEqual(visible(), [panels[1]]);
+  dom.window.location.hash = '#오늘-할-것';
+  await new Promise(resolve => dom.window.setTimeout(resolve, 10));
+  assert.deepEqual(visible(), [panels[0]], '기존 내부 앵커로 이동해도 소유 장면을 연다');
+  doc.querySelector('[data-day-expand]').click();
+  assert.equal(visible().length, 3);
+  doc.querySelector('[data-stage-check]').click();
+  assert.equal(JSON.parse(dom.window.localStorage.getItem('javaexperience.course.stages.v1'))['step-d00-1'], true);
+  assert.equal(dom.window.localStorage.getItem(KEY), null);
+  source.defaultView.close();
+  dom.window.close();
+});
+
+test('모든 구현일의 데이터·SQL·채점은 단계 안에 있고 핵심 조건만 먼저 보인다', () => {
+  for (const day of loadCourseSources().roadmap.days) {
+    const doc = new JSDOM(read(`course/spring/${day.id}.html`)).window.document;
+    for (const node of doc.querySelectorAll('.day-data, .day-sql, .day-grade')) assert.ok(node.closest('[data-day-panel]'), `${day.id}: 행동별 단계 안에 ${node.className}`);
+    for (const step of doc.querySelectorAll('.day-step')) {
+      for (const key of ['files', 'done', 'layers']) {
+        const fact = step.querySelector(`.fact-${key}`);
+        if (fact) assert.equal(fact.closest('details'), null, `${day.id}: ${key} 기본 노출`);
+      }
+      for (const key of ['trap', 'tickets', 'answer-link', 'spec', 'data-spec']) {
+        const fact = step.querySelector(`.fact-${key}`);
+        if (fact) assert.equal(fact.closest('details').open, false, `${day.id}: ${key} 기본 접힘`);
+      }
+    }
+    doc.defaultView.close();
+  }
+});
 test('실습 노트: SQL·질문은 노출하고 채점·다음 날은 같은 행동 영역에 둔다', () => {
   const days = loadCourseSources().roadmap.days;
   for (const [i, day] of days.entries()) {
@@ -70,7 +130,7 @@ test('실행안 2: 파일 작업 구분이 생성된 각 순서에 보인다', (
     }
   }
 });
-test('순서 칸: 파일 원문과 계약을 먼저 읽고, 필수 관찰과 다음 순서를 찾는다', async () => {
+test('순서 칸: 만들 것·완료 조건을 먼저 읽고, 접힌 계약·필수 관찰과 다음 순서를 찾는다', async () => {
   const { roadmap } = loadCourseSources();
   for (const id of ['D04', 'D05', 'D11', 'D19']) {
     const day = roadmap.days.find(d => d.id === id);
@@ -86,10 +146,15 @@ test('순서 칸: 파일 원문과 계약을 먼저 읽고, 필수 관찰과 다
       }
       const spec = section.querySelector('.fact-spec');
       const done = section.querySelector('.fact-done');
-      if (spec && done) assert.ok(spec.compareDocumentPosition(done) & 4, `${id}-${step.no}: 명세를 완료 조건 앞에 배치`);
+      if (spec && done) {
+        assert.ok(done.compareDocumentPosition(spec) & 4, `${id}-${step.no}: 완료 조건을 보인 뒤 명세를 찾아본다`);
+        assert.equal(spec.closest('details').open, false, `${id}-${step.no}: 명세는 기본 접힘`);
+      }
+      const fullTitle = section.querySelector('.step-context');
+      if (fullTitle) assert.equal(fullTitle.querySelector('p').textContent, step.title.replace(/`/g, ''), `${id}-${step.no}: 제목의 세부 조건 원문도 보존`);
       const next = section.querySelector('.step-next');
       assert.ok(next, `${id}-${step.no}: 다음 행동 링크`);
-      assert.equal(next.getAttribute('href'), day.steps[index + 1] ? `#step-${id.toLowerCase()}-${day.steps[index + 1].no}` : '#오늘-순서');
+      assert.equal(next.getAttribute('href'), day.steps[index + 1] ? `#step-${id.toLowerCase()}-${day.steps[index + 1].no}` : `#step-${id.toLowerCase()}-${doc.querySelector('.day-data') ? 'data' : 'wrap'}`);
       const before = [...doc.querySelectorAll('input.step-check')].map(input => input.checked);
       next.click();
       assert.deepEqual([...doc.querySelectorAll('input.step-check')].map(input => input.checked), before, '순서 이동만으로 완료 체크하지 않는다');
@@ -121,16 +186,17 @@ test('실행안 3: 실제 존재하는 섹션만 머리에서 이동하고 데�
 test('일자 머리: 긴 안내보다 먼저 Java·구현 목록이 보이고 시점 예외를 보존한다', () => {
   for (const day of loadCourseSources().roadmap.days) {
     const doc = new JSDOM(read(`course/spring/${day.id}.html`)).window.document;
-    const overview = doc.querySelector('.day-overview');
+    const overview = doc.querySelector('.day-stepper-layout');
     assert.ok(overview, day.id);
-    assert.equal(doc.querySelector('.day-sections').nextElementSibling, overview, `${day.id}: 바로가기 다음 작업대`);
+    assert.equal(doc.querySelector('.day-head').nextElementSibling, overview, `${day.id}: 일자 제목 다음 단계 작업대`);
     assert.ok(overview.querySelector('.day-java'), `${day.id}: Java 접근`);
-    assert.equal(overview.querySelector('.day-java').nextElementSibling, overview.querySelector('.day-today'), `${day.id}: DOM·키보드 순서도 Java 다음 구현 목록`);
+    assert.equal(overview.firstElementChild, overview.querySelector('.day-today'), `${day.id}: 순서 목록 다음에 본문 패널`);
+    assert.ok(overview.querySelector('.day-stage-prep .day-java'), `${day.id}: Java는 별도 준비 자료 단계`);
     assert.equal(overview.querySelectorAll('.day-chip').length, day.steps.length);
     const meter = overview.querySelector('progress');
     assert.ok(meter && meter.getAttribute('aria-label').includes('구현'), `${day.id}: 하루 전체 진도로 오인하지 않음`);
     assert.ok(doc.querySelector('.day-crumbs [aria-current="page"]'), `${day.id}: 현재 일자`);
-    for (const link of overview.querySelectorAll('a[href^="#"]')) assert.ok(doc.getElementById(decodeURIComponent(link.hash.slice(1))), `${day.id}: 작업대 링크 목적지`);
+    for (const link of overview.querySelectorAll('.day-today a[href^="#"]')) assert.ok(doc.getElementById(decodeURIComponent(link.hash.slice(1))), `${day.id}: 작업대 링크 목적지`);
     if (['D44','D45'].includes(day.id)) {
       assert.match(overview.querySelector('.day-java').textContent, /수행 중.*사후 확인/);
       assert.doesNotMatch(overview.querySelector('.day-java').textContent, /먼저 연습하기/);
@@ -356,7 +422,7 @@ test('통합: D11 인수인계·구현 작업대·순서 칸은 서로 독립된
   const handoff = doc.querySelector('.handoff-sheet');
   assert.equal(handoff.querySelectorAll('[data-prep]').length, 6);
   assert.equal(handoff.querySelectorAll('.day-overview, .day-step, .practice-panel').length, 0);
-  assert.equal(doc.querySelectorAll('.day-overview > .day-java + .day-today').length, 1);
+  assert.equal(doc.querySelectorAll('.day-stepper-layout > .day-today').length, 1);
   assert.equal(doc.querySelectorAll('.day-step').length, 4);
-  assert.ok(handoff.compareDocumentPosition(doc.querySelector('.day-overview')) & 4);
+  assert.ok(doc.querySelector('.day-stage-prep').contains(handoff), '인수인계는 준비 자료 단계에서 읽는다');
 });

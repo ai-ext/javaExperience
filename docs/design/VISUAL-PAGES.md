@@ -1,6 +1,6 @@
 # 화면별 시각 개편 체크리스트
 
-저자 원문과 생성 HTML이 함께 있는 391개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 50,616개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
+저자 원문과 생성 HTML이 함께 있는 391개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 50,965개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
 
 체크는 해당 화면의 모든 개별 항목이 `verified`일 때만 자동으로 붙는다. `imagegen` 시안 또는 공통 컴포넌트 한 개를 적용한 상태는 완료가 아니다.
 
@@ -29,52 +29,52 @@
 
 - [ ] [course/README.md](../../course/README.html) — 항목 43, 긴 산문 2, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [course/map.md](../../course/map.html) — 항목 16, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
-- [ ] [course/spring/D00.md](../../course/spring/D00.html) — 항목 15, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
-- [ ] [course/spring/D01.md](../../course/spring/D01.html) — 항목 223, 긴 산문 0, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D02.md](../../course/spring/D02.html) — 항목 239, 긴 산문 1, 토글 24, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D03.md](../../course/spring/D03.html) — 항목 298, 긴 산문 0, 토글 23, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D04.md](../../course/spring/D04.html) — 항목 247, 긴 산문 1, 토글 26, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [course/spring/D05.md](../../course/spring/D05.html) — 항목 318, 긴 산문 0, 토글 26, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D06.md](../../course/spring/D06.html) — 항목 230, 긴 산문 1, 토글 20, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [course/spring/D07.md](../../course/spring/D07.html) — 항목 347, 긴 산문 0, 토글 27, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D08.md](../../course/spring/D08.html) — 항목 346, 긴 산문 0, 토글 23, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D09.md](../../course/spring/D09.html) — 항목 329, 긴 산문 0, 토글 23, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D10.md](../../course/spring/D10.html) — 항목 359, 긴 산문 1, 토글 24, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D11.md](../../course/spring/D11.html) — 항목 147, 긴 산문 1, 토글 11, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D12.md](../../course/spring/D12.html) — 항목 137, 긴 산문 1, 토글 11, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D13.md](../../course/spring/D13.html) — 항목 146, 긴 산문 1, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D14.md](../../course/spring/D14.html) — 항목 164, 긴 산문 1, 토글 13, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D15.md](../../course/spring/D15.html) — 항목 90, 긴 산문 0, 토글 10, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D16.md](../../course/spring/D16.html) — 항목 89, 긴 산문 1, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D17.md](../../course/spring/D17.html) — 항목 88, 긴 산문 1, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D18.md](../../course/spring/D18.html) — 항목 88, 긴 산문 1, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D19.md](../../course/spring/D19.html) — 항목 86, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D20.md](../../course/spring/D20.html) — 항목 88, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D21.md](../../course/spring/D21.html) — 항목 87, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D22.md](../../course/spring/D22.html) — 항목 87, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D23.md](../../course/spring/D23.html) — 항목 91, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D24.md](../../course/spring/D24.html) — 항목 94, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D25.md](../../course/spring/D25.html) — 항목 87, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D26.md](../../course/spring/D26.html) — 항목 88, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D27.md](../../course/spring/D27.html) — 항목 89, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D28.md](../../course/spring/D28.html) — 항목 89, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D29.md](../../course/spring/D29.html) — 항목 89, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D30.md](../../course/spring/D30.html) — 항목 87, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D31.md](../../course/spring/D31.html) — 항목 88, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D32.md](../../course/spring/D32.html) — 항목 86, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D33.md](../../course/spring/D33.html) — 항목 94, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D34.md](../../course/spring/D34.html) — 항목 89, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D35.md](../../course/spring/D35.html) — 항목 88, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D36.md](../../course/spring/D36.html) — 항목 87, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D37.md](../../course/spring/D37.html) — 항목 86, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D38.md](../../course/spring/D38.html) — 항목 90, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D39.md](../../course/spring/D39.html) — 항목 90, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D40.md](../../course/spring/D40.html) — 항목 87, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D41.md](../../course/spring/D41.html) — 항목 87, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D42.md](../../course/spring/D42.html) — 항목 86, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D43.md](../../course/spring/D43.html) — 항목 86, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D44.md](../../course/spring/D44.html) — 항목 86, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D45.md](../../course/spring/D45.html) — 항목 86, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D00.md](../../course/spring/D00.html) — 항목 16, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [course/spring/D01.md](../../course/spring/D01.html) — 항목 234, 긴 산문 0, 토글 28, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D02.md](../../course/spring/D02.html) — 항목 252, 긴 산문 1, 토글 37, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D03.md](../../course/spring/D03.html) — 항목 314, 긴 산문 0, 토글 39, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D04.md](../../course/spring/D04.html) — 항목 261, 긴 산문 1, 토글 40, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [course/spring/D05.md](../../course/spring/D05.html) — 항목 335, 긴 산문 0, 토글 43, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D06.md](../../course/spring/D06.html) — 항목 243, 긴 산문 1, 토글 33, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [course/spring/D07.md](../../course/spring/D07.html) — 항목 365, 긴 산문 0, 토글 45, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D08.md](../../course/spring/D08.html) — 항목 359, 긴 산문 0, 토글 36, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D09.md](../../course/spring/D09.html) — 항목 346, 긴 산문 0, 토글 40, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D10.md](../../course/spring/D10.html) — 항목 375, 긴 산문 1, 토글 40, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D11.md](../../course/spring/D11.html) — 항목 164, 긴 산문 1, 토글 28, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D12.md](../../course/spring/D12.html) — 항목 153, 긴 산문 1, 토글 27, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D13.md](../../course/spring/D13.html) — 항목 166, 긴 산문 1, 토글 32, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D14.md](../../course/spring/D14.html) — 항목 189, 긴 산문 1, 토글 38, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D15.md](../../course/spring/D15.html) — 항목 92, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D16.md](../../course/spring/D16.html) — 항목 93, 긴 산문 1, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D17.md](../../course/spring/D17.html) — 항목 92, 긴 산문 1, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D18.md](../../course/spring/D18.html) — 항목 92, 긴 산문 1, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D19.md](../../course/spring/D19.html) — 항목 90, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D20.md](../../course/spring/D20.html) — 항목 92, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D21.md](../../course/spring/D21.html) — 항목 91, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D22.md](../../course/spring/D22.html) — 항목 91, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D23.md](../../course/spring/D23.html) — 항목 95, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D24.md](../../course/spring/D24.html) — 항목 98, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D25.md](../../course/spring/D25.html) — 항목 91, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D26.md](../../course/spring/D26.html) — 항목 92, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D27.md](../../course/spring/D27.html) — 항목 93, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D28.md](../../course/spring/D28.html) — 항목 93, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D29.md](../../course/spring/D29.html) — 항목 93, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D30.md](../../course/spring/D30.html) — 항목 91, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D31.md](../../course/spring/D31.html) — 항목 92, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D32.md](../../course/spring/D32.html) — 항목 90, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D33.md](../../course/spring/D33.html) — 항목 98, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D34.md](../../course/spring/D34.html) — 항목 93, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D35.md](../../course/spring/D35.html) — 항목 92, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D36.md](../../course/spring/D36.html) — 항목 91, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D37.md](../../course/spring/D37.html) — 항목 90, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D38.md](../../course/spring/D38.html) — 항목 94, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D39.md](../../course/spring/D39.html) — 항목 94, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D40.md](../../course/spring/D40.html) — 항목 91, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D41.md](../../course/spring/D41.html) — 항목 91, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D42.md](../../course/spring/D42.html) — 항목 90, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D43.md](../../course/spring/D43.html) — 항목 90, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D44.md](../../course/spring/D44.html) — 항목 90, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D45.md](../../course/spring/D45.html) — 항목 90, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/README.md](../../course/spring/README.html) — 항목 8, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [course/start/README.md](../../course/start/README.html) — 항목 34, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [course/start/dummy/README.md](../../course/start/dummy/README.html) — 항목 20, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed

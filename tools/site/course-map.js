@@ -1,5 +1,5 @@
 // 과정 지도 동작 — 노드를 고르면 관계 보기(직접 연결·상하류 전체·영향 주는 쪽·영향 받는 쪽)에 맞는 노드만 밝히고,
-// 넓은 화면에서는 레인 사이 연결선을 그린다. 스크립트가 없어도 아래 관계 표에 모든 연결이 있다.
+// 넓은 화면에서는 레인 사이 연결선을 그린다. 스크립트가 없어도 아래 연결 흐름에 모든 연결이 있다.
 (function () {
   'use strict';
   var root = document.querySelector('[data-course-map]');
@@ -128,7 +128,7 @@
     if (!selected) {
       board.classList.remove('has-selection');
       buttons.forEach(function (b) { b.classList.remove('is-related', 'is-selected'); b.setAttribute('aria-pressed', 'false'); });
-      status.textContent = '노드를 고르면 관계 보기에 맞는 노드만 밝힙니다. 아래 관계 표에 모든 연결이 글로 있습니다.';
+      status.textContent = '노드를 고르면 관계 보기에 맞는 노드만 밝힙니다. 아래 연결 흐름에 모든 연결이 글로 있습니다.';
       renderDetail(null);
       draw(null);
       return;

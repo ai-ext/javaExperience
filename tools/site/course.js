@@ -153,6 +153,115 @@
     });
   }
 
+
+  // 해시를 기존 앵커 그대로 사용한다. 숨겨진 패널의 내부 앵커도 해당 패널을 먼저 연다.
+  function initDayStepper(page) {
+    var panels = Array.prototype.slice.call(page.querySelectorAll('.day-stepper-main > [data-day-panel]'));
+    if (!panels.length) return;
+    var toggle = page.querySelector('[data-day-expand]');
+    var position = page.querySelector('[data-day-position]');
+    var links = Array.prototype.slice.call(page.querySelectorAll('[data-panel-link]'));
+    var expanded = false, active = panels.find(function (panel) { return panel.matches('.day-step'); }) || panels[0];
+    var printDetails = [];
+    var wrapPanels = Array.prototype.slice.call(page.querySelectorAll('[data-wrap-panel]'));
+    var wrapLinks = Array.prototype.slice.call(page.querySelectorAll('[data-wrap-target]'));
+    var wrapActive = wrapPanels[0];
+    var wrapTabs = page.querySelector('.day-wrap-tabs');
+    if (wrapTabs) wrapTabs.hidden = false;
+    var stageKey = 'javaexperience.course.stages.v1';
+    var stageInputs = Array.prototype.slice.call(page.querySelectorAll('[data-stage-check]'));
+    var stageState = {}, stagePending = {}, stageStore = storage();
+    function loadStages() {
+      try { var value = stageStore && JSON.parse(stageStore.getItem(stageKey) || '{}'); if (value && typeof value === 'object') stageState = value; } catch (e) { /* 저장 불가 시 현재 화면의 기록을 유지한다. */ }
+      Object.keys(stagePending).forEach(function (id) { stageState[id] = stagePending[id]; });
+      stageInputs.forEach(function (input) { input.checked = stageState[input.dataset.stageCheck] === true; input.parentElement.classList.toggle('is-done', input.checked); });
+    }
+    stageInputs.forEach(function (input) {
+      input.addEventListener('change', function () {
+        var checked = input.checked;
+        loadStages();
+        stageState[input.dataset.stageCheck] = checked;
+        stagePending[input.dataset.stageCheck] = checked;
+        try { if (stageStore) { stageStore.setItem(stageKey, JSON.stringify(stageState)); stagePending = {}; } } catch (e) { /* 구현 진도와 분리하여 이 화면에 보존한다. */ }
+        loadStages();
+      });
+    });
+    window.addEventListener('pageshow', loadStages);
+    window.addEventListener('storage', function (event) { if (event.key === stageKey || event.key === null) loadStages(); });
+    loadStages();
+    function paint() {
+      panels.forEach(function (panel) {
+        panel.hidden = !expanded && panel !== active;
+        panel.classList.toggle('is-active', panel === active);
+      });
+      links.forEach(function (link) {
+        var selected = link.getAttribute('href') === '#' + active.id;
+        if (selected) link.setAttribute('aria-current', 'step'); else link.removeAttribute('aria-current');
+        link.parentElement.classList.toggle('is-active', selected);
+      });
+      if (toggle) { toggle.setAttribute('aria-pressed', String(expanded)); toggle.textContent = expanded ? '한 순서씩 보기' : '모두 펼쳐 보기'; }
+      if (position) position.textContent = (panels.indexOf(active) + 1) + ' / ' + panels.length + ' 단계';
+      page.classList.toggle('day-show-all', expanded);
+      wrapPanels.forEach(function (panel) { panel.hidden = !expanded && panel !== wrapActive; });
+      wrapLinks.forEach(function (link) {
+        var selected = wrapActive && link.dataset.wrapTarget === wrapActive.id;
+        if (selected) link.setAttribute('aria-current', 'step'); else link.removeAttribute('aria-current');
+      });
+    }
+    function revealHash(scroll) {
+      var id;
+      try { id = decodeURIComponent(window.location.hash.slice(1)); } catch (e) { return; }
+      var target = id && document.getElementById(id);
+      var owner = target && target.closest('[data-day-panel]');
+      if (owner && panels.indexOf(owner) >= 0) {
+        active = owner;
+        var wrapOwner = target.closest('[data-wrap-panel]');
+        if (wrapOwner) wrapActive = wrapOwner;
+        // 사용자 내부 링크만 접기를 연다. 초기 선택은 힌트·정답을 펼치지 않는다.
+        if (target !== owner) {
+          var fold = target.closest('details');
+          while (fold && owner.contains(fold)) { fold.open = true; fold = fold.parentElement.closest('details'); }
+        }
+        paint();
+        if (scroll && target.scrollIntoView) target.scrollIntoView({ block: 'start' });
+      } else if (!id) {
+        active = panels.find(function (panel) { return panel.matches('.day-step'); }) || panels[0];
+        paint();
+      }
+    }
+    page.classList.add('day-stepper-ready');
+    if (toggle) {
+      toggle.hidden = false;
+      toggle.addEventListener('click', function () { expanded = !expanded; paint(); });
+    }
+    window.addEventListener('hashchange', function () { revealHash(true); });
+    // 같은 앵커를 다시 누른 경우 hashchange가 없어도 패널을 연다.
+    page.addEventListener('click', function (event) {
+      var link = event.target.closest('a[href^="#"]');
+      if (link && link.hash === window.location.hash) revealHash(true);
+    });
+    var beforePrintExpanded;
+    window.addEventListener('beforeprint', function () {
+      beforePrintExpanded = expanded;
+      expanded = true;
+      printDetails = Array.prototype.slice.call(page.querySelectorAll('details:not([open])'));
+      printDetails.forEach(function (fold) { fold.open = true; });
+      paint();
+    });
+    window.addEventListener('afterprint', function () {
+      expanded = beforePrintExpanded === true;
+      printDetails.forEach(function (fold) { fold.open = false; });
+      printDetails = [];
+      paint();
+    });
+    // 브라우저 찾기 전에 모든 패널을 노출한다. 브라우저 기본 검색은 그대로 실행한다.
+    window.addEventListener('keydown', function (event) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') { expanded = true; paint(); }
+    });
+    paint();
+    revealHash(false);
+  }
+
   // 준비·선택 기록은 구현 체크와 별도로 관리한다. 저장 실패한 변경은 이 화면에서 보존한다.
   function initRecords() {
     var store = storage(), pending = {}, pendingPrep = {};
@@ -395,7 +504,7 @@
   window.jxCourseProgress = { KEY: KEY, readProgress: readProgress, writeProgress: writeProgress, nextDay: nextDay };
   function start() {
     var page = document.querySelector('[data-day-page]');
-    if (page) initDay(page);
+    if (page) { initDay(page); initDayStepper(page); }
     var home = document.querySelector('[data-course-home]');
     if (home) initHome(home);
     initCopy();

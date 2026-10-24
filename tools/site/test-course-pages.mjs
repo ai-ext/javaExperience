@@ -166,6 +166,7 @@ await test('길찾기: 홈 첫 방문의 행동 순서는 Java → Spring → �
 });
 
 // R4: JSDOM은 배치를 계산하지 않으므로 크기·줄바꿈은 소스 규칙을, 이름은 생성 DOM을 검사한다.
+const tokenCss = fs.readFileSync(new URL('course-tokens.css', import.meta.url), 'utf8');
 const courseCss = fs.readFileSync(new URL('course.css', import.meta.url), 'utf8');
 const flowCss = fs.readFileSync(new URL('course-flow.css', import.meta.url), 'utf8');
 const siteCss = fs.readFileSync(new URL('site.css', import.meta.url), 'utf8');
@@ -192,7 +193,7 @@ await test('R4-01: 모든 지도 노드 title은 전체 이름과 같다', () =>
   const span = declarations(courseCss, '.cm-node span');
   assert.equal(span['white-space'], 'normal');
   assert.ok(!span['text-overflow'] && span.overflow !== 'hidden' && !span['-webkit-line-clamp'], '긴 이름도 높이 제한으로 자르지 않는다');
-  assert.match(courseCss, /@media \(max-width: 899px\)[\s\S]*?\.cm-node span \{ display: none; \}/, '좁은 화면 칩 배치는 유지');
+  assert.ok(mapNodes(course).every(node => node.title), 'PC에서 모든 노드의 전체 제목을 제공한다');
 });
 await test('P10: 홈 진도는 수동 체크이며 채점 결과가 아님을 알린다', async () => {
   const home = await open('index.html');
@@ -201,17 +202,21 @@ await test('P10: 홈 진도는 수동 체크이며 채점 결과가 아님을 �
   assert.match(note, /공통 구현과 선택한 티켓을 집계하며, 고르지 않은 후보는 제외합니다\./);
   assert.match(note, /Java 수행 여부와 역량은 따로 확인합니다\./);
 });
-await test('R4-08: 390 폭에서 선 범례를 숨기고 노드 범례와 관계 표를 남긴다', async () => {
+await test('R4-08: PC 지도에 노드·연결선 범례와 모든 연결 흐름을 남긴다', async () => {
   const map = await open('course/map.html', { script: mapScript });
-  assert.ok(map.$('.cm-line-legend'));
   assert.equal(map.$$('.cm-line-legend .cm-line-sample').length, 3);
-  assert.match(courseCss, /@media \(max-width: 899px\)[\s\S]*?\.cm-line-legend \{ display: none; \}/);
-  assert.equal(map.$$('[data-cm-lines] .cm-edge').length, 0);
-  assert.ok(map.$('.cm-legend .cm-swatch') && map.$('.cm-tables'));
+  assert.ok(map.$('.cm-legend .cm-swatch') && map.$('.cm-tables .course-outline'));
+  assert.equal(map.$$('.cm-tables table').length, 0);
+  for (const edge of course.edges) assert.ok(map.$$('[data-edge]').some(node => node.dataset.edge === `${edge.from}>${edge.to}`));
+  map.window.close();
 });
 await test('R4-05: 일자 칩 체크박스의 누르는 면은 최소 24×24px', () => {
   const input = declarations(courseCss, '.day-chip input');
-  for (const prop of ['width', 'height']) assert.ok(/^\d+px$/.test(input[prop]) && parseFloat(input[prop]) >= 24, `${prop}: ${input[prop]}`);
+  const tokens = declarations(tokenCss, ':root');
+  for (const prop of ['width', 'height']) {
+    const size = input[prop].replace(/var\((--[\w-]+)\)/g, (_, name) => tokens[name]);
+    assert.ok(/^\d+px$/.test(size) && parseFloat(size) >= 24, `${prop}: ${size}`);
+  }
 });
 // JSDOM에는 레이아웃이 없으므로 텍스트 존재 대신 DOM과 실제 CSS의 잘림 경계를 검사한다.
 await test('오늘 순서 상태 표식은 제목의 두 줄 제한과 잘림 조상 밖에 있다', async () => {
@@ -264,7 +269,7 @@ await test('R4-06: 한국어 본문은 낱말을 지키고 코드는 긴 토큰�
     assert.equal(code['overflow-wrap'], 'anywhere');
   }
 });
-await test('R4-03: 공통 테마의 홈 본문·서비스·아바타 대비는 라이트·다크 모두 4.5 이상', () => {
+await test('R4-03: 단일 다크 테마의 홈 본문·서비스·아바타 대비는 4.5 이상', () => {
   const pairs = [
     ...['.home-method-grid p', '.home-explore-grid p', '.home-faq p', '.home-footer', '.home-roadmap'].map(selector => [homeCss, selector, '--bg']),
     [homeCss, '.home-progress-note', '--card'],
@@ -274,21 +279,32 @@ await test('R4-03: 공통 테마의 홈 본문·서비스·아바타 대비는 �
     [serviceCss, '.home-service-avatar-green', '--c-day-soft'],
     [serviceCss, '.home-service-avatar-purple', '--c-area-soft'],
   ];
-  for (const theme of [':root', ':root[data-theme="dark"]']) {
-    const tokens = {...declarations(siteCss, theme), ...declarations(courseCss, theme)};
-    for (const [css, selector, background] of pairs) {
-      const raw = declarations(css, selector).color;
-      const fg = raw.replace(/var\((--[\w-]+)\)/g, (_, name) => tokens[name]);
-      assert.ok(contrast(fg, tokens[background]) >= 4.5, `${theme} ${selector}: ${fg} / ${tokens[background]}`);
-    }
+  const tokens = declarations(tokenCss, ':root');
+  const resolve = value => value.replace(/var\((--[\w-]+)\)/g, (_, name) => resolve(tokens[name]));
+  for (const [css, selector, background] of pairs) {
+    const fg = resolve(declarations(css, selector).color);
+    assert.ok(contrast(fg, resolve(tokens[background])) >= 4.5, `${selector}: ${fg} / ${tokens[background]}`);
   }
-  assert.equal(declarations(homeCss, 'body.home-page')['color-scheme'], undefined, '홈도 공통 테마를 상속한다');
+  assert.equal(tokens['color-scheme'], 'dark');
 });
-await test('R4-07: 라이트 주석 대비는 4.5 이상이고 다크 토큰은 보존한다', () => {
-  const colors = [...siteCss.matchAll(/--syntax-comment:\s*(#[0-9a-f]{6})/g)].map((m) => m[1]);
-  assert.ok(contrast(colors[0], '#f3f1ec') >= 4.5, `라이트: ${contrast(colors[0], '#f3f1ec').toFixed(4)}`);
-  assert.deepEqual(colors.slice(1), ['#89939e', '#89939e']);
-  assert.ok(contrast(colors[1], '#22262b') >= 4.5);
+await test('R4-07: 다크 코드 주석 대비는 4.5 이상이다', () => {
+  const color = tokenCss.match(/--syntax-comment:\s*(#[0-9a-f]{6})/)[1];
+  const tokens = declarations(tokenCss, ':root');
+  assert.ok(contrast(color, tokens['--code-bg']) >= 4.5);
+});
+await test('과정·홈은 다크 CSS만 로드하고 테마 선택 코드가 없다', () => {
+  const files = ['README.html', ...course.days.map(day => day.page), ...course.java.map(java => java.page), ...course.tickets.map(ticket => ticket.page).filter(Boolean), 'course/map.html', 'course/README.html', 'course/spring/README.html', 'course/start/README.html'];
+  for (const file of files) {
+    const doc = new JSDOM(fs.readFileSync(new URL(file, root), 'utf8')).window.document;
+    assert.equal(doc.documentElement.hasAttribute('data-theme'), false, file);
+    assert.ok(doc.querySelector('link[href*="course-tokens.css"]'), file);
+    for (const link of doc.querySelectorAll('link[rel="stylesheet"]')) {
+      const css = fs.readFileSync(new URL(link.getAttribute('href').split('?')[0], new URL(file, root)), 'utf8');
+      assert.doesNotMatch(css, /prefers-color-scheme|\[data-theme/, file + ': ' + link.href);
+    }
+    for (const script of doc.querySelectorAll('script:not([src])')) assert.doesNotMatch(script.textContent, /prefers-color-scheme|dataset\.theme/);
+    doc.defaultView.close();
+  }
 });
 
 // ---------------------------------------------------------------- 칩 제목
@@ -322,8 +338,7 @@ for (const day of course.days) {
   if (course.flows.days.has(day.id)) assert.ok($(`section.day-flow.flow[data-flow="${day.id}"]`) && !$('.day-flow[hidden]'), `${day.id}: 오늘 흐름`);
   else if (day.phase === 'maintain') assert.ok($(`section.day-flow.flow-links[data-flow-links="${day.id}"]`), `${day.id}: 그날 티켓의 장애 흐름으로 잇기`);
   else assert.ok($('.day-flow[hidden]') && $('.day-flow').children.length === 0, `${day.id}: 흐름이 없는 날은 빈 자리`);
-  const flowPrevious = $('.day-overview') ? 'section.day-java + section.day-today' : 'section.day-java';
-  assert.ok(!$('section.day-java') || $(`${flowPrevious} + .day-flow, ${flowPrevious} + details.implementation-flow > .day-flow`), `${day.id}: 흐름은 Java·구현 목록 다음이며 DOM과 시각 순서를 맞춘다`);
+  assert.ok(!$('section.day-java') || $('section.day-java + .day-flow, section.day-java + details.implementation-flow > .day-flow'), `${day.id}: 준비 자료에서 Java 다음 흐름을 읽는다`);
   assert.ok($('nav.day-pager'), `${day.id}: 이전·다음 날`);
   for (const a of $$('.day-pager a, .course-crumbs a')) {
     const target = new URL(a.getAttribute('href'), `${root.href}${file}`);
@@ -1036,4 +1051,66 @@ await test('API 층은 순서별 독립 사실 칸에 있고 D04 가이드는 �
     }
     page.window.close();
   }
+});
+
+await test('단계형 일자: 무스크립트 원문, 해시·뒤로 가기, 전체 보기·인쇄·검색을 보존한다', async () => {
+  const raw = new JSDOM(fs.readFileSync(new URL('course/spring/D05.html', root), 'utf8')).window.document;
+  const rawPanels = [...raw.querySelectorAll('.day-stepper-main > [data-day-panel]')];
+  assert.ok(rawPanels.length > 4);
+  assert.equal(rawPanels.filter(panel => panel.hidden).length, 0, 'JS가 없으면 모든 단계 원문을 읽을 수 있다');
+  assert.ok(raw.querySelector('.day-stage-data .day-data'), '적재 원문은 데이터 단계에 있다');
+  for (const cls of ['day-sql', 'day-talk', 'day-grade']) assert.ok(raw.querySelector(`.day-stage-wrap .${cls}`), cls);
+  for (const step of raw.querySelectorAll('.day-step')) {
+    assert.match(step.querySelector('.fact-files .fact-label').textContent, /^만들 것(?:\s|$)/);
+    assert.ok(step.querySelector('.fact-done:not(details), .fact-layers:not(details)'));
+    assert.equal(step.querySelector('details.fact-trap').open, false);
+    assert.equal(step.querySelector('details.step-references').open, false);
+  }
+  const page = await open('course/spring/D05.html', { before(win) { win.history.replaceState(null, '', '#step-d05-3'); } });
+  const visible = () => page.$$('.day-stepper-main > [data-day-panel]').filter(panel => !panel.hidden).map(panel => panel.id);
+  assert.deepEqual(visible(), ['step-d05-3'], '직접 해시 진입');
+  assert.equal(page.$('[data-panel-link][aria-current="step"]').hash, '#step-d05-3');
+  const hashChange = () => new Promise(resolve => page.window.addEventListener('hashchange', resolve, { once: true }));
+  let changed = hashChange();
+  page.window.location.hash = '#step-d05-wrap';
+  await changed;
+  assert.deepEqual(visible(), ['step-d05-wrap']);
+  assert.deepEqual(page.$$('[data-wrap-panel]').filter(panel => !panel.hidden).map(panel => panel.id), ['step-d05-wrap-sql']);
+  const coreValue = page.$('[data-day-meter]').value;
+  page.$('[data-stage-check="step-d05-wrap"]').click();
+  assert.equal(page.$('[data-day-meter]').value, coreValue, '마무리 확인은 구현 진도에 더하지 않는다');
+  assert.equal(JSON.parse(page.window.localStorage.getItem('javaexperience.course.stages.v1'))['step-d05-wrap'], true);
+  changed = hashChange();
+  page.window.location.hash = '#말하기-카드';
+  await changed;
+  assert.deepEqual(page.$$('[data-wrap-panel]').filter(panel => !panel.hidden).map(panel => panel.id), ['step-d05-wrap-talk'], '기존 마무리 앵커가 하위 순서를 연다');
+  changed = hashChange();
+  page.window.history.back();
+  await changed;
+  changed = hashChange();
+  page.window.history.back();
+  await changed;
+  assert.deepEqual(visible(), ['step-d05-3'], '브라우저 뒤로 가기');
+  changed = hashChange();
+  page.window.location.hash = '#observations-d05-2';
+  await changed;
+  assert.deepEqual(visible(), ['step-d05-2'], '기존 내부 앵커도 소속 단계를 연다');
+  assert.equal(page.$('#observations-d05-2').open, true);
+  page.$('[data-day-expand]').click();
+  assert.equal(visible().length, rawPanels.length);
+  assert.equal(page.$('[data-day-expand]').getAttribute('aria-pressed'), 'true');
+  page.$('[data-day-expand]').click();
+  assert.deepEqual(visible(), ['step-d05-2']);
+  const trap = page.$('#step-d05-2 details.fact-trap');
+  assert.equal(trap.open, false);
+  page.window.dispatchEvent(new page.window.Event('beforeprint'));
+  assert.equal(visible().length, rawPanels.length);
+  assert.equal(trap.open, true);
+  page.window.dispatchEvent(new page.window.Event('afterprint'));
+  assert.deepEqual(visible(), ['step-d05-2']);
+  assert.equal(trap.open, false);
+  assert.equal(page.$('#observations-d05-2').open, true, '인쇄 전 열어둔 관찰 접기는 유지');
+  page.window.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'f', ctrlKey: true }));
+  assert.equal(visible().length, rawPanels.length, '브라우저 검색을 시작하면 숨긴 순서도 찾는다');
+  page.window.close();
 });
