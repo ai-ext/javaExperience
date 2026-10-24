@@ -362,7 +362,7 @@ export function renderDayPage(sourceRel, body, course) {
     const extraCount = day.steps.filter((s) => isExtraStep(s, course)).length;
     const coreCount = day.steps.length - extraCount || day.steps.length;
     const progress = `0/${coreCount} 끝냄${extraCount && extraCount < day.steps.length ? ` · 선택·연습 0/${extraCount}` : ''}`;
-    const extraNote = extraCount && extraCount < day.steps.length ? ' 선택·연습 티켓 순서는 진도에 세지 않습니다.' : '';
+    const extraNote = extraCount && extraCount < day.steps.length ? ' 선택한 티켓은 진도에 포함하며, 고르지 않은 선택·연습 티켓 순서는 진도에 세지 않습니다.' : '';
     const firstCore = day.steps.find((s) => !isExtraStep(s, course)) || day.steps[0];
     todayPanel = `<section class="day-today" aria-labelledby="오늘-순서"><div class="day-today-head"><div><p class="day-panel-label">Spring · 구현 체크</p>${heading}</div><p class="day-progress" data-day-progress aria-live="polite">${progress}</p></div>`
       + `<progress class="day-progress-track" data-day-meter max="${coreCount}" value="0" aria-label="필수 구현 순서 진도"></progress>`
@@ -459,7 +459,7 @@ export function renderCourseHome(course) {
   const stepTotal = main.reduce((n, d) => n + coreCount(d), 0);
   const data = course.days.map((d) => ({ id: d.id, title: d.title, phase: d.phase, phaseLabel: PHASE[d.phase], java: d.java, javaTiming: course.java.find((j) => j.id === d.java)?.timing || 'before', href: href(d.page),
     javaHref: course.java.find((j) => j.id === d.java)?.page ? href(course.java.find((j) => j.id === d.java).page) : null,
-    steps: d.steps.map((s) => ({ id: s.id, title: plain(s.short), ...(isExtraStep(s, course) ? { extra: true } : {}) })) }));
+    steps: d.steps.map((s) => ({ id: s.id, title: plain(s.short), ...(isExtraStep(s, course) ? { extra: true, choiceTickets: s.tickets.filter(id => course.tickets.find(t => t.id === id)?.pool) } : {}) })) }));
   const todaySteps = (d) => d.steps.map((s, i) => `<li><span aria-hidden="true">${NUMS[i]}</span> <a href="${esc(href(d.page))}#step-${d.id.toLowerCase()}-${s.no}">${inline(s.short)}</a></li>`).join('');
   const phases = [['build', '1단계 · 만들기'], ['maintain', '2단계 · 넘겨받기'], ['wrap', '중간 점검'], ['extend', '3단계 · 설계·운영·업무 적용']];
   const dayCell = (d) => `<li class="ch-day" data-day="${d.id}"><a href="${esc(href(d.page))}" title="${esc(d.id + ' · ' + d.title)}"><b>${d.id}</b><span class="ch-day-title">${esc(d.title)}</span><span class="ch-bar" aria-hidden="true"><i style="width:0%"></i></span><small data-day-count>0/${coreCount(d)}</small></a></li>`;
@@ -497,7 +497,7 @@ export function renderCourseHome(course) {
   </div>
     <section class="ch-progress" aria-labelledby="ch-progress-title">
       <div class="ch-progress-head"><h2 id="ch-progress-title">${main.length}일 진도</h2><p data-progress-summary>체크한 순서 0/${stepTotal}</p></div>
-      <p class="ch-progress-note">직접 체크한 진도이며 채점 결과가 아닙니다. Java·선택 티켓의 수행 여부와 역량은 따로 확인합니다.</p>
+      <p class="ch-progress-note">직접 체크한 진도이며 채점 결과가 아닙니다. 공통 구현과 선택한 티켓을 집계하며, 고르지 않은 후보는 제외합니다. Java 수행 여부와 역량은 따로 확인합니다.</p>
       <p class="ch-progress-key"><span class="ch-key-current">추천 구현일</span><span class="ch-key-done">구현 체크 끝</span><span>각 칸의 수치 = 체크한 순서 / 집계 순서</span></p>
       ${phases.map(([phase, label]) => {
         const days = main.filter(d => d.phase === phase);

@@ -35,18 +35,31 @@
     if (preparation && Object.keys(preparation).length) value.preparation = preparation;
     try { store.setItem(KEY, JSON.stringify(value)); return true; } catch (e) { return false; }
   }
-  // 진도로 세는 순서: 선택·연습 티켓만 다루는 추가 순서(extra)를 뺀 나머지. 그날 순서가 모두 추가면 전부 센다.
+  // 공통 구현 순서: 선택·연습 티켓만 다루는 추가 순서(extra)를 뺀 나머지. 그날 순서가 모두 추가면 전부 센다.
   function coreSteps(day) {
     var core = day.steps.filter(function (s) { return !s.extra; });
     return core.length ? core : day.steps;
   }
+  function selectedSteps(day, selectedTicket) {
+    return day.steps.filter(function (s) { return s.extra && selectedTicket && (s.choiceTickets || []).indexOf(selectedTicket) >= 0; });
+  }
+  // 공통 구현에 실제로 선택한 후보의 순서만 더한다.
+  function progressSteps(day, selectedTicket) {
+    var selected = selectedSteps(day, selectedTicket), core = coreSteps(day);
+    return day.steps.filter(function (s) { return core.indexOf(s) >= 0 || selected.indexOf(s) >= 0; });
+  }
   // 오늘 할 일: 체크가 있는 가장 늦은 날이 덜 끝났으면 그날, 다 끝났으면 다음 날. 체크가 없으면 첫날.
+  // 이미 지난 날에 선택한 티켓이 남아 있으면 그날로 복귀한다.
   // 마지막 날까지 끝냈는데 앞에 덜 끝낸 날이 있으면 그 첫 날로 돌아간다. 진도로 세는 순서를 모두 끝냈을 때만 complete다.
-  function nextDay(days, done) {
-    var finished = function (day) { return coreSteps(day).every(function (s) { return done.has(s.id); }); };
+  function nextDay(days, done, selectedTicket) {
+    var finished = function (day) { return progressSteps(day, selectedTicket).every(function (s) { return done.has(s.id); }); };
     var last = -1;
     days.forEach(function (day, index) { if (day.steps.some(function (s) { return done.has(s.id); })) last = index; });
     if (last < 0) return { day: days[0], mode: 'first' };
+    var pendingChoice = days.slice(0, last + 1).find(function (day) {
+      return selectedSteps(day, selectedTicket).some(function (s) { return !done.has(s.id); });
+    });
+    if (pendingChoice) return { day: pendingChoice, mode: 'continue' };
     var current = days[last];
     if (!finished(current)) return { day: current, mode: 'continue' };
     if (last + 1 < days.length) return { day: days[last + 1], mode: 'next' };
@@ -75,6 +88,10 @@
     inputs.forEach(function (input) { if (input.hasAttribute('data-extra') && extraIds.indexOf(input.dataset.step) < 0) extraIds.push(input.dataset.step); });
     if (extraIds.length === ids.length) extraIds = [];
     var coreIds = ids.filter(function (id) { return extraIds.indexOf(id) < 0; });
+    var day = { steps: ids.map(function (id) {
+      var chip = page.querySelector('.day-chip[data-step="' + id + '"]');
+      return { id: id, extra: extraIds.indexOf(id) >= 0, choiceTickets: chip && chip.dataset.choiceTickets ? chip.dataset.choiceTickets.split(',') : [] };
+    }) };
     var counter = page.querySelector('[data-day-progress]');
     var meter = page.querySelector('[data-day-meter]');
     var resume = page.querySelector('[data-day-resume]');
@@ -84,16 +101,14 @@
         node.classList.toggle('is-done', state.done.has(node.dataset.step));
       });
       var doneOf = function (list) { return list.filter(function (id) { return state.done.has(id); }).length; };
-      if (counter) counter.textContent = doneOf(coreIds) + '/' + coreIds.length + ' 끝냄'
-        + (extraIds.length ? ' · 선택·연습 ' + doneOf(extraIds) + '/' + extraIds.length : '');
-      if (meter) meter.value = doneOf(coreIds);
-      // 선택 티켓도 실제로 고른 항목이면 이어하기에 포함한다. 진도 집계 기준은 유지한다.
-      var nextId = ids.find(function (id) {
-        if (state.done.has(id)) return false;
-        if (coreIds.indexOf(id) >= 0) return true;
-        var chip = page.querySelector('.day-chip[data-step="' + id + '"]');
-        return Boolean(state.selectedTicket && chip && (chip.dataset.choiceTickets || '').split(',').indexOf(state.selectedTicket) >= 0);
-      });
+      var selectedIds = selectedSteps(day, state.selectedTicket).map(function (s) { return s.id; });
+      var countedIds = progressSteps(day, state.selectedTicket).map(function (s) { return s.id; });
+      var practiceIds = extraIds.filter(function (id) { return selectedIds.indexOf(id) < 0; });
+      if (counter) counter.textContent = (selectedIds.length ? '공통 구현 ' : '') + doneOf(coreIds) + '/' + coreIds.length + ' 끝냄'
+        + (selectedIds.length ? ' · 선택 티켓 ' + state.selectedTicket + ' ' + doneOf(selectedIds) + '/' + selectedIds.length : '')
+        + (practiceIds.length ? ' · 선택·연습 ' + doneOf(practiceIds) + '/' + practiceIds.length : '');
+      if (meter) { meter.max = countedIds.length; meter.value = doneOf(countedIds); }
+      var nextId = countedIds.find(function (id) { return !state.done.has(id); });
       page.querySelectorAll('.day-chip[data-step]').forEach(function (node) {
         node.classList.toggle('is-current', node.dataset.step === nextId);
       });
@@ -289,22 +304,25 @@
     var NUMS = '①②③④⑤⑥⑦⑧⑨⑩';
     function render() {
       var state = readProgress(store);
-      var pick = nextDay(days, state.done);
+      var pick = nextDay(days, state.done, state.selectedTicket);
       var day = pick.day;
       var tags = { first: '오늘 할 일 · 처음 시작', continue: '오늘 할 일 · 이어서', next: '오늘 할 일 · 다음 날', remaining: '오늘 할 일 · 남은 순서가 있는 날', complete: days.length + '일 과정 · 필수 구현 체크 끝 · 채점 결과 별도' };
       $('[data-today-tag]').textContent = tags[pick.mode];
       $('[data-today-id]').textContent = day.id;
       $('[data-today-title]').textContent = day.title;
       var core = coreSteps(day);
-      var extraCount = day.steps.length - core.length;
+      var selected = selectedSteps(day, state.selectedTicket);
+      var extraCount = day.steps.length - progressSteps(day, state.selectedTicket).length;
       var doneHere = core.filter(function (s) { return state.done.has(s.id); }).length;
-      $('[data-today-meta]').textContent = day.phaseLabel + ' · 순서 ' + core.length + '개' + (doneHere ? ' 중 ' + doneHere + '개 끝냄' : '')
+      $('[data-today-meta]').textContent = day.phaseLabel + (selected.length
+        ? ' · 공통 구현 ' + doneHere + '/' + core.length + ' · 선택 티켓 ' + state.selectedTicket + ' ' + selected.filter(function (s) { return state.done.has(s.id); }).length + '/' + selected.length
+        : ' · 순서 ' + core.length + '개' + (doneHere ? ' 중 ' + doneHere + '개 끝냄' : ''))
         + (extraCount ? ' · 선택·연습 ' + extraCount + '개' : '') + ' · 오늘의 Java ' + day.java;
       var wrapup = $('[data-course-wrapup]');
       if (wrapup) {
         wrapup.replaceChildren();
         var lastChecked = days.filter(function(d) { return d.steps.some(function(s) { return state.done.has(s.id); }); }).pop();
-        if (lastChecked && coreSteps(lastChecked).every(function(s) { return state.done.has(s.id); })) {
+        if (lastChecked && progressSteps(lastChecked, state.selectedTicket).every(function(s) { return state.done.has(s.id); })) {
           wrapup.append('구현 체크 뒤 SQL·말하기·채점을 확인하세요: ');
           [['SQL','#오늘의-sql'],['말하기','#말하기-카드'],['채점','#ai-채점-프롬프트']].forEach(function(item) {
             var a=document.createElement('a'); a.href=lastChecked.href+item[1]; a.textContent=lastChecked.id+' '+item[0]; wrapup.append(a,' ');
@@ -320,13 +338,15 @@
         no.textContent = NUMS[i] || String(i + 1);
         var task = document.createElement('a');
         task.href = day.href + '#step-' + s.id.toLowerCase();
-        task.textContent = s.title + (s.extra && core.length < day.steps.length ? ' (선택·연습)' : '') + (state.done.has(s.id) ? ' (끝냄)' : '');
+        task.textContent = s.title + (selected.indexOf(s) >= 0 ? ' (내 선택 ' + state.selectedTicket + ')' : s.extra && core.length < day.steps.length ? ' (선택·연습)' : '') + (state.done.has(s.id) ? ' (끝냄)' : '');
         li.append(no, ' ', task);
         return li;
       }));
       var open = $('[data-today-open]');
       open.href = day.href;
-      open.textContent = 'Spring ' + day.id;
+      var pendingTicket = selected.find(function (s) { return !state.done.has(s.id); });
+      if (pendingTicket && doneHere === core.length) open.href = day.href + '#step-' + pendingTicket.id.toLowerCase();
+      open.textContent = 'Spring ' + day.id + (pendingTicket && doneHere === core.length ? ' · ' + state.selectedTicket + ' 이어서' : '');
       var java = $('[data-today-java]');
       if (day.javaHref) { java.href = day.javaHref; java.textContent = 'Java ' + day.java; java.hidden = false; } else java.hidden = true;
       var during = day.javaTiming === 'during-or-after';
@@ -344,10 +364,13 @@
       flow.replaceChildren(first, arrow(), second, arrow(), grade);
       grade.href = day.href + '#ai-채점-프롬프트';
       $('[data-today-note]').hidden = pick.mode !== 'first';
-      var total = 0, checked = 0;
+      var total = 0, checked = 0, choiceTotal = 0, choiceChecked = 0;
       days.forEach(function (d) {
-        var counted = coreSteps(d);
+        var counted = progressSteps(d, state.selectedTicket);
         var n = counted.filter(function (s) { return state.done.has(s.id); }).length;
+        var choice = selectedSteps(d, state.selectedTicket);
+        choiceTotal += choice.length;
+        choiceChecked += choice.filter(function (s) { return state.done.has(s.id); }).length;
         total += counted.length; checked += n;
         var cell = home.querySelector('.ch-day[data-day="' + d.id + '"]');
         if (!cell) return;
@@ -358,7 +381,9 @@
         var bar = cell.querySelector('.ch-bar i');
         if (bar) bar.style.width = Math.round((n / counted.length) * 100) + '%';
       });
-      $('[data-progress-summary]').textContent = '체크한 순서 ' + checked + '/' + total;
+      $('[data-progress-summary]').textContent = choiceTotal
+        ? '공통 구현 ' + (checked - choiceChecked) + '/' + (total - choiceTotal) + ' · 선택 티켓 ' + state.selectedTicket + ' ' + choiceChecked + '/' + choiceTotal
+        : '체크한 순서 ' + checked + '/' + total;
       storageNote(state.ok ? '' : 'blocked');
     }
     window.addEventListener('pageshow', render);

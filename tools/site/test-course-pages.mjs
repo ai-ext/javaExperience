@@ -196,7 +196,10 @@ await test('R4-01: 모든 지도 노드 title은 전체 이름과 같다', () =>
 });
 await test('P10: 홈 진도는 수동 체크이며 채점 결과가 아님을 알린다', async () => {
   const home = await open('index.html');
-  assert.match(home.$('[data-progress-summary]').parentElement.parentElement.textContent, /직접 체크한 진도이며 채점 결과가 아닙니다\. Java·선택 티켓의 수행 여부와 역량은 따로 확인합니다\./);
+  const note = home.$('[data-progress-summary]').parentElement.parentElement.textContent;
+  assert.match(note, /직접 체크한 진도이며 채점 결과가 아닙니다\./);
+  assert.match(note, /공통 구현과 선택한 티켓을 집계하며, 고르지 않은 후보는 제외합니다\./);
+  assert.match(note, /Java 수행 여부와 역량은 따로 확인합니다\./);
 });
 await test('R4-08: 390 폭에서 선 범례를 숨기고 노드 범례와 관계 표를 남긴다', async () => {
   const map = await open('course/map.html', { script: mapScript });
@@ -456,6 +459,66 @@ for (const day of course.days) {
 }
 
 // ---------------------------------------------------------------- 홈
+await test('선택한 B16이 남으면 홈은 D14로 복귀하고 완료하면 D15를 추천한다', async () => {
+  const d11 = await open('course/spring/D11.html');
+  const choice = d11.$('[data-ticket-choice]');
+  choice.value = 'B16';
+  choice.dispatchEvent(new d11.window.Event('change', { bubbles: true }));
+  const d14 = await open('course/spring/D14.html', { saved: d11.window.localStorage.getItem(KEY) });
+  for (const id of ['D14-5', 'D14-6']) d14.$(`.day-chip input[data-step="${id}"]`).click();
+  const home = await open('index.html', { saved: d14.window.localStorage.getItem(KEY) });
+  assert.equal(home.$('[data-today-id]').textContent, 'D14', 'B16을 건너뛰지 않는다');
+  assert.equal(home.$('[data-today-open]').getAttribute('href'), 'course/spring/D14.html#step-d14-4');
+  assert.match(home.$('[data-today-open]').textContent, /B16 이어서/);
+  assert.match(home.$('[data-today-meta]').textContent, /공통 구현 2\/2.*선택 티켓 B16 0\/1/);
+  assert.match(home.$('[data-today-steps] a[href$="#step-d14-4"]').textContent, /내 선택 B16/);
+  const cell = home.$('.ch-day[data-day="D14"]');
+  assert.equal(cell.querySelector('[data-day-count]').textContent, '2/3');
+  assert.equal(cell.classList.contains('is-done'), false);
+  assert.notEqual(cell.querySelector('.ch-bar i').style.width, '100%');
+  assert.match(home.$('[data-progress-summary]').textContent, /공통 구현.*선택 티켓 B16 0\/1/);
+  assert.equal(home.$('[data-course-wrapup]').textContent, '', '선택 티켓이 남은 날을 완료로 처리하지 않는다');
+  const later = await open('index.html', { saved: JSON.stringify({ version: 1, selectedTicket: 'B16', steps: { 'D14-5': true, 'D14-6': true, 'D15-1': true } }) });
+  assert.equal(later.$('[data-today-id]').textContent, 'D14', '다음 날을 열었어도 미완료 선택 티켓을 안내한다');
+  d14.$('.day-chip input[data-step="D14-4"]').click();
+  home.window.localStorage.setItem(KEY, d14.window.localStorage.getItem(KEY));
+  home.window.dispatchEvent(new home.window.StorageEvent('storage', { key: KEY }));
+  assert.equal(home.$('[data-today-id]').textContent, 'D15', '열린 홈도 완료 기록에 맞춰 갱신한다');
+  const finished = await open('index.html', { saved: d14.window.localStorage.getItem(KEY) });
+  assert.equal(finished.$('[data-today-id]').textContent, 'D15');
+  assert.equal(finished.$('.ch-day[data-day="D14"] [data-day-count]').textContent, '3/3');
+  assert.ok(finished.$('.ch-day[data-day="D14"]').classList.contains('is-done'));
+});
+
+await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제도 반영한다', async () => {
+  const steps = { 'D14-1': true, 'D14-5': true, 'D14-6': true };
+  const saved = selectedTicket => JSON.stringify({ version: 1, steps, selectedTicket });
+  const page = await open('course/spring/D14.html', { saved: saved('B16') });
+  const counter = () => page.$('[data-day-progress]').textContent;
+  const meter = page.$('[data-day-meter]');
+  assert.match(counter(), /공통 구현 2\/2.*선택 티켓 B16 0\/1/);
+  assert.match(counter(), /선택·연습 1\/3/, '고르지 않은 완료 후보는 연습에만 센다');
+  assert.equal(meter.value, 2);
+  assert.equal(meter.max, 3);
+  assert.equal(page.$('[data-day-resume]').getAttribute('href'), '#step-d14-4');
+  for (const [ticket, step] of [['B12', 1], ['B13', 2], ['B15', 3], ['B16', 4]]) {
+    page.window.localStorage.setItem(KEY, saved(ticket));
+    page.window.dispatchEvent(new page.window.StorageEvent('storage', { key: KEY }));
+    assert.match(counter(), new RegExp(`선택 티켓 ${ticket} ${step === 1 ? 1 : 0}/1`));
+    assert.equal(meter.max, 3, '미선택 후보는 분모에서 제외');
+    assert.equal(meter.value, step === 1 ? 3 : 2);
+    const home = await open('index.html', { saved: saved(ticket) });
+    assert.equal(home.$('[data-today-id]').textContent, step === 1 ? 'D15' : 'D14');
+    assert.equal(home.$('.ch-day[data-day="D14"] [data-day-count]').textContent, step === 1 ? '3/3' : '2/3');
+  }
+  page.window.localStorage.setItem(KEY, saved(''));
+  page.window.dispatchEvent(new page.window.StorageEvent('storage', { key: KEY }));
+  assert.equal(counter(), '2/2 끝냄 · 선택·연습 1/4');
+  assert.equal(meter.max, 2);
+  assert.equal((await open('index.html', { saved: saved('') })).$('[data-today-id]').textContent, 'D15');
+  assert.equal((await open('index.html', { saved: saved('B14') })).$('[data-today-id]').textContent, 'D15', '다른 날의 공통 순서를 중복 집계하지 않는다');
+});
+
 {
   const { nextDay } = (await open('index.html')).window.jxCourseProgress;
   const days = course.days.filter((d) => d.steps.length);
