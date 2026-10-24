@@ -42,12 +42,15 @@
 </ul></div><div class="step-fact fact-done" data-content-kind="check"><span class="content-kind " data-kind-label="check"><span aria-hidden="true">✓</span> 확인<small>끝났는지 판단</small></span><p class="fact-label" data-content-kind="check">완료 조건</p><ul class="visual-rules" data-visual-pattern="rules" data-content-kind="check">
 <li>운영자별 예약 상태·회원별 지급 이력·실패 건수 중 하나의 조회 계약을 정하고 JOIN 다중성·동일 시각 커서·빈 결과를 테스트한다.</li>
 <li>같은 조회 한 건을 MyBatis와 JdbcClient 또는 JPQL로 비교한다. QueryDSL은 선택이며 도입한다면 빌드·Q타입 생성 비용을 별도 기록한다.</li>
+<li>예약별 대상·성공·실패 건수 조회를 선집계 JOIN 또는 상관 서브쿼리로 만든다. 행 곱셈·NULL·빈 예약·동일 시각 커서를 반례로 검증한다.</li>
+<li>QueryDSL을 선택하면 기존 비교 상대 하나를 QueryDSL JPA로 대체해 같은 필터·DTO·집계 결과를 비교한다. Q타입 생성·컴파일·SQL·count 비용을 남긴다. 윈도 함수는 MySQL SQL/MyBatis 선택 과제로 둔다.</li>
 </ul></div><details class="step-references" data-content-kind="reference"><summary><span class="content-kind " data-kind-label="reference"><span aria-hidden="true">↗</span> 참고<small>필요할 때 찾기</small></span>명세·데이터 요구사항 보기</summary><div class="step-fact fact-spec" data-content-kind="reference"><p class="fact-label" data-content-kind="reference">명세</p><p data-content-kind="reference"><a href="D23.html#step-d23-1">D23 예약 요구·모델 결정</a> · <a href="../spec-v2.html">기존 API 계약</a> · 오늘의 완료 조건으로 내 합의 명세에 요구·오류·불변식을 먼저 적는다.</p></div></details><details class="step-fact fact-trap" data-content-kind="guide"><summary><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span>겪을 것</summary><p data-content-kind="guide">전체 건수와 목록의 스캔 비용을 분리한다. 비교 시 SELECT 열·필터·정렬·데이터는 같아야 한다.</p>
 <p data-content-kind="guide"><a data-data-return="" href="#이-날-데이터-넣기">오늘 실험 데이터 준비 → 작업 복귀</a></p></details></div><div class="step-help"><details class="step-hint" data-step="D24-1" data-content-kind="guide">
 <summary><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span>막히면</summary>
 
 <ul data-content-kind="guide">
 <li>전체 건수와 목록의 스캔 비용을 분리한다. 비교 시 SELECT 열·필터·정렬·데이터는 같아야 한다.</li>
+<li>대상과 지급을 동시에 JOIN하면 행이 곱해질 수 있다. 예약별 target 상태를 먼저 GROUP BY한 뒤 예약과 JOIN하거나 상관 서브쿼리를 쓴다. QueryDSL 선택자는 같은 조회의 기존 비교 상대 하나만 대체한다.</li>
 </ul>
 </details>
 
@@ -81,8 +84,9 @@
 <header class="practice-heading"><p class="practice-kicker" data-content-kind="practice">01 · 직접 풀기</p><h2 id="오늘의-sql"><a class="anchor" href="#오늘의-sql" aria-hidden="true">#</a>오늘의 SQL</h2></header>
 <p data-content-kind="practice">내 프로젝트의 disposable 실습 DB를 쓴다. D23에서 정한 예약·대상·지급 상태의 물리 이름과 필터로 아래 예시를 반드시 매핑한다. 예시의 member_coupon은 1단계 비교 모델이며 새 예약 테이블의 정답이 아니다. practice·원본 서버 DB는 수정하지 않는다.</p>
 <ol class="sql-questions" data-content-kind="practice">
-<li><p data-content-kind="practice">동일 시각의 다음 페이지 경계를 검사한다.</p><p data-content-kind="practice"><strong>확인할 성질</strong> 내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.</p></li>
+<li><p data-content-kind="practice">동일 issued_at이 20건을 넘는 데이터에서 첫 페이지와 다음 페이지의 경계를 검사한다.</p><p data-content-kind="practice"><strong>확인할 성질</strong> 첫 20건과 다음 페이지의 (issued_at,id) 교집합이 0이고 두 페이지 합집합이 상위 40건과 같다. 25건의 동일 시각 fixture에서는 20+5를 확인한다. 예약 필터가 있으면 두 쿼리에 모두 적용한다.</p></li>
 <li><p data-content-kind="practice">선택 조회의 실제 계획을 인덱스 전후 비교한다.</p><p data-content-kind="practice"><strong>확인할 성질</strong> 내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.</p></li>
+<li><p data-content-kind="practice">예약별 대상·성공·실패를 선집계해 행 곱셈 없이 조회한다.</p><p data-content-kind="practice"><strong>확인할 성질</strong> 예약 1의 대상 5·성공 2·실패 1, 예약 2의 대상 1·성공 0·실패 0을 확인한다. 대상 없는 예약도 0으로 나타내고 실제 조회 API의 필터·정렬과 대조한다.</p></li>
 </ol>
 
 <details class="sql-answer" data-content-kind="practice">
@@ -90,9 +94,12 @@
 
 <p data-content-kind="practice">아래는 비교용 SQL이다. 예약·대상·작업 모델은 내가 정한 물리 이름과 필터로 옮긴다. board-server의 설계 기준이다. 2단계에서는 같은 계열의 기존 스키마를 관찰한다. 내 물리 이름·키·정렬이 다르면 매핑해 비교한다. 아래 SQL은 실제 실행 결과가 아니며 예시 서버가 모든 불변식을 보장한다는 뜻도 아니다. 오류가 예상되는 문장은 하나씩 실행하고 실패 뒤 ROLLBACK을 별도로 보낸다.</p>
 <p data-content-kind="practice"><strong>문항 1 구현 예시</strong></p>
-<pre data-content-kind="practice"><code class="language-sql">SELECT id,issued_at FROM member_coupon ORDER BY issued_at DESC,id DESC LIMIT 20;</code></pre>
+<pre data-content-kind="practice"><code class="language-sql">SELECT id,issued_at FROM issuance WHERE campaign_id=1 ORDER BY issued_at DESC,id DESC LIMIT 20;
+WITH first_page AS (SELECT id,issued_at FROM issuance WHERE campaign_id=1 ORDER BY issued_at DESC,id DESC LIMIT 20), boundary AS (SELECT id,issued_at FROM first_page ORDER BY issued_at,id LIMIT 1) SELECT i.id,i.issued_at FROM issuance i CROSS JOIN boundary b WHERE i.campaign_id=1 AND (i.issued_at &lt; b.issued_at OR (i.issued_at=b.issued_at AND i.id&lt;b.id)) ORDER BY i.issued_at DESC,i.id DESC LIMIT 20;</code></pre>
 <p data-content-kind="practice"><strong>문항 2 구현 예시</strong></p>
 <pre data-content-kind="practice"><code class="language-sql">EXPLAIN ANALYZE SELECT id FROM member_coupon WHERE member_id=1 ORDER BY id DESC LIMIT 20;</code></pre>
+<p data-content-kind="practice"><strong>문항 3 구현 예시</strong></p>
+<pre data-content-kind="practice"><code class="language-sql">SELECT c.id,COALESCE(s.total,0) AS total,COALESCE(s.success,0) AS success,COALESCE(s.failed,0) AS failed FROM campaign c LEFT JOIN (SELECT campaign_id,COUNT(*) AS total,SUM(state='SUCCESS') AS success,SUM(state='FAILED') AS failed FROM target GROUP BY campaign_id) s ON s.campaign_id=c.id ORDER BY c.id;</code></pre>
 </details>
 
 
@@ -143,6 +150,8 @@
 ① 직접 쓴 SQL로 이력 조회 계약 검증
   - [C1-1] 운영자별 예약 상태·회원별 지급 이력·실패 건수 중 하나의 조회 계약을 정하고 JOIN 다중성·동일 시각 커서·빈 결과를 테스트한다.
   - [C1-2] 같은 조회 한 건을 MyBatis와 JdbcClient 또는 JPQL로 비교한다. QueryDSL은 선택이며 도입한다면 빌드·Q타입 생성 비용을 별도 기록한다.
+  - [C1-3] 예약별 대상·성공·실패 건수 조회를 선집계 JOIN 또는 상관 서브쿼리로 만든다. 행 곱셈·NULL·빈 예약·동일 시각 커서를 반례로 검증한다.
+  - [C1-4] QueryDSL을 선택하면 기존 비교 상대 하나를 QueryDSL JPA로 대체해 같은 필터·DTO·집계 결과를 비교한다. Q타입 생성·컴파일·SQL·count 비용을 남긴다. 윈도 함수는 MySQL SQL/MyBatis 선택 과제로 둔다.
   - [R1] 함정을 피했는지 실행 증거·설계·회고에서 확인: 전체 건수와 목록의 스캔 비용을 분리한다. 비교 시 SELECT 열·필터·정렬·데이터는 같아야 한다.
 ② 분포 두 개에서 실행계획·쓰기 비용 측정
   - [C2-1] 최소 200행의 균등 분포와 한 예약에 90%가 몰린 편향 분포를 별도 DB에 생성한다. 행 수·seed·실행 명령을 남긴다.
@@ -151,8 +160,9 @@
 
 오늘의 SQL(예시 답은 제공하지 않는다)
 내 프로젝트의 disposable 실습 DB를 쓴다. D23에서 정한 예약·대상·지급 상태의 물리 이름과 필터로 아래 예시를 반드시 매핑한다. 예시의 member_coupon은 1단계 비교 모델이며 새 예약 테이블의 정답이 아니다. practice·원본 서버 DB는 수정하지 않는다.
-[SQL1] 동일 시각의 다음 페이지 경계를 검사한다. / 확인할 성질: 내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.
+[SQL1] 동일 issued_at이 20건을 넘는 데이터에서 첫 페이지와 다음 페이지의 경계를 검사한다. / 확인할 성질: 첫 20건과 다음 페이지의 (issued_at,id) 교집합이 0이고 두 페이지 합집합이 상위 40건과 같다. 25건의 동일 시각 fixture에서는 20+5를 확인한다. 예약 필터가 있으면 두 쿼리에 모두 적용한다.
 [SQL2] 선택 조회의 실제 계획을 인덱스 전후 비교한다. / 확인할 성질: 내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.
+[SQL3] 예약별 대상·성공·실패를 선집계해 행 곱셈 없이 조회한다. / 확인할 성질: 예약 1의 대상 5·성공 2·실패 1, 예약 2의 대상 1·성공 0·실패 0을 확인한다. 대상 없는 예약도 0으로 나타내고 실제 조회 API의 필터·정렬과 대조한다.
 
 말하기 질문(답을 먼저 공개하지 않는다. 세 줄 기준은 학습자료 저장소의 course/days/D24.json의 cards에서 읽는다. 작업 프로젝트와 자료 저장소가 다르면 먼저 자료 경로를 확인하고 접근 불가는 확인 불가로 남긴다.)
 - [TC-D24-1] 조회 두 구현의 차이는 성능 말고 무엇인가요?

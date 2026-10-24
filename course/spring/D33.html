@@ -81,7 +81,7 @@
 <header class="practice-heading"><p class="practice-kicker" data-content-kind="practice">01 · 직접 풀기</p><h2 id="오늘의-sql"><a class="anchor" href="#오늘의-sql" aria-hidden="true">#</a>오늘의 SQL</h2></header>
 <p data-content-kind="practice">내 프로젝트의 disposable 실습 DB를 쓴다. D23에서 정한 예약·대상·지급 상태의 물리 이름과 필터로 아래 예시를 반드시 매핑한다. 예시의 member_coupon은 1단계 비교 모델이며 새 예약 테이블의 정답이 아니다. practice·원본 서버 DB는 수정하지 않는다.</p>
 <ol class="sql-questions" data-content-kind="practice">
-<li><p data-content-kind="practice">대상에서 지급되지 않은 식별 집합을 찾는다.</p><p data-content-kind="practice"><strong>확인할 성질</strong> 내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.</p></li>
+<li><p data-content-kind="practice">승인 시 고정한 예약 대상에서 지급되지 않은 식별 집합을 찾는다.</p><p data-content-kind="practice"><strong>확인할 성질</strong> 예약 ID를 고정해 대상 밖 회원과 다른 예약의 지급을 제외한다. 미지급 행의 FAILED/PENDING, attempts, next_retry_at을 함께 남기고 합의된 대기와 누락을 구분한다.</p></li>
 <li><p data-content-kind="practice">재시작 전후 중복 지급이 없는지 대사한다.</p><p data-content-kind="practice"><strong>확인할 성질</strong> 내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.</p></li>
 </ol>
 
@@ -90,7 +90,7 @@
 
 <p data-content-kind="practice">아래는 비교용 SQL이다. 예약·대상·작업 모델은 내가 정한 물리 이름과 필터로 옮긴다. board-server의 설계 기준이다. 2단계에서는 같은 계열의 기존 스키마를 관찰한다. 내 물리 이름·키·정렬이 다르면 매핑해 비교한다. 아래 SQL은 실제 실행 결과가 아니며 예시 서버가 모든 불변식을 보장한다는 뜻도 아니다. 오류가 예상되는 문장은 하나씩 실행하고 실패 뒤 ROLLBACK을 별도로 보낸다.</p>
 <p data-content-kind="practice"><strong>문항 1 구현 예시</strong></p>
-<pre data-content-kind="practice"><code class="language-sql">SELECT m.id FROM member m WHERE NOT EXISTS (SELECT 1 FROM member_coupon c WHERE c.member_id=m.id AND c.coupon_id=1);</code></pre>
+<pre data-content-kind="practice"><code class="language-sql">SELECT t.campaign_id,t.member_id,t.state,t.attempts,t.next_retry_at FROM target t LEFT JOIN issuance i ON i.campaign_id=t.campaign_id AND i.member_id=t.member_id WHERE t.campaign_id=1 AND i.id IS NULL ORDER BY t.member_id;</code></pre>
 <p data-content-kind="practice"><strong>문항 2 구현 예시</strong></p>
 <pre data-content-kind="practice"><code class="language-sql">SELECT member_id,coupon_id,COUNT(*) FROM member_coupon GROUP BY member_id,coupon_id HAVING COUNT(*)&gt;1;</code></pre>
 </details>
@@ -151,7 +151,7 @@
 
 오늘의 SQL(예시 답은 제공하지 않는다)
 내 프로젝트의 disposable 실습 DB를 쓴다. D23에서 정한 예약·대상·지급 상태의 물리 이름과 필터로 아래 예시를 반드시 매핑한다. 예시의 member_coupon은 1단계 비교 모델이며 새 예약 테이블의 정답이 아니다. practice·원본 서버 DB는 수정하지 않는다.
-[SQL1] 대상에서 지급되지 않은 식별 집합을 찾는다. / 확인할 성질: 내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.
+[SQL1] 승인 시 고정한 예약 대상에서 지급되지 않은 식별 집합을 찾는다. / 확인할 성질: 예약 ID를 고정해 대상 밖 회원과 다른 예약의 지급을 제외한다. 미지급 행의 FAILED/PENDING, attempts, next_retry_at을 함께 남기고 합의된 대기와 누락을 구분한다.
 [SQL2] 재시작 전후 중복 지급이 없는지 대사한다. / 확인할 성질: 내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.
 
 말하기 질문(답을 먼저 공개하지 않는다. 세 줄 기준은 학습자료 저장소의 course/days/D33.json의 cards에서 읽는다. 작업 프로젝트와 자료 저장소가 다르면 먼저 자료 경로를 확인하고 접근 불가는 확인 불가로 남긴다.)

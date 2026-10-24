@@ -69,8 +69,8 @@
 <header class="practice-heading"><p class="practice-kicker" data-content-kind="practice">01 · 직접 풀기</p><h2 id="오늘의-sql"><a class="anchor" href="#오늘의-sql" aria-hidden="true">#</a>오늘의 SQL</h2></header>
 <p data-content-kind="practice">내 프로젝트의 disposable 실습 DB를 쓴다. D23에서 정한 예약·대상·지급 상태의 물리 이름과 필터로 아래 예시를 반드시 매핑한다. 예시의 member_coupon은 1단계 비교 모델이며 새 예약 테이블의 정답이 아니다. practice·원본 서버 DB는 수정하지 않는다.</p>
 <ol class="sql-questions" data-content-kind="practice">
-<li><p data-content-kind="practice">항목 상태별 수와 고정 대상 합계를 대사한다.</p><p data-content-kind="practice"><strong>확인할 성질</strong> 내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.</p></li>
-<li><p data-content-kind="practice">중복 지급을 찾는 검증 SQL을 작성한다.</p><p data-content-kind="practice"><strong>확인할 성질</strong> 내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.</p></li>
+<li><p data-content-kind="practice">예약별 고정 대상의 성공·실패·대기 수를 대사한다.</p><p data-content-kind="practice"><strong>확인할 성질</strong> 전체=성공+실패+대기가 예약마다 성립하고, 상태별 건수와 실제 지급 건수를 나누어 기록한다. 성공 2·실패 1·대기 2 fixture를 확인한다.</p></li>
+<li><p data-content-kind="practice">성공 항목과 실제 지급을 양방향으로 대사하고 중복 지급을 찾는다.</p><p data-content-kind="practice"><strong>확인할 성질</strong> SUCCESS인데 지급이 없거나 지급은 있는데 고정 대상의 SUCCESS가 아닌 행은 모두 조사한다. 실패·대기는 합의된 미지급 상태로 남겨 재처리 시각과 시도 횟수를 별도 확인한다.</p></li>
 </ol>
 
 <details class="sql-answer" data-content-kind="practice">
@@ -78,9 +78,10 @@
 
 <p data-content-kind="practice">아래는 비교용 SQL이다. 예약·대상·작업 모델은 내가 정한 물리 이름과 필터로 옮긴다. board-server의 설계 기준이다. 2단계에서는 같은 계열의 기존 스키마를 관찰한다. 내 물리 이름·키·정렬이 다르면 매핑해 비교한다. 아래 SQL은 실제 실행 결과가 아니며 예시 서버가 모든 불변식을 보장한다는 뜻도 아니다. 오류가 예상되는 문장은 하나씩 실행하고 실패 뒤 ROLLBACK을 별도로 보낸다.</p>
 <p data-content-kind="practice"><strong>문항 1 구현 예시</strong></p>
-<pre data-content-kind="practice"><code class="language-sql">SELECT member_id,COUNT(*) FROM member_coupon GROUP BY member_id;</code></pre>
+<pre data-content-kind="practice"><code class="language-sql">SELECT c.id AS campaign_id,COUNT(t.id) AS total,COALESCE(SUM(t.state='SUCCESS'),0) AS success,COALESCE(SUM(t.state='FAILED'),0) AS failed,COALESCE(SUM(t.state='PENDING'),0) AS pending FROM campaign c LEFT JOIN target t ON t.campaign_id=c.id GROUP BY c.id ORDER BY c.id;</code></pre>
 <p data-content-kind="practice"><strong>문항 2 구현 예시</strong></p>
-<pre data-content-kind="practice"><code class="language-sql">SELECT member_id,coupon_id,COUNT(*) FROM member_coupon GROUP BY member_id,coupon_id HAVING COUNT(*)&gt;1;</code></pre>
+<pre data-content-kind="practice"><code class="language-sql">SELECT t.campaign_id,t.member_id,t.state,i.id AS issuance_id FROM target t LEFT JOIN issuance i ON i.campaign_id=t.campaign_id AND i.member_id=t.member_id WHERE t.state='SUCCESS' AND i.id IS NULL UNION ALL SELECT i.campaign_id,i.member_id,COALESCE(t.state,'NO_TARGET'),i.id FROM issuance i LEFT JOIN target t ON t.campaign_id=i.campaign_id AND t.member_id=i.member_id WHERE t.id IS NULL OR t.state&lt;&gt;'SUCCESS';
+SELECT campaign_id,member_id,COUNT(*) FROM issuance GROUP BY campaign_id,member_id HAVING COUNT(*)&gt;1;</code></pre>
 </details>
 
 
@@ -139,8 +140,8 @@
 
 오늘의 SQL(예시 답은 제공하지 않는다)
 내 프로젝트의 disposable 실습 DB를 쓴다. D23에서 정한 예약·대상·지급 상태의 물리 이름과 필터로 아래 예시를 반드시 매핑한다. 예시의 member_coupon은 1단계 비교 모델이며 새 예약 테이블의 정답이 아니다. practice·원본 서버 DB는 수정하지 않는다.
-[SQL1] 항목 상태별 수와 고정 대상 합계를 대사한다. / 확인할 성질: 내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.
-[SQL2] 중복 지급을 찾는 검증 SQL을 작성한다. / 확인할 성질: 내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.
+[SQL1] 예약별 고정 대상의 성공·실패·대기 수를 대사한다. / 확인할 성질: 전체=성공+실패+대기가 예약마다 성립하고, 상태별 건수와 실제 지급 건수를 나누어 기록한다. 성공 2·실패 1·대기 2 fixture를 확인한다.
+[SQL2] 성공 항목과 실제 지급을 양방향으로 대사하고 중복 지급을 찾는다. / 확인할 성질: SUCCESS인데 지급이 없거나 지급은 있는데 고정 대상의 SUCCESS가 아닌 행은 모두 조사한다. 실패·대기는 합의된 미지급 상태로 남겨 재처리 시각과 시도 횟수를 별도 확인한다.
 
 말하기 질문(답을 먼저 공개하지 않는다. 세 줄 기준은 학습자료 저장소의 course/days/D32.json의 cards에서 읽는다. 작업 프로젝트와 자료 저장소가 다르면 먼저 자료 경로를 확인하고 접근 불가는 확인 불가로 남긴다.)
 - [TC-D32-1] 작업 성공과 항목 성공은 어떻게 다른가요?

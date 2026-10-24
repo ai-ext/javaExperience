@@ -406,13 +406,14 @@ public class PostSummary {
 </ul></div><div class="step-fact fact-done" data-content-kind="check"><span class="content-kind " data-kind-label="check"><span aria-hidden="true">✓</span> 확인<small>끝났는지 판단</small></span><p class="fact-label" data-content-kind="check">완료 조건</p><ul class="visual-rules" data-visual-pattern="rules" data-content-kind="check">
 <li><code>PostQueryServiceTest</code> 통과: 21건일 때 첫 쪽 20건과 <code>nextCursor</code>, 둘째 쪽 1건과 <code>nextCursor = null</code></li>
 <li><code>keyword</code>·<code>tag</code>가 없으면 그 조건이 SQL에서 빠진다</li>
+<li>keyword·tag·cursor의 선택 필터 2~3개 조합에서 null·공백·빈 목록을 구분하고, MyBatis <code>&lt;if&gt;</code>·<code>&lt;where&gt;</code>·<code>&lt;foreach&gt;</code>와 <code>#{}</code> 바인딩으로 ID 집합·정렬·빈 결과를 검증한다. 빈 IN 목록은 <code>IN ()</code>을 만들지 않고 계약상 빈 결과 또는 필터 생략 중 하나로 정한다.</li>
 </ul></div><details class="step-references" data-content-kind="reference"><summary><span class="content-kind " data-kind-label="reference"><span aria-hidden="true">↗</span> 참고<small>필요할 때 찾기</small></span>명세·데이터 요구사항 보기</summary><div class="step-fact fact-spec" data-content-kind="reference"><p class="fact-label" data-content-kind="reference">명세</p><p data-content-kind="reference"><a href="../spec-v2.html#4-엔드포인트"><code>GET /api/posts</code></a> (<a href="../spec-v2.html#5-3-목록검색">5-3. 목록·검색</a>)</p></div></details><details class="step-fact fact-trap" data-content-kind="guide"><summary><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span>겪을 것</summary><p data-content-kind="guide">검색어나 정렬 값을 <code>${}</code>로 넣으면 문자열이 SQL에 그대로 붙어 인젝션이 되므로 값은 <code>#{}</code>로, 정렬은 허용 목록에서 고른다.</p></details></div><div class="step-help"><details class="step-context" data-content-kind="guide"><summary><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span>순서 제목의 세부 조건 보기</summary><p data-content-kind="guide">커서 페이징과 동적 검색 조건(<code>&lt;where&gt;</code>·<code>&lt;if&gt;</code>)</p></details><details class="step-hint" data-step="D06-3" data-content-kind="guide">
 <summary><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span>막히면</summary>
 
 <ul data-content-kind="guide">
 <li>이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 기존 테이블과 제약을 확인한다 → 필요한 저장·조회 조건을 저장소에서 먼저 확인한다 → 업무 검증과 트랜잭션 경계를 연결한다. 앞서 만든 층은 재사용하고 이 순서에서 바꾸는 부분만 진행한다.</li>
 <li>다음 쪽 판단은 <code>size + 1</code>건을 읽어 남는 1건이 있는지로 한다. <code>&lt;where&gt;</code>·<code>&lt;if test&gt;</code>와 <code>#{}</code>·<code>${}</code>의 차이를 찾아본다.</li>
-<li>커서 문자열은 서버가 만든 값이라 클라이언트가 해석하지 않는다. 마지막 글의 <code>id</code>를 어떻게 인코딩할지 정한다.</li>
+<li>커서 문자열은 서버가 만든 값이라 클라이언트가 해석하지 않는다. 마지막 글의 <code>id</code>를 어떻게 인코딩할지 정한다. 정렬 키는 허용 목록에서 고정 SQL 조각으로 고르고 요청 값을 <code>${}</code>에 넣지 않는다. 조건 조합별 SQL과 결과 순서를 비교한다.</li>
 </ul>
 </details>
 
@@ -1221,6 +1222,7 @@ SET SESSION cte_max_recursion_depth = @bulk_old_depth;
 <ol class="sql-questions" data-content-kind="practice">
 <li><p data-content-kind="practice">지정 태그가 붙은 공개 글을 EXISTS와 JOIN 두 방식으로 조회한다.</p><p data-content-kind="practice"><strong>확인할 성질</strong> seed D05+bulk 기준 spring 태그 공개 글은 16,080건이다. EXISTS·JOIN의 글 식별 집합·순서가 같고 중복 행이 없다.</p></li>
 <li><p data-content-kind="practice">위 두 SQL의 실행 계획을 비교한다.</p><p data-content-kind="practice"><strong>확인할 성질</strong> seed D05+bulk의 16,080건 결과 동등성을 먼저 확인하고 접근 경로·행 수·중복 제거 단계를 기록한다. 보편적으로 빠른 문법이라고 단정하지 않는다.</p></li>
+<li><p data-content-kind="practice">선택 필터를 바꿔 같은 글 ID 집합을 비교한다. MyBatis의 조건 생성과 값 바인딩은 애플리케이션 테스트에서 확인한다.</p><p data-content-kind="practice"><strong>확인할 성질</strong> keyword만, tag만, 둘 다, 필터 없음에서 공개 글의 식별 집합·정렬을 확인한다. 공백과 빈 목록의 계약은 D06 ③의 API 테스트로 확인한다.</p></li>
 </ol>
 
 <details class="sql-answer" data-content-kind="practice">
@@ -1233,6 +1235,9 @@ SELECT DISTINCT p.id FROM post p JOIN post_tag pt ON pt.post_id=p.id JOIN tag t 
 <p data-content-kind="practice"><strong>문항 2 구현 예시</strong></p>
 <pre data-content-kind="practice"><code class="language-sql">EXPLAIN SELECT p.id FROM post p WHERE p.status='ACTIVE' AND EXISTS (SELECT 1 FROM post_tag pt JOIN tag t ON t.id=pt.tag_id WHERE pt.post_id=p.id AND t.name='spring');
 EXPLAIN SELECT DISTINCT p.id FROM post p JOIN post_tag pt ON pt.post_id=p.id JOIN tag t ON t.id=pt.tag_id WHERE p.status='ACTIVE' AND t.name='spring';</code></pre>
+<p data-content-kind="practice"><strong>문항 3 구현 예시</strong></p>
+<pre data-content-kind="practice"><code class="language-sql">SET @keyword='spring'; SET @tag='spring';
+SELECT p.id FROM post p WHERE p.status='ACTIVE' AND (@keyword IS NULL OR p.title LIKE CONCAT('%',@keyword,'%')) AND (@tag IS NULL OR EXISTS (SELECT 1 FROM post_tag pt JOIN tag t ON t.id=pt.tag_id WHERE pt.post_id=p.id AND t.name=@tag)) ORDER BY p.id DESC LIMIT 20;</code></pre>
 </details>
 
 <p data-content-kind="practice"><strong>선택 자료</strong> — 이전 과정은 별도 스키마(community·practice·성능 실험 DB)를 전제한다. 이름·필터를 내 설계로 옮겨 풀고 기존 DB를 덮어쓰지 않는다.</p>
@@ -1251,6 +1256,7 @@ EXPLAIN SELECT DISTINCT p.id FROM post p JOIN post_tag pt ON pt.post_id=p.id JOI
 <li><code>${}</code>는 값을 SQL 문자열에 그대로 끼워 넣으므로 SQL 인젝션이 가능하다</li>
 <li><code>#{}</code>는 PreparedStatement 파라미터로 바인딩돼 안전하지만, 값으로만 들어가므로 컬럼명이나 <code>ORDER BY</code> 대상에는 쓸 수 없다</li>
 <li>정렬은 허용 목록(명세상 <code>latest</code>만)으로 받고, 서버가 고정된 SQL 조각을 고른다</li>
+<li>null·공백·빈 목록을 구분하고 조건 조합별 ID·순서가 같은지 확인한다</li>
 </ul>
 <p data-content-kind="practice"><strong>근거</strong> spec-v2 §5-3</p>
 </details></div>
@@ -1319,6 +1325,7 @@ EXPLAIN SELECT DISTINCT p.id FROM post p JOIN post_tag pt ON pt.post_id=p.id JOI
 ③ 커서 페이징과 동적 검색 조건(&lt;where&gt;·&lt;if&gt;)
   - [C3-1] PostQueryServiceTest 통과: 21건일 때 첫 쪽 20건과 nextCursor, 둘째 쪽 1건과 nextCursor = null
   - [C3-2] keyword·tag가 없으면 그 조건이 SQL에서 빠진다
+  - [C3-3] keyword·tag·cursor의 선택 필터 2~3개 조합에서 null·공백·빈 목록을 구분하고, MyBatis &lt;if&gt;·&lt;where&gt;·&lt;foreach&gt;와 #{} 바인딩으로 ID 집합·정렬·빈 결과를 검증한다. 빈 IN 목록은 IN ()을 만들지 않고 계약상 빈 결과 또는 필터 생략 중 하나로 정한다.
   - [R3] 함정을 피했는지 코드로 확인: 검색어나 정렬 값을 ${}로 넣으면 문자열이 SQL에 그대로 붙어 인젝션이 되므로 값은 #{}로, 정렬은 허용 목록에서 고른다.
 ④ 글 목록·검색 API
   - [C4-1] GET /api/posts → 200 {items, nextCursor}
@@ -1338,6 +1345,7 @@ EXPLAIN SELECT DISTINCT p.id FROM post p JOIN post_tag pt ON pt.post_id=p.id JOI
     · ${}는 값을 SQL 문자열에 그대로 끼워 넣으므로 SQL 인젝션이 가능하다
     · #{}는 PreparedStatement 파라미터로 바인딩돼 안전하지만, 값으로만 들어가므로 컬럼명이나 ORDER BY 대상에는 쓸 수 없다
     · 정렬은 허용 목록(명세상 latest만)으로 받고, 서버가 고정된 SQL 조각을 고른다
+    · null·공백·빈 목록을 구분하고 조건 조합별 ID·순서가 같은지 확인한다
 - [TC-D06-2] 공개 글 최신순 커서 목록이 데이터가 늘자 느려졌습니다. 인덱스를 어떻게 정하고 확인했나요?
     · 내 필터·정렬·커서·데이터 분포를 보고 만든 인덱스의 열 순서와 선택 이유, 버린 대안 1개를 설명한다. 특정 실행 계획을 측정 전에 보장하지 않는다
     · EXPLAIN의 type, key, rows, Extra(Using filesort 여부)를 인덱스 전후로 비교하고, EXPLAIN ANALYZE로 실제 읽은 행 수를 본다
