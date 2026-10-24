@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>B13. PG 결제 완료 콜백이 전부 401</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=6580290a3c9f">
+<link rel="stylesheet" href="../../tools/site/course-exercise.css?v=c30e18dc3d31">
+<link rel="stylesheet" href="../../tools/site/course.css?v=b6c93c158a77">
 <link rel="stylesheet" href="../../tools/site/course-flow.css?v=0d2a7c3a0db7">
+<link rel="stylesheet" href="../../tools/site/course-tokens.css?v=90f7ed5128e9">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 
 
@@ -16,82 +19,81 @@
 <header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../spring/README.html" aria-current="page">과정 v2 · 일자 목록</a><a href="../map.html">과정 지도</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
 <main>
 
-<h1 id="b13-pg-결제-완료-콜백이-전부-401"><a class="anchor" href="#b13-pg-결제-완료-콜백이-전부-401" aria-hidden="true">#</a>B13. PG 결제 완료 콜백이 전부 401</h1>
-<nav class="course-exercise-nav" aria-label="연습에서 일자로 돌아가기"><p>이 연습을 쓰는 날: <a href="../spring/D14.html#step-d14-2">D14 ② · 고도화와 모의 장애 훈련</a></p></nav>
-
-<blockquote>
+<article class="exercise-sheet exercise-ticket" data-exercise="B13"><header class="exercise-head"><p class="exercise-kind"><b>B13</b> 2단계 · 티켓 작업서</p><h1 id="b13-pg-결제-완료-콜백이-전부-401"><a class="anchor" href="#b13-pg-결제-완료-콜백이-전부-401" aria-hidden="true">#</a>B13. PG 결제 완료 콜백이 전부 401</h1><blockquote class="exercise-meta">
 <p>같은 날: D14 ② · 선택 후보(Security) · 진단 도구: Security debug 로그(<code>logging.level.org.springframework.security=TRACE</code>)</p>
-</blockquote>
-<h2 id="받은-티켓"><a class="anchor" href="#받은-티켓" aria-hidden="true">#</a>받은 티켓</h2>
-<blockquote>
+</blockquote></header><nav class="exercise-route" aria-label="티켓 처리 순서"><ol><li><a href="#받은-티켓"><b>01</b><span>받은 티켓</span></a></li><li><a href="#환경과-재현"><b>02</b><span>환경과 재현</span></a></li><li><a href="#제출물"><b>03</b><span>제출물</span></a></li><li><a href="#flow-b13"><b>04</b><span>흐름 재생</span></a></li></ol></nav>
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D14.html#step-d14-2">D14 ② · 고도화와 모의 장애 훈련</a></p></nav>
+
+
+<section class="exercise-section exercise-received" aria-labelledby="받은-티켓"><h2 id="받은-티켓"><a class="anchor" href="#받은-티켓" aria-hidden="true">#</a>받은 티켓</h2><blockquote>
 <p>결제사에서 연락이 왔습니다. 저희 서버로 보내는 결제 완료 통지가 지난 배포 이후 전부 401로 거절된다고 합니다.
-그 사이 승인 응답을 못 받고 &quot;결과 불명&quot;으로 남은 충전 건들이 확정되지 않아 고객 문의가 들어오고 있습니다.
+그 사이 승인 응답을 못 받고 "결과 불명"으로 남은 충전 건들이 확정되지 않아 고객 문의가 들어오고 있습니다.
 결제사 쪽 서명 키는 바뀐 게 없다고 합니다. — 결제 담당</p>
-</blockquote>
+</blockquote></section>
+
+
+<section class="exercise-section exercise-repro" aria-labelledby="환경과-재현"><h2 id="환경과-재현"><a class="anchor" href="#환경과-재현" aria-hidden="true">#</a>환경과 재현</h2><ol>
+<li><code>messy-server</code>에서 <code>docker compose up -d</code></li>
+<li><code>./gradlew bootRun --args='--spring.profiles.active=local --logging.level.org.springframework.security=TRACE'</code></li>
+<li><code>bash tickets/B13/repro.sh</code><ul>
+<li>실제 충전으로 <code>orderId</code>를 만든 뒤 PG처럼 원문에 HMAC-SHA256 서명을 붙여 콜백을 보낸다. 서명이 틀린 콜백도 하나 보낸다.</li>
+<li>기대 증상: 서명이 맞아도 401 <code>/errors/unauthorized</code>(인증 필요). 서명이 틀린 콜백도 똑같은 응답이다.</li>
+</ul>
+</li>
+</ol></section>
+
+<section class="exercise-section exercise-submission" aria-labelledby="제출물"><h2 id="제출물"><a class="anchor" href="#제출물" aria-hidden="true">#</a>제출물</h2><ul>
+<li>원인 서술: 콜백이 어디서, 왜 막히는가(서명 검증까지 가는가?)</li>
+<li>재현 테스트: 토큰 없이 서명이 맞는 콜백 → 200·충전 확정, 서명이 틀리거나 없는 콜백 → 401 <code>/errors/invalid-signature</code>를 보는 테스트(결함 상태에서 실패 → 수정 후 통과)</li>
+<li>수정 diff</li>
+</ul></section>
 <section class="ticket-flow flow" data-flow="B13" data-flow-kind="ticket" id="flow-b13" aria-labelledby="flow-b13-title">
   <div class="flow-head"><p class="flow-eyebrow">장애 흐름 · 증상에서 관찰 지점까지</p><h2 id="flow-b13-title">B13 장애가 번지는 흐름</h2><p class="flow-summary">밖에서 보이는 증상과 관찰 지점만 먼저 보여 줍니다. 원인 쪽 단계는 직접 진단한 뒤 아래 접기에서 펼쳐 맞춰 보세요. 펼치면 재생에도 원인 단계가 끼어듭니다.</p></div>
-  <ol class="flow-nodes" aria-label="장애 흐름 지도: PG 서버 → 원인 쪽 → 원인 쪽 → 증상 → 관찰 지점"><li class="flow-node" data-node="pg" data-index="0"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="6" width="17" height="12" rx="2"/><path d="M3.5 10h17M7 14.5h4"/></svg></span><span class="flow-node-text"><b>PG 서버</b><small>결제 완료 콜백</small></span></li><li class="flow-node is-masked" data-node="rules" data-index="1"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4.5" y="4.5" width="15" height="15" rx="2" stroke-dasharray="3 2.4"/><path d="M10 10a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3M12 15.6v.1"/></svg></span><span class="flow-node-text"><b>원인 쪽</b><small>펼치면 보임</small></span></li><li class="flow-node is-masked" data-node="code" data-index="2"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4.5" y="4.5" width="15" height="15" rx="2" stroke-dasharray="3 2.4"/><path d="M10 10a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3M12 15.6v.1"/></svg></span><span class="flow-node-text"><b>원인 쪽</b><small>펼치면 보임</small></span></li><li class="flow-node" data-node="symptom" data-index="3"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4 21 19.5H3z"/><path d="M12 10v4.4M12 17.2v.1"/></svg></span><span class="flow-node-text"><b>증상</b><small>401 · 결과 불명 충전</small></span></li><li class="flow-node" data-node="observe" data-index="4"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5M8 12.5v-2M10.5 12.5V8.5M13 12.5v-3"/></svg></span><span class="flow-node-text"><b>관찰 지점</b><small>Security TRACE 로그</small></span></li></ol>
-  <div class="flow-player" data-flow-player hidden>
+  <ol class="flow-nodes" aria-label="장애 흐름 지도: PG 서버 → 원인 쪽 → 원인 쪽 → 증상 → 관찰 지점"><li class="flow-node" data-node="pg" data-index="0"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="6" width="17" height="12" rx="2"></rect><path d="M3.5 10h17M7 14.5h4"></path></svg></span><span class="flow-node-text"><b>PG 서버</b><small>결제 완료 콜백</small></span></li><li class="flow-node is-masked" data-node="rules" data-index="1"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4.5" y="4.5" width="15" height="15" rx="2" stroke-dasharray="3 2.4"></rect><path d="M10 10a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3M12 15.6v.1"></path></svg></span><span class="flow-node-text"><b>원인 쪽</b><small>펼치면 보임</small></span></li><li class="flow-node is-masked" data-node="code" data-index="2"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4.5" y="4.5" width="15" height="15" rx="2" stroke-dasharray="3 2.4"></rect><path d="M10 10a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3M12 15.6v.1"></path></svg></span><span class="flow-node-text"><b>원인 쪽</b><small>펼치면 보임</small></span></li><li class="flow-node" data-node="symptom" data-index="3"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4 21 19.5H3z"></path><path d="M12 10v4.4M12 17.2v.1"></path></svg></span><span class="flow-node-text"><b>증상</b><small>401 · 결과 불명 충전</small></span></li><li class="flow-node" data-node="observe" data-index="4"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6"></circle><path d="m15 15 5 5M8 12.5v-2M10.5 12.5V8.5M13 12.5v-3"></path></svg></span><span class="flow-node-text"><b>관찰 지점</b><small>Security TRACE 로그</small></span></li></ol>
+  <div class="flow-player" data-flow-player="" hidden="">
   <div class="flow-controls" role="group" aria-label="흐름 재생 조작">
-    <button type="button" class="flow-btn" data-flow-prev aria-controls="flow-b13-now">◀ 이전</button>
-    <button type="button" class="flow-btn flow-play" data-flow-play aria-pressed="false" aria-controls="flow-b13-now">▶ 재생</button>
-    <button type="button" class="flow-btn" data-flow-next aria-controls="flow-b13-now">다음 ▶</button>
+    <button type="button" class="flow-btn" data-flow-prev="" aria-controls="flow-b13-now">◀ 이전</button>
+    <button type="button" class="flow-btn flow-play" data-flow-play="" aria-pressed="false" aria-controls="flow-b13-now">▶ 재생</button>
+    <button type="button" class="flow-btn" data-flow-next="" aria-controls="flow-b13-now">다음 ▶</button>
     <span class="flow-speed" role="group" aria-label="재생 속도"><button type="button" class="flow-btn" data-flow-speed="0.5" aria-pressed="false">0.5×</button><button type="button" class="flow-btn" data-flow-speed="1" aria-pressed="true">1×</button><button type="button" class="flow-btn" data-flow-speed="2" aria-pressed="false">2×</button></span>
-    <span class="flow-count" data-flow-count aria-hidden="true"></span>
+    <span class="flow-count" data-flow-count="" aria-hidden="true"></span>
   </div>
-  <div class="flow-now" id="flow-b13-now" data-flow-now aria-live="polite" aria-atomic="true"></div>
+  <div class="flow-now" id="flow-b13-now" data-flow-now="" aria-live="polite" aria-atomic="true"></div>
   <p class="flow-keys">이 영역 안에서 <kbd>←</kbd> <kbd>→</kbd> 이전·다음, <kbd>Home</kbd> <kbd>End</kbd> 처음·끝. 재생은 마지막 단계에서 멈춥니다.</p>
 </div>
   <h3 class="flow-list-title">보이는 증상과 관찰 지점 <small>3단계</small></h3>
   <ol class="flow-steps"><li class="flow-step" id="flow-b13-1" data-order="1" data-node="pg"><p class="flow-step-head"><span class="flow-step-no">1</span><span class="flow-step-node">PG 서버</span></p><p class="flow-step-title">PG가 원문에 HMAC 서명을 붙여 콜백을 보낸다</p><dl class="flow-values"><div><dt>재현</dt><dd>실제 충전으로 <code>orderId</code>를 만든 뒤 원문에 HMAC-SHA256 서명을 붙여 보낸다</dd></div><div><dt>결제사</dt><dd>서명 키는 바뀐 게 없다</dd></div></dl></li><li class="flow-step" id="flow-b13-4" data-order="4" data-node="symptom"><p class="flow-step-head"><span class="flow-step-no">2</span><span class="flow-step-node">증상</span></p><p class="flow-step-title">서명이 맞아도 401, 틀려도 똑같은 응답</p><dl class="flow-values"><div><dt>재현</dt><dd>401 <code>/errors/unauthorized</code>(인증 필요)</dd></div><div><dt>운영</dt><dd>지난 배포 이후 전부 401, 결과 불명 충전이 확정되지 않는다</dd></div></dl></li><li class="flow-step" id="flow-b13-5" data-order="5" data-node="observe"><p class="flow-step-head"><span class="flow-step-no">3</span><span class="flow-step-node">관찰 지점</span></p><p class="flow-step-title">어느 필터에서 막혔는지 본다</p><dl class="flow-values"><div><dt>로그</dt><dd><code>logging.level.org.springframework.security=TRACE</code></dd></div></dl></li></ol>
   <details class="flow-cause"><summary>원인 쪽 단계 2개 펼치기 — "원인과 정답"과 같은 수준</summary>
   <p class="flow-cause-note">원인 서술을 먼저 써 본 뒤 펼치세요. 단계 번호는 위 증상 단계와 섞인 실제 순서로 재생됩니다.</p>
-  <ol class="flow-steps is-cause"><li class="flow-step is-cause" id="flow-b13-2" data-order="2" data-node="rules"><p class="flow-step-head"><span class="flow-step-no">원인 1</span><span class="flow-step-node">인가 규칙</span></p><p class="flow-step-title">넓은 쓰기 규칙이 콜백 공개 규칙보다 위에 있다</p><dl class="flow-values"><div><dt>위</dt><dd><code>requestMatchers(HttpMethod.POST, &quot;/api/**&quot;).authenticated()</code></dd></div><div><dt>아래</dt><dd><code>requestMatchers(HttpMethod.POST, &quot;/api/pg/callbacks&quot;).permitAll()</code> — 영원히 매치되지 않는다</dd></div></dl></li><li class="flow-step is-cause" id="flow-b13-3" data-order="3" data-node="code"><p class="flow-step-head"><span class="flow-step-no">원인 2</span><span class="flow-step-node">서명 검증</span></p><p class="flow-step-title">서명 검증까지 가지 못한다</p><dl class="flow-values"><div><dt>결과</dt><dd>서명이 맞든 틀리든 같은 401</dd></div><div><dt>테스트</dt><dd>콜백 테스트의 <code>@WithMockUser</code>가 이미 인증된 상태로 만들었다</dd></div></dl></li></ol></details>
+  <ol class="flow-steps is-cause"><li class="flow-step is-cause" id="flow-b13-2" data-order="2" data-node="rules"><p class="flow-step-head"><span class="flow-step-no">원인 1</span><span class="flow-step-node">인가 규칙</span></p><p class="flow-step-title">넓은 쓰기 규칙이 콜백 공개 규칙보다 위에 있다</p><dl class="flow-values"><div><dt>위</dt><dd><code>requestMatchers(HttpMethod.POST, "/api/**").authenticated()</code></dd></div><div><dt>아래</dt><dd><code>requestMatchers(HttpMethod.POST, "/api/pg/callbacks").permitAll()</code> — 영원히 매치되지 않는다</dd></div></dl></li><li class="flow-step is-cause" id="flow-b13-3" data-order="3" data-node="code"><p class="flow-step-head"><span class="flow-step-no">원인 2</span><span class="flow-step-node">서명 검증</span></p><p class="flow-step-title">서명 검증까지 가지 못한다</p><dl class="flow-values"><div><dt>결과</dt><dd>서명이 맞든 틀리든 같은 401</dd></div><div><dt>테스트</dt><dd>콜백 테스트의 <code>@WithMockUser</code>가 이미 인증된 상태로 만들었다</dd></div></dl></li></ol></details>
 </section>
-<h2 id="환경과-재현"><a class="anchor" href="#환경과-재현" aria-hidden="true">#</a>환경과 재현</h2>
-<ol>
-<li><code>messy-server</code>에서 <code>docker compose up -d</code></li>
-<li><code>./gradlew bootRun --args=&#39;--spring.profiles.active=local --logging.level.org.springframework.security=TRACE&#39;</code></li>
-<li><code>bash tickets/B13/repro.sh</code><ul>
-<li>실제 충전으로 <code>orderId</code>를 만든 뒤 PG처럼 원문에 HMAC-SHA256 서명을 붙여 콜백을 보낸다. 서명이 틀린 콜백도 하나 보낸다.</li>
-<li>기대 증상: 서명이 맞아도 401 <code>/errors/unauthorized</code>(인증 필요). 서명이 틀린 콜백도 똑같은 응답이다.</li>
-</ul>
-</li>
-</ol>
-<h2 id="제출물"><a class="anchor" href="#제출물" aria-hidden="true">#</a>제출물</h2>
-<ul>
-<li>원인 서술: 콜백이 어디서, 왜 막히는가(서명 검증까지 가는가?)</li>
-<li>재현 테스트: 토큰 없이 서명이 맞는 콜백 → 200·충전 확정, 서명이 틀리거나 없는 콜백 → 401 <code>/errors/invalid-signature</code>를 보는 테스트(결함 상태에서 실패 → 수정 후 통과)</li>
-<li>수정 diff</li>
-</ul>
-<h2 id="힌트"><a class="anchor" href="#힌트" aria-hidden="true">#</a>힌트</h2>
-<details>
+<section class="exercise-section" aria-labelledby="힌트"><h2 id="힌트"><a class="anchor" href="#힌트" aria-hidden="true">#</a>힌트</h2><details>
 <summary>1. 같은 401이라도 누가 만든 401인지 본다</summary>
 
 <p>응답 본문의 <code>type</code>이 <code>/errors/unauthorized</code>면 Security 진입점(<code>ProblemDetailSecurityHandler</code>)이 만든 것이고, <code>/errors/invalid-signature</code>면 컨트롤러의 서명 검증이 만든 것이다.
 서명이 맞든 틀리든 같은 <code>/errors/unauthorized</code>라면 요청은 컨트롤러에 닿지도 못했다. 서명 키를 의심할 이유가 없다.</p>
-</details>
-
-<details>
+</details><details>
 <summary>2. Security TRACE 로그 읽기</summary>
 
 <p>TRACE 로그에서 <code>POST /api/pg/callbacks</code>가 필터를 하나씩 지나는 줄(<code>Invoking ... (n/m)</code>)을 따라간다.
 <code>AuthorizationFilter</code>에서 어떤 인가 관리자(<code>AuthenticatedAuthorizationManager</code> 등)로 판정했는지 본다. 그 관리자가 어느 규칙에서 왔는지 <code>SecurityConfig</code>의 규칙을 위에서부터 짚어 본다.</p>
-</details>
-
-<details>
+</details><details>
 <summary>3. 테스트에서 이 문제가 안 보였던 이유</summary>
 
 <p><code>PgCallbackApiTest</code>·<code>PgCallbackOrderingTest</code> 클래스에 붙은 애노테이션을 본다. 테스트가 늘 인증된 사용자로 요청하면 인가 규칙의 실수를 잡을 수 없다.
 확인 테스트는 인증 없이(PG 서버처럼) 보내야 한다. <code>pg_payment</code>에 <code>UNKNOWN</code> 행을 하나 넣고 서명한 콜백을 보낸 뒤 상태와 잔액을 본다.</p>
-</details>
+</details></section>
 
-<h2 id="원인과-정답"><a class="anchor" href="#원인과-정답" aria-hidden="true">#</a>원인과 정답</h2>
-<details>
+
+
+
+
+
+<section class="exercise-section exercise-answer" aria-labelledby="원인과-정답"><h2 id="원인과-정답"><a class="anchor" href="#원인과-정답" aria-hidden="true">#</a>원인과 정답</h2><details>
 <summary>펼치기</summary>
 
-<p><strong>원인.</strong> <code>SecurityConfig</code>에 &quot;회원 전용 쓰기 API&quot; 규칙 <code>requestMatchers(HttpMethod.POST, &quot;/api/**&quot;).authenticated()</code>가 추가됐는데,
-콜백 공개 규칙 <code>requestMatchers(HttpMethod.POST, &quot;/api/pg/callbacks&quot;).permitAll()</code>보다 <strong>위</strong>에 있다.
+<p><strong>원인.</strong> <code>SecurityConfig</code>에 "회원 전용 쓰기 API" 규칙 <code>requestMatchers(HttpMethod.POST, "/api/**").authenticated()</code>가 추가됐는데,
+콜백 공개 규칙 <code>requestMatchers(HttpMethod.POST, "/api/pg/callbacks").permitAll()</code>보다 <strong>위</strong>에 있다.
 인가 규칙은 위에서부터 처음 매치된 것 하나만 적용되므로 <code>POST /api/pg/callbacks</code>는 넓은 쓰기 규칙에 먼저 걸려 토큰을 요구받고, 아래의 <code>permitAll</code>은 영원히 매치되지 않는다.
 PG 서버는 JWT가 없으니 모든 콜백이 401이다. 서명 검증(<code>PgCallbackController</code>)까지 가지 못하므로 서명이 맞든 틀리든 같은 401이다.
 테스트가 이를 놓친 것은 콜백 테스트 클래스에 <code>@WithMockUser</code>가 붙어 모든 요청이 이미 인증된 상태였기 때문이다.</p>
@@ -100,9 +102,10 @@ PG 서버는 JWT가 없으니 모든 콜백이 401이다. 서명 검증(<code>Pg
 <p><strong>확인 테스트.</strong> <code>tickets/B13/answer/B13ConfirmTest.java</code> — <code>토큰_없이_서명이_맞는_콜백은_200이고_충전이_확정된다</code>, <code>서명이_틀리면_401_invalid_signature이고_상태는_그대로다</code>, <code>서명이_없어도_401_invalid_signature다</code></p>
 <p><strong>1단계 정답 서버는?</strong> <code>board-server/src/main/java/com/example/board/config/SecurityConfig.java</code>는 구체적인 공개 규칙만 나열하고 마지막에 <code>anyRequest().authenticated()</code> 하나로 닫는다.
 넓은 <code>/api/**</code> 규칙이 중간에 없으니 콜백 <code>permitAll</code>이 가려지지 않는다. <code>PgCallbackApiTest</code>는 인증 헤더 없이 서명만으로 통과하는지 확인했다.</p>
-</details>
+</details></section>
 
-<nav class="course-exercise-nav" aria-label="연습에서 일자로 돌아가기"><p>이 연습을 쓰는 날: <a href="../spring/D14.html#step-d14-2">D14 ② · 고도화와 모의 장애 훈련</a></p></nav>
+
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><strong>제출물을 준비했다면</strong><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D14.html#step-d14-2">D14 ② · 고도화와 모의 장애 훈련</a></p><p class="exercise-return-note">연결된 일자로 돌아가 완료 조건을 확인하고 진행 기록을 남기세요.</p></nav></article>
 
 </main>
 

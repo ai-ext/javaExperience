@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>B03. 예외를 잡았는데도 구매가 롤백된다 / 안 된다</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=6580290a3c9f">
+<link rel="stylesheet" href="../../tools/site/course-exercise.css?v=c30e18dc3d31">
+<link rel="stylesheet" href="../../tools/site/course.css?v=b6c93c158a77">
 <link rel="stylesheet" href="../../tools/site/course-flow.css?v=0d2a7c3a0db7">
+<link rel="stylesheet" href="../../tools/site/course-tokens.css?v=90f7ed5128e9">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
 
 
@@ -16,31 +19,47 @@
 <header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../spring/README.html" aria-current="page">과정 v2 · 일자 목록</a><a href="../map.html">과정 지도</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
 <main>
 
-<h1 id="b03-예외를-잡았는데도-구매가-롤백된다--안-된다"><a class="anchor" href="#b03-예외를-잡았는데도-구매가-롤백된다--안-된다" aria-hidden="true">#</a>B03. 예외를 잡았는데도 구매가 롤백된다 / 안 된다</h1>
-<nav class="course-exercise-nav" aria-label="연습에서 일자로 돌아가기"><p>이 연습을 쓰는 날: <a href="../spring/D12.html#step-d12-3">D12 ③ · 티켓 처리 1</a> · <a href="../spring/D13.html#step-d13-1">D13 ① · 티켓 처리 2</a></p></nav>
-
-<blockquote>
+<article class="exercise-sheet exercise-ticket" data-exercise="B03"><header class="exercise-head"><p class="exercise-kind"><b>B03</b> 2단계 · 티켓 작업서</p><h1 id="b03-예외를-잡았는데도-구매가-롤백된다--안-된다"><a class="anchor" href="#b03-예외를-잡았는데도-구매가-롤백된다--안-된다" aria-hidden="true">#</a>B03. 예외를 잡았는데도 구매가 롤백된다 / 안 된다</h1><blockquote class="exercise-meta">
 <p>같은 날: D12 ③(두 실패 증상)·D13 ①(같은 키 동시 주문까지 마무리) · 필수 · 진단 도구: 트랜잭션 로그(<code>logging.level.org.springframework.transaction=DEBUG</code>), 디버거(<code>TransactionSynchronizationManager.isActualTransactionActive()</code>)</p>
-</blockquote>
-<h2 id="받은-티켓"><a class="anchor" href="#받은-티켓" aria-hidden="true">#</a>받은 티켓</h2>
-<blockquote>
+</blockquote></header><nav class="exercise-route" aria-label="티켓 처리 순서"><ol><li><a href="#받은-티켓"><b>01</b><span>받은 티켓</span></a></li><li><a href="#환경과-재현"><b>02</b><span>환경과 재현</span></a></li><li><a href="#제출물"><b>03</b><span>제출물</span></a></li><li><a href="#flow-b03"><b>04</b><span>흐름 재생</span></a></li></ol></nav>
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D12.html#step-d12-3">D12 ③ · 티켓 처리 1</a> · <a href="../spring/D13.html#step-d13-1">D13 ① · 티켓 처리 2</a></p></nav>
+
+
+<section class="exercise-section exercise-received" aria-labelledby="받은-티켓"><h2 id="받은-티켓"><a class="anchor" href="#받은-티켓" aria-hidden="true">#</a>받은 티켓</h2><blockquote>
 <p>구매 감사 쿠폰 이벤트를 시작한 뒤로 상점 문의가 두 종류 들어옵니다.
-① &quot;포인트가 모자라 구매 실패가 떴는데 쓰려던 할인 쿠폰은 사용됨으로 바뀌었고 재고도 줄었다. 주문 내역에도 남아 있다.&quot;
-② &quot;감사 쿠폰이 다 떨어진 뒤로는 구매하면 오류 화면이 뜬다. 그런데 포인트는 빠져 있다.&quot;
+① "포인트가 모자라 구매 실패가 떴는데 쓰려던 할인 쿠폰은 사용됨으로 바뀌었고 재고도 줄었다. 주문 내역에도 남아 있다."
+② "감사 쿠폰이 다 떨어진 뒤로는 구매하면 오류 화면이 뜬다. 그런데 포인트는 빠져 있다."
 쿠폰 지급 실패는 코드에서 예외를 잡아 넘기게 되어 있다고 들었습니다. 이벤트 기간이라 쿠폰 쪽에 몰리는 부하로 DB 연결이 끊겨 롤백이 꼬이는 것 같다는 의견이 있습니다. — CS팀</p>
-</blockquote>
+</blockquote></section>
+
+
+<section class="exercise-section exercise-repro" aria-labelledby="환경과-재현"><h2 id="환경과-재현"><a class="anchor" href="#환경과-재현" aria-hidden="true">#</a>환경과 재현</h2><ol>
+<li><code>messy-server</code>에서 <code>docker compose up -d</code></li>
+<li>감사 쿠폰 이벤트를 켜고 기동: <code>./gradlew bootRun --args='--spring.profiles.active=local --board.shop.thanks-coupon-id=9001'</code></li>
+<li><code>bash tickets/B03/repro.sh</code><ul>
+<li>A: 포인트가 모자란 회원이 할인 쿠폰을 써서 주문 → 409인데 재고가 줄고 쿠폰이 USED, 주문 행이 남는다.</li>
+<li>B: 감사 쿠폰이 소진된 상태에서 주문 → 201이어야 하는데 500. 주문 행은 생기고 포인트도 빠진다.</li>
+</ul>
+</li>
+</ol></section>
+
+<section class="exercise-section exercise-submission" aria-labelledby="제출물"><h2 id="제출물"><a class="anchor" href="#제출물" aria-hidden="true">#</a>제출물</h2><ul>
+<li>원인 서술: 증상 ①과 ②가 각각 왜 생기는지, 하나를 고치면 다른 하나가 어떻게 바뀌는지</li>
+<li>재현 테스트: 테스트 메서드에 <code>@Transactional</code>을 붙이지 않고, 응답 코드와 주문·재고·쿠폰·잔액의 최종 상태로 판정(결함 상태에서 실패 → 수정 후 통과). 예: <code>src/test/java/com/example/board/shop/OrderRollbackTest.java</code></li>
+<li>수정 diff</li>
+</ul></section>
 <section class="ticket-flow flow" data-flow="B03" data-flow-kind="ticket" id="flow-b03" aria-labelledby="flow-b03-title">
   <div class="flow-head"><p class="flow-eyebrow">장애 흐름 · 증상에서 관찰 지점까지</p><h2 id="flow-b03-title">B03 장애가 번지는 흐름</h2><p class="flow-summary">밖에서 보이는 증상과 관찰 지점만 먼저 보여 줍니다. 원인 쪽 단계는 직접 진단한 뒤 아래 접기에서 펼쳐 맞춰 보세요. 펼치면 재생에도 원인 단계가 끼어듭니다.</p></div>
-  <ol class="flow-nodes" aria-label="장애 흐름 지도: 구매 API → 재고·쿠폰·주문 행 → 원인 쪽 → 증상 → 관찰 지점"><li class="flow-node" data-node="api" data-index="0"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v18"/><path d="M6 5.5h10.5L19 8l-2.5 2.5H6z"/><path d="M18 13H7.5L5 15.5 7.5 18H18z"/></svg></span><span class="flow-node-text"><b>구매 API</b><small>POST /api/shop/orders</small></span></li><li class="flow-node" data-node="data" data-index="1"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4.5" y="4" width="15" height="4.4" rx="1.2"/><rect x="4.5" y="9.8" width="15" height="4.4" rx="1.2"/><rect x="4.5" y="15.6" width="15" height="4.4" rx="1.2"/></svg></span><span class="flow-node-text"><b>재고·쿠폰·주문 행</b><small>shop_item · member_coupon · shop_order</small></span></li><li class="flow-node is-masked" data-node="code" data-index="2"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4.5" y="4.5" width="15" height="15" rx="2" stroke-dasharray="3 2.4"/><path d="M10 10a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3M12 15.6v.1"/></svg></span><span class="flow-node-text"><b>원인 쪽</b><small>펼치면 보임</small></span></li><li class="flow-node" data-node="symptom" data-index="3"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4 21 19.5H3z"/><path d="M12 10v4.4M12 17.2v.1"/></svg></span><span class="flow-node-text"><b>증상</b><small>CS 문의 두 종류</small></span></li><li class="flow-node" data-node="observe" data-index="4"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5M8 12.5v-2M10.5 12.5V8.5M13 12.5v-3"/></svg></span><span class="flow-node-text"><b>관찰 지점</b><small>트랜잭션 로그 · 디버거</small></span></li></ol>
-  <div class="flow-player" data-flow-player hidden>
+  <ol class="flow-nodes" aria-label="장애 흐름 지도: 구매 API → 재고·쿠폰·주문 행 → 원인 쪽 → 증상 → 관찰 지점"><li class="flow-node" data-node="api" data-index="0"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v18"></path><path d="M6 5.5h10.5L19 8l-2.5 2.5H6z"></path><path d="M18 13H7.5L5 15.5 7.5 18H18z"></path></svg></span><span class="flow-node-text"><b>구매 API</b><small>POST /api/shop/orders</small></span></li><li class="flow-node" data-node="data" data-index="1"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4.5" y="4" width="15" height="4.4" rx="1.2"></rect><rect x="4.5" y="9.8" width="15" height="4.4" rx="1.2"></rect><rect x="4.5" y="15.6" width="15" height="4.4" rx="1.2"></rect></svg></span><span class="flow-node-text"><b>재고·쿠폰·주문 행</b><small>shop_item · member_coupon · shop_order</small></span></li><li class="flow-node is-masked" data-node="code" data-index="2"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4.5" y="4.5" width="15" height="15" rx="2" stroke-dasharray="3 2.4"></rect><path d="M10 10a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3M12 15.6v.1"></path></svg></span><span class="flow-node-text"><b>원인 쪽</b><small>펼치면 보임</small></span></li><li class="flow-node" data-node="symptom" data-index="3"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4 21 19.5H3z"></path><path d="M12 10v4.4M12 17.2v.1"></path></svg></span><span class="flow-node-text"><b>증상</b><small>CS 문의 두 종류</small></span></li><li class="flow-node" data-node="observe" data-index="4"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6"></circle><path d="m15 15 5 5M8 12.5v-2M10.5 12.5V8.5M13 12.5v-3"></path></svg></span><span class="flow-node-text"><b>관찰 지점</b><small>트랜잭션 로그 · 디버거</small></span></li></ol>
+  <div class="flow-player" data-flow-player="" hidden="">
   <div class="flow-controls" role="group" aria-label="흐름 재생 조작">
-    <button type="button" class="flow-btn" data-flow-prev aria-controls="flow-b03-now">◀ 이전</button>
-    <button type="button" class="flow-btn flow-play" data-flow-play aria-pressed="false" aria-controls="flow-b03-now">▶ 재생</button>
-    <button type="button" class="flow-btn" data-flow-next aria-controls="flow-b03-now">다음 ▶</button>
+    <button type="button" class="flow-btn" data-flow-prev="" aria-controls="flow-b03-now">◀ 이전</button>
+    <button type="button" class="flow-btn flow-play" data-flow-play="" aria-pressed="false" aria-controls="flow-b03-now">▶ 재생</button>
+    <button type="button" class="flow-btn" data-flow-next="" aria-controls="flow-b03-now">다음 ▶</button>
     <span class="flow-speed" role="group" aria-label="재생 속도"><button type="button" class="flow-btn" data-flow-speed="0.5" aria-pressed="false">0.5×</button><button type="button" class="flow-btn" data-flow-speed="1" aria-pressed="true">1×</button><button type="button" class="flow-btn" data-flow-speed="2" aria-pressed="false">2×</button></span>
-    <span class="flow-count" data-flow-count aria-hidden="true"></span>
+    <span class="flow-count" data-flow-count="" aria-hidden="true"></span>
   </div>
-  <div class="flow-now" id="flow-b03-now" data-flow-now aria-live="polite" aria-atomic="true"></div>
+  <div class="flow-now" id="flow-b03-now" data-flow-now="" aria-live="polite" aria-atomic="true"></div>
   <p class="flow-keys">이 영역 안에서 <kbd>←</kbd> <kbd>→</kbd> 이전·다음, <kbd>Home</kbd> <kbd>End</kbd> 처음·끝. 재생은 마지막 단계에서 멈춥니다.</p>
 </div>
   <h3 class="flow-list-title">보이는 증상과 관찰 지점 <small>4단계</small></h3>
@@ -49,46 +68,29 @@
   <p class="flow-cause-note">원인 서술을 먼저 써 본 뒤 펼치세요. 단계 번호는 위 증상 단계와 섞인 실제 순서로 재생됩니다.</p>
   <ol class="flow-steps is-cause"><li class="flow-step is-cause" id="flow-b03-2" data-order="2" data-node="api"><p class="flow-step-head"><span class="flow-step-no">원인 1</span><span class="flow-step-node">구매 API</span></p><p class="flow-step-title"><code>order</code>가 같은 클래스의 <code>@Transactional placeOnce</code>를 <code>this</code>로 부른다</p><dl class="flow-values"><div><dt>프록시</dt><dd>프록시를 거치지 않은 호출이라 트랜잭션이 아예 열리지 않는다</dd></div></dl></li><li class="flow-step is-cause" id="flow-b03-3" data-order="3" data-node="data"><p class="flow-step-head"><span class="flow-step-no">원인 2</span><span class="flow-step-node">재고·쿠폰·주문 행</span></p><p class="flow-step-title">재고 차감·쿠폰 사용·주문 INSERT·포인트 차감이 각자 커밋된다</p><dl class="flow-values"><div><dt>결과</dt><dd>마지막 포인트 차감이 실패해도 앞의 변경이 남는다</dd></div></dl></li><li class="flow-step is-cause" id="flow-b03-5" data-order="5" data-node="code"><p class="flow-step-head"><span class="flow-step-no">원인 3</span><span class="flow-step-node">감사 쿠폰 지급</span></p><p class="flow-step-title">안쪽 지급이 예외로 끝나 바깥 트랜잭션에 rollback-only가 남는다</p><dl class="flow-values"><div><dt>전파</dt><dd><code>giveAfterPurchase</code>(REQUIRED) → <code>CouponService.grant</code>(REQUIRED, 같은 트랜잭션), 소진 예외를 catch</dd></div><div><dt>커밋 때</dt><dd><code>UnexpectedRollbackException</code></dd></div></dl></li></ol></details>
 </section>
-<h2 id="환경과-재현"><a class="anchor" href="#환경과-재현" aria-hidden="true">#</a>환경과 재현</h2>
-<ol>
-<li><code>messy-server</code>에서 <code>docker compose up -d</code></li>
-<li>감사 쿠폰 이벤트를 켜고 기동: <code>./gradlew bootRun --args=&#39;--spring.profiles.active=local --board.shop.thanks-coupon-id=9001&#39;</code></li>
-<li><code>bash tickets/B03/repro.sh</code><ul>
-<li>A: 포인트가 모자란 회원이 할인 쿠폰을 써서 주문 → 409인데 재고가 줄고 쿠폰이 USED, 주문 행이 남는다.</li>
-<li>B: 감사 쿠폰이 소진된 상태에서 주문 → 201이어야 하는데 500. 주문 행은 생기고 포인트도 빠진다.</li>
-</ul>
-</li>
-</ol>
-<h2 id="제출물"><a class="anchor" href="#제출물" aria-hidden="true">#</a>제출물</h2>
-<ul>
-<li>원인 서술: 증상 ①과 ②가 각각 왜 생기는지, 하나를 고치면 다른 하나가 어떻게 바뀌는지</li>
-<li>재현 테스트: 테스트 메서드에 <code>@Transactional</code>을 붙이지 않고, 응답 코드와 주문·재고·쿠폰·잔액의 최종 상태로 판정(결함 상태에서 실패 → 수정 후 통과). 예: <code>src/test/java/com/example/board/shop/OrderRollbackTest.java</code></li>
-<li>수정 diff</li>
-</ul>
-<h2 id="힌트"><a class="anchor" href="#힌트" aria-hidden="true">#</a>힌트</h2>
-<details>
+<section class="exercise-section" aria-labelledby="힌트"><h2 id="힌트"><a class="anchor" href="#힌트" aria-hidden="true">#</a>힌트</h2><details>
 <summary>1. 트랜잭션이 정말 열렸는지부터 본다</summary>
 
 <p><code>logging.level.org.springframework.transaction=DEBUG</code>(그리고 <code>org.springframework.orm.jpa=DEBUG</code>)로 기동하고 주문 하나를 보낸다.
 <code>Creating new transaction with name [...]</code> 로그가 어떤 메서드 이름으로 찍히는지 본다. <code>OrderService.placeOnce</code>로 찍히는 줄이 있는가?
 디버거로 <code>place(...)</code> 안에 멈춰 <code>TransactionSynchronizationManager.isActualTransactionActive()</code>를 평가해 봐도 된다.</p>
-</details>
-
-<details>
+</details><details>
 <summary>2. "예외를 잡았다"는 곳이 어느 트랜잭션 안인지 본다</summary>
 
 <p>감사 쿠폰 지급은 <code>ThanksCouponService.giveAfterPurchase</code>(트랜잭션) 안에서 <code>CouponService.grant</code>(또 <code>@Transactional</code>)를 부르고 예외를 잡는다.
 안쪽 메서드가 같은 트랜잭션에 참여(REQUIRED)한 채 예외를 던지면 무슨 표시가 남는가? 로그에서 <code>Participating transaction failed - marking existing transaction as rollback-only</code>를 찾는다.</p>
-</details>
-
-<details>
+</details><details>
 <summary>3. 하나만 고치면 생기는 일</summary>
 
-<p>①을 먼저 고쳐 주문 전체가 진짜 트랜잭션 하나가 되면, ②는 &quot;오류인데 포인트가 빠진다&quot;에서 &quot;오류가 나고 구매가 통째로 롤백된다&quot;로 바뀐다. 두 증상을 모두 테스트로 고정한 뒤 고친다.</p>
-</details>
+<p>①을 먼저 고쳐 주문 전체가 진짜 트랜잭션 하나가 되면, ②는 "오류인데 포인트가 빠진다"에서 "오류가 나고 구매가 통째로 롤백된다"로 바뀐다. 두 증상을 모두 테스트로 고정한 뒤 고친다.</p>
+</details></section>
 
-<h2 id="원인과-정답"><a class="anchor" href="#원인과-정답" aria-hidden="true">#</a>원인과 정답</h2>
-<details>
+
+
+
+
+
+<section class="exercise-section exercise-answer" aria-labelledby="원인과-정답"><h2 id="원인과-정답"><a class="anchor" href="#원인과-정답" aria-hidden="true">#</a>원인과 정답</h2><details>
 <summary>펼치기</summary>
 
 <p><strong>원인 ① self-invocation.</strong> <code>OrderService.order</code>(트랜잭션 없음, 데드락 재시도 루프)가 같은 클래스의 <code>@Transactional placeOnce</code>를 <code>this</code>로 부른다.
@@ -96,7 +98,7 @@ Spring의 <code>@Transactional</code>은 프록시를 거친 호출에만 적용
 마지막의 포인트 차감이 실패해도 앞의 변경이 남는다. 이 리팩터링 때 <code>findByIdForUpdate</code>가 <code>InvalidDataAccessApiUsageException: No active transaction</code>(원인 <code>TransactionRequiredException</code>)으로 실패하자 잠금을 <code>findById</code>로 바꿔 덮은 흔적도 있다. 그 오류가 바로 트랜잭션이 없다는 증거였다.</p>
 <p><strong>원인 ② rollback-only.</strong> <code>ThanksCouponService.giveAfterPurchase</code>(REQUIRED)가 <code>CouponService.grant</code>(REQUIRED, 같은 트랜잭션에 참여)를 부르고, 소진 예외를 catch로 삼킨다.
 참여한 안쪽 트랜잭션이 예외로 끝나면 바깥 트랜잭션에 rollback-only 표시가 남고, 바깥이 커밋하려는 순간 <code>UnexpectedRollbackException</code>이 난다. 예외를 잡았어도 롤백된다.
-지금은 ① 때문에 주문이 이미 커밋된 뒤라 &quot;오류인데 포인트는 빠짐&quot;으로 보이고, ①을 고치면 &quot;구매 전체 롤백&quot;으로 보인다. 쿠폰 쪽 부하나 DB 연결 문제가 아니다.</p>
+지금은 ① 때문에 주문이 이미 커밋된 뒤라 "오류인데 포인트는 빠짐"으로 보이고, ①을 고치면 "구매 전체 롤백"으로 보인다. 쿠폰 쪽 부하나 DB 연결 문제가 아니다.</p>
 <p><strong>정답 수정.</strong> (<code>tickets/B03/answer/fix.patch</code>)</p>
 <ul>
 <li><code>placeOnce</code>를 다시 <code>TransactionTemplate</code>으로 감싸 실제 트랜잭션을 열고, 회원 행 잠금(<code>findByIdForUpdate</code>)을 되살린다(같은 회원·같은 키 동시 요청 직렬화).</li>
@@ -106,9 +108,10 @@ Spring의 <code>@Transactional</code>은 프록시를 거친 호출에만 적용
 <p><strong>확인 테스트.</strong> <code>tickets/B03/answer/B03ConfirmTest.java</code> — <code>포인트가_모자라_실패한_주문은_재고와_쿠폰을_건드리지_않는다</code>, <code>감사_쿠폰이_떨어져도_구매는_201로_한_번_반영된다</code>, <code>같은_키로_동시에_두_번_눌러도_재고와_잔액은_한_번만_줄어든다</code></p>
 <p><strong>1단계 정답 서버는?</strong> <code>board-server/src/main/java/com/example/board/shop/OrderService.java</code>는 클래스·메서드에 <code>@Transactional</code>을 두지 않고 <code>TransactionTemplate</code>으로 주문 한 건을 감싼다(재시도는 그 바깥).
 <code>OrderServiceRulesTest</code>가 선언적 트랜잭션이 없는지, <code>OrderApiTest</code>가 실패 시 재고·쿠폰이 되돌아가는지 확인했는데, 이 서버에서는 그 테스트들이 지워지거나 약해져 있다.</p>
-</details>
+</details></section>
 
-<nav class="course-exercise-nav" aria-label="연습에서 일자로 돌아가기"><p>이 연습을 쓰는 날: <a href="../spring/D12.html#step-d12-3">D12 ③ · 티켓 처리 1</a> · <a href="../spring/D13.html#step-d13-1">D13 ① · 티켓 처리 2</a></p></nav>
+
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><strong>제출물을 준비했다면</strong><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D12.html#step-d12-3">D12 ③ · 티켓 처리 1</a> · <a href="../spring/D13.html#step-d13-1">D13 ① · 티켓 처리 2</a></p><p class="exercise-return-note">연결된 일자로 돌아가 완료 조건을 확인하고 진행 기록을 남기세요.</p></nav></article>
 
 </main>
 
