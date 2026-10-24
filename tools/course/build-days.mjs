@@ -248,6 +248,41 @@ export function fixPlacementErrors(dayId, entry, root = ROOT, deferred = DEFERRE
 }
 
 // ---------------------------------------------------------------- 재료 읽기
+// 머리 주석부터 다음 머리 직전까지를 자른다. 줄바꿈·공백을 정규화하지 않는다.
+export function parseDaySql(sql) {
+  const heads = [...sql.matchAll(/^-- 이 블록을 쓰는 날: ([^\r\n]+)/gm)];
+  const days = new Map();
+  heads.forEach((head, i) => {
+    const block = sql.slice(head.index, heads[i + 1]?.index ?? sql.length);
+    for (const id of new Set(head[1].match(/\bD\d{2}\b/g) ?? [])) {
+      if (!days.has(id)) days.set(id, []);
+      days.get(id).push(block);
+    }
+  });
+  return days;
+}
+
+function dayDataSection(day, root) {
+  const entries = ['seed', 'bulk'].flatMap((name) => {
+    const blocks = parseDaySql(read(path.join(root, `course/start/dummy/${name}.sql`))).get(day.id);
+    if (!blocks?.length) return [];
+    return [
+      `<div class="day-data-file" data-day-sql="${name}" data-sql-filename="${day.id}-${name}.sql">`,
+      `<p><a href="../start/dummy/${name}.sql">원본 ${name}.sql</a> · ${name === 'bulk' ? '대량 재실험용 · seed D05까지 넣은 별도 DB에서 한 번 실행' : '기본 데이터 · 앞선 날 seed 블록을 순서대로 넣은 뒤 한 번 실행'}</p>`,
+      '<details class="day-data-sql">', `<summary>${day.id} ${name} SQL 보기</summary>`,
+      `<pre><code id="${day.id.toLowerCase()}-${name}-sql">${escapeHtml(blocks.join(''))}</code></pre>`,
+      '</details>', '</div>',
+    ].join('\n');
+  });
+  if (!entries.length) return '';
+  return [
+    '<section class="day-data">', '', '## 이 날 데이터 넣기', '',
+    '테이블·컬럼 이름이 다르면 붙여 넣기 전에 이름만 바꾸세요. 테이블을 먼저 만든 뒤 아래 SQL을 MySQL 편집기에 붙여 넣으세요.', '',
+    '[넣는 순서와 확인 방법](../start/dummy/README.md)을 확인하세요. 기본 데이터는 앞선 날 → 오늘 순서로 넣고, 대량 데이터는 별도 실험 DB에서 실행하세요. 이미 넣은 블록은 다시 실행하지 마세요.', '',
+    ...entries, '', '</section>',
+  ].join('\n');
+}
+
 export function parseTalkCards(md) {
   const cards = new Map();
   const blocks = md.split(/^(?=### TC-)/m).slice(1);
@@ -690,6 +725,8 @@ export function renderDay(day, ctx) {
     for (const [k, rule] of deferred) if (rule.after === s.no) parts.push(deferredFixSection(day, Number(k.split('-')[1]), rule, ctx));
   }
   for (const group of ctx.answers?.extras.values() ?? []) parts.push(extraSection(day, group, ctx));
+  const data = dayDataSection(day, ctx.root);
+  if (data) parts.push(data);
   if (ctx.ready) parts.push(sqlSection(day, ctx.hintsDay.sql, ctx.root));
   parts.push('---', '## 말하기 카드', '하루가 끝나면 질문에 "문제 상황 → 원인 → 선택 → 결과" 순서로 소리 내어 답한 뒤, 접힌 "답에 들어가야 할 것"과 비교한다. 세 줄이 모두 나오면 통과다.');
   for (const id of day.talkCards) {

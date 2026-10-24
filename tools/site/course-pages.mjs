@@ -254,6 +254,12 @@ export function renderDayPage(sourceRel, body, course) {
   // 5) 정답 코드는 닫힌 채로 두고, 펼칠 때 하이라이트한다(course.js가 language- 클래스를 되돌린다)
   html = html.replace(/<details class="step-answer"[\s\S]*?<\/details>/g, (block) => block.replace(/<code class="language-([\w-]+)">/g, '<code data-lazy-lang="$1">'));
 
+  // Markdown에는 원본 링크·접힌 SQL만 두고 HTML에만 파일별 동작을 붙인다.
+  html = html.replace(/(<div class="day-data-file" data-day-sql="(seed|bulk)"[^>]*>)/g, (head, tag, name) => {
+    const target = `${day.id.toLowerCase()}-${name}-sql`;
+    return `${tag}<div class="copy-row"><button type="button" class="copy-button" data-sql-copy="${target}">SQL 복사</button><button type="button" class="copy-button" data-sql-download="${target}">파일 받기</button><span class="copy-status" role="status" aria-live="polite"></span></div>`;
+  });
+
   // 6) AI 채점 프롬프트 복사
   const graderAt = html.indexOf('<h2 id="ai-채점-프롬프트"');
   if (graderAt >= 0) {

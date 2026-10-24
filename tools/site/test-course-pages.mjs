@@ -16,6 +16,17 @@ const flowScript = fs.readFileSync(new URL('course-flow.js', import.meta.url), '
 const KEY = 'javaexperience.course.progress.v1';
 const trackedTickets = new Set(execFileSync('git', ['ls-files', '--', 'course/tickets'], { cwd: rootPath, encoding: 'utf8' }).split('\n').filter(Boolean));
 
+// 원본에서 독립적으로 기대값을 구성한다. 생성기와 같은 파서를 쓰지 않는다.
+const daySql = new Map();
+for (const name of ['seed', 'bulk']) {
+  const sql = fs.readFileSync(new URL(`course/start/dummy/${name}.sql`, root), 'utf8');
+  const heads = [...sql.matchAll(/^-- 이 블록을 쓰는 날: ([^\r\n]+)/gm)];
+  for (let i = 0; i < heads.length; i++) for (const id of new Set(heads[i][1].match(/\bD\d{2}\b/g))) {
+    const key = `${id}-${name}`;
+    daySql.set(key, (daySql.get(key) ?? '') + sql.slice(heads[i].index, heads[i + 1]?.index ?? sql.length));
+  }
+}
+
 // JSDOM은 생성 직후 readyState가 loading이라, 스크립트의 DOMContentLoaded 초기화를 기다린다.
 async function open(file, { saved, brokenStorage = false, script = courseScript, before } = {}) {
   const dom = new JSDOM(fs.readFileSync(new URL(file, root), 'utf8'), { url: `https://learn.example/${file}`, runScripts: 'outside-only', pretendToBeVisual: true });
@@ -28,6 +39,61 @@ async function open(file, { saved, brokenStorage = false, script = courseScript,
   await new Promise((resolve) => (window.document.readyState === 'complete' ? resolve() : window.addEventListener('load', resolve)));
   return { window, doc: window.document, $: (s) => window.document.querySelector(s), $$: (s) => [...window.document.querySelectorAll(s)] };
 }
+
+await test('이 날 데이터: 원본 날짜 집합·본문·버튼·복사·Blob 다운로드가 일치한다', async () => {
+  const actual = [];
+  for (const day of course.days) {
+    const copies = [];
+    let blob, filename, revoked;
+    const page = await open(day.page, { before(win) {
+      Object.defineProperty(win.navigator, 'clipboard', { value: { writeText: async (sql) => copies.push(sql) }, configurable: true });
+      win.URL.createObjectURL = (value) => { blob = value; return 'blob:day-data'; };
+      win.URL.revokeObjectURL = (url) => { revoked = url; };
+      win.HTMLAnchorElement.prototype.click = function () { filename = this.download; };
+    } });
+    const entries = page.$$('[data-day-sql]');
+    assert.equal(page.$$('.day-data').length, entries.length ? 1 : 0, day.id);
+    for (const entry of entries) {
+      const key = `${day.id}-${entry.dataset.daySql}`;
+      actual.push(key);
+      const expected = daySql.get(key);
+      assert.ok(expected, `${key}: 원본 날짜 블록`);
+      assert.equal(entry.querySelector('pre code').textContent, expected);
+      assert.equal(entry.querySelector('details').open, false);
+      const buttons = [...entry.querySelectorAll('button')];
+      assert.deepEqual(buttons.map((b) => b.textContent), ['SQL 복사', '파일 받기']);
+      assert.ok(entry.querySelector('[aria-live="polite"]'));
+      buttons[0].click();
+      await Promise.resolve();
+      assert.equal(copies.at(-1), expected);
+      assert.match(entry.querySelector('[role="status"]').textContent, /복사했어요/);
+      buttons[1].click();
+      assert.equal(filename, `${key}.sql`);
+      const content = await new Promise((resolve, reject) => {
+        const reader = new page.window.FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsText(blob);
+      });
+      assert.equal(content, expected);
+      assert.equal(blob.type, 'text/sql;charset=utf-8');
+      await new Promise((resolve) => page.window.setTimeout(resolve, 5));
+      assert.equal(revoked, 'blob:day-data');
+      Object.defineProperty(page.window.navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('denied')) }, configurable: true });
+      buttons[0].click();
+      await Promise.resolve(); await Promise.resolve();
+      assert.equal(entry.querySelector('details').open, true);
+      assert.equal(page.window.getSelection().toString(), expected);
+      assert.match(entry.querySelector('[role="status"]').textContent, /선택된 SQL/);
+      Object.defineProperty(page.window.navigator, 'clipboard', { value: undefined, configurable: true });
+      buttons[0].click();
+      assert.equal(page.window.getSelection().toString(), expected);
+      Object.defineProperty(page.window.navigator, 'clipboard', { value: { writeText: async (sql) => copies.push(sql) }, configurable: true });
+    }
+    page.window.close();
+  }
+  assert.deepEqual(actual.sort(), [...daySql.keys()].sort());
+});
 
 await test('길찾기: Java·티켓 머리와 끝은 roadmap의 일자·순서로 복귀한다', () => {
   const roadmap = JSON.parse(fs.readFileSync(new URL('course/roadmap.json', root), 'utf8'));

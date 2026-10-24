@@ -144,6 +144,56 @@
     });
   }
 
+  // ------------------------------------------------------------ 일자 더미 SQL
+  function initDaySql() {
+    document.querySelectorAll('[data-day-sql]').forEach(function (entry) {
+      var status = entry.querySelector('[role="status"]');
+      var copy = entry.querySelector('[data-sql-copy]');
+      var download = entry.querySelector('[data-sql-download]');
+      if (!copy || !download) return;
+      var target = document.getElementById(copy.dataset.sqlCopy);
+      if (!target) return;
+      function fallback() {
+        entry.querySelector('details').open = true;
+        var range = document.createRange();
+        range.selectNodeContents(target);
+        var selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        status.textContent = '자동 복사가 막혔어요. 선택된 SQL을 직접 복사하세요(⌘C / Ctrl+C).';
+      }
+      copy.addEventListener('click', function () {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(target.textContent).then(function () {
+              status.textContent = 'SQL을 복사했어요. MySQL 편집기에 붙여 넣으세요.';
+            }, fallback);
+            return;
+          }
+        } catch (e) { /* 선택으로 대체한다 */ }
+        fallback();
+      });
+      download.addEventListener('click', function () {
+        var url;
+        try {
+          var blob = new Blob([target.textContent], { type: 'text/sql;charset=utf-8' });
+          url = URL.createObjectURL(blob);
+          var link = document.createElement('a');
+          link.href = url;
+          link.download = entry.dataset.sqlFilename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          status.textContent = '파일 받기를 시작했어요.';
+        } catch (e) {
+          status.textContent = '파일을 받지 못했어요. SQL 복사를 이용하세요.';
+        } finally {
+          if (url) window.setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+        }
+      });
+    });
+  }
+
   // ------------------------------------------------------------ 홈
   function initHome(home) {
     var dataNode = document.getElementById('course-days-data');
@@ -214,6 +264,7 @@
     var home = document.querySelector('[data-course-home]');
     if (home) initHome(home);
     initCopy();
+    initDaySql();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

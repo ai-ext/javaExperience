@@ -1,3 +1,4 @@
+-- 이 블록을 쓰는 날: D04 커서·인덱스 재실험 / D06 EXISTS·JOIN 비교
 -- MySQL 8.4, D04 커서·인덱스 재실험 / D06 EXISTS·JOIN 비교용.
 -- seed.sql의 D02~D05 블록을 넣은 별도 실험 DB에서 전체를 한 번 실행한다.
 -- 테이블 이름·컬럼이 다르면 이 줄만 바꿔라: 아래 INSERT INTO·SELECT의 이름.

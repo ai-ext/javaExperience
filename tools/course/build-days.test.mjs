@@ -6,6 +6,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ROOT, EXTRA_COMMITS, DEFERRED_FIXES, HEADER, buildAll, fixPlacementErrors, publicBasis, listAnswerCommits, commitFiles, netFixFiles, collectAnswers, specLinks, parseSpecSections, parseTalkCards, renderDay, fence, stepId } from './build-days.mjs';
 import { stripFences, parseDayPage } from './validate.mjs';
+import * as dayBuilder from './build-days.mjs';
 
 const roadmap = JSON.parse(fs.readFileSync(path.join(ROOT, 'course/roadmap.json'), 'utf8'));
 const hints = JSON.parse(fs.readFileSync(path.join(ROOT, 'course/hints.json'), 'utf8'));
@@ -16,6 +17,46 @@ const answerDays = readyDays.filter((d) => d.phase === 'build');
 const page = (id) => built.files.get(`course/spring/${id}.md`);
 const allCommits = listAnswerCommits(ROOT);
 const stepCommits = allCommits.filter((c) => c.kind === 'answer');
+
+test('더미 SQL 파서는 여러 날·같은 날 여러 블록의 공백과 원문을 보존한다', () => {
+  assert.equal(typeof dayBuilder.parseDaySql, 'function');
+  const first = '-- 이 블록을 쓰는 날: D02·D06 예시\r\nSELECT \'< & >\';  \r\n\r\n';
+  const second = '-- 이 블록을 쓰는 날: D02 추가\r\nSELECT 2;';
+  const blocks = dayBuilder.parseDaySql('-- 공통 안내\r\n' + first + second);
+  assert.deepEqual(blocks.get('D02'), [first, second]);
+  assert.deepEqual(blocks.get('D06'), [first]);
+  assert.equal(blocks.has('D01'), false);
+});
+
+test('데이터 칸이 있는 Markdown 일자는 원본 날짜 집합과 같고 SQL은 원문 그대로다', () => {
+  const expected = new Map();
+  for (const name of ['seed', 'bulk']) {
+    const sql = fs.readFileSync(path.join(ROOT, `course/start/dummy/${name}.sql`), 'utf8');
+    const heads = [...sql.matchAll(/^-- 이 블록을 쓰는 날: ([^\r\n]+)/gm)];
+    for (let i = 0; i < heads.length; i++) for (const id of new Set(heads[i][1].match(/\bD\d{2}\b/g))) {
+      if (!expected.has(id)) expected.set(id, new Map());
+      const files = expected.get(id);
+      files.set(name, (files.get(name) ?? '') + sql.slice(heads[i].index, heads[i + 1]?.index ?? sql.length));
+    }
+  }
+  assert.ok(expected.has('D06'), '대량 SQL도 날짜 머리 주석으로 연결한다');
+  const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const actual = [];
+  for (const day of roadmap.days) {
+    const md = page(day.id);
+    if (!expected.has(day.id)) { assert.doesNotMatch(md, /class="day-data"/); continue; }
+    actual.push(day.id);
+    assert.equal((md.match(/class="day-data"/g) ?? []).length, 1);
+    assert.ok(md.indexOf('## 이 날 데이터 넣기') < md.indexOf('## 오늘의 SQL'));
+    for (const [name, sql] of expected.get(day.id)) {
+      assert.ok(md.includes(`<pre><code id="${day.id.toLowerCase()}-${name}-sql">${escape(sql)}</code></pre>`), `${day.id}-${name}: 글자 단위 일치`);
+      assert.ok(md.includes(`href="../start/dummy/${name}.sql"`));
+    }
+    const section = md.slice(md.indexOf('<section class="day-data"'), md.indexOf('## 오늘의 SQL'));
+    assert.doesNotMatch(section, /<button|<details[^>]*\bopen\b/);
+  }
+  assert.deepEqual(actual.sort(), [...expected.keys()].sort());
+});
 
 test('정답 커밋이 있고 생성을 건너뛰지 않는다', () => {
   assert.equal(built.skipped, null);
