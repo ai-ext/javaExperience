@@ -27,7 +27,7 @@
         },
         {
           "no": 2,
-          "title": "Colima에서 MySQL 8.4를 띄우고 JPA 연결하기 (`compose.yaml`은 출발 자료에서 복사, `build.gradle`에 JPA·MySQL 의존성 추가, 스키마는 `src/main/resources/schema.sql`로 관리하고 Flyway는 쓰지 않는다, 테스트 DB는 Testcontainers `TestcontainersConfig`)",
+          "title": "Colima에서 MySQL 8.4를 띄우고 JPA 연결하기 (`compose.yaml`은 출발 자료의 파일 사용, `build.gradle`에 JPA·MySQL 의존성 추가, 스키마는 `src/main/resources/schema.sql`로 관리하고 Flyway는 쓰지 않는다, 테스트 DB는 Testcontainers `TestcontainersConfig`)",
           "files": [
             "src/main/resources/application.yml",
             "src/main/resources/schema.sql",
@@ -462,9 +462,11 @@
             "`PATCH /api/posts/{postId}` 제목만 → 200, 본문은 그대로",
             "`PATCH` 본문 `{}` → 400",
             "`DELETE /api/posts/{postId}` → 204, 이후 `GET` → 404",
-            "다른 회원 토큰으로 `PUT` → 403 `/errors/forbidden`, 삭제된 글에 `PUT` → 404"
+            "다른 회원 토큰으로 `PUT` → 403 `/errors/forbidden`, 삭제된 글에 `PUT` → 404",
+            "[꼭 할 관찰] flush 후 rollback의 Java 값·SQL·같은 연결·별도 연결 값을 기록해 제출한다.",
+            "[꼭 할 관찰] 공유 태그 수명: 연결 해제·soft delete·rollback 전후의 tag·연결 행 수를 기록해 제출한다."
           ],
-          "trap": "`save()`를 부르지 않아도 변경 감지로 flush 때 UPDATE SQL이 발행된다. commit은 변경을 확정하며 flush 뒤에도 rollback할 수 있다. SQL 로그와 별도 연결의 commit 후 새 조회를 구분해 확인한다. 선택 관찰: Java 값·flush SQL·같은 연결·별도 연결을 commit/rollback 전후로 기록하거나 공유 태그의 연결 해제·실패 원복을 확인한다. 오늘은 선택 실험 중 하나만 골라도 되며 필수 채점에는 추가하지 않는다.",
+          "trap": "`save()`를 부르지 않아도 변경 감지로 flush 때 UPDATE SQL이 발행된다. commit은 변경을 확정하며 flush 뒤에도 rollback할 수 있다. SQL 로그와 별도 연결의 commit 후 새 조회를 구분해 확인한다. 꼭 할 관찰: flush 후 rollback의 값·SQL·연결별 관찰과 공유 태그의 연결 해제·실패 원복을 모두 기록한다. 두 관찰의 증거를 완료 조건으로 채점받는다.",
           "specRefs": [
             "PUT /api/posts/{postId}",
             "PATCH /api/posts/{postId}",
@@ -674,9 +676,10 @@
           ],
           "done": [
             "`PointConcurrencyTest`가 \"조회 후 저장\" 방식에서 먼저 실패하는 것(50건 동시 적립 후 잔액 < 합계)을 보고, 원자적 UPDATE로 바꾼 뒤 통과: 잔액 = `point_ledger` 합",
-            "USER 토큰으로 `POST /api/posts` → 201 뒤 작성자 잔액이 늘어난다"
+            "USER 토큰으로 `POST /api/posts` → 201 뒤 작성자 잔액이 늘어난다",
+            "[꼭 할 관찰] 1차 캐시와 RC/RR: clear 전후·같은 연결·새 트랜잭션의 값과 SQL 수를 표로 제출한다."
           ],
-          "trap": "잔액을 읽어 더한 뒤 저장하면 동시 적립에서 갱신이 사라지므로 `UPDATE member SET point_balance = point_balance + ?`로 바꾼다. 선택 관찰: 1차 캐시와 DB snapshot을 분리하고 서로 다른 회원의 새 공유 태그 UNIQUE 경합을 재현한다. 오늘은 선택 실험 중 하나만 골라도 되며 필수 채점에는 추가하지 않는다.",
+          "trap": "잔액을 읽어 더한 뒤 저장하면 동시 적립에서 갱신이 사라지므로 `UPDATE member SET point_balance = point_balance + ?`로 바꾼다. 꼭 할 관찰: 1차 캐시와 DB snapshot을 RC/RR에서 구분한 표를 제출한다. 서로 다른 회원의 새 공유 태그 UNIQUE 경합은 선택 관찰로 둔다.",
           "specRefs": [
             "GET /api/me/points",
             "POST /api/posts"
@@ -1549,7 +1552,8 @@
           ],
           "done": [
             "`PopularPostStampedeTest` 통과: TTL 만료 순간 동시 100요청에도 DB 목록 쿼리 1회",
-            "`GET /api/posts/popular` 응답 형식은 그대로"
+            "`GET /api/posts/popular` 응답 형식은 그대로",
+            "[티켓 E01의 제출물 체크리스트 전부](../tickets/E01.md#제출물)를 충족한다(설계 메모·테스트·수정 diff)."
           ],
           "trap": "재적재를 락으로 막으면서 락 대기에 상한을 두지 않으면 Redis가 느릴 때 모든 요청이 락 앞에서 멈춘다.",
           "specRefs": [
@@ -1579,6 +1583,9 @@
           ],
           "tickets": [
             "B16"
+          ],
+          "guides": [
+            "course/tickets/drill.md"
           ]
         }
       ],
@@ -1734,7 +1741,7 @@
       "id": "J11",
       "day": "D11",
       "optional": false,
-      "topic": "리팩터링 ①: 특성화 테스트 쓰기 — 동작이 이상한 레거시 포인트 계산 메서드의 현재 출력을 테스트로 고정한다 (선택: ThreadLocal로 트랜잭션·SecurityContext·MDC가 스레드에 붙는 원리)",
+      "topic": "리팩터링 ①: 특성화 테스트 쓰기 — 레거시 포인트 계산의 현재 출력을 고정하고 변형 6개로 테스트의 빈틈을 확인한다. 배열 공변성과 `Arrays.asList`의 크기 고정도 비교한다",
       "basics": "레거시 메서드의 입력 조합을 for로 만들어 결과를 `List`에 모으고 한 번에 단정하기",
       "typeCut": "배열 vs `List`: 고정 길이·공변성, `Arrays.asList`의 크기 고정 — 레거시 코드의 배열 반환",
       "habit": null
@@ -1743,7 +1750,7 @@
       "id": "J12",
       "day": "D12",
       "optional": false,
-      "topic": "리팩터링 ②: 긴 메서드 나누기 — 80줄 구매 처리 메서드를 검증·계산·저장으로 나누고 특성화 테스트를 그대로 통과시킨다 (선택: 정규식 기초)",
+      "topic": "리팩터링 ②: 긴 메서드 나누기 — 76줄 구매 처리 메서드를 검증·계산·저장으로 나누고 특성화 테스트를 유지한다. 필드·생성자·상수별 메서드를 가진 `enum`으로 상태별 동작을 옮긴다",
       "basics": "나눈 검증 메서드가 실패 사유를 `List<String>`으로 모아 반환하게 하기",
       "typeCut": "`enum` 확장: 필드·생성자·메서드를 가진 enum, 상수별 메서드 구현 — 상태별 분기 정리",
       "habit": null
@@ -1752,7 +1759,7 @@
       "id": "J13",
       "day": "D13",
       "optional": false,
-      "topic": "리팩터링 ③: 조건문을 전략으로 바꾸기 — 쿠폰 종류별 `if-else` 할인 계산을 `DiscountPolicy` 구현으로 옮긴다 (선택: switch 식, record 패턴, text block)",
+      "topic": "리팩터링 ③: 조건문을 전략으로 바꾸기 — 쿠폰 종류별 `if-else` 할인 계산을 `DiscountPolicy` 구현으로 옮긴다. `record`의 compact 생성자로 쿠폰 코드를 정규화·검증한다",
       "basics": "정책 목록을 stream으로 돌며 적용 가능한 정책 중 할인액이 가장 큰 것을 고르기",
       "typeCut": "`record`: 불변 데이터 운반 객체, 압축 생성자 검증 — DTO와 값 객체",
       "habit": null
@@ -1761,7 +1768,7 @@
       "id": "J14",
       "day": "D14",
       "optional": false,
-      "topic": "리팩터링 ④: null 처리 — null을 돌려주는 조회 메서드를 `Optional`과 빈 컬렉션으로 바꾸고 호출부의 NPE를 없앤다 (선택: JVM 메모리 기초 — 힙·스택·GC·OOM)",
+      "topic": "리팩터링 ④: null 처리 — 단건 조회를 `Optional`, 목록 조회를 빈 컬렉션으로 바꾸고 호출부의 NPE를 없앤다 (선택: `double`/`BigDecimal` 금액·포인트 계산과 값 비교)",
       "basics": "null이 섞인 회원 목록에서 null을 거르고 닉네임을 정렬해 `String.join`으로 잇기",
       "typeCut": "(선택) `double` vs `BigDecimal`: 0.1 + 0.2, 금액 계산과 반올림 — 포인트·결제 금액",
       "habit": null

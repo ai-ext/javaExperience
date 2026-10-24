@@ -45,7 +45,7 @@ import { renderDb12FocusedJourney } from './db12-focused-journey.mjs';
 import { renderDb13FocusedJourney } from './db13-focused-journey.mjs';
 import { renderDb14FocusedJourney } from './db14-focused-journey.mjs';
 import { renderL12QueryJourney } from './l12-query-journey.mjs';
-import { loadCourse, renderDayPage, dayCrumbs, renderCourseHome, renderHomeReference, renderCourseMap, mapCrumbs, findInjectedLinkErrors, DAY_PAGE, MAP_PAGE } from './course-pages.mjs';
+import { loadCourse, renderDayPage, renderExerciseNavigation, dayCrumbs, renderCourseHome, renderHomeReference, renderCourseMap, mapCrumbs, findInjectedLinkErrors, DAY_PAGE, MAP_PAGE } from './course-pages.mjs';
 import { injectTicketFlow } from './course-flow.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -579,6 +579,7 @@ function page({ abs, title, body, hasMermaid, hasDbIndexExperiment }) {
   // 티켓 페이지(course/tickets/Bnn.md): 원문은 고치지 않고 빌드 때 [장애 흐름]을 '받은 티켓' 다음에 넣는다.
   const ticketFlow = /^course\/tickets\/[BE]\d{2}\.md$/.test(rel(abs)) ? COURSE.flows.tickets.get(path.basename(abs, '.md')) : null;
   if (ticketFlow) body = injectTicketFlow(body, ticketFlow);
+  body = renderExerciseNavigation(rel(abs), body, COURSE);
   const hasFlow = isDayPage || (ticketFlow && body.includes('data-flow-kind="ticket"'));
   if (isDayPage) {
     crumbs = dayCrumbs(rel(abs), COURSE);

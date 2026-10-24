@@ -43,7 +43,7 @@ export function loadCourse(root) {
   const days = [
     { id: 'D00', phase: 'warmup', title: d00 ? d00.replace(/^D00\.\s*/, '') : 'Java 워밍업 (선택)', java: 'J00', steps: [], optional: true },
     ...roadmap.days.map((d) => ({ id: d.id, phase: d.phase, title: d.title, java: d.java, tomorrow: d.tomorrow,
-      steps: d.steps.map((s) => ({ id: `${d.id}-${s.no}`, no: s.no, title: s.title, short: shortTitle(s.title), tickets: s.tickets || [] })) })),
+      steps: d.steps.map((s) => ({ id: `${d.id}-${s.no}`, no: s.no, title: s.title, short: shortTitle(s.title), tickets: s.tickets || [], guides: s.guides || [] })) })),
   ].map((d) => ({ ...d, page: `course/spring/${d.id}.html`, source: `course/spring/${d.id}.md` }));
   for (const d of days) if (!exists(d.source)) throw new Error(`과정 데이터: ${d.source}가 없다`);
   // 티켓 페이지는 원문(md)이 git에 커밋돼 있을 때만 "준비됨"으로 잇는다. 작업 중인 원문(미추적)을 링크하면
@@ -74,6 +74,31 @@ export function loadCourse(root) {
   // 흐름 재생 데이터(course/flows/*.json). 일자 페이지 [오늘 흐름]과 티켓 페이지 [장애 흐름]이 쓴다.
   course.flows = loadFlows(root, course);
   return course;
+}
+
+// 연습을 쓰는 날은 roadmap에서 가져온다. 링크 이름에 티켓의 원인을 넣지 않는다.
+export function renderExerciseNavigation(sourceRel, body, course) {
+  if (!/^course\/(?:java\/J\d{2}|tickets\/(?:[BE]\d{2}|drill))\.md$/.test(sourceRel)) return body;
+  const id = path.posix.basename(sourceRel, '.md');
+  const java = course.java.find((j) => j.id === id);
+  const uses = course.days.flatMap((day) => {
+    if (java) return day.java === id ? [{ day, step: null }] : [];
+    return day.steps.filter((s) => s.tickets.includes(id) || s.guides.includes(sourceRel)).map((step) => ({ day, step }));
+  });
+  if (!uses.length) throw new Error(`${sourceRel}: roadmap에 사용하는 날·순서가 없다`);
+  const returns = uses.map(({ day, step }) => {
+    const anchor = step ? `step-${step.id.toLowerCase()}` : day.id === 'D00' ? '오늘-할-것' : '오늘-순서';
+    return `<a href="${esc(relHref(sourceRel, `${day.page}#${anchor}`))}">${esc(day.id)}${step ? ` ${NUMS[step.no - 1]}` : ''} · ${esc(day.title)}</a>`;
+  }).join(' · ');
+  const index = course.java.findIndex((j) => j.id === id);
+  const neighbors = java ? [
+    index > 0 ? `<a href="${course.java[index - 1].id}.html">← 이전 ${course.java[index - 1].id}</a>` : '',
+    index < course.java.length - 1 ? `<a href="${course.java[index + 1].id}.html">다음 ${course.java[index + 1].id} →</a>` : '',
+  ].filter(Boolean).join(' · ') : '';
+  const nav = `<nav class="course-exercise-nav" aria-label="연습에서 일자로 돌아가기"><p>이 연습을 쓰는 날: ${returns}</p>${java ? `<p>Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p><p>${neighbors}</p>` : ''}</nav>`;
+  const headEnd = body.indexOf('</h1>') + 5;
+  if (headEnd < 5) throw new Error(`${sourceRel}: 제목이 없다`);
+  return `${body.slice(0, headEnd)}\n${nav}\n${body.slice(headEnd)}\n${nav}`;
 }
 
 const relHref = (fromRel, target) => path.posix.relative(path.posix.dirname(fromRel), target);
@@ -274,7 +299,7 @@ export function renderCourseHome(course) {
       <h2 id="ch-today-title"><b data-today-id>${first.id}</b> <span data-today-title>${esc(first.title)}</span></h2>
       <p class="ch-today-meta" data-today-meta>${esc(PHASE[first.phase])} · 순서 ${first.steps.length}개 · 오늘의 Java ${esc(first.java)}</p>
       <ol class="ch-today-steps" data-today-steps>${todaySteps(first)}</ol>
-      <div class="ch-actions"><a class="ch-primary" data-today-open href="${esc(href(first.page))}">${first.id} 열기 <span aria-hidden="true">→</span></a><a class="ch-secondary" data-today-java href="${esc(href(course.java.find((j) => j.id === first.java).page))}">오늘의 Java ${esc(first.java)} →</a></div>
+      <nav class="ch-actions" data-today-flow aria-label="오늘 진행 순서"><a class="ch-primary" data-today-java href="${esc(href(course.java.find((j) => j.id === first.java).page))}">Java ${esc(first.java)}</a><span aria-hidden="true">→</span><a class="ch-secondary" data-today-open href="${esc(href(first.page))}">Spring ${first.id}</a><span aria-hidden="true">→</span><a class="ch-secondary" data-today-grade href="${esc(href(first.page))}#ai-채점-프롬프트">채점</a></nav>
       <p class="ch-note" data-today-note>Java가 처음이면 <a href="${esc(href('course/spring/D00.html'))}">D00 Java 워밍업(선택)</a>을 먼저 하세요.</p>
     </article>
     <section class="ch-progress" aria-labelledby="ch-progress-title">

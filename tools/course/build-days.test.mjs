@@ -640,8 +640,8 @@ test('P09: D05는 flush의 SQL 발행과 commit의 확정을 구분한다', () =
   assert.match(baseline, /DB 락.*모든 인스턴스/);
 });
 
-// 필수 힌트 1~2개 규칙을 유지하면서 선택 실험을 별도로 제공한다.
-test('선택 관찰은 별도 접기이며 항목·순서가 입력과 같다', () => {
+// 기존 힌트와 별도로 관찰 절차를 제공하고 필수 여부를 구분한다.
+test('관찰은 별도 접기이며 항목·순서·필수 여부가 입력과 같다', () => {
   let count = 0;
   for (const [day, data] of Object.entries(hints.days)) {
     for (const [step, observations] of Object.entries(data.observations ?? {})) {
@@ -649,10 +649,10 @@ test('선택 관찰은 별도 접기이며 항목·순서가 입력과 같다', 
       const md = page(day);
       const block = md.match(new RegExp(`<details class="step-observations" data-step="${id}">([\\s\\S]*?)</details>`))?.[1];
       assert.ok(block, `${id}: 선택 관찰 접기`);
-      assert.match(block, /선택 관찰 실험.*하나만/);
+      assert.match(block, observations.some((o) => o.required) ? /꼭 할 관찰/ : /선택 관찰 실험/);
       let previous = -1;
       for (const observation of observations) {
-        const index = block.indexOf(observation);
+        const index = block.indexOf(observation.text);
         assert.ok(index > previous, `${id}: 관찰 항목 원문·순서`);
         previous = index;
         count++;
@@ -661,4 +661,78 @@ test('선택 관찰은 별도 접기이며 항목·순서가 입력과 같다', 
     }
   }
   assert.equal(count, 12);
+});
+
+
+test('길찾기: README는 v2 실행을 먼저 안내하고 이전 과정 내용을 보존한다', () => {
+  const md = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
+  const start = md.split('## 참고 자료(이전 과정)')[0];
+  for (const link of ['index.html', 'course/spring/D00.md', 'course/spring/D01.md', 'course/start/README.md']) assert.ok(start.includes(`](${link})`), link);
+  assert.match(start, /java-track/);
+  assert.match(start, /새.*프로젝트/);
+  assert.match(md, /## 참고 자료\(이전 과정\)/);
+  for (const old of ['게시판 API 101단계', '## 초기화 전 백업과 DB 복원', '## DB 접속 정보']) assert.ok(md.includes(old), old);
+});
+
+test('길찾기: D01 첫 순서 전에 출발 파일과 두 실행 위치를 안내한다', () => {
+  const head = page('D01').split('## 오늘 순서')[0];
+  for (const f of ['README.md', 'compose.yaml', 'toxiproxy.json', 'wiremock/mappings/pg-approve.json', 'wiremock/mappings/pg-approve-declined.json']) assert.ok(head.includes(`](../start/${f})`), f);
+  assert.match(head, /java-track\//);
+  assert.match(head, /저장소 루트/);
+  assert.match(head, /새.*프로젝트.*루트/);
+  assert.doesNotMatch(page('D01'), /(?<!\[)출발 자료에서 복사/);
+});
+
+test('길찾기: D11은 인수인계 시작과 기준 실행을 순서 앞에 둔다', () => {
+  const head = page('D11').split('## 오늘 순서')[0];
+  for (const marker of ['## 인수인계 시작', '1단계 앱', '종료', 'messy-server/', 'docker compose up -d --wait', 'docker compose ps', "./gradlew bootRun --args='--spring.profiles.active=local'", 'curl -i http://localhost:8080/actuator/health', './gradlew test', '13311', '../README.md#2단계-티켓-규칙']) assert.ok(head.includes(marker), marker);
+  assert.match(fs.readFileSync(path.join(ROOT, 'messy-server/compose.yaml'), 'utf8'), /13311:3306/);
+  assert.match(fs.readFileSync(path.join(ROOT, 'messy-server/src/main/resources/application-local.yml'), 'utf8'), /localhost:13311\/board/);
+});
+
+test('길찾기: 2단계 완료 조건의 구분은 채점 항목 담당과 일치한다', () => {
+  const meta = JSON.parse(fs.readFileSync(path.join(ROOT, 'course/map-tickets.json'), 'utf8')).tickets;
+  for (const day of roadmap.days.filter((d) => d.phase === 'maintain')) for (const step of day.steps) {
+    const section = page(day.id).split(`<section class="day-step" id="step-${day.id.toLowerCase()}-${step.no}" data-step="${day.id}-${step.no}">`)[1].split('</section>')[0];
+    const done = section.split('**완료 조건**')[1].split(/\n\*\*(?:명세|원인과 정답)/)[0];
+    step.done.forEach((line, i) => {
+      const key = `C${step.no}-${i + 1}`;
+      const ticket = hints.days[day.id].grader.itemTickets?.[key] ?? (step.tickets.length === 1 ? step.tickets[0] : '');
+      const t = meta.find((t) => t.id === ticket);
+      const label = t ? `${ticket} ${t.required ? '필수' : t.enhancement ? '고도화' : t.pool ? '선택' : '연습'}` : '공통';
+      assert.ok(done.includes(`- [${label}] ${line}`), `${day.id} ${key}: ${label}`);
+    });
+  }
+});
+
+test('길찾기: E01 완료 기준은 티켓 제출물 전체를 가리킨다', () => {
+  assert.match(roadmap.days.find((d) => d.id === 'D14').steps[4].done.join(' '), /티켓 E01의 제출물 체크리스트 전부.*\.\.\/tickets\/E01\.md#제출물/);
+});
+
+test('길찾기: J11~14 설명은 제공하지 않는 선택 과제를 약속하지 않는다', () => {
+  const topic = (id) => roadmap.java.find((j) => j.id === id).topic;
+  assert.doesNotMatch(topic('J11'), /ThreadLocal|SecurityContext|MDC/);
+  assert.doesNotMatch(topic('J12'), /80줄|정규식/);
+  assert.match(topic('J12'), /76줄/);
+  assert.doesNotMatch(topic('J13'), /record 패턴|text block|선택: switch/);
+  assert.doesNotMatch(topic('J14'), /JVM|힙|스택|GC|OOM/);
+  assert.match(topic('J14'), /double.*BigDecimal/);
+});
+
+test('꼭 할 관찰은 flush rollback·공유 태그 수명·1차 캐시와 RC/RR 세 개다', () => {
+  const required = [];
+  for (const [day, data] of Object.entries(hints.days)) for (const [step, observations] of Object.entries(data.observations ?? {})) {
+    for (const o of observations) if (o.required) {
+      required.push(`${day}-${step}`);
+      assert.match(o.text, /^꼭 할 관찰/);
+      assert.ok(roadmap.days.find((d) => d.id === day).steps.find((s) => String(s.no) === step).done.some((s) => s.includes('꼭 할 관찰')), `${day}-${step}: 완료 기준`);
+      assert.ok(page(day).includes('관찰 증거도 함께 채점'), `${day}: 필수 관찰 채점`);
+    }
+  }
+  assert.deepEqual(required.sort(), ['D05-2', 'D05-2', 'D07-1']);
+  for (const [day, no] of [['D05', 2], ['D07', 1]]) {
+    const step = roadmap.days.find((d) => d.id === day).steps.find((s) => s.no === no);
+    assert.doesNotMatch(step.trap, /하나만 골라도|필수 채점에는 추가하지/);
+    assert.match(step.trap, /꼭 할 관찰/);
+  }
 });

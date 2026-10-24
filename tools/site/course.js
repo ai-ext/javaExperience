@@ -179,9 +179,10 @@
       }));
       var open = $('[data-today-open]');
       open.href = day.href;
-      open.firstChild.textContent = day.id + ' 열기 ';
+      open.textContent = 'Spring ' + day.id;
       var java = $('[data-today-java]');
-      if (day.javaHref) { java.href = day.javaHref; java.textContent = '오늘의 Java ' + day.java + ' →'; java.hidden = false; } else java.hidden = true;
+      if (day.javaHref) { java.href = day.javaHref; java.textContent = 'Java ' + day.java; java.hidden = false; } else java.hidden = true;
+      $('[data-today-grade]').href = day.href + '#ai-채점-프롬프트';
       $('[data-today-note]').hidden = pick.mode !== 'first';
       var total = 0, checked = 0;
       days.forEach(function (d) {

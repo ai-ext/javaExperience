@@ -416,13 +416,14 @@ function hintBlock(dataStep, hints) {
   ].join('\n');
 }
 
-// 필수 힌트와 별도로 고르는 관찰 실험. 기존 힌트의 개수·채점 조건은 유지한다.
+// 필수 힌트와 별도인 관찰 절차. required 관찰은 완료 조건과 채점에도 포함한다.
 function observationBlock(dataStep, observations) {
+  const required = observations.some((o) => o.required);
   return [
     `<details class="step-observations" data-step="${dataStep}">`,
-    '<summary>선택 관찰 실험 · 오늘은 하나만 골라도 됩니다</summary>',
+    `<summary>${required ? '꼭 할 관찰 · 증거를 완료 조건과 함께 제출하세요' : '선택 관찰 실험 · 필요한 실험을 골라 하세요'}</summary>`,
     '',
-    ...observations.map((observation) => `- ${observation}`),
+    ...observations.map((observation) => `- ${observation.text}`),
     '',
     '</details>',
   ].join('\n');
@@ -472,8 +473,7 @@ export function graderPrompt(day, cards, hintsDay, template, root = ROOT) {
   for (const id of [...(g.fromRecords ?? []), ...Object.keys(g.itemTickets ?? {})]) if (!allIds.includes(id)) throw new Error(`hints.json: ${day.id} 채점 표시가 없는 항목을 가리킨다 → ${id}`);
   const tagOf = (s, id) => {
     if (day.phase !== 'maintain') return '';
-    const ticket = id in (g.itemTickets ?? {}) ? g.itemTickets[id] : (s.tickets?.length === 1 ? s.tickets[0] : '');
-    if (ticket && !s.tickets.includes(ticket)) throw new Error(`hints.json: ${day.id} ${id}의 티켓 ${ticket}이 그 순서 티켓이 아니다`);
+    const ticket = completionTicket(day, s, id, hintsDay);
     // 구분(필수·선택·고도화)을 붙여야 채점 에이전트가 선택 티켓 항목만 제외한다
     const tags = [ticket && `${ticket} ${ticketInfo(ticket, root).kind}`, (g.fromRecords ?? []).includes(id) ? '기록으로 확인' : ''].filter(Boolean);
     return tags.length ? `(${tags.join(' · ')}) ` : '';
@@ -529,6 +529,14 @@ function javaSection(java, roadmapJava) {
   ].join('\n');
 }
 
+// 본문과 채점이 같은 담당 표를 사용한다. 빈 담당은 모두 하는 공통 항목이다.
+function completionTicket(day, step, id, hintsDay) {
+  const assignments = hintsDay.grader?.itemTickets ?? {};
+  const ticket = id in assignments ? assignments[id] : (step.tickets?.length === 1 ? step.tickets[0] : '');
+  if (ticket && !step.tickets.includes(ticket)) throw new Error(`hints.json: ${day.id} ${id}의 티켓 ${ticket}이 그 순서 티켓이 아니다`);
+  return ticket;
+}
+
 function stepSection(day, s, ctx) {
   const id = stepId(day.id, s.no);
   const lines = [`<section class="day-step" id="${stepAnchor(day.id, s.no)}" data-step="${id}">`, '', `## ${circled(s.no)} ${s.title}`, ''];
@@ -536,7 +544,11 @@ function stepSection(day, s, ctx) {
   if (s.tickets?.length) lines.push(`**티켓** ${s.tickets.map((t) => `\`${t}\``).join(' · ')}`, '');
   if (ctx.ready) {
     if (s.trap) lines.push(`**겪을 것** ${s.trap}`, '');
-    lines.push('**완료 조건**', '', ...s.done.map((d) => `- ${d}`), '');
+    lines.push('**완료 조건**', '', ...s.done.map((d, i) => {
+      const ticket = completionTicket(day, s, `C${s.no}-${i + 1}`, ctx.hintsDay);
+      const label = day.phase === 'maintain' ? `[${ticket ? `${ticket} ${ticketInfo(ticket, ctx.root).kind}` : '공통'}] ` : '';
+      return `- ${label}${d}`;
+    }), '');
     if (s.specRefs.length) {
       const refs = s.specRefs.map((r) => {
         const l = specLinks(r, ctx.specSections);
@@ -548,7 +560,7 @@ function stepSection(day, s, ctx) {
     if (day.phase === 'maintain' && s.tickets?.length) {
       // 2단계: 티켓 정답은 티켓 페이지에만 둔다(마크다운 링크라 빌드 링크 검사가 티켓 페이지·절 누락을 잡는다).
       // 힌트 접기보다 앞에 둬야 사이트 빌드가 사실 칸(원인과 정답)으로 묶는다.
-      const guides = (ctx.hintsDay.guides?.[String(s.no)] ?? []).map((p) => `[${docTitle(p, ctx.root, day.id)}](${path.posix.relative('course/spring', p)})`);
+      const guides = (s.guides ?? []).map((p) => `[${docTitle(p, ctx.root, day.id)}](${path.posix.relative('course/spring', p)})`);
       lines.push(`**원인과 정답** ${s.tickets.map((t) => `[${t} 티켓 페이지](../tickets/${t}.md#${ANSWER_ANCHOR})`).join(' · ')}의 "원인과 정답" 접기에 있다.${guides.length ? ` 진행 순서와 양식은 ${guides.join(' · ')}에 있다.` : ''}`, '');
     }
     const hints = ctx.hintsDay.steps?.[String(s.no)];
@@ -622,6 +634,27 @@ export function renderDay(day, ctx) {
     parts.push(ticketRule(ctx.root));
     if (day.note) parts.push(`**오늘** ${day.note}`);
   }
+  if (day.id === 'D01') parts.push([
+    '## 작업 위치와 출발 자료',
+    '',
+    '- **Java**: 이 저장소의 `java-track/`에 작성한다. 실행은 **저장소 루트**에서 `./gradlew :java-track:test --tests \'J01*\'`.',
+    '- **Spring**: [출발 자료 안내](../start/README.md)의 설정값으로 **새로 만드는 내 프로젝트 루트**에서 작성·실행한다. ①은 `./gradlew bootRun`, ③ 이후에는 `./gradlew bootRun --args=\'--spring.profiles.active=local\'`.',
+    '- [출발 자료에서 복사](../start/README.md): [compose.yaml](../start/compose.yaml) · [toxiproxy.json](../start/toxiproxy.json) → 내 프로젝트 루트.',
+    '- [PG 승인 응답](../start/wiremock/mappings/pg-approve.json) · [PG 거절 응답](../start/wiremock/mappings/pg-approve-declined.json) → 내 프로젝트의 `src/test/resources/wiremock/mappings/`. 파일을 먼저 복사한 뒤 compose를 띄운다.',
+  ].join('\n'));
+  if (day.id === 'D11') parts.push([
+    '## 인수인계 시작',
+    '',
+    '1. **1단계 앱 종료**: 실행 중인 터미널에서 `Ctrl+C`(IDE라면 Stop). 1단계 프로젝트 루트에서 `docker compose down`으로 의존 서비스도 멈춘다. 데이터 삭제 옵션은 붙이지 않는다.',
+    '2. **작업 대상 전환**: 저장소 루트에서 `cd messy-server`. 이제 코드·명령의 기준은 `messy-server/`다. 1단계 내 프로젝트와 구분한다.',
+    '3. **서버의 compose·DB 기동**: 아래 명령을 `messy-server/`에서 실행한다. [compose.yaml](../../messy-server/compose.yaml)과 [local 설정](../../messy-server/src/main/resources/application-local.yml)의 MySQL은 `localhost:13311/board`다(1단계는 13310). Redis·PG도 이 compose를 쓴다.',
+    '',
+    fence('docker compose up -d --wait\ndocker compose ps\n./gradlew bootRun --args=\'--spring.profiles.active=local\'', 'bash'),
+    '',
+    '4. **최초 기동 확인**: 별도 터미널에서 `curl -i http://localhost:8080/actuator/health` → 200과 `UP`. 실패하면 기동 로그를 먼저 기록한다.',
+    '5. **기준 테스트**: 별도 터미널의 `messy-server/`에서 `./gradlew test`를 실행한다(Docker 필요, 테스트는 별도 컨테이너 사용). 수정 전 성공·실패 개수와 실패 테스트·로그를 저장한다. 이 기록과 수정 후 결과를 비교한다.',
+    '6. **이번 주 규칙 확인**: [2단계 티켓 규칙](../README.md#2단계-티켓-규칙)을 읽고 필수 B01~B04·선택 1건·[E01](../tickets/E01.md)·[훈련](../tickets/drill.md)을 구분한다.',
+  ].join('\n'));
   parts.push('## 오늘 순서', checklist(day, day.steps), javaSection(java, roadmapJava), '---');
   const deferred = Object.entries(ctx.deferred ?? DEFERRED_FIXES).filter(([k]) => k.startsWith(`${day.id}-`));
   for (const s of day.steps) {
@@ -638,6 +671,9 @@ export function renderDay(day, ctx) {
   }
   if (ctx.ready) {
     parts.push('## AI 채점 프롬프트', GRADER_INTRO[day.phase]);
+    if (Object.values(ctx.hintsDay.observations ?? {}).flat().some((o) => o.required)) {
+      parts.push('**꼭 할 관찰**의 관찰 증거도 함께 채점받는다. 미제출은 해당 완료 조건 실패다. 선택 관찰은 제외한다.');
+    }
     parts.push(fence(graderPrompt(day, ctx.cards, ctx.hintsDay, graderTemplate(ctx.hints, day.phase), ctx.root), 'text'));
   }
   parts.push('## 내일 미리보기', day.tomorrow);

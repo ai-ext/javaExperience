@@ -29,6 +29,45 @@ async function open(file, { saved, brokenStorage = false, script = courseScript,
   return { window, doc: window.document, $: (s) => window.document.querySelector(s), $$: (s) => [...window.document.querySelectorAll(s)] };
 }
 
+await test('길찾기: Java·티켓 머리와 끝은 roadmap의 일자·순서로 복귀한다', () => {
+  const roadmap = JSON.parse(fs.readFileSync(new URL('course/roadmap.json', root), 'utf8'));
+  const files = ['java', 'tickets'].flatMap((folder) => fs.readdirSync(new URL(`course/${folder}/`, root)).filter((f) => /^(?:J\d{2}|[BE]\d{2}|drill)\.md$/.test(f)).map((f) => `course/${folder}/${f}`));
+  for (const file of files) {
+    const id = file.split('/').at(-1).replace('.md', '');
+    const doc = new JSDOM(fs.readFileSync(new URL(file.replace('.md', '.html'), root), 'utf8')).window.document;
+    const navs = [...doc.querySelectorAll('nav.course-exercise-nav')];
+    assert.equal(navs.length, 2, `${id}: 머리와 끝`);
+    const uses = roadmap.days.flatMap((d) => {
+      if (id.startsWith('J')) return d.java === id ? [{ day: d, step: null }] : [];
+      return d.steps.filter((s) => id === 'drill' ? s.guides?.includes('course/tickets/drill.md') : s.tickets.includes(id)).map((s) => ({ day: d, step: s }));
+    });
+    if (id === 'J00') uses.push({ day: course.days.find((d) => d.id === 'D00'), step: null });
+    assert.ok(uses.length, `${id}: roadmap 연결`);
+    for (const nav of navs) for (const { day, step } of uses) {
+      const href = `../spring/${day.id}.html${step ? `#step-${day.id.toLowerCase()}-${step.no}` : day.id === 'D00' ? '#오늘-할-것' : '#오늘-순서'}`;
+      const link = [...nav.querySelectorAll('a')].find((a) => a.getAttribute('href') === href);
+      assert.ok(link, `${id}: ${href}`);
+      assert.equal(link.textContent, `${day.id}${step ? ` ${'①②③④⑤⑥⑦⑧⑨⑩'[step.no - 1]}` : ''} · ${day.title}`);
+    }
+    if (id.startsWith('J')) {
+      const i = roadmap.java.findIndex((j) => j.id === id);
+      for (const nav of navs) for (const n of [roadmap.java[i - 1], roadmap.java[i + 1]].filter(Boolean)) assert.ok(nav.querySelector(`a[href="${n.id}.html"]`), `${id}: ${n.id}`);
+    }
+  }
+});
+await test('길찾기: 홈 첫 방문의 행동 순서는 Java → Spring → 채점이다', async () => {
+  const home = await open('index.html');
+  const flow = home.$('[data-today-flow]');
+  assert.ok(flow);
+  const links = [...flow.querySelectorAll('a')];
+  assert.deepEqual(links.map((a) => a.getAttribute('href')), ['course/java/J01.html', 'course/spring/D01.html', 'course/spring/D01.html#ai-채점-프롬프트']);
+  assert.match(flow.textContent, /Java.*J01.*→.*Spring.*D01.*→.*채점/);
+  assert.ok(home.$('[data-today-java]').classList.contains('ch-primary'));
+  const next = await open('index.html', { saved: JSON.stringify({ version: 1, steps: { 'D01-1': true, 'D01-2': true, 'D01-3': true, 'D01-4': true } }) });
+  assert.match(next.$('[data-today-flow]').textContent, /J02.*D02/);
+  assert.match(next.$('[data-today-grade]').getAttribute('href'), /D02.html#ai-채점-프롬프트$/);
+});
+
 // R4: JSDOM은 배치를 계산하지 않으므로 크기·줄바꿈은 소스 규칙을, 이름은 생성 DOM을 검사한다.
 const courseCss = fs.readFileSync(new URL('course.css', import.meta.url), 'utf8');
 const flowCss = fs.readFileSync(new URL('course-flow.css', import.meta.url), 'utf8');
@@ -615,7 +654,7 @@ for (const day of course.days) {
       if (observations.length) {
         assert.ok(observationFold && !observationFold.open, `${s.id}: 선택 관찰은 별도 닫힌 접기`);
         assert.equal(observationFold.querySelectorAll('li').length, observations.length, `${s.id}: 관찰 개수`);
-        assert.match(observationFold.querySelector('summary').textContent, /선택 관찰 실험.*하나만/);
+        assert.match(observationFold.querySelector('summary').textContent, observations.some((o) => o.required) ? /꼭 할 관찰/ : /선택 관찰 실험/);
       } else {
         assert.equal(observationFold, null, `${s.id}: 등록하지 않은 관찰을 표시하지 않는다`);
       }

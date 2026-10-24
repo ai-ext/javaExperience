@@ -1,5 +1,30 @@
 # javaExperience
 
+Java·Spring 서버 전환 과정 v2다. 매일 **Java → Spring → 채점** 순서로 진행한다.
+
+## 과정 v2 시작하기
+
+준비물: **JDK 21 · IntelliJ IDEA · Docker 런타임(Colima 등) · Python 3**. 문서 빌드에만 Node.js·npm이 필요하다. AI 채점은 Codex 또는 Claude Code를 쓴다.
+
+1. 저장소를 받은 뒤 **저장소 루트**에서 문서 서버를 켠다.
+
+   ```bash
+   git clone https://github.com/ai-ext/javaExperience.git
+   cd javaExperience
+   python3 -m http.server 8765 --bind 127.0.0.1
+   ```
+
+2. [학습 홈](index.html)을 `http://127.0.0.1:8765/index.html`에서 연다. Java 워밍업이 필요하면 [D00(선택)](course/spring/D00.md), 바로 시작하면 [D01 프로젝트 뼈대](course/spring/D01.md)로 간다.
+3. [1단계 출발 자료](course/start/README.md)의 설정값으로 **새 Spring 프로젝트**를 만든다. compose·PG 모의 파일을 복사한 뒤 **새 프로젝트 루트**에서 `docker compose up -d --wait`를 실행한다.
+4. Java는 저장소의 `java-track/`에서 채우고 **저장소 루트**에서 `./gradlew :java-track:test --tests 'J01*'`를 실행한다. Spring D01~D10은 **새 프로젝트 루트**에서 `./gradlew bootRun`으로 시작한다(D01 ③ 이후에는 `--args='--spring.profiles.active=local'` 추가).
+5. 일자 페이지의 완료 조건을 확인하고 하단 AI 채점 프롬프트를 실행한다. D11부터는 작업 대상을 `messy-server/`로 전환한다.
+
+[과정 안내·티켓 규칙](course/README.md) · [명세서 v2](course/spec-v2.md) · [일자 목록](course/spring/README.md)
+
+## 참고 자료(이전 과정)
+
+아래 101단계 과정과 루트 앱·DB 실행법은 이전 과정의 참고 자료다. v2 D01~D10의 작업 대상과 실행 위치는 위 안내를 따른다.
+
 Spring Boot 백엔드를 **직접 만들면서** 배우는 공개 실습 레포다. 게시판 API 101단계를 이어서 만들고, Codex 또는 Claude Code로 단계별 채점과 피드백을 받을 수 있다. 시나리오와 HTML은 GitHub 로그인 없이 읽거나 다운로드할 수 있다.
 
 > 과정 v2(일자 페이지 D00~D15·Java 트랙·2단계 티켓)는 [과정 안내](course/README.md)와 [학습 홈](index.html)에서 시작한다. 아래 `scenario/`·`practice/`·`docs/knowledge/`·`tickets/`는 그 과정에서 찾아보는 참고 도감이다.
@@ -7,14 +32,14 @@ Spring Boot 백엔드를 **직접 만들면서** 배우는 공개 실습 레포�
 | 폴더 | 내용 |
 |---|---|
 | [`index.html`](index.html) | 학습 홈 — 시작점 선택, 6개 과제의 진도·마지막 장면 이어하기, 게시판 예시와 환경 준비 안내 |
-| [`scenario/`](scenario/README.md) | **따라 만들기 시나리오** — 101단계 요구사항·난이도·역할별 전체 코드 접기, 쿼리 연습 18개, JWT 이후 세션 인증과 interface/impl 선택 실습. 여기서 시작한다 |
+| [`scenario/`](scenario/README.md) | **따라 만들기 시나리오** — 101단계 요구사항·난이도·역할별 전체 코드 접기, 쿼리 연습 18개, JWT 이후 세션 인증과 interface/impl 선택 실습. 이전 과정을 순서대로 볼 때 사용한다 |
 | [`practice/`](practice/MISSIONS.md) | 학습용 미션 — 함정이 섞인 많은 데이터(`practice` DB)로 조회·쿼리 연습 |
 | [`docs/knowledge/`](docs/knowledge/README.md) | 공부자료 134개 — 단계마다 "필요한 지식"으로 링크된다 |
 | `docker/` | 실습 DB(MySQL 8.4) 초기 데이터 dump(`mysql/init/`)와 CloudBeaver(웹 DBeaver) 설정 |
 | `src/` | 직접 이어서 구현할 Spring Boot 4.1 프로젝트 — `/hello`와 Todo·Post 학습 코드가 있으며 구현 상태는 브랜치에 따라 다르다 |
 | `tools/site/` | `.md` → `.html` 빌드 도구(문서를 고칠 때만 쓴다) |
 
-## 시작하기
+### 이전 과정 시작하기
 
 준비물: Docker 런타임(사내 표준은 Colima. `docker`·`docker compose` 명령이 동작하면 된다), IntelliJ IDEA, JDK 21(없으면 Gradle이 찾는다 — `gradle/gradle-daemon-jvm.properties`). AI 채점을 원하면 Codex 또는 Claude Code를 선택해 쓸 수 있다.
 
