@@ -168,7 +168,8 @@ test('실제 spec-v2는 엔드포인트 30개', () => {
 
 test('실제 카드 문서는 일자마다 3~5장', () => {
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-  const ids = parseTalkCardIds(loadCourseSources(root).cards);
+  const { roadmap, cards } = loadCourseSources(root);
+  const ids = parseTalkCardIds(cards);
   assert.equal(new Set(ids).size, ids.length, '카드 ID 중복');
   const byDay = new Map();
   for (const id of ids) {
@@ -176,8 +177,8 @@ test('실제 카드 문서는 일자마다 3~5장', () => {
     const d = id.slice(3, 6);
     byDay.set(d, (byDay.get(d) ?? 0) + 1);
   }
-  assert.equal(byDay.size, 15);
-  for (let n = 1; n <= 15; n++) {
+  assert.equal(byDay.size, roadmap.days.length);
+  for (let n = 1; n <= roadmap.days.length; n++) {
     const d = `D${String(n).padStart(2, '0')}`;
     const c = byDay.get(d) ?? 0;
     assert.ok(c >= 3 && c <= 5, `${d}: ${c}장`);

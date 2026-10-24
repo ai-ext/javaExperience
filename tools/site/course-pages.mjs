@@ -9,8 +9,8 @@ import { loadFlows, renderDayFlow, renderDayTicketLinks } from './course-flow.mj
 import { loadCourseSources } from '../course/sources.mjs';
 
 const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const PHASE = { warmup: '선택 · Java 워밍업', build: '1단계 · 빈 프로젝트로 서버 만들기', maintain: '2단계 · 어수선한 서버 넘겨받기', wrap: '마무리 · 설명 세션' };
-const PHASE_SHORT = { warmup: '선택', build: '1단계', maintain: '2단계', wrap: '마무리' };
+const PHASE = { warmup: '선택 · Java 워밍업', build: '1단계 · 빈 프로젝트로 서버 만들기', maintain: '2단계 · 어수선한 서버 넘겨받기', wrap: '중간 점검 · 설명 세션', extend: '3단계 · 설계·운영·업무 적용' };
+const PHASE_SHORT = { warmup: '선택', build: '1단계', maintain: '2단계', wrap: '중간 점검', extend: '3단계' };
 const NUMS = '①②③④⑤⑥⑦⑧⑨⑩';
 
 export const DAY_PAGE = /^course\/spring\/D\d{2}\.md$/;
@@ -38,7 +38,7 @@ export function loadCourse(root) {
   const h1 = (p) => (exists(p) ? read(p).match(/^# (.+)$/m)?.[1].replace(/[`*]/g, '').trim() : null);
   const java = roadmap.java.map((j) => {
     const title = h1(`course/java/${j.id}.md`);
-    return { id: j.id, day: j.day || (j.id === 'J00' ? 'D00' : null), optional: Boolean(j.optional), title: title ? title.replace(/^J\d{2}\.\s*/, '') : plain(j.topic).split(/[:—]/)[0].trim(), page: exists(`course/java/${j.id}.md`) ? `course/java/${j.id}.html` : null };
+    return { id: j.id, timing: j.timing || 'before', day: j.day || (j.id === 'J00' ? 'D00' : null), optional: Boolean(j.optional), title: title ? title.replace(/^J\d{2}\.\s*/, '') : plain(j.topic).split(/[:—]/)[0].trim(), page: exists(`course/java/${j.id}.md`) ? `course/java/${j.id}.html` : null };
   });
   const d00 = h1('course/spring/D00.md');
   const days = [
@@ -96,7 +96,11 @@ export function renderExerciseNavigation(sourceRel, body, course) {
     index > 0 ? `<a href="${course.java[index - 1].id}.html">← 이전 ${course.java[index - 1].id}</a>` : '',
     index < course.java.length - 1 ? `<a href="${course.java[index + 1].id}.html">다음 ${course.java[index + 1].id} →</a>` : '',
   ].filter(Boolean).join(' · ') : '';
-  const nav = `<nav class="course-exercise-nav" aria-label="연습에서 일자로 돌아가기"><p>이 연습을 쓰는 날: ${returns}</p>${java ? `<p>Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p><p>${neighbors}</p>` : ''}</nav>`;
+  const location = Number(id.slice(1)) >= 16
+    ? '확장 실험은 학습자 프로젝트 루트에서 작성·실행한다. 기존 java-track 과제는 해당 J 페이지의 모듈 명령을 따른다.'
+    : 'Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.';
+  const timing = ['J44','J45'].includes(id) ? '<p>요구 제시·초기 진단 뒤 수행 중 증거 또는 사후 확인으로 진행한다.</p>' : '';
+  const nav = `<nav class="course-exercise-nav" aria-label="연습에서 일자로 돌아가기"><p>이 연습을 쓰는 날: ${returns}</p>${java ? `<p>${location}</p>${timing}<p>${neighbors}</p>` : ''}</nav>`;
   const headEnd = body.indexOf('</h1>') + 5;
   if (headEnd < 5) throw new Error(`${sourceRel}: 제목이 없다`);
   return `${body.slice(0, headEnd)}\n${nav}\n${body.slice(headEnd)}\n${nav}`;
@@ -201,7 +205,7 @@ export function renderDayPage(sourceRel, body, course) {
   const head = html.match(/(<h1\b[\s\S]*?<\/h1>)\s*<blockquote>\s*<p>([\s\S]*?)<\/p>\s*<\/blockquote>/);
   if (!head) throw new Error(`${sourceRel}: 제목과 요약 줄이 없다`);
   const chips = head[2].split(' · ').map((part) => {
-    const cls = /준비 중/.test(part) ? ' is-pending' : /^(1단계|2단계|마무리|선택)$/.test(part.trim()) ? ` is-phase phase-${day.phase}` : '';
+    const cls = /준비 중/.test(part) ? ' is-pending' : /^(1단계|2단계|3단계|중간 점검|선택)$/.test(part.trim()) ? ` is-phase phase-${day.phase}` : '';
     return `<span class="day-meta-chip${cls}">${part.trim()}</span>`;
   }).join('');
   html = html.replace(head[0], `<header class="day-head">${head[1]}<p class="day-meta">${chips}</p></header>${['D11','D14'].includes(day.id) ? renderTicketSelection(course, sourceRel, day.id === 'D11') : ''}`);
@@ -307,11 +311,11 @@ export function renderCourseHome(course) {
   const first = main[0];
   const coreCount = (d) => d.steps.filter((s) => !isExtraStep(s, course)).length || d.steps.length;
   const stepTotal = main.reduce((n, d) => n + coreCount(d), 0);
-  const data = course.days.map((d) => ({ id: d.id, title: d.title, phase: d.phase, phaseLabel: PHASE[d.phase], java: d.java, href: href(d.page),
+  const data = course.days.map((d) => ({ id: d.id, title: d.title, phase: d.phase, phaseLabel: PHASE[d.phase], java: d.java, javaTiming: course.java.find((j) => j.id === d.java)?.timing || 'before', href: href(d.page),
     javaHref: course.java.find((j) => j.id === d.java)?.page ? href(course.java.find((j) => j.id === d.java).page) : null,
     steps: d.steps.map((s) => ({ id: s.id, title: plain(s.short), ...(isExtraStep(s, course) ? { extra: true } : {}) })) }));
   const todaySteps = (d) => d.steps.map((s, i) => `<li><span aria-hidden="true">${NUMS[i]}</span> ${inline(s.short)}</li>`).join('');
-  const phases = [['build', '1단계 · 만들기'], ['maintain', '2단계 · 넘겨받기'], ['wrap', '마무리']];
+  const phases = [['build', '1단계 · 만들기'], ['maintain', '2단계 · 넘겨받기'], ['wrap', '중간 점검'], ['extend', '3단계 · 설계·운영·업무 적용']];
   const dayCell = (d) => `<li class="ch-day" data-day="${d.id}"><a href="${esc(href(d.page))}"><b>${d.id}</b><span class="ch-day-title">${esc(d.title)}</span><span class="ch-bar" aria-hidden="true"><i style="width:0%"></i></span><small data-day-count>0/${coreCount(d)}</small></a></li>`;
   const javaChips = course.java.map((j) => (j.page
     ? `<a href="${esc(href(j.page))}" title="${esc(j.title)}">${j.id}${j.optional ? '<small>선택</small>' : ''}</a>`
@@ -322,7 +326,7 @@ export function renderCourseHome(course) {
   }).join('');
   const readyTickets = course.tickets.filter((t) => t.page && !t.enhancement).length;
   return `<section class="course-home" data-course-home aria-labelledby="course-home-title">
-  <div class="ch-intro"><p class="home-eyebrow">Java·Spring 온보딩 과정 v2 · 15일</p><h1 id="course-home-title">빈 프로젝트로 서버를 만들고, <span>넘겨받은 서버를 고칩니다.</span></h1><p>1단계 10일은 게시판·상점·결제 연동 서버를 직접 만들고, 2단계 4일은 결함이 심어진 서버의 티켓을 처리합니다. 매일 Spring 순서 전에 30~60분 Java 트랙을 먼저 합니다.</p></div>
+  <div class="ch-intro"><p class="home-eyebrow">Java·Spring 온보딩 과정 v2 · ${main.length}일</p><h1 id="course-home-title">빈 프로젝트로 서버를 만들고, <span>넘겨받은 서버를 고칩니다.</span></h1><p>1단계 10일은 게시판·상점·결제 연동 서버를 직접 만들고, 2단계 4일은 결함이 심어진 서버의 티켓을 처리합니다. D15에서 중간 점검하고, 3단계는 새 요구 설계·배포·재시작 작업·장애·회의를 검증합니다. 보통 Java를 먼저 연습하며 D44·D45는 요구 제시·초기 진단 뒤 증거로 연결합니다. 완료 조건을 체크한 만큼 다음 날로 갑니다.</p></div>
   <div class="ch-hero">
     <article class="ch-today" aria-labelledby="ch-today-title">
       <p class="ch-tag" data-today-tag>오늘 할 일 · 처음 시작</p>
@@ -334,7 +338,7 @@ export function renderCourseHome(course) {
       <p class="ch-note" data-today-note>Java가 처음이면 <a href="${esc(href('course/spring/D00.html'))}">D00 Java 워밍업(선택)</a>을 먼저 하세요.</p>
     </article>
     <section class="ch-progress" aria-labelledby="ch-progress-title">
-      <div class="ch-progress-head"><h2 id="ch-progress-title">15일 진도</h2><p data-progress-summary>체크한 순서 0/${stepTotal}</p></div>
+      <div class="ch-progress-head"><h2 id="ch-progress-title">${main.length}일 진도</h2><p data-progress-summary>체크한 순서 0/${stepTotal}</p></div>
       <p class="ch-progress-note">직접 체크한 진도이며 채점 결과가 아닙니다. Java·선택 티켓의 수행 여부와 역량은 따로 확인합니다.</p>
       ${phases.map(([phase, label]) => `<h3 class="ch-phase">${label}</h3><ol class="ch-days">${main.filter((d) => d.phase === phase).map(dayCell).join('')}</ol>`).join('')}
       <p class="ch-progress-note">일자 페이지의 순서 체크가 이 브라우저에 저장되고, 여기서 다음 구현일을 추천합니다. 다른 기기·브라우저에서는 <a href="course/spring/README.html">일자 목록</a>에서 하던 날로 직접 재진입하세요. <span data-course-storage></span></p>
@@ -342,9 +346,10 @@ export function renderCourseHome(course) {
   </div>
   ${renderTicketSelection(course, from)}
   <div class="ch-entries">
-    <article class="ch-entry"><p class="home-eyebrow">Spring 트랙 · 메인</p><h3>일자 페이지 D00~D15</h3><p>오늘 순서 → 순서 칸(만들 파일·겪을 것·완료 조건) → 막히면 힌트 → 그 순서의 구현 예시 → 오늘의 SQL → 말하기 카드와 AI 채점.</p><a href="${esc(href('course/spring/README.html'))}">일자 목록 열기 →</a></article>
-    <article class="ch-entry"><p class="home-eyebrow">Java 트랙 · 매일 30~60분</p><h3>같은 날 쓰는 Java 먼저</h3><p class="ch-chips">${javaChips}</p></article>
+    <article class="ch-entry"><p class="home-eyebrow">Spring 트랙 · 메인</p><h3>일자 페이지 D00~${main.at(-1).id}</h3><p>오늘 순서 → 순서 칸(만들 파일·겪을 것·완료 조건) → 막히면 힌트 → 필요한 구현 예시(1·2단계) → 오늘의 SQL → 말하기 카드와 AI 채점.</p><a href="${esc(href('course/spring/README.html'))}">일자 목록 열기 →</a></article>
+    <article class="ch-entry"><p class="home-eyebrow">Java 트랙 · 매일 30~60분</p><h3>같은 날 쓰는 Java 연결</h3><p>J16 이후는 기존 J 재사용과 오늘의 작은 경계 실험입니다. 보통 먼저 연습하고 J44·J45는 수행 중 증거·사후 확인으로 연결합니다. 실행 위치와 완료 조건을 확인하세요.</p><p class="ch-chips">${javaChips}</p></article>
     <article class="ch-entry"><p class="home-eyebrow">2단계 티켓 · 필수 4건 + 선택 1건(Security·Redis 후보)</p><h3>증상만 적힌 티켓 B01~B16</h3><p class="ch-chips ch-ticket-chips">${ticketChips}</p><p class="ch-entry-note">필수 B01~B04 + 선택 1건(B12·B13·B14 또는 B15·B16) + <a href="${esc(href('course/tickets/E01.html'))}">고도화 E01</a> + <a href="${esc(href('course/tickets/drill.html'))}">모의 장애 훈련</a>. B05~B11과 고르지 않은 후보는 연습으로 하고, 처리한 것만 채점합니다. 티켓 문서 ${readyTickets}/16 제공 · 학습 완료 표시와 별개입니다.</p></article>
+    <article class="ch-entry"><p class="home-eyebrow">3단계 · D16~${main.at(-1).id}</p><h3>설계에서 운영·회의·독립 수행까지</h3><p>미수행 개인 과제 → Java·DB 관찰 → 예약 쿠폰 → 배포·스키마·복원 → 계약·인증·재개 작업 → 새 업무·장애·회의 → 독립 평가. 실제 업무 이슈가 없어도 제공 변형으로 진행합니다.</p><a href="${esc(href('course/spring/D16.html'))}">D16 개인 경로 열기 →</a></article>
     <article class="ch-entry ch-entry-map"><p class="home-eyebrow">과정 지도</p><h3>날·Java·티켓·결함 영역의 관계</h3><p>어느 날의 Java가 어떤 날을 받치고, 2단계 티켓이 어떤 결함 영역에 속하는지 한 장에서 봅니다.</p><a href="${esc(href('course/map.html'))}">과정 지도 열기 →</a></article>
   </div>
   <p>데이터 요구사항으로 테이블을 직접 설계하고 더미 SQL을 내 테이블 이름에 맞춰 붙여 넣습니다. SQL을 매일 풀고, board-server는 구현 예시로 비교합니다.</p>
@@ -363,7 +368,7 @@ export function renderHomeReference(homeVisualHtml) {
 
 // ---------------------------------------------------------------- 과정 지도
 const KIND_LABEL = { java: 'Java 트랙', day: 'Spring 일자', ticket: '티켓', area: '결함 영역' };
-const EDGE_LABEL = { practice: '같은 날 먼저 연습', ticket: '그날 다루는 티켓', area: '결함 영역' };
+const EDGE_LABEL = { practice: '같은 날 연결 실험 (J44·J45는 수행 중·사후)', ticket: '그날 다루는 티켓', area: '결함 영역' };
 
 export function mapNodes(course) {
   const ticketOrder = [];
@@ -422,7 +427,7 @@ export function renderCourseMap(course, fromRel = MAP_PAGE) {
   <h2 id="cm-table-title">관계 표</h2>
   <p>지도와 같은 연결을 글로 적었습니다. 화살표 방향으로 읽습니다: Java → 같은 날 Spring 일자 → 그날 다루는 티켓 → 결함 영역.</p>
   <h3 id="cm-table-days">일자별: 오늘의 Java와 다루는 티켓</h3>
-  <div class="table-wrap"><table><thead><tr><th>일자</th><th>먼저 연습하는 Java (J → D)</th><th>다루는 티켓 (D → 티켓)</th></tr></thead><tbody>${dayRows}</tbody></table></div>
+  <div class="table-wrap"><table><thead><tr><th>일자</th><th>연결하는 Java (J44·J45는 수행 중·사후)</th><th>다루는 티켓 (D → 티켓)</th></tr></thead><tbody>${dayRows}</tbody></table></div>
   <h3 id="cm-table-tickets">티켓별: 다루는 날과 결함 영역</h3>
   <div class="table-wrap"><table><thead><tr><th>티켓</th><th>다루는 날 (D → 티켓)</th><th>결함 영역 (티켓 → 영역)</th></tr></thead><tbody>${ticketRows}</tbody></table></div>
   <h3 id="cm-table-areas">결함 영역별: 속한 티켓</h3>

@@ -31,7 +31,7 @@ test('실행안 2: 파일 작업 구분이 생성된 각 순서에 보인다', (
   }
 });
 test('실행안 3: 실제 존재하는 섹션만 머리에서 이동하고 데이터 적재 후 작업에 복귀한다', () => {
-  for (let n=1;n<=15;n++) {
+  for (let n=1;n<=loadCourseSources().roadmap.days.length;n++) {
     const id = `D${String(n).padStart(2,'0')}`;
     const doc = new JSDOM(read(`course/spring/${id}.html`)).window.document;
     const nav = doc.querySelector('nav.day-sections');
@@ -144,5 +144,37 @@ test('선택 요약에서 모두 할 E01·훈련의 D14 과제로 바로 이동�
     const hrefs=[...dom.window.document.querySelectorAll('a')].map(a=>a.href);
     for(const no of [5,6]) assert.ok(hrefs.includes(`https://learn.test/course/spring/D14.html#step-d14-${no}`));
     dom.window.close();
+  }
+});
+
+test('P9: D15 체크 후 D16을 추천하고 45일·3단계를 표시한다', async () => {
+  const {roadmap} = loadCourseSources();
+  const saved=JSON.stringify({version:1,steps:Object.fromEntries(roadmap.days.slice(0,15).flatMap(d=>d.steps.map(s=>[`${d.id}-${s.no}`,true])))});
+  const dom=await open('index.html',saved);
+  const doc=dom.window.document;
+  assert.equal(doc.querySelector('[data-today-id]').textContent,'D16');
+  assert.equal(doc.querySelector('.ch-progress-head h2').textContent,'45일 진도');
+  assert.equal(doc.querySelectorAll('.ch-day').length,45);
+  assert.match([...doc.querySelectorAll('.ch-phase')].map(x=>x.textContent).join(' '),/3단계/);
+  assert.equal(doc.querySelectorAll('.ch-days [data-day="D45"]').length,1);
+  dom.window.close();
+});
+
+test('P9: 확장 화면은 작업 대상·선행·개인 경로와 정상적인 Java 복귀 링크를 제공한다', () => {
+  for (const n of [16,25,30,45]) {
+    const doc=new JSDOM(read(`course/spring/D${n}.html`)).window.document;
+    assert.match(doc.body.textContent,/작업 대상/);
+    assert.match(doc.body.textContent,/먼저 확인/);
+    assert.doesNotMatch(doc.body.textContent,/undefined/);
+    assert.ok(doc.querySelector(`a[href="../java/J${n}.html"]`));
+    const java=new JSDOM(read(`course/java/J${n}.html`)).window.document;
+    assert.ok(java.querySelector(`a[href="../spring/D${n}.html"]`));
+  }
+});
+
+test('P9: 날짜·티켓 범위가 취소선으로 렌더링되지 않는다', () => {
+  for (let n=15;n<=45;n++) {
+    const doc=new JSDOM(read(`course/spring/D${n}.html`)).window.document;
+    assert.equal(doc.querySelectorAll('del').length,0,`D${n}: 범위 문구 보존`);
   }
 });

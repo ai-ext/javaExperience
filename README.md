@@ -1,6 +1,6 @@
 # javaExperience
 
-Java·Spring 서버 전환 과정 v2다. 매일 **Java → Spring → 채점** 순서로 진행한다. Spring에서는 데이터 요구사항을 보고 테이블을 직접 설계하고 매일 SQL을 푼다. [더미 SQL](course/start/dummy/README.md)은 내 테이블 이름에 맞춰 붙여 넣으며, board-server는 구현 예시로 비교한다.
+Java·Spring 서버 전환 과정 v2 · 45일이다. D15 중간 점검 뒤 D16~D45에서 설계·운영 변경·새 업무·회의·독립 수행을 검증한다. 빠른 학습자는 체크한 만큼 다음 날로 간다. 매일 **Java → Spring → 채점** 순서로 진행한다. Spring에서는 데이터 요구사항을 보고 테이블을 직접 설계하고 매일 SQL을 푼다. [더미 SQL](course/start/dummy/README.md)은 내 테이블 이름에 맞춰 붙여 넣으며, board-server는 구현 예시로 비교한다.
 
 ## 과정 v2 시작하기
 
@@ -17,9 +17,9 @@ Java·Spring 서버 전환 과정 v2다. 매일 **Java → Spring → 채점** �
 2. [학습 홈](index.html)을 `http://127.0.0.1:8765/index.html`에서 연다. Java 워밍업이 필요하면 [D00(선택)](course/spring/D00.md), 바로 시작하면 [D01 프로젝트 뼈대](course/spring/D01.md)로 간다.
 3. [1단계 출발 자료](course/start/README.md)의 설정값으로 **새 Spring 프로젝트**를 만든다. compose·PG 모의 파일을 복사한 뒤 **새 프로젝트 루트**에서 `docker compose up -d --wait`를 실행한다.
 4. Java는 저장소의 `java-track/`에서 채우고 **저장소 루트**에서 `./gradlew :java-track:test --tests 'J01*'`를 실행한다. Spring D01~D10은 **새 프로젝트 루트**에서 `./gradlew bootRun`으로 시작한다(D01 ③ 이후에는 `--args='--spring.profiles.active=local'` 추가).
-5. 일자 페이지의 완료 조건을 확인하고 하단 AI 채점 프롬프트를 실행한다. D11부터는 작업 대상을 `messy-server/`로 전환한다.
+5. 일자 페이지의 완료 조건을 확인하고 하단 AI 채점 프롬프트를 실행한다. D11~D14는 `messy-server/`를 다룬다. D16~D18은 그 사본에서 개인 과제를 처리하고 D19 이후는 1단계의 내 프로젝트에서 진행한다.
 
-[과정 안내·티켓 규칙](course/README.md) · [명세서 v2](course/spec-v2.md) · [일자 목록](course/spring/README.md)
+[후반 설계·분량 근거](docs/course-redesign/plans/2026-10-24-p9-d16-d30.md) · [과정 안내·티켓 규칙](course/README.md) · [명세서 v2](course/spec-v2.md) · [일자 목록](course/spring/README.md)
 
 ## 참고 자료(이전 과정)
 
@@ -27,7 +27,7 @@ Java·Spring 서버 전환 과정 v2다. 매일 **Java → Spring → 채점** �
 
 Spring Boot 백엔드를 **직접 만들면서** 배우는 공개 실습 레포다. 게시판 API 101단계를 이어서 만들고, Codex 또는 Claude Code로 단계별 채점과 피드백을 받을 수 있다. 시나리오와 HTML은 GitHub 로그인 없이 읽거나 다운로드할 수 있다.
 
-> 과정 v2(일자 페이지 D00~D15·Java 트랙·2단계 티켓)는 [과정 안내](course/README.md)와 [학습 홈](index.html)에서 시작한다. 아래 `scenario/`·`practice/`·`docs/knowledge/`·`tickets/`는 그 과정에서 찾아보는 참고 도감이다.
+> 과정 v2(일자 페이지 D00~D45·Java 트랙·2단계 티켓)는 [과정 안내](course/README.md)와 [학습 홈](index.html)에서 시작한다. 아래 `scenario/`·`practice/`·`docs/knowledge/`·`tickets/`는 그 과정에서 찾아보는 참고 도감이다.
 
 | 폴더 | 내용 |
 |---|---|

@@ -1,0 +1,150 @@
+{
+  "id": "D28",
+  "roadmap": {
+    "id": "D28",
+    "phase": "extend",
+    "title": "재개 가능한 백필과 제약 강화",
+    "java": "J28",
+    "purpose": "작은 구간 백필을 중단·재개하고 제약 강화의 진입 조건을 검증한다.",
+    "prerequisite": "D27 nullable 확장·신구 호환 행렬",
+    "workTarget": "1단계에서 만든 내 프로젝트 · 별도 disposable DB/포트. board-server·messy-server 원본은 수정하지 않는다.",
+    "note": "개인 경로: 앞선 티켓에서 얻은 증거를 재사용하되 오늘의 완료 조건은 전원 확인한다. 실제 업무 접근권이 없어도 내 상점/사본의 명시된 변형으로 진행한다.",
+    "steps": [
+      {
+        "no": 1,
+        "title": "작은 구간 백필과 중단·재시작",
+        "files": [
+          "src/main/resources/db/extension/backfill.sql",
+          "docs/evidence/D28/backfill.md"
+        ],
+        "fileActions": {
+          "create": [
+            "src/main/resources/db/extension/backfill.sql",
+            "docs/evidence/D28/backfill.md"
+          ],
+          "modify": [],
+          "inspect": []
+        },
+        "done": [
+          "PK 구간·batch 크기·체크포인트·진행률·재시도 정책을 정하고 대상의 절반에서 중단한다.",
+          "재시작·동일 구간 재실행 후 중복 변경 0을 대사한다. 구앱 쓰기로 null이 재유입되는 것을 관찰한다. 이 예비 백필의 미처리 0은 contract 진입 허가가 아니며 쓰기 전환 후 최종 백필을 다시 한다."
+        ],
+        "trap": "한 번의 큰 UPDATE로 전체를 잠그지 않는다. 대상 조건과 완료 체크포인트의 commit 경계를 연결한다.",
+        "specRefs": [],
+        "tickets": [],
+        "guides": [],
+        "dayRefs": [
+          {
+            "day": "D27",
+            "step": 1,
+            "label": "스키마 변경·호환 행렬"
+          }
+        ]
+      },
+      {
+        "no": 2,
+        "title": "신규 쓰기 전환과 contract 진입 판단",
+        "files": [
+          "src/main/resources/db/extension/contract.sql",
+          "docs/schema-change-plan.md"
+        ],
+        "fileActions": {
+          "create": [
+            "src/main/resources/db/extension/contract.sql"
+          ],
+          "modify": [
+            "docs/schema-change-plan.md"
+          ],
+          "inspect": []
+        },
+        "done": [
+          "전체 순서 expand → 신앱 쓰기 전환 → 구앱 종료 → null 재유입 차단 확인 → 최종 백필 → 제약 강화를 따른다. 신앱 쓰기 전환과 모든 구앱/구 worker 종료를 확인한 뒤 null을 만드는 요청을 신앱이 거부하는지 검사한다. 그 뒤 최종 백필·미처리 0 대사·제약 강화를 실행한다.",
+          "강화 후 신앱 테스트와 호환 행렬을 갱신한다. 앱 롤백이 불가능해지는 경계·대신 forward fix/복원 조건을 적는다."
+        ],
+        "trap": "backfill 완료 숫자만 보지 말고 동시 신규 쓰기를 확인한다. 옛 앱이 다시 null을 쓰는 실패도 증거로 남긴다.",
+        "specRefs": [],
+        "tickets": [],
+        "guides": [],
+        "dayRefs": [
+          {
+            "day": "D27",
+            "step": 1,
+            "label": "스키마 변경·호환 행렬"
+          }
+        ]
+      }
+    ],
+    "talkCards": [
+      "TC-D28-1",
+      "TC-D28-2",
+      "TC-D28-3"
+    ],
+    "tomorrow": "D29는 실패 배포·앱 롤백·DB 복원를 진행한다. 오늘의 증거와 미해결 항목을 입력으로 쓴다."
+  },
+  "java": {
+    "id": "J28",
+    "day": "D28",
+    "optional": false,
+    "topic": "체크포인트로 목록을 나누고 중간 예외 후 같은 구간 재실행이 안전한지 테스트한다.",
+    "basics": "체크포인트로 목록을 나누고 중간 예외 후 같은 구간 재실행이 안전한지 테스트한다.",
+    "typeCut": null,
+    "habit": "실제 실행·입출력·반례를 남기고 관찰과 추정을 구분한다.",
+    "reuse": [
+      "J06"
+    ],
+    "labFile": "src/test/java/J28EvidenceTest.java",
+    "acceptance": [
+      "체크포인트로 목록을 나누고 중간 예외 후 같은 구간 재실행이 안전한지 테스트한다.",
+      "선택한 경계의 기대값과 실제 출력·실행 명령을 남긴다. 단순 설명만으로 완료하지 않는다."
+    ],
+    "title": "체크포인트와 구간 재실행",
+    "experiment": [
+      "J06은 목록·정렬 타입의 기초만 지원한다. checkpoint와 데이터 commit 원자성은 D28의 실제 구간 백필 실험으로 검증한다. 이 Java 항목을 같은 통합 증거로 제출해도 된다."
+    ],
+    "evidence": {
+      "instructions": "D28의 통합 관찰·테스트와 같은 증거를 사용한다. 실제 사용한 테스트 클래스 또는 요청/SQL 스크립트 경로·실행 명령·시각·예상/실제 결과를 기록한다. 별도 J28EvidenceTest.java를 만들 필요가 없다.",
+      "commands": [
+        "테스트를 사용했다면 `./gradlew test --tests <실제클래스명>`으로 재실행한다. 요청·SQL 관찰이면 해당 일자의 실제 명령과 출력을 보존한다."
+      ]
+    }
+  },
+  "hints": {
+    "steps": {
+      "1": [
+        "한 번의 큰 UPDATE로 전체를 잠그지 않는다. 대상 조건과 완료 체크포인트의 commit 경계를 연결한다.",
+        "운영 실습 출발 자료의 D28 절에서 환경·통제 명령·정리를 먼저 확인한다. 명령 예시는 격리 사본용이며 도메인 설계·구현은 직접 한다."
+      ],
+      "2": [
+        "backfill 완료 숫자만 보지 말고 동시 신규 쓰기를 확인한다. 옛 앱이 다시 null을 쓰는 실패도 증거로 남긴다."
+      ]
+    },
+    "grader": {
+      "focus": [
+        "재시작·동일 구간 재실행 후 미처리 0·중복 변경 0을 대사한다. 구앱 쓰기로 생긴 null의 재유입도 관찰한다.",
+        "강화 후 신앱 테스트와 호환 행렬을 갱신한다. 앱 롤백이 불가능해지는 경계·대신 forward fix/복원 조건을 적는다.",
+        "실행하지 않은 항목은 확인 불가이며 예상값·추정·실측을 구분한다."
+      ]
+    },
+    "refs": [
+      "course/start/ops/README.md",
+      "course/java/J06.md"
+    ],
+    "sql": {
+      "context": "내 프로젝트의 disposable 실습 DB를 쓴다. D23에서 정한 예약·대상·지급 상태의 물리 이름과 필터로 아래 예시를 반드시 매핑한다. 예시의 member_coupon은 1단계 비교 모델이며 새 예약 테이블의 정답이 아니다. practice·원본 서버 DB는 수정하지 않는다.",
+      "questions": [
+        {
+          "task": "백필 미처리 수를 실제 확장 열 조건으로 센다.",
+          "expect": "내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.",
+          "example": "SELECT COUNT(*) FROM member_coupon WHERE issued_at IS NULL;"
+        },
+        {
+          "task": "체크포인트 전후 행 수·범위를 대조한다.",
+          "expect": "내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.",
+          "example": "SELECT MIN(id),MAX(id),COUNT(*) FROM member_coupon;"
+        }
+      ],
+      "refs": []
+    }
+  },
+  "cards": "## D28 재개 가능한 백필과 제약 강화\n\n### TC-D28-1\n**질문** 백필 재시작은 어떤 단위로 안전한가요?\n**답에 들어가야 할 것**\n- PK 구간·대상 조건·batch 크기·checkpoint와 데이터의 commit 경계를 말한다.\n- 절반 중단·재개·같은 구간 재실행의 미처리/변경 수를 제시한다.\n- 큰 단일 UPDATE 대비 잠금·재처리 비용과 동시 쓰기 한계를 설명한다.\n**근거** D28 완료 조건·실행 증거\n\n### TC-D28-2\n**질문** 백필이 끝났는데 null이 왜 다시 생기나요?\n**답에 들어가야 할 것**\n- 구앱은 새 열을 모르는 INSERT로 null을 다시 만들 수 있다.\n- 예비 백필 완료와 신규 null 차단은 다르며 신앱 전환·구앱 종료를 확인한다.\n- 전환 뒤 null 거부·최종 백필·미처리 0 결과를 근거로 contract를 판단한다.\n**근거** D28 완료 조건·실행 증거\n\n### TC-D28-3\n**질문** 언제 옛 앱으로 되돌릴 수 없나요?\n**답에 들어가야 할 것**\n- 구앱이 쓰지 않는 필수 열/새 계약으로 contract하면 구버전 쓰기가 실패한다.\n- 호환 행렬과 null 거부·최종 백필·제약 강화 시점으로 되돌릴 경계를 제시한다.\n- 경계 이후 호환 버전 forward fix와 별도 복원의 손실/시간 비용을 말한다.\n**근거** D28 완료 조건·실행 증거\n\n"
+}

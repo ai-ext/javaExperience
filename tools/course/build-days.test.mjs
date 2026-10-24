@@ -44,7 +44,13 @@ test('데이터 칸이 있는 Markdown 일자는 원본 날짜 집합과 같고 
   const actual = [];
   for (const day of roadmap.days) {
     const md = page(day.id);
-    if (!expected.has(day.id)) { assert.doesNotMatch(md, /class="day-data"/); continue; }
+    if (!expected.has(day.id)) {
+      if (hints.days[day.id].dataSetup?.length) {
+        assert.match(md, /class="day-data"/);
+        for (const text of hints.days[day.id].dataSetup) assert.ok(md.includes(text));
+      } else assert.doesNotMatch(md, /class="day-data"/);
+      continue;
+    }
     actual.push(day.id);
     assert.equal((md.match(/class="day-data"/g) ?? []).length, 1);
     assert.ok(md.indexOf('## 이 날 데이터 넣기') < md.indexOf('## 오늘의 SQL'));
@@ -77,13 +83,13 @@ test('커밋된 course/spring 파일이 생성 결과와 같다(생성물이 최
   }
 });
 
-test('D00~D15와 README를 모두 만든다', () => {
-  const names = [...built.files.keys()].map((k) => path.basename(k)).sort();
-  const want = ['README.md', ...Array.from({ length: 16 }, (_, n) => `D${String(n).padStart(2, '0')}.md`)].sort();
+test('전체 일자와 README를 모두 만든다', () => {
+  const names = [...built.files.keys()].filter(k => k.startsWith('course/spring/')).map((k) => path.basename(k)).sort();
+  const want = ['README.md', ...Array.from({ length: roadmap.days.length + 1 }, (_, n) => `D${String(n).padStart(2, '0')}.md`)].sort();
   assert.deepEqual(names, want);
 });
 
-test('D01~D15 모두 완성 페이지다(snapshot은 1단계만)', () => {
+test('전체 일자가 모두 완성 페이지다(snapshot은 1단계만)', () => {
   assert.deepEqual(readyDays.map((d) => d.id), roadmap.days.map((d) => d.id));
   for (const d of roadmap.days) {
     const md = page(d.id);

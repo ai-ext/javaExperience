@@ -80,6 +80,10 @@ function listMd() {
     }
   };
   out.push(path.join(ROOT, 'errors.md'));
+  // 홈·과정 안내에서 여는 현재 확장 설계와 원장만 공개 문서로 렌더링한다.
+  for (const name of ['2026-10-24-p9-d16-d30.md', '2026-10-24-p9-ledger.md']) {
+    out.push(path.join(ROOT, 'docs/course-redesign/plans', name));
+  }
   for (const d of ['docs/knowledge', 'scenario', 'practice', 'lessons', 'tickets', 'course']) if (fs.existsSync(path.join(ROOT, d))) walk(path.join(ROOT, d));
   return out;
 }
@@ -211,6 +215,9 @@ function render(abs) {
   }
   // course/의 D01·J04·B01은 일자·트랙·티켓 ID라서 같은 모양의 공부자료 ID 링크를 붙이지 않는다.
   if (!rel(abs).startsWith('course/')) html = autolinkDocIds(html, abs);
+  // 일자 순서처럼 원문 HTML에 명시한 id도 Markdown 링크의 앵커 대상이다.
+  // fenced 코드의 HTML은 이미 escape됐으므로 실제 태그에서만 수집한다.
+  for (const match of html.matchAll(/<[a-z][^>]*\bid="([^"]+)"/gi)) anchors.add(match[1]);
   return { html, anchors, links, hasMermaid, hasDbIndexExperiment };
 }
 
@@ -589,6 +596,7 @@ function page({ abs, title, body, hasMermaid, hasDbIndexExperiment }) {
   }
   if (isCourseMap) {
     crumbs = mapCrumbs();
+    body = body.replace('쓰는 Java를 먼저 연습하고', '쓰는 Java를 보통 먼저 연습하며 J44·J45는 요구 제시·초기 진단 뒤 수행 중 증거·사후 확인으로 연결하고');
     const marker = body.match(/<!-- course-map:[^>]*-->/);
     if (!marker) throw new Error('course/map.md에 지도 자리(<!-- course-map: … -->)가 없다');
     body = body.replace(marker[0], renderCourseMap(COURSE));

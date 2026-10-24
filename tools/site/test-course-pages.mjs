@@ -33,6 +33,8 @@ async function open(file, { saved, brokenStorage = false, script = courseScript,
   const dom = new JSDOM(fs.readFileSync(new URL(file, root), 'utf8'), { url: `https://learn.example/${file}`, runScripts: 'outside-only', pretendToBeVisual: true });
   const { window } = dom;
   window.matchMedia = window.matchMedia || (() => ({ matches: false, addEventListener() {} }));
+  // 실제 스크롤·뷰포트는 Playwright로 검증하고 JSDOM에는 없는 API만 대체한다.
+  window.HTMLElement.prototype.scrollIntoView = function () {};
   if (saved) window.localStorage.setItem(KEY, saved);
   if (before) before(window);
   if (brokenStorage) Object.defineProperty(window, 'localStorage', { get() { throw new window.DOMException('blocked', 'SecurityError'); } });
@@ -53,7 +55,13 @@ await test('이 날 데이터: 원본 날짜 집합·본문·버튼·복사·Blo
       win.HTMLAnchorElement.prototype.click = function () { filename = this.download; };
     } });
     const entries = page.$$('[data-day-sql]');
-    assert.equal(page.$$('.day-data').length, entries.length ? 1 : 0, day.id);
+    const setup = loadCourseSources().hints.days[day.id]?.dataSetup;
+    assert.equal(page.$$('.day-data').length, entries.length || setup?.length ? 1 : 0, day.id);
+    if (setup?.length) {
+      assert.equal(entries.length, 0, `${day.id}: 자작 fixture를 기존 seed 다운로드로 오인하지 않는다`);
+      for (const line of setup) assert.ok(page.$('.day-data').textContent.includes(line), `${day.id}: 데이터 준비 요구`);
+      assert.ok(page.$('.day-data [data-work-return]'), `${day.id}: 준비 뒤 작업 복귀`);
+    }
     for (const entry of entries) {
       const key = `${day.id}-${entry.dataset.daySql}`;
       actual.push(key);
@@ -469,9 +477,9 @@ for (const day of course.days) {
   assert.equal(home.$('h1').id, 'course-home-title');
   assert.equal(home.$('[data-today-id]').textContent, 'D01', '진도 없으면 D01');
   assert.equal(home.$('[data-today-note]').hidden, false, 'D00 워밍업 안내');
-  assert.equal(home.$$('.ch-day').length, 15, '15일 진도');
+  assert.equal(home.$$('.ch-day').length, course.days.length - 1, '전체 일자 진도');
   assert.ok(home.$('.ch-entries a[href="course/spring/README.html"]') && home.$('.ch-entries a[href="course/map.html"]'), 'Spring 일자·지도 진입');
-  assert.equal(home.$$('.ch-entries .ch-chips a[href^="course/java/J"]').length, 16, 'Java 트랙 J00~J15 진입');
+  assert.equal(home.$$('.ch-entries .ch-chips a[href^="course/java/J"]').length, course.java.length, '전체 Java 트랙 진입');
   assert.equal(home.$$('.ch-ticket-chips > *').length, 16, '2단계 티켓 B01~B16');
   for (const a of home.$$('.course-home a[href], .home-reference-head a[href]')) {
     const href = a.getAttribute('href');
@@ -902,7 +910,7 @@ for (const day of course.days) {
   assert.ok(!tsec.querySelector('.flow-step.is-current').classList.contains('is-cause'), '접으면 지금 단계가 증상 쪽으로 옮겨 간다');
   console.log(`흐름 재생: 일자 ${course.flows.days.size}개·티켓 ${course.flows.tickets.size}개, 근거 문자열 ${checkedEvidence}개, 조작·누출 검사 통과`);
 }
-console.log(`과정 화면: 일자 ${course.days.length}쪽 배치·진도 체크·저장 실패, 홈 오늘 할 일·15일 진도·진입, 지도 노드 ${mapNodes(course).length}·간선 ${course.edges.length} 검사 통과`);
+console.log(`과정 화면: 일자 ${course.days.length}쪽 배치·진도 체크·저장 실패, 홈 오늘 할 일·전체 진도·진입, 지도 노드 ${mapNodes(course).length}·간선 ${course.edges.length} 검사 통과`);
 
 await test('매일 SQL: 전 일자 과제·기대 성질은 보이고 예시 SQL과 설계 흐름은 닫힌 접기에 있다', () => {
   const hints = loadCourseSources(rootPath).hints;

@@ -34,18 +34,20 @@ test('날짜 원본은 합본 없이 로드되고 기존 합본의 모든 값·�
     assert.deepEqual(data[name], expected);
   }
   assert.equal(data.cards, read('course/talk-cards.md'));
-  assert.deepEqual(data.roadmap.java.map((j) => j.id), Array.from({ length: 16 }, (_, n) => `J${String(n).padStart(2, '0')}`));
+  assert.deepEqual(data.roadmap.java.map((j) => j.id), Array.from({ length: data.roadmap.days.length + 1 }, (_, n) => `J${String(n).padStart(2, '0')}`));
 });
 
-test('날짜 파일명 순으로 합치며 새 D16 파일을 자동 발견한다', (t) => {
+test('날짜 파일명 순으로 합치며 새 다음 날짜 파일을 자동 발견한다', (t) => {
   const dir = scratch(t);
-  const source = JSON.parse(read('course/days/D15.json'));
-  const next = JSON.parse(JSON.stringify(source).replaceAll('D15', 'D16').replaceAll('J15', 'J16'));
-  fs.writeFileSync(path.join(dir, 'course/days/D16.json'), JSON.stringify(next));
+  const lastId = loadCourseSources(root).roadmap.days.at(-1).id;
+  const nextId = `D${String(Number(lastId.slice(1))+1).padStart(2,'0')}`;
+  const source = JSON.parse(read(`course/days/${lastId}.json`));
+  const next = JSON.parse(JSON.stringify(source).replaceAll(lastId, nextId).replaceAll(`J${lastId.slice(1)}`, `J${nextId.slice(1)}`));
+  fs.writeFileSync(path.join(dir, `course/days/${nextId}.json`), JSON.stringify(next));
   const data = loadCourseSources(dir);
-  assert.equal(data.roadmap.days.at(-1).id, 'D16');
-  assert.equal(data.roadmap.java.at(-1).id, 'J16');
-  assert.ok(data.hints.days.D16);
+  assert.equal(data.roadmap.days.at(-1).id, nextId);
+  assert.equal(data.roadmap.java.at(-1).id, `J${nextId.slice(1)}`);
+  assert.ok(data.hints.days[nextId]);
   assert.ok(data.cards.endsWith(next.cards));
 });
 

@@ -1,4 +1,4 @@
-// 과정 v2 화면 동작 — 일자 페이지의 순서 체크·프롬프트 복사·정답 지연 하이라이트, 홈의 "오늘 할 일"과 15일 진도.
+// 과정 v2 화면 동작 — 일자 페이지의 순서 체크·프롬프트 복사·정답 지연 하이라이트, 홈의 "오늘 할 일"과 일자 진도.
 // file://로 열어도 동작하도록 import 없는 일반 스크립트다. 저장소를 못 써도 화면은 그대로 읽힌다.
 (function () {
   'use strict';
@@ -270,7 +270,7 @@
       var state = readProgress(store);
       var pick = nextDay(days, state.done);
       var day = pick.day;
-      var tags = { first: '오늘 할 일 · 처음 시작', continue: '오늘 할 일 · 이어서', next: '오늘 할 일 · 다음 날', remaining: '오늘 할 일 · 남은 순서가 있는 날', complete: '15일 과정 · 필수 구현 체크 끝 · 채점 결과 별도' };
+      var tags = { first: '오늘 할 일 · 처음 시작', continue: '오늘 할 일 · 이어서', next: '오늘 할 일 · 다음 날', remaining: '오늘 할 일 · 남은 순서가 있는 날', complete: days.length + '일 과정 · 필수 구현 체크 끝 · 채점 결과 별도' };
       $('[data-today-tag]').textContent = tags[pick.mode];
       $('[data-today-id]').textContent = day.id;
       $('[data-today-title]').textContent = day.title;
@@ -305,7 +305,20 @@
       open.textContent = 'Spring ' + day.id;
       var java = $('[data-today-java]');
       if (day.javaHref) { java.href = day.javaHref; java.textContent = 'Java ' + day.java; java.hidden = false; } else java.hidden = true;
-      $('[data-today-grade]').href = day.href + '#ai-채점-프롬프트';
+      var during = day.javaTiming === 'during-or-after';
+      var flow = $('[data-today-flow]');
+      var grade = $('[data-today-grade]');
+      var first = during ? open : java;
+      var second = during ? java : open;
+      [java, open].forEach(function (link) {
+        link.classList.toggle('ch-primary', link === first);
+        link.classList.toggle('ch-secondary', link !== first);
+      });
+      if (during) java.textContent += ' · 수행 중·사후 증거';
+      // CSS 순서만 바꾸지 않고 키보드·스크린리더도 같은 순서로 읽게 한다.
+      var arrow = function () { var span = document.createElement('span'); span.setAttribute('aria-hidden', 'true'); span.textContent = '→'; return span; };
+      flow.replaceChildren(first, arrow(), second, arrow(), grade);
+      grade.href = day.href + '#ai-채점-프롬프트';
       $('[data-today-note]').hidden = pick.mode !== 'first';
       var total = 0, checked = 0;
       days.forEach(function (d) {

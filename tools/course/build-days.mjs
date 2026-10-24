@@ -1,5 +1,5 @@
 // 일자 페이지 생성기: course/days/Dnn.json + _common.json + 정답 커밋 answer(Dnn-m)
-// → course/spring/D00~D15.md, course/spring/README.md
+// → course/spring/D00~Dnn.md, course/spring/README.md
 //
 // - 같은 입력이면 같은 파일을 만든다(시각·환경 값을 쓰지 않는다).
 // - Dnn.json의 hints가 있는 날만 완성 페이지로 만들고, 없는 날은 "준비 중" 자리표시 페이지로 만든다.
@@ -34,7 +34,8 @@ const GENERATED_FILES = new Set(['gradlew', 'gradlew.bat']);
 const PHASE = {
   build: '1단계 · 빈 프로젝트로 서버 만들기',
   maintain: '2단계 · 어수선한 서버 넘겨받기',
-  wrap: '마무리 · 설명 세션',
+  wrap: '중간 점검 · 설명 세션',
+  extend: '3단계 · 설계·운영·업무 적용',
 };
 // 티켓 페이지의 "## 원인과 정답" 제목 앵커(사이트 빌드와 같은 slugify)
 const ANSWER_ANCHOR = '원인과-정답';
@@ -42,6 +43,7 @@ const ANSWER_ANCHOR = '원인과-정답';
 const GRADER_INTRO = {
   build: '오늘 순서를 다 만들었으면 서버를 띄운 채로 아래 프롬프트를 복사해 Codex 또는 Claude Code에 붙여 넣는다. 에이전트가 완료 조건·함정·말하기 카드로 채점표를 준다. 코드는 고치지 않는다.',
   maintain: '오늘 티켓을 다 처리했으면 `messy-server`를 띄운 채로 아래 프롬프트를 복사해 `messy-server` 폴더에서 연 Codex 또는 Claude Code에 붙여 넣는다. 에이전트가 완료 조건·함정·티켓 3점 세트(원인 서술·재현 테스트·수정)·말하기 카드로 채점표를 준다. 코드는 고치지 않는다.',
+  extend: '내 프로젝트 또는 messy-server 사본에서 오늘의 증거 파일을 준비하고 아래 프롬프트로 채점받는다. 체크는 자가 기록이며 SQL·카드·회의·독립 수행은 별도로 판정한다.',
   wrap: '설명 세션을 시작할 때 아래 프롬프트를 복사해 javaExperience 저장소 루트에서 연 Codex 또는 Claude Code에 붙여 넣는다. 에이전트가 말하기 카드 전체에서 10문항을 골라 묻고, 회고 문서와 함께 채점표를 준다. 파일은 고치지 않는다.',
 };
 const graderTemplate = (hints, phase) => {
@@ -422,7 +424,7 @@ export function specLinks(ref, sections) {
 function javaInfo(id, root) {
   const md = read(path.join(root, 'course/java', `${id}.md`));
   const title = md.match(/^# (.+)$/m)[1].trim();
-  const duration = md.match(/소요\s*([^·\n]+)/)?.[1].trim() ?? '30~60분';
+  const duration = (md.match(/소요\s*([^·\n]+)/)?.[1].trim() ?? '30~60분').replaceAll('~', '–');
   return { id, title, duration };
 }
 
@@ -609,7 +611,7 @@ export function graderPrompt(day, cards, hintsDay, template, root = ROOT) {
     criteria.push(`${circled(s.no)} ${stripMd(s.title)}`);
     s.done.forEach((d, i) => criteria.push(`  - [C${s.no}-${i + 1}] ${tagOf(s, `C${s.no}-${i + 1}`)}${stripMd(d)}`));
     // 마무리(wrap)는 코드를 보지 않는 날이라 설명·회고에서 확인한다
-    if (s.trap) criteria.push(`  - [R${s.no}] 함정을 피했는지 ${day.phase === 'wrap' ? '설명·회고에서' : '코드로'} 확인: ${stripMd(s.trap)}`);
+    if (s.trap) criteria.push(`  - [R${s.no}] 함정을 피했는지 ${day.phase === 'wrap' ? '설명·회고에서' : day.phase === 'extend' ? '실행 증거·설계·회고에서' : '코드로'} 확인: ${stripMd(s.trap)}`);
   }
   const cardLines = [];
   for (const id of day.talkCards) {
@@ -617,6 +619,11 @@ export function graderPrompt(day, cards, hintsDay, template, root = ROOT) {
     cardLines.push(`- [${id}] ${stripMd(c.question)}`);
     c.answers.forEach((a) => cardLines.push(`    · ${stripMd(a)}`));
   }
+  const session = [
+    ...(g.meeting ? [`회의 역할: ${g.meeting.kind}. 먼저 학습자의 제안을 듣고 다음 반론을 제시한다: ${g.meeting.objection}`, ...g.meeting.criteria.map((c,i) => `[M${i+1}] ${c}`)] : []),
+    ...(g.explanation ? [`설명 세션: ${g.explanation.range} 실제 수행 사례에서 무작위 ${g.explanation.count}문항, 같은 날 최대 ${g.explanation.maxPerDay}개. ${g.explanation.requiredAreas.join('·')} 영역을 모두 포함하고 답변 전 기준을 공개하지 않는다.`] : []),
+    ...(g.independent ? ['독립 수행 평가: 해법·힌트를 먼저 제공하지 않는다. 도움 횟수와 범위·시간·미실행을 기록하고 역량별 판정한다.'] : []),
+  ].join('\n') || '오늘은 별도 회의 역할극 없이 완료 조건·SQL·카드를 검증한다.';
   const focus = (hintsDay.grader?.focus ?? []).map((f) => `- ${f}`).join('\n') || '- (없음)';
   const ticketIds = [...new Set(day.steps.flatMap((s) => s.tickets ?? []))];
   const tickets = ticketIds.map((id) => {
@@ -625,6 +632,8 @@ export function graderPrompt(day, cards, hintsDay, template, root = ROOT) {
     return `- [T-${id}] ${id}. ${t.title} (${t.kind} · ${at}) — 티켓 페이지 ../course/tickets/${id}.md · 대조 자료 tickets/${id}/answer/`;
   });
   return template
+    .replaceAll('{{SQL}}', [hintsDay.sql?.context, ...(hintsDay.sql?.questions ?? []).map((q,i) => `[SQL${i+1}] ${q.task} / 확인할 성질: ${q.expect}`)].filter(Boolean).join('\n'))
+    .replaceAll('{{SESSION}}', session)
     .replaceAll('{{DAY}}', day.id)
     .replaceAll('{{TITLE}}', day.title)
     .replaceAll('{{CRITERIA}}', criteria.join('\n'))
@@ -651,7 +660,7 @@ function javaSection(java, roadmapJava) {
   return [
     '## 오늘의 Java',
     '',
-    `[${java.title}](../java/${java.id}.md) — ${java.duration}. Spring 순서를 시작하기 전에 오늘 쓰는 Java를 먼저 연습한다.`,
+    `[${java.title}](../java/${java.id}.md) — ${java.duration}. ${roadmapJava?.timing === 'during-or-after' ? '오늘의 요구 제시·초기 진단 뒤 수행 중 증거 또는 사후 확인으로 연결한다.' : 'Spring 순서를 시작하기 전에 오늘 쓰는 Java를 먼저 연습한다.'}`,
     ...(roadmapJava?.topic ? ['', `- 주제: ${roadmapJava.topic}`] : []),
   ].join('\n');
 }
@@ -682,6 +691,11 @@ function stepSection(day, s, ctx) {
   if (s.tickets?.length) lines.push(`**티켓** ${s.tickets.map((t) => `\`${t}\``).join(' · ')}`, '');
   if (ctx.ready) {
     if (s.trap) lines.push(`**겪을 것** ${s.trap}`, '');
+    if (day.phase === 'extend' && ctx.hintsDay.dataSetup?.length && s.no === 1) lines.push('<a data-data-return href="#이-날-데이터-넣기">오늘 실험 데이터 준비 → 작업 복귀</a>', '');
+    if (day.phase === 'extend') {
+      const refs = (s.dayRefs ?? []).map(r => `[${r.day} ${r.label}](${r.day}.md#${stepAnchor(r.day,r.step)})`);
+      lines.push('**명세** ' + [...refs, '[기존 API 계약](../spec-v2.md)'].join(' · ') + ' · 오늘의 완료 조건으로 내 합의 명세에 요구·오류·불변식을 먼저 적는다.', '');
+    }
     const tables = DATA_STEPS[day.id]?.[s.no];
     if (tables?.length && day.id !== 'D06') lines.push(`<p class="data-handoff">테이블 준비 후 기본 DB에 필요한 데이터: ${tables.map(table => `<a data-data-return href="#data-${day.id.toLowerCase()}-${table}">${table} 넣기 → 작업 복귀</a>`).join(' · ')}</p>`, '');
     if (day.id === 'D06' && s.no === 5) lines.push('<p><a data-data-return href="#이-날-데이터-넣기">D05 준비 이후 별도 실험 DB · bulk 넣기</a></p>', '');
@@ -785,7 +799,7 @@ function sqlSection(day, sql, root) {
     ...(day.phase === 'build' ? ['[더미 SQL·붙여 넣는 순서](../start/dummy/README.md)를 먼저 확인한다.', ''] : []),
     '<ol class="sql-questions">', ...questions, '</ol>', '',
     '<details class="sql-answer">', '<summary>구현 예시 SQL · 직접 작성한 뒤 비교하기</summary>', '',
-    'board-server의 설계 기준이다. 2단계에서는 같은 계열의 기존 스키마를 관찰한다. 내 물리 이름·키·정렬이 다르면 매핑해 비교한다. 아래 SQL은 실제 실행 결과가 아니며 예시 서버가 모든 불변식을 보장한다는 뜻도 아니다. 오류가 예상되는 문장은 하나씩 실행하고 실패 뒤 ROLLBACK을 별도로 보낸다.', '',
+    (day.phase === 'extend' ? '아래는 비교용 SQL이다. 예약·대상·작업 모델은 내가 정한 물리 이름과 필터로 옮긴다. ' : '') + 'board-server의 설계 기준이다. 2단계에서는 같은 계열의 기존 스키마를 관찰한다. 내 물리 이름·키·정렬이 다르면 매핑해 비교한다. 아래 SQL은 실제 실행 결과가 아니며 예시 서버가 모든 불변식을 보장한다는 뜻도 아니다. 오류가 예상되는 문장은 하나씩 실행하고 실패 뒤 ROLLBACK을 별도로 보낸다.', '',
     ...sql.questions.flatMap((q,i) => [`**문항 ${i+1} 구현 예시**`, '', fence(q.example,'sql'), '']),
     '</details>', '',
     ...((sql.refs ?? []).length ? ['**선택 자료** — 이전 과정은 별도 스키마(community·practice·성능 실험 DB)를 전제한다. 이름·필터를 내 설계로 옮겨 풀고 기존 DB를 덮어쓰지 않는다.', '', ...(sql.refs ?? []).map(p => `- [${docTitle(p,root,day.id)}](../../${p})`)] : []),
@@ -794,9 +808,9 @@ function sqlSection(day, sql, root) {
 }
 
 export function renderDay(day, ctx) {
-  const java = javaInfo(day.java, ctx.root);
   const roadmapJava = ctx.roadmap.java.find((j) => j.id === day.java);
-  const data = dayDataSection(day, ctx.root);
+  const java = day.phase === 'extend' ? {id: day.java, title: `${day.java}. ${roadmapJava.title}`, duration: '20~40분 · 이미 증거가 있으면 확인 후 다음 순서'} : javaInfo(day.java, ctx.root);
+  const data = ctx.hintsDay.dataSetup?.length ? ['<section class="day-data">', '', '## 이 날 데이터 넣기', '', ...ctx.hintsDay.dataSetup.map(x => `- ${x}`), '', `<a data-work-return href="#${stepAnchor(day.id,1)}">① 작업으로 복귀</a>`, '', '</section>'].join('\n') : dayDataSection(day, ctx.root);
   const sections = [['오늘 순서','오늘-순서'], ...(data ? [['이 날 데이터 넣기','이-날-데이터-넣기']] : []), ['오늘의 SQL','오늘의-sql'], ['말하기','말하기-카드'], ['채점','ai-채점-프롬프트']];
   const parts = [dayHeader(day, java, ctx.ready ? '' : ' · **준비 중**')];
   if (day.purpose) parts.push(day.purpose);
@@ -805,6 +819,11 @@ export function renderDay(day, ctx) {
   if (day.phase === 'maintain') {
     parts.push(ticketRule(ctx.root));
     if (day.note) parts.push(`**오늘** ${day.note}`);
+  }
+  if (day.phase === 'extend') {
+    parts.push('## 작업 위치와 개인 경로', `**작업 대상** ${day.workTarget}`, `**먼저 확인** ${day.prerequisite}`, day.note);
+    if (ctx.hintsDay.pathTickets?.length) parts.push('**개인 과제 자료** ' + ctx.hintsDay.pathTickets.map(id => `[${id} 증상·재현·제출물](../tickets/${id}.md)`).join(' · '));
+    if (ctx.hintsDay.grader?.meeting) parts.push(`**회의 역할극** ${ctx.hintsDay.grader.meeting.kind} · 최초 제안 → 반론 → 수정 발언 → 합의/보류. 다섯 기준 각 0–2점, 각 1점 이상·합계 8/10 이상. 사실/가정·대안 비용·결정 요청·검증/배포/실패 대응·반론 후 수정.`);
   }
   if (day.id === 'D01') parts.push([
     '## 작업 위치와 출발 자료',
@@ -925,7 +944,8 @@ export function renderIndex(roadmap, hints) {
     '',
     '- 1단계(D01~D10): 데이터 요구사항으로 테이블을 직접 설계하고 빈 프로젝트로 서버 만들기. 시작은 [출발 자료](../start/README.md)',
     '- 2단계(D11~D14): 어수선한 서버 넘겨받기. 티켓은 필수 B01~B04 4건 + 선택 1건(Security·Redis 후보에서 고른다) + 고도화 E01 + 모의 장애 훈련이고, 나머지는 연습 티켓이다',
-    '- 마무리(D15): 설명 세션',
+    '- 중간 점검(D15): 설명·회고를 남기고 D16 개인 경로로 연결',
+    `- 3단계(D16~${roadmap.days.at(-1).id}): 미수행 과제·설계·운영 변경·회의·새 사례 독립 평가. 하루 분량은 완료 조건 기준으로 조절한다`,
     '',
     '| 일 | 단계 | 마일스톤 | 오늘의 Java | 순서 | 말하기 카드 | 상태 |',
     '|---|---|---|---|---|---|---|',
@@ -934,6 +954,26 @@ export function renderIndex(roadmap, hints) {
     '',
     '과정 안내는 [과정 v2](../README.md), 계약은 [명세서 v2](../spec-v2.md), 카드 전체는 [말하기 카드](../talk-cards.md)에 있다.',
     '',
+  ].join('\n');
+}
+
+export function renderExtendedJava(j, roadmap) {
+  const previous = `J${dd(dayNo(j.id)-1)}`;
+  const next = roadmap.java.find(x => x.id === `J${dd(dayNo(j.id)+1)}`);
+  return [HEADER, '', `# ${j.id}. ${j.title}`, '',
+    `> 소요 20~40분 · ${j.day} ${j.timing === 'during-or-after' ? '수행 중 증거·사후 확인' : '연결 실험'} · 기존 J 재사용과 새 경계 관찰을 구분한다.`, '',
+    '## 만들 파일과 실행 위치', '',
+    j.evidence ? `**내 프로젝트 루트**에서 진행한다. ${j.evidence.instructions}` : `**내 프로젝트 루트**에서 \`${j.labFile}\`를 만든다. 기존 테스트로 동일 증거가 있으면 재실행·조건을 기록하고 재사용한다. java-track에 존재하지 않는 J16 이후 테스트가 있다고 가정하지 않는다.`, '',
+    '## 오늘 실험', '', j.topic, '',
+    ...(j.timing === 'during-or-after' ? ['요구 제시·초기 진단 뒤에 테스트를 선택한다. Java를 독립 평가의 선행 과제로 수행하지 않는다.', ''] : []),
+    ...(j.experiment ?? []).flatMap(x => [x, '']),
+    '## 재사용할 Java', '', ...j.reuse.map(id => `- [${id} 기존 연습](${id}.md)`), '',
+    '## 실행과 완료 조건', '',
+    ...(j.evidence ? j.evidence.commands.map(x => `- ${x}`) : [`- \`./gradlew test --tests '${j.id}EvidenceTest'\` (직접 이 이름으로 만든 테스트). 기존 테스트를 재사용하면 실제 클래스 이름으로 실행한다.`]),
+    ...j.acceptance.map(x => `- ${x}`), '',
+    '통합 관찰은 disposable DB/별도 JVM에서 실행한다. 실행 불가는 이유와 함께 확인 불가로 기록한다. 성공/실패·예상/실측을 나눈다.', '',
+    '## 오늘 Spring에서 다시 만나는 곳', '',
+    `[오늘 Spring ${j.day} →](../spring/${j.day}.md) · [이전 ${previous}](${previous}.md)${next ? ` · [다음 ${next.id}](${next.id}.md)` : ''}`, '',
   ].join('\n');
 }
 
@@ -959,6 +999,7 @@ export function buildAll(root = ROOT) {
   };
   const warnings = [];
   const files = new Map();
+  for (const j of roadmap.java.filter(j => j.reuse?.length)) files.set(`course/java/${j.id}.md`, renderExtendedJava(j, roadmap));
   files.set('course/spring/D00.md', renderD00(roadmap, root));
   for (const day of roadmap.days) {
     const hintsDay = hints.days[day.id];

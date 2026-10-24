@@ -43,7 +43,9 @@ export function validate({ spec, roadmap, cards, courseFiles }) {
   const epSet = new Set(endpoints);
   const days = roadmap.days ?? [];
 
-  if (days.length !== 15) errs.push(`일자 수가 15가 아니다: ${days.length}`);
+  const totalDays = roadmap.totalDays ?? 15;
+  if (!Number.isInteger(totalDays) || totalDays < 15 || totalDays > 45) errs.push('전체 일수는 15~45 범위여야 한다');
+  if (days.length !== totalDays) errs.push(`일자 수가 ${totalDays}가 아니다: ${days.length}`);
 
   const cardIds = parseTalkCardIds(cards);
   const seen = new Set();
@@ -60,7 +62,7 @@ export function validate({ spec, roadmap, cards, courseFiles }) {
     const num = idx + 1;
     const expectId = `D${String(num).padStart(2, '0')}`;
     if (d !== expectId) errs.push(`${idx + 1}번째 일자 ID가 ${expectId}가 아니다: ${d}`);
-    const expectPhase = num <= 10 ? 'build' : num <= 14 ? 'maintain' : 'wrap';
+    const expectPhase = num <= 10 ? 'build' : num <= 14 ? 'maintain' : num === 15 ? 'wrap' : 'extend';
     if (day.phase !== expectPhase) errs.push(`${d}: phase는 ${expectPhase}여야 한다(${day.phase})`);
     if (day.java !== `J${String(d).slice(1)}`) errs.push(`${d}: java ${day.java}가 ${d}와 짝이 아니다`);
     const tc = day.talkCards ?? [];
@@ -71,6 +73,11 @@ export function validate({ spec, roadmap, cards, courseFiles }) {
     }
 
     const steps = day.steps ?? [];
+    if (day.phase === 'extend') {
+      if (!day.purpose || !day.prerequisite || !day.workTarget) errs.push(`${d}: 확장 목적·선행·작업 대상이 필요하다`);
+      if (steps.length < 2 || steps.length > 3) errs.push(`${d}: 확장 순서는 2~3개여야 한다`);
+      for (const step of steps) if (!step.files?.length || !step.done?.length) errs.push(`${d}: 확장 파일·완료 조건이 필요하다`);
+    }
     if (day.phase === 'build' && (steps.length < 3 || steps.length > 6)) errs.push(`${d}: build 단계 steps는 3~6개(${steps.length})`);
     if (day.phase === 'wrap' && steps.length < 1) errs.push(`${d}: wrap 단계 steps가 1개 이상 필요`);
     for (const s of steps) {
@@ -97,7 +104,7 @@ export function validate({ spec, roadmap, cards, courseFiles }) {
   const javaById = new Map((roadmap.java ?? []).map((j) => [j.id, j]));
   const j0 = javaById.get('J00');
   if (!j0 || j0.optional !== true) errs.push('java: J00(optional: true)이 없다');
-  for (let n = 1; n <= 15; n++) {
+  for (let n = 1; n <= totalDays; n++) {
     const nn = String(n).padStart(2, '0');
     const j = javaById.get(`J${nn}`);
     if (!j) errs.push(`java: J${nn}이 없다`);
@@ -130,7 +137,28 @@ export function validateSql({roadmap,hints}) {
       if(!q.task||!q.expect||!q.example) errors.push(`${day.id}: SQL 과제·성질·예시가 필요하다`);
       if(/```|<details|<pre/i.test((q.task??'')+(q.expect??''))) errors.push(`${day.id}: SQL 예시를 과제 문구에 섞지 않는다`);
     }
-    if(day.phase==='maintain' && leak.test([sql.context,...sql.questions.flatMap(q=>[q.task,q.expect])].join(' '))) errors.push(`${day.id}: SQL 원인·해법 누출`);
+    if((day.phase==='maintain' || day.phase==='extend' && Number(day.id.slice(1))<=18) && leak.test([sql.context,...sql.questions.flatMap(q=>[q.task,q.expect])].join(' '))) errors.push(`${day.id}: SQL 원인·해법 누출`);
+  }
+  return errors;
+}
+
+// 확장 과정의 선행 참조·Java 재사용·회의/독립 수행 계약도 원본에서 검사한다.
+export function validateExtension({roadmap, hints}) {
+  const errors = [];
+  const days = new Map(roadmap.days.map(d => [d.id,d]));
+  const java = new Map(roadmap.java.map(j => [j.id,j]));
+  for (const day of roadmap.days.filter(d => d.phase === 'extend')) {
+    const h = hints.days?.[day.id];
+    const j = java.get(day.java);
+    if (!j?.title || !j.reuse?.length || !j.labFile || !j.acceptance?.length || j.reuse.some(id => !java.has(id))) errors.push(`${day.id}: Java 재사용·파일·완료 조건 오류`);
+    if (!h?.grader?.focus?.length) errors.push(`${day.id}: 리뷰 초점이 없다`);
+    for (const s of day.steps) {
+      if (!h?.steps?.[s.no]?.length) errors.push(`${day.id}: 순서 ${s.no} 힌트가 없다`);
+      for (const r of s.dayRefs ?? []) if (!r.label || !days.get(r.day)?.steps.some(x => x.no === r.step) || r.day > day.id) errors.push(`${day.id}: 선행 명세 참조 ${r.day}-${r.step} 오류`);
+    }
+    const meeting = h?.grader?.meeting;
+    if (['D30','D35','D40','D41'].includes(day.id) && (!meeting?.kind || !meeting.objection || meeting.criteria?.length !== 5)) errors.push(`${day.id}: 회의 역할·반론·5개 기준이 필요하다`);
+    if (['D44','D45'].includes(day.id) && !h?.grader?.independent) errors.push(`${day.id}: 독립 수행 표시가 없다`);
   }
   return errors;
 }
@@ -240,6 +268,7 @@ function cli() {
       ...validate({ spec: courseFiles['spec-v2.md'], roadmap, cards, courseFiles: { ...courseFiles, ...extraFiles, 'days/roadmap': JSON.stringify(roadmap), 'days/hints': JSON.stringify(hints), 'days/cards': cards } }),
       ...validateDayPages({ roadmap, pages }),
       ...validateSql({roadmap,hints}),
+      ...validateExtension({roadmap,hints}),
     ];
     if (!result.length) {
       console.log(`course OK: ${parseSpecEndpoints(courseFiles['spec-v2.md']).length} endpoints, ${roadmap.days.length} days, ${parseTalkCardIds(cards).length} cards, ${Object.keys(pages).length} day pages`);

@@ -1,0 +1,42 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ops-only
+      MYSQL_DATABASE: ops_lab
+    ports: ["127.0.0.1:18998:3306"]
+    volumes: ["db:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=ops-only mysql --protocol=TCP -h127.0.0.1 -uroot --database=ops_lab --execute='SELECT 1' --skip-column-names"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+  app-a:
+    init: true
+    image: ${APP_A_IMAGE:-jx-ops:a}
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ops_lab
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ops-only
+      OPS_VERSION: ${OPS_A_VERSION:-a}
+    ports: ["127.0.0.1:18996:8080"]
+    volumes: ["control:/control"]
+    stop_grace_period: 20s
+    depends_on:
+      mysql: {condition: service_healthy}
+  app-b:
+    init: true
+    image: ${APP_B_IMAGE:-jx-ops:b}
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ops_lab
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ops-only
+      OPS_VERSION: b
+    ports: ["127.0.0.1:18997:8080"]
+    volumes: ["control:/control"]
+    stop_grace_period: 20s
+    depends_on:
+      mysql: {condition: service_healthy}
+volumes:
+  db:
+  control:

@@ -16,7 +16,7 @@
   var nodeById = {};
   graph.nodes.forEach(function (n) { nodeById[n.id] = n; });
   var VIEW_LABEL = { direct: '직접 연결', both: '상·하류 전체', up: '영향 주는 쪽', down: '영향 받는 쪽' };
-  var EDGE_LABEL = { practice: '같은 날 먼저 연습', ticket: '그날 다루는 티켓', area: '결함 영역' };
+  var EDGE_LABEL = { practice: '같은 날 연결 실험 (J44·J45는 수행 중·사후)', ticket: '그날 다루는 티켓', area: '결함 영역' };
   var selected = null;
 
   function name(id) { var n = nodeById[id]; return n.kind === 'area' ? n.title : n.id; }
@@ -148,7 +148,15 @@
   }
 
   buttons.forEach(function (b) {
-    b.addEventListener('click', function () { selected = selected === b.dataset.node ? null : b.dataset.node; apply(); });
+    b.addEventListener('click', function () {
+      selected = selected === b.dataset.node ? null : b.dataset.node;
+      apply();
+      if (selected) {
+        detail.scrollIntoView({ behavior: 'instant', block: 'center' });
+        var open = detail.querySelector('.cm-detail-open');
+        if (open) open.focus({ preventScroll: true });
+      }
+    });
   });
   root.querySelectorAll('input[name="cm-view"]').forEach(function (input) { input.addEventListener('change', apply); });
   root.querySelector('[data-cm-clear]').addEventListener('click', function () { selected = null; apply(); });
