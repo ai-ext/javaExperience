@@ -224,18 +224,18 @@
 <p><strong>질문</strong> 좋아요 <code>PUT</code>을 두 번 보내도 204이고 수는 한 번만 오릅니다. 동시에 두 번 와도 그런가요? 어떻게 보장했나요?
 <strong>답에 들어가야 할 것</strong></p>
 <ul>
-<li><code>post_like</code>의 UNIQUE(<code>post_id</code>, <code>member_id</code>)가 DB에서 중복 행을 막는다</li>
+<li>한 회원·한 글의 좋아요 중복을 DB에서 거부하도록 설계하고 실제 중복 INSERT 결과로 확인한다</li>
 <li>동시 요청 중 하나가 중복 키 예외를 받으면 이미 눌린 상태로 보고 204를 돌려준다</li>
-<li><code>like_count</code>는 읽고 더해서 저장하지 않고 <code>like_count = like_count + 1</code> UPDATE로 올린다. +1 UPDATE와 INSERT를 한 트랜잭션에 두고(글 행을 먼저 잠가 교착을 피한다) 중복이면 트랜잭션째 롤백해 +1도 취소한다
+<li>좋아요 수를 저장한다면 읽고 더해 덮어쓰지 않고 DB의 현재 값에서 원자적으로 갱신한다. +1 UPDATE와 INSERT를 한 트랜잭션에 두고(글 행을 먼저 잠가 교착을 피한다) 중복이면 트랜잭션째 롤백해 +1도 취소한다
 <strong>근거</strong> spec-v2 §5-2, 07 #12</li>
 </ul>
 <h3 id="tc-d05-5"><a class="anchor" href="#tc-d05-5" aria-hidden="true">#</a>TC-D05-5</h3>
-<p><strong>질문</strong> 글 삭제를 행 삭제 대신 <code>status = DELETED</code>로 바꾸는 소프트 삭제로 했습니다. 이유와 대가는?
+<p><strong>질문</strong> 글 삭제를 행 삭제 대신 공개 상태를 <code>DELETED</code>로 바꾸는 소프트 삭제로 했습니다. 이유와 대가는?
 <strong>답에 들어가야 할 것</strong></p>
 <ul>
-<li>신고(<code>report</code>)와 감사 로그가 글을 가리키므로, 행을 남겨야 나중에 추적할 수 있다</li>
+<li>신고 기록와 감사 로그가 글을 가리키므로, 행을 남겨야 나중에 추적할 수 있다</li>
 <li>대가는 모든 조회에 상태 조건을 빠뜨리지 않아야 한다는 것이다. 하나라도 빠지면 삭제된 글이 노출된다</li>
-<li>목록 인덱스를 (<code>status</code>, <code>id</code>)로 둔 것도 모든 목록 조회에 이 상태 조건이 붙기 때문이다
+<li>공개 상태 필터와 최신순·커서 조회 패턴을 바탕으로 내가 만든 인덱스의 이유를 설명한다
 <strong>근거</strong> spec-v2 §6</li>
 </ul>
 <h2 id="d06-목록검색-mybatis"><a class="anchor" href="#d06-목록검색-mybatis" aria-hidden="true">#</a>D06 목록·검색 (MyBatis)</h2>
@@ -249,12 +249,12 @@
 <strong>근거</strong> 06 §16, spec-v2 §5-3</li>
 </ul>
 <h3 id="tc-d06-2"><a class="anchor" href="#tc-d06-2" aria-hidden="true">#</a>TC-D06-2</h3>
-<p><strong>질문</strong> 글 목록(<code>WHERE status = &#39;ACTIVE&#39; ... ORDER BY id DESC LIMIT 20</code>)이 데이터가 늘자 느려졌습니다. 인덱스를 어떻게 정하고 확인했나요?
+<p><strong>질문</strong> 공개 글 최신순 커서 목록이 데이터가 늘자 느려졌습니다. 인덱스를 어떻게 정하고 확인했나요?
 <strong>답에 들어가야 할 것</strong></p>
 <ul>
-<li>동등 조건 컬럼을 앞에, 정렬 컬럼을 뒤에 둔 (<code>status</code>, <code>id</code>) 인덱스면 인덱스가 정렬을 제공해 filesort 없이 LIMIT만큼 읽고 멈춘다</li>
+<li>내 필터·정렬·커서·데이터 분포를 보고 만든 인덱스의 열 순서와 선택 이유, 버린 대안 1개를 설명한다. 특정 실행 계획을 측정 전에 보장하지 않는다</li>
 <li>EXPLAIN의 <code>type</code>, <code>key</code>, <code>rows</code>, <code>Extra</code>(Using filesort 여부)를 인덱스 전후로 비교하고, <code>EXPLAIN ANALYZE</code>로 실제 읽은 행 수를 본다</li>
-<li>커서 페이징은 <code>id &lt; 마지막 id</code>로 이어 읽어, offset처럼 앞쪽 행을 읽고 버리지 않는다
+<li>커서 페이징은 내가 정한 안정적 정렬의 마지막 위치 뒤부터 이어 읽어, offset처럼 앞쪽 행을 읽고 버리지 않는다
 <strong>근거</strong> 07 §2, 07 §5</li>
 </ul>
 <h3 id="tc-d06-3"><a class="anchor" href="#tc-d06-3" aria-hidden="true">#</a>TC-D06-3</h3>
@@ -282,7 +282,7 @@
 <ul>
 <li>두 트랜잭션이 같은 잔액을 읽고 각자 계산해 쓰면, 나중 쓰기가 앞 쓰기를 덮어쓴다(갱신 손실)</li>
 <li><code>UPDATE member SET point_balance = point_balance - ? WHERE id = ? AND point_balance &gt;= ?</code>로 DB가 원자적으로 계산하게 하고, 바뀐 행이 0이면 409 <code>/errors/insufficient-points</code>로 처리한다</li>
-<li>같은 트랜잭션에서 <code>point_ledger</code>에 이력을 쌓아 잔액과 이력의 합이 항상 맞게 한다
+<li>같은 트랜잭션에서 포인트 이력에 이력을 쌓아 잔액과 이력의 합이 항상 맞게 한다
 <strong>근거</strong> 05 §3-6, spec-v2 §6</li>
 </ul>
 <h3 id="tc-d07-2"><a class="anchor" href="#tc-d07-2" aria-hidden="true">#</a>TC-D07-2</h3>
@@ -290,7 +290,7 @@
 <strong>답에 들어가야 할 것</strong></p>
 <ul>
 <li>&quot;이미 받았는지 조회 후 INSERT&quot;는 두 요청이 동시에 조회를 통과하면 둘 다 INSERT한다</li>
-<li><code>member_coupon</code>의 UNIQUE(<code>coupon_id</code>, <code>member_id</code>)로 DB가 두 번째 INSERT를 거부하게 하고, 중복 키 예외를 409 <code>/errors/duplicate</code>로 바꾼다</li>
+<li>같은 회원·쿠폰 조합의 두 번째 INSERT를 DB가 거부하도록 설계하고, 중복 키 예외를 409 <code>/errors/duplicate</code>로 바꾼다</li>
 <li>중복 키 오류가 난 INSERT는 기존 행에 공유 락을 걸기 때문에 동시 INSERT가 많으면 데드락이 날 수 있어, 예외 처리를 함께 설계한다
 <strong>근거</strong> 07 #13, spec-v2 §5-4</li>
 </ul>
@@ -308,7 +308,7 @@
 <strong>답에 들어가야 할 것</strong></p>
 <ul>
 <li>클라이언트는 같은 구매를 재시도할 때 같은 <code>Idempotency-Key</code>를 보낸다</li>
-<li><code>shop_order</code>의 UNIQUE(<code>member_id</code>, <code>idempotency_key</code>)로 두 번째 주문 생성을 막고, 같은 키·같은 본문이면 처음 응답을 그대로 돌려준다</li>
+<li>같은 회원의 같은 멱등 키로 주문이 중복 생성되지 않게 설계하고, 같은 키·같은 본문이면 처음 응답을 그대로 돌려준다</li>
 <li>같은 키에 다른 본문이 오면 422로 거부한다
 <strong>근거</strong> spec-v2 §5-4, 05 §3-2</li>
 </ul>
