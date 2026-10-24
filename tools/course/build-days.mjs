@@ -330,6 +330,15 @@ export function splitSeedTables(sql) {
   return [...chunks].map(([table, sql]) => ({ table, sql }));
 }
 
+// 데이터는 테이블을 준비한 순서에서 필요한 조각으로 왕복한다.
+export const DATA_STEPS = {
+  D02: {5:['banned_word','common_code']}, D03: {2:['member']},
+  D04: {1:['post'],2:['tag','post_tag']}, D05: {3:['comment'],5:['post_like']},
+  D07: {1:['point_ledger'],3:['coupon','member_coupon'],5:['shop_item'],6:['shop_order']},
+  D06: {5:['bulk']}, D08: {2:['pg_payment'],3:['point_ledger']}, D10: {1:['report'],3:['audit_log']},
+};
+const dataStep = (day, table) => Object.entries(DATA_STEPS[day.id] ?? {}).find(([,tables]) => tables.includes(table))?.[0];
+
 function dayDataSection(day, root) {
   const entries = ['seed', 'bulk'].flatMap((name) => {
     const blocks = parseDaySql(read(path.join(root, `course/start/dummy/${name}.sql`))).get(day.id);
@@ -343,7 +352,8 @@ function dayDataSection(day, root) {
       ...(name === 'seed' ? [
         '<p>테이블별 복사에도 SET·트랜잭션과 필요한 카운터·잔액 보정을 포함합니다. 앞선 날 데이터와 참조할 테이블을 먼저 넣고, 아래 순서로 한 번씩 실행하세요. 전체 복사와 중복 실행하지 마세요. 실패하면 ROLLBACK 후 확인하세요.</p>',
         ...splitSeedTables(blocks.join('')).map(({ table, sql }) => [
-          `<div class="day-data-table" data-sql-table="${table}">`,
+          `<div class="day-data-table" id="data-${day.id.toLowerCase()}-${table}" data-sql-table="${table}">`,
+          `<p>${table} 테이블을 준비한 뒤 넣으세요. <a data-work-return href="#${stepAnchor(day.id, dataStep(day, table))}">넣었으면 ${circled(Number(dataStep(day, table)))} 작업으로 복귀</a></p>`,
           '<details class="day-data-sql">', `<summary>${table} SQL 보기</summary>`,
           `<pre><code id="${day.id.toLowerCase()}-${name}-${table}-sql">${escapeHtml(sql)}</code></pre>`,
           '</details>', '</div>',
@@ -355,7 +365,10 @@ function dayDataSection(day, root) {
   if (!entries.length) return '';
   return [
     '<section class="day-data">', '', '## 이 날 데이터 넣기', '',
-    '테이블·컬럼 이름이 다르면 붙여 넣기 전에 이름만 바꾸세요. 테이블을 먼저 만든 뒤 아래 SQL을 MySQL 편집기에 붙여 넣으세요.', '',
+    '기본 DB에서 테이블을 먼저 준비하고 해당 테이블 조각을 넣은 뒤 작업으로 돌아오세요. 전체 블록은 이 날 필요한 테이블을 모두 만든 뒤 실행합니다. 컬럼 생략·복합 키·COUNT 설계는 [SQL 조정법](../start/dummy/README.md)을 따라 수정하세요.', '',
+    `<p><a data-work-return href="#${stepAnchor(day.id, Number(Object.keys(DATA_STEPS[day.id] ?? {})[0] ?? 1))}">데이터 준비를 마치고 오늘 작업으로 복귀</a></p>`, '',
+    ...(day.id === 'D04' ? ['**bulk는 지금 실행하지 않는다. D05 테이블·seed 준비를 마친 뒤 [D06 실험 진입점](D06.md#이-날-데이터-넣기)에서 별도 실험 DB로 재실험한다. 기본 DB는 그대로 둔다.**', ''] : []),
+    ...(day.id === 'D06' ? ['**실험 진입점:** 별도 실험 DB에 D05까지의 테이블·seed가 준비됐는지 먼저 확인하고 bulk를 한 번 넣는다. <a href="#step-d06-5">⑤ EXPLAIN 실험으로 복귀</a>. 기본 seed DB와 구분하고 끝나면 원래 연결로 돌아간다.', ''] : []),
     '[넣는 순서와 확인 방법](../start/dummy/README.md)을 확인하세요. 기본 데이터는 앞선 날 → 오늘 순서로 넣고, 대량 데이터는 별도 실험 DB에서 실행하세요. 이미 넣은 블록은 다시 실행하지 마세요.', '',
     ...entries, '', '</section>',
   ].join('\n');
@@ -629,7 +642,7 @@ function dayHeader(day, java, extra = '') {
     '',
     `# ${day.id}. ${day.title}`,
     '',
-    `> ${PHASE[day.phase]} · 오늘의 Java [${java.id}](../java/${java.id}.md) · 순서 ${day.steps.length}개 · 말하기 카드 ${day.talkCards.length}장${extra}`,
+    `> ${PHASE[day.phase]} · 오늘의 Java [${java.id}](../java/${java.id}.md) · 전체 구현 순서 ${day.steps.length}개 · 말하기 카드 ${day.talkCards.length}장${extra}`,
   ].join('\n');
 }
 
@@ -657,10 +670,20 @@ function stepSection(day, s, ctx) {
     const layers = stepLayers(s);
     lines.push(`**이 순서에서 만들 층** ${layers.join(' · ') || '해당 없음 · 공통 설정·지원 코드'}`, '');
   }
-  if (ctx.ready && s.files.length) lines.push(`**만들 파일** (${day.phase === 'maintain' ? 'messy-server' : '내 프로젝트 · 경로는 구현 예시'} 기준)`, '', ...s.files.map((f) => `- \`${f}\``), '');
+  if (ctx.ready && s.files.length) {
+    lines.push(`**만들 파일** (${day.phase === 'maintain' ? 'messy-server' : '내 프로젝트 · 경로는 구현 예시'} 기준)`, '');
+    for (const [action, label] of Object.entries({create:'새로 만들기',modify:'기존 수정',inspect:'확인만'})) {
+      const files = s.fileActions?.[action] ?? (action === 'create' ? s.files : []);
+      if (files.length) lines.push(`- **${label}**: ${files.map(f => `\`${f}\``).join(' · ')}`);
+    }
+    lines.push('');
+  }
   if (s.tickets?.length) lines.push(`**티켓** ${s.tickets.map((t) => `\`${t}\``).join(' · ')}`, '');
   if (ctx.ready) {
     if (s.trap) lines.push(`**겪을 것** ${s.trap}`, '');
+    const tables = DATA_STEPS[day.id]?.[s.no];
+    if (tables?.length && day.id !== 'D06') lines.push(`<p class="data-handoff">테이블 준비 후 기본 DB에 필요한 데이터: ${tables.map(table => `<a data-data-return href="#data-${day.id.toLowerCase()}-${table}">${table} 넣기 → 작업 복귀</a>`).join(' · ')}</p>`, '');
+    if (day.id === 'D06' && s.no === 5) lines.push('<p><a data-data-return href="#이-날-데이터-넣기">D05 준비 이후 별도 실험 DB · bulk 넣기</a></p>', '');
     lines.push('**완료 조건**', '', ...s.done.map((d, i) => {
       const ticket = completionTicket(day, s, `C${s.no}-${i + 1}`, ctx.hintsDay);
       const label = day.phase === 'maintain' ? `[${ticket ? `${ticket} ${ticketInfo(ticket, ctx.root).kind}` : '공통'}] ` : '';
@@ -772,7 +795,11 @@ function sqlSection(day, sql, root) {
 export function renderDay(day, ctx) {
   const java = javaInfo(day.java, ctx.root);
   const roadmapJava = ctx.roadmap.java.find((j) => j.id === day.java);
+  const data = dayDataSection(day, ctx.root);
+  const sections = [['오늘 순서','오늘-순서'], ...(data ? [['이 날 데이터 넣기','이-날-데이터-넣기']] : []), ['오늘의 SQL','오늘의-sql'], ['말하기','말하기-카드'], ['채점','ai-채점-프롬프트']];
   const parts = [dayHeader(day, java, ctx.ready ? '' : ' · **준비 중**')];
+  if (day.purpose) parts.push(day.purpose);
+  parts.push(`<nav class="day-sections" aria-label="오늘 섹션 바로가기">${sections.map(([label,id]) => `<a href="#${id}">${label}</a>`).join('')}</nav>`);
   if (!ctx.ready) parts.push('> 이 날은 아직 준비 중이다. 순서 제목과 말하기 카드만 먼저 싣고, 티켓 페이지·힌트·채점 프롬프트는 2단계 자료가 끝난 뒤 채운다.');
   if (day.phase === 'maintain') {
     parts.push(ticketRule(ctx.root));
@@ -799,6 +826,11 @@ export function renderDay(day, ctx) {
     '4. **최초 기동 확인**: 별도 터미널에서 `curl -i http://localhost:8080/actuator/health` → 200과 `UP`. 실패하면 기동 로그를 먼저 기록한다.',
     '5. **기준 테스트**: 별도 터미널의 `messy-server/`에서 `./gradlew test`를 실행한다(Docker 필요, 테스트는 별도 컨테이너 사용). 수정 전 성공·실패 개수와 실패 테스트·로그를 저장한다. 이 기록과 수정 후 결과를 비교한다.',
     '6. **이번 주 규칙 확인**: [2단계 티켓 규칙](../README.md#2단계-티켓-규칙)을 읽고 필수 B01~B04·선택 1건·[E01](../tickets/E01.md)·[훈련](../tickets/drill.md)을 구분한다.',
+    '',
+    '<div data-preparation>',
+    '<p><strong>준비 기록</strong> — 환경 전환 확인용이며 구현 진도·채점 결과에 포함하지 않는다. 위 절차를 마칠 때마다 기록한다.</p>',
+    ...['1단계 앱 종료','messy-server 폴더 전환','13311 DB·의존 서비스 기동','health 200·UP 확인','수정 전 기준 테스트 결과 저장','필수·선택·훈련 규칙 확인'].map((label,i) => `<label class="prep-item"><input type="checkbox" data-prep="D11-${i+1}"> ${label}</label>`),
+    '</div>',
   ].join('\n'));
   parts.push('## 오늘 순서', checklist(day, day.steps), javaSection(java, roadmapJava), '---');
   const deferred = Object.entries(ctx.deferred ?? DEFERRED_FIXES).filter(([k]) => k.startsWith(`${day.id}-`));
@@ -808,13 +840,18 @@ export function renderDay(day, ctx) {
     for (const [k, rule] of deferred) if (rule.after === s.no) parts.push(deferredFixSection(day, Number(k.split('-')[1]), rule, ctx));
   }
   for (const group of ctx.answers?.extras.values() ?? []) parts.push(extraSection(day, group, ctx));
-  const data = dayDataSection(day, ctx.root);
   if (data) parts.push(data);
   if (ctx.ready) parts.push(sqlSection(day, ctx.hintsDay.sql, ctx.root));
+  if (ctx.hintsDay?.diagnostics) {
+    const diag = ctx.hintsDay.diagnostics;
+    parts.push('## 진단 도구 예행 관찰', diag.intro, ...diag.tasks.map((text, i) => `${i+1}. ${text}`), '관찰 파일·설정 복원 기록과 도구별 해석 한 문장을 채점 때 제출한다.');
+  }
   parts.push('---', '## 말하기 카드', '하루가 끝나면 질문에 "문제 상황 → 원인 → 선택 → 결과" 순서로 소리 내어 답한 뒤, 접힌 "답에 들어가야 할 것"과 비교한다. 세 줄이 모두 나오면 통과다.');
   for (const id of day.talkCards) {
     const card = ctx.cards.get(id);
     if (!card) throw new Error(`${day.id}: 말하기 카드 ${id}가 talk-cards.md에 없다`);
+    const link = day.talkCardLinks?.[id];
+    if (link) parts.push(`<p class="card-task-link"><a href="#${stepAnchor(day.id, link.step)}">${circled(link.step)} 과제 · ${link.ticket}</a>를 설명하는 카드</p>`);
     parts.push(cardBlock(card));
   }
   if (ctx.ready) {

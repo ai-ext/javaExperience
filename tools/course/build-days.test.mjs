@@ -216,6 +216,8 @@ test('정답 블록: 새 파일은 전체 내용, 수정 파일은 diff로 싣�
 test('페이지 안 #step 링크는 모두 실제 순서 칸을 가리킨다', () => {
   for (const [rel, md] of built.files) {
     const ids = new Set([...md.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]));
+    // 섹션 바로가기는 raw id뿐 아니라 Markdown 제목이 생성할 앵커도 가리킨다.
+    for (const [, heading] of md.matchAll(/^#{1,6} (.+)$/gm)) ids.add(dayBuilder.slugify(heading.replace(/[`*]/g, '')));
     for (const [, target] of md.matchAll(/href="#([^"]+)"/g)) assert.ok(ids.has(target), `${rel}: #${target}`);
     // 사이트 빌드는 마크다운 링크의 #앵커를 제목 앵커와만 대조하므로, raw HTML id를 마크다운 링크로 가리키면 빌드가 깨진다
     for (const [, target] of stripFences(md).matchAll(/\]\(#([^)]+)\)/g)) assert.ok(!ids.has(target), `${rel}: raw HTML id #${target}를 마크다운 링크로 가리킨다(<a href>로 쓴다)`);

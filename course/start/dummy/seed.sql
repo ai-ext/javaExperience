@@ -22,28 +22,28 @@ COMMIT;
 -- 테이블 이름·컬럼이 다르면 이 줄만 바꿔라: 아래 INSERT INTO의 테이블·컬럼 목록과 UPDATE/조회 이름.
 SET @seed_at = '2026-01-01 09:00:00.000000';
 START TRANSACTION;
--- 공통 비밀번호 Course1234. D07까지 잔액은 0이다.
-INSERT INTO member (id, email, password_hash, nickname, role, point_balance, created_at, updated_at) VALUES
-(1, 'learner001@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner1', 'ADMIN', 0, @seed_at, @seed_at),
-(2, 'learner002@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner2', 'USER', 0, @seed_at, @seed_at),
-(3, 'learner003@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner3', 'USER', 0, @seed_at, @seed_at),
-(4, 'learner004@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner4', 'USER', 0, @seed_at, @seed_at),
-(5, 'learner005@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner5', 'USER', 0, @seed_at, @seed_at),
-(6, 'learner006@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner6', 'USER', 0, @seed_at, @seed_at),
-(7, 'learner007@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner7', 'USER', 0, @seed_at, @seed_at),
-(8, 'learner008@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner8', 'USER', 0, @seed_at, @seed_at),
-(9, 'learner009@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner9', 'USER', 0, @seed_at, @seed_at),
-(10, 'learner010@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner10', 'USER', 0, @seed_at, @seed_at),
-(11, 'learner011@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner11', 'USER', 0, @seed_at, @seed_at),
-(12, 'learner012@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner12', 'USER', 0, @seed_at, @seed_at),
-(13, 'learner013@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner13', 'USER', 0, @seed_at, @seed_at),
-(14, 'learner014@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner14', 'USER', 0, @seed_at, @seed_at),
-(15, 'learner015@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner15', 'USER', 0, @seed_at, @seed_at),
-(16, 'learner016@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner16', 'USER', 0, @seed_at, @seed_at),
-(17, 'learner017@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner17', 'USER', 0, @seed_at, @seed_at),
-(18, 'learner018@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner18', 'USER', 0, @seed_at, @seed_at),
-(19, 'learner019@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner19', 'USER', 0, @seed_at, @seed_at),
-(20, 'learner020@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner20', 'USER', 0, @seed_at, @seed_at);
+-- 공통 비밀번호 Course1234. D03의 회원 식별·인증 정보만 넣는다.
+INSERT INTO member (id, email, password_hash, nickname, role, created_at, updated_at) VALUES
+(1, 'learner001@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner1', 'ADMIN', @seed_at, @seed_at),
+(2, 'learner002@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner2', 'USER', @seed_at, @seed_at),
+(3, 'learner003@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner3', 'USER', @seed_at, @seed_at),
+(4, 'learner004@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner4', 'USER', @seed_at, @seed_at),
+(5, 'learner005@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner5', 'USER', @seed_at, @seed_at),
+(6, 'learner006@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner6', 'USER', @seed_at, @seed_at),
+(7, 'learner007@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner7', 'USER', @seed_at, @seed_at),
+(8, 'learner008@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner8', 'USER', @seed_at, @seed_at),
+(9, 'learner009@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner9', 'USER', @seed_at, @seed_at),
+(10, 'learner010@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner10', 'USER', @seed_at, @seed_at),
+(11, 'learner011@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner11', 'USER', @seed_at, @seed_at),
+(12, 'learner012@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner12', 'USER', @seed_at, @seed_at),
+(13, 'learner013@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner13', 'USER', @seed_at, @seed_at),
+(14, 'learner014@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner14', 'USER', @seed_at, @seed_at),
+(15, 'learner015@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner15', 'USER', @seed_at, @seed_at),
+(16, 'learner016@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner16', 'USER', @seed_at, @seed_at),
+(17, 'learner017@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner17', 'USER', @seed_at, @seed_at),
+(18, 'learner018@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner18', 'USER', @seed_at, @seed_at),
+(19, 'learner019@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner19', 'USER', @seed_at, @seed_at),
+(20, 'learner020@example.test', '$2a$10$nziX3RcyE5RCFnbCbiuQdeUj48eflXdB9weckIL/RvJPhpb6pa8q.', 'learner20', 'USER', @seed_at, @seed_at);
 COMMIT;
 
 -- 이 블록을 쓰는 날: D04 글·태그
@@ -551,6 +551,7 @@ UPDATE post p SET like_count = (SELECT COUNT(*) FROM post_like l WHERE l.post_id
 COMMIT;
 
 -- 이 블록을 쓰는 날: D07 포인트·쿠폰·상점·주문
+-- D07 요구에 맞춰 member의 잔액 컬럼을 준비한 뒤 실행한다. point_balance는 이 날 처음 사용한다.
 -- 테이블 이름·컬럼이 다르면 이 줄만 바꿔라: 아래 INSERT INTO의 테이블·컬럼 목록과 UPDATE/조회 이름.
 SET @seed_at = '2026-01-01 09:00:00.000000';
 START TRANSACTION;

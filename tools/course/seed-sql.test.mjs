@@ -115,3 +115,29 @@ test('테이블별 조각을 순서대로 실행하면 원본 블록의 행·카
     }
   } finally { full.close(); fragments.close(); }
 });
+
+
+test('D03 요구만 구현한 회원 테이블에는 잔액 컬럼 없이 회원 블록을 넣는다', () => {
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec(`CREATE TABLE member (
+      id INTEGER PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
+      nickname TEXT NOT NULL UNIQUE, role TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    )`);
+    const memberBlock = blocks.find(block => block.startsWith('-- 이 블록을 쓰는 날: D03'));
+    execute(db, memberBlock);
+    assert.equal(size(db, 'member'), 20);
+    assert.equal(count(db, "SELECT COUNT(*) FROM member WHERE role='ADMIN'"), 1);
+    assert.doesNotMatch(memberBlock, /point_balance/);
+    assert.doesNotMatch(hints.D03.sql.questions.map(q => q.expect + q.example).join('\n'), /point_balance|잔액은 0/);
+  } finally { db.close(); }
+});
+
+test('직접 설계 안내는 생략한 열·복합 키·카운터 없는 SQL 조정을 구분한다', () => {
+  const guide = read('course/start/dummy/README.md');
+  assert.match(guide, /D07.*point_balance/);
+  assert.match(guide, /복합 키/);
+  assert.match(guide, /열 목록.*VALUES/);
+  assert.match(guide, /COUNT\(l\.post_id\)/);
+  assert.match(guide, /bulk\.sql.*SELECT/);
+});

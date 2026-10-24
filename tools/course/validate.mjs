@@ -22,6 +22,20 @@ export function parseTalkCardIds(md) {
   return [...md.matchAll(/^###\s+(TC-\S+)/gm)].map((m) => m[1]);
 }
 
+// files는 전체 작업 범위, fileActions는 각 파일을 이번 순서에서 다루는 방식이다.
+export function validateFileActions(files, actions, at) {
+  const error = (message) => [`${at}: fileActions ${message}`];
+  const keys = ['create', 'modify', 'inspect'];
+  if (!actions || typeof actions !== 'object' || Array.isArray(actions)) return error('구분이 필요하다');
+  if (Object.keys(actions).length !== keys.length || keys.some((key) => !Array.isArray(actions[key]))) return error('create·modify·inspect 배열이 필요하다');
+  const assigned = keys.flatMap((key) => actions[key]);
+  if (assigned.some((file) => typeof file !== 'string' || !file.trim())) return error('파일은 비어 있지 않은 문자열이어야 한다');
+  if (new Set(assigned).size !== assigned.length) return error('파일 동작이 중복됐다');
+  const expected = new Set(files);
+  if (expected.size !== files.length || assigned.length !== files.length || assigned.some((file) => !expected.has(file))) return error('files와 누락 없이 일치해야 한다');
+  return [];
+}
+
 export function validate({ spec, roadmap, cards, courseFiles }) {
   const errs = [];
   const endpoints = parseSpecEndpoints(spec);
@@ -61,6 +75,7 @@ export function validate({ spec, roadmap, cards, courseFiles }) {
     for (const s of steps) {
       const at = `${d} step ${s.no}`;
       const nf = (s.files ?? []).length;
+      errs.push(...validateFileActions(s.files ?? [], s.fileActions, at));
       if (day.phase === 'build') {
         // 층 표시는 files를 근거로 하므로 수정하는 파일을 개수 때문에 생략하지 않는다.
         if (nf < 1) errs.push(`${at}: build 단계 files는 1개 이상(${nf})`);

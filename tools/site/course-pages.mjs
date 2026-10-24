@@ -203,7 +203,7 @@ export function renderDayPage(sourceRel, body, course) {
     const cls = /준비 중/.test(part) ? ' is-pending' : /^(1단계|2단계|마무리|선택)$/.test(part.trim()) ? ` is-phase phase-${day.phase}` : '';
     return `<span class="day-meta-chip${cls}">${part.trim()}</span>`;
   }).join('');
-  html = html.replace(head[0], `<header class="day-head">${head[1]}<p class="day-meta">${chips}</p></header>`);
+  html = html.replace(head[0], `<header class="day-head">${head[1]}<p class="day-meta">${chips}</p></header>${['D11','D14'].includes(day.id) ? renderTicketSelection(course, sourceRel, day.id === 'D11') : ''}`);
 
   // 2) 오늘 순서 → 체크 칩 목록. 체크박스와 이동 링크를 형제로 둬 제목을 눌러도 체크가 바뀌지 않게 한다.
   const steps = between(html, /<h2 id="오늘-순서"/, /<h2 /);
@@ -214,7 +214,9 @@ export function renderDayPage(sourceRel, body, course) {
     const chipList = day.steps.map((s, i) => {
       const anchor = `step-${s.id.toLowerCase()}`;
       if (!html.includes(`<section class="day-step" id="${anchor}"`)) throw new Error(`${sourceRel}: 순서 칸 #${anchor}가 없다`);
-      return `<li class="day-chip" data-step="${s.id}"><input type="checkbox" class="step-check" data-step="${s.id}"${isExtraStep(s, course) ? ' data-extra' : ''} id="check-${s.id.toLowerCase()}" aria-label="${NUMS[i]} ${esc(plain(s.short))} 끝냄"><a href="#${anchor}"><span class="chip-no" aria-hidden="true">${NUMS[i]}</span><span class="chip-title">${inline(s.short)}</span></a></li>`;
+      const candidates = isExtraStep(s, course) ? s.tickets.filter(id => course.tickets.find(t => t.id === id)?.pool) : [];
+      const kind = candidates.length ? '선택 후보' : isExtraStep(s, course) ? '추가 연습' : day.phase === 'maintain' ? (s.tickets.includes('B14') ? '공통 작업 필수 · B14 처리는 선택' : '모두 필수') : '';
+      return `<li class="day-chip" data-step="${s.id}"${candidates.length ? ` data-choice-tickets="${candidates.join(',')}"` : ''}><input type="checkbox" class="step-check" data-step="${s.id}"${isExtraStep(s, course) ? ' data-extra' : ''} id="check-${s.id.toLowerCase()}" aria-label="${NUMS[i]} ${esc(plain(s.short))} 끝냄"><a href="#${anchor}"><span class="chip-no" aria-hidden="true">${NUMS[i]}</span><span class="chip-copy"><span class="chip-title">${inline(s.short)}</span>${kind ? `<small data-step-kind>${kind}</small>` : ''}</span></a></li>`;
     }).join('');
     const heading = steps.text.match(/<h2[\s\S]*?<\/h2>/)[0];
     // 홈 진도와 같은 기준: 선택·연습 티켓 순서는 따로 센다(course.js initDay의 진도 문구와 같다)
@@ -225,7 +227,7 @@ export function renderDayPage(sourceRel, body, course) {
     html = html.slice(0, steps.start)
       + `<section class="day-today" aria-labelledby="오늘-순서"><div class="day-today-head">${heading}<p class="day-progress" data-day-progress aria-live="polite">${progress}</p></div>`
       + `<ol class="day-steps day-chips" data-day="${day.id}">${chipList}</ol>`
-      + `<p class="day-progress-note">체크는 이 브라우저에만 저장되고, 홈의 "오늘 할 일"이 이 체크로 다음 날을 고릅니다.${extraNote} <span data-course-storage></span></p></section>\n`
+      + `<p class="day-progress-note">구현 체크는 이 브라우저에만 저장되며 채점 결과가 아닙니다. SQL·말하기·채점도 확인하세요. 다른 기기·브라우저에서는 일자 목록에서 하던 날로 직접 재진입하세요.${extraNote} <span data-course-storage></span></p></section>\n`
       + html.slice(steps.end);
   } else fail('오늘 순서가 없다');
 
@@ -260,7 +262,7 @@ export function renderDayPage(sourceRel, body, course) {
     return `${tag}<div class="copy-row"><button type="button" class="copy-button" data-sql-copy="${target}">SQL 복사</button><button type="button" class="copy-button" data-sql-download="${target}">파일 받기</button><span class="copy-status" role="status" aria-live="polite"></span></div>`;
   });
 
-  html = html.replace(/(<div class="day-data-table" data-sql-table="(\w+)"[^>]*>)/g, (_, tag, table) => {
+  html = html.replace(/(<div class="day-data-table"[^>]* data-sql-table="(\w+)"[^>]*>)/g, (_, tag, table) => {
     const target = `${day.id.toLowerCase()}-seed-${table}-sql`;
     return `${tag}<div class="copy-row"><button type="button" class="copy-button" data-table-copy="${table}" data-sql-copy="${target}">${table} 복사</button><span class="copy-status" role="status" aria-live="polite"></span></div>`;
   });
@@ -278,6 +280,22 @@ export function renderDayPage(sourceRel, body, course) {
   if (!pagerLine.test(html)) throw new Error(`${sourceRel}: 맨 아래 이전·다음 줄을 찾지 못했다`);
   html = html.replace(pagerLine, dayPager(day, sourceRel, course));
   return `<article class="course-day" data-day-page="${day.id}">${html}</article>`;
+}
+
+// 증상·관찰 도구만 비교한다. 원인과 해법은 티켓의 접기 안에 남긴다.
+export function renderTicketSelection(course, fromRel, editable = false) {
+  const observe = { B12:'브라우저 Network의 요청·응답', B13:'Security 로그·콜백 응답', B14:'prod 프로필의 curl 응답·Security 인가 규칙', B15:'글 변경·인기글 조회 로그 시각', B16:'요청 응답 시간·스레드 덤프' };
+  const choices = course.tickets.filter(t => t.pool).map(t => ({id:t.id,title:t.title,observe:observe[t.id],href:relHref(fromRel,t.page),day:t.id==='B14'?'D11':'D14'}));
+  return `<section class="ticket-selection" aria-label="선택 티켓 기록">
+  <p><strong>내 선택 티켓</strong> · 후보 5건 중 1건. 고르지 않은 후보는 추가 연습입니다.</p>${editable ? `
+  <label>끝까지 처리할 티켓 <select data-ticket-choice><option value="">아직 고르지 않음</option>${choices.map(t=>`<option value="${t.id}">${t.id} · ${esc(t.title)}</option>`).join('')}</select></label>
+  <ul class="ticket-comparison">${choices.map(t=>`<li><a href="${esc(t.href)}">${t.id} · ${esc(t.title)}</a> — 관찰: ${t.observe} · ${t.day} 수행</li>`).join('')}</ul>` : ''}
+  <p data-record-storage role="status"></p>
+  <p data-selected-ticket role="status">선택 기록 없음 · D11에서 한 건을 고르세요.</p>
+  <p>B16을 처리하면 장애 훈련은 201/200·1초 이내가 기준입니다. 다른 선택자는 실패 여부와 대응 근거를 기록합니다. E01·모의 장애 훈련은 모두 수행합니다. 선택·체크 기록은 채점 결과가 아닙니다.</p>
+  <p><a href="${esc(relHref(fromRel, 'course/spring/D14.html#step-d14-5'))}">모두 할 D14 ⑤ E01</a> · <a href="${esc(relHref(fromRel, 'course/spring/D14.html#step-d14-6'))}">D14 ⑥ 모의 장애 훈련</a></p>
+  <script type="application/json" id="course-choice-data">${JSON.stringify(choices).replace(/</g,'\\u003c')}</script>
+  </section>`;
 }
 
 // ---------------------------------------------------------------- 홈: 과정 v2 진입
@@ -308,22 +326,24 @@ export function renderCourseHome(course) {
     <article class="ch-today" aria-labelledby="ch-today-title">
       <p class="ch-tag" data-today-tag>오늘 할 일 · 처음 시작</p>
       <h2 id="ch-today-title"><b data-today-id>${first.id}</b> <span data-today-title>${esc(first.title)}</span></h2>
-      <p class="ch-today-meta" data-today-meta>${esc(PHASE[first.phase])} · 순서 ${first.steps.length}개 · 오늘의 Java ${esc(first.java)}</p>
+      <p class="ch-today-meta" data-today-meta>${esc(PHASE[first.phase])} · 구현 순서 ${first.steps.length}개 · 오늘의 Java ${esc(first.java)}</p>
       <ol class="ch-today-steps" data-today-steps>${todaySteps(first)}</ol>
       <nav class="ch-actions" data-today-flow aria-label="오늘 진행 순서"><a class="ch-primary" data-today-java href="${esc(href(course.java.find((j) => j.id === first.java).page))}">Java ${esc(first.java)}</a><span aria-hidden="true">→</span><a class="ch-secondary" data-today-open href="${esc(href(first.page))}">Spring ${first.id}</a><span aria-hidden="true">→</span><a class="ch-secondary" data-today-grade href="${esc(href(first.page))}#ai-채점-프롬프트">채점</a></nav>
+      <p data-course-wrapup></p>
       <p class="ch-note" data-today-note>Java가 처음이면 <a href="${esc(href('course/spring/D00.html'))}">D00 Java 워밍업(선택)</a>을 먼저 하세요.</p>
     </article>
     <section class="ch-progress" aria-labelledby="ch-progress-title">
       <div class="ch-progress-head"><h2 id="ch-progress-title">15일 진도</h2><p data-progress-summary>체크한 순서 0/${stepTotal}</p></div>
       <p class="ch-progress-note">직접 체크한 진도이며 채점 결과가 아닙니다. Java·선택 티켓의 수행 여부와 역량은 따로 확인합니다.</p>
       ${phases.map(([phase, label]) => `<h3 class="ch-phase">${label}</h3><ol class="ch-days">${main.filter((d) => d.phase === phase).map(dayCell).join('')}</ol>`).join('')}
-      <p class="ch-progress-note">일자 페이지의 순서 체크가 이 브라우저에 저장되고, 여기서 다음 날을 고릅니다. <span data-course-storage></span></p>
+      <p class="ch-progress-note">일자 페이지의 순서 체크가 이 브라우저에 저장되고, 여기서 다음 구현일을 추천합니다. 다른 기기·브라우저에서는 <a href="course/spring/README.html">일자 목록</a>에서 하던 날로 직접 재진입하세요. <span data-course-storage></span></p>
     </section>
   </div>
+  ${renderTicketSelection(course, from)}
   <div class="ch-entries">
     <article class="ch-entry"><p class="home-eyebrow">Spring 트랙 · 메인</p><h3>일자 페이지 D00~D15</h3><p>오늘 순서 → 순서 칸(만들 파일·겪을 것·완료 조건) → 막히면 힌트 → 그 순서의 구현 예시 → 오늘의 SQL → 말하기 카드와 AI 채점.</p><a href="${esc(href('course/spring/README.html'))}">일자 목록 열기 →</a></article>
     <article class="ch-entry"><p class="home-eyebrow">Java 트랙 · 매일 30~60분</p><h3>같은 날 쓰는 Java 먼저</h3><p class="ch-chips">${javaChips}</p></article>
-    <article class="ch-entry"><p class="home-eyebrow">2단계 티켓 · 필수 4건 + 선택 1건(Security·Redis 후보)</p><h3>증상만 적힌 티켓 B01~B16</h3><p class="ch-chips ch-ticket-chips">${ticketChips}</p><p class="ch-entry-note">필수 B01~B04 + 선택 1건(B12·B13·B14 또는 B15·B16) + <a href="${esc(href('course/tickets/E01.html'))}">고도화 E01</a> + <a href="${esc(href('course/tickets/drill.html'))}">모의 장애 훈련</a>. B05~B11과 고르지 않은 후보는 연습으로 하고, 처리한 것만 채점합니다. 티켓 페이지 ${readyTickets}/16 준비됨.</p></article>
+    <article class="ch-entry"><p class="home-eyebrow">2단계 티켓 · 필수 4건 + 선택 1건(Security·Redis 후보)</p><h3>증상만 적힌 티켓 B01~B16</h3><p class="ch-chips ch-ticket-chips">${ticketChips}</p><p class="ch-entry-note">필수 B01~B04 + 선택 1건(B12·B13·B14 또는 B15·B16) + <a href="${esc(href('course/tickets/E01.html'))}">고도화 E01</a> + <a href="${esc(href('course/tickets/drill.html'))}">모의 장애 훈련</a>. B05~B11과 고르지 않은 후보는 연습으로 하고, 처리한 것만 채점합니다. 티켓 문서 ${readyTickets}/16 제공 · 학습 완료 표시와 별개입니다.</p></article>
     <article class="ch-entry ch-entry-map"><p class="home-eyebrow">과정 지도</p><h3>날·Java·티켓·결함 영역의 관계</h3><p>어느 날의 Java가 어떤 날을 받치고, 2단계 티켓이 어떤 결함 영역에 속하는지 한 장에서 봅니다.</p><a href="${esc(href('course/map.html'))}">과정 지도 열기 →</a></article>
   </div>
   <p>데이터 요구사항으로 테이블을 직접 설계하고 더미 SQL을 내 테이블 이름에 맞춰 붙여 넣습니다. SQL을 매일 풀고, board-server는 구현 예시로 비교합니다.</p>

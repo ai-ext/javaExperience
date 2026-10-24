@@ -8,7 +8,12 @@ import { parseSpecEndpoints, parseTalkCardIds, validate, validateDayPages, valid
 const FX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures');
 const load = () => ({
   spec: fs.readFileSync(path.join(FX, 'spec.md'), 'utf8'),
-  roadmap: JSON.parse(fs.readFileSync(path.join(FX, 'roadmap.json'), 'utf8')),
+  roadmap: (() => {
+    const roadmap = JSON.parse(fs.readFileSync(path.join(FX, 'roadmap.json'), 'utf8'));
+    // 기존 엔드포인트 픽스처에 파일 동작 계약을 보충한다. 실제 로드맵은 별도로 전수 검증한다.
+    for (const day of roadmap.days) for (const step of day.steps) step.fileActions = { create: [...step.files], modify: [], inspect: [] };
+    return roadmap;
+  })(),
   cards: fs.readFileSync(path.join(FX, 'cards.md'), 'utf8'),
   courseFiles: { 'spec-v2.md': '깨끗한 본문' },
 });
@@ -27,6 +32,15 @@ test('정상 픽스처는 오류가 없다', () => {
   assert.deepEqual(validate(load()), []);
 });
 
+test('파일 동작이 빠지거나 작업 범위와 다르면 오류', () => {
+  const i = load();
+  delete i.roadmap.days[0].steps[0].fileActions;
+  assert.ok(has(validate(i), 'D01', 'step 1', 'fileActions'));
+  const j = load();
+  j.roadmap.days[0].steps[0].fileActions.modify.push('unlisted.java');
+  assert.ok(has(validate(j), 'D01', 'step 1', 'fileActions'));
+});
+
 test('일자 수가 15가 아니면 오류', () => {
   const i = load();
   i.roadmap.days.pop();
@@ -42,6 +56,7 @@ test('build 단계 순서에 파일이 없으면 오류', () => {
 test('build 단계는 실제 작업 층을 빠뜨리지 않도록 파일 4개 이상도 허용한다', () => {
   const i = load();
   i.roadmap.days[0].steps[0].files = ['Post.java', 'PostRepository.java', 'PostService.java', 'PostController.java', 'PostTest.java'];
+  i.roadmap.days[0].steps[0].fileActions.create = [...i.roadmap.days[0].steps[0].files];
   assert.deepEqual(validate(i), []);
 });
 

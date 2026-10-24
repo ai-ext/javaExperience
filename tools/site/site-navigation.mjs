@@ -2,6 +2,8 @@ import path from 'node:path';
 
 const spaces = [
   { label: '홈', target: 'index.html' },
+  { label: '과정 v2 · 일자 목록', target: 'course/spring/README.html' },
+  { label: '과정 지도', target: 'course/map.html' },
   { label: '서비스 만들기', target: 'scenario/README.html' },
   { label: '실전 미션', target: 'practice/MISSIONS.html' },
   { label: '개념 학습', target: 'docs/knowledge/README.html' },
@@ -10,6 +12,8 @@ const spaces = [
 // 문서 제목 대신 소속 폴더로 판별한다. 예외 문서를 홈으로 표시하지 않는다.
 export function siteSection(sourcePath) {
   if (sourcePath === 'README.md') return '홈';
+  if (sourcePath === 'course/map.md') return '과정 지도';
+  if (sourcePath.startsWith('course/')) return '과정 v2 · 일자 목록';
   if (sourcePath.startsWith('scenario/')) return '서비스 만들기';
   if (/^(practice|tickets)\//.test(sourcePath)) return '실전 미션';
   if (/^(docs\/knowledge|lessons)\//.test(sourcePath)) return '개념 학습';

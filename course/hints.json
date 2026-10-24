@@ -71,7 +71,7 @@
           "바인딩이 안 되면 yml 키의 kebab-case(`forbidden-words`)와 필드 이름(camelCase)이 relaxed binding으로 이어지는지 확인한다."
         ],
         "4": [
-          "검사기는 `@Component`로 등록하고 생성자 주입으로 설정 값을 받는다. 요청마다 달라지는 값은 필드가 아니라 지역 변수와 반환값으로만 다룬다.",
+          "Spring 싱글톤 빈은 기본적으로 하나의 객체를 여러 요청 스레드가 공유한다. 요청 A의 값을 필드에 쓰면 요청 B가 같은 필드를 읽거나 덮을 수 있다. 요청별 값은 지역 변수·인자·반환값으로 두고, 스레드와 공유 상태는 J07에서 자세히 실습한다. 검사기는 `@Component`로 등록하고 생성자 주입으로 설정 값을 받는다. 요청마다 달라지는 값은 필드가 아니라 지역 변수와 반환값으로만 다룬다.",
           "정규화처럼 상태도 의존도 없는 계산은 `private` 생성자를 둔 `final` 클래스의 static 메서드로 둔다."
         ],
         "5": [
@@ -175,13 +175,13 @@
         "questions": [
           {
             "task": "seed.sql의 D03 회원 블록을 붙여 넣고 전체 수와 역할별 수를 구한다.",
-            "expect": "seed D03 기준 20명, ADMIN 1명·USER 19명이다. 잔액은 0이고 원문 비밀번호는 조회 결과에 없다.",
+            "expect": "seed D03 기준 20명, ADMIN 1명·USER 19명이다. 원문 비밀번호는 조회 결과에 없다.",
             "example": "SELECT role, COUNT(*) FROM member GROUP BY role;"
           },
           {
             "task": "기존 회원과 이메일만 같은 경우, 닉네임만 같은 경우를 분리해 직접 INSERT한다.",
             "expect": "seed D03 기준 서로 다른 두 중복 원인이 각각 DB에서 거부되고 회원은 20명 그대로다. 거부 결과를 설계 메모에 남긴다.",
-            "example": "START TRANSACTION;\nINSERT INTO member(email,password_hash,nickname,role,point_balance,created_at,updated_at) SELECT email,password_hash,'freshnick','USER',0,NOW(6),NOW(6) FROM member LIMIT 1;\nROLLBACK;\nSTART TRANSACTION;\nINSERT INTO member(email,password_hash,nickname,role,point_balance,created_at,updated_at) SELECT 'fresh@example.test',password_hash,nickname,'USER',0,NOW(6),NOW(6) FROM member LIMIT 1;\nROLLBACK;"
+            "example": "START TRANSACTION;\nINSERT INTO member(email,password_hash,nickname,role,created_at,updated_at) SELECT email,password_hash,'freshnick','USER',NOW(6),NOW(6) FROM member LIMIT 1;\nROLLBACK;\nSTART TRANSACTION;\nINSERT INTO member(email,password_hash,nickname,role,created_at,updated_at) SELECT 'fresh@example.test',password_hash,nickname,'USER',NOW(6),NOW(6) FROM member LIMIT 1;\nROLLBACK;"
           }
         ],
         "refs": []
@@ -195,6 +195,7 @@
           "상태 매핑을 바꿔도 API의 ACTIVE/HIDDEN/DELETED 계약이 유지되는지 DB 재조회로 확인한다."
         ],
         "2": [
+          "이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 이미 만든 층은 재사용하고 오늘 담당 파일만 연결한다.",
           "한 태그를 여러 글이 공유하고 글에는 여러 태그가 붙는다. 중복·참조·공유 태그 수명을 어떤 구조로 표현할지 비교한다.",
           "글에서 연결을 없애도 다른 글의 같은 태그가 남는지 검증할 방법을 정한다. 이름으로 찾기는 Spring Data 쿼리 메서드를 찾아본다."
         ],
@@ -508,6 +509,7 @@
           "백오프 간격과 최대 시도 횟수는 상수로 두고, 재시도 대상 여부는 예외 타입(연결 실패·응답 타임아웃·거절)으로 나눈다. 테스트는 WireMock 시나리오(`inScenario`)로 \"처음 실패, 다음 성공\"을 만든다."
         ],
         "5": [
+          "이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 이미 만든 층은 재사용하고 오늘 담당 파일만 연결한다.",
           "서명은 `javax.crypto.Mac`(`HmacSHA256`)으로 계산하고 비교는 `MessageDigest.isEqual`로 한다. 원문 바이트는 `@RequestBody byte[]`로 받는다.",
           "콜백 경로는 공개 범위 규칙에 넣되, 같은 `paymentKey`가 다시 와도 포인트가 한 번만 적립되는지 상태 전이 조건으로 확인한다."
         ]
@@ -620,6 +622,7 @@
           "USER가 통과하면 `@PreAuthorize` 메서드를 같은 클래스 안에서 부르고 있지 않은지 본다."
         ],
         "3": [
+          "이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 이미 만든 층은 재사용하고 오늘 담당 파일만 연결한다.",
           "`@Target(ElementType.METHOD)`·`@Retention(RetentionPolicy.RUNTIME)`으로 표시 애노테이션을 만든다. 저장소는 `Repository` 인터페이스를 직접 상속해 필요한 메서드만 연다."
         ],
         "4": [
@@ -639,7 +642,8 @@
       "grader": {
         "focus": [
           "관리자 API가 URL 규칙(`/api/admin/**`)과 메서드 보안 두 겹으로 막히는지",
-          "통합 테스트 메서드에 `@Transactional`이 붙어 있지 않은지"
+          "통합 테스트 메서드에 `@Transactional`이 붙어 있지 않은지",
+          "진단 도구 예행 관찰의 스레드·메트릭·slow log·EXPLAIN ANALYZE 증거와 해석 및 설정 복원 기록을 확인한다"
         ]
       },
       "refs": [
@@ -665,6 +669,15 @@
           }
         ],
         "refs": []
+      },
+      "diagnostics": {
+        "intro": "1단계 내 서버에서 정상 요청 한 번을 관찰한다. 결함을 추측하기보다 도구가 무엇을 보여 주는지 기록하고 D12 B01·B02에서 같은 관찰법을 다시 쓴다.",
+        "tasks": [
+          "스레드 덤프: 같은 JDK의 `jcmd -l`로 내 서버 PID를 확인하고 `jcmd <PID> Thread.print > threads.txt`를 실행한다. `http-nio` 요청 스레드 하나의 이름·상태·스택을 골라 지금 실행 중인지 대기 중인지 한 문장으로 적는다.",
+          "메트릭: 내 서버의 로컬 프로필에서만 Actuator의 web exposure에 `health,metrics`를 임시로 넣고 로컬 접근 권한을 허용한다. `curl http://localhost:8080/actuator/metrics`와 `/actuator/metrics/http.server.requests`를 요청 전후 비교한다. 인증이 필요하면 관리자 자격으로 요청한다. count·단위·증가량을 기록하고 노출·보안 설정은 관찰 뒤 원래대로 되돌린다.",
+          "slow log: 내 로컬 disposable MySQL에서 `SHOW VARIABLES LIKE 'slow_query_log'`와 `SHOW VARIABLES LIKE 'long_query_time'`, `SHOW VARIABLES LIKE 'log_output'` 값을 먼저 저장한다. 관리자 연결에서 `SET GLOBAL log_output='TABLE'; SET GLOBAL slow_query_log=ON;` 후 관찰 연결에서 `SET SESSION long_query_time=0;`으로 두고 내 목록 SELECT를 한 번 실행한다. 관리자 연결에서 `SELECT start_time,query_time,rows_examined,sql_text FROM mysql.slow_log ORDER BY start_time DESC LIMIT 5;`로 대상 쿼리를 찾는다. 종료 후 GLOBAL 두 설정과 log_output을 기존 값으로 되돌리고 관찰 연결을 닫는다. 공유·운영 DB에서는 실행하지 않는다.",
+          "실행 계획: 같은 목록 SELECT 앞에 `EXPLAIN ANALYZE`를 붙인다(조회가 실제 실행된다). 실제 행 수·loops·시간을 읽고 slow log의 읽은 행 수와 함께 한 문장으로 해석한다. 측정값을 기록하며 빠르다는 결론을 미리 정하지 않는다."
+        ]
       }
     },
     "D11": {

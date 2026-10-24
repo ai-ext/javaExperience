@@ -4,6 +4,8 @@
   'use strict';
   var KEY = 'javaexperience.course.progress.v1';
   var STEP_ID = /^D\d{2}-\d+$/;
+  var CHOICE = /^B(?:12|13|14|15|16)$/;
+  var PREP_ID = /^D11-[1-6]$/;
 
   function storage() { try { return window.localStorage; } catch (e) { return null; } }
   // 반환: { ok: 저장소 사용 가능 여부, done: Set(순서 id) }
@@ -16,14 +18,22 @@
       if (value && value.version === 1 && value.steps && typeof value.steps === 'object') {
         Object.keys(value.steps).forEach(function (id) { if (STEP_ID.test(id) && value.steps[id] === true) done.add(id); });
       }
-      return { ok: true, done: done };
+      var preparation = {};
+      if (value && value.version === 1) Object.keys(value.preparation || {}).forEach(function(id) { if (PREP_ID.test(id) && value.preparation[id] === true) preparation[id] = true; });
+      return { ok: true, done: done, selectedTicket: value && value.version === 1 && CHOICE.test(value.selectedTicket) ? value.selectedTicket : '', preparation: preparation };
     } catch (e) { return { ok: false, done: new Set() }; }
   }
-  function writeProgress(store, done) {
+  function writeProgress(store, done, records) {
     if (!store) return false;
     var steps = {};
     done.forEach(function (id) { steps[id] = true; });
-    try { store.setItem(KEY, JSON.stringify({ version: 1, steps: steps })); return true; } catch (e) { return false; }
+    var latest = readProgress(store);
+    var value = { version: 1, steps: steps };
+    var selected = records && 'selectedTicket' in records ? records.selectedTicket : latest.selectedTicket;
+    var preparation = records && records.preparation ? records.preparation : latest.preparation;
+    if (CHOICE.test(selected)) value.selectedTicket = selected;
+    if (preparation && Object.keys(preparation).length) value.preparation = preparation;
+    try { store.setItem(KEY, JSON.stringify(value)); return true; } catch (e) { return false; }
   }
   // 진도로 세는 순서: 선택·연습 티켓만 다루는 추가 순서(extra)를 뺀 나머지. 그날 순서가 모두 추가면 전부 센다.
   function coreSteps(day) {
@@ -110,6 +120,52 @@
     });
   }
 
+  // 준비·선택 기록은 구현 체크와 별도로 관리한다. 저장 실패한 변경은 이 화면에서 보존한다.
+  function initRecords() {
+    var store = storage(), pending = {}, pendingPrep = {};
+    var choice = document.querySelector('[data-ticket-choice]');
+    var preps = Array.prototype.slice.call(document.querySelectorAll('[data-prep]'));
+    var data = document.getElementById('course-choice-data');
+    var choices = data ? JSON.parse(data.textContent) : [];
+    function current() {
+      var state = readProgress(store);
+      state.preparation = state.preparation || {};
+      if ('selectedTicket' in pending) state.selectedTicket = pending.selectedTicket;
+      Object.keys(pendingPrep).forEach(function(id) { if (pendingPrep[id]) state.preparation[id] = true; else delete state.preparation[id]; });
+      return state;
+    }
+    function paint() {
+      var state = current();
+      if (choice) choice.value = state.selectedTicket || '';
+      preps.forEach(function(input) { input.checked = state.preparation[input.dataset.prep] === true; });
+      var selected = choices.find(function(t) { return t.id === state.selectedTicket; });
+      document.querySelectorAll('[data-selected-ticket]').forEach(function(node) {
+        node.replaceChildren();
+        if (!selected) { node.textContent = '선택 기록 없음 · D11에서 한 건을 고르세요. E01·모의 장애 훈련은 모두 수행합니다.'; return; }
+        var link = document.createElement('a'); link.href = selected.href; link.textContent = selected.id + ' · ' + selected.title;
+        node.append('내 선택: ', link, ' · ' + selected.day + '에서 수행 · E01·모의 장애 훈련은 모두 수행. ' + (selected.id === 'B16' ? '훈련: 201/200·1초 이내로 확인합니다.' : '훈련: 실패 여부와 대응 근거를 기록합니다.'));
+      });
+      document.querySelectorAll('[data-choice-tickets]').forEach(function(node) {
+        var mine = node.dataset.choiceTickets.split(',').indexOf(state.selectedTicket) >= 0;
+        var kind = node.querySelector('.chip-copy > [data-step-kind]');
+        if (kind) kind.textContent = mine ? '내 선택 티켓 포함' : state.selectedTicket ? '고르지 않은 후보 · 추가 연습' : '선택 후보 · D11에서 1건 선택';
+        node.classList.toggle('is-selected-ticket', mine);
+      });
+      var note = document.querySelector('[data-record-storage]');
+      if (note) note.textContent = !state.ok ? '저장소를 쓸 수 없어 새로고침하면 기록이 사라집니다.' : Object.keys(pending).length || Object.keys(pendingPrep).length ? '기록을 저장하지 못했습니다. 이 화면에만 남아 있습니다.' : '';
+    }
+    function save() {
+      var state = current();
+      if (writeProgress(store, state.done, state)) { pending = {}; pendingPrep = {}; }
+      paint();
+    }
+    if (choice) choice.addEventListener('change', function() { pending.selectedTicket = choice.value; save(); });
+    preps.forEach(function(input) { input.addEventListener('change', function() { pendingPrep[input.dataset.prep] = input.checked; save(); }); });
+    window.addEventListener('pageshow', paint);
+    window.addEventListener('storage', function(e) { if (e.key === null || e.key === KEY) paint(); });
+    paint();
+  }
+
   // ------------------------------------------------------------ 복사 버튼
   function initCopy() {
     document.querySelectorAll('button[data-copy-target]').forEach(function (button) {
@@ -119,7 +175,7 @@
         if (!target) return;
         var text = target.textContent;
         function done(ok) {
-          if (status) status.textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 선택된 프롬프트를 직접 복사하세요(⌘C / Ctrl+C).';
+          if (status) status.textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 선택된 프롬프트를 길게 눌러 복사하거나 ⌘C / Ctrl+C를 쓰세요.';
         }
         function fallback() {
           var ok = false;
@@ -165,7 +221,7 @@
           var selection = window.getSelection();
           selection.removeAllRanges();
           selection.addRange(range);
-          copyStatus.textContent = '자동 복사가 막혔어요. 선택된 SQL을 직접 복사하세요(⌘C / Ctrl+C).';
+          copyStatus.textContent = '자동 복사가 막혔어요. 선택된 SQL을 길게 눌러 복사하거나 파일 받기를 쓰세요(⌘C / Ctrl+C도 가능).';
         }
         button.addEventListener('click', function () {
           try {
@@ -214,7 +270,7 @@
       var state = readProgress(store);
       var pick = nextDay(days, state.done);
       var day = pick.day;
-      var tags = { first: '오늘 할 일 · 처음 시작', continue: '오늘 할 일 · 이어서', next: '오늘 할 일 · 다음 날', remaining: '오늘 할 일 · 남은 순서가 있는 날', complete: '15일 과정 · 모두 체크함' };
+      var tags = { first: '오늘 할 일 · 처음 시작', continue: '오늘 할 일 · 이어서', next: '오늘 할 일 · 다음 날', remaining: '오늘 할 일 · 남은 순서가 있는 날', complete: '15일 과정 · 필수 구현 체크 끝 · 채점 결과 별도' };
       $('[data-today-tag]').textContent = tags[pick.mode];
       $('[data-today-id]').textContent = day.id;
       $('[data-today-title]').textContent = day.title;
@@ -223,6 +279,17 @@
       var doneHere = core.filter(function (s) { return state.done.has(s.id); }).length;
       $('[data-today-meta]').textContent = day.phaseLabel + ' · 순서 ' + core.length + '개' + (doneHere ? ' 중 ' + doneHere + '개 끝냄' : '')
         + (extraCount ? ' · 선택·연습 ' + extraCount + '개' : '') + ' · 오늘의 Java ' + day.java;
+      var wrapup = $('[data-course-wrapup]');
+      if (wrapup) {
+        wrapup.replaceChildren();
+        var lastChecked = days.filter(function(d) { return d.steps.some(function(s) { return state.done.has(s.id); }); }).pop();
+        if (lastChecked && coreSteps(lastChecked).every(function(s) { return state.done.has(s.id); })) {
+          wrapup.append('구현 체크 뒤 SQL·말하기·채점을 확인하세요: ');
+          [['SQL','#오늘의-sql'],['말하기','#말하기-카드'],['채점','#ai-채점-프롬프트']].forEach(function(item) {
+            var a=document.createElement('a'); a.href=lastChecked.href+item[1]; a.textContent=lastChecked.id+' '+item[0]; wrapup.append(a,' ');
+          });
+        }
+      }
       var list = $('[data-today-steps]');
       list.replaceChildren.apply(list, day.steps.map(function (s, i) {
         var li = document.createElement('li');
@@ -271,6 +338,7 @@
     if (home) initHome(home);
     initCopy();
     initDaySql();
+    initRecords();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

@@ -4,7 +4,7 @@ import test from 'node:test';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { JSDOM } from 'jsdom';
-import { loadCourse, shortTitle, mapNodes, findInjectedLinkErrors } from './course-pages.mjs';
+import { loadCourse, shortTitle, mapNodes, findInjectedLinkErrors, renderTicketSelection } from './course-pages.mjs';
 import { maskedNodes, MASK_LABEL } from './course-flow.mjs';
 
 const root = new URL('../../', import.meta.url);
@@ -201,6 +201,48 @@ await test('R4-05: 일자 칩 체크박스의 누르는 면은 최소 24×24px',
   const input = declarations(courseCss, '.day-chip input');
   for (const prop of ['width', 'height']) assert.ok(/^\d+px$/.test(input[prop]) && parseFloat(input[prop]) >= 24, `${prop}: ${input[prop]}`);
 });
+// JSDOM에는 레이아웃이 없으므로 텍스트 존재 대신 DOM과 실제 CSS의 잘림 경계를 검사한다.
+await test('오늘 순서 상태 표식은 제목의 두 줄 제한과 잘림 조상 밖에 있다', async () => {
+  const clippingRules = [...courseCss.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(([, , body]) => /(?:^|;)\s*(?:(?:-webkit-)?line-clamp\s*:\s*[1-9]|overflow(?:-[xy])?\s*:\s*(?:hidden|clip)|display\s*:\s*none|visibility\s*:\s*hidden)/.test(body));
+  const titleStyle = declarations(courseCss, '.chip-title');
+  assert.equal(titleStyle['-webkit-line-clamp'], '2', '제목의 두 줄 제한은 유지한다');
+  assert.equal(titleStyle.overflow, 'hidden');
+  for (const selectedTicket of ['', 'B16']) {
+    for (const day of course.days) {
+      const page = await open(day.page, { saved: JSON.stringify({ version: 1, steps: {}, selectedTicket }) });
+      try {
+        const chips = page.$$('.day-chip');
+        if (day.phase === 'maintain') assert.equal(chips.filter(chip => chip.querySelector('[data-step-kind]')).length, day.steps.length, `${day.id}: 모든 순서에 상태 표식`);
+        for (const chip of chips) {
+          const marker = chip.querySelector('[data-step-kind]');
+          if (!marker) continue;
+          assert.equal(marker.closest('.chip-title'), null, `${chip.dataset.step}: 상태 표식은 제목 밖`);
+          assert.ok(marker.previousElementSibling?.matches('.chip-title'), `${chip.dataset.step}: 제목 다음의 독립 요소`);
+          for (let node = marker; chip.contains(node); node = node.parentElement) {
+            assert.equal(node.hidden, false, `${chip.dataset.step}: 표식과 조상을 숨기지 않는다`);
+            for (const [, selector] of clippingRules) assert.equal(node.matches(selector.trim()), false, `${chip.dataset.step}: ${selector.trim()}의 잘림·숨김 규칙 밖`);
+          }
+        }
+        if (day.id === 'D14' && selectedTicket === 'B16') {
+          const labels = page.$$('.day-chip [data-step-kind]').map(node => node.textContent);
+          assert.equal(labels.filter(label => label === '내 선택 티켓 포함').length, 1);
+          assert.equal(labels.filter(label => label === '고르지 않은 후보 · 추가 연습').length, 3);
+          assert.equal(labels.filter(label => label === '모두 필수').length, 2);
+        }
+      } finally { page.window.close(); }
+    }
+  }
+});
+
+await test('비편집 선택 UI 템플릿과 생성 페이지는 공백만 있는 줄을 남기지 않는다', () => {
+  for (const from of ['README.md', 'index.md', 'course/spring/D14.md']) {
+    assert.doesNotMatch(renderTicketSelection(course, from, false), /^[ \t]+$/m, from);
+    const file = from.replace(/\.md$/, '.html');
+    assert.doesNotMatch(fs.readFileSync(new URL(file, root), 'utf8'), /^[ \t]+$/m, file);
+  }
+});
+
 await test('R4-06: 한국어 본문은 낱말을 지키고 코드는 긴 토큰을 줄바꿈한다', () => {
   assert.equal(declarations(courseCss, '.course-day')['word-break'], 'keep-all');
   assert.equal(declarations(flowCss, '.flow')['word-break'], 'keep-all');

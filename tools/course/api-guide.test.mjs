@@ -60,3 +60,22 @@ test('INSERT 문은 문자열 속 세미콜론·주석을 자르지 않고 같�
   assert.ok(chunks[0].sql.includes("VALUES ('a;--b', 'it''s');"));
   assert.match(chunks[0].sql, /INSERT INTO demo VALUES/);
 });
+
+test('모든 seed 조각은 준비 순서로 복귀하고 bulk 실험은 D06 ⑤로 복귀한다', () => {
+  const seed = read('course/start/dummy/seed.sql');
+  for (const [id, blocks] of builder.parseDaySql(seed)) {
+    const prepared = Object.values(builder.DATA_STEPS[id]).flat();
+    for (const {table} of builder.splitSeedTables(blocks.join(''))) assert.ok(prepared.includes(table), `${id} ${table}: 준비·복귀 누락`);
+  }
+  assert.ok(builder.DATA_STEPS.D06[5].includes('bulk'));
+});
+
+test('D13 카드 연결은 로드맵 과제·티켓과 일치하고 D10 진단 증거를 완료·채점에서 요구한다', () => {
+  const d13=roadmap.days.find(d=>d.id==='D13');
+  for(const [id,step,ticket] of [['TC-D13-1',5,'B06'],['TC-D13-2',2,'B07'],['TC-D13-3',3,'B09'],['TC-D13-4',4,'B10']]) {
+    assert.deepEqual(d13.talkCardLinks?.[id],{step,ticket});
+    assert.ok(d13.steps.find(s=>s.no===step).tickets.includes(ticket));
+  }
+  assert.match(roadmap.days.find(d=>d.id==='D10').steps[5].done.join(' '),/스레드.*메트릭.*slow log.*EXPLAIN ANALYZE/);
+  assert.match(hints.days.D10.grader.focus.join(' '),/진단.*관찰/);
+});
