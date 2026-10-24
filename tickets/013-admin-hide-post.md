@@ -12,7 +12,7 @@
 - 운영자가 아니면 두 API 모두 거절합니다. 토큰이 없으면 401, 운영자가 아니면 403.
 - **완료 조건**: 숨긴 글은 일반 목록·상세에서 사라지고(작성자 본인에게도), 복구하면 그대로 돌아온다.
 
-**DB 시작 상태**: `community` 처음 상태(`bash scripts/java-db.sh --reset`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 이미 숨김 상태인 글은 10번 하나, 임시저장 글은 7번, 삭제된 글은 8번이다. 운영자 토큰은 `tok-admin`.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 이미 숨김 상태인 글은 10번 하나, 임시저장 글은 7번, 삭제된 글은 8번이다. 운영자 토큰은 `tok-admin`.
 
 ## 지금 코드
 

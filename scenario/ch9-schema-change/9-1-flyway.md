@@ -1,6 +1,6 @@
 # 9-1. Flyway 도입 — 지금 스키마를 기준선으로
 
-> **9장은 학습용 DB(`practice`)로 채점한다.** 앱을 `practice` 프로파일로 띄운다(8-1 참고). 9장에서 만드는 마이그레이션은 `community`에도 똑같이 적용된다(두 DB는 같은 스키마). 스키마를 처음으로 되돌리려면 javaExperience 레포 루트에서 `docker compose down -v && docker compose up -d`.
+> **9장은 학습용 DB(`practice`)로 채점한다.** 앱을 `practice` 프로파일로 띄운다(8-1 참고). 9장에서 만드는 마이그레이션은 `community`에도 똑같이 적용된다(두 DB는 같은 스키마). 스키마를 처음으로 되돌리려면 javaExperience 레포 루트에서 `docker compose down -v && docker compose up -d`. **루트 compose의 `down -v`는 `community`·`practice`·`project` DB와 CloudBeaver 작업 공간(저장한 SQL·연결 설정)을 함께 초기화한다. 먼저 `./docker/mysql/dump.sh`로 DB를 백업하고 CloudBeaver 자료는 따로 보관한다(DB 덤프에 포함되지 않음).**
 
 ## 상황
 
@@ -136,7 +136,7 @@ docker compose exec -T mysql mysqldump -uroot -proot --no-create-info --compact 
   > src/test/resources/db/testdata/V1_1__community_seed.sql
 ```
 
-시드 dump에는 다른 장에서 쌓인 채점 데이터가 섞이지 않도록 **DB를 초기화한 직후**에 뜬다(javaExperience 레포 루트에서 `docker compose down -v && docker compose up -d`). 데이터 파일 앞에도 `SET FOREIGN_KEY_CHECKS = 0;`을 붙인다.
+시드 dump에는 다른 장에서 쌓인 채점 데이터가 섞이지 않도록 **DB를 초기화한 직후**에 뜬다(javaExperience 레포 루트에서 `docker compose down -v && docker compose up -d`). 데이터 파일 앞에도 `SET FOREIGN_KEY_CHECKS = 0;`을 붙인다. **루트 compose의 `down -v`는 `community`·`practice`·`project` DB와 CloudBeaver 작업 공간(저장한 SQL·연결 설정)을 함께 초기화한다. 먼저 `./docker/mysql/dump.sh`로 DB를 백업하고 CloudBeaver 자료는 따로 보관한다(DB 덤프에 포함되지 않음).**
 
 ## 구현 가이드
 

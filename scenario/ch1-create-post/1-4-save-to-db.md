@@ -224,7 +224,7 @@ id  board_id  author_id  title          status     visibility  published_at  vie
 **지켜야 할 것**
 
 - 테이블을 바꾸지 말고 엔티티를 테이블에 맞춘다. `application.yml`의 `ddl-auto: validate`는 그대로 둔다.
-- 테이블은 CloudBeaver(`http://localhost:8978`)의 `community (Java 시나리오)` 연결, 아래 `SHOW CREATE TABLE`, dump 파일 중 편한 것으로 본다.
+- 테이블은 CloudBeaver(`http://localhost:8978`)의 `community (시나리오)` 연결, 아래 `SHOW CREATE TABLE`, dump 파일 중 편한 것으로 본다.
 
 ```bash
 docker compose exec -T mysql mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community -e "SHOW CREATE TABLE post\G"
@@ -257,7 +257,7 @@ docker compose exec -T mysql mysql --default-character-set=utf8mb4 -ucommunity -
 | `create` | 켤 때마다 테이블을 **지우고 새로 만든다.** | **쓰면 안 된다.** `community` DB의 시드 데이터(글 21개·회원·게시판)가 사라진다. |
 | `create-drop` | `create` + 끌 때 또 지운다. | **쓰면 안 된다.** 위와 같다. |
 
-시드가 날아갔다면 javaExperience 레포 루트에서 `docker compose down -v && docker compose up -d`으로 처음 상태로 되돌린다.
+시드가 날아갔다면 javaExperience 레포 루트에서 `docker compose down -v && docker compose up -d`으로 처음 상태로 되돌린다. **루트 compose의 `down -v`는 `community`·`practice`·`project` DB와 CloudBeaver 작업 공간(저장한 SQL·연결 설정)을 함께 초기화한다. 먼저 `./docker/mysql/dump.sh`로 DB를 백업하고 CloudBeaver 자료는 따로 보관한다(DB 덤프에 포함되지 않음).**
 
 ## 기본값은 언제 들어가나
 
@@ -350,7 +350,7 @@ VALUES (2, 2, 'SQL로 넣은 글', '터미널에서 INSERT', 'PUBLISHED', 'PUBLI
 SELECT LAST_INSERT_ID();"
 ```
 
-CloudBeaver(`http://localhost:8978`)라면 `community (Java 시나리오)` 연결 → SQL 편집기에 `INSERT …` 문만 붙여 넣고 실행한다.
+CloudBeaver(`http://localhost:8978`)라면 `community (시나리오)` 연결 → SQL 편집기에 `INSERT …` 문만 붙여 넣고 실행한다.
 
 SQL로 넣어 보면 JPA가 대신 해 주던 일이 다 내 몫이다.
 

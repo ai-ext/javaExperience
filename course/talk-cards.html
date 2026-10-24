@@ -1,0 +1,1498 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>말하기 카드</title>
+<link rel="stylesheet" href="../tools/site/site.css?v=6580290a3c9f">
+<link rel="stylesheet" href="../tools/site/course.css?v=b6c93c158a77">
+<link rel="stylesheet" href="../tools/site/course-tokens.css?v=90f7ed5128e9">
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../index.html">홈</a><a href="spring/README.html" aria-current="page">과정 v2 · 일자 목록</a><a href="map.html">과정 지도</a><a href="../scenario/README.html">서비스 만들기</a><a href="../practice/MISSIONS.html">실전 미션</a><a href="../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<h1 id="말하기-카드"><a class="anchor" href="#말하기-카드" aria-hidden="true">#</a>말하기 카드</h1>
+<p>리뷰어가 그날 묻는 질문이다. &quot;문제 상황 → 원인 → 선택 → 결과&quot; 순서로 답한다. <strong>답에 들어가야 할 것</strong>의 세 줄이 모두 나오면 통과다. <strong>근거</strong>의 <code>spec-v2 §…</code>는 <a href="spec-v2.html">명세서 v2</a>의 절이다. 숫자 번호(예: <code>06 §15</code>)는 카드를 쓸 때 참고한 저장소 밖 작성 자료의 번호라 학습자는 열 수 없고, 일자 페이지에는 명세 절만 싣는다.</p>
+<h2 id="d01-프로젝트-뼈대"><a class="anchor" href="#d01-프로젝트-뼈대" aria-hidden="true">#</a>D01 프로젝트 뼈대</h2>
+<h3 id="tc-d01-1"><a class="anchor" href="#tc-d01-1" aria-hidden="true">#</a>TC-D01-1</h3>
+<p><strong>질문</strong> <code>application.yml</code>의 <code>server.port</code>를 바꿨는데 서버가 예전 포트로 뜹니다. 어디부터 확인하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>커맨드라인 인자와 OS 환경 변수는 <code>application.yml</code>보다 우선하므로, 같은 키가 그쪽에 있으면 yml 수정은 반영되지 않는다</li>
+<li>활성 프로파일의 설정(<code>application-local.yml</code> 또는 <code>on-profile</code> 문서)이 기본 문서의 같은 키를 덮어쓴다</li>
+<li>값은 키 단위로 덮어써지므로 추측하지 않고, 로컬에서 연 <code>/actuator/env</code>의 출처 목록이나 기동 로그로 어느 출처가 이겼는지 확인한다
+<strong>근거</strong> 06 §15</li>
+</ul>
+<h3 id="tc-d01-2"><a class="anchor" href="#tc-d01-2" aria-hidden="true">#</a>TC-D01-2</h3>
+<p><strong>질문</strong> prod 서버가 로컬 DB 주소로 떠 있었습니다. 원인으로 무엇을 의심하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>활성 프로파일을 지정하지 않으면 <code>default</code> 프로파일로 기동해 prod 문서가 적용되지 않는다</li>
+<li>프로파일 전용 문서(<code>on-profile</code> 문서, <code>application-prod.yml</code>) 안에서는 <code>spring.profiles.active</code>를 지정할 수 없으므로, 활성화는 실행 인자나 환경 변수로 한다</li>
+<li>기동 로그에 찍히는 활성 프로파일 줄로 어떤 프로파일이 켜졌는지 먼저 확인한다
+<strong>근거</strong> 06 §15</li>
+</ul>
+<h3 id="tc-d01-3"><a class="anchor" href="#tc-d01-3" aria-hidden="true">#</a>TC-D01-3</h3>
+<p><strong>질문</strong> DB 비밀번호를 <code>application.yml</code>에 적어 커밋했습니다. 무엇이 문제고 어떻게 바꾸나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>파일에서 지워도 git 이력에 평문이 남으므로, 이미 커밋된 비밀번호는 노출된 것으로 보고 교체한다</li>
+<li>Spring Boot에는 내장 프로퍼티 암호화가 없어서 yml에는 <code>${DB_PASSWORD}</code> 같은 자리표시자만 둔다</li>
+<li>실제 값은 환경 변수(또는 <code>configtree:</code>로 마운트한 파일)로 주입한다. PG 비밀키도 같은 방식이다
+<strong>근거</strong> 06 §15, spec-v2 §7</li>
+</ul>
+<h3 id="tc-d01-4"><a class="anchor" href="#tc-d01-4" aria-hidden="true">#</a>TC-D01-4</h3>
+<p><strong>질문</strong> 동시 요청 세 건의 로그가 섞여서 한 사용자 요청만 골라낼 수 없었습니다. 요청 ID 필터를 어떻게 만들었나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>서블릿 필터가 요청 시작에서 요청 ID를 <code>MDC.put</code>하고, 로그 패턴에 그 키를 넣어 모든 줄에 찍는다</li>
+<li><code>finally</code>에서 MDC를 지운다. 톰캣 스레드는 재사용되므로 지우지 않으면 다음 요청 로그에 이전 ID가 남을 수 있다</li>
+<li>MDC는 스레드 단위라 <code>@Async</code>나 별도 스레드풀로 넘어가면 전파되지 않으므로 <code>TaskDecorator</code>로 복사한다
+<strong>근거</strong> 06 §8</li>
+</ul>
+<h3 id="tc-d01-5"><a class="anchor" href="#tc-d01-5" aria-hidden="true">#</a>TC-D01-5</h3>
+<p><strong>질문</strong> 헬스 체크(liveness)에 DB 연결 확인을 넣자는 제안을 받았습니다. 어떻게 답하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>liveness에 DB 같은 외부 시스템을 넣으면 DB가 잠깐 끊겼을 때 모든 인스턴스가 재시작돼 장애가 커진다</li>
+<li>외부 의존 상태는 readiness에서 다룰지 판단한다. 넣으면 그 시스템 장애 때 인스턴스가 트래픽에서 빠진다</li>
+<li>Boot는 기본으로 HTTP에 <code>health</code>만 노출하고, 명세도 <code>/actuator/health</code> 외의 actuator는 공개하지 않는다
+<strong>근거</strong> 10 §1, spec-v2 §3</li>
+</ul>
+<h2 id="d02-공통-기반"><a class="anchor" href="#d02-공통-기반" aria-hidden="true">#</a>D02 공통 기반</h2>
+<h3 id="tc-d02-1"><a class="anchor" href="#tc-d02-1" aria-hidden="true">#</a>TC-D02-1</h3>
+<p><strong>질문</strong> 금칙어 목록을 DB에서 읽어 메모리에 올리는 코드를 <code>@PostConstruct</code>가 아니라 <code>ApplicationReadyEvent</code>에 둔 이유는?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li><code>@PostConstruct</code>는 빈 하나를 초기화하는 도중에 실행되므로, 그 시점에는 다른 빈이나 트랜잭션 프록시가 아직 준비되지 않았을 수 있다</li>
+<li><code>@PostConstruct</code> 안에서 같은 클래스의 <code>@Transactional</code> 메서드를 불러도 프록시를 거치지 않아 트랜잭션이 걸리지 않는다</li>
+<li><code>ApplicationReadyEvent</code>는 컨텍스트 refresh와 runner 실행이 끝난 뒤 발행되므로 기동 후 적재는 여기나 <code>ApplicationRunner</code>에 둔다
+<strong>근거</strong> 06 §14</li>
+</ul>
+<h3 id="tc-d02-2"><a class="anchor" href="#tc-d02-2" aria-hidden="true">#</a>TC-D02-2</h3>
+<p><strong>질문</strong> 금칙어 검사기에 마지막 검사 결과를 담는 필드 <code>lastMatched</code>를 두자는 코드가 올라왔습니다. 리뷰에서 뭐라고 하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>Spring 빈의 기본 스코프는 singleton이라 모든 요청 스레드가 같은 인스턴스를 공유한다</li>
+<li>요청마다 바뀌는 값을 인스턴스 필드에 쓰면 동시 요청끼리 덮어써 다른 사용자의 값이 섞인다</li>
+<li>요청별 값은 지역 변수·인자·반환값으로 다루고, 필드에는 <code>final</code> 의존성과 불변 설정만 둔다
+<strong>근거</strong> 06 §1</li>
+</ul>
+<h3 id="tc-d02-3"><a class="anchor" href="#tc-d02-3" aria-hidden="true">#</a>TC-D02-3</h3>
+<p><strong>질문</strong> 닉네임 정규화 함수는 static 유틸로, 금칙어 검사기는 빈으로 만들었습니다. 무엇을 기준으로 나눴나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>입력만 받아 결과를 돌려주고 외부 자원이 없는 순수 함수는 static 유틸로 둔다</li>
+<li>DB·설정·다른 빈에 의존하거나 트랜잭션·AOP가 필요한 것은 빈으로 만들어 주입받는다</li>
+<li>빈은 생성자 주입으로 테스트 대역을 넣을 수 있지만, static 호출은 대역으로 바꾸기 어렵다
+<strong>근거</strong> 06 §1</li>
+</ul>
+<h3 id="tc-d02-4"><a class="anchor" href="#tc-d02-4" aria-hidden="true">#</a>TC-D02-4</h3>
+<p><strong>질문</strong> 전역 예외 처리기에서 <code>IllegalArgumentException</code>을 전부 400으로 바꾸자는 제안이 있습니다. 어떻게 답하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li><code>IllegalArgumentException</code>은 서버 버그에서도 나므로, 일괄 400으로 바꾸면 서버 결함이 클라이언트 잘못으로 보이고 5xx 지표에서 사라진다</li>
+<li>클라이언트 잘못이 명백한 경우만 도메인 예외로 정의해 4xx로 매핑하고, 예상하지 못한 예외는 500으로 둔다</li>
+<li>모든 에러는 ProblemDetail(<code>application/problem+json</code>)로 내고, 클라이언트는 <code>type</code>으로 분기한다
+<strong>근거</strong> 06 §10, spec-v2 §2</li>
+</ul>
+<h3 id="tc-d02-5"><a class="anchor" href="#tc-d02-5" aria-hidden="true">#</a>TC-D02-5</h3>
+<p><strong>질문</strong> 여러 클래스에서 <code>@Value</code>로 읽던 금칙어 설정을 <code>@ConfigurationProperties</code> 하나로 묶었습니다. 무엇이 좋아졌나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>관련 설정이 한 타입에 모이고, <code>@Validated</code>를 붙이면 잘못된 값이 기동 시점에 실패한다</li>
+<li>relaxed binding으로 kebab-case, camelCase, 환경 변수 표기를 모두 받는다</li>
+<li><code>@Value</code>는 relaxed binding이 제한적이라, 키를 정규형(kebab-case)으로 쓰지 않으면 다른 표기의 값을 못 찾을 수 있다
+<strong>근거</strong> 06 §14</li>
+</ul>
+<h2 id="d03-회원인증"><a class="anchor" href="#d03-회원인증" aria-hidden="true">#</a>D03 회원·인증</h2>
+<h3 id="tc-d03-1"><a class="anchor" href="#tc-d03-1" aria-hidden="true">#</a>TC-D03-1</h3>
+<p><strong>질문</strong> permitAll 규칙을 관리자 규칙보다 앞에 두면 어떤 일이 생기나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>인가 규칙은 위에서부터 첫 번째로 매치된 것만 적용된다</li>
+<li>넓은 패턴이 앞에 있으면 뒤의 관리자 규칙은 평가되지 않는다</li>
+<li>테스트로 관리자 경로에 USER 토큰을 보내 403을 확인한다
+<strong>근거</strong> 06 §6</li>
+</ul>
+<h3 id="tc-d03-2"><a class="anchor" href="#tc-d03-2" aria-hidden="true">#</a>TC-D03-2</h3>
+<p><strong>질문</strong> 프론트(<code>http://localhost:3000</code>)에서만 로그인 요청이 막히고 curl로는 성공합니다. 왜 그런가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>브라우저는 다른 출처로 JSON 본문이나 <code>Authorization</code> 헤더를 보낼 때 먼저 <code>OPTIONS</code> preflight를 보내고, curl은 CORS를 검사하지 않는다</li>
+<li>preflight에는 인증 정보가 없으므로 CORS 처리가 인증보다 먼저 돼야 한다. 그렇지 않으면 401·403으로 막히고 브라우저에는 CORS 에러로만 보인다</li>
+<li><code>http.cors(...)</code>로 Security 체인에 CORS를 붙이고, 허용 출처는 명세의 두 곳만 둔다
+<strong>근거</strong> 06 §6, spec-v2 §3</li>
+</ul>
+<h3 id="tc-d03-3"><a class="anchor" href="#tc-d03-3" aria-hidden="true">#</a>TC-D03-3</h3>
+<p><strong>질문</strong> 토큰 없이 <code>GET /api/members/me</code>를 부르면 401, USER 토큰으로 <code>GET /api/admin/reports</code>를 부르면 403입니다. 두 응답을 어디서 만들었나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>401(인증 없음·만료)은 <code>AuthenticationEntryPoint</code>가, 403(인증됐지만 권한 없음)은 <code>AccessDeniedHandler</code>가 만든다</li>
+<li>URL 인가 단계의 401·403은 필터 체인에서 처리돼 <code>@RestControllerAdvice</code>까지 오지 않으므로, 두 핸들러에서 직접 응답을 쓴다</li>
+<li>두 응답도 다른 에러와 같은 ProblemDetail 형식으로 낸다
+<strong>근거</strong> spec-v2 §2, 06 §6</li>
+</ul>
+<h3 id="tc-d03-4"><a class="anchor" href="#tc-d03-4" aria-hidden="true">#</a>TC-D03-4</h3>
+<p><strong>질문</strong> 로그인 실패 때 &quot;없는 이메일&quot;과 &quot;틀린 비밀번호&quot;를 구분해 알려 주면 안 되는 이유는?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>구분해 알려 주면 응답만으로 가입된 이메일을 알아낼 수 있다</li>
+<li>명세대로 두 경우 모두 같은 401 <code>/errors/unauthorized</code>로 응답한다</li>
+<li>비밀번호는 BCrypt 해시로 저장하고 <code>PasswordEncoder.matches</code>로 비교한다. 해시에 솔트가 들어 있어 같은 비밀번호도 매번 다른 해시가 나온다
+<strong>근거</strong> spec-v2 §5-1</li>
+</ul>
+<h3 id="tc-d03-5"><a class="anchor" href="#tc-d03-5" aria-hidden="true">#</a>TC-D03-5</h3>
+<p><strong>질문</strong> JWT 필터는 토큰이 없을 때 401을 바로 내지 않고 다음 필터로 넘깁니다. 왜 그렇게 했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>공개 경로(가입·로그인·공개 GET)도 같은 필터를 지나므로, 토큰이 없다고 막으면 공개 API까지 막힌다</li>
+<li>필터는 토큰이 유효할 때만 <code>SecurityContextHolder</code>에 인증을 올리고, 막을지는 인가 규칙(<code>authorizeHttpRequests</code>)이 정한다</li>
+<li>토큰이 없거나 잘못된 요청이 보호 경로에 오면 진입점(<code>AuthenticationEntryPoint</code>)이 401을 낸다
+<strong>근거</strong> 06 §6, 05 §3-3</li>
+</ul>
+<h2 id="d04-게시글-쓰기-jpa"><a class="anchor" href="#d04-게시글-쓰기-jpa" aria-hidden="true">#</a>D04 게시글 쓰기 (JPA)</h2>
+<h3 id="tc-d04-1"><a class="anchor" href="#tc-d04-1" aria-hidden="true">#</a>TC-D04-1</h3>
+<p><strong>질문</strong> <code>PostStatus</code> enum 맨 앞에 <code>DRAFT</code>를 추가했더니 기존 글의 상태가 전부 바뀌어 보입니다. 원인과 예방은?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li><code>@Enumerated</code>의 기본값은 <code>ORDINAL</code>이라 enum의 순서 번호가 저장된다</li>
+<li>중간에 상수를 끼우면 기존 숫자가 다른 상수를 가리켜 데이터가 조용히 바뀐다</li>
+<li><code>@Enumerated(EnumType.STRING)</code>으로 이름을 저장한다. 대신 상수 이름을 바꿀 때는 데이터 이전을 함께 한다
+<strong>근거</strong> spec-v2 §6</li>
+</ul>
+<h3 id="tc-d04-2"><a class="anchor" href="#tc-d04-2" aria-hidden="true">#</a>TC-D04-2</h3>
+<p><strong>질문</strong> <code>Post</code> 엔티티에 <code>@Setter</code>와 <code>@AllArgsConstructor</code>를 두지 않고 <code>protected</code> 기본 생성자와 정적 팩토리를 쓴 이유는?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>JPA는 기본 생성자(public 또는 protected)가 필요하다. <code>protected</code>로 두면 다른 코드가 빈 엔티티를 <code>new</code>로 만들지 못한다</li>
+<li>정적 팩토리(<code>Post.create(...)</code>)에서 필수값과 규칙을 검사해 잘못된 상태의 엔티티가 생기지 않게 한다</li>
+<li>setter 대신 의미 있는 메서드(<code>edit</code>, <code>delete</code>)로만 상태를 바꾸면 변경 규칙이 한곳에 모인다
+<strong>근거</strong> 06 §4</li>
+</ul>
+<h3 id="tc-d04-3"><a class="anchor" href="#tc-d04-3" aria-hidden="true">#</a>TC-D04-3</h3>
+<p><strong>질문</strong> 구현이 하나뿐인데 <code>PostService</code> 인터페이스와 <code>PostServiceImpl</code>을 두었습니다. 왜 두었고, 어디부터 과잉인가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>Spring은 CGLIB 클래스 프록시로 인터페이스 없이도 <code>@Transactional</code>을 적용하므로, AOP 때문에 인터페이스가 필요하지는 않다</li>
+<li>인터페이스가 값을 하는 곳은 구현이 둘 이상이거나 바뀔 것이 분명한 경계다. 외부 연동이나 테스트용 Fake가 그 예다</li>
+<li>쌍을 팀 관례로 둔다면 그 이유(구현 은닉, 인터페이스 기준 테스트)를 말할 수 있어야 하고, 근거 없이 모든 클래스에 쌍을 만들면 과잉이다
+<strong>근거</strong> 06 §12</li>
+</ul>
+<h3 id="tc-d04-4"><a class="anchor" href="#tc-d04-4" aria-hidden="true">#</a>TC-D04-4</h3>
+<p><strong>질문</strong> 제목이 공백 문자만 있는 글이 저장됐습니다. 검증을 어디에 어떻게 두었나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>요청 DTO에 Bean Validation(<code>@NotBlank</code>, <code>@Size(max = 100)</code>)을 붙이고 컨트롤러 파라미터에 <code>@Valid</code>를 둔다</li>
+<li><code>@NotEmpty</code>나 <code>@NotNull</code>은 공백만 있는 문자열을 통과시키므로, 명세의 &quot;공백만 불가&quot;는 <code>@NotBlank</code>로 표현한다</li>
+<li>검증 실패(<code>MethodArgumentNotValidException</code>)는 400 ProblemDetail로 바꾸고 <code>errors[]</code>에 <code>{field, reason}</code>을 담는다
+<strong>근거</strong> spec-v2 §5-2</li>
+</ul>
+<h2 id="d05-조회수정삭제-jpa"><a class="anchor" href="#d05-조회수정삭제-jpa" aria-hidden="true">#</a>D05 조회·수정·삭제 (JPA)</h2>
+<h3 id="tc-d05-1"><a class="anchor" href="#tc-d05-1" aria-hidden="true">#</a>TC-D05-1</h3>
+<p><strong>질문</strong> 글 수정 서비스에서 <code>save()</code>를 부르지 않았는데 UPDATE가 나갑니다. 왜 그런가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>트랜잭션 안에서 조회한 엔티티는 영속성 컨텍스트가 관리하며, 조회 시점의 상태를 따로 가지고 있다</li>
+<li>flush에서 그 상태와 비교해 UPDATE SQL을 발행한다. 명시적 flush, commit 전 또는 AUTO 모드에서 결과에 영향을 받는 JPQL 실행 전에 일어날 수 있고, flush 후에도 rollback할 수 있다</li>
+<li>변경은 <code>@Transactional</code> 안에서 하고 SQL 로그로 flush를 확인한다. commit은 변경을 확정한다. 별도 연결의 새 조회로 확정 결과를 확인하되, 기존 REPEATABLE READ 스냅샷은 이전 값을 볼 수 있다
+<strong>근거</strong> 05 §3-4, 06 §16</li>
+</ul>
+<h3 id="tc-d05-2"><a class="anchor" href="#tc-d05-2" aria-hidden="true">#</a>TC-D05-2</h3>
+<p><strong>질문</strong> 댓글 목록 API에서 댓글 20개의 작성자 닉네임을 보여 주는데 SQL이 21번 나갑니다. 원인과 해결은?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>댓글을 한 번 조회한 뒤, 지연 로딩인 <code>member</code>를 댓글마다 접근하면서 작성자마다 회원 조회가 한 번씩 더 나간다(N+1)</li>
+<li><code>join fetch</code>(또는 <code>@EntityGraph</code>)로 작성자를 함께 가져오거나, 필요한 컬럼만 DTO로 조회한다</li>
+<li>SQL 로그나 Hibernate 통계로 쿼리 수를 세고, 그 수를 테스트로 고정한다
+<strong>근거</strong> 05 §3-4, 06 §16</li>
+</ul>
+<h3 id="tc-d05-3"><a class="anchor" href="#tc-d05-3" aria-hidden="true">#</a>TC-D05-3</h3>
+<p><strong>질문</strong> 남의 글을 수정하려는 요청과 삭제된 글을 수정하려는 요청에 각각 무엇을 돌려주고, 어떤 순서로 검사하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>대상이 없거나 삭제·숨김 상태면 404 <code>/errors/not-found</code>다</li>
+<li>대상은 있지만 요청자가 작성자가 아니면 403 <code>/errors/forbidden</code>이다</li>
+<li>존재 여부를 먼저 보고 그다음 작성자를 검사하며, 작성자는 요청 본문이 아니라 토큰의 회원 ID와 글의 <code>member_id</code>로 비교한다
+<strong>근거</strong> spec-v2 §5-2, 05 §3-3</li>
+</ul>
+<h3 id="tc-d05-4"><a class="anchor" href="#tc-d05-4" aria-hidden="true">#</a>TC-D05-4</h3>
+<p><strong>질문</strong> 좋아요 <code>PUT</code>을 두 번 보내도 204이고 수는 한 번만 오릅니다. 동시에 두 번 와도 그런가요? 어떻게 보장했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>한 회원·한 글의 좋아요 중복을 DB에서 거부하도록 설계하고 실제 중복 INSERT 결과로 확인한다</li>
+<li>동시 요청 중 하나가 중복 키 예외를 받으면 이미 눌린 상태로 보고 204를 돌려준다</li>
+<li>좋아요 수를 저장한다면 읽고 더해 덮어쓰지 않고 DB의 현재 값에서 원자적으로 갱신한다. +1 UPDATE와 INSERT를 한 트랜잭션에 두고(글 행을 먼저 잠가 교착을 피한다) 중복이면 트랜잭션째 롤백해 +1도 취소한다
+<strong>근거</strong> spec-v2 §5-2, 07 #12</li>
+</ul>
+<h3 id="tc-d05-5"><a class="anchor" href="#tc-d05-5" aria-hidden="true">#</a>TC-D05-5</h3>
+<p><strong>질문</strong> 글 삭제를 행 삭제 대신 공개 상태를 <code>DELETED</code>로 바꾸는 소프트 삭제로 했습니다. 이유와 대가는? 공개 상태 필터와 최신순·커서 조회를 위해 설계한 인덱스의 이유도 설명해 보세요.
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>신고 기록와 감사 로그가 글을 가리키므로, 행을 남겨야 나중에 추적할 수 있다</li>
+<li>대가는 모든 조회에 상태 조건을 빠뜨리지 않아야 한다는 것이다. 하나라도 빠지면 삭제된 글이 노출된다</li>
+<li>공개 상태 필터와 최신순·커서 조회 패턴을 바탕으로 내가 만든 인덱스의 이유를 설명한다
+<strong>근거</strong> spec-v2 §6</li>
+</ul>
+<h2 id="d06-목록검색-mybatis"><a class="anchor" href="#d06-목록검색-mybatis" aria-hidden="true">#</a>D06 목록·검색 (MyBatis)</h2>
+<h3 id="tc-d06-1"><a class="anchor" href="#tc-d06-1" aria-hidden="true">#</a>TC-D06-1</h3>
+<p><strong>질문</strong> 정렬 키를 요청 파라미터로 받아 <code>ORDER BY ${sort}</code>로 넣는 코드가 있습니다. 무엇이 문제고 어떻게 바꾸나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li><code>${}</code>는 값을 SQL 문자열에 그대로 끼워 넣으므로 SQL 인젝션이 가능하다</li>
+<li><code>#{}</code>는 PreparedStatement 파라미터로 바인딩돼 안전하지만, 값으로만 들어가므로 컬럼명이나 <code>ORDER BY</code> 대상에는 쓸 수 없다</li>
+<li>정렬은 허용 목록(명세상 <code>latest</code>만)으로 받고, 서버가 고정된 SQL 조각을 고른다
+<strong>근거</strong> 06 §16, spec-v2 §5-3</li>
+</ul>
+<h3 id="tc-d06-2"><a class="anchor" href="#tc-d06-2" aria-hidden="true">#</a>TC-D06-2</h3>
+<p><strong>질문</strong> 공개 글 최신순 커서 목록이 데이터가 늘자 느려졌습니다. 인덱스를 어떻게 정하고 확인했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>내 필터·정렬·커서·데이터 분포를 보고 만든 인덱스의 열 순서와 선택 이유, 버린 대안 1개를 설명한다. 특정 실행 계획을 측정 전에 보장하지 않는다</li>
+<li>EXPLAIN의 <code>type</code>, <code>key</code>, <code>rows</code>, <code>Extra</code>(Using filesort 여부)를 인덱스 전후로 비교하고, <code>EXPLAIN ANALYZE</code>로 실제 읽은 행 수를 본다</li>
+<li>커서 페이징은 내가 정한 안정적 정렬의 마지막 위치 뒤부터 이어 읽어, offset처럼 앞쪽 행을 읽고 버리지 않는다
+<strong>근거</strong> 07 §2, 07 §5</li>
+</ul>
+<h3 id="tc-d06-3"><a class="anchor" href="#tc-d06-3" aria-hidden="true">#</a>TC-D06-3</h3>
+<p><strong>질문</strong> 같은 트랜잭션에서 JPA로 글 제목을 고친 직후 MyBatis로 목록을 읽었더니 옛 제목이 나왔습니다. 왜 그런가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>JPA의 변경은 flush 전까지 영속성 컨텍스트에만 있고 DB에는 아직 UPDATE가 나가지 않았다</li>
+<li>Hibernate의 자동 flush는 JPQL 실행 전에 일어나며, MyBatis가 JDBC로 직접 보내는 SQL은 Hibernate가 모르므로 flush를 일으키지 않는다</li>
+<li>MyBatis 조회 전에 명시적으로 flush하고, 두 도구가 같은 트랜잭션(같은 커넥션)에 참여하는지 실험으로 확인한다
+<strong>근거</strong> 06 §16</li>
+</ul>
+<h3 id="tc-d06-4"><a class="anchor" href="#tc-d06-4" aria-hidden="true">#</a>TC-D06-4</h3>
+<p><strong>질문</strong> MyBatis 목록에서 글마다 태그를 <code>&lt;collection select=&quot;...&quot;&gt;</code>로 가져왔더니 쿼리가 글 수만큼 늘었습니다. 어떻게 고치나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>중첩 select는 부모 행마다 쿼리를 따로 실행하므로 글 20개면 태그 쿼리가 20번 나간다</li>
+<li>JOIN 한 번으로 가져와 <code>resultMap</code>의 중첩 결과로 묶고, <code>&lt;id&gt;</code>를 선언해 같은 글의 행을 합친다</li>
+<li>다만 1:N JOIN 결과에 LIMIT을 걸면 글이 아니라 행 기준으로 잘리므로, 글에만 LIMIT을 거는 파생 테이블로 먼저 자르고 바깥에서 태그를 JOIN한다(글 ID 목록을 뽑은 뒤 <code>IN</code>으로 두 번 조회하는 것도 대안)
+<strong>근거</strong> 06 §16</li>
+</ul>
+<h2 id="d07-포인트쿠폰-상점"><a class="anchor" href="#d07-포인트쿠폰-상점" aria-hidden="true">#</a>D07 포인트·쿠폰 상점</h2>
+<h3 id="tc-d07-1"><a class="anchor" href="#tc-d07-1" aria-hidden="true">#</a>TC-D07-1</h3>
+<p><strong>질문</strong> 같은 회원의 구매 두 건이 동시에 들어왔는데 포인트가 한 번만 차감됐습니다. 원인과 수정은?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>두 트랜잭션이 같은 잔액을 읽고 각자 계산해 쓰면, 나중 쓰기가 앞 쓰기를 덮어쓴다(갱신 손실)</li>
+<li><code>UPDATE member SET point_balance = point_balance - ? WHERE id = ? AND point_balance &gt;= ?</code>로 DB가 원자적으로 계산하게 하고, 바뀐 행이 0이면 409 <code>/errors/insufficient-points</code>로 처리한다</li>
+<li>같은 트랜잭션에서 포인트 이력에 이력을 쌓아 잔액과 이력의 합이 항상 맞게 한다
+<strong>근거</strong> 05 §3-6, spec-v2 §6</li>
+</ul>
+<h3 id="tc-d07-2"><a class="anchor" href="#tc-d07-2" aria-hidden="true">#</a>TC-D07-2</h3>
+<p><strong>질문</strong> 쿠폰 발급 버튼을 연타하면 한 회원이 두 장을 받을 수 있나요? 어떻게 막았나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>&quot;이미 받았는지 조회 후 INSERT&quot;는 두 요청이 동시에 조회를 통과하면 둘 다 INSERT한다</li>
+<li>같은 회원·쿠폰 조합의 두 번째 INSERT를 DB가 거부하도록 설계하고, 중복 키 예외를 409 <code>/errors/duplicate</code>로 바꾼다</li>
+<li>중복 키 오류가 난 INSERT는 기존 행에 공유 락을 걸기 때문에 동시 INSERT가 많으면 데드락이 날 수 있어, 예외 처리를 함께 설계한다
+<strong>근거</strong> 07 #13, spec-v2 §5-4</li>
+</ul>
+<h3 id="tc-d07-3"><a class="anchor" href="#tc-d07-3" aria-hidden="true">#</a>TC-D07-3</h3>
+<p><strong>질문</strong> 구매 중 데드락으로 실패한 요청을 재시도합니다. 재시도 코드를 <code>@Transactional</code> 메서드 안에 두면 안 되는 이유는?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>데드락이 나면 InnoDB가 한쪽 트랜잭션 전체를 롤백한다</li>
+<li>같은 트랜잭션·영속성 컨텍스트 안에서 다시 시도하면 이미 롤백된 작업을 이어 가게 되므로, 재시도는 바깥에서 새 트랜잭션으로 한다</li>
+<li>여러 행을 잠글 때는 순서(예: id 오름차순)를 통일해 데드락 자체를 줄이고, 재시도에는 횟수 상한을 둔다
+<strong>근거</strong> 07 §6, 07 #3</li>
+</ul>
+<h3 id="tc-d07-4"><a class="anchor" href="#tc-d07-4" aria-hidden="true">#</a>TC-D07-4</h3>
+<p><strong>질문</strong> 구매 요청이 네트워크 문제로 다시 전송되면 두 번 구매되나요? <code>Idempotency-Key</code>를 어떻게 처리했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>클라이언트는 같은 구매를 재시도할 때 같은 <code>Idempotency-Key</code>를 보낸다</li>
+<li>같은 회원의 같은 멱등 키로 주문이 중복 생성되지 않게 설계하고, 같은 키·같은 본문이면 처음 응답을 그대로 돌려준다</li>
+<li>같은 키에 다른 본문이 오면 422로 거부한다
+<strong>근거</strong> spec-v2 §5-4, 05 §3-2</li>
+</ul>
+<h2 id="d08-포인트-충전-외부-pg-모의"><a class="anchor" href="#d08-포인트-충전-외부-pg-모의" aria-hidden="true">#</a>D08 포인트 충전 (외부 PG 모의)</h2>
+<h3 id="tc-d08-1"><a class="anchor" href="#tc-d08-1" aria-hidden="true">#</a>TC-D08-1</h3>
+<p><strong>질문</strong> PG 클라이언트에 연결 1s, 응답 3s, 커넥션 풀 대기 2s를 따로 두었습니다. 셋은 각각 무엇을 막나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>연결 타임아웃은 TCP 연결을 맺는 시간, 응답 타임아웃은 요청 후 응답을 기다리는 시간, 풀 대기 타임아웃은 클라이언트 풀에서 빈 커넥션을 얻는 시간이다</li>
+<li>셋 중 하나라도 비어 있으면 그 구간에서 요청 스레드가 오래(클라이언트에 따라 무한히) 묶일 수 있다</li>
+<li>값은 명세 운영 값을 쓰고, WireMock·Toxiproxy로 지연을 주입해 각 타임아웃이 어떤 예외로 나는지 직접 확인한다
+<strong>근거</strong> 10 §8, spec-v2 §8</li>
+</ul>
+<h3 id="tc-d08-2"><a class="anchor" href="#tc-d08-2" aria-hidden="true">#</a>TC-D08-2</h3>
+<p><strong>질문</strong> 포인트 충전 흐름을 트랜잭션 몇 개로 나눴나요? 왜 그렇게 나눴나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li><code>pg_payment</code>를 <code>REQUESTED</code>로 저장하는 짧은 트랜잭션 → 트랜잭션 밖에서 PG 호출 → 결과로 상태를 바꾸고 포인트를 적립하는 짧은 트랜잭션, 세 단계다</li>
+<li>요청 기록을 먼저 커밋해 두어야 PG 호출 중 서버가 죽어도 무엇을 보냈는지 남는다</li>
+<li>PG를 기다리는 동안 DB 커넥션을 쥐지 않으므로, PG가 느려도 Hikari 풀(10)이 고갈되지 않는다
+<strong>근거</strong> 10 §8, spec-v2 §8</li>
+</ul>
+<h3 id="tc-d08-3"><a class="anchor" href="#tc-d08-3" aria-hidden="true">#</a>TC-D08-3</h3>
+<p><strong>질문</strong> PG 응답이 3초를 넘겨 타임아웃이 났습니다. 사용자에게 &quot;충전 실패&quot;라고 보여 주면 왜 안 되나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>타임아웃은 실패가 아니라 결과 불명이다. PG는 승인을 끝냈을 수 있다</li>
+<li><code>pg_payment</code>를 <code>UNKNOWN</code>으로 남기고 504 <code>/errors/pg-timeout</code>을 돌려준다</li>
+<li>상태는 <code>orderId</code>가 담긴 PG 콜백이나 <code>GET /pg/v1/payments?orderId=</code> 조회(재처리 워커)로 확정한다. 같은 <code>Idempotency-Key</code>로 승인을 다시 요청해도 PG는 처음 결과를 돌려준다
+<strong>근거</strong> 10 §8, spec-v2 §5-5, spec-v2 §7</li>
+</ul>
+<h3 id="tc-d08-4"><a class="anchor" href="#tc-d08-4" aria-hidden="true">#</a>TC-D08-4</h3>
+<p><strong>질문</strong> PG 호출이 실패하면 무조건 세 번 재시도하게 했다가 리뷰에서 지적을 받았습니다. 무엇을 재시도하고 무엇을 하지 않나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>연결 실패·5xx는 같은 멱등 키로 재시도하고, 응답 타임아웃은 PG가 처리했을 수 있어 재시도하지 않고 조회·콜백으로 결과를 확인한다. 400·401 같은 4xx는 같은 요청이 같은 실패를 내므로 재시도하지 않는다</li>
+<li>결제 같은 POST는 같은 멱등 키로 재시도할 때만 이중 승인이 생기지 않는다</li>
+<li>재시도 간격은 지수 백오프와 지터로 늘리고, 전체 시간이 상위 요청의 시간 예산을 넘지 않게 횟수를 제한한다
+<strong>근거</strong> 10 §8, 10 §5</li>
+</ul>
+<h3 id="tc-d08-5"><a class="anchor" href="#tc-d08-5" aria-hidden="true">#</a>TC-D08-5</h3>
+<p><strong>질문</strong> PG 콜백 경로는 인증 없이 공개했습니다. 그러면 아무나 &quot;결제 완료&quot;를 보내 포인트를 받을 수 있지 않나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>공개 경로라도 서버가 본문 원문 바이트를 같은 비밀키로 HMAC-SHA256해 <code>X-PG-Signature</code>와 상수 시간으로 비교하고, 다르면 401을 낸다</li>
+<li>서명은 파싱 전 원문으로 계산한다. JSON을 파싱해 다시 직렬화하면 공백이나 필드 순서가 바뀌어 바이트가 달라질 수 있다</li>
+<li>같은 <code>paymentKey</code> 콜백이 여러 번 와도 한 번만 적립하고, <code>amount</code>가 저장된 충전 금액과 다르면 거부한다
+<strong>근거</strong> spec-v2 §5-5, spec-v2 §7</li>
+</ul>
+<h2 id="d09-redis"><a class="anchor" href="#d09-redis" aria-hidden="true">#</a>D09 Redis</h2>
+<h3 id="tc-d09-1"><a class="anchor" href="#tc-d09-1" aria-hidden="true">#</a>TC-D09-1</h3>
+<p><strong>질문</strong> 인기글 캐시(TTL 60초)가 만료되는 순간마다 DB 쿼리가 몰립니다. 왜 그렇고 어떻게 막나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>키가 만료된 순간 들어온 요청이 모두 캐시 미스를 보고 동시에 DB를 조회한다(스탬피드)</li>
+<li>한 요청만 다시 계산하고 나머지는 그 결과를 기다리게 한다(single-flight). 방법은 인스턴스 안의 JVM 락(<code>ReentrantLock</code>, <code>@Cacheable(sync = true)</code>)이나 분산 락(<code>SET NX</code>), 만료 전 선갱신이 있다</li>
+<li>무엇을 골랐고 왜인지 말한다. JVM 락이면 서버 대수만큼 DB 조회가 남는 한계가 있고(정답은 이 정도면 충분하고 Redis 장애 때 락까지 잃지 않아 JVM 락을 골랐다), 분산 락이면 Redis 장애 때 락도 함께 잃는다
+<strong>근거</strong> 10 §3</li>
+</ul>
+<h3 id="tc-d09-2"><a class="anchor" href="#tc-d09-2" aria-hidden="true">#</a>TC-D09-2</h3>
+<p><strong>질문</strong> Redis가 느려지거나 죽으면 인기글 조회가 어떻게 동작하도록 만들었나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>Redis 명령 타임아웃을 500ms로 둬서 Redis 지연이 요청 스레드를 오래 잡지 않게 한다</li>
+<li>캐시 조회 실패는 경고 로그를 남기고 DB 조회로 폴백한다</li>
+<li>캐시 호출을 직접 감쌌다면 예외를 잡아 폴백한다(정답 <code>RedisGuard</code>). Spring Cache를 쓴다면 <code>CacheErrorHandler</code>를 등록해 조회 오류를 캐시 미스로 처리한다(기본 처리기는 예외를 그대로 던진다)
+<strong>근거</strong> spec-v2 §8, 10 §3</li>
+</ul>
+<h3 id="tc-d09-3"><a class="anchor" href="#tc-d09-3" aria-hidden="true">#</a>TC-D09-3</h3>
+<p><strong>질문</strong> 선착순 쿠폰 잔여 수량을 Redis <code>DECR</code>로 관리합니다. Redis 값과 DB의 <code>issued_quantity</code>가 다르면 무엇을 믿나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>남은 수량 확인과 감소를 원자적으로 묶어(Lua 스크립트 등) 0 아래로 내려가지 않게 한다. <code>DECR</code> 뒤 음수면 <code>INCR</code>로 되돌리는 방식은 초과 요청과 DB 실패 되돌리기가 겹치면 수량이 어긋날 수 있다</li>
+<li>발급의 최종 기준은 DB(<code>member_coupon</code> UNIQUE, <code>issued_quantity</code> &lt;= <code>total_quantity</code>)이고, Redis는 DB 앞에서 요청을 거르는 장치다</li>
+<li>Redis에서 차감한 뒤 DB 저장이 실패하면 Redis 수량을 되돌리거나 DB 기준으로 다시 맞추는 절차가 있어야 한다
+<strong>근거</strong> 10 §4, spec-v2 §6</li>
+</ul>
+<h3 id="tc-d09-4"><a class="anchor" href="#tc-d09-4" aria-hidden="true">#</a>TC-D09-4</h3>
+<p><strong>질문</strong> 관리자가 글을 숨기면 인기글 캐시를 지웁니다. 지우는 시점을 트랜잭션 커밋 뒤로 둔 이유는?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>커밋 전에 지우면 그 사이 들어온 조회가 아직 커밋되지 않은, 숨기기 전 값을 DB에서 읽어 캐시에 다시 넣는다</li>
+<li>그러면 TTL(60초)이 끝날 때까지 숨긴 글이 인기글에 보인다</li>
+<li>그래서 <code>@TransactionalEventListener(phase = AFTER_COMMIT)</code>이나 <code>TransactionSynchronization</code>의 <code>afterCommit</code>에서 지운다
+<strong>근거</strong> 08 #7, spec-v2 §8</li>
+</ul>
+<h3 id="tc-d09-5"><a class="anchor" href="#tc-d09-5" aria-hidden="true">#</a>TC-D09-5</h3>
+<p><strong>질문</strong> 로그인 시도 제한(10분에 5회)을 서버 메모리가 아니라 Redis에 둔 이유와 구현은?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>메모리 카운터는 인스턴스마다 따로 세므로 인스턴스가 여럿이면 제한이 인스턴스 수만큼 느슨해진다</li>
+<li>계정별 키를 <code>INCR</code>하고 첫 증가 때 600초 만료를 건다. 두 명령 사이에 실패하면 만료 없는 키가 남아 계정이 계속 막힐 수 있으므로 Lua 스크립트로 묶는다</li>
+<li>5회를 넘으면 429 <code>/errors/too-many-attempts</code>로 응답한다
+<strong>근거</strong> 10 §4, spec-v2 §5-1</li>
+</ul>
+<h2 id="d10-관리자--aop--테스트"><a class="anchor" href="#d10-관리자--aop--테스트" aria-hidden="true">#</a>D10 관리자 · AOP · 테스트</h2>
+<h3 id="tc-d10-1"><a class="anchor" href="#tc-d10-1" aria-hidden="true">#</a>TC-D10-1</h3>
+<p><strong>질문</strong> <code>AdminService</code>의 한 메서드가 같은 클래스의 <code>@PreAuthorize(&quot;hasRole(&#39;ADMIN&#39;)&quot;)</code> 메서드를 부르는데, USER도 통과합니다. 왜 그런가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li><code>@PreAuthorize</code>, <code>@Transactional</code>, 감사 로그 AOP는 프록시로 들어온 호출에만 적용되고, <code>this</code>로 부른 내부 호출은 프록시를 거치지 않는다</li>
+<li><code>@PreAuthorize</code>는 <code>@EnableMethodSecurity</code>를 켜야 동작하므로, 붙였는데 아무도 막지 않으면 이것부터 확인한다</li>
+<li>보호할 메서드는 바깥에서 직접 부르는 진입점에 두거나 별도 빈으로 빼고, URL 규칙(<code>/api/admin/**</code>는 ADMIN)을 첫 방어선으로 함께 둔다
+<strong>근거</strong> 06 §7, 06 §6</li>
+</ul>
+<h3 id="tc-d10-2"><a class="anchor" href="#tc-d10-2" aria-hidden="true">#</a>TC-D10-2</h3>
+<p><strong>질문</strong> 서비스 테스트에 <code>@Transactional</code>을 붙였더니 통과했는데, 운영에서는 <code>LazyInitializationException</code>이 났습니다. 왜 그런가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>테스트의 <code>@Transactional</code>은 테스트 메서드 전체를 한 트랜잭션으로 감싸고 끝에 롤백한다</li>
+<li>그래서 서비스에 <code>@Transactional</code>이 빠져 있어도 테스트에서는 영속성 컨텍스트가 열려 있어 지연 로딩과 변경 감지가 동작한다</li>
+<li>서비스 동작을 검증하는 통합 테스트는 테스트 트랜잭션 없이 돌리고, 데이터는 테스트가 끝난 뒤 직접 정리한다
+<strong>근거</strong> 06 §11</li>
+</ul>
+<h3 id="tc-d10-3"><a class="anchor" href="#tc-d10-3" aria-hidden="true">#</a>TC-D10-3</h3>
+<p><strong>질문</strong> 감사 로그를 서비스 코드에 직접 쓰지 않고 AOP로 뺐습니다. 감사 로그가 남지 않는 경우는 언제인가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>대상 메서드가 같은 클래스 안에서 호출되거나 <code>private</code>·<code>final</code>이면 프록시가 가로채지 못해 남지 않는다</li>
+<li>감사 로그를 업무 트랜잭션 안에서 쓰면 업무가 롤백될 때 로그도 함께 사라진다. 실패한 시도까지 남기려면 별도 빈의 <code>REQUIRES_NEW</code> 트랜잭션으로 쓴다</li>
+<li>기록할 값(<code>actor_id</code>, <code>action</code>, <code>target_type</code>, <code>target_id</code>)은 메서드 인자와 <code>SecurityContext</code>에서 얻는다
+<strong>근거</strong> 06 §7, 05 §3-1, spec-v2 §6</li>
+</ul>
+<h3 id="tc-d10-4"><a class="anchor" href="#tc-d10-4" aria-hidden="true">#</a>TC-D10-4</h3>
+<p><strong>질문</strong> 1,000행 엑셀로 쿠폰을 대량 지급하다 한 행이 실패하면 어떻게 되나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>명세는 부분 성공이다. 없는 회원이나 이미 보유한 행은 건너뛰고 <code>{issued, skipped[]}</code>로 알린다</li>
+<li>한 트랜잭션에서 행마다 중복 키 예외를 잡고 계속해도 JPA에서는 그 트랜잭션을 살려 쓸 수 없어(rollback-only 표시 또는 flush 시점 실패) 전체가 롤백된다</li>
+<li>그래서 대량 지급 메서드에는 <code>@Transactional</code>을 두지 않고 행마다 짧은 트랜잭션(<code>CouponService.issue</code>)으로 지급한다. 중복(UNIQUE)·소진은 그 행만 건너뛰므로 같은 파일을 다시 올려도 중복 지급되지 않는다
+<strong>근거</strong> spec-v2 §5-6, 06 §7</li>
+</ul>
+<h3 id="tc-d10-5"><a class="anchor" href="#tc-d10-5" aria-hidden="true">#</a>TC-D10-5</h3>
+<p><strong>질문</strong> &quot;신고 목록은 ADMIN만&quot; 규칙을 어떤 테스트로 고정했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>토큰 없음(401), USER(403), ADMIN(200) 세 경우를 모두 보낸다. 성공 한 경우만 보면 규칙이 열려 있어도 통과한다</li>
+<li>테스트 컨텍스트에 실제 <code>SecurityFilterChain</code>과 JWT 필터가 올라와 있는지 확인한다. 보안 설정이 빠진 테스트는 아무것도 검증하지 않는다</li>
+<li><code>@WithMockUser</code>는 <code>SecurityContext</code>를 직접 채우므로 JWT 파싱 경로는 검증되지 않는다. JWT 필터는 실제 토큰으로 따로 확인한다
+<strong>근거</strong> 06 §6, 06 §11</li>
+</ul>
+<h2 id="d11-인수인계"><a class="anchor" href="#d11-인수인계" aria-hidden="true">#</a>D11 인수인계</h2>
+<h3 id="tc-d11-1"><a class="anchor" href="#tc-d11-1" aria-hidden="true">#</a>TC-D11-1</h3>
+<p><strong>질문</strong> (B04) &quot;알림 채널 하나 추가하는데 세 군데가 깨진다.&quot; 원인이 무엇이었나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>알림 채널(IN_APP·PUSH·EMAIL)별 저장 코드가 글 작성·글 삭제·댓글 작성 세 곳에 <code>switch</code>로 복사돼 있고 셋 다 <code>default</code>에서 예외를 던져, 채널 하나를 더하면 세 API가 함께 500이 됐다</li>
+<li>댓글 알림 때문에 <code>PostServiceImpl</code>과 <code>CommentService</code>가 서로를 필드로 받는 순환이 있었다. 현재 Boot는 순환 참조를 기본으로 막는데, 이 순환을 <code>@Lazy</code>로 덮어 기동만 되게 해 두었다</li>
+<li>고치기 전에 현재 동작을 특성화 테스트로 고정하고, 채널 하나 = 구현 하나(<code>NotificationSender</code>)로 모아 글·댓글 서비스는 생성자 주입으로 알림 서비스만 부르게 바꾼 뒤, 필드 주입 금지 ArchUnit 규칙으로 재발을 막는다
+<strong>근거</strong> 06 §2, 06 §3</li>
+</ul>
+<h3 id="tc-d11-2"><a class="anchor" href="#tc-d11-2" aria-hidden="true">#</a>TC-D11-2</h3>
+<p><strong>질문</strong> (B08) &quot;회원 API 응답에 비밀번호 해시가 보인다.&quot; 원인과 재발 방지는?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>회원 엔티티를 그대로 JSON으로 응답해 <code>passwordHash</code> 필드까지 직렬화됐다</li>
+<li>엔티티를 직접 응답하면 엔티티 필드 추가가 곧 API 변경이 되고, 지연 로딩 연관이 있으면 직렬화 중 예외나 순환이 날 수 있다</li>
+<li>응답 DTO(<code>id</code>, <code>email</code>, <code>nickname</code>, <code>role</code>, <code>createdAt</code>)로 바꾸고, 응답에 비밀번호 필드가 없음을 단언하는 테스트를 둔다
+<strong>근거</strong> 06 §4, spec-v2 §5-1</li>
+</ul>
+<h3 id="tc-d11-3"><a class="anchor" href="#tc-d11-3" aria-hidden="true">#</a>TC-D11-3</h3>
+<p><strong>질문</strong> (B11) &quot;prod에서 설정값이 안 바뀐다.&quot; yml을 고쳤는데 왜 그대로였나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>커맨드라인 인자와 환경 변수가 설정 파일보다 우선하므로, prod에 같은 키의 환경 변수가 있으면 yml 수정은 반영되지 않는다</li>
+<li>jar 밖의 <code>application-prod.yml</code>은 jar 안 파일보다 우선하므로, 서버에 남아 있는 외부 파일도 후보다</li>
+<li>인증 뒤의 <code>/actuator/env/{키}</code>에서 <code>propertySources</code>로 그 키를 어느 출처가 주는지 확인한 다음 그 출처를 고친다
+<strong>근거</strong> 06 §15</li>
+</ul>
+<h3 id="tc-d11-4"><a class="anchor" href="#tc-d11-4" aria-hidden="true">#</a>TC-D11-4</h3>
+<p><strong>질문</strong> (B14) &quot;운영에서 <code>/actuator/env</code>가 인증 없이 열린다.&quot; 원인이 무엇이었나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>넓은 <code>permitAll</code> 규칙(<code>EndpointRequest.toAnyEndpoint()</code>)이 env 관리자 규칙보다 앞에 있어, 첫 매치 규칙 때문에 env가 공개로 끝나고 뒤의 제한은 평가되지 않았다</li>
+<li>prod 설정이 env를 노출하면서 <code>show-values: always</code>로 값 가림까지 꺼, 공개된 env에 비밀값이 평문으로 실렸다. <code>SecurityFilterChain</code>을 직접 정의하면 actuator 보안은 이 규칙이 전부다</li>
+<li>health만 공개하고 나머지 노출 엔드포인트는 ADMIN으로 둔 뒤(좁은 규칙 먼저), <code>show-values</code>는 기본(never)으로 되돌리고, 토큰 없음 401·일반 회원 403·관리자 200을 테스트로 고정한다
+<strong>근거</strong> 06 §6, 06 §15</li>
+</ul>
+<h2 id="d12-티켓-처리-1"><a class="anchor" href="#d12-티켓-처리-1" aria-hidden="true">#</a>D12 티켓 처리 1</h2>
+<h3 id="tc-d12-1"><a class="anchor" href="#tc-d12-1" aria-hidden="true">#</a>TC-D12-1</h3>
+<p><strong>질문</strong> (B01) &quot;PG가 느린 날 글 목록까지 멈춘다.&quot; 상관없어 보이는 두 기능이 왜 같이 멈췄나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>충전 서비스가 <code>@Transactional</code> 안에서 PG를 호출해, PG가 느린 동안 DB 커넥션을 쥔 채 기다렸다</li>
+<li>동시 충전 요청이 Hikari 풀(10개)을 모두 쥐자, 같은 풀을 쓰는 글 목록도 <code>connection-timeout</code>(2초)까지 기다리다 실패했다</li>
+<li>Hikari 메트릭(active가 최대에 붙고 pending이 쌓임)과 스레드 덤프로 확인하고, PG 호출을 트랜잭션 밖으로 뺀다. 풀을 키우는 것은 해법이 아니다
+<strong>근거</strong> 07 #4, 10 §9, spec-v2 §8</li>
+</ul>
+<h3 id="tc-d12-2"><a class="anchor" href="#tc-d12-2" aria-hidden="true">#</a>TC-D12-2</h3>
+<p><strong>질문</strong> (B02) &quot;글 목록이 어느 날부터 느리다.&quot; 어떻게 원인 쿼리를 찾고 무엇을 고쳤나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>slow query log로 후보를 찾는다. <code>long_query_time</code> 기본값이 10초라 낮춰야 잡힌다</li>
+<li><code>EXPLAIN ANALYZE</code>로 읽은 행 수와 실제 돌려준 행 수를 비교해 풀스캔이나 인덱스 비효율을 확인한다. 데이터가 적을 때는 풀스캔도 빨라 보여 드러나지 않았다</li>
+<li>복합 인덱스는 왼쪽 컬럼부터만 쓰이므로 조건·정렬에 맞게 순서를 고치고, 고친 뒤 EXPLAIN의 <code>key</code>, <code>rows</code>, <code>Extra</code>로 확인한다
+<strong>근거</strong> 07 #7, 07 §2</li>
+</ul>
+<h3 id="tc-d12-3"><a class="anchor" href="#tc-d12-3" aria-hidden="true">#</a>TC-D12-3</h3>
+<p><strong>질문</strong> (B03) &quot;예외를 잡았는데도 구매가 롤백된다 / 안 된다.&quot; 두 증상의 원인은 각각 무엇이었나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>롤백 안 됨: <code>order</code>가 같은 클래스의 <code>@Transactional placeOnce</code>를 <code>this</code>로 불러 프록시를 거치지 않아 트랜잭션이 아예 열리지 않았다. 재고·쿠폰·주문·포인트가 각자 커밋돼 마지막 포인트 차감이 실패해도 앞의 변경이 남았다</li>
+<li>롤백됨: 감사 쿠폰 지급(REQUIRED)이 참여한 안쪽 <code>grant</code>의 예외를 catch로 삼켜도 트랜잭션에 rollback-only가 남아, 커밋 때 <code>UnexpectedRollbackException</code>으로 구매 전체가 롤백된다</li>
+<li>트랜잭션이 열리게 고치면 rollback-only가 &quot;구매 전체 롤백&quot;으로 드러나므로 두 증상을 테스트로 함께 고정하고, <code>TransactionTemplate</code>으로 실제 트랜잭션을 연 뒤 지급 실패는 예외 대신 조건부 UPDATE의 영향 행 수로 판단한다
+<strong>근거</strong> 06 §7, 08 #16</li>
+</ul>
+<h3 id="tc-d12-4"><a class="anchor" href="#tc-d12-4" aria-hidden="true">#</a>TC-D12-4</h3>
+<p><strong>질문</strong> (B05) &quot;부하 때만 다른 사람 값이 섞인다.&quot; 왜 부하 때만 나타났나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>싱글톤 빈의 인스턴스 필드에 요청별 값을 저장해, 동시 요청이 서로의 값을 덮어썼다</li>
+<li>요청이 하나씩 올 때는 덮어쓸 상대가 없어 단위 테스트나 수동 확인으로는 재현되지 않았다</li>
+<li>여러 스레드로 동시에 호출하는 재현 테스트(<code>ExecutorService</code>, <code>CountDownLatch</code>)로 섞임을 먼저 보이고, 값을 지역 변수·인자로 옮긴 뒤 같은 테스트가 통과하는지 확인한다
+<strong>근거</strong> 06 §1</li>
+</ul>
+<h2 id="d13-티켓-처리-2"><a class="anchor" href="#d13-티켓-처리-2" aria-hidden="true">#</a>D13 티켓 처리 2</h2>
+<h3 id="tc-d13-1"><a class="anchor" href="#tc-d13-1" aria-hidden="true">#</a>TC-D13-1</h3>
+<p><strong>질문</strong> (D13 ⑤ · B06) &quot;컬럼 하나 추가했더니 상점 전체가 멈췄다.&quot; ALTER 한 줄이 왜 서비스를 멈췄나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>커밋하지 않은 긴 트랜잭션이 그 테이블의 메타데이터 락(MDL)을 쥐고 있어, ALTER가 MDL을 얻지 못하고 기다렸다</li>
+<li>대기 중인 ALTER 뒤로 같은 테이블의 일반 쿼리까지 줄줄이 막혀 상점 전체가 멈췄다</li>
+<li><code>SHOW PROCESSLIST</code>의 <code>Waiting for table metadata lock</code>과 <code>information_schema.innodb_trx</code>로 오래된 트랜잭션을 찾고, DDL 세션에는 짧은 <code>lock_wait_timeout</code>을 걸어 무한 대기를 막는다
+<strong>근거</strong> 07 #1</li>
+</ul>
+<h3 id="tc-d13-2"><a class="anchor" href="#tc-d13-2" aria-hidden="true">#</a>TC-D13-2</h3>
+<p><strong>질문</strong> (D13 ② · B07) &quot;선착순 쿠폰을 동시에 받을 때 가끔 실패한다.&quot; 실패 원인이 무엇이었나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>REPEATABLE READ에서 <code>SELECT ... FOR UPDATE</code>로 없는 행을 확인하면, 결과가 없어도 그 구간에 gap lock이 걸린다</li>
+<li>gap lock끼리는 충돌하지 않아 두 트랜잭션이 같은 구간을 잡는다. A는 쿠폰 행 락을 쥔 채 발급 행 INSERT(insert intention)가 B의 gap lock에 막히고, B는 A가 쥔 쿠폰 행 락을 기다려 순환 대기(데드락)가 된다</li>
+<li><code>SHOW ENGINE INNODB STATUS</code>의 <code>LATEST DETECTED DEADLOCK</code>에서 두 트랜잭션의 락을 읽고, 중복 확인용 <code>FOR UPDATE</code>를 빼고 UNIQUE 제약과 중복 키 처리로 바꾼다
+<strong>근거</strong> 07 #2</li>
+</ul>
+<h3 id="tc-d13-3"><a class="anchor" href="#tc-d13-3" aria-hidden="true">#</a>TC-D13-3</h3>
+<p><strong>질문</strong> (D13 ③ · B09) &quot;자정 전후 출석 포인트가 두 번 쌓인다.&quot; 원인과 재현 방법은?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>출석 날짜를 <code>LocalDate.now(clock)</code>으로 구했는데 주입된 시계가 <code>Clock.systemUTC()</code>라 날짜가 UTC 기준으로 잘렸다. KST 08:59:59와 09:00:00(UTC 자정)이 다른 날이 되어 같은 KST 날짜에 두 번 적립됐다</li>
+<li>반대로 KST 23:59:59와 다음 날 00:00:00은 UTC로 같은 날이라 다음 날 첫 출석이 거절됐다. (회원, 날짜) UNIQUE는 같은 날짜 값의 중복만 막으므로 날짜 값 자체가 틀린 것은 막지 못한다</li>
+<li>업무 기준 시간대를 코드에 명시하고(<code>LocalDate.ofInstant(clock.instant(), ZoneId.of(&quot;Asia/Seoul&quot;))</code>), 영역은 UTC 그대로 시각만 바꾸는 가변 시계로 KST 08:59:59/09:00:00과 23:59:59/00:00:00을 고정한 테스트를 쓴다
+<strong>근거</strong> 08 #10</li>
+</ul>
+<h3 id="tc-d13-4"><a class="anchor" href="#tc-d13-4" aria-hidden="true">#</a>TC-D13-4</h3>
+<p><strong>질문</strong> (D13 ④ · B10) &quot;포인트 충전이 가끔 두 번 된다.&quot; 원인이 무엇이었나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>PG 응답 타임아웃 뒤 재시도가 새 멱등 키(<code>UUID.randomUUID()</code>)로 새 승인 요청을 보냈고, PG는 응답만 늦었을 뿐 첫 요청도 이미 승인했다</li>
+<li>새 키 = 새 <code>pg_payment</code> 행이라 행마다 &quot;한 번만 적립&quot;은 지켜져도 두 행이 각각 적립됐다. <code>idempotency_key</code> UNIQUE는 같은 키만 막으므로 새로 만든 키는 막지 못한다</li>
+<li>응답 타임아웃은 다시 보내지 않고 결과 불명(UNKNOWN)으로 남겨 콜백·재처리(<code>reconcile</code>)로 확정한다(다시 보내야 하면 같은 키로). WireMock 시나리오로 첫 응답만 늦춰 &quot;PG가 받은 서로 다른 키 1개, 충전 원장 1건&quot;을 테스트로 고정한다
+<strong>근거</strong> 10 §8, 10 §10</li>
+</ul>
+<h2 id="d14-고도화와-모의-장애-훈련"><a class="anchor" href="#d14-고도화와-모의-장애-훈련" aria-hidden="true">#</a>D14 고도화와 모의 장애 훈련</h2>
+<h3 id="tc-d14-1"><a class="anchor" href="#tc-d14-1" aria-hidden="true">#</a>TC-D14-1</h3>
+<p><strong>질문</strong> (B12) &quot;새 프론트 도메인에서만 호출이 실패한다.&quot; 서버 로그에 에러가 없는데 무엇을 봤나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>새 출처가 CORS 허용 목록에 없으면 preflight가 거부되고, 브라우저는 실제 요청을 서버로 보내지 않는다</li>
+<li>새 출처가 MVC <code>addCorsMappings</code>에만 있고 Security가 쓰는 <code>CorsConfigurationSource</code>에는 없어, 필터 체인 안의 <code>CorsFilter</code>가 preflight를 403(<code>Invalid CORS request</code>)으로 끝내 MVC 매핑까지 오지 못했다</li>
+<li>브라우저 개발자 도구 Network 탭에서 <code>OPTIONS</code> 요청의 상태 코드와 <code>Access-Control-Allow-Origin</code> 응답 헤더를 먼저 확인하고, 허용 출처는 Security가 쓰는 <code>CorsConfigurationSource</code> 한 곳에 명세의 출처 목록대로 모은다(와일드카드로 열지 않는다)
+<strong>근거</strong> 06 §6, spec-v2 §3</li>
+</ul>
+<h3 id="tc-d14-2"><a class="anchor" href="#tc-d14-2" aria-hidden="true">#</a>TC-D14-2</h3>
+<p><strong>질문</strong> (B13) &quot;PG 결제 완료 콜백이 전부 401.&quot; 원인과 수정은?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>PG 콜백에는 JWT가 없는데 <code>/api/pg/callbacks</code>가 인증 필요 규칙에 걸려 진입점이 401을 냈다</li>
+<li>Security 로그(<code>logging.level.org.springframework.security=TRACE</code>)로 어느 필터·규칙에서 막혔는지 확인한다. 규칙 판정(<code>Checking authorization</code>) 줄은 TRACE에서 보인다</li>
+<li>콜백 경로를 넓은 규칙보다 앞에서 <code>permitAll</code>로 열고, 인증 대신 <code>X-PG-Signature</code> 서명 검증으로 보호한다
+<strong>근거</strong> 06 §6, spec-v2 §7</li>
+</ul>
+<h3 id="tc-d14-3"><a class="anchor" href="#tc-d14-3" aria-hidden="true">#</a>TC-D14-3</h3>
+<p><strong>질문</strong> (B15) &quot;숨긴 글이 인기글에 1분간 계속 보인다.&quot; 캐시를 지웠는데도 왜 보였나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>숨김 트랜잭션이 커밋되기 전에 캐시를 지웠다</li>
+<li>그 사이 들어온 인기글 조회가 캐시 미스를 보고, 아직 커밋 전이라 숨기기 전 값을 DB에서 읽어 캐시에 다시 넣었다</li>
+<li>그 값이 TTL(60초) 동안 남았다. 캐시 삭제·캐시 적재·커밋 시각을 로그로 찍어 순서를 증명하고, 삭제를 커밋 후(<code>AFTER_COMMIT</code>)로 옮긴다
+<strong>근거</strong> 08 #7, spec-v2 §8</li>
+</ul>
+<h3 id="tc-d14-4"><a class="anchor" href="#tc-d14-4" aria-hidden="true">#</a>TC-D14-4</h3>
+<p><strong>질문</strong> (B16) &quot;Redis 점검 시간에 글쓰기까지 멈췄다.&quot; 캐시 서버 점검이 왜 글쓰기를 막았나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>Redis 명령 타임아웃을 설정하지 않아, 요청 스레드가 Lettuce 기본값(60초)까지 Redis 응답을 기다렸다</li>
+<li>폴백(<code>RedisGuard</code>)이 연결 실패(<code>RedisConnectionFailureException</code>)만 잡아, 끊긴 연결의 명령 거절·명령 타임아웃 예외가 인기글 조회까지 올라가 500이 됐다</li>
+<li>스레드 덤프에서 Redis 응답을 기다리는 요청 스레드를 확인하고, 타임아웃을 500ms로 두며 캐시 실패는 로그만 남기고 진행한다
+<strong>근거</strong> 10 §3, spec-v2 §8</li>
+</ul>
+<h2 id="d15-설명-세션"><a class="anchor" href="#d15-설명-세션" aria-hidden="true">#</a>D15 설명 세션</h2>
+<h3 id="tc-d15-1"><a class="anchor" href="#tc-d15-1" aria-hidden="true">#</a>TC-D15-1</h3>
+<p><strong>질문</strong> 15일 동안 겪은 문제 하나를 골라 &quot;문제 상황 → 원인 → 선택 → 결과&quot;로 2분 안에 설명해 보세요.
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>증상을 관찰한 사실로 말한다(무엇이, 언제, 얼마나)</li>
+<li>원인을 짐작이 아니라 재현 테스트·로그·메트릭 같은 근거와 함께 말한다</li>
+<li>고른 해법과 버린 대안, 고친 뒤 무엇(테스트, 수치)으로 확인했는지 말한다
+<strong>근거</strong> 05 §4, 06 §9</li>
+</ul>
+<h3 id="tc-d15-2"><a class="anchor" href="#tc-d15-2" aria-hidden="true">#</a>TC-D15-2</h3>
+<p><strong>질문</strong> 처음 진단이 틀렸던 티켓이 있었나요? 있었다면 무엇으로 바로잡았나요? 없었다면 다른 가설을 어떻게 배제했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>처음 세운 가설과 단서를 말한다. 오진이 없었다면 비교한 다른 가설도 말한다</li>
+<li>가설을 바로잡은 관찰을 말한다. 오진이 없었다면 다른 가설을 배제한 재현 테스트·로그·메트릭 등 근거를 말한다</li>
+<li>같은 증상을 다시 보면 먼저 확인할 것을 순서대로 말한다
+<strong>근거</strong> 06 §9, 08 #8, 08 #9</li>
+</ul>
+<h3 id="tc-d15-3"><a class="anchor" href="#tc-d15-3" aria-hidden="true">#</a>TC-D15-3</h3>
+<p><strong>질문</strong> 1단계에서 직접 만든 코드에 2단계 티켓과 같은 결함이 있었나요? 있었다면 왜 놓쳤나요? 없었다면 어떻게 배제·예방했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>대조한 코드 위치와 티켓 번호를 댄다</li>
+<li>결함을 놓친 이유를 말한다. 없었다면 해당 결함을 배제·예방한 테스트·로그·코드 조건 등 근거를 말한다</li>
+<li>재발 방지 또는 예방 장치(재현 테스트, ArchUnit 규칙, 리뷰 체크 항목)와 확인 방법을 말한다
+<strong>근거</strong> 06 §17</li>
+</ul>
+<h3 id="tc-d15-4"><a class="anchor" href="#tc-d15-4" aria-hidden="true">#</a>TC-D15-4</h3>
+<p><strong>질문</strong> 모의 장애 훈련에서 장애를 알아차리고 원인을 지목하기까지 무엇을 봤나요? 회고 문서에는 무엇을 남겼나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>처음 알아차린 신호(에러율, 응답 시간, Hikari pending 등)와 그 시각을 말한다</li>
+<li>원인을 좁힌 순서(메트릭 → 요청 ID로 로그 → 스레드 덤프 등)를 말한다</li>
+<li>사람 탓이 아니라 구조의 원인을 적고, 재발 방지 조치마다 확인 방법을 남겼다
+<strong>근거</strong> 13 §4, 10 §1</li>
+</ul>
+<h3 id="tc-d15-5"><a class="anchor" href="#tc-d15-5" aria-hidden="true">#</a>TC-D15-5</h3>
+<p><strong>질문</strong> 지금 다시 만든다면 바꿀 설계 결정 하나는 무엇인가요? 바꾸는 데 드는 비용은?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>당시 결정과 그때의 근거를 말한다</li>
+<li>생각을 바꾸게 한 관찰(티켓, 측정 결과)을 말한다</li>
+<li>바꿀 때의 영향 범위와 옮겨 가는 방법(하위 호환, 데이터 이전)을 말한다
+<strong>근거</strong> 05 §4, 05 §3-12</li>
+</ul>
+<h2 id="d16-개인-경로와-미수행-티켓-재현"><a class="anchor" href="#d16-개인-경로와-미수행-티켓-재현" aria-hidden="true">#</a>D16 개인 경로와 미수행 티켓 재현</h2>
+<h3 id="tc-d16-1"><a class="anchor" href="#tc-d16-1" aria-hidden="true">#</a>TC-D16-1</h3>
+<p><strong>질문</strong> 왜 A·B를 골랐고 기존 수행과 무엇이 다른가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>미수행 영역·기존 증거·A/B 선택 이유를 구분한다.</li>
+<li>기존 수행과 달라진 요구나 실패 입력을 밝히고 실제 실패 로그를 제시한다.</li>
+<li>이미 통과하면 새 미충족 계약을 합의하며 정상 코드를 약화하지 않는다.
+<strong>근거</strong> D16 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d16-2"><a class="anchor" href="#tc-d16-2" aria-hidden="true">#</a>TC-D16-2</h3>
+<p><strong>질문</strong> 실패를 재현했다고 원인까지 확정할 수 있나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>증상 재현은 관찰이며 원인 확정에는 코드 경계와 반증이 추가로 필요하다.</li>
+<li>같은 증상을 만드는 다른 가설 하나와 배제할 실험을 말한다.</li>
+<li>실패 요청·로그·테스트 경로와 아직 확인하지 못한 조건을 제시한다.
+<strong>근거</strong> D16 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d16-3"><a class="anchor" href="#tc-d16-3" aria-hidden="true">#</a>TC-D16-3</h3>
+<p><strong>질문</strong> 사본과 기준 서버를 어떻게 구분했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>원본과 사본의 절대경로·브랜치/기준 SHA·포트·DB 이름을 말한다.</li>
+<li>수정은 사본에서 수행하고 기준 서버의 파일·데이터를 보존한 방법을 제시한다.</li>
+<li>실행 명령·실제 출력과 사본 정리 범위를 남긴다.
+<strong>근거</strong> D16 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d17-개인-과제-a-수정과-반례"><a class="anchor" href="#d17-개인-과제-a-수정과-반례" aria-hidden="true">#</a>D17 개인 과제 A 수정과 반례</h2>
+<h3 id="tc-d17-1"><a class="anchor" href="#tc-d17-1" aria-hidden="true">#</a>TC-D17-1</h3>
+<p><strong>질문</strong> 수정 전후 어떤 증거가 원인을 지지하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>수정 전 실패와 수정 후 같은 입력의 성공을 제시한다.</li>
+<li>로그·호출 경계·데이터 전후 중 원인 가설을 지지하는 근거를 말한다.</li>
+<li>대안 가설을 배제한 반례와 남은 검증 한계를 구분한다.
+<strong>근거</strong> D17 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d17-2"><a class="anchor" href="#tc-d17-2" aria-hidden="true">#</a>TC-D17-2</h3>
+<p><strong>질문</strong> 고친 범위와 회귀 범위를 어떻게 정했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>고장 난 계약과 영향받는 호출자를 근거로 최소 수정 범위를 정한다.</li>
+<li>인접 성공·실패·중복/동시성 계약 중 해당 회귀를 선택한 이유를 말한다.</li>
+<li>변경 파일·회귀 테스트 결과와 제외 범위의 위험을 제시한다.
+<strong>근거</strong> D17 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d17-3"><a class="anchor" href="#tc-d17-3" aria-hidden="true">#</a>TC-D17-3</h3>
+<p><strong>질문</strong> Java 공백은 코드 어느 지점에서 드러났나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>예외·타입·컬렉션·스레드 중 실제 막힌 코드 지점을 지목한다.</li>
+<li>그 Java 성질이 실패로 이어진 경로를 작은 재현과 연결한다.</li>
+<li>보충 실험·재실행 결과와 여전히 도움받은 범위를 말한다.
+<strong>근거</strong> D17 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d18-개인-과제-b와-경계-비교"><a class="anchor" href="#d18-개인-과제-b와-경계-비교" aria-hidden="true">#</a>D18 개인 과제 B와 경계 비교</h2>
+<h3 id="tc-d18-1"><a class="anchor" href="#tc-d18-1" aria-hidden="true">#</a>TC-D18-1</h3>
+<p><strong>질문</strong> A와 B의 증상이 비슷해도 왜 같은 원인이 아닐 수 있나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>A/B의 같은 HTTP 증상과 서로 다른 상태·실행 경계를 나눈다.</li>
+<li>각 원인을 지지하는 독립 로그/테스트를 제시한다.</li>
+<li>한 수정으로 둘 다 고치려는 대안의 위험과 선택 비용을 말한다.
+<strong>근거</strong> D18 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d18-2"><a class="anchor" href="#tc-d18-2" aria-hidden="true">#</a>TC-D18-2</h3>
+<p><strong>질문</strong> 두 과제에서 배제한 가설은 무엇인가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>각 과제의 초기 가설과 예상 관찰값을 말한다.</li>
+<li>실제 출력이 어느 가설을 반증했는지 테스트별로 설명한다.</li>
+<li>배제하지 못한 가설과 추가 확인 조건을 남긴다.
+<strong>근거</strong> D18 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d18-3"><a class="anchor" href="#tc-d18-3" aria-hidden="true">#</a>TC-D18-3</h3>
+<p><strong>질문</strong> 보충이 끝났다는 판단은 어떤 증거로 하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>보충 전 실패했던 경계와 완료 기준을 말한다.</li>
+<li>같은 입력 재실행·반례·회귀 결과를 근거로 제시한다.</li>
+<li>이해 설명과 직접 수행 증거를 구분하고 남은 공백을 기록한다.
+<strong>근거</strong> D18 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d19-threadlocal과-요청-경계-정리"><a class="anchor" href="#d19-threadlocal과-요청-경계-정리" aria-hidden="true">#</a>D19 ThreadLocal과 요청 경계 정리</h2>
+<h3 id="tc-d19-1"><a class="anchor" href="#tc-d19-1" aria-hidden="true">#</a>TC-D19-1</h3>
+<p><strong>질문</strong> ThreadLocal은 왜 싱글톤 필드와 다르게 보이나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>싱글톤 필드는 요청들이 공유하고 ThreadLocal은 현재 스레드마다 값을 보관한다.</li>
+<li>풀의 같은 스레드 재사용으로 요청 A의 값이 B에 남는 누출을 설명한다.</li>
+<li>풀 1개의 A/B 실제 출력과 일반 ThreadLocal의 비전달 한계를 제시한다.
+<strong>근거</strong> D19 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d19-2"><a class="anchor" href="#tc-d19-2" aria-hidden="true">#</a>TC-D19-2</h3>
+<p><strong>질문</strong> 요청 실패 뒤 정리는 어디서 보장하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>성공·예외·취소 모두에서 finally의 remove가 실행되어야 한다.</li>
+<li>A 실패 뒤 B에서 이전 값이 남지 않는 테스트 결과를 제시한다.</li>
+<li>비동기 작업도 자체 set/remove가 필요하며 정리 누락 비용을 말한다.
+<strong>근거</strong> D19 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d19-3"><a class="anchor" href="#tc-d19-3" aria-hidden="true">#</a>TC-D19-3</h3>
+<p><strong>질문</strong> 비동기 작업에는 어떤 문맥만 전달하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>부모의 일반 ThreadLocal 값은 비동기 스레드로 자동 전달되지 않는다.</li>
+<li>요청 식별자 등 필요한 불변 값만 명시적 인자로 전달하는 기준을 말한다.</li>
+<li>민감 인증 객체 복사의 위험·작업 내부 정리·실제 비전달/전달 관찰을 제시한다.
+<strong>근거</strong> D19 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d20-시각정책제한된-실행기"><a class="anchor" href="#d20-시각정책제한된-실행기" aria-hidden="true">#</a>D20 시각·정책·제한된 실행기</h2>
+<h3 id="tc-d20-1"><a class="anchor" href="#tc-d20-1" aria-hidden="true">#</a>TC-D20-1</h3>
+<p><strong>질문</strong> 만료 경계에 Clock이 필요한 이유는?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>실제 시계를 직접 읽으면 실행 시각에 따라 만료 테스트 결과가 달라진다.</li>
+<li>Clock.fixed로 만료 직전·정각·직후의 기대값과 실제 결과를 재현한다.</li>
+<li>UTC 저장·표시 시간대 구분과 Clock 주입 비용을 테스트 근거로 말한다.
+<strong>근거</strong> D20 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d20-2"><a class="anchor" href="#tc-d20-2" aria-hidden="true">#</a>TC-D20-2</h3>
+<p><strong>질문</strong> 정책 분리와 과한 추상화의 경계는?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>실제로 바뀌는 정책 축과 같은 입력에 대한 두 정책 결과를 말한다.</li>
+<li>조건문 유지와 인터페이스 도입의 파일 수·변경 범위·테스트 비용을 비교한다.</li>
+<li>분리 결정과 과한 추상화라고 판단할 재검토 조건을 제시한다.
+<strong>근거</strong> D20 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d20-3"><a class="anchor" href="#tc-d20-3" aria-hidden="true">#</a>TC-D20-3</h3>
+<p><strong>질문</strong> 작업이 넘칠 때 무엇을 거부하고 어떻게 알리나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>worker 2·queue 2를 latch로 막았을 때 다섯 번째 작업의 거부를 설명한다.</li>
+<li>AbortPolicy의 예외를 호출자에게 어떻게 전달할지와 대기 상한을 말한다.</li>
+<li>수용/거부 수·shutdown 뒤 거부·종료/미완료 작업 실측을 제시한다.
+<strong>근거</strong> D20 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d21-필수-관찰-flush-뒤-rollback"><a class="anchor" href="#d21-필수-관찰-flush-뒤-rollback" aria-hidden="true">#</a>D21 필수 관찰: flush 뒤 rollback</h2>
+<h3 id="tc-d21-1"><a class="anchor" href="#tc-d21-1" aria-hidden="true">#</a>TC-D21-1</h3>
+<p><strong>질문</strong> flush했는데 왜 다른 연결은 값을 못 볼 수 있나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>flush는 SQL 전송이며 commit 완료와 다르다.</li>
+<li>별도 연결의 격리 수준·관찰 시각에 따라 미커밋 변경이 보이지 않음을 설명한다.</li>
+<li>flush 후 rollback·commit 대조의 실제 SQL/행 결과를 제시한다.
+<strong>근거</strong> D21 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d21-2"><a class="anchor" href="#tc-d21-2" aria-hidden="true">#</a>TC-D21-2</h3>
+<p><strong>질문</strong> rollback 뒤 Java 객체 값은 무엇을 증명하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>rollback 뒤 Java 객체 필드는 자동으로 원래 값이 되지 않을 수 있다.</li>
+<li>객체 값·영속성 컨텍스트·DB 확정 행은 서로 다른 증거다.</li>
+<li>종료 뒤 새 연결 조회로 rollback 결과를 확인하고 객체만 본 판단의 한계를 말한다.
+<strong>근거</strong> D21 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d21-3"><a class="anchor" href="#tc-d21-3" aria-hidden="true">#</a>TC-D21-3</h3>
+<p><strong>질문</strong> 관찰 테스트의 트랜잭션이 결과를 바꾸나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>테스트의 바깥 트랜잭션과 실제 서비스 프록시 경계를 구분한다.</li>
+<li>테스트 자동 rollback이 commit 관찰을 가리거나 같은 연결 조회를 만들 수 있다.</li>
+<li>트랜잭션 종료 후 별도 연결에서 확인한 명령·격리 수준·출력을 제시한다.
+<strong>근거</strong> D21 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d22-필수-관찰-1차-캐시격리공유-태그"><a class="anchor" href="#d22-필수-관찰-1차-캐시격리공유-태그" aria-hidden="true">#</a>D22 필수 관찰: 1차 캐시·격리·공유 태그</h2>
+<h3 id="tc-d22-1"><a class="anchor" href="#tc-d22-1" aria-hidden="true">#</a>TC-D22-1</h3>
+<p><strong>질문</strong> 1차 캐시와 RR의 반복 읽기는 어떻게 구분했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>1차 캐시는 같은 EntityManager의 객체 재사용이고 RR은 DB snapshot 규칙이다.</li>
+<li>같은 EM·clear 후 EM·새 트랜잭션을 나눠 관찰한 결과를 제시한다.</li>
+<li>RC/RR의 실제 격리 수준·commit 시각·예상과 다른 결과를 설명한다.
+<strong>근거</strong> D22 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d22-2"><a class="anchor" href="#tc-d22-2" aria-hidden="true">#</a>TC-D22-2</h3>
+<p><strong>질문</strong> 공유 태그는 글과 수명이 같나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>공유 태그는 여러 게시글이 참조하므로 한 게시글과 수명이 같지 않다.</li>
+<li>연결 행 삭제와 태그 자체 삭제를 나누고 다른 글의 참조 보존을 설명한다.</li>
+<li>공유 fixture의 삭제 전후 SQL·회귀 결과와 선택한 관계 비용을 제시한다.
+<strong>근거</strong> D22 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d22-3"><a class="anchor" href="#tc-d22-3" aria-hidden="true">#</a>TC-D22-3</h3>
+<p><strong>질문</strong> 새 연결에서 확인하는 이유는 무엇인가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>같은 연결/EM은 1차 캐시나 미커밋 변경을 보므로 외부 가시성 증거가 아니다.</li>
+<li>새 연결·새 트랜잭션의 격리 수준과 시작/조회 시각을 고정한다.</li>
+<li>독립 조회 결과로 확정 행을 검증하고 connection만 새로 만든 경우의 한계를 말한다.
+<strong>근거</strong> D22 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d23-예약-쿠폰-요구에서-모델-결정"><a class="anchor" href="#d23-예약-쿠폰-요구에서-모델-결정" aria-hidden="true">#</a>D23 예약 쿠폰 요구에서 모델 결정</h2>
+<h3 id="tc-d23-1"><a class="anchor" href="#tc-d23-1" aria-hidden="true">#</a>TC-D23-1</h3>
+<p><strong>질문</strong> 예약과 지급을 왜 분리하거나 합쳤나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>예약 의도·대상·지급 사실의 수명과 상태 전이 차이를 말한다.</li>
+<li>분리/통합 두 안의 조회·제약·재시도 비용을 비교한다.</li>
+<li>선택 모델의 DDL·fixture·불변식 반증 결과를 제시한다.
+<strong>근거</strong> D23 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d23-2"><a class="anchor" href="#tc-d23-2" aria-hidden="true">#</a>TC-D23-2</h3>
+<p><strong>질문</strong> 대상을 예약 때 고정하면 어떤 비용이 생기나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>예약 시점 대상 고정은 재시작 재현성을 주지만 저장 공간과 개인정보 보존 비용이 있다.</li>
+<li>실행 시점 재조회는 최신성을 얻는 대신 대상 변동과 중복/누락 위험이 있다.</li>
+<li>선택 시점·대상 식별 집합·변동 fixture의 실제 결과를 제시한다.
+<strong>근거</strong> D23 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d23-3"><a class="anchor" href="#tc-d23-3" aria-hidden="true">#</a>TC-D23-3</h3>
+<p><strong>질문</strong> 1인 1매는 어디서 보장하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>1인 1매의 업무 키와 허용 범위를 먼저 정의한다.</li>
+<li>조회 후 INSERT 경쟁에서 DB 제약/원자 경계가 필요한 이유를 설명한다.</li>
+<li>동시 요청의 성공·충돌·최종 행 수로 검증하고 애플리케이션 검사만의 한계를 말한다.
+<strong>근거</strong> D23 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d24-지급-이력-조회와-인덱스-선택"><a class="anchor" href="#d24-지급-이력-조회와-인덱스-선택" aria-hidden="true">#</a>D24 지급 이력 조회와 인덱스 선택</h2>
+<h3 id="tc-d24-1"><a class="anchor" href="#tc-d24-1" aria-hidden="true">#</a>TC-D24-1</h3>
+<p><strong>질문</strong> 조회 두 구현의 차이는 성능 말고 무엇인가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>같은 DTO·정렬·null·중복 계약을 두 조회가 지키는지 말한다.</li>
+<li>매핑·트랜잭션 참여·동적 조건·유지보수 비용을 비교한다.</li>
+<li>같은 fixture의 결과 동등성과 측정하지 않은 성능을 구분한다.
+<strong>근거</strong> D24 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d24-2"><a class="anchor" href="#tc-d24-2" aria-hidden="true">#</a>TC-D24-2</h3>
+<p><strong>질문</strong> JOIN 때문에 지급 건수가 부풀지 않나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>일대다 JOIN의 행 증폭과 지급 건수의 업무 집계 단위를 구분한다.</li>
+<li>중복 대상·여러 지급 상태 fixture에서 식별 집합과 합계를 검증한다.</li>
+<li>집계 위치/중복 제거 대안의 비용과 실제 SQL 출력을 제시한다.
+<strong>근거</strong> D24 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d24-3"><a class="anchor" href="#tc-d24-3" aria-hidden="true">#</a>TC-D24-3</h3>
+<p><strong>질문</strong> 어떤 분포에서 인덱스 선택을 바꾸겠나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>선택도·편향·데이터 크기가 다른 두 분포를 말한다.</li>
+<li>동일 요청의 실행 계획·실측 지연·읽은 행 수를 제시한다.</li>
+<li>인덱스 쓰기/공간 비용을 포함한 변경 임계값과 일반화 한계를 말한다.
+<strong>근거</strong> D24 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d25-예약-쿠폰의-작은-수직-구현"><a class="anchor" href="#d25-예약-쿠폰의-작은-수직-구현" aria-hidden="true">#</a>D25 예약 쿠폰의 작은 수직 구현</h2>
+<h3 id="tc-d25-1"><a class="anchor" href="#tc-d25-1" aria-hidden="true">#</a>TC-D25-1</h3>
+<p><strong>질문</strong> 오늘 구현한 한 흐름과 뒤로 미룬 범위는?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>예약 생성→상세→취소 중 오늘 연결한 흐름과 API 계약을 말한다.</li>
+<li>실행·대량 지급 등 뒤로 미룬 범위와 이유를 밝힌다.</li>
+<li>정상/실패 fixture·실제 응답·최종 상태를 제시한다.
+<strong>근거</strong> D25 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d25-2"><a class="anchor" href="#tc-d25-2" aria-hidden="true">#</a>TC-D25-2</h3>
+<p><strong>질문</strong> 같은 요청 두 개가 오면 어느 경계가 중복을 막나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>동일 요청의 멱등 키·업무 유일 키와 원자 처리 경계를 구분한다.</li>
+<li>두 요청이 함께 들어온 실험에서 성공/재사용/충돌 결과를 설명한다.</li>
+<li>최종 예약/지급 행 수와 중복 0 증거 및 남은 장애 경계를 제시한다.
+<strong>근거</strong> D25 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d25-3"><a class="anchor" href="#tc-d25-3" aria-hidden="true">#</a>TC-D25-3</h3>
+<p><strong>질문</strong> 상태 코드를 왜 그렇게 정했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>성공·검증 오류·권한·없음·상태 충돌을 계약별로 구분한다.</li>
+<li>예약 접수와 실제 지급 성공을 같은 성공 상태로 혼동하지 않는다.</li>
+<li>선택한 상태 코드·오류 본문·구클라이언트 호환 비용을 실제 테스트로 제시한다.
+<strong>근거</strong> D25 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d26-앱-이미지-배포와-정상-종료"><a class="anchor" href="#d26-앱-이미지-배포와-정상-종료" aria-hidden="true">#</a>D26 앱 이미지 배포와 정상 종료</h2>
+<h3 id="tc-d26-1"><a class="anchor" href="#tc-d26-1" aria-hidden="true">#</a>TC-D26-1</h3>
+<p><strong>질문</strong> 정상 종료와 강제 종료는 요청에 어떤 차이를 주나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>SIGTERM의 정상 종료는 신규 수용 중단과 진행 요청 대기를 시도한다.</li>
+<li>SIGKILL은 진행 요청·훅 완료를 보장하지 않으며 DB 확정 여부는 별도 확인한다.</li>
+<li>같은 느린 요청의 응답·종료 시간·로그·데이터를 비교하고 timeout 비용을 말한다.
+<strong>근거</strong> D26 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d26-2"><a class="anchor" href="#tc-d26-2" aria-hidden="true">#</a>TC-D26-2</h3>
+<p><strong>질문</strong> 앱 롤백과 DB 롤백은 왜 다른가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>앱 롤백은 실행 이미지/설정을 되돌리며 이미 commit된 데이터는 유지한다.</li>
+<li>DB rollback은 미확정 트랜잭션 취소이고 백업 복원은 과거 시점으로 별도 복구하는 작업이다.</li>
+<li>스키마 호환 경계·손실 위험·이전 이미지 smoke와 DB 대사 증거를 제시한다.
+<strong>근거</strong> D26 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d26-3"><a class="anchor" href="#tc-d26-3" aria-hidden="true">#</a>TC-D26-3</h3>
+<p><strong>질문</strong> 이미지 재기동으로 무엇을 확인했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>같은 이미지 ID·환경·DB 볼륨으로 재기동했는지 말한다.</li>
+<li>기존 데이터 보존·health/예약/로그인 smoke·실패 요청 식별을 확인한다.</li>
+<li>관찰 결과와 미검증 범위·이전 이미지 복귀 명령을 제시한다.
+<strong>근거</strong> D26 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d27-신구-앱-공존과-스키마-확장"><a class="anchor" href="#d27-신구-앱-공존과-스키마-확장" aria-hidden="true">#</a>D27 신구 앱 공존과 스키마 확장</h2>
+<h3 id="tc-d27-1"><a class="anchor" href="#tc-d27-1" aria-hidden="true">#</a>TC-D27-1</h3>
+<p><strong>질문</strong> 왜 열 추가와 필수 제약을 한 번에 하지 않나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>구앱 INSERT가 새 필수 열 값을 주지 않으면 제약 강화로 실패할 수 있다.</li>
+<li>expand→신앱 쓰기 전환→구앱 종료→null 차단→최종 백필→제약 강화 순서를 설명한다.</li>
+<li>공존 중 INSERT 생존과 contract 뒤 롤백 제한의 실제 근거·비용을 제시한다.
+<strong>근거</strong> D27 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d27-2"><a class="anchor" href="#tc-d27-2" aria-hidden="true">#</a>TC-D27-2</h3>
+<p><strong>질문</strong> 구앱 호환은 어떤 조합으로 확인했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>구앱/구DB·구앱/확장DB·신앱/확장DB의 읽기/쓰기 조합을 말한다.</li>
+<li>누락/null/새 필드 요청과 구앱 INSERT의 실제 결과를 제시한다.</li>
+<li>신앱/구DB 지원 여부·금지 조합·남은 호환 한계를 선언한다.
+<strong>근거</strong> D27 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d27-3"><a class="anchor" href="#tc-d27-3" aria-hidden="true">#</a>TC-D27-3</h3>
+<p><strong>질문</strong> DDL이 기다리면 언제 중단하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>metadata lock 대기와 실제 DDL 실행을 구분한다.</li>
+<li>사전 대기 상한·영향·백업 조건과 자신의 연결만 중단할 기준을 말한다.</li>
+<li>두 연결의 PROCESSLIST·timeout·해제/재시도 로그와 담당 행동을 제시한다.
+<strong>근거</strong> D27 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d28-재개-가능한-백필과-제약-강화"><a class="anchor" href="#d28-재개-가능한-백필과-제약-강화" aria-hidden="true">#</a>D28 재개 가능한 백필과 제약 강화</h2>
+<h3 id="tc-d28-1"><a class="anchor" href="#tc-d28-1" aria-hidden="true">#</a>TC-D28-1</h3>
+<p><strong>질문</strong> 백필 재시작은 어떤 단위로 안전한가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>PK 구간·대상 조건·batch 크기·checkpoint와 데이터의 commit 경계를 말한다.</li>
+<li>절반 중단·재개·같은 구간 재실행의 미처리/변경 수를 제시한다.</li>
+<li>큰 단일 UPDATE 대비 잠금·재처리 비용과 동시 쓰기 한계를 설명한다.
+<strong>근거</strong> D28 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d28-2"><a class="anchor" href="#tc-d28-2" aria-hidden="true">#</a>TC-D28-2</h3>
+<p><strong>질문</strong> 백필이 끝났는데 null이 왜 다시 생기나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>구앱은 새 열을 모르는 INSERT로 null을 다시 만들 수 있다.</li>
+<li>예비 백필 완료와 신규 null 차단은 다르며 신앱 전환·구앱 종료를 확인한다.</li>
+<li>전환 뒤 null 거부·최종 백필·미처리 0 결과를 근거로 contract를 판단한다.
+<strong>근거</strong> D28 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d28-3"><a class="anchor" href="#tc-d28-3" aria-hidden="true">#</a>TC-D28-3</h3>
+<p><strong>질문</strong> 언제 옛 앱으로 되돌릴 수 없나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>구앱이 쓰지 않는 필수 열/새 계약으로 contract하면 구버전 쓰기가 실패한다.</li>
+<li>호환 행렬과 null 거부·최종 백필·제약 강화 시점으로 되돌릴 경계를 제시한다.</li>
+<li>경계 이후 호환 버전 forward fix와 별도 복원의 손실/시간 비용을 말한다.
+<strong>근거</strong> D28 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d29-실패-배포앱-롤백db-복원"><a class="anchor" href="#d29-실패-배포앱-롤백db-복원" aria-hidden="true">#</a>D29 실패 배포·앱 롤백·DB 복원</h2>
+<h3 id="tc-d29-1"><a class="anchor" href="#tc-d29-1" aria-hidden="true">#</a>TC-D29-1</h3>
+<p><strong>질문</strong> 앱 롤백이 데이터를 되돌리나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>이미지 복귀는 이미 commit된 DB 행을 되돌리지 않는다.</li>
+<li>스키마/데이터와 이전 앱의 호환 여부를 별도 검증한다.</li>
+<li>롤백 전후 요청·행/금액/식별 집합 대사와 신규 데이터 보존 결과를 제시한다.
+<strong>근거</strong> D29 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d29-2"><a class="anchor" href="#tc-d29-2" aria-hidden="true">#</a>TC-D29-2</h3>
+<p><strong>질문</strong> 백업이 아니라 복원을 검증한 증거는?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>새 DB에 실제 import한 명령·원본/복원 DB 식별자·백업 시각을 말한다.</li>
+<li>쓰기를 멈춰 보존한 baseline과 복원 행 수·식별 집합·금액·제약을 비교한다.</li>
+<li>복원 시간·차집합·백업 이후 데이터의 미복구 범위를 제시한다.
+<strong>근거</strong> D29 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d29-3"><a class="anchor" href="#tc-d29-3" aria-hidden="true">#</a>TC-D29-3</h3>
+<p><strong>질문</strong> 허용할 데이터 손실 구간을 누가 결정하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>백업 시점부터 장애 시점까지 복구하지 못하는 변경 구간을 말한다.</li>
+<li>업무 책임자가 손실 허용치와 복원/전진 수정의 비용을 승인해야 한다.</li>
+<li>실측 복원 시간·데이터 차이·합의/보류·다음 백업/복구 행동을 제시한다.
+<strong>근거</strong> D29 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d30-api-변경-협의와-하위-호환"><a class="anchor" href="#d30-api-변경-협의와-하위-호환" aria-hidden="true">#</a>D30 API 변경 협의와 하위 호환</h2>
+<h3 id="tc-d30-1"><a class="anchor" href="#tc-d30-1" aria-hidden="true">#</a>TC-D30-1</h3>
+<p><strong>질문</strong> 전체 건수 요청에 어떤 비용과 대안을 제시했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>전체 COUNT의 비용을 실제 분포·요청 빈도·실측/미확인으로 구분한다.</li>
+<li>전체 수 대신 hasNext·별도 집계·근사값의 정확도/지연 비용을 비교한다.</li>
+<li>구클라이언트 요구를 포함한 합의 응답과 테스트 근거를 제시한다.
+<strong>근거</strong> D30 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d30-2"><a class="anchor" href="#tc-d30-2" aria-hidden="true">#</a>TC-D30-2</h3>
+<p><strong>질문</strong> 예약 접수와 지급 성공을 어떻게 구분해 합의했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>예약 접수는 미래 작업 수락이고 지급 성공은 항목별 확정 사실이다.</li>
+<li>접수 응답·상세 상태·부분 실패와 재시도의 외부 계약을 합의한다.</li>
+<li>정상/실패 JSON fixture·상태 코드·책임 경계 증거를 제시한다.
+<strong>근거</strong> D30 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d30-3"><a class="anchor" href="#tc-d30-3" aria-hidden="true">#</a>TC-D30-3</h3>
+<p><strong>질문</strong> 구앱을 못 바꾼다는 반론에 무엇을 수정했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>구앱이 처리하는 필드·enum·상태 코드 계약을 말한다.</li>
+<li>새 필드 선택화/버전 분리 등 대안의 이행 비용을 비교한다.</li>
+<li>반론 전후 합의·구클라이언트 fixture 재검증·보류/담당을 기록한다.
+<strong>근거</strong> D30 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d31-인증-수명주기-정책과-경계-테스트"><a class="anchor" href="#d31-인증-수명주기-정책과-경계-테스트" aria-hidden="true">#</a>D31 인증 수명주기 정책과 경계 테스트</h2>
+<h3 id="tc-d31-1"><a class="anchor" href="#tc-d31-1" aria-hidden="true">#</a>TC-D31-1</h3>
+<p><strong>질문</strong> 로그아웃 뒤 access 토큰의 잔여 수명은?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>access 토큰은 폐기 조회가 없으면 exp까지 유효할 수 있다.</li>
+<li>logout/refresh 폐기와 access 잔여 수명 정책을 분리한다.</li>
+<li>고정 Clock의 만료 직전·정각·직후 결과와 보안/가용성 비용을 제시한다.
+<strong>근거</strong> D31 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d31-2"><a class="anchor" href="#tc-d31-2" aria-hidden="true">#</a>TC-D31-2</h3>
+<p><strong>질문</strong> 인증 저장소가 멈추면 어떤 요청을 거절하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>인증 저장소 의존 요청과 로컬 서명 검증만 하는 요청을 구분한다.</li>
+<li>fail-closed/fail-open의 보안·가용성 비용과 선택한 실패 계약을 말한다.</li>
+<li>저장소 장애 요청·실제 응답·필수 구현과 확인 불가 범위를 제시한다.
+<strong>근거</strong> D31 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d31-3"><a class="anchor" href="#tc-d31-3" aria-hidden="true">#</a>TC-D31-3</h3>
+<p><strong>질문</strong> 키 교체와 refresh 회전은 같은 정책인가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>키 교체는 서명 검증 신뢰키의 전환이고 refresh 회전은 토큰 재사용 수명의 전환이다.</li>
+<li>이전 키 유예·토큰 만료·refresh 재사용 탐지 정책의 차이를 말한다.</li>
+<li>선택한 최소 경계의 테스트·미구현/미확인 항목과 운영 비용을 제시한다.
+<strong>근거</strong> D31 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d32-예약-지급-작업-상태와-작은-단위"><a class="anchor" href="#d32-예약-지급-작업-상태와-작은-단위" aria-hidden="true">#</a>D32 예약 지급 작업 상태와 작은 단위</h2>
+<h3 id="tc-d32-1"><a class="anchor" href="#tc-d32-1" aria-hidden="true">#</a>TC-D32-1</h3>
+<p><strong>질문</strong> 작업 성공과 항목 성공은 어떻게 다른가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>작업 전체 상태와 개별 항목의 성공·실패·대기 상태를 구분한다.</li>
+<li>집계 상태가 부분 실패를 숨기지 않는 허용 전이와 종료 조건을 말한다.</li>
+<li>항목 식별 집합/건수 대사·실제 chunk 결과를 제시한다.
+<strong>근거</strong> D32 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d32-2"><a class="anchor" href="#tc-d32-2" aria-hidden="true">#</a>TC-D32-2</h3>
+<p><strong>질문</strong> 체크포인트보다 지급 행이 먼저 남으면?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>지급 행 commit 뒤 checkpoint가 남지 않으면 재시작이 같은 구간을 다시 읽을 수 있다.</li>
+<li>같은 트랜잭션 경계 또는 업무 키 중복 방지 대안을 비교한다.</li>
+<li>당일 한 chunk의 지급 commit·checkpoint 전후 결과를 제시한다. 실제 중단·재시작과 누락/중복 실증은 D33에서 평가한다.
+<strong>근거</strong> D32 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d32-3"><a class="anchor" href="#tc-d32-3" aria-hidden="true">#</a>TC-D32-3</h3>
+<p><strong>질문</strong> 외부 발송에 정확히 한 번을 약속할 수 있나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>DB commit과 외부 발송은 하나의 원자 트랜잭션이 아닐 수 있다.</li>
+<li>응답 유실·재시도 중복에 대한 멱등 키/발송 기록/보상 대안 비용을 말한다.</li>
+<li>외부 발송 선택 시 실패 경계의 실제 실험을 제시한다. 미선택 시 실패 경계·대안 설명으로 충족하며 정확히 한 번이라고 보장하지 못하는 범위를 말한다.
+<strong>근거</strong> D32 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d33-작업-중단재시작과-누락-대사"><a class="anchor" href="#d33-작업-중단재시작과-누락-대사" aria-hidden="true">#</a>D33 작업 중단·재시작과 누락 대사</h2>
+<h3 id="tc-d33-1"><a class="anchor" href="#tc-d33-1" aria-hidden="true">#</a>TC-D33-1</h3>
+<p><strong>질문</strong> 어느 장애 지점이 가장 위험했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>beforeCommit은 미확정 상태이고 afterCommit은 DB 확정 뒤 응답 전일 수 있다.</li>
+<li>각 marker에서 실제 JVM을 종료하고 별도 연결로 확인한 행을 제시한다.</li>
+<li>재실행 중복/누락 위험이 큰 경계와 선택한 회복 대안의 비용을 설명한다.
+<strong>근거</strong> D33 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d33-2"><a class="anchor" href="#tc-d33-2" aria-hidden="true">#</a>TC-D33-2</h3>
+<p><strong>질문</strong> 재시작해도 누락이 없음을 어떻게 증명하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>중단 전 대상 식별 집합을 기준 시점과 함께 보존한다.</li>
+<li>재시작·재처리 후 성공/실패/대기 집합을 서로 대사한다.</li>
+<li>중복·누락 0 또는 실제 차이·checkpoint와 commit 결과를 증거로 제시한다.
+<strong>근거</strong> D33 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d33-3"><a class="anchor" href="#tc-d33-3" aria-hidden="true">#</a>TC-D33-3</h3>
+<p><strong>질문</strong> 영구 실패는 언제 자동 재시도를 멈추나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>일시 실패와 입력 오류 등 영구 실패를 구분하는 기준을 말한다.</li>
+<li>재시도 횟수·backoff·최대 대기·격리/수동 처리 종료 조건을 정한다.</li>
+<li>영구 실패 fixture의 실제 시도 수·상태·운영자 후속 행동을 제시한다.
+<strong>근거</strong> D33 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d34-두-인스턴스의-작업-소유권"><a class="anchor" href="#d34-두-인스턴스의-작업-소유권" aria-hidden="true">#</a>D34 두 인스턴스의 작업 소유권</h2>
+<h3 id="tc-d34-1"><a class="anchor" href="#tc-d34-1" aria-hidden="true">#</a>TC-D34-1</h3>
+<p><strong>질문</strong> synchronized는 왜 두 앱을 보호하지 못하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>synchronized는 같은 JVM의 같은 모니터를 쓰는 스레드만 직렬화한다.</li>
+<li>두 앱은 서로 다른 메모리/모니터이므로 DB의 공유 원자 경계가 필요하다.</li>
+<li>두 PID 경쟁 결과와 선택한 조건부 갱신/잠금/lease 비용을 제시한다.
+<strong>근거</strong> D34 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d34-2"><a class="anchor" href="#tc-d34-2" aria-hidden="true">#</a>TC-D34-2</h3>
+<p><strong>질문</strong> 만료된 소유자의 늦은 완료를 어떻게 막나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>A의 소유권 획득·정지·만료·B 인수·A 재개의 순서를 말한다.</li>
+<li>오래된 owner/세대의 완료를 거부하는 자신의 검증 경계를 설명한다.</li>
+<li>실제 변경 행 수·소유권 세대·지급 식별 집합으로 늦은 완료 차단을 증명한다.
+<strong>근거</strong> D34 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d34-3"><a class="anchor" href="#tc-d34-3" aria-hidden="true">#</a>TC-D34-3</h3>
+<p><strong>질문</strong> 장애 후 누가 언제 작업을 가져가나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>회수 주체·lease 만료 기준 시각·재시도 주기·대기 상한을 말한다.</li>
+<li>열린 DB 락과 프로세스 STOP/KILL의 차이를 설명한다.</li>
+<li>B의 실제 회수 시간·중복/누락 대사·강제 회수 담당과 명령을 제시한다.
+<strong>근거</strong> D34 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d35-새-업무-선택과-일정-산정-회의"><a class="anchor" href="#d35-새-업무-선택과-일정-산정-회의" aria-hidden="true">#</a>D35 새 업무 선택과 일정 산정 회의</h2>
+<h3 id="tc-d35-1"><a class="anchor" href="#tc-d35-1" aria-hidden="true">#</a>TC-D35-1</h3>
+<p><strong>질문</strong> 어떤 사실과 가정으로 일정을 계산했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>현재 코드/계약·환경 확인 사실과 아직 모르는 의존성을 나눈다.</li>
+<li>요구·모델/SQL·구현·검증·이행의 작업별 최소/최대 추정과 근거를 말한다.</li>
+<li>버퍼·담당 부재·미확인의 영향과 실측이 아닌 추정임을 밝힌다.
+<strong>근거</strong> D35 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d35-2"><a class="anchor" href="#tc-d35-2" aria-hidden="true">#</a>TC-D35-2</h3>
+<p><strong>질문</strong> 마감 단축 때 무엇을 포기하겠다고 요청했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>마감 단축 때 줄일 기능·유지할 검증/배포/실패 대응선을 말한다.</li>
+<li>완료 범위 축소와 일정 유지 두 안의 비용·위험을 비교한다.</li>
+<li>결정권자에게 요청한 승인·합의/보류·담당/기한을 제시한다.
+<strong>근거</strong> D35 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d35-3"><a class="anchor" href="#tc-d35-3" aria-hidden="true">#</a>TC-D35-3</h3>
+<p><strong>질문</strong> 언제 무엇을 확인해 재산정하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>미확인 DB 변경·계약 충돌 등 재산정할 불확실성을 말한다.</li>
+<li>확인 실험/담당·기한과 추정을 바꿀 결과 조건을 정한다.</li>
+<li>D36/D37 실제 소요와 비교할 작업별 기록·다음 재검토 시점을 제시한다.
+<strong>근거</strong> D35 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d36-새-업무의-실패-테스트와-구현"><a class="anchor" href="#d36-새-업무의-실패-테스트와-구현" aria-hidden="true">#</a>D36 새 업무의 실패 테스트와 구현</h2>
+<h3 id="tc-d36-1"><a class="anchor" href="#tc-d36-1" aria-hidden="true">#</a>TC-D36-1</h3>
+<p><strong>질문</strong> 요구 한 줄이 어느 데이터 경계를 바꿨나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>D35 합의에서 바뀐 성공/실패 기대값을 한 줄로 말한다.</li>
+<li>취소 사유/승인 등 변경이 API·상태·감사 데이터의 어느 경계를 바꾸는지 설명한다.</li>
+<li>수정 파일·데이터 전후·기존 계약 유지 테스트와 범위 비용을 제시한다.
+<strong>근거</strong> D36 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d36-2"><a class="anchor" href="#tc-d36-2" aria-hidden="true">#</a>TC-D36-2</h3>
+<p><strong>질문</strong> 수정 전 실패 테스트가 어떤 반례를 잡았나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>새 계약의 실제 입력·수정 전 기대/실제 불일치·RED 로그를 말한다.</li>
+<li>최소 변경 뒤 같은 테스트 GREEN과 인접 반례/회귀 결과를 제시한다.</li>
+<li>이미 통과면 정상 코드를 약화하지 않고 D35에서 새 요구를 합의한 증거를 남긴다.
+<strong>근거</strong> D36 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d36-3"><a class="anchor" href="#tc-d36-3" aria-hidden="true">#</a>TC-D36-3</h3>
+<p><strong>질문</strong> 추정과 실제 차이를 어떻게 반영하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>D35 작업별 예상 범위와 실제 측정 소요를 비교한다.</li>
+<li>초과/단축 원인과 남은 불확실성을 사실·추정으로 나눈다.</li>
+<li>남은 작업·배포/복귀 검증·담당/기한과 수정 추정을 제시한다.
+<strong>근거</strong> D36 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d37-조건-변경과-리뷰-대응"><a class="anchor" href="#d37-조건-변경과-리뷰-대응" aria-hidden="true">#</a>D37 조건 변경과 리뷰 대응</h2>
+<h3 id="tc-d37-1"><a class="anchor" href="#tc-d37-1" aria-hidden="true">#</a>TC-D37-1</h3>
+<p><strong>질문</strong> 새 정보 때문에 어떤 결정을 바꿨나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>시작 뒤 미지급 취소 등 받은 새 조건과 이전 결정을 말한다.</li>
+<li>상태 경쟁·데이터/계약·배포 순서에서 바뀔 부분과 대안 비용을 비교한다.</li>
+<li>반론 전후 추천안·포기한 성질·재검토 조건을 기록한다.
+<strong>근거</strong> D37 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d37-2"><a class="anchor" href="#tc-d37-2" aria-hidden="true">#</a>TC-D37-2</h3>
+<p><strong>질문</strong> 기존 지급과 미지급 취소를 어떻게 구분했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>이미 지급된 쿠폰의 수명과 아직 미지급인 대상의 취소 상태를 나눈다.</li>
+<li>시작/지급/취소 경쟁에서 유지할 불변식·우선순위·오류 계약을 설명한다.</li>
+<li>기존 지급 보존·미지급 재개/취소·중복/누락 반례 결과를 제시한다.
+<strong>근거</strong> D37 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d37-3"><a class="anchor" href="#tc-d37-3" aria-hidden="true">#</a>TC-D37-3</h3>
+<p><strong>질문</strong> 리뷰를 받았다는 말 대신 무엇을 남겼나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>받은 반론·기존 결정·수정 결정을 구체적으로 남긴다.</li>
+<li>수정으로 추가한 계약/재시작/롤백 검증의 실제 결과를 연결한다.</li>
+<li>남은 위험·합의/보류·후속 담당/기한과 추정 갱신을 제시한다.
+<strong>근거</strong> D37 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d38-두-앱의-부하캐시중복-경계"><a class="anchor" href="#d38-두-앱의-부하캐시중복-경계" aria-hidden="true">#</a>D38 두 앱의 부하·캐시·중복 경계</h2>
+<h3 id="tc-d38-1"><a class="anchor" href="#tc-d38-1" aria-hidden="true">#</a>TC-D38-1</h3>
+<p><strong>질문</strong> 단일 앱의 락이 두 앱에서 충분했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>단일 앱 락은 다른 JVM의 요청/캐시 재적재를 막지 못한다.</li>
+<li>한 앱/두 앱에서 같은 요청으로 재적재·오래된 값·중복 지급을 비교한다.</li>
+<li>실제 수치·공유 경계 대안의 비용과 단일 JVM 테스트 한계를 제시한다.
+<strong>근거</strong> D38 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d38-2"><a class="anchor" href="#tc-d38-2" aria-hidden="true">#</a>TC-D38-2</h3>
+<p><strong>질문</strong> 어떤 지표가 병목 가설을 지지하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>병목 가설과 이를 지지/반박할 지표를 먼저 정한다.</li>
+<li>처리량·오류율·p50/p95/p99·DB pending·CPU/메모리를 같은 구간에서 기록한다.</li>
+<li>반복 조건·실제 상관관계와 원인을 확정하지 못한 항목을 말한다.
+<strong>근거</strong> D38 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d38-3"><a class="anchor" href="#tc-d38-3" aria-hidden="true">#</a>TC-D38-3</h3>
+<p><strong>질문</strong> 개선 수치를 어떤 범위까지만 주장하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>변경 하나·동일 데이터/유입/측정 구간·반복 횟수를 명시한다.</li>
+<li>전후 실측과 변동·다음 병목·정합성 회귀를 함께 제시한다.</li>
+<li>운영 적정값으로 일반화하지 못하는 범위와 추가 검증 비용을 말한다.
+<strong>근거</strong> D38 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d39-jvm스레드풀자원-고갈-진단"><a class="anchor" href="#d39-jvm스레드풀자원-고갈-진단" aria-hidden="true">#</a>D39 JVM·스레드풀·자원 고갈 진단</h2>
+<h3 id="tc-d39-1"><a class="anchor" href="#tc-d39-1" aria-hidden="true">#</a>TC-D39-1</h3>
+<p><strong>질문</strong> CPU 과다와 외부 대기를 어떻게 구분했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>CPU 사용률과 같은 시각의 스레드 스택/실제 작업을 함께 본다.</li>
+<li>외부 HTTP/DB 대기·큐 대기와 CPU 연산을 단일 RUNNABLE 상태만으로 단정하지 않는다.</li>
+<li>각 조건의 PID·jcmd/ps 출력·배제 가설과 추가 증거를 제시한다.
+<strong>근거</strong> D39 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d39-2"><a class="anchor" href="#tc-d39-2" aria-hidden="true">#</a>TC-D39-2</h3>
+<p><strong>질문</strong> DB 풀을 늘리면 항상 빨라지나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>DB 풀 확대는 DB 자원·락 경쟁·체류 시간 병목을 악화시킬 수 있다.</li>
+<li>처리율×체류 시간 가설과 요청 풀/DB 풀/queue/timeout 상한을 말한다.</li>
+<li>한 설정만 바꾼 재측정과 유입 제한 대안의 비용·한계를 제시한다.
+<strong>근거</strong> D39 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d39-3"><a class="anchor" href="#tc-d39-3" aria-hidden="true">#</a>TC-D39-3</h3>
+<p><strong>질문</strong> 메모리 증가와 누수는 어떤 추가 증거가 필요한가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>정상 부하의 일시 할당·의도적 보유와 회수되지 않는 누수를 구분한다.</li>
+<li>부하 종료/GC 전후 heap·객체 수/보유 경로의 시간 추이를 더 확인한다.</li>
+<li>실제 관찰·회복 여부와 heap 증가만으로 누수라고 확정하지 못하는 한계를 말한다.
+<strong>근거</strong> D39 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d40-원인-비공개-장애-대응과-회고-회의"><a class="anchor" href="#d40-원인-비공개-장애-대응과-회고-회의" aria-hidden="true">#</a>D40 원인 비공개 장애 대응과 회고 회의</h2>
+<h3 id="tc-d40-1"><a class="anchor" href="#tc-d40-1" aria-hidden="true">#</a>TC-D40-1</h3>
+<p><strong>질문</strong> 원인 미확정인데 처음 무엇을 공유했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>초기 공유는 영향 범위·발생 시각·확인 사실·미확인을 구분한다.</li>
+<li>현재 완화·담당·다음 보고 시각을 원인 추정과 분리해 전달한다.</li>
+<li>실제 첫 메시지·요청/DB/자원 증거와 사용한 판단 비용을 제시한다.
+<strong>근거</strong> D40 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d40-2"><a class="anchor" href="#tc-d40-2" aria-hidden="true">#</a>TC-D40-2</h3>
+<p><strong>질문</strong> 왜 원인 확정 전에 완화했거나 기다렸나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>지속 영향과 최소 증거 확보 시간을 근거로 완화/대기 결정을 말한다.</li>
+<li>재시작의 증거 손실·중복/누락 위험과 기다림 비용을 비교한다.</li>
+<li>완화/복구 시각·데이터 대사·원인 확정 시각을 구분해 제시한다.
+<strong>근거</strong> D40 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d40-3"><a class="anchor" href="#tc-d40-3" aria-hidden="true">#</a>TC-D40-3</h3>
+<p><strong>질문</strong> 반론을 받고 재발 방지안을 어떻게 바꿨나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>재시작 우선 반론과 원래 재발 방지안의 가정을 말한다.</li>
+<li>증거 손실·영향 비용·검증 가능성으로 수정안을 설명한다.</li>
+<li>수정 전후 결정·담당·기한·검증·실패 대응을 회의록으로 제시한다.
+<strong>근거</strong> D40 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d41-새-조건의-설계-리뷰-회의"><a class="anchor" href="#d41-새-조건의-설계-리뷰-회의" aria-hidden="true">#</a>D41 새 조건의 설계 리뷰 회의</h2>
+<h3 id="tc-d41-1"><a class="anchor" href="#tc-d41-1" aria-hidden="true">#</a>TC-D41-1</h3>
+<p><strong>질문</strong> 지금 조건에서 추천안을 바꾼 이유는?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>새 규모/정합성 조건과 기존 실측·미확인을 구분한다.</li>
+<li>기존 추천안과 대안의 읽기/쓰기·배포/복원·운영 비용을 비교한다.</li>
+<li>조건 변화로 바꾼 선택·포기한 성질·재검토 임계값을 제시한다.
+<strong>근거</strong> D41 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d41-2"><a class="anchor" href="#tc-d41-2" aria-hidden="true">#</a>TC-D41-2</h3>
+<p><strong>질문</strong> 포기한 성질을 누가 승인해야 하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>정합성·지연·가용성 중 포기할 성질과 영향받는 업무를 명시한다.</li>
+<li>업무 결정권자·운영/DB 담당의 승인 범위와 결정을 요청할 내용을 말한다.</li>
+<li>합의/보류·담당/기한·검증 및 실패 대응 유지선을 기록한다.
+<strong>근거</strong> D41 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d41-3"><a class="anchor" href="#tc-d41-3" aria-hidden="true">#</a>TC-D41-3</h3>
+<p><strong>질문</strong> 반론 뒤 어떤 검증을 추가했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>락 대기와 취소 경쟁 등 받은 반론을 구체적으로 말한다.</li>
+<li>수정한 상태/timeout/실패 계약과 확인할 테스트를 연결한다.</li>
+<li>검증 계획·배포 순서·되돌릴 경계·담당/기한을 남기고 계획과 실행을 구분한다.
+<strong>근거</strong> D41 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d42-새-사례로-10문항-설명-갱신"><a class="anchor" href="#d42-새-사례로-10문항-설명-갱신" aria-hidden="true">#</a>D42 새 사례로 10문항 설명 갱신</h2>
+<h3 id="tc-d42-1"><a class="anchor" href="#tc-d42-1" aria-hidden="true">#</a>TC-D42-1</h3>
+<p><strong>질문</strong> D15 때보다 증거로 말하게 된 부분은?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>D15의 설명과 D42의 새 사례를 영역별로 비교한다.</li>
+<li>문제→증거/원인→대안/선택→결과에 실제 파일/출력을 연결한다.</li>
+<li>점수·시간·추가 질문·도움 범위와 여전히 근거가 없는 항목을 제시한다.
+<strong>근거</strong> D42 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d42-2"><a class="anchor" href="#tc-d42-2" aria-hidden="true">#</a>TC-D42-2</h3>
+<p><strong>질문</strong> 설명 가능과 독립 수행 가능은 어떻게 다른가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>설명 가능은 개념/선택을 말하는 능력이고 독립 수행은 힌트 없이 구현/진단한 증거가 필요하다.</li>
+<li>설명 점수와 실제 코드·SQL·진단 결과를 별도 판정한다.</li>
+<li>설명은 통과했지만 수행은 확인 불가인 사례와 다음 검증 조건을 말한다.
+<strong>근거</strong> D42 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d42-3"><a class="anchor" href="#tc-d42-3" aria-hidden="true">#</a>TC-D42-3</h3>
+<p><strong>질문</strong> 다음 독립 평가에서 무엇을 확인하나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>D15/D42 증거에서 약점 두 개를 선택한다.</li>
+<li>D44 새 요구·D45 새 장애에서 힌트 없이 확인할 완료 조건을 정한다.</li>
+<li>실패/확인 불가 기준·도움 기록·재평가 시점을 제시하고 연차 도달을 보장하지 않는다.
+<strong>근거</strong> D42 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d43-문제-5개-회고-갱신과-운영-문서"><a class="anchor" href="#d43-문제-5개-회고-갱신과-운영-문서" aria-hidden="true">#</a>D43 문제 5개 회고 갱신과 운영 문서</h2>
+<h3 id="tc-d43-1"><a class="anchor" href="#tc-d43-1" aria-hidden="true">#</a>TC-D43-1</h3>
+<p><strong>질문</strong> 회고의 바꿀 것이 어떤 코드/운영 행동인가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>회고 문제의 원인/오진·실제 결과를 근거로 말한다.</li>
+<li>바꿀 코드 경계 또는 운영 명령·판단 기준을 구체적으로 연결한다.</li>
+<li>다음 실행에서 확인할 테스트/신호·담당/기한과 비용을 제시한다.
+<strong>근거</strong> D43 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d43-2"><a class="anchor" href="#tc-d43-2" aria-hidden="true">#</a>TC-D43-2</h3>
+<p><strong>질문</strong> runbook을 읽고 복구 성공을 어떻게 알 수 있나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>앱 기동·작업 재처리·복원 등 각 명령의 대상/전제/중단 기준을 말한다.</li>
+<li>성공은 health뿐 아니라 계약 응답·데이터 집합/금액 대사로 확인한다.</li>
+<li>실제 재실행 출력·실패 시 대응·확인 불가 범위를 제시한다.
+<strong>근거</strong> D43 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d43-3"><a class="anchor" href="#tc-d43-3" aria-hidden="true">#</a>TC-D43-3</h3>
+<p><strong>질문</strong> 아직 도움 없이 못하는 부분은 무엇인가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>회고·회의·테스트에서 아직 도움받은 구간을 숨기지 않는다.</li>
+<li>혼자 수행한 범위와 미실행/실패를 증거별로 나눈다.</li>
+<li>약점별 추가 실험·완료 조건·담당/재평가 시점을 제시한다.
+<strong>근거</strong> D43 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d44-예시-해법-없는-작은-변경-독립-수행"><a class="anchor" href="#d44-예시-해법-없는-작은-변경-독립-수행" aria-hidden="true">#</a>D44 예시 해법 없는 작은 변경 독립 수행</h2>
+<h3 id="tc-d44-1"><a class="anchor" href="#tc-d44-1" aria-hidden="true">#</a>TC-D44-1</h3>
+<p><strong>질문</strong> 해법 없이 어떤 순서로 요구를 좁혔나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>새 요구를 받은 뒤 사실·가정·불명확한 계약을 먼저 나눈다.</li>
+<li>성공/실패 반례를 고르고 RED→구현→불변식/권한/호환 순서를 설명한다.</li>
+<li>실제 시간·질문·도구/AI 도움과 수행 중 선택한 Java 증거를 제시한다.
+<strong>근거</strong> D44 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d44-2"><a class="anchor" href="#tc-d44-2" aria-hidden="true">#</a>TC-D44-2</h3>
+<p><strong>질문</strong> 비용 때문에 버린 대안은 무엇인가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>같은 요구를 만족하는 두 대안의 데이터/구현/운영 비용을 비교한다.</li>
+<li>버린 대안의 장점과 지금 포기한 성질을 말한다.</li>
+<li>실제 검증·배포/이행/복귀 경계와 선택 근거를 제시한다.
+<strong>근거</strong> D44 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d44-3"><a class="anchor" href="#tc-d44-3" aria-hidden="true">#</a>TC-D44-3</h3>
+<p><strong>질문</strong> 어느 범위까지 독립 수행했다고 말할 수 있나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>요구 설계·구현·SQL·설명별 통과/실패/확인 불가를 나눈다.</li>
+<li>각 판정의 파일·테스트·출력과 받은 도움 범위를 제시한다.</li>
+<li>새 반론에 수정한 결정·남은 위험·다음 재평가 조건을 말한다.
+<strong>근거</strong> D44 완료 조건·실행 증거</li>
+</ul>
+<h2 id="d45-새-장애-독립-진단과-최종-근거"><a class="anchor" href="#d45-새-장애-독립-진단과-최종-근거" aria-hidden="true">#</a>D45 새 장애 독립 진단과 최종 근거</h2>
+<h3 id="tc-d45-1"><a class="anchor" href="#tc-d45-1" aria-hidden="true">#</a>TC-D45-1</h3>
+<p><strong>질문</strong> 원인을 모르는 상태에서 무엇부터 결정했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>새 장애의 초기 영향·사실·가정·미확인을 구분한다.</li>
+<li>최소 증거 확보와 완화 우선순위·담당·다음 보고 시각을 결정한다.</li>
+<li>초기 진단 뒤 선택한 가설/Java 반증·실제 타임라인과 받은 도움을 제시한다.
+<strong>근거</strong> D45 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d45-2"><a class="anchor" href="#tc-d45-2" aria-hidden="true">#</a>TC-D45-2</h3>
+<p><strong>질문</strong> 복구와 원인 확정을 각각 무엇으로 확인했나요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>복구는 요청 정상화·데이터 대사·정상 구간 유지로 확인한다.</li>
+<li>원인 확정은 주입 기록/재현/반증으로 가설과 대조하며 복구와 다른 시점일 수 있다.</li>
+<li>실제 복구·원인 증거·미확인 항목과 비공개 주입자 부재 한계를 제시한다.
+<strong>근거</strong> D45 완료 조건·실행 증거</li>
+</ul>
+<h3 id="tc-d45-3"><a class="anchor" href="#tc-d45-3" aria-hidden="true">#</a>TC-D45-3</h3>
+<p><strong>질문</strong> 무엇을 혼자 할 수 있고 무엇은 재평가가 필요한가요?
+<strong>답에 들어가야 할 것</strong></p>
+<ul>
+<li>D15/D42 설명·회고 5개·네 회의·D44/D45 독립 결과를 연결한다.</li>
+<li>혼자 가능한 범위와 도움 필요/실패/미실행을 역량별로 나눈다.</li>
+<li>연차 보증 대신 약점별 다음 실험·완료 조건·재평가 시점을 확정한다.
+<strong>근거</strong> D45 완료 조건·실행 증거</li>
+</ul>
+
+
+</main>
+
+
+
+
+
+</body>
+</html>

@@ -49,6 +49,8 @@
 
 ## 3. 따라 하기
 
+> **이 저장소에 없는 실습 환경** — 이 문서의 예제는 원래 공부자료가 전제한 쇼핑몰 연습 DB `ds_practice`(`practice/schema/schema.sql`·`seed.sql`로 만드는 `member`·`product`·`orders` 등)를 쓴다. 그 파일과 DB는 이 저장소에 없다. 그대로 따라 하려면 그런 MySQL을 직접 준비해야 하고, 명령에 적힌 포트(`3306` 등)·계정도 그때 정한 값으로 바꾼다. 이 저장소에서 바로 쓸 수 있는 DB는 루트 `compose.yaml`의 MySQL(`docker compose up -d` — 호스트 `localhost:13308`, 계정 `community`/`community`, DB `community`·`practice`·`project`)이고, 테이블은 게시판용(`member`·`post`·`comment`·`tag` 등)이라 이름과 열이 다르다.
+
 연습 DB는 `ds_practice`의 MySQL 8.4 스키마를 사용한다. 아래 `product.name`은 스키마에서 인덱스를 두지 않은 열이고, 상품 행은 80개다. 그 정도로 작은 테이블에서는 인덱스를 추가해도 옵티마이저가 전체 스캔을 고를 수 있으므로, 강제 인덱스 계획과 자연 선택 계획을 모두 확인한다.
 
 DDL은 트랜잭션 롤백 대상이 아니므로 마지막 `DROP INDEX`까지 같은 DB 세션에서 실행한다. 이 실습 SQL은 직접 실행하지 않았다. 결과는 모두 예상이다.

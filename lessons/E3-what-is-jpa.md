@@ -159,7 +159,7 @@ TRACE org.hibernate.orm.jdbc.bind              : binding parameter (2:VARCHAR) <
 
 ## 따라 해 보기
 
-15분. 실습 레포(javaExperience)에서 한다. studymate MySQL이 떠 있어야 한다.
+15분. 실습 레포(javaExperience)에서 한다. 이 저장소 compose의 MySQL(`docker compose up -d`)이 떠 있어야 한다.
 
 **1. 파일 세 개를 만든다.** 위 예시의 `Tag.java`, `TagRepository.java`를 `org.example.tag` 패키지에 만든다. 이 둘은 1-3에서 그대로 쓰니 지우지 않는다. 그리고 연습용 파일 하나를 더 만든다.
 

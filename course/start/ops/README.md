@@ -1,0 +1,278 @@
+# 운영 실습 출발 자료
+
+D26~D29·D33·D34·D38·D39에서 환경을 만드는 부분만 제공한다. 예약 모델·스키마 변경 DDL·백필·멱등/취소·chunk/checkpoint·소유권/lease/fencing·재시도 정책은 학습자가 설계·구현한다. `probe`는 도구 확인용 최소 Spring Boot 앱이며 예약 서버 정답이 아니다. 장치 실행 성공과 학습자 도메인 완료를 구분한다. 원본 board-server·messy-server는 수정하지 않는다.
+
+## 준비: 격리 사본과 두 이미지
+
+실행 중인 Docker Engine·JDK 21·curl이 필요하다. 저장소 루트를 `JX_REPO`, 학습자가 만든 프로젝트의 절대경로를 `LEARNER_PROJECT`로 직접 지정한다. 변수에는 실제 경로를 넣는다. 포트 18996~18998이 비었는지 먼저 확인하고 충돌하면 compose의 호스트 포트와 아래 URL을 함께 바꾼다. 아래 자격증명은 이 일회용 DB 전용이며 실서비스 값을 복사하지 않는다.
+
+```bash
+export JX_REPO=/absolute/path/to/javaExperience
+export LEARNER_PROJECT=/absolute/path/to/my-project
+export OPS_LAB=$(mktemp -d /tmp/jx-ops.XXXXXX)
+export OPS_LAB=$(cd "$OPS_LAB" && pwd -P)
+export COMPOSE_PROJECT_NAME=jx-ops-$(basename "$OPS_LAB" | tr '[:upper:].' '[:lower:]-')
+lsof -nP -iTCP:18996 -iTCP:18997 -iTCP:18998 -sTCP:LISTEN
+cp "$JX_REPO/course/start/ops/Dockerfile" "$OPS_LAB/"
+cp "$JX_REPO/course/start/ops/compose.yaml" "$OPS_LAB/"
+cp "$JX_REPO/course/start/ops/baseline.sql" "$OPS_LAB/"
+mkdir -p "$OPS_LAB/evidence"
+```
+
+두 경로가 공유하는 JDK 준비다. 기존 JAVA_HOME이 11이어도 여기서 21을 선택한다. Linux에서는 설치된 JDK 21의 절대경로를 JAVA_HOME에 먼저 지정한다. 이 준비는 probe 경로에서도 생략하지 않는다.
+
+```bash
+if [ "$(uname -s)" = Darwin ]; then
+  export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+else
+  : "${JAVA_HOME:?설치된 JDK 21 경로를 지정하세요}"
+fi
+export PATH="$JAVA_HOME/bin:$PATH"
+"$JAVA_HOME/bin/java" -version
+"$JAVA_HOME/bin/javac" -version
+test "$("$JAVA_HOME/bin/javac" -version 2>&1 | cut -d ' ' -f 2 | cut -d . -f 1)" = 21 || { echo 'JDK 21이 필요합니다'; exit 1; }
+```
+
+학습자 앱을 사용하면 아래를 실행한다. 도구 확인용 probe를 쓰려면 이 블록을 건너뛰고 다음 probe 블록으로 진행한다.
+
+```bash
+cp -R "$LEARNER_PROJECT/." "$OPS_LAB/learner"
+cd "$OPS_LAB/learner"
+./gradlew --no-daemon bootJar
+# plain jar를 제외한 실행 jar의 실제 이름을 확인해 app.jar로 복사한다.
+find build/libs -maxdepth 1 -name '*.jar' -print
+cp build/libs/my-app.jar "$OPS_LAB/app.jar"
+cd "$OPS_LAB"
+docker build -t jx-ops:a .
+```
+
+아직 운영 장치만 먼저 확인하려면 learner 대신 아래 probe 사본을 빌드한다. 원본에 빌드 파일을 쓰지 않는다.
+
+```bash
+cp -R "$JX_REPO/course/start/ops/probe" "$OPS_LAB/probe"
+cp "$JX_REPO/gradlew" "$OPS_LAB/probe/"
+cp -R "$JX_REPO/gradle" "$OPS_LAB/probe/"
+cd "$OPS_LAB/probe"
+./gradlew --no-daemon bootJar
+cp build/libs/app.jar "$OPS_LAB/app.jar"
+cd "$OPS_LAB"
+docker build -t jx-ops:a .
+docker tag jx-ops:a jx-ops:b
+```
+
+학습자 앱도 D25 기준 a 이미지와 D26 변경 후 b 이미지를 각각 고정 태그로 보관한다. 수정은 사본에서만 하고 b용 jar로 app.jar를 바꾼 뒤 `docker build -t jx-ops:b .`를 실행한다. probe의 a/b는 동일 코드에 버전 표지만 다르므로 실제 신구 API 호환 증거로 세지 않는다.
+
+```bash
+cd "$OPS_LAB"
+docker compose up -d mysql app-a app-b
+docker compose ps
+docker compose logs --tail=60 app-a app-b
+curl --fail http://127.0.0.1:18996/actuator/health
+curl --fail http://127.0.0.1:18997/actuator/health
+docker image inspect jx-ops:a jx-ops:b --format '{{.Id}}'
+```
+
+앱 시작은 health 200을 확인할 때까지 최대 60초 재시도하고 실패하면 로그를 확인한다. 학습자 앱에는 실제 프로파일·환경변수 이름을 맞춘다. `localhost` DB 주소를 컨테이너 안에 그대로 넣지 않는다. health 뒤 예약 생성/조회·로그인 요청은 자신의 계약대로 실행한다.
+
+## D26: 느린 요청과 SIGTERM
+
+probe의 `/ops/slow`는 bounded sleep 장치다. 학습자 사본에는 **테스트 프로파일 전용** 느린 endpoint 또는 외부 stub 지연을 두고 요청 진입 로그를 남긴다. 도메인 로직을 바꾸지 않는다. 통제 파일은 앱 둘이 공유하는 전용 named volume에 있어 macOS /tmp 공유 설정이 필요 없다. exec-form ENTRYPOINT와 compose의 init: true를 사용한다. init이 PID 1을 맡아 신호를 자식 Java에 전달하며 Java PID는 jcmd로 조회한다. Linux의 PID 1은 STOP을 무시할 수 있으므로 1을 고정하지 않는다. `server.shutdown=graceful`, `spring.lifecycle.timeout-per-shutdown-phase=15s`, compose의 `stop_grace_period: 20s`를 사용한다. 신규 요청 거부·기존 요청 완료·프로세스 종료는 서로 다른 증거다.
+
+```bash
+curl --max-time 25 -sS -w '\nHTTP %{http_code} total %{time_total}\n' \
+  'http://127.0.0.1:18996/ops/slow?millis=8000' > evidence/slow.txt 2>&1 &
+REQUEST_PID=$!
+# 다른 터미널의 docker compose logs -f app-a에서 SLOW_ENTER를 확인한 뒤만 신호를 보낸다.
+docker compose logs --tail=20 app-a
+date -u +%FT%TZ
+docker compose kill --signal SIGTERM app-a
+curl --max-time 2 -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18996/actuator/health
+wait "$REQUEST_PID"
+cat evidence/slow.txt
+docker compose wait app-a || true
+docker compose logs --tail=60 app-a
+docker inspect "$(docker compose ps -aq app-a)" --format '{{.State.ExitCode}} {{.State.FinishedAt}}'
+docker compose up -d app-a
+```
+
+신규 요청 curl 실패는 이 실험의 관찰값이다. Java가 SIGTERM으로 끝나면 compose wait가 143을 반환할 수 있으므로 이 값만으로 graceful 실패라고 판정하지 않고 응답 완료·종료 로그·제한 시간을 함께 확인한다. readiness와 shutdown 사이의 경쟁 때문에 최초 한 번이 성공하면 시각을 적고 재시도한다. KILL 비교는 재기동 뒤 새로운 느린 요청이 진입한 것을 확인하고 `docker compose kill --signal SIGKILL app-a`로 반복한다. 응답 000/연결 종료와 200/본문 완료를 대조한다. KILL 뒤 실패 요청·DB 상태를 대사한다. 앱 롤백은 `APP_A_IMAGE=jx-ops:a docker compose up -d --force-recreate app-a`이며 DB 파일은 되돌리지 않는다.
+
+## D27: 공존·백업·DDL 대기
+
+전체 순서는 **expand → 신앱 쓰기 전환 → 구앱 종료 → null 재유입 차단 확인 → 최종 백필 → 제약 강화**다. D27은 nullable expand와 구앱 INSERT 생존만 확인한다. 구앱이 쓰는 동안 NOT NULL로 강화하지 않는다. 신앱/구DB 지원 여부는 별도로 선언한다.
+
+첫 백업은 D29 절의 쓰기 정지·baseline·dump 명령으로 expand 전에 만든다. 학습자 사본 a/b 이미지를 compose에 넣고 같은 DB에서 읽기/쓰기 fixture를 실행한다. DB 연결 식별은 다음으로 보존한다.
+
+```bash
+docker compose exec -T -e MYSQL_PWD=ops-only mysql mysql -uroot ops_lab \
+  -e 'SELECT DATABASE(),@@server_uuid,UTC_TIMESTAMP(6); SHOW FULL PROCESSLIST;'
+# 두 터미널 모두 같은 OPS_LAB와 COMPOSE_PROJECT_NAME 사용
+# 터미널 A: 실제 테이블명을 넣어 BEGIN; SELECT * FROM my_table LIMIT 1; 후 commit하지 않고 유지
+# 터미널 B: SET SESSION lock_wait_timeout=3; 다음 학습자가 작성한 expand.sql의 DDL 실행
+# timeout·metadata lock 대기 시간을 기록하고 A에서 ROLLBACK 후 다시 실행한다.
+# SHOW FULL PROCESSLIST로 연결 id를 확인. 중단할 때 자신의 DDL 연결에만 KILL QUERY <id>.
+```
+
+## D28: 백필과 contract 경계
+
+구앱 공존 중 구간 백필은 예비 작업이다. 같은 구간 재실행·중단 재개·구앱 null 재유입을 먼저 관찰한다. 신앱이 필수 값을 쓰고 null 요청을 거부하는 계약을 직접 구현한 뒤 쓰기를 b로 전환한다. 라우터가 없으면 실험 클라이언트 URL을 18997로 바꾸고 a의 진행 요청/worker 종료까지 확인한다.
+
+```bash
+docker compose stop app-a
+docker compose ps -a app-a
+# 옛 앱의 재시작 정책·다른 worker도 확인하고 자동 재기동을 막는다.
+# b에서 누락·명시적 null·정상 쓰기 요청을 실제 계약대로 실행하고 null 재유입 차단 증거 보존
+# 여기서만 학습자가 작성한 최종 백필 → null=0 대사 → contract.sql 실행
+```
+
+마지막 null 수 조회와 DDL 사이에도 쓰기가 있으므로 신앱의 null 거부를 먼저 검증한다. contract 뒤 구버전으로 복귀하지 말고 호환되는 버전으로 forward fix하거나 승인된 복원 절차를 쓴다. 백필·제약 DDL 자체는 자신의 모델에 맞춰 작성한다.
+
+## D29: 기준 시점 보존과 별도 DB 복원
+
+D27 expand **이전**에 아래를 실행한다. D29까지 원본 파일을 보존한다. InnoDB만 대상으로 하고 백업 중 DDL을 실행하지 않는다. 앱·worker·수동 writer를 모두 멈춰 baseline 조회와 dump가 같은 데이터 시점을 가리키도록 한다. `--single-transaction`만으로 별도 baseline 조회까지 동일 snapshot이 되지는 않는다.
+
+`baseline.sql`은 장치용 예시다. 학습자 DB에서는 **테이블별 행 수·예약 대상·지급 식별 집합·금액 합계·제약**을 실제 스키마로 조회하는 파일로 교체한다. 정렬 기준을 고정하고 source/restore에서 **동일 파일**을 쓴다. 비밀 값은 증거에 쓰지 않는다.
+
+```bash
+cd "$OPS_LAB"
+docker compose stop app-a app-b
+mkdir -p evidence/backup-D27
+# 다른 writer가 없는지 PROCESSLIST와 DB 식별자를 확인한다.
+docker compose exec -T -e MYSQL_PWD=ops-only mysql mysql -uroot ops_lab \
+  -e 'SELECT DATABASE(),@@server_uuid,UTC_TIMESTAMP(6); SHOW FULL PROCESSLIST;' > evidence/backup-D27/source.txt
+docker compose exec -T -e MYSQL_PWD=ops-only mysql mysql -uroot -N ops_lab \
+  < baseline.sql > evidence/backup-D27/baseline.tsv
+docker compose exec -T -e MYSQL_PWD=ops-only mysql mysqldump -uroot \
+  --single-transaction --set-gtid-purged=OFF --no-tablespaces --column-statistics=0 ops_lab \
+  > evidence/backup-D27/snapshot.sql
+test -s evidence/backup-D27/snapshot.sql
+shasum -a 256 baseline.sql evidence/backup-D27/* > evidence/backup-D27.sha256
+date -u +%FT%TZ > evidence/backup-D27/completed-at.txt
+docker compose up -d app-a app-b
+# 이후 쓰기는 별도 after-backup 증거로 기록하고 원본 baseline을 덮어쓰지 않는다.
+```
+
+복원은 새 DB로 한다. `snapshot.sql`에 CREATE DATABASE/USE가 없는지 먼저 검사한다. 있으면 원본 파일은 보존하고 복원 전용 사본을 검토하여 목적 DB를 지정한다. 아래 dump 옵션은 이를 넣지 않는다. 현재 DB를 초기화하지 않는다.
+
+```bash
+docker compose exec -T -e MYSQL_PWD=ops-only mysql mysql -uroot \
+  -e 'CREATE DATABASE ops_restore;'
+date -u +%FT%TZ > evidence/restore-start.txt
+docker compose exec -T -e MYSQL_PWD=ops-only mysql mysql -uroot ops_restore \
+  < evidence/backup-D27/snapshot.sql
+docker compose exec -T -e MYSQL_PWD=ops-only mysql mysql -uroot -N ops_restore \
+  < baseline.sql > evidence/restored.tsv
+diff -u evidence/backup-D27/baseline.tsv evidence/restored.tsv
+date -u +%FT%TZ > evidence/restore-end.txt
+```
+
+재실행에는 새 목적 DB 이름을 사용한다. 비교 기준은 백업 시점 baseline이며 백업 뒤 변경된 현재 원본과 일치할 필요가 없다. 시작/완료 시각·차집합·손실 구간을 남기고 복원 RTO/RPO와 업무 허용치를 구분한다. 현재 시점 데이터까지 복구했다는 보장은 없다.
+
+앱 복귀 표본은 probe에서 `OPS_A_VERSION=broken docker compose up -d --force-recreate app-a` 후 health 200·`/ops/smoke` 503을 확인하고, `OPS_A_VERSION=a APP_A_IMAGE=jx-ops:a docker compose up -d --force-recreate app-a` 후 smoke 200을 확인한다. 학습자 앱은 자신의 계약 실패 fixture와 호환 이미지로 같은 절차를 수행한다.
+
+## D33: commit 직전·직후 결정적 중단
+
+probe는 TransactionSynchronization의 beforeCommit/afterCommit에서 named volume의 `/control/<point>.entered` marker를 쓰고 `/control/<point>.release` 파일을 최대 60초 기다린다. afterCommit hook은 DB commit 완료 뒤·HTTP 성공 반환 전이다. beforeCommit hook에서 예외가 나면 rollback된다. 이 표본은 ops_marker 행만 쓰며 작업 재개 알고리즘을 제공하지 않는다.
+
+```bash
+cd "$OPS_LAB"
+# 이전 실행의 marker/release 파일만 정리한다.
+docker compose exec -T app-b rm -f /control/beforeCommit.entered /control/beforeCommit.release /control/afterCommit.entered /control/afterCommit.release
+curl --max-time 70 -sS -X POST 'http://127.0.0.1:18996/ops/tx?id=3301&point=beforeCommit' > evidence/before.txt 2>&1 &
+REQUEST_PID=$!
+# app-b의 /control/beforeCommit.entered가 생길 때까지 최대 15초 기다린다. 없으면 중단하고 로그 확인.
+for i in $(seq 1 150); do docker compose exec -T app-b test -f /control/beforeCommit.entered && break; sleep 0.1; done
+docker compose exec -T app-b test -f /control/beforeCommit.entered
+# 별도 연결: id=3301이 아직 안 보이는지 확인. then 실제 JVM 강제 종료
+docker compose exec -T -e MYSQL_PWD=ops-only mysql mysql -uroot ops_lab -e 'SELECT * FROM ops_marker WHERE id=3301;'
+docker compose kill --signal SIGKILL app-a
+wait "$REQUEST_PID" || true
+docker compose up -d app-a
+# health 200 뒤 같은 SELECT로 0행 확인. 새 id=3302, point=afterCommit으로 반복하면 종료 전후 1행.
+```
+
+학습자 사본은 실제 지급·체크포인트 트랜잭션의 beforeCommit/afterCommit에 같은 **테스트용 지연 훅**을 연결한다. 또는 디버거에서 hook의 marker 지점에 breakpoint를 걸고 `Suspend: Thread`로 멈춘다. 프로세스 전체 중지는 JVM 전체를 정지시키므로 관찰용 별도 연결은 DB 클라이언트를 사용한다. marker만 믿지 말고 별도 연결에서 commit 가시성을 확인한 뒤 KILL한다. 단순 sleep 후 운에 맡기지 않는다. DB 락 대기는 SQL 실행 전/중 통제에는 쓸 수 있으나 afterCommit 증거를 대신하지 않는다.
+
+재기동 뒤 자신의 재처리 명령/API를 실행하고 누락·중복·checkpoint·영구 실패를 직접 대사한다. release로 정상 진행시키려면 `docker compose exec -T app-b touch /control/beforeCommit.release` 또는 `docker compose exec -T app-b touch /control/afterCommit.release`를 쓴다. 실험 종료 때 marker/release를 지우고 지연 훅·프로파일·endpoint를 사본에서 제거하며 배포 이미지에 넣지 않는다.
+
+## D34: 두 JVM·소유권 회수·늦은 worker
+
+```bash
+docker compose up -d app-a app-b
+docker compose exec -T app-a jcmd -l
+docker compose exec -T app-b jcmd -l
+# 각 컨테이너의 JVM PID를 조회한다. init PID 1·호스트 PID·docker CLI PID와 구분한다.
+JVM_A=$(docker compose exec -T app-a jcmd -l | awk '$2=="/app/app.jar"{print $1}')
+test -n "$JVM_A"
+# A가 실제 chunk를 획득한 owner·lease_until·세대 번호를 별도 DB 연결로 보존한 뒤:
+docker compose exec -T app-a sh -c 'kill -STOP "$1"' sh "$JVM_A"
+# /proc/$JVM_A/status의 State가 T(stopped)인지 확인한다.
+docker compose exec -T app-a sh -c 'cat "/proc/$1/status"' sh "$JVM_A"
+# B의 회수 조건이 충족되는 시각까지 상한을 정해 조회. 두 소유자의 실제 변경 행 수와 지급 집합 기록.
+docker compose exec -T app-a sh -c 'kill -CONT "$1"' sh "$JVM_A"
+```
+
+학습자가 구현한 소유권 SQL·관찰 API로 B의 인수와 늦은 A 완료를 비교한다. lease 시간 경과는 DB 시각 기준을 기록한다. STOP만으로 DB 트랜잭션 잠금이 풀리지는 않는다. 열린 락 때문에 B가 대기한다면 그 결과·timeout을 기록하고, 잠금 해제 후 회수되는 별도 KILL 실험과 구분한다. 소유권 확인 뒤 STOP할 위치는 디버거/테스트 훅으로 통제한다. 정리 시 **먼저 CONT**하여 멈춘 프로세스를 풀고 compose stop으로 종료한다.
+
+## D38: 두 앱 요청 표본과 같은 구간의 자원
+
+`measure-http.py`는 macOS/Linux의 Python 3 표준 라이브러리로 유한 GET 요청을 보내는 장치다. URL을 번갈아 호출하며 요청별 시작/종료 시각·HTTP 상태·연결/본문 읽기 오류·latency를 JSONL로 남긴다. `--timeout`은 연결 시작부터 헤더와 본문 수신 완료까지의 전체 deadline(초)이다. 요청별 작업 프로세스에서 타이머로 제한하며, 조금씩 본문이 도착해도 deadline은 연장되지 않는다. deadline 초과·본문 중단·프로토콜 오류는 해당 요청의 실패로 기록하고 나머지 요청을 계속 처리한다. HTTP 200 헤더를 받았더라도 본문을 끝까지 받지 못하면 실패이며 `error`가 남는다. 전체 시도(실패와 부분 응답 포함)의 nearest-rank p50/p95/p99·오류율·처리량을 계산한다. 개별 요청 실패가 있어도 수집과 요약 출력이 끝나면 exit 0이며, 실패 여부는 요약의 `errors`와 JSONL의 `error`/HTTP 상태로 확인한다. 고정 RPS 도구가 아니라 응답을 기다린 뒤 다음 묶음을 보내므로 요청 수·동시성·실제 처리량을 구분한다. 100건의 p99는 소수 표본이므로 운영 보장으로 쓰지 않는다. 지급 POST·도메인 중복/재적재 횟수는 자신의 통합 테스트로 별도 확인한다.
+
+학습자 앱 두 개를 준비하고 URL을 실제 조회 계약으로 바꾼다. probe의 health URL로 먼저 수집기만 확인할 수도 있다. warm/miss/무효화와 개선 전후 각각에 같은 데이터·요청 수·동시성·timeout을 쓰고 출력 파일 이름을 바꾼다. 먼저 100건·동시 4·요청 timeout 2초 상한으로 시작하고 장애가 관찰되면 LOAD_PID를 중단해 부분 JSONL만 보존한다. 중단된 실행은 완결된 100건 결과로 쓰지 않는다.
+
+```bash
+cd "$OPS_LAB"
+docker stats --format '{{json .}}' > evidence/resources.jsonl &
+STATS_PID=$!
+python3 "$JX_REPO/course/start/ops/measure-http.py" \
+  --requests 100 --concurrency 4 --timeout 2 --output evidence/latency.jsonl \
+  http://127.0.0.1:18996/actuator/health http://127.0.0.1:18997/actuator/health \
+  > evidence/latency-summary.json &
+LOAD_PID=$!
+# 요청 실행 중 다른 터미널에서 아래 Hikari 관찰을 수행한다.
+wait "$LOAD_PID"
+kill "$STATS_PID"
+wait "$STATS_PID" || true
+cat evidence/latency-summary.json
+```
+
+Hikari active/pending은 학습자 앱의 테스트 환경에서 Actuator metrics를 노출한 경우 `/actuator/metrics/hikaricp.connections.active`와 `/actuator/metrics/hikaricp.connections.pending`을 앱 둘에서 1초 간격으로 조회하고 UTC 시각과 함께 보존한다. `date -u +%FT%TZ` 뒤 `curl --fail <앱주소>/actuator/metrics/hikaricp.connections.pending`을 실행한다. 노출되지 않으면 404를 0으로 바꾸지 말고 확인 불가로 남긴다. 요청 표본의 startedAt/finishedAt 구간과 Docker CPU/MemUsage·메트릭의 수집 시각을 대조한다. 요청이 너무 빨리 끝나 동시각 표본이 없으면 통합 자원 진단은 확인 불가이며 조건을 다시 설계한다. D39의 요청 풀/Hikari 통합 진단도 이 방식으로 자기 앱에서 수집한다. 독립 JvmSignals 결과로 대체하지 않는다.
+
+## D39: JVM PID·CPU·외부 대기·힙
+
+`JvmSignals.java`를 OPS_LAB에 복사하고 JDK 21의 javac로 컴파일한다. CPU는 20초 busy loop, wait는 위 slow endpoint의 실제 HTTP 응답 대기, heap은 24MiB 보유다. `-Xmx64m`은 실험 상한이며 운영 권장값이 아니다.
+
+```bash
+cp "$JX_REPO/course/start/ops/JvmSignals.java" "$OPS_LAB/"
+cd "$OPS_LAB"
+"$JAVA_HOME/bin/javac" JvmSignals.java
+"$JAVA_HOME/bin/java" -Xmx64m JvmSignals cpu > evidence/jvm-cpu.txt 2>&1 &
+JVM_PID=$!
+"$JAVA_HOME/bin/jcmd" -l
+ps -p "$JVM_PID" -o pid,pcpu,rss,etime,command
+"$JAVA_HOME/bin/jcmd" "$JVM_PID" Thread.print > evidence/cpu-threads.txt
+"$JAVA_HOME/bin/jcmd" "$JVM_PID" GC.heap_info > evidence/cpu-heap.txt
+wait "$JVM_PID"
+# 같은 절차를 아래 두 명령으로 각각 반복한다. PID·시각·파일 이름을 매번 새로 보존.
+# java -Xmx64m JvmSignals wait http://127.0.0.1:18997/ops/slow?millis=20000
+# java -Xmx64m JvmSignals heap
+```
+
+heap은 시작과 12초 뒤 GC.heap_info·GC.class_histogram을 비교한다. histogram은 GC/정지를 유발할 수 있으므로 실행 시각도 적는다. 보유 객체 증가와 누수는 다르다. CPU/대기/heap 표본은 Hikari 진단 증거가 아니며 자신의 앱에서 요청 풀·DB active/pending·timeout을 같은 시각으로 별도 관찰한다. 컨테이너 JVM은 `docker compose exec -T app-a jcmd "$JVM_A" Thread.print` (위 PID 조회 후)로 수집한다.
+
+## 정리
+
+실행 증거는 자신의 docs/evidence에 복사한 뒤 이 실험의 자원만 제거한다. 기존 저장소 compose나 다른 프로젝트에는 아래 명령을 실행하지 않는다. DB 볼륨 삭제는 이 격리 실습 데이터만 지운다.
+
+```bash
+cd "$OPS_LAB"
+# STOP 전에 보존한 JVM_A를 사용한다. 정지한 JVM은 jcmd -l 응답을 못 할 수 있다.
+docker compose exec -T app-a sh -c 'kill -CONT "$1"' sh "$JVM_A" || true
+JVM_B=$(docker compose exec -T app-b jcmd -l | awk '$2=="/app/app.jar"{print $1}')
+docker compose exec -T app-b sh -c 'kill -CONT "$1"' sh "$JVM_B" || true
+docker compose down --volumes --remove-orphans
+docker image rm jx-ops:a jx-ops:b
+# 남아 있는 이 실험 전용 JVM/curl PID만 kill하고 wait한다. 공통 이름 pkill은 사용하지 않는다.
+# 실제 생성 경로를 확인한 뒤 OPS_LAB만 제거한다.
+case "$OPS_LAB" in /tmp/jx-ops.*|/private/tmp/jx-ops.*) rm -rf -- "$OPS_LAB" ;; *) echo '실습 경로 확인 필요' ;; esac
+```

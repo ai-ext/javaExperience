@@ -89,7 +89,8 @@ this.restClient = RestClient.builder().requestFactory(factory).build();
      원인 java.net.SocketTimeoutException: Read timed out
 ```
 
-연결 타임아웃은 응답하지 않는 주소(`http://10.255.255.1/`)로 확인했다. (나)는 `1006ms` 만에 `Connect timed out`, (가)는 `1002ms` 만에 `HTTP connect timed out`(`HttpConnectTimeoutException`)이었다. 아무도 안 듣는 포트(`localhost:18399`)는 기다릴 것도 없이 `0ms`에 `Connection refused`였다.
+연결 타임아웃은 응답하지 않는 주소로 확인했다(예시 주소는 RFC 5737 문서용 `http://192.0.2.1/`. 아래 측정값은 `10.255.255.1`로 잰 것이다).
+회사망 같은 곳에서는 이런 "응답 없는 주소"가 바로 거절되거나 프록시가 받아서 다르게 굴 수 있으므로, 정답 테스트(`PgClientTest`)처럼 로컬 소켓으로 SYN이 버려지게 만드는 방법이 믿을 만하다. (나)는 `1006ms` 만에 `Connect timed out`, (가)는 `1002ms` 만에 `HTTP connect timed out`(`HttpConnectTimeoutException`)이었다. 아무도 안 듣는 포트(`localhost:18399`)는 기다릴 것도 없이 `0ms`에 `Connection refused`였다.
 
 ### 3. 상태 코드 — `onStatus`
 

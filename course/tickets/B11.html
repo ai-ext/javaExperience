@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B11. prod에서 설정값이 안 바뀐다</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=6580290a3c9f">
+<link rel="stylesheet" href="../../tools/site/course-exercise.css?v=c30e18dc3d31">
+<link rel="stylesheet" href="../../tools/site/course.css?v=b6c93c158a77">
+<link rel="stylesheet" href="../../tools/site/course-flow.css?v=0d2a7c3a0db7">
+<link rel="stylesheet" href="../../tools/site/course-tokens.css?v=90f7ed5128e9">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../spring/README.html" aria-current="page">과정 v2 · 일자 목록</a><a href="../map.html">과정 지도</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<article class="exercise-sheet exercise-ticket" data-exercise="B11"><header class="exercise-head"><p class="exercise-kind"><b>B11</b> 2단계 · 티켓 작업서</p><h1 id="b11-prod에서-설정값이-안-바뀐다"><a class="anchor" href="#b11-prod에서-설정값이-안-바뀐다" aria-hidden="true">#</a>B11. prod에서 설정값이 안 바뀐다</h1><blockquote class="exercise-meta">
+<p>같은 날: D11 ①·③ · 연습(인수인계 리뷰 과제) · 진단 도구: <code>/actuator/env/{키}</code>의 <code>propertySources</code>, 로그인 응답 <code>expiresIn</code></p>
+</blockquote></header><nav class="exercise-route" aria-label="티켓 처리 순서"><ol><li><a href="#받은-티켓"><b>01</b><span>받은 티켓</span></a></li><li><a href="#환경과-재현"><b>02</b><span>환경과 재현</span></a></li><li><a href="#제출물"><b>03</b><span>제출물</span></a></li><li><a href="#flow-b11"><b>04</b><span>흐름 재생</span></a></li></ol></nav>
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D11.html#step-d11-1">D11 ① · 인수인계</a> · <a href="../spring/D11.html#step-d11-3">D11 ③ · 인수인계</a></p></nav>
+
+
+<section class="exercise-section exercise-received" aria-labelledby="받은-티켓"><h2 id="받은-티켓"><a class="anchor" href="#받은-티켓" aria-hidden="true">#</a>받은 티켓</h2><blockquote>
+<p>보안 점검 지적으로 운영 로그인 토큰 만료를 1시간에서 30분으로 줄이기로 했고, <code>application-prod.yml</code>에 <code>expires-in-seconds: 1800</code>을 넣어 어제 배포했습니다.
+그런데 운영에서 로그인해 보면 <code>expiresIn</code>이 여전히 7200입니다. 1800도 3600도 아니고 7200이라 더 이상합니다.
+배포가 덜 된 건지 확인했는데 jar는 새 것이 맞습니다. — 운영팀</p>
+</blockquote></section>
+
+
+<section class="exercise-section exercise-repro" aria-labelledby="환경과-재현"><h2 id="환경과-재현"><a class="anchor" href="#환경과-재현" aria-hidden="true">#</a>환경과 재현</h2><ol>
+<li><code>messy-server</code>에서 <code>docker compose up -d</code></li>
+<li><code>bash tickets/B11/repro.sh</code> (bootJar로 만든 jar를 8088 포트에 띄우고, 끝나면 그 프로세스만 내린다. 포트가 이미 쓰이면 시작하지 않는다)<ul>
+<li>운영 서버의 배포 설정(<code>deploy/</code>)을 그대로 읽고, 접속 정보·비밀값만 로컬 값으로 바꿔 <code>prod</code> 프로파일로 띄운다.</li>
+<li>로그인 응답의 <code>expiresIn</code>과 <code>/actuator/env/board.jwt.expires-in-seconds</code>를 찍는다.</li>
+<li>기대 증상: <code>expiresIn</code>이 7200이다. <code>/actuator/env</code>가 보여 주는 이 키의 출처 목록에서 맨 위(이긴 값)가 <code>application-prod.yml</code>이 아니다.</li>
+</ul>
+</li>
+</ol></section>
+
+<section class="exercise-section exercise-submission" aria-labelledby="제출물"><h2 id="제출물"><a class="anchor" href="#제출물" aria-hidden="true">#</a>제출물</h2><ul>
+<li>원인 서술: 7200은 어디서 왔고, 왜 <code>application-prod.yml</code>의 1800을 이겼는가</li>
+<li>재현 테스트: 운영 서버와 같은 배포 설정으로 띄웠을 때 실제로 쓰이는 값이 1800인지 보는 테스트(결함 상태에서 실패 → 수정 후 통과)</li>
+<li>수정 diff</li>
+</ul></section>
+<section class="ticket-flow flow" data-flow="B11" data-flow-kind="ticket" id="flow-b11" aria-labelledby="flow-b11-title">
+  <div class="flow-head"><p class="flow-eyebrow">장애 흐름 · 증상에서 관찰 지점까지</p><h2 id="flow-b11-title">B11 장애가 번지는 흐름</h2><p class="flow-summary">밖에서 보이는 증상과 관찰 지점만 먼저 보여 줍니다. 원인 쪽 단계는 직접 진단한 뒤 아래 접기에서 펼쳐 맞춰 보세요. 펼치면 재생에도 원인 단계가 끼어듭니다.</p></div>
+  <ol class="flow-nodes" aria-label="장애 흐름 지도: application-prod.yml → 원인 쪽 → 원인 쪽 → 로그인 응답 → 관찰 지점"><li class="flow-node" data-node="config" data-index="0"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 6h14M5 12h14M5 18h14"></path><circle cx="9" cy="6" r="1.8"></circle><circle cx="15" cy="12" r="1.8"></circle><circle cx="8" cy="18" r="1.8"></circle></svg></span><span class="flow-node-text"><b>application-prod.yml</b><small>expires-in-seconds</small></span></li><li class="flow-node is-masked" data-node="data" data-index="1"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4.5" y="4.5" width="15" height="15" rx="2" stroke-dasharray="3 2.4"></rect><path d="M10 10a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3M12 15.6v.1"></path></svg></span><span class="flow-node-text"><b>원인 쪽</b><small>펼치면 보임</small></span></li><li class="flow-node is-masked" data-node="code" data-index="2"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4.5" y="4.5" width="15" height="15" rx="2" stroke-dasharray="3 2.4"></rect><path d="M10 10a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3M12 15.6v.1"></path></svg></span><span class="flow-node-text"><b>원인 쪽</b><small>펼치면 보임</small></span></li><li class="flow-node" data-node="symptom" data-index="3"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4 21 19.5H3z"></path><path d="M12 10v4.4M12 17.2v.1"></path></svg></span><span class="flow-node-text"><b>로그인 응답</b><small>expiresIn</small></span></li><li class="flow-node" data-node="observe" data-index="4"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6"></circle><path d="m15 15 5 5M8 12.5v-2M10.5 12.5V8.5M13 12.5v-3"></path></svg></span><span class="flow-node-text"><b>관찰 지점</b><small>/actuator/env/{키}</small></span></li></ol>
+  <div class="flow-player" data-flow-player="" hidden="">
+  <div class="flow-controls" role="group" aria-label="흐름 재생 조작">
+    <button type="button" class="flow-btn" data-flow-prev="" aria-controls="flow-b11-now">◀ 이전</button>
+    <button type="button" class="flow-btn flow-play" data-flow-play="" aria-pressed="false" aria-controls="flow-b11-now">▶ 재생</button>
+    <button type="button" class="flow-btn" data-flow-next="" aria-controls="flow-b11-now">다음 ▶</button>
+    <span class="flow-speed" role="group" aria-label="재생 속도"><button type="button" class="flow-btn" data-flow-speed="0.5" aria-pressed="false">0.5×</button><button type="button" class="flow-btn" data-flow-speed="1" aria-pressed="true">1×</button><button type="button" class="flow-btn" data-flow-speed="2" aria-pressed="false">2×</button></span>
+    <span class="flow-count" data-flow-count="" aria-hidden="true"></span>
+  </div>
+  <div class="flow-now" id="flow-b11-now" data-flow-now="" aria-live="polite" aria-atomic="true"></div>
+  <p class="flow-keys">이 영역 안에서 <kbd>←</kbd> <kbd>→</kbd> 이전·다음, <kbd>Home</kbd> <kbd>End</kbd> 처음·끝. 재생은 마지막 단계에서 멈춥니다.</p>
+</div>
+  <h3 class="flow-list-title">보이는 증상과 관찰 지점 <small>3단계</small></h3>
+  <ol class="flow-steps"><li class="flow-step" id="flow-b11-1" data-order="1" data-node="config"><p class="flow-step-head"><span class="flow-step-no">1</span><span class="flow-step-node">application-prod.yml</span></p><p class="flow-step-title"><code>application-prod.yml</code>에 1800을 넣어 배포했다</p><dl class="flow-values"><div><dt>변경</dt><dd><code>expires-in-seconds: 1800</code></dd></div><div><dt>확인</dt><dd>jar는 새 것이 맞다</dd></div></dl></li><li class="flow-step" id="flow-b11-4" data-order="4" data-node="symptom"><p class="flow-step-head"><span class="flow-step-no">2</span><span class="flow-step-node">로그인 응답</span></p><p class="flow-step-title">운영에서 로그인하면 <code>expiresIn</code>이 여전히 7200</p><dl class="flow-values"><div><dt>티켓</dt><dd>1800도 3600도 아니고 7200</dd></div></dl></li><li class="flow-step" id="flow-b11-5" data-order="5" data-node="observe"><p class="flow-step-head"><span class="flow-step-no">3</span><span class="flow-step-node">관찰 지점</span></p><p class="flow-step-title">이 키를 누가 이겼는지 본다</p><dl class="flow-values"><div><dt>재현</dt><dd><code>/actuator/env/board.jwt.expires-in-seconds</code>의 출처 목록 맨 위가 <code>application-prod.yml</code>이 아니다</dd></div></dl></li></ol>
+  <details class="flow-cause"><summary>원인 쪽 단계 2개 펼치기 — "원인과 정답"과 같은 수준</summary>
+  <p class="flow-cause-note">원인 서술을 먼저 써 본 뒤 펼치세요. 단계 번호는 위 증상 단계와 섞인 실제 순서로 재생됩니다.</p>
+  <ol class="flow-steps is-cause"><li class="flow-step is-cause" id="flow-b11-2" data-order="2" data-node="data"><p class="flow-step-head"><span class="flow-step-no">원인 1</span><span class="flow-step-node">환경 변수 파일</span></p><p class="flow-step-title">환경 변수 파일에 6월에 넣은 값이 남아 있다</p><dl class="flow-values"><div><dt>줄</dt><dd><code>BOARD_JWT_EXPIRES_IN_SECONDS=7200</code> ("로그인 유지" 임시 연장)</dd></div></dl></li><li class="flow-step is-cause" id="flow-b11-3" data-order="3" data-node="code"><p class="flow-step-head"><span class="flow-step-no">원인 2</span><span class="flow-step-node">설정 우선순위</span></p><p class="flow-step-title">OS 환경 변수는 어떤 <code>application*.yml</code>보다 우선한다</p><dl class="flow-values"><div><dt>착각</dt><dd>"프로파일 전용 yml이 마지막에 덮는다" — yml끼리만 맞다</dd></div></dl></li></ol></details>
+</section>
+<section class="exercise-section" aria-labelledby="힌트"><h2 id="힌트"><a class="anchor" href="#힌트" aria-hidden="true">#</a>힌트</h2><details>
+<summary>1. 값을 추측하지 말고 Environment에 묻는다</summary>
+
+<p>yml을 눈으로 읽어서는 이긴 값을 알 수 없다. <code>/actuator/env/board.jwt.expires-in-seconds</code>는 그 키를 가진 출처를 우선순위 순서로 모두 보여 주고,
+<code>property.source</code>가 실제로 이긴 출처다. 출처 이름(<code>systemEnvironment</code>, <code>Config resource 'class path resource [application-prod.yml]'</code> 등)과 <code>origin</code>을 본다.</p>
+</details><details>
+<summary>2. 같은 키에 값을 줄 수 있는 곳을 모두 찾는다</summary>
+
+<p>뒤에 오는 것이 이긴다: jar 안 <code>application.yml</code> → jar 안 <code>application-{profile}.yml</code> → … → <strong>OS 환경 변수</strong> → Java 시스템 프로퍼티 → 커맨드라인 인자.
+환경 변수는 느슨한 바인딩(relaxed binding)으로 키에 붙는다. 점을 밑줄로 바꾸고 대문자로 쓴 <code>BOARD_JWT_EXPIRES_IN_SECONDS</code>는 <code>board.jwt.expires-in-seconds</code>와 같은 키다.
+리포에서 <code>7200</code>과 <code>EXPIRES</code>를 찾아본다(<code>grep -rn</code>). 소스 밖 파일도 본다.</p>
+</details><details>
+<summary>3. 테스트로 고정하기</summary>
+
+<p><code>SpringApplicationBuilder</code>로 빈 없는 작은 설정 클래스를 <code>prod</code> 프로파일로 띄우되, <code>StandardEnvironment</code>의 <code>systemEnvironment</code> 출처를
+<code>deploy/board.env</code> 내용으로 바꿔 끼운다(<code>SystemEnvironmentPropertySource</code>). 그 뒤 <code>Binder.get(env).bind("board.jwt.expires-in-seconds", Long.class)</code>로 이긴 값을 단언한다.</p>
+</details></section>
+
+
+
+
+
+
+<section class="exercise-section exercise-answer" aria-labelledby="원인과-정답"><h2 id="원인과-정답"><a class="anchor" href="#원인과-정답" aria-hidden="true">#</a>원인과 정답</h2><details>
+<summary>펼치기</summary>
+
+<p><strong>원인.</strong> 운영 서버 환경 변수 파일 <code>deploy/board.env</code>에 6월에 넣은 <code>BOARD_JWT_EXPIRES_IN_SECONDS=7200</code>("로그인 유지" 임시 연장)이 남아 있다.
+OS 환경 변수는 어떤 <code>application*.yml</code>보다 우선순위가 높으므로, <code>application-prod.yml</code>에 1800을 넣어도 환경 변수 7200이 이긴다.
+"프로파일 전용 yml이 마지막에 덮는다"는 착각이 원인이다. yml끼리는 맞지만 환경 변수·시스템 프로퍼티·커맨드라인 인자는 그보다 위다.
+yml만 고치면 몇 번을 배포해도 그대로다(로드맵 함정).</p>
+<p><strong>정답 수정.</strong> 환경 변수 파일에서 그 줄을 지우고, 운영 동작값은 <code>application-prod.yml</code> 한 곳에만 둔다는 규칙을 파일 머리에 적는다.
+환경 변수에는 서버마다 다른 접속 정보만 둔다. 같은 키를 두 곳에 두지 않는 것이 핵심이다. (<code>tickets/B11/answer/fix.patch</code>)
+고친 뒤 <code>/actuator/env/board.jwt.expires-in-seconds</code>의 이긴 출처가 <code>application-prod.yml</code>이고, 로그인 응답 <code>expiresIn</code>이 1800인지 확인한다.</p>
+<p><strong>확인 테스트.</strong> <code>tickets/B11/answer/B11ConfirmTest.java</code> — <code>운영_배포_환경_변수로_띄우면_토큰_만료는_1800초다</code>, <code>환경_변수가_없는_로컬은_기본값_3600초다</code></p>
+<p><strong>1단계 정답 서버는?</strong> <code>board-server/src/main/resources/application-prod.yml</code>은 비밀값·접속 정보를 기본값 없는 자리표시자(<code>${DB_URL}</code> 등)로만 두고,
+동작값은 <code>application.yml</code>에 둔다. 정답 서버도 같은 <code>@ConfigurationProperties("board")</code> 바인딩을 쓰므로 환경 변수는 여전히 어떤 키든 덮어쓸 수 있다.
+차이는 배포 구성에 있다. 정답 서버의 운영 구성에서 환경 변수로 넣는 것은 자리표시자가 가리키는 이름(<code>DB_URL</code>, <code>BOARD_JWT_SECRET</code> 등)뿐이고 동작값 키를 넣는 환경 변수는 없어서, 같은 키가 두 출처에 겹치지 않는다. 자리표시자가 덮어쓰기를 막아 주는 것은 아니다. 누가 <code>BOARD_JWT_EXPIRES_IN_SECONDS</code>를 넣으면 정답 서버에서도 그 값이 이긴다.</p>
+</details></section>
+
+
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><strong>제출물을 준비했다면</strong><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D11.html#step-d11-1">D11 ① · 인수인계</a> · <a href="../spring/D11.html#step-d11-3">D11 ③ · 인수인계</a></p><p class="exercise-return-note">연결된 일자로 돌아가 완료 조건을 확인하고 진행 기록을 남기세요.</p></nav></article>
+
+</main>
+
+
+
+
+
+<script src="../../tools/site/course-flow.js?v=1684be5bc034" defer></script>
+</body>
+</html>

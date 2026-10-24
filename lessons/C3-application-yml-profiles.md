@@ -53,7 +53,7 @@ server:
 # 실행: ./gradlew bootRun --args='--spring.profiles.active=practice'  (IntelliJ: Active profiles에 practice)
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/practice?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+    url: jdbc:mysql://localhost:13308/practice?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
 ```
 
 ### 누가 이기나 — 우선순위
@@ -132,7 +132,7 @@ server:
 **② 프로필 없이 / 있이 띄워 비교 (6분)**
 
 ```bash
-./gradlew bootRun      # studymate MySQL(3306)이 떠 있어야 한다
+./gradlew bootRun      # compose의 MySQL(호스트 13308)이 떠 있어야 한다
 ```
 
 로그에서 세 곳을 본다: `No active profile set ... "default"`, 줄마다 찍히는 `[javaExperience]`, `Tomcat started on port 8080`. `Ctrl+C`로 끈다.
@@ -177,7 +177,7 @@ IntelliJ로 띄울 때는 Run → Edit Configurations → `Main` → Program arg
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/community
+    url: jdbc:mysql://localhost:13308/community
     username: community
     password: community
 ```

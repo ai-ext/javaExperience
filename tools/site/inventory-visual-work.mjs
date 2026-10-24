@@ -29,6 +29,7 @@ function writePageChecklist(summary) {
         : page.source.startsWith('docs/knowledge/') ? '공부자료'
           : page.source.startsWith('lessons/') ? '개념 레슨'
             : page.source.startsWith('tickets/') ? '티켓'
+              : page.source.startsWith('course/') ? '과정 v2'
               : '홈·목차·미션·기타';
     if (!groups.has(group)) groups.set(group, []);
     groups.get(group).push(page);
@@ -170,7 +171,13 @@ function collectHtml(page, html) {
     'home-demo-result', 'home-cursor-preview', 'home-service-section', 'home-service-board',
     'kc-catalog', 'kc-hero', 'kc-context', 'kc-browse', 'kc-empty', 'kc-sequence', 'kc-original-link', 'kc-detail-navigation',
     'p16-json-visual', 'p16-navigation', 'p16-scene', 'p16-pair', 'p16-code-location', 'p16-actions',
-    'home-new-visual', 'home-new-stepper', 'home-new-plate', 'home-prepare-shortcut', 'home-return-work', 'home-preparation-steps']);
+    'home-new-visual', 'home-new-stepper', 'home-new-plate', 'home-prepare-shortcut', 'home-return-work', 'home-preparation-steps',
+    // 과정 v2(P5-2): 홈 과정 영역·참고 도감, 일자 페이지 배치, 과정 지도
+    'course-home', 'ch-today', 'ch-progress', 'ch-entries', 'home-reference',
+    'day-head', 'day-today', 'day-java', 'step-facts', 'copy-row', 'day-pager',
+    'course-map', 'cm-legend', 'cm-toolbar', 'cm-board', 'cm-detail', 'cm-tables',
+    // 과정 v2(P5-3): 일자 [오늘 흐름]·티켓 [장애 흐름] 재생, 2단계 일자의 티켓 흐름 목록
+    'flow', 'flow-links']);
   for (const match of html.matchAll(/<(?:section|header|footer|div|nav|button|article|aside|dialog|figure|p|ol)\b([^>]*\bclass="([^"]+)"[^>]*)>/g)) {
     const classes = match[2].split(/\s+/);
     for (const component of classes) {
@@ -195,7 +202,9 @@ function markdownFiles(dir) {
   });
 }
 
-const sourceFiles = ['README.md', 'errors.md', ...['scenario', 'practice', 'docs/knowledge', 'lessons', 'tickets'].flatMap(markdownFiles)].sort();
+// 과정 v2는 이 렌더러가 배치하는 화면(과정 안내·지도·일자 페이지·출발 자료)만 넣는다. course/java·course/tickets는 각 담당이 넣는다.
+const courseFiles = ['course/README.md', 'course/map.md', ...['course/spring', 'course/start'].flatMap(markdownFiles)];
+const sourceFiles = ['README.md', 'errors.md', ...['scenario', 'practice', 'docs/knowledge', 'lessons', 'tickets'].flatMap(markdownFiles), ...courseFiles].sort();
 for (const file of sourceFiles) {
   const htmlFile = file.replace(/\.md$/, '.html');
   const before = rows.length;

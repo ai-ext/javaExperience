@@ -142,7 +142,7 @@ DB에 남은 것은 **1.6초 사이에 10개**다(`16:06:58.869`~`16:07:00.480`)
 10분. 두 방식이 **같은 순간에 다른 숫자**를 내는 것을 SQL로 본다. G3처럼 `mysql`에 들어가 임시 테이블로 한다(접속을 끊으면 사라진다).
 
 ```bash
-docker exec -it -e LANG=C.UTF-8 studymate-mysql-1 mysql --default-character-set=utf8mb4 -ucommunity -pcommunity practice
+docker compose exec -e LANG=C.UTF-8 mysql mysql --default-character-set=utf8mb4 -ucommunity -pcommunity practice
 ```
 
 **1. 분이 바뀌기 직전에 글 다섯 개를 넣는다.**

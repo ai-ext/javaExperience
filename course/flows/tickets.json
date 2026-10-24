@@ -1,0 +1,2400 @@
+{
+  "version": 1,
+  "source": "2단계 티켓 페이지(course/tickets/Bnn.md)의 [장애 흐름] 데이터. 렌더러가 빌드 때 티켓 HTML의 '받은 티켓' 다음에 넣는다. side=open 단계는 티켓 페이지에서 접기 밖에 이미 있는 내용(받은 티켓·환경과 재현·머리의 진단 도구)만 다시 적고, side=cause 단계는 '원인과 정답' 접기와 같은 수준으로 접힌 채 둔다. evidence는 그 문장이 티켓 원문의 어느 쪽(open = 접기 밖, cause = 원인과 정답 안)에 있는지 검사하는 문자열이다(tools/site/test-course-pages.mjs). 티켓 원문을 P4가 고치면 검사가 알려 준다.",
+  "catalog": {
+    "pg": {
+      "label": "외부 PG",
+      "icon": "card"
+    },
+    "api": {
+      "label": "API",
+      "icon": "route"
+    },
+    "pool": {
+      "label": "Hikari 풀",
+      "icon": "pool"
+    },
+    "db": {
+      "label": "MySQL",
+      "icon": "db"
+    },
+    "data": {
+      "label": "데이터",
+      "icon": "stack"
+    },
+    "redis": {
+      "label": "Redis",
+      "icon": "bolt"
+    },
+    "thread": {
+      "label": "요청 스레드",
+      "icon": "thread"
+    },
+    "code": {
+      "label": "코드",
+      "icon": "brackets"
+    },
+    "config": {
+      "label": "설정",
+      "icon": "sliders"
+    },
+    "browser": {
+      "label": "브라우저",
+      "icon": "window"
+    },
+    "rules": {
+      "label": "인가 규칙",
+      "icon": "shield"
+    },
+    "clock": {
+      "label": "서버 시계",
+      "icon": "clock"
+    },
+    "client": {
+      "label": "사용자",
+      "icon": "user"
+    },
+    "response": {
+      "label": "응답",
+      "icon": "doc"
+    },
+    "symptom": {
+      "label": "증상",
+      "icon": "alert"
+    },
+    "observe": {
+      "label": "관찰 지점",
+      "icon": "search"
+    }
+  },
+  "pending": [],
+  "tickets": [
+    {
+      "ticket": "B01",
+      "title": "PG가 느려지자 결제와 상관없는 글 목록이 멈추기까지",
+      "nodes": [
+        {
+          "id": "pg",
+          "sub": "Toxiproxy +5초"
+        },
+        {
+          "id": "api",
+          "label": "충전 API",
+          "sub": "POST /api/me/points/charges"
+        },
+        {
+          "id": "pool",
+          "sub": "maximum-pool-size"
+        },
+        {
+          "id": "symptom",
+          "label": "글 목록 API",
+          "sub": "GET /api/posts"
+        },
+        {
+          "id": "observe",
+          "sub": "Hikari 메트릭 · 스레드 덤프"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "pg",
+          "title": "PG 응답이 느려진다",
+          "values": [
+            [
+              "운영",
+              "저녁 8시쯤 결제사(PG) 장애 공지"
+            ],
+            [
+              "재현",
+              "Toxiproxy로 PG 응답을 5초 늦춘다"
+            ]
+          ],
+          "evidence": [
+            "장애 공지",
+            "PG 응답을 5초 늦추고"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "api",
+          "title": "그 사이 충전 요청이 몰린다",
+          "values": [
+            [
+              "재현",
+              "회원 12명이 동시에 충전"
+            ]
+          ],
+          "evidence": [
+            "회원 12명이 동시에 충전"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "api",
+          "title": "충전이 PG 응답을 트랜잭션 안에서 기다린다",
+          "values": [
+            [
+              "코드",
+              "`ChargeService.charge`가 `tx.execute(...)` 안에서 `pgClient.approve(...)`를 부른다"
+            ],
+            [
+              "커넥션",
+              "JPA 트랜잭션은 시작할 때 커넥션을 얻는다 → PG를 기다리는 내내 1개를 쥔다"
+            ]
+          ],
+          "evidence": [
+            "`tx.execute(...)` 안에서",
+            "시작할 때 DB 커넥션을 얻으므로"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "pool",
+          "title": "커넥션 10개가 모두 PG 대기에 묶인다",
+          "values": [
+            [
+              "풀",
+              "10개"
+            ],
+            [
+              "계산",
+              "동시 충전 10건이면 바닥난다. 풀을 키워도 PG 지연 × 동시 충전 수만큼 다시 바닥난다"
+            ]
+          ],
+          "evidence": [
+            "풀(10개)이 모두 PG 대기에 묶이고",
+            "풀 크기를 늘려도"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "symptom",
+          "title": "글 목록은 커넥션을 2초 기다리다 실패한다",
+          "values": [
+            [
+              "대기",
+              "`connection-timeout` 2초"
+            ],
+            [
+              "오진",
+              "쿼리가 느린 것이 아니라 커넥션을 얻지 못했다"
+            ]
+          ],
+          "evidence": [
+            "커넥션을 2초(`connection-timeout`) 기다리다 실패",
+            "커넥션을 얻지 못한 것이다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "결제와 상관없는 글 목록이 같이 멈춘다",
+          "values": [
+            [
+              "운영",
+              "10분 가까이 500 아니면 무한 로딩"
+            ],
+            [
+              "재현",
+              "평소 수십 ms인 글 목록이 2초쯤 기다린 뒤 500"
+            ]
+          ],
+          "evidence": [
+            "10분 가까이 안 떴습니다",
+            "2초쯤 기다린 뒤 500으로 끝난다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "그 순간 Hikari 지표",
+          "values": [
+            [
+              "active",
+              "`hikaricp.connections.active` = 10 (풀 최대)"
+            ],
+            [
+              "pending",
+              "`pending` > 0"
+            ]
+          ],
+          "evidence": [
+            "`hikaricp.connections.active`가 10(풀 최대)",
+            "`pending`이 0보다 크다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "스레드 덤프를 뜰 도구",
+          "values": [
+            [
+              "명령",
+              "`jcmd <pid> Thread.print`"
+            ]
+          ],
+          "evidence": [
+            "스레드 덤프(`jcmd <pid> Thread.print`)"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B02",
+      "title": "글이 쌓인 뒤 첫 화면만 느려지기까지",
+      "nodes": [
+        {
+          "id": "data",
+          "sub": "post"
+        },
+        {
+          "id": "db",
+          "label": "실행 계획",
+          "sub": "인덱스 선택"
+        },
+        {
+          "id": "symptom",
+          "label": "목록 첫 쪽",
+          "sub": "GET /api/posts"
+        },
+        {
+          "id": "api",
+          "label": "다음 쪽",
+          "sub": "커서"
+        },
+        {
+          "id": "observe",
+          "sub": "slow log · EXPLAIN ANALYZE"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "data",
+          "title": "글이 계속 쌓였다 · 그 주에 배포는 없었다",
+          "values": [
+            [
+              "운영",
+              "지난주 중반부터 첫 화면이 느리다는 문의"
+            ],
+            [
+              "재현",
+              "오래된 글 20만 건(ACTIVE·DELETED 반반) 위에 최근 글 20만 건(HIDDEN)"
+            ]
+          ],
+          "evidence": [
+            "그 주에는 배포가 없었습니다",
+            "최근 글 20만 건(HIDDEN)"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "db",
+          "title": "목록 인덱스가 `(id, status)` 순서다",
+          "values": [
+            [
+              "인덱스",
+              "`idx_post_id_status (id, status)`"
+            ],
+            [
+              "결과",
+              "`status = ?` 등호로 범위를 좁히지 못해 PK를 최신 글부터 거꾸로 훑으며 한 행씩 거른다"
+            ]
+          ],
+          "evidence": [
+            "`idx_post_id_status (id, status)`",
+            "PK를 최신 글부터 거꾸로 훑으며"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "data",
+          "title": "최근 글이 숨김으로 쏠린 날부터 드러났다",
+          "values": [
+            [
+              "어느 날",
+              "스팸 계정 정리로 최근 글 수십만 건이 HIDDEN"
+            ],
+            [
+              "첫 쪽",
+              "숨김 글을 모두 지나야 ACTIVE 21건을 채운다"
+            ]
+          ],
+          "evidence": [
+            "스팸 계정 정리로",
+            "숨김 글을 모두 지나야 ACTIVE 21건을 채운다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "첫 쪽 목록 쿼리가 느리고, 데이터가 늘면 같이 는다",
+          "values": [
+            [
+              "재현",
+              "slow log·performance_schema 요약에 30ms 남짓"
+            ]
+          ],
+          "evidence": [
+            "30ms 남짓"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "api",
+          "title": "다음 쪽 커서는 숨김 구간 아래에서 시작한다",
+          "values": [
+            [
+              "커서",
+              "`id < ?`가 오래된 글 구간에서 시작해 다시 빠르다"
+            ]
+          ],
+          "evidence": [
+            "숨김 구간 아래(오래된 글 구간)에서 시작"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "api",
+          "title": "\"더 보기\"로 넘긴 쪽은 예전처럼 빠르다",
+          "values": [
+            [
+              "재현",
+              "다음 쪽(커서)은 0.4ms 안팎"
+            ]
+          ],
+          "evidence": [
+            "\"더 보기\"로 넘긴 다음 쪽들은 예전처럼 빠릅니다",
+            "0.4ms 안팎"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "실행 계획과 핸들러 지표",
+          "values": [
+            [
+              "EXPLAIN ANALYZE",
+              "`Index scan on post using PRIMARY (reverse) ... rows=200042`"
+            ],
+            [
+              "Handler",
+              "`Handler_read_prev`가 20만을 넘는다"
+            ]
+          ],
+          "evidence": [
+            "`Index scan on post using PRIMARY (reverse) ... rows=200042`",
+            "`Handler_read_prev`가 20만을 넘는다"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B03",
+      "title": "구매 실패가 반쯤 남고, 잡은 예외가 구매 전체를 깨기까지",
+      "nodes": [
+        {
+          "id": "api",
+          "label": "구매 API",
+          "sub": "POST /api/shop/orders"
+        },
+        {
+          "id": "data",
+          "label": "재고·쿠폰·주문 행",
+          "sub": "shop_item · member_coupon · shop_order"
+        },
+        {
+          "id": "code",
+          "label": "감사 쿠폰 지급",
+          "sub": "이벤트"
+        },
+        {
+          "id": "symptom",
+          "sub": "CS 문의 두 종류"
+        },
+        {
+          "id": "observe",
+          "sub": "트랜잭션 로그 · 디버거"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "api",
+          "title": "감사 쿠폰 이벤트를 켠 채 구매한다",
+          "values": [
+            [
+              "기동",
+              "`--board.shop.thanks-coupon-id=9001`"
+            ]
+          ],
+          "evidence": [
+            "--board.shop.thanks-coupon-id=9001"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "api",
+          "title": "`order`가 같은 클래스의 `@Transactional placeOnce`를 `this`로 부른다",
+          "values": [
+            [
+              "프록시",
+              "프록시를 거치지 않은 호출이라 트랜잭션이 아예 열리지 않는다"
+            ]
+          ],
+          "evidence": [
+            "`this`로 부른다",
+            "트랜잭션이 아예 열리지 않는다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "data",
+          "title": "재고 차감·쿠폰 사용·주문 INSERT·포인트 차감이 각자 커밋된다",
+          "values": [
+            [
+              "결과",
+              "마지막 포인트 차감이 실패해도 앞의 변경이 남는다"
+            ]
+          ],
+          "evidence": [
+            "각자 따로 커밋되어"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "data",
+          "title": "① 포인트가 모자라 실패했는데 쿠폰·재고·주문이 남는다",
+          "values": [
+            [
+              "재현 A",
+              "409인데 재고가 줄고 쿠폰이 USED, 주문 행이 남는다"
+            ]
+          ],
+          "evidence": [
+            "409인데 재고가 줄고 쿠폰이 USED, 주문 행이 남는다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "code",
+          "title": "안쪽 지급이 예외로 끝나 바깥 트랜잭션에 rollback-only가 남는다",
+          "values": [
+            [
+              "전파",
+              "`giveAfterPurchase`(REQUIRED) → `CouponService.grant`(REQUIRED, 같은 트랜잭션), 소진 예외를 catch"
+            ],
+            [
+              "커밋 때",
+              "`UnexpectedRollbackException`"
+            ]
+          ],
+          "evidence": [
+            "rollback-only 표시가 남고",
+            "`UnexpectedRollbackException`"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "② 감사 쿠폰 소진 뒤 구매하면 오류인데 포인트는 빠진다",
+          "values": [
+            [
+              "재현 B",
+              "201이어야 하는데 500. 주문 행은 생기고 포인트도 빠진다"
+            ]
+          ],
+          "evidence": [
+            "201이어야 하는데 500. 주문 행은 생기고 포인트도 빠진다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "트랜잭션이 정말 열렸는지 보는 도구",
+          "values": [
+            [
+              "로그",
+              "`logging.level.org.springframework.transaction=DEBUG`"
+            ],
+            [
+              "디버거",
+              "`TransactionSynchronizationManager.isActualTransactionActive()`"
+            ]
+          ],
+          "evidence": [
+            "`logging.level.org.springframework.transaction=DEBUG`",
+            "`TransactionSynchronizationManager.isActualTransactionActive()`"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B04",
+      "title": "enum 값 하나가 세 API와 기동까지 깨기까지",
+      "nodes": [
+        {
+          "id": "code",
+          "label": "알림 채널 enum",
+          "sub": "NotificationChannel"
+        },
+        {
+          "id": "api",
+          "label": "글·댓글 API",
+          "sub": "작성 · 댓글 · 삭제"
+        },
+        {
+          "id": "config",
+          "label": "빈 그래프",
+          "sub": "기동"
+        },
+        {
+          "id": "symptom",
+          "sub": "500 · 기동 실패"
+        },
+        {
+          "id": "observe",
+          "sub": "특성화 테스트 · ArchUnit"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "code",
+          "title": "`NotificationChannel`에 `KAKAO`를 하나 넣었다",
+          "values": [
+            [
+              "요청",
+              "카카오 알림톡 채널 추가"
+            ]
+          ],
+          "evidence": [
+            "`NotificationChannel`에 `KAKAO`를 하나 넣었더니"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "api",
+          "title": "채널별 저장 코드가 글 서비스 안 `switch`로 세 군데 복사돼 있다",
+          "values": [
+            [
+              "복사",
+              "글 작성 → 글 삭제 · 댓글 알림"
+            ],
+            [
+              "끝",
+              "셋 다 `default -> throw new IllegalStateException(\"알 수 없는 알림 채널\")`"
+            ]
+          ],
+          "evidence": [
+            "`switch`로 직접 썼고",
+            "`default -> throw new IllegalStateException(\"알 수 없는 알림 채널\")`"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "글 쓰기·댓글 달기·글 삭제가 한꺼번에 500",
+          "values": [
+            [
+              "재현 ①",
+              "`응답 코드: 글 작성=500 댓글 작성=500 글 삭제=500`"
+            ],
+            [
+              "로그",
+              "같은 예외 메시지가 세 번 찍힌다"
+            ]
+          ],
+          "evidence": [
+            "`응답 코드: 글 작성=500 댓글 작성=500 글 삭제=500`",
+            "같은 예외 메시지가 세 번 찍힌다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "config",
+          "title": "`PostServiceImpl` ↔ `CommentService`가 서로를 필드로 받는다",
+          "values": [
+            [
+              "덮은 방법",
+              "순환을 `@Lazy`로 덮어 기동만 되게 했다"
+            ]
+          ],
+          "evidence": [
+            "이 순환을 `@Lazy`로 덮어 기동만 되게 했다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "config",
+          "title": "붙여 둔 어노테이션 한 줄을 지우면 기동이 안 된다",
+          "values": [
+            [
+              "재현 ②",
+              "`PostServiceImpl`에 붙여 둔 어노테이션 한 줄을 지우면 기동 테스트가 컨텍스트를 만들지 못하고 실패한다"
+            ],
+            [
+              "티켓",
+              "누가 기동이 안 된다고 어노테이션을 하나 붙였다"
+            ]
+          ],
+          "evidence": [
+            "`PostServiceImpl`에 붙여 둔 어노테이션 한 줄을 지우고",
+            "기동 테스트가 컨텍스트를 만들지 못하고 실패한다",
+            "어노테이션을 하나 붙여서 넘어갔다는 얘기"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "고치기 전에 동작부터 고정한다",
+          "values": [
+            [
+              "도구",
+              "코드 읽기, 특성화 테스트로 동작 고정 → 리팩터링, ArchUnit 규칙"
+            ]
+          ],
+          "evidence": [
+            "특성화 테스트로 동작 고정 → 리팩터링, ArchUnit 규칙"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B05",
+      "title": "싱글톤 빈 필드 하나에 동시 요청의 글이 섞이기까지",
+      "nodes": [
+        {
+          "id": "client",
+          "label": "동시 글쓰기",
+          "sub": "POST /api/posts"
+        },
+        {
+          "id": "code",
+          "label": "금칙어 검사기",
+          "sub": "싱글톤 빈"
+        },
+        {
+          "id": "thread",
+          "sub": "요청 A · 요청 B"
+        },
+        {
+          "id": "symptom",
+          "sub": "201 · 400 뒤바뀜"
+        },
+        {
+          "id": "observe",
+          "sub": "부하 스크립트 · 동시성 테스트"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "client",
+          "title": "혼자 보낼 때는 언제나 맞다",
+          "values": [
+            [
+              "재현",
+              "깨끗한 글 201, 금칙어 글 400"
+            ],
+            [
+              "티켓",
+              "낮에 한 명이 테스트하면 한 번도 재현되지 않는다"
+            ]
+          ],
+          "evidence": [
+            "혼자 보낼 때는 깨끗한 글 201, 금칙어 글 400이다",
+            "낮에 한 명이 테스트하면 한 번도 재현되지 않습니다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "client",
+          "title": "글이 몰리는 시간에 동시에 보낸다",
+          "values": [
+            [
+              "재현",
+              "깨끗한 글 25건과 금칙어 글 25건을 동시에"
+            ],
+            [
+              "데이터",
+              "금칙어 301개"
+            ]
+          ],
+          "evidence": [
+            "깨끗한 글 25건과 금칙어 글 25건을 동시에 보내면",
+            "금칙어 301개"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "code",
+          "title": "검사기가 마지막 검사 대상과 정규화 결과를 인스턴스 필드에 둔다",
+          "values": [
+            [
+              "필드",
+              "`lastText`, `lastFolded`"
+            ],
+            [
+              "이유",
+              "같은 글을 연달아 검사할 때 다시 정규화하지 않으려고"
+            ]
+          ],
+          "evidence": [
+            "마지막 검사 대상(`lastText`)과 정규화 결과(`lastFolded`)를 인스턴스 필드에 둔다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "thread",
+          "title": "A가 목록을 도는 사이 B가 그 필드를 자기 글로 덮어쓴다",
+          "values": [
+            [
+              "결과",
+              "A는 B의 글을 검사한 결과를 돌려준다"
+            ],
+            [
+              "창",
+              "금칙어 목록이 길수록 섞이는 창이 넓다. `volatile`은 이 경쟁을 막지 못한다"
+            ]
+          ],
+          "evidence": [
+            "A는 B의 글을 검사한 결과를 돌려준다",
+            "`volatile`은 가시성만 보장하고 이 경쟁은 막지 못한다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "깨끗한 글이 400을 받거나 금칙어 글이 201로 저장된다",
+          "values": [
+            [
+              "재현",
+              "실행마다 건수가 다르다"
+            ],
+            [
+              "CS",
+              "평범한 글이 금칙어로 거절 · 금칙어 글이 그대로 올라감"
+            ]
+          ],
+          "evidence": [
+            "깨끗한 글이 400을 받거나 금칙어 글이 201로 저장되는 건이 섞인다(실행마다 건수가 다르다)",
+            "금칙어가 든 글이 그대로 올라간 것도 몇 건 신고됐습니다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "동시에 부딪히게 만든다",
+          "values": [
+            [
+              "도구",
+              "부하 스크립트(동시 요청), 동시성 단위 테스트(여러 스레드가 검사기 하나를 함께 호출)"
+            ]
+          ],
+          "evidence": [
+            "부하 스크립트(동시 요청), 동시성 단위 테스트(여러 스레드가 검사기 하나를 함께 호출)"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B06",
+      "title": "컬럼 추가 한 줄 뒤로 상점 요청이 줄 서기까지",
+      "nodes": [
+        {
+          "id": "api",
+          "label": "회원 A 주문",
+          "sub": "구매 알림 웹훅"
+        },
+        {
+          "id": "db",
+          "label": "ALTER TABLE",
+          "sub": "shop_item"
+        },
+        {
+          "id": "symptom",
+          "label": "회원 B 주문 · 상품 목록",
+          "sub": "GET /api/shop/items"
+        },
+        {
+          "id": "observe",
+          "sub": "SHOW PROCESSLIST"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "api",
+          "title": "회원 A가 주문한다 — 구매 알림 웹훅이 느린 날",
+          "values": [
+            [
+              "재현",
+              "알림 서버(WireMock)를 8초 늦게 만든다"
+            ],
+            [
+              "운영",
+              "사내 메신저도 느려서 구매 알림이 늦게 왔다"
+            ]
+          ],
+          "evidence": [
+            "알림 서버(WireMock)를 8초 늦게",
+            "구매 알림이 늦게 왔다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "api",
+          "title": "알림이 읽기 트랜잭션 안에서 웹훅 응답을 기다린다",
+          "values": [
+            [
+              "코드",
+              "`OrderNotifier.notifyOrdered`가 `@Transactional(readOnly = true)`"
+            ],
+            [
+              "잠금",
+              "읽은 `shop_order`·`shop_item`·`member`의 메타데이터 락(공유)이 트랜잭션이 끝날 때까지 유지"
+            ]
+          ],
+          "evidence": [
+            "`@Transactional(readOnly = true)`이다",
+            "메타데이터 락(공유)은 트랜잭션이 끝날 때까지 유지된다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "db",
+          "title": "배포 때 컬럼 하나를 추가한다",
+          "values": [
+            [
+              "SQL",
+              "`ALTER TABLE shop_item ADD COLUMN discount_note ...`"
+            ]
+          ],
+          "evidence": [
+            "`ALTER TABLE shop_item ADD COLUMN discount_note ...`"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "db",
+          "title": "ALTER가 배타 메타데이터 락을 기다린다",
+          "values": [
+            [
+              "INSTANT",
+              "INSTANT 컬럼 추가도 시작과 끝에 잠깐 배타 메타데이터 락이 필요하다"
+            ]
+          ],
+          "evidence": [
+            "INSTANT 컬럼 추가도 시작과 끝에 잠깐 배타 메타데이터 락이 필요하다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "symptom",
+          "title": "대기 중인 배타 요청 뒤로 새 주문과 조회가 줄 선다",
+          "values": [
+            [
+              "줄",
+              "새 주문(`UPDATE shop_item`)과 상품 목록 조회"
+            ]
+          ],
+          "evidence": [
+            "모두 줄을 선다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "B의 주문과 상품 목록이 A의 알림이 끝날 때까지 멈춘다",
+          "values": [
+            [
+              "운영",
+              "그 몇 분 동안 상점 주문과 상품 목록이 전부 멈췄다"
+            ]
+          ],
+          "evidence": [
+            "A의 알림이 끝날 때까지 멈춘다",
+            "상점 주문과 상품 목록이 전부 멈췄습니다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "누가 무엇을 기다리는지",
+          "values": [
+            [
+              "SHOW PROCESSLIST",
+              "ALTER와 뒤의 쿼리들이 `Waiting for table metadata lock`"
+            ],
+            [
+              "더 보기",
+              "`information_schema.innodb_trx`, `performance_schema.metadata_locks`"
+            ]
+          ],
+          "evidence": [
+            "`Waiting for table metadata lock`",
+            "`performance_schema.metadata_locks`"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B07",
+      "title": "없는 행을 잠근 두 요청이 서로를 기다리기까지",
+      "nodes": [
+        {
+          "id": "client",
+          "label": "선착순 발급",
+          "sub": "POST /api/coupons/{id}/issue"
+        },
+        {
+          "id": "db",
+          "label": "InnoDB 잠금",
+          "sub": "member_coupon · coupon"
+        },
+        {
+          "id": "code",
+          "label": "발급 코드",
+          "sub": "CouponService"
+        },
+        {
+          "id": "symptom",
+          "sub": "500 · 다시 누르면 성공"
+        },
+        {
+          "id": "observe",
+          "sub": "INNODB STATUS · 서버 로그"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "client",
+          "title": "선착순 쿠폰 오픈 직후 몇 초 동안 동시에 누른다",
+          "values": [
+            [
+              "운영",
+              "10시 1,000장 오픈, 쿠폰은 10시 5분까지 남아 있었다"
+            ],
+            [
+              "재현",
+              "수량이 인원만큼인 쿠폰에 회원 N명(기본 20)이 동시에 발급"
+            ]
+          ],
+          "evidence": [
+            "쿠폰은 10시 5분까지 남아 있었으니",
+            "수량이 인원만큼인 쿠폰을 새로 만들고 회원 N명이 동시에 발급을 누른다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "code",
+          "title": "아직 없는 발급 행을 `SELECT ... FOR UPDATE`로 잠그고 확인한다",
+          "values": [
+            [
+              "메서드",
+              "`findByCouponIdAndMemberIdForUpdate`"
+            ],
+            [
+              "이유",
+              "연타 방지"
+            ]
+          ],
+          "evidence": [
+            "`MemberCouponRepository.findByCouponIdAndMemberIdForUpdate`(`SELECT ... FOR UPDATE`)로 아직 없는 발급 행을 잠그고"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "db",
+          "title": "A·B가 같은 갭에 갭 락을 잡고, 쿠폰 행 락과 INSERT가 서로를 기다린다",
+          "values": [
+            [
+              "순환",
+              "A는 B의 갭 락에 막히고, B는 A가 쥔 쿠폰 행 락을 기다린다"
+            ],
+            [
+              "InnoDB",
+              "한쪽을 롤백(1213)"
+            ]
+          ],
+          "evidence": [
+            "같은 갭에 갭 락을 잡고",
+            "한쪽을 롤백(1213)하고"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "일부가 500, 다시 누르면 대부분 받아진다",
+          "values": [
+            [
+              "재현",
+              "일부가 500"
+            ],
+            [
+              "CS",
+              "받기를 눌렀더니 오류 — 수량이 모자란 것은 아니다"
+            ]
+          ],
+          "evidence": [
+            "기대 증상: 일부가 500",
+            "다시 누르면 대부분 받아집니다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "서버 로그와 InnoDB 상태",
+          "values": [
+            [
+              "로그",
+              "`Deadlock found when trying to get lock; try restarting transaction`(MySQL 1213)"
+            ],
+            [
+              "INNODB STATUS",
+              "`LATEST DETECTED DEADLOCK`에 `member_coupon` 두 트랜잭션"
+            ]
+          ],
+          "evidence": [
+            "`Deadlock found when trying to get lock; try restarting transaction`(MySQL 1213)",
+            "`LATEST DETECTED DEADLOCK`에 `member_coupon` 두 트랜잭션이 보인다"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B08",
+      "title": "엔티티 하나가 응답 JSON이 되며 해시까지 실리기까지",
+      "nodes": [
+        {
+          "id": "client",
+          "sub": "가입 · 로그인"
+        },
+        {
+          "id": "api",
+          "label": "내 정보 API",
+          "sub": "GET /api/members/me"
+        },
+        {
+          "id": "code",
+          "label": "JSON 직렬화",
+          "sub": "Jackson"
+        },
+        {
+          "id": "response",
+          "sub": "개발자 도구"
+        },
+        {
+          "id": "observe",
+          "sub": "curl · jq"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "client",
+          "title": "새 회원으로 가입·로그인한 뒤 내 정보를 부른다",
+          "values": [
+            [
+              "재현",
+              "`GET /api/members/me` 응답을 그대로 찍는다"
+            ]
+          ],
+          "evidence": [
+            "`GET /api/members/me` 응답을 그대로 찍는다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "api",
+          "title": "컨트롤러가 JPA 엔티티 `Member`를 그대로 반환한다",
+          "values": [
+            [
+              "주석",
+              "\"필드가 같아 DTO를 따로 두지 않는다\""
+            ]
+          ],
+          "evidence": [
+            "엔티티 `Member`를 그대로 반환한다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "code",
+          "title": "Jackson이 엔티티의 getter를 전부 직렬화한다",
+          "values": [
+            [
+              "시간",
+              "엔티티의 `LocalDateTime`이 그대로 찍혀 KST 오프셋이 빠진다"
+            ]
+          ],
+          "evidence": [
+            "getter를 전부 직렬화하므로",
+            "`LocalDateTime`이 그대로 찍혀"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "response",
+          "title": "응답에 `passwordHash`와 spec에 없는 필드가 보인다",
+          "values": [
+            [
+              "보안 점검",
+              "`$2a$10$...`로 시작하는 값"
+            ],
+            [
+              "재현",
+              "`passwordHash`, `pointBalance`·`updatedAt`"
+            ]
+          ],
+          "evidence": [
+            "`$2a$10$...`로 시작하는 값",
+            "`pointBalance`·`updatedAt`도 보인다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "response",
+          "title": "`createdAt`에 `+09:00`이 없다",
+          "values": [
+            [
+              "재현",
+              "`createdAt`에는 `+09:00`이 없다"
+            ]
+          ],
+          "evidence": [
+            "`createdAt`에는 `+09:00`이 없다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "응답을 그대로 확인한다",
+          "values": [
+            [
+              "도구",
+              "`curl … | jq`, 특성화 테스트"
+            ]
+          ],
+          "evidence": [
+            "응답 확인(`curl … | jq`)"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B09",
+      "title": "UTC 시계가 KST 출석 날짜를 9시간 밀기까지",
+      "nodes": [
+        {
+          "id": "clock",
+          "sub": "Clock 빈"
+        },
+        {
+          "id": "code",
+          "label": "출석 날짜 계산",
+          "sub": "AttendanceService"
+        },
+        {
+          "id": "api",
+          "label": "출석 API",
+          "sub": "POST /api/me/attendance"
+        },
+        {
+          "id": "symptom",
+          "label": "적립 이력",
+          "sub": "refType: ATTENDANCE"
+        },
+        {
+          "id": "observe",
+          "sub": "Clock 고정 테스트"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "clock",
+          "title": "서버 시계는 운영 서버와 같은 시간대 설정이다",
+          "values": [
+            [
+              "재현",
+              "서버 시계(`Clock` 빈)를 운영 서버와 같은 시간대 설정으로 두고 시각만 바꿔 부른다"
+            ]
+          ],
+          "evidence": [
+            "서버 시계(`Clock` 빈)를 운영 서버와 같은 시간대 설정으로 두고"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "code",
+          "title": "오늘을 `LocalDate.now(clock)`으로 구한다 — UTC 날짜로 잘린다",
+          "values": [
+            [
+              "어긋남",
+              "KST 날짜 경계와 9시간 차이"
+            ]
+          ],
+          "evidence": [
+            "`LocalDate.now(clock)`으로 구한다",
+            "KST 날짜 경계와 9시간 어긋난다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "api",
+          "title": "A) KST 08:59:59 → 09:00:00: 같은 날 두 번 적립",
+          "values": [
+            [
+              "재현",
+              "201, 201. 적립 2건, `attendedOn`이 `2026-10-22`·`2026-10-23`"
+            ]
+          ],
+          "evidence": [
+            "08:59:59 → 09:00:00(같은 KST 날짜): 201, 201"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "clock",
+          "title": "UTC 자정 = KST 09시",
+          "values": [
+            [
+              "A",
+              "KST 08:59:59는 UTC 전날 23:59:59, 09:00:00은 UTC 00:00:00"
+            ],
+            [
+              "B",
+              "KST 23:59:59와 다음 날 00:00:00은 UTC로 같은 날(14:59:59, 15:00:00)"
+            ]
+          ],
+          "evidence": [
+            "09:00:00(UTC 00:00:00)",
+            "UTC로는 같은 날(14:59:59, 15:00:00)"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "api",
+          "title": "B) KST 23:59:59 → 다음 날 00:00:00: 다음 날 첫 출석이 거절된다",
+          "values": [
+            [
+              "재현",
+              "201, 409"
+            ]
+          ],
+          "evidence": [
+            "(KST 자정을 넘김): 201, 409"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "symptom",
+          "title": "UNIQUE와 행 잠금은 같은 날짜 값의 중복만 막는다",
+          "values": [
+            [
+              "제약",
+              "`uk_attendance_member_date` — 날짜 값 자체가 틀리면 막지 못한다"
+            ]
+          ],
+          "evidence": [
+            "`uk_attendance_member_date`와 회원 행 잠금은"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "운영 로그엔 늘 자정 직전과 직후에 두 건",
+          "values": [
+            [
+              "CS",
+              "하루 한 번 10포인트인데 두 번 적립, 반대로 \"이미 출석했다\" 문의"
+            ]
+          ],
+          "evidence": [
+            "자정 직전과 직후(23:59, 00:00 근처)",
+            "이미 출석했다고 나온다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "시계를 고정해 다시 본다",
+          "values": [
+            [
+              "도구",
+              "`Clock` 고정 재현 테스트, 운영 로그 시각과 서비스 날짜 비교"
+            ]
+          ],
+          "evidence": [
+            "`Clock` 고정 재현 테스트, 운영 로그 시각과 서비스 날짜 비교"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B10",
+      "title": "늦은 PG 응답 뒤 새 키 재시도가 승인을 두 번 만들기까지",
+      "nodes": [
+        {
+          "id": "pg",
+          "sub": "WireMock · 5초 뒤 응답"
+        },
+        {
+          "id": "api",
+          "label": "충전 API",
+          "sub": "POST /api/me/points/charges"
+        },
+        {
+          "id": "data",
+          "label": "연계 로그",
+          "sub": "pg_payment"
+        },
+        {
+          "id": "symptom",
+          "label": "잔액",
+          "sub": "7,000 → 14,000"
+        },
+        {
+          "id": "observe",
+          "sub": "/__admin/requests"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "pg",
+          "title": "PG가 승인하되 5초 뒤에 답한다",
+          "values": [
+            [
+              "재현",
+              "첫 승인 요청은 승인하되 5초 뒤에 답하는 상태 있는 PG"
+            ],
+            [
+              "운영",
+              "PG 응답이 느렸던 어제 저녁"
+            ]
+          ],
+          "evidence": [
+            "첫 승인 요청은 승인하되 5초 뒤에 답하는",
+            "PG 응답이 느렸던 시간"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "api",
+          "title": "충전은 한 번만 보냈다",
+          "values": [
+            [
+              "앱",
+              "충전 버튼을 한 번만 보내도록 막혀 있다"
+            ],
+            [
+              "재현",
+              "충전을 한 번 보낸다"
+            ]
+          ],
+          "evidence": [
+            "앱은 충전 버튼을 한 번만 보내도록 막혀 있다고 합니다",
+            "충전을 한 번 보낸다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "api",
+          "title": "`PG_TIMEOUT`이면 한 번 더 시도하면서 재시도용 키를 새로 만든다",
+          "values": [
+            [
+              "코드",
+              "`UUID.randomUUID()`"
+            ],
+            [
+              "결과",
+              "새 키 = 새 `pg_payment` 행 = 새 `orderId` → PG에는 별개의 결제"
+            ]
+          ],
+          "evidence": [
+            "재시도용 키를 새로 만든다",
+            "새 키 = 새 `pg_payment` 행 = 새 `orderId`"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "data",
+          "title": "PG가 받은 승인 요청 2건, 연계 로그 2행",
+          "values": [
+            [
+              "WireMock",
+              "승인 요청 2건"
+            ],
+            [
+              "pg_payment",
+              "UNKNOWN 1, DONE 1"
+            ]
+          ],
+          "evidence": [
+            "PG가 받은 승인 요청이 2건",
+            "`pg_payment`에 행이 2개(UNKNOWN 1, DONE 1)"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "data",
+          "title": "행마다 한 번만 적립해도 행이 둘이라 적립도 둘이다",
+          "values": [
+            [
+              "두 번째",
+              "바로 DONE으로 적립"
+            ],
+            [
+              "첫 번째",
+              "PG 콜백이 오거나 재처리(`ChargeService.reconcile`, PG 조회)로 DONE을 확인하는 순간 또 적립"
+            ]
+          ],
+          "evidence": [
+            "바로 DONE으로 적립되고",
+            "PG 콜백이 오거나 재처리(`ChargeService.reconcile`, PG 조회)로 DONE을 확인하는 순간 또 적립된다",
+            "행이 둘이라 적립도 둘이다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "7,000포인트를 한 번 충전했는데 잔액은 14,000",
+          "values": [
+            [
+              "정산팀",
+              "같은 회원의 같은 금액 충전이 몇 초 간격으로 두 번씩 승인"
+            ],
+            [
+              "재현",
+              "UNKNOWN 행의 `orderId`로 결제 완료 콜백(DONE)을 보내면 잔액 14000, 충전 원장 2건"
+            ]
+          ],
+          "evidence": [
+            "7,000포인트를 한 번 충전했는데 잔액은 14,000",
+            "UNKNOWN 행의 `orderId`로 서명을 붙인 결제 완료 콜백(DONE)을 보낸다",
+            "잔액 14000, 충전 원장 2건"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "연계 로그와 PG 요청 기록을 맞춰 본다",
+          "values": [
+            [
+              "도구",
+              "연계 로그(`pg_payment`), WireMock 요청 기록(`/__admin/requests`)과 시나리오(상태 있는 스텁)"
+            ]
+          ],
+          "evidence": [
+            "연계 로그(`pg_payment`), WireMock 요청 기록(`/__admin/requests`)"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B11",
+      "title": "yml을 고쳐 배포해도 다른 출처가 이기기까지",
+      "nodes": [
+        {
+          "id": "config",
+          "label": "application-prod.yml",
+          "sub": "expires-in-seconds"
+        },
+        {
+          "id": "data",
+          "label": "환경 변수 파일",
+          "sub": "deploy/board.env"
+        },
+        {
+          "id": "code",
+          "label": "설정 우선순위",
+          "sub": "Environment"
+        },
+        {
+          "id": "symptom",
+          "label": "로그인 응답",
+          "sub": "expiresIn"
+        },
+        {
+          "id": "observe",
+          "sub": "/actuator/env/{키}"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "config",
+          "title": "`application-prod.yml`에 1800을 넣어 배포했다",
+          "values": [
+            [
+              "변경",
+              "`expires-in-seconds: 1800`"
+            ],
+            [
+              "확인",
+              "jar는 새 것이 맞다"
+            ]
+          ],
+          "evidence": [
+            "`expires-in-seconds: 1800`",
+            "jar는 새 것이 맞습니다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "data",
+          "title": "환경 변수 파일에 6월에 넣은 값이 남아 있다",
+          "values": [
+            [
+              "줄",
+              "`BOARD_JWT_EXPIRES_IN_SECONDS=7200` (\"로그인 유지\" 임시 연장)"
+            ]
+          ],
+          "evidence": [
+            "`BOARD_JWT_EXPIRES_IN_SECONDS=7200`"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "code",
+          "title": "OS 환경 변수는 어떤 `application*.yml`보다 우선한다",
+          "values": [
+            [
+              "착각",
+              "\"프로파일 전용 yml이 마지막에 덮는다\" — yml끼리만 맞다"
+            ]
+          ],
+          "evidence": [
+            "OS 환경 변수는 어떤 `application*.yml`보다 우선순위가 높으므로"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "운영에서 로그인하면 `expiresIn`이 여전히 7200",
+          "values": [
+            [
+              "티켓",
+              "1800도 3600도 아니고 7200"
+            ]
+          ],
+          "evidence": [
+            "1800도 3600도 아니고 7200"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "이 키를 누가 이겼는지 본다",
+          "values": [
+            [
+              "재현",
+              "`/actuator/env/board.jwt.expires-in-seconds`의 출처 목록 맨 위가 `application-prod.yml`이 아니다"
+            ]
+          ],
+          "evidence": [
+            "맨 위(이긴 값)가 `application-prod.yml`이 아니다"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B12",
+      "title": "새 출처의 preflight가 인증 전에 거절되기까지",
+      "nodes": [
+        {
+          "id": "browser",
+          "sub": "127.0.0.1:8765"
+        },
+        {
+          "id": "config",
+          "label": "CORS 설정 두 곳",
+          "sub": "MVC · Security"
+        },
+        {
+          "id": "rules",
+          "label": "Security CorsFilter",
+          "sub": "인증 필터 앞"
+        },
+        {
+          "id": "symptom",
+          "label": "preflight 응답",
+          "sub": "OPTIONS"
+        },
+        {
+          "id": "observe",
+          "sub": "Network · Console"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "browser",
+          "title": "새 프론트에서 로그인 버튼부터 반응이 없다",
+          "values": [
+            [
+              "새 출처",
+              "`http://127.0.0.1:8765`"
+            ],
+            [
+              "기존 출처",
+              "`localhost:3000`은 멀쩡하다"
+            ]
+          ],
+          "evidence": [
+            "로그인 버튼부터 아무 반응이 없습니다",
+            "기존 웹(`localhost:3000`)은 멀쩡합니다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "browser",
+          "title": "브라우저는 본 요청 전에 preflight를 보낸다",
+          "values": [
+            [
+              "재현",
+              "curl로 브라우저의 preflight를 흉내 낸다"
+            ]
+          ],
+          "evidence": [
+            "curl로 브라우저의 preflight를 흉내 낸다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "config",
+          "title": "새 출처가 MVC 쪽 `addCorsMappings`에만 들어가 있다",
+          "values": [
+            [
+              "Security 쪽",
+              "`corsConfigurationSource()` 허용 목록에는 `localhost:3000`만"
+            ]
+          ],
+          "evidence": [
+            "`CorsConfig.addCorsMappings`(Spring MVC의 CORS 매핑)에만",
+            "`corsConfigurationSource()` 빈의 허용 목록에는 `localhost:3000`만"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "rules",
+          "title": "Security 필터 체인 안 `CorsFilter`가 먼저 403으로 거절한다",
+          "values": [
+            [
+              "결과",
+              "MVC 매핑까지 오지 못한다. curl은 `Origin`을 붙이지 않아 멀쩡해 보인다"
+            ]
+          ],
+          "evidence": [
+            "MVC 매핑까지 오지 못한다",
+            "`Origin`도 붙이지 않아"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "새 출처의 preflight만 403, 서버 로그는 조용하다",
+          "values": [
+            [
+              "localhost:3000",
+              "200 + `Access-Control-Allow-Origin`"
+            ],
+            [
+              "127.0.0.1:8765",
+              "403 `Invalid CORS request`, 허용 헤더 없음"
+            ]
+          ],
+          "evidence": [
+            "preflight는 200 + `Access-Control-Allow-Origin`",
+            "403 `Invalid CORS request`",
+            "서버 로그는 조용하다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "브라우저에서 실패한 OPTIONS를 본다",
+          "values": [
+            [
+              "도구",
+              "개발자 도구 Network·Console, `curl -X OPTIONS`"
+            ]
+          ],
+          "evidence": [
+            "브라우저 개발자 도구(Network·Console), `curl -X OPTIONS`"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B13",
+      "title": "서명이 맞는 PG 콜백이 인증 규칙에 먼저 걸리기까지",
+      "nodes": [
+        {
+          "id": "pg",
+          "label": "PG 서버",
+          "sub": "결제 완료 콜백"
+        },
+        {
+          "id": "rules",
+          "sub": "SecurityConfig"
+        },
+        {
+          "id": "code",
+          "label": "서명 검증",
+          "sub": "PgCallbackController"
+        },
+        {
+          "id": "symptom",
+          "sub": "401 · 결과 불명 충전"
+        },
+        {
+          "id": "observe",
+          "sub": "Security TRACE 로그"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "pg",
+          "title": "PG가 원문에 HMAC 서명을 붙여 콜백을 보낸다",
+          "values": [
+            [
+              "재현",
+              "실제 충전으로 `orderId`를 만든 뒤 원문에 HMAC-SHA256 서명을 붙여 보낸다"
+            ],
+            [
+              "결제사",
+              "서명 키는 바뀐 게 없다"
+            ]
+          ],
+          "evidence": [
+            "원문에 HMAC-SHA256 서명을 붙여 콜백을 보낸다",
+            "서명 키는 바뀐 게 없다고"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "rules",
+          "title": "넓은 쓰기 규칙이 콜백 공개 규칙보다 위에 있다",
+          "values": [
+            [
+              "위",
+              "`requestMatchers(HttpMethod.POST, \"/api/**\").authenticated()`"
+            ],
+            [
+              "아래",
+              "`requestMatchers(HttpMethod.POST, \"/api/pg/callbacks\").permitAll()` — 영원히 매치되지 않는다"
+            ]
+          ],
+          "evidence": [
+            "`requestMatchers(HttpMethod.POST, \"/api/**\").authenticated()`",
+            "영원히 매치되지 않는다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "code",
+          "title": "서명 검증까지 가지 못한다",
+          "values": [
+            [
+              "결과",
+              "서명이 맞든 틀리든 같은 401"
+            ],
+            [
+              "테스트",
+              "콜백 테스트의 `@WithMockUser`가 이미 인증된 상태로 만들었다"
+            ]
+          ],
+          "evidence": [
+            "서명 검증(`PgCallbackController`)까지 가지 못하므로",
+            "`@WithMockUser`가 붙어"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "서명이 맞아도 401, 틀려도 똑같은 응답",
+          "values": [
+            [
+              "재현",
+              "401 `/errors/unauthorized`(인증 필요)"
+            ],
+            [
+              "운영",
+              "지난 배포 이후 전부 401, 결과 불명 충전이 확정되지 않는다"
+            ]
+          ],
+          "evidence": [
+            "서명이 맞아도 401 `/errors/unauthorized`(인증 필요). 서명이 틀린 콜백도 똑같은 응답이다",
+            "\"결과 불명\"으로 남은 충전 건들이 확정되지 않아"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "어느 필터에서 막혔는지 본다",
+          "values": [
+            [
+              "로그",
+              "`logging.level.org.springframework.security=TRACE`"
+            ]
+          ],
+          "evidence": [
+            "`logging.level.org.springframework.security=TRACE`"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B14",
+      "title": "모니터링 공개 규칙이 env까지 열기까지",
+      "nodes": [
+        {
+          "id": "client",
+          "label": "외부 요청",
+          "sub": "토큰 없음"
+        },
+        {
+          "id": "rules",
+          "sub": "SecurityConfig"
+        },
+        {
+          "id": "config",
+          "label": "노출 설정",
+          "sub": "application-prod.yml"
+        },
+        {
+          "id": "symptom",
+          "label": "/actuator/env 응답",
+          "sub": "prod"
+        },
+        {
+          "id": "observe",
+          "sub": "규칙 점검 · curl"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "client",
+          "title": "토큰 없이 actuator 세 경로를 부른다",
+          "values": [
+            [
+              "재현",
+              "`/actuator/health`, `/actuator/metrics`, `/actuator/env`"
+            ],
+            [
+              "프로파일",
+              "prod (8089 포트)"
+            ]
+          ],
+          "evidence": [
+            "토큰 없이 `/actuator/health`, `/actuator/metrics`, `/actuator/env`를 부르고",
+            "prod 프로파일로 8089 포트"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "rules",
+          "title": "`toAnyEndpoint()` 공개 규칙이 env 관리자 규칙보다 위에 있다",
+          "values": [
+            [
+              "위",
+              "`requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll()`"
+            ],
+            [
+              "아래",
+              "`requestMatchers(EndpointRequest.to(\"env\")).hasRole(\"ADMIN\")`"
+            ]
+          ],
+          "evidence": [
+            "`requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll()`",
+            "`requestMatchers(EndpointRequest.to(\"env\")).hasRole(\"ADMIN\")`"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "config",
+          "title": "prod가 env를 노출하며 값 가림을 껐다",
+          "values": [
+            [
+              "설정",
+              "`show-values: always`"
+            ]
+          ],
+          "evidence": [
+            "`show-values: always`로 값 가림을 껐다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "세 경로 모두 200, env에 비밀값이 평문",
+          "values": [
+            [
+              "재현",
+              "env 응답에 `DB_PASSWORD`, `BOARD_JWT_SECRET` 값이 그대로"
+            ],
+            [
+              "티켓",
+              "관리자만 보게 해 뒀다고 알고 있다"
+            ]
+          ],
+          "evidence": [
+            "세 경로 모두 200",
+            "`DB_PASSWORD`, `BOARD_JWT_SECRET` 값이 그대로 보인다",
+            "관리자만 보게 해 뒀다고 알고 있습니다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "로컬에서는 401이라 기존 테스트로 보이지 않는다",
+          "values": [
+            [
+              "재현",
+              "로컬 프로파일(test·local)에서는 env가 노출되지 않아 401"
+            ],
+            [
+              "도구",
+              "`SecurityConfig` 인가 규칙 점검, prod 프로파일 기동 후 `curl`"
+            ]
+          ],
+          "evidence": [
+            "로컬 프로파일(test·local)에서는 env가 노출되지 않아 401",
+            "prod 프로파일 기동 후 `curl`"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B15",
+      "title": "숨긴 글이 커밋 전 캐시 삭제 틈으로 다시 적재되기까지",
+      "nodes": [
+        {
+          "id": "api",
+          "label": "관리자 숨김",
+          "sub": "POST /api/admin/posts/{id}/hide"
+        },
+        {
+          "id": "redis",
+          "sub": "popular:posts · TTL 60초"
+        },
+        {
+          "id": "client",
+          "label": "다른 사용자",
+          "sub": "GET /api/posts/popular"
+        },
+        {
+          "id": "db",
+          "sub": "post 행"
+        },
+        {
+          "id": "observe",
+          "sub": "로그 타임라인"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "api",
+          "title": "신고 글을 관리자 화면에서 숨긴다",
+          "values": [
+            [
+              "재현",
+              "MySQL 세션 하나가 그 글 행을 `FOR UPDATE`로 4초 잡아 숨김 요청을 늦춘다"
+            ],
+            [
+              "운영",
+              "트래픽 많은 시간대에 가끔"
+            ]
+          ],
+          "evidence": [
+            "`FOR UPDATE`로 4초 잡게 해서 숨김 요청을 늦춘다",
+            "트래픽 많은 시간대에 가끔"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "redis",
+          "title": "숨김이 트랜잭션 안에서 캐시를 직접 지운다 — 커밋 전",
+          "values": [
+            [
+              "코드",
+              "`AdminService.hidePost`가 이벤트를 거치지 않고 `popularPostService.evict()`를 직접 부른다"
+            ]
+          ],
+          "evidence": [
+            "트랜잭션 안에서 `popularPostService.evict()`를 직접 부른다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "client",
+          "title": "그 틈에 다른 요청이 캐시 미스 → 아직 ACTIVE인 값을 다시 적재한다",
+          "values": [
+            [
+              "TTL",
+              "옛 값을 60초 TTL로 다시 적재"
+            ]
+          ],
+          "evidence": [
+            "이 옛 값을 60초 TTL로 다시 적재한다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "db",
+          "title": "숨김이 커밋된 뒤에는 캐시를 지우는 사람이 없다",
+          "values": [
+            [
+              "결과",
+              "TTL 동안 숨긴 글이 보인다"
+            ]
+          ],
+          "evidence": [
+            "캐시를 지우는 사람이 없어"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "client",
+          "title": "DB는 HIDDEN인데 인기글 1위로 남는다",
+          "values": [
+            [
+              "재현",
+              "숨김 응답(200) 뒤에도 인기글에 남고 60초 뒤에야 사라진다"
+            ],
+            [
+              "운영",
+              "새로고침해도 그대로"
+            ]
+          ],
+          "evidence": [
+            "DB는 `HIDDEN`인데 인기글에 그 글이 1위로 남는다",
+            "60초 뒤에야 사라진다",
+            "새로고침해도 그대로"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "요청 ID별 로그를 시간순으로 놓는다",
+          "values": [
+            [
+              "로그",
+              "요청 ID별 `인기글 캐시 …` 줄과(DEBUG면) 트랜잭션 커밋 줄"
+            ],
+            [
+              "방법",
+              "숨김 요청과 다른 요청의 줄을 시간순으로 놓고 본다"
+            ],
+            [
+              "로그 설정",
+              "`JpaTransactionManager` DEBUG"
+            ]
+          ],
+          "evidence": [
+            "`인기글 캐시 …` 줄과(DEBUG면) 트랜잭션 커밋 줄이 찍힌다",
+            "숨김 요청과 다른 요청의 줄을 시간순으로 놓고 본다",
+            "`JpaTransactionManager` DEBUG"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "B16",
+      "title": "캐시 서버 점검이 글쓰기 응답까지 번지기까지",
+      "nodes": [
+        {
+          "id": "redis",
+          "label": "Redis 점검",
+          "sub": "일시 정지 · 내림"
+        },
+        {
+          "id": "thread",
+          "sub": "http-nio-8080-exec-*"
+        },
+        {
+          "id": "api",
+          "label": "글쓰기",
+          "sub": "POST /api/posts"
+        },
+        {
+          "id": "symptom",
+          "label": "인기글",
+          "sub": "GET /api/posts/popular"
+        },
+        {
+          "id": "observe",
+          "sub": "스레드 덤프"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "redis",
+          "title": "Redis 점검(장애 조치 리허설) 20분",
+          "values": [
+            [
+              "재현 1",
+              "Redis 컨테이너를 일시 정지한다(연결은 살아 있는데 응답이 없다)"
+            ],
+            [
+              "재현 2",
+              "`repro.sh stop` — 컨테이너를 내린다(연결 끊김)"
+            ]
+          ],
+          "evidence": [
+            "Redis 컨테이너를 일시 정지한다(연결은 살아 있는데 응답이 없다)",
+            "Redis 컨테이너를 내린다(연결 끊김)"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "redis",
+          "title": "명령 타임아웃 설정이 지워져 Lettuce 기본 60초를 쓴다",
+          "values": [
+            [
+              "설정",
+              "`spring.data.redis.timeout` 없음"
+            ]
+          ],
+          "evidence": [
+            "Lettuce 기본값은 60초다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "thread",
+          "title": "커밋 뒤 랭킹 가산·캐시 삭제가 요청 스레드를 붙잡는다",
+          "values": [
+            [
+              "대기",
+              "Redis가 응답하지 않으면 호출마다 그만큼 기다린다"
+            ]
+          ],
+          "evidence": [
+            "각각 그만큼 요청 스레드를 붙잡고"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "api",
+          "title": "응답 없는 Redis 동안 글쓰기가 끝나지 않는다",
+          "values": [
+            [
+              "운영",
+              "글쓰기가 1분 넘게 돌다 실패"
+            ],
+            [
+              "재현 1",
+              "`POST /api/posts`와 `GET /api/posts/popular`가 15초 안에 끝나지 않는다"
+            ]
+          ],
+          "evidence": [
+            "글쓰기가 1분 넘게 돌다 실패했고",
+            "15초 안에 끝나지 않는다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "symptom",
+          "title": "`RedisGuard`가 `RedisConnectionFailureException`만 잡는다",
+          "values": [
+            [
+              "새는 예외",
+              "끊긴 연결의 `RedisSystemException`, 명령 타임아웃의 `QueryTimeoutException`"
+            ]
+          ],
+          "evidence": [
+            "`RedisConnectionFailureException`(처음부터 붙지 못함)만 잡고",
+            "`RedisSystemException`"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "연결이 끊기면 글쓰기는 되는데 인기글은 500",
+          "values": [
+            [
+              "재현 2",
+              "글쓰기는 201이지만 `GET /api/posts/popular`가 500"
+            ],
+            [
+              "운영",
+              "인기글 화면에 500이 섞였다"
+            ]
+          ],
+          "evidence": [
+            "글쓰기는 201이지만 `GET /api/posts/popular`가 500이다",
+            "500이 섞여 나왔습니다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "멈춘 동안 스레드 덤프를 뜬다",
+          "values": [
+            [
+              "명령",
+              "`\"${JAVA_HOME:+$JAVA_HOME/bin/}jcmd\" $(pgrep -f BoardApplication) Thread.print`"
+            ],
+            [
+              "더 보기",
+              "응답 시간 측정, 서버 경고 로그"
+            ]
+          ],
+          "evidence": [
+            "`\"${JAVA_HOME:+$JAVA_HOME/bin/}jcmd\" $(pgrep -f BoardApplication) Thread.print`",
+            "응답 시간 측정, 서버 경고 로그"
+          ]
+        }
+      ]
+    },
+    {
+      "ticket": "E01",
+      "title": "캐시가 빈 순간 동시 요청이 모두 DB로 가기까지",
+      "nodes": [
+        {
+          "id": "redis",
+          "label": "캐시 만료",
+          "sub": "popular:posts"
+        },
+        {
+          "id": "client",
+          "label": "동시 요청",
+          "sub": "GET /api/posts/popular"
+        },
+        {
+          "id": "db",
+          "label": "인기글 쿼리",
+          "sub": "findPopular"
+        },
+        {
+          "id": "symptom",
+          "label": "DB CPU",
+          "sub": "1분마다"
+        },
+        {
+          "id": "observe",
+          "sub": "performance_schema · 로그 줄 수"
+        }
+      ],
+      "steps": [
+        {
+          "side": "open",
+          "node": "redis",
+          "title": "캐시가 막 만료된 순간을 만든다",
+          "values": [
+            [
+              "재현",
+              "Redis의 `popular:posts`를 지워 TTL이 막 끝난 순간을 만든다"
+            ]
+          ],
+          "evidence": [
+            "TTL이 막 끝난 순간을 만들고"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "client",
+          "title": "그 순간 인기글 요청이 동시에 몰린다",
+          "values": [
+            [
+              "재현",
+              "`GET /api/posts/popular`를 동시에 100개 (`N=200`처럼 바꿀 수 있다)"
+            ]
+          ],
+          "evidence": [
+            "`GET /api/posts/popular`를 동시에 100개 보낸다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "client",
+          "title": "캐시 미스 때 재적재를 막는 장치가 없다",
+          "values": [
+            [
+              "결과",
+              "비는 그 순간 들어온 요청 수만큼 DB 조회가 겹친다"
+            ]
+          ],
+          "evidence": [
+            "재적재를 막는 장치가 없다",
+            "요청 수만큼 DB 조회가 겹친다"
+          ]
+        },
+        {
+          "side": "cause",
+          "node": "db",
+          "title": "첫 적재를 멈춰 두면 그사이 요청마다 `findPopular`를 실행한다",
+          "values": [
+            [
+              "확인 테스트",
+              "`findPopular`가 1번이 아니라 십수 번(커넥션 풀 크기에 따라 다르다)"
+            ],
+            [
+              "무효화",
+              "글 변경 커밋마다도 같은 일이 생긴다"
+            ]
+          ],
+          "evidence": [
+            "`findPopular`가 1번이 아니라 십수 번 실행됐다(커넥션 풀 크기에 따라 다르다)",
+            "무효화(글 변경 커밋)마다도 같은 일이 생긴다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "db",
+          "title": "DB 인기글 쿼리가 요청 수만큼 실행된다",
+          "values": [
+            [
+              "재현",
+              "DB 인기글 쿼리가 100번 가까이, 서버 로그에 `인기글 캐시 적재`가 그만큼"
+            ]
+          ],
+          "evidence": [
+            "DB 인기글 쿼리가 100번 가까이 실행되고"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "symptom",
+          "title": "캐시가 만료되는 1분마다 DB CPU가 튄다",
+          "values": [
+            [
+              "요청",
+              "응답 형식은 바꾸면 안 된다"
+            ]
+          ],
+          "evidence": [
+            "1분마다 DB CPU가 잠깐씩 튑니다",
+            "응답 형식은 앱이 이미 쓰고 있으니 바꾸면 안 됩니다"
+          ]
+        },
+        {
+          "side": "open",
+          "node": "observe",
+          "title": "실행 횟수를 센다",
+          "values": [
+            [
+              "도구",
+              "DB 쿼리 실행 횟수(performance_schema 다이제스트), 서버 로그의 \"인기글 캐시 적재\" 줄 수"
+            ]
+          ],
+          "evidence": [
+            "DB 쿼리 실행 횟수(performance_schema 다이제스트)"
+          ]
+        }
+      ]
+    }
+  ]
+}

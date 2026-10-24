@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P9 확장 과정 구현·검증 원장</title>
+<link rel="stylesheet" href="../../../tools/site/site.css?v=6580290a3c9f">
+<script src="../../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../../index.html">홈</a><a href="../../../course/spring/README.html">과정 v2 · 일자 목록</a><a href="../../../course/map.html">과정 지도</a><a href="../../../scenario/README.html">서비스 만들기</a><a href="../../../practice/MISSIONS.html">실전 미션</a><a href="../../knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<h1 id="p9-확장-과정-구현검증-원장"><a class="anchor" href="#p9-확장-과정-구현검증-원장" aria-hidden="true">#</a>P9 확장 과정 구현·검증 원장</h1>
+<p>설계·일수·날별 순서·검증 결과의 기준은 <a href="2026-10-24-p9-d16-d30.html">D16–D45 설계 및 구현 결과</a>다. <a class="docref" href="../../knowledge/D01-dev-lifecycle-overview.html">D01</a>–<a class="docref" href="../../knowledge/D15-server-sizing.html">D15</a>·기존 카드 ID는 유지한다. 신규 D16–D45의 원본은 날짜별 JSON이며 합본·Spring·신규 Java 문서는 빌드 생성물이다.</p>
+<ul>
+<li>범위: 개인 미수행 경로·필수 관찰·예약 쿠폰·운영 변경·계약/인증·작업·실제 이슈 대체·부하/진단·회의 4종·독립 평가.</li>
+<li>금지 범위: 원본 board-server/messy-server 수정, Git add/commit/stash/reset/checkout, 측정값/연차 도달 보증.</li>
+<li>브라우저: 지정 HTTP 18982 · gstack Playwright Chromium · 1440 PC. 모바일 보류.</li>
+<li>체크 완료·채점 통과·실제 학습자 수행·화면 검증 상태를 구분한다.</li>
+</ul>
+<h2 id="최종-로컬-검증-2026-10-24"><a class="anchor" href="#최종-로컬-검증-2026-10-24" aria-hidden="true">#</a>최종 로컬 검증 (2026-10-24)</h2>
+<p>45일·158카드, <code>test:course</code> 50/50·루트 과정 테스트 125/125·화면 14/14+13/13. 요청한 10개 명령 모두 성공. HTML 458개·링크 오류 0. PC 1440 지정 6화면·13캡처·52조작 확인. 상세 수치·날별 표·한계는 설계 문서 끝 구현 결과 절에 있다. <a href="2026-10-24-p9-files.txt">변경 파일 전체</a>. 모바일·학습자 실제 후반 실습·새 시안 대조는 보류/미수행으로 분리했다.</p>
+<h2 id="fix-round-1"><a class="anchor" href="#fix-round-1" aria-hidden="true">#</a>fix round 1</h2>
+<p>2026-10-24. 리뷰 <code>~/.cache/jx-p8/reviews/rev45.md</code>의 문제 1~9·날별 표·J 판정 표를 전부 읽고 원본과 대조했다. HEAD <code>766491b4a8d65b7ddf4b423493a530dc9ba171a2</code>와 기존 미커밋/미추적 작업을 보존했다. 작업 저장소의 index·HEAD를 변경하지 않았다.</p>
+<h3 id="지적별-수정회귀"><a class="anchor" href="#지적별-수정회귀" aria-hidden="true">#</a>지적별 수정·회귀</h3>
+<p><code>tools/course/fix45.test.mjs</code>: <strong>수정 전 9건 모두 RED → 수정 후 9건 모두 GREEN</strong>. <code>tools/site/package.json</code>의 <code>test:course</code>에 회귀를 포함했다. GREEN은 이 지적의 수정 판정이며 45일 학습자 수행·시안 대조 완료를 뜻하지 않는다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>지적</th>
+<th>상태</th>
+<th>바꾼 편집 원본·회귀</th>
+<th>수정과 실제 실행 결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1. 스키마 순서</td>
+<td>GREEN</td>
+<td><code>course/days/D27.json</code>, <code>D28.json</code>; 회귀 1</td>
+<td>두 날 모두 <strong>expand → 신앱 쓰기 전환 → 구앱 종료 → null 재유입 차단 확인 → 최종 백필 → 제약 강화</strong>로 통일. 공존 중 백필은 예비 작업. Docker mysql:8.4에서 조기 contract의 1364 오류를 재현하고 새 순서에서 공존 중 옛 INSERT 두 번 성공·최종 null 0·강화 뒤 새 쓰기 성공을 확인.</td>
+</tr>
+<tr>
+<td>2. D35/D36 새 업무</td>
+<td>GREEN</td>
+<td><code>course/days/D35.json</code>, <code>D36.json</code>; 회귀 2</td>
+<td>D25의 기존 취소 API를 취소 사유 필수·누락/공백 422·사유 보존·동일 멱등 키의 다른 사유 409로 변경. 이미 충족하면 두 운영자 승인 계약, 그것도 충족하면 새 미충족 계약을 합의. D36의 기존 시작/취소 경쟁 복제 지시 제거. 이미 GREEN이면 D35로 복귀하며 정상 코드·기대값을 약화하지 않음. 문서 계약 검사이며 학습자 정답 구현은 제공하지 않음.</td>
+</tr>
+<tr>
+<td>3. 운영 실행 안내</td>
+<td>GREEN</td>
+<td><code>course/days/D26.json</code>~`D29.json<code>, </code>D33.json<code>, </code>D34.json<code>, </code>D39.json<code>; 아래 </code>course/start/ops/` 10개 원본; 회귀 3</td>
+<td>Dockerfile·두 앱 compose·느린 요청·SIGTERM/KILL·mysqldump/별도 복원·baseline·commit 전후 marker/gate·JVM PID·STOP/CONT·jcmd·정리 제공. D26/D29/D33을 임시 최소 Spring Boot 앱으로 실제 수행. D34 신호·D39 JVM도 추가 확인. 도메인 상태/백필/소유권/재처리는 학습자가 설계.</td>
+</tr>
+<tr>
+<td>4. Java 연결·보강</td>
+<td>GREEN</td>
+<td><code>course/days/D16.json</code>, <code>D18.json</code>~`D28.json<code>, </code>D31.json<code>, </code>D33.json<code>, </code>D34.json<code>, </code>D38.json<code>, </code>D39.json<code>; </code>tools/course/build-days.mjs`; 회귀 4</td>
+<td>동시성 <a class="docref" href="../../knowledge/J07-collections-internals.html">J07</a>·Clock/만료 <a class="docref" href="../../knowledge/J09-stream-api.html">J09</a>·값/enum <a class="docref" href="../../knowledge/J03-generics.html">J03</a>·DTO 변환 <a class="docref" href="../../knowledge/J05-modern-syntax.html">J05</a> 등 실제 원문 내용에 연결. 기존 J의 지원 범위 표시. ThreadLocal·bounded executor·JSON 호환·JVM 설명/실험 보강, JPA/백필/소유권은 D 통합 관찰로 연결. <a class="docref" href="../../knowledge/J12-virtual-threads.html">J12</a>를 JVM/worker, <a class="docref" href="../../knowledge/J05-modern-syntax.html">J05</a>를 격리 수준 근거로 쓰던 연결 제거.</td>
+</tr>
+<tr>
+<td>5. Java 실행 위치</td>
+<td>GREEN</td>
+<td><code>tools/site/course-pages.mjs</code>; 회귀 5</td>
+<td>J00<del><a class="docref" href="../../knowledge/J15-jit-profiling.html">J15</a>의 저장소 java-track과 <a class="docref" href="../../knowledge/J16-jvm-in-containers.html">J16</a></del>J45의 학습자 프로젝트 루트를 구분. 확장 Java 30개 공통 내비게이션 검사. PC <a class="docref" href="../../knowledge/J16-jvm-in-containers.html">J16</a>에서 본문·공통 안내 일치 확인.</td>
+</tr>
+<tr>
+<td>6. 카드 질문·기준</td>
+<td>GREEN</td>
+<td><code>course/days/D16.json</code>~`D45.json`; 회귀 6</td>
+<td>확장 90장 각각의 필수 세 줄을 질문의 정답 요소로 재작성. ID·질문·순서·전체 158장 보존. Clock에는 시각 경계, 정책에는 분리 비용, 앱/DB 롤백에는 commit 데이터·복원/호환 경계를 배치. 증거·비용·한계도 질문 맥락에 연결.</td>
+</tr>
+<tr>
+<td>7. J44/J45 시점</td>
+<td>GREEN</td>
+<td><code>course/days/D44.json</code>, <code>D45.json</code>; <code>tools/course/build-days.mjs</code>, <code>tools/site/course-pages.mjs</code>, <code>tools/site/course-map.js</code>, <code>tools/site/build.mjs</code>; 회귀 7</td>
+<td>요구 제시/초기 진단 뒤 수행 중 증거·사후 확인으로 연결. 일자·Java 본문·내비게이션·홈·지도 표/범례의 ‘먼저’ 안내에도 예외 반영. PC D44/J45 확인.</td>
+</tr>
+<tr>
+<td>8. SQL 선행 모델</td>
+<td>GREEN</td>
+<td><code>course/days/D19.json</code>~`D22.json`; 회귀 8</td>
+<td>D19~D22는 기존 1단계 모델이며 예약 모델을 선행 조건으로 요구하지 않음. D23 이후 예약 모델 매핑 유지. 원본·생성 결과 검사 통과.</td>
+</tr>
+<tr>
+<td>9. 지도 열기 발견성</td>
+<td>GREEN</td>
+<td><code>tools/site/course-map.js</code>; 회귀 9</td>
+<td>선택 뒤 상세 패널로 즉시 스크롤하고 열기 링크에 focus. JSDOM 이동 대상/focus 검사. 1440×1000 PC에서 D30 링크 y=457.27·높이 27.19px로 화면 안 표시, Enter로 D30 상세 진입 확인.</td>
+</tr>
+</tbody></table></div>
+<p>운영 출발 자료의 신규 원본 10개는 <code>course/start/ops/README.md</code>, <code>Dockerfile</code>, <code>compose.yaml</code>, <code>baseline.sql</code>, <code>JvmSignals.java</code>, <code>probe/build.gradle</code>, <code>probe/settings.gradle</code>, <code>probe/src/main/java/lab/Probe.java</code>, <code>probe/src/main/resources/application.properties</code>, <code>probe/src/main/resources/schema.sql</code>이다. probe는 실험 장치용 <code>ops_marker</code>만 쓰며 예약·지급·checkpoint·lease 정답은 구현하지 않는다.</p>
+<p><code>course/spring/*</code>·합본 JSON·Java 연결 문서·HTML은 손편집하지 않고 <code>cd tools/site &amp;&amp; npm run build</code>로 생성했다.</p>
+<h3 id="실제-실행-표본과-한계"><a class="anchor" href="#실제-실행-표본과-한계" aria-hidden="true">#</a>실제 실행 표본과 한계</h3>
+<p>전용 Compose 프로젝트 <code>jx-fix45-run</code>과 격리 사본에서 실행했다. 아래는 도구/통제 방법 검증이며 학습자 도메인 과제 전체 완주 판정이 아니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>표본</th>
+<th>실제 결과</th>
+<th>검증 범위·한계</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>D26</td>
+<td>JDK 21·Spring Boot 4.1.1 bootJar/이미지 빌드·두 앱 health 200. 8초 느린 요청 중 SIGTERM: HTTP 200, 8.016초, 신규 요청 거부, 종료 관찰 8.127초. SIGKILL: curl 52·HTTP 000, 종료 관찰 0.545초.</td>
+<td>이미지·네트워크·진행 요청·신호/종료 장치 확인. 학습자 예약/로그인 smoke 미검증. Java SIGTERM의 exit 143은 응답 완료와 별도로 해석하도록 안내.</td>
+</tr>
+<tr>
+<td>D27~D28</td>
+<td>조기 NOT NULL 뒤 옛 INSERT error 1364. nullable expand 중 옛 INSERT 두 번 성공·null 재유입 관찰. 신앱 입력 검사 모사에서 null/빈값/공백 3개 거부. 최종 백필 null 0·제약 강화 뒤 신앱 쓰기 성공·최종 6행.</td>
+<td>MySQL 8.4 SQL fixture와 격리 클라이언트 입력 검사. 실제 학습자 신구 앱 호환 행렬 전체 검증 아님.</td>
+</tr>
+<tr>
+<td>D29 백업/복원</td>
+<td>writer 정지 중 baseline+mysqldump 보존. 별도 DB import 뒤 baseline 일치: 2행·합계 300. 백업 뒤 원본은 3행·합계 600으로 유지. import+대사 표본 약 0.298초.</td>
+<td>ops_marker·장치/호환 스키마 fixture. 실제 예약 대상/지급 집합/금액 대사는 자신의 모델로 수행해야 함. 표본 시간은 업무 RTO 보장 아님.</td>
+</tr>
+<tr>
+<td>D29 앱 복귀</td>
+<td>broken 실험 설정은 health 200·smoke 503. 이전 호환 설정/이미지로 복귀 뒤 smoke 200, 원본 3행·합계 600 유지.</td>
+<td>앱 복귀와 DB 복원 구분. 서로 다른 업무 코드 이미지의 전체 계약 검증 아님.</td>
+</tr>
+<tr>
+<td>D33</td>
+<td>최종 init 구성에서 beforeCommit marker: 별도 연결 0행→실제 KILL/재기동 뒤 0행(id 3303). afterCommit marker: 종료 전후 1행(id 3304). 두 진행 요청 curl 52.</td>
+<td>실제 commit 가시성·프로세스 종료 지점 확인. 학습자 chunk 재처리/중복/누락 정책은 미구현·미검증.</td>
+</tr>
+<tr>
+<td>D34 장치</td>
+<td>PID 1 고정 STOP은 S(sleeping)로 통제 실패. init: true와 jcmd의 실제 Java PID 7로 수정한 뒤 T(stopped), CONT 뒤 health 200.</td>
+<td>신호 통제 장치 확인. 두 worker 소유권 회수 알고리즘은 학습자가 구현.</td>
+</tr>
+<tr>
+<td>D39 장치</td>
+<td>-Xmx64m 별도 JVM 세 개에서 CPU·외부 HTTP 대기·객체 보유. 표본 CPU 99.6%, 대기 0.0%; heap 사용 15,310K→50,796K. Thread.print·heap·histogram 수집, 세 JVM exit 0.</td>
+<td>JVM/PID·조건 생성 확인. Spring 요청 풀/Hikari 통합 진단·누수 확정·운영 적정값 검증 아님.</td>
+</tr>
+</tbody></table></div>
+<p>운영 실행에서 /tmp bind mount 차단을 만나 control을 전용 named volume으로 변경했다. PID 1의 STOP 무시도 실제 확인하여 init/Java PID 조회로 수정했다. 최종 구성에서 신호/commit 표본을 재검증했다.</p>
+<h3 id="최종-검사pc정리"><a class="anchor" href="#최종-검사pc정리" aria-hidden="true">#</a>최종 검사·PC·정리</h3>
+<ul>
+<li><code>npm run build</code>: exit 0, HTML 459개·링크 오류 0.</li>
+<li><code>npm run test:course</code>: <strong>59/59</strong>, fix45 회귀 9건 포함.</li>
+<li><code>npm run validate:course</code>: <strong>30 endpoints·45 days·158 cards·47 day pages</strong>, exit 0.</li>
+<li><code>npm run test:course-pages</code>: <strong>14/14 + 13/13</strong>.</li>
+<li><code>npm run audit:visual</code>, <code>audit:version-cards</code>, <code>audit:parity</code>, <code>test:navigation</code>, <code>test:home</code>: 모두 exit 0.</li>
+<li>리포 루트 <code>node --test tools/course/*.test.mjs</code>: <strong>134/134</strong>, 실패 0.</li>
+<li><code>node tools/site/inventory-visual-work.mjs</code> 실행. 신규 내용은 미검토로 유지. parity <strong>446건·verified 0개</strong>를 보존하며 PC 캡처를 시안 대조 완료로 올리지 않음.</li>
+<li><code>git diff --check</code> 통과. board-server·messy-server <strong>845개 파일 SHA-256 변화 0·추가 0</strong>.</li>
+<li>요청한 HTTP 18994와 지정 gstack Playwright 모듈로 <strong>1440×1000, 8개 캡처·9개 확인</strong>. D30 선택→열기 focus→Enter 상세 진입, <a class="docref" href="../../knowledge/J16-jvm-in-containers.html">J16</a> 위치·<a class="docref" href="../../knowledge/J19-testing-junit.html">J19</a> 설명·D20/D26·운영 안내·D44/J45 확인. page error 0·확인 화면 가로 넘침 0. 모바일·학습자 전체 실습은 미검증.</li>
+</ul>
+<p>초기 build는 esbuild 네이티브 바이너리 플랫폼 불일치로 실패하여 <code>npm rebuild esbuild</code> 뒤 성공했다(package-lock 변경 없음). 과정 검증기의 출발 자료 금지어 1종은 원문 문구를 수정·재빌드한 뒤 통과했다. 원본 편집과 동시에 실행한 초기 전체 검사에서는 참고 링크 스냅샷 비교 1건이 실패했으며 원본 고정 뒤 다시 실행해 134/134 통과했다.</p>
+<p>PC 캡처와 RED/GREEN·빌드·검사·MySQL/운영/JVM 로그·재현 스크립트는 다음 디렉터리에 보관한다. 스크린샷은 루트, 상세 로그·SQL·프로세스 관찰은 <code>_data/</code>에 둔다.</p>
+<p><code>(로컬 임시 폴더)/eval/shots-fix45/</code></p>
+<p>임시 Compose 컨테이너·DB/control 볼륨·네트워크·실험 이미지·JVM·HTTP 서버·실습 사본은 정리했다. 증거 파일은 검토용 산출물로 보존한다. 기존 실행 서비스와 원래 작업 파일은 유지했다.</p>
+<h2 id="fix-round-2--2026-10-24"><a class="anchor" href="#fix-round-2--2026-10-24" aria-hidden="true">#</a>fix round 2 · 2026-10-24</h2>
+<p>재검토 원문 <code>~/.cache/jx-p8/reviews/rev45b.md</code>의 N1~N5를 수정했다. 날짜 원본·공통 원본·운영 출발 자료·생성기·렌더러와 회귀 검사만 편집했고 HTML·합본은 <code>cd tools/site &amp;&amp; npm run build</code>로 생성했다. 기존 미커밋·미추적 파일은 보존했으며 git add/commit/stash/reset/checkout은 실행하지 않았다.</p>
+<h3 id="n1n5와-red--green"><a class="anchor" href="#n1n5와-red--green" aria-hidden="true">#</a>N1~N5와 RED → GREEN</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>변경·회귀 검사</th>
+<th>실제 실행 증거와 한계</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>N1</td>
+<td>MySQL healthcheck를 <code>--protocol=TCP -h127.0.0.1 -uroot --database=ops_lab --execute=&#39;SELECT 1&#39;</code>로 변경. 두 앱의 <code>service_healthy</code> 의존은 유지. <code>round2-N1</code>은 기존 socket ping에서 RED, 변경 후 GREEN.</td>
+<td>실험 전용 Compose project·이미지에서 <strong>빈 DB/control 볼륨 최초 기동 5/5</strong>, 매회 두 앱 <code>/actuator/health</code> <strong>UP</strong>. 소요 10.58/10.85/10.35/10.27/10.34초. 올바른 인증·DB 쿼리 exit 0, 틀린 비밀번호 1045·없는 DB 1049로 실패. probe 기동 장치 검증이며 학습자 도메인 완주 증거는 아님.</td>
+</tr>
+<tr>
+<td>N2</td>
+<td>JDK 21 선택·PATH·java/javac 버전·21 검증을 앱/probe 공통 준비로 이동. <code>round2-N2</code> RED → GREEN.</td>
+<td>실제 JAVA_HOME·PATH를 Corretto <strong>11.0.22</strong>로 설정한 bash에서 문서 공통 준비만 실행해 <strong>21.0.6</strong> 선택. probe bootJar 성공. 같은 11 시작 셸에서 D39 CPU·외부 HTTP 대기·힙 세 실험 모두 <strong>exit 0</strong>, PID·Thread.print·heap_info·histogram 보존. CPU 약 99.7%, 대기 0.0% 표본. Spring/Hikari 통합 진단·누수 확정 아님.</td>
+</tr>
+<tr>
+<td>N3</td>
+<td>원본 java.timing → loadCourse → 홈 javaTiming → course.js까지 전달. D44·D45의 DOM 순서·주 버튼을 Spring → Java 수행 중·사후 증거 → 채점으로 전환. 일반 날로 복귀하면 Java 선행·주 버튼도 복원. <code>round2-N3</code> RED → GREEN.</td>
+<td>지정한 Python HTTP 18996·gstack Playwright 모듈에서 <strong>1440×1000</strong>. D43의 실제 체크박스 완료 → 홈 D44, D44 체크 완료 → 홈 D45를 각각 확인. Spring 주 버튼 focus·Enter 상세 진입 성공. 캡처 2개 직접 확인, 가로 넘침 0·pageerror 0. 체크는 브라우저 진행 표시 실험이며 독립 평가 합격을 뜻하지 않음.</td>
+</tr>
+<tr>
+<td>N4</td>
+<td>TC-D32-2는 당일 한 chunk commit/checkpoint 증거, 실제 중단·재시작 실증은 D33으로 구분. TC-D32-3은 외부 발송 미선택이면 실패 경계·대안 설명으로 충족, 선택하면 실제 실험을 제출. <code>round2-N4</code> RED → GREEN.</td>
+<td>카드별 세 줄 형식·질문 범위 검사 통과. 도메인 정답 코드는 추가하지 않음.</td>
+</tr>
+<tr>
+<td>N5</td>
+<td>D36 hints.grader.focus를 D35의 취소 사유·두 운영자 승인 새 계약으로 통일. 기존 fix45-2 검사를 roadmap뿐 아니라 <strong>날짜 원본 전체·hints.grader.focus·생성된 AI 채점 프롬프트</strong>까지 확대.</td>
+<td>기존 잔존 과제 문구에서 RED, 변경 후 GREEN. 공통 채점도 이미 통과한 새 조건에서는 정상 코드 약화를 금하고 해당 요구 합의 단계(D36은 D35)로 복귀하도록 정합성을 맞춤.</td>
+</tr>
+</tbody></table></div>
+<p>최초 회귀 실행은 13건 중 <strong>5건 RED(N1~N5)</strong>, 수정 후 13/13 GREEN이었다. 약점 검사 2건을 먼저 RED로 확인한 뒤 보완했고 D38 수집기도 생성 전 실패 → 로컬 실제 HTTP 검사 성공을 확인했다. 최종 fix45 회귀 <strong>16/16</strong>, npm 과정 검사 <strong>66/66</strong>, 루트 과정 검사 <strong>141/141</strong>이다.</p>
+<h3 id="3절의-보완과-남은-범위"><a class="anchor" href="#3절의-보완과-남은-범위" aria-hidden="true">#</a>3절의 보완과 남은 범위</h3>
+<ul>
+<li>D16~D18: 요청 수·지연만 바꿔도 새 실패가 생긴다고 가정하지 않는다. 통과 사실을 보존하고 담당자/훈련 진행자와 미충족 새 계약을 합의한 뒤 RED를 요구하도록 핵심 순서·공통 채점까지 수정했다.</li>
+<li>D31: 최소 구현의 필수 테스트와 refresh 미도입의 재로그인 대안을 구분했다. 장애·서명키 검증이 확인 불가이면 전체 합격은 보류하고 재검증 조건을 남긴다.</li>
+<li><a class="docref" href="../../knowledge/J17-versions-roadmap.html">J17</a>: A가 예외 번역과 무관하면 선택한 A의 실제 실패 경계·회귀 테스트를 사용하고 무관한 번역 구현을 요구하지 않는다.</li>
+<li><a class="docref" href="../../knowledge/J21-design-patterns-solid.html">J21</a>·<a class="docref" href="../../knowledge/J22-coding-test-algorithms.html">J22</a>·<a class="docref" href="../../knowledge/J24-compiled-vs-interpreted.html">J24</a>·<a class="docref" href="../../knowledge/J25-data-structures-map.html">J25</a>·J28·J31·J33·J34·J38은 해당 D의 통합 증거를, J35·J41은 기존 코드/테스트 비교와 검토 문서를, J42·J43은 기존 테스트 재실행을 허용하도록 원본 evidence 메타와 생성 안내를 분기했다. 공통 새 JUnit 파일/클래스 생성 명령을 제거했다. J39는 별도 JVM·jcmd 출력으로 구분했다.</li>
+<li>J29는 보상 상태 전이의 별도 선수 실험 대신 <strong>이미지 복귀와 DB 복원의 판단표 + D29 실제 실행 기록</strong>으로 직접 연결했다.</li>
+<li>D24는 fixture loader의 위치·실행 명령·seed 24·균등/편향 200행 분포·FK 매핑·baseline/인덱스 비교의 같은 상태 복원·반복 절차를 보강했다. 학습자별 실제 스키마 fixture 구현과 측정은 이번 작업에서 수행하지 않았다.</li>
+<li>D38은 Python 표준 라이브러리 <code>measure-http.py</code>로 유한 요청·동시성·timeout·요청별 JSONL·실패 포함 nearest-rank 백분위·처리량을 수집하게 했다. 로컬 HTTP 200/503 각 3건, 총 6건의 실제 요청에서 오류 3·오류율 0.5와 JSONL/요약 일치를 검증했다. 같은 구간 Docker stats·Hikari active/pending 관찰과 정리 절차를 안내했다. 고정 RPS나 도메인 지급 검증 도구가 아니며 앱별 메트릭 미노출은 확인 불가다.</li>
+<li>D20·D22·D25의 설계상 분량 부담은 남아 있다. 학습 시간을 실측하지 않아 하루 분량 적정을 확정하거나 필수 요구를 임의로 줄이지 않았다. D33·D34의 도메인 재처리/소유권 알고리즘 완주와 D39의 학습자 Spring/Hikari 통합 진단도 미검증이다.</li>
+</ul>
+<h3 id="검사보존정리"><a class="anchor" href="#검사보존정리" aria-hidden="true">#</a>검사·보존·정리</h3>
+<p><code>npm run build</code>, <code>test:course</code>, <code>validate:course</code>, <code>test:course-pages</code>, <code>audit:visual</code>, <code>audit:version-cards</code>, <code>audit:parity</code>, <code>test:navigation</code>, <code>test:home</code> 및 루트 <code>node --test tools/course/*.test.mjs</code>를 실행했다. 과정 검증은 30 endpoints·45 days·158 cards·47 day pages, 화면 검사 14/14 + 13/13이다. build는 HTML 459개·링크 오류 0. 기존 <a class="docref" href="../../knowledge/D04-build-pipeline-explained.html">D04</a>/<a class="docref" href="../../knowledge/D07-onprem-vs-cloud.html">D07</a> 정답 커밋 파일 대조 경고 2건은 남아 있다.</p>
+<p>최종 화면 검사에서 D24 dataSetup 명령의 backtick 표기와 원문 그대로 비교하는 검사의 충돌 1건을 확인하여 원문 명령을 기존 일반 텍스트 형식으로 통일했다. 기존 화면 검사에서 JSDOM의 scrollIntoView 미지원 예외가 출력되는 것을 확인하여 테스트 환경에만 API 대체를 추가했다. 실제 스크롤·포커스는 Playwright로 별도 확인했다. 시각 inventory를 재생성했고 새 항목은 미검토로 유지했다. parity 446건·verified 0개를 유지하며 이번 홈 캡처를 시안 일치 검증으로 올리지 않았다.</p>
+<p>작업 전 Git 대상 파일 5,149개의 SHA-256을 보존했다. 그 안의 board-server·messy-server 558개 파일은 해시 변화·추가·삭제가 없고 <a class="docref" href="../../knowledge/D01-dev-lifecycle-overview.html">D01</a>~<a class="docref" href="../../knowledge/D14-os-basics-backend.html">D14</a> 날짜 원본도 변경하지 않았다. 컨테이너·DB/control 볼륨·네트워크·실험 이미지·별도 JVM·실습 사본·HTTP 서버는 이 작업의 자원만 정리했다.</p>
+<p>RED/GREEN·최종 빌드/검사·기동 5회·인증 실패·JDK 전환·JVM·브라우저·보존 검증 로그와 실행 스크립트: <code>~/.cache/jx-p8/fix-round-2/_data/</code>. 실제 홈 캡처: <code>~/.cache/jx-p8/fix-round-2/home-D44.png</code>, <code>~/.cache/jx-p8/fix-round-2/home-D45.png</code>.</p>
+<h2 id="fix-round-3--2026-10-24"><a class="anchor" href="#fix-round-3--2026-10-24" aria-hidden="true">#</a>fix round 3 · 2026-10-24</h2>
+<p>재검토 원문 <code>~/.cache/jx-p8/reviews/rev45c.md</code>의 ‘남은 문제’ N6·N7을 수정했다. 편집 원본은 <code>course/start/ops/measure-http.py</code>, <code>course/start/ops/README.md</code>, <code>course/days/D38.json</code>, <code>tools/course/fix45.test.mjs</code>와 이 장부다. HTML·합본·일자 문서는 <code>cd tools/site &amp;&amp; npm run build</code>로만 생성했다.</p>
+<h3 id="n6n7의-red--green"><a class="anchor" href="#n6n7의-red--green" aria-hidden="true">#</a>N6·N7의 RED → GREEN</h3>
+<p>수집기 변경 전에 리뷰 조건을 그대로 회귀 테스트에 추가해 <strong>2/2 RED</strong>를 확인했다. N6은 로컬 서버가 본문 9바이트를 0.4초마다 1바이트씩 보내도록 하고 <code>--timeout 1</code>로 실행했을 때 약 <strong>3.7초 뒤 오류 0</strong>으로 집계되어 실패했다. N7은 <code>Content-Length: 100</code>을 보내고 1바이트 뒤 연결을 닫는 응답과 정상 응답을 동시 요청했을 때 <strong>IncompleteRead·exit 1</strong>로 실패했다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>수정</th>
+<th>GREEN 근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>N6</td>
+<td>macOS/Linux 작업 프로세스의 주 스레드에서 <code>SIGALRM</code>/<code>ITIMER_REAL</code>로 연결·헤더·본문 수신 전체에 한 deadline을 적용한다. 요청마다 타이머를 설정하고 <code>finally</code>에서 해제한다. 소켓 대기 timeout을 반복 갱신해 느린 본문을 성공 처리하던 문제를 제거했다.</td>
+<td>동일한 9바이트/0.4초/timeout 1 조건에서 <strong>실패 1·오류율 1</strong>, 요청 latency <strong>1004.82ms</strong>, 수집 경과 <strong>1.096초</strong>, JSONL·요약 출력·exit 0. 헤더가 0.4초마다 조금씩 도착하는 추가 검사도 latency <strong>1004.99ms</strong>·실패 1로 종료했다. 수치는 루트 전체 검사 실행 표본이다.</td>
+</tr>
+<tr>
+<td>N7</td>
+<td><code>http.client.HTTPException</code> 계열을 요청별 실패로 기록한다. 헤더의 HTTP 상태는 보존하고, <code>error</code>가 있으면 HTTP 200이어도 오류율에 포함한다. 실패·부분 응답도 latency 백분위의 전체 시도에 포함한다.</td>
+<td>지정한 중단 응답과 정상 응답을 <strong>동시성 2</strong>로 실행해 <strong>정상 1·실패 1·요청 2·오류율 0.5</strong>, JSONL 2행·요약 출력·exit 0. 부분 응답은 status 200과 <code>IncompleteRead(1 bytes read, 99 more expected)</code>를 함께 보존했다.</td>
+</tr>
+</tbody></table></div>
+<p>D38 날짜 원본과 운영 출발 안내에 전체 deadline, 부분 응답/프로토콜 오류의 개별 실패 처리, HTTP 200이어도 읽기 실패 시 오류 집계, 전체 시도 기준 통계, 수집·요약 완료 시 exit 0을 명시했다. 날짜 원본·생성된 D38 안내·운영 안내의 계약도 회귀 테스트로 대조했다. macOS/Linux의 프로세스 타이머를 사용하므로 해당 실행 환경을 옵션 도움말과 운영 안내에 표시했다. 고정 RPS·학습자 도메인 부하·정합성 검증을 완료했다는 뜻은 아니다.</p>
+<h3 id="검사보존"><a class="anchor" href="#검사보존" aria-hidden="true">#</a>검사·보존</h3>
+<ul>
+<li>기존 200/503 수집 회귀와 N6·N7 및 느린 헤더 회귀는 모두 GREEN. 최종 루트 전체 검사에 fix45 회귀 <strong>19/19</strong>가 포함된다.</li>
+<li><code>cd tools/site &amp;&amp; npm run build</code>: <strong>HTML 459개·링크 오류 0</strong>. 기존 <a class="docref" href="../../knowledge/D04-build-pipeline-explained.html">D04</a>/<a class="docref" href="../../knowledge/D07-onprem-vs-cloud.html">D07</a> 정답 커밋 파일 대조 경고 2건은 유지했다.</li>
+<li><code>npm run test:course</code>: <strong>69/69</strong>, <code>npm run validate:course</code>: <strong>30 endpoints·45 days·158 cards·47 day pages</strong>.</li>
+<li><code>npm run test:course-pages</code>: <strong>14/14 + 13/13</strong>. <code>npm run test:navigation</code>, <code>npm run test:home</code>: 모두 <strong>exit 0</strong>.</li>
+<li>리포 루트 <code>node --test tools/course/*.test.mjs</code>: <strong>144/144</strong>, 실패 0.</li>
+<li><code>npm run audit:visual</code>, <code>npm run audit:version-cards</code>, <code>npm run audit:parity</code>: 모두 <strong>exit 0</strong>. parity <strong>446건·verified 0개</strong>를 유지했다. 새 브라우저/시안 검증은 수행하지 않았다.</li>
+<li>시각 inventory를 갱신했다. 전체 <strong>50,565개 항목·unreviewed 50,506·implemented 53·기존 verified 6</strong>이며 바뀐 안내는 미검토 상태다. 시안 검증 상태를 올리지 않았다.</li>
+<li>작업 전 <strong>5,150개 파일 SHA-256</strong>, HEAD·index 해시를 보존하고 변경 범위를 대조했다. board-server·messy-server <strong>558개 파일의 변경·추가·삭제 0</strong>. D38 외 날짜 원본은 보존했다. HEAD는 동일하고 스테이징 diff는 비어 있다. index 파일의 바이트 해시는 조회 후 달라졌지만 스테이징된 내용의 변경은 없다. <code>git diff --check</code> 통과. 작업 저장소에서 git add/commit/stash/reset은 실행하지 않았다. 다만 사용자가 지정한 기존 루트 테스트의 tempRepo fixture가 별도 임시 저장소에서 내부적으로 git add/commit을 실행한다. 해당 fixture는 테스트 후 삭제되며 작업 저장소에는 적용되지 않는다. 이 내부 동작은 실행 후 확인했다.</li>
+</ul>
+<p>RED/GREEN 진단·요청별 실제 결과·빌드/검사·보존 대조 기록은 <code>~/.cache/jx-p8/fix-round-3/_data/</code>에 보관한다. 테스트의 로컬 HTTP 서버·작업 프로세스·타이머·임시 JSONL 디렉터리는 종료 시 정리했다. 학습자 서버 코드와 기존 미커밋·미추적 작업은 보존했다.</p>
+
+
+</main>
+
+
+
+
+
+</body>
+</html>

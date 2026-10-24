@@ -1,0 +1,66 @@
+diff --git a/src/main/java/com/example/board/member/MemberController.java b/src/main/java/com/example/board/member/MemberController.java
+index a069b19..d83f57a 100644
+--- a/src/main/java/com/example/board/member/MemberController.java
++++ b/src/main/java/com/example/board/member/MemberController.java
+@@ -18,10 +18,11 @@ public class MemberController {
+         this.memberRepository = memberRepository;
+     }
+ 
+-    // 내 정보는 회원 엔티티와 필드가 같아 응답 DTO를 따로 두지 않는다. 필드가 늘면 화면에도 바로 나온다.
++    // 엔티티를 그대로 내보내지 않는다. 엔티티에 필드가 늘면 그대로 응답에 새어 나간다.
+     @GetMapping("/me")
+-    public Member me(@AuthenticationPrincipal AuthMember auth) {
+-        return memberRepository.findById(auth.id())
++    public MemberResponse me(@AuthenticationPrincipal AuthMember auth) {
++        Member member = memberRepository.findById(auth.id())
+                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다."));
++        return MemberResponse.from(member);
+     }
+ }
+diff --git a/src/main/java/com/example/board/member/MemberResponse.java b/src/main/java/com/example/board/member/MemberResponse.java
+new file mode 100644
+index 0000000..6c0a8ae
+--- /dev/null
++++ b/src/main/java/com/example/board/member/MemberResponse.java
+@@ -0,0 +1,16 @@
++package com.example.board.member;
++
++import java.time.OffsetDateTime;
++import java.time.ZoneId;
++
++/** 내 정보 응답(spec-v2). 엔티티를 그대로 내보내면 passwordHash·잔액·수정 시각까지 실리므로 응답 전용으로 둔다. */
++public record MemberResponse(Long id, String email, String nickname, Role role, OffsetDateTime createdAt) {
++
++    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
++
++    public static MemberResponse from(Member member) {
++        // 저장은 KST 기준 LocalDateTime이라 오프셋을 붙여 ISO-8601로 내보낸다
++        return new MemberResponse(member.getId(), member.getEmail(), member.getNickname(), member.getRole(),
++                member.getCreatedAt().atZone(KST).toOffsetDateTime());
++    }
++}
+diff --git a/src/test/java/com/example/board/member/MemberApiTest.java b/src/test/java/com/example/board/member/MemberApiTest.java
+index 90a1eed..456391a 100644
+--- a/src/test/java/com/example/board/member/MemberApiTest.java
++++ b/src/test/java/com/example/board/member/MemberApiTest.java
+@@ -52,7 +52,7 @@ class MemberApiTest {
+     }
+ 
+     @Test
+-    void me는_내_정보를_돌려준다() throws Exception {
++    void me는_필드_다섯개만_돌려주고_passwordHash는_없다() throws Exception {
+         Member member = saveMember();
+ 
+         mockMvc.perform(get("/api/members/me").header("Authorization", "Bearer " + jwtProvider.issue(member.getId(), Role.USER)))
+@@ -60,7 +60,10 @@ class MemberApiTest {
+                 .andExpect(jsonPath("$.id").value(member.getId()))
+                 .andExpect(jsonPath("$.email").value(member.getEmail()))
+                 .andExpect(jsonPath("$.nickname").value(member.getNickname()))
+-                .andExpect(jsonPath("$.role").value("USER"));
++                .andExpect(jsonPath("$.role").value("USER"))
++                .andExpect(jsonPath("$.createdAt").value(org.hamcrest.Matchers.matchesPattern(".*\\+09:00$")))
++                .andExpect(jsonPath("$.passwordHash").doesNotExist())
++                .andExpect(jsonPath("$.length()").value(5));
+     }
+ 
+     @Test

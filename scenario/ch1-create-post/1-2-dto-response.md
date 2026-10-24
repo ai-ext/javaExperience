@@ -337,12 +337,12 @@ dependencies {
 
 ### application.yml — DB 연결
 
-[시작하기](../../README.md)에서 넣은 블록이다. studymate MySQL의 `community` DB에 붙는다.
+`src/main/resources/application.yml`의 DB 연결 블록이다. 이 저장소 `compose.yaml`의 mysql(호스트 13308 → 컨테이너 3306)의 `community` DB에 붙는다. 지금 main의 `application.yml`은 `localhost:3306`을 가리키므로 compose DB를 쓰려면 포트를 `13308`로 바꾼다([README — DB 접속 정보](../../README.md#db-접속-정보)).
 
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/community?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
     username: community
     password: community
   jpa:
@@ -352,7 +352,7 @@ spring:
 
 | 키 | 뜻 |
 |---|---|
-| `spring.datasource.url` | 어디에 붙나. `jdbc:mysql://` 종류 · `localhost:3306` 호스트와 포트(studymate MySQL) · `/community` DB 이름 · `?characterEncoding=UTF-8&serverTimezone=Asia/Seoul` 한글과 시간대 옵션. |
+| `spring.datasource.url` | 어디에 붙나. `jdbc:mysql://` 종류 · `localhost:13308` 호스트와 포트(compose의 mysql — 호스트 13308 → 컨테이너 3306) · `/community` DB 이름 · `?characterEncoding=UTF-8&serverTimezone=Asia/Seoul` 한글과 시간대 옵션. |
 | `username` · `password` | DB 계정. `community` 계정은 `community`·`practice` DB만 쓸 수 있다. |
 | `jpa.hibernate.ddl-auto: validate` | 서버를 켤 때 Hibernate가 엔티티와 테이블을 **비교만** 한다. 엔티티가 가리키는 테이블·컬럼이 없으면 서버가 뜨지 않는다. 테이블은 절대 바꾸지 않는다. 무엇을 잡고 무엇을 못 잡는지는 [1-4](1-4-save-to-db.md#ddl-auto-validate가-잡는-것과-못-잡는-것)에서 본다. |
 
@@ -487,7 +487,7 @@ Caused by: java.lang.ClassNotFoundException: com.mysql.cj.jdbc.Driver
   Caused by: java.net.ConnectException: Connection refused
   ```
 
-  고치는 법 — studymate 레포 루트에서 `docker compose ps mysql`로 DB가 `healthy`인지, `url`의 포트가 `3306`인지 본다. → [에러 도감: DB에 연결 못 함](../../errors.md#db에-연결-못-함)
+  고치는 법 — 이 저장소 루트에서 `docker compose ps mysql`로 DB가 `healthy`인지, `url`의 포트가 `13308`인지 본다. → [에러 도감: DB에 연결 못 함](../../errors.md#db에-연결-못-함)
 
 - **DB 이름을 틀리면(`/comunity`)** "없는 DB"가 아니라 **권한 없음**으로 나온다.
 
@@ -567,11 +567,11 @@ API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아�
 **DB에서 확인** — 응답이 `201`이어도 정말 저장됐는지는 DB를 봐야 안다. 방금 저장된 행을 본다.
 
 ```bash
-docker exec -i studymate-mysql-1 mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community -e "
+docker compose exec -T mysql mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community -e "
 SELECT id, board_id, author_id, title, visibility, status, published_at, created_at FROM post ORDER BY id DESC LIMIT 1;"
 ```
 
-studymate의 **'DB에서 확인'**으로 봐도 된다. 방금 저장된 행이 맨 위에 보인다. `status`가 `PUBLISHED`, `published_at`이 `NULL`인 것도 확인해 둔다. 내가 넣지 않은 컬럼은 테이블 기본값이 채웠다는 뜻이다(1-4에서 다룬다).
+CloudBeaver(`http://localhost:8978`)의 `community (시나리오)` 연결에서 같은 SQL을 실행해 봐도 된다. 방금 저장된 행이 맨 위에 보인다. `status`가 `PUBLISHED`, `published_at`이 `NULL`인 것도 확인해 둔다. 내가 넣지 않은 컬럼은 테이블 기본값이 채웠다는 뜻이다(1-4에서 다룬다).
 
 서버를 껐다 켠 뒤 요청 A를 한 번 더 보내면 `id`가 1로 돌아가지 않고 이어진다. 번호를 DB가 세기 때문이다.
 
@@ -837,7 +837,7 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 
 로그에서 `Schema validation:`이 들어간 줄을 찾는다(Hibernate 7 표기 — 하이픈 없음). 엔티티의 테이블·컬럼 이름이 실제 테이블과 다르다는 뜻이다.
 
-테이블은 CloudBeaver(`http://localhost:8978`)의 `community (Java 시나리오)` 연결이나 dump 파일 [`01-community.sql`](../../docker/mysql/init/01-community.sql)의 `CREATE TABLE`로 확인한다. </details>
+테이블은 CloudBeaver(`http://localhost:8978`)의 `community (시나리오)` 연결이나 dump 파일 [`01-community.sql`](../../docker/mysql/init/01-community.sql)의 `CREATE TABLE`로 확인한다. </details>
 
 ## 다음 단계
 

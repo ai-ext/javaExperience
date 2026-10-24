@@ -2,7 +2,7 @@
 
 ## 상황
 
-요청 한 통에는 값이 실리는 자리가 네 곳 있다. 경로(`/echo/7`), 쿼리(`?q=spring`), 헤더(`X-Client: studymate`), 본문(JSON)이다. 서버는 이 네 자리를 **각각 다른 어노테이션**으로 받는다. 이걸 짝지어 두지 않으면 "`@PathVariable`이 뭐였더라", "`@RequestBody`를 두 개 놓으면 왜 안 되지"에서 계속 막힌다.
+요청 한 통에는 값이 실리는 자리가 네 곳 있다. 경로(`/echo/7`), 쿼리(`?q=spring`), 헤더(`X-Client: javaExperience`), 본문(JSON)이다. 서버는 이 네 자리를 **각각 다른 어노테이션**으로 받는다. 이걸 짝지어 두지 않으면 "`@PathVariable`이 뭐였더라", "`@RequestBody`를 두 개 놓으면 왜 안 되지"에서 계속 막힌다.
 
 이 단계에서는 **받은 것을 그대로 돌려주는 API(echo)**를 만든다. 응답의 키 이름에 `fromPath`처럼 어느 자리에서 왔는지를 적어 두었다. 그래서 버튼을 누르면 내가 보낸 값이 서버의 어느 매개변수로 들어갔는지 바로 보인다. 본문을 `Map`으로 받는 방법과 DTO로 받는 방법도 나란히 비교한다.
 
@@ -18,7 +18,7 @@
     { "type": "bar", "id": "bar", "label": "요청 실험실", "right": "김자바" },
     { "type": "field", "id": "path-id", "label": "경로의 id", "value": "7" },
     { "type": "field", "id": "query-q", "label": "쿼리 q", "value": "spring" },
-    { "type": "field", "id": "header-client", "label": "헤더 X-Client", "value": "studymate" },
+    { "type": "field", "id": "header-client", "label": "헤더 X-Client", "value": "javaExperience" },
     { "type": "field", "id": "body", "label": "본문(JSON)", "value": "{\"title\": \"첫 요청\", \"tags\": [\"java\", \"spring\"], \"extra\": \"덤\"}", "multiline": true },
     { "type": "actions", "id": "buttons", "items": [{ "id": "send-map", "label": "Map으로 받기", "variant": "primary" }, { "id": "send-dto", "label": "DTO로 받기", "variant": "secondary" }] },
     { "type": "code", "id": "result", "label": "서버가 받은 것", "value": "fromPath   ← @PathVariable\nfromQuery  ← @RequestParam\nfromHeader ← @RequestHeader\nfromBody   ← @RequestBody" }
@@ -32,7 +32,7 @@
           "kind": "request",
           "method": "POST",
           "path": "/api/start/echo/7?q=spring",
-          "headers": ["Content-Type: application/json", "X-Client: studymate"],
+          "headers": ["Content-Type: application/json", "X-Client: javaExperience"],
           "body": "{\n  \"title\": \"첫 요청\",\n  \"tags\": [\"java\", \"spring\"],\n  \"extra\": \"덤\"\n}"
         },
         { "kind": "server", "text": "경로의 7 → @PathVariable Long id, 쿼리 q=spring → @RequestParam String q, 헤더 X-Client → @RequestHeader(\"X-Client\") String client" },
@@ -41,7 +41,7 @@
           "kind": "response",
           "status": 200,
           "headers": ["Content-Type: application/json"],
-          "body": "{\n  \"fromPath\": 7,\n  \"fromQuery\": \"spring\",\n  \"fromHeader\": \"studymate\",\n  \"fromBody\": {\n    \"title\": \"첫 요청\",\n    \"tags\": [\"java\", \"spring\"],\n    \"extra\": \"덤\"\n  }\n}"
+          "body": "{\n  \"fromPath\": 7,\n  \"fromQuery\": \"spring\",\n  \"fromHeader\": \"javaExperience\",\n  \"fromBody\": {\n    \"title\": \"첫 요청\",\n    \"tags\": [\"java\", \"spring\"],\n    \"extra\": \"덤\"\n  }\n}"
         },
         { "kind": "screen", "text": "각 값이 어느 자리에서 왔는지 이름표와 함께 보인다", "focus": ["result"] }
       ]
@@ -54,7 +54,7 @@
           "kind": "request",
           "method": "POST",
           "path": "/api/start/echo/7/dto?q=spring",
-          "headers": ["Content-Type: application/json", "X-Client: studymate"],
+          "headers": ["Content-Type: application/json", "X-Client: javaExperience"],
           "body": "{\n  \"title\": \"첫 요청\",\n  \"tags\": [\"java\", \"spring\"],\n  \"extra\": \"덤\"\n}"
         },
         { "kind": "server", "text": "본문 → @RequestBody EchoBody body. record EchoBody(String title, List<String> tags)에 있는 필드만 채우고 모르는 extra는 버린다" },
@@ -62,7 +62,7 @@
           "kind": "response",
           "status": 200,
           "headers": ["Content-Type: application/json"],
-          "body": "{\n  \"fromPath\": 7,\n  \"fromQuery\": \"spring\",\n  \"fromHeader\": \"studymate\",\n  \"fromBody\": {\n    \"title\": \"첫 요청\",\n    \"tags\": [\"java\", \"spring\"]\n  }\n}"
+          "body": "{\n  \"fromPath\": 7,\n  \"fromQuery\": \"spring\",\n  \"fromHeader\": \"javaExperience\",\n  \"fromBody\": {\n    \"title\": \"첫 요청\",\n    \"tags\": [\"java\", \"spring\"]\n  }\n}"
         },
         { "kind": "screen", "text": "fromBody에 extra가 없다 — DTO는 정한 모양만 받는다", "focus": ["result"] }
       ]
@@ -75,7 +75,7 @@
           "kind": "request",
           "method": "POST",
           "path": "/api/start/echo/7",
-          "headers": ["Content-Type: application/json", "X-Client: studymate"],
+          "headers": ["Content-Type: application/json", "X-Client: javaExperience"],
           "body": "{\"title\": \"첫 요청\"}"
         },
         { "kind": "server", "text": "@RequestParam은 기본이 필수다. 컨트롤러 메서드에 들어가기 전에 Spring이 막는다 — 로그: Required request parameter 'q' ... is not present" },
@@ -91,7 +91,7 @@
           "kind": "request",
           "method": "POST",
           "path": "/api/start/echo/7?q=spring",
-          "headers": ["Content-Type: text/plain", "X-Client: studymate"],
+          "headers": ["Content-Type: text/plain", "X-Client: javaExperience"],
           "body": "{\"title\": \"첫 요청\"}"
         },
         { "kind": "server", "text": "JSON 변환기는 application/json 본문만 읽는다. 글자는 JSON처럼 생겼어도 형식표가 text/plain이라 읽지 않는다 — 로그: Content-Type 'text/plain;charset=UTF-8' is not supported" },
@@ -184,7 +184,7 @@ public class EchoController {
 ```text
 POST /api/start/echo/7?q=spring       ← @PostMapping · ① 경로의 7 · ② 쿼리 q
 Content-Type: application/json        ← "본문은 JSON이에요" — 없거나 다르면 415
-X-Client: studymate                   ← ③ 헤더 → @RequestHeader("X-Client")
+X-Client: javaExperience              ← ③ 헤더 → @RequestHeader("X-Client")
 
 {"title":"첫 요청","tags":["java","spring"],"extra":"덤"}   ← ④ 본문 → @RequestBody
 ```
@@ -193,7 +193,7 @@ X-Client: studymate                   ← ③ 헤더 → @RequestHeader("X-Clien
 |---|---|---|---|
 | ① 경로 | URL 안 `/echo/7` | `@PathVariable Long id` + 경로의 `{id}` | 다른 주소라 404 |
 | ② 쿼리 | `?q=spring` | `@RequestParam String q` | 400(필수일 때) |
-| ③ 헤더 | `-H 'X-Client: studymate'` | `@RequestHeader("X-Client") String client` | 400(필수일 때) |
+| ③ 헤더 | `-H 'X-Client: javaExperience'` | `@RequestHeader("X-Client") String client` | 400(필수일 때) |
 | ④ 본문 | `-d '{...}'` + `-H 'Content-Type: application/json'` | `@RequestBody 타입 이름` — **하나만** | 400(본문 없음), 415(형식 다름) |
 
 ### 본문은 왜 `@RequestBody` 하나뿐인가
@@ -244,7 +244,7 @@ API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아�
       "title": "Map으로 받기",
       "method": "POST",
       "path": "/api/start/echo/7?q=spring",
-      "headers": { "X-Client": "studymate" },
+      "headers": { "X-Client": "javaExperience" },
       "body": { "title": "첫 요청", "tags": ["java", "spring"], "extra": "덤" }
     },
     {
@@ -252,7 +252,7 @@ API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아�
       "title": "DTO로 받기",
       "method": "POST",
       "path": "/api/start/echo/7/dto?q=spring",
-      "headers": { "X-Client": "studymate" },
+      "headers": { "X-Client": "javaExperience" },
       "body": { "title": "첫 요청", "tags": ["java", "spring"], "extra": "덤" }
     },
     {
@@ -260,7 +260,7 @@ API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아�
       "title": "쿼리 q 없이",
       "method": "POST",
       "path": "/api/start/echo/7",
-      "headers": { "X-Client": "studymate" },
+      "headers": { "X-Client": "javaExperience" },
       "body": { "title": "첫 요청" }
     },
     {
@@ -268,7 +268,7 @@ API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아�
       "title": "본문 형식 text/plain",
       "method": "POST",
       "path": "/api/start/echo/7?q=spring",
-      "headers": { "Content-Type": "text/plain", "X-Client": "studymate" },
+      "headers": { "Content-Type": "text/plain", "X-Client": "javaExperience" },
       "body": "{\"title\":\"첫 요청\"}"
     }
   ],
@@ -281,7 +281,7 @@ API 서버 주소는 페이지 상단의 공통 입력에서 설정한다. 아�
         "json": [
           { "path": "$.fromPath", "equals": 7 },
           { "path": "$.fromQuery", "equals": "spring" },
-          { "path": "$.fromHeader", "equals": "studymate" },
+          { "path": "$.fromHeader", "equals": "javaExperience" },
           { "path": "$.fromBody", "equals": { "title": "첫 요청", "tags": ["java", "spring"], "extra": "덤" } }
         ]
       }
@@ -313,7 +313,7 @@ C = HTTP 확인(필수), R = 코드 리뷰(피드백용).
 
 | # | 확인 방법 | 기대 |
 |---|---|---|
-| C1 | 요청 A | 상태 `200`, `fromPath`=`7`(숫자), `fromQuery`=`spring`, `fromHeader`=`studymate`, `fromBody`가 보낸 JSON과 같다(`extra` 포함) |
+| C1 | 요청 A | 상태 `200`, `fromPath`=`7`(숫자), `fromQuery`=`spring`, `fromHeader`=`javaExperience`, `fromBody`가 보낸 JSON과 같다(`extra` 포함) |
 | C2 | 요청 B | 상태 `200`, `fromPath`=`7`, `fromBody`의 `title`·`tags`가 보낸 값과 같고 `extra`는 없다 |
 | C3 | 요청 C | 상태 `400` |
 | C4 | 요청 D | 상태 `415` |

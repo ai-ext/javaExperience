@@ -1,0 +1,145 @@
+{
+  "id": "D20",
+  "roadmap": {
+    "id": "D20",
+    "phase": "extend",
+    "title": "시각·정책·제한된 실행기",
+    "java": "J20",
+    "purpose": "시각과 정책을 고정해 테스트하고 작업을 무한히 쌓지 않는 실행기를 관찰한다.",
+    "prerequisite": "D19의 문맥 정리·D07 쿠폰 정책",
+    "workTarget": "1단계에서 만든 내 프로젝트 · 별도 disposable DB/포트. board-server·messy-server 원본은 수정하지 않는다.",
+    "note": "개인 경로: 앞선 티켓에서 얻은 증거를 재사용하되 오늘의 완료 조건은 전원 확인한다. 실제 업무 접근권이 없어도 내 상점/사본의 명시된 변형으로 진행한다.",
+    "steps": [
+      {
+        "no": 1,
+        "title": "쿠폰 시각·정책을 테스트 가능하게 분리",
+        "files": [
+          "src/test/java/CouponPolicyBoundaryTest.java"
+        ],
+        "fileActions": {
+          "create": [
+            "src/test/java/CouponPolicyBoundaryTest.java"
+          ],
+          "modify": [],
+          "inspect": []
+        },
+        "done": [
+          "만료 시각 경계·서버 시간대·사용자 표시 시각을 구분하고 고정 Clock으로 결과를 재현한다.",
+          "정책 두 개를 같은 입력에 적용해 결과를 비교한다. 인터페이스 도입 비용과 조건문 유지안을 함께 적는다."
+        ],
+        "trap": "record 패턴이나 정규식을 필수로 늘리지 않는다. 실제 쿠폰 판단에서 바뀔 조건 하나만 분리한다.",
+        "specRefs": [],
+        "tickets": [],
+        "guides": [],
+        "dayRefs": [
+          {
+            "day": "D19",
+            "step": 2,
+            "label": "문맥 생명주기"
+          }
+        ]
+      },
+      {
+        "no": 2,
+        "title": "작업 수용량과 종료 동작 확인",
+        "files": [
+          "src/test/java/BoundedExecutorTest.java",
+          "docs/evidence/D20/executor.md"
+        ],
+        "fileActions": {
+          "create": [
+            "src/test/java/BoundedExecutorTest.java",
+            "docs/evidence/D20/executor.md"
+          ],
+          "modify": [],
+          "inspect": []
+        },
+        "done": [
+          "worker 2·queue 2에서 작업 5개를 막고 수용/거부·대기 시간·문맥 정리를 기록한다. 무한 대기를 금지한다.",
+          "shutdown 뒤 새 작업 거부, 제한 시간 내 종료와 미완료 작업 식별을 테스트한다. 이 결과를 D32 작업 설계의 입력으로 적는다."
+        ],
+        "trap": "latch로 작업을 막고 timeout을 테스트에 둔다. 숫자는 실험 설정이며 운영 적정값으로 주장하지 않는다.",
+        "specRefs": [],
+        "tickets": [],
+        "guides": [],
+        "dayRefs": [
+          {
+            "day": "D19",
+            "step": 2,
+            "label": "문맥 생명주기"
+          }
+        ]
+      }
+    ],
+    "talkCards": [
+      "TC-D20-1",
+      "TC-D20-2",
+      "TC-D20-3"
+    ],
+    "tomorrow": "D21는 필수 관찰: flush 뒤 rollback를 진행한다. 오늘의 증거와 미해결 항목을 입력으로 쓴다."
+  },
+  "java": {
+    "id": "J20",
+    "day": "D20",
+    "optional": false,
+    "topic": "Clock.fixed와 정책 인터페이스를 사용해 만료 직전·정각·직후를 검사하고, 작은 bounded executor에서 초과 작업의 거부를 관찰한다.",
+    "basics": "Clock.fixed와 정책 인터페이스를 사용해 만료 직전·정각·직후를 검사하고, 작은 bounded executor에서 초과 작업의 거부를 관찰한다.",
+    "typeCut": null,
+    "habit": "실제 실행·입출력·반례를 남기고 관찰과 추정을 구분한다.",
+    "reuse": [
+      "J09",
+      "J13",
+      "J07"
+    ],
+    "labFile": "src/test/java/J20EvidenceTest.java",
+    "acceptance": [
+      "Clock.fixed와 정책 인터페이스를 사용해 만료 직전·정각·직후를 검사하고, 작은 bounded executor에서 초과 작업의 거부를 관찰한다.",
+      "선택한 경계의 기대값과 실제 출력·실행 명령을 남긴다. 단순 설명만으로 완료하지 않는다."
+    ],
+    "title": "Clock·정책·제한된 실행기",
+    "experiment": [
+      "Clock.fixed는 J09의 만료 경계를 재사용하고 정책 비교는 J13을 재사용한다. 실행기 용량은 별도 실험이다. `new ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(2), new ThreadPoolExecutor.AbortPolicy())`로 worker와 queue 모두 상한을 둔다.",
+      "CountDownLatch started(2)와 release(1)를 둔다. 첫 두 작업은 started.countDown 후 release.await(2, SECONDS)한다. started.await가 성공한 뒤 작업 3·4를 제출하면 queue=2, 다섯 번째 submit은 RejectedExecutionException이어야 한다. sleep으로 순서를 추측하지 않는다.",
+      "finally에서 release.countDown·shutdown을 실행하고 awaitTermination(3초)이 false면 shutdownNow 후 다시 기다린다. shutdown 뒤 제출 거부도 확인한다. queue 크기·수용/거부 수·대기 시간을 기록한다. 예외 경로도 동일 정리하고 인터럽트는 복원한다. 이 숫자는 운영 적정값이 아니다."
+    ]
+  },
+  "hints": {
+    "steps": {
+      "1": [
+        "record 패턴이나 정규식을 필수로 늘리지 않는다. 실제 쿠폰 판단에서 바뀔 조건 하나만 분리한다."
+      ],
+      "2": [
+        "latch로 작업을 막고 timeout을 테스트에 둔다. 숫자는 실험 설정이며 운영 적정값으로 주장하지 않는다."
+      ]
+    },
+    "grader": {
+      "focus": [
+        "정책 두 개를 같은 입력에 적용해 결과를 비교한다. 인터페이스 도입 비용과 조건문 유지안을 함께 적는다.",
+        "shutdown 뒤 새 작업 거부, 제한 시간 내 종료와 미완료 작업 식별을 테스트한다. 이 결과를 D32 작업 설계의 입력으로 적는다.",
+        "실행하지 않은 항목은 확인 불가이며 예상값·추정·실측을 구분한다."
+      ]
+    },
+    "refs": [
+      "course/java/J09.md",
+      "course/java/J13.md",
+      "course/java/J07.md"
+    ],
+    "sql": {
+      "context": "내 프로젝트의 disposable 실습 DB에서 기존 1단계 모델(게시글·회원·쿠폰)을 쓴다. 아래 예시를 내 테이블·열·키·필터로 매핑한다. 예약 모델은 D23 이후에 설계하며 오늘의 선행 조건이 아니다. practice·원본 서버 DB는 수정하지 않는다.",
+      "questions": [
+        {
+          "task": "DB 시각과 앱 Clock의 저장 기준을 비교한다.",
+          "expect": "내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.",
+          "example": "SELECT NOW(),UTC_TIMESTAMP(),@@session.time_zone;"
+        },
+        {
+          "task": "쿠폰 만료 경계의 행을 내 열 이름으로 조회한다.",
+          "expect": "내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.",
+          "example": "SELECT id,expires_at FROM member_coupon ORDER BY expires_at LIMIT 10;"
+        }
+      ],
+      "refs": []
+    }
+  },
+  "cards": "## D20 시각·정책·제한된 실행기\n\n### TC-D20-1\n**질문** 만료 경계에 Clock이 필요한 이유는?\n**답에 들어가야 할 것**\n- 실제 시계를 직접 읽으면 실행 시각에 따라 만료 테스트 결과가 달라진다.\n- Clock.fixed로 만료 직전·정각·직후의 기대값과 실제 결과를 재현한다.\n- UTC 저장·표시 시간대 구분과 Clock 주입 비용을 테스트 근거로 말한다.\n**근거** D20 완료 조건·실행 증거\n\n### TC-D20-2\n**질문** 정책 분리와 과한 추상화의 경계는?\n**답에 들어가야 할 것**\n- 실제로 바뀌는 정책 축과 같은 입력에 대한 두 정책 결과를 말한다.\n- 조건문 유지와 인터페이스 도입의 파일 수·변경 범위·테스트 비용을 비교한다.\n- 분리 결정과 과한 추상화라고 판단할 재검토 조건을 제시한다.\n**근거** D20 완료 조건·실행 증거\n\n### TC-D20-3\n**질문** 작업이 넘칠 때 무엇을 거부하고 어떻게 알리나요?\n**답에 들어가야 할 것**\n- worker 2·queue 2를 latch로 막았을 때 다섯 번째 작업의 거부를 설명한다.\n- AbortPolicy의 예외를 호출자에게 어떻게 전달할지와 대기 상한을 말한다.\n- 수용/거부 수·shutdown 뒤 거부·종료/미완료 작업 실측을 제시한다.\n**근거** D20 완료 조건·실행 증거\n\n"
+}

@@ -288,7 +288,7 @@ server:
   port: 18280
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/practice?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+    url: jdbc:mysql://localhost:13308/practice?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
     username: community
     password: community
   jpa:

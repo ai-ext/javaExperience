@@ -1,0 +1,168 @@
+diff --git a/src/main/java/com/example/board/admin/AdminService.java b/src/main/java/com/example/board/admin/AdminService.java
+index e660ac4..58dfa38 100644
+--- a/src/main/java/com/example/board/admin/AdminService.java
++++ b/src/main/java/com/example/board/admin/AdminService.java
+@@ -4,6 +4,7 @@ import java.util.List;
+ 
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
++import org.springframework.context.ApplicationEventPublisher;
+ import org.springframework.data.domain.PageRequest;
+ import org.springframework.security.access.prepost.PreAuthorize;
+ import org.springframework.stereotype.Service;
+@@ -12,8 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
+ import com.example.board.common.BusinessException;
+ import com.example.board.common.CursorPage;
+ import com.example.board.common.ErrorCode;
+-import com.example.board.post.PopularPostService;
+ import com.example.board.post.Post;
++import com.example.board.post.PostChangedEvent;
+ import com.example.board.post.PostRepository;
+ import com.example.board.post.PostStatus;
+ 
+@@ -30,14 +31,14 @@ public class AdminService {
+     private final ReportRepository reportRepository;
+     private final PostRepository postRepository;
+     private final AuditLogRepository auditLogRepository;
+-    private final PopularPostService popularPostService;
++    private final ApplicationEventPublisher events;
+ 
+     public AdminService(ReportRepository reportRepository, PostRepository postRepository,
+-            AuditLogRepository auditLogRepository, PopularPostService popularPostService) {
++            AuditLogRepository auditLogRepository, ApplicationEventPublisher events) {
+         this.reportRepository = reportRepository;
+         this.postRepository = postRepository;
+         this.auditLogRepository = auditLogRepository;
+-        this.popularPostService = popularPostService;
++        this.events = events;
+     }
+ 
+     /** 응답 DTO 변환까지 트랜잭션 안에서 한다. 엔티티를 밖으로 내보내면 LAZY 연관에서 LazyInitializationException이 난다. */
+@@ -55,7 +56,8 @@ public class AdminService {
+     /**
+      * 없는 글·삭제된 글은 404. 이미 숨긴 글은 다시 숨겨도 200이다(같은 글의 다른 신고를 처리할 수 있게).
+      * reportId가 없거나 다른 글의 신고면 404이고 아무것도 바꾸지 않는다.
+-     * 신고로 숨긴 글은 인기글에서 바로 내려야 해서, 이벤트(커밋 뒤 리스너)를 거치지 않고 숨기는 자리에서 캐시를 지운다.
++     * 인기글 캐시는 숨김이 커밋된 뒤에 지운다(PostCacheEvictListener, AFTER_COMMIT). 커밋 전에 지우면 그 틈에 다른 요청이
++     * 아직 ACTIVE인 옛 값을 다시 적재해 TTL(60초) 동안 숨긴 글이 보이고, 롤백되면 지울 이유도 없다.
+      */
+     @Audited(action = "HIDE_POST", targetType = "POST")
+     @Transactional
+@@ -73,7 +75,7 @@ public class AdminService {
+         if (report != null) {
+             report.resolve();
+         }
+-        popularPostService.evict();
++        events.publishEvent(new PostChangedEvent(postId));
+         log.info("글 숨김 postId={} reportId={}", postId, reportId);
+         return new HidePostResponse(postId, post.getStatus(), reportId);
+     }
+diff --git a/src/test/java/com/example/board/admin/HidePostCacheRaceTest.java b/src/test/java/com/example/board/admin/HidePostCacheRaceTest.java
+new file mode 100644
+index 0000000..8a38a69
+--- /dev/null
++++ b/src/test/java/com/example/board/admin/HidePostCacheRaceTest.java
+@@ -0,0 +1,103 @@
++package com.example.board.admin;
++
++import java.sql.Connection;
++import java.sql.PreparedStatement;
++import java.sql.ResultSet;
++import java.util.List;
++import java.util.concurrent.ExecutorService;
++import java.util.concurrent.Executors;
++import java.util.concurrent.Future;
++import java.util.concurrent.TimeUnit;
++
++import javax.sql.DataSource;
++
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.datasource.DriverManagerDataSource;
++import org.testcontainers.mysql.MySQLContainer;
++
++import com.example.board.ApiTestSupport;
++import com.example.board.member.Member;
++import com.example.board.member.Role;
++import com.jayway.jsonpath.JsonPath;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
++
++/**
++ * 로그 타임라인 "캐시 삭제 → 다른 요청의 재적재 → 커밋"을 테스트로 고정한다.
++ * 글 행을 다른 커넥션이 FOR UPDATE로 잡고 있으면 숨김 요청은 커밋 전에 그 행 잠금에서 기다린다. 그 사이에 인기글을 읽는다.
++ * 기다리는지는 잠금 표(performance_schema.data_lock_waits)로 본다. 모든 대기에는 상한을 둔다.
++ */
++class HidePostCacheRaceTest extends ApiTestSupport {
++
++    @Autowired
++    DataSource dataSource;
++
++    @Autowired
++    MySQLContainer mysql;
++
++    List<Long> popularIds() throws Exception {
++        String body = mockMvc.perform(get("/api/posts/popular")).andReturn().getResponse().getContentAsString();
++        return JsonPath.<List<Number>>read(body, "$.items[*].id").stream().map(Number::longValue).toList();
++    }
++
++    /** locker 연결이 잡은 post 행 잠금을 기다리는 트랜잭션 수. 잠금 표는 PROCESS 권한이 필요해 root로 읽는다. */
++    long waitersOn(long lockerId) {
++        JdbcTemplate root = new JdbcTemplate(
++                new DriverManagerDataSource(mysql.getJdbcUrl(), "root", mysql.getPassword()));
++        return root.queryForObject("SELECT COUNT(*) FROM performance_schema.data_lock_waits w"
++                + " JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID = w.REQUESTING_ENGINE_LOCK_ID"
++                + " JOIN performance_schema.threads t ON t.THREAD_ID = w.BLOCKING_THREAD_ID"
++                + " WHERE t.PROCESSLIST_ID = ? AND l.OBJECT_NAME = 'post'", Long.class, lockerId);
++    }
++
++    @Test
++    void 숨김_커밋_전에_인기글이_다시_적재돼도_커밋_뒤에는_숨긴_글이_빠진다() throws Exception {
++        clearPosts();
++        Member admin = newMember(Role.ADMIN);
++        Long postId = newPost(newMember(Role.USER));
++        jdbc.update("UPDATE post SET like_count = 100 WHERE id = ?", postId);
++        assertThat(popularIds()).contains(postId);
++
++        ExecutorService pool = Executors.newSingleThreadExecutor();
++        try (Connection locker = dataSource.getConnection()) {
++            locker.setAutoCommit(false);
++            long lockerId;
++            try (ResultSet rs = locker.createStatement().executeQuery("SELECT CONNECTION_ID()")) {
++                rs.next();
++                lockerId = rs.getLong(1);
++            }
++            try (PreparedStatement ps = locker.prepareStatement("SELECT id FROM post WHERE id = ? FOR UPDATE")) {
++                ps.setLong(1, postId);
++                ps.executeQuery().close();
++            }
++            Future<Integer> hide = pool.submit(() -> mockMvc
++                    .perform(post("/api/admin/posts/{id}/hide", postId).header("Authorization", bearer(admin)))
++                    .andReturn().getResponse().getStatus());
++            try {
++                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
++                while (waitersOn(lockerId) == 0 && !hide.isDone() && System.nanoTime() < deadline) {
++                    Thread.sleep(20);
++                }
++                if (hide.isDone()) {
++                    // 잠금을 기다리지 않고 끝났다면 원인(응답 코드나 예외)을 그대로 보여 준다
++                    assertThat(hide.get()).as("숨김 요청이 글 행 잠금을 기다리지 않고 끝났다").isNegative();
++                }
++                assertThat(waitersOn(lockerId)).as("10초 안에 숨김 요청이 글 행 잠금을 기다려야 한다").isPositive();
++                popularIds(); // 커밋 전의 다른 요청
++            } finally {
++                locker.rollback();
++            }
++            assertThat(hide.get(10, TimeUnit.SECONDS)).isEqualTo(200);
++        } finally {
++            // 끼어들기(interrupt)로 끝내면 진행 중인 Redis 명령이 실패해 다음 테스트까지 캐시가 꺼진다
++            pool.shutdown();
++            pool.awaitTermination(10, TimeUnit.SECONDS);
++        }
++
++        assertThat(popularIds()).doesNotContain(postId);
++    }
++}

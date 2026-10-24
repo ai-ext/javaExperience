@@ -1,5 +1,7 @@
 # 10-1. 새 프로젝트 시작 — 명세서 읽기, project DB·Flyway, 헬스 체크
 
+> **과정 v2와 다른 점** — 10장은 과정 v2 이전의 참고 자료라 원문을 그대로 둔다. 과정 v2의 [명세서 v2](../../course/spec-v2.md)와는 응답 형식이 다르다. 10장은 성공·실패를 모두 `ApiResponse`(`{status, message, data}`)로 감싸지만, 명세서 v2는 성공 응답을 래퍼 없이 리소스 그대로 돌려주고 에러는 ProblemDetail(`application/problem+json`)로 통일한다. 인증도 10장은 JWT 인터셉터, 명세서 v2는 Spring Security 필터 체인이다. 과정 v2를 진행 중이라면 응답·에러 모양은 명세서 v2를 기준으로 한다.
+
 ## 상황
 
 1~9장에서는 이미 있는 레포(javaExperience)에 기능을 하나씩 붙였다. 회사에서는 이런 일도 자주 생긴다. 팀장이 **명세서 한 장**을 주며 말한다.
@@ -192,7 +194,7 @@ javaExperience 레포 루트에서 한 번 실행한다. 이미 있는 DB는 건
 docker compose exec -T mysql mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS project; GRANT ALL PRIVILEGES ON project.* TO 'community'@'%';"
 ```
 
-명령이 성공하면 빈 `project` DB와 권한이 준비된 것이다. 테이블은 앱이 처음 뜰 때 Flyway가 만든다. 처음 상태로 돌리고 싶으면 `docker compose down -v && docker compose up -d`을 실행한다. `project`가 다시 빈 DB가 되고, 앱을 띄우면 V1이 다시 돈다(`community`·`practice`도 함께 처음 상태로 돌아간다).
+명령이 성공하면 빈 `project` DB와 권한이 준비된 것이다. 테이블은 앱이 처음 뜰 때 Flyway가 만든다. 처음 상태로 돌리고 싶으면 `docker compose down -v && docker compose up -d`을 실행한다. `project`가 다시 빈 DB가 되고, 앱을 띄우면 V1이 다시 돈다(`community`·`practice`도 함께 처음 상태로 돌아간다). **루트 compose의 `down -v`는 `community`·`practice`·`project` DB와 CloudBeaver 작업 공간(저장한 SQL·연결 설정)을 함께 초기화한다. 먼저 `./docker/mysql/dump.sh`로 DB를 백업하고 CloudBeaver 자료는 따로 보관한다(DB 덤프에 포함되지 않음).**
 
 ### 시드 데이터 (V1이 넣는 것)
 
@@ -288,7 +290,7 @@ spring:
   application:
     name: board-api
   datasource:
-    # javaExperience MySQL(호스트 3306)의 project DB. 빈 DB면 Flyway가 V1으로 테이블·시드를 만든다
+    # compose.yaml의 mysql(호스트 13308 → 컨테이너 3306)의 project DB. 빈 DB면 Flyway가 V1으로 테이블·시드를 만든다
     url: jdbc:mysql://localhost:13308/project?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
     username: community
     password: community
@@ -301,7 +303,7 @@ spring:
 
 | 코드 | 설명 |
 |---|---|
-| `url: jdbc:mysql://localhost:13308/project?...` | javaExperience MySQL(호스트 3306)의 `project` DB. `characterEncoding=UTF-8`은 한글, `serverTimezone`은 시각 변환 기준 |
+| `url: jdbc:mysql://localhost:13308/project?...` | compose.yaml의 mysql(호스트 13308 → 컨테이너 3306)의 `project` DB. `characterEncoding=UTF-8`은 한글, `serverTimezone`은 시각 변환 기준 |
 | `username` · `password` | 실습 계정. 이 계정은 `community`·`practice`·`project` 세 DB에만 권한이 있다 |
 | `ddl-auto: validate` | Hibernate가 테이블을 **만들거나 고치지 않고**, 엔티티와 테이블이 맞는지 확인만 한다. 테이블은 Flyway만 만든다 |
 | `open-in-view: false` | DB 연결을 트랜잭션이 끝나면 바로 돌려준다(응답 JSON을 만드는 동안 붙잡지 않음) |
@@ -710,7 +712,7 @@ Caused by: java.sql.SQLSyntaxErrorException: Access denied for user 'community'@
 
 ### ② V1 파일 이름에 밑줄을 하나만 → 앱은 뜨는데 500
 
-파일 이름을 `V1_init.sql`로 바꾸고, DB를 처음 상태로(`docker compose down -v && docker compose up -d`) 돌린 뒤 띄운다.
+파일 이름을 `V1_init.sql`로 바꾸고, DB를 처음 상태로(`docker compose down -v && docker compose up -d`) 돌린 뒤 띄운다. **루트 compose의 `down -v`는 `community`·`practice`·`project` DB와 CloudBeaver 작업 공간(저장한 SQL·연결 설정)을 함께 초기화한다. 먼저 `./docker/mysql/dump.sh`로 DB를 백업하고 CloudBeaver 자료는 따로 보관한다(DB 덤프에 포함되지 않음).**
 
 ```text
 WARN ... o.f.core.internal.command.DbValidate : No migrations found. Are your locations set up correctly?
@@ -741,7 +743,7 @@ Caused by: org.springframework.beans.factory.BeanCreationException: Error creati
 ```
 
 - 읽는 법: Flyway는 실행한 파일의 **체크섬(내용 지문)** 을 기록해 둔다. 기록(`Applied to database`)과 지금 파일(`Resolved locally`)이 다르면 "누가 이미 실행한 이력을 고쳤다"로 보고 멈춘다. 운영 DB에서는 이게 안전장치다.
-- 고치기: V1을 원래대로 되돌린다. 바꾸고 싶은 내용은 `V2__add_docker_tag.sql`처럼 **새 파일**로 만든다. 실습 DB라 처음부터 다시 하고 싶으면 `docker compose down -v && docker compose up -d`을 실행한다.
+- 고치기: V1을 원래대로 되돌린다. 바꾸고 싶은 내용은 `V2__add_docker_tag.sql`처럼 **새 파일**로 만든다. 실습 DB라 처음부터 다시 하고 싶으면 `docker compose down -v && docker compose up -d`을 실행한다. **루트 compose의 `down -v`는 `community`·`practice`·`project` DB와 CloudBeaver 작업 공간(저장한 SQL·연결 설정)을 함께 초기화한다. 먼저 `./docker/mysql/dump.sh`로 DB를 백업하고 CloudBeaver 자료는 따로 보관한다(DB 덤프에 포함되지 않음).**
 
 ### ④ CorsConfig를 지운다 → 버튼만 실패, Postman은 응답 확인
 
@@ -785,7 +787,7 @@ Content-Length: 0
 <details>
 <summary>힌트 3 — 헬스 체크 숫자가 0이다</summary>
 
-테이블은 있는데 비어 있다면 V1의 `INSERT` 부분을 빠뜨렸다. 이미 적용된 V1은 고칠 수 없으니 `docker compose down -v && docker compose up -d` 후 V1 전문을 다시 붙이고 띄운다.
+테이블은 있는데 비어 있다면 V1의 `INSERT` 부분을 빠뜨렸다. 이미 적용된 V1은 고칠 수 없으니 `docker compose down -v && docker compose up -d` 후 V1 전문을 다시 붙이고 띄운다. **루트 compose의 `down -v`는 `community`·`practice`·`project` DB와 CloudBeaver 작업 공간(저장한 SQL·연결 설정)을 함께 초기화한다. 먼저 `./docker/mysql/dump.sh`로 DB를 백업하고 CloudBeaver 자료는 따로 보관한다(DB 덤프에 포함되지 않음).**
 </details>
 
 ## 다음 단계

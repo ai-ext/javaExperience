@@ -55,13 +55,13 @@ sequenceDiagram
     DB-->>M: "행 반환"
     M-->>S: "DTO 반환"
     S->>P: "관리 엔티티 변경"
-    Note over P,DB: "flush 또는 commit에서 변경 SQL 동기화"
+    Note over P,DB: "flush에서 변경 SQL 동기화, commit에서 확정"
     S->>DB: "commit"
 ```
 
 `@Transactional` 메서드가 시작될 때 트랜잭션이 열리고, JPA 엔티티는 이 범위의 영속성 컨텍스트에서 관리된다. 메서드가 끝날 때 provider는 보통 commit 전에 flush한다. flush는 commit과 다르다.
 
-flush는 현재 변경을 SQL로 DB에 전달하고 제약조건 오류가 그 시점에 날 수 있게 하지만, 아직 트랜잭션은 rollback 가능하다. Hibernate `AUTO` flush 모드는 commit 시뿐 아니라 쿼리가 변경 상태를 stale하게 볼 수 있는 경우에도 쿼리 전에 flush할 수 있다. `save()` 호출 즉시 SQL이 실행된다고 가정하면 디버깅 로그와 장애 시점이 어긋난다.
+flush는 현재 변경을 SQL로 DB에 전달하고 제약조건 오류가 그 시점에 날 수 있게 하지만, 아직 트랜잭션은 rollback 가능하다. Hibernate `AUTO` flush 모드는 commit 전뿐 아니라 쿼리가 변경 상태를 stale하게 볼 수 있는 경우에도 쿼리 전에 flush할 수 있다. `save()` 호출 즉시 SQL이 실행된다고 가정하면 디버깅 로그와 장애 시점이 어긋난다.
 
 반대로 MyBatis 호출은 호출한 시점에 mapper SQL이 실행된다. 다만 SQL 실행과 트랜잭션 commit은 별개다. Spring이 관리하는 MyBatis mapper는 Spring 트랜잭션에 참여할 수 있으며, transaction manager가 사용하는 `DataSource`와 `SqlSessionFactory`에 연결된 `DataSource`가 같아야 한다.
 

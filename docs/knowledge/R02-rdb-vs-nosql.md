@@ -80,6 +80,8 @@ ACID 일관성은 트랜잭션 전후 업무 불변식이 유지되는 성질이
 
 ## 3. 따라 하기
 
+> **이 저장소에 없는 실습 환경** — 이 문서의 예제는 원래 공부자료가 전제한 쇼핑몰 연습 DB `ds_practice`(`practice/schema/schema.sql`·`seed.sql`로 만드는 `member`·`product`·`orders` 등)를 쓴다. 그 파일과 DB는 이 저장소에 없다. 그대로 따라 하려면 그런 MySQL을 직접 준비해야 하고, 명령에 적힌 포트(`3306` 등)·계정도 그때 정한 값으로 바꾼다. 이 저장소에서 바로 쓸 수 있는 DB는 루트 `compose.yaml`의 MySQL(`docker compose up -d` — 호스트 `localhost:13308`, 계정 `community`/`community`, DB `community`·`practice`·`project`)이고, 테이블은 게시판용(`member`·`post`·`comment`·`tag` 등)이라 이름과 열이 다르다.
+
 Boot 4.1.1 / Java 25 기준이다. SQL은 `ds_practice` 조회 예제이며 Docker·DB·앱은 실행하지 않았다.
 
 ### 3.1 Spring Boot에 필요한 드라이버만 넣는다
@@ -112,6 +114,7 @@ Maven은 Boot parent/BOM 4.1.1과 같은 starter를 쓴다. Spring Data stable�
 ```yaml
 spring:
   datasource:
+    # 직접 준비한 MySQL 예시(3306·ds_practice). 이 저장소 compose라면 localhost:13308/practice
     url: jdbc:mysql://localhost:3306/ds_practice?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
     username: ${DB_USER}
     password: ${DB_PASSWORD}

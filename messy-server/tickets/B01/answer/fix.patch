@@ -1,0 +1,31 @@
+diff --git a/src/main/java/com/example/board/payment/ChargeService.java b/src/main/java/com/example/board/payment/ChargeService.java
+index cb1d640..cb3b347 100644
+--- a/src/main/java/com/example/board/payment/ChargeService.java
++++ b/src/main/java/com/example/board/payment/ChargeService.java
+@@ -13,7 +13,7 @@ import com.example.board.member.MemberRepository;
+ import com.example.board.point.PointService;
+ 
+ /**
+- * 충전은 두 단계다: REQUESTED 저장(트랜잭션 1) → PG 승인과 결과 반영(트랜잭션 2).
++ * 충전은 세 단계다: REQUESTED 저장(트랜잭션 1) → PG 승인(트랜잭션 밖) → 결과 반영(트랜잭션 2).
+  * REQUESTED를 먼저 커밋해 두므로 PG가 실패해도 연계 로그는 남는다.
+  */
+ @Service
+@@ -44,12 +44,15 @@ public class ChargeService {
+             return replay(payment);
+         }
+ 
++        // PG 호출은 트랜잭션 밖에서 한다. 트랜잭션 안에서 부르면 PG 응답을 기다리는 동안 DB 커넥션을 쥐어
++        // PG가 느린 날 Hikari 풀이 바닥나고 충전과 상관없는 API까지 커넥션을 못 얻는다.
++        PgApproval approval;
+         try {
+-            // 승인과 결과 반영을 한 트랜잭션으로 묶는다. PG는 승인했는데 우리 쪽 반영이 빠지는 틈을 없앤다.
+-            return tx.execute(s -> apply(payment, pgClient.approve(payment.getOrderId(), amount, idempotencyKey)));
++            approval = pgClient.approve(payment.getOrderId(), amount, idempotencyKey);
+         } catch (PgException e) {
+             throw fail(payment, e);
+         }
++        return apply(payment, approval);
+     }
+ 
+     /**

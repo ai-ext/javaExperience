@@ -96,6 +96,8 @@ this.otherMethod() 호출은 프록시를 우회한다. private·final 메서드
 
 ## 3. 따라 하기
 
+> **이 저장소에 없는 예제 프로젝트** — `practice/starter`는 원래 공부자료가 쓰던 상품 API 예제 프로젝트다(자체 `compose.yaml`: 호스트 `13307` → 컨테이너 `3306`, DB `ds_practice`, 계정 `practice`/`practice`). 이 저장소에는 없으므로 아래 경로·명령은 그런 프로젝트를 직접 만들었을 때의 예시로 읽는다. 이 저장소에서는 루트 프로젝트에 같은 패턴을 적용한다 — `./gradlew test`는 Testcontainers의 일회용 MySQL을 쓰고, 개발 DB는 루트 [`compose.yaml`](../../compose.yaml)(호스트 `localhost:13308`, 계정 `community`/`community`)이다.
+
 Spring Initializr에서 Boot 4.1.1, Java 25, Gradle Kotlin, Web MVC를 고른다. 예제는 (미실행)이다.
 
 ### 1단계: 프로젝트와 AOP 의존성
@@ -238,9 +240,9 @@ public class GreetingService {
 
 ### 6단계: MVC 슬라이스 테스트에서 협력 빈 교체
 
-컨트롤러 테스트는 MVC 관련 빈만 올리는 @WebMvcTest와 서비스 대역용 @MockitoBean을 조합한다. 이 작업공간의 practice/starter에는 같은 패턴의 완성 예제가 src/test/java/com/example/practice/product/ProductControllerTest.java에 있다.
+컨트롤러 테스트는 MVC 관련 빈만 올리는 @WebMvcTest와 서비스 대역용 @MockitoBean을 조합한다. 원래 공부자료의 예제 프로젝트 practice/starter(이 저장소에는 없다)에는 같은 패턴의 완성 예제가 src/test/java/com/example/practice/product/ProductControllerTest.java에 있었다.
 
-**확인 방법:** cd practice/starter 후 ./gradlew test --tests '*ProductControllerTest'를 실행한다. MockMvc로 응답 상태·본문을 확인한다. 이 슬라이스는 실제 ProductService와 AOP 전체를 검증하지 않는다. Spring 테스트는 이 문서에서 실행하지 않았다.
+**확인 방법:** 그 프로젝트가 있다면 cd practice/starter 후 ./gradlew test --tests '*ProductControllerTest'를 실행한다. MockMvc로 응답 상태·본문을 확인한다. 이 슬라이스는 실제 ProductService와 AOP 전체를 검증하지 않는다. Spring 테스트는 이 문서에서 실행하지 않았다.
 
 ## 4. 치트시트
 

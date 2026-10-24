@@ -30,6 +30,8 @@
 
 ## 3. 따라 하기
 
+> **이 저장소에 없는 실습 환경** — 이 문서의 예제는 원래 공부자료가 전제한 쇼핑몰 연습 DB `ds_practice`(`practice/schema/schema.sql`·`seed.sql`로 만드는 `member`·`product`·`orders` 등)를 쓴다. 그 파일과 DB는 이 저장소에 없다. 그대로 따라 하려면 그런 MySQL을 직접 준비해야 하고, 명령에 적힌 포트(`3306` 등)·계정도 그때 정한 값으로 바꾼다. 이 저장소에서 바로 쓸 수 있는 DB는 루트 `compose.yaml`의 MySQL(`docker compose up -d` — 호스트 `localhost:13308`, 계정 `community`/`community`, DB `community`·`practice`·`project`)이고, 테이블은 게시판용(`member`·`post`·`comment`·`tag` 등)이라 이름과 열이 다르다.
+
 아래 구성은 Java 25, Spring Boot 4.1.1, Spring Security 7.1.1 기준이다. Boot 관리 버전은 개별로 덮어쓰지 않는다. 스키마는 `practice/schema/schema.sql`의 MySQL `member`를 확장한다.
 
 ### 3.1 의존성·로컬 확인 환경
@@ -57,6 +59,7 @@ dependencies {
 Maven은 parent `4.1.1`과 같은 starter artifact를 쓴다. Mailpit: `docker run --rm -p 1025:1025 -p 8025:8025 axllent/mailpit`; UI는 `http://localhost:8025`. `src/main/resources/application-local.properties`:
 
 ```properties
+# 직접 준비한 MySQL 예시(3306·ds_practice). 이 저장소 compose라면 localhost:13308/practice
 spring.datasource.url=jdbc:mysql://localhost:3306/ds_practice
 spring.datasource.username=app
 spring.datasource.password=${DB_PASSWORD}

@@ -50,7 +50,7 @@ flowchart LR
 
 Tomcat NIO의 Acceptor는 연결을 받고 Poller는 소켓 I/O 준비 상태를 감시한다. 이들은 비즈니스 로직을 실행하지 않는다. 준비된 연결은 Executor 작업 스레드에서 필터·`DispatcherServlet`·컨트롤러·서비스를 거친다. 동기 MVC에서 JDBC를 기다리는 동안에도 작업 스레드는 점유된다.
 
-`practice/starter`(Boot 4.1.1, Tomcat)에 12건을 동시에 요청했을 때 Hibernate SQL 로그에는 `http-nio-8080-exec-1..12`가 각각 기록됐다. 같은 시각 덤프에는 Acceptor·Poller 각 1개와 Hikari `housekeeper`, `connection-adder`가 별도 스레드로 보였다. 이는 SQL 호출도 요청 worker 흐름에서 수행됐음을 보여주는 로컬 실측이지, 최대 동시성이나 성능 수치는 아니다.
+원래 작업공간의 예제 프로젝트 `practice/starter`(Boot 4.1.1, Tomcat — 이 저장소에는 없다)에 12건을 동시에 요청했을 때 Hibernate SQL 로그에는 `http-nio-8080-exec-1..12`가 각각 기록됐다. 같은 시각 덤프에는 Acceptor·Poller 각 1개와 Hikari `housekeeper`, `connection-adder`가 별도 스레드로 보였다. 이는 SQL 호출도 요청 worker 흐름에서 수행됐음을 보여주는 로컬 실측이지, 최대 동시성이나 성능 수치는 아니다. 이 저장소에서 DB를 띄우려면 루트 [`compose.yaml`](../../compose.yaml)을 쓴다(`docker compose up -d`, 호스트 `localhost:13308`, DB `community`·`practice`·`project`, 계정 `community`/`community`). 상품 API와 그 측정 결과가 이 저장소에 포함됐다는 뜻은 아니다.
 
 Spring Boot 4.1의 `server.tomcat.threads.max` 기본값은 **200**, `server.tomcat.threads.min-spare`는 **10**이다. `server.tomcat.threads.max`는 가상 스레드가 켜져 있으면 적용되지 않는다는 조건도 Boot 속성 문서에 명시돼 있다. Tomcat 풀의 max는 동시에 일할 작업 스레드 수의 상한이지, 데이터베이스 동시 쿼리 수가 아니다.
 

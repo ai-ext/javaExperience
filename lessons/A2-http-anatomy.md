@@ -12,7 +12,7 @@ A1에서 HTTP는 "요청과 응답을 어떤 모양의 **글**로 쓸지 정한 
 POST /post?q=spring HTTP/1.1          ← ① 요청 줄: 메서드 · 경로(+쿼리) · 버전
 Host: httpbin.org                     ← ② 헤더(머리글): "이름: 값"이 한 줄에 하나
 Content-Type: application/json
-X-Client: studymate
+X-Client: javaExperience
 Content-Length: 42
                                       ← ③ 빈 줄: 여기서 헤더가 끝난다
 {"title":"hello","tags":["java","spring"]}   ← ④ 본문
@@ -101,7 +101,7 @@ Content-Length: 573
 | 메서드 | 요청 줄 첫 낱말 | `-X POST`(`-d`가 있으면 자동 POST) | `@PostMapping` |
 | 경로 `/posts/7` | 요청 줄 두 번째 칸 | 주소 그대로 | `@PathVariable` |
 | 쿼리 `?q=spring` | 요청 줄 두 번째 칸의 `?` 뒤 | 주소 그대로, 또는 `-G --data-urlencode` | `@RequestParam` |
-| 헤더 | 헤더 줄 | `-H 'X-Client: studymate'` | `@RequestHeader` |
+| 헤더 | 헤더 줄 | `-H 'X-Client: javaExperience'` | `@RequestHeader` |
 | 본문 | 빈 줄 다음 | `-d '{...}'` | `@RequestBody` |
 | 응답 상태 | 응답 상태 줄 | `-i`로 보인다 | 메서드가 정상 반환하면 200, 예외면 4xx·5xx |
 | 응답 헤더 | 응답 헤더 줄 | `-i`로 보인다 | `ResponseEntity`로 붙인다(1-2) |
@@ -114,7 +114,7 @@ Content-Length: 573
 ```bash
 curl -v "http://httpbin.org/post?q=spring" \
   -H 'Content-Type: application/json' \
-  -H 'X-Client: studymate' \
+  -H 'X-Client: javaExperience' \
   -d '{"title":"hello","tags":["java","spring"]}'
 ```
 
@@ -124,7 +124,7 @@ curl -v "http://httpbin.org/post?q=spring" \
 > User-Agent: curl/8.7.1
 > Accept: */*
 > Content-Type: application/json
-> X-Client: studymate
+> X-Client: javaExperience
 > Content-Length: 42
 >
 < HTTP/1.1 200 OK
@@ -135,7 +135,7 @@ curl -v "http://httpbin.org/post?q=spring" \
 {
   "args": { "q": "spring" },
   "data": "{\"title\":\"hello\",\"tags\":[\"java\",\"spring\"]}",
-  "headers": { "Content-Type": "application/json", "X-Client": "studymate", ... },
+  "headers": { "Content-Type": "application/json", "X-Client": "javaExperience", ... },
   "json": { "tags": ["java", "spring"], "title": "hello" },
   "url": "http://httpbin.org/post?q=spring"
 }
@@ -165,10 +165,10 @@ POST만 받는 주소에 GET을 보냈더니 405와 함께 `Allow: POST` 헤더�
 **① 쿼리와 헤더 보내기**
 
 ```bash
-curl -i "http://httpbin.org/get?sort=new&page=2" -H 'X-Client: studymate'
+curl -i "http://httpbin.org/get?sort=new&page=2" -H 'X-Client: javaExperience'
 ```
 
-기대: `200 OK`. 본문의 `args`에 `"page": "2"`, `"sort": "new"`가, `headers`에 `"X-Client": "studymate"`가 있다. 쿼리 값 `2`가 숫자가 아니라 **문자열** `"2"`로 온다는 점도 본다. 쿼리는 늘 글자다. 숫자로 바꾸는 것은 서버 몫이다.
+기대: `200 OK`. 본문의 `args`에 `"page": "2"`, `"sort": "new"`가, `headers`에 `"X-Client": "javaExperience"`가 있다. 쿼리 값 `2`가 숫자가 아니라 **문자열** `"2"`로 온다는 점도 본다. 쿼리는 늘 글자다. 숫자로 바꾸는 것은 서버 몫이다.
 
 **② JSON 본문 보내기** — 위 [실제 글](#실제-글-실측)의 명령을 그대로 보낸다. `json` 칸이 채워졌는지 본다.
 

@@ -10,6 +10,8 @@
 
 ## 2. 당장 알아야 할 것
 
+> **이 저장소에 없는 실습 환경** — 이 문서의 예제는 원래 공부자료가 전제한 쇼핑몰 연습 DB `ds_practice`(`practice/schema/schema.sql`·`seed.sql`로 만드는 `member`·`product`·`orders` 등)를 쓴다. 그 파일과 DB는 이 저장소에 없다. 그대로 따라 하려면 그런 MySQL을 직접 준비해야 하고, 명령에 적힌 포트(`3306` 등)·계정도 그때 정한 값으로 바꾼다. 이 저장소에서 바로 쓸 수 있는 DB는 루트 `compose.yaml`의 MySQL(`docker compose up -d` — 호스트 `localhost:13308`, 계정 `community`/`community`, DB `community`·`practice`·`project`)이고, 테이블은 게시판용(`member`·`post`·`comment`·`tag` 등)이라 이름과 열이 다르다. 이 저장소의 compose DB를 SQL 파일로 떠 두는 스크립트는 `docker/mysql/dump.sh`다.
+
 1. **RPO와 RTO를 먼저 정한다.** RPO는 허용하는 데이터 손실 구간, RTO는 장애부터 서비스 복구까지 허용하는 최대 시간이다. RPO가 15분이면 일일 덤프만으로 부족하다. 두 목표는 조직이 정한다.
 
    ```text
@@ -70,11 +72,11 @@
 
 ## 3. 따라 하기
 
-다음 예는 로컬 MySQL 8.4 컨테이너 `ds-mysql`과 `ds_practice`를 쓴다. 저장소의 `schema.sql`과 `README.md`에 맞췄다. 안내용 명령만 작성했고 Docker·MySQL은 실행하지 않았다. `local`은 로컬 연습 전용 비밀번호다.
+다음 예는 로컬 MySQL 8.4 컨테이너 `ds-mysql`과 `ds_practice`를 쓴다. 원래 공부자료 저장소의 `practice/schema/schema.sql`과 README에 맞췄다(이 저장소에는 없다). 안내용 명령만 작성했고 Docker·MySQL은 실행하지 않았다. `local`은 로컬 연습 전용 비밀번호다.
 
 ### 1단계: 연습 DB 준비
 
-컨테이너가 아직 없다면 시작하고, 저장소 루트에서 스키마와 시드를 넣는다. `schema.sql`은 `DROP DATABASE IF EXISTS ds_practice`를 포함하므로 이미 데이터가 든 DB에서 다시 실행하지 않는다.
+컨테이너가 아직 없다면 시작하고, `practice/schema/`가 있는 그 저장소 루트에서 스키마와 시드를 넣는다. `schema.sql`은 `DROP DATABASE IF EXISTS ds_practice`를 포함하므로 이미 데이터가 든 DB에서 다시 실행하지 않는다.
 
 ```bash
 docker run --name ds-mysql -e MYSQL_ROOT_PASSWORD=local -p 3306:3306 -d mysql:8.4

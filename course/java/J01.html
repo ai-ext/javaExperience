@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>J01. 클래스·생성자·record와 참조 복사</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=6580290a3c9f">
+<link rel="stylesheet" href="../../tools/site/course-exercise.css?v=c30e18dc3d31">
+<link rel="stylesheet" href="../../tools/site/course.css?v=b6c93c158a77">
+<link rel="stylesheet" href="../../tools/site/course-tokens.css?v=90f7ed5128e9">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../spring/README.html" aria-current="page">과정 v2 · 일자 목록</a><a href="../map.html">과정 지도</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<article class="exercise-sheet exercise-java" data-exercise="J01"><header class="exercise-head"><p class="exercise-kind"><b>J01</b> Java 연결 실험</p><h1 id="j01-클래스생성자record와-참조-복사"><a class="anchor" href="#j01-클래스생성자record와-참조-복사" aria-hidden="true">#</a>J01. 클래스·생성자·record와 참조 복사</h1><blockquote class="exercise-meta">
+<p>같은 날: D01 · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests 'J01*'</code></p>
+</blockquote></header><nav class="exercise-route" aria-label="Java 실험 순서"><ol><li><a href="#만들-것"><b>01</b><span>만들 것</span></a></li><li><a href="#오늘-spring에서-다시-만나는-곳"><b>02</b><span>Spring 이어하기</span></a></li></ol></nav>
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D01.html#오늘-순서">D01 · 프로젝트 뼈대</a></p><p>Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p><p><a href="J00.html">← 이전 J00</a> · <a href="J02.html">다음 J02 →</a></p></nav>
+
+
+<section class="exercise-section" aria-labelledby="상황"><h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2><p>D01은 프로젝트 뼈대를 세우는 날이다(헬스 체크, DB 연결, 프로파일, 요청 ID 필터). D01 ④ <code>RequestIdFilter</code>부터 <code>public static final</code> 상수와 <code>private</code> 필드가 나오고, D03에서는 <code>Member</code> 엔티티와 가입 요청 record를 만든다.
+오늘은 Spring 없이 <code>Member</code>를 직접 만들어 본다. 생성자에서 잘못된 값을 거절하는 클래스, 값으로 비교되는 record, 그리고 객체를 메서드에 넘기면 참조가 복사된다는 사실이 엔티티의 리스트 필드에서 어떤 사고로 이어지는지 확인한다.</p></section>
+
+<section class="exercise-section" aria-labelledby="빠른-연상"><h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2><div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>일반 클래스 <code>Member</code></th>
+<th><code>record MemberProfile</code></th>
+<th>TS로 치면</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>필드</td>
+<td>직접 선언, <code>private</code>으로 숨김</td>
+<td>괄호 안 구성 요소가 곧 <code>private final</code> 필드</td>
+<td><code>class</code>의 <code>private</code> 필드 / <code>readonly</code> 객체</td>
+</tr>
+<tr>
+<td>생성자</td>
+<td>직접 작성, 여기서 값 검사</td>
+<td>자동 생성. 검사는 compact 생성자 <code>MemberProfile { … }</code>에</td>
+<td><code>constructor</code></td>
+</tr>
+<tr>
+<td>getter</td>
+<td>직접 작성 <code>getEmail()</code></td>
+<td>자동 생성 <code>email()</code></td>
+<td>프로퍼티 접근</td>
+</tr>
+<tr>
+<td><code>equals</code></td>
+<td>안 만들면 **같은 객체인지(주소)**만 비교</td>
+<td><strong>모든 필드 값</strong>으로 비교</td>
+<td><code>===</code> / 값 비교 함수</td>
+</tr>
+<tr>
+<td>값 바꾸기</td>
+<td>메서드로 허용할 수 있음</td>
+<td>못 바꾼다(새로 만든다)</td>
+<td><code>Readonly&lt;T&gt;</code></td>
+</tr>
+</tbody></table></div><p>흔한 착각: "<code>final List&lt;String&gt; tags</code>면 태그 목록이 안 바뀐다". <code>final</code>은 <strong>다른 리스트를 대입하지 못하게</strong> 할 뿐이다. 리스트 안에 <code>add</code>하는 것은 막지 않는다. 그리고 getter가 그 리스트를 그대로 내주면 밖에서도 <code>add</code>할 수 있다. J00에서 본 "참조가 복사된다"가 엔티티에서 터지는 모양이다.</p></section>
+
+
+<section class="exercise-section" aria-labelledby="만들-것"><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2><details>
+<summary>펼치기</summary>
+
+<p>채울 파일(<code>java-track/src/main/java/com/example/javatrack/j01/</code>):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>파일</th>
+<th>채울 것</th>
+<th>칸</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Member.java</code></td>
+<td>필드 선언, 생성자 검사, <code>getEmail</code>·<code>getNickname</code>·<code>changeNickname</code>·<code>toProfile</code></td>
+<td>주제 과제</td>
+</tr>
+<tr>
+<td><code>MemberStats.java</code></td>
+<td><code>countValidNicknames</code></td>
+<td>기본기 반복</td>
+</tr>
+<tr>
+<td><code>PostListRequest.java</code></td>
+<td>compact 생성자 검사, <code>sizeOrDefault</code></td>
+<td>타입 한 컷</td>
+</tr>
+<tr>
+<td><code>Post.java</code></td>
+<td>필드 선언, 생성자(방어적 복사), <code>getTitle</code>·<code>getTags</code>·<code>addTag</code></td>
+<td>실무 습관</td>
+</tr>
+<tr>
+<td><code>MemberProfile.java</code>·<code>MemberRow.java</code>·<code>LeakyPost.java</code></td>
+<td>주어진 코드. 고치지 않는다</td>
+<td>-</td>
+</tr>
+</tbody></table></div>
+<p><code>Member</code> 규칙:</p>
+<ul>
+<li>이메일: null이 아니고 <code>@</code>를 포함하며 최대 100자. 만든 뒤에는 바꿀 수 없다(<code>final</code>).</li>
+<li>닉네임: 2~20자. <code>changeNickname</code>으로만 바꾸며, 생성자와 같은 규칙으로 검사한다.</li>
+<li>규칙을 어기면 <code>IllegalArgumentException</code>을 던진다.</li>
+<li>인스턴스 필드는 모두 <code>private</code>이다. 필드 이름은 <code>email</code>·<code>nickname</code>으로 한다(테스트가 <code>email</code> 필드를 이름으로 찾아 <code>final</code>인지 본다).</li>
+</ul>
+<p>뼈대 발췌:</p>
+<pre><code class="language-java">public class Member {
+
+    public static final int EMAIL_MAX_LENGTH = 100;
+    public static final int NICKNAME_MIN_LENGTH = 2;
+    public static final int NICKNAME_MAX_LENGTH = 20;
+
+    // TODO: 이메일·닉네임 필드를 선언하세요. 이름은 email·nickname(밖에서 직접 못 건드리게, 이메일은 다시 대입할 수 없게)
+
+    public Member(String email, String nickname) {
+        throw new UnsupportedOperationException("J01: Member 생성자 — 이메일·닉네임을 검사하고 필드에 담으세요");
+    }
+
+    /** 생성자와 같은 규칙으로 검사한 뒤 닉네임을 바꾼다. 규칙을 어기면 원래 닉네임이 남는다. */
+    public void changeNickname(String newNickname) {
+        throw new UnsupportedOperationException("J01: Member.changeNickname — 닉네임 규칙을 검사하고 바꾸세요");
+    }
+
+    /** 지금 값으로 MemberProfile record를 만들어 돌려준다. */
+    public MemberProfile toProfile() {
+        throw new UnsupportedOperationException("J01: Member.toProfile — 지금 이메일·닉네임으로 MemberProfile을 만드세요");
+    }
+    // getEmail · getNickname도 같은 모양
+}</code></pre>
+<p>통과시킬 테스트(주제 과제) — <code>J01MemberTest</code>:</p>
+<ul>
+<li><code>올바른_값으로_만든_회원은_이메일과_닉네임을_돌려준다</code></li>
+<li><code>이메일_형식이_아니면_생성자가_거절한다</code> (null, 빈 문자열, <code>@</code> 없음)</li>
+<li><code>이메일이_100자를_넘으면_생성자가_거절한다</code></li>
+<li><code>닉네임이_2자_미만이거나_20자를_넘으면_생성자가_거절한다</code> (null, 0자, 1자, 21자)</li>
+<li><code>닉네임_2자와_20자는_받아들인다</code></li>
+<li><code>인스턴스_필드는_모두_private이고_이메일은_final이다</code></li>
+<li><code>메서드에_넘긴_회원의_닉네임을_바꾸면_원본도_바뀐다</code></li>
+<li><code>메서드_안에서_매개변수에_새_회원을_대입하면_원본은_그대로다</code></li>
+<li><code>잘못된_닉네임으로는_바꿀_수_없고_원래_닉네임이_남는다</code></li>
+<li><code>값이_같은_두_회원은_서로_다른_객체지만_프로필_record는_equals로_같다</code></li>
+<li><code>프로필은_만든_시점의_값을_담아_회원이_바뀌어도_그대로다</code></li>
+</ul>
+<p>값 전달 두 테스트는 테스트 클래스 안의 도우미 메서드(<code>renameInside</code>·<code>replaceInside</code>)가 <code>Member</code>를 받아 바꾼다. 결과를 먼저 예상해 보고 <code>Member</code>를 채운다.</p>
+</details></section>
+
+
+<section class="exercise-section" aria-labelledby="기본기-반복"><h2 id="기본기-반복"><a class="anchor" href="#기본기-반복" aria-hidden="true">#</a>기본기 반복</h2><p>회원 목록을 for로 돌며 닉네임이 2~20자인 회원 수를 센다. 매개변수로 목록을 받고 <code>return</code>으로 개수를 돌려준다. <code>MemberRow</code>는 닉네임 규칙이 생기기 전의 옛 데이터라 규칙을 어긴 값과 null이 섞여 있다.</p><pre><code class="language-java">/** 회원 목록을 for로 돌며 닉네임이 2~20자인 회원 수를 센다. 닉네임이 null이면 세지 않는다. */
+public static int countValidNicknames(List&lt;MemberRow&gt; rows)</code></pre><p>테스트 — <code>J01BasicsTest</code>:</p><ul>
+<li><code>닉네임이_2자에서_20자인_회원만_센다</code> (1자·2자·20자·21자 경계)</li>
+<li><code>빈_목록이면_0을_돌려준다</code></li>
+<li><code>닉네임이_null인_회원은_예외_없이_세지_않는다</code></li>
+</ul></section>
+
+
+
+
+<section class="exercise-section" aria-labelledby="타입-한-컷"><h2 id="타입-한-컷"><a class="anchor" href="#타입-한-컷" aria-hidden="true">#</a>타입 한 컷</h2><p><code>int</code> vs <code>Integer</code> — 요청 DTO에서 "값 없음"과 "0"을 구분해야 하는 이유.</p><div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th><code>int</code> (기본형)</th>
+<th><code>Integer</code> (래퍼)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>null을 담을 수 있나</td>
+<td>없다</td>
+<td>있다</td>
+</tr>
+<tr>
+<td>필드 기본값</td>
+<td><code>0</code></td>
+<td><code>null</code></td>
+</tr>
+<tr>
+<td>요청에 값이 없을 때</td>
+<td><code>0</code>이 들어가 "안 보냄"과 "0을 보냄"을 구분 못 한다</td>
+<td><code>null</code>이 들어가 "안 보냄"을 알 수 있다</td>
+</tr>
+<tr>
+<td>제네릭에 쓰기</td>
+<td><code>List&lt;int&gt;</code> 불가</td>
+<td><code>List&lt;Integer&gt;</code></td>
+</tr>
+</tbody></table></div><p>함정: <code>Integer</code>가 null인데 <code>int</code>로 받으면(<code>int size = request.size();</code>) 언박싱하는 순간 <code>NullPointerException</code>이 난다. 그래서 null을 먼저 처리한 메서드(<code>sizeOrDefault</code>)로 꺼낸다.</p><p>과제: <code>PostListRequest(Integer size)</code>를 채운다. size를 보내지 않으면(null) 기본값 20을 쓰고, 보냈다면 1~50만 받는다. 0은 "값 없음"이 아니라 잘못된 값이다.</p><p>확인 테스트 — <code>J01TypeCutTest</code>:</p><ul>
+<li><code>대입하지_않은_필드는_int면_0이고_Integer면_null이다</code> (관찰. 테스트 안의 작은 클래스로 필드 기본값을 직접 본다. 처음부터 통과한다)</li>
+<li><code>size를_보내지_않으면_null로_받고_기본값_20을_쓴다</code></li>
+<li><code>보낸_size가_범위_안이면_그대로_쓴다</code> (1, 20, 50)</li>
+<li><code>size_0은_값_없음이_아니라_잘못된_값이라_거절한다</code> (0, -1, 51)</li>
+<li><code>함정_null인_Integer를_int로_꺼내면_NPE가_난다</code></li>
+</ul></section>
+
+
+
+
+
+
+<section class="exercise-section" aria-labelledby="실무-습관"><h2 id="실무-습관"><a class="anchor" href="#실무-습관" aria-hidden="true">#</a>실무 습관</h2><p>불변 컬렉션과 방어적 복사. 주어진 <code>LeakyPost</code>는 받은 리스트를 그대로 필드에 담고, getter로 그대로 내준다. 그래서 두 가지 사고가 난다.</p><ol>
+<li>getter로 받은 리스트에 밖에서 <code>add</code>하면 글의 태그가 바뀐다(<code>addTag</code>를 거치지 않는다).</li>
+<li>생성자에 <code>List.of()</code>를 넘기면 그 불변 리스트를 그대로 쓰게 되어, 나중에 <code>addTag</code>가 <code>UnsupportedOperationException</code>으로 터진다.</li>
+</ol><p>과제: <code>Post</code>를 채워 두 사고를 막는다. 받은 리스트는 내 리스트로 복사해 담고, getter는 밖에서 고칠 수 없는 리스트를 내준다.</p><p>테스트 — <code>J01HabitTest</code> (각 테스트가 <code>LeakyPost</code>가 어떻게 터지는지 먼저 보여 준다):</p><ul>
+<li><code>getter가_내부_리스트를_내주면_밖에서_글이_바뀐다_Post는_막는다</code></li>
+<li><code>생성자에_넘긴_리스트를_밖에서_바꿔도_글의_태그는_그대로다</code></li>
+<li><code>List_of를_넘겨도_addTag가_된다</code></li>
+<li><code>태그는_addTag로만_바뀐다</code></li>
+</ul></section>
+
+
+
+
+
+<section class="exercise-section" aria-labelledby="확인"><h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2><pre><code class="language-bash">./gradlew :java-track:test --tests 'J01*'</code></pre><p>32개(매개변수 테스트는 값마다 하나로 센다)가 모두 <code>PASSED</code>면 끝이다.</p></section>
+
+
+<section class="exercise-section" aria-labelledby="정답"><h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2><details>
+<summary>펼치기</summary>
+
+<pre><code class="language-java">// Member
+private final String email;
+private String nickname;
+
+public Member(String email, String nickname) {
+    if (email == null || !email.contains("@") || email.length() &gt; EMAIL_MAX_LENGTH) {
+        throw new IllegalArgumentException("이메일 형식이 아닙니다: " + email);
+    }
+    this.email = email;
+    this.nickname = validNickname(nickname);
+}
+
+public void changeNickname(String newNickname) {
+    // 검사를 먼저 하고 통과한 값만 대입하므로, 예외가 나면 원래 닉네임이 그대로 남는다
+    this.nickname = validNickname(newNickname);
+}
+
+public MemberProfile toProfile() {
+    return new MemberProfile(email, nickname);
+}
+
+private static String validNickname(String nickname) {
+    if (nickname == null || nickname.length() &lt; NICKNAME_MIN_LENGTH || nickname.length() &gt; NICKNAME_MAX_LENGTH) {
+        throw new IllegalArgumentException("닉네임은 2~20자여야 합니다: " + nickname);
+    }
+    return nickname;
+}</code></pre>
+<pre><code class="language-java">// MemberStats
+public static int countValidNicknames(List&lt;MemberRow&gt; rows) {
+    int count = 0;
+    for (MemberRow row : rows) {
+        String nickname = row.nickname();
+        // null 검사를 먼저 해야 length()에서 NPE가 나지 않는다
+        if (nickname != null
+                &amp;&amp; nickname.length() &gt;= Member.NICKNAME_MIN_LENGTH
+                &amp;&amp; nickname.length() &lt;= Member.NICKNAME_MAX_LENGTH) {
+            count++;
+        }
+    }
+    return count;
+}</code></pre>
+<pre><code class="language-java">// PostListRequest
+public PostListRequest {
+    // null(보내지 않음)을 먼저 걸러야 size &lt; 1 비교에서 언박싱 NPE가 나지 않는다
+    if (size != null &amp;&amp; (size &lt; 1 || size &gt; MAX_SIZE)) {
+        throw new IllegalArgumentException("size는 1~50이어야 합니다: " + size);
+    }
+}
+
+public int sizeOrDefault() {
+    return size == null ? DEFAULT_SIZE : size;
+}</code></pre>
+<pre><code class="language-java">// Post
+private final String title;
+private final List&lt;String&gt; tags;
+
+public Post(String title, List&lt;String&gt; tags) {
+    this.title = title;
+    // 방어적 복사: 받은 리스트와 연결을 끊는다. 받은 것이 List.of()여도 내 리스트는 add할 수 있다
+    this.tags = new ArrayList&lt;&gt;(tags);
+}
+
+public List&lt;String&gt; getTags() {
+    // 읽기 전용 뷰를 내준다. 밖에서 add하면 UnsupportedOperationException
+    return Collections.unmodifiableList(tags);
+}
+
+public void addTag(String tag) {
+    tags.add(tag);
+}</code></pre>
+<p>왜 이렇게 쓰나:</p>
+<ol>
+<li>검사를 생성자와 <code>changeNickname</code>에 모아 두면 "만들어진 <code>Member</code>는 언제나 규칙을 지킨다"가 보장된다. 필드가 <code>private</code>이라 이 길을 우회할 방법이 없다.</li>
+<li>요청 값은 "안 보냄"이 의미를 가지므로 <code>Integer</code>로 받고, 꺼내는 곳은 null을 처리한 메서드 하나로 모은다. 기본형으로 받으면 0과 구분할 수 없다.</li>
+<li>리스트 필드는 들어올 때 복사하고(<code>new ArrayList&lt;&gt;(tags)</code>) 나갈 때 읽기 전용으로 내준다(<code>Collections.unmodifiableList</code>). 그래야 태그가 <code>addTag</code> 한 곳에서만 바뀐다. 호출할 때마다 그 시점의 복사본을 내주고 싶으면 <code>List.copyOf(tags)</code>를 쓴다.</li>
+</ol>
+</details></section>
+
+
+<section class="exercise-section" aria-labelledby="오늘-spring에서-다시-만나는-곳"><h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2><ul>
+<li>D01 ④ <code>board-server/src/main/java/com/example/board/common/RequestIdFilter.java</code> — 밖에서 쓰는 헤더 이름은 <code>public static final String HEADER</code>, 안에서만 쓰는 정규식은 <code>private static final Pattern SAFE</code>. 접근제어자로 공개 범위를 나눈다.</li>
+<li>D03 ② <code>board-server/src/main/java/com/example/board/member/Member.java</code> — 필드는 모두 <code>private</code>이고, 생성자는 <code>private</code>으로 숨긴 뒤 <code>Member.create(…)</code>로만 만든다.</li>
+<li>D03 ③ <code>board-server/src/main/java/com/example/board/member/SignupRequest.java</code> — 가입 요청이 record다. 닉네임 2~20자 규칙은 이 DTO의 <code>@Pattern</code>이 검사한다(오늘은 같은 규칙을 생성자에서 직접 검사했다).</li>
+<li>D03 ⑤ <code>board-server/src/main/java/com/example/board/member/MemberResponse.java</code> — 응답 DTO도 record다. 엔티티를 그대로 내보내지 않고 필요한 값만 복사해 담는다(<code>toProfile</code>과 같은 생각).</li>
+<li>D04 ① <code>board-server/src/main/java/com/example/board/post/Post.java</code> — 클래스에 붙은 <code>@Getter</code>가 <code>getPostTags()</code>로 내부 <code>ArrayList</code>를 그대로 내준다. 지금 호출부는 읽기만 하지만, 밖에서 <code>add</code>하면 <code>addTag</code>를 거치지 않고 엔티티가 바뀐다(<code>LeakyPost</code>와 같은 모양).</li>
+<li>D06 ④ <code>board-server/src/main/java/com/example/board/post/PostListRequest.java</code> — <code>@Min(1) @Max(50) Integer size</code>로 받는다. 기본값 20과 1~50 범위는 오늘과 같지만, 여기서는 compact 생성자가 <code>size == null</code>을 20으로 바꿔 담는다(오늘 만든 것은 null을 그대로 두고 <code>sizeOrDefault</code>에서 처리해 언박싱 함정을 볼 수 있게 했다). 어느 쪽이든 <code>Integer</code>라서 "안 보냄"과 "0"을 구분할 수 있다.</li>
+</ul></section>
+
+
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><strong>실험 결과를 남겼다면</strong><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D01.html#오늘-순서">D01 · 프로젝트 뼈대</a></p><p>Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p><p><a href="J00.html">← 이전 J00</a> · <a href="J02.html">다음 J02 →</a></p><p class="exercise-return-note">연결된 일자로 돌아가 완료 조건을 확인하고 진행 기록을 남기세요.</p></nav></article>
+
+</main>
+
+
+
+
+
+</body>
+</html>

@@ -248,7 +248,7 @@
       "steps": [
         {
           "kind": "user",
-          "text": "http://localhost:3000에 뜬 화면(studymate 실행 칸도 같다)에서 [저장]을 누른다. 서버는 http://localhost:8080 — 포트가 달라 다른 출처다",
+          "text": "http://localhost:3000에 뜬 화면(이 저장소 문서 사이트 http://127.0.0.1:8765의 실행 칸도 다른 출처다)에서 [저장]을 누른다. 서버는 http://localhost:8080 — 포트가 달라 다른 출처다",
           "focus": [
             "save"
           ]

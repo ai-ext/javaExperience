@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>J12. 리팩터링 ②: 긴 메서드를 검증·계산·저장으로 나누기</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=6580290a3c9f">
+<link rel="stylesheet" href="../../tools/site/course-exercise.css?v=c30e18dc3d31">
+<link rel="stylesheet" href="../../tools/site/course.css?v=b6c93c158a77">
+<link rel="stylesheet" href="../../tools/site/course-tokens.css?v=90f7ed5128e9">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../spring/README.html" aria-current="page">과정 v2 · 일자 목록</a><a href="../map.html">과정 지도</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<article class="exercise-sheet exercise-java" data-exercise="J12"><header class="exercise-head"><p class="exercise-kind"><b>J12</b> Java 연결 실험</p><h1 id="j12-리팩터링-②-긴-메서드를-검증계산저장으로-나누기"><a class="anchor" href="#j12-리팩터링-②-긴-메서드를-검증계산저장으로-나누기" aria-hidden="true">#</a>J12. 리팩터링 ②: 긴 메서드를 검증·계산·저장으로 나누기</h1><blockquote class="exercise-meta">
+<p>같은 날: D12 · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests 'J12*'</code></p>
+</blockquote></header><nav class="exercise-route" aria-label="Java 실험 순서"><ol><li><a href="#만들-것"><b>01</b><span>만들 것</span></a></li><li><a href="#오늘-spring에서-다시-만나는-곳"><b>02</b><span>Spring 이어하기</span></a></li></ol></nav>
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D12.html#오늘-순서">D12 · 티켓 처리 1</a></p><p>Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p><p><a href="J11.html">← 이전 J11</a> · <a href="J13.html">다음 J13 →</a></p></nav>
+
+
+<section class="exercise-section" aria-labelledby="상황"><h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2><p>D12에서는 넘겨받은 서버의 티켓을 직접 진단한다. 여기서는 진단할 코드를 읽는 데 필요한 메서드 분리 연습을 먼저 한다. 실제 티켓과의 비교는 티켓을 마친 뒤 아래 접기에서 읽는다.
+오늘은 Spring 없이 76줄짜리 구매 처리 메서드를 검증·계산·저장 세 메서드로 나눈다. 나누기 전후에 동작이 같은지는 J11에서 익힌 특성화 테스트가 지킨다.</p></section>
+
+<section class="exercise-section" aria-labelledby="빠른-연상"><h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2><div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>나누기 전 <code>purchase</code> (76줄)</th>
+<th>나눈 뒤</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>한눈에 보이는 것</td>
+<td><code>if</code>와 문자열 이어 붙이기가 섞인 한 덩어리</td>
+<td><code>validate</code> → <code>calculate</code> → <code>save</code> 흐름 4줄</td>
+</tr>
+<tr>
+<td>실패 사유</td>
+<td><code>error = error + ", " + …</code>로 문자열에 누적</td>
+<td><code>List&lt;String&gt;</code>에 <code>add</code>하고, 잇기(<code>String.join</code>)는 보여 줄 때 한 번</td>
+</tr>
+<tr>
+<td>한 부분만 테스트</td>
+<td>불가능(항상 전체가 돈다)</td>
+<td><code>validate</code>·<code>calculate</code>만 따로 불러 본다</td>
+</tr>
+<tr>
+<td>바꿀 때</td>
+<td>계산식을 고치다 저장 순서를 건드릴 수 있다</td>
+<td>계산은 <code>calculate</code> 한 곳</td>
+</tr>
+<tr>
+<td>JS로 치면</td>
+<td>300줄 <code>handleSubmit</code></td>
+<td><code>validate(form)</code>, <code>toPayload(form)</code>, <code>api.save(payload)</code></td>
+</tr>
+</tbody></table></div><p>흔한 착각: "나누면서 조금 더 낫게 고쳐도 된다". 리팩터링은 <strong>동작을 바꾸지 않는</strong> 변경이다. 레거시에는 수량이 11개면 "수량" 사유와 "재고" 사유가 둘 다 나오는 이상한 동작이 있다. 이것도 그대로 둔다. 고치는 것은 특성화 테스트가 지키는 상태에서 따로 한다.</p></section>
+
+
+<section class="exercise-section" aria-labelledby="만들-것"><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2><details>
+<summary>펼치기</summary>
+
+<p>채울 파일(<code>java-track/src/main/java/com/example/javatrack/j12/</code>):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>파일</th>
+<th>채울 것</th>
+<th>칸</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>PurchaseService.java</code></td>
+<td><code>purchase</code>를 나누어 <code>validate</code>·<code>calculate</code>·<code>save</code>를 채우고, <code>purchase</code>는 그 셋을 부르게</td>
+<td>주제 과제·기본기 반복</td>
+</tr>
+<tr>
+<td><code>OrderStatus.java</code></td>
+<td>라벨 필드·생성자, 상수별 몸체로 <code>canCancel</code>·<code>refundAmount</code></td>
+<td>타입 한 컷</td>
+</tr>
+<tr>
+<td><code>PurchaseRequest</code>·<code>Payment</code>·<code>PurchaseOrder</code>·<code>PurchaseResult</code>·<code>ShopItem</code>·<code>ShopStore</code>·<code>LegacyOrderStatus</code></td>
+<td>주어진 코드. 고치지 않는다</td>
+<td>-</td>
+</tr>
+</tbody></table></div>
+<p>뼈대 발췌(<code>purchase</code>는 길어서 일부만):</p>
+<pre><code class="language-java">public PurchaseResult purchase(PurchaseRequest request) {
+    String error = "";
+
+    // ---- 수량 ----
+    if (request.quantity() &lt; 1 || request.quantity() &gt; 10) {
+        error = error + "수량은 1~10개여야 합니다";
+    }
+    // ---- 상품·재고 ---- ---- 포인트 ---- ---- 쿠폰 ---- (같은 모양으로 error에 이어 붙인다)
+    …
+    if (!error.isEmpty()) {
+        return new PurchaseResult(false, null, 0, error);
+    }
+    // ---- 금액 계산 ---- 쿠폰 10%(최대 5000원), 포인트는 할인 뒤 금액의 절반까지
+    …
+    // ---- 저장 ---- 재고 감소, 포인트 사용, 결제 금액 1% 적립, 주문 저장
+    …
+    return new PurchaseResult(true, orderId, paid, "구매 완료");
+}
+
+/** 실패 사유를 수량 → 상품·재고 → 포인트 → 쿠폰 순으로 모두 모은다. 문제가 없으면 빈 목록. */
+List&lt;String&gt; validate(PurchaseRequest request) {
+    throw new UnsupportedOperationException("J12: PurchaseService.validate — purchase의 검증 부분을 옮기고 사유를 List로 모으세요");
+}
+
+/** 검증을 통과한 요청의 금액을 계산한다. 저장소는 바꾸지 않는다. */
+Payment calculate(PurchaseRequest request) { … }
+
+/** 재고·포인트를 바꾸고 주문을 저장한 뒤 주문 번호를 돌려준다. */
+long save(PurchaseRequest request, Payment payment) { … }</code></pre>
+<p>나누는 순서(한 단계마다 <code>J12PurchaseTest</code>의 <code>특성화_</code> 테스트 4개를 돌려 초록인지 본다):</p>
+<ol>
+<li>계산 부분을 <code>calculate</code>로 옮기고 <code>Payment</code>를 돌려준다. <code>purchase</code>는 <code>Payment</code>의 값을 쓴다.</li>
+<li>저장 부분을 <code>save</code>로 옮긴다.</li>
+<li>검증 부분을 <code>validate</code>로 옮긴다. 이때 사유를 문자열에 이어 붙이지 말고 <code>List&lt;String&gt;</code>에 모은다. <code>purchase</code>에서 <code>String.join(", ", errors)</code>로 잇는다.</li>
+<li>매직 넘버(10, 5000, <code>"SALE"</code>, 1%)에 이름을 붙인다(<code>private static final</code>).</li>
+</ol>
+<p>세 메서드는 <code>package-private</code>이고 <code>final</code>이 아니다. 테스트가 하나씩 바꿔 끼워(익명 하위 클래스로 override) <code>purchase</code>가 정말 그 메서드를 부르는지 확인하기 때문이다.</p>
+<p>통과시킬 테스트(주제 과제) — <code>J12PurchaseTest</code>:</p>
+<ul>
+<li>특성화(나누기 전에도 통과하고, 나눈 뒤에도 그대로 통과해야 한다)<ul>
+<li><code>특성화_정상_구매는_재고를_줄이고_결제_금액의_1퍼센트를_적립하고_주문을_저장한다</code></li>
+<li><code>특성화_포인트는_할인_뒤_금액의_절반까지만_쓴다</code></li>
+<li><code>특성화_쿠폰_할인은_10퍼센트이고_최대_5000원이다</code></li>
+<li><code>특성화_검증에_걸리면_사유를_쉼표로_이어_실패를_돌려주고_아무것도_바꾸지_않는다</code></li>
+</ul>
+</li>
+<li>구조(나누기 전에는 실패한다)<ul>
+<li><code>calculate는_금액만_계산하고_저장소를_바꾸지_않는다</code></li>
+<li><code>purchase는_validate가_돌려준_사유로_실패를_만든다</code></li>
+<li><code>purchase는_calculate가_계산한_금액으로_저장한다</code></li>
+<li><code>purchase는_save가_돌려준_주문_번호를_돌려준다</code></li>
+</ul>
+</li>
+</ul>
+</details></section>
+
+
+<section class="exercise-section" aria-labelledby="기본기-반복"><h2 id="기본기-반복"><a class="anchor" href="#기본기-반복" aria-hidden="true">#</a>기본기 반복</h2><p>나눈 <code>validate</code>가 실패 사유를 <code>List&lt;String&gt;</code>으로 모아 돌려준다. 첫 실패에서 <code>return</code>하지 않고 끝까지 검사한다. 사용자는 한 번에 모든 사유를 봐야 한다. 문제가 없으면 null이 아니라 빈 목록을 돌려준다.</p><pre><code class="language-java">List&lt;String&gt; errors = new ArrayList&lt;&gt;();
+if (…) {
+    errors.add("수량은 1~10개여야 합니다");
+}
+…
+return errors;</code></pre><p>테스트 — <code>J12BasicsTest</code>:</p><ul>
+<li><code>문제가_없으면_빈_목록이다</code></li>
+<li><code>첫_실패에서_멈추지_않고_사유를_순서대로_모두_모은다</code></li>
+<li><code>없는_상품이면_재고는_검사하지_않는다</code></li>
+</ul></section>
+
+
+
+
+<section class="exercise-section" aria-labelledby="타입-한-컷"><h2 id="타입-한-컷"><a class="anchor" href="#타입-한-컷" aria-hidden="true">#</a>타입 한 컷</h2><p><code>enum</code> 확장: 필드·생성자·메서드를 가진 enum, 상수별 메서드 구현. 주어진 <code>LegacyOrderStatus</code>는 상태를 문자열(<code>"PAID"</code>)로 들고 다닌다. 그리고 <code>label</code>·<code>canCancel</code>·<code>refundAmount</code> 메서드마다 같은 if-else를 반복한다.</p><div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>문자열 코드 + if-else</th>
+<th>필드만 가진 enum</th>
+<th>상수별 몸체를 가진 enum</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>오타(<code>"PIAD"</code>)</td>
+<td>실행해 봐야 안다</td>
+<td>컴파일 에러</td>
+<td>컴파일 에러</td>
+</tr>
+<tr>
+<td>상태별 값(라벨)</td>
+<td>if-else</td>
+<td>생성자로 받은 필드</td>
+<td>생성자로 받은 필드</td>
+</tr>
+<tr>
+<td>상태별 동작(환불액)</td>
+<td>if-else</td>
+<td>메서드 안 <code>switch (this)</code></td>
+<td>상수마다 <code>{ … }</code> 안에 구현</td>
+</tr>
+<tr>
+<td>상태를 하나 더하면</td>
+<td>if-else를 전부 찾아 고친다</td>
+<td><code>switch</code>를 찾아 고친다</td>
+<td>메서드를 <code>abstract</code>로 두면 구현을 빠뜨린 순간 컴파일 에러</td>
+</tr>
+</tbody></table></div><p>함정: 상수에 <code>{ … }</code> 몸체를 열면 그 상수는 enum을 상속한 <strong>익명 클래스의 객체</strong>가 된다. 그래서 <code>OrderStatus.SHIPPING.getClass() == OrderStatus.class</code>는 <code>false</code>다. "어느 enum의 상수인가"는 <code>getDeclaringClass()</code>로 묻는다(<code>EnumMap</code>·직렬화 라이브러리도 이것을 쓴다). 그리고 <code>valueOf("paid")</code>는 대소문자가 달라 <code>IllegalArgumentException</code>이다.</p><p>과제: <code>OrderStatus</code>를 채운다. 규칙은 <code>LegacyOrderStatus</code>와 같다. 결제 완료면 전액 환불, 배송 중이면 배송비 3000원을 빼고 환불(0 아래로는 내려가지 않음), 배송 완료와 취소됨은 취소할 수 없고 환불액 0이다.</p><p>확인 테스트 — <code>J12TypeCutTest</code>:</p><ul>
+<li><code>상태마다_라벨을_필드로_가진다</code></li>
+<li><code>라벨_취소_가능_환불액이_레거시_if_else와_같다</code> (상태 4개)</li>
+<li><code>배송_중_환불은_배송비_3000원을_빼고_0_아래로_내려가지_않는다</code></li>
+<li><code>함정_상수별_몸체가_있으면_getClass는_enum_타입이_아니다</code></li>
+<li><code>함정_valueOf는_대소문자까지_같아야_하고_없으면_예외다</code></li>
+</ul></section>
+
+
+
+
+
+
+<section class="exercise-section" aria-labelledby="확인"><h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2><pre><code class="language-bash">./gradlew :java-track:test --tests 'J12*'</code></pre><p>19개(매개변수 테스트는 값마다 하나로 센다)가 모두 <code>PASSED</code>면 끝이다. 시작할 때부터 초록인 <code>특성화_</code> 테스트 4개는 끝날 때까지 초록이어야 한다.</p></section>
+
+
+<section class="exercise-section" aria-labelledby="정답"><h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2><details>
+<summary>펼치기</summary>
+
+<pre><code class="language-java">// PurchaseService
+private static final int MIN_QUANTITY = 1;
+private static final int MAX_QUANTITY = 10;
+private static final String COUPON_PREFIX = "SALE";
+private static final long COUPON_DISCOUNT_PERCENT = 10;
+private static final long COUPON_DISCOUNT_MAX = 5000;
+private static final long EARN_PERCENT = 1;
+
+public PurchaseResult purchase(PurchaseRequest request) {
+    List&lt;String&gt; errors = validate(request);
+    if (!errors.isEmpty()) {
+        return new PurchaseResult(false, null, 0, String.join(", ", errors));
+    }
+    Payment payment = calculate(request);
+    long orderId = save(request, payment);
+    return new PurchaseResult(true, orderId, payment.paidAmount(), "구매 완료");
+}
+
+List&lt;String&gt; validate(PurchaseRequest request) {
+    // 첫 실패에서 돌아가지 않고 끝까지 모은다. ", " 잇기는 보여 주는 쪽(purchase)이 한다
+    List&lt;String&gt; errors = new ArrayList&lt;&gt;();
+    if (request.quantity() &lt; MIN_QUANTITY || request.quantity() &gt; MAX_QUANTITY) {
+        errors.add("수량은 1~10개여야 합니다");
+    }
+    ShopItem item = store.findItem(request.itemCode());
+    if (item == null) {
+        errors.add("없는 상품입니다");
+    } else if (item.stock() &lt; request.quantity()) {
+        errors.add("재고가 부족합니다");
+    }
+    if (request.usePoints() &lt; 0) {
+        errors.add("사용 포인트는 0 이상이어야 합니다");
+    } else if (request.usePoints() &gt; store.pointsOf(request.memberId())) {
+        errors.add("포인트가 부족합니다");
+    }
+    if (request.couponCode() != null &amp;&amp; !request.couponCode().startsWith(COUPON_PREFIX)) {
+        errors.add("쓸 수 없는 쿠폰입니다");
+    }
+    return errors;
+}
+
+Payment calculate(PurchaseRequest request) {
+    long total = store.findItem(request.itemCode()).price() * request.quantity();
+    long discount = request.couponCode() == null
+            ? 0
+            : Math.min(total * COUPON_DISCOUNT_PERCENT / 100, COUPON_DISCOUNT_MAX);
+    // 포인트는 할인 뒤 금액의 절반까지만 쓸 수 있다
+    int usedPoints = (int) Math.min(request.usePoints(), (total - discount) / 2);
+    return new Payment(total, discount, usedPoints, total - discount - usedPoints);
+}
+
+long save(PurchaseRequest request, Payment payment) {
+    store.decreaseStock(request.itemCode(), request.quantity());
+    if (payment.usedPoints() &gt; 0) {
+        store.usePoints(request.memberId(), payment.usedPoints());
+    }
+    store.addPoints(request.memberId(), (int) (payment.paidAmount() * EARN_PERCENT / 100));
+    return store.saveOrder(new PurchaseOrder(request.memberId(), request.itemCode(), request.quantity(),
+            payment.totalPrice(), payment.discount(), payment.usedPoints(), payment.paidAmount()));
+}</code></pre>
+<pre><code class="language-java">// OrderStatus
+public enum OrderStatus {
+
+    PAID("결제 완료") {
+        @Override
+        public boolean canCancel() {
+            return true;
+        }
+
+        @Override
+        public long refundAmount(long paidAmount) {
+            return paidAmount;
+        }
+    },
+    SHIPPING("배송 중") {
+        @Override
+        public boolean canCancel() {
+            return true;
+        }
+
+        @Override
+        public long refundAmount(long paidAmount) {
+            return Math.max(0, paidAmount - SHIPPING_FEE);
+        }
+    },
+    DELIVERED("배송 완료") { /* canCancel → false, refundAmount → 0 */ },
+    CANCELLED("취소됨") { /* canCancel → false, refundAmount → 0 */ };
+
+    private static final long SHIPPING_FEE = 3000;
+
+    private final String label;
+
+    OrderStatus(String label) {
+        this.label = label;
+    }
+
+    public String label() {
+        return label;
+    }
+
+    // 몸체마다 반드시 구현하게 abstract로 둔다. 상태를 하나 더하면서 구현을 빠뜨리면 컴파일 에러가 난다
+    public abstract boolean canCancel();
+
+    public abstract long refundAmount(long paidAmount);
+}</code></pre>
+<p>왜 이렇게 쓰나:</p>
+<ol>
+<li><code>purchase</code>가 흐름만 남으면 "검증에 걸리면 아무것도 저장하지 않는다"가 코드 모양으로 보인다. 저장은 <code>save</code> 한 곳에서만 일어난다.</li>
+<li>실패 사유는 모으는 일(<code>List.add</code>)과 보여 주는 일(<code>String.join</code>)을 나눈다. 그러면 나중에 사유를 JSON 배열로 내보내도 <code>validate</code>는 그대로다.</li>
+<li>나누는 동안 매 단계 특성화 테스트를 돌린다. 한 번에 다 옮기고 나서 돌리면 어느 단계에서 동작이 바뀌었는지 찾기 어렵다.</li>
+</ol>
+</details></section>
+
+
+<section class="exercise-section" aria-labelledby="오늘-spring에서-다시-만나는-곳"><h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2><p><a href="../spring/D12.html">D12 ①·③ 티켓 처리</a>에서 메서드별 책임과 호출 순서를 읽고, 동작을 테스트로 지키면서 변경 범위를 찾는다. 오늘의 메서드 나누기가 진단 근거를 정리하는 데 쓰인다.</p><details>
+<summary>티켓을 마친 뒤 읽기</summary>
+
+<p>2단계(D11~D14)에서 진단하고 고치는 곳은 넘겨받은 <code>messy-server</code>다. <code>board-server</code>의 같은 이름 파일은 비교할 구현 예시이라 내용이 다르다. 아래는 어느 쪽을 보는지 경로에 적었다.</p>
+<ul>
+<li>D12 ① <code>board-server/src/main/java/com/example/board/payment/ChargeService.java</code> (고친 뒤 모습) — <code>charge</code>가 <code>start</code>(결제 행 만들기) → PG 호출 → <code>apply</code>(결과 반영)로 나뉘어 있다. 메서드를 단계별로 나눠 두면 각 단계가 어떤 자원(트랜잭션·커넥션·외부 호출)을 쓰는지 한눈에 보인다. D12 ①(B01)에서는 <code>messy-server</code>의 같은 파일을 이 관점으로 읽는다.</li>
+<li>D12 ③ <code>board-server/src/main/java/com/example/board/shop/OrderService.java</code> (고친 뒤 모습) — <code>order</code> → <code>placeOnce</code> → <code>place</code>, <code>findReplay</code>로 나뉜 구매 처리. 데드락 재시도(<code>order</code>)는 트랜잭션 밖, 실제 처리(<code>place</code>)는 <code>TransactionTemplate</code> 안이라는 경계가 메서드 단위로 보인다. 메서드를 나눌 때는 트랜잭션 경계가 어디에 걸리는지도 같이 본다(J10의 프록시 내용과 이어진다). D12 ③(B03)에서는 <code>messy-server</code>의 같은 파일을 이 관점으로 읽는다.</li>
+<li>D12 ③ <code>messy-server/src/test/java/com/example/board/shop/OrderRollbackTest.java</code> (<strong>D12 ③에서 작성할 예정</strong> — 아직 없는 파일이다) — 메서드를 나누고 경계를 옮긴 뒤에도 롤백 동작을 테스트로 고정한다.</li>
+</ul>
+</details></section>
+
+
+
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><strong>실험 결과를 남겼다면</strong><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D12.html#오늘-순서">D12 · 티켓 처리 1</a></p><p>Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p><p><a href="J11.html">← 이전 J11</a> · <a href="J13.html">다음 J13 →</a></p><p class="exercise-return-note">연결된 일자로 돌아가 완료 조건을 확인하고 진행 기록을 남기세요.</p></nav></article>
+
+</main>
+
+
+
+
+
+</body>
+</html>

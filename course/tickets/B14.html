@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B14. 운영에서 /actuator/env가 인증 없이 열린다</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=6580290a3c9f">
+<link rel="stylesheet" href="../../tools/site/course-exercise.css?v=c30e18dc3d31">
+<link rel="stylesheet" href="../../tools/site/course.css?v=b6c93c158a77">
+<link rel="stylesheet" href="../../tools/site/course-flow.css?v=0d2a7c3a0db7">
+<link rel="stylesheet" href="../../tools/site/course-tokens.css?v=90f7ed5128e9">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../spring/README.html" aria-current="page">과정 v2 · 일자 목록</a><a href="../map.html">과정 지도</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<article class="exercise-sheet exercise-ticket" data-exercise="B14"><header class="exercise-head"><p class="exercise-kind"><b>B14</b> 2단계 · 티켓 작업서</p><h1 id="b14-운영에서-actuatorenv가-인증-없이-열린다"><a class="anchor" href="#b14-운영에서-actuatorenv가-인증-없이-열린다" aria-hidden="true">#</a>B14. 운영에서 <code>/actuator/env</code>가 인증 없이 열린다</h1><blockquote class="exercise-meta">
+<p>같은 날: D11 ①·③ · 선택 후보(Security, 인수인계 리뷰 과제) · 진단 도구: <code>SecurityConfig</code> 인가 규칙 점검, prod 프로파일 기동 후 <code>curl</code></p>
+</blockquote></header><nav class="exercise-route" aria-label="티켓 처리 순서"><ol><li><a href="#받은-티켓"><b>01</b><span>받은 티켓</span></a></li><li><a href="#환경과-재현"><b>02</b><span>환경과 재현</span></a></li><li><a href="#제출물"><b>03</b><span>제출물</span></a></li><li><a href="#flow-b14"><b>04</b><span>흐름 재생</span></a></li></ol></nav>
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D11.html#step-d11-1">D11 ① · 인수인계</a> · <a href="../spring/D11.html#step-d11-3">D11 ③ · 인수인계</a></p></nav>
+
+
+<section class="exercise-section exercise-received" aria-labelledby="받은-티켓"><h2 id="받은-티켓"><a class="anchor" href="#받은-티켓" aria-hidden="true">#</a>받은 티켓</h2><blockquote>
+<p>외부 모의해킹 결과입니다. 운영 서버 <code>GET /actuator/env</code>가 로그인 없이 200을 돌려주고, 응답에 DB 비밀번호와 JWT 서명 키가 평문으로 보입니다.
+운영 설정을 확인하려고 env를 열어 둔 것은 맞지만 관리자만 보게 해 뒀다고 알고 있습니다. 관리자는 계속 볼 수 있어야 합니다.
+긴급으로 막고, 노출된 키는 교체 일정을 잡겠습니다. — 보안 담당</p>
+</blockquote></section>
+
+
+<section class="exercise-section exercise-repro" aria-labelledby="환경과-재현"><h2 id="환경과-재현"><a class="anchor" href="#환경과-재현" aria-hidden="true">#</a>환경과 재현</h2><ol>
+<li><code>messy-server</code>에서 <code>docker compose up -d</code></li>
+<li><code>bash tickets/B14/repro.sh</code> (bootJar로 만든 jar를 prod 프로파일로 8089 포트에 띄우고, 끝나면 그 프로세스만 내린다. 포트가 이미 쓰이면 시작하지 않는다)<ul>
+<li>토큰 없이 <code>/actuator/health</code>, <code>/actuator/metrics</code>, <code>/actuator/env</code>를 부르고, env 응답에서 비밀번호·비밀키 값을 뽑아 본다.</li>
+<li>기대 증상: 세 경로 모두 200. env 응답에 <code>DB_PASSWORD</code>, <code>BOARD_JWT_SECRET</code> 값이 그대로 보인다.</li>
+</ul>
+</li>
+<li>로컬 프로파일(test·local)에서는 env가 노출되지 않아 401이 나온다. 그래서 기존 테스트로는 보이지 않는다.</li>
+</ol></section>
+
+<section class="exercise-section exercise-submission" aria-labelledby="제출물"><h2 id="제출물"><a class="anchor" href="#제출물" aria-hidden="true">#</a>제출물</h2><ul>
+<li>원인 서술: 관리자 전용 규칙이 있는데도 왜 토큰 없이 열리는가, 그리고 왜 값까지 보이는가</li>
+<li>재현 테스트: prod 설정 그대로 띄워 토큰 없음 401, 일반 회원 403, 관리자 200, health는 토큰 없이 200을 함께 보고, 관리자에게도 비밀값이 평문으로 나가지 않는지 보는 테스트(결함 상태에서 실패 → 수정 후 통과)</li>
+<li>수정 diff</li>
+</ul></section>
+<section class="ticket-flow flow" data-flow="B14" data-flow-kind="ticket" id="flow-b14" aria-labelledby="flow-b14-title">
+  <div class="flow-head"><p class="flow-eyebrow">장애 흐름 · 증상에서 관찰 지점까지</p><h2 id="flow-b14-title">B14 장애가 번지는 흐름</h2><p class="flow-summary">밖에서 보이는 증상과 관찰 지점만 먼저 보여 줍니다. 원인 쪽 단계는 직접 진단한 뒤 아래 접기에서 펼쳐 맞춰 보세요. 펼치면 재생에도 원인 단계가 끼어듭니다.</p></div>
+  <ol class="flow-nodes" aria-label="장애 흐름 지도: 외부 요청 → 원인 쪽 → 원인 쪽 → /actuator/env 응답 → 관찰 지점"><li class="flow-node" data-node="client" data-index="0"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="3.6"></circle><path d="M4.5 20c1.2-4 4-6 7.5-6s6.3 2 7.5 6"></path></svg></span><span class="flow-node-text"><b>외부 요청</b><small>토큰 없음</small></span></li><li class="flow-node is-masked" data-node="rules" data-index="1"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4.5" y="4.5" width="15" height="15" rx="2" stroke-dasharray="3 2.4"></rect><path d="M10 10a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3M12 15.6v.1"></path></svg></span><span class="flow-node-text"><b>원인 쪽</b><small>펼치면 보임</small></span></li><li class="flow-node is-masked" data-node="config" data-index="2"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4.5" y="4.5" width="15" height="15" rx="2" stroke-dasharray="3 2.4"></rect><path d="M10 10a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3M12 15.6v.1"></path></svg></span><span class="flow-node-text"><b>원인 쪽</b><small>펼치면 보임</small></span></li><li class="flow-node" data-node="symptom" data-index="3"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4 21 19.5H3z"></path><path d="M12 10v4.4M12 17.2v.1"></path></svg></span><span class="flow-node-text"><b>/actuator/env 응답</b><small>prod</small></span></li><li class="flow-node" data-node="observe" data-index="4"><span class="flow-tile"><svg class="flow-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6"></circle><path d="m15 15 5 5M8 12.5v-2M10.5 12.5V8.5M13 12.5v-3"></path></svg></span><span class="flow-node-text"><b>관찰 지점</b><small>규칙 점검 · curl</small></span></li></ol>
+  <div class="flow-player" data-flow-player="" hidden="">
+  <div class="flow-controls" role="group" aria-label="흐름 재생 조작">
+    <button type="button" class="flow-btn" data-flow-prev="" aria-controls="flow-b14-now">◀ 이전</button>
+    <button type="button" class="flow-btn flow-play" data-flow-play="" aria-pressed="false" aria-controls="flow-b14-now">▶ 재생</button>
+    <button type="button" class="flow-btn" data-flow-next="" aria-controls="flow-b14-now">다음 ▶</button>
+    <span class="flow-speed" role="group" aria-label="재생 속도"><button type="button" class="flow-btn" data-flow-speed="0.5" aria-pressed="false">0.5×</button><button type="button" class="flow-btn" data-flow-speed="1" aria-pressed="true">1×</button><button type="button" class="flow-btn" data-flow-speed="2" aria-pressed="false">2×</button></span>
+    <span class="flow-count" data-flow-count="" aria-hidden="true"></span>
+  </div>
+  <div class="flow-now" id="flow-b14-now" data-flow-now="" aria-live="polite" aria-atomic="true"></div>
+  <p class="flow-keys">이 영역 안에서 <kbd>←</kbd> <kbd>→</kbd> 이전·다음, <kbd>Home</kbd> <kbd>End</kbd> 처음·끝. 재생은 마지막 단계에서 멈춥니다.</p>
+</div>
+  <h3 class="flow-list-title">보이는 증상과 관찰 지점 <small>3단계</small></h3>
+  <ol class="flow-steps"><li class="flow-step" id="flow-b14-1" data-order="1" data-node="client"><p class="flow-step-head"><span class="flow-step-no">1</span><span class="flow-step-node">외부 요청</span></p><p class="flow-step-title">토큰 없이 actuator 세 경로를 부른다</p><dl class="flow-values"><div><dt>재현</dt><dd><code>/actuator/health</code>, <code>/actuator/metrics</code>, <code>/actuator/env</code></dd></div><div><dt>프로파일</dt><dd>prod (8089 포트)</dd></div></dl></li><li class="flow-step" id="flow-b14-4" data-order="4" data-node="symptom"><p class="flow-step-head"><span class="flow-step-no">2</span><span class="flow-step-node">/actuator/env 응답</span></p><p class="flow-step-title">세 경로 모두 200, env에 비밀값이 평문</p><dl class="flow-values"><div><dt>재현</dt><dd>env 응답에 <code>DB_PASSWORD</code>, <code>BOARD_JWT_SECRET</code> 값이 그대로</dd></div><div><dt>티켓</dt><dd>관리자만 보게 해 뒀다고 알고 있다</dd></div></dl></li><li class="flow-step" id="flow-b14-5" data-order="5" data-node="observe"><p class="flow-step-head"><span class="flow-step-no">3</span><span class="flow-step-node">관찰 지점</span></p><p class="flow-step-title">로컬에서는 401이라 기존 테스트로 보이지 않는다</p><dl class="flow-values"><div><dt>재현</dt><dd>로컬 프로파일(test·local)에서는 env가 노출되지 않아 401</dd></div><div><dt>도구</dt><dd><code>SecurityConfig</code> 인가 규칙 점검, prod 프로파일 기동 후 <code>curl</code></dd></div></dl></li></ol>
+  <details class="flow-cause"><summary>원인 쪽 단계 2개 펼치기 — "원인과 정답"과 같은 수준</summary>
+  <p class="flow-cause-note">원인 서술을 먼저 써 본 뒤 펼치세요. 단계 번호는 위 증상 단계와 섞인 실제 순서로 재생됩니다.</p>
+  <ol class="flow-steps is-cause"><li class="flow-step is-cause" id="flow-b14-2" data-order="2" data-node="rules"><p class="flow-step-head"><span class="flow-step-no">원인 1</span><span class="flow-step-node">인가 규칙</span></p><p class="flow-step-title"><code>toAnyEndpoint()</code> 공개 규칙이 env 관리자 규칙보다 위에 있다</p><dl class="flow-values"><div><dt>위</dt><dd><code>requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll()</code></dd></div><div><dt>아래</dt><dd><code>requestMatchers(EndpointRequest.to("env")).hasRole("ADMIN")</code></dd></div></dl></li><li class="flow-step is-cause" id="flow-b14-3" data-order="3" data-node="config"><p class="flow-step-head"><span class="flow-step-no">원인 2</span><span class="flow-step-node">노출 설정</span></p><p class="flow-step-title">prod가 env를 노출하며 값 가림을 껐다</p><dl class="flow-values"><div><dt>설정</dt><dd><code>show-values: always</code></dd></div></dl></li></ol></details>
+</section>
+<section class="exercise-section" aria-labelledby="힌트"><h2 id="힌트"><a class="anchor" href="#힌트" aria-hidden="true">#</a>힌트</h2><details>
+<summary>1. 규칙을 위에서부터 짚어 본다</summary>
+
+<p><code>SecurityConfig</code>의 <code>authorizeHttpRequests</code> 규칙을 요청 하나(<code>GET /actuator/env</code>, 토큰 없음)를 들고 위에서부터 하나씩 대어 본다.
+처음 매치되는 규칙에서 판정이 끝나고 아래 규칙은 보지 않는다. <code>EndpointRequest.toAnyEndpoint()</code>가 무엇을 포함하는지 생각한다(노출된 모든 엔드포인트).</p>
+</details><details>
+<summary>2. 노출 설정도 함께 본다</summary>
+
+<p><code>application-prod.yml</code>의 <code>management.endpoints.web.exposure.include</code>와 <code>management.endpoint.env.show-values</code>를 본다.
+Spring Boot의 기본은 env 값을 <code>******</code>로 가린다(<code>never</code>). 노출 엔드포인트가 test 프로파일과 prod 프로파일에서 다르다는 것도 테스트가 놓친 이유다.</p>
+</details><details>
+<summary>3. 테스트로 고정하기</summary>
+
+<p><code>@ActiveProfiles("prod")</code>를 test 프로파일 위에 얹고, prod yml의 자리표시자(<code>DB_PASSWORD</code>, <code>BOARD_JWT_SECRET</code>, <code>BOARD_PG_SECRET</code> 등)만 <code>@SpringBootTest(properties = …)</code>로 채운다.
+접속은 테스트 컨테이너가 그대로 맡는다. 그 컨텍스트에서 토큰 없음·USER·ADMIN 세 경우와 health를 함께 단언한다.</p>
+</details></section>
+
+
+
+
+
+
+<section class="exercise-section exercise-answer" aria-labelledby="원인과-정답"><h2 id="원인과-정답"><a class="anchor" href="#원인과-정답" aria-hidden="true">#</a>원인과 정답</h2><details>
+<summary>펼치기</summary>
+
+<p><strong>원인.</strong> 두 가지가 겹쳤다.
+① <code>SecurityConfig</code>에서 "모니터링은 토큰 없이" 규칙 <code>requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll()</code>이 "env는 관리자만" 규칙 <code>requestMatchers(EndpointRequest.to("env")).hasRole("ADMIN")</code>보다 <strong>위</strong>에 있다.
+<code>toAnyEndpoint()</code>는 노출된 모든 엔드포인트(env 포함)와 매치되므로 env 요청은 여기서 공개로 끝나고, 아래 관리자 규칙은 영원히 매치되지 않는다. metrics도 함께 공개된다.
+② <code>application-prod.yml</code>이 env를 노출하면서 <code>show-values: always</code>로 값 가림을 껐다. 그래서 공개된 env에 비밀값이 평문으로 실린다.
+test 프로파일은 health만 노출하므로 <code>/actuator/env</code>가 아예 엔드포인트가 아니고, 마지막 <code>anyRequest().authenticated()</code>에 걸려 401이 난다. 기존 테스트가 통과한 이유다.</p>
+<p><strong>정답 수정.</strong> health만 공개(<code>EndpointRequest.to("health")</code>)하고, 그다음에 나머지 노출 엔드포인트를 관리자 전용(<code>EndpointRequest.toAnyEndpoint()</code> → <code>hasRole("ADMIN")</code>)으로 둔다. 좁은 규칙을 먼저, 넓은 규칙을 나중에.
+<code>show-values: always</code>는 지운다(기본 <code>never</code>). 키와 출처 이름만으로도 설정 확인(B11)은 충분하다. 노출된 키는 교체해야 한다. (<code>tickets/B14/answer/fix.patch</code>)</p>
+<p><strong>확인 테스트.</strong> <code>tickets/B14/answer/B14ConfirmTest.java</code> — 토큰 없는 env·metrics 401, 일반 회원 env·metrics 403, 관리자 env·metrics 200, 관리자 env 응답에도 비밀값 평문 없음, 토큰 없는 health 200</p>
+<p><strong>1단계 정답 서버는?</strong> <code>board-server/src/main/resources/application.yml</code>은 HTTP로 health만 노출하고(<code>exposure.include: health</code>),
+<code>SecurityConfig</code>는 <code>GET /actuator/health</code>만 <code>permitAll</code>로 열어 나머지 <code>/actuator/**</code>는 <code>anyRequest().authenticated()</code>가 막는다(spec-v2 3절).</p>
+</details></section>
+
+
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><strong>제출물을 준비했다면</strong><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D11.html#step-d11-1">D11 ① · 인수인계</a> · <a href="../spring/D11.html#step-d11-3">D11 ③ · 인수인계</a></p><p class="exercise-return-note">연결된 일자로 돌아가 완료 조건을 확인하고 진행 기록을 남기세요.</p></nav></article>
+
+</main>
+
+
+
+
+
+<script src="../../tools/site/course-flow.js?v=1684be5bc034" defer></script>
+</body>
+</html>

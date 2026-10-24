@@ -161,7 +161,7 @@ Consider the following:
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/community?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+    url: jdbc:mysql://localhost:13308/community?characterEncoding=UTF-8&serverTimezone=Asia/Seoul
     username: community
     password: community
 ```
@@ -195,13 +195,13 @@ Caused by: org.hibernate.HibernateException: Unable to determine Dialect without
 
 **로그에서 볼 줄** — 주의할 곳이다. **맨 아래 `Caused by:`(Dialect 어쩌고)는 진짜 원인이 아니다.** DB에 못 붙어서 DB 종류를 알아내지 못했다는 뒤따른 결과일 뿐이다. 로그 **위쪽**의 `WARN … Communications link failure`와 그 밑 `Caused by: java.net.ConnectException: Connection refused`가 원인이다. "그 주소에서 아무도 대답하지 않는다"는 뜻이다.
 
-**원인** — 앱이 `url`에 적힌 호스트·포트로 TCP 연결을 열지 못했다. MySQL 컨테이너가 꺼져 있거나, 포트 번호가 다르다. 예를 들면 studymate가 꺼져 있거나, `application.yml`의 `url`을 [시작하기](./README.md)대로 `localhost:3306`(studymate MySQL)으로 바꾸지 않은 경우다.
+**원인** — 앱이 `url`에 적힌 호스트·포트로 TCP 연결을 열지 못했다. MySQL 컨테이너가 꺼져 있거나, 포트 번호가 다르다. 예를 들면 이 저장소의 DB 컨테이너가 꺼져 있거나, `application.yml`의 `url` 포트가 compose의 호스트 포트 `13308`([README — DB 접속 정보](./README.md#db-접속-정보))과 다른 경우다. 지금 main의 `application.yml`은 `localhost:3306`을 가리키므로 compose DB를 쓰려면 `13308`로 바꾼다.
 
 **고치는 법**
 
-1. studymate 레포 루트에서 `docker compose ps mysql` → `healthy`인지 본다. 꺼져 있으면 `docker compose up -d`.
-2. `application.yml`의 `url` 포트가 `3306`인지 본다.
-3. 그래도 안 되면 `docker exec -i studymate-mysql-1 mysql -ucommunity -pcommunity community -e "SELECT 1"`로 DB 자체가 응답하는지 확인한다.
+1. 이 저장소 루트에서 `docker compose ps mysql` → `healthy`인지 본다. 꺼져 있으면 `docker compose up -d`.
+2. `application.yml`의 `url` 포트가 `13308`(`DB_PORT`를 바꿨다면 그 값)인지 본다.
+3. 그래도 안 되면 `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e "SELECT 1"`로 DB 자체가 응답하는지 확인한다.
 
 **관련 단계** — [1-2 일부러 망가뜨리기](scenario/ch1-create-post/1-2-dto-response.md#일부러-망가뜨리기) · [R08 앱 서버와 DB 서버는 어떻게 연결되나](docs/knowledge/R08-app-to-db-connection.md)
 
@@ -219,7 +219,7 @@ WARN … org.hibernate.orm.jdbc.error : Access denied for user 'community'@'%' t
 Caused by: java.sql.SQLSyntaxErrorException: Access denied for user 'community'@'%' to database 'comunity'
 ```
 
-비밀번호를 틀렸을 때(`192.168.65.1`은 Docker Desktop이 보는 내 PC 주소라 환경마다 다르다)
+비밀번호를 틀렸을 때(`192.168.65.1`은 Docker 런타임(VM) 쪽에서 보이는 내 PC 주소라 런타임(Colima 등)·환경마다 다르다)
 
 ```text
 WARN … org.hibernate.orm.jdbc.error : HHH000247: ErrorCode: 1045, SQLState: 28000
@@ -233,7 +233,7 @@ Caused by: java.sql.SQLException: Access denied for user 'community'@'192.168.65
 
 **원인** — `community` 계정은 `community`·`practice` 두 DB만 쓸 수 있다. 없는 DB 이름은 "권한 없는 DB"로 취급되어 1044가 난다. 비밀번호가 틀리면 로그인 자체가 거절되어 1045가 난다.
 
-**고치는 법** — `url`의 `/community?` 부분 철자를 확인한다. `username`·`password`는 `community`/`community`다. 계정이 아예 없다고 나오면 studymate 레포 루트에서 `bash scripts/java-db.sh`를 한 번 돌린다.
+**고치는 법** — `url`의 `/community?` 부분 철자를 확인한다. `username`·`password`는 `community`/`community`다. 계정이 아예 없다고 나오면 먼저 `url`의 포트가 `13308`인지 본다. 다른 포트(예: `3306`)에 떠 있는 다른 MySQL에 붙으면 `community` 계정이 없다. 포트가 맞는데도 계정이 없으면 DB 볼륨이 이 저장소의 초기 데이터로 만들어지지 않은 것이다. 이 저장소 루트에서 `docker compose down -v && docker compose up -d`로 새로 만든다(`community`·`practice`·`project` 세 DB와 CloudBeaver 작업 공간이 지워진다. 남길 것이 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않는다).
 
 **관련 단계** — [1-2 일부러 망가뜨리기](scenario/ch1-create-post/1-2-dto-response.md#일부러-망가뜨리기) · [R08 앱 서버와 DB 서버는 어떻게 연결되나](docs/knowledge/R08-app-to-db-connection.md)
 

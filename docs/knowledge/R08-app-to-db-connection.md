@@ -10,6 +10,8 @@ Spring Boot 앱은 JDBC 드라이버로 MySQL에 TCP 연결을 만들고, 요청
 
 ## 2. 당장 알아야 할 것
 
+> **이 저장소에 없는 예제 프로젝트** — `practice/starter`는 원래 공부자료가 쓰던 상품 API 예제 프로젝트다(자체 `compose.yaml`: 호스트 `13307` → 컨테이너 `3306`, DB `ds_practice`, 계정 `practice`/`practice`). 이 저장소에는 없으므로 아래 경로·명령은 그런 프로젝트를 직접 만들었을 때의 예시로 읽는다. 이 저장소에서는 루트 프로젝트에 같은 패턴을 적용한다 — `./gradlew test`는 Testcontainers의 일회용 MySQL을 쓰고, 개발 DB는 루트 [`compose.yaml`](../../compose.yaml)(호스트 `localhost:13308`, 계정 `community`/`community`)이다.
+
 ### 2.1 요청 하나의 길
 
 ```mermaid
@@ -167,6 +169,18 @@ management:
 `/actuator/metrics/hikaricp.connections.active`로 확인한다. 운영에서는 인증과 네트워크 접근을 제한한다.
 ## 3. 따라 하기
 
+**이 저장소에서 연결을 확인하려면** javaExperience 레포 루트에서 실행한다. DB 설정 파일은 [`compose.yaml`](../../compose.yaml)이다.
+
+```bash
+docker compose up -d mysql
+docker compose ps
+docker compose exec -T mysql mysql -ucommunity -pcommunity practice -e "SELECT DATABASE(); SELECT COUNT(*) FROM post;"
+```
+
+`mysql`이 `healthy`이고 `DATABASE()`가 `practice`인지 확인한다. 현재 저장소의 앱 연결은 [실행 안내](../../README.md)를 따른다. 아래 상품 API·세션 수는 별도 예제 프로젝트의 절차·과거 관찰이며, 위 명령으로 그 상품 API가 준비되지는 않는다.
+
+### 별도 상품 API 예제의 절차와 관찰
+
 `practice/starter`는 호스트 `13307`→컨테이너 `3306`, DB `ds_practice`, 계정 `practice`/`practice`다. Boot 4.1.1이고 toolchain은 Java 21(신규 기준 Java 25)이다.
 
 ### 단계 1 — DB 시작
@@ -211,7 +225,7 @@ docker compose exec mysql mysql -upractice -ppractice ds_practice -e "SHOW PROCE
 
 - **앱이 뜨자마자 커넥션 10개가 이미 열려 있다.** Hikari `minimumIdle`을 따로 주지 않으면 `maximumPoolSize`(10)와 같아서, 기동 시 10개를 채워 둔다.
 - **요청을 보내도 DB 연결 수는 늘지 않는다.** 요청은 열려 있던 10개 중 하나를 빌렸다 돌려준다. 이게 풀을 쓰는 이유다.
-- Host가 `192.168.65.1`인 것은 앱이 호스트(맥)에서 돌고 DB가 Docker 안에 있어서다. DB 입장에서는 Docker Desktop 내부 네트워크 주소에서 들어온 연결로 보인다(포트 포워딩 경유).
+- Host가 `192.168.65.1`인 것은 앱이 호스트(맥)에서 돌고 DB가 Docker 안에 있어서다. DB 입장에서는 Docker 런타임(VM) 내부 네트워크 주소에서 들어온 연결로 보인다(포트 포워딩 경유). 이 주소는 런타임(Colima 등)과 환경마다 다르다.
 
 ### 단계 4 — 풀 메트릭과 쿼리 맞춰 보기
 

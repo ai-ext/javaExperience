@@ -1,0 +1,64 @@
+diff --git a/src/main/java/com/example/board/config/CorsConfig.java b/src/main/java/com/example/board/config/CorsConfig.java
+index e9c64f7..ecc886c 100644
+--- a/src/main/java/com/example/board/config/CorsConfig.java
++++ b/src/main/java/com/example/board/config/CorsConfig.java
+@@ -7,14 +7,16 @@ import org.springframework.context.annotation.Configuration;
+ import org.springframework.web.cors.CorsConfiguration;
+ import org.springframework.web.cors.CorsConfigurationSource;
+ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+-import org.springframework.web.servlet.config.annotation.CorsRegistry;
+-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+ 
++/**
++ * CORS 설정은 여기 한 곳이다. SecurityConfig의 cors()가 이 빈을 써서 인증 필터보다 앞에서 preflight를 처리한다.
++ * WebMvcConfigurer.addCorsMappings에 출처를 넣으면 preflight가 Security 필터 체인에서 이미 거절되어 거기까지 오지 않는다.
++ */
+ @Configuration
+-public class CorsConfig implements WebMvcConfigurer {
++public class CorsConfig {
+ 
+-    // 사내 프론트(웹) 출처. 와일드카드(*)는 쓰지 않는다
+-    private static final List<String> ALLOWED_ORIGINS = List.of("http://localhost:3000");
++    // spec-v2 3절의 허용 출처(기존 웹 프론트, 새 프론트). 와일드카드(*)는 쓰지 않는다
++    private static final List<String> ALLOWED_ORIGINS = List.of("http://localhost:3000", "http://127.0.0.1:8765");
+ 
+     private static final List<String> ALLOWED_METHODS = List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
+     private static final List<String> ALLOWED_HEADERS = List.of("Authorization", "Content-Type", "Idempotency-Key");
+@@ -30,14 +32,4 @@ public class CorsConfig implements WebMvcConfigurer {
+         source.registerCorsConfiguration("/**", config);
+         return source;
+     }
+-
+-    // 새 프론트(127.0.0.1:8765) 오픈. API 컨트롤러 쪽 CORS 매핑에 출처를 추가한다.
+-    @Override
+-    public void addCorsMappings(CorsRegistry registry) {
+-        registry.addMapping("/api/**")
+-                .allowedOrigins("http://127.0.0.1:8765")
+-                .allowedMethods(ALLOWED_METHODS.toArray(String[]::new))
+-                .allowedHeaders(ALLOWED_HEADERS.toArray(String[]::new))
+-                .maxAge(3600L);
+-    }
+ }
+diff --git a/src/test/java/com/example/board/config/SecurityRulesTest.java b/src/test/java/com/example/board/config/SecurityRulesTest.java
+index 879abb2..24acdb1 100644
+--- a/src/test/java/com/example/board/config/SecurityRulesTest.java
++++ b/src/test/java/com/example/board/config/SecurityRulesTest.java
+@@ -73,11 +73,13 @@ class SecurityRulesTest {
+ 
+     @Test
+     void preflight는_인증_없이_200_허용_출처를_돌려준다() throws Exception {
+-        mockMvc.perform(options("/api/posts").header("Origin", "http://localhost:3000")
+-                        .header("Access-Control-Request-Method", "POST")
+-                        .header("Access-Control-Request-Headers", "authorization,content-type"))
+-                .andExpect(status().isOk())
+-                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
++        for (String origin : new String[] {"http://localhost:3000", "http://127.0.0.1:8765"}) {
++            mockMvc.perform(options("/api/posts").header("Origin", origin)
++                            .header("Access-Control-Request-Method", "POST")
++                            .header("Access-Control-Request-Headers", "authorization,content-type"))
++                    .andExpect(status().isOk())
++                    .andExpect(header().string("Access-Control-Allow-Origin", origin));
++        }
+     }
+ 
+     @Test

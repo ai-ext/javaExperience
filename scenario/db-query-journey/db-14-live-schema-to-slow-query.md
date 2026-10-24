@@ -27,7 +27,7 @@ tools/db-perf-fixture.sh up
 tools/db-perf-fixture.sh status
 ```
 
-CloudBeaver 또는 DBeaver에서 MySQL 연결을 만들거나 기존 연결을 복제합니다. DBeaver Desktop은 호스트 OS에서 실행되므로 `127.0.0.1`에 접속합니다. CloudBeaver는 컨테이너 안에서 실행되므로 그 컨테이너의 `127.0.0.1`은 CloudBeaver 자신입니다. Mac Docker Desktop에서는 `host.docker.internal`을 사용합니다.
+CloudBeaver 또는 DBeaver에서 MySQL 연결을 만들거나 기존 연결을 복제합니다. DBeaver Desktop은 호스트 OS에서 실행되므로 `127.0.0.1`에 접속합니다. CloudBeaver는 컨테이너 안에서 실행되므로 그 컨테이너의 `127.0.0.1`은 CloudBeaver 자신입니다. Mac의 Docker 런타임에서는 보통 `host.docker.internal`을 사용합니다. 쓰는 런타임에서 이 이름이 해석되지 않으면 호스트 OS의 DBeaver Desktop으로 `127.0.0.1`에 접속합니다.
 
 | 항목 | 값 |
 |---|---|

@@ -12,7 +12,7 @@
 - **옛 앱이 남아 있습니다.** `page` 번호 방식은 그대로 동작해야 하고, 응답 모양은 필드가 늘어나기만 해야 합니다(첫 페이지는 `page`로 받고 그다음부터 커서로 넘어갈 수 있게, `page` 응답에도 `nextCursor`).
 - **완료 조건**: 첫 묶음 → 새 글 등록 → 커서로 다음 묶음을 받으면, 새 글이 올라오기 전의 2페이지와 정확히 같다. 깨진 커서는 `400`.
 
-**DB 시작 상태**: `practice` 처음 상태(`bash scripts/java-db.sh --reset`). 기준 코드를 practice 프로파일로 켠다. 개발 게시판(`dev`)에 비로그인으로 볼 수 있는 글이 50개 있다. 새 글은 코딩하는고양이(`tok-p02`)가 쓰고 마지막에 지운다.
+**DB 시작 상태**: `practice` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드를 practice 프로파일로 켠다. 개발 게시판(`dev`)에 비로그인으로 볼 수 있는 글이 50개 있다. 새 글은 코딩하는고양이(`tok-p02`)가 쓰고 마지막에 지운다.
 
 ## 지금 코드
 

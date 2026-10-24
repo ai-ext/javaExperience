@@ -23,7 +23,9 @@
 
 ## 3. 따라 하기
 
-아래 단계는 연습 프로젝트의 실제 구조를 기준으로 한다. Boot 4.1.1·Gradle 9.8 프로젝트이고, 현재 starter의 Java toolchain은 21로 설정되어 있다. 예제 문법은 Java 25에서도 그대로 동작한다. 로컬 기준 경로는 저장소 루트의 practice/starter다.
+> **이 저장소에 없는 예제 프로젝트** — `practice/starter`는 원래 공부자료가 쓰던 상품 API 예제 프로젝트다(자체 `compose.yaml`: 호스트 `13307` → 컨테이너 `3306`, DB `ds_practice`, 계정 `practice`/`practice`). 이 저장소에는 없으므로 아래 경로·명령은 그런 프로젝트를 직접 만들었을 때의 예시로 읽는다. 이 저장소에서는 루트 프로젝트에 같은 패턴을 적용한다 — `./gradlew test`는 Testcontainers의 일회용 MySQL을 쓰고, 개발 DB는 루트 [`compose.yaml`](../../compose.yaml)(호스트 `localhost:13308`, 계정 `community`/`community`)이다.
+
+아래 단계는 연습 프로젝트의 실제 구조를 기준으로 한다. Boot 4.1.1·Gradle 9.8 프로젝트이고, 현재 starter의 Java toolchain은 21로 설정되어 있다. 예제 문법은 Java 25에서도 그대로 동작한다. 로컬 기준 경로는 원래 공부자료 저장소 루트의 practice/starter다(이 저장소에는 없다).
 
 ### 1단계: 현재 동작과 테스트 경계 확인
 

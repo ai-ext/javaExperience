@@ -196,7 +196,7 @@ ROLLBACK;
 - [E3 JPA는 무엇인가](../../lessons/E3-what-is-jpa.md) — `save`와 DB의 INSERT
 - [1-3 서비스로 나누기](1-3-service-layer.md) — 태그까지 한 트랜잭션
 
-DB를 처음 상태로 돌려야 한다면 javaExperience 레포에서 `docker compose down -v && docker compose up -d`을 쓴다. **이 명령은 `community`와 `practice`의 실습 데이터를 함께 초기화하므로 본인이 만든 실습 데이터를 보관한 뒤 실행한다.**
+DB를 처음 상태로 돌려야 한다면 javaExperience 레포에서 `docker compose down -v && docker compose up -d`을 쓴다. **이 명령은 `community`·`practice`·`project` 세 DB와 CloudBeaver 작업 공간을 함께 초기화한다. 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 떠 두고, CloudBeaver에 저장한 SQL 스크립트는 이 백업에 들어가지 않으니 따로 복사해 둔다.**
 
 ## 다음 단계
 

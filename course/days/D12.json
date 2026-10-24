@@ -1,0 +1,201 @@
+{
+  "id": "D12",
+  "roadmap": {
+    "id": "D12",
+    "phase": "maintain",
+    "title": "티켓 처리 1",
+    "note": "①~③ B01·B02·B03은 필수, ④ B05는 연습 티켓이다. B03의 두 실패 증상은 오늘 고치고, D13 ①에서 같은 키 동시 주문까지 검증해 마친다.",
+    "java": "J12",
+    "steps": [
+      {
+        "no": 1,
+        "title": "B01 \"PG가 느린 날 글 목록까지 멈춘다\": 스레드 덤프로 진단",
+        "files": [
+          "src/main/java/com/example/board/payment/ChargeService.java",
+          "src/test/java/com/example/board/payment/PostListDuringSlowPgTest.java"
+        ],
+        "done": [
+          "재현 중 `/actuator/metrics`와 스레드 덤프를 떠서 근거로 남긴다",
+          "`PostListDuringSlowPgTest` 통과: Toxiproxy로 PG 응답을 늦춘 채 충전을 몰아, 충전들이 PG 응답을 기다리는 동안에도 `GET /api/posts` → 200, 1.5초 이내"
+        ],
+        "trap": "\"글 목록이 멈춘다\"는 증상만 보고 목록 쿼리부터 의심하면, 같은 시각에 함께 느려진 다른 기능이라는 단서를 놓친다.",
+        "specRefs": [
+          "POST /api/me/points/charges",
+          "GET /api/posts"
+        ],
+        "tickets": [
+          "B01"
+        ],
+        "fileActions": {
+          "create": [
+            "src/test/java/com/example/board/payment/PostListDuringSlowPgTest.java"
+          ],
+          "modify": [
+            "src/main/java/com/example/board/payment/ChargeService.java"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 2,
+        "title": "B02 \"글 목록이 어느 날부터 느리다\": slow log → EXPLAIN ANALYZE",
+        "files": [
+          "src/main/resources/schema.sql",
+          "src/main/resources/mapper/PostQueryMapper.xml",
+          "src/test/java/com/example/board/post/PostListExplainTest.java"
+        ],
+        "done": [
+          "slow query log에서 목록 쿼리를 찾는다",
+          "EXPLAIN ANALYZE의 읽은 행 수와 돌려준 행 수를 근거로 남긴다",
+          "고친 뒤 `PostListExplainTest` 통과"
+        ],
+        "trap": "데이터가 적은 로컬에서는 느린 쿼리도 빨라 보여 재현되지 않으므로, `repro.sh`로 데이터를 늘린 뒤 EXPLAIN ANALYZE로 본다.",
+        "specRefs": [
+          "GET /api/posts"
+        ],
+        "tickets": [
+          "B02"
+        ],
+        "fileActions": {
+          "create": [],
+          "modify": [
+            "src/main/resources/schema.sql",
+            "src/main/resources/mapper/PostQueryMapper.xml",
+            "src/test/java/com/example/board/post/PostListExplainTest.java"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 3,
+        "title": "B03 \"예외를 잡았는데도 구매가 롤백된다 / 안 된다\": 트랜잭션 로그와 디버거",
+        "files": [
+          "src/main/java/com/example/board/shop/OrderService.java",
+          "src/test/java/com/example/board/shop/OrderRollbackTest.java"
+        ],
+        "done": [
+          "트랜잭션 로그(`org.springframework.transaction` DEBUG)로 구매 한 번에서 트랜잭션이 열리고 끝나는 순서를 찾는다",
+          "`OrderRollbackTest` 통과: 예외를 잡았는데 롤백되던 경우와 롤백돼야 하는데 안 되던 경우 둘 다"
+        ],
+        "trap": "예외를 catch했으니 롤백되지 않으리라 믿으면, 트랜잭션 로그에 실제로 찍힌 순서를 확인하지 않게 된다.",
+        "specRefs": [
+          "POST /api/shop/orders"
+        ],
+        "tickets": [
+          "B03"
+        ],
+        "fileActions": {
+          "create": [
+            "src/test/java/com/example/board/shop/OrderRollbackTest.java"
+          ],
+          "modify": [
+            "src/main/java/com/example/board/shop/OrderService.java"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 4,
+        "title": "B05 \"부하 때만 다른 사람 값이 섞인다\": 부하 스크립트로 재현",
+        "files": [
+          "src/main/java/com/example/board/common/ForbiddenWordChecker.java",
+          "src/test/java/com/example/board/common/ForbiddenWordCheckerConcurrencyTest.java"
+        ],
+        "done": [
+          "동시 50요청 부하로 다른 회원 요청의 결과가 섞이는 것을 재현",
+          "`ForbiddenWordCheckerConcurrencyTest` 통과: 고친 뒤 동시 요청에서도 결과가 섞이지 않는다"
+        ],
+        "trap": "혼자 요청할 때는 재현되지 않아 \"가끔 생기는 버그\"로 넘기기 쉽지만, 동시에 몰아 보내면 거의 매번 재현된다.",
+        "specRefs": [
+          "POST /api/posts"
+        ],
+        "tickets": [
+          "B05"
+        ],
+        "fileActions": {
+          "create": [
+            "src/test/java/com/example/board/common/ForbiddenWordCheckerConcurrencyTest.java"
+          ],
+          "modify": [
+            "src/main/java/com/example/board/common/ForbiddenWordChecker.java"
+          ],
+          "inspect": []
+        }
+      }
+    ],
+    "talkCards": [
+      "TC-D12-1",
+      "TC-D12-2",
+      "TC-D12-3",
+      "TC-D12-4"
+    ],
+    "tomorrow": "D13은 필수 B03의 같은 키 동시 주문 검증으로 시작한다. B06·B07·B09·B10은 원하는 경우 진행하는 연습 티켓이다.",
+    "purpose": "전날 확보한 기준 위에서 필수 티켓의 증상을 관찰하고 원인·재현 테스트·수정으로 연결한다."
+  },
+  "java": {
+    "id": "J12",
+    "day": "D12",
+    "optional": false,
+    "topic": "리팩터링 ②: 긴 메서드 나누기 — 76줄 구매 처리 메서드를 검증·계산·저장으로 나누고 특성화 테스트를 유지한다. 필드·생성자·상수별 메서드를 가진 `enum`으로 상태별 동작을 옮긴다",
+    "basics": "나눈 검증 메서드가 실패 사유를 `List<String>`으로 모아 반환하게 하기",
+    "typeCut": "`enum` 확장: 필드·생성자·메서드를 가진 enum, 상수별 메서드 구현 — 상태별 분기 정리",
+    "habit": null
+  },
+  "hints": {
+    "steps": {
+      "1": [
+        "재현 중에 `/actuator/metrics/hikaricp.connections.active`·`pending`을 보고, 같은 순간 `\"${JAVA_HOME:+$JAVA_HOME/bin/}jcmd\" <pid> Thread.print`로 뜬 `http-nio-8080-exec-*` 스레드가 각각 무엇을 기다리는지 스택 맨 위와 맨 아래를 함께 읽는다.",
+        "테스트는 PG 응답 지연 6초·응답 타임아웃 10초(이 테스트에서만)로 두고 충전을 동시에 몰아, PG에 닿은 충전이 아직 응답을 기다리는 동안 글 목록 200·1.5초 이내를 단언한다. 충전이 끝내 성공하는지도 함께 확인해 타임아웃 재시도 증상과 섞이지 않게 한다."
+      ],
+      "2": [
+        "`bash tickets/B02/repro.sh`로 데이터를 늘리고 slow log를 켠 뒤 목록 쿼리를 잡는다. 그 쿼리를 `EXPLAIN ANALYZE`로 돌려 읽은 행 수와 돌려준 행 수, 실제로 쓰인 `key`를 비교한다."
+      ],
+      "3": [
+        "`logging.level.org.springframework.transaction=DEBUG`로 구매 한 번의 로그에서 트랜잭션이 열리고(`Creating new transaction`), 참여하고, 끝나는 줄을 순서대로 적는다. 디버거는 예외를 잡는 줄에 멈춰 `TransactionSynchronizationManager.isActualTransactionActive()`와 현재 트랜잭션 이름을 본다."
+      ],
+      "4": [
+        "회원 여러 명이 서로 다른 글을 동시에 쓰게(`ExecutorService` + `CountDownLatch`로 한꺼번에 출발) 해서 결과가 섞이는 횟수를 센다. 섞이면 `ForbiddenWordChecker`가 요청마다 다른 값을 어디에 두는지 본다."
+      ]
+    },
+    "grader": {
+      "focus": [
+        "원인 서술이 티켓 원문의 첫 의심에 머물지 않고 메트릭·로그·EXPLAIN·스레드 덤프로 뒷받침되는지",
+        "재현 테스트가 증상(걸린 시간·응답 코드·섞인 값)을 직접 단언하고, 고치기 전 코드에서 실패하는지"
+      ],
+      "fromRecords": [
+        "C1-1",
+        "C2-1",
+        "C2-2",
+        "C3-1",
+        "C4-1"
+      ]
+    },
+    "refs": [
+      "docs/knowledge/S08-transactions.md",
+      "docs/knowledge/W11-why-tx-in-service.md",
+      "docs/knowledge/S17-performance-tuning.md",
+      "docs/knowledge/R05-index-btree.md",
+      "scenario/ch9-schema-change/9-2-index-explain.md",
+      "docs/knowledge/W25-spring-multithreading.md"
+    ],
+    "sql": {
+      "context": "messy-server DB(13311)의 실제 스키마와 티켓 재현 자료를 쓴다. 1단계 seed.sql·bulk.sql은 적재하지 않는다. 읽기 전용 진단 SQL·관찰 시각·실제 결과만 남긴다. 관찰 결과가 0행이어도 원인이나 정상 여부를 단정하지 않는다. 예시 SQL은 기존 서버 설계 기준이다.",
+      "questions": [
+        {
+          "task": "재현 중 실행 중인 세션과 열린 트랜잭션을 같은 시각에 조회한다.",
+          "expect": "세션 식별·시작 시각·현재 SQL을 증거로 남긴다. 관찰 권한이 없으면 그 오류를 기록한다.",
+          "example": "SHOW FULL PROCESSLIST;\nSELECT trx_id,trx_state,trx_started,trx_mysql_thread_id,trx_query FROM information_schema.innodb_trx;"
+        },
+        {
+          "task": "로그에서 실제 목록 SELECT를 찾아 실행 계획과 반환 건수를 비교한다.",
+          "expect": "관찰한 쿼리·바인딩 값·key·추정 행 수를 남긴다. ANALYZE는 SELECT임을 확인한 뒤 실행하며 실행 부담도 기록한다.",
+          "example": "EXPLAIN SELECT id,title FROM post WHERE status='ACTIVE' ORDER BY id DESC LIMIT 20;\nSELECT COUNT(*) FROM post WHERE status='ACTIVE';"
+        }
+      ],
+      "refs": [
+        "scenario/db-query-journey/DB-09-explain-analyze.md"
+      ]
+    }
+  },
+  "cards": "## D12 티켓 처리 1\n\n### TC-D12-1\n**질문** (B01) \"PG가 느린 날 글 목록까지 멈춘다.\" 상관없어 보이는 두 기능이 왜 같이 멈췄나요?\n**답에 들어가야 할 것**\n- 충전 서비스가 `@Transactional` 안에서 PG를 호출해, PG가 느린 동안 DB 커넥션을 쥔 채 기다렸다\n- 동시 충전 요청이 Hikari 풀(10개)을 모두 쥐자, 같은 풀을 쓰는 글 목록도 `connection-timeout`(2초)까지 기다리다 실패했다\n- Hikari 메트릭(active가 최대에 붙고 pending이 쌓임)과 스레드 덤프로 확인하고, PG 호출을 트랜잭션 밖으로 뺀다. 풀을 키우는 것은 해법이 아니다\n**근거** 07 #4, 10 §9, spec-v2 §8\n\n### TC-D12-2\n**질문** (B02) \"글 목록이 어느 날부터 느리다.\" 어떻게 원인 쿼리를 찾고 무엇을 고쳤나요?\n**답에 들어가야 할 것**\n- slow query log로 후보를 찾는다. `long_query_time` 기본값이 10초라 낮춰야 잡힌다\n- `EXPLAIN ANALYZE`로 읽은 행 수와 실제 돌려준 행 수를 비교해 풀스캔이나 인덱스 비효율을 확인한다. 데이터가 적을 때는 풀스캔도 빨라 보여 드러나지 않았다\n- 복합 인덱스는 왼쪽 컬럼부터만 쓰이므로 조건·정렬에 맞게 순서를 고치고, 고친 뒤 EXPLAIN의 `key`, `rows`, `Extra`로 확인한다\n**근거** 07 #7, 07 §2\n\n### TC-D12-3\n**질문** (B03) \"예외를 잡았는데도 구매가 롤백된다 / 안 된다.\" 두 증상의 원인은 각각 무엇이었나요?\n**답에 들어가야 할 것**\n- 롤백 안 됨: `order`가 같은 클래스의 `@Transactional placeOnce`를 `this`로 불러 프록시를 거치지 않아 트랜잭션이 아예 열리지 않았다. 재고·쿠폰·주문·포인트가 각자 커밋돼 마지막 포인트 차감이 실패해도 앞의 변경이 남았다\n- 롤백됨: 감사 쿠폰 지급(REQUIRED)이 참여한 안쪽 `grant`의 예외를 catch로 삼켜도 트랜잭션에 rollback-only가 남아, 커밋 때 `UnexpectedRollbackException`으로 구매 전체가 롤백된다\n- 트랜잭션이 열리게 고치면 rollback-only가 \"구매 전체 롤백\"으로 드러나므로 두 증상을 테스트로 함께 고정하고, `TransactionTemplate`으로 실제 트랜잭션을 연 뒤 지급 실패는 예외 대신 조건부 UPDATE의 영향 행 수로 판단한다\n**근거** 06 §7, 08 #16\n\n### TC-D12-4\n**질문** (B05) \"부하 때만 다른 사람 값이 섞인다.\" 왜 부하 때만 나타났나요?\n**답에 들어가야 할 것**\n- 싱글톤 빈의 인스턴스 필드에 요청별 값을 저장해, 동시 요청이 서로의 값을 덮어썼다\n- 요청이 하나씩 올 때는 덮어쓸 상대가 없어 단위 테스트나 수동 확인으로는 재현되지 않았다\n- 여러 스레드로 동시에 호출하는 재현 테스트(`ExecutorService`, `CountDownLatch`)로 섞임을 먼저 보이고, 값을 지역 변수·인자로 옮긴 뒤 같은 테스트가 통과하는지 확인한다\n**근거** 06 §1\n\n"
+}

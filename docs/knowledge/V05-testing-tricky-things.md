@@ -21,6 +21,8 @@
 
 ## 3. 따라 하기
 
+> **이 저장소에 없는 예제 프로젝트** — `practice/starter`는 원래 공부자료가 쓰던 상품 API 예제 프로젝트다(자체 `compose.yaml`: 호스트 `13307` → 컨테이너 `3306`, DB `ds_practice`, 계정 `practice`/`practice`). 이 저장소에는 없으므로 아래 경로·명령은 그런 프로젝트를 직접 만들었을 때의 예시로 읽는다. 이 저장소에서는 루트 프로젝트에 같은 패턴을 적용한다 — `./gradlew test`는 Testcontainers의 일회용 MySQL을 쓰고, 개발 DB는 루트 [`compose.yaml`](../../compose.yaml)(호스트 `localhost:13308`, 계정 `community`/`community`)이다.
+
 기준은 Boot 4.1.1 / Framework 7.0.9 / Java 25다. 연습 프로젝트는 JDK 21이며 예제는 미실행 템플릿이다.
 
 ### 1단계 — 테스트 의존성과 Boot 4 import

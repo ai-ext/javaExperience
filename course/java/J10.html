@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>J10. 어노테이션·리플렉션·JDK 동적 프록시로 AOP 직접 만들기</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=6580290a3c9f">
+<link rel="stylesheet" href="../../tools/site/course-exercise.css?v=c30e18dc3d31">
+<link rel="stylesheet" href="../../tools/site/course.css?v=b6c93c158a77">
+<link rel="stylesheet" href="../../tools/site/course-tokens.css?v=90f7ed5128e9">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../spring/README.html" aria-current="page">과정 v2 · 일자 목록</a><a href="../map.html">과정 지도</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<article class="exercise-sheet exercise-java" data-exercise="J10"><header class="exercise-head"><p class="exercise-kind"><b>J10</b> Java 연결 실험</p><h1 id="j10-어노테이션리플렉션jdk-동적-프록시로-aop-직접-만들기"><a class="anchor" href="#j10-어노테이션리플렉션jdk-동적-프록시로-aop-직접-만들기" aria-hidden="true">#</a>J10. 어노테이션·리플렉션·JDK 동적 프록시로 AOP 직접 만들기</h1><blockquote class="exercise-meta">
+<p>같은 날: D10 · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests 'J10*'</code></p>
+</blockquote></header><nav class="exercise-route" aria-label="Java 실험 순서"><ol><li><a href="#만들-것"><b>01</b><span>만들 것</span></a></li><li><a href="#오늘-spring에서-다시-만나는-곳"><b>02</b><span>Spring 이어하기</span></a></li></ol></nav>
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D10.html#오늘-순서">D10 · 관리자 · AOP · 테스트</a></p><p>Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p><p><a href="J09.html">← 이전 J09</a> · <a href="J11.html">다음 J11 →</a></p></nav>
+
+
+<section class="exercise-section" aria-labelledby="상황"><h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2><p>D10은 관리자 기능과 AOP를 붙이는 날이다. D10 ③에서 <code>@Audited</code> 어노테이션을 만들고, D10 ④ <code>AuditLogAspect</code>가 그 어노테이션이 붙은 메서드만 가로채 감사 로그를 남긴다. 같은 날 함정이 두 번 나온다. D10 ②는 같은 클래스 안에서 <code>@PreAuthorize</code> 메서드를 부르면 USER도 통과하는 것이고, D10 ④는 같은 클래스 안 호출이나 <code>private</code> 메서드에 붙인 <code>@Audited</code>가 기록되지 않는 것이다.
+오늘은 Spring 없이 그 원리를 직접 만든다. <code>java.lang.reflect.Proxy</code>로 인터페이스를 구현한 가짜 객체를 만들고, 호출마다 리플렉션으로 <code>@Timed</code>가 붙었는지 본 뒤 실행 시간을 기록한다. 그러면 <code>this.xxx()</code> 호출이 왜 프록시를 건너뛰는지가 테스트로 보인다.</p></section>
+
+<section class="exercise-section" aria-labelledby="빠른-연상"><h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2><pre><code>호출한 쪽 ──▶ [프록시] ──▶ InvocationHandler.invoke(proxy, method, args)
+                              │ @Timed? → 시간 재기 시작
+                              ├─▶ method.invoke(target, args) ──▶ [target] hideAll()
+                              │                                      └─ this.hidePost()  ← 프록시를 거치지 않는다
+                              └─ 기록 남기기</code></pre><div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>Spring AOP (D10)</th>
+<th>오늘 만드는 것</th>
+<th>TS로 치면</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>표시</td>
+<td><code>@Audited</code></td>
+<td><code>@Timed</code></td>
+<td>데코레이터 <code>@Timed()</code></td>
+</tr>
+<tr>
+<td>가로채는 것</td>
+<td>스프링이 만든 프록시 빈</td>
+<td><code>Proxy.newProxyInstance</code></td>
+<td><code>new Proxy(target, { get… })</code></td>
+</tr>
+<tr>
+<td>진짜 메서드 부르기</td>
+<td><code>joinPoint.proceed()</code></td>
+<td><code>method.invoke(target, args)</code></td>
+<td><code>Reflect.apply</code></td>
+</tr>
+<tr>
+<td>자기 호출</td>
+<td>프록시를 거치지 않는다</td>
+<td>같다</td>
+<td>클로저 안 <code>this</code>는 원본</td>
+</tr>
+</tbody></table></div><p>흔한 착각: "어노테이션을 붙이면 그 메서드가 무언가를 한다". 어노테이션은 표시일 뿐 스스로 아무것도 하지 않는다. 누군가(프록시, 프레임워크)가 실행 중에 리플렉션으로 <strong>읽어야</strong> 의미가 생긴다. 그래서 <code>@Retention(RUNTIME)</code>이어야 하고, 읽는 쪽을 거치지 않는 호출(<code>this.xxx()</code>)에는 효과가 없다.</p></section>
+
+
+
+<section class="exercise-section" aria-labelledby="만들-것"><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2><details>
+<summary>펼치기</summary>
+
+<p>채울 파일(<code>java-track/src/main/java/com/example/javatrack/j10/</code>):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>파일</th>
+<th>채울 것</th>
+<th>칸</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TimedProxy.java</code></td>
+<td><code>wrap</code>, <code>isTimed</code></td>
+<td>주제 과제</td>
+</tr>
+<tr>
+<td><code>AuditStats.java</code></td>
+<td><code>countByAction</code></td>
+<td>기본기 반복</td>
+</tr>
+<tr>
+<td><code>UploadLimits.java</code></td>
+<td>필드 선언, 생성자 검사, <code>rows</code>·<code>fileBytes</code></td>
+<td>타입 한 컷</td>
+</tr>
+<tr>
+<td><code>Timed.java</code>·<code>ClassRetainedTimed.java</code>·<code>AdminActions.java</code>·<code>FakeAdminActions.java</code>·<code>PostNotFoundException.java</code>·<code>Timing.java</code>·<code>TimingLog.java</code>·<code>AuditEntry.java</code>·<code>LeakyUploadSettings.java</code></td>
+<td>주어진 코드. 고치지 않는다</td>
+<td>-</td>
+</tr>
+</tbody></table></div>
+<p><code>TimedProxy</code> 규칙:</p>
+<ul>
+<li><code>Proxy.newProxyInstance(type.getClassLoader(), new Class&lt;?&gt;[] {type}, handler)</code>로 <code>type</code> 인터페이스의 프록시를 만들고, 인터페이스 메서드 호출을 <code>target</code>에 넘긴다.</li>
+<li><code>@Timed</code>가 붙은 메서드만 <code>new Timing(메서드 이름, 걸린 시간)</code>을 <code>log</code>에 남긴다. 대상이 예외를 던져도 남긴다.</li>
+<li><code>@Timed</code>는 인터페이스 메서드(<code>bulkIssueCoupon</code>)에 붙어 있을 수도, 구현 클래스 메서드(<code>FakeAdminActions.hidePost</code>)에 붙어 있을 수도 있다. 둘 다 찾는다.</li>
+<li>대상이 던진 예외는 포장하지 않고 그대로 던진다.</li>
+<li><code>equals</code>·<code>hashCode</code>·<code>toString</code>도 프록시로 들어온다. 이 셋은 <code>target</code>에 넘기지 않고 프록시 자신을 기준으로 답한다: <code>equals</code>는 같은 프록시일 때만 true(<code>self == args[0]</code>), <code>hashCode</code>는 <code>System.identityHashCode(self)</code>, <code>toString</code>은 <code>target.toString()</code>을 부르지 않는 문자열(예: 프록시 identity + <code>target</code> 클래스 이름). 기록하지 않는다.</li>
+</ul>
+<p>뼈대 발췌:</p>
+<pre><code class="language-java">public final class TimedProxy {
+
+    /** target을 감싼 프록시를 type으로 돌려준다. type은 인터페이스여야 한다. */
+    public static &lt;T&gt; T wrap(Class&lt;T&gt; type, T target, TimingLog log) {
+        throw new UnsupportedOperationException("J10: TimedProxy.wrap — Proxy.newProxyInstance와 InvocationHandler로 감싸세요");
+    }
+
+    /** 인터페이스 메서드에 없으면 targetClass에서 이름·매개변수 타입이 같은 메서드를 찾아 본다. */
+    public static boolean isTimed(Method interfaceMethod, Class&lt;?&gt; targetClass) {
+        throw new UnsupportedOperationException("J10: TimedProxy.isTimed — 인터페이스 메서드와 구현 메서드에서 @Timed를 찾으세요");
+    }
+}
+
+public class FakeAdminActions implements AdminActions {   // 주어진 코드
+    @Timed
+    public String hidePost(Long postId) { … }
+
+    /** 어노테이션 없음. 안에서 this.hidePost를 부른다(같은 객체 안 호출). */
+    public List&lt;String&gt; hideAll(List&lt;Long&gt; postIds) { … this.hidePost(postId) … }
+
+    @ClassRetainedTimed                                  // 리텐션이 CLASS인 함정 어노테이션
+    public void resolveReport(Long reportId) { … }
+}</code></pre>
+<p>막히는 곳 두 군데:</p>
+<ol>
+<li><code>InvocationHandler.invoke</code>가 받는 <code>Method</code>는 <strong>인터페이스의</strong> 메서드다. 구현 클래스에 붙인 <code>@Timed</code>는 거기서 보이지 않는다. <code>targetClass.getMethod(이름, 매개변수 타입)</code>으로 구현 메서드를 찾아 확인한다. 예외가 하나 있다: 프록시에 부른 <code>equals</code>·<code>hashCode</code>·<code>toString</code>은 선언 클래스가 <code>Object</code>인 <code>Method</code>로 들어온다(<code>method.getDeclaringClass() == Object.class</code>). 이것까지 <code>target</code>에 넘기면 <code>proxy.equals(proxy)</code>가 <code>target.equals(proxy)</code>로 바뀌어 false가 된다 — 자기 자신과 같지 않은 객체가 생긴다.</li>
+<li><code>method.invoke(target, args)</code>는 대상이 던진 예외를 <code>InvocationTargetException</code>으로 감싼다. 그대로 두면 호출한 쪽은 <code>UndeclaredThrowableException</code>을 받는다. <code>e.getCause()</code>를 꺼내 던진다.</li>
+</ol>
+<p>통과시킬 테스트(주제 과제) — <code>J10TimedProxyTest</code>. 실행 시간 값은 단언하지 않는다(돌릴 때마다 다르다). 기록이 남았는지, 어떤 메서드 이름인지를 본다.</p>
+<ul>
+<li><code>Timed가_붙은_메서드만_기록된다</code></li>
+<li><code>프록시를_거쳐도_인자와_반환값은_그대로_전달된다</code></li>
+<li><code>여러_번_부르면_부른_순서대로_기록된다</code></li>
+<li><code>인터페이스_메서드에_붙은_Timed도_기록된다</code></li>
+<li><code>대상이_던진_예외는_포장되지_않고_그대로_나오며_실패한_호출도_기록된다</code></li>
+<li><code>같은_객체_안에서_this로_부르면_프록시를_거치지_않아_기록되지_않는다</code></li>
+<li><code>리텐션이_CLASS인_어노테이션은_실행_중에_보이지_않아_기록되지_않는다</code></li>
+<li><code>equals_hashCode_toString은_Object_메서드라_target에_넘기지_않고_프록시_자신을_기준으로_답한다</code></li>
+<li><code>프록시가_받는_Method는_인터페이스_메서드라_구현_클래스의_어노테이션은_따로_찾아야_한다</code></li>
+</ul>
+</details></section>
+
+
+<section class="exercise-section" aria-labelledby="기본기-반복"><h2 id="기본기-반복"><a class="anchor" href="#기본기-반복" aria-hidden="true">#</a>기본기 반복</h2><p>감사 로그 목록에서 <code>action</code>별 건수를 stream으로 세어 <strong>고칠 수 없는</strong> <code>Map</code>으로 돌려준다. <code>action</code>이 생기기 전에 쌓인 옛 기록은 <code>action</code>이 null이라 건너뛴다.</p><pre><code class="language-java">/** action별 건수. action이 null이면 건너뛴다. 돌려주는 Map에 put하면 UnsupportedOperationException. */
+public static Map&lt;String, Long&gt; countByAction(List&lt;AuditEntry&gt; entries)</code></pre><p>함정 두 개: <code>Collectors.groupingBy</code>는 분류 키가 null이면 <code>NullPointerException</code>을 던진다. 그리고 <code>groupingBy</code>는 돌려주는 <code>Map</code>의 종류도, 고칠 수 없는지도 약속하지 않는다(지금 JDK는 가변 <code>HashMap</code>을 준다). 그대로 내주면 밖에서 숫자를 고칠 수 있으니 <code>Map.copyOf</code>로 불변을 직접 만든다.</p><p>테스트 — <code>J10BasicsTest</code>:</p><ul>
+<li><code>action별_건수를_센다</code></li>
+<li><code>빈_목록이면_빈_Map을_돌려준다</code></li>
+<li><code>action이_null인_옛_기록은_예외_없이_건너뛴다</code></li>
+<li><code>돌려준_Map은_고칠_수_없다</code></li>
+</ul></section>
+
+
+
+
+
+<section class="exercise-section" aria-labelledby="타입-한-컷"><h2 id="타입-한-컷"><a class="anchor" href="#타입-한-컷" aria-hidden="true">#</a>타입 한 컷</h2><p><code>final</code>·<code>var</code>·<code>static final</code> 상수 — 설정 상수, 불변 필드.</p><div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>뜻</th>
+<th>다시 대입</th>
+<th>어울리는 곳</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>static final int MAX_ROWS = 1_000</code></td>
+<td>클래스에 하나뿐인 상수</td>
+<td>불가</td>
+<td>업로드 한도, TTL 같은 설정 상수</td>
+</tr>
+<tr>
+<td><code>static int maxRows</code></td>
+<td>클래스에 하나뿐인 <strong>변수</strong></td>
+<td>어디서든 가능</td>
+<td>거의 없다. 한 곳에서 바꾸면 모든 인스턴스가 바뀐다</td>
+</tr>
+<tr>
+<td><code>private final int rows</code></td>
+<td>객체마다 하나, 생성자에서 한 번만 대입</td>
+<td>불가</td>
+<td>만든 뒤 바뀌면 안 되는 값(엔티티 id·DTO 필드)</td>
+</tr>
+<tr>
+<td><code>var limits = …</code></td>
+<td>타입을 오른쪽 값에서 추론하는 지역 변수</td>
+<td><strong>가능</strong></td>
+<td>타입이 길고 오른쪽에서 뻔히 보일 때</td>
+</tr>
+</tbody></table></div><p>함정: <code>static</code>만 붙이고 <code>final</code>을 빼면 "설정"이 전역 변수가 된다. 주어진 <code>LeakyUploadSettings.maxRows</code>를 요청 A가 "이번만" 10으로 줄이면 요청 B도 함께 줄어든다. 그리고 <code>var</code>는 타입을 적지 않을 뿐 <code>final</code>이 아니다. 다시 대입을 막으려면 <code>final var</code>로 쓴다.</p><p>과제: <code>UploadLimits(int rows, long fileBytes)</code>를 채운다. 행 수는 1<del><code>MAX_ROWS</code>, 파일 크기는 1</del><code>MAX_FILE_BYTES</code>(5MB)만 받고, 값은 <code>private final</code> 필드에 담는다.</p><p>확인 테스트 — <code>J10TypeCutTest</code>:</p><ul>
+<li><code>한도_안의_업로드는_받아들인다</code></li>
+<li><code>한도를_넘으면_거절한다</code> (0행, 1,001행, 0바이트, 5MB+1)</li>
+<li><code>인스턴스_필드는_모두_private_final이다</code></li>
+<li><code>함정_final이_없는_static_필드는_한_곳에서_바꾸면_모든_곳이_바뀐다</code></li>
+<li><code>var는_오른쪽_값으로_타입이_정해질_뿐_final은_아니다</code></li>
+</ul></section>
+
+
+
+
+
+
+<section class="exercise-section" aria-labelledby="확인"><h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2><pre><code class="language-bash">./gradlew :java-track:test --tests 'J10*'</code></pre><p>18개가 모두 <code>PASSED</code>면 끝이다.</p></section>
+
+
+<section class="exercise-section" aria-labelledby="정답"><h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2><details>
+<summary>펼치기</summary>
+
+<pre><code class="language-java">// TimedProxy
+public static &lt;T&gt; T wrap(Class&lt;T&gt; type, T target, TimingLog log) {
+    Object proxy = Proxy.newProxyInstance(type.getClassLoader(), new Class&lt;?&gt;[] {type}, (self, method, args) -&gt; {
+        if (method.getDeclaringClass() == Object.class) {
+            // equals·hashCode·toString. target에 넘기면 proxy.equals(proxy)가 target.equals(proxy) = false가 된다
+            return objectMethod(self, target, method, args);
+        }
+        if (!isTimed(method, target.getClass())) {
+            return invoke(target, method, args);
+        }
+        long start = System.nanoTime();
+        try {
+            return invoke(target, method, args);
+        } finally {
+            // 성공이든 예외든 한 줄 남긴다
+            log.add(new Timing(method.getName(), Duration.ofNanos(System.nanoTime() - start)));
+        }
+    });
+    return type.cast(proxy);
+}
+
+public static boolean isTimed(Method interfaceMethod, Class&lt;?&gt; targetClass) {
+    if (interfaceMethod.isAnnotationPresent(Timed.class)) {
+        return true;
+    }
+    try {
+        // 프록시가 받는 Method는 인터페이스 쪽이다. 구현 클래스에 붙은 어노테이션은 구현 메서드를 찾아야 보인다
+        Method implementation = targetClass.getMethod(interfaceMethod.getName(), interfaceMethod.getParameterTypes());
+        return implementation.isAnnotationPresent(Timed.class);
+    } catch (NoSuchMethodException e) {
+        return false;
+    }
+}
+
+/** 프록시 자신의 참조로 답한다. 같은 프록시끼리만 같고, hashCode는 그와 맞는 identityHashCode다. target의 메서드는 부르지 않는다. */
+private static Object objectMethod(Object self, Object target, Method method, Object[] args) {
+    return switch (method.getName()) {
+        case "equals" -&gt; self == args[0];
+        case "hashCode" -&gt; System.identityHashCode(self);
+        // target + "" 는 target.toString()을 부른다. 클래스 이름만 쓰고 프록시 자신의 identity로 구분한다
+        case "toString" -&gt; "TimedProxy@" + Integer.toHexString(System.identityHashCode(self))
+                + "(" + target.getClass().getName() + ")";
+        default -&gt; throw new IllegalStateException("프록시로 들어올 수 없는 Object 메서드: " + method);
+    };
+}
+
+private static Object invoke(Object target, Method method, Object[] args) throws Throwable {
+    try {
+        return method.invoke(target, args);
+    } catch (InvocationTargetException e) {
+        // 대상이 던진 원래 예외를 꺼내 던진다. 그대로 두면 호출한 쪽은 UndeclaredThrowableException을 받는다
+        throw e.getCause();
+    }
+}</code></pre>
+<pre><code class="language-java">// AuditStats
+public static Map&lt;String, Long&gt; countByAction(List&lt;AuditEntry&gt; entries) {
+    Map&lt;String, Long&gt; counts = entries.stream()
+            .map(AuditEntry::action)
+            // groupingBy는 null 키에서 NPE를 던지므로 먼저 거른다
+            .filter(Objects::nonNull)
+            .collect(Collectors.groupingBy(action -&gt; action, Collectors.counting()));
+    // groupingBy는 Map의 종류·불변 여부를 약속하지 않는다(지금 JDK는 가변 HashMap). 복사해 불변으로 내준다
+    return Map.copyOf(counts);
+}</code></pre>
+<pre><code class="language-java">// UploadLimits
+private final int rows;
+private final long fileBytes;
+
+public UploadLimits(int rows, long fileBytes) {
+    if (rows &lt; 1 || rows &gt; MAX_ROWS) {
+        throw new IllegalArgumentException("행 수는 1~" + MAX_ROWS + "이어야 합니다: " + rows);
+    }
+    if (fileBytes &lt; 1 || fileBytes &gt; MAX_FILE_BYTES) {
+        throw new IllegalArgumentException("파일 크기는 1~" + MAX_FILE_BYTES + "바이트여야 합니다: " + fileBytes);
+    }
+    // final 필드는 생성자에서 딱 한 번 대입한다. 빠뜨리거나 두 번 대입하면 컴파일 오류다
+    this.rows = rows;
+    this.fileBytes = fileBytes;
+}</code></pre>
+<p>왜 이렇게 쓰나:</p>
+<ol>
+<li>기록은 <code>finally</code>에서 남긴다. 성공한 호출만 남기면 장애 때 가장 궁금한 "실패한 시도"가 빠진다. D10 <code>AuditLogAspect</code>도 실패를 <code>result=FAILURE</code>로 따로 남긴다.</li>
+<li>프록시는 밖에서 들어오는 호출만 가로챈다. 대상 객체 안의 <code>this</code>는 프록시가 아니라 원본이다. 그래서 어노테이션은 <code>public</code> 메서드에 붙이고 <strong>다른 객체에서</strong> 부르게 설계한다(같은 클래스 안 호출이 필요하면 메서드를 다른 빈으로 옮긴다).</li>
+<li>설정 한도는 <code>static final</code> 상수로 이름을 붙이고, 객체의 값은 <code>private final</code>로 생성자에서 한 번만 정한다. 바뀔 수 없는 값은 "누가 언제 바꿨나"를 추적할 일이 없다.</li>
+</ol>
+</details></section>
+
+
+<section class="exercise-section" aria-labelledby="오늘-spring에서-다시-만나는-곳"><h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2><ul>
+<li>D10 ② <code>board-server/src/main/java/com/example/board/admin/AdminService.java</code> — <code>hidePost</code>에 <code>@Audited(action = "HIDE_POST", targetType = "POST")</code>와 <code>@Transactional</code>이 함께 붙어 있다. 둘 다 프록시가 처리하므로 다른 빈(컨트롤러)에서 불러야 동작한다. 같은 단계의 함정이 "같은 클래스 안에서 <code>@PreAuthorize</code> 메서드를 부르면 USER도 통과한다"이다.</li>
+<li>D10 ③ <code>board-server/src/main/java/com/example/board/admin/Audited.java</code> — <code>@Target(METHOD)</code>, <code>@Retention(RUNTIME)</code>. 주석에 "public 메서드에 붙이고, 다른 빈에서 불러야 한다(같은 클래스 안 this 호출·private 메서드는 기록되지 않는다)"라고 적혀 있다.</li>
+<li>D10 ④ <code>board-server/src/main/java/com/example/board/admin/AuditLogAspect.java</code> — <code>@Around("@annotation(audited)")</code>가 오늘 만든 <code>InvocationHandler</code> 자리다. <code>joinPoint.proceed()</code>가 <code>method.invoke</code>이고, 실패하면 기록을 남긴 뒤 원래 예외를 다시 던진다(기록 실패는 <code>addSuppressed</code>로 붙인다).</li>
+<li>D10 ⑤ <code>board-server/src/main/java/com/example/board/admin/CouponBulkIssueService.java</code> — <code>@Audited(action = "BULK_ISSUE_COUPON", targetType = "COUPON")</code>. 감사 로그의 <code>action</code> 값이 오늘 기본기에서 센 키다.</li>
+<li>D10 ⑤ <code>board-server/src/main/java/com/example/board/admin/ExcelMemberIdReader.java</code> — <code>static final long MAX_BYTES = 5L * 1024 * 1024</code>, <code>static final int MAX_ROWS = 1000</code>. 오늘 <code>UploadLimits</code>의 상수와 같은 한도다.</li>
+</ul></section>
+
+
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><strong>실험 결과를 남겼다면</strong><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D10.html#오늘-순서">D10 · 관리자 · AOP · 테스트</a></p><p>Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p><p><a href="J09.html">← 이전 J09</a> · <a href="J11.html">다음 J11 →</a></p><p class="exercise-return-note">연결된 일자로 돌아가 완료 조건을 확인하고 진행 기록을 남기세요.</p></nav></article>
+
+</main>
+
+
+
+
+
+</body>
+</html>

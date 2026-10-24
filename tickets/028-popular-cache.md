@@ -12,7 +12,7 @@
 - 캐시가 비어 있을 때 요청이 한꺼번에 몰려도 집계 쿼리는 **한 번만** 돌아야 합니다(9시 정각에 캐시가 만료되면 그 순간 DB가 다시 맞는다).
 - **완료 조건**: 연속 두 번 부르면 두 번째는 `HIT`이고 같은 결과, 1위 글을 비공개로 바꾸면 바로 다음 요청에서 빠지고, 다시 공개하면 바로 돌아온다.
 
-**DB 시작 상태**: `practice` 처음 상태(`bash scripts/java-db.sh --reset`). 기준 코드를 practice 프로파일로 켠다(“지금”이 2026-10-05 00:00으로 고정). 최근 7일 1위는 밤샘개발자(`tok-p06`)의 글 145다.
+**DB 시작 상태**: `practice` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드를 practice 프로파일로 켠다(“지금”이 2026-10-05 00:00으로 고정). 최근 7일 1위는 밤샘개발자(`tok-p06`)의 글 145다.
 
 ## 지금 코드
 

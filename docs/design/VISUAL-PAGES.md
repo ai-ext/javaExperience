@@ -1,33 +1,88 @@
 # 화면별 시각 개편 체크리스트
 
-저자 원문과 생성 HTML이 함께 있는 339개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 44,103개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
+저자 원문과 생성 HTML이 함께 있는 391개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 50,616개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
 
 체크는 해당 화면의 모든 개별 항목이 `verified`일 때만 자동으로 붙는다. `imagegen` 시안 또는 공통 컴포넌트 한 개를 적용한 상태는 완료가 아니다.
 
 ## 홈·목차·미션·기타 (18)
 
-- [ ] [README.md](../../README.html) — 항목 63, 긴 산문 1, 토글 9, 최대 접기 깊이 1; 상태: in_progress
-- [ ] [errors.md](../../errors.html) — 항목 261, 긴 산문 1, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [README.md](../../README.html) — 항목 89, 긴 산문 2, 토글 11, 최대 접기 깊이 1; 상태: in_progress
+- [ ] [errors.md](../../errors.html) — 항목 261, 긴 산문 2, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [practice/MISSIONS.md](../../practice/MISSIONS.html) — 항목 97, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [scenario/README.md](../../scenario/README.html) — 항목 371, 긴 산문 1, 토글 195, 최대 접기 깊이 4; 상태: unreviewed
+- [ ] [scenario/README.md](../../scenario/README.html) — 항목 372, 긴 산문 2, 토글 195, 최대 접기 깊이 4; 상태: unreviewed
 - [ ] [scenario/db-query-journey/DB-07-same-api-five-query-styles.md](../../scenario/db-query-journey/DB-07-same-api-five-query-styles.html) — 항목 70, 긴 산문 0, 토글 7, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [scenario/db-query-journey/DB-08-explain-hypothesis.md](../../scenario/db-query-journey/DB-08-explain-hypothesis.html) — 항목 24, 긴 산문 1, 토글 2, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [scenario/db-query-journey/DB-09-explain-analyze.md](../../scenario/db-query-journey/DB-09-explain-analyze.html) — 항목 18, 긴 산문 2, 토글 2, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [scenario/db-query-journey/DB-10-performance-fixture.md](../../scenario/db-query-journey/DB-10-performance-fixture.html) — 항목 31, 긴 산문 1, 토글 4, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [scenario/db-query-journey/DB-11-index-lifecycle.md](../../scenario/db-query-journey/DB-11-index-lifecycle.html) — 항목 30, 긴 산문 0, 토글 2, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [scenario/db-query-journey/db-01-response-to-query.md](../../scenario/db-query-journey/db-01-response-to-query.html) — 항목 37, 긴 산문 1, 토글 4, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [scenario/db-query-journey/db-02-select-cursor.md](../../scenario/db-query-journey/db-02-select-cursor.html) — 항목 20, 긴 산문 0, 토글 3, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [scenario/db-query-journey/db-03-detail-join.md](../../scenario/db-query-journey/db-03-detail-join.html) — 항목 29, 긴 산문 0, 토글 4, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [scenario/db-query-journey/db-02-select-cursor.md](../../scenario/db-query-journey/db-02-select-cursor.html) — 항목 21, 긴 산문 0, 토글 3, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [scenario/db-query-journey/db-03-detail-join.md](../../scenario/db-query-journey/db-03-detail-join.html) — 항목 30, 긴 산문 0, 토글 4, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [scenario/db-query-journey/db-04-tag-filter-and-exists.md](../../scenario/db-query-journey/db-04-tag-filter-and-exists.html) — 항목 25, 긴 산문 0, 토글 5, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [scenario/db-query-journey/db-05-aggregate-fanout.md](../../scenario/db-query-journey/db-05-aggregate-fanout.html) — 항목 35, 긴 산문 0, 토글 7, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [scenario/db-query-journey/db-06-exists-not-exists.md](../../scenario/db-query-journey/db-06-exists-not-exists.html) — 항목 27, 긴 산문 0, 토글 7, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [scenario/db-query-journey/db-12-join-exists-explain.md](../../scenario/db-query-journey/db-12-join-exists-explain.html) — 항목 33, 긴 산문 2, 토글 5, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [scenario/db-query-journey/db-13-list-api-n-plus-one.md](../../scenario/db-query-journey/db-13-list-api-n-plus-one.html) — 항목 36, 긴 산문 1, 토글 4, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [scenario/db-query-journey/db-14-live-schema-to-slow-query.md](../../scenario/db-query-journey/db-14-live-schema-to-slow-query.html) — 항목 67, 긴 산문 0, 토글 4, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [scenario/db-query-journey/db-06-exists-not-exists.md](../../scenario/db-query-journey/db-06-exists-not-exists.html) — 항목 28, 긴 산문 0, 토글 7, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [scenario/db-query-journey/db-12-join-exists-explain.md](../../scenario/db-query-journey/db-12-join-exists-explain.html) — 항목 34, 긴 산문 2, 토글 5, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [scenario/db-query-journey/db-13-list-api-n-plus-one.md](../../scenario/db-query-journey/db-13-list-api-n-plus-one.html) — 항목 37, 긴 산문 1, 토글 4, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [scenario/db-query-journey/db-14-live-schema-to-slow-query.md](../../scenario/db-query-journey/db-14-live-schema-to-slow-query.html) — 항목 68, 긴 산문 1, 토글 4, 최대 접기 깊이 2; 상태: unreviewed
+
+## 과정 v2 (52)
+
+- [ ] [course/README.md](../../course/README.html) — 항목 43, 긴 산문 2, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [course/map.md](../../course/map.html) — 항목 16, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [course/spring/D00.md](../../course/spring/D00.html) — 항목 15, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [course/spring/D01.md](../../course/spring/D01.html) — 항목 223, 긴 산문 0, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D02.md](../../course/spring/D02.html) — 항목 239, 긴 산문 1, 토글 24, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D03.md](../../course/spring/D03.html) — 항목 298, 긴 산문 0, 토글 23, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D04.md](../../course/spring/D04.html) — 항목 247, 긴 산문 1, 토글 26, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [course/spring/D05.md](../../course/spring/D05.html) — 항목 318, 긴 산문 0, 토글 26, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D06.md](../../course/spring/D06.html) — 항목 230, 긴 산문 1, 토글 20, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [course/spring/D07.md](../../course/spring/D07.html) — 항목 347, 긴 산문 0, 토글 27, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D08.md](../../course/spring/D08.html) — 항목 346, 긴 산문 0, 토글 23, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D09.md](../../course/spring/D09.html) — 항목 329, 긴 산문 0, 토글 23, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D10.md](../../course/spring/D10.html) — 항목 359, 긴 산문 1, 토글 24, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D11.md](../../course/spring/D11.html) — 항목 147, 긴 산문 1, 토글 11, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D12.md](../../course/spring/D12.html) — 항목 137, 긴 산문 1, 토글 11, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D13.md](../../course/spring/D13.html) — 항목 146, 긴 산문 1, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D14.md](../../course/spring/D14.html) — 항목 164, 긴 산문 1, 토글 13, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D15.md](../../course/spring/D15.html) — 항목 90, 긴 산문 0, 토글 10, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D16.md](../../course/spring/D16.html) — 항목 89, 긴 산문 1, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D17.md](../../course/spring/D17.html) — 항목 88, 긴 산문 1, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D18.md](../../course/spring/D18.html) — 항목 88, 긴 산문 1, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D19.md](../../course/spring/D19.html) — 항목 86, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D20.md](../../course/spring/D20.html) — 항목 88, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D21.md](../../course/spring/D21.html) — 항목 87, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D22.md](../../course/spring/D22.html) — 항목 87, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D23.md](../../course/spring/D23.html) — 항목 91, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D24.md](../../course/spring/D24.html) — 항목 94, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D25.md](../../course/spring/D25.html) — 항목 87, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D26.md](../../course/spring/D26.html) — 항목 88, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D27.md](../../course/spring/D27.html) — 항목 89, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D28.md](../../course/spring/D28.html) — 항목 89, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D29.md](../../course/spring/D29.html) — 항목 89, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D30.md](../../course/spring/D30.html) — 항목 87, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D31.md](../../course/spring/D31.html) — 항목 88, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D32.md](../../course/spring/D32.html) — 항목 86, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D33.md](../../course/spring/D33.html) — 항목 94, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D34.md](../../course/spring/D34.html) — 항목 89, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D35.md](../../course/spring/D35.html) — 항목 88, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D36.md](../../course/spring/D36.html) — 항목 87, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D37.md](../../course/spring/D37.html) — 항목 86, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D38.md](../../course/spring/D38.html) — 항목 90, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D39.md](../../course/spring/D39.html) — 항목 90, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D40.md](../../course/spring/D40.html) — 항목 87, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D41.md](../../course/spring/D41.html) — 항목 87, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D42.md](../../course/spring/D42.html) — 항목 86, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D43.md](../../course/spring/D43.html) — 항목 86, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D44.md](../../course/spring/D44.html) — 항목 86, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D45.md](../../course/spring/D45.html) — 항목 86, 긴 산문 0, 토글 8, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/README.md](../../course/spring/README.html) — 항목 8, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [course/start/README.md](../../course/start/README.html) — 항목 34, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [course/start/dummy/README.md](../../course/start/dummy/README.html) — 항목 20, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [course/start/ops/README.md](../../course/start/ops/README.html) — 항목 54, 긴 산문 7, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 
 ## 공부자료 (135)
 
-- [ ] [docs/knowledge/B01-account-lifecycle.md](../../docs/knowledge/B01-account-lifecycle.html) — 항목 87, 긴 산문 1, 토글 12, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/B01-account-lifecycle.md](../../docs/knowledge/B01-account-lifecycle.html) — 항목 88, 긴 산문 1, 토글 12, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/D01-dev-lifecycle-overview.md](../../docs/knowledge/D01-dev-lifecycle-overview.html) — 항목 99, 긴 산문 0, 토글 15, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/D02-server-network-basics.md](../../docs/knowledge/D02-server-network-basics.html) — 항목 128, 긴 산문 0, 토글 22, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/D03-rest-api-dev-process.md](../../docs/knowledge/D03-rest-api-dev-process.html) — 항목 119, 긴 산문 0, 토글 21, 최대 접기 깊이 2; 상태: unreviewed
@@ -93,19 +148,19 @@
 - [ ] [docs/knowledge/P24-kafka-practical.md](../../docs/knowledge/P24-kafka-practical.html) — 항목 119, 긴 산문 0, 토글 23, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/P25-external-api-client.md](../../docs/knowledge/P25-external-api-client.html) — 항목 131, 긴 산문 1, 토글 24, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/P26-mail-notification.md](../../docs/knowledge/P26-mail-notification.html) — 항목 117, 긴 산문 0, 토글 27, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/P27-annotations-when-how.md](../../docs/knowledge/P27-annotations-when-how.html) — 항목 139, 긴 산문 0, 토글 26, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/P28-default-beans.md](../../docs/knowledge/P28-default-beans.html) — 항목 105, 긴 산문 0, 토글 13, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/P27-annotations-when-how.md](../../docs/knowledge/P27-annotations-when-how.html) — 항목 140, 긴 산문 0, 토글 26, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/P28-default-beans.md](../../docs/knowledge/P28-default-beans.html) — 항목 106, 긴 산문 0, 토글 13, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/P29-static-complete.md](../../docs/knowledge/P29-static-complete.html) — 항목 115, 긴 산문 0, 토글 20, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/P30-scheduling-practical.md](../../docs/knowledge/P30-scheduling-practical.html) — 항목 120, 긴 산문 0, 토글 22, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/P31-stream-patterns.md](../../docs/knowledge/P31-stream-patterns.html) — 항목 55, 긴 산문 0, 토글 10, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/R01-what-is-db-server.md](../../docs/knowledge/R01-what-is-db-server.html) — 항목 105, 긴 산문 0, 토글 19, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/R02-rdb-vs-nosql.md](../../docs/knowledge/R02-rdb-vs-nosql.html) — 항목 144, 긴 산문 0, 토글 26, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/R03-schema-types-constraints.md](../../docs/knowledge/R03-schema-types-constraints.html) — 항목 90, 긴 산문 0, 토글 12, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/R04-sql-crud-join.md](../../docs/knowledge/R04-sql-crud-join.html) — 항목 100, 긴 산문 0, 토글 13, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/R05-index-btree.md](../../docs/knowledge/R05-index-btree.html) — 항목 94, 긴 산문 0, 토글 14, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/R06-db-client-tools.md](../../docs/knowledge/R06-db-client-tools.html) — 항목 128, 긴 산문 0, 토글 21, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/R07-backup-restore.md](../../docs/knowledge/R07-backup-restore.html) — 항목 96, 긴 산문 0, 토글 13, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/R08-app-to-db-connection.md](../../docs/knowledge/R08-app-to-db-connection.html) — 항목 131, 긴 산문 0, 토글 26, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/R01-what-is-db-server.md](../../docs/knowledge/R01-what-is-db-server.html) — 항목 105, 긴 산문 4, 토글 19, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/R02-rdb-vs-nosql.md](../../docs/knowledge/R02-rdb-vs-nosql.html) — 항목 145, 긴 산문 0, 토글 26, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/R03-schema-types-constraints.md](../../docs/knowledge/R03-schema-types-constraints.html) — 항목 91, 긴 산문 0, 토글 12, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/R04-sql-crud-join.md](../../docs/knowledge/R04-sql-crud-join.html) — 항목 101, 긴 산문 0, 토글 13, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/R05-index-btree.md](../../docs/knowledge/R05-index-btree.html) — 항목 95, 긴 산문 0, 토글 14, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/R06-db-client-tools.md](../../docs/knowledge/R06-db-client-tools.html) — 항목 133, 긴 산문 0, 토글 21, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/R07-backup-restore.md](../../docs/knowledge/R07-backup-restore.html) — 항목 97, 긴 산문 0, 토글 13, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/R08-app-to-db-connection.md](../../docs/knowledge/R08-app-to-db-connection.html) — 항목 137, 긴 산문 0, 토글 27, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/README.md](../../docs/knowledge/README.html) — 항목 28, 긴 산문 0, 토글 2, 최대 접기 깊이 1; 상태: in_progress
 - [ ] [docs/knowledge/S01-ioc-di.md](../../docs/knowledge/S01-ioc-di.html) — 항목 117, 긴 산문 0, 토글 25, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/S02-aop-proxy.md](../../docs/knowledge/S02-aop-proxy.html) — 항목 128, 긴 산문 0, 토글 24, 최대 접기 깊이 2; 상태: unreviewed
@@ -130,12 +185,12 @@
 - [ ] [docs/knowledge/S21-boot4-migration.md](../../docs/knowledge/S21-boot4-migration.html) — 항목 129, 긴 산문 3, 토글 26, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/S22-architecture-ddd.md](../../docs/knowledge/S22-architecture-ddd.html) — 항목 130, 긴 산문 0, 토글 26, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/S23-openapi-swagger.md](../../docs/knowledge/S23-openapi-swagger.html) — 항목 109, 긴 산문 0, 토글 18, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/V01-what-and-how-to-test.md](../../docs/knowledge/V01-what-and-how-to-test.html) — 항목 121, 긴 산문 0, 토글 26, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/V02-layered-tests-handson.md](../../docs/knowledge/V02-layered-tests-handson.html) — 항목 77, 긴 산문 0, 토글 12, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/V03-mocking-in-practice.md](../../docs/knowledge/V03-mocking-in-practice.html) — 항목 128, 긴 산문 1, 토글 25, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/V04-test-db-strategy.md](../../docs/knowledge/V04-test-db-strategy.html) — 항목 110, 긴 산문 0, 토글 18, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/V05-testing-tricky-things.md](../../docs/knowledge/V05-testing-tricky-things.html) — 항목 133, 긴 산문 0, 토글 21, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/V06-testing-at-work.md](../../docs/knowledge/V06-testing-at-work.html) — 항목 92, 긴 산문 0, 토글 13, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/V01-what-and-how-to-test.md](../../docs/knowledge/V01-what-and-how-to-test.html) — 항목 122, 긴 산문 0, 토글 26, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/V02-layered-tests-handson.md](../../docs/knowledge/V02-layered-tests-handson.html) — 항목 78, 긴 산문 0, 토글 12, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/V03-mocking-in-practice.md](../../docs/knowledge/V03-mocking-in-practice.html) — 항목 129, 긴 산문 1, 토글 25, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/V04-test-db-strategy.md](../../docs/knowledge/V04-test-db-strategy.html) — 항목 111, 긴 산문 0, 토글 18, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/V05-testing-tricky-things.md](../../docs/knowledge/V05-testing-tricky-things.html) — 항목 134, 긴 산문 0, 토글 21, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/V06-testing-at-work.md](../../docs/knowledge/V06-testing-at-work.html) — 항목 93, 긴 산문 0, 토글 13, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/W01-api-dev-order.md](../../docs/knowledge/W01-api-dev-order.html) — 항목 127, 긴 산문 2, 토글 13, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/W02-why-layers.md](../../docs/knowledge/W02-why-layers.html) — 항목 140, 긴 산문 0, 토글 29, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/W03-db-access-comparison.md](../../docs/knowledge/W03-db-access-comparison.html) — 항목 103, 긴 산문 0, 토글 12, 최대 접기 깊이 2; 상태: unreviewed
@@ -160,7 +215,7 @@
 - [ ] [docs/knowledge/W22-works-locally-not-on-server.md](../../docs/knowledge/W22-works-locally-not-on-server.html) — 항목 115, 긴 산문 3, 토글 22, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/W23-cache-and-in-memory.md](../../docs/knowledge/W23-cache-and-in-memory.html) — 항목 126, 긴 산문 0, 토글 22, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/W24-why-database.md](../../docs/knowledge/W24-why-database.html) — 항목 117, 긴 산문 0, 토글 23, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [docs/knowledge/W25-spring-multithreading.md](../../docs/knowledge/W25-spring-multithreading.html) — 항목 131, 긴 산문 0, 토글 24, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [docs/knowledge/W25-spring-multithreading.md](../../docs/knowledge/W25-spring-multithreading.html) — 항목 131, 긴 산문 1, 토글 24, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/W26-naming-conventions.md](../../docs/knowledge/W26-naming-conventions.html) — 항목 114, 긴 산문 0, 토글 21, 최대 접기 깊이 2; 상태: unreviewed
 
 ## 개념 레슨 (50)
@@ -185,7 +240,7 @@
 - [ ] [lessons/C4-logs-and-stack-traces.md](../../lessons/C4-logs-and-stack-traces.html) — 항목 80, 긴 산문 1, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [lessons/D1-json-jackson.md](../../lessons/D1-json-jackson.html) — 항목 92, 긴 산문 2, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [lessons/E1-why-layers.md](../../lessons/E1-why-layers.html) — 항목 74, 긴 산문 0, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [lessons/E2-db-sql-basics.md](../../lessons/E2-db-sql-basics.html) — 항목 115, 긴 산문 0, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [lessons/E2-db-sql-basics.md](../../lessons/E2-db-sql-basics.html) — 항목 115, 긴 산문 1, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [lessons/E3-what-is-jpa.md](../../lessons/E3-what-is-jpa.html) — 항목 88, 긴 산문 0, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [lessons/E4-jpa-associations.md](../../lessons/E4-jpa-associations.html) — 항목 95, 긴 산문 3, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [lessons/E5-mybatis-first-steps.md](../../lessons/E5-mybatis-first-steps.html) — 항목 87, 긴 산문 1, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
@@ -210,7 +265,7 @@
 - [ ] [lessons/H5-spring-events.md](../../lessons/H5-spring-events.html) — 항목 94, 긴 산문 0, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [lessons/H6-async-thread-pool.md](../../lessons/H6-async-thread-pool.html) — 항목 91, 긴 산문 0, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [lessons/H7-cache-cacheable-evict.md](../../lessons/H7-cache-cacheable-evict.html) — 항목 84, 긴 산문 1, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [lessons/H8-rest-client-timeout.md](../../lessons/H8-rest-client-timeout.html) — 항목 94, 긴 산문 0, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [lessons/H8-rest-client-timeout.md](../../lessons/H8-rest-client-timeout.html) — 항목 94, 긴 산문 1, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [lessons/H9-csv-and-time.md](../../lessons/H9-csv-and-time.html) — 항목 93, 긴 산문 1, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [lessons/I1-why-tests.md](../../lessons/I1-why-tests.html) — 항목 83, 긴 산문 0, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [lessons/J1-reading-explain.md](../../lessons/J1-reading-explain.html) — 항목 93, 긴 산문 0, 토글 6, 최대 접기 깊이 1; 상태: unreviewed
@@ -228,27 +283,27 @@
 - [ ] [scenario/ch0-first-steps/0-8-java-types-and-methods.md](../../scenario/ch0-first-steps/0-8-java-types-and-methods.html) — 항목 72, 긴 산문 0, 토글 25, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch1-create-post/1-1-receive-request.md](../../scenario/ch1-create-post/1-1-receive-request.html) — 항목 107, 긴 산문 0, 토글 37, 최대 접기 깊이 3; 상태: in_progress
 - [ ] [scenario/ch1-create-post/1-2-dto-response.md](../../scenario/ch1-create-post/1-2-dto-response.html) — 항목 219, 긴 산문 0, 토글 63, 최대 접기 깊이 3; 상태: unreviewed
-- [ ] [scenario/ch1-create-post/1-3-service-layer.md](../../scenario/ch1-create-post/1-3-service-layer.html) — 항목 222, 긴 산문 0, 토글 58, 최대 접기 깊이 3; 상태: unreviewed
+- [ ] [scenario/ch1-create-post/1-3-service-layer.md](../../scenario/ch1-create-post/1-3-service-layer.html) — 항목 222, 긴 산문 1, 토글 58, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch1-create-post/1-4-save-to-db.md](../../scenario/ch1-create-post/1-4-save-to-db.html) — 항목 224, 긴 산문 0, 토글 61, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch1-create-post/1-5-validation.md](../../scenario/ch1-create-post/1-5-validation.html) — 항목 162, 긴 산문 0, 토글 74, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch1-create-post/1-6-token-auth.md](../../scenario/ch1-create-post/1-6-token-auth.html) — 항목 188, 긴 산문 0, 토글 88, 최대 접기 깊이 3; 상태: unreviewed
-- [ ] [scenario/ch1-create-post/1-7-direct-db-dml.md](../../scenario/ch1-create-post/1-7-direct-db-dml.html) — 항목 80, 긴 산문 0, 토글 25, 최대 접기 깊이 3; 상태: unreviewed
+- [ ] [scenario/ch1-create-post/1-7-direct-db-dml.md](../../scenario/ch1-create-post/1-7-direct-db-dml.html) — 항목 80, 긴 산문 1, 토글 25, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch1-create-post/1-8-copy-post.md](../../scenario/ch1-create-post/1-8-copy-post.html) — 항목 120, 긴 산문 1, 토글 59, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch1-create-post/1-9-list-post-tags.md](../../scenario/ch1-create-post/1-9-list-post-tags.html) — 항목 83, 긴 산문 0, 토글 31, 최대 접기 깊이 3; 상태: unreviewed
-- [ ] [scenario/ch10-project/10-1-new-project.md](../../scenario/ch10-project/10-1-new-project.html) — 항목 214, 긴 산문 0, 토글 35, 최대 접기 깊이 3; 상태: unreviewed
+- [ ] [scenario/ch10-project/10-1-new-project.md](../../scenario/ch10-project/10-1-new-project.html) — 항목 215, 긴 산문 2, 토글 35, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch10-project/10-10-like-toggle.md](../../scenario/ch10-project/10-10-like-toggle.html) — 항목 243, 긴 산문 0, 토글 110, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch10-project/10-11-idempotent-like.md](../../scenario/ch10-project/10-11-idempotent-like.html) — 항목 227, 긴 산문 0, 토글 119, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch10-project/10-12-jpa-mybatis-flush.md](../../scenario/ch10-project/10-12-jpa-mybatis-flush.html) — 항목 191, 긴 산문 0, 토글 65, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch10-project/10-2-common-response.md](../../scenario/ch10-project/10-2-common-response.html) — 항목 160, 긴 산문 0, 토글 40, 최대 접기 깊이 3; 상태: unreviewed
-- [ ] [scenario/ch10-project/10-3-signup.md](../../scenario/ch10-project/10-3-signup.html) — 항목 270, 긴 산문 0, 토글 89, 최대 접기 깊이 3; 상태: unreviewed
-- [ ] [scenario/ch10-project/10-4-login-jwt.md](../../scenario/ch10-project/10-4-login-jwt.html) — 항목 229, 긴 산문 0, 토글 97, 최대 접기 깊이 3; 상태: in_progress
+- [ ] [scenario/ch10-project/10-3-signup.md](../../scenario/ch10-project/10-3-signup.html) — 항목 270, 긴 산문 1, 토글 89, 최대 접기 깊이 3; 상태: unreviewed
+- [ ] [scenario/ch10-project/10-4-login-jwt.md](../../scenario/ch10-project/10-4-login-jwt.html) — 항목 227, 긴 산문 0, 토글 96, 최대 접기 깊이 3; 상태: in_progress
 - [ ] [scenario/ch10-project/10-5-create-post.md](../../scenario/ch10-project/10-5-create-post.html) — 항목 202, 긴 산문 0, 토글 97, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch10-project/10-6-post-detail.md](../../scenario/ch10-project/10-6-post-detail.html) — 항목 203, 긴 산문 0, 토글 90, 최대 접기 깊이 3; 상태: unreviewed
-- [ ] [scenario/ch10-project/10-7-post-list.md](../../scenario/ch10-project/10-7-post-list.html) — 항목 204, 긴 산문 1, 토글 85, 최대 접기 깊이 3; 상태: unreviewed
+- [ ] [scenario/ch10-project/10-7-post-list.md](../../scenario/ch10-project/10-7-post-list.html) — 항목 204, 긴 산문 2, 토글 85, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch10-project/10-8-update-delete.md](../../scenario/ch10-project/10-8-update-delete.html) — 항목 214, 긴 산문 0, 토글 119, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch10-project/10-9-comments.md](../../scenario/ch10-project/10-9-comments.html) — 항목 236, 긴 산문 0, 토글 143, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch11-post-advanced/11-1-draft-publish.md](../../scenario/ch11-post-advanced/11-1-draft-publish.html) — 항목 231, 긴 산문 0, 토글 109, 최대 접기 깊이 3; 상태: unreviewed
-- [ ] [scenario/ch11-post-advanced/11-2-image-upload.md](../../scenario/ch11-post-advanced/11-2-image-upload.html) — 항목 242, 긴 산문 0, 토글 116, 최대 접기 깊이 3; 상태: unreviewed
+- [ ] [scenario/ch11-post-advanced/11-2-image-upload.md](../../scenario/ch11-post-advanced/11-2-image-upload.html) — 항목 245, 긴 산문 0, 토글 117, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch11-post-advanced/11-3-view-count.md](../../scenario/ch11-post-advanced/11-3-view-count.html) — 항목 156, 긴 산문 0, 토글 62, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch11-post-advanced/11-4-search.md](../../scenario/ch11-post-advanced/11-4-search.html) — 항목 191, 긴 산문 0, 토글 99, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch11-post-advanced/11-5-trash-restore.md](../../scenario/ch11-post-advanced/11-5-trash-restore.html) — 항목 180, 긴 산문 0, 토글 90, 최대 접기 깊이 3; 상태: unreviewed
@@ -314,7 +369,7 @@
 - [ ] [scenario/ch8-query-deep/8-3-relations.md](../../scenario/ch8-query-deep/8-3-relations.html) — 항목 175, 긴 산문 0, 토글 116, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch8-query-deep/8-4-dynamic-search.md](../../scenario/ch8-query-deep/8-4-dynamic-search.html) — 항목 218, 긴 산문 0, 토글 138, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch8-query-deep/8-5-recount-batch.md](../../scenario/ch8-query-deep/8-5-recount-batch.html) — 항목 208, 긴 산문 0, 토글 123, 최대 접기 깊이 3; 상태: unreviewed
-- [ ] [scenario/ch9-schema-change/9-1-flyway.md](../../scenario/ch9-schema-change/9-1-flyway.html) — 항목 170, 긴 산문 0, 토글 106, 최대 접기 깊이 3; 상태: unreviewed
+- [ ] [scenario/ch9-schema-change/9-1-flyway.md](../../scenario/ch9-schema-change/9-1-flyway.html) — 항목 170, 긴 산문 1, 토글 106, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch9-schema-change/9-2-index-explain.md](../../scenario/ch9-schema-change/9-2-index-explain.html) — 항목 197, 긴 산문 1, 토글 111, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch9-schema-change/9-3-add-column-backfill.md](../../scenario/ch9-schema-change/9-3-add-column-backfill.html) — 항목 201, 긴 산문 1, 토글 132, 최대 접기 깊이 3; 상태: unreviewed
 - [ ] [scenario/ch9-schema-change/9-4-notifications.md](../../scenario/ch9-schema-change/9-4-notifications.html) — 항목 245, 긴 산문 0, 토글 158, 최대 접기 깊이 3; 상태: unreviewed
@@ -330,33 +385,33 @@
 
 ## 티켓 (30)
 
-- [ ] [tickets/001-board-list-api.md](../../tickets/001-board-list-api.html) — 항목 55, 긴 산문 0, 토글 7, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/002-post-edited-flag.md](../../tickets/002-post-edited-flag.html) — 항목 66, 긴 산문 0, 토글 13, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/003-board-list-sort.md](../../tickets/003-board-list-sort.html) — 항목 70, 긴 산문 0, 토글 14, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/004-huge-page-number.md](../../tickets/004-huge-page-number.html) — 항목 69, 긴 산문 0, 토글 16, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/005-change-nickname.md](../../tickets/005-change-nickname.html) — 항목 73, 긴 산문 0, 토글 20, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/006-normalize-tags.md](../../tickets/006-normalize-tags.html) — 항목 69, 긴 산문 0, 토글 14, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/007-post-thumbnail.md](../../tickets/007-post-thumbnail.html) — 항목 74, 긴 산문 0, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/008-notification-post-title.md](../../tickets/008-notification-post-title.html) — 항목 53, 긴 산문 0, 토글 9, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/009-null-tag-500.md](../../tickets/009-null-tag-500.html) — 항목 67, 긴 산문 0, 토글 16, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/010-tag-stats-api.md](../../tickets/010-tag-stats-api.html) — 항목 59, 긴 산문 0, 토글 15, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/011-member-profile-api.md](../../tickets/011-member-profile-api.html) — 항목 81, 긴 산문 0, 토글 23, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/012-following-feed-api.md](../../tickets/012-following-feed-api.html) — 항목 69, 긴 산문 0, 토글 16, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/013-admin-hide-post.md](../../tickets/013-admin-hide-post.html) — 항목 107, 긴 산문 0, 토글 42, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/014-list-liked-bookmarked-by-me.md](../../tickets/014-list-liked-bookmarked-by-me.html) — 항목 64, 긴 산문 0, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/015-comment-delete-permission.md](../../tickets/015-comment-delete-permission.html) — 항목 78, 긴 산문 0, 토글 28, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/016-notification-skip-deleted.md](../../tickets/016-notification-skip-deleted.html) — 항목 75, 긴 산문 0, 토글 25, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/017-view-count-lost-update.md](../../tickets/017-view-count-lost-update.html) — 항목 63, 긴 산문 0, 토글 10, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/018-new-tag-race-500.md](../../tickets/018-new-tag-race-500.html) — 항목 65, 긴 산문 1, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/001-board-list-api.md](../../tickets/001-board-list-api.html) — 항목 55, 긴 산문 1, 토글 7, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/002-post-edited-flag.md](../../tickets/002-post-edited-flag.html) — 항목 66, 긴 산문 1, 토글 13, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/003-board-list-sort.md](../../tickets/003-board-list-sort.html) — 항목 70, 긴 산문 1, 토글 14, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/004-huge-page-number.md](../../tickets/004-huge-page-number.html) — 항목 69, 긴 산문 1, 토글 16, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/005-change-nickname.md](../../tickets/005-change-nickname.html) — 항목 73, 긴 산문 1, 토글 20, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/006-normalize-tags.md](../../tickets/006-normalize-tags.html) — 항목 69, 긴 산문 1, 토글 14, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/007-post-thumbnail.md](../../tickets/007-post-thumbnail.html) — 항목 74, 긴 산문 1, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/008-notification-post-title.md](../../tickets/008-notification-post-title.html) — 항목 53, 긴 산문 1, 토글 9, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/009-null-tag-500.md](../../tickets/009-null-tag-500.html) — 항목 67, 긴 산문 1, 토글 16, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/010-tag-stats-api.md](../../tickets/010-tag-stats-api.html) — 항목 59, 긴 산문 1, 토글 15, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/011-member-profile-api.md](../../tickets/011-member-profile-api.html) — 항목 81, 긴 산문 1, 토글 23, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/012-following-feed-api.md](../../tickets/012-following-feed-api.html) — 항목 69, 긴 산문 1, 토글 16, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/013-admin-hide-post.md](../../tickets/013-admin-hide-post.html) — 항목 107, 긴 산문 1, 토글 42, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/014-list-liked-bookmarked-by-me.md](../../tickets/014-list-liked-bookmarked-by-me.html) — 항목 64, 긴 산문 1, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/015-comment-delete-permission.md](../../tickets/015-comment-delete-permission.html) — 항목 78, 긴 산문 1, 토글 28, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/016-notification-skip-deleted.md](../../tickets/016-notification-skip-deleted.html) — 항목 75, 긴 산문 1, 토글 25, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/017-view-count-lost-update.md](../../tickets/017-view-count-lost-update.html) — 항목 63, 긴 산문 1, 토글 10, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/018-new-tag-race-500.md](../../tickets/018-new-tag-race-500.html) — 항목 65, 긴 산문 2, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [tickets/019-comment-list-block-n-plus-1.md](../../tickets/019-comment-list-block-n-plus-1.html) — 항목 65, 긴 산문 2, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/020-popular-range-index.md](../../tickets/020-popular-range-index.html) — 항목 52, 긴 산문 0, 토글 7, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/021-last-commented-at.md](../../tickets/021-last-commented-at.html) — 항목 80, 긴 산문 1, 토글 23, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/022-error-code-refactor.md](../../tickets/022-error-code-refactor.html) — 항목 83, 긴 산문 1, 토글 32, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/023-comment-deadlock.md](../../tickets/023-comment-deadlock.html) — 항목 63, 긴 산문 1, 토글 11, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/024-like-burst-pool-exhaustion.md](../../tickets/024-like-burst-pool-exhaustion.html) — 항목 63, 긴 산문 1, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/025-post-edit-conflict.md](../../tickets/025-post-edit-conflict.html) — 항목 69, 긴 산문 0, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/026-idempotency-key.md](../../tickets/026-idempotency-key.html) — 항목 74, 긴 산문 0, 토글 20, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/027-board-list-cursor.md](../../tickets/027-board-list-cursor.html) — 항목 69, 긴 산문 0, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/028-popular-cache.md](../../tickets/028-popular-cache.html) — 항목 69, 긴 산문 0, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/029-comment-body-mediumtext.md](../../tickets/029-comment-body-mediumtext.html) — 항목 67, 긴 산문 2, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [tickets/030-entity-out-of-controller.md](../../tickets/030-entity-out-of-controller.html) — 항목 63, 긴 산문 0, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/020-popular-range-index.md](../../tickets/020-popular-range-index.html) — 항목 52, 긴 산문 1, 토글 7, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/021-last-commented-at.md](../../tickets/021-last-commented-at.html) — 항목 80, 긴 산문 2, 토글 23, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/022-error-code-refactor.md](../../tickets/022-error-code-refactor.html) — 항목 83, 긴 산문 2, 토글 32, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/023-comment-deadlock.md](../../tickets/023-comment-deadlock.html) — 항목 63, 긴 산문 2, 토글 11, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/024-like-burst-pool-exhaustion.md](../../tickets/024-like-burst-pool-exhaustion.html) — 항목 63, 긴 산문 2, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/025-post-edit-conflict.md](../../tickets/025-post-edit-conflict.html) — 항목 69, 긴 산문 1, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/026-idempotency-key.md](../../tickets/026-idempotency-key.html) — 항목 74, 긴 산문 1, 토글 20, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/027-board-list-cursor.md](../../tickets/027-board-list-cursor.html) — 항목 69, 긴 산문 1, 토글 18, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/028-popular-cache.md](../../tickets/028-popular-cache.html) — 항목 69, 긴 산문 1, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/029-comment-body-mediumtext.md](../../tickets/029-comment-body-mediumtext.html) — 항목 67, 긴 산문 3, 토글 17, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [tickets/030-entity-out-of-controller.md](../../tickets/030-entity-out-of-controller.html) — 항목 63, 긴 산문 1, 토글 18, 최대 접기 깊이 1; 상태: unreviewed

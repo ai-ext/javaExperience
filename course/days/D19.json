@@ -1,0 +1,139 @@
+{
+  "id": "D19",
+  "roadmap": {
+    "id": "D19",
+    "phase": "extend",
+    "title": "ThreadLocal과 요청 경계 정리",
+    "java": "J19",
+    "purpose": "재사용 스레드에서 요청 문맥이 생성·전달·정리되는 경계를 확인한다.",
+    "prerequisite": "D17·D18에서 남긴 Java 공백·D01 MDC",
+    "workTarget": "1단계에서 만든 내 프로젝트 · 별도 disposable DB/포트. board-server·messy-server 원본은 수정하지 않는다.",
+    "note": "개인 경로: 앞선 티켓에서 얻은 증거를 재사용하되 오늘의 완료 조건은 전원 확인한다. 실제 업무 접근권이 없어도 내 상점/사본의 명시된 변형으로 진행한다.",
+    "steps": [
+      {
+        "no": 1,
+        "title": "재사용 스레드의 요청 문맥 누출 재현",
+        "files": [
+          "src/test/java/RequestContextIsolationTest.java"
+        ],
+        "fileActions": {
+          "create": [
+            "src/test/java/RequestContextIsolationTest.java"
+          ],
+          "modify": [],
+          "inspect": []
+        },
+        "done": [
+          "한 스레드 풀에서 A→예외→B 순서로 사용자·요청 ID를 관찰한다. finally 정리 전 실패와 정리 후 통과를 남긴다.",
+          "부모 스레드의 ThreadLocal 값이 다른 작업 스레드로 자동 전달된다고 가정하지 않고 실제 값을 비교한다."
+        ],
+        "trap": "새 Thread를 매번 만들면 재사용 문제를 숨긴다. 풀 크기 1에서 요청 경계를 분리한다.",
+        "specRefs": [],
+        "tickets": [],
+        "guides": [],
+        "dayRefs": [
+          {
+            "day": "D17",
+            "step": 2,
+            "label": "티켓에서 확인한 Java 공백"
+          }
+        ]
+      },
+      {
+        "no": 2,
+        "title": "내 필터의 문맥 생명주기 확인",
+        "files": [
+          "docs/evidence/D19/context.md"
+        ],
+        "fileActions": {
+          "create": [
+            "docs/evidence/D19/context.md"
+          ],
+          "modify": [],
+          "inspect": []
+        },
+        "done": [
+          "내 프로젝트의 요청 ID 필터·SecurityContext 사용 위치를 읽고 생성·사용·정리 시점을 연결한다.",
+          "작업 스레드로 필요한 문맥을 명시 전달하고 완료·예외·취소 뒤 개인정보와 문맥이 남지 않는 테스트를 남긴다."
+        ],
+        "trap": "프레임워크의 정리 책임과 직접 만든 ThreadLocal을 구분한다. 인증 객체 전체를 무분별하게 복사하지 않는다.",
+        "specRefs": [],
+        "tickets": [],
+        "guides": [],
+        "dayRefs": [
+          {
+            "day": "D17",
+            "step": 2,
+            "label": "티켓에서 확인한 Java 공백"
+          }
+        ]
+      }
+    ],
+    "talkCards": [
+      "TC-D19-1",
+      "TC-D19-2",
+      "TC-D19-3"
+    ],
+    "tomorrow": "D20는 시각·정책·제한된 실행기를 진행한다. 오늘의 증거와 미해결 항목을 입력으로 쓴다."
+  },
+  "java": {
+    "id": "J19",
+    "day": "D19",
+    "optional": false,
+    "topic": "Executors.newFixedThreadPool(1)에서 요청 A 성공·실패 뒤 요청 B를 실행한다. ThreadLocal.remove를 finally에 둔 전후 값과 비동기 스레드의 값을 비교한다.",
+    "basics": "Executors.newFixedThreadPool(1)에서 요청 A 성공·실패 뒤 요청 B를 실행한다. ThreadLocal.remove를 finally에 둔 전후 값과 비동기 스레드의 값을 비교한다.",
+    "typeCut": null,
+    "habit": "실제 실행·입출력·반례를 남기고 관찰과 추정을 구분한다.",
+    "reuse": [
+      "J07"
+    ],
+    "labFile": "src/test/java/J19EvidenceTest.java",
+    "acceptance": [
+      "Executors.newFixedThreadPool(1)에서 요청 A 성공·실패 뒤 요청 B를 실행한다. ThreadLocal.remove를 finally에 둔 전후 값과 비동기 스레드의 값을 비교한다.",
+      "선택한 경계의 기대값과 실제 출력·실행 명령을 남긴다. 단순 설명만으로 완료하지 않는다."
+    ],
+    "title": "ThreadLocal과 문맥 정리",
+    "experiment": [
+      "ThreadLocal은 객체별이 아니라 현재 스레드별 값을 보관한다. 풀은 같은 스레드를 다음 요청에 재사용하므로 A의 값이 B에 남을 수 있다. remove는 현재 스레드 값만 지운다. J07은 공유 상태와 동시 실행의 기초이고 이 문맥 생명주기 자체는 새 실험이다.",
+      "`Executors.newFixedThreadPool(1)`에 A를 submit하여 `set(\"A\")` 후 성공 또는 예외로 끝내고 Future.get(2, TimeUnit.SECONDS)로 종료를 기다린다. 그 뒤 B를 submit해 get()을 수집한다. 누출 관찰용 사본과 `try/finally { context.remove(); }` 사본을 분리한다. B의 예상값은 각각 A/null이며 실제 출력을 비교한다.",
+      "부모 스레드의 set 후 풀에서 submit한 작업의 get을 관찰한다. 일반 ThreadLocal은 부모 값을 자동 전달하지 않는다. 필요한 식별값만 명시적 인자로 전달하고 작업 내부에서 set/remove한다. 인증 객체 전체를 복제하지 않는다. finally에서 latch 해제·shutdownNow·awaitTermination(2초)을 실행하여 실패 경로도 정리한다."
+    ]
+  },
+  "hints": {
+    "steps": {
+      "1": [
+        "새 Thread를 매번 만들면 재사용 문제를 숨긴다. 풀 크기 1에서 요청 경계를 분리한다."
+      ],
+      "2": [
+        "프레임워크의 정리 책임과 직접 만든 ThreadLocal을 구분한다. 인증 객체 전체를 무분별하게 복사하지 않는다."
+      ]
+    },
+    "grader": {
+      "focus": [
+        "부모 스레드의 ThreadLocal 값이 다른 작업 스레드로 자동 전달된다고 가정하지 않고 실제 값을 비교한다.",
+        "작업 스레드로 필요한 문맥을 명시 전달하고 완료·예외·취소 뒤 개인정보와 문맥이 남지 않는 테스트를 남긴다.",
+        "실행하지 않은 항목은 확인 불가이며 예상값·추정·실측을 구분한다."
+      ]
+    },
+    "refs": [
+      "course/java/J07.md"
+    ],
+    "sql": {
+      "context": "내 프로젝트의 disposable 실습 DB에서 기존 1단계 모델(게시글·회원·쿠폰)을 쓴다. 아래 예시를 내 테이블·열·키·필터로 매핑한다. 예약 모델은 D23 이후에 설계하며 오늘의 선행 조건이 아니다. practice·원본 서버 DB는 수정하지 않는다.",
+      "questions": [
+        {
+          "task": "서로 다른 DB 연결 식별자를 기록한다.",
+          "expect": "내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.",
+          "example": "SELECT CONNECTION_ID(),DATABASE(),NOW();"
+        },
+        {
+          "task": "같은 회원의 현재 상태와 요청의 관찰 시점을 대조한다.",
+          "expect": "내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.",
+          "example": "SELECT id,nickname FROM member ORDER BY id LIMIT 5;"
+        }
+      ],
+      "refs": []
+    }
+  },
+  "cards": "## D19 ThreadLocal과 요청 경계 정리\n\n### TC-D19-1\n**질문** ThreadLocal은 왜 싱글톤 필드와 다르게 보이나요?\n**답에 들어가야 할 것**\n- 싱글톤 필드는 요청들이 공유하고 ThreadLocal은 현재 스레드마다 값을 보관한다.\n- 풀의 같은 스레드 재사용으로 요청 A의 값이 B에 남는 누출을 설명한다.\n- 풀 1개의 A/B 실제 출력과 일반 ThreadLocal의 비전달 한계를 제시한다.\n**근거** D19 완료 조건·실행 증거\n\n### TC-D19-2\n**질문** 요청 실패 뒤 정리는 어디서 보장하나요?\n**답에 들어가야 할 것**\n- 성공·예외·취소 모두에서 finally의 remove가 실행되어야 한다.\n- A 실패 뒤 B에서 이전 값이 남지 않는 테스트 결과를 제시한다.\n- 비동기 작업도 자체 set/remove가 필요하며 정리 누락 비용을 말한다.\n**근거** D19 완료 조건·실행 증거\n\n### TC-D19-3\n**질문** 비동기 작업에는 어떤 문맥만 전달하나요?\n**답에 들어가야 할 것**\n- 부모의 일반 ThreadLocal 값은 비동기 스레드로 자동 전달되지 않는다.\n- 요청 식별자 등 필요한 불변 값만 명시적 인자로 전달하는 기준을 말한다.\n- 민감 인증 객체 복사의 위험·작업 내부 정리·실제 비전달/전달 관찰을 제시한다.\n**근거** D19 완료 조건·실행 증거\n\n"
+}

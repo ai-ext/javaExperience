@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace는 매퍼 인터페이스의 전체 이름과 같아야 한다. 다르면 기동은 되고 호출할 때 BindingException이 난다. -->
+<mapper namespace="com.example.board.post.PostQueryMapper">
+
+    <!-- 태그는 <collection select="...">로 따로 읽으면 글 수만큼 쿼리가 늘어난다(N+1). 조인 한 번으로 묶는다. -->
+    <resultMap id="postSummaryMap" type="com.example.board.post.PostSummary">
+        <id property="id" column="id"/>
+        <result property="authorId" column="member_id"/>
+        <result property="authorNickname" column="nickname"/>
+        <result property="title" column="title"/>
+        <result property="likeCount" column="like_count"/>
+        <result property="createdAt" column="created_at"/>
+        <collection property="tags" ofType="string">
+            <result column="tag_name"/>
+        </collection>
+    </resultMap>
+
+    <!-- 값은 모두 샵 중괄호(#{})로 바인딩한다. 달러 중괄호 치환은 문자열이 SQL에 그대로 붙어 인젝션이 된다. 정렬은 id DESC 고정이다. -->
+    <!-- LIMIT은 글에만 걸어야 한다. 태그와 조인한 결과에 걸면 글 수가 아니라 행 수로 잘린다. -->
+    <select id="search" resultMap="postSummaryMap">
+        SELECT p.id, p.member_id, m.nickname, p.title, p.like_count, p.created_at, t.name AS tag_name
+        FROM (SELECT id, member_id, title, like_count, created_at
+              FROM post
+              <where>
+                  status = 'ACTIVE'
+                  <if test="afterId != null">
+                      AND id &lt; #{afterId}
+                  </if>
+                  <if test="cond.keyword != null">
+                      AND (title LIKE CONCAT('%', #{cond.keyword}, '%') OR content LIKE CONCAT('%', #{cond.keyword}, '%'))
+                  </if>
+                  <if test="cond.tag != null">
+                      AND EXISTS (SELECT 1 FROM post_tag f JOIN tag ft ON ft.id = f.tag_id
+                                  WHERE f.post_id = post.id AND ft.name = #{cond.tag})
+                  </if>
+              </where>
+              ORDER BY id DESC
+              LIMIT #{limit}) p
+        JOIN member m ON m.id = p.member_id
+        LEFT JOIN post_tag pt ON pt.post_id = p.id
+        LEFT JOIN tag t ON t.id = pt.tag_id
+        ORDER BY p.id DESC, pt.id
+    </select>
+
+    <!-- 인기글은 캐시(60초)가 앞에 있어 자주 실행되지 않는다. like_count 인덱스 없이 정렬한다. -->
+    <select id="findPopular" resultMap="postSummaryMap">
+        SELECT p.id, p.member_id, m.nickname, p.title, p.like_count, p.created_at, t.name AS tag_name
+        FROM (SELECT id, member_id, title, like_count, created_at
+              FROM post
+              WHERE status = 'ACTIVE'
+              ORDER BY like_count DESC, id DESC
+              LIMIT #{limit}) p
+        JOIN member m ON m.id = p.member_id
+        LEFT JOIN post_tag pt ON pt.post_id = p.id
+        LEFT JOIN tag t ON t.id = pt.tag_id
+        ORDER BY p.like_count DESC, p.id DESC, pt.id
+    </select>
+</mapper>

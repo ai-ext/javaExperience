@@ -356,16 +356,16 @@ public void save(String storedName, byte[] bytes) {
 API 서버 주소는 페이지 상단의 공통 입력에서 설정하고, HTTP 요청은 아래 실행 패널에서 순서대로 보낸다. Postman 설정은 접어서 필요할 때 확인할 수 있다.
 
 ```bash
-jget() { python3 -c "import sys,json; print(json.load(sys.stdin)['$1'])"; }
-
+# Postman 수동 확인(C2 바이트 비교, C9 1MB 초과 등)에 올릴 파일을 만든다
 printf 'GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;' > dot.gif   # 1×1 GIF
 echo hello > fake.png
 head -c 1200000 /dev/urandom > big.gif                                  # 1.2MB
+```
 
-F=$(jget fileName < up.json); IMG=$(jget id < up.json)
-for ids in '[null]' '["abc"]' '[99999999]' '[1,2,3,4,5,6,7,8,9,10,11]'; do
-done
+C2 바이트 비교(수동) — Postman에서 `POST /api/images`를 Body `form-data`(key `file`, 종류 File)로 `dot.gif`를 골라 김자바 토큰으로 보낸다. 응답의 `url`로 `GET`을 보낼 때 Send 버튼 옆 화살표의 **Send and Download**로 응답을 위 파일들과 같은 폴더에 `got.gif`로 저장한다. 그다음 같은 폴더에서 올린 파일과 받은 파일을 바이트 단위로 비교한다.
 
+```bash
+cmp dot.gif got.gif && echo 같은파일   # C2 — 한 바이트라도 다르거나 길이가 다르면 cmp가 차이를 출력하고 같은파일이 나오지 않는다
 ```
 
 버튼으로 확인 — 아래 실행 패널에서 요청을 보내고 채점 기준의 C 항목을 대조한다. 실행 칸은 파일을 고를 수 없어서 `multipart/form-data` 본문을 글자로 직접 적어 보낸다(경계 `jx11`, 줄바꿈은 `\r\n`).
@@ -568,7 +568,7 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 | # | 확인 방법 | 기대 |
 |---|---|---|
 | C1 | I0 | `201`, `Location`이 `/api/images/{fileName}`, `fileName`이 `32자 16진수.gif`, `url`=`/api/images/{fileName}`, `contentType`=`image/gif`, `size`=`14` |
-| C2 | I1 | `200`, `Content-Type: image/gif`, 본문이 올린 바이트(`GIF89a…`) — curl에서는 `cmp`가 `같은파일` |
+| C2 | I1 | `200`, `Content-Type: image/gif`, 본문이 올린 바이트 그대로 — 실행 칸에서는 본문이 `GIF89a`로 시작하는지 보고, 바이트 전체가 같은지는 직접 확인의 Postman 수동 절차에서 `cmp dot.gif got.gif`가 `같은파일`을 출력하는 것으로 확인한다 |
 | C3 | I2(이름만 `.png`인 텍스트) | `415` |
 | C4 | I3(토큰 없음) | `401` |
 | C5 | I8(`file` 파트 없음) | `400` |

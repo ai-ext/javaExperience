@@ -196,7 +196,7 @@ flowchart LR
 DB에는 이미 시나리오용 글이 들어 있다. 저장된 모습을 SQL로 직접 본다.
 
 ```bash
-docker exec -i studymate-mysql-1 mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community -e "SELECT id, title, author_id FROM post ORDER BY id LIMIT 3;"
+docker compose exec -T mysql mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community -e "SELECT id, title, author_id FROM post ORDER BY id LIMIT 3;"
 ```
 
 ```text

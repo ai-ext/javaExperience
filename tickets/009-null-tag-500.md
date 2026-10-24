@@ -9,7 +9,7 @@
 - 프론트도 고치겠지만, 서버는 어떤 입력에도 500을 내면 안 됩니다. 잘못된 입력이니 다른 검증 오류처럼 400과 `errors`(어느 필드가 왜)를 돌려주세요.
 - **완료 조건**: `null`이 섞인 작성 요청은 400이고 글은 저장되지 않는다. 정상 요청·태그 없는 요청은 그대로 201.
 
-**DB 시작 상태**: `community` 처음 상태(`bash scripts/java-db.sh --reset`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다.
 
 ## 지금 코드
 

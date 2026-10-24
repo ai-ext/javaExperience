@@ -13,7 +13,7 @@
 - 키가 없는 요청은 지금과 똑같이 동작합니다.
 - **완료 조건**: 같은 키로 5개가 동시에 와도 글 1개, 응답 5개 모두 그 글.
 
-**DB 시작 상태**: `community` 처음 상태(`bash scripts/java-db.sh --reset`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다 — **다음 마이그레이션 번호는 V7**. 김자바(`tok-kimjava`)가 자유 게시판(`free`)에 쓴다.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다 — **다음 마이그레이션 번호는 V7**. 김자바(`tok-kimjava`)가 자유 게시판(`free`)에 쓴다.
 
 ## 지금 코드
 

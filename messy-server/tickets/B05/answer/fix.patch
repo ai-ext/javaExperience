@@ -1,0 +1,34 @@
+diff --git a/src/main/java/com/example/board/common/ForbiddenWordChecker.java b/src/main/java/com/example/board/common/ForbiddenWordChecker.java
+index 59eb50d..4293a61 100644
+--- a/src/main/java/com/example/board/common/ForbiddenWordChecker.java
++++ b/src/main/java/com/example/board/common/ForbiddenWordChecker.java
+@@ -13,12 +13,9 @@ import com.example.board.config.BoardProperties;
+ public class ForbiddenWordChecker {
+ 
+     private final boolean ignoreCase;
+-    // 적재 시 통째로 교체하는 불변 집합
++    // 적재 시 통째로 교체하는 불변 집합. 요청마다 바뀌는 값은 필드에 두지 않는다.
++    // 싱글톤 빈의 필드는 모든 요청 스레드가 함께 쓰므로 volatile이어도 다른 요청 값으로 덮인다.
+     private volatile Set<String> words = Set.of();
+-    // 같은 글을 제목·본문·수정 때 연달아 검사하는 일이 많아 마지막 정규화 결과를 재사용한다.
+-    // 여러 요청 스레드가 함께 읽으므로 volatile로 둔다.
+-    private volatile String lastText;
+-    private volatile String lastFolded;
+ 
+     public ForbiddenWordChecker(BoardProperties properties) {
+         this.ignoreCase = properties.forbiddenWords().ignoreCase();
+@@ -36,12 +33,9 @@ public class ForbiddenWordChecker {
+         if (text == null || text.isEmpty()) {
+             return false;
+         }
+-        if (!text.equals(lastText)) {
+-            lastText = text;
+-            lastFolded = fold(text);
+-        }
++        String target = fold(text);
+         for (String word : words) {
+-            if (lastFolded.contains(word)) {
++            if (target.contains(word)) {
+                 return true;
+             }
+         }

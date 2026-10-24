@@ -10,7 +10,7 @@
 - 다른 회원이 쓰고 있는 닉네임이면 거절(409)합니다. 지금 내 닉네임을 그대로 다시 저장하는 건 성공이어야 합니다(프론트가 다른 항목과 같이 저장 버튼을 누르는 경우).
 - **완료 조건**: 바꾼 뒤 내가 쓰는 글·댓글의 작성자 이름이 새 닉네임으로 나온다.
 
-**DB 시작 상태**: `community` 처음 상태(`bash scripts/java-db.sh --reset`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 회원 2(`tok-kimjava`)의 닉네임은 `김자바`, 회원 3은 `이스프링`.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 회원 2(`tok-kimjava`)의 닉네임은 `김자바`, 회원 3은 `이스프링`.
 
 ## 지금 코드
 

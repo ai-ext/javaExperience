@@ -584,7 +584,7 @@ SELECT id, name FROM tag WHERE name = '[채점]롤백태그';"
 
 트랜잭션이 없으면 저장소 메서드 하나하나가 따로 `COMMIT`된다. 태그 `INSERT`는 이미 확정된 뒤에 글 `INSERT`가 실패한 것이다.
 
-고치는 법 — 서비스 메서드에 `@Transactional`을 되돌린다. 남은 태그는 `docker compose down -v && docker compose up -d`(javaExperience 레포 루트)으로 지운다. → [G3 첫 트랜잭션](../../lessons/G3-first-transaction.md)
+고치는 법 — 서비스 메서드에 `@Transactional`을 되돌린다. 남은 태그는 `docker compose down -v && docker compose up -d`(javaExperience 레포 루트)으로 지운다. → [G3 첫 트랜잭션](../../lessons/G3-first-transaction.md) **루트 compose의 `down -v`는 `community`·`practice`·`project` DB와 CloudBeaver 작업 공간(저장한 SQL·연결 설정)을 함께 초기화한다. 먼저 `./docker/mysql/dump.sh`로 DB를 백업하고 CloudBeaver 자료는 따로 보관한다(DB 덤프에 포함되지 않음).**
 
 ## 구현 가이드
 

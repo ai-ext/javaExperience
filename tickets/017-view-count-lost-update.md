@@ -11,7 +11,7 @@
 - 좋아요 수 문의도 같은 원인인지 확인해 주세요 — 조회 처리가 좋아요 수를 건드리면 안 됩니다.
 - **완료 조건**: 동시 조회 30번 뒤 조회수가 정확히 30(+직접 연 횟수) 오르고, 좋아요 수는 실제 좋아요 행 수와 같다.
 
-**DB 시작 상태**: `community` 처음 상태(`bash scripts/java-db.sh --reset`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 글 12(자유 게시판, 이스프링의 공개 글)를 쓴다.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 글 12(자유 게시판, 이스프링의 공개 글)를 쓴다.
 
 ## 지금 코드
 

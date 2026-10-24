@@ -10,7 +10,7 @@
 - "실패하면 사용자가 다시 누르면 된다"는 안 됩니다. 글 작성은 사용자가 공들여 쓴 내용이라 한 번에 성공해야 합니다.
 - **완료 조건**: 같은 새 태그로 동시에 10개를 써도 10개 모두 `201`, 그 태그 행은 하나, 태그 검색으로 10개가 나온다.
 
-**DB 시작 상태**: `community` 처음 상태(`bash scripts/java-db.sh --reset`). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 아래 확인은 매번 새 태그 이름(`t018-<글 번호>`)을 만들어 쓴다.
+**DB 시작 상태**: `community` 처음 상태(이 저장소 루트에서 `docker compose down -v && docker compose up -d` — `community`·`practice`·`project` 세 DB를 모두 지우고 `docker/mysql/init/`의 처음 상태로 다시 만든다(`project`는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 `./docker/mysql/dump.sh`로 세 DB를 `docker/mysql/backup/<시각>/`에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 아래 확인은 매번 새 태그 이름(`t018-<글 번호>`)을 만들어 쓴다.
 
 ## 지금 코드
 

@@ -1,0 +1,323 @@
+{
+  "id": "D07",
+  "roadmap": {
+    "id": "D07",
+    "phase": "build",
+    "title": "포인트·쿠폰 상점",
+    "java": "J07",
+    "steps": [
+      {
+        "no": 1,
+        "title": "포인트 이력과 원자적 적립, 글 작성 활동 포인트 연결 — 데이터 요구사항 §6-5을 만족하도록 테이블을 직접 설계·생성",
+        "files": [
+          "src/main/java/com/example/board/point/PointLedger.java",
+          "src/main/java/com/example/board/point/PointService.java",
+          "src/main/resources/schema.sql",
+          "src/main/java/com/example/board/point/PointLedgerRepository.java",
+          "src/main/java/com/example/board/post/PostServiceImpl.java",
+          "src/main/java/com/example/board/member/Member.java",
+          "src/main/java/com/example/board/member/MemberRepository.java"
+        ],
+        "done": [
+          "`PointConcurrencyTest`가 \"조회 후 저장\" 방식에서 먼저 실패하는 것(50건 동시 적립 후 잔액 < 합계)을 보고, 원자적 UPDATE로 바꾼 뒤 통과: 잔액 = 포인트 이력 합",
+          "USER 토큰으로 `POST /api/posts` → 201 뒤 작성자 잔액이 늘어난다",
+          "[꼭 할 관찰] 1차 캐시와 RC/RR: clear 전후·같은 연결·새 트랜잭션의 값과 SQL 수를 표로 제출한다.",
+          "설계 메모: 만든 테이블·키·제약·인덱스와 각각의 이유, 고려했다 버린 대안 1개를 기록한다.",
+          "DB 불변식 확인: 잔액과 이력 합 대사에 불일치가 없고 실패 시 두 변경이 함께 취소된다. 이력 수정·삭제 차단 정책도 테스트한다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다.",
+          "트랜잭션 경계: 글 저장·포인트 잔액·이력을 어디까지 묶는지와 그 이유를 적는다. 실패 시 어느 변경이 함께 취소되는지 실행 결과로 설명한다."
+        ],
+        "trap": "잔액을 읽어 더한 뒤 저장하면 동시 적립에서 갱신이 사라진다. DB 안에서 원자적으로 갱신하도록 설계한다. 꼭 할 관찰: 1차 캐시와 DB snapshot을 RC/RR에서 구분한 표를 제출한다. 서로 다른 회원의 새 공유 태그 경합은 선택 관찰로 둔다.",
+        "specRefs": [
+          "GET /api/me/points",
+          "POST /api/posts"
+        ],
+        "tickets": [],
+        "dataRefs": [
+          "6-5"
+        ],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/point/PointLedger.java",
+            "src/main/java/com/example/board/point/PointService.java",
+            "src/main/java/com/example/board/point/PointLedgerRepository.java"
+          ],
+          "modify": [
+            "src/main/resources/schema.sql",
+            "src/main/java/com/example/board/post/PostServiceImpl.java",
+            "src/main/java/com/example/board/member/Member.java",
+            "src/main/java/com/example/board/member/MemberRepository.java"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 2,
+        "title": "내 포인트 잔액·이력 API (이력은 MyBatis 커서 목록)",
+        "files": [
+          "src/main/java/com/example/board/point/PointController.java",
+          "src/main/java/com/example/board/point/PointHistoryMapper.java",
+          "src/main/resources/mapper/PointHistoryMapper.xml"
+        ],
+        "done": [
+          "`GET /api/me/points` → 200 `{balance}`",
+          "`GET /api/me/points/history?size=20` → 200 `{items, nextCursor}`",
+          "토큰 없음 → 401"
+        ],
+        "trap": "잔액을 포인트 이력의 `SUM`으로 구하면 이력 0건 회원에서 null이 나온다. MyBatis `resultType=\"long\"`은 `java.lang.Long`이라 null을 담지만 그 값을 기본형 `long` 변수로 받으면 언박싱 NPE가 나고, 매퍼 메서드 반환 타입을 기본형 `long`으로 두면 `BindingException`이 난다. 잔액은 회원별 잔액에서 읽고, 이력 0건 회원에게도 200 `{balance: 0}`과 `items: []`를 준다.",
+        "specRefs": [
+          "GET /api/me/points",
+          "GET /api/me/points/history"
+        ],
+        "tickets": [],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/point/PointController.java",
+            "src/main/java/com/example/board/point/PointHistoryMapper.java",
+            "src/main/resources/mapper/PointHistoryMapper.xml"
+          ],
+          "modify": [],
+          "inspect": []
+        }
+      },
+      {
+        "no": 3,
+        "title": "쿠폰과 회원별 보유·발급량 설계 — 데이터 요구사항 §6-6을 만족하도록 테이블을 직접 설계·생성",
+        "files": [
+          "src/main/java/com/example/board/coupon/Coupon.java",
+          "src/main/java/com/example/board/coupon/CouponRepository.java",
+          "src/main/resources/schema.sql"
+        ],
+        "done": [
+          "`CouponRepositoryTest` 통과: 남은 수량이 있을 때만 발급량이 1 증가하고 영향 행 수로 성공 여부를 판정한다",
+          "설계 메모: 만든 테이블·키·제약·인덱스와 각각의 이유, 고려했다 버린 대안 1개를 기록한다.",
+          "DB 불변식 확인: 같은 회원·쿠폰의 중복 INSERT와 총량 초과·음수 발급량 UPDATE를 거부한다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다."
+        ],
+        "trap": "남은 수량을 읽어 확인한 뒤 증가시키면 동시 발급에서 총 수량을 넘는다.",
+        "specRefs": [
+          "POST /api/coupons/{couponId}/issue"
+        ],
+        "tickets": [],
+        "dataRefs": [
+          "6-6"
+        ],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/coupon/Coupon.java",
+            "src/main/java/com/example/board/coupon/CouponRepository.java"
+          ],
+          "modify": [
+            "src/main/resources/schema.sql"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 4,
+        "title": "쿠폰 발급(1인 1매)과 내 쿠폰 목록 API (`coupon/MemberCouponRepository.java` 추가)",
+        "files": [
+          "src/main/java/com/example/board/coupon/MemberCoupon.java",
+          "src/main/java/com/example/board/coupon/CouponService.java",
+          "src/main/java/com/example/board/coupon/CouponController.java",
+          "src/main/java/com/example/board/coupon/MemberCouponRepository.java"
+        ],
+        "done": [
+          "`POST /api/coupons/{couponId}/issue` → 201",
+          "같은 회원이 다시 → 409 `/errors/duplicate`",
+          "수량 소진 뒤 → 409 `/errors/coupon-exhausted`",
+          "`GET /api/me/coupons` → 200",
+          "트랜잭션 경계: 중복 확인·발급량 증가·보유 쿠폰 저장의 시작과 끝, 사전 판정과 동시 요청 경합 예외를 처리하는 위치와 그 이유를 적는다. 실패 시 발급량·보유 내역의 rollback 결과를 기록한다."
+        ],
+        "trap": "발급 버튼 연타로 두 요청이 동시에 오면 \"이미 받았나\" 조회가 둘 다 통과하므로 UNIQUE 위반을 409로 바꿔 막는다.",
+        "specRefs": [
+          "POST /api/coupons/{couponId}/issue",
+          "GET /api/me/coupons"
+        ],
+        "tickets": [],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/coupon/MemberCoupon.java",
+            "src/main/java/com/example/board/coupon/CouponService.java",
+            "src/main/java/com/example/board/coupon/CouponController.java",
+            "src/main/java/com/example/board/coupon/MemberCouponRepository.java"
+          ],
+          "modify": [],
+          "inspect": []
+        }
+      },
+      {
+        "no": 5,
+        "title": "상점 아이템 목록 API와 재고 설계 — 데이터 요구사항 §6-6을 만족하도록 테이블을 직접 설계·생성",
+        "files": [
+          "src/main/java/com/example/board/shop/ShopItem.java",
+          "src/main/java/com/example/board/shop/ShopController.java",
+          "src/main/resources/schema.sql",
+          "src/main/java/com/example/board/shop/ShopItemRepository.java"
+        ],
+        "done": [
+          "토큰 없이 `GET /api/shop/items` → 200",
+          "설계 메모: 만든 테이블·키·제약·인덱스와 각각의 이유, 고려했다 버린 대안 1개를 기록한다.",
+          "DB 불변식 확인: 음수 재고 UPDATE가 거부된다. 남은 재고보다 큰 구매의 조건부 차감은 영향 행 수 0이다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다."
+        ],
+        "trap": "재고를 조회한 뒤 차감하면 동시 구매에서 재고이 음수가 된다.",
+        "specRefs": [
+          "GET /api/shop/items"
+        ],
+        "tickets": [],
+        "dataRefs": [
+          "6-6"
+        ],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/shop/ShopItem.java",
+            "src/main/java/com/example/board/shop/ShopController.java",
+            "src/main/java/com/example/board/shop/ShopItemRepository.java"
+          ],
+          "modify": [
+            "src/main/resources/schema.sql"
+          ],
+          "inspect": []
+        }
+      },
+      {
+        "no": 6,
+        "title": "쿠폰·포인트 구매와 Idempotency-Key 설계 — 데이터 요구사항 §6-6을 만족하도록 테이블을 직접 설계·생성",
+        "files": [
+          "src/main/java/com/example/board/shop/ShopOrder.java",
+          "src/main/java/com/example/board/shop/OrderService.java",
+          "src/main/resources/schema.sql",
+          "src/main/java/com/example/board/shop/ShopOrderRepository.java",
+          "src/main/java/com/example/board/shop/ShopController.java",
+          "src/main/java/com/example/board/shop/OrderRequest.java",
+          "src/main/java/com/example/board/shop/OrderResponse.java"
+        ],
+        "done": [
+          "`POST /api/shop/orders` + `Idempotency-Key` → 201",
+          "같은 키·같은 본문 다시 → 처음과 같은 응답",
+          "같은 키·다른 본문 → 422",
+          "키 없음 → 400",
+          "잔액 부족 → 409 `/errors/insufficient-points`",
+          "남의 쿠폰 → 409 `/errors/coupon-unusable`",
+          "설계 메모: 만든 테이블·키·제약·인덱스와 각각의 이유, 고려했다 버린 대안 1개를 기록한다.",
+          "DB 불변식 확인: 같은 회원·같은 멱등 키 주문의 두 번째 INSERT가 거부되고 구매 실패에 재고·잔액·쿠폰이 함께 복원된다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다.",
+          "트랜잭션 경계: 멱등 키 확인·주문·재고·잔액·쿠폰 사용을 묶는 범위와 재사용하는 서비스의 경계, 그 이유를 적는다. 실패 시 함께 취소되는 변경과 재시도 뒤 결과를 테스트로 설명한다."
+        ],
+        "trap": "데드락 재시도를 `@Transactional` 메서드 안에 두면 이미 rollback-only가 된 같은 트랜잭션을 다시 쓰게 되므로 재시도는 트랜잭션 밖에서 한다.",
+        "specRefs": [
+          "POST /api/shop/orders"
+        ],
+        "tickets": [],
+        "dataRefs": [
+          "6-6"
+        ],
+        "fileActions": {
+          "create": [
+            "src/main/java/com/example/board/shop/ShopOrder.java",
+            "src/main/java/com/example/board/shop/OrderService.java",
+            "src/main/java/com/example/board/shop/ShopOrderRepository.java",
+            "src/main/java/com/example/board/shop/OrderRequest.java",
+            "src/main/java/com/example/board/shop/OrderResponse.java"
+          ],
+          "modify": [
+            "src/main/resources/schema.sql",
+            "src/main/java/com/example/board/shop/ShopController.java"
+          ],
+          "inspect": []
+        }
+      }
+    ],
+    "talkCards": [
+      "TC-D07-1",
+      "TC-D07-2",
+      "TC-D07-3",
+      "TC-D07-4"
+    ],
+    "tomorrow": "D08은 오늘 만든 원자적 잔액 갱신과 포인트 이력 적립을 충전 성공 처리에 그대로 쓴다.",
+    "purpose": "글 작성 적립에서 시작해 포인트·쿠폰·재고가 구매 한 번에 일관되게 변하는지 확인한다."
+  },
+  "java": {
+    "id": "J07",
+    "day": "D07",
+    "optional": false,
+    "topic": "`Map`·`Set`, 스레드와 공유 상태, `AtomicInteger`, `synchronized`: 잔액 갱신 손실을 순수 Java로 재현하고 고치기",
+    "basics": "회원별 포인트 이력을 `Map<Long, List<PointEntry>>`로 묶고 회원별 잔액 계산",
+    "typeCut": "`boolean` vs `Boolean`, `is` 접두어와 JSON 직렬화 — 응답 필드 이름이 바뀌는 문제",
+    "habit": "Map 함정: `toMap` 중복 키 예외, `HashMap`은 순서를 보장하지 않는다"
+  },
+  "hints": {
+    "steps": {
+      "1": [
+        "이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 필요한 데이터의 관계와 제약을 정해 테이블을 만든다 → 업무 검증과 트랜잭션 경계를 연결한다. 앞서 만든 층은 재사용하고 이 순서에서 바꾸는 부분만 진행한다.",
+        "먼저 \"조회 후 저장\"으로 만들어 `ExecutorService`와 `CountDownLatch`로 50건을 동시에 보내 테스트가 실패하는 것을 본다. 그다음 잔액 계산을 DB 안에서 하는 `@Modifying` UPDATE로 바꾼다.",
+        "원장 행과 잔액 UPDATE가 한 트랜잭션에 들어가는지 확인한다."
+      ],
+      "2": [
+        "이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 기존 테이블과 제약을 확인한다 → 필요한 저장·조회 조건을 저장소에서 먼저 확인한다 → DTO와 응답 계약을 연결해 호출로 확인한다. 앞서 만든 층은 재사용하고 이 순서에서 바꾸는 부분만 진행한다.",
+        "현재 잔액과 이력 합을 각각 구해 대사한다. 이력 0건 회원도 0이어야 한다. SUM의 NULL과 COALESCE를 비교한다. 이력 목록은 D06의 커서 방식을 내 설계에 맞춰 적용한다."
+      ],
+      "3": [
+        "이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 필요한 데이터의 관계와 제약을 정해 테이블을 만든다 → 필요한 저장·조회 조건을 저장소에서 먼저 확인한다. 앞서 만든 층은 재사용하고 이 순서에서 바꾸는 부분만 진행한다.",
+        "수량 확인과 증가를 한 문장에 담는 조건부 UPDATE(남은 수량 조건을 `WHERE`에 둔다)를 `@Modifying` 쿼리로 찾아보고, 성공 여부는 반환되는 영향 행 수로 판정한다."
+      ],
+      "4": [
+        "이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 기존 테이블과 제약을 확인한다 → 필요한 저장·조회 조건을 저장소에서 먼저 확인한다 → 업무 검증과 트랜잭션 경계를 연결한다 → DTO와 응답 계약을 연결해 호출로 확인한다. 앞서 만든 층은 재사용하고 이 순서에서 바꾸는 부분만 진행한다.",
+        "발급량 변경 뒤 회원별 쿠폰 저장에 실패하면 어떤 상태가 남는지 확인한다. 한 회원의 중복 발급과 수량 소진을 구별할 근거를 정한다.",
+        "동시 요청에서 앱의 사전 조회만으로 1인 1매를 지킬 수 있는지 고민한다."
+      ],
+      "5": [
+        "이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 필요한 데이터의 관계와 제약을 정해 테이블을 만든다 → 필요한 저장·조회 조건을 저장소에서 먼저 확인한다 → DTO와 응답 계약을 연결해 호출로 확인한다. 앞서 만든 층은 재사용하고 이 순서에서 바꾸는 부분만 진행한다.",
+        "공개 GET이므로 D03의 공개 범위 규칙에 경로를 추가한다. local 시드는 `data.sql` 또는 프로파일별 초기화를 찾아본다."
+      ],
+      "6": [
+        "이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 필요한 데이터의 관계와 제약을 정해 테이블을 만든다 → 필요한 저장·조회 조건을 저장소에서 먼저 확인한다 → 업무 검증과 트랜잭션 경계를 연결한다 → DTO와 응답 계약을 연결해 호출로 확인한다. 앞서 만든 층은 재사용하고 이 순서에서 바꾸는 부분만 진행한다.",
+        "동일 키의 범위가 회원별인 주문과 전체 충전 요청인 경우를 구분한다. 요청 본문을 비교하고 기존 응답을 다시 만들 근거를 어떻게 보존할지 정한다.",
+        "재고·잔액·쿠폰 중 한 변경만 실패했을 때 모두 원복되는지 확인하고 경합 테스트를 작성한다."
+      ]
+    },
+    "grader": {
+      "focus": [
+        "포인트·쿠폰 수량·재고를 \"읽고 계산해서 저장\"하는 코드가 남아 있지 않은지",
+        "구매 실패(잔액 부족·쿠폰 불가)에서 재고·포인트·쿠폰 상태가 모두 원래대로인지"
+      ]
+    },
+    "refs": [
+      "docs/knowledge/P18-concurrency-inventory.md",
+      "docs/knowledge/S08-transactions.md",
+      "docs/knowledge/W25-spring-multithreading.md",
+      "scenario/ch4-like/4-2-like-concurrency.md"
+    ],
+    "observations": {
+      "1": [
+        {
+          "text": "꼭 할 관찰: 1차 캐시와 RC/RR(15분, C16): 앞의 D05 실험을 확장해 MySQL InnoDB의 서로 다른 두 물리 연결 A/B를 쓴다. 테스트 자동 tx/OSIV와 2차 캐시를 끄고 각 실행의 @@transaction_isolation을 기록한다. A가 old를 일반 SELECT/find로 먼저 읽은 뒤 B에서 new로 UPDATE·commit한다(latch로 순서 고정). A에서 find 재호출(SQL 수), em.clear 후 find, 같은 A tx의 JDBC 일반 SELECT, A 종료 뒤 새 tx SELECT를 비교한다. clear 전 SQL 0회는 1차 캐시 증거다. REPEATABLE READ의 기존 consistent-read snapshot에서는 clear 후에도 old, READ COMMITTED는 새 SELECT에서 new, 새 tx는 두 수준 모두 new가 기대된다. DB snapshot과 Hibernate 변경 감지용 loaded state도 별개다. SELECT FOR UPDATE 같은 locking/current read는 이 예상표에서 제외한다. 두 격리 수준을 각각 새 tx로 실행하고 물리 연결을 바꾼 조회를 같은 tx의 JDBC 비교라고 적지 않는다.",
+          "required": true
+        },
+        {
+          "text": "선택 관찰 B(15분, I12): D04의 공유 태그를 서로 다른 회원 A/B가 동시에 생성하는 상황으로 반복한다. 학습자 src/test의 두 worker가 각자 새 tx에서 고유한 같은 태그 이름을 findByName하여 둘 다 없음임을 확인한 지점에서 latch로 모은 뒤 INSERT를 시도한다. 둘 다 조회를 마치기 전에 INSERT하지 않으며 INSERT 뒤 두 worker barrier는 두지 않는다(UNIQUE 잠금 대기와 교착될 수 있다). 모든 Future를 timeout과 함께 회수하고 worker별 SQL·UNIQUE 제약명·예외·commit/rollback을 기록한다. 기준 재현은 공유 태그 1건과 한 tx의 충돌이며 회원별 락만으로 공유 이름을 보호할 수 있는지 질문한다. 복구안을 선택해 별도 fixture에서 검증한다면 실패 tx를 끝낸 후 새 tx 재조회·기존 태그 재사용 또는 DB 충돌 처리 정책을 설명한다. 최종 목표는 공유 태그 1건·서로 다른 글의 연결 2행이며 다른 제약 오류를 모두 중복으로 삼키지 않는다. 현재 예시 서버가 이 경합을 통과한다고 가정하지 않는다.",
+          "required": false
+        }
+      ]
+    },
+    "sql": {
+      "context": "내 프로젝트 DB에서 오늘까지 만든 테이블을 쓴다. seed.sql의 D07까지 필요한 블록을 순서대로 붙여 넣는다. 이름이 다르면 INSERT·UPDATE·조회 이름을 바꾼다. 별도 실험 데이터에서 SQL·실제 결과를 저장한다.",
+      "questions": [
+        {
+          "task": "전체 회원의 잔액과 부호 있는 이력 합을 대사해 어긋난 회원만 찾는다.",
+          "expect": "seed D07 기준 20명 모두 잔액 900 = 적립 1,000 - 지출 100으로 불일치 0행이다. 이력이 없는 회원을 추가해도 잔액 0이면 불일치로 잡히지 않는다.",
+          "example": "SELECT m.id,m.point_balance,COALESCE(SUM(l.amount),0) AS ledger_sum FROM member m LEFT JOIN point_ledger l ON l.member_id=m.id GROUP BY m.id,m.point_balance HAVING m.point_balance<>ledger_sum;"
+        },
+        {
+          "task": "격리한 아이템에 남은 재고보다 큰 수량을 조건부 차감한다.",
+          "expect": "seed D07 기준 상품 1 재고는 80이다. 101개 조건부 차감은 영향 행 수 0, 재고 80 그대로다. 마지막에 ROLLBACK한다.",
+          "example": "START TRANSACTION;\nSELECT id,stock FROM shop_item WHERE id=1;\nUPDATE shop_item SET stock=stock-101 WHERE id=1 AND stock>=101;\nSELECT ROW_COUNT();\nROLLBACK;"
+        },
+        {
+          "task": "쿠폰별 보유 관계 수와 기록된 발급량을 비교한다.",
+          "expect": "seed D07 기준 쿠폰 2종 각각 보유 10건, 기록된 발급량도 10으로 불일치 0행이다.",
+          "example": "SELECT c.id,c.issued_quantity,COUNT(mc.id) AS held FROM coupon c LEFT JOIN member_coupon mc ON mc.coupon_id=c.id GROUP BY c.id,c.issued_quantity HAVING c.issued_quantity<>held;"
+        }
+      ],
+      "refs": []
+    }
+  },
+  "cards": "## D07 포인트·쿠폰 상점\n\n### TC-D07-1\n**질문** 같은 회원의 구매 두 건이 동시에 들어왔는데 포인트가 한 번만 차감됐습니다. 원인과 수정은?\n**답에 들어가야 할 것**\n- 두 트랜잭션이 같은 잔액을 읽고 각자 계산해 쓰면, 나중 쓰기가 앞 쓰기를 덮어쓴다(갱신 손실)\n- `UPDATE member SET point_balance = point_balance - ? WHERE id = ? AND point_balance >= ?`로 DB가 원자적으로 계산하게 하고, 바뀐 행이 0이면 409 `/errors/insufficient-points`로 처리한다\n- 같은 트랜잭션에서 포인트 이력에 이력을 쌓아 잔액과 이력의 합이 항상 맞게 한다\n**근거** 05 §3-6, spec-v2 §6\n\n### TC-D07-2\n**질문** 쿠폰 발급 버튼을 연타하면 한 회원이 두 장을 받을 수 있나요? 어떻게 막았나요?\n**답에 들어가야 할 것**\n- \"이미 받았는지 조회 후 INSERT\"는 두 요청이 동시에 조회를 통과하면 둘 다 INSERT한다\n- 같은 회원·쿠폰 조합의 두 번째 INSERT를 DB가 거부하도록 설계하고, 중복 키 예외를 409 `/errors/duplicate`로 바꾼다\n- 중복 키 오류가 난 INSERT는 기존 행에 공유 락을 걸기 때문에 동시 INSERT가 많으면 데드락이 날 수 있어, 예외 처리를 함께 설계한다\n**근거** 07 #13, spec-v2 §5-4\n\n### TC-D07-3\n**질문** 구매 중 데드락으로 실패한 요청을 재시도합니다. 재시도 코드를 `@Transactional` 메서드 안에 두면 안 되는 이유는?\n**답에 들어가야 할 것**\n- 데드락이 나면 InnoDB가 한쪽 트랜잭션 전체를 롤백한다\n- 같은 트랜잭션·영속성 컨텍스트 안에서 다시 시도하면 이미 롤백된 작업을 이어 가게 되므로, 재시도는 바깥에서 새 트랜잭션으로 한다\n- 여러 행을 잠글 때는 순서(예: id 오름차순)를 통일해 데드락 자체를 줄이고, 재시도에는 횟수 상한을 둔다\n**근거** 07 §6, 07 #3\n\n### TC-D07-4\n**질문** 구매 요청이 네트워크 문제로 다시 전송되면 두 번 구매되나요? `Idempotency-Key`를 어떻게 처리했나요?\n**답에 들어가야 할 것**\n- 클라이언트는 같은 구매를 재시도할 때 같은 `Idempotency-Key`를 보낸다\n- 같은 회원의 같은 멱등 키로 주문이 중복 생성되지 않게 설계하고, 같은 키·같은 본문이면 처음 응답을 그대로 돌려준다\n- 같은 키에 다른 본문이 오면 422로 거부한다\n**근거** spec-v2 §5-4, 05 §3-2\n\n"
+}

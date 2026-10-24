@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>J08. 예외·try-with-resources·람다로 만드는 재시도 함수</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=6580290a3c9f">
+<link rel="stylesheet" href="../../tools/site/course-exercise.css?v=c30e18dc3d31">
+<link rel="stylesheet" href="../../tools/site/course.css?v=b6c93c158a77">
+<link rel="stylesheet" href="../../tools/site/course-tokens.css?v=90f7ed5128e9">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../spring/README.html" aria-current="page">과정 v2 · 일자 목록</a><a href="../map.html">과정 지도</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<article class="exercise-sheet exercise-java" data-exercise="J08"><header class="exercise-head"><p class="exercise-kind"><b>J08</b> Java 연결 실험</p><h1 id="j08-예외try-with-resources람다로-만드는-재시도-함수"><a class="anchor" href="#j08-예외try-with-resources람다로-만드는-재시도-함수" aria-hidden="true">#</a>J08. 예외·try-with-resources·람다로 만드는 재시도 함수</h1><blockquote class="exercise-meta">
+<p>같은 날: D08 · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests 'J08*'</code></p>
+</blockquote></header><nav class="exercise-route" aria-label="Java 실험 순서"><ol><li><a href="#만들-것"><b>01</b><span>만들 것</span></a></li><li><a href="#오늘-spring에서-다시-만나는-곳"><b>02</b><span>Spring 이어하기</span></a></li></ol></nav>
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D08.html#오늘-순서">D08 · 포인트 충전 (외부 PG 모의)</a></p><p>Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p><p><a href="J07.html">← 이전 J07</a> · <a href="J09.html">다음 J09 →</a></p></nav>
+
+
+<section class="exercise-section" aria-labelledby="상황"><h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2><p>D08은 외부 PG를 붙여 포인트 충전을 만드는 날이다. D08 ④ "재시도와 백오프"에서 <code>PgRetryPolicy</code>가 연결 실패만 200ms·400ms 간격으로 다시 보내고, 거절은 다시 보내지 않는다. D08 ① <code>PgClient</code>는 HTTP 라이브러리 예외를 원인을 담은 <code>PgException</code>으로 바꾼다.
+오늘은 Spring 없이 같은 재시도 함수 <code>retry(Supplier&lt;T&gt;, int)</code>를 직접 만든다. 람다로 호출을 넘기려면 체크 예외를 언체크 예외로 바꿔야 하고, 연결은 try-with-resources로 반드시 닫고, 바꿀 때 원인을 버리면 장애 때 무엇이 실패했는지 알 수 없다는 것까지 테스트로 확인한다.</p></section>
+
+<section class="exercise-section" aria-labelledby="빠른-연상"><h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2><div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>체크 예외 (<code>IOException</code>, <code>InterruptedException</code>)</th>
+<th>언체크 예외 (<code>RuntimeException</code> 하위)</th>
+<th>TS로 치면</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>컴파일러가 처리를 강제하나</td>
+<td>강제한다. <code>catch</code> 하거나 <code>throws</code>로 선언해야 컴파일된다</td>
+<td>강제하지 않는다</td>
+<td>TS는 둘 다 강제하지 않는다</td>
+</tr>
+<tr>
+<td>람다(<code>Supplier.get()</code>) 안에서 던질 수 있나</td>
+<td>없다. <code>get()</code>에 <code>throws</code>가 없다</td>
+<td>있다</td>
+<td>콜백 안 <code>throw</code></td>
+</tr>
+<tr>
+<td>언제 쓰나</td>
+<td>호출한 쪽이 복구할 수 있는 외부 실패</td>
+<td>프로그래밍 오류, 또는 체크 예외를 감싸 올릴 때</td>
+<td></td>
+</tr>
+</tbody></table></div><pre><code>retry(call, 3)
+ ├─ 1회 call.get() ── PgUnreachableException ── 200ms 기다림 (Sleeper)
+ ├─ 2회 call.get() ── PgUnreachableException ── 400ms 기다림
+ └─ 3회 call.get() ── PgUnreachableException ── 기다리지 않고 그대로 던짐
+          └─ PgDeclinedException(거절)이면 몇 번째든 바로 던짐</code></pre><p>흔한 착각: "체크 예외를 언체크로 바꾸면 정보가 사라진다". 원인을 생성자 두 번째 인자로 넘기면(<code>new PgUnreachableException(msg, e)</code>) 원래 예외가 <code>getCause()</code>와 스택 트레이스의 <code>Caused by:</code>로 그대로 남는다. 정보가 사라지는 경우는 원인을 넘기지 않을 때다.</p></section>
+
+
+
+<section class="exercise-section" aria-labelledby="만들-것"><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2><details>
+<summary>펼치기</summary>
+
+<p>채울 파일(<code>java-track/src/main/java/com/example/javatrack/j08/</code>):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>파일</th>
+<th>채울 것</th>
+<th>칸</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Retrier.java</code></td>
+<td><code>Sleeper</code> 필드, 생성자, <code>retry</code></td>
+<td>주제 과제</td>
+</tr>
+<tr>
+<td><code>PgCall.java</code></td>
+<td><code>sendOnce</code></td>
+<td>주제 과제 · 실무 습관</td>
+</tr>
+<tr>
+<td><code>ChargeValidator.java</code></td>
+<td><code>validateAndSum</code></td>
+<td>기본기 반복</td>
+</tr>
+<tr>
+<td><code>PgMessages.java</code></td>
+<td><code>queryUrl</code>, <code>approvalLog</code></td>
+<td>타입 한 컷</td>
+</tr>
+<tr>
+<td><code>Sleeper.java</code>·<code>PgChannel.java</code>·<code>PgUnreachableException.java</code>·<code>PgDeclinedException.java</code>·<code>ChargeRequest.java</code>·<code>ChargeFailure.java</code>·<code>ChargeValidationException.java</code>·<code>LeakyPgCall.java</code></td>
+<td>주어진 코드. 고치지 않는다</td>
+<td>-</td>
+</tr>
+</tbody></table></div>
+<p><code>retry</code> 규칙:</p>
+<ul>
+<li><code>maxAttempts</code>는 첫 시도를 포함한 전체 시도 횟수다. 1보다 작으면 한 번도 부르지 않고 <code>IllegalArgumentException</code>을 던진다.</li>
+<li><code>PgUnreachableException</code>(연결 실패)만 다시 시도한다. 다른 예외(<code>PgDeclinedException</code> 등)는 그대로 던진다.</li>
+<li>다시 시도하기 전에 200ms부터 두 배씩(200ms, 400ms, 800ms …) 기다린다. 마지막 시도 뒤에는 기다리지 않는다.</li>
+<li>끝까지 실패하면 마지막 예외를 <strong>그대로</strong> 던진다(새 예외로 감싸지 않는다).</li>
+<li>기다리는 일은 생성자로 받은 <code>Sleeper</code>가 한다. 테스트는 기다리지 않고 시간만 적어 두는 람다(<code>sleeps::add</code>)를 넘긴다. <code>Thread.sleep</code>을 직접 부르지 않는다.</li>
+<li><code>Sleeper</code>가 <code>InterruptedException</code>을 던지면 인터럽트 표시를 되살리고(<code>Thread.currentThread().interrupt()</code>), 더 시도하지 않고 마지막 예외를 던진다.</li>
+</ul>
+<p>뼈대 발췌:</p>
+<pre><code class="language-java">@FunctionalInterface
+public interface Sleeper {                         // 주어진 코드
+    void sleep(Duration duration) throws InterruptedException;
+}
+
+public class Retrier {
+
+    public static final Duration FIRST_BACKOFF = Duration.ofMillis(200);
+
+    // TODO: 주입받은 Sleeper를 담을 필드를 선언하세요(다시 대입할 일이 없다)
+
+    public Retrier(Sleeper sleeper) {
+        throw new UnsupportedOperationException("J08: Retrier 생성자 — 받은 Sleeper를 필드에 담으세요");
+    }
+
+    /** call을 최대 maxAttempts번 부른다. 성공하면 그 값을 돌려준다. */
+    public &lt;T&gt; T retry(Supplier&lt;T&gt; call, int maxAttempts) {
+        throw new UnsupportedOperationException("J08: Retrier.retry — 연결 실패만 백오프를 두고 다시 부르세요");
+    }
+}
+
+public final class PgCall {
+    /** 채널을 열어 보내고 반드시 닫는다. IOException은 원인으로 담아 PgUnreachableException으로 바꾼다. */
+    public static String sendOnce(Supplier&lt;PgChannel&gt; opener, String body) {
+        throw new UnsupportedOperationException("J08: PgCall.sendOnce — try-with-resources로 보내고, IOException은 원인을 담아 바꾸세요");
+    }
+}</code></pre>
+<p><code>PgChannel</code>은 <code>AutoCloseable</code>이고 <code>send</code>가 체크 예외 <code>IOException</code>을 던진다. <code>Supplier.get()</code>은 체크 예외를 던질 수 없으므로, <code>retrier.retry(() -&gt; channel.send(body), 3)</code>처럼 바로 넘기면 컴파일되지 않는다. <code>sendOnce</code>가 바꿔 주면 <code>retrier.retry(() -&gt; PgCall.sendOnce(opener, body), 3)</code>이 된다.</p>
+<p>통과시킬 테스트(주제 과제) — <code>J08RetryTest</code>:</p>
+<ul>
+<li><code>첫_시도에_성공하면_한_번만_부르고_기다리지_않는다</code></li>
+<li><code>연결_실패_뒤_성공하면_그_값을_돌려주고_200ms_400ms를_기다린다</code></li>
+<li><code>끝까지_실패하면_마지막_예외를_그대로_던지고_마지막_시도_뒤에는_기다리지_않는다</code> (4회 시도, 200·400·800ms)</li>
+<li><code>거절은_다시_보내지_않고_기다리지도_않는다</code></li>
+<li><code>시도_횟수가_1보다_작으면_한_번도_부르지_않고_거절한다</code> (0, -1)</li>
+<li><code>기다리다_인터럽트되면_인터럽트_표시를_되살리고_마지막_예외를_던진다</code></li>
+<li><code>보내고_나면_채널이_닫힌다</code></li>
+<li><code>보내다_IOException이_나도_채널은_닫히고_언체크_예외로_바뀐다</code></li>
+<li><code>닫다가_난_예외는_원래_예외를_가리지_않고_suppressed로_붙는다</code></li>
+<li><code>체크_예외를_바꿔_주면_sendOnce를_retry에_람다로_넘길_수_있다</code></li>
+</ul>
+<p>테스트의 호출 횟수는 <code>AtomicInteger</code>로 센다. 람다 안에서는 바깥의 지역 변수를 바꿀 수 없기 때문이다(effectively final). <code>int count</code>를 람다 안에서 <code>count++</code> 해 보면 컴파일 오류로 확인할 수 있다.</p>
+</details></section>
+
+
+<section class="exercise-section" aria-labelledby="기본기-반복"><h2 id="기본기-반복"><a class="anchor" href="#기본기-반복" aria-hidden="true">#</a>기본기 반복</h2><p>충전 요청 목록을 for로 돌며 검사한다. 모두 통과하면 금액 합계를 <code>return</code>하고, 하나라도 실패하면 <strong>실패한 건을 모두</strong> 모아 <code>ChargeValidationException</code> 하나로 던진다. 첫 실패에서 멈추면 사용자는 고치고 다시 보낼 때마다 다음 오류를 하나씩 알게 된다.</p><pre><code class="language-java">/**
+ * 멱등 키: null이거나 공백뿐이면 실패. 금액: 1,000~1,000,000이고 1,000 단위.
+ * 한 요청에는 실패 하나만 기록한다. ChargeFailure.index는 목록에서의 위치(0부터).
+ */
+public static long validateAndSum(List&lt;ChargeRequest&gt; requests)</code></pre><p>테스트 — <code>J08BasicsTest</code>:</p><ul>
+<li><code>모두_통과하면_금액_합계를_돌려준다</code> (1,000·1,000,000 경계 포함)</li>
+<li><code>빈_목록이면_0을_돌려준다</code></li>
+<li><code>실패한_건을_첫_실패에서_멈추지_않고_모두_모아_한_번에_던진다</code> (1,500·0·1,001,000)</li>
+<li><code>멱등_키가_없거나_공백뿐이면_실패이고_한_요청에는_실패_하나만_남긴다</code></li>
+</ul></section>
+
+
+
+
+<section class="exercise-section" aria-labelledby="타입-한-컷"><h2 id="타입-한-컷"><a class="anchor" href="#타입-한-컷" aria-hidden="true">#</a>타입 한 컷</h2><p><code>String</code> 불변, <code>+</code> 결합과 <code>StringBuilder</code>, <code>String.format</code> — 외부 API URL 조립과 로그 메시지.</p><div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th><code>+</code> / <code>+=</code></th>
+<th><code>StringBuilder</code></th>
+<th><code>String.format</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>결과</td>
+<td>매번 새 <code>String</code></td>
+<td>한 버퍼에 이어 붙이고 마지막에 <code>toString()</code></td>
+<td>틀(<code>%s</code>, <code>%d</code>)에 값을 채운 새 <code>String</code></td>
+</tr>
+<tr>
+<td>어울리는 곳</td>
+<td>한 줄짜리 짧은 결합</td>
+<td>반복문으로 개수가 정해지지 않은 조각 붙이기(쿼리 파라미터)</td>
+<td>모양이 정해진 메시지(로그 한 줄)</td>
+</tr>
+<tr>
+<td>반복문 안에서</td>
+<td>조각마다 새 문자열을 만든다</td>
+<td>버퍼 하나를 늘려 간다</td>
+<td>-</td>
+</tr>
+</tbody></table></div><p>함정: <code>String</code>은 불변이라 <code>url.concat("?a=1")</code>, <code>url.replace(…)</code>, <code>url.toUpperCase()</code>는 <strong>새 문자열을 돌려줄 뿐</strong> <code>url</code>을 바꾸지 않는다. 결과를 받지 않으면(<code>url = url.concat(…)</code>) 아무 일도 일어나지 않는다. 그리고 쿼리 값에 <code>&amp;</code>·공백이 섞이면 파라미터가 갈라지므로 <code>URLEncoder.encode(값, UTF_8)</code>로 인코딩한다.</p><p>과제: <code>PgMessages.queryUrl(baseUrl, params)</code>는 <code>StringBuilder</code>로 <code>?키=값&amp;키=값</code>을 params 순서대로 붙이고(비어 있으면 baseUrl 그대로), <code>approvalLog</code>는 <code>String.format</code>으로 <code>PG 승인 orderId=CHG-1 amount=10000 elapsedMs=120</code>을 만든다.</p><p>확인 테스트 — <code>J08TypeCutTest</code>:</p><ul>
+<li><code>쿼리_파라미터를_넣은_순서대로_이어_붙인다</code></li>
+<li><code>파라미터가_없으면_물음표_없이_기본_URL만_돌려준다</code></li>
+<li><code>값에_섞인_특수문자는_인코딩해_파라미터가_갈라지지_않게_한다</code></li>
+<li><code>로그_메시지는_String_format으로_자리를_채운다</code></li>
+<li><code>함정_String은_불변이라_concat_결과를_받지_않으면_그대로다</code></li>
+</ul></section>
+
+
+
+
+
+
+<section class="exercise-section" aria-labelledby="실무-습관"><h2 id="실무-습관"><a class="anchor" href="#실무-습관" aria-hidden="true">#</a>실무 습관</h2><p>예외 원인 연결과 삼키기. 주어진 <code>LeakyPgCall</code>은 컴파일도 되고 평소에는 잘 돈다. 장애가 나야 문제가 드러난다.</p><ol>
+<li><code>sendSwallowing</code> — 빈 <code>catch</code>. PG에 연결하지 못했는데 <code>null</code>을 돌려준다. 호출한 쪽은 "응답이 비었다"와 "실패했다"를 구분하지 못하고, 로그에도 아무것도 남지 않는다.</li>
+<li><code>sendWithoutCause</code> — <code>new PgUnreachableException("PG 호출 실패")</code>처럼 원인 없이 새 예외를 던진다. 실패한 것은 알지만 연결 거부인지 리셋인지 알 수 없다. 스택 트레이스에 <code>Caused by:</code>가 없다.</li>
+</ol><p>과제: <code>PgCall.sendOnce</code>에서 <code>IOException</code>을 바꿀 때 <code>new PgUnreachableException(msg, e)</code>로 원인을 넘긴다.</p><p>테스트 — <code>J08HabitTest</code> (각 테스트가 <code>LeakyPgCall</code>이 무엇을 숨기는지 먼저 보여 준다):</p><ul>
+<li><code>빈_catch는_실패를_null로_숨기고_PgCall은_예외로_드러낸다</code></li>
+<li><code>원인_없이_새_예외를_던지면_원래_IOException이_사라진다_PgCall은_원인으로_남긴다</code></li>
+<li><code>원인을_이어_두면_스택_트레이스에_Caused_by로_원래_예외가_찍힌다</code></li>
+</ul></section>
+
+
+
+
+
+<section class="exercise-section" aria-labelledby="확인"><h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2><pre><code class="language-bash">./gradlew :java-track:test --tests 'J08*'</code></pre><p>23개(매개변수 테스트는 값마다 하나로 센다)가 모두 <code>PASSED</code>면 끝이다.</p></section>
+
+
+<section class="exercise-section" aria-labelledby="정답"><h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2><details>
+<summary>펼치기</summary>
+
+<pre><code class="language-java">// Retrier
+private final Sleeper sleeper;
+
+public Retrier(Sleeper sleeper) {
+    this.sleeper = sleeper;
+}
+
+public &lt;T&gt; T retry(Supplier&lt;T&gt; call, int maxAttempts) {
+    if (maxAttempts &lt; 1) {
+        throw new IllegalArgumentException("maxAttempts는 1 이상이어야 합니다: " + maxAttempts);
+    }
+    Duration backoff = FIRST_BACKOFF;
+    for (int attempt = 1; ; attempt++) {
+        try {
+            return call.get();
+        } catch (PgUnreachableException e) {
+            // 재시도 대상만 잡는다. 거절 같은 다른 예외는 catch에 걸리지 않고 그대로 나간다
+            if (attempt &gt;= maxAttempts) {
+                throw e;
+            }
+            pause(backoff, e);
+            backoff = backoff.multipliedBy(2);
+        }
+    }
+}
+
+private void pause(Duration backoff, PgUnreachableException last) {
+    try {
+        sleeper.sleep(backoff);
+    } catch (InterruptedException interrupted) {
+        // 잡는 순간 인터럽트 표시가 지워진다. 되살려야 스레드를 멈추려던 쪽이 신호를 잃지 않는다
+        Thread.currentThread().interrupt();
+        throw last;
+    }
+}</code></pre>
+<pre><code class="language-java">// PgCall
+public static String sendOnce(Supplier&lt;PgChannel&gt; opener, String body) {
+    // 괄호 안에서 연 자원은 블록을 어떻게 빠져나가든 close된다. close 예외는 원래 예외의 suppressed로 붙는다
+    try (PgChannel channel = opener.get()) {
+        return channel.send(body);
+    } catch (IOException e) {
+        // 두 번째 인자로 원인을 넘긴다. 빼면 로그에서 "왜" 실패했는지가 사라진다
+        throw new PgUnreachableException("PG 호출 실패: " + e.getMessage(), e);
+    }
+}</code></pre>
+<pre><code class="language-java">// ChargeValidator
+public static long validateAndSum(List&lt;ChargeRequest&gt; requests) {
+    List&lt;ChargeFailure&gt; failures = new ArrayList&lt;&gt;();
+    long total = 0;
+    for (int i = 0; i &lt; requests.size(); i++) {
+        String reason = reasonOf(requests.get(i));
+        if (reason != null) {
+            failures.add(new ChargeFailure(i, reason));
+        } else {
+            total += requests.get(i).amount();
+        }
+    }
+    if (!failures.isEmpty()) {
+        throw new ChargeValidationException(failures);
+    }
+    return total;
+}
+
+/** 통과하면 null, 실패하면 첫 번째로 어긴 규칙의 사유. */
+private static String reasonOf(ChargeRequest request) {
+    if (request.idempotencyKey() == null || request.idempotencyKey().isBlank()) {
+        return "멱등 키가 없습니다";
+    }
+    int amount = request.amount();
+    if (amount &lt; MIN_AMOUNT || amount &gt; MAX_AMOUNT) {
+        return "금액은 1,000~1,000,000원이어야 합니다: " + amount;
+    }
+    if (amount % AMOUNT_UNIT != 0) {
+        return "금액은 1,000원 단위여야 합니다: " + amount;
+    }
+    return null;
+}</code></pre>
+<pre><code class="language-java">// PgMessages
+public static String queryUrl(String baseUrl, Map&lt;String, String&gt; params) {
+    // String은 불변이라 반복문에서 +=를 쓰면 매번 새 문자열을 만든다. 한 버퍼에 이어 붙인다
+    StringBuilder url = new StringBuilder(baseUrl);
+    char separator = '?';
+    for (Map.Entry&lt;String, String&gt; param : params.entrySet()) {
+        url.append(separator)
+                .append(param.getKey())
+                .append('=')
+                .append(URLEncoder.encode(param.getValue(), StandardCharsets.UTF_8));
+        separator = '&amp;';
+    }
+    return url.toString();
+}
+
+public static String approvalLog(String orderId, int amount, long elapsedMillis) {
+    return String.format("PG 승인 orderId=%s amount=%d elapsedMs=%d", orderId, amount, elapsedMillis);
+}</code></pre>
+<p>왜 이렇게 쓰나:</p>
+<ol>
+<li><code>catch (PgUnreachableException e)</code>처럼 재시도할 예외만 잡으면 "무엇을 다시 보내는가"가 catch 한 줄에 드러난다. 거절이나 버그 예외는 잡히지 않고 그대로 나간다. <code>Exception</code>을 통째로 잡고 다시 고르는 것보다 실수할 곳이 적다.</li>
+<li>기다리는 일을 <code>Sleeper</code>로 주입받으면 테스트는 실제로 기다리지 않고 "몇 ms를 몇 번 기다렸나"만 정확히 확인한다. 실제로 기다리는 테스트는 느리고, 걸린 시간을 범위로만 단언할 수 있다. <code>InterruptedException</code>을 잡으면 인터럽트 표시가 지워지므로 되살려 둔다.</li>
+<li>체크 예외를 언체크로 바꾸는 곳은 람다 경계 한 곳(<code>sendOnce</code>)에 모으고, 바꿀 때 반드시 원인을 넘긴다. try-with-resources는 close 실패를 버리지 않고 원래 예외의 <code>getSuppressed()</code>에 붙이므로, 원인 연결과 함께 쓰면 장애 로그 한 덩어리에 전부 남는다.</li>
+</ol>
+</details></section>
+
+
+<section class="exercise-section" aria-labelledby="오늘-spring에서-다시-만나는-곳"><h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2><ul>
+<li>D08 ① <code>board-server/src/main/java/com/example/board/payment/PgClient.java</code> — <code>translate</code>가 HTTP 라이브러리 예외를 <code>new PgException(Kind.UNREACHABLE, "PG 연결 실패", e)</code>처럼 원인을 담아 바꾼다. <code>approve</code>는 <code>retryPolicy.execute(() -&gt; call(…))</code>로 호출을 람다(<code>Supplier</code>)에 담아 넘긴다.</li>
+<li>D08 ③ <code>board-server/src/main/java/com/example/board/payment/ChargeService.java</code> — <code>catch (PgException e)</code>에서 예외 종류에 따라 충전 상태(<code>FAILED</code>·<code>UNKNOWN</code>)를 정한다. 삼키지 않고 상태와 응답으로 드러낸다.</li>
+<li>D08 ④ <code>board-server/src/main/java/com/example/board/payment/PgRetryPolicy.java</code> — 오늘 만든 <code>retry</code>의 실전판. 첫 시도를 포함해 최대 3회, 백오프 200ms·400ms(+지터), 연결 실패와 5xx만 다시 보내고 응답 타임아웃·거절은 보내지 않는다. 인터럽트되면 표시를 되살리고 마지막 예외를 던진다. 다른 점은 <code>Thread.sleep</code>을 직접 부른다는 것이다(오늘은 <code>Sleeper</code>로 주입받았다).</li>
+<li>D08 ④ <code>board-server/src/test/java/com/example/board/payment/PgClientRetryTest.java</code> — 5xx는 같은 <code>Idempotency-Key</code>로 세 번 보내고, 거절(400)과 응답 타임아웃은 한 번만 보내는지 PG가 받은 요청 수로 확인한다. 백오프는 실제로 기다린 시간을 재서(600ms 이상 등) 범위로 확인한다. 오늘은 <code>Sleeper</code>를 주입해 기다리지 않고 기다린 시간 목록을 정확히 단언했다.</li>
+</ul></section>
+
+
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><strong>실험 결과를 남겼다면</strong><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D08.html#오늘-순서">D08 · 포인트 충전 (외부 PG 모의)</a></p><p>Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p><p><a href="J07.html">← 이전 J07</a> · <a href="J09.html">다음 J09 →</a></p><p class="exercise-return-note">연결된 일자로 돌아가 완료 조건을 확인하고 진행 기록을 남기세요.</p></nav></article>
+
+</main>
+
+
+
+
+
+</body>
+</html>

@@ -24,7 +24,7 @@
 
    이 스키마는 MySQL 8.4의 `utf8mb4_0900_ai_ci`, `CHECK`, `AUTO_INCREMENT`를 쓴다. 대소문자 정렬 규칙이나 MySQL 함수·`ON DUPLICATE KEY UPDATE`·`SELECT ... FOR UPDATE`를 확인하려면 H2 `MODE=MySQL`이 아니라 MySQL 컨테이너에서 검증한다. 호환 모드는 MySQL 서버 자체가 아니다.
 3. **`@DataJpaTest` 기본값에 주의한다.** JPA slice만 올리고 테스트마다 롤백하며 임베디드 DB가 있으면 DataSource를 교체한다. 실 DB를 쓰려면 `@AutoConfigureTestDatabase(replace = Replace.NONE)`를 둔다. Boot 4 import는 `org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest`, `org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase`다.
-4. **연결 정보·버전:** `@ServiceConnection`으로 컨테이너 연결을 자동 설정한다. 이 프로젝트는 `spring-boot-starter-data-jpa-test`, `spring-boot-testcontainers`, `testcontainers-mysql`, `testcontainers-junit-jupiter`를 Boot 4.1.1 관리 버전(Testcontainers 2.0.5)으로 쓴다.
+4. **연결 정보·버전:** `@ServiceConnection`으로 컨테이너 연결을 자동 설정한다. 원래 공부자료의 예제 프로젝트(`practice/starter`, 이 저장소에는 없다)는 `spring-boot-starter-data-jpa-test`, `spring-boot-testcontainers`, `testcontainers-mysql`, `testcontainers-junit-jupiter`를 Boot 4.1.1 관리 버전(Testcontainers 2.0.5)으로 쓴다. 이 저장소 루트 `build.gradle`에는 그중 `spring-boot-starter-data-jpa-test`와 `testcontainers-mysql`이 있다.
 5. **작은 fixture부터 준비한다.** 고정 시드는 통계·페이지 총계처럼 넓은 데이터가 필요할 때만 쓴다. 한 테스트에 필요한 행은 테스트 본문/팩토리로 만들고, 정적 SQL은 `@Sql`, 공통 기반 데이터는 시드 파일로 둔다.
 6. **초기화와 fixture를 분리한다.** `spring.sql.init.*`는 컨텍스트의 스키마·공통 시드, `@Sql`은 메서드 전후의 테스트별 SQL에 쓴다. 트랜잭션에 참여한 SQL은 롤백되지만 별도 커밋·연결은 정리 대상이다.
 7. **SQL 시점을 확인한다.** JPA는 flush 때 쓰기를 모아 보낼 수 있으므로 제약 위반/쿼리 오류를 잡을 때 `entityManager.flush()`를 사용한다. 단 `Product`의 `IDENTITY` 키처럼 `save()` 때 일찍 INSERT하는 전략도 있다.
@@ -32,6 +32,8 @@
 9. **속도는 수명 관리로 개선한다.** static `@Container`는 클래스 내 공유, Boot-managed container Bean은 Spring context와 함께 관리한다. Testcontainers reusable은 종료 후에도 컨테이너가 남는 실험 기능이라 일반 CI의 기본값으로 삼지 않는다.
 
 ## 3. 따라 하기
+
+> **이 저장소에 없는 예제 프로젝트** — `practice/starter`는 원래 공부자료가 쓰던 상품 API 예제 프로젝트다(자체 `compose.yaml`: 호스트 `13307` → 컨테이너 `3306`, DB `ds_practice`, 계정 `practice`/`practice`). 이 저장소에는 없으므로 아래 경로·명령은 그런 프로젝트를 직접 만들었을 때의 예시로 읽는다. 이 저장소에서는 루트 프로젝트에 같은 패턴을 적용한다 — `./gradlew test`는 Testcontainers의 일회용 MySQL을 쓰고, 개발 DB는 루트 [`compose.yaml`](../../compose.yaml)(호스트 `localhost:13308`, 계정 `community`/`community`)이다.
 
 ### 1단계 — 의존성 확인
 

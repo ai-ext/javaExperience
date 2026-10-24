@@ -106,7 +106,7 @@ o.f.core.internal.command.DbMigrate : Schema `lesson_flyway` is up to date. No m
 15분. Flyway를 실제로 붙이는 것은 9-1에서 한다. 여기서는 Flyway가 하는 일을 **손으로 흉내 내서** 원리를 본다. 시드 데이터를 건드리지 않도록 G3처럼 임시 테이블만 쓴다(접속을 끊으면 사라진다).
 
 ```bash
-docker exec -it -e LANG=C.UTF-8 studymate-mysql-1 mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community
+docker compose exec -e LANG=C.UTF-8 mysql mysql --default-character-set=utf8mb4 -ucommunity -pcommunity community
 ```
 
 **1. 기록 테이블을 만들고, 지금 몇 번까지 됐는지 본다.**
