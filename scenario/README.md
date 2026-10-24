@@ -211,11 +211,11 @@ PUT 전체 교체와 PATCH 부분 수정 뒤 본인 글을 지운다. 지운 글
 > 단계가 진행되며 같은 API의 응답 계약이 확장된다. 이전 단계의 채점이 나중에 실패할 수 있다. `community`, `practice`, `project`는 서로 다른 DB이므로 DB를 바꾼 뒤에는 이전 글 ID를 그대로 사용할 수 없다.
 
 - **작업 브랜치** — 각자 새 브랜치를 만들어 구현한다. 공개 저장소를 읽거나 다운로드할 때는 계정이 필요하지 않다. 원격에 push하거나 PR을 보낼 때는 GitHub 계정과 권한이 필요하다.
-- **DB 초기화** — `docker compose down -v && docker compose up -d`는 로컬 실습 데이터를 모두 지운다. 필요한 데이터를 먼저 보관한다.
+- **DB 초기화** — `docker compose down -v && docker compose up -d`는 로컬 실습 데이터를 모두 지운다. 필요한 데이터를 먼저 보관한다. **루트 compose의 `down -v`는 `community`·`practice`·`project` DB와 CloudBeaver 작업 공간(저장한 SQL·연결 설정)을 함께 초기화한다. 먼저 `./docker/mysql/dump.sh`로 DB를 백업하고 CloudBeaver 자료는 따로 보관한다(DB 덤프에 포함되지 않음).**
 
 ## 시나리오 데이터 (`community` DB)
 
-게시글은 여러분이 API로 만든다. 처음에는 아래 데이터만 있다. 2장부터는 이 데이터로 채점하므로 **채점 결과가 이상하면 먼저 DB를 처음 상태로 돌린다**(`docker compose down -v && docker compose up -d`).
+게시글은 여러분이 API로 만든다. 처음에는 아래 데이터만 있다. 2장부터는 이 데이터로 채점하므로 **채점 결과가 이상하면 먼저 DB를 처음 상태로 돌린다**(`docker compose down -v && docker compose up -d`). **루트 compose의 `down -v`는 `community`·`practice`·`project` DB와 CloudBeaver 작업 공간(저장한 SQL·연결 설정)을 함께 초기화한다. 먼저 `./docker/mysql/dump.sh`로 DB를 백업하고 CloudBeaver 자료는 따로 보관한다(DB 덤프에 포함되지 않음).**
 
 **회원과 토큰** — 요청 헤더 `Authorization: Bearer <토큰>`
 

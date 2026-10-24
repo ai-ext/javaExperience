@@ -32,7 +32,7 @@
 
 ## 3. 따라 하기
 
-실습 기준은 Java 25, Spring Boot 4.1.1, MySQL 8.4이고, 이 저장소 루트 `compose.yaml`의 MySQL을 쓴다(`docker compose up -d` — 호스트 `localhost:13308`, 계정 `community`/`community`, 학습용 DB `practice`). 데이터는 `docker/mysql/init/02-practice.sql`에서 처음 한 번 적재된다. 아래 결과는 그 처음 상태 기준 **(예상)**이며, 이 문서를 쓰며 DB를 실행해 보지는 않았다.
+실습 기준은 Java 25, Spring Boot 4.1.1, MySQL 8.4이고, 이 저장소 루트 [`compose.yaml`](../../compose.yaml)의 MySQL을 쓴다(`docker compose up -d` — 호스트 `localhost:13308`, 계정 `community`/`community`, 학습용 DB `practice`). 데이터는 `docker/mysql/init/02-practice.sql`에서 처음 한 번 적재된다. 아래 결과는 그 처음 상태 기준 **(예상)**이며, 이 문서를 쓰며 DB를 실행해 보지는 않았다.
 
 ```mermaid
 flowchart LR

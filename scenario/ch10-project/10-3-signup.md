@@ -1020,7 +1020,7 @@ C = HTTP 확인(필수), D = DB 확인(필수, SELECT만), R = 코드 리뷰(피
 
 ## 일부러 망가뜨리기
 
-하나씩 바꾸고 다시 띄운 뒤 요청을 보낸다. 끝나면 되돌린다. 모두 Boot 4.1.1에서 재현했다. 망가뜨린 채 만든 회원은 확인 후 `DELETE FROM users WHERE email = '...'`로 지우거나 `docker compose down -v && docker compose up -d`으로 되돌린다.
+하나씩 바꾸고 다시 띄운 뒤 요청을 보낸다. 끝나면 되돌린다. 모두 Boot 4.1.1에서 재현했다. 망가뜨린 채 만든 회원은 확인 후 `DELETE FROM users WHERE email = '...'`로 지우거나 `docker compose down -v && docker compose up -d`으로 되돌린다. **루트 compose의 `down -v`는 `community`·`practice`·`project` DB와 CloudBeaver 작업 공간(저장한 SQL·연결 설정)을 함께 초기화한다. 먼저 `./docker/mysql/dump.sh`로 DB를 백업하고 CloudBeaver 자료는 따로 보관한다(DB 덤프에 포함되지 않음).**
 
 ### ① `@Valid`를 뺀다 → 엉뚱한 409, 엉뚱한 201
 

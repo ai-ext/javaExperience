@@ -49,10 +49,36 @@ python3 -m http.server 8765 --bind 127.0.0.1
 | 학습용 데이터로 앱 실행 | `./gradlew bootRun --args='--spring.profiles.active=practice'` |
 | 격리된 성능 DB 만들기 | `tools/db-perf-fixture.sh up` — 게시판·회원·글·좋아요·댓글·태그 데이터, 기본 좋아요 50만 행 |
 | 테스트 | `./gradlew test` (Docker가 켜져 있어야 한다 — 아래 "테스트") |
-| DB를 처음 상태로 | `docker compose down -v && docker compose up -d` |
+| DB를 처음 상태로 | `docker compose down -v && docker compose up -d` — 세 DB와 CloudBeaver 작업 공간도 초기화(아래 백업·복원 절차 확인) |
 | 지금 DB 상태를 떠 두기 | `./docker/mysql/dump.sh` → `docker/mysql/backup/<시각>/` (git에 안 올라감) |
 | 레포의 초기 데이터를 지금 상태로 바꾸기 | `./docker/mysql/dump.sh --seed` → `docker/mysql/init/` 교체 후 커밋 |
 | DB에 SQL 한 줄 | `docker compose exec -T mysql mysql -ucommunity -pcommunity community -e "SELECT COUNT(*) FROM post"` |
+
+## 초기화 전 백업과 DB 복원
+
+루트 compose의 `down -v`는 `community`·`practice`·`project`와 CloudBeaver 작업 공간(저장한 SQL·바꾼 연결 설정)을 함께 지운다. 먼저 `./docker/mysql/dump.sh`로 DB를 백업하고, CloudBeaver 자료는 별도로 복사한다. DB 덤프에는 CloudBeaver 작업 공간이 들어 있지 않으며, 다시 띄우면 저장소 기본 계정·연결로 시작한다.
+
+`dump.sh`의 `--compact` 덤프에는 기존 테이블을 지우는 `DROP TABLE`이 없다. 초기화로 시드가 다시 적재된 DB 위에 덮어 넣으면 테이블·키 중복이 나므로, **앱을 멈추고 아래 대상 DB를 지워도 되는지 확인한 뒤** 빈 DB에 복원한다. 이 절차는 현재 DB 내용을 백업 시점으로 교체한다. `--seed`가 아닌 일반 백업 디렉터리를 지정한다(`project`가 없었던 백업은 그 DB를 건너뜀).
+
+```bash
+# javaExperience 레포 루트에서 실행. 실제 백업 디렉터리 이름으로 바꾼다.
+backup_dir=docker/mysql/backup/20261024-120000
+test -s "$backup_dir/01-community.sql" && test -s "$backup_dir/02-practice.sql" || exit 1
+docker compose up -d mysql
+# docker compose ps에서 mysql이 healthy가 된 다음 아래를 실행한다.
+for db in community practice project; do
+  case "$db" in
+    community) file=01-community.sql ;;
+    practice) file=02-practice.sql ;;
+    project) file=03-project.sql ;;
+  esac
+  if [ ! -s "$backup_dir/$file" ]; then continue; fi
+  docker compose exec -T mysql mysql -uroot -proot -e "DROP DATABASE IF EXISTS $db; CREATE DATABASE $db CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci; GRANT ALL PRIVILEGES ON $db.* TO 'community'@'%';" || exit 1
+  docker compose exec -T mysql mysql -uroot -proot "$db" < "$backup_dir/$file" || exit 1
+done
+```
+
+`01-community.sql`에는 `USE`가 없어 대상 DB를 인자로 준다. 나머지 덤프는 `CREATE DATABASE`·`USE`를 포함한다. 백업 시점에 각 DB의 테이블·정확한 행 수·대표 조회 결과를 따로 기록하고, 복원 뒤 같은 조회로 대조한다. `project`의 `flyway_schema_history`도 백업에 포함되므로 정상 복원한 뒤 앱을 시작한다. 파일 크기만으로 복원 성공을 판단하지 않는다.
 
 ## DB 접속 정보
 

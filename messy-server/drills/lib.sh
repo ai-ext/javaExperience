@@ -13,11 +13,13 @@ lock() {
       echo $$ >"$LOCK/pid"
       return 0
     fi
-    # 잡은 프로세스가 죽고 남은 잠금은 치운다(pid를 아직 안 쓴 순간은 건드리지 않는다)
+    # 죽은 잠금도 자동으로 지우지 않는다. 동시 정리자가 새 소유자의 잠금을 지울 수 있다.
+    # pid를 아직 쓰지 않은 순간은 기다린다. 수동 정리는 모든 훈련 스크립트를 멈춘 뒤에만 한다.
     holder=$(cat "$LOCK/pid" 2>/dev/null || true)
     if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
-      rm -rf "$LOCK"
-      continue
+      echo "죽은 프로세스의 잠금이 남았다($LOCK, pid=$holder)." >&2
+      echo "모든 훈련 스크립트(start·inject·recover)를 멈추고 pid가 종료됐는지 확인한 뒤 이 잠금 디렉터리만 지우고 다시 실행한다." >&2
+      return 1
     fi
     sleep 0.1
   done

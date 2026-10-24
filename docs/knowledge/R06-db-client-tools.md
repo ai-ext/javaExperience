@@ -14,7 +14,7 @@ DBeaver는 DB 서버에 네트워크로 접속해 SQL을 보내고, 결과와 �
 
 > **이 저장소에 없는 실습 환경** — 이 문서의 연결 예시는 원래 공부자료의 예제 프로젝트 `practice/starter`가 띄우는 연습 DB(자체 `compose.yaml`: 호스트 `13307` → 컨테이너 `3306`, DB `ds_practice`, 계정 `practice`/`practice`, 쇼핑몰 테이블 `member`·`product`·`orders` 등)를 기준으로 한다. 그 프로젝트와 DB는 이 저장소에 없다. 이 저장소에서 바로 쓸 수 있는 DB는 루트 `compose.yaml`의 MySQL(`docker compose up -d` — 호스트 `localhost:13308`, 계정 `community`/`community`, DB `community`·`practice`·`project`)이고, 테이블은 게시판용(`member`·`post`·`comment`·`tag` 등)이라 이름과 열이 다르다. 이 저장소의 compose에는 웹 DB 클라이언트 CloudBeaver(`http://localhost:8978`, `cbadmin`/`Admin1234`)도 들어 있어 세 DB 연결이 미리 만들어져 있다.
 
-1. **연결 정보는 서버의 주소와 계정이다.** 로컬 DB라면 `127.0.0.1`은 내 컴퓨터를 뜻하고 포트는 호스트에 공개된 포트다. 컨테이너 안의 MySQL 포트 `3306`과 내 컴퓨터의 공개 포트가 같다는 보장은 없다. 이 문서가 기준으로 삼는 starter Compose는 `13307:3306`, 이 저장소 루트 `compose.yaml`은 `13308:3306`으로 공개한다.
+1. **연결 정보는 서버의 주소와 계정이다.** 로컬 DB라면 `127.0.0.1`은 내 컴퓨터를 뜻하고 포트는 호스트에 공개된 포트다. 컨테이너 안의 MySQL 포트 `3306`과 내 컴퓨터의 공개 포트가 같다는 보장은 없다. 이 문서가 기준으로 삼는 starter Compose는 `13307:3306`, 이 저장소 루트 [`compose.yaml`](../../compose.yaml)은 `13308:3306`으로 공개한다.
 
    ```text
    Host: 127.0.0.1   Port: (호스트에 공개된 포트)
