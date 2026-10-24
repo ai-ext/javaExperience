@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/F7-roles-and-ownership.md](../../../../../lessons/F7-roles-and-ownership.md)
 
 원문 SHA-256: `01f390ba57a950553939f485d375f33971328c50f740d8f48dee730f5e3e9d3e`
 
@@ -26,7 +26,7 @@ Standalone practice DB 예제에서 @AdminOnly interceptor 순서, id-only memo 
 
 공백 또는 한계: interceptor는 학습용 직접 구현이며 실무 보안 체계는 S12/Spring Security로 확장한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md:5) — 5~90행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F7-roles-and-ownership.md](../../../../../lessons/F7-roles-and-ownership.md) — 5~90행
 
 ### 2. id만 조건에 둔 resource query는 IDOR를 만든다. GET/PATCH는 인증 사용자 owner id까지 WHERE 조건으로 묶어야 한다.
 
@@ -36,7 +36,7 @@ Standalone practice DB 예제에서 @AdminOnly interceptor 순서, id-only memo 
 
 공백 또는 한계: resource id를 받는 모든 endpoint에 owner check를 적용한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md:91) — 91~190행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F7-roles-and-ownership.md](../../../../../lessons/F7-roles-and-ownership.md) — 91~190행
 
 ### 3. AuthInterceptor가 role check보다 먼저 실행되고 owner id는 request body에서 받지 않는다.
 
@@ -46,7 +46,7 @@ Standalone practice DB 예제에서 @AdminOnly interceptor 순서, id-only memo 
 
 공백 또는 한계: 실제 project의 route registration/order를 테스트해야 한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md:191) — 191~239행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F7-roles-and-ownership.md](../../../../../lessons/F7-roles-and-ownership.md) — 191~239행
 
 ## 이번 실행 근거
 
@@ -75,7 +75,7 @@ Custom interceptor/JDBC는 교육용 예제다. 모든 CRUD endpoint의 통합 �
 
 판정 범위: 예시/과거 관찰을 본편 구현 또는 이번 감사 실행으로 혼동하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md:5) — 5~239행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F7-roles-and-ownership.md](../../../../../lessons/F7-roles-and-ownership.md) — 5~239행
 
 ## 확장 개발 명세
 
@@ -128,10 +128,10 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F7/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F7/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F7/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F7/screen.jpg`)
 - 관찰: 렌더 캡처 미제공으로 검토 대기.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F7/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F7/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F7/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F7/dom.txt`)
 
 원문: corpus의 latest_source_same=True. 최신 HTML byte 해시 다름; 실제 캡처 기반 렌더 비교 전이므로 시각 차이는 pending_render. 원문 SHA/HTML 차이만으로 UI의 정확성이나 시각 완료를 추정하지 않는다.
 
@@ -139,8 +139,8 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md:5) — 5~90행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md:91) — 91~190행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F7-roles-and-ownership.md:191) — 191~239행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F7-roles-and-ownership.md](../../../../../lessons/F7-roles-and-ownership.md) — 5~90행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F7-roles-and-ownership.md](../../../../../lessons/F7-roles-and-ownership.md) — 91~190행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F7-roles-and-ownership.md](../../../../../lessons/F7-roles-and-ownership.md) — 191~239행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-F7.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-F7.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-F7.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-F7.json`)

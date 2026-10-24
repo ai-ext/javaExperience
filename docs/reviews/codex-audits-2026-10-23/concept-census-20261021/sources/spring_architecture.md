@@ -2,7 +2,7 @@
 
 확인 시각(원 조사): **2026-10-21T00:17:42+09:00 KST**. 총 **35개** 출처 레코드를 포함한다.
 
-출처는 Spring Framework/Boot/Data, Jakarta, Hibernate, MySQL, RFC, 프로젝트 공식 코드 tag 등 1차 자료다. 원자료 사본과 다운로드 한계는 [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/fetch-manifest.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/fetch-manifest.json)에 둔다. 원 조사 시각은 2026-10-21 00:17:42 KST이며, 본 census 날짜도 2026-10-21이다. 아래는 원 조사 결과 재사용이며 이번 턴에서 35개 페이지를 모두 재-fetch하지 않았다.
+출처는 Spring Framework/Boot/Data, Jakarta, Hibernate, MySQL, RFC, 프로젝트 공식 코드 tag 등 1차 자료다. 원자료 사본과 다운로드 한계는 $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/fetch-manifest.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/fetch-manifest.json`)에 둔다. 원 조사 시각은 2026-10-21 00:17:42 KST이며, 본 census 날짜도 2026-10-21이다. 아래는 원 조사 결과 재사용이며 이번 턴에서 35개 페이지를 모두 재-fetch하지 않았다.
 
 ## spring-di — [Dependency Injection — Spring Framework Reference ](https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html)
 
@@ -15,7 +15,7 @@
 - 주의·한계:
   - DI가 모든 테스트를 자동으로 단순하게 만들지는 않는다. 단위 테스트에서 직접 인스턴스화할 수 있다는 이점과 Spring 통합 테스트 필요를 구분한다.
   - 저장소→서비스 의존 자체가 항상 오류인 것은 아니다. 실제 등록된 빈 그래프가 순환할 때 런타임 순환 의존이다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-ioc-di.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-ioc-di.html
 - 신뢰도: high
 
 ## spring-bean-definition — [Bean Overview — Spring Framework Reference ](https://docs.spring.io/spring-framework/reference/core/beans/definition.html)
@@ -26,7 +26,7 @@
   - Spring 컨테이너는 definition을 토대로 bean instance를 생성·조립한다.
 - 주의·한계:
   - 직접 new한 모든 Java 객체가 자동으로 Spring bean이 되는 것은 아니다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-bean-definition.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-bean-definition.html
 - 신뢰도: high
 
 ## spring-bean-scopes — [Bean Scopes — Spring Framework Reference ](https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html)
@@ -39,7 +39,7 @@
   - 요청/세션 scope는 web-aware ApplicationContext 범위다.
 - 주의·한계:
   - 고정 singleton 수명과 요청별 state는 분리해야 한다. scope proxy, ObjectProvider 또는 명시적 메서드 인자가 필요한 경우가 있다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-bean-scopes.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-bean-scopes.html
 - 신뢰도: high
 
 ## spring-lifecycle — [Customizing the Nature of a Bean — Spring Framework Reference ](https://docs.spring.io/spring-framework/reference/core/beans/factory-nature.html)
@@ -51,7 +51,7 @@
   - @PostConstruct 안의 외부 bean 호출/장시간 작업은 singleton creation lock 교착을 일으킬 수 있어 제한한다.
 - 주의·한계:
   - 정상 컨테이너 종료 시점의 lifecycle이며 강제 프로세스 종료까지 정리를 보장하지 않는다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-bean-lifecycle.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-bean-lifecycle.html
 - 신뢰도: high
 
 ## spring-aop-proxy — [Proxying Mechanisms — Spring Framework Reference ](https://docs.spring.io/spring-framework/reference/core/aop/proxying.html)
@@ -63,7 +63,7 @@
   - self-invocation 된 @Transactional/@Retryable 메서드의 advice는 실행되지 않을 수 있다.
 - 주의·한계:
   - AspectJ weaving은 proxy-based self-invocation 제한과 다르다. 이 프로젝트는 일반 Spring proxy 관례를 전제로 해야 한다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-aop-proxy.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-aop-proxy.html
 - 신뢰도: high
 
 ## spring-tx-annotation — [Using @Transactional — Spring Framework Reference ](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html)
@@ -76,7 +76,7 @@
 - 주의·한계:
   - Framework 6.2부터 ALL_EXCEPTIONS global rollback 기본을 선택 가능하므로 설정을 확인한다.
   - annotation 메타데이터만으로 실제 트랜잭션이 생기는 것이 아니라 proxy/interceptor와 transaction manager를 통한 호출이어야 한다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-tx-annotations.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-tx-annotations.html
 - 신뢰도: high
 
 ## spring-tx-rollback — [Rolling Back a Declarative Transaction — Spring Framework Reference ](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/rolling-back.html)
@@ -89,7 +89,7 @@
 - 주의·한계:
   - JDBC/Hibernate가 이미 transaction을 rollback-only로 표시한 데이터베이스 예외는 단순히 catch했다고 다시 사용 가능한 transaction이 되지 않는다.
   - 개별 rollback rule 및 global default는 적용 순서/설정을 확인한다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-tx-rollback.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-tx-rollback.html
 - 신뢰도: high
 
 ## spring-propagation — [Transaction Propagation — Spring Framework Reference ](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html)
@@ -104,7 +104,7 @@
 - 주의·한계:
   - Propagation의 동작은 transaction manager와 resource driver 지원에 따라 달라진다.
   - NESTED를 JPA 독립 transaction이나 REQUIRES_NEW와 혼동하면 안 된다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-tx-propagation.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-tx-propagation.html
 - 신뢰도: high
 
 ## spring-tx-thread-bound — [Understanding Declarative Transaction Implementation — Spring Framework Reference ](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-decl-explained.html)
@@ -116,7 +116,7 @@
   - 새로 시작한 thread/ExecutorService worker로 transaction context는 자동 전파되지 않는다.
 - 주의·한계:
   - Reactive transaction은 Reactor Context를 사용하므로 imperative thread-local 설명을 그대로 적용하지 않는다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-thread-bound-tx.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-thread-bound-tx.html
 - 신뢰도: high
 
 ## spring-test-thread-bound — [Transaction Management in TestContext Framework ](https://docs.spring.io/spring-framework/reference/testing/testcontext-framework/tx.html)
@@ -128,7 +128,7 @@
   - 테스트 method transaction은 기본적으로 끝에서 rollback된다.
 - 주의·한계:
   - 문서는 preemptive timeout 사례를 예로 들지만 그 ThreadLocal 원리는 별도 worker thread에도 적용된다. 동시성 테스트는 cleanup/commit 관찰점을 별도 설계한다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-test-thread-tx.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-test-thread-tx.html
 - 신뢰도: high
 
 ## spring-data-jpa-tx — [Transactionality — Spring Data JPA Reference ](https://docs.spring.io/spring-data/jpa/reference/jpa/transactions.html)
@@ -140,7 +140,7 @@
   - Hibernate 사용 시 Spring Data JPA는 read-only transaction에서 flush mode를 MANUAL로 설정해 dirty checking을 생략할 수 있다.
 - 주의·한계:
   - provider/transaction manager/DB에 따라 실제 최적화·쓰기 제한은 다르다. 한 MySQL 버전/provider의 성능효과를 무측정으로 단정하지 않는다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-data-jpa-transactions.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-data-jpa-transactions.html
 - 신뢰도: high
 
 ## spring-jdbc-enforce-readonly — [DataSourceTransactionManager Javadoc ](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/jdbc/datasource/DataSourceTransactionManager.html)
@@ -151,7 +151,7 @@
   - explicit SET TRANSACTION READ ONLY enforcement는 manager 설정으로 별도 적용할 수 있고 MySQL을 포함한 DB에 명시 SQL을 전송한다.
 - 주의·한계:
   - Jdbc transaction manager 옵션으로 모든 JpaTransactionManager가 자동 적용한다고 일반화하지 않는다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-read-only-tx-manager.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-read-only-tx-manager.html
 - 신뢰도: high
 
 ## jakarta-tx-annotation — [Jakarta Transactions Transactional API ](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/transaction/transactional)
@@ -180,7 +180,7 @@
 - 주의·한계:
   - 명세는 provider-neutral이다. SQL 발생 시점, provider optimization, database lock 동작을 정하지 않는다.
   - EntityManagerFactory는 thread-safe일 수 있어도 개별 EntityManager/persistence context는 별도다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/jakarta-persistence-3-2-spec.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/jakarta-persistence-3-2-spec.html
 - 신뢰도: high
 
 ## jakarta-entitymanager-api — [EntityManager API Javadoc ](https://jakarta.ee/specifications/persistence/3.2/apidocs/jakarta.persistence/jakarta/persistence/EntityManager.html)
@@ -194,7 +194,7 @@
   - clear/detach는 미flush 변경을 DB에 쓰지 않고 떼어낼 수 있다.
 - 주의·한계:
   - JPA API contract는 Hibernate/MySQL SQL 구체 동작을 규정하지 않는다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/jakarta-entitymanager-api.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/jakarta-entitymanager-api.html
 - 신뢰도: high
 
 ## spring-data-new-state — [Entity State Detection Strategies — Spring Data JPA Reference ](https://docs.spring.io/spring-data/jpa/reference/data-commons/is-new-state-detection.html)
@@ -207,7 +207,7 @@
   - Persistable 구현은 isNew()로 전략을 바꾼다.
 - 주의·한계:
   - merge 반환값을 사용해야 한다. merge는 request DTO를 덮어쓰듯 안전하게 patch하지 않는다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-data-new-state.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-data-new-state.html
 - 신뢰도: high
 
 ## spring-data-derived-delete — [Spring Data JPA 4.1.1 Query Methods ](https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html)
@@ -219,7 +219,7 @@
   - @Modifying @Query bulk delete는 single executeUpdate SQL이고 persistence context synchronization/lifecycle semantics가 달라진다.
 - 주의·한계:
   - 동시 delete race에서 두 번째 manager/provider SQL affected-row behavior, exception, rollback outcome는 실제 DB/provider에서 검증해야 한다. 카운터 감소는 이 return type을 affected-row evidence라고 단정하지 말아야 한다.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-data-jpa-derived-delete.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-data-jpa-derived-delete.html
 - 신뢰도: high for implementation semantics; medium for race outcome
 
 ## spring-data-jpa-delete-code — [JpaQueryExecution.java at Spring Data JPA 4.1.1 tag ](https://github.com/spring-projects/spring-data-jpa/blob/4.1.1/spring-data-jpa/src/main/java/org/springframework/data/jpa/repository/query/JpaQueryExecution.java)
@@ -229,7 +229,7 @@
   - DeleteExecution calls getResultList(), loops em.remove(o), and for numeric/void simple-batch return returns resultList.size().
 - 주의·한계:
   - This shows Spring Data's selected-result count contract, not committed SQL row count under a concurrent race.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-data-jpa-deleteexecution-4.1.1.java
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-data-jpa-deleteexecution-4.1.1.java
 - 신뢰도: high
 
 ## hibernate-7-4-user-guide — [Hibernate ORM 7.4 User Guide ](https://docs.hibernate.org/orm/7.4/userguide/html_single/)
@@ -245,7 +245,7 @@
 - 주의·한계:
   - Fetched 7.4.13 guide is a later patch than the project's 7.4.5.Final. Use it for 7.4 concepts, but confirm patch-specific behavior against 7.4.5 source/repro.
   - Native Hibernate details are not necessarily portable JPA guarantees.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/hibernate-7-4-user-guide.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/hibernate-7-4-user-guide.html
 - 신뢰도: high for 7.4 concepts; medium for exact patch behavior
 
 ## hibernate-7-4-intro — [A Short Guide to Hibernate 7 ](https://docs.hibernate.org/orm/7.4/introduction/html_single/)
@@ -255,7 +255,7 @@
   - Persistence context change tracking, flush, fetching, locking and entity equality topics at an overview level.
 - 주의·한계:
   - Not a JPA standard; provider specifics require User Guide and exact version checks.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/hibernate-7-4-introduction.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/hibernate-7-4-introduction.html
 - 신뢰도: medium
 
 ## spring-boot-bom — [Spring Boot 4.1.1 Managed Dependency Coordinates ](https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html)
@@ -265,7 +265,7 @@
   - Boot 4.1.1 BOM supplies coordinated library versions including Hibernate ORM, Spring Data JPA, Spring Framework, Jakarta Persistence and MySQL Connector/J.
 - 주의·한계:
   - Project build declares versions; BOM managed versions are verified from official coordinates and the cached boot-dependencies POM. A running server version is independent from the JDBC driver version.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-boot-coordinates.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-boot-coordinates.html
 - 신뢰도: high
 
 ## mysql-innodb-transactions — [InnoDB Locking and Transaction Model — MySQL 8.4 Manual ](https://dev.mysql.com/doc/refman/8.4/en/innodb-locking-transaction-model.html)
@@ -381,7 +381,7 @@
   - The proxy delegates to the actual transaction-bound EntityManager; do not share that underlying persistence context concurrently across worker threads.
 - 주의·한계:
   - A thread-safe proxy does not make an EntityManager or Hibernate Session concurrently usable. Jakarta Persistence forbids sharing one EM across concurrent threads.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-shared-entity-manager.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/spring-shared-entity-manager.html
 - 신뢰도: high
 
 ## hibernate-basic-collections — [Hibernate ORM 7.4 User Guide, Basic collection mapping ](https://docs.hibernate.org/orm/7.4/userguide/html_single/#basic-collection-mapping)
@@ -392,7 +392,7 @@
   - Fallback SQL representation depends on dialect/database array support and may be ARRAY, JSON, XML, or VARBINARY.
 - 주의·한계:
   - A context-load success or H2 schema is not proof of portable JPA mapping or MySQL 8.4 behavior. Parent reports a separate MySQL 8.4.11 isolated baseline context-load result; persistence/read/write behavior still needs MySQL-specific verification.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/hibernate-7-4-user-guide.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/hibernate-7-4-user-guide.html
 - 신뢰도: high for Hibernate 7.4 mapping; medium for exact dialect behavior at pinned 7.4.5
 
 ## jakarta-persistence-entity-class — [Jakarta Persistence 3.2 Entity Class Requirements ](https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2.html#the-entity-class)
@@ -402,7 +402,7 @@
   - JPA entity requires public or protected no-argument constructor and must be non-final; methods and persistent instance variables must be non-final.
 - 주의·한계:
   - Hibernate bytecode enhancement/proxy specifics are provider-specific, but these are portable spec requirements.
-- 원문 사본: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/official/jakarta-persistence-3-2-spec.html
+- 원문 사본: $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/official/jakarta-persistence-3-2-spec.html
 - 신뢰도: high
 
 ## spring-boot-circular-beans — [Spring Boot application-properties reference: allow-circular-references ](https://docs.spring.io/spring-boot/appendix/application-properties/index.html)

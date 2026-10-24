@@ -8,16 +8,16 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S22-architecture-ddd.md:27](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S22-architecture-ddd.md:27) — 확인 범위 27–40행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S22-architecture-ddd.md:27](../../../../knowledge/S22-architecture-ddd.md) — 확인 범위 27–40행.
 
   발췌: `| 용어 | 의미 | 코드에서 보이는 형태 | |---|---|---| | 도메인 | 해결하려는 업무의 문제 영역과 규칙 | 주문, 재고, 환불 정책 | | 유비쿼터스 언어 | 기획자·개발자·코드가 공유하는 업무 단어 | ’confirm’, ’Refundable’, ’Reservation’ |`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S22-architecture-ddd.md:129](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S22-architecture-ddd.md:129) — 확인 범위 129–175행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S22-architecture-ddd.md:129](../../../../knowledge/S22-architecture-ddd.md) — 확인 범위 129–175행.
 
   발췌: `### 예제 1 — 풍부한 애그리거트와 값 객체  다음은 Java 21에서 실행한 순수 Java 예제다. ’Order’가 상태 변경과 한도 불변식을 소유하고 ’Money’가 산술을 소유한다. ’OrderConfirmed’는 루트가 발행한 도메인 이벤트의 최소 형태다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:7](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:7) — 확인 범위 7–17행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:7](../../../../knowledge/P20-jpa-entity-mapping.md) — 확인 범위 7–17행.
 
   발췌: `## 1. 한 줄로 말하면  JPA 엔티티는 ’@Entity’가 붙은 non-final 클래스이며, public/protected 무인자 생성자, ’@Id’, persistent 필드를 가진다. 연관관계는 객체 참조를 외래 키로 매핑하는 선언이다. 엔티티를 API 응답으로 직접 반환하면 지연 로딩, 순환 JSON, 내부 필드 노출이 생기므로 DTO로 경계를 둔다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W09-why-dto.md:17](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W09-why-dto.md:17) — 확인 범위 17–25행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/W09-why-dto.md:17](../../../../knowledge/W09-why-dto.md) — 확인 범위 17–25행.
 
   발췌: `## 2. 짧은 답  - 엔티티는 영속성 컨텍스트가 추적하는 도메인·DB 모델이고, DTO는 호출 경계에 필요한 값을 전달하는 모양이다. - 요청 DTO는 클라이언트가 제출할 값만 받고, 응답 DTO는 외부에 공개할 값만 담는다. 내부 DTO/Command는 외부 JSON 계약이 아니라 애플리케이션 유스케이스·모듈 사이에 별도 모양이 필요할 때 둔다.`
 
@@ -43,7 +43,7 @@ S22는 Entity/ValueObject/Aggregate의 정의와 Money/ProductId/Order 순수 Ja
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `jakarta-persistence-entity-class` — [Jakarta Persistence 3.2 Entity Class Requirements](https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2.html#the-entity-class)
 

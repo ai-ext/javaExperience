@@ -172,11 +172,11 @@ Git add/commit/stash/reset/checkout은 실행하지 않는다. board-server와 m
 
 초기 검사에서 확인한 환경 문제와 조정:
 
-1. 생성기는 임시 index로 구현 예시 diff를 조립하는 과정에서 Git 객체를 쓴다. 공유 `.git`은 쓰기 제한되어 처음에 Operation not permitted가 났다. `GIT_OBJECT_DIRECTORY=/private/tmp/course-sql-objects`, `GIT_ALTERNATE_OBJECT_DIRECTORIES=$(git rev-parse --path-format=absolute --git-common-dir)/objects`를 실행 환경에 지정해 임시 객체만 별도 위치에 썼다. 원본 Git 객체·index·브랜치 변경과 구분한다.
+1. 생성기는 임시 index로 구현 예시 diff를 조립하는 과정에서 Git 객체를 쓴다. 공유 `.git`은 쓰기 제한되어 처음에 Operation not permitted가 났다. `GIT_OBJECT_DIRECTORY=$TMPDIR/course-sql-objects`, `GIT_ALTERNATE_OBJECT_DIRECTORIES=$(git rev-parse --path-format=absolute --git-common-dir)/objects`를 실행 환경에 지정해 임시 객체만 별도 위치에 썼다. 원본 Git 객체·index·브랜치 변경과 구분한다.
 2. npm에서 실행된 x64 Node가 ARM esbuild 설치본을 자동 선택하지 못했다. `ESBUILD_BINARY_PATH`를 현재 worktree의 `tools/site/node_modules/@esbuild/darwin-arm64/bin/esbuild` 절대경로로 지정했다. 바이너리 0.28.2 실행을 확인했으며 의존성·lockfile·패키지 설정은 바꾸지 않았다.
 3. 새 기능의 없는 SQL 데이터 테스트 실패를 확인하고 구현한 뒤 통과시켰다. 바깥 접기로 감싼 흐름에서 기존 재생 초기화가 실패하는 것도 화면 테스트로 확인하고 수정했다. 테스트가 성공 문구와 함께 비동기 AssertionError를 남기던 초기 실행은 통과로 세지 않았다. 최종 화면 로그에는 해당 오류가 없다.
 
-실행 로그는 이 세션의 `/private/tmp/course-sql-final-*.log`에 있다. 임시 파일이므로 영구 증거로 의존하지 말고 위 명령으로 재검사한다. 데이터 파일별 해시는 저장소의 dummy/manifest.json으로 재현한다.
+실행 로그는 이 세션의 `$TMPDIR/course-sql-final-*.log`에 있다. 임시 파일이므로 영구 증거로 의존하지 말고 위 명령으로 재검사한다. 데이터 파일별 해시는 저장소의 dummy/manifest.json으로 재현한다.
 
 ## 못 한 것과 검증 한계
 
@@ -189,7 +189,7 @@ Git add/commit/stash/reset/checkout은 실행하지 않는다. board-server와 m
 
 ## 더미 데이터 단순화
 
-확인일: 2026-10-24. 현재 작업 공간은 `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap`, 브랜치 파일의 값은 `course/p1-spec-roadmap`, 읽은 ref는 `3397f80a6b3dd697a4dd44525575045107f6dbb0`이다. 위 CSV 방식·검사 결과는 변경 전 이력이며 이 절이 현재 SQL 방식의 기준이다.
+확인일: 2026-10-24. 현재 작업 공간은 `$WORKTREE_ROOT/p1-spec-roadmap`, 브랜치 파일의 값은 `course/p1-spec-roadmap`, 읽은 ref는 `3397f80a6b3dd697a4dd44525575045107f6dbb0`이다. 위 CSV 방식·검사 결과는 변경 전 이력이며 이 절이 현재 SQL 방식의 기준이다.
 
 ### 변경과 실행 계획
 
@@ -199,7 +199,7 @@ Git add/commit/stash/reset/checkout은 실행하지 않는다. board-server와 m
 
 삭제: `course/start/dummy/`의 CSV 16종(합계 5,086,814바이트), `manifest.json`, `tools/course/gen-dummy.mjs`, `tools/course/gen-dummy.test.mjs`, `tools/course/verify-dummy.mjs`. 삭제한 CSV는 members·posts·tags·post-tags·comments·likes·coupons·member-coupons·items·orders·point-history·payments·banned-words·common-codes·reports·audit-events다.
 
-새 데이터 파일은 `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/start/dummy/seed.sql`과 `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/start/dummy/bulk.sql`이다. 스키마 출처는 `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/src/main/resources/schema.sql`이다. INSERT의 테이블·컬럼은 원본 그대로 사용한다. 복사해 실행하는 SQL만 배포하고 CSV 재생성·파일 업로드·LOAD DATA·외부 생성기를 요구하지 않는다.
+새 데이터 파일은 `$WORKTREE_ROOT/p1-spec-roadmap/course/start/dummy/seed.sql`과 `$WORKTREE_ROOT/p1-spec-roadmap/course/start/dummy/bulk.sql`이다. 스키마 출처는 `$WORKTREE_ROOT/p1-spec-roadmap/board-server/src/main/resources/schema.sql`이다. INSERT의 테이블·컬럼은 원본 그대로 사용한다. 복사해 실행하는 SQL만 배포하고 CSV 재생성·파일 업로드·LOAD DATA·외부 생성기를 요구하지 않는다.
 
 `course/hints.json`·과정/출발 README·루트 README·지도·일자 생성기·홈 렌더러의 안내를 SQL로 바꿨다. D00~D15와 일자 목록은 생성기로 갱신했다. D01의 local_infile 조회와 출발 compose의 `--local-infile=1`을 제거했다. 전체 도구와 package.json을 검색했으며 삭제 도구를 호출하는 스크립트는 없어서 package.json 변경은 불필요했다. 이전 CSV 테스트를 삭제하고 `tools/course/seed-sql.test.mjs`로 현재 데이터 관계·집계 회귀 검사를 추가했다. P8 장부에는 이 변경이 이전 CSV 기록을 대체한다고 덧붙였다.
 
@@ -309,8 +309,8 @@ D04·D05는 seed만 기준이다. D06은 seed D05+bulk 기준이며 별도 실�
 | 독립 파일 SHA-256 비교 | board-server 245개·messy-server 313개 파일이 작업 전과 모두 동일. 새 서버 파일도 없음 |
 | 삭제 참조·공백 검사 | 현행 course·도구에서 이전 CSV 안내·생성기/검증기 참조·local_infile 없음. 삭제한 파일 20개 부재, 수동 변경 원본 14개에 후행 공백 없음. 생성된 구현 예시 코드의 원문 공백은 보존 |
 
-빌드·테스트 환경에는 `GIT_OBJECT_DIRECTORY=/private/tmp/sql-redesign-objects`, `GIT_ALTERNATE_OBJECT_DIRECTORIES=/Users/ds/code/javaExperience/.git/objects`를 지정해 생성기의 임시 객체가 공유 .git에 쓰이지 않게 했다. 빌드에는 설치된 ARM esbuild의 `ESBUILD_BINARY_PATH=/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/tools/site/node_modules/@esbuild/darwin-arm64/bin/esbuild`를 지정했다. Git 명령을 직접 호출하지 않았고, 요청한 기존 빌드·테스트 도구가 내부에서 읽는 이력과 임시 fixture 작성은 그대로 사용했다. 생성 HTML·일자 Markdown은 손으로 편집하지 않았다. 장부는 inventory 생성기로만 갱신했으며 두 서버 코드는 수정하지 않았다.
+빌드·테스트 환경에는 `GIT_OBJECT_DIRECTORY=$TMPDIR/sql-redesign-objects`, `GIT_ALTERNATE_OBJECT_DIRECTORIES=$REPO_ROOT/.git/objects`를 지정해 생성기의 임시 객체가 공유 .git에 쓰이지 않게 했다. 빌드에는 설치된 ARM esbuild의 `ESBUILD_BINARY_PATH=$WORKTREE_ROOT/p1-spec-roadmap/tools/site/node_modules/@esbuild/darwin-arm64/bin/esbuild`를 지정했다. Git 명령을 직접 호출하지 않았고, 요청한 기존 빌드·테스트 도구가 내부에서 읽는 이력과 임시 fixture 작성은 그대로 사용했다. 생성 HTML·일자 Markdown은 손으로 편집하지 않았다. 장부는 inventory 생성기로만 갱신했으며 두 서버 코드는 수정하지 않았다.
 
 빌드를 처음 저장소 루트에서 호출한 실행은 package.json 부재로 실패했다. 요청한 `tools/site` 디렉터리로 바로잡은 빌드가 exit 0인 결과만 위 표에 기록했다. SQLite bulk 검사 초기에는 테스트 어댑터가 DROP TEMPORARY TABLE 표기를 변환하지 못해 실패했고, SQLite용 변환을 보완한 뒤 2/2 통과했다. 원본 MySQL SQL의 오류로 취급하지 않는다.
 
-세션 로그는 `/private/tmp/sql-redesign-build.log`, `/private/tmp/sql-redesign-course-tests.log`, `/private/tmp/sql-redesign-home.log`, `/private/tmp/sql-redesign-inventory.log`에 있다. 임시 로그를 영구 증거로 의존하지 말고 위 명령으로 재실행한다. 실제 MySQL 실행과 실측 계획은 이 표에 포함되지 않는다.
+세션 로그는 `$TMPDIR/sql-redesign-build.log`, `$TMPDIR/sql-redesign-course-tests.log`, `$TMPDIR/sql-redesign-home.log`, `$TMPDIR/sql-redesign-inventory.log`에 있다. 임시 로그를 영구 증거로 의존하지 말고 위 명령으로 재실행한다. 실제 MySQL 실행과 실측 계획은 이 표에 포함되지 않는다.

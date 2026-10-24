@@ -106,15 +106,15 @@ find ~/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-lang3/3.20.
 ```
 
 ```text
-/Users/me/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-lang3/3.20.0/65897b3e5731220962e659e001904af3c3cbeba9/commons-lang3-3.20.0.jar
-/Users/me/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-lang3/3.20.0/54f65c450509a0cc4723b8bfb3553d9c9eb44175/commons-lang3-3.20.0.pom
+$USER_HOME/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-lang3/3.20.0/65897b3e5731220962e659e001904af3c3cbeba9/commons-lang3-3.20.0.jar
+$USER_HOME/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-lang3/3.20.0/54f65c450509a0cc4723b8bfb3553d9c9eb44175/commons-lang3-3.20.0.pom
 ```
 
 처음 받는 라이브러리라면 `--info`로 빌드할 때 받아 오는 주소가 보인다. 아래는 캐시에 없던 `commons-text:1.15.0`을 처음 넣었을 때다.
 
 ```text
-Downloading https://repo.maven.apache.org/maven2/org/apache/commons/commons-text/1.15.0/commons-text-1.15.0.pom to /Users/me/.gradle/.tmp/gradle_download...bin
-Downloading https://repo.maven.apache.org/maven2/org/apache/commons/commons-text/1.15.0/commons-text-1.15.0.jar to /Users/me/.gradle/.tmp/gradle_download...bin
+Downloading https://repo.maven.apache.org/maven2/org/apache/commons/commons-text/1.15.0/commons-text-1.15.0.pom to $USER_HOME/.gradle/.tmp/gradle_download...bin
+Downloading https://repo.maven.apache.org/maven2/org/apache/commons/commons-text/1.15.0/commons-text-1.15.0.jar to $USER_HOME/.gradle/.tmp/gradle_download...bin
 ```
 
 pom을 먼저 받고(무엇에 기대는지 보려고), jar를 받는다. `commons-text`의 pom에는 `commons-lang3`이 적혀 있어서, 트리에 이렇게 따라 들어온다.

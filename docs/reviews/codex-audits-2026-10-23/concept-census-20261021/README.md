@@ -8,11 +8,11 @@
 
 ## 먼저 볼 파일
 
-- **문서134개 전체 평가:** [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/DOCUMENTS.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/DOCUMENTS.md)
-- **의미 단위 개념527개 항목:** [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/CONCEPTS.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/CONCEPTS.md)
-- **추가 필요 후보41건의 메인 교차 판정:** [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/NEEDED-CONCEPTS.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/NEEDED-CONCEPTS.md)
-- **어떤 질문에서 어디로 찾아가야 하는가:** [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/reviews/LEARNING-MAP.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/reviews/LEARNING-MAP.md)
-- **실제 화면과 탐색 문제:** [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/reviews/VISUAL-AND-DISCOVERY.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/reviews/VISUAL-AND-DISCOVERY.md)
+- **문서134개 전체 평가:** $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/DOCUMENTS.md (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/DOCUMENTS.md`)
+- **의미 단위 개념527개 항목:** $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/CONCEPTS.md (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/CONCEPTS.md`)
+- **추가 필요 후보41건의 메인 교차 판정:** $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/NEEDED-CONCEPTS.md (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/NEEDED-CONCEPTS.md`)
+- **어떤 질문에서 어디로 찾아가야 하는가:** $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/reviews/LEARNING-MAP.md (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/reviews/LEARNING-MAP.md`)
+- **실제 화면과 탐색 문제:** $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/reviews/VISUAL-AND-DISCOVERY.md (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/reviews/VISUAL-AND-DISCOVERY.md`)
 
 527은 문서 사이에 반복되는 개념을 포함한 **검토 항목 수**다. 고유한 개념527종이라는 뜻이 아니다. 후보41건도 서로 겹치며 기존 자료의 연결·실행·검색 보완을 포함하므로 누락 개념41종이라고 부르지 않는다.
 
@@ -83,8 +83,8 @@ P10은390px에서 긴 제목이 잘리는 것을 재확인했다. body 너비는
 
 일회용 MySQL8.4.11에서 UNIQUE/NULL, 중복 제약 오류, UNION/UNION ALL, 복합·커버링·비커버링·선두 열 없는 인덱스 접근, EXPLAIN/ANALYZE를 실제 확인했다. 생성/조회 자료는 합성 데이터이며 기존 개발 DB와 분리했다. 인덱스 사용 유무만으로 효율을 판단하지 않고, 실행계획의 접근 방식과 실제 관측을 구분했다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/reviews/SQL-INDEX-UNIQUE-UNION.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/reviews/SQL-INDEX-UNIQUE-UNION.md)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/reviews/DTO-ENTITY-VALUE-OBJECT.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/reviews/DTO-ENTITY-VALUE-OBJECT.md)
+- $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/reviews/SQL-INDEX-UNIQUE-UNION.md (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/reviews/SQL-INDEX-UNIQUE-UNION.md`)
+- $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/reviews/DTO-ENTITY-VALUE-OBJECT.md (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/reviews/DTO-ENTITY-VALUE-OBJECT.md`)
 
 ## 먼저 교정할 설명
 
@@ -104,6 +104,6 @@ P20 치트시트318행은 `final·무인자 생성자 금지`라고 쓰지만 �
 
 ## 검증과 한계
 
-재검증 명령과 결과는 /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/COMPLETION.md 에 있다. 공식 근거와 확인 날짜/버전/접근 한계는 /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/sources/ 에 분야별로 기록했다. 이전 조사에서 실제 수집한 출처를 재사용한 경우에는 새로 fetch했다고 표시하지 않았다.
+재검증 명령과 결과는 $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/COMPLETION.md 에 있다. 공식 근거와 확인 날짜/버전/접근 한계는 $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/sources/ 에 분야별로 기록했다. 이전 조사에서 실제 수집한 출처를 재사용한 경우에는 새로 fetch했다고 표시하지 않았다.
 
 이번에는 조사 목록과 근거를 만들었다. 학습 화면·정답·서버 코드를 대신 수정하지 않았으며 실제 학습자에게 과제를 수행시켜 숙련도를 판정하지 않았다. 전수라는 범위는 개념 카탈로그134문서와 그 의미 단위이고, 모든 시나리오/티켓 전문을 별도 전수 감사했다는 뜻은 아니다.

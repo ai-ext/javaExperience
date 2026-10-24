@@ -30,10 +30,10 @@ API DELETE의 멱등성과 반복 응답코드가 같다는 것은 별개다. �
 
 ## 근거: 절대경로와 라인
 
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/snapshots/blobs/ca164f353bb47e76f139a5d1054df57b8642fd57.txt:176](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/snapshots/blobs/ca164f353bb47e76f139a5d1054df57b8642fd57.txt:176) (L176–L192) — 3-2 정답의 src/main/java/org/example/post/PostService.java
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:137](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:137) (L137–L153) — 직접 읽은 원문/코드
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/ch3-update-delete/3-2-soft-delete.md:410](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/ch3-update-delete/3-2-soft-delete.md:410) (L410–L419) — 직접 읽은 원문/코드
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/practice/MISSIONS.md:111](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/practice/MISSIONS.md:111) (L111–L117) — 직접 읽은 원문/코드
+- [$WORKTREE_ROOT/scenario-crud-redesign/scenario/snapshots/blobs/ca164f353bb47e76f139a5d1054df57b8642fd57.txt:176](../../../../../scenario/snapshots/blobs/ca164f353bb47e76f139a5d1054df57b8642fd57.txt) (L176–L192) — 3-2 정답의 src/main/java/org/example/post/PostService.java
+- $WORKTREE_ROOT/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:137 (기록 경로: `$WORKTREE_ROOT/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:137`) (L137–L153) — 직접 읽은 원문/코드
+- [$WORKTREE_ROOT/scenario-crud-redesign/scenario/ch3-update-delete/3-2-soft-delete.md:410](../../../../../scenario/ch3-update-delete/3-2-soft-delete.md) (L410–L419) — 직접 읽은 원문/코드
+- [$WORKTREE_ROOT/scenario-crud-redesign/practice/MISSIONS.md:111](../../../../../practice/MISSIONS.md) (L111–L117) — 직접 읽은 원문/코드
 
 ## 구분해서 읽기
 

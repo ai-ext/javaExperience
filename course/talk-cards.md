@@ -5,10 +5,10 @@
 ## D01 프로젝트 뼈대
 
 ### TC-D01-1
-**질문** `application.yml`의 `server.port`를 바꿨는데 서버가 예전 포트로 뜹니다. 어디부터 확인하나요?
+**질문** `application.yml`(또는 `application.properties`)의 `server.port`를 바꿨는데 서버가 예전 포트로 뜹니다. 어디부터 확인하나요?
 **답에 들어가야 할 것**
-- 커맨드라인 인자와 OS 환경 변수는 `application.yml`보다 우선하므로, 같은 키가 그쪽에 있으면 yml 수정은 반영되지 않는다
-- 활성 프로파일의 설정(`application-local.yml` 또는 `on-profile` 문서)이 기본 문서의 같은 키를 덮어쓴다
+- 커맨드라인 인자와 OS 환경 변수는 `application.yml`(또는 `application.properties`)보다 우선하므로, 같은 키가 그쪽에 있으면 설정 수정은 반영되지 않는다
+- 활성 프로파일의 설정(`application-local.yml`(또는 `application-local.properties`) 또는 `on-profile` 문서)이 기본 문서의 같은 키를 덮어쓴다
 - 값은 키 단위로 덮어써지므로 추측하지 않고, 로컬에서 연 `/actuator/env`의 출처 목록이나 기동 로그로 어느 출처가 이겼는지 확인한다
 **근거** 06 §15
 
@@ -16,15 +16,15 @@
 **질문** prod 서버가 로컬 DB 주소로 떠 있었습니다. 원인으로 무엇을 의심하나요?
 **답에 들어가야 할 것**
 - 활성 프로파일을 지정하지 않으면 `default` 프로파일로 기동해 prod 문서가 적용되지 않는다
-- 프로파일 전용 문서(`on-profile` 문서, `application-prod.yml`) 안에서는 `spring.profiles.active`를 지정할 수 없으므로, 활성화는 실행 인자나 환경 변수로 한다
+- 프로파일 전용 문서(`on-profile` 문서, `application-prod.yml`(또는 `application-prod.properties`)) 안에서는 `spring.profiles.active`를 지정할 수 없으므로, 활성화는 실행 인자나 환경 변수로 한다
 - 기동 로그에 찍히는 활성 프로파일 줄로 어떤 프로파일이 켜졌는지 먼저 확인한다
 **근거** 06 §15
 
 ### TC-D01-3
-**질문** DB 비밀번호를 `application.yml`에 적어 커밋했습니다. 무엇이 문제고 어떻게 바꾸나요?
+**질문** DB 비밀번호를 `application.yml`(또는 `application.properties`)에 적어 커밋했습니다. 무엇이 문제고 어떻게 바꾸나요?
 **답에 들어가야 할 것**
 - 파일에서 지워도 git 이력에 평문이 남으므로, 이미 커밋된 비밀번호는 노출된 것으로 보고 교체한다
-- Spring Boot에는 내장 프로퍼티 암호화가 없어서 yml에는 `${DB_PASSWORD}` 같은 자리표시자만 둔다
+- Spring Boot에는 내장 프로퍼티 암호화가 없어서 설정 파일에는 `${DB_PASSWORD}` 같은 자리표시자만 둔다
 - 실제 값은 환경 변수(또는 `configtree:`로 마운트한 파일)로 주입한다. PG 비밀키도 같은 방식이다
 **근거** 06 §15, spec-v2 §7
 
@@ -420,7 +420,7 @@
 **질문** (B11) "prod에서 설정값이 안 바뀐다." yml을 고쳤는데 왜 그대로였나요?
 **답에 들어가야 할 것**
 - 커맨드라인 인자와 환경 변수가 설정 파일보다 우선하므로, prod에 같은 키의 환경 변수가 있으면 yml 수정은 반영되지 않는다
-- jar 밖의 `application-prod.yml`은 jar 안 파일보다 우선하므로, 서버에 남아 있는 외부 파일도 후보다
+- jar 밖의 `application-prod.yml`(또는 `application-prod.properties`)은 jar 안 파일보다 우선하므로, 서버에 남아 있는 외부 파일도 후보다
 - 인증 뒤의 `/actuator/env/{키}`에서 `propertySources`로 그 키를 어느 출처가 주는지 확인한 다음 그 출처를 고친다
 **근거** 06 §15
 

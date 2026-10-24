@@ -10,7 +10,7 @@
 
 **① major — 조건부: 이전 0패딩 member가 남으면 중복·점수 분리가 지속됨**
 
-위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/src/main/java/com/example/board/point/ActivityRankingService.java:51](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/src/main/java/com/example/board/point/ActivityRankingService.java:51), 같은 파일 103행.
+위치: [$WORKTREE_ROOT/p1-spec-roadmap/board-server/src/main/java/com/example/board/point/ActivityRankingService.java:51](../../../../board-server/src/main/java/com/example/board/point/ActivityRankingService.java), 같은 파일 103행.
 
 ```java
 redis.opsForZSet().incrementScore(KEY, memberId.toString(), score)
@@ -28,7 +28,7 @@ redis.opsForZSet().incrementScore(KEY, memberId.toString(), score)
 
 **② minor — 기존 유보: 온라인 rebuild가 정상 적립을 덮어쓸 수 있음**
 
-위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/src/main/java/com/example/board/point/ActivityRankingService.java:85](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/src/main/java/com/example/board/point/ActivityRankingService.java:85), 86·95·96행.
+위치: [$WORKTREE_ROOT/p1-spec-roadmap/board-server/src/main/java/com/example/board/point/ActivityRankingService.java:85](../../../../board-server/src/main/java/com/example/board/point/ActivityRankingService.java), 86·95·96행.
 
 ```java
 List<MemberScore> scores = ledgerRepository.sumActivityScores(SCORED_REF_TYPES, Pageable.unpaged());
@@ -43,7 +43,7 @@ redis.rename(REBUILD_KEY, KEY);
 
 **③ minor — 전환 테스트가 실제 DB 폴백 실행을 단언하지 않음**
 
-위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/src/test/java/com/example/board/point/ActivityRankingApiTest.java:171](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/src/test/java/com/example/board/point/ActivityRankingApiTest.java:171), 172~185행.
+위치: [$WORKTREE_ROOT/p1-spec-roadmap/board-server/src/test/java/com/example/board/point/ActivityRankingApiTest.java:171](../../../../board-server/src/test/java/com/example/board/point/ActivityRankingApiTest.java), 172~185행.
 
 ```java
 guard.call("테스트 장애 주입", () -> {
@@ -67,7 +67,7 @@ assertThat(ids).containsExactly(nine, tenPlusOne, ten);
 
 - **단, 실제 CAST collation은 연결 설정을 확인해야 합니다.**
 
-  [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/src/main/java/com/example/board/point/PointLedgerRepository.java:20](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/src/main/java/com/example/board/point/PointLedgerRepository.java:20):
+  [$WORKTREE_ROOT/p1-spec-roadmap/board-server/src/main/java/com/example/board/point/PointLedgerRepository.java:20](../../../../board-server/src/main/java/com/example/board/point/PointLedgerRepository.java):
 
   ```java
   + " group by l.member.id order by sum(l.amount) desc, cast(l.member.id as string) desc")
@@ -88,7 +88,7 @@ assertThat(ids).containsExactly(nine, tenPlusOne, ten);
 
 - **정렬 회귀를 잡는 테스트는 유효합니다.**
 
-  [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/src/test/java/com/example/board/point/ActivityRankingApiTest.java:153](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/src/test/java/com/example/board/point/ActivityRankingApiTest.java:153)의 기대 순서 `[9p, 10p+1, 10p]`는 숫자 ASC·DESC 모두와 다릅니다. 같은 파일 200~216행은 Redis와 repository를 각각 기대 순서 `[9p, 2p, 19p, 10p, p]`와 비교하므로 **DB 숫자 정렬 회귀를 독립적으로 잡습니다.**
+  [$WORKTREE_ROOT/p1-spec-roadmap/board-server/src/test/java/com/example/board/point/ActivityRankingApiTest.java:153](../../../../board-server/src/test/java/com/example/board/point/ActivityRankingApiTest.java)의 기대 순서 `[9p, 10p+1, 10p]`는 숫자 ASC·DESC 모두와 다릅니다. 같은 파일 200~216행은 Redis와 repository를 각각 기대 순서 `[9p, 2p, 19p, 10p, p]`와 비교하므로 **DB 숫자 정렬 회귀를 독립적으로 잡습니다.**
 
   다만 패딩 잔존 상태의 재구축, 동점 다중 페이지 전체의 `score`·`rank`, 큰 커서 검사 경계 바로 전·동일·직후는 검증하지 않습니다.
 
@@ -104,6 +104,6 @@ assertThat(ids).containsExactly(nine, tenPlusOne, ten);
 
 - **정렬 통일은 점수·스냅샷 일치까지 보장하지 않습니다.** 장애 중 누락된 Redis 가산, 페이지 사이 활동 변경이 있으면 위치 커서의 중복·누락은 여전히 가능합니다. 이번 변경으로 생긴 회귀는 아닙니다.
 
-- **실행 증거는 기존 기록만 확인했습니다.** [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/build/test-results/test/TEST-com.example.board.point.ActivityRankingApiTest.xml:2](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/build/test-results/test/TEST-com.example.board.point.ActivityRankingApiTest.xml:2)에 변경된 테스트 이름을 포함한 **11건, 실패 0건**이 기록돼 있습니다. 이번 재실행 결과나 대상 커밋과 결박된 검증 증거로 간주하지 않았습니다. Luna CLI는 app-server 초기화 권한 오류로 실행되지 않았으며, 정렬 판단은 공식 자료를 직접 대조한 결과입니다.
+- **실행 증거는 기존 기록만 확인했습니다.** $WORKTREE_ROOT/p1-spec-roadmap/board-server/build/test-results/test/TEST-com.example.board.point.ActivityRankingApiTest.xml:2 (기록 경로: `$WORKTREE_ROOT/p1-spec-roadmap/board-server/build/test-results/test/TEST-com.example.board.point.ActivityRankingApiTest.xml:2`)에 변경된 테스트 이름을 포함한 **11건, 실패 0건**이 기록돼 있습니다. 이번 재실행 결과나 대상 커밋과 결박된 검증 증거로 간주하지 않았습니다. Luna CLI는 app-server 초기화 권한 오류로 실행되지 않았으며, 정렬 판단은 공식 자료를 직접 대조한 결과입니다.
 
 model=gpt-6-astra

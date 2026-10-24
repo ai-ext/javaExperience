@@ -8,16 +8,16 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:82](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:82) — 확인 범위 82–86행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:82](../../../../knowledge/P20-jpa-entity-mapping.md) — 확인 범위 82–86행.
 
   발췌: `JPA 기본 fetch는 ’@ManyToOne’·’@OneToOne’가 EAGER, 컬렉션이 LAZY다. 기본값은 모든 연관에 ’LAZY’를 명시하고 필요한 관계만 가져오는 것이다.  Lombok ’@Data’는 쓰지 않는다. equals/hashCode/toString이 연관관계를 순회해 순환·지연 로딩·프록시 문제를 만든다. generated ID가 null일 때도 안전한 팀 표준을 정한다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:363](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:363) — 확인 범위 363–365행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:363](../../../../knowledge/P20-jpa-entity-mapping.md) — 확인 범위 363–365행.
 
   발췌: `### Q5. 왜 ’@Data’를 피하나? equals/hashCode/toString이 연관관계를 순회해 순환·지연 로딩·프록시 문제를 만든다. 필요한 메서드만 작성한다. 꼬리질문: generated ID equals는? → null·hash 안정성을 고려한다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S22-architecture-ddd.md:153](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S22-architecture-ddd.md:153) — 확인 범위 153–159행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S22-architecture-ddd.md:153](../../../../knowledge/S22-architecture-ddd.md) — 확인 범위 153–159행.
 
   발췌: `record ProductId(String value) {}     record Money(BigDecimal value) {         Money(String value) { this(new BigDecimal(value)); }         Money add(Money other) { return new Money(value.add(other.value)); }`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/w09-lesson-data.mjs:83](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/w09-lesson-data.mjs:83) — 확인 범위 83–85행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/w09-lesson-data.mjs:83 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/w09-lesson-data.mjs:83`) — 확인 범위 83–85행.
 
   발췌: `{ id: 'record', question: 'record 안의 List도 자동으로 불변일까?', source: scope + ' · 별도 ItemList 추가 실험', note: 'ItemList(List<String> items)는 원문 OrderSummary와 별개인 추가 record입니다. record는 참조 필드 재대입을 막지만 참조한 mutable 목록의 내용 변경까지 막지 않습니다. List.copyOf는 구조의 얕은 복사이며 요소 객체까지 복제하지 않습니다. 이 두 상태는 DB·주문항목의 실험이 아닙니다.', stages: [     stage('record-shared', '같은 mutable 목록을 공유', '별도 ArrayList에 one을 넣어 ItemList에 전달했습니다. original에 two를 추가하면 같은 목록을 가리키는 shallow.items()에서도 두 값이 보였습니다.', 'W09-record', 'record ItemList(List<Str`
 
@@ -43,10 +43,10 @@ P20의 “팀 표준을 정한다”에서 어떤 계약을 실제로 검증할�
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `jakarta-persistence-spec` — [Jakarta Persistence 3.2 Specification](https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2.html)
 
-추가 본문 확인: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/J02-oop-object-contracts.md:58–104는 equals/hashCode/정렬 계약과 가변 키 문제를 이미 상세히 설명한다. /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/J01-types-string.md:68–72도 BigDecimal scale 차이를 설명한다. 남는 공백은 일반 Java 계약 설명의 부재가 아니라 P20 generated ID/proxy 상태로의 적용 실험이다.
+추가 본문 확인: $WORKTREE_ROOT/concept-learning-night/docs/knowledge/J02-oop-object-contracts.md:58–104는 equals/hashCode/정렬 계약과 가변 키 문제를 이미 상세히 설명한다. $WORKTREE_ROOT/concept-learning-night/docs/knowledge/J01-types-string.md:68–72도 BigDecimal scale 차이를 설명한다. 남는 공백은 일반 Java 계약 설명의 부재가 아니라 P20 generated ID/proxy 상태로의 적용 실험이다.
 
 발췌 표기 안내: 위 짧은 발췌는 줄바꿈을 공백으로 합치고 Markdown backtick을 표시용 따옴표로 정리했다. 바이트 단위 인용본은 아니며 정확한 원문은 연결한 파일·행과 SCOPE-MANIFEST.json의 SHA를 기준으로 한다.

@@ -8,16 +8,16 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V04-test-db-strategy.md:133](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V04-test-db-strategy.md:133) — 확인 범위 133–181행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/V04-test-db-strategy.md:133](../../../../knowledge/V04-test-db-strategy.md) — 확인 범위 133–181행.
 
   발췌: `### 4단계 — ’@Transactional’ 함정을 재현  (미실행) 아래 Spring 코드는 개념을 가진 실제 도메인에 적용하는 패턴이다. starter에는 ’Order’ 관계·쓰기 API·커밋 리스너가 없어 그대로 실행할 수 없으며, 기존 ’Product’ 테스트와 혼동하지 않는다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/v04-lesson-data.mjs:445](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/v04-lesson-data.mjs:445) — 확인 범위 445–447행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/v04-lesson-data.mjs:445 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/v04-lesson-data.mjs:445`) — 확인 범위 445–447행.
 
   발췌: `{id:'lazy',question:'테스트 transaction이 lazy 실패를 숨겼을까?',source:'추가 H2 LearnOrder1/LearnLine101 · service REQUIRED',sourceNote:toyNote+' @BeforeAll seed는 TestTransaction 비활성 상태에서 별도 commit했습니다.',note:'테스트의 바깥 transaction 유무만 나눈 추가 도메인입니다. 실제 상품·주문 API·OSIV·DTO를 검증한 결과가 아닙니다.',stages:[  stage('lazy','outer','바깥 test transaction이면 size1','추가 service.getEntity(1) 반환 때 컬렉션은 미초기화였지만 바깥 테스트 transaction이 유지돼 getLines().size()가1입니다. Hibernate prepared는2문장이었습니다.','LearnOrder order = service.getEntity(1);\nb`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/v04-lesson-data.mjs:463](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/v04-lesson-data.mjs:463) — 확인 범위 463–465행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/v04-lesson-data.mjs:463 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/v04-lesson-data.mjs:463`) — 확인 범위 463–465행.
 
   발췌: `{id:'http',question:'추가 실제 TCP와 동기 MockMvc는 같은 transaction일까?',source:'추가 Boot4.1.1/JDBC/H2 toy app · 실제 Tomcat TCP / 동기 MockMvc',sourceNote:'이번에는 추가 Boot 앱·실제 TCP201을 실행했습니다. 원문 OrderHttpTest·학습자 상품 쓰기 API·MySQL HTTP·async MVC 실행 결과가 아닙니다.',note:'실제 source response/threadID/port 원자료는 따로 보존하고 frozen에는 관찰한 same/different·flag·행 수를 기록합니다.',stages:[  stage('http','tcp','실제 TCP201은 다른 thread','추가 테스트의 미커밋 marker100을 서버는0개로 읽었습니다. 실제 TCP POST는 다른 worker에서 status201·TestManagedTx=false·ApplicationTx=t`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/source-proof/probe/java/v04/http/HttpBoundaryTest.java:26](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/source-proof/probe/java/v04/http/HttpBoundaryTest.java:26) — 확인 범위 26–59행.
+- $WORKTREE_ROOT/concept-learning-night/docs/design/v04-2026-10-20/source-proof/probe/java/v04/http/HttpBoundaryTest.java:26 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/docs/design/v04-2026-10-20/source-proof/probe/java/v04/http/HttpBoundaryTest.java:26`) — 확인 범위 26–59행.
 
   발췌: `@SpringBootTest(classes=HttpApp.class,webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"server.address=127.0.0.1","spring.sql.init.mode=never","logging.level.root=ERROR"}) @AutoConfigureMockMvc @Transactional @TestInstance(TestInstance.Lifecycle.PER_CLASS) @DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_CLASS) class HttpBoundaryTest {`
 
@@ -43,7 +43,7 @@
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `spring-test-thread-bound` — [Transaction Management in TestContext Framework](https://docs.spring.io/spring-framework/reference/testing/testcontext-framework/tx.html)
 

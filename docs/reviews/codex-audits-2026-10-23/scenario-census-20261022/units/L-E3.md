@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E3-what-is-jpa.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E3-what-is-jpa.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/E3-what-is-jpa.md](../../../../../lessons/E3-what-is-jpa.md)
 
 원문 SHA-256: `53bfc322cfc212d1288acea66bf2dc02f0b8093a2cf6156bdcfd162ea0ab305d`
 
@@ -26,7 +26,7 @@ ORM 첫 저장·조회는 충분하며 영속상태/flush/merge는 E7과10-12로
 
 공백 또는 한계: 162행 DB 전제와 158행 bind trace 기본값이 현행 환경과 다르다. save diagram의 id 있음→UPDATE를 detached/assigned-ID/merge 실험 없이 일반화하면 오해가 남는다. E7은 merge와반환객체를다루므로기존후속을직접연결해야 한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E3-what-is-jpa.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E3-what-is-jpa.md:54) — 54~158행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E3-what-is-jpa.md](../../../../../lessons/E3-what-is-jpa.md) — 54~158행
 
 ### 2. CommandLineRunner로 count/find/save/delete를 관찰하고 태그0행을확인한다.
 
@@ -36,7 +36,7 @@ ORM 첫 저장·조회는 충분하며 영속상태/flush/merge는 E7과10-12로
 
 공백 또는 한계: 162행 DB 전제와 158행 bind trace 기본값이 현행 환경과 다르다. save diagram의 id 있음→UPDATE를 detached/assigned-ID/merge 실험 없이 일반화하면 오해가 남는다. E7은 merge와반환객체를다루므로기존후속을직접연결해야 한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E3-what-is-jpa.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E3-what-is-jpa.md:160) — 160~234행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E3-what-is-jpa.md](../../../../../lessons/E3-what-is-jpa.md) — 160~234행
 
 ### 3. 파생메서드 오타와 Entity 누락의 기동 실패를 재현한다.
 
@@ -46,7 +46,7 @@ ORM 첫 저장·조회는 충분하며 영속상태/flush/merge는 E7과10-12로
 
 공백 또는 한계: 162행 DB 전제와 158행 bind trace 기본값이 현행 환경과 다르다. save diagram의 id 있음→UPDATE를 detached/assigned-ID/merge 실험 없이 일반화하면 오해가 남는다. E7은 merge와반환객체를다루므로기존후속을직접연결해야 한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E3-what-is-jpa.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E3-what-is-jpa.md:236) — 236~260행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E3-what-is-jpa.md](../../../../../lessons/E3-what-is-jpa.md) — 236~260행
 
 ## 이번 실행 근거
 
@@ -70,7 +70,7 @@ DB/트랜잭션을 직접 다루는 레슨은 별도 행 비교를 기록한다.
 
 판정 범위: 해당 레슨과 명시한 후속 경로의 판정이며 전체 개념의 부재를 뜻하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E3-what-is-jpa.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E3-what-is-jpa.md)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E3-what-is-jpa.md](../../../../../lessons/E3-what-is-jpa.md)
 
 ## 확장 개발 명세
 
@@ -123,10 +123,10 @@ P2
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E3/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E3/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E3/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E3/screen.jpg`)
 - 관찰: 없음
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E3/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E3/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E3/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E3/dom.txt`)
 
 - markdown_same: 예
 - html_same: 아니오
@@ -136,6 +136,6 @@ P2
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E3-what-is-jpa.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E3-what-is-jpa.md:1) — 1~321행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E3-what-is-jpa.md](../../../../../lessons/E3-what-is-jpa.md) — 1~321행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-E3.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-E3.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-E3.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-E3.json`)

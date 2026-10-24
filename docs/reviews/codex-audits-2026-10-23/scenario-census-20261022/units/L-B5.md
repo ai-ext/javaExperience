@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B5-interfaces.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B5-interfaces.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/B5-interfaces.md](../../../../../lessons/B5-interfaces.md)
 
 원문 SHA-256: `fe079b7c307b5213519441ebebaf7fc4fc6309e7b6c1dfe2994c39ddea88ee56`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: 직접 new 기반 다형성에서 Spring의 후보 빈0/2개·선택·실패대역으로 이어지는 L16이 이미 있지만 이 레슨 후속 링크에는 직접 연결되지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B5-interfaces.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B5-interfaces.md:53) — 53~138행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B5-interfaces.md](../../../../../lessons/B5-interfaces.md) — 53~138행
 
 ### 2. Upper 구현을 추가하고 서비스 코드를 유지한다.
 
@@ -36,7 +36,7 @@
 
 공백 또는 한계: 직접 new 기반 다형성에서 Spring의 후보 빈0/2개·선택·실패대역으로 이어지는 L16이 이미 있지만 이 레슨 후속 링크에는 직접 연결되지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B5-interfaces.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B5-interfaces.md:140) — 140~173행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B5-interfaces.md](../../../../../lessons/B5-interfaces.md) — 140~173행
 
 ### 3. 구현 누락·interface new·implements 누락을 컴파일 오류로 확인한다.
 
@@ -46,13 +46,13 @@
 
 공백 또는 한계: 직접 new 기반 다형성에서 Spring의 후보 빈0/2개·선택·실패대역으로 이어지는 L16이 이미 있지만 이 레슨 후속 링크에는 직접 연결되지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B5-interfaces.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B5-interfaces.md:175) — 175~230행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B5-interfaces.md](../../../../../lessons/B5-interfaces.md) — 175~230행
 
 ## 이번 실행 근거
 
 이번 독립 Java 예시 1개를 실행해 예상 출력/예외를 확인했다. Spring·DB·IDE 실습 전체의 실행이 아니다.
 
-[/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json)
+$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json`)
 
 ## 쿼리·DB 깊이와 다음 단계
 
@@ -72,7 +72,7 @@ DB/트랜잭션을 직접 다루는 레슨은 별도 행 비교를 기록한다.
 
 판정 범위: 해당 레슨과 명시한 후속 경로의 판정이며 전체 개념의 부재를 뜻하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B5-interfaces.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B5-interfaces.md)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B5-interfaces.md](../../../../../lessons/B5-interfaces.md)
 
 ## 확장 개발 명세
 
@@ -125,10 +125,10 @@ P2
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B5/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B5/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B5/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B5/screen.jpg`)
 - 관찰: 없음
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B5/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B5/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B5/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B5/dom.txt`)
 
 - markdown_same: 예
 - html_same: 아니오
@@ -138,6 +138,6 @@ P2
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B5-interfaces.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B5-interfaces.md:1) — 1~283행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B5-interfaces.md](../../../../../lessons/B5-interfaces.md) — 1~283행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-B5.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-B5.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-B5.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-B5.json`)

@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/F2-auth-token.md](../../../../../lessons/F2-auth-token.md)
 
 원문 SHA-256: `ba3ca8e4d2d11888592f4a90db2beb95783ab5e9486fa96916ed1565258b2ef1`
 
@@ -26,7 +26,7 @@ VisitController로 cookie jar/browser count와 재시작을 확인하고 api_tok
 
 공백 또는 한계: sessionId body 노출은 HttpOnly 목적을 우회할 위험이 있어 lab 한정.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md:39) — 39~104행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F2-auth-token.md](../../../../../lessons/F2-auth-token.md) — 39~104행
 
 ### 2. 401/403 및 token principal author
 
@@ -36,7 +36,7 @@ VisitController로 cookie jar/browser count와 재시작을 확인하고 api_tok
 
 공백 또는 한계: authorId request spoofing 금지, principal 사용.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md:105) — 105~154행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F2-auth-token.md](../../../../../lessons/F2-auth-token.md) — 105~154행
 
 ### 3. 세션·DB token·JWT의 persistence/revoke
 
@@ -46,7 +46,7 @@ VisitController로 cookie jar/browser count와 재시작을 확인하고 api_tok
 
 공백 또는 한계: JWT lifecycle 심화는 F5/S13.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md:25) — 25~36행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F2-auth-token.md](../../../../../lessons/F2-auth-token.md) — 25~36행
 
 ## 이번 실행 근거
 
@@ -74,7 +74,7 @@ VisitController로 cookie jar/browser count와 재시작을 확인하고 api_tok
 
 판정 범위: 레슨은 구현 예시와 실습 지시를 제공하며 이번 감사자가 실행/build한 것은 아니다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md:25) — 25~154행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F2-auth-token.md](../../../../../lessons/F2-auth-token.md) — 25~154행
 
 ## 확장 개발 명세
 
@@ -126,10 +126,10 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F2/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F2/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F2/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F2/screen.jpg`)
 - 관찰: 렌더 캡처가 제공되지 않아 시각 검토 대기.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F2/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F2/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F2/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F2/dom.txt`)
 
 - source: corpus latest_source 기록에 따름
 - html: source 동일, generated HTML hash 상이; screenshot 비교 대기
@@ -140,8 +140,8 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md:39) — 39~104행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md:105) — 105~154행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F2-auth-token.md:25) — 25~36행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F2-auth-token.md](../../../../../lessons/F2-auth-token.md) — 39~104행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F2-auth-token.md](../../../../../lessons/F2-auth-token.md) — 105~154행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F2-auth-token.md](../../../../../lessons/F2-auth-token.md) — 25~36행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-F2.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-F2.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-F2.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-F2.json`)

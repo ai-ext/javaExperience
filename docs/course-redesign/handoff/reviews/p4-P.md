@@ -8,7 +8,7 @@
 
 **① major — B04 확인 테스트가 핵심 증상을 고치지 않은 수정도 통과시킵니다.**
 
-위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B04/answer/B04ConfirmTest.java:203](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B04/answer/B04ConfirmTest.java:203), 같은 파일 221행.
+위치: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/B04/answer/B04ConfirmTest.java:203](../../../../messy-server/tickets/B04/answer/B04ConfirmTest.java), 같은 파일 221행.
 
 검사하는 구조 조건은 다음 두 가지입니다.
 
@@ -23,7 +23,7 @@ assertThat(findCycle(edges)).as("빈 의존 순환(이름 → 이름)").isEmpty(
 
 **② major — B15·E01 패치를 함께 적용해도 이전 조회 결과가 숨김 커밋 후 캐시를 다시 채울 수 있습니다.**
 
-위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/E01/answer/fix.patch:66](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/E01/answer/fix.patch:66), [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/src/main/java/com/example/board/post/PostCacheEvictListener.java:20](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/src/main/java/com/example/board/post/PostCacheEvictListener.java:20).
+위치: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/E01/answer/fix.patch:66](../../../../messy-server/tickets/E01/answer/fix.patch), [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/src/main/java/com/example/board/post/PostCacheEvictListener.java:20](../../../../messy-server/src/main/java/com/example/board/post/PostCacheEvictListener.java).
 
 ```java
 List<PopularPost> loaded = loadFromDb();
@@ -44,7 +44,7 @@ E01의 진행 중인 `loading` 역시 무효화 세대를 구분하지 않습니
 
 **③ major — B15 정답 테스트가 무한 대기할 수 있고, 확인 테스트도 특정 SQL 모양에 의존합니다.**
 
-위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B15/answer/fix.patch:124](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B15/answer/fix.patch:124).
+위치: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/B15/answer/fix.patch:124](../../../../messy-server/tickets/B15/answer/fix.patch).
 
 ```java
 while (jdbc.queryForObject(
@@ -55,13 +55,13 @@ while (jdbc.queryForObject(
 
 숨김 요청이 UPDATE 전에 실패하면 이 반복문은 끝나지 않습니다. 뒤에 있는 `hide.get(10, TimeUnit.SECONDS)`까지 도달하지 못하므로 그 제한 시간은 도움이 되지 않습니다.
 
-또한 [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B15/answer/B15ConfirmTest.java:97](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B15/answer/B15ConfirmTest.java:97)는 제한 시간은 있지만 같은 UPDATE 문자열을 요구합니다. 학습자가 `SELECT … FOR UPDATE`로 먼저 잠그는 올바른 수정과 AFTER_COMMIT 무효화를 조합하면, UPDATE에 도달하기 전에 대기하므로 오탐할 수 있습니다.
+또한 [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/B15/answer/B15ConfirmTest.java:97](../../../../messy-server/tickets/B15/answer/B15ConfirmTest.java)는 제한 시간은 있지만 같은 UPDATE 문자열을 요구합니다. 학습자가 `SELECT … FOR UPDATE`로 먼저 잠그는 올바른 수정과 AFTER_COMMIT 무효화를 조합하면, UPDATE에 도달하기 전에 대기하므로 오탐할 수 있습니다.
 
 수정 방법: 정답 테스트에도 마감 시간과 `hide.isDone()` 검사를 넣고 실패 원인을 회수해야 합니다. 동기화 지점은 특정 SQL 문자열 대신 대상 트랜잭션·행의 잠금 상태를 관찰하도록 보완해야 합니다.
 
 **④ major — E01 확인 테스트가 결정적인 RED와 대기 상한을 검증하지 못합니다.**
 
-위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/E01/answer/E01ConfirmTest.java:77](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/E01/answer/E01ConfirmTest.java:77).
+위치: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/E01/answer/E01ConfirmTest.java:77](../../../../messy-server/tickets/E01/answer/E01ConfirmTest.java).
 
 ```java
 ready.await(10, TimeUnit.SECONDS);
@@ -80,8 +80,8 @@ assertThat(queries.count("findPopular")).isEqualTo(1);
 
 위치:
 
-- [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/tickets/B04.md:16](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/tickets/B04.md:16)
-- [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/tickets/B15.md:21](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/tickets/B15.md:21)
+- [$WORKTREE_ROOT/p1-spec-roadmap/course/tickets/B04.md:16](../../../../course/tickets/B04.md)
+- [$WORKTREE_ROOT/p1-spec-roadmap/course/tickets/B15.md:21](../../../../course/tickets/B15.md)
 
 접기 밖에 다음 설명이 있습니다.
 
@@ -95,7 +95,7 @@ assertThat(queries.count("findPopular")).isEqualTo(1);
 
 **⑥ minor — E01의 일자 표기는 맞지만 roadmap 티켓 연결은 B15로 남아 있습니다.**
 
-위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/roadmap.json:1534](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/roadmap.json:1534).
+위치: [$WORKTREE_ROOT/p1-spec-roadmap/course/roadmap.json:1534](../../../../course/roadmap.json).
 
 ```json
 "tickets": [
@@ -109,7 +109,7 @@ D14 ⑤ 제목과 과제는 E01의 스탬피드 방지인데 티켓 ID는 B15입
 
 **⑦ minor — B04 재현 스크립트는 환경·컴파일 실패를 숨기고 정상 종료할 수 있습니다.**
 
-위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B04/repro.sh:86](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B04/repro.sh:86), 같은 파일 96행.
+위치: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/B04/repro.sh:86](../../../../messy-server/tickets/B04/repro.sh), 같은 파일 96행.
 
 ```bash
 ./gradlew ... >/dev/null 2>&1 || true
@@ -122,7 +122,7 @@ Gradle이 테스트 전에 실패해 XML을 만들지 않으면 `xml_failures`�
 
 **⑧ major — 정답 서버와 동시에 실행하면 Redis의 호스트 포트가 충돌합니다.**
 
-위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/compose.yaml:21](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/compose.yaml:21), [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/compose.yaml:20](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/compose.yaml:20).
+위치: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/compose.yaml:21](../../../../messy-server/compose.yaml), [$WORKTREE_ROOT/p1-spec-roadmap/board-server/compose.yaml:20](../../../../board-server/compose.yaml).
 
 두 Compose 모두 다음 포트를 공개합니다.
 
@@ -138,9 +138,9 @@ messy 애플리케이션의 Redis 접속 포트는 16380으로 분리됐지만, 
 
 위치:
 
-- [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/src/main/java/com/example/board/comment/CommentService.java:48](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/src/main/java/com/example/board/comment/CommentService.java:48)
-- [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/src/main/java/com/example/board/post/PostServiceImpl.java:272](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/src/main/java/com/example/board/post/PostServiceImpl.java:272)
-- [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/src/main/resources/schema.sql:109](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/src/main/resources/schema.sql:109)
+- [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/src/main/java/com/example/board/comment/CommentService.java:48](../../../../messy-server/src/main/java/com/example/board/comment/CommentService.java)
+- [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/src/main/java/com/example/board/post/PostServiceImpl.java:272](../../../../messy-server/src/main/java/com/example/board/post/PostServiceImpl.java)
+- [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/src/main/resources/schema.sql:109](../../../../messy-server/src/main/resources/schema.sql)
 
 ```java
 Member member = memberRepository.findByIdForUpdate(memberId)

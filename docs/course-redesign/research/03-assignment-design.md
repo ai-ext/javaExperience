@@ -18,7 +18,7 @@
 
 | 단계 | 기간 | 범위 | 제출물 | 통과 기준 |
 |---|---|---|---|---|
-| 0. 환경 | 0.5일 | JDK 21, Colima, `docker compose up -d`, `/hello` | 스크린샷 대신 `./gradlew test` 출력 | `HelloControllerTest` 통과 |
+| 0. 환경 | 0.5일 | JDK 21, Docker 런타임, `docker compose up -d`, `/hello` | 스크린샷 대신 `./gradlew test` 출력 | `HelloControllerTest` 통과 |
 | 1. 워밍업 (Java 처음인 사람만) | 2~3일 | 0-1 ~ 0-5 (+ Gilded Rose 1회 선택) | 단계별 커밋 | 각 단계 결과 테스트 프롬프트 `필수 N/N` |
 | 2. 따라 만들기 필수 경로 | 2주 | 1-1~1-6 · 2-1~2-4 · 3-1~3-2 · 4-1~4-2 · 5-1~5-3 · 7-1~7-3 (20단계) | **장(ch)마다 PR 1개.** PR 본문에 AI 채점표 붙이기 | C·D 전부 통과, T 통과, R은 리뷰어가 질문 → 학습자가 답변 |
 | 3. 티켓 | 1주 | 쉬움 2 · 중급 2 · 고급 1 (아래 추천 세트) | **티켓마다 PR 1개.** 원인 설명·재현 방법·완료 조건 확인 결과 | 티켓의 "완료 조건" + "하지 말 것" 위반 없음 |
@@ -49,7 +49,7 @@
 |---|---|---|
 | 1 | **깨끗한 시작 브랜치/태그** (`start`) 만들기 | main의 `src/`에 Todo·Post 연습 코드가 섞여 있고 `application.yml`이 3306을 가리킨다(compose는 13308) |
 | 2 | **티켓 기준 브랜치** (`ticket-base`) 만들기 | 티켓이 StudyMate 레포의 `scripts/java-db.sh`를 전제한다. `scenario/snapshots/9-5.json`(Flyway V1~V6)을 펼쳐 기준 코드로 쓰고, DB 리셋 명령을 이 레포 기준으로 바꾼다 |
-| 3 | Colima·Testcontainers 안내 | README가 Docker Desktop 전제. Testcontainers는 Colima에서 `DOCKER_HOST`·`TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 설정이 필요할 수 있다(이 맥에서는 아직 검증 안 함) |
+| 3 | VM 기반 Docker 런타임·Testcontainers 안내 | README가 Docker Desktop 전제. Testcontainers는 VM 기반 Docker 런타임에서 `DOCKER_HOST`·`TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 설정이 필요할 수 있다(이 맥에서는 아직 검증 안 함) |
 | 4 | 필수 경로 목록을 한 페이지로 | 101단계 목차를 그대로 주면 범위가 안 보인다 |
 | 5 | (선택) C·D 표를 **인수 테스트로 변환** | AI 채점은 모델·프롬프트에 따라 흔들린다. 필수 경로 20단계만이라도 RestAssured/MockMvc 숨은 테스트로 만들면 재현 가능한 자동 채점이 된다 (NEXTSTEP ATDD 방식) |
 

@@ -501,8 +501,47 @@
     render();
   }
 
+  // 설정 형식은 모든 블록에서 공유한다. 저장 실패는 현재 화면 조작을 막지 않는다.
+  function initConfigTabs() {
+    var key = 'javaexperience.course.config-format.v1';
+    var groups = Array.from(document.querySelectorAll('[data-config-tabs]'));
+    var store = storage(), selected = 'yml';
+    try { if (store && store.getItem(key) === 'properties') selected = 'properties'; } catch (e) {}
+    function select(format, persist) {
+      groups.forEach(function (group) {
+        group.querySelectorAll('[role="tab"]').forEach(function (tab) {
+          var active = tab.dataset.configFormat === format;
+          tab.setAttribute('aria-selected', String(active));
+          tab.tabIndex = active ? 0 : -1;
+        });
+        group.querySelectorAll('[data-config-panel]').forEach(function (panel) { panel.hidden = panel.dataset.configPanel !== format; });
+      });
+      if (persist) { try { if (store) store.setItem(key, format); } catch (e) {} }
+    }
+    groups.forEach(function (group) {
+      group.querySelector('[role="tablist"]').hidden = false;
+      var tabs = Array.from(group.querySelectorAll('[role="tab"]'));
+      tabs.forEach(function (tab, index) {
+        tab.addEventListener('click', function () { select(tab.dataset.configFormat, true); });
+        tab.addEventListener('keydown', function (e) {
+          var next;
+          if (e.key === 'ArrowRight') next = (index + 1) % tabs.length;
+          else if (e.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+          else if (e.key === 'Home') next = 0;
+          else if (e.key === 'End') next = tabs.length - 1;
+          else return;
+          e.preventDefault();
+          select(tabs[next].dataset.configFormat, true);
+          tabs[next].focus();
+        });
+      });
+    });
+    select(selected, false);
+  }
+
   window.jxCourseProgress = { KEY: KEY, readProgress: readProgress, writeProgress: writeProgress, nextDay: nextDay };
   function start() {
+    initConfigTabs();
     var page = document.querySelector('[data-day-page]');
     if (page) { initDay(page); initDayStepper(page); }
     var home = document.querySelector('[data-course-home]');

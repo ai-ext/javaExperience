@@ -8,16 +8,16 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:44](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:44) — 확인 범위 44–53행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:44](../../../../knowledge/S09-jpa-hibernate.md) — 확인 범위 44–53행.
 
   발췌: `### 헷갈리는 매핑 옵션  | 구분 | 동작 | 선택 기준 | |---|---|---|`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:76](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:76) — 확인 범위 76–86행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/P20-jpa-entity-mapping.md:76](../../../../knowledge/P20-jpa-entity-mapping.md) — 확인 범위 76–86행.
 
   발췌: `### 2.5 cascade, orphanRemoval, 다대다  cascade는 JPA 상태 전파이고 DB FK cascade가 아니다. ’orphanRemoval=true’는 부모 컬렉션에서 빠진 자식을 삭제한다. 주문항목처럼 생명주기가 종속된 경우에만 함께 쓴다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/p20-lesson-data.mjs:657](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/p20-lesson-data.mjs:657) — 확인 범위 657–659행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/p20-lesson-data.mjs:657 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/p20-lesson-data.mjs:657`) — 확인 범위 657–659행.
 
   발췌: `"id": "orphan",     "question": "managed 자식을 removeLine하면 언제 DB에서 없어질까?",     "source": "원문orphanRemoval=true · 추가managed삭제transaction",`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/p20-lesson-data.mjs:753](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/p20-lesson-data.mjs:753) — 확인 범위 753–755행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/p20-lesson-data.mjs:753 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/p20-lesson-data.mjs:753`) — 확인 범위 753–755행.
 
   발췌: `"id": "mapping",     "question": "애노테이션이 실제 열과 감사 값에 어떻게 나타났을까?",     "source": "원문Column/Enumerated/BaseEntity · 추가JDBC metadata와commit행",`
 
@@ -43,7 +43,7 @@ P20 보강은 managed child 제거→flush DELETE→외부observer는 이전행�
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `jakarta-persistence-spec` — [Jakarta Persistence 3.2 Specification](https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2.html)
 

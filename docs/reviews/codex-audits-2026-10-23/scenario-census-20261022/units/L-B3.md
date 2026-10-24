@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B3-static-and-inner-classes.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B3-static-and-inner-classes.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/B3-static-and-inner-classes.md](../../../../../lessons/B3-static-and-inner-classes.md)
 
 원문 SHA-256: `e570546429e726f3cd011ebf6c9d03167e4dd19bf46ff86a5043416c0dff4162`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: 이 계약의 입문 목표에 대해 별도 공백을 확인하지 않았다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B3-static-and-inner-classes.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B3-static-and-inner-classes.md:44) — 44~159행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B3-static-and-inner-classes.md](../../../../../lessons/B3-static-and-inner-classes.md) — 44~159행
 
 ### 2. 같은 JSON을 inner/nested/record DTO에 보내 500/200 차이를 보고 고친다.
 
@@ -36,7 +36,7 @@
 
 공백 또는 한계: 이 계약의 입문 목표에 대해 별도 공백을 확인하지 않았다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B3-static-and-inner-classes.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B3-static-and-inner-classes.md:161) — 161~246행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B3-static-and-inner-classes.md](../../../../../lessons/B3-static-and-inner-classes.md) — 161~246행
 
 ### 3. static에서 인스턴스 접근과 외부 객체 없는 inner 생성을 실패시킨다.
 
@@ -46,13 +46,13 @@
 
 공백 또는 한계: 이 계약의 입문 목표에 대해 별도 공백을 확인하지 않았다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B3-static-and-inner-classes.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B3-static-and-inner-classes.md:248) — 248~282행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B3-static-and-inner-classes.md](../../../../../lessons/B3-static-and-inner-classes.md) — 248~282행
 
 ## 이번 실행 근거
 
 이번 독립 Java 예시 2개를 실행해 예상 출력/예외를 확인했다. Spring·DB·IDE 실습 전체의 실행이 아니다.
 
-[/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json)
+$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/runtime-lessons/summary.json`)
 
 ## 쿼리·DB 깊이와 다음 단계
 
@@ -74,10 +74,10 @@ DB/트랜잭션을 직접 다루는 레슨은 별도 행 비교를 기록한다.
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B3/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B3/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B3/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B3/screen.jpg`)
 - 관찰: 없음
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B3/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B3/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B3/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-B3/dom.txt`)
 
 - markdown_same: 예
 - html_same: 아니오
@@ -87,6 +87,6 @@ DB/트랜잭션을 직접 다루는 레슨은 별도 행 비교를 기록한다.
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B3-static-and-inner-classes.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/B3-static-and-inner-classes.md:1) — 1~335행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/B3-static-and-inner-classes.md](../../../../../lessons/B3-static-and-inner-classes.md) — 1~335행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-B3.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-B3.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-B3.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-B3.json`)

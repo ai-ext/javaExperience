@@ -30,10 +30,10 @@
 
 ## 근거: 절대경로와 라인
 
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/snapshots/blobs/ca164f353bb47e76f139a5d1054df57b8642fd57.txt:28](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/snapshots/blobs/ca164f353bb47e76f139a5d1054df57b8642fd57.txt:28) (L28–L32) — 3-2 정답의 src/main/java/org/example/post/PostService.java
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/snapshots/blobs/ca164f353bb47e76f139a5d1054df57b8642fd57.txt:131](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/snapshots/blobs/ca164f353bb47e76f139a5d1054df57b8642fd57.txt:131) (L131–L173) — 3-2 정답의 src/main/java/org/example/post/PostService.java
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:118](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:118) (L118–L135) — 직접 읽은 원문/코드
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/ch3-update-delete/3-0-put-replace.md:34](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/ch3-update-delete/3-0-put-replace.md:34) (L34–L42) — 직접 읽은 원문/코드
+- [$WORKTREE_ROOT/scenario-crud-redesign/scenario/snapshots/blobs/ca164f353bb47e76f139a5d1054df57b8642fd57.txt:28](../../../../../scenario/snapshots/blobs/ca164f353bb47e76f139a5d1054df57b8642fd57.txt) (L28–L32) — 3-2 정답의 src/main/java/org/example/post/PostService.java
+- [$WORKTREE_ROOT/scenario-crud-redesign/scenario/snapshots/blobs/ca164f353bb47e76f139a5d1054df57b8642fd57.txt:131](../../../../../scenario/snapshots/blobs/ca164f353bb47e76f139a5d1054df57b8642fd57.txt) (L131–L173) — 3-2 정답의 src/main/java/org/example/post/PostService.java
+- $WORKTREE_ROOT/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:118 (기록 경로: `$WORKTREE_ROOT/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:118`) (L118–L135) — 직접 읽은 원문/코드
+- [$WORKTREE_ROOT/scenario-crud-redesign/scenario/ch3-update-delete/3-0-put-replace.md:34](../../../../../scenario/ch3-update-delete/3-0-put-replace.md) (L34–L42) — 직접 읽은 원문/코드
 
 ## 구분해서 읽기
 
@@ -43,4 +43,4 @@
 
 감사 중 PATCH 화면의 설명이 갱신됐다. “제목 변경 요청”은 “수정 요청 전”으로, 객체·commit 설명은 선택한 요청의 필드/태그를 비교하도록, rollback 설명은 선택한 요청에 후행 검증 실패 값을 더하는 별도 분기로 명확해졌다. 생성 HTML에도 이 문구와 “기본 제목 요청 예시” 라벨이 반영되어 있다. 따라서 선택한 요청과 고정 예시를 혼동하는 설명상의 위험은 일부 줄었다. 기존 null/[]/권한/rollback 계약과 상태 ID·값 모델은 같으며, 이 항목의 핵심인 직접 계약 설계 연습과 과도한 Bean Validation 불가 표현에 대한 판정은 유지한다.
 
-현재 원문: /Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:118-135. 현재 생성 화면: /Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/flow/update-post.html. 초기 SHA와 현재 SHA는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/implementation/CONCURRENT-CHANGE-RECHECK.json에 함께 보존했다. 본 담당자는 재빌드나 브라우저 동작 시험을 수행하지 않았다.
+현재 원문: $WORKTREE_ROOT/scenario-crud-redesign/tools/site/functional-scenario-data.mjs:118-135. 현재 생성 화면: $WORKTREE_ROOT/scenario-crud-redesign/scenario/flow/update-post.html. 초기 SHA와 현재 SHA는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/implementation/CONCURRENT-CHANGE-RECHECK.json에 함께 보존했다. 본 담당자는 재빌드나 브라우저 동작 시험을 수행하지 않았다.

@@ -2,7 +2,7 @@
 
 대상 HEAD: `c9786af3b97c48ec118cade5777bc015fe282a88`. 현재 HEAD 재검증 결과가 아니다.
 
-원본: `/Users/ds/research/javaexperience-pr9-review-20261022/_data/verification-summary.json`
+원본: `$USER_HOME/research/javaexperience-pr9-review-20261022/_data/verification-summary.json`
 
 ````json
 {

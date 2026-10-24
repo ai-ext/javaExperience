@@ -4,7 +4,7 @@
 
 | 사용자 요구 | 대조한 결과 |
 |---|---|
-| worktree 하나 생성 | /Users/ds/code/javaExperience/.worktrees/concept-census-20261021, audit/concept-census-20261021, 기준 d66dc21a54b442175da6427654c1d5efb4659bc9 |
+| worktree 하나 생성 | $WORKTREE_ROOT/concept-census-20261021, audit/concept-census-20261021, 기준 d66dc21a54b442175da6427654c1d5efb4659bc9 |
 | 개념쪽 전수 조사 | 카탈로그134개 ID와 문서134쌍(Markdown/JSON), 전문 읽기 범위와 원문 해시 일치 |
 | 개념 하나하나 평가 | 중복 포함 의미 단위527항목. 정의/용도/대안/예/선수/질문/보완/상태/근거 기록 |
 | 무엇을 알아야 하고 무엇이 부족한지 | 추가 필요 후보41건을 기존 자료와 교차검토해 누락·연결·시각·심화 실험으로 구분 |
@@ -18,9 +18,9 @@
 ## 검사 명령
 
 ```bash
-python3 /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/validate_census.py
-python3 /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/build_catalog.py
-python3 /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/concept-census-20261021/_data/final_check.py
+python3 $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/validate_census.py
+python3 $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/build_catalog.py
+python3 $WORKTREE_ROOT/concept-census-20261021/audits/concept-census-20261021/_data/final_check.py
 ```
 
 처음 worktree를 만든 뒤 기존 `test-knowledge-catalog-data.mjs`로134문서 ID·원문 메타데이터·검색 범위를 확인했다. 감사 파일의 변경은 학습 사이트 빌드 입력인 기존 원문/HTML/도구 코드를 바꾸지 않는다. 최종 diff로 그 경계를 확인한다.

@@ -8,16 +8,16 @@ Repository 메서드명이 곧 SQL 한 문장이라는 오해를 버리고 persi
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S10-spring-data-query.md:44](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S10-spring-data-query.md:44) — 확인 범위 44–74행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S10-spring-data-query.md:44](../../../../knowledge/S10-spring-data-query.md) — 확인 범위 44–74행.
 
   발췌: `### 리포지토리 메서드는 SQL로 바로 치환되지 않는다  시작 시 저장소 팩토리가 메타데이터를 읽어 프록시를 만든다. CRUD는 기본 구현으로 위임하고, 쿼리 메서드는 선언 쿼리를 찾거나 이름을 분석한다. JPA 파생 쿼리는 속성 경로와 키워드로 JPQL을 만들며, 실행 시 JPA 구현체가 SQL로 변환해 JDBC로 전달한다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/E7-jpa-update-delete.md:211](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/E7-jpa-update-delete.md:211) — 확인 범위 211–237행.
+- [$WORKTREE_ROOT/concept-learning-night/lessons/E7-jpa-update-delete.md:211](../../../../../lessons/E7-jpa-update-delete.md) — 확인 범위 211–237행.
 
   발췌: `### ④ ’@Transactional’ 없이 ’save’를 부르면  ’’’text SQL: select lp1_0.id,…,lp1_0.view_count from lesson_post lp1_0 where lp1_0.id=?        ← findById`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/E7-jpa-update-delete.md:331](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/lessons/E7-jpa-update-delete.md:331) — 확인 범위 331–400행.
+- [$WORKTREE_ROOT/concept-learning-night/lessons/E7-jpa-update-delete.md:331](../../../../../lessons/E7-jpa-update-delete.md) — 확인 범위 331–400행.
 
   발췌: `### ⑪~⑭ 벌크 수정 — ’@Modifying’  "게시판 2의 글 조회수를 전부 +1"을 변경 감지로 하면 글마다 읽고 ’UPDATE’가 한 줄씩 나간다. ’UPDATE’ 한 번으로 끝내려면 저장소에 직접 쓴다.`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:754](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:754) — 확인 범위 754–756행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/s09-lesson-data.mjs:754 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/s09-lesson-data.mjs:754`) — 확인 범위 754–756행.
 
   발췌: `"id": "merge",     "question": "merge는 원본을 managed로 바꿀까?",     "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 ProbePost42 detached 원본과 반환 객체",`
 
@@ -43,7 +43,7 @@ E7 222행 “id가 있는 객체면 이미 있는 행으로 보고 merge”는 �
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `spring-data-new-state` — [Entity State Detection Strategies — Spring Data JPA Reference](https://docs.spring.io/spring-data/jpa/reference/data-commons/is-new-state-detection.html)
 - `spring-data-derived-delete` — [Spring Data JPA 4.1.1 Query Methods](https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html)

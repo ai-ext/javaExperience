@@ -845,3 +845,28 @@ test('API 층 표시는 모든 specRefs 순서에만 나오고 D04 공통 가이
   assert.ok(d04.includes(dayBuilder.apiGuide(hints.apiGuide)));
   assert.ok(d04.indexOf('### API 하나 만드는 순서') < d04.indexOf('## 오늘 순서'));
 });
+
+test('Spring 설정 정답은 같은 커밋의 전체 YAML과 자동 생성 properties를 함께 싣는다', () => {
+  for (const id of ['D01', 'D03', 'D08']) {
+    const md = page(id);
+    assert.match(md, /<!-- spring-config:start application/);
+    assert.match(md, /```properties\n/);
+    assert.match(md, /properties를 쓰면 같은 키를 `key=value`로/);
+  }
+  for (const commit of allCommits.filter(c => c.kind === 'answer' && ['D01','D03','D08'].includes(c.day))) {
+    for (const file of commitFiles(commit.sha)) {
+      if (file.configContent === undefined) continue;
+      const original = execFileSync('git', ['show', `${commit.sha}:board-server/${file.path}`], {cwd:ROOT,encoding:'utf8'});
+      assert.equal(file.configContent, original);
+      assert.ok(page(commit.day).includes(fence(original, 'yaml')));
+    }
+  }
+});
+test('설정 형식 채점은 모든 단계에서 properties와 프로파일 파일을 인정한다', () => {
+  for (const template of [hints.graderTemplate, ...Object.values(hints.graderTemplates)]) {
+    assert.match(template, /application.yml과 application.properties를 모두 인정/);
+    assert.match(template, /파일 확장자나 YAML의 --- 구조만으로 실패 처리하지 말고/);
+  }
+  const done = roadmap.days.find(d => d.id === 'D01').steps.flatMap(s => s.done).join('\n');
+  assert.match(done, /application-test.properties/);
+});

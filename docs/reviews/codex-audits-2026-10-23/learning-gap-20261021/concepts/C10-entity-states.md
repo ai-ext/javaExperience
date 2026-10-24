@@ -8,16 +8,16 @@ new/managed/detached/removed와 DB 행 존재를 별개로 판단하고 merge �
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:33](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:33) — 확인 범위 33–42행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:33](../../../../knowledge/S09-jpa-hibernate.md) — 확인 범위 33–42행.
 
   발췌: `### 엔티티 상태  | 상태 | 의미 | 다음 전이 예 | |---|---|---|`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:754](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:754) — 확인 범위 754–756행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/s09-lesson-data.mjs:754 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/s09-lesson-data.mjs:754`) — 확인 범위 754–756행.
 
   발췌: `"id": "merge",     "question": "merge는 원본을 managed로 바꿀까?",     "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 ProbePost42 detached 원본과 반환 객체",`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:866](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:866) — 확인 범위 866–868행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/s09-lesson-data.mjs:866 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/s09-lesson-data.mjs:866`) — 확인 범위 866–868행.
 
   발췌: `"id": "remove",     "question": "remove 직후 contains=false면 DB에서도 없을까?",     "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 ProbePost42 remove·flush·commit",`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:353](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:353) — 확인 범위 353–355행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/s09-lesson-data.mjs:353 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/s09-lesson-data.mjs:353`) — 확인 범위 353–355행.
 
   발췌: `"id": "cache",     "question": "id가 있는 객체는 이미 영속 상태일까?",     "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 ProbePost42 생성·저장·find",`
 
@@ -43,7 +43,7 @@ new/managed/detached/removed와 DB 행 존재를 별개로 판단하고 merge �
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `jakarta-entitymanager-api` — [EntityManager API Javadoc](https://jakarta.ee/specifications/persistence/3.2/apidocs/jakarta.persistence/jakarta/persistence/EntityManager.html)
 

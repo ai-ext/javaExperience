@@ -8,16 +8,16 @@
 
 ## 확인한 자료와 실제 커버리지
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S08-transactions.md:48](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S08-transactions.md:48) — 확인 범위 48–62행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S08-transactions.md:48](../../../../knowledge/S08-transactions.md) — 확인 범위 48–62행.
 
   발췌: `### 격리수준과 동시성 이상  | 수준 | 방지하는 이상(표준 정의) | 남을 수 있는 이상 | |---|---|---|`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:59](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:59) — 확인 범위 59–76행.
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md:59](../../../../knowledge/S09-jpa-hibernate.md) — 확인 범위 59–76행.
 
   발췌: `’’’text EntityManager.find(Order, id)         │         ├─ 1차 캐시에 식별자 존재 → 같은 인스턴스 반환`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:353](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:353) — 확인 범위 353–355행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/s09-lesson-data.mjs:353 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/s09-lesson-data.mjs:353`) — 확인 범위 353–355행.
 
   발췌: `"id": "cache",     "question": "id가 있는 객체는 이미 영속 상태일까?",     "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 ProbePost42 생성·저장·find",`
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/r04-lesson-data.mjs:1817](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/r04-lesson-data.mjs:1817) — 확인 범위 1817–1819행.
+- $WORKTREE_ROOT/concept-learning-night/tools/site/r04-lesson-data.mjs:1817 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/r04-lesson-data.mjs:1817`) — 확인 범위 1817–1819행.
 
   발췌: `{id:'transaction',question:'나중 ROLLBACK은 어느 변경까지 취소할까?',source:scope+' · 추가 r04_extra transaction probe',sourceNote:'이 네 가지는 원문 demo와 다른 추가 작은 테이블입니다. autocommit·명시commit·CHECK3819·통제된 두 연결 교차 실행을 구분합니다.',note:'한 CHECK 오류의 관측을 모든 에러·deadlock의 처리로 일반화하지 않습니다. 교차 실행은 통제된 문장 순서이며 thread 부하시험이나 시간 측정이 아닙니다. '+limits,stages:[  stage('transaction','autocommit','autocommit 성공 뒤 ROLLBACK에도 남음','추가 autocommit_probe id1을 기본autocommit1에서 INSERT한 뒤 ROLLBACK했습니다. observer에도 id1은 남았습니다.','INSERT INTO autocomm`
 
@@ -43,7 +43,7 @@ S08은 표준 isolation 이상과 DB별 차이를 설명한다. S09는 같은 �
 
 ## 공식 근거 연결
 
-아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 /Users/ds/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
+아래는 별도 Luna 조사에서 수집한 공식근거의 적용 지점이다. 이 담당자가 웹을 다시 조회한 결과는 아니며 출처의 적용한계는 $USER_HOME/research/javaexperience-learning-gap-audit-20261021/sources/SOURCES.md에서 확인한다.
 
 - `mysql-isolation` — [InnoDB Transaction Isolation Levels — MySQL 8.4 Manual](https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html)
 - `mysql-consistent-read` — [Consistent Nonlocking Reads — MySQL 8.4 Manual](https://dev.mysql.com/doc/refman/8.4/en/innodb-consistent-read.html)

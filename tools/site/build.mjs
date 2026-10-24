@@ -11,6 +11,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Marked } from 'marked';
+import { renderSpringConfigTabs } from './spring-config-tabs.mjs';
 import { buildSync } from 'esbuild';
 import { renderScreen, withImplementationCode } from './scenario-content.mjs';
 import { renderCatalog, renderStage } from './api-architecture-view.mjs';
@@ -207,6 +208,7 @@ function render(abs) {
     // DB 조회와 빌드처럼 브라우저에서 할 수 없는 터미널 명령만 접어 둔다.
     source = source.replace(/(## 직접 확인[\s\S]*?)(?=\n## |$)/, (section) => section.replace(/```(?:bash|sh|shell)\n([\s\S]*?)\n```/g, '```manual-command\n$1\n```'));
   }
+  if (rel(abs).startsWith('course/')) source = renderSpringConfigTabs(source);
   let html = marked.parse(source);
   html = html.replace(/<table>/g, '<div class="table-wrap"><table>').replace(/<\/table>/g, '</table></div>');
   if (abs === path.join(ROOT, 'scenario/README.md')) {
@@ -640,7 +642,7 @@ ${lv || lab ? `<script src="${assetUrl('tools/site/scenario-runner.js', path.dir
 ${abs === path.join(ROOT, 'scenario/ch4-like/4-2-like-concurrency.md') ? `<script src="${assetUrl('tools/site/first-java-journey.js', path.dirname(abs))}" defer></script>` : ''}${['S14-messaging.md', 'W23-cache-and-in-memory.md', 'S12-security-architecture.md'].some((name) => abs === path.join(ROOT, 'docs/knowledge', name)) ? `<script src="${assetUrl('tools/site/concept-scenes.js', path.dirname(abs))}" defer></script>` : ''}
 ${['P08-maven-gradle-practical.md','S03-boot-autoconfig.md','S04-config-profiles.md','R08-app-to-db-connection.md'].some((name) => abs === path.join(ROOT, 'docs/knowledge', name)) ? `<script src="${assetUrl('tools/site/config-concept-scenes.js', path.dirname(abs))}" defer></script>` : ''}
 ${abs.startsWith(`${DOC_DIR}${path.sep}`) ? `<script src="${assetUrl('tools/site/knowledge-learning.bundle.js', path.dirname(abs))}" defer></script>` : ''}
-${isDayPage || isHome ? `<script src="${assetUrl('tools/site/course.js', path.dirname(abs))}" defer></script>\n` : ''}${isCourseMap ? `<script src="${assetUrl('tools/site/course-map.js', path.dirname(abs))}" defer></script>\n` : ''}${hasFlow ? `<script src="${assetUrl('tools/site/course-flow.js', path.dirname(abs))}" defer></script>\n` : ''}${isHome || homeTask ? `<script src="${assetUrl('tools/site/home-learning.bundle.js', path.dirname(abs))}" defer data-home-controller data-home-root="${up('index.html')}"${homeTask ? ` data-home-task="${homeTask.id}"` : ''}></script>\n` : ''}</body>
+${isDayPage || isHome || body.includes('data-config-tabs') ? `<script src="${assetUrl('tools/site/course.js', path.dirname(abs))}" defer></script>\n` : ''}${isCourseMap ? `<script src="${assetUrl('tools/site/course-map.js', path.dirname(abs))}" defer></script>\n` : ''}${hasFlow ? `<script src="${assetUrl('tools/site/course-flow.js', path.dirname(abs))}" defer></script>\n` : ''}${isHome || homeTask ? `<script src="${assetUrl('tools/site/home-learning.bundle.js', path.dirname(abs))}" defer data-home-controller data-home-root="${up('index.html')}"${homeTask ? ` data-home-task="${homeTask.id}"` : ''}></script>\n` : ''}</body>
 </html>
 `;
 }

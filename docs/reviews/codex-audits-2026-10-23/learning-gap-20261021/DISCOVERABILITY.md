@@ -1,6 +1,6 @@
 # 추가 감사: 개념 이름을 모르는 학습자의 발견 가능성
 
-확인일: 2026-10-21 KST. 대상은 /Users/ds/code/javaExperience/.worktrees/common-learning-foundation 의 현재 자료·생성 HTML·카탈로그 검색 구현이다. 원본 코드를 수정하지 않았다. 실제 브라우저 클릭·시선·사용자 이해도 실험이 아니라 현재 검색 조건을 생성 HTML의 134개 문서에 적용해 재현한 정적/로직 검증이다.
+확인일: 2026-10-21 KST. 대상은 $WORKTREE_ROOT/common-learning-foundation 의 현재 자료·생성 HTML·카탈로그 검색 구현이다. 원본 코드를 수정하지 않았다. 실제 브라우저 클릭·시선·사용자 이해도 실험이 아니라 현재 검색 조건을 생성 HTML의 134개 문서에 적용해 재현한 정적/로직 검증이다.
 
 ## 결론
 
@@ -18,7 +18,7 @@
 | N:1·1:N·N:N | P20/E4, 댓글·태그 시나리오 | 매핑/중간Entity 설명 있음. 기호·다대일 검색 접근이 부족 |
 | LAZY·EAGER | P20/S09와 조회 관련 자료 | EAGER가 본문에는 있어도 현재 검색 대상에 잡히지 않음 |
 
-위 ID는 /Users/ds/code/javaExperience/.worktrees/common-learning-foundation/docs/knowledge/README.md에서 실제 파일로 연결된다. E4는 /Users/ds/code/javaExperience/.worktrees/common-learning-foundation/lessons/E4-jpa-associations.md다.
+위 ID는 $WORKTREE_ROOT/common-learning-foundation/docs/knowledge/README.md에서 실제 파일로 연결된다. E4는 $WORKTREE_ROOT/common-learning-foundation/lessons/E4-jpa-associations.md다.
 
 ## 현재 탐색 기능 중 있는 것
 
@@ -69,11 +69,11 @@
 
 ## 재현 근거 파일
 
-- /Users/ds/code/javaExperience/.worktrees/common-learning-foundation/tools/site/knowledge-catalog-data.mjs: 제목/Markdown h1~h3 검색어 생성.
-- /Users/ds/code/javaExperience/.worktrees/common-learning-foundation/tools/site/knowledge-catalog-view.mjs: 네 단계 학습 순서·검색 안내.
-- /Users/ds/code/javaExperience/.worktrees/common-learning-foundation/tools/site/knowledge-catalog-controller.mjs: question exact match/단어별 includes와 네 과제 contextMap.
-- /Users/ds/code/javaExperience/.worktrees/common-learning-foundation/docs/knowledge/README.html: 현재134개 항목과 질문별칭6개.
-- /Users/ds/research/javaexperience-learning-gap-audit-20261021/_data/discoverability-search.json: 검색 입력/결과 전체.
+- $WORKTREE_ROOT/common-learning-foundation/tools/site/knowledge-catalog-data.mjs: 제목/Markdown h1~h3 검색어 생성.
+- $WORKTREE_ROOT/common-learning-foundation/tools/site/knowledge-catalog-view.mjs: 네 단계 학습 순서·검색 안내.
+- $WORKTREE_ROOT/common-learning-foundation/tools/site/knowledge-catalog-controller.mjs: question exact match/단어별 includes와 네 과제 contextMap.
+- $WORKTREE_ROOT/common-learning-foundation/docs/knowledge/README.html: 현재134개 항목과 질문별칭6개.
+- $USER_HOME/research/javaexperience-learning-gap-audit-20261021/_data/discoverability-search.json: 검색 입력/결과 전체.
 
 ## 보완할 기준
 

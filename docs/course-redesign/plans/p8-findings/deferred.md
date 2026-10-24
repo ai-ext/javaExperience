@@ -1,6 +1,6 @@
 # P8-6 — minor (deferred) 전수 분류
 
-확인일: 2026-10-24. 기준 HEAD: `aefa4cab` (`course/p1-spec-roadmap`). 작업 루트: `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap`.
+확인일: 2026-10-24. 기준 HEAD: `aefa4cab` (`course/p1-spec-roadmap`). 작업 루트: `$WORKTREE_ROOT/p1-spec-roadmap`.
 
 원장 23줄(P2 15·P4 1·P6 2·P8 5)을 복합 항목별 **34건**으로 분리했다. 같은 원장 줄의 할인율/재고 부족, 당시 HTML 생성, 장부/계획 이력 등도 각각 센다. 표의 파일:줄은 이 작업 트리의 줄 번호이며, 원장의 옛 SHA는 이력 재작성 전 값일 수 있다. 원장 원문은 보존한다.
 
@@ -43,7 +43,7 @@
 | 22 | P4:39 | probe 가입·로그인 실패 뒤 빈 토큰으로 반복 | **이미 해결** | `messy-server/drills/probe.sh:21`; `docs/course-redesign/plans/p7-findings/R2.md:140` | R2 m10·a6e6d8d6에서 빈 토큰이면 복구 안내 후 exit 1. 직접 확인, 변경 없음. |
 | 23 | P4:39 | 당시 course/tickets HTML 미생성 | **이미 해결** | `course/tickets/B04.html:65`; `tools/site/package.json:7` | 현재 HEAD에도 갱신된 제출물 HTML이 있다. 이번 npm run build로 전체 HTML도 다시 생성했다. 과거 원장을 현재 미완료로 해석하지 않는다. |
 | 24 | P6:13 | 공부자료 12개의 없는 starter compose 전제 | **고침** | `docs/knowledge/README.md:7`; `docs/knowledge/R06-db-client-tools.md:17`; `docs/knowledge/R08-app-to-db-connection.md:172`; `compose.yaml:25` | da4dbe74·1ba4df4f가 없는 예제임을 이미 고지했다. 이번에는 해당 12개 자료와 자료 목차에 실제 루트 compose 링크를 연결하고 R08에 현재 DB 확인 명령을 추가했다. 상품 테이블·과거 측정·테스트를 게시판용 결과로 바꾸지 않았다. 아래 전수 목록 참고. |
-| 25 | P6:13 | README의 Colima Testcontainers 환경 변수 현장 미실행 | **보류** | `README.md:113` | Colima 장비에서 Docker 소켓·네트워크 구성을 실행 검증하지 않았다. 문서에 있는 설정을 현재 환경에서 검증 완료로 올리지 않는다. 문서 기준과 런타임 확인을 구분해 보류. |
+| 25 | P6:13 | README의 VM 기반 Docker 런타임 Testcontainers 환경 변수 현장 미실행 | **보류** | `README.md:113` | VM 기반 Docker 런타임 장비에서 Docker 소켓·네트워크 구성을 실행 검증하지 않았다. 문서에 있는 설정을 현재 환경에서 검증 완료로 올리지 않는다. 문서 기준과 런타임 확인을 구분해 보류. |
 | 26 | P6:17 | --compact 덤프를 초기화 뒤 복원하는 절차 없음 | **고침** | `docker/mysql/dump.sh:11`; `docker/mysql/dump.sh:35`; `README.md:57` | 시드와 중복되지 않게 앱 정지·대상 DB 삭제 후 빈 DB 복원을 설명했다. community는 대상 인자 필요, practice·project는 CREATE/USE 포함, project 백업 없으면 건너뜀. 백업 시점 행 수·대표 조회와 복원 뒤 대조를 명시. 복원은 실행하지 않았다. |
 | 27 | P6:17 | down -v 안내 일부에 CloudBeaver 초기화 누락 | **고침** | `compose.yaml:51`; `scenario/ch10-project/10-1-new-project.md:197`; `scenario/README.md:214` | 루트 README 및 해당 시나리오 7개 문서의 모든 초기화 언급에 세 DB·CloudBeaver 작업 공간 삭제와 별도 보관 범위를 명시했다. 외부 예제 compose의 볼륨 범위까지 확대하지 않았다. |
 | 28 | P8:16 | drills/lib.sh 죽은 잠금 동시 정리 경합 | **고침** | `messy-server/drills/lib.sh:16`; `messy-server/drills/lib.sh:17` | 죽은 pid를 본 실행자도 자동 rm하지 않고 실패한다. 모든 start·inject·recover 실행이 끝났음을 확인한 뒤 해당 잠금만 수동 정리하도록 안내한다. 정상 mkdir 잠금·대기는 유지. 자동 복구 대신 안전한 중단을 택했다. 동시 접근 8개와 정상 획득·대기·해제 검사 통과. |
@@ -78,7 +78,7 @@
 - 최초 `npm run build`는 임시 index의 `git apply --cached`가 원본 `.git/objects`에 객체를 쓰려다 `Operation not permitted`로 실패했다. 적용 시점 검사가 이 예외를 패치 문맥 불일치로 표시했다.
 - 저장소를 수정하지 않고 쓰기 가능한 임시 `GIT_OBJECT_DIRECTORY`와 읽기 전용 원본 `GIT_ALTERNATE_OBJECT_DIRECTORIES`로 분리해 같은 빌드·검사를 실행했다. 원본 Git index·refs·객체 저장소에는 쓰지 않았다.
 - 셸 확인: `bash -n messy-server/drills/lib.sh`와 README 복원 코드 블록의 `bash -n` 통과. 임시 디렉터리에서 정상 획득·해제, 죽은 pid 잠금 동시 접근 8건의 모두 실패·잠금 보존, 살아 있는 소유자 해제 뒤 대기자의 획득을 실행해 확인했다.
-- DB 복원·Colima·Java 서버 테스트·B04 재현은 실행하지 않았다. DB 초기화나 Redis 삭제도 실행하지 않았다.
+- DB 복원·VM 기반 Docker 런타임·Java 서버 테스트·B04 재현은 실행하지 않았다. DB 초기화나 Redis 삭제도 실행하지 않았다.
 
 | 검사 | 결과 |
 |---|---|
@@ -100,55 +100,55 @@
 
 소스 파일(절대경로):
 
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/README.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/P27-annotations-when-how.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/P28-default-beans.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/R01-what-is-db-server.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/R06-db-client-tools.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/R08-app-to-db-connection.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/README.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/V01-what-and-how-to-test.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/V02-layered-tests-handson.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/V03-mocking-in-practice.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/V04-test-db-strategy.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/V05-testing-tricky-things.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/V06-testing-at-work.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/W25-spring-multithreading.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/drills/lib.sh`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/scenario/README.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/scenario/ch1-create-post/1-3-service-layer.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/scenario/ch1-create-post/1-4-save-to-db.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/scenario/ch10-project/10-1-new-project.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/scenario/ch10-project/10-3-signup.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/scenario/ch10-project/10-7-post-list.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/scenario/ch9-schema-change/9-1-flyway.md`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/course-redesign/plans/p8-findings/deferred.md` (이 보고서)
+- `$WORKTREE_ROOT/p1-spec-roadmap/README.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/P27-annotations-when-how.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/P28-default-beans.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/R01-what-is-db-server.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/R06-db-client-tools.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/R08-app-to-db-connection.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/README.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/V01-what-and-how-to-test.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/V02-layered-tests-handson.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/V03-mocking-in-practice.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/V04-test-db-strategy.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/V05-testing-tricky-things.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/V06-testing-at-work.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/W25-spring-multithreading.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/messy-server/drills/lib.sh`
+- `$WORKTREE_ROOT/p1-spec-roadmap/scenario/README.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/scenario/ch1-create-post/1-3-service-layer.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/scenario/ch1-create-post/1-4-save-to-db.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/scenario/ch10-project/10-1-new-project.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/scenario/ch10-project/10-3-signup.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/scenario/ch10-project/10-7-post-list.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/scenario/ch9-schema-change/9-1-flyway.md`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/course-redesign/plans/p8-findings/deferred.md` (이 보고서)
 
 생성 파일(자동 빌드):
 
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/README.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/P27-annotations-when-how.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/P28-default-beans.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/R01-what-is-db-server.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/R06-db-client-tools.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/R08-app-to-db-connection.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/README.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/V01-what-and-how-to-test.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/V02-layered-tests-handson.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/V03-mocking-in-practice.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/V04-test-db-strategy.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/V05-testing-tricky-things.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/V06-testing-at-work.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/knowledge/W25-spring-multithreading.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/index.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/scenario/README.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/scenario/ch1-create-post/1-3-service-layer.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/scenario/ch1-create-post/1-4-save-to-db.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/scenario/ch10-project/10-1-new-project.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/scenario/ch10-project/10-3-signup.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/scenario/ch10-project/10-7-post-list.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/scenario/ch9-schema-change/9-1-flyway.html`
-- `/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/docs/scenario-visual-state.json`
+- `$WORKTREE_ROOT/p1-spec-roadmap/README.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/P27-annotations-when-how.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/P28-default-beans.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/R01-what-is-db-server.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/R06-db-client-tools.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/R08-app-to-db-connection.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/README.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/V01-what-and-how-to-test.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/V02-layered-tests-handson.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/V03-mocking-in-practice.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/V04-test-db-strategy.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/V05-testing-tricky-things.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/V06-testing-at-work.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/knowledge/W25-spring-multithreading.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/index.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/scenario/README.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/scenario/ch1-create-post/1-3-service-layer.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/scenario/ch1-create-post/1-4-save-to-db.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/scenario/ch10-project/10-1-new-project.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/scenario/ch10-project/10-3-signup.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/scenario/ch10-project/10-7-post-list.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/scenario/ch9-schema-change/9-1-flyway.html`
+- `$WORKTREE_ROOT/p1-spec-roadmap/docs/scenario-visual-state.json`
 
 `docs/scenario-visual-state.json`의 R08 topic 17→18·전체 1773→1774는 별도 상품 예제 소제목 추가를 빌드가 반영한 값이다. Java·SQL·서버 설정 변경 0건, 생성 일자 Markdown 직접 변경 0건, 원장 원문 변경 0건, Git stage·commit·stash·reset·checkout·rebase 실행 0건이다.
 

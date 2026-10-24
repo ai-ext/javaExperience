@@ -31,7 +31,7 @@ IntelliJ IDEA는 Java/Spring 코드를 편집하는 프로그램을 넘어 빌�
 
 ```properties
 # gradle.properties — 개발자 컴퓨터마다 경로가 달라지므로 보통은 개인 파일에 둔다.
-# org.gradle.java.home=/Users/me/.jdks/jdk-25
+# org.gradle.java.home=$USER_HOME/.jdks/jdk-25
 org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
 ```
 

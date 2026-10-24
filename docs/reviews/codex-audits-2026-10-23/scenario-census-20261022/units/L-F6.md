@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/F6-validation-in-practice.md](../../../../../lessons/F6-validation-in-practice.md)
 
 원문 SHA-256: `2ede7833a827fe213f131ccd3b513e5d567ed8ff2ad1445a9fa913c727c2a961`
 
@@ -26,7 +26,7 @@ Standalone Boot 4.1.1 앱에서 Bean Validation cascade, MaxBytes, DB 제약, qu
 
 공백 또는 한계: 경계 동작의 정확한 provider/version metadata를 실제 사용 버전에서 확인한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md:5) — 5~125행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F6-validation-in-practice.md](../../../../../lessons/F6-validation-in-practice.md) — 5~125행
 
 ### 2. 글자 수와 UTF-8 바이트 수는 다르며 BCrypt 바이트 한계는 encode 전에 검사한다.
 
@@ -36,7 +36,7 @@ Standalone Boot 4.1.1 앱에서 Bean Validation cascade, MaxBytes, DB 제약, qu
 
 공백 또는 한계: MaxBytes는 null을 유효 처리하므로 필수값 제약을 별도로 함께 둬야 한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md:126) — 126~230행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F6-validation-in-practice.md](../../../../../lessons/F6-validation-in-practice.md) — 126~230행
 
 ### 3. JSON 파싱, request-body validation, method validation, DB constraint는 서로 다른 exception path를 탄다.
 
@@ -46,7 +46,7 @@ Standalone Boot 4.1.1 앱에서 Bean Validation cascade, MaxBytes, DB 제약, qu
 
 공백 또는 한계: F1의 MethodArgumentNotValidException 처리기만으로 method-parameter validation은 처리되지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md:231) — 231~301행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F6-validation-in-practice.md](../../../../../lessons/F6-validation-in-practice.md) — 231~301행
 
 ## 이번 실행 근거
 
@@ -75,7 +75,7 @@ Standalone Boot 4.1.1 앱에서 Bean Validation cascade, MaxBytes, DB 제약, qu
 
 판정 범위: 예시/과거 관찰을 본편 구현 또는 이번 감사 실행으로 혼동하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md:5) — 5~301행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F6-validation-in-practice.md](../../../../../lessons/F6-validation-in-practice.md) — 5~301행
 
 ## 확장 개발 명세
 
@@ -128,10 +128,10 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F6/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F6/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F6/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F6/screen.jpg`)
 - 관찰: 렌더 캡처 미제공으로 검토 대기.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F6/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F6/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F6/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F6/dom.txt`)
 
 원문: corpus의 latest_source_same=True. 최신 HTML byte 해시 다름; 실제 캡처 기반 렌더 비교 전이므로 시각 차이는 pending_render. 원문 SHA/HTML 차이만으로 UI의 정확성이나 시각 완료를 추정하지 않는다.
 
@@ -139,8 +139,8 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md:5) — 5~125행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md:126) — 126~230행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F6-validation-in-practice.md:231) — 231~301행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F6-validation-in-practice.md](../../../../../lessons/F6-validation-in-practice.md) — 5~125행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F6-validation-in-practice.md](../../../../../lessons/F6-validation-in-practice.md) — 126~230행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F6-validation-in-practice.md](../../../../../lessons/F6-validation-in-practice.md) — 231~301행 (레슨 본문 설명/코드/과거 실험 기록; 별도 snapshot 없음)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-F6.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-F6.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-F6.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-F6.json`)

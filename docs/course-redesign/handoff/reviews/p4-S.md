@@ -8,8 +8,8 @@
 
 1. **major — Redis 호스트 포트가 정답 서버와 충돌합니다.**
 
-   - 위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/compose.yaml:21](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/compose.yaml:21)
-   - 대조: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/compose.yaml:20](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/board-server/compose.yaml:20)
+   - 위치: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/compose.yaml:21](../../../../messy-server/compose.yaml)
+   - 대조: [$WORKTREE_ROOT/p1-spec-roadmap/board-server/compose.yaml:20](../../../../board-server/compose.yaml)
    - 양쪽 모두 다음 포트를 공개합니다.
 
      ```yaml
@@ -21,7 +21,7 @@
 
 2. **major — 장애 관찰 스크립트가 curl 실패 시 종료됩니다.**
 
-   - 위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/drills/probe.sh:24](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/drills/probe.sh:24)
+   - 위치: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/drills/probe.sh:24](../../../../messy-server/drills/probe.sh)
 
      ```bash
      out=$(curl ... -w '%{http_code} %{time_total}' "$@" || echo "000 $MAX")
@@ -35,8 +35,8 @@
 
 3. **major — 장애 예약을 중복 실행하면 복구 후 다시 장애가 주입될 수 있습니다.**
 
-   - 위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/drills/start.sh:22](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/drills/start.sh:22)
-   - 복구 측: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/drills/recover.sh:13](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/drills/recover.sh:13)
+   - 위치: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/drills/start.sh:22](../../../../messy-server/drills/start.sh)
+   - 복구 측: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/drills/recover.sh:13](../../../../messy-server/drills/recover.sh)
 
      ```bash
      (...) >/dev/null 2>&1 &
@@ -52,7 +52,7 @@
 
 4. **major — 장애 삭제가 실패해도 복구 성공으로 기록합니다.**
 
-   - 위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/drills/recover.sh:19](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/drills/recover.sh:19)
+   - 위치: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/drills/recover.sh:19](../../../../messy-server/drills/recover.sh)
 
      ```bash
      toxics=$(curl -sf "$TOXI/proxies/$PROXY/toxics" || echo '[]')
@@ -68,7 +68,7 @@
 
 5. **minor — B16의 인기글 검사가 앞선 글쓰기의 guard 상태에 가려집니다.**
 
-   - 위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B16/answer/B16ConfirmTest.java:51](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B16/answer/B16ConfirmTest.java:51)
+   - 위치: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/B16/answer/B16ConfirmTest.java:51](../../../../messy-server/tickets/B16/answer/B16ConfirmTest.java)
 
      ```java
      injectFault();
@@ -82,7 +82,7 @@
 
 6. **minor — B14 확인 테스트가 정답 수정의 일부를 놓칩니다.**
 
-   - 위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B14/answer/B14ConfirmTest.java:47](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B14/answer/B14ConfirmTest.java:47)
+   - 위치: [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/B14/answer/B14ConfirmTest.java:47](../../../../messy-server/tickets/B14/answer/B14ConfirmTest.java)
 
      ```java
      mockMvc.perform(get("/actuator/env")
@@ -96,8 +96,8 @@
 7. **minor — B11·B14 재현 스크립트가 다른 프로세스를 종료할 수 있습니다.**
 
    - 위치:
-     - [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B11/repro.sh:35](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B11/repro.sh:35)
-     - [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B14/repro.sh:29](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/messy-server/tickets/B14/repro.sh:29)
+     - [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/B11/repro.sh:35](../../../../messy-server/tickets/B11/repro.sh)
+     - [$WORKTREE_ROOT/p1-spec-roadmap/messy-server/tickets/B14/repro.sh:29](../../../../messy-server/tickets/B14/repro.sh)
 
      ```bash
      pkill -f "server.port=$PORT"
@@ -108,7 +108,7 @@
 
 8. **minor — B12 제출물 문구가 접기 밖에서 원인 구조를 알려 줍니다.**
 
-   - 위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/tickets/B12.md:22](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/tickets/B12.md:22)
+   - 위치: [$WORKTREE_ROOT/p1-spec-roadmap/course/tickets/B12.md:22](../../../../course/tickets/B12.md)
 
      > 원인 서술: 새 출처 설정이 어디에 들어갔고, 왜 그 설정까지 요청이 오지 못하는가
 
@@ -117,7 +117,7 @@
 
 9. **minor — B11의 정답 서버 설명이 환경 변수 덮어쓰기 가능성을 잘못 제한합니다.**
 
-   - 위치: [/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/tickets/B11.md:65](/Users/ds/code/javaExperience/.worktrees/p1-spec-roadmap/course/tickets/B11.md:65)
+   - 위치: [$WORKTREE_ROOT/p1-spec-roadmap/course/tickets/B11.md:65](../../../../course/tickets/B11.md)
 
      > 환경 변수로 들어오는 것은 자리표시자가 가리키는 이름뿐이라 같은 키가 두 출처에 겹치지 않는다.
 

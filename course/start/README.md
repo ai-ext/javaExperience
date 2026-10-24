@@ -12,7 +12,7 @@
 ## 1. 준비물
 
 - JDK 21
-- Colima(docker CLI 런타임). 처음 한 번 `colima start`로 띄운다
+- Docker 런타임. 실행한 뒤 `docker info`와 `docker compose version`이 성공하는지 확인한다
 - IntelliJ IDEA
 
 ## 2. start.spring.io 설정값
@@ -28,12 +28,13 @@
 | Artifact / Name | `board` |
 | Package name | `com.example.board` |
 | Packaging | Jar |
-| Configuration | YAML |
+| Configuration | YAML 또는 Properties |
 | Java | 21 |
 
 **받은 뒤 바꿀 것**
 
-- Configuration을 YAML로 고르면 `src/main/resources/application.yaml`이 생긴다. 과정·구현 예시·예시 테스트(`ApplicationYmlTest` 등)는 `application.yml`을 읽으므로 **`application.yml`로 이름을 바꾼다**. 두 파일을 함께 두면 둘 다 적재되어 어느 값이 이기는지 헷갈린다.
+- YAML을 선택하면 생성된 `src/main/resources/application.yaml`을 `application.yml`로 바꿔 예시와 맞춘다. Properties를 선택하면 `application.properties`를 그대로 사용한다. 설정 예시의 `yml | properties` 탭에서 같은 키·값을 확인한다. 프로파일은 `application-local.properties`·`application-prod.properties`·`application-test.properties`로 나눌 수 있다. 같은 위치에는 한 형식만 둔다.
+- 구현 예시의 `ApplicationYmlTest`·`ProfileConfigTest`·`LocalProfileSeedTest`는 YAML 원문을 읽는 예시다. properties를 쓰면 같은 키·값과 프로파일 적용을 Spring Environment 또는 Properties 로딩으로 검증한다. 채점은 파일 확장자나 YAML 문서 개수가 아니라 동등한 설정·실행 결과를 기준으로 한다.
 - Artifact를 `board`로 두면 `settings.gradle`의 `rootProject.name`과 `spring.application.name`이 `board`다. 구현 예시는 `board-server`다. 동작에는 차이가 없으니 그대로 둬도 되고, 구현 예시와 맞추려면 두 곳을 `board-server`로 바꾼다.
 - 생성된 `build.gradle`에는 `spring-boot-starter-actuator-test`·`spring-boot-starter-validation-test` 같은 테스트 스타터가 더 들어 있을 수 있다. 동작에는 영향이 없으니 그대로 둔다.
 

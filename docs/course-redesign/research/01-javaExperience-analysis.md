@@ -50,10 +50,10 @@
 | 3 | main의 `src/`가 깨끗한 시작점이 아니다 | Todo·Post 연습 코드, `application.yml`이 MySQL **3306**(compose는 13308), `intent.md`는 "기본 H2"라고 기술 → 서로 어긋남 | 첫 실행에서 DB 연결 실패 가능 |
 | 4 | 채점이 LLM 프롬프트에 의존 | 자동 인수 테스트(숨은 테스트 스위트) 없음. T 항목도 학습자가 쓴 테스트 | 채점 재현성·공정성이 모델·프롬프트에 좌우 |
 | 5 | 문서 규모가 과하다 | 시나리오 md 8.9만 줄, `docs/` 271MB, 시각 감사 도구 238파일 | 온보딩 기간 내 완주 불가. 경로를 잘라 줘야 함 |
-| 6 | README가 **Docker Desktop** 전제 | `README.md` 준비물 | 사내는 라이선스로 Colima. Testcontainers는 `DOCKER_HOST`·`TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 설정 필요할 수 있음(이 맥에선 미검증) |
+| 6 | README가 **Docker Desktop** 전제 | `README.md` 준비물 | 사내는 라이선스로 VM 기반 Docker 런타임. Testcontainers는 `DOCKER_HOST`·`TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 설정 필요할 수 있음(이 맥에선 미검증) |
 | 7 | `AGENTS.md`가 Codex 전용 지시 포함 | `~/.codex/skills/gpt-image-prompt`, `imagegen` | 학습 화면 개편 작업용 규칙. Claude로 채점할 때는 무관 |
 
 ## 이번에 한 것 / 못 한 것
 
 - 한 것: `~/code/javaExperience`에 clone, 로컬 `CLAUDE.md` = `@AGENTS.md`(미커밋), `~/reference/projects.md` 등록.
-- 못 한 것: **빌드·테스트 미실행** — 이 맥에 JDK가 없다(`java -version` → "Unable to locate a Java Runtime"). Gradle wrapper 자체가 JVM을 요구하므로 toolchain 자동 탐색 이전 단계에서 막힌다. Docker(Colima)는 떠 있음.
+- 못 한 것: **빌드·테스트 미실행** — 이 맥에 JDK가 없다(`java -version` → "Unable to locate a Java Runtime"). Gradle wrapper 자체가 JVM을 요구하므로 toolchain 자동 탐색 이전 단계에서 막힌다. Docker(VM 기반 Docker 런타임)는 떠 있음.

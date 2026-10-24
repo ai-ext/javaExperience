@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H2-file-upload-download.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H2-file-upload-download.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/H2-file-upload-download.md](../../../../../lessons/H2-file-upload-download.md)
 
 원문 SHA-256: `58f0ba61127b93988ea81d425c57e6711143264f872e432e973ab5e043604780`
 
@@ -26,7 +26,7 @@ multipart/form-data로 파일을 받고, 클라이언트가 보낸 filename/MIME
 
 공백 또는 한계: originalNames는 프로세스 메모리 Map이고 파일은 local uploads 디렉터리에 저장한다. 재시작 후 원본 이름 mapping은 사라지고, disk write와 DB record transaction은 원자적이지 않다. 11-2는 DB post_image와 연결·실패 cleanup을 이어 받는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H2-file-upload-download.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H2-file-upload-download.md:1) — 1~336행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H2-file-upload-download.md](../../../../../lessons/H2-file-upload-download.md) — 1~336행
 
 ## 이번 실행 근거
 
@@ -48,7 +48,7 @@ sample은 DB 영속성/권한과 파일·DB 간 보상 처리를 구현하지 �
 
 판정 범위: originalNames는 프로세스 메모리 Map이고 파일은 local uploads 디렉터리에 저장한다. 재시작 후 원본 이름 mapping은 사라지고, disk write와 DB record transaction은 원자적이지 않다. 11-2는 DB post_image와 연결·실패 cleanup을 이어 받는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H2-file-upload-download.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H2-file-upload-download.md:1) — 1~336행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H2-file-upload-download.md](../../../../../lessons/H2-file-upload-download.md) — 1~336행
 
 ## 확장 개발 명세
 
@@ -113,14 +113,14 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H2/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H2/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H2/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H2/screen.jpg`)
 - 관찰: HTML/캡처를 실제 열어 확인하지 않았다. source와 HTML 차이만으로 시각 검토를 완료하지 않는다.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H2/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H2/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H2/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-H2/dom.txt`)
 
-- source: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H2-file-upload-download.md](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H2-file-upload-download.md)
+- source: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H2-file-upload-download.md](../../../../../lessons/H2-file-upload-download.md)
 - source_same: 예
-- html: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H2-file-upload-download.html](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/H2-file-upload-download.html)
+- html: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/H2-file-upload-download.html](../../../../../lessons/H2-file-upload-download.html)
 - html_same: 아니오
 - difference: source는 corpus에서 최신 원문과 동일하다고 기록되어 있다. HTML byte hash가 다르지만 화면/원인을 미검토했다.
 
@@ -129,6 +129,6 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H2-file-upload-download.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/H2-file-upload-download.md:1) — 1~336행 (원리·코드 예시·기록된 저자 실행·따라 하기·실패 반례·정답과 후속 경로)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/H2-file-upload-download.md](../../../../../lessons/H2-file-upload-download.md) — 1~336행 (원리·코드 예시·기록된 저자 실행·따라 하기·실패 반례·정답과 후속 경로)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H2.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-H2.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H2.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-H2.json`)

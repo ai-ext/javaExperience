@@ -13,7 +13,7 @@
 | 상점 | 활동 포인트 적립, 포인트 충전(외부 PG 모의), 쿠폰 발급(1인 1매, 선착순), 쿠폰·포인트로 아이템 구매 |
 | 관리자 | 신고 처리·글 숨김, 쿠폰 대량 지급, 감사 로그, 역할별 권한 |
 
-스택은 Java 21, Spring Boot 4.1, Spring Security, JPA(Hibernate 7), MyBatis, MySQL 8.4, Redis(Spring Data Redis·Lettuce), Testcontainers, WireMock(+Toxiproxy)이다. 로컬 컨테이너 런타임은 Colima다.
+스택은 Java 21, Spring Boot 4.1, Spring Security, JPA(Hibernate 7), MyBatis, MySQL 8.4, Redis(Spring Data Redis·Lettuce), Testcontainers, WireMock(+Toxiproxy)이다. 로컬에서는 `docker`·`docker compose` 명령이 동작하는 Docker 런타임을 쓴다.
 
 쓰기는 JPA, 목록·검색은 MyBatis를 쓴다(D06).
 

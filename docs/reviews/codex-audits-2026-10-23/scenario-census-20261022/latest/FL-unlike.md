@@ -1,8 +1,8 @@
 # 최신 기능형 과제 — unlike
 
-원문: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/flow/unlike-post.md](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/flow/unlike-post.md)
+원문: $WORKTREE_ROOT/scenario-crud-redesign/scenario/flow/unlike-post.md (기록 경로: `$WORKTREE_ROOT/scenario-crud-redesign/scenario/flow/unlike-post.md`)
 
-기준 worktree: /Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign. 화면/현행 소스 확인 HEAD 9ce57dd9ba9c5961ebc7a65d30408e970990d57f. 기존225단위와 동일한 단계 원문을 재배치한 최신7개를 별도 대조했다. 독립 새 기능232개라는 뜻이 아니다.
+기준 worktree: $WORKTREE_ROOT/scenario-crud-redesign. 화면/현행 소스 확인 HEAD 9ce57dd9ba9c5961ebc7a65d30408e970990d57f. 기존225단위와 동일한 단계 원문을 재배치한 최신7개를 별도 대조했다. 독립 새 기능232개라는 뜻이 아니다.
 
 ## 과제와 직접 구현 범위
 
@@ -52,4 +52,4 @@
 
 최신 계약·원문 보존·검증 안내·좋아요 데이터/모델 검사와 시각 정밀도 안내 검사6개 스크립트는 이번에 통과했다. 이는 화면/계약 검사이며 API 성능 검증이 아니다.
 
-화면: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/latest-flow/unlike-post/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/latest-flow/unlike-post/screen.jpg)
+화면: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/latest-flow/unlike-post/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/latest-flow/unlike-post/screen.jpg`)

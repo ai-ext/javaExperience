@@ -2,7 +2,7 @@
 
 요청: 모든 시나리오의 부족함과 확장 필요성을 하나씩 조사하여, 기초 구현에서 어렵고 깊은 업무·쿼리·DB 문제까지 학습할 수 있는지 검증한다. 기존 학습자 코드나 정답을 대신 완성하지 않고 조사·확장 명세·검증 결과를 만든다.
 
-기준 worktree: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021 (audit/concept-census-20261021). 산출물: /Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/ . 최신 후속 화면은 /Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign 의 별도 근거로 대조한다. 조사 기준/파일 해시는 _data/corpus.json.
+기준 worktree: $WORKTREE_ROOT/concept-census-20261021 (audit/concept-census-20261021). 산출물: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/ . 최신 후속 화면은 $WORKTREE_ROOT/scenario-crud-redesign 의 별도 근거로 대조한다. 조사 기준/파일 해시는 _data/corpus.json.
 
 범위는 본편101, DB경로14, 쿼리Q18, 선택랩L15/L16 2, 실전티켓30, 미션M10, 연결레슨50의 225단위다. scenario/README 및 L12~14 공통 준비·코드·채점 영역은 단위들의 공통 입력으로 읽는다. 같은 .md의Q/M은 구간별단위이며중복문서수가아니다. 제공된 원문의 해당구간 전문, 공동 준비사항, 연관정답/스냅샷 실제코드와 검사 기준을 함께 읽는다.
 

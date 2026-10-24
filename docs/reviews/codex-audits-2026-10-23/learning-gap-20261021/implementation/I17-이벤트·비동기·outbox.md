@@ -30,11 +30,11 @@
 
 ## 근거: 절대경로와 라인
 
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/ch16-events-async-cache/16-1-new-post-event.md:149](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/ch16-events-async-cache/16-1-new-post-event.md:149) (L149–L168) — 직접 읽은 원문/코드
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/ch16-events-async-cache/16-2-async-notification.md:154](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/ch16-events-async-cache/16-2-async-notification.md:154) (L154–L160) — 직접 읽은 원문/코드
-- [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/ch16-events-async-cache/16-2-async-notification.md:1909](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/scenario/ch16-events-async-cache/16-2-async-notification.md:1909) (L1909–L1920) — 직접 읽은 원문/코드
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s08-lesson-data.mjs:1157](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s08-lesson-data.mjs:1157) (L1157–L1161) — 개념 worktree 표시 데이터, 기존 실험 기록
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S08-transactions.md:255](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S08-transactions.md:255) (L255–L275) — outbox 스키마/처리절차가 이미 있는 원문
+- [$WORKTREE_ROOT/scenario-crud-redesign/scenario/ch16-events-async-cache/16-1-new-post-event.md:149](../../../../../scenario/ch16-events-async-cache/16-1-new-post-event.md) (L149–L168) — 직접 읽은 원문/코드
+- [$WORKTREE_ROOT/scenario-crud-redesign/scenario/ch16-events-async-cache/16-2-async-notification.md:154](../../../../../scenario/ch16-events-async-cache/16-2-async-notification.md) (L154–L160) — 직접 읽은 원문/코드
+- [$WORKTREE_ROOT/scenario-crud-redesign/scenario/ch16-events-async-cache/16-2-async-notification.md:1909](../../../../../scenario/ch16-events-async-cache/16-2-async-notification.md) (L1909–L1920) — 직접 읽은 원문/코드
+- $WORKTREE_ROOT/concept-learning-night/tools/site/s08-lesson-data.mjs:1157 (기록 경로: `$WORKTREE_ROOT/concept-learning-night/tools/site/s08-lesson-data.mjs:1157`) (L1157–L1161) — 개념 worktree 표시 데이터, 기존 실험 기록
+- [$WORKTREE_ROOT/concept-learning-night/docs/knowledge/S08-transactions.md:255](../../../../knowledge/S08-transactions.md) (L255–L275) — outbox 스키마/처리절차가 이미 있는 원문
 
 ## 구분해서 읽기
 

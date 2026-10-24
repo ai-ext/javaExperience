@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E1-why-layers.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E1-why-layers.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/E1-why-layers.md](../../../../../lessons/E1-why-layers.md)
 
 원문 SHA-256: `fa948666639bb0c9ca8da9cf5d647924937c160898dd0c39aedbbce71831c919`
 
@@ -26,7 +26,7 @@
 
 공백 또는 한계: singleton 저장소 공유의 장점만 실습하며 같은 객체에 요청별 가변상태를 두었을 때 사용자 간 값이 섞이는 반례가 없다. 생명주기와 L16 구현체 선택은 관련지식 링크 중심이다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E1-why-layers.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E1-why-layers.md:35) — 35~108행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E1-why-layers.md](../../../../../lessons/E1-why-layers.md) — 35~108행
 
 ### 2. 구현교체·빈제목·누락의존성을 정상/실패로 확인한다.
 
@@ -36,7 +36,7 @@
 
 공백 또는 한계: singleton 저장소 공유의 장점만 실습하며 같은 객체에 요청별 가변상태를 두었을 때 사용자 간 값이 섞이는 반례가 없다. 생명주기와 L16 구현체 선택은 관련지식 링크 중심이다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E1-why-layers.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E1-why-layers.md:110) — 110~180행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E1-why-layers.md](../../../../../lessons/E1-why-layers.md) — 110~180행
 
 ### 3. 변경 요구를 Controller/Service/Repository 중 어디에 둘지 판단한다.
 
@@ -46,7 +46,7 @@
 
 공백 또는 한계: singleton 저장소 공유의 장점만 실습하며 같은 객체에 요청별 가변상태를 두었을 때 사용자 간 값이 섞이는 반례가 없다. 생명주기와 L16 구현체 선택은 관련지식 링크 중심이다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E1-why-layers.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E1-why-layers.md:182) — 182~235행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E1-why-layers.md](../../../../../lessons/E1-why-layers.md) — 182~235행
 
 ## 이번 실행 근거
 
@@ -70,7 +70,7 @@ singleton 저장소 공유의 장점만 실습하며 같은 객체에 요청별 
 
 판정 범위: 해당 레슨과 명시한 후속 경로의 판정이며 전체 개념의 부재를 뜻하지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E1-why-layers.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E1-why-layers.md)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E1-why-layers.md](../../../../../lessons/E1-why-layers.md)
 
 ## 확장 개발 명세
 
@@ -123,10 +123,10 @@ P2
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E1/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E1/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E1/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E1/screen.jpg`)
 - 관찰: 없음
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E1/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E1/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E1/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-E1/dom.txt`)
 
 - markdown_same: 예
 - html_same: 아니오
@@ -136,6 +136,6 @@ P2
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E1-why-layers.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/E1-why-layers.md:1) — 1~235행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/E1-why-layers.md](../../../../../lessons/E1-why-layers.md) — 1~235행 (독립 학습 예시의 Java/curl/출력/확인문제와 정답)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-E1.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-E1.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-E1.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-E1.json`)

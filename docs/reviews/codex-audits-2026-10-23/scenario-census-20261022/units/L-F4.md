@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/F4-password-storage.md](../../../../../lessons/F4-password-storage.md)
 
 원문 SHA-256: `57aad9832363d5db29d5be7eaad186323786d68e4072d924c733dfb2f687d315`
 
@@ -26,7 +26,7 @@ security-crypto demo로 SHA/BCrypt, seed hash, cost, byte limit, Delegating pref
 
 공백 또는 한계: encode한 두 결과를 equals 비교하면 salt 차이 때문에 서로 일치하지 않는다. matches로 비교한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md:54) — 54~128행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F4-password-storage.md](../../../../../lessons/F4-password-storage.md) — 54~128행
 
 ### 2. 72-byte vs character limit
 
@@ -36,7 +36,7 @@ security-crypto demo로 SHA/BCrypt, seed hash, cost, byte limit, Delegating pref
 
 공백 또는 한계: implementation version limit must be verified.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md:189) — 189~217행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F4-password-storage.md](../../../../../lessons/F4-password-storage.md) — 189~217행
 
 ### 3. Delegating prefix compatibility
 
@@ -46,7 +46,7 @@ security-crypto demo로 SHA/BCrypt, seed hash, cost, byte limit, Delegating pref
 
 공백 또는 한계: one encoder/storage format policy.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md:219) — 219~235행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F4-password-storage.md](../../../../../lessons/F4-password-storage.md) — 219~235행
 
 ## 이번 실행 근거
 
@@ -74,7 +74,7 @@ Cost timing에는 CPU/JDK/provider/repetition metadata가 없어 서로 비교 �
 
 판정 범위: 레슨은 구현 예시와 실습 지시를 제공하며 이번 감사자가 실행/build한 것은 아니다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md:54) — 54~235행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F4-password-storage.md](../../../../../lessons/F4-password-storage.md) — 54~235행
 
 ## 확장 개발 명세
 
@@ -126,10 +126,10 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F4/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F4/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F4/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F4/screen.jpg`)
 - 관찰: 렌더 캡처가 제공되지 않아 시각 검토 대기.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F4/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F4/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F4/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-F4/dom.txt`)
 
 - source: corpus latest_source 기록에 따름
 - html: source 동일, generated HTML hash 상이; screenshot 비교 대기
@@ -140,8 +140,8 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md:54) — 54~128행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md:189) — 189~217행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/F4-password-storage.md:219) — 219~235행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F4-password-storage.md](../../../../../lessons/F4-password-storage.md) — 54~128행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F4-password-storage.md](../../../../../lessons/F4-password-storage.md) — 189~217행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/F4-password-storage.md](../../../../../lessons/F4-password-storage.md) — 219~235행 (레슨 본문 코드/설명/과거 실험 결과; 별도 snapshot 없음)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-F4.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-F4.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-F4.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-F4.json`)

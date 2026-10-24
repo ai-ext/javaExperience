@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](../../../../../lessons/G2-access-rules-in-one-place.md)
 
 원문 SHA-256: `39ff52e3befb7a82fb90686176854b7af08f95aa3b4ee768815daf2183b53847`
 
@@ -26,7 +26,7 @@ JDK21 jshell에서 viewer/post policy matrix, edit rule 변경, copied rule과 c
 
 공백 또는 한계: in-memory model은 DB에 쓰거나 실제 행을 바꾸지 않는다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md:5) — 5~145행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](../../../../../lessons/G2-access-rules-in-one-place.md) — 5~145행
 
 ### 2. resource ID endpoint는 UI에서 버튼을 숨겨도 서버에서 owner를 검사해야 한다.
 
@@ -36,7 +36,7 @@ JDK21 jshell에서 viewer/post policy matrix, edit rule 변경, copied rule과 c
 
 공백 또는 한계: GET/PATCH/DELETE 모두 owner check가 필요하다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md:146) — 146~239행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](../../../../../lessons/G2-access-rules-in-one-place.md) — 146~239행
 
 ### 3. 목록 policy는 page/count 전에 WHERE로 옮기고 Java detail policy와 의미를 맞춘다.
 
@@ -46,7 +46,7 @@ JDK21 jshell에서 viewer/post policy matrix, edit rule 변경, copied rule과 c
 
 공백 또는 한계: 실제 query predicate는 2-3/10-7에서 구현한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md:140) — 140~180행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](../../../../../lessons/G2-access-rules-in-one-place.md) — 140~180행
 
 ## 이번 실행 근거
 
@@ -75,7 +75,7 @@ SQL/JPQL parity test와 모든 project endpoint 검증은 이 레슨 범위가 �
 
 판정 범위: source historical output은 이번 감사 실행이 아니다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md:5) — 5~239행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](../../../../../lessons/G2-access-rules-in-one-place.md) — 5~239행
 
 ## 확장 개발 명세
 
@@ -128,10 +128,10 @@ medium
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G2/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G2/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G2/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G2/screen.jpg`)
 - 관찰: 렌더 캡처 미제공으로 시각 검토 대기.
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G2/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G2/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G2/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-G2/dom.txt`)
 
 원문: corpus의 latest_source_same=True. 최신 HTML byte 해시 다름; 실제 캡처 기반 렌더 비교 전이므로 시각 차이는 pending_render. 원문 SHA/HTML 차이만으로 UI의 정확성이나 시각 완료를 추정하지 않는다.
 
@@ -139,8 +139,8 @@ medium
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md:5) — 5~145행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md:146) — 146~239행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/G2-access-rules-in-one-place.md:140) — 140~180행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](../../../../../lessons/G2-access-rules-in-one-place.md) — 5~145행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](../../../../../lessons/G2-access-rules-in-one-place.md) — 146~239행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/G2-access-rules-in-one-place.md](../../../../../lessons/G2-access-rules-in-one-place.md) — 140~180행 (레슨 본문 예시/역사적 실험; 별도 snapshot 없음)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-G2.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-G2.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-G2.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-G2.json`)

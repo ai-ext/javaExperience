@@ -2,7 +2,7 @@
 
 기준일: 2026-10-22. 기준 HEAD: `ac41c5ed24b883742821f55da4e68a0ffc215b79`. 유형: `lesson`.
 
-원문: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md)
+원문: [$WORKTREE_ROOT/concept-census-20261021/lessons/I1-why-tests.md](../../../../../lessons/I1-why-tests.md)
 
 원문 SHA-256: `9c0cde6a60ad30143a23da15e7697854c5b42236f4a0f5b07f7a619c2b0d4f9b`
 
@@ -26,11 +26,11 @@ PageInfo와 같은 package의 PageInfoTest를 만들고 지정된 Gradle 테스�
 
 공백 또는 한계: 두 Java 파일을 학습자가 직접 작성해야 하므로 현재 저장소에서 재현 가능한 자동 시험은 없다. 14/5에서 expected 3 대신 2가 되는 결과와 마지막 페이지 hasNext의 오판을 직접 확인해야 한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md:21) — 21~51행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md:131) — 131~184행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md:186) — 186~202행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md:204) — 204~250행
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md:262) — 262~264행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/I1-why-tests.md](../../../../../lessons/I1-why-tests.md) — 21~51행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/I1-why-tests.md](../../../../../lessons/I1-why-tests.md) — 131~184행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/I1-why-tests.md](../../../../../lessons/I1-why-tests.md) — 186~202행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/I1-why-tests.md](../../../../../lessons/I1-why-tests.md) — 204~250행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/I1-why-tests.md](../../../../../lessons/I1-why-tests.md) — 262~264행
 
 ## 이번 실행 근거
 
@@ -52,7 +52,7 @@ PageInfo 예제는 학습자가 두 파일을 새로 만들어야 하며 저장�
 
 판정 범위: 개념 레슨의 작은 계산 테스트 목표에는 맞지만 완료자는 자기 파일로 결과를 확인해야 한다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md:131) — 131~144행
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/I1-why-tests.md](../../../../../lessons/I1-why-tests.md) — 131~144행
 
 ## 확장 개발 명세
 
@@ -110,14 +110,14 @@ low
 ## 화면·최신 변형·검증 한계
 
 - 상태: captured_not_reviewed
-- 화면 증거: - [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-I1/screen.jpg](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-I1/screen.jpg)
+- 화면 증거: - $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-I1/screen.jpg (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-I1/screen.jpg`)
 - 관찰: 레슨 HTML 시각 검토 전
 - 검증 한계: 실제 첫 화면/해당 앵커의 캡처와 DOM은 저장했다. 이 단위의 전 화면·모바일·상호작용을 시각 검증한 것은 아니다.
-- dom_snapshot: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-I1/dom.txt](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-I1/dom.txt)
+- dom_snapshot: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-I1/dom.txt (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/_data/screens/L-I1/dom.txt`)
 
-- source: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/I1-why-tests.md](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/I1-why-tests.md)
+- source: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/I1-why-tests.md](../../../../../lessons/I1-why-tests.md)
 - source_same: 예
-- html: [/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/I1-why-tests.html](/Users/ds/code/javaExperience/.worktrees/scenario-crud-redesign/lessons/I1-why-tests.html)
+- html: [$WORKTREE_ROOT/scenario-crud-redesign/lessons/I1-why-tests.html](../../../../../lessons/I1-why-tests.html)
 - html_same: 아니오
 - difference: latest HTML未검토.
 
@@ -126,6 +126,6 @@ low
 
 ## 읽은 구현 근거
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/lessons/I1-why-tests.md:1) — 1~264행 (개념, 예시, 따라하기, 일부러 틀려 보기 및 확인 문제)
+- [$WORKTREE_ROOT/concept-census-20261021/lessons/I1-why-tests.md](../../../../../lessons/I1-why-tests.md) — 1~264행 (개념, 예시, 따라하기, 일부러 틀려 보기 및 확인 문제)
 
-구조화 원본: [/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-I1.json](/Users/ds/code/javaExperience/.worktrees/concept-census-20261021/audits/scenario-census-20261022/units/L-I1.json)
+구조화 원본: $WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-I1.json (기록 경로: `$WORKTREE_ROOT/concept-census-20261021/audits/scenario-census-20261022/units/L-I1.json`)
