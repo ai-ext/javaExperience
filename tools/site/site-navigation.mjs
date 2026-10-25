@@ -2,7 +2,6 @@ import path from 'node:path';
 
 const spaces = [
   { label: '홈', target: 'index.html' },
-  { label: '과정 v2 · 일정', target: 'course/spring/README.html' },
   { label: '과정 지도', target: 'course/map.html' },
   { label: '서비스 만들기', target: 'scenario/README.html' },
   { label: '실전 미션', target: 'practice/MISSIONS.html' },
@@ -13,7 +12,7 @@ const spaces = [
 export function siteSection(sourcePath) {
   if (sourcePath === 'README.md') return '홈';
   if (sourcePath === 'course/map.md') return '과정 지도';
-  if (sourcePath.startsWith('course/')) return '과정 v2 · 일정';
+  if (sourcePath.startsWith('course/')) return '서비스 만들기';
   if (sourcePath.startsWith('scenario/')) return '서비스 만들기';
   if (/^(practice|tickets)\//.test(sourcePath)) return '실전 미션';
   if (/^(docs\/knowledge|lessons)\//.test(sourcePath)) return '개념 학습';
@@ -26,8 +25,8 @@ export function renderSiteNavigation(sourcePath) {
   const links = spaces.map(({ label, target }) => `<a href="${href(target)}"${label === current ? ' aria-current="page"' : ''}>${label}</a>`).join('');
   const setup = current === '홈' ? '<a class="home-header-setup" href="#home-environment">개발 환경 ↗</a>' : '';
   const courseItems = [
-    ['가이드 · 과정 안내', 'course/README.html', sourcePath === 'course/README.md'],
-    ['일정 · 일자 목록', 'course/spring/README.html', sourcePath.startsWith('course/spring/')],
+    ['서비스 기능 목록', 'scenario/README.html', false],
+    ['일정 · 원본 과정', 'course/spring/README.html', sourcePath.startsWith('course/spring/')],
     ['연습 · Java', 'index.html#course-java-entry', sourcePath.startsWith('course/java/')],
     ['과제 · 티켓', 'index.html#course-ticket-entry', sourcePath.startsWith('course/tickets/')],
     ['참고 · 출발 자료', 'course/start/README.html', sourcePath.startsWith('course/start/')],

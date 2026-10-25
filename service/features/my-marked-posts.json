@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "id": "my-marked-posts",
+  "title": "내가 표시한 글을 모아 보기",
+  "summary": "community 4-3 좋아요 목록과 6-5 좋아요/북마크 조건 목록을 목적·페이지 방식별로 구분한다.",
+  "difficulty": "중급",
+  "prerequisites": [
+    "likes",
+    "bookmarks"
+  ],
+  "stages": [
+    {
+      "id": "marked",
+      "title": "좋아요·북마크 조건으로 내 목록 이어 보기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "marked",
+          "title": "좋아요·북마크 조건으로 내 목록 이어 보기",
+          "sourceUnits": [
+            "legacy:4-3",
+            "legacy:6-5"
+          ],
+          "brief": {
+            "purpose": "community 4-3 좋아요 목록과 6-5 좋아요/북마크 조건 목록을 목적·페이지 방식별로 구분한다.",
+            "task": "박디비의 좋아요 8개에서 볼 수 없는 post6/post8 제외·cursor 이어읽기를 확인하고 별도 Kim 조건 조합에서는 OR/단일/교집합 목록을 검사한다.",
+            "preconditions": [
+              "4-3 seed에서 박디비는 8개 liked; post6 FOLLOWERS(박디비 비팔로워), post8 deleted.",
+              "6-5는 Kim의 좋아요/북마크 relation과 공개 글 [표시실습] 둘 다를 별도로 준비한다."
+            ],
+            "scenario": [
+              {
+                "start": "박디비 /api/me/likes initial result의 item ids와 nextCursor를 기록한다.",
+                "action": "size=3 첫 페이지 다음 nextCursor를 그대로 전달하고 bogus cursor도 요청한다. 별도 /api/me/posts에서 liked/bookmarked query 조합을 비교한다.",
+                "result": "likes 목록은 지금 볼 수 있는 글만 cursor 최신 likedAt/id 순으로 반환. 6-5의 liked=true&bookmarked=true는 두 relation 모두 있는 공개글만 page=0,size=20에서 반환.",
+                "after": "6-5의 조건 생략/false=OR, liked only, bookmarked only 결과 집합을 확인하고 empty result totalElements 0을 비교한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "박디비의 post_like 8관계 중 post6/post8",
+                "reason": "볼 수 없는 좋아요 글은 4-3 목록에서 제외됨을 검증."
+              },
+              {
+                "name": "like.created_at/id cursor",
+                "reason": "timestamp 동점에서도 중복/누락 없는 keyset 순서."
+              },
+              {
+                "name": "Kim liked/bookmarked relation 집합",
+                "reason": "6-5 조건 조합의 OR와 intersection 의미."
+              },
+              {
+                "name": "PUBLISHED/PUBLIC/deleted/block 상태",
+                "reason": "6-5는 가시 글만; 6-3 bookmark list의 unavailable 보존과 구별."
+              }
+            ],
+            "policies": [
+              "GET /api/me/likes는 인증 필수 401, size 기본 10 범위 1..100, likedAt desc/id desc cursor. invalid base64/time/relation cursor는 400. 지금 볼 수 없는 글은 목록에서 제외한다.",
+              "GET /api/me/posts는 인증 필수. liked/bookmarked 둘 다 생략/false이면 OR, 하나 true이면 해당 relation, 둘 다 true면 AND. 대상은 PUBLISHED/PUBLIC/미삭제이며 2-3 block condition 적용.",
+              "6-5는 offset page 0-based default, size default20/range1..100, 결과 items[]/totalElements. 범위 안 넘는 valid page는 빈 배열. 6-3처럼 unavailable bookmark placeholder를 유지하지 않는다."
+            ],
+            "inputs": [
+              "GET /api/me/likes?size=3; then ?size=3&cursor=<nextCursor>; ?cursor=bogus.",
+              "GET /api/me/posts?liked=true&page=0&size=20.",
+              "김자바 token: 조건 생략, liked=true, bookmarked=true, both=true 조합."
+            ],
+            "success": [
+              "4-3 first and next cursor pages are 200; nextCursor returned 그대로 이어짐; 6번과 8번은 visible result에서 제외.",
+              "6-5 both=true는 [표시실습] 둘 다 1개만 포함; items[].liked/bookmarked 둘 다 true.",
+              "조건 생략/false 결과는 union, true/true는 intersection, empty는 items=[]/totalElements=0."
+            ],
+            "failures": [
+              {
+                "when": "GET /api/me/likes without token",
+                "result": "401.",
+                "unchanged": "like/bookmark relations unchanged."
+              },
+              {
+                "when": "cursor=bogus 또는 size=0/101",
+                "result": "400.",
+                "unchanged": "관계·글·카운터 변화 없음."
+              },
+              {
+                "when": "liked=빈 문자열/truex 등 invalid boolean, size 범위 밖",
+                "result": "400.",
+                "unchanged": "목록 조건/데이터 불변."
+              }
+            ],
+            "examples": [
+              {
+                "title": "박디비 좋아요 첫 cursor",
+                "start": "박디비가 8 likes; post6 비팔로워, post8 deleted",
+                "action": "GET /api/me/likes?size=3",
+                "result": "200; visible post만, 다음 cursor; id 6/8 제외"
+              },
+              {
+                "title": "다음 cursor",
+                "start": "첫 response nextCursor",
+                "action": "GET /api/me/likes?size=3&cursor=<nextCursor>",
+                "result": "200; likedAt/id DESC 이어지고 이전 page와 중복 없음"
+              },
+              {
+                "title": "표시된 글 교집합",
+                "start": "Kim의 공개글 [표시실습] 둘 다가 like+bookmark됨",
+                "action": "GET /api/me/posts?liked=true&bookmarked=true&page=0&size=20",
+                "result": "200; 해당 post 한 건, liked=true/bookmarked=true,totalElements=1"
+              }
+            ],
+            "work": [
+              "likes의 cursor 페이지와 marked-posts offset 조건 API를 혼동 없이 별도 호출한다.",
+              "응답 item postId 집합과 like/bookmark relation을 SQL로 교차 검증한다.",
+              "blocked/deleted item이 어느 목록에서 빠지는지 4-3 vs 6-3 vs 6-5 차이를 적는다."
+            ],
+            "done": [
+              "8 likes 중 제한 대상 2개 처리와 cursor 연속성을 확인했다.",
+              "6-5의 OR/각 단일조건/AND 결과를 비교했다.",
+              "인증/invalid cursor/size 실패에서 데이터가 보존됐다."
+            ],
+            "hints": [
+              "4-3 likes 목록과 6-3 bookmarks 목록은 볼 수 없는 글을 다르게 다룹니다. 지금 조회 중인 route는 어느 정책인가요?",
+              "두 filter를 모두 true로 보냈을 때 SQL에 두 relation이 모두 요구되는지 결과 id로 확인했나요?",
+              "좋아요 cursor에서 created_at이 같은 두 항목이 있어도 페이지가 안정적으로 이어지려면 어떤 두 번째 정렬키가 필요할까요?"
+            ]
+          },
+          "hints": [
+            "4-3 likes 목록과 6-3 bookmarks 목록은 볼 수 없는 글을 다르게 다룹니다. 지금 조회 중인 route는 어느 정책인가요?",
+            "두 filter를 모두 true로 보냈을 때 SQL에 두 relation이 모두 요구되는지 결과 id로 확인했나요?",
+            "좋아요 cursor에서 created_at이 같은 두 항목이 있어도 페이지가 안정적으로 이어지려면 어떤 두 번째 정렬키가 필요할까요?"
+          ],
+          "recipeIds": [
+            "legacy:4-3:M1",
+            "legacy:4-3:M2",
+            "legacy:4-3:M3",
+            "legacy:4-3:M4",
+            "legacy:4-3:M5",
+            "legacy:4-3:M6",
+            "legacy:4-3:M7",
+            "legacy:6-5:P1",
+            "legacy:6-5:P2",
+            "legacy:6-5:L1",
+            "legacy:6-5:L2",
+            "legacy:6-5:B1",
+            "legacy:6-5:Q1",
+            "legacy:6-5:Q2",
+            "legacy:6-5:Q3",
+            "legacy:6-5:Q4",
+            "legacy:6-5:Q5",
+            "legacy:6-5:Q6",
+            "legacy:6-5:Q7",
+            "legacy:6-5:Q8",
+            "legacy:6-5:Q9",
+            "legacy:6-5:Q10",
+            "legacy:6-5:Q11",
+            "legacy:6-5:Q12"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:4-3 · 내가 좋아요한 글 — 커서 페이징",
+              "href": "/scenario/ch4-like/4-3-my-likes.html"
+            },
+            {
+              "label": "../../docs/knowledge/W15-paging-offset-vs-cursor.md",
+              "href": "/docs/knowledge/W15-paging-offset-vs-cursor.html"
+            },
+            {
+              "label": "../../docs/knowledge/R05-index-btree.md",
+              "href": "/docs/knowledge/R05-index-btree.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:4-3 · 내가 좋아요한 글 — 커서 페이징",
+              "href": "/scenario/ch4-like/4-3-my-likes.html"
+            },
+            {
+              "label": "../../docs/knowledge/W15-paging-offset-vs-cursor.md",
+              "href": "/docs/knowledge/W15-paging-offset-vs-cursor.html"
+            },
+            {
+              "label": "../../docs/knowledge/R05-index-btree.md",
+              "href": "/docs/knowledge/R05-index-btree.html"
+            },
+            {
+              "label": "../../docs/knowledge/P21-querydsl-setup.md",
+              "href": "/docs/knowledge/P21-querydsl-setup.html"
+            },
+            {
+              "label": "legacy:6-5 · 내가 표시한 글 — 좋아요·북마크 조건 조합",
+              "href": "/scenario/ch6-bookmark/6-5-my-marked-posts.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "게시글과 소통",
+  "status": "authored"
+}

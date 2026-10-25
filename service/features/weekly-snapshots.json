@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "id": "weekly-snapshots",
+  "title": "주간 순위를 그때의 값으로 보관하기",
+  "summary": "주간 순위는 기간 경계와 당시 순위 값을 저장하고 같은 주 재실행은 안전해야 한다.",
+  "difficulty": "고급",
+  "group": "자동화와 작업",
+  "prerequisites": [
+    "ranking-window"
+  ],
+  "stages": [
+    {
+      "id": "weekly",
+      "title": "기간 경계와 재실행에서도 같은 스냅샷 지키기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "weekly",
+          "title": "기간 경계와 재실행에서도 같은 스냅샷 지키기",
+          "sourceUnits": [
+            "legacy:15-2"
+          ],
+          "brief": {
+            "purpose": "주간 순위는 기간 경계와 당시 순위 값을 저장하고 같은 주 재실행은 안전해야 한다.",
+            "task": "주 시작일 기준 주간 집계와 snapshot 조회를 구현한다.",
+            "preconditions": [
+              "학습용 DB(`practice`) — 앱을 `practice` 프로파일로 띄운다. \"지금\" = 2026-10-05 00:00(월요일).",
+              "practice Clock 및 원문 seed data로 실행한다."
+            ],
+            "scenario": [
+              {
+                "start": "한 주의 활동이 끝난 뒤 그때의 글 순위를 보관하려 합니다.",
+                "action": "허용된 기준 날짜로 주간 배치를 돌리고 weekStart로 스냅샷을 조회합니다.",
+                "result": "점수와 순위는 집계한 그 주의 값으로 남고 이후 현재 좋아요 변경 때문에 과거 스냅샷이 즉시 달라지지 않습니다.",
+                "after": "weekStart는 월요일 YYYY-MM-DD입니다. 잘못된 형식 400·일반 회원 실행 403에서도 기존 순위/점수를 보존합니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "weekly ranking week_start, post_id, score",
+                "reason": "저장 시점 순위 값을 동일 주 키로 다시 읽는다."
+              },
+              {
+                "name": "date=2026-10-05 / weekStart=2026-09-21",
+                "reason": "실행 기준일과 조회 주 시작일을 분리해 비교한다."
+              }
+            ],
+            "policies": [
+              "월요일 00:10 Asia/Seoul에 실행합니다. 수동 date는 배치가 도는 월요일이며 집계 기간은 [date−7일 0시, date 0시), 저장 weekStart=date−7일입니다.",
+              "기간 좋아요×2+살아있는 댓글(답글 포함)×3으로 계산하며 점수 0·비공개/미발행/삭제 글은 제외합니다. 점수 높은 순→published_at 최신→id 큰 순의 상위 10개입니다.",
+              "완료 표식과 순위를 같은 트랜잭션으로 기록합니다. 후보 0건도 표식을 남겨 첫 실행 created=true/items=[]·반복 created=false/items=[]·조회 200으로 구분합니다.",
+              "완료 표식 없는 주의 조회는 404입니다. 원본 글이 영구 삭제돼도 과거 title/score/likes/comments 스냅샷을 보존하므로 원본 글 FK를 강제하지 않습니다."
+            ],
+            "inputs": [
+              "legacy:15-2:W1: POST /api/admin/jobs/weekly-ranking/run?date=2026-10-05; case=10-05(월) 실행 — 9/28 주; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"W1\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.weekStart\",\"equals\":\"2026-09-28\"},{\"path\":\"$.items[*].rank\",\"equals\":[1,2,3,4,5,6,7,8,9,10]},{\"path\":\"$.items[*].postId\",\"equals\":[145,143,140,144,139,4,141,133,70,48]},{\"path\":\"$.items[*].score\",\"equals\":[43,43,13,9,8,6,3,3,3,3]},{\"path\":\"$.items[0].likes\",\"equals\":20},{\"path\":\"$.items[0].comments\",\"equals\":1}]}}]",
+              "legacy:15-2:W2: POST /api/admin/jobs/weekly-ranking/run?date=2026-10-05; case=같은 주 한 번 더; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"W2\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.created\",\"equals\":false},{\"path\":\"$.items[*].postId\",\"equals\":[145,143,140,144,139,4,141,133,70,48]}]}}]",
+              "legacy:15-2:W3: POST /api/admin/jobs/weekly-ranking/run?date=2026-09-28; case=09-28(월) 실행 — 9/21 주; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"W3\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.weekStart\",\"equals\":\"2026-09-21\"},{\"path\":\"$.items[*].postId\",\"equals\":[131,130,134,139,133,140,132,138,135,141]}]}}]",
+              "legacy:15-2:W4: GET /api/rankings/weekly?weekStart=2026-09-21; case=9/21 주 조회; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"W4\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.weekStart\",\"equals\":\"2026-09-21\"},{\"path\":\"$.items[*].postId\",\"equals\":[131,130,134,139,133,140,132,138,135,141]},{\"path\":\"$.items[*].score\",\"equals\":[48,41,26,20,19,17,15,14,14,8]}]}}]",
+              "legacy:15-2:W10: GET /api/rankings/weekly?weekStart=2026/09/21; case=조회 — 형식 아님; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"W10\",\"expect\":{\"status\":400,\"json\":[{\"path\":\"$.errors[*].field\",\"contains\":\"weekStart\"}]}}]",
+              "legacy:15-2:W11: POST /api/admin/jobs/weekly-ranking/run?date=2026-10-05; case=일반 회원 실행; source expected/status checks=[{\"id\":\"C5\",\"pointer\":\"/checks/4\",\"request\":\"W11\",\"expect\":{\"status\":403}}]"
+            ],
+            "success": [
+              "경계 데이터가 정확히 해당 주에 집계되고 snapshot 조회 시 저장 시점 값 반환."
+            ],
+            "failures": [
+              {
+                "when": "GET /api/rankings/weekly?weekStart=2026/09/21 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 400 — 원문 check의 실패 응답",
+                "unchanged": "해당 weekStart의 기존 snapshot 행/값을 실패 전 그대로 보존한다."
+              },
+              {
+                "when": "GET /api/rankings/weekly?weekStart=2026/09/21 · [교육용 fixture · legacy:15-2:W10] 조회 — 형식 아님",
+                "result": "HTTP 400 (W10); $.errors[*].field contains \"weekStart\"",
+                "unchanged": "해당 weekStart snapshot 행·rank·score를 실패 전과 같이 둔다."
+              },
+              {
+                "when": "POST /api/admin/jobs/weekly-ranking/run?date=2026-10-05 · [교육용 fixture · legacy:15-2:W11] 일반 회원 실행",
+                "result": "HTTP 403 (W11)",
+                "unchanged": "해당 weekStart snapshot 행·rank·score를 실패 전과 같이 둔다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "한 주의 활동이 끝난 뒤 그때의 글 순위를 보관하려 합니다.",
+                "action": "허용된 기준 날짜로 주간 배치를 돌리고 weekStart로 스냅샷을 조회합니다.",
+                "result": "weekStart는 월요일 YYYY-MM-DD입니다. 잘못된 형식 400·일반 회원 실행 403에서도 기존 순위/점수를 보존합니다."
+              }
+            ],
+            "work": [
+              "날짜→주 시작 범위 계산을 명시하고 입력 범위와 snapshot 키를 일치시킨다."
+            ],
+            "done": [
+              "점수와 순위는 집계한 그 주의 값으로 남고 이후 현재 좋아요 변경 때문에 과거 스냅샷이 즉시 달라지지 않습니다.",
+              "weekStart는 월요일 YYYY-MM-DD입니다. 잘못된 형식 400·일반 회원 실행 403에서도 기존 순위/점수를 보존합니다.",
+              "GET /api/rankings/weekly?weekStart=2026/09/21 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 해당 weekStart의 기존 snapshot 행/값을 실패 전 그대로 보존한다.",
+              "GET /api/rankings/weekly?weekStart=2026/09/21 · [교육용 fixture · legacy:15-2:W10] 조회 — 형식 아님 → HTTP 400 (W10); $.errors[*].field contains \"weekStart\" 해당 weekStart snapshot 행·rank·score를 실패 전과 같이 둔다."
+            ]
+          },
+          "hints": [
+            "주간 데이터 범위의 끝을 포함으로 두면 다음 주 월요일 데이터가 중복될 수 있는 이유는 무엇인가요?",
+            "date와 weekStart가 같은 개념인지 원문 실행/조회 계약을 어떻게 대조해야 할까요?",
+            "기준 주 집계값이 뒤늦은 좋아요 변경으로 변하지 않아야 한다면 무엇을 복사해 저장해야 할까요?"
+          ],
+          "recipeIds": [
+            "legacy:15-2:W1",
+            "legacy:15-2:W2",
+            "legacy:15-2:W3",
+            "legacy:15-2:W4",
+            "legacy:15-2:W10",
+            "legacy:15-2:W11"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "15-2-weekly-ranking-snapshot.html",
+              "href": "/scenario/ch15-scheduling-batch/15-2-weekly-ranking-snapshot.html"
+            },
+            {
+              "label": "W20-time-timezone.html",
+              "href": "/docs/knowledge/W20-time-timezone.html"
+            },
+            {
+              "label": "R04-sql-crud-join.html",
+              "href": "/docs/knowledge/R04-sql-crud-join.html"
+            },
+            {
+              "label": "P30-scheduling-practical.html",
+              "href": "/docs/knowledge/P30-scheduling-practical.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

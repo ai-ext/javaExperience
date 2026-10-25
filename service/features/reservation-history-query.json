@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "id": "reservation-history-query",
+  "title": "예약과 지급 이력을 빠짐없이 조회하기",
+  "summary": "운영자와 회원이 예약 상태와 지급 이력을 정확하게 읽고, 실제 데이터 분포에서 조회 비용을 비교하게 합니다.",
+  "difficulty": "고급",
+  "group": "예약과 지급",
+  "prerequisites": [
+    "reservation-plan"
+  ],
+  "stages": [
+    {
+      "id": "history",
+      "title": "집계·커서·빈 결과가 맞는 조회 만들기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 내 확장 프로젝트",
+      "stages": [
+        {
+          "id": "history",
+          "title": "집계·커서·빈 결과가 맞는 조회 만들기",
+          "sourceUnits": [
+            "course:D24-1",
+            "course:D24-2",
+            "support:course/java/J24.md"
+          ],
+          "brief": {
+            "purpose": "운영자와 회원이 예약 상태와 지급 이력을 정확하게 읽고, 실제 데이터 분포에서 조회 비용을 비교하게 합니다.",
+            "task": "운영자별 예약·회원별 지급·실패 건수 중 조회 계약 하나를 정하고 두 접근 방식의 결과와 인덱스 전후 비용을 비교하세요.",
+            "preconditions": [
+              "앞서 선택한 물리 모델을 쓰며 같은 시각·대상 없는 예약·성공/실패 혼합 fixture를 준비합니다.",
+              "별도 DB에 최소 200행 균등 분포와 한 예약에 90%가 몰린 편향 분포를 생성하고 seed를 저장합니다."
+            ],
+            "scenario": [
+              {
+                "start": "예약 한 개에 여러 대상과 지급 이력이 있고 같은 시각의 항목 및 빈 예약이 섞여 있습니다.",
+                "action": "직접 쓴 목록·집계 SQL을 MyBatis와 JdbcClient 또는 JPQL에 연결하고 같은 필터·DTO로 실행합니다.",
+                "result": "대상 수와 성공·실패 수가 JOIN 곱셈으로 불어나지 않으며 빈 예약과 동일 시각 커서도 빠지지 않습니다.",
+                "after": "두 분포에서 EXPLAIN 추정·EXPLAIN ANALYZE 실측·INSERT 비용을 별도로 남기고 인덱스를 선택합니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "목록 필터·정렬·동률 키",
+                "reason": "다음 묶음에서 중복과 누락을 막습니다."
+              },
+              {
+                "name": "예약별 대상·성공·실패 집계",
+                "reason": "원본 행 수와 응답 그룹 수를 구분합니다."
+              }
+            ],
+            "policies": [
+              "QueryDSL은 선택이며 채택하면 비교 상대 하나를 대체합니다.",
+              "Q타입 생성·컴파일·SQL·count 비용을 따로 기록합니다.",
+              "읽기 속도만으로 채택하지 않고 쓰기·공간·변경 비용을 비교합니다."
+            ],
+            "inputs": [
+              "선택한 조회 계약과 실제 물리 이름, 동일 필터·커서·정렬 키, 두 분포의 seed·행 수"
+            ],
+            "success": [
+              "대상 수와 성공·실패 수가 JOIN 곱셈으로 불어나지 않으며 빈 예약과 동일 시각 커서도 빠지지 않습니다."
+            ],
+            "failures": [
+              {
+                "when": "같은 시각·빈 예약·일대다 JOIN이 겹침",
+                "result": "잘못된 집계·중복·누락을 기대값과 대조합니다.",
+                "unchanged": "조회가 예약·지급 데이터를 바꾸면 안 됩니다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "같은 대상의 전후 비교",
+                "start": "예약 한 개에 여러 대상과 지급 이력이 있고 같은 시각의 항목 및 빈 예약이 섞여 있습니다.",
+                "action": "직접 쓴 목록·집계 SQL을 MyBatis와 JdbcClient 또는 JPQL에 연결하고 같은 필터·DTO로 실행합니다.",
+                "result": "두 분포에서 EXPLAIN 추정·EXPLAIN ANALYZE 실측·INSERT 비용을 별도로 남기고 인덱스를 선택합니다."
+              }
+            ],
+            "work": [
+              "운영자별 예약·회원별 지급·실패 건수 중 조회 계약 하나를 정하고 두 접근 방식의 결과와 인덱스 전후 비용을 비교하세요."
+            ],
+            "done": [
+              "운영자별 예약 상태·회원별 지급 이력·실패 건수 중 하나의 조회 계약을 정하고 JOIN 다중성·동일 시각 커서·빈 결과를 테스트한다.",
+              "같은 조회 한 건을 MyBatis와 JdbcClient 또는 JPQL로 비교한다. QueryDSL은 선택이며 도입한다면 빌드·Q타입 생성 비용을 별도 기록한다.",
+              "예약별 대상·성공·실패 건수 조회를 선집계 JOIN 또는 상관 서브쿼리로 만든다. 행 곱셈·NULL·빈 예약·동일 시각 커서를 반례로 검증한다.",
+              "QueryDSL을 선택하면 기존 비교 상대 하나를 QueryDSL JPA로 대체해 같은 필터·DTO·집계 결과를 비교한다. Q타입 생성·컴파일·SQL·count 비용을 남긴다. 윈도 함수는 MySQL SQL/MyBatis 선택 과제로 둔다.",
+              "최소 200행의 균등 분포와 한 예약에 90%가 몰린 편향 분포를 별도 DB에 생성한다. 행 수·seed·실행 명령을 남긴다.",
+              "인덱스 전후 EXPLAIN 추정과 EXPLAIN ANALYZE 실측·동일 INSERT 부하를 기록한다. 읽기 개선만으로 채택하지 않고 쓰기·공간·변경 비용으로 선택한다."
+            ]
+          },
+          "hints": [
+            "대상과 지급을 동시에 JOIN하면 한 대상이 몇 행으로 늘어날까요?",
+            "같은 시각의 두 항목을 다음 목록에 남기려면 어떤 동률 키가 필요할까요?",
+            "정확한 total은 원본 행 수인가요, 필터를 통과한 그룹 수인가요?"
+          ],
+          "recipeIds": [],
+          "executionChecks": [
+            {
+              "title": "집계·커서·빈 결과가 맞는 조회 만들기 · 실행 확인",
+              "command": "./gradlew test --tests \"*ReservationQuery*\"",
+              "expected": "두 분포에서 EXPLAIN 추정·EXPLAIN ANALYZE 실측·INSERT 비용을 별도로 남기고 인덱스를 선택합니다.",
+              "record": "실제 조회 테스트 명령, fixture·SQL·DTO 비교, 두 분포 seed/행 수, 실행계획·count·INSERT 실측을 남깁니다."
+            }
+          ],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "직접 쓴 SQL로 이력 조회 계약 검증",
+              "href": "course/spring/D24.html#step-d24-1"
+            },
+            {
+              "label": "분포 두 개에서 실행계획·쓰기 비용 측정",
+              "href": "course/spring/D24.html#step-d24-2"
+            },
+            {
+              "label": "J24. 조회 DTO와 두 매핑",
+              "href": "course/java/J24.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

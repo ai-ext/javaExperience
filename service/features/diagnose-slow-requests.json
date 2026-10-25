@@ -1,0 +1,284 @@
+{
+  "version": 1,
+  "id": "diagnose-slow-requests",
+  "title": "느린 요청의 대기 지점 찾아 고치기",
+  "summary": "느린 PG 충전이 같은 DB 연결 풀을 쓰는 글 목록 요청을 막는 지점을 측정 증거로 찾습니다.",
+  "difficulty": "고급",
+  "group": "조회와 성능",
+  "prerequisites": [
+    "points-charge",
+    "posts-find"
+  ],
+  "stages": [
+    {
+      "id": "pg",
+      "title": "결제가 느려도 글 목록은 계속 응답하기"
+    },
+    {
+      "id": "query",
+      "title": "느린 목록의 실행계획과 실제 비용 비교하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 과정 프로젝트",
+      "stages": [
+        {
+          "id": "pg",
+          "title": "결제가 느려도 글 목록은 계속 응답하기",
+          "sourceUnits": [
+            "course:D12-1",
+            "support:course/tickets/B01.md",
+            "support:course/java/J12.md"
+          ],
+          "brief": {
+            "purpose": "느린 PG 충전이 같은 DB 연결 풀을 쓰는 글 목록 요청을 막는 지점을 측정 증거로 찾습니다.",
+            "task": "Toxiproxy로 PG 응답을 늦추고 충전 요청 중 actuator 메트릭·스레드 덤프를 수집하세요. PG 대기 중에도 목록이 정해진 응답시간 안에 끝나도록 경계를 고칩니다.",
+            "preconditions": [
+              "B01은 D12 필수 ticket이다. Hikari pool max=10, connection timeout=2초인 현재 설정값을 먼저 기록한다.",
+              "Toxiproxy로 PG response delay를 걸고 concurrent 충전과 GET /api/posts를 발생시킬 격리 DB/회원 fixture를 준비한다."
+            ],
+            "scenario": [
+              {
+                "start": "pool 10개가 비어 있고 글 목록 endpoint는 정상이다. 여러 충전이 PG 응답을 기다리는 동안 pool active/pending과 요청 thread를 동시에 관찰할 수 있게 한다.",
+                "action": "Toxiproxy로 PG를 지연시키고 충전 요청을 몰아 actuator metrics와 thread dump를 수집한다. 그동안 GET /api/posts를 호출하고 수정 전후 응답시간과 Hikari connection 사용을 비교한다.",
+                "result": "수정 전에는 PG HTTP를 `@Transactional` 안에서 기다려 pool 10개가 차고 목록 요청이 connection timeout 2초를 기다릴 수 있다. 수정 후 charging 중 GET /api/posts → 200, 1.5초 이내다.",
+                "after": "thread dump에서 PG wait와 Hikari metrics active=max/pending>0을 같은 시각으로 연결한다. 해결은 PG 대기를 DB transaction 밖으로 옮기는 것이며 pool size만 키우지 않는다."
+              }
+            ],
+            "data": [
+              {
+                "name": "Hikari maximumPoolSize=10/active/pending",
+                "reason": "충전 요청이 점유한 connection 수와 대기 요청을 글 목록 지연과 연결한다."
+              },
+              {
+                "name": "PG response delay 및 충전 thread stack",
+                "reason": "대기 stack이 PG network response를 기다리는지 확인한다."
+              },
+              {
+                "name": "GET /api/posts status·elapsed time",
+                "reason": "동일 지연 주입 구간에서 목록이 HTTP 200/1.5초 이내로 끝나는지 합격 기준을 준다."
+              },
+              {
+                "name": "connection timeout 2초",
+                "reason": "목록 실패가 pool 대기 만료에서 발생하는지 로그와 elapsed time으로 판별한다."
+              }
+            ],
+            "policies": [
+              "B01 재현에서 충전이 PG 응답을 기다리는 중에도 GET /api/posts는 200, 1.5초 이내여야 합니다.",
+              "PG 호출은 DB 트랜잭션/커넥션을 점유하지 않아야 합니다. pool을 늘리는 것으로 근본 원인을 가리지 않습니다.",
+              "메트릭과 스레드 덤프를 같은 재현 시점에 수집해 대기 원인으로 연결합니다. B01 티켓 제출물을 원문대로 유지합니다. B01은 D12 필수 티켓입니다.",
+              "원문 완료 기준: 재현 중 `/actuator/metrics`와 스레드 덤프를 떠서 근거로 남긴다",
+              "원문 완료 기준: `PostListDuringSlowPgTest` 통과: Toxiproxy로 PG 응답을 늦춘 채 충전을 몰아, 충전들이 PG 응답을 기다리는 동안에도 `GET /api/posts` → 200, 1.5초 이내",
+              "원문 완료 기준: 원인 서술: 무엇이 커넥션을 쥐고 있었고, 왜 글 목록이 영향을 받았는가",
+              "원문 완료 기준: 재현 테스트: PG를 늦춘 채 충전을 몰았을 때, 충전들이 PG 응답을 기다리는 동안 `GET /api/posts`가 곧바로(예: 1.5초 안에) 200인지 보는 테스트(결함 상태에서 실패 → 수정 후 통과). 부하가 실제로 걸렸는지(충전이 PG에 닿아 응답을 기다리는 중인지)와 충전이 끝내 성공하는지도 함께 확인한다. 예: `src/test/java/com/example/board/payment/PostListDuringSlowPgTest.java`",
+              "원문 완료 기준: 수정 diff"
+            ],
+            "inputs": [
+              "동시 points charge 요청은 WireMock PG response를 지연시킨다. GET /api/posts를 지연 주입이 살아 있는 같은 구간에서 보낸다.",
+              "수정 전 관찰 설정: Hikari max pool 10, connection timeout 2초. 성공 기준: 목록 HTTP 200, 1.5초 이내.",
+              "`/actuator/metrics` Hikari active/pending과 thread dump, request ID·시간을 같은 evidence 묶음에 저장한다."
+            ],
+            "success": [
+              "충전 요청들이 PG 응답을 기다리는 동안에도 GET /api/posts → 200, 1.5초 이내; PostListDuringSlowPgTest 통과.",
+              "수정 전 thread dump의 PG wait와 Hikari active=10/pending 적체를 연결하고, 수정 뒤 대기 thread/connection hold가 사라졌음을 기록한다.",
+              "PG 호출은 transaction/DB connection을 잡지 않는 경계에서 일어난다. B01 mandatory ticket의 재현·원인·수정 test를 제출한다."
+            ],
+            "failures": [
+              {
+                "when": "PG 지연 중 GET /api/posts가 1.5초를 넘거나 2초 connection timeout/5xx를 반환",
+                "result": "PostListDuringSlowPgTest 합격 기준 실패다.",
+                "unchanged": "원인을 입증하기 전에 Hikari pool만 키워 결과를 숨기지 않는다."
+              },
+              {
+                "when": "thread dump/metrics가 서로 다른 시점 또는 다른 재현 구간에서 수집됨",
+                "result": "PG 대기와 pool 고갈의 인과 증거로 묶을 수 없다.",
+                "unchanged": "request ID와 timestamp가 맞는 한 재현 구간으로 다시 수집한다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "수정 전 pool 고갈 재현",
+                "start": "Hikari pool max=10이고 PG 정상 상태에서 GET /api/posts는 200이다.",
+                "action": "PG를 느리게 한 채 10개 이상 충전을 시작하고 metrics/thread dump와 목록 요청을 수집한다.",
+                "result": "active가 10에 붙고 pending 증가, PG wait stack, 목록 2초 대기/실패 가능성을 시간순으로 남긴다."
+              },
+              {
+                "title": "PG 외부 대기 후 목록 독립성",
+                "start": "PG delay injection이 적용된 동시 충전 상태다.",
+                "action": "수정한 경계에서 GET /api/posts를 보낸다.",
+                "result": "200, 1.5초 이내이며 pool connection이 PG 응답을 기다리는 동안 점유되지 않는다."
+              }
+            ],
+            "work": [
+              "충전 서비스 transaction 시작/종료와 PgClient HTTP 호출의 실제 stack 경계를 찾는다.",
+              "같은 주입 구간에서 Hikari metrics/thread dump/GET timing을 수정 전후 비교한다.",
+              "PostListDuringSlowPgTest를 고치고 request ID 기준 evidence를 남긴다."
+            ],
+            "done": [
+              "B01 필수 재현에서 Hikari max10/active/pending, PG wait thread와 목록 요청 지연을 연결했다.",
+              "수정 후 slow PG 중 GET list 200/≤1.5초를 test로 고정했다.",
+              "해결 근거가 PG call을 DB transaction 밖으로 분리한 점이며 pool 크기 변경으로 대체하지 않았음을 기록했다."
+            ]
+          },
+          "hints": [
+            "PG 요청 동안 JDBC connection이 transaction에 묶여 있다면 동시 충전 10개에서 pool metric은 어떻게 변하나요?",
+            "thread dump의 PG client wait와 Hikari pending이 같은 시각에 나타나야 어떤 원인을 지지하나요?",
+            "목록 1.5초 응답 합격과 pool을 키워 장애를 감춘 결과는 어떤 측정으로 구별하나요?",
+            "timeout을 2초로 설정한 connection 대기 실패가 응답 지연 2초와 어떤 관계가 있나요?"
+          ],
+          "recipeIds": [
+            "board:post-list:normal",
+            "board:points-charge:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D12-1 · B01 \"PG가 느린 날 글 목록까지 멈춘다\": 스레드 덤프로 진단",
+              "href": "course/spring/D12.html#step-d12-1"
+            },
+            {
+              "label": "support:course/tickets/B01.md · B01. PG가 느린 날 글 목록까지 멈춘다",
+              "href": "course/tickets/B01.html"
+            },
+            {
+              "label": "J12. 리팩터링 ②: 긴 메서드를 검증·계산·저장으로 나누기",
+              "href": "course/java/J12.html"
+            }
+          ]
+        },
+        {
+          "id": "query",
+          "title": "느린 목록의 실행계획과 실제 비용 비교하기",
+          "sourceUnits": [
+            "course:D12-2",
+            "support:course/tickets/B02.md"
+          ],
+          "brief": {
+            "purpose": "느린 목록 쿼리를 slow log에서 찾고 EXPLAIN ANALYZE의 실제 읽은 행과 반환 행으로 병목을 검증합니다.",
+            "task": "목록 요청의 SQL을 slow query log에서 찾고 전후 실행 계획을 비교하세요. 실제 사용 인덱스·행 수·Extra를 근거로 수정 여부를 설명합니다.",
+            "preconditions": [
+              "B02는 D12 필수 ticket이다. `GET /api/posts`가 실제 query를 만들고 충분한 격리 데이터가 있는 상태를 준비한다.",
+              "slow log 실험 전 local DB setting과 원래 `long_query_time` 값을 기록해 종료 뒤 복원한다. 기본값은 10초다."
+            ],
+            "scenario": [
+              {
+                "start": "게시글 데이터가 늘어난 상태에서 GET /api/posts가 사용하는 SQL을 모른다. MySQL slow query log는 기본 long_query_time 10초라 짧은 병목을 놓칠 수 있다.",
+                "action": "B02 repro로 데이터를 늘리고 local long_query_time을 실험 목적에 맞게 낮춰 목록 요청을 남긴다. slow log SQL을 EXPLAIN ANALYZE로 실행해 실제 읽은 행·반환 행·key·rows·Extra를 기록하고 index 수정 뒤 다시 비교한다.",
+                "result": "slow log에서 목록 SQL을 찾고 EXPLAIN ANALYZE의 실제 read/returned rows와 선택 key를 얻는다. 수정 후 PostListExplainTest가 통과한다. 임의 milliseconds 개선값은 쓰지 않는다.",
+                "after": "복합 인덱스 선행 컬럼과 query WHERE/order 조건을 비교하고 고친 뒤 key/rows/Extra 변화를 기록한다. local long_query_time 설정은 실험 후 원래 값으로 복원한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "GET /api/posts list query",
+                "reason": "느린 요청과 실제 실행된 SQL을 같은 endpoint 로그에서 추적한다."
+              },
+              {
+                "name": "slow log threshold 10 seconds",
+                "reason": "실험 설정으로 포착 범위를 바꾸되 기본값을 기록하고 local 설정 복원을 확인한다."
+              },
+              {
+                "name": "EXPLAIN ANALYZE actual rows read/returned",
+                "reason": "추정 계획만 보지 않고 실행이 실제로 읽고 돌려준 행 수를 비교한다."
+              },
+              {
+                "name": "key/rows/Extra",
+                "reason": "수정 전후 인덱스 선택과 filesort/filtering 등 실행 특성을 판정한다."
+              }
+            ],
+            "policies": [
+              "slow log의 long_query_time 기본값은 10초이므로 실험에 사용할 로컬 관찰 설정과 복원을 기록합니다.",
+              "EXPLAIN ANALYZE는 실제 실행 결과와 함께 해석하고 측정하지 않은 속도 개선 수치를 쓰지 않습니다.",
+              "복합 인덱스는 왼쪽 컬럼부터 활용되므로 조건·정렬과 key/rows/Extra를 비교합니다. B02 ticket 상태는 원문대로 유지합니다. B02는 D12 필수 티켓입니다.",
+              "원문 완료 기준: slow query log에서 목록 쿼리를 찾는다",
+              "원문 완료 기준: EXPLAIN ANALYZE의 읽은 행 수와 돌려준 행 수를 근거로 남긴다",
+              "원문 완료 기준: 고친 뒤 `PostListExplainTest` 통과",
+              "원문 완료 기준: 원인 서술: 어떤 쿼리가 무엇을 얼마나 읽는가, 왜 \"어느 날부터\"이고 왜 첫 쪽만인가",
+              "원문 완료 기준: 재현 테스트: 매번 같은 데이터를 쌓아 두고, 그 데이터에서 목록 쿼리가 읽는 행 수를 단언하는 테스트(결함 상태에서 실패 → 수정 후 통과). 예: `src/test/java/com/example/board/post/PostListExplainTest.java`",
+              "원문 완료 기준: 수정 diff"
+            ],
+            "inputs": [
+              "`GET /api/posts` 실제 목록 query를 B02 repro data로 발생시킨다.",
+              "MySQL 기본 long_query_time 10초를 기록한 뒤 로컬 실험 임계값을 낮춰 slow log를 수집한다.",
+              "EXPLAIN ANALYZE 결과에서 actual rows 읽은 수/반환 수, 선택 key, rows, Extra를 복사하고 실험 setting을 복원한다."
+            ],
+            "success": [
+              "slow log에서 GET /api/posts 목록 SQL을 식별한다.",
+              "EXPLAIN ANALYZE 실제 실행의 read rows, returned rows, key/rows/Extra를 수정 전후 표에 기록하고 source에 맞는 인덱스 수정 뒤 PostListExplainTest 통과.",
+              "수치 성능 향상을 측정하지 않았으면 속도 향상 claim은 하지 않는다. long_query_time local 설정 복원 기록을 남긴다."
+            ],
+            "failures": [
+              {
+                "when": "long_query_time이 10초인 채 수 초짜리 느린 query를 찾으려 함",
+                "result": "slow log에 목록 query가 기록되지 않을 수 있다.",
+                "unchanged": "기본값을 기록하고 격리 local 실험 설정만 낮춘 뒤 원래 설정으로 복원한다."
+              },
+              {
+                "when": "EXPLAIN ANALYZE의 estimated rows만 보고 실제 rows/returned rows를 생략",
+                "result": "실제 데이터 읽기 비용을 검증하지 못해 B02 완료가 아니다.",
+                "unchanged": "측정되지 않은 query 시간 개선이나 index 효과를 결과처럼 쓰지 않는다."
+              },
+              {
+                "when": "복합 index 컬럼 순서를 query 조건과 대조하지 않음",
+                "result": "선택 key/rows/Extra가 기대와 다를 수 있다.",
+                "unchanged": "source 조건을 맞춰 재실행하고 실험 DB 밖의 schema를 임의 파괴하지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "slow log에서 목록 SQL 찾기",
+                "start": "기본 long_query_time=10초, GET /api/posts query 로그가 없다.",
+                "action": "isolated local DB threshold를 낮추고 B02 fixture로 요청을 발생시킨다.",
+                "result": "slow log의 query와 실행 시간을 확인하고 설정 변경/복원 시각을 기록한다."
+              },
+              {
+                "title": "index 전후 실행 계획 비교",
+                "start": "목록 SQL과 데이터 fixture가 동일하다.",
+                "action": "EXPLAIN ANALYZE로 실제 read/returned rows와 key/rows/Extra를 수정 전후 비교한다.",
+                "result": "실제 선택 key와 row 수 차이를 남기고 PostListExplainTest 통과 여부를 기록한다."
+              }
+            ],
+            "work": [
+              "동일 GET list 요청으로 slow log 대상 SQL을 특정한다.",
+              "query predicate/order와 composite index 선행 열을 비교하고 EXPLAIN ANALYZE 실제 수치를 저장한다.",
+              "index 수정 후 동일 데이터/쿼리로 다시 측정하고 local setting을 원복한다."
+            ],
+            "done": [
+              "B02 필수 ticket에서 slow log 목록 SQL을 찾았다.",
+              "EXPLAIN ANALYZE 실제 rows read/returned와 key/rows/Extra를 전후 비교하고 test 통과를 남겼다.",
+              "설정 변경과 복원, 측정하지 않은 개선값 미기재를 확인했다."
+            ]
+          },
+          "hints": [
+            "slow log 기본 임계값 10초에서 2초 지연 query가 기록되지 않을 수 있는 이유는 무엇인가요?",
+            "optimizer estimate와 EXPLAIN ANALYZE actual rows는 어떤 점이 다른가요?",
+            "WHERE와 ORDER BY가 composite index 선두 컬럼에 맞는지 어떤 evidence로 판단하나요?",
+            "실험을 위해 바꾼 long_query_time을 그대로 두면 다음 실습 결과에 어떤 혼선을 주나요?"
+          ],
+          "recipeIds": [
+            "board:post-list:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D12-2 · B02 \"글 목록이 어느 날부터 느리다\": slow log → EXPLAIN ANALYZE",
+              "href": "course/spring/D12.html#step-d12-2"
+            },
+            {
+              "label": "support:course/tickets/B02.md · B02. 글 목록이 어느 날부터 느리다",
+              "href": "course/tickets/B02.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

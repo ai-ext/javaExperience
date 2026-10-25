@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "id": "browser-access",
+  "title": "허용한 브라우저에서 API 호출하기",
+  "summary": "허용된 브라우저 출처의 실제 요청과 preflight를 함께 처리하고 차단 원인을 네트워크 증거로 구분합니다.",
+  "difficulty": "중급",
+  "group": "회원과 접근",
+  "prerequisites": [
+    "members-auth"
+  ],
+  "stages": [
+    {
+      "id": "cors",
+      "title": "실제 요청과 사전 요청을 함께 허용하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 과정 프로젝트",
+      "stages": [
+        {
+          "id": "cors",
+          "title": "실제 요청과 사전 요청을 함께 허용하기",
+          "sourceUnits": [
+            "course:D03-6",
+            "course:D14-1",
+            "support:course/tickets/B12.md"
+          ],
+          "brief": {
+            "purpose": "허용된 브라우저 출처의 실제 요청과 preflight를 함께 처리하고 차단 원인을 네트워크 증거로 구분합니다.",
+            "task": "기존 출처·새 출처·허용 목록 밖 출처를 비교해 OPTIONS preflight와 실제 POST가 의도한 범위만 통과하도록 설정하고 재현 기록을 남기세요.",
+            "preconditions": [
+              "local board 서버와 별도 브라우저 출처를 사용한다. D03 허용 출처 `http://localhost:3000`과 B12의 `http://127.0.0.1:8765`를 구분한다.",
+              "실제 POST는 이미 발급한 USER Bearer token과 유효한 JSON body를 사용한다. OPTIONS preflight는 브라우저가 보낼 Authorization/Content-Type 헤더를 요청한다."
+            ],
+            "scenario": [
+              {
+                "start": "허용 출처 `http://localhost:3000`, 추가하려는 출처 `http://127.0.0.1:8765`, 비허용 출처 `http://evil.example`의 세 브라우저 탭을 준비한다. 게시글 생성 전 상태를 기록한다.",
+                "action": "각 출처에서 OPTIONS /api/posts 또는 /api/auth/login에 Origin, Access-Control-Request-Method: POST, Access-Control-Request-Headers: authorization,content-type를 넣는다. 허용된 출처에서는 이어 실제 POST를 보낸다.",
+                "result": "원문 계약상 localhost:3000 preflight는 200과 `Access-Control-Allow-Origin: http://localhost:3000`; evil.example은 403이다. B12의 새 출처는 설정 후 OPTIONS 200과 허용 origin 헤더를 받고 실제 POST까지 브라우저에서 완료한다.",
+                "after": "Network 탭의 OPTIONS와 POST 상태·응답 헤더를 각각 기록한다. 허용된 POST만 글을 201로 만들고 비허용 출처 거부는 글 수를 바꾸지 않는다."
+              }
+            ],
+            "data": [
+              {
+                "name": "Origin 출처 세 개",
+                "reason": "기존 허용·추가 허용·차단 대상을 나란히 비교해 단일 출처 성공만으로 CORS 정책을 과개방하지 않게 한다."
+              },
+              {
+                "name": "Access-Control-Request-Method/Headers",
+                "reason": "브라우저 preflight가 실제 POST와 Authorization·Content-Type 전송을 요청했는지 확인한다."
+              },
+              {
+                "name": "Access-Control-Allow-Origin·상태",
+                "reason": "OPTIONS 응답이 허용 출처만 정확히 반영하는지 관찰한다."
+              },
+              {
+                "name": "게시글 생성 수",
+                "reason": "preflight 차단과 실제 POST 성공을 데이터 변경으로 구별한다."
+              }
+            ],
+            "policies": [
+              "CORS는 브라우저의 교차 출처 응답 읽기 정책이며 인증이나 API 권한 검사를 대체하지 않습니다.",
+              "허용 출처 목록에 없는 Origin을 무조건 반사해 허용하지 않습니다. 새 출처와 목록 밖 출처를 각각 비교합니다.",
+              "B12는 선택 지원 티켓입니다. 기존 mandatory/practice/optional 구분을 유지하고 재현·수정 기록을 티켓 제출물로 남깁니다. B12는 D14의 선택 Security 후보 티켓이며 선택하지 않은 경우 별도 티켓 완료를 표시하지 않습니다.",
+              "원문 완료 기준: `OPTIONS /api/auth/login` + `Origin: http://localhost:3000` → 200, `Access-Control-Allow-Origin: http://localhost:3000`",
+              "원문 완료 기준: `Origin: http://evil.example` → 403",
+              "원문 완료 기준: 브라우저(`http://127.0.0.1:8765`)에서 `POST /api/auth/login` → 200",
+              "원문 완료 기준: 개발자 도구 Network 탭에서 실패한 요청과 그 상태 코드·응답 헤더를 근거로 남긴다(서버 에러 로그 없음)",
+              "원문 완료 기준: `OPTIONS /api/posts` + `Origin: http://127.0.0.1:8765` → 200, `Access-Control-Allow-Origin` 포함",
+              "원문 완료 기준: 원인 서술: 기존 출처와 새 출처의 결과가 왜 다른가, 그리고 그렇게 판단한 관찰 근거(Network 탭·응답 헤더·서버 설정)",
+              "원문 완료 기준: 재현 테스트: 새·기존·목록에 없는 출처로 preflight(`OPTIONS` + `Origin` + `Access-Control-Request-Method`/`-Headers`)를 보내 상태 코드와 허용 헤더를 단언하는 테스트(결함 상태에서 실패 → 수정 후 통과)",
+              "원문 완료 기준: 수정 diff"
+            ],
+            "inputs": [
+              "OPTIONS 요청에 `Origin`, `Access-Control-Request-Method: POST`, `Access-Control-Request-Headers: authorization,content-type`를 보낸다.",
+              "허용 출처 사례: `http://localhost:3000`; B12 추가 출처: `http://127.0.0.1:8765`; 차단 사례: `http://evil.example`.",
+              "실제 POST는 Authorization Bearer token과 `{\"title\":\"CORS 확인\",\"content\":\"허용된 출처 요청\",\"tags\":[]}`를 사용한다."
+            ],
+            "success": [
+              "허용 localhost:3000의 OPTIONS /api/auth/login → 200, `Access-Control-Allow-Origin: http://localhost:3000`.",
+              "비허용 Origin `http://evil.example` → 403; B12 추가 허용 Origin은 OPTIONS /api/posts → 200 및 allow-origin 포함.",
+              "브라우저에서 허용 Origin의 POST /api/posts → 201. 기존/추가/비허용 출처별 Network 요청과 게시글 생성 여부를 구분한다."
+            ],
+            "failures": [
+              {
+                "when": "Origin이 `http://evil.example`이고 OPTIONS preflight를 보냄",
+                "result": "403으로 거부하며 응답에 그 Origin을 반사해 허용하지 않는다.",
+                "unchanged": "실제 POST가 이어지지 않고 새 게시글이 생성되지 않는다."
+              },
+              {
+                "when": "허용 Origin preflight는 성공했으나 실제 POST 인증 token이 없음",
+                "result": "CORS 허용과 별개로 API는 401이다.",
+                "unchanged": "게시글은 생성되지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "허용 출처의 브라우저 생성",
+                "start": "http://localhost:3000에서 아직 글을 생성하지 않았고 유효 USER token이 있다.",
+                "action": "OPTIONS를 확인한 뒤 같은 브라우저에서 token 포함 POST /api/posts를 보낸다.",
+                "result": "OPTIONS 200과 정확한 allow-origin, POST 201을 확인하고 생성 글의 Location을 기록한다."
+              },
+              {
+                "title": "목록 밖 출처 차단",
+                "start": "Origin이 http://evil.example인 브라우저 요청이다.",
+                "action": "POST 전에 Network 탭의 OPTIONS 요청을 확인한다.",
+                "result": "OPTIONS 403, 실제 POST 미전송, 게시글 증가 없음으로 끝난다."
+              }
+            ],
+            "work": [
+              "Security가 사용하는 CorsConfigurationSource와 실제 허용 origin 목록의 단일 기준을 찾는다.",
+              "세 Origin에 대해 OPTIONS 상태와 허용 헤더를 비교하고 기존/추가 출처를 명세 목록에만 추가한다.",
+              "브라우저에서 OPTIONS 성공과 실제 API 401/201을 따로 관찰해 인증과 CORS를 구분한다."
+            ],
+            "done": [
+              "localhost:3000의 200 및 evil.example의 403을 확인했다.",
+              "B12 추가 출처의 preflight 200/allow-origin과 브라우저 POST 201을 Network 증거로 남겼다.",
+              "CORS 실패 요청에서 게시글이 생성되지 않고 token 없는 실제 POST는 401인 것을 분리해 기록했다."
+            ]
+          },
+          "hints": [
+            "OPTIONS preflight의 allow-origin이 맞아도 실제 POST에서 401일 수 있는 이유는 무엇인가요?",
+            "Security filter chain 안의 CORS 설정과 MVC handler 설정이 서로 다르면 preflight가 어느 지점에서 끝날 수 있나요?",
+            "허용하지 않은 Origin을 wildcard나 요청값 반사로 허용하면 어떤 출처 제한이 사라지나요?",
+            "Network 탭에서 OPTIONS 실패와 POST 실패를 각각 어떤 상태·헤더로 판별하나요?"
+          ],
+          "recipeIds": [
+            "board:post-create:normal"
+          ],
+          "executionChecks": [
+            {
+              "title": "preflight 비교",
+              "command": "curl -i -X OPTIONS http://localhost:8080/api/posts -H \"Origin: http://127.0.0.1:8765\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: authorization,content-type\"",
+              "expected": "허용 Origin은 200과 Access-Control-Allow-Origin을 돌려준다. 기존·허용 밖 출처도 별도 요청해 헤더 차이를 확인한다.",
+              "record": "세 Origin의 요청·상태·응답 허용 헤더를 기록한다."
+            },
+            {
+              "title": "실제 요청",
+              "command": "브라우저 개발자 도구 Network 탭에서 OPTIONS와 POST 확인",
+              "expected": "OPTIONS와 실제 요청의 상태·응답 헤더를 구분하고, 실패에 서버 에러 로그가 있는지 대조한다.",
+              "record": "요청/응답 캡처와 서버 로그 관찰 결과를 남긴다."
+            }
+          ],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D03-6 · CORS 허용 출처 설정과 preflight를 인증보다 먼저 처리하기",
+              "href": "course/spring/D03.html#step-d03-6"
+            },
+            {
+              "label": "course:D14-1 · B12 \"새 프론트 도메인에서만 호출이 실패한다\": 브라우저 개발자 도구로 실패한 요청 확인",
+              "href": "course/spring/D14.html#step-d14-1"
+            },
+            {
+              "label": "support:course/tickets/B12.md · B12. 새 프론트 도메인에서만 호출이 실패한다",
+              "href": "course/tickets/B12.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

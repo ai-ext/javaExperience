@@ -1,6 +1,7 @@
 import { initHomeServicePreview } from './home-service-preview.js';
 import { initHomeNewVisual } from './home-new-visual.js';
 import { TASKS, PROGRESS_KEY, readProgress, startTask, saveScene, completeTask, reopenTask, chooseStart, homeView } from './home-state.mjs';
+import { readReferenceContext } from './functional-reference-context.mjs';
 
 // 학습자 서버를 호출하지 않는다. 홈 예시는 오직 로컬 화면의 값만 바꾼다.
 export function initLearning(doc = document, win = window) {
@@ -38,8 +39,11 @@ export function initLearning(doc = document, win = window) {
     let view;
     const response = $('[data-demo-response]');
     const demoStatus = $('[data-demo-status]');
+    const postDrafts = { functional: { title: '새 게시글', content: '본문' }, legacy: { title: $('#home-demo-post-title').value, content: $('#home-demo-post-content').value } };
+    let postPreviewMode = 'legacy';
     function renderPreview(task) {
-      doc.querySelectorAll('[data-demo]').forEach((el) => { el.hidden = el.dataset.demo !== (task.preview === 'store' ? 'receive' : task.preview); });
+      const preview = task.functionalId && task.preview === 'store' ? 'receive' : task.preview;
+      doc.querySelectorAll('[data-demo]').forEach((el) => { el.hidden = el.dataset.demo !== preview; });
       $('[data-demo-path]').textContent = task.api;
       const result = $('[data-demo-result]');
       result.hidden = ['query', 'cursor'].includes(task.preview);
@@ -49,7 +53,20 @@ export function initLearning(doc = document, win = window) {
         $('[data-demo-result-meta]').textContent = meta;
       };
       const responseTitle = $('[data-demo-response-title]');
-      if (task.preview === 'greeting') {
+      if (task.functionalId && task.preview !== 'store') {
+        const descriptions = {
+          detail: ['새 게시글', '본문과 태그가 포함된 상세 조회 예시', '200 OK\nviewCount: 요청 전 v → v+1\n없는 글·삭제 글·볼 수 없는 글: 404'],
+          list: ['새 게시글', '목록 항목 예시 · 본문 제외 · publishedAt DESC, id DESC', '200 OK\nitems / page / size / totalElements / totalPages / hasNext\n같은 조건의 COUNT와 DB 값 불변을 직접 확인'],
+          update: ['수정한 제목', '제목만 보내면 생략한 본문과 태그는 유지됩니다.', 'PATCH /api/posts/{capturedId}\n{"title":"수정한 제목"}\n\n200 OK\n보낸 non-null 값만 변경 · 생략/null 유지 · tags=[] 연결 해제'],
+          delete: ['수정한 제목', '삭제 뒤에도 행·태그·좋아요·댓글 연결을 보존하는 예시', '204 No Content\n본문 없음\n같은 id 상세/PATCH/재삭제 404 · 목록 제외'],
+          like: ['다른 회원의 새 게시글', '다른 회원 관계는 유지하며 내 관계만 추가합니다.', '200 OK\nliked: true\n기존 관계가 없을 때만 likeCount +1 · 반복 요청 멱등'],
+          unlike: ['좋아요를 설정한 같은 글', '내 관계만 제거하고 다른 회원의 좋아요와 글은 유지합니다.', '200 OK\nliked: false\n내 관계가 있던 경우만 likeCount -1 · 반복 요청 멱등'],
+        };
+        const [title, content, example] = descriptions[task.functionalId];
+        showResult(title, content, '학습용 기대 결과 · 실제 서버·DB 미실행');
+        response.textContent = example;
+        responseTitle.textContent = '완료할 기능의 기대 결과 보기';
+      } else if (task.preview === 'greeting') {
         const name = $('#home-demo-name').value || '익명';
         const message = `${name}님, 반가워요`;
         showResult(message, '입력한 이름으로 인사말이 달라집니다.', `이름 글자 수: ${name.length}`);
@@ -66,11 +83,18 @@ export function initLearning(doc = document, win = window) {
         response.textContent = '응답 필드     ← 테이블의 열\ntitle       ← post.title\nauthorNickname ← member.nickname\nlikeCount   ← post.like_count';
         responseTitle.textContent = '응답 필드의 출처 보기';
       } else {
+        const nextMode = task.functionalId ? 'functional' : 'legacy';
+        if (postPreviewMode !== nextMode) {
+          postDrafts[postPreviewMode] = { title: $('#home-demo-post-title').value, content: $('#home-demo-post-content').value };
+          $('#home-demo-post-title').value = postDrafts[nextMode].title;
+          $('#home-demo-post-content').value = postDrafts[nextMode].content;
+          postPreviewMode = nextMode;
+        }
         const title = $('#home-demo-post-title').value;
         const content = $('#home-demo-post-content').value;
         const stored = task.preview === 'store';
         showResult(title || '(제목이 비어 있어요)', content || '(본문이 비어 있어요)', stored ? '저장 후 만들어 갈 모습 · 실제 DB 저장 전' : '요청 접수 예시 · 이 단계에서는 DB에 저장하지 않습니다.');
-        response.textContent = `${JSON.stringify({ boardSlug: 'dev', title, content, tags: [], visibility: 'PUBLIC' }, null, 2)}\n\n${stored ? '201 Created\nid: DB가 생성 → 같은 id의 행 직접 확인' : '200 OK\nsuccess\n아직 DB에 저장하지 않습니다.'}`;
+        response.textContent = `${JSON.stringify({ boardSlug: 'dev', title, content, tags: task.functionalId ? ['spring', '새태그'] : [], visibility: 'PUBLIC' }, null, 2)}\n\n${stored ? '201 Created\nLocation: /api/posts/{capturedId}\nid: DB가 생성 → 같은 id의 행 직접 확인' : '200 OK\nsuccess\n아직 DB에 저장하지 않습니다.'}`;
         responseTitle.textContent = stored ? '요청·저장 흐름 보기' : '요청·응답 데이터 보기';
       }
       demoStatus.textContent = '학습용 미리보기 · 내 서버에 요청하지 않습니다.';
@@ -91,7 +115,7 @@ export function initLearning(doc = document, win = window) {
         intro.textContent = mode === 'resume' ? '하던 기능부터 이어가 볼까요?' : '만든 결과를 직접 확인했어요.';
         introDescription.textContent = mode === 'resume' ? '마지막으로 보던 학습 위치부터 이어가세요. 필요한 설명은 언제든 다시 열어볼 수 있습니다.' : '지금까지 확인한 기능을 바탕으로 다음 과제를 시작해 보세요.';
       }
-      $('[data-home-tag]').textContent = `${mode === 'resume' ? '이어서 만들기' : mode === 'complete' ? '직접 확인 완료' : mode === 'selection' ? '선택한 시작점' : '첫 시작'} · ${task.id}`;
+      $('[data-home-tag]').textContent = `${mode === 'resume' ? '이어서 만들기' : mode === 'complete' ? '직접 확인 완료' : mode === 'selection' ? '선택한 시작점' : '첫 시작'} · ${task.functionalId ? task.title : task.id}`;
       $('[data-home-title]').textContent = task.title;
       $('[data-home-description]').textContent = task.description;
       $('[data-home-api]').textContent = task.api;
@@ -149,15 +173,23 @@ export function initLearning(doc = document, win = window) {
       });
     }
     const selection = $('[data-home-selection]');
+    const choices = startDialog.querySelector('fieldset');
+    if (choices && !choices.querySelector('input[value="flow-create"]')) {
+      const label = doc.createElement('label'); label.className = 'home-choice';
+      const input = doc.createElement('input'); input.type = 'radio'; input.name = 'start'; input.value = 'flow-create';
+      const text = doc.createElement('span'); const title = doc.createElement('strong'); title.textContent = '게시글 기능부터';
+      const description = doc.createElement('small'); description.textContent = 'API 하나를 만들 수 있다면 저장·201 응답부터 시작합니다.';
+      text.append(title, description); label.append(input, text); choices.append(label);
+    }
     function updateSelection() {
       const chosen = TASKS[startDialog.querySelector('input:checked').value];
       selection.replaceChildren();
-      const title = doc.createElement('strong'); title.textContent = `${chosen.id} · ${chosen.title}`;
+      const title = doc.createElement('strong'); title.textContent = chosen.functionalId ? chosen.title : `${chosen.id} · ${chosen.title}`;
       const description = doc.createElement('p'); description.textContent = `${chosen.work} · ${chosen.goal}`;
       selection.append(title, description);
     }
     $('[data-home-choose]').addEventListener('click', (event) => {
-      startDialog.querySelector(`input[value="${state.selected}"]`).checked = true;
+      (startDialog.querySelector(`input[value="${state.selected}"]`) || startDialog.querySelector('input[value="0-1"]')).checked = true;
       updateSelection(); openDialog(startDialog, event.currentTarget);
     });
     startDialog.addEventListener('change', updateSelection);
@@ -197,8 +229,56 @@ export function initLearning(doc = document, win = window) {
     win.addEventListener('hashchange', revealOriginal); revealOriginal();
   }
 
-  const task = TASKS[marker.dataset.homeTask];
-  if (task) {
+  const functionalRoot = doc.querySelector('[data-fw-root][data-fw-task]');
+  const functionalTask = functionalRoot && TASKS[`flow-${functionalRoot.dataset.fwTask}`];
+  const task = functionalTask || TASKS[marker.dataset.homeTask];
+  if (task?.functionalId && functionalRoot) {
+    const begin = functionalRoot.querySelector('[data-fw-begin]');
+    const status = functionalRoot.querySelector('[data-fw-home-status]');
+    function updateFunctionalStatus() {
+      const active = state.active === task.id;
+      if (begin) begin.hidden = active;
+      if (status) status.textContent = active
+        ? state.records[task.id]?.status === 'complete'
+          ? '완료 기준을 직접 확인한 기록입니다. 자동 채점과 별도입니다.'
+          : storageAvailable ? '홈에서 이 기능을 이어갈 수 있습니다. 완료 기준은 직접 확인해 체크하세요.' : '현재 기능을 시작했습니다. 저장소가 차단되어 다음 방문에는 기록이 유지되지 않습니다.'
+        : '둘러보기 중입니다. 이 기능 시작하기를 누르면 홈의 이어하기에 남습니다.';
+    }
+    function syncSelfChecks() {
+      if (!functionalRoot.dataset.fwInitialized) return;
+      refreshState();
+      if (state.active !== task.id) { updateFunctionalStatus(); return; }
+      const checks = [...functionalRoot.querySelectorAll('[data-fw-check]')];
+      const complete = checks.length > 0 && checks.every((check) => check.checked);
+      if (complete !== (state.records[task.id]?.status === 'complete')) changeProgress(complete ? completeTask : reopenTask, task.id);
+      updateFunctionalStatus();
+    }
+    begin?.addEventListener('click', () => {
+      changeProgress(startTask, task.id);
+      updateFunctionalStatus();
+      const implementation = functionalRoot.querySelector('#fw-implementation-title');
+      implementation?.focus({ preventScroll: true });
+      implementation?.scrollIntoView?.({ block: 'start' });
+    });
+    doc.addEventListener('functional-progress-change', (event) => {
+      const progress = event.detail;
+      if (typeof progress?.taskId !== 'string' || typeof progress.complete !== 'boolean' || !Array.isArray(progress.checkedIds)) return;
+      const eventTaskId = progress.taskId.startsWith('flow-') ? progress.taskId : `flow-${progress.taskId}`;
+      if (eventTaskId !== task.id) return;
+      refreshState();
+      if (state.active === task.id) changeProgress(progress.complete ? completeTask : reopenTask, task.id);
+      updateFunctionalStatus();
+    });
+    const syncAfterRestore = () => win.queueMicrotask(syncSelfChecks);
+    doc.addEventListener('DOMContentLoaded', syncAfterRestore, { once: true });
+    win.addEventListener('pageshow', () => { refreshState(); updateFunctionalStatus(); syncAfterRestore(); });
+    win.addEventListener('storage', (event) => {
+      if (event.key === null || event.key === PROGRESS_KEY || event.key === 'javaExperience.functional.selfChecks.v1') {
+        refreshState(); updateFunctionalStatus(); syncAfterRestore();
+      }
+    });
+    updateFunctionalStatus(); syncAfterRestore();
+  } else if (task && !task.functionalId && readReferenceContext(doc, win.location)?.kind !== 'legacy') {
     const bar = doc.createElement('section'); bar.className = 'learning-progress-bar'; bar.setAttribute('aria-label', '홈 이어하기와 직접 확인 기록');
     const status = doc.createElement('span'); status.className = 'learning-progress-status'; status.setAttribute('role', 'status');
     const begin = doc.createElement('button'); begin.type = 'button'; begin.textContent = '이 과제 시작하기';

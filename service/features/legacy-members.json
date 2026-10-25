@@ -1,0 +1,273 @@
+{
+  "version": 1,
+  "id": "legacy-members",
+  "title": "명세 프로젝트 회원 가입·로그인 만들기",
+  "summary": "spec-board 회원가입·JWT 로그인·내 정보 요청으로 회원 정규화와 인증 주체가 이어지는지 확인한다.",
+  "difficulty": "기초",
+  "prerequisites": [
+    "legacy-runtime"
+  ],
+  "stages": [
+    {
+      "id": "auth",
+      "title": "회원 가입부터 내 정보까지 연결하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "project-v1",
+      "project": "project-v1",
+      "label": "project-v1 · 명세 프로젝트",
+      "stages": [
+        {
+          "id": "auth",
+          "title": "회원 가입부터 내 정보까지 연결하기",
+          "sourceUnits": [
+            "legacy:10-3",
+            "legacy:10-4"
+          ],
+          "brief": {
+            "purpose": "spec-board 회원가입·JWT 로그인·내 정보 요청으로 회원 정규화와 인증 주체가 이어지는지 확인한다.",
+            "task": "가입한 email을 정규화해 중복 차단하고 BCrypt hash를 저장한 뒤 실제 id와 token으로 내 정보를 조회한다.",
+            "preconditions": [
+              "project DB에 check-10-3@example.com 계정이 없어야 한다.",
+              "가입 길이 경계: password 8~64자와 UTF-8 72 bytes 이하, nickname 2~20자."
+            ],
+            "scenario": [
+              {
+                "start": "user row에 check-10-3@example.com 없음; 현재 row 수 n.",
+                "action": "POST /api/v1/users에 email=\" Check-10-3@Example.COM \", password=\"password1234\", nickname=\" 채점용 \"을 전송하고 response id로 login/me 수행.",
+                "result": "가입 201과 Location /api/v1/users/{id}; email은 check-10-3@example.com으로 정규화. login 200, me 200에서 같은 id/email/nickname.",
+                "after": "중복 email은 409, password 7자와 한글 25자(75 bytes)는 400, 없는 email/틀린 password는 동일 401."
+              }
+            ],
+            "data": [
+              {
+                "name": "users.email, password_hash, nickname",
+                "reason": "정규화·중복 여부·hash 저장·응답 제외 여부를 확인."
+              },
+              {
+                "name": "회원 id와 임시 accessToken",
+                "reason": "가입에서 인증 조회까지 같은 회원이 유지되는지 검증; token은 저장하지 않음."
+              },
+              {
+                "name": "8/7자 password, 한글24/25자 password, nickname1/2자",
+                "reason": "문자 수와 UTF-8 byte 경계의 오류를 재현."
+              }
+            ],
+            "policies": [
+              "email은 trim 후 lowercase(Locale.ROOT)하여 검사·저장한다. nickname은 앞뒤 공백 제거 후 2~20자다.",
+              "password는 BCrypt로 hash만 저장하며 8~64자와 72 UTF-8 byte 조건을 모두 만족해야 한다. 한글 24자 허용, 25자 거절.",
+              "없는 이메일과 틀린 password는 동일한 401 문구여야 한다."
+            ],
+            "inputs": [
+              "정상 body: {email:\" Check-10-3@Example.COM \",password:\"password1234\",nickname:\" 채점용 \"}.",
+              "정상 경계: password 8자, 64자, 한글 24자; nickname 2자, 20자.",
+              "실패: 중복 email, password 7자/65자/한글25자, nickname 1자/21자, email 배열 JSON."
+            ],
+            "success": [
+              "POST /api/v1/users → 201, Location 포함, data {id,email,nickname}; 비밀번호/hash 미포함.",
+              "POST /api/v1/auth/login → 200 accessToken/expiresIn; GET /api/v1/users/me → 200 같은 id."
+            ],
+            "failures": [
+              {
+                "when": "정규화 뒤 이미 존재하는 email로 가입",
+                "result": "409 DUPLICATE.",
+                "unchanged": "user row 수 n 유지, 기존 password_hash/nickname 불변."
+              },
+              {
+                "when": "password가 7자 또는 한글 25자, nickname 경계 밖",
+                "result": "400 VALIDATION_FAILED와 해당 errors[].field.",
+                "unchanged": "DB에 회원이 추가되지 않고 BCrypt encode를 호출하지 않는다."
+              },
+              {
+                "when": "이메일 없음과 틀린 비밀번호 로그인",
+                "result": "양쪽 모두 401 같은 문구.",
+                "unchanged": "token/user row가 생성되지 않는다."
+              },
+              {
+                "when": "token 없이 /api/v1/users/me",
+                "result": "401.",
+                "unchanged": "회원 데이터 변화 없음."
+              }
+            ],
+            "examples": [
+              {
+                "title": "정규화 가입",
+                "start": "row count n, 대소문자 없는 계정",
+                "action": "email에 공백·대문자를 포함해 POST /api/v1/users",
+                "result": "201; email check-10-3@example.com, row n+1, body에 password/hash 없음"
+              },
+              {
+                "title": "중복",
+                "start": "정규화 email row가 이미 1개",
+                "action": "같은 email의 signup POST",
+                "result": "409 DUPLICATE; row 1개 유지"
+              },
+              {
+                "title": "BCrypt byte 경계",
+                "start": "신규 email, row n",
+                "action": "password 한글 25자(75 UTF-8 bytes)로 POST",
+                "result": "400 errors.password; row n 유지, 500 아님"
+              }
+            ],
+            "work": [
+              "가입 후 Location/id를 기록해 로그인과 내 정보 요청에 재사용한다.",
+              "DB는 email과 hash의 존재만 확인하고 hash/token 값은 출력 자료에 복사하지 않는다.",
+              "오류 응답의 field·code·status와 row count를 같이 대조한다."
+            ],
+            "done": [
+              "가입·login·me에서 id가 이어지고 secret은 응답에 없다.",
+              "email 중복·byte 경계·nickname 실패가 DB row를 추가하지 않았다.",
+              "존재/비밀번호 오류의 401 문구가 동일하다."
+            ],
+            "hints": [
+              "대소문자·공백이 다른 email을 같은 계정으로 취급하려면 중복 조회 전에 어떤 변환이 필요하나요?",
+              "한글 25자가 자바 문자 수로는 통과해 보여도 400이어야 하는 근거는 무엇인가요?",
+              "가입 후 응답과 DB에서 password 원문과 BCrypt hash는 각각 어디에 있어야 하나요?"
+            ]
+          },
+          "hints": [
+            "대소문자·공백이 다른 email을 같은 계정으로 취급하려면 중복 조회 전에 어떤 변환이 필요하나요?",
+            "한글 25자가 자바 문자 수로는 통과해 보여도 400이어야 하는 근거는 무엇인가요?",
+            "가입 후 응답과 DB에서 password 원문과 BCrypt hash는 각각 어디에 있어야 하나요?"
+          ],
+          "recipeIds": [
+            "legacy:10-3:A",
+            "legacy:10-3:B",
+            "legacy:10-3:C",
+            "legacy:10-3:V",
+            "legacy:10-3:E",
+            "legacy:10-3:J",
+            "legacy:10-3:K",
+            "legacy:10-3:V1",
+            "legacy:10-3:V2",
+            "legacy:10-3:V3",
+            "legacy:10-3:V4",
+            "legacy:10-3:V5",
+            "legacy:10-3:V6",
+            "legacy:10-3:B1",
+            "legacy:10-3:B2",
+            "legacy:10-3:O1",
+            "legacy:10-4:L",
+            "legacy:10-4:W",
+            "legacy:10-4:U",
+            "legacy:10-4:K",
+            "legacy:10-4:V",
+            "legacy:10-4:P",
+            "legacy:10-4:V1",
+            "legacy:10-4:V2",
+            "legacy:10-4:V3",
+            "legacy:10-4:V4",
+            "legacy:10-4:V5",
+            "legacy:10-4:V6",
+            "legacy:10-4:M",
+            "legacy:10-4:M0",
+            "legacy:10-4:M1",
+            "legacy:10-4:M2",
+            "legacy:10-4:M3",
+            "legacy:10-4:M4"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:10-3 · 회원 가입 — BCrypt 해시와 이메일 중복 409",
+              "href": "/scenario/ch10-project/10-3-signup.html"
+            },
+            {
+              "label": "../../lessons/F4-password-storage.md",
+              "href": "/lessons/F4-password-storage.html"
+            },
+            {
+              "label": "../../lessons/E1-why-layers.md",
+              "href": "/lessons/E1-why-layers.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:10-3 · 회원 가입 — BCrypt 해시와 이메일 중복 409",
+              "href": "/scenario/ch10-project/10-3-signup.html"
+            },
+            {
+              "label": "../../lessons/F4-password-storage.md",
+              "href": "/lessons/F4-password-storage.html"
+            },
+            {
+              "label": "../../lessons/E1-why-layers.md",
+              "href": "/lessons/E1-why-layers.html"
+            },
+            {
+              "label": "../../lessons/E3-what-is-jpa.md",
+              "href": "/lessons/E3-what-is-jpa.html"
+            },
+            {
+              "label": "../../lessons/B5-interfaces.md",
+              "href": "/lessons/B5-interfaces.html"
+            },
+            {
+              "label": "../../docs/knowledge/W09-why-dto.md",
+              "href": "/docs/knowledge/W09-why-dto.html"
+            },
+            {
+              "label": "../../lessons/G3-first-transaction.md",
+              "href": "/lessons/G3-first-transaction.html"
+            },
+            {
+              "label": "../../lessons/F1-validation-errors.md",
+              "href": "/lessons/F1-validation-errors.html"
+            },
+            {
+              "label": "../../lessons/B4-record-getter-immutable.md",
+              "href": "/lessons/B4-record-getter-immutable.html"
+            },
+            {
+              "label": "../../docs/knowledge/W10-where-to-validate.md",
+              "href": "/docs/knowledge/W10-where-to-validate.html"
+            },
+            {
+              "label": "../../docs/knowledge/D11-web-security-basics.md",
+              "href": "/docs/knowledge/D11-web-security-basics.html"
+            },
+            {
+              "label": "legacy:10-4 · 로그인과 JWT — 인터셉터와 @LoginUser, 내 정보",
+              "href": "/scenario/ch10-project/10-4-login-jwt.html"
+            },
+            {
+              "label": "../../lessons/F5-jwt-anatomy.md",
+              "href": "/lessons/F5-jwt-anatomy.html"
+            },
+            {
+              "label": "../../lessons/F2-auth-token.md",
+              "href": "/lessons/F2-auth-token.html"
+            },
+            {
+              "label": "../../lessons/F3-cors.md",
+              "href": "/lessons/F3-cors.html"
+            },
+            {
+              "label": "../../lessons/B8-annotations.md",
+              "href": "/lessons/B8-annotations.html"
+            },
+            {
+              "label": "../../docs/knowledge/S13-jwt-oauth2.md",
+              "href": "/docs/knowledge/S13-jwt-oauth2.html"
+            },
+            {
+              "label": "../../docs/knowledge/S12-security-architecture.md",
+              "href": "/docs/knowledge/S12-security-architecture.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "회원과 접근",
+  "status": "authored"
+}

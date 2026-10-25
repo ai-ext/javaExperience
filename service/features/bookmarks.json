@@ -1,0 +1,310 @@
+{
+  "version": 1,
+  "id": "bookmarks",
+  "title": "북마크를 폴더에 보관하기",
+  "summary": "community 북마크 생성·upsert·폴더 CRUD·목록·메모 수정에서 회원 소유권과 북마크 행 수명을 보존한다.",
+  "difficulty": "기초",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "save",
+      "title": "글을 폴더에 담고 메모·목록 관리하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "save",
+          "title": "글을 폴더에 담고 메모·목록 관리하기",
+          "sourceUnits": [
+            "legacy:6-0",
+            "legacy:6-1",
+            "legacy:6-2",
+            "legacy:6-3",
+            "legacy:6-4"
+          ],
+          "brief": {
+            "purpose": "community 북마크 생성·upsert·폴더 CRUD·목록·메모 수정에서 회원 소유권과 북마크 행 수명을 보존한다.",
+            "task": "Kim이 글 2에 memo와 folder를 지정해 저장하고 반복 PUT/upsert·메모 PATCH·폴더 삭제/이동·cursor 목록을 확인한다.",
+            "preconditions": [
+              "Kim token과 post 2(자기 글도 bookmark 가능), Park token 및 각 member 소유 folder를 분리해 준비한다.",
+              "Kim 폴더는 최대 10개; 폴더 이름은 trim 후 1~50자, member-post UNIQUE."
+            ],
+            "scenario": [
+              {
+                "start": "post2 bookmark 없음; Kim folder \"스프링 공부\" id11에 2 bookmarks, folder12 \"나중에 읽기\"에도 2 bookmarks.",
+                "action": "PUT /api/posts/2/bookmark memo=\"[북마크실습] 복습\"; 같은 PUT 반복; 6-2 folder rename/create/delete·move; 6-4 memo PATCH.",
+                "result": "첫 저장 200 bookmarkId 한 개, 반복 같은 ID. 폴더 생성 201/rename 200/delete 204; delete folder는 child bookmarks를 지우지 않고 folder_id=NULL 이동. memo PATCH는 200.",
+                "after": "다른 회원 folder ID, 중복 folder name, 11번째 folder, memo 201자, memo PATCH {}/null을 검사하고 영향 row를 비교."
+              }
+            ],
+            "data": [
+              {
+                "name": "bookmark(member_id=Kim,post_id=2,folder_id,memo)",
+                "reason": "한 회원·한 글 북마크와 folder/memo 상태 전후 비교."
+              },
+              {
+                "name": "bookmark_folder Kim: id11 스프링 공부, id12 나중에 읽기",
+                "reason": "목록/count/rename/delete 이관 규칙 검증."
+              },
+              {
+                "name": "Park 소유 folder",
+                "reason": "타 회원 folder id 거절 및 북마크 변경 없음 확인."
+              },
+              {
+                "name": "bookmarkedAt/id cursor",
+                "reason": "created_at DESC,id DESC stable ordering."
+              }
+            ],
+            "policies": [
+              "6-0 PUT는 token member와 post, optional folderId/memo; 누락/null folder는 기본 폴더, memo는 null; memo max200. 반복 PUT은 같은 bookmarkId, 행은 한 개. 내 글 북마크 허용, like_count는 건드리지 않는다.",
+              "folderId 존재뿐 아니라 folder.member_id=token member인지 확인한다. invalid folder면 새 bookmark를 만들지 않는다. UNIQUE(member_id,post_id).",
+              "6-1 upsert는 existing folder/memo를 요청값으로 갱신한다. 6-2 folder max10, duplicate normalized name 409, 빈/51자 400, 삭제 시 bookmark 유지하면서 folder_id=NULL.",
+              "6-3 GET /api/me/bookmarks 생략=전체, folder=default/null-folder, numeric folder own only; size 1..100/default10; sort bookmarkedAt desc then bookmark id desc, cursor opaque. Unavailable row는 남기고 available=false,title=null,author=null.",
+              "6-4 PATCH existing bookmark memo: {} means unchanged, {memo:null} clears; string incl empty allowed up to 200, >200/wrong type 400, missing bookmark 404, no new row; folderId ignored and folderId/bookmarkId/created_at stable."
+            ],
+            "inputs": [
+              "PUT /api/posts/2/bookmark {memo:\"[북마크실습] 복습\"}; repeat; folderId=Kim folder id11.",
+              "folder names \" 스프링 공부 \", duplicate \"스프링 공부\", 50자/51자, 11th folder.",
+              "PATCH bookmark body {}, {memo:null}, {memo:\"다시 읽기\"}, {memo:\"\"}, 201 chars, {memo:12}.",
+              "GET /api/me/bookmarks?folder=default&size=10 and next cursor."
+            ],
+            "success": [
+              "PUT bookmark 200; repeated PUT same bookmarkId, one row; response bookmarked=true, folderId/memo actual.",
+              "folder list 200 created order/count; create 201 Location; rename 200; delete 204 with child bookmark retained at default (folder_id NULL).",
+              "memo PATCH 200; text change returns memo, null removes memo, empty string remains empty, {} keeps prior.",
+              "bookmark list 200; unavailable rows stay with available=false and title/author null."
+            ],
+            "failures": [
+              {
+                "when": "folder missing/owned by Park; invalid positive integer representation",
+                "result": "404 for foreign/nonexistent folder or 400 malformed folderId.",
+                "unchanged": "bookmark row is not created or moved."
+              },
+              {
+                "when": "same Kim folder name exists or folder count already 10",
+                "result": "409 duplicate name or 400 max folders.",
+                "unchanged": "folder count/name and bookmarks stay unchanged."
+              },
+              {
+                "when": "memo 201 chars or numeric/array type; no token",
+                "result": "400 or 401.",
+                "unchanged": "existing bookmarkId, folderId, memo, created_at remain unchanged."
+              },
+              {
+                "when": "move/delete foreign bookmark/folder",
+                "result": "404.",
+                "unchanged": "Park/Kim folder contents not altered."
+              }
+            ],
+            "examples": [
+              {
+                "title": "반복 북마크 설정",
+                "start": "Kim-post2 no bookmark; bookmark table pair absent",
+                "action": "PUT memo=[북마크실습] 복습 twice",
+                "result": "both 200; same bookmarkId; row count 1; like_count unchanged"
+              },
+              {
+                "title": "폴더 삭제와 북마크 보존",
+                "start": "folder12 has 2 bookmarks",
+                "action": "DELETE /api/me/bookmark-folders/12",
+                "result": "204; folder12 absent; its 2 rows remain with folder_id=NULL"
+              },
+              {
+                "title": "memo 생략과 null",
+                "start": "bookmark id7 memo=다시 읽기, folder=NULL",
+                "action": "PATCH {} then PATCH {memo:null}",
+                "result": "first 200 memo unchanged; second 200 memo=null; bookmark id/folder/created_at unchanged"
+              },
+              {
+                "title": "중복 폴더 생성",
+                "start": "Kim already owns 스프링 공부",
+                "action": "POST same normalized name",
+                "result": "409; folder count unchanged"
+              }
+            ],
+            "work": [
+              "6-0/6-1/6-2/6-3/6-4 source recipe를 기능별로 나눠 호출한다.",
+              "bookmarkId/folderId/memo/created_at before-after와 folder count를 기록한다.",
+              "삭제 폴더가 비어 있지 않은 경우 연결 UPDATE 후 folder delete가 이뤄졌는지 확인한다."
+            ],
+            "done": [
+              "중복 PUT은 bookmarkId와 row 하나를 유지했다.",
+              "폴더 소유/limit/name/delete 이관 규칙을 확인했다.",
+              "6-3 unavailable 보존 및 6-4 absent/null/empty memo 의미를 구분했다.",
+              "실패 후 bookmark/folder 관계가 unchanged다."
+            ],
+            "hints": [
+              "같은 pair에 PUT을 반복했을 때 bookmarkId까지 같은지 어떤 응답/DB 값을 비교할까요?",
+              "folder_id를 NULL로 바꾸는 폴더 삭제와 bookmark 행 자체 삭제는 SQL에서 어떻게 구별되나요?",
+              "PATCH {}와 {memo:null}을 같은 Java null로 읽으면 사용자가 할 수 없는 어떤 동작이 사라지나요?"
+            ]
+          },
+          "hints": [
+            "같은 pair에 PUT을 반복했을 때 bookmarkId까지 같은지 어떤 응답/DB 값을 비교할까요?",
+            "folder_id를 NULL로 바꾸는 폴더 삭제와 bookmark 행 자체 삭제는 SQL에서 어떻게 구별되나요?",
+            "PATCH {}와 {memo:null}을 같은 Java null로 읽으면 사용자가 할 수 없는 어떤 동작이 사라지나요?"
+          ],
+          "recipeIds": [
+            "legacy:6-0:A",
+            "legacy:6-0:B",
+            "legacy:6-0:C",
+            "legacy:6-0:D",
+            "legacy:6-0:E",
+            "legacy:6-0:F",
+            "legacy:6-1:B0",
+            "legacy:6-1:B1",
+            "legacy:6-1:B2",
+            "legacy:6-1:B3",
+            "legacy:6-1:B4",
+            "legacy:6-1:V1",
+            "legacy:6-1:V2",
+            "legacy:6-1:V3",
+            "legacy:6-1:V4",
+            "legacy:6-1:V5",
+            "legacy:6-1:V6",
+            "legacy:6-1:B5",
+            "legacy:6-1:B6",
+            "legacy:6-1:B7",
+            "legacy:6-1:V7",
+            "legacy:6-2:F1",
+            "legacy:6-2:F2",
+            "legacy:6-2:F0",
+            "legacy:6-2:F3",
+            "legacy:6-2:F4",
+            "legacy:6-2:F5",
+            "legacy:6-2:F6",
+            "legacy:6-2:F7",
+            "legacy:6-2:F8",
+            "legacy:6-2:F9",
+            "legacy:6-2:V1",
+            "legacy:6-2:V2",
+            "legacy:6-2:V3",
+            "legacy:6-2:V4",
+            "legacy:6-2:V5",
+            "legacy:6-2:V6",
+            "legacy:6-2:B1",
+            "legacy:6-2:V7",
+            "legacy:6-2:V8",
+            "legacy:6-2:V9",
+            "legacy:6-2:V10",
+            "legacy:6-2:V11",
+            "legacy:6-2:V12",
+            "legacy:6-2:V13",
+            "legacy:6-2:V14",
+            "legacy:6-2:B2",
+            "legacy:6-2:V15",
+            "legacy:6-2:V16",
+            "legacy:6-2:V17",
+            "legacy:6-2:V18",
+            "legacy:6-2:V19",
+            "legacy:6-2:V20",
+            "legacy:6-3:K1",
+            "legacy:6-3:K2",
+            "legacy:6-3:K3",
+            "legacy:6-3:K4",
+            "legacy:6-3:K5",
+            "legacy:6-3:K6",
+            "legacy:6-3:K7",
+            "legacy:6-3:K8",
+            "legacy:6-4:A",
+            "legacy:6-4:B",
+            "legacy:6-4:C",
+            "legacy:6-4:D",
+            "legacy:6-4:E",
+            "legacy:6-4:P",
+            "legacy:6-4:F",
+            "legacy:6-4:G",
+            "legacy:6-4:H",
+            "legacy:6-4:I",
+            "legacy:6-4:J"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:6-0 · 북마크 설정 — 내 글과 폴더까지",
+              "href": "/scenario/ch6-bookmark/6-0-set-bookmark.html"
+            },
+            {
+              "label": "legacy:6-1 · 북마크 추가·삭제",
+              "href": "/scenario/ch6-bookmark/6-1-bookmark.html"
+            },
+            {
+              "label": "../../docs/knowledge/D11-web-security-basics.md",
+              "href": "/docs/knowledge/D11-web-security-basics.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:6-0 · 북마크 설정 — 내 글과 폴더까지",
+              "href": "/scenario/ch6-bookmark/6-0-set-bookmark.html"
+            },
+            {
+              "label": "legacy:6-1 · 북마크 추가·삭제",
+              "href": "/scenario/ch6-bookmark/6-1-bookmark.html"
+            },
+            {
+              "label": "../../docs/knowledge/D11-web-security-basics.md",
+              "href": "/docs/knowledge/D11-web-security-basics.html"
+            },
+            {
+              "label": "../../docs/knowledge/P18-concurrency-inventory.md",
+              "href": "/docs/knowledge/P18-concurrency-inventory.html"
+            },
+            {
+              "label": "../../docs/knowledge/S06-rest-api-clients.md",
+              "href": "/docs/knowledge/S06-rest-api-clients.html"
+            },
+            {
+              "label": "legacy:6-2 · 폴더 — 최대 10개, 이름 중복 불가",
+              "href": "/scenario/ch6-bookmark/6-2-folders.html"
+            },
+            {
+              "label": "../../docs/knowledge/W10-where-to-validate.md",
+              "href": "/docs/knowledge/W10-where-to-validate.html"
+            },
+            {
+              "label": "../../docs/knowledge/W08-where-to-handle-exceptions.md",
+              "href": "/docs/knowledge/W08-where-to-handle-exceptions.html"
+            },
+            {
+              "label": "legacy:6-3 · 내 북마크 목록",
+              "href": "/scenario/ch6-bookmark/6-3-my-bookmarks.html"
+            },
+            {
+              "label": "../../docs/knowledge/W15-paging-offset-vs-cursor.md",
+              "href": "/docs/knowledge/W15-paging-offset-vs-cursor.html"
+            },
+            {
+              "label": "../../docs/knowledge/W13-frontend-backend-boundary.md",
+              "href": "/docs/knowledge/W13-frontend-backend-boundary.html"
+            },
+            {
+              "label": "../../docs/knowledge/S09-jpa-hibernate.md",
+              "href": "/docs/knowledge/S09-jpa-hibernate.html"
+            },
+            {
+              "label": "legacy:6-4 · 북마크 메모 부분 수정 — 생략과 null 구분",
+              "href": "/scenario/ch6-bookmark/6-4-patch-bookmark-memo.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "게시글과 소통",
+  "status": "authored"
+}

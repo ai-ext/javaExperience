@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "id": "community-moderation",
+  "title": "신고를 처리하고 글 공개 상태 관리하기",
+  "summary": "신고자는 글에 사유를 남기고 운영자는 접근 가능한 권한으로 숨김·복구와 처리 상태를 남긴다.",
+  "difficulty": "중급",
+  "group": "운영과 안전",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "report",
+      "title": "신고 접수부터 운영자 숨김·복구·처리 연결하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "report",
+          "title": "신고 접수부터 운영자 숨김·복구·처리 연결하기",
+          "sourceUnits": [
+            "legacy:12-6",
+            "legacy:13-1",
+            "legacy:13-2"
+          ],
+          "brief": {
+            "purpose": "신고자는 글에 사유를 남기고 운영자는 접근 가능한 권한으로 숨김·복구와 처리 상태를 남긴다.",
+            "task": "report 생성과 관리자 moderation/처리 동작을 구현한다.",
+            "preconditions": [
+              "학습용 DB(`practice`) — 앱을 `practice` 프로파일로 띄운다.",
+              "community DB에서 기존 게시글/회원/운영 역할을 사용한다."
+            ],
+            "scenario": [
+              {
+                "start": "회원이 볼 수 있는 다른 사람의 글을 신고했고 운영자의 처리를 기다립니다.",
+                "action": "신고를 접수하고 운영자가 대상별 신고를 검토해 숨김 또는 기각 처리합니다.",
+                "result": "신고는 처리 상태·처리자·시각을 남기고 숨긴 글은 일반 사용자에게 보이지 않습니다.",
+                "after": "동일 신고 중복은 409, 일반 회원의 운영 처리는 403입니다. 실패한 처리는 글 공개 상태와 기존 신고 처리 기록을 바꾸지 않습니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "report.status, reporter_id, target post",
+                "reason": "접수와 운영 처리 상태 및 신고 대상 연결을 확인한다."
+              },
+              {
+                "name": "member.role, post.status",
+                "reason": "운영자 권한 및 숨김/복구 전이를 확인한다."
+              }
+            ],
+            "policies": [
+              "신고 body의 targetType은 POST/COMMENT, targetId 양수, reason은 SPAM/ABUSE/HATE/ETC. ETC에는 2~500자 detail이 필요하고, 그 외 사유의 입력은 원문 규칙대로 검사한다.",
+              "같은 reporter+target 중복 신고는 409이며 동시에도 한 건만 남긴다. 내 글·댓글, 숨김/삭제/볼 수 없는 대상은 400 또는 404 원문 계약을 따른다.",
+              "13-1의 숨김 권한 HANDLE_POST는 MODERATOR·ADMIN, role 변경/정합성 배치는 ADMIN 전용; 13-2는 PENDING 신고를 대상별 묶음으로 처리하고 ACCEPTED/REJECTED, handled_by/handled_at을 기록한다."
+            ],
+            "inputs": [
+              "legacy:12-6:RC: POST /api/reports; body={\"targetType\":\"COMMENT\",\"targetId\":20,\"reason\":\"ABUSE\"}; case=회원 3이 댓글 20 신고(ABUSE); source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"RC\",\"expect\":{\"status\":[201,409]}}]",
+              "legacy:13-1:H: PATCH /api/admin/posts/12/status; body={\"status\":\"HIDDEN\"}; case=모더레이터가 글 12 숨기기; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"H\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.id\",\"equals\":12},{\"path\":\"$.status\",\"equals\":\"HIDDEN\"},{\"path\":\"$.hiddenBy\",\"equals\":{\"id\":7,\"nickname\":\"동시성01\"}},{\"path\":\"$.hiddenAt\",\"type\":\"string\"}]}}]",
+              "legacy:13-1:V1: GET /api/posts/12; case=비로그인 상세; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"V1\",\"expect\":{\"status\":404}}]",
+              "legacy:13-2:R1: POST /api/reports; body={\"targetType\":\"POST\",\"targetId\":\"{{P.body.id}}\",\"reason\":\"SPAM\"}; case=회원 8이 글 신고(SPAM); source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"R1\",\"expect\":{\"status\":201}}]",
+              "legacy:13-2:H: POST /api/admin/reports/resolve; body={\"targetType\":\"POST\",\"targetId\":\"{{P.body.id}}\",\"action\":\"HIDE\"}; case=글 숨김으로 처리; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"H\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$\",\"equals\":{\"targetType\":\"POST\",\"targetId\":\"{{P.body.id}}\",\"action\":\"HIDE\",\"resolvedCount\":2,\"targetStatus\":\"HIDDEN\"}}]}}]",
+              "legacy:13-2:MP: POST /api/admin/reports/resolve; body={\"targetType\":\"POST\",\"targetId\":\"{{P.body.id}}\",\"action\":\"HIDE\"}; case=일반 회원이 처리; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"MP\",\"expect\":{\"status\":403}}]"
+            ],
+            "success": [
+              "운영자 처리 후 공개 상태 및 처리자/처리 결과 확인."
+            ],
+            "failures": [
+              {
+                "when": "POST /api/reports 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 409 — 원문 check의 실패 응답",
+                "unchanged": "report.status, post.status와 처리자 기록을 실패 전 그대로 보존한다."
+              },
+              {
+                "when": "GET /api/posts/12 · [교육용 fixture · legacy:13-1:V1] 비로그인 상세",
+                "result": "HTTP 404 (V1)",
+                "unchanged": "report.status, post.status, handled_by/hidden_by 기록은 실패 전 그대로다."
+              },
+              {
+                "when": "POST /api/admin/reports/resolve · [교육용 fixture · legacy:13-2:MP] 일반 회원이 처리",
+                "result": "HTTP 403 (MP)",
+                "unchanged": "report.status, post.status, handled_by/hidden_by 기록은 실패 전 그대로다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "회원이 볼 수 있는 다른 사람의 글을 신고했고 운영자의 처리를 기다립니다.",
+                "action": "신고를 접수하고 운영자가 대상별 신고를 검토해 숨김 또는 기각 처리합니다.",
+                "result": "동일 신고 중복은 409, 일반 회원의 운영 처리는 403입니다. 실패한 처리는 글 공개 상태와 기존 신고 처리 기록을 바꾸지 않습니다."
+              }
+            ],
+            "work": [
+              "신고 접수와 운영 조치 권한을 분리하고 모든 조회/변경에 대상·운영자 정책을 적용한다."
+            ],
+            "done": [
+              "신고는 처리 상태·처리자·시각을 남기고 숨긴 글은 일반 사용자에게 보이지 않습니다.",
+              "동일 신고 중복은 409, 일반 회원의 운영 처리는 403입니다. 실패한 처리는 글 공개 상태와 기존 신고 처리 기록을 바꾸지 않습니다.",
+              "POST /api/reports 입력이 원문 실패 check 조건에 해당 → HTTP 409 — 원문 check의 실패 응답 report.status, post.status와 처리자 기록을 실패 전 그대로 보존한다.",
+              "GET /api/posts/12 · [교육용 fixture · legacy:13-1:V1] 비로그인 상세 → HTTP 404 (V1) report.status, post.status, handled_by/hidden_by 기록은 실패 전 그대로다."
+            ]
+          },
+          "hints": [
+            "신고를 제출한 회원이 운영자 화면에서 모든 신고를 볼 수 있어야 할까요? 권한은 어디에서 판정해야 할까요?",
+            "숨김 처리가 글 행을 삭제하면 안 되는 이유와 복구 시 보존해야 할 데이터는 무엇일까요?",
+            "같은 신고를 두 번 처리하려는 요청에서 현재 상태를 검사하지 않으면 어떤 감사 정보가 모호해질까요?"
+          ],
+          "recipeIds": [
+            "legacy:12-6:RC",
+            "legacy:13-1:H",
+            "legacy:13-1:V1",
+            "legacy:13-2:R1",
+            "legacy:13-2:H",
+            "legacy:13-2:MP"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "12-6-report.html",
+              "href": "/scenario/ch12-community-features/12-6-report.html"
+            },
+            {
+              "label": "W10-where-to-validate.html",
+              "href": "/docs/knowledge/W10-where-to-validate.html"
+            },
+            {
+              "label": "F1-validation-errors.html",
+              "href": "/lessons/F1-validation-errors.html"
+            },
+            {
+              "label": "P18-concurrency-inventory.html",
+              "href": "/docs/knowledge/P18-concurrency-inventory.html"
+            },
+            {
+              "label": "R03-schema-types-constraints.html",
+              "href": "/docs/knowledge/R03-schema-types-constraints.html"
+            },
+            {
+              "label": "13-1-roles-and-hide.html",
+              "href": "/scenario/ch13-operations/13-1-roles-and-hide.html"
+            },
+            {
+              "label": "013-admin-hide-post.html",
+              "href": "/tickets/013-admin-hide-post.html"
+            },
+            {
+              "label": "S12-security-architecture.html",
+              "href": "/docs/knowledge/S12-security-architecture.html"
+            },
+            {
+              "label": "S02-aop-proxy.html",
+              "href": "/docs/knowledge/S02-aop-proxy.html"
+            },
+            {
+              "label": "B8-annotations.html",
+              "href": "/lessons/B8-annotations.html"
+            },
+            {
+              "label": "W08-where-to-handle-exceptions.html",
+              "href": "/docs/knowledge/W08-where-to-handle-exceptions.html"
+            },
+            {
+              "label": "13-2-report-handling.html",
+              "href": "/scenario/ch13-operations/13-2-report-handling.html"
+            },
+            {
+              "label": "R04-sql-crud-join.html",
+              "href": "/docs/knowledge/R04-sql-crud-join.html"
+            },
+            {
+              "label": "S10-spring-data-query.html",
+              "href": "/docs/knowledge/S10-spring-data-query.html"
+            },
+            {
+              "label": "W15-paging-offset-vs-cursor.html",
+              "href": "/docs/knowledge/W15-paging-offset-vs-cursor.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

@@ -1,0 +1,206 @@
+{
+  "version": 1,
+  "source": {
+    "path": "scenario/labs/l15-session-auth/README.md",
+    "title": "L15 세션 인증",
+    "project": "project-v1",
+    "sourceUnitId": "support:scenario/labs/l15-session-auth/README.md"
+  },
+  "transport": {
+    "credentials": "include",
+    "cookieHandling": "browser-managed",
+    "tokenPersistence": "none",
+    "csrfTokenPersistence": "none",
+    "sessionCookiePersistence": "none",
+    "manualCapture": [
+      "curl의 -b/-c cookie jar로 JSESSIONID를 로컬에서만 비교한다. cookie jar와 값은 저장소나 브라우저 저장소에 보관하지 않는다.",
+      "가입 응답의 실제 회원 id N, 로그인 전후 session id, csrfToken은 실행 화면의 기록란에 옮기지 말고 로컬 터미널에서만 비교한다.",
+      "요청마다 Set-Cookie가 다시 온다고 가정하지 않는다. 쿠키의 HttpOnly·SameSite=Lax와 Secure 환경 차이는 응답 헤더에서 직접 확인한다."
+    ]
+  },
+  "prepare": [
+    {
+      "method": "POST",
+      "path": "/api/v1/users",
+      "source": "L15 README L15, L67",
+      "action": "session-lab@example.com 회원을 가입시키고 응답에서 실제 id N을 로컬에 기록한다. 고정 id를 가정하지 않는다.",
+      "expectedStatus": null,
+      "expectedBody": "가입 응답 id가 사용된다. 원문은 가입 route의 응답 status/body를 이 실습에서 정의하지 않는다."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "source": "L15 README L19, L27",
+      "action": "같은 회원으로 JWT를 발급받아 세션 로그아웃 뒤에도 JWT 인증은 별도로 유효할 수 있는지 비교한다.",
+      "expectedStatus": 200,
+      "expectedBody": "{accessToken, expiresIn: 3600}. JWT는 세션 cookie와 다른 인증 재료다.",
+      "capture": "JWT는 메모리나 화면 저장소에 기록하지 않고 실습 중에만 사용한다."
+    }
+  ],
+  "recipes": [
+    {
+      "id": "session-lab:csrf",
+      "label": "익명 세션과 CSRF 토큰 발급",
+      "project": "project-v1",
+      "method": "GET",
+      "path": "/api/v1/session/csrf",
+      "pathParams": {},
+      "query": {},
+      "headers": {},
+      "bodyKind": "none",
+      "body": null,
+      "credentials": "include",
+      "expected": {
+        "statuses": [],
+        "bodyMode": "json",
+        "description": "원문은 익명 세션에 무작위 csrfToken을 만들고 응답하며 JSESSIONID cookie로 이어진다고 설명한다. 정확한 HTTP 상태 코드는 정하지 않는다.",
+        "fields": ["csrfToken"],
+        "assertions": [],
+        "assertionSupport": { "httpStatus": "unavailable", "jsonBody": "manual" }
+      },
+      "sourceCases": [],
+      "prepare": ["10-3 회원 가입을 끝내고 실제 회원 id N을 기록한다.", "응답 cookie jar의 JSESSIONID는 로컬에서만 확인한다."],
+      "provides": [
+        { "name": "JSESSIONID", "location": "cookie", "source": "응답 Set-Cookie / 로컬 cookie jar", "persistence": "none" },
+        { "name": "csrfToken", "location": "response-body", "source": "응답 body의 무작위 csrfToken", "persistence": "none" }
+      ],
+      "needsInput": [],
+      "manualCapture": ["Set-Cookie가 매 요청에 반드시 오지는 않는다.", "csrfToken과 session id를 로그·URL·화면 저장소에 남기지 않는다."],
+      "sourceRefs": [
+        { "path": "scenario/labs/l15-session-auth/README.md", "pointer": "L20-L21" },
+        { "path": "scenario/labs/l15-session-auth/README.md", "pointer": "L33-L34" },
+        { "path": "scenario/labs/l15-session-auth/README.md", "pointer": "L61" }
+      ],
+      "sourceUnits": ["support:scenario/labs/l15-session-auth/README.md"]
+    },
+    {
+      "id": "session-lab:login",
+      "label": "CSRF 검증과 session id 회전으로 로그인",
+      "project": "project-v1",
+      "method": "POST",
+      "path": "/api/v1/session/login",
+      "pathParams": {},
+      "query": {},
+      "headers": { "Content-Type": "application/json", "X-CSRF-Token": "" },
+      "bodyKind": "json",
+      "body": { "email": "session-lab@example.com", "password": "" },
+      "credentials": "include",
+      "requiresCookie": true,
+      "requiresCsrfToken": true,
+      "expected": {
+        "statuses": [200],
+        "bodyMode": "json",
+        "description": "정상 로그인은 회원 id N을 저장하고 응답에 비밀번호·해시를 포함하지 않는다. 로그인 전후 session id가 바뀌어야 한다. 원문은 응답 JSON의 전체 필드 모양을 지정하지 않는다.",
+        "fields": [],
+        "assertions": [],
+        "assertionSupport": { "httpStatus": "automatic", "jsonBody": "manual", "cookieRotation": "manual" }
+      },
+      "sourceCases": [
+        { "id": "session-lab:login:csrf-missing", "label": "CSRF 헤더 누락", "expected": { "statuses": [403], "bodyMode": "any", "description": "비밀번호 검사를 시작하지 않고 인증 상태를 바꾸지 않는다." } },
+        { "id": "session-lab:login:csrf-mismatch", "label": "CSRF 토큰 불일치", "expected": { "statuses": [403], "bodyMode": "any", "description": "인증 상태를 바꾸지 않는다." } },
+        { "id": "session-lab:login:bad-credentials", "label": "없는 이메일 또는 틀린 비밀번호", "expected": { "statuses": [401], "bodyMode": "any", "description": "없는 이메일과 틀린 비밀번호는 같은 문구다." } }
+      ],
+      "prepare": ["먼저 GET /api/v1/session/csrf로 받은 익명 session cookie와 csrfToken을 사용한다.", "10-3에서 만든 session-lab@example.com 계정의 실제 비밀번호를 직접 입력한다."],
+      "manualBindings": [
+        { "name": "JSESSIONID", "location": "cookie", "source": "GET /api/v1/session/csrf의 응답 cookie jar", "required": true },
+        { "name": "csrfToken", "location": "header", "source": "GET /api/v1/session/csrf의 응답 body", "required": true },
+        { "name": "password", "location": "body", "source": "학습자가 10-3 가입에 사용한 비밀번호", "required": true }
+      ],
+      "needsInput": ["JSESSIONID", "csrfToken", "password"],
+      "manualObservations": [
+        { "name": "N", "source": "POST /api/v1/users의 실제 응답 id", "compareWith": "로그인 응답 회원 id와 GET /me 응답 id", "persistence": "none" }
+      ],
+      "manualCapture": ["로그인 전·후 session id를 로컬 cookie jar에서 비교한다.", "응답 회원 id가 실제 가입 id N과 같은지 확인한다.", "session id와 csrfToken을 저장하지 않는다."],
+      "sourceRefs": [
+        { "path": "scenario/labs/l15-session-auth/README.md", "pointer": "L21-L22" },
+        { "path": "scenario/labs/l15-session-auth/README.md", "pointer": "L33-L34" },
+        { "path": "scenario/labs/l15-session-auth/README.md", "pointer": "L45-L53" },
+        { "path": "scenario/labs/l15-session-auth/README.md", "pointer": "L61-L63" }
+      ],
+      "sourceUnits": ["support:scenario/labs/l15-session-auth/README.md"]
+    },
+    {
+      "id": "session-lab:me",
+      "label": "쿠키 세션으로 내 정보 조회",
+      "project": "project-v1",
+      "method": "GET",
+      "path": "/api/v1/session/me",
+      "pathParams": {},
+      "query": {},
+      "headers": {},
+      "bodyKind": "none",
+      "body": null,
+      "credentials": "include",
+      "requiresCookie": true,
+      "expected": {
+        "statuses": [200],
+        "bodyMode": "json",
+        "description": "로그인 session cookie로 DB의 회원 id N과 email·nickname을 다시 조회한다. password는 요청하지 않으며 응답에 비밀번호·해시를 포함하지 않는다.",
+        "fields": ["id", "email", "nickname"],
+        "assertions": [],
+        "assertionSupport": { "httpStatus": "automatic", "jsonFields": "automatic", "memberIdEqualsN": "manual" }
+      },
+      "sourceCases": [
+        { "id": "session-lab:me:no-cookie", "label": "쿠키 없음 또는 다른 cookie jar", "expected": { "statuses": [401], "bodyMode": "any", "description": "익명 세션을 새로 만들지 않고 기존 로그인 jar의 상태를 바꾸지 않는다." } },
+        { "id": "session-lab:me:logged-out-cookie", "label": "로그아웃한 옛 cookie", "expected": { "statuses": [401], "bodyMode": "any", "description": "오래된 cookie로 회원으로 인정하지 않는다." } },
+        { "id": "session-lab:me:expired", "label": "유휴 만료 뒤 조회", "expected": { "statuses": [401], "bodyMode": "any", "description": "실제 timeout 설정에 따른 유휴 만료 후 인증 상태를 복구하지 못한다. 고정 시간은 가정하지 않는다." } }
+      ],
+      "prepare": ["POST /api/v1/session/login 성공 뒤 발급된 cookie jar를 사용한다."],
+      "manualBindings": [
+        { "name": "JSESSIONID", "location": "cookie", "source": "POST /api/v1/session/login의 새 cookie jar", "required": true }
+      ],
+      "needsInput": ["JSESSIONID"],
+      "manualObservations": [
+        { "name": "N", "source": "POST /api/v1/users의 실제 응답 id", "compareWith": "GET /me 응답 id", "persistence": "none" }
+      ],
+      "manualCapture": ["로그인한 jar와 빈 jar의 결과를 각각 기록한다.", "익명 /me 호출 뒤 Set-Cookie 유무와 세션 생성 여부를 확인한다.", "cookie 값을 저장하지 않는다."],
+      "sourceRefs": [
+        { "path": "scenario/labs/l15-session-auth/README.md", "pointer": "L22-L25" },
+        { "path": "scenario/labs/l15-session-auth/README.md", "pointer": "L35-L37" },
+        { "path": "scenario/labs/l15-session-auth/README.md", "pointer": "L54-L58" },
+        { "path": "scenario/labs/l15-session-auth/README.md", "pointer": "L61-L63" }
+      ],
+      "sourceUnits": ["support:scenario/labs/l15-session-auth/README.md"]
+    },
+    {
+      "id": "session-lab:logout",
+      "label": "CSRF 검증 뒤 세션 무효화",
+      "project": "project-v1",
+      "method": "POST",
+      "path": "/api/v1/session/logout",
+      "pathParams": {},
+      "query": {},
+      "headers": { "X-CSRF-Token": "" },
+      "bodyKind": "none",
+      "body": null,
+      "credentials": "include",
+      "requiresCookie": true,
+      "requiresCsrfToken": true,
+      "expected": {
+        "statuses": [204],
+        "bodyMode": "empty",
+        "description": "성공 응답은 204이고 session을 invalidate한다. 같은 옛 cookie로 GET /api/v1/session/me를 보내면 401이어야 한다.",
+        "fields": [],
+        "assertions": [],
+        "assertionSupport": { "httpStatus": "automatic", "emptyBody": "automatic", "oldCookieInvalidation": "manual" }
+      },
+      "sourceCases": [
+        { "id": "session-lab:logout:csrf-missing", "label": "CSRF 헤더 누락", "expected": { "statuses": [403], "bodyMode": "any", "description": "로그인 세션은 유지되어야 한다." } },
+        { "id": "session-lab:logout:csrf-mismatch", "label": "CSRF 토큰 불일치", "expected": { "statuses": [403], "bodyMode": "any", "description": "로그인 세션은 유지되어야 한다." } }
+      ],
+      "prepare": ["POST /api/v1/session/login 성공 뒤 새 cookie jar와 같은 세션의 csrfToken을 사용한다."],
+      "manualBindings": [
+        { "name": "JSESSIONID", "location": "cookie", "source": "POST /api/v1/session/login의 새 cookie jar", "required": true },
+        { "name": "csrfToken", "location": "header", "source": "같은 session의 CSRF 토큰", "required": true }
+      ],
+      "needsInput": ["JSESSIONID", "csrfToken"],
+      "manualCapture": ["로그아웃 성공 뒤 같은 옛 cookie jar로 /me를 요청한다.", "csrfToken을 저장하지 않는다."],
+      "sourceRefs": [
+        { "path": "scenario/labs/l15-session-auth/README.md", "pointer": "L24-L25" },
+        { "path": "scenario/labs/l15-session-auth/README.md", "pointer": "L36-L39" },
+        { "path": "scenario/labs/l15-session-auth/README.md", "pointer": "L56-L63" }
+      ],
+      "sourceUnits": ["support:scenario/labs/l15-session-auth/README.md"]
+    }
+  ]
+}

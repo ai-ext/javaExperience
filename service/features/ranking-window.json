@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "id": "ranking-window",
+  "title": "기간 안의 인기글 순위 계산하기",
+  "summary": "8-2 최근 N일 인기 점수를 고정 Clock과 Asia/Seoul의 반열린 시간 구간으로 재현한다.",
+  "difficulty": "중급",
+  "prerequisites": [
+    "likes"
+  ],
+  "stages": [
+    {
+      "id": "window",
+      "title": "고정한 기준 시각으로 기간 순위 계산하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "window",
+          "title": "고정한 기준 시각으로 기간 순위 계산하기",
+          "sourceUnits": [
+            "legacy:8-2"
+          ],
+          "brief": {
+            "purpose": "8-2 최근 N일 인기 점수를 고정 Clock과 Asia/Seoul의 반열린 시간 구간으로 재현한다.",
+            "task": "2026-10-05 기준 7일 동안의 좋아요×3+삭제 제외 댓글 점수를 계산하고 0점 제외 및 top5 tie order를 확인한다.",
+            "preconditions": [
+              "practice fixed-now=2026-10-05T00:00:00, timezone Asia/Seoul.",
+              "예시 post145 score61/likes20/comments1; lifetime leaders post18/55/103 각각 22 likes는 오래된 반응이 다수다."
+            ],
+            "scenario": [
+              {
+                "start": "days=7, to=2026-10-05 00:00 Asia/Seoul, from=2026-09-28 00:00를 계산한다.",
+                "action": "popular endpoint에 days=7,limit=5를 보내고 from 직전/from exact/to 직전/to exact event 포함 여부를 비교한다.",
+                "result": "기간 [2026-09-28,2026-10-05), score=likes×3 + live comments, score 0 제외, score desc/publishedAt desc/id desc top5; post145 sample score61.",
+                "after": "days=30 및 0/31/abc/empty를 보내 range validation과 순위 변화를 확인한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "fixed Clock now 2026-10-05T00:00 Asia/Seoul",
+                "reason": "매 실행 시 같은 query window."
+              },
+              {
+                "name": "event timestamps at 2026-09-28 and 2026-10-05",
+                "reason": "하한 포함·상한 제외 semantics."
+              },
+              {
+                "name": "post145 score61 / 20 likes / 1 comment; old posts18/55/103",
+                "reason": "최근 반응 대 누적 반응 정렬 비교."
+              },
+              {
+                "name": "published/public/nondeleted post",
+                "reason": "랭킹 대상 필터."
+              }
+            ],
+            "policies": [
+              "기간 [now-days,now), days 1..30 default7; invalid numeric/empty/bounds 400.",
+              "score = in-window likes*3 + nondeleted comments; score 0 excluded. Order score desc, published_at desc, id desc, top five.",
+              "Clock bean, Asia/Seoul. Fixed app time은 SQL NOW()나 LocalDateTime.now()에 적용되지 않으므로 DB timestamps와 구분한다."
+            ],
+            "inputs": [
+              "popular endpoint with days=7 and limit=5.",
+              "boundary events: 2026-09-27 23:59:59; 2026-09-28 00:00:00; 2026-10-04 23:59:59; 2026-10-05 00:00:00.",
+              "days=30,0,31,abc,empty."
+            ],
+            "success": [
+              "from exact and to-minus-one events count; before from and exact to do not.",
+              "post145 example scores 61 based on 20 likes and 1 comment.",
+              "old cumulative 22 likes alone does not decide current-period ranking."
+            ],
+            "failures": [
+              {
+                "when": "days outside 1..30, malformed or empty",
+                "result": "400.",
+                "unchanged": "events/posts unchanged."
+              },
+              {
+                "when": "from excluded or to exact included",
+                "result": "boundary assertion fails.",
+                "unchanged": "timestamps unchanged."
+              },
+              {
+                "when": "system time or SQL NOW mixes with fixed Clock",
+                "result": "repeat calls drift from fixed source fixture.",
+                "unchanged": "no data change."
+              }
+            ],
+            "examples": [
+              {
+                "title": "Seven-day top list",
+                "start": "fixed now 2026-10-05T00:00 Asia/Seoul, from 2026-09-28",
+                "action": "GET popular?days=7&limit=5",
+                "result": "200; in-window order; sample post145 score61,likes20,comments1"
+              },
+              {
+                "title": "Upper exclusive bound",
+                "start": "one event at 2026-10-05T00:00:00",
+                "action": "same 7 day query",
+                "result": "that event contributes zero to the current period"
+              },
+              {
+                "title": "Bad window",
+                "start": "same fixture and clock",
+                "action": "GET popular?days=31",
+                "result": "400; values and events unchanged"
+              }
+            ],
+            "work": [
+              "Read actual endpoint recipe and fixed Clock profile.",
+              "Independently count events by boundary and compare SQL CASE output.",
+              "Write measured results only; do not invent latency/index performance."
+            ],
+            "done": [
+              "time window boundaries and timezone confirmed.",
+              "score formula, zero exclusion and tie break confirmed.",
+              "days range success/failure recorded."
+            ],
+            "hints": [
+              "The event exactly at 2026-10-05 00:00 is which side of the half-open window?",
+              "How does post145 reach score61 with 20 likes and 1 comment under the source weights?",
+              "Why might a new like created with actual DB NOW be outside the frozen practice window?"
+            ]
+          },
+          "hints": [
+            "The event exactly at 2026-10-05 00:00 is which side of the half-open window?",
+            "How does post145 reach score61 with 20 likes and 1 comment under the source weights?",
+            "Why might a new like created with actual DB NOW be outside the frozen practice window?"
+          ],
+          "recipeIds": [
+            "legacy:8-2:H1",
+            "legacy:8-2:H2",
+            "legacy:8-2:H3",
+            "legacy:8-2:H4",
+            "legacy:8-2:H5",
+            "legacy:8-2:H6"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:8-2 · 최근 N일 인기글 랭킹 — 조건부 집계와 고정 시계",
+              "href": "/scenario/ch8-query-deep/8-2-popular-ranking.html"
+            },
+            {
+              "label": "../../docs/knowledge/W20-time-timezone.md",
+              "href": "/docs/knowledge/W20-time-timezone.html"
+            },
+            {
+              "label": "../../docs/knowledge/V03-mocking-in-practice.md",
+              "href": "/docs/knowledge/V03-mocking-in-practice.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:8-2 · 최근 N일 인기글 랭킹 — 조건부 집계와 고정 시계",
+              "href": "/scenario/ch8-query-deep/8-2-popular-ranking.html"
+            },
+            {
+              "label": "../../docs/knowledge/W20-time-timezone.md",
+              "href": "/docs/knowledge/W20-time-timezone.html"
+            },
+            {
+              "label": "../../docs/knowledge/V03-mocking-in-practice.md",
+              "href": "/docs/knowledge/V03-mocking-in-practice.html"
+            },
+            {
+              "label": "../../docs/knowledge/R04-sql-crud-join.md",
+              "href": "/docs/knowledge/R04-sql-crud-join.html"
+            },
+            {
+              "label": "../../docs/knowledge/W17-where-to-cache.md",
+              "href": "/docs/knowledge/W17-where-to-cache.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "조회와 성능",
+  "status": "authored"
+}

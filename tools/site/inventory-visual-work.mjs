@@ -30,6 +30,9 @@ import { D09_LESSONS } from './d09-lesson-data.mjs';
 import { D10_LESSONS } from './d10-lesson-data.mjs';
 import { D11_LESSONS } from './d11-lesson-data.mjs';
 import { D12_LESSONS } from './d12-lesson-data.mjs';
+import { FUNCTIONAL_TASKS } from './functional-scenario-data.mjs';
+import { FUNCTIONAL_LIKE_TASKS } from './functional-like-data.mjs';
+import { LIKE_VISUAL_PHASES } from './functional-like-model.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const output = path.join(root, 'docs/design/visual-inventory.jsonl');
@@ -230,6 +233,20 @@ function collectHtml(page, html) {
     'kc-catalog', 'kc-hero', 'kc-context', 'kc-browse', 'kc-empty', 'kc-sequence', 'kc-original-link', 'kc-detail-navigation',
     'p16-json-visual', 'p16-navigation', 'p16-scene', 'p16-pair', 'p16-code-location', 'p16-actions',
     'home-new-visual', 'home-new-stepper', 'home-new-plate', 'home-prepare-shortcut', 'home-return-work', 'home-preparation-steps',
+    'functional-catalog', 'functional-workspace', 'functional-like-workspace', 'functional-like-catalog', 'functional-reference-context', 'fw-nav', 'fw-header', 'fw-work-grid', 'fw-code-panel',
+    'fnp', 'fnp-dialog', 'fnp-code', 'fnp-before', 'fnp-after', 'fnp-graph', 'fnp-delta', 'fnp-figure',
+    'fw-actions-panel', 'fw-image', 'fw-state-tabs', 'fw-state-panel', 'fw-lane', 'fw-request', 'fw-request-form', 'fw-request-params',
+    'fw-no-body', 'fw-variants', 'fw-request-preview', 'fw-send-actions', 'fw-send', 'fw-copy-request', 'fw-copy-status', 'fw-curl-fallback',
+    'fw-request-status', 'fw-captured', 'fw-actual', 'fw-expected', 'fw-expected-status', 'fw-db-check', 'fw-copy-file', 'fw-file-copy-status', 'fw-file-copy-fallback',
+    'fw-completion', 'fw-references', 'fw-setup-steps', 'fw-setup-step', 'fw-starting-state', 'fw-task-context', 'fw-common-start',
+    'fw-mobile-target', 'fw-begin-row', 'fw-setup-link', 'fw-situation', 'fw-actions', 'fw-primary-actions', 'fw-start-link', 'fw-run-link',
+    'fw-catalog-columns', 'fw-catalog-continuity', 'fw-catalog-list', 'fw-catalog-row', 'fw-catalog-name', 'fw-catalog-implementation',
+    'fw-catalog-method', 'fw-catalog-api', 'fw-catalog-outcome', 'fw-catalog-open', 'fw-catalog-preparation', 'fw-catalog-note', 'fw-view-tabs',
+    'flv-note', 'flv-count', 'flv-mine', 'flv-state-heading', 'flv-grid', 'flv-java', 'flv-object-meta', 'flv-relation', 'flv-db',
+    'flv-case-note', 'flv-observer', 'flv-visual-toolbar', 'flv-state-toolbar', 'flv-preparation', 'flv-prep-open', 'flv-implementation-guide', 'flv-contract-note',
+    'frv', 'frv-field-picker', 'frv-app-lanes', 'frv-java',
+    'frv-database', 'frv-db-table', 'frv-reference-list', 'frv-transaction', 'frv-observer', 'fqv', 'fqv-controls',
+    'fqv-list-results', 'fqv-presets', 'fqv-patch-top', 'fqv-relations', 'fqv-phase-label', 'fqv-table-scroll',
     // 과정 v2(P5-2): 홈 과정 영역·참고 도감, 일자 페이지 배치, 과정 지도
     'course-home', 'ch-today', 'ch-progress', 'ch-entries', 'home-reference',
     'day-head', 'day-today', 'day-java', 'step-facts', 'copy-row', 'day-pager',
@@ -248,6 +265,29 @@ function collectHtml(page, html) {
       const hint = (match[0].startsWith('<button') ? tail.slice(0, tail.indexOf('</button>')) : tail.slice(0, 240)).replace(/<[^>]*>/g, ' ');
       add(page, '생성 시각 교구', `visual:${component}`, aria || hint, 0, { className: component });
     }
+  }
+  if (html.includes('data-fw-root') || html.includes('class="functional-catalog"')) {
+    const dom = new JSDOM(html);
+    for (const element of dom.window.document.querySelectorAll('.functional-workspace p, .functional-workspace pre, .functional-workspace table, .functional-catalog p, .functional-catalog pre, .functional-catalog table, [data-frv-root] .frv-sql-scroll > code')) {
+      const panel = element.closest('[data-fw-state-panel]');
+      const task = element.closest('[data-fw-root]')?.getAttribute('data-fw-task');
+      const nativeModel = Boolean(element.closest('[data-frv-root],[data-fqv]'));
+      const type = element.tagName === 'TABLE' ? 'table' : ['PRE', 'CODE'].includes(element.tagName) ? 'code' : 'prose';
+      const value = type === 'table'
+        ? [...element.querySelectorAll('tr')].map(tr => [...tr.querySelectorAll('th,td')].map(cell => cell.textContent).join(' | ')).join('\n')
+        : element.textContent;
+      const section = nativeModel ? `값 비교 모델 · ${panel?.getAttribute('data-fw-state-panel') || task}`
+        : task ? `기능 작업 UI · ${task}` : '기능 목차 UI';
+      add(page, section, `${nativeModel ? 'native' : 'generated'}_${type}`, value, value.length,
+        { taskId: task || '', stateId: panel?.getAttribute('data-fw-state-panel') || '', nativeModel });
+    }
+    for (const panel of dom.window.document.querySelectorAll('[data-fw-state-panel]')) {
+      const task = panel.closest('[data-fw-root]')?.getAttribute('data-fw-task') || '';
+      const stateId = panel.getAttribute('data-fw-state-panel') || '';
+      add(page, `기능 과제 예상 상태 · ${task}`, 'functional_typed_state', stateId, 0,
+        { taskId: task, stateId, evidenceType: task === 'like' || task === 'unlike' ? '4-1 설명용 계산 상태' : '3-2 설명용 계산 상태' });
+    }
+    dom.window.close();
   }
   return maxDepth;
 }
@@ -271,6 +311,19 @@ for (const file of sourceFiles) {
   const before = rows.length;
   collectMarkdown(file, fs.readFileSync(path.join(root, file), 'utf8'));
   const maxToggleDepth = collectHtml(file, fs.readFileSync(path.join(root, htmlFile), 'utf8'));
+  const functionalTask = [...FUNCTIONAL_TASKS, ...FUNCTIONAL_LIKE_TASKS].find((task) => task.sourcePath === file);
+  if (functionalTask) {
+    add(file, '기능 과제', 'functional_task', `${functionalTask.id}: ${functionalTask.title}`, functionalTask.goal?.length ?? 0,
+      { taskId: functionalTask.id, api: `${functionalTask.api.method} ${functionalTask.api.path}` });
+    const hasRenderedStates = rows.some((unit) => unit.kind === 'functional_typed_state' && unit.taskId === functionalTask.id);
+    if (!hasRenderedStates) {
+      const states = ['like', 'unlike'].includes(functionalTask.id)
+        ? LIKE_VISUAL_PHASES.map(stateId => ({ id: stateId, title: stateId, summary: '', evidenceType: '4-1 설명용 계산 상태' }))
+        : (functionalTask.visualization?.states ?? []).map(state => ({ ...state, evidenceType: '3-2 설명용 예상 상태' }));
+      for (const state of states) add(file, '기능 과제 예상 상태', 'functional_typed_state', `${state.id}: ${state.title}`, state.summary?.length ?? 0,
+        { taskId: functionalTask.id, stateId: state.id, evidenceType: state.evidenceType });
+    }
+  }
   for (const [source, kind, lessons] of [
     ['docs/knowledge/P09-java-syntax-basics.md', 'p09_learning_state', P09_LESSONS],
     ['docs/knowledge/P04-constructors-builder.md', 'p04_learning_state', P04_LESSONS],

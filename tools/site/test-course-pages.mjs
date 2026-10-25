@@ -5,7 +5,7 @@ import test from 'node:test';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { JSDOM } from 'jsdom';
-import { loadCourse, shortTitle, mapNodes, findInjectedLinkErrors, renderTicketSelection } from './course-pages.mjs';
+import { loadCourse, shortTitle, mapNodes, findInjectedLinkErrors, renderTicketSelection, renderCourseHome, renderHomeReference } from './course-pages.mjs';
 import { maskedNodes, MASK_LABEL } from './course-flow.mjs';
 
 const root = new URL('../../', import.meta.url);
@@ -42,6 +42,28 @@ async function open(file, { saved, brokenStorage = false, script = courseScript,
   await new Promise((resolve) => (window.document.readyState === 'complete' ? resolve() : window.addEventListener('load', resolve)));
   return { window, doc: window.document, $: (s) => window.document.querySelector(s), $$: (s) => [...window.document.querySelectorAll(s)] };
 }
+
+await test('홈은 서비스 만들기를 먼저 안내하고 기존 일자 기록과 이어하기를 분리한다', () => {
+  const home = new JSDOM(renderCourseHome(course), { url: 'https://learn.example/README.html' }).window.document;
+  assert.equal(home.querySelector('h1').textContent.trim(), '만들 기능을 고르고, 직접 완성해 보세요.');
+  assert.match(home.querySelector('.ch-intro').textContent, /요구사항을 읽고 직접 구현하세요\. 막히면 질문형 힌트를 열고, 내 서버에 요청을 보내 결과를 확인합니다\./);
+  assert.equal(home.querySelector('.ch-home-primary').getAttribute('href'), 'scenario/README.html');
+  assert.equal(home.querySelector('.ch-home-primary').textContent.trim(), '서비스 만들기 시작하기');
+  assert.equal(home.querySelector('.ch-home-secondary').getAttribute('href'), 'course/spring/README.html');
+  assert.equal(home.querySelector('.ch-home-secondary').textContent.trim(), '기존 일자별 자료 보기');
+  assert.match(home.querySelector('.ch-progress-head h2').textContent, /기존 일자별 진행 기록/);
+  assert.match(home.querySelector('.ch-progress-note').textContent, /기능 진도와 자동으로 환산되지 않습니다/);
+  assert.ok(home.querySelector('.ch-entry-service a[href="scenario/README.html"]'));
+  assert.ok(home.querySelector('.ch-entry-service .ch-day-reference[href="course/spring/README.html"]'));
+  assert.ok(home.querySelector('.ch-entries a[href="course/map.html"]'));
+  assert.equal(home.querySelectorAll('.ch-entries .ch-chips a[href^="course/java/J"]').length, course.java.length);
+  assert.equal(home.querySelectorAll('.ch-ticket-chips > *').length, 16);
+
+  const reference = new JSDOM(renderHomeReference('<h1 id="home-title">게시판</h1>'), { url: 'https://learn.example/README.html' }).window.document;
+  assert.match(reference.querySelector('.home-reference-head').textContent, /서비스 만들기에서 통합 기능을 찾아 요구사항에 맞춰 구현/);
+  assert.doesNotMatch(reference.querySelector('.home-reference-head').textContent, /과정 v2 이전에 만든 101단계/);
+  assert.equal(reference.querySelector('#home-title').tagName, 'H2');
+});
 
 await test('이 날 데이터: 원본 날짜 집합·본문·버튼·복사·Blob 다운로드가 일치한다', async () => {
   const actual = [];
@@ -300,7 +322,8 @@ await test('과정·홈은 다크 CSS만 로드하고 테마 선택 코드가 �
     assert.ok(doc.querySelector('link[href*="course-tokens.css"]'), file);
     for (const link of doc.querySelectorAll('link[rel="stylesheet"]')) {
       const css = fs.readFileSync(new URL(link.getAttribute('href').split('?')[0], new URL(file, root)), 'utf8');
-      assert.doesNotMatch(css, /prefers-color-scheme|\[data-theme/, file + ': ' + link.href);
+      // 고정 dark 루트에 한정한 개념 CSS는 허용하고 OS 자동 전환·라이트 분기는 계속 금지한다.
+      assert.doesNotMatch(css, /prefers-color-scheme|\[data-theme\s*=\s*["']?light\b/, file + ': ' + link.href);
     }
     for (const script of doc.querySelectorAll('script:not([src])')) assert.doesNotMatch(script.textContent, /prefers-color-scheme|dataset\.theme/);
     doc.defaultView.close();
@@ -571,7 +594,7 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
     const href = a.getAttribute('href');
     assert.ok(fs.existsSync(new URL(href.split('#')[0].replace(/\.html$/, '.md'), root)) || fs.existsSync(new URL(href.split('#')[0], root)), `홈 링크 ${href}`);
   }
-  assert.ok(home.$('section.home-reference .home-visual [data-home-start]'), '기존 시나리오 시작은 참고 도감 안에 유지');
+  assert.ok(home.$('section.home-reference .home-visual [data-home-start]'), '기존 시나리오 이어하기 기록 유지');
   assert.equal(home.$('#home-title').tagName, 'H2');
 
   const resumed = await open('index.html', { saved: JSON.stringify({ version: 1, steps: { 'D04-1': true, 'D04-2': true } }) });

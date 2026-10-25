@@ -9,6 +9,7 @@ import { loadFlows, renderDayFlow, renderDayTicketLinks } from './course-flow.mj
 import { loadCourseSources } from '../course/sources.mjs';
 import { renderCourseApiWorkspace } from './course-api-workspace.mjs';
 import { renderCoursePostVisual } from './course-post-visual.mjs';
+import { renderLearningContent } from './course-criteria.mjs';
 
 const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const PHASE = { warmup: '선택 · Java 워밍업', build: '1단계 · 빈 프로젝트로 서버 만들기', maintain: '2단계 · 어수선한 서버 넘겨받기', wrap: '중간 점검 · 설명 세션', extend: '3단계 · 설계·운영·업무 적용' };
@@ -46,7 +47,7 @@ export function loadCourse(root) {
   const days = [
     { id: 'D00', phase: 'warmup', title: d00 ? d00.replace(/^D00\.\s*/, '') : 'Java 워밍업 (선택)', java: 'J00', steps: [], optional: true },
     ...roadmap.days.map((d) => ({ id: d.id, phase: d.phase, title: d.title, java: d.java, tomorrow: d.tomorrow, transition: d.transition, workTarget: d.workTarget, entryNotice: d.entryNotice,
-      steps: d.steps.map((s) => ({ id: `${d.id}-${s.no}`, no: s.no, title: s.title, short: s.navTitle || shortTitle(s.title), requirement: s.requirement, tickets: s.tickets || [], guides: s.guides || [] })) })),
+      steps: d.steps.map((s) => ({ id: `${d.id}-${s.no}`, no: s.no, title: s.title, short: s.navTitle || shortTitle(s.title), requirement: s.requirement, presentation: s.presentation, tickets: s.tickets || [], guides: s.guides || [] })) })),
   ].map((d) => ({ ...d, page: `course/spring/${d.id}.html`, source: `course/spring/${d.id}.md` }));
   for (const d of days) if (!exists(d.source)) throw new Error(`과정 데이터: ${d.source}가 없다`);
   // 티켓 페이지는 원문(md)이 git에 커밋돼 있을 때만 "준비됨"으로 잇는다. 작업 중인 원문(미추적)을 링크하면
@@ -466,7 +467,8 @@ export function renderDayPage(sourceRel, body, course) {
   const context = notice ? `${notice.href && !notice.linkLabel ? '' : `<strong>${esc(notice.label)}</strong>`}${notice.selection ? ' <span data-selected-ticket-compact>선택 기록 없음 · D11에서 한 건을 고르세요.</span>' : ''}${notice.description ? `<p>${esc(notice.description)}</p>` : ''}${notice.href ? ` <a href="${esc(notice.href)}">${esc(notice.linkLabel || notice.label)} →</a>` : ''}`
     : day.phase === 'extend' ? `<strong>작업 대상</strong> ${esc(day.workTarget)}` : '';
   if (context) html = html.replace('</header>', `</header><aside class="day-context">${context}</aside>`);
-  return `<article class="course-day" data-day-page="${day.id}" data-phase="${day.phase}">${renderDayStepper(html, day)}</article>`;
+  const rendered = `<article class="course-day" data-day-page="${day.id}" data-phase="${day.phase}">${renderDayStepper(html, day)}</article>`;
+  return renderLearningContent(rendered, day.steps);
 }
 
 
@@ -751,7 +753,7 @@ export function renderCourseHome(course) {
   }).join('');
   const readyTickets = course.tickets.filter((t) => t.page && !t.enhancement).length;
   return `<section class="course-home" data-course-home aria-labelledby="course-home-title">
-  <div class="ch-intro"><p class="home-eyebrow">Java·Spring 온보딩 과정 v2 · ${main.length}일</p><h1 id="course-home-title">빈 프로젝트로 서버를 만들고, <span>넘겨받은 서버를 고칩니다.</span></h1><p>직접 만들기 → 티켓 처리 → 설계·운영·독립 수행. 오늘의 Java를 연습하고 Spring에서 구현한 뒤, SQL·말하기·채점으로 마무리하세요.</p><div class="ch-cover-badge" aria-hidden="true"><span class="ch-badge-strap"></span><div class="ch-badge-face"><span class="ch-badge-welcome">WELCOME</span><b>JAVA<br>SPRING</b><span class="ch-badge-caption">BACKEND · 45 DAYS</span></div></div></div>
+  <div class="ch-intro"><p class="home-eyebrow">Spring 서비스 만들기 · 기존 일자별 자료 포함</p><h1 id="course-home-title">만들 기능을 고르고, 직접 완성해 보세요.</h1><p>요구사항을 읽고 직접 구현하세요. 막히면 질문형 힌트를 열고, 내 서버에 요청을 보내 결과를 확인합니다.</p><nav class="ch-home-actions" aria-label="학습 시작"><a class="ch-primary ch-home-primary" href="${esc(href('scenario/README.html'))}">서비스 만들기 시작하기</a><a class="ch-secondary ch-home-secondary" href="${esc(href('course/spring/README.html'))}">기존 일자별 자료 보기</a></nav><div class="ch-cover-badge" aria-hidden="true"><span class="ch-badge-strap"></span><div class="ch-badge-face"><span class="ch-badge-welcome">WELCOME</span><b>JAVA<br>SPRING</b><span class="ch-badge-caption">DAY-BY-DAY · 45 DAYS</span></div></div></div>
   <div class="ch-hero">
     <article class="ch-today" aria-labelledby="ch-today-title">
       <p class="ch-tag" data-today-tag>오늘 할 일 · 처음 시작</p>
@@ -766,7 +768,7 @@ export function renderCourseHome(course) {
       <p class="ch-note" data-today-note>Java가 처음이면 <a href="${esc(href('course/spring/D00.html'))}">D00 Java 워밍업(선택)</a>을 먼저 하세요.</p>
     </article>
     <aside class="ch-route" aria-labelledby="ch-route-title">
-      <h2 id="ch-route-title">45일, 이렇게 이어집니다</h2>
+      <h2 id="ch-route-title">기존 일자별 자료의 흐름</h2>
       <ol class="ch-milestones">
         <li><b>01</b><div><small>D01–D10 · 만들기</small><strong>빈 프로젝트에서 서버까지</strong><p>게시판·상점·결제 연동을 직접 구현</p></div></li>
         <li><b>02</b><div><small>D11–D15 · 넘겨받기와 점검</small><strong>결함을 찾고 근거로 고치기</strong><p>4일 티켓 처리 후 D15 중간 점검</p></div></li>
@@ -776,8 +778,8 @@ export function renderCourseHome(course) {
     </aside>
   </div>
     <section class="ch-progress" aria-labelledby="ch-progress-title">
-      <div class="ch-progress-head"><h2 id="ch-progress-title">${main.length}일 진도</h2><p data-progress-summary>체크한 순서 0/${stepTotal}</p></div>
-      <p class="ch-progress-note">직접 체크한 진도이며 채점 결과가 아닙니다. 공통 구현과 선택한 티켓을 집계하며, 고르지 않은 후보는 제외합니다. Java 수행 여부와 역량은 따로 확인합니다.</p>
+      <div class="ch-progress-head"><h2 id="ch-progress-title">${main.length}일 기존 일자별 진행 기록</h2><p data-progress-summary>체크한 순서 0/${stepTotal}</p></div>
+      <p class="ch-progress-note">기능 진도와 자동으로 환산되지 않습니다. 이곳은 기존 일자별 확인 기록이며, 직접 체크한 진도는 채점 결과가 아닙니다. 공통 구현과 선택한 티켓을 집계하며, 고르지 않은 후보는 제외합니다. Java 수행 여부와 역량은 따로 확인합니다.</p>
       <p class="ch-progress-key"><span class="ch-key-current">추천 구현일</span><span class="ch-key-done">구현 체크 끝</span><span>각 칸의 수치 = 체크한 순서 / 집계 순서</span></p>
       ${phases.map(([phase, label]) => {
         const days = main.filter(d => d.phase === phase);
@@ -787,7 +789,7 @@ export function renderCourseHome(course) {
     </section>
   ${renderTicketSelection(course, from).replace('class="ticket-selection"', 'class="ticket-selection ch-ticket-summary"')}
   <div class="ch-entries">
-    <article class="ch-entry" data-content-kind="action"><p class="home-eyebrow">일정 · 오늘 할 일</p><h3>일자 페이지 D00~${main.at(-1).id}</h3><p>오늘 순서 → 순서 칸(만들 파일·겪을 것·완료 조건) → 막히면 힌트 → 필요한 구현 예시(1·2단계) → 오늘의 SQL → 말하기 카드와 AI 채점.</p><a href="${esc(href('course/spring/README.html'))}">일자 목록 열기 →</a></article>
+    <article class="ch-entry ch-entry-service" data-content-kind="action"><p class="home-eyebrow">시작 · 서비스 만들기</p><h3>요구사항에서 서비스 완성까지</h3><p>필요한 기능을 찾아 요구사항대로 구현하고, 질문형 힌트와 내 서버 요청으로 결과를 확인합니다.</p><a class="ch-primary" href="${esc(href('scenario/README.html'))}">서비스 만들기 시작하기 →</a><a class="ch-day-reference" href="${esc(href('course/spring/README.html'))}">기존 일자별 자료도 보기</a></article>
     <article class="ch-entry" id="course-java-entry" data-content-kind="practice"><p class="home-eyebrow">연습 · Java · 매일 30~60분</p><h3>같은 날 쓰는 Java 연결</h3><p>J16 이후는 기존 J 재사용과 오늘의 작은 경계 실험입니다. 보통 먼저 연습하고 J44·J45는 수행 중 증거·사후 확인으로 연결합니다. 실행 위치와 완료 조건을 확인하세요.</p><details class="ch-catalog"><summary>Java 연결 ${course.java.length}개 찾아보기</summary><p class="ch-chips">${javaChips}</p></details></article>
     <article class="ch-entry" id="course-ticket-entry" data-content-kind="action"><p class="home-eyebrow">과제 · 2단계 티켓 · 필수 4건 + 선택 1건(Security·Redis 후보)</p><h3>증상만 적힌 티켓 B01~B16</h3><p class="ch-entry-note">필수 B01~B04 + 선택 1건(B12·B13·B14 또는 B15·B16) + <a href="${esc(href('course/tickets/E01.html'))}">고도화 E01</a> + <a href="${esc(href('course/tickets/drill.html'))}">모의 장애 훈련</a>. B05~B11과 고르지 않은 후보는 연습으로 하고, 처리한 것만 채점합니다. 티켓 문서 ${readyTickets}/16 제공 · 학습 완료 표시와 별개입니다.</p><details class="ch-catalog"><summary>티켓 16건 찾아보기</summary><p class="ch-chips ch-ticket-chips">${ticketChips}</p></details></article>
     <article class="ch-entry" data-content-kind="action"><p class="home-eyebrow">3단계 · D16~${main.at(-1).id}</p><h3>설계에서 운영·회의·독립 수행까지</h3><p>미수행 개인 과제 → Java·DB 관찰 → 예약 쿠폰 → 배포·스키마·복원 → 계약·인증·재개 작업 → 새 업무·장애·회의 → 독립 평가. 실제 업무 이슈가 없어도 제공 변형으로 진행합니다.</p><a href="${esc(href('course/spring/D16.html'))}">D16 개인 경로 열기 →</a></article>
@@ -799,11 +801,11 @@ export function renderCourseHome(course) {
 </section>`;
 }
 
-// 기존 홈(시나리오 첫 과제·미리보기·FAQ·설치 안내)은 링크와 이어하기를 그대로 두고 "참고 도감"으로 내린다.
+// 기존 홈(시나리오 첫 과제·미리보기·FAQ·설치 안내)은 링크와 이어하기를 그대로 둔다.
 export function renderHomeReference(homeVisualHtml) {
   const demoted = homeVisualHtml.replace(/<h1 id="home-title"([^>]*)>([\s\S]*?)<\/h1>/, '<h2 id="home-title"$1>$2</h2>');
   if (demoted === homeVisualHtml) throw new Error('홈: 기존 제목(#home-title)을 찾지 못했다');
-  return `<section class="home-reference" aria-labelledby="home-reference-title"><div class="home-reference-head"><p class="home-eyebrow">참고 도감</p><h2 id="home-reference-title">기존 게시판 시나리오·실전 미션·개념 학습</h2><p>과정 v2 이전에 만든 101단계 시나리오와 공부자료입니다. 일자 페이지 맨 아래 "참고 자료"가 이곳의 문서로 이어집니다. 하던 시나리오 과제의 이어하기 기록도 그대로 남아 있습니다.</p><p>데이터 요구사항으로 테이블을 직접 설계하고 더미 SQL을 내 테이블 이름에 맞춰 붙여 넣습니다. SQL을 매일 풀고, board-server는 구현 예시로 비교합니다.</p>
+  return `<section class="home-reference" aria-labelledby="home-reference-title"><div class="home-reference-head"><p class="home-eyebrow">기능 탐색 · 추가 학습 자료</p><h2 id="home-reference-title">서비스 만들기 · 실전 미션 · 개념 학습</h2><p>서비스 만들기에서 통합 기능을 찾아 요구사항에 맞춰 구현하세요. 기존 시나리오의 이어하기 기록은 그대로 남아 있습니다. 일자별 자료는 별도 학습 경로로 계속 볼 수 있습니다.</p><p>데이터 요구사항으로 테이블을 직접 설계하고 더미 SQL을 내 테이블 이름에 맞춰 붙여 넣습니다. SQL을 매일 풀고, board-server는 구현 예시로 비교합니다.</p>
   <p class="ch-links"><a href="scenario/README.html">서비스 만들기(시나리오)</a><a href="practice/MISSIONS.html">실전 미션</a><a href="docs/knowledge/README.html">개념 학습</a><a href="errors.html">에러 도감</a></p></div>${demoted}</section>`;
 }
 

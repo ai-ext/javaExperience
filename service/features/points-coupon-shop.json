@@ -1,0 +1,451 @@
+{
+  "version": 1,
+  "id": "points-coupon-shop",
+  "title": "포인트와 쿠폰으로 상품 구매하기",
+  "summary": "글·댓글 활동이 포인트 원장과 잔액에 반영되고, 내 잔액·이력을 일관되게 확인합니다.",
+  "difficulty": "중급",
+  "group": "포인트와 상점",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "points",
+      "title": "활동 포인트 적립·잔액·이력 확인하기"
+    },
+    {
+      "id": "coupons",
+      "title": "한 사람에게 쿠폰 한 장 발급하기"
+    },
+    {
+      "id": "purchase",
+      "title": "상품을 조회하고 포인트·쿠폰으로 구매하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 과정 프로젝트",
+      "stages": [
+        {
+          "id": "points",
+          "title": "활동 포인트 적립·잔액·이력 확인하기",
+          "sourceUnits": [
+            "course:D07-1",
+            "course:D07-2",
+            "support:course/java/J07.md"
+          ],
+          "brief": {
+            "purpose": "글·댓글 활동이 포인트 원장과 잔액에 반영되고, 내 잔액·이력을 일관되게 확인합니다.",
+            "task": "잔액 변경과 원장 추가가 원자적으로 맞물리는 구조를 설계하고 50건 동시 적립, 트랜잭션 실패, JPA 관찰 시점을 확인하세요.",
+            "preconditions": [
+              "D07 point ledger 요구와 `course/spec-v2.md` §6-5를 읽고 member.point_balance 및 원장 표본을 준비한다.",
+              "API 관찰 예시는 USER token의 실제 회원을 쓴다. 글 작성 적립은 10점이며 예시 초기 잔액은 격리한 수업 fixture로 명시한다."
+            ],
+            "scenario": [
+              {
+                "start": "격리 수업 fixture의 회원 `learner@example.test` 잔액 100점, point ledger 합계 100점이다. 게시글이 0개다.",
+                "action": "동시에 글 작성 50건을 보내고, 각 `POST /api/posts`가 201인지 확인한다. 이어 GET /api/me/points와 GET /api/me/points/history?size=20을 호출한다. 같은 값을 RC/RR에서 clear 전후·같은 연결·새 transaction으로 관찰한다.",
+                "result": "50개 글 작성은 각각 10점 적립해 잔액과 signed ledger 합계가 600점이 된다. balance API는 200 `{balance:600}`, history는 200 `{items,nextCursor}`다. 동일한 적립 이벤트당 원장 한 줄이 남는다.",
+                "after": "별도 transaction에서 잔액 600과 ledger 합계 600을 대사하고 중간 실패 fixture에서는 글·잔액·원장 모두 이전 값으로 rollback되는지 확인한다. clear 전 1차 캐시와 DB snapshot은 격리 수준별 표로 구별한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "member.point_balance",
+                "reason": "회원이 즉시 조회하는 현재 잔액이며 동시 적립 때 잃어버린 UPDATE가 없는지 ledger 합계와 대조한다."
+              },
+              {
+                "name": "point_ledger의 signed amount·reason·reference",
+                "reason": "각 글 작성 적립 10점의 이력과 실제 잔액 변동을 연결하고 이력이 추가 전용인지 확인한다."
+              },
+              {
+                "name": "GET /api/me/points 응답",
+                "reason": "자기 회원의 balance를 확인하며 원장을 매번 SUM한 결과와 분리해 본다."
+              },
+              {
+                "name": "GET /api/me/points/history 커서 페이지",
+                "reason": "20개 단위 이력과 다음 cursor를 재현해 최신 순·페이지 경계를 확인한다."
+              }
+            ],
+            "policies": [
+              "잔액은 원자적 UPDATE로 바꾸고 같은 트랜잭션에서 원장에 기록해 잔액과 이력 합을 맞춥니다.",
+              "잔액 조회 후 저장 방식의 동시 갱신 손실을 먼저 재현하고, 50건 후 잔액과 원장 합의 불일치 여부를 확인합니다.",
+              "글 저장·포인트 잔액·이력의 트랜잭션 경계를 기록하고 실패 시 함께 취소되는 범위를 실행으로 설명합니다.",
+              "포인트 이력의 수정·삭제는 허용하지 않는 정책으로 시험합니다.",
+              "원문 완료 기준: `PointConcurrencyTest`가 \"조회 후 저장\" 방식에서 먼저 실패하는 것(50건 동시 적립 후 잔액 < 합계)을 보고, 원자적 UPDATE로 바꾼 뒤 통과: 잔액 = 포인트 이력 합",
+              "원문 완료 기준: USER 토큰으로 `POST /api/posts` → 201 뒤 작성자 잔액이 늘어난다",
+              "원문 완료 기준: [꼭 할 관찰] 1차 캐시와 RC/RR: clear 전후·같은 연결·새 트랜잭션의 값과 SQL 수를 표로 제출한다.",
+              "원문 완료 기준: 설계 메모: 만든 테이블·키·제약·인덱스와 각각의 이유, 고려했다 버린 대안 1개를 기록한다.",
+              "원문 완료 기준: DB 불변식 확인: 잔액과 이력 합 대사에 불일치가 없고 실패 시 두 변경이 함께 취소된다. 이력 수정·삭제 차단 정책도 테스트한다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다.",
+              "원문 완료 기준: 트랜잭션 경계: 글 저장·포인트 잔액·이력을 어디까지 묶는지와 그 이유를 적는다. 실패 시 어느 변경이 함께 취소되는지 실행 결과로 설명한다.",
+              "원문 완료 기준: `GET /api/me/points` → 200 `{balance}`",
+              "원문 완료 기준: `GET /api/me/points/history?size=20` → 200 `{items, nextCursor}`",
+              "원문 완료 기준: 토큰 없음 → 401"
+            ],
+            "inputs": [
+              "50개 동시 글 작성 요청, 동일 USER 회원, 각 POST /api/posts의 실제 응답 id/Location.",
+              "초기 잔액 100 및 ledger 합계 100은 테스트 전용 fixture 예시다(고정 seed 정책 아님). 글 적립은 source policy상 10점이다.",
+              "`GET /api/me/points`; `GET /api/me/points/history?size=20`; 토큰 누락 대조는 401이다."
+            ],
+            "success": [
+              "50개 POST /api/posts 성공이면 글 적립 500점이 더해져 잔액 600, 원장 합계 600이다. GET /api/me/points → 200 `{balance:600}`; history?size=20 → 200 `{items,nextCursor}`.",
+              "원장과 잔액 갱신은 같은 transaction에서 확정되며 잔액은 음수가 되지 않는다. ledger 수정/삭제는 허용하지 않는다.",
+              "토큰 없이 balance/history 요청은 401. 데이터 없는 회원의 잔액은 0, 이력은 빈 items다."
+            ],
+            "failures": [
+              {
+                "when": "조회 후 더한 값을 저장하는 방식으로 50개 적립 동시성 테스트 실행",
+                "result": "수정 전 fixture에서 잔액이 ledger 합계보다 작은 lost update가 재현된다. 원자적 UPDATE 적용 뒤 테스트를 통과해야 한다.",
+                "unchanged": "불일치 상태를 정상으로 보정했다고 표시하지 말고 재현값과 수정 후 대사값을 모두 기록한다."
+              },
+              {
+                "when": "ledger INSERT가 실패한 글 작성/적립 transaction",
+                "result": "해당 글 작성 요청이 실패한다.",
+                "unchanged": "글 row, member.point_balance, point_ledger 중 일부만 남아서는 안 된다."
+              },
+              {
+                "when": "Authorization token 없이 GET /api/me/points/history",
+                "result": "401.",
+                "unchanged": "다른 회원의 잔액·이력을 반환하지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "50건 글 적립 대사",
+                "start": "시험 전 잔액 100, ledger 부호합 100인 격리 회원 fixture를 준비한다.",
+                "action": "50개 글을 동시에 생성하고 실제로 성공한 요청 수와 각 적립 이력을 조회한다.",
+                "result": "성공 50건이면 잔액 600, ledger 합 600이며 글당 10점이다. 실패가 있으면 성공 글 수만큼만 반영돼야 한다."
+              },
+              {
+                "title": "중간 저장 실패 rollback",
+                "start": "잔액과 원장 합이 600인 회원에게 다음 글 적립을 시작한다.",
+                "action": "원장 INSERT 또는 후속 저장 단계가 실패하도록 테스트를 주입한다.",
+                "result": "요청 실패 뒤 글 수, 잔액 600, ledger 합 600이 유지된다."
+              }
+            ],
+            "work": [
+              "회원 잔액과 point_ledger 스키마의 키·제약·인덱스 및 추가 전용 정책을 정하고 이유와 버린 대안을 적는다.",
+              "lost update를 먼저 재현한 뒤 DB 원자적 UPDATE와 ledger INSERT의 transaction을 구성한다.",
+              "글 요청과 GET balance/history의 response, DB 대사 및 RC/RR 관찰을 표로 남긴다."
+            ],
+            "done": [
+              "50개 동시 글 요청의 성공 수·잔액·원장 합이 일치하고 글 활동당 10점으로 반영됐다.",
+              "balance/history의 200 계약, 빈 회원의 `{balance:0}`·`items:[]`, 미인증 401을 확인했다.",
+              "clear/격리수준별 관찰과 실패 rollback, 추가 전용 ledger 근거를 기록했다."
+            ]
+          },
+          "hints": [
+            "두 transaction이 잔액 100을 읽고 각각 10을 더해 110을 저장하면 두 적립 중 한 건이 왜 사라질 수 있나요?",
+            "잔액 UPDATE와 ledger INSERT 중 하나가 실패하면 글 row를 포함해 어느 사실을 함께 취소해야 하나요?",
+            "같은 EntityManager에서 clear 전 SQL 0회인 결과는 1차 캐시와 DB snapshot 중 무엇을 보여 주나요?",
+            "이력이 없는 회원에서 SUM 결과가 null일 때 API가 balance 0을 반환하려면 어떤 저장 사실을 조회해야 하나요?"
+          ],
+          "recipeIds": [
+            "board:points-balance:normal",
+            "board:points-history:normal",
+            "board:post-create:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D07-1 · 포인트 이력과 원자적 적립, 글 작성 활동 포인트 연결 — 데이터 요구사항 §6-5을 만족하도록 테이블을 직접 설계·생성",
+              "href": "course/spring/D07.html#step-d07-1"
+            },
+            {
+              "label": "course:D07-2 · 내 포인트 잔액·이력 API (이력은 MyBatis 커서 목록)",
+              "href": "course/spring/D07.html#step-d07-2"
+            },
+            {
+              "label": "J07. Map·Set과 스레드: 잔액 갱신 손실 재현하고 고치기",
+              "href": "course/java/J07.html"
+            }
+          ]
+        },
+        {
+          "id": "coupons",
+          "title": "한 사람에게 쿠폰 한 장 발급하기",
+          "sourceUnits": [
+            "course:D07-3",
+            "course:D07-4"
+          ],
+          "brief": {
+            "purpose": "총 발급량, 회원별 보유 한 장, 남은 수량을 함께 지키며 쿠폰 발급 결과를 조회합니다.",
+            "task": "DB 제약과 발급 서비스 경계를 설계해 같은 회원의 중복과 총량 초과를 막고, 내 쿠폰 목록으로 저장 결과를 확인하세요.",
+            "preconditions": [
+              "`data-local.sql`의 seed 예: coupon id=1, 웰컴 쿠폰, total_quantity=10, issued_quantity=0, expires_at=현재+30일이다. 이는 로컬 bootstrap 예시이며 schema의 고정 발급/만료 정책이 아니다.",
+              "동일 USER 회원이 발급을 시작하기 전 coupon/member_coupon row와 DB 재고를 기록한다."
+            ],
+            "scenario": [
+              {
+                "start": "local seed의 쿠폰 1은 총량 10, 발급량 0, 만료 시각 현재+30일인 예시다. USER 회원 learner@example.test는 아직 이 쿠폰을 받지 않았다.",
+                "action": "coupon 발급 DB 조건을 설계하고 USER token으로 POST /api/coupons/1/issue를 보낸다. 같은 회원으로 다시 발급한 뒤 GET /api/me/coupons를 재조회한다.",
+                "result": "첫 발급은 201, member_coupon이 회원·coupon 쌍으로 한 건 생기고 issued_quantity는 0→1이다. 두 번째는 409 `/errors/duplicate`; 내 쿠폰 목록은 200이며 해당 쿠폰 한 장을 포함한다.",
+                "after": "DB에서 issued_quantity=1과 소유 회원의 member_coupon 한 건, UNIQUE(coupon_id,member_id)를 확인한다. 다른 신규 회원 발급은 총량이 남으면 성공하되 issued_quantity는 10을 넘을 수 없다."
+              }
+            ],
+            "data": [
+              {
+                "name": "coupon.total_quantity·issued_quantity",
+                "reason": "조건부 UPDATE 영향 행 수가 수량을 확보했는지 보여 주고 총량 초과를 DB에서도 막는다."
+              },
+              {
+                "name": "coupon.expires_at",
+                "reason": "발급/사용 데이터가 어느 유효 기간에 속하는지 보관한다. seed의 30일은 샘플 날짜 산출식이지 고정 기간 정책이 아니다."
+              },
+              {
+                "name": "member_coupon(coupon_id,member_id)",
+                "reason": "한 회원 한 장 UNIQUE 불변식과 실제 소유권을 확인한다."
+              },
+              {
+                "name": "GET /api/me/coupons 응답",
+                "reason": "발급 직후 회원이 받은 쿠폰과 만료/사용 상태를 API에서 다시 확인한다."
+              }
+            ],
+            "policies": [
+              "한 회원은 같은 쿠폰을 한 장만 보유합니다. 총 발급량은 0 이상 총량 이하이며 중복·초과 발급을 DB에서도 막습니다.",
+              "중복 확인·발급량 증가·보유 저장은 원자적인 업무 흐름으로 처리하고 경합 시 UNIQUE/조건부 변경 결과를 정해진 오류로 변환합니다.",
+              "이미 보유한 회원은 409 /errors/duplicate, 수량 소진은 409 /errors/coupon-exhausted입니다.",
+              "원문 완료 기준: `CouponRepositoryTest` 통과: 남은 수량이 있을 때만 발급량이 1 증가하고 영향 행 수로 성공 여부를 판정한다",
+              "원문 완료 기준: 설계 메모: 만든 테이블·키·제약·인덱스와 각각의 이유, 고려했다 버린 대안 1개를 기록한다.",
+              "원문 완료 기준: DB 불변식 확인: 같은 회원·쿠폰의 중복 INSERT와 총량 초과·음수 발급량 UPDATE를 거부한다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다.",
+              "원문 완료 기준: `POST /api/coupons/{couponId}/issue` → 201",
+              "원문 완료 기준: 같은 회원이 다시 → 409 `/errors/duplicate`",
+              "원문 완료 기준: 수량 소진 뒤 → 409 `/errors/coupon-exhausted`",
+              "원문 완료 기준: `GET /api/me/coupons` → 200",
+              "원문 완료 기준: 트랜잭션 경계: 중복 확인·발급량 증가·보유 쿠폰 저장의 시작과 끝, 사전 판정과 동시 요청 경합 예외를 처리하는 위치와 그 이유를 적는다. 실패 시 발급량·보유 내역의 rollback 결과를 기록한다."
+            ],
+            "inputs": [
+              "POST /api/coupons/1/issue는 빈 body이며 유효 USER Bearer token을 보낸다.",
+              "GET /api/me/coupons는 같은 token으로 재조회한다. 첫 발급 예상 201, 중복 발급 409 `/errors/duplicate`, 소진 409 `/errors/coupon-exhausted`.",
+              "local seed의 10개/30일은 data-local.sql에 있는 초기값 예시만 뜻한다. 실제 schema 정책은 total_quantity, issued_quantity, expires_at과 불변식이다."
+            ],
+            "success": [
+              "첫 발급 POST /api/coupons/1/issue → 201; `issued_quantity:0→1`, member_coupon 해당 회원 row `0→1`.",
+              "동일 회원 재발급 → 409 `/errors/duplicate`; 발급량 1과 보유 row 1은 바뀌지 않는다. GET /api/me/coupons → 200에서 해당 쿠폰 한 장을 확인한다.",
+              "소진된 쿠폰 발급 → 409 `/errors/coupon-exhausted`; issued_quantity ≤ total_quantity를 유지한다. local seed의 10매/30일은 예시 seed 사실이며 모두에게 적용되는 기간 정책이 아니다."
+            ],
+            "failures": [
+              {
+                "when": "같은 회원이 coupon id=1을 두 번째 발급",
+                "result": "409 `/errors/duplicate`.",
+                "unchanged": "issued_quantity는 1이고 member_coupon은 한 행만 남는다."
+              },
+              {
+                "when": "발급량이 total_quantity=10에 도달한 뒤 추가 발급",
+                "result": "409 `/errors/coupon-exhausted`.",
+                "unchanged": "발급 row/issued_quantity가 총량 10을 초과하지 않는다."
+              },
+              {
+                "when": "CouponRepository의 조건부 증가 영향 행 수가 0",
+                "result": "쿠폰 없음은 404, 남은 수량 없음은 409 exhaustion으로 구분한다.",
+                "unchanged": "회원 보유 row가 생기지 않고 issued_quantity도 증가하지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "local welcome coupon 한 장 발급",
+                "start": "data-local.sql 예시 coupon 1: 총량 10, 발급 0, expires_at NOW()+30 DAY; USER는 아직 미보유다.",
+                "action": "POST /api/coupons/1/issue 후 GET /api/me/coupons와 DB를 확인한다.",
+                "result": "201, issued 1, 내 보유 1장; 만료일은 seed에 설정된 값이다. 30일을 애플리케이션의 공통 기간 규칙으로 가정하지 않는다."
+              },
+              {
+                "title": "중복 발급 후 보존 확인",
+                "start": "첫 성공 뒤 issued_quantity=1, 해당 회원 member_coupon 1행이다.",
+                "action": "동일 token으로 issue를 한 번 더 보낸다.",
+                "result": "409 duplicate; issued_quantity=1과 member_coupon 1행 유지, 내 쿠폰 목록도 한 장이다."
+              }
+            ],
+            "work": [
+              "coupon 총량·발급량 CHECK와 member_coupon UNIQUE/FK를 설계해 직접 SQL 중복·총량 초과·음수 변경을 거부한다.",
+              "발급량 조건부 UPDATE의 영향 행 수와 회원별 쿠폰 저장을 한 transaction으로 연결한다.",
+              "첫 발급/중복/소진 후 POST status, 내 목록, DB 수량을 대조한다."
+            ],
+            "done": [
+              "CouponRepositoryTest에서 남은 수량 조건부 증가와 영향 행 수를 확인했다.",
+              "새 회원 201, 동일 회원 409 duplicate, 소진 409 exhaustion, 내 쿠폰 200의 API·DB 값을 대조했다.",
+              "local seed 10매·30일은 data-local.sql의 샘플임을 표기하고 고정 schema policy로 승격하지 않았다."
+            ]
+          },
+          "hints": [
+            "중복 확인 SELECT만 통과한 두 요청이 동시에 발급을 시도하면 DB에서 어떤 제약이 최종 한 장을 보장하나요?",
+            "조건부 issued_quantity UPDATE 결과가 0일 때 쿠폰 없음과 수량 소진을 어떻게 나눠 응답하나요?",
+            "Redis나 애플리케이션 사전 검사에 실패해도 total_quantity가 넘지 않게 보장해야 하는 저장소는 어디인가요?",
+            "data-local.sql의 NOW()+30 DAY 값과 서비스 전체 쿠폰 만료 정책을 어떤 근거로 구별하나요?"
+          ],
+          "recipeIds": [
+            "board:coupon-issue:normal",
+            "board:coupon-list:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D07-3 · 쿠폰과 회원별 보유·발급량 설계 — 데이터 요구사항 §6-6을 만족하도록 테이블을 직접 설계·생성",
+              "href": "course/spring/D07.html#step-d07-3"
+            },
+            {
+              "label": "course:D07-4 · 쿠폰 발급(1인 1매)과 내 쿠폰 목록 API (`coupon/MemberCouponRepository.java` 추가)",
+              "href": "course/spring/D07.html#step-d07-4"
+            }
+          ]
+        },
+        {
+          "id": "purchase",
+          "title": "상품을 조회하고 포인트·쿠폰으로 구매하기",
+          "sourceUnits": [
+            "course:D07-5",
+            "course:D07-6"
+          ],
+          "brief": {
+            "purpose": "상품 재고·포인트·쿠폰을 한 주문 결과로 확정하고 같은 요청의 재시도에도 주문을 중복 생성하지 않습니다.",
+            "task": "상품 목록을 확인한 뒤 주문 요청을 처리하세요. 재고와 잔액, 쿠폰 사용, 주문을 함께 확정하거나 취소하고 같은 키의 재전송 결과를 비교합니다.",
+            "preconditions": [
+              "local bootstrap에는 item 1 아메리카노 500/stock 100, item 2 프로필 배지 1,000/stock 50, item 3 닉네임 변경권 2,000/stock 30이 있다. coupon id=1은 10장·30일 만료 seed 예시다.",
+              "USER member 및 초기 포인트 1,000은 격리된 수업 fixture에 준비한다. `Idempotency-Key`는 회원별 8~64자 영문·숫자·하이픈이다."
+            ],
+            "scenario": [
+              {
+                "start": "수업용 fixture: USER 잔액 1,000, item1 가격 500/stock 100, 미사용·소유 쿠폰 1장이다. seed의 item 가격은 500·1,000·2,000이며 quantity는 1~10이다.",
+                "action": "GET /api/shop/items로 재고를 확인한 뒤 POST /api/shop/orders에 itemId=1, quantity=1, memberCouponId=<내 쿠폰 id>, Idempotency-Key=order-0001을 보낸다. 같은 key/body 재전송, 같은 key에 quantity=2, 잔액 부족 fixture도 보낸다.",
+                "result": "첫 구매는 201, `price=500`, 할인 10%=50, paidAmount=450. 잔액 1,000→550, stock 100→99, 쿠폰 UNUSED→USED, 주문·SPEND 원장 1건이다. 같은 key/body는 처음 결과를 재생하고 다른 body는 422다.",
+                "after": "동일 키 재전송 뒤에도 주문 1건·잔액 550·재고 99·쿠폰 USED가 유지된다. 부족 잔액 400 fixture에서는 409 `/errors/insufficient-points`이며 주문·재고·잔액·쿠폰은 요청 전 그대로다."
+              }
+            ],
+            "data": [
+              {
+                "name": "shop_item.price·stock",
+                "reason": "가격×수량 계산의 원본과 조건부 재고 감소를 확인한다. local bootstrap seed 가격은 500/1,000/2,000이다."
+              },
+              {
+                "name": "member.point_balance와 ORDER ledger",
+                "reason": "실제 결제액 450만큼 잔액이 줄고 같은 금액이 주문 참조 원장에 기록되는지 대조한다."
+              },
+              {
+                "name": "member_coupon.status·used_at",
+                "reason": "주문에 쓰인 쿠폰이 미사용·소유·유효기간 조건을 만족한 뒤 한 번만 USED로 바뀌는지 확인한다."
+              },
+              {
+                "name": "shop_order.idempotency_key와 paid_amount",
+                "reason": "같은 회원 멱등 재요청이 주문 재생으로 끝나고 응답·정산 금액을 보존하는지 확인한다."
+              }
+            ],
+            "policies": [
+              "상품 가격 예시는 500·1,000·2,000 포인트이며 수량은 1~10입니다. 쿠폰 할인은 10%, 할인액 소수점 이하는 버립니다.",
+              "Idempotency-Key는 필수이며 8~64자의 영문·숫자·하이픈입니다. 같은 회원·같은 키·같은 본문 재요청은 처음 결과를 돌려주고 같은 키의 다른 본문은 422입니다.",
+              "포인트 부족은 409 /errors/insufficient-points, 남의 쿠폰·사용 불가 쿠폰은 409 /errors/coupon-unusable입니다. 재고·잔액·쿠폰 사용·주문은 함께 확정/취소합니다.",
+              "내부 API에서 실제 응답을 재조회할 계약이 없는 경우 새 경로를 추가하지 말고 DB/기존 응답으로 관찰합니다.",
+              "원문 완료 기준: 토큰 없이 `GET /api/shop/items` → 200",
+              "원문 완료 기준: 설계 메모: 만든 테이블·키·제약·인덱스와 각각의 이유, 고려했다 버린 대안 1개를 기록한다.",
+              "원문 완료 기준: DB 불변식 확인: 음수 재고 UPDATE가 거부된다. 남은 재고보다 큰 구매의 조건부 차감은 영향 행 수 0이다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다.",
+              "원문 완료 기준: `POST /api/shop/orders` + `Idempotency-Key` → 201",
+              "원문 완료 기준: 같은 키·같은 본문 다시 → 처음과 같은 응답",
+              "원문 완료 기준: 같은 키·다른 본문 → 422",
+              "원문 완료 기준: 키 없음 → 400",
+              "원문 완료 기준: 잔액 부족 → 409 `/errors/insufficient-points`",
+              "원문 완료 기준: 남의 쿠폰 → 409 `/errors/coupon-unusable`",
+              "원문 완료 기준: DB 불변식 확인: 같은 회원·같은 멱등 키 주문의 두 번째 INSERT가 거부되고 구매 실패에 재고·잔액·쿠폰이 함께 복원된다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다.",
+              "원문 완료 기준: 트랜잭션 경계: 멱등 키 확인·주문·재고·잔액·쿠폰 사용을 묶는 범위와 재사용하는 서비스의 경계, 그 이유를 적는다. 실패 시 함께 취소되는 변경과 재시도 뒤 결과를 테스트로 설명한다."
+            ],
+            "inputs": [
+              "GET /api/shop/items는 token 없이 200이다. 주문 JSON 예: `{\"itemId\":1,\"quantity\":1,\"memberCouponId\":<내 쿠폰 id>}`.",
+              "POST /api/shop/orders header `Idempotency-Key: order-0001` (8~64자 영문·숫자·하이픈). item1 seed 가격 500, quantity=1~10.",
+              "수업 fixture 초기 잔액 1,000, coupon 소유/미사용 상태는 예시값이며 실제 data-local seed에는 일반 USER 잔액·보유 쿠폰이 자동 보장되지 않는다."
+            ],
+            "success": [
+              "GET /api/shop/items → 200에서 seed item 1/2/3 가격 500/1,000/2,000과 재고를 확인한다.",
+              "쿠폰 포함 item1×1 주문 POST → 201 `OrderResponse`; total 500, discount 50(10%, 소수점 이하 버림), paidAmount 450. fixture 잔액 1,000→550, stock 100→99, 쿠폰 UNUSED→USED, order와 SPEND ledger가 한 번 생성된다.",
+              "같은 회원·key·body 재요청은 같은 주문 응답을 재생하고 상태를 다시 차감하지 않는다. 같은 key에 다른 body는 422."
+            ],
+            "failures": [
+              {
+                "when": "Idempotency-Key 누락/형식 오류 또는 quantity가 1~10 밖임",
+                "result": "400 `/errors/validation`; key는 8~64자 영문·숫자·하이픈이다.",
+                "unchanged": "주문 row·재고·잔액·쿠폰 상태가 모두 요청 전과 같다."
+              },
+              {
+                "when": "같은 key로 quantity/item/coupon 본문을 바꿔 재요청",
+                "result": "422.",
+                "unchanged": "원래 주문 1건의 paidAmount와 잔액·재고·쿠폰 변경만 남고 두 번째 주문/차감은 없다."
+              },
+              {
+                "when": "fixture 잔액 400으로 500원 item 1을 쿠폰 없이 주문",
+                "result": "409 `/errors/insufficient-points`.",
+                "unchanged": "잔액 400, 재고 100, 주문 0건, 쿠폰 상태 unchanged."
+              },
+              {
+                "when": "다른 회원 쿠폰·만료·이미 사용된 쿠폰을 주문에 전달",
+                "result": "409 `/errors/coupon-unusable`.",
+                "unchanged": "재고·잔액·주문·쿠폰 사용 시각이 바뀌지 않는다."
+              },
+              {
+                "when": "요청 수량보다 재고가 적음",
+                "result": "409 `/errors/out-of-stock`.",
+                "unchanged": "재고 음수나 부분 포인트 차감·쿠폰 사용이 발생하지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "500원 상품에 10% 쿠폰",
+                "start": "격리 fixture 잔액 1,000, item 1 가격 500/stock 100, 내 쿠폰 UNUSED 1장.",
+                "action": "order-0001로 quantity 1을 구매한다.",
+                "result": "201 paidAmount 450; balance 550; stock 99; 쿠폰 USED; 주문/지출 원장 각 1회."
+              },
+              {
+                "title": "동일 key의 다른 body",
+                "start": "첫 주문 뒤 위 네 상태가 이미 반영되어 있다.",
+                "action": "같은 key order-0001로 quantity 2를 다시 보낸다.",
+                "result": "422; 기존 주문 결과를 보존하고 balance=550, stock=99, coupon=USED, order count=1."
+              },
+              {
+                "title": "잔액 부족 보존",
+                "start": "별도 회원 fixture balance 400, item1 stock 100, order 없음.",
+                "action": "쿠폰 없이 item1 quantity 1을 주문한다.",
+                "result": "409 insufficient-points; balance 400/stock 100/order 0이 유지된다."
+              }
+            ],
+            "work": [
+              "아이템 목록에서 price/stock을 확인하고 coupon 소유·UNUSED·expires_at 조건, 주문 멱등키 scope를 저장 구조에 반영한다.",
+              "결제액을 price×quantity에서 계산하고 쿠폰 적용 시 할인액을 버림 처리한다.",
+              "주문·재고·포인트 SPEND·쿠폰 사용을 단일 확정/rollback 경계로 묶고 같은 key 재전송을 비교한다."
+            ],
+            "done": [
+              "seed item 가격 500/1,000/2,000 및 수량 1~10, key 8~64 형식을 확인했다.",
+              "수업 fixture balance 1,000의 500원 상품 쿠폰 구매 결과 450/잔액 550/재고 감소 1/쿠폰 USED를 DB와 API에서 대조했다.",
+              "동일 key 재생, 다른 body 422, insufficient-points 409, coupon-unusable 409, out-of-stock 409 뒤 저장 상태 보존을 확인했다."
+            ]
+          },
+          "hints": [
+            "500×1에서 10% 할인액을 소수점 이하 버림으로 계산하면 잔액에서 빠져야 할 금액은 얼마인가요?",
+            "주문은 저장됐는데 포인트 차감이나 쿠폰 사용이 실패하면 어떤 세 상태가 함께 rollback되어야 하나요?",
+            "같은 키의 동일 본문과 다른 본문을 구분하려면 기존 주문에서 어떤 요청 필드를 비교해야 하나요?",
+            "쿠폰 ID를 body에 넣었다는 사실만으로 소유자·만료·미사용 조건을 증명할 수 있나요?"
+          ],
+          "recipeIds": [
+            "board:shop-items:normal",
+            "board:shop-order:normal",
+            "board:points-balance:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D07-5 · 상점 아이템 목록 API와 재고 설계 — 데이터 요구사항 §6-6을 만족하도록 테이블을 직접 설계·생성",
+              "href": "course/spring/D07.html#step-d07-5"
+            },
+            {
+              "label": "course:D07-6 · 쿠폰·포인트 구매와 Idempotency-Key 설계 — 데이터 요구사항 §6-6을 만족하도록 테이블을 직접 설계·생성",
+              "href": "course/spring/D07.html#step-d07-6"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

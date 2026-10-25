@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "id": "post-drafts",
+  "title": "글을 임시저장했다가 발행하기",
+  "summary": "초안은 작성자에게만 보이고 발행 시각부터 공개 목록에 참여해야 한다.",
+  "difficulty": "중급",
+  "group": "게시글과 소통",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "publish",
+      "title": "초안과 공개 상태 구분해 전환하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "publish",
+          "title": "초안과 공개 상태 구분해 전환하기",
+          "sourceUnits": [
+            "legacy:11-1"
+          ],
+          "brief": {
+            "purpose": "초안은 작성자에게만 보이고 발행 시각부터 공개 목록에 참여해야 한다.",
+            "task": "작성 요청에서 status를 받아 DRAFT/PUBLISHED 전이를 구현하고 내 초안 목록과 발행 동작을 연결한다.",
+            "preconditions": [
+              "시나리오 DB(`community`) — 8·9장에서 `practice` 프로파일로 띄웠다면 프로파일 없이 다시 띄운다. 11장의 마이그레이션은 `V20`부터 쓴다(9장까지 `V6`).  11~16장은 한 레포에서 **순서대로** 이어서 한다. 장마다 쓰는 DB가 다르다 — 11·13·14장은 `community`(기본 프로파일), 12·15·16장은 `practice`(`practice` 프로파일). 각 단계 맨 위에 적어 둔다. 마이그레이션 번호도 장마다 정해져 있다(11장 V20대, 12장 V30대, 13장 V40대, 14장 V50대, 15장 V60대, 16장 V70대). 장을 건너뛰고 뒤 장을 먼저 하면, 나중에 앞 장의 낮은 번호가 \"이미 지나간 버전\"이 되어 Flyway가 앱 기동을 막는다(`outOfOrder` 기본값 `false`).",
+              "community 기본 프로파일에서 기존 post.status·published_at을 사용하며 별도 스키마 변경은 없다."
+            ],
+            "scenario": [
+              {
+                "start": "로그인한 김자바가 아직 공개할 수 없는 글을 임시저장합니다.",
+                "action": "DRAFT로 등록한 글을 내 초안에서 확인한 뒤 같은 글을 발행합니다.",
+                "result": "초안은 작성자만 읽고, 발행 뒤 공개 범위에 맞는 사용자에게 보입니다.",
+                "after": "발행 시각은 처음 발행할 때만 정해집니다. 다시 발행하면 409이며 기존 발행 시각은 유지됩니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "post.status, published_at",
+                "reason": "목록 공개 여부와 발행 순서는 이 두 필드의 전이로 결정된다."
+              },
+              {
+                "name": "post.author_id",
+                "reason": "작성자 소유 확인과 내 초안 목록 필터에 사용한다."
+              }
+            ],
+            "policies": [
+              "DRAFT 상세는 작성자만 200, 다른 사람은 404; 발행은 404→403→409 순서로 대상·작성자·상태를 검사한다. 이미 발행된 글의 published_at은 덮어쓰지 않는다."
+            ],
+            "inputs": [
+              "legacy:11-1:P0: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 임시저장 글\",\"content\":\"쓰는 중\",\"status\":\"DRAFT\"}; case=P0 임시저장으로 쓰기(김자바); source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P0\",\"expect\":{\"status\":201,\"json\":[{\"path\":\"$.status\",\"equals\":\"DRAFT\"},{\"path\":\"$.publishedAt\",\"type\":\"null\"}]}}]",
+              "legacy:11-1:P5: POST /api/posts/{{P0.body.id}}/publish; case=P5 작성자가 발행; source expected/status checks=[{\"id\":\"C5\",\"pointer\":\"/checks/4\",\"request\":\"P5\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.id\",\"equals\":\"{{P0.body.id}}\"},{\"path\":\"$.status\",\"equals\":\"PUBLISHED\"},{\"path\":\"$.publishedAt\",\"type\":\"string\"}]}}]",
+              "legacy:11-1:P6: POST /api/posts/{{P0.body.id}}/publish; case=P6 또 발행; source expected/status checks=[{\"id\":\"C6\",\"pointer\":\"/checks/5\",\"request\":\"P6\",\"expect\":{\"status\":409}}]",
+              "legacy:11-1:P3: GET /api/me/drafts; case=P3 내 임시저장 글; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"P3\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.items[0].id\",\"equals\":\"{{P0.body.id}}\"},{\"path\":\"$.items[0].boardSlug\",\"equals\":\"free\"},{\"path\":\"$.items[0].title\",\"equals\":\"[채점] 임시저장 글\"}]}}]",
+              "legacy:11-1:P9: POST /api/posts/2/publish; case=P9 남의 공개 글(2번) 발행; source expected/status checks=[{\"id\":\"C8\",\"pointer\":\"/checks/7\",\"request\":\"P9\",\"expect\":{\"status\":403}}]"
+            ],
+            "success": [
+              "POST 응답과 상세에 status·publishedAt; 발행 후 게시판 목록 최신순은 발행 시각 기준."
+            ],
+            "failures": [
+              {
+                "when": "GET /api/me/drafts 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 401 — 원문 check의 실패 응답",
+                "unchanged": "해당 post.status/published_at과 post/tag 연결을 요청 직전 그대로 보존한다."
+              },
+              {
+                "when": "POST /api/posts/{{P0.body.id}}/publish · [교육용 fixture · legacy:11-1:P6] P6 또 발행",
+                "result": "HTTP 409 (P6)",
+                "unchanged": "post.status/published_at과 post/tag 연결은 실패 전 그대로다."
+              },
+              {
+                "when": "POST /api/posts/2/publish · [교육용 fixture · legacy:11-1:P9] P9 남의 공개 글(2번) 발행",
+                "result": "HTTP 403 (P9)",
+                "unchanged": "post.status/published_at과 post/tag 연결은 실패 전 그대로다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "로그인한 김자바가 아직 공개할 수 없는 글을 임시저장합니다.",
+                "action": "DRAFT로 등록한 글을 내 초안에서 확인한 뒤 같은 글을 발행합니다.",
+                "result": "발행 시각은 처음 발행할 때만 정해집니다. 다시 발행하면 409이며 기존 발행 시각은 유지됩니다."
+              }
+            ],
+            "work": [
+              "작성·내 초안 목록·상세·발행 간 가시성 규칙과 published_at 설정을 구현한다."
+            ],
+            "done": [
+              "초안은 작성자만 읽고, 발행 뒤 공개 범위에 맞는 사용자에게 보입니다.",
+              "발행 시각은 처음 발행할 때만 정해집니다. 다시 발행하면 409이며 기존 발행 시각은 유지됩니다.",
+              "GET /api/me/drafts 입력이 원문 실패 check 조건에 해당 → HTTP 401 — 원문 check의 실패 응답 해당 post.status/published_at과 post/tag 연결을 요청 직전 그대로 보존한다.",
+              "POST /api/posts/{{P0.body.id}}/publish · [교육용 fixture · legacy:11-1:P6] P6 또 발행 → HTTP 409 (P6) post.status/published_at과 post/tag 연결은 실패 전 그대로다."
+            ]
+          },
+          "hints": [
+            "생성 요청에서 status가 생략되거나 null일 때 기존 PUBLISHED 동작과 맞추려면 기본값을 어느 경계에서 정해야 할까요?",
+            "DRAFT의 published_at을 비워 두는 이유는 목록 정렬과 어떤 관계일까요?",
+            "발행에서 404, 403, 409 검사를 이 순서로 두면 대상 존재 여부가 어떻게 보호될까요?"
+          ],
+          "recipeIds": [
+            "legacy:11-1:P0",
+            "legacy:11-1:P5",
+            "legacy:11-1:P6",
+            "legacy:11-1:P3",
+            "legacy:11-1:P9"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "11-1-draft-publish.html",
+              "href": "/scenario/ch11-post-advanced/11-1-draft-publish.html"
+            },
+            {
+              "label": "G2-access-rules-in-one-place.html",
+              "href": "/lessons/G2-access-rules-in-one-place.html"
+            },
+            {
+              "label": "A5-rest-api-design.html",
+              "href": "/lessons/A5-rest-api-design.html"
+            },
+            {
+              "label": "D03-rest-api-dev-process.html",
+              "href": "/docs/knowledge/D03-rest-api-dev-process.html"
+            },
+            {
+              "label": "P20-jpa-entity-mapping.html",
+              "href": "/docs/knowledge/P20-jpa-entity-mapping.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

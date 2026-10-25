@@ -1,0 +1,588 @@
+{
+  "version": 1,
+  "id": "legacy-runtime",
+  "title": "커뮤니티와 명세 프로젝트 실행 준비하기",
+  "summary": "0장 여덟 단계를 하나의 실행 흐름으로 묶어 route·path/query/header/body, DTO·Java type, annotation, stack trace, Gradle/YAML, Lombok, response JSON을 확인한다.",
+  "difficulty": "기초",
+  "prerequisites": [],
+  "stages": [
+    {
+      "id": "community",
+      "title": "커뮤니티 실행과 요청 오류 확인하기"
+    },
+    {
+      "id": "project",
+      "title": "별도 명세 프로젝트와 DB 준비하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "community",
+          "title": "커뮤니티 실행과 요청 오류 확인하기",
+          "sourceUnits": [
+            "legacy:0-1",
+            "legacy:0-2",
+            "legacy:0-3",
+            "legacy:0-4",
+            "legacy:0-5",
+            "legacy:0-6",
+            "legacy:0-7",
+            "legacy:0-8"
+          ],
+          "brief": {
+            "purpose": "0장 여덟 단계를 하나의 실행 흐름으로 묶어 route·path/query/header/body, DTO·Java type, annotation, stack trace, Gradle/YAML, Lombok, response JSON을 확인한다.",
+            "task": "원문에 있는 /api/start routes를 실제 요청하고 각 입력 위치와 응답 필드를 확인한다. 정확한 200/400/404/415 case를 recipe별로 비교한다.",
+            "preconditions": [
+              "community-board 서버와 원문 compose MySQL을 실행한다. 0-6 GET config 결과로 app 설정이 반영됐는지 본다.",
+              "legacy:0-1..0-8 recipe를 선택해 id·path·request body를 원문 그대로 보낸다."
+            ],
+            "scenario": [
+              {
+                "start": "서버 기동 후 GET /api/start/hello?name=김자바 및 GET /api/start/ping을 호출한다. 구성 단계를 따라 profile/echo/member/config/summary 요청을 준비한다.",
+                "action": "legacy recipe 0-1..0-8의 정상과 실패 요청을 실행하며 0-3은 path=7, query=spring, header X-Client, JSON body를 각각 바꿔 본다.",
+                "result": "hello 김자바/익명은 200과 nameLength 3/2; ping=200 pong text; 존재하지 않는 pong=404; echo/profile 성공은 200; 누락 query 400, text/plain 415, 잘못된 age/name 400; member1=200, member3=404; config/summary 200.",
+                "after": "각 응답과 server log를 실행한 단계별로 연결하고 DB row가 바뀌지 않는 GET 요청과 profile POST의 변화 여부를 구분한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "query `name=김자바`와 생략 기본값",
+                "reason": "0-1 response name/message/nameLength 비교."
+              },
+              {
+                "name": "path 7, query spring, X-Client javaExperience, body title/tags/extra",
+                "reason": "0-3에서 요청의 네 입력 위치가 독립된 JSON field로 수신되는지 확인."
+              },
+              {
+                "name": "profile name/age: 김자바20, 이프론15",
+                "reason": "0-4/0-7의 age 숫자 type, adult true/false, Bean Validation 비교."
+              },
+              {
+                "name": "member id 1/3",
+                "reason": "0-5의 존재 성공과 404 실패를 확인."
+              },
+              {
+                "name": "application config appName/maxItems와 summary fields",
+                "reason": "0-6/0-8 YAML/configuration 및 response DTO 결과 확인."
+              },
+              {
+                "name": "stacktrace 첫 원인과 요청 route",
+                "reason": "0-5 오류에서 로그를 따라 실제 원인 위치 확인."
+              }
+            ],
+            "policies": [
+              "@GetMapping/@PostMapping 같은 annotation이 어떤 method+path를 맡는지 실제 handler와 대조한다.",
+              "0-3 path/query/header/body는 각각 path=7, q=spring, X-Client=javaExperience, body={title:첫 요청,tags:[java,spring],extra:덤}; DTO mapping은 extra를 보존/제거하는 source case 차이를 관찰한다.",
+              "JSON 숫자 age=20/15는 숫자로 보내고 \"스무살\" 문자열은 400. request DTO validation 실패는 저장 전 응답으로 처리한다.",
+              "Gradle 의존성·YAML application 설정은 실제 프로젝트 파일에서 확인한다. Lombok annotation 사용이 생성하는 DTO getter/constructor와 Java type/method signature를 컴파일 결과와 연결한다.",
+              "404는 등록하지 않은 route/없는 resource를 구분한다. 0-2 `/api/start/pong`은 원문 recipe의 404이며 임의 경로를 만들지 않는다."
+            ],
+            "inputs": [
+              "GET /api/start/hello?name=김자바; GET /api/start/hello.",
+              "GET /api/start/ping; GET /api/start/pong.",
+              "POST /api/start/echo/7?q=spring with X-Client=javaExperience, body {title:\"첫 요청\",tags:[\"java\",\"spring\"],extra:\"덤\"}; missing q -> /echo/7; text/plain content type.",
+              "POST /api/start/profile body {name:\"김자바\",age:20}, {name:\"이프론\",age:15}, invalid age \"스무살\"; Lombok checks {name:\" \", missing age, age151}.",
+              "GET /api/start/members/1 and /3; GET /api/start/config; GET /api/start/summary."
+            ],
+            "success": [
+              "GET /api/start/hello?name=김자바 → 200 {name:김자바,message:김자바님, 반가워요,nameLength:3}; no name → 200 익명/nameLength2.",
+              "GET /api/start/ping → 200 `pong`; POST echo A/B →200 with path/query/header/body mapping according to recipe.",
+              "POST profile age20 →200 adult=true; age15 →200 adult=false. GET member1/config/summary→200 with recipe fields."
+            ],
+            "failures": [
+              {
+                "when": "GET /api/start/pong (the exact missing route from 0-2 source)",
+                "result": "404 and JSON path identifies /api/start/pong.",
+                "unchanged": "server data unchanged."
+              },
+              {
+                "when": "POST /api/start/echo/7 without required q",
+                "result": "400.",
+                "unchanged": "no data write."
+              },
+              {
+                "when": "POST echo with Content-Type text/plain",
+                "result": "415.",
+                "unchanged": "no data write."
+              },
+              {
+                "when": "POST /api/start/profile sends age as \"스무살\", name blank, age missing or age151",
+                "result": "400.",
+                "unchanged": "request rejected at validation/binding boundary; no profile write is expected."
+              },
+              {
+                "when": "GET /api/start/members/3",
+                "result": "404.",
+                "unchanged": "existing member data unchanged."
+              }
+            ],
+            "examples": [
+              {
+                "title": "hello name value",
+                "start": "server ready; no DB mutation",
+                "action": "GET /api/start/hello?name=김자바",
+                "result": "200; name=김자바, message=김자바님, 반가워요, nameLength=3"
+              },
+              {
+                "title": "request four places",
+                "start": "path/query/header/body values recorded",
+                "action": "POST /api/start/echo/7?q=spring + X-Client javaExperience + JSON first 요청/tags/extra",
+                "result": "200; fromPath=7, fromQuery=spring, fromHeader=javaExperience, body fields match case"
+              },
+              {
+                "title": "annotation route missing",
+                "start": "ping mapping exists, pong mapping is absent per recipe",
+                "action": "GET /api/start/pong",
+                "result": "404 with path /api/start/pong"
+              },
+              {
+                "title": "wrong JSON number type",
+                "start": "profile accepts numeric age",
+                "action": "POST /api/start/profile {name:김자바,age:\"스무살\"}",
+                "result": "400; profile is not stored"
+              },
+              {
+                "title": "existing member not found",
+                "start": "member1 exists, member3 fixture absent",
+                "action": "GET /api/start/members/3",
+                "result": "404; no member row changed"
+              }
+            ],
+            "work": [
+              "0-2의 ping/pong recipe로 annotation 매핑 성공·실패를 비교한다.",
+              "0-3의 path/query/header/body 각 source field와 DTO를 한 항목씩 대조한다.",
+              "0-4 record/DTO validation과 0-7 Lombok DTO case의 정상·400을 비교한다.",
+              "0-5에서 response 404와 server stack trace 첫 원인 위치를 확인한다.",
+              "0-6 Gradle/YAML 설정과 config response 값을 실제 설정파일에서 찾고 0-8 Java type/method/summary DTO와 연결한다."
+            ],
+            "done": [
+              "0-1..0-8 모든 recipe source에 있는 정상/실패 입력과 status를 확인했다.",
+              "요청 네 위치, DTO/Java 타입, annotation, Lombok/설정/stack trace가 응답에 미치는 차이를 설명한다.",
+              "성공 및 실패 요청 뒤 DB 변화 유무를 실제로 구분했다."
+            ],
+            "hints": [
+              "`/echo/7?q=spring` 응답에서 path와 query 값이 어느 JSON 경로로 돌아오는지 실제 recipe assertions와 대조했나요?",
+              "age 20과 15가 각각 성인 여부를 어떻게 바꾸고 문자열 `스무살`은 왜 같은 binding으로 처리될 수 없나요?",
+              "annotation이 없는 `/api/start/pong`의 404와 member id 3의 404는 실패 위치가 어디서 다른가요?",
+              "Lombok DTO에 name 공백/age 누락이 들어왔을 때 Controller 진입 전 어떤 validation 결과가 예상되나요?"
+            ]
+          },
+          "hints": [
+            "`/echo/7?q=spring` 응답에서 path와 query 값이 어느 JSON 경로로 돌아오는지 실제 recipe assertions와 대조했나요?",
+            "age 20과 15가 각각 성인 여부를 어떻게 바꾸고 문자열 `스무살`은 왜 같은 binding으로 처리될 수 없나요?",
+            "annotation이 없는 `/api/start/pong`의 404와 member id 3의 404는 실패 위치가 어디서 다른가요?",
+            "Lombok DTO에 name 공백/age 누락이 들어왔을 때 Controller 진입 전 어떤 validation 결과가 예상되나요?"
+          ],
+          "recipeIds": [
+            "legacy:0-1:A",
+            "legacy:0-1:B",
+            "legacy:0-2:A",
+            "legacy:0-2:B",
+            "legacy:0-3:A",
+            "legacy:0-3:B",
+            "legacy:0-3:C",
+            "legacy:0-3:D",
+            "legacy:0-4:A",
+            "legacy:0-4:B",
+            "legacy:0-4:C",
+            "legacy:0-5:A",
+            "legacy:0-5:B",
+            "legacy:0-6:A",
+            "legacy:0-7:A",
+            "legacy:0-7:B",
+            "legacy:0-7:C",
+            "legacy:0-7:D",
+            "legacy:0-7:E",
+            "legacy:0-8:A"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:0-1 · Java로 첫 API — 타입·변수·클래스·생성자·record",
+              "href": "/scenario/ch0-first-steps/0-1-ts-to-java.html"
+            },
+            {
+              "label": "../../docs/knowledge/P09-java-syntax-basics.md",
+              "href": "/docs/knowledge/P09-java-syntax-basics.html"
+            },
+            {
+              "label": "../../docs/knowledge/P04-constructors-builder.md",
+              "href": "/docs/knowledge/P04-constructors-builder.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:0-1 · Java로 첫 API — 타입·변수·클래스·생성자·record",
+              "href": "/scenario/ch0-first-steps/0-1-ts-to-java.html"
+            },
+            {
+              "label": "../../compose.yaml",
+              "href": "/compose.yaml"
+            },
+            {
+              "label": "../../docs/knowledge/P09-java-syntax-basics.md",
+              "href": "/docs/knowledge/P09-java-syntax-basics.html"
+            },
+            {
+              "label": "../../docs/knowledge/P04-constructors-builder.md",
+              "href": "/docs/knowledge/P04-constructors-builder.html"
+            },
+            {
+              "label": "../../docs/knowledge/J05-modern-syntax.md",
+              "href": "/docs/knowledge/J05-modern-syntax.html"
+            },
+            {
+              "label": "../../docs/knowledge/J01-types-string.md",
+              "href": "/docs/knowledge/J01-types-string.html"
+            },
+            {
+              "label": "legacy:0-2 · 어노테이션은 무엇인가 — 떼어 보면 404",
+              "href": "/scenario/ch0-first-steps/0-2-annotations.html"
+            },
+            {
+              "label": "../../docs/knowledge/P03-annotations-cheatsheet.md",
+              "href": "/docs/knowledge/P03-annotations-cheatsheet.html"
+            },
+            {
+              "label": "../../docs/knowledge/P27-annotations-when-how.md",
+              "href": "/docs/knowledge/P27-annotations-when-how.html"
+            },
+            {
+              "label": "../../docs/knowledge/P12-why-beans-ioc-intro.md",
+              "href": "/docs/knowledge/P12-why-beans-ioc-intro.html"
+            },
+            {
+              "label": "../../docs/knowledge/S05-mvc-request-flow.md",
+              "href": "/docs/knowledge/S05-mvc-request-flow.html"
+            },
+            {
+              "label": "legacy:0-3 · 요청의 네 자리 — 경로·쿼리·헤더·본문",
+              "href": "/scenario/ch0-first-steps/0-3-request-four-places.html"
+            },
+            {
+              "label": "../../docs/knowledge/P16-json-jackson-practical.md",
+              "href": "/docs/knowledge/P16-json-jackson-practical.html"
+            },
+            {
+              "label": "../../docs/knowledge/W13-frontend-backend-boundary.md",
+              "href": "/docs/knowledge/W13-frontend-backend-boundary.html"
+            },
+            {
+              "label": "../../docs/knowledge/W09-why-dto.md",
+              "href": "/docs/knowledge/W09-why-dto.html"
+            },
+            {
+              "label": "../../docs/knowledge/D11-web-security-basics.md",
+              "href": "/docs/knowledge/D11-web-security-basics.html"
+            },
+            {
+              "label": "legacy:0-4 · DTO 만들기 — record·static·기본 생성자",
+              "href": "/scenario/ch0-first-steps/0-4-dto-rules.html"
+            },
+            {
+              "label": "../../docs/knowledge/P29-static-complete.md",
+              "href": "/docs/knowledge/P29-static-complete.html"
+            },
+            {
+              "label": "../../docs/knowledge/W21-null-handling.md",
+              "href": "/docs/knowledge/W21-null-handling.html"
+            },
+            {
+              "label": "legacy:0-5 · 에러 읽기 — 스택트레이스에서 내 코드 찾기",
+              "href": "/scenario/ch0-first-steps/0-5-read-stack-trace.html"
+            },
+            {
+              "label": "../../docs/knowledge/D05-debugging-methodology.md",
+              "href": "/docs/knowledge/D05-debugging-methodology.html"
+            },
+            {
+              "label": "../../docs/knowledge/J04-exceptions.md",
+              "href": "/docs/knowledge/J04-exceptions.html"
+            },
+            {
+              "label": "../../docs/knowledge/W06-why-server-debugging.md",
+              "href": "/docs/knowledge/W06-why-server-debugging.html"
+            },
+            {
+              "label": "../../docs/knowledge/P15-intellij-practical.md",
+              "href": "/docs/knowledge/P15-intellij-practical.html"
+            },
+            {
+              "label": "../../docs/knowledge/W08-where-to-handle-exceptions.md",
+              "href": "/docs/knowledge/W08-where-to-handle-exceptions.html"
+            },
+            {
+              "label": "legacy:0-6 · Gradle 의존성과 application.yml 읽기",
+              "href": "/scenario/ch0-first-steps/0-6-gradle-and-yml.html"
+            },
+            {
+              "label": "../../docs/knowledge/P08-maven-gradle-practical.md",
+              "href": "/docs/knowledge/P08-maven-gradle-practical.html"
+            },
+            {
+              "label": "../../docs/knowledge/S04-config-profiles.md",
+              "href": "/docs/knowledge/S04-config-profiles.html"
+            },
+            {
+              "label": "../../docs/knowledge/S03-boot-autoconfig.md",
+              "href": "/docs/knowledge/S03-boot-autoconfig.html"
+            },
+            {
+              "label": "../../docs/knowledge/P14-docker-compose-local.md",
+              "href": "/docs/knowledge/P14-docker-compose-local.html"
+            },
+            {
+              "label": "../../docs/knowledge/R08-app-to-db-connection.md",
+              "href": "/docs/knowledge/R08-app-to-db-connection.html"
+            },
+            {
+              "label": "legacy:0-7 · Lombok DTO — 생성된 메서드와 JSON 확인",
+              "href": "/scenario/ch0-first-steps/0-7-lombok-dto.html"
+            },
+            {
+              "label": "../../docs/knowledge/W19-lombok-or-not.md",
+              "href": "/docs/knowledge/W19-lombok-or-not.html"
+            },
+            {
+              "label": "legacy:0-8 · Java 선언식으로 API 읽기 — 타입·변수·메서드",
+              "href": "/scenario/ch0-first-steps/0-8-java-types-and-methods.html"
+            },
+            {
+              "label": "../../docs/knowledge/J03-generics.md",
+              "href": "/docs/knowledge/J03-generics.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "project-v1",
+      "project": "project-v1",
+      "label": "project-v1 · 명세 프로젝트",
+      "stages": [
+        {
+          "id": "project",
+          "title": "별도 명세 프로젝트와 DB 준비하기",
+          "sourceUnits": [
+            "legacy:10-1",
+            "legacy:10-2"
+          ],
+          "brief": {
+            "purpose": "spec-board 전용 DB·Flyway·공통 응답을 실행 확인해 커뮤니티 과정과 다른 project 설정 경계를 세운다.",
+            "task": "별도 application 설정을 확인하고 GET /api/v1/health 및 없는 route의 status와 ApiResponse envelope를 대조한다.",
+            "preconditions": [
+              "legacy 10장 spec-board용 project DB를 사용한다. community-board DB·application.yml과 합치지 않는다.",
+              "10-1/10-2의 실제 health 경로·Flyway 설정·오류 envelope를 확인한다."
+            ],
+            "scenario": [
+              {
+                "start": "앱 시작 전 datasource DB명과 flyway_schema_history version을 기록한다.",
+                "action": "spec-board를 띄우고 GET /api/v1/health와 원문 없는 경로 GET /api/v1/no-such-path를 요청한다.",
+                "result": "health 성공은 {status,message,data}; route 실패는 {status,message,code,errors,data:null} 형식으로 구분된다.",
+                "after": "서버 재기동 후 같은 health와 schema version을 다시 확인한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "spec-board datasource와 project schema",
+                "reason": "다른 project의 연결을 잘못 검사하지 않도록 한다."
+              },
+              {
+                "name": "Flyway migration version",
+                "reason": "재기동 때 적용된 스키마와 데이터 호환을 추적한다."
+              },
+              {
+                "name": "ApiResponse / ErrorCode 응답 필드",
+                "reason": "HTTP 상태와 envelope의 의미를 함께 확인한다."
+              }
+            ],
+            "policies": [
+              "10장 success/error는 ApiResponse wrapper다. course spec-v2의 ProblemDetail 계약을 섞지 않는다.",
+              "실패는 controller 개별 try/catch 대신 전역 advice가 공통 에러 틀로 바꾸는지 확인한다.",
+              "spec-board 전용 DB만 사용한다. migration SQL을 적용한 뒤 schema version을 보존한다."
+            ],
+            "inputs": [
+              "GET /api/v1/health.",
+              "GET /api/v1/no-such-path.",
+              "비교로 Flyway history와 project datasource명을 읽는다."
+            ],
+            "success": [
+              "health 정상 요청은 project API contract의 200 응답과 wrapper를 반환한다.",
+              "기동 완료와 Flyway 적용 version을 기록할 수 있다."
+            ],
+            "failures": [
+              {
+                "when": "GET /api/v1/no-such-path (10-2 exact source route)",
+                "result": "HTTP 실패와 공통 code/errors/data=null을 반환한다.",
+                "unchanged": "회원·게시글 row 변화 없음."
+              },
+              {
+                "when": "project datasource 연결 실패",
+                "result": "기동/health가 실패하고 로그에 DB 연결 원인이 드러난다.",
+                "unchanged": "community DB 데이터·schema는 그대로다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "명세 프로젝트 health",
+                "start": "spec-board와 project DB 기동; schema version 기록됨",
+                "action": "GET /api/v1/health",
+                "result": "200; ApiResponse {status,message,data} 구조 확인"
+              },
+              {
+                "title": "없는 경로 오류",
+                "start": "같은 서버 상태, 생성 요청 없음",
+                "action": "GET /api/v1/no-such-path",
+                "result": "공통 실패 wrapper {status,message,code,errors,data:null}; DB unchanged"
+              }
+            ],
+            "work": [
+              "실제 application profile의 datasource와 Flyway locations를 적는다.",
+              "성공·실패 JSON을 필드 단위로 비교한다.",
+              "재기동 뒤 schema version과 health가 같은지 기록한다."
+            ],
+            "done": [
+              "spec-board DB 분리와 migration version을 확인했다.",
+              "공통 success/error 응답 모양과 실제 HTTP status를 기록했다.",
+              "community-board의 계약을 섞지 않았다."
+            ],
+            "hints": [
+              "health 200 하나로 Flyway가 실제 적용됐다고 결론내리면 어떤 근거가 빠지나요?",
+              "실패 envelope의 code와 HTTP status는 각각 어떤 소비자가 읽나요?",
+              "10장 wrapper와 course ProblemDetail의 구분을 실제 response Content-Type/body에서 어떻게 확인하나요?"
+            ]
+          },
+          "hints": [
+            "health 200 하나로 Flyway가 실제 적용됐다고 결론내리면 어떤 근거가 빠지나요?",
+            "실패 envelope의 code와 HTTP status는 각각 어떤 소비자가 읽나요?",
+            "10장 wrapper와 course ProblemDetail의 구분을 실제 response Content-Type/body에서 어떻게 확인하나요?"
+          ],
+          "recipeIds": [
+            "legacy:10-1:H",
+            "legacy:10-2:H",
+            "legacy:10-2:N",
+            "legacy:10-2:M"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:10-1 · 새 프로젝트 시작 — 명세서 읽기, project DB·Flyway, 헬스 체크",
+              "href": "/scenario/ch10-project/10-1-new-project.html"
+            },
+            {
+              "label": "../../lessons/C2-gradle-dependencies.md",
+              "href": "/lessons/C2-gradle-dependencies.html"
+            },
+            {
+              "label": "../../lessons/C3-application-yml-profiles.md",
+              "href": "/lessons/C3-application-yml-profiles.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:10-1 · 새 프로젝트 시작 — 명세서 읽기, project DB·Flyway, 헬스 체크",
+              "href": "/scenario/ch10-project/10-1-new-project.html"
+            },
+            {
+              "label": "../../course/spec-v2.md",
+              "href": "/course/spec-v2.html"
+            },
+            {
+              "label": "../../lessons/C2-gradle-dependencies.md",
+              "href": "/lessons/C2-gradle-dependencies.html"
+            },
+            {
+              "label": "../../lessons/C3-application-yml-profiles.md",
+              "href": "/lessons/C3-application-yml-profiles.html"
+            },
+            {
+              "label": "../../lessons/J2-why-migrations.md",
+              "href": "/lessons/J2-why-migrations.html"
+            },
+            {
+              "label": "../../lessons/F3-cors.md",
+              "href": "/lessons/F3-cors.html"
+            },
+            {
+              "label": "../../lessons/A5-rest-api-design.md",
+              "href": "/lessons/A5-rest-api-design.html"
+            },
+            {
+              "label": "../../lessons/A3-server-process-port.md",
+              "href": "/lessons/A3-server-process-port.html"
+            },
+            {
+              "label": "../../lessons/A4-what-spring-boot-does.md",
+              "href": "/lessons/A4-what-spring-boot-does.html"
+            },
+            {
+              "label": "../../lessons/E2-db-sql-basics.md",
+              "href": "/lessons/E2-db-sql-basics.html"
+            },
+            {
+              "label": "../../docs/knowledge/P19-mysql-jpa-setup.md",
+              "href": "/docs/knowledge/P19-mysql-jpa-setup.html"
+            },
+            {
+              "label": "legacy:10-2 · 공통 응답 틀과 전역 예외 처리",
+              "href": "/scenario/ch10-project/10-2-common-response.html"
+            },
+            {
+              "label": "../../lessons/B4-record-getter-immutable.md",
+              "href": "/lessons/B4-record-getter-immutable.html"
+            },
+            {
+              "label": "../../lessons/B3-static-and-inner-classes.md",
+              "href": "/lessons/B3-static-and-inner-classes.html"
+            },
+            {
+              "label": "../../lessons/B7-exceptions.md",
+              "href": "/lessons/B7-exceptions.html"
+            },
+            {
+              "label": "../../lessons/B6-collections-optional-lambda.md",
+              "href": "/lessons/B6-collections-optional-lambda.html"
+            },
+            {
+              "label": "../../lessons/D1-json-jackson.md",
+              "href": "/lessons/D1-json-jackson.html"
+            },
+            {
+              "label": "../../lessons/F1-validation-errors.md",
+              "href": "/lessons/F1-validation-errors.html"
+            },
+            {
+              "label": "../../docs/knowledge/W08-where-to-handle-exceptions.md",
+              "href": "/docs/knowledge/W08-where-to-handle-exceptions.html"
+            },
+            {
+              "label": "../../docs/knowledge/P16-json-jackson-practical.md",
+              "href": "/docs/knowledge/P16-json-jackson-practical.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "개발 준비",
+  "status": "authored"
+}

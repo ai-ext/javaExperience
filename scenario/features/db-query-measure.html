@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>실제 스키마와 실행계획으로 느린 조회 개선하기</title>
+<link rel="stylesheet" href="../../tools/site/site.css?v=d360dce19dc2">
+
+
+<link rel="stylesheet" href="../../tools/site/service-feature.css?v=7a664da90ec6">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+
+
+
+
+
+
+<link rel="stylesheet" href="../../tools/site/course-tokens.css?v=a74da8acda65">
+<link rel="stylesheet" href="../../tools/site/course-content.css?v=526afc2a1110">
+<link rel="stylesheet" href="../../tools/site/contrast.css?v=fa9b5b7d70bc">
+<link rel="stylesheet" href="../../tools/site/course-navigation.css?v=c3ed4f121393">
+<link rel="stylesheet" href="../../tools/site/course-data-blocks.css?v=bc0b02a82ffb">
+<link rel="stylesheet" href="../../tools/site/course-semantics.css?v=f4e45f454a8c">
+
+
+
+</head>
+<body>
+<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../../course/map.html">과정 지도</a><a href="../README.html" aria-current="page">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<main>
+
+<div class="sf-feature-page" data-sf-feature="db-query-measure" data-sf-title="실제 스키마와 실행계획으로 느린 조회 개선하기"><header class="sf-feature-head"><nav aria-label="경로"><a href="../../scenario/README.html">서비스 만들기</a><span aria-hidden="true">›</span><span>실제 스키마와 실행계획으로 느린 조회 개선하기</span></nav><h1>실제 스키마와 실행계획으로 느린 조회 개선하기</h1><p class="sf-feature-summary">회원별 좋아요 목록의 실행 계획을 읽고 전용 데이터에서 인덱스 적용 전후 효과를 검증합니다.</p><p class="sf-prerequisites"><strong>먼저 확인할 기능</strong> · <a href="../../scenario/features/db-result-integrity.html">JOIN과 집계에서도 빠지거나 늘지 않는 결과 만들기</a></p><div class="sf-feature-controls"><label>실습 프로젝트<select data-sf-variant-select><option value="practice" selected>DB 비교 실습 · 연결 대상은 각 단계에 표시</option></select></label></div></header>
+    <div class="sf-feature-layout"><nav class="sf-stage-nav" aria-label="이 기능의 단계"><section><h3>DB 비교 실습 · 연결 대상은 각 단계에 표시</h3><ol><li><button type="button" data-sf-stage-link data-sf-variant="practice" data-sf-stage="plans" aria-current="step"><span>1</span>추정·실측을 나누어 인덱스 효과 비교하기<small data-sf-stage-indicator aria-label="완료 기록 없음">미완료</small></button></li><li><button type="button" data-sf-stage-link data-sf-variant="practice" data-sf-stage="live" aria-current="false"><span>2</span>실제 테이블에서 API의 SQL 수와 병목 찾기<small data-sf-stage-indicator aria-label="완료 기록 없음">미완료</small></button></li></ol></section><div class="sf-progress"><span>현재 프로젝트 완료 단계</span><strong data-sf-progress-count>0 / 2</strong></div></nav><section class="sf-stage-content" data-sf-stage-content><article class="sf-stage-panel" id="sf-stage-practice-plans" data-sf-stage-panel data-sf-variant="practice" data-sf-stage="plans" data-sf-stage-index="0" data-sf-variant-index="0">
+    <header class="sf-stage-title"><p>DB 비교 실습 · 연결 대상은 각 단계에 표시 · 1단계</p><h2 tabindex="-1">추정·실측을 나누어 인덱스 효과 비교하기</h2></header>
+    <label class="sf-stage-completion"><input type="checkbox" data-sf-stage-complete><span>이 단계의 완료 조건을 직접 확인했습니다</span></label>
+    <div class="sf-brief">
+    <p class="sf-purpose">회원별 좋아요 목록의 실행 계획을 읽고 전용 데이터에서 인덱스 적용 전후 효과를 검증합니다.</p>
+    <section class="sf-brief-section sf-task"><h4>이번에 할 일</h4><p>격리fixture에서회원12·LIMIT11의동일SELECT로EXPLAIN과EXPLAIN ANALYZE를따로기록하고전용인덱스가시성을바꿔비교·복원하세요.</p></section>
+    <section class="sf-brief-section "><h4>시작 조건</h4><ul><li>tools/db-perf-fixture.sh up으로MySQL8.4·127.0.0.1:13319·javaexperience_perf를준비합니다.</li><li>기본 좋아요 500000행과 회원 12에 2%가 집중되는 조건은 fixture 설정입니다. 실제 행 수를 조회해 확인합니다.</li><li>up은 이미 실행 중인 컨테이너를 초기화하지 않습니다.</li></ul></section>
+    <section class="sf-brief-section"><h4>사용자 시나리오</h4><ol class="sf-scenario"><li><dl><div><dt>시작</dt><dd>회원12의좋아요를created_at DESC,id DESC로11행읽습니다.인덱스의현재존재/가시성을먼저확인합니다.</dd></div><div><dt>행동</dt><dd>일반SELECT결과id·순서를기록하고EXPLAIN추정과ANALYZE의actual rows/loops/time을분리해비교합니다.</dd></div><div><dt>결과</dt><dd>인덱스가 visible/invisible인 경우와 복원 후에도 결과는 같습니다. 실행 계획과 실제 비용의 차이를 설명할 수 있습니다.</dd></div><div><dt>이후</dt><dd>ix_post_like_member_created를 숨긴 채로 끝내지 말고 복원합니다. JOIN/EXISTS 비교에서는 같은 권한 필터·열·정렬·LIMIT을 유지합니다.</dd></div></dl></li></ol></section>
+    <section class="sf-brief-section"><h4>데이터와 이유</h4><dl class="sf-data-list"><div><dt>연결 대상·행 수·인덱스 가시성</dt><dd>practice 원본과 대량 실험을 분리합니다.</dd></div><div><dt>추정rows와actual rows/loops/time</dt><dd>계획 예상과 실제 실행을 구분합니다.</dd></div></dl></section>
+    <section class="sf-brief-section "><h4>업무 정책</h4><ul><li>EXPLAIN ANALYZE는SELECT를실제실행합니다.</li><li>ANALYZE TABLE은통계갱신이며다른명령입니다.</li><li>단순 PUBLIC 필터 비교만으로 M3의 전체 R1 권한이 완료됐다고 주장하지 않습니다.</li></ul></section>
+    <section class="sf-brief-section "><h4>입력과 출력</h4><ul><li>전용 DB·회원 12·LIMIT11·같은 SELECT·전용 인덱스의 현재 상태·복원 명령</li></ul></section>
+    <section class="sf-brief-section "><h4>성공 기준</h4><ul><li>인덱스가 visible/invisible인 경우와 복원 후에도 결과는 같습니다. 실행 계획과 실제 비용의 차이를 설명할 수 있습니다.</li></ul></section>
+    <section class="sf-brief-section "><h4>실패와 데이터 보존</h4><ul><li>다른 DB/인덱스 존재 불일치 또는 큰 비용 쿼리 → 연결과 명령 범위를 확인할 때까지 중단합니다. · 유지: practice·운영 DB·다른 사람의 인덱스는 변경하지 않습니다.</li></ul></section>
+    <section class="sf-brief-section"><h4>입력 사례</h4><ul><li><strong>같은 대상의 전후 비교</strong></li></ul></section>
+    <section class="sf-brief-section "><h4>개발 과제</h4><ul><li>격리fixture에서회원12·LIMIT11의동일SELECT로EXPLAIN과EXPLAIN ANALYZE를따로기록하고전용인덱스가시성을바꿔비교·복원하세요.</li></ul></section>
+    <section class="sf-brief-section "><h4>완료 확인</h4><ul><li>격리된 `javaexperience_perf` 연결 대상을 확인했다.</li><li>위 SELECT와 같은 조건의 EXPLAIN 결과에서 `type`, `possible_keys`, `key`, `rows`, `Extra`를 기록했다.</li><li>관측한 계획을 바탕으로 병목 가설과 다음 비교 방법을 한 문장씩 적었다.</li><li>추정 계획과 실제 실행 측정을 구분해 설명할 수 있다.</li><li>격리된 DB와 읽기 전용 SELECT를 확인했다.</li><li>`EXPLAIN ANALYZE`를 DB 클라이언트에서 직접 실행하고 TREE 출력을 기록했다.</li><li>추정 `rows`와 노드별 `actual rows`·`loops`·`actual time`을 구분했다.</li><li>같은 SELECT의 결과 id·순서를 별도로 확인했고 다음 비교에서 고정할 조건을 적었다.</li><li>연결 DB와 인덱스 존재·가시성을 확인했다.</li><li>VISIBLE → INVISIBLE → VISIBLE 각 상태의 계획을 같은 SELECT로 기록했다.</li><li>`ANALYZE TABLE`과 `EXPLAIN ANALYZE`의 차이를 설명할 수 있다.</li><li>인덱스를 숨긴 채 실습을 끝내지 않았고, 제거를 선택했다면 전용 인덱스만 지웠다.</li></ul></section>
+  </div>
+    
+    
+    
+    <section class="sf-execution"><h4>직접 실행하고 기록하기</h4><p>명령을 자동 실행하지 않습니다. 직접 실행한 뒤 결과를 기록하세요.</p><ol><li><label><input type="checkbox" data-sf-execution-check="0"> <strong>추정·실측을 나누어 인덱스 효과 비교하기 · 실행 확인</strong></label><pre><code>tools/db-perf-fixture.sh status
+# javaexperience_perf에서 동일 SELECT·EXPLAIN·EXPLAIN ANALYZE 실행
+# SHOW INDEX로 복원 상태 확인</code></pre><p><b>확인할 결과</b> · ix_post_like_member_created를 숨긴 채로 끝내지 말고 복원합니다. JOIN/EXISTS 비교에서는 같은 권한 필터·열·정렬·LIMIT을 유지합니다.</p><label class="sf-record-label" for="sf-record-db-query-measure-practice-plans-0">실행 기록</label><textarea id="sf-record-db-query-measure-practice-plans-0" rows="2" placeholder="직접 확인한 결과를 적어 두세요."></textarea></li></ol></section>
+    <aside class="sf-references" aria-label="원문과 관련 자료"><section class="sf-source-units"><h4>원문 단계와 세부 자료</h4><ul><li><details><summary><a href="../../scenario/db-query-journey/DB-08-explain-hypothesis.html">DB-08. 좋아요 목록의 실행 계획을 읽고 가설 세우기 ↗</a><span> · database-journey</span></summary><p>프로젝트 · practice</p><p>필수 여부 · 선택</p><section class="sf-brief-section "><h4>원문 요구사항</h4><ul><li>격리된 `javaexperience_perf` 연결 대상을 확인했다.</li><li>위 SELECT와 같은 조건의 EXPLAIN 결과에서 `type`, `possible_keys`, `key`, `rows`, `Extra`를 기록했다.</li><li>관측한 계획을 바탕으로 병목 가설과 다음 비교 방법을 한 문장씩 적었다.</li><li>추정 계획과 실제 실행 측정을 구분해 설명할 수 있다.</li></ul></section><section class="sf-brief-section"><h4>원문 API·참고 링크</h4><ul><li>{&quot;path&quot;:&quot;scenario/db-query-journey/DB-08-explain-hypothesis.md&quot;}</li><li>{&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/api/me/likes?size=10&quot;,&quot;evidence&quot;:&quot;GET /api/me/likes?size=10&quot;}</li></ul></section></details></li><li><details><summary><a href="../../scenario/db-query-journey/DB-09-explain-analyze.html">DB-09. 추정 계획과 실제 실행 비교하기 ↗</a><span> · database-journey</span></summary><p>프로젝트 · practice</p><p>필수 여부 · 선택</p><section class="sf-brief-section "><h4>원문 요구사항</h4><ul><li>격리된 DB와 읽기 전용 SELECT를 확인했다.</li><li>`EXPLAIN ANALYZE`를 DB 클라이언트에서 직접 실행하고 TREE 출력을 기록했다.</li><li>추정 `rows`와 노드별 `actual rows`·`loops`·`actual time`을 구분했다.</li><li>같은 SELECT의 결과 ID·순서를 별도로 확인했고 다음 비교에서 고정할 조건을 적었다.</li></ul></section><section class="sf-brief-section"><h4>원문 API·참고 링크</h4><ul><li>{&quot;path&quot;:&quot;scenario/db-query-journey/DB-09-explain-analyze.md&quot;}</li><li>{&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/api/me/likes?size=10&quot;,&quot;evidence&quot;:&quot;GET /api/me/likes?size=10&quot;}</li></ul></section></details></li><li><details><summary><a href="../../scenario/db-query-journey/DB-10-performance-fixture.html">DB-10. 좋아요 조회를 EXPLAIN으로 개선하기 ↗</a><span> · database-journey</span></summary><p>프로젝트 · practice</p><p>필수 여부 · 선택</p><section class="sf-brief-section"><h4>원문 API·참고 링크</h4><ul><li>{&quot;path&quot;:&quot;scenario/db-query-journey/DB-10-performance-fixture.md&quot;}</li><li>{&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/api/me/likes&quot;,&quot;evidence&quot;:&quot;GET /api/me/likes&quot;}</li><li>{&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/api/me/likes?size=10&quot;,&quot;evidence&quot;:&quot;GET /api/me/likes?size=10&quot;}</li></ul></section></details></li><li><details><summary><a href="../../scenario/db-query-journey/DB-11-index-lifecycle.html">DB-11. 인덱스를 숨기고 복원하고 제거하기 ↗</a><span> · database-journey</span></summary><p>프로젝트 · practice</p><p>필수 여부 · 선택</p><section class="sf-brief-section "><h4>원문 요구사항</h4><ul><li>연결 DB와 인덱스 존재·가시성을 확인했다.</li><li>VISIBLE → INVISIBLE → VISIBLE 각 상태의 계획을 같은 SELECT로 기록했다.</li><li>`ANALYZE TABLE`과 `EXPLAIN ANALYZE`의 차이를 설명할 수 있다.</li><li>인덱스를 숨긴 채 실습을 끝내지 않았고, 제거를 선택했다면 전용 인덱스만 지웠다.</li></ul></section><section class="sf-brief-section"><h4>원문 API·참고 링크</h4><ul><li>{&quot;path&quot;:&quot;scenario/db-query-journey/DB-11-index-lifecycle.md&quot;}</li></ul></section></details></li><li><details><summary><a href="../../scenario/db-query-journey/db-12-join-exists-explain.html">DB-12. 같은 API 조건을 JOIN·EXISTS로 쓰고 실행 계획 읽기 — 중급 ↗</a><span> · database-journey</span></summary><p>프로젝트 · practice</p><p>필수 여부 · 선택</p><section class="sf-brief-section"><h4>원문 API·참고 링크</h4><ul><li>{&quot;path&quot;:&quot;scenario/db-query-journey/db-12-join-exists-explain.md&quot;}</li><li>{&quot;path&quot;:&quot;../../practice/MISSIONS.md&quot;}</li><li>{&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/api/me/likes&quot;,&quot;evidence&quot;:&quot;GET /api/me/likes&quot;}</li></ul></section></details></li></ul></section><section><h4>참고 자료</h4><ul><li><a href="../../scenario/db-query-journey/DB-08-explain-hypothesis.html">DB-08. 좋아요 목록의 실행 계획을 읽고 가설 세우기 ↗</a></li><li><a href="../../scenario/db-query-journey/DB-09-explain-analyze.html">DB-09. 추정 계획과 실제 실행 비교하기 ↗</a></li><li><a href="../../scenario/db-query-journey/DB-10-performance-fixture.html">DB-10. 좋아요 조회를 EXPLAIN으로 개선하기 ↗</a></li><li><a href="../../scenario/db-query-journey/DB-11-index-lifecycle.html">DB-11. 인덱스를 숨기고 복원하고 제거하기 ↗</a></li><li><a href="../../scenario/db-query-journey/db-12-join-exists-explain.html">DB-12. 같은 API 조건을 JOIN·EXISTS로 쓰고 실행 계획 읽기 — 중급 ↗</a></li></ul></section></aside>
+  </article><article class="sf-stage-panel" id="sf-stage-practice-live" data-sf-stage-panel data-sf-variant="practice" data-sf-stage="live" data-sf-stage-index="1" data-sf-variant-index="0">
+    <header class="sf-stage-title"><p>DB 비교 실습 · 연결 대상은 각 단계에 표시 · 2단계</p><h2 tabindex="-1">실제 테이블에서 API의 SQL 수와 병목 찾기</h2></header>
+    <label class="sf-stage-completion"><input type="checkbox" data-sf-stage-complete><span>이 단계의 완료 조건을 직접 확인했습니다</span></label>
+    <div class="sf-brief">
+    <p class="sf-purpose">그림 속 테이블이 아니라 접속한 DB의 실제 열·FK·인덱스에서 API 조회 경로와 N+1을 찾습니다.</p>
+    <section class="sf-brief-section sf-task"><h4>이번에 할 일</h4><p>전용 fixture 스키마를 조사하고 목록 응답에 필요한 열·관계를 연결합니다. 서로 다른 페이지 크기에서 실제 SQL 수를 세고 개선하세요.</p></section>
+    <section class="sf-brief-section "><h4>시작 조건</h4><ul><li>확장 fixture에 board/member/post/post_like/tag/post_tag/comment가 있는지 확인합니다.</li><li>DBeaver Desktop은 127.0.0.1에, 컨테이너 CloudBeaver는 호스트 접근 주소에 연결되는 차이를 확인합니다.</li><li>실제 목록 API가 없는 루트 앱을 이미 완성된 서버로 가정하지 않습니다.</li></ul></section>
+    <section class="sf-brief-section"><h4>사용자 시나리오</h4><ol class="sf-scenario"><li><dl><div><dt>시작</dt><dd>목록을 한 번 조회한 뒤 작성자/태그를 반복 조회하는 구현에서 페이지 크기를 바꾸어 봅니다.</dd></div><div><dt>행동</dt><dd>SHOW CREATE TABLE·information_schema로스키마를읽고실제Controller→Service→Repository→SQL→DTO경로의statement수를계측합니다.</dd></div><div><dt>결과</dt><dd>개선 후에도 같은 글 id·정렬·작성자·태그를 유지하면서 실제 SQL 수 변화를 설명합니다.</dd></div><div><dt>이후</dt><dd>설명용 1+N(+N)과 측정값을 분리하고 환경·캐시·ORM 설정·중복 작성자 차이를 기록합니다.</dd></div></dl></li></ol></section>
+    <section class="sf-brief-section"><h4>데이터와 이유</h4><dl class="sf-data-list"><div><dt>실제 테이블·열·FK·인덱스</dt><dd>API 조건이 실제 어느 열을 읽는지 확인합니다.</dd></div><div><dt>페이지별 SQL 수와 응답 id</dt><dd>추측한 N+1과 실제 실행을 구분합니다.</dd></div></dl></section>
+    <section class="sf-brief-section "><h4>업무 정책</h4><ul><li>테이블이 없으면 스크립트 버전/연결을 먼저 확인합니다.</li><li>모든 컬렉션을 JOIN한 후 페이징하면 행 수가 달라질 수 있습니다.</li><li>계측하지 않은 수와 시간을 실측값처럼 표시하지 않습니다.</li></ul></section>
+    <section class="sf-brief-section "><h4>입력과 출력</h4><ul><li>실제 DB/버전·두 개 이상의 페이지 크기·SQL 로그 설정·같은 요청 필터·동일 응답 비교</li></ul></section>
+    <section class="sf-brief-section "><h4>성공 기준</h4><ul><li>개선 후에도 같은 글 id·정렬·작성자·태그를 유지하면서 실제 SQL 수 변화를 설명합니다.</li></ul></section>
+    <section class="sf-brief-section "><h4>실패와 데이터 보존</h4><ul><li>추가 JOIN 뒤 id나 페이지 수가 달라짐 → 조회가 빨라도 기능 실패로 기록하고 행 곱셈/조건을 수정합니다. · 유지: 기존 공개 범위·정렬·태그 정보를 보존합니다.</li></ul></section>
+    <section class="sf-brief-section"><h4>입력 사례</h4><ul><li><strong>같은 대상의 전후 비교</strong></li></ul></section>
+    <section class="sf-brief-section "><h4>개발 과제</h4><ul><li>전용 fixture 스키마를 조사하고 목록 응답에 필요한 열·관계를 연결합니다. 서로 다른 페이지 크기에서 실제 SQL 수를 세고 개선하세요.</li></ul></section>
+    <section class="sf-brief-section "><h4>완료 확인</h4><ul><li>Controller → Service → Repository → SQL → DTO 응답을 실제 코드 경로로 설명한다.</li><li>반복문 안의 Repository 호출이 어떤 추가 SELECT를 만들 수 있는지 말한다.</li><li>서로 다른 페이지 크기에서 실제 SQL 로그를 세고, 측정에 사용한 도구와 결과를 기록한다.</li><li>개선 후에도 같은 게시글 id·정렬·작성자·태그가 반환되는지 비교한다.</li><li>이 문서의 `1 + N (+ N)` 설명값과 자신이 계측한 실제 값을 구분한다.</li></ul></section>
+  </div>
+    
+    
+    
+    <section class="sf-execution"><h4>직접 실행하고 기록하기</h4><p>명령을 자동 실행하지 않습니다. 직접 실행한 뒤 결과를 기록하세요.</p><ol><li><label><input type="checkbox" data-sf-execution-check="0"> <strong>실제 테이블에서 API의 SQL 수와 병목 찾기 · 실행 확인</strong></label><pre><code>tools/db-perf-fixture.sh status
+# 실제 선택 연결에서 SHOW TABLES·SHOW CREATE TABLE 및 information_schema 조회
+# 구현한 목록 API의 서로 다른 페이지 크기에서 SQL 로그 계측</code></pre><p><b>확인할 결과</b> · 설명용 1+N(+N)과 측정값을 분리하고 환경·캐시·ORM 설정·중복 작성자 차이를 기록합니다.</p><label class="sf-record-label" for="sf-record-db-query-measure-practice-live-0">실행 기록</label><textarea id="sf-record-db-query-measure-practice-live-0" rows="2" placeholder="직접 확인한 결과를 적어 두세요."></textarea></li></ol></section>
+    <aside class="sf-references" aria-label="원문과 관련 자료"><section class="sf-source-units"><h4>원문 단계와 세부 자료</h4><ul><li><details><summary><a href="../../scenario/db-query-journey/db-13-list-api-n-plus-one.html">DB-13. GET 목록 API의 흐름과 N+1을 직접 계측하기 — 기초→중급 ↗</a><span> · database-journey</span></summary><p>프로젝트 · practice</p><p>필수 여부 · 선택</p><section class="sf-brief-section "><h4>원문 요구사항</h4><ul><li>Controller → Service → Repository → SQL → DTO 응답을 실제 코드 경로로 설명한다.</li><li>반복문 안의 Repository 호출이 어떤 추가 SELECT를 만들 수 있는지 말한다.</li><li>서로 다른 페이지 크기에서 실제 SQL 로그를 세고, 측정에 사용한 도구와 결과를 기록한다.</li><li>개선 후에도 같은 게시글 ID·정렬·작성자·태그가 반환되는지 비교한다.</li><li>이 문서의 `1 + N (+ N)` 설명값과 자신이 계측한 실제 값을 구분한다.</li></ul></section><section class="sf-brief-section"><h4>원문 API·참고 링크</h4><ul><li>{&quot;path&quot;:&quot;scenario/db-query-journey/db-13-list-api-n-plus-one.md&quot;}</li><li>{&quot;path&quot;:&quot;../../practice/MISSIONS.md&quot;}</li><li>{&quot;path&quot;:&quot;../../docs/knowledge/S09-jpa-hibernate.md&quot;}</li></ul></section></details></li><li><details><summary><a href="../../scenario/db-query-journey/db-14-live-schema-to-slow-query.html">DB-14. 실제 스키마에서 느린 목록 쿼리까지 — 실습 ↗</a><span> · database-journey</span></summary><p>프로젝트 · practice</p><p>필수 여부 · 선택</p><section class="sf-brief-section"><h4>원문 API·참고 링크</h4><ul><li>{&quot;path&quot;:&quot;scenario/db-query-journey/db-14-live-schema-to-slow-query.md&quot;}</li><li>{&quot;path&quot;:&quot;../../docs/knowledge/R05-index-btree.md&quot;}</li></ul></section></details></li></ul></section><section><h4>참고 자료</h4><ul><li><a href="../../scenario/db-query-journey/db-13-list-api-n-plus-one.html">DB-13. GET 목록 API의 흐름과 N+1을 직접 계측하기 — 기초→중급 ↗</a></li><li><a href="../../scenario/db-query-journey/db-14-live-schema-to-slow-query.html">DB-14. 실제 스키마에서 느린 목록 쿼리까지 — 실습 ↗</a></li></ul></section></aside>
+  </article></section><aside class="sf-feature-aside" aria-label="현재 단계 힌트"><section class="sf-aside-stage" data-sf-aside-stage data-sf-variant="practice" data-sf-stage="plans"><p class="sf-aside-progress" data-sf-aside-progress>이 단계의 완료 기록 없음</p><section class="sf-hints" data-sf-hints data-hint-count="3"><div class="sf-hints-heading"><div><h4>막힐 때만 힌트</h4><p>질문을 하나씩 열어 생각할 방향을 확인하세요.</p></div><span data-sf-hint-count aria-live="polite">힌트를 열지 않았습니다</span></div><button type="button" data-sf-hint-open>힌트 보기 ↓</button><div class="sf-hint-card" data-sf-hint-card hidden><p data-sf-hint-text></p><div><button type="button" data-sf-hint-prev disabled>이전 힌트</button><button type="button" data-sf-hint-next>다음 힌트</button></div></div><script type="application/json" data-sf-hints-data>["EXPLAIN의rows와actual rows/loops는무엇이다른가요?","실행 계획만 봤을 때와 일반 SELECT 결과를 봤을 때 확인할 수 있는 사실은 무엇인가요?","인덱스가 이미 있거나 숨겨져 있다면 비교 시작 조건을 어떻게 맞출까요?"]</script></section></section><section class="sf-aside-stage" data-sf-aside-stage data-sf-variant="practice" data-sf-stage="live"><p class="sf-aside-progress" data-sf-aside-progress>이 단계의 완료 기록 없음</p><section class="sf-hints" data-sf-hints data-hint-count="3"><div class="sf-hints-heading"><div><h4>막힐 때만 힌트</h4><p>질문을 하나씩 열어 생각할 방향을 확인하세요.</p></div><span data-sf-hint-count aria-live="polite">힌트를 열지 않았습니다</span></div><button type="button" data-sf-hint-open>힌트 보기 ↓</button><div class="sf-hint-card" data-sf-hint-card hidden><p data-sf-hint-text></p><div><button type="button" data-sf-hint-prev disabled>이전 힌트</button><button type="button" data-sf-hint-next>다음 힌트</button></div></div><script type="application/json" data-sf-hints-data>["실제 DB에 응답 필드에 해당하는 열과 FK가 있나요?","작성자를 이미 캐시한 요청과 처음 읽는 요청의 SQL 수를 함께 비교해도 될까요?","개선 후 SQL 수만 줄고 페이지 id가 달라졌다면 무엇을 완성한 걸까요?"]</script></section></section></aside></div>
+    <footer class="sf-manual-progress"><p role="status" data-sf-progress-status></p><small>직접 확인한 단계만 이 브라우저에 저장합니다 · 자동 채점 아님</small></footer>
+  </div>
+
+</main>
+
+
+
+
+
+
+
+
+<script src="../../tools/site/service-feature.bundle.js?v=5d67f23b1c64" defer></script></body>
+</html>

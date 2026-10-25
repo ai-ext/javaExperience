@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "id": "job-run-records",
+  "title": "배치 실행 결과를 남기고 다시 실행하기",
+  "summary": "각 배치 실행은 기준일·trigger·status·처리량·오류를 기록하고 FAILED 기준일만 재시도한다.",
+  "difficulty": "고급",
+  "group": "자동화와 작업",
+  "prerequisites": [],
+  "stages": [
+    {
+      "id": "jobs",
+      "title": "실패·재실행을 실행 이력으로 구분하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "jobs",
+          "title": "실패·재실행을 실행 이력으로 구분하기",
+          "sourceUnits": [
+            "legacy:15-6"
+          ],
+          "brief": {
+            "purpose": "각 배치 실행은 기준일·trigger·status·처리량·오류를 기록하고 FAILED 기준일만 재시도한다.",
+            "task": "job_run 이력 조회, 실패 기준 재시도, 성공 상태 기록을 구현한다.",
+            "preconditions": [
+              "학습용 DB(`practice`) — 앱을 `practice` 프로파일로 띄운다.",
+              "practice V65 시드와 job_run API를 사용; weekly-ranking은 기준일 2026-09-21 실패."
+            ],
+            "scenario": [
+              {
+                "start": "배치 실행 중 한 기준일의 마지막 실행이 FAILED로 기록됐습니다.",
+                "action": "운영자가 실행 이력을 조회하고 해당 실패 기준일만 재시도합니다.",
+                "result": "새 실행은 RETRY로 구분되고 멱등한 대상 배치의 성공/실패와 오류 요약이 이력에 남습니다.",
+                "after": "성공한 날짜를 임의 재시도하지 않고 실패 재시도도 기존 이력과 다른 날짜 스냅샷을 덮어쓰지 않습니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "job_run(job_name,run_date,trigger_type,status,processed,error)",
+                "reason": "기준일별 마지막 실행과 재시도 행 상태를 비교한다."
+              },
+              {
+                "name": "weekly-ranking run_date=2026-09-21",
+                "reason": "원문 시드의 실패 job과 retry 기준일이다."
+              }
+            ],
+            "policies": [
+              "job_name/run_date별 실행을 RUNNING/SUCCESS/FAILED로 기록하고 trigger_type은 SCHEDULED/MANUAL/RETRY를 구분합니다. started_at/finished_at은 실제 벽시계, run_date는 업무 기준일입니다.",
+              "실패 이유는 예외 이름+메시지 최대 500자입니다. 예약 발행 reference_at은 원래 기준 시각을 보관해 재시도에도 같은 값을 사용합니다.",
+              "해당 업무/기준일의 마지막 실행이 FAILED일 때만 재시도합니다. 성공한 날짜와 예전 실패 이력은 그대로 보존하고 새 RETRY 실행을 추가합니다. 대상 배치의 멱등성도 검증합니다."
+            ],
+            "inputs": [
+              "legacy:15-6:J1: GET /api/admin/jobs/runs?job=weekly-ranking&status=FAILED; case=실패 기록 보기; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"J1\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$[*].runDate\",\"contains\":\"2026-09-21\"},{\"path\":\"$[*].status\",\"notContains\":\"SUCCESS\"},{\"path\":\"$[0].error\",\"type\":\"string\"}]}}]",
+              "legacy:15-6:J2: POST /api/admin/jobs/weekly-ranking/retry-failed; case=주간 랭킹 — 실패한 날만 다시; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"J2\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.job\",\"equals\":\"weekly-ranking\"}],\"anyOf\":[{\"json\":[{\"path\":\"$.retried[*].runDate\",\"contains\":\"2026-09-21\"},{\"path\":\"$.retried[*].status\",\"notContains\":\"FAILED\"}]},{\"json\":[{\"path\":\"$.retried\",\"type\":\"array\"},{\"path\":\"$.retried\",\"length\":0}]}]}}]",
+              "legacy:15-6:J3: POST /api/admin/jobs/weekly-ranking/retry-failed; case=한 번 더; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"J3\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.retried\",\"type\":\"array\"},{\"path\":\"$.retried\",\"length\":0}]}}]",
+              "legacy:15-6:J4: GET /api/rankings/weekly?weekStart=2026-09-14; case=9/14 주 랭킹; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"J4\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.items[*].postId\",\"equals\":[123,122,120,118,116,125,124,115,103,119]}]}}]",
+              "legacy:15-6:J9: POST /api/admin/jobs/weekly-ranking/run?date=2026-10-01; case=잘못된 입력으로 실행(목요일); source expected/status checks=[{\"id\":\"C7\",\"pointer\":\"/checks/6\",\"request\":\"J9\",\"expect\":{\"status\":400,\"json\":[{\"path\":\"$.errors[*].field\",\"contains\":\"date\"}]}}]",
+              "legacy:15-6:J17: GET /api/admin/jobs/runs; case=기록 — 일반 회원; source expected/status checks=[{\"id\":\"C9\",\"pointer\":\"/checks/8\",\"request\":\"J17\",\"expect\":{\"status\":403}}]"
+            ],
+            "success": [
+              "첫 시작·종료 상태와 오류 요약, processed 확인."
+            ],
+            "failures": [
+              {
+                "when": "GET /api/admin/jobs/runs?job=nope 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 400 — 원문 check의 실패 응답",
+                "unchanged": "기존 FAILED job_run과 오류 요약, 해당 ranking snapshot을 그대로 보존한다."
+              },
+              {
+                "when": "POST /api/admin/jobs/weekly-ranking/run?date=2026-10-01 · [교육용 fixture · legacy:15-6:J9] 잘못된 입력으로 실행(목요일)",
+                "result": "HTTP 400 (J9); $.errors[*].field contains \"date\"",
+                "unchanged": "기존 FAILED job_run/error와 ranking snapshot은 실패 전 그대로다."
+              },
+              {
+                "when": "GET /api/admin/jobs/runs · [교육용 fixture · legacy:15-6:J17] 기록 — 일반 회원",
+                "result": "HTTP 403 (J17)",
+                "unchanged": "기존 FAILED job_run/error와 ranking snapshot은 실패 전 그대로다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "배치 실행 중 한 기준일의 마지막 실행이 FAILED로 기록됐습니다.",
+                "action": "운영자가 실행 이력을 조회하고 해당 실패 기준일만 재시도합니다.",
+                "result": "성공한 날짜를 임의 재시도하지 않고 실패 재시도도 기존 이력과 다른 날짜 스냅샷을 덮어쓰지 않습니다."
+              }
+            ],
+            "work": [
+              "실행 이력을 업무 기준일과 실행 시점/유형으로 분리하고 retry 시 동일 기준을 전달한다."
+            ],
+            "done": [
+              "새 실행은 RETRY로 구분되고 멱등한 대상 배치의 성공/실패와 오류 요약이 이력에 남습니다.",
+              "성공한 날짜를 임의 재시도하지 않고 실패 재시도도 기존 이력과 다른 날짜 스냅샷을 덮어쓰지 않습니다.",
+              "GET /api/admin/jobs/runs?job=nope 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 기존 FAILED job_run과 오류 요약, 해당 ranking snapshot을 그대로 보존한다.",
+              "POST /api/admin/jobs/weekly-ranking/run?date=2026-10-01 · [교육용 fixture · legacy:15-6:J9] 잘못된 입력으로 실행(목요일) → HTTP 400 (J9); $.errors[*].field contains \"date\" 기존 FAILED job_run/error와 ranking snapshot은 실패 전 그대로다."
+            ]
+          },
+          "hints": [
+            "실패했던 실행을 새 RUNNING 행으로 기록하면 기존 실패 사유를 어떤 방식으로 보존할 수 있을까요?",
+            "재시도 대상을 현재 마지막 실행 상태로 필터링해야 하는 이유는 무엇일까요?",
+            "retry API가 사용자에게 임의의 기준일을 받지 않을 때 어떤 실패 이력만 안전하게 다시 돌릴 수 있을까요?"
+          ],
+          "recipeIds": [
+            "legacy:15-6:J1",
+            "legacy:15-6:J2",
+            "legacy:15-6:J3",
+            "legacy:15-6:J4",
+            "legacy:15-6:J9",
+            "legacy:15-6:J17"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "15-6-job-runs-retry.html",
+              "href": "/scenario/ch15-scheduling-batch/15-6-job-runs-retry.html"
+            },
+            {
+              "label": "S08-transactions.html",
+              "href": "/docs/knowledge/S08-transactions.html"
+            },
+            {
+              "label": "S15-async-scheduling-batch.html",
+              "href": "/docs/knowledge/S15-async-scheduling-batch.html"
+            },
+            {
+              "label": "P30-scheduling-practical.html",
+              "href": "/docs/knowledge/P30-scheduling-practical.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

@@ -1,0 +1,207 @@
+{
+  "version": 1,
+  "id": "index-lifecycle",
+  "title": "실제 조회를 측정하며 인덱스 선택하기",
+  "summary": "9-2 내 좋아요 cursor query의 실제 인덱스 사용·추정 rows·실제 rows·정렬 단계를 격리 DB에서 비교한다.",
+  "difficulty": "고급",
+  "prerequisites": [
+    "posts-find"
+  ],
+  "stages": [
+    {
+      "id": "measure",
+      "title": "실행계획과 데이터 분포로 인덱스 비교하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "measure",
+          "title": "실행계획과 데이터 분포로 인덱스 비교하기",
+          "sourceUnits": [
+            "legacy:9-2"
+          ],
+          "brief": {
+            "purpose": "9-2 내 좋아요 cursor query의 실제 인덱스 사용·추정 rows·실제 rows·정렬 단계를 격리 DB에서 비교한다.",
+            "task": "post_like 회원별 목록 query를 기존 member_id index와 migration index 상태에서 EXPLAIN/EXPLAIN ANALYZE하고 결과 순서를 보존한다.",
+            "preconditions": [
+              "4-3 seed에서 member_id 인덱스만 있는지 SHOW INDEX로 기록한다.",
+              "이 실험은 disposable practice DB에서 실행하며 schema.sql 원본 index를 영구 변경하지 않는다."
+            ],
+            "scenario": [
+              {
+                "start": "member12의 likes query `WHERE member_id=12 ORDER BY created_at DESC,id DESC LIMIT 6`; 기존 index와 rows를 기록한다.",
+                "action": "EXPLAIN과 EXPLAIN ANALYZE를 실행하고 V2 ix_post_like_member_created 및 ANALYZE TABLE 후 같은 plan/query를 재확인한다.",
+                "result": "actual API GET /api/me/likes?size=6의 IDs/순서는 전후 동일. key/rows/Extra와 actual rows/loops/time을 각 실행 결과 그대로 기록한다.",
+                "after": "기존 foreign key index는 삭제하지 않는다. `Using filesort` 또는 작은 seed latency만으로 대량 속도 개선을 단정하지 않는다."
+              }
+            ],
+            "data": [
+              {
+                "name": "post_like(member_id,created_at,id)",
+                "reason": "회원 조건과 cursor 정렬 키의 복합 인덱스 후보."
+              },
+              {
+                "name": "member12 likes rows and six result IDs",
+                "reason": "계획 변경 후 user result ordering이 동일한지 확인."
+              },
+              {
+                "name": "EXPLAIN key/rows/Extra estimates",
+                "reason": "optimizer plan estimate 기록."
+              },
+              {
+                "name": "EXPLAIN ANALYZE actual rows/loops/time",
+                "reason": "실제 실행 관찰값과 추정값을 분리."
+              },
+              {
+                "name": "SHOW INDEX before/after",
+                "reason": "기존 FK index 보존 및 새 index 존재 확인."
+              }
+            ],
+            "policies": [
+              "같은 select/join/order/limit와 같은 data state를 비교한다. `EXPLAIN rows`는 estimate이지 duration이 아니다.",
+              "EXPLAIN ANALYZE는 읽기 SELECT를 실행해 actual iterator rows/loops/time을 보여준다. 결과 데이터와 API 응답은 별도 확인한다.",
+              "ANALYZE TABLE은 optimizer statistics refresh이며 EXPLAIN ANALYZE와 다른 조작이다.",
+              "새 compound index migration에 `ANALYZE TABLE post_like`; FK index는 이번 단계에서 제거하지 않는다. 쿼리 결과는 동일해야 한다.",
+              "운영 큰 데이터 결과를 추정하거나 속도 수치를 만들어 쓰지 않는다."
+            ],
+            "inputs": [
+              "EXPLAIN SELECT l.id,l.post_id,l.created_at FROM post_like l WHERE l.member_id=12 ORDER BY l.created_at DESC,l.id DESC LIMIT 5.",
+              "EXPLAIN ANALYZE same SELECT.",
+              "V2 after index + ANALYZE TABLE; repeat.",
+              "API GET /api/me/likes?size=6."
+            ],
+            "success": [
+              "Index key/rows/Extra pre/post values are transcribed.",
+              "EXPLAIN ANALYZE actual rows/loops/time kept separate from estimates.",
+              "Same API response id order before and after index.",
+              "실제 route GET /api/me/likes?size=5는 200이며 seed postId 순서 [145,143,140,139,142]를 반환한다. EXPLAIN query는 size+1 처리용 limit을 포함할 수 있으므로 SQL과 API page size를 별도 기록한다."
+            ],
+            "failures": [
+              {
+                "when": "EXPLAIN ANALYZE reads a different query, page, user or data snapshot",
+                "result": "comparison is invalid.",
+                "unchanged": "do not claim performance change."
+              },
+              {
+                "when": "new index changes returned IDs/order",
+                "result": "result regression.",
+                "unchanged": "restore disposable experiment index and preserve schema.sql."
+              },
+              {
+                "when": "old foreign key index deleted to simplify plan",
+                "result": "out of task scope.",
+                "unchanged": "recreate original FK index before recording final state."
+              }
+            ],
+            "examples": [
+              {
+                "title": "Before index plan",
+                "start": "SHOW INDEX confirms current member_id index and post_like rows recorded",
+                "action": "EXPLAIN and EXPLAIN ANALYZE same member12 query",
+                "result": "actual plan fields recorded, not inferred from timing alone"
+              },
+              {
+                "title": "After V2 candidate",
+                "start": "same data, new (member_id,created_at,id) index and stats refreshed",
+                "action": "repeat plan and API GET size6",
+                "result": "plan may choose different key; response IDs/order remain the same"
+              },
+              {
+                "title": "No speed claim from small seed",
+                "start": "tiny practice seed and one local measurement",
+                "action": "review actual and estimate fields",
+                "result": "record observation only; do not extrapolate to production latency"
+              },
+              {
+                "title": "API 응답과 plan 결과 보존",
+                "start": "legacy:9-2 recipe seed member and likes rows",
+                "action": "GET /api/me/likes?size=5 before/after index; compare with the same EXPLAIN query",
+                "result": "200; postId order [145,143,140,139,142] is unchanged; plan measurements are kept separate"
+              }
+            ],
+            "work": [
+              "Same database snapshot and SQL before/after.",
+              "Copy plan columns key/rows/Extra and ANALYZE actual fields into notes.",
+              "Compare six IDs and cursor order before/after.",
+              "legacy:9-2:A의 정확한 GET /api/me/likes?size=5 응답 id와 EXPLAIN의 query limit을 구분한다."
+            ],
+            "done": [
+              "EXPLAIN estimate and ANALYZE actual metrics are distinguished.",
+              "Index presence and preserved FK index checked.",
+              "Results unchanged and no unsupported performance claim made.",
+              "API 200의 실제 seed id 순서가 인덱스 전후 유지됨을 확인했다."
+            ],
+            "hints": [
+              "Which EXPLAIN field is an optimizer estimate rather than a measured runtime row count?",
+              "What does ANALYZE TABLE change, and why is it not the same as EXPLAIN ANALYZE?",
+              "Could a plan change still be a regression if the API returns the same items? Which measured fields would explain the tradeoff?",
+              "왜 SQL의 limit=size+1과 API recipe의 `size=5`를 같은 수치로 취급하면 안 될까요?"
+            ]
+          },
+          "hints": [
+            "Which EXPLAIN field is an optimizer estimate rather than a measured runtime row count?",
+            "What does ANALYZE TABLE change, and why is it not the same as EXPLAIN ANALYZE?",
+            "Could a plan change still be a regression if the API returns the same items? Which measured fields would explain the tradeoff?",
+            "왜 SQL의 limit=size+1과 API recipe의 `size=5`를 같은 수치로 취급하면 안 될까요?"
+          ],
+          "recipeIds": [
+            "legacy:9-2:A"
+          ],
+          "executionChecks": [
+            {
+              "title": "Baseline plan",
+              "command": "SHOW INDEX FROM post_like; EXPLAIN SELECT l.id,l.post_id,l.created_at FROM post_like l WHERE l.member_id=12 ORDER BY l.created_at DESC,l.id DESC LIMIT 6; EXPLAIN ANALYZE <same SELECT>",
+              "expected": "plan key/rows/Extra estimate and actual rows/loops/time shown separately.",
+              "record": "DB version, row distribution, exact plan output and six API result ids."
+            },
+            {
+              "title": "Candidate index observation",
+              "command": "apply source V2 to disposable DB; ANALYZE TABLE post_like; rerun same EXPLAIN and GET /api/me/likes?size=6",
+              "expected": "plan may choose candidate; API IDs/order remain identical.",
+              "record": "before/after index definitions, plan output, result ids; no extrapolated speed claim."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:9-2 · 인덱스와 실행 계획",
+              "href": "/scenario/ch9-schema-change/9-2-index-explain.html"
+            },
+            {
+              "label": "../../docs/knowledge/R05-index-btree.md",
+              "href": "/docs/knowledge/R05-index-btree.html"
+            },
+            {
+              "label": "../../docs/knowledge/W15-paging-offset-vs-cursor.md",
+              "href": "/docs/knowledge/W15-paging-offset-vs-cursor.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:9-2 · 인덱스와 실행 계획",
+              "href": "/scenario/ch9-schema-change/9-2-index-explain.html"
+            },
+            {
+              "label": "../../docs/knowledge/R05-index-btree.md",
+              "href": "/docs/knowledge/R05-index-btree.html"
+            },
+            {
+              "label": "../../docs/knowledge/W15-paging-offset-vs-cursor.md",
+              "href": "/docs/knowledge/W15-paging-offset-vs-cursor.html"
+            },
+            {
+              "label": "../../docs/knowledge/S17-performance-tuning.md",
+              "href": "/docs/knowledge/S17-performance-tuning.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "조회와 성능",
+  "status": "authored"
+}

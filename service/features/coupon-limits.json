@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "id": "coupon-limits",
+  "title": "동시에 받아도 쿠폰 수량 지키기",
+  "summary": "선착순 쿠폰 경쟁 요청에서 Redis 사전 제어와 DB 기준 수량이 일치하도록 발급 결과를 정합하게 만듭니다.",
+  "difficulty": "고급",
+  "group": "포인트와 상점",
+  "prerequisites": [
+    "points-coupon-shop"
+  ],
+  "stages": [
+    {
+      "id": "issue",
+      "title": "경쟁 요청에서도 DB 수량과 발급을 일치시키기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 과정 프로젝트",
+      "stages": [
+        {
+          "id": "issue",
+          "title": "경쟁 요청에서도 DB 수량과 발급을 일치시키기",
+          "sourceUnits": [
+            "course:D09-4",
+            "course:D13-2",
+            "support:course/tickets/B07.md",
+            "support:course/java/J13.md"
+          ],
+          "brief": {
+            "purpose": "선착순 쿠폰 경쟁 요청에서 Redis 사전 제어와 DB 기준 수량이 일치하도록 발급 결과를 정합하게 만듭니다.",
+            "task": "Redis 원자적 감소와 DB 발급량·회원별 보유 기록을 연결해 100명의 동시 요청 중 설정한 총량만 성공하게 하세요. 실패한 요청은 500 대신 계약된 충돌 결과로 돌려줍니다.",
+            "preconditions": [
+              "local `data-local.sql` seed coupon id=1은 total 10, issued 0, expires_at=NOW()+30 DAY인 예시다. 이 10매/30일은 seed 값이며 전역 schema policy로 쓰지 않는다.",
+              "D07의 회원별 UNIQUE와 조건부 DB 발급량 증가가 먼저 구현돼 있어야 한다. D13 B07은 선택 연습 ticket이다."
+            ],
+            "scenario": [
+              {
+                "start": "coupon id=1 total 10/issued 0인 격리 DB와 Redis 잔여량 10을 맞춘다. 서로 다른 USER 100명을 준비하고 이미 보유한 회원은 없다.",
+                "action": "POST /api/coupons/1/issue 100건을 동시에 보낸다. 20건 B07 연습에서는 InnoDB deadlock 발생 당시 `SHOW ENGINE INNODB STATUS`를 보관한다.",
+                "result": "10건만 201, 나머지는 409 `/errors/coupon-exhausted`로 종료하며 500은 없다. DB issued_quantity=10, member_coupon row 10개, Redis 잔여량 0이다.",
+                "after": "DB 총량이 최종 기준임을 확인하고 일부 DB 발급 실패 뒤 Redis decrement가 복구/재동기화됐는지 대조한다. 11번째 발급은 409이며 수량이 10을 넘지 않는다."
+              }
+            ],
+            "data": [
+              {
+                "name": "DB coupon total/issued",
+                "reason": "DB 수량이 최종 발급 기준이며 0≤issued≤total 불변식을 가진다."
+              },
+              {
+                "name": "member_coupon UNIQUE(coupon_id,member_id)",
+                "reason": "동일 회원 중복 요청 경합에서도 한 회원 한 장만 저장되도록 한다."
+              },
+              {
+                "name": "Redis stock counter",
+                "reason": "빠른 사전 거름망일 뿐 DB 실패/재시도 후 수량이 복구돼야 하는 보조 값이다."
+              },
+              {
+                "name": "100개 동시 요청의 HTTP 분포",
+                "reason": "성공 10, 소진 충돌 90, 서버 오류 0의 합계를 검증한다."
+              }
+            ],
+            "policies": [
+              "기준 데이터는 DB이며 Redis는 요청을 거르는 보조 수단입니다. Redis 값만을 최종 발급 근거로 사용하지 않습니다.",
+              "쿠폰 수량 10장에 100명 동시 요청이면 발급 정확히 10장, DB 발급량 10건이어야 합니다. 11번째 요청은 409 /errors/coupon-exhausted입니다.",
+              "D13-2와 B07의 재현에서는 동시 20건이 모두 201 또는 정해진 409로 종료되고 500은 없어야 합니다. B07은 원문 티켓의 지원 등급을 유지합니다. B07은 D13의 선택 연습 티켓이며 원하는 경우에만 수행합니다.",
+              "원문 완료 기준: `CouponIssueConcurrencyTest` 통과: 수량 10장에 100명 동시 요청 → 정확히 10장, DB 발급량 = 10",
+              "원문 완료 기준: 11번째 `POST /api/coupons/{couponId}/issue` → 409 `/errors/coupon-exhausted`",
+              "원문 완료 기준: `SHOW ENGINE INNODB STATUS`에서 500이 난 순간의 기록을 찾아 근거로 남긴다",
+              "원문 완료 기준: 동시 쿠폰 발급 20건이 모두 201 또는 정해진 409로 끝나고 500이 없음을 재현 테스트로 고정",
+              "원문 완료 기준: 원인 서술: 데드락의 두 트랜잭션이 각각 무엇을 쥐고 무엇을 기다렸는가(락 종류·인덱스까지)",
+              "원문 완료 기준: 재현 테스트: 수량이 충분한 쿠폰을 여러 회원이 동시에 받을 때 모두 201이고, 수량이 모자라면 나머지는 정해진 409(`/errors/coupon-exhausted`)인지 보는 테스트(결함 상태에서 실패 → 수정 후 통과). 예: `src/test/java/com/example/board/coupon/CouponUseDeadlockTest.java`",
+              "원문 완료 기준: 수정 diff"
+            ],
+            "inputs": [
+              "100개 서로 다른 회원 JWT가 같은 couponId=1에 POST /api/coupons/1/issue; coupon total=10, Redis count=10.",
+              "예상: HTTP 201 정확히 10건, HTTP 409 exhaustion 나머지 90건, 500 0건; DB issued=10/보유 row=10.",
+              "11번째 추가 요청은 409 `/errors/coupon-exhausted`; B07의 20 concurrent trial은 각 201 또는 정해진 409이며 500 없음."
+            ],
+            "success": [
+              "100명 동시 요청에서 201=10, 409 exhaustion=90, 500=0; DB issued_quantity=10≤total_quantity=10 및 member_coupon=10행.",
+              "POST /api/coupons/1/issue 11번째 추가 요청 → 409 `/errors/coupon-exhausted`; Redis 잔여=0, DB 수량 불변.",
+              "D13 B07 선택 연습 시 동시 20건 모두 201 또는 409이고 500이 없으며 InnoDB deadlock 기록으로 원인을 남긴다."
+            ],
+            "failures": [
+              {
+                "when": "DB 조건부 issued increment 영향 행 수가 0 또는 회원별 UNIQUE 위반",
+                "result": "소진은 409 `/errors/coupon-exhausted`, 중복 회원은 409 `/errors/duplicate`로 매핑한다.",
+                "unchanged": "DB transaction rollback 후 issued_quantity와 member_coupon이 원래 값이다. Redis decrement는 restore 또는 DB 기준 재조정한다."
+              },
+              {
+                "when": "Redis counter는 감소했지만 DB insert/commit이 실패",
+                "result": "요청을 성공으로 처리하지 않는다.",
+                "unchanged": "DB 수량은 증가하지 않고 Redis가 한 장을 영구 소비하지 않도록 복구/재동기화한다."
+              },
+              {
+                "when": "20개 동시 요청 중 SQL deadlock/exception이 500으로 노출",
+                "result": "B07 선택 재현 기준을 통과하지 못한다.",
+                "unchanged": "유효 요청은 모두 201 또는 정해진 409로 종료하고 실제 deadlock 근거를 확인한다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "총량 10매 동시 경쟁",
+                "start": "DB/Redis 수량 10, coupon member row 0개, 요청자 100명 준비.",
+                "action": "동시에 issue 100건을 보내 status와 commit된 DB row를 집계한다.",
+                "result": "201×10, 409×90, 500×0; issued=10, member_coupon=10, Redis=0."
+              },
+              {
+                "title": "DB 실패 뒤 잔여 복구",
+                "start": "Redis=10이며 다음 회원 요청이 Redis decrement를 마친 직후 DB insert를 실패하도록 주입한다.",
+                "action": "요청 이후 Redis counter와 DB issued/member_coupon을 읽는다.",
+                "result": "DB 발급 변화 없음, Redis 잔여가 DB 기준과 다시 일치; 다음 정상 회원은 마지막 한 장을 받을 수 있다."
+              }
+            ],
+            "work": [
+              "Redis 원자 감소를 0 아래로 내리지 않고 DB 조건부 UPDATE+UNIQUE를 최종 보호층으로 둔다.",
+              "Redis decrement/DB transaction 실패 시 counter restore 또는 기준 데이터 재동기화 흐름을 만든다.",
+              "100명 경합과 B07 20건 선택 실습을 구분해 응답 분포, SHOW ENGINE INNODB STATUS evidence를 저장한다."
+            ],
+            "done": [
+              "10장 fixture/100 요청에서 성공 10·소진409·500 0, DB issued/member_coupon 10을 대조했다.",
+              "11번째 요청 409와 Redis/DB 불일치 복구를 확인했다.",
+              "B07은 선택 ticket으로 남기고 수행 시 deadlock 기록 및 20요청 status를 남겼다. seed 30일은 고정 정책이 아니다."
+            ]
+          },
+          "hints": [
+            "Redis decrement가 성공하고 DB commit이 실패한 경우 두 저장소의 남은 수량을 다시 맞출 책임은 어디에 있나요?",
+            "Redis가 최종 기준이 아니라면 DB에서 동시에 보장하는 수량 조건과 UNIQUE는 무엇인가요?",
+            "동시 발급에서 앱의 exists 조회가 동시에 false를 반환한 뒤에도 중복 row를 막는 근거는 무엇인가요?",
+            "InnoDB deadlock 보고서에서 두 transaction의 보유 lock과 대기 lock은 어떤 관계인가요?"
+          ],
+          "recipeIds": [
+            "board:coupon-issue:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D09-4 · 선착순 쿠폰 잔여 수량을 Redis 원자적 감소로 거르기 (기준 데이터는 DB)",
+              "href": "course/spring/D09.html#step-d09-4"
+            },
+            {
+              "label": "course:D13-2 · B07 \"선착순 쿠폰을 동시에 받을 때 가끔 실패한다\": `SHOW ENGINE INNODB STATUS` 읽기",
+              "href": "course/spring/D13.html#step-d13-2"
+            },
+            {
+              "label": "support:course/tickets/B07.md · B07. 선착순 쿠폰을 동시에 받을 때 가끔 실패한다",
+              "href": "course/tickets/B07.html"
+            },
+            {
+              "label": "J13. 리팩터링 ③: 쿠폰 종류별 if-else를 DiscountPolicy 전략으로",
+              "href": "course/java/J13.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

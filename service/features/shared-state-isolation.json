@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "id": "shared-state-isolation",
+  "title": "다른 트랜잭션의 변경과 공유 태그 수명 확인하기",
+  "summary": "같은 값을 다시 읽었을 때 JPA 캐시 때문인지 DB 스냅샷 때문인지 구분합니다.",
+  "difficulty": "고급",
+  "group": "데이터 정합성",
+  "prerequisites": [
+    "transaction-observation"
+  ],
+  "stages": [
+    {
+      "id": "snapshots",
+      "title": "캐시와 격리 수준의 재조회 차이 확인하기"
+    },
+    {
+      "id": "shared-tag",
+      "title": "글 하나를 지워도 다른 글의 태그 보존하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 내 확장 프로젝트",
+      "stages": [
+        {
+          "id": "snapshots",
+          "title": "캐시와 격리 수준의 재조회 차이 확인하기",
+          "sourceUnits": [
+            "course:D22-1",
+            "support:course/java/J22.md"
+          ],
+          "brief": {
+            "purpose": "같은 값을 다시 읽었을 때 JPA 캐시 때문인지 DB 스냅샷 때문인지 구분합니다.",
+            "task": "두 연결 A/B의 읽기→변경·commit→재읽기를 RC와 RR에서 비교하고 EntityManager 재조회·clear·새 트랜잭션을 나누세요.",
+            "preconditions": [
+              "두 DB 연결과 같은 글 id·초기 값을 준비합니다.",
+              "RC/RR 실제 세션 설정과 일반 SELECT·잠금 읽기를 구분합니다."
+            ],
+            "scenario": [
+              {
+                "start": "A가 제목 A를 읽은 뒤 B가 B로 바꾸고 commit합니다.",
+                "action": "A의 일반 SELECT, 동일 EntityManager 재조회, clear 뒤 조회, 새 트랜잭션을 조건별로 실행합니다.",
+                "result": "SQL 발행 유무와 실제 값을 조건마다 기록하고 캐시와 DB 격리의 원인을 분리합니다.",
+                "after": "RC/RR·일반/잠금 읽기·같은/새 트랜잭션의 결과를 한 값으로 뭉뚱그리지 않습니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "세션 격리와 연결 id",
+                "reason": "어느 DB 스냅샷인지 확인합니다."
+              },
+              {
+                "name": "EntityManager와 SQL 로그",
+                "reason": "캐시 재사용과 DB 재조회 여부를 구분합니다."
+              }
+            ],
+            "policies": [
+              "clear는 새 트랜잭션 시작이 아닙니다.",
+              "동시 실행의 순서는 테스트 신호로 고정합니다."
+            ],
+            "inputs": [
+              "글 id, A/B 두 연결, RC/RR 두 격리 설정, 변경 전후 제목"
+            ],
+            "success": [
+              "SQL 발행 유무와 실제 값을 조건마다 기록하고 캐시와 DB 격리의 원인을 분리합니다."
+            ],
+            "failures": [
+              {
+                "when": "B가 아직 commit하지 않음",
+                "result": "미확정 변경을 확정값으로 읽었다고 기록하지 않습니다.",
+                "unchanged": "타 연결의 미완료 변경과 테스트 순서를 섞지 않습니다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "같은 대상의 전후 비교",
+                "start": "A가 제목 A를 읽은 뒤 B가 B로 바꾸고 commit합니다.",
+                "action": "A의 일반 SELECT, 동일 EntityManager 재조회, clear 뒤 조회, 새 트랜잭션을 조건별로 실행합니다.",
+                "result": "RC/RR·일반/잠금 읽기·같은/새 트랜잭션의 결과를 한 값으로 뭉뚱그리지 않습니다."
+              }
+            ],
+            "work": [
+              "두 연결 A/B의 읽기→변경·commit→재읽기를 RC와 RR에서 비교하고 EntityManager 재조회·clear·새 트랜잭션을 나누세요."
+            ],
+            "done": [
+              "두 연결 A·B를 사용해 A 읽기→B 변경/commit→A 재읽기를 RC/RR에서 각각 실행한다. 잠금 읽기와 일반 SELECT를 구분한다.",
+              "같은 EntityManager의 재조회·clear 뒤 조회·새 트랜잭션 결과를 구분하고 SQL 발행 여부와 실제 값을 남긴다."
+            ]
+          },
+          "hints": [
+            "A의 두 번째 읽기에서 SQL이 실제 발행됐나요?",
+            "clear 뒤에도 RR에서 같은 값이면 무엇이 유지된 걸까요?",
+            "새 트랜잭션과 잠금 읽기는 비교 조건이 어떻게 다른가요?"
+          ],
+          "recipeIds": [],
+          "executionChecks": [
+            {
+              "title": "캐시와 격리 수준의 재조회 차이 확인하기 · 실행 확인",
+              "command": "./gradlew test --tests \"*Isolation*\"",
+              "expected": "RC/RR·일반/잠금 읽기·같은/새 트랜잭션의 결과를 한 값으로 뭉뚱그리지 않습니다.",
+              "record": "격리 수준·연결·순서·SQL 발행·읽은 값의 표와 실행 명령을 남깁니다."
+            }
+          ],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "1차 캐시와 RC/RR 스냅샷 분리",
+              "href": "course/spring/D22.html#step-d22-1"
+            },
+            {
+              "label": "J22. 1차 캐시·격리·공유 수명",
+              "href": "course/java/J22.html"
+            }
+          ]
+        },
+        {
+          "id": "shared-tag",
+          "title": "글 하나를 지워도 다른 글의 태그 보존하기",
+          "sourceUnits": [
+            "course:D22-2"
+          ],
+          "brief": {
+            "purpose": "여러 글이 공유한 태그를 한 글의 삭제 때문에 함께 잃지 않게 합니다.",
+            "task": "두 글이 같은 태그를 쓰는 상태에서 한 글을 삭제하고 남은 글·태그·연결을 재확인하세요.",
+            "preconditions": [
+              "글 A/B와 공유 태그 spring, 각 연결을 격리 DB에 만듭니다.",
+              "실제 삭제 정책이 soft delete인지 관계 제거인지 구분합니다."
+            ],
+            "scenario": [
+              {
+                "start": "글 A와 B가 spring을 함께 쓰고 있습니다.",
+                "action": "글 A 삭제 요청을 보내고 새 연결에서 B의 태그와 원본 태그 행을 조회합니다.",
+                "result": "삭제 대상 A의 정책만 적용되고 B의 spring 연결과 공유 원본이 유지됩니다.",
+                "after": "공유 원본의 수명과 글별 연결의 수명을 나누고 유지할 불변식 두 개를 기록합니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "글별 태그 연결",
+                "reason": "어느 글이 태그를 사용하는지 구별합니다."
+              },
+              {
+                "name": "공유 태그 원본",
+                "reason": "다른 글이 계속 쓸 수 있게 유지합니다."
+              }
+            ],
+            "policies": [
+              "연결 삭제안과 원본 삭제안의 참조 무결성을 비교합니다.",
+              "원본을 함께 지우는 cascade가 남은 글에 미치는 영향을 실제 실패로 확인합니다."
+            ],
+            "inputs": [
+              "공유 태그를 가진 두 실제 글 id, 삭제할 글 id"
+            ],
+            "success": [
+              "삭제 대상 A의 정책만 적용되고 B의 spring 연결과 공유 원본이 유지됩니다."
+            ],
+            "failures": [
+              {
+                "when": "공유 태그까지 삭제하려 함",
+                "result": "FK 오류나 다른 글의 연결 손상을 재현하고 안전한 안으로 수정합니다.",
+                "unchanged": "삭제하지 않은 글 B와 태그가 남아야 합니다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "같은 대상의 전후 비교",
+                "start": "글 A와 B가 spring을 함께 쓰고 있습니다.",
+                "action": "글 A 삭제 요청을 보내고 새 연결에서 B의 태그와 원본 태그 행을 조회합니다.",
+                "result": "공유 원본의 수명과 글별 연결의 수명을 나누고 유지할 불변식 두 개를 기록합니다."
+              }
+            ],
+            "work": [
+              "두 글이 같은 태그를 쓰는 상태에서 한 글을 삭제하고 남은 글·태그·연결을 재확인하세요."
+            ],
+            "done": [
+              "두 게시글이 한 태그를 공유하는 fixture에서 게시글 하나 삭제 후 다른 글의 태그·연결·원본 행을 확인한다.",
+              "연결만 삭제하는 안과 원본 삭제안의 참조 무결성을 비교하고 반드시 유지할 불변식 2개를 남긴다."
+            ]
+          },
+          "hints": [
+            "태그 spring의 주인은 글 A 한 개일까요?",
+            "글의 연결을 지우는 것과 tag 행을 지우는 것은 다른 글에 어떤 차이를 만들까요?",
+            "두 글 중 하나를 지운 뒤 반드시 유지할 두 사실은 무엇인가요?"
+          ],
+          "recipeIds": [
+            "board:post-delete:normal"
+          ],
+          "executionChecks": [
+            {
+              "title": "글 하나를 지워도 다른 글의 태그 보존하기 · 실행 확인",
+              "command": "./gradlew test --tests \"*SharedTag*\"",
+              "expected": "공유 원본의 수명과 글별 연결의 수명을 나누고 유지할 불변식 두 개를 기록합니다.",
+              "record": "두 글과 태그 id, 삭제 전후 행·연결·원본 조회 및 불변식 두 개를 기록합니다."
+            }
+          ],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "공유 태그의 수명과 삭제 범위 검증",
+              "href": "course/spring/D22.html#step-d22-2"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

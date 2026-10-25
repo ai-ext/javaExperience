@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "id": "trash-restore",
+  "title": "삭제한 글을 휴지통에서 복구하기",
+  "summary": "삭제한 글 중 내가 쓰고 내가 지운 글만 30일 동안 휴지통에 보인다.",
+  "difficulty": "중급",
+  "group": "게시글과 소통",
+  "prerequisites": [
+    "posts-edit-remove"
+  ],
+  "stages": [
+    {
+      "id": "restore",
+      "title": "내 휴지통 목록에서 글 되살리기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "restore",
+          "title": "내 휴지통 목록에서 글 되살리기",
+          "sourceUnits": [
+            "legacy:11-5"
+          ],
+          "brief": {
+            "purpose": "삭제한 글 중 내가 쓰고 내가 지운 글만 30일 동안 휴지통에 보인다.",
+            "task": "deleted_by를 기록해 내 휴지통 목록과 복구 동작을 구현한다.",
+            "preconditions": [
+              "시나리오 DB(`community`). 이번 단계 마이그레이션은 `V22`다.",
+              "community V22, 기존 3-2 soft delete 데이터가 준비되어 있다."
+            ],
+            "scenario": [
+              {
+                "start": "김자바가 직접 삭제한 글과 운영자가 신고로 삭제한 글이 있습니다.",
+                "action": "내 휴지통을 열고 내가 삭제한 글을 원본의 복구 기간 안에 복구합니다.",
+                "result": "복구한 글은 기존 내용과 관계를 유지한 채 다시 보이고, 반복 복구는 409입니다.",
+                "after": "운영자 신고로 삭제한 글과 이관 전 deleted_by가 NULL인 글은 내 복구 대상에 포함하지 않습니다. 없는 id는 404입니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "post.deleted_at, deleted_by",
+                "reason": "30일 보관 구간과 삭제 주체를 기준으로 복구 자격을 가른다."
+              },
+              {
+                "name": "post.author_id와 post 자식 행",
+                "reason": "작성자 본인 복구와 복구 전후 연관 데이터 보존을 비교한다."
+              }
+            ],
+            "policies": [
+              "기존 마이그레이션 이전 삭제행의 deleted_by=NULL은 바꾸지 않아 휴지통/복구 대상이 아니다. 운영자가 신고로 지운 글은 작성자가 복구할 수 없다. 복구는 canView 대신 작성자 직접 확인. 30일 경계 정책은 원문 API 표대로."
+            ],
+            "inputs": [
+              "legacy:11-5:R0: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 휴지통\",\"content\":\"x\"}; case=R0 김자바의 새 글; source expected/status checks=[]",
+              "legacy:11-5:R2: GET /api/me/trash; case=R2 김자바의 휴지통; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"R2\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.items[0].id\",\"equals\":\"{{R0.body.id}}\"},{\"path\":\"$.items[0].boardSlug\",\"equals\":\"free\"},{\"path\":\"$.items[0].deletedAt\",\"type\":\"string\"},{\"path\":\"$.items[0].restoreUntil\",\"type\":\"string\"}]}}]",
+              "legacy:11-5:R4: POST /api/posts/{{R0.body.id}}/restore; case=R4 김자바가 복구; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"R4\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.id\",\"equals\":\"{{R0.body.id}}\"},{\"path\":\"$.status\",\"equals\":\"PUBLISHED\"}]}}]",
+              "legacy:11-5:R6: POST /api/posts/{{R0.body.id}}/restore; case=R6 또 복구; source expected/status checks=[{\"id\":\"C5\",\"pointer\":\"/checks/4\",\"request\":\"R6\",\"expect\":{\"status\":409}}]",
+              "legacy:11-5:R5: GET /api/posts/{{R0.body.id}}; case=R5 비로그인 상세; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"R5\",\"expect\":{\"status\":200}}]"
+            ],
+            "success": [
+              "정렬 deleted_at DESC,id DESC; restoreUntil=deletedAt+30일; 복구 상태 확인."
+            ],
+            "failures": [
+              {
+                "when": "POST /api/posts/99999999/restore 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 404 — 원문 check의 실패 응답",
+                "unchanged": "post.deleted_at/deleted_by와 모든 자식 행을 실패 전 그대로 보존한다."
+              },
+              {
+                "when": "POST /api/posts/{{R0.body.id}}/restore · [교육용 fixture · legacy:11-5:R6] R6 또 복구",
+                "result": "HTTP 409 (R6)",
+                "unchanged": "post.deleted_at/deleted_by 및 자식 행은 실패 전 그대로다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "김자바가 직접 삭제한 글과 운영자가 신고로 삭제한 글이 있습니다.",
+                "action": "내 휴지통을 열고 내가 삭제한 글을 원본의 복구 기간 안에 복구합니다.",
+                "result": "운영자 신고로 삭제한 글과 이관 전 deleted_by가 NULL인 글은 내 복구 대상에 포함하지 않습니다. 없는 id는 404입니다."
+              }
+            ],
+            "work": [
+              "삭제 주체 기록과 복구 권한을 분리하고 휴지통 목록 필터를 소유 관계로 제한한다."
+            ],
+            "done": [
+              "복구한 글은 기존 내용과 관계를 유지한 채 다시 보이고, 반복 복구는 409입니다.",
+              "운영자 신고로 삭제한 글과 이관 전 deleted_by가 NULL인 글은 내 복구 대상에 포함하지 않습니다. 없는 id는 404입니다.",
+              "POST /api/posts/99999999/restore 입력이 원문 실패 check 조건에 해당 → HTTP 404 — 원문 check의 실패 응답 post.deleted_at/deleted_by와 모든 자식 행을 실패 전 그대로 보존한다.",
+              "POST /api/posts/{{R0.body.id}}/restore · [교육용 fixture · legacy:11-5:R6] R6 또 복구 → HTTP 409 (R6) post.deleted_at/deleted_by 및 자식 행은 실패 전 그대로다."
+            ]
+          },
+          "hints": [
+            "작성자와 삭제자가 모두 나인지 확인해야 하는 이유는 무엇일까요?",
+            "2-3의 canView가 삭제 글을 막는다면 복구 요청은 어떤 권한 조건으로 판단해야 할까요?",
+            "deleted_by가 NULL인 과거 삭제 행을 지금 작성자가 복구하도록 허용하면 어떤 사실을 잘못 추정하게 될까요?"
+          ],
+          "recipeIds": [
+            "legacy:11-5:R0",
+            "legacy:11-5:R2",
+            "legacy:11-5:R4",
+            "legacy:11-5:R6",
+            "legacy:11-5:R5"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "11-5-trash-restore.html",
+              "href": "/scenario/ch11-post-advanced/11-5-trash-restore.html"
+            },
+            {
+              "label": "G2-access-rules-in-one-place.html",
+              "href": "/lessons/G2-access-rules-in-one-place.html"
+            },
+            {
+              "label": "J2-why-migrations.html",
+              "href": "/lessons/J2-why-migrations.html"
+            },
+            {
+              "label": "R07-backup-restore.html",
+              "href": "/docs/knowledge/R07-backup-restore.html"
+            },
+            {
+              "label": "A5-rest-api-design.html",
+              "href": "/lessons/A5-rest-api-design.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}
