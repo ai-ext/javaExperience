@@ -38,7 +38,7 @@
                 "start": "원본 fixedClock은 2026-10-05이고 정리 경계는 2026-09-05 00:00입니다.",
                 "action": "만료한 교육용 부모 2404개를 1000건씩 정리하고 각 자식 관계·commit 경계를 확인합니다.",
                 "result": "9월 4일 23:59:59 삭제 행은 정리하고 정확히 9월 5일 00:00 행은 남습니다. 자식부터 지워 FK를 지킵니다.",
-                "after": "실패한 chunk는 부모/자식을 함께 rollback합니다. 이미 commit한 chunk는 별도 기록하며 시리즈 원본은 남깁니다."
+                "after": "잘못된 날짜·권한·인증은 배치 시작 전에 거절하며 모든 행이 그대로입니다. 실행 중 chunk 실패는 현재 chunk만 rollback하고 이전 commit은 유지합니다. 시리즈 원본은 남깁니다."
               }
             ],
             "data": [
@@ -69,29 +69,24 @@
             ],
             "failures": [
               {
-                "when": "POST /api/admin/jobs/trash-purge/run?date=2026-10-06 입력이 원문 실패 check 조건에 해당",
-                "result": "HTTP 400 — 원문 check의 실패 응답",
-                "unchanged": "실패 청크의 부모·자식 행 전체를 롤백한다; 앞서 커밋한 청크 여부는 별도 기록한다."
-              },
-              {
-                "when": "POST /api/admin/jobs/trash-purge/run?date=2026-10-06 · [교육용 fixture · legacy:15-4:T4] 미래 날짜",
+                "when": "미래 date 입력으로 실행 전 검증에서 거절",
                 "result": "HTTP 400 (T4); $.errors[*].field contains \"date\"",
-                "unchanged": "실패한 청크의 부모·자식 행은 함께 rollback한다; 이미 commit한 청크 여부는 별도로 남긴다."
+                "unchanged": "사전 검증에서 거절되어 배치는 시작하지 않으며 부모·자식 행은 모두 요청 전과 같습니다."
               },
               {
-                "when": "POST /api/admin/jobs/trash-purge/run · [교육용 fixture · legacy:15-4:T6] 일반 회원",
+                "when": "일반 회원의 실행 요청이 권한 검사에서 거절",
                 "result": "HTTP 403 (T6)",
-                "unchanged": "실패한 청크의 부모·자식 행은 함께 rollback한다; 이미 commit한 청크 여부는 별도로 남긴다."
+                "unchanged": "사전 검증에서 거절되어 배치는 시작하지 않으며 부모·자식 행은 모두 요청 전과 같습니다."
               },
               {
-                "when": "POST /api/admin/jobs/trash-purge/run · [교육용 fixture · legacy:15-4:T7] 토큰 없음",
+                "when": "토큰 없는 실행 요청이 인증 검사에서 거절",
                 "result": "HTTP 401 (T7)",
-                "unchanged": "실패한 청크의 부모·자식 행은 함께 rollback한다; 이미 commit한 청크 여부는 별도로 남긴다."
+                "unchanged": "사전 검증에서 거절되어 배치는 시작하지 않으며 부모·자식 행은 모두 요청 전과 같습니다."
               },
               {
-                "when": "미래 date 또는 권한 없는 요청",
-                "result": "date 미래는 400(errors[].field=date), 일반 회원은 403, 무인증은 401이며 배치는 시작하지 않습니다.",
-                "unchanged": "사전 검증 실패에서는 모든 부모·자식 행이 불변입니다. 실행 도중 자식 삭제가 실패하면 현재 chunk를 rollback하고 이전 commit chunk는 유지합니다."
+                "when": "배치 실행 중 자식 삭제에서 오류 발생",
+                "result": "현재 chunk는 rollback하고 실행을 중단합니다.",
+                "unchanged": "현재 chunk의 부모·자식 변경은 모두 취소되며 이전에 commit한 chunk는 유지됩니다."
               }
             ],
             "examples": [
@@ -99,7 +94,7 @@
                 "title": "교육용 데이터로 전후 확인",
                 "start": "원본 fixedClock은 2026-10-05이고 정리 경계는 2026-09-05 00:00입니다.",
                 "action": "만료한 교육용 부모 2404개를 1000건씩 정리하고 각 자식 관계·commit 경계를 확인합니다.",
-                "result": "실패한 chunk는 부모/자식을 함께 rollback합니다. 이미 commit한 chunk는 별도 기록하며 시리즈 원본은 남깁니다."
+                "result": "사전 검증 거절에서는 배치가 시작되지 않아 모든 행이 그대로입니다. 실행 중 chunk 실패에서는 현재 부모·자식 변경만 rollback하고 이미 commit한 chunk는 유지하며 시리즈 원본은 남깁니다."
               }
             ],
             "work": [
@@ -107,9 +102,8 @@
             ],
             "done": [
               "9월 4일 23:59:59 삭제 행은 정리하고 정확히 9월 5일 00:00 행은 남습니다. 자식부터 지워 FK를 지킵니다.",
-              "실패한 chunk는 부모/자식을 함께 rollback합니다. 이미 commit한 chunk는 별도 기록하며 시리즈 원본은 남깁니다.",
-              "POST /api/admin/jobs/trash-purge/run?date=2026-10-06 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 실패 청크의 부모·자식 행 전체를 롤백한다; 앞서 커밋한 청크 여부는 별도 기록한다.",
-              "POST /api/admin/jobs/trash-purge/run?date=2026-10-06 · [교육용 fixture · legacy:15-4:T4] 미래 날짜 → HTTP 400 (T4); $.errors[*].field contains \"date\" 실패한 청크의 부모·자식 행은 함께 rollback한다; 이미 commit한 청크 여부는 별도로 남긴다."
+              "9월 4일 23:59:59 삭제 행은 정리하고 정확히 9월 5일 00:00 행은 남습니다. 자식부터 지워 FK를 지킵니다.",
+              "미래 날짜의 T4는 실행 전 검증에서 400(date field)로 거절되며 배치가 시작되지 않고 모든 부모·자식 행이 그대로다."
             ]
           },
           "hints": [
