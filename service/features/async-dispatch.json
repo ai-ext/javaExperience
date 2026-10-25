@@ -28,7 +28,7 @@
           ],
           "brief": {
             "purpose": "알림 발송이 느리거나 한 명에게 실패해도 글은 먼저 저장되게 하세요. 글 생성 201 뒤 15명 중 14명 발송 성공·1명 실패를 확인합니다.",
-            "task": "이벤트 listener 비동기 전송, 실패 상태 기록, 큐 포화 응답 정책을 구현한다.",
+            "task": "푸시 발송이 끝날 때까지 글쓰기 응답이 기다리지 않게 하세요. 회원별 발송 결과를 기록하고, 실행기 포화 때의 응답 정책은 원문에서 확인해 정합니다.",
             "preconditions": [
               "학습용 DB(`practice`) — 앱을 `practice` 프로파일로 띄운다.",
               "practice DB에서 follower 15명, 회원 26 실패, FakePushSender delay=150ms; notification executor를 확인한다."
@@ -67,7 +67,16 @@
               "글 생성은 201 및 정상 DB commit, 처리 뒤 14/1 상태."
             ],
             "failures": [
-              "ADMIN이 delayMs=-1로 fake-push 설정을 변경하면 400이며 errors[].field에 delayMs가 포함됩니다. 일반 회원의 설정 변경은 403입니다. 두 경우 기존 fake-push 설정은 유지되어야 합니다. 별도 글 생성 성공 뒤 회원 26의 발송 실패는 글의 201/commit을 취소하지 않고 해당 알림만 FAILED로 남깁니다."
+              {
+                "when": "ADMIN이 delayMs=-1로 fake-push 설정을 변경하거나 일반 회원이 설정 변경을 요청",
+                "result": "각각 400(errors[].field에 delayMs 포함) 또는 403입니다.",
+                "unchanged": "두 설정 실패 모두 기존 fake-push 설정을 유지합니다. 아직 실행 전인 별도 글 생성 결과와 섞어 판정하지 않습니다."
+              },
+              {
+                "when": "성공한 글의 비동기 푸시에서 회원 26 발송 실패",
+                "result": "글 생성은 201 및 DB commit을 유지하고 해당 알림만 FAILED로 기록합니다. 나머지 수신자 발송을 계속합니다.",
+                "unchanged": "푸시 실패가 이미 커밋된 글이나 HTTP 결과를 취소하지 않습니다."
+              }
             ],
             "examples": [
               {
