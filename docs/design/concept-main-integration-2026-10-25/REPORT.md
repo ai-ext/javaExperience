@@ -1,6 +1,6 @@
 # 최신 main 기반 개념 학습 통합
 
-2026-10-25. 작업 후보는 /Users/ds/code/javaExperience/.worktrees/concept-learning-integration, 브랜치는 integrate/concept-learning-main이다. 기준은 원격 main a70f1bd531c1b72077d56e7363ff424ba5795143이며 원본 개념 작업은 별도로 보존했다. 실제 main merge·push·PR은 하지 않는다.
+2026-10-25. 작업 후보는 /Users/ds/code/javaExperience/.worktrees/concept-learning-integration, 브랜치는 integrate/concept-learning-main이다. 기준은 원격 main a70f1bd531c1b72077d56e7363ff424ba5795143이며 원본 개념 작업은 별도로 보존했다. 아래 초기 통합 결과는 구현 커밋 bc1651ec 기준의 기록이다. 이후 사용자 요청으로 PR 게시를 준비했으며 추가 교정·현재 검증은 마지막 절과 PR-PREFLIGHT.json을 따른다. main merge는 수행하지 않는다.
 
 ## 결합한 범위
 
@@ -42,10 +42,18 @@ main과 옛 개념 원문24개가 달라 과거 SHA를 현재 원문에 그대�
 
 현재 수집기는 main의 과정52화면을 포함한391화면·53963항목을 수집한다. 기존 개념 근거가 있는 P09의 동일 원문/ID/label5개는 기존 implemented 상태와 근거를 유지했다. implemented910, 과거 verified6이며 새 verified 승격은0이다. main 장부와 새 개념 ID를 결합하고 같은 ID의 양쪽 과거 기록은 sidecar에 보존했다.
 
-진행표는 /Users/ds/code/javaExperience/.worktrees/concept-learning-integration/docs/design/concept-cycle-2026-10-24/PROGRESS.md 다. 개념26개 범위별 구현과134개 공통 reader 적용을, 나머지108개 맞춤 보강 및 개별 문서 전수 완료 승인과 구분한다. 기존 원본 브랜치의 직접 merge 보류와 새 main 기반 후보의 검증 상태도 분리한다. 다음은 검증한 후보의 로컬 커밋·생성물 재빌드 일치·제외 이력 최종 확인이다.
+진행표는 /Users/ds/code/javaExperience/.worktrees/concept-learning-integration/docs/design/concept-cycle-2026-10-24/PROGRESS.md 다. 개념26개 범위별 구현과134개 공통 reader 적용을, 나머지108개 맞춤 보강 및 개별 문서 전수 완료 승인과 구분한다. 기존 원본 브랜치의 직접 merge 보류와 새 main 기반 후보의 검증 상태도 분리한다. 초기 통합의 로컬 커밋·생성물 재빌드 일치·제외 이력 최종 확인은 아래 기록처럼 완료했다.
 
 ## 로컬 구현 커밋 이후 확인
 
-구현 커밋은 `bc1651ec8fd15d99b69e1eff158643d30af2987b`이며 부모는 main a70f1bd5 하나다. 원본 common/source snapshot은 조상이 아니고 제외 캡처 blob 도달0, main 대비 가상병합 exit0·결과tree=후보tree를 확인했다. `npm run check:generated`는 커밋 후 재빌드한 HTML이 커밋과 같음을 확인했다. 이후 추가분은 검증 기록·장부·진행표뿐이다. main에서 원래 보이던 D04-5/D07-1 답안 경로 경고2건은 그대로다.
+구현 커밋은 `bc1651ec8fd15d99b69e1eff158643d30af2987b`이며 부모는 main a70f1bd5 하나다. 원본 common/source snapshot은 조상이 아니고 제외 캡처 blob 도달0, main 대비 가상병합 exit0·결과tree=후보tree를 확인했다. `npm run check:generated`는 커밋 후 재빌드한 HTML이 커밋과 같음을 확인했다. 이 구현 커밋 다음 검증 커밋 a2f4c4e9까지는 검증 기록·장부·진행표만 추가했다. 아래 PR 준비 단계에서는 별도 동작 교정을 수행했다. main에서 원래 보이던 D04-5/D07-1 답안 경로 경고2건은 그대로다.
 
 원본 파일 읽기 차단 진단에서도26검사/86Node프로세스/시도0이었다. 역사자료1422개와 보완한rawHTML8개는 SHA/byte가원본과같다. Git 공백검사에는 원본로그·렌더HTML과 D08학습용 Git충돌문자열이경고로남는다. D08번들은 원본과byte동일하고Node문법검사·canonical검사가통과하며 실제미해결충돌이아니다. STAGED-HYGIENE.json에경고원문을기록했다. 제품소스 trailing whitespace는0이다.
+
+## PR 게시 전 추가 교정
+
+독립 Sol 검수에서 21개 학습 화면의 복사 요청이 장면 이동 뒤 완료되면 새 장면에 이전 성공 안내를 표시하거나 새 코드를 fallback 선택하는 경계 문제를 재현했다. 각 handler에 장면 세대와 요청 순서 검사를 추가해 클릭 당시 payload는 유지하고 현재 요청에만 안내·선택을 허용한다. Luna가 구현했고 메인과 Sol이 검증한다. 정상 성공·거절, 장면 이동 후 성공·거절, A→B→A 복귀, 같은 장면 요청 역순 완료를 21×6=126개 회귀 사례로 검사한다. 수정 전 실패와 수정 후 통과 로그를 보존한다.
+
+이 변경으로 21개 bundle과 연결 HTML을 다시 생성했다. 위 D08 bundle의 원본 byte 동일 판정은 초기 통합 커밋에 대한 역사적 기록이며 현재 bundle에는 복사 guard가 추가됐다. 교육용 충돌 문자열은 유지한다. 원본 proof·리뷰·실행 기록은 수정하지 않는다.
+
+현재 검증은 PR-PREFLIGHT.json에 정확한 코드 지문과 26개 하네스·공통 검사 명령 및 결과를 기록한다. FINAL-VERIFICATION.json과 HARNESS26.json은 초기 통합 검증의 고정 기록으로 보존한다. 전체 134개 개별 상세화면 완성을 주장하지 않으며 남은 맞춤 보강 108개는 기존 진행표에서 추적한다.

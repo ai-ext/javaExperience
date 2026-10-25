@@ -19,6 +19,7 @@ export function initS08Learning(doc = document, win = window) {
   const $ = selector => root.querySelector(selector);
   const key = '__javaExperienceS08', mobile = win.matchMedia?.('(max-width:700px)');
   let lesson = available[0], index = 0, zoom = mobile?.matches === true, zoomManual = false;
+  let copyGeneration = 0, copyRequest = 0;
   const element = (tag, text) => { const node = doc.createElement(tag); node.textContent = text; return node; };
   function save() {
     try { win.history.replaceState({ ...win.history.state, [key]: { topic: lesson.id, stage: lesson.stages[index].id } }, ''); }
@@ -32,6 +33,7 @@ export function initS08Learning(doc = document, win = window) {
     }));
   }
   function render() {
+    copyGeneration++;
     const stage = lesson.stages[index], asset = S08_ASSETS[stage.image];
     root.dataset.topic = lesson.id; root.dataset.stage = stage.id;
     $('[data-s08-topic]').value = lesson.id;
@@ -96,8 +98,10 @@ export function initS08Learning(doc = document, win = window) {
   $('[data-s08-zoom]').addEventListener('click', () => { zoom = !zoom; zoomManual = true; render(); });
   mobile?.addEventListener('change', event => { if (!zoomManual) zoom = event.matches; render(); });
   $('[data-s08-copy]').addEventListener('click', async () => {
-    try { await win.navigator.clipboard.writeText(lesson.stages[index].code); $('[data-s08-copy-status]').textContent = '코드를 복사했습니다.'; }
-    catch { const range = doc.createRange(); range.selectNodeContents($('[data-s08-code]')); const selection = win.getSelection(); selection.removeAllRanges(); selection.addRange(range); $('[data-s08-copy-status]').textContent = '코드를 선택했습니다. 복사 키를 눌러 주세요.'; }
+    const generation = copyGeneration, request = ++copyRequest, copyText = lesson.stages[index].code;
+    const isCurrent = () => generation === copyGeneration && request === copyRequest;
+    try { await win.navigator.clipboard.writeText(copyText); if (isCurrent()) $('[data-s08-copy-status]').textContent = '코드를 복사했습니다.'; }
+    catch { if (!isCurrent()) return; const range = doc.createRange(); range.selectNodeContents($('[data-s08-code]')); const selection = win.getSelection(); selection.removeAllRanges(); selection.addRange(range); $('[data-s08-copy-status]').textContent = '코드를 선택했습니다. 복사 키를 눌러 주세요.'; }
   });
   win.addEventListener('popstate', () => {
     const record = win.history.state?.[key];

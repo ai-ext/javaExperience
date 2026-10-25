@@ -209,8 +209,8 @@
 
 - 원본 concept 브랜치의 과거 기록과 task1–134 목록은 보존한다. 전체 134개 중 기존 24 감사, task25–26 범위 한정 보강, task27–134 추가 맞춤 보강 미착수 108개라는 학습 범위는 변하지 않았다. fullDocumentComplete=true 승인은 여전히 0건이다.
 - 후보는 main 기반이며 main 서버 코드 29개, 원문 Markdown 135개, JPG 602개, course와 tools-course의 원본을 보존한 것으로 integration audit에 기록돼 있다. 개념 학습화면 26개는 current harness 26/26 통과다.
-- final check 기록의 test:jpg 실패는 QA 캡처 9개가 장부에 등록되기 전의 중간 실행이다. 이후 post-qa-jpg.log에서 추가 JPG 9개를 등록한 최신 실행이 통과했고 PNG는 0개다.
-- 남은 후보 관문은 root 작업자의 최종 history/source 보존 검사와 로컬 커밋뿐이다. 원본 브랜치나 후보의 실제 push, PR, main merge는 아직 없다.
+- final check 기록의 test:jpg 실패는 QA 캡처가 장부에 등록되기 전의 중간 실행이다. 이후 final-registered-jpg.log에서 QA JPG 10개를 등록한 실행이 통과했고 PNG는 0개다.
+- 최종 history/source 보존 검사와 로컬 구현·검증 커밋을 완료했다. 이후 사용자 요청으로 후보의 PR 게시를 준비하며, 21개 복사 handler의 지연 응답 문제를 추가로 교정했다. 현재 코드 461개 지문에서 하네스 26개·복사 회귀 126개·공통 검사 17개가 통과했고 결과는 PR-PREFLIGHT.json에 기록했다. main merge는 수행하지 않는다.
 - 통합 증거 묶음: [/Users/ds/code/javaExperience/.worktrees/concept-learning-integration/docs/design/concept-main-integration-2026-10-25/INPUT.json](</Users/ds/code/javaExperience/.worktrees/concept-learning-integration/docs/design/concept-main-integration-2026-10-25/INPUT.json>), [/Users/ds/code/javaExperience/.worktrees/concept-learning-integration/docs/design/concept-main-integration-2026-10-25/SOURCE-AUDIT.md](</Users/ds/code/javaExperience/.worktrees/concept-learning-integration/docs/design/concept-main-integration-2026-10-25/SOURCE-AUDIT.md>), [/Users/ds/code/javaExperience/.worktrees/concept-learning-integration/docs/design/concept-main-integration-2026-10-25/final-checks.json](</Users/ds/code/javaExperience/.worktrees/concept-learning-integration/docs/design/concept-main-integration-2026-10-25/final-checks.json>), [/Users/ds/code/javaExperience/.worktrees/concept-learning-integration/docs/design/concept-main-integration-2026-10-25/post-qa-jpg.log](</Users/ds/code/javaExperience/.worktrees/concept-learning-integration/docs/design/concept-main-integration-2026-10-25/post-qa-jpg.log>).
 
 ## 통합 후 추가 확인
