@@ -17,7 +17,51 @@
   graph.nodes.forEach(function (n) { nodeById[n.id] = n; });
   var VIEW_LABEL = { direct: '직접 연결', both: '상·하류 전체', up: '영향 주는 쪽', down: '영향 받는 쪽' };
   var EDGE_LABEL = { practice: '같은 날 연결 실험 (J44·J45는 수행 중·사후)', ticket: '그날 다루는 티켓', area: '결함 영역' };
-  var selected = null;
+  var selected = root.dataset.currentDay || 'D01';
+  var exploring = false;
+  var explore = document.createElement('button');
+  explore.type = 'button'; explore.className = 'cm-explore'; explore.dataset.cmExplore = '';
+  explore.textContent = '전체 연결 탐색'; explore.setAttribute('aria-pressed', 'false');
+  root.querySelector('[data-cm-current]').after(explore);
+  var tools = document.createElement('details'); tools.className = 'cm-tools';
+  var toolsTitle = document.createElement('summary'); toolsTitle.textContent = '관계 범례·보기 설정';
+  tools.appendChild(toolsTitle);
+  var legend = root.querySelector('.cm-legend'), toolbar = root.querySelector('.cm-toolbar');
+  legend.before(tools); tools.append(legend, toolbar);
+  tools.addEventListener('toggle', function () { draw(selected ? related(selected, view()).edges : null); });
+  explore.addEventListener('click', function () { exploring = !exploring; explore.setAttribute('aria-pressed', String(exploring)); explore.textContent = exploring ? '현재 연결만 보기' : '전체 연결 탐색'; apply(); });
+
+  // 긴 관계 목록은 분류별로 읽고, 스크립트가 없을 때는 원래 목록을 그대로 제공한다.
+  var tables = document.querySelector('.cm-tables');
+  if (tables) {
+    var fold = document.createElement('details'); fold.className = 'cm-relations-fold';
+    var foldTitle = document.createElement('summary'); foldTitle.textContent = '일자·티켓·결함 영역의 전체 연결 목록'; fold.appendChild(foldTitle);
+    var tabs = document.createElement('div'); tabs.className = 'cm-relation-tabs'; tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', '연결 목록 분류'); fold.appendChild(tabs);
+    var headings = Array.prototype.slice.call(tables.querySelectorAll(':scope > h3'));
+    var panels = [], tabButtons = [];
+    function chooseTab(index, focus) {
+      panels.forEach(function (panel, i) { panel.hidden = i !== index; tabButtons[i].setAttribute('aria-selected', String(i === index)); tabButtons[i].tabIndex = i === index ? 0 : -1; });
+      if (focus) tabButtons[index].focus();
+    }
+    headings.forEach(function (heading, i) {
+      var list = heading.nextElementSibling;
+      var panel = document.createElement('section'); panel.className = 'cm-relation-panel'; panel.id = heading.id + '-panel'; panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-labelledby', heading.id + '-tab');
+      var tab = document.createElement('button'); tab.type = 'button'; tab.id = heading.id + '-tab'; tab.textContent = ['일자별', '티켓별', '결함 영역별'][i]; tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', panel.id);
+      tab.addEventListener('click', function () { chooseTab(i, false); });
+      tab.addEventListener('keydown', function (event) {
+        var index = event.key === 'ArrowRight' ? (i + 1) % headings.length : event.key === 'ArrowLeft' ? (i + headings.length - 1) % headings.length : event.key === 'Home' ? 0 : event.key === 'End' ? headings.length - 1 : null;
+        if (index === null) return; event.preventDefault(); chooseTab(index, true);
+      });
+      tabs.appendChild(tab); panel.append(heading, list); fold.appendChild(panel); panels.push(panel); tabButtons.push(tab);
+    });
+    tables.appendChild(fold); if (panels.length) chooseTab(0, false);
+    function revealAnchor() {
+      var id; try { id = decodeURIComponent(window.location.hash.slice(1)); } catch (e) { return; }
+      var target = document.getElementById(id); var index = panels.findIndex(function (panel) { return target && panel.contains(target); });
+      if (index !== -1) { fold.open = true; chooseTab(index, false); requestAnimationFrame(function () { target.scrollIntoView(); }); }
+    }
+    window.addEventListener('hashchange', revealAnchor); revealAnchor();
+  }
 
   function name(id) { var n = nodeById[id]; return n.kind === 'area' ? n.title : n.id; }
   function walk(start, forward) {
@@ -75,7 +119,7 @@
     graph.edges.forEach(function (e) {
       var a = root.querySelector('.cm-node[data-node="' + e.from + '"]');
       var b = root.querySelector('.cm-node[data-node="' + e.to + '"]');
-      if (!a || !b) return;
+      if (!a || !b || a.hidden || b.hidden) return;
       var ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
       var x1 = ra.right - box.left, y1 = ra.top + ra.height / 2 - box.top;
       var x2 = rb.left - box.left - 2, y2 = rb.top + rb.height / 2 - box.top;
@@ -127,7 +171,7 @@
     var v = view();
     if (!selected) {
       board.classList.remove('has-selection');
-      buttons.forEach(function (b) { b.classList.remove('is-related', 'is-selected'); b.setAttribute('aria-pressed', 'false'); });
+      buttons.forEach(function (b) { b.classList.remove('is-related', 'is-selected'); b.setAttribute('aria-pressed', 'false'); b.hidden = !exploring && b.dataset.node !== (root.dataset.currentDay || 'D01'); });
       status.textContent = '노드를 고르면 관계 보기에 맞는 노드만 밝힙니다. 아래 연결 흐름에 모든 연결이 글로 있습니다.';
       renderDetail(null);
       draw(null);
@@ -137,12 +181,13 @@
     board.classList.add('has-selection');
     buttons.forEach(function (b) {
       var id = b.dataset.node;
+      b.hidden = !exploring && id !== selected && !rel.nodes.has(id);
       b.classList.toggle('is-selected', id === selected);
       b.classList.toggle('is-related', rel.nodes.has(id));
       b.setAttribute('aria-pressed', String(id === selected));
     });
     var names = []; rel.nodes.forEach(function (id) { names.push(name(id)); });
-    status.textContent = name(selected) + ' · ' + VIEW_LABEL[v] + ': ' + (names.length ? names.length + '개 (' + names.join(', ') + ')' : '연결 없음');
+    status.textContent = name(selected) + ' · ' + VIEW_LABEL[v] + ': ' + (names.length ? names.length + '개 (' + names.join(', ') + ')' : '연결 없음') + (exploring ? ' · 전체 노드 탐색 중' : ' · 현재 연결만 표시');
     renderDetail(selected);
     draw(rel.edges);
   }

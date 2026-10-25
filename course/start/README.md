@@ -57,7 +57,7 @@ Windows에서는 WSL2의 Linux 작업 경로에서 `./gradlew`, Docker CLI, Pyth
 
 ## 3. compose 실행
 
-D01 ①에서 프로젝트를 만든 뒤, **파일 3개를 먼저 복사하고** 프로젝트 루트에서 실행한다. `compose.yaml`, `toxiproxy.json`은 프로젝트 루트에, 스텁 두 개는 `src/test/resources/wiremock/mappings/`에 둔다.
+D01 ①에서 프로젝트를 만든 뒤, **파일 4개를 먼저 복사하고** 프로젝트 루트에서 실행한다. `compose.yaml`, `toxiproxy.json`은 프로젝트 루트에, 스텁 두 개는 `src/test/resources/wiremock/mappings/`에 둔다.
 
 ```bash
 docker compose up -d --wait
@@ -66,7 +66,7 @@ curl -s localhost:8474/proxies   # "pg" 프록시가 보여야 한다
 ```
 
 - 순서가 중요하다. compose는 `./toxiproxy.json`과 `./src/test/resources/wiremock`을 그대로 마운트하므로, 복사하기 전에 띄우면 둘이 **빈 디렉터리**로 생긴다. 그러면 Toxiproxy에 `pg` 프록시가 없고(`curl localhost:8474/proxies` → `{}`), 그 뒤 `cp`도 `Is a directory`로 실패한다.
-- 이미 그렇게 됐다면 `docker compose down` → 생긴 빈 디렉터리 `toxiproxy.json`을 지우고(`rmdir toxiproxy.json`) → 파일 3개를 다시 복사한 뒤 → `docker compose up -d --wait`로 다시 띄운다.
+- 이미 그렇게 됐다면 `docker compose down` → 생긴 빈 디렉터리 `toxiproxy.json`을 지우고(`rmdir toxiproxy.json`) → 파일 4개를 다시 복사한 뒤 → `docker compose up -d --wait`로 다시 띄운다.
 
 | 서비스 | 내 컴퓨터 포트 | 쓰기 시작하는 날 | 서버 설정 값 |
 |---|---|---|---|

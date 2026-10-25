@@ -140,7 +140,7 @@ function renderExerciseDocument(body, id, isJava, springHref) {
   const route = doc.createElement('nav');
   route.className = 'exercise-route';
   route.setAttribute('aria-label', isJava ? 'Java 실험 순서' : '티켓 처리 순서');
-  route.innerHTML = `<ol>${stops.map((h, i) => `<li><a href="${label(h) === '오늘 Spring에서 다시 만나는 곳' ? esc(springHref) : '#' + esc(h.id)}"><b>${String(i + 1).padStart(2, '0')}</b><span>${esc(label(h) === '오늘 Spring에서 다시 만나는 곳' ? 'D' + id.slice(1) + ' Spring 이어서 시작하기' : label(h))}</span></a></li>`).join('')}${flow ? `<li><a href="#${esc(flow.id)}"><b>04</b><span>흐름 재생</span></a></li>` : ''}</ol>`;
+  route.innerHTML = `<ol>${stops.map((h, i) => `<li><a href="${label(h) === '오늘 Spring에서 다시 만나는 곳' ? esc(springHref) : '#' + esc(h.id)}"><b>${String(i + 1).padStart(2, '0')}</b><span>${esc(label(h) === '오늘 Spring에서 다시 만나는 곳' ? 'D' + id.slice(1) + ' Spring 이어서 시작하기' : label(h))}</span></a></li>`).join('')}</ol>${flow ? `<a class="exercise-flow-link" href="#${esc(flow.id)}">장애 흐름 재생 →</a>` : ''}`;
   head.after(route);
   if (isJava && headings.some(h => label(h) === '오늘 Spring에서 다시 만나는 곳')) route.insertAdjacentHTML('beforeend', '<a class="exercise-connections" href="#오늘-spring에서-다시-만나는-곳">Java와 Spring 연결 사례</a>');
   for (const heading of headings) {
@@ -154,6 +154,25 @@ function renderExerciseDocument(body, id, isJava, springHref) {
     heading.before(section);
     section.append(heading);
     while (section.nextElementSibling && !section.nextElementSibling.matches('h2, .ticket-flow, .course-exercise-nav')) section.append(section.nextElementSibling);
+  }
+  if (isJava) {
+    const sections = [...article.querySelectorAll(':scope > .exercise-section')];
+    const work = sections.filter(section => /^(만들 파일과 실행 위치|만들 것|오늘 실험|실행과 완료 조건)$/.test(label(section.querySelector('h2'))));
+    let cursor = route;
+    for (const section of work) {
+      section.classList.add('exercise-primary');
+      cursor.after(section);
+      cursor = section;
+    }
+    const topReturn = article.querySelector(':scope > .course-exercise-nav');
+    if (topReturn) {
+      const support = doc.createElement('details');
+      support.className = 'exercise-context-links';
+      support.innerHTML = '<summary>실행 위치·연결 일자·이전 연습</summary>';
+      topReturn.before(support);
+      const metadata = [...topReturn.querySelectorAll('p')].slice(1).filter(p => !p.querySelector('a'));
+      support.append(topReturn, ...metadata);
+    }
   }
   for (const nav of article.querySelectorAll('.course-exercise-nav')) {
     nav.classList.add('exercise-return');
@@ -227,9 +246,10 @@ function ticketBadge(ticket, fromRel, course) {
   const kind = ticketKind(ticket);
   const inner = `<b>${esc(ticket.id)}</b><span>${kind}</span>`;
   const cls = `ticket-badge${ticket.required ? ' is-required' : ''}`;
+  const dataKind = ticket.required ? 'required' : ticket.enhancement ? 'enhancement' : ticket.pool ? 'optional' : 'practice';
   return ticket.page
-    ? `<a class="${cls}" href="${esc(relHref(fromRel, ticket.page))}" title="${esc(ticket.title)}">${inner}</a>`
-    : `<span class="${cls} is-pending" title="${esc(ticket.title)} · 티켓 페이지 준비 중">${inner}<small>페이지 준비 중</small></span>`;
+    ? `<a class="${cls}" data-ticket-kind="${dataKind}" href="${esc(relHref(fromRel, ticket.page))}" title="${esc(ticket.title)}">${inner}</a>`
+    : `<span class="${cls} is-pending" data-ticket-kind="${dataKind}" title="${esc(ticket.title)} · 티켓 페이지 준비 중">${inner}<small>페이지 준비 중</small></span>`;
 }
 
 const FACTS = { '이 순서에서 만들 층': 'layers', '만들 파일': 'files', '겪을 것': 'trap', '완료 조건': 'done', '명세': 'spec', '데이터 요구사항': 'data-spec', '티켓': 'tickets', '원인과 정답': 'answer-link' };
@@ -293,7 +313,7 @@ function renderStepSection(section, fromRel, course, step) {
 function dayPager(day, fromRel, course) {
   const index = course.days.findIndex((d) => d.id === day.id);
   const link = (d, dir) => (d
-    ? `<a class="day-pager-${dir}" href="${esc(relHref(fromRel, d.page))}"><small>${dir === 'prev' ? '← 이전 날' : '다음 날 →'}</small><span><b>${d.id}</b> ${esc(d.title)}</span></a>`
+    ? `<a class="day-pager-${dir}" href="${esc(relHref(fromRel, d.page))}"><small>${dir === 'prev' ? '<svg class="pager-arrow" viewBox="0 0 18 18" aria-hidden="true"><path d="M15 9H3 M8 4L3 9L8 14" fill="none" stroke="currentColor" stroke-width="1.5"/></svg> 이전 날' : '다음 날 <svg class="pager-arrow" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 9h12 M10 4l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>'}</small><span><b>${d.id}</b> ${esc(d.title)}</span></a>`
     : '<span></span>');
   return `<nav class="day-pager" aria-label="이전·다음 날">${link(course.days[index - 1], 'prev')}<a class="day-pager-list" href="README.html">일자 목록</a>${link(course.days[index + 1], 'next')}</nav>`;
 }
@@ -335,7 +355,7 @@ export function dayCrumbs(sourceRel, course) {
   const index = course.days.indexOf(day);
   const prev = course.days[index - 1];
   const next = course.days[index + 1];
-  return `<nav class="course-crumbs day-crumbs" aria-label="현재 위치"><p class="crumbs"><a href="../README.html">과정 안내</a> <span aria-hidden="true">/</span> <a href="README.html">일자 목록</a> <span aria-hidden="true">/</span> <span aria-current="page">${esc(day.id)}</span></p><p class="course-crumbs-jump">${prev ? `<a href="${prev.id}.html" rel="prev" aria-label="이전 날 ${prev.id}: ${esc(prev.title)}">← 이전 ${prev.id}</a>` : ''}${next ? `<a href="${next.id}.html" rel="next" aria-label="다음 날 ${next.id}: ${esc(next.title)}">다음 ${next.id} →</a>` : ''}</p></nav>`;
+  return `<nav class="course-crumbs day-crumbs" aria-label="현재 위치"><details class="day-location-menu"><summary>${esc(day.id)} · 일자 탐색</summary><div class="day-location-links"><p class="crumbs"><a href="../README.html">과정 안내</a> <svg class="crumb-separator" aria-hidden="true" viewBox="0 0 6 11"><polyline points="1,1 5,5.5 1,10" fill="none" stroke="currentColor" stroke-width="1.5"></polyline></svg> <a href="README.html">일자 목록</a> <svg class="crumb-separator" aria-hidden="true" viewBox="0 0 6 11"><polyline points="1,1 5,5.5 1,10" fill="none" stroke="currentColor" stroke-width="1.5"></polyline></svg> <span aria-current="page">${esc(day.id)}</span></p><p class="course-crumbs-jump">${prev ? `<a href="${prev.id}.html" rel="prev" aria-label="이전 날 ${prev.id}: ${esc(prev.title)}">← 이전 ${prev.id}</a>` : ''}${next ? `<a href="${next.id}.html" rel="next" aria-label="다음 날 ${next.id}: ${esc(next.title)}">다음 ${next.id} →</a>` : ''}</p></div></details></nav>`;
 }
 
 export function renderDayPage(sourceRel, body, course) {
@@ -376,7 +396,7 @@ export function renderDayPage(sourceRel, body, course) {
     const progress = `구현 완료 0/${coreCount}${extraCount && extraCount < day.steps.length ? ` · 선택·연습 0/${extraCount}` : ''}`;
     const extraNote = extraCount && extraCount < day.steps.length ? ' 선택한 티켓은 진도에 포함하며, 고르지 않은 선택·연습 티켓 순서는 진도에 세지 않습니다.' : '';
     const firstCore = day.steps.find((s) => !isExtraStep(s, course)) || day.steps[0];
-    todayPanel = `<section class="day-today" aria-labelledby="오늘-순서"><div class="day-today-head"><div><p class="day-panel-label">Spring · 구현 체크</p>${heading}</div><p class="day-progress" data-day-progress aria-live="polite">${progress}</p></div>`
+    todayPanel = `<section class="day-today" aria-labelledby="오늘-순서"><div class="day-today-head"><div>${heading}</div><p class="day-progress day-progress-chip" data-day-progress aria-live="polite">${progress}</p></div>`
       + `<progress class="day-progress-track" data-day-meter max="${coreCount}" value="0" aria-label="필수 구현 순서 진도"></progress>`
       + `<ol class="day-steps day-chips" data-day="${day.id}">${chipList}</ol>`
       + `<a class="day-resume" data-day-resume href="#step-${firstCore.id.toLowerCase()}">${NUMS[day.steps.indexOf(firstCore)]} 시작하기 →</a>`
@@ -446,7 +466,7 @@ export function renderDayPage(sourceRel, body, course) {
   const context = notice ? `${notice.href && !notice.linkLabel ? '' : `<strong>${esc(notice.label)}</strong>`}${notice.selection ? ' <span data-selected-ticket-compact>선택 기록 없음 · D11에서 한 건을 고르세요.</span>' : ''}${notice.description ? `<p>${esc(notice.description)}</p>` : ''}${notice.href ? ` <a href="${esc(notice.href)}">${esc(notice.linkLabel || notice.label)} →</a>` : ''}`
     : day.phase === 'extend' ? `<strong>작업 대상</strong> ${esc(day.workTarget)}` : '';
   if (context) html = html.replace('</header>', `</header><aside class="day-context">${context}</aside>`);
-  return `<article class="course-day" data-day-page="${day.id}">${renderDayStepper(html, day)}</article>`;
+  return `<article class="course-day" data-day-page="${day.id}" data-phase="${day.phase}">${renderDayStepper(html, day)}</article>`;
 }
 
 
@@ -502,13 +522,42 @@ function renderDayStepper(html, day) {
     else if (node.matches('.day-sql, .day-talk, .day-grade, .day-finish')) wrap.append(node);
     else prep.append(node);
   }
+  for (const heading of [...prep.querySelectorAll(':scope > h2')].slice(1)) {
+    const section = doc.createElement('section');
+    section.className = 'day-prep-section';
+    heading.before(section);
+    section.append(heading);
+    while (section.nextElementSibling && !section.nextElementSibling.matches('h2,hr')) section.append(section.nextElementSibling);
+  }
   steps.forEach(step => {
     step.setAttribute('data-day-panel', '');
-    if (day.entryNotice?.selection) {
-      const choice = doc.createElement('aside');
-      choice.className = 'day-choice-banner';
-      choice.innerHTML = `<p data-selected-ticket-compact></p><p>${esc(day.entryNotice.description)} <a href="${esc(day.entryNotice.href)}">${esc(day.entryNotice.linkLabel)}</a></p>`;
+    if (day.entryNotice?.selection && step === steps.at(-1)) {
+      const choice = doc.createElement('p');
+      choice.dataset.selectedTicketCompact = '';
+      choice.hidden = true;
       step.prepend(choice);
+    }
+    if (day.id === 'D11') {
+      const no = Number(step.dataset.step?.split('-')[1]);
+      const branches = no === 1 ? {1:'B14',2:'B11'} : no === 3 ? {1:'B08',2:'B14',3:'B11'} : {};
+      const list = step.querySelector('.fact-done > ul');
+      if (list) for (const [index, item] of [...list.children].entries()) {
+        const ticket = branches[index];
+        if (!ticket) continue;
+        const fold = doc.createElement('details');
+        fold.className = 'step-optional-criteria';
+        fold.dataset.criterionTicket = ticket;
+        fold.innerHTML = `<summary>${ticket} · ${ticket === 'B14' ? '선택한 경우 확인' : '추가 연습 확인'}</summary><ul></ul>`;
+        fold.querySelector('ul').append(item);
+        list.after(fold);
+      }
+    }
+    const seenDirectories = new Set();
+    for (const directory of step.querySelectorAll('.fact-files .file-directory')) {
+      const value = directory.textContent;
+      directory.parentElement.title = directory.parentElement.textContent;
+      directory.classList.toggle('is-repeat-directory', seenDirectories.has(value));
+      seenDirectories.add(value);
     }
     const configs = [...step.querySelectorAll('[data-config-tabs]')];
     if (configs.length) {
@@ -555,23 +604,31 @@ function renderDayStepper(html, day) {
   wrap.firstElementChild.after(wrapTabs);
   const panels = [prep, ...steps, ...(data.querySelector('.day-data') ? [data] : []), wrap];
   const list = today.querySelector('.day-steps');
+  list.id = `steps-${day.id.toLowerCase()}`;
+  const listToggle = doc.createElement('details');
+  listToggle.className = 'day-step-list-toggle';
+  listToggle.innerHTML = `<summary aria-controls="${list.id}">다른 단계 보기</summary>`;
+  list.after(listToggle);
+  const progress = today.querySelector('[data-day-progress]');
+  const track = today.querySelector('[data-day-meter]');
+  listToggle.after(progress, track);
   for (const item of today.querySelectorAll('.day-chip a')) item.setAttribute('data-panel-link', '');
   for (const extra of [prep, ...(data.querySelector('.day-data') ? [data] : []), wrap]) {
     const li = doc.createElement('li');
     li.className = 'day-stage-item';
     const label = extra === prep ? '준비 자료' : extra === data ? '데이터 넣기' : '마무리: SQL·말하기·채점';
     li.innerHTML = `<input type="checkbox" data-stage-check="${extra.id}" aria-label="${label} 확인"><a href="#${extra.id}" data-panel-link><span class="chip-no" aria-hidden="true">${extra === prep ? '○' : extra === data ? '+' : '✓'}</span><span class="chip-copy"><span class="chip-title">${label}</span></span></a>`;
-    if (extra === prep) list.prepend(li); else list.append(li);
+    list.append(li);
   }
   const tools = doc.createElement('div');
   tools.className = 'day-stepper-tools';
   tools.innerHTML = '<button type="button" data-day-expand aria-pressed="false" hidden>모두 펼쳐 보기</button><p data-day-position role="status" aria-live="polite"></p>';
-  today.querySelector('.day-progress-track').after(tools);
+  today.append(tools);
   const quick = doc.createElement('nav');
   quick.className = 'day-quick-links';
   quick.setAttribute('aria-label', '자주 찾는 자료');
   quick.innerHTML = `${data.querySelector('.day-data') ? `<a href="#${data.id}">데이터 넣기</a> · ` : ''}<a href="#오늘의-sql">오늘의 SQL</a>`;
-  tools.before(quick);
+  tools.after(quick);
   tools.insertAdjacentHTML('afterend', '<p data-stage-progress role="status"></p>');
   if (data.querySelector('.day-data')) {
     const note = doc.createElement('p');
@@ -594,6 +651,16 @@ function renderDayStepper(html, day) {
     if (link && next) {
       link.href = `#${next.id}`;
       link.textContent = next === data ? '다음 순서 · 데이터 넣기 →' : next === wrap ? '다음 순서 · 마무리 →' : `다음 순서 ${NUMS[index] || ''} →`;
+    }
+    if (index > 0) {
+      let footer = el.querySelector('.step-footer');
+      if (!footer) { footer = doc.createElement('nav'); footer.className = 'step-footer'; el.append(footer); }
+      footer.setAttribute('aria-label', '순서 이동');
+      const previous = doc.createElement('a');
+      previous.className = 'step-prev';
+      previous.href = `#${panels[index - 1].id}`;
+      previous.textContent = index === 1 ? '← 준비 자료' : '← 이전 순서';
+      footer.prepend(previous);
     }
     main.append(el);
   });

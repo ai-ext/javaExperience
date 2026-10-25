@@ -1,6 +1,8 @@
 // 콘텐츠의 용도와 시각 문법. 원문 노드를 옮기므로 링크·접기·복사 대상은 유지한다.
 import { JSDOM } from 'jsdom';
 import { marked } from 'marked';
+import fs from 'node:fs';
+import { DATA_STEPS, parseDaySql } from '../course/build-days.mjs';
 
 const esc = value => String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const inline = value => marked.parseInline(String(value ?? ''));
@@ -14,6 +16,48 @@ export const CONTENT_KINDS = {
 };
 const badge = (kind, extra='') => `<span class="content-kind ${extra}" data-kind-label="${kind}"><span aria-hidden="true">${CONTENT_KINDS[kind].icon}</span> ${CONTENT_KINDS[kind].label}<small>${CONTENT_KINDS[kind].help}</small></span>`;
 function requireText(value, label) { if (typeof value !== 'string' || !value.trim()) throw new Error(`시각 블록: ${label}이 필요하다`); }
+
+// 일자별 SQL 맥락과 파일 범위는 학습 원본에서 가져온다.
+export function loadDayDataGuide() {
+  const read = name => fs.readFileSync(new URL(`../../course/${name}`, import.meta.url), 'utf8');
+  const seed = parseDaySql(read('start/dummy/seed.sql'));
+  const bulk = parseDaySql(read('start/dummy/bulk.sql'));
+  const seedDays = [...seed.keys()].sort();
+  const blockTitle = (blocks, id) => blocks.get(id)?.[0].match(/^-- 이 블록을 쓰는 날:\s*(.+)$/m)?.[1] || id;
+  const guide = {};
+  for (let day = 1; day <= 45; day++) {
+    const id = `D${String(day).padStart(2,'0')}`;
+    const source = JSON.parse(read(`days/${id}.json`));
+    const sql = source.hints.sql;
+    if (!sql?.context || !Array.isArray(sql.questions)) continue;
+    const prior = seedDays.filter(key => key < id);
+    const tables = [...new Set(Object.values(DATA_STEPS[id] || {}).flat())].filter(name => name !== 'bulk');
+    const files = [];
+    if (day <= 10 && seed.has(id)) files.push({name:'seed.sql',href:'seed.sql',scope:blockTitle(seed,id)});
+    if (id === 'D06') files.push({name:'bulk.sql',href:'bulk.sql',scope:'seed.sql의 D02~D05 블록을 넣은 별도 실험 DB에서 전체를 한 번 실행한다.'});
+    if (id === 'D04' && bulk.has(id)) files.push({name:'bulk.sql',href:'bulk.sql',scope:'D05까지 준비한 별도 DB에서 선택 재실험한다. 기본 DB에서는 지금 실행하지 않는다.'});
+    const prerequisites = [];
+    const steps = [];
+    if (day <= 10 && seed.has(id)) {
+      if (tables.length) prerequisites.push(`이번 블록에서 쓰는 테이블: ${tables.join(' · ')}. 테이블을 먼저 준비한다.`);
+      if (prior.length) prerequisites.push(`앞선 seed 블록: ${prior.map(key => blockTitle(seed,key)).join(' → ')}. 이미 넣은 블록은 다시 실행하지 않는다.`);
+      steps.push(`${blockTitle(seed,id)} 블록 전체(SET~COMMIT)를 한 번 실행하거나, 준비한 테이블 조각만 순서대로 실행한다. 두 방식을 중복 실행하지 않는다.`);
+    } else if (id === 'D06') {
+      prerequisites.push('seed.sql의 D02~D05 블록을 넣은 별도 실험 DB를 쓴다. D04·D05의 seed 전용 DB와 구분한다.');
+      steps.push('bulk.sql 전체를 같은 연결에서 한 번 실행한다. 실패 시 임시 테이블과 cte_max_recursion_depth를 파일 끝의 문장으로 복구한다.');
+    } else {
+      prerequisites.push(sql.context);
+      steps.push(...sql.questions.map(question => question.task));
+    }
+    const hasData = Object.hasOwn(DATA_STEPS,id);
+    guide[id] = {id,title:source.roadmap.title,context:sql.context,files,prerequisites,steps,
+      checks:sql.questions.map(({task,expect})=>({task,expect})),
+      returnHref:`../../spring/${id}.html#${hasData ? `step-${id.toLowerCase()}-data` : '오늘의-sql'}`,
+      returnLabel:`${id} ${hasData ? '데이터 넣기' : '오늘의 SQL'}로 돌아가기`,
+      warnings:files.length ? ['고정 ID·고정 시각을 쓰므로 중복 실행은 오류다. 기존 앱 데이터와 섞지 않는다.','도중 오류는 COMMIT하지 말고 ROLLBACK 후 확인한다.'] : []};
+  }
+  return guide;
+}
 
 export function renderContentVisual(data) {
   const title = data.title ? `<h3 class="visual-title">${esc(data.title)}</h3>` : '';
@@ -108,12 +152,147 @@ function compareTables(doc,root) {
   }
 }
 
+// 조작은 native 요소에 두고 본문만 감싼다. 접힌 구현 내용은 밖으로 복제하지 않는다.
+function frameContentBlocks(doc, root, source) {
+  for (const detail of root.querySelectorAll('.step-help > details,.exercise-section > details,.exercise-answer > details,details.fact-trap')) {
+    const summary = detail.querySelector(':scope > summary');
+    if (!summary || detail.querySelector(':scope > .disclosure-body')) continue;
+    const body = doc.createElement('div');
+    body.className = 'disclosure-body';
+    for (const node of [...detail.childNodes]) if (node !== summary) body.append(node);
+    detail.append(body);
+    const chevron = doc.createElement('span');
+    chevron.className = 'disclosure-chevron';
+    chevron.setAttribute('aria-hidden','true');
+    chevron.textContent = '▸';
+    summary.append(chevron);
+  }
+  for (const table of root.querySelectorAll('table')) {
+    for (const th of table.querySelectorAll('thead th')) th.setAttribute('scope','col');
+    const labels = [...table.querySelectorAll('thead th')].map(node => node.textContent.trim());
+    if (source.startsWith('course/java/') && labels.join('|') === '파일|채울 것|칸') table.classList.add('java-task-table');
+  }
+  let codeIndex = 0;
+  for (const pre of root.querySelectorAll('pre')) {
+    if (pre.closest('.code-block') || !pre.innerHTML.includes('course-preserved-code:')) continue;
+    const figure = doc.createElement('figure');
+    figure.className = 'code-block';
+    const toolbar = doc.createElement('figcaption');
+    toolbar.className = 'code-toolbar';
+    const lang = pre.dataset.contentKind === 'reference' ? '코드 원문' : '코드';
+    if (!pre.id) {
+      let id;
+      do { id = `content-code-${++codeIndex}`; } while (doc.getElementById(id));
+      pre.id = id;
+    }
+    toolbar.innerHTML = `<span>${lang}</span><button type="button" data-copy-target="${esc(pre.id)}">코드 복사</button><span class="copy-status" role="status" aria-live="polite"></span>`;
+    pre.before(figure);
+    figure.append(toolbar,pre);
+  }
+  if (source.startsWith('course/start/')) {
+    const content = root.querySelector('.guide-content');
+    if (content) {
+      content.classList.add(source === 'course/start/dummy/README.md' ? 'data-reference-layout' : 'start-reference-layout');
+      for (const section of content.querySelectorAll(':scope > .guide-section')) {
+        const name = section.querySelector(':scope > h2')?.textContent || '';
+        section.dataset.referenceSection = /붙여 넣는 순서/.test(name) ? 'sequence' : /내 설계/.test(name) ? 'mapping' : /넣은 뒤/.test(name) ? 'verify' : /로그인/.test(name) ? 'login' : /compose/.test(name) ? 'run' : /설정값/.test(name) ? 'settings' : /준비물/.test(name) ? 'prepare' : 'reference';
+        const heading = section.querySelector(':scope > h2');
+        const kind = section.querySelector(':scope > .content-kind');
+        if (heading && kind) {
+          const header = doc.createElement('header');
+          header.className = 'reference-heading';
+          heading.before(header);
+          header.append(heading,kind);
+        }
+        if (source === 'course/start/README.md' && section.dataset.referenceSection === 'settings') {
+          const table = section.querySelector(':scope > .table-wrap');
+          if (table) {
+            const columns = doc.createElement('div');
+            columns.className = 'reference-columns';
+            const notes = doc.createElement('div');
+            notes.className = 'reference-notes';
+            table.before(columns);
+            columns.append(table,notes);
+            while (columns.nextElementSibling && !columns.nextElementSibling.matches('.course-outline')) notes.append(columns.nextElementSibling);
+          }
+        }
+        if (source === 'course/start/dummy/README.md' && section.dataset.referenceSection === 'mapping') {
+          for (const item of section.querySelectorAll(':scope > ul > li')) {
+            const name = item.querySelector(':scope > strong');
+            if (!name) continue;
+            const detail = doc.createElement('details');
+            detail.className = 'data-adjustment';
+            const summary = doc.createElement('summary');
+            summary.append(name);
+            const body = doc.createElement('div');
+            body.className = 'disclosure-body';
+            body.append(...item.childNodes);
+            item.append(detail);
+            detail.append(summary,body);
+          }
+        }
+      }
+      if (source === 'course/start/dummy/README.md') {
+        const reference = doc.createElement('div');
+        reference.dataset.dayGuideReference = '';
+        reference.className = 'data-reference-layout data-guide-reference';
+        for (const node of [...content.children]) if (!node.matches('h1,.content-page-kind')) reference.append(node);
+        const guide = doc.createElement('section');
+        guide.dataset.dayGuide = '';
+        guide.className = 'day-data-guide';
+        guide.hidden = true;
+        guide.setAttribute('aria-labelledby','day-data-guide-title');
+        const payload = doc.createElement('script');
+        payload.id = 'course-day-data-guide';
+        payload.type = 'application/json';
+        payload.textContent = JSON.stringify(loadDayDataGuide()).replace(/</g,'\\u003c');
+        content.append(guide,payload,reference);
+      }
+    }
+  }
+  if (source.startsWith('course/java/')) {
+    const sheet = root.querySelector('.exercise-java');
+    for (const files of sheet?.querySelectorAll('.visual-files') || []) {
+      const count = files.querySelectorAll('.visual-file').length;
+      if (count < 3 || files.closest('details')) continue;
+      const details = doc.createElement('details');
+      details.className = 'exercise-file-reference';
+      const summary = doc.createElement('summary');
+      summary.textContent = `Spring 연결 파일 ${count}개 · 경로·역할·비교 확인`;
+      files.before(details);
+      details.append(summary,files);
+    }
+    for (const list of sheet?.querySelectorAll('.exercise-section > ul') || []) {
+      const caption = list.previousElementSibling;
+      if (!caption || !/^(통과시킬 테스트|테스트|확인 테스트)/.test(caption.textContent.trim()) || ![...list.children].every(li => li.querySelector('code'))) continue;
+      const details = doc.createElement('details');
+      details.className = 'exercise-test-index';
+      const summary = doc.createElement('summary');
+      summary.textContent = `확인할 테스트 이름 ${list.children.length}개`;
+      list.before(details);
+      details.append(summary,list);
+    }
+    const sections = [...(sheet?.querySelectorAll(':scope > .exercise-section') || [])];
+    const supporting = sections.filter(section => /^(기본기 반복|타입 한 컷|실무 습관)$/.test(section.querySelector(':scope > h2')?.textContent.replace(/^#\s*/,'').trim() || ''));
+    if (supporting.length > 1) {
+      const grid = doc.createElement('div');
+      grid.className = 'exercise-support-grid';
+      supporting[0].before(grid);
+      for (const section of supporting) grid.append(section);
+    }
+  }
+}
+
 // 구조화한 데이터만 렌더링하고 닫힌 정답을 복제하지 않는다.
 export function renderContentKinds(source,html) {
   const type=coursePageType(source);
   if(!type || html.includes('class="content-page-kind"')) return html;
   const preservedCode=[];
-  const protectedHtml=html.replace(/(<pre\b[^>]*>)([\s\S]*?)(<\/pre>)/gi, (_,open,content,close)=>`${open}<!--course-preserved-code:${preservedCode.push(content)-1}-->${close}`);
+  const protectedHtml=html.replace(/(<pre\b[^>]*>)([\s\S]*?)(<\/pre>)/gi, (_,open,content,close)=>{
+    // 파서가 보정한 빈 복제 표식만 제거한다. 실제 코드와 대상 ID는 그대로 둔다.
+    const cleaned = content.replace(/<p><code id="([^"]+)"><\/code><\/p>/g, (duplicate,id,offset) => content.slice(0,offset).includes(`<code id="${id}">`) ? '' : duplicate);
+    return `${open}<!--course-preserved-code:${preservedCode.push(cleaned)-1}-->${close}`;
+  });
   const dom=new JSDOM(`<div id="content-root">${protectedHtml}</div>`);const doc=dom.window.document,root=doc.getElementById('content-root');
   const words = doc.createTreeWalker(root, 4);
   let word;
@@ -163,6 +342,7 @@ export function renderContentKinds(source,html) {
   for(const block of root.querySelectorAll('p,ul,ol,table,pre,blockquote,details')) {
     if(!block.dataset.contentKind)block.dataset.contentKind=block.closest('nav,.crumbs') ? 'reference' : block.closest('[data-content-kind]')?.dataset.contentKind||type.kind;
   }
+  frameContentBlocks(doc, root, source);
   const result=root.innerHTML.replace(/<!--course-preserved-code:(\d+)-->/g, (_,index)=>preservedCode[Number(index)]);
   dom.window.close();return result;
 }
