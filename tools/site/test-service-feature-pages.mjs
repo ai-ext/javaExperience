@@ -241,3 +241,31 @@ test('서비스 SSR의 기본·query·hash 선택은 외부 스크립트와 DOMC
     }
   }
 });
+
+// 기능 기획의 전후 사례와 현재 단계 힌트는 본문 안에서 함께 읽는다.
+test('기획의 전후 사례와 단계 안 힌트, 의미 종류를 보존한다', () => {
+  const copy = structuredClone(feature);
+  copy.variants[0].stages[0].brief.examples = [{title:'전후 사례',start:'입력 전 상태',action:'실제 요청 행동',result:'요청 후 상태'}];
+  const doc = new JSDOM(renderServiceFeature({feature:copy, apiRecipes:[recipe]})).window.document;
+  const panel = doc.querySelector('[data-sf-stage-panel]');
+  assert.ok(panel.querySelector('[data-sf-hints]'));
+  for (const text of ['입력 전 상태','실제 요청 행동','요청 후 상태']) assert.ok(panel.textContent.includes(text));
+  assert.equal(panel.querySelector('.sf-task').dataset.contentKind, 'action');
+  assert.ok(panel.querySelector('[data-content-kind=check]'));
+});
+
+test('목록·시안·API는 같은 기능 집합을 보존하며 스크롤 없이 보기를 전환한다', () => {
+  const dom = new JSDOM(renderServiceCatalog({features:[feature],apiRecipes:[recipe]}), {url:'https://learn.example/scenario/README.html'});
+  mountServiceFeaturePages(dom.window.document);
+  const doc=dom.window.document, root=doc.querySelector('[data-sf-catalog]');
+  assert.equal(root.dataset.sfView,'features');
+  assert.equal(doc.querySelector('.sf-api-explorer').hidden,true);
+  doc.querySelector('[data-sf-view-button=api]').click();
+  assert.equal(doc.querySelector('.sf-feature-list').hidden,true);
+  assert.equal(doc.querySelector('.sf-api-explorer').hidden,false);
+  doc.querySelector('[data-sf-view-button=preview]').click();
+  assert.equal(root.dataset.sfView,'preview');
+  assert.equal(doc.querySelectorAll('[data-sf-feature-card]').length,1);
+  assert.equal(dom.window.scrollY,0);
+  dom.window.close();
+});

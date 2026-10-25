@@ -43,7 +43,7 @@ export function renderServiceRequestTool({scopeKey = 'service', project = '', re
   <p class="srq-note" data-srq-note>${note}</p>
   ${list.length ? `<label class="srq-field"><span>요청 사례</span><select data-srq-recipe>${options}</select></label>` : ''}
   <label class="srq-field srq-example-row" data-srq-example-row hidden><span>요청 예시</span><select data-srq-example></select></label>
-  <div class="srq-plan" data-srq-plan><div><span>기획상 기대</span><strong data-srq-expected>API를 직접 등록해 주세요.</strong></div><p data-srq-description></p></div>
+
   <details class="srq-register" data-srq-register ${list.length ? '' : 'open'}><summary>${list.length ? 'API 미등록 작업 직접 연결' : '요청 계약 직접 등록'}</summary><p>원본에 없는 API 경로를 자동으로 만들지 않습니다. 실제 과제와 서버에 맞는 값을 입력하세요.</p>
     <div class="srq-grid"><label class="srq-field"><span>요청 방식(HTTP 메서드)</span><select data-srq-bind-method><option value="">선택</option><option>GET</option><option>HEAD</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option></select></label>${field('경로','bind-path','')}${field('기대 상태 코드','bind-status','', 'inputmode="numeric"')}${field('JSON 필수 필드 (쉼표로 구분)','bind-fields','')}</div>
     <button type="button" class="srq-secondary" data-srq-apply-binding>계약 등록 후 사용</button>
@@ -65,8 +65,12 @@ export function renderServiceRequestTool({scopeKey = 'service', project = '', re
   </div>
   <div class="srq-actions"><label class="srq-inline"><input type="checkbox" data-srq-curl-token>curl 복사에 토큰 포함</label><button type="button" class="srq-secondary" data-srq-copy-curl>curl 복사</button><button type="button" class="srq-send" data-srq-send disabled>요청 보내기</button></div>
   <p class="srq-status" data-srq-status role="status" aria-live="polite">미실행</p>
-  <div class="srq-result" data-srq-result hidden><div class="srq-result-metrics"><span>실제 HTTP 상태 <strong data-srq-actual-status>—</strong></span><span>실측 응답 시간 <strong data-srq-duration>—</strong></span></div><p data-srq-verdict></p><dl><dt>응답 headers</dt><dd><pre data-srq-response-headers></pre></dd><dt>응답 body 원문</dt><dd><pre data-srq-response-body></pre></dd></dl><p class="srq-snapshot" data-srq-snapshot></p></div>
-  <aside class="srq-diagnostic" data-srq-diagnostic>브라우저가 CORS를 허용하지 않거나 API 서버에 연결할 수 없으면 요청 결과를 읽을 수 없습니다. 문서 사이트를 file://로 열었다면 http://localhost:3000에서 여세요. 실패 상태를 성공으로 추정하지 않습니다.</aside>
+  <div class="srq-verification" data-srq-verification></div>
+  <div class="srq-comparison">
+  <div class="srq-plan" data-srq-plan><div><span>기획상 기대</span><strong data-srq-expected>API를 직접 등록해 주세요.</strong></div><p data-srq-description></p></div>
+  <div class="srq-result" data-srq-result><h3>실제 서버 응답</h3><div class="srq-result-metrics"><span>실제 HTTP 상태 <strong data-srq-actual-status>—</strong></span><span>실측 응답 시간 <strong data-srq-duration>—</strong></span></div><p data-srq-verdict></p><dl><dt>응답 headers</dt><dd><pre data-srq-response-headers></pre></dd><dt>응답 body 원문</dt><dd><pre data-srq-response-body></pre></dd></dl><p class="srq-snapshot" data-srq-snapshot></p></div>
+  </div>
+  <aside class="srq-diagnostic" data-srq-diagnostic>브라우저가 CORS를 허용하지 않거나 API 서버에 연결할 수 없으면 요청 결과를 읽을 수 없습니다. 문서 사이트를 file://로 열었다면 HTTP 문서 서버로 여세요. API 서버는 문서 Origin의 CORS와 필요한 메서드·헤더를 허용해야 합니다. 실패 상태를 성공으로 추정하지 않습니다.</aside>
   <details class="srq-curl-fallback"><summary>curl 대체 실행 명령</summary><p>브라우저 CORS 제한을 확인할 때만 사용하세요. 복사 버튼은 별도 클릭이 필요하고 토큰은 체크하지 않으면 포함하지 않습니다. 브라우저 쿠키는 curl 복사에 포함되지 않으며, 실제 Origin·Cookie·preflight 값은 개발자 도구 Network에서 확인하세요.</p><textarea data-srq-curl readonly rows="5" aria-label="curl 명령"></textarea></details>
   <script type="application/json" data-srq-data>${data}</script>
 </section>`;

@@ -40,6 +40,32 @@ function mountOne(root, deps) {
     updateSendState();
   };
 
+  // 준비 조건과 SQL은 안내이며, 브라우저가 DB를 읽거나 실행하지 않는다.
+  function renderVerification(recipe) {
+    const target = get('verification');
+    if (!target) return;
+    target.replaceChildren();
+    const section = (title, values) => {
+      if (!values?.length) return;
+      const card = doc.createElement('section');
+      const heading = doc.createElement('h4'); heading.textContent = title; card.append(heading);
+      const ul = doc.createElement('ul');
+      for (const value of values) { const li = doc.createElement('li'); li.textContent = typeof value === 'string' ? value : value.text || value.description || JSON.stringify(value); ul.append(li); }
+      card.append(ul); target.append(card);
+    };
+    section('요청 전 준비', recipe.prepare);
+    section('요청 뒤 확인', recipe.manualCheck);
+    for (const check of recipe.manualDb || []) {
+      const card = doc.createElement('section');
+      const title = doc.createElement('h4'); title.textContent = check.title || 'DB 확인 SQL'; card.append(title);
+      const pre = doc.createElement('pre'); pre.textContent = check.sql || ''; card.append(pre);
+      const note = doc.createElement('p'); note.textContent = check.notes || '확인한 실제 ID로 별도 DB 클라이언트에서 실행하세요. 자동 실행하지 않습니다.'; card.append(note);
+      target.append(card);
+    }
+    if (recipe.capture?.key) section('생성 ID로 사후 조회', [`응답에서 확인한 ${recipe.capture.key}를 같은 서버·프로젝트의 다음 조회 단계에서 이어 씁니다. 자동 완료로 기록하지 않습니다.`]);
+    target.hidden = !target.children.length;
+  }
+
   function fillRecipe(recipe) {
     let source = recipe ?? {};
     const bindingDefinition = loadBindingDefinition(source);
@@ -99,7 +125,14 @@ function mountOne(root, deps) {
     get('body').closest('.srq-body-field').hidden = get('body-kind').value === 'none';
     renderManualBindings(source);
     updateBodyLabel();
-    get('result').hidden = true;
+    get('result').hidden = false;
+    get('actual-status').textContent = '미실행';
+    get('duration').textContent = '—';
+    get('response-headers').textContent = '';
+    get('response-body').textContent = '요청을 보내면 실제 응답이 표시됩니다.';
+    get('verdict').textContent = '';
+    get('snapshot').textContent = '';
+    renderVerification(source);
     get('status').textContent = source.binding?.key && !source.contractRegistered
       ? '선택사항의 API 계약이 아직 등록되지 않았습니다. 내 프로젝트에서 정한 method, 경로, 상태, JSON 응답 필드명을 입력해 주세요.'
       : removedManagedHeader || source.removedManagedHeader
@@ -315,7 +348,7 @@ function mountOne(root, deps) {
       const fileProtocol = doc.location?.protocol === 'file:';
       get('result').hidden = false;
       get('actual-status').textContent = '응답 없음'; get('duration').textContent = `${Math.max(0, readNow() - started).toFixed(1)} ms`;
-      get('verdict').textContent = `브라우저에서 HTTP 상태와 본문을 읽지 못했습니다. ${fileProtocol ? '문서를 file://로 열었으므로 http://localhost:3000에서 다시 열어 주세요. ' : ''}CORS 정책 또는 서버 연결을 확인하세요. 요청 실패를 성공으로 판정하지 않습니다.`;
+      get('verdict').textContent = `브라우저에서 HTTP 상태와 본문을 읽지 못했습니다. ${fileProtocol ? '문서를 file://로 열었으므로 HTTP 문서 서버로 다시 열어 주세요. ' : ''}CORS 정책 또는 서버 연결을 확인하세요. 요청 실패를 성공으로 판정하지 않습니다.`;
       get('response-headers').textContent = '읽을 수 없음'; get('response-body').textContent = String(error?.message ?? error);
       get('snapshot').textContent = `실패한 전송 snapshot: ${snapshot.method} ${snapshot.built.url}`;
       get('status').textContent = '요청 결과를 읽지 못했습니다.';
@@ -398,7 +431,7 @@ function expectedLabel(recipe) {
   if (!recipe) return 'API를 직접 등록해 주세요.';
   if (recipe.userDefinedContract && !recipe.contractRegistered) return '내 프로젝트에서 정한 계약 · 아직 등록하지 않았습니다.';
   const statuses = recipe.expected?.statuses ?? (recipe.expectedStatus ? [recipe.expectedStatus] : []);
-  const fields = recipe.expected?.fields?.length ? ` · 필수 필드 ${recipe.expected.fields.join(', ')}` : '';
+  const fields = recipe.expected?.bodyMode !== 'empty' && recipe.expected?.fields?.length ? ` · 필수 필드 ${recipe.expected.fields.join(', ')}` : '';
   const failures = recipe.failures ?? recipe.expected?.failures ?? [];
   const failureStatuses = [...new Set(failures.flatMap(item=>item.statuses ?? [item.status]).filter(Number.isInteger))];
   const failureLabel = failureStatuses.length ? ` · 기획한 실패 ${failureStatuses.join(', ')}` : '';

@@ -87,6 +87,8 @@ export function renderInitialPage(html, sourcePath = 'README.md') {
   const dayPanels=[...doc.querySelectorAll('.day-stepper-main > [data-day-panel]')].map(e=>({id:e.id,display:e.matches('.day-stage-wrap')?'grid':'block',initial:!e.hidden}));
   const prepare=doc.createElement('script');
   prepare.textContent=`(${prepareFirstPaint.toString()})(${JSON.stringify({panelMap,dayPanels,servicePanels,knowledgeCategories})});`;
+  // 서비스 전용 보기는 다른 영역의 초기 렌더링 코드와 분리한다.
+  if(doc.querySelector('[data-sf-catalog]')) prepare.textContent += `;(${prepareServiceCatalogFirstPaint.toString()})();`;
   doc.head.append(prepare);
   const release=doc.createElement('script');release.textContent="document.getElementById('first-paint-state')?.stopEarlySelection?.();document.getElementById('first-paint-state')?.remove();";doc.body.append(release);
   const fallback=doc.createElement('noscript');
@@ -135,4 +137,12 @@ function prepareFirstPaint({panelMap,dayPanels,servicePanels,knowledgeCategories
   // 설정 형식은 CSS가 첫 페인트부터, controller가 DOM·키보드 상태를 이어받는다.
   style.textContent+=`html.js body main [data-config-panel]{display:none!important}html.js body main [data-config-panel="${format}"]{display:block!important}`;
   document.head.append(style);
+}
+
+function prepareServiceCatalogFirstPaint() {
+  const style=document.getElementById('first-paint-state');
+  if(!style) return;
+  const api=location.hash==='#journey-all-apis';
+  style.textContent+=`html.js body main [data-sf-catalog] .sf-feature-list{display:${api?'none':'block'}!important}html.js body main [data-sf-catalog] .sf-api-explorer{display:${api?'block':'none'}!important}`;
+  if(location.hash!=='#visual-catalog')style.textContent+='html.js body main [data-sf-catalog] .sf-card-preview{display:none!important}';
 }

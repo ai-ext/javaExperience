@@ -190,7 +190,8 @@ export function inspectServiceResponse(recipe, response = {}) {
   else if (bodyMode === 'json') bodyMatches = !parseError && parsed !== undefined;
   else if (bodyMode === 'text') bodyMatches = typeof response.body === 'string';
   else if (bodyMode === 'any') bodyMatches = true;
-  const requiredFields = expected.fields ?? [];
+  // 빈 본문 계약의 생성 ID는 JSON 필드가 아니라 선언된 Location에서 확인한다.
+  const requiredFields = bodyMode === 'empty' ? [] : expected.fields ?? [];
   const fieldsMatch = !requiredFields.length || (parsed && typeof parsed === 'object' && requiredFields.every(field => hasJsonPath(parsed, field)));
   const resourceId = statusMatches && bodyMatches && fieldsMatch ? captureDeclaredResourceId(recipe, response) : null;
   const expectedStatusText = Array.isArray(expected.statuses) ? expected.statuses.join(' 또는 ') : '미등록';

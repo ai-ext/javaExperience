@@ -77,3 +77,10 @@ test('응답 성공 판단은 status와 body mode를 분리하고 캡처 ID만 �
   assert.equal(captureDeclaredResourceId(recipe,{status:201,body:'{"id":9007199254740992}',headers:{},requestUrl:'http://localhost:8080/api/posts'}),null);
   assert.equal(captureDeclaredResourceId(recipe,{status:201,body:'',headers:{location:'https://evil.test/api/posts/42'},requestUrl:'http://localhost:8080/api/posts'}),null);
 });
+
+test('실제 board 생성 recipe의 빈 본문과 Location ID를 함께 확인한다', () => {
+  const recipe={expected:{statuses:[201],bodyMode:'empty',fields:['postId']},capture:{key:'postId',locationPattern:'/api/posts/{postId}'}};
+  const actual=inspectServiceResponse(recipe,{status:201,body:'',headers:{location:'/api/posts/42'},requestUrl:'http://localhost:8080/api/posts'});
+  assert.equal(actual.bodyMatches,true);
+  assert.equal(actual.resourceId,'42');
+});

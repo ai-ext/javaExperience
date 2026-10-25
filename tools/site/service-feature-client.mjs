@@ -105,6 +105,31 @@ function writeProgress(storage, progress) {
 }
 
 function mountCatalog(root, storage) {
+  const win = root.ownerDocument.defaultView;
+  const viewForHash = hash => hash === '#journey-all-apis' ? 'api' : hash === '#visual-catalog' ? 'preview' : 'features';
+  function selectView(view, updateUrl = false) {
+    root.dataset.sfView = view;
+    const title=root.querySelector('#sf-feature-list-title');
+    if(title) title.textContent=view === 'preview' ? '단계별 시안으로 고르기' : '만들 기능 고르기';
+    root.querySelector('.sf-feature-list').hidden = view === 'api';
+    root.querySelector('.sf-api-explorer').hidden = view !== 'api';
+    for (const button of root.querySelectorAll('[data-sf-view-button]')) button.setAttribute('aria-pressed', String(button.dataset.sfViewButton === view));
+    if (updateUrl && win?.history) {
+      const url = new URL(win.location.href); url.hash = view === 'api' ? 'journey-all-apis' : view === 'preview' ? 'visual-catalog' : '';
+      win.history.pushState({}, '', url);
+    }
+  }
+  for (const button of root.querySelectorAll('[data-sf-view-button]')) button.addEventListener('click', () => selectView(button.dataset.sfViewButton, true));
+  root.ownerDocument.addEventListener('click', event => {
+    const link = event.target.closest?.('a'); if (!link || !win?.location) return;
+    const url = new URL(link.href, win.location.href);
+    if (url.pathname === win.location.pathname && ['', '#visual-catalog', '#journey-all-apis'].includes(url.hash)) {
+      event.preventDefault(); selectView(viewForHash(url.hash), true);
+    }
+  });
+  win?.addEventListener('popstate', () => selectView(viewForHash(win.location.hash)));
+  selectView(viewForHash(win?.location?.hash));
+
   const cards = [...root.querySelectorAll('[data-sf-feature-card]')];
   const search = root.querySelector('[data-sf-search]');
   const difficulty = root.querySelector('[data-sf-difficulty]');
@@ -288,8 +313,7 @@ function mountFeature(root, storage) {
     if (updateUrl) writeLocation(selected.dataset.sfVariant, selected.dataset.sfStage, push);
     if (focus) {
       const heading = selected.querySelector('.sf-stage-title h2');
-      heading?.focus({ preventScroll: false });
-      selected.scrollIntoView?.({ block: 'start' });
+      heading?.focus({ preventScroll: true });
     }
     return selected;
   }

@@ -36,3 +36,23 @@ test('recipe의 Cookie와 Origin 값은 HTML에 복제하지 않는다', () => {
   assert.ok(!html.includes('private-cookie'));
   assert.ok(!html.includes('spoofed.test'));
 });
+
+test('예상과 실제는 같은 비교 영역에서 입력 뒤 나란히 제공한다', () => {
+  const doc = new JSDOM(renderServiceRequestTool({recipes:[]})).window.document;
+  const comparison = doc.querySelector('.srq-comparison');
+  assert.ok(comparison?.querySelector('.srq-plan'));
+  assert.ok(comparison?.querySelector('[data-srq-result]'));
+});
+
+test('준비·DB 안내를 노출하고 사례 전환은 이전 응답을 초기화한다', () => {
+  const dom=new JSDOM(renderServiceRequestTool({recipes:[{id:'create',method:'POST',path:'/api/posts',prepare:['회원 준비'],manualDb:[{title:'생성 행 확인',sql:'SELECT id FROM post WHERE id = :postId;',notes:'별도 연결에서 확인'}],capture:{key:'postId'},expected:{statuses:[201]}}]}));
+  mountServiceRequestTools(dom.window.document);
+  const doc=dom.window.document;
+  assert.ok(doc.querySelector('[data-srq-verification]').textContent.includes('SELECT id FROM post'));
+  assert.ok(doc.querySelector('[data-srq-verification]').textContent.includes('생성 ID로 사후 조회'));
+  assert.equal(doc.querySelector('[data-srq-result]').hidden,false);
+  doc.querySelector('[data-srq-actual-status]').textContent='201';
+  doc.querySelector('[data-srq-recipe]').dispatchEvent(new dom.window.Event('change'));
+  assert.equal(doc.querySelector('[data-srq-actual-status]').textContent,'미실행');
+  dom.window.close();
+});

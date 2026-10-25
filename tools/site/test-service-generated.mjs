@@ -13,6 +13,7 @@ for(const entry of catalog.features){
  const source=JSON.parse(fs.readFileSync(new URL(`service/${entry.file}`,root),'utf8'));
  const dom=new JSDOM(fs.readFileSync(new URL(`scenario/features/${entry.id}.html`,root),'utf8'),{url:`http://localhost:3000/scenario/features/${entry.id}.html`});
  const doc=dom.window.document;
+ assert.ok([...doc.querySelectorAll('link[rel=stylesheet]')].some(link=>link.getAttribute('href').includes('service-request.css')),`${entry.id}: 요청 도구 stylesheet`);
  const values=new Map([['course.progress','kept'],['javaExperience.home.activeTask.v1','kept']]);
  const storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
  const ids=[...doc.querySelectorAll('[id]')].map(node=>node.id);
