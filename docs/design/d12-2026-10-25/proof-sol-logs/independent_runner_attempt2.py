@@ -11,7 +11,7 @@ def cmd(argv,timeout=30):
 def dock(*args,timeout=30):return cmd(['docker','--host',ENDPOINT,*args],timeout)
 ctx=json.loads(cmd(['docker','context','inspect'])['stdout'])[0]
 ENDPOINT=ctx['Endpoints']['docker']['Host']
-assert ctx['Name']=='desktop-linux' and ENDPOINT=='unix:///Users/ds/.docker/run/docker.sock'
+assert ctx['Name']=='desktop-linux' and ENDPOINT=='unix://LOCAL_HOME/.docker/run/docker.sock'
 old=json.loads((BASE/'proof-logs/attempt-0665b1344c5b.json').read_text())
 IMAGE=old['ownedImage']['Id']
 im=json.loads(dock('image','inspect',IMAGE,'--format','{{json .}}')['stdout'])

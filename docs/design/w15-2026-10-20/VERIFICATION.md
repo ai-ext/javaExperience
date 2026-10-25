@@ -1,6 +1,6 @@
 # W15 페이지네이션 보충 학습 검증
 
-2026-10-20, 별도 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night`의 개념 전용 부분 보강이다. 9질문·25상태와 선택 이미지9장(실제23회 생성·14draft)을 구현했다. 원문 전체의 모든 장면·픽셀·학습자 이해도를 완료 처리하지 않는다. merge·push·PR은 하지 않았다.
+2026-10-20, 별도 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night`의 개념 전용 부분 보강이다. 9질문·25상태와 선택 이미지9장(실제23회 생성·14draft)을 구현했다. 원문 전체의 모든 장면·픽셀·학습자 이해도를 완료 처리하지 않는다. merge·push·PR은 하지 않았다.
 
 ## 실행한 것과 추가한 것
 

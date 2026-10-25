@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-import {renderD12Learning} from '/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/d12-learning.mjs';
-import {initD12Learning} from '/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/d12-learning.js';
-import {D12_LESSONS} from '/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/d12-lesson-data.mjs';
+import {renderD12Learning} from 'LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/d12-learning.mjs';
+import {initD12Learning} from 'LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/d12-learning.js';
+import {D12_LESSONS} from 'LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/d12-lesson-data.mjs';
 const root=process.cwd(),out=root+'/docs/design/d12-2026-10-25/ui-sol-logs/attempt2/';
 const {JSDOM}=createRequire(root+'/tools/site/package.json')('jsdom');
 const fixture=()=>{const dom=new JSDOM(renderD12Learning(),{url:'https://example.test/docs/knowledge/D12-linux-terminal-basics.html'}),doc=dom.window.document,pending=[];Object.defineProperty(dom.window.navigator,'clipboard',{configurable:true,value:{writeText:payload=>new Promise((resolve,reject)=>pending.push({payload,resolve,reject}))}});initD12Learning(doc,dom.window);const ui=doc.querySelector('[data-d12-learning]');return{dom,doc,ui,pending,copy:()=>ui.querySelector('[data-d12-copy]').click(),status:()=>ui.querySelector('[data-d12-copy-status]').textContent,choose:(topic,stage)=>{const s=ui.querySelector('[data-d12-topic]');s.value=topic;s.dispatchEvent(new dom.window.Event('change',{bubbles:true}));ui.querySelector('[data-d12-stage="'+stage+'"]').click();}};};

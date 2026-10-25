@@ -11,10 +11,10 @@ document.querySelectorAll('.reader-journey').forEach((journey) => {
   baseInput.addEventListener('input', refreshCommands);
   refreshCommands();
 
-  const show = (name) => {
+  const show = (name, scroll = true) => {
     for (const panel of panels) panel.hidden = panel.dataset.readerPanel !== name;
     journey.dataset.readerScreen = name;
-    journey.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) journey.scrollIntoView({ block: 'start', behavior: 'instant' });
   };
   for (const button of journey.querySelectorAll('[data-reader-go]')) {
     button.addEventListener('click', () => show(button.dataset.readerGo));
@@ -96,5 +96,5 @@ document.querySelectorAll('.reader-journey').forEach((journey) => {
       state.textContent = 'SQL을 선택했습니다. 직접 복사해 DB 도구에서 실행하세요.';
     }
   });
-  show('scenario');
+  show('scenario', false);
 });

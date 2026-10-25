@@ -46,4 +46,4 @@ URL: https://docs.oracle.com/javase/specs/jls/se25/html/jls-8.html
 
 ## 기존 자료 대조
 
-`/Users/ds/research/java-beginner-theory/01-jpa-associations.md`는 개념과 기존 용어를 파악하는 참고자료로만 읽었다. 그 문서의 Hibernate 7.2 등 기존 인용을 현행 근거로 재사용하지 않았다. 위 URL을 라이브로 다시 확인했으며, 이 파일은 자료 간 대조 노트이지 공식 출처가 아니다.
+`LOCAL_HOME/research/java-beginner-theory/01-jpa-associations.md`는 개념과 기존 용어를 파악하는 참고자료로만 읽었다. 그 문서의 Hibernate 7.2 등 기존 인용을 현행 근거로 재사용하지 않았다. 위 URL을 라이브로 다시 확인했으며, 이 파일은 자료 간 대조 노트이지 공식 출처가 아니다.

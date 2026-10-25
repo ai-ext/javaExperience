@@ -33,4 +33,4 @@ order by o.id
 - 미확인: 이후 7.4 패치가 이 증상을 수정했는지 여부. 관련 공식 issue/release change를 확인할 수 없었다.
 - 조사자는 runtime 실행, 의존성 변경, 앱 변경을 하지 않았다.
 
-자세한 URL, 버전 범위 및 접근 한계는 [`_data/pagination-source-notes.md`](/Users/ds/research/javaexperience-s09-20261020/_data/pagination-source-notes.md)에 기록했다.
+자세한 URL, 버전 범위 및 접근 한계는 [`_data/pagination-source-notes.md`](LOCAL_HOME/research/javaexperience-s09-20261020/_data/pagination-source-notes.md)에 기록했다.

@@ -23,7 +23,7 @@
 
 - Bash pipeline은 pipeline 직후 `snapshot=("$?" "${PIPESTATUS[@]}")` 한 명령 확장에서 종료 상태와 각 단계 상태를 함께 보존한다. 최신 Linux 관측은 기본 모드 전체 pipeline exit 0, `STATUS=0 PIPESTATUS=7 0`; `pipefail` 전체 exit 7, `STATUS=7 PIPESTATUS=7 0`이었다. `set -o pipefail` 제거 mutant는 exit 0으로 관측되어 요구 exit 7 assertion에서 거부됐다.
 - `df_before_write`는 8 MiB 실제 쓰기 전에 실행한다. `df_after_write`, `df_after_unlink_open_fd`, `df_after_close`를 나눠 기록하고, 각 시점에 대응하는 `statvfs`도 보존한다. `/tmp` 전용 tmpfs 수치만 의미가 있다.
-- Runner는 `DOCKER_HOST`, `DOCKER_CONTEXT`, TLS/cert/API override 환경변수를 제거한 환경에서 설정된 `desktop-linux` context endpoint가 Unix socket인지 검증한다. 이후 모든 Docker CLI argv에 `docker --host unix:///Users/ds/.docker/run/docker.sock`을 지정했다.
+- Runner는 `DOCKER_HOST`, `DOCKER_CONTEXT`, TLS/cert/API override 환경변수를 제거한 환경에서 설정된 `desktop-linux` context endpoint가 Unix socket인지 검증한다. 이후 모든 Docker CLI argv에 `docker --host unix://LOCAL_HOME/.docker/run/docker.sock`을 지정했다.
 - Cleanup은 컨테이너 이름이 아닌 생성 당시 저장한 container ID로 inspect한다. ID와 nonce label이 모두 일치한 경우에만 같은 ID로 `docker rm --force`를 실행한다. 최신 두 container cleanup의 명령 exit는 각각 0이다.
 - `proof.py`는 import 때 filesystem 변경을 하지 않는다. Linux, `/.dockerenv`, 명시적인 lab marker, `/proof/proof.py` 파일과 읽기 permission bit를 확인한 뒤에만 `/tmp/d12-proof`를 만들고 mode를 설정한다. read-only bind mount는 runner의 Docker 생성 옵션과 실행 전 inspect로 확인한다.
 

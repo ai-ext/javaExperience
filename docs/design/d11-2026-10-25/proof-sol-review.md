@@ -11,17 +11,17 @@
 
 실제 Chrome CORS 강제와 실제 화면 DOM 검증은 부모 담당자의 별도 관문이다. 이 검토는 부모 브라우저 결과에 의존하지 않는다. Spring Boot4.1.1/Java25 원문, MySQL/JPA/JDBC server prepare, HSTS 브라우저 상태, 실제 키 회전, SCA/CVE 및 비밀번호 성능은 실행하지 않았다.
 
-검토 JSON: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/proof-sol-review.json
+검토 JSON: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/proof-sol-review.json
 
-명세 기록: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/proof-sol-logs/attempt1/01-spec-review.json
+명세 기록: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/proof-sol-logs/attempt1/01-spec-review.json
 
-quality 기록: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/proof-sol-logs/attempt1/09-quality-review.json
+quality 기록: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/proof-sol-logs/attempt1/09-quality-review.json
 
-raw·재실행 스크립트: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/proof-sol-logs/attempt1
+raw·재실행 스크립트: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/proof-sol-logs/attempt1
 
 ## 추가 비교 proof 2건 검토
 
-추가 범위만 별도 **spec PASS → quality PASS, C/I/M 0/0/0**다. 승인 소스는 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/source-proof/sqlite_compare_addendum.py`와 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/source-proof/sqlite_compare_addendum_runner.py` 두 개이며, source SHA는 `b947c0a9a8ef71be708ddec9a38a77c95796ace5f33a2a17f830efdda6fb5e1a`다. 기존 승인 소스 4개와 기존 실행 로그의 변경은 0건이다.
+추가 범위만 별도 **spec PASS → quality PASS, C/I/M 0/0/0**다. 승인 소스는 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/source-proof/sqlite_compare_addendum.py`와 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/source-proof/sqlite_compare_addendum_runner.py` 두 개이며, source SHA는 `b947c0a9a8ef71be708ddec9a38a77c95796ace5f33a2a17f830efdda6fb5e1a`다. 기존 승인 소스 4개와 기존 실행 로그의 변경은 0건이다.
 
 기대값을 실행 전에 고정한 뒤 native Python 3.14.3/SQLite 3.53.0에서 독립 재실행했다. reviewer 소유 새 `:memory:`의 동일 합성2행으로 exact SQL/binds를 실행해 ID-only1002는 `[{"id":1002,"owner_id":7}]`, UUID-only1003는 `[{"id":1003,"owner_id":8}]`를 얻었다. 기존 own-scoped1002의 동일 행과 UUID+owner7의 빈 결과도 독립 DB에서 대조했다. 입력 행은 기존 proof의 합성행과 정확히 같다.
 
@@ -29,8 +29,8 @@ expected만 바꾼 반례 2개와 actual seed owner만 바꾼 반례 1개는 모
 
 이 승인은 비교 관측2개만 추가한다. 제품 UI·이미지 정합의 최종 승인이 아니며, 브라우저·Git·외부CLI·다른모델을 호출하지 않았다. 실제 Spring/Java/MySQL/JPA/JDBC 실행으로 확대하지 않는다.
 
-추가 spec: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/proof-sol-logs/addendum/01-spec-review.json
+추가 spec: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/proof-sol-logs/addendum/01-spec-review.json
 
-추가 quality: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/proof-sol-logs/addendum/08-quality-review.json
+추가 quality: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/proof-sol-logs/addendum/08-quality-review.json
 
-추가 raw/재실행 스크립트: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/proof-sol-logs/addendum
+추가 raw/재실행 스크립트: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/proof-sol-logs/addendum

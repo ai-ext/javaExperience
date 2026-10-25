@@ -2,7 +2,7 @@
 
 초기 실행 전 계획이다. 현재 구현·실행·브라우저 확인 범위는 VERIFICATION.md를 따른다. 원문 전체 완료를 뜻하지 않는다.
 
-원문351줄을전문검토했다. /Users/ds/research/java-spring/R04-sql-crud-join.md 와현재repo원문은동일바이트다. 다른프로젝트리서치dssd-repos의R04는대상이아니다. 원문13fence(sql7/bash2/Java1/Kotlin1/yaml1/mermaid1)를행시작기준으로추출해들여쓴목록코드를보존했다.
+원문351줄을전문검토했다. LOCAL_HOME/research/java-spring/R04-sql-crud-join.md 와현재repo원문은동일바이트다. 다른프로젝트리서치dssd-repos의R04는대상이아니다. 원문13fence(sql7/bash2/Java1/Kotlin1/yaml1/mermaid1)를행시작기준으로추출해들여쓴목록코드를보존했다.
 
 1. 원문SQL7/Java원문및외부study schema/seed사본출처확인 → 원문SHA·전체HTML/text/code/anchor/map기준을고정한다.
 2. R03에서검증한공식portableMySQL8.4.11로매번새private datadir/socket인스턴스만사용 → 기존사용자DB·3306·설정·Docker를사용하지않는다. SQL사본의DROP을전달하기전에실제@@datadir/socket/PID/네트워크조건을검증한다.

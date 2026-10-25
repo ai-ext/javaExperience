@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "id": "post-view-dedupe",
+  "title": "같은 사람의 조회수를 하루에 한 번만 세기",
+  "summary": "로그인 회원의 같은 날짜 재조회와 작성자 조회는 카운트를 늘리지 않는다.",
+  "difficulty": "중급",
+  "group": "게시글과 소통",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "view",
+      "title": "날짜와 회원을 구분해 조회 집계하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "view",
+          "title": "날짜와 회원을 구분해 조회 집계하기",
+          "sourceUnits": [
+            "legacy:11-3"
+          ],
+          "brief": {
+            "purpose": "로그인 회원의 같은 날짜 재조회와 작성자 조회는 카운트를 늘리지 않는다.",
+            "task": "상세 읽기에서 post_view 기록이 새로 생성된 경우에만 원자적으로 view_count를 증가시킨다.",
+            "preconditions": [
+              "시나리오 DB(`community`). 이번 단계 마이그레이션은 `V21`이다.",
+              "community V21, 서버 기준 시간대 Asia/Seoul. 상세 API/기존 응답 구조를 유지한다."
+            ],
+            "scenario": [
+              {
+                "start": "새 글의 조회수는 0입니다. 김자바·박디비·작성자와 비로그인 요청을 구분합니다.",
+                "action": "김자바가 같은 날 두 번, 박디비가 한 번, 비로그인이 두 번, 작성자가 한 번 읽습니다.",
+                "result": "조회수는 0→1→1→2→3→4→4이며 회원별 날짜는 Asia/Seoul을 사용합니다.",
+                "after": "같은 회원/글/날짜의 기록은 한 행만 남고, 작성자 조회는 증가시키지 않습니다. 다음 날짜의 판정은 고정 Clock으로 별도 확인합니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "post_view(post_id,member_id,viewed_on)",
+                "reason": "같은 회원/날짜 중복, 다른 회원과 비로그인 식별 규칙을 기록한다."
+              },
+              {
+                "name": "W0 글의 view_count",
+                "reason": "W1~W7 원문 응답 값은 1,1,2,3,4,4,4로 변화한다."
+              }
+            ],
+            "policies": [
+              "복합 PK(post_id, member_id, viewed_on)에서 같은 회원·글·날짜는 한 행만 남긴다. Asia/Seoul 날짜를 기준으로 한다.",
+              "W1 김자바 첫 조회는 viewCount=1, W2 같은 회원 재조회도 1, W3 박디비 조회는 2다. W4·W5 비로그인 조회는 각각 3·4로 증가하고, W6 작성자 조회는 4를 유지한다.",
+              "상세 응답 viewCount는 이번 조회 반영값; 목록은 DB view_count 그대로. 새 post_view 행이 만들어졌을 때만 UPDATE post SET view_count=view_count+1 한다."
+            ],
+            "inputs": [
+              "legacy:11-3:W0: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 조회수 확인\",\"content\":\"x\"}; case=W0 이스프링의 새 글; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"W0\",\"expect\":{\"status\":201}}]",
+              "legacy:11-3:W1: GET /api/posts/{{W0.body.id}}; case=W1 김자바 처음; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"W1\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.viewCount\",\"equals\":1}]}}]",
+              "legacy:11-3:W2: GET /api/posts/{{W0.body.id}}; case=W2 김자바 또; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"W2\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.viewCount\",\"equals\":1}]}}]",
+              "legacy:11-3:W3: GET /api/posts/{{W0.body.id}}; case=W3 박디비 처음; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"W3\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.viewCount\",\"equals\":2}]}}]",
+              "legacy:11-3:W4: GET /api/posts/{{W0.body.id}}; case=W4 비로그인; source expected/status checks=[{\"id\":\"C5\",\"pointer\":\"/checks/4\",\"request\":\"W4\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.viewCount\",\"equals\":3}]}}]",
+              "legacy:11-3:W5: GET /api/posts/{{W0.body.id}}; case=W5 비로그인 또; source expected/status checks=[{\"id\":\"C5\",\"pointer\":\"/checks/4\",\"request\":\"W5\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.viewCount\",\"equals\":4}]}}]",
+              "legacy:11-3:W6: GET /api/posts/{{W0.body.id}}; case=W6 작성자 본인; source expected/status checks=[{\"id\":\"C6\",\"pointer\":\"/checks/5\",\"request\":\"W6\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.viewCount\",\"equals\":4}]}}]",
+              "legacy:11-3:W7: GET /api/boards/free/posts?size=1; case=W7 자유 게시판 첫 글; source expected/status checks=[{\"id\":\"C7\",\"pointer\":\"/checks/6\",\"request\":\"W7\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.items[0].id\",\"equals\":\"{{W0.body.id}}\"},{\"path\":\"$.items[0].viewCount\",\"equals\":4}]}}]"
+            ],
+            "success": [
+              "W1 김자바 첫 조회 200→1, W2 재조회 200→1, W3 박디비 첫 조회 200→2.",
+              "W4/W5 비로그인 조회 200→3/4, W6 작성자 조회 200→4, W7 목록 viewCount=4."
+            ],
+            "failures": [
+              {
+                "when": "상세 요청에서 대상 게시글을 확인할 수 없는 경우",
+                "result": "11-3 원문 check에 없는 글 없음/차단 사례는 HTTP 상태 미확인으로 유지한다.",
+                "unchanged": "상태 미확인; 신규 post_view 행/view_count 증가 여부는 추가 source check가 필요하다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "새 글의 조회수는 0입니다. 김자바·박디비·작성자와 비로그인 요청을 구분합니다.",
+                "action": "김자바가 같은 날 두 번, 박디비가 한 번, 비로그인이 두 번, 작성자가 한 번 읽습니다.",
+                "result": "같은 회원/글/날짜의 기록은 한 행만 남고, 작성자 조회는 증가시키지 않습니다. 다음 날짜의 판정은 고정 Clock으로 별도 확인합니다."
+              }
+            ],
+            "work": [
+              "중복 방지는 DB 키에 맡기고 증가 SQL은 view_count=view_count+1 형태로 동시성 안전하게 수행한다."
+            ],
+            "done": [
+              "조회수는 0→1→1→2→3→4→4이며 회원별 날짜는 Asia/Seoul을 사용합니다.",
+              "같은 회원/글/날짜의 기록은 한 행만 남고, 작성자 조회는 증가시키지 않습니다. 다음 날짜의 판정은 고정 Clock으로 별도 확인합니다.",
+              "상세 요청에서 대상 게시글을 확인할 수 없는 경우 → 11-3 원문 check에 없는 글 없음/차단 사례는 HTTP 상태 미확인으로 유지한다. 상태 미확인; 신규 post_view 행/view_count 증가 여부는 추가 source check가 필요하다."
+            ]
+          },
+          "hints": [
+            "같은 날짜의 두 요청이 동시에 들어오면 애플리케이션의 사전 조회만으로 중복을 막을 수 있을까요?",
+            "INSERT가 실제로 1행을 만들었는지를 조회수 증가 조건으로 쓰면 어떤 race가 사라질까요?",
+            "작성자와 비로그인 사용자는 post_view 행을 남기지 않는다는 규칙을 어느 분기에서 표현할까요?"
+          ],
+          "recipeIds": [
+            "legacy:11-3:W0",
+            "legacy:11-3:W1",
+            "legacy:11-3:W2",
+            "legacy:11-3:W3",
+            "legacy:11-3:W4",
+            "legacy:11-3:W5",
+            "legacy:11-3:W6",
+            "legacy:11-3:W7"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "11-3-view-count.html",
+              "href": "/scenario/ch11-post-advanced/11-3-view-count.html"
+            },
+            {
+              "label": "R03-schema-types-constraints.html",
+              "href": "/docs/knowledge/R03-schema-types-constraints.html"
+            },
+            {
+              "label": "S10-spring-data-query.html",
+              "href": "/docs/knowledge/S10-spring-data-query.html"
+            },
+            {
+              "label": "E3-what-is-jpa.html",
+              "href": "/lessons/E3-what-is-jpa.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

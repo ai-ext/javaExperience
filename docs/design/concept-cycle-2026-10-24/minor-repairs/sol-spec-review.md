@@ -18,9 +18,9 @@
 | D02-Q01 | PASS | TLS title/lead/values/note/alt와 diagnose-layers까지 완료 proxyRequests 증가0/handler진입미계측으로 한정. generated bundle 실제 diagnose 값 확인. tls-v2.jpg 직접 view_image, source counter 단위·미계측 footer 일치 및 SHA 검증. raw/check/기존이미지 보존. AST분리단위실행 handlerEntries1/completedProxyRequestsAdded0. 상대경로/http.server미수입 회귀도 수정, site cwd 및 root --prefix npm 양쪽 exit0. TLS새실험 없음. |
 | D04-Q1 | PASS | 원문 링크 직전 바깥에 §1 L23/§3.4 L108은 고정 실행순서 아님 안내. 두 버튼이 generated bundle에서 graph-branches/assemble-boundary 실제 topic/stage/select/title로 이동. 원문/보존본문 불변, npm exit0. |
 
-최초 B01 plumbing/D02 diagnose 잔존 FAIL과 두 번째 D02 AST harness FAIL은 각각 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-24/minor-repairs/attempts/sol-spec-initial-fail 및 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-24/minor-repairs/attempts/sol-spec-stable-handoff-fail 에 보존했다. 마지막 D02 수정은 source 절대경로 전달과 http.server 명시 import이며 정식 npm 실행 두 방식에서 통과했다.
+최초 B01 plumbing/D02 diagnose 잔존 FAIL과 두 번째 D02 AST harness FAIL은 각각 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-24/minor-repairs/attempts/sol-spec-initial-fail 및 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-24/minor-repairs/attempts/sol-spec-stable-handoff-fail 에 보존했다. 마지막 D02 수정은 source 절대경로 전달과 http.server 명시 import이며 정식 npm 실행 두 방식에서 통과했다.
 
-검증: 관련 npm8 모두 통과. P09 이미지 체인은 test:jpg 추가 통과. JPG 매핑/파일/source해시/destination해시 변이4개, P16/S09 active 변이3개, W11 guard제거 변이2개가 기대 오류를 검출했다. W11독립8분기·B01공백제외 원문동등성·D02/D04/V04 생성 bundle/DOM 특정동작도 확인했다. 로그는 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-24/minor-repairs/sol-spec-logs/final 에 있다.
+검증: 관련 npm8 모두 통과. P09 이미지 체인은 test:jpg 추가 통과. JPG 매핑/파일/source해시/destination해시 변이4개, P16/S09 active 변이3개, W11 guard제거 변이2개가 기대 오류를 검출했다. W11독립8분기·B01공백제외 원문동등성·D02/D04/V04 생성 bundle/DOM 특정동작도 확인했다. 로그는 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-24/minor-repairs/sol-spec-logs/final 에 있다.
 
 보존: preexistingDirty2·historicalProof1366·initial24Reviews24는 baseline SHA와 일치하고 docs/knowledge 원문MD135·학습자src17는 HEAD 바이트와 일치했다. 마지막 검사에도 불일치0. 검토한 소스·bundle·HTML·TLS이미지의 SHA snapshot도 기록했다.
 

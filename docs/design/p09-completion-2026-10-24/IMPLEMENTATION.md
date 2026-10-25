@@ -33,7 +33,7 @@
 - `npm run test:concept-dark`: 성공. 다크 범위와 136개 페이지 기준 통과.
 - `git diff --check`: 성공.
 - 독립 데이터 변이 재검사: `sum-items` 배열 길이와 `sum-array` 원소를 각각 잘못된 값으로 바꾸면 두 경우 모두 신규 contract의 전체 값 비교에서 실패했다. 변이된 bundle은 임시 메모리에서만 만들었고 proof·product data는 변경하지 않았다.
-- 독립 UI 검수 attempt2: Spec/Quality PASS, C0/I0/M0, 미해결 finding 0. 최종 판정과 범위는 [ui-sol-review.md](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-completion-2026-10-24/ui-sol-review.md)에 기록돼 있다.
+- 독립 UI 검수 attempt2: Spec/Quality PASS, C0/I0/M0, 미해결 finding 0. 최종 판정과 범위는 [ui-sol-review.md](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-completion-2026-10-24/ui-sol-review.md)에 기록돼 있다.
 - Java proof는 다시 컴파일하지 않았다. 고정 SHA `527af7d57af199b72a6c83cd61a4de1771a98e32c7b6e1eafb39410ce2bfe95b`, execution의 expected/actual 13개 값, raw stdout, 선정 이미지 SHA를 신규 검사로 대조했다. 별도 proof 재실행 승인은 기존 독립검수 자료에 기록돼 있다.
 
 ## 남은 확인과 한계

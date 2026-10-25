@@ -4,9 +4,9 @@
 
 ## 로컬 자료 직접 열람
 
-- `/Users/ds/research/java-spring/R03-schema-types-constraints.md` — 기존 R03 전체 읽음. DB 타입 표, VARCHAR·인덱스, temporal, NULL/DEFAULT, PK/FK, UNIQUE/CHECK, 단계별 실습/DML과 DDL 관련 설명 확인.
-- `/Users/ds/research/java-spring/practice/schema/schema.sql` — 전체 읽음. `DROP DATABASE IF EXISTS ds_practice`, schema 생성과 InnoDB/utf8mb4, PK/FK/CHECK/UNIQUE/DEFAULT, DECIMAL, DATE/DATETIME/TINYINT(1), 각 인덱스 정의 확인.
-- `/Users/ds/research/java-spring/practice/schema/seed.sql` — 전체 읽음. `SET NAMES utf8mb4`, 기준일, 여러 테이블 데이터 작성 확인. 실행 안 함.
+- `LOCAL_HOME/research/java-spring/R03-schema-types-constraints.md` — 기존 R03 전체 읽음. DB 타입 표, VARCHAR·인덱스, temporal, NULL/DEFAULT, PK/FK, UNIQUE/CHECK, 단계별 실습/DML과 DDL 관련 설명 확인.
+- `LOCAL_HOME/research/java-spring/practice/schema/schema.sql` — 전체 읽음. `DROP DATABASE IF EXISTS ds_practice`, schema 생성과 InnoDB/utf8mb4, PK/FK/CHECK/UNIQUE/DEFAULT, DECIMAL, DATE/DATETIME/TINYINT(1), 각 인덱스 정의 확인.
+- `LOCAL_HOME/research/java-spring/practice/schema/seed.sql` — 전체 읽음. `SET NAMES utf8mb4`, 기준일, 여러 테이블 데이터 작성 확인. 실행 안 함.
 - 작업 디렉터리 파일 목록 조회에서 javaExperience 현재 저장소 내 `ds_practice` 스키마/seed가 확인되지 않았다. 이는 다른 MySQL 서비스/사용자 DB 부재를 입증하지 않는다.
 
 ## 공식 본문에서 직접 확인한 내용

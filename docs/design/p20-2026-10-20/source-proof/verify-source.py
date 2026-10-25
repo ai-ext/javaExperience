@@ -10,7 +10,7 @@ for name in names:
  b=next(b for b in blocks if re.search(r'public (?:abstract )?(?:class|record) '+name+r'\b',b))+'\n'
  assert (OUT/'original'/f'{name}.java').read_text()==b,name
 assert(OUT/'corrected/OrderResponse.java').read_text()==(OUT/'original/OrderResponse.java').read_text().replace('l.getStatus().name()','String.valueOf(l.getStatus())')
-deps=json.loads((OUT/'dependencies.json').read_text());jdk='/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home'
+deps=json.loads((OUT/'dependencies.json').read_text());jdk='LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home'
 compile_out=OUT/'compile-output';compile_out.mkdir(exist_ok=True)
 r=subprocess.run([jdk+'/bin/javac','-cp',os.pathsep.join(d['file']for d in deps),'-d',str(compile_out),*[str(OUT/'original'/f'{n}.java')for n in names]],capture_output=True,text=True)
 (OUT/'original-compile.txt').write_text(r.stdout+r.stderr)

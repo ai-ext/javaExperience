@@ -20,6 +20,6 @@ P16 실제1668×832에서 메뉴/reader 왼쪽40.03125px, reader1587.9375px, 원
 
 ## 시각 참고와 남은 범위
 
-gpt-image-prompt/imagegen 스킬을 적용해 실제 built-in imagegen 1회 생성했다. 원본 /Users/ds/.codex/generated_images/01a154b3-918f-7c03-b91b-df3e8d21b2a3/exec-242e15ee-4fc3-4de9-9419-f7cf7550b563.png, 선정본 reader-reference.jpg는실제JPEG quality92/1775×886이다. 최종 같은1775×886 실제 화면은 final-p16-wide-1775.jpg, 프롬프트는 image-prompt.txt다. 제품은 원문DOM을 보존하므로 이미지에 임의로 들어간 축약annotation·줄번호·새비교표는 추가하지 않았다. 시안은배치 방향이며 기술 근거나 pixel동등 판정이 아니다.
+gpt-image-prompt/imagegen 스킬을 적용해 실제 built-in imagegen 1회 생성했다. 원본 LOCAL_HOME/.codex/generated_images/01a154b3-918f-7c03-b91b-df3e8d21b2a3/exec-242e15ee-4fc3-4de9-9419-f7cf7550b563.png, 선정본 reader-reference.jpg는실제JPEG quality92/1775×886이다. 최종 같은1775×886 실제 화면은 final-p16-wide-1775.jpg, 프롬프트는 image-prompt.txt다. 제품은 원문DOM을 보존하므로 이미지에 임의로 들어간 축약annotation·줄번호·새비교표는 추가하지 않았다. 시안은배치 방향이며 기술 근거나 pixel동등 판정이 아니다.
 
 산문 폭을 유지하므로 오른쪽에 여유 공간이 남는 문단은 있다. 코드/표/장면을 포함한 바깥 화면까지 중앙의 좁은 틀에 가두던 제한은 해제했다. 새 모바일·라이트·file URL 오프라인 검증이나134개 개별 학습효과/전체상태 검증은 이번 완료 범위가 아니다. 장부는 신규verified 승격 없이 공통 적용과 표본 검증을 구분한다. 모든 새 이미지·캡처는 JPG다.

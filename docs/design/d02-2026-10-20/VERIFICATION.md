@@ -1,6 +1,6 @@
 # D02 서버·네트워크 부분 보강
 
-2026-10-20, /Users/ds/code/javaExperience/.worktrees/concept-learning-night 의 개념 전용 작업이다.10질문27상태·선정PNG10장/실제imagegen13개·draft3개를 구현했다. 원문 전체 장면·전수 픽셀·학습자 이해도나134문서 전체를 완료 처리하지 않는다. merge·push·PR은 하지 않았다.
+2026-10-20, LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night 의 개념 전용 작업이다.10질문27상태·선정PNG10장/실제imagegen13개·draft3개를 구현했다. 원문 전체 장면·전수 픽셀·학습자 이해도나134문서 전체를 완료 처리하지 않는다. merge·push·PR은 하지 않았다.
 
 ## 원문과 실제 실행
 

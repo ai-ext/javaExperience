@@ -2,7 +2,7 @@
 
 reviewer p09_review가 original SQL/source/SHA와 run-proof safetyguard를 읽고 별도 fixture복제 /var/folders/v7/q1cs_f5d0n7cccrbydpm88xr0000gn/T/r03-review-proof-lk_4nu0e/source-proof 에서 재현했다.
 
-- MySQL8.4.11 새 datadir /Users/ds/research/javaexperience-r03-20261020/_data/reviewer-runtime/run-584avdzy/data/ : 35PASS/frozenMatchtrue/currentexecution전체동일.
+- MySQL8.4.11 새 datadir LOCAL_HOME/research/javaexperience-r03-20261020/_data/reviewer-runtime/run-584avdzy/data/ : 35PASS/frozenMatchtrue/currentexecution전체동일.
 - @@datadir/socket일치, skip_networking1, mysqlxDISABLED, socket디렉터리0700 확인 후 schema사본을 적재했다. own mysqladmin shutdown 뒤 serverExit0/serverStoppedtrue. 기존DB/원본proof 수정없음.
 - external원본schema/seed SHA와사본현재동일. 미실행으로남았던metadata는메인갱신으로Minor해소.
 - 현재기술/범위Critical/Important/Minor0. UI/이미지는이리뷰시점미검토다.

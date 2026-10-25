@@ -1,0 +1,159 @@
+{
+  "version": 1,
+  "id": "purge-trash",
+  "title": "오래된 휴지통 글을 작은 묶음으로 정리하기",
+  "summary": "삭제 후 30일이 지난 글을 자식 관계부터 1000개 청크 단위로 물리 삭제한다.",
+  "difficulty": "고급",
+  "group": "자동화와 작업",
+  "prerequisites": [
+    "trash-restore"
+  ],
+  "stages": [
+    {
+      "id": "purge",
+      "title": "자식 관계부터 지우고 다음 묶음 이어 가기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "purge",
+          "title": "자식 관계부터 지우고 다음 묶음 이어 가기",
+          "sourceUnits": [
+            "legacy:15-4"
+          ],
+          "brief": {
+            "purpose": "삭제 후 30일이 지난 글을 자식 관계부터 1000개 청크 단위로 물리 삭제한다.",
+            "task": "휴지통 정리 배치와 자식별 삭제 건수·청크 커밋을 구현한다.",
+            "preconditions": [
+              "학습용 DB(`practice`) — 앱을 `practice` 프로파일로 띄운다. \"지금\" = 2026-10-05 00:00.",
+              "practice 고정 시각 2026-10-05 00:00; V63 시드 2,420개와 30일 경계가 준비됨."
+            ],
+            "scenario": [
+              {
+                "start": "원본 fixedClock은 2026-10-05이고 정리 경계는 2026-09-05 00:00입니다.",
+                "action": "만료한 교육용 부모 2404개를 1000건씩 정리하고 각 자식 관계·commit 경계를 확인합니다.",
+                "result": "9월 4일 23:59:59 삭제 행은 정리하고 정확히 9월 5일 00:00 행은 남습니다. 자식부터 지워 FK를 지킵니다.",
+                "after": "실패한 chunk는 부모/자식을 함께 rollback합니다. 이미 commit한 chunk는 별도 기록하며 시리즈 원본은 남깁니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "post.deleted_at, child FK rows",
+                "reason": "30일 기준과 자식 삭제 순서를 실제 FK 데이터로 검증한다."
+              },
+              {
+                "name": "chunk size=1000; expired seed=2,400; total old deleted=2,404",
+                "reason": "원문 연습 seed의 대상 건수와 청크 경계를 재현한다."
+              }
+            ],
+            "policies": [
+              "기준 시각은 practice Clock 2026-10-05 00:00, cutoff=2026-09-05 00:00:00. 정확 cutoff 시각 행은 남고 2026-09-04 23:59:59는 삭제한다.",
+              "원문 seed의 만료 parent는 2,404개(기존 42·59·60·67 포함); 청크는 1,000씩 transaction commit한다. 부모 post보다 child FK부터 지우며 답글→원댓글 순이다.",
+              "11·14장 FK 대상도 적용된 경우 post_image/view/revision/reaction/poll_option/poll_vote/poll/pin/series_post/recent_view를 함께 처리한다. series 자체는 남긴다."
+            ],
+            "inputs": [
+              "legacy:15-4:T1: POST /api/admin/jobs/trash-purge/run; case=비우기; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"T1\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.cutoff\",\"equals\":\"2026-09-05T00:00:00\"}],\"anyOf\":[{\"json\":[{\"path\":\"$.deletedPosts\",\"equals\":2404},{\"path\":\"$.chunks\",\"equals\":[1000,1000,404]},{\"path\":\"$.deleted.likes\",\"equals\":4827},{\"path\":\"$.deleted.replies\",\"equals\":2401},{\"path\":\"$.deleted.comments\",\"equals\":2408},{\"path\":\"$.deleted.bookmarks\",\"equals\":2407},{\"path\":\"$.deleted.notifications\",\"equals\":480}]},{\"json\":[{\"path\":\"$.deletedPosts\",\"equals\":0},{\"path\":\"$.chunks\",\"length\":0}]}]}}]",
+              "legacy:15-4:T2: POST /api/admin/jobs/trash-purge/run; case=한 번 더; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"T2\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.deletedPosts\",\"equals\":0},{\"path\":\"$.chunks\",\"type\":\"array\"},{\"path\":\"$.chunks\",\"length\":0}]}}]",
+              "legacy:15-4:T4: POST /api/admin/jobs/trash-purge/run?date=2026-10-06; case=미래 날짜; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"T4\",\"expect\":{\"status\":400,\"json\":[{\"path\":\"$.errors[*].field\",\"contains\":\"date\"}]}}]",
+              "legacy:15-4:T6: POST /api/admin/jobs/trash-purge/run; case=일반 회원; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"T6\",\"expect\":{\"status\":403}}]",
+              "legacy:15-4:T7: POST /api/admin/jobs/trash-purge/run; case=토큰 없음; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"T7\",\"expect\":{\"status\":401}}]"
+            ],
+            "success": [
+              "만료 대상 2,404개를 청크 [1000,1000,404]로 삭제한다.",
+              "원문 check의 deleted child counts: likes=4827, replies=2401, comments=2408, bookmarks=2407, notifications=480; exact cutoff와 20개 미만료 글은 남는다."
+            ],
+            "failures": [
+              {
+                "when": "POST /api/admin/jobs/trash-purge/run?date=2026-10-06 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 400 — 원문 check의 실패 응답",
+                "unchanged": "실패 청크의 부모·자식 행 전체를 롤백한다; 앞서 커밋한 청크 여부는 별도 기록한다."
+              },
+              {
+                "when": "POST /api/admin/jobs/trash-purge/run?date=2026-10-06 · [교육용 fixture · legacy:15-4:T4] 미래 날짜",
+                "result": "HTTP 400 (T4); $.errors[*].field contains \"date\"",
+                "unchanged": "실패한 청크의 부모·자식 행은 함께 rollback한다; 이미 commit한 청크 여부는 별도로 남긴다."
+              },
+              {
+                "when": "POST /api/admin/jobs/trash-purge/run · [교육용 fixture · legacy:15-4:T6] 일반 회원",
+                "result": "HTTP 403 (T6)",
+                "unchanged": "실패한 청크의 부모·자식 행은 함께 rollback한다; 이미 commit한 청크 여부는 별도로 남긴다."
+              },
+              {
+                "when": "POST /api/admin/jobs/trash-purge/run · [교육용 fixture · legacy:15-4:T7] 토큰 없음",
+                "result": "HTTP 401 (T7)",
+                "unchanged": "실패한 청크의 부모·자식 행은 함께 rollback한다; 이미 commit한 청크 여부는 별도로 남긴다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "원본 fixedClock은 2026-10-05이고 정리 경계는 2026-09-05 00:00입니다.",
+                "action": "만료한 교육용 부모 2404개를 1000건씩 정리하고 각 자식 관계·commit 경계를 확인합니다.",
+                "result": "실패한 chunk는 부모/자식을 함께 rollback합니다. 이미 commit한 chunk는 별도 기록하며 시리즈 원본은 남깁니다."
+              }
+            ],
+            "work": [
+              "정확한 대상 cutoff/end-exclusive와 자식 삭제 순서를 적용하고 트랜잭션 경계를 청크별로 구성한다."
+            ],
+            "done": [
+              "9월 4일 23:59:59 삭제 행은 정리하고 정확히 9월 5일 00:00 행은 남습니다. 자식부터 지워 FK를 지킵니다.",
+              "실패한 chunk는 부모/자식을 함께 rollback합니다. 이미 commit한 chunk는 별도 기록하며 시리즈 원본은 남깁니다.",
+              "POST /api/admin/jobs/trash-purge/run?date=2026-10-06 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 실패 청크의 부모·자식 행 전체를 롤백한다; 앞서 커밋한 청크 여부는 별도 기록한다.",
+              "POST /api/admin/jobs/trash-purge/run?date=2026-10-06 · [교육용 fixture · legacy:15-4:T4] 미래 날짜 → HTTP 400 (T4); $.errors[*].field contains \"date\" 실패한 청크의 부모·자식 행은 함께 rollback한다; 이미 commit한 청크 여부는 별도로 남긴다."
+            ]
+          },
+          "hints": [
+            "30일 경계값을 cutoff에 포함하면 원문이 보존하라고 한 행을 어떻게 잘못 삭제하게 될까요?",
+            "답글이 원댓글을 참조할 때 comment를 한 번에 지우면 어떤 FK 순서가 필요한가요?",
+            "청크별 커밋이면 두 번째 청크 실패 후 첫 번째 청크의 상태는 어떤 확인값으로 남아 있어야 할까요?"
+          ],
+          "recipeIds": [
+            "legacy:15-4:T1",
+            "legacy:15-4:T2",
+            "legacy:15-4:T4",
+            "legacy:15-4:T6",
+            "legacy:15-4:T7"
+          ],
+          "executionChecks": [
+            {
+              "title": "휴지통 시드 경계와 청크 결과 확인",
+              "command": "./gradlew bootRun --args=\"--spring.profiles.active=practice\"",
+              "expected": "practice Clock=2026-10-05 00:00; 대상/경계 seed가 로드된다. 문서의 T11 실행 recipe가 없는 경우 기존 실행 도구 대신 원문 단계의 실행 경로만 선택한다.",
+              "record": "deleted.* 자식 종류별 삭제 건수, 1000건 청크 결과, 30일 경계 행과 시리즈 보존을 SQL로 기록한다."
+            }
+          ],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "15-4-trash-purge.html",
+              "href": "/scenario/ch15-scheduling-batch/15-4-trash-purge.html"
+            },
+            {
+              "label": "S08-transactions.html",
+              "href": "/docs/knowledge/S08-transactions.html"
+            },
+            {
+              "label": "S15-async-scheduling-batch.html",
+              "href": "/docs/knowledge/S15-async-scheduling-batch.html"
+            },
+            {
+              "label": "R03-schema-types-constraints.html",
+              "href": "/docs/knowledge/R03-schema-types-constraints.html"
+            },
+            {
+              "label": "R05-index-btree.html",
+              "href": "/docs/knowledge/R05-index-btree.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

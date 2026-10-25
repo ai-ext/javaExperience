@@ -4,14 +4,14 @@
 
 ## 고정 입력과 검수 경계
 
-- 작업 공간: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night`
+- 작업 공간: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night`
 - 원격 main 기준: `a70f1bd531c1b72077d56e7363ff424ba5795143`
 - HEAD: `b93457b577d913f2a7dbe2635f88c1a0d6e4920a`
 - 최신 WIP 포함 검수 snapshot: `e6f837ab420d903ad7c4a21a75744502b44492ab`
-- 입력: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/merge-readiness-2026-10-25/INPUT-SNAPSHOT.json`
-- 아래 핵심 소스 16개는 검수 당시 worktree 바이트와 snapshot blob이 모두 일치했다. 해시는 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/merge-readiness-2026-10-25/code-review.json`에 기록했다.
+- 입력: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/merge-readiness-2026-10-25/INPUT-SNAPSHOT.json`
+- 아래 핵심 소스 16개는 검수 당시 worktree 바이트와 snapshot blob이 모두 일치했다. 해시는 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/merge-readiness-2026-10-25/code-review.json`에 기록했다.
 
-소스를 대조해 관련 경계를 검토한 범위는 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/` 아래 `knowledge-reader.mjs`, `knowledge-reader.js`, `knowledge-reader.css`, `knowledge-catalog-data.mjs`, `knowledge-catalog-view.mjs`, `knowledge-catalog-controller.mjs`, `knowledge-dark.css`, `site-navigation.mjs`, `knowledge-navigation.css`, `d12-source-diagrams.mjs`, `p09-learning.js`, `d11-learning.js`, `d12-learning.js`, `d11-learning.mjs`, `d12-learning.mjs`다. `build.mjs`는 변경 중 registration·source wrapper·escaping·asset version·Mermaid bootstrap 경계를 집중 검토했으며 파일의 무관한 모든 기능을 전수 감사하지 않았다.
+소스를 대조해 관련 경계를 검토한 범위는 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/` 아래 `knowledge-reader.mjs`, `knowledge-reader.js`, `knowledge-reader.css`, `knowledge-catalog-data.mjs`, `knowledge-catalog-view.mjs`, `knowledge-catalog-controller.mjs`, `knowledge-dark.css`, `site-navigation.mjs`, `knowledge-navigation.css`, `d12-source-diagrams.mjs`, `p09-learning.js`, `d11-learning.js`, `d12-learning.js`, `d11-learning.mjs`, `d12-learning.mjs`다. `build.mjs`는 변경 중 registration·source wrapper·escaping·asset version·Mermaid bootstrap 경계를 집중 검토했으며 파일의 무관한 모든 기능을 전수 감사하지 않았다.
 
 검토한 테스트는 reader 보존·hash/history 계약, catalog 검색·복귀·storage/IME·텍스트 보안, D12 도식 visible-only/anchor guard, D11/D12 데이터 계약·generated 검사의 관련 assert다. 수백만 줄의 proof 원자료와 모든 fixture payload를 재실행·전수 재검증하지 않았다.
 
@@ -20,18 +20,18 @@
 ### M1 · D12 단계 경계에서 focus 복구 조건이 변경 전 값을 검사한다
 
 - 분류: **Minor / 현재 HEAD에 도입된 오류 / 미수정**.
-- 위치: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/d12-learning.js:162`와 `:164`.
+- 위치: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/d12-learning.js:162`와 `:164`.
 - 사실: `focusWasDisabled`는 `render()` 이전 `doc.activeElement.disabled`의 Boolean이다. 활성 Next/Previous 버튼으로 이동할 때 이 값은 `false`다. `render()`가 끝점에서 해당 버튼을 disabled로 바꿔도 이미 저장한 값은 바뀌지 않아 stage 버튼으로 focus를 옮기는 분기가 실행되지 않는다.
 - 재현: 기본 질문에서 끝에서 두 번째 단계 선택 → Next에 focus → 클릭; 또는 두 번째 단계 선택 → Previous에 focus → 클릭. source와 generated bundle 각각 두 방향, 총 4건에서 이동 버튼이 disabled가 된 후에도 activeElement가 그 버튼에 남고 선택 stage에는 focus가 가지 않았다.
-- 정상 인접 동작: D12의 선택 stage/관측 내용 자체는 기대하는 마지막·첫 단계로 이동했다. D11은 같은 4조건에서 element 참조를 보존한 뒤 `focused.disabled`를 검사하므로 선택 stage로 focus를 이동했다. D11의 비교 위치는 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/d11-learning.js:131`이다.
+- 정상 인접 동작: D12의 선택 stage/관측 내용 자체는 기대하는 마지막·첫 단계로 이동했다. D11은 같은 4조건에서 element 참조를 보존한 뒤 `focused.disabled`를 검사하므로 선택 stage로 focus를 이동했다. D11의 비교 위치는 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/d11-learning.js:131`이다.
 - 실제 Chrome 재현: 메인이 `redirect-order` 질문에서 `append` → Next → 마지막 `overwrite-output`, `stderr-first` → Previous → 첫 `stdout-first`의 두 경계를 조작했다. 두 경우 모두 경계 버튼은 disabled, 선택 stage는 정상 변경됐지만 `activeTag`와 `activeText`는 `BODY`였다. JSDOM에서는 activeElement가 disabled 이동 버튼에 남는 반면 Chrome에서는 BODY로 빠지는 차이가 있다. 두 결과 모두 의도한 선택 stage로 focus가 복구되지 않는 M1을 뒷받침한다. 이 검수자는 메인이 수집한 JSON을 읽었고 브라우저를 직접 조작하지 않았다.
-- 실제 Chrome 근거: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/merge-readiness-2026-10-25/d12-focus-native.json`. 캡처는 메인이 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/merge-readiness-2026-10-25/d12-focus-native.jpg`에 보관했다. 이후 Tab 순서와 수정 후 focus 복구는 아직 검증하지 않았다.
+- 실제 Chrome 근거: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/merge-readiness-2026-10-25/d12-focus-native.json`. 캡처는 메인이 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/merge-readiness-2026-10-25/d12-focus-native.jpg`에 보관했다. 이후 Tab 순서와 수정 후 focus 복구는 아직 검증하지 않았다.
 - 영향: 경계에 도달한 키보드 사용자의 focus 이동 계약이 깨진다. 실제 Chrome에서는 선택 stage 대신 BODY로 focus가 빠진다. 콘텐츠·복사 데이터·원문이 손실되는 결함은 확인되지 않았다.
 - 도입 근거: `git blame -L 159,164 b93457b577d913f2a7dbe2635f88c1a0d6e4920a -- tools/site/d12-learning.js`는 모두 `b93457b577d913f2a7dbe2635f88c1a0d6e4920a` (`docs: add D12 PC dark Linux concept learning`)로 연결된다. 최신 catalog/reader CSS WIP에서 도입된 문제는 아니다.
 - 교정 과제: render 전 focused element 참조를 보관하고 render 후 그 element의 `disabled`를 검사한다. D11과 같은 단순 패턴이면 충분하다. source와 generated bundle의 양방향 경계 focus 검사를 추가하고 실제 PC 키보드로 끝점 이동을 확인한다. 이번 작업은 검수이므로 제품 코드를 수정하지 않았다.
-- 재현 스크립트: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/merge-readiness-2026-10-25/code-repro-d12-focus.mjs`
-- 관찰 결과: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/merge-readiness-2026-10-25/code-repro-d12-focus.json`
-- 재현 명령: `node /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/merge-readiness-2026-10-25/code-repro-d12-focus.mjs`
+- 재현 스크립트: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/merge-readiness-2026-10-25/code-repro-d12-focus.mjs`
+- 관찰 결과: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/merge-readiness-2026-10-25/code-repro-d12-focus.json`
+- 재현 명령: `node LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/merge-readiness-2026-10-25/code-repro-d12-focus.mjs`
 
 위 스크립트 exit 0은 **관찰 자료 생성 성공**이다. 제품 정상 동작 검사를 통과했다는 뜻이 아니다. 기존 D12 계약 하네스가 녹색이어도 이 결함은 남아 있다.
 
@@ -48,7 +48,7 @@
 
 ## 이번 검수에서 실행한 검사
 
-작업 디렉터리는 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site`다. 아래 순차 명령은 최종 exit 0이었다.
+작업 디렉터리는 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site`다. 아래 순차 명령은 최종 exit 0이었다.
 
 1. `node test-knowledge-reader.mjs` → 134개 원문·코드·ID·Markdown baseline, hash/history 등 PASS.
 2. `node test-knowledge-catalog.mjs` → 14 tests, pass 14, fail 0.
@@ -57,7 +57,7 @@
 
 별도로 M1 반례 스크립트를 실행했다. D12 source/bundle 4경계에서 잘못된 focus를 관찰했고 D11 source/bundle 4경계는 인접 정상 동작이었다. 이어 메인이 수집한 실제 Chrome 양방향 2경계 JSON을 대조해 선택 stage 대신 BODY로 focus가 빠지는 결과를 확인했다. 기존 계약 하네스 통과와 이 동작 결함은 공존한다.
 
-기존 catalog/reader Sol 보고서는 현재 CSS·view 해시와 대조해 **과거 한정 UI 근거**로만 사용했다. `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/catalog-polish-2026-10-25/SOL-REVIEW.json`의 해시 두 개는 현 소스와 일치하며, `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/reader-width-2026-10-25/SOL-REVIEW.json`의 최종 reader CSS SHA도 일치한다. 이 검수자는 새 브라우저 조작이나 캡처 전수 열람을 하지 않았다.
+기존 catalog/reader Sol 보고서는 현재 CSS·view 해시와 대조해 **과거 한정 UI 근거**로만 사용했다. `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/catalog-polish-2026-10-25/SOL-REVIEW.json`의 해시 두 개는 현 소스와 일치하며, `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/reader-width-2026-10-25/SOL-REVIEW.json`의 최종 reader CSS SHA도 일치한다. 이 검수자는 새 브라우저 조작이나 캡처 전수 열람을 하지 않았다.
 
 ## 남은 작업과 판정 범위
 

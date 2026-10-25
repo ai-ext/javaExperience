@@ -1,7 +1,7 @@
 # 2026-10-24 최신 작업 범위
 
 - 기존134개 개념학습 개발을 계속한다. 기존24개 감사 뒤 잔여minor9 수정 사이클을 먼저 닫고, P09 두개 공백 보강과 전체진입/산문/표/코드 정보구조를 적용한다.
-- 사용자8766주소는 기존미리캔버스비교보드로실제확인. 개념도감134용추가조사는 /Users/ds/research/javaexperience-concept-ia-20261024 에 directOpenAI CodexCLI gpt-6-luna/high+인증MiriMCP로실행했다. LiteLLM없음.
+- 사용자8766주소는 기존미리캔버스비교보드로실제확인. 개념도감134용추가조사는 LOCAL_HOME/research/javaexperience-concept-ia-20261024 에 directOpenAI CodexCLI gpt-6-luna/high+인증MiriMCP로실행했다. LiteLLM없음.
 - **최신 사용자 지시: PC 다크 화면만 설계·구현·검증. 모바일·라이트 추가 작업 제외.** 이미생성/검증한기록은보존하되새작업의완료조건으로요구하지않는다. 이전계획의모바일관문은이최신지시로대체한다.
 - 기존홈의첫API시작과학습자원문/서버는보존한다. 개념진입/읽기구조는새요청으로설계범위에포함된다. 8766원본보드/다른worktree는읽기전용. 구현은현재개념worktree에서한다.
 - 신규/수정이미지는 actualimagegen+스킬검수·최종JPG. 템플릿은배치분석참고이고미리캔버스원본자산을제품repo에복제하지않는다.

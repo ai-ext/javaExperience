@@ -13,7 +13,7 @@ HEAD: `4b0493af52b1a06decca909d6bf9a8b6f9610686`.
 
 ## HARNESS-005 · important
 
-위치: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py:357`, 관련 `_write_json`은 212~215행.
+위치: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py:357`, 관련 `_write_json`은 212~215행.
 
 symlink 검사는 runner 이전에만 수행되며 결과 기록 시 경계를 다시 확인하지 않는다. 실행 중 생성된 run/임시 결과 symlink를 따라 범위 밖 파일을 작성·덮어쓰고 passed를 반환한다.
 
@@ -25,18 +25,18 @@ symlink 검사는 runner 이전에만 수행되며 결과 기록 시 경계를 �
 
 ## 검토 입력 해시
 
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py`: `a7713b4d240bc2dc69f619d2e3d9530b05f53d79591cda15c5c9a2ed1140d99e`
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/test-harness.py`: `19dec8279d8c16a5b385d1c2f62adb16eaa129800b5f418ef89e99d166c3ad60`
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/HARNESS.md`: `2fcb4ed80ba7d1e2c6141cc7f451b25ce152c07368bfe2493a13307b40917103`
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/AUDIT-CONTRACT.md`: `06f0bad92b7fcb7b4bc590ea8e9d891556c68d2de94dcb2223997dbd5f453cfb`
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks.json`: `119100f9cecf80065cecb721724498f7572ca99c341da7433dc2ce17349f1cd0`
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py`: `a7713b4d240bc2dc69f619d2e3d9530b05f53d79591cda15c5c9a2ed1140d99e`
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/test-harness.py`: `19dec8279d8c16a5b385d1c2f62adb16eaa129800b5f418ef89e99d166c3ad60`
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/HARNESS.md`: `2fcb4ed80ba7d1e2c6141cc7f451b25ce152c07368bfe2493a13307b40917103`
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/AUDIT-CONTRACT.md`: `06f0bad92b7fcb7b4bc590ea8e9d891556c68d2de94dcb2223997dbd5f453cfb`
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks.json`: `119100f9cecf80065cecb721724498f7572ca99c341da7433dc2ce17349f1cd0`
 
 ## 새 실행 증거와 한계
 
-- 18개 unit, exit 0: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-rereview-unit-tests.log`.
-- 이전 재현 및 신규 symlink 재현: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-rereview-edge-cases.log`.
-- fingerprint after 누락 수정 fixture: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-rereview-fingerprint-postflight.log`.
-- 현재 코드·원문 baseline·입력 해시: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-rereview-static-checks.log`.
+- 18개 unit, exit 0: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-rereview-unit-tests.log`.
+- 이전 재현 및 신규 symlink 재현: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-rereview-edge-cases.log`.
+- fingerprint after 누락 수정 fixture: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-rereview-fingerprint-postflight.log`.
+- 현재 코드·원문 baseline·입력 해시: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-rereview-static-checks.log`.
 
 - 실제 --existing24/npm은 미실행이다. unit 및 재현은 임시 저장소와 injected runner만 사용했다.
 - code fingerprint 범위는 HARNESS.md에 명시된 tools/site의 .mjs/.js/.css/.json이며 node_modules·생성 HTML·외부 도구 버전·실행 환경 전체를 식별하지 않는다.

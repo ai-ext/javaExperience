@@ -29,7 +29,7 @@
 
 catalog 문구/구조 변경으로 main 기준 implemented 옛 ID 5개가 current live에서 retired됐다. 원본 5행은 [`historical-catalog-records.json`](historical-catalog-records.json)에 exact-copy로 보존했다. 옛 ID를 live로 되살리거나 새 대응 row로 evidence·상태를 자동 이관하지 않았으며, 새 5행은 unreviewed다. 현재 live implemented는 기존 905개 + 신규 core 18개 = 923개, 기존 verified 6개는 그대로다.
 
-최종 보존 기록 [`PRESERVATION-FINAL.json`](</Users/ds/research/javaExperience-concept-curriculum-20261025/_data/PRESERVATION-FINAL.json>)은 금지된 캡처 blob reachable 0, 기존 source 문서/learner source 변경 0, main HEAD 불변을 확인한다. live implemented 923개는 기존 live 905개와 신규 core 18개로 구성되며 archived catalog 5행은 live count에 포함하지 않는다. verified 6개 유지, 신규 verified 0개다.
+최종 보존 기록 [`PRESERVATION-FINAL.json`](<LOCAL_HOME/research/javaExperience-concept-curriculum-20261025/_data/PRESERVATION-FINAL.json>)은 금지된 캡처 blob reachable 0, 기존 source 문서/learner source 변경 0, main HEAD 불변을 확인한다. live implemented 923개는 기존 live 905개와 신규 core 18개로 구성되며 archived catalog 5행은 live count에 포함하지 않는다. verified 6개 유지, 신규 verified 0개다.
 
 완료 범위는 기본 API 입문용 핵심 6단원의 PC 다크 구현·브라우저 확인이다. 기존 134개 상세 문서의 전체 내용 사실 검증·각 예제 실행 또는 개별 화면 개선 완료를 뜻하지 않는다. 모바일·라이트 테마와 imagegen 시안 parity도 확인하지 않았다. C03 설명 지도는 Spring AOP 실행 실험이 아니다.
 

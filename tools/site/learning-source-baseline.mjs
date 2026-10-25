@@ -4,6 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { resolveEvidencePath } from './evidence-path.mjs';
 const digest = data => createHash('sha256').update(data).digest('hex');
 const directoryOf = root => root instanceof URL ? fileURLToPath(root) : root;
 const indexAt = root => JSON.parse(fs.readFileSync(path.join(directoryOf(root), 'docs/design/concept-main-integration-2026-10-25/baseline-overrides.json')));
@@ -28,8 +29,8 @@ export function readHistoricalSource(root, relative) {
   return historical.toString('utf8');
 }
 export function resolveHistoricalAsset(root, recorded) {
-  const oldRoot = indexAt(root).sourceWorktreeAtCapture;
-  const original = recorded.startsWith('file:') ? fileURLToPath(recorded) : recorded;
+  const oldRoot = resolveEvidencePath(indexAt(root).sourceWorktreeAtCapture);
+  const original = resolveEvidencePath(recorded.startsWith('file:') ? fileURLToPath(recorded) : recorded);
   assert.ok(path.posix.isAbsolute(original));
   const relative = path.posix.relative(oldRoot, original);
   assert.ok(relative && !relative.startsWith('../') && !path.posix.isAbsolute(relative), '승인된 원본 worktree 안의 자산 경로');

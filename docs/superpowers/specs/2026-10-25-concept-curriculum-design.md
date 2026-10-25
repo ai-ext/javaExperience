@@ -1,6 +1,6 @@
 # Java·Spring Boot 개념 학습 재구성 — 검토용 설계
 
-작성일: 2026-10-25. 기준 저장소는 /Users/ds/code/javaExperience, 확인한 main은 f6d82d705e279a0e74a5e6287a35cc51953e49ba다. 이 파일은 구현 전 검토용이며 제품·분류·리서치 완료를 선언하지 않는다. 사용자 기준은 PC·다크, 이미지가 필요하면 JPG다.
+작성일: 2026-10-25. 기준 저장소는 LOCAL_HOME/code/javaExperience, 확인한 main은 f6d82d705e279a0e74a5e6287a35cc51953e49ba다. 이 파일은 구현 전 검토용이며 제품·분류·리서치 완료를 선언하지 않는다. 사용자 기준은 PC·다크, 이미지가 필요하면 JPG다.
 
 ## 문제와 목표
 

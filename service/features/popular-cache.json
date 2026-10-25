@@ -1,0 +1,328 @@
+{
+  "version": 1,
+  "id": "popular-cache",
+  "title": "인기글을 빠르고 정확하게 보여 주기",
+  "summary": "Redis 캐시가 정상일 때 빠른 인기글 응답을 제공하고 Redis 장애·글 변경 뒤에도 응답과 결과를 유지합니다.",
+  "difficulty": "중급",
+  "group": "조회와 성능",
+  "prerequisites": [
+    "posts-find"
+  ],
+  "stages": [
+    {
+      "id": "cache",
+      "title": "캐시 장애에도 목록을 반환하고 변경 후 갱신하기"
+    },
+    {
+      "id": "reload",
+      "title": "동시에 비어도 한 요청만 다시 채우기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 과정 프로젝트",
+      "stages": [
+        {
+          "id": "cache",
+          "title": "캐시 장애에도 목록을 반환하고 변경 후 갱신하기",
+          "sourceUnits": [
+            "course:D09-1",
+            "course:D09-2",
+            "course:D09-3",
+            "course:D14-3",
+            "course:D14-4",
+            "support:course/tickets/B15.md",
+            "support:course/tickets/B16.md"
+          ],
+          "brief": {
+            "purpose": "Redis 캐시가 정상일 때 빠른 인기글 응답을 제공하고 Redis 장애·글 변경 뒤에도 응답과 결과를 유지합니다.",
+            "task": "인기글 GET 결과의 TTL과 SQL 호출을 관찰하고 Redis 지연·중단 시 DB 폴백, 글 상태 변경 후 커밋 시점에 맞춘 캐시 무효화를 구현하세요.",
+            "preconditions": [
+              "Redis와 MySQL을 실행하고 ACTIVE 글·좋아요가 있는 fixture를 준비한다. Redis command timeout=500ms, 인기글 TTL=60s를 설정한다.",
+              "B15/B16은 D14의 선택 Redis 후보 티켓이다. D09의 cache fallback/eviction 작업과 ticket 완료를 섞지 않는다."
+            ],
+            "scenario": [
+              {
+                "start": "ACTIVE 인기글 P-101이 DB에 있고 캐시는 비어 있다. Redis는 먼저 정상, 다음은 3초 지연, 마지막은 중지 상태로 바꿔 관찰한다.",
+                "action": "GET /api/posts/popular를 요청하고 60초 안에 다시 요청해 SQL 로그와 Redis TTL을 확인한다. Redis 지연/중지 중에도 GET을 보내고 POST /api/posts, 글 삭제 또는 관리자 숨김을 성공시킨 뒤 인기글을 재조회한다.",
+                "result": "첫 GET은 200과 DB 결과, cache TTL은 60 이하; 60초 내 hit에는 목록 SQL이 없다. Redis 3초 지연은 500ms timeout 뒤 DB 폴백으로 GET 200이며 Redis 중지 중 글 작성도 POST 201이다. 커밋 뒤 삭제/숨김된 P-101은 다음 GET의 목록에서 빠진다.",
+                "after": "DB 글 status와 cache key 삭제 시각을 transaction commit과 로그로 대조한다. rollback된 글 변경은 cache를 미리 지우지 않으며 인기글 응답 계약을 유지한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "ACTIVE 글/좋아요를 포함한 인기 목록",
+                "reason": "빈 결과만으로 목록 쿼리·캐시 hit·장애 폴백 내용을 확인할 수 없어 실제 P-101 fixture를 둔다."
+              },
+              {
+                "name": "Redis popular key와 TTL",
+                "reason": "최초 적재와 60초 이내 재요청의 캐시 hit 여부를 TTL/SQL 로그로 확인한다."
+              },
+              {
+                "name": "Redis 명령 timeout 500ms",
+                "reason": "3초 지연이 요청 thread를 500ms보다 오래 붙잡지 않는 경계를 관찰한다."
+              },
+              {
+                "name": "글 status·commit event·cache eviction",
+                "reason": "DB 변경이 확정된 뒤에만 캐시를 지워 stale 데이터 재적재를 막는다."
+              }
+            ],
+            "policies": [
+              "인기글 TTL은 60초, Redis 명령 timeout은 500ms입니다. 캐시 hit이면 60초 안에 다시 조회할 때 목록 SQL이 없어야 합니다.",
+              "Redis 3초 지연/중단에도 GET /api/posts/popular는 200으로 DB 결과를 반환하고, Redis 중단에도 POST /api/posts는 201이어야 합니다.",
+              "글 삭제 응답은 204이며 커밋 뒤 캐시가 갱신되어 숨김·삭제 글은 직후 인기글에서 빠집니다. 롤백된 트랜잭션은 캐시를 지우지 않습니다.",
+              "B15와 B16은 D14의 연습용 지원 티켓입니다. 티켓 제출물은 각 원문의 등급·체크리스트에 따릅니다. B15·B16은 D14에서 선택하는 Redis 후보 티켓입니다.",
+              "원문 완료 기준: `GET /api/posts/popular` → 200",
+              "원문 완료 기준: 60초 안에 다시 부르면 SQL 로그에 목록 쿼리가 없다",
+              "원문 완료 기준: `redis-cli TTL` 값이 60 이하",
+              "원문 완료 기준: `PopularPostFallbackTest` 통과: Toxiproxy로 Redis 3초 지연 중에도 0.5초 타임아웃 뒤 DB 결과로 응답",
+              "원문 완료 기준: Redis를 멈춘 상태에서 `GET /api/posts/popular` → 200, `POST /api/posts` → 201",
+              "원문 완료 기준: `DELETE /api/posts/{postId}` → 204 직후 `GET /api/posts/popular`에 그 글이 없다",
+              "원문 완료 기준: `PostCacheEvictListenerTest` 통과: 롤백된 트랜잭션에서는 캐시를 지우지 않는다",
+              "원문 완료 기준: 트랜잭션 경계: DB 변경과 캐시 무효화가 만나는 시점과 그 이유를 적는다. 실패 시 DB rollback 뒤 캐시를 유지하는지 로그·조회 결과로 설명한다.",
+              "원문 완료 기준: 요청 ID별 로그 타임라인에 숨김 요청과 인기글 조회의 캐시·트랜잭션 로그를 시간순으로 놓고 근거로 남긴다",
+              "원문 완료 기준: `POST /api/admin/posts/{postId}/hide` 직후 `GET /api/posts/popular`에 그 글이 없다",
+              "원문 완료 기준: 스레드 덤프에서 글쓰기 요청 스레드가 멈춘 지점을 찾아 근거로 남긴다",
+              "원문 완료 기준: Redis를 멈춘 상태에서 `POST /api/posts` → 201, 1초 이내 (고친 뒤 `bash tickets/B16/repro.sh`와 `bash tickets/B16/repro.sh stop` 출력을 남긴다)",
+              "원문 완료 기준: 원인 서술: 숨김 응답을 받은 뒤에도 인기글에 숨긴 글이 남는 까닭(어느 요청의 무엇이 어떤 순서로 일어났는지)",
+              "원문 완료 기준: 재현 테스트: TTL을 기다리지 않고 매번 같은 결과를 내는 테스트(결함 상태에서 실패 → 수정 후 통과). 대기에는 모두 상한을 둔다. 예: `HidePostCacheRaceTest`",
+              "원문 완료 기준: 수정 diff",
+              "원문 완료 기준: 원인 서술: 요청 스레드가 무엇을 기다렸고, 왜 캐시 장애가 글쓰기·인기글 실패가 됐는가. \"응답 지연\"과 \"연결 끊김\"이 각각 어떻게 번졌는지 나눠서",
+              "원문 완료 기준: 재현 테스트: Toxiproxy로 Redis 응답을 3초 늦춘 경우와 연결을 끊은 경우 각각, 글쓰기 201·인기글 200이 1초 안인지 보는 테스트(결함 상태에서 실패 → 수정 후 통과)"
+            ],
+            "inputs": [
+              "GET /api/posts/popular 정상 query는 board recipe의 기본값을 사용하고 200 응답의 items를 확인한다.",
+              "Redis 정상/3초 지연/중지 세 상태를 분리한다. local compose Redis를 중지한 경우에도 POST /api/posts 요청을 수행한다.",
+              "커밋 완료 후 P-101을 삭제(DELETE → 204)하거나 숨김(POST /api/admin/posts/{postId}/hide → 200)하고 GET popular를 재조회한다."
+            ],
+            "success": [
+              "GET /api/posts/popular → 200. 최초 miss에서 DB 목록을 읽고 Redis TTL ≤60초; 60초 이내 두 번째 GET에는 목록 SQL이 추가되지 않는다.",
+              "Redis 3초 지연 시 명령 timeout 500ms 뒤 DB 폴백 GET → 200. Redis 중지 시 POST /api/posts → 201.",
+              "DELETE /api/posts/{postId} → 204 또는 관리자 hide → 200 후 commit이 끝난 다음 GET popular 200에서 해당 글 제외. rollback transaction이면 cache eviction 없음. B15/B16은 선택 후보 티켓이다."
+            ],
+            "failures": [
+              {
+                "when": "Redis가 3초 지연되거나 중지돼 cache read/write가 실패",
+                "result": "GET /api/posts/popular는 DB 폴백으로 200이어야 한다.",
+                "unchanged": "cache 장애를 이유로 글 내용을 500으로 실패시키지 않고 DB의 ACTIVE 목록을 반환한다."
+              },
+              {
+                "when": "hide/delete transaction이 rollback됨",
+                "result": "변경 이벤트의 AFTER_COMMIT 처리는 실행되지 않는다.",
+                "unchanged": "DB의 기존 ACTIVE status와 이전 cache 값이 유지되어 숨김·삭제가 완료됐다고 표시하지 않는다."
+              },
+              {
+                "when": "글 변경 commit 전에 cache를 삭제하고 동시 GET이 old row를 다시 적재",
+                "result": "숨긴 글이 최대 TTL 60초 동안 재노출되는 순서 오류다.",
+                "unchanged": "이를 정상 완료로 인정하지 않고 transaction commit 후 eviction되도록 고친다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "캐시 hit 확인",
+                "start": "DB에서 ACTIVE P-101이 목록 대상이고 Redis popular key는 없다.",
+                "action": "GET popular를 두 번 60초 안에 호출하고 SQL 로그·redis-cli TTL을 비교한다.",
+                "result": "첫 요청에서만 목록 SQL, 응답 200, TTL 60 이하; 두 번째는 cache hit로 목록 SQL 없음."
+              },
+              {
+                "title": "Redis 장애 fallback과 hide",
+                "start": "인기글 P-101 cache hit 상태에서 Redis를 중지한다.",
+                "action": "popular 조회와 글쓰기 1건을 실행하고, Redis 복구 후 P-101을 숨겨 commit한 뒤 popular를 재조회한다.",
+                "result": "장애 중 GET 200/POST 201; hide 200 뒤 다음 GET의 items에서 P-101이 빠진다."
+              }
+            ],
+            "work": [
+              "TTL 60초와 command timeout 500ms를 설정하고 최초 miss/hit에서 실제 SQL 및 Redis TTL을 측정한다.",
+              "cache 오류를 DB read fallback으로 변환하고 글 변경 이벤트를 transaction AFTER_COMMIT에 연결한다.",
+              "Redis 지연·중지, 정상 캐시, rollback, commit 직후 조회를 각각 재현하고 B15/B16 선택 여부를 기록한다."
+            ],
+            "done": [
+              "첫/재호출 popular 200, 60초 TTL·SQL hit, Redis 지연/중지 시 GET 200 및 POST 201을 확인했다.",
+              "삭제 204/hide 200 후 commit된 글은 목록에서 빠지고 rollback 시 cache가 유지되는 순서를 검증했다.",
+              "B15/B16은 선택 ticket 후보로 유지하고 실제 수행한 경우에만 재현 로그를 붙였다."
+            ]
+          },
+          "hints": [
+            "Redis가 3초 늦을 때 500ms command timeout과 DB 폴백이 각각 어떤 대기를 제한하나요?",
+            "cache를 transaction commit 전에 지우면 동시 조회가 어떤 DB snapshot을 다시 cache에 넣을 수 있나요?",
+            "인기글 첫 조회와 60초 안의 두 번째 조회를 어떤 SQL 로그로 구별할 수 있나요?",
+            "Redis가 멈췄을 때 GET popular와 POST create 중 어느 동작이 캐시 실패를 겪어도 계속돼야 하나요?"
+          ],
+          "recipeIds": [
+            "board:post-popular:normal",
+            "board:post-delete:normal",
+            "board:post-create:normal",
+            "board:admin-hide:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D09-1 · Redis를 띄우고 인기글 캐시 만들기 (TTL 60s, 명령 타임아웃 500ms, `PostController`에 `GET /api/posts/popular`)",
+              "href": "course/spring/D09.html#step-d09-1"
+            },
+            {
+              "label": "course:D09-2 · Redis 지연·장애 때 DB로 폴백하기",
+              "href": "course/spring/D09.html#step-d09-2"
+            },
+            {
+              "label": "course:D09-3 · 글 변경 이벤트를 커밋 뒤에 받아 인기글 캐시 지우기 (`PostServiceImpl`에서 이벤트 발행)",
+              "href": "course/spring/D09.html#step-d09-3"
+            },
+            {
+              "label": "course:D14-3 · B15 \"숨긴 글이 인기글에 1분간 계속 보인다\": 로그 타임라인으로 순서 확인",
+              "href": "course/spring/D14.html#step-d14-3"
+            },
+            {
+              "label": "course:D14-4 · B16 \"Redis 점검 시간에 글쓰기까지 멈췄다\": 스레드 덤프로 대기 지점 찾기",
+              "href": "course/spring/D14.html#step-d14-4"
+            },
+            {
+              "label": "support:course/tickets/B15.md · B15. 숨긴 글이 인기글에 1분간 계속 보인다",
+              "href": "course/tickets/B15.html"
+            },
+            {
+              "label": "support:course/tickets/B16.md · B16. Redis 점검 시간에 글쓰기까지 멈췄다",
+              "href": "course/tickets/B16.html"
+            }
+          ]
+        },
+        {
+          "id": "reload",
+          "title": "동시에 비어도 한 요청만 다시 채우기",
+          "sourceUnits": [
+            "course:D14-5",
+            "support:course/tickets/E01.md",
+            "support:course/java/J14.md"
+          ],
+          "brief": {
+            "purpose": "만료 순간 동시에 들어온 인기글 조회가 DB 재적재를 한 번만 수행하도록 캐시 stampede를 막습니다.",
+            "task": "TTL 만료 직후 다수의 동시 요청을 재현하고 인기글 응답 계약을 유지하면서 DB 목록 조회가 한 번만 일어나는지 테스트하세요.",
+            "preconditions": [
+              "GET /api/posts/popular의 정상 200 응답과 60초 cache TTL이 구현돼 있어야 한다. DB에 ACTIVE 인기글이 여러 건 있는 fixture를 준비한다.",
+              "E01 고도화는 필수. B15 처리 여부는 선택이다. TTL 만료 순간 동시 호출을 제어할 barrier와 SQL count 관찰을 준비한다."
+            ],
+            "scenario": [
+              {
+                "start": "Redis popular key의 TTL을 0으로 만들어 만료시킨다. DB popular 조회 결과와 cache 결과 계약은 기존 GET /api/posts/popular를 기준으로 한다.",
+                "action": "100개 요청 thread를 barrier로 동시에 시작해 GET /api/posts/popular를 호출한다. DB 목록 SELECT 횟수와 각 HTTP 응답의 status/body shape를 수집한다.",
+                "result": "100개 응답 모두 HTTP 200, 기존 response 형식을 유지하고 cache 재적재를 위한 DB 목록 query는 총 1회다.",
+                "after": "새 key TTL은 최대 60초로 설정되고 곧바로 GET을 다시 해 cache hit 응답이 같은 목록인지 확인한다. B15를 선택했다면 hide commit 직후 제거도 별도 증거로 둔다."
+              }
+            ],
+            "data": [
+              {
+                "name": "만료된 popular cache key",
+                "reason": "경합 시작 시 모든 thread가 cache miss를 보도록 만료 상태를 고정한다."
+              },
+              {
+                "name": "100개 동시 GET과 barrier",
+                "reason": "순차 호출이 아니라 stampede가 발생할 수 있는 실제 동시 시점을 재현한다."
+              },
+              {
+                "name": "DB 목록 query count",
+                "reason": "single-flight가 성공해 재적재 쿼리를 단 한 번만 실행했는지 수량으로 판정한다."
+              },
+              {
+                "name": "100개의 status/body shape",
+                "reason": "경합 제어가 응답 계약이나 반환 목록을 바꾸지 않았음을 비교한다."
+              }
+            ],
+            "policies": [
+              "TTL 만료 순간 100개 요청에서도 DB 목록 쿼리는 1회여야 합니다. 응답 형식은 기존 GET /api/posts/popular 계약과 같습니다.",
+              "단일 JVM 동기화와 여러 인스턴스 분산 조정의 적용 범위를 구분해 선택 근거를 기록합니다. source에 구체 구현이 고정돼 있지 않으므로 알고리즘을 정답처럼 강제하지 않습니다.",
+              "E01 고도화는 원문 요구에 따라 필수입니다. B15 처리는 선택입니다. 기존 티켓의 상태 구분을 유지합니다.",
+              "원문 완료 기준: E01 고도화 필수 / B15 처리는 선택 시 수행",
+              "원문 완료 기준: `PopularPostStampedeTest` 통과: TTL 만료 순간 동시 100요청에도 DB 목록 쿼리 1회",
+              "원문 완료 기준: `GET /api/posts/popular` 응답 형식은 그대로",
+              "원문 완료 기준: [티켓 E01의 제출물 체크리스트 전부](../tickets/E01.md#제출물)를 충족한다(설계 메모·테스트·수정 diff).",
+              "원문 완료 기준: 설계 메모: 무엇을 한 요청만 하게 할지, 기다리는 요청은 얼마나 기다리고 그 뒤에는 어떻게 할지(첫 적재가 늦을 때·실패할 때), 적재하는 동안 글이 바뀌면 어떻게 할지, 서버가 여러 대면 어떻게 달라지는지",
+              "원문 완료 기준: 테스트:",
+              "원문 완료 기준: 캐시가 빈 순간 동시 100요청에 DB 목록 쿼리 1회(예: `src/test/java/com/example/board/post/PopularPostStampedeTest.java`, `MyBatisQueryCounter`로 센다). 응답 형식이 그대로인지도 본다.",
+              "원문 완료 기준: 첫 적재가 늦거나 실패해도 기다리던 요청이 정해 둔 시간 안에 200을 받는다.",
+              "원문 완료 기준: 적재하는 동안 글이 지워져도, 삭제 응답 뒤의 조회에 그 글이 없다.",
+              "원문 완료 기준: 순서는 시간(`sleep`)에 맡기지 말고 멈출 자리를 만들어 고정한다. 모든 대기에 상한을 둔다.",
+              "원문 완료 기준: 수정 diff"
+            ],
+            "inputs": [
+              "실제 API는 GET /api/posts/popular, body 없음이며 기존 query/response 계약을 변경하지 않는다.",
+              "TTL 만료 후 100개 동시 요청을 barrier로 동시에 발사한다. 별도 seed 상태와 전체 DB query count를 관찰한다.",
+              "E01 제출물은 설계 메모·재현 테스트·수정 diff 모두 필요하다. B15는 선택 ticket이다."
+            ],
+            "success": [
+              "100개 GET /api/posts/popular이 모두 200이고 response field/정렬이 기존 recipe와 같다.",
+              "만료 순간 DB 목록 SELECT는 1회이며 재적재 뒤 key TTL ≤60초; 다음 GET은 캐시 hit다.",
+              "E01 설계 메모·테스트·diff를 제출한다. B15를 선택하지 않았으면 B15 ticket 완료를 표시하지 않는다."
+            ],
+            "failures": [
+              {
+                "when": "TTL 만료 때 100개 GET이 각자 cache miss를 보고 DB를 조회",
+                "result": "DB 목록 query count가 100 또는 1보다 큰 수로 측정되어 E01 기준 실패다.",
+                "unchanged": "응답 형식을 바꾸거나 stale/partial 목록을 반환해 쿼리 수만 줄인 것으로 처리하지 않는다."
+              },
+              {
+                "when": "동시 요청 하나라도 500/비정상 JSON/다른 response field를 반환",
+                "result": "기존 GET /api/posts/popular 계약을 지키지 못한 실패다.",
+                "unchanged": "이미 정상 사용자에게 제공하는 response schema와 목록 의미를 보존한다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "TTL 만료 경합 100건",
+                "start": "ACTIVE 인기글이 든 cache key의 TTL이 0이고 DB 쿼리 count가 0인 상태다.",
+                "action": "barrier를 연 순간 100개 GET을 동시에 보낸다.",
+                "result": "100개 모두 200, DB 목록 SELECT 1회, 재생성 key TTL ≤60초."
+              },
+              {
+                "title": "재생성 직후 재조회",
+                "start": "동시 경합이 끝나 cache key가 재생성된 상태다.",
+                "action": "GET popular를 다시 한 번 요청해 응답과 SQL 로그를 확인한다.",
+                "result": "200, 직전 목록과 같은 schema/내용이며 추가 목록 query는 없다."
+              }
+            ],
+            "work": [
+              "single-flight/JVM lock 또는 source-compatible coordination 방법을 선택하고 instance 수 한계를 설계 메모에 적는다.",
+              "100 worker barrier 테스트와 DB query counter를 설정해 cache miss 경합을 계량한다.",
+              "response contract, TTL, E01 제출물, 선택 B15 수행 여부를 각각 기록한다."
+            ],
+            "done": [
+              "TTL 만료 순간 100건 동시 GET에서 100개 200과 DB query 정확히 1회를 확인했다.",
+              "재생성 TTL ≤60초와 후속 cache hit, 기존 response 형식 보존을 확인했다.",
+              "E01 필수 산출물을 작성했고 B15는 실행 여부와 무관하게 선택 등급을 유지했다."
+            ]
+          },
+          "hints": [
+            "모든 요청이 lock 전에 cache를 읽는 구조라면 TTL 만료 순간 각 thread는 무엇을 관찰하나요?",
+            "동시성 테스트가 100개의 순차 요청이 되지 않도록 어느 지점에 barrier를 놓아야 하나요?",
+            "DB query 1회와 HTTP response 100개의 성공을 각각 어떻게 측정하나요?",
+            "JVM 단일 인스턴스 테스트 결과가 여러 서버 인스턴스의 DB query 수를 보장하나요?"
+          ],
+          "recipeIds": [
+            "board:post-popular:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D14-5 · 고도화 1건: 인기글 캐시 재적재를 한 요청만 하도록 (스탬피드 방지)",
+              "href": "course/spring/D14.html#step-d14-5"
+            },
+            {
+              "label": "support:course/tickets/E01.md · E01. 고도화: 인기글 캐시 재적재를 한 요청만 하도록 (스탬피드 방지)",
+              "href": "course/tickets/E01.html"
+            },
+            {
+              "label": "J14. 리팩터링 ④: null 반환을 Optional과 빈 컬렉션으로",
+              "href": "course/java/J14.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

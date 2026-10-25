@@ -4,7 +4,7 @@
 
 기준 HEAD `4b0493af52b1a06decca909d6bf9a8b6f9610686`, 원문 SHA256 `6f2fe2c7c720eef33f939ed06b459c2311a8615fbc53ce68acc890a18c80fbaf` / 304줄.
 
-`npm --prefix tools/site run test:d02` 새 실행 exit0 (2026-10-22T00:06:26.499044+00:00 ~ 2026-10-22T00:06:38.880716+00:00). 원시 출력·exit·14개 파일 SHA·전후 불변은 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task16/test-d02.command.json` 및 stdout/stderr 파일에 저장했다. 새 native 서버·네트워크·Java·DB·브라우저·외부 조사/LLM 실행은 없다.
+`npm --prefix tools/site run test:d02` 새 실행 exit0 (2026-10-22T00:06:26.499044+00:00 ~ 2026-10-22T00:06:38.880716+00:00). 원시 출력·exit·14개 파일 SHA·전후 불변은 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task16/test-d02.command.json` 및 stdout/stderr 파일에 저장했다. 새 native 서버·네트워크·Java·DB·브라우저·외부 조사/LLM 실행은 없다.
 
 ## spec → quality
 
@@ -14,7 +14,7 @@
 
 ### 확정 품질 finding
 
-- **D02-Q01 · minor**: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d02-2026-10-20/source-proof/run-proof.py:164`는 upstream 정상 반환 뒤에만 `proxy_requests.append`를 한다. 같은 파일190~195의 `httpHandlerCallsAdded`는 handler 진입 횟수보다 약한 지표다. 현재 TLS거부 관찰을 뒤집는 결함은 아니며, 직접 진입 counter로 측정하거나 완료 요청 수로 라벨을 좁힐 필요가 있다. 새 네트워크 재현은 하지 않았다. 수정·검증 조건은 review.json의 finding에 명시했다.
+- **D02-Q01 · minor**: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d02-2026-10-20/source-proof/run-proof.py:164`는 upstream 정상 반환 뒤에만 `proxy_requests.append`를 한다. 같은 파일190~195의 `httpHandlerCallsAdded`는 handler 진입 횟수보다 약한 지표다. 현재 TLS거부 관찰을 뒤집는 결함은 아니며, 직접 진입 counter로 측정하거나 완료 요청 수로 라벨을 좁힐 필요가 있다. 새 네트워크 재현은 하지 않았다. 수정·검증 조건은 review.json의 finding에 명시했다.
 
 확인한 critical0 / important0 / minor1 (quality 진단). spec의 important 공백2묶음은 별도이며 quality 승인으로 덮지 않았다. 공통 clipboard race는 재현하지 않았다.
 

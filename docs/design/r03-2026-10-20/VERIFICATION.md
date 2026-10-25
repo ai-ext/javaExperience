@@ -1,10 +1,10 @@
 # R03 개념 학습 보강 검증
 
-2026-10-20 · 작업 위치 /Users/ds/code/javaExperience/.worktrees/concept-learning-night · 상태 partially_implemented_and_browser_checked. R03 전체와 134개 개념의 완료를 뜻하지 않는다. merge/push/PR은 하지 않는다.
+2026-10-20 · 작업 위치 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night · 상태 partially_implemented_and_browser_checked. R03 전체와 134개 개념의 완료를 뜻하지 않는다. merge/push/PR은 하지 않는다.
 
-- 원문 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/R03-schema-types-constraints.md 217줄을 전문 검토했다. 원문 SHA 4e23b082e208b0a93e9debcd4be106bf8ced96847a7f26189ced3cf9fed22f1f 및 bash1/SQL4 추출본을 보존했다. bash 사용자 placeholder 접속 명령은 실행하지 않았다.
-- 원래 연습 schema/seed는 /Users/ds/research/java-spring/practice/schema/schema.sql 과 /Users/ds/research/java-spring/practice/schema/seed.sql 에서 찾았다. 저장소 practice DB와 구별해 SHA 사본만 사용했다. 원본 두 파일은 현재 SHA도 동일하다.
-- Luna 조사는 /Users/ds/research/javaexperience-r03-20261020/REPORT.md 에 남겼다. Codex CLI gpt-6-luna/OpenAI 직접 실행이며 LiteLLM을 쓰지 않았다. Luna는 공식 파일 목록만 확인하고 href 열람은 실패했다. 메인이 실제 Chrome의 macOS ARM64 파일 행→다운로드 페이지→로그인 없이 다운로드 링크로 공식 파일을 확인했다. 167,977,240 bytes의 MD5는 공식 목록과 일치했다. SHA256 b96e00493bc3499b9ffd7f08d65c5d64933af0383a8287d9873b64f94c2d6009를 기록했으며 GPG 검증은 하지 않았다.
+- 원문 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/R03-schema-types-constraints.md 217줄을 전문 검토했다. 원문 SHA 4e23b082e208b0a93e9debcd4be106bf8ced96847a7f26189ced3cf9fed22f1f 및 bash1/SQL4 추출본을 보존했다. bash 사용자 placeholder 접속 명령은 실행하지 않았다.
+- 원래 연습 schema/seed는 LOCAL_HOME/research/java-spring/practice/schema/schema.sql 과 LOCAL_HOME/research/java-spring/practice/schema/seed.sql 에서 찾았다. 저장소 practice DB와 구별해 SHA 사본만 사용했다. 원본 두 파일은 현재 SHA도 동일하다.
+- Luna 조사는 LOCAL_HOME/research/javaexperience-r03-20261020/REPORT.md 에 남겼다. Codex CLI gpt-6-luna/OpenAI 직접 실행이며 LiteLLM을 쓰지 않았다. Luna는 공식 파일 목록만 확인하고 href 열람은 실패했다. 메인이 실제 Chrome의 macOS ARM64 파일 행→다운로드 페이지→로그인 없이 다운로드 링크로 공식 파일을 확인했다. 167,977,240 bytes의 MD5는 공식 목록과 일치했다. SHA256 b96e00493bc3499b9ffd7f08d65c5d64933af0383a8287d9873b64f94c2d6009를 기록했으며 GPG 검증은 하지 않았다.
 - 공식 portable MySQL8.4.11 macOS15 ARM64를 연구 폴더에만 풀었다. 전역 설치·사용자 설정·기존 Docker/DB 변경은 없다. 매 실행 새 datadir와0700 socket 디렉터리, --no-defaults, --skip-networking, mysqlx OFF를 사용했다. @@datadir/socket와 skip_networking1 및 mysqlx DISABLED를 확인한 뒤에만 사본의 DROP DATABASE를 전달했다. 전용 socket에만 연결하고 own mysqladmin shutdown 뒤 서버 exit0·정지를 확인했다. 임시 데이터는 연구 _data/runtime에 격리 보관했다.
 - PyMySQL1.1.2는 연구 전용 venv에 설치했다. 원문 SQL2~5의 mysql client 표시 명령 \G만 서버 전달 시 ;로 바꾸고 분할용 주석을 제거했다. SQL 표현식과 추출 파일을 수정하지 않았다. 추가 probe는 별도 r03_extra 및 연습 사본에 대한 rollback-only 제약 실험이다.
 - 실제35관측과 전체 SQL/바인딩/행/오류 JSON을 frozen 기준과 대조했다. 메인 새 인스턴스 재현과 독립 reviewer의 새 datadir 재현이 모두35PASS/frozenMatchtrue다. 첫 재현 실패는 trace의 임시 datadir/socket 두 경로뿐이었으며 setup 격리 조회는 각 runtime/isolation.json에 남기고 결정적 SQL trace에서 제외했다. 결과값을 고쳐 맞추지 않았다.
@@ -16,6 +16,6 @@
 - 9질문30상태는 native 선택기·단계 버튼·현재값·원문/추가SQL·선택검증로그·그림확대/모바일pan을 제공한다. 핵심설명은 펼쳐두고 긴원문/추가전체코드만 접는다. 새 controller는 기존 progress/localStorage를 쓰지 않는다.
 - 실제 Chrome1672×941·360×800에서 각30상태(총60)를 질문/제목/정확코드/값/PNG크기와로드/PASS/run JSON/문서넘침과 대조했다. 이미지별양쪽18캡처, 기존지도2흐름, 특수10(실제복사·로그유지·nativepan·EndEnter·원문앵커·reload·목록Back·actualForward/Back)을 확인했다. 첫clipboard관측은async복사완료전의기존값이라별도시도기록으로남겼고 완료문구확인후freshread는정확히일치했다. 사이트console오류0이다.
 - 생성 원문12,848자/code5/id13·기존지도1·고유id 보존, 전체135문서/학습자서버17파일SHA불변, 원래 작업트리3,403파일SHA불변/루트clean을 확인했다. 기존parity561records의바이트prefix를보존하고9개만추가해570records/verified0이다. 신규30상태만unreviewed→mockup_ready→implemented의60전이를기록했다. inventory339pages44,494units/implemented378/verified6은기존6건을포함하며새verified는없다.
-- 최종 npm run build, test:r03 포함13suite, audit:visual/audit:version-cards/audit:parity 통과. HTML339개/링크오류0. 실행로그와결과는 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/r03-2026-10-20/checks/ 에있다.
+- 최종 npm run build, test:r03 포함13suite, audit:visual/audit:version-cards/audit:parity 통과. HTML339개/링크오류0. 실행로그와결과는 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/r03-2026-10-20/checks/ 에있다.
 
 미완료: CHAR/JSON/ENUM·모든정수범위·정규화이상·임시테이블/물리저장·성능·대형DDL/락·다른page크기/rowformat·Java/JPA/HTTP·기존학습자서버·전수픽셀동일성·학습자이해도. 캡처에는stickyheader stitch/스크롤위치차이와모바일번역확장overlay가있다. 구현부분만implemented로유지한다. 다음개념은R04다.

@@ -8,7 +8,7 @@ blocks=re.findall(r'```java\n(.*?)\n```',source.read_text(),re.S)
 for name in ['PurchaseOrder','OrderLine','OrderService','OrderReadService']:
  b=next(b for b in blocks if re.search(r'public class '+name+r'\b',b))+'\n';assert (OUT/'original'/f'{name}.java').read_text()==b,name
 expected=json.loads((OUT/'checkpoints/expected-current-execution.json').read_text())
-env=os.environ.copy();env['JAVA_HOME']='/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home'
+env=os.environ.copy();env['JAVA_HOME']='LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home'
 cmd=[str(ROOT/'gradlew'),'-p',str(OUT/'runtime'),'--no-daemon','--console=plain','recordDependencies','runProof'];r=subprocess.run(cmd,cwd=ROOT,env=env,capture_output=True,text=True);(OUT/'gradle-run.txt').write_text(r.stdout+r.stderr)
 assert r.returncode==0,r.stdout+r.stderr
 x=json.loads((OUT/'execution.json').read_text());assert x['checks']==61 and r.stdout.count('PASS ')==61

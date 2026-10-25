@@ -39,7 +39,7 @@ function makeFixture({ mode = 'scene', openOriginal = mode === 'read', openChapt
   const alternateAnchor = document.getElementById('alternate-source-target');
   const outsideAnchor = document.getElementById('outside-source-target');
   const anchorScrolls = [];
-  const pathIsVisible = () => reader.dataset.krMode === 'read' && !reading.hidden && original.open && chapter.open;
+  const pathIsVisible = () => reader.dataset.krMode === 'read' && !reading.hidden && original.open && chapter.open && !chapter.hidden;
   const readingAreaVisible = () => reader.dataset.krMode === 'read' && !reading.hidden;
   for (const node of nodes) {
     Object.defineProperties(node, {
@@ -300,6 +300,20 @@ await helperControlController.whenIdle();
 assert.equal(helperControlRenderer.calls, 3, 'initial read=1 visibility renders all three source diagrams');
 assert.ok(helperControl.nodes.every(node => node.querySelector('svg.rendered')));
 helperControlController.dispose();
+
+// 리더의 절 전환은 open을 유지한 채 hidden만 바꾼다. 이때도 보인 원문 도식을 렌더해야 한다.
+const chapterSelection = makeFixture({mode:'read'});
+chapterSelection.chapter.hidden = true;
+const chapterRenderer = fakeMermaid();
+const chapterController = initD12SourceDiagrams(chapterSelection.document, chapterSelection.dom.window, chapterRenderer.api);
+await chapterController.whenIdle();
+assert.equal(chapterRenderer.calls,0,'선택되지 않은 절은 렌더하지 않는다');
+chapterSelection.chapter.hidden = false;
+await Promise.resolve();
+await chapterController.whenIdle();
+assert.equal(chapterRenderer.calls,3,'hidden 해제만으로 선택된 절의 세 도식이 렌더된다');
+assert.ok(chapterSelection.nodes.every(node=>node.querySelector('svg.rendered')));
+chapterController.dispose();
 
 const widthGate = makeFixture({ mode: 'read', measuredWidth: 0 });
 const widthGateRenderer = fakeMermaid();

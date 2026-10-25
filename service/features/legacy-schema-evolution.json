@@ -1,0 +1,225 @@
+{
+  "version": 1,
+  "id": "legacy-schema-evolution",
+  "title": "기존 데이터 보존하며 스키마 바꾸기",
+  "summary": "9-1 기준선, 9-3 excerpt backfill, 9-5 bookmark memo에서 note로 expand/contract를 연결해 기존 row를 보존한다.",
+  "difficulty": "고급",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "migrate",
+      "title": "기준선·추가·백필·이름 변경 순서 지키기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "migrate",
+          "title": "기준선·추가·백필·이름 변경 순서 지키기",
+          "sourceUnits": [
+            "legacy:9-1",
+            "legacy:9-3",
+            "legacy:9-5"
+          ],
+          "brief": {
+            "purpose": "9-1 기준선, 9-3 excerpt backfill, 9-5 bookmark memo에서 note로 expand/contract를 연결해 기존 row를 보존한다.",
+            "task": "기존 DB와 빈 Testcontainers DB의 migration history를 비교하고, post excerpt 및 bookmark 메모가 각 schema/data migration을 거쳐 보존되는지 확인한다.",
+            "preconditions": [
+              "scenario DB에는 기존 schema와 rows가 있고 Flyway history는 없음을 확인한다. 별도 Testcontainers DB는 비어 있다.",
+              "9-3에서는 본문 101자 글, 9-5에서는 기존 memo 값·null·다른 대소문자·old-version update fixture를 기록한다."
+            ],
+            "scenario": [
+              {
+                "start": "각 DB의 schema, Flyway version, post/content/excerpt와 bookmark/memo 값을 기록한다.",
+                "action": "9-1 기존 schema baseline 및 빈 DB migrate를 비교하고, 이후 9-3 excerpt backfill, 9-5 note 확장·복사·dual-write·불일치 보정·구버전 code 제거 뒤 column 축소를 검토한다.",
+                "result": "기존 DB는 baseline version만 기록하고 기존 DDL을 다시 실행하지 않는다. 빈 test DB는 V1 schema 다음 test-only seed를 적용한다. excerpt는 본문 첫 100자; note는 최신 memo 값을 복사한다.",
+                "after": "app read/write 전환 단계와 migration history를 기록하고 old code가 memo를 참조하는 동안 최종 drop을 하지 않는다."
+              }
+            ],
+            "data": [
+              {
+                "name": "flyway_schema_history version/checksum",
+                "reason": "기존·빈 DB별 migration 적용을 추적한다."
+              },
+              {
+                "name": "post.content/excerpt 101자 경계 row",
+                "reason": "기존 데이터 backfill 값과 길이 변환을 검증한다."
+              },
+              {
+                "name": "bookmark.memo/note: text/null/case-only/old-writer update",
+                "reason": "dual-write/reconcile의 변경 감지 범위를 확인한다."
+              },
+              {
+                "name": "기존 DB, blank Testcontainers DB, test-only seed",
+                "reason": "각 환경의 V1 적용 경로를 구분한다."
+              }
+            ],
+            "policies": [
+              "기존 populated DB에는 baseline-on-migrate version 1: V1 DDL을 실행하지 않고 history만 만든다. 빈 DB는 V1 schema와 test-only V1_1 seed를 순서대로 실행한다. JPA ddl-auto=validate 유지.",
+              "적용된 migration file은 수정하지 않고 새로운 version migration만 추가한다. existing user data를 dump reset으로 교체하지 않는다.",
+              "9-3 excerpt는 기존 content 앞 100자에서 backfill하고 column constraint는 data가 채워진 다음 적용한다. create/update content rule에 맞춰 excerpt를 동기화하고 PATCH null은 그대로 둔다.",
+              "9-5 V5는 nullable note 추가·memo 복사; rolling stage에서는 새 code가 memo/note 둘 다 쓰되 읽기는 memo. 모든 old node가 사라진 뒤 memo/note byte mismatch를 다시 맞추고 note read, 이후 memo mapping 제거, 최종 drop 순서를 지킨다. 운영 multi-node에서는 reconcile과 drop을 별도 배포로 나눈다."
+            ],
+            "inputs": [
+              "기존 schema + rows, history 없음; blank MySQL Testcontainers.",
+              "post content 101 characters 및 기존 row; PATCH content null/empty.",
+              "bookmark memo text, null, old writer로 바뀐 값, 대소문자 차이 값."
+            ],
+            "success": [
+              "기존 DB version1 baseline 기록, V1 DDL 재실행 없음. 빈 DB V1 후 test-only seed.",
+              "excerpt 기존 값은 content first 100 characters; 101 char yields exactly 100.",
+              "note는 현재 memo와 일치하고 null·case-only·old-writer 변경도 최종 reconcile에서 반영된다. memo drop은 모든 old reader/writer 제거 뒤다."
+            ],
+            "failures": [
+              {
+                "when": "기존 populated DB에 V1 DDL 실행 또는 applied migration checksum 변경",
+                "result": "Flyway validate/startup fails.",
+                "unchanged": "기존 business rows 보존; DB reset하지 않는다."
+              },
+              {
+                "when": "excerpt NOT NULL 적용 전에 backfill 누락",
+                "result": "null audit 또는 migration fail.",
+                "unchanged": "다음 schema/app version 전개를 중단한다."
+              },
+              {
+                "when": "memo를 읽고 쓰는 old server가 남았는데 V6 drop",
+                "result": "old app SQL fails.",
+                "unchanged": "memo 컬럼 유지하고 호환 release gate를 기다린다."
+              },
+              {
+                "when": "note IS NULL만으로 stale memo 찾기",
+                "result": "old writer update/case/null 이후 note stale 값이 남을 수 있다.",
+                "unchanged": "source memo를 current value로 보존한다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "Existing database baseline",
+                "start": "테이블/데이터는 있고 flyway_schema_history 없음",
+                "action": "baseline-on-migrate version1로 app 기동",
+                "result": "history에 version1 기록, 기존 table 생성 SQL을 다시 실행하지 않음"
+              },
+              {
+                "title": "Excerpt 101자 backfill",
+                "start": "기존 content 101자, excerpt 미설정",
+                "action": "9-3 migration 적용 후 row 조회",
+                "result": "excerpt는 content 첫 100자, post row는 동일"
+              },
+              {
+                "title": "Memo old writer reconciliation",
+                "start": "V5가 memo를 note로 복사한 뒤 호환 안 된 writer가 memo를 수정 또는 null 처리",
+                "action": "dual-write rollout 완료 후 note/memo byte mismatch 보정하고 read 전환",
+                "result": "note가 최신 memo와 일치; old node 제거 전 column drop 금지"
+              }
+            ],
+            "work": [
+              "migration 적용 전후 history version, row count, null count를 저장한다.",
+              "101자 post와 memo null/case/update row를 실제 SQL query로 다시 읽는다.",
+              "old/new app의 read/write 지원을 release 단계별 표로 작성한다."
+            ],
+            "done": [
+              "existing/empty/test DB baseline 차이를 확인했다.",
+              "excerpt backfill와 101자 경계를 검증했다.",
+              "V5 expand, dual-write, mismatch repair, read switch, old code removal, drop 순서를 문서화했다."
+            ],
+            "hints": [
+              "이미 테이블이 있는 DB에 baseline을 넣을 때 Flyway는 기존 schema를 어떤 식으로 취급해야 하나요?",
+              "note 값이 null이 아니어도 memo와 다를 수 있는데 null 검사만으로 어떤 변화가 놓치나요?",
+              "모든 old server가 memo를 참조하지 않기 전에 column을 제거하면 어느 요청이 깨질까요?"
+            ]
+          },
+          "hints": [
+            "이미 테이블이 있는 DB에 baseline을 넣을 때 Flyway는 기존 schema를 어떤 식으로 취급해야 하나요?",
+            "note 값이 null이 아니어도 memo와 다를 수 있는데 null 검사만으로 어떤 변화가 놓치나요?",
+            "모든 old server가 memo를 참조하지 않기 전에 column을 제거하면 어느 요청이 깨질까요?"
+          ],
+          "recipeIds": [],
+          "executionChecks": [
+            {
+              "title": "Existing DB baseline and empty test DB",
+              "command": "Compare Flyway history and schema on existing scenario DB and a fresh Testcontainers DB; apply only source-directed migrations.",
+              "expected": "existing DB records baseline without V1 table recreation; empty DB executes schema V1 then test-only seed.",
+              "record": "pre/post history version, table/row counts, null audit, startup log."
+            },
+            {
+              "title": "Excerpt backfill",
+              "command": "After 9-3 migration, SELECT id,CHAR_LENGTH(content),excerpt FROM post for the 101-character fixture.",
+              "expected": "excerpt matches first 100 content characters.",
+              "record": "captured fixture id and before/after values."
+            },
+            {
+              "title": "Expand/contract gate",
+              "command": "Review V5/V6 order and old/new node read/write matrix; inspect memo/note mismatches before read switch/drop.",
+              "expected": "V5 add/copy first; dual write; reconcile differing values; old memo mapping removed before final drop.",
+              "record": "migration versions, sample null/case/update rows, release gate decision."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:9-1 · Flyway 도입 — 지금 스키마를 기준선으로",
+              "href": "/scenario/ch9-schema-change/9-1-flyway.html"
+            },
+            {
+              "label": "../../docs/knowledge/S11-cache-redis-migration.md",
+              "href": "/docs/knowledge/S11-cache-redis-migration.html"
+            },
+            {
+              "label": "../../docs/knowledge/P19-mysql-jpa-setup.md",
+              "href": "/docs/knowledge/P19-mysql-jpa-setup.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:9-1 · Flyway 도입 — 지금 스키마를 기준선으로",
+              "href": "/scenario/ch9-schema-change/9-1-flyway.html"
+            },
+            {
+              "label": "../../docs/knowledge/S11-cache-redis-migration.md",
+              "href": "/docs/knowledge/S11-cache-redis-migration.html"
+            },
+            {
+              "label": "../../docs/knowledge/P19-mysql-jpa-setup.md",
+              "href": "/docs/knowledge/P19-mysql-jpa-setup.html"
+            },
+            {
+              "label": "../../docs/knowledge/V04-test-db-strategy.md",
+              "href": "/docs/knowledge/V04-test-db-strategy.html"
+            },
+            {
+              "label": "../../docs/knowledge/R07-backup-restore.md",
+              "href": "/docs/knowledge/R07-backup-restore.html"
+            },
+            {
+              "label": "legacy:9-3 · 컬럼 추가와 백필",
+              "href": "/scenario/ch9-schema-change/9-3-add-column-backfill.html"
+            },
+            {
+              "label": "../../docs/knowledge/R03-schema-types-constraints.md",
+              "href": "/docs/knowledge/R03-schema-types-constraints.html"
+            },
+            {
+              "label": "../../docs/knowledge/W09-why-dto.md",
+              "href": "/docs/knowledge/W09-why-dto.html"
+            },
+            {
+              "label": "legacy:9-5 · 서비스를 멈추지 않는 이름 변경 — expand와 contract",
+              "href": "/scenario/ch9-schema-change/9-5-expand-contract.html"
+            },
+            {
+              "label": "../../docs/knowledge/D06-deployment-concepts.md",
+              "href": "/docs/knowledge/D06-deployment-concepts.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "배포와 복구",
+  "status": "authored"
+}

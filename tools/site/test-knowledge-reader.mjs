@@ -102,7 +102,9 @@ assert.equal(generalRoot.querySelector('.kr-controls').hidden, true, '실제 조
 j01.window.close();
 
 const home = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-assert.match(home, /class="home-concept-direct"[^>]+href="docs\/knowledge\/README\.html"/, '홈 intro에서 개념 목록으로 직행');
+const homeDoc = new JSDOM(home).window.document;
+assert.ok(homeDoc.querySelector('.ch-menu-guide a[href="docs/knowledge/README.html"]'), '홈의 대주제 안내에서 개념 목록으로 직행');
+homeDoc.defaultView.close();
 const catalog = new JSDOM(fs.readFileSync(path.join(ROOT, 'docs/knowledge/README.html'), 'utf8')).window.document;
 const row = catalog.querySelector('[data-kc-document="P09"]');
 assert.equal(row.querySelector('h3 a[data-kc-open]').getAttribute('href').includes('read=1'), false, '질문 제목은 기존 장면 링크');

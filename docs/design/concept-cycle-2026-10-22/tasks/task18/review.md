@@ -1,7 +1,7 @@
 # task18 D04 독립 감사
 
 기준 HEAD `4b0493af52b1a06decca909d6bf9a8b6f9610686` · 검토 UTC `2026-10-22T00:11:50.225708+00:00` · reviewer gpt-6.1-sol/high.
-원문 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D04-build-pipeline-explained.md` 전문325줄·9fence SHA `eeadf83f4e342eba3befc7034aa31234c3617150368baea5b94f66419875b0a8`.
+원문 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D04-build-pipeline-explained.md` 전문325줄·9fence SHA `eeadf83f4e342eba3befc7034aa31234c3617150368baea5b94f66419875b0a8`.
 
 부분 보강의 관측값/경계는 현재 데이터·controller·renderer·테스트·생성 HTML·source-proof와 일치한다. 새 `npm --prefix tools/site run test:d04` exit0이다. 전체 의미 단위는 86개로 분해했으며 covered 33, partial 45, missing 4, unrun 4다. 보존 원문이 존재하는 것과 장면 coverage를 구분했다. fullDocumentComplete=false.
 
@@ -11,7 +11,7 @@ Spec는 needs_completion이다. 따라서 quality는 진단만 기록하고 전�
 
 ## 확정 finding
 
-- **D04-Q1 · minor · 원문 잔존 설명 상충.** `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/d04-learning.mjs:26`의 원문 링크에는 원문L23/L108의 “테스트 통과 뒤 JAR”라는 선형 설명이 고정 task 순서를 보장하지 않는다는 별도 정정 안내가 없다. 생성 HTML L2899/L3079에도 남는다. 반대로 보강 graph-classes/assemble-boundary와 실제 direct graph는 build→assemble/check 두 갈래이고 historical baseline/twin raw에서 bootJar/jar/assemble이 test보다 앞이다. 보강 graph 자체는 올바르다. 원문을 보존한 채 링크/원문 details 바깥에 해당 문장들의 범위와 보강 장면으로 연결하는 짧은 주석을 추가하는 좁은 사양을 권고한다. 검증은 원문SHA 불변·새 주석 DOM 검사·D04검사 exit0·메인 원문이동 브라우저 확인이다. 자세한 evidence/fix/validation은 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task18/review.json`에 있다.
+- **D04-Q1 · minor · 원문 잔존 설명 상충.** `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/d04-learning.mjs:26`의 원문 링크에는 원문L23/L108의 “테스트 통과 뒤 JAR”라는 선형 설명이 고정 task 순서를 보장하지 않는다는 별도 정정 안내가 없다. 생성 HTML L2899/L3079에도 남는다. 반대로 보강 graph-classes/assemble-boundary와 실제 direct graph는 build→assemble/check 두 갈래이고 historical baseline/twin raw에서 bootJar/jar/assemble이 test보다 앞이다. 보강 graph 자체는 올바르다. 원문을 보존한 채 링크/원문 details 바깥에 해당 문장들의 범위와 보강 장면으로 연결하는 짧은 주석을 추가하는 좁은 사양을 권고한다. 검증은 원문SHA 불변·새 주석 DOM 검사·D04검사 exit0·메인 원문이동 브라우저 확인이다. 자세한 evidence/fix/validation은 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task18/review.json`에 있다.
 
 ## 기술 대조와 실행 경계
 
@@ -19,20 +19,20 @@ Spec는 needs_completion이다. 따라서 quality는 진단만 기록하고 전�
 
 추가 실험의 Java21.0.6·Wrapper9.8.0·Boot4.1.1·JUnit6.0.3은 원문 Java25 실행이 아니다. 추가 non-web launcher의 명시 인자는 web-application-type=none/banner/logging이며 active profile 변화는 시험하지 않았다. `/lesson.properties` 읽기 성공을 profile별 설정·HTTP·DB·배포 성공으로 확대할 수 없다. 원문은 profile 실험 자체를 요구하지 않으므로 이를 새 구현 요구로 만들지 않았다.
 
-새 native 실행 없이 historical20개 로그를 읽고 독립 twin JAR 실물을 ZIP으로 검사했다. 9,103,378bytes / SHA `19be540e7682740e6d04d338fde021222c0c6e3a83dbaeb0935c3a85d928d16e` / lib20 / lesson.message=build-ready / test class 제외가 일치한다. baseline은 cache-on, twin은 cache-off이며 보편 재현성 또는 속도 개선 결과가 아니다. version lock과 private expected checksum 불일치 거부를 분리했다. `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task18/historical-readback.json`에 파일/로그 SHA와 주요 원문줄을 고정했다.
+새 native 실행 없이 historical20개 로그를 읽고 독립 twin JAR 실물을 ZIP으로 검사했다. 9,103,378bytes / SHA `19be540e7682740e6d04d338fde021222c0c6e3a83dbaeb0935c3a85d928d16e` / lib20 / lesson.message=build-ready / test class 제외가 일치한다. baseline은 cache-on, twin은 cache-off이며 보편 재현성 또는 속도 개선 결과가 아니다. version lock과 private expected checksum 불일치 거부를 분리했다. `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task18/historical-readback.json`에 파일/로그 SHA와 주요 원문줄을 고정했다.
 
-새 D04검사 UTC 2026-10-22T00:07:08.658861+00:00 ~ 2026-10-22T00:07:16.390903+00:00, exit 0. 원시 stdout/stderr와 HEAD·sourceSHA·관련8파일 SHA는 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task18/runs/independent-20261022T000708.613828Z/result.json`에 있다. 이 실행은 Node/JSDOM/frozen/static hash 대조이며 fresh Gradle/Java 실행이 아니다. 원문9개 fence를 원문본문에서 직접 추출하여 각각 byte exact도 확인했다.
+새 D04검사 UTC 2026-10-22T00:07:08.658861+00:00 ~ 2026-10-22T00:07:16.390903+00:00, exit 0. 원시 stdout/stderr와 HEAD·sourceSHA·관련8파일 SHA는 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task18/runs/independent-20261022T000708.613828Z/result.json`에 있다. 이 실행은 Node/JSDOM/frozen/static hash 대조이며 fresh Gradle/Java 실행이 아니다. 원문9개 fence를 원문본문에서 직접 추출하여 각각 byte exact도 확인했다.
 
 ## 시각 직접 열람
 
 `view_image`로 다음6개를 실제 열람했다. 선정11개 전체 또는58상태 전수 시각 검수라고 주장하지 않는다.
 
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d04-2026-10-21/images/graph-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d04-2026-10-21/images/repro-v5.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d04-2026-10-21/images/delivery-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d04-2026-10-21/captures/desktop-graph.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d04-2026-10-21/captures/mobile-package.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d04-2026-10-21/captures/mobile-delivery.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d04-2026-10-21/images/graph-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d04-2026-10-21/images/repro-v5.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d04-2026-10-21/images/delivery-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d04-2026-10-21/captures/desktop-graph.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d04-2026-10-21/captures/mobile-package.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d04-2026-10-21/captures/mobile-delivery.jpg
 
 시안 graph는 selected dependencies/edge 생략·고정 timing 아님을 표시한다. repro는 두 scoped clean JAR와 별도의 resource 입력 변경을 구분한다. delivery는 MODEL ONLY/NOT EXECUTED를 반복한다. desktop graph의 기본 코드·값과 mobile package/delivery의 줄바꿈·부분 확대 상태를 확인했다. 과거캡처는 현재브라우저를 대신하지 않는다. 현재 browser는 메인 검수 범위다.
 

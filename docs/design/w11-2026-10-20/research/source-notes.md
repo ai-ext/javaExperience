@@ -1,6 +1,6 @@
 # W11 공식 출처 조회 기록
 
-조회일: 2026-10-20 (KST). 기존 기준선은 `/Users/ds/research/javaexperience-s08-20261020/REPORT.md` 및 `/Users/ds/research/javaexperience-s08-20261020/_data/source-notes.md`다. 아래 상태는 이번 조회에서 실제 확인한 범위를 뜻한다.
+조회일: 2026-10-20 (KST). 기존 기준선은 `LOCAL_HOME/research/javaexperience-s08-20261020/REPORT.md` 및 `LOCAL_HOME/research/javaexperience-s08-20261020/_data/source-notes.md`다. 아래 상태는 이번 조회에서 실제 확인한 범위를 뜻한다.
 
 ## URL 본문 조회 성공
 

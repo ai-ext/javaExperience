@@ -9,7 +9,7 @@
 - 주문3개/서로다른고객3개,매번새Session,batchfetch0/2차cacheoff,seedtransaction커밋후조건이다. closedfind1/닫힌getter추가0+LazyInitializationException/열린getter추가1/직렬화추가2+StreamConstraintsException/수동root1+고객3/MapStructroot1+고객3/단건·목록projection각1을관측했다. 별도JDBC관찰SELECT는ORM계수밖이며실패뒤행유지를확인했다.
 - 직접반환객체의메모노출/추가CustomerPublic(name),단건projection의Session종료뒤직렬화추가0,별도ItemList의공유/복사를실행했다. DB고객(customer1@example.com/internal-1)과별도plainCustomer(m@example.com/internal-only)를섞지않았다.
 - MapStruct실제생성구현/의존성좌표·SHA/실행JSON/원시로그를보관한다. runtime/build와.gradle은gitignore다. registry의정확한선언버전을Gradle로해결했고processor1.6.3도기록했다. 수치와속도를다른설정으로일반화하지않는다.
-- CodexCLI gpt-6-luna/openai직접경로의공식문헌조사를 /Users/ds/research/javaexperience-w09-20261020 에보관했다. LiteLLM/재위임/임의모델전환없음. 메인은SpringData/MapStruct/Hibernate공식본문과실행을대조했다. 보고서·출처메모는research에복사했다.
+- CodexCLI gpt-6-luna/openai직접경로의공식문헌조사를 LOCAL_HOME/research/javaexperience-w09-20261020 에보관했다. LiteLLM/재위임/임의모델전환없음. 메인은SpringData/MapStruct/Hibernate공식본문과실행을대조했다. 보고서·출처메모는research에복사했다.
 
 ## 이미지와 화면
 

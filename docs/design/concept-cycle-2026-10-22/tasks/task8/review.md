@@ -3,9 +3,9 @@
 판정: **needs_completion**, fullDocumentComplete=false. spec의 원문 전체 범위가 부족하므로 quality 승인은 하지 않는다. 한정된 기존 구현을 진단용으로 대조했을 때 확정 critical/important/minor 기술 결함은 발견하지 못했다. 원문 보존과 부분 보강의 정직성은 유지된다.
 
 - 기준 HEAD: `4b0493af52b1a06decca909d6bf9a8b6f9610686`
-- 원문: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S08-transactions.md (329줄, SHA256 `364142fe4a16b661ab5fee7ec388bcf1b4dca306d37ae9af521a7d40e6fc4e30`)
-- 의미 단위: 63개 — covered 14, partial 27, missing 9, unrun 13. 단순 절 개수나 완료율이 아니다. 각 항목의 sourceLines/stageIds/evidence/gap은 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task8/source-coverage.json 참조.
-- fresh `npm --prefix tools/site run test:s08`: UTC 2026-10-21T23:50:16.752111+00:00 → 2026-10-21T23:50:23.327818+00:00, exit0. 원시 stdout/stderr 및 HEAD·12소스 SHA는 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task8/test-s08.execution.json과 동명 log에 보존했다.
+- 원문: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S08-transactions.md (329줄, SHA256 `364142fe4a16b661ab5fee7ec388bcf1b4dca306d37ae9af521a7d40e6fc4e30`)
+- 의미 단위: 63개 — covered 14, partial 27, missing 9, unrun 13. 단순 절 개수나 완료율이 아니다. 각 항목의 sourceLines/stageIds/evidence/gap은 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task8/source-coverage.json 참조.
+- fresh `npm --prefix tools/site run test:s08`: UTC 2026-10-21T23:50:16.752111+00:00 → 2026-10-21T23:50:23.327818+00:00, exit0. 원시 stdout/stderr 및 HEAD·12소스 SHA는 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task8/test-s08.execution.json과 동명 log에 보존했다.
 
 ## spec: 전체 문서 공백
 

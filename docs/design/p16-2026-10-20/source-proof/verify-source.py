@@ -4,8 +4,8 @@ import re,json,subprocess,tempfile,hashlib
 from urllib.request import urlopen
 ROOT=Path(__file__).resolve().parents[4]
 OUT=Path(__file__).resolve().parent
-CACHE=Path('/Users/ds/.gradle/caches/modules-2/files-2.1')
-JDK=Path('/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home/bin')
+CACHE=Path('LOCAL_HOME/.gradle/caches/modules-2/files-2.1')
+JDK=Path('LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home/bin')
 coords=[('tools.jackson.core','jackson-core','3.1.5'),('tools.jackson.core','jackson-databind','3.1.5'),('com.fasterxml.jackson.core','jackson-annotations','2.21')]
 jars={f'{g}:{a}:{v}':next((CACHE/g/a/v).glob('*/*.jar')) for g,a,v in coords}
 for entry in json.loads((ROOT/'docs/design/p04-2026-10-20/source-proof/Spring.verification.json').read_text())['jars']:

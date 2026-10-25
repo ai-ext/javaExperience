@@ -1,23 +1,37 @@
 # 복사해서 붙여 넣는 더미 SQL
 
-일자 페이지의 '이 날 데이터 넣기' 버튼으로 그날 블록만 받을 수 있다.
-
-- [seed.sql](seed.sql): 회원 20명·글 100건의 작은 기본 데이터. `board-server/src/main/resources/schema.sql`의 테이블·컬럼 이름을 그대로 쓴다.
-- [bulk.sql](bulk.sql): D04 커서·EXPLAIN 재실험, D06 인덱스·JOIN 비교용. seed의 D05까지 넣은 별도 실험 DB에 글 20,000건·댓글 40,000건·좋아요 40,000건을 **추가**한다. seed와 합치면 글 20,100건(공개 16,080건)이다. 실행 계획·속도는 직접 측정한다.
+일자 페이지의 '이 날 데이터 넣기'에서 현재 날의 블록을 받는다. 기본 실습과 대량 실험은 DB를 분리한다.
 
 ## 붙여 넣는 순서
 
-내 프로젝트의 테이블을 만든 뒤 MySQL 8.4 SQL 편집기에서 실행한다. D01은 연결만 확인한다. 빈 학습용 테이블에서 시작해 `seed.sql`의 **해당 블록 전체(SET~COMMIT)를 한 번씩**, D02 기준 데이터 → D03 회원 → D04 글·태그 → D05 댓글·좋아요 → D07 포인트·쿠폰·상점·주문 → D08 충전 → D10 신고·감사 순서로 붙인다. 처음부터 모든 테이블이 있으면 파일 전체를 실행해도 된다.
+| 지금 상태 | 작업 DB | 가져올 범위 | 실행·확인 |
+|---|---|---|---|
+| D01 연결 확인 | 기본 학습 DB | SQL 데이터 없음 | 연결만 확인 |
+| D02 → D03 → D04 → D05 | 빈 학습용 테이블에서 시작한 기본 DB | `seed.sql`의 해당 날 블록 | 테이블을 먼저 준비하고 **블록 전체(SET~COMMIT)를 한 번씩** 실행 |
+| D04 커서·EXPLAIN 대량 재실험 | D05 seed까지 준비한 **별도 실험 DB** | `bulk.sql` 전체 | 선택 실험. D04·D05 기본 문항은 **seed만** 사용 |
+| D06 인덱스·JOIN 비교 | D05 seed까지 준비한 **별도 실험 DB** | **seed+bulk** | 실행 계획·속도는 직접 측정 |
+| D07 → D08 → D10 | **원래 seed DB로 복귀** | 해당 날 seed 블록 | 이미 반영된 스냅샷. API 이벤트 재발행·재고 재차감 금지 |
 
-테이블 이름·컬럼이 다르면 블록의 `INSERT INTO 테이블 (컬럼, ...)` 줄과 관련 `UPDATE`·조회 이름만 내 이름으로 바꾼다. 추가 필수 열이 있으면 열 목록·VALUES도 보완한다. 키·상태 표현까지 다르게 설계했다면 참조 값도 함께 맞춘다. 이 SQL의 물리 이름은 직접 설계의 채점 기준이 아니다.
+기본 순서: **D02 기준 데이터 → D03 회원 → D04 글·태그 → D05 댓글·좋아요 → D07 포인트·쿠폰·상점·주문 → D08 충전 → D10 신고·감사**.
 
-D04·D05 문항은 **seed만**, D06은 **seed+bulk** 기준이다. D04의 대량 재실험은 D05 블록까지 준비한 별도 DB에서 bulk를 실행한다. D07 이후에는 원래 seed DB로 돌아와 해당 날 블록을 이어 넣는다. 이미 반영된 스냅샷이므로 API 이벤트를 재발행하거나 재고를 다시 차감하지 않는다. D03에는 잔액 컬럼이 필요 없다. D07에는 잔액이 모두 900, D08에는 회원 1·5만 1,900이고 나머지는 900이다.
+**실행 조건:** 내 테이블을 먼저 만들고 MySQL 8.4 SQL 편집기를 사용한다. 처음부터 모든 테이블이 있으면 seed 파일 전체를 한 번 실행해도 된다. 블록 실행과 전체 실행을 중복하지 않는다.
 
-고정 ID·고정 시각을 쓰므로 중복 실행은 오류다. 기존 앱 데이터와 섞지 않는다. 도중 오류는 `COMMIT`하지 말고 `ROLLBACK` 후 확인한다. bulk는 같은 연결에서 실행하고, 실패 시 임시 테이블과 `cte_max_recursion_depth`도 파일 끝의 문장으로 복구한다.
+**실패·복구:** 고정 ID·고정 시각이므로 중복 실행은 오류다. 기존 앱 데이터와 섞지 않는다. 도중 오류는 `COMMIT`하지 말고 `ROLLBACK` 후 확인한다. bulk는 같은 연결에서 실행하고, 실패 시 임시 테이블과 `cte_max_recursion_depth`도 파일 끝의 문장으로 복구한다.
+
+<details class="data-file-details">
+<summary>파일별 데이터 수와 일자별 잔액 기준</summary>
+
+- [seed.sql](seed.sql): 회원 20명·글 100건의 작은 기본 데이터. `board-server/src/main/resources/schema.sql`의 테이블·컬럼 이름을 그대로 쓴다.
+- [bulk.sql](bulk.sql): D04 커서·EXPLAIN 재실험, D06 인덱스·JOIN 비교용. seed의 D05까지 넣은 별도 실험 DB에 글 20,000건·댓글 40,000건·좋아요 40,000건을 **추가**한다. seed와 합치면 글 20,100건(공개 16,080건)이다. 실행 계획·속도는 직접 측정한다.
+- D03에는 잔액 컬럼이 필요 없다. D07에는 잔액이 모두 900, D08에는 회원 1·5만 1,900이고 나머지는 900이다.
+
+</details>
 
 ## 내 설계에 맞게 조정하기
 
 SQL의 물리 구조는 예시다. 수정한 SQL과 결과를 함께 제출하면 직접 설계의 불변식으로 확인한다.
+
+테이블 이름·컬럼이 다르면 블록의 `INSERT INTO 테이블 (컬럼, ...)` 줄과 관련 `UPDATE`·조회 이름만 내 이름으로 바꾼다. 추가 필수 열이 있으면 열 목록·VALUES도 보완한다. 키·상태 표현까지 다르게 설계했다면 참조 값도 함께 맞춘다. 이 SQL의 물리 이름은 직접 설계의 채점 기준이 아니다.
 
 - **생략한 열**: 테이블에 없는 열은 INSERT의 열 목록과 VALUES의 같은 위치 값을 함께 뺀다. `bulk.sql`은 VALUES 대신 SELECT의 같은 위치 식을 뺀다. 추가 필수 열은 열과 값을 함께 더한다. 행의 참조 ID·상태·시각은 그대로 맞춘다.
 - **복합 키**: `post_tag(post_id, tag_id)` 또는 `post_like(post_id, member_id)`를 복합 키로 골랐다면 독립 `id` 열과 각 행의 첫 값을 뺀다. 감사 열도 생략했다면 `created_at`·`updated_at`과 해당 값을 함께 뺀다. `member_coupon`의 독립 ID를 없앴다면 이를 참조하는 `shop_order.member_coupon_id`도 내가 고른 참조 방식으로 바꾼다. 외래 키를 끄거나 중복을 무시하지 않는다.
@@ -34,10 +48,6 @@ SELECT m.id, COALESCE(SUM(l.amount),0) AS point_balance
 FROM member m LEFT JOIN point_ledger l ON l.member_id=m.id
 GROUP BY m.id;
 ```
-
-## 로그인
-
-`learner001@example.test`~`learner020@example.test`, 첫 회원만 ADMIN이다. 공통 비밀번호는 **`Course1234`**. Spring `BCryptPasswordEncoder`가 읽는 `$2a$` BCrypt(cost 10) 해시를 넣었다. 저장된 해시를 다시 해시하지 않는다. 실제 앱 로그인은 별도로 확인한다.
 
 ## 넣은 뒤 확인
 
@@ -57,3 +67,7 @@ GROUP BY p.id,p.like_count HAVING p.like_count<>COUNT(l.post_id);
 SELECT m.id FROM member m LEFT JOIN point_ledger l ON l.member_id=m.id
 GROUP BY m.id,m.point_balance HAVING m.point_balance<>COALESCE(SUM(l.amount),0);
 ```
+
+## 로그인
+
+`learner001@example.test`~`learner020@example.test`, 첫 회원만 ADMIN이다. 공통 비밀번호는 **`Course1234`**. Spring `BCryptPasswordEncoder`가 읽는 `$2a$` BCrypt(cost 10) 해시를 넣었다. 저장된 해시를 다시 해시하지 않는다. 실제 앱 로그인은 별도로 확인한다.

@@ -1,6 +1,6 @@
 # W11 서비스트랜잭션 학습: 공식 근거와 범위
 
-확인일: 2026-10-20 (KST). 기존 [W08 보고서: /Users/ds/research/javaexperience-s08-20261020/REPORT.md](/Users/ds/research/javaexperience-s08-20261020/REPORT.md)와 source-notes를 기준선으로 삼아, 이번 요청의 빈틈만 공식 페이지/태그 소스에서 확인했다.
+확인일: 2026-10-20 (KST). 기존 [W08 보고서: LOCAL_HOME/research/javaexperience-s08-20261020/REPORT.md](LOCAL_HOME/research/javaexperience-s08-20261020/REPORT.md)와 source-notes를 기준선으로 삼아, 이번 요청의 빈틈만 공식 페이지/태그 소스에서 확인했다.
 
 | 주장 | 공식 근거 및 실제 확인 위치 | 버전·날짜 | 한계 |
 |---|---|---|---|

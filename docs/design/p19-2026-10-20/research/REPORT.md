@@ -1,7 +1,7 @@
 # P19 원문 기술 검토 및 교정 권고
 
 **검토 기준일:** 2026-10-20  
-**대상:** `/Users/ds/research/javaexperience-p19-20261020/P19-source.md`  
+**대상:** `LOCAL_HOME/research/javaexperience-p19-20261020/P19-source.md`  
 **검토 범위:** Spring Boot 4.1.1, Testcontainers 2.0.5, Hibernate 7.4.5.Final을 중심으로 의존성 좌표와 권장 모듈, 테스트 주입/SQL 초기화, H2 프로파일, naming strategy, Actuator health, Hikari 설정의 공식 문서 대조.
 
 ## 요약
@@ -76,6 +76,6 @@ Hibernate 7.4.5.Final의 공식 Javadoc URL을 웹 도구로 열었으나 접근
 
 ## 검증 범위와 제한
 
-이번 결과는 원문에 대한 교정 권고 보고서다. 공식 웹 문서 본문은 `/Users/ds/research/javaexperience-p19-20261020/_data/source-notes.md`에 URL, 요지, 확인일, 확인 한계와 함께 정리했다. Boot 4.1.1 Build Systems/Web/Testing/SQL/Actuator, Testcontainers MySQL 모듈 및 Spring TestContext, HikariCP 문서를 확인했다. Hibernate 7.4.5.Final naming strategy Javadoc 직접 접근은 실패했으므로 deprecated 표시 및 대체 권장안을 미확인으로 남겼다.
+이번 결과는 원문에 대한 교정 권고 보고서다. 공식 웹 문서 본문은 `LOCAL_HOME/research/javaexperience-p19-20261020/_data/source-notes.md`에 URL, 요지, 확인일, 확인 한계와 함께 정리했다. Boot 4.1.1 Build Systems/Web/Testing/SQL/Actuator, Testcontainers MySQL 모듈 및 Spring TestContext, HikariCP 문서를 확인했다. Hibernate 7.4.5.Final naming strategy Javadoc 직접 접근은 실패했으므로 deprecated 표시 및 대체 권장안을 미확인으로 남겼다.
 
 어떤 코드도 생성하거나 입력 원문을 수정하지 않았다. Docker, MySQL, Spring Boot 애플리케이션 또는 테스트를 실행하지 않았으며, 실행 성공/컴파일 성공을 주장하지 않는다. 이 문서는 공식 문서 조사에 근거한 정적 검토이므로 실제 dependency resolution, profile 활성화, health component 응답, DB 스키마 호환성은 검증 대상 밖이다.

@@ -2,7 +2,7 @@
 
 판정은 **needs_completion**이다. 기준 HEAD `4b0493af52b1a06decca909d6bf9a8b6f9610686`, 원문 SHA256 `05e6f3eabfeb1d915d88a79a6cda1da555f05744285247b74539de16a9ee7226`. 원문449줄/UTF8 31008bytes/18533문자/13fence 전문과 data/controller/renderer/tests/생성 HTML·기존 VERIFICATION/source-proof를 대조했다. application·기존근거·장부·Git·타task는 수정하지 않았다.
 
-1. 원문 의미단위 → `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task24/source-coverage.json`의 69항목과 44stage 전체 매핑으로 확인했다.
+1. 원문 의미단위 → `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task24/source-coverage.json`의 69항목과 44stage 전체 매핑으로 확인했다.
 2. 현재 자동하네스 → `npm --prefix tools/site run test:d10`를 새 실행하여 실제 exit0과 UTC/HEAD/소스11개 SHA를 보존했다.
 3. 기술·역사 시각근거 → raw/fixture/model을 대조하고 시안3+역사캡처3을 실제 view_image로 열람했다. 현재 브라우저·native DB는 실행하지 않았다.
 
@@ -30,9 +30,9 @@ spec이 needs_completion이므로 quality 승인하지 않았다. 허용된 정�
 
 ## 직접 열람한 시각 자료
 
-시안: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d10-2026-10-21/images/normalization-v3.jpg`, `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d10-2026-10-21/images/visibility-v2.jpg`, `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d10-2026-10-21/images/operations-v2.jpg`.
+시안: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d10-2026-10-21/images/normalization-v3.jpg`, `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d10-2026-10-21/images/visibility-v2.jpg`, `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d10-2026-10-21/images/operations-v2.jpg`.
 
-역사캡처: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d10-2026-10-21/captures/final-desktop-normalization.jpg`, `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d10-2026-10-21/captures/final-mobile-visibility.jpg`, `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d10-2026-10-21/captures/final-desktop-operations.jpg`.
+역사캡처: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d10-2026-10-21/captures/final-desktop-normalization.jpg`, `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d10-2026-10-21/captures/final-mobile-visibility.jpg`, `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d10-2026-10-21/captures/final-desktop-operations.jpg`.
 
 정규화의후보키/prime예외와분해,가시성20/10/20/30,풀93/113/153·복제/백업/샤딩 내용은 모델과부합한다.역사mobile은 확대된그림의오른쪽이화면밖이며pan안내와전체그림버튼이보인다.현재pan동작을관측했다는뜻은아니다.직접읽은6개의실제JPEG헤더와 역사manifest viewport desktop1672×819/mobile360×800은일치한다.15시안/30최종캡처/44상태전부의pixel검수는하지않았다.
 
@@ -47,7 +47,7 @@ spec이 needs_completion이므로 quality 승인하지 않았다. 허용된 정�
 
 원문PG18/MySQL8.4/Docker/Java25/JDBC와 실제행락·deadlock·부하·운영서비스는미실행이다.메인의현재desktop/mobile관문도남는다.새엔진실행/웹리서치가필요하면별도실행범위를메인이판단해야한다.
 
-재검증원시로그: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task24/fresh-test-d10.log`.명령/UTC/HEAD/11파일SHA: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task24/fresh-test-d10.json`. 독립정적block/frozen/raw대조: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task24/static-proof-check.json`. 이미지헤더/실제열람목록: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task24/images-viewed.json`.
+재검증원시로그: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task24/fresh-test-d10.log`.명령/UTC/HEAD/11파일SHA: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task24/fresh-test-d10.json`. 독립정적block/frozen/raw대조: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task24/static-proof-check.json`. 이미지헤더/실제열람목록: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task24/images-viewed.json`.
 
 판정: needs_completion
 fullDocumentComplete: false

@@ -12,8 +12,8 @@ args = parser.parse_args()
 assert not (args.probe and args.freeze), '--probe and --freeze are mutually exclusive'
 ROOT = Path(args.project_root).resolve()
 BASE = Path(args.runtime_root).resolve()
-JAVA = Path('/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home')
-CACHE_SOURCE = Path('/Users/ds/.gradle')
+JAVA = Path('LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home')
+CACHE_SOURCE = Path('LOCAL_HOME/.gradle')
 EXPECTED = OUT/'checkpoints/expected-execution.json'
 if args.freeze and EXPECTED.exists():
     raise SystemExit('frozen baseline exists; --freeze never overwrites it')

@@ -21,6 +21,11 @@ async function __flowCheck() {
   const q = s => r.querySelector(s), bad = [], wait = ms => new Promise(res => setTimeout(res, ms));
   const player = q("[data-flow-player]");
   if (!player || player.hidden) return "조작부가 숨어 있음";
+  // 기본 단계가 접힌 준비 자료 안에 있으면 실제 단계 링크로 연다.
+  const owner = r.closest('[data-day-panel]');
+  if (owner) document.querySelector('[data-panel-link][href="#' + owner.id + '"]')?.click();
+  for (let parent = r.parentElement; parent; parent = parent.parentElement) if (parent.tagName === 'DETAILS') parent.open = true;
+  await wait(50);
   const cnt = () => q("[data-flow-count]").textContent.trim();
   const flat = s => s.replace(/\s+/g, " ").trim();
   const prev = q("[data-flow-prev]"), next = q("[data-flow-next]"), play = q("[data-flow-play]");
@@ -40,10 +45,18 @@ async function __flowCheck() {
   if (play.getAttribute("aria-pressed") !== "false") bad.push("일시정지 안 됨");
   await wait(1500);
   if (cnt() !== at) bad.push(`일시정지 뒤에도 진행 ${at}→${cnt()}`);
-  // 멈춘 상태: 목록의 모든 단계 글이 DOM 에 있고 흐리게 사라지지 않는다
-  steps.forEach((li, i) => { const cs = getComputedStyle(li), rc = li.getBoundingClientRect();
-    if (!flat(li.textContent)) bad.push(`단계${i + 1} 글 없음`);
-    else if (cs.visibility === "hidden" || +cs.opacity < 0.5 || !rc.height) bad.push(`단계${i + 1} 안 보임(opacity ${cs.opacity}, h ${Math.round(rc.height)})`); });
+  // 전체 모드의 원문 목록 또는 원문에서 만든 표에서 모든 단계의 글을 확인한다.
+  const allMode = q('[data-flow-mode="all"]'), stepMode = q('button[data-flow-mode="step"]');
+  if (allMode) allMode.click();
+  const compact = q('[data-flow-overview] table');
+  steps.forEach((li, i) => {
+    const text = flat(li.textContent);
+    if (!text) { bad.push(`단계${i + 1} 글 없음`); return; }
+    const row = compact && [...compact.querySelectorAll('tbody tr')].find(row => flat(row.textContent).includes(flat(li.querySelector('.flow-step-title')?.textContent || text)));
+    const shown = row || li, cs = getComputedStyle(shown), rc = shown.getBoundingClientRect();
+    if (cs.visibility === "hidden" || +cs.opacity < 0.5 || !rc.height) bad.push(`단계${i + 1} 전체 모드에서 안 보임`);
+  });
+  if (stepMode) stepMode.click();
   const cur = r.querySelector(".flow-step.is-current"), now = flat(q("[data-flow-now]").textContent);
   if (!cur || !now.includes(flat(cur.textContent).slice(0, 20))) bad.push("지금 단계 칸 ≠ 목록의 현재 항목");
   q('[data-flow-speed="1"]').click();

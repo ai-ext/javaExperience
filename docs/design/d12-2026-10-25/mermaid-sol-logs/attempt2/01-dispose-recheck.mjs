@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-import {initD12SourceDiagrams} from '/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/d12-source-diagrams.mjs';
+import {initD12SourceDiagrams} from 'LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/d12-source-diagrams.mjs';
 const root=process.cwd(),out=root+'/docs/design/d12-2026-10-25/mermaid-sol-logs/attempt2/';
 const {JSDOM}=createRequire(root+'/tools/site/package.json')('jsdom');
 const make=()=>{const dom=new JSDOM('<div data-knowledge-reader data-kr-mode="read"><section data-kr-reading><details id="d12-original" open><pre class="mermaid">flowchart TD\nA --&gt; B</pre></details></section></div>');const node=dom.window.document.querySelector('pre');node.getClientRects=()=>[{width:700}];node.getBoundingClientRect=()=>({width:700});let release,start;const begun=new Promise(x=>start=x),held=new Promise(x=>release=x);return{dom,node,begun,release,api:{run:async()=>{start();await held;node.innerHTML='<svg><text>late result</text></svg>';node.setAttribute('data-processed','true');}},rejectApi:{run:async()=>{start();await held;node.innerHTML='<svg class="error"><text>Syntax error in text</text></svg>';throw Error('late rejection');}}};};

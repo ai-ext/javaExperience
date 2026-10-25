@@ -1,6 +1,6 @@
 # P04 객체 생성 학습
 
-원문 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P04-constructors-builder.md 전체를 읽었다. 원문·기존 앵커·학습자 서버는 보존한다. 먼저 순수 Java의 실제 예제부터 다룬다.
+원문 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P04-constructors-builder.md 전체를 읽었다. 원문·기존 앵커·학습자 서버는 보존한다. 먼저 순수 Java의 실제 예제부터 다룬다.
 
 1. new Child()와 this("delegated")의 경로, 부모/자식 필드·블록·생성자 본문 7개 출력 → 원문 stdout 대조, 현재 필드 값을 구분해 장면 전환.
 2. Order.of("ORD-1",2)의 이름 있는 생성 → 실제 private 생성자의 검증과 List.of() 입력, 정확한 결과 비교.

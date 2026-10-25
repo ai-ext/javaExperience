@@ -1,5 +1,5 @@
 import datetime,hashlib,json,pathlib,subprocess
-root=pathlib.Path('/Users/ds/code/javaExperience/.worktrees/concept-learning-night');base=json.loads((root/'docs/design/concept-cycle-2026-10-24/baseline.json').read_text())
+root=pathlib.Path('LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night');base=json.loads((root/'docs/design/concept-cycle-2026-10-24/baseline.json').read_text())
 sha=lambda b:hashlib.sha256(b).hexdigest()
 report={'checkedAtUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'HEAD':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()}
 for key in ['preexistingDirty','historicalProofFiles','initial24Reviews']:

@@ -161,15 +161,33 @@ export function renderLearningJourney(manifest, catalog, levelHref) {
       root.querySelector('[data-visual-result]').textContent = visible ? visible + '개 단계 표시' : '일치하는 단계가 없습니다';
     };
     visualSearch.addEventListener('input', applyVisual);
-    for (const button of gradeButtons) button.addEventListener('click', () => {
+    function chooseGrade(button, save) {
       grade = button.dataset.visualFilter;
-      for (const other of gradeButtons) other.setAttribute('aria-pressed', String(other === button));
+      for (const other of gradeButtons) { other.setAttribute('aria-pressed', String(other === button)); other.tabIndex = other === button ? 0 : -1; }
       applyVisual();
-    });
+      if (save) {
+        history.pushState(history.state, '', '#visual-grade-' + grade);
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      }
+    }
+    function restoreGrade() {
+      const selected = location.hash.match(/^#visual-grade-(all|basic|intermediate|advanced)$/)?.[1] || 'all';
+      chooseGrade(gradeButtons.find(button => button.dataset.visualFilter === selected), false);
+    }
+    for (const [index, button] of gradeButtons.entries()) {
+      button.addEventListener('click', () => chooseGrade(button, true));
+      button.addEventListener('keydown', event => {
+        const next = event.key === 'ArrowRight' ? (index + 1) % gradeButtons.length : event.key === 'ArrowLeft' ? (index + gradeButtons.length - 1) % gradeButtons.length : event.key === 'Home' ? 0 : event.key === 'End' ? gradeButtons.length - 1 : null;
+        if (next === null) return;
+        event.preventDefault(); chooseGrade(gradeButtons[next], true); gradeButtons[next].focus({ preventScroll:true });
+      });
+    }
+    window.addEventListener('popstate', restoreGrade);
+    window.addEventListener('hashchange', restoreGrade);
+    restoreGrade();
     for (const button of root.querySelectorAll('[data-journey-grade]')) button.addEventListener('click', () => {
       const matching = gradeButtons.find((item) => item.dataset.visualFilter === button.dataset.journeyGrade);
       matching?.click();
-      root.querySelector('#visual-catalog').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
     });
   })();
   </script>`;

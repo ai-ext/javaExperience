@@ -25,7 +25,7 @@
 
 ## taskC: P09추가두질문
 
-별도 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-completion-2026-10-24/SPEC.md. 최신PCdark지시에따라화이트시안은역사draft로남기고신규darkJPG를확정한뒤Luna구현. 2질문9상태/추가Java21 actual13값/원문489줄preserve. 기존84상태역사관측에가짜추가하지않고새9상태검사·PCdark9행으로검증한다. 전체P09완료판정은별도다.
+별도 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-completion-2026-10-24/SPEC.md. 최신PCdark지시에따라화이트시안은역사draft로남기고신규darkJPG를확정한뒤Luna구현. 2질문9상태/추가Java21 actual13값/원문489줄preserve. 기존84상태역사관측에가짜추가하지않고새9상태검사·PCdark9행으로검증한다. 전체P09완료판정은별도다.
 
 ## 최종관문
 

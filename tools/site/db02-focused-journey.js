@@ -1,12 +1,12 @@
 document.querySelectorAll('.db02-focused').forEach((journey) => {
   const panels = [...journey.querySelectorAll('[data-db02-panel]')];
   const original = document.querySelector('#db02-original');
-  const show = (name) => {
+  const show = (name, scroll = true) => {
     const active = panels.find((panel) => panel.dataset.db02Panel === name);
     if (!active) return;
     for (const panel of panels) panel.hidden = panel !== active;
     journey.dataset.db02Screen = name;
-    journey.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) journey.scrollIntoView({ block: 'start', behavior: 'instant' });
   };
   for (const button of journey.querySelectorAll('[data-db02-go]')) button.addEventListener('click', () => show(button.dataset.db02Go));
   for (const link of journey.querySelectorAll('[data-db02-source]')) link.addEventListener('click', () => { if (original) original.open = true; });
@@ -26,5 +26,5 @@ document.querySelectorAll('.db02-focused').forEach((journey) => {
       state.textContent = 'SQL을 선택했습니다. 직접 복사해 practice DB에서 실행하세요.';
     }
   });
-  show('scenario');
+  show('scenario', false);
 });

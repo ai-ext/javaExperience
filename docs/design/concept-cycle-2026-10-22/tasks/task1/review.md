@@ -57,13 +57,13 @@
 ## 2. quality: 현재 보강 진단
 
 ### P09-M1 · minor · numeric-boundary의 원문 출처가 155줄로 표시되지만 해당 원문155줄은 빈 줄이며 정수/금액 경계 설명은152줄이다.
-- 위치: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/p09-lesson-data.mjs:210
+- 위치: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/p09-lesson-data.mjs:210
 - 재현 근거: data210 source=§2 연산 보강 · 원문 155줄. 원문152에 정수나눗셈·0·overflow·BigDecimal 설명,155 빈줄. questions.json1916도155 사용.
 - 최소 수정: 원문은 보존하고 lesson 출처와 현재 질문 메타데이터를152줄로 교정한다. 과거 생성/실행 이력은 덮어쓰지 않는다.
 - 검증 조건: numeric-boundary 선택 시출처152줄 표시, static source line 대조·기존 test:p09 통과 및 메인브라우저확인.
 
 ### P09-M2 · minor · 질문별 imageEvidence 검사는 배열길이만 확인하여 현행근거로 따라갈수없는 PNG경로를 놓친다. 현재 questions의 imageEvidence79항목(고유44경로)이 모두 미존재 PNG다.
-- 위치: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/test-p09-coverage.mjs:27
+- 위치: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/test-p09-coverage.mjs:27
 - 재현 근거: task1/static-evidence.json 실측. 예questions.json1150 P09-06.png부재;실제렌더러와asset-review는JPG. asset-review45개현재파일/해시는모두일치해제품이미지깨짐은아님. 역사browser이미지경로PNG는당시관측이므로보존해야함.
 - 최소 수정: 기존역사PNG근거는유지하고질문마다currentImageEvidence또는변환manifest/assetID기반해결을명시한다. coverage검사는현재파일/변환연결존재를검증한다.
 - 검증 조건: 79개연결이현행JPG또는명시변환매핑으로해결되고,존재하지않는경로를주입하면검사실패. 과거관찰로그를현재실행으로덮어쓰지않음.
@@ -78,10 +78,10 @@
 ## 3. 새 하네스와 기존 실행 근거
 
 - 새 명령: `npm --prefix tools/site run test:p09` / exitCode=0 / UTC 2026-10-21T23:33:09.494161+00:00 → 2026-10-21T23:33:15.240928+00:00.
-- 원시 stdout: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task1/test-p09.stdout.txt
-- 원시 stderr: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task1/test-p09.stderr.txt
-- HEAD·소스해시·시점: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task1/test-p09.execution.json
-- 정적 대조 상세: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task1/static-evidence.json
+- 원시 stdout: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task1/test-p09.stdout.txt
+- 원시 stderr: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task1/test-p09.stderr.txt
+- HEAD·소스해시·시점: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task1/test-p09.execution.json
+- 정적 대조 상세: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task1/static-evidence.json
 - 새 test:p09 5 suite 통과: 기계 연결20주제84상태27질문, DOM 상호작용, 모바일 참조, 준비 장면, 원문135/서버17 및 P09 코드23/앵커32 보존.
 - 저장된 원문 Java 3개와 stdout를 현재 Markdown에 바이트 대조했다. 모두 일치했으며 MethodsDemo 둘째 줄 끝 공백도 유지된다. 이것은 새 JVM 실행이 아니다.
 - 기존 source-proof의 JDK21 실행/추가34상태/Methods6/javac12/protected 증거는 역사 근거다. 추가계측 코드와 원문 코드는 분리했다.
@@ -90,11 +90,11 @@
 
 ## 4. 실제 이미지 열람 범위
 
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-2026-10-20/images/P09-07.jpg — tools.view_image 직접 열람. 원문 p.nickname="Grace"; 두변수가같은A헤더로연결,필드Ada→Grace.
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-2026-10-20/images/P09-09.jpg — tools.view_image 직접 열람. 원문 p=new Profile("Local only"); 호출자A Grace유지,매개변수B로분리.
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-2026-10-20/images/P09-12-overload-v3.jpg — tools.view_image 직접 열람. format(name)후String.repeat(count),같은this.prefix,반환문자열끝공백이명시됨.
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-2026-10-20/browser-evidence/mobile-P09-09.jpg — tools.view_image 직접 열람. 모바일DOM호출자p→A Grace/매개변수p→B Local only,현재원문코드일치. 번역확장overlay가호출자위쪽을가림.
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-2026-10-20/browser-evidence/desktop-P09-07.jpg — tools.view_image 직접 열람. 필드변경이미지와DOM A/A/Grace및현재코드강조일치. 전체그림영문작은글씨는원본보다작아DOM보완에의존.
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-2026-10-20/images/P09-07.jpg — tools.view_image 직접 열람. 원문 p.nickname="Grace"; 두변수가같은A헤더로연결,필드Ada→Grace.
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-2026-10-20/images/P09-09.jpg — tools.view_image 직접 열람. 원문 p=new Profile("Local only"); 호출자A Grace유지,매개변수B로분리.
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-2026-10-20/images/P09-12-overload-v3.jpg — tools.view_image 직접 열람. format(name)후String.repeat(count),같은this.prefix,반환문자열끝공백이명시됨.
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-2026-10-20/browser-evidence/mobile-P09-09.jpg — tools.view_image 직접 열람. 모바일DOM호출자p→A Grace/매개변수p→B Local only,현재원문코드일치. 번역확장overlay가호출자위쪽을가림.
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-2026-10-20/browser-evidence/desktop-P09-07.jpg — tools.view_image 직접 열람. 필드변경이미지와DOM A/A/Grace및현재코드강조일치. 전체그림영문작은글씨는원본보다작아DOM보완에의존.
 
 시안3장+과거캡처2장만 직접 열람했다. 모든84상태·모든45선택이미지·모든캡처의 전수 시각 검토라고 주장하지 않는다. 현재브라우저는 메인에서 검증해야 한다. 선택45개 파일·해시 일치는 정적 검증이며 눈으로 본 범위와 다르다.
 

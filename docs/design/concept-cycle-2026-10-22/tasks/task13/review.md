@@ -2,15 +2,15 @@
 
 판정: **needs_completion**. 원문264줄을 44개 주요 의미 단위로 대조했다. covered 14, partial 18, missing 5, unrun 7. 전체 문서 완료는 false다.
 
-기준 HEAD: `4b0493af52b1a06decca909d6bf9a8b6f9610686`. 원문 SHA256: `1fe115e967ba5602aeb8547c93e8a29eed1838549893a8598f90e1b905773cda`. 검토자 gpt-6.1-sol/high. 출력 경로: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task13.
+기준 HEAD: `4b0493af52b1a06decca909d6bf9a8b6f9610686`. 원문 SHA256: `1fe115e967ba5602aeb8547c93e8a29eed1838549893a8598f90e1b905773cda`. 검토자 gpt-6.1-sol/high. 출력 경로: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task13.
 
-새 검사 `npm --prefix tools/site run test:v04`: exit 0. UTC 2026-10-21T23:59:23.231836+00:00 ~ 2026-10-21T23:59:35.584955+00:00. 원시 출력·종료값·HEAD·관련 소스 SHA는 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task13/runs/sol-20261021T235923.215202Z에 보존했다. 이는 Node/jsdom·현재 HTML·frozen 근거 대조이며 Java/DB/HTTP 재실행 성공이 아니다.
+새 검사 `npm --prefix tools/site run test:v04`: exit 0. UTC 2026-10-21T23:59:23.231836+00:00 ~ 2026-10-21T23:59:35.584955+00:00. 원시 출력·종료값·HEAD·관련 소스 SHA는 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task13/runs/sol-20261021T235923.215202Z에 보존했다. 이는 Node/jsdom·현재 HTML·frozen 근거 대조이며 Java/DB/HTTP 재실행 성공이 아니다.
 
 ## Spec 검토
 
 원문 전문·9fence·기존 목차가 HTML에 보존된다. 추가10질문·27장면은 mock unit, NON_TEST 교체4조건, fixture INFERRED/ISOLATED, H2/MySQL collation 반례, proxy/lazy, 지연 flush/IDENTITY, rollback/AFTER_COMMIT, 독립 observer, REQUIRES_NEW, 실제 추가TCP/동기MockMvc를 구분한다. 원문 TC class는 컴파일만, 원본 unit2는 mock/new, native adapter는 원문 assertion body2개만 재사용했다고 표시돼 있다.
 
-전체 의미 단위의 상세 대응은 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task13/source-coverage.json에 기록했다. 기존 개념 지도는 목차이므로 독립 개념 장면으로 세지 않았다. 설정·목적별 선택·오류 해결·DTO/fetch 수정·container 수명/비용의 범위는 아직 충족되지 않았다. 미실행 원문을 추가 toy로 대체하지 않는다.
+전체 의미 단위의 상세 대응은 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task13/source-coverage.json에 기록했다. 기존 개념 지도는 목차이므로 독립 개념 장면으로 세지 않았다. 설정·목적별 선택·오류 해결·DTO/fetch 수정·container 수명/비용의 범위는 아직 충족되지 않았다. 미실행 원문을 추가 toy로 대체하지 않는다.
 
 | 원문 줄 | 의미 단위 | 장면 | 판정 |
 |---|---|---|---|
@@ -63,18 +63,18 @@
 
 Spec 미통과이므로 quality 승인을 부여하지 않았다. 진단 범위에서 확정 critical/important는 0건이며 minor 1건이다.
 
-- **V04-Q01 · minor** — /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/source-proof/source.json:118. runtimeScope가 preparing/native adapter proposed로 남아 L61 최종 status·execution 기록과 모순된다. 이 JSON은 보충 근거에 그대로 노출된다. 최종 실제 추가 실행 범위와 미실행 경계를 일치시키고 HTML 재생성·test:v04로 확인한다. 기존 증거는 수정하지 않았다.
+- **V04-Q01 · minor** — LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/source-proof/source.json:118. runtimeScope가 preparing/native adapter proposed로 남아 L61 최종 status·execution 기록과 모순된다. 이 JSON은 보충 근거에 그대로 노출된다. 최종 실제 추가 실행 범위와 미실행 경계를 일치시키고 HTML 재생성·test:v04로 확인한다. 기존 증거는 수정하지 않았다.
 
 mock unit의 SQL/proxy 미검증, MySQL adapter·H2 toy의 환경 분리, Product save와 추가 persist의 구분, Hibernate prepared와 observer JDBC 제외, flagForCommit/end와 rollback/commit, 독립 connection RowListener와 외부 전송의 차이는 코드·frozen·화면 값이 대응한다. REQUIRES_NEW73 cleanup 최종0 미측정 및 실제 TCP/동기 MockMvc의 한정 범위도 숨기지 않는다.
 
 ## 직접 본 이미지와 실행 한계
 
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/images/V04-lazy-v3.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/images/V04-flush-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/images/V04-http-v3.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/captures/desktop-lazy.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/captures/desktop-http.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/captures/mobile-flush.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/images/V04-lazy-v3.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/images/V04-flush-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/images/V04-http-v3.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/captures/desktop-lazy.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/captures/desktop-http.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/v04-2026-10-20/captures/mobile-flush.jpg
 
 시안3/10·과거캡처3/20만 직접 열람했다. 현재 브라우저 조작·전수 픽셀·학습자 이해도는 검증하지 않았다. mobile flush의 번역 확장 overlay는 일부 안내를 가리지만 제품 원인으로 단정할 증거는 없다. 현재 브라우저 검증은 메인 담당이다.
 

@@ -1,6 +1,6 @@
 # D09 원문 byte 보존용 보충 메모
 
-대상은 `/Users/ds/research/javaexperience-d09-20261021/SOURCE.md`이다. 조사 시점에 309줄, fenced code block 9개임을 직접 확인했다. `_data/source-baseline.json`의 현재/이전 연구 SHA가 다르므로 이전 연구 문구를 현재 원문으로 간주하지 않았다. 이 메모는 보충 제안이며 SOURCE.md를 수정하지 않는다.
+대상은 `LOCAL_HOME/research/javaexperience-d09-20261021/SOURCE.md`이다. 조사 시점에 309줄, fenced code block 9개임을 직접 확인했다. `_data/source-baseline.json`의 현재/이전 연구 SHA가 다르므로 이전 연구 문구를 현재 원문으로 간주하지 않았다. 이 메모는 보충 제안이며 SOURCE.md를 수정하지 않는다.
 
 ## 삽입/정정 제안
 

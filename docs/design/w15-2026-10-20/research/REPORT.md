@@ -1,6 +1,6 @@
 # W15 OFFSET·커서 조사 보고서
 
-확인일: 2026-10-20. 기준 원문은 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W15-paging-offset-vs-cursor.md`(283줄, SHA-256 `9937498a3b948f96099dca7bb625573bdc40879254c82c67afc465dee663108b`)이다. 5개 펜스 원본·해시는 `docs/design/w15-2026-10-20/source-proof/source.json` 및 `original/block-01..05.*`에서 확인했다. 실험·repo/DB 변경은 실행하지 않았다.
+확인일: 2026-10-20. 기준 원문은 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W15-paging-offset-vs-cursor.md`(283줄, SHA-256 `9937498a3b948f96099dca7bb625573bdc40879254c82c67afc465dee663108b`)이다. 5개 펜스 원본·해시는 `docs/design/w15-2026-10-20/source-proof/source.json` 및 `original/block-01..05.*`에서 확인했다. 실험·repo/DB 변경은 실행하지 않았다.
 
 ## 확인된 주장과 조건
 

@@ -1,6 +1,6 @@
 # 최신 main 기반 개념 학습 통합
 
-2026-10-25. 작업 후보는 /Users/ds/code/javaExperience/.worktrees/concept-learning-integration, 브랜치는 integrate/concept-learning-main이다. 기준은 원격 main a70f1bd531c1b72077d56e7363ff424ba5795143이며 원본 개념 작업은 별도로 보존했다. 아래 초기 통합 결과는 구현 커밋 bc1651ec 기준의 기록이다. 이후 사용자 요청으로 PR 게시를 준비했으며 추가 교정·현재 검증은 마지막 절과 PR-PREFLIGHT.json을 따른다. main merge는 수행하지 않는다.
+2026-10-25. 작업 후보는 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-integration, 브랜치는 integrate/concept-learning-main이다. 기준은 원격 main a70f1bd531c1b72077d56e7363ff424ba5795143이며 원본 개념 작업은 별도로 보존했다. 아래 초기 통합 결과는 구현 커밋 bc1651ec 기준의 기록이다. 이후 사용자 요청으로 PR 게시를 준비했으며 추가 교정·현재 검증은 마지막 절과 PR-PREFLIGHT.json을 따른다. main merge는 수행하지 않는다.
 
 ## 결합한 범위
 
@@ -42,7 +42,7 @@ main과 옛 개념 원문24개가 달라 과거 SHA를 현재 원문에 그대�
 
 현재 수집기는 main의 과정52화면을 포함한391화면·53963항목을 수집한다. 기존 개념 근거가 있는 P09의 동일 원문/ID/label5개는 기존 implemented 상태와 근거를 유지했다. implemented910, 과거 verified6이며 새 verified 승격은0이다. main 장부와 새 개념 ID를 결합하고 같은 ID의 양쪽 과거 기록은 sidecar에 보존했다.
 
-진행표는 /Users/ds/code/javaExperience/.worktrees/concept-learning-integration/docs/design/concept-cycle-2026-10-24/PROGRESS.md 다. 개념26개 범위별 구현과134개 공통 reader 적용을, 나머지108개 맞춤 보강 및 개별 문서 전수 완료 승인과 구분한다. 기존 원본 브랜치의 직접 merge 보류와 새 main 기반 후보의 검증 상태도 분리한다. 초기 통합의 로컬 커밋·생성물 재빌드 일치·제외 이력 최종 확인은 아래 기록처럼 완료했다.
+진행표는 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-integration/docs/design/concept-cycle-2026-10-24/PROGRESS.md 다. 개념26개 범위별 구현과134개 공통 reader 적용을, 나머지108개 맞춤 보강 및 개별 문서 전수 완료 승인과 구분한다. 기존 원본 브랜치의 직접 merge 보류와 새 main 기반 후보의 검증 상태도 분리한다. 초기 통합의 로컬 커밋·생성물 재빌드 일치·제외 이력 최종 확인은 아래 기록처럼 완료했다.
 
 ## 로컬 구현 커밋 이후 확인
 

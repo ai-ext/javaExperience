@@ -2,7 +2,7 @@
 
 기준 HEAD `4b0493af52b1a06decca909d6bf9a8b6f9610686`. 원문335줄을 전부 읽고 spec을 먼저 판정했다. **문서 전체는 미완료이며 기존 보충 범위의 값/코드 정확성과 구분한다.**
 
-새 `npm --prefix tools/site run test:p16`는 exit0. UTC 2026-10-21T23:38:12.695642+00:00 ~ 2026-10-21T23:38:17.285802+00:00. 관련 소스/현재 HTML/보관 근거의 전후 SHA가 동일하다. 원시 출력과 해시는 [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task3/test-p16-run.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task3/test-p16-run.json), [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task3/test-p16.stdout.txt](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task3/test-p16.stdout.txt)에 보존했다. Java24/MockMvc11은 과거 근거이며 새 실행이 아니다.
+새 `npm --prefix tools/site run test:p16`는 exit0. UTC 2026-10-21T23:38:12.695642+00:00 ~ 2026-10-21T23:38:17.285802+00:00. 관련 소스/현재 HTML/보관 근거의 전후 SHA가 동일하다. 원시 출력과 해시는 [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task3/test-p16-run.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task3/test-p16-run.json), [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task3/test-p16.stdout.txt](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task3/test-p16.stdout.txt)에 보존했다. Java24/MockMvc11은 과거 근거이며 새 실행이 아니다.
 
 ## spec 검토
 
@@ -57,25 +57,25 @@
 | §7 Q6 JsonPropertyOrder 특수 순서 계약 | [323, 324] | shape-object | partial | JsonPropertyOrder 및 정규화/서명/해시의 별도 계약 사례 없음. |
 | §8 공식 참고문헌 현재 유효성 | [326, 335] |  | unrun | 외부 web 금지에 따라 현재 링크 접근·버전/사실 재확인은 미실행; 역사 확인을 이번 확인으로 승격하지 않음. |
 
-상세 evidence는 [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task3/source-coverage.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task3/source-coverage.json)에 단위별로 기록했다. 중요한 남은 범위는 전역 naming, NON_EMPTY/0, 레거시 JsonFormat, 엔티티 순환/지연로딩, creator 실패 진단, JacksonComponent/Bean, 필수입력/응답진화다. 원문 Boot/Java25 환경은 미실행으로 분리했다.
+상세 evidence는 [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task3/source-coverage.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task3/source-coverage.json)에 단위별로 기록했다. 중요한 남은 범위는 전역 naming, NON_EMPTY/0, 레거시 JsonFormat, 엔티티 순환/지연로딩, creator 실패 진단, JacksonComponent/Bean, 필수입력/응답진화다. 원문 Boot/Java25 환경은 미실행으로 분리했다.
 
 ## quality 진단
 
 spec 미통과 상태이므로 quality 전체 승인을 하지 않는다. 검토한 부분에서 critical/important 기술 오류는 발견하지 못했다. 원문 주문 keyboard2/id1 고정값과 추가 Mina7, 원문 Kim29와 ImmutableName Mina, HTTP/mapper/Java시간 비교, 406의 본문 호출 여부를 구분한 구현은 보관 근거와 일치한다.
 
-- **P16-Q1 · minor** — [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/test-p16-contract-learning.mjs:60](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/test-p16-contract-learning.mjs:60). 코드 textContent·복사 일치만 검사하고 active index 유효성/실제 mark 구간은 검사하지 않아 강조 누락 회귀가 통과한다. 현재 데이터의 강조가 잘못됐다는 판정은 아니다.
-  - 근거: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task3/highlight-diagnostic-run.json: property-out.active=[999]를 프로세스 메모리에서만 바꿔 기존 contract test를 import해도 exit0. property-out의 코드3줄 어디에도 mark가 생성되지 않는 변이를 검출하지 못함.
+- **P16-Q1 · minor** — [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/test-p16-contract-learning.mjs:60](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/test-p16-contract-learning.mjs:60). 코드 textContent·복사 일치만 검사하고 active index 유효성/실제 mark 구간은 검사하지 않아 강조 누락 회귀가 통과한다. 현재 데이터의 강조가 잘못됐다는 판정은 아니다.
+  - 근거: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task3/highlight-diagnostic-run.json: property-out.active=[999]를 프로세스 메모리에서만 바꿔 기존 contract test를 import해도 exit0. property-out의 코드3줄 어디에도 mark가 생성되지 않는 변이를 검출하지 못함.
   - 최소 수정: 현재20상태에서 active가 비어 있지 않고 모든 index가 코드 줄 범위 내인지, 생성된 mark의 줄/텍스트가 의도한 코드 구간인지 검사한다. 모든 markup 세부를 고정하지 말고 핵심 의미 줄을 확인한다.
   - 검증: active=[999] 변이는 nonzero가 되고 정상20상태는 통과해야 한다. 앱/원문은 변경하지 않아도 되는 검사 보강이다.
 
 ## 직접 열람한 이미지와 캡처
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/images/P16-unknown-v4.jpg](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/images/P16-unknown-v4.jpg) — JPEG 1672×941, 선택 이미지
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/images/P16-creator-v3.jpg](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/images/P16-creator-v3.jpg) — JPEG 1672×941, 선택 이미지
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/images/P16-null-v2.jpg](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/images/P16-null-v2.jpg) — JPEG 1672×941, 선택 이미지
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/desktop-unknown.jpg](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/desktop-unknown.jpg) — JPEG 1672×3776, 과거 full-page 캡처
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/mobile-creator.jpg](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/mobile-creator.jpg) — JPEG 360×5592, 과거 full-page 캡처
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/mobile-null.jpg](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/mobile-null.jpg) — JPEG 360×5275, 과거 full-page 캡처
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/images/P16-unknown-v4.jpg](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/images/P16-unknown-v4.jpg) — JPEG 1672×941, 선택 이미지
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/images/P16-creator-v3.jpg](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/images/P16-creator-v3.jpg) — JPEG 1672×941, 선택 이미지
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/images/P16-null-v2.jpg](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/images/P16-null-v2.jpg) — JPEG 1672×941, 선택 이미지
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/desktop-unknown.jpg](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/desktop-unknown.jpg) — JPEG 1672×3776, 과거 full-page 캡처
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/mobile-creator.jpg](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/mobile-creator.jpg) — JPEG 360×5592, 과거 full-page 캡처
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/mobile-null.jpg](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p16-2026-10-20/mobile-null.jpg) — JPEG 360×5275, 과거 full-page 캡처
 
 선택 그림에서 unknown 기본/strict/DTO 예외, record/불변 creator, int/Integer null의 값·타입 분리가 코드와 일치했다. 과거 desktop은 전체그림과 DOM값/코드를 함께 보여 주며, 과거 mobile은 확대 구간 일부와 가로 이동 안내를 보여 준다. 모바일 상단 번역 overlay도 보인다. 이 관찰은 현재 브라우저 조작 증거가 아니다.
 

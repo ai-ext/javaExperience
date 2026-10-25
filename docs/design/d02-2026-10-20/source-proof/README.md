@@ -16,7 +16,7 @@ TLS는 매회 새 demo CA/leaf와 RSA key를 자체 run 안에 만들었다. 개
 
 실제17CHECK와 별도3모델을 구분한다. bind-and-route의0.0.0.0/외부 경로, transport-and-trust의HTTP3/QUIC와Forwarded 신뢰는 원문 개념이다. wildcard bind/외부 노출·실제 L4/L7·QUIC·TCP handshake packet capture·신뢰 proxy 정책 적용은 없다. HTTP404와 TLS 거부·connect/read deadline은 실행한 계층과 입력이 달라 생긴 관찰이며 상태나 증상 하나만으로 일반 원인을 단정하지 않는다.
 
-finally에서 자체 DNS thread/socket·proxy server/thread와 Boot subprocess만 종료했다. 자체 Boot 포트 닫힘과 프로세스 종료를 확인했다. 전역 kill·서비스·DNS/hosts/firewall/trust 설정을 바꾸지 않았다. main final freeze 뒤 새 run의 일반 replay와 별도 temp 사본의 독립 재현에서17검사·3모델 전체 frozen이 일치했다. 일반 재현은 `python3 docs/design/d02-2026-10-20/source-proof/run-proof.py --runtime-root /Users/ds/research/javaexperience-d02-20261020/_data/runtime`이며 --freeze를 넣지 않는다.
+finally에서 자체 DNS thread/socket·proxy server/thread와 Boot subprocess만 종료했다. 자체 Boot 포트 닫힘과 프로세스 종료를 확인했다. 전역 kill·서비스·DNS/hosts/firewall/trust 설정을 바꾸지 않았다. main final freeze 뒤 새 run의 일반 replay와 별도 temp 사본의 독립 재현에서17검사·3모델 전체 frozen이 일치했다. 일반 재현은 `python3 docs/design/d02-2026-10-20/source-proof/run-proof.py --runtime-root LOCAL_HOME/research/javaexperience-d02-20261020/_data/runtime`이며 --freeze를 넣지 않는다.
 
 런타임 버전은 실행별 runtime-last.json으로 구분한다. main 마지막 replay는 Python3.14.3/linkedOpenSSL3.6.3/CLI OpenSSL3.6.3, 독립 담당자의 환경은 Python3.13.1/linkedOpenSSL3.6.2/CLI3.6.2였다. 두 경로의 canonical 관찰은 같고 모두 strict 검증·TLS1.3을 확인했다. 그 전에 별도 shell에서 조회한 CLI OpenSSL3.6.2를 main 최종 실행 버전으로 쓰지 않는다. 날짜·임시 PID/port/CA bytes·인증서 기간·로그 시간과 절대 경로는 raw 자료이며 frozen 비교값으로 위조하거나 고정하지 않았다.
 

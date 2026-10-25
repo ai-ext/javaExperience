@@ -1,12 +1,12 @@
 document.querySelectorAll('.db04-focused').forEach((journey) => {
   const panels = [...journey.querySelectorAll('[data-db04-panel]')];
   const original = document.querySelector('#db04-original');
-  const show = (name) => {
+  const show = (name, scroll = true) => {
     const active = panels.find((panel) => panel.dataset.db04Panel === name);
     if (!active) return;
     for (const panel of panels) panel.hidden = panel !== active;
     journey.dataset.db04Screen = name;
-    journey.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) journey.scrollIntoView({ block: 'start', behavior: 'instant' });
   };
   for (const button of journey.querySelectorAll('[data-db04-go]')) button.addEventListener('click', () => show(button.dataset.db04Go));
   for (const link of journey.querySelectorAll('[data-db04-source]')) link.addEventListener('click', () => { if (original) original.open = true; });
@@ -44,5 +44,5 @@ document.querySelectorAll('.db04-focused').forEach((journey) => {
       }
     });
   }
-  show('scenario');
+  show('scenario', false);
 });

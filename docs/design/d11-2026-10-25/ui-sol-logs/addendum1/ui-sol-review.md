@@ -9,4 +9,4 @@
 
 명세를 먼저 통과시킨 뒤 기존9변이와 새4교정의 회귀 변이4개를 실행했다. 총13개 모두 AssertionError/exit1, 제어군은 exit0이다. 추가 변이는 Java fence 범위 복귀, HSTS 호스트 복귀, CORS의 모호한 라벨 복귀, cookie-token 이전 focus 복귀이며 제품 디스크 소스는 쓰지 않았다. D11/P09/reader/dark와 diff-check는 모두 exit0, 입력9,753개 SHA 전후 변경0개, W15 생성 HTML은 여전히 HEAD 바이트와 같다.
 
-추가 spec/quality/변이raw/SHA: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/ui-sol-logs/addendum1/
+추가 spec/quality/변이raw/SHA: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/ui-sol-logs/addendum1/

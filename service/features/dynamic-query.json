@@ -1,0 +1,203 @@
+{
+  "version": 1,
+  "id": "dynamic-query",
+  "title": "검색 조건을 조합해 글 찾기",
+  "summary": "8-4 검색 조건 조합을 SELECT와 COUNT에 똑같이 적용해 page metadata 및 날짜·게시판 오류를 확인한다.",
+  "difficulty": "중급",
+  "prerequisites": [
+    "posts-find"
+  ],
+  "stages": [
+    {
+      "id": "search",
+      "title": "없는 조건은 빼고 여러 조건은 함께 적용하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "search",
+          "title": "없는 조건은 빼고 여러 조건은 함께 적용하기",
+          "sourceUnits": [
+            "legacy:8-4"
+          ],
+          "brief": {
+            "purpose": "8-4 검색 조건 조합을 SELECT와 COUNT에 똑같이 적용해 page metadata 및 날짜·게시판 오류를 확인한다.",
+            "task": "board/tag/author/date/q를 단독·조합 검색하고 없는 slug/tag는 빈 결과, from>to와 invalid values는 400인지 확인한다.",
+            "preconditions": [
+              "dev board, tag jpa, author 3 이스프링, publishedAt 경계에 걸리는 글을 확인한다.",
+              "기본 page=0,size=10 및 응답 total 필드 계약을 확인한다."
+            ],
+            "scenario": [
+              {
+                "start": "dev/jpa/author3에 맞는 글과 제외될 글의 id 집합을 기록한다.",
+                "action": "GET /api/posts/search?board=dev&tag=jpa&author=3&from=2026-09-01&to=2026-09-30&q=JPA&page=0&size=5; 이후 없는 board/tag와 날짜 역전을 시험한다.",
+                "result": "200 목록과 total이 같은 filter에 맞고 publishedAt desc/id desc다. 없는 board/tag는 200 empty. from>to는 없는 board라도 400.",
+                "after": "날짜 종료일 전체 포함, size/page 오류, wildcard q escaping을 확인한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "published_at calendar-day boundary",
+                "reason": "from/to both-inclusive 날짜 경계를 검증한다."
+              },
+              {
+                "name": "board slug dev/nope",
+                "reason": "검색 없는 board는 empty 200; normal list 404와 구별한다."
+              },
+              {
+                "name": "tag jpa, author 3, q JPA",
+                "reason": "단독 및 조합 조건 집합을 비교한다."
+              },
+              {
+                "name": "items/totalElements/totalPages/hasNext",
+                "reason": "SELECT와 COUNT가 같은 조건을 사용하는지 본다."
+              }
+            ],
+            "policies": [
+              "GET /api/posts/search filters board/tag/author/from/to/q; page default0,size default10.",
+              "없는 board/tag는 200 zero results. board listing missing slug 404와 다르다.",
+              "from/to YYYY-MM-DD inclusive, DATETIME range 1000-01-01..9999-12-31; from>to 400; date validation precedes missing-board short-circuit.",
+              "검색·visibility predicate와 parameter binding을 SELECT 및 COUNT 모두에서 공유한다."
+            ],
+            "inputs": [
+              "valid: board=dev,tag=jpa,author=3,from=2026-09-01,to=2026-09-30,q=JPA,page=0,size=5.",
+              "board=nope or tag=missing.",
+              "board=nope with from=2026-10-01&to=2026-09-01."
+            ],
+            "success": [
+              "valid results ordered published_at desc/id desc; COUNT matches same conditions.",
+              "missing board/tag returns 200 items=[] and totalElements=0.",
+              "both calendar endpoints included."
+            ],
+            "failures": [
+              {
+                "when": "from>to, malformed/out-of-range date",
+                "result": "400, even with missing board.",
+                "unchanged": "post/tag rows unchanged."
+              },
+              {
+                "when": "page<0, invalid size/type",
+                "result": "400.",
+                "unchanged": "read-only search makes no DB changes."
+              },
+              {
+                "when": "COUNT omits tag/date/visibility condition",
+                "result": "metadata no longer corresponds to result filter.",
+                "unchanged": "data unchanged."
+              }
+            ],
+            "examples": [
+              {
+                "title": "Combined search",
+                "start": "post2 is public dev by member3, title JPA 연관관계 매핑 정리, tag jpa",
+                "action": "GET /api/posts/search?board=dev&tag=jpa&author=3&from=2026-09-01&to=2026-09-30&q=JPA&page=0&size=5",
+                "result": "200; post2 is included and total count matches SQL"
+              },
+              {
+                "title": "Missing slug",
+                "start": "board nope does not exist",
+                "action": "GET /api/posts/search?board=nope",
+                "result": "200; items=[], totalElements=0"
+              },
+              {
+                "title": "Invalid date precedence",
+                "start": "board nope plus from later than to",
+                "action": "GET /api/posts/search?board=nope&from=2026-10-01&to=2026-09-01",
+                "result": "400 date validation, not empty 200"
+              }
+            ],
+            "work": [
+              "Add one search predicate at a time and save returned id sets.",
+              "Compare list IDs and a SQL COUNT with the exact same where clauses.",
+              "Run inclusive date boundaries and invalid date plus missing board."
+            ],
+            "done": [
+              "Empty search versus normal-list 404 is clear.",
+              "Inclusive date and validation precedence confirmed.",
+              "SELECT/count, visibility, page metadata align."
+            ],
+            "hints": [
+              "Why should search for a missing board return empty 200 while a board-specific listing returns 404?",
+              "Which total changes first if the count query omits the tag predicate?",
+              "When both a missing slug and from>to are sent, what does the source say to validate first?"
+            ]
+          },
+          "hints": [
+            "Why should search for a missing board return empty 200 while a board-specific listing returns 404?",
+            "Which total changes first if the count query omits the tag predicate?",
+            "When both a missing slug and from>to are sent, what does the source say to validate first?"
+          ],
+          "recipeIds": [
+            "legacy:8-4:Z1",
+            "legacy:8-4:Z2",
+            "legacy:8-4:Z3",
+            "legacy:8-4:Z4",
+            "legacy:8-4:Z5",
+            "legacy:8-4:Z6",
+            "legacy:8-4:Z7",
+            "legacy:8-4:Z8",
+            "legacy:8-4:Z9",
+            "legacy:8-4:Z10",
+            "legacy:8-4:Z11",
+            "legacy:8-4:Z12",
+            "legacy:8-4:Z13",
+            "legacy:8-4:Z14",
+            "legacy:8-4:Z15",
+            "legacy:8-4:Z16"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:8-4 · 조합 검색 — 동적 쿼리",
+              "href": "/scenario/ch8-query-deep/8-4-dynamic-search.html"
+            },
+            {
+              "label": "../../docs/knowledge/P21-querydsl-setup.md",
+              "href": "/docs/knowledge/P21-querydsl-setup.html"
+            },
+            {
+              "label": "../../docs/knowledge/S10-spring-data-query.md",
+              "href": "/docs/knowledge/S10-spring-data-query.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:8-4 · 조합 검색 — 동적 쿼리",
+              "href": "/scenario/ch8-query-deep/8-4-dynamic-search.html"
+            },
+            {
+              "label": "../../docs/knowledge/P21-querydsl-setup.md",
+              "href": "/docs/knowledge/P21-querydsl-setup.html"
+            },
+            {
+              "label": "../../docs/knowledge/S10-spring-data-query.md",
+              "href": "/docs/knowledge/S10-spring-data-query.html"
+            },
+            {
+              "label": "../../docs/knowledge/W04-mybatis-xml-practical.md",
+              "href": "/docs/knowledge/W04-mybatis-xml-practical.html"
+            },
+            {
+              "label": "../../docs/knowledge/R05-index-btree.md",
+              "href": "/docs/knowledge/R05-index-btree.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "조회와 성능",
+  "status": "authored"
+}

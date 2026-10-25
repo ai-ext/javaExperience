@@ -36,7 +36,7 @@
 | 변경된 core row 18개 | before aggregate SHA-256: `0ec3a2f8938f0f40de00f375b818bf8f22dcda1d6ece25e8de1a3bbc8bbf919a`; after: `9aa3013f40a2de0a20d89158888677e5361f45d30b0a875a449a7b0a361ca2ab` |
 | 변경되지 않은 기존 행 53,998개 | before/after ordered line aggregate SHA-256 모두 `52ea3511af29fbaade8260f3985f92dedcb2d0778307d6170d4804c6ef69e194` |
 | independent code review | `SOL-FINAL-REVIEW.json`: PASS, Critical 0 / Important 0 / Minor 0 |
-| independent review addendum | `SOL-FINAL-REVIEW.json` / `.md`와 `/Users/ds/research/javaExperience-concept-curriculum-20261025/_data/FINAL-REVIEW.json` / `.md` exact SHA match; recommendation `local_preview_with_native_clipboard_limit`, code snapshot 474 files / `e1bbc746…` |
+| independent review addendum | `SOL-FINAL-REVIEW.json` / `.md`와 `LOCAL_HOME/research/javaExperience-concept-curriculum-20261025/_data/FINAL-REVIEW.json` / `.md` exact SHA match; recommendation `local_preview_with_native_clipboard_limit`, code snapshot 474 files / `e1bbc746…` |
 | commit state | implementation commit `7601bd80372dd87117b149f32067851b04654642`, tree `ece5e0c6b3504073ca1a617f234b8fd41a9d8ca0`; branch ref may advance for verification-only commit |
 | post-commit generated check | `npm --prefix tools/site run check:generated` exit 0 · 2026-10-25 08:47:55 UTC · two roadmap warnings (D04-5, D07-1) · `_data/check-generated-postcommit.log`: `생성 HTML = 커밋된 HTML` |
 | 최종 보존 확인 | `PRESERVATION-FINAL.json`: 금지된 캡처 blob reachable 0, 기존 source 문서/learner source 변경 0, main HEAD 기준 commit 불변. live implemented 905 기존 + 18 core = 923; retired catalog 5건 별도 exact archive; verified 6 유지, 새 verified 0 |

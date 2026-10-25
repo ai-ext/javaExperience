@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { marked } from 'marked';
+import { JSDOM } from 'jsdom';
 import { P09_LESSONS } from './p09-lesson-data.mjs';
 import { P04_LESSONS } from './p04-lesson-data.mjs';
 import { P16_CONTRACT_LESSONS } from './p16-contract-data.mjs';
@@ -31,11 +32,17 @@ import { D10_LESSONS } from './d10-lesson-data.mjs';
 import { D11_LESSONS } from './d11-lesson-data.mjs';
 import { D12_LESSONS } from './d12-lesson-data.mjs';
 import { loadCoreLearning } from './core-learning-data.mjs';
+import { FUNCTIONAL_TASKS } from './functional-scenario-data.mjs';
+import { FUNCTIONAL_LIKE_TASKS } from './functional-like-data.mjs';
+import { LIKE_VISUAL_PHASES } from './functional-like-model.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const output = path.join(root, 'docs/design/visual-inventory.jsonl');
 const summaryPath = path.join(root, 'docs/design/visual-inventory-summary.json');
 const checklistPath = path.join(root, 'docs/design/VISUAL-PAGES.md');
+const serviceRecipesPath = path.join(root, 'service/api-contracts.json');
+const serviceRecipes = fs.existsSync(serviceRecipesPath)
+  ? JSON.parse(fs.readFileSync(serviceRecipesPath, 'utf8')).recipes ?? [] : [];
 const states = ['unreviewed', 'mockup_ready', 'implemented', 'verified'];
 const now = new Date().toISOString().slice(0, 10);
 
@@ -232,13 +239,32 @@ function collectHtml(page, html) {
     'p16-json-visual', 'p16-navigation', 'p16-scene', 'p16-pair', 'p16-code-location', 'p16-actions',
     'core-learning', 'core-learning-layout', 'core-stage-nav', 'core-stage-columns', 'core-observation',
     'home-new-visual', 'home-new-stepper', 'home-new-plate', 'home-prepare-shortcut', 'home-return-work', 'home-preparation-steps',
+    'functional-catalog', 'functional-workspace', 'functional-like-workspace', 'functional-like-catalog', 'functional-reference-context', 'fw-nav', 'fw-header', 'fw-work-grid', 'fw-code-panel',
+    'fnp', 'fnp-dialog', 'fnp-code', 'fnp-before', 'fnp-after', 'fnp-graph', 'fnp-delta', 'fnp-figure',
+    'fw-actions-panel', 'fw-image', 'fw-state-tabs', 'fw-state-panel', 'fw-lane', 'fw-request', 'fw-request-form', 'fw-request-params',
+    'fw-no-body', 'fw-variants', 'fw-request-preview', 'fw-send-actions', 'fw-send', 'fw-copy-request', 'fw-copy-status', 'fw-curl-fallback',
+    'fw-request-status', 'fw-captured', 'fw-actual', 'fw-expected', 'fw-expected-status', 'fw-db-check', 'fw-copy-file', 'fw-file-copy-status', 'fw-file-copy-fallback',
+    'fw-completion', 'fw-references', 'fw-setup-steps', 'fw-setup-step', 'fw-starting-state', 'fw-task-context', 'fw-common-start',
+    'fw-mobile-target', 'fw-begin-row', 'fw-setup-link', 'fw-situation', 'fw-actions', 'fw-primary-actions', 'fw-start-link', 'fw-run-link',
+    'fw-catalog-columns', 'fw-catalog-continuity', 'fw-catalog-list', 'fw-catalog-row', 'fw-catalog-name', 'fw-catalog-implementation',
+    'fw-catalog-method', 'fw-catalog-api', 'fw-catalog-outcome', 'fw-catalog-open', 'fw-catalog-preparation', 'fw-catalog-note', 'fw-view-tabs',
+    'flv-note', 'flv-count', 'flv-mine', 'flv-state-heading', 'flv-grid', 'flv-java', 'flv-object-meta', 'flv-relation', 'flv-db',
+    'flv-case-note', 'flv-observer', 'flv-visual-toolbar', 'flv-state-toolbar', 'flv-preparation', 'flv-prep-open', 'flv-implementation-guide', 'flv-contract-note',
+    'frv', 'frv-field-picker', 'frv-app-lanes', 'frv-java',
+    'frv-database', 'frv-db-table', 'frv-reference-list', 'frv-transaction', 'frv-observer', 'fqv', 'fqv-controls',
+    'fqv-list-results', 'fqv-presets', 'fqv-patch-top', 'fqv-relations', 'fqv-phase-label', 'fqv-table-scroll',
     // 과정 v2(P5-2): 홈 과정 영역·참고 도감, 일자 페이지 배치, 과정 지도
     'course-home', 'ch-today', 'ch-progress', 'ch-entries', 'home-reference',
     'day-head', 'day-today', 'day-java', 'step-facts', 'copy-row', 'day-pager',
     'course-map', 'cm-legend', 'cm-toolbar', 'cm-board', 'cm-detail', 'cm-tables',
     // 과정 v2(P5-3): 일자 [오늘 흐름]·티켓 [장애 흐름] 재생, 2단계 일자의 티켓 흐름 목록
-    'flow', 'flow-links']);
-  for (const match of html.matchAll(/<(?:section|header|footer|div|nav|button|article|aside|dialog|figure|p|ol)\b([^>]*\bclass="([^"]+)"[^>]*)>/g)) {
+    'flow', 'flow-links',
+    // 콘텐츠 종류·파일 카드·관계·비교·절차를 페이지마다 독립적으로 추적한다.
+    'content-page-kind', 'visual-files', 'visual-file', 'visual-relations',
+    'visual-comparison', 'visual-procedure', 'visual-flow', 'visual-rules',
+    'task-visual', 'task-target-files', 'repro-command', 'ticket-validation',
+    'independent-cases', 'cm-relation-filters', 'flow-observation-table', 'day-required-route']);
+  for (const match of html.matchAll(/<(?:section|header|footer|div|nav|button|article|aside|dialog|figure|p|ol|ul|table)\b([^>]*\bclass="([^"]+)"[^>]*)>/g)) {
     const classes = match[2].split(/\s+/);
     for (const component of classes) {
       if (!visualClasses.has(component)) continue;
@@ -248,7 +274,145 @@ function collectHtml(page, html) {
       add(page, '생성 시각 교구', `visual:${component}`, aria || hint, 0, { className: component });
     }
   }
+  if (html.includes('data-fw-root') || html.includes('class="functional-catalog"')) {
+    const dom = new JSDOM(html);
+    for (const element of dom.window.document.querySelectorAll('.functional-workspace p, .functional-workspace pre, .functional-workspace table, .functional-catalog p, .functional-catalog pre, .functional-catalog table, [data-frv-root] .frv-sql-scroll > code')) {
+      const panel = element.closest('[data-fw-state-panel]');
+      const task = element.closest('[data-fw-root]')?.getAttribute('data-fw-task');
+      const nativeModel = Boolean(element.closest('[data-frv-root],[data-fqv]'));
+      const type = element.tagName === 'TABLE' ? 'table' : ['PRE', 'CODE'].includes(element.tagName) ? 'code' : 'prose';
+      const value = type === 'table'
+        ? [...element.querySelectorAll('tr')].map(tr => [...tr.querySelectorAll('th,td')].map(cell => cell.textContent).join(' | ')).join('\n')
+        : element.textContent;
+      const section = nativeModel ? `값 비교 모델 · ${panel?.getAttribute('data-fw-state-panel') || task}`
+        : task ? `기능 작업 UI · ${task}` : '기능 목차 UI';
+      add(page, section, `${nativeModel ? 'native' : 'generated'}_${type}`, value, value.length,
+        { taskId: task || '', stateId: panel?.getAttribute('data-fw-state-panel') || '', nativeModel });
+    }
+    for (const panel of dom.window.document.querySelectorAll('[data-fw-state-panel]')) {
+      const task = panel.closest('[data-fw-root]')?.getAttribute('data-fw-task') || '';
+      const stateId = panel.getAttribute('data-fw-state-panel') || '';
+      add(page, `기능 과제 예상 상태 · ${task}`, 'functional_typed_state', stateId, 0,
+        { taskId: task, stateId, evidenceType: task === 'like' || task === 'unlike' ? '4-1 설명용 계산 상태' : '3-2 설명용 계산 상태' });
+    }
+    dom.window.close();
+  }
   return maxDepth;
+}
+
+function collectServiceFeature(page, html) {
+  const dom = new JSDOM(html);
+  const document = dom.window.document;
+  const sectionLabel = (featureId, variantId, stageId, section) =>
+    `서비스 기능 · ${featureId}/${variantId}/${stageId} · ${section}`;
+  const addService = (pagePath, feature, variant, stage, kind, section, label, length = 0, extra = {}) => {
+    const recipeIds = [...new Set((stage?.recipeIds ?? []).filter(Boolean))];
+    const ids = (stage?.sourceUnits ?? []).filter(Boolean);
+    add(pagePath, sectionLabel(feature.id, variant?.id ?? '', stage?.id ?? '', section), `service_functional_${kind}`, label, length, {
+      featureId: feature.id,
+      variantId: variant?.id ?? '',
+      stageId: stage?.id ?? '',
+      recipeCount: recipeIds.length,
+      recipeIds,
+      sourceId: `service/features/${feature.id}.json`,
+      sourceIds: ids,
+      ...extra,
+    });
+  };
+  const scalarList = (pagePath, feature, variant, stage, key, values) => {
+    for (const [index, value] of (values ?? []).entries()) {
+      const text = typeof value === 'string' ? value : JSON.stringify(value);
+      if (text) addService(pagePath, feature, variant, stage, 'prose', key, text, text.length, { itemIndex: index });
+    }
+  };
+  const catalog = document.querySelector('[data-sf-catalog]');
+  if (catalog) {
+    for (const card of catalog.querySelectorAll('[data-sf-feature-card][data-sf-id]')) {
+      const featureId = card.getAttribute('data-sf-id');
+      const sourceJson = `service/features/${featureId}.json`;
+      const sourcePath = path.join(root, sourceJson);
+      if (!fs.existsSync(sourcePath)) continue;
+      const feature = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+      const title = card.querySelector('h2,h3,h4')?.textContent?.trim() || feature.title || featureId;
+      const summary = card.querySelector('.sf-feature-summary')?.textContent?.trim() || feature.summary || '';
+      add(page, '서비스 기능 목차', 'service_functional_catalog_feature', `${featureId}: ${title}`, summary.length, {
+        featureId, sourceId: sourceJson, route: `scenario/features/${featureId}.html`,
+      });
+    }
+  }
+
+  const featureRoot = document.querySelector('[data-sf-feature]');
+  if (featureRoot) {
+    const featureId = featureRoot.getAttribute('data-sf-feature');
+    const sourceJson = `service/features/${featureId}.json`;
+    const sourcePath = path.join(root, sourceJson);
+    if (!fs.existsSync(sourcePath)) throw new Error(`서비스 기능 원본 JSON이 없습니다: ${sourceJson}`);
+    const feature = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+    if (feature.id !== featureId) throw new Error(`서비스 기능 ID 불일치: ${sourceJson} (${feature.id} != ${featureId})`);
+    const sourcePage = `scenario/features/${featureId}.md`;
+    for (const variant of feature.variants ?? []) {
+      for (const stage of variant.stages ?? []) {
+        const recipeIds = [...new Set((stage.recipeIds ?? []).filter(Boolean))];
+        const recipeById = new Map(serviceRecipes.map((recipe) => [recipe.id, recipe]));
+        const brief = stage.brief ?? {};
+        const proseSections = [
+          ['purpose', '목적'], ['task', '요구사항'], ['work', '구현 작업'],
+          ['inputs', '입력'], ['success', '성공 조건'],
+        ];
+        const typedText = [stage.title, ...proseSections.flatMap(([key]) => Array.isArray(brief[key]) ? brief[key] : [brief[key]])]
+          .filter((value) => typeof value === 'string').join(' ');
+        addService(sourcePage, feature, variant, stage, 'stage', '단계 메타데이터', `${stage.id}: ${stage.title}`, typedText.length, {
+          route: `scenario/features/${featureId}.html`,
+          registeredRecipeCount: recipeIds.length,
+          resolvedRecipeCount: recipeIds.filter((id) => recipeById.has(id)).length,
+        });
+
+        for (const [key, label] of proseSections) {
+          const values = Array.isArray(brief[key]) ? brief[key] : [brief[key]];
+          scalarList(sourcePage, feature, variant, stage, label, values.filter(Boolean));
+        }
+        for (const [index, condition] of (brief.preconditions ?? []).entries()) {
+          addService(sourcePage, feature, variant, stage, 'prose', '사전 조건', condition, condition.length, { itemIndex: index });
+        }
+        for (const [scenarioIndex, scenario] of (brief.scenario ?? []).entries()) {
+          for (const key of ['start', 'action', 'result', 'after']) if (scenario[key]) {
+            addService(sourcePage, feature, variant, stage, 'prose', `시나리오 ${scenarioIndex + 1} · ${key}`, scenario[key], scenario[key].length, { scenarioIndex });
+          }
+        }
+        for (const [index, item] of (brief.data ?? []).entries()) {
+          const value = [item.name, item.reason].filter(Boolean).join(' | ');
+          addService(sourcePage, feature, variant, stage, 'data_table', '설계 데이터 표', value, value.length, { rowIndex: index, columns: ['name', 'reason'] });
+        }
+        scalarList(sourcePage, feature, variant, stage, '정책과 제약', brief.policies);
+        for (const [index, failure] of (brief.failures ?? []).entries()) {
+          const value = [failure.when, failure.result, failure.unchanged].filter(Boolean).join(' · ');
+          addService(sourcePage, feature, variant, stage, 'failure_condition', '실패 조건', value, value.length, { failureIndex: index });
+        }
+        scalarList(sourcePage, feature, variant, stage, '완료 체크', brief.done);
+        scalarList(sourcePage, feature, variant, stage, '힌트', [...new Set([
+          ...(feature.hints ?? []), ...(brief.hints ?? []), ...(stage.hints ?? []),
+        ])]);
+
+        for (const recipeId of recipeIds) {
+          const recipe = recipeById.get(recipeId);
+          if (!recipe) {
+            addService(sourcePage, feature, variant, stage, 'api_form', 'API 요청 양식', recipeId, 0, { recipeId, recipeResolved: false });
+            continue;
+          }
+          const failures = recipe.sourceCases ?? recipe.failures ?? recipe.expected?.failures ?? [];
+          const fields = (recipe.requestFields ?? []).map((field) => `${field.in ?? ''} ${field.name ?? ''} ${field.type ?? ''} ${field.constraint ?? ''}`.trim());
+          const failureLabels = failures.map((failure) => `${failure.label ?? failure.condition ?? ''} ${failure.expected?.statuses ?? failure.status ?? ''}`.trim());
+          const label = [recipeId, `${recipe.method ?? ''} ${recipe.path ?? ''}`.trim(), ...(recipe.expected?.statuses ?? []).map(String), ...fields, ...failureLabels]
+            .filter(Boolean).join(' · ');
+          addService(sourcePage, feature, variant, stage, 'api_form', 'API 요청 양식', label, label.length, {
+            recipeId, recipeResolved: true, method: recipe.method ?? '', path: recipe.path ?? '',
+            requestFieldCount: (recipe.requestFields ?? []).length, failureCount: failures.length,
+          });
+        }
+      }
+    }
+  }
+  dom.window.close();
 }
 
 function markdownFiles(dir) {
@@ -262,14 +426,29 @@ function markdownFiles(dir) {
   });
 }
 
-// 과정 v2는 이 렌더러가 배치하는 화면(과정 안내·지도·일자 페이지·출발 자료)만 넣는다. course/java·course/tickets는 각 담당이 넣는다.
-const courseFiles = ['course/README.md', 'course/map.md', ...['course/spring', 'course/start'].flatMap(markdownFiles)];
+// 과정 v2의 모든 종류를 포함한다. Java·티켓의 새 시각 블록도 개별 항목으로 남긴다.
+const courseFiles = ['course/README.md', 'course/map.md', ...['course/spring', 'course/start', 'course/java', 'course/tickets'].flatMap(markdownFiles)];
 const sourceFiles = ['README.md', 'errors.md', ...['scenario', 'practice', 'docs/knowledge', 'lessons', 'tickets'].flatMap(markdownFiles), ...courseFiles].sort();
 for (const file of sourceFiles) {
   const htmlFile = file.replace(/\.md$/, '.html');
   const before = rows.length;
   collectMarkdown(file, fs.readFileSync(path.join(root, file), 'utf8'));
-  const maxToggleDepth = collectHtml(file, fs.readFileSync(path.join(root, htmlFile), 'utf8'));
+  const html = fs.readFileSync(path.join(root, htmlFile), 'utf8');
+  const maxToggleDepth = collectHtml(file, html);
+  if (html.includes('data-sf-catalog') || html.includes('data-sf-feature')) collectServiceFeature(file, html);
+  const functionalTask = [...FUNCTIONAL_TASKS, ...FUNCTIONAL_LIKE_TASKS].find((task) => task.sourcePath === file);
+  if (functionalTask) {
+    add(file, '기능 과제', 'functional_task', `${functionalTask.id}: ${functionalTask.title}`, functionalTask.goal?.length ?? 0,
+      { taskId: functionalTask.id, api: `${functionalTask.api.method} ${functionalTask.api.path}` });
+    const hasRenderedStates = rows.some((unit) => unit.kind === 'functional_typed_state' && unit.taskId === functionalTask.id);
+    if (!hasRenderedStates) {
+      const states = ['like', 'unlike'].includes(functionalTask.id)
+        ? LIKE_VISUAL_PHASES.map(stateId => ({ id: stateId, title: stateId, summary: '', evidenceType: '4-1 설명용 계산 상태' }))
+        : (functionalTask.visualization?.states ?? []).map(state => ({ ...state, evidenceType: '3-2 설명용 예상 상태' }));
+      for (const state of states) add(file, '기능 과제 예상 상태', 'functional_typed_state', `${state.id}: ${state.title}`, state.summary?.length ?? 0,
+        { taskId: functionalTask.id, stateId: state.id, evidenceType: state.evidenceType });
+    }
+  }
   for (const [source, kind, lessons] of [
     ['docs/knowledge/P09-java-syntax-basics.md', 'p09_learning_state', P09_LESSONS],
     ['docs/knowledge/P04-constructors-builder.md', 'p04_learning_state', P04_LESSONS],

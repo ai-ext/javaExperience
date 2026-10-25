@@ -14,7 +14,7 @@ BootBOM4.1.1의실제resolve결과를따로기록했다. 원문main/web/test는r
 
 DockerCLI/앱설치/desktop-linuxcontext/프로세스는확인했으나읽기전용version조회가8초안에응답하지않았다. 원인은미확정이며backend재시작·종료·설정변경을하지않았다. 원문Java25/MySQL전체구성·실제HTTP·Actuator·Docker컨테이너는미실행이다.
 
-공식조사는CodexCLI gpt-6-luna/OpenAI직접경로로 /Users/ds/research/javaexperience-p19-20261020 에저장했다. 첫시도는잘못된재위임절차/산출물누락으로실패했고같은모델/제공자의재시도로완료했다. LiteLLM과모델전환은없다. 메인은Boot/Testcontainers/Hikari공식본문과로컬실행을대조했다. research에보고서·출처메모를복사했다.
+공식조사는CodexCLI gpt-6-luna/OpenAI직접경로로 LOCAL_HOME/research/javaexperience-p19-20261020 에저장했다. 첫시도는잘못된재위임절차/산출물누락으로실패했고같은모델/제공자의재시도로완료했다. LiteLLM과모델전환은없다. 메인은Boot/Testcontainers/Hikari공식본문과로컬실행을대조했다. research에보고서·출처메모를복사했다.
 
 ## 이미지와 화면
 

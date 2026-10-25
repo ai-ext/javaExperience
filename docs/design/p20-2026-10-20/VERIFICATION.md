@@ -18,7 +18,7 @@ H2 JDBC metadata에서 PRICE NUMERIC(19,2), ORDER_ID NOT NULL/FK와 deleteRule3(
 
 ## 근거와 화면
 
-공식 문헌 조사는 Codex CLI gpt-6-luna/OpenAI 직접 경로로 /Users/ds/research/javaexperience-p20-20261020 에 저장했다. LiteLLM·재위임·모델 대체는 없었다. 메인은 Jakarta Persistence 3.2 전체 명세와 Spring Data JPA auditing 본문을 열어 enum의 final String @EnumeratedValue 예외, orphan 상태 제외, ownership/persist/flush와 사용자 SPI를 대조했다. 두 API 개별 URL 열기는 실패했지만 같은 공식 전체 명세는 열렸다. research에 보고서·메모·메인 확인 범위를 기록했다. 원문 치트시트의 무인자 생성자 금지 오기는 보존하고, 별도 화면에 public/protected 무인자 생성자가 필요하다고 명시했다.
+공식 문헌 조사는 Codex CLI gpt-6-luna/OpenAI 직접 경로로 LOCAL_HOME/research/javaexperience-p20-20261020 에 저장했다. LiteLLM·재위임·모델 대체는 없었다. 메인은 Jakarta Persistence 3.2 전체 명세와 Spring Data JPA auditing 본문을 열어 enum의 final String @EnumeratedValue 예외, orphan 상태 제외, ownership/persist/flush와 사용자 SPI를 대조했다. 두 API 개별 URL 열기는 실패했지만 같은 공식 전체 명세는 열렸다. research에 보고서·메모·메인 확인 범위를 기록했다. 원문 치트시트의 무인자 생성자 금지 오기는 보존하고, 별도 화면에 public/protected 무인자 생성자가 필요하다고 명시했다.
 
 built-in image_gen 17장 중 8장 선택·9장 draft다. 원본/프롬프트/교정/SHA/실제 크기는 generation-records.json과 correction-prompts.json에 있다. 초기 이미지의 가짜 파일/클래스·getter·필드·반대 화살표·Kim 대소문자·상품값·미측정 추가 표를 제외했다. 최종 DTO v3는 entity LineStatus와 DTO String을 구분한다. 선택 8PNG는 실측1672×941이며 메인이 전부 읽고 독립 리뷰가 최종 교정을 대조했다.
 

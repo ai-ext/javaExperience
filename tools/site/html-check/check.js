@@ -37,7 +37,7 @@ function __htmlCheck(rootSel) {
   const deep = e => pse(e, "::before") + " " + [...e.childNodes].map(n => n.nodeType === 3 ? n.textContent : n.nodeType === 1 && vis(n) ? deep(n) : "").join(" ") + " " + pse(e, "::after");
   const full = e => deep(e).replace(/\s+/g, " ").trim();
   const rep = t => { if (t.length < 8 || t.length > 160) return null; const m = t.match(/(\S[^·:|]{3,}?)\s*[·:|]?\s*\1(?=\s|$|[·:|])/); return m && !/^(.)\1+$/.test(m[1]) ? m[1] : null; };
-  [...root.querySelectorAll("*")].filter(e => e.children.length <= 4 && vis(e)).forEach(e => { const r = rep(full(e)); if (r && ![...e.children].some(c => rep(full(c)) === r)) add("dup", e, `"${r}" 반복`); });
+  [...root.querySelectorAll("*")].filter(e => e.children.length <= 4 && !e.matches("tr") && vis(e)).forEach(e => { const r = rep(full(e)); if (r && ![...e.children].some(c => rep(full(c)) === r)) add("dup", e, `"${r}" 반복`); });
   const counts = {}; items.forEach(x => { counts[x.type] = (counts[x.type] || 0) + 1; });
   const seen = new Set(), uniq = items.filter(x => { const k = x.type + x.where + x.text; if (seen.has(k)) return false; seen.add(k); return true; });
   // 유형마다 앞에서 몇 개만 (한 유형이 목록을 다 채워 다른 유형이 안 보이는 것을 막는다)

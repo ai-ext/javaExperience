@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 
 OUT = Path(__file__).resolve().parent
 ROOT = OUT.parents[3]
-JAVA = Path('/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home')
+JAVA = Path('LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home')
 parser = argparse.ArgumentParser()
 parser.add_argument('--runtime-root', required=True)
 parser.add_argument('--freeze', action='store_true')

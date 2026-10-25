@@ -21,14 +21,14 @@ document.querySelectorAll('.l12-journey').forEach((journey) => {
     note.textContent = '이 요청들은 위의 16개 장면에 하나씩 배치했습니다. 순서에서 요청을 고르면 해당 장면으로 이동합니다.';
     originalRequests.querySelector('.request-panel-heading')?.after(note);
   }
-  const show = (name) => {
+  const show = (name, scroll = true) => {
     const active = panels.find((panel) => panel.dataset.l12Panel === name);
     if (!active) return;
     for (const panel of panels) panel.hidden = panel !== active;
     journey.dataset.l12Screen = name;
     const baseSlot = active.querySelector('[data-l12-base-slot]');
     if (base && baseSlot) baseSlot.append(base);
-    journey.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) journey.scrollIntoView({ block: 'start', behavior: 'instant' });
   };
   for (const button of journey.querySelectorAll('[data-l12-go]')) {
     button.addEventListener('click', () => show(button.dataset.l12Go));
@@ -40,5 +40,5 @@ document.querySelectorAll('.l12-journey').forEach((journey) => {
     const id = [...cards].find(([, card]) => `#${card.id}` === link.getAttribute('href'))?.[0];
     if (requestPanel[id]) link.addEventListener('click', () => show(requestPanel[id]));
   }
-  show('scenario');
+  show('scenario', false);
 });

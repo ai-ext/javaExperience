@@ -43,4 +43,4 @@ Spring Boot 4.1.1·Java25·HTTP와 실제 학습자 서버는 실행하지 않�
 
 웹 ChatGPT 새 대화: https://chatgpt.com/c/6ad632f9-7120-83e8-a4aa-faf4b15cbccd . 실제 스킬 기준·예제·장면을 `web-request.txt`로 전달했다. 업로드의 파일 URL 권한 실패 뒤 설정을 바꾸지 않고 본문에 실제 내용을 전달했다. 후속 메시지 시간 초과 후 같은 요청을 재시도했지만 새 답이나 최종 ZIP을 확인하지 못했고, 마지막 관찰에서 중지 제어는 0개였다. 웹 작업이 현재 실행 중이라고 표시하지 않는다. 이후 부족한 이미지는 built-in image_gen으로 생성했다. `direct-generation-records.json`에 실제 도구 경로와 프롬프트/교정 이력을 보관한다. 첫 참조값 복사 그림은 실제 생성 원본 경로를 남겼지만 별도 정확한 프롬프트 사본은 보관되지 않았다.
 
-`file://`는 브라우저 도구에서 차단되어 허용된 loopback HTTP로 개념 문서와 필요한 공개 자산만 제공했다. 작업은 /Users/ds/code/javaExperience/.worktrees/concept-learning-night 에만 보관하며 merge·push·PR은 하지 않는다.
+`file://`는 브라우저 도구에서 차단되어 허용된 loopback HTTP로 개념 문서와 필요한 공개 자산만 제공했다. 작업은 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night 에만 보관하며 merge·push·PR은 하지 않는다.

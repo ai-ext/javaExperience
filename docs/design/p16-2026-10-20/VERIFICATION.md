@@ -4,7 +4,7 @@
 
 ## 근거와 범위
 
-- Codex CLI 직접 gpt-6-luna/openai 경로를 사용했다. 현재 도움말·기본 제공자 설정과 ACCESS_OK를 확인한 뒤 공식 FasterXML/Spring 원문을 조사했다. LiteLLM·재위임·임의 모델 전환 없음. 원자료/실행로그: /Users/ds/research/javaexperience-p16-20261020/_data . 보고서와 출처메모를 research에 복사했다.
+- Codex CLI 직접 gpt-6-luna/openai 경로를 사용했다. 현재 도움말·기본 제공자 설정과 ACCESS_OK를 확인한 뒤 공식 FasterXML/Spring 원문을 조사했다. LiteLLM·재위임·임의 모델 전환 없음. 원자료/실행로그: LOCAL_HOME/research/javaexperience-p16-20261020/_data . 보고서와 출처메모를 research에 복사했다.
 - 메인이 공식 Jackson3 변경표·Spring 메시지 변환기·Boot JSON 문서를 라이브 대조했다. unknown 기본false, Enum toString 사용, annotations namespace 및 실행 범위를 구분했다. 원문은 수정하지 않고 별도 버전 안내를 추가했다.
 - JDK21.0.6/Jackson3.1.5/annotations2.21로 원문 MapperExample의 출력2줄을 재현했다. 추가 mapper24검사, Spring7.0.9/ServletAPI6.1.0 MockMvc11검사를 실행했다. 현재 명령은 source-proof/verify-source.py, 결과는 verification.json·stdout·compile/stderr 파일이다.
 - 원문 §3.2의 DTO/반환식에 호출계수만 더한 추가 Controller다. JSON converter를 하나 명시 등록했다. 200/400/415/406은 MockMvc 결과이며 실제 포트·Boot4.1.1·Java25·JPA·DB 실행이 아니다. 응답406일 때 본문이 이미 호출된 것을 호출계수로 확인했다.

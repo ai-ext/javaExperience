@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "id": "counter-reconcile",
+  "title": "실제 관계와 어긋난 숫자 바로잡기",
+  "summary": "8-5 ADMIN recount에서 실제 post_like 및 nondeleted comment 관계와 counter 불일치만 집합 갱신한다.",
+  "difficulty": "고급",
+  "prerequisites": [
+    "likes",
+    "comments"
+  ],
+  "stages": [
+    {
+      "id": "repair",
+      "title": "관계 수를 다시 세고 필요한 행만 보정하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "repair",
+          "title": "관계 수를 다시 세고 필요한 행만 보정하기",
+          "sourceUnits": [
+            "legacy:8-5"
+          ],
+          "brief": {
+            "purpose": "8-5 ADMIN recount에서 실제 post_like 및 nondeleted comment 관계와 counter 불일치만 집합 갱신한다.",
+            "task": "실행 전 mismatch SELECT 결과를 기록하고 tok-p01로 POST /api/admin/recount, 재검사해 D1/D2=0 및 두 번째 실행 무변화를 확인한다.",
+            "preconditions": [
+              "학습용 practice DB에서만 작업하고 post별 like_count/comment_count와 relation aggregates를 먼저 읽는다.",
+              "ADMIN member1 tok-p01, ordinary member 및 no-token을 구분한다."
+            ],
+            "scenario": [
+              {
+                "start": "deleted_at is null인 post 중 저장 count와 relation count가 다른 id 및 각 값을 기록한다.",
+                "action": "ADMIN token으로 POST /api/admin/recount 후 같은 SELECT를 재실행한다.",
+                "result": "불일치 active post만 실제 relation 수로 맞춰지고 D1/D2 mismatch 수가 0이 된다.",
+                "after": "두 번째 POST에서 값/affected rows가 더 바뀌지 않으며 deleted post는 대상에서 제외된다."
+              }
+            ],
+            "data": [
+              {
+                "name": "active post id/deleted_at/like_count/comment_count",
+                "reason": "대상 범위와 원래 counter를 기록한다."
+              },
+              {
+                "name": "post_like grouped count",
+                "reason": "likes counter의 실제 관계값이다."
+              },
+              {
+                "name": "comment grouped count where deleted_at is null",
+                "reason": "활성 댓글만 counter에 포함한다."
+              },
+              {
+                "name": "before/after mismatch id and affected rows",
+                "reason": "고친 범위가 사전 SELECT 후보와 일치하는지 검증한다."
+              }
+            ],
+            "policies": [
+              "POST /api/admin/recount는 ADMIN(member1 tok-p01) only; no token 401, ordinary member 403.",
+              "진단 SELECT를 먼저 남기고 active posts만 처리한다. likes는 post_like 행수, comments는 미삭제 comment 행수의 합이다.",
+              "post를 한 개씩 entity load/save하지 않고 집합형 update로 대상 mismatch만 보정한다.",
+              "scheduled/background job이 아니라 명시적인 학습용 ADMIN request다."
+            ],
+            "inputs": [
+              "pre-recount mismatch SELECT for likes/comments.",
+              "POST /api/admin/recount with tok-p01.",
+              "repeat SELECT and endpoint; then ordinary member and no token."
+            ],
+            "success": [
+              "D1 active like_count mismatch=0; D2 live comment_count mismatch=0.",
+              "repeated recount produces no further count changes.",
+              "deleted posts remain outside update."
+            ],
+            "failures": [
+              {
+                "when": "no Authorization",
+                "result": "401.",
+                "unchanged": "all counters unchanged."
+              },
+              {
+                "when": "non-ADMIN token",
+                "result": "403.",
+                "unchanged": "all counters unchanged."
+              },
+              {
+                "when": "deleted comments are included in aggregation",
+                "result": "D2 source check exposes wrong count.",
+                "unchanged": "run in disposable fixture and restore only by documented fixture reset."
+              }
+            ],
+            "examples": [
+              {
+                "title": "Repair one mismatch",
+                "start": "active post P has like_count=4 but 3 post_like rows; comment_count=5 but 4 nondeleted comments",
+                "action": "POST /api/admin/recount as member1 tok-p01",
+                "result": "post P counts become 3 and 4; D1/D2 mismatch checks return 0"
+              },
+              {
+                "title": "Repeat repair",
+                "start": "all active counters match",
+                "action": "POST recount again",
+                "result": "success with no further changes"
+              },
+              {
+                "title": "Ordinary member denied",
+                "start": "member2 token, record counts first",
+                "action": "POST recount",
+                "result": "403; every count remains at recorded value"
+              }
+            ],
+            "work": [
+              "Save diagnostic SELECT output before requesting the operation.",
+              "Compare changed IDs with SELECT candidates and affected-row count.",
+              "Read service log to confirm one grouped set update rather than per-post entity loop."
+            ],
+            "done": [
+              "D1 and D2 are zero afterward.",
+              "Only mismatch active records changed; deleted records excluded.",
+              "401/403 keep counts and second run is stable."
+            ],
+            "hints": [
+              "Which table is the source of truth for like_count if the cached column is already wrong?",
+              "Should a soft-deleted comment contribute to comment_count under the D2 check?",
+              "How can before-select IDs and affected row count prove the batch changed only rows that needed repair?"
+            ]
+          },
+          "hints": [
+            "Which table is the source of truth for like_count if the cached column is already wrong?",
+            "Should a soft-deleted comment contribute to comment_count under the D2 check?",
+            "How can before-select IDs and affected row count prove the batch changed only rows that needed repair?"
+          ],
+          "recipeIds": [
+            "legacy:8-5:X1",
+            "legacy:8-5:X2",
+            "legacy:8-5:X3",
+            "legacy:8-5:X4"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:8-5 · 정합성 배치 — 어긋난 숫자 찾아 고치기",
+              "href": "/scenario/ch8-query-deep/8-5-recount-batch.html"
+            },
+            {
+              "label": "../../docs/knowledge/P30-scheduling-practical.md",
+              "href": "/docs/knowledge/P30-scheduling-practical.html"
+            },
+            {
+              "label": "../../docs/knowledge/S15-async-scheduling-batch.md",
+              "href": "/docs/knowledge/S15-async-scheduling-batch.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:8-5 · 정합성 배치 — 어긋난 숫자 찾아 고치기",
+              "href": "/scenario/ch8-query-deep/8-5-recount-batch.html"
+            },
+            {
+              "label": "../../docs/knowledge/P30-scheduling-practical.md",
+              "href": "/docs/knowledge/P30-scheduling-practical.html"
+            },
+            {
+              "label": "../../docs/knowledge/S15-async-scheduling-batch.md",
+              "href": "/docs/knowledge/S15-async-scheduling-batch.html"
+            },
+            {
+              "label": "../../docs/knowledge/P18-concurrency-inventory.md",
+              "href": "/docs/knowledge/P18-concurrency-inventory.html"
+            },
+            {
+              "label": "../../docs/knowledge/R04-sql-crud-join.md",
+              "href": "/docs/knowledge/R04-sql-crud-join.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "데이터 정합성",
+  "status": "authored"
+}

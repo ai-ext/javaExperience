@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "id": "post-tags",
+  "title": "글에 붙은 태그 목록 보여 주기",
+  "summary": "1-9 공개 글의 post_tag join 결과를 태그 이름 배열로 변환하고 글 상태별 접근 규칙을 확인한다.",
+  "difficulty": "기초",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "tags",
+      "title": "태그 연결을 목록 응답으로 바꾸기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "tags",
+          "title": "태그 연결을 목록 응답으로 바꾸기",
+          "sourceUnits": [
+            "legacy:1-9"
+          ],
+          "brief": {
+            "purpose": "1-9 공개 글의 post_tag join 결과를 태그 이름 배열로 변환하고 글 상태별 접근 규칙을 확인한다.",
+            "task": "post2 tag 목록, 태그 없는 공개 글, 없는 id를 조회해 `[name]` response와 글 정보 비노출을 확인한다.",
+            "preconditions": [
+              "기본 post2의 tag java/jpa relation을 확인한다.",
+              "1-3 POST로 tags=[]인 공개 글을 만들고 실제 response id를 캡처한다."
+            ],
+            "scenario": [
+              {
+                "start": "post2와 tagless captured post의 post_tag/tag rows를 기록한다.",
+                "action": "GET /api/posts/2/tags, GET /api/posts/{taglessId}/tags, GET /api/posts/999999/tags.",
+                "result": "두 공개 글 모두 200 JSON array; post2 [java,jpa], tagless []. 없는 글은 404.",
+                "after": "삭제·private/unpublished source 글에도 태그 정보가 노출되지 않는지 404 확인."
+              }
+            ],
+            "data": [
+              {
+                "name": "post2 post_tag→tag(java,jpa)",
+                "reason": "응답 tag names and relation join 검증."
+              },
+              {
+                "name": "tagless post actual id with no relations",
+                "reason": "empty array vs null distinction."
+              },
+              {
+                "name": "post status/visibility/deleted_at",
+                "reason": "태그 조회가 글 visibility/access 정책을 우회하지 않음."
+              },
+              {
+                "name": "TagResponse name-only",
+                "reason": "응답에서 entity internals/IDs를 노출하지 않음."
+              }
+            ],
+            "policies": [
+              "GET /api/posts/{postId}/tags returns 200 array of `{name}` only.",
+              "public readable post with no tags returns 200 []; no null or fabricated empty tag object.",
+              "missing/deleted/private/unpublished source returns 404; do not disclose whether tags exist.",
+              "This stage assesses JPA collection/stream mapping; MyBatis alternative is not supplied and remains ungraded until authored."
+            ],
+            "inputs": [
+              "GET /api/posts/2/tags.",
+              "GET /api/posts/{captured tagless id}/tags.",
+              "GET /api/posts/999999/tags plus hidden/deleted id if fixture provides."
+            ],
+            "success": [
+              "post2 returns 200 [{name:\"java\"},{name:\"jpa\"}] in stored/source order.",
+              "tagless public post returns 200 [].",
+              "Response item only contains name."
+            ],
+            "failures": [
+              {
+                "when": "post id missing/deleted/private",
+                "result": "404.",
+                "unchanged": "no post/tag state changes and no tag names exposed."
+              },
+              {
+                "when": "tagless route returns 404/null instead of empty array",
+                "result": "contract assertion fails.",
+                "unchanged": "post remains tagless."
+              }
+            ],
+            "examples": [
+              {
+                "title": "Tagged post",
+                "start": "post2 has two linked tags java and jpa",
+                "action": "GET /api/posts/2/tags",
+                "result": "200; [{name:java},{name:jpa}]"
+              },
+              {
+                "title": "No tags",
+                "start": "new public post capturedId has no post_tag rows",
+                "action": "GET /api/posts/{capturedId}/tags",
+                "result": "200; []"
+              },
+              {
+                "title": "Missing post",
+                "start": "post999999 absent",
+                "action": "GET /api/posts/999999/tags",
+                "result": "404; no tags or post detail leaked"
+              }
+            ],
+            "work": [
+              "Use response id for tagless fixture instead of hard-coded guessed id.",
+              "Join actual post_tag/tag rows and compare response name array.",
+              "Check hidden/deleted no-leak result separately."
+            ],
+            "done": [
+              "tag names list matches relation rows.",
+              "tagless 200 [] distinguished from missing 404.",
+              "missing/deleted/private status does not disclose tag data."
+            ],
+            "hints": [
+              "When a public post has zero post_tag rows, what should JSON represent: null, 404, or an empty array?",
+              "Why should the query verify post visibility before returning tag names?",
+              "Can the response expose tag id or entity fields when the source contract asks for `{name}` only?"
+            ]
+          },
+          "hints": [
+            "When a public post has zero post_tag rows, what should JSON represent: null, 404, or an empty array?",
+            "Why should the query verify post visibility before returning tag names?",
+            "Can the response expose tag id or entity fields when the source contract asks for `{name}` only?"
+          ],
+          "recipeIds": [
+            "legacy:1-9:A",
+            "legacy:1-9:B",
+            "legacy:1-9:C"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:1-9 · 글의 태그 목록 조회 — 제네릭과 Stream",
+              "href": "/scenario/ch1-create-post/1-9-list-post-tags.html"
+            },
+            {
+              "label": "../../docs/knowledge/J03-generics.md",
+              "href": "/docs/knowledge/J03-generics.html"
+            },
+            {
+              "label": "../../docs/knowledge/J09-stream-api.md",
+              "href": "/docs/knowledge/J09-stream-api.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:1-9 · 글의 태그 목록 조회 — 제네릭과 Stream",
+              "href": "/scenario/ch1-create-post/1-9-list-post-tags.html"
+            },
+            {
+              "label": "../../docs/knowledge/J03-generics.md",
+              "href": "/docs/knowledge/J03-generics.html"
+            },
+            {
+              "label": "../../docs/knowledge/J09-stream-api.md",
+              "href": "/docs/knowledge/J09-stream-api.html"
+            },
+            {
+              "label": "../../docs/knowledge/P02-mvc-layered-architecture.md",
+              "href": "/docs/knowledge/P02-mvc-layered-architecture.html"
+            },
+            {
+              "label": "../../docs/knowledge/P03-annotations-cheatsheet.md",
+              "href": "/docs/knowledge/P03-annotations-cheatsheet.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "게시글과 소통",
+  "status": "authored"
+}

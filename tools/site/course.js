@@ -75,12 +75,13 @@
 
   // ------------------------------------------------------------ 일자 페이지
   function initDay(page) {
+    var scope = page.closest('main') || page;
     var store = storage();
     var state = readProgress(store);
     // 쓰기에 실패해 저장값에 아직 없는 이 화면의 체크·해제(id → true/false). 저장에 성공하면 비운다.
     // 저장값을 다시 읽을 때 이 키만 덮고 나머지 키(다른 탭이 저장한 진도)는 그대로 둔다.
     var pending = {};
-    var inputs = Array.prototype.slice.call(page.querySelectorAll('input.step-check[data-step]'));
+    var inputs = Array.prototype.slice.call(scope.querySelectorAll('input.step-check[data-step]'));
     var ids = [];
     inputs.forEach(function (input) { if (ids.indexOf(input.dataset.step) < 0) ids.push(input.dataset.step); });
     // 홈 진도와 같은 기준: 선택·연습 티켓 순서(data-extra)는 따로 센다. 그날 순서가 모두 추가면 전부 센다.
@@ -89,31 +90,32 @@
     if (extraIds.length === ids.length) extraIds = [];
     var coreIds = ids.filter(function (id) { return extraIds.indexOf(id) < 0; });
     var day = { steps: ids.map(function (id) {
-      var chip = page.querySelector('.day-chip[data-step="' + id + '"]');
+      var chip = scope.querySelector('.day-chip[data-step="' + id + '"]');
       return { id: id, extra: extraIds.indexOf(id) >= 0, choiceTickets: chip && chip.dataset.choiceTickets ? chip.dataset.choiceTickets.split(',') : [] };
     }) };
-    var counter = page.querySelector('[data-day-progress]');
-    var meter = page.querySelector('[data-day-meter]');
-    var resume = page.querySelector('[data-day-resume]');
+    var counter = scope.querySelector('[data-day-progress]');
+    var meter = scope.querySelector('[data-day-meter]');
+    var resume = scope.querySelector('[data-day-resume]');
     function paint() {
       inputs.forEach(function (input) { input.checked = state.done.has(input.dataset.step); });
-      page.querySelectorAll('.day-chip[data-step], .day-step[data-step]').forEach(function (node) {
+      scope.querySelectorAll('.day-chip[data-step], .day-step[data-step]').forEach(function (node) {
         node.classList.toggle('is-done', state.done.has(node.dataset.step));
       });
       var doneOf = function (list) { return list.filter(function (id) { return state.done.has(id); }).length; };
       var selectedIds = selectedSteps(day, state.selectedTicket).map(function (s) { return s.id; });
       var countedIds = progressSteps(day, state.selectedTicket).map(function (s) { return s.id; });
       var practiceIds = extraIds.filter(function (id) { return selectedIds.indexOf(id) < 0; });
-      if (counter) counter.textContent = (selectedIds.length ? '공통 구현 ' : '') + doneOf(coreIds) + '/' + coreIds.length + ' 끝냄'
+      if (counter) counter.textContent = (selectedIds.length ? '공통 구현 완료 ' : '구현 완료 ') + doneOf(coreIds) + '/' + coreIds.length
         + (selectedIds.length ? ' · 선택 티켓 ' + state.selectedTicket + ' ' + doneOf(selectedIds) + '/' + selectedIds.length : '')
         + (practiceIds.length ? ' · 선택·연습 ' + doneOf(practiceIds) + '/' + practiceIds.length : '');
       if (meter) { meter.max = countedIds.length; meter.value = doneOf(countedIds); }
+      if (counter) counter.classList.toggle('is-complete', doneOf(countedIds) === countedIds.length);
       var nextId = countedIds.find(function (id) { return !state.done.has(id); });
-      page.querySelectorAll('.day-chip[data-step]').forEach(function (node) {
+      scope.querySelectorAll('.day-chip[data-step]').forEach(function (node) {
         node.classList.toggle('is-current', node.dataset.step === nextId);
       });
       if (resume) {
-        var nextChip = nextId && page.querySelector('.day-chip[data-step="' + nextId + '"]');
+        var nextChip = nextId && scope.querySelector('.day-chip[data-step="' + nextId + '"]');
         resume.href = nextChip ? nextChip.querySelector('a').getAttribute('href') : '#오늘의-sql';
         resume.textContent = nextChip ? nextChip.querySelector('.chip-no').textContent + ' ' + (doneOf(coreIds) ? '이어서 하기' : '시작하기') + ' →' : '구현 체크 완료 · 오늘의 SQL 확인 →';
       }
@@ -135,12 +137,13 @@
         paint();
       });
     });
+    window.addEventListener('course-records-change', function () { reload(); paint(); });
     window.addEventListener('pageshow', function () { reload(); paint(); });
     window.addEventListener('storage', function (e) { if (e.key !== null && e.key !== KEY) return; reload(); paint(); });
     paint();
 
     // 정답은 펼칠 때만 하이라이트한다. syntax-highlight.js가 새로 붙은 code 노드를 처리하도록 노드를 바꿔 끼운다.
-    page.querySelectorAll('details.step-answer').forEach(function (details) {
+    scope.querySelectorAll('details.step-answer').forEach(function (details) {
       details.addEventListener('toggle', function () {
         if (!details.open) return;
         details.querySelectorAll('code[data-lazy-lang]').forEach(function (code) {
@@ -153,7 +156,237 @@
     });
   }
 
+
+  // 해시를 기존 앵커 그대로 사용한다. 숨겨진 패널의 내부 앵커도 해당 패널을 먼저 연다.
+  function initDayStepper(page) {
+    var scope = page.closest('main') || page;
+    var panels = Array.prototype.slice.call(scope.querySelectorAll('.day-stepper-main > [data-day-panel]'));
+    if (!panels.length) return;
+    var toggle = scope.querySelector('[data-day-expand]');
+    var position = scope.querySelector('[data-day-position]');
+    var links = Array.prototype.slice.call(scope.querySelectorAll('[data-panel-link]'));
+    var expanded = false, active = panels.find(function (panel) { return panel.matches('.day-step'); }) || panels[0];
+    var canonicalPanels = panels.slice();
+    var defaultActive = active;
+    function rebuildChoiceRoute(selectedTicket) {
+      if (page.dataset.dayPage !== 'D14') return;
+      var selection = typeof selectedTicket === 'string' ? selectedTicket : readProgress(storage()).selectedTicket;
+      var choicePanels = canonicalPanels.filter(function (panel) {
+        var chip = scope.querySelector('.day-chip[data-step="' + panel.dataset.step + '"]');
+        return chip && chip.hasAttribute('data-choice-tickets');
+      });
+      var selectedPanel = choicePanels.find(function (panel) {
+        var chip = scope.querySelector('.day-chip[data-step="' + panel.dataset.step + '"]');
+        return (chip.dataset.choiceTickets || '').split(',').indexOf(selection) >= 0;
+      });
+      var additional = choicePanels.filter(function (panel) { return panel !== selectedPanel; });
+      panels = canonicalPanels.filter(function (panel) { return additional.indexOf(panel) < 0; }).concat(additional);
+      defaultActive = selectedPanel || (selection ? canonicalPanels.find(function (panel) { return panel.id === 'step-d14-5'; }) : canonicalPanels[0]);
+      var list = scope.querySelector('.day-chips');
+      panels.forEach(function (panel, index) {
+        panel.style.order = index;
+        var link = links.find(function (item) { return item.getAttribute('href') === '#' + panel.id; });
+        if (list && link) link.parentElement.style.order = index;
+        var previous = panel.querySelector('.step-prev');
+        if (previous && index > 0) {
+          previous.href = '#' + panels[index - 1].id;
+          previous.textContent = /-prep$/.test(panels[index - 1].id) ? '← 준비 자료' : '← 이전 순서';
+        }
+        var nextPanel = panels[index + 1];
+        var next = panel.querySelector('.step-next');
+        if (!next && nextPanel) {
+          next = document.createElement('a');
+          next.className = 'step-next';
+          panel.querySelector('.step-footer').append(next);
+        }
+        if (next) {
+          next.hidden = !nextPanel;
+          if (nextPanel) {
+            next.href = '#' + nextPanel.id;
+            next.textContent = additional.indexOf(nextPanel) >= 0 ? '추가 연습 →' : '다음 순서 →';
+          } else next.remove();
+        }
+        panel.classList.toggle('is-additional-ticket', additional.indexOf(panel) >= 0);
+      });
+    }
+    rebuildChoiceRoute();
+    if (page.dataset.dayPage === 'D14') active = defaultActive;
+    var printDetails = [];
+    var wrapPanels = Array.prototype.slice.call(scope.querySelectorAll('[data-wrap-panel]'));
+    var wrapLinks = Array.prototype.slice.call(scope.querySelectorAll('[data-wrap-target]'));
+    var wrapActive = wrapPanels[0];
+    var wrapTabs = scope.querySelector('.day-wrap-tabs');
+    if (wrapTabs) wrapTabs.hidden = false;
+    var stageKey = 'javaexperience.course.stages.v1';
+    var stageInputs = Array.prototype.slice.call(scope.querySelectorAll('[data-stage-check]'));
+    var stageState = {}, stagePending = {}, stageStore = storage();
+    function loadStages() {
+      try { var value = stageStore && JSON.parse(stageStore.getItem(stageKey) || '{}'); if (value && typeof value === 'object') stageState = value; } catch (e) { /* 저장 불가 시 현재 화면의 기록을 유지한다. */ }
+      Object.keys(stagePending).forEach(function (id) { stageState[id] = stagePending[id]; });
+      stageInputs.forEach(function (input) { input.checked = stageState[input.dataset.stageCheck] === true; input.parentElement.classList.toggle('is-done', input.checked); });
+      var stageProgress = scope.querySelector('[data-stage-progress]');
+      if (stageProgress) stageProgress.textContent = stageInputs.map(function(input) {
+        var label = /-prep$/.test(input.dataset.stageCheck) ? '준비' : /-data$/.test(input.dataset.stageCheck) ? '데이터' : '마무리';
+        return label + (input.checked ? ' 확인' : ' 미확인');
+      }).join(' · ');
+    }
+    stageInputs.forEach(function (input) {
+      input.addEventListener('change', function () {
+        var checked = input.checked;
+        loadStages();
+        stageState[input.dataset.stageCheck] = checked;
+        stagePending[input.dataset.stageCheck] = checked;
+        try { if (stageStore) { stageStore.setItem(stageKey, JSON.stringify(stageState)); stagePending = {}; } } catch (e) { /* 구현 진도와 분리하여 이 화면에 보존한다. */ }
+        loadStages();
+      });
+    });
+    window.addEventListener('pageshow', loadStages);
+    window.addEventListener('storage', function (event) { if (event.key === stageKey || event.key === null) loadStages(); });
+    loadStages();
+    function paint() {
+      panels.forEach(function (panel) {
+        panel.hidden = !expanded && panel !== active;
+        panel.classList.toggle('is-active', panel === active);
+      });
+      links.forEach(function (link) {
+        var selected = link.getAttribute('href') === '#' + active.id;
+        if (selected) link.setAttribute('aria-current', 'step'); else link.removeAttribute('aria-current');
+        link.parentElement.classList.toggle('is-active', selected);
+        var ownerIndex = panels.findIndex(function (panel) { return '#' + panel.id === link.getAttribute('href'); });
+        link.parentElement.classList.toggle('is-following', ownerIndex === panels.indexOf(active) + 1);
+      });
+      if (toggle) { toggle.setAttribute('aria-pressed', String(expanded)); toggle.querySelector('[data-expand-label]').textContent = expanded ? '한 순서씩 보기' : '모두 펼쳐 보기'; }
+      if (position) position.textContent = expanded ? '전체 ' + panels.length + '개 단계 · 내부 코드는 개별 펼침' : '현재 화면 · ' + (active.matches('.day-step') ? '구현 ' + (active.querySelector('.step-number')?.textContent || '') : /-prep$/.test(active.id) ? '준비' : /-data$/.test(active.id) ? '데이터' : '마무리');
+      page.classList.toggle('day-show-all', expanded);
+      wrapPanels.forEach(function (panel) { panel.hidden = !expanded && panel !== wrapActive; });
+      wrapLinks.forEach(function (link) {
+        var selected = wrapActive && link.dataset.wrapTarget === wrapActive.id;
+        if (selected) link.setAttribute('aria-current', 'step'); else link.removeAttribute('aria-current');
+      });
+    }
+    function revealHash(scroll, targetHash) {
+      var id;
+      try { id = decodeURIComponent((targetHash === undefined ? window.location.hash : targetHash).slice(1)); } catch (e) { return; }
+      var target = id && document.getElementById(id);
+      var owner = target && target.closest('[data-day-panel]');
+      if (owner && panels.indexOf(owner) >= 0) {
+        active = owner;
+        var wrapOwner = target.closest('[data-wrap-panel]');
+        if (wrapOwner) wrapActive = wrapOwner;
+        // 사용자 내부 링크만 접기를 연다. 초기 선택은 힌트·정답을 펼치지 않는다.
+        if (target !== owner) {
+          var fold = target.closest('details');
+          while (fold && owner.contains(fold)) { fold.open = true; fold = fold.parentElement.closest('details'); }
+        }
+        paint();
+        if (scroll && target.scrollIntoView) target.scrollIntoView({ block: 'start' });
+      } else if (!id) {
+        active = defaultActive;
+        paint();
+      }
+    }
+    function refreshChoiceRoute(event) {
+      if (page.dataset.dayPage !== 'D14') return;
+      if (event.type === 'storage' && event.key !== null && event.key !== KEY) return;
+      rebuildChoiceRoute(event.detail && event.detail.selectedTicket);
+      paint();
+    }
+    window.addEventListener('course-records-change', refreshChoiceRoute);
+    window.addEventListener('storage', refreshChoiceRoute);
+    window.addEventListener('pageshow', refreshChoiceRoute);
+    page.classList.add('day-stepper-ready');
+    if (toggle) {
+      toggle.hidden = false;
+      toggle.addEventListener('click', function () {
+        if (expanded) {
+          var rail = scope.querySelector('.day-today');
+          var edge = rail ? rail.getBoundingClientRect().bottom + 16 : 0;
+          var currentBox = active.getBoundingClientRect();
+          // 현재 순서가 보이는 동안에는 전환 직전의 선택을 유지한다.
+          if (currentBox.height > 0 && (currentBox.bottom <= edge || currentBox.top >= window.innerHeight)) {
+            var reading = panels.find(function (panel) { var box = panel.getBoundingClientRect(); return box.height > 0 && box.bottom > edge && box.top < window.innerHeight; });
+            if (reading) active = reading;
+          }
+        }
+        var before = active.getBoundingClientRect().top;
+        var panelMain = scope.querySelector('.day-stepper-main');
+        panelMain.style.paddingTop = '';
+        panelMain.style.paddingBottom = '';
+        expanded = !expanded;
+        paint();
+        // 앞선 순서가 나타나거나 사라진 만큼만 보정하여 읽던 순서를 유지한다.
+        var delta = active.getBoundingClientRect().top - before;
+        var targetY = window.scrollY + delta;
+        if (targetY < 0) { panelMain.style.paddingTop = -targetY + 'px'; targetY = 0; }
+        var lastY = Math.max(0,document.documentElement.scrollHeight - window.innerHeight);
+        if (targetY > lastY) panelMain.style.paddingBottom = targetY - lastY + 'px';
+        if (delta) window.scrollTo({top:targetY,behavior:'instant'});
+      });
+    }
+    window.addEventListener('hashchange', function () { revealHash(false); });
+    window.addEventListener('popstate', function () { revealHash(false); });
+    // 메뉴 선택은 주소만 갱신하므로 브라우저의 앵커 점프와 중복 스크롤이 없다.
+    scope.addEventListener('click', function (event) {
+      var link = event.target.closest('a[href^="#"]');
+      if (!link || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      var id; try { id = decodeURIComponent(link.hash.slice(1)); } catch (e) { return; }
+      var target = document.getElementById(id);
+      if (!target || !target.closest('[data-day-panel]')) return;
+      event.preventDefault();
+      var panelMain = scope.querySelector('.day-stepper-main');
+      panelMain.style.paddingTop = '';
+      panelMain.style.paddingBottom = '';
+      history.pushState(history.state,'',link.hash);
+      revealHash(false, link.hash);
+      if (!link.closest('.day-today,.day-quick-links,.day-wrap-tabs,.practice-review')) {
+        if (target.scrollIntoView) target.scrollIntoView({block:'start'});
+      }
+    });
+    links.forEach(function (link,index) {
+      link.addEventListener('keydown',function (event) {
+        var next = event.key === 'ArrowDown' || event.key === 'ArrowRight' ? (index + 1) % links.length : event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? (index + links.length - 1) % links.length : event.key === 'Home' ? 0 : event.key === 'End' ? links.length - 1 : null;
+        if (next === null) return; event.preventDefault(); links[next].click(); links[next].focus({preventScroll:true});
+      });
+    });
+    var beforePrintExpanded;
+    window.addEventListener('beforeprint', function () {
+      beforePrintExpanded = expanded;
+      expanded = true;
+      printDetails = Array.prototype.slice.call(scope.querySelectorAll('details:not([open])'));
+      printDetails.forEach(function (fold) { fold.open = true; });
+      paint();
+    });
+    window.addEventListener('afterprint', function () {
+      expanded = beforePrintExpanded === true;
+      printDetails.forEach(function (fold) { fold.open = false; });
+      printDetails = [];
+      paint();
+    });
+    // 브라우저 찾기 전에 모든 패널을 노출한다. 브라우저 기본 검색은 그대로 실행한다.
+    window.addEventListener('keydown', function (event) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') { expanded = true; paint(); }
+    });
+    paint();
+    revealHash(false);
+  }
+
   // 준비·선택 기록은 구현 체크와 별도로 관리한다. 저장 실패한 변경은 이 화면에서 보존한다.
+  function initSchedule() {
+    var data = document.getElementById('course-schedule-data');
+    if (!data) return;
+    var days = JSON.parse(data.textContent);
+    function paintSchedule() {
+      var state = readProgress(storage());
+      days.forEach(function (day) {
+        var steps = progressSteps(day, state.selectedTicket);
+        var count = steps.filter(function (step) { return state.done.has(step.id); }).length;
+        var node = document.querySelector('[data-schedule-count="' + day.id + '"]');
+        if (node) node.textContent = '구현 ' + count + '/' + steps.length;
+      });
+    }
+    paintSchedule();
+    window.addEventListener('storage', paintSchedule);
+  }
   function initRecords() {
     var store = storage(), pending = {}, pendingPrep = {};
     var choice = document.querySelector('[data-ticket-choice]');
@@ -172,6 +405,10 @@
       if (choice) choice.value = state.selectedTicket || '';
       preps.forEach(function(input) { input.checked = state.preparation[input.dataset.prep] === true; });
       var selected = choices.find(function(t) { return t.id === state.selectedTicket; });
+      document.querySelectorAll('[data-selected-ticket-compact]').forEach(function(node) {
+        node.textContent = selected ? '내 선택 ' + selected.id + ' · ' + selected.day + ' 수행 · 고르지 않은 후보는 추가 연습' : '선택 기록 없음 · D11에서 한 건을 고르세요.';
+        node.hidden = !selected && !!node.closest('[data-course-home]');
+      });
       document.querySelectorAll('[data-selected-ticket]').forEach(function(node) {
         node.replaceChildren();
         if (!selected) { node.textContent = '선택 기록 없음 · D11에서 한 건을 고르세요. E01·모의 장애 훈련은 모두 수행합니다.'; return; }
@@ -183,6 +420,12 @@
         var kind = node.querySelector('.chip-copy > [data-step-kind]');
         if (kind) kind.textContent = mine ? '내 선택 티켓 포함' : state.selectedTicket ? '고르지 않은 후보 · 추가 연습' : '선택 후보 · D11에서 1건 선택';
         node.classList.toggle('is-selected-ticket', mine);
+        node.classList.toggle('is-additional-ticket', !mine);
+      });
+      document.querySelectorAll('[data-criterion-ticket]').forEach(function (fold) {
+        var mine = fold.dataset.criterionTicket === state.selectedTicket;
+        fold.open = mine;
+        fold.classList.toggle('is-my-criterion', mine);
       });
       var note = document.querySelector('[data-record-storage]');
       if (note) note.textContent = !state.ok ? '저장소를 쓸 수 없어 새로고침하면 기록이 사라집니다.' : Object.keys(pending).length || Object.keys(pendingPrep).length ? '기록을 저장하지 못했습니다. 이 화면에만 남아 있습니다.' : '';
@@ -191,8 +434,21 @@
       var state = current();
       if (writeProgress(store, state.done, state)) { pending = {}; pendingPrep = {}; }
       paint();
+      window.dispatchEvent(new CustomEvent('course-records-change', { detail: { selectedTicket: state.selectedTicket || '' } }));
     }
     if (choice) choice.addEventListener('change', function() { pending.selectedTicket = choice.value; save(); });
+    if (choice) choice.addEventListener('keydown', function(event) {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      var index = choice.selectedIndex;
+      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') index = Math.min(choice.options.length - 1, index + 1);
+      else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') index = Math.max(0, index - 1);
+      else if (event.key === 'Home') index = 0;
+      else if (event.key === 'End') index = choice.options.length - 1;
+      else return;
+      event.preventDefault();
+      choice.selectedIndex = index;
+      choice.dispatchEvent(new Event('change', {bubbles:true}));
+    });
     preps.forEach(function(input) { input.addEventListener('change', function() { pendingPrep[input.dataset.prep] = input.checked; save(); }); });
     window.addEventListener('pageshow', paint);
     window.addEventListener('storage', function(e) { if (e.key === null || e.key === KEY) paint(); });
@@ -208,6 +464,7 @@
         if (!target) return;
         var text = target.textContent;
         function done(ok) {
+          if (button.closest('.code-toolbar')) { if (status) status.textContent = ok ? '복사됨' : '복사하지 못했습니다. 코드를 선택해 복사하세요.'; return; }
           if (status) status.textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 선택된 프롬프트를 길게 눌러 복사하거나 ⌘C / Ctrl+C를 쓰세요.';
         }
         function fallback() {
@@ -338,10 +595,19 @@
         no.textContent = NUMS[i] || String(i + 1);
         var task = document.createElement('a');
         task.href = day.href + '#step-' + s.id.toLowerCase();
-        task.textContent = s.title + (selected.indexOf(s) >= 0 ? ' (내 선택 ' + state.selectedTicket + ')' : s.extra && core.length < day.steps.length ? ' (선택·연습)' : '') + (state.done.has(s.id) ? ' (끝냄)' : '');
+        task.textContent = s.title + (s.requirement ? ' · ' + s.requirement : '') + (selected.indexOf(s) >= 0 ? ' (내 선택 ' + state.selectedTicket + ')' : s.extra && core.length < day.steps.length ? ' (선택·연습)' : '') + (state.done.has(s.id) ? ' (끝냄)' : '');
         li.append(no, ' ', task);
         return li;
       }));
+      var returning = state.done.size > 0;
+      home.classList.toggle('is-returning', returning);
+      var resume = $('[data-today-resume]');
+      var pending = progressSteps(day, state.selectedTicket).find(function(s) { return !state.done.has(s.id); });
+      if (resume) {
+        resume.hidden = !returning;
+        resume.href = day.href + (pending ? '#step-' + pending.id.toLowerCase() : '#오늘의-sql');
+        resume.textContent = pending ? day.id + ' ' + NUMS[day.steps.indexOf(pending)] + ' 이어서 하기 →' : day.id + ' SQL·말하기·채점 확인 →';
+      }
       var open = $('[data-today-open]');
       open.href = day.href;
       var pendingTicket = selected.find(function (s) { return !state.done.has(s.id); });
@@ -352,11 +618,11 @@
       var during = day.javaTiming === 'during-or-after';
       var flow = $('[data-today-flow]');
       var grade = $('[data-today-grade]');
-      var first = during ? open : java;
-      var second = during ? java : open;
+      var first = returning || during ? open : java;
+      var second = returning || during ? java : open;
       [java, open].forEach(function (link) {
-        link.classList.toggle('ch-primary', link === first);
-        link.classList.toggle('ch-secondary', link !== first);
+        link.classList.toggle('ch-primary', !returning && link === first);
+        link.classList.toggle('ch-secondary', returning || link !== first);
       });
       if (during) java.textContent += ' · 수행 중·사후 증거';
       // CSS 순서만 바꾸지 않고 키보드·스크린리더도 같은 순서로 읽게 한다.
@@ -381,7 +647,7 @@
         var bar = cell.querySelector('.ch-bar i');
         if (bar) bar.style.width = Math.round((n / counted.length) * 100) + '%';
       });
-      $('[data-progress-summary]').textContent = choiceTotal
+      if ($('[data-progress-summary]')) $('[data-progress-summary]').textContent = choiceTotal
         ? '공통 구현 ' + (checked - choiceChecked) + '/' + (total - choiceTotal) + ' · 선택 티켓 ' + state.selectedTicket + ' ' + choiceChecked + '/' + choiceTotal
         : '체크한 순서 ' + checked + '/' + total;
       storageNote(state.ok ? '' : 'blocked');
@@ -389,7 +655,7 @@
     window.addEventListener('pageshow', render);
     // 다른 탭(일자 페이지)에서 체크하면 열린 홈의 오늘 할 일·진도도 다시 그린다. 홈은 저장값을 쓰지 않으므로 덮을 변경이 없다.
     window.addEventListener('storage', function (e) { if (e.key === null || e.key === KEY) render(); });
-    render();
+    if (readProgress(store).done.size || readProgress(store).selectedTicket) render();
   }
 
   // 설정 형식은 모든 블록에서 공유한다. 저장 실패는 현재 화면 조작을 막지 않는다.
@@ -430,16 +696,149 @@
     select(selected, false);
   }
 
+  function initMapProgress() {
+    var root = document.querySelector('[data-course-map]');
+    var data = document.getElementById('course-days-data');
+    if (!root || !data) return;
+    var days = JSON.parse(data.textContent), store = storage();
+    function paint() {
+      var state = readProgress(store), pick = nextDay(days, state.done, state.selectedTicket), day = pick.day;
+      var steps = progressSteps(day, state.selectedTicket);
+      var next = steps.find(function(s) { return !state.done.has(s.id); });
+      var count = steps.filter(function(s) { return state.done.has(s.id); }).length;
+      root.querySelector('[data-cm-progress]').textContent = '이어서 할 곳: ' + day.id + ' · ' + count + '/' + steps.length + (next ? ' · 다음 ' + '①②③④⑤⑥⑦⑧⑨⑩'[day.steps.indexOf(next)] : ' · 구현 체크 끝, 마무리 확인') + ' · 지금 학습 중 표시는 관계 선택과 별개입니다.';
+      root.querySelectorAll('[data-node]').forEach(function(node) {
+        var current = node.dataset.node === day.id;
+        node.classList.toggle('is-learning', current);
+        if (current) node.setAttribute('aria-current', 'step'); else node.removeAttribute('aria-current');
+      });
+      root.dataset.currentDay = day.id;
+      root.dispatchEvent(new CustomEvent('course-location'));
+    }
+    window.addEventListener('pageshow', paint);
+    window.addEventListener('storage', function(e) { if (e.key === KEY || e.key === null) paint(); });
+    paint();
+  }
+  function initHeaderOffset() {
+    var header = document.querySelector('.site-topbar');
+    if (!header) return;
+    function measure() { document.documentElement.style.setProperty('--course-header-height', Math.ceil(header.getBoundingClientRect().height) + 'px'); }
+    measure();
+    if (window.ResizeObserver) new ResizeObserver(measure).observe(header);
+    window.addEventListener('resize', measure);
+  }
+  function initDataReturn() {
+    if (!/\/course\/start\/dummy\/README\.html$/.test(window.location.pathname)) return;
+    var day = new URLSearchParams(window.location.search).get('day');
+    if (!/^D(?:0[1-9]|[1-3][0-9]|4[0-5])$/.test(day || '')) return;
+    var content = document.querySelector('.guide-content');
+    if (!content) return;
+    var link = document.createElement('a');
+    link.className = 'data-guide-return'; link.href = '../../spring/' + day + '.html#step-' + day.toLowerCase() + '-data';
+    link.textContent = day + ' 데이터 넣기로 돌아가기 →';
+    content.prepend(link);
+    var region = content.querySelector('[data-day-guide]');
+    var reference = content.querySelector('[data-day-guide-reference]');
+    var data = document.getElementById('course-day-data-guide');
+    if (!region || !reference || !data) return;
+    var payload;
+    try { payload = JSON.parse(data.textContent)[day]; } catch (e) { return; }
+    if (!payload || payload.id !== day || !Array.isArray(payload.files) || !Array.isArray(payload.steps) || !Array.isArray(payload.checks)) return;
+    function node(tag, className, text) {
+      var element = document.createElement(tag);
+      if (className) element.className = className;
+      if (text !== undefined) {
+        String(text).split(/(`[^`]+`)/g).forEach(function (part) {
+          if (/^`[^`]+`$/.test(part)) {
+            var code = document.createElement('code'); code.textContent = part.slice(1, -1); element.append(code);
+          } else element.append(document.createTextNode(part));
+        });
+      }
+      return element;
+    }
+    function listSection(className, title, items, ordered, tag) {
+      if (!items || !items.length) return null;
+      var section = node(tag || 'section', className);
+      section.append(node('h3', '', title));
+      var list = node(ordered ? 'ol' : 'ul');
+      items.forEach(function (item) { list.append(node('li', '', item)); });
+      section.append(list);
+      return section;
+    }
+    var heading = node('h2', '', day + ' · ' + payload.title);
+    heading.id = 'day-data-guide-title';
+    region.replaceChildren(heading, node('p', 'day-guide-context', payload.context));
+    region.dataset.contentKind = 'practice';
+    var warnings = listSection('day-guide-warnings', '실행 전에 주의', payload.warnings, false, 'aside');
+    if (warnings) region.append(warnings);
+    var files = node('section', 'day-guide-files');
+    files.append(node('h3', '', '이 날 실행할 파일·범위'));
+    if (payload.files.length) {
+      var fileList = node('ul');
+      payload.files.forEach(function (file) {
+        var item = node('li');
+        var fileLink = node('a', '', file.name); fileLink.href = file.href;
+        item.append(fileLink, node('span', '', file.scope));
+        fileList.append(item);
+      });
+      files.append(fileList);
+    } else files.append(node('p', '', '이 날 새로 적재할 SQL 파일은 없습니다. 아래 실행 범위를 따르세요.'));
+    region.append(files);
+    var grid = node('div', 'day-guide-grid');
+    var prerequisites = listSection('day-guide-prerequisites', '먼저 확인할 조건', payload.prerequisites);
+    var steps = listSection('day-guide-steps', '실행 순서', payload.steps, true);
+    if (prerequisites) grid.append(prerequisites);
+    if (steps) grid.append(steps);
+    var checks = node('section', 'day-guide-checks');
+    checks.append(node('h3', '', '확인할 성질·원문 기준 기대값'));
+    var checkList = node('ol');
+    payload.checks.forEach(function (check) {
+      var item = node('li');
+      item.append(node('p', 'day-guide-check-task', check.task), node('p', 'day-guide-check-expect', check.expect));
+      checkList.append(item);
+    });
+    checks.append(checkList); grid.append(checks);
+    region.append(grid);
+    var action = node('a', 'day-guide-action', payload.returnLabel); action.href = payload.returnHref;
+    region.append(action);
+    var full = node('details', 'day-guide-all');
+    full.append(node('summary', '', '전체 더미 SQL 안내'));
+    reference.before(full); full.append(reference);
+    content.classList.add('has-day-guide');
+    region.hidden = false;
+    function revealReference(hash, scroll) {
+      var id;
+      try { id = decodeURIComponent((hash || '').slice(1)); } catch (e) { return; }
+      var target = id && document.getElementById(id);
+      if (!target || !reference.contains(target)) return;
+      full.open = true;
+      var parent = target.closest('details');
+      while (parent && reference.contains(parent)) { parent.open = true; parent = parent.parentElement.closest('details'); }
+      if (scroll && target.scrollIntoView) target.scrollIntoView({ block: 'start' });
+    }
+    (content.closest('.course-guide') || content).addEventListener('click', function (event) {
+      var anchor = event.target.closest('a[href^="#"]');
+      if (anchor) revealReference(anchor.hash, false);
+    });
+    window.addEventListener('hashchange', function () { revealReference(window.location.hash, true); });
+    revealReference(window.location.hash, true);
+  }
+
   window.jxCourseProgress = { KEY: KEY, readProgress: readProgress, writeProgress: writeProgress, nextDay: nextDay };
   function start() {
+    initHeaderOffset();
     initConfigTabs();
+    initMapProgress();
+    initDataReturn();
     var page = document.querySelector('[data-day-page]');
-    if (page) initDay(page);
+    if (page) { initDay(page); initDayStepper(page); }
     var home = document.querySelector('[data-course-home]');
     if (home) initHome(home);
     initCopy();
     initDaySql();
+    initSchedule();
     initRecords();
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  if (document.currentScript && document.currentScript.hasAttribute('data-course-initial')) start();
+  else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

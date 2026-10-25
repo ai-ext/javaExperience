@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "id": "recent-history",
+  "title": "최근 본 글 스무 개 보여 주기",
+  "summary": "회원별 최근 본 글을 중복 없이 최신 순으로 보관하되 최대 20개다.",
+  "difficulty": "중급",
+  "group": "게시글과 소통",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "recent",
+      "title": "회원별 최근 열람 순서와 보관량 지키기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "recent",
+          "title": "회원별 최근 열람 순서와 보관량 지키기",
+          "sourceUnits": [
+            "legacy:14-5"
+          ],
+          "brief": {
+            "purpose": "회원별 최근 본 글을 중복 없이 최신 순으로 보관하되 최대 20개다.",
+            "task": "상세 열람 기록을 갱신하고 내 최근 보기 목록을 관리한다.",
+            "preconditions": [
+              "시나리오 DB(`community`) — 앱을 기본 프로파일로 띄운다.",
+              "community 또는 원문에서 지정한 DB/Clock, 회원별 접근 권한과 공개 글을 준비한다."
+            ],
+            "scenario": [
+              {
+                "start": "회원이 서로 다른 글 20개를 읽은 상태에서 새 글과 전에 읽은 글을 엽니다.",
+                "action": "최근 목록을 읽고 스물한 번째 글 조회·기존 글 재조회를 차례로 수행합니다.",
+                "result": "목록은 회원별 최신 열람 순 최대 20개이며 기존 글 재조회는 중복 추가 대신 앞으로 옮깁니다.",
+                "after": "size 21은 400이고 실패한 목록 조회는 열람 기록과 순서를 바꾸지 않습니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "recent_view(member_id, post_id, viewed_at)",
+                "reason": "회원별 최근 순서와 재방문 중복 행을 비교한다."
+              },
+              {
+                "name": "회원별 최신 20개 post id",
+                "reason": "보관 한도 후 오래된 열람 행 정리 여부를 확인한다."
+              }
+            ],
+            "policies": [
+              "최근 본 글은 회원별 기록. 삭제/숨김·접근 불가 데이터 표시 규칙과 20개 보관 정책은 14-5 원문을 따름; 익명 처리는 만들어내지 않는다."
+            ],
+            "inputs": [
+              "legacy:14-5:H0: DELETE /api/me/recent-posts; case=처음 상태로(내 기록 지우기); source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"H0\",\"expect\":{\"status\":204}}]",
+              "legacy:14-5:H1: GET /api/posts/12; case=12번 보기; source expected/status checks=[]",
+              "legacy:14-5:H2: GET /api/posts/13; case=13번 보기; source expected/status checks=[]",
+              "legacy:14-5:H3: GET /api/posts/14; case=14번 보기; source expected/status checks=[]",
+              "legacy:14-5:H4: GET /api/posts/12; case=12번 다시 보기; source expected/status checks=[]",
+              "legacy:14-5:H6: GET /api/me/recent-posts; case=최근 본 글; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"H6\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.items[*].postId\",\"equals\":[12,14,13]},{\"path\":\"$.items[0].title\",\"equals\":\"자유글 01\"},{\"path\":\"$.items[0].viewedAt\",\"type\":\"string\"}]},\"note\":\"다시 본 12번은 맨 앞으로(행이 둘이 되지 않는다). 볼 수 없어 404였던 9번·비로그인으로 본 15번은 남지 않는다\"}]",
+              "legacy:14-5:H11: GET /api/me/recent-posts?size=20; case=삭제 뒤 최근 본 글; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"H11\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.items[*].postId\",\"equals\":[12,14,13]}]},\"note\":\"본 뒤에 지워진 글은 목록에서 빠진다\"}]",
+              "legacy:14-5:H14b: GET /api/me/recent-posts?size=21; case=잘못된 입력 — size=21; source expected/status checks=[{\"id\":\"C6\",\"pointer\":\"/checks/5\",\"request\":\"H14b\",\"expect\":{\"status\":400},\"note\":\"size는 1~20, 숫자가 아니면 400 — 500이 아니다\"}]"
+            ],
+            "success": [
+              "최근 조회 순서와 제한량 확인, 다른 회원 목록은 분리."
+            ],
+            "failures": [
+              {
+                "when": "GET /api/me/recent-posts?size=0 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 400 — 원문 check의 실패 응답",
+                "unchanged": "요청 회원의 recent_view 행/정렬 값을 실패 전 그대로 보존한다."
+              },
+              {
+                "when": "GET /api/me/recent-posts?size=21 · [교육용 fixture · legacy:14-5:H14b] 잘못된 입력 — size=21",
+                "result": "HTTP 400 (H14b)",
+                "unchanged": "요청 회원 recent_view 행과 순서를 보존한다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "회원이 서로 다른 글 20개를 읽은 상태에서 새 글과 전에 읽은 글을 엽니다.",
+                "action": "최근 목록을 읽고 스물한 번째 글 조회·기존 글 재조회를 차례로 수행합니다.",
+                "result": "size 21은 400이고 실패한 목록 조회는 열람 기록과 순서를 바꾸지 않습니다."
+              }
+            ],
+            "work": [
+              "회원-글 유니크성, 최근 시각 갱신, 보관량 제한을 구현하고 조회 권한과 함께 확인한다."
+            ],
+            "done": [
+              "목록은 회원별 최신 열람 순 최대 20개이며 기존 글 재조회는 중복 추가 대신 앞으로 옮깁니다.",
+              "size 21은 400이고 실패한 목록 조회는 열람 기록과 순서를 바꾸지 않습니다.",
+              "GET /api/me/recent-posts?size=0 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 요청 회원의 recent_view 행/정렬 값을 실패 전 그대로 보존한다.",
+              "GET /api/me/recent-posts?size=21 · [교육용 fixture · legacy:14-5:H14b] 잘못된 입력 — size=21 → HTTP 400 (H14b) 요청 회원 recent_view 행과 순서를 보존한다."
+            ]
+          },
+          "hints": [
+            "이미 기록된 글을 다시 열 때 새 row를 더하는 대신 어떤 값을 갱신해야 최근 순서가 정확할까요?",
+            "20개 초과일 때 오래된 행을 정리하기 전에 어느 회원의 기록인지 구분해야 할까요?",
+            "최근 본 목록이 상세 조회의 권한 규칙을 우회해 숨겨진 제목을 노출하지 않는지 어떻게 확인할까요?"
+          ],
+          "recipeIds": [
+            "legacy:14-5:H0",
+            "legacy:14-5:H1",
+            "legacy:14-5:H2",
+            "legacy:14-5:H3",
+            "legacy:14-5:H4",
+            "legacy:14-5:H6",
+            "legacy:14-5:H11",
+            "legacy:14-5:H14b"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "14-5-recent-views.html",
+              "href": "/scenario/ch14-more-with-posts/14-5-recent-views.html"
+            },
+            {
+              "label": "G2-access-rules-in-one-place.html",
+              "href": "/lessons/G2-access-rules-in-one-place.html"
+            },
+            {
+              "label": "W20-time-timezone.html",
+              "href": "/docs/knowledge/W20-time-timezone.html"
+            },
+            {
+              "label": "R05-index-btree.html",
+              "href": "/docs/knowledge/R05-index-btree.html"
+            },
+            {
+              "label": "S10-spring-data-query.html",
+              "href": "/docs/knowledge/S10-spring-data-query.html"
+            },
+            {
+              "label": "V04-test-db-strategy.html",
+              "href": "/docs/knowledge/V04-test-db-strategy.html"
+            },
+            {
+              "label": "I1-why-tests.html",
+              "href": "/lessons/I1-why-tests.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

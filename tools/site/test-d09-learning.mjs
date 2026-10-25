@@ -1,3 +1,4 @@
+import { resolveEvidencePath } from './evidence-path.mjs';
 import assert from 'node:assert/strict';
 import { D09_LESSONS, D09_ASSETS, D09_RUNS, d09AssetRoot, d09Run } from './d09-lesson-data.mjs';
 const contract = {
@@ -50,7 +51,7 @@ assert.ok(raw.promQueries.length > 0);
 assert.ok(raw.promQueries.every(row => row.response.status === 'success'));
 const upSamples = raw.promQueries.filter(row => row.expression === 'up{job="d09-extra-exporter"}').flatMap(row => row.response.data.result.map(result => Number(result.value[1])));
 assert.ok(upSamples.includes(0) && upSamples.includes(1), '실제 Prom API up0/up1 sample');
-const eventRows = readFileSync(raw.run + '/business-events.jsonl', 'utf8').trim().split('\n').map(line => JSON.parse(line));
+const eventRows = readFileSync(resolveEvidencePath(raw.run + '/business-events.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
 assert.deepEqual(eventRows, businessRequests.map(row => JSON.parse(row.body)));
 assert.ok(eventRows.every(row => Number.isFinite(Date.parse(row.timestamp))));
 const f = execution.facts, state = id => stages.find(stage => stage.id === id);

@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "id": "activity-ranking",
+  "title": "회원 활동에 따라 순위 보여 주기",
+  "summary": "글 작성 10점과 댓글 작성 2점 활동을 순위 점수로 연결해 회원 활동 순서를 보여 줍니다.",
+  "difficulty": "중급",
+  "group": "포인트와 상점",
+  "prerequisites": [
+    "points-coupon-shop"
+  ],
+  "stages": [
+    {
+      "id": "rank",
+      "title": "댓글 포인트와 활동 순위 연결하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 과정 프로젝트",
+      "stages": [
+        {
+          "id": "rank",
+          "title": "댓글 포인트와 활동 순위 연결하기",
+          "sourceUnits": [
+            "course:D09-5"
+          ],
+          "brief": {
+            "purpose": "글 작성 10점과 댓글 작성 2점 활동을 순위 점수로 연결해 회원 활동 순서를 보여 줍니다.",
+            "task": "포인트 적립 이벤트와 Redis Sorted Set 순위 데이터를 연결하고, 글·댓글 작성 뒤 점수 순서와 조회 제한을 확인하세요.",
+            "preconditions": [
+              "D07 point ledger의 글 활동 10점과 D09 댓글 활동 2점 규칙을 사용한다. 순위는 활동 적립만 포함하고 충전·지출은 제외한다.",
+              "격리 fixture에 활동이 다른 두 회원과 글/댓글 생성 가능한 상태를 둔다. seed의 회원 20 점수 1,000 예시는 별도 기준 사실로 표시한다."
+            ],
+            "scenario": [
+              {
+                "start": "fixture에서 회원 A 활동점수 20, 회원 B 10으로 시작한다. A가 글 1개, B가 댓글 1개를 작성한다.",
+                "action": "각 POST 성공 뒤 GET /api/rankings/activity를 호출하고 GET /api/rankings/activity?size=51 경계 요청을 보낸다. Redis Sorted Set과 point ledger를 각각 비교한다.",
+                "result": "A는 글 작성 +10으로 30점, B는 댓글 +2로 12점이 된다. 순위 API는 200이며 A가 B보다 앞선다. size=51은 400이다.",
+                "after": "활동 score 합계와 해당 회원의 글/댓글 ledger를 대조하고 충전·주문 지출이 순위에 섞이지 않았는지 확인한다. transaction rollback된 활동은 순위에 남지 않아야 한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "글 작성 활동 점수 10",
+                "reason": "POST 글 한 건이 랭킹 점수와 point ledger에 각각 +10으로 반영되는 source 규칙이다."
+              },
+              {
+                "name": "댓글 작성 활동 점수 2",
+                "reason": "댓글 한 건의 활동 기여를 글 작성 점수와 구분해 검증한다."
+              },
+              {
+                "name": "Redis Sorted Set member/score",
+                "reason": "회원 ID별 합산 점수와 내림차순 순위를 반환하는 저장 단위다."
+              },
+              {
+                "name": "GET /api/rankings/activity size",
+                "reason": "페이지 결과 제한과 size=51 유효성 실패를 확인한다."
+              }
+            ],
+            "policies": [
+              "점수 적립은 원본 활동 포인트 정책과 일치해야 합니다. 댓글 2점과 글 10점 수치를 바꾸거나 중복 적립을 허용하지 않습니다.",
+              "GET /api/rankings/activity 기본 요청은 200이며 size=51은 400입니다.",
+              "Redis 랭킹 갱신은 포인트 변경 커밋 뒤 발생하는 이벤트 흐름을 확인하고 실패 처리 경계를 설명합니다.",
+              "원문 완료 기준: 글·댓글 작성 뒤 `GET /api/rankings/activity` → 200, 점수 높은 순",
+              "원문 완료 기준: `GET /api/rankings/activity?size=51` → 400"
+            ],
+            "inputs": [
+              "USER A 글 POST /api/posts 1회 → 201, 활동 +10. USER B 댓글 POST /api/posts/{postId}/comments 1회 → 201, 활동 +2.",
+              "GET /api/rankings/activity → 200, 점수 높은 순; `?size=51` → 400.",
+              "fixture A=20/B=10이면 활동 뒤 A=30/B=12다. source D09 seed 20명=1,000점은 비교 데이터일 뿐 주문 충전 점수로 사용하지 않는다.",
+              "댓글 입력 예: POST /api/posts/{postId}/comments, `{\"content\":\"오늘 배운 내용\"}`, USER Bearer token; 정상 201 및 Location `/api/comments/{id}`. 댓글 활동 +2점은 D09 규칙에 따른다."
+            ],
+            "success": [
+              "글 작성 1건의 활동점수/ledger +10, 댓글 1건은 +2; GET /api/rankings/activity → 200에서 A 30점이 B 12점보다 앞선다.",
+              "`GET /api/rankings/activity?size=51` → 400 validation.",
+              "ranking score는 글/댓글 활동 source만 합산하며 충전·지출은 제외한다. rollback된 활동은 commit 후 event 처리되어 score를 바꾸지 않는다.",
+              "POST /api/posts/{postId}/comments → 201; 댓글 하나가 성공한 뒤 activity rank에서 회원 점수가 +2이며 응답 Location으로 생성 댓글을 확인한다."
+            ],
+            "failures": [
+              {
+                "when": "size=51로 ranking 요청",
+                "result": "400 validation.",
+                "unchanged": "Redis Sorted Set과 point ledger의 score는 변경되지 않는다."
+              },
+              {
+                "when": "글·댓글 transaction rollback 후 PointEarnedEvent가 순위에 반영됨",
+                "result": "잘못된 event timing으로 테스트 실패한다.",
+                "unchanged": "rollback된 글/댓글 및 포인트 원장이 없으면 Redis score도 기존 값(예: A 20/B 10)이어야 한다."
+              },
+              {
+                "when": "댓글 content가 공백/500자를 넘거나 token이 없음",
+                "result": "400 validation 또는 401 unauthorized.",
+                "unchanged": "댓글 row·활동 point ledger·Sorted Set score가 증가하지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "글과 댓글 활동 순위",
+                "start": "A=20점, B=10점 fixture다.",
+                "action": "A가 POST /api/posts로 글 하나를 만들고 B가 그 실제 postId에 POST /api/posts/{postId}/comments로 댓글을 단다.",
+                "result": "두 write 요청은 각각 201; A=30, B=12, GET ranking 200, A가 먼저 표시된다."
+              },
+              {
+                "title": "잘못된 size 및 rollback",
+                "start": "점수 A=30/B=12 상태다.",
+                "action": "size=51을 요청하고 별도 테스트에서 댓글 transaction을 rollback시킨다.",
+                "result": "size는 400이며 rollback 댓글로 B score가 2점 증가하지 않는다."
+              }
+            ],
+            "work": [
+              "PointEarnedEvent와 Sorted Set 갱신 시점이 성공 transaction commit 뒤인지 확인한다.",
+              "글/댓글 적립 점수를 각각 10/2로 기록하고 balance ledger 및 Redis score와 대조한다.",
+              "size 경계, score 내림차순, rollback event 부재를 테스트한다."
+            ],
+            "done": [
+              "글 +10, 댓글 +2 이후 ranking 200에서 A 30점이 B 12점보다 앞서는 결과를 확인했다.",
+              "size=51은 400이며 활동 ledger와 Redis score가 맞고 충전/지출은 순위에 미포함이다.",
+              "rollback된 활동의 score가 증가하지 않는지 확인하고 source seed fixture와 사용자 fixture를 구분했다."
+            ]
+          },
+          "hints": [
+            "글 activity 10점과 댓글 2점이 포인트 ledger/Redis score에서 각각 어디로 연결되나요?",
+            "DB transaction이 rollback된 이벤트를 Redis에 먼저 반영하면 순위가 어떤 잘못된 상태가 되나요?",
+            "seed 회원 20명의 1,000점이 활동 적립만의 값인지 어떻게 D09 기준과 대조하나요?",
+            "size=51의 400 실패 뒤에도 정렬 점수는 바뀌지 않았는지 무엇을 읽어야 하나요?"
+          ],
+          "recipeIds": [
+            "board:activity-ranking:normal",
+            "board:comment-create:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D09-5 · 활동 랭킹 (Sorted Set, 댓글 작성 2점 적립도 여기서 `CommentService`에 추가)",
+              "href": "course/spring/D09.html#step-d09-5"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

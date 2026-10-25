@@ -1,82 +1,86 @@
-<!doctype html>
-<html lang="ko">
-<head>
+<!DOCTYPE html><html lang="ko" data-theme="dark" style="background: rgb(20, 22, 25); color-scheme: dark; --course-header-height: 0px;"><head>
 <meta charset="utf-8">
+<script>document.documentElement.classList.add('js')</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J07. Map·Set과 스레드: 잔액 갱신 손실 재현하고 고치기</title>
-<link rel="stylesheet" href="../../tools/site/site.css?v=6580290a3c9f">
-<link rel="stylesheet" href="../../tools/site/course-exercise.css?v=1a4aa4155ccc">
-
-<link rel="stylesheet" href="../../tools/site/course.css?v=0c6a1b167d4a">
-<link rel="stylesheet" href="../../tools/site/course-tokens.css?v=90f7ed5128e9">
-<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+<link rel="stylesheet" href="../../tools/site/site.css?v=d360dce19dc2">
 
 
+<link rel="stylesheet" href="../../tools/site/course-exercise.css?v=8eda63e0ec25">
+<link rel="stylesheet" href="../../tools/site/course.css?v=49911c9e7435">
+<link rel="stylesheet" href="../../tools/site/course-stepper.css?v=1124522a27dd">
+<link rel="stylesheet" href="../../tools/site/course-tokens.css?v=7d70b43e3c66">
+<script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer=""></script>
 
 
-</head>
-<body>
-<header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../spring/README.html" aria-current="page">과정 v2 · 일자 목록</a><a href="../map.html">과정 지도</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
-<main>
-
-<article class="exercise-sheet exercise-java" data-exercise="J07"><header class="exercise-head"><p class="exercise-kind"><b>J07</b> Java 연결 실험</p><h1 id="j07-mapset과-스레드-잔액-갱신-손실-재현하고-고치기"><a class="anchor" href="#j07-mapset과-스레드-잔액-갱신-손실-재현하고-고치기" aria-hidden="true">#</a>J07. Map·Set과 스레드: 잔액 갱신 손실 재현하고 고치기</h1><blockquote class="exercise-meta">
-<p>같은 날: D07 · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests 'J07*'</code></p>
-</blockquote></header><nav class="exercise-route" aria-label="Java 실험 순서"><ol><li><a href="#만들-것"><b>01</b><span>만들 것</span></a></li><li><a href="#오늘-spring에서-다시-만나는-곳"><b>02</b><span>Spring 이어하기</span></a></li></ol></nav>
-<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D07.html#오늘-순서">D07 · 포인트·쿠폰 상점</a></p><p>Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p><p><a href="J06.html">← 이전 J06</a> · <a href="J08.html">다음 J08 →</a></p></nav>
 
 
-<section class="exercise-section" aria-labelledby="상황"><h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2><p>D07은 포인트·쿠폰 상점을 만드는 날이다. ① 포인트를 적립할 때 "잔액을 읽어 더한 뒤 저장"하면 동시 적립에서 갱신이 사라지므로 <code>UPDATE … SET point_balance = point_balance + ?</code>로 바꾼다. ④ 쿠폰 발급 버튼을 연타하면 "이미 받았나" 조회가 두 요청 모두 통과한다.
-오늘은 DB 없이 같은 사고를 순수 Java로 재현한다. 두 스레드가 같은 잔액을 읽게 만들어 적립 하나가 사라지는 것을 확실히 보고, <code>synchronized</code>와 <code>AtomicInteger</code>로 고친다. 여러 스레드가 함께 쓰는 <code>Map</code>·<code>Set</code>도 같은 원리로 고른다.</p></section>
 
-<section class="exercise-section" aria-labelledby="빠른-연상"><h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2><pre><code>스레드 A: 잔액 읽기(0) ─────────────── 0+10 쓰기 → 10
-스레드 B:        잔액 읽기(0) ── 0+10 쓰기 → 10        결과 10 (20이어야 한다)</code></pre><div class="table-wrap"><table>
+
+
+
+<link rel="stylesheet" href="../../tools/site/course-content.css?v=526afc2a1110">
+<link rel="stylesheet" href="../../tools/site/contrast.css?v=fa9b5b7d70bc">
+<link rel="stylesheet" href="../../tools/site/course-navigation.css?v=036941f5c2c9">
+<link rel="stylesheet" href="../../tools/site/course-data-blocks.css?v=7207893bf610">
+<link rel="stylesheet" href="../../tools/site/course-semantics.css?v=8632fefaa184">
+<link rel="stylesheet" href="../../tools/site/course-flow-layout.css?v=b33e13ca0173">
+<link rel="stylesheet" href="../../tools/site/section-switcher.css?v=975a56e01be7">
+<link rel="stylesheet" href="../../tools/site/site-frame.css?v=f528fcef5e04">
+
+
+<script>(function prepareFirstPaint({panelMap,dayPanels,servicePanels,knowledgeCategories}) {
+  const root=document.documentElement;
+  root.classList.add('js');
+  let format='yml';try {if(localStorage.getItem('javaexperience.course.config-format.v1')==='properties')format='properties';}catch{}
+  root.dataset.configFormat=format;
+  let id='';try{id=decodeURIComponent(location.hash.slice(1));}catch{}
+  const style=document.createElement('style');style.id='first-paint-state';
+  const active=panelMap[id]||dayPanels.find(p=>p.initial)?.id;
+  const category=id.startsWith('kc-category-')?id.slice('kc-category-'.length):null;
+  if(category && knowledgeCategories.includes(category) && panelMap['kc-browse-view']) {
+    // 큰 문서는 body 끝의 controller보다 먼저 페인트될 수 있어 분야 패널과 선택 표시를 먼저 인계한다.
+    const target='kc-browse-view';
+    style.textContent+=`html.js body main [data-section-panel]:not(#${target}):not(:has(#${target})):not(#${target} [data-section-panel]){display:none!important}html.js body main #${target}{display:block!important}`;
+    const select=()=>{
+      for(const button of document.querySelectorAll('.section-switcher [data-section-target]')) {
+        const selected=button.dataset.sectionTarget===target;
+        button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;
+      }
+      for(const button of document.querySelectorAll('button[data-kc-category]')) {
+        const selected=button.dataset.kcCategory===category;
+        button.setAttribute('aria-pressed',String(selected));button.tabIndex=selected?0:-1;
+      }
+    };
+    const observer=new MutationObserver(select);
+    observer.observe(document,{childList:true,subtree:true});
+    style.stopEarlySelection=()=>observer.disconnect();
+    select();
+  }
+  if(servicePanels.length){
+    const params=new URLSearchParams(location.search);
+    const selected=servicePanels.find(p=>p.id===id)||servicePanels.find(p=>p.variant===params.get('variant')&&p.stage===params.get('stage'))||servicePanels[0];
+    style.textContent+=servicePanels.map(p=>`html.js body main #${CSS.escape(p.id)}{display:${p.id===selected.id?'block':'none'}!important}`).join('');
+    style.textContent+=`html.js body main [data-sf-aside-stage]{display:none!important}html.js body main [data-sf-aside-stage][data-sf-variant="${CSS.escape(selected.variant)}"][data-sf-stage="${CSS.escape(selected.stage)}"]{display:block!important}`;
+  }
+  if(dayPanels.length)style.textContent+=dayPanels.map(p=>`html.js body main #${CSS.escape(p.id)}{display:${p.id===active?p.display:'none'}!important}`).join('');
+  // 설정 형식은 CSS가 첫 페인트부터, controller가 DOM·키보드 상태를 이어받는다.
+  style.textContent+=`html.js body main [data-config-panel]{display:none!important}html.js body main [data-config-panel="${format}"]{display:block!important}`;
+  document.head.append(style);
+})({"panelMap":{"section-panel-1":"section-panel-1","만들-것":"section-panel-1","content-code-1":"section-panel-1","section-panel-2":"section-panel-2","상황":"section-panel-2","section-panel-3":"section-panel-3","빠른-연상":"section-panel-3","content-code-2":"section-panel-3","section-panel-4":"section-panel-4","기본기-반복":"section-panel-4","content-code-3":"section-panel-4","section-panel-5":"section-panel-5","타입-한-컷":"section-panel-5","section-panel-6":"section-panel-6","실무-습관":"section-panel-6","section-panel-7":"section-panel-7","확인":"section-panel-7","content-code-4":"section-panel-7","content-code-5":"section-panel-7","section-panel-8":"section-panel-8","정답":"section-panel-8","content-code-6":"section-panel-8","content-code-7":"section-panel-8","content-code-8":"section-panel-8","content-code-9":"section-panel-8","content-code-10":"section-panel-8","content-code-11":"section-panel-8","section-panel-9":"section-panel-9","오늘-spring에서-다시-만나는-곳":"section-panel-9"},"dayPanels":[],"servicePanels":[],"knowledgeCategories":[]});</script><noscript><style>body main [data-day-panel][hidden],body main [data-wrap-panel][hidden],body main [data-section-panel][hidden],body main [data-config-panel][hidden],body main [data-sf-stage-panel][hidden],body main [data-sf-aside-stage][hidden],body main [data-sf-group-cards][hidden],body main [data-sf-api-rows][hidden]{display:block!important}body .section-switcher,body .day-wrap-tabs,body [data-day-expand]{display:none!important}</style></noscript></head>
+<body class="course-page">
+<header class="topbar site-topbar study-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../map.html">과정 지도</a><a href="../../scenario/README.html" aria-current="page">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="../../docs/knowledge/README.html">개념 학습</a></nav></header>
+<a class="site-skip" href="#site-main">본문으로 건너뛰기</a>
+<main id="site-main" class="has-section-switcher site-main"><div class="site-frame"><aside class="site-frame-sidebar" aria-label="영역 및 페이지 탐색"><p class="page-sidebar-caption">서비스 만들기</p><nav class="section-navigation" aria-label="서비스 만들기 영역"><a href="../../scenario/README.html">기능 목록</a><a href="../../scenario/README.html#visual-catalog">단계별 시안</a><a href="../../scenario/README.html#journey-all-apis">API EXPLORER</a><p class="page-sidebar-caption section-navigation-reference">참고</p><a href="../spring/README.html">일자 목록</a><a href="README.html" aria-current="page">Java</a><a href="../tickets/README.html">티켓</a><a href="../start/README.html">출발 자료</a><a class="section-navigation-child" href="../start/dummy/README.html">더미 데이터</a><a class="section-navigation-child" href="../start/ops/README.html">운영 실습</a><a href="../README.html">과정 안내</a></nav><aside class="page-sidebar site-local-navigation" aria-label="페이지 탐색"><p class="page-sidebar-caption">이 페이지</p><nav class="section-switcher" aria-label="이 페이지 내용 선택" role="tablist" aria-orientation="vertical"><button type="button" id="section-tab-0" role="tab" data-section-target="section-all" data-panel-id="" data-phase="" aria-selected="true" tabindex="0">전체</button><button type="button" id="section-tab-1" role="tab" data-section-target="만들-것" aria-controls="section-panel-1" data-panel-id="section-panel-1" data-phase="" aria-selected="false" tabindex="-1">만들 것</button><button type="button" id="section-tab-2" role="tab" data-section-target="상황" aria-controls="section-panel-2" data-panel-id="section-panel-2" data-phase="" aria-selected="false" tabindex="-1">상황</button><button type="button" id="section-tab-3" role="tab" data-section-target="빠른-연상" aria-controls="section-panel-3" data-panel-id="section-panel-3" data-phase="" aria-selected="false" tabindex="-1">빠른 연상</button><button type="button" id="section-tab-4" role="tab" data-section-target="기본기-반복" aria-controls="section-panel-4" data-panel-id="section-panel-4" data-phase="" aria-selected="false" tabindex="-1">기본기 반복</button><button type="button" id="section-tab-5" role="tab" data-section-target="타입-한-컷" aria-controls="section-panel-5" data-panel-id="section-panel-5" data-phase="" aria-selected="false" tabindex="-1">타입 한 컷</button><button type="button" id="section-tab-6" role="tab" data-section-target="실무-습관" aria-controls="section-panel-6" data-panel-id="section-panel-6" data-phase="" aria-selected="false" tabindex="-1">실무 습관</button><button type="button" id="section-tab-7" role="tab" data-section-target="확인" aria-controls="section-panel-7" data-panel-id="section-panel-7" data-phase="" aria-selected="false" tabindex="-1">확인</button><button type="button" id="section-tab-8" role="tab" data-section-target="정답" aria-controls="section-panel-8" data-panel-id="section-panel-8" data-phase="" aria-selected="false" tabindex="-1">구현 예시</button><button type="button" id="section-tab-9" role="tab" data-section-target="오늘-spring에서-다시-만나는-곳" aria-controls="section-panel-9" data-panel-id="section-panel-9" data-phase="" aria-selected="false" tabindex="-1">오늘 Spring에서 다시 만나는 곳</button></nav></aside></aside><div class="site-frame-content"><div class="page-navigation-layout"><div class="page-navigation-content">
+<nav class="site-breadcrumb" aria-label="현재 위치"><a href="../../index.html">홈</a><span aria-hidden="true">›</span> <a href="../../scenario/README.html">서비스 만들기</a></nav>
+<section class="course-guide guide-java" data-guide-kind="java"><div class="guide-layout"><aside class="guide-rail" aria-label="Java 연습 목차"><span class="guide-type" aria-hidden="true">J07</span><h2>Java 연습</h2><nav class="guide-index" aria-label="이 페이지 순서" hidden="" data-replaced-by-sections=""><ol data-content-kind="reference"><li><a href="#만들-것">만들 것</a></li><li><a href="#상황">상황</a></li><li><a href="#빠른-연상">빠른 연상</a></li><li><a href="#기본기-반복">기본기 반복</a></li><li><a href="#타입-한-컷">타입 한 컷</a></li><li><a href="#실무-습관">실무 습관</a></li><li><a href="#확인">확인</a></li><li><a href="#정답">구현 예시</a></li><li><a href="#오늘-spring에서-다시-만나는-곳">오늘 Spring에서 다시 만나는 곳</a></li></ol></nav></aside><div class="guide-content"><article class="exercise-sheet exercise-java" data-exercise="J07"><header class="exercise-head"><p class="content-page-kind" data-content-kind="practice"><strong>연습 · Java</strong><span>직접 작성하고 실행한 뒤 연결된 일자로 돌아가세요</span></p><h1 id="j07-mapset과-스레드-잔액-갱신-손실-재현하고-고치기"><a class="anchor" href="#j07-mapset과-스레드-잔액-갱신-손실-재현하고-고치기" aria-hidden="true">#</a>J07. Map·Set과 스레드: 잔액 갱신 손실 재현하고 고치기</h1><blockquote class="exercise-meta" data-content-kind="practice">
+<p data-content-kind="practice">같은 날: D07 · 소요 30~60분 · 실행 <code>./gradlew :java-track:test --tests 'J07*'</code></p>
+</blockquote></header><nav class="exercise-route" aria-label="Java 실험 순서" hidden="" data-replaced-by-sections=""><ol data-content-kind="reference"><li><a href="#만들-것"><b>01</b><span>만들 것</span></a></li><li><a href="../spring/D07.html"><b>02</b><span>D07 Spring 이어서 시작하기</span></a></li></ol><a class="exercise-connections" href="#오늘-spring에서-다시-만나는-곳">Java와 Spring 연결 사례</a></nav><section class="exercise-section exercise-primary" aria-labelledby="만들-것" data-content-kind="action" data-section-original-hidden="false" data-section-panel="" id="section-panel-1"><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2><p data-content-kind="action">채울 파일(<code>java-track/src/main/java/com/example/javatrack/j07/</code>):</p><div class="table-wrap"><table data-content-kind="action" class="java-task-table">
 <thead>
 <tr>
-<th></th>
-<th>이전 (<code>LeakyPointWallet</code>)</th>
-<th><code>synchronized</code></th>
-<th><code>AtomicInteger</code></th>
-</tr>
-</thead>
-<tbody><tr>
-<td>방법</td>
-<td>읽고 → 더해서 쓰기</td>
-<td>한 번에 한 스레드만 메서드 안에 들어온다(잠금)</td>
-<td>읽은 값이 <strong>그대로일 때만</strong> 바꾼다(<code>compareAndSet</code>), 실패하면 다시 읽는다</td>
-</tr>
-<tr>
-<td>기다림</td>
-<td>없다(대신 손실)</td>
-<td>다른 스레드는 입구에서 기다린다</td>
-<td>기다리지 않고 다시 시도한다</td>
-</tr>
-<tr>
-<td>DB로 치면</td>
-<td><code>SELECT</code> 후 <code>UPDATE … SET balance = 읽은값+10</code></td>
-<td><code>SELECT … FOR UPDATE</code>(비관적 잠금)</td>
-<td><code>UPDATE … WHERE balance = 읽은값</code>(낙관적 갱신)</td>
-</tr>
-<tr>
-<td>board-server가 쓴 방법</td>
-<td></td>
-<td></td>
-<td>한 문장 <code>UPDATE … SET balance = balance + ?</code></td>
-</tr>
-</tbody></table></div><p>JS는 한 스레드에서 돌아서 <code>balance += 10</code> 사이에 다른 코드가 끼지 않는다. Java 서버는 요청마다 다른 스레드가 같은 객체(싱글톤 빈)를 동시에 쓴다.</p><p>흔한 착각: "<code>balance += 10</code>은 한 줄이니 한 번에 일어난다". 컴파일되면 읽기·더하기·쓰기 세 단계다. 그 사이에 다른 스레드가 끼어들 수 있다. 테스트에서 잘 안 터지는 것은 틈이 아주 짧기 때문이다. 그래서 오늘은 틈을 일부러 벌려 매번 터지게 한다.</p></section>
-
-
-
-
-<section class="exercise-section" aria-labelledby="만들-것"><h2 id="만들-것"><a class="anchor" href="#만들-것" aria-hidden="true">#</a>만들 것</h2><details>
-<summary>펼치기</summary>
-
-<p>채울 파일(<code>java-track/src/main/java/com/example/javatrack/j07/</code>):</p>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>파일</th>
-<th>채울 것</th>
-<th>칸</th>
+<th scope="col">파일</th>
+<th scope="col">채울 것</th>
+<th scope="col">칸</th>
 </tr>
 </thead>
 <tbody><tr>
@@ -119,21 +123,15 @@
 <td>주어진 코드. 고치지 않는다</td>
 <td>-</td>
 </tr>
-</tbody></table></div>
-<p>틈(<code>betweenReadAndWrite</code>): 지갑은 생성자로 <code>Runnable</code> 하나를 받아 <strong>읽은 뒤 쓰기 전에</strong> 한 번 부른다. 테스트는 여기에 "두 스레드가 모두 잔액을 읽을 때까지 기다리기"를 넣는다. 그래서 <code>LeakyPointWallet</code>은 매번 둘이 같은 0을 읽고 손실이 난다. 고친 지갑도 이 틈을 반드시 거쳐야 한다.</p>
-<ul>
+</tbody></table></div><p data-content-kind="action">틈(<code>betweenReadAndWrite</code>): 지갑은 생성자로 <code>Runnable</code> 하나를 받아 <strong>읽은 뒤 쓰기 전에</strong> 한 번 부른다. 테스트는 여기에 "두 스레드가 모두 잔액을 읽을 때까지 기다리기"를 넣는다. 그래서 <code>LeakyPointWallet</code>은 매번 둘이 같은 0을 읽고 손실이 난다. 고친 지갑도 이 틈을 반드시 거쳐야 한다.</p><ul data-content-kind="action">
 <li><code>synchronized</code> 지갑 테스트는 기다림이 제때 끝났는지(시간 초과인지)를 기록한다. 먼저 들어온 스레드는 잠금을 쥔 채 기다리다 시간 초과, 뒤 스레드는 잠금이 풀린 뒤 바로 통과 — 이 모양이 "한 번에 한 스레드"의 증거다.</li>
 <li>CAS 지갑 테스트는 <strong>첫 읽기 두 번만</strong> <code>CyclicBarrier</code>에서 서로를 기다리게 한다. 둘 다 같은 0을 읽었으니 <code>compareAndSet(0, 10)</code>은 한쪽만 성공하고, 실패한 쪽은 다시 읽어 틈을 한 번 더 지난다. 그래서 틈은 정확히 3번 불린다(2번이면 재시도하지 않은 것이다).</li>
-</ul>
-<p>규칙:</p>
-<ul>
+</ul><p data-content-kind="action">규칙:</p><ul class="visual-rules" data-visual-pattern="rules" data-content-kind="action">
 <li><code>SynchronizedPointWallet.earn</code>: 읽기 → <code>betweenReadAndWrite.run()</code> → 쓰기. 메서드에 <code>synchronized</code>를 붙인다. <code>balance()</code>도 같은 잠금으로 읽는다.</li>
 <li><code>AtomicPointWallet.earn</code>: <code>get()</code> → <code>betweenReadAndWrite.run()</code> → <code>compareAndSet(읽은 값, 읽은 값 + amount)</code>. 실패하면 <code>get()</code>부터 다시.</li>
 <li><code>MemberPoints</code>: 회원별 잔액을 <code>ConcurrentHashMap</code>에 담는다. 더할 때는 <code>merge</code> 한 번으로.</li>
 <li><code>CouponIssuer.issue</code>: 처음 받는 회원이면 true. <code>contains</code>로 확인하고 <code>add</code>하지 말고, <code>add</code>의 반환값을 쓴다.</li>
-</ul>
-<p>뼈대 발췌:</p>
-<pre><code class="language-java">public class AtomicPointWallet {
+</ul><p data-content-kind="action">뼈대 발췌:</p><details class="exercise-code-source" data-content-kind="action"><summary>뼈대 코드·실행 원문 펼치기<span class="disclosure-chevron" aria-hidden="true">▸</span></summary><div class="disclosure-body"><figure class="code-block"><figcaption class="code-toolbar"><span>코드</span><button type="button" data-copy-target="content-code-1">코드 복사</button><span class="copy-status" role="status" aria-live="polite"></span></figcaption><pre data-content-kind="action" id="content-code-1"><code class="language-java">public class AtomicPointWallet {
 
     private final Runnable betweenReadAndWrite;
     // TODO: 잔액을 담을 AtomicInteger 필드를 선언하세요(0에서 시작)
@@ -153,9 +151,7 @@ public class CouponIssuer {
 
     /** 처음 받는 회원이면 true, 이미 받았으면 false. "있나 확인하고 넣기"를 한 번에 한다. */
     public boolean issue(long memberId) { … }
-}</code></pre>
-<p>통과시킬 테스트(주제 과제) — <code>J07PointWalletTest</code> (모든 테스트에 10초 제한이 걸려 있다):</p>
-<ul>
+}</code></pre></figure></div></details><p data-content-kind="action">통과시킬 테스트(주제 과제) — <code>J07PointWalletTest</code> (모든 테스트에 10초 제한이 걸려 있다):</p><details class="exercise-test-index"><summary>확인할 테스트 이름 7개</summary><ul data-content-kind="action">
 <li><code>함정_읽고_쓰는_사이에_다른_스레드가_끼면_적립_하나가_사라진다_synchronized는_막는다</code> (<code>LeakyPointWallet</code>이 매번 10을 남긴다)</li>
 <li><code>AtomicInteger는_compareAndSet이_실패하면_다시_읽어_손실이_없다</code> (틈이 정확히 3번 불려야 한다)</li>
 <li><code>여러_스레드가_천_번씩_적립해도_synchronized와_AtomicInteger는_합계가_맞다</code></li>
@@ -163,30 +159,68 @@ public class CouponIssuer {
 <li><code>적립한_적이_없는_회원의_잔액은_0이다</code></li>
 <li><code>Set_add는_이미_있으면_false라_1인_1매를_지킨다</code></li>
 <li><code>같은_회원이_동시에_여러_번_요청해도_한_장만_발급된다</code></li>
-</ul>
-<p><code>synchronized</code> 지갑 테스트는 0.3초쯤 걸린다. 잠금을 쥔 스레드가 틈에서 다른 스레드를 기다리지만, 다른 스레드는 잠금 때문에 틈에 오지 못한다. 기다림이 0.3초 뒤 끝나야 첫 스레드가 쓰고 잠금을 푼다.</p>
-</details></section>
+</ul></details><p data-content-kind="action"><code>synchronized</code> 지갑 테스트는 0.3초쯤 걸린다. 잠금을 쥔 스레드가 틈에서 다른 스레드를 기다리지만, 다른 스레드는 잠금 때문에 틈에 오지 못한다. 기다림이 0.3초 뒤 끝나야 첫 스레드가 쓰고 잠금을 푼다.</p></section>
+<details class="exercise-context-links" data-content-kind="practice"><summary>실행 위치·연결 일자·이전 연습</summary><nav class="course-exercise-nav exercise-return" aria-label="연습에서 일정으로 돌아가기"><p class="exercise-return-links" data-content-kind="reference">이 연습을 쓰는 날: <a href="../spring/D07.html#오늘-순서">D07 · 포인트·쿠폰 상점</a></p><p data-content-kind="reference"><a href="J06.html">← 이전 J06</a> · <a href="J08.html">다음 J08 →</a></p></nav><p data-content-kind="practice">Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p></details>
 
 
-<section class="exercise-section" aria-labelledby="기본기-반복"><h2 id="기본기-반복"><a class="anchor" href="#기본기-반복" aria-hidden="true">#</a>기본기 반복</h2><p>회원별 포인트 이력을 <code>Map&lt;Long, List&lt;PointEntry&gt;&gt;</code>로 묶고, 묶은 것으로 회원별 잔액을 계산한다. J05의 <code>computeIfAbsent</code>를 기본기로 다시 쓴다.</p><pre><code class="language-java">/** 회원 id별로 이력을 묶는다. 한 회원의 목록은 들어온 순서를 지킨다. */
+<section class="exercise-section" aria-labelledby="상황" data-content-kind="guide" data-section-original-hidden="false" data-section-panel="" id="section-panel-2"><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span><h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2><p data-content-kind="guide">D07은 포인트·쿠폰 상점을 만드는 날이다. ① 포인트를 적립할 때 "잔액을 읽어 더한 뒤 저장"하면 동시 적립에서 갱신이 사라지므로 <code>UPDATE … SET point_balance = point_balance + ?</code>로 바꾼다. ④ 쿠폰 발급 버튼을 연타하면 "이미 받았나" 조회가 두 요청 모두 통과한다.
+오늘은 DB 없이 같은 사고를 순수 Java로 재현한다. 두 스레드가 같은 잔액을 읽게 만들어 적립 하나가 사라지는 것을 확실히 보고, <code>synchronized</code>와 <code>AtomicInteger</code>로 고친다. 여러 스레드가 함께 쓰는 <code>Map</code>·<code>Set</code>도 같은 원리로 고른다.</p></section>
+
+<section class="exercise-section" aria-labelledby="빠른-연상" data-content-kind="guide" data-section-original-hidden="false" data-section-panel="" id="section-panel-3"><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span><h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2><figure class="code-block"><figcaption class="code-toolbar"><span>코드</span><button type="button" data-copy-target="content-code-2">코드 복사</button><span class="copy-status" role="status" aria-live="polite"></span></figcaption><pre data-content-kind="guide" id="content-code-2"><code>스레드 A: 잔액 읽기(0) ─────────────── 0+10 쓰기 → 10
+스레드 B:        잔액 읽기(0) ── 0+10 쓰기 → 10        결과 10 (20이어야 한다)</code></pre></figure><div class="table-wrap"><table data-content-kind="guide">
+<thead>
+<tr>
+<th scope="col"></th>
+<th scope="col">이전 (<code>LeakyPointWallet</code>)</th>
+<th scope="col"><code>synchronized</code></th>
+<th scope="col"><code>AtomicInteger</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>방법</td>
+<td>읽고 → 더해서 쓰기</td>
+<td>한 번에 한 스레드만 메서드 안에 들어온다(잠금)</td>
+<td>읽은 값이 <strong>그대로일 때만</strong> 바꾼다(<code>compareAndSet</code>), 실패하면 다시 읽는다</td>
+</tr>
+<tr>
+<td>기다림</td>
+<td>없다(대신 손실)</td>
+<td>다른 스레드는 입구에서 기다린다</td>
+<td>기다리지 않고 다시 시도한다</td>
+</tr>
+<tr>
+<td>DB로 치면</td>
+<td><code>SELECT</code> 후 <code>UPDATE … SET balance = 읽은값+10</code></td>
+<td><code>SELECT … FOR UPDATE</code>(비관적 잠금)</td>
+<td><code>UPDATE … WHERE balance = 읽은값</code>(낙관적 갱신)</td>
+</tr>
+<tr>
+<td>board-server가 쓴 방법</td>
+<td></td>
+<td></td>
+<td>한 문장 <code>UPDATE … SET balance = balance + ?</code></td>
+</tr>
+</tbody></table></div><p data-content-kind="guide">JS는 한 스레드에서 돌아서 <code>balance += 10</code> 사이에 다른 코드가 끼지 않는다. Java 서버는 요청마다 다른 스레드가 같은 객체(싱글톤 빈)를 동시에 쓴다.</p><p data-content-kind="guide">흔한 착각: "<code>balance += 10</code>은 한 줄이니 한 번에 일어난다". 컴파일되면 읽기·더하기·쓰기 세 단계다. 그 사이에 다른 스레드가 끼어들 수 있다. 테스트에서 잘 안 터지는 것은 틈이 아주 짧기 때문이다. 그래서 오늘은 틈을 일부러 벌려 매번 터지게 한다.</p></section>
+
+
+
+
+
+
+
+<div class="exercise-support-grid"><section class="exercise-section" aria-labelledby="기본기-반복" data-content-kind="practice" data-section-original-hidden="false" data-section-panel="" id="section-panel-4"><span class="content-kind " data-kind-label="practice"><span aria-hidden="true">▷</span> 실습<small>실행하고 관찰</small></span><h2 id="기본기-반복"><a class="anchor" href="#기본기-반복" aria-hidden="true">#</a>기본기 반복</h2><p data-content-kind="practice">회원별 포인트 이력을 <code>Map&lt;Long, List&lt;PointEntry&gt;&gt;</code>로 묶고, 묶은 것으로 회원별 잔액을 계산한다. J05의 <code>computeIfAbsent</code>를 기본기로 다시 쓴다.</p><figure class="code-block"><figcaption class="code-toolbar"><span>코드</span><button type="button" data-copy-target="content-code-3">코드 복사</button><span class="copy-status" role="status" aria-live="polite"></span></figcaption><pre data-content-kind="practice" id="content-code-3"><code class="language-java">/** 회원 id별로 이력을 묶는다. 한 회원의 목록은 들어온 순서를 지킨다. */
 public static Map&lt;Long, List&lt;PointEntry&gt;&gt; groupByMember(List&lt;PointEntry&gt; entries)
 /** 묶인 이력으로 회원별 잔액(amount 합)을 구한다. */
-public static Map&lt;Long, Long&gt; balances(Map&lt;Long, List&lt;PointEntry&gt;&gt; entriesByMember)</code></pre><p><code>Map</code>을 돌 때는 <code>entrySet()</code>으로 키와 값을 함께 꺼낸다.</p><p>테스트 — <code>J07BasicsTest</code>:</p><ul>
+public static Map&lt;Long, Long&gt; balances(Map&lt;Long, List&lt;PointEntry&gt;&gt; entriesByMember)</code></pre></figure><p data-content-kind="practice"><code>Map</code>을 돌 때는 <code>entrySet()</code>으로 키와 값을 함께 꺼낸다.</p><p data-content-kind="practice">테스트 — <code>J07BasicsTest</code>:</p><details class="exercise-test-index"><summary>확인할 테스트 이름 3개</summary><ul data-content-kind="practice">
 <li><code>회원별로_이력을_묶고_각_목록은_들어온_순서를_지킨다</code></li>
 <li><code>회원별_잔액은_적립과_사용을_더한_값이다</code></li>
 <li><code>이력이_없으면_빈_Map이다</code></li>
-</ul></section>
-
-
-
-
-
-<section class="exercise-section" aria-labelledby="타입-한-컷"><h2 id="타입-한-컷"><a class="anchor" href="#타입-한-컷" aria-hidden="true">#</a>타입 한 컷</h2><p><code>boolean</code> vs <code>Boolean</code>, <code>is</code> 접두어와 JSON 직렬화 — 응답 필드 이름이 바뀌는 문제.</p><div class="table-wrap"><table>
+</ul></details></section><section class="exercise-section" aria-labelledby="타입-한-컷" data-content-kind="practice" data-section-original-hidden="false" data-section-panel="" id="section-panel-5"><span class="content-kind " data-kind-label="practice"><span aria-hidden="true">▷</span> 실습<small>실행하고 관찰</small></span><h2 id="타입-한-컷"><a class="anchor" href="#타입-한-컷" aria-hidden="true">#</a>타입 한 컷</h2><p data-content-kind="practice"><code>boolean</code> vs <code>Boolean</code>, <code>is</code> 접두어와 JSON 직렬화 — 응답 필드 이름이 바뀌는 문제.</p><div class="table-wrap"><table data-content-kind="practice">
 <thead>
 <tr>
-<th></th>
-<th><code>boolean</code></th>
-<th><code>Boolean</code></th>
+<th scope="col"></th>
+<th scope="col"><code>boolean</code></th>
+<th scope="col"><code>Boolean</code></th>
 </tr>
 </thead>
 <tbody><tr>
@@ -209,12 +243,12 @@ public static Map&lt;Long, Long&gt; balances(Map&lt;Long, List&lt;PointEntry&gt;
 <td><code>isExpired()</code> (접두어를 겹치지 않는다)</td>
 <td><code>getIsExpired()</code></td>
 </tr>
-</tbody></table></div><p>JSON 라이브러리(Jackson)는 필드가 아니라 <strong>getter 이름</strong>으로 응답 이름을 정한다. <code>isExpired()</code>는 <code>expired</code>, <code>getIsExpired()</code>는 <code>isExpired</code>로 나간다.</p><div class="table-wrap"><table>
+</tbody></table></div><p data-content-kind="practice">JSON 라이브러리(Jackson)는 필드가 아니라 <strong>getter 이름</strong>으로 응답 이름을 정한다. <code>isExpired()</code>는 <code>expired</code>, <code>getIsExpired()</code>는 <code>isExpired</code>로 나간다.</p><div class="table-wrap"><table data-content-kind="practice">
 <thead>
 <tr>
-<th>필드 선언</th>
-<th>Lombok이 만든 getter</th>
-<th>응답 JSON 이름</th>
+<th scope="col">필드 선언</th>
+<th scope="col">Lombok이 만든 getter</th>
+<th scope="col">응답 JSON 이름</th>
 </tr>
 </thead>
 <tbody><tr>
@@ -242,40 +276,24 @@ public static Map&lt;Long, Long&gt; balances(Map&lt;Long, List&lt;PointEntry&gt;
 <td><code>getAutoRenew()</code></td>
 <td><code>autoRenew</code></td>
 </tr>
-</tbody></table></div><p>함정 두 가지:</p><ol>
-<li><code>boolean isExpired</code>로 이름 지으면 응답에는 <code>expired</code>로 나간다. 프런트엔드가 <code>response.isExpired</code>를 읽으면 <code>undefined</code>다.</li>
-<li>나중에 null을 담으려고 타입만 <code>Boolean</code>으로 바꾸면 getter가 <code>getIsExpired()</code>가 되어 응답 이름이 <code>isExpired</code>로 바뀐다. 코드 한 글자 안 바꾼 클라이언트가 깨진다.</li>
-</ol><p>그래서 boolean 필드는 <code>is</code>를 붙이지 않고 <code>expired</code>처럼 짓는다. record는 구성 요소 이름이 그대로 응답 이름이 된다(Jackson 2.18·3.1에서 <code>record R(boolean isUsed)</code> → <code>"isUsed"</code> 확인).</p><p>이 모듈에는 Jackson이 없어서, 같은 이름 규칙을 쓰는 JDK의 <code>java.beans.Introspector</code>로 확인한다. 위 표의 getter 모양에서는 Jackson(2.18·3.1)과 Introspector의 결과가 같다. 다만 <code>Boolean</code>을 돌려주는 <code>isX()</code>를 손으로 쓰면 Jackson은 <code>x</code>로 내보내고 Introspector는 프로퍼티로 보지 않는다. 라이브러리마다 다르니 그런 getter는 만들지 않는다.</p><p>약어도 하나 본다. <code>boolean isURL</code>의 getter는 <code>isURL()</code>이고, "is"를 뗀 <code>URL</code>은 앞 두 글자가 모두 대문자라 첫 글자를 소문자로 바꾸지 않는다(<code>Introspector.decapitalize</code> 규칙). 응답 이름은 <code>uRL</code>이 아니라 <code>URL</code>이다.</p><p>기본 과제: 관찰. 주어진 delombok 코드(<code>LombokCouponResponse</code>·<code>WrapperExpiredResponse</code>·<code>AcronymFlagResponse</code>)를 <code>Introspector</code>로 읽어 위 표가 맞는지 확인한다. 이 테스트들은 처음부터 통과한다 — 읽고 왜 그런지 설명할 수 있으면 된다.</p><p>선택 과제: <code>JsonNames.jsonName(Field)</code>로 이름 규칙을 직접 구현한다. 기본형 <code>boolean</code>이고 이름이 "is" + 대문자로 시작하면 "is"를 떼고 <code>decapitalize</code> 규칙(앞 두 글자가 모두 대문자면 그대로, 아니면 첫 글자만 소문자)을 적용한다. 아니면 필드 이름 그대로다. <code>jsonNames(Class)</code>는 인스턴스 필드마다 모은다. <code>getDeclaredFields()</code>는 선언 순서를 보장하지 않으므로 순서는 정하지 않는다(테스트도 순서 없이 비교한다). 여기서 다루는 getter 모양에 한한 규칙이다(Lombok이 <code>xIndex</code> 같은 이름에 만드는 getter까지 다루지 않는다).</p><p>확인 테스트 — <code>J07TypeCutTest</code> (기본, 관찰):</p><ul>
+</tbody></table></div><p data-content-kind="practice">함정 두 가지:</p><ol class="visual-procedure" data-visual-pattern="procedure" data-content-kind="practice">
+<li data-sequence="1"><code>boolean isExpired</code>로 이름 지으면 응답에는 <code>expired</code>로 나간다. 프런트엔드가 <code>response.isExpired</code>를 읽으면 <code>undefined</code>다.</li>
+<li data-sequence="2">나중에 null을 담으려고 타입만 <code>Boolean</code>으로 바꾸면 getter가 <code>getIsExpired()</code>가 되어 응답 이름이 <code>isExpired</code>로 바뀐다. 코드 한 글자 안 바꾼 클라이언트가 깨진다.</li>
+</ol><p data-content-kind="practice">그래서 boolean 필드는 <code>is</code>를 붙이지 않고 <code>expired</code>처럼 짓는다. record는 구성 요소 이름이 그대로 응답 이름이 된다(Jackson 2.18·3.1에서 <code>record R(boolean isUsed)</code> → <code>"isUsed"</code> 확인).</p><p data-content-kind="practice">이 모듈에는 Jackson이 없어서, 같은 이름 규칙을 쓰는 JDK의 <code>java.beans.Introspector</code>로 확인한다. 위 표의 getter 모양에서는 Jackson(2.18·3.1)과 Introspector의 결과가 같다. 다만 <code>Boolean</code>을 돌려주는 <code>isX()</code>를 손으로 쓰면 Jackson은 <code>x</code>로 내보내고 Introspector는 프로퍼티로 보지 않는다. 라이브러리마다 다르니 그런 getter는 만들지 않는다.</p><p data-content-kind="practice">약어도 하나 본다. <code>boolean isURL</code>의 getter는 <code>isURL()</code>이고, "is"를 뗀 <code>URL</code>은 앞 두 글자가 모두 대문자라 첫 글자를 소문자로 바꾸지 않는다(<code>Introspector.decapitalize</code> 규칙). 응답 이름은 <code>uRL</code>이 아니라 <code>URL</code>이다.</p><p data-content-kind="practice">기본 과제: 관찰. 주어진 delombok 코드(<code>LombokCouponResponse</code>·<code>WrapperExpiredResponse</code>·<code>AcronymFlagResponse</code>)를 <code>Introspector</code>로 읽어 위 표가 맞는지 확인한다. 이 테스트들은 처음부터 통과한다 — 읽고 왜 그런지 설명할 수 있으면 된다.</p><p data-content-kind="practice">선택 과제: <code>JsonNames.jsonName(Field)</code>로 이름 규칙을 직접 구현한다. 기본형 <code>boolean</code>이고 이름이 "is" + 대문자로 시작하면 "is"를 떼고 <code>decapitalize</code> 규칙(앞 두 글자가 모두 대문자면 그대로, 아니면 첫 글자만 소문자)을 적용한다. 아니면 필드 이름 그대로다. <code>jsonNames(Class)</code>는 인스턴스 필드마다 모은다. <code>getDeclaredFields()</code>는 선언 순서를 보장하지 않으므로 순서는 정하지 않는다(테스트도 순서 없이 비교한다). 여기서 다루는 getter 모양에 한한 규칙이다(Lombok이 <code>xIndex</code> 같은 이름에 만드는 getter까지 다루지 않는다).</p><p data-content-kind="practice">확인 테스트 — <code>J07TypeCutTest</code> (기본, 관찰):</p><details class="exercise-test-index"><summary>확인할 테스트 이름 4개</summary><ul data-content-kind="practice">
 <li><code>함정_boolean_필드를_isExpired로_지으면_응답_필드는_expired가_된다</code></li>
 <li><code>함정_null을_담으려고_Boolean으로만_바꿔도_getIsExpired가_되어_응답_이름이_isExpired로_바뀐다</code></li>
 <li><code>is_다음이_소문자면_접두어가_아니라_issued는_그대로다</code></li>
 <li><code>약어는_첫_글자를_소문자로_바꾸지_않아_isURL은_URL이_된다</code></li>
-</ul><p>선택 과제 테스트(<code>@Tag("optional")</code>, <code>./gradlew :java-track:optionalTest --tests 'J07*'</code>):</p><ul>
+</ul></details><p data-content-kind="practice">선택 과제 테스트(<code>@Tag("optional")</code>, <code>./gradlew :java-track:optionalTest --tests 'J07*'</code>):</p><ul data-content-kind="practice">
 <li><code>선택_getter_이름_규칙대로_필드마다_응답_이름을_구한다</code> (<code>Introspector</code>가 찾은 이름과 순서 없이 같은지도 본다)</li>
 <li><code>선택_jsonName은_boolean의_is_접두어만_떼고_래퍼와_소문자는_그대로_둔다</code></li>
 <li><code>선택_jsonName은_약어를_JavaBeans_규칙대로_URL로_남긴다</code></li>
-</ul></section>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<section class="exercise-section" aria-labelledby="실무-습관"><h2 id="실무-습관"><a class="anchor" href="#실무-습관" aria-hidden="true">#</a>실무 습관</h2><p>Map 함정 두 가지.</p><div class="table-wrap"><table>
+</ul></section><section class="exercise-section" aria-labelledby="실무-습관" data-content-kind="practice" data-section-original-hidden="false" data-section-panel="" id="section-panel-6"><span class="content-kind " data-kind-label="practice"><span aria-hidden="true">▷</span> 실습<small>실행하고 관찰</small></span><h2 id="실무-습관"><a class="anchor" href="#실무-습관" aria-hidden="true">#</a>실무 습관</h2><p data-content-kind="practice">Map 함정 두 가지.</p><div class="table-wrap"><table data-content-kind="practice">
 <thead>
 <tr>
-<th>함정</th>
-<th>터지는 모양</th>
-<th>고치는 법</th>
+<th scope="col">함정</th>
+<th scope="col">터지는 모양</th>
+<th scope="col">고치는 법</th>
 </tr>
 </thead>
 <tbody><tr>
@@ -288,28 +306,50 @@ public static Map&lt;Long, Long&gt; balances(Map&lt;Long, List&lt;PointEntry&gt;
 <td>넣은 순서도 키 순서도 약속하지 않는다. 데이터가 바뀌면 순서도 바뀐다</td>
 <td>넣은 순서: <code>LinkedHashMap</code>, 키 순서: <code>TreeMap</code></td>
 </tr>
-</tbody></table></div><p><code>toMap(키, 값)</code>은 어떤 <code>Map</code>을 돌려줄지 약속하지 않는다(API 문서에 종류·순서·가변 여부 보장이 없다. 지금 JDK는 <code>HashMap</code>을 준다). 순서가 필요하면 네 번째 인자로 <code>LinkedHashMap::new</code>처럼 원하는 <code>Map</code>을 직접 넘긴다.</p><p>과제: <code>NicknameIndex</code>를 채운다. 닉네임 중복 검사가 생기기 전의 옛 데이터라 같은 닉네임이 섞여 있다. 먼저 나온 회원의 id를 남기고, 닉네임이 처음 나온 순서를 지킨다. <code>sortedById</code>는 id 오름차순으로 도는 <code>Map</code>을 돌려준다.</p><p>테스트 — <code>J07HabitTest</code>:</p><ul>
+</tbody></table></div><p data-content-kind="practice"><code>toMap(키, 값)</code>은 어떤 <code>Map</code>을 돌려줄지 약속하지 않는다(API 문서에 종류·순서·가변 여부 보장이 없다. 지금 JDK는 <code>HashMap</code>을 준다). 순서가 필요하면 네 번째 인자로 <code>LinkedHashMap::new</code>처럼 원하는 <code>Map</code>을 직접 넘긴다.</p><p data-content-kind="practice">과제: <code>NicknameIndex</code>를 채운다. 닉네임 중복 검사가 생기기 전의 옛 데이터라 같은 닉네임이 섞여 있다. 먼저 나온 회원의 id를 남기고, 닉네임이 처음 나온 순서를 지킨다. <code>sortedById</code>는 id 오름차순으로 도는 <code>Map</code>을 돌려준다.</p><p data-content-kind="practice">테스트 — <code>J07HabitTest</code>:</p><details class="exercise-test-index"><summary>확인할 테스트 이름 4개</summary><ul data-content-kind="practice">
 <li><code>함정_toMap은_같은_키가_두_번_나오면_IllegalStateException이다</code></li>
 <li><code>같은_닉네임이면_먼저_나온_회원의_id를_남긴다</code></li>
 <li><code>결과를_돌면_닉네임이_처음_나온_순서대로_나온다</code></li>
 <li><code>id_오름차순으로_도는_Map을_돌려준다</code></li>
-</ul></section>
+</ul></details></section></div>
 
 
 
 
 
 
-<section class="exercise-section" aria-labelledby="확인"><h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2><pre><code class="language-bash">./gradlew :java-track:test --tests 'J07*'</code></pre><p>18개가 모두 <code>PASSED</code>면 끝이다(타입 한 컷의 관찰 테스트 4개는 처음부터 초록이다. <code>JsonNames</code> 선택 과제 테스트는 이 실행에서 빠진다).</p><p>선택 과제는 따로 돌린다(기본 완료 조건에는 들어가지 않는다):</p><pre><code class="language-bash">./gradlew :java-track:optionalTest --tests 'J07*'</code></pre><p>3개가 모두 <code>PASSED</code>면 선택 과제도 끝이다.</p></section>
 
 
 
 
 
-<section class="exercise-section" aria-labelledby="정답"><h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>정답</h2><details>
-<summary>펼치기</summary>
 
-<pre><code class="language-java">// SynchronizedPointWallet
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<section class="exercise-section" aria-labelledby="확인" data-content-kind="check" data-section-original-hidden="false" data-section-panel="" id="section-panel-7"><span class="content-kind " data-kind-label="check"><span aria-hidden="true">✓</span> 확인<small>끝났는지 판단</small></span><h2 id="확인"><a class="anchor" href="#확인" aria-hidden="true">#</a>확인</h2><figure class="code-block"><figcaption class="code-toolbar"><span>코드</span><button type="button" data-copy-target="content-code-4">코드 복사</button><span class="copy-status" role="status" aria-live="polite"></span></figcaption><pre data-content-kind="check" id="content-code-4"><code class="language-bash">./gradlew :java-track:test --tests 'J07*'</code></pre></figure><p data-content-kind="check">18개가 모두 <code>PASSED</code>면 끝이다(타입 한 컷의 관찰 테스트 4개는 처음부터 초록이다. <code>JsonNames</code> 선택 과제 테스트는 이 실행에서 빠진다).</p><p data-content-kind="check">선택 과제는 따로 돌린다(기본 완료 조건에는 들어가지 않는다):</p><figure class="code-block"><figcaption class="code-toolbar"><span>코드</span><button type="button" data-copy-target="content-code-5">코드 복사</button><span class="copy-status" role="status" aria-live="polite"></span></figcaption><pre data-content-kind="check" id="content-code-5"><code class="language-bash">./gradlew :java-track:optionalTest --tests 'J07*'</code></pre></figure><p data-content-kind="check">3개가 모두 <code>PASSED</code>면 선택 과제도 끝이다.</p></section>
+
+
+
+
+
+<section class="exercise-section" aria-labelledby="정답" data-content-kind="example" data-section-original-hidden="false" data-section-panel="" id="section-panel-8"><span class="content-kind " data-kind-label="example"><span aria-hidden="true">{ }</span> 구현 예시<small>내 구현과 비교</small></span><h2 id="정답"><a class="anchor" href="#정답" aria-hidden="true">#</a>구현 예시</h2><details data-content-kind="example"><summary>펼치기<span class="disclosure-chevron" aria-hidden="true">▸</span></summary><div class="disclosure-body">
+
+
+<figure class="code-block"><figcaption class="code-toolbar"><span>코드</span><button type="button" data-copy-target="content-code-6">코드 복사</button><span class="copy-status" role="status" aria-live="polite"></span></figcaption><pre data-content-kind="example" id="content-code-6"><code class="language-java">// SynchronizedPointWallet
 public synchronized void earn(int amount) {
     // 이 객체의 잠금을 쥔 스레드 하나만 들어온다. 다른 스레드는 잠금이 풀릴 때까지 메서드 입구에서 기다린다
     int current = balance;
@@ -319,8 +359,8 @@ public synchronized void earn(int amount) {
 
 public synchronized int balance() {
     return balance;
-}</code></pre>
-<pre><code class="language-java">// AtomicPointWallet
+}</code></pre></figure>
+<figure class="code-block"><figcaption class="code-toolbar"><span>코드</span><button type="button" data-copy-target="content-code-7">코드 복사</button><span class="copy-status" role="status" aria-live="polite"></span></figcaption><pre data-content-kind="example" id="content-code-7"><code class="language-java">// AtomicPointWallet
 private final AtomicInteger balance = new AtomicInteger(0);
 
 public AtomicPointWallet(Runnable betweenReadAndWrite) {
@@ -340,9 +380,9 @@ public void earn(int amount) {
 
 public int balance() {
     return balance.get();
-}</code></pre>
-<p>틈이 없다면 <code>balance.addAndGet(amount)</code> 한 줄이 같은 결과를 원자적으로 낸다. 오늘은 틈을 거쳐야 해서 되풀이를 직접 썼다.</p>
-<pre><code class="language-java">// MemberPoints
+}</code></pre></figure>
+<p data-content-kind="example">틈이 없다면 <code>balance.addAndGet(amount)</code> 한 줄이 같은 결과를 원자적으로 낸다. 오늘은 틈을 거쳐야 해서 되풀이를 직접 썼다.</p>
+<figure class="code-block"><figcaption class="code-toolbar"><span>코드</span><button type="button" data-copy-target="content-code-8">코드 복사</button><span class="copy-status" role="status" aria-live="polite"></span></figcaption><pre data-content-kind="example" id="content-code-8"><code class="language-java">// MemberPoints
 public void earn(long memberId, long amount) {
     // ConcurrentHashMap.merge는 "읽고 합쳐서 쓰기"를 그 키에 대해 한 번에(원자적으로) 한다.
     // get으로 읽고 put으로 쓰면 그 사이에 다른 스레드가 끼어 LeakyPointWallet과 같은 손실이 난다
@@ -361,8 +401,8 @@ public boolean issue(long memberId) {
 
 public int issuedCount() {
     return issuedMemberIds.size();
-}</code></pre>
-<pre><code class="language-java">// PointBasics
+}</code></pre></figure>
+<figure class="code-block"><figcaption class="code-toolbar"><span>코드</span><button type="button" data-copy-target="content-code-9">코드 복사</button><span class="copy-status" role="status" aria-live="polite"></span></figcaption><pre data-content-kind="example" id="content-code-9"><code class="language-java">// PointBasics
 public static Map&lt;Long, List&lt;PointEntry&gt;&gt; groupByMember(List&lt;PointEntry&gt; entries) {
     Map&lt;Long, List&lt;PointEntry&gt;&gt; byMember = new HashMap&lt;&gt;();
     for (PointEntry entry : entries) {
@@ -381,8 +421,8 @@ public static Map&lt;Long, Long&gt; balances(Map&lt;Long, List&lt;PointEntry&gt;
         balances.put(member.getKey(), sum);
     }
     return balances;
-}</code></pre>
-<pre><code class="language-java">// JsonNames (선택 과제)
+}</code></pre></figure>
+<figure class="code-block"><figcaption class="code-toolbar"><span>코드</span><button type="button" data-copy-target="content-code-10">코드 복사</button><span class="copy-status" role="status" aria-live="polite"></span></figcaption><pre data-content-kind="example" id="content-code-10"><code class="language-java">// JsonNames (선택 과제)
 public static String jsonName(Field field) {
     String name = field.getName();
     // boolean.class는 기본형, Boolean.class는 래퍼. 래퍼 필드의 getter는 getIsHidden()이라 이름이 그대로 남는다
@@ -410,8 +450,8 @@ public static List&lt;String&gt; jsonNames(Class&lt;?&gt; type) {
         }
     }
     return names;
-}</code></pre>
-<pre><code class="language-java">// NicknameIndex
+}</code></pre></figure>
+<figure class="code-block"><figcaption class="code-toolbar"><span>코드</span><button type="button" data-copy-target="content-code-11">코드 복사</button><span class="copy-status" role="status" aria-live="polite"></span></figcaption><pre data-content-kind="example" id="content-code-11"><code class="language-java">// NicknameIndex
 public static Map&lt;String, Long&gt; firstIdByNickname(List&lt;MemberRow&gt; rows) {
     return rows.stream().collect(Collectors.toMap(
             MemberRow::nickname,
@@ -425,35 +465,1115 @@ public static Map&lt;String, Long&gt; firstIdByNickname(List&lt;MemberRow&gt; ro
 public static Map&lt;Long, Long&gt; sortedById(Map&lt;Long, Long&gt; balances) {
     // TreeMap은 키를 정렬해 담는다
     return new TreeMap&lt;&gt;(balances);
-}</code></pre>
-<p>왜 이렇게 쓰나:</p>
-<ol>
+}</code></pre></figure>
+<p data-content-kind="example">왜 이렇게 쓰나:</p>
+<ol data-content-kind="example">
 <li>여러 스레드가 함께 쓰는 값은 "읽고 → 계산하고 → 쓰기"가 끊기지 않게 한다. 잠그거나(<code>synchronized</code>), 읽은 값이 그대로일 때만 바꾸거나(<code>compareAndSet</code>), 그 일을 한 번에 해 주는 API(<code>merge</code>, <code>Set.add</code>)를 쓴다. DB에서는 같은 일을 한 문장 <code>UPDATE … SET x = x + ?</code>와 UNIQUE 제약이 한다.</li>
 <li>응답 DTO의 boolean 필드는 <code>is</code>를 붙이지 않고 짓는다. getter 이름이 응답 이름을 정하므로, 필드 이름이나 타입(<code>boolean</code> ↔ <code>Boolean</code>)만 바꿔도 API가 바뀔 수 있다.</li>
 <li><code>toMap</code>에는 중복 키를 어떻게 합칠지와 어떤 <code>Map</code>에 담을지를 적어 둔다. 순서가 의미 있는 결과를 <code>HashMap</code>에 담지 않는다.</li>
 </ol>
-</details></section>
+</div></details></section>
 
 
-<section class="exercise-section" aria-labelledby="오늘-spring에서-다시-만나는-곳"><h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2><ul>
-<li>D02 ③ <code>board-server/src/main/java/com/example/board/config/BoardProperties.java</code> — <code>record ForbiddenWords(@NotNull Boolean ignoreCase)</code>. 설정을 빠뜨리면 <code>boolean</code>은 조용히 false가 되지만, <code>Boolean</code>은 null이 되어 <code>@NotNull</code>이 기동을 막는다.</li>
-<li>D02 ④ <code>board-server/src/main/java/com/example/board/common/ForbiddenWordChecker.java</code> — 싱글톤 빈이라 모든 요청 스레드가 같은 객체를 쓴다. 요청마다 바뀌는 필드를 두지 않고, 금칙어 집합은 <code>volatile</code> 필드에 불변 <code>Set</code>을 통째로 바꿔 끼운다.</li>
-<li>D03 ① <code>board-server/src/main/java/com/example/board/config/ProblemDetailSecurityHandler.java</code> — 401·403 응답 본문을 <code>new LinkedHashMap&lt;&gt;()</code>에 담는다. JSON 필드가 넣은 순서(<code>type</code>, <code>title</code>, <code>status</code>…)대로 나간다.</li>
-<li>D05 ② <code>board-server/src/main/java/com/example/board/post/PostPatchRequest.java</code> — <code>@AssertTrue public boolean isAnyFieldPresent()</code>. <code>is</code>로 시작하는 boolean 메서드라 JavaBeans getter 규칙에 맞는다. Bean Validation은 메서드 검증 애노테이션을 getter에 붙였을 때 프로퍼티로 보고 검사한다(<code>checkAnyField()</code>처럼 getter 규칙에 맞지 않는 이름이면 빈 검증 대상이 아니다).</li>
-<li>D07 ① <code>board-server/src/main/java/com/example/board/point/PointService.java</code> — <code>earn</code>이 <code>memberRepository.addBalance(memberId, amount)</code>(한 문장 <code>UPDATE … SET pointBalance = pointBalance + :amount</code>)로 더한다. 오늘 <code>LeakyPointWallet</code>의 "읽고 더해 쓰기"를 DB가 한 번에 하게 바꾼 것이다.</li>
-<li>D07 ③ <code>board-server/src/main/java/com/example/board/coupon/CouponRepository.java</code> — 발급 수량을 <code>issued_quantity &lt; total_quantity</code>일 때만 올리고 영향 행 수로 판정한다. <code>compareAndSet</code>처럼 "조건이 맞을 때만 바꾸고, 바뀌었는지로 판단"한다.</li>
-<li>D07 ④ <code>board-server/src/main/java/com/example/board/coupon/CouponService.java</code> — 1인 1매를 UNIQUE(<code>coupon_id</code>, <code>member_id</code>) 위반으로 막고 409로 바꾼다. 오늘 <code>Set.add</code>가 false를 돌려주는 것과 같은 판단을 DB 제약이 한다.</li>
-<li>D09 ⑤ <code>board-server/src/main/java/com/example/board/point/ActivityRankingService.java</code> — <code>Collectors.toMap(Member::getId, Member::getNickname)</code>. 키가 회원 id라 중복이 없으므로 합치는 함수 없이 쓴다. 키가 닉네임이었다면 오늘의 함정에 걸린다.</li>
-</ul></section>
+<section class="exercise-section" aria-labelledby="오늘-spring에서-다시-만나는-곳" data-content-kind="reference" data-section-original-hidden="false" data-section-panel="" id="section-panel-9"><span class="content-kind " data-kind-label="reference"><span aria-hidden="true">↗</span> 참고<small>필요할 때 찾기</small></span><h2 id="오늘-spring에서-다시-만나는-곳"><a class="anchor" href="#오늘-spring에서-다시-만나는-곳" aria-hidden="true">#</a>오늘 Spring에서 다시 만나는 곳</h2><details class="exercise-file-reference"><summary>Spring 연결 파일 8개 · 경로·역할·비교 확인</summary><section class="content-visual visual-files" data-content-kind="example" data-visual-pattern="files"><span class="content-kind " data-kind-label="example"><span aria-hidden="true">{ }</span> 구현 예시<small>내 구현과 비교</small></span><h3 class="visual-title">Java 연습과 Spring 구현의 연결</h3><div class="visual-file-grid"><article class="visual-file"><header><span class="file-index">01</span><span class="file-day">D02 ③</span><span class="file-layer" data-file-layer="entity">도메인·공통</span></header><h4>BoardProperties.java</h4><code class="file-path">board-server/src/main/java/com/example/board/config/BoardProperties.java</code><p class="file-role" data-content-kind="example"><code>record ForbiddenWords(@NotNull Boolean ignoreCase)</code>.</p><div class="file-concepts"><code>boolean</code><code>Boolean</code><code>@NotNull</code></div><ul class="file-points" data-content-kind="example"><li>설정을 빠뜨리면 <code>boolean</code>은 조용히 false가 되지만, <code>Boolean</code>은 null이 되어 <code>@NotNull</code>이 기동을 막는다.</li></ul><p class="file-relation" data-relation="connection" data-content-kind="example"><b>Spring 연결 지점</b></p></article><article class="visual-file"><header><span class="file-index">02</span><span class="file-day">D02 ④</span><span class="file-layer" data-file-layer="entity">도메인·공통</span></header><h4>ForbiddenWordChecker.java</h4><code class="file-path">board-server/src/main/java/com/example/board/common/ForbiddenWordChecker.java</code><p class="file-role" data-content-kind="example">싱글톤 빈이라 모든 요청 스레드가 같은 객체를 쓴다.</p><div class="file-concepts"><code>volatile</code><code>Set</code></div><ul class="file-points" data-content-kind="example"><li>요청마다 바뀌는 필드를 두지 않고, 금칙어 집합은 <code>volatile</code> 필드에 불변 <code>Set</code>을 통째로 바꿔 끼운다.</li></ul><p class="file-relation" data-relation="connection" data-content-kind="example"><b>Spring 연결 지점</b></p></article><article class="visual-file"><header><span class="file-index">03</span><span class="file-day">D03 ①</span><span class="file-layer" data-file-layer="entity">도메인·공통</span></header><h4>ProblemDetailSecurityHandler.java</h4><code class="file-path" data-file-layer="controller">board-server/src/main/java/com/example/board/config/ProblemDetailSecurityHandler.java</code><p class="file-role" data-content-kind="example"><span data-http-status="401" class="semantic-http-status">401</span>·<span data-http-status="403" class="semantic-http-status">403</span> 응답 본문을 <code>new LinkedHashMap&lt;&gt;()</code>에 담는다.</p><div class="file-concepts"><code>new LinkedHashMap&lt;&gt;()</code><code>type</code><code>title</code><code>status</code></div><ul class="file-points" data-content-kind="example"><li>JSON 필드가 넣은 순서(<code>type</code>, <code>title</code>, <code>status</code>…)대로 나간다.</li></ul><p class="file-relation" data-relation="connection" data-content-kind="example"><b>Spring 연결 지점</b></p></article><article class="visual-file"><header><span class="file-index">04</span><span class="file-day">D05 ②</span><span class="file-layer" data-file-layer="dto">요청 DTO</span></header><h4>PostPatchRequest.java</h4><code class="file-path" data-file-layer="dto">board-server/src/main/java/com/example/board/post/PostPatchRequest.java</code><p class="file-role" data-content-kind="example"><code>@AssertTrue public boolean isAnyFieldPresent()</code>.</p><div class="file-concepts"><code>is</code><code>checkAnyField()</code></div><ul class="file-points" data-content-kind="example"><li><code>is</code>로 시작하는 boolean 메서드라 JavaBeans getter 규칙에 맞는다.</li><li>Bean Validation은 메서드 검증 애노테이션을 getter에 붙였을 때 프로퍼티로 보고 검사한다(<code>checkAnyField()</code>처럼 getter 규칙에 맞지 않는 이름이면 빈 검증 대상이 아니다).</li></ul><p class="file-relation" data-relation="connection" data-content-kind="example"><b>Spring 연결 지점</b></p></article><article class="visual-file"><header><span class="file-index">05</span><span class="file-day">D07 ①</span><span class="file-layer" data-file-layer="service">서비스</span></header><h4>PointService.java</h4><code class="file-path" data-file-layer="service">board-server/src/main/java/com/example/board/point/PointService.java</code><p class="file-role" data-content-kind="example"><code>earn</code>이 <code>memberRepository.addBalance(memberId, amount)</code>(한 문장 <code>UPDATE … SET pointBalance = pointBalance + :amount</code>)로 더한다.</p><div class="file-concepts"><code>earn</code><code>LeakyPointWallet</code></div><ul class="file-points" data-content-kind="example"><li>오늘 <code>LeakyPointWallet</code>의 "읽고 더해 쓰기"를 DB가 한 번에 하게 바꾼 것이다.</li></ul><p class="file-relation" data-relation="connection" data-content-kind="example"><b>Spring 연결 지점</b></p></article><article class="visual-file"><header><span class="file-index">06</span><span class="file-day">D07 ③</span><span class="file-layer" data-file-layer="query">쿼리</span></header><h4>CouponRepository.java</h4><code class="file-path" data-file-layer="repository">board-server/src/main/java/com/example/board/coupon/CouponRepository.java</code><p class="file-role" data-content-kind="example">발급 수량을 <code>issued_quantity &lt; total_quantity</code>일 때만 올리고 영향 행 수로 판정한다.</p><div class="file-concepts"><code>issued_quantity &lt; total_quantity</code><code>compareAndSet</code></div><ul class="file-points" data-content-kind="example"><li><code>compareAndSet</code>처럼 "조건이 맞을 때만 바꾸고, 바뀌었는지로 판단"한다.</li></ul><p class="file-relation" data-relation="connection" data-content-kind="example"><b>Spring 연결 지점</b></p></article><article class="visual-file"><header><span class="file-index">07</span><span class="file-day">D07 ④</span><span class="file-layer" data-file-layer="service">서비스</span></header><h4>CouponService.java</h4><code class="file-path" data-file-layer="service">board-server/src/main/java/com/example/board/coupon/CouponService.java</code><p class="file-role" data-content-kind="example">1인 1매를 UNIQUE(<code>coupon_id</code>, <code>member_id</code>) 위반으로 막고 409로 바꾼다.</p><div class="file-concepts"><code>coupon_id</code><code>member_id</code><code>Set.add</code></div><ul class="file-points" data-content-kind="example"><li>오늘 <code>Set.add</code>가 false를 돌려주는 것과 같은 판단을 DB 제약이 한다.</li></ul><p class="file-relation" data-relation="mixed" data-content-kind="example"><b>같은 점과 다른 점</b><span>중복을 거절하는 판단은 같고, 실제 방어 위치는 Set과 DB UNIQUE로 다릅니다.</span></p></article><article class="visual-file"><header><span class="file-index">08</span><span class="file-day">D09 ⑤</span><span class="file-layer" data-file-layer="service">서비스</span></header><h4>ActivityRankingService.java</h4><code class="file-path" data-file-layer="service">board-server/src/main/java/com/example/board/point/ActivityRankingService.java</code><p class="file-role" data-content-kind="example"><code>Collectors.toMap(Member::getId, Member::getNickname)</code>.</p><ul class="file-points" data-content-kind="example"><li>키가 회원 id라 중복이 없으므로 합치는 함수 없이 쓴다.</li><li>키가 닉네임이었다면 오늘의 함정에 걸린다.</li></ul><p class="file-relation" data-relation="connection" data-content-kind="example"><b>Spring 연결 지점</b></p></article></div></section></details></section>
 
+<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일정으로 돌아가기"><strong>실험 결과를 남겼다면</strong><p class="exercise-return-links" data-content-kind="reference">이 연습을 쓰는 날: <a href="../spring/D07.html#오늘-순서">D07 · 포인트·쿠폰 상점</a></p><p data-content-kind="reference">Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p><p data-content-kind="reference"><a href="J06.html">← 이전 J06</a> · <a href="J08.html">다음 J08 →</a></p><p class="exercise-return-note" data-content-kind="reference">연결된 일자로 돌아가 완료 조건을 확인하고 진행 기록을 남기세요.</p></nav></article></div></div></section>
 
-<nav class="course-exercise-nav exercise-return" aria-label="연습에서 일자로 돌아가기"><strong>실험 결과를 남겼다면</strong><p class="exercise-return-links">이 연습을 쓰는 날: <a href="../spring/D07.html#오늘-순서">D07 · 포인트·쿠폰 상점</a></p><p>Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p><p><a href="J06.html">← 이전 J06</a> · <a href="J08.html">다음 J08 →</a></p><p class="exercise-return-note">연결된 일자로 돌아가 완료 조건을 확인하고 진행 기록을 남기세요.</p></nav></article>
-
-</main>
+</div></div></div></div></main>
 
 
 
 
 
-</body>
-</html>
+<script data-course-initial="">// 과정 v2 화면 동작 — 일자 페이지의 순서 체크·프롬프트 복사·정답 지연 하이라이트, 홈의 "오늘 할 일"과 일자 진도.
+// file://로 열어도 동작하도록 import 없는 일반 스크립트다. 저장소를 못 써도 화면은 그대로 읽힌다.
+(function () {
+  'use strict';
+  var KEY = 'javaexperience.course.progress.v1';
+  var STEP_ID = /^D\d{2}-\d+$/;
+  var CHOICE = /^B(?:12|13|14|15|16)$/;
+  var PREP_ID = /^D11-[1-6]$/;
+
+  function storage() { try { return window.localStorage; } catch (e) { return null; } }
+  // 반환: { ok: 저장소 사용 가능 여부, done: Set(순서 id) }
+  function readProgress(store) {
+    if (!store) return { ok: false, done: new Set() };
+    try {
+      var raw = store.getItem(KEY);
+      var value = raw ? JSON.parse(raw) : null;
+      var done = new Set();
+      if (value && value.version === 1 && value.steps && typeof value.steps === 'object') {
+        Object.keys(value.steps).forEach(function (id) { if (STEP_ID.test(id) && value.steps[id] === true) done.add(id); });
+      }
+      var preparation = {};
+      if (value && value.version === 1) Object.keys(value.preparation || {}).forEach(function(id) { if (PREP_ID.test(id) && value.preparation[id] === true) preparation[id] = true; });
+      return { ok: true, done: done, selectedTicket: value && value.version === 1 && CHOICE.test(value.selectedTicket) ? value.selectedTicket : '', preparation: preparation };
+    } catch (e) { return { ok: false, done: new Set() }; }
+  }
+  function writeProgress(store, done, records) {
+    if (!store) return false;
+    var steps = {};
+    done.forEach(function (id) { steps[id] = true; });
+    var latest = readProgress(store);
+    var value = { version: 1, steps: steps };
+    var selected = records && 'selectedTicket' in records ? records.selectedTicket : latest.selectedTicket;
+    var preparation = records && records.preparation ? records.preparation : latest.preparation;
+    if (CHOICE.test(selected)) value.selectedTicket = selected;
+    if (preparation && Object.keys(preparation).length) value.preparation = preparation;
+    try { store.setItem(KEY, JSON.stringify(value)); return true; } catch (e) { return false; }
+  }
+  // 공통 구현 순서: 선택·연습 티켓만 다루는 추가 순서(extra)를 뺀 나머지. 그날 순서가 모두 추가면 전부 센다.
+  function coreSteps(day) {
+    var core = day.steps.filter(function (s) { return !s.extra; });
+    return core.length ? core : day.steps;
+  }
+  function selectedSteps(day, selectedTicket) {
+    return day.steps.filter(function (s) { return s.extra && selectedTicket && (s.choiceTickets || []).indexOf(selectedTicket) >= 0; });
+  }
+  // 공통 구현에 실제로 선택한 후보의 순서만 더한다.
+  function progressSteps(day, selectedTicket) {
+    var selected = selectedSteps(day, selectedTicket), core = coreSteps(day);
+    return day.steps.filter(function (s) { return core.indexOf(s) >= 0 || selected.indexOf(s) >= 0; });
+  }
+  // 오늘 할 일: 체크가 있는 가장 늦은 날이 덜 끝났으면 그날, 다 끝났으면 다음 날. 체크가 없으면 첫날.
+  // 이미 지난 날에 선택한 티켓이 남아 있으면 그날로 복귀한다.
+  // 마지막 날까지 끝냈는데 앞에 덜 끝낸 날이 있으면 그 첫 날로 돌아간다. 진도로 세는 순서를 모두 끝냈을 때만 complete다.
+  function nextDay(days, done, selectedTicket) {
+    var finished = function (day) { return progressSteps(day, selectedTicket).every(function (s) { return done.has(s.id); }); };
+    var last = -1;
+    days.forEach(function (day, index) { if (day.steps.some(function (s) { return done.has(s.id); })) last = index; });
+    if (last < 0) return { day: days[0], mode: 'first' };
+    var pendingChoice = days.slice(0, last + 1).find(function (day) {
+      return selectedSteps(day, selectedTicket).some(function (s) { return !done.has(s.id); });
+    });
+    if (pendingChoice) return { day: pendingChoice, mode: 'continue' };
+    var current = days[last];
+    if (!finished(current)) return { day: current, mode: 'continue' };
+    if (last + 1 < days.length) return { day: days[last + 1], mode: 'next' };
+    for (var i = 0; i < days.length; i++) if (!finished(days[i])) return { day: days[i], mode: 'remaining' };
+    return { day: current, mode: 'complete' };
+  }
+  // reason: '' = 저장됨, 'blocked' = 저장소를 아예 못 씀, 'unsaved' = 쓰기만 실패해 이 화면에만 남은 체크가 있음
+  function storageNote(reason) {
+    var text = reason === 'blocked' ? '지금 브라우저에서는 저장소를 쓸 수 없어 체크가 새로고침하면 사라집니다.'
+      : reason === 'unsaved' ? '체크를 저장하지 못했습니다. 이 화면에는 남아 있지만 새로고침하거나 다른 탭에서 열면 사라집니다.' : '';
+    document.querySelectorAll('[data-course-storage]').forEach(function (node) { node.textContent = text; });
+  }
+
+  // ------------------------------------------------------------ 일자 페이지
+  function initDay(page) {
+    var scope = page.closest('main') || page;
+    var store = storage();
+    var state = readProgress(store);
+    // 쓰기에 실패해 저장값에 아직 없는 이 화면의 체크·해제(id → true/false). 저장에 성공하면 비운다.
+    // 저장값을 다시 읽을 때 이 키만 덮고 나머지 키(다른 탭이 저장한 진도)는 그대로 둔다.
+    var pending = {};
+    var inputs = Array.prototype.slice.call(scope.querySelectorAll('input.step-check[data-step]'));
+    var ids = [];
+    inputs.forEach(function (input) { if (ids.indexOf(input.dataset.step) < 0) ids.push(input.dataset.step); });
+    // 홈 진도와 같은 기준: 선택·연습 티켓 순서(data-extra)는 따로 센다. 그날 순서가 모두 추가면 전부 센다.
+    var extraIds = [];
+    inputs.forEach(function (input) { if (input.hasAttribute('data-extra') && extraIds.indexOf(input.dataset.step) < 0) extraIds.push(input.dataset.step); });
+    if (extraIds.length === ids.length) extraIds = [];
+    var coreIds = ids.filter(function (id) { return extraIds.indexOf(id) < 0; });
+    var day = { steps: ids.map(function (id) {
+      var chip = scope.querySelector('.day-chip[data-step="' + id + '"]');
+      return { id: id, extra: extraIds.indexOf(id) >= 0, choiceTickets: chip && chip.dataset.choiceTickets ? chip.dataset.choiceTickets.split(',') : [] };
+    }) };
+    var counter = scope.querySelector('[data-day-progress]');
+    var meter = scope.querySelector('[data-day-meter]');
+    var resume = scope.querySelector('[data-day-resume]');
+    function paint() {
+      inputs.forEach(function (input) { input.checked = state.done.has(input.dataset.step); });
+      scope.querySelectorAll('.day-chip[data-step], .day-step[data-step]').forEach(function (node) {
+        node.classList.toggle('is-done', state.done.has(node.dataset.step));
+      });
+      var doneOf = function (list) { return list.filter(function (id) { return state.done.has(id); }).length; };
+      var selectedIds = selectedSteps(day, state.selectedTicket).map(function (s) { return s.id; });
+      var countedIds = progressSteps(day, state.selectedTicket).map(function (s) { return s.id; });
+      var practiceIds = extraIds.filter(function (id) { return selectedIds.indexOf(id) < 0; });
+      if (counter) counter.textContent = (selectedIds.length ? '공통 구현 완료 ' : '구현 완료 ') + doneOf(coreIds) + '/' + coreIds.length
+        + (selectedIds.length ? ' · 선택 티켓 ' + state.selectedTicket + ' ' + doneOf(selectedIds) + '/' + selectedIds.length : '')
+        + (practiceIds.length ? ' · 선택·연습 ' + doneOf(practiceIds) + '/' + practiceIds.length : '');
+      if (meter) { meter.max = countedIds.length; meter.value = doneOf(countedIds); }
+      if (counter) counter.classList.toggle('is-complete', doneOf(countedIds) === countedIds.length);
+      var nextId = countedIds.find(function (id) { return !state.done.has(id); });
+      scope.querySelectorAll('.day-chip[data-step]').forEach(function (node) {
+        node.classList.toggle('is-current', node.dataset.step === nextId);
+      });
+      if (resume) {
+        var nextChip = nextId && scope.querySelector('.day-chip[data-step="' + nextId + '"]');
+        resume.href = nextChip ? nextChip.querySelector('a').getAttribute('href') : '#오늘의-sql';
+        resume.textContent = nextChip ? nextChip.querySelector('.chip-no').textContent + ' ' + (doneOf(coreIds) ? '이어서 하기' : '시작하기') + ' →' : '구현 체크 완료 · 오늘의 SQL 확인 →';
+      }
+      storageNote(!state.ok ? 'blocked' : Object.keys(pending).length ? 'unsaved' : '');
+    }
+    // 최신 저장값(다른 탭의 체크 포함)을 다시 읽고 그 위에 이 화면의 미저장 변경을 얹는다.
+    // 읽기에 실패하면 지금 화면 상태를 기준으로 한다.
+    function reload() {
+      var latest = readProgress(store);
+      if (latest.ok || !state.ok) state = latest;
+      Object.keys(pending).forEach(function (id) { if (pending[id]) state.done.add(id); else state.done.delete(id); });
+    }
+    inputs.forEach(function (input) {
+      input.addEventListener('change', function () {
+        pending[input.dataset.step] = input.checked;
+        reload();
+        // 저장소 자체를 못 쓰는 경우(state.ok=false)와 쓰기만 실패한 경우 모두 미저장 변경을 지켜 다음 저장 때 다시 얹는다.
+        if (writeProgress(store, state.done)) pending = {};
+        paint();
+      });
+    });
+    window.addEventListener('course-records-change', function () { reload(); paint(); });
+    window.addEventListener('pageshow', function () { reload(); paint(); });
+    window.addEventListener('storage', function (e) { if (e.key !== null && e.key !== KEY) return; reload(); paint(); });
+    paint();
+
+    // 정답은 펼칠 때만 하이라이트한다. syntax-highlight.js가 새로 붙은 code 노드를 처리하도록 노드를 바꿔 끼운다.
+    scope.querySelectorAll('details.step-answer').forEach(function (details) {
+      details.addEventListener('toggle', function () {
+        if (!details.open) return;
+        details.querySelectorAll('code[data-lazy-lang]').forEach(function (code) {
+          var fresh = code.cloneNode(true);
+          fresh.className = 'language-' + code.dataset.lazyLang;
+          fresh.removeAttribute('data-lazy-lang');
+          code.replaceWith(fresh);
+        });
+      });
+    });
+  }
+
+
+  // 해시를 기존 앵커 그대로 사용한다. 숨겨진 패널의 내부 앵커도 해당 패널을 먼저 연다.
+  function initDayStepper(page) {
+    var scope = page.closest('main') || page;
+    var panels = Array.prototype.slice.call(scope.querySelectorAll('.day-stepper-main > [data-day-panel]'));
+    if (!panels.length) return;
+    var toggle = scope.querySelector('[data-day-expand]');
+    var position = scope.querySelector('[data-day-position]');
+    var links = Array.prototype.slice.call(scope.querySelectorAll('[data-panel-link]'));
+    var expanded = false, active = panels.find(function (panel) { return panel.matches('.day-step'); }) || panels[0];
+    var canonicalPanels = panels.slice();
+    var defaultActive = active;
+    function rebuildChoiceRoute(selectedTicket) {
+      if (page.dataset.dayPage !== 'D14') return;
+      var selection = typeof selectedTicket === 'string' ? selectedTicket : readProgress(storage()).selectedTicket;
+      var choicePanels = canonicalPanels.filter(function (panel) {
+        var chip = scope.querySelector('.day-chip[data-step="' + panel.dataset.step + '"]');
+        return chip && chip.hasAttribute('data-choice-tickets');
+      });
+      var selectedPanel = choicePanels.find(function (panel) {
+        var chip = scope.querySelector('.day-chip[data-step="' + panel.dataset.step + '"]');
+        return (chip.dataset.choiceTickets || '').split(',').indexOf(selection) >= 0;
+      });
+      var additional = choicePanels.filter(function (panel) { return panel !== selectedPanel; });
+      panels = canonicalPanels.filter(function (panel) { return additional.indexOf(panel) < 0; }).concat(additional);
+      defaultActive = selectedPanel || (selection ? canonicalPanels.find(function (panel) { return panel.id === 'step-d14-5'; }) : canonicalPanels[0]);
+      var list = scope.querySelector('.day-chips');
+      panels.forEach(function (panel, index) {
+        panel.style.order = index;
+        var link = links.find(function (item) { return item.getAttribute('href') === '#' + panel.id; });
+        if (list && link) link.parentElement.style.order = index;
+        var previous = panel.querySelector('.step-prev');
+        if (previous && index > 0) {
+          previous.href = '#' + panels[index - 1].id;
+          previous.textContent = /-prep$/.test(panels[index - 1].id) ? '← 준비 자료' : '← 이전 순서';
+        }
+        var nextPanel = panels[index + 1];
+        var next = panel.querySelector('.step-next');
+        if (!next && nextPanel) {
+          next = document.createElement('a');
+          next.className = 'step-next';
+          panel.querySelector('.step-footer').append(next);
+        }
+        if (next) {
+          next.hidden = !nextPanel;
+          if (nextPanel) {
+            next.href = '#' + nextPanel.id;
+            next.textContent = additional.indexOf(nextPanel) >= 0 ? '추가 연습 →' : '다음 순서 →';
+          } else next.remove();
+        }
+        panel.classList.toggle('is-additional-ticket', additional.indexOf(panel) >= 0);
+      });
+    }
+    rebuildChoiceRoute();
+    if (page.dataset.dayPage === 'D14') active = defaultActive;
+    var printDetails = [];
+    var wrapPanels = Array.prototype.slice.call(scope.querySelectorAll('[data-wrap-panel]'));
+    var wrapLinks = Array.prototype.slice.call(scope.querySelectorAll('[data-wrap-target]'));
+    var wrapActive = wrapPanels[0];
+    var wrapTabs = scope.querySelector('.day-wrap-tabs');
+    if (wrapTabs) wrapTabs.hidden = false;
+    var stageKey = 'javaexperience.course.stages.v1';
+    var stageInputs = Array.prototype.slice.call(scope.querySelectorAll('[data-stage-check]'));
+    var stageState = {}, stagePending = {}, stageStore = storage();
+    function loadStages() {
+      try { var value = stageStore && JSON.parse(stageStore.getItem(stageKey) || '{}'); if (value && typeof value === 'object') stageState = value; } catch (e) { /* 저장 불가 시 현재 화면의 기록을 유지한다. */ }
+      Object.keys(stagePending).forEach(function (id) { stageState[id] = stagePending[id]; });
+      stageInputs.forEach(function (input) { input.checked = stageState[input.dataset.stageCheck] === true; input.parentElement.classList.toggle('is-done', input.checked); });
+      var stageProgress = scope.querySelector('[data-stage-progress]');
+      if (stageProgress) stageProgress.textContent = stageInputs.map(function(input) {
+        var label = /-prep$/.test(input.dataset.stageCheck) ? '준비' : /-data$/.test(input.dataset.stageCheck) ? '데이터' : '마무리';
+        return label + (input.checked ? ' 확인' : ' 미확인');
+      }).join(' · ');
+    }
+    stageInputs.forEach(function (input) {
+      input.addEventListener('change', function () {
+        var checked = input.checked;
+        loadStages();
+        stageState[input.dataset.stageCheck] = checked;
+        stagePending[input.dataset.stageCheck] = checked;
+        try { if (stageStore) { stageStore.setItem(stageKey, JSON.stringify(stageState)); stagePending = {}; } } catch (e) { /* 구현 진도와 분리하여 이 화면에 보존한다. */ }
+        loadStages();
+      });
+    });
+    window.addEventListener('pageshow', loadStages);
+    window.addEventListener('storage', function (event) { if (event.key === stageKey || event.key === null) loadStages(); });
+    loadStages();
+    function paint() {
+      panels.forEach(function (panel) {
+        panel.hidden = !expanded && panel !== active;
+        panel.classList.toggle('is-active', panel === active);
+      });
+      links.forEach(function (link) {
+        var selected = link.getAttribute('href') === '#' + active.id;
+        if (selected) link.setAttribute('aria-current', 'step'); else link.removeAttribute('aria-current');
+        link.parentElement.classList.toggle('is-active', selected);
+        var ownerIndex = panels.findIndex(function (panel) { return '#' + panel.id === link.getAttribute('href'); });
+        link.parentElement.classList.toggle('is-following', ownerIndex === panels.indexOf(active) + 1);
+      });
+      if (toggle) { toggle.setAttribute('aria-pressed', String(expanded)); toggle.querySelector('[data-expand-label]').textContent = expanded ? '한 순서씩 보기' : '모두 펼쳐 보기'; }
+      if (position) position.textContent = expanded ? '전체 ' + panels.length + '개 단계 · 내부 코드는 개별 펼침' : '현재 화면 · ' + (active.matches('.day-step') ? '구현 ' + (active.querySelector('.step-number')?.textContent || '') : /-prep$/.test(active.id) ? '준비' : /-data$/.test(active.id) ? '데이터' : '마무리');
+      page.classList.toggle('day-show-all', expanded);
+      wrapPanels.forEach(function (panel) { panel.hidden = !expanded && panel !== wrapActive; });
+      wrapLinks.forEach(function (link) {
+        var selected = wrapActive && link.dataset.wrapTarget === wrapActive.id;
+        if (selected) link.setAttribute('aria-current', 'step'); else link.removeAttribute('aria-current');
+      });
+    }
+    function revealHash(scroll, targetHash) {
+      var id;
+      try { id = decodeURIComponent((targetHash === undefined ? window.location.hash : targetHash).slice(1)); } catch (e) { return; }
+      var target = id && document.getElementById(id);
+      var owner = target && target.closest('[data-day-panel]');
+      if (owner && panels.indexOf(owner) >= 0) {
+        active = owner;
+        var wrapOwner = target.closest('[data-wrap-panel]');
+        if (wrapOwner) wrapActive = wrapOwner;
+        // 사용자 내부 링크만 접기를 연다. 초기 선택은 힌트·정답을 펼치지 않는다.
+        if (target !== owner) {
+          var fold = target.closest('details');
+          while (fold && owner.contains(fold)) { fold.open = true; fold = fold.parentElement.closest('details'); }
+        }
+        paint();
+        if (scroll && target.scrollIntoView) target.scrollIntoView({ block: 'start' });
+      } else if (!id) {
+        active = defaultActive;
+        paint();
+      }
+    }
+    function refreshChoiceRoute(event) {
+      if (page.dataset.dayPage !== 'D14') return;
+      if (event.type === 'storage' && event.key !== null && event.key !== KEY) return;
+      rebuildChoiceRoute(event.detail && event.detail.selectedTicket);
+      paint();
+    }
+    window.addEventListener('course-records-change', refreshChoiceRoute);
+    window.addEventListener('storage', refreshChoiceRoute);
+    window.addEventListener('pageshow', refreshChoiceRoute);
+    page.classList.add('day-stepper-ready');
+    if (toggle) {
+      toggle.hidden = false;
+      toggle.addEventListener('click', function () {
+        if (expanded) {
+          var rail = scope.querySelector('.day-today');
+          var edge = rail ? rail.getBoundingClientRect().bottom + 16 : 0;
+          var currentBox = active.getBoundingClientRect();
+          // 현재 순서가 보이는 동안에는 전환 직전의 선택을 유지한다.
+          if (currentBox.height > 0 && (currentBox.bottom <= edge || currentBox.top >= window.innerHeight)) {
+            var reading = panels.find(function (panel) { var box = panel.getBoundingClientRect(); return box.height > 0 && box.bottom > edge && box.top < window.innerHeight; });
+            if (reading) active = reading;
+          }
+        }
+        var before = active.getBoundingClientRect().top;
+        var panelMain = scope.querySelector('.day-stepper-main');
+        panelMain.style.paddingTop = '';
+        panelMain.style.paddingBottom = '';
+        expanded = !expanded;
+        paint();
+        // 앞선 순서가 나타나거나 사라진 만큼만 보정하여 읽던 순서를 유지한다.
+        var delta = active.getBoundingClientRect().top - before;
+        var targetY = window.scrollY + delta;
+        if (targetY < 0) { panelMain.style.paddingTop = -targetY + 'px'; targetY = 0; }
+        var lastY = Math.max(0,document.documentElement.scrollHeight - window.innerHeight);
+        if (targetY > lastY) panelMain.style.paddingBottom = targetY - lastY + 'px';
+        if (delta) window.scrollTo({top:targetY,behavior:'instant'});
+      });
+    }
+    window.addEventListener('hashchange', function () { revealHash(false); });
+    window.addEventListener('popstate', function () { revealHash(false); });
+    // 메뉴 선택은 주소만 갱신하므로 브라우저의 앵커 점프와 중복 스크롤이 없다.
+    scope.addEventListener('click', function (event) {
+      var link = event.target.closest('a[href^="#"]');
+      if (!link || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      var id; try { id = decodeURIComponent(link.hash.slice(1)); } catch (e) { return; }
+      var target = document.getElementById(id);
+      if (!target || !target.closest('[data-day-panel]')) return;
+      event.preventDefault();
+      var panelMain = scope.querySelector('.day-stepper-main');
+      panelMain.style.paddingTop = '';
+      panelMain.style.paddingBottom = '';
+      history.pushState(history.state,'',link.hash);
+      revealHash(false, link.hash);
+      if (!link.closest('.day-today,.day-quick-links,.day-wrap-tabs,.practice-review')) {
+        if (target.scrollIntoView) target.scrollIntoView({block:'start'});
+      }
+    });
+    links.forEach(function (link,index) {
+      link.addEventListener('keydown',function (event) {
+        var next = event.key === 'ArrowDown' || event.key === 'ArrowRight' ? (index + 1) % links.length : event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? (index + links.length - 1) % links.length : event.key === 'Home' ? 0 : event.key === 'End' ? links.length - 1 : null;
+        if (next === null) return; event.preventDefault(); links[next].click(); links[next].focus({preventScroll:true});
+      });
+    });
+    var beforePrintExpanded;
+    window.addEventListener('beforeprint', function () {
+      beforePrintExpanded = expanded;
+      expanded = true;
+      printDetails = Array.prototype.slice.call(scope.querySelectorAll('details:not([open])'));
+      printDetails.forEach(function (fold) { fold.open = true; });
+      paint();
+    });
+    window.addEventListener('afterprint', function () {
+      expanded = beforePrintExpanded === true;
+      printDetails.forEach(function (fold) { fold.open = false; });
+      printDetails = [];
+      paint();
+    });
+    // 브라우저 찾기 전에 모든 패널을 노출한다. 브라우저 기본 검색은 그대로 실행한다.
+    window.addEventListener('keydown', function (event) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') { expanded = true; paint(); }
+    });
+    paint();
+    revealHash(false);
+  }
+
+  // 준비·선택 기록은 구현 체크와 별도로 관리한다. 저장 실패한 변경은 이 화면에서 보존한다.
+  function initSchedule() {
+    var data = document.getElementById('course-schedule-data');
+    if (!data) return;
+    var days = JSON.parse(data.textContent);
+    function paintSchedule() {
+      var state = readProgress(storage());
+      days.forEach(function (day) {
+        var steps = progressSteps(day, state.selectedTicket);
+        var count = steps.filter(function (step) { return state.done.has(step.id); }).length;
+        var node = document.querySelector('[data-schedule-count="' + day.id + '"]');
+        if (node) node.textContent = '구현 ' + count + '/' + steps.length;
+      });
+    }
+    paintSchedule();
+    window.addEventListener('storage', paintSchedule);
+  }
+  function initRecords() {
+    var store = storage(), pending = {}, pendingPrep = {};
+    var choice = document.querySelector('[data-ticket-choice]');
+    var preps = Array.prototype.slice.call(document.querySelectorAll('[data-prep]'));
+    var data = document.getElementById('course-choice-data');
+    var choices = data ? JSON.parse(data.textContent) : [];
+    function current() {
+      var state = readProgress(store);
+      state.preparation = state.preparation || {};
+      if ('selectedTicket' in pending) state.selectedTicket = pending.selectedTicket;
+      Object.keys(pendingPrep).forEach(function(id) { if (pendingPrep[id]) state.preparation[id] = true; else delete state.preparation[id]; });
+      return state;
+    }
+    function paint() {
+      var state = current();
+      if (choice) choice.value = state.selectedTicket || '';
+      preps.forEach(function(input) { input.checked = state.preparation[input.dataset.prep] === true; });
+      var selected = choices.find(function(t) { return t.id === state.selectedTicket; });
+      document.querySelectorAll('[data-selected-ticket-compact]').forEach(function(node) {
+        node.textContent = selected ? '내 선택 ' + selected.id + ' · ' + selected.day + ' 수행 · 고르지 않은 후보는 추가 연습' : '선택 기록 없음 · D11에서 한 건을 고르세요.';
+        node.hidden = !selected && !!node.closest('[data-course-home]');
+      });
+      document.querySelectorAll('[data-selected-ticket]').forEach(function(node) {
+        node.replaceChildren();
+        if (!selected) { node.textContent = '선택 기록 없음 · D11에서 한 건을 고르세요. E01·모의 장애 훈련은 모두 수행합니다.'; return; }
+        var link = document.createElement('a'); link.href = selected.href; link.textContent = selected.id + ' · ' + selected.title;
+        node.append('내 선택: ', link, ' · ' + selected.day + '에서 수행 · E01·모의 장애 훈련은 모두 수행. ' + (selected.id === 'B16' ? '훈련: 201/200·1초 이내로 확인합니다.' : '훈련: 실패 여부와 대응 근거를 기록합니다.'));
+      });
+      document.querySelectorAll('[data-choice-tickets]').forEach(function(node) {
+        var mine = node.dataset.choiceTickets.split(',').indexOf(state.selectedTicket) >= 0;
+        var kind = node.querySelector('.chip-copy > [data-step-kind]');
+        if (kind) kind.textContent = mine ? '내 선택 티켓 포함' : state.selectedTicket ? '고르지 않은 후보 · 추가 연습' : '선택 후보 · D11에서 1건 선택';
+        node.classList.toggle('is-selected-ticket', mine);
+        node.classList.toggle('is-additional-ticket', !mine);
+      });
+      document.querySelectorAll('[data-criterion-ticket]').forEach(function (fold) {
+        var mine = fold.dataset.criterionTicket === state.selectedTicket;
+        fold.open = mine;
+        fold.classList.toggle('is-my-criterion', mine);
+      });
+      var note = document.querySelector('[data-record-storage]');
+      if (note) note.textContent = !state.ok ? '저장소를 쓸 수 없어 새로고침하면 기록이 사라집니다.' : Object.keys(pending).length || Object.keys(pendingPrep).length ? '기록을 저장하지 못했습니다. 이 화면에만 남아 있습니다.' : '';
+    }
+    function save() {
+      var state = current();
+      if (writeProgress(store, state.done, state)) { pending = {}; pendingPrep = {}; }
+      paint();
+      window.dispatchEvent(new CustomEvent('course-records-change', { detail: { selectedTicket: state.selectedTicket || '' } }));
+    }
+    if (choice) choice.addEventListener('change', function() { pending.selectedTicket = choice.value; save(); });
+    if (choice) choice.addEventListener('keydown', function(event) {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      var index = choice.selectedIndex;
+      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') index = Math.min(choice.options.length - 1, index + 1);
+      else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') index = Math.max(0, index - 1);
+      else if (event.key === 'Home') index = 0;
+      else if (event.key === 'End') index = choice.options.length - 1;
+      else return;
+      event.preventDefault();
+      choice.selectedIndex = index;
+      choice.dispatchEvent(new Event('change', {bubbles:true}));
+    });
+    preps.forEach(function(input) { input.addEventListener('change', function() { pendingPrep[input.dataset.prep] = input.checked; save(); }); });
+    window.addEventListener('pageshow', paint);
+    window.addEventListener('storage', function(e) { if (e.key === null || e.key === KEY) paint(); });
+    paint();
+  }
+
+  // ------------------------------------------------------------ 복사 버튼
+  function initCopy() {
+    document.querySelectorAll('button[data-copy-target]').forEach(function (button) {
+      var status = button.parentNode.querySelector('.copy-status');
+      button.addEventListener('click', function () {
+        var target = document.getElementById(button.dataset.copyTarget);
+        if (!target) return;
+        var text = target.textContent;
+        function done(ok) {
+          if (button.closest('.code-toolbar')) { if (status) status.textContent = ok ? '복사됨' : '복사하지 못했습니다. 코드를 선택해 복사하세요.'; return; }
+          if (status) status.textContent = ok ? '복사했어요. Codex 또는 Claude Code에 붙여 넣으세요.' : '자동 복사가 막혔어요. 선택된 프롬프트를 길게 눌러 복사하거나 ⌘C / Ctrl+C를 쓰세요.';
+        }
+        function fallback() {
+          var ok = false;
+          try {
+            // 접힌 프롬프트도 자동 복사가 막히면 펼쳐서 직접 선택할 수 있게 한다.
+            var fold = target.closest('details.grader-source');
+            if (fold) fold.open = true;
+            var range = document.createRange();
+            range.selectNodeContents(target);
+            var selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            ok = document.execCommand('copy');
+          } catch (e) { ok = false; }
+          done(ok);
+        }
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
+            return;
+          }
+        } catch (e) { /* 아래 대체 경로 */ }
+        fallback();
+      });
+    });
+  }
+
+  // ------------------------------------------------------------ 일자 더미 SQL
+  function initDaySql() {
+    document.querySelectorAll('[data-day-sql]').forEach(function (entry) {
+      var status = entry.querySelector('[role="status"]');
+      var copy = entry.querySelector('[data-sql-copy]');
+      var download = entry.querySelector('[data-sql-download]');
+      if (!copy || !download) return;
+      var target = document.getElementById(copy.dataset.sqlCopy);
+      if (!target) return;
+      entry.querySelectorAll('[data-sql-copy]').forEach(function (button) {
+        var fragment = button.closest('[data-sql-table]') || entry;
+        var copyStatus = fragment.querySelector('[role="status"]');
+        var copyTarget = document.getElementById(button.dataset.sqlCopy);
+        if (!copyTarget) return;
+        function fallback() {
+          fragment.querySelector('details').open = true;
+          var range = document.createRange();
+          range.selectNodeContents(copyTarget);
+          var selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+          copyStatus.textContent = '자동 복사가 막혔어요. 선택된 SQL을 길게 눌러 복사하거나 파일 받기를 쓰세요(⌘C / Ctrl+C도 가능).';
+        }
+        button.addEventListener('click', function () {
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(copyTarget.textContent).then(function () {
+                copyStatus.textContent = 'SQL을 복사했어요. MySQL 편집기에 붙여 넣으세요.';
+              }, fallback);
+              return;
+            }
+          } catch (e) { /* 선택으로 대체한다 */ }
+          fallback();
+        });
+      });
+      download.addEventListener('click', function () {
+        var url;
+        try {
+          var blob = new Blob([target.textContent], { type: 'text/sql;charset=utf-8' });
+          url = URL.createObjectURL(blob);
+          var link = document.createElement('a');
+          link.href = url;
+          link.download = entry.dataset.sqlFilename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          status.textContent = '파일 받기를 시작했어요.';
+        } catch (e) {
+          status.textContent = '파일을 받지 못했어요. SQL 복사를 이용하세요.';
+        } finally {
+          if (url) window.setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+        }
+      });
+    });
+  }
+
+  // ------------------------------------------------------------ 홈
+  function initHome(home) {
+    var dataNode = document.getElementById('course-days-data');
+    if (!dataNode) return;
+    var all;
+    try { all = JSON.parse(dataNode.textContent); } catch (e) { return; }
+    var days = all.filter(function (d) { return d.steps.length > 0; });
+    var store = storage();
+    var $ = function (selector) { return home.querySelector(selector); };
+    var NUMS = '①②③④⑤⑥⑦⑧⑨⑩';
+    function render() {
+      var state = readProgress(store);
+      var pick = nextDay(days, state.done, state.selectedTicket);
+      var day = pick.day;
+      var tags = { first: '오늘 할 일 · 처음 시작', continue: '오늘 할 일 · 이어서', next: '오늘 할 일 · 다음 날', remaining: '오늘 할 일 · 남은 순서가 있는 날', complete: days.length + '일 과정 · 필수 구현 체크 끝 · 채점 결과 별도' };
+      $('[data-today-tag]').textContent = tags[pick.mode];
+      $('[data-today-id]').textContent = day.id;
+      $('[data-today-title]').textContent = day.title;
+      var core = coreSteps(day);
+      var selected = selectedSteps(day, state.selectedTicket);
+      var extraCount = day.steps.length - progressSteps(day, state.selectedTicket).length;
+      var doneHere = core.filter(function (s) { return state.done.has(s.id); }).length;
+      $('[data-today-meta]').textContent = day.phaseLabel + (selected.length
+        ? ' · 공통 구현 ' + doneHere + '/' + core.length + ' · 선택 티켓 ' + state.selectedTicket + ' ' + selected.filter(function (s) { return state.done.has(s.id); }).length + '/' + selected.length
+        : ' · 순서 ' + core.length + '개' + (doneHere ? ' 중 ' + doneHere + '개 끝냄' : ''))
+        + (extraCount ? ' · 선택·연습 ' + extraCount + '개' : '') + ' · 오늘의 Java ' + day.java;
+      var wrapup = $('[data-course-wrapup]');
+      if (wrapup) {
+        wrapup.replaceChildren();
+        var lastChecked = days.filter(function(d) { return d.steps.some(function(s) { return state.done.has(s.id); }); }).pop();
+        if (lastChecked && progressSteps(lastChecked, state.selectedTicket).every(function(s) { return state.done.has(s.id); })) {
+          wrapup.append('구현 체크 뒤 SQL·말하기·채점을 확인하세요: ');
+          [['SQL','#오늘의-sql'],['말하기','#말하기-카드'],['채점','#ai-채점-프롬프트']].forEach(function(item) {
+            var a=document.createElement('a'); a.href=lastChecked.href+item[1]; a.textContent=lastChecked.id+' '+item[0]; wrapup.append(a,' ');
+          });
+        }
+      }
+      var list = $('[data-today-steps]');
+      list.replaceChildren.apply(list, day.steps.map(function (s, i) {
+        var li = document.createElement('li');
+        if (state.done.has(s.id)) li.className = 'is-done';
+        var no = document.createElement('span');
+        no.setAttribute('aria-hidden', 'true');
+        no.textContent = NUMS[i] || String(i + 1);
+        var task = document.createElement('a');
+        task.href = day.href + '#step-' + s.id.toLowerCase();
+        task.textContent = s.title + (s.requirement ? ' · ' + s.requirement : '') + (selected.indexOf(s) >= 0 ? ' (내 선택 ' + state.selectedTicket + ')' : s.extra && core.length < day.steps.length ? ' (선택·연습)' : '') + (state.done.has(s.id) ? ' (끝냄)' : '');
+        li.append(no, ' ', task);
+        return li;
+      }));
+      var returning = state.done.size > 0;
+      home.classList.toggle('is-returning', returning);
+      var resume = $('[data-today-resume]');
+      var pending = progressSteps(day, state.selectedTicket).find(function(s) { return !state.done.has(s.id); });
+      if (resume) {
+        resume.hidden = !returning;
+        resume.href = day.href + (pending ? '#step-' + pending.id.toLowerCase() : '#오늘의-sql');
+        resume.textContent = pending ? day.id + ' ' + NUMS[day.steps.indexOf(pending)] + ' 이어서 하기 →' : day.id + ' SQL·말하기·채점 확인 →';
+      }
+      var open = $('[data-today-open]');
+      open.href = day.href;
+      var pendingTicket = selected.find(function (s) { return !state.done.has(s.id); });
+      if (pendingTicket && doneHere === core.length) open.href = day.href + '#step-' + pendingTicket.id.toLowerCase();
+      open.textContent = 'Spring ' + day.id + (pendingTicket && doneHere === core.length ? ' · ' + state.selectedTicket + ' 이어서' : '');
+      var java = $('[data-today-java]');
+      if (day.javaHref) { java.href = day.javaHref; java.textContent = 'Java ' + day.java; java.hidden = false; } else java.hidden = true;
+      var during = day.javaTiming === 'during-or-after';
+      var flow = $('[data-today-flow]');
+      var grade = $('[data-today-grade]');
+      var first = returning || during ? open : java;
+      var second = returning || during ? java : open;
+      [java, open].forEach(function (link) {
+        link.classList.toggle('ch-primary', !returning && link === first);
+        link.classList.toggle('ch-secondary', returning || link !== first);
+      });
+      if (during) java.textContent += ' · 수행 중·사후 증거';
+      // CSS 순서만 바꾸지 않고 키보드·스크린리더도 같은 순서로 읽게 한다.
+      var arrow = function () { var span = document.createElement('span'); span.setAttribute('aria-hidden', 'true'); span.textContent = '→'; return span; };
+      flow.replaceChildren(first, arrow(), second, arrow(), grade);
+      grade.href = day.href + '#ai-채점-프롬프트';
+      $('[data-today-note]').hidden = pick.mode !== 'first';
+      var total = 0, checked = 0, choiceTotal = 0, choiceChecked = 0;
+      days.forEach(function (d) {
+        var counted = progressSteps(d, state.selectedTicket);
+        var n = counted.filter(function (s) { return state.done.has(s.id); }).length;
+        var choice = selectedSteps(d, state.selectedTicket);
+        choiceTotal += choice.length;
+        choiceChecked += choice.filter(function (s) { return state.done.has(s.id); }).length;
+        total += counted.length; checked += n;
+        var cell = home.querySelector('.ch-day[data-day="' + d.id + '"]');
+        if (!cell) return;
+        cell.classList.toggle('is-today', d.id === day.id);
+        cell.classList.toggle('is-done', n === counted.length);
+        var count = cell.querySelector('[data-day-count]');
+        if (count) count.textContent = n + '/' + counted.length;
+        var bar = cell.querySelector('.ch-bar i');
+        if (bar) bar.style.width = Math.round((n / counted.length) * 100) + '%';
+      });
+      if ($('[data-progress-summary]')) $('[data-progress-summary]').textContent = choiceTotal
+        ? '공통 구현 ' + (checked - choiceChecked) + '/' + (total - choiceTotal) + ' · 선택 티켓 ' + state.selectedTicket + ' ' + choiceChecked + '/' + choiceTotal
+        : '체크한 순서 ' + checked + '/' + total;
+      storageNote(state.ok ? '' : 'blocked');
+    }
+    window.addEventListener('pageshow', render);
+    // 다른 탭(일자 페이지)에서 체크하면 열린 홈의 오늘 할 일·진도도 다시 그린다. 홈은 저장값을 쓰지 않으므로 덮을 변경이 없다.
+    window.addEventListener('storage', function (e) { if (e.key === null || e.key === KEY) render(); });
+    if (readProgress(store).done.size || readProgress(store).selectedTicket) render();
+  }
+
+  // 설정 형식은 모든 블록에서 공유한다. 저장 실패는 현재 화면 조작을 막지 않는다.
+  function initConfigTabs() {
+    var key = 'javaexperience.course.config-format.v1';
+    var groups = Array.from(document.querySelectorAll('[data-config-tabs]'));
+    var store = storage(), selected = 'yml';
+    try { if (store && store.getItem(key) === 'properties') selected = 'properties'; } catch (e) {}
+    function select(format, persist) {
+      groups.forEach(function (group) {
+        group.querySelectorAll('[role="tab"]').forEach(function (tab) {
+          var active = tab.dataset.configFormat === format;
+          tab.setAttribute('aria-selected', String(active));
+          tab.tabIndex = active ? 0 : -1;
+        });
+        group.querySelectorAll('[data-config-panel]').forEach(function (panel) { panel.hidden = panel.dataset.configPanel !== format; });
+      });
+      if (persist) { try { if (store) store.setItem(key, format); } catch (e) {} }
+    }
+    groups.forEach(function (group) {
+      group.querySelector('[role="tablist"]').hidden = false;
+      var tabs = Array.from(group.querySelectorAll('[role="tab"]'));
+      tabs.forEach(function (tab, index) {
+        tab.addEventListener('click', function () { select(tab.dataset.configFormat, true); });
+        tab.addEventListener('keydown', function (e) {
+          var next;
+          if (e.key === 'ArrowRight') next = (index + 1) % tabs.length;
+          else if (e.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+          else if (e.key === 'Home') next = 0;
+          else if (e.key === 'End') next = tabs.length - 1;
+          else return;
+          e.preventDefault();
+          select(tabs[next].dataset.configFormat, true);
+          tabs[next].focus();
+        });
+      });
+    });
+    select(selected, false);
+  }
+
+  function initMapProgress() {
+    var root = document.querySelector('[data-course-map]');
+    var data = document.getElementById('course-days-data');
+    if (!root || !data) return;
+    var days = JSON.parse(data.textContent), store = storage();
+    function paint() {
+      var state = readProgress(store), pick = nextDay(days, state.done, state.selectedTicket), day = pick.day;
+      var steps = progressSteps(day, state.selectedTicket);
+      var next = steps.find(function(s) { return !state.done.has(s.id); });
+      var count = steps.filter(function(s) { return state.done.has(s.id); }).length;
+      root.querySelector('[data-cm-progress]').textContent = '이어서 할 곳: ' + day.id + ' · ' + count + '/' + steps.length + (next ? ' · 다음 ' + '①②③④⑤⑥⑦⑧⑨⑩'[day.steps.indexOf(next)] : ' · 구현 체크 끝, 마무리 확인') + ' · 지금 학습 중 표시는 관계 선택과 별개입니다.';
+      root.querySelectorAll('[data-node]').forEach(function(node) {
+        var current = node.dataset.node === day.id;
+        node.classList.toggle('is-learning', current);
+        if (current) node.setAttribute('aria-current', 'step'); else node.removeAttribute('aria-current');
+      });
+      root.dataset.currentDay = day.id;
+      root.dispatchEvent(new CustomEvent('course-location'));
+    }
+    window.addEventListener('pageshow', paint);
+    window.addEventListener('storage', function(e) { if (e.key === KEY || e.key === null) paint(); });
+    paint();
+  }
+  function initHeaderOffset() {
+    var header = document.querySelector('.site-topbar');
+    if (!header) return;
+    function measure() { document.documentElement.style.setProperty('--course-header-height', Math.ceil(header.getBoundingClientRect().height) + 'px'); }
+    measure();
+    if (window.ResizeObserver) new ResizeObserver(measure).observe(header);
+    window.addEventListener('resize', measure);
+  }
+  function initDataReturn() {
+    if (!/\/course\/start\/dummy\/README\.html$/.test(window.location.pathname)) return;
+    var day = new URLSearchParams(window.location.search).get('day');
+    if (!/^D(?:0[1-9]|[1-3][0-9]|4[0-5])$/.test(day || '')) return;
+    var content = document.querySelector('.guide-content');
+    if (!content) return;
+    var link = document.createElement('a');
+    link.className = 'data-guide-return'; link.href = '../../spring/' + day + '.html#step-' + day.toLowerCase() + '-data';
+    link.textContent = day + ' 데이터 넣기로 돌아가기 →';
+    content.prepend(link);
+    var region = content.querySelector('[data-day-guide]');
+    var reference = content.querySelector('[data-day-guide-reference]');
+    var data = document.getElementById('course-day-data-guide');
+    if (!region || !reference || !data) return;
+    var payload;
+    try { payload = JSON.parse(data.textContent)[day]; } catch (e) { return; }
+    if (!payload || payload.id !== day || !Array.isArray(payload.files) || !Array.isArray(payload.steps) || !Array.isArray(payload.checks)) return;
+    function node(tag, className, text) {
+      var element = document.createElement(tag);
+      if (className) element.className = className;
+      if (text !== undefined) {
+        String(text).split(/(`[^`]+`)/g).forEach(function (part) {
+          if (/^`[^`]+`$/.test(part)) {
+            var code = document.createElement('code'); code.textContent = part.slice(1, -1); element.append(code);
+          } else element.append(document.createTextNode(part));
+        });
+      }
+      return element;
+    }
+    function listSection(className, title, items, ordered, tag) {
+      if (!items || !items.length) return null;
+      var section = node(tag || 'section', className);
+      section.append(node('h3', '', title));
+      var list = node(ordered ? 'ol' : 'ul');
+      items.forEach(function (item) { list.append(node('li', '', item)); });
+      section.append(list);
+      return section;
+    }
+    var heading = node('h2', '', day + ' · ' + payload.title);
+    heading.id = 'day-data-guide-title';
+    region.replaceChildren(heading, node('p', 'day-guide-context', payload.context));
+    region.dataset.contentKind = 'practice';
+    var warnings = listSection('day-guide-warnings', '실행 전에 주의', payload.warnings, false, 'aside');
+    if (warnings) region.append(warnings);
+    var files = node('section', 'day-guide-files');
+    files.append(node('h3', '', '이 날 실행할 파일·범위'));
+    if (payload.files.length) {
+      var fileList = node('ul');
+      payload.files.forEach(function (file) {
+        var item = node('li');
+        var fileLink = node('a', '', file.name); fileLink.href = file.href;
+        item.append(fileLink, node('span', '', file.scope));
+        fileList.append(item);
+      });
+      files.append(fileList);
+    } else files.append(node('p', '', '이 날 새로 적재할 SQL 파일은 없습니다. 아래 실행 범위를 따르세요.'));
+    region.append(files);
+    var grid = node('div', 'day-guide-grid');
+    var prerequisites = listSection('day-guide-prerequisites', '먼저 확인할 조건', payload.prerequisites);
+    var steps = listSection('day-guide-steps', '실행 순서', payload.steps, true);
+    if (prerequisites) grid.append(prerequisites);
+    if (steps) grid.append(steps);
+    var checks = node('section', 'day-guide-checks');
+    checks.append(node('h3', '', '확인할 성질·원문 기준 기대값'));
+    var checkList = node('ol');
+    payload.checks.forEach(function (check) {
+      var item = node('li');
+      item.append(node('p', 'day-guide-check-task', check.task), node('p', 'day-guide-check-expect', check.expect));
+      checkList.append(item);
+    });
+    checks.append(checkList); grid.append(checks);
+    region.append(grid);
+    var action = node('a', 'day-guide-action', payload.returnLabel); action.href = payload.returnHref;
+    region.append(action);
+    var full = node('details', 'day-guide-all');
+    full.append(node('summary', '', '전체 더미 SQL 안내'));
+    reference.before(full); full.append(reference);
+    content.classList.add('has-day-guide');
+    region.hidden = false;
+    function revealReference(hash, scroll) {
+      var id;
+      try { id = decodeURIComponent((hash || '').slice(1)); } catch (e) { return; }
+      var target = id && document.getElementById(id);
+      if (!target || !reference.contains(target)) return;
+      full.open = true;
+      var parent = target.closest('details');
+      while (parent && reference.contains(parent)) { parent.open = true; parent = parent.parentElement.closest('details'); }
+      if (scroll && target.scrollIntoView) target.scrollIntoView({ block: 'start' });
+    }
+    (content.closest('.course-guide') || content).addEventListener('click', function (event) {
+      var anchor = event.target.closest('a[href^="#"]');
+      if (anchor) revealReference(anchor.hash, false);
+    });
+    window.addEventListener('hashchange', function () { revealReference(window.location.hash, true); });
+    revealReference(window.location.hash, true);
+  }
+
+  window.jxCourseProgress = { KEY: KEY, readProgress: readProgress, writeProgress: writeProgress, nextDay: nextDay };
+  function start() {
+    initHeaderOffset();
+    initConfigTabs();
+    initMapProgress();
+    initDataReturn();
+    var page = document.querySelector('[data-day-page]');
+    if (page) { initDay(page); initDayStepper(page); }
+    var home = document.querySelector('[data-course-home]');
+    if (home) initHome(home);
+    initCopy();
+    initDaySql();
+    initSchedule();
+    initRecords();
+  }
+  if (document.currentScript && document.currentScript.hasAttribute('data-course-initial')) start();
+  else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+</script>
+<script src="../../tools/site/course-semantic-colors.js?v=f70be5d5c239" defer=""></script>
+<script data-section-initial="">// 기존 앵커를 주소로 유지하며 메뉴가 선택한 본문만 연다.
+(function () {
+  'use strict';
+  function start() {
+    var main = document.querySelector('main');
+    if (!main || main.dataset.sectionViewsReady) return;
+    main.dataset.sectionViewsReady = 'true';
+    var siteHeader = document.querySelector('.site-topbar');
+    function measureHeader() { if (siteHeader) document.documentElement.style.setProperty('--course-header-height',siteHeader.getBoundingClientRect().height + 'px'); }
+    measureHeader(); window.addEventListener('resize',measureHeader);
+    if (siteHeader && window.ResizeObserver) new ResizeObserver(measureHeader).observe(siteHeader);
+    if (main.querySelector('[data-day-page],[data-knowledge-reader],[data-core-learning]')) return;
+    var menus = Array.from(main.querySelectorAll('.guide-index, .exercise-route, .knowledge-page-steps, .lesson-atlas, .request-steps, .mission-visual nav, .mission-visual-shortcuts, .journey-chapter-nav'));
+    var entries = [], panels = [], originalHidden = new WeakMap();
+    function addPanel(panel) {
+      if (!panel) return null;
+      if (panels.indexOf(panel) < 0) { panels.push(panel); originalHidden.set(panel,panel.hidden); panel.dataset.sectionOriginalHidden = String(panel.hidden); panel.dataset.sectionPanel = ''; }
+      return panel;
+    }
+    function owner(target) {
+      if (!target) return null;
+      var panel = target.closest('[data-section-panel], .guide-section, .exercise-section, .knowledge-chapter, .lesson-scene, .api-request, .ticket-flow');
+      if (panel) return addPanel(panel);
+      if (/^H[23]$/.test(target.tagName)) {
+        panel = document.createElement('section'); panel.className = 'section-view-panel';
+        target.before(panel); panel.append(target);
+        while (panel.nextElementSibling && !panel.nextElementSibling.matches('h1,h2,h3,script,nav')) panel.append(panel.nextElementSibling);
+        return addPanel(panel);
+      }
+      return addPanel(target.closest('section,article,details') || target);
+    }
+    function entry(id, label, panel, phase) {
+      if (!panel || entries.some(function (e) { return e.id === id; })) return;
+      panel.id ||= 'section-panel-' + (panels.indexOf(panel) + 1);
+      entries.push({id:id,label:label.replace(/^#\s*/, '').trim(),panel:panel,phase:phase || ''});
+    }
+    var baked = main.querySelector('.page-navigation-layout');
+    var nav, layout, sidebar, content, filters = [], all;
+    if (baked) {
+      layout = baked; sidebar = main.querySelector('.page-sidebar');
+      content = layout.querySelector('.page-navigation-content'); nav = sidebar.querySelector('.section-switcher');
+      panels = Array.from(content.querySelectorAll('[data-section-panel]'));
+      panels.forEach(function(panel) { originalHidden.set(panel,panel.dataset.sectionOriginalHidden === 'true'); });
+      entries = Array.from(nav.querySelectorAll('button')).map(function(button) {
+        return {id:button.dataset.sectionTarget,label:button.textContent,panel:button.dataset.panelId ? document.getElementById(button.dataset.panelId) : null,phase:button.dataset.phase || '',button:button};
+      });
+      all = entries[0];
+      filters = Array.from(sidebar.querySelectorAll('.page-sidebar-filters')).map(function(group) {return {group:group,panel:document.getElementById(group.dataset.ownerPanel)};});
+    } else {
+    var guide = main.querySelector('.course-guide');
+    if (guide) {
+      // 일정 원문에는 표 앞의 대제목이 독립 노드로 남아 있다.
+      Array.from(guide.querySelectorAll('.guide-content > h2')).forEach(owner);
+      guide.querySelectorAll('.guide-section,.exercise-section,.ticket-flow').forEach(addPanel);
+    }
+    menus.forEach(function (menu) {
+      menu.querySelectorAll('a[href^="#"]').forEach(function (link) {
+        var id; try { id = decodeURIComponent(link.hash.slice(1)); } catch (e) { return; }
+        var target = document.getElementById(id);
+        var phase = target && target.matches('.schedule-card') ? target.dataset.phase : '';
+        entry(id, link.querySelector('.request-step-title,strong,.chip-title')?.textContent || link.textContent, owner(target), phase);
+      });
+    });
+    var home = main.querySelector('[data-course-home]');
+    if (home) return;
+    if (home) {
+      [['.ch-hero','home-today','오늘 할 일'],['.ch-progress','home-progress','45일 진도'],['.ch-ticket-summary','home-tickets','선택 티켓'],['.ch-entries','home-resources','학습 자료'],['.home-reference','home-reference','참고 도감']].forEach(function (item) {
+        var panel = main.querySelector(item[0]); if (!panel) return;
+        panel.id ||= item[1]; entry(panel.id,item[2],addPanel(panel));
+      });
+      var environment = document.getElementById('home-environment');
+      if (environment) entry(environment.id,'개발 환경',addPanel(environment));
+      main.querySelectorAll('.home-reference > :not(script),.home-visual > :not(script)').forEach(addPanel);
+    }
+    var journey = main.querySelector('.learning-journey');
+    if (journey) {
+      [['.journey-dashboard','journey-overview','학습 흐름'],['.visual-catalog','visual-catalog','단계별 시안'],['.journey-browser','journey-all-apis','API 찾기'],['.journey-chapters','journey-chapters-view','장별 경로']].forEach(function (item) {
+        var panel = journey.querySelector(item[0]); if (!panel) return;
+        panel.id ||= item[1]; entry(panel.id,item[2],addPanel(panel));
+      });
+      journey.querySelectorAll(':scope > .journey-entry').forEach(addPanel);
+    }
+    var catalog = main.querySelector('.kc-catalog');
+    if (catalog) {
+      [['.kc-browse','kc-browse-view','개념 분야'],['.kc-sequence','kc-sequence','학습 순서'],['#kc-original','kc-original','원문 전체']].forEach(function (item) {
+        var panel = main.querySelector(item[0]); if (!panel) return;
+        panel.id ||= item[1]; entry(panel.id,item[2],addPanel(panel));
+      });
+      catalog.querySelectorAll('.kc-context,.kc-intro,.kc-original-link').forEach(addPanel);
+    }
+    var missions = main.querySelector('.mission-visual');
+    if (journey || catalog || missions) {
+      Array.from(main.querySelectorAll(':scope > h2')).forEach(owner);
+      main.querySelectorAll(':scope > section,:scope > article,:scope > details,:scope > div,:scope > p:not(.crumbs)').forEach(addPanel);
+      if (missions) main.querySelectorAll('.mission-detail-card').forEach(addPanel);
+    }
+    var map = main.querySelector('.course-map'), tables = main.querySelector('.cm-tables');
+    if (map && tables) {
+      map.id ||= 'course-map-view'; tables.id ||= 'course-relations-view';
+      entry(map.id,'관계 지도',addPanel(map)); entry(tables.id,'연결 목록',addPanel(tables));
+    }
+    if (menus.some(function(menu) { return menu.matches('.knowledge-page-steps,.lesson-atlas,.request-steps'); })) {
+      main.querySelectorAll(':scope > section,:scope > article,:scope > details,:scope > div,.knowledge-chapter,.lesson-scene,.api-request').forEach(addPanel);
+    }
+    main.querySelectorAll('.first-java-journey,.first-api-journey,.first-db-journey,.p02-focused,.jpa-focused,.mybatis-focused,.tx-why-focused').forEach(function (panel,index) {
+      panel.id ||= 'learning-scenes-' + index; entry(panel.id,'핵심 장면',addPanel(panel));
+    });
+    if (!entries.length) {
+      main.querySelectorAll(':scope > h2').forEach(function (heading) { entry(heading.id,heading.textContent,owner(heading)); });
+    }
+    if (!entries.length) return;
+    nav = document.createElement('nav'); nav.className = 'section-switcher';
+    nav.setAttribute('aria-label','이 페이지 내용 선택'); nav.setAttribute('role','tablist'); nav.setAttribute('aria-orientation','vertical');
+    all = {id:'section-all',label:'전체',panel:null,phase:''};
+    entries.unshift(all);
+    entries.forEach(function (item,index) {
+      var button = document.createElement('button'); button.type = 'button'; button.id = 'section-tab-' + index;
+      button.setAttribute('role','tab'); button.textContent = item.label; button.dataset.sectionTarget = item.id;
+      if (item.panel) button.setAttribute('aria-controls',item.panel.id);
+      button.dataset.panelId = item.panel ? item.panel.id : ''; button.dataset.phase = item.phase;
+      item.button = button; nav.append(button);
+    });
+    layout = document.createElement('div'); layout.className = 'page-navigation-layout';
+    sidebar = document.createElement('aside'); sidebar.className = 'page-sidebar'; sidebar.setAttribute('aria-label','페이지 탐색');
+    var caption = document.createElement('p'); caption.className = 'page-sidebar-caption'; caption.textContent = '이 페이지';
+    sidebar.append(caption,nav);
+    content = document.createElement('div'); content.className = 'page-navigation-content';
+    content.append.apply(content,Array.from(main.childNodes)); layout.append(sidebar,content); main.append(layout);
+    main.classList.add('has-section-switcher');
+    filters = [];
+    content.querySelectorAll('.kc-filters,.visual-catalog-controls,.cm-relation-tabs,.cm-relation-filters,.first-java-rail').forEach(function (control) {
+      if (control.parentElement.closest('.kc-filters,.visual-catalog-controls')) return;
+      var group = document.createElement('section'); group.className = 'page-sidebar-filters';
+      var ownerPanel = control.closest('[data-section-panel]');
+      if(control.matches('.kc-filters')) ownerPanel = main.querySelector('.kc-browse');
+      var label = document.createElement('p'); label.className = 'page-sidebar-caption';
+      label.textContent = control.matches('.kc-filters') ? '개념 분야' : control.matches('.visual-catalog-controls') ? '단계 찾기' : '연결 목록';
+      if (ownerPanel && !ownerPanel.id) ownerPanel.id = 'section-filter-owner-' + filters.length;
+      group.dataset.ownerPanel = ownerPanel ? ownerPanel.id : '';
+      group.append(label,control); sidebar.append(group); filters.push({group:group,panel:ownerPanel});
+
+    });
+    menus.forEach(function (menu) { menu.hidden = true; menu.dataset.replacedBySections = ''; });
+    main.querySelectorAll('.journey-learning-nav').forEach(function (menu) { menu.hidden = true; menu.dataset.replacedBySections = ''; });
+    }
+    entries.forEach(function(item,index) { var button = item.button;
+      button.addEventListener('click',function () { choose(item,true); });
+      button.addEventListener('keydown',function (event) {
+        var next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (index + 1) % entries.length : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (index + entries.length - 1) % entries.length : event.key === 'Home' ? 0 : event.key === 'End' ? entries.length - 1 : null;
+        if (next === null) return; event.preventDefault(); choose(entries[next],true); entries[next].button.focus({preventScroll:true});
+      });
+    });
+    filters.forEach(function(filter) {
+      var control = filter.group.querySelector('.kc-filters,.visual-catalog-controls,.cm-relation-tabs,.cm-relation-filters,.first-java-rail');
+      var ownerPanel = filter.panel, label = filter.group.querySelector('.page-sidebar-caption');
+      if (!control) return;
+      if(control.matches('.first-java-rail')) {
+        label.textContent = '학습 장면';
+        control.addEventListener('click',function () { if(ownerPanel) { var view=entries.find(function(candidate) { return candidate.panel === ownerPanel; }); if(view) paint(view); } },true);
+      }
+      if (control.matches('.cm-relation-tabs')) {
+        control.setAttribute('aria-orientation','vertical');
+        control.addEventListener('click',function () { var view = entries.find(function (candidate) { return candidate.id === 'course-relations-view'; }); if(view) { paint(view); align(); } });
+      }
+    });
+    var active = all;
+    function paint(item) {
+      active = item;
+      panels.forEach(function (panel) {
+        panel.hidden = item.panel ? panel !== item.panel && !panel.contains(item.panel) && !item.panel.contains(panel) : originalHidden.get(panel);
+      });
+      main.querySelectorAll('.schedule-card[data-phase]').forEach(function (card) { card.hidden = !!item.phase && card.dataset.phase !== item.phase; });
+      filters.forEach(function (filter) { filter.group.hidden = !!item.panel && !!filter.panel && filter.panel !== item.panel && !filter.panel.contains(item.panel) && !item.panel.contains(filter.panel); });
+      entries.forEach(function (candidate) {
+        var selected = candidate === item;
+        candidate.button.setAttribute('aria-selected',String(selected)); candidate.button.tabIndex = selected ? 0 : -1;
+      });
+      if (item.panel) {
+        item.panel.setAttribute('role','tabpanel'); item.panel.setAttribute('aria-labelledby',item.button.id);
+        var fold = item.panel.closest('details');
+        while (fold) { fold.open = true; fold = fold.parentElement.closest('details'); }
+        if (item.panel.matches('details')) item.panel.open = true;
+      }
+      main.querySelectorAll('.exercise-work-grid').forEach(function (grid) { grid.hidden = !Array.from(grid.children).some(function(child) { return !child.hidden; }); });
+    }
+    function align() {
+      // 본문이 짧아지거나 깊이 읽은 뒤 전환해도 본문 시작점까지만 즉시 이동한다.
+      var start = Math.max(0,window.scrollY + content.getBoundingClientRect().top - 20);
+      if (window.scrollY > start) window.scrollTo({top:start,behavior:'instant'});
+    }
+    function choose(item,push) {
+      paint(item);
+      if (push && window.location.hash !== '#' + encodeURIComponent(item.id)) history.pushState(history.state,'','#' + encodeURIComponent(item.id));
+      align();
+    }
+    function reveal(scroll) {
+      var id; try { id = decodeURIComponent(window.location.hash.slice(1)); } catch (e) { return; }
+      if (!id || id === all.id) { paint(all); if (scroll) align(); return; }
+      var item = entries.find(function (candidate) { return candidate.id === id; });
+      if (!item && /^visual-grade-/.test(id)) item = entries.find(function(candidate) { return candidate.id === 'visual-catalog'; });
+      if (!item && /^kc-category-/.test(id)) item = entries.find(function(candidate) { return candidate.id === 'kc-browse-view'; });
+      var target = document.getElementById(id);
+      if (!item && target) {
+        // 내부 링크는 가장 가까운 본문을 선택하며 접힌 원문도 연다.
+        var candidates = entries.filter(function(candidate) { return candidate.panel && candidate.panel.contains(target); });
+        item = candidates.find(function(candidate) { return !candidates.some(function(other) { return other !== candidate && candidate.panel.contains(other.panel) && other.panel.contains(target); }); });
+      }
+      if (!item) return;
+      paint(item);
+      if (target && target !== item.panel) {
+        var fold = target.closest('details');
+        while (fold) { fold.open = true; fold = fold.parentElement.closest('details'); }
+      }
+      if (scroll) align();
+    }
+    // pushState로 주소만 갱신하고 기존 내부 링크도 같은 전환 경로에서 처리한다.
+    document.addEventListener('click',function (event) {
+      var link = event.target.closest('a[href^="#"]');
+      if (!link || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      var id; try { id = decodeURIComponent(link.hash.slice(1)); } catch(e) { return; }
+      var target = document.getElementById(id);
+      if (!entries.some(function(item) { return item.id === id || (target && item.panel && item.panel.contains(target)); })) return;
+      event.preventDefault(); history.pushState(history.state,'',link.hash); reveal(true);
+    },true);
+    window.addEventListener('popstate',function () { reveal(true); });
+    window.addEventListener('hashchange',function () { reveal(true); });
+    document.addEventListener('click',function (event) { if (event.target.closest('button[data-kc-category]')) reveal(true); });
+    document.addEventListener('keydown',function (event) {
+      if (event.target.matches('button[data-kc-category]') && ['ArrowLeft','ArrowRight','Home','End'].indexOf(event.key) >= 0) reveal(true);
+    });
+    document.addEventListener('submit',function (event) { if (event.target.matches('.kc-search')) reveal(true); });
+    var beforePrint;
+    window.addEventListener('beforeprint',function () { beforePrint = active; paint(all); });
+    window.addEventListener('afterprint',function () { paint(beforePrint || all); });
+    paint(all); reveal(false);
+  }
+  if (document.currentScript && document.currentScript.hasAttribute('data-section-initial')) start();
+  else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',start); else start();
+})();
+</script>
+
+
+
+
+
+<script>document.getElementById('first-paint-state')?.stopEarlySelection?.();document.getElementById('first-paint-state')?.remove();</script></body></html>

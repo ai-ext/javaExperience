@@ -50,6 +50,6 @@
 
 ## 산출물
 
-- [`/Users/ds/research/javaexperience-d05-20261021/REPORT.md`](/Users/ds/research/javaexperience-d05-20261021/REPORT.md)
-- [`/Users/ds/research/javaexperience-d05-20261021/source-access.json`](/Users/ds/research/javaexperience-d05-20261021/source-access.json)
-- [`/Users/ds/research/javaexperience-d05-20261021/_data/source-notes.md`](/Users/ds/research/javaexperience-d05-20261021/_data/source-notes.md)
+- [`LOCAL_HOME/research/javaexperience-d05-20261021/REPORT.md`](LOCAL_HOME/research/javaexperience-d05-20261021/REPORT.md)
+- [`LOCAL_HOME/research/javaexperience-d05-20261021/source-access.json`](LOCAL_HOME/research/javaexperience-d05-20261021/source-access.json)
+- [`LOCAL_HOME/research/javaexperience-d05-20261021/_data/source-notes.md`](LOCAL_HOME/research/javaexperience-d05-20261021/_data/source-notes.md)

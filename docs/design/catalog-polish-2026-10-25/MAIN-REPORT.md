@@ -18,9 +18,9 @@ catalog 전용 shared gutter를 적용해 로고/목록 모두 x40.03125, 목록
 
 ## 시안·MCP와 한계
 
-gpt-image-prompt/imagegen 스킬의 UI 정렬·계층 기준으로 실제 built-in imagegen 1회 생성했다. 원본은 /Users/ds/.codex/generated_images/01a154b3-918f-7c03-b91b-df3e8d21b2a3/exec-6817eb9e-4620-4c28-903c-50af73bc10ad.png에 있고 선정본 catalog-reference.jpg는 실제 JPEG quality92/1775×886이다. prompt는 image-prompt.txt에 보관했다. 제품에 이미지를 삽입하는 대신 정확한 텍스트 DOM/CSS로 구현했다. 시안의 임의 P06 관련 과제/작은 오문구·그라데이션을 옮기지 않았다. 실제 dto-1775.jpg와 같은 뷰포트로 대조했으며 문구·색·정보 순서 일부가 달라 pixel 동등이나 verified를 주장하지 않는다.
+gpt-image-prompt/imagegen 스킬의 UI 정렬·계층 기준으로 실제 built-in imagegen 1회 생성했다. 원본은 LOCAL_HOME/.codex/generated_images/01a154b3-918f-7c03-b91b-df3e8d21b2a3/exec-6817eb9e-4620-4c28-903c-50af73bc10ad.png에 있고 선정본 catalog-reference.jpg는 실제 JPEG quality92/1775×886이다. prompt는 image-prompt.txt에 보관했다. 제품에 이미지를 삽입하는 대신 정확한 텍스트 DOM/CSS로 구현했다. 시안의 임의 P06 관련 과제/작은 오문구·그라데이션을 옮기지 않았다. 실제 dto-1775.jpg와 같은 뷰포트로 대조했으며 문구·색·정보 순서 일부가 달라 pixel 동등이나 verified를 주장하지 않는다.
 
-미리캔버스는 /Users/ds/research/javaexperience-concept-ia-20261024/PATTERNS.md의 기존 검증된 검색/구조 참고를 사용했다. 이번 세션에는 MiriCanvas 도구가 노출되지 않았으며 새 MCP 검색·템플릿 편집을 수행했다고 표시하지 않는다. MCP를 사용한 이력이 실제 제품 화면 완성도를 보장하지 않으므로 이번에는 직접 화면과 CSS 계산 결과를 검증했다.
+미리캔버스는 LOCAL_HOME/research/javaexperience-concept-ia-20261024/PATTERNS.md의 기존 검증된 검색/구조 참고를 사용했다. 이번 세션에는 MiriCanvas 도구가 노출되지 않았으며 새 MCP 검색·템플릿 편집을 수행했다고 표시하지 않는다. MCP를 사용한 이력이 실제 제품 화면 완성도를 보장하지 않으므로 이번에는 직접 화면과 CSS 계산 결과를 검증했다.
 
 viewport 변경 직후 이전 프레임이 저장된 최초 1775/1920 캡처는 intermediate-stale-frame 파일로 보존하고 최종 이름에서 제외했다. AX 확인 후 재캡처해 JPEG 실제 치수1775×886/1920×832를 검증했다. browser-checks의 final-code-dto-native는 구HTML 캐시로 구 stylesheet d9454cbdf2ce가 로딩된 실패 관측이다. 정상 증거에서 제외하고 실제 reload 뒤 final-after-reload-dto-native 및 final-code-8b650-dto를 최종 증거로 사용한다. 최종 브라우저는 새 생성물로 reload하고 기본 viewport1668×832로 복원해 DTO 결과를 열어 두었다.
 

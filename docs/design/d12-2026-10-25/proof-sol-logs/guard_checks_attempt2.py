@@ -31,9 +31,9 @@ for endpoint,expected_refused in [('tcp://review.invalid:2375',True),('unix://',
   except SystemExit as e:assert 'not a local Unix socket' in str(e)
  result['tests'].append({'name':'reject-unverified-endpoint','endpoint':endpoint,'calls':calls,'pass':True})
 # Actual call() implementation must prefix all operations with verified --host.
-ns['call'].__globals__['DOCKER_SOCKET']='unix:///Users/ds/.docker/run/docker.sock'
+ns['call'].__globals__['DOCKER_SOCKET']='unix://LOCAL_HOME/.docker/run/docker.sock'
 def fixed(argv,**kw):
- assert argv==['docker','--host','unix:///Users/ds/.docker/run/docker.sock','image','inspect','review-synthetic']
+ assert argv==['docker','--host','unix://LOCAL_HOME/.docker/run/docker.sock','image','inspect','review-synthetic']
  assert not any(k in kw['env'] for k in overrides)
  return subprocess.CompletedProcess(argv,0,'synthetic\n','')
 with patch('subprocess.run',side_effect=fixed):fixed_result=ns['call'](['docker','image','inspect','review-synthetic'])
@@ -44,7 +44,7 @@ for label_matches,id_matches in ((True,True),(False,True),(True,False)):
  cid='a'*64;nonce='review_mock_nonce';calls=[]
  def cleanup_fake(argv,**kw):
   calls.append(argv)
-  assert argv[:3]==['docker','--host','unix:///Users/ds/.docker/run/docker.sock']
+  assert argv[:3]==['docker','--host','unix://LOCAL_HOME/.docker/run/docker.sock']
   assert not any(k in kw['env'] for k in overrides)
   if argv[3]=='inspect':
    assert argv[-1]==cid

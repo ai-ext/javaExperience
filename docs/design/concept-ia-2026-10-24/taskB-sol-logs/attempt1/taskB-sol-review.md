@@ -4,7 +4,7 @@
 
 ## TASKB-I1 — 읽기 모드에서 Q&A 답과 참고문헌이 자동 노출됨 (important)
 
-코드: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/knowledge-reader.js`의 tools/site/knowledge-reader.js:47-53. 계약: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/TASK-B-SPEC.md`의 TASK-B-SPEC.md:31.
+코드: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/knowledge-reader.js`의 tools/site/knowledge-reader.js:47-53. 계약: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/TASK-B-SPEC.md`의 TASK-B-SPEC.md:31.
 
 재현: P09/J01/S09/W11을 ?read=1로 열기. 자가점검 chapter는 open=true이고 내부 Q1~Q4 topic도 모두 open=true. 참고문헌 chapter도 open=true.
 
@@ -16,7 +16,7 @@
 
 ## TASKB-I2 — 기존 원문 H1 ID를 새 제목에서 복제함 (important)
 
-코드: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/knowledge-reader.mjs`의 tools/site/knowledge-reader.mjs:17; tools/site/build.mjs:678-683. 계약: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/TASK-B-SPEC.md`의 TASK-B-SPEC.md:21-23,35.
+코드: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/knowledge-reader.mjs`의 tools/site/knowledge-reader.mjs:17; tools/site/build.mjs:678-683. 계약: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/TASK-B-SPEC.md`의 TASK-B-SPEC.md:21-23,35.
 
 재현: P09 생성 HTML의 id=p09-java-문법-기초--클래스필드메서드생성자를-선언하고-호출하기는 HEAD 1개에서 현재 2개가 된다. 새 .kr-source-title와 #p09-original 안의 기존 H1이 같은 ID를 가진다. document.getElementById는 새로 생성한 숨김 제목을 먼저 선택한다.
 
@@ -28,7 +28,7 @@
 
 ## TASKB-M1 — hash 없는 읽기 전환에서 제목으로 focus가 이동하지 않음 (minor)
 
-코드: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/knowledge-reader.js`의 tools/site/knowledge-reader.js:65-70; tools/site/knowledge-reader.mjs:17. 계약: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/TASK-B-SPEC.md`의 TASK-B-SPEC.md:35.
+코드: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/knowledge-reader.js`의 tools/site/knowledge-reader.js:65-70; tools/site/knowledge-reader.mjs:17. 계약: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/TASK-B-SPEC.md`의 TASK-B-SPEC.md:35.
 
 재현: P09를 hash 없이 scene으로 열고 설명 차근차근 읽기 버튼에 focus한 뒤 click. mode는 read로 바뀌지만 document.activeElement는 계속 read button이다.
 
@@ -40,12 +40,12 @@
 
 ## 실행 근거와 판정 범위
 
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/test-concept-reader.log`: 기존 reader 하네스 PASS. 위 경계를 검출하지 못한다.
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/test-concept-dark.log`: 기존 theme/source 하네스 PASS. 134 원문 text/code/Markdown/기존 ID와 136페이지 scope 계약이 유지된다.
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/spec-probe.mjs` / `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/spec-probe.json`: 실제 생성 P09/J01/S09/W11 DOM과 HEAD 비교 관찰. probe exit 0은 결함 재현 관찰 수집 완료이며 제품 정상 의미가 아니다.
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/assert-spec-boundaries.mjs` / `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/assert-spec-boundaries.log`: 필수 경계 단언 10개 모두 실패(exit 1). Q&A 답 접힘 4개, 참고문헌 접힘 4개, 새 중복 ID 1개, 제목 focus 1개다.
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/input-snapshot.json`: 검토한 소스 및 baseline SHA-256.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/test-concept-reader.log`: 기존 reader 하네스 PASS. 위 경계를 검출하지 못한다.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/test-concept-dark.log`: 기존 theme/source 하네스 PASS. 134 원문 text/code/Markdown/기존 ID와 136페이지 scope 계약이 유지된다.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/spec-probe.mjs` / `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/spec-probe.json`: 실제 생성 P09/J01/S09/W11 DOM과 HEAD 비교 관찰. probe exit 0은 결함 재현 관찰 수집 완료이며 제품 정상 의미가 아니다.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/assert-spec-boundaries.mjs` / `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/assert-spec-boundaries.log`: 필수 경계 단언 10개 모두 실패(exit 1). Q&A 답 접힘 4개, 참고문헌 접힘 4개, 새 중복 ID 1개, 제목 focus 1개다.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/input-snapshot.json`: 검토한 소스 및 baseline SHA-256.
 
 기존 catalog controller의 하던 과제/목록 복귀는 `querySelectorAll`로 모든 anchor를 처리하므로, toolbar 추가로 첫 링크만 갱신되는 문제는 해당 경로에 없다. 홈/카탈로그 링크 변경은 원문 밖에 있으며 기존 source baseline을 고치지 않았다.
 
-검토자는 제품·원문·Java·DB·proof·기존 review·AGENTS·RESUME를 수정하지 않았다. 변경은 이 보고서와 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs` 안에만 있다. 브라우저·fresh build·24하네스·audit·외부 CLI·commit/push/PR를 수행하지 않았다. PC 실제 렌더링 검증은 메인 담당자 소유다. 134개 개념 전체 완료를 승인하지 않는다.
+검토자는 제품·원문·Java·DB·proof·기존 review·AGENTS·RESUME를 수정하지 않았다. 변경은 이 보고서와 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs` 안에만 있다. 브라우저·fresh build·24하네스·audit·외부 CLI·commit/push/PR를 수행하지 않았다. PC 실제 렌더링 검증은 메인 담당자 소유다. 134개 개념 전체 완료를 승인하지 않는다.

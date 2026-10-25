@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
 
-const root = '/Users/ds/code/javaExperience/.worktrees/concept-learning-night';
+const root = 'LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night';
 const outputDirectory = `${root}/docs/design/p09-completion-2026-10-24/luna-logs`;
 const require = createRequire(`${root}/tools/site/package.json`);
 const { build } = require('esbuild');

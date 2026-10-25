@@ -10,12 +10,12 @@
 
 전체선정수는16이다. 구memory-available은이미지그대로보존하고draft-superseded로선정목록에서제외했다. 생성이력은19개(선정16/거절2/교체이전1)다. FOCUS45좌표와sourceproof/Dockerfile은변경없다. 실제UIcrop확인은여전히별도이며Docker를재실행하지않았다.
 
-보충 보고: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-sol-memory-addendum.json
+보충 보고: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-sol-memory-addendum.json
 
-교정 이미지: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/images/memory-available-v2-pc-dark.jpg
+교정 이미지: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/images/memory-available-v2-pc-dark.jpg
 
-Q92검증 원출력: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-sol-logs/memory-v2-asset-check.json
+Q92검증 원출력: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-sol-logs/memory-v2-asset-check.json
 
-기존보고: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-sol-review.json
+기존보고: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-sol-review.json
 
 이미지·구현·proof·기존보고서를수정하거나커밋하지않았다.

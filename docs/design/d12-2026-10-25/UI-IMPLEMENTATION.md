@@ -14,7 +14,7 @@
 - `LEAD-DESIGN.json`의 설명 문장 45개를 각 상태에 그대로 연결하고 누락·변경을 테스트에서 차단한다.
 - 원문 Bash·INI는 미실행으로 구분한다. SSH host/user key, systemd 시작·재읽기·재시작·enable은 설명 모델 또는 원문 예시로만 표시한다.
 - `log-sources`와 `memory-available`은 원문 산문으로 표시한다. 산문은 코드 블록에 넣지 않고 산문 복사로 제공하며, available의 회수 가능 cache 설명은 SPEC 보강으로 원문 근거와 구분한다.
-- memory 보강 문장의 공식 근거는 [PRIMARY-SOURCES-ADDENDUM.md](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/PRIMARY-SOURCES-ADDENDUM.md)에 연결했다. 원문 D12는 free보다 available을 보라고만 안내한다. cache 등을 고려한다는 정의는 SPEC 보강과 Linux kernel 문서에 귀속하며, 원문에 있던 내용처럼 말하지 않는다.
+- memory 보강 문장의 공식 근거는 [PRIMARY-SOURCES-ADDENDUM.md](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/PRIMARY-SOURCES-ADDENDUM.md)에 연결했다. 원문 D12는 free보다 available을 보라고만 안내한다. cache 등을 고려한다는 정의는 SPEC 보강과 Linux kernel 문서에 귀속하며, 원문에 있던 내용처럼 말하지 않는다.
 - TERM ACK 뒤 생존과 release 뒤 반환을 분리한다. KILL은 별도 child의 Python Popen `-9`를 표시하며 cleanup 비교를 주장하지 않는다.
 - socket/TCP/HTTP 상태를 구분하고, curl `--fail` 미사용과 503/exit 0을 함께 표시한다. 디스크 값은 컨테이너 `/tmp` tmpfs이며 host APFS로 일반화하지 않는다.
 - 컨테이너 주 proof의 PID 1 `python3`와 별도 idle 컨테이너의 PID 1 `sleep`을 분리한다.
@@ -39,15 +39,15 @@
 
 ## 검증과 남은 확인
 
-- Sol attempt3 독립 검토는 명세 PASS, 품질 PASS, C0/I0/M0이다. [attempt3 보고서](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/ui-sol-review-attempt3.md)를 보존한다. attempt1/2 실패 보고서와 candidate snapshot도 변경하지 않았다.
+- Sol attempt3 독립 검토는 명세 PASS, 품질 PASS, C0/I0/M0이다. [attempt3 보고서](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/ui-sol-review-attempt3.md)를 보존한다. attempt1/2 실패 보고서와 candidate snapshot도 변경하지 않았다.
 - Sol attempt2 Q1은 45상태 source label/href/heading/body의 독립 파일 범위 대조로, Q2는 stale rejection의 A→B→A·동일 A 무효화, newer reject 뒤 older resolve, visible prose fallback `Range` 검사로 닫았다. 최초 Sol 실패 보고와 candidate-source snapshot은 수정하지 않았다.
 - `pipefail` 상태의 “mutant 제거” 행은 기본 학습값에서 뺐다. raw proof 원문과 assertion은 변경하지 않았다. 메인이 수정한 `overwrite-output` focus 좌표 `[2,62,96,27]`을 그대로 불러온다.
 - `cd tools/site && npm run test:d12` 통과. 테스트는 12/45 식별자/lead, canonical attempt/raw 결속과 port·runner/path mutant, 독립 상태값, source range와 실제 Bash argv, 원문 산문·모델·미실행 유형, 누락 상태/이미지/focus·설명 모델 승격 mutant, 전체 상태 표시·복사·확대, query 보존·재로드, 키보드, clipboard race/fallback을 확인한다.
 - `npm run test:concept-reader` 통과. 공통 reader의 134개 원문·코드·ID·Markdown baseline 및 history/hash/catalog 계약을 확인한다.
 - 생성 HTML에서 D12 bundle과 공통 `knowledge-reader.js`를 함께 실행해 45 상태, 16 이미지 URL, query/read 전환, 원문·generic map 보존을 확인한다.
 - `node --check`로 D12 renderer/controller/data와 `build.mjs` 구문을 확인했다.
-- 최종 `npm run build` 통과. docs/scenario HTML 301개 중 사전·사후 SHA-256 변경은 [D12 페이지](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D12-linux-terminal-basics.html) 1개뿐이고, 생성/삭제 파일은 없다.
-- 메인 실제 PC 검수는 45상태 × normal/zoom 90개 캡처와 45행 matrix로 확인했다. matrix overflow는 0이며, 메인이 교정한 overwrite·known path·directory list·container exec zoom도 현재 FOCUS 좌표에 반영되어 있다. [main-browser matrix](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-browser/matrix-final.json)와 [캡처 manifest](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-browser/captures.json)를 참조한다.
+- 최종 `npm run build` 통과. docs/scenario HTML 301개 중 사전·사후 SHA-256 변경은 [D12 페이지](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D12-linux-terminal-basics.html) 1개뿐이고, 생성/삭제 파일은 없다.
+- 메인 실제 PC 검수는 45상태 × normal/zoom 90개 캡처와 45행 matrix로 확인했다. matrix overflow는 0이며, 메인이 교정한 overwrite·known path·directory list·container exec zoom도 현재 FOCUS 좌표에 반영되어 있다. [main-browser matrix](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-browser/matrix-final.json)와 [캡처 manifest](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-browser/captures.json)를 참조한다.
 
 ## 후보 SHA-256
 

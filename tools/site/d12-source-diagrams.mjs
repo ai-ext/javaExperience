@@ -255,7 +255,8 @@ export function initD12SourceDiagrams(doc = document, win = window, mermaid = wi
   }
   for (const details of original.querySelectorAll('details')) {
     visibilityTargets.add(details);
-    observer.observe(details, { attributes: true, attributeFilter: ['open'] });
+    // 절 선택은 접기 상태와 별개로 hidden을 바꾸므로 함께 감시한다.
+    observer.observe(details, { attributes: true, attributeFilter: ['open', 'hidden'] });
   }
   const onResize = () => syncVisibility([{ type: 'resize' }]);
   win.addEventListener('resize', onResize);

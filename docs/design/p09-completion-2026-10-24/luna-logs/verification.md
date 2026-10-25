@@ -1,6 +1,6 @@
 # P09 implementation verification log
 
-Worktree: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night`  
+Worktree: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night`  
 Branch: `docs/concept-learning-night`  
 Base task commit: `8c851029`  
 Verification recorded: 2026-10-25

@@ -11,7 +11,7 @@ for name in ['P19Application','Customer','CustomerRepository','CustomerControlle
     block=next(b for b in blocks if re.search(r'public (?:class|interface) '+name+r'\b',b))+'\n'
     assert (OUT/'original'/f'{name}.java').read_text()==block,name
 cmd=[str(ROOT/'gradlew'),'-p',str(OUT/'runtime'),'--no-daemon','--console=plain','recordDependencies','runProof']
-env=os.environ.copy();env['JAVA_HOME']='/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home'
+env=os.environ.copy();env['JAVA_HOME']='LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home'
 r=subprocess.run(cmd,cwd=ROOT,env=env,capture_output=True,text=True);(OUT/'gradle-run.txt').write_text(r.stdout+r.stderr)
 assert r.returncode==0,r.stdout+r.stderr
 assert r.stdout.count('PASS ')==19

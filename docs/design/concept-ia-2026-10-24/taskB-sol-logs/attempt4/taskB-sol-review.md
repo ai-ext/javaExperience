@@ -1,6 +1,6 @@
 # Task B 독립 검토 — 한정 승인
 
-**Spec PASS_BOUNDED → Quality PASS_BOUNDED, C0/I0/M0.** 기준 HEAD `90edde073041885f56661056e0532f4fc9ef4cc4`의 현재 reader diff와 명시 승인된 QA 구조/toolbar H1/19개 source-H1 selector 변경을 검토했다. 입력 SHA는 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/input-snapshot.json`에 고정했고 품질 완료 시 다시 같음을 확인했다.
+**Spec PASS_BOUNDED → Quality PASS_BOUNDED, C0/I0/M0.** 기준 HEAD `90edde073041885f56661056e0532f4fc9ef4cc4`의 현재 reader diff와 명시 승인된 QA 구조/toolbar H1/19개 source-H1 selector 변경을 검토했다. 입력 SHA는 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/input-snapshot.json`에 고정했고 품질 완료 시 다시 같음을 확인했다.
 
 ## 명세와 보존
 
@@ -14,18 +14,18 @@
 
 ## 품질과 검증
 
-관련5하네스 concept-reader/concept-dark/home/knowledge-catalog/navigation 모두 fresh PASS다. `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/mutations.json`의 독립변이10개를 모두 검출했다. 외부history/query 손실, read중 scene노출/source닫힘, Q&A 자동노출, hash 미정리, 중복init, 잘못된decode, nested표버튼 숨김, read중복제목 경계를 검증했다. 변이는 메모리 문자열/격리 DOM에서만 실행해 제품 파일을 바꾸지 않았다.
+관련5하네스 concept-reader/concept-dark/home/knowledge-catalog/navigation 모두 fresh PASS다. `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/mutations.json`의 독립변이10개를 모두 검출했다. 외부history/query 손실, read중 scene노출/source닫힘, Q&A 자동노출, hash 미정리, 중복init, 잘못된decode, nested표버튼 숨김, read중복제목 경계를 검증했다. 변이는 메모리 문자열/격리 DOM에서만 실행해 제품 파일을 바꾸지 않았다.
 
 QA helper는 H3가 없는 자가점검 chapter에서만 호출되며 다른 core section·기존H3 경로는 보존된다. raw slice로 필요한 문단/목록만 감싸고 전체 원문을 재직렬화하지 않는다. 독립 fixture에서 text순서/질문1회/inline+후속답/ordered start/코드·ID 보존을 확인했다. 의존성·네트워크·storage·새mobile/light 분기·래스터filter 추가가 없다. catalog 복귀 controller는 querySelectorAll로 toolbar와 기존 anchor를 처리한다.
 
 근거:
 
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/spec-pass.json` 및 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/independent-spec.json`
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/all-qa.json`
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/quality-pass.json`, `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/quality-static.json`, `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/quality-scope.json`
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/mutations.json`와 같은 폴더의 명령별 log
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/spec-pass.json` 및 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/independent-spec.json`
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/all-qa.json`
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/quality-pass.json`, `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/quality-static.json`, `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/quality-scope.json`
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt4/mutations.json`와 같은 폴더의 명령별 log
 
-이전3회 FAIL 원본은 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt1`, `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt2`, `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt3`에 보존했다. I1/I2/M1/I3/I4는 모두 해소됐다.
+이전3회 FAIL 원본은 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt1`, `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt2`, `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt3`에 보존했다. I1/I2/M1/I3/I4는 모두 해소됐다.
 
 ## 승인 한계
 

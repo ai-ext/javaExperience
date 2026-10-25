@@ -4,7 +4,7 @@
 
 ## 범위와 결론
 
-대상은 현재 디렉터리의 `/Users/ds/research/javaexperience-p20-20261020/P20-source.md` 전체 386줄이다. 본 보고서는 실행 검증이 아니라 공식 명세와 공식 API 문서에 대한 문헌 검증이다. 사용된 주 근거는 Jakarta Persistence 3.2 명세/API 및 Spring Data JPA 4.1.1 문서다.
+대상은 현재 디렉터리의 `LOCAL_HOME/research/javaexperience-p20-20261020/P20-source.md` 전체 386줄이다. 본 보고서는 실행 검증이 아니라 공식 명세와 공식 API 문서에 대한 문헌 검증이다. 사용된 주 근거는 Jakarta Persistence 3.2 명세/API 및 Spring Data JPA 4.1.1 문서다.
 
 문서의 핵심 설명은 대체로 정확하다. 다만 엔티티의 필드/메서드 제한 표현, enum의 새 예외, orphanRemoval의 적용 대상 상태, `IDENTITY` 실행 설명, Java 접근제어 오류를 고칠 필요가 있다.
 

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import {createRequire} from 'node:module';
 import assert from 'node:assert/strict';
-const root='/Users/ds/code/javaExperience/.worktrees/concept-learning-night';
+const root='LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night';
 const out=process.env.REVIEW_OUT || root+'/docs/design/p09-completion-2026-10-24/ui-sol-logs/attempt1';
 const require=createRequire(root+'/tools/site/package.json');
 const {build}=require('esbuild');

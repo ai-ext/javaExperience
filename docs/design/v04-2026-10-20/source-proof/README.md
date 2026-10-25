@@ -1,16 +1,16 @@
 # V04 원문과 추가 검증의 경계
 
-확인일:2026-10-20. 원문 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V04-test-db-strategy.md`264줄/9fence를 보존했다. 완전한 원문 ProductRepositoryTest1개는 수정 없이 컴파일만 했다. Docker Unixsocket2곳은 읽기 전용3초 _ping에서 접속거부였으며 Docker 서비스·컨테이너·ServiceConnection을 실행하지 않았다. Java4부분 패턴은 문서에 필요한 도메인/설정이 생략된 예제이므로 원문 전체를 그대로 실행했다고 하지 않는다. 원문 Kotlin/bash2도 외부 starter에서 실행한 것으로 표시하지 않는다.
+확인일:2026-10-20. 원문 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/V04-test-db-strategy.md`264줄/9fence를 보존했다. 완전한 원문 ProductRepositoryTest1개는 수정 없이 컴파일만 했다. Docker Unixsocket2곳은 읽기 전용3초 _ping에서 접속거부였으며 Docker 서비스·컨테이너·ServiceConnection을 실행하지 않았다. Java4부분 패턴은 문서에 필요한 도메인/설정이 생략된 예제이므로 원문 전체를 그대로 실행했다고 하지 않는다. 원문 Kotlin/bash2도 외부 starter에서 실행한 것으로 표시하지 않는다.
 
 외부 study의Product관련6Java와원본ServiceUnitTest2케이스·schema/seed는 SHA 사본으로 별도 보관했다. 기존 외부파일·학습자서버는 수정하지 않았다. ServiceUnitTest는 mock repository를 직접 new한 service에 전달하는 코드로 SQL·Spring proxy·DB를 검증하지 않는다. 실제 원본 unit2개가 통과했고, 원문 RepositoryTest의 assert body2개는 **추가 native adapter**에서 검증했다. 이 adapter는 TC 원문 class와 구분한다. Page요청은 정렬이 없으며 id목록은 추가 관찰기가 membership만 정렬 표시한 값이고 SQL ORDER BY 보장이 아니다.
 
 추가 fixture는 Boot4.1.1 BOM/JDK21/Spring7.0.9/DataJPA4.1.1/Hibernate7.4.5.Final/H22.4.240/MySQL8.4.11/ConnectorJ9.7.0/TC2.0.5를 사용했다. 실제 HTTP toy app의 Tomcat은11.0.24다. dependencies.json의132개는 testRuntimeClasspath·annotationProcessor·compileClasspath에서 선택된 artifact의 합집합과 SHA이며132개 전부를 runtime class로 로드했다는 뜻은 아니다.
 
 ```bash
-cd /Users/ds/code/javaExperience/.worktrees/concept-learning-night
-/Users/ds/research/javaexperience-r03-20261020/_data/venv/bin/python docs/design/v04-2026-10-20/source-proof/run-proof.py \
-  --mysql-base /Users/ds/research/javaexperience-r03-20261020/_data/portable/mysql-8.4.11-macos15-arm64 \
-  --runtime-root /Users/ds/research/javaexperience-v04-20261020/_data/runtime
+cd LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night
+LOCAL_HOME/research/javaexperience-r03-20261020/_data/venv/bin/python docs/design/v04-2026-10-20/source-proof/run-proof.py \
+  --mysql-base LOCAL_HOME/research/javaexperience-r03-20261020/_data/portable/mysql-8.4.11-macos15-arm64 \
+  --runtime-root LOCAL_HOME/research/javaexperience-v04-20261020/_data/runtime
 ```
 
 매번 0700 run 아래 새datadir(실측0750)·0700 socket디렉터리·자체PID·새127.0.0.1port·mysqlxOFF를 guard한 뒤 외부 study schema/seed사본만 적재한다. Java는 두 private schema의 SELECT/INSERT/UPDATE/DELETE만 허용한 새 임시 계정과 TLS REQUIRED를 쓴다. 암호는 매번 생성하고 기록하지 않는다. 기존 DB·3306·서버·설정·실습 데이터는 사용하지 않는다. 자기 MySQL은 정상 종료했다.

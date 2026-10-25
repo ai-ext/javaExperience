@@ -4,7 +4,7 @@ D26~D29·D33·D34·D38·D39에서 환경을 만드는 부분만 제공한다. �
 
 ## 준비: 격리 사본과 두 이미지
 
-실행 중인 Docker Engine·JDK 21·curl이 필요하다. 저장소 루트를 `JX_REPO`, 학습자가 만든 프로젝트의 절대경로를 `LEARNER_PROJECT`로 직접 지정한다. 변수에는 실제 경로를 넣는다. 포트 18996~18998이 비었는지 먼저 확인하고 충돌하면 compose의 호스트 포트와 아래 URL을 함께 바꾼다. 아래 자격증명은 이 일회용 DB 전용이며 실서비스 값을 복사하지 않는다.
+실행 중인 Docker Engine·JDK 21·curl·Python 3이 필요하다. 아래 명령은 bash/zsh 기준이다. Windows에서는 WSL2의 Linux 작업 경로에서 실행하고, WSL 안의 JDK 21·Python 3·`docker info`·`docker compose version`·LF 줄바꿈과 `gradlew` 실행 권한을 먼저 확인한다. PowerShell에서는 셸 명령과 Python의 Unix signal 동작이 같지 않으므로 이 절의 명령을 그대로 실행하지 않는다. 다른 Docker 런타임에서는 먼저 `docker info`와 compose 연결·포트 공개를 확인하고, 실패하면 호스트 JDK 21로 Gradle을 실행한다. 저장소 루트를 `JX_REPO`, 학습자가 만든 프로젝트의 절대경로를 `LEARNER_PROJECT`로 직접 지정한다. 변수에는 실제 경로를 넣는다. 포트 18996~18998이 비었는지 먼저 확인하고 충돌하면 compose의 호스트 포트와 아래 URL을 함께 바꾼다. 아래 자격증명은 이 일회용 DB 전용이며 실서비스 값을 복사하지 않는다.
 
 ```bash
 export JX_REPO=/absolute/path/to/javaExperience
@@ -12,7 +12,16 @@ export LEARNER_PROJECT=/absolute/path/to/my-project
 export OPS_LAB=$(mktemp -d "${TMPDIR:-/tmp}/jx-ops.XXXXXX")
 export OPS_LAB=$(cd "$OPS_LAB" && pwd -P)
 export COMPOSE_PROJECT_NAME=jx-ops-$(basename "$OPS_LAB" | tr '[:upper:].' '[:lower:]-')
-lsof -nP -iTCP:18996 -iTCP:18997 -iTCP:18998 -sTCP:LISTEN
+python3 - <<'PY'
+import socket
+for port in (18996, 18997, 18998):
+    with socket.socket() as probe:
+        try:
+            probe.bind(('127.0.0.1', port))
+        except OSError:
+            raise SystemExit(f'{port}: 사용 중 — 포트를 바꾸세요')
+    print(f'{port}: 사용 가능')
+PY
 cp "$JX_REPO/course/start/ops/Dockerfile" "$OPS_LAB/"
 cp "$JX_REPO/course/start/ops/compose.yaml" "$OPS_LAB/"
 cp "$JX_REPO/course/start/ops/baseline.sql" "$OPS_LAB/"
@@ -146,7 +155,7 @@ docker compose exec -T -e MYSQL_PWD=ops-only mysql mysqldump -uroot \
   --single-transaction --set-gtid-purged=OFF --no-tablespaces --column-statistics=0 ops_lab \
   > evidence/backup-D27/snapshot.sql
 test -s evidence/backup-D27/snapshot.sql
-shasum -a 256 baseline.sql evidence/backup-D27/* > evidence/backup-D27.sha256
+if command -v sha256sum >/dev/null 2>&1; then sha256sum baseline.sql evidence/backup-D27/* > evidence/backup-D27.sha256; else shasum -a 256 baseline.sql evidence/backup-D27/* > evidence/backup-D27.sha256; fi
 date -u +%FT%TZ > evidence/backup-D27/completed-at.txt
 docker compose up -d app-a app-b
 # 이후 쓰기는 별도 after-backup 증거로 기록하고 원본 baseline을 덮어쓰지 않는다.
@@ -222,19 +231,32 @@ docker compose exec -T app-a sh -c 'kill -CONT "$1"' sh "$JVM_A"
 
 ```bash
 cd "$OPS_LAB"
-docker stats --format '{{json .}}' > evidence/resources.jsonl &
-STATS_PID=$!
+APP_A_ID=$(docker compose ps -q app-a)
+APP_B_ID=$(docker compose ps -q app-b)
+DB_ID=$(docker compose ps -q mysql)
+test -n "$APP_A_ID" && test -n "$APP_B_ID" && test -n "$DB_ID"
 python3 "$JX_REPO/course/start/ops/measure-http.py" \
   --requests 100 --concurrency 4 --timeout 2 --output evidence/latency.jsonl \
   http://127.0.0.1:18996/actuator/health http://127.0.0.1:18997/actuator/health \
   > evidence/latency-summary.json &
 LOAD_PID=$!
+(
+  while kill -0 "$LOAD_PID" 2>/dev/null; do
+    STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    SAMPLE=$(docker stats --no-stream --format '{{json .}}' "$APP_A_ID" "$APP_B_ID" "$DB_ID") || exit 1
+    FINISHED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    printf '%s\n' "$SAMPLE" | python3 -c 'import json,sys; rows=[json.loads(line) for line in sys.stdin if line.strip()]; print(json.dumps({"startedAt":sys.argv[1],"finishedAt":sys.argv[2],"containers":rows}))' "$STARTED_AT" "$FINISHED_AT" >> evidence/resources.jsonl
+    sleep 1
+  done
+) &
+STATS_PID=$!
 # 요청 실행 중 다른 터미널에서 아래 Hikari 관찰을 수행한다.
 wait "$LOAD_PID"
-kill "$STATS_PID"
-wait "$STATS_PID" || true
+wait "$STATS_PID"
 cat evidence/latency-summary.json
 ```
+
+`resources.jsonl`이 비어 있으면 요청이 첫 표본보다 먼저 끝난 것이다. 동일한 수집 조건으로 더 긴 유한 요청을 다시 실행하고, 표본이 없는 구간은 자원 측정 완료로 세지 않는다.
 
 Hikari active/pending은 학습자 앱의 테스트 환경에서 Actuator metrics를 노출한 경우 `/actuator/metrics/hikaricp.connections.active`와 `/actuator/metrics/hikaricp.connections.pending`을 앱 둘에서 1초 간격으로 조회하고 UTC 시각과 함께 보존한다. `date -u +%FT%TZ` 뒤 `curl --fail <앱주소>/actuator/metrics/hikaricp.connections.pending`을 실행한다. 노출되지 않으면 404를 0으로 바꾸지 말고 확인 불가로 남긴다. 요청 표본의 startedAt/finishedAt 구간과 Docker CPU/MemUsage·메트릭의 수집 시각을 대조한다. 요청이 너무 빨리 끝나 동시각 표본이 없으면 통합 자원 진단은 확인 불가이며 조건을 다시 설계한다. D39의 요청 풀/Hikari 통합 진단도 이 방식으로 자기 앱에서 수집한다. 독립 JvmSignals 결과로 대체하지 않는다.
 
@@ -254,7 +276,7 @@ ps -p "$JVM_PID" -o pid,pcpu,rss,etime,command
 "$JAVA_HOME/bin/jcmd" "$JVM_PID" GC.heap_info > evidence/cpu-heap.txt
 wait "$JVM_PID"
 # 같은 절차를 아래 두 명령으로 각각 반복한다. PID·시각·파일 이름을 매번 새로 보존.
-# java -Xmx64m JvmSignals wait http://127.0.0.1:18997/ops/slow?millis=20000
+# java -Xmx64m JvmSignals wait 'http://127.0.0.1:18997/ops/slow?millis=20000'
 # java -Xmx64m JvmSignals heap
 ```
 

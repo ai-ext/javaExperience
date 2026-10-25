@@ -15,7 +15,7 @@
 
 ## 보존 확인
 
-- 원문 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D11-web-security-basics.md`는 314줄, SHA-256 `a9ba3c0109c24d61fcfbaf0e013ab2b90cee5dceac5a8432326f4bc7f63e2fba`다.
+- 원문 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D11-web-security-basics.md`는 314줄, SHA-256 `a9ba3c0109c24d61fcfbaf0e013ab2b90cee5dceac5a8432326f4bc7f63e2fba`다.
 - 생성 HTML의 `#d11-original` 안 `.knowledge-chapters`와 기존 개념 지도는 HEAD 생성본과 DOM subtree가 각각 일치한다. 원문 개념 지도는 `.d11-legacy`에 한 번만 존재한다.
 - 생성된 페이지에서 D11 controller와 common reader를 초기화한 뒤 장면 모드와 읽기 모드 각각 한 개의 visible H1을 확인한다.
 
@@ -30,5 +30,5 @@
 - `chain-rules` 원문 Java 발췌는 184~197행으로 시작 fence 없이 복사한다. `version-pinned`는 원문 설명 문장 발췌를 유지한다.
 - CORS 허용 상태 표는 `Allow-Methods`와 `Allow-Headers`로 표기한다. HSTS 첫 입력·기억된 입력은 시안의 `learn.example.test`와 맞추고, 기본 정책 `max-age=31536000`과 다음 장면의 `includeSubDomains`를 분리한다.
 - `cookie-token` focus는 FOCUS-DESIGN.json, 데이터, 독립 테스트 기대값에 `[1, 56, 56, 24]`로 동일하게 지정했다.
-- `test:d11`은 38개 실제 DOM 출처/evidence 라벨을 독립 map과 대조한다. 원문 Spring 실행을 주장하는 source label 메모리 변이는 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/ui-luna-logs/09-rendered-code-kind-mutant.json`에서 assertion 실패로 검출된다.
+- `test:d11`은 38개 실제 DOM 출처/evidence 라벨을 독립 map과 대조한다. 원문 Spring 실행을 주장하는 source label 메모리 변이는 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d11-2026-10-25/ui-luna-logs/09-rendered-code-kind-mutant.json`에서 assertion 실패로 검출된다.
 - 재검증: `npm run build`, `npm run test:d11`, `npm run test:p09`, `npm run test:concept-reader`, `npm run test:concept-dark`, `git diff --check` 통과. W15 생성 HTML과 HEAD blob SHA-256은 `964e56e13fa8b30762b32c20039f2b23ab44e9a99f4a7e4e35e20aa239e4ad03`로 일치한다.

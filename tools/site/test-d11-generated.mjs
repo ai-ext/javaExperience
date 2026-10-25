@@ -14,7 +14,13 @@ assert.equal(doc.querySelectorAll('[data-d11-learning]').length, 1);
 assert.equal(doc.querySelectorAll('#d11-original').length, 1);
 assert.equal(doc.querySelectorAll('.d11-legacy').length, 1);
 assert.equal(doc.querySelectorAll('.knowledge-chapters').length, 1);
-assert.equal(doc.querySelector('.knowledge-reader-original #d11-original .knowledge-chapters').outerHTML, original.querySelector('.knowledge-chapters').outerHTML);
+// 절 전환의 hidden 속성만 배치 상태로 제외한다. 나머지 원문 DOM·코드·앵커 대조는 그대로 유지한다.
+const sourceWithoutSelection = node => {
+  const copy = node.cloneNode(true);
+  copy.querySelectorAll('details.knowledge-chapter').forEach(chapter => chapter.removeAttribute('hidden'));
+  return copy.outerHTML;
+};
+assert.equal(sourceWithoutSelection(doc.querySelector('.knowledge-reader-original #d11-original .knowledge-chapters')), sourceWithoutSelection(original.querySelector('.knowledge-chapters')));
 assert.equal(doc.querySelector('.d11-legacy .knowledge-page-map').outerHTML, original.querySelector('.knowledge-page-map').outerHTML);
 assert.equal(doc.querySelectorAll('[id]').length, new Set([...doc.querySelectorAll('[id]')].map(node => node.id)).size);
 assert.equal(doc.querySelector('[data-d11-topic]').value, 'object-ownership');

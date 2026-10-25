@@ -3,9 +3,9 @@
 판정은 **needs_fix**이며 전체 문서 완료는 false다. 원문 범위는 **needs_completion**, 품질은 spec 미통과 상태의 진단이다. 확정 이슈는 important 1건이다.
 
 - 기준 HEAD: `4b0493af52b1a06decca909d6bf9a8b6f9610686`
-- 원문: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D06-deployment-concepts.md` · 264줄 · SHA `0e67f2ea37cbf166229fc256d1cd3a5b81a9e48a164a9680840b4ec21e0f63f1`
+- 원문: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D06-deployment-concepts.md` · 264줄 · SHA `0e67f2ea37cbf166229fc256d1cd3a5b81a9e48a164a9680840b4ec21e0f63f1`
 - 새 검사: `npm --prefix tools/site run test:d06` · UTC `2026-10-22T00:13:45.569362+00:00` → `2026-10-22T00:13:49.252298+00:00` · actual exit `0`
-- 원시 출력/소스 SHA: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task20/runs/sol-audit-20261022T001345Z/`
+- 원시 출력/소스 SHA: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task20/runs/sol-audit-20261022T001345Z/`
 
 ## spec: 원문 보존과 전체 커버리지를 구별
 
@@ -15,7 +15,7 @@
 
 ## quality: 진단용 확정 finding
 
-**D06-Q1 · important** — `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/d06-lesson-data.mjs:1656`가 사용하는 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d06-2026-10-21/images/promotion-v4.jpg` 상단 Local / Dev 상자는 두 환경을 `Used for individual development and local testing`이라고 함께 설명한다. 원문 L38–39·65는 local 개인 확인과 dev 공유 통합 목적을 구별한다. 현재 장면 값은 이름만 열거하여 그림의 잘못된 역할을 교정하지 않는다.
+**D06-Q1 · important** — `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/d06-lesson-data.mjs:1656`가 사용하는 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d06-2026-10-21/images/promotion-v4.jpg` 상단 Local / Dev 상자는 두 환경을 `Used for individual development and local testing`이라고 함께 설명한다. 원문 L38–39·65는 local 개인 확인과 dev 공유 통합 목적을 구별한다. 현재 장면 값은 이름만 열거하여 그림의 잘못된 역할을 교정하지 않는다.
 
 수정은 local/dev 역할을 이미지와 같은 장면의 텍스트에서 구별하는 범위다. 모델/실제 운영 미실행 표시는 유지한다. 새 이미지를 직접 읽고 원문과 대조하며 해당 의미를 검사에 추가해야 한다. 현재 test:d06은 이미지 SHA·노출·고정 JSON·문자열 일치를 검사하므로 이 의미 오류가 있어도 exit0이다.
 

@@ -2,9 +2,9 @@
 
 D12에 PC 다크 전용 질문 12개·상태 45개와 실제 imagegen JPG 시안 16개를 구현했다. 현재 코드 fingerprint에서 기존24개와 D11·D12를 합친 하네스26개가 모두 통과했다. 이 결과는 D12의 이번 보강 범위에 대한 구현·검증이며, 원문 전체 또는 134개 문서 전체의 완료 판정은 아니다. fullDocumentComplete는 false다.
 
-작업 위치는 /Users/ds/code/javaExperience/.worktrees/concept-learning-night, 브랜치는 docs/concept-learning-night다. 검증 당시 HEAD는 7e824f893aa3d78eb5e21100169865cfb0f6a6d1이며, 미커밋 코드까지 포함한 최종 tools/site fingerprint는 0e2d190b2f8bd721b0b8e556b32312186a4e47b2dba611ba4dd45881f399bf18이다. 통합·push·PR·merge는 수행하지 않았다.
+작업 위치는 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night, 브랜치는 docs/concept-learning-night다. 검증 당시 HEAD는 7e824f893aa3d78eb5e21100169865cfb0f6a6d1이며, 미커밋 코드까지 포함한 최종 tools/site fingerprint는 0e2d190b2f8bd721b0b8e556b32312186a4e47b2dba611ba4dd45881f399bf18이다. 통합·push·PR·merge는 수행하지 않았다.
 
-기계 판독 결과: [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-summary.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-summary.json)
+기계 판독 결과: [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-summary.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-summary.json)
 
 ## 구현과 교육 범위
 
@@ -14,7 +14,7 @@ D12에 PC 다크 전용 질문 12개·상태 45개와 실제 imagegen JPG 시안
 - 이미지 기본 표시를 넓게 두고 관측값·코드를 아래 두 열에 배치했다. 공통 reader CSS가 처음 의도한 배치를 덮어쓰는 문제를 D12 국소 선택자로 교정했다. 새 모바일·라이트 구성은 만들지 않았다.
 - 원문 D12 330행의 SHA-256은 bcdd88b289812a79e82d1a705d38c0f11477afaadfc76985b2eb50b231d79b0c로 유지했다. 기존 map·원문·anchor를 보존했다.
 
-설계 계약: [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/SPEC.md](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/SPEC.md), [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/LEAD-DESIGN.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/LEAD-DESIGN.json), [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/FOCUS-DESIGN.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/FOCUS-DESIGN.json)
+설계 계약: [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/SPEC.md](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/SPEC.md), [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/LEAD-DESIGN.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/LEAD-DESIGN.json), [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/FOCUS-DESIGN.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/FOCUS-DESIGN.json)
 
 ## 실제 Linux 관측과 미실행 모델
 
@@ -26,7 +26,7 @@ D12에 PC 다크 전용 질문 12개·상태 45개와 실제 imagegen JPG 시안
 
 SSH/scp, 실제 systemd/systemctl/journalctl, Java25 jar 서비스, free, ICMP는 실행하지 않았다. 해당 화면은 원문 분석·설명 모델이다. TERM/KILL cleanup 파일 생성 여부를 비교한 실험도 아니다. available 보강은 원문 귀속과 구분하고 공식 kernel MemAvailable 본문으로 대조했다.
 
-근거: [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/selected-proof.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/selected-proof.json), [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/PROOF-IMPLEMENTATION.md](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/PROOF-IMPLEMENTATION.md), [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/PRIMARY-SOURCES-ADDENDUM.md](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/PRIMARY-SOURCES-ADDENDUM.md)
+근거: [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/selected-proof.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/selected-proof.json), [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/PROOF-IMPLEMENTATION.md](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/PROOF-IMPLEMENTATION.md), [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/PRIMARY-SOURCES-ADDENDUM.md](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/PRIMARY-SOURCES-ADDENDUM.md)
 
 ## 메인의 실제 PC 검수
 
@@ -37,7 +37,7 @@ SSH/scp, 실제 systemd/systemctl/journalctl, Java25 jar 서비스, free, ICMP�
 - Q&A8개 초기 닫힘과 Q1만 열림, 원문 목차, ArrowRight 포커스/Enter 선택, 다음 버튼 경계, 새로고침 상태 복원, 원문 직접 이동을 확인했다. 검색은 입력 후 제출하는 UI이며, 리눅스 검색의 D12 읽기 진입 뒤 같은 query·결과1개·D12 포커스로 돌아왔다.
 - 별도 추가 화면7개 중 width1280 원문 사진에서 Mermaid 오류를 발견했다. 그 사진은 before_fix로 남겼고 정상 수용 사진과 구분했다.
 
-행렬과 원자료: [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-browser/matrix-final.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-browser/matrix-final.json), [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-browser/captures.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-browser/captures.json), [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MAIN-VISUAL-REVIEW.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MAIN-VISUAL-REVIEW.json)
+행렬과 원자료: [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-browser/matrix-final.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-browser/matrix-final.json), [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-browser/captures.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/main-browser/captures.json), [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MAIN-VISUAL-REVIEW.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MAIN-VISUAL-REVIEW.json)
 
 ## 원문 도식의 실제 회귀를 찾아 수정한 과정
 
@@ -51,7 +51,7 @@ D12만 자동 시작을 끄고 읽기 영역·열린 경로·양수 폭에서 �
 
 관찰 기록의 실패·대조·중간·최종은 역할별로 구분했다. locator 재포커스가 포함된 PageDown 관측은 취소 입증으로 쓰지 않는다. Chrome extension 오류100건과 preview source 오류0의 console tail은 도식 정상 렌더의 증명이 아니므로 실제 SVG와 사진을 따로 봤다.
 
-근거: [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-ROOT-CAUSE.md](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-ROOT-CAUSE.md), [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-BROWSER-ROLES.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-BROWSER-ROLES.json), [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/mermaid-investigation/MERMAID-BROWSER-SUMMARY.md](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/mermaid-investigation/MERMAID-BROWSER-SUMMARY.md)
+근거: [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-ROOT-CAUSE.md](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-ROOT-CAUSE.md), [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-BROWSER-ROLES.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-BROWSER-ROLES.json), [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/mermaid-investigation/MERMAID-BROWSER-SUMMARY.md](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/mermaid-investigation/MERMAID-BROWSER-SUMMARY.md)
 
 ## 독립 검수와 최종 검사
 
@@ -61,15 +61,15 @@ UI 변이19개, 도식 기본17개와 anchor11개·Tab1개·capture2개의 의�
 
 최종 검수는 모두 C0/I0/M0다.
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-doc-addendum.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-doc-addendum.json)
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-sol-memory-addendum.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-sol-memory-addendum.json)
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/ui-sol-polish-addendum.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/ui-sol-polish-addendum.json)
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-SOL-REVIEW-final.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-SOL-REVIEW-final.json)
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-ANCHOR-SOL-REVIEW-final.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-ANCHOR-SOL-REVIEW-final.json)
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-doc-addendum.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-doc-addendum.json)
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-sol-memory-addendum.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-sol-memory-addendum.json)
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/ui-sol-polish-addendum.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/ui-sol-polish-addendum.json)
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-SOL-REVIEW-final.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-SOL-REVIEW-final.json)
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-ANCHOR-SOL-REVIEW-final.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/MERMAID-ANCHOR-SOL-REVIEW-final.json)
 
 최종 하네스26개는 모두 현재 코드 fingerprint와 일치한다. build HTML339개·링크 오류0, audit:visual·audit:version-cards·audit:parity가 모두 통과했다. 최종 재빌드에서 코드 fingerprint와 inventory가 바뀌지 않았다.
 
-검사 원출력: [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/final-checks/checks.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/final-checks/checks.json), [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/final-checks/harness-current26.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/final-checks/harness-current26.json)
+검사 원출력: [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/final-checks/checks.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/final-checks/checks.json), [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/final-checks/harness-current26.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/final-checks/harness-current26.json)
 
 ## 장부와 보존
 
@@ -79,6 +79,6 @@ parity는기존750행 byte prefix를 보존하고16개 implemented만 추가해7
 
 HTTP Chrome PC에서 검증했다. 모바일·라이트·file URL 오프라인 수용, 실제 운영 배포·학습자의 실력·서버 구현 완료는 판정하지 않는다. 다음 등록 문서는 task27 D13이며 이번 문서로134개 전체 완료를 표시하지 않는다.
 
-Git 공백 검사는 실제 원출력5개 파일의 EOF 빈 줄만 예외로 보존했다. 작성 문서3개의 EOF만 정리했고, 생성된45상태 payload가 현재 데이터와 그대로 같음을 확인했다. 상세 예외와 해시는 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/final-checks/whitespace-exceptions.json 에 있다.
+Git 공백 검사는 실제 원출력5개 파일의 EOF 빈 줄만 예외로 보존했다. 작성 문서3개의 EOF만 정리했고, 생성된45상태 payload가 현재 데이터와 그대로 같음을 확인했다. 상세 예외와 해시는 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/final-checks/whitespace-exceptions.json 에 있다.
 
-최종 실제 화면: [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/FINAL-PC-DARK.jpg](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/FINAL-PC-DARK.jpg)
+최종 실제 화면: [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/FINAL-PC-DARK.jpg](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/FINAL-PC-DARK.jpg)

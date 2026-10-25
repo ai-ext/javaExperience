@@ -44,7 +44,7 @@ try:
  assert settings=={'bind':'127.0.0.1','port':str(port),'dir':str(run),'save':'','appendonly':'no'}
  assert not pid.exists()or int(pid.read_text())==server.pid
  (run/'guard.json').write_text(json.dumps(dict(pid=server.pid,port=port,socket=str(sock),settings=settings,password='fresh perrun; not recorded',socketDirectoryMode=oct(short.stat().st_mode&0o777)),indent=2)+'\n')
- env=os.environ.copy();env.update(JAVA_HOME='/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home',B01_REDIS_PORT=str(port),B01_REDIS_PASSWORD=password,B01_REDIS_PID=str(server.pid),B01_REDIS_RAW_OUTPUT=str(run/'raw-java.json'),B01_REDIS_JAVA_OUTPUT=str(run/'java.json'),B01_JAVA_OUTPUT=str(run/'crypto-java.json'))
+ env=os.environ.copy();env.update(JAVA_HOME='LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home',B01_REDIS_PORT=str(port),B01_REDIS_PASSWORD=password,B01_REDIS_PID=str(server.pid),B01_REDIS_RAW_OUTPUT=str(run/'raw-java.json'),B01_REDIS_JAVA_OUTPUT=str(run/'java.json'),B01_JAVA_OUTPUT=str(run/'crypto-java.json'))
  r=subprocess.run([str(ROOT/'gradlew'),'-p',str(OUT/'runtime'),'--no-daemon','--console=plain','runProof','runRedisProof','recordDependencies'],cwd=ROOT,env=env,capture_output=True,text=True)
  raw=r.stdout+r.stderr;assert password not in raw,'unexpected secret in diagnostic output';(OUT/'redis-java-run.log').write_text(raw)
  assert r.returncode==0,'Java Redis probe failed; inspect source-proof/redis-java-run.log'

@@ -4,7 +4,7 @@
 
 ## 조사 범위와 읽기 기준
 
-이 문서는 `/Users/ds/research/javaexperience-d10-20261021/SOURCE.md`의 449줄 학습 원고를 PostgreSQL 18, MySQL 8.4, SQLite 및 Python 3.14의 공식 문서와 대조해 개념을 보완한다. 문서가 지향하는 PostgreSQL 18/MySQL 8.4 Docker 및 Spring Boot 4.1.1/Java 25 예제는 이번 조사에서 실행하지 않았다. 관련 서비스 접속, 설치, 다운로드, SQL 실행, 원고 수정도 하지 않았다. 이 보고서는 제품 설정이나 운영 권고가 아니라 개념의 범위와 제품 차이를 설명한다.
+이 문서는 `LOCAL_HOME/research/javaexperience-d10-20261021/SOURCE.md`의 449줄 학습 원고를 PostgreSQL 18, MySQL 8.4, SQLite 및 Python 3.14의 공식 문서와 대조해 개념을 보완한다. 문서가 지향하는 PostgreSQL 18/MySQL 8.4 Docker 및 Spring Boot 4.1.1/Java 25 예제는 이번 조사에서 실행하지 않았다. 관련 서비스 접속, 설치, 다운로드, SQL 실행, 원고 수정도 하지 않았다. 이 보고서는 제품 설정이나 운영 권고가 아니라 개념의 범위와 제품 차이를 설명한다.
 
 원고 말미의 PostgreSQL 링크는 `/docs/current/`였다. 2026-10-21 실제 웹 페이지의 헤더는 `PostgreSQL 18.6 Documentation`이며 `Supported Versions: Current (18)`로 표시됐다. PostgreSQL 18의 고정 주소 `/docs/18/...` 역시 문서 머리글에서 18 문서임을 확인했다. 따라서 원고의 current URL은 확인 시점에는 18로 연결되지만, URL 자체가 18에 고정된 주소는 아니다. 열어 본 MySQL 기능 페이지의 실제 제목은 `MySQL 8.4 Reference Manual`로 표기됐다. Python 문서 주소 `/3.14/`의 페이지 제목은 Python 3.14.8 문서다. 로컬에서 관찰했다는 Python 3.14.3/SQLite 3.53.0과 문서 페이지의 패치 버전은 구분한다. (S01, S15, S22)
 

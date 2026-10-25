@@ -57,7 +57,7 @@ try:
  with writer.cursor()as c:
   c.execute("CREATE USER 'v04_probe'@'127.0.0.1' IDENTIFIED BY %s",(jdbc_password,))
   for schema in ['ds_practice','v04_extra']:c.execute(f"GRANT SELECT,INSERT,UPDATE,DELETE ON {schema}.* TO 'v04_probe'@'127.0.0.1'")
- env=os.environ.copy();env.update(JAVA_HOME='/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home',V04_DB_URL=f'jdbc:mysql://127.0.0.1:{port}/ds_practice?characterEncoding=UTF-8&sslMode=REQUIRED&useServerPrepStmts=true',V04_DB_PASSWORD=jdbc_password,V04_EXPECTED_DATADIR=str(data),V04_EXPECTED_PORT=str(port),V04_JAVA_OUTPUT=str(run/'java.json'),V04_RUNTIME_DIR=str(run))
+ env=os.environ.copy();env.update(JAVA_HOME='LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home',V04_DB_URL=f'jdbc:mysql://127.0.0.1:{port}/ds_practice?characterEncoding=UTF-8&sslMode=REQUIRED&useServerPrepStmts=true',V04_DB_PASSWORD=jdbc_password,V04_EXPECTED_DATADIR=str(data),V04_EXPECTED_PORT=str(port),V04_JAVA_OUTPUT=str(run/'java.json'),V04_RUNTIME_DIR=str(run))
  r=subprocess.run([str(ROOT/'gradlew'),'-p',str(OUT/'runtime'),'--no-daemon','--console=plain','cleanTest','test','recordDependencies'],cwd=ROOT,env=env,capture_output=True,text=True);(OUT/'java-run.log').write_text(r.stdout+r.stderr);assert r.returncode==0,'Java suite failed; see source-proof/java-run.log'
  listener=json.loads((run/'http-listener.json').read_text());assert listener['address']=='127.0.0.1'
  with net.socket()as probe:probe.settimeout(2);http_closed=probe.connect_ex(('127.0.0.1',listener['port']))!=0

@@ -450,7 +450,7 @@ test('answer-fix(Dnn-m)는 순서 수에 넣지 않고, 그 순서 원래 커밋
   const block = md.match(/<details class="step-answer" data-step="D09-3"[\s\S]*?\n<\/details>/)[0];
   // 실제 이력의 answer-fix(D09-3)에 합성 커밋 하나가 더해진다
   const fixes = step3.filter((c) => c.kind === 'fix').length;
-  assert.ok(block.includes(`<summary>구현 예시 보기 · answer(D09-3) + 보완 ${fixes}개`));
+  assert.ok(block.includes(`<summary>구현 예시 보기 · 구현 D09-3 + 보완 ${fixes}개`));
   const orig = block.indexOf(step3[0].sha.slice(0, 8));
   const extra = block.indexOf('**보완**');
   assert.ok(orig >= 0 && extra > orig, '보완은 원래 커밋 코드 뒤에 온다');
@@ -716,13 +716,13 @@ test('관찰은 별도 접기이며 항목·순서·필수 여부가 입력과 �
 });
 
 
-test('길찾기: README는 v2 실행을 먼저 안내하고 이전 과정 내용을 보존한다', () => {
+test('길찾기: README는 v2 실행을 먼저 안내하고 서비스 만들기 내용을 보존한다', () => {
   const md = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
-  const start = md.split('## 참고 자료(이전 과정)')[0];
+  const start = md.split('## 서비스 만들기와 실습')[0];
   for (const link of ['index.html', 'course/spring/D00.md', 'course/spring/D01.md', 'course/start/README.md']) assert.ok(start.includes(`](${link})`), link);
   assert.match(start, /java-track/);
   assert.match(start, /새.*프로젝트/);
-  assert.match(md, /## 참고 자료\(이전 과정\)/);
+  assert.match(md, /## 서비스 만들기와 실습/);
   for (const old of ['게시판 API 101단계', '## 초기화 전 백업과 DB 복원', '## DB 접속 정보']) assert.ok(md.includes(old), old);
 });
 

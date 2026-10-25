@@ -1,6 +1,6 @@
 # 출처 메모
 
-확인일은 모두 2026-10-21이다. 아래 요약은 열어 본 공식 문서의 짧은 의역이다. 원문 문장을 길게 옮기지 않았다. IDs는 `/Users/ds/research/javaexperience-d10-20261021/sources.json`과 연결된다.
+확인일은 모두 2026-10-21이다. 아래 요약은 열어 본 공식 문서의 짧은 의역이다. 원문 문장을 길게 옮기지 않았다. IDs는 `LOCAL_HOME/research/javaexperience-d10-20261021/sources.json`과 연결된다.
 
 - **S01 PostgreSQL current** — 페이지가 실제 `PostgreSQL 18.6 Documentation`으로 제목을 표시하고 Supported Versions에서 Current를 18로 표시했다. `/docs/current/`는 버전 고정 URL이 아니며 확인 시점의 current를 나타낸다.
 - **S02 PostgreSQL constraints** — CHECK는 식이 거짓인 행을 거부하며 NULL 결과는 통과한다. UNIQUE의 기본 NULL 처리와 `NULLS NOT DISTINCT`, PK의 비NULL 성격, FK 참조 대상 키 조건을 설명한다. PostgreSQL은 FK 자식 열 인덱스를 자동 생성하지 않는다고 명시한다.

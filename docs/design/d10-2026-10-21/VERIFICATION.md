@@ -28,8 +28,8 @@
 
 - frozen SHA256: `b9c9093ddb903e13afd3769ac095a7948fcc76fc3b5d94fa23950a50e1856afe`
 - runner SHA256: `8341779128856983ae5cb9b3a86e0b8dd628970f1e880432aa916d40511c1c66`
-- 메인 새 실행: `/Users/ds/research/javaexperience-d10-20261021/_data/main-runtime/run-lmzoevsf`
-- 이전 독립 사본 실행: `/Users/ds/research/javaexperience-d10-20261021/_data/reviewer-runtime/run-byelj6w2`
+- 메인 새 실행: `LOCAL_HOME/research/javaexperience-d10-20261021/_data/main-runtime/run-lmzoevsf`
+- 이전 독립 사본 실행: `LOCAL_HOME/research/javaexperience-d10-20261021/_data/reviewer-runtime/run-byelj6w2`
 
 작성자·메인 새 실행·이전 독립 사본의 전체 frozen이 일치했다. raw wrapper SQL 688행과 trace callback 688항목, 시점 marker 4개는 서로 다른 기록이다. 네트워크 SQL 수나 I/O 측정으로 부르지 않는다. 새 0700 runtime의 SQLite 파일4개·fixture 연결5개만 사용했고 모든 연결의 foreign_keys=1, 빈 foreign_key_check, integrity ok, 종료를 확인했다. 원문 PG/MySQL 명령, 기존 DB·practice 데이터·서비스 포트는 사용하지 않았다.
 
@@ -47,7 +47,7 @@
 
 Chrome에서44상태×데스크톱1672×941/모바일360×800=88행을 확인했다. 코드의 빈 줄·끝 개행, 강조 줄, 제목·설명·출처, 값, PASS의 범위, full JSON100개, 이미지·alt·실제 크기·focus·zoom, 접기 밖 핵심 내용, document overflow를 대조했다. 최종 대표30캡처를 메인이 모두 실제 열람했고 해당30상태 DOM도 추가 대조했다.
 
-최종 캡처는 desktop1672×819와 mobile360×800이다. 각 JPEG 실제 헤더와 그때의 DOM viewport가 일치한다. 이전 요청941px이 DOM에는 적용되지만 캡처가819px로 제공된 사례가 있어 최종 desktop을819px로 맞춰 다시 촬영했다. 일부 그림 아래에 치우친 캡처 등 중간90개는 `/Users/ds/research/javaexperience-d10-20261021/_data/browser-capture-attempts/`에 보존하고 코드 저장소에서 제외했다. 미확인 캡처를 최종 비교 증거로 쓰지 않는다.
+최종 캡처는 desktop1672×819와 mobile360×800이다. 각 JPEG 실제 헤더와 그때의 DOM viewport가 일치한다. 이전 요청941px이 DOM에는 적용되지만 캡처가819px로 제공된 사례가 있어 최종 desktop을819px로 맞춰 다시 촬영했다. 일부 그림 아래에 치우친 캡처 등 중간90개는 `LOCAL_HOME/research/javaexperience-d10-20261021/_data/browser-capture-attempts/`에 보존하고 코드 저장소에서 제외했다. 미확인 캡처를 최종 비교 증거로 쓰지 않는다.
 
 실제 복사189문자(중간 빈 줄·끝 개행 포함), End→Enter 선택, 마지막 단계 disabled와 focus, 새로고침의 장면 복원, 모바일 다음 이동(이전 이동은 단위 검사), 확대 수동 설정의 resize 유지, 실제 가로 pan6.5px, 원문 열기, 기존 지도 토글, 단계 변경 시 근거 접기를 확인했다. pan 직후0을 읽은 초기 관측은 화면 갱신 후 관측과 분리한다. 뒤로/앞으로는 각 history 항목에 저장된 서로 다른 장면을 복원했다. 같은 장면이어야 한다는 초기 검사 가정은 수정했고 관측을 보존했다.
 

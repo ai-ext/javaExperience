@@ -22,6 +22,6 @@
 
 ## 원문과 실험 기록
 
-- 현재 기준 파일: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W15-paging-offset-vs-cursor.md`, 283줄, SHA-256 `9937498a3b948f96099dca7bb625573bdc40879254c82c67afc465dee663108b`.
-- 5 fence manifest: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/w15-2026-10-20/source-proof/source.json`; 개별 원본은 같은 경로 `original/block-01.mmd`부터 `block-05.json`. 다섯 해시는 manifest의 값과 대조했으며 코드 실행은 하지 않음.
-- old `/Users/ds/research/java-spring/W15-paging-offset-vs-cursor.md` 및 `_data/briefs/W15.md`는 기준으로 읽지 않음. 연구자는 repo/DB/서버 변경, SQL/Java 실행을 하지 않음.
+- 현재 기준 파일: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W15-paging-offset-vs-cursor.md`, 283줄, SHA-256 `9937498a3b948f96099dca7bb625573bdc40879254c82c67afc465dee663108b`.
+- 5 fence manifest: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/w15-2026-10-20/source-proof/source.json`; 개별 원본은 같은 경로 `original/block-01.mmd`부터 `block-05.json`. 다섯 해시는 manifest의 값과 대조했으며 코드 실행은 하지 않음.
+- old `LOCAL_HOME/research/java-spring/W15-paging-offset-vs-cursor.md` 및 `_data/briefs/W15.md`는 기준으로 읽지 않음. 연구자는 repo/DB/서버 변경, SQL/Java 실행을 하지 않음.

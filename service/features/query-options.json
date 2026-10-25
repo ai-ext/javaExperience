@@ -1,0 +1,496 @@
+{
+  "version": 1,
+  "id": "query-options",
+  "title": "같은 조회 결과를 여러 DB 접근 방식으로 만들기",
+  "summary": "2-4/2-5에서 목록 N+1을 줄이고 작성자·board 조건 검색의 결과와 query 수를 검증한다.",
+  "difficulty": "중급",
+  "prerequisites": [
+    "posts-find"
+  ],
+  "stages": [
+    {
+      "id": "join",
+      "title": "누락·중복 없이 상세와 목록 정보 조립하기"
+    },
+    {
+      "id": "implementations",
+      "title": "저장 기술을 바꿔도 같은 공개 글 읽기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "join",
+          "title": "누락·중복 없이 상세와 목록 정보 조립하기",
+          "sourceUnits": [
+            "legacy:2-4",
+            "legacy:2-5"
+          ],
+          "brief": {
+            "purpose": "2-4/2-5에서 목록 N+1을 줄이고 작성자·board 조건 검색의 결과와 query 수를 검증한다.",
+            "task": "20개 목록의 author/tag SQL 증가를 측정하고 member3/dev 결과와 member4 빈 결과를 확인한다.",
+            "preconditions": [
+              "free board 목록 20개와 author/tag 관계를 가진 scenario fixture를 사용한다.",
+              "member3 이스프링은 post2(dev), member4는 존재하지만 dev 글이 없고 post6 followers/post8 deleted를 확인한다."
+            ],
+            "scenario": [
+              {
+                "start": "GET /api/boards/free/posts?size=20 전후 SQL과 item ids를 기록한다.",
+                "action": "20개 목록 query를 대조한 뒤 GET /api/members/3/posts?board=dev 및 member4 같은 route를 호출한다.",
+                "result": "N+1 query 수는 측정 후 감소하되 JSON은 유지한다. member3 결과에 post2, member4는 200 [].",
+                "after": "post6/post8의 공개 결과 제외와 JPQL/query projection을 확인한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "free board 20 posts and author/tag relations",
+                "reason": "N+1 before/after 측정."
+              },
+              {
+                "name": "member3 post2 title/author/board",
+                "reason": "검색 projection과 필터 확인."
+              },
+              {
+                "name": "member4 empty results, post6/post8",
+                "reason": "empty result와 visibility exclusions 검증."
+              }
+            ],
+            "policies": [
+              "2-4 preserves response shape and logs SQL count for 20 items.",
+              "2-5 requires member+board existence; missing ->404, existing with no public match ->200 [].",
+              "filter: author, board, PUBLISHED, PUBLIC, not deleted; SQL uses columns, JPQL uses entity fields."
+            ],
+            "inputs": [
+              "GET /api/boards/free/posts?size=20.",
+              "GET /api/members/3/posts?board=dev and member4 equivalent."
+            ],
+            "success": [
+              "20-item response fields/order preserved; before/after query counts are measured.",
+              "member3 gets id2 JPA 연관관계 매핑 정리; member4 gets 200 []."
+            ],
+            "failures": [
+              {
+                "when": "member/board missing",
+                "result": "404.",
+                "unchanged": "posts unchanged."
+              },
+              {
+                "when": "member4/board dev exist but no matching row",
+                "result": "200 empty list.",
+                "unchanged": "database unchanged."
+              },
+              {
+                "when": "post6 or deleted post8 appears in anonymous results",
+                "result": "visibility assertion fails.",
+                "unchanged": "query read-only."
+              }
+            ],
+            "examples": [
+              {
+                "title": "N+1 measurement",
+                "start": "20 free-board posts with author/tag rows",
+                "action": "GET list before/after query change",
+                "result": "same JSON; measured query count no longer grows per row"
+              },
+              {
+                "title": "member3 dev posts",
+                "start": "member3 is 이스프링 and post2 is public/dev",
+                "action": "GET /api/members/3/posts?board=dev",
+                "result": "200 includes post2"
+              },
+              {
+                "title": "existing member empty",
+                "start": "member4 and dev board exist, no qualifying posts",
+                "action": "GET /api/members/4/posts?board=dev",
+                "result": "200 []"
+              }
+            ],
+            "work": [
+              "Capture SQL logs and result IDs at page size 20.",
+              "Compare direct SQL and JPQL query filters.",
+              "Check missing entity versus empty result and public filters."
+            ],
+            "done": [
+              "N+1 query count measured; response shape retained.",
+              "404 missing member/board differs from 200 empty.",
+              "public/deleted conditions checked."
+            ],
+            "hints": [
+              "author/tag를 row마다 읽는 흔적은 SQL 로그에서 어떻게 식별하나요?",
+              "member4의 200 []와 존재하지 않는 member의 404를 구분하려면 어떤 선행 조회가 필요할까요?",
+              "post6 FOLLOWERS와 post8 deleted를 제외하는 조건이 목록과 count에 함께 적용됐나요?"
+            ]
+          },
+          "hints": [
+            "author/tag를 row마다 읽는 흔적은 SQL 로그에서 어떻게 식별하나요?",
+            "member4의 200 []와 존재하지 않는 member의 404를 구분하려면 어떤 선행 조회가 필요할까요?",
+            "post6 FOLLOWERS와 post8 deleted를 제외하는 조건이 목록과 count에 함께 적용됐나요?"
+          ],
+          "recipeIds": [
+            "legacy:2-4:Q",
+            "legacy:2-5:A",
+            "legacy:2-5:B",
+            "legacy:2-5:C",
+            "legacy:2-5:D",
+            "legacy:2-5:E",
+            "legacy:2-5:F"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:2-4 · 쿼리 수 줄이기(N+1)",
+              "href": "/scenario/ch2-read-post/2-4-n-plus-1.html"
+            },
+            {
+              "label": "../../docs/knowledge/S09-jpa-hibernate.md",
+              "href": "/docs/knowledge/S09-jpa-hibernate.html"
+            },
+            {
+              "label": "../../docs/knowledge/P20-jpa-entity-mapping.md",
+              "href": "/docs/knowledge/P20-jpa-entity-mapping.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:2-4 · 쿼리 수 줄이기(N+1)",
+              "href": "/scenario/ch2-read-post/2-4-n-plus-1.html"
+            },
+            {
+              "label": "../../docs/knowledge/S09-jpa-hibernate.md",
+              "href": "/docs/knowledge/S09-jpa-hibernate.html"
+            },
+            {
+              "label": "../../docs/knowledge/P20-jpa-entity-mapping.md",
+              "href": "/docs/knowledge/P20-jpa-entity-mapping.html"
+            },
+            {
+              "label": "../../docs/knowledge/W03-db-access-comparison.md",
+              "href": "/docs/knowledge/W03-db-access-comparison.html"
+            },
+            {
+              "label": "../../docs/knowledge/V04-test-db-strategy.md",
+              "href": "/docs/knowledge/V04-test-db-strategy.html"
+            },
+            {
+              "label": "../../docs/knowledge/S18-spring-testing.md",
+              "href": "/docs/knowledge/S18-spring-testing.html"
+            },
+            {
+              "label": "legacy:2-5 · JPA 쿼리 작성 — 예시에서 JOIN까지",
+              "href": "/scenario/ch2-read-post/2-5-guided-jpa-query.html"
+            },
+            {
+              "label": "../../lessons/E3-what-is-jpa.md",
+              "href": "/lessons/E3-what-is-jpa.html"
+            },
+            {
+              "label": "../../lessons/E4-jpa-associations.md",
+              "href": "/lessons/E4-jpa-associations.html"
+            },
+            {
+              "label": "../../lessons/E2-db-sql-basics.md",
+              "href": "/lessons/E2-db-sql-basics.html"
+            }
+          ]
+        },
+        {
+          "id": "implementations",
+          "title": "저장 기술을 바꿔도 같은 공개 글 읽기",
+          "sourceUnits": [
+            "support:scenario/labs/l16-interface-implementations/README.md"
+          ],
+          "brief": {
+            "purpose": "JPA와 JDBC 중 구현을 바꿔도 같은 공개 글의 제목과 id를 반환합니다.",
+            "task": "같은 입력과 응답 계약으로 두 구현을 연결하고, 설정만 바꾸어 공개/비공개 조건과 실제 빈 선택을 확인하세요.",
+            "preconditions": [
+              "2-3 이후 community DB와 seed를 사용합니다.",
+              "같은 서버를 하나씩 jpa/jdbc 설정으로 실행합니다. 원본 행은 변경하지 않습니다."
+            ],
+            "scenario": [
+              {
+                "start": "공개 글 id 2와 팔로워 공개 6·초안 7·삭제 8·숨김 10을 준비합니다.",
+                "action": "app.post-summary.reader를 jpa와 jdbc로 각각 기동해 GET /api/labs/post-summaries/2 및 나머지 id를 호출합니다.",
+                "result": "id 2는 200과 {id:2,title:JPA 연관관계 매핑 정리}로 같고, 6/7/8/10/없는 id는 모두 404입니다.",
+                "after": "두 빈 동시 등록의 기동 실패를 관찰한 뒤 한 빈만 등록하는 정상 설정으로 복원합니다. 같은 통합 계약 테스트를 두 설정에서 실행하고 DB 불변을 확인합니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "공개글요약id/title",
+                "reason": "Entity 전체와 비공개 필드를 노출하지 않고 같은 계약을 제공합니다."
+              },
+              {
+                "name": "실제공개조건과빈선택설정",
+                "reason": "PUBLISHED·PUBLIC·미삭제 필터와 한 번에 한 구현만 선택하는 조건을 검증합니다."
+              }
+            ],
+            "policies": [
+              "이 실습은 익명에게도 보이는 공개 글만 반환하며 2-3 전체 회원별 정책을 대체하지 않습니다.",
+              "id<=0은 400이며 조회수나 원본 행을 변경하지 않습니다. JDBC는 ?바인딩을 사용합니다.",
+              "기본 설정 jpa, 선택 jdbc입니다. 두 후보 또는 후보 0개로 기동 실패를 확인하고 한 후보 상태로 복구합니다.",
+              "마지막에는 공개 글 제목에 게시판 slug 추가 요구를 실제로 적용하고 DTO·두 구현·계약 테스트를 함께 갱신합니다."
+            ],
+            "inputs": [
+              "같은 post id, app.post-summary.reader=jpa/jdbc. 추가 과제는 같은 글의 board_id→board.slug 관계입니다."
+            ],
+            "success": [
+              "두 구현이 같은 200/404 계약을 지키고 설정 변경에 Service/Controller 코드를 분기하지 않습니다."
+            ],
+            "failures": [
+              {
+                "when": "비공개·초안·삭제·숨김·없는 글",
+                "result": "두 구현 모두 404이며 잘못된 id<=0은 400입니다.",
+                "unchanged": "글과 조회수·원본 행·공개 범위·태그는 그대로입니다."
+              },
+              {
+                "when": "주입 후보가 두 개 또는 0개",
+                "result": "서버 기동 실패를 관찰하고 원래 한 후보 설정으로 복구합니다.",
+                "unchanged": "DB seed는 변경하지 않습니다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "같은글을두구현으로읽기",
+                "start": "community post 2는 PUBLIC/PUBLISHED/미삭제입니다.",
+                "action": "jpa 서버 조회 뒤 종료하고 jdbc 서버로 같은 요청을 보냅니다.",
+                "result": "같은 id/title, 같은 공개 범위 거절이며 로그의 실제 SQL만 별도로 대조합니다."
+              }
+            ],
+            "work": [
+              "공개 글 조회 계약·JPA/JDBC 교체·빈 설정·실패 관찰·slug 추가를 하나의 조회 기능으로 완성합니다."
+            ],
+            "done": [
+              "같은 통합 계약 테스트가 jpa/jdbc 두 설정에서 통과했습니다.",
+              "공개 글 2의 200·6/7/8/10/없는 id의 404·잘못된 id 400과 원본 DB 불변을 확인했습니다.",
+              "두/0 후보의 기동 실패를 관찰하고 한 후보로 복구했습니다.",
+              "게시판 slug 추가 후 두 구현/응답/계약 테스트를 같이 갱신했습니다."
+            ]
+          },
+          "hints": [
+            "구현이 JPA에서 JDBC로 바뀌어도 변하지 않아야 하는 사용자 결과는 무엇인가요?",
+            "공개 글 조건 세 개 중 하나가 빠지면 어느 seed 글이 잘못 나올까요?",
+            "빈이 두 개일 때 설정이 구현을 하나만 선택했다는 것을 어떻게 확인할까요?",
+            "slug 추가 시 DTO만 바꾸면 두 저장 구현이 모두 새 값을 채울 수 있을까요?"
+          ],
+          "recipeIds": [
+            "interface-lab:read",
+            "interface-lab:hidden",
+            "interface-lab:bad-id"
+          ],
+          "executionChecks": [
+            {
+              "title": "두구현의동일계약",
+              "command": "./gradlew bootRun --args='--app.post-summary.reader=jpa'\n# 서버 종료 후\n./gradlew bootRun --args='--app.post-summary.reader=jdbc'",
+              "expected": "두 설정에서 같은 id/title·200/404와 DB 불변, 한 빈 선택을 확인합니다.",
+              "record": "실제 설정·기동 결과·요청 응답·SQL/빈 후보·정상 설정 복구·slug 추가 전후를 남깁니다."
+            }
+          ],
+          "choices": [],
+          "concepts": [
+            {
+              "label": "인터페이스와 구현",
+              "href": "lessons/B5-interfaces.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "L16 원본과 같은 계약 확인",
+              "href": "scenario/labs/l16-interface-implementations/README.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "project": "practice",
+      "label": "practice · query 실습 프로젝트",
+      "stages": [
+        {
+          "id": "join",
+          "title": "누락·중복 없이 상세와 목록 정보 조립하기",
+          "sourceUnits": [
+            "support:scenario/labs/l12-query-methods/README.md",
+            "support:scenario/labs/l13-declared-queries/README.md",
+            "support:scenario/labs/l14-querydsl-extension/README.md"
+          ],
+          "brief": {
+            "purpose": "L12-L14 query-practice를 통해 JPA 파생 query, @Query/MyBatis, Querydsl이 같은 dataset을 반환하는지 비교한다.",
+            "task": "같은 생성 게시글 id로 L12 Q01, L13 Q09, L14 Q15 흐름을 실행하고 result ids/count를 비교한다.",
+            "preconditions": [
+              "`python3 tools/materialize-query-practice.py --output /tmp/query-practice --through l12-query-methods`부터 L14까지 순서대로 복원한다.",
+              "Java21 practice server에서 POST /api/posts로 만든 글 id를 사용한다.",
+              "README의 게시글 생성 요청 POST /api/posts는 query-practice 조회 route와 다른 community project recipe다. 실행 전 대상 server/db가 같은지 확인하고 API tool의 community recipe를 practice variant 목록에 섞지 않는다."
+            ],
+            "scenario": [
+              {
+                "start": "L12 disposable app에 dev board/tag jpa의 query lab alpha를 생성하고 id를 기록한다.",
+                "action": "Q01 detail id, L13 Q09 JPA search, L14 Q15 Querydsl search를 같은 post/filter로 호출한다.",
+                "result": "same filter 결과의 ids/count가 같고 query method만 다르다. Q01 existing 200, missing 404.",
+                "after": "다른 board/empty filter 결과와 SQL bind parameter를 확인한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "query lab alpha actual response id",
+                "reason": "세 query route가 같은 row를 읽는지 확인."
+              },
+              {
+                "name": "boardSlug dev/tag jpa filter",
+                "reason": "같은 검색 조건 및 result ids 비교."
+              },
+              {
+                "name": "search items/count/page",
+                "reason": "select/count predicate alignment 확인."
+              }
+            ],
+            "policies": [
+              "L12→L13→L14 disposable query-practice workspace only; repository data overwrite 금지.",
+              "Q01 GET /api/query-practice/jpa/posts/{id}, Q09 JPA search, Q15 GET /api/query-practice/querydsl/search?boardSlug=dev.",
+              "SQL parameter binding and identical count/list predicates; existing project API unchanged."
+            ],
+            "inputs": [
+              "POST /api/posts {boardSlug:\"dev\",title:\"query lab alpha\",tags:[\"jpa\"]}; save actual id.",
+              "GET /api/query-practice/jpa/posts/{id}.",
+              "GET /api/query-practice/jpa/search and /api/query-practice/querydsl/search?boardSlug=dev.",
+              "README data preparation endpoint POST /api/posts는 설정된 lab server에서 실행한다. 이 API recipe는 practice query stage에 포함하지 않는다."
+            ],
+            "success": [
+              "Q01 returns 200 for captured id, 404 for absent id.",
+              "Q09/Q15 matching results and totals agree for same filters."
+            ],
+            "failures": [
+              {
+                "when": "Q01 id absent",
+                "result": "404.",
+                "unchanged": "disposable rows unchanged."
+              },
+              {
+                "when": "list and count filters differ or raw string concatenation",
+                "result": "wrong total or unsafe query check fails.",
+                "unchanged": "only practice DB used."
+              }
+            ],
+            "examples": [
+              {
+                "title": "L12 Q01",
+                "start": "created post has captured id",
+                "action": "GET /api/query-practice/jpa/posts/{id}",
+                "result": "200 existing row; missing id 404"
+              },
+              {
+                "title": "L13 and L14 same search",
+                "start": "dev board contains query lab alpha id",
+                "action": "run Q09 JPA and Q15 Querydsl search",
+                "result": "same matching id and count across engine routes"
+              }
+            ],
+            "work": [
+              "Materialize each lab in order under disposable path.",
+              "Reuse API-captured id; save result id/count and SQL log."
+            ],
+            "done": [
+              "Q01/Q09/Q15 exact paths checked.",
+              "Same filter yields same ids/count.",
+              "No repo DB or source files overwritten."
+            ],
+            "hints": [
+              "세 query를 비교할 때 어떤 id를 첫 POST 응답에서 받아 세 경로에 재사용하나요?",
+              "list query와 count query에서 tag 조건이 다르면 어떤 total 값이 먼저 달라지나요?",
+              "검색 문자열을 SQL 구문이 아니라 값으로 전달하려면 어떤 방식으로 바인딩해야 할까요?"
+            ]
+          },
+          "hints": [
+            "세 query를 비교할 때 어떤 id를 첫 POST 응답에서 받아 세 경로에 재사용하나요?",
+            "list query와 count query에서 tag 조건이 다르면 어떤 total 값이 먼저 달라지나요?",
+            "검색 문자열을 SQL 구문이 아니라 값으로 전달하려면 어떤 방식으로 바인딩해야 할까요?"
+          ],
+          "recipeIds": [
+            "legacy:L12:A",
+            "legacy:L12:B",
+            "legacy:L12:C",
+            "legacy:L12:D",
+            "legacy:L12:E",
+            "legacy:L12:F",
+            "legacy:L12:G",
+            "legacy:L12:H",
+            "legacy:L12:J",
+            "legacy:L13:A",
+            "legacy:L13:B",
+            "legacy:L13:C",
+            "legacy:L13:D",
+            "legacy:L13:E",
+            "legacy:L13:F",
+            "legacy:L13:G",
+            "legacy:L13:H",
+            "legacy:L13:I",
+            "legacy:L13:J",
+            "legacy:L14:A",
+            "legacy:L14:B",
+            "legacy:L14:C",
+            "legacy:L14:D",
+            "legacy:L14:E",
+            "legacy:L14:F",
+            "legacy:L14:G",
+            "legacy:L14:H"
+          ],
+          "executionChecks": [
+            {
+              "title": "Create disposable query fixture",
+              "command": "Run the L12 README preparation POST /api/posts on the configured lab server and capture its actual id; verify the lab server and database target before querying.",
+              "expected": "A real inserted id is reused by query-practice endpoint calls.",
+              "record": "Server/project target and response id; do not copy community-project recipe into practice recipeIds."
+            },
+            {
+              "title": "Compare practice query routes",
+              "command": "Select a project=practice recipe for L12 Q01, L13 Q09 or L14 Q15 and explicitly send it.",
+              "expected": "Exact practice route and selected fixture are shown; result IDs/count match the query method being compared.",
+              "record": "recipe id, project, method/path, result IDs/count, SQL observation."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "support:scenario/labs/l12-query-methods/README.md · L12. 기초 파생 메서드·MyBatis SQL",
+              "href": "/scenario/labs/l12-query-methods/README.html"
+            },
+            {
+              "label": "support:scenario/labs/l13-declared-queries/README.md · L13. 확장 @Query·JOIN·집계",
+              "href": "/scenario/labs/l13-declared-queries/README.html"
+            },
+            {
+              "label": "support:scenario/labs/l14-querydsl-extension/README.md · L14. 확장 QueryDSL 동적 쿼리",
+              "href": "/scenario/labs/l14-querydsl-extension/README.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "support:scenario/labs/l12-query-methods/README.md · L12. 기초 파생 메서드·MyBatis SQL",
+              "href": "/scenario/labs/l12-query-methods/README.html"
+            },
+            {
+              "label": "support:scenario/labs/l13-declared-queries/README.md · L13. 확장 @Query·JOIN·집계",
+              "href": "/scenario/labs/l13-declared-queries/README.html"
+            },
+            {
+              "label": "support:scenario/labs/l14-querydsl-extension/README.md · L14. 확장 QueryDSL 동적 쿼리",
+              "href": "/scenario/labs/l14-querydsl-extension/README.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "조회와 성능",
+  "status": "authored"
+}

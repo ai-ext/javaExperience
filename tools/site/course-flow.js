@@ -25,6 +25,43 @@
     var timer = null;
     var index = 0;
     var steps = [];
+    var modeControls = root.querySelector('[data-flow-mode-controls]');
+    var overview = root.querySelector('[data-flow-overview]');
+    var modeButtons = Array.prototype.slice.call(root.querySelectorAll('[data-flow-mode]'));
+    var mode = 'step';
+
+    function setMode(nextMode) {
+      stop();
+      mode = nextMode;
+      root.dataset.flowMode = mode;
+      player.hidden = mode !== 'step';
+      if (overview) overview.hidden = mode !== 'all';
+      var map = root.querySelector('.flow-nodes');
+      if (map) map.hidden = mode !== 'step';
+      modeButtons.forEach(function (button) { button.setAttribute('aria-pressed', String(button.dataset.flowMode === mode)); });
+    }
+    function makeOverview() {
+      if (!overview) return;
+      var source = overview.querySelector('.flow-steps');
+      var table = document.createElement('table');
+      table.className = 'flow-observation-table';
+      table.innerHTML = '<thead><tr><th scope="col">시점</th><th scope="col">관찰 대상·증상</th><th scope="col">확인할 값</th><th scope="col">실제 증거</th></tr></thead><tbody></tbody>';
+      Array.prototype.forEach.call(source.children, function (step, i) {
+        var row = document.createElement('tr');
+        var when = document.createElement('th'); when.scope = 'row';
+        when.textContent = step.querySelector('.flow-when') ? step.querySelector('.flow-when').textContent : String(i + 1);
+        var event = document.createElement('td');
+        var node = document.createElement('strong'); node.textContent = step.querySelector('.flow-step-node').textContent;
+        var title = step.querySelector('.flow-step-title').cloneNode(true);
+        event.append(node, title);
+        var values = document.createElement('td'); values.append(step.querySelector('.flow-values').cloneNode(true));
+        if (step.querySelector('.flow-step-note')) values.append(step.querySelector('.flow-step-note').cloneNode(true));
+        var evidence = document.createElement('td'); evidence.className = 'flow-evidence-empty'; evidence.textContent = '미기록 · 실행 시각과 실제 값을 기록하세요';
+        row.append(when, event, values, evidence); table.tBodies[0].append(row);
+      });
+      var wrap = document.createElement('div'); wrap.className = 'table-wrap'; wrap.append(table);
+      source.hidden = true; source.after(wrap);
+    }
 
     // 재생 순서: data-order 순. 닫힌 접기 안의 단계는 뺀다.
     function collect() {
@@ -111,7 +148,7 @@
     });
     // 키보드: 이 영역 안에 초점이 있을 때만. 접기 요약(summary)·링크 위에서는 기본 동작을 지킨다.
     root.addEventListener('keydown', function (e) {
-      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.altKey || e.ctrlKey || e.metaKey || mode !== 'step') return;
       var tag = e.target && e.target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       var to = null;
@@ -166,12 +203,37 @@
     if (reducedMotion()) root.classList.add('is-reduced-motion');
     root.setAttribute('data-flow-ready', '');
     player.hidden = false;
+    if (modeControls && overview) {
+      makeOverview();
+      modeControls.hidden = false;
+      modeButtons.forEach(function (button) { button.addEventListener('click', function () { setMode(button.dataset.flowMode); }); });
+      setMode('step');
+    }
     render();
     stop();
   }
 
+  function setupValidation(root) {
+    var tabs = Array.prototype.slice.call(root.querySelectorAll('[role="tab"]'));
+    var panels = Array.prototype.slice.call(root.querySelectorAll('[role="tabpanel"]'));
+    function choose(index, focus) {
+      tabs.forEach(function (tab, i) { tab.setAttribute('aria-selected', String(i === index)); tab.tabIndex = i === index ? 0 : -1; });
+      panels.forEach(function (panel, i) { panel.hidden = i !== index; });
+      if (focus) tabs[index].focus();
+    }
+    tabs.forEach(function (tab, index) {
+      tab.addEventListener('click', function () { choose(index, false); });
+      tab.addEventListener('keydown', function (event) {
+        var next = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : null;
+        if (next === null) return;
+        event.preventDefault(); choose(next, true);
+      });
+    });
+    choose(0, false);
+  }
   function init() {
     Array.prototype.forEach.call(document.querySelectorAll('section.flow[data-flow]'), setup);
+    Array.prototype.forEach.call(document.querySelectorAll('[data-ticket-validation]'), setupValidation);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

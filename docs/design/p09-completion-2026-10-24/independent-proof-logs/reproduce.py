@@ -5,10 +5,10 @@ import pathlib
 import subprocess
 import tempfile
 
-ROOT = pathlib.Path('/Users/ds/code/javaExperience/.worktrees/concept-learning-night')
+ROOT = pathlib.Path('LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night')
 BASE = ROOT / 'docs/design/p09-completion-2026-10-24'
 LOGS = BASE / 'independent-proof-logs'
-JDK = pathlib.Path('/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home/bin')
+JDK = pathlib.Path('LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home/bin')
 SOURCE = BASE / 'proof/P09BoundariesProof.java'
 
 def sha(path):

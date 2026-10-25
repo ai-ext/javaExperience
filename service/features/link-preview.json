@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "id": "link-preview",
+  "title": "외부 링크를 제한 시간 안에 미리 보여 주기",
+  "summary": "링크 미리보기는 지정한 2초 안에 실패해도 링크가 달린 글 저장을 완료한다.",
+  "difficulty": "고급",
+  "group": "게시글과 소통",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "preview",
+      "title": "외부 지연·오류를 제한하고 안전한 응답 만들기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "preview",
+          "title": "외부 지연·오류를 제한하고 안전한 응답 만들기",
+          "sourceUnits": [
+            "legacy:16-4"
+          ],
+          "brief": {
+            "purpose": "링크 미리보기는 지정한 2초 안에 실패해도 링크가 달린 글 저장을 완료한다.",
+            "task": "POST 글 생성 전에 제한 시간 내 외부 제목을 가져오고 안전 입력을 저장한다.",
+            "preconditions": [
+              "학습용 DB(`practice`) — 앱을 `practice` 프로파일로 띄운다.",
+              "practice fake-site endpoint; RestClient connection 1초/read 2초, 최대 HTML 앞 64KB."
+            ],
+            "scenario": [
+              {
+                "start": "글에 넣을 외부 주소는 가짜 사이트의 정상 페이지 또는 delay 3000ms 페이지입니다.",
+                "action": "정상 주소와 지연 주소로 각각 글을 등록하고 linkUrl/linkTitle을 비교합니다.",
+                "result": "정상 페이지는 og:title 우선, 없으면 title을 보관합니다. 읽기 2초 초과나 상대 오류에도 글은 201로 저장하고 link_title은 NULL입니다.",
+                "after": "연결 1초·읽기 2초 상한과 HTML 앞 64KB 조건을 지킵니다. ftp/javascript/공백 주소는 400이며 글/태그를 만들지 않습니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "post.link_url, link_title",
+                "reason": "외부 응답 정상/timeout 뒤 저장된 URL과 nullable 제목을 비교한다."
+              },
+              {
+                "name": "delay=0ms / 3000ms, read timeout=2s, HTML cap=64KB",
+                "reason": "원문 fake-site에서 성공과 시간 초과 경계를 재현한다."
+              }
+            ],
+            "policies": [
+              "linkUrl은 선택, null/생략은 링크 없음, 빈 문자열 400, 최대 500자이며 `https?://[^\\s/?#]+\\S*` 형식만 허용한다. ftp/javascript/공백 포함 값은 400.",
+              "외부 페이지 HTML 앞 64KB에서 og:title, 없으면 title을 찾는다. RestClient connect timeout 1초/read timeout 2초; 2초 초과/상대 사이트 오류는 한 줄 기록 후 link_title=NULL로 post는 201 저장한다.",
+              "Fake site delay=0은 title=hello를 돌려주고 delay=3000은 timeout 사례다. POST /api/posts 응답 본문에는 원문대로 linkUrl/linkTitle 저장 결과를 확인한다."
+            ],
+            "inputs": [
+              "legacy:16-4:W: GET /fake-site/base; case=이 서버 주소; source expected/status checks=[]",
+              "legacy:16-4:W0: GET /fake-site/page?title=hello&delay=0; case=가짜 사이트가 HTML을 돌려주는지; source expected/status checks=[]",
+              "legacy:16-4:F: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 16-4 빠른 링크\",\"content\":\"링크 미리보기 확인\",\"linkUrl\":\"{{W.body.base}}/fake-site/page?title=spring-cache-guide&delay=0\"}; case=빠른 링크; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"F\",\"expect\":{\"status\":201,\"headers\":{\"Server-Timing\":{\"matches\":\"^app;dur=\\\\d{1,3}$\"}},\"json\":[{\"path\":\"$.link.url\",\"equals\":\"{{W.body.base}}/fake-site/page?title=spring-cache-guide&delay=0\"},{\"path\":\"$.link.title\",\"equals\":\"spring-cache-guide\"}]}}]",
+              "legacy:16-4:S: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 16-4 느린 링크(3초)\",\"content\":\"링크 미리보기 확인\",\"linkUrl\":\"{{W.body.base}}/fake-site/page?title=slow-page&delay=3000\"}; case=느린 링크(3초); source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"S\",\"expect\":{\"status\":201,\"headers\":{\"Server-Timing\":{\"matches\":\"^app;dur=(19\\\\d\\\\d|2\\\\d\\\\d\\\\d)$\"}},\"json\":[{\"path\":\"$.link.url\",\"equals\":\"{{W.body.base}}/fake-site/page?title=slow-page&delay=3000\"},{\"path\":\"$.link.title\",\"type\":\"null\"}]}}]",
+              "legacy:16-4:GF: GET /api/posts/{{F.body.id}}; case=빠른 링크 글 상세; source expected/status checks=[{\"id\":\"C5\",\"pointer\":\"/checks/4\",\"request\":\"GF\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.link.title\",\"equals\":\"spring-cache-guide\"}]}}]",
+              "legacy:16-4:GS: GET /api/posts/{{S.body.id}}; case=느린 링크 글 상세; source expected/status checks=[{\"id\":\"C5\",\"pointer\":\"/checks/4\",\"request\":\"GS\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.link.url\",\"equals\":\"{{W.body.base}}/fake-site/page?title=slow-page&delay=3000\"},{\"path\":\"$.link.title\",\"type\":\"null\"}]}}]",
+              "legacy:16-4:X1: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 16-4 잘못된 입력 — ftp 주소\",\"content\":\"링크 미리보기 확인\",\"linkUrl\":\"ftp://example.com/a\"}; case=잘못된 입력 — ftp 주소; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"X1\",\"expect\":{\"status\":400,\"json\":[{\"path\":\"$.errors[*].field\",\"contains\":\"linkUrl\"}]}}]"
+            ],
+            "success": [
+              "미리보기 성공/시간초과 모두 생성 응답 유지."
+            ],
+            "failures": [
+              {
+                "when": "POST /api/posts 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 400 — 원문 check의 실패 응답",
+                "unchanged": "입력 URL 검증 실패는 post/tag를 만들지 않는다; 외부 timeout은 원문대로 link_title=NULL 상태로 글을 저장한다."
+              },
+              {
+                "when": "POST /api/posts · [교육용 fixture · legacy:16-4:X1] 잘못된 입력 — ftp 주소",
+                "result": "HTTP 400 (X1); $.errors[*].field contains \"linkUrl\"",
+                "unchanged": "잘못된 URL은 post/tag를 만들지 않는다; timeout은 글 저장 후 link_title=NULL이다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "글에 넣을 외부 주소는 가짜 사이트의 정상 페이지 또는 delay 3000ms 페이지입니다.",
+                "action": "정상 주소와 지연 주소로 각각 글을 등록하고 linkUrl/linkTitle을 비교합니다.",
+                "result": "연결 1초·읽기 2초 상한과 HTML 앞 64KB 조건을 지킵니다. ftp/javascript/공백 주소는 400이며 글/태그를 만들지 않습니다."
+              }
+            ],
+            "work": [
+              "입력 검증→외부 호출을 트랜잭션 밖에서 수행→결과를 글 저장에 반영하고 timeout/error는 정상 저장 fallback 처리한다."
+            ],
+            "done": [
+              "정상 페이지는 og:title 우선, 없으면 title을 보관합니다. 읽기 2초 초과나 상대 오류에도 글은 201로 저장하고 link_title은 NULL입니다.",
+              "연결 1초·읽기 2초 상한과 HTML 앞 64KB 조건을 지킵니다. ftp/javascript/공백 주소는 400이며 글/태그를 만들지 않습니다.",
+              "POST /api/posts 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 입력 URL 검증 실패는 post/tag를 만들지 않는다; 외부 timeout은 원문대로 link_title=NULL 상태로 글을 저장한다.",
+              "POST /api/posts · [교육용 fixture · legacy:16-4:X1] 잘못된 입력 — ftp 주소 → HTTP 400 (X1); $.errors[*].field contains \"linkUrl\" 잘못된 URL은 post/tag를 만들지 않는다; timeout은 글 저장 후 link_title=NULL이다."
+            ]
+          },
+          "hints": [
+            "연결 timeout과 읽기 timeout을 둘 다 설정해야 외부 서버의 어느 두 지연 구간을 제한할 수 있을까요?",
+            "2초 timeout 뒤 링크 자체는 저장하되 link_title을 null로 남기는 이유는 제품 요구에서 무엇일까요?",
+            "사용자가 준 URL을 서버가 직접 가져올 때 SSRF 위험을 검토할 지점은 어디일까요?"
+          ],
+          "recipeIds": [
+            "legacy:16-4:W",
+            "legacy:16-4:W0",
+            "legacy:16-4:F",
+            "legacy:16-4:S",
+            "legacy:16-4:GF",
+            "legacy:16-4:GS",
+            "legacy:16-4:X1"
+          ],
+          "executionChecks": [
+            {
+              "title": "Fake site의 0ms·3000ms 지연 비교",
+              "command": "./gradlew bootRun --args=\"--spring.profiles.active=practice\"",
+              "expected": "`/fake-site/page?title=hello&delay=0`은 제목을 채우고 `delay=3000`은 2초 timeout 후에도 글이 201로 저장되며 link_title은 null이다.",
+              "record": "각 응답 시간/status와 저장된 link_url/link_title, timeout 로그 한 줄을 기록한다."
+            }
+          ],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "16-4-link-preview.html",
+              "href": "/scenario/ch16-events-async-cache/16-4-link-preview.html"
+            },
+            {
+              "label": "S06-rest-api-clients.html",
+              "href": "/docs/knowledge/S06-rest-api-clients.html"
+            },
+            {
+              "label": "P25-external-api-client.html",
+              "href": "/docs/knowledge/P25-external-api-client.html"
+            },
+            {
+              "label": "W14-sync-async-blocking.html",
+              "href": "/docs/knowledge/W14-sync-async-blocking.html"
+            },
+            {
+              "label": "D13-backend-glossary.html",
+              "href": "/docs/knowledge/D13-backend-glossary.html"
+            },
+            {
+              "label": "F1-validation-errors.html",
+              "href": "/lessons/F1-validation-errors.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

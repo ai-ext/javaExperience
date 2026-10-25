@@ -55,11 +55,11 @@ document.querySelectorAll('.jwt-journey').forEach((journey) => {
     }
     if (serverUrl) panel.querySelector(`[data-jwt-server="${id}"]`)?.append(serverUrl);
   };
-  const show = (name) => {
+  const show = (name, scroll = true) => {
     for (const panel of panels) panel.hidden = panel.dataset.jwtPanel !== name;
     journey.dataset.jwtScreen = name;
     if (cases[name]) showCase(name, selected[name]);
-    journey.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) journey.scrollIntoView({ block: 'start', behavior: 'instant' });
   };
   journey.querySelectorAll('[data-jwt-go]').forEach((button) => button.addEventListener('click', () => show(button.dataset.jwtGo)));
   journey.querySelectorAll('[data-jwt-select]').forEach((button) => button.addEventListener('click', () =>
@@ -87,6 +87,6 @@ document.querySelectorAll('.jwt-journey').forEach((journey) => {
   };
   window.addEventListener('hashchange', revealRequest);
   for (const [name, values] of Object.entries(cases)) showCase(name, values[0]);
-  show('scenario');
+  show('scenario', false);
   revealRequest();
 });

@@ -8,4 +8,4 @@
 
 dryrun의산출물없음/classmajor65·별도resourcescopy/JUnit2성공및2중1실패/compileJava·compileTestJava실패/BootJAR·plain구조/별도nonwebJARresource출력후exit0/UPTODATE·privateFROMCACHE·NOSOURCE·SKIPPED/기존JAR와현재테스트실패/lock버전선택·private예상체크섬불일치거부를관찰했다. 자체두cleanbuild의실물JAR9103378bytes/SHA19be540e7682740e6d04d338fde021222c0c6e3a83dbaeb0935c3a85d928d16e가같았다. 첫비교baseline은emptyprivatecache에서--build-cache,다른workspace의twin은--no-build-cache였고양쪽cacheoff라고표시하지않는다. 같은fixture/JDK/Gradle/dependency조건의관측이지일반재현성보장이나속도측정이아니다.
 
-재현: 추가관찰기run-proof.py를--runtime-root /Users/ds/research/javaexperience-d04-20261021/_data/runtime로실행한다. 기존frozen을다시작성하지않는일반실행이전체대조를수행한다. 실제UI/JPG/브라우저·Docker/CI/registry·원문Java25설정전체는별도미실행범위다. 원문Markdown/학습자서버소스는수정하지않았다.
+재현: 추가관찰기run-proof.py를--runtime-root LOCAL_HOME/research/javaexperience-d04-20261021/_data/runtime로실행한다. 기존frozen을다시작성하지않는일반실행이전체대조를수행한다. 실제UI/JPG/브라우저·Docker/CI/registry·원문Java25설정전체는별도미실행범위다. 원문Markdown/학습자서버소스는수정하지않았다.

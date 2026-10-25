@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 const root=process.cwd(),base=root+'/docs/design/d12-2026-10-25/',out=base+'ui-sol-logs/polish-addendum/';
-const oldRoot='/Users/ds/research/javaexperience-d12-linux-terminal-20261025/_data/ui-sol-candidate3-source';
+const oldRoot='LOCAL_HOME/research/javaexperience-d12-linux-terminal-20261025/_data/ui-sol-candidate3-source';
 const before=await import(oldRoot+'/tools/site/d12-lesson-data.mjs');
 const after=await import(root+'/tools/site/d12-lesson-data.mjs');
 const oldStages=before.D12_LESSONS.flatMap(x=>x.stages),stages=after.D12_LESSONS.flatMap(x=>x.stages);

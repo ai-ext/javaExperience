@@ -8,7 +8,7 @@ import tempfile
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[3]
-JDK = Path('/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home/bin')
+JDK = Path('LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home/bin')
 source = ROOT / 'docs/knowledge/P09-java-syntax-basics.md'
 text = source.read_text()
 report = {'sourceSha256': hashlib.sha256(source.read_bytes()).hexdigest(), 'originalExamples': [], 'additionalChecks': []}

@@ -1,6 +1,6 @@
 # D11 PC 다크 학습 장면 명세
 
-메인 원문314줄 전문 대조. 연구 근거는 /Users/ds/research/javaexperience-d11-web-security-20261024/REPORT.md, CLAIM-MAP.json, SCENE-PLAN.md 및 _data/main-primary-verification.json이다. 원문 보존 SHA와 범위는 PLAN.md를 따른다. 다음 상태는 설계 계약이며 실행 로그가 생기기 전 관측값으로 게시하지 않는다.
+메인 원문314줄 전문 대조. 연구 근거는 LOCAL_HOME/research/javaexperience-d11-web-security-20261024/REPORT.md, CLAIM-MAP.json, SCENE-PLAN.md 및 _data/main-primary-verification.json이다. 원문 보존 SHA와 범위는 PLAN.md를 따른다. 다음 상태는 설계 계약이며 실행 로그가 생기기 전 관측값으로 게시하지 않는다.
 
 ## 학습 계약과 제품 구조
 

@@ -24,8 +24,10 @@
           "inspect": []
         },
         "done": [
-          "진행자는 D40과 다른 장애를 원인/티켓 번호 없이 제시한다. 학습자는 최초 공유→영향 판단→증거/완화→가설 배제→복구→대사를 수행한다.",
-          "중요 구간 시각·요청/DB 결과·자원 관찰·받은 도움·추가 증거를 기록한다. 독립 주입자가 없으면 공개 실험으로 남기고 비공개 진단은 확인 불가다."
+          "제시 조건: 진행자는 D40과 다른 장애를 원인/티켓 번호 없이 제시한다.",
+          "수행: 최초 공유→영향 판단→증거/완화→가설 배제→복구→대사를 수행한다.",
+          "증거: 중요 구간 시각·요청/DB 결과·자원 관찰·받은 도움·추가 증거를 기록한다.",
+          "판정 한계: 독립 주입자가 없으면 공개 실험으로 남기고 비공개 진단은 확인 불가다."
         ],
         "trap": "원인 단어를 맞히는 시험이 아니다. 영향이 크면 최소 증거 뒤 완화하고 다음 보고 시각을 지킨다.",
         "specRefs": [],
@@ -37,7 +39,41 @@
             "step": 2,
             "label": "독립 변경 검증"
           }
-        ]
+        ],
+        "visualGuide": {
+          "kind": "evidence",
+          "title": "증거와 판단을 시간순으로 남기기",
+          "headers": [
+            "시간순 기록",
+            "증거·판정"
+          ],
+          "rows": [
+            [
+              "최초 공유·영향 관찰",
+              "요청/DB·자원·영향 범위"
+            ],
+            [
+              "증거 확보·완화",
+              "증거 링크·조치·판단 이유"
+            ],
+            [
+              "가설·배제",
+              "받은 도움·추가 증거·배제 근거"
+            ],
+            [
+              "복구·대사",
+              "응답·DB 대사·미확인 항목"
+            ]
+          ],
+          "note": "시각·실제 결과를 직접 기록한다. D40과 다른 장애를 원인·번호 없이 제시한다. 독립 주입자가 없으면 공개 실험이며 비공개 진단은 확인 불가다.",
+          "coversDone": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "presentation": "evidence"
       },
       {
         "no": 2,
@@ -68,7 +104,8 @@
             "step": 2,
             "label": "독립 변경 검증"
           }
-        ]
+        ],
+        "presentation": "evidence"
       }
     ],
     "talkCards": [
@@ -122,14 +159,14 @@
       "context": "내 프로젝트의 disposable 실습 DB를 쓴다. D23에서 정한 예약·대상·지급 상태의 물리 이름과 필터로 아래 예시를 반드시 매핑한다. 예시의 member_coupon은 1단계 비교 모델이며 새 예약 테이블의 정답이 아니다. practice·원본 서버 DB는 수정하지 않는다.",
       "questions": [
         {
-          "task": "복구 후 지급 중복·누락을 실제 대상과 대사한다.",
-          "expect": "내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.",
-          "example": "SELECT member_id,coupon_id,COUNT(*) FROM member_coupon GROUP BY member_id,coupon_id HAVING COUNT(*)>1;"
+          "task": "복구 후 고정 대상 대비 지급 중복·누락·상태 불일치를 대사한다.",
+          "expect": "예약별 전체=성공+실패+대기를 확인한다. 중복 0, SUCCESS 미지급 0, 지급됐지만 SUCCESS가 아닌 행 0을 각각 확인한다. FAILED/PENDING 미지급은 누락으로 숨기지 말고 후속 처리 상태로 남긴다.",
+          "example": "SELECT c.id,COUNT(t.id) AS total,COALESCE(SUM(t.state='SUCCESS'),0) AS success,COALESCE(SUM(t.state='FAILED'),0) AS failed,COALESCE(SUM(t.state='PENDING'),0) AS pending FROM campaign c LEFT JOIN target t ON t.campaign_id=c.id GROUP BY c.id;\nSELECT campaign_id,member_id,COUNT(*) FROM issuance GROUP BY campaign_id,member_id HAVING COUNT(*)>1;\nSELECT t.campaign_id,t.member_id,t.state,i.id AS issuance_id FROM target t LEFT JOIN issuance i ON i.campaign_id=t.campaign_id AND i.member_id=t.member_id WHERE (t.state='SUCCESS' AND i.id IS NULL) OR (t.state<>'SUCCESS' AND i.id IS NOT NULL) UNION ALL SELECT i.campaign_id,i.member_id,'NO_TARGET',i.id FROM issuance i LEFT JOIN target t ON t.campaign_id=i.campaign_id AND t.member_id=i.member_id WHERE t.id IS NULL;"
         },
         {
-          "task": "복구 전후 재시도/대기 상태를 최종 확인한다.",
-          "expect": "내 물리 테이블·키·필터로 옮긴 SQL, 관찰 시각, 실제 출력과 기대 성질의 일치 여부를 남긴다. 예시는 실행 결과가 아니다.",
-          "example": "SHOW FULL PROCESSLIST;"
+          "task": "복구 전후 항목의 재시도·대기·영구 실패 상태를 확인한다.",
+          "expect": "FAILED/PENDING 행의 attempts·next_retry_at과 합의된 영구 실패 표시를 기록하고 전후 식별 집합을 비교한다. DB 세션 목록을 작업 상태로 대체하지 않는다.",
+          "example": "SELECT t.campaign_id,t.member_id,t.state,t.attempts,t.next_retry_at,i.id AS issuance_id FROM target t LEFT JOIN issuance i ON i.campaign_id=t.campaign_id AND i.member_id=t.member_id WHERE t.state IN ('FAILED','PENDING') ORDER BY t.campaign_id,t.member_id;"
         }
       ],
       "refs": []

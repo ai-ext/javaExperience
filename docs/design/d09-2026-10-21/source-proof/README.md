@@ -8,13 +8,13 @@
 # Prometheus 바이너리가 없을 때도 가능한 별도 component 관찰. freeze 금지.
 python3 docs/design/d09-2026-10-21/source-proof/run-proof.py \
   --component-only \
-  --runtime-root /Users/ds/research/javaexperience-d09-20261021/_data/native
+  --runtime-root LOCAL_HOME/research/javaexperience-d09-20261021/_data/native
 
 # 실제 main-provided native binary로 전체 관찰. 최초 freeze 뒤에는 전체 JSON 비교.
 python3 docs/design/d09-2026-10-21/source-proof/run-proof.py \
-  --project-root /Users/ds/code/javaExperience/.worktrees/concept-learning-night \
-  --runtime-root /Users/ds/research/javaexperience-d09-20261021/_data/native \
-  --prometheus-binary /Users/ds/research/javaexperience-d09-20261021/_data/tools/extracted/prometheus-3.15.0.darwin-arm64/prometheus \
+  --project-root LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night \
+  --runtime-root LOCAL_HOME/research/javaexperience-d09-20261021/_data/native \
+  --prometheus-binary LOCAL_HOME/research/javaexperience-d09-20261021/_data/tools/extracted/prometheus-3.15.0.darwin-arm64/prometheus \
   --prometheus-version 3.15.0 \
   --prometheus-sha256 edfbcf257fff3694e345be7648ce8ee05aa0cf602662097c649f4923116d7145
 ```

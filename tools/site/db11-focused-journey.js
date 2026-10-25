@@ -1,12 +1,12 @@
 document.querySelectorAll('.db11-focused').forEach((journey)=>{
   const panels=[...journey.querySelectorAll('[data-db11-panel]')];
-  const show=(name)=>{
+  const show = (name, scroll = true) =>{
     const active=panels.find((panel)=>panel.dataset.db11Panel===name);
     if(!active)return;
     for(const panel of panels)panel.hidden=panel!==active;
     journey.dataset.db11Screen=name;
     for(const button of journey.querySelectorAll('.db11-progress [data-db11-go]'))button.setAttribute('aria-current',button.dataset.db11Go===name?'step':'false');
-    journey.scrollIntoView({block:'start',behavior:'instant'});
+    if (scroll) journey.scrollIntoView({block:'start',behavior:'instant'});
   };
   for(const button of journey.querySelectorAll('[data-db11-go]'))button.addEventListener('click',()=>show(button.dataset.db11Go));
   for(const button of journey.querySelectorAll('[data-db11-copy]'))button.addEventListener('click',async()=>{
@@ -25,5 +25,5 @@ document.querySelectorAll('.db11-focused').forEach((journey)=>{
     for(const item of journey.querySelectorAll('[data-db11-choice]'))item.setAttribute('aria-pressed',String(item===button));
     journey.querySelector('[data-db11-drop]').hidden=!drop;
   });
-  show('scenario');
+  show('scenario', false);
 });

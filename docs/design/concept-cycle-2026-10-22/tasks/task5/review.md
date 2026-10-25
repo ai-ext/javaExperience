@@ -2,7 +2,7 @@
 
 판정: **needs_completion**. 원문 450줄을 대조한 문서 전체 감사이며, 기존 보강의 6질문·19상태가 문서 전체 완료를 뜻하지 않는다. 기준 HEAD `4b0493af52b1a06decca909d6bf9a8b6f9610686`. source SHA-256 `378a8c986a8fe4f70c9569f364fdda3258fcd9ac6057bea08e1420d44869f321`.
 
-새 실행 `npm --prefix tools/site run test:p19`: UTC 2026-10-21T23:43:29.668750+00:00 → 2026-10-21T23:43:35.138325+00:00, **actual exit 0**. 원시 stdout/stderr와 HEAD·소스별 SHA는 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task5/_data/`에 보존했다.
+새 실행 `npm --prefix tools/site run test:p19`: UTC 2026-10-21T23:43:29.668750+00:00 → 2026-10-21T23:43:35.138325+00:00, **actual exit 0**. 원시 stdout/stderr와 HEAD·소스별 SHA는 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task5/_data/`에 보존했다.
 
 ## 1. Spec 검토
 
@@ -65,35 +65,35 @@
 ### 문서 공백과 미실행 관문
 
 **P19-S1 · important · 문서 범위 공백**
-- 위치: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P19-mysql-jpa-setup.md:79`
+- 위치: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P19-mysql-jpa-setup.md:79`
 - 문제: 프로파일·비밀·TLS·문자셋/시간대의 주요 설정을 첫 학습 흐름에서 설명하지 않는다.
 - 근거: tools/site/p19-lesson-data.mjs:310-342의 6질문에는 포트/추가H2만 있음. 원문 보존 자체는 통과.
 - 후속 보강: profile/환경변수/default값과 local TLS/charset/timezone을 원문 기반 작은 장면으로 추가. 원문은 보존.
 - 검증: 잘못된 profile/host/port/DB명 선택의 기대 해석과 stage data를 독립 검사. MySQL 미실행이면 모델로 표시.
 
 **P19-S2 · important · 문서 범위 공백**
-- 위치: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P19-mysql-jpa-setup.md:147`
+- 위치: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P19-mysql-jpa-setup.md:147`
 - 문제: 환경별 DDL/Flyway·OSIV·dialect 의미가 validate/naming 추가 실험 밖으로 확장되지 않았다.
 - 근거: tools/site/p19-lesson-data.mjs:322-324 validate2stage는 실제H2를 정확히 설명하나 create-drop/update/none/Flyway/서비스 트랜잭션 판단은 없음.
 - 후속 보강: 환경별 정책과 스키마 선행 준비/서비스 조회 경계를 구분해 보강.
 - 검증: validate가 생성하지 않는 기존 검사 보존. 정책 결정 장면과 원문 참조·미실행 범위 검사.
 
 **P19-S3 · important · 문서 범위 공백**
-- 위치: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P19-mysql-jpa-setup.md:155`
+- 위치: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P19-mysql-jpa-setup.md:155`
 - 문제: SQL/bind 로그와 Actuator DB health 조건의 의미 장면·실행 관문이 없다.
 - 근거: 원문155-164/298-317; 현재 lesson6질문에 해당 topic 없음. source-proof는 NONE/OFF로 실행.
 - 후속 보강: SQL/바인딩/민감정보/health component·details·노출 조건을 별도 장면으로 설계.
 - 검증: 로그/health를 모델과 실측으로 분리. 실제 HTTP 실행 전 실측 UP/DB응답을 표시하지 않기.
 
 **P19-S4 · important · 문서 범위 공백**
-- 위치: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P19-mysql-jpa-setup.md:365`
+- 위치: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P19-mysql-jpa-setup.md:365`
 - 문제: PostgreSQL 전환과 여러 연결오류·풀원인 진단·자가점검의 핵심이 원문 접기 안에만 남았다.
 - 근거: coverage P19-U30 이후; ports/timeout 일부 외 TLS/Access denied/Unknown DB/utf8mb4/PG 장면 없음.
 - 후속 보강: 오류→확인 대상→다음 조치와 PG 전환 점검을 작은 의미 장면으로 보강.
 - 검증: 각 원문 오류/QA의 sourceLines-stageIds 연결을 갱신하고 부분장면 누락 검사.
 
 **P19-S5 · important · 문서 범위 공백**
-- 위치: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P19-mysql-jpa-setup.md:172`
+- 위치: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P19-mysql-jpa-setup.md:172`
 - 문제: 원문 Java25/MySQL/web/Actuator/Testcontainers 전체 실행은 완료되지 않았다.
 - 근거: VERIFICATION/source.json/execution.scope가 이를 명시. 현재 추가JDK21/H2/non-web/typecompile는 원문 실행 대체가 아님.
 - 후속 보강: 메인이 실행 범위를 별도 확정. 원문 테스트의 스키마 준비·생성자 주입·JUnit module 조건을 먼저 점검하고 가능환경에서 별도검증.
@@ -127,12 +127,12 @@ compose.yaml DB_PORT기본13308/community, 원문3307/app, 추가H2 p19_ready/mi
 
 ## 3. 직접 열람한 시안/과거 캡처
 
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p19-2026-10-20/images/P19-boot-h2-v4.jpg` — view_image 실제 열람, JPEG 1672×941.
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p19-2026-10-20/images/P19-validate-v2.jpg` — view_image 실제 열람, JPEG 1672×941.
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p19-2026-10-20/images/P19-pool-v2.jpg` — view_image 실제 열람, JPEG 1672×941.
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p19-2026-10-20/desktop-boot-h2.jpg` — view_image 실제 열람, JPEG 1672×2050.
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p19-2026-10-20/mobile-validate.jpg` — view_image 실제 열람, JPEG 360×2758.
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p19-2026-10-20/desktop-pool.jpg` — view_image 실제 열람, JPEG 1672×2001.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p19-2026-10-20/images/P19-boot-h2-v4.jpg` — view_image 실제 열람, JPEG 1672×941.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p19-2026-10-20/images/P19-validate-v2.jpg` — view_image 실제 열람, JPEG 1672×941.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p19-2026-10-20/images/P19-pool-v2.jpg` — view_image 실제 열람, JPEG 1672×941.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p19-2026-10-20/desktop-boot-h2.jpg` — view_image 실제 열람, JPEG 1672×2050.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p19-2026-10-20/mobile-validate.jpg` — view_image 실제 열람, JPEG 360×2758.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p19-2026-10-20/desktop-pool.jpg` — view_image 실제 열람, JPEG 1672×2001.
 
 시안은 Boot/H2·validate·pool 대표3장만 읽었다. 나머지 선정3장과 draft8장은 미열람이다. 선정6장 전체의 해시는 generation/asset 기록과 일치했다. 과거 캡처3장은 저장 화면을 보는 범위이며 현재 브라우저 재조작을 대신하지 않는다. mobile validate에는 번역 확장 overlay가 보이며 사이트 오류로 판정하지 않았다. 당시 viewport1672×941/360×800과 full-page JPEG 높이를 구분했다.
 

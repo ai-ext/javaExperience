@@ -1,3 +1,4 @@
+import { resolveEvidencePath } from './evidence-path.mjs';
 // 생성 HTML·선정 JPG·원문·native 경계를 실제 산출물과 대조하는 계약 검사다.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -126,7 +127,7 @@ assert.equal(facts['evaluation-changes-later-observed-result'].afterBumpEvaluati
 assert.deepEqual(facts['private-git-bisect-finds-controlled-first-bad'].actualPredicateRuns, [{ commit: 'C4', exit: 1 }, { commit: 'C3', exit: 0 }]);
 const dependencies = json(proof + 'dependencies.json');
 assert.equal(dependencies.length, 47);
-for (const row of dependencies) assert.equal(hash(fs.readFileSync(row.file)), row.sha256);
+for (const row of dependencies) assert.equal(hash(fs.readFileSync(resolveEvidencePath(row.file))), row.sha256);
 const fixture = json(proof + 'fixture-files.json');
 assert.equal(fixture.length, 9);
 for (const row of fixture) assert.equal(hash(fs.readFileSync(new URL(proof + row.file, root))), row.sha256);

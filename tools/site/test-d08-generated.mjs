@@ -1,3 +1,4 @@
+import { resolveEvidencePath } from './evidence-path.mjs';
 // 생성 HTML과 선정 JPG·원문·native·미실행 정책 모델의 실제 연결을 검사한다.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -129,12 +130,12 @@ const fixture = json(proof + 'fixture-manifest.json'); assert.equal(fixture.file
 for (const file of fixture.files) assert.equal(hash(read(proof + 'fixture/' + file.file)), file.sha256);
 assert.equal(hash(read(proof + 'run-proof.py')), fixture.runnerSHA256);
 const raw = json(proof + 'runtime-last.json'); assert.equal(raw.completed, true);
-assert.equal(hash(fs.readFileSync(raw.jar.path)), facts['boot-jar-manifest-and-compiled-byte-evidence'].sha256);
+assert.equal(hash(fs.readFileSync(resolveEvidencePath(raw.jar.path))), facts['boot-jar-manifest-and-compiled-byte-evidence'].sha256);
 const dependencies = json(proof + 'dependencies.json');
 assert.deepEqual([dependencies.runtime.length, dependencies.test.length], [21, 29]);
 for (const [name, group] of Object.entries(raw.dependencyFiles)) {
   assert.deepEqual(group.map(({ coordinate, sha256 }) => ({ coordinate, sha256 })), dependencies[name]);
-  for (const row of group) assert.equal(hash(fs.readFileSync(row.file)), row.sha256);
+  for (const row of group) assert.equal(hash(fs.readFileSync(resolveEvidencePath(row.file))), row.sha256);
 }
 for (const [name, code] of [['ungated-clean-test-bootjar', 1], ['buggy-clean-test-bootjar', 1], ['fixed-clean-test-bootjar', 0]]) assert.equal(raw.commands.find(row => row.name === name).exitCode, code);
 const independent = json(proof + 'independent-replay.json');

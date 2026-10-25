@@ -3,9 +3,9 @@
 판정: **needs_completion**. 전체 문서 완료: **false**. 선택 범위의 확정 품질 결함 **0**; 원문 공백 후속 묶음 **4**.
 
 - 기준 HEAD: `4b0493af52b1a06decca909d6bf9a8b6f9610686`
-- 원문: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D03-rest-api-dev-process.md (332줄, SHA256 `c91a9ac8a9f9168b51a174cf39084c684d3e0e52ced12446b9283b23676a71c7`)
+- 원문: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D03-rest-api-dev-process.md (332줄, SHA256 `c91a9ac8a9f9168b51a174cf39084c684d3e0e52ced12446b9283b23676a71c7`)
 - fresh 검사: `npm --prefix tools/site run test:d03` → exit **0**, UTC 2026-10-22T00:07:03.449584+00:00 ~ 2026-10-22T00:07:16.417929+00:00.
-- 원시 결과: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task17/runs/independent-20261022T000703.445500Z/result.json · stdout.log · stderr.log. 검사 전후14개 대상 SHA 동일.
+- 원시 결과: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task17/runs/independent-20261022T000703.445500Z/result.json · stdout.log · stderr.log. 검사 전후14개 대상 SHA 동일.
 
 ## spec 검토
 
@@ -111,21 +111,21 @@
 
 선정 이미지10장 전부 actual view_image로 열람하고 SHA를 review.json에 고정했다. 역사 capture는 desktop-create.jpg, mobile-openapi.jpg, desktop-problem.jpg의3장만 직접 열람했다. 현재 브라우저 조작/새 캡처는 수행하지 않았다. 메인의 현재 desktop/mobile 검증과 별도이다.
 
-이미지 폴더: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d03-2026-10-20/images/
+이미지 폴더: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d03-2026-10-20/images/
 
-역사 캡처 폴더: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d03-2026-10-20/captures/
+역사 캡처 폴더: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d03-2026-10-20/captures/
 
 fresh test:d03는 Node/jsdom·저장된 source-proof·dependency60/fixture4 SHA·27상태·10JPG·원문13774자/code3/Mermaid3/id22/map1 보존을 검사한다. Java/HTTP/DB·웹·외부CLI·추가 agent는 실행하지 않았다. 역사 raw18HTTP/독립재현19CHECK 기록을 이번 fresh native 실행이라고 부르지 않는다.
 
 ## 남은 작업 묶음
 
-- **D03-SCOPE-1** 요구사항·소비자 합의·design/code-first 선택의 구체 왕복/산출물 부족 (/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D03-rest-api-dev-process.md:62)
+- **D03-SCOPE-1** 요구사항·소비자 합의·design/code-first 선택의 구체 왕복/산출물 부족 (LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D03-rest-api-dev-process.md:62)
   근거: delivery-contract는 원문 앞 단계 요약/미실행 모델이며 3.3 시퀀스·질문 후 diff 장면 없음. 후속: 한 요구를 수용 기준→요청/성공/오류 예시→소비자 질문→합의된 명세로 연결하는 최소 장면 추가. 검증: 해당 원문 L62-111 및 Q1/Q2/Q8을 stageIds로 다시 전수 대조; 실제 합의/CI로 오표시하지 않음.
-- **D03-SCOPE-2** 페이지네이션·버전 이행·인증인가·상태코드 선택 공백 (/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D03-rest-api-dev-process.md:75)
+- **D03-SCOPE-2** 페이지네이션·버전 이행·인증인가·상태코드 선택 공백 (LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D03-rest-api-dev-process.md:75)
   근거: routing-query는 목록/필터/페이지 미구현 관찰만 제공; 401/403·cursor/offset·4개 버전 위치 전용 stage 없음. 후속: 안정정렬에서 목록 변동에 따른 offset/cursor 비교, 토큰 검증/만료/종료·API버전/지원종료·인증인가와 성공/오류 선택 사례 추가. 검증: L75-84/L260-263/Q4-Q6을 covered로 올리기 전에 입력/정책/소비자 결과를 확인.
-- **D03-SCOPE-3** 계층 분리·테스트 범위/실행과 원문 환경이 미실행 (/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D03-rest-api-dev-process.md:115)
+- **D03-SCOPE-3** 계층 분리·테스트 범위/실행과 원문 환경이 미실행 (LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D03-rest-api-dev-process.md:115)
   근거: 추가 역사 Java21 HTTP의 성공은 Java25/Initializr/Boot플러그인·JUnit WebMvcTest/Boot MOCK/RANDOM_PORT 검증 아님. 후속: 원문 실습 환경 확인 및 별도 최소 Service/Repository/DTO·단위/슬라이스/통합 차이 장면 설계; 실행을 한다면 별도 승인된 후속 작업에서 근거 기록. 검증: L113-121/L142-168/L248/Q7별 환경·명령·실제 요청/포트·exit와 SHA를 따로 기록.
-- **D03-SCOPE-4** 하위호환·배포 관문의 구체 실패/복구 미검증 (/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D03-rest-api-dev-process.md:127)
+- **D03-SCOPE-4** 하위호환·배포 관문의 구체 실패/복구 미검증 (LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D03-rest-api-dev-process.md:127)
   근거: consumer는 Python 집합 모델이고 delivery-feedback은 실제 PR/CI/운영/rollback 미실행 모델. 후속: 타입·의미 변경, consumer/OpenAPI diff와 릴리스 판단, 지표 기준 초과→담당자/rollback의 구체 경로 보강. 실제 배포 인증과 개념 모델 구분 유지. 검증: L127-140/L269/Q6/Q8에서 계약 변경 전후/배포 판단/복구 분기를 재검토.
 
 아래5줄은 최종 판정 인터페이스다.

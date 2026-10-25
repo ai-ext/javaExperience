@@ -8,6 +8,6 @@
 
 기존20질문84상태 데이터 전체와 asset44 객체, sourceRoot 전체 HTML이 HEAD와 같다. 사전 dirty2·historical proof1366·초기 review24·원문135·learner17 보존 mismatch는 0이다. 신규 질문2/상태9를 과거 history에 합성하지 않았다. sourceFragments는 source 순서와 절/열 범위를 따라 정확 byte로 일치하고 문자열 리터럴 정규화에 의존하지 않는다. 추가 전체 Java/raw13은 원문 영역 밖의 명확한 details에 있다.
 
-재현 로그: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-completion-2026-10-24/ui-sol-logs/attempt2
+재현 로그: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p09-completion-2026-10-24/ui-sol-logs/attempt2
 
 실제 PC 시각·수정된 focus crop·확대/스크롤·정상 OS clipboard 및 inventory/전체24 harness는 parent의 별도 관문이다. native Java/JPG는 독립 proof 승인과 구분했다. 이번 승인은 새2질문9상태의 Node/정적 UI 계약에 한정하며 P09전체·24전체·134전체 완료를 뜻하지 않는다. 제품파일 수정·commit/push·외부CLI·브라우저·LLM 재위임은 하지 않았다.

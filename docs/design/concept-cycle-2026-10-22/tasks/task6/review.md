@@ -4,11 +4,11 @@
 
 검토 기준 HEAD: `4b0493af52b1a06decca909d6bf9a8b6f9610686`. 원문 SHA256: `6cd8b34253f33255e8c7ec5608f07c382d3fe020b049182bfa0bc536dabdd125`. 원문386줄 전문을 읽고 data/controller/renderer/tests·현재생성HTML·기존 VERIFICATION/source-proof와 대조했다.
 
-새 명령 `npm --prefix tools/site run test:p20`는 UTC 2026-10-21T23:44:08.160892+00:00 ~ 2026-10-21T23:44:12.750469+00:00에 **exit 0**. Node/JSDOM과 생성HTML에서 8질문/21상태·8JPG·과거27PASS/SQL 연결 및 원문13279자/code13/id25·기존map/generic 보존 검사를 통과했다. 이 명령은 Java나 DB를 실행하지 않는다. 원시 출력: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task6/test-p20.raw.txt. UTC·HEAD·15개 입력 SHA·변경 여부·rawSHA: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task6/test-p20.meta.json.
+새 명령 `npm --prefix tools/site run test:p20`는 UTC 2026-10-21T23:44:08.160892+00:00 ~ 2026-10-21T23:44:12.750469+00:00에 **exit 0**. Node/JSDOM과 생성HTML에서 8질문/21상태·8JPG·과거27PASS/SQL 연결 및 원문13279자/code13/id25·기존map/generic 보존 검사를 통과했다. 이 명령은 Java나 DB를 실행하지 않는다. 원시 출력: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task6/test-p20.raw.txt. UTC·HEAD·15개 입력 SHA·변경 여부·rawSHA: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task6/test-p20.meta.json.
 
 ## spec: 범위와 근거
 
-전수 대응: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task6/source-coverage.json. `sourceLines`는 start,end 쌍, `stageIds`는 실제 stage 식별자다. covered도 명시한 역사 증거 범위의 대응이며 오늘의 DB 재실행이나 학습자 이해 인증이 아니다.
+전수 대응: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task6/source-coverage.json. `sourceLines`는 start,end 쌍, `stageIds`는 실제 stage 식별자다. covered도 명시한 역사 증거 범위의 대응이며 오늘의 DB 재실행이나 학습자 이해 인증이 아니다.
 
 | 원문 단위 | 줄 | stage | 판정 | 남은 범위 |
 |---|---|---|---|---|
@@ -82,17 +82,17 @@ spec는 원문 전체에서 통과하지 않았으므로 quality는 **diagnostic
 
 아래 선택8장과 과거캡처3장을 실제 `view_image`로 열었다. 선택8장 JPEG magic `ffd8ff`, 실제1672×941 및 manifest SHA 일치를 새로 검사했다.
 
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-compile-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-ownership-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-inverse-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-identity-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-rollback-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-orphan-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-mapping-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-dto-v3.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/desktop-identity.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/mobile-dto.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/desktop-orphan.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-compile-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-ownership-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-inverse-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-identity-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-rollback-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-orphan-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-mapping-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/images/P20-dto-v3.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/desktop-identity.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/mobile-dto.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p20-2026-10-20/desktop-orphan.jpg
 
 identity·rollback·orphan 값과 DTO v3 entity LineStatus/DTO String 구분을 읽고 기존 JSON/Java에 대조했다. 과거 mobile DTO의 가로로 긴 JSON은 확대/pan 영역에 있고 DOM에 전체 값이 있다. Translate overlay는 당시 확장 표시로 분리한다. 과거 full-page 이미지는1672×2355/360×2578/1672×2303이며 현재 viewport가 아니다. 새 실브라우저 조작을 대신하지 않는다.
 
@@ -103,7 +103,7 @@ identity·rollback·orphan 값과 DTO v3 entity LineStatus/DTO String 구분을 
 - MySQL/Java25/HTTP/Docker 원문 경로를 실행할지 메인이 범위를 정하고, 실행하지 않으면 미실행으로 유지. 이 감사에서 DB를 조작하지 않음.
 - 메인이 현재 preview desktop/mobile에서 선택·단계·copy·zoom/pan·원문·overflow를 확인하고 현재 JPG 및 viewport 증거를 별도 기록. 구현 수정 시 fresh spec→quality 재검토 필요.
 
-기계 판정: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task6/review.json. fresh 정적 소스·JPEG 증거: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task6/static-evidence.json. application·원문·기존증거·장부·Git·다른task는 수정하지 않았다. reviewer는 브라우저/DB·Java 재실행/외부 web·CLI/agent 호출을 하지 않았다.
+기계 판정: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task6/review.json. fresh 정적 소스·JPEG 증거: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task6/static-evidence.json. application·원문·기존증거·장부·Git·다른task는 수정하지 않았다. reviewer는 브라우저/DB·Java 재실행/외부 web·CLI/agent 호출을 하지 않았다.
 
 판정: needs_completion
 커버리지: 50단위 · covered 18 / partial 17 / missing 12 / unrun 3

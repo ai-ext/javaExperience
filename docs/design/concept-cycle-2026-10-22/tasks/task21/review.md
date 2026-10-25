@@ -3,16 +3,16 @@
 **판정: needs_completion.** 기존 부분 보강은 선언된 범위에서 일관되지만 전체 원문 학습 장면은 미완료다. spec을 승인하지 않았으므로 quality는 진단만 기록했다.
 
 - 기준 HEAD: `4b0493af52b1a06decca909d6bf9a8b6f9610686`
-- 원문: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D07-onprem-vs-cloud.md (300줄, SHA256 `0945450013d203109827f96fe2450233a1c79de1ce6caa4e904ccebd3da228b2`)
+- 원문: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D07-onprem-vs-cloud.md (300줄, SHA256 `0945450013d203109827f96fe2450233a1c79de1ce6caa4e904ccebd3da228b2`)
 - 새 검사: `npm --prefix tools/site run test:d07` → **actual exit 0**, 2026-10-22T00:14:00.877302+00:00 ~ 2026-10-22T00:14:04.416374+00:00.
-- 원시 출력: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task21/test-d07.raw.log; 시각·HEAD·소스 해시: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task21/test-d07.run.json.
+- 원시 출력: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task21/test-d07.raw.log; 시각·HEAD·소스 해시: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task21/test-d07.run.json.
 - 검사 범위는 Node/JSDOM·생성HTML·보존된 근거/39개 dependency SHA다. native 서버 재실행/현재브라우저 검증은 아니다.
 
 ## spec: 원문 전문 대조
 
 중첩 가능한 주요 의미 단위 74개: covered 40 / partial 29 / missing 2 / unrun 3. 원문 줄 커버리지 백분율이 아니다. 기존13질문·36상태는 native8/model·원문미실행28이며, 원문 bytes 보존과 전체 장면 완료를 구분했다.
 
-전수표: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task21/source-coverage.json
+전수표: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task21/source-coverage.json
 
 | 원문 의미 단위 | sourceLines | stageIds | 판정 | 공백 또는 근거 |
 |---|---|---|---|---|
@@ -95,7 +95,7 @@
 
 ### D07-S01 · important · coverage_gap
 
-/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/d07-lesson-data.mjs:747
+LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/d07-lesson-data.mjs:747
 
 서버리스/FaaS의 독립 보충 장면이 없다.
 
@@ -105,7 +105,7 @@
 
 ### D07-S02 · important · coverage_gap
 
-/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/d07-lesson-data.mjs:1628
+LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/d07-lesson-data.mjs:1628
 
 원문 서비스 대응표 중 관리형 RDBMS 행의 독립 장면이 없다.
 
@@ -115,7 +115,7 @@
 
 ### D07-S03 · important · coverage_gap
 
-/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/d07-lesson-data.mjs:1563
+LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/d07-lesson-data.mjs:1563
 
 Region 선택·DR·운영 예방 조치의 핵심 조건은 부분 설명에 머문다.
 
@@ -125,7 +125,7 @@ Region 선택·DR·운영 예방 조치의 핵심 조건은 부분 설명에 머
 
 ### D07-S04 · important · coverage_gap
 
-/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/d07-lesson-data.mjs:1889
+LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/d07-lesson-data.mjs:1889
 
 배치 선택과 전환 파일럿의 단계별 의사결정 흐름은 독립 장면으로 완성되지 않았다.
 
@@ -148,18 +148,18 @@ Region 선택·DR·운영 예방 조치의 핵심 조건은 부분 설명에 머
 
 실제로 view_image로 본 시안6개:
 
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/images/responsibility-v3.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/images/traffic-v4.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/images/cost-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/images/placement-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/images/managed-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/images/migration-v3.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/images/responsibility-v3.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/images/traffic-v4.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/images/cost-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/images/placement-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/images/managed-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/images/migration-v3.jpg
 
 실제로 본 역사캡처3개 (새 브라우저 확인 아님):
 
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/captures/desktop-responsibility.jpg · JPEG 1672×2517
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/captures/mobile-traffic.jpg · JPEG 360×2534
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/captures/desktop-lifecycle.jpg · JPEG 1672×3235
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/captures/desktop-responsibility.jpg · JPEG 1672×2517
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/captures/mobile-traffic.jpg · JPEG 360×2534
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d07-2026-10-21/captures/desktop-lifecycle.jpg · JPEG 1672×3235
 
 - 책임표의 provider/customer/shared와 DOM 단계가 대응한다.
 - traffic 그림은 DNS 응답 뒤 client→LB HTTPS와 정상/장애 대안경로를 구분한다.

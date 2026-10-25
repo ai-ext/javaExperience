@@ -37,4 +37,4 @@ PASS는 설정과 관측 기록의 일치를 뜻하며 페이지 제한 정확�
 
 JDK21/native Hibernate/H2/Boot BOM만 사용했다. MySQL·Docker·Java25·Boot 앱·Spring proxy·HTTP·OSIV·비관적 락·모든 버전 migration·전체 픽셀 정밀 비교·다른 브라우저·학습자 이해도는 미검증이다. Docker daemon 접근 실패를 복구하려고 사용자의 실행 환경을 바꾸지 않았다. 원문 버전별 가이드/선택 기준/자가점검은 보존했으며 전부 새 이미지로 제작한 것은 아니다. 상태는 부분 implemented이며 verified가 아니다.
 
-개념 전용 로컬 브랜치에 보관한다. merge/push/PR은 하지 않는다. 재현과 통합 기준은 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-learning-night-2026-10-20/INTEGRATION.md 를 따른다.
+개념 전용 로컬 브랜치에 보관한다. merge/push/PR은 하지 않는다. 재현과 통합 기준은 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-learning-night-2026-10-20/INTEGRATION.md 를 따른다.

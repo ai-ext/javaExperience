@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
-const root='/Users/ds/code/javaExperience/.worktrees/concept-learning-night';
+const root='LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night';
 const require=createRequire(root+'/tools/site/package.json');
 const {JSDOM}=require('jsdom');
 const {buildSync}=require('esbuild');

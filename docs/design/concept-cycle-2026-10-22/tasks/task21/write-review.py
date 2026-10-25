@@ -1,6 +1,6 @@
 from pathlib import Path
 import json,datetime,hashlib,collections
-R=Path('/Users/ds/code/javaExperience/.worktrees/concept-learning-night'); O=R/'docs/design/concept-cycle-2026-10-22/tasks/task21'; D='docs/design/d07-2026-10-21/'; S='docs/knowledge/D07-onprem-vs-cloud.md'
+R=Path('LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night'); O=R/'docs/design/concept-cycle-2026-10-22/tasks/task21'; D='docs/design/d07-2026-10-21/'; S='docs/knowledge/D07-onprem-vs-cloud.md'
 rows=[]
 def add(section,lines,stages,v,e,g=''):
  rows.append(dict(sourceSection=section,sourceLines=lines,stageIds=stages.split() if stages else [],verdict=v,evidence=e,gap=g))

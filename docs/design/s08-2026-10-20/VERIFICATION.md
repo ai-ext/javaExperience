@@ -27,7 +27,7 @@
 
 최초 fixture는 AFTER_COMMIT 리스너 실패가 caller로 전파된다고 잘못 가정했다. 실제 로그/호출 스택을 읽고 Spring v7.0.9의 TransactionPhase와 pinned 구현을 대조했다. 이 enum phase는 direct TransactionSynchronization.afterCommit과 달리 afterCompletion에서 실행되고 해당 경로는 Throwable을 catch/log한다. 원문 listener를 고치지 않고 예상만 교정했다. 초기 실패는 checkpoints, 조사 과정은 DEBUG-NOTE.md에 있다. callback active=true/sync=false는 이미 완료된 DB commit을 뒤집거나 미커밋을 뜻하지 않는다.
 
-Luna 직접 OpenAI 조사는 /Users/ds/research/javaexperience-s08-20261020 에 있다. LiteLLM/재위임/다른 모델 전환은 없었다. Luna의 최신 이벤트 URL 열기가 실패한 한계는 보존했고, 메인의 출처 검증에서는 공식7.0.9 이벤트 본문·API·pinned 구현을 실제 열었다. 원문 버전/격리표·outbox·reactive 선택 기준은 보존했으며 실행 결과로 바꾸지 않았다.
+Luna 직접 OpenAI 조사는 LOCAL_HOME/research/javaexperience-s08-20261020 에 있다. LiteLLM/재위임/다른 모델 전환은 없었다. Luna의 최신 이벤트 URL 열기가 실패한 한계는 보존했고, 메인의 출처 검증에서는 공식7.0.9 이벤트 본문·API·pinned 구현을 실제 열었다. 원문 버전/격리표·outbox·reactive 선택 기준은 보존했으며 실행 결과로 바꾸지 않았다.
 
 ## 실제 화면과 보존
 

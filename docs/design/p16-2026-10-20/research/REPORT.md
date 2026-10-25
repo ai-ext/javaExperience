@@ -1,6 +1,6 @@
 # P16 JSON·Jackson 실무 원문 검증 보고서
 
-조사 기준 시각은 **2026-10-19 20:19:29 UTC**(시스템 시계, 한국 시간 2026-10-20 05:19:29)이다. 확인 대상 원문은 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P16-json-jackson-practical.md`이며, 사용자가 지정한 쟁점만 대조했다. 이 보고서는 웹 공식 원문 조사 결과이고, 원문 파일은 수정하지 않았다. Boot 4.1.1·Java 25 조합 프로젝트를 빌드하거나 실행하지 않았다. Jackson 라이브러리 로컬 캐시 검증은 별도 메인 작업이므로 다루지 않는다.
+조사 기준 시각은 **2026-10-19 20:19:29 UTC**(시스템 시계, 한국 시간 2026-10-20 05:19:29)이다. 확인 대상 원문은 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P16-json-jackson-practical.md`이며, 사용자가 지정한 쟁점만 대조했다. 이 보고서는 웹 공식 원문 조사 결과이고, 원문 파일은 수정하지 않았다. Boot 4.1.1·Java 25 조합 프로젝트를 빌드하거나 실행하지 않았다. Jackson 라이브러리 로컬 캐시 검증은 별도 메인 작업이므로 다루지 않는다.
 
 ## 판정 요약
 
@@ -54,7 +54,7 @@ Spring Framework 공식 메시지 변환 문서는 `HttpMessageConverter`가 서
 
 ## 5. 출처표 및 검증 한계
 
-URL별 실제 웹 본문에서 확인한 발췌, 조사 시각, 해석 한계를 기록한 원자료는 [`_data/source-notes.md`](/Users/ds/research/javaexperience-p16-20261020/_data/source-notes.md)에 저장했다. 확인한 출처는 FasterXML Jackson 3.1.5 릴리스/3.0 변경 목록/마이그레이션 가이드/annotations 공식 문서, Spring Boot 4.1.1 JSON 문서, Spring Framework 7 메시지 변환 문서·Javadoc·MVC 구현 원문이다. 링크와 역할은 다음과 같다.
+URL별 실제 웹 본문에서 확인한 발췌, 조사 시각, 해석 한계를 기록한 원자료는 [`_data/source-notes.md`](LOCAL_HOME/research/javaexperience-p16-20261020/_data/source-notes.md)에 저장했다. 확인한 출처는 FasterXML Jackson 3.1.5 릴리스/3.0 변경 목록/마이그레이션 가이드/annotations 공식 문서, Spring Boot 4.1.1 JSON 문서, Spring Framework 7 메시지 변환 문서·Javadoc·MVC 구현 원문이다. 링크와 역할은 다음과 같다.
 
 | 공식 원문 | 이 보고서에서 뒷받침하는 내용 |
 |---|---|

@@ -15,10 +15,10 @@ document.querySelectorAll('.session-journey').forEach((journey) => {
     const id = Number.isSafeInteger(value) && value > 0 ? String(value) : 'N';
     for (const node of journey.querySelectorAll('[data-session-id-label]')) node.textContent = id;
   });
-  const show = (name) => {
+  const show = (name, scroll = true) => {
     for (const panel of panels) panel.hidden = panel.dataset.sessionPanel !== name;
     journey.dataset.sessionScreen = name;
-    journey.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) journey.scrollIntoView({ block: 'start', behavior: 'instant' });
   };
   for (const button of journey.querySelectorAll('[data-session-go]')) {
     button.addEventListener('click', () => show(button.dataset.sessionGo));
@@ -41,5 +41,5 @@ document.querySelectorAll('.session-journey').forEach((journey) => {
       }
     });
   }
-  show('scenario');
+  show('scenario', false);
 });

@@ -19,7 +19,7 @@ mainline merge `a70f1bd5`의 Markdown 차이는 세 파일이다. 모두 도구/
 | 파일 | main 쪽 변경 | 영향 |
 |---|---|---|
 | `docs/knowledge/D07-onprem-vs-cloud.md` | Docker Desktop에서 Docker runtime 중립으로 전제 변경 | 환경 가정 — UI 계약 직접 변화 없음(추정), 원문 baseline hash는 달라짐 |
-| `docs/knowledge/P15-intellij-practical.md` | code block 주석의 /Users/me 개인 경로를 $USER_HOME 변수 예시로 변경 | 문서 안전·이식성. 기존 ID 29개와 code block 15개 수는 같고 문자열 1개 변경 |
+| `docs/knowledge/P15-intellij-practical.md` | code block 주석의 LOCAL_HOME 개인 경로를 $USER_HOME 변수 예시로 변경 | 문서 안전·이식성. 기존 ID 29개와 code block 15개 수는 같고 문자열 1개 변경 |
 | `docs/knowledge/R08-app-to-db-connection.md` | 192.168.65.1 설명의 Colima 등 예시를 제거, runtime/environment 변동은 유지 | 환경 설명 — UI 계약 직접 변화 없음(추정), 원문 baseline hash는 달라짐 |
 
 ## 24개 Markdown 차이
@@ -69,7 +69,7 @@ HTML text/code/ID의 새 값은 아직 만들지 않았다. 최종 생성 HTML�
 
 ## 역사 증거
 
-복사 대상인 `/Users/ds/code/javaExperience/.worktrees/concept-learning-integration/docs/design/` 아래 source-proof 27개 디렉터리(1,374개 파일)와 `concept-cycle-2026-10-22/tasks/task1`부터 `task24`까지의 리뷰 JSON/Markdown(48개 파일)은 source snapshot의 바이트를 유지한다. 파일별 SHA-256·크기는 JSON `historicalProof.byteManifest`에 기록했다. 이 자료는 과거 작업 상태를 입증한다. baseline 재대응은 별도 통합 소스 트리의 검사 기준을 추가하는 일이며, 옛 source-proof·리뷰·실패 로그의 내용이나 hash를 수정하는 일이 아니다.
+복사 대상인 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-integration/docs/design/` 아래 source-proof 27개 디렉터리(1,374개 파일)와 `concept-cycle-2026-10-22/tasks/task1`부터 `task24`까지의 리뷰 JSON/Markdown(48개 파일)은 source snapshot의 바이트를 유지한다. 파일별 SHA-256·크기는 JSON `historicalProof.byteManifest`에 기록했다. 이 자료는 과거 작업 상태를 입증한다. baseline 재대응은 별도 통합 소스 트리의 검사 기준을 추가하는 일이며, 옛 source-proof·리뷰·실패 로그의 내용이나 hash를 수정하는 일이 아니다.
 
 ## 실행·제한
 

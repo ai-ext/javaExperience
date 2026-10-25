@@ -2,7 +2,7 @@
 from pathlib import Path
 import subprocess,tempfile,json,sys,hashlib
 OUT=Path(__file__).resolve().parent
-JDK=Path('/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home/bin')
+JDK=Path('LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home/bin')
 subprocess.run([sys.executable,str(OUT/'verify-spring-local.py')],check=True)
 spring=json.loads((OUT/'Spring.verification.json').read_text())
 jar=Path(next(x['file'] for x in spring['jars'] if x['artifact']=='lombok'))

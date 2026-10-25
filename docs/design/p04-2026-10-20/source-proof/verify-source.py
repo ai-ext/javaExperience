@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib, json, re, subprocess, tempfile
 ROOT = Path(__file__).resolve().parents[4]
 OUT = Path(__file__).resolve().parent
-JAVA = Path('/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home/bin')
+JAVA = Path('LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home/bin')
 source = ROOT / 'docs/knowledge/P04-constructors-builder.md'
 text = source.read_text()
 records = []

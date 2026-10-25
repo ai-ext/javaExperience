@@ -7,10 +7,10 @@ document.querySelectorAll('.db01-focused').forEach((journey) => {
     tags: ['tags[]', 'post.id → post_tag.post_id → tag.name', '글 145 · java'],
     publishedAt: ['publishedAt', 'post.published_at', '글 145 · 발행 시각'],
   };
-  const show = (name) => {
+  const show = (name, scroll = true) => {
     for (const panel of panels) panel.hidden = panel.dataset.db01Panel !== name;
     journey.dataset.db01Screen = name;
-    journey.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) journey.scrollIntoView({ block: 'start', behavior: 'instant' });
   };
   for (const button of journey.querySelectorAll('[data-db01-go]')) {
     button.addEventListener('click', () => show(button.dataset.db01Go));
@@ -67,5 +67,5 @@ document.querySelectorAll('.db01-focused').forEach((journey) => {
       }
     });
   }
-  show('scenario');
+  show('scenario', false);
 });

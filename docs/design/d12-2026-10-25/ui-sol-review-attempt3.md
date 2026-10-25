@@ -8,4 +8,4 @@ collector는 D12 import와 수집 tuple 두 줄만 추가됐다. 다른 133개 t
 
 실제 PC 배치, 전체 이미지와 확대 판독, OS clipboard, 최종 장부와 커밋은 메인의 별도 관문이다. 이 검수에서 Docker, 외부 CLI, 리서치, 제품 수정, 커밋은 수행하지 않았다. 원문 전체와 134개 문서 전체의 완성을 판정하지 않는다.
 
-첫 명세 FAIL과 후보 2의 품질 FAIL은 불변으로 보존했다. 상세 원출력은 같은 작업 폴더의 ui-sol-logs/attempt3에 있다. 제품 snapshot은 /Users/ds/research/javaexperience-d12-linux-terminal-20261025/_data/ui-sol-candidate3-source에 보관했다.
+첫 명세 FAIL과 후보 2의 품질 FAIL은 불변으로 보존했다. 상세 원출력은 같은 작업 폴더의 ui-sol-logs/attempt3에 있다. 제품 snapshot은 LOCAL_HOME/research/javaexperience-d12-linux-terminal-20261025/_data/ui-sol-candidate3-source에 보관했다.

@@ -54,10 +54,10 @@
 
 선정 원본2장과 과거캡처2장을 `view_image`로 직접 보았다. 나머지15선정원본/32캡처는 육안 미열람이다.
 
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p04-2026-10-20/images/P04-initialization-v2.jpg`: 한 Child, this delegated→implicit super, 7개 완료 체크포인트; Parent/Child marker 분리 및 field values inferred from source 문구. 관찰한 stdout와 추론한 필드 값을 구분하며 현재 데이터와 내용 일치. 한계: 선정 이미지 원본2장 중1장 육안 확인; 나머지 이미지의 정확성으로 일반화하지 않음.
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p04-2026-10-20/images/P04-constructor-injection-v4.jpg`: Controller C1→Service S1→Generator G1 참조, 명시등록3 Bean, 네 원문 소스, 직접Java Mina/2/UUID, noBoot/noHTTP/noJPA. 실제 필드 및 같은 참조 방향·비고정UUID 표현이 fixture와 일치. 한계: 실제 컨테이너 재실행·HTTP 검증 아님.
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p04-2026-10-20/mobile-P04-record-v5.jpg`: 360px full-page, record-input 첫 장면, 매개변수 공백·필드 저장 전 값/코드. 현재 모델 텍스트와 일치. Translate/Dual/Settings 번역 확장 overlay가 그림 일부를 가림.. 한계: 과거 캡처이며 viewport 실제 새 조작 확인 아님. overlay 아래 픽셀은 판독 불가.
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/p04-2026-10-20/desktop-P04-constructor-injection-v4.jpg`: desktop full-page, injection-generator, 전체그림 및 G1 동일성 값과 등록 코드. 원본 그림과 DOM 값/코드/한계 문구 연결 확인.. 한계: 과거 캡처이며 현재 브라우저 재검증 아님; 축소 표시로 미세 글꼴/픽셀 정밀 비교 불가.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p04-2026-10-20/images/P04-initialization-v2.jpg`: 한 Child, this delegated→implicit super, 7개 완료 체크포인트; Parent/Child marker 분리 및 field values inferred from source 문구. 관찰한 stdout와 추론한 필드 값을 구분하며 현재 데이터와 내용 일치. 한계: 선정 이미지 원본2장 중1장 육안 확인; 나머지 이미지의 정확성으로 일반화하지 않음.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p04-2026-10-20/images/P04-constructor-injection-v4.jpg`: Controller C1→Service S1→Generator G1 참조, 명시등록3 Bean, 네 원문 소스, 직접Java Mina/2/UUID, noBoot/noHTTP/noJPA. 실제 필드 및 같은 참조 방향·비고정UUID 표현이 fixture와 일치. 한계: 실제 컨테이너 재실행·HTTP 검증 아님.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p04-2026-10-20/mobile-P04-record-v5.jpg`: 360px full-page, record-input 첫 장면, 매개변수 공백·필드 저장 전 값/코드. 현재 모델 텍스트와 일치. Translate/Dual/Settings 번역 확장 overlay가 그림 일부를 가림.. 한계: 과거 캡처이며 viewport 실제 새 조작 확인 아님. overlay 아래 픽셀은 판독 불가.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/p04-2026-10-20/desktop-P04-constructor-injection-v4.jpg`: desktop full-page, injection-generator, 전체그림 및 G1 동일성 값과 등록 코드. 원본 그림과 DOM 값/코드/한계 문구 연결 확인.. 한계: 과거 캡처이며 현재 브라우저 재검증 아님; 축소 표시로 미세 글꼴/픽셀 정밀 비교 불가.
 
 ## 4. 새 검사와 역사 실행 근거
 

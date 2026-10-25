@@ -69,24 +69,24 @@
 
 spec 미충족으로 quality 승인 없이 진단만 기록한다. critical0 / important0 / minor1.
 
-- **B01-Q01 minor** — /Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/b01-lesson-data.mjs:1271,1301. password-encoder의 화면은 matches true/false를 설명하면서 code는 encode만, password-version은 거부를 설명하면서 정수선언만 보여준다. 실제 predicate는 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/b01-2026-10-20/source-proof/probe/example/account/B01Proof.java:58,61에 있다. 기존 검사는 발췌가 원본의 substring이면 통과하므로 이 누락을 놓친다. predicate 자체를 정확 발췌한 뒤 test:b01와 메인의 desktop/mobile 코드·값 동시독해를 검증한다.
+- **B01-Q01 minor** — LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/b01-lesson-data.mjs:1271,1301. password-encoder의 화면은 matches true/false를 설명하면서 code는 encode만, password-version은 거부를 설명하면서 정수선언만 보여준다. 실제 predicate는 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/b01-2026-10-20/source-proof/probe/example/account/B01Proof.java:58,61에 있다. 기존 검사는 발췌가 원본의 substring이면 통과하므로 이 누락을 놓친다. predicate 자체를 정확 발췌한 뒤 test:b01와 메인의 desktop/mobile 코드·값 동시독해를 검증한다.
 
 공통 clipboard race는 중복 재현하지 않았다. 현재 DB guard가 HTTP 인가 전체를 증명한다거나 정수 version 비교가 JWT 폐기를 증명한다는 과장된 표시는 발견하지 못했다.
 
 ## 실행 근거와 한계
 
-fresh 명령 UTC 2026-10-22T00:01:46.649641+00:00 → 2026-10-22T00:01:49.502172+00:00, exit0. stdout/stderr·소스/HTML/번들/test/package SHA는 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task14/fresh-test-b01.json에 보존했다. 이 명령은 Node/jsdom 및 보존된 frozen/로그를 검사하며 native 프로세스를 띄우지 않는다.
+fresh 명령 UTC 2026-10-22T00:01:46.649641+00:00 → 2026-10-22T00:01:49.502172+00:00, exit0. stdout/stderr·소스/HTML/번들/test/package SHA는 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task14/fresh-test-b01.json에 보존했다. 이 명령은 Node/jsdom 및 보존된 frozen/로그를 검사하며 native 프로세스를 띄우지 않는다.
 
 기존 Java10/Redis9/MySQL14=고유33 관찰은 독립33 보안 실험이 아니다. MySQL은 사본 migration 및 추가 direct SQL, Redis는 같은 JVM의 독립client/thread2개, Java는 direct new/추가 wrapper였다. DB marker/session/audit를 실제 encoder 저장·외부 session/JWT로 일반화하지 않는다. 원자 Lua는 오류 전 변경을 rollback하지 않고 999ms는0초로 잘린다. raw clientID/epoch/PTTL은 과거 run 값이다.
 
 ## 실제 열람한 이미지
 
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/b01-2026-10-20/images/B01-reset-v4.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/b01-2026-10-20/images/B01-counter-v4.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/b01-2026-10-20/images/B01-signup-v3.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/b01-2026-10-20/captures/desktop-reset.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/b01-2026-10-20/captures/mobile-counter.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/b01-2026-10-20/captures/desktop-signup.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/b01-2026-10-20/images/B01-reset-v4.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/b01-2026-10-20/images/B01-counter-v4.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/b01-2026-10-20/images/B01-signup-v3.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/b01-2026-10-20/captures/desktop-reset.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/b01-2026-10-20/captures/mobile-counter.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/b01-2026-10-20/captures/desktop-signup.jpg
 
 시안3/캡처3만 직접 열람했다. 그림의 성공 관찰기표식/해시marker/DB session행/두client와 추가threshold 경계는 자료와 일치한다. mobile-counter는 pan과 번역확장overlay가 보인다. 모든 이미지를 검수한 것으로 표시하지 않는다. JPEG헤더와 실측크기는 diagnostics.json에 보존했다. 기존 fullpage 캡처 저장크기와 당시 viewport는 구분했다. PNG src의 과거 브라우저기록은 현재 JPG 브라우저실행 증거가 아니다.
 
@@ -98,8 +98,8 @@ fresh 명령 UTC 2026-10-22T00:01:46.649641+00:00 → 2026-10-22T00:01:49.502172
 4. Java25/Boot/Kotlin/properties/HTTP/Mailpit/실제 인증·인가/session/JWT/외부발송은 미실행으로 유지한다. 실제 실행은 별도 승인 범위·구현이 있을 때 검증한다.
 5. 메인이 별도 preview current desktop/mobile에서 선택/이동/확대/pan/복사/원문앵커/overflow를 확인한다. 기존 캡처는 현재 브라우저 대체물이 아니다.
 
-전체 상세 및 파일/근거 목록: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task14/review.json
-전수 sourceLines/stageIds/evidence 표: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task14/source-coverage.json
+전체 상세 및 파일/근거 목록: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task14/review.json
+전수 sourceLines/stageIds/evidence 표: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task14/source-coverage.json
 
 판정: needs_completion
 커버리지: 56단위 = covered10 / partial26 / missing8 / unrun12

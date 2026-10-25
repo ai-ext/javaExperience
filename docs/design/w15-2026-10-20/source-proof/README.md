@@ -1,14 +1,14 @@
 # W15 원문 실행과 추가 실험
 
-확인일은2026-10-20이다. 원문 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W15-paging-offset-vs-cursor.md`의 SQL3과 Java2파일은 SHA를 확인해 그대로 실행했다. `Article`의 실제 entity/schema는 원문에 없어 별도 추가했다. `consume`는 주석뿐이다. Mermaid/JSON은 설명용이고 JSON의 signature는 placeholder다.
+확인일은2026-10-20이다. 원문 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W15-paging-offset-vs-cursor.md`의 SQL3과 Java2파일은 SHA를 확인해 그대로 실행했다. `Article`의 실제 entity/schema는 원문에 없어 별도 추가했다. `consume`는 주석뿐이다. Mermaid/JSON은 설명용이고 JSON의 signature는 placeholder다.
 
 `execution.json`과 `checkpoints/expected-current-execution.json`은 새 인스턴스 replay에서 동일했다. Python18개/Java25개 고유 ASSERT ID를 기록했다. 이는43번의 독립 실험 또는43개 SQL이라는 뜻이 아니다. 원문 Java compare가 만든 SQL은15개(Page2+Slice1+Window12)이고 추가 guard/setup/metadata는 포함하지 않는다.
 
 ```bash
-cd /Users/ds/code/javaExperience/.worktrees/concept-learning-night
-/Users/ds/research/javaexperience-r03-20261020/_data/venv/bin/python docs/design/w15-2026-10-20/source-proof/run-proof.py \
-  --mysql-base /Users/ds/research/javaexperience-r03-20261020/_data/portable/mysql-8.4.11-macos15-arm64 \
-  --runtime-root /Users/ds/research/javaexperience-w15-20261020/_data/runtime
+cd LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night
+LOCAL_HOME/research/javaexperience-r03-20261020/_data/venv/bin/python docs/design/w15-2026-10-20/source-proof/run-proof.py \
+  --mysql-base LOCAL_HOME/research/javaexperience-r03-20261020/_data/portable/mysql-8.4.11-macos15-arm64 \
+  --runtime-root LOCAL_HOME/research/javaexperience-w15-20261020/_data/runtime
 ```
 
 매 실행마다 0700 run 아래 새datadir(실측0750)·0700 socket디렉터리·loopback전용임시port·자체PID를 확인하고 `w15_demo`를 만든다. R03/R04의외부원본/schema사본/기존DB·3306은 사용하지 않는다. JDBC에는 새 SELECT-only 계정·매회 암호·TLS REQUIRED를 쓴다. 실제datadir/socket/port/PID가 맞아야 실험을 시작하며 자기 서버를 정상 종료한다. 인증값은 파일·SQL trace·로그에 넣지 않는다. 실제datadir는 연구폴더에만 있고 Git에 포함하지 않는다.

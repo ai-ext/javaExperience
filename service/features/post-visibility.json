@@ -1,0 +1,209 @@
+{
+  "version": 1,
+  "id": "post-visibility",
+  "title": "공개 범위와 차단에 맞게 글 보여 주기",
+  "summary": "2-3의 게시글 상세/목록 접근 규칙을 같은 판정으로 적용해 status·visibility·follow·block의 조합을 확인한다.",
+  "difficulty": "중급",
+  "prerequisites": [
+    "posts-find"
+  ],
+  "stages": [
+    {
+      "id": "visibility",
+      "title": "작성자·팔로우·차단에 따른 접근 판정하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "visibility",
+          "title": "작성자·팔로우·차단에 따른 접근 판정하기",
+          "sourceUnits": [
+            "legacy:2-3"
+          ],
+          "brief": {
+            "purpose": "2-3의 게시글 상세/목록 접근 규칙을 같은 판정으로 적용해 status·visibility·follow·block의 조합을 확인한다.",
+            "task": "시드 글 6~10과 viewer 김자바·박디비로 직접 상세와 목록을 조회하고 보이지 않는 글은 조회수도 올리지 않는지 검사한다.",
+            "preconditions": [
+              "2-3 원문 fixture에서 글 6 FOLLOWERS, 7 DRAFT, 8 HIDDEN, 9 차단 관계, 10 공개 관계를 확인한다.",
+              "viewer 관계: 김자바 id 2, 작성자 이스프링/한차단 등 source seed를 읽는다."
+            ],
+            "scenario": [
+              {
+                "start": "익명 viewer와 김자바 viewer 각각의 follow/block 관계를 source fixture대로 확인한다.",
+                "action": "GET /api/posts/6, /7, /8, /9, /10과 GET /api/boards/free/posts를 두 viewer 상태에서 호출한다.",
+                "result": "익명은 PUBLISHED+PUBLIC만 노출. 김자바는 자신이 팔로우한 작성자의 6번 글은 볼 수 있으나 한차단이 김자바를 block한 9번은 숨긴다. DRAFT는 작성자만, HIDDEN은 ADMIN만.",
+                "after": "김자바가 권한 없는 7번 상세를 직접 열어 404인지 확인하고 view_count와 list totalElements가 그대로인지 기록."
+              }
+            ],
+            "data": [
+              {
+                "name": "post 6 FOLLOWERS 및 follow edge",
+                "reason": "팔로워와 비팔로워 접근 결과 비교."
+              },
+              {
+                "name": "post 7 DRAFT / post 8 HIDDEN / deleted post",
+                "reason": "작성자·ADMIN·삭제 상태별 상세 기준을 구별."
+              },
+              {
+                "name": "post 9 작성자 한차단과 viewer 김자바의 block edge",
+                "reason": "양방향 block 관계가 query에서 제외되는지 확인."
+              },
+              {
+                "name": "view_count와 목록 totalElements",
+                "reason": "비공개 결과가 조회수·전체건수에 포함되지 않는지 검증."
+              }
+            ],
+            "policies": [
+              "상세는 삭제되지 않았고 status PUBLISHED여야 한다. DRAFT는 작성자, HIDDEN은 ADMIN만 본다.",
+              "FOLLOWERS는 작성자 본인 또는 작성자를 follow하는 viewer만 본다.",
+              "viewer와 작성자 사이 양방향 어느 쪽 block도 없어야 한다. 익명은 PUBLISHED+PUBLIC만 본다.",
+              "상세에서 보이지 않는 글은 403이 아니라 404이며 404는 view_count를 올리지 않는다. 일반 목록은 visible PUBLISHED 글만 담고 DRAFT는 작성자 목록에서도 제외한다. totalElements도 동일 조건을 쓴다."
+            ],
+            "inputs": [
+              "익명: GET /api/posts/{6,7,8,9,10}, GET /api/boards/free/posts?size=20.",
+              "김자바 viewer: 동일 상세/list; 6번 작성자 follow는 있음, 9번 한차단이 김자바를 block.",
+              "작성자와 ADMIN은 각각 DRAFT/HIDDEN을 확인한다."
+            ],
+            "success": [
+              "김자바는 팔로우 중인 6번 FOLLOWERS 글을 상세에서 본다.",
+              "작성자가 직접 보면 DRAFT가 상세에서 보이고, ADMIN은 HIDDEN을 볼 수 있다.",
+              "목록에는 접근 가능한 PUBLISHED 글만 나오고 totalElements가 같은 predicate와 맞는다."
+            ],
+            "failures": [
+              {
+                "when": "익명으로 FOLLOWERS/DRAFT/HIDDEN/삭제 글 상세 요청",
+                "result": "404.",
+                "unchanged": "실패 조회는 해당 글 view_count를 올리지 않는다."
+              },
+              {
+                "when": "김자바가 차단 관계인 9번 글 접근",
+                "result": "404.",
+                "unchanged": "view_count와 list totalElements 및 글 상태 불변."
+              },
+              {
+                "when": "일반 목록에 자기 DRAFT 또는 HIDDEN 글 포함",
+                "result": "결과는 contract 위반.",
+                "unchanged": "조회만 수행되어 DB 상태 변화 없음."
+              }
+            ],
+            "examples": [
+              {
+                "title": "팔로워 공개 글",
+                "start": "6번 PUBLISHED/FOLLOWERS, 김자바가 작성자 follow",
+                "action": "김자바 token으로 GET /api/posts/6",
+                "result": "200; 상세 노출"
+              },
+              {
+                "title": "DRAFT 직접 주소",
+                "start": "7번 DRAFT 작성자는 김자바가 아님",
+                "action": "김자바 token으로 GET /api/posts/7",
+                "result": "404; view_count 전후 같음"
+              },
+              {
+                "title": "차단된 작성자",
+                "start": "9번 author가 김자바를 block",
+                "action": "김자바 token GET /api/posts/9 및 목록",
+                "result": "404; 상세/목록 모두 제외, totalElements·view_count 불변"
+              }
+            ],
+            "work": [
+              "각 viewer-role 조합의 status와 SQL where/result를 한 행씩 기록한다.",
+              "상세 호출 전에 view_count를 읽고 응답 직후 새로 조회한다.",
+              "목록의 items와 totalElements에 같은 policy predicate가 쓰였는지 대조한다."
+            ],
+            "done": [
+              "익명·작성자·팔로워·ADMIN의 DRAFT/HIDDEN/FOLLOWERS 판정이 source 기준과 일치한다.",
+              "양방향 차단 시 상세/목록에서 제외되고 조회수도 증가하지 않는다.",
+              "목록 item 수와 totalElements의 접근 규칙이 같다."
+            ],
+            "hints": [
+              "FOLLOWERS의 작성자 id와 viewer의 follow 방향이 작성자를 향하는지 어떤 row로 확인할까요?",
+              "숨긴 글과 삭제된 글을 모두 status만으로 표현하면 어느 관찰이 사라지나요?",
+              "404를 내는 숨김 상세 요청의 view_count가 오르지 않음을 응답 외 어떤 값으로 검증할까요?"
+            ]
+          },
+          "hints": [
+            "FOLLOWERS의 작성자 id와 viewer의 follow 방향이 작성자를 향하는지 어떤 row로 확인할까요?",
+            "숨긴 글과 삭제된 글을 모두 status만으로 표현하면 어느 관찰이 사라지나요?",
+            "404를 내는 숨김 상세 요청의 view_count가 오르지 않음을 응답 외 어떤 값으로 검증할까요?"
+          ],
+          "recipeIds": [
+            "legacy:2-3:V1a",
+            "legacy:2-3:V1b",
+            "legacy:2-3:V1c",
+            "legacy:2-3:V1d",
+            "legacy:2-3:V2a",
+            "legacy:2-3:V2b",
+            "legacy:2-3:V2c",
+            "legacy:2-3:V3a",
+            "legacy:2-3:V3b",
+            "legacy:2-3:V4a",
+            "legacy:2-3:V4b",
+            "legacy:2-3:V4c",
+            "legacy:2-3:V5a",
+            "legacy:2-3:V5b",
+            "legacy:2-3:V6",
+            "legacy:2-3:V7",
+            "legacy:2-3:V8",
+            "legacy:2-3:V9"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:2-3 · 볼 수 있는 글만 — 임시저장·삭제·숨김·팔로워·차단",
+              "href": "/scenario/ch2-read-post/2-3-visibility.html"
+            },
+            {
+              "label": "../../lessons/G2-access-rules-in-one-place.md",
+              "href": "/lessons/G2-access-rules-in-one-place.html"
+            },
+            {
+              "label": "../../docs/knowledge/D11-web-security-basics.md",
+              "href": "/docs/knowledge/D11-web-security-basics.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:2-3 · 볼 수 있는 글만 — 임시저장·삭제·숨김·팔로워·차단",
+              "href": "/scenario/ch2-read-post/2-3-visibility.html"
+            },
+            {
+              "label": "../../lessons/G2-access-rules-in-one-place.md",
+              "href": "/lessons/G2-access-rules-in-one-place.html"
+            },
+            {
+              "label": "../../docs/knowledge/D11-web-security-basics.md",
+              "href": "/docs/knowledge/D11-web-security-basics.html"
+            },
+            {
+              "label": "../../docs/knowledge/P21-querydsl-setup.md",
+              "href": "/docs/knowledge/P21-querydsl-setup.html"
+            },
+            {
+              "label": "../../docs/knowledge/S10-spring-data-query.md",
+              "href": "/docs/knowledge/S10-spring-data-query.html"
+            },
+            {
+              "label": "../../docs/knowledge/W13-frontend-backend-boundary.md",
+              "href": "/docs/knowledge/W13-frontend-backend-boundary.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "게시글과 소통",
+  "status": "authored"
+}

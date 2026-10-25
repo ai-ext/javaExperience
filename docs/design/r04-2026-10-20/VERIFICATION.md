@@ -1,10 +1,10 @@
 # R04 SQL 개념 학습 보강 검증
 
-2026-10-20 · /Users/ds/code/javaExperience/.worktrees/concept-learning-night · partially_implemented_and_browser_checked. R04 전체 또는 개념134개 완료가 아니다. merge/push/PR은 하지 않는다.
+2026-10-20 · LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night · partially_implemented_and_browser_checked. R04 전체 또는 개념134개 완료가 아니다. merge/push/PR은 하지 않는다.
 
-- 원문 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/R04-sql-crud-join.md 351줄 전문을 검토했다. SHA78af924291e7161c8357e46a8ba08361a57d53509deab926262b0e81fbfaa780와13fence(SQL7/Java1/Kotlin1/YAML1/bash2/Mermaid1)를 보존했다. 들여쓴 목록 코드도 행 시작 기준 fence 추출로 원래 body바이트를 유지했다. 외부 원고 사본과 현재 repo 원고는 동일바이트다.
-- /Users/ds/research/java-spring/practice/schema/schema.sql 과 /Users/ds/research/java-spring/practice/schema/seed.sql 의 SHA 사본을 사용했다. 저장소 practice DB와 구분한다. 원본 및 사본 두 파일의 현재SHA도 일치한다.
-- 공식 조사는 /Users/ds/research/javaexperience-r04-20261020/REPORT.md 에 있다. 첫 Luna 실행자는 금지된 중첩CLI를 다시 호출해 sandbox 초기화EPERM을 웹 실패로 오판했고 잘못된 worktree 경로도 사용했다. 실제 outer Luna 접근은 성공했고 웹 호출은 없었다. 이 시도는 근거에서 제외했다. 같은 Codex CLI gpt-6-luna/OpenAI로 직접 웹 조회를 재시도해 성공했다. LiteLLM이나 다른 모델·제공자로 전환하지 않았다. 실패 기록은 연구 _data/attempt1에 보존했다.
+- 원문 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/R04-sql-crud-join.md 351줄 전문을 검토했다. SHA78af924291e7161c8357e46a8ba08361a57d53509deab926262b0e81fbfaa780와13fence(SQL7/Java1/Kotlin1/YAML1/bash2/Mermaid1)를 보존했다. 들여쓴 목록 코드도 행 시작 기준 fence 추출로 원래 body바이트를 유지했다. 외부 원고 사본과 현재 repo 원고는 동일바이트다.
+- LOCAL_HOME/research/java-spring/practice/schema/schema.sql 과 LOCAL_HOME/research/java-spring/practice/schema/seed.sql 의 SHA 사본을 사용했다. 저장소 practice DB와 구분한다. 원본 및 사본 두 파일의 현재SHA도 일치한다.
+- 공식 조사는 LOCAL_HOME/research/javaexperience-r04-20261020/REPORT.md 에 있다. 첫 Luna 실행자는 금지된 중첩CLI를 다시 호출해 sandbox 초기화EPERM을 웹 실패로 오판했고 잘못된 worktree 경로도 사용했다. 실제 outer Luna 접근은 성공했고 웹 호출은 없었다. 이 시도는 근거에서 제외했다. 같은 Codex CLI gpt-6-luna/OpenAI로 직접 웹 조회를 재시도해 성공했다. LiteLLM이나 다른 모델·제공자로 전환하지 않았다. 실패 기록은 연구 _data/attempt1에 보존했다.
 - 메인은 MySQL8.4 JOIN/GROUPBY/UPSERT/ROW_COUNT/EXISTS/비교연산자와 Spring7.0.9 JdbcTemplate·Java21 PreparedStatement 공식 자료를 열어 대조했다. EXISTS 공식 절은15.2.15.6으로 Luna 초안의15.2.15.7 표기를 바로잡았다. Connector/J 매뉴얼은 Luna에서 Internal Error로 열지 못했으며 일반적 호환성 확인으로 표시하지 않는다. 아래의 드라이버 버전·연결 결과는 별도 실측이다.
 - R03에서 공식 목록MD5와 일치를 확인한 MySQL8.4.11 macOS15 ARM64 portable 바이너리를 사용했다. 새 datadir·0700 socket 디렉터리·--no-defaults·새127.0.0.1 전용 임시port·mysqlx OFF를 사용했다. 실제 @@datadir/socket/port/bind 및 자체PID를 검증한 뒤에만 사본의 DROP DATABASE를 전달했다. 기존 서비스·3306·사용자DB·설정·인증정보는 사용하지 않았다.
 - 새 인스턴스의 root와 JDBC SELECT 전용 계정에 매run 새 임시 암호를 생성했다. 암호값·인증 SQL은 trace/log에 남기지 않았다. root는 setup용 전용socket, JDBC는 새 loopback 계정과 sslMode=REQUIRED로 연결했다. 각 자체 서버는 mysqladmin shutdown 뒤 exit0·정지를 확인했다. R03의 TCP OFF 실험과 이 R04의 별도 loopback JDBC 실험을 구분한다.
@@ -22,7 +22,7 @@
 - 실제 Chrome1672×941/360×800에서각34상태(총68)와이미지별양쪽20캡처를확인했다. 질문·제목·정확코드·label-value·PASS·dottedrunJSON·PNG로드/크기·로그기본접힘·페이지넘침과대조했다. copy완료신호뒤실제clipboard일치,로그유지,모바일nativepan40px,EndEnter,원문anchor/reload/catalogBack/actualForward의특수10과기존지도2흐름·사이트console오류0이다.
 - 독립 reviewer가선정10PNG와20브라우저캡처를모두실제열람하고68관찰을현데이터에대조해일치/상태누락중복0을확인했다. 현재미해결Critical/Important/Minor0. 브라우저직접조작·전수픽셀/학습자검증은그리뷰에서수행하지않았다.
 - 원문HTML12,933자/code12/id14·기존지도1·고유id보존. 전체135문서/학습자17파일SHA불변·원래작업트리3,403파일SHA불변·루트clean. 기존parity570행바이트prefix를보존하고10implemented만추가해580행/verified0이다. 신규34상태만unreviewed→mockup_ready→implemented의68전이를기록했다. inventory339pages44,545units/implemented412/기존verified6이며새verified는없다.
-- 최종 npm run build, test:r04포함14suite, audit:visual/audit:version-cards/audit:parity통과. HTML339개/링크0. 실행근거는 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/r04-2026-10-20/source-proof/execution.json 과 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/r04-2026-10-20/checks/ 에있다.
+- 최종 npm run build, test:r04포함14suite, audit:visual/audit:version-cards/audit:parity통과. HTML339개/링크0. 실행근거는 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/r04-2026-10-20/source-proof/execution.json 과 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/r04-2026-10-20/checks/ 에있다.
 
 미완료: 원문 Java25/Boot실행설정·bash/HTTP,모든SQL/에러/동시성경우,다른clientflag조건,wire/물리계획/성능·부하시험,학습자서버·이해도·전수픽셀동일성. 캡처에는stickyheaderstitch/스크롤위치차이와모바일번역확장overlay가있다. 구현부분만implemented를유지한다. 다음개념은W15다.
 

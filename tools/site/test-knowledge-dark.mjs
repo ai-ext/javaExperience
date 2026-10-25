@@ -23,10 +23,17 @@ for (const page of baseline.pages) {
   const expectedBodyClass = page.file === 'index.html' ? 'home-page'
     : page.file === 'docs/knowledge/README.html' ? 'knowledge-catalog-page'
       : page.file.endsWith('/P02-mvc-layered-architecture.html') ? 'p02-focused-page'
-        : page.file.endsWith('/P16-json-jackson-practical.html') ? 'knowledge-detail-page' : '';
-  assert.equal(document.body.getAttribute('class') || '', expectedBodyClass, `${page.file} 기존 body class 보존`);
+        : /\/(?:P16-json-jackson-practical|P09-java-syntax-basics)\.html$/.test(page.file) ? 'knowledge-detail-page' : '';
+  assert.equal(document.body.getAttribute('class') || '', expectedBodyClass, `${page.file} 공통 틀과 런타임의 body class 일치`);
   const stylesheets = [...document.querySelectorAll('link[rel="stylesheet"]')];
-  assert.ok(stylesheets.length > 0 && darkHref(stylesheets.at(-1).getAttribute('href')), `${page.file} knowledge-dark.css가 마지막 stylesheet`);
+  // PC 다크 공통 토큰을 쓰며 개념에는 별도 팔레트 스킨을 싣지 않는다. 홈의 기존 호환 파일은 유지한다.
+  if (page.file === 'index.html') assert.ok(stylesheets.some(link=>darkHref(link.getAttribute('href'))));
+  else {
+    assert.ok(!stylesheets.some(link=>darkHref(link.getAttribute('href'))), `${page.file}: 전용 다크 스킨 제거`);
+    assert.ok(stylesheets.some(link=>/concept-content\.css/.test(link.href)), `${page.file}: 원문 부품의 공통 토큰 연결`);
+    assert.ok(stylesheets.some(link=>/concept-layout\.css/.test(link.href)), `${page.file}: 공통 부품 배치`);
+  }
+  assert.match(stylesheets.at(-1).getAttribute('href'), /site-frame\.css\?v=[a-f0-9]{12}$/, `${page.file} 공통 틀은 페이지별 CSS 뒤에서 좌표를 확정`);
 
   // taskB는 reader 제목·모드 도구를 main 바깥 원문은 그대로 둔 채 추가한다.
   // 따라서 TaskA 당시의 전체 main text 해시는 역사 기준으로 남기고 원문 selector 해시와 reader 계약으로 검증한다.
@@ -49,12 +56,13 @@ for (const page of baseline.pages) {
 
 for (const file of ['scenario/README.html', 'practice/MISSIONS.html']) {
   const document = new JSDOM(fs.readFileSync(path.join(ROOT, file), 'utf8')).window.document;
-  assert.notEqual(document.documentElement.dataset.theme, 'dark', `${file} 다크 테마 미적용`);
+  // 통합 화면은 다크 단일 테마다. 개념 전용 표식과 stylesheet의 적용 범위만 분리한다.
+  assert.equal(document.documentElement.dataset.theme, 'dark', `${file} 공통 다크 테마 적용`);
   assert.notEqual(document.body.dataset.conceptSurface, 'dark', `${file} 개념 표식 미적용`);
   assert.ok(![...document.querySelectorAll('link[rel="stylesheet"]')].some((link) => darkHref(link.getAttribute('href'))), `${file} 다크 stylesheet 미적용`);
 }
 
-const css = fs.readFileSync(path.join(ROOT, 'tools/site/knowledge-dark.css'), 'utf8');
+const css = fs.readFileSync(path.join(ROOT, 'tools/site/concept-content.css'), 'utf8');
 assert.doesNotMatch(css, /filter\s*:/i, '기존 이미지 색상 반전 금지');
 assert.doesNotMatch(css, /@media/i, '다크 전용 새 responsive 분기 없음');
 console.log('PASS knowledge dark scope, stylesheet registration, and 136-page source baseline');

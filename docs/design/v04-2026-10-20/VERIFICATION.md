@@ -1,6 +1,6 @@
 # V04 테스트 DB 경계 보충 학습 검증
 
-2026-10-20, 별도 /Users/ds/code/javaExperience/.worktrees/concept-learning-night 의 개념 전용 부분 보강이다. 10질문·27상태와 선택 이미지10장(실제20회 생성·10draft)을 구현했다. 전체 원문의 모든 독립 장면·전수 픽셀·학습자 이해도를 완료 처리하지 않는다. merge·push·PR은 하지 않았다.
+2026-10-20, 별도 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night 의 개념 전용 부분 보강이다. 10질문·27상태와 선택 이미지10장(실제20회 생성·10draft)을 구현했다. 전체 원문의 모든 독립 장면·전수 픽셀·학습자 이해도를 완료 처리하지 않는다. merge·push·PR은 하지 않았다.
 
 ## 원문과 실행 범위
 

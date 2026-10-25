@@ -36,7 +36,8 @@ export function renderKnowledgeVisual(root) {
       practice: practice ? { href: source.href + '#' + encodeURIComponent(practice.anchorId), title: '코드 예제 읽기' } : null,
     };
   });
-  const categories = DOMAINS;
+  const days = fs.readdirSync(path.join(root, 'course/days')).filter(name => /^D\d{2}\.json$/.test(name)).map(name => ({ id: name.slice(0, 3), raw: fs.readFileSync(path.join(root, 'course/days', name), 'utf8') }));
+  const categories = DOMAINS.map(domain => ({ ...domain, relatedDays: days.filter(day => documents.some(doc => doc.category === domain.id && day.raw.includes(doc.sourcePath))).map(day => day.id) }));
   const aliases = Object.fromEntries(index.questionAliases.map(({question, literalQuery}) => [question, literalQuery]));
   return renderKnowledgeCatalog(documents, categories, aliases, CORE_UNITS);
 }

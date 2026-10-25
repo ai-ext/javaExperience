@@ -1,6 +1,6 @@
 # 자동 하네스 독립 Sol 검토
 
-검토 HEAD: `4b0493af52b1a06decca909d6bf9a8b6f9610686`. 대상: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py`.
+검토 HEAD: `4b0493af52b1a06decca909d6bf9a8b6f9610686`. 대상: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py`.
 
 판정: **needs_fix**. fresh unit 12개는 모두 통과했지만, 추가 임시 fixture에서 important 4건을 재현했다. critical 0건. 요구사항 검토가 실패했으므로 품질 관찰은 진단용이며 승인으로 승격하지 않는다.
 
@@ -18,7 +18,7 @@
 
 ### HARNESS-001 · important
 
-위치: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py:236`.
+위치: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py:236`.
 
 HEAD 조회가 불완전해도 자동검사 결과가 passed가 된다.
 
@@ -30,7 +30,7 @@ HEAD 조회가 불완전해도 자동검사 결과가 passed가 된다.
 
 ### HARNESS-002 · important
 
-위치: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py:197`.
+위치: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py:197`.
 
 tasks.json의 기준 원문 sourceSHA256과 현재 원문을 비교하지 않아 기준과 다른 원문도 passed가 된다.
 
@@ -42,7 +42,7 @@ tasks.json의 기준 원문 sourceSHA256과 현재 원문을 비교하지 않아
 
 ### HARNESS-003 · important
 
-위치: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py:182`.
+위치: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py:182`.
 
 검사 대상 실제 코드 해시를 기록하지 않아 결과를 검사한 코드 상태에 귀속하거나 이후 stale 여부를 판단할 수 없다.
 
@@ -54,7 +54,7 @@ tasks.json의 기준 원문 sourceSHA256과 현재 원문을 비교하지 않아
 
 ### HARNESS-004 · important
 
-위치: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py:116`.
+위치: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py:116`.
 
 출력 루트 자체 및 task 폴더 symlink가 논리 경계를 바꾸어 범위 밖 기록 또는 다른 task 최신 결과 덮어쓰기를 허용한다.
 
@@ -66,9 +66,9 @@ tasks.json의 기준 원문 sourceSHA256과 현재 원문을 비교하지 않아
 
 ## 실행 증거와 범위
 
-- 12개 unit fresh 실행: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-unit-tests.log` (exit 0).
-- 추가 fixture 재현: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-edge-cases.log`.
-- 현재 24개 해시/스크립트 및 검토 코드 해시: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-static-checks.log`.
+- 12개 unit fresh 실행: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-unit-tests.log` (exit 0).
+- 추가 fixture 재현: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-edge-cases.log`.
+- 현재 24개 해시/스크립트 및 검토 코드 해시: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-static-checks.log`.
 - 실제 `--existing24` 또는 npm은 실행하지 않았다. application·원문·공유 장부·기존 증거는 수정하지 않았다.
 - failure exit/timeout/launch error는 mock runner 단위 검증이다. 실제 프로세스·DB·브라우저의 실행 결과로 해석하지 않는다.
 - 현재 실제 24개 원문은 registry 해시와 일치하며, tasks/taskN 출력 symlink는 없다. fixture 결과는 실패 경계의 결함을 보여 준다.

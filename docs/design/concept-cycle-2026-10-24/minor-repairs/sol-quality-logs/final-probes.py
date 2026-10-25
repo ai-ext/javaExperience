@@ -1,5 +1,5 @@
 import concurrent.futures, datetime, json, pathlib, subprocess
-root=pathlib.Path('/Users/ds/code/javaExperience/.worktrees/concept-learning-night');logs=root/'docs/design/concept-cycle-2026-10-24/minor-repairs/sol-quality-logs';url=lambda p:(root/p).as_uri()
+root=pathlib.Path('LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night');logs=root/'docs/design/concept-cycle-2026-10-24/minor-repairs/sol-quality-logs';url=lambda p:(root/p).as_uri()
 initial={'status':'initial_quality_findings','counts':{'critical':0,'important':1,'minor':0},'finding':{'id':'B01-display-source-disconnected','file':'tools/site/test-b01-learning.mjs:19-28','description':'표시 code의 wrong matches !를 제거해도 원문 sourceFragments가 정상인 상태에서 test-b01-learning은 exit0이었다. 표시 code와 sourceFragments 동등성 검사가 없었다.','evidence':'sol-quality-logs/b01-negation-mutation.log','productChangedByReviewer':False}}
 (logs/'initial-quality-finding.json').write_text(json.dumps(initial,ensure_ascii=False,indent=2)+'\n')
 cases=[]

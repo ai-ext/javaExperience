@@ -3,8 +3,8 @@
 - 조사 시각(시스템): 2026-10-19 20:19:29 UTC / 2026-10-20 05:19:29 Asia/Seoul
 - 확인 방법: web 공식 기술 사이트 URL 직접 open/find. 출처는 FasterXML 프로젝트 문서/저장소, Spring 공식 문서/Javadoc/저장소만 채택.
 - 확인 범위: 사용자가 지정한 unknown/null/date/enum defaults, annotation namespace, strict/ignoreUnknown, Spring MVC 415/400/406 및 controller 호출.
-- 사용자 지정 원문: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P16-json-jackson-practical.md` (읽기만 함)
-- 기존 참고: `/Users/ds/research/java-beginner-theory/06-json-jackson.md` (기존 주장을 현재 라이브 공식 출처와 다시 대조; 참고용)
+- 사용자 지정 원문: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/P16-json-jackson-practical.md` (읽기만 함)
+- 기존 참고: `LOCAL_HOME/research/java-beginner-theory/06-json-jackson.md` (기존 주장을 현재 라이브 공식 출처와 다시 대조; 참고용)
 
 ## 출처별 본문 확인 기록
 

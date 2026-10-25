@@ -1,7 +1,7 @@
 # D02 서버·네트워크 개념 리서치 보고서
 
 - 확인일: 2026-10-20 (Asia/Seoul)
-- 대상 원문: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D02-server-network-basics.md` (읽기 전용)
+- 대상 원문: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/D02-server-network-basics.md` (읽기 전용)
 - 조사 범위: 요청한 URL, DNS, listener, TCP/QUIC, TLS, NGINX, Forwarded, Spring Boot/Tomcat/Java 21 개념과 예정 실험의 주장 한계
 - 조사 방식: 공식 규격·프로젝트 문서의 직접 URL 열기. 사이트 검색 결과 snippet은 직접 본문 확인과 구분해 기록.
 

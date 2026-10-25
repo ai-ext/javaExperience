@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "id": "community-popular-cache",
+  "title": "커뮤니티 인기글을 캐시하고 숨김 즉시 반영하기",
+  "summary": "인기글 결과는 최대 60초 재사용하지만 숨김·삭제 성공 후 즉시 캐시에서 제거한다.",
+  "difficulty": "고급",
+  "group": "조회와 성능",
+  "prerequisites": [
+    "ranking-window"
+  ],
+  "stages": [
+    {
+      "id": "cache",
+      "title": "재사용 기간과 무효화 시점 지키기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "cache",
+          "title": "재사용 기간과 무효화 시점 지키기",
+          "sourceUnits": [
+            "legacy:16-3"
+          ],
+          "brief": {
+            "purpose": "인기글 결과는 최대 60초 재사용하지만 숨김·삭제 성공 후 즉시 캐시에서 제거한다.",
+            "task": "8-2 인기글 쿼리의 Caffeine cache, HIT/MISS 증거, mutation invalidation을 구현한다.",
+            "preconditions": [
+              "학습용 DB(`practice`) — 앱을 `practice` 프로파일로 띄운다. 8-2의 `GET /api/posts/popular`를 그대로 쓴다.",
+              "practice profile에서 /api/posts/popular?days=7&limit=10; Caffeine 설정과 8-2 endpoint 사용."
+            ],
+            "scenario": [
+              {
+                "start": "같은 기간/개수/버전으로 인기 글을 아직 읽지 않았습니다.",
+                "action": "첫 목록과 즉시 반복 목록을 비교한 뒤 공개 범위 변경이나 삭제를 성공시킵니다.",
+                "result": "처음 MISS·반복 HIT이며 60초 재사용합니다. 성공한 공개 범위 변경/삭제는 모든 인기 글 캐시를 즉시 비웁니다.",
+                "after": "실패한 변경과 발행 대상 0건 배치는 캐시를 지우지 않습니다. 캐시 중 좋아요 변화의 기존 순위 허용과 숨김 즉시 반영을 구분합니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "popularPosts(days,limit,version), X-Cache",
+                "reason": "cache hit/miss와 mutation 직후 무효화를 같은 key로 본다."
+              },
+              {
+                "name": "days=7, limit=10, TTL=60s",
+                "reason": "원문 popular API 파라미터와 TTL을 확인한다."
+              }
+            ],
+            "policies": [
+              "popularPosts Caffeine cache: maximumSize=100, expireAfterWrite=60s; key=(days,limit,version), 반환 리스트는 불변이다.",
+              "첫 GET은 MISS, 즉시 같은 key 재조회는 HIT; 60초 동안 좋아요 변화는 이전 순위를 보여 주는 것이 허용된다.",
+              "성공한 visibility 변경/삭제는 모든 popularPosts key를 바로 비운다. 잘못된 요청·실패 변경에는 eviction 하지 않고 발행 대상 0건 배치도 cache를 유지한다."
+            ],
+            "inputs": [
+              "legacy:16-3:Y1: GET /api/posts/popular?days=7&limit=10; case=인기글 1번째; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"Y1\",\"expect\":{\"status\":200,\"headers\":{\"X-Cache\":{\"matches\":\"^(HIT|MISS)$\"}},\"json\":[{\"path\":\"$[*].postId\",\"contains\":144}]}}]",
+              "legacy:16-3:Y2: GET /api/posts/popular?days=7&limit=10; case=인기글 2번째(곧바로); source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"Y2\",\"expect\":{\"status\":200,\"headers\":{\"X-Cache\":{\"equals\":\"HIT\"}},\"json\":[{\"path\":\"$[*].postId\",\"contains\":144}]}}]",
+              "legacy:16-3:B1: PATCH /api/posts/144; body={\"title\":\"가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가\"}; case=경계값 — 제목 200자; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/3\",\"request\":\"B1\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.title\",\"length\":200}]}}]",
+              "legacy:16-3:Y4: GET /api/posts/popular?days=7&limit=10; case=숨긴 직후 인기글; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/4\",\"request\":\"Y4\",\"expect\":{\"status\":200,\"headers\":{\"X-Cache\":{\"equals\":\"MISS\"}},\"json\":[{\"path\":\"$[*].postId\",\"notContains\":144}]}}]",
+              "legacy:16-3:X5: PATCH /api/posts/144; body={\"visibility\":\"FOLLOWERS\"}; case=남의 글(회원 7); source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/2\",\"request\":\"X5\",\"expect\":{\"status\":403}}]"
+            ],
+            "success": [
+              "응답 본문은 8-2 배열, X-Cache만 진단 추가; MISS일 때 SQL 실행."
+            ],
+            "failures": [
+              {
+                "when": "PATCH /api/posts/144 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 400 — 원문 check의 실패 응답",
+                "unchanged": "실패한 변경은 post visibility/deleted_at 및 cache generation을 바꾸지 않는다."
+              },
+              {
+                "when": "PATCH /api/posts/144 · [교육용 fixture · legacy:16-3:X5] 남의 글(회원 7)",
+                "result": "HTTP 403 (X5)",
+                "unchanged": "실패 mutation은 post visibility/deleted_at과 cache generation을 바꾸지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "같은 기간/개수/버전으로 인기 글을 아직 읽지 않았습니다.",
+                "action": "첫 목록과 즉시 반복 목록을 비교한 뒤 공개 범위 변경이나 삭제를 성공시킵니다.",
+                "result": "실패한 변경과 발행 대상 0건 배치는 캐시를 지우지 않습니다. 캐시 중 좋아요 변화의 기존 순위 허용과 숨김 즉시 반영을 구분합니다."
+              }
+            ],
+            "work": [
+              "cache proxy 경유, 세대 키, immutable snapshot, 성공 mutation 무효화를 구현한다."
+            ],
+            "done": [
+              "처음 MISS·반복 HIT이며 60초 재사용합니다. 성공한 공개 범위 변경/삭제는 모든 인기 글 캐시를 즉시 비웁니다.",
+              "실패한 변경과 발행 대상 0건 배치는 캐시를 지우지 않습니다. 캐시 중 좋아요 변화의 기존 순위 허용과 숨김 즉시 반영을 구분합니다.",
+              "PATCH /api/posts/144 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 실패한 변경은 post visibility/deleted_at 및 cache generation을 바꾸지 않는다.",
+              "PATCH /api/posts/144 · [교육용 fixture · legacy:16-3:X5] 남의 글(회원 7) → HTTP 403 (X5) 실패 mutation은 post visibility/deleted_at과 cache generation을 바꾸지 않는다."
+            ]
+          },
+          "hints": [
+            "TTL을 60초로 두어도 비공개 전환 직후 인기글 응답에 남으면 왜 보안 정책 위반일까요?",
+            "현재 시각을 cache key에 매번 넣으면 60초 재사용이 불가능한 이유는 무엇일까요?",
+            "캐시된 리스트 객체를 요청마다 수정하면 다음 요청 응답은 어떻게 변할 수 있을까요?"
+          ],
+          "recipeIds": [
+            "legacy:16-3:Y1",
+            "legacy:16-3:Y2",
+            "legacy:16-3:B1",
+            "legacy:16-3:Y4",
+            "legacy:16-3:X5"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "16-3-popular-cache.html",
+              "href": "/scenario/ch16-events-async-cache/16-3-popular-cache.html"
+            },
+            {
+              "label": "W17-where-to-cache.html",
+              "href": "/docs/knowledge/W17-where-to-cache.html"
+            },
+            {
+              "label": "W23-cache-and-in-memory.html",
+              "href": "/docs/knowledge/W23-cache-and-in-memory.html"
+            },
+            {
+              "label": "S11-cache-redis-migration.html",
+              "href": "/docs/knowledge/S11-cache-redis-migration.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

@@ -2,7 +2,7 @@
 
 판정: **needs_completion**. fullDocumentComplete=false. 원문277줄의 보존과10질문·25상태의 부분정확성은 확인했지만 전체 학습범위 완료는 아니다. 기준HEAD `4b0493af52b1a06decca909d6bf9a8b6f9610686`.
 
-새 검사 `npm --prefix tools/site run test:d01`: **actual exit 0**, UTC 2026-10-22T00:01:34.609316+00:00 ~ 2026-10-22T00:01:37.784391+00:00. 원문 SHA256 `b0f93186f2b1dd9f88f534874e63a03c311fa7a0a1c5aaaf0486354510a6cf1f`. 명령/HEAD/소스10파일SHA/원시출력은 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task15/test-d01.execution.json`에 보존했다.
+새 검사 `npm --prefix tools/site run test:d01`: **actual exit 0**, UTC 2026-10-22T00:01:34.609316+00:00 ~ 2026-10-22T00:01:37.784391+00:00. 원문 SHA256 `b0f93186f2b1dd9f88f534874e63a03c311fa7a0a1c5aaaf0486354510a6cf1f`. 명령/HEAD/소스10파일SHA/원시출력은 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task15/test-d01.execution.json`에 보존했다.
 
 ## spec 검토
 
@@ -105,12 +105,12 @@ spec 공백이 있어 quality 승인은 부여하지 않았다. 진단한 범위
 
 선정시안 flow/build-v2/recovery3장과 과거캡처 desktop-flow/desktop-build/mobile-recovery3장을 실제 view_image로 열람했다. 모두JPEG 헤더이며 시안1672×941, 캡처1672×2350/1672×2170/360×2442다. 전수 이미지 검수나 현재브라우저 실행을 주장하지 않는다.
 
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d01-2026-10-20/images/flow.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d01-2026-10-20/images/build-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d01-2026-10-20/images/recovery.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d01-2026-10-20/captures/desktop-flow.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d01-2026-10-20/captures/desktop-build.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d01-2026-10-20/captures/mobile-recovery.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d01-2026-10-20/images/flow.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d01-2026-10-20/images/build-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d01-2026-10-20/images/recovery.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d01-2026-10-20/captures/desktop-flow.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d01-2026-10-20/captures/desktop-build.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d01-2026-10-20/captures/mobile-recovery.jpg
 
 과거실행 JAR archive/dev/stg/prod/rebuild5개는 지금 읽기만 하여 모두2859bytes·동일SHA·F2 Source-Revision을 확인했다. Java/Gradle/DB/브라우저/외부CLI/LLM을 새로 호출하지 않았다. 새 npm검사는 Node/jsdom과 보존기록의 일치 검증이다. 실제 과거실행과 새 runtime 결과를 구분한다.
 

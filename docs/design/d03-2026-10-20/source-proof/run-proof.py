@@ -4,7 +4,7 @@ import argparse,hashlib,http.client,json,os,re,shutil,socket,subprocess,tempfile
 from urllib.parse import urlsplit
 
 OUT=Path(__file__).resolve().parent;ROOT=OUT.parents[3]
-JAVA=Path('/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home')
+JAVA=Path('LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home')
 p=argparse.ArgumentParser();p.add_argument('--runtime-root',required=True);p.add_argument('--freeze',action='store_true');a=p.parse_args()
 runtime=Path(a.runtime_root).resolve();runtime.mkdir(parents=True,exist_ok=True)
 run=Path(tempfile.mkdtemp(prefix='run-',dir=runtime));os.chmod(run,0o700)

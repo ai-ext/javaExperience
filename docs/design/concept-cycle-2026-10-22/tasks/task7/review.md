@@ -2,7 +2,7 @@
 
 판정은 **needs_completion**이다. 기준 HEAD `4b0493af52b1a06decca909d6bf9a8b6f9610686`에서 원문304줄 전문·현재9질문/31상태·probe/JSON·현재HTML을 대조했다. 기존 부분 보강의 관측/환경 표시는 대체로 일치하지만 원문 전체 완료는 아니다.
 
-원문: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md
+원문: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/S09-jpa-hibernate.md
 원문 SHA256: `23e3a001a2afbad0e4234795d9566645e25fffd5ab9f06a82b8f27b8c550d05e`
 
 ## spec 검토
@@ -65,7 +65,7 @@
 
 spec 미승인 후 진단만 수행했다. quality 승인을 부여하지 않는다. 현재 구현의 critical/important는 발견하지 못했고 minor1건을 확인했다. 전체 문서 공백은 위 coverage와 후속 작업에 별도로 기록했다.
 
-**S09-Q01 · minor** — /Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:1055. fetch-join의2줄 code에 active `[0,2,3]`이 남아2·3은 무시되고 HQL 주석 줄1은 강조되지 않는다. controller의55줄은 유효 i만 표시하며 새 test:s09는 이 오류를 검출하지 못했다. 의도한 줄로 인덱스를 고치고 모든 active의 범위를 검증한다. 확인: Node로 stage별 `0 <= i < code.split("\n").length`, 이어 test:s09와 메인의 강조 표시 확인.
+**S09-Q01 · minor** — LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/s09-lesson-data.mjs:1055. fetch-join의2줄 code에 active `[0,2,3]`이 남아2·3은 무시되고 HQL 주석 줄1은 강조되지 않는다. controller의55줄은 유효 i만 표시하며 새 test:s09는 이 오류를 검출하지 못했다. 의도한 줄로 인덱스를 고치고 모든 active의 범위를 검증한다. 확인: Node로 stage별 `0 <= i < code.split("\n").length`, 이어 test:s09와 메인의 강조 표시 확인.
 
 기술 대조에서 확인한 경계:
 
@@ -81,10 +81,10 @@ spec 미승인 후 진단만 수행했다. quality 승인을 부여하지 않는
 
 `npm --prefix tools/site run test:s09` → exit **0**. UTC 2026-10-21T23:47:26.935291+00:00 ~ 2026-10-21T23:47:32.219678+00:00. 원문/HTML/data/controller/renderer/tests/bundle/proof 해시는 실행 전후 동일하다. 이 명령은 JSDOM·생성HTML/bundle·기존61PASS/SQL 연결과 원문보존을 검사하며 Java/DB를 재실행하지 않는다.
 
-- 원시 stdout: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task7/test-s09.stdout.log
-- 원시 stderr: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task7/test-s09.stderr.log
-- 시점·HEAD·명령·해시·exit: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task7/test-s09.result.json
-- 원문Java/고정JSON/이미지헤더 정적 대조: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task7/static-inspection.json
+- 원시 stdout: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task7/test-s09.stdout.log
+- 원시 stderr: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task7/test-s09.stderr.log
+- 시점·HEAD·명령·해시·exit: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task7/test-s09.result.json
+- 원문Java/고정JSON/이미지헤더 정적 대조: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task7/static-inspection.json
 
 기존61관측의 execution.json은 frozen expected와 정확히 일치했다. READ_COMMITTED/autocommit observer와 같은transaction JDBC를 나누고 추가 ProbePost/원문 PurchaseOrder를 구분한다. Java/Gradle/DB·현재 웹은 실행하지 않았다.
 
@@ -92,21 +92,21 @@ spec 미승인 후 진단만 수행했다. quality 승인을 부여하지 않는
 
 view_image로 선정 이미지9장을 모두 열었다:
 
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-cache-v3.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-flush-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-merge-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-remove-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-fetch-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-service-v2.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-lock.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-auto-v3.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-pagination-v3.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-cache-v3.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-flush-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-merge-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-remove-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-fetch-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-service-v2.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-lock.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-auto-v3.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/images/S09-pagination-v3.jpg
 
 과거 full-page 캡처18장 중 아래3장을 열었다:
 
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/desktop-flush.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/mobile-fetch.jpg
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/desktop-auto.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/desktop-flush.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/mobile-fetch.jpg
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/s09-2026-10-20/desktop-auto.jpg
 
 flush·fetch·AUTO의 주요값과 observer/추가 seed 라벨이 probe/JSON과 일치했다. 나머지6시안의 상태/값/환경 경계도 대조했다. 모바일 fetch 캡처는 내부 가로이동 영역의 일부를 보이고 번역 확장 overlay가 있다. JPEG 실제 헤더·캔버스를 확인했고 full-page 이미지 크기를 viewport로 오인하지 않았다. 현재 브라우저와 픽셀정밀비교는 미검증이다.
 

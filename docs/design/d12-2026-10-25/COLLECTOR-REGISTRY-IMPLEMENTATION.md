@@ -2,10 +2,10 @@
 
 ## 변경
 
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/inventory-visual-work.mjs`에 `D12_LESSONS` import와 D12 source의 `d12_learning_state` 수집 항목을 추가했다. D11 import와 기존 수집 항목은 유지했다.
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks.json`의 `task26.harnessCommand`만 `npm --prefix tools/site run test:d12`로 등록했다.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/inventory-visual-work.mjs`에 `D12_LESSONS` import와 D12 source의 `d12_learning_state` 수집 항목을 추가했다. D11 import와 기존 수집 항목은 유지했다.
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks.json`의 `task26.harnessCommand`만 `npm --prefix tools/site run test:d12`로 등록했다.
 - task26의 `historicalStatus`는 `queued`로 유지했다. 실제 `status`는 변경 전부터 `waiting_existing24_audit`였고 그대로 보존했다. task26 외 133개 task는 깊은 비교에서 변경되지 않았다.
-- 변경 전 registry 백업: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/registry-before-task26.json`
+- 변경 전 registry 백업: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/registry-before-task26.json`
   - 백업 SHA-256: `2d361146f3e7826f2dc3351be187bda0faa1c5635f0c1b8bf0459764eaf09f39`
 
 ## 검증

@@ -6,7 +6,7 @@
 
 | 구분 | 고정 값 |
 |---|---|
-| 작업 공간 | /Users/ds/code/javaExperience/.worktrees/concept-learning-night |
+| 작업 공간 | LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night |
 | 원본 브랜치 / HEAD | docs/concept-learning-night / b93457b577d913f2a7dbe2635f88c1a0d6e4920a |
 | 최신 원격 main | a70f1bd531c1b72077d56e7363ff424ba5795143 — fetch 및 마지막 ls-remote 재확인 |
 | 기존 로컬 main | 2c2556c5e6c348d82f895f8f405b2e2d26f1807b — 이동하지 않음 |
@@ -45,10 +45,10 @@ snapshot 뒤에는 이번 검사 로그·진행표·보고서만 추가했다. �
 
 ## 발견한 후속 수정
 
-**Minor1: D12 양 끝 단계 이동 후 키보드 초점 유실.** /Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/d12-learning.js:162–164에서 render 전 disabled Boolean을 읽어 render 후 변경을 놓친다. source/bundle JSDOM4경계와 메인 실제 Chrome2경계로 재현했다. 실제 Chrome은 다음→마지막/이전→처음에서 activeElement가 BODY가 됐다. 단계 데이터 자체는 정상 변경된다. CODE-REVIEW.md, code-repro-d12-focus.json, d12-focus-native.json 참조. 제품 코드는 수정하지 않았으며 진행표에 미완료로 등록한다. 하네스 녹색이 이 반례의 정상 동작을 뜻하지 않는다.
+**Minor1: D12 양 끝 단계 이동 후 키보드 초점 유실.** LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/d12-learning.js:162–164에서 render 전 disabled Boolean을 읽어 render 후 변경을 놓친다. source/bundle JSDOM4경계와 메인 실제 Chrome2경계로 재현했다. 실제 Chrome은 다음→마지막/이전→처음에서 activeElement가 BODY가 됐다. 단계 데이터 자체는 정상 변경된다. CODE-REVIEW.md, code-repro-d12-focus.json, d12-focus-native.json 참조. 제품 코드는 수정하지 않았으며 진행표에 미완료로 등록한다. 하네스 녹색이 이 반례의 정상 동작을 뜻하지 않는다.
 
 ## 진행표와 다음 순서
 
-완료한 범위·근거·전체 문서에 남은 공백·108개 미착수·머지 전 필수/후속 개발은 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-24/PROGRESS.md 에 기록했다. 26개는 범위별 학습 화면과 검증이 있는 문서 수이며134개 개별 문서의 전수 완료 승인 수가 아니다.
+완료한 범위·근거·전체 문서에 남은 공백·108개 미착수·머지 전 필수/후속 개발은 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-24/PROGRESS.md 에 기록했다. 26개는 범위별 학습 화면과 검증이 있는 문서 수이며134개 개별 문서의 전수 완료 승인 수가 아니다.
 
 다음 순서는 **최신 main 기반 정제 이식 → 공통15경로의 양쪽 기능 결합 → 자산/장부 조정 → 생성물 재빌드 → 통합본 검사·PC다크 확인 → 병합 재판정**이다. 신규108개 문서 개발과 각 문서의 전체 범위 보강은 이 통합 관문과 구분해 후속 개발로 추적한다. 실제 main merge는 이번 요청에서 실행하지 않았다.

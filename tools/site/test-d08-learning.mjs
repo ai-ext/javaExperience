@@ -1,3 +1,4 @@
+import { resolveEvidencePath } from './evidence-path.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -91,8 +92,8 @@ assert.deepEqual([f['pinned-runtime-test-artifact-sha'].runtimeArtifacts, f['pin
 assert.equal(f['same-jar-three-local-folder-copies'].realEnvironmentPromotionExecuted, false);
 assert.equal(f['bounded-local-command-scope-no-deployment'].HTTPExecuted, false);
 assert.equal(f['all-toy-git-repositories-have-no-remotes'].repositories, 6);
-for (const group of Object.values(raw.dependencyFiles)) for (const dep of group) assert.equal(sha(readFileSync(dep.file)), dep.sha256);
-assert.equal(sha(readFileSync(raw.jar.path)), f['boot-jar-manifest-and-compiled-byte-evidence'].sha256);
+for (const group of Object.values(raw.dependencyFiles)) for (const dep of group) assert.equal(sha(readFileSync(resolveEvidencePath(dep.file))), dep.sha256);
+assert.equal(sha(readFileSync(resolveEvidencePath(raw.jar.path))), f['boot-jar-manifest-and-compiled-byte-evidence'].sha256);
 assert.equal(execution.models['pr-policy'].refs.head, 'H2');
 assert.equal(execution.models['pr-policy'].refs.pull_request_default_sha, 'M1 (시험 merge commit)');
 assert.match(state('pr-gates').sourceNote, /모든 job 실행 성공과 같지/);

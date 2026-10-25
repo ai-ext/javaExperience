@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "id": "api-docs",
+  "title": "내 API를 실행 가능한 문서로 공개하기",
+  "summary": "OpenAPI 문서가 실제 요청·응답 계약과 일치하고 사용자가 직접 실행할 수 있게 한다.",
+  "difficulty": "중급",
+  "group": "개발과 검증",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "docs",
+      "title": "명세와 실제 API의 입력·응답 맞추기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "docs",
+          "title": "명세와 실제 API의 입력·응답 맞추기",
+          "sourceUnits": [
+            "legacy:13-7"
+          ],
+          "brief": {
+            "purpose": "OpenAPI 문서가 실제 요청·응답 계약과 일치하고 사용자가 직접 실행할 수 있게 한다.",
+            "task": "Swagger UI와 사용자용 API 그룹을 구성하고 명세와 검증 결과를 맞춘다.",
+            "preconditions": [
+              "시나리오 DB(`community`) — 앱을 기본 프로파일로 띄운다.",
+              "community app 의존성 및 13-7에서 정한 springdoc 버전·접근 경로를 확인한다."
+            ],
+            "scenario": [
+              {
+                "start": "사용자용 API와 운영자용 API가 실제 서버에 구현돼 있습니다.",
+                "action": "/v3/api-docs/public과 원본 문서 경로를 열어 실제 operation·입력·응답·Bearer 설정을 비교합니다.",
+                "result": "public 명세는 OpenAPI 3.1과 javaExperience 게시판 API 제목, HTTP bearerAuth 설정을 제공합니다.",
+                "after": "문서의 경로·필드·오류 예시와 실제 서버의 응답을 대조합니다. 명세 파일이 열린 것만으로 모든 API 실행 완료로 표시하지 않습니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "실제 controller method/path/status와 OpenAPI operation",
+                "reason": "문서 정의와 실행 응답을 같은 endpoint로 비교한다."
+              },
+              {
+                "name": "public/admin group 설정",
+                "reason": "사용자용 그룹의 우선 노출과 운영용 API 분리를 확인한다."
+              }
+            ],
+            "policies": [
+              "API path/method/status/error schema와 bearer 인증 표시는 실제 controller/security 설정을 따른다. 원문에 없는 endpoint를 추가하지 않는다. 문서 그룹은 사용자용 먼저."
+            ],
+            "inputs": [
+              "legacy:13-7:A: GET /v3/api-docs/public; case=사용자용 문서(JSON); source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"A\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.openapi\",\"matches\":\"^3\\\\.1\\\\.\"},{\"path\":\"$.info.title\",\"equals\":\"javaExperience 게시판 API\"},{\"path\":\"$.components.securitySchemes.bearerAuth.type\",\"equals\":\"http\"},{\"path\":\"$.components.securitySchemes.bearerAuth.scheme\",\"equals\":\"bearer\"},{\"path\":\"$.paths./api/posts.post\",\"exists\":true},{\"path\":\"$.paths./api/posts/{id}.get\",\"exists\":true}]}},{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"A\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.paths./api/reports.post.summary\",\"equals\":\"글·댓글 신고\"},{\"path\":\"$.paths./api/reports.post.responses.409.description\",\"equals\":\"이미 신고함\"},{\"path\":\"$.paths./api/reports.post.responses.400\",\"exists\":true},{\"path\":\"$.paths./api/me/notifications.get.parameters[*].name\",\"contains\":\"unreadOnly\"},{\"path\":\"$.paths./api/me/notifications.get.parameters[*].name\",\"contains\":\"size\"},{\"path\":\"$.paths./api/me/notifications.get.parameters[*].name\",\"contains\":\"cursor\"},{\"path\":\"$.paths./api/me/notifications.get.parameters[*].name\",\"notContains\":\"me\"},{\"path\":\"$.paths./api/reports.post.parameters\",\"exists\":false}]}},{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"A\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.paths./api/admin/reports\",\"exists\":false},{\"path\":\"$.paths./api/admin/posts/{id}/status\",\"exists\":false}]}}]",
+              "legacy:13-7:B: GET /v3/api-docs/admin; case=운영용 문서(JSON); source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"B\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.paths./api/admin/reports.get\",\"exists\":true},{\"path\":\"$.paths./api/admin/reports/resolve.post\",\"exists\":true},{\"path\":\"$.paths./api/posts\",\"exists\":false}]}}]",
+              "legacy:13-7:S: GET /v3/api-docs/swagger-config; case=Swagger UI 설정; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"S\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.urls[*].name\",\"contains\":\"public\"},{\"path\":\"$.urls[*].name\",\"contains\":\"admin\"}],\"bodyText\":{\"contains\":\"\\\"urls.primaryName\\\":\\\"public\\\"\"}}}]",
+              "legacy:13-7:U: GET /swagger-ui/index.html; case=Swagger UI 화면; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"U\",\"expect\":{\"status\":200,\"headers\":{\"Content-Type\":{\"contains\":\"text/html\"}},\"bodyText\":{\"contains\":\"swagger-ui\"}}}]"
+            ],
+            "success": [
+              "OpenAPI JSON과 UI가 앱에서 제공되고 실제 응답 status/field가 명세와 일치."
+            ],
+            "failures": [
+              {
+                "when": "OpenAPI 문서 경로 또는 group을 열 수 없는 경우",
+                "result": "13-7 직접 확인 사례는 성공 경로만 있어 HTTP 오류 코드는 미확인으로 둔다.",
+                "unchanged": "문서 접근 실패 시 업무 DB 상태는 바뀌지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "사용자용 API와 운영자용 API가 실제 서버에 구현돼 있습니다.",
+                "action": "/v3/api-docs/public과 원본 문서 경로를 열어 실제 operation·입력·응답·Bearer 설정을 비교합니다.",
+                "result": "문서의 경로·필드·오류 예시와 실제 서버의 응답을 대조합니다. 명세 파일이 열린 것만으로 모든 API 실행 완료로 표시하지 않습니다."
+              }
+            ],
+            "work": [
+              "문서 의존성, security scheme, operation annotation을 실제 controller 계약에 맞춘다."
+            ],
+            "done": [
+              "public 명세는 OpenAPI 3.1과 javaExperience 게시판 API 제목, HTTP bearerAuth 설정을 제공합니다.",
+              "문서의 경로·필드·오류 예시와 실제 서버의 응답을 대조합니다. 명세 파일이 열린 것만으로 모든 API 실행 완료로 표시하지 않습니다.",
+              "OpenAPI 문서 경로 또는 group을 열 수 없는 경우 → 13-7 직접 확인 사례는 성공 경로만 있어 HTTP 오류 코드는 미확인으로 둔다. 문서 접근 실패 시 업무 DB 상태는 바뀌지 않는다."
+            ]
+          },
+          "hints": [
+            "요청 예시를 명세에 적는 것과 실행 가능한 API 계약을 유지하는 것은 어떤 차이가 있을까요?",
+            "실제 controller 경로와 OpenAPI operation path가 어긋나지 않는지 어떤 산출물을 비교해야 할까요?",
+            "인증이 필요한 operation에서 UI가 Bearer token 입력을 지원하지 않으면 어떤 실행 검증이 막힐까요?"
+          ],
+          "recipeIds": [
+            "legacy:13-7:A",
+            "legacy:13-7:B",
+            "legacy:13-7:S",
+            "legacy:13-7:U"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "13-7-api-docs.html",
+              "href": "/scenario/ch13-operations/13-7-api-docs.html"
+            },
+            {
+              "label": "S23-openapi-swagger.html",
+              "href": "/docs/knowledge/S23-openapi-swagger.html"
+            },
+            {
+              "label": "S21-boot4-migration.html",
+              "href": "/docs/knowledge/S21-boot4-migration.html"
+            },
+            {
+              "label": "C2-gradle-dependencies.html",
+              "href": "/lessons/C2-gradle-dependencies.html"
+            },
+            {
+              "label": "F3-cors.html",
+              "href": "/lessons/F3-cors.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

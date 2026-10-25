@@ -4,7 +4,7 @@
 
 기준 HEAD `4b0493af52b1a06decca909d6bf9a8b6f9610686`. 원문 `c3a875fb1940e05020301d8b0c5e88c607c870acb4c86c100f2c696155ff03e9`, 343줄 전문. 11질문·30상태.
 
-`npm --prefix tools/site run test:d05`를 2026-10-22T00:12:42.312238+00:00에 새 실행했고 exit0·stderr0이다. 로그와 HEAD·소스 해시는 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task19/runs/20261022T001242.310928Z 에 있다. Node/jsdom/static 산출물 검사이며 native Java나 현재 browser 재실행이 아니다.
+`npm --prefix tools/site run test:d05`를 2026-10-22T00:12:42.312238+00:00에 새 실행했고 exit0·stderr0이다. 로그와 HEAD·소스 해시는 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task19/runs/20261022T001242.310928Z 에 있다. Node/jsdom/static 산출물 검사이며 native Java나 현재 browser 재실행이 아니다.
 
 원문 보존은 통과한다. 생성 HTML의 원문13876자/도표제외12865자·code6/Mermaid3/id16/map1 및 원문/fixture9/47deps 해시가 일치한다. 이것은 원문 전체 학습 장면 완료와 다르다.
 
@@ -24,12 +24,12 @@
 
 ## 대표 이미지 실제 열람
 
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d05-2026-10-21/images/stack.jpg — actual view_image original, 1672×941, SHA `c5790d1ed06811c63700e2ea968bb6b13b6bfda6ff24c0713dd167a5176f44ab`.
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d05-2026-10-21/images/stepping-v2.jpg — actual view_image original, 1671×941, SHA `528326f7f1ca4c9e7350f0b28e7cd39fa7d2c3add377c51f25930e852723c227`.
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d05-2026-10-21/images/threads-v3.jpg — actual view_image original, 1672×941, SHA `a1f3540823d55e07eaf7d665c5624b7e43bb655466736ff0ca57bdfc4e3e4445`.
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d05-2026-10-21/captures/desktop-stack.jpg — actual view_image original, 1672×2292, SHA `e9bc3e008667c8e23827db9c91040f4c8e079d3bf2e60bd7719735ed3e579867`.
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d05-2026-10-21/captures/mobile-stepping.jpg — actual view_image original, 360×2075, SHA `e2d48a186a91499dbca00d41ce4ff06cd1ce43010aaaf649d212d21afc9851de`.
-- /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d05-2026-10-21/captures/desktop-threads.jpg — actual view_image original, 1672×2243, SHA `a0121c8f28e18a2556e3131e28c28b9fcf62770148133c646c006ebea42d886e`.
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d05-2026-10-21/images/stack.jpg — actual view_image original, 1672×941, SHA `c5790d1ed06811c63700e2ea968bb6b13b6bfda6ff24c0713dd167a5176f44ab`.
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d05-2026-10-21/images/stepping-v2.jpg — actual view_image original, 1671×941, SHA `528326f7f1ca4c9e7350f0b28e7cd39fa7d2c3add377c51f25930e852723c227`.
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d05-2026-10-21/images/threads-v3.jpg — actual view_image original, 1672×941, SHA `a1f3540823d55e07eaf7d665c5624b7e43bb655466736ff0ca57bdfc4e3e4445`.
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d05-2026-10-21/captures/desktop-stack.jpg — actual view_image original, 1672×2292, SHA `e9bc3e008667c8e23827db9c91040f4c8e079d3bf2e60bd7719735ed3e579867`.
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d05-2026-10-21/captures/mobile-stepping.jpg — actual view_image original, 360×2075, SHA `e2d48a186a91499dbca00d41ce4ff06cd1ce43010aaaf649d212d21afc9851de`.
+- LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d05-2026-10-21/captures/desktop-threads.jpg — actual view_image original, 1672×2243, SHA `a0121c8f28e18a2556e3131e28c28b9fcf62770148133c646c006ebea42d886e`.
 
 선정3/11·역사캡처3/22만 보았다. 모바일 그림 우측은 첫뷰에 잘리고 pan안내와 별도 현재값이 보인다. 캡처만으로 현재 pan·확대/복사·overflow 동작을 승인하지 않는다. 현재 browser는 메인이 검증한다.
 

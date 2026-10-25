@@ -69,6 +69,21 @@ const candidateJpgPaths = allPublicFiles.filter(file => /\.jpe?g$/i.test(file)).
 const pinnedPaths = new Set([...expectedByPath.keys(), ...extraByPath.keys()]);
 const candidateSet = new Set(candidateJpgPaths);
 for (const file of pinnedPaths) assert.ok(candidateSet.has(file), `baseline 경로 누락: ${file}`);
+// 개념 이식 뒤 병합된 서비스 자료는 과거 개념 baseline을 고치지 않고 병합 커밋의 blob으로 검증한다.
+// 현재 HEAD를 허용 목록으로 쓰지 않으므로 이번 작업에서 추가한 미등록 이미지는 계속 실패한다.
+const serviceIntegration = '779acd79a86d638b024b17e5c2a3ab273e8334f0';
+const integratedJpgs = new Map(execFileSync('git', ['ls-tree', '-r', '-z', serviceIntegration], {cwd:root, maxBuffer:16*1024*1024}).toString('utf8').split('\0').filter(Boolean).map(row => {
+  const [header, file] = row.split('\t'); return [file, header.split(' ')[2]];
+}).filter(([file]) => /\.jpe?g$/i.test(file) && !pinnedPaths.has(file)));
+assert.equal(integratedJpgs.size, 57, '기존 서비스 병합에서 추가된 JPG 57개');
+for (const [file, gitBlob] of integratedJpgs) {
+  assert.ok(candidateSet.has(file), `${file}: 병합 자료 누락 없음`);
+  const bytes = fs.readFileSync(path.join(root,file));
+  const actualBlob = crypto.createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+  assert.equal(actualBlob,gitBlob,`${file}: 서비스 병합 입력 blob 보존`);
+  assert.equal(rasterDimensions(bytes).format,'jpeg',`${file}: 기존 JPG 형식`);
+  pinnedPaths.add(file);
+}
 const unexpectedJpgs = candidateJpgPaths.filter(file => !pinnedPaths.has(file));
 assert.deepEqual(unexpectedJpgs, [], '새 추가 JPG는 고정 입력 baseline의 extra 목록에 등록');
 for (const row of baseline.extraCandidateJpgs) {

@@ -34,7 +34,7 @@ Controller는 Spring 프록시 빈의 **Java 메서드 호출**로 검사했다.
 
 ## 공식 근거와 이미지 교정
 
-Luna 직접 OpenAI 조사 경로는 `/Users/ds/research/javaexperience-w11-20261020`이다. LiteLLM·재위임·모델 전환은 없었다. 메인은 공식 Spring7.0.9 자원 동기화/JDBC/TransactionTemplate, Fowler 원문과 pinned MVC 반환값 처리 소스를 직접 열었다. MVC 소스의 호출·반환값 처리 순서는 공식 근거이며 이번 HTTP 실측이 아니다.
+Luna 직접 OpenAI 조사 경로는 `LOCAL_HOME/research/javaexperience-w11-20261020`이다. LiteLLM·재위임·모델 전환은 없었다. 메인은 공식 Spring7.0.9 자원 동기화/JDBC/TransactionTemplate, Fowler 원문과 pinned MVC 반환값 처리 소스를 직접 열었다. MVC 소스의 호출·반환값 처리 순서는 공식 근거이며 이번 HTTP 실측이 아니다.
 
 초안의 잘못된 메서드 이름, 0행과 SQL 미실행의 혼동, 임의 sequence와 미측정 writer 조회를 실제 imagegen으로 교정했다. 최종 그림은 SQL 반환 직후 writer/observer, 순수 commit 기록, 최종 observer를 구분한다. 아직 호출하지 않은 메서드를 실행된 것으로 표시하지 않는다. 메인과 독립 검수가 최종 6그림을 직접 읽었고 미해소 소견은0이다.
 

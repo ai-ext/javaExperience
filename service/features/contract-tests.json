@@ -1,0 +1,231 @@
+{
+  "version": 1,
+  "id": "contract-tests",
+  "title": "내 API의 정상·실패 동작을 테스트로 남기기",
+  "summary": "7장 Controller slice, service unit, real MySQL integration test가 보장하는 경계를 각각 확인한다.",
+  "difficulty": "중급",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "verify",
+      "title": "HTTP부터 실제 DB까지 알맞은 범위로 확인하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "verify",
+          "title": "HTTP부터 실제 DB까지 알맞은 범위로 확인하기",
+          "sourceUnits": [
+            "legacy:7-1",
+            "legacy:7-2",
+            "legacy:7-3"
+          ],
+          "brief": {
+            "purpose": "7장 Controller slice, service unit, real MySQL integration test가 보장하는 경계를 각각 확인한다.",
+            "task": "PostControllerTest, LikeServiceTest, PostFlowIntegrationTest 전용 명령을 실행하고 각 테스트의 mock/real dependency와 assertion을 기록한다.",
+            "preconditions": [
+              "community-board test configuration과 Testcontainers의 MySQL 사용 여부를 확인한다.",
+              "테스트 class 이름과 package를 원문에서 그대로 사용한다."
+            ],
+            "scenario": [
+              {
+                "start": "컨트롤러만 테스트, 서비스 규칙 테스트, 전체 요청 flow 테스트를 각각 분류한다.",
+                "action": "각 source에 선언된 `./gradlew test --tests ...` 명령을 따로 실행한다.",
+                "result": "Controller: POST 정상201+Location, blank title400, no token401, absent post404. Service: own post no save, new like once+1, existing like/no unlike no-op, access policy404. Integration: 실제 DB로 글→상세→좋아요→댓글→삭제.",
+                "after": "integration DB free list id가 21..12,9,5,4인지 확인하고 container 로그를 보존한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "PostControllerTest MockMvc status/header/problem body",
+                "reason": "HTTP contract 검증을 확인."
+              },
+              {
+                "name": "LikeServiceTest repository calls/count",
+                "reason": "순수 서비스 정책과 side effect 횟수 검증."
+              },
+              {
+                "name": "PostFlowIntegrationTest generated post id and final DB rows",
+                "reason": "실제 SQL·commit·인증 흐름 검증."
+              },
+              {
+                "name": "free board seed ids 21..12,9,5,4",
+                "reason": "visibility/list fixture contract 확인."
+              }
+            ],
+            "policies": [
+              "PostControllerTest는 @WebMvcTest(PostController.class), controller/validation/advice 실물, PostService/token mock, DB container 없이 실행.",
+              "LikeServiceTest는 Spring context와 DB 없는 pure unit; policy spy는 요구된 테스트에 한해 사용.",
+              "PostFlowIntegrationTest는 @SpringBootTest + @AutoConfigureMockMvc + real MySQL Testcontainers, service/repository mock 금지. 생성 id를 다음 요청에 이어 쓰고 request commit을 관찰한다."
+            ],
+            "inputs": [
+              "./gradlew test --tests org.example.post.PostControllerTest",
+              "./gradlew test --tests org.example.like.LikeServiceTest",
+              "./gradlew test --tests org.example.post.PostFlowIntegrationTest"
+            ],
+            "success": [
+              "Controller has 4+ contract tests: 201+Location+author, 400 title error, 401+WWW-Authenticate, 404.",
+              "Like unit has 5+ cases: self-like no save; new save once and count+1; existing unlike no-op; absent unlike no-op; actual access policy 404.",
+              "Integration runs real MySQL and verifies create201/detail200/like/comment201/delete204 plus free seed order."
+            ],
+            "failures": [
+              {
+                "when": "Controller slice starts Hikari/Testcontainers or claims a mock service performed real SQL",
+                "result": "test boundary is misrepresented.",
+                "unchanged": "test environment and database remain unchanged."
+              },
+              {
+                "when": "blank title test invokes create service, or 401 misses WWW-Authenticate",
+                "result": "contract assertion fails.",
+                "unchanged": "no database write occurs in slice."
+              },
+              {
+                "when": "integration test reuses hard-coded post id instead of response id or mocks repository",
+                "result": "flow does not prove persistent linkage.",
+                "unchanged": "existing fixture preserved."
+              }
+            ],
+            "examples": [
+              {
+                "title": "Controller contract",
+                "start": "no DB container; controller test slice",
+                "action": "./gradlew test --tests org.example.post.PostControllerTest",
+                "result": "201+Location, 400 problem+json, 401 challenge header, 404 verified"
+              },
+              {
+                "title": "Like policy unit",
+                "start": "Spring/MySQL stopped; repository mocked",
+                "action": "./gradlew test --tests org.example.like.LikeServiceTest",
+                "result": "5+ unit cases, only expected save invocation, no real SQL claim"
+              },
+              {
+                "title": "Real flow",
+                "start": "Testcontainers mysql:8.4",
+                "action": "./gradlew test --tests org.example.post.PostFlowIntegrationTest",
+                "result": "same generated post id moves through create/detail/like/comment/delete"
+              }
+            ],
+            "work": [
+              "각 테스트의 annotation, mock target, dependency startup log를 캡처한다.",
+              "status 외 Location, JSON fields, interaction count, final DB state assertion을 확인한다.",
+              "통합은 실제 id를 다음 요청에 전달하고 commit 후 결과를 읽는다."
+            ],
+            "done": [
+              "세 테스트의 가짜/실제 경계를 설명했다.",
+              "HTTP contract·service rule·database integration assertions를 각각 확인했다.",
+              "Testcontainers와 seed ordering 증거를 기록했다."
+            ],
+            "hints": [
+              "201 응답을 MockMvc로 확인하는 것만으로 SQL INSERT가 있었다고 할 수 없는 이유는 무엇인가요?",
+              "LikeServiceTest에서 repository.save 호출이 없는 경우가 보장하는 정책은 어떤 상태인가요?",
+              "PostFlowIntegrationTest에서 요청별 commit 뒤의 DB 관찰이 필요한 이유를 같은 테스트 transaction과 비교해 볼까요?"
+            ]
+          },
+          "hints": [
+            "201 응답을 MockMvc로 확인하는 것만으로 SQL INSERT가 있었다고 할 수 없는 이유는 무엇인가요?",
+            "LikeServiceTest에서 repository.save 호출이 없는 경우가 보장하는 정책은 어떤 상태인가요?",
+            "PostFlowIntegrationTest에서 요청별 commit 뒤의 DB 관찰이 필요한 이유를 같은 테스트 transaction과 비교해 볼까요?"
+          ],
+          "recipeIds": [],
+          "executionChecks": [
+            {
+              "title": "Controller slice HTTP contract",
+              "command": "./gradlew test --tests org.example.post.PostControllerTest",
+              "expected": "4+ cases: 201+Location; 400 title validation; 401+WWW-Authenticate; 404.",
+              "record": "실행 결과 및 각 status/header/body/service mock interaction을 기록한다."
+            },
+            {
+              "title": "Like service policy unit",
+              "command": "./gradlew test --tests org.example.like.LikeServiceTest",
+              "expected": "5+ unit cases: self-like no save, new like save once/count+1, already liked/unlike absent no-op, access 404.",
+              "record": "save invocation, counter delta, policy spy 사용 case를 적는다."
+            },
+            {
+              "title": "Real MySQL flow",
+              "command": "./gradlew test --tests org.example.post.PostFlowIntegrationTest",
+              "expected": "Testcontainers MySQL real flow create/detail/like/comment/delete plus free id order.",
+              "record": "생성 id, SQL-backed states, container startup and build result."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:7-1 · 컨트롤러 슬라이스 테스트",
+              "href": "/scenario/ch7-tests/7-1-controller-slice.html"
+            },
+            {
+              "label": "../../docs/knowledge/V02-layered-tests-handson.md",
+              "href": "/docs/knowledge/V02-layered-tests-handson.html"
+            },
+            {
+              "label": "../../docs/knowledge/V03-mocking-in-practice.md",
+              "href": "/docs/knowledge/V03-mocking-in-practice.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:7-1 · 컨트롤러 슬라이스 테스트",
+              "href": "/scenario/ch7-tests/7-1-controller-slice.html"
+            },
+            {
+              "label": "../../docs/knowledge/V02-layered-tests-handson.md",
+              "href": "/docs/knowledge/V02-layered-tests-handson.html"
+            },
+            {
+              "label": "../../docs/knowledge/V03-mocking-in-practice.md",
+              "href": "/docs/knowledge/V03-mocking-in-practice.html"
+            },
+            {
+              "label": "../../docs/knowledge/S18-spring-testing.md",
+              "href": "/docs/knowledge/S18-spring-testing.html"
+            },
+            {
+              "label": "../../docs/knowledge/V01-what-and-how-to-test.md",
+              "href": "/docs/knowledge/V01-what-and-how-to-test.html"
+            },
+            {
+              "label": "../../docs/knowledge/V05-testing-tricky-things.md",
+              "href": "/docs/knowledge/V05-testing-tricky-things.html"
+            },
+            {
+              "label": "legacy:7-2 · 서비스 단위 테스트 — mock과 spy",
+              "href": "/scenario/ch7-tests/7-2-service-unit.html"
+            },
+            {
+              "label": "../../docs/knowledge/J19-testing-junit.md",
+              "href": "/docs/knowledge/J19-testing-junit.html"
+            },
+            {
+              "label": "../../docs/knowledge/W12-why-interfaces.md",
+              "href": "/docs/knowledge/W12-why-interfaces.html"
+            },
+            {
+              "label": "legacy:7-3 · 통합 테스트 — Testcontainers",
+              "href": "/scenario/ch7-tests/7-3-integration.html"
+            },
+            {
+              "label": "../../docs/knowledge/V04-test-db-strategy.md",
+              "href": "/docs/knowledge/V04-test-db-strategy.html"
+            },
+            {
+              "label": "../../docs/knowledge/V06-testing-at-work.md",
+              "href": "/docs/knowledge/V06-testing-at-work.html"
+            },
+            {
+              "label": "../../practice/MISSIONS.md",
+              "href": "/practice/MISSIONS.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "개발과 검증",
+  "status": "authored"
+}

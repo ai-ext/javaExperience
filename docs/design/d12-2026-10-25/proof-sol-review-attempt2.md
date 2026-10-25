@@ -24,14 +24,14 @@
 
 ## 증거
 
-전체 보고: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-review-attempt2.json
+전체 보고: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-review-attempt2.json
 
-실제 Linux 원출력: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-logs/independent-attempt2-d9c6399f991486bd.json
+실제 Linux 원출력: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-logs/independent-attempt2-d9c6399f991486bd.json
 
-guard·소유 ID 반례 원출력: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-logs/guard-checks-attempt2.json
+guard·소유 ID 반례 원출력: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-logs/guard-checks-attempt2.json
 
-기존 attempt 해시·실패 집계: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-logs/attempt2-original-attempt-index.json
+기존 attempt 해시·실패 집계: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-logs/attempt2-original-attempt-index.json
 
-기존 FAIL 보고서: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-review.json
+기존 FAIL 보고서: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-review.json
 
 AGENTS·RESUME·구현·이미지·UI·기존원출력은 이 리뷰에서 수정하지 않았다. 커밋하지 않았다.

@@ -1,5 +1,5 @@
 import datetime,hashlib,json,pathlib,subprocess
-root=pathlib.Path('/Users/ds/code/javaExperience/.worktrees/concept-learning-night');base=root/'docs/design/concept-cycle-2026-10-24/minor-repairs';logs=base/'sol-quality-logs';abs=lambda x:str(root/x)
+root=pathlib.Path('LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night');base=root/'docs/design/concept-cycle-2026-10-24/minor-repairs';logs=base/'sol-quality-logs';abs=lambda x:str(root/x)
 old=json.loads((base/'sol-spec-logs/final/reviewed-snapshot-sha256.json').read_text());files=list(old)+['tools/site/d04-learning.css'];snapshot={file:hashlib.sha256((root/file).read_bytes()).hexdigest() for file in files};(logs/'reviewed-snapshot-sha256.json').write_text(json.dumps(snapshot,indent=2)+'\n')
 css=(root/'tools/site/d04-learning.css').read_text();assert '@media(max-width:700px)' in css and '.d04-learning [data-d04-title]{scroll-margin-top:112px}' in css
 (logs/'d04-css-review.json').write_text(json.dumps({'file':abs('tools/site/d04-learning.css'),'rule':'.d04-learning [data-d04-title]{scroll-margin-top:112px}','scope':'기존 @media(max-width:700px) 내부 D04 title만','actualViewportVerifiedByThisReviewer':False},ensure_ascii=False,indent=2)+'\n')

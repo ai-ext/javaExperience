@@ -6,7 +6,7 @@ export function initCoreLearning(doc = document, win = window) {
   const data = JSON.parse(payload.textContent);
   if (!Array.isArray(data.units) || !data.units.length) return;
   root.dataset.ready = 'true';
-  const $ = name => root.querySelector(`[data-core-${name}]`);
+  const $ = name => root.querySelector(`[data-core-${name}]`) || doc.querySelector(`.site-frame-sidebar [data-core-${name}]`);
   const element = (tag, text) => { const node = doc.createElement(tag); node.textContent = text; return node; };
   let unit, index = 0, generation = 0, request = 0;
   const readLocation = () => {
@@ -25,6 +25,10 @@ export function initCoreLearning(doc = document, win = window) {
   const link = (title, href) => { const node = element('a', title); node.href = href; return node; };
   function render() {
     generation++;
+    for (const item of doc.querySelectorAll('.section-navigation a[href*="concept-core.html?unit="]')) {
+      const selected = new URL(item.href, win.location.href).searchParams.get('unit') === unit.id;
+      if (selected) item.setAttribute('aria-current','page'); else item.removeAttribute('aria-current');
+    }
     const stage = unit.stages[index];
     $('title').textContent = unit.title;
     $('definition').textContent = unit.definition;

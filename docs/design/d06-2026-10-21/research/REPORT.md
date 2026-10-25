@@ -1,7 +1,7 @@
 # D06 배포 개념 기술 사실 검수
 
 조사일: 2026-10-21 (UTC 기준 웹 확인일, 로컬 날짜 동일)  
-검토 원문: `/Users/ds/research/javaexperience-d06-20261021/SOURCE.md` (264줄, SHA-256 `0e67f2ea37cbf166229fc256d1cd3a5b81a9e48a164a9680840b4ec21e0f63f1`). 제공된 기존 경로의 D06 문서와 해시가 달라 이 원문만 검토했다. 아래는 구현 사실과 시각화·실험에서 보존해야 할 범위다.
+검토 원문: `LOCAL_HOME/research/javaexperience-d06-20261021/SOURCE.md` (264줄, SHA-256 `0e67f2ea37cbf166229fc256d1cd3a5b81a9e48a164a9680840b4ec21e0f63f1`). 제공된 기존 경로의 D06 문서와 해시가 달라 이 원문만 검토했다. 아래는 구현 사실과 시각화·실험에서 보존해야 할 범위다.
 
 ## 1. Deploy, Release, Launch와 환경 이름
 

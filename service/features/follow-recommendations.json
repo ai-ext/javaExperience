@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "id": "follow-recommendations",
+  "title": "관계에 따라 팔로우 후보 추천하기",
+  "summary": "8-3 follow table self-join으로 mutuals·follow-back·친구의 친구 후보를 계산하고 아직 연결되지 않은 활성 회원을 찾는다.",
+  "difficulty": "중급",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "recommend",
+      "title": "맞팔과 친구의 친구를 중복 없이 찾기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "recommend",
+          "title": "맞팔과 친구의 친구를 중복 없이 찾기",
+          "sourceUnits": [
+            "legacy:8-3"
+          ],
+          "brief": {
+            "purpose": "8-3 follow table self-join으로 mutuals·follow-back·친구의 친구 후보를 계산하고 아직 연결되지 않은 활성 회원을 찾는다.",
+            "task": "member 7의 상호 관계를 조회하고 suggestions?limit=5에서 self/already-followed/inactive/양방향 차단 후보를 제외한다.",
+            "preconditions": [
+              "practice DB의 member7 outgoing/incoming follow edge, member_status, block edge를 먼저 읽는다.",
+              "limit 기본 5와 범위 1..20을 확인한다."
+            ],
+            "scenario": [
+              {
+                "start": "member7 기준 follow 관계를 directed edge로 기록한다.",
+                "action": "GET /api/members/7/mutuals, member7 인증으로 GET /api/me/follow-back 및 /api/me/suggestions?limit=5를 호출한다.",
+                "result": "mutual id는 오름차순; follow-back은 나를 follow하지만 내가 follow하지 않는 ACTIVE 회원; suggestions는 공통 팔로우 수 desc, 동률 id asc 순이다.",
+                "after": "나 자신·현재 팔로우·inactive·양방향 block candidate가 빠졌는지 비교한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "follow(follower_id,followee_id) directed edges",
+                "reason": "상호·역방향·친구의 친구 관계를 그래프로 검산한다."
+              },
+              {
+                "name": "member 7 and member_status",
+                "reason": "기준 회원과 활성 후보를 구별한다."
+              },
+              {
+                "name": "member_block 양방향 관계",
+                "reason": "차단 관계 어느 방향도 추천 후보가 되지 않는지 확인한다."
+              },
+              {
+                "name": "candidate common-path count",
+                "reason": "추천 순서와 동점 처리를 계산한다."
+              }
+            ],
+            "policies": [
+              "mutuals는 양방향 follow id, 오름차순, 인증 불필요.",
+              "follow-back은 ACTIVE inbound-only member이며 인증 필요.",
+              "suggestions는 내가 follow하는 회원들이 follow하는 후보 중 self/already-followed/block/inactive 제외; common count desc, id asc; limit 1..20 default 5.",
+              "미존재 관계는 NOT EXISTS 또는 LEFT JOIN IS NULL로 표현한다. NOT IN의 NULL 함정을 피하고 DB에서 group/sort/limit한다."
+            ],
+            "inputs": [
+              "GET /api/members/7/mutuals.",
+              "GET /api/me/follow-back with member7 token; no token case.",
+              "GET /api/me/suggestions?limit=5; limit=1/20,0/21/empty."
+            ],
+            "success": [
+              "mutual ids are ascending and both directions exist.",
+              "follow-back contains only ACTIVE inbound-only ids.",
+              "suggestions top five sorted by shared follow-path count desc then id asc."
+            ],
+            "failures": [
+              {
+                "when": "no token for /api/me/follow-back or suggestions",
+                "result": "401.",
+                "unchanged": "follow graph unchanged."
+              },
+              {
+                "when": "limit=0,21 or empty",
+                "result": "400.",
+                "unchanged": "follow graph and member status unchanged."
+              },
+              {
+                "when": "self/already-followed/inactive/blocked candidate returned",
+                "result": "result assertion fails.",
+                "unchanged": "GET request changes no rows."
+              }
+            ],
+            "examples": [
+              {
+                "title": "Mutual list",
+                "start": "members 2 and 4 follow one another",
+                "action": "GET /api/members/2/mutuals",
+                "result": "200; id 4 appears in ascending mutual ids"
+              },
+              {
+                "title": "Follow back",
+                "start": "member10→member7 exists but 7→10 absent; member11 inactive",
+                "action": "member7 GET /api/me/follow-back",
+                "result": "200 includes 10 and excludes 11"
+              },
+              {
+                "title": "Suggestion tie",
+                "start": "candidates20/21 have equal common-path count; 21 already followed",
+                "action": "GET suggestions?limit=5",
+                "result": "20 sorts before other equal-count ids; 21 excluded"
+              }
+            ],
+            "work": [
+              "follow edge direction and SQL aliases in a small graph table.",
+              "calculate candidate counts by hand and compare actual result.",
+              "run inactive/block/invalid limit/no token cases independently."
+            ],
+            "done": [
+              "Three routes' auth/order/limit contracts checked.",
+              "self/followed/inactive/bidirectionally blocked ids excluded.",
+              "SQL candidate count and returned sort match."
+            ],
+            "hints": [
+              "In the follow self-join, which edge column identifies the friend's followee candidate?",
+              "What NULL case makes NOT IN unsafe for excluding already-followed ids?",
+              "For equal recommendation counts, did you compare the candidate id tie-break direction?"
+            ]
+          },
+          "hints": [
+            "In the follow self-join, which edge column identifies the friend's followee candidate?",
+            "What NULL case makes NOT IN unsafe for excluding already-followed ids?",
+            "For equal recommendation counts, did you compare the candidate id tie-break direction?"
+          ],
+          "recipeIds": [
+            "legacy:8-3:F1",
+            "legacy:8-3:F2",
+            "legacy:8-3:F3",
+            "legacy:8-3:F4",
+            "legacy:8-3:F5",
+            "legacy:8-3:F6",
+            "legacy:8-3:F7"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:8-3 · 관계 쿼리 — 맞팔·맞팔 추천·친구의 친구",
+              "href": "/scenario/ch8-query-deep/8-3-relations.html"
+            },
+            {
+              "label": "../../docs/knowledge/R04-sql-crud-join.md",
+              "href": "/docs/knowledge/R04-sql-crud-join.html"
+            },
+            {
+              "label": "../../docs/knowledge/R05-index-btree.md",
+              "href": "/docs/knowledge/R05-index-btree.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:8-3 · 관계 쿼리 — 맞팔·맞팔 추천·친구의 친구",
+              "href": "/scenario/ch8-query-deep/8-3-relations.html"
+            },
+            {
+              "label": "../../docs/knowledge/R04-sql-crud-join.md",
+              "href": "/docs/knowledge/R04-sql-crud-join.html"
+            },
+            {
+              "label": "../../docs/knowledge/R05-index-btree.md",
+              "href": "/docs/knowledge/R05-index-btree.html"
+            },
+            {
+              "label": "../../docs/knowledge/P21-querydsl-setup.md",
+              "href": "/docs/knowledge/P21-querydsl-setup.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "조회와 성능",
+  "status": "authored"
+}

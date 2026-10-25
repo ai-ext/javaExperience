@@ -1,6 +1,6 @@
 # R04 native/JDBC 독립 리뷰
 
-reviewer p09_review가 proof의ROOT만실제repo경로로조정한임시복제 /var/folders/v7/q1cs_f5d0n7cccrbydpm88xr0000gn/T/r04-review-proof-8simmunn/source-proof 에서독립실행했다. 새privateinstance /Users/ds/research/javaexperience-r04-20261020/_data/reviewer-runtime/run-g4bc3m_v/ 에서 native41+JDBC8=49고유PASS/frozen/currentexecution전체동일.
+reviewer p09_review가 proof의ROOT만실제repo경로로조정한임시복제 /var/folders/v7/q1cs_f5d0n7cccrbydpm88xr0000gn/T/r04-review-proof-8simmunn/source-proof 에서독립실행했다. 새privateinstance LOCAL_HOME/research/javaexperience-r04-20261020/_data/reviewer-runtime/run-g4bc3m_v/ 에서 native41+JDBC8=49고유PASS/frozen/currentexecution전체동일.
 
 13fence·원문Java사본·의존성15개SHA,ROW_COUNT직전writer UPDATE/DELETE와별도observer5관측,원문JDBC setLong1/181·BigDecimal·ServerPreparedStatement·source연결2및PS/RS닫힘을확인했다. 실제datadir/socket/loopbackport/bind/자체PIDguard/mysqlxDISABLED/0700조건뒤ownmysqladminshutdown후exit0·정지. 원본proof/기존서버/학습자DB변경없음. source.json실행완료갱신확인. UI/HTTP/원문Kotlin/YAML/bash·Java25는이리뷰범위아님. Critical/Important/Minor0.
 

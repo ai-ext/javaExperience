@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "id": "tag-related-posts",
+  "title": "태그가 겹치는 관련 글 추천하기",
+  "summary": "현재 글과 공유하는 태그 수로 추천하고 같은 점수는 결정적인 순서로 정렬한다.",
+  "difficulty": "중급",
+  "group": "조회와 성능",
+  "prerequisites": [
+    "post-tags"
+  ],
+  "stages": [
+    {
+      "id": "related",
+      "title": "공유 태그 수와 동률 규칙으로 추천하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "related",
+          "title": "공유 태그 수와 동률 규칙으로 추천하기",
+          "sourceUnits": [
+            "legacy:14-6"
+          ],
+          "brief": {
+            "purpose": "현재 글과 공유하는 태그 수로 추천하고 같은 점수는 결정적인 순서로 정렬한다.",
+            "task": "같은 게시글 제외·접근 정책·공유 태그 개수 집계를 적용한다.",
+            "preconditions": [
+              "시나리오 DB(`community`) — 앱을 기본 프로파일로 띄운다.",
+              "community 태그 연결과 게시판 공개 규칙이 있는 데이터 사용."
+            ],
+            "scenario": [
+              {
+                "start": "현재 글에 태그가 붙어 있고 후보 글마다 공유하는 태그 수가 다릅니다.",
+                "action": "현재 글의 관련 글을 요청하고 태그 겹침 수·동률·공개 범위를 비교합니다.",
+                "result": "자기 글은 후보에서 빼고 볼 수 있는 후보만 원본의 공유 태그/동률 순서로 반환합니다.",
+                "after": "size 0은 400, 볼 수 없는 기준 글은 404입니다. 추천 조회는 태그 연결이나 후보 글을 수정하지 않습니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "post_tag(post_id,tag_id)",
+                "reason": "기준 글과 후보 글의 공통 tag 행 수를 재현해 추천 순서를 검증한다."
+              },
+              {
+                "name": "GET /api/posts/{id}/related?size=1",
+                "reason": "size 1 결과와 기본 페이지 결과를 비교한다."
+              }
+            ],
+            "policies": [
+              "기준 글과 태그가 1개 이상 겹치는 글만 후보로 하고 기준 글 자신은 제외합니다. 공유 태그 수 내림차순→published_at 최신→id 큰 순입니다.",
+              "size는 1~10, 기본 5이며 빈 값·숫자 아님·범위 밖은 400입니다. 기준 글 없음/접근 불가는 404, 태그 없음은 200과 items 빈 배열입니다.",
+              "삭제·초안·숨김·팔로워 공개·차단 등 2-3의 모든 접근 규칙을 후보에도 적용합니다. 기존 post_tag 기본 키와 tag 역방향 인덱스를 사용하며 새 마이그레이션은 필요하지 않습니다."
+            ],
+            "inputs": [
+              "legacy:14-6:K1: POST /api/posts; body={\"boardSlug\":\"qna\",\"title\":\"[채점] 관련 글 기준\",\"content\":\"관련 글 추천 확인용\",\"tags\":[\"관련a-{{F0.body.totalElements}}\",\"관련b-{{F0.body.totalElements}}\"]}; case=기준 글(이스프링) — 태그 a·b; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"K1\",\"expect\":{\"status\":201}}]",
+              "legacy:14-6:K2: POST /api/posts; body={\"boardSlug\":\"qna\",\"title\":\"[채점] 관련 글 둘 겹침\",\"content\":\"관련 글 추천 확인용\",\"tags\":[\"관련a-{{F0.body.totalElements}}\",\"관련b-{{F0.body.totalElements}}\"]}; case=한차단의 글 — 태그 a·b(2개 겹침); source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"K2\",\"expect\":{\"status\":201}}]",
+              "legacy:14-6:K3: POST /api/posts; body={\"boardSlug\":\"qna\",\"title\":\"[채점] 관련 글 하나 겹침\",\"content\":\"관련 글 추천 확인용\",\"tags\":[\"관련a-{{F0.body.totalElements}}\"]}; case=동시성01의 글 — 태그 a(1개 겹침); source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"K3\",\"expect\":{\"status\":201}}]",
+              "legacy:14-6:K4: GET /api/posts/{{K1.body.id}}/related; case=관련 글(비로그인); source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"K4\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.items[*].postId\",\"equals\":[\"{{K2.body.id}}\",\"{{K3.body.id}}\"]},{\"path\":\"$.items[*].sharedTags\",\"equals\":[2,1]},{\"path\":\"$.items[*].postId\",\"notContains\":\"{{K1.body.id}}\"}]},\"note\":\"겹치는 태그가 많은 글이 먼저, 기준 글 자신은 없다\"}]",
+              "legacy:14-6:K9: GET /api/posts/{{K1.body.id}}/related?size=0; case=잘못된 입력 — size=0; source expected/status checks=[{\"id\":\"C7\",\"pointer\":\"/checks/6\",\"request\":\"K9\",\"expect\":{\"status\":400},\"note\":\"size는 1~10 — 범위 밖·숫자가 아니거나 빈 값이면 400(500이 아니다)\"}]"
+            ],
+            "success": [
+              "결과 순위는 공유 태그 수 내림차순 후 원문 tie-break."
+            ],
+            "failures": [
+              {
+                "when": "GET /api/posts/8/related 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 404 — 원문 check의 실패 응답",
+                "unchanged": "조회는 post_tag 관계나 추천 대상 행을 변경하지 않는다."
+              },
+              {
+                "when": "GET /api/posts/{{K1.body.id}}/related?size=0 · [교육용 fixture · legacy:14-6:K9] 잘못된 입력 — size=0",
+                "result": "HTTP 400 (K9)",
+                "unchanged": "조회는 post_tag/추천 대상 데이터를 변경하지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "현재 글에 태그가 붙어 있고 후보 글마다 공유하는 태그 수가 다릅니다.",
+                "action": "현재 글의 관련 글을 요청하고 태그 겹침 수·동률·공개 범위를 비교합니다.",
+                "result": "size 0은 400, 볼 수 없는 기준 글은 404입니다. 추천 조회는 태그 연결이나 후보 글을 수정하지 않습니다."
+              }
+            ],
+            "work": [
+              "태그 관계 집계를 한 번의 query 흐름으로 구성하고 필터·동률을 명시한다."
+            ],
+            "done": [
+              "자기 글은 후보에서 빼고 볼 수 있는 후보만 원본의 공유 태그/동률 순서로 반환합니다.",
+              "size 0은 400, 볼 수 없는 기준 글은 404입니다. 추천 조회는 태그 연결이나 후보 글을 수정하지 않습니다.",
+              "GET /api/posts/8/related 입력이 원문 실패 check 조건에 해당 → HTTP 404 — 원문 check의 실패 응답 조회는 post_tag 관계나 추천 대상 행을 변경하지 않는다.",
+              "GET /api/posts/{{K1.body.id}}/related?size=0 · [교육용 fixture · legacy:14-6:K9] 잘못된 입력 — size=0 → HTTP 400 (K9) 조회는 post_tag/추천 대상 데이터를 변경하지 않는다."
+            ]
+          },
+          "hints": [
+            "공유 태그 수가 같은 후보를 매번 다른 순서로 반환하면 페이지 결과가 어떻게 흔들릴까요?",
+            "현재 글 자체를 추천 후보에서 제외하는 조건을 태그 집계 결과에 어떻게 적용할까요?",
+            "추천 집계가 숨김 글을 노출하지 않도록 2-3 규칙은 어느 조회에 재사용해야 할까요?"
+          ],
+          "recipeIds": [
+            "legacy:14-6:K1",
+            "legacy:14-6:K2",
+            "legacy:14-6:K3",
+            "legacy:14-6:K4",
+            "legacy:14-6:K9"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "14-6-related-posts.html",
+              "href": "/scenario/ch14-more-with-posts/14-6-related-posts.html"
+            },
+            {
+              "label": "R04-sql-crud-join.html",
+              "href": "/docs/knowledge/R04-sql-crud-join.html"
+            },
+            {
+              "label": "R05-index-btree.html",
+              "href": "/docs/knowledge/R05-index-btree.html"
+            },
+            {
+              "label": "J1-reading-explain.html",
+              "href": "/lessons/J1-reading-explain.html"
+            },
+            {
+              "label": "S10-spring-data-query.html",
+              "href": "/docs/knowledge/S10-spring-data-query.html"
+            },
+            {
+              "label": "G2-access-rules-in-one-place.html",
+              "href": "/lessons/G2-access-rules-in-one-place.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

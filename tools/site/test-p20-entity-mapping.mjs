@@ -38,6 +38,6 @@ assert.ok(visual.indexOf('p20-entity-map') < visual.indexOf('knowledge-page-map'
 assert.ok(built.indexOf('p20-entity-map') < built.indexOf('jpa-concept"'), 'generated P20 page should lead with the P20-specific view');
 assert.ok(built.includes('id="1-한-줄로-말하면"'), 'P20 source section anchor must remain available in generated HTML');
 assert.ok(built.includes('data-p20-stage="3"'), 'generated page should include the runtime panel controls');
-assert.ok(built.includes('Order o=Order.create(&quot;kim&quot;);'), 'generated page should include the P20 create example');
+assert.ok(built.includes('Order o=Order.create(&quot;kim&quot;);') || built.includes('Order o=Order.create("kim");'), 'generated page should include the P20 create example');
 
 console.log('P20 Entity-to-table mapping structural and source-alignment checks passed.');

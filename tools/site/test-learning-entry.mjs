@@ -11,8 +11,11 @@ assert.match(first, /success/);
 assert.match(first, /DB에 저장하지/);
 assert.match(stored, /201/);
 assert.match(stored, /id/);
-assert.match(home, /href="scenario\/ch0-first-steps\/0-1-ts-to-java\.html"[^>]*>0-1 첫 API 만들기/);
-assert.match(index, /href="ch0-first-steps\/0-1-ts-to-java\.html"[^>]*>0-1 첫 API 만들기/);
-assert.match(index, /data-flow-step="0" href="ch1-create-post\/1-2-dto-response\.html"/);
-assert.match(index, /1-1은 <code>success<\/code>만 응답하고 DB에 저장하지 않습니다/);
-console.log('첫 진입 0-1, 성공만 반환하는 1-1, 저장·id 반환 1-2 연결 통과');
+/* 기능 목록 진입은 새 서비스 계약을 따르고, 기존 일자 주소와 원문 사실 검사는 유지한다. */
+assert.match(home, /href="scenario\/README\.html"/);
+assert.match(home, /href="course\/spring\/D01\.html"/);
+assert.match(index, /data-sf-id="posts-create-read"/);
+assert.match(index, /scenario\/features\/posts-create-read\.html/);
+assert.match(index, /id="legacy-scenarios"/);
+assert.doesNotMatch(index, /class="journey-learning-nav|class="journey-architecture-panel/);
+console.log('기능 중심 시작과 기존 success/저장 원문·참고 진입 보존 통과');

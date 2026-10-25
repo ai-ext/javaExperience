@@ -11,7 +11,7 @@ for name,signature in [('OrderEntity','public class OrderEntity '),('OrderItemEn
     original=next(b for b in blocks if signature in b)+'\n'
     assert (OUT/'original'/f'{name}.java').read_text()==original,name
 command=[str(ROOT/'gradlew'),'-p',str(OUT/'runtime'),'--no-daemon','--console=plain','recordDependencies','runProof']
-environment=os.environ.copy();environment['JAVA_HOME']='/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home'
+environment=os.environ.copy();environment['JAVA_HOME']='LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home'
 run=subprocess.run(command,cwd=ROOT,env=environment,capture_output=True,text=True)
 (OUT/'gradle-run.txt').write_text(run.stdout+run.stderr)
 assert run.returncode==0,run.stdout+run.stderr

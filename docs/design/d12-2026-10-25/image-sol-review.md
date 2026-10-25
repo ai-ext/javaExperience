@@ -41,12 +41,12 @@ SSH rsync 명령은 이미지의 축약 표기이며 실제 -av·절대경로 ar
 
 FOCUS-DESIGN의45좌표는 design/pending 상태다. 이 보고서는 실제 UI crop·540px 확대·DOM실제argv·복사·reader·검색·overflow 검증을 완료했다고 표시하지 않는다. fullDocumentComplete=false다.
 
-전체 보고: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-sol-review.json
+전체 보고: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-sol-review.json
 
-16개 자산검증 원출력: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-sol-logs/assets-16-selected.json
+16개 자산검증 원출력: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-sol-logs/assets-16-selected.json
 
-선정manifest: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/selected-images.json
+선정manifest: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/selected-images.json
 
-생성·거절 이력: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-records.json
+생성·거절 이력: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/image-records.json
 
 이미지·구현·기존 proof·보호문서는 수정하지 않았고 커밋하지 않았다.

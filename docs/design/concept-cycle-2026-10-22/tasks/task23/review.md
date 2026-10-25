@@ -7,18 +7,18 @@
 
 ## 확정한 범위 공백
 
-- D09-S01 (important): 3.2의 신호 파이프라인 운영 경계가 보충 학습에서 일부 빠져 있다. 원문 근거와 수정/검증 조건은 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task23/review.json에 기록했다.
-- D09-S02 (important): 3.3 대시보드 운영과 반복 알림/당직 준비가 보충되지 않았다. 원문 근거와 수정/검증 조건은 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task23/review.json에 기록했다.
-- D09-S03 (minor): 전체 운영 피드백 루프·모니터링 대비·버짓 의사결정은 구성 요소 설명에 머문다. 원문 근거와 수정/검증 조건은 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task23/review.json에 기록했다.
-- D09-S04 (important): 복원 toy 이후 사본 정책·가용성 전환/다른 위치 DR·목표 시간 대조가 남아 있다. 원문 근거와 수정/검증 조건은 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task23/review.json에 기록했다.
+- D09-S01 (important): 3.2의 신호 파이프라인 운영 경계가 보충 학습에서 일부 빠져 있다. 원문 근거와 수정/검증 조건은 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task23/review.json에 기록했다.
+- D09-S02 (important): 3.3 대시보드 운영과 반복 알림/당직 준비가 보충되지 않았다. 원문 근거와 수정/검증 조건은 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task23/review.json에 기록했다.
+- D09-S03 (minor): 전체 운영 피드백 루프·모니터링 대비·버짓 의사결정은 구성 요소 설명에 머문다. 원문 근거와 수정/검증 조건은 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task23/review.json에 기록했다.
+- D09-S04 (important): 복원 toy 이후 사본 정책·가용성 전환/다른 위치 DR·목표 시간 대조가 남아 있다. 원문 근거와 수정/검증 조건은 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task23/review.json에 기록했다.
 
 ## 검증과 경계
 
-`npm --prefix tools/site run test:d09`는 새 실행 exit0. UTC/HEAD/소스SHA/stdout/stderr는 `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task23/runs/sol-20261022T001957Z/`에 보존했다. native/DB/HTTP/Java는 재실행하지 않았다.
+`npm --prefix tools/site run test:d09`는 새 실행 exit0. UTC/HEAD/소스SHA/stdout/stderr는 `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task23/runs/sol-20261022T001957Z/`에 보존했다. native/DB/HTTP/Java는 재실행하지 않았다.
 
 기존 rawHTTP108/query99 가운데 업무4건과 실제 사건4개가 일치한다. outcome1/2/1, 유효3·업무성공1·유효HTTP2002, up1→0→1·선택counter6개0, 같은 Prom/TSDB 유지, SQLite source2/snapshot1/restored1과 integrity/close, 지정 산술 allowed10/remaining-10/burn2를 대조했다. raw runtime과 저장본8파일은 byte 동일하다. 지정10000건/벡터는 측정 traffic/latency가 아니고 원문 Java25·Actuator·Grafana 미실행 경계도 유지한다.
 
-선정 business-v2/backup-v2/original-v4 3장과 과거 desktop-business/mobile-counters/mobile-original 3장을 view_image로 직접 열람했다. JPEG 실제 크기·SHA는 /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task23/evidence-crosscheck.json에 기록했다. 14선정/28캡처 전체 pixel 검수 주장은 하지 않는다. 메인의 현재 browser-desktop/mobile/special 기록도 읽었으며 reviewer 자신의 브라우저 실행과 구분한다.
+선정 business-v2/backup-v2/original-v4 3장과 과거 desktop-business/mobile-counters/mobile-original 3장을 view_image로 직접 열람했다. JPEG 실제 크기·SHA는 LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task23/evidence-crosscheck.json에 기록했다. 14선정/28캡처 전체 pixel 검수 주장은 하지 않는다. 메인의 현재 browser-desktop/mobile/special 기록도 읽었으며 reviewer 자신의 브라우저 실행과 구분한다.
 
 ## 의미 단위 전수표
 

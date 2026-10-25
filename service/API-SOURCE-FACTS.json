@@ -1,0 +1,3121 @@
+{
+  "metadata": {
+    "title": "Current board-server API contract and browser request-client consolidation research",
+    "targetRoot": ".",
+    "createdDate": "2026-10-25",
+    "method": "local read-only source inspection; no web research, no product/backend/test modifications",
+    "counts": {
+      "specV2EndpointRows": 30,
+      "boardServerControllerRoutes": 29,
+      "actuatorEndpointRows": 1,
+      "totalCurrentEndpointRows": 30,
+      "courseApiRecipes": 8,
+      "notInCourseApiRecipes": 22
+    }
+  },
+  "currentEndpointSourceOfTruth": "board-server Controller/DTO/validation plus course/spec-v2.md; legacy scenario flows are stored separately and must not override current contracts.",
+  "endpoints": [
+    {
+      "id": "health",
+      "method": "GET",
+      "path": "/actuator/health",
+      "phase": "D01",
+      "auth": "공개",
+      "request": {
+        "headers": [],
+        "fields": []
+      },
+      "success": {
+        "status": 200,
+        "body": "Actuator health JSON {status:\"UP\"} (운영 상태에 따라 component 포함)"
+      },
+      "seedPreparation": "DB row 불필요. Actuator health는 board-server controller route 아님.",
+      "specificErrors": [],
+      "sourceRefs": [
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            63,
+            63
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/config/SecurityConfig.java",
+          "lines": [
+            40,
+            45
+          ]
+        },
+        {
+          "path": "board-server/src/main/resources/application.yml",
+          "lines": [
+            1,
+            10
+          ]
+        }
+      ]
+    },
+    {
+      "id": "signup",
+      "method": "POST",
+      "path": "/api/auth/signup",
+      "phase": "D03",
+      "auth": "공개",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "email",
+            "in": "json",
+            "type": "string",
+            "required": true,
+            "constraint": "email, max 100"
+          },
+          {
+            "name": "password",
+            "in": "json",
+            "type": "string",
+            "required": true,
+            "constraint": "8-64 chars, at least one ASCII letter and digit"
+          },
+          {
+            "name": "nickname",
+            "in": "json",
+            "type": "string",
+            "required": true,
+            "constraint": "2-20 Korean/English/digit chars"
+          }
+        ]
+      },
+      "success": {
+        "status": 201,
+        "body": "SignupResponse {id}"
+      },
+      "seedPreparation": "회원 row 생성 endpoint 자체로 준비 가능. 기존 member 필요 없음. 중복 이메일/닉네임이면 conflict.",
+      "specificErrors": [
+        {
+          "status": 409,
+          "type": "/errors/duplicate",
+          "condition": "email or nickname already exists"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/member/AuthController.java",
+          "lines": [
+            22,
+            25
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/member/SignupRequest.java",
+          "lines": [
+            8,
+            13
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/member/SignupResponse.java",
+          "lines": [
+            3,
+            3
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            64,
+            64
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            102,
+            105
+          ]
+        }
+      ]
+    },
+    {
+      "id": "login",
+      "method": "POST",
+      "path": "/api/auth/login",
+      "phase": "D03",
+      "auth": "공개",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "email",
+            "in": "json",
+            "type": "string",
+            "required": true,
+            "constraint": "nonblank email"
+          },
+          {
+            "name": "password",
+            "in": "json",
+            "type": "string",
+            "required": true,
+            "constraint": "nonblank"
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "TokenResponse {accessToken, tokenType, expiresIn}"
+      },
+      "seedPreparation": "가입된 member row와 저장된 password hash 필요. 비밀번호 값은 자료에 저장하지 않음.",
+      "specificErrors": [
+        {
+          "status": 401,
+          "type": "/errors/unauthorized",
+          "condition": "credential mismatch; response does not reveal which credential failed"
+        },
+        {
+          "status": 429,
+          "type": "/errors/too-many-attempts",
+          "condition": "more than 5 attempts per account per 10 min"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/member/AuthController.java",
+          "lines": [
+            28,
+            30
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/member/LoginRequest.java",
+          "lines": [
+            6,
+            6
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/member/TokenResponse.java",
+          "lines": [
+            3,
+            3
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            65,
+            65
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            106,
+            109
+          ]
+        }
+      ]
+    },
+    {
+      "id": "member-me",
+      "method": "GET",
+      "path": "/api/members/me",
+      "phase": "D03",
+      "auth": "USER",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "type": "Bearer JWT",
+            "required": true
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "MemberResponse {id,email,nickname,role,createdAt}; passwordHash 제외"
+      },
+      "seedPreparation": "유효한 로그인 member/JWT 필요. signup→login으로 준비 가능.",
+      "specificErrors": [
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "authenticated member row missing"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/member/MemberController.java",
+          "lines": [
+            21,
+            26
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/member/MemberResponse.java",
+          "lines": [
+            6,
+            15
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            66,
+            66
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            111,
+            111
+          ]
+        }
+      ]
+    },
+    {
+      "id": "post-create",
+      "method": "POST",
+      "path": "/api/posts",
+      "phase": "D04",
+      "auth": "USER",
+      "request": {
+        "headers": [
+          "Authorization: Bearer <JWT>"
+        ],
+        "fields": [
+          {
+            "name": "title",
+            "in": "json",
+            "type": "string",
+            "required": true,
+            "constraint": "nonblank, max 100"
+          },
+          {
+            "name": "content",
+            "in": "json",
+            "type": "string",
+            "required": true,
+            "constraint": "not null, 1-5000 chars"
+          },
+          {
+            "name": "tags",
+            "in": "json",
+            "type": "string[]",
+            "required": false,
+            "constraint": "max 5; each nonblank, max 20"
+          }
+        ]
+      },
+      "success": {
+        "status": 201,
+        "body": "empty body; Location: /api/posts/{postId}"
+      },
+      "seedPreparation": "유효한 JWT member 필요. 요청만으로 post row 생성. 태그 생략은 빈 관계, 기존 태그 또는 새 태그 관계는 DB 상태에 의존.",
+      "specificErrors": [
+        {
+          "status": 401,
+          "condition": "unauthenticated"
+        },
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "title/content/tags invalid"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostController.java",
+          "lines": [
+            38,
+            43
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostCreateRequest.java",
+          "lines": [
+            9,
+            14
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostServiceImpl.java",
+          "lines": [
+            38,
+            52
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            67,
+            67
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            117,
+            119
+          ]
+        }
+      ]
+    },
+    {
+      "id": "post-detail",
+      "method": "GET",
+      "path": "/api/posts/{postId}",
+      "phase": "D05",
+      "auth": "공개",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "postId",
+            "in": "path",
+            "type": "long",
+            "required": true,
+            "constraint": "positive"
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "PostDetailResponse {id,authorId,authorNickname,title,content,tags[],likeCount,createdAt,updatedAt}"
+      },
+      "seedPreparation": "대상 post row; 비어 있지 않은 tags를 보일 때 tag/post_tag 연결. 현재 board-server 상세는 response에 viewCount가 없으며 scenario/spec 설명과 일치 여부는 별도 해석하지 말고 DTO 우선.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "non-positive or nonnumeric path id"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "no ACTIVE post"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostController.java",
+          "lines": [
+            56,
+            59
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostDetailResponse.java",
+          "lines": [
+            7,
+            18
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            68,
+            68
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            122,
+            123
+          ]
+        }
+      ]
+    },
+    {
+      "id": "post-replace",
+      "method": "PUT",
+      "path": "/api/posts/{postId}",
+      "phase": "D05",
+      "auth": "USER(작성자)",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "title",
+            "in": "json",
+            "type": "string",
+            "required": true,
+            "constraint": "nonblank, max 100"
+          },
+          {
+            "name": "content",
+            "in": "json",
+            "type": "string",
+            "required": true,
+            "constraint": "not null, 1-5000 chars"
+          },
+          {
+            "name": "tags",
+            "in": "json",
+            "type": "string[]",
+            "required": false,
+            "constraint": "max 5; each nonblank, max 20"
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "PostDetailResponse {id,authorId,authorNickname,title,content,tags[],likeCount,createdAt,updatedAt}"
+      },
+      "seedPreparation": "기존 ACTIVE post row와 작성자 JWT 필요. tags 생략/empty semantics는 PostServiceImpl 및 source 기준을 따른다.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "invalid body or id"
+        },
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 403,
+          "type": "/errors/forbidden",
+          "condition": "not owner"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "missing/inactive post"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostController.java",
+          "lines": [
+            61,
+            65
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostUpdateRequest.java",
+          "lines": [
+            9,
+            14
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostServiceImpl.java",
+          "lines": [
+            54,
+            75
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostDetailResponse.java",
+          "lines": [
+            7,
+            18
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            69,
+            69
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            117,
+            119
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            124,
+            124
+          ]
+        }
+      ]
+    },
+    {
+      "id": "post-patch",
+      "method": "PATCH",
+      "path": "/api/posts/{postId}",
+      "phase": "D05",
+      "auth": "USER(작성자)",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "title",
+            "in": "json",
+            "type": "string",
+            "required": false,
+            "constraint": "if non-null, nonblank, max 100"
+          },
+          {
+            "name": "content",
+            "in": "json",
+            "type": "string",
+            "required": false,
+            "constraint": "if non-null, 1-5000 chars"
+          },
+          {
+            "name": "tags",
+            "in": "json",
+            "type": "string[]",
+            "required": false,
+            "constraint": "if non-null, max 5; each nonblank, max 20; at least one non-null field"
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "PostDetailResponse {id,authorId,authorNickname,title,content,tags[],likeCount,createdAt,updatedAt}"
+      },
+      "seedPreparation": "기존 ACTIVE post row와 작성자 JWT 필요. 선택적으로 태그 관계 row 필요.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "all fields missing/null or field invalid"
+        },
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 403,
+          "type": "/errors/forbidden",
+          "condition": "not owner"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "missing/inactive post"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostController.java",
+          "lines": [
+            67,
+            71
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostPatchRequest.java",
+          "lines": [
+            10,
+            20
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostServiceImpl.java",
+          "lines": [
+            77,
+            92
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostDetailResponse.java",
+          "lines": [
+            7,
+            18
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            70,
+            70
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            120,
+            120
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            124,
+            124
+          ]
+        }
+      ]
+    },
+    {
+      "id": "post-delete",
+      "method": "DELETE",
+      "path": "/api/posts/{postId}",
+      "phase": "D05",
+      "auth": "USER(작성자)",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "postId",
+            "in": "path",
+            "type": "long",
+            "required": true,
+            "constraint": "positive"
+          }
+        ]
+      },
+      "success": {
+        "status": 204,
+        "body": "empty body"
+      },
+      "seedPreparation": "기존 ACTIVE post row와 작성자 JWT 필요. 현재 schema는 status 기반 논리 삭제; 테스트 전 tag/like/comment 연결을 둘 필요는 없음.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "invalid id"
+        },
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 403,
+          "type": "/errors/forbidden",
+          "condition": "not owner"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "missing/inactive post"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostController.java",
+          "lines": [
+            73,
+            77
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostServiceImpl.java",
+          "lines": [
+            93,
+            103
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            71,
+            71
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            122,
+            124
+          ]
+        }
+      ]
+    },
+    {
+      "id": "comment-create",
+      "method": "POST",
+      "path": "/api/posts/{postId}/comments",
+      "phase": "D05",
+      "auth": "USER",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "postId",
+            "in": "path",
+            "type": "long",
+            "required": true,
+            "constraint": "positive"
+          },
+          {
+            "name": "content",
+            "in": "json",
+            "type": "string",
+            "required": true,
+            "constraint": "nonblank, max 500"
+          }
+        ]
+      },
+      "success": {
+        "status": 201,
+        "body": "CommentResponse {id,authorId,authorNickname,content,createdAt}; Location /api/comments/{id}"
+      },
+      "seedPreparation": "대상 post(보이는/활성) row 및 USER member 필요. 생성 요청으로 comment row를 만든다.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "invalid id/content"
+        },
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "missing/non-visible post"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/comment/CommentController.java",
+          "lines": [
+            31,
+            36
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/comment/CommentRequest.java",
+          "lines": [
+            6,
+            6
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/comment/CommentResponse.java",
+          "lines": [
+            7,
+            15
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            72,
+            72
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            121,
+            123
+          ]
+        }
+      ]
+    },
+    {
+      "id": "comment-list",
+      "method": "GET",
+      "path": "/api/posts/{postId}/comments",
+      "phase": "D05",
+      "auth": "공개",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "postId",
+            "in": "path",
+            "type": "long",
+            "required": true,
+            "constraint": "positive"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "type": "string",
+            "required": false,
+            "constraint": "opaque server cursor"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "type": "int",
+            "required": false,
+            "constraint": "1-50, default 20"
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "CommentPage {items: CommentResponse[], nextCursor}"
+      },
+      "seedPreparation": "대상 post row 필요; 비어 있지 않은 page 재현에는 comment row 추가 필요.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "invalid postId/cursor/size"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "post unavailable"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/comment/CommentController.java",
+          "lines": [
+            38,
+            42
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/comment/CommentPage.java",
+          "lines": [
+            5,
+            5
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/comment/CommentResponse.java",
+          "lines": [
+            7,
+            15
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            73,
+            73
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            140,
+            140
+          ]
+        }
+      ]
+    },
+    {
+      "id": "comment-delete",
+      "method": "DELETE",
+      "path": "/api/comments/{commentId}",
+      "phase": "D05",
+      "auth": "USER(작성자) 또는 ADMIN",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "commentId",
+            "in": "path",
+            "type": "long",
+            "required": true,
+            "constraint": "positive"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "type": "Bearer JWT",
+            "required": true
+          }
+        ]
+      },
+      "success": {
+        "status": 204,
+        "body": "empty body"
+      },
+      "seedPreparation": "기존 comment와 연결 post/member row 필요. 작성자 JWT 또는 ADMIN JWT.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "invalid id"
+        },
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 403,
+          "type": "/errors/forbidden",
+          "condition": "neither comment author nor admin"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "missing comment"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/comment/CommentController.java",
+          "lines": [
+            44,
+            49
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            74,
+            74
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            122,
+            124
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/config/SecurityConfig.java",
+          "lines": [
+            40,
+            48
+          ]
+        }
+      ]
+    },
+    {
+      "id": "like-put",
+      "method": "PUT",
+      "path": "/api/posts/{postId}/like",
+      "phase": "D05",
+      "auth": "USER",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "postId",
+            "in": "path",
+            "type": "long",
+            "required": true,
+            "constraint": "positive"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "type": "Bearer JWT",
+            "required": true
+          }
+        ]
+      },
+      "success": {
+        "status": 204,
+        "body": "empty body"
+      },
+      "seedPreparation": "기존 활성 post와 member 필요. like row 없어야 신규 관계를 보일 수 있고, 기존 row면 멱등 상태 유지.",
+      "specificErrors": [
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "post unavailable"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostLikeController.java",
+          "lines": [
+            23,
+            27
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostLikeService.java",
+          "lines": [
+            1,
+            55
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            75,
+            75
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            126,
+            126
+          ]
+        }
+      ]
+    },
+    {
+      "id": "like-delete",
+      "method": "DELETE",
+      "path": "/api/posts/{postId}/like",
+      "phase": "D05",
+      "auth": "USER",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "postId",
+            "in": "path",
+            "type": "long",
+            "required": true,
+            "constraint": "positive"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "type": "Bearer JWT",
+            "required": true
+          }
+        ]
+      },
+      "success": {
+        "status": 204,
+        "body": "empty body"
+      },
+      "seedPreparation": "기존 활성 post와 member 필요. 내 like row가 있어야 삭제 변화가 보이고 다른 회원 관계 보존 확인에는 다른 member row 필요.",
+      "specificErrors": [
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "post unavailable"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostLikeController.java",
+          "lines": [
+            29,
+            33
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostLikeService.java",
+          "lines": [
+            1,
+            55
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            76,
+            76
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            126,
+            126
+          ]
+        }
+      ]
+    },
+    {
+      "id": "post-list",
+      "method": "GET",
+      "path": "/api/posts",
+      "phase": "D06",
+      "auth": "공개",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "type": "string",
+            "required": false,
+            "constraint": "opaque Base64URL id cursor"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "type": "int",
+            "required": false,
+            "constraint": "1-50, default 20"
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "type": "string",
+            "required": false,
+            "constraint": "2-50 chars"
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "type": "string",
+            "required": false,
+            "constraint": "1-20 chars"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "type": "string",
+            "required": false,
+            "constraint": "latest only/default"
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "CursorPage<PostSummary> {items,nextCursor}; summary fields id,authorId,authorNickname,title,tags,likeCount,createdAt"
+      },
+      "seedPreparation": "빈 목록도 호출 가능. 비어 있지 않은 결과/검색/커서 테스트에는 ACTIVE post, tag/post_tag row 준비.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "invalid query or cursor"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostController.java",
+          "lines": [
+            45,
+            48
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostListRequest.java",
+          "lines": [
+            8,
+            24
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostSummary.java",
+          "lines": [
+            10,
+            28
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/common/CursorPage.java",
+          "lines": [
+            7,
+            29
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            77,
+            77
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            130,
+            140
+          ]
+        }
+      ]
+    },
+    {
+      "id": "post-popular",
+      "method": "GET",
+      "path": "/api/posts/popular",
+      "phase": "D09",
+      "auth": "공개",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "type": "string",
+            "required": false,
+            "constraint": "opaque cursor"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "type": "int",
+            "required": false,
+            "constraint": "1-50, default 20"
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "CursorPage<PopularPost> {items,nextCursor}; PopularPost fields id,authorId,authorNickname,title,tags,likeCount,createdAt"
+      },
+      "seedPreparation": "실제 게시글/좋아요 기반 비어 있지 않은 결과에는 ACTIVE post 및 like_count/캐시 정책에 맞는 row 필요. 빈 캐시 fallback/세부 계산은 service 소스 참조.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "invalid cursor/size"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PostController.java",
+          "lines": [
+            50,
+            54
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PopularPostRequest.java",
+          "lines": [
+            6,
+            14
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/post/PopularPost.java",
+          "lines": [
+            6,
+            14
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            86,
+            86
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            140,
+            140
+          ]
+        }
+      ]
+    },
+    {
+      "id": "points-balance",
+      "method": "GET",
+      "path": "/api/me/points",
+      "phase": "D07",
+      "auth": "USER",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "type": "Bearer JWT",
+            "required": true
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "PointBalanceResponse {balance}"
+      },
+      "seedPreparation": "member row 및 JWT 필요. point_balance=0이면 초기 잔액 조회 가능.",
+      "specificErrors": [
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/point/PointController.java",
+          "lines": [
+            23,
+            26
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/point/PointBalanceResponse.java",
+          "lines": [
+            3,
+            3
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            78,
+            78
+          ]
+        }
+      ]
+    },
+    {
+      "id": "points-history",
+      "method": "GET",
+      "path": "/api/me/points/history",
+      "phase": "D07",
+      "auth": "USER",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "type": "string",
+            "required": false,
+            "constraint": "opaque cursor"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "type": "int",
+            "required": false,
+            "constraint": "1-50, default 20"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "type": "Bearer JWT",
+            "required": true
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "CursorPage<PointHistoryItem> {items,nextCursor}; item: id,type,amount,balanceAfter,refType,refId,createdAt"
+      },
+      "seedPreparation": "member row/JWT 필요. 비어 있지 않은 history에는 point_ledger row.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "bad cursor/size"
+        },
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/point/PointController.java",
+          "lines": [
+            28,
+            32
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/point/PointHistoryRequest.java",
+          "lines": [
+            6,
+            14
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/point/PointHistoryItem.java",
+          "lines": [
+            9,
+            26
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/common/CursorPage.java",
+          "lines": [
+            7,
+            29
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            79,
+            79
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            140,
+            140
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coupon-issue",
+      "method": "POST",
+      "path": "/api/coupons/{couponId}/issue",
+      "phase": "D07",
+      "auth": "USER",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "couponId",
+            "in": "path",
+            "type": "long",
+            "required": true,
+            "constraint": "positive"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "type": "Bearer JWT",
+            "required": true
+          }
+        ]
+      },
+      "success": {
+        "status": 201,
+        "body": "JSON {memberCouponId}"
+      },
+      "seedPreparation": "member row/JWT 및 coupon row 필요. data-local profile은 coupon id=1 seed. 1인1매 재호출에서는 member_coupon이 기존 상태.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "invalid couponId"
+        },
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "coupon missing"
+        },
+        {
+          "status": 409,
+          "type": "/errors/duplicate or /errors/coupon-exhausted",
+          "condition": "already issued or exhausted"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/coupon/CouponController.java",
+          "lines": [
+            26,
+            31
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            80,
+            80
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            146,
+            147
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coupon-list",
+      "method": "GET",
+      "path": "/api/me/coupons",
+      "phase": "D07",
+      "auth": "USER",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "type": "Bearer JWT",
+            "required": true
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "MemberCouponResponse[] {id,couponId,name,status,expiresAt,usedAt}"
+      },
+      "seedPreparation": "member row/JWT 필요. 비어 있지 않은 목록에는 coupon와 해당 member_coupon row.",
+      "specificErrors": [
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/coupon/CouponController.java",
+          "lines": [
+            33,
+            36
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/coupon/MemberCouponResponse.java",
+          "lines": [
+            6,
+            16
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            81,
+            81
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shop-items",
+      "method": "GET",
+      "path": "/api/shop/items",
+      "phase": "D07",
+      "auth": "공개",
+      "request": {
+        "headers": [],
+        "fields": []
+      },
+      "success": {
+        "status": 200,
+        "body": "ShopItemResponse[] {id,name,price,stock}"
+      },
+      "seedPreparation": "row 불필요. local profile data-local.sql seeds shop_item id 1-3.",
+      "specificErrors": [],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/shop/ShopController.java",
+          "lines": [
+            31,
+            34
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/shop/ShopItemResponse.java",
+          "lines": [
+            3,
+            8
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            82,
+            82
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shop-order",
+      "method": "POST",
+      "path": "/api/shop/orders",
+      "phase": "D07",
+      "auth": "USER",
+      "request": {
+        "headers": [
+          "Idempotency-Key"
+        ],
+        "fields": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "type": "string",
+            "required": true,
+            "constraint": "8-64 chars [A-Za-z0-9-]"
+          },
+          {
+            "name": "itemId",
+            "in": "json",
+            "type": "long",
+            "required": true,
+            "constraint": "positive"
+          },
+          {
+            "name": "quantity",
+            "in": "json",
+            "type": "int",
+            "required": true,
+            "constraint": "1-10"
+          },
+          {
+            "name": "memberCouponId",
+            "in": "json",
+            "type": "long|null",
+            "required": false,
+            "constraint": "positive; own, unused, unexpired coupon"
+          }
+        ]
+      },
+      "success": {
+        "status": 201,
+        "body": "OrderResponse {orderId,itemId,quantity,paidAmount,memberCouponId}"
+      },
+      "seedPreparation": "member JWT/row, shop_item with sufficient stock, enough points; optional member_coupon row must belong to member, be usable. Idempotency key is per member.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "missing/bad key or invalid fields"
+        },
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "item/coupon target absent"
+        },
+        {
+          "status": 409,
+          "type": "/errors/coupon-unusable, /errors/insufficient-points, /errors/out-of-stock",
+          "condition": "purchase precondition failure"
+        },
+        {
+          "status": 422,
+          "type": "/errors/idempotency-mismatch",
+          "condition": "same key reused with different request body"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/shop/ShopController.java",
+          "lines": [
+            36,
+            41
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/shop/OrderRequest.java",
+          "lines": [
+            8,
+            12
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/shop/OrderResponse.java",
+          "lines": [
+            3,
+            8
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            83,
+            83
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            59,
+            59
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            148,
+            157
+          ]
+        }
+      ]
+    },
+    {
+      "id": "points-charge",
+      "method": "POST",
+      "path": "/api/me/points/charges",
+      "phase": "D08",
+      "auth": "USER",
+      "request": {
+        "headers": [
+          "Idempotency-Key"
+        ],
+        "fields": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "type": "string",
+            "required": true,
+            "constraint": "8-64 chars [A-Za-z0-9-]"
+          },
+          {
+            "name": "amount",
+            "in": "json",
+            "type": "int",
+            "required": true,
+            "constraint": "1000-1000000 inclusive, multiple of 1000"
+          }
+        ]
+      },
+      "success": {
+        "status": "201 if DONE; 202 if PENDING",
+        "body": "ChargeResponse {orderId,amount,status,balance}"
+      },
+      "seedPreparation": "member row/JWT, PG client configuration/service availability and idempotency key. Do not assume external PG state or seed a real charge.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "missing/bad key or amount"
+        },
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 502,
+          "type": "/errors/pg-declined",
+          "condition": "PG decline/unreachable per spec"
+        },
+        {
+          "status": 504,
+          "type": "/errors/pg-timeout",
+          "condition": "ambiguous timeout"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/payment/ChargeController.java",
+          "lines": [
+            25,
+            33
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/payment/ChargeRequest.java",
+          "lines": [
+            9,
+            9
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/payment/ChargeResponse.java",
+          "lines": [
+            3,
+            3
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            84,
+            84
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            163,
+            167
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            176,
+            178
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pg-callback",
+      "method": "POST",
+      "path": "/api/pg/callbacks",
+      "phase": "D08",
+      "auth": "공개 URL, HMAC signature required",
+      "request": {
+        "headers": [
+          "X-PG-Signature"
+        ],
+        "fields": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "type": "application/json",
+            "required": true
+          },
+          {
+            "name": "X-PG-Signature",
+            "in": "header",
+            "type": "lowercase hex HMAC-SHA256 of exact raw body bytes",
+            "required": true
+          },
+          {
+            "name": "orderId",
+            "in": "json",
+            "type": "string",
+            "required": true,
+            "constraint": "matches stored charge orderId"
+          },
+          {
+            "name": "paymentKey",
+            "in": "json",
+            "type": "string",
+            "required": true,
+            "constraint": "nonblank, max 64"
+          },
+          {
+            "name": "status",
+            "in": "json",
+            "type": "string",
+            "required": true,
+            "constraint": "DONE or FAILED"
+          },
+          {
+            "name": "amount",
+            "in": "json",
+            "type": "int",
+            "required": true,
+            "constraint": "positive and matches stored charge"
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "empty body"
+      },
+      "seedPreparation": "matching pending pg_payment row and secret signing config are required. Callback is not a browser CRUD recipe; exact raw body must be signed. No real PG credentials should enter fixture.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "invalid JSON/fields"
+        },
+        {
+          "status": 401,
+          "type": "/errors/invalid-signature",
+          "condition": "signature invalid"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "order id unknown"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/payment/PgCallbackController.java",
+          "lines": [
+            22,
+            48
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/payment/PgCallbackRequest.java",
+          "lines": [
+            9,
+            14
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            85,
+            85
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            168,
+            174
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            298,
+            300
+          ]
+        }
+      ]
+    },
+    {
+      "id": "activity-ranking",
+      "method": "GET",
+      "path": "/api/rankings/activity",
+      "phase": "D09",
+      "auth": "공개",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "type": "string",
+            "required": false,
+            "constraint": "opaque cursor"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "type": "int",
+            "required": false,
+            "constraint": "1-50, default 20"
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "CursorPage<ActivityRank> {items,nextCursor}; ActivityRank {rank,memberId,nickname,score}"
+      },
+      "seedPreparation": "빈 결과도 가능. nonempty ranking requires activity score rows/state (service may use Redis); exact Redis seed source must be read before fixture automation.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "invalid cursor/size"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/point/RankingController.java",
+          "lines": [
+            19,
+            22
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/point/RankingRequest.java",
+          "lines": [
+            6,
+            14
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/point/ActivityRank.java",
+          "lines": [
+            3,
+            5
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            87,
+            87
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            140,
+            140
+          ]
+        }
+      ]
+    },
+    {
+      "id": "post-report",
+      "method": "POST",
+      "path": "/api/posts/{postId}/reports",
+      "phase": "D10",
+      "auth": "USER",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "postId",
+            "in": "path",
+            "type": "long",
+            "required": true,
+            "constraint": "positive"
+          },
+          {
+            "name": "reason",
+            "in": "json",
+            "type": "string",
+            "required": true,
+            "constraint": "SPAM|ABUSE|ETC"
+          },
+          {
+            "name": "detail",
+            "in": "json",
+            "type": "string|null",
+            "required": false,
+            "constraint": "max 300"
+          }
+        ]
+      },
+      "success": {
+        "status": 201,
+        "body": "JSON {reportId}"
+      },
+      "seedPreparation": "member JWT/row and target post row. Duplicate report for same member/post conflicts.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "bad path/body"
+        },
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "post unavailable"
+        },
+        {
+          "status": 409,
+          "type": "/errors/duplicate",
+          "condition": "same member reports same post twice"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/ReportController.java",
+          "lines": [
+            28,
+            33
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/ReportRequest.java",
+          "lines": [
+            7,
+            13
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            88,
+            88
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            184,
+            186
+          ]
+        }
+      ]
+    },
+    {
+      "id": "admin-reports",
+      "method": "GET",
+      "path": "/api/admin/reports",
+      "phase": "D10",
+      "auth": "ADMIN",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "status",
+            "in": "query",
+            "type": "string",
+            "required": false,
+            "constraint": "OPEN|RESOLVED, default OPEN"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "type": "string",
+            "required": false,
+            "constraint": "opaque cursor"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "type": "int",
+            "required": false,
+            "constraint": "1-50, default 20"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "type": "Bearer ADMIN JWT",
+            "required": true
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "CursorPage<ReportResponse> {items,nextCursor}; report item {id,postId,postTitle,reporterId,reporterNickname,reason,detail,status,createdAt}"
+      },
+      "seedPreparation": "ADMIN JWT/member row and at least one report row for nonempty list.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "invalid status/cursor/size"
+        },
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 403,
+          "type": "/errors/forbidden",
+          "condition": "role is not ADMIN"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/AdminController.java",
+          "lines": [
+            31,
+            34
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/ReportListRequest.java",
+          "lines": [
+            7,
+            22
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/ReportResponse.java",
+          "lines": [
+            6,
+            16
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            89,
+            89
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            187,
+            188
+          ]
+        }
+      ]
+    },
+    {
+      "id": "admin-hide",
+      "method": "POST",
+      "path": "/api/admin/posts/{postId}/hide",
+      "phase": "D10",
+      "auth": "ADMIN",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "postId",
+            "in": "path",
+            "type": "long",
+            "required": true,
+            "constraint": "positive"
+          },
+          {
+            "name": "reportId",
+            "in": "json",
+            "type": "long|null",
+            "required": false,
+            "constraint": "positive; body itself may be omitted"
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "HidePostResponse {postId,status,reportId}"
+      },
+      "seedPreparation": "ADMIN JWT/member row and active target post; optional reportId requires matching report row if used.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "invalid id/reportId"
+        },
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 403,
+          "type": "/errors/forbidden",
+          "condition": "not ADMIN"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "post or linked report missing"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/AdminController.java",
+          "lines": [
+            36,
+            40
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/HidePostRequest.java",
+          "lines": [
+            5,
+            7
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/HidePostResponse.java",
+          "lines": [
+            5,
+            10
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            90,
+            90
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            189,
+            189
+          ]
+        }
+      ]
+    },
+    {
+      "id": "admin-bulk-coupon",
+      "method": "POST",
+      "path": "/api/admin/coupons/{couponId}/bulk-issue",
+      "phase": "D10",
+      "auth": "ADMIN",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "couponId",
+            "in": "path",
+            "type": "long",
+            "required": true,
+            "constraint": "positive"
+          },
+          {
+            "name": "file",
+            "in": "multipart/form-data",
+            "type": "xlsx file",
+            "required": true,
+            "constraint": ".xlsx, max 5MiB, max 1000 rows, first column memberId"
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "BulkIssueResponse {issued, skipped:[{row,value,reason}]}"
+      },
+      "seedPreparation": "ADMIN JWT, coupon row, XLSX rows referring to existing member rows. The no-mount request client has no multipart file upload control.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "invalid extension/format/size/row count"
+        },
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 403,
+          "type": "/errors/forbidden",
+          "condition": "not ADMIN"
+        },
+        {
+          "status": 404,
+          "type": "/errors/not-found",
+          "condition": "coupon missing"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/AdminController.java",
+          "lines": [
+            47,
+            50
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/BulkIssueResponse.java",
+          "lines": [
+            5,
+            10
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/Skipped.java",
+          "lines": [
+            7,
+            7
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/CouponBulkIssueService.java",
+          "lines": [
+            41,
+            49
+          ]
+        },
+        {
+          "path": "board-server/src/main/resources/application.yml",
+          "lines": [
+            17,
+            23
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            91,
+            91
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            190,
+            191
+          ]
+        }
+      ]
+    },
+    {
+      "id": "admin-audit-logs",
+      "method": "GET",
+      "path": "/api/admin/audit-logs",
+      "phase": "D10",
+      "auth": "ADMIN",
+      "request": {
+        "headers": [],
+        "fields": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "type": "string",
+            "required": false,
+            "constraint": "opaque cursor"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "type": "int",
+            "required": false,
+            "constraint": "1-50, default 20"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "type": "Bearer ADMIN JWT",
+            "required": true
+          }
+        ]
+      },
+      "success": {
+        "status": 200,
+        "body": "CursorPage<AuditLogResponse> {items,nextCursor}; item {id,actorId,action,targetType,targetId,detail,createdAt}"
+      },
+      "seedPreparation": "ADMIN JWT/member row. Nonempty response requires audit_log row; successful admin mutation can produce rows.",
+      "specificErrors": [
+        {
+          "status": 400,
+          "type": "/errors/validation",
+          "condition": "invalid cursor/size"
+        },
+        {
+          "status": 401,
+          "condition": "missing/invalid token"
+        },
+        {
+          "status": 403,
+          "type": "/errors/forbidden",
+          "condition": "not ADMIN"
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/AdminController.java",
+          "lines": [
+            42,
+            45
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/AuditLogListRequest.java",
+          "lines": [
+            6,
+            14
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/admin/AuditLogResponse.java",
+          "lines": [
+            6,
+            14
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            92,
+            92
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            140,
+            140
+          ]
+        }
+      ]
+    }
+  ],
+  "commonHttpBehavior": {
+    "responseErrorShape": "ProblemDetail: type,title,status,detail,instance; validation adds errors:[{field,reason}].",
+    "validationStatus": 400,
+    "cursor": {
+      "params": [
+        "cursor",
+        "size"
+      ],
+      "defaultSize": 20,
+      "sizeRange": [
+        1,
+        50
+      ],
+      "response": [
+        "items",
+        "nextCursor"
+      ],
+      "lastCursor": null,
+      "encoding": "opaque Base64URL encoding of last numeric id; malformed cursor -> validation error"
+    },
+    "auth": "JWT Authorization: Bearer <token>; stateless; roles USER/ADMIN. Secure routes do not read a user ID from request bodies.",
+    "cors": {
+      "allowedOrigins": [
+        "http://localhost:3000",
+        "http://127.0.0.1:8765"
+      ],
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "OPTIONS"
+      ],
+      "allowedHeaders": [
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key"
+      ],
+      "maxAgeSeconds": 3600,
+      "exposedHeaders": [],
+      "consequence": "CorsConfig does not expose Location; browser JS on a different origin may receive a 201 response but cannot read Location unless the server adds Access-Control-Expose-Headers. Do not infer body id for current create because response body is empty.",
+      "disallowedOrigin": "403 text/plain Invalid CORS request; browser hides the response body."
+    },
+    "refs": [
+      {
+        "path": "course/spec-v2.md",
+        "lines": [
+          35,
+          39
+        ]
+      },
+      {
+        "path": "course/spec-v2.md",
+        "lines": [
+          41,
+          55
+        ]
+      },
+      {
+        "path": "board-server/src/main/java/com/example/board/config/SecurityConfig.java",
+        "lines": [
+          29,
+          48
+        ]
+      },
+      {
+        "path": "board-server/src/main/java/com/example/board/config/CorsConfig.java",
+        "lines": [
+          14,
+          26
+        ]
+      },
+      {
+        "path": "board-server/src/main/java/com/example/board/common/GlobalExceptionHandler.java",
+        "lines": [
+          36,
+          150
+        ]
+      },
+      {
+        "path": "board-server/src/main/java/com/example/board/common/ErrorCode.java",
+        "lines": [
+          5,
+          20
+        ]
+      }
+    ]
+  },
+  "localSeedInventory": {
+    "profile": "application-local only loads data-local.sql; do not assume these rows exist in non-local profiles or the separate ZIP project.",
+    "rows": [
+      {
+        "table": "member",
+        "row": "one ADMIN member with email admin@board.local; local fixture only; credential value intentionally omitted",
+        "source": {
+          "path": "board-server/src/main/resources/data-local.sql",
+          "lines": [
+            3,
+            4
+          ]
+        }
+      },
+      {
+        "table": "coupon",
+        "row": "id=1 welcome coupon, total_quantity=10, issued_quantity=0, expires_at now+30 days",
+        "source": {
+          "path": "board-server/src/main/resources/data-local.sql",
+          "lines": [
+            6,
+            7
+          ]
+        }
+      },
+      {
+        "table": "shop_item",
+        "row": "ids 1-3: price/stock seed rows",
+        "source": {
+          "path": "board-server/src/main/resources/data-local.sql",
+          "lines": [
+            9,
+            11
+          ]
+        }
+      }
+    ],
+    "normalUser": "No ordinary USER row is inserted by data-local.sql; use signup/login or an explicitly managed disposable fixture. Do not embed local credentials in API recipe data.",
+    "tableRequirements": "schema.sql defines member/post/tag/post_tag/comment/post_like/point_ledger/coupon/member_coupon/shop_item/shop_order/pg_payment/report/audit_log rows and keys. Seed only the minimum rows needed per endpoint; do not reset or assume fixed generated IDs.",
+    "refs": [
+      {
+        "path": "board-server/src/main/resources/application-local.yml",
+        "lines": [
+          9,
+          12
+        ]
+      },
+      {
+        "path": "board-server/src/main/resources/data-local.sql",
+        "lines": [
+          3,
+          11
+        ]
+      },
+      {
+        "path": "board-server/src/main/resources/schema.sql",
+        "lines": [
+          19,
+          212
+        ]
+      }
+    ]
+  },
+  "courseApiCoverage": {
+    "source": "tools/site/course-api-contracts.mjs",
+    "recipes": [
+      {
+        "id": "create",
+        "stepId": "D04-5",
+        "method": "POST",
+        "path": "/api/posts",
+        "status": 201,
+        "body": {
+          "title": "첫 게시글",
+          "content": "본문을 저장합니다.",
+          "tags": [
+            "spring"
+          ]
+        },
+        "bodyRule": "empty success body; read id only from validated Location",
+        "currentEndpointId": "post-create"
+      },
+      {
+        "id": "detail",
+        "stepId": "D05-1",
+        "method": "GET",
+        "path": "/api/posts/{postId}",
+        "status": 200,
+        "body": null,
+        "currentEndpointId": "post-detail"
+      },
+      {
+        "id": "replace",
+        "stepId": "D05-2",
+        "method": "PUT",
+        "path": "/api/posts/{postId}",
+        "status": 200,
+        "body": {
+          "title": "첫 게시글",
+          "content": "본문을 저장합니다.",
+          "tags": [
+            "spring"
+          ]
+        },
+        "currentEndpointId": "post-replace"
+      },
+      {
+        "id": "partial",
+        "stepId": "D05-2",
+        "method": "PATCH",
+        "path": "/api/posts/{postId}",
+        "status": 200,
+        "body": {
+          "title": "수정한 제목"
+        },
+        "currentEndpointId": "post-patch"
+      },
+      {
+        "id": "delete",
+        "stepId": "D05-2",
+        "method": "DELETE",
+        "path": "/api/posts/{postId}",
+        "status": 204,
+        "body": null,
+        "currentEndpointId": "post-delete"
+      },
+      {
+        "id": "like",
+        "stepId": "D05-6",
+        "method": "PUT",
+        "path": "/api/posts/{postId}/like",
+        "status": 204,
+        "body": null,
+        "currentEndpointId": "like-put"
+      },
+      {
+        "id": "unlike",
+        "stepId": "D05-6",
+        "method": "DELETE",
+        "path": "/api/posts/{postId}/like",
+        "status": 204,
+        "body": null,
+        "currentEndpointId": "like-delete"
+      },
+      {
+        "id": "list",
+        "stepId": "D06-4",
+        "method": "GET",
+        "path": "/api/posts",
+        "status": 200,
+        "query": [
+          "cursor",
+          "size",
+          "keyword",
+          "tag",
+          "sort"
+        ],
+        "body": "CursorPage<PostSummary>",
+        "currentEndpointId": "post-list"
+      }
+    ],
+    "notCoveredCurrentEndpoints": [
+      "health",
+      "signup",
+      "login",
+      "member-me",
+      "comment-create",
+      "comment-list",
+      "comment-delete",
+      "post-popular",
+      "points-balance",
+      "points-history",
+      "coupon-issue",
+      "coupon-list",
+      "shop-items",
+      "shop-order",
+      "points-charge",
+      "pg-callback",
+      "activity-ranking",
+      "post-report",
+      "admin-reports",
+      "admin-hide",
+      "admin-bulk-coupon",
+      "admin-audit-logs"
+    ],
+    "ref": {
+      "path": "tools/site/course-api-contracts.mjs",
+      "lines": [
+        22,
+        90
+      ]
+    }
+  },
+  "learnerDesignedApis": [
+    {
+      "day": "D23",
+      "status": "learner-designed, no fixed board-server endpoint",
+      "contractWork": "Define reservation creation/list/detail or related API only after learner decides; D23 itself asks for data model, not a fixed endpoint.",
+      "refs": [
+        {
+          "path": "course/days/D23.json",
+          "lines": [
+            1,
+            147
+          ]
+        },
+        {
+          "path": "course/spec-v2.md",
+          "lines": [
+            197,
+            200
+          ]
+        }
+      ]
+    },
+    {
+      "day": "D25",
+      "status": "learner-designed implementation dependent on D23",
+      "contractWork": "Use POST reservation create and GET reservation detail contracts chosen in D23; exact route/DTO/physical mapping is to be decided by learner.",
+      "refs": [
+        {
+          "path": "course/days/D25.json",
+          "lines": [
+            1,
+            153
+          ]
+        }
+      ]
+    },
+    {
+      "day": "D30",
+      "status": "negotiated compatibility API; no single existing endpoint",
+      "contractWork": "Agree total-count/pagination/instant-payout state or compatibility choice with product role; record selected OpenAPI and fixtures rather than treating one alternative as existing API.",
+      "refs": [
+        {
+          "path": "course/days/D30.json",
+          "lines": [
+            1,
+            158
+          ]
+        }
+      ]
+    }
+  ],
+  "legacyScenarioRequestData": {
+    "warning": "These flows target the separate org.example starter ZIP/reference project; their DTOs, statuses, and side effects differ from current com.example.board board-server and MUST be preserved as a separate source family. Fixture token literals are intentionally omitted.",
+    "requests": [
+      {
+        "id": "create-post",
+        "source": "scenario/flow/create-post.md",
+        "sourceLines": [
+          39,
+          58
+        ],
+        "request": {
+          "method": "POST",
+          "path": "/api/posts",
+          "headers": [
+            "Authorization: Bearer <legacy fixture token>",
+            "Content-Type: application/json"
+          ],
+          "body": {
+            "boardSlug": "dev",
+            "title": "새 게시글",
+            "content": "본문",
+            "tags": [
+              "spring",
+              "새태그"
+            ],
+            "visibility": "PUBLIC"
+          }
+        },
+        "documentedSuccess": "201 with body id and Location",
+        "projectSemantics": "separate org.example legacy starter: includes boardSlug/visibility, PUBLISHED, view/like/comment counters; not board-server PostCreateRequest or empty-body 201"
+      },
+      {
+        "id": "read-post",
+        "source": "scenario/flow/read-post.md",
+        "sourceLines": [
+          36,
+          45
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/api/posts/{capturedId}",
+          "headers": [],
+          "body": null
+        },
+        "documentedSuccess": "200 detail; this legacy flow increments view count; optional token must be valid if sent",
+        "projectSemantics": "separate legacy service contract; current board-server detail response has no viewCount field and its read behavior must be taken from current controller/service"
+      },
+      {
+        "id": "list-posts",
+        "source": "scenario/flow/list-posts.md",
+        "sourceLines": [
+          39,
+          48
+        ],
+        "request": {
+          "method": "GET",
+          "path": "/api/boards/dev/posts",
+          "query": {
+            "page": 0,
+            "size": 10
+          },
+          "headers": [],
+          "body": null
+        },
+        "documentedSuccess": "200 with page metadata totalElements/totalPages/hasNext; items omit content",
+        "projectSemantics": "separate boardSlug/page-offset API; current board-server GET /api/posts uses cursor,size,keyword,tag,sort"
+      },
+      {
+        "id": "update-post",
+        "source": "scenario/flow/update-post.md",
+        "sourceLines": [
+          43,
+          57
+        ],
+        "request": {
+          "method": "PATCH",
+          "path": "/api/posts/{capturedId}",
+          "headers": [
+            "Authorization: Bearer <legacy fixture token>",
+            "Content-Type: application/json"
+          ],
+          "body": {
+            "title": "수정한 제목"
+          }
+        },
+        "documentedSuccess": "200 legacy detail DTO",
+        "projectSemantics": "legacy DTO includes boardSlug/visibility/view/like/comment fields; current board-server PostDetailResponse is different"
+      },
+      {
+        "id": "delete-post",
+        "source": "scenario/flow/delete-post.md",
+        "sourceLines": [
+          39,
+          48
+        ],
+        "request": {
+          "method": "DELETE",
+          "path": "/api/posts/{capturedId}",
+          "headers": [
+            "Authorization: Bearer <legacy fixture token>"
+          ],
+          "body": null
+        },
+        "documentedSuccess": "204 empty",
+        "projectSemantics": "legacy sets deleted_at and retains associations; current board-server marks status DELETED"
+      },
+      {
+        "id": "like-put",
+        "source": "scenario/flow/like-post.md",
+        "sourceLines": [
+          3,
+          13
+        ],
+        "request": {
+          "method": "PUT",
+          "path": "/api/posts/{capturedId}/like",
+          "headers": [
+            "Authorization: Bearer <legacy fixture token>"
+          ],
+          "body": null
+        },
+        "documentedSuccess": "200 legacy body includes postId,liked,likeCount",
+        "projectSemantics": "legacy contract differs from current board-server 204 empty response"
+      },
+      {
+        "id": "like-delete",
+        "source": "scenario/flow/unlike-post.md",
+        "sourceLines": [
+          3,
+          13
+        ],
+        "request": {
+          "method": "DELETE",
+          "path": "/api/posts/{capturedId}/like",
+          "headers": [
+            "Authorization: Bearer <legacy fixture token>"
+          ],
+          "body": null
+        },
+        "documentedSuccess": "200 legacy body includes postId,liked,likeCount",
+        "projectSemantics": "legacy contract differs from current board-server 204 empty response"
+      }
+    ]
+  },
+  "requestClientReuseEvidence": [
+    {
+      "name": "scenario-runner",
+      "source": "tools/site/scenario-runner.js",
+      "scope": "generic scenario request cards with editable URL/headers/body and in-memory response interpolation",
+      "features": {
+        "actualFetch": "yes",
+        "latencyDisplay": "no; no elapsed timer/performance measurement",
+        "captureId": "partial; parsed response stored in in-memory {{requestId.body.*}} map for follow-up request, not durable captured-ID provenance",
+        "cors": "partial; explains browser-owned Origin and network CORS troubleshooting; does not resolve CORS",
+        "filePageError": "no explicit file: handling",
+        "multipartFile": "no file input/Upload path found; body textarea/raw text only",
+        "editSnapshot": "no explicit stale-input/snapshot marker after send",
+        "tokenStorage": "no persistent storage; auth values are supplied per request card",
+        "expectedVsActual": "partial; actual status/body/header shown, HTTP >=400 marked error, no per-endpoint contract evaluator",
+        "manualDb": "no SQL execution or per-endpoint manual DB check in runner"
+      },
+      "refs": [
+        {
+          "path": "tools/site/scenario-runner.js",
+          "lines": [
+            6,
+            21
+          ]
+        },
+        {
+          "path": "tools/site/scenario-runner.js",
+          "lines": [
+            33,
+            56
+          ]
+        },
+        {
+          "path": "tools/site/scenario-runner.js",
+          "lines": [
+            100,
+            139
+          ]
+        },
+        {
+          "path": "tools/site/scenario-runner.js",
+          "lines": [
+            142,
+            205
+          ]
+        }
+      ]
+    },
+    {
+      "name": "course-api-client",
+      "source": "tools/site/course-api-client.mjs",
+      "scope": "fixed eight main-board post recipes from course-api-contracts.mjs",
+      "features": {
+        "actualFetch": "yes",
+        "latencyDisplay": "no elapsed timing visible",
+        "captureId": "yes; validates same-origin Location /api/posts/{positive integer}; manual id provenance is explicitly not server-verified",
+        "cors": "partial; generic fetch failure displayed; server CorsConfig allows localhost:3000 and 127.0.0.1:8765 but does not expose Location",
+        "filePageError": "no file:-specific guidance in client",
+        "multipartFile": "no multipart/file recipe or control",
+        "editSnapshot": "yes; captures contract/base/id/token/request/body/query and detects if controls changed before response",
+        "tokenStorage": "token is not persisted; only base/id/provenance stored in sessionStorage key javaexperience.course.api-context.v1",
+        "expectedVsActual": "yes for expected HTTP status and small body-shape checks; explicitly not task grading",
+        "manualDb": "yes; displays SQL examples only; never executes them"
+      },
+      "refs": [
+        {
+          "path": "tools/site/course-api-contracts.mjs",
+          "lines": [
+            22,
+            90
+          ]
+        },
+        {
+          "path": "tools/site/course-api-client.mjs",
+          "lines": [
+            3,
+            20
+          ]
+        },
+        {
+          "path": "tools/site/course-api-client.mjs",
+          "lines": [
+            163,
+            230
+          ]
+        },
+        {
+          "path": "board-server/src/main/java/com/example/board/config/CorsConfig.java",
+          "lines": [
+            14,
+            26
+          ]
+        }
+      ]
+    },
+    {
+      "name": "functional-scenario",
+      "source": "tools/site/functional-scenario.js",
+      "scope": "legacy five-flow CRUD and like request workspace; endpoints belong to scenario starter project, not current board-server contracts",
+      "features": {
+        "actualFetch": "yes",
+        "latencyDisplay": "no elapsed duration; has 15-second timeout only",
+        "captureId": "yes for legacy POST: body.id must be safe positive integer and match Location; stores base/id in sessionStorage",
+        "cors": "yes as diagnostic text; also handles Location not exposed by CORS; does not alter server CORS",
+        "filePageError": "partial; explicitly detects file:// and advises serving documents on localhost:3000",
+        "multipartFile": "no multipart input handler",
+        "editSnapshot": "yes; revision captured at send and stale response labeled when input changes",
+        "tokenStorage": "token is typed into request form and not stored; server base/captured id persist in sessionStorage; self-checks use localStorage",
+        "expectedVsActual": "yes for expected status and some task-specific response fields (like); displays raw response; not general DTO schema validator",
+        "manualDb": "yes; generated SQL examples and explicit manual DB check; SQL is not executed by browser"
+      },
+      "refs": [
+        {
+          "path": "tools/site/functional-scenario.js",
+          "lines": [
+            56,
+            88
+          ]
+        },
+        {
+          "path": "tools/site/functional-scenario.js",
+          "lines": [
+            193,
+            207
+          ]
+        },
+        {
+          "path": "tools/site/functional-scenario.js",
+          "lines": [
+            242,
+            299
+          ]
+        },
+        {
+          "path": "tools/site/functional-scenario.js",
+          "lines": [
+            300,
+            369
+          ]
+        },
+        {
+          "path": "tools/site/functional-scenario.mjs",
+          "lines": [
+            145,
+            170
+          ]
+        }
+      ]
+    }
+  ],
+  "consolidationNotes": [
+    "Current source has 29 annotated application-controller routes plus GET /actuator/health, yielding the spec-v2 total of 30. /api/start/ping appears in legacy setup instructions, not in current board-server Controller mappings.",
+    "Main board-server POST /api/posts returns 201, empty body, and Location. The legacy create flow documents an id-bearing response body with boardSlug/visibility fields; do not reuse that response contract for the main API.",
+    "Current like PUT/DELETE are 204 empty body; legacy scenario flow says 200 and body postId/liked/likeCount.",
+    "Current GET /api/posts uses cursor pagination and optional keyword/tag/sort; legacy GET /api/boards/{slug}/posts uses page/size and boardSlug.",
+    "Current board-server has no multipart browser recipe. Its /api/admin/coupons/{couponId}/bulk-issue requires an XLSX multipart file; the three inspected clients have no file-upload control."
+  ]
+}

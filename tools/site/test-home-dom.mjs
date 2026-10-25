@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { JSDOM } from 'jsdom';
+import { renderHomeVisual } from './home-visual.mjs';
 import { initLearning } from './home-learning.mjs';
 import { TASKS, PROGRESS_KEY } from './home-state.mjs';
 const root = new URL('../../', import.meta.url);
 function page(file = 'index.html', saved) {
-  const dom = new JSDOM(fs.readFileSync(new URL(file, root), 'utf8'), { url: `https://learn.example/${file}`, runScripts: 'outside-only' });
+  const dom = new JSDOM(file === 'index.html' ? `<main>${renderHomeVisual(root.pathname, new URL('README.md',root).pathname, '<h2 id="javaexperience">실행 안내</h2>')}</main><script data-home-controller data-home-root="index.html" src="tools/site/home-learning.bundle.js"></script>` : fs.readFileSync(new URL(file, root), 'utf8'), { url: `https://learn.example/${file}`, runScripts: 'outside-only' });
   const { window } = dom;
   window.scrollTo = () => {};
   window.HTMLElement.prototype.scrollIntoView = () => {};
@@ -116,8 +117,17 @@ assert.equal(JSON.parse(browse.window.localStorage.getItem(PROGRESS_KEY)).active
 assert.equal(browse.$('.learning-progress-bar button').hidden, false); browse.close();
 for (const task of Object.values(TASKS)) {
   const lesson = page(task.href);
+  if (task.functionalId) {
+    lesson.window.eval(fs.readFileSync(new URL('tools/site/functional-scenario.js', root), 'utf8'));
+    lesson.doc.dispatchEvent(new lesson.window.Event('DOMContentLoaded'));
+  }
   initLearning(lesson.doc, lesson.window);
-  assert.ok(lesson.$('.learning-progress-bar'), `${task.id} 진행 연결`);
+  if (task.functionalId) {
+    assert.equal(lesson.$('.learning-progress-bar'), null, `${task.id}: 기존 단계 진도를 중복 표시하지 않음`);
+    assert.ok(lesson.$('[data-fw-home-status]'), `${task.id}: 기능별 진도 연결`);
+    lesson.$('[data-fw-begin]').click();
+    assert.equal(JSON.parse(lesson.window.localStorage.getItem(PROGRESS_KEY)).active, task.id);
+  } else assert.ok(lesson.$('.learning-progress-bar'), `${task.id} 진행 연결`);
   lesson.close();
 }
 console.log('홈 DOM: 선택/취소·예시 입력·패널 복귀·이어하기·장면 복원·수동 완료·6개 과제 연결 통과');
@@ -179,7 +189,7 @@ assert.match(cursorHome.$('[data-demo-response]').textContent, /published_at/);
 assert.match(cursorHome.$('[data-demo=cursor]').textContent, /144/);
 cursorHome.close();
 
-// 실제 배포용 classic script도 import 없이 파일 문서에서 초기화 가능한지 검사한다.
+// 시나리오 이어하기 컨트롤러의 classic script도 import 없이 파일 문서에서 초기화 가능한지 검사한다.
 const direct = page();
 const script = direct.$('script[data-home-controller]');
 assert.notEqual(script.getAttribute('type'), 'module', '직접 파일 열기에서 ESM 의존 제거');

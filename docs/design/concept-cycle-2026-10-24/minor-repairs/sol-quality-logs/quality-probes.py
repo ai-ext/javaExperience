@@ -1,5 +1,5 @@
 import concurrent.futures, json, pathlib, subprocess, sys
-root=pathlib.Path('/Users/ds/code/javaExperience/.worktrees/concept-learning-night')
+root=pathlib.Path('LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night')
 logs=root/'docs/design/concept-cycle-2026-10-24/minor-repairs/sol-quality-logs'
 url=lambda f:(root/f).as_uri()
 

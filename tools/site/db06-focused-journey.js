@@ -1,11 +1,11 @@
 document.querySelectorAll('.db06-focused').forEach((journey) => {
   const panels = [...journey.querySelectorAll('[data-db06-panel]')];
-  const show = (name) => {
+  const show = (name, scroll = true) => {
     const active = panels.find((panel) => panel.dataset.db06Panel === name);
     if (!active) return;
     for (const panel of panels) panel.hidden = panel !== active;
     journey.dataset.db06Screen = name;
-    journey.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) journey.scrollIntoView({ block: 'start', behavior: 'instant' });
   };
   for (const button of journey.querySelectorAll('[data-db06-go]')) button.addEventListener('click', () => show(button.dataset.db06Go));
   const mini = { 101: '101은 북마크 행이 없으므로 남습니다.', 102: '102는 북마크 행이 있어 제외됩니다.', 103: '103은 북마크 행이 있어 제외됩니다.' };
@@ -56,5 +56,5 @@ document.querySelectorAll('.db06-focused').forEach((journey) => {
   };
   for (const input of records.values()) input.addEventListener('input', refresh);
   refresh();
-  show('scenario');
+  show('scenario', false);
 });

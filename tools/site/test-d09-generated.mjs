@@ -1,3 +1,4 @@
+import { resolveEvidencePath } from './evidence-path.mjs';
 // main의 이미지 ready·공유 등록·빌드 뒤 실행한다. UI 작성 단계에서는 구문만 확인한다.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -69,7 +70,7 @@ assert.deepEqual(f['sqlite-restored-snapshot-differs-from-newer-source'].sourceR
 assert.deepEqual([f['explicit-decimal-error-budget-not-measured-traffic'].allowedFailures, f['explicit-decimal-error-budget-not-measured-traffic'].remaining, f['explicit-decimal-error-budget-not-measured-traffic'].burn], ['10', '-10', '2']); assert.equal(f['explicit-decimal-error-budget-not-measured-traffic'].timeOnlyExample.minutes, '43.2'); assert.deepEqual(f['explicit-nearest-rank-vector-not-latency'].p95, { rank: 5, value: 50 });
 const manifest = json(proof + 'fixture-manifest.json'); assert.equal(manifest.files.length, 4); for (const row of manifest.files) assert.equal(sha(read(proof + 'fixture/' + row.file)), row.sha256); assert.equal(sha(read(proof + 'run-proof.py')), manifest.runnerSHA256);
 const raw = json(proof + 'runtime-last.json'); assert.equal(raw.completed, true); assert.equal(raw.processes.length, 3); assert.ok(raw.processes.every(row => row.exitCode === 0 && row.pidGone && row.portClosedWhenStopped && !row.killFallback)); assert.ok(raw.commands.every(row => row.exitCode === 0)); assert.equal(raw.requests.filter(row => row.label.startsWith('business-')).length, 4); assert.ok(raw.requests.length > 4 && raw.promQueries.length > 0);
-const binary = raw.commands.find(row => row.name === 'prometheus-version').argv[0]; assert.equal(sha(fs.readFileSync(binary)), f['actual-prometheus-binary-version-sha'].binarySHA256);
+const binary = raw.commands.find(row => row.name === 'prometheus-version').argv[0]; assert.equal(sha(fs.readFileSync(resolveEvidencePath(binary))), f['actual-prometheus-binary-version-sha'].binarySHA256);
 const supplement = d.querySelector('.d09-supplement'); assert.ok(supplement && !source.contains(supplement)); assert.equal(supplement.open, false); assert.ok([...supplement.querySelectorAll('details')].every(node => !node.open));
 for (const phrase of ['원문309줄9block', 'native22CHECK', 'native17·모델19·미실행 원문3', 'fixture4개', 'archive SHA920df', '실행파일 SHAedfbcf', '전체 HTTP가4번이라는 뜻이 아닙니다', 'RPO5분/RTO2시간', 'minimumTTL>0', '전수pixel']) assert.ok(supplement.textContent.includes(phrase), phrase);
 const fullCode = [...supplement.querySelectorAll('pre code')].map(node => node.textContent);

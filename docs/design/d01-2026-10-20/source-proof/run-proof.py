@@ -18,7 +18,7 @@ for key in list(env):
     if key.startswith('GIT_'):env.pop(key)
 env.update(GIT_CONFIG_NOSYSTEM='1',GIT_CONFIG_GLOBAL='/dev/null',
            GIT_AUTHOR_DATE='2026-10-20T00:00:00Z',GIT_COMMITTER_DATE='2026-10-20T00:00:00Z',
-           JAVA_HOME='/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home',
+           JAVA_HOME='LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home',
            TZ='UTC',LC_ALL='C')
 checks=[];facts={};commands=[]
 

@@ -2,9 +2,9 @@
 
 최신 사용자 요청: 전체134문서를 task1~task134로 계획하고, 우선 기존24문서를 검증한다. 이후 구현은 gpt-6-luna/high, 독립 검증은 gpt-6.1-sol/high의 하네스 서브에이전트로 반복한다. 기존24개의 부분 보강 기록은 완료24개를 뜻하지 않는다.
 
-작업 루트: /Users/ds/code/javaExperience/.worktrees/concept-learning-night
+작업 루트: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night
 기준 HEAD: 4b0493af52b1a06decca909d6bf9a8b6f9610686
-출력 루트: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22
+출력 루트: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22
 
 ## 첫24개 검증
 

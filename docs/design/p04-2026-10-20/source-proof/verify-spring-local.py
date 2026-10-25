@@ -4,8 +4,8 @@ import json,re,subprocess,tempfile,hashlib,xml.etree.ElementTree as ET
 from urllib.request import urlopen
 ROOT=Path(__file__).resolve().parents[4]
 OUT=Path(__file__).resolve().parent
-CACHE=Path('/Users/ds/.gradle/caches/modules-2/files-2.1')
-JDK=Path('/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home/bin')
+CACHE=Path('LOCAL_HOME/.gradle/caches/modules-2/files-2.1')
+JDK=Path('LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home/bin')
 namespace={'m':'http://maven.apache.org/POM/4.0.0'}
 resolved={}
 DOWNLOADS=OUT/'dependencies'

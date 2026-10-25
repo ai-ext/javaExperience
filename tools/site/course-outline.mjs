@@ -1,0 +1,229 @@
+import { JSDOM } from 'jsdom';
+import { marked } from 'marked';
+import { loadCourse } from './course-pages.mjs';
+import { fileURLToPath } from 'node:url';
+import { isExtraStep } from './course-pages.mjs';
+
+const guideType = source => {
+  if (source === 'course/README.md') return { kind: 'overview', tag: '가이드', label: '과정 안내' };
+  if (source === 'course/spring/README.md') return { kind: 'days', tag: '일정', label: '일자 목록' };
+  if (source === 'course/spec-v2.md') return { kind: 'spec', tag: 'SPEC', label: '서버 명세' };
+  if (/^course\/java\/J\d{2}\.md$/.test(source)) return { kind: 'java', tag: source.match(/J\d{2}/)[0], label: 'Java 연습' };
+  if (/^course\/tickets\/(?:[BE]\d{2}|drill)\.md$/.test(source)) return { kind: 'ticket', tag: source.match(/([^/]+)\.md$/)[1].toUpperCase(), label: '티켓 과제' };
+  if (/^course\/start\/.+\.md$/.test(source)) return { kind: 'start', tag: '참고', label: '출발 자료' };
+  return null;
+};
+
+// 과정 설명은 흐름으로 읽고, 요청·응답·SQL·설정의 비교 표는 그대로 보존한다.
+function isOutlineTable(source, headings) {
+  if (['course/README.md', 'course/spring/README.md'].includes(source)) return headings.some(label => /^(일|일자|단계)$/.test(label));
+  if (source.startsWith('course/start/')) return /^(파일|날·순서)$/.test(headings[0]);
+  if (source === 'course/spec-v2.md') return headings.join('|') === '영역|기능';
+  return false;
+}
+
+// 과정 안내에는 빈 줄 뒤의 일정 행이 문단으로 파싱되는 구간이 있다.
+// 인접한 일정 행만 같은 tbody에 복원해 원문의 뒤쪽 일자도 흐름에 포함한다.
+function appendScheduleContinuation(doc, source, table, headings) {
+  if (source !== 'course/README.md' || headings[0] !== '일') return;
+  const after = (table.closest('.table-wrap') || table).nextElementSibling;
+  if (after?.tagName !== 'P') return;
+  const lines = after.innerHTML.trim().split('\n');
+  if (!lines.every(line => /^\|\s*D\d{2}\s*\|/.test(line))) return;
+  const scratch = doc.createElement('div');
+  scratch.innerHTML = marked.parse(`| ${headings.join(' | ')} |\n| ${headings.map(() => '---').join(' | ')} |\n${lines.join('\n')}`);
+  const rows = [...scratch.querySelectorAll('tbody tr')];
+  if (rows.length !== lines.length || rows.some(row => row.children.length !== headings.length)) throw new Error('과정 일정의 연속 행을 복원할 수 없다');
+  table.querySelector('tbody').append(...rows);
+  after.remove();
+}
+
+function renderOutline(doc, table, headings) {
+  const flow = doc.createElement('ol');
+  const schedule = headings.some(label => /^(일|일자)$/.test(label));
+  flow.className = 'course-outline' + (schedule ? ' outline-schedule' : '');
+  flow.dataset.columns = headings.length;
+  if (table.id) flow.id = table.id;
+  flow.setAttribute('aria-label', headings.some(label => /^(일|일자)$/.test(label)) ? '일자별 과정 흐름' : '과정 단계 흐름');
+  for (const row of table.querySelectorAll('tbody tr')) {
+    const item = doc.createElement('li');
+    if (row.id) item.id = row.id;
+    const day = row.children[0]?.textContent.match(/D(\d+)/);
+    if (schedule && day) { const n = Number(day[1]); item.dataset.phase = n === 0 ? 'warmup' : n <= 10 ? 'build' : n <= 14 ? 'maintain' : n === 15 ? 'wrap' : 'extend'; }
+    [...row.children].forEach((cell, index) => {
+      const field = doc.createElement(index === 0 ? 'h3' : 'p');
+      if (cell.id) field.id = cell.id;
+      const label = doc.createElement('small');
+      label.textContent = headings[index] || '';
+      field.append(label, ...cell.childNodes);
+      item.append(field);
+    });
+    flow.append(item);
+  }
+  if (schedule) {
+    const legend = doc.createElement('div');
+    legend.className = 'outline-head';
+    legend.dataset.columns = headings.length;
+    legend.setAttribute('aria-hidden', 'true');
+    headings.forEach(text => { const label = doc.createElement('span'); label.textContent = text; legend.append(label); });
+    table.before(legend);
+  }
+  const parent = table.parentElement;
+  if (parent.classList.contains('table-wrap') && parent.children.length === (schedule ? 2 : 1)) {
+    const legend = parent.querySelector(':scope > .outline-head');
+    if (legend) parent.replaceWith(legend, flow); else parent.replaceWith(flow);
+  }
+  else table.replaceWith(flow);
+}
+
+// 기존 노드를 옮겨 복사·다운로드·접기와 본문 앵커의 연결을 유지한다.
+export function renderCourseOutline(source, html) {
+  const type = guideType(source);
+  if (!type) return html;
+  const doc = new JSDOM(`<article>${html}</article>`).window.document;
+  const article = doc.querySelector('article');
+  if (article.querySelector(':scope > .course-guide')) { doc.defaultView.close(); return html; }
+  for (const table of article.querySelectorAll('table')) {
+    const headings = [...table.querySelectorAll('thead th')].map(node => node.textContent.trim());
+    if (isOutlineTable(source, headings)) {
+      appendScheduleContinuation(doc, source, table, headings);
+      renderOutline(doc, table, headings);
+    }
+  }
+  const shell = doc.createElement('section');
+  shell.className = `course-guide guide-${type.kind}`;
+  shell.dataset.guideKind = type.kind;
+  const layout = doc.createElement('div');
+  layout.className = 'guide-layout';
+  const rail = doc.createElement('aside');
+  rail.className = 'guide-rail';
+  rail.setAttribute('aria-label', `${type.label} 목차`);
+  const tag = doc.createElement('span');
+  tag.className = 'guide-type';
+  tag.setAttribute('aria-hidden', 'true');
+  tag.textContent = type.tag;
+  const title = doc.createElement('h2');
+  title.textContent = type.label;
+  rail.append(tag, title);
+  const nav = doc.createElement('nav');
+  nav.className = 'guide-index';
+  nav.setAttribute('aria-label', '이 페이지 순서');
+  const list = doc.createElement('ol');
+  // 접힌 힌트·정답이나 코드 블록 안의 제목은 목차에 복제하지 않는다.
+  const headings = [...article.querySelectorAll('h2')].filter(heading => !heading.closest('details, pre, .exercise-answer'));
+  for (const [index, heading] of headings.entries()) {
+    if (!heading.id) {
+      let id = `guide-section-${index + 1}`;
+      while (doc.getElementById(id)) id += '-section';
+      heading.id = id;
+    }
+    const item = doc.createElement('li');
+    const link = doc.createElement('a');
+    link.href = `#${heading.id}`;
+    link.textContent = heading.textContent.replace(/^#\s*/, '').trim();
+    item.append(link);
+    list.append(item);
+  }
+  if (type.kind === 'days') {
+    const course = loadCourse(fileURLToPath(new URL('../../', import.meta.url)));
+    const schedule = [];
+    for (const item of article.querySelectorAll('.outline-schedule > li')) {
+      const heading = item.querySelector('h3');
+      const link = heading.querySelector('a');
+      const day = course.days.find(day => day.id === link?.textContent.trim() && day.id !== 'D00');
+      const optional = !day;
+      const title = doc.createElement('p');
+      title.className = 'schedule-title';
+      title.textContent = day?.title || 'Java 워밍업';
+      const status = doc.createElement('p');
+      status.className = 'schedule-status';
+      const count = doc.createElement('span');
+      count.dataset.scheduleCount = day?.id || 'D00';
+      count.textContent = optional ? '진도 제외' : `구현 0/${day.steps.filter(step => !isExtraStep(step, course)).length || day.steps.length}`;
+      const kind = doc.createElement('span');
+      kind.className = 'schedule-requirement';
+      kind.textContent = optional ? '선택' : '필수';
+      status.append(count, kind);
+      item.replaceChildren(heading, title, status);
+      item.classList.add('schedule-card');
+      if (day) schedule.push({id:day.id, steps:day.steps.map(step => ({id:step.id,extra:isExtraStep(step, course),choiceTickets:step.tickets || []}))});
+    }
+    const data = doc.createElement('script');
+    data.type = 'application/json';
+    data.id = 'course-schedule-data';
+    data.textContent = JSON.stringify(schedule);
+    article.append(data);
+    const groups = new Map();
+    for (const item of article.querySelectorAll('.outline-schedule > li')) {
+      if (!groups.has(item.dataset.phase)) groups.set(item.dataset.phase, []);
+      groups.get(item.dataset.phase).push(item);
+    }
+    const names = {warmup:'선택 · 워밍업', build:'1단계 · 서버 만들기', maintain:'2단계 · 티켓 처리', wrap:'중간 점검', extend:'3단계 · 설계·운영'};
+    for (const [phase, items] of groups) {
+      const group = doc.createElement('li');
+      const link = doc.createElement('a');
+      const first = items[0];
+      first.id ||= `schedule-${phase}`;
+      link.href = `#${first.id}`;
+      link.textContent = names[phase];
+      group.append(link);
+      const details = doc.createElement('details');
+      details.innerHTML = `<summary>${items.length}개 일자 바로가기</summary><ul></ul>`;
+      for (const item of items) {
+        const row = doc.createElement('li');
+        row.append(item.querySelector('h3 a').cloneNode(true));
+        details.querySelector('ul').append(row);
+      }
+      group.append(details);
+      list.append(group);
+    }
+  }
+  nav.append(list);
+  if (list.children.length) rail.append(nav);
+  const content = doc.createElement('div');
+  content.className = 'guide-content';
+  content.append(...article.childNodes);
+  // 설명·출발 문서의 절도 독립된 체크리스트 패널로 읽는다.
+  if (['overview', 'start', 'spec'].includes(type.kind)) {
+    for (const heading of [...content.querySelectorAll(':scope > h2')]) {
+      const section = doc.createElement('section');
+      section.className = 'guide-section';
+      section.setAttribute('aria-labelledby', heading.id);
+      heading.before(section);
+      section.append(heading);
+      while (section.nextElementSibling && !section.nextElementSibling.matches('h2')) section.append(section.nextElementSibling);
+    }
+  }
+  if (type.kind === 'overview') {
+    const promise = content.querySelector('.guide-section');
+    if (promise) {
+      const original = [...promise.children].slice(1);
+      const detail = doc.createElement('details');
+      detail.innerHTML = '<summary>과정의 범위·데이터 설계·연습 기준</summary>';
+      original.forEach(node => detail.append(node));
+      promise.insertAdjacentHTML('beforeend', '<ul class="overview-promises"><li><strong>만들기</strong> · 인증·조회·동시성·외부 연동 서버 구현</li><li><strong>말하기</strong> · 문제 → 원인 → 선택 → 결과를 내 경험으로 설명</li><li><strong>운영·협의</strong> · 배포·복원·두 앱 부하 검증, 반론에 따라 결정 수정</li></ul><p>데이터는 직접 설계하고 API 계약·DB 불변식·실행 증거로 확인합니다.</p>');
+      promise.append(detail);
+    }
+    const schedule = content.querySelector('.outline-schedule');
+    if (schedule && schedule.children.length > 20) {
+      const overview = doc.createElement('div');
+      overview.className = 'overview-phases';
+      overview.innerHTML = '<a href="spring/README.html"><b>01 · D01–D10</b><strong>서버 만들기</strong><span>인증·게시글·상점·외부 연동</span></a><a href="spring/README.html"><b>02 · D11–D15</b><strong>인수인계·설명</strong><span>필수 티켓·선택 과제·회고</span></a><a href="spring/README.html"><b>03 · D16–D45</b><strong>설계·운영·독립 수행</strong><span>업무 변경·배포·새 장애 진단</span></a>';
+      const details = doc.createElement('details');
+      details.className = 'overview-schedule';
+      const summary = doc.createElement('summary');
+      summary.textContent = '전체 46개 일정과 Java·말하기 수 확인';
+      const header = schedule.previousElementSibling?.classList.contains('outline-head') ? schedule.previousElementSibling : null;
+      schedule.before(overview, details);
+      details.append(summary);
+      if (header) details.append(header);
+      details.append(schedule);
+    }
+  }
+  layout.append(rail, content);
+  shell.append(layout);
+  article.append(shell);
+  const result = article.innerHTML;
+  doc.defaultView.close();
+  return result;
+}

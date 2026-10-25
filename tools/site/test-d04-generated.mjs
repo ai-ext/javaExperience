@@ -1,3 +1,4 @@
+import { resolveEvidencePath } from './evidence-path.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -127,7 +128,7 @@ assert.equal(facts['private-verification-mismatch-rejects-unchanged-dependency']
 assert.equal(facts['actual-bootjar-launch-loads-resource'].exitCode, 0);
 const dependencies = json(proof + 'dependencies.json');
 assert.equal(dependencies.length, 29);
-for (const row of dependencies) assert.equal(hash(fs.readFileSync(row.file)), row.sha256);
+for (const row of dependencies) assert.equal(hash(fs.readFileSync(resolveEvidencePath(row.file))), row.sha256);
 const fixture = json(proof + 'fixture-files.json');
 assert.equal(fixture.length, 6);
 for (const row of fixture) assert.equal(hash(fs.readFileSync(new URL(proof + row.file, root))), row.sha256);

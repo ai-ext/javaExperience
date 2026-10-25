@@ -21,25 +21,25 @@ Java·Spring 서버 전환 과정 v2 · 45일이다. D15 중간 점검 뒤 D16~D
 
 [후반 설계·분량 근거](docs/course-redesign/plans/2026-10-24-p9-d16-d30.md) · [과정 안내·티켓 규칙](course/README.md) · [명세서 v2](course/spec-v2.md) · [일자 목록](course/spring/README.md)
 
-## 참고 자료(이전 과정)
+## 서비스 만들기와 실습
 
-아래 101단계 과정과 루트 앱·DB 실행법은 이전 과정의 참고 자료다. v2 D01~D10의 작업 대상과 실행 위치는 위 안내를 따른다.
+아래는 계속 사용할 수 있는 게시판 API 101단계와 루트 앱·DB 실행법이다. v2 D01~D10의 작업 대상과 실행 위치는 위 안내를 따른다.
 
 Spring Boot 백엔드를 **직접 만들면서** 배우는 공개 실습 레포다. 게시판 API 101단계를 이어서 만들고, Codex 또는 Claude Code로 단계별 채점과 피드백을 받을 수 있다. 시나리오와 HTML은 GitHub 로그인 없이 읽거나 다운로드할 수 있다.
 
-> 과정 v2(일자 페이지 D00~D45·Java 트랙·2단계 티켓)는 [과정 안내](course/README.md)와 [학습 홈](index.html)에서 시작한다. 아래 `scenario/`·`practice/`·`docs/knowledge/`·`tickets/`는 그 과정에서 찾아보는 참고 도감이다.
+> 과정 v2(일자 페이지 D00~D45·Java 트랙·2단계 티켓)는 [과정 안내](course/README.md)와 [학습 홈](index.html)에서 시작한다. 서비스 만들기·실전 미션·개념 학습은 상단 대주제에서 계속 사용할 수 있다. 구현 티켓은 서비스 만들기 영역의 사이드바에서 찾는다.
 
 | 폴더 | 내용 |
 |---|---|
-| [`index.html`](index.html) | 학습 홈 — 시작점 선택, 6개 과제의 진도·마지막 장면 이어하기, 게시판 예시와 환경 준비 안내 |
-| [`scenario/`](scenario/README.md) | **따라 만들기 시나리오** — 101단계 요구사항·난이도·역할별 전체 코드 접기, 쿼리 연습 18개, JWT 이후 세션 인증과 interface/impl 선택 실습. 이전 과정을 순서대로 볼 때 사용한다 |
+| [`index.html`](index.html) | 학습 홈 — 오늘 할 일·과정 전체 설명·대주제 안내 |
+| [`scenario/`](scenario/README.md) | **따라 만들기 시나리오** — 101단계 요구사항·난이도·역할별 전체 코드 접기, 쿼리 연습 18개, JWT 이후 세션 인증과 interface/impl 선택 실습. 게시판 API를 순서대로 구현할 때 사용한다 |
 | [`practice/`](practice/MISSIONS.md) | 학습용 미션 — 함정이 섞인 많은 데이터(`practice` DB)로 조회·쿼리 연습 |
 | [`docs/knowledge/`](docs/knowledge/README.md) | 공부자료 134개 — 단계마다 "필요한 지식"으로 링크된다 |
 | `docker/` | 실습 DB(MySQL 8.4) 초기 데이터 dump(`mysql/init/`)와 CloudBeaver(웹 DBeaver) 설정 |
 | `src/` | 직접 이어서 구현할 Spring Boot 4.1 프로젝트 — `/hello`와 Todo·Post 학습 코드가 있으며 구현 상태는 브랜치에 따라 다르다 |
 | `tools/site/` | `.md` → `.html` 빌드 도구(문서를 고칠 때만 쓴다) |
 
-### 이전 과정 시작하기
+### 서비스 만들기 시작하기
 
 준비물: Docker 런타임(`docker`·`docker compose` 명령이 동작하면 된다), IntelliJ IDEA, JDK 21(없으면 Gradle이 찾는다 — `gradle/gradle-daemon-jvm.properties`). AI 채점을 원하면 Codex 또는 Claude Code를 선택해 쓸 수 있다.
 
@@ -130,7 +130,7 @@ done
 - 연결 설정은 `docker/cloudbeaver/data-sources.json`이고 처음 뜰 때 한 번 들어간다. 바꿨다면 `docker compose rm -sf cloudbeaver && docker volume rm <폴더이름>_cloudbeaver-data && docker compose up -d`.
 - 아이디가 `admin`이 아닌 이유: CloudBeaver에 같은 이름의 기본 팀이 있어 쓸 수 없다. 비밀번호는 CloudBeaver 규칙(8자 이상·대소문자·숫자)에 맞춘 것이다.
 - 데스크톱 DBeaver를 쓰면: 새 연결 → MySQL → 위 DB 값 입력 → Driver properties에서 `allowPublicKeyRetrieval` = `true`.
-- Docker 안에서 도는 다른 도구에서 붙을 때는 호스트를 `localhost`가 아니라 `host.docker.internal`로 넣는다(컨테이너 안의 localhost는 컨테이너 자신이다).
+- Docker 안에서 도는 다른 도구가 **호스트 서비스**에 붙을 때는 컨테이너 안의 `localhost` 대신 런타임의 호스트 게이트웨이 주소를 쓴다. Docker Desktop은 `host.docker.internal`을 제공한다. 같은 compose 안의 서비스끼리는 `mysql`처럼 서비스 이름을 쓴다. 다른 런타임에서는 게이트웨이 주소와 연결 가능 여부를 먼저 확인한다.
 - 13308·8978가 이미 쓰이고 있으면 `DB_PORT=13318 CB_PORT=8989 docker compose up -d`로 바꾼다. DB 포트를 바꾸면 `application.yml`의 포트도 같이 바꾼다.
 
 ## 테스트

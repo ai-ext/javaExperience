@@ -3,15 +3,15 @@
 판정은 **needs_completion**이다. 기존 보강 6질문·19상태의 주문/재고·트랜잭션 관찰은 저장된 코드/JSON과 일치한다. 원문 전체 완료는 아니다. quality는 spec 뒤 **진단만 수행**했으며 전체 승인을 부여하지 않았다.
 
 - 기준 HEAD: `4b0493af52b1a06decca909d6bf9a8b6f9610686`
-- 원문: [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W11-why-tx-in-service.md](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W11-why-tx-in-service.md) · 369줄 · SHA256 `4d9a55cb4ccf321ad91c0df27209536f5632f72bef2a242c061ae04f8ca27579`
+- 원문: [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W11-why-tx-in-service.md](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/knowledge/W11-why-tx-in-service.md) · 369줄 · SHA256 `4d9a55cb4ccf321ad91c0df27209536f5632f72bef2a242c061ae04f8ca27579`
 - fresh 명령: `npm --prefix tools/site run test:w11` → **exit 0**, UTC `2026-10-21T23:50:36.709768+00:00`. 실행 전후 관련 소스 해시 불변.
-- 원시 결과/귀속: [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/test-w11.run.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/test-w11.run.json), [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/test-w11.stdout.log](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/test-w11.stdout.log), [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/test-w11.stderr.log](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/test-w11.stderr.log).
+- 원시 결과/귀속: [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/test-w11.run.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/test-w11.run.json), [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/test-w11.stdout.log](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/test-w11.stdout.log), [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/test-w11.stderr.log](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/test-w11.stderr.log).
 
 ## 요구사항 검토
 
 원문 전문과 현재 HTML·lesson data/controller/renderer/tests·기존 VERIFICATION·source-proof를 대조했다. 원문 5Java블록은 추출 파일과 바이트가 같고, 생성 HTML의 전체 원문14944자/code5/id22 및 기존 focused/map 보존 검사는 통과했다. 원문 보존은 보충 학습 커버리지 완료와 다르다.
 
-49 의미 단위(자가점검 복습 중복 포함): covered 11 / partial 21 / missing 11 / unrun 6. covered는 이번 DB·현재 브라우저·학습자 이해를 인증하지 않는다. 전체 행은 [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/source-coverage.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/source-coverage.json)에 sourceLines/stageIds/evidence/gap으로 남겼다.
+49 의미 단위(자가점검 복습 중복 포함): covered 11 / partial 21 / missing 11 / unrun 6. covered는 이번 DB·현재 브라우저·학습자 이해를 인증하지 않는다. 전체 행은 [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/source-coverage.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/source-coverage.json)에 sourceLines/stageIds/evidence/gap으로 남겼다.
 
 | 원문 의미 단위 | 줄 | stageIds | 판정 | 공백/근거 요약 |
 |---|---|---|---|---|
@@ -69,9 +69,9 @@
 
 확정 implementation finding은 **minor 1개**, critical/important 0개다. 전체 문서 공백은 위 표와 후속 묶음이며 이 이슈 수에 섞지 않았다.
 
-**W11-Q01 — 복사 완료와 장면 이동의 경쟁**: [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/w11-learning.js:99](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/tools/site/w11-learning.js:99). repository-insert에서 clipboard Promise를 보류하고 service-failure로 이동한 뒤 resolve하면, 현재 표시 코드와 clipboard는 다르지만 현재 장면에 `코드를 복사했습니다.`가 표시된다. 기대는 오래된 복사 완료가 새 장면 status/selection을 변경하지 않는 것이다. 시작 장면/요청 식별자로 콜백을 제한하고 지연 resolve/reject·연속복사 회귀 검사를 추가하는 좁은 수정을 권한다.
+**W11-Q01 — 복사 완료와 장면 이동의 경쟁**: [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/w11-learning.js:99](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/tools/site/w11-learning.js:99). repository-insert에서 clipboard Promise를 보류하고 service-failure로 이동한 뒤 resolve하면, 현재 표시 코드와 clipboard는 다르지만 현재 장면에 `코드를 복사했습니다.`가 표시된다. 기대는 오래된 복사 완료가 새 장면 status/selection을 변경하지 않는 것이다. 시작 장면/요청 식별자로 콜백을 제한하고 지연 resolve/reject·연속복사 회귀 검사를 추가하는 좁은 수정을 권한다.
 
-재현: `node docs/design/concept-cycle-2026-10-22/tasks/task9/repro-copy-race.mjs` exit0은 **결함 관찰 assert 성공**이며 제품 수정 통과가 아니다. 관측은 [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/copy-race.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/copy-race.json)에 있다. 최초 reviewer 스크립트는 import 상대경로 오류로 exit1이었고, task9 스크립트만 고친 재실행이 exit0이다. 제품 파일은 바꾸지 않았다.
+재현: `node docs/design/concept-cycle-2026-10-22/tasks/task9/repro-copy-race.mjs` exit0은 **결함 관찰 assert 성공**이며 제품 수정 통과가 아니다. 관측은 [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/copy-race.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/copy-race.json)에 있다. 최초 reviewer 스크립트는 import 상대경로 오류로 exit1이었고, task9 스크립트만 고친 재실행이 exit0이다. 제품 파일은 바꾸지 않았다.
 
 기술 대조의 핵심은 다음과 같다.
 
@@ -81,14 +81,14 @@
 - C에서도 Repository annotation을 유지한 REQUIRED 참여를 확인한다. 자기호출·다른 propagation·checked/catch/readOnly는 이 실행으로 검증하지 않았다.
 - 트래커 연결1/2는 run-local wrapper ID이며 DB session/pool 개수가 아니다. trackedConnections0은 setup/raw observer/assert 연결을 제외한다. 원문 DML과 관찰 SELECT·setup·assert를 구분한다.
 
-추가 정적 검증 요약: [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/static-proof.json](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/static-proof.json). 원문 Boot4.1.1/Java25 구조 예제와, 추가 Spring7.0.9 CGLIB/DataSourceTransactionManager/H2 2.4.240/JDK21·Boot BOM만의 과거 실험을 구분했다. Controller는 Java proxy 호출이며 HTTP/201/직렬화 실측이 아니다. RiskClient는 제어된 메모리 stub이다. JDBC 예제이므로 JPA flush 장면/EntityManager 관측으로 확대하지 않았다.
+추가 정적 검증 요약: [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/static-proof.json](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks/task9/static-proof.json). 원문 Boot4.1.1/Java25 구조 예제와, 추가 Spring7.0.9 CGLIB/DataSourceTransactionManager/H2 2.4.240/JDK21·Boot BOM만의 과거 실험을 구분했다. Controller는 Java proxy 호출이며 HTTP/201/직렬화 실측이 아니다. RiskClient는 제어된 메모리 stub이다. JDBC 예제이므로 JPA flush 장면/EntityManager 관측으로 확대하지 않았다.
 
 ## 직접 본 이미지와 한계
 
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/images/W11-repository-v3.jpg](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/images/W11-repository-v3.jpg)
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/images/W11-service.jpg](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/images/W11-service.jpg)
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/desktop-repository.jpg](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/desktop-repository.jpg)
-- [/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/mobile-service.jpg](/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/mobile-service.jpg)
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/images/W11-repository-v3.jpg](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/images/W11-repository-v3.jpg)
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/images/W11-service.jpg](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/images/W11-service.jpg)
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/desktop-repository.jpg](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/desktop-repository.jpg)
+- [LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/mobile-service.jpg](LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/w11-2026-10-20/mobile-service.jpg)
 
 시안2장+역사 desktop/mobile 캡처2장을 직접 열었다. repository/service의 writer·별도 observer·commit/rollback 값과 한계 문구를 확인했다. desktop 캡처의 전체 그림 글자는 작고 확대 조작에 의존하며, mobile-service에는 번역 확장 overlay가 보인다. 현재 application 결함이나 현재 가독성 통과로 단정하지 않았다. 나머지4시안·10캡처는 미열람이다. 직접 확인한 JPEG 헤더는 시안1672×941, desktop full-page1672×2402, mobile full-page390×3300이다. full-page JPG 높이와 기록된 viewport1672×941/390×844는 같지 않다. 현재 viewport·가로 넘침·모바일 pan·복사/링크는 메인이 별도로 검사해야 한다.
 

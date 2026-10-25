@@ -1,0 +1,904 @@
+{
+  "version": 1,
+  "id": "posts-edit-remove",
+  "title": "내 글을 수정하고 삭제하기",
+  "summary": "board 과정의 PUT 전체 교체와 PATCH 일부 수정 계약을 적용해 작성자·태그·기본값을 확인한다.",
+  "difficulty": "기초",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "edit",
+      "title": "전체 교체와 부분 변경으로 내 글 수정하기"
+    },
+    {
+      "id": "delete",
+      "title": "삭제한 글이 다시 노출되지 않게 하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 과정 프로젝트",
+      "stages": [
+        {
+          "id": "edit",
+          "title": "전체 교체와 부분 변경으로 내 글 수정하기",
+          "sourceUnits": [
+            "course:D05-2"
+          ],
+          "brief": {
+            "purpose": "board 과정의 PUT 전체 교체와 PATCH 일부 수정 계약을 적용해 작성자·태그·기본값을 확인한다.",
+            "task": "자기 글 title A→B 수정, PUT 전체 본문 교체, PATCH title만 변경을 비교한다. 과정 board D05-2에 포함된 DELETE까지 실행해 soft delete 204와 후속 상세 404를 확인한다.",
+            "preconditions": [
+              "spec-board recipe board:post-replace:normal, board:post-patch:normal을 사용하고 실제 postId를 받는다.",
+              "Kim 소유 글과 Park 소유 글을 분리한다."
+            ],
+            "scenario": [
+              {
+                "start": "post title A, content C, tags=[java]이며 Kim 소유.",
+                "action": "PUT /api/posts/{postId}에 title B/content D/tags=[spring] 전송; 뒤에 PATCH {title:E}.",
+                "result": "각 요청 200. PUT은 전체 필드를 반영하고 PATCH는 E로 title만 변경, content D와 tags[spring] 유지.",
+                "after": "PUT에서 tags를 생략한 별도 요청은 tags=[]로 교체되는지 확인하고 실패 body/권한에서 row 불변을 확인."
+              }
+            ],
+            "data": [
+              {
+                "name": "Kim post의 title/content/tags",
+                "reason": "PUT 교체와 PATCH 보존 필드를 분리한다."
+              },
+              {
+                "name": "Park owner id와 Kim token",
+                "reason": "작성자 불일치 403에서 타인 row가 유지되는지 확인한다."
+              },
+              {
+                "name": "post_tag의 java/spring 관계",
+                "reason": "PUT tag replacement 뒤 연결 row와 공유 tag 보존을 확인한다."
+              }
+            ],
+            "policies": [
+              "PUT /api/posts/{postId}는 title/content 필수, tags 생략은 빈 목록, visibility는 기본 PUBLIC이며 author/board 변경 필드는 받지 않는다.",
+              "PATCH는 전달한 non-null 필드만 수정하며 boardSlug·authorId를 임의로 받지 않는다.",
+              "대상 존재 및 작성자 권한은 source 규칙으로 판정한다. DB 실패는 부분 필드 변경을 남기지 않는다.",
+              "course D05-2 source unit에는 DELETE /api/posts/{postId}도 포함한다. 작성자는 204, 후속 GET은 404이며 soft delete다. title/body 수정 stage에 함께 매핑된 이 source endpoint도 이 board variant에서 확인한다."
+            ],
+            "inputs": [
+              "PUT body title=B,content=D,tags=[spring]; PATCH body {title:E}.",
+              "비정상 body PATCH {title:F,tags:[\"\", \"valid\"]}; Park token; id 999999.",
+              "board exact recipe: DELETE /api/posts/{postId}; 성공 뒤 GET 같은 id."
+            ],
+            "success": [
+              "PUT recipe: 200 상세 응답, title=B/content=D/tags=[spring].",
+              "PATCH recipe: 200, title=E/content=D/tags=[spring].",
+              "PUT tags 생략 시 빈 배열로 기존 tag가 제거되는 계약 확인.",
+              "board D05-2 DELETE /api/posts/{postId} → 204; 후속 GET → 404."
+            ],
+            "failures": [
+              {
+                "when": "PATCH의 tag 검증이 실패",
+                "result": "400 validation 오류.",
+                "unchanged": "요청 전 title/content/tags 모두 유지."
+              },
+              {
+                "when": "Park token이 Kim 글을 수정",
+                "result": "403.",
+                "unchanged": "Kim post와 java/spring 연결 모두 유지."
+              },
+              {
+                "when": "postId 999999 또는 token 누락",
+                "result": "404 또는 401.",
+                "unchanged": "대상 목록과 다른 글 모두 변화 없음."
+              },
+              {
+                "when": "Park token deletes Kim post or id missing",
+                "result": "403 또는 404 source contract.",
+                "unchanged": "post state and tag associations remain unchanged."
+              }
+            ],
+            "examples": [
+              {
+                "title": "PUT 뒤 PATCH",
+                "start": "Kim 글 A/C/[java]",
+                "action": "PUT B/D/[spring], 다음 PATCH {title:E}",
+                "result": "PUT 200 → B/D/[spring]; PATCH 200 → E/D/[spring]"
+              },
+              {
+                "title": "PATCH 뒤쪽 필드 검증 실패",
+                "start": "DB E/D/[spring]",
+                "action": "PATCH {title:F,tags:[\"\", \"valid\"]}",
+                "result": "400; DB는 E/D/[spring] 그대로"
+              },
+              {
+                "title": "다른 작성자 token",
+                "start": "Park 글 id P, Kim token",
+                "action": "PUT/PATCH /api/posts/P",
+                "result": "403; Park 글과 tag 관계 불변"
+              },
+              {
+                "title": "Course board soft delete",
+                "start": "Kim post id from board recipe is active",
+                "action": "DELETE /api/posts/{postId}, then GET same id",
+                "result": "204; follow-up GET 404; soft-delete row remains under source policy"
+              }
+            ],
+            "work": [
+              "normal recipe와 source error cases를 호출하고 actual id를 사용한다.",
+              "GET 상세와 post_tag query를 수정 전/후 비교한다.",
+              "validation 실패 후 DB 값을 새 연결에서 읽어 rollback을 확인한다.",
+              "D05-2 board delete recipe도 수행해 PUT/PATCH와 별개 status 및 상세 후속 결과를 기록한다."
+            ],
+            "done": [
+              "PUT 기본값과 PATCH 누락 필드 보존이 분리 확인됐다.",
+              "Kim/Park 권한 오류와 없는 id가 기대 status를 냈다.",
+              "실패 후 title/content/tags DB 값이 그대로였다.",
+              "course source가 포함한 DELETE 204·GET 404를 board variant에서 확인했다."
+            ],
+            "hints": [
+              "PUT에서 tags를 생략했을 때 기존 java tag가 남는지 지워지는지 contract에서 어디를 볼까요?",
+              "PATCH에 title은 valid, tags는 invalid로 보낼 때 DB가 title만 먼저 저장하지 않게 어떤 경계를 확인할까요?",
+              "404와 403을 나누기 전에 글 존재·조회 가능·작성자 여부 중 어떤 순서가 원문인가요?",
+              "D05-2의 soft delete가 204 뒤 DB row를 남기면서 일반 GET에서 404가 되는지 어떤 값으로 확인할까요?"
+            ]
+          },
+          "hints": [
+            "PUT에서 tags를 생략했을 때 기존 java tag가 남는지 지워지는지 contract에서 어디를 볼까요?",
+            "PATCH에 title은 valid, tags는 invalid로 보낼 때 DB가 title만 먼저 저장하지 않게 어떤 경계를 확인할까요?",
+            "404와 403을 나누기 전에 글 존재·조회 가능·작성자 여부 중 어떤 순서가 원문인가요?",
+            "D05-2의 soft delete가 204 뒤 DB row를 남기면서 일반 GET에서 404가 되는지 어떤 값으로 확인할까요?"
+          ],
+          "recipeIds": [
+            "board:post-replace:normal",
+            "board:post-patch:normal",
+            "board:post-delete:normal"
+          ],
+          "executionChecks": [
+            {
+              "title": "원문 실행 절차 확인",
+              "command": "./gradlew test",
+              "expected": "원본 시나리오의 PUT/PATCH 정상·실패 check를 실행한다.",
+              "record": "각 변경 전후의 제목·본문·작성자 id와 실제 HTTP 응답을 기록한다."
+            }
+          ],
+          "concepts": [],
+          "references": []
+        },
+        {
+          "id": "delete",
+          "title": "삭제한 글을 일반 조회에서 제외하기",
+          "sourceUnits": [
+            "course:D05-2"
+          ],
+          "brief": {
+            "purpose": "작성자가 지운 글을 일반 상세·목록에서 다시 노출하지 않게 합니다.",
+            "task": "작성자 권한을 확인해 소프트 삭제하고, 상세·목록·DB 상태를 같은 글 id로 비교하세요.",
+            "preconditions": [
+              "선택한 프로젝트에서 작성자가 직접 등록한 실제 글 id와 다른 회원 인증을 준비합니다.",
+              "삭제 전 제목·본문·태그와 DB 상태를 기록합니다."
+            ],
+            "scenario": [
+              {
+                "start": "김자바의 공개 글이 상세와 목록에 보입니다. 박디비는 이 글의 작성자가 아닙니다.",
+                "action": "작성자 인증으로 DELETE /api/posts/{postId}를 보낸 뒤 같은 글 상세와 목록을 다시 읽습니다.",
+                "result": "성공 응답은204이며 본문이 없습니다. 일반 상세는404, 목록에서는 제외됩니다.",
+                "after": "DB의 삭제 표시를 확인하고 글의 기존 내용과 공유 태그가 보존됐는지 확인합니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "삭제 대상과 인증 작성자",
+                "reason": "다른 사람의 글을 지우지 못하게 합니다."
+              },
+              {
+                "name": "소프트 삭제 표시",
+                "reason": "원래 행을 보존하면서 일반 조회에서 제외합니다."
+              }
+            ],
+            "policies": [
+              "작성자는 본문이 아니라 인증 주체로 확인합니다.",
+              "board 과정은 status=DELETED와 deleted_at을 확인합니다.",
+              "성공204는 빈 본문이며, 실패한 권한·대상 요청은 저장 상태를 바꾸지 않습니다."
+            ],
+            "inputs": [
+              "DELETE /api/posts/{postId}, 실제 postId, 작성자 또는 다른 회원의 인증. 삭제 요청 본문은 없습니다."
+            ],
+            "success": [
+              "204 빈 본문, 같은 글 일반 상세404, 목록에서 제외됨을 확인합니다."
+            ],
+            "failures": [
+              {
+                "when": "다른 회원이 볼 수 있는 내 글을 삭제하려 함",
+                "result": "403으로 거절합니다. 없는 대상은404입니다.",
+                "unchanged": "글 내용·삭제 표시·태그 연결·다른 회원 데이터가 요청 전과 같아야 합니다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "작성자와 다른 회원 비교",
+                "start": "내 글은 정상 상세200입니다.",
+                "action": "다른 회원 삭제 후 작성자 삭제를 각각 요청합니다.",
+                "result": "다른 회원403에서 글은 유지되고, 작성자204 뒤 일반 상세404가 됩니다."
+              }
+            ],
+            "work": [
+              "대상·작성자·삭제 표시·일반 조회 조건을 하나의 삭제 기능으로 연결합니다."
+            ],
+            "done": [
+              "작성자 삭제204와 빈 본문을 확인했습니다.",
+              "동일 id의 상세404·목록 제외·DB 삭제 표시를 확인했습니다.",
+              "다른 회원403과 없는 글404에서 기존 저장 결과가 보존됐습니다."
+            ]
+          },
+          "hints": [
+            "HTTP204를 받았는데 DB 행이 남아 있다면 무엇이 삭제를 나타낼까요?",
+            "목록과 상세가 같은 삭제 정책을 적용한다는 것은 어떤 조회로 확인할까요?",
+            "다른 사람이 쓰는 공유 태그까지 삭제하지 않았다는 것을 어떤 행과 연결로 증명할까요?"
+          ],
+          "recipeIds": [
+            "board:post-delete:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "기존 삭제 계약",
+              "href": "course/spring/D05.html#step-d05-2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "edit",
+          "title": "전체 교체와 부분 변경으로 내 글 수정하기",
+          "sourceUnits": [
+            "legacy:3-0",
+            "legacy:3-1",
+            "functional:update"
+          ],
+          "brief": {
+            "purpose": "3-0 PUT과 3-1 PATCH를 community API에서 수행하고 제목·본문·태그·visibility의 전후 상태를 검증한다.",
+            "task": "Kim의 post 22 제목 A→B를 바꾸고 PUT 필수 필드·tag 기본값과 PATCH 일부 수정/rollback을 별도 요청으로 확인한다.",
+            "preconditions": [
+              "원문 3-0/3-1 recipe가 만든 id를 캡처하고 tok-kimjava로 본다.",
+              "같은 tag java를 쓰는 다른 글을 두어 공유 row 삭제와 연결 해제를 구별한다."
+            ],
+            "scenario": [
+              {
+                "start": "post 22는 title=\"이전 제목 A\", content=\"이전 본문 C\", tags=[java], visibility=PUBLIC.",
+                "action": "PUT /api/posts/22에 B/D/[spring]/PUBLIC, 다음 PATCH title=E만 전송.",
+                "result": "PUT 200 상세 DTO B/D/[spring]; PATCH 200 E/D/[spring]으로 title만 바뀐다.",
+                "after": "PATCH 후속 tag 오류, Park token, 없는 id에 대한 실패와 rollback을 검증한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "post 22 title/content/tags/visibility",
+                "reason": "전체교체와 부분변경의 필드 효과를 관찰."
+              },
+              {
+                "name": "Kim/Park 회원 token",
+                "reason": "owner check와 401/403을 구분."
+              },
+              {
+                "name": "공유 java tag 및 post_tag row",
+                "reason": "연결 삭제와 태그 원본 삭제를 분리 확인."
+              }
+            ],
+            "policies": [
+              "PUT title/content는 필수, tags 누락은 빈 배열, visibility 누락은 PUBLIC이다. boardSlug/authorId를 받아 옮기거나 소유자를 바꾸지 않는다.",
+              "PATCH에서는 보낸 non-null 필드만 검증·수정한다. {}도 source 기준으로 성공하며 updated_at이 바뀔 수 있다. PATCH는 조회수를 올리지 않는다.",
+              "canView 이후 author를 확인한다. ADMIN이어도 다른 회원의 글 수정 권한을 자동으로 얻지 않는다.",
+              "후속 validation 오류 시 transaction rollback이 DB를 되돌려도 이미 변경된 Java 객체가 자동으로 원복된다는 뜻은 아니다."
+            ],
+            "inputs": [
+              "PUT body {title:\"새 제목 B\",content:\"새 본문 D\",tags:[\"spring\"],visibility:\"PUBLIC\"}.",
+              "PATCH body {title:\"부분 제목 E\"}; failure PATCH {title:\"바뀌면 안 됨\",tags:[\"valid\",\" \"]}.",
+              "Park token+Kim 글, token 없음, 없는 999999 id."
+            ],
+            "success": [
+              "PUT /api/posts/{id} → 200, 상세 DTO의 title/content/tags 변경.",
+              "PATCH /api/posts/{id} → 200; 보내지 않은 content/tags/visibility 유지.",
+              "D05 course source와 community legacy의 실제 status/body를 따로 비교한다."
+            ],
+            "failures": [
+              {
+                "when": "PATCH의 뒤 필드 tags가 공백이라 validation fail",
+                "result": "400.",
+                "unchanged": "DB에서 title은 이전 값, content/tags/visibility도 이전 값."
+              },
+              {
+                "when": "Park 또는 ADMIN이 Kim 작성 글 수정",
+                "result": "403.",
+                "unchanged": "post와 post_tag 관계 unchanged."
+              },
+              {
+                "when": "없는/삭제된/볼 수 없는 글",
+                "result": "404.",
+                "unchanged": "다른 글 및 tag 원본을 건드리지 않는다."
+              },
+              {
+                "when": "토큰 없음/오류",
+                "result": "401.",
+                "unchanged": "post unchanged."
+              }
+            ],
+            "examples": [
+              {
+                "title": "title/body 전체 교체",
+                "start": "id22 A/C/[java]/PUBLIC",
+                "action": "PUT title B, content D, tags [spring], visibility PUBLIC",
+                "result": "200; B/D/[spring]/PUBLIC"
+              },
+              {
+                "title": "title만 PATCH",
+                "start": "B/D/[spring]/PUBLIC",
+                "action": "PATCH {title:E}",
+                "result": "200; E/D/[spring]/PUBLIC, view_count 불변"
+              },
+              {
+                "title": "다중 필드 요청 중 검증 실패",
+                "start": "E/D/[spring]/PUBLIC",
+                "action": "PATCH title=F와 tags=[valid,공백]",
+                "result": "400; DB는 E/D/[spring]/PUBLIC 그대로"
+              }
+            ],
+            "work": [
+              "API response 상세와 SQL before-after를 함께 확인한다.",
+              "공유 tag row 수와 post_tag 관계 수, rollback 시 Java/entity 및 DB 관찰을 나누어 기록한다.",
+              "flush 후 SQL 로그, same connection, 별도 connection commit 이후를 구분한다."
+            ],
+            "done": [
+              "3-0 PUT, 3-1 PATCH status와 누락 필드 동작을 확인했다.",
+              "400/401/403/404마다 저장값이 바뀌지 않음을 확인했다.",
+              "공유 tag와 flush/rollback 증거를 제출할 수 있다."
+            ],
+            "hints": [
+              "PATCH는 view_count를 올리지 않는다는 점을 어느 전후 query로 확인할 수 있나요?",
+              "후속 tags 검증이 실패했을 때 메모리 entity title과 DB title은 각각 언제 읽어야 하나요?",
+              "post_tag의 연결을 지울 때 공유 tag 본문을 삭제하지 않았다는 증거는 무엇인가요?"
+            ]
+          },
+          "hints": [
+            "PATCH는 view_count를 올리지 않는다는 점을 어느 전후 query로 확인할 수 있나요?",
+            "후속 tags 검증이 실패했을 때 메모리 entity title과 DB title은 각각 언제 읽어야 하나요?",
+            "post_tag의 연결을 지울 때 공유 tag 본문을 삭제하지 않았다는 증거는 무엇인가요?"
+          ],
+          "recipeIds": [
+            "community:update:normal",
+            "legacy:3-0:P",
+            "legacy:3-0:U",
+            "legacy:3-0:V",
+            "legacy:3-0:G",
+            "legacy:3-0:F",
+            "legacy:3-0:A",
+            "legacy:3-0:N",
+            "legacy:3-1:E0",
+            "legacy:3-1:E1",
+            "legacy:3-1:E2",
+            "legacy:3-1:E3",
+            "legacy:3-1:V1",
+            "legacy:3-1:V2",
+            "legacy:3-1:V3",
+            "legacy:3-1:V4",
+            "legacy:3-1:V5",
+            "legacy:3-1:V10",
+            "legacy:3-1:V6",
+            "legacy:3-1:V7",
+            "legacy:3-1:V8",
+            "legacy:3-1:V9",
+            "legacy:3-1:O1",
+            "legacy:3-1:E4",
+            "legacy:3-1:E5",
+            "legacy:3-1:E6",
+            "legacy:3-1:E7",
+            "legacy:3-1:B0",
+            "legacy:3-1:B1",
+            "legacy:3-1:B2",
+            "legacy:3-1:B3"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:3-0 · PUT으로 게시글 전체 교체",
+              "href": "/scenario/ch3-update-delete/3-0-put-replace.html"
+            },
+            {
+              "label": "legacy:3-1 · 부분 수정(PATCH)과 본인 확인",
+              "href": "/scenario/ch3-update-delete/3-1-patch.html"
+            },
+            {
+              "label": "../../docs/knowledge/S09-jpa-hibernate.md",
+              "href": "/docs/knowledge/S09-jpa-hibernate.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:3-0 · PUT으로 게시글 전체 교체",
+              "href": "/scenario/ch3-update-delete/3-0-put-replace.html"
+            },
+            {
+              "label": "legacy:3-1 · 부분 수정(PATCH)과 본인 확인",
+              "href": "/scenario/ch3-update-delete/3-1-patch.html"
+            },
+            {
+              "label": "../../docs/knowledge/S09-jpa-hibernate.md",
+              "href": "/docs/knowledge/S09-jpa-hibernate.html"
+            },
+            {
+              "label": "../../docs/knowledge/D11-web-security-basics.md",
+              "href": "/docs/knowledge/D11-web-security-basics.html"
+            },
+            {
+              "label": "../../docs/knowledge/W10-where-to-validate.md",
+              "href": "/docs/knowledge/W10-where-to-validate.html"
+            },
+            {
+              "label": "../../docs/knowledge/P16-json-jackson-practical.md",
+              "href": "/docs/knowledge/P16-json-jackson-practical.html"
+            },
+            {
+              "label": "functional:update · 4. 게시글 부분 수정",
+              "href": "/scenario/flow/update-post.html"
+            },
+            {
+              "label": "../../docs/knowledge/W21-null-handling.md",
+              "href": "/docs/knowledge/W21-null-handling.html"
+            },
+            {
+              "label": "../../docs/knowledge/P20-jpa-entity-mapping.md",
+              "href": "/docs/knowledge/P20-jpa-entity-mapping.html"
+            }
+          ]
+        },
+        {
+          "id": "delete",
+          "title": "삭제한 글이 다시 노출되지 않게 하기",
+          "sourceUnits": [
+            "legacy:3-2",
+            "functional:delete"
+          ],
+          "brief": {
+            "purpose": "community 3-2 soft delete를 실행해 204 뒤 상세 404·목록 제외와 공유 tag 보존을 함께 검증한다.",
+            "task": "Kim이 만든 글을 삭제하고, Park의 삭제 시도 및 이미 삭제된 id의 반복 요청에서 상태와 관계 행이 보존되는지 확인한다.",
+            "preconditions": [
+              "3-2 recipe에서 실제 생성 id를 캡처한다.",
+              "삭제 대상 post title/status/deleted_at과 공유 tag 및 다른 글 연결을 기록한다."
+            ],
+            "scenario": [
+              {
+                "start": "Kim post active, 글 상세 200; post_tag에 tag 연결.",
+                "action": "Kim token DELETE /api/posts/{id}; 뒤이어 상세, 목록, 반복 DELETE 조회.",
+                "result": "첫 삭제 204, 상세 GET 404, 정상 목록에서 제외. 두 번째 삭제는 source contract status를 확인한다.",
+                "after": "Park token으로 별도 글을 삭제해 403 확인하고 soft delete 및 공유 tag 상태를 비교."
+              }
+            ],
+            "data": [
+              {
+                "name": "post id/author_id/deleted_at/status",
+                "reason": "삭제의 soft-state 전이를 확인."
+              },
+              {
+                "name": "tag와 post_tag 관계 row",
+                "reason": "글 삭제가 공유 태그와 타 글 연결을 지우지 않는지 확인."
+              },
+              {
+                "name": "삭제 전후 상세·목록 결과",
+                "reason": "API 노출 정책이 DB 상태와 일치하는지 검증."
+              }
+            ],
+            "policies": [
+              "3-2는 physical DELETE가 아니라 soft delete다. 삭제된 글은 GET 상세에서 404, 정상 목록에서 제외한다.",
+              "작성자 이외는 403이며 삭제 처리 중에는 대상 존재·권한 검증이 원문 순서대로 적용된다.",
+              "같은 transaction에서 rollback되면 삭제 표시와 관계 변경을 확정하지 않는다."
+            ],
+            "inputs": [
+              "DELETE /api/posts/{capturedId} with Kim token.",
+              "GET 같은 id; GET /api/boards/dev/posts?size=50; repeat DELETE.",
+              "Park token으로 Kim id DELETE."
+            ],
+            "success": [
+              "자기 글 DELETE → 204.",
+              "같은 글 GET → 404, 일반 목록에 없음.",
+              "DB row는 soft-delete 정보로 남고 공유 tag row는 보존된다."
+            ],
+            "failures": [
+              {
+                "when": "Park token으로 Kim 글 삭제",
+                "result": "403.",
+                "unchanged": "post status/deleted_at, title, post_tag, shared tag 그대로."
+              },
+              {
+                "when": "없는 id 또는 삭제 후 반복 삭제",
+                "result": "recipe의 404.",
+                "unchanged": "다른 글과 태그 관계 변화 없음."
+              }
+            ],
+            "examples": [
+              {
+                "title": "소프트 삭제 후 재조회",
+                "start": "post 22 active, java tag가 다른 글에도 연결",
+                "action": "Kim token DELETE /api/posts/22, GET /api/posts/22, GET 목록",
+                "result": "204; 상세 404; 목록에서 22 제외; soft-delete marker 기록, 다른 글 java 연결 유지"
+              },
+              {
+                "title": "타인 글 삭제 거절",
+                "start": "Kim 글 22, Park token",
+                "action": "DELETE /api/posts/22",
+                "result": "403; marker와 연결 row 전 상태 유지"
+              }
+            ],
+            "work": [
+              "DELETE 전후 API와 DB marker를 확인한다.",
+              "같은 tag를 쓰는 타 글을 조회해 원문 공유 tag 수명 규칙을 확인한다.",
+              "flush, rollback, commit 뒤 새 DB connection 관찰을 분리해 기록한다."
+            ],
+            "done": [
+              "204/404/목록 제외의 연쇄가 확인됐다.",
+              "403/404 뒤 대상과 다른 데이터가 보존됐다.",
+              "soft delete와 공유 tag의 실제 전후 값을 기록했다."
+            ],
+            "hints": [
+              "HTTP 204 뒤 상세 404인데 DB 행이 남아 있다면 어떤 열이 삭제 상태를 나타내나요?",
+              "삭제된 글이 목록에서 빠지는 query 조건을 DB marker와 어떻게 연결할까요?",
+              "tag row가 지워졌는지 post_tag 연결만 끊겼는지 구별하는 query는 무엇인가요?"
+            ]
+          },
+          "hints": [
+            "HTTP 204 뒤 상세 404인데 DB 행이 남아 있다면 어떤 열이 삭제 상태를 나타내나요?",
+            "삭제된 글이 목록에서 빠지는 query 조건을 DB marker와 어떻게 연결할까요?",
+            "tag row가 지워졌는지 post_tag 연결만 끊겼는지 구별하는 query는 무엇인가요?"
+          ],
+          "recipeIds": [
+            "community:delete:normal",
+            "legacy:3-2:S0",
+            "legacy:3-2:S1",
+            "legacy:3-2:S2",
+            "legacy:3-2:S3",
+            "legacy:3-2:S4",
+            "legacy:3-2:S5",
+            "legacy:3-2:Z",
+            "legacy:3-2:S6"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:3-2 · 삭제 — soft delete",
+              "href": "/scenario/ch3-update-delete/3-2-soft-delete.html"
+            },
+            {
+              "label": "../../docs/knowledge/P20-jpa-entity-mapping.md",
+              "href": "/docs/knowledge/P20-jpa-entity-mapping.html"
+            },
+            {
+              "label": "../../docs/knowledge/S09-jpa-hibernate.md",
+              "href": "/docs/knowledge/S09-jpa-hibernate.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:3-2 · 삭제 — soft delete",
+              "href": "/scenario/ch3-update-delete/3-2-soft-delete.html"
+            },
+            {
+              "label": "../../docs/knowledge/P20-jpa-entity-mapping.md",
+              "href": "/docs/knowledge/P20-jpa-entity-mapping.html"
+            },
+            {
+              "label": "../../docs/knowledge/S09-jpa-hibernate.md",
+              "href": "/docs/knowledge/S09-jpa-hibernate.html"
+            },
+            {
+              "label": "../../docs/knowledge/W08-where-to-handle-exceptions.md",
+              "href": "/docs/knowledge/W08-where-to-handle-exceptions.html"
+            },
+            {
+              "label": "../../docs/knowledge/R07-backup-restore.md",
+              "href": "/docs/knowledge/R07-backup-restore.html"
+            },
+            {
+              "label": "functional:delete · 5. 게시글 삭제",
+              "href": "/scenario/flow/delete-post.html"
+            },
+            {
+              "label": "../../docs/knowledge/R06-db-client-tools.md",
+              "href": "/docs/knowledge/R06-db-client-tools.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "project-v1",
+      "project": "project-v1",
+      "label": "project-v1 · 명세 프로젝트",
+      "stages": [
+        {
+          "id": "edit",
+          "title": "전체 교체와 부분 변경으로 내 글 수정하기",
+          "sourceUnits": [
+            "legacy:10-8"
+          ],
+          "brief": {
+            "purpose": "legacy 10-8 spec-board 게시글 수정/삭제 중 수정 계약을 JWT 주체와 ApiResponse wrapper로 검증한다.",
+            "task": "project-v1의 자신의 글 전체 수정과 빠진 필드의 default를 실제 recipe에 따라 확인하고 타인/없는 글을 거절한다.",
+            "preconditions": [
+              "10-5에서 실제 Location id를 얻은 project-v1 post를 쓴다.",
+              "spec-board token/DB만 사용하고 community 3장의 response body를 가져오지 않는다."
+            ],
+            "scenario": [
+              {
+                "start": "Kim의 spec-board 글 title A/content C/PUBLIC, id는 10-5 응답에서 캡처.",
+                "action": "10-8에서 명시한 PUT /api/v1/posts/{postId} body로 title B/content D 전체 수정.",
+                "result": "source recipe가 정한 200 ApiResponse/data 상세가 B/D를 보여 준다.",
+                "after": "author token을 Park으로 바꾸거나 없는 id를 넣어 403/404와 기존 값 보존 확인."
+              }
+            ],
+            "data": [
+              {
+                "name": "project-v1 posts row: id/author/title/content/visibility",
+                "reason": "전체 PUT의 변경·초기화 값을 비교."
+              },
+              {
+                "name": "Kim/Park JWT subject",
+                "reason": "본문 authorId 대신 인증 주체가 권한 판정하는지 확인."
+              },
+              {
+                "name": "ApiResponse data envelope",
+                "reason": "legacy 10장 response wrapper와 community raw DTO를 분리."
+              }
+            ],
+            "policies": [
+              "URI와 body 필드는 legacy 10-8/spec-board API recipe만 따른다.",
+              "project-v1 성공/실패는 ApiResponse status/message/data 형식이다.",
+              "수정 권한은 JWT의 사용자 id와 post.author_id 비교로 판정한다."
+            ],
+            "inputs": [
+              "실제 postId 및 Kim token.",
+              "title=\"명세 수정 B\", content=\"전체 교체 D\"와 10-8에서 허용한 선택 필드를 보낸다.",
+              "Park token 및 postId=999999 실패 probe."
+            ],
+            "success": [
+              "PUT /api/v1/posts/{postId} → recipe의 200 status와 ApiResponse data.",
+              "응답 id/author id는 대상 글을 유지하고 전송한 변경 필드만 contract대로 반영한다."
+            ],
+            "failures": [
+              {
+                "when": "Park JWT로 Kim 글 수정",
+                "result": "403 공통 오류 envelope.",
+                "unchanged": "post row 기존 title/content/author 유지."
+              },
+              {
+                "when": "없는 post id",
+                "result": "404 공통 오류 envelope.",
+                "unchanged": "다른 글 변경 없음."
+              },
+              {
+                "when": "필수 body 누락/범위 밖 값",
+                "result": "400 validation envelope.",
+                "unchanged": "DB row 유지."
+              }
+            ],
+            "examples": [
+              {
+                "title": "소유 글 전체 수정",
+                "start": "Kim post id=실제 캡처값, title=A/content=C",
+                "action": "PUT project-v1 글 수정 요청 title=B/content=D",
+                "result": "200; ApiResponse.data에 동일 id와 B/D"
+              },
+              {
+                "title": "타인 소유 수정",
+                "start": "동일 id, Park token",
+                "action": "같은 PUT request",
+                "result": "403; data=null 오류 wrapper, 기존 A/C 보존"
+              }
+            ],
+            "work": [
+              "10-8 source recipe와 prepare 순서를 따라 실제 id를 캡처한다.",
+              "wrapper status와 HTTP status를 따로 기록하고 상세 재조회로 DB 결과를 본다.",
+              "권한/validation 실패 뒤 row unchanged를 검증한다."
+            ],
+            "done": [
+              "project-v1 route/body/status만 사용했다.",
+              "성공 상세와 오류 envelope, 실패 후 데이터 보존을 확인했다."
+            ],
+            "hints": [
+              "수정 대상의 authorId는 request body와 JWT 중 어느 쪽에서 신뢰해야 하나요?",
+              "legacy 10장 응답에서 HTTP status와 body의 status가 다르면 두 관측을 어떻게 기록할까요?",
+              "실패한 PUT 뒤 기존 title/content를 검증할 때 response만으로 충분할까요?"
+            ]
+          },
+          "hints": [
+            "수정 대상의 authorId는 request body와 JWT 중 어느 쪽에서 신뢰해야 하나요?",
+            "legacy 10장 응답에서 HTTP status와 body의 status가 다르면 두 관측을 어떻게 기록할까요?",
+            "실패한 PUT 뒤 기존 title/content를 검증할 때 response만으로 충분할까요?"
+          ],
+          "recipeIds": [
+            "legacy:10-8:L",
+            "legacy:10-8:M",
+            "legacy:10-8:P",
+            "legacy:10-8:U",
+            "legacy:10-8:G",
+            "legacy:10-8:F",
+            "legacy:10-8:N",
+            "legacy:10-8:V",
+            "legacy:10-8:V1",
+            "legacy:10-8:V2",
+            "legacy:10-8:V3",
+            "legacy:10-8:V4",
+            "legacy:10-8:V5",
+            "legacy:10-8:V6",
+            "legacy:10-8:B1",
+            "legacy:10-8:B2",
+            "legacy:10-8:X",
+            "legacy:10-8:PV",
+            "legacy:10-8:D1",
+            "legacy:10-8:DN",
+            "legacy:10-8:D",
+            "legacy:10-8:D2",
+            "legacy:10-8:D3",
+            "legacy:10-8:D4"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:10-8 · 수정(PUT 전체 교체)과 삭제(soft) — 작성자 검증 403",
+              "href": "/scenario/ch10-project/10-8-update-delete.html"
+            },
+            {
+              "label": "../../lessons/G2-access-rules-in-one-place.md",
+              "href": "/lessons/G2-access-rules-in-one-place.html"
+            },
+            {
+              "label": "../../lessons/G3-first-transaction.md",
+              "href": "/lessons/G3-first-transaction.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:10-8 · 수정(PUT 전체 교체)과 삭제(soft) — 작성자 검증 403",
+              "href": "/scenario/ch10-project/10-8-update-delete.html"
+            },
+            {
+              "label": "../../lessons/G2-access-rules-in-one-place.md",
+              "href": "/lessons/G2-access-rules-in-one-place.html"
+            },
+            {
+              "label": "../../lessons/G3-first-transaction.md",
+              "href": "/lessons/G3-first-transaction.html"
+            },
+            {
+              "label": "../../lessons/A2-http-anatomy.md",
+              "href": "/lessons/A2-http-anatomy.html"
+            },
+            {
+              "label": "../../docs/knowledge/S09-jpa-hibernate.md",
+              "href": "/docs/knowledge/S09-jpa-hibernate.html"
+            },
+            {
+              "label": "../../docs/knowledge/W11-why-tx-in-service.md",
+              "href": "/docs/knowledge/W11-why-tx-in-service.html"
+            }
+          ]
+        },
+        {
+          "id": "delete",
+          "title": "삭제한 글을 일반 조회에서 제외하기",
+          "sourceUnits": [
+            "legacy:10-8"
+          ],
+          "brief": {
+            "purpose": "작성자가 지운 글을 일반 상세·목록에서 다시 노출하지 않게 합니다.",
+            "task": "작성자 권한을 확인해 소프트 삭제하고, 상세·목록·DB 상태를 같은 글 id로 비교하세요.",
+            "preconditions": [
+              "선택한 프로젝트에서 작성자가 직접 등록한 실제 글 id와 다른 회원 인증을 준비합니다.",
+              "삭제 전 제목·본문·태그와 DB 상태를 기록합니다."
+            ],
+            "scenario": [
+              {
+                "start": "김자바의 공개 글이 상세와 목록에 보입니다. 박디비는 이 글의 작성자가 아닙니다.",
+                "action": "작성자 인증으로 DELETE /api/v1/posts/{postId}를 보낸 뒤 같은 글 상세와 목록을 다시 읽습니다.",
+                "result": "성공 응답은204이며 본문이 없습니다. 일반 상세는404, 목록에서는 제외됩니다.",
+                "after": "DB의 삭제 표시를 확인하고 글의 기존 내용과 공유 태그가 보존됐는지 확인합니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "삭제 대상과 인증 작성자",
+                "reason": "다른 사람의 글을 지우지 못하게 합니다."
+              },
+              {
+                "name": "소프트 삭제 표시",
+                "reason": "원래 행을 보존하면서 일반 조회에서 제외합니다."
+              }
+            ],
+            "policies": [
+              "작성자는 본문이 아니라 인증 주체로 확인합니다.",
+              "명세 프로젝트는 posts.deleted_at을 확인합니다. community의 단수 post 테이블과 혼동하지 않습니다.",
+              "성공204는 빈 본문이며, 실패한 권한·대상 요청은 저장 상태를 바꾸지 않습니다."
+            ],
+            "inputs": [
+              "DELETE /api/v1/posts/{postId}, 실제 postId, 작성자 또는 다른 회원의 인증. 삭제 요청 본문은 없습니다."
+            ],
+            "success": [
+              "204 빈 본문, 같은 글 일반 상세404, 목록에서 제외됨을 확인합니다."
+            ],
+            "failures": [
+              {
+                "when": "다른 회원이 볼 수 있는 내 글을 삭제하려 함",
+                "result": "403으로 거절합니다. 없는 대상은404입니다.",
+                "unchanged": "글 내용·삭제 표시·태그 연결·다른 회원 데이터가 요청 전과 같아야 합니다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "작성자와 다른 회원 비교",
+                "start": "내 글은 정상 상세200입니다.",
+                "action": "다른 회원 삭제 후 작성자 삭제를 각각 요청합니다.",
+                "result": "다른 회원403에서 글은 유지되고, 작성자204 뒤 일반 상세404가 됩니다."
+              }
+            ],
+            "work": [
+              "대상·작성자·삭제 표시·일반 조회 조건을 하나의 삭제 기능으로 연결합니다."
+            ],
+            "done": [
+              "작성자 삭제204와 빈 본문을 확인했습니다.",
+              "동일 id의 상세404·목록 제외·DB 삭제 표시를 확인했습니다.",
+              "다른 회원403과 없는 글404에서 기존 저장 결과가 보존됐습니다."
+            ]
+          },
+          "hints": [
+            "HTTP204를 받았는데 DB 행이 남아 있다면 무엇이 삭제를 나타낼까요?",
+            "목록과 상세가 같은 삭제 정책을 적용한다는 것은 어떤 조회로 확인할까요?",
+            "다른 사람이 쓰는 공유 태그까지 삭제하지 않았다는 것을 어떤 행과 연결로 증명할까요?"
+          ],
+          "recipeIds": [
+            "legacy:10-8:D1",
+            "legacy:10-8:DN",
+            "legacy:10-8:D",
+            "legacy:10-8:D3"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "기존 삭제 계약",
+              "href": "scenario/ch10-project/10-8-update-delete.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "게시글과 소통",
+  "status": "authored"
+}

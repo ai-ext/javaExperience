@@ -492,7 +492,7 @@ function renderFile(f) {
 
 function renderCommitAnswer(commit, files, stepFiles) {
   const sorted = [...files].sort(fileOrder(stepFiles));
-  const lines = [`커밋 [\`${commit.sha.slice(0, 8)}\`](${REPO_URL}/commit/${commit.sha}) — ${commit.subject}`];
+  const lines = [`커밋 [\`${commit.sha.slice(0, 8)}\`](${REPO_URL}/commit/${commit.sha}) — ${commit.subject.replace(/^answer(?:-fix)?\(D\d{2}-\d+\):\s*/, '')}`];
   if (commit.rule?.note) lines.push('', commit.rule.note);
   for (const f of sorted) lines.push('', renderFile(f));
   return lines.join('\n');
@@ -507,7 +507,7 @@ function renderFixAnswer(fixes, files, stepFiles) {
     '',
     '**보완 이력**',
     '',
-    ...fixes.map((c) => `- [\`${c.sha.slice(0, 8)}\`](${REPO_URL}/commit/${c.sha}) ${c.subject}`),
+    ...fixes.map((c) => `- [\`${c.sha.slice(0, 8)}\`](${REPO_URL}/commit/${c.sha}) ${c.subject.replace(/^answer(?:-fix)?\(D\d{2}-\d+\):\s*/, '')}`),
   ];
   for (const f of sorted) lines.push('', renderFile(f));
   return lines.join('\n');
@@ -519,7 +519,7 @@ function answerBlock(dataStep, commits, stepFiles, filesOf, lastTouch, fixFilesO
   const fixes = deferred ? [] : commits.filter((c) => c.kind === 'fix');
   const fixFiles = fixes.length ? fixFilesOf(fixes) : [];
   const all = [...originals.flatMap((c) => filesOf(c.sha)), ...fixFiles];
-  const names = originals.map((c) => `answer(${stepId(c.day, c.m)})`).join(' + ') + (fixes.length ? ` + 보완 ${fixes.length}개` : '');
+  const names = originals.map((c) => `구현 ${stepId(c.day, c.m)}`).join(' + ') + (fixes.length ? ` + 보완 ${fixes.length}개` : '');
   // 보완을 뒤로 미룬 순서도 "만들 파일" 대조는 원래 커밋과 그 보완을 함께 본다
   const touched = new Set([...all, ...(deferred ? fixFilesOf(commits.filter((c) => c.kind === 'fix')) : [])].map((f) => f.path));
   const untouched = stepFiles.filter((f) => !touched.has(f)).map((f) => {
@@ -531,7 +531,7 @@ function answerBlock(dataStep, commits, stepFiles, filesOf, lastTouch, fixFilesO
     `<details class="step-answer" data-step="${dataStep}" data-commits="${shown.map((c) => c.sha).join(' ')}">`,
     `<summary>구현 예시 보기 · ${names} · board-server 파일 ${all.length}개</summary>`,
     '',
-    [...originals.map((c) => renderCommitAnswer(c, filesOf(c.sha), stepFiles)), ...(fixes.length ? [renderFixAnswer(fixes, fixFiles, stepFiles)] : [])].join('\n\n---\n\n'),
+    ['가능한 구현 중 하나입니다. 내 구현은 완료 조건으로 판단하고, 직접 작성한 뒤 비교하세요.', ...originals.filter(c => !(c.day === 'D01' && c.m === 0)).map((c) => renderCommitAnswer(c, filesOf(c.sha), stepFiles)), ...originals.filter(c => c.day === 'D01' && c.m === 0).map(c => `<details class="example-preparation"><summary>프로젝트 준비 이력 · Gradle wrapper·.gitignore</summary>\n\n${renderCommitAnswer(c, filesOf(c.sha), stepFiles)}\n\n</details>`), ...(fixes.length ? [renderFixAnswer(fixes, fixFiles, stepFiles)] : [])].join('\n\n---\n\n'),
     ...(deferred ? ['', `**보완** — 이 순서의 보완은 뒤 순서 코드에 맞춘 diff라 <a href="#${fixAnchor(dataStep)}">${circled(deferred.after)} 뒤 보완 칸</a>에 따로 싣는다.`] : []),
     ...(untouched.length ? ['', '**만들 파일 중 이 커밋에 없는 것**', '', ...untouched] : []),
     '',
@@ -686,7 +686,7 @@ function stepSection(day, s, ctx) {
     lines.push(`**이 순서에서 만들 층** ${layers.join(' · ') || '해당 없음 · 공통 설정·지원 코드'}`, '');
   }
   if (ctx.ready && s.files.length) {
-    lines.push(`**만들 파일** (${day.phase === 'maintain' ? 'messy-server' : '내 프로젝트 · 경로는 구현 예시'} 기준)`, '');
+    lines.push(`**만들 파일** (${day.workTarget?.split(' · ')[0] || (day.phase === 'maintain' ? 'messy-server' : '내 프로젝트 · 경로는 구현 예시')} 기준)`, '');
     for (const [action, label] of Object.entries({create:'새로 만들기',modify:'기존 수정',inspect:'확인만'})) {
       const files = s.fileActions?.[action] ?? (action === 'create' ? s.files : []);
       if (files.length) lines.push(`- **${label}**: ${files.map(f => `\`${f}\``).join(' · ')}`);
@@ -780,7 +780,7 @@ function deferredFixSection(day, no, rule, ctx) {
     `${circled(rule.after)}까지(그 순서의 보완 포함) 만들었으면 <a href="#${stepAnchor(day.id, no)}">${circled(no)}</a>의 보완을 적용한다. ${rule.note}`,
     '',
     `<details class="step-answer" data-step="${id}" data-commits="${fixes.map((c) => c.sha).join(' ')}">`,
-    `<summary>구현 예시 보기 · answer(${id}) 보완 ${fixes.length}개 · board-server 파일 ${files.length}개</summary>`,
+    `<summary>구현 예시 보기 · ${id} 보완 ${fixes.length}개 · board-server 파일 ${files.length}개</summary>`,
     '',
     renderFixAnswer(fixes, files, step.files),
     '',
@@ -807,7 +807,7 @@ function sqlSection(day, sql, root) {
     (day.phase === 'extend' ? '아래는 비교용 SQL이다. 예약·대상·작업 모델은 내가 정한 물리 이름과 필터로 옮긴다. ' : '') + 'board-server의 설계 기준이다. 2단계에서는 같은 계열의 기존 스키마를 관찰한다. 내 물리 이름·키·정렬이 다르면 매핑해 비교한다. 아래 SQL은 실제 실행 결과가 아니며 예시 서버가 모든 불변식을 보장한다는 뜻도 아니다. 오류가 예상되는 문장은 하나씩 실행하고 실패 뒤 ROLLBACK을 별도로 보낸다.', '',
     ...sql.questions.flatMap((q,i) => [`**문항 ${i+1} 구현 예시**`, '', fence(q.example,'sql'), '']),
     '</details>', '',
-    ...((sql.refs ?? []).length ? ['**선택 자료** — 이전 과정은 별도 스키마(community·practice·성능 실험 DB)를 전제한다. 이름·필터를 내 설계로 옮겨 풀고 기존 DB를 덮어쓰지 않는다.', '', ...(sql.refs ?? []).map(p => `- [${docTitle(p,root,day.id)}](../../${p})`)] : []),
+    ...((sql.refs ?? []).length ? ['**선택 자료** — 연결된 실습은 별도 스키마(community·practice·성능 실험 DB)를 전제한다. 이름·필터를 내 설계로 옮겨 풀고 기존 DB를 덮어쓰지 않는다.', '', ...(sql.refs ?? []).map(p => `- [${docTitle(p,root,day.id)}](../../${p})`)] : []),
     '', '</section>',
   ].join('\n');
 }

@@ -1,6 +1,6 @@
 # D01 개발 생명주기 부분 보강
 
-2026-10-20, /Users/ds/code/javaExperience/.worktrees/concept-learning-night 에서 개념 학습만 보강했다. 10질문·25상태·선정 PNG10장이다. 134문서 전체나 전수 픽셀·학습자 이해도를 완료 처리하지 않는다. merge·push·PR은 하지 않았다.
+2026-10-20, LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night 에서 개념 학습만 보강했다. 10질문·25상태·선정 PNG10장이다. 134문서 전체나 전수 픽셀·학습자 이해도를 완료 처리하지 않는다. merge·push·PR은 하지 않았다.
 
 ## 원문과 추가 실행
 

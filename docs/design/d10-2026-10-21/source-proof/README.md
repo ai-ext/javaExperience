@@ -7,8 +7,8 @@
 ```bash
 python3 -B docs/design/d10-2026-10-21/source-proof/run-proof.py \
   --probe \
-  --project-root /Users/ds/code/javaExperience/.worktrees/concept-learning-night \
-  --runtime-root /Users/ds/research/javaexperience-d10-20261021/_data/native
+  --project-root LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night \
+  --runtime-root LOCAL_HOME/research/javaexperience-d10-20261021/_data/native
 ```
 
 최초 준비 단계는 모델0의 probe였고 해당 기록은 그대로 보존했다. main의 정적 검토가 끝난 미실행 모델6을 포함해 최초 freeze와 별도 author fresh를 실행했으며, 현재 고유27CHECK/모델6 전체 JSON이 frozen expected와 일치했다. 이 두 실행은 exit0이다. main/독립 재현은 별도 범위이며 정확한 명령·SHA·run·정리 근거는 freeze-verification.json/author-fresh-verification.json과 로그에 있다. `--probe`는 `probe-execution.json`에 실제 관찰을 쓰고 기대값을 생성/비교하지 않는다. 이후 최초 `--freeze`는 main 모델6의 executed=false를 확인하고 checkpoint를 `open('x')`로 한 번만 생성한다. 기존 checkpoint가 있으면 실행 전에 거부한다. 일반 재현은 전체 execution과 expected를 비교한다. `--project-root`는 읽을 원문 루트, `--runtime-root`는 새 private run 부모다.

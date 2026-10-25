@@ -1,0 +1,519 @@
+{
+  "version": 1,
+  "id": "posts-find",
+  "title": "조건에 맞는 글 목록 이어 보기",
+  "summary": "과정 D06의 MyBatis 최신순 목록·태그/키워드 검색·cursor 경계를 결과 id와 실행 쿼리로 확인한다.",
+  "difficulty": "기초",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "list",
+      "title": "글·태그·검색 조건을 같은 목록에 적용하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 과정 프로젝트",
+      "stages": [
+        {
+          "id": "list",
+          "title": "글·태그·검색 조건을 같은 목록에 적용하기",
+          "sourceUnits": [
+            "course:D06-1",
+            "course:D06-2",
+            "course:D06-3",
+            "course:D06-4",
+            "course:D06-5",
+            "support:course/java/J06.md"
+          ],
+          "brief": {
+            "purpose": "과정 D06의 MyBatis 최신순 목록·태그/키워드 검색·cursor 경계를 결과 id와 실행 쿼리로 확인한다.",
+            "task": "21건 fixture를 size=20 cursor 방식으로 읽고 다음 cursor가 마지막 1건을 가리키는지, 태그 조건이 결과에만 적용되는지 확인한다.",
+            "preconditions": [
+              "course D06에서 만든 MyBatis mapper/query와 PostListResponse 계약을 사용한다.",
+              "실습용 데이터가 21건이며 모두 테스트 fixture임을 확인한다."
+            ],
+            "scenario": [
+              {
+                "start": "21개 글을 최신순 id 내림차순으로 준비한다.",
+                "action": "GET /api/posts?size=20 후 실제 nextCursor를 그대로 넣어 두 번째 호출; 추가로 ?tag=spring.",
+                "result": "첫 응답 20건과 nextCursor, 다음 응답 1건과 nextCursor=null; tag=spring은 해당 tag 글만 반환.",
+                "after": "size=51, keyword=a, sort=title 요청을 각각 보낸다."
+              }
+            ],
+            "data": [
+              {
+                "name": "정렬된 21개 post id와 ACTIVE status",
+                "reason": "20+1 경계와 최신순 순서를 비교."
+              },
+              {
+                "name": "tag spring과 keyword title",
+                "reason": "동적 where에서 지정 predicate만 결과를 좁히는지 확인."
+              },
+              {
+                "name": "nextCursor 문자열",
+                "reason": "서버 반환값 그대로 재사용해 keyset 연속성을 확인."
+              }
+            ],
+            "policies": [
+              "최신순 커서 경계는 마지막 id보다 작은 id를 읽는다. cursor는 클라이언트에서 파싱하지 않고 그대로 전달한다.",
+              "keyword/tag가 없으면 조건이 SQL에서 빠진다. 빈 IN 목록으로 IN ()을 만들지 않는다.",
+              "목록 DTO items+nextCursor이며 D06에서 명시한 cursor를 page/offset으로 바꾸지 않는다."
+            ],
+            "inputs": [
+              "GET /api/posts?size=20.",
+              "GET /api/posts?size=20&cursor=<첫 응답 nextCursor>.",
+              "GET /api/posts?tag=spring; GET /api/posts?size=51; GET /api/posts?keyword=a; GET /api/posts?sort=title."
+            ],
+            "success": [
+              "21건에서 첫 응답 20개+nextCursor, 두 번째 1개+nextCursor=null.",
+              "태그 선택 시 그 태그가 연결된 글만 반환한다."
+            ],
+            "failures": [
+              {
+                "when": "size=51",
+                "result": "400 validation error.",
+                "unchanged": "게시글·태그 row와 조회 순서는 변하지 않는다."
+              },
+              {
+                "when": "keyword=a 또는 sort=title",
+                "result": "400 validation error.",
+                "unchanged": "읽기 전용이므로 DB 불변."
+              }
+            ],
+            "examples": [
+              {
+                "title": "cursor 첫 묶음",
+                "start": "21개 ACTIVE 글, id 내림차순",
+                "action": "GET /api/posts?size=20",
+                "result": "200; 20 item과 nextCursor 존재"
+              },
+              {
+                "title": "마지막 묶음",
+                "start": "첫 응답의 nextCursor 원문",
+                "action": "GET /api/posts?size=20&cursor=<nextCursor>",
+                "result": "200; 남은 1 item, nextCursor=null; 중복 id 없음"
+              },
+              {
+                "title": "태그 필터",
+                "start": "spring 연결 글과 미연결 글 공존",
+                "action": "GET /api/posts?tag=spring",
+                "result": "200; spring 연결 글만"
+              }
+            ],
+            "work": [
+              "source API recipe로 연속 두 요청을 보내고 응답 id를 합친다.",
+              "합친 id가 중복·누락 없는지 DB 정렬 결과와 대조한다.",
+              "MyBatis SQL에서 미지정 filter가 조건에서 빠지는지 log로 확인한다."
+            ],
+            "done": [
+              "21건 경계 결과가 20+1로 이어졌다.",
+              "cursor를 변형하지 않고 사용했고 id 집합에 중복이 없다.",
+              "invalid size/keyword/sort 요청이 400이고 DB는 읽기 전과 동일하다."
+            ],
+            "hints": [
+              "nextCursor가 마지막 item의 id와 연결되는지 응답·다음 query에서 어떻게 확인할까요?",
+              "21번째 글이 두 번째 응답에 한 번만 나오려면 SQL 조건은 어떤 방향이어야 할까요?",
+              "keyword/tag가 비어 있을 때 SQL에서 해당 조건을 생략한다는 것을 query log로 어떻게 확인하나요?"
+            ]
+          },
+          "hints": [
+            "nextCursor가 마지막 item의 id와 연결되는지 응답·다음 query에서 어떻게 확인할까요?",
+            "21번째 글이 두 번째 응답에 한 번만 나오려면 SQL 조건은 어떤 방향이어야 할까요?",
+            "keyword/tag가 비어 있을 때 SQL에서 해당 조건을 생략한다는 것을 query log로 어떻게 확인하나요?"
+          ],
+          "recipeIds": [
+            "board:post-list:normal"
+          ],
+          "executionChecks": [
+            {
+              "title": "원문 실행 절차 확인",
+              "command": "./gradlew test",
+              "expected": "각 variant의 목록 recipe와 source check를 실행한다.",
+              "record": "요청 조건·페이지 경계 id·정렬·중복 여부를 기록한다."
+            }
+          ],
+          "concepts": [],
+          "references": [
+            {
+              "label": "build.gradle",
+              "href": "/build.gradle"
+            },
+            {
+              "label": "src/main/resources/application.yml",
+              "href": "/src/main/resources/application.yml"
+            },
+            {
+              "label": "J06. 제네릭 메서드·와일드카드와 Comparator: CursorPage",
+              "href": "course/java/J06.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "list",
+          "title": "글·태그·검색 조건을 같은 목록에 적용하기",
+          "sourceUnits": [
+            "legacy:2-2",
+            "functional:list"
+          ],
+          "brief": {
+            "purpose": "community board 목록의 offset page·size·board slug·visibility 정책을 정렬 id와 page metadata로 검증한다.",
+            "task": "free 게시판 14개 샘플에서 size=5의 첫·마지막 페이지를 읽고 잘못된 범위와 없는 board 응답을 확인한다.",
+            "preconditions": [
+              "legacy 2-2 fixture의 free 게시판 글이 최신순 14개이며 자유글 10~01 형태다.",
+              "page는 0부터, 기본 size 10, 허용 size 1~50이다."
+            ],
+            "scenario": [
+              {
+                "start": "free 게시판 전체 14글; id/order를 기록한다.",
+                "action": "GET /api/boards/free/posts?page=0&size=5, 이어 page=2&size=5를 보낸다.",
+                "result": "첫 응답 item title 자유글 10/09/08/07/06, totalElements=14,totalPages=3,hasNext=true; page2는 남은 마지막 묶음.",
+                "after": "size=51, page=-1, /boards/nope/posts와 protected visibility 조합을 요청한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "free 게시판의 14개 정렬 글",
+                "reason": "offset 경계와 total count를 대조."
+              },
+              {
+                "name": "page/size/totalElements/totalPages/hasNext",
+                "reason": "응답 메타데이터와 실제 result page 수가 맞는지 확인."
+              },
+              {
+                "name": "PUBLISHED·PUBLIC·FOLLOWERS·PRIVATE 상태",
+                "reason": "현재 viewer의 공개/관계 정책에 따른 목록 포함 여부 검증."
+              }
+            ],
+            "policies": [
+              "legacy 2-2 page는 0부터, 기본 0, size 기본 10; 1..50만 허용한다.",
+              "community board 목록은 미삭제 공개 가능 글과 요청자 정책을 적용하고 DRAFT/HIDDEN을 일반 목록에 포함하지 않는다.",
+              "offset pagination을 project-v1 cursor 계약과 교환해 쓰지 않는다."
+            ],
+            "inputs": [
+              "page0: GET /api/boards/free/posts?page=0&size=5.",
+              "last: GET /api/boards/free/posts?page=2&size=5.",
+              "failure: size=51, page=-1, /api/boards/nope/posts."
+            ],
+            "success": [
+              "page0 200, 자유글 10→06 순서, totalElements 14,totalPages 3,hasNext true.",
+              "page2는 범위 내 마지막 결과를 돌려준다. GET list는 조회수·데이터를 수정하지 않는다."
+            ],
+            "failures": [
+              {
+                "when": "size=51 또는 page=-1",
+                "result": "400.",
+                "unchanged": "게시글·view_count·전체 count 불변."
+              },
+              {
+                "when": "없는 board slug nope",
+                "result": "404.",
+                "unchanged": "다른 board의 글은 반환/변경되지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "첫 offset page",
+                "start": "free 14건, 최신순 자유글 10→01",
+                "action": "GET /api/boards/free/posts?page=0&size=5",
+                "result": "200; 10,09,08,07,06; totalElements 14, totalPages 3, hasNext true"
+              },
+              {
+                "title": "마지막 offset page",
+                "start": "동일 14개, page size 5",
+                "action": "GET /api/boards/free/posts?page=2&size=5",
+                "result": "200; 마지막 page 항목만 반환, page=2"
+              },
+              {
+                "title": "없는 게시판",
+                "start": "board slug nope 없음",
+                "action": "GET /api/boards/nope/posts",
+                "result": "404; free 게시판 결과는 유지"
+              }
+            ],
+            "work": [
+              "API response item id 순서를 DB의 동일 where/order 결과와 비교한다.",
+              "첫 page와 마지막 page의 중복/누락을 확인한다.",
+              "size/page/slug 실패에서 status와 DB unchanged를 기록한다."
+            ],
+            "done": [
+              "14건·5개 page metadata가 계산 결과와 같다.",
+              "page 경계를 이어 읽을 때 겹침/누락을 확인했다.",
+              "범위 오류 400·없는 board 404를 확인했다."
+            ],
+            "hints": [
+              "totalElements 14와 size 5일 때 totalPages가 몇인지 직접 계산해 응답과 맞춰 볼까요?",
+              "page 0과 page 2를 이어 읽을 때 어떤 id를 비교하면 중복이나 누락을 찾을 수 있나요?",
+              "조회자 visibility 조건이 달라지면 totalElements query에도 같은 where 조건이 들어가야 할까요?"
+            ]
+          },
+          "hints": [
+            "totalElements 14와 size 5일 때 totalPages가 몇인지 직접 계산해 응답과 맞춰 볼까요?",
+            "page 0과 page 2를 이어 읽을 때 어떤 id를 비교하면 중복이나 누락을 찾을 수 있나요?",
+            "조회자 visibility 조건이 달라지면 totalElements query에도 같은 where 조건이 들어가야 할까요?"
+          ],
+          "recipeIds": [
+            "community:list:normal",
+            "legacy:2-2:L1",
+            "legacy:2-2:L2",
+            "legacy:2-2:L3",
+            "legacy:2-2:L4",
+            "legacy:2-2:L5"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:2-2 · 게시판 목록과 페이징",
+              "href": "/scenario/ch2-read-post/2-2-board-list.html"
+            },
+            {
+              "label": "../../docs/knowledge/W15-paging-offset-vs-cursor.md",
+              "href": "/docs/knowledge/W15-paging-offset-vs-cursor.html"
+            },
+            {
+              "label": "../../docs/knowledge/S10-spring-data-query.md",
+              "href": "/docs/knowledge/S10-spring-data-query.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:2-2 · 게시판 목록과 페이징",
+              "href": "/scenario/ch2-read-post/2-2-board-list.html"
+            },
+            {
+              "label": "../../docs/knowledge/W15-paging-offset-vs-cursor.md",
+              "href": "/docs/knowledge/W15-paging-offset-vs-cursor.html"
+            },
+            {
+              "label": "../../docs/knowledge/S10-spring-data-query.md",
+              "href": "/docs/knowledge/S10-spring-data-query.html"
+            },
+            {
+              "label": "../../docs/knowledge/W09-why-dto.md",
+              "href": "/docs/knowledge/W09-why-dto.html"
+            },
+            {
+              "label": "../../docs/knowledge/W10-where-to-validate.md",
+              "href": "/docs/knowledge/W10-where-to-validate.html"
+            },
+            {
+              "label": "functional:list · 3. 게시글 목록 조회",
+              "href": "/scenario/flow/list-posts.html"
+            },
+            {
+              "label": "../../docs/knowledge/S09-jpa-hibernate.md",
+              "href": "/docs/knowledge/S09-jpa-hibernate.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "project-v1",
+      "project": "project-v1",
+      "label": "project-v1 · 명세 프로젝트",
+      "stages": [
+        {
+          "id": "list",
+          "title": "글·태그·검색 조건을 같은 목록에 적용하기",
+          "sourceUnits": [
+            "legacy:10-7"
+          ],
+          "brief": {
+            "purpose": "spec-board 글 목록의 sort·offset/cursor·tag/q 필터를 계약별로 실행해 데이터와 cursor 경계를 검증한다.",
+            "task": "tag=mybatis 최신순 size=2 결과를 page 또는 cursor로 이어 보고 popular 정렬, invalid 조합을 따로 확인한다.",
+            "preconditions": [
+              "10-7 spec-board의 PUBLIC/PRIVATE fixture 및 tag mybatis 데이터 확인.",
+              "spec-board token을 사용할 때만 내 PRIVATE가 추가되는지 구분한다."
+            ],
+            "scenario": [
+              {
+                "start": "PUBLIC mybatis 글과 PRIVATE 소유 글이 존재하고 최신순 id가 기록됨.",
+                "action": "GET /api/v1/posts?tag=mybatis&size=2 후 응답 cursor를 그대로 넘겨 다음 page를 요청한다.",
+                "result": "200, tag 대상만 반환; 익명에는 PUBLIC만, login 시 자신의 PRIVATE 포함. 최신순 cursor가 이어진다.",
+                "after": "sort=popular+cursor, page와 cursor 동시, size=51, sort=title을 전송한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "PUBLIC/PRIVATE 게시글과 author id",
+                "reason": "익명과 로그인 viewer의 노출 집합을 비교."
+              },
+              {
+                "name": "tag mybatis 및 q 제목 검색",
+                "reason": "필터 대상 집합과 결합 결과를 확인."
+              },
+              {
+                "name": "cursor와 page metadata",
+                "reason": "offset page 방식과 keyset 방식의 요청 모드를 분리."
+              }
+            ],
+            "policies": [
+              "size 1..50 기본 20. sort latest/popular만 허용, 기본 latest; q는 제목검색.",
+              "cursor parameter가 존재하면 cursor mode이며 빈 값은 첫 page. cursor는 최신순에서만 가능하고 page+cursor 동시 금지.",
+              "popular는 likes 내림차순, tie는 id 내림차순. PUBLIC만 공개, 로그인 시 자신의 PRIVATE도 포함."
+            ],
+            "inputs": [
+              "GET /api/v1/posts?tag=mybatis&size=2; 다음 요청에 nextCursor 그대로 전달.",
+              "GET /api/v1/posts?sort=popular&size=3.",
+              "실패: ?size=51, ?sort=title, ?sort=popular&cursor=, ?page=1&cursor=, ?size=abc."
+            ],
+            "success": [
+              "tag=mybatis 요청은 그 tag 글만 반환하고 200.",
+              "latest page/cursor는 id 내림차순, popular는 likeCount 내림차순 후 id 내림차순.",
+              "응답 page/cursor metadata가 선택 모드와 일치한다."
+            ],
+            "failures": [
+              {
+                "when": "size 51·숫자 아님 또는 sort=title",
+                "result": "400 VALIDATION_FAILED와 field=size/sort.",
+                "unchanged": "게시글·tag·like 관계 불변."
+              },
+              {
+                "when": "popular+cursor, page+cursor 동시",
+                "result": "400 errors field cursor 또는 page.",
+                "unchanged": "조회 조건 및 데이터 불변."
+              }
+            ],
+            "examples": [
+              {
+                "title": "태그 첫 cursor page",
+                "start": "PUBLIC mybatis 글, size 2",
+                "action": "GET /api/v1/posts?tag=mybatis&size=2&cursor=",
+                "result": "200; mybatis 두 글 이내, nextCursor는 다음 요청용"
+              },
+              {
+                "title": "다음 cursor page",
+                "start": "첫 response의 nextCursor 값",
+                "action": "GET /api/v1/posts?tag=mybatis&size=2&cursor=<response value>",
+                "result": "200; 이전 id와 겹치지 않고 최신순 계속"
+              },
+              {
+                "title": "popular와 cursor 충돌",
+                "start": "같은 dataset",
+                "action": "GET /api/v1/posts?sort=popular&cursor=",
+                "result": "400 VALIDATION_FAILED; 데이터 불변"
+              }
+            ],
+            "work": [
+              "spec-board recipe의 page/cursor 각각을 project-v1 서버에서 실행한다.",
+              "익명 및 Kim token으로 response ids를 비교해 PRIVATE 포함 규칙을 본다.",
+              "invalid query field와 status를 errors에서 확인한다."
+            ],
+            "done": [
+              "latest/popular 정렬과 tie-break를 확인했다.",
+              "page/cursor 제한과 태그/제목 필터의 실제 응답을 기록했다.",
+              "익명/인증 공개 집합 차이를 확인했다."
+            ],
+            "hints": [
+              "cursor parameter가 빈 문자열로 존재하는 요청은 offset mode일까요 cursor mode일까요?",
+              "popular+cursor 조합이 제한되는 이유를 정렬 조건과 다음 위치 기준에서 설명할 수 있나요?",
+              "익명과 작성자의 결과 집합에서 PRIVATE 글 하나의 포함 여부를 어떤 id로 확인하나요?"
+            ]
+          },
+          "hints": [
+            "cursor parameter가 빈 문자열로 존재하는 요청은 offset mode일까요 cursor mode일까요?",
+            "popular+cursor 조합이 제한되는 이유를 정렬 조건과 다음 위치 기준에서 설명할 수 있나요?",
+            "익명과 작성자의 결과 집합에서 PRIVATE 글 하나의 포함 여부를 어떤 id로 확인하나요?"
+          ],
+          "recipeIds": [
+            "legacy:10-7:A",
+            "legacy:10-7:B",
+            "legacy:10-7:C",
+            "legacy:10-7:D",
+            "legacy:10-7:E",
+            "legacy:10-7:F",
+            "legacy:10-7:L",
+            "legacy:10-7:G",
+            "legacy:10-7:H",
+            "legacy:10-7:I",
+            "legacy:10-7:J",
+            "legacy:10-7:K",
+            "legacy:10-7:Z",
+            "legacy:10-7:N"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:10-7 · 목록 — 최신·인기·페이지·커서·태그·검색, JPA(JPQL·Pageable)",
+              "href": "/scenario/ch10-project/10-7-post-list.html"
+            },
+            {
+              "label": "../../lessons/G1-paging-and-sorting.md",
+              "href": "/lessons/G1-paging-and-sorting.html"
+            },
+            {
+              "label": "../../lessons/E3-what-is-jpa.md",
+              "href": "/lessons/E3-what-is-jpa.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:10-7 · 목록 — 최신·인기·페이지·커서·태그·검색, JPA(JPQL·Pageable)",
+              "href": "/scenario/ch10-project/10-7-post-list.html"
+            },
+            {
+              "label": "../../lessons/G1-paging-and-sorting.md",
+              "href": "/lessons/G1-paging-and-sorting.html"
+            },
+            {
+              "label": "../../lessons/E3-what-is-jpa.md",
+              "href": "/lessons/E3-what-is-jpa.html"
+            },
+            {
+              "label": "../../lessons/E2-db-sql-basics.md",
+              "href": "/lessons/E2-db-sql-basics.html"
+            },
+            {
+              "label": "../../docs/knowledge/S10-spring-data-query.md",
+              "href": "/docs/knowledge/S10-spring-data-query.html"
+            },
+            {
+              "label": "../../docs/knowledge/W15-paging-offset-vs-cursor.md",
+              "href": "/docs/knowledge/W15-paging-offset-vs-cursor.html"
+            },
+            {
+              "label": "../../lessons/E5-mybatis-first-steps.md",
+              "href": "/lessons/E5-mybatis-first-steps.html"
+            },
+            {
+              "label": "../../docs/knowledge/W04-mybatis-xml-practical.md",
+              "href": "/docs/knowledge/W04-mybatis-xml-practical.html"
+            },
+            {
+              "label": "../../docs/knowledge/W05-jpa-vs-mybatis-strategy.md",
+              "href": "/docs/knowledge/W05-jpa-vs-mybatis-strategy.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "게시글과 소통",
+  "status": "authored"
+}

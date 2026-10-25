@@ -1,5 +1,6 @@
 import { initP16JsonVisual } from './p16-json-visual.js';
 import { readProgress, TASKS } from './home-state.mjs';
+import { readReferenceContext } from './functional-reference-context.mjs';
 
 export const CATALOG_RETURN_KEY = 'javaexperience.knowledge.return.v1';
 export const CATALOG_HISTORY_KEY = '__javaExperienceKnowledge';
@@ -7,16 +8,26 @@ const ENTRY_PREFIX = 'javaexperience:knowledge:v8:entry:';
 const categories = ['all', 'java', 'spring', 'request', 'data', 'testing', 'delivery'];
 const priorities = ['all', 'required', 'optional'];
 const depths = ['all', 'foundation', 'applied', 'advanced'];
+const hashCategory = (hash) => {
+  let id; try { id = decodeURIComponent(hash).match(/^#kc-category-(.+)$/)?.[1]; } catch { return null; }
+  return categories.includes(id) ? id : null;
+};
 const safeRead = (storage, key) => { try { return JSON.parse(storage.getItem(key)); } catch { return null; } };
 const safeWrite = (storage, key, value) => { try { storage.setItem(key, JSON.stringify(value)); return true; } catch { return false; } };
 const safeRemove = (storage, key) => { try { storage.removeItem(key); } catch {} };
 const normalize = (value) => String(value ?? '').normalize('NFKC').toLocaleLowerCase('ko').trim().replace(/\s+/g, ' ');
 const clip = (value) => String(value ?? '').trim().slice(0, 160);
 const plainClick = (event, link) => !event.defaultPrevented && event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && !link.hasAttribute('download') && (!link.target || link.target === '_self');
+const publicTaskId = (url) => {
+  const values = url.searchParams.getAll('fromTask');
+  const id = values.length === 1 ? values[0] : null;
+  return id && Object.hasOwn(TASKS, id) && TASKS[id].functionalId ? id : null;
+};
 
 /** 검색 상태는 history entry별로 저장한다. 학습 과제 진도에는 쓰지 않는다. */
 export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.location.assign(href) } = {}) {
   const root = doc.querySelector('.kc-catalog');
+  const referenceMetadata = doc.querySelectorAll('script[type="application/json"][data-frc-data]').length > 0;
   const storage = (name) => { try { return win[name]; } catch { return { getItem: () => null, setItem: () => {}, removeItem: () => {} }; } };
   const session = storage('sessionStorage');
   const local = storage('localStorage');
@@ -25,13 +36,57 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   const writeHistory = (method, entry, href) => {
     try { win.history[method]({ ...foreignState(), [CATALOG_HISTORY_KEY]: entry }, '', href); return true; } catch { return false; }
   };
+  const knowledgeDirectory = new URL('./', win.location.href);
+  const initialUrl = new URL(win.location.href);
+  if (initialUrl.searchParams.has('fromTask') && !publicTaskId(initialUrl)) {
+    initialUrl.searchParams.delete('fromTask');
+    try { win.history.replaceState(win.history.state, '', initialUrl.href); } catch {}
+  }
+  const referenceContext = () => readReferenceContext(doc, win.location);
+  const callerId = () => {
+    const url = new URL(win.location.href);
+    if (referenceMetadata) {
+      const context = referenceContext();
+      if (!context) return null;
+      return root ? publicTaskId(url) : context.task.id;
+    }
+    return publicTaskId(url);
+  };
+  const isKnowledgeHtml = (target) => target.origin === win.location.origin && target.protocol === win.location.protocol
+    && new URL('./', target).pathname === knowledgeDirectory.pathname && /\.html$/i.test(target.pathname);
+  const allowedWithReference = (target) => {
+    const context = referenceContext();
+    if (!context) return false;
+    const page = new URL(target); page.search = ''; page.hash = '';
+    return context.allowedUrls.has(page.href);
+  };
+  const withTaskContext = (href) => {
+    let target;
+    try { target = new URL(href, win.location.href); } catch { return href; }
+    if (referenceMetadata && !referenceContext()) return href;
+    if (!isKnowledgeHtml(target) && !allowedWithReference(target)) return href;
+    target.searchParams.delete('fromTask');
+    if (callerId()) target.searchParams.set('fromTask', callerId());
+    return target.href;
+  };
+  function propagateTaskContext() {
+    for (const link of doc.querySelectorAll('a[href]')) {
+      const href = link.getAttribute('href');
+      if (!href || href.startsWith('#') || link.hasAttribute('download')) continue;
+      const target = withTaskContext(href);
+      if (target !== href) link.setAttribute('href', target);
+    }
+  }
   const progress = readProgress(local);
   const active = TASKS[progress.active];
+  const contextTask = TASKS[callerId()] || active;
   for (const link of doc.querySelectorAll('[data-kc-task-return]')) {
-    if (!active) continue;
-    link.hidden = false; link.href = new URL('../../' + active.href, win.location.href).href;
-    link.textContent = `${active.id} 하던 과제로 돌아가기 →`;
+    if (!contextTask) continue;
+    link.hidden = false; link.href = new URL('../../' + contextTask.href, win.location.href).href;
+    link.textContent = `${contextTask.title} 과제 열기 →`;
+    link.closest('[data-kc-task-context]')?.removeAttribute('hidden');
   }
+  propagateTaskContext();
   // 일반 링크로 건넨 일회 토큰만 받는다. 복사된 세션 캐시만으로는 origin을 만들지 않는다.
   if (!root) {
     const url = new URL(win.location.href);
@@ -39,10 +94,10 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     const token = url.searchParams.get('kcOrigin');
     const target = new URL(url); target.searchParams.delete('kcOrigin');
     let entry = foreignState()[CATALOG_HISTORY_KEY];
-    const sameReferrer = url.protocol === 'file:' || doc.referrer === pending?.origin?.listHref?.split('#')[0];
+    const sameReferrer = url.protocol === 'file:' || doc.referrer.split('#')[0] === pending?.origin?.listHref?.split('#')[0];
     const validList = (list, origin) => {
       if (list?.schema !== 1 || list.entryId !== origin?.listEntryId || list.href !== origin?.listHref || typeof list.queryRaw !== 'string') return false;
-      try { const href = new URL(list.href);const expected = new URL('README.html', win.location.href);return href.origin === expected.origin && href.pathname === expected.pathname; } catch { return false; }
+      try { const href = new URL(list.href);const expected = new URL('README.html', win.location.href);return href.origin === expected.origin && href.pathname === expected.pathname && publicTaskId(href) === callerId(); } catch { return false; }
     };
     if (token && pending?.schema === 1 && pending.token === token && pending.targetHref === target.href && Number.isFinite(pending.time) && Date.now() >= pending.time && Date.now() - pending.time < 60000 && sameReferrer) {
       const list = safeRead(session, ENTRY_PREFIX + pending.origin?.listEntryId);
@@ -57,7 +112,7 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     const valid = validList(list, origin);
     for (const back of doc.querySelectorAll('[data-kc-catalog-return]')) {
       back.textContent = valid ? list.queryRaw ? '검색 결과로 돌아가기' : '개념 목록으로 돌아가기' : '개념 목록으로';
-      back.href = valid ? list.href : 'README.html';
+      back.href = withTaskContext(valid ? list.href : 'README.html');
       if (valid) back.addEventListener('click', (event) => {
         if (plainClick(event, back)) {
           event.preventDefault();
@@ -81,7 +136,7 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   if (win.location.hash) revealOriginal(win.location.hash);
   if (root.dataset.ready) return;
   root.dataset.ready = 'true';
-  const $ = (selector) => root.querySelector(selector);
+  const $ = (selector) => root.querySelector(selector) || doc.querySelector('.page-sidebar')?.querySelector(selector);
   const input = $('#knowledge-search-input');
   const rows = [...root.querySelectorAll('[data-kc-document]')];
   const aliases = new Map();
@@ -89,21 +144,21 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     const configured = JSON.parse($('[data-kc-aliases]')?.textContent || '{}');
     for (const [question, literal] of Object.entries(configured)) if (typeof literal === 'string') aliases.set(normalize(question), normalize(literal));
   } catch {}
-  const contextMap = { '0-1': 'P09', '0-2': 'P03', '1-1': 'P16', '1-2': 'W09' };
-  const contextId = contextMap[active?.id];
+  const contextMap = { '0-1': 'P09', '0-2': 'P03', '1-1': 'P16', '1-2': 'W09', 'flow-create': 'S09', 'flow-detail': 'W09', 'flow-list': 'S10', 'flow-update': 'W21', 'flow-delete': 'P20', 'flow-like': 'S08', 'flow-unlike': 'S08' };
+  const contextId = contextMap[contextTask?.id];
   const context = contextId && rows.find((row) => row.dataset.kcDocument === contextId);
   if (context) {
-    $('[data-kc-context-tag]').textContent = `${active.id} ${active.title}`;
+    $('[data-kc-context-tag]').textContent = contextTask.title;
     const target = $('[data-kc-context-body]'); target.append(context.querySelector('.kc-result-main').cloneNode(true));
-    const link = doc.createElement('a'); link.href = context.querySelector('h3 a').getAttribute('href'); link.dataset.kcOpen = contextId; link.textContent = '개념 보기 →'; target.append(link);
+    const link = doc.createElement('a'); link.href = withTaskContext(context.querySelector('h3 a').getAttribute('href')); link.dataset.kcOpen = contextId; link.textContent = '개념 보기 →'; target.append(link);
   }
   function fromUrl() {
     const url = new URL(win.location.href); const query = clip(url.searchParams.get('q'));
-    const categoryId = categories.includes(url.searchParams.get('category')) ? url.searchParams.get('category') : 'all';
+    const categoryId = hashCategory(url.hash) || (categories.includes(url.searchParams.get('category')) ? url.searchParams.get('category') : 'all');
     const priorityId = priorities.includes(url.searchParams.get('priority')) ? url.searchParams.get('priority') : query ? 'all' : 'required';
     const depthId = depths.includes(url.searchParams.get('depth')) ? url.searchParams.get('depth') : query ? 'all' : 'foundation';
     return { schema: 1, entryId: uid(), route: url.pathname, queryRaw: query, inputDraft: query, categoryId, priorityId, depthId,
-      explicitFilters: { category: url.searchParams.has('category'), priority: url.searchParams.has('priority'), depth: url.searchParams.has('depth') },
+      explicitFilters: { category: Boolean(hashCategory(url.hash)) || url.searchParams.has('category'), priority: url.searchParams.has('priority'), depth: url.searchParams.has('depth') },
       sort: url.searchParams.get('sort') === 'title' ? 'title' : 'relevance', expanded: url.searchParams.get('all') === '1', view: query ? 'results' : 'browse', selectedDocId: null, focusKey: null, scroll: url.hash ? {} : { absoluteY: 0 } };
   }
   function validEntry(value) {
@@ -135,7 +190,8 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   let composing = false; let matches = [];
   const resultLink = (id) => rows.find((row) => row.dataset.kcDocument === id)?.querySelector('h3 a');
   function params() {
-    const value = new URLSearchParams();
+    const value = new URLSearchParams(win.location.search);
+    for (const key of ['q','category','all','sort','kcReturn']) value.delete(key);
     if (entry.queryRaw) value.set('q', entry.queryRaw);
     value.set('category', entry.categoryId);
     value.set('priority', entry.priorityId);
@@ -145,7 +201,9 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     return value;
   }
   function entryHref() {
-    const url = new URL(win.location.href);url.search = params().toString();return url.href;
+    const url = new URL(win.location.href);url.search = params().toString();
+    if (hashCategory(url.hash)) url.hash = 'kc-category-' + entry.categoryId;
+    return url.href;
   }
   function focusKey() {
     const current = doc.activeElement;
@@ -199,7 +257,10 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
         reason.textContent = aliases.has(raw) || matchesQuestion(row, raw) ? '등록된 질문과 일치' : words.every((word) => normalize(row.dataset.kcTitle || row.querySelector('.kc-source')?.textContent).includes(word)) ? '문서 제목과 일치' : '소제목과 일치';
       }
     }
-    for (const button of root.querySelectorAll('button[data-kc-category]')) button.setAttribute('aria-pressed', String(button.dataset.kcCategory === entry.categoryId));
+    for (const button of doc.querySelectorAll('button[data-kc-category]')) {
+      const selected = button.dataset.kcCategory === entry.categoryId;
+      button.setAttribute('aria-pressed', String(selected)); button.tabIndex = selected ? 0 : -1;
+    }
     $('[data-kc-category-select]').value = entry.categoryId;
     $('[data-kc-priority]').value = entry.priorityId;
     $('[data-kc-depth]').value = entry.depthId;
@@ -207,7 +268,7 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     $('[data-kc-hero-title]').textContent = entry.queryRaw ? '개념 검색' : '막힌 개념을, 값의 변화로 이해하세요.';
     for (const part of root.querySelectorAll('[data-kc-discovery]')) part.hidden = Boolean(entry.queryRaw);
     $('[data-kc-context]').hidden = Boolean(entry.queryRaw) || !context;
-    const label = $(`[data-kc-category="${entry.categoryId}"]`)?.dataset.kcLabel || '전체';
+    const label = $(`button[data-kc-category="${entry.categoryId}"]`)?.dataset.kcLabel || '전체';
     const priorityLabel = { required: '필수', optional: '선택', all: '전체 우선순위' }[entry.priorityId];
     const depthLabel = { foundation: '기초', applied: '응용', advanced: '심화', all: '전체 깊이' }[entry.depthId];
     $('[data-kc-results-title]').textContent = entry.queryRaw ? `${entry.queryRaw} 검색 결과 ${filtered.length}개` : `${label} · ${priorityLabel} · ${depthLabel} ${filtered.length}개 문서`;
@@ -222,6 +283,7 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     $('[data-kc-more]').hidden = Boolean(entry.queryRaw) || show.length >= filtered.length;
     $('[data-kc-more]').textContent = `${label} ${filtered.length}개 모두 보기`;
     draftNotice();
+    propagateTaskContext();
   }
   function restore() {
     render();
@@ -244,6 +306,9 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
       next.entryId = uid();next.parentEntryId = entry.entryId;next.scroll = { absoluteY: win.scrollY };next.selectedDocId = null;next.focusKey = null;
     }
     entry = next;entry.href = entryHref();
+    if (Object.hasOwn(changes, 'categoryId')) {
+      const url = new URL(entry.href);url.hash = 'kc-category-' + entry.categoryId;entry.href = url.href;
+    }
     writeHistory(before === after ? 'replaceState' : 'pushState', entry, entry.href);
     safeWrite(session, ENTRY_PREFIX + entry.entryId, entry);render();
     if (focusResults) $('[data-kc-results-title]').focus({ preventScroll: true });
@@ -266,12 +331,13 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   $('[data-kc-search-clear]').addEventListener('click', () => clear(true));
   for (const button of root.querySelectorAll('[data-kc-query]')) button.addEventListener('click', () => search(button.dataset.kcQuery));
   const filter = (category) => { if (!categories.includes(category)) return; commit({ categoryId: category, explicitFilters: { ...entry.explicitFilters, category: true }, expanded: false }); };
-  for (const button of root.querySelectorAll('button[data-kc-category]')) button.addEventListener('click', () => filter(button.dataset.kcCategory));
-  const fieldButtons = [...root.querySelectorAll('button[data-kc-category]')];
+  for (const button of doc.querySelectorAll('button[data-kc-category]')) button.addEventListener('click', () => filter(button.dataset.kcCategory));
+  for (const tile of root.querySelectorAll('[data-kc-domain-open]')) tile.addEventListener('click', event => { event.preventDefault(); doc.querySelector(`button[data-kc-category="${tile.dataset.kcDomainOpen}"]`)?.click(); });
+  const fieldButtons = [...doc.querySelectorAll('button[data-kc-category]')];
   for (const button of fieldButtons) button.addEventListener('keydown', (event) => {
     const index = fieldButtons.indexOf(button);
     const next = { ArrowLeft: (index + fieldButtons.length - 1) % fieldButtons.length, ArrowRight: (index + 1) % fieldButtons.length, Home: 0, End: fieldButtons.length - 1 }[event.key];
-    if (next !== undefined) { event.preventDefault();fieldButtons[next].focus(); }
+    if (next !== undefined) { event.preventDefault();fieldButtons[next].focus({preventScroll:true});filter(fieldButtons[next].dataset.kcCategory); }
   });
   $('[data-kc-category-select]').addEventListener('change', (event) => filter(event.target.value));
   $('[data-kc-priority]').addEventListener('change', (event) => { if (priorities.includes(event.target.value)) commit({ priorityId: event.target.value, explicitFilters: { ...entry.explicitFilters, priority: true }, expanded: false }); });
@@ -298,6 +364,12 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   });
   // popstate 시 URL/history.state는 이미 목적지다. 출발 snapshot은 세션에만 쓴다.
   win.addEventListener('popstate', () => { remember(false);entry = currentEntry();restore(); });
+  win.addEventListener('hashchange', () => {
+    const category = hashCategory(win.location.hash);
+    if (!category || category === entry.categoryId) return;
+    remember(false);entry = currentEntry();entry.categoryId = category;entry.href = win.location.href;
+    writeHistory('replaceState', entry, entry.href);safeWrite(session, ENTRY_PREFIX + entry.entryId, entry);restore();
+  });
   win.addEventListener('pageshow', (event) => { if (event.persisted) { entry = currentEntry();restore(); } });
   win.addEventListener('pagehide', () => remember(false));
   win.addEventListener('scroll', () => remember(false), { passive: true });

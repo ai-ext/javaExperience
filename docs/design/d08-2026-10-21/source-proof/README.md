@@ -6,8 +6,8 @@
 
 ```bash
 python3 docs/design/d08-2026-10-21/source-proof/run-proof.py \
-  --project-root /Users/ds/code/javaExperience/.worktrees/concept-learning-night \
-  --runtime-root /Users/ds/research/javaexperience-d08-20261021/_data/native
+  --project-root LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night \
+  --runtime-root LOCAL_HOME/research/javaexperience-d08-20261021/_data/native
 ```
 
 `--project-root`는 읽을 원문·현재 wrapper가 있는 프로젝트 루트를, `--runtime-root`는 새 실행 디렉터리를 만들 부모를 지정한다. runner 파일이 있는 `source-proof/`에 실행 기록을 쓴다. 별도 사본의 runner에서도 두 인자를 지정할 수 있다. `--probe`는 native 관찰 후 체크포인트를 만들거나 비교하지 않는다. 최초 `--freeze`만 체크포인트를 `open('x')`로 생성하며 기존 frozen 파일이 있으면 실행 전에 거부한다. 보통 재현은 전체 `execution.json`을 `checkpoints/expected-execution.json`과 비교한다.

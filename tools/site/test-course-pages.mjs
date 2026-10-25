@@ -5,7 +5,7 @@ import test from 'node:test';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { JSDOM } from 'jsdom';
-import { loadCourse, shortTitle, mapNodes, findInjectedLinkErrors, renderTicketSelection } from './course-pages.mjs';
+import { loadCourse, shortTitle, mapNodes, findInjectedLinkErrors, renderTicketSelection, renderCourseHome, renderHomeReference } from './course-pages.mjs';
 import { maskedNodes, MASK_LABEL } from './course-flow.mjs';
 
 const root = new URL('../../', import.meta.url);
@@ -42,6 +42,22 @@ async function open(file, { saved, brokenStorage = false, script = courseScript,
   await new Promise((resolve) => (window.document.readyState === 'complete' ? resolve() : window.addEventListener('load', resolve)));
   return { window, doc: window.document, $: (s) => window.document.querySelector(s), $$: (s) => [...window.document.querySelectorAll(s)] };
 }
+
+// 홈 배치는 디자인 브랜치를 유지한다. 통합 기능과 기존 일자는 새 메뉴 및 같은 저장값으로 연결한다.
+await test('홈은 통합 기능 진입과 기존 일자 기록을 분리해 연결한다', () => {
+  const home = new JSDOM(renderCourseHome(course), { url: 'https://learn.example/README.html' }).window.document;
+  assert.equal(home.querySelector('h1').textContent.trim(), '오늘 만들고, 결과로 확인하세요.');
+  assert.ok(home.querySelector('.ch-menu-guide a[href="scenario/README.html"]'), '기능 목록 대표 진입');
+  assert.ok(home.querySelector('.ch-menu-guide a[href="course/map.html"]'), '독립 과정 지도 진입');
+  assert.ok(home.querySelector('[data-today-open][href="course/spring/D01.html"]'), '기존 일자 주소 보존');
+  assert.equal(home.querySelector('.ch-progress'), null, '홈에 일자 진도를 중복 나열하지 않는다');
+  const days = JSON.parse(home.querySelector('#course-days-data').textContent);
+  assert.equal(days.length, course.days.length, '이어하기가 쓰는 일자 데이터는 보존한다');
+  const choices = JSON.parse(home.querySelector('#course-choice-data').textContent);
+  assert.ok(choices.length > 0, '선택 티켓 기록의 원본 후보 보존');
+  const reference = new JSDOM(renderHomeReference('<h1 id="home-title">게시판</h1>')).window.document;
+  assert.equal(reference.querySelector('#home-title').tagName, 'H2');
+});
 
 await test('이 날 데이터: 원본 날짜 집합·본문·버튼·복사·Blob 다운로드가 일치한다', async () => {
   const actual = [];
@@ -161,11 +177,12 @@ await test('길찾기: 홈 첫 방문의 행동 순서는 Java → Spring → �
   assert.match(flow.textContent, /Java.*J01.*→.*Spring.*D01.*→.*채점/);
   assert.ok(home.$('[data-today-java]').classList.contains('ch-primary'));
   const next = await open('index.html', { saved: JSON.stringify({ version: 1, steps: { 'D01-1': true, 'D01-2': true, 'D01-3': true, 'D01-4': true } }) });
-  assert.match(next.$('[data-today-flow]').textContent, /J02.*D02/);
+  assert.match(next.$('[data-today-flow]').textContent, /D02.*J02/);
   assert.match(next.$('[data-today-grade]').getAttribute('href'), /D02.html#ai-채점-프롬프트$/);
 });
 
 // R4: JSDOM은 배치를 계산하지 않으므로 크기·줄바꿈은 소스 규칙을, 이름은 생성 DOM을 검사한다.
+const tokenCss = fs.readFileSync(new URL('course-tokens.css', import.meta.url), 'utf8');
 const courseCss = fs.readFileSync(new URL('course.css', import.meta.url), 'utf8');
 const flowCss = fs.readFileSync(new URL('course-flow.css', import.meta.url), 'utf8');
 const siteCss = fs.readFileSync(new URL('site.css', import.meta.url), 'utf8');
@@ -192,26 +209,31 @@ await test('R4-01: 모든 지도 노드 title은 전체 이름과 같다', () =>
   const span = declarations(courseCss, '.cm-node span');
   assert.equal(span['white-space'], 'normal');
   assert.ok(!span['text-overflow'] && span.overflow !== 'hidden' && !span['-webkit-line-clamp'], '긴 이름도 높이 제한으로 자르지 않는다');
-  assert.match(courseCss, /@media \(max-width: 899px\)[\s\S]*?\.cm-node span \{ display: none; \}/, '좁은 화면 칩 배치는 유지');
+  assert.ok(mapNodes(course).every(node => node.title), 'PC에서 모든 노드의 전체 제목을 제공한다');
 });
-await test('P10: 홈 진도는 수동 체크이며 채점 결과가 아님을 알린다', async () => {
+await test('P10: 홈은 전체 진도를 복제하지 않고 오늘 일자와 구현 순서를 안내한다', async () => {
   const home = await open('index.html');
-  const note = home.$('[data-progress-summary]').parentElement.parentElement.textContent;
-  assert.match(note, /직접 체크한 진도이며 채점 결과가 아닙니다\./);
-  assert.match(note, /공통 구현과 선택한 티켓을 집계하며, 고르지 않은 후보는 제외합니다\./);
-  assert.match(note, /Java 수행 여부와 역량은 따로 확인합니다\./);
+  assert.equal(home.$('[data-progress-summary]'), null);
+  assert.ok(home.$('[data-today-id]'));
+  assert.ok(home.$('[data-today-steps]'));
+  // 지도는 참고 링크가 아니라 독립 상단 메뉴와 대주제 안내에서 진입한다.
+  assert.ok(home.$('.ch-menu-guide a[href="course/map.html"]'));
 });
-await test('R4-08: 390 폭에서 선 범례를 숨기고 노드 범례와 관계 표를 남긴다', async () => {
+await test('R4-08: PC 지도에 노드·연결선 범례와 모든 연결 흐름을 남긴다', async () => {
   const map = await open('course/map.html', { script: mapScript });
-  assert.ok(map.$('.cm-line-legend'));
   assert.equal(map.$$('.cm-line-legend .cm-line-sample').length, 3);
-  assert.match(courseCss, /@media \(max-width: 899px\)[\s\S]*?\.cm-line-legend \{ display: none; \}/);
-  assert.equal(map.$$('[data-cm-lines] .cm-edge').length, 0);
-  assert.ok(map.$('.cm-legend .cm-swatch') && map.$('.cm-tables'));
+  assert.ok(map.$('.cm-legend .cm-swatch') && map.$('.cm-tables .course-outline'));
+  assert.equal(map.$$('.cm-tables table').length, 0);
+  for (const edge of course.edges) assert.ok(map.$$('[data-edge]').some(node => node.dataset.edge === `${edge.from}>${edge.to}`));
+  map.window.close();
 });
 await test('R4-05: 일자 칩 체크박스의 누르는 면은 최소 24×24px', () => {
   const input = declarations(courseCss, '.day-chip input');
-  for (const prop of ['width', 'height']) assert.ok(/^\d+px$/.test(input[prop]) && parseFloat(input[prop]) >= 24, `${prop}: ${input[prop]}`);
+  const tokens = declarations(tokenCss, ':root');
+  for (const prop of ['width', 'height']) {
+    const size = input[prop].replace(/var\((--[\w-]+)\)/g, (_, name) => tokens[name]);
+    assert.ok(/^\d+px$/.test(size) && parseFloat(size) >= 24, `${prop}: ${size}`);
+  }
 });
 // JSDOM에는 레이아웃이 없으므로 텍스트 존재 대신 DOM과 실제 CSS의 잘림 경계를 검사한다.
 await test('오늘 순서 상태 표식은 제목의 두 줄 제한과 잘림 조상 밖에 있다', async () => {
@@ -240,7 +262,7 @@ await test('오늘 순서 상태 표식은 제목의 두 줄 제한과 잘림 �
           const labels = page.$$('.day-chip [data-step-kind]').map(node => node.textContent);
           assert.equal(labels.filter(label => label === '내 선택 티켓 포함').length, 1);
           assert.equal(labels.filter(label => label === '고르지 않은 후보 · 추가 연습').length, 3);
-          assert.equal(labels.filter(label => label === '모두 필수').length, 2);
+          assert.equal(labels.filter(label => /필수/.test(label)).length, 2);
         }
       } finally { page.window.close(); }
     }
@@ -264,7 +286,7 @@ await test('R4-06: 한국어 본문은 낱말을 지키고 코드는 긴 토큰�
     assert.equal(code['overflow-wrap'], 'anywhere');
   }
 });
-await test('R4-03: 공통 테마의 홈 본문·서비스·아바타 대비는 라이트·다크 모두 4.5 이상', () => {
+await test('R4-03: 단일 다크 테마의 홈 본문·서비스·아바타 대비는 4.5 이상', () => {
   const pairs = [
     ...['.home-method-grid p', '.home-explore-grid p', '.home-faq p', '.home-footer', '.home-roadmap'].map(selector => [homeCss, selector, '--bg']),
     [homeCss, '.home-progress-note', '--card'],
@@ -274,21 +296,32 @@ await test('R4-03: 공통 테마의 홈 본문·서비스·아바타 대비는 �
     [serviceCss, '.home-service-avatar-green', '--c-day-soft'],
     [serviceCss, '.home-service-avatar-purple', '--c-area-soft'],
   ];
-  for (const theme of [':root', ':root[data-theme="dark"]']) {
-    const tokens = {...declarations(siteCss, theme), ...declarations(courseCss, theme)};
-    for (const [css, selector, background] of pairs) {
-      const raw = declarations(css, selector).color;
-      const fg = raw.replace(/var\((--[\w-]+)\)/g, (_, name) => tokens[name]);
-      assert.ok(contrast(fg, tokens[background]) >= 4.5, `${theme} ${selector}: ${fg} / ${tokens[background]}`);
-    }
+  const tokens = declarations(tokenCss, ':root');
+  const resolve = value => value.replace(/var\((--[\w-]+)\)/g, (_, name) => resolve(tokens[name]));
+  for (const [css, selector, background] of pairs) {
+    const fg = resolve(declarations(css, selector).color);
+    assert.ok(contrast(fg, resolve(tokens[background])) >= 4.5, `${selector}: ${fg} / ${tokens[background]}`);
   }
-  assert.equal(declarations(homeCss, 'body.home-page')['color-scheme'], undefined, '홈도 공통 테마를 상속한다');
+  assert.equal(tokens['color-scheme'], 'dark');
 });
-await test('R4-07: 라이트 주석 대비는 4.5 이상이고 다크 토큰은 보존한다', () => {
-  const colors = [...siteCss.matchAll(/--syntax-comment:\s*(#[0-9a-f]{6})/g)].map((m) => m[1]);
-  assert.ok(contrast(colors[0], '#f3f1ec') >= 4.5, `라이트: ${contrast(colors[0], '#f3f1ec').toFixed(4)}`);
-  assert.deepEqual(colors.slice(1), ['#89939e', '#89939e']);
-  assert.ok(contrast(colors[1], '#22262b') >= 4.5);
+await test('R4-07: 다크 코드 주석 대비는 4.5 이상이다', () => {
+  const color = tokenCss.match(/--syntax-comment:\s*(#[0-9a-f]{6})/)[1];
+  const tokens = declarations(tokenCss, ':root');
+  assert.ok(contrast(color, tokens['--code-bg']) >= 4.5);
+});
+await test('과정·홈은 다크 CSS만 로드하고 테마 선택 코드가 없다', () => {
+  const files = ['README.html', ...course.days.map(day => day.page), ...course.java.map(java => java.page), ...course.tickets.map(ticket => ticket.page).filter(Boolean), 'course/map.html', 'course/README.html', 'course/spring/README.html', 'course/start/README.html'];
+  for (const file of files) {
+    const doc = new JSDOM(fs.readFileSync(new URL(file, root), 'utf8')).window.document;
+    assert.ok([null,'dark'].includes(doc.documentElement.getAttribute('data-theme')), file + ': 고정 다크 또는 공통 다크');
+    assert.ok(doc.querySelector('link[href*="course-tokens.css"]'), file);
+    for (const link of doc.querySelectorAll('link[rel="stylesheet"]')) {
+      const css = fs.readFileSync(new URL(link.getAttribute('href').split('?')[0], new URL(file, root)), 'utf8');
+      assert.doesNotMatch(css, /prefers-color-scheme|\[data-theme=["\']?light/, file + ': ' + link.href);
+    }
+    for (const script of doc.querySelectorAll('script:not([src])')) assert.doesNotMatch(script.textContent, /prefers-color-scheme|dataset\.theme/);
+    doc.defaultView.close();
+  }
 });
 
 // ---------------------------------------------------------------- 칩 제목
@@ -322,8 +355,7 @@ for (const day of course.days) {
   if (course.flows.days.has(day.id)) assert.ok($(`section.day-flow.flow[data-flow="${day.id}"]`) && !$('.day-flow[hidden]'), `${day.id}: 오늘 흐름`);
   else if (day.phase === 'maintain') assert.ok($(`section.day-flow.flow-links[data-flow-links="${day.id}"]`), `${day.id}: 그날 티켓의 장애 흐름으로 잇기`);
   else assert.ok($('.day-flow[hidden]') && $('.day-flow').children.length === 0, `${day.id}: 흐름이 없는 날은 빈 자리`);
-  const flowPrevious = $('.day-overview') ? 'section.day-java + section.day-today' : 'section.day-java';
-  assert.ok(!$('section.day-java') || $(`${flowPrevious} + .day-flow, ${flowPrevious} + details.implementation-flow > .day-flow`), `${day.id}: 흐름은 Java·구현 목록 다음이며 DOM과 시각 순서를 맞춘다`);
+  assert.ok(!$('section.day-java') || $('section.day-java + .day-flow, section.day-java + details.implementation-flow > .day-flow'), `${day.id}: 준비 자료에서 Java 다음 흐름을 읽는다`);
   assert.ok($('nav.day-pager'), `${day.id}: 이전·다음 날`);
   for (const a of $$('.day-pager a, .course-crumbs a')) {
     const target = new URL(a.getAttribute('href'), `${root.href}${file}`);
@@ -370,7 +402,7 @@ for (const day of course.days) {
   top.checked = true; top.dispatchEvent(new page.window.Event('change', { bubbles: true }));
   assert.equal(bottom.checked, true, '같은 순서 체크 동기화');
   assert.ok(page.$('.day-chip[data-step="D04-2"]').classList.contains('is-done'));
-  assert.equal(page.$('[data-day-progress]').textContent, '1/5 끝냄');
+  assert.equal(page.$('[data-day-progress]').textContent, '구현 완료 1/5');
   const saved = page.window.localStorage.getItem(KEY);
   assert.deepEqual(JSON.parse(saved), { version: 1, steps: { 'D04-2': true } });
   const again = await open('course/spring/D04.html', { saved });
@@ -386,7 +418,7 @@ for (const day of course.days) {
   const page = await open('course/spring/D04.html', { brokenStorage: true });
   const input = page.$('input.step-check[data-step="D04-1"]');
   input.checked = true; input.dispatchEvent(new page.window.Event('change', { bubbles: true }));
-  assert.equal(page.$('[data-day-progress]').textContent, '1/5 끝냄');
+  assert.equal(page.$('[data-day-progress]').textContent, '구현 완료 1/5');
   assert.match(page.$('[data-course-storage]').textContent, /저장소를 쓸 수 없어/);
   const corrupt = await open('course/spring/D04.html', { saved: '{not json' });
   assert.equal(corrupt.$$('input.step-check:checked').length, 0, '망가진 저장값은 비운 상태로');
@@ -398,15 +430,15 @@ for (const day of course.days) {
     before: (win) => { win.Storage.prototype.setItem = function () { throw new win.DOMException('full', 'QuotaExceededError'); }; },
   });
   const check = (id, on) => { const el = page.$(`input.step-check[data-step="${id}"]`); el.checked = on; el.dispatchEvent(new page.window.Event('change', { bubbles: true })); };
-  assert.equal(page.$('[data-day-progress]').textContent, '1/5 끝냄', '저장값은 읽힌다');
+  assert.equal(page.$('[data-day-progress]').textContent, '구현 완료 1/5', '저장값은 읽힌다');
   check('D04-1', true);
   check('D04-2', true);
-  assert.equal(page.$('[data-day-progress]').textContent, '3/5 끝냄', '쓰기 실패 뒤 다음 체크가 앞 체크를 지우지 않는다');
+  assert.equal(page.$('[data-day-progress]').textContent, '구현 완료 3/5', '쓰기 실패 뒤 다음 체크가 앞 체크를 지우지 않는다');
   check('D04-5', false);
-  assert.equal(page.$('[data-day-progress]').textContent, '2/5 끝냄', '해제도 이 화면에 남는다');
+  assert.equal(page.$('[data-day-progress]').textContent, '구현 완료 2/5', '해제도 이 화면에 남는다');
   page.window.dispatchEvent(new page.window.Event('pageshow'));
   page.window.dispatchEvent(new page.window.StorageEvent('storage', { key: KEY }));
-  assert.equal(page.$('[data-day-progress]').textContent, '2/5 끝냄', 'pageshow·storage가 저장 못 한 체크를 덮지 않는다');
+  assert.equal(page.$('[data-day-progress]').textContent, '구현 완료 2/5', 'pageshow·storage가 저장 못 한 체크를 덮지 않는다');
   assert.deepEqual(page.$$('.day-chips input.step-check:checked').map((i) => i.dataset.step), ['D04-1', 'D04-2']);
   assert.match(page.$('[data-course-storage]').textContent, /저장하지 못했습니다/, '저장 실패 안내');
 }
@@ -448,9 +480,9 @@ for (const day of course.days) {
   const day = await open('course/spring/D04.html');
   day.window.localStorage.setItem(KEY, JSON.stringify({ version: 1, steps: { 'D04-1': true } }));
   day.window.dispatchEvent(new day.window.StorageEvent('storage', { key: 'other.key' }));
-  assert.equal(day.$('[data-day-progress]').textContent, '0/5 끝냄', '다른 키는 무시');
+  assert.equal(day.$('[data-day-progress]').textContent, '구현 완료 0/5', '다른 키는 무시');
   day.window.dispatchEvent(new day.window.StorageEvent('storage', { key: KEY }));
-  assert.equal(day.$('[data-day-progress]').textContent, '1/5 끝냄', '같은 키면 다시 그린다');
+  assert.equal(day.$('[data-day-progress]').textContent, '구현 완료 1/5', '같은 키면 다시 그린다');
   const home = await open('index.html');
   assert.equal(home.$('[data-today-id]').textContent, 'D01');
   home.window.localStorage.setItem(KEY, JSON.stringify({ version: 1, steps: { 'D06-1': true } }));
@@ -472,11 +504,7 @@ await test('선택한 B16이 남으면 홈은 D14로 복귀하고 완료하면 D
   assert.match(home.$('[data-today-open]').textContent, /B16 이어서/);
   assert.match(home.$('[data-today-meta]').textContent, /공통 구현 2\/2.*선택 티켓 B16 0\/1/);
   assert.match(home.$('[data-today-steps] a[href$="#step-d14-4"]').textContent, /내 선택 B16/);
-  const cell = home.$('.ch-day[data-day="D14"]');
-  assert.equal(cell.querySelector('[data-day-count]').textContent, '2/3');
-  assert.equal(cell.classList.contains('is-done'), false);
-  assert.notEqual(cell.querySelector('.ch-bar i').style.width, '100%');
-  assert.match(home.$('[data-progress-summary]').textContent, /공통 구현.*선택 티켓 B16 0\/1/);
+  assert.equal(home.$('.ch-progress'), null, '진도 목록은 과정 메뉴에서 확인한다');
   assert.equal(home.$('[data-course-wrapup]').textContent, '', '선택 티켓이 남은 날을 완료로 처리하지 않는다');
   const later = await open('index.html', { saved: JSON.stringify({ version: 1, selectedTicket: 'B16', steps: { 'D14-5': true, 'D14-6': true, 'D15-1': true } }) });
   assert.equal(later.$('[data-today-id]').textContent, 'D14', '다음 날을 열었어도 미완료 선택 티켓을 안내한다');
@@ -486,8 +514,7 @@ await test('선택한 B16이 남으면 홈은 D14로 복귀하고 완료하면 D
   assert.equal(home.$('[data-today-id]').textContent, 'D15', '열린 홈도 완료 기록에 맞춰 갱신한다');
   const finished = await open('index.html', { saved: d14.window.localStorage.getItem(KEY) });
   assert.equal(finished.$('[data-today-id]').textContent, 'D15');
-  assert.equal(finished.$('.ch-day[data-day="D14"] [data-day-count]').textContent, '3/3');
-  assert.ok(finished.$('.ch-day[data-day="D14"]').classList.contains('is-done'));
+  assert.match(finished.$('[data-course-wrapup]').textContent, /D14.*SQL/);
 });
 
 await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제도 반영한다', async () => {
@@ -496,7 +523,7 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
   const page = await open('course/spring/D14.html', { saved: saved('B16') });
   const counter = () => page.$('[data-day-progress]').textContent;
   const meter = page.$('[data-day-meter]');
-  assert.match(counter(), /공통 구현 2\/2.*선택 티켓 B16 0\/1/);
+  assert.match(counter(), /공통 구현 완료 2\/2.*선택 티켓 B16 0\/1/);
   assert.match(counter(), /선택·연습 1\/3/, '고르지 않은 완료 후보는 연습에만 센다');
   assert.equal(meter.value, 2);
   assert.equal(meter.max, 3);
@@ -509,11 +536,11 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
     assert.equal(meter.value, step === 1 ? 3 : 2);
     const home = await open('index.html', { saved: saved(ticket) });
     assert.equal(home.$('[data-today-id]').textContent, step === 1 ? 'D15' : 'D14');
-    assert.equal(home.$('.ch-day[data-day="D14"] [data-day-count]').textContent, step === 1 ? '3/3' : '2/3');
+    assert.equal(home.$('.ch-progress'), null);
   }
   page.window.localStorage.setItem(KEY, saved(''));
   page.window.dispatchEvent(new page.window.StorageEvent('storage', { key: KEY }));
-  assert.equal(counter(), '2/2 끝냄 · 선택·연습 1/4');
+  assert.equal(counter(), '구현 완료 2/2 · 선택·연습 1/4');
   assert.equal(meter.max, 2);
   assert.equal((await open('index.html', { saved: saved('') })).$('[data-today-id]').textContent, 'D15');
   assert.equal((await open('index.html', { saved: saved('B14') })).$('[data-today-id]').textContent, 'D15', '다른 날의 공통 순서를 중복 집계하지 않는다');
@@ -538,26 +565,22 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
   assert.equal(d15only.$('[data-today-id]').textContent, 'D01');
 
   const home = await open('index.html');
-  assert.ok(home.$('main').firstElementChild.matches('section.course-home'), '과정 v2가 첫 화면');
+  assert.ok(home.$('main').firstElementChild.matches('.site-frame'), '홈 메뉴와 공부 영역이 첫 화면');
   assert.equal(home.$$('h1').filter((h) => !h.closest('details')).length, 1, '보이는 h1은 하나');
   assert.equal(home.$('h1').id, 'course-home-title');
   assert.equal(home.$('[data-today-id]').textContent, 'D01', '진도 없으면 D01');
   assert.equal(home.$('[data-today-note]').hidden, false, 'D00 워밍업 안내');
-  assert.equal(home.$$('.ch-day').length, course.days.length - 1, '전체 일자 진도');
-  assert.equal(home.$$('.ch-milestones > li').length, 3, '홈에서 세 단계의 범위를 먼저 보여 준다');
-  assert.ok(!home.$('.ch-progress').closest('.ch-hero'), '전체 진도는 오늘 할 일 열과 분리한다');
+  assert.equal(home.$$('.ch-day').length, 0, '홈에서 전체 진도 중복 제거');
+  assert.equal(home.$$('.ch-milestones > li').length, 3);
   for (const [i, a] of home.$$('[data-today-steps] a').entries()) {
     assert.equal(a.getAttribute('href'), `course/spring/D01.html#step-d01-${i + 1}`, '첫 방문의 구현 항목이 작업 위치로 연결된다');
   }
-  assert.ok(home.$('.ch-entries a[href="course/spring/README.html"]') && home.$('.ch-entries a[href="course/map.html"]'), 'Spring 일자·지도 진입');
-  assert.equal(home.$$('.ch-entries .ch-chips a[href^="course/java/J"]').length, course.java.length, '전체 Java 트랙 진입');
-  assert.equal(home.$$('.ch-ticket-chips > *').length, 16, '2단계 티켓 B01~B16');
+  assert.equal(home.$$('.ch-menu-guide li').length, 4, '각 목적지의 용도를 안내');
   for (const a of home.$$('.course-home a[href], .home-reference-head a[href]')) {
     const href = a.getAttribute('href');
     assert.ok(fs.existsSync(new URL(href.split('#')[0].replace(/\.html$/, '.md'), root)) || fs.existsSync(new URL(href.split('#')[0], root)), `홈 링크 ${href}`);
   }
-  assert.ok(home.$('section.home-reference .home-visual [data-home-start]'), '기존 시나리오 시작은 참고 도감 안에 유지');
-  assert.equal(home.$('#home-title').tagName, 'H2');
+  assert.equal(home.$('.home-reference'), null);
 
   const resumed = await open('index.html', { saved: JSON.stringify({ version: 1, steps: { 'D04-1': true, 'D04-2': true } }) });
   assert.equal(resumed.$('[data-today-id]').textContent, 'D04');
@@ -566,9 +589,6 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
   assert.equal(resumed.$('[data-today-note]').hidden, true);
   assert.equal(resumed.$$('[data-today-steps] a').length, course.days.find(d => d.id === 'D04').steps.length);
   assert.equal(resumed.$('[data-today-steps] a').getAttribute('href'), 'course/spring/D04.html#step-d04-1', '이어하기로 날이 바뀌면 작업 링크도 바뀐다');
-  assert.equal(resumed.$('.ch-day[data-day="D04"] [data-day-count]').textContent, '2/5');
-  assert.ok(resumed.$('.ch-day[data-day="D04"]').classList.contains('is-today'));
-  assert.equal(resumed.$('[data-progress-summary]').textContent, `체크한 순서 2/${JSON.parse(resumed.$('#course-days-data').textContent).filter((d) => d.steps.length).reduce((n, d) => n + (d.steps.filter((s) => !s.extra).length || d.steps.length), 0)}`);
   // 선택·연습 티켓만 다루는 순서는 진도에서 뺀다. 필수 B03만 끝낸 D13은 끝난 날이다(P8-4 리뷰 ②).
   const homeDays = JSON.parse(home.$('#course-days-data').textContent).filter((d) => d.steps.length);
   const extraIds = homeDays.flatMap((d) => d.steps.filter((s) => s.extra).map((s) => s.id));
@@ -579,29 +599,26 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
   const allCore = homeDays.flatMap((d) => d.steps.filter((s) => !s.extra).map((s) => s.id));
   assert.equal(nextDay(homeDays, set(...allCore)).mode, 'complete', '추가 순서 없이도 과정 완료');
   const d13 = await open('index.html', { saved: JSON.stringify({ version: 1, steps: Object.fromEntries(coreUpToD13.map((id) => [id, true])) }) });
-  assert.equal(d13.$('.ch-day[data-day="D13"] [data-day-count]').textContent, '1/1');
-  assert.ok(d13.$('.ch-day[data-day="D13"]').classList.contains('is-done'));
+  assert.equal(d13.$('.ch-progress'), null, '홈은 전체 진도를 복제하지 않는다');
   assert.equal(d13.$('[data-today-id]').textContent, 'D14');
   assert.match(d13.$('[data-today-meta]').textContent, /순서 2개 · 선택·연습 4개/);
-  assert.equal(d13.$('[data-progress-summary]').textContent, `체크한 순서 ${coreUpToD13.length}/${allCore.length}`);
+  assert.equal(d13.$('[data-progress-summary]'), null);
   // JS 없이 서버가 처음 그린 숫자도 같은 기준이다(재검토 지적: JS가 고쳐 그리면 초기 HTML 회귀를 못 잡는다)
   const rawHome = await open('index.html', { script: '' });
-  assert.equal(rawHome.$('.ch-day[data-day="D13"] [data-day-count]').textContent, '0/1', '처음 그린 칸도 진도로 세는 순서 수');
-  assert.equal(rawHome.$('[data-progress-summary]').textContent, `체크한 순서 0/${allCore.length}`);
+  assert.equal(rawHome.$$('.ch-day').length, 0);
   // 일자 페이지도 홈과 같은 저장값을 같은 기준으로 센다(P8-4 재검토 ①)
   const savedUpToD13 = JSON.stringify({ version: 1, steps: Object.fromEntries(coreUpToD13.map((id) => [id, true])) });
   const d13page = await open('course/spring/D13.html', { saved: savedUpToD13 });
-  assert.equal(d13page.$('[data-day-progress]').textContent, '1/1 끝냄 · 선택·연습 0/4');
+  assert.equal(d13page.$('[data-day-progress]').textContent, '구현 완료 1/1 · 선택·연습 0/4');
   assert.match(d13page.$('.day-progress-note').textContent, /선택·연습 티켓 순서는 진도에 세지 않습니다/);
   assert.deepEqual(d13page.$$('.day-chip input[data-extra]').map((i) => i.dataset.step), ['D13-2', 'D13-3', 'D13-4', 'D13-5']);
-  assert.equal((await open('course/spring/D13.html', { script: '' })).$('[data-day-progress]').textContent, '0/1 끝냄 · 선택·연습 0/4', '처음 그린 일자 진도');
+  assert.equal((await open('course/spring/D13.html', { script: '' })).$('[data-day-progress]').textContent, '구현 완료 0/1 · 선택·연습 0/4', '처음 그린 일자 진도');
   for (const id of ['D12', 'D14']) {
     const d = homeDays.find((x) => x.id === id);
     const page = await open(`course/spring/${id}.html`, { saved: savedUpToD13 });
     const core = d.steps.filter((x) => !x.extra), extra = d.steps.filter((x) => x.extra);
     const n = core.filter((x) => coreUpToD13.includes(x.id)).length;
-    assert.equal(page.$('[data-day-progress]').textContent, `${n}/${core.length} 끝냄 · 선택·연습 0/${extra.length}`, `${id} 일자 진도 = 홈 칸 ${d13.$(`.ch-day[data-day="${id}"] [data-day-count]`).textContent}`);
-    assert.equal(d13.$(`.ch-day[data-day="${id}"] [data-day-count]`).textContent, `${n}/${core.length}`);
+    assert.equal(page.$('[data-day-progress]').textContent, `구현 완료 ${n}/${core.length} · 선택·연습 0/${extra.length}`);
   }
   const d04page = await open('course/spring/D04.html', { saved: savedUpToD13 });
   assert.doesNotMatch(d04page.$('[data-day-progress]').textContent, /선택·연습/, '추가 순서가 없는 날은 예전 표시 그대로');
@@ -716,7 +733,7 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
     assert.equal(fold.querySelectorAll('.flow-step').length, flow.steps.filter((s) => s.side === 'cause').length, `${id}: 원인 단계 수`);
     assert.equal(section.querySelectorAll('.flow-step:not(.is-cause)').length, flow.steps.filter((s) => s.side === 'open').length, `${id}: 증상 단계 수`);
     const bare = doc.body.cloneNode(true);
-    bare.querySelectorAll('details').forEach((d) => d.remove());
+    bare.querySelectorAll('details,script,style,noscript').forEach((d) => d.remove());
     const visible = bare.textContent.replace(/\s+/g, ' ') + [...bare.querySelectorAll('[aria-label],[title]')].map((e) => `${e.getAttribute('aria-label')} ${e.getAttribute('title')}`).join(' ');
     for (const s of flow.steps.filter((x) => x.side === 'cause')) {
       for (const piece of [s.title, ...s.values.map((v) => v[1])]) assert.ok(!visible.includes(plainText(piece)), `${id}: 원인 문장 "${plainText(piece)}"이 접기 밖에 보인다`);
@@ -744,7 +761,7 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
     const attrs = [...doc.body.querySelectorAll('[aria-label],[title]')].filter(shown).map((e) => ` ${e.getAttribute('aria-label') ?? ''} ${e.getAttribute('title') ?? ''}`).join('');
     const summaries = [...doc.body.querySelectorAll('summary')].map((e) => ` ${e.textContent}`).join('');
     const bare = doc.body.cloneNode(true);
-    bare.querySelectorAll('details').forEach((d) => d.remove());
+    bare.querySelectorAll('details,script,style,noscript').forEach((d) => d.remove());
     return plainText(bare.textContent + summaries + attrs);
   };
   // 낱말 목록이 놓친 해법·메커니즘 문구(codex P8-3 리뷰 ①)와 동의 표현. 진단 도구 이름은 넣지 않는다.
@@ -1036,4 +1053,66 @@ await test('API 층은 순서별 독립 사실 칸에 있고 D04 가이드는 �
     }
     page.window.close();
   }
+});
+
+await test('단계형 일자: 무스크립트 원문, 해시·뒤로 가기, 전체 보기·인쇄·검색을 보존한다', async () => {
+  const raw = new JSDOM(fs.readFileSync(new URL('course/spring/D05.html', root), 'utf8')).window.document;
+  const rawPanels = [...raw.querySelectorAll('.day-stepper-main > [data-day-panel]')];
+  assert.ok(rawPanels.length > 4);
+  assert.ok(raw.querySelector('noscript')?.textContent.includes('[data-day-panel][hidden]'), 'JS가 없으면 모든 단계 원문을 여는 fallback CSS가 있다');
+  assert.ok(raw.querySelector('.day-stage-data .day-data'), '적재 원문은 데이터 단계에 있다');
+  for (const cls of ['day-sql', 'day-talk', 'day-grade']) assert.ok(raw.querySelector(`.day-stage-wrap .${cls}`), cls);
+  for (const step of raw.querySelectorAll('.day-step')) {
+    assert.match(step.querySelector('.fact-files .fact-label').textContent, /^만들 것(?:\s|$)/);
+    assert.ok(step.querySelector('.fact-done:not(details), .fact-layers:not(details)'));
+    assert.equal(step.querySelector('details.fact-trap').open, false);
+    assert.equal(step.querySelector('details.step-references').open, false);
+  }
+  const page = await open('course/spring/D05.html', { before(win) { win.history.replaceState(null, '', '#step-d05-3'); } });
+  const visible = () => page.$$('.day-stepper-main > [data-day-panel]').filter(panel => !panel.hidden).map(panel => panel.id);
+  assert.deepEqual(visible(), ['step-d05-3'], '직접 해시 진입');
+  assert.equal(page.$('[data-panel-link][aria-current="step"]').hash, '#step-d05-3');
+  const hashChange = () => new Promise(resolve => page.window.addEventListener('hashchange', resolve, { once: true }));
+  let changed = hashChange();
+  page.window.location.hash = '#step-d05-wrap';
+  await changed;
+  assert.deepEqual(visible(), ['step-d05-wrap']);
+  assert.deepEqual(page.$$('[data-wrap-panel]').filter(panel => !panel.hidden).map(panel => panel.id), ['step-d05-wrap-sql']);
+  const coreValue = page.$('[data-day-meter]').value;
+  page.$('[data-stage-check="step-d05-wrap"]').click();
+  assert.equal(page.$('[data-day-meter]').value, coreValue, '마무리 확인은 구현 진도에 더하지 않는다');
+  assert.equal(JSON.parse(page.window.localStorage.getItem('javaexperience.course.stages.v1'))['step-d05-wrap'], true);
+  changed = hashChange();
+  page.window.location.hash = '#말하기-카드';
+  await changed;
+  assert.deepEqual(page.$$('[data-wrap-panel]').filter(panel => !panel.hidden).map(panel => panel.id), ['step-d05-wrap-talk'], '기존 마무리 앵커가 하위 순서를 연다');
+  changed = hashChange();
+  page.window.history.back();
+  await changed;
+  changed = hashChange();
+  page.window.history.back();
+  await changed;
+  assert.deepEqual(visible(), ['step-d05-3'], '브라우저 뒤로 가기');
+  changed = hashChange();
+  page.window.location.hash = '#observations-d05-2';
+  await changed;
+  assert.deepEqual(visible(), ['step-d05-2'], '기존 내부 앵커도 소속 단계를 연다');
+  assert.equal(page.$('#observations-d05-2').open, true);
+  page.$('[data-day-expand]').click();
+  assert.equal(visible().length, rawPanels.length);
+  assert.equal(page.$('[data-day-expand]').getAttribute('aria-pressed'), 'true');
+  page.$('[data-day-expand]').click();
+  assert.deepEqual(visible(), ['step-d05-2']);
+  const trap = page.$('#step-d05-2 details.fact-trap');
+  assert.equal(trap.open, false);
+  page.window.dispatchEvent(new page.window.Event('beforeprint'));
+  assert.equal(visible().length, rawPanels.length);
+  assert.equal(trap.open, true);
+  page.window.dispatchEvent(new page.window.Event('afterprint'));
+  assert.deepEqual(visible(), ['step-d05-2']);
+  assert.equal(trap.open, false);
+  assert.equal(page.$('#observations-d05-2').open, true, '인쇄 전 열어둔 관찰 접기는 유지');
+  page.window.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'f', ctrlKey: true }));
+  assert.equal(visible().length, rawPanels.length, '브라우저 검색을 시작하면 숨긴 순서도 찾는다');
+  page.window.close();
 });

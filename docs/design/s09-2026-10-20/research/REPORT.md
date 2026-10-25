@@ -4,7 +4,7 @@
 
 ## 범위와 결론
 
-대상은 `/Users/ds/research/javaexperience-s09-20261020/S09-source.md` 304줄이다. 요청대로 원문은 데이터로만 읽고 수정하지 않았다. 조사 범위는 Jakarta Persistence 3.2 표준, Hibernate ORM 7.4 문서, Spring Boot 관리 좌표이며 코드를 실행한 보고서가 아니다. 핵심 개념은 대체로 맞지만, persistence context를 트랜잭션과 동의어로 쓰는 표현, 일률적인 N+1·fetch join pagination 설명은 조건을 분명히 해야 한다.
+대상은 `LOCAL_HOME/research/javaexperience-s09-20261020/S09-source.md` 304줄이다. 요청대로 원문은 데이터로만 읽고 수정하지 않았다. 조사 범위는 Jakarta Persistence 3.2 표준, Hibernate ORM 7.4 문서, Spring Boot 관리 좌표이며 코드를 실행한 보고서가 아니다. 핵심 개념은 대체로 맞지만, persistence context를 트랜잭션과 동의어로 쓰는 표현, 일률적인 N+1·fetch join pagination 설명은 조건을 분명히 해야 한다.
 
 ## 확인 결과
 

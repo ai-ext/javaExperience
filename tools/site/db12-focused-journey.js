@@ -1,12 +1,12 @@
 document.querySelectorAll('.db12-focused').forEach((journey)=>{
   const panels=[...journey.querySelectorAll('[data-db12-panel]')];
-  const show=(name)=>{
+  const show = (name, scroll = true) =>{
     const active=panels.find((panel)=>panel.dataset.db12Panel===name);
     if(!active)return;
     for(const panel of panels)panel.hidden=panel!==active;
     journey.dataset.db12Screen=name;
     for(const button of journey.querySelectorAll('.db12-progress [data-db12-go]'))button.setAttribute('aria-current',button.dataset.db12Go===name?'step':'false');
-    journey.scrollIntoView({block:'start',behavior:'instant'});
+    if (scroll) journey.scrollIntoView({block:'start',behavior:'instant'});
   };
   for(const button of journey.querySelectorAll('[data-db12-go]'))button.addEventListener('click',()=>show(button.dataset.db12Go));
   for(const button of journey.querySelectorAll('[data-db12-copy]'))button.addEventListener('click',async()=>{
@@ -47,5 +47,5 @@ document.querySelectorAll('.db12-focused').forEach((journey)=>{
     try{localStorage.setItem(storageKey,JSON.stringify(Object.fromEntries(fields.map((item)=>[item.dataset.db12Record,item.value]))));}catch{/* 저장 실패에도 현재 입력은 유지된다. */}
     refresh();
   });
-  refresh();show('scenario');
+  refresh();show('scenario', false);
 });

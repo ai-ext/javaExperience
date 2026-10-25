@@ -20,7 +20,7 @@ Swagger 경로는HTTP302→/swagger-ui/index.html→HTML200을확인했다. 브�
 
 별도모델3개는 Pythonset소비자계약비교, HTTPsafe/idempotent문헌, 합의→검증→리뷰/CI→배포→관측의미실행흐름이다. strict/tolerant결과는필드이름집합계산이지실제Jackson/제품소비자의설정검증이아니다. 원문에는PUT/DELETE·DB·인증/인가·분산멱등저장소·페이지API·JUnit슬라이스·PR/CI·운영배포/지표가없거나이번범위에서미실행이다.
 
-main최종19개freeze뒤새run의일반replay가19관찰·3모델전체frozen과일치했다. raw timestamp/UUID/PID/port/date header·절대경로는비교값에섞지않고원자료에남겼다. frozen은실제로확인한형식·동등관계·명시alias·고정nil예시·문서내용만비교한다. 일반재현은 `python3 docs/design/d03-2026-10-20/source-proof/run-proof.py --runtime-root /Users/ds/research/javaexperience-d03-20261020/_data/runtime`이며 --freeze를 넣지 않는다.
+main최종19개freeze뒤새run의일반replay가19관찰·3모델전체frozen과일치했다. raw timestamp/UUID/PID/port/date header·절대경로는비교값에섞지않고원자료에남겼다. frozen은실제로확인한형식·동등관계·명시alias·고정nil예시·문서내용만비교한다. 일반재현은 `python3 docs/design/d03-2026-10-20/source-proof/run-proof.py --runtime-root LOCAL_HOME/research/javaexperience-d03-20261020/_data/runtime`이며 --freeze를 넣지 않는다.
 
 공식연구는CodexCLI gpt-6-luna/OpenAI직접경로다. 첫실행자가불필요한nestedCodex를시도해옵션/초기화오류를냈고부분보고서로남았다. 같은Luna/OpenAI직접retry에서재위임없이직접web3회/nestedCLI0/error0/turn.completed를확인했다. 다른model/provider/LiteLLM으로바꾸지않았다. 첫원시로그는연구폴더attempt-01에보존하며해당시도의무관한config조회출력은저장소로복사하지않았다. 메인이공식9본문과actualruntime을별도로대조했다. 버전별라이브러리일반성·전체스키마·실제소비자·보안/성능·운영안전성·원문전체실행완료를주장하지않는다.
 

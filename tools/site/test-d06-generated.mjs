@@ -1,3 +1,4 @@
+import { resolveEvidencePath } from './evidence-path.mjs';
 import { resolveHistoricalAsset } from './learning-source-baseline.mjs';
 // 생성 HTML·선정 JPG·원문·native 경계를 실제 산출물과 대조하는 계약 검사다.
 import assert from 'node:assert/strict';
@@ -151,7 +152,7 @@ const dependencies = json(proof + 'dependencies.json');
 assert.equal(dependencies.length, 50);
 assert.equal(dependencies.filter(row => row.scope === 'runtimeClasspath').length, 49);
 assert.equal(dependencies.filter(row => row.scope === 'proofRuntime').length, 1);
-for (const row of dependencies) assert.equal(hash(fs.readFileSync(row.file)), row.sha256);
+for (const row of dependencies) assert.equal(hash(fs.readFileSync(resolveEvidencePath(row.file))), row.sha256);
 const fixture = json(proof + 'fixture-files.json');
 assert.equal(fixture.length, 8);
 for (const row of fixture) assert.equal(hash(fs.readFileSync(new URL(proof + row.file, root))), row.sha256);

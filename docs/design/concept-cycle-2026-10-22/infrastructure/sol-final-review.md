@@ -16,17 +16,17 @@ HEAD: `4b0493af52b1a06decca909d6bf9a8b6f9610686`.
 
 ## 승인 입력 SHA-256
 
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py`: `4339c5494a5efc9a39fedd4f10d92ba3b8f3ef47255204f985d8731490c9548f`
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/test-harness.py`: `684836988be54c10218cf067a079de037bed95fd3aae1fc8a0945a195922b1e1`
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/HARNESS.md`: `bda4297fbbb2a930301207e0ba076bf7ce1884494f29ef86fe6e6beb2429d6f7`
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/AUDIT-CONTRACT.md`: `06f0bad92b7fcb7b4bc590ea8e9d891556c68d2de94dcb2223997dbd5f453cfb`
-- `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks.json`: `119100f9cecf80065cecb721724498f7572ca99c341da7433dc2ce17349f1cd0`
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/run-harness.py`: `4339c5494a5efc9a39fedd4f10d92ba3b8f3ef47255204f985d8731490c9548f`
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/test-harness.py`: `684836988be54c10218cf067a079de037bed95fd3aae1fc8a0945a195922b1e1`
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/HARNESS.md`: `bda4297fbbb2a930301207e0ba076bf7ce1884494f29ef86fe6e6beb2429d6f7`
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/AUDIT-CONTRACT.md`: `06f0bad92b7fcb7b4bc590ea8e9d891556c68d2de94dcb2223997dbd5f453cfb`
+- `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/tasks.json`: `119100f9cecf80065cecb721724498f7572ca99c341da7433dc2ce17349f1cd0`
 
 ## 새 실행 증거
 
-- fresh21 unit, exit0: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-final-unit-tests.log`.
-- 이전5 finding 직접 fixture 재실행: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-final-edge-cases.log`.
-- 현재 HEAD/해시/코드 manifest/원문 baseline: `/Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-final-static-checks.log`.
+- fresh21 unit, exit0: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-final-unit-tests.log`.
+- 이전5 finding 직접 fixture 재실행: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-final-edge-cases.log`.
+- 현재 HEAD/해시/코드 manifest/원문 baseline: `LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/concept-cycle-2026-10-22/infrastructure/sol-final-static-checks.log`.
 
 현재 tools/site 코드 manifest는 418개다. 실제 원문24개의 registry 기준 해시가 모두 일치하며 대응 npm 스크립트도 모두 존재한다. 검토 시작과 완료 시 승인 입력 해시가 일치했다.
 

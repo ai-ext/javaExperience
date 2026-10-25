@@ -14,7 +14,7 @@ for block,entry in zip(blocks,meta['originalJava'],strict=True):
     assert (OUT/'original'/entry['file']).read_bytes()==raw
     assert hashlib.sha256(raw).hexdigest()==entry['sha256']
 expected=json.loads((OUT/'checkpoints/expected-current-execution.json').read_text())
-env=os.environ.copy();env['JAVA_HOME']='/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home'
+env=os.environ.copy();env['JAVA_HOME']='LOCAL_HOME/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home'
 command=[str(ROOT/'gradlew'),'-p',str(OUT/'runtime'),'--no-daemon','--console=plain','recordDependencies','runProof']
 result=subprocess.run(command,cwd=ROOT,env=env,capture_output=True,text=True)
 (OUT/'gradle-run.txt').write_text(result.stdout+result.stderr)

@@ -75,10 +75,10 @@ docker context inspect 결과만 Unix인지 검사한 뒤 환경을 상속한 ba
 
 권한은 root orchestrator와 nonroot UID1000/1001/1002 표본을 분리했다. 스트림/환경/권한/신호/HTTP/용량/rsync/Docker PID1 원출력은 재현됐다. network none의 외부경로 차단과 컨테이너 내부 loopback 성공은 양립한다. 인터페이스에는 DOWN tunnel장치도 보였으며 eth0/default route는 없었다. SSH/systemd/Spring Boot와 운영자원은 실행하지 않았다. TERM/KILL의 cleanup marker 비교도 수행하지 않았다.
 
-검수 보고: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-review.json
+검수 보고: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-review.json
 
-독립 원출력: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-logs/independent-656fa995a4406df1.json
+독립 원출력: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-logs/independent-656fa995a4406df1.json
 
-기존 attempt별 원출력 감사: /Users/ds/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-logs/original-attempt-audit.json
+기존 attempt별 원출력 감사: LOCAL_HOME/code/javaExperience/.worktrees/concept-learning-night/docs/design/d12-2026-10-25/proof-sol-logs/original-attempt-audit.json
 
 기존 PLAN·AGENTS·RESUME·구현·학습자코드·기존원출력은 이 리뷰에서 수정하지 않았다. 커밋하지 않았다.

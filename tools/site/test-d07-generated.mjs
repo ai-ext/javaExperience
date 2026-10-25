@@ -1,3 +1,4 @@
+import { resolveEvidencePath } from './evidence-path.mjs';
 import { loadSourceBaseline, readHistoricalSource } from './learning-source-baseline.mjs';
 // 생성 HTML과 선정 JPG·원문·실측·미실행 모델의 연결을 검사한다.
 import assert from 'node:assert/strict';
@@ -137,7 +138,7 @@ assert.equal(facts['stopping-one-local-process-leaves-other-answering'].bHealthS
 assert.deepEqual(facts['all-own-http-processes-and-ports-closed'].exitCodes, [143, 143]);
 const dependencies = json(proof + 'dependencies.json');
 assert.equal(dependencies.length, 39);
-for (const row of dependencies) assert.equal(hash(fs.readFileSync(row.file)), row.sha256);
+for (const row of dependencies) assert.equal(hash(fs.readFileSync(resolveEvidencePath(row.file))), row.sha256);
 const fixture = json(proof + 'fixture-files.json');
 assert.equal(fixture.length, 4);
 for (const row of fixture) assert.equal(hash(fs.readFileSync(new URL(proof + row.file, root))), row.sha256);
