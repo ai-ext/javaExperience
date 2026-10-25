@@ -15,12 +15,14 @@
 10. PCdark기준+360px기본조작성/overflow검증. fileURL목록/상세이동/힌트작동과HTTP문서에서실제API성공을구분. 새설계시안은실제imagegen,실제캡처대조,미검증verified금지.
 
 ## 실행순서
-- [ ] 사용자요청대상원본46일/135작업+기존101단계+7functional+관련Java/티켓/운영요구전수수집,API의정본과설계선택대상분리.
-- [ ] 기능묶음/단계정의와원본crosswalk를편집가능한service원본으로관리. 원본부재/중복/배경설명누락을검사해미지정0보장.
-- [ ] 기능별세부기획/질문형힌트/호출레시피를전부작성하고구체성·source계약대조. 대표2과제에만제한하지않음.
-- [ ] 실제PCdark목록/상세/힌트+요청열림imagegen시안과component스펙.
-- [ ] 기존코드/원문/이미지26개념+134reader+7functional을재사용해메뉴/목록/상세/필터/Explorer/브라우저도구/진도/기존주소연결구현.
-- [ ] 46일/101원문에대한기능mapping·구체본문·힌트·API/실행검사누락0,원문/계약/진도보존. PC3폭+360/fileURL/HTTP/실서버/old-new환산없음검증.
-- [ ] build/audit visual/version/parity/navigation/learning-entry/course-pages/course-data및기존26harness/functional/main회귀를최종코드로실행. 로컬커밋·백업복원,mainpush/merge없음.
+
+2026-10-25 후속 갱신: 작성·구현과 실제 검증을 구분한 현재 진행표는 `/Users/ds/code/javaExperience/.worktrees/course-learning-integration/docs/design/full-integration-2026-10-25/PROGRESS.md`를 따른다. 아래 체크는 해당 실행 묶음에 한정하며 전체 수락 조건 완료를 뜻하지 않는다.
+- [x] 사용자요청대상원본46일/135작업+기존101단계+7functional+관련Java/티켓/운영요구전수수집,API의정본과설계선택대상분리.
+- [x] 기능묶음/단계정의와원본crosswalk를편집가능한service원본으로관리. 원본부재/중복/배경설명누락을검사해미지정0보장.
+- [x] 기능별세부기획/질문형힌트/호출레시피를전부작성하고구체성·source계약대조. 대표2과제에만제한하지않음.
+- [x] 실제PCdark목록/상세/힌트+요청열림imagegen시안과component스펙.
+- [x] 기존코드/원문/이미지26개념+134reader+7functional을재사용해메뉴/목록/상세/필터/Explorer/브라우저도구/진도/기존주소연결구현.
+- [ ] (정적 대응·보존은 확인, native 검증 미완료) 46일/101원문에대한기능mapping·구체본문·힌트·API/실행검사누락0,원문/계약/진도보존. PC3폭+360/fileURL/HTTP/실서버/old-new환산없음검증.
+- [x] build/audit visual/version/parity/navigation/learning-entry/course-pages/course-data및기존26harness/functional/main회귀를최종코드로실행. 로컬커밋·백업복원,mainpush/merge없음.
 
 이전full-learning-integration계획에서수행한이식/검증은기반작업이다. 이번전수수락조건을대신하지않는다.
