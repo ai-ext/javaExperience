@@ -1,8 +1,12 @@
 # 개념 학습 재구성 최종 보고서
 
-기준일: 2026-10-25 · 브랜치 `feat/concept-curriculum` · HEAD `c8a6133c42dd3032c06846d0bd183f097f34c9df` · 기준 main `f6d82d705e279a0e74a5e6287a35cc51953e49ba`
+기준일: 2026-10-25 · branch ref `feat/concept-curriculum` · 구현 커밋 `7601bd80372dd87117b149f32067851b04654642` · tree `ece5e0c6b3504073ca1a617f234b8fd41a9d8ca0` · 기준 main `f6d82d705e279a0e74a5e6287a35cc51953e49ba`
 
-상태: **로컬 구현 완료 · native clipboard round-trip 미확정**. C01–C06 PC 다크 경로는 코드·fixture·브라우저 범위에서 확인했다. main 반영이나 원격 공유는 하지 않았다.
+상태: **구현 로컬 커밋 완료 · post-commit `check:generated` PASS · native clipboard round-trip 미확정**. C01–C06 PC 다크 경로는 코드·fixture·브라우저 범위에서 확인했다. main 반영이나 원격 공유는 하지 않았다.
+
+## 커밋 시점과 현재 검증 상태
+
+런타임 구현 커밋은 2026-10-25 17:44:05 +09에 생성됐다. 구현 커밋 SHA는 `7601bd80372dd87117b149f32067851b04654642`, tree는 `ece5e0c6b3504073ca1a617f234b8fd41a9d8ca0`이다. runtime code·HTML·proof·research가 이 커밋의 상태에 고정됐다. `head`는 이 구현 커밋을 뜻하며, branch ref `feat/concept-curriculum`은 후속 verification-only 커밋으로 이동할 수 있다. 상태 확인 시각은 2026-10-25 08:47:55 UTC다. `npm --prefix tools/site run check:generated`는 exit 0이고 로그의 최종 결과는 `생성 HTML = 커밋된 HTML`이다.
 
 ## 결과와 범위
 
@@ -12,7 +16,7 @@
 | fixture·공식 근거 확인 완료 | Java 21/Spring Boot 4.1.1 fixture 8 tests; 독립 Sol 재현 8, 의미 변이 6 거부, control 2 통과. 공식 출처 19·claim 22 | 직접 Luna/OpenAI/high 초기 조사 1회(본문 18/19, native web 8, shell 0, nested delegation 0)와 메인 지시 표적 Luna 후속 1회(S14 본문 확인, shell 0, nested delegation 0)를 합쳐 최종 본문 19/19. 메인이 공식 페이지 7개 본문을 표본 대조했고 현행 웹 버전과 fixture 차이를 기록 | 초기 S14 ledger의 `read` 판정은 검색 snippet만으로 잘못 부여됐다. 후속에서 본문을 직접 확인해 바로잡았다. 초기 재귀 CLI 시도는 별도로 미채택. C03 네 처리 시점은 설명 지도이며 AOP 실행 결과가 아니다. C06은 setter 주입·정상 close 범위 |
 | PC 다크 브라우저 동작 확인 | native Chrome/CUA, 2026-10-25 08:17 UTC; 1280·1440·1920 × 높이 832에서 54/54 DOM 상태, overflow 0, 최대 code top 631.5859 px | 카탈로그와 C01–C06의 1440px JPEG 7개를 메인 담당자가 직접 확인; 연구 폴더에만 보관, 제품 raster 자산 추가 0 | 모바일·라이트, imagegen 시안 parity 미확인 |
 | 카탈로그 이동·복귀 확인 | 필터 6조합, 검색 후 상세 진입/검색·필터 복귀, 단원 back/forward, W19 원문 anchor에서 C05 복귀 통과 | 기존 검색 query와 두 필터 상태가 URL로 보존됨 | 없음 |
-| 최종 검증·독립 코드 검수 통과 | 초기 45개 명령 PASS 뒤 core delta의 build/inventory/core/core-inventory/visual/parity 6개 표적 검사 PASS. 불변성 근거로 공통 17개·하네스 26개 재사용. 독립 리뷰 PASS, C0/I0/M0 | 스냅샷 HTML 428개 중 `lessons/concept-core.html`만 변경, 나머지 427개 byte 동일. 변경 코드 7개는 core 전용 | main merge, push, PR 없음 |
+| 최종 검증·독립 코드 검수 통과 | 초기 45개 명령 PASS 뒤 core delta의 build/inventory/core/core-inventory/visual/parity 6개 표적 검사 PASS. 불변성 근거로 공통 17개·하네스 26개 재사용. 새 Sol review PASS, C0/I0/M0; recommendation `local_preview_with_native_clipboard_limit`. post-commit `check:generated` exit 0, 2026-10-25 08:47:55 UTC | 스냅샷 HTML 428개 중 `lessons/concept-core.html`만 변경, 나머지 427개 byte 동일. 변경 코드 7개는 core 전용. 새 review JSON/MD는 연구 addendum에서 exact-copy | main merge, push, PR 없음 |
 | 시각 inventory 상태 정리 | 2026-10-25 inventory collector 및 `test:core-inventory` 재실행 통과 | 현재 live implemented 923개는 기존 live 905개와 신규 core 18개로 구성. 기존 verified 6개 유지, 신규 verified 0개. main 기준 기존 catalog implemented 5개는 내용/구조 변경으로 생긴 이전 ID라 별도 historical archive에 exact 보존했고 live에서 되살리지 않았다. 새 catalog 대응 5개는 unreviewed이며 이전 evidence를 자동 이관하지 않았다. 비대상 53,998행은 core 18행 상태 갱신 전후 line hash와 순서가 같음 | concept-core 페이지 합계는 나머지 미검토 항목이 있어 `in_progress` |
 
 ## Clipboard 결과와 미확정 항목
@@ -32,6 +36,10 @@
 | 변경된 core row 18개 | before aggregate SHA-256: `0ec3a2f8938f0f40de00f375b818bf8f22dcda1d6ece25e8de1a3bbc8bbf919a`; after: `9aa3013f40a2de0a20d89158888677e5361f45d30b0a875a449a7b0a361ca2ab` |
 | 변경되지 않은 기존 행 53,998개 | before/after ordered line aggregate SHA-256 모두 `52ea3511af29fbaade8260f3985f92dedcb2d0778307d6170d4804c6ef69e194` |
 | independent code review | `SOL-FINAL-REVIEW.json`: PASS, Critical 0 / Important 0 / Minor 0 |
+| independent review addendum | `SOL-FINAL-REVIEW.json` / `.md`와 `/Users/ds/research/javaExperience-concept-curriculum-20261025/_data/FINAL-REVIEW.json` / `.md` exact SHA match; recommendation `local_preview_with_native_clipboard_limit`, code snapshot 474 files / `e1bbc746…` |
+| commit state | implementation commit `7601bd80372dd87117b149f32067851b04654642`, tree `ece5e0c6b3504073ca1a617f234b8fd41a9d8ca0`; branch ref may advance for verification-only commit |
+| post-commit generated check | `npm --prefix tools/site run check:generated` exit 0 · 2026-10-25 08:47:55 UTC · two roadmap warnings (D04-5, D07-1) · `_data/check-generated-postcommit.log`: `생성 HTML = 커밋된 HTML` |
+| 최종 보존 확인 | `PRESERVATION-FINAL.json`: 금지된 캡처 blob reachable 0, 기존 source 문서/learner source 변경 0, main HEAD 기준 commit 불변. live implemented 905 기존 + 18 core = 923; retired catalog 5건 별도 exact archive; verified 6 유지, 새 verified 0 |
 | 실행·출처 기록 | `proof/execution.json`: 8 tests; `research/sources.json`: 19 sources / 22 claims |
 | exact source ledger copy | 제품 `research/sources.json`과 외부 `sources-verified-final.json` SHA-256 동일: `6799a456041e40d5734baf5f443cca283acfdd8e4270572135a3ae5af24ab2ce`; provenance.followups/sourceReadAudit 보존 |
 | retired catalog history | `historical-catalog-records.json` 5 rows exact-copy SHA-256: `f511e400e45ed737e8674bd584e2c991d84477bc39cac3d5ca7ef62dcfa409fd`; old IDs live 0, five replacements remain unreviewed |
