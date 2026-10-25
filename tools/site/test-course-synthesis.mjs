@@ -36,11 +36,13 @@ test('선택 워밍업도 세 장면을 이동하며 원문·앵커·확인 기�
   await new Promise(resolve => dom.window.addEventListener('load', resolve));
   const visible = () => panels.filter(panel => !panel.hidden);
   assert.deepEqual(visible(), [panels[0]]);
+  const nextHashChange = new Promise(resolve => dom.window.addEventListener('hashchange', resolve, { once: true }));
   doc.querySelector('.step-next').click();
-  await new Promise(resolve => dom.window.setTimeout(resolve, 10));
+  await nextHashChange;
   assert.deepEqual(visible(), [panels[1]]);
+  const anchorHashChange = new Promise(resolve => dom.window.addEventListener('hashchange', resolve, { once: true }));
   dom.window.location.hash = '#오늘-할-것';
-  await new Promise(resolve => dom.window.setTimeout(resolve, 10));
+  await anchorHashChange;
   assert.deepEqual(visible(), [panels[0]], '기존 내부 앵커로 이동해도 소유 장면을 연다');
   doc.querySelector('[data-day-expand]').click();
   assert.equal(visible().length, 3);

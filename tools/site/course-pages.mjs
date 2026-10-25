@@ -7,6 +7,8 @@ import path from 'node:path';
 import { JSDOM } from 'jsdom';
 import { loadFlows, renderDayFlow, renderDayTicketLinks } from './course-flow.mjs';
 import { loadCourseSources } from '../course/sources.mjs';
+import { renderCourseApiWorkspace } from './course-api-workspace.mjs';
+import { renderCoursePostVisual } from './course-post-visual.mjs';
 
 const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const PHASE = { warmup: '선택 · Java 워밍업', build: '1단계 · 빈 프로젝트로 서버 만들기', maintain: '2단계 · 어수선한 서버 넘겨받기', wrap: '중간 점검 · 설명 세션', extend: '3단계 · 설계·운영·업무 적용' };
@@ -277,7 +279,7 @@ function renderStepSection(section, fromRel, course, step) {
   const next = day.steps[day.steps.indexOf(step) + 1];
   const nextLink = `<a class="step-next" href="${next ? `#step-${next.id.toLowerCase()}` : '#오늘-순서'}">${next ? `다음 순서 ${NUMS[next.no - 1]} →` : '오늘 순서로 돌아가기 ↑'}</a>`;
   const done = `<p class="step-done"><label><input type="checkbox" class="step-check" data-step="${esc(step.id)}"> 이 순서를 끝냈다</label></p>`;
-  return `${head}${facts}<div class="step-help">${titleDetail}${tail}</div><div class="step-footer">${done}${nextLink}</div></section>`;
+  return `${head}${facts}${renderCoursePostVisual({ stepId: step.id })}${renderCourseApiWorkspace({ stepId: step.id })}<div class="step-help">${titleDetail}${tail}</div><div class="step-footer">${done}${nextLink}</div></section>`;
 }
 
 function dayPager(day, fromRel, course) {

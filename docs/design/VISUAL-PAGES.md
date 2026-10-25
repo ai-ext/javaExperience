@@ -1,6 +1,6 @@
 # 화면별 시각 개편 체크리스트
 
-저자 원문과 생성 HTML이 함께 있는 391개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 50,965개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
+저자 원문과 생성 HTML이 함께 있는 391개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 51,119개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
 
 체크는 해당 화면의 모든 개별 항목이 `verified`일 때만 자동으로 붙는다. `imagegen` 시안 또는 공통 컴포넌트 한 개를 적용한 상태는 완료가 아니다.
 
@@ -30,16 +30,16 @@
 - [ ] [course/README.md](../../course/README.html) — 항목 43, 긴 산문 2, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [course/map.md](../../course/map.html) — 항목 16, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [course/spring/D00.md](../../course/spring/D00.html) — 항목 16, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
-- [ ] [course/spring/D01.md](../../course/spring/D01.html) — 항목 234, 긴 산문 0, 토글 28, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D02.md](../../course/spring/D02.html) — 항목 252, 긴 산문 1, 토글 37, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D03.md](../../course/spring/D03.html) — 항목 314, 긴 산문 0, 토글 39, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D04.md](../../course/spring/D04.html) — 항목 261, 긴 산문 1, 토글 40, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [course/spring/D05.md](../../course/spring/D05.html) — 항목 335, 긴 산문 0, 토글 43, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D06.md](../../course/spring/D06.html) — 항목 243, 긴 산문 1, 토글 33, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [course/spring/D07.md](../../course/spring/D07.html) — 항목 365, 긴 산문 0, 토글 45, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D08.md](../../course/spring/D08.html) — 항목 359, 긴 산문 0, 토글 36, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D09.md](../../course/spring/D09.html) — 항목 346, 긴 산문 0, 토글 40, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D10.md](../../course/spring/D10.html) — 항목 375, 긴 산문 1, 토글 40, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D01.md](../../course/spring/D01.html) — 항목 258, 긴 산문 0, 토글 28, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D02.md](../../course/spring/D02.html) — 항목 260, 긴 산문 1, 토글 37, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D03.md](../../course/spring/D03.html) — 항목 334, 긴 산문 0, 토글 39, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D04.md](../../course/spring/D04.html) — 항목 267, 긴 산문 1, 토글 46, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [course/spring/D05.md](../../course/spring/D05.html) — 항목 345, 긴 산문 0, 토글 46, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D06.md](../../course/spring/D06.html) — 항목 252, 긴 산문 1, 토글 34, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [course/spring/D07.md](../../course/spring/D07.html) — 항목 371, 긴 산문 0, 토글 45, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D08.md](../../course/spring/D08.html) — 항목 399, 긴 산문 0, 토글 36, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D09.md](../../course/spring/D09.html) — 항목 368, 긴 산문 0, 토글 40, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [course/spring/D10.md](../../course/spring/D10.html) — 항목 383, 긴 산문 1, 토글 40, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/D11.md](../../course/spring/D11.html) — 항목 164, 긴 산문 1, 토글 28, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/D12.md](../../course/spring/D12.html) — 항목 153, 긴 산문 1, 토글 27, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/D13.md](../../course/spring/D13.html) — 항목 166, 긴 산문 1, 토글 32, 최대 접기 깊이 1; 상태: unreviewed
@@ -76,7 +76,7 @@
 - [ ] [course/spring/D44.md](../../course/spring/D44.html) — 항목 90, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/D45.md](../../course/spring/D45.html) — 항목 90, 긴 산문 0, 토글 12, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/README.md](../../course/spring/README.html) — 항목 8, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
-- [ ] [course/start/README.md](../../course/start/README.html) — 항목 34, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
+- [ ] [course/start/README.md](../../course/start/README.html) — 항목 35, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [course/start/dummy/README.md](../../course/start/dummy/README.html) — 항목 20, 긴 산문 0, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 - [ ] [course/start/ops/README.md](../../course/start/ops/README.html) — 항목 54, 긴 산문 7, 토글 0, 최대 접기 깊이 0; 상태: unreviewed
 
