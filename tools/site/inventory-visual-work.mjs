@@ -30,6 +30,7 @@ import { D09_LESSONS } from './d09-lesson-data.mjs';
 import { D10_LESSONS } from './d10-lesson-data.mjs';
 import { D11_LESSONS } from './d11-lesson-data.mjs';
 import { D12_LESSONS } from './d12-lesson-data.mjs';
+import { loadCoreLearning } from './core-learning-data.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const output = path.join(root, 'docs/design/visual-inventory.jsonl');
@@ -229,6 +230,7 @@ function collectHtml(page, html) {
     'home-demo-result', 'home-cursor-preview', 'home-service-section', 'home-service-board',
     'kc-catalog', 'kc-hero', 'kc-context', 'kc-browse', 'kc-empty', 'kc-sequence', 'kc-original-link', 'kc-detail-navigation',
     'p16-json-visual', 'p16-navigation', 'p16-scene', 'p16-pair', 'p16-code-location', 'p16-actions',
+    'core-learning', 'core-learning-layout', 'core-stage-nav', 'core-stage-columns', 'core-observation',
     'home-new-visual', 'home-new-stepper', 'home-new-plate', 'home-prepare-shortcut', 'home-return-work', 'home-preparation-steps',
     // 과정 v2(P5-2): 홈 과정 영역·참고 도감, 일자 페이지 배치, 과정 지도
     'course-home', 'ch-today', 'ch-progress', 'ch-entries', 'home-reference',
@@ -299,6 +301,23 @@ for (const file of sourceFiles) {
     for (const lesson of lessons) for (const stage of lesson.stages) {
       add(file, lesson.question, kind, stage.title, stage.lead.length,
         { topicId: lesson.id, stageId: stage.id, imageId: stage.image });
+    }
+  }
+  if (file === 'lessons/concept-core.md') {
+    const { units } = loadCoreLearning(root);
+    for (const unit of units) for (const [index, stage] of unit.stages.entries()) {
+      const step = index + 1;
+      const stageButton = index;
+      add(file, unit.title, 'core_learning_state', stage.title, stage.explanation.length,
+        {
+          topicId: unit.id,
+          stageId: `step${step}`,
+          sourcePath: 'tools/site/core-learning-data.mjs',
+          sourceFact: stage.explanation,
+          codeFact: stage.code,
+          observationFacts: stage.rows,
+          currentSelector: `[data-core-learning] [data-core-unit="${unit.id}"][aria-pressed="true"], [data-core-learning] [data-core-stage-nav] [data-core-step="${stageButton}"][aria-pressed="true"]`,
+        });
     }
   }
   const units = rows.slice(before);
