@@ -1,6 +1,6 @@
 # 화면별 시각 개편 체크리스트
 
-저자 원문과 생성 HTML이 함께 있는 391개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 53,963개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
+저자 원문과 생성 HTML이 함께 있는 392개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 54,016개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
 
 체크는 해당 화면의 모든 개별 항목이 `verified`일 때만 자동으로 붙는다. `imagegen` 시안 또는 공통 컴포넌트 한 개를 적용한 상태는 완료가 아니다.
 
@@ -218,7 +218,7 @@
 - [ ] [docs/knowledge/W25-spring-multithreading.md](../../docs/knowledge/W25-spring-multithreading.html) — 항목 143, 긴 산문 1, 토글 24, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [docs/knowledge/W26-naming-conventions.md](../../docs/knowledge/W26-naming-conventions.html) — 항목 126, 긴 산문 0, 토글 21, 최대 접기 깊이 2; 상태: unreviewed
 
-## 개념 레슨 (50)
+## 개념 레슨 (51)
 
 - [ ] [lessons/A0-first-api.md](../../lessons/A0-first-api.html) — 항목 76, 긴 산문 0, 토글 4, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [lessons/A1-client-server-http.md](../../lessons/A1-client-server-http.html) — 항목 64, 긴 산문 0, 토글 4, 최대 접기 깊이 1; 상태: unreviewed
@@ -270,6 +270,7 @@
 - [ ] [lessons/I1-why-tests.md](../../lessons/I1-why-tests.html) — 항목 83, 긴 산문 0, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [lessons/J1-reading-explain.md](../../lessons/J1-reading-explain.html) — 항목 93, 긴 산문 0, 토글 6, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [lessons/J2-why-migrations.md](../../lessons/J2-why-migrations.html) — 항목 93, 긴 산문 0, 토글 5, 최대 접기 깊이 1; 상태: unreviewed
+- [ ] [lessons/concept-core.md](../../lessons/concept-core.html) — 항목 53, 긴 산문 0, 토글 4, 최대 접기 깊이 1; 상태: in_progress
 
 ## 시나리오 101단계 (101)
 

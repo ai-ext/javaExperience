@@ -54,9 +54,10 @@ test('검색·분야·정렬은 history 한 개씩 추가하고 타 모듈 state
   assert.deepEqual(p.win.history.state.home,{keep:true});
 });
 
-test('탐색 대표 세 문서와 검색 관련도는 별도의 실제 메타데이터 순서를 따른다',()=>{
-  const p=page();assert.deepEqual(p.visible().map((row)=>row.dataset.kcDocument),['P09','P04','P29']);
-  p.$('button[data-kc-category="request"]').click();assert.deepEqual(p.visible().map((row)=>row.dataset.kcDocument),['P16','W09','P02']);
+test('탐색 대표 문서와 검색 관련도는 분류·핵심 경로와 별도 메타데이터 순서를 따른다',()=>{
+  const p=page();assert.deepEqual(p.visible().slice(0,6).map((row)=>row.dataset.kcDocument),['P09','P01','P03','P12','W19','S01']);assert.equal(p.visible().length,12);
+  p.$('button[data-kc-category="request"]').click();assert.deepEqual(p.visible().slice(0,2).map((row)=>row.dataset.kcDocument),['P16','W09']);
+  p.$('button[data-kc-category="all"]').click();
   submit(p,'DTO');assert.deepEqual(p.visible().map((row)=>row.dataset.kcDocument),['P16','W09','P06','P02','P03','P25','W10']);
   const count=p.win.history.length;const all=p.$('button[data-kc-category="all"]');all.focus();all.dispatchEvent(new p.win.KeyboardEvent('keydown',{key:'End',cancelable:true}));
   assert.equal(p.doc.activeElement.dataset.kcCategory,'delivery');assert.equal(p.win.history.length,count,'화살표 탐색은 선택 확정 전까지 history를 추가하지 않음');
@@ -81,8 +82,8 @@ test('IME 조합 중 Enter와 submit은 확정 검색으로 처리하지 않는�
 test('검색 ×는 분야를 보존하고 전체 0건의 주 행동은 검색어를 보존한 수정이다',()=>{
   const p=page();submit(p,'DTO');p.$('button[data-kc-category="java"]').click();p.$('[data-kc-search-clear]').click();
   assert.equal(p.$('#knowledge-search-input').value,'');assert.equal(p.$('[data-kc-category-select]').value,'java');assert.equal(p.doc.activeElement,p.$('#knowledge-search-input'));
-  submit(p,'확실히없는문서012345');assert.equal(p.visible().length,0);assert.equal(p.$('[data-kc-filter-reset]').hidden,false);assert.equal(p.$('[data-kc-filter-reset]').textContent,'검색어 수정');
-  const count=p.win.history.length;p.$('[data-kc-filter-reset]').click();assert.equal(p.$('#knowledge-search-input').value,'확실히없는문서012345');assert.equal(p.win.history.length,count);assert.equal(p.doc.activeElement,p.$('#knowledge-search-input'));
+  submit(p,'확실히없는문서012345');assert.equal(p.visible().length,0);assert.equal(p.$('[data-kc-filter-reset]').hidden,false);
+  const count=p.win.history.length;p.$('[data-kc-filter-reset]').click();assert.equal(p.$('#knowledge-search-input').value,'확실히없는문서012345');assert.equal(p.win.history.length,count+1);assert.equal(p.$('[data-kc-priority]').value,'all');assert.equal(p.$('[data-kc-depth]').value,'all');
   p.$('[data-kc-reset]').click();assert.equal(p.$('#knowledge-search-input').value,'');assert.equal(p.$('[data-kc-category-select]').value,'all');
 });
 
@@ -151,7 +152,7 @@ test('modifier·새탭·직접 URL·오래된 origin은 복사 세션의 검색 
 test('새로고침은 해당 history entry의 초안을 복원하며 copied session만으로 목록 조건을 바꾸지 않는다',()=>{
   const p=page();submit(p,'DTO');draft(p,'미확정');const same=page(p.win.location.href,{session:sessions(p.win),history:p.win.history.state});
   assert.equal(same.$('#knowledge-search-input').value,'미확정');assert.equal(same.visible().length,7);
-  const direct=page('README.html',{session:sessions(p.win)});assert.equal(direct.$('#knowledge-search-input').value,'');assert.equal(direct.$('[data-kc-category-select]').value,'java');
+  const direct=page('README.html',{session:sessions(p.win)});assert.equal(direct.$('#knowledge-search-input').value,'');assert.equal(direct.$('[data-kc-category-select]').value,'all');assert.equal(direct.$('[data-kc-priority]').value,'required');assert.equal(direct.$('[data-kc-depth]').value,'foundation');
 });
 
 test('학습 진도 불변·원문 앵커·모바일 select·저장 차단·텍스트 보안을 유지한다',()=>{

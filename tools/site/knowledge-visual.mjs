@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadKnowledgeCatalog } from './knowledge-catalog-data.mjs';
 import { renderKnowledgeCatalog } from './knowledge-catalog-view.mjs';
+import { CORE_UNITS, DOMAINS, classifyConcept } from './concept-curriculum.mjs';
 
 /** 웹 시안의 탐색 메타데이터를 현재 Markdown 제목·소제목과 결합한다. */
 export function renderKnowledgeVisual(root) {
@@ -20,7 +21,11 @@ export function renderKnowledgeVisual(root) {
     const relatedTasks = metadata.relatedTasks.filter((task) => task.verification === 'sourceLinkAndRelationshipReviewed').map((task) => ({
       href: path.posix.relative('docs/knowledge', task.route), title: task.title.split(' — ')[0],
     }));
-    return { ...source, category: metadata.categoryId,
+    const classification = classifyConcept(source.id);
+    return { ...source, category: classification.domain,
+      priority: classification.priority, depths: classification.depths,
+      classificationBasis: classification.classificationBasis,
+      contentReview: classification.contentReview,
       question: copy.searchQuestion || copy.browseQuestion || metadata.displayQuestion,
       displayQuestion: metadata.displayQuestion,
       description: copy.description || source.summary.replace(/`/g, ''),
@@ -28,13 +33,10 @@ export function renderKnowledgeVisual(root) {
       rank: metadata.curationOrder,
       browseRank: featured.get(source.id)?.position ?? 1000,
       relatedTasks,
-      practice: practice ? { href: source.href + '#' + encodeURIComponent(practice.anchorId), title: copy.practiceLabel || practice.label } : null,
+      practice: practice ? { href: source.href + '#' + encodeURIComponent(practice.anchorId), title: '코드 예제 읽기' } : null,
     };
   });
-  const categories = index.categories.map(({ id, label, total }) => {
-    if (documents.filter((doc) => doc.category === id).length !== total) throw new Error(`분야별 문서 수 불일치: ${id}`);
-    return { id, label };
-  });
+  const categories = DOMAINS;
   const aliases = Object.fromEntries(index.questionAliases.map(({question, literalQuery}) => [question, literalQuery]));
-  return renderKnowledgeCatalog(documents, categories, aliases);
+  return renderKnowledgeCatalog(documents, categories, aliases, CORE_UNITS);
 }
