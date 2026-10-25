@@ -104,7 +104,7 @@
       var selectedIds = selectedSteps(day, state.selectedTicket).map(function (s) { return s.id; });
       var countedIds = progressSteps(day, state.selectedTicket).map(function (s) { return s.id; });
       var practiceIds = extraIds.filter(function (id) { return selectedIds.indexOf(id) < 0; });
-      if (counter) counter.textContent = (selectedIds.length ? '공통 구현 ' : '') + doneOf(coreIds) + '/' + coreIds.length + ' 끝냄'
+      if (counter) counter.textContent = (selectedIds.length ? '공통 구현 완료 ' : '구현 완료 ') + doneOf(coreIds) + '/' + coreIds.length
         + (selectedIds.length ? ' · 선택 티켓 ' + state.selectedTicket + ' ' + doneOf(selectedIds) + '/' + selectedIds.length : '')
         + (practiceIds.length ? ' · 선택·연습 ' + doneOf(practiceIds) + '/' + practiceIds.length : '');
       if (meter) { meter.max = countedIds.length; meter.value = doneOf(countedIds); }
@@ -175,6 +175,11 @@
       try { var value = stageStore && JSON.parse(stageStore.getItem(stageKey) || '{}'); if (value && typeof value === 'object') stageState = value; } catch (e) { /* 저장 불가 시 현재 화면의 기록을 유지한다. */ }
       Object.keys(stagePending).forEach(function (id) { stageState[id] = stagePending[id]; });
       stageInputs.forEach(function (input) { input.checked = stageState[input.dataset.stageCheck] === true; input.parentElement.classList.toggle('is-done', input.checked); });
+      var stageProgress = page.querySelector('[data-stage-progress]');
+      if (stageProgress) stageProgress.textContent = stageInputs.map(function(input) {
+        var label = /-prep$/.test(input.dataset.stageCheck) ? '준비' : /-data$/.test(input.dataset.stageCheck) ? '데이터' : '마무리';
+        return label + (input.checked ? ' 확인' : ' 미확인');
+      }).join(' · ');
     }
     stageInputs.forEach(function (input) {
       input.addEventListener('change', function () {
@@ -200,7 +205,7 @@
         link.parentElement.classList.toggle('is-active', selected);
       });
       if (toggle) { toggle.setAttribute('aria-pressed', String(expanded)); toggle.textContent = expanded ? '한 순서씩 보기' : '모두 펼쳐 보기'; }
-      if (position) position.textContent = (panels.indexOf(active) + 1) + ' / ' + panels.length + ' 단계';
+      if (position) position.textContent = '현재 화면 ' + (panels.indexOf(active) + 1) + ' / ' + panels.length;
       page.classList.toggle('day-show-all', expanded);
       wrapPanels.forEach(function (panel) { panel.hidden = !expanded && panel !== wrapActive; });
       wrapLinks.forEach(function (link) {
@@ -281,6 +286,10 @@
       if (choice) choice.value = state.selectedTicket || '';
       preps.forEach(function(input) { input.checked = state.preparation[input.dataset.prep] === true; });
       var selected = choices.find(function(t) { return t.id === state.selectedTicket; });
+      document.querySelectorAll('[data-selected-ticket-compact]').forEach(function(node) {
+        node.textContent = selected ? '내 선택 ' + selected.id + ' · ' + selected.day + ' 수행 · 고르지 않은 후보는 추가 연습' : '선택 기록 없음 · D11에서 한 건을 고르세요.';
+        node.hidden = !selected && !!node.closest('[data-course-home]');
+      });
       document.querySelectorAll('[data-selected-ticket]').forEach(function(node) {
         node.replaceChildren();
         if (!selected) { node.textContent = '선택 기록 없음 · D11에서 한 건을 고르세요. E01·모의 장애 훈련은 모두 수행합니다.'; return; }
@@ -447,10 +456,19 @@
         no.textContent = NUMS[i] || String(i + 1);
         var task = document.createElement('a');
         task.href = day.href + '#step-' + s.id.toLowerCase();
-        task.textContent = s.title + (selected.indexOf(s) >= 0 ? ' (내 선택 ' + state.selectedTicket + ')' : s.extra && core.length < day.steps.length ? ' (선택·연습)' : '') + (state.done.has(s.id) ? ' (끝냄)' : '');
+        task.textContent = s.title + (s.requirement ? ' · ' + s.requirement : '') + (selected.indexOf(s) >= 0 ? ' (내 선택 ' + state.selectedTicket + ')' : s.extra && core.length < day.steps.length ? ' (선택·연습)' : '') + (state.done.has(s.id) ? ' (끝냄)' : '');
         li.append(no, ' ', task);
         return li;
       }));
+      var returning = state.done.size > 0;
+      home.classList.toggle('is-returning', returning);
+      var resume = $('[data-today-resume]');
+      var pending = progressSteps(day, state.selectedTicket).find(function(s) { return !state.done.has(s.id); });
+      if (resume) {
+        resume.hidden = !returning;
+        resume.href = day.href + (pending ? '#step-' + pending.id.toLowerCase() : '#오늘의-sql');
+        resume.textContent = pending ? day.id + ' ' + NUMS[day.steps.indexOf(pending)] + ' 이어서 하기 →' : day.id + ' SQL·말하기·채점 확인 →';
+      }
       var open = $('[data-today-open]');
       open.href = day.href;
       var pendingTicket = selected.find(function (s) { return !state.done.has(s.id); });
@@ -461,11 +479,11 @@
       var during = day.javaTiming === 'during-or-after';
       var flow = $('[data-today-flow]');
       var grade = $('[data-today-grade]');
-      var first = during ? open : java;
-      var second = during ? java : open;
+      var first = returning || during ? open : java;
+      var second = returning || during ? java : open;
       [java, open].forEach(function (link) {
-        link.classList.toggle('ch-primary', link === first);
-        link.classList.toggle('ch-secondary', link !== first);
+        link.classList.toggle('ch-primary', !returning && link === first);
+        link.classList.toggle('ch-secondary', returning || link !== first);
       });
       if (during) java.textContent += ' · 수행 중·사후 증거';
       // CSS 순서만 바꾸지 않고 키보드·스크린리더도 같은 순서로 읽게 한다.
@@ -539,9 +557,53 @@
     select(selected, false);
   }
 
+  function initMapProgress() {
+    var root = document.querySelector('[data-course-map]');
+    var data = document.getElementById('course-days-data');
+    if (!root || !data) return;
+    var days = JSON.parse(data.textContent), store = storage();
+    function paint() {
+      var state = readProgress(store), pick = nextDay(days, state.done, state.selectedTicket), day = pick.day;
+      var steps = progressSteps(day, state.selectedTicket);
+      var next = steps.find(function(s) { return !state.done.has(s.id); });
+      var count = steps.filter(function(s) { return state.done.has(s.id); }).length;
+      root.querySelector('[data-cm-progress]').textContent = '이어서 할 곳: ' + day.id + ' · ' + count + '/' + steps.length + (next ? ' · 다음 ' + '①②③④⑤⑥⑦⑧⑨⑩'[day.steps.indexOf(next)] : ' · 구현 체크 끝, 마무리 확인') + ' · 지금 학습 중 표시는 관계 선택과 별개입니다.';
+      root.querySelectorAll('[data-node]').forEach(function(node) {
+        var current = node.dataset.node === day.id;
+        node.classList.toggle('is-learning', current);
+        if (current) node.setAttribute('aria-current', 'step'); else node.removeAttribute('aria-current');
+      });
+      root.dataset.currentDay = day.id;
+      root.dispatchEvent(new CustomEvent('course-location'));
+    }
+    window.addEventListener('pageshow', paint);
+    window.addEventListener('storage', function(e) { if (e.key === KEY || e.key === null) paint(); });
+    paint();
+  }
+  function initHeaderOffset() {
+    var header = document.querySelector('.site-topbar');
+    if (!header) return;
+    function measure() { document.documentElement.style.setProperty('--course-header-height', Math.ceil(header.getBoundingClientRect().height) + 'px'); }
+    measure();
+    if (window.ResizeObserver) new ResizeObserver(measure).observe(header);
+    window.addEventListener('resize', measure);
+  }
+  function initDataReturn() {
+    if (!/\/course\/start\/dummy\/README\.html$/.test(window.location.pathname)) return;
+    var day = new URLSearchParams(window.location.search).get('day');
+    if (!/^D(?:0[1-9]|[1-3][0-9]|4[0-5])$/.test(day || '')) return;
+    var link = document.createElement('a');
+    link.className = 'data-guide-return'; link.href = '../../spring/' + day + '.html#step-' + day.toLowerCase() + '-data';
+    link.textContent = day + ' 데이터 넣기로 돌아가기 →';
+    document.querySelector('.guide-content')?.prepend(link);
+  }
+
   window.jxCourseProgress = { KEY: KEY, readProgress: readProgress, writeProgress: writeProgress, nextDay: nextDay };
   function start() {
+    initHeaderOffset();
     initConfigTabs();
+    initMapProgress();
+    initDataReturn();
     var page = document.querySelector('[data-day-page]');
     if (page) { initDay(page); initDayStepper(page); }
     var home = document.querySelector('[data-course-home]');

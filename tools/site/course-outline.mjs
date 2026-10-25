@@ -2,12 +2,12 @@ import { JSDOM } from 'jsdom';
 import { marked } from 'marked';
 
 const guideType = source => {
-  if (source === 'course/README.md') return { kind: 'overview', tag: 'GUIDE', label: '과정 안내' };
-  if (source === 'course/spring/README.md') return { kind: 'days', tag: '45', label: '일자 목록' };
+  if (source === 'course/README.md') return { kind: 'overview', tag: '가이드', label: '과정 안내' };
+  if (source === 'course/spring/README.md') return { kind: 'days', tag: '일정', label: '일자 목록' };
   if (source === 'course/spec-v2.md') return { kind: 'spec', tag: 'SPEC', label: '서버 명세' };
   if (/^course\/java\/J\d{2}\.md$/.test(source)) return { kind: 'java', tag: source.match(/J\d{2}/)[0], label: 'Java 연습' };
-  if (/^course\/tickets\/(?:[BE]\d{2}|drill)\.md$/.test(source)) return { kind: 'ticket', tag: source.match(/([^/]+)\.md$/)[1].toUpperCase(), label: '티켓 작업서' };
-  if (/^course\/start\/.+\.md$/.test(source)) return { kind: 'start', tag: 'START', label: '출발 자료' };
+  if (/^course\/tickets\/(?:[BE]\d{2}|drill)\.md$/.test(source)) return { kind: 'ticket', tag: source.match(/([^/]+)\.md$/)[1].toUpperCase(), label: '티켓 과제' };
+  if (/^course\/start\/.+\.md$/.test(source)) return { kind: 'start', tag: '참고', label: '출발 자료' };
   return null;
 };
 
@@ -105,6 +105,13 @@ export function renderCourseOutline(source, html) {
     link.textContent = heading.textContent.replace(/^#\s*/, '').trim();
     item.append(link);
     list.append(item);
+  }
+  if (type.kind === 'days') {
+    for (const link of article.querySelectorAll('.course-outline h3 a[href]')) {
+      const item = doc.createElement('li');
+      item.append(link.cloneNode(true));
+      list.append(item);
+    }
   }
   nav.append(list);
   if (list.children.length) rail.append(nav);

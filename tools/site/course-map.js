@@ -163,6 +163,16 @@
   var pending = 0;
   window.addEventListener('resize', function () { cancelAnimationFrame(pending); pending = requestAnimationFrame(apply); });
   window.addEventListener('load', apply);
+  function showCurrent() {
+    selected = root.dataset.currentDay || selected;
+    apply();
+    var node = root.querySelector('.is-learning');
+    var scroller = root.querySelector('.cm-board-scroll');
+    if (node && scroller) scroller.scrollTop += node.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 70;
+  }
+  root.addEventListener('course-location', function() { if (!selected) showCurrent(); });
+  root.querySelector('[data-cm-current]').addEventListener('click', showCurrent);
+  if (root.dataset.currentDay) showCurrent();
   window.jxCourseMap = { related: related };
   apply();
 })();

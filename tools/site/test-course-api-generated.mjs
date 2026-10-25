@@ -34,8 +34,11 @@ for(let day=0;day<=45;day++){
 assert.equal(tools,5);
 for(const p of ['index.html','scenario/README.html','practice/MISSIONS.html','docs/knowledge/README.html','docs/knowledge/P16-json-jackson-practical.html']){
   const d=new JSDOM(fs.readFileSync(path.join(root,p),'utf8'));
-  assert.equal(d.window.document.documentElement.dataset.theme,'dark',p);d.window.close();
+  assert.equal(d.window.document.documentElement.dataset.theme,'dark',p);
+  assert.ok(d.window.document.querySelector('link[href*="course-tokens.css"]'),p+': 공통 토큰 로드');
+  assert.ok(d.window.document.querySelector('link[href*="contrast.css"]'),p+': 공통 다크·경계·포커스 규칙 로드');
+  d.window.close();
 }
-const theme=fs.readFileSync(path.join(root,'tools/site/site-theme.css'),'utf8');
+const theme=fs.readFileSync(path.join(root,'tools/site/contrast.css'),'utf8');
 assert.match(theme,/color-scheme:\s*dark/);assert.doesNotMatch(theme,/prefers-color-scheme|color-scheme:\s*light/);
 console.log('v2 API8개를5개순서에연결,46일페이지·대표5페이지 다크·비전송초기상태 확인');

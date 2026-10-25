@@ -10,7 +10,7 @@ export function renderSpringConfigTabs(source) {
     const { files, note } = toPropertiesFiles(yaml, filename);
     const id = `spring-config-${++count}`;
     const panel = (format, content) => `<div id="${id}-${format}-panel" role="tabpanel" aria-labelledby="${id}-${format}" tabindex="0" data-config-panel="${format}">${content}</div>`;
-    return `<div class="spring-config" data-config-tabs>
+    return `<div id="${id}" class="spring-config" data-config-tabs data-config-file="${esc(filename)}">
 <div class="spring-config-tabs" role="tablist" aria-label="Spring 설정 형식" hidden>${['yml', 'properties'].map(format => `<button type="button" id="${id}-${format}" role="tab" aria-controls="${id}-${format}-panel" aria-selected="${format === 'yml'}" tabindex="${format === 'yml' ? 0 : -1}" data-config-format="${format}">${format}</button>`).join('')}</div>
 ${panel('yml', `<p class="spring-config-file">${esc(filename)}</p>${code(yaml, 'yaml')}`)}
 ${panel('properties', `${note ? `<p class="spring-config-note">${esc(note)}</p>` : ''}${files.map(f => `<p class="spring-config-file">${esc(f.name)}</p>${code(f.content, 'properties')}`).join('')}`)}

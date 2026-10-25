@@ -130,7 +130,7 @@ done
 - 연결 설정은 `docker/cloudbeaver/data-sources.json`이고 처음 뜰 때 한 번 들어간다. 바꿨다면 `docker compose rm -sf cloudbeaver && docker volume rm <폴더이름>_cloudbeaver-data && docker compose up -d`.
 - 아이디가 `admin`이 아닌 이유: CloudBeaver에 같은 이름의 기본 팀이 있어 쓸 수 없다. 비밀번호는 CloudBeaver 규칙(8자 이상·대소문자·숫자)에 맞춘 것이다.
 - 데스크톱 DBeaver를 쓰면: 새 연결 → MySQL → 위 DB 값 입력 → Driver properties에서 `allowPublicKeyRetrieval` = `true`.
-- Docker 안에서 도는 다른 도구에서 붙을 때는 호스트를 `localhost`가 아니라 `host.docker.internal`로 넣는다(컨테이너 안의 localhost는 컨테이너 자신이다).
+- Docker 안에서 도는 다른 도구가 **호스트 서비스**에 붙을 때는 컨테이너 안의 `localhost` 대신 런타임의 호스트 게이트웨이 주소를 쓴다. Docker Desktop은 `host.docker.internal`을 제공한다. 같은 compose 안의 서비스끼리는 `mysql`처럼 서비스 이름을 쓴다. 다른 런타임에서는 게이트웨이 주소와 연결 가능 여부를 먼저 확인한다.
 - 13308·8978가 이미 쓰이고 있으면 `DB_PORT=13318 CB_PORT=8989 docker compose up -d`로 바꾼다. DB 포트를 바꾸면 `application.yml`의 포트도 같이 바꾼다.
 
 ## 테스트

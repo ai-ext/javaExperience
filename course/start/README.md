@@ -13,7 +13,9 @@
 
 - JDK 21
 - Docker 런타임. 실행한 뒤 `docker info`와 `docker compose version`이 성공하는지 확인한다
-- IntelliJ IDEA
+- IDE 선택 사항: IntelliJ IDEA, VS Code 또는 Eclipse. 어느 IDE든 Gradle 프로젝트를 가져오고 JDK 21·annotation processing·실행 profile을 맞춘다. D21의 스레드 중단 관찰은 디버거의 thread suspend를 사용한다.
+
+Windows에서는 WSL2의 Linux 작업 경로에서 `./gradlew`, Docker CLI, Python 3 실습을 진행한다. WSL 안에서 `java -version`·`docker info`·`docker compose version`을 확인하고 LF 줄바꿈과 `gradlew` 실행 권한을 유지한다. PowerShell의 환경 변수·프로세스·signal 명령은 아래 bash 예시와 다르다.
 
 ## 2. start.spring.io 설정값
 
@@ -74,6 +76,7 @@ curl -s localhost:8474/proxies   # "pg" 프록시가 보여야 한다
 | toxiproxy | 8474(관리 API), 18666(PG 프록시) | D08 ① | `board.pg.base-url=http://localhost:18666` |
 
 - 포트·계정은 구현 예시 서버(`board-server`)와 같다. 그래야 순서 칸의 구현 예시 설정을 그대로 붙여도 연결된다. 그래서 `board-server/compose.yaml`과 동시에 띄우지 않는다.
+- 컨테이너 간 연결은 compose 서비스 이름(`mysql`, `redis`, `wiremock`)을 쓰고, 호스트에서 실행한 앱은 공개된 `localhost` 포트를 쓴다. 다른 Docker 런타임에서 Testcontainers가 실패하면 먼저 `docker info`·`docker compose ps`·소켓 접근 권한과 테스트 컨테이너의 연결 주소를 확인한다. 특정 런타임의 호스트 이름이나 `/var/run/docker.sock`이 모든 런타임에서 같다고 가정하지 않는다. 호스트 JDK 21의 `./gradlew`가 기본 실행 경로다.
 - D01 ②부터 이 `compose.yaml`을 쓴다. 그대로 복사해 써도 되고, MySQL만 먼저 쓰고 D08 ①에 WireMock·Toxiproxy를, D09 ①에 Redis를 옮겨 붙여도 된다. 완료 조건은 어느 쪽이든 같다. 나눠 붙일 때도 `toxiproxy.json`과 스텁은 Toxiproxy·WireMock을 처음 띄우기 전에 복사한다.
 - 지연을 주입할 때는 `curl -X POST localhost:8474/proxies/pg/toxics -d '{"type":"latency","attributes":{"latency":5000}}'`, 지울 때는 `curl -X DELETE localhost:8474/proxies/pg/toxics/latency_downstream`.
 - 멈출 때는 `docker compose down`, 데이터까지 지울 때는 `docker compose down -v`.

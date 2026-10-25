@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { renderSiteNavigation, siteSection } from './site-navigation.mjs';
 
-const labels = ['홈', '과정 v2 · 일자 목록', '과정 지도', '서비스 만들기', '실전 미션', '개념 학습'];
+const labels = ['홈', '과정 v2 · 일정', '과정 지도', '서비스 만들기', '실전 미션', '개념 학습'];
 const destinations = ['index.html', 'course/spring/README.html', 'course/map.html', 'scenario/README.html', 'practice/MISSIONS.html', 'docs/knowledge/README.html'];
 const examples = [
   ['README.md', '홈'],
-  ['course/spring/D11.md', '과정 v2 · 일자 목록'],
+  ['course/spring/D11.md', '과정 v2 · 일정'],
   ['course/map.md', '과정 지도'],
   ['scenario/README.md', '서비스 만들기'],
   ['scenario/ch1-create-post/1-2-dto-response.md', '서비스 만들기'],

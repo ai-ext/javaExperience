@@ -450,7 +450,7 @@ test('answer-fix(Dnn-m)는 순서 수에 넣지 않고, 그 순서 원래 커밋
   const block = md.match(/<details class="step-answer" data-step="D09-3"[\s\S]*?\n<\/details>/)[0];
   // 실제 이력의 answer-fix(D09-3)에 합성 커밋 하나가 더해진다
   const fixes = step3.filter((c) => c.kind === 'fix').length;
-  assert.ok(block.includes(`<summary>구현 예시 보기 · answer(D09-3) + 보완 ${fixes}개`));
+  assert.ok(block.includes(`<summary>구현 예시 보기 · 구현 D09-3 + 보완 ${fixes}개`));
   const orig = block.indexOf(step3[0].sha.slice(0, 8));
   const extra = block.indexOf('**보완**');
   assert.ok(orig >= 0 && extra > orig, '보완은 원래 커밋 코드 뒤에 온다');

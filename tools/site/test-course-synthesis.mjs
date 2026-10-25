@@ -58,11 +58,11 @@ test('모든 구현일의 데이터·SQL·채점은 단계 안에 있고 핵심 
     const doc = new JSDOM(read(`course/spring/${day.id}.html`)).window.document;
     for (const node of doc.querySelectorAll('.day-data, .day-sql, .day-grade')) assert.ok(node.closest('[data-day-panel]'), `${day.id}: 행동별 단계 안에 ${node.className}`);
     for (const step of doc.querySelectorAll('.day-step')) {
-      for (const key of ['files', 'done', 'layers']) {
+      for (const key of ['files', 'done', 'layers', 'tickets']) {
         const fact = step.querySelector(`.fact-${key}`);
         if (fact) assert.equal(fact.closest('details'), null, `${day.id}: ${key} 기본 노출`);
       }
-      for (const key of ['trap', 'tickets', 'answer-link', 'spec', 'data-spec']) {
+      for (const key of ['trap', 'answer-link', 'spec', 'data-spec']) {
         const fact = step.querySelector(`.fact-${key}`);
         if (fact) assert.equal(fact.closest('details').open, false, `${day.id}: ${key} 기본 접힘`);
       }
@@ -190,7 +190,7 @@ test('일자 머리: 긴 안내보다 먼저 Java·구현 목록이 보이고 �
     const doc = new JSDOM(read(`course/spring/${day.id}.html`)).window.document;
     const overview = doc.querySelector('.day-stepper-layout');
     assert.ok(overview, day.id);
-    assert.equal(doc.querySelector('.day-head').nextElementSibling, overview, `${day.id}: 일자 제목 다음 단계 작업대`);
+    assert.equal((doc.querySelector('.day-context') || doc.querySelector('.day-head')).nextElementSibling, overview, `${day.id}: 일자 제목 다음 단계 작업대`);
     assert.ok(overview.querySelector('.day-java'), `${day.id}: Java 접근`);
     assert.equal(overview.firstElementChild, overview.querySelector('.day-today'), `${day.id}: 순서 목록 다음에 본문 패널`);
     assert.ok(overview.querySelector('.day-stage-prep .day-java'), `${day.id}: Java는 별도 준비 자료 단계`);
@@ -253,7 +253,7 @@ test('실행안 4: D11 선택은 기존 진도를 보존하고 D14·홈에 같�
     if (file.includes('D14')) {
       assert.match(page.window.document.querySelector('[data-selected-ticket]').textContent, /E01/);
       assert.match(page.window.document.querySelector('[data-step="D14-1"] [data-step-kind]').textContent, /고르지 않은 후보/);
-      assert.match(page.window.document.querySelector('[data-step="D14-5"] [data-step-kind]').textContent, /모두 필수/);
+      assert.match(page.window.document.querySelector('[data-step="D14-5"] [data-step-kind]').textContent, /고도화 필수/);
     }
     page.window.close();
   }

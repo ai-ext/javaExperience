@@ -72,7 +72,8 @@
         ],
         "done": [
           "`PostQueryServiceTest` 통과: 21건일 때 첫 쪽 20건과 `nextCursor`, 둘째 쪽 1건과 `nextCursor = null`",
-          "`keyword`·`tag`가 없으면 그 조건이 SQL에서 빠진다"
+          "`keyword`·`tag`가 없으면 그 조건이 SQL에서 빠진다",
+          "keyword·tag·cursor의 선택 필터 2~3개 조합에서 null·공백·빈 목록을 구분하고, MyBatis `<if>`·`<where>`·`<foreach>`와 `#{}` 바인딩으로 ID 집합·정렬·빈 결과를 검증한다. 빈 IN 목록은 `IN ()`을 만들지 않고 계약상 빈 결과 또는 필터 생략 중 하나로 정한다."
         ],
         "trap": "검색어나 정렬 값을 `${}`로 넣으면 문자열이 SQL에 그대로 붙어 인젝션이 되므로 값은 `#{}`로, 정렬은 허용 목록에서 고른다.",
         "specRefs": [
@@ -177,7 +178,7 @@
       "3": [
         "이 순서는 DB → 쿼리 → 서비스 → 컨트롤러 순으로: 기존 테이블과 제약을 확인한다 → 필요한 저장·조회 조건을 저장소에서 먼저 확인한다 → 업무 검증과 트랜잭션 경계를 연결한다. 앞서 만든 층은 재사용하고 이 순서에서 바꾸는 부분만 진행한다.",
         "다음 쪽 판단은 `size + 1`건을 읽어 남는 1건이 있는지로 한다. `<where>`·`<if test>`와 `#{}`·`${}`의 차이를 찾아본다.",
-        "커서 문자열은 서버가 만든 값이라 클라이언트가 해석하지 않는다. 마지막 글의 `id`를 어떻게 인코딩할지 정한다."
+        "커서 문자열은 서버가 만든 값이라 클라이언트가 해석하지 않는다. 마지막 글의 `id`를 어떻게 인코딩할지 정한다. 정렬 키는 허용 목록에서 고정 SQL 조각으로 고르고 요청 값을 `${}`에 넣지 않는다. 조건 조합별 SQL과 결과 순서를 비교한다."
       ],
       "4": [
         "쿼리 파라미터 묶음은 record에 `@Min`·`@Max`·`@Size`·`@Pattern`을 붙이고 컨트롤러 매개변수에 `@Valid`를 붙여 받는다(쿼리 파라미터 바인딩은 `@ModelAttribute` 규칙을 따른다).",
@@ -213,6 +214,11 @@
           "task": "위 두 SQL의 실행 계획을 비교한다.",
           "expect": "seed D05+bulk의 16,080건 결과 동등성을 먼저 확인하고 접근 경로·행 수·중복 제거 단계를 기록한다. 보편적으로 빠른 문법이라고 단정하지 않는다.",
           "example": "EXPLAIN SELECT p.id FROM post p WHERE p.status='ACTIVE' AND EXISTS (SELECT 1 FROM post_tag pt JOIN tag t ON t.id=pt.tag_id WHERE pt.post_id=p.id AND t.name='spring');\nEXPLAIN SELECT DISTINCT p.id FROM post p JOIN post_tag pt ON pt.post_id=p.id JOIN tag t ON t.id=pt.tag_id WHERE p.status='ACTIVE' AND t.name='spring';"
+        },
+        {
+          "task": "선택 필터를 바꿔 같은 글 ID 집합을 비교한다. MyBatis의 조건 생성과 값 바인딩은 애플리케이션 테스트에서 확인한다.",
+          "expect": "keyword만, tag만, 둘 다, 필터 없음에서 공개 글의 식별 집합·정렬을 확인한다. 공백과 빈 목록의 계약은 D06 ③의 API 테스트로 확인한다.",
+          "example": "SET @keyword='spring'; SET @tag='spring';\nSELECT p.id FROM post p WHERE p.status='ACTIVE' AND (@keyword IS NULL OR p.title LIKE CONCAT('%',@keyword,'%')) AND (@tag IS NULL OR EXISTS (SELECT 1 FROM post_tag pt JOIN tag t ON t.id=pt.tag_id WHERE pt.post_id=p.id AND t.name=@tag)) ORDER BY p.id DESC LIMIT 20;"
         }
       ],
       "refs": [
@@ -221,5 +227,5 @@
       ]
     }
   },
-  "cards": "## D06 목록·검색 (MyBatis)\n\n### TC-D06-1\n**질문** 정렬 키를 요청 파라미터로 받아 `ORDER BY ${sort}`로 넣는 코드가 있습니다. 무엇이 문제고 어떻게 바꾸나요?\n**답에 들어가야 할 것**\n- `${}`는 값을 SQL 문자열에 그대로 끼워 넣으므로 SQL 인젝션이 가능하다\n- `#{}`는 PreparedStatement 파라미터로 바인딩돼 안전하지만, 값으로만 들어가므로 컬럼명이나 `ORDER BY` 대상에는 쓸 수 없다\n- 정렬은 허용 목록(명세상 `latest`만)으로 받고, 서버가 고정된 SQL 조각을 고른다\n**근거** 06 §16, spec-v2 §5-3\n\n### TC-D06-2\n**질문** 공개 글 최신순 커서 목록이 데이터가 늘자 느려졌습니다. 인덱스를 어떻게 정하고 확인했나요?\n**답에 들어가야 할 것**\n- 내 필터·정렬·커서·데이터 분포를 보고 만든 인덱스의 열 순서와 선택 이유, 버린 대안 1개를 설명한다. 특정 실행 계획을 측정 전에 보장하지 않는다\n- EXPLAIN의 `type`, `key`, `rows`, `Extra`(Using filesort 여부)를 인덱스 전후로 비교하고, `EXPLAIN ANALYZE`로 실제 읽은 행 수를 본다\n- 커서 페이징은 내가 정한 안정적 정렬의 마지막 위치 뒤부터 이어 읽어, offset처럼 앞쪽 행을 읽고 버리지 않는다\n**근거** 07 §2, 07 §5\n\n### TC-D06-3\n**질문** 같은 트랜잭션에서 JPA로 글 제목을 고친 직후 MyBatis로 목록을 읽었더니 옛 제목이 나왔습니다. 왜 그런가요?\n**답에 들어가야 할 것**\n- JPA의 변경은 flush 전까지 영속성 컨텍스트에만 있고 DB에는 아직 UPDATE가 나가지 않았다\n- Hibernate의 자동 flush는 JPQL 실행 전에 일어나며, MyBatis가 JDBC로 직접 보내는 SQL은 Hibernate가 모르므로 flush를 일으키지 않는다\n- MyBatis 조회 전에 명시적으로 flush하고, 두 도구가 같은 트랜잭션(같은 커넥션)에 참여하는지 실험으로 확인한다\n**근거** 06 §16\n\n### TC-D06-4\n**질문** MyBatis 목록에서 글마다 태그를 `<collection select=\"...\">`로 가져왔더니 쿼리가 글 수만큼 늘었습니다. 어떻게 고치나요?\n**답에 들어가야 할 것**\n- 중첩 select는 부모 행마다 쿼리를 따로 실행하므로 글 20개면 태그 쿼리가 20번 나간다\n- JOIN 한 번으로 가져와 `resultMap`의 중첩 결과로 묶고, `<id>`를 선언해 같은 글의 행을 합친다\n- 다만 1:N JOIN 결과에 LIMIT을 걸면 글이 아니라 행 기준으로 잘리므로, 글에만 LIMIT을 거는 파생 테이블로 먼저 자르고 바깥에서 태그를 JOIN한다(글 ID 목록을 뽑은 뒤 `IN`으로 두 번 조회하는 것도 대안)\n**근거** 06 §16\n\n"
+  "cards": "## D06 목록·검색 (MyBatis)\n\n### TC-D06-1\n**질문** 정렬 키를 요청 파라미터로 받아 `ORDER BY ${sort}`로 넣는 코드가 있습니다. 무엇이 문제고 어떻게 바꾸나요?\n**답에 들어가야 할 것**\n- `${}`는 값을 SQL 문자열에 그대로 끼워 넣으므로 SQL 인젝션이 가능하다\n- `#{}`는 PreparedStatement 파라미터로 바인딩돼 안전하지만, 값으로만 들어가므로 컬럼명이나 `ORDER BY` 대상에는 쓸 수 없다\n- 정렬은 허용 목록(명세상 `latest`만)으로 받고, 서버가 고정된 SQL 조각을 고른다\n- null·공백·빈 목록을 구분하고 조건 조합별 ID·순서가 같은지 확인한다\n**근거** 06 §16, spec-v2 §5-3\n\n### TC-D06-2\n**질문** 공개 글 최신순 커서 목록이 데이터가 늘자 느려졌습니다. 인덱스를 어떻게 정하고 확인했나요?\n**답에 들어가야 할 것**\n- 내 필터·정렬·커서·데이터 분포를 보고 만든 인덱스의 열 순서와 선택 이유, 버린 대안 1개를 설명한다. 특정 실행 계획을 측정 전에 보장하지 않는다\n- EXPLAIN의 `type`, `key`, `rows`, `Extra`(Using filesort 여부)를 인덱스 전후로 비교하고, `EXPLAIN ANALYZE`로 실제 읽은 행 수를 본다\n- 커서 페이징은 내가 정한 안정적 정렬의 마지막 위치 뒤부터 이어 읽어, offset처럼 앞쪽 행을 읽고 버리지 않는다\n**근거** 07 §2, 07 §5\n\n### TC-D06-3\n**질문** 같은 트랜잭션에서 JPA로 글 제목을 고친 직후 MyBatis로 목록을 읽었더니 옛 제목이 나왔습니다. 왜 그런가요?\n**답에 들어가야 할 것**\n- JPA의 변경은 flush 전까지 영속성 컨텍스트에만 있고 DB에는 아직 UPDATE가 나가지 않았다\n- Hibernate의 자동 flush는 JPQL 실행 전에 일어나며, MyBatis가 JDBC로 직접 보내는 SQL은 Hibernate가 모르므로 flush를 일으키지 않는다\n- MyBatis 조회 전에 명시적으로 flush하고, 두 도구가 같은 트랜잭션(같은 커넥션)에 참여하는지 실험으로 확인한다\n**근거** 06 §16\n\n### TC-D06-4\n**질문** MyBatis 목록에서 글마다 태그를 `<collection select=\"...\">`로 가져왔더니 쿼리가 글 수만큼 늘었습니다. 어떻게 고치나요?\n**답에 들어가야 할 것**\n- 중첩 select는 부모 행마다 쿼리를 따로 실행하므로 글 20개면 태그 쿼리가 20번 나간다\n- JOIN 한 번으로 가져와 `resultMap`의 중첩 결과로 묶고, `<id>`를 선언해 같은 글의 행을 합친다\n- 다만 1:N JOIN 결과에 LIMIT을 걸면 글이 아니라 행 기준으로 잘리므로, 글에만 LIMIT을 거는 파생 테이블로 먼저 자르고 바깥에서 태그를 JOIN한다(글 ID 목록을 뽑은 뒤 `IN`으로 두 번 조회하는 것도 대안)\n**근거** 06 §16\n\n"
 }

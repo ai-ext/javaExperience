@@ -58,9 +58,10 @@ test('round2-N3: 홈의 실제 DOM 순서와 주 버튼은 Java 수행 시점을
     assert.equal(home.querySelector('[data-today-id]').textContent,id);
     const flow=home.querySelector('[data-today-flow]');
     const links=[...flow.querySelectorAll('a')];
-    const during=next>=44;
-    assert.equal(links[0].hasAttribute(during?'data-today-open':'data-today-java'),true,id);
-    assert.ok(links[0].classList.contains('ch-primary'),id);
+    const during=next>=44, returning=doneThrough>0;
+    assert.equal(links[0].hasAttribute(returning||during?'data-today-open':'data-today-java'),true,id);
+    assert.equal(links[0].classList.contains('ch-primary'), !returning, id);
+    if(returning) assert.equal(home.querySelector('[data-today-resume]').hidden,false,id);
     if(during) {
       assert.equal(data.find(d=>d.id===id).javaTiming,'during-or-after');
       assert.match(links[1].textContent,/수행 중·사후 증거/);
