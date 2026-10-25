@@ -61,13 +61,11 @@
             "policies": [
               "PUT은 title/content 필수이고 tags 생략은 빈 목록으로 교체합니다. 이 board 계약에는 visibility·boardSlug·authorId 입력이 없습니다. PATCH는 보낸 non-null 필드만 변경하며 최소 한 필드가 필요합니다.",
               "PATCH는 전달한 non-null 필드만 수정하며 boardSlug·authorId를 임의로 받지 않는다.",
-              "대상 존재 및 작성자 권한은 source 규칙으로 판정한다. DB 실패는 부분 필드 변경을 남기지 않는다.",
-              "course D05-2 source unit에는 DELETE /api/posts/{postId}도 포함한다. 작성자는 204, 후속 GET은 404이며 soft delete다. title/body 수정 stage에 함께 매핑된 이 source endpoint도 이 board variant에서 확인한다."
+              "대상 존재 및 작성자 권한은 source 규칙으로 판정한다. DB 실패는 부분 필드 변경을 남기지 않는다."
             ],
             "inputs": [
               "PUT body title=B,content=D,tags=[spring]; PATCH body {title:E}.",
-              "비정상 body PATCH {title:F,tags:[\"\", \"valid\"]}; Park token; id 999999.",
-              "board exact recipe: DELETE /api/posts/{postId}; 성공 뒤 GET 같은 id."
+              "비정상 body PATCH {title:F,tags:[\"\", \"valid\"]}; Park token; id 999999."
             ],
             "success": [
               "PUT recipe: 200 상세 응답, title=B/content=D/tags=[spring].",
@@ -90,11 +88,6 @@
                 "when": "postId 999999 또는 token 누락",
                 "result": "404 또는 401.",
                 "unchanged": "대상 목록과 다른 글 모두 변화 없음."
-              },
-              {
-                "when": "Park token deletes Kim post or id missing",
-                "result": "403 또는 404 source contract.",
-                "unchanged": "post state and tag associations remain unchanged."
               }
             ],
             "examples": [
@@ -132,8 +125,7 @@
             "done": [
               "PUT 기본값과 PATCH 누락 필드 보존이 분리 확인됐다.",
               "Kim/Park 권한 오류와 없는 id가 기대 status를 냈다.",
-              "실패 후 title/content/tags DB 값이 그대로였다.",
-              "course source가 포함한 DELETE 204·GET 404를 board variant에서 확인했다."
+              "실패 후 title/content/tags DB 값이 그대로였다."
             ],
             "hints": [
               "PUT에서 tags를 생략했을 때 기존 java tag가 남는지 지워지는지 contract에서 어디를 볼까요?",
@@ -652,7 +644,7 @@
             "scenario": [
               {
                 "start": "Kim의 spec-board 글 title A/content C/PUBLIC, id는 10-5 응답에서 캡처.",
-                "action": "10-8에서 명시한 PUT /api/v1/posts/{postId} body로 title B/content D 전체 수정.",
+                "action": "초기 제목 \"명세 원문 A\"·본문 \"기존 본문 C\"를 PUT {title:\"명세 수정 B\",content:\"전체 교체 D\"}로 수정합니다. 성공 응답의 B/D를 확인한 뒤 같은 id를 타인으로 수정해 403 응답과 저장값을 다시 조회합니다.",
                 "result": "source recipe가 정한 200 ApiResponse/data 상세가 B/D를 보여 준다.",
                 "after": "author token을 Park으로 바꾸거나 없는 id를 넣어 403/404와 기존 값 보존 확인."
               }
@@ -708,7 +700,7 @@
                 "title": "타인 소유 수정",
                 "start": "동일 id, Park token",
                 "action": "같은 PUT request",
-                "result": "403; data=null 오류 wrapper, 기존 A/C 보존"
+                "result": "403; data=null 오류 wrapper. 직전 성공 수정의 title=\"명세 수정 B\", content=\"전체 교체 D\"는 그대로 유지됩니다."
               }
             ],
             "work": [
