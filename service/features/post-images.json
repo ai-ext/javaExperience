@@ -31,7 +31,7 @@
             "task": "이미지 업로드와 글 등록의 imageIds 연결을 구현한다.",
             "preconditions": [
               "시나리오 DB(`community`). 이번 단계 마이그레이션은 `V20`이다.",
-              "community V20, uploads 설정 폴더, MultipartFile 요청을 사용하고 실제 1×1 GIF 파일을 준비한다."
+              "community V20과 `app.upload-dir` 설정 폴더를 사용한다. 실제 1×1 GIF 파일을 파일 선택 창에서 골라 multipart `file`로 전송하고, 반환된 실제 id를 이어 쓴다."
             ],
             "scenario": [
               {
@@ -53,7 +53,8 @@
             ],
             "policies": [
               "1MB 초과 거절; 파일 앞 바이트 signature로 형식을 검증; 클라이언트 파일명·Content-Type을 신뢰하지 않는다. 이미지 7은 로그인 업로더 본인 소유이고 아직 미연결이어야 연결한다.",
-              "허용 형식은 PNG/JPEG/GIF/WebP, 최대 크기는 1,048,576 byte입니다. 초과 파일은 413, 잘못된 signature는 415이며 연결 요청의 imageIds는 최대 10개·중복 제거입니다. 타인 소유/이미 연결된 이미지 연결은 400입니다. 업로드 파일 GET 응답은 원문 계약대로 확인합니다."
+              "허용 형식은 PNG/JPEG/GIF/WebP, 최대 크기는 1,048,576 byte입니다. 초과 파일은 413, 잘못된 signature는 415이며 연결 요청의 imageIds는 최대 10개·중복 제거입니다. 타인 소유/이미 연결된 이미지 연결은 400입니다. 업로드 파일 GET 응답은 원문 계약대로 확인합니다.",
+              "원문 11-2 범위 제외: PATCH로 이미지 교체·제거하는 기능과 글에 끝내 연결되지 않은 업로드 파일의 삭제/정리 작업은 구현하지 않는다. 미연결 업로드 상태는 글 등록 연결 전 단계로 확인한다."
             ],
             "inputs": [
               "legacy:11-2:I0: POST /api/images; body=\"--jx11\\r\\nContent-Disposition: form-data; name=\\\"file\\\"; filename=\\\"dot.gif\\\"\\r\\nContent-Type: image/gif\\r\\n\\r\\nGIF89a\\u0001\\u0000\\u0001\\u0000\\u0000\\u0000\\u0000;\\r\\n--jx11--\\r\\n\"; case=I0 GIF 올리기(김자바); source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"I0\",\"expect\":{\"status\":201,\"headers\":{\"location\":{\"endsWith\":\"/api/images/{{I0.body.fileName}}\"}},\"json\":[{\"path\":\"$.id\",\"type\":\"number\"},{\"path\":\"$.fileName\",\"matches\":\"^[0-9a-f]{32}\\\\.gif$\"},{\"path\":\"$.url\",\"equals\":\"/api/images/{{I0.body.fileName}}\"},{\"path\":\"$.contentType\",\"equals\":\"image/gif\"},{\"path\":\"$.size\",\"equals\":14}]}}]",
@@ -91,19 +92,21 @@
               }
             ],
             "work": [
-              "서버 측 형식 판정, 안전한 저장 이름, 업로더 소유 검증, 글과 연결 트랜잭션을 구성한다."
+              "서버 측 형식 판정, 안전한 저장 이름, 업로더 소유 검증, 글과 연결 트랜잭션을 구성한다.",
+              "파일 선택 창에서 실제 이미지 파일을 골라 업로드하고, 응답 fileName/url로 미리보기를 확인한 뒤 응답 id를 글의 imageIds에 넣는다."
             ],
             "done": [
               "정상 파일은 201로 저장되고 본인 소유의 미연결 이미지만 글에 연결됩니다.",
               "확장자만 png인 텍스트는 415로 거절합니다. 다른 회원 이미지나 이미 연결된 이미지는 새 글에 가져올 수 없습니다.",
               "POST /api/images 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 기존 파일·post_image row·post 연결을 요청 직전 그대로 보존하고 거절 파일을 새 저장하지 않는다.",
-              "POST /api/images · [교육용 fixture · legacy:11-2:I2] I2 이름만 .png인 텍스트 → HTTP 415 (I2) 기존 파일·post_image row·post 연결은 그대로며 실패 파일은 새 저장하지 않는다."
+              "POST /api/images · [교육용 fixture · legacy:11-2:I2] I2 이름만 .png인 텍스트 → HTTP 415 (I2) 기존 파일·post_image row·post 연결은 그대로며 실패 파일은 새 저장하지 않는다.",
+              "실제 파일 선택→업로드 응답 id→글 imageIds→상세 images의 순서가 연결된다. 이미지 변경 API와 끝내 미연결 파일 정리는 이번 범위에 포함하지 않는다."
             ]
           },
           "hints": [
             "파일 signature가 PNG/JPEG/GIF/WebP 중 하나인지 어떻게 판정하고 최대 1,048,576 byte 경계를 어떤 두 입력으로 비교하나요?",
             "이미지 7이 다른 회원 소유이거나 이미 연결된 경우 응답은 무엇이며 file·post_image·post는 그대로인가요?",
-            "파일 저장과 DB 연결이 서로 다른 단계에서 실패할 때 이 기능이 보장하는 보존 범위는 어디까지이며 원문은 미연결 파일 정리를 요구하나요?"
+            "파일 저장이나 DB 연결이 실패했을 때 원문이 보장하는 롤백 범위는 어디까지인가요? 11-2에서 이미지 변경 API와 끝내 미연결 파일 정리는 이번 구현 범위인가요?"
           ],
           "recipeIds": [
             "legacy:11-2:I0",
