@@ -23,7 +23,7 @@
 
 54개 화면 상태와 카탈로그 6개 필터 조합의 브라우저 결과는 [`BROWSER-QA.json`](BROWSER-QA.json)에 있다. 새 `core_learning_state` 18개는 브라우저에서 C01–C06 × 3단계를 확인한 근거를 연결해 `implemented`로 기록했다. `verified`로 올린 새 항목은 0개이며 기존 `verified` 6개는 보존했다. core 페이지 전체 장부 상태는 나머지 unreviewed 항목 때문에 `in_progress`다.
 
-추가 독립 review JSON/MD는 연구 addendum에서 `SOL-FINAL-REVIEW.json` / `.md`로 exact-copy했다. 추천은 `local_preview_with_native_clipboard_limit`; source ledger는 19/19 native body, 초기 18/19 + S14 표적 후속 1회다. native clipboard는 여전히 inconclusive다. 구현 커밋 SHA는 `7601bd80372dd87117b149f32067851b04654642`, tree는 `ece5e0c6b3504073ca1a617f234b8fd41a9d8ca0`이며 branch ref는 `feat/concept-curriculum`이다. post-commit `check:generated`가 exit 0이고 HTML이 커밋된 HTML과 같음을 확인했다.
+추가 독립 review JSON/MD는 연구 addendum에서 `SOL-FINAL-REVIEW.json` / `.md`로 exact-copy했다. 추천은 `local_preview_with_native_clipboard_limit`; source ledger는 19/19 native body, 초기 18/19 + S14 표적 후속 1회다. 이후 사용자 복사 동작 뒤 메인이 `/usr/bin/pbpaste`로 읽은 C05 3단계 OS text는 예상 UTF-8 원문과 139바이트 및 SHA-256이 일치했다. 근거는 [`CLIPBOARD-VERIFICATION.json`](CLIPBOARD-VERIFICATION.json)이며 `FINAL-STATUS.json`은 `implemented_local_verified_scoped`로 갱신했다. 이는 사용자 UI 복사와 메인의 실제 macOS clipboard 읽기 비교 1건이다. 자동화 도구가 6개 단원의 UI paste를 OS에서 전부 인증한 것은 아니며, UI 제어 연결도 여전히 미복구다. 이전 자동화의 inconclusive 결과와 6개 UI 응답 기록은 과거 근거로 보존했다. 구현 커밋 SHA는 `7601bd80372dd87117b149f32067851b04654642`, tree는 `ece5e0c6b3504073ca1a617f234b8fd41a9d8ca0`이며 branch ref는 `feat/concept-curriculum`이다. post-commit `check:generated`가 exit 0이고 HTML이 커밋된 HTML과 같음을 확인했다.
 
 최종 출처 대조는 첫 직접 조사에서 본문을 연 18개와 표적 후속에서 연 S14 1개를 합쳐 19/19다. 최초 ledger가 S14를 `read`로 표시했지만 실제로는 snippet-only였음을 정정했고 C06 claim C21을 최종 본문에 맞췄다. 메인 본문 표본 대조는 별도로 7개 URL이며, 초기 재귀 CLI 미채택 건과 구분한다. 실행 경로와 대조 수는 [`research/sources.json`](research/sources.json)에 남겼다.
 
@@ -33,4 +33,4 @@ catalog 문구/구조 변경으로 main 기준 implemented 옛 ID 5개가 curren
 
 완료 범위는 기본 API 입문용 핵심 6단원의 PC 다크 구현·브라우저 확인이다. 기존 134개 상세 문서의 전체 내용 사실 검증·각 예제 실행 또는 개별 화면 개선 완료를 뜻하지 않는다. 모바일·라이트 테마와 imagegen 시안 parity도 확인하지 않았다. C03 설명 지도는 Spring AOP 실행 실험이 아니다.
 
-복사 UI는 각 단원에서 성공 응답 문구가 표시됐다. 실제 OS clipboard round-trip은 자동화에서 현재 페이지/번들에 없는 이전 텍스트가 반환되고 native CUA fallback도 시작되지 않아 **미확정**이다. 앱 데이터·copy API의 원인 결함은 확정하지 않았다. 이 제한은 [`REPORT.md`](REPORT.md)와 [`FINAL-STATUS.json`](FINAL-STATUS.json)에 남기며 별도 follow-up으로 다룬다.
+복사 UI의 6개 성공 응답과 자동화 clipboard/paste의 inconclusive 기록은 [`BROWSER-QA.json`](BROWSER-QA.json)에 그대로 보존했다. 별도 후속 검증에서 사용자가 C05 3단계 복사를 실행했고, 메인이 `/usr/bin/pbpaste`의 OS 결과를 예상 원문과 raw UTF-8 기준으로 비교해 139바이트 및 SHA-256 일치를 확인했다([`CLIPBOARD-VERIFICATION.json`](CLIPBOARD-VERIFICATION.json)). 따라서 OS readback은 이 한 상태에 한해 확인됐다. 자동화 도구가 6개 전체를 검증한 것은 아니며, UI 제어 연결은 여전히 미복구다. 이 측정만으로 이전 불일치의 원인이나 모든 브라우저의 동작을 확정하지 않았다.

@@ -2,7 +2,7 @@
 
 기준일: 2026-10-25 · branch ref `feat/concept-curriculum` · 구현 커밋 `7601bd80372dd87117b149f32067851b04654642` · tree `ece5e0c6b3504073ca1a617f234b8fd41a9d8ca0` · 기준 main `f6d82d705e279a0e74a5e6287a35cc51953e49ba`
 
-상태: **구현 로컬 커밋 완료 · post-commit `check:generated` PASS · native clipboard round-trip 미확정**. C01–C06 PC 다크 경로는 코드·fixture·브라우저 범위에서 확인했다. main 반영이나 원격 공유는 하지 않았다.
+상태: **구현 로컬 커밋 완료 · post-commit `check:generated` PASS · C05 3단계 native clipboard readback 범위 확인**. C01–C06 PC 다크 경로는 코드·fixture·브라우저 범위에서 확인했다. main 반영이나 원격 공유는 하지 않았다.
 
 ## 커밋 시점과 현재 검증 상태
 
@@ -21,7 +21,7 @@
 
 ## Clipboard 결과와 미확정 항목
 
-각 단원의 코드 복사 UI에서 성공 응답 문구는 확인됐다. 자동화 clipboard/paste 왕복은 현재 페이지나 bundle에 없는 이전 텍스트를 반환했고, native CUA fallback은 startup에 실패했다. OS clipboard round-trip은 **inconclusive**다. 제품 코드 결함 원인은 특정되지 않았으며 clipboard 성공으로 기록하지 않았다. native CUA가 정상 시작되는 환경에서 OS 붙여넣기 왕복을 별도 확인해야 한다.
+각 단원의 코드 복사 UI에서 성공 응답 문구가 확인됐고, 과거 자동화 clipboard/paste 왕복은 현재 페이지나 bundle에 없는 이전 텍스트를 반환했으며 native CUA fallback은 startup에 실패했다. 후속으로 사용자가 C05 3단계에서 복사한 뒤 메인이 macOS의 `/usr/bin/pbpaste`로 실제 OS clipboard text를 읽어 예상 원문과 raw UTF-8 바이트를 비교했다. 두 값은 각각 139바이트로 같고 SHA-256은 `2b67a2e797fed16e75f4ac22fe3393f5c5ef9080ac3b73865c5efa63595e8ba7`로 일치한다. 원본 측정 기록은 [`CLIPBOARD-VERIFICATION.json`](CLIPBOARD-VERIFICATION.json)이다. 확인 주체는 사용자(UI 복사)와 메인(OS 읽기·비교)이며, 자동화 도구가 6개 UI paste를 OS에서 인증한 결과가 아니다. 따라서 native clipboard 상태는 **C05 3단계에 한해 확인**됐고, 나머지 자동화 readback은 미검증이다. UI 제어 연결은 여전히 미복구이며 이 결과만으로 과거 불일치의 원인이나 모든 브라우저의 동작을 확정하지 않는다. 제품 코드 결함 원인도 특정되지 않았다.
 
 그 밖에 모바일·라이트 화면, 전체 134개 원문의 내용·실행·개별 보강 완료, 새 imagegen 시안 parity는 이 작업의 검증 범위가 아니다. 브라우저 수치는 C01–C06 PC 다크 화면에 한정된다.
 
