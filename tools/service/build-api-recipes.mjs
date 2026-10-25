@@ -748,9 +748,21 @@ export function buildApiContracts() {
   for (const recipe of legacy.recipes) {
     recipe.project = normalizedSourceProject(recipe.id.split(':')[1], recipe.project, recipe.path);
   }
-  const authored = fs.existsSync(path.join(ROOT, 'service/authored-api-contracts.json'))
-    ? readJson('service/authored-api-contracts.json').recipes : [];
-  const recipes = [...boardRecipes, ...functionalRecipes, ...legacy.recipes, ...authored];
+  const authoredSource = fs.existsSync(path.join(ROOT, 'service/authored-api-contracts.json'))
+    ? readJson('service/authored-api-contracts.json') : {};
+  const authored = authoredSource.recipes || [];
+  const overrides = new Map((authoredSource.overrides || []).map(({ id, ...fields }) => [id, fields]));
+  const baseRecipes = [...boardRecipes, ...functionalRecipes, ...legacy.recipes];
+  for (const recipe of baseRecipes) {
+    const override = overrides.get(recipe.id);
+    if (override) {
+      Object.assign(recipe, override);
+      if (override.expected) recipe.expected = { ...recipe.expected, ...override.expected };
+    }
+  }
+  const unknownOverrides = [...overrides.keys()].filter((id) => !baseRecipes.some((recipe) => recipe.id === id));
+  if (unknownOverrides.length) throw new Error(`알 수 없는 authored recipe override: ${unknownOverrides.join(', ')}`);
+  const recipes = [...baseRecipes, ...authored];
   const ids = recipes.map((recipe) => recipe.id);
   const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
   const mappedCourseContracts = [...existingByStep.values()].reduce((count, contracts) => count + contracts.length, 0);
