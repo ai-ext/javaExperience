@@ -67,7 +67,7 @@ test('catalog renders one feature card, grouping, filters, Explorer routes and c
   assert.match(grouped, /data-sf-api-collapse aria-expanded="false"/);
 });
 
-test('feature renderer exposes full brief without script, hides hints until a click, and preserves root-relative references', () => {
+test('feature renderer follows the requirement sequence without content tabs and preserves root-relative references', () => {
   const html = renderServiceFeature({ feature, features: [feature, { id: 'members-auth', title: '회원 가입과 로그인' }], sourceIndex, apiRecipes: [recipe, relatedRecipe], rootPrefix: '../../' });
   assert.equal((html.match(/data-sf-stage-panel/g) || []).length, 2);
   for (const text of ['이번에 할 일', '시작 조건', '사용자 시나리오', '데이터와 이유', '업무 정책', '입력과 출력', '성공 기준', '입력 사례', '개발 과제', '완료 확인', '제목 누락']) assert.match(html, new RegExp(text));
@@ -82,12 +82,18 @@ test('feature renderer exposes full brief without script, hides hints until a cl
   assert.match(html, /href="\.\.\/\.\.\/scenario\/ch1-create-post\/1-2-dto-response\.html#post"/);
   assert.match(html, /href="\.\.\/\.\.\/docs\/knowledge\/P16-json-jackson-practical\.html"/);
   assert.match(html, /data-sf-stage-complete/);
-  assert.match(html, /data-sf-content-tab="brief"[^>]*checked/);
-  for (const tab of ['brief', 'hints', 'request', 'done']) assert.match(html, new RegExp(`data-sf-content-panel="${tab}"`));
-  assert.doesNotMatch(html, /data-sf-content-panel="(?:hints|request|done)"[^>]*hidden/);
+  assert.doesNotMatch(html, /sf-content-tab|sf-content-panel|sf-content-switch/);
+  const order = ['1 · 이번에 할 일', '2 · 시작 조건', '3 · 세부 요구사항', '4 · 사용자 시나리오', '5 · 필요할 때 보는 힌트', '6 · 직접 호출하기', '7 · 완료 확인'];
+  const positions = order.map((label) => html.indexOf(label)).filter((position) => position >= 0);
+  assert.equal(positions.length, order.length, '요구사항서의 일곱 항목이 모두 있는 fixture');
+  assert.deepEqual(positions, [...positions].sort((left, right) => left - right));
+  assert.match(html, /class="sf-requirements-table"/);
+  assert.match(html, /class="sf-request-checklist"/);
+  assert.match(html, /<details class="sf-execution"><summary>직접 시도한 뒤 보기/);
+  assert.doesNotMatch(html, /<details class="sf-source-criteria"/);
   assert.match(html, /class="sf-brief-section sf-policy"/);
   assert.match(html, /<table><thead><tr><th>조건<\/th><th>결과<\/th><th>유지할 상태<\/th>/);
-  assert.match(html, /원문 완료 기준·검증 메모 1개 보기/);
+  assert.match(html, /원문 완료 기준·검증 메모/);
   assert.doesNotMatch(html, /<script[^>]+src=/);
 });
 

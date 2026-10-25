@@ -173,7 +173,6 @@ function prepareFirstPaint({panelMap,dayPanels,servicePanels,knowledgeCategories
     const params=new URLSearchParams(location.search);
     const selected=servicePanels.find(p=>p.id===id)||servicePanels.find(p=>p.variant===params.get('variant')&&p.stage===params.get('stage'))||servicePanels[0];
     style.textContent+=servicePanels.map(p=>`html.js body main #${CSS.escape(p.id)}{display:${p.id===selected.id?'block':'none'}!important}`).join('');
-    style.textContent+=`html.js body main [data-sf-aside-stage]{display:none!important}html.js body main [data-sf-aside-stage][data-sf-variant="${CSS.escape(selected.variant)}"][data-sf-stage="${CSS.escape(selected.stage)}"]{display:block!important}`;
   }
   if(dayPanels.length)style.textContent+=dayPanels.map(p=>`html.js body main #${CSS.escape(p.id)}{display:${p.id===active?p.display:'none'}!important}`).join('');
   // 설정 형식은 CSS가 첫 페인트부터, controller가 DOM·키보드 상태를 이어받는다.
