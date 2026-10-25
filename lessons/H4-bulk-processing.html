@@ -11,13 +11,14 @@
 
 
 
-<link rel="stylesheet" href="../tools/site/course-tokens.css?v=8009eae9bf44">
+<link rel="stylesheet" href="../tools/site/course-tokens.css?v=7d70b43e3c66">
 <link rel="stylesheet" href="../tools/site/course-content.css?v=35f34c292222">
 <link rel="stylesheet" href="../tools/site/contrast.css?v=fa9b5b7d70bc">
 <link rel="stylesheet" href="../tools/site/course-navigation.css?v=cd5344da4567">
 <link rel="stylesheet" href="../tools/site/course-data-blocks.css?v=7207893bf610">
-<link rel="stylesheet" href="../tools/site/course-semantics.css?v=57aed7765b39">
+<link rel="stylesheet" href="../tools/site/course-semantics.css?v=8632fefaa184">
 <link rel="stylesheet" href="../tools/site/course-flow-layout.css?v=b33e13ca0173">
+<link rel="stylesheet" href="../tools/site/section-switcher.css?v=27af795b9d88">
 </head>
 <body>
 <header class="topbar site-topbar"><a class="home-brand" href="../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../index.html">홈</a><a href="../course/spring/README.html">과정 v2 · 일정</a><a href="../course/map.html">과정 지도</a><a href="../scenario/README.html">서비스 만들기</a><a href="../practice/MISSIONS.html">실전 미션</a><a href="../docs/knowledge/README.html" aria-current="page">개념 학습</a></nav></header>
@@ -28,7 +29,7 @@
 <p>개념 레슨 · 40분</p>
 </blockquote>
 <h2 id="이게-뭐냐"><a class="anchor" href="#이게-뭐냐" aria-hidden="true">#</a>이게 뭐냐</h2>
-<p>&quot;삭제하고 30일 지난 글을 진짜로 지워 주세요. 댓글도 같이요.&quot; 지울 글이 6,000개, 댓글이 18,000개다. <code>DELETE</code> 한 문장이면 될 것 같지만 세 가지에 걸린다.</p>
+<p>"삭제하고 30일 지난 글을 진짜로 지워 주세요. 댓글도 같이요." 지울 글이 6,000개, 댓글이 18,000개다. <code>DELETE</code> 한 문장이면 될 것 같지만 세 가지에 걸린다.</p>
 <ul>
 <li><strong>순서</strong> — 댓글(<code>comment.post_id</code>)이 글을 가리키는 FK가 있으면 글을 먼저 못 지운다. <strong>자식 먼저</strong>, 부모 나중.</li>
 <li><strong>잠금</strong> — <code>DELETE</code>는 지우는 행을 잠근다. 잠금은 <strong>커밋할 때까지</strong> 유지된다. 한 트랜잭션에 18,000행이면 그동안 그 행을 고치려는 요청이 전부 기다린다. 중간에 실패하면 전부 되돌아간다.</li>
@@ -59,7 +60,7 @@
 <td><code>JdbcTemplate.batchUpdate</code></td>
 </tr>
 </tbody></table></div>
-<p><code>flush()</code>는 &quot;모아 둔 SQL을 지금 DB로 보내라&quot;이고, <strong>커밋이 아니다.</strong> <code>flush()</code>를 아무리 불러도 트랜잭션은 하나 그대로다.</p>
+<p><code>flush()</code>는 "모아 둔 SQL을 지금 DB로 보내라"이고, <strong>커밋이 아니다.</strong> <code>flush()</code>를 아무리 불러도 트랜잭션은 하나 그대로다.</p>
 <h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
 <p><code>practice</code>에 연습용 표를 만들어 실험했다. 글 10,000개 중 6,000개가 오래전에 지운 글, 글마다 댓글 3개다.</p>
 <pre><code class="language-sql">CREATE TABLE lesson_h4_post (
@@ -84,12 +85,12 @@ CROSS JOIN (SELECT 1 k UNION ALL SELECT 2 UNION ALL SELECT 3) k;</code></pre>
 <h3 id="부모부터-지우면--1451"><a class="anchor" href="#부모부터-지우면--1451" aria-hidden="true">#</a>부모부터 지우면 — 1451</h3>
 <pre><code class="language-text">mysql&gt; DELETE FROM lesson_h4_post WHERE deleted_at &lt; '2026-09-05';
 ERROR 1451 (23000): Cannot delete or update a parent row: a foreign key constraint fails (`practice`.`lesson_h4_comment`, CONSTRAINT `fk_h4_comment_post` FOREIGN KEY (`post_id`) REFERENCES `lesson_h4_post` (`id`))</code></pre>
-<h3 id="limit은-최대-몇-행"><a class="anchor" href="#limit은-최대-몇-행" aria-hidden="true">#</a><code>LIMIT</code>은 &quot;최대 몇 행&quot;</h3>
+<h3 id="limit은-최대-몇-행"><a class="anchor" href="#limit은-최대-몇-행" aria-hidden="true">#</a><code>LIMIT</code>은 "최대 몇 행"</h3>
 <pre><code class="language-text">mysql&gt; DELETE FROM lesson_h4_comment
     -&gt; WHERE post_id IN (SELECT id FROM lesson_h4_post WHERE deleted_at &lt; '2026-09-05')
     -&gt; ORDER BY id LIMIT 1000;
 Query OK, 1000 rows affected (0.03 sec)</code></pre>
-<p>한 번에 1000행만 지웠다. 나머지는 남아 있다. <strong>0행이 나올 때까지 되풀이</strong>한다. 매번 &quot;앞에서부터 1000개&quot;를 지우니 <code>OFFSET</code>이 필요 없다(지울 때 <code>OFFSET</code>으로 넘기면 앞이 지워져 당겨지면서 행을 건너뛴다). 단, 표 두 개를 조인한 <code>DELETE</code>에는 <code>LIMIT</code>을 못 쓴다.</p>
+<p>한 번에 1000행만 지웠다. 나머지는 남아 있다. <strong>0행이 나올 때까지 되풀이</strong>한다. 매번 "앞에서부터 1000개"를 지우니 <code>OFFSET</code>이 필요 없다(지울 때 <code>OFFSET</code>으로 넘기면 앞이 지워져 당겨지면서 행을 건너뛴다). 단, 표 두 개를 조인한 <code>DELETE</code>에는 <code>LIMIT</code>을 못 쓴다.</p>
 <pre><code class="language-text">mysql&gt; DELETE c FROM lesson_h4_comment c JOIN lesson_h4_post p ON p.id = c.post_id
     -&gt; WHERE p.deleted_at &lt; '2026-09-05' LIMIT 1000;
 ERROR 1064 (42000): You have an error in your SQL syntax; … near 'LIMIT 1000' at line 1</code></pre>
@@ -106,7 +107,7 @@ ERROR 1064 (42000): You have an error in your SQL syntax; … near 'LIMIT 1000' 
 <tbody><tr>
 <td>18,000행 한 번에 <code>DELETE</code></td>
 <td>17000번(지울 대상)</td>
-<td><code>ERROR 1205 … Lock wait timeout exceeded</code></td>
+<td><code>ERROR 1205 … Lock wait <span data-http-status="timeout" class="semantic-http-status">timeout</span> exceeded</code></td>
 </tr>
 <tr>
 <td>〃</td>
@@ -232,7 +233,7 @@ executing 0 JDBC batches</code></pre>
 <td>189 · 183 · 210ms</td>
 </tr>
 </tbody></table></div>
-<p>배열은 &quot;각 파라미터 묶음이 몇 행을 바꿨나&quot;다. 두 경우 모두 <code>1</code>이 2,000개였다.</p>
+<p>배열은 "각 파라미터 묶음이 몇 행을 바꿨나"다. 두 경우 모두 <code>1</code>이 2,000개였다.</p>
 <h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
 <p>15분. G3의 mysql 접속 명령에서 맨 끝 DB 이름 <code>community</code>를 <code>practice</code>로 바꿔 들어간다(진짜 <code>post</code>·<code>comment</code>는 건드리지 않는다).</p>
 <p><strong>1.</strong> 예시의 <code>CREATE</code>·<code>INSERT</code>를 실행하고 <code>SELECT COUNT(*)</code>로 10000·30000을 확인한다.</p>
@@ -265,7 +266,7 @@ executing 0 JDBC batches</code></pre>
 <tr>
 <td>4</td>
 <td></td>
-<td><code>UPDATE lesson_h4_comment SET body = &#39;수정&#39; WHERE id = 17000;</code> → 3초 뒤 <code>1205</code></td>
+<td><code>UPDATE lesson_h4_comment SET body = '수정' WHERE id = 17000;</code> → 3초 뒤 <code>1205</code></td>
 </tr>
 <tr>
 <td>5</td>
@@ -280,7 +281,7 @@ executing 0 JDBC batches</code></pre>
 <p><strong>2. <code>flush()</code>면 커밋된 줄 알기.</strong> 위 1과 같은 이유다. <code>flush</code>는 SQL을 보낼 뿐이다. 커밋 경계는 <code>TransactionTemplate</code>이나 <code>@Transactional</code> 메서드가 끝나는 곳이다.</p>
 <p><strong>3. <code>clear()</code> 뒤에 옛 객체 고치기.</strong> 예시의 <code>DB 제목: 글 7001</code>. 고칠 게 있으면 <code>clear()</code> 전에 고치거나, 다시 <code>find</code>해서 고친다.</p>
 <h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
-<p><strong>1.</strong> <code>DELETE FROM t WHERE … LIMIT 500</code>을 한 번 실행했다. 대상이 2,000행이면 몇 행이 지워지나? 다 지우려면?</p>
+<p><strong>1.</strong> <code>DELETE FROM t WHERE … LIMIT <span data-http-status="500" class="semantic-http-status">500</span></code>을 한 번 실행했다. 대상이 2,000행이면 몇 행이 지워지나? 다 지우려면?</p>
 <details>
 <summary>정답</summary>
 
@@ -298,7 +299,7 @@ executing 0 JDBC batches</code></pre>
 <details>
 <summary>정답</summary>
 
-<p>한 번에: 커밋까지 기다리다 <code>1205 Lock wait timeout</code>이 날 수 있다. 청크: 잠긴 건 지금 청크 1000행뿐이라 다른 행은 바로 고쳐진다.</p>
+<p>한 번에: 커밋까지 기다리다 <code>1205 Lock wait <span data-http-status="timeout" class="semantic-http-status">timeout</span></code>이 날 수 있다. 청크: 잠긴 건 지금 청크 1000행뿐이라 다른 행은 바로 고쳐진다.</p>
 </details>
 
 <p><strong>4.</strong> 청크 루프 안에서 <code>tx.execute</code>로 청크마다 커밋하게 짰는데, 그 메서드를 부르는 서비스에 <code>@Transactional</code>이 붙어 있다. 어떻게 되나?</p>
@@ -312,7 +313,7 @@ executing 0 JDBC batches</code></pre>
 <details>
 <summary>정답</summary>
 
-<p>달라지는 것: 들고 있는 엔티티가 2만 개까지 쌓이지 않고 500개 이하로 유지된다(메모리). 그대로인 것: <strong>트랜잭션은 하나</strong>다. <code>flush</code>는 커밋이 아니다. 그리고 <code>clear()</code> 전에 받은 객체를 나중에 고쳐도 저장되지 않는다.</p>
+<p>달라지는 것: 들고 있는 엔티티가 2만 개까지 쌓이지 않고 <span data-http-status="500" class="semantic-http-status">500</span>개 이하로 유지된다(메모리). 그대로인 것: <strong>트랜잭션은 하나</strong>다. <code>flush</code>는 커밋이 아니다. 그리고 <code>clear()</code> 전에 받은 객체를 나중에 고쳐도 저장되지 않는다.</p>
 </details>
 
 <h2 id="더-깊이"><a class="anchor" href="#더-깊이" aria-hidden="true">#</a>더 깊이</h2>
@@ -341,5 +342,7 @@ executing 0 JDBC batches</code></pre>
 
 
 
+<script src="../tools/site/course-semantic-colors.js?v=f70be5d5c239" defer></script>
+<script src="../tools/site/section-switcher.js?v=3578501f04d7" defer></script>
 </body>
 </html>

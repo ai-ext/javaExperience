@@ -11,13 +11,14 @@
 
 
 
-<link rel="stylesheet" href="../tools/site/course-tokens.css?v=8009eae9bf44">
+<link rel="stylesheet" href="../tools/site/course-tokens.css?v=7d70b43e3c66">
 <link rel="stylesheet" href="../tools/site/course-content.css?v=35f34c292222">
 <link rel="stylesheet" href="../tools/site/contrast.css?v=fa9b5b7d70bc">
 <link rel="stylesheet" href="../tools/site/course-navigation.css?v=cd5344da4567">
 <link rel="stylesheet" href="../tools/site/course-data-blocks.css?v=7207893bf610">
-<link rel="stylesheet" href="../tools/site/course-semantics.css?v=57aed7765b39">
+<link rel="stylesheet" href="../tools/site/course-semantics.css?v=8632fefaa184">
 <link rel="stylesheet" href="../tools/site/course-flow-layout.css?v=b33e13ca0173">
+<link rel="stylesheet" href="../tools/site/section-switcher.css?v=27af795b9d88">
 </head>
 <body>
 <header class="topbar site-topbar"><a class="home-brand" href="../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../index.html">홈</a><a href="../course/spring/README.html">과정 v2 · 일정</a><a href="../course/map.html">과정 지도</a><a href="../scenario/README.html">서비스 만들기</a><a href="../practice/MISSIONS.html">실전 미션</a><a href="../docs/knowledge/README.html" aria-current="page">개념 학습</a></nav></header>
@@ -53,7 +54,7 @@
 </tr>
 </tbody></table></div>
 <h3 id="프록시--async가-일하는-방법"><a class="anchor" href="#프록시--async가-일하는-방법" aria-hidden="true">#</a>프록시 — <code>@Async</code>가 일하는 방법</h3>
-<p>Spring은 <code>@Async</code>가 붙은 빈을 그대로 주입하지 않는다. 겉모양이 같은 <strong>대리 객체(프록시)</strong> 로 감싸서 준다. 다른 빈이 <code>sender.sendAsync(1)</code>을 부르면 먼저 프록시가 받는다. 프록시는 &quot;이 메서드에 <code>@Async</code>가 있네&quot; 하고 실행기에 일을 넘긴 뒤 바로 돌아온다. G3에서 붙인 <code>@Transactional</code>도 이 방식으로 동작한다.</p>
+<p>Spring은 <code>@Async</code>가 붙은 빈을 그대로 주입하지 않는다. 겉모양이 같은 <strong>대리 객체(프록시)</strong> 로 감싸서 준다. 다른 빈이 <code>sender.sendAsync(1)</code>을 부르면 먼저 프록시가 받는다. 프록시는 "이 메서드에 <code>@Async</code>가 있네" 하고 실행기에 일을 넘긴 뒤 바로 돌아온다. G3에서 붙인 <code>@Transactional</code>도 이 방식으로 동작한다.</p>
 <p>그래서 <strong>같은 클래스 안에서 <code>this.메서드()</code>로 부르면</strong> 프록시를 안 거치고 <code>@Async</code>가 무시된다. 아래에서 실측한다.</p>
 <h2 id="예시"><a class="anchor" href="#예시" aria-hidden="true">#</a>예시</h2>
 <p>이 레슨을 쓰면서 작은 Spring Boot 4.1 앱(포트 <code>18310</code>)을 만들어 돌렸다. 푸시 한 건은 <code>Thread.sleep(500)</code>으로 흉내 냈다.</p>
@@ -90,7 +91,7 @@ public class NotifyService {
         log.info(&quot;푸시 보냄(같은 클래스) memberId={}&quot;, memberId);
     }
 }</code></pre>
-<p><code>curl -s -o /dev/null -w &#39;HTTP %{http_code} time_total=%{time_total}s\n&#39; -X POST …</code>로 응답 시간을 쟀다. 로그의 <code>[…]</code>는 스레드 이름이다(앞부분 줄임).</p>
+<p><code>curl -s -o /dev/null -w 'HTTP %{http_code} time_total=%{time_total}s\n' -X POST …</code>로 응답 시간을 쟀다. 로그의 <code>[…]</code>는 스레드 이름이다(앞부분 줄임).</p>
 <p><strong>동기 — 1.66초</strong></p>
 <pre><code class="language-text">HTTP 200 time_total=1.664627s
 16:01:54.192 [io-18310-exec-1] PushSender : 푸시 보냄 memberId=1
@@ -117,7 +118,7 @@ public class NotifyService {
 
 java.lang.IllegalStateException: 푸시 서버 오류 memberId=26</code></pre>
 <p>부른 쪽은 이미 다음 줄로 가 버려서 잡을 수 없다. 예외는 <code>task-4</code> 스레드에서 로그 한 줄로 끝난다. 실패를 기록하려면 <code>@Async</code> 메서드 <strong>안에서</strong> 잡아야 한다(16-2의 <code>FAILED</code> 기록).</p>
-<p>결과가 필요하면 <code>CompletableFuture</code>를 돌려준다. 메서드 안에서는 <code>return CompletableFuture.completedFuture(&quot;SENT &quot; + memberId);</code>처럼 감싸 돌려주고, 부른 쪽은 <code>join()</code>으로 기다린다. 실패하면 <code>join()</code>에서 예외가 나온다.</p>
+<p>결과가 필요하면 <code>CompletableFuture</code>를 돌려준다. 메서드 안에서는 <code>return CompletableFuture.completedFuture("SENT " + memberId);</code>처럼 감싸 돌려주고, 부른 쪽은 <code>join()</code>으로 기다린다. 실패하면 <code>join()</code>에서 예외가 나온다.</p>
 <pre><code class="language-text">join에서 잡았다: java.util.concurrent.CompletionException: java.lang.IllegalStateException: 푸시 서버 오류 memberId=26</code></pre>
 <p>단, <code>join()</code>은 끝날 때까지 <strong>기다린다.</strong> 응답 경로에서 <code>join()</code>하면 응답 시간이 다시 늘어난다.</p>
 <h3 id="boot가-만들어-주는-풀과-직접-만드는-풀"><a class="anchor" href="#boot가-만들어-주는-풀과-직접-만드는-풀" aria-hidden="true">#</a>Boot가 만들어 주는 풀과 직접 만드는 풀</h3>
@@ -148,7 +149,7 @@ java.lang.IllegalStateException: 푸시 서버 오류 memberId=26</code></pre>
 작업 4 시작 thread=task-2
 작업 3 시작 thread=task-4</code></pre>
 <p>마지막 두 줄은 1초 뒤에 찍혔다. 3·4는 큐에 들어가 1초를 기다렸고, 5·6이 오자 큐가 차서 스레드 3·4가 생겼다. 7·8은 갈 곳이 없어 <strong>부른 쪽에서</strong> <code>TaskRejectedException</code>이 났다. 큐를 끝없이 두면(기본값) max는 영영 안 쓰인다.</p>
-<p>16-2처럼 업무별 풀을 직접 만들면 Boot의 풀은 <strong>물러난다</strong>. 아래 빈 하나만 두었더니 실행기 빈 목록이 <code>{&quot;notificationExecutor&quot;: &quot;…ThreadPoolTaskExecutor&quot;}</code> 하나였고, 이름 없는 <code>@Async</code>도 <code>notify-1</code>·<code>notify-2</code>에서 돌았다.</p>
+<p>16-2처럼 업무별 풀을 직접 만들면 Boot의 풀은 <strong>물러난다</strong>. 아래 빈 하나만 두었더니 실행기 빈 목록이 <code>{"notificationExecutor": "…ThreadPoolTaskExecutor"}</code> 하나였고, 이름 없는 <code>@Async</code>도 <code>notify-1</code>·<code>notify-2</code>에서 돌았다.</p>
 <pre><code class="language-java">@Bean
 public ThreadPoolTaskExecutor notificationExecutor() {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -186,7 +187,7 @@ public ThreadPoolTaskExecutor notificationExecutor() {
 <td><code>true</code></td>
 </tr>
 </tbody></table></div>
-<p>가상 스레드 모드는 <strong>풀이 아니다.</strong> 작업마다 새 스레드를 만들고(이름 번호가 계속 올라간다), <code>pool.*</code> 설정은 무시된다. 그래서 &quot;동시에 몇 개까지&quot;라는 제한이 사라진다. 직접 만든 <code>notificationExecutor</code> 빈이 있으면 가상 스레드를 켜도 그 풀(<code>notify-</code>, <code>isVirtual=false</code>)을 그대로 쓴다.</p>
+<p>가상 스레드 모드는 <strong>풀이 아니다.</strong> 작업마다 새 스레드를 만들고(이름 번호가 계속 올라간다), <code>pool.*</code> 설정은 무시된다. 그래서 "동시에 몇 개까지"라는 제한이 사라진다. 직접 만든 <code>notificationExecutor</code> 빈이 있으면 가상 스레드를 켜도 그 풀(<code>notify-</code>, <code>isVirtual=false</code>)을 그대로 쓴다.</p>
 <h2 id="따라-해-보기"><a class="anchor" href="#따라-해-보기" aria-hidden="true">#</a>따라 해 보기</h2>
 <p>15분. 실습 레포에서 연습 패키지(<code>lab.h6</code>)를 만들어 한다. 끝나면 패키지째 지운다.</p>
 <p><strong>1.</strong> 위 예시의 <code>AsyncConfig</code>, <code>PushSender</code>, <code>NotifyService</code>를 붙여 넣고(<code>sleep</code>은 <code>Thread.sleep</code>을 <code>try/catch</code>로 감싼 정적 메서드), <code>POST /lab/h6/sync</code>·<code>/lab/h6/async</code>·<code>/lab/h6/self</code>가 각각 <code>notifySync()</code>·<code>notifyAsync()</code>·<code>notifySelf()</code>를 부르는 컨트롤러를 만든다. <code>/lab/**</code>가 토큰 검사에 걸리면 F2에서 만든 인증 필터의 제외 경로에 잠시 더한다.</p>
@@ -198,7 +199,7 @@ done</code></pre>
 <p><strong>3.</strong> <code>application.yml</code>에 <code>spring.task.execution.pool.core-size: 1</code>을 넣고 다시 띄운다. <code>async</code>의 응답 시간은 그대로인데, 로그의 세 줄이 <strong>0.5초 간격</strong>으로 <code>task-1</code> 하나에서 찍힌다. 응답은 빨라도 일은 풀 크기만큼만 동시에 된다.</p>
 <h2 id="일부러-틀려-보기"><a class="anchor" href="#일부러-틀려-보기" aria-hidden="true">#</a>일부러 틀려 보기</h2>
 <p><strong>1. <code>@EnableAsync</code>를 지운다.</strong> 실험 앱에서 지웠더니 <code>async</code>가 <code>1.656656s</code>로 돌아갔고, 로그가 요청 스레드(<code>http-nio-18310-exec-1</code>)에서 0.5초 간격으로 찍혔다. 에러는 없다. <code>@Async</code>가 안 먹으면 ① <code>@EnableAsync</code>, ② 같은 클래스 <code>this.</code> 호출부터 본다.</p>
-<p><strong>2. <code>@Async</code> 메서드 안에서 예외를 안 잡는다.</strong> 위 <code>fail-void</code>처럼 부른 쪽은 성공으로 안다. 16-2라면 글쓰기는 <code>201</code>인데 푸시 실패 기록(<code>FAILED</code>)이 하나도 안 남는다. 회원 한 명 단위로 <code>try/catch</code> 해서 기록하고 다음 회원으로 넘어간다.</p>
+<p><strong>2. <code>@Async</code> 메서드 안에서 예외를 안 잡는다.</strong> 위 <code>fail-void</code>처럼 부른 쪽은 성공으로 안다. 16-2라면 글쓰기는 <code><span data-http-status="201" class="semantic-http-status">201</span></code>인데 푸시 실패 기록(<code>FAILED</code>)이 하나도 안 남는다. 회원 한 명 단위로 <code>try/catch</code> 해서 기록하고 다음 회원으로 넘어간다.</p>
 <p><strong>3. 큐를 작게 두고 거절 정책을 안 정한다.</strong> 위 core 2·max 4·큐 2 실험처럼 바쁠 때 <code>TaskRejectedException</code>이 <strong>부른 쪽</strong>에서 난다. 거절된 7·8번 일은 아무도 실행하지 않았다. 알림이었다면 그대로 사라진다. 16-2가 큐 100에 <code>CallerRunsPolicy</code>를 쓰는 이유다.</p>
 <h2 id="확인-문제"><a class="anchor" href="#확인-문제" aria-hidden="true">#</a>확인 문제</h2>
 <p><strong>1.</strong> <code>NotifyService</code> 안에서 <code>this.pushInside(id)</code>를 불렀다. <code>pushInside</code>에 <code>@Async</code>가 있는데 응답이 1.5초 걸린다. 왜이고, 어떻게 고치나?</p>
@@ -250,7 +251,7 @@ done</code></pre>
 <h2 id="다음"><a class="anchor" href="#다음" aria-hidden="true">#</a>다음</h2>
 <ul>
 <li>실습: <a href="../scenario/ch16-events-async-cache/16-2-async-notification.html">16-2. 알림을 비동기로 — 느린 발송이 글쓰기를 막지 않게</a> — <code>notificationExecutor</code>(core 2·max 4·큐 100·<code>CallerRunsPolicy</code>)로 커밋 뒤 알림을 넘기고, 푸시 실패를 <code>FAILED</code>로 남긴다.</li>
-<li>레슨: <a href="H7-cache-cacheable-evict.html">H7. 캐시 — @Cacheable과 무효화</a> — 같은 프록시가 이번에는 &quot;메서드를 아예 안 부르기&quot;를 한다.</li>
+<li>레슨: <a href="H7-cache-cacheable-evict.html">H7. 캐시 — @Cacheable과 무효화</a> — 같은 프록시가 이번에는 "메서드를 아예 안 부르기"를 한다.</li>
 </ul>
 
 
@@ -260,5 +261,7 @@ done</code></pre>
 
 
 
+<script src="../tools/site/course-semantic-colors.js?v=f70be5d5c239" defer></script>
+<script src="../tools/site/section-switcher.js?v=3578501f04d7" defer></script>
 </body>
 </html>
