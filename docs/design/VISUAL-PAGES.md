@@ -1,6 +1,6 @@
 # 화면별 시각 개편 체크리스트
 
-저자 원문과 생성 HTML이 함께 있는 455개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 53,859개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
+저자 원문과 생성 HTML이 함께 있는 455개 화면의 목록이다. 상세한 산문·표·코드·토글·화면 요소 53,864개는 [visual-inventory.jsonl](visual-inventory.jsonl)에 한 줄씩 있다.
 
 체크는 해당 화면의 모든 개별 항목이 `verified`일 때만 자동으로 붙는다. `imagegen` 시안 또는 공통 컴포넌트 한 개를 적용한 상태는 완료가 아니다.
 
@@ -79,9 +79,9 @@
 - [ ] [course/spring/D01.md](../../course/spring/D01.html) — 항목 269, 긴 산문 0, 토글 29, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [course/spring/D02.md](../../course/spring/D02.html) — 항목 271, 긴 산문 1, 토글 37, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/D03.md](../../course/spring/D03.html) — 항목 347, 긴 산문 0, 토글 39, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D04.md](../../course/spring/D04.html) — 항목 279, 긴 산문 1, 토글 46, 최대 접기 깊이 2; 상태: unreviewed
-- [ ] [course/spring/D05.md](../../course/spring/D05.html) — 항목 358, 긴 산문 0, 토글 46, 최대 접기 깊이 1; 상태: unreviewed
-- [ ] [course/spring/D06.md](../../course/spring/D06.html) — 항목 267, 긴 산문 1, 토글 34, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [course/spring/D04.md](../../course/spring/D04.html) — 항목 280, 긴 산문 1, 토글 47, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [course/spring/D05.md](../../course/spring/D05.html) — 항목 361, 긴 산문 0, 토글 49, 최대 접기 깊이 2; 상태: unreviewed
+- [ ] [course/spring/D06.md](../../course/spring/D06.html) — 항목 268, 긴 산문 1, 토글 35, 최대 접기 깊이 2; 상태: unreviewed
 - [ ] [course/spring/D07.md](../../course/spring/D07.html) — 항목 384, 긴 산문 0, 토글 45, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/D08.md](../../course/spring/D08.html) — 항목 412, 긴 산문 0, 토글 36, 최대 접기 깊이 1; 상태: unreviewed
 - [ ] [course/spring/D09.md](../../course/spring/D09.html) — 항목 381, 긴 산문 0, 토글 40, 최대 접기 깊이 1; 상태: unreviewed

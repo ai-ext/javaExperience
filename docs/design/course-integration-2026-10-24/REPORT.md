@@ -16,18 +16,19 @@
 
 ## 실제 서버와 DB 증거
 
-두 차례 모두 변경하지 않은 main board-server JAR과 자기 소유의 일회용 MySQL8.4·Redis7.4만 사용했다. 기존 사용자 DB와 서버는 변경하거나 종료하지 않았다.
+세 차례 모두 변경하지 않은 main board-server JAR과 자기 소유의 일회용 MySQL8.4·Redis7.4만 사용했다. 기존 사용자 DB와 서버는 변경하거나 종료하지 않았다.
 
 1. 첫 실험: 브라우저 요청18건으로 8동작, like/unlike 재요청, 커서 다음 묶음, 삭제 뒤404, 미인증401, 입력오류400을 확인했다. SQL 관찰13건에는 utf8mb4 관찰 클라이언트 재확인1건이 포함된다. 첫 두 like 요청 사이에 각각 SQL을 읽었다고 주장하지 않는다. 이후 한 번을 더 요청해 relation1→1과 id/시각 불변을 확인했다. DELETE는 물리 제거가 아니라 DELETED 상태다.
 2. 새 시각화 연결 후 두 번째 실험: 같은 bundle로 실제 브라우저 POST201/500 두 건, SQL 실행5건을 기록했다. 일회용 DB의 지연 trigger로 commit 전 시점을 만들었다. 별도 RR autocommit SELECT는 글42·관계42/7을 못 보고, READ UNCOMMITTED 외부 probe는 미확정 행을 봤다. 이 probe를 앱의 JDBC 연결이나 Java heap이라고 표현하지 않는다. commit 뒤 글·관계·포인트가 확정됐다. fixture를 리셋한 별도 실패 실험에서 원장 INSERT를 실패시켜 글·관계·포인트가 rollback되고 기존 태그7이 남는 것을 확인했다. 성공 뒤 같은 트랜잭션을 rollback한 실험이 아니다.
-3. CLI 회원가입/로그인은 각 실험의 준비2건씩이며 브라우저 요청 수에 포함하지 않는다. 두 실험의 JVM·컨테이너를 종료하고 private credential 파일을 제거했다. `post-runtime-cleanup.json`과 `api-round1-cleanup-observed.json`을 참조한다.
+3. 최종 요청 표시 보완 후 세 번째 실험: 실제 브라우저 생성201(대기 중 초안 수정)·상세200·목록200·삭제204 네 건을 새 bundle로 확인했다. SQL3실행 중1건은 fixture/지연 trigger 준비이고, 나머지 조회에서 원본 제목 저장과 soft delete를 확인했다. 생성 때 보낸 본문은 그대로이고 아직 보내지 않은 초안은 따로 남았으며 경고가 표시됐다. 요청별 실제 본문 또는 본문 없음이 보존됐다. 진도는 모두0이다. 삭제로 검증용 id 연결을 해제했고 새 문서는 기본8080/id없음/token없음으로 복원됐다.
+4. CLI 회원가입/로그인은 각 실험의 준비2건씩이며 브라우저 요청 수에 포함하지 않는다. 세 실험의 JVM·컨테이너를 종료하고 private credential 파일을 제거했다. `post-runtime-cleanup.json`과 `api-round1-cleanup-observed.json`을 참조한다.
 
-첫 실험의 transport/client와 계약 파일은 최종본과 바이트가 같다. 두 번째 실험의 bundle SHA도 최종본과 같다. 최신 stepper 병합은 API 실행 코드를 바꾸지 않았다. `SOURCE-MANIFEST.json`에 해시와 범위를 기록했다.
+첫 실험의 계약 파일은 최종본과 바이트가 같다. 마지막 검토에서 실제 전송 본문 보존과 전송 중 본문·커서·인증 변경 감지를 보완해 client/bundle은 달라졌다. fetch의 URL·method·header·body 구성은 바꾸지 않았다. 이전 두 실험을 최종 bundle에서 재실행했다고 표현하지 않는다. 최종 bundle의 별도 브라우저4건 확인은 final-request-browser.json/final-request-runtime.json에 기록했다. `SOURCE-MANIFEST.json`에 해시와 범위를 기록했다.
 
 ## 검증 결과와 한계
 
 - build: HTML459개, 기존 시나리오101개, 링크 오류0. 별도 검증 대시보드도 재생성한다.
-- test:course-api: 단위23건 + 46일 페이지·5개 도구·대표5페이지 생성물 검사 통과.
+- test:course-api: 단위26건 + 46일 페이지·5개 도구·대표5페이지 생성물 검사 통과.
 - test:course-pages: 18+44+10건 통과. D00의 고정10ms 대기 검사는 실제 hashchange를 기다리도록 고쳤고 과정 로직은 바꾸지 않았다.
 - test:course: 69건, check:course-data, validate:course 통과. 45일 과정·30엔드포인트·158말하기 카드 검증이다.
 - test:home, test:knowledge-catalog(상태14건 및 데이터/생성물 검사), test:navigation 통과.
@@ -38,7 +39,7 @@
 - 기존 contrast 도구의 브라우저/CLI 자가검사4건은 Playwright 모듈이 없어 실행 실패했다. 환경 문제를 제품 통과로 바꾸지 않았고 임의로 패키지를 설치하지 않았다. 색상변수/단일테마 정적 검사1건은 통과했다. 실제 브라우저는 CUA로 확인했다.
 - 초기918파일 SHA 보존과 별개로 최종918개 보호 파일을 최신 stepper3b35와 대조해 차이0을 확인했다. 일자 원본의 후속 내용 변화는 upstream 커밋이며 통합에서 재작성한 것이 아니다. 서버·학습자 구현 소스는 main과 같다.
 
-최종 생성물 재생성 일치와 백업 복원 검사는 로컬 커밋 뒤 수행하고 별도 실행 결과에 기록한다.
+체크포인트a152f9d7의 생성물 재생성 일치와 self-contained Git bundle의 독립 bare 복원·tree/7개파일 일치·fsck를 확인했다. 마지막 요청 표시 보완은 후속 커밋으로 저장하고 동일 백업 폴더에 증분 bundle을 추가해 최종 HEAD까지 복원 검사한다. 최종 후속 검사 결과는 /Users/ds/research/javaExperience-course-learning-integration-20261024/FINAL-VERIFICATION.json 및 /Users/ds/backups/javaExperience/course-learning-integration-20261025/manifest.json에 기록한다.
 
 ## 확인할 화면과 남은 범위
 

@@ -91,3 +91,37 @@ test('저장소 자체가 없는 환경에서도 수동 연결은 유지하되 �
   assert.match(e.d.querySelector('[data-ca-context]').textContent,/42/);
   assert.match(e.d.querySelector('[data-ca-storage]').textContent,/저장소|이 화면/);e.dom.window.close();
 });
+
+test('전송 뒤 본문을 고쳐도 실제 보낸 본문을 보존하고 다른 입력의 응답임을 알린다',async()=>{
+  let finish;const sent='{"title":"<first>","content":"original"}';
+  const e=mount('D04-5',{fetchImpl:()=>new Promise(r=>{finish=r;})});
+  e.input('token','fixture-private');e.input('body',sent);e.send();
+  e.input('body','{"title":"new draft","content":"edited"}');
+  finish(reply(201,'',{Location:'/api/posts/42'}));await tick();
+  assert.equal(e.d.querySelector('[data-ca-sent-body]')?.textContent,sent);
+  assert.match(e.d.querySelector('[data-ca-verdict]').textContent,/전송 당시|현재 입력/);
+  assert.equal(e.d.querySelector('[data-ca-id]').value,'','새 초안에 예전 생성 id를 연결하지 않는다');
+  assert.equal(e.d.querySelectorAll('first').length,0);
+  assert.doesNotMatch(e.d.querySelector('[data-ca-last-request]').textContent,/fixture-private/);
+  assert.equal(e.w.sessionStorage.getItem(contextKey),null);e.dom.window.close();
+});
+
+test('전송 중 바꾼 커서 조건과 실제 요청 URL을 구분한다',async()=>{
+  let finish;const e=mount('D06-4',{fetchImpl:()=>new Promise(r=>{finish=r;})});
+  e.send();const size=e.d.querySelector('[data-ca-query="size"]');size.value='1';size.dispatchEvent(new e.w.Event('input',{bubbles:true}));
+  finish(reply(200,'{"items":[],"nextCursor":null}'));await tick();
+  assert.match(e.d.querySelector('[data-ca-sent-request]').textContent,/size=20/);
+  assert.match(e.d.querySelector('[data-ca-verdict]').textContent,/전송 당시|현재 입력/);
+  e.dom.window.close();
+});
+
+test('전송 중 인증 입력을 바꾸면 이전 인증으로 만든 글을 새 컨텍스트에 연결하지 않는다',async()=>{
+  let finish;const e=mount('D04-5',{fetchImpl:()=>new Promise(r=>{finish=r;})});
+  e.input('token','original-user');e.send();e.input('token','different-user');
+  finish(reply(201,'',{Location:'/api/posts/42'}));await tick();
+  assert.equal(e.w.sessionStorage.getItem(contextKey),null);
+  assert.equal(e.d.querySelector('[data-ca-id]').value,'');
+  assert.match(e.d.querySelector('[data-ca-verdict]').textContent,/전송 당시|현재 입력/);
+  assert.doesNotMatch(e.d.querySelector('[data-ca-last-request]').textContent,/original-user|different-user/);
+  e.dom.window.close();
+});

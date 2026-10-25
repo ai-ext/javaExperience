@@ -36,7 +36,7 @@ export function renderCourseApiWorkspace({ stepId } = {}) {
         <div class="ca-actions"><button data-ca-send type="submit" disabled>요청 전송</button><button data-ca-copy type="button" disabled>요청 복사 · 토큰 포함</button></div>
         <p data-ca-feedback role="status"></p><label for="${id('curl')}" data-ca-fallback hidden>요청 복사 대체 텍스트</label><textarea id="${id('curl')}" data-ca-curl readonly hidden></textarea>
       </form>
-      <section class="ca-response"><h4>실제 응답 · 마지막 전송</h4><p data-ca-status role="status">미실행</p><p data-ca-sent-request></p><pre data-ca-response>아직 요청하지 않았습니다.</pre><h5>읽을 수 있는 응답 헤더</h5><pre data-ca-headers>요청 후 표시합니다.</pre><p data-ca-verdict>상태·본문 형식 확인이며 자동 채점이 아닙니다.</p></section>
+      <section class="ca-response"><h4>실제 응답 · 마지막 전송</h4><p data-ca-status role="status">미실행</p><p data-ca-sent-request></p><details data-ca-last-request hidden><summary>실제 전송한 요청 본문</summary><pre data-ca-sent-body></pre></details><pre data-ca-response>아직 요청하지 않았습니다.</pre><h5>읽을 수 있는 응답 헤더</h5><pre data-ca-headers>요청 후 표시합니다.</pre><p data-ca-verdict>상태·본문 형식 확인이며 자동 채점이 아닙니다.</p></section>
     </div>
     <div class="ca-context"><p data-ca-context>연결한 글 id 없음</p>${selected.requiresId ? '' : idField}<button data-ca-remember type="button" disabled>입력한 id로 이어가기</button><p class="ca-context-note">직접 입력한 id는 서버에 존재하는지 확인한 값이 아닙니다. 생성 응답의 Location을 읽을 수 없으면 브라우저 Network의 기존 응답 헤더나 API 클라이언트에서 실제 id를 확인하세요. 복사한 POST를 다시 실행하면 새 글이 추가됩니다.</p><p data-ca-storage role="status"></p></div>
     <section class="ca-sql"><h4>DB는 직접 확인</h4><p>구현 예시의 테이블입니다. 내 스키마에 맞게 직접 실행하세요. 화면은 SQL을 실행하거나 완료를 판정하지 않습니다.</p><div data-ca-sql>${sqlMarkup}</div><ul data-ca-checks>${checks}</ul></section>

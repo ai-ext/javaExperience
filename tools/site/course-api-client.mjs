@@ -167,10 +167,14 @@ function mountCourseApiTools(doc, { fetchImpl, storage, clipboard } = {}) {
       try { request = makeRequest(contract, { base: get('base'), id: get('id'), body: get('body'), query: Object.fromEntries([...root.querySelectorAll('[data-ca-query]')].map(el => [el.dataset.caQuery, el.value])), token: get('token') }); }
       catch (error) { setText(root, 'feedback', error.message); return; }
       if (typeof sendFetch !== 'function') { setText(root, 'feedback', 'fetch를 사용할 수 없습니다.'); return; }
-      const snapshot = { contract, base: normalizeApiBase(get('base')), id: get('id'), request, body: get('body'), query: [...root.querySelectorAll('[data-ca-query]')].map(el => el.value) };
+      const snapshot = { contract, base: normalizeApiBase(get('base')), id: get('id'), token: get('token').trim(), request, body: get('body'), query: [...root.querySelectorAll('[data-ca-query]')].map(el => el.value) };
       pending = true;
       const sendButton = select(root, 'send'); if (sendButton) sendButton.disabled = true;
       const sent = select(root, 'sent-request'); if (sent) sent.textContent = `마지막 전송: ${request.method} ${request.url}`;
+      const sentBody = select(root, 'sent-body');
+      const lastRequest = select(root, 'last-request');
+      if (sentBody) sentBody.textContent = request.body === undefined ? '본문 없음' : request.body;
+      if (lastRequest) lastRequest.hidden = false;
       setText(root, 'status', '요청 중');
       setText(root, 'response', '응답 대기 중');
       setText(root, 'headers', '응답 헤더 대기 중');
@@ -197,7 +201,13 @@ function mountCourseApiTools(doc, { fetchImpl, storage, clipboard } = {}) {
         const responseNode = select(root, 'response'); if (responseNode) responseNode.textContent = raw;
         const verdict = evaluateApiResponse(snapshot.contract, { status: response.status, body: raw, location, requestUrl: snapshot.request.url });
         setText(root, 'verdict', verdict.note);
-        const stateChanged = safeOrigin(get('base')) !== snapshot.base || get('id') !== snapshot.id || contract !== snapshot.contract;
+        const currentQuery = [...root.querySelectorAll('[data-ca-query]')].map(el => el.value);
+        const stateChanged = safeOrigin(get('base')) !== snapshot.base
+          || get('id') !== snapshot.id
+          || get('token').trim() !== snapshot.token
+          || contract !== snapshot.contract
+          || (snapshot.contract.requestBody !== null && get('body') !== snapshot.body)
+          || (snapshot.contract.id === 'list' && currentQuery.some((value, index) => value !== snapshot.query[index]));
         if (stateChanged) setText(root, 'verdict', `${verdict.note} 응답은 전송 당시 입력에 대한 결과이며 현재 입력과 다를 수 있습니다.`);
         if (snapshot.contract.id === 'create' && verdict.createdId && !stateChanged) {
           const created = { version: 1, base: snapshot.base, id: verdict.createdId, provenance: 'location' };
