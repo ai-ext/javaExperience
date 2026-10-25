@@ -72,7 +72,13 @@ assert.match(d12MermaidModule.textContent, /startOnLoad:\s*false/);
 assert.match(d12MermaidModule.textContent, /mermaid@11\.4\.1/);
 assert.match(d12MermaidModule.textContent, /d12-source-diagrams\.mjs/);
 assert.match(otherMermaidHtml, /startOnLoad:\s*true/);
-assert.equal(doc.querySelector('.knowledge-reader-original .knowledge-chapters').outerHTML, baseline.querySelector('.knowledge-reader-original .knowledge-chapters').outerHTML);
+// 절 전환의 hidden 속성만 배치 상태로 제외한다. 나머지 원문 DOM·코드·앵커 대조는 그대로 유지한다.
+const sourceWithoutSelection = node => {
+  const copy = node.cloneNode(true);
+  copy.querySelectorAll('details.knowledge-chapter').forEach(chapter => chapter.removeAttribute('hidden'));
+  return copy.outerHTML;
+};
+assert.equal(sourceWithoutSelection(doc.querySelector('.knowledge-reader-original .knowledge-chapters')), sourceWithoutSelection(baseline.querySelector('.knowledge-reader-original .knowledge-chapters')));
 assert.deepEqual([...doc.querySelectorAll('.d12-original .mermaid')].map(node => node.textContent), [...baseline.querySelectorAll('.knowledge-reader-original .mermaid')].map(node => node.textContent));
 assert.equal(doc.querySelectorAll('.d12-original .mermaid').length, 3);
 assert.equal(doc.querySelector('.d12-legacy .knowledge-page-map').outerHTML, baseline.querySelector('.knowledge-page-map').outerHTML);

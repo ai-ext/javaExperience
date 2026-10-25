@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { renderSectionNavigation } from './site-navigation.mjs';
 import { JSDOM } from 'jsdom';
+import { initP09Learning } from './p09-learning.js';
 import { initCoreLearning } from './core-learning.js';
 import { initKnowledgeCatalog } from './knowledge-catalog-controller.mjs';
 import { mountServiceFeaturePages } from './service-feature-client.mjs';
@@ -15,6 +16,10 @@ export function renderInitialPage(html, sourcePath = 'README.md') {
   if(doc.querySelector('.kc-catalog')){
     initKnowledgeCatalog(doc,win);
     delete doc.querySelector('.kc-catalog').dataset.ready;
+  }
+  if(doc.querySelector('[data-p09-learning]')) {
+    initP09Learning(doc,win);
+    delete doc.querySelector('[data-p09-learning]').dataset.ready;
   }
   if(doc.querySelector('[data-knowledge-reader]')) {
     win.eval(reader + '\ninitKnowledgeReader(document, window);');
@@ -40,6 +45,11 @@ export function renderInitialPage(html, sourcePath = 'README.md') {
     mountServiceRequestTools(doc);
   }
   win.eval(switcher);doc.dispatchEvent(new win.Event('DOMContentLoaded'));
+  const lessonDefault = doc.querySelector('[data-concept-default]')?.dataset.conceptDefault;
+  if (lessonDefault) {
+    const button = [...doc.querySelectorAll('.section-switcher [data-section-target]')].find(item => item.dataset.sectionTarget === lessonDefault);
+    button?.click();
+  }
   const main=doc.querySelector('main');
   if(main)delete main.dataset.sectionViewsReady;
   const day=doc.querySelector('[data-day-page]');
@@ -60,6 +70,7 @@ export function renderInitialPage(html, sourcePath = 'README.md') {
   // 모든 문서에 동일한 바깥 틀을 만들고 기존 페이지 탐색을 같은 레일에 둔다.
   if(main){
     const frame=doc.createElement('div');frame.className='site-frame';
+    if (sourcePath.startsWith('docs/knowledge/') || sourcePath.startsWith('lessons/')) frame.classList.add('site-concept-frame');
     const sidebar=doc.createElement('aside');sidebar.className='site-frame-sidebar';sidebar.setAttribute('aria-label','영역 및 페이지 탐색');
     sidebar.innerHTML=renderSectionNavigation(sourcePath);
     const local=main.querySelector('.page-sidebar,.day-today');
@@ -89,6 +100,7 @@ export function renderInitialPage(html, sourcePath = 'README.md') {
   prepare.textContent=`(${prepareFirstPaint.toString()})(${JSON.stringify({panelMap,dayPanels,servicePanels,knowledgeCategories})});`;
   // 서비스 전용 보기는 다른 영역의 초기 렌더링 코드와 분리한다.
   if(doc.querySelector('[data-sf-catalog]')) prepare.textContent += `;(${prepareServiceCatalogFirstPaint.toString()})();`;
+  if (doc.querySelector('.kc-catalog')) prepare.textContent += `;(${prepareConceptPanel.toString()})(${JSON.stringify(panelMap)});`;
   doc.head.append(prepare);
   const release=doc.createElement('script');release.textContent="document.getElementById('first-paint-state')?.stopEarlySelection?.();document.getElementById('first-paint-state')?.remove();";doc.body.append(release);
   const fallback=doc.createElement('noscript');
@@ -145,4 +157,27 @@ function prepareServiceCatalogFirstPaint() {
   const api=location.hash==='#journey-all-apis';
   style.textContent+=`html.js body main [data-sf-catalog] .sf-feature-list{display:${api?'none':'block'}!important}html.js body main [data-sf-catalog] .sf-api-explorer{display:${api?'block':'none'}!important}`;
   if(location.hash!=='#visual-catalog')style.textContent+='html.js body main [data-sf-catalog] .sf-card-preview{display:none!important}';
+}
+
+// 개념 목록에만 넣는다. 다른 대주제의 초기 HTML과 스크롤 계약은 그대로 둔다.
+function prepareConceptPanel(panelMap) {
+  let id = ''; try { id = decodeURIComponent(location.hash.slice(1)); } catch {}
+  if (!['kc-browse-view','kc-sequence','kc-original'].includes(id) || !panelMap[id]) return;
+  const originalHash = location.hash;
+  window.__javaExperienceConceptHash = originalHash;
+  history.replaceState(history.state, '', location.pathname + location.search);
+  const style = document.getElementById('first-paint-state');
+  style.textContent += `html.js body main [data-section-panel]:not(#${id}):not(:has(#${id})):not(#${id} [data-section-panel]){display:none!important}html.js body main #${id}{display:block!important}${id === 'kc-browse-view' ? '' : 'html.js body main .page-sidebar-filters{display:none!important}'}`;
+  const select = () => {
+    for (const button of document.querySelectorAll('.section-switcher [data-section-target]')) {
+      const selected = button.dataset.sectionTarget === id;
+      button.setAttribute('aria-selected', String(selected)); button.tabIndex = selected ? 0 : -1;
+    }
+  };
+  const observer = new MutationObserver(select); observer.observe(document, {childList:true, subtree:true});
+  style.stopEarlySelection = () => observer.disconnect(); select();
+  window.addEventListener('load', () => {
+    history.replaceState(history.state, '', location.pathname + location.search + originalHash);
+    delete window.__javaExperienceConceptHash;
+  }, {once:true});
 }
