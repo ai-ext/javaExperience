@@ -23,7 +23,9 @@ export function siteSection(sourcePath) {
 export function renderSiteNavigation(sourcePath) {
   const current = siteSection(sourcePath);
   const href = (target) => path.posix.relative(path.posix.dirname(sourcePath), target);
-  const links = spaces.map(({ label, target }) => `<a href="${href(target)}"${label === current ? ' aria-current="page"' : ''}>${label}</a>`).join('');
+  const study = /^course\/(?:spring\/D\d{2}|java\/J\d{2}|tickets\/)/.test(sourcePath);
+  const items = spaces.map(({ label, target }) => `<a href="${href(target)}"${label === current ? ' aria-current="page"' : ''}>${label}</a>`);
+  const links = study ? items.slice(0, 2).join('') + `<details class="study-library"><summary>자료 찾아보기</summary><div class="study-library-links">${items.slice(2).join('')}</div></details>` : items.join('');
   const setup = current === '홈' ? '<a class="home-header-setup" href="#home-environment">개발 환경 ↗</a>' : '';
   const courseItems = [
     ['가이드 · 과정 안내', 'course/README.html', sourcePath === 'course/README.md'],
@@ -34,7 +36,7 @@ export function renderSiteNavigation(sourcePath) {
   ];
   const courseNav = sourcePath.startsWith('course/') || sourcePath === 'README.md'
     ? `<nav class="course-content-nav" aria-label="과정 콘텐츠 종류">${courseItems.map(([label, target, active]) => `<a href="${href(target)}"${active ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav>` : '';
-  return `<header class="topbar site-topbar"><a class="home-brand" href="${href('index.html')}"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴">${links}</nav>${setup}${courseNav}</header>`;
+  return `<header class="topbar site-topbar${study ? ' study-topbar' : ''}"><a class="home-brand" href="${href('index.html')}"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴">${links}</nav>${setup}${courseNav}</header>`;
 }
 
 const catalogNames = {

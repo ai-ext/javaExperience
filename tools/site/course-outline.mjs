@@ -37,12 +37,16 @@ function appendScheduleContinuation(doc, source, table, headings) {
 
 function renderOutline(doc, table, headings) {
   const flow = doc.createElement('ol');
-  flow.className = 'course-outline';
+  const schedule = headings.some(label => /^(일|일자)$/.test(label));
+  flow.className = 'course-outline' + (schedule ? ' outline-schedule' : '');
+  flow.dataset.columns = headings.length;
   if (table.id) flow.id = table.id;
   flow.setAttribute('aria-label', headings.some(label => /^(일|일자)$/.test(label)) ? '일자별 과정 흐름' : '과정 단계 흐름');
   for (const row of table.querySelectorAll('tbody tr')) {
     const item = doc.createElement('li');
     if (row.id) item.id = row.id;
+    const day = row.children[0]?.textContent.match(/D(\d+)/);
+    if (schedule && day) { const n = Number(day[1]); item.dataset.phase = n === 0 ? 'warmup' : n <= 10 ? 'build' : n <= 14 ? 'maintain' : n === 15 ? 'wrap' : 'extend'; }
     [...row.children].forEach((cell, index) => {
       const field = doc.createElement(index === 0 ? 'h3' : 'p');
       if (cell.id) field.id = cell.id;
@@ -53,8 +57,19 @@ function renderOutline(doc, table, headings) {
     });
     flow.append(item);
   }
+  if (schedule) {
+    const legend = doc.createElement('div');
+    legend.className = 'outline-head';
+    legend.dataset.columns = headings.length;
+    legend.setAttribute('aria-hidden', 'true');
+    headings.forEach(text => { const label = doc.createElement('span'); label.textContent = text; legend.append(label); });
+    table.before(legend);
+  }
   const parent = table.parentElement;
-  if (parent.classList.contains('table-wrap') && parent.children.length === 1) parent.replaceWith(flow);
+  if (parent.classList.contains('table-wrap') && parent.children.length === (schedule ? 2 : 1)) {
+    const legend = parent.querySelector(':scope > .outline-head');
+    if (legend) parent.replaceWith(legend, flow); else parent.replaceWith(flow);
+  }
   else table.replaceWith(flow);
 }
 
@@ -127,6 +142,23 @@ export function renderCourseOutline(source, html) {
       heading.before(section);
       section.append(heading);
       while (section.nextElementSibling && !section.nextElementSibling.matches('h2')) section.append(section.nextElementSibling);
+    }
+  }
+  if (type.kind === 'overview') {
+    const schedule = content.querySelector('.outline-schedule');
+    if (schedule && schedule.children.length > 20) {
+      const overview = doc.createElement('div');
+      overview.className = 'overview-phases';
+      overview.innerHTML = '<a href="spring/README.html"><b>01 · D01–D10</b><strong>서버 만들기</strong><span>인증·게시글·상점·외부 연동</span></a><a href="spring/README.html"><b>02 · D11–D15</b><strong>인수인계·설명</strong><span>필수 티켓·선택 과제·회고</span></a><a href="spring/README.html"><b>03 · D16–D45</b><strong>설계·운영·독립 수행</strong><span>업무 변경·배포·새 장애 진단</span></a>';
+      const details = doc.createElement('details');
+      details.className = 'overview-schedule';
+      const summary = doc.createElement('summary');
+      summary.textContent = '전체 46개 일정과 Java·말하기 수 확인';
+      const header = schedule.previousElementSibling?.classList.contains('outline-head') ? schedule.previousElementSibling : null;
+      schedule.before(overview, details);
+      details.append(summary);
+      if (header) details.append(header);
+      details.append(schedule);
     }
   }
   layout.append(rail, content);
