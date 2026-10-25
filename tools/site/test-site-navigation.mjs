@@ -66,6 +66,9 @@ if (process.argv.includes('--generated')) {
     const html = fs.readFileSync(new URL(source.replace(/\.md$/, '.html'), root), 'utf8');
     const header = html.match(/<header class="topbar[^"\n]*">[\s\S]*?<\/header>/)?.[0];
     assert.equal(header, renderSiteNavigation(source), `${source}: 생성된 메뉴·선택 상태 일치`);
+    const dom = new JSDOM(html);
+    assert.equal(dom.window.document.querySelectorAll('script[src*="tools/site/syntax-highlight.js"]').length, 1, `${source}: syntax-highlight.js 단일 등록`);
+    dom.window.close();
   }
   assert.equal(fs.readFileSync(new URL('index.html', root), 'utf8'), fs.readFileSync(new URL('README.html', root), 'utf8'), '홈 진입 두 경로 일치');
   for (const [source, expected] of [['scenario/README.md', '서비스 만들기'], ['practice/MISSIONS.md', '실전 미션'], ['docs/knowledge/README.md', '개념 학습']]) {

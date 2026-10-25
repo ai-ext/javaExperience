@@ -1,0 +1,27 @@
+plugins { id 'java' }
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+dependencies {
+    implementation platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'com.h2database:h2'
+}
+sourceSets.main.java {
+    srcDirs = ['../original', '../corrected', '../probe']
+    exclude { detail -> detail.file.parentFile.name == 'original' && detail.file.name == 'OrderResponse.java' }
+}
+tasks.register('recordDependencies') {
+    doLast {
+        def rows = configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts.collect {
+            [coordinate:it.moduleVersion.id.toString(),file:it.file.absolutePath,sha256:java.security.MessageDigest.getInstance('SHA-256').digest(it.file.bytes).encodeHex().toString()]
+        }
+        file('../dependencies.json').text=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(rows))+'\n'
+    }
+}
+tasks.register('runProof', JavaExec) {
+    dependsOn classes
+    classpath=sourceSets.main.runtimeClasspath
+    mainClass='example.shop.probe.P20Proof'
+    args=[file('../').absolutePath]
+}

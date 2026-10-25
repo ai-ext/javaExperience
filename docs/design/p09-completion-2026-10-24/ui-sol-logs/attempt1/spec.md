@@ -1,0 +1,22 @@
+# P09 UI spec 독립 검수
+
+판정: PASS, C0 / I0 / M0.
+
+- SPEC.md/PLAN.md/IMPLEMENTATION.md 전문 및 실제 AGENTS.md 대조
+- 기존 data20질문84상태·기존 asset44개 객체 전체 HEAD 동등; authoring 질문27/history168행 고유84 보존
+- 새2질문9상태 코드·모든 values·강조·JPG 경로·actual13에 직접 연결
+- sourceFragments ordered 절/열 exact byte 비교; 문자열 리터럴 값 무정규화
+- RequestState 필드/대입/현재까지 호출·sum 전체5줄·choose 양 선언/선택 선언+호출 기본노출
+- 전체Java/raw13 별도명확details, 기존 sourceRoot 밖, 원문 sourceRoot HTML byte 동일
+- 9상태 history 초기/ popstate 복원·기존 query/foreign state/기본reference 유지
+- test:p09/reader/dark/diff-check 모두 독립 실행 exit0
+- write:false esbuild 재생성 bundle byte 동일·renderP09Learning 생성markup actual HTML 동등
+- 사전dirty2·historicalProof1366·초기24review·원문135·learner17 보존 mismatch0
+
+한계:
+
+- 실제PC 1366이상 9상태 시각·확대·스크롤·정상OS clipboard는 parent 별도 관문
+- build 전체 재실행은 제품파일 변경금지 때문에 하지 않음; bundle은 write:false로 재생성 비교
+- native Java/JPG 검증은 independent-proof-review에 승인된 별도 증거이며 이번 검수에서 다시 실행하지 않음
+- 새모바일/라이트/D11/inventory는 이번 범위 밖
+- P09전체/24전체/134전체 완료 판정 아님

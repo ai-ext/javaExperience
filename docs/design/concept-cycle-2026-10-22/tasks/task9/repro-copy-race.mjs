@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {JSDOM} from '../../../../../tools/site/node_modules/jsdom/lib/api.js';
+import {renderW11Learning} from '../../../../../tools/site/w11-learning.mjs';
+import {initW11Learning} from '../../../../../tools/site/w11-learning.js';
+const page=new JSDOM(renderW11Learning(),{url:'https://learn.example/W11.html'}),win=page.window,d=win.document;
+win.matchMedia=()=>({matches:false,addEventListener(){}});
+let complete;const writes=[];
+Object.defineProperty(win.navigator,'clipboard',{value:{writeText(value){writes.push(value);return new Promise(resolve=>{complete=resolve;});}}});
+initW11Learning(d,win);
+d.querySelector('[data-w11-copy]').click();
+const topic=d.querySelector('[data-w11-topic]');topic.value='service';topic.dispatchEvent(new win.Event('change'));
+d.querySelector('[data-w11-stage="service-failure"]').click();
+complete();await Promise.resolve();await Promise.resolve();
+const result={reproducedAtUTC:new Date().toISOString(),initialStage:'repository-insert',currentStage:d.querySelector('[data-w11-learning]').dataset.stage,clipboardTextIsCurrentCode:writes[0]===d.querySelector('[data-w11-code]').textContent,currentStatus:d.querySelector('[data-w11-copy-status]').textContent};
+assert.equal(result.clipboardTextIsCurrentCode,false);assert.equal(result.currentStatus,'코드를 복사했습니다.');
+fs.writeFileSync(new URL('copy-race.json',import.meta.url),JSON.stringify(result,null,2)+'\n');
+console.log(JSON.stringify(result));win.close();

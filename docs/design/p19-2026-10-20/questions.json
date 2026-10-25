@@ -1,0 +1,260 @@
+{
+  "source": "docs/knowledge/P19-mysql-jpa-setup.md",
+  "sourceSHA256": "378a8c986a8fe4f70c9569f364fdda3258fcd9ac6057bea08e1420d44869f321",
+  "questions": [
+    {
+      "id": "ports",
+      "question": "앱을 어디서 실행하느냐에 따라 MySQL 주소가 달라질까?",
+      "source": "원문 §2.2 / §7 Q3 · 원문 설정 설명 · MySQL 미실행",
+      "note": "3307:3306은 원문 Compose의 예제 값입니다. 현재 저장소 Compose 기본값 13308과 별개입니다. 호스트 포트와 컨테이너 내부 포트를 구분합니다. 이 세 장면은 접속 실행 로그가 아닌 설정 설명입니다. 원문의 Java 25·MySQL 전체 구성과 Docker·HTTP·Actuator는 미실행입니다. 추가 H2의 MODE=MySQL은 MySQL 서버를 실행했다는 뜻이 아닙니다.",
+      "stages": [
+        {
+          "id": "ports-host",
+          "title": "호스트 앱은 매핑된 3307로",
+          "image": "P19-ports-v2.png",
+          "checks": [],
+          "dependencies": []
+        },
+        {
+          "id": "ports-compose",
+          "title": "같은 Compose 앱은 mysql:3306",
+          "image": "P19-ports-v2.png",
+          "checks": [],
+          "dependencies": []
+        },
+        {
+          "id": "ports-localhost",
+          "title": "앱 컨테이너 localhost는 자기 자신",
+          "image": "P19-ports-v2.png",
+          "checks": [],
+          "dependencies": []
+        }
+      ],
+      "evidence": [
+        "docs/design/p19-2026-10-20/source-proof/execution.json",
+        "docs/design/p19-2026-10-20/source-proof/dependency-cases.json",
+        "docs/design/p19-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "boot-h2",
+      "question": "Boot가 실제로 구성한 연결과 저장 결과는 무엇일까?",
+      "source": "추가 P19Proof · Boot 4.1.1 non-web / JDK 21 / H2 2.4.240 / Hibernate 7.4.5.Final / HikariCP 7.0.2",
+      "note": "원문 Java 소스 파일 4개에 추가 H2 설정을 적용했습니다. 성공 경로의 스키마는 Boot 시작 전에 별도 JDBC로 만들었고 ddl-auto=validate를 사용했습니다. CamelCaseToUnderscoresNamingStrategy 클래스는 실제 JAR에 있으며 이 추가 설정에서 동작했습니다. 원문의 Java 25·MySQL 전체 구성과 Docker·HTTP·Actuator는 미실행입니다. 추가 H2의 MODE=MySQL은 MySQL 서버를 실행했다는 뜻이 아닙니다. JSON 객체 키 순서는 의미상의 필드 계약과 별개입니다. 이 실험은 ORM SQL문·쿼리 수를 계측하지 않았습니다.",
+      "stages": [
+        {
+          "id": "boot-start",
+          "title": "추가 H2로 non-web 부팅",
+          "image": "P19-boot-h2-v4.png",
+          "checks": [
+            "boot-configures-hikari",
+            "driver-inferred-h2",
+            "additional-pool-max-two",
+            "original-naming-strategy-class-present"
+          ],
+          "dependencies": []
+        },
+        {
+          "id": "boot-create",
+          "title": "Controller를 Java로 직접 호출",
+          "image": "P19-boot-h2-v4.png",
+          "checks": [
+            "direct-controller-identity-id",
+            "direct-controller-display-name"
+          ],
+          "dependencies": []
+        },
+        {
+          "id": "boot-list",
+          "title": "같은 repository에서 한 건 조회",
+          "image": "P19-boot-h2-v4.png",
+          "checks": [
+            "repository-list-one"
+          ],
+          "dependencies": []
+        },
+        {
+          "id": "boot-observer",
+          "title": "별도 JDBC 행과 JSON 프로퍼티 비교",
+          "image": "P19-boot-h2-v4.png",
+          "checks": [
+            "customer-json",
+            "separate-jdbc-row"
+          ],
+          "dependencies": []
+        }
+      ],
+      "evidence": [
+        "docs/design/p19-2026-10-20/source-proof/execution.json",
+        "docs/design/p19-2026-10-20/source-proof/dependency-cases.json",
+        "docs/design/p19-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "validate",
+      "question": "validate는 없는 테이블도 만들어 줄까?",
+      "source": "추가 P19Proof · Boot 4.1.1 non-web / JDK 21 / H2 2.4.240 / Hibernate 7.4.5.Final / HikariCP 7.0.2 · 서로 다른 추가 H2 DB 두 개",
+      "note": "p19_missing과 p19_ready는 다른 추가 메모리 DB입니다. validate가 스키마를 만들었다고 해석하지 않습니다. p19_ready의 테이블은 원문 CREATE TABLE 문을 Boot 시작 전에 명시 JDBC로 실행해 만들었습니다. 원문의 Java 25·MySQL 전체 구성과 Docker·HTTP·Actuator는 미실행입니다. 추가 H2의 MODE=MySQL은 MySQL 서버를 실행했다는 뜻이 아닙니다.",
+      "stages": [
+        {
+          "id": "validate-missing",
+          "title": "없는 테이블은 부팅 실패",
+          "image": "P19-validate-v2.png",
+          "checks": [
+            "validate-missing-table-reject",
+            "validate-did-not-create-table"
+          ],
+          "dependencies": []
+        },
+        {
+          "id": "validate-ready",
+          "title": "먼저 DDL 실행 후 검사 통과",
+          "image": "P19-validate-v2.png",
+          "checks": [
+            "boot-configures-hikari",
+            "separate-jdbc-row"
+          ],
+          "dependencies": []
+        }
+      ],
+      "evidence": [
+        "docs/design/p19-2026-10-20/source-proof/execution.json",
+        "docs/design/p19-2026-10-20/source-proof/dependency-cases.json",
+        "docs/design/p19-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "pool",
+      "question": "연결 한 개를 빌린 동안 다음 thread는 어떻게 될까?",
+      "source": "독립 추가 P19AdditionalPool · HikariCP 7.0.2 / H2 / JDK 21",
+      "note": "이 풀은 앞의 Boot max=2 풀과 별개입니다. 추가 maximumPoolSize=1·connectionTimeout=250ms는 원문 10·30000ms와 다릅니다. 250ms는 대기 상한 설정값이며 측정한 SQL 시간이나 연결 지연시간이 아닙니다. 그림 Caller·conn 번호는 설명 기호입니다. waiting은 연결 수가 아니라 연결을 기다리는 thread 수입니다. timeout 순간의 카운터 스냅샷은 기록하지 않았습니다.",
+      "stages": [
+        {
+          "id": "pool-idle",
+          "title": "준비된 연결 한 개는 idle",
+          "image": "P19-pool-v2.png",
+          "checks": [
+            "pool-idle-one"
+          ],
+          "dependencies": []
+        },
+        {
+          "id": "pool-borrowed",
+          "title": "한 호출자가 유일한 연결 대여",
+          "image": "P19-pool-v2.png",
+          "checks": [
+            "pool-borrowed-one"
+          ],
+          "dependencies": []
+        },
+        {
+          "id": "pool-waiting",
+          "title": "다른 thread는 반환을 기다림",
+          "image": "P19-pool-v2.png",
+          "checks": [
+            "pool-waiting-one"
+          ],
+          "dependencies": []
+        },
+        {
+          "id": "pool-timeout",
+          "title": "대기 호출은 예외로 종료",
+          "image": "P19-pool-v2.png",
+          "checks": [
+            "pool-timeout-fails"
+          ],
+          "dependencies": []
+        },
+        {
+          "id": "pool-returned",
+          "title": "close하면 풀에 반환",
+          "image": "P19-pool-v2.png",
+          "checks": [
+            "pool-close-returns-idle"
+          ],
+          "dependencies": []
+        }
+      ],
+      "evidence": [
+        "docs/design/p19-2026-10-20/source-proof/execution.json",
+        "docs/design/p19-2026-10-20/source-proof/dependency-cases.json",
+        "docs/design/p19-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "dependencies",
+      "question": "원문 의존성은 모두 같은 상태로 resolve될까?",
+      "source": "추가 Boot 4.1.1 BOM 의존성 조회 · dependency-cases.json / dependencies.json",
+      "note": "의존성 resolve 성공과 앱·테스트 실행 성공은 별개입니다. web starter는 deprecated 경로이지만 resolve되며 일반 starter-test가 제거된 것은 아닙니다. 원문 main 구성과 추가 실행 구성도 구분합니다. 아래 목록은 별도 Gradle resolved 결과이며 MySQL·Docker 실행 기록이 아닙니다.",
+      "stages": [
+        {
+          "id": "dependency-starters",
+          "title": "web과 일반 test starter는 resolve",
+          "image": "P19-dependencies-v2.png",
+          "checks": [],
+          "dependencies": [
+            "originalWeb",
+            "originalTest"
+          ]
+        },
+        {
+          "id": "dependency-testcontainers",
+          "title": "MySQL 모듈 좌표는 별도 확인",
+          "image": "P19-dependencies-v2.png",
+          "checks": [],
+          "dependencies": [
+            "originalMysqlTest",
+            "correctedMysqlTest"
+          ]
+        },
+        {
+          "id": "dependency-h2",
+          "title": "H2 프로파일에는 H2 classpath도 필요",
+          "image": "P19-dependencies-v2.png",
+          "checks": [],
+          "dependencies": [
+            "originalMain",
+            "additionalRuntime"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/p19-2026-10-20/source-proof/execution.json",
+        "docs/design/p19-2026-10-20/source-proof/dependency-cases.json",
+        "docs/design/p19-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "tc-type",
+      "question": "이 MySQLContainer에 <?>와 <>를 붙일 수 있을까?",
+      "source": "추가 실제 Testcontainers 2.0.5 타입 조회 + JDK 21 compile-only 검사",
+      "note": "org.testcontainers.mysql.MySQLContainer의 실제 타입과 작은 별도 TypeCase를 확인했습니다. 원문 테스트 전체를 실행한 것이 아닙니다. MySQL 컨테이너는 미시작이며 전체 JUnit은 미실행입니다. 컴파일 성공을 Docker·MySQL 접속 성공으로 표시하지 않습니다.",
+      "stages": [
+        {
+          "id": "tc-generic",
+          "title": "실제 타입에는 매개변수가 없음",
+          "image": "P19-tc-type-v2.png",
+          "checks": [
+            "tc2-mysql-no-type-parameters",
+            "tc2-original-generic-reject"
+          ],
+          "dependencies": []
+        },
+        {
+          "id": "tc-nongeneric",
+          "title": "별도 non-generic 소스는 compile 성공",
+          "image": "P19-tc-type-v2.png",
+          "checks": [
+            "tc2-nongeneric-compiles"
+          ],
+          "dependencies": []
+        }
+      ],
+      "evidence": [
+        "docs/design/p19-2026-10-20/source-proof/execution.json",
+        "docs/design/p19-2026-10-20/source-proof/dependency-cases.json",
+        "docs/design/p19-2026-10-20/browser-all-states.json"
+      ]
+    }
+  ]
+}

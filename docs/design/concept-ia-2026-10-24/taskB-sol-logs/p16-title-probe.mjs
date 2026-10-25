@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {JSDOM} from '../../../../tools/site/node_modules/jsdom/lib/api.js';
+const file='docs/knowledge/P16-json-jackson-practical.html';
+const css=fs.readFileSync('tools/site/p16-json-visual.css','utf8');
+const make=html=>new JSDOM('<style>'+css+'</style>'+html);
+const before=make(execFileSync('git',['show','HEAD:'+file],{encoding:'utf8'}));
+const after=make(fs.readFileSync(file,'utf8'));
+const take=dom=>{const h=dom.window.document.querySelector('#p16-heading'),s=dom.window.getComputedStyle(h);return {html:h.outerHTML,className:h.className,position:s.position,width:s.width,height:s.height,clipPath:s.clipPath};};
+const result={head:take(before),current:take(after),expected:'실제 scene 제목 #p16-heading에 원문 숨김 전용 class가 없어야 함'};
+fs.writeFileSync('docs/design/concept-ia-2026-10-24/taskB-sol-logs/attempt2/p16-title-probe.json',JSON.stringify(result,null,2)+'\n');
+console.log(JSON.stringify(result,null,2));
+assert.equal(after.window.document.querySelector('#p16-heading').classList.contains('p16-original-title'),false,'실제 P16 장면 제목에 원문 숨김 class가 붙음');
