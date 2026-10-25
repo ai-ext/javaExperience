@@ -38,7 +38,7 @@
           ],
           "brief": {
             "purpose": "외부 PG 응답 지연·거절·연결 실패를 구분하면서 충전 요청 중복과 이중 승인을 막습니다.",
-            "task": "요청을 먼저 기록하고 PG 호출을 DB 트랜잭션 밖에서 수행하세요. 같은 멱등 키 재요청, 거절, 응답 시간 초과, 결과 확인을 나눠 기록합니다.",
+            "task": "충전 요청 접수, PG callback, 포인트 반영을 차례로 확인하고 접수 응답과 지급 완료를 구분합니다.",
             "preconditions": [
               "USER JWT와 충전 요청이 필요하다. 외부 PG는 WireMock, 지연 주입은 Toxiproxy로 검증한다. 실제 PG secret/credentials는 사용하지 않는다.",
               "Idempotency-Key는 8~64자의 영문·숫자·하이픈이며 충전 amount는 1,000~1,000,000의 1,000 단위다."
@@ -89,7 +89,9 @@
               "원문 완료 기준: 재현 테스트 통과: WireMock 첫 응답이 늦어도 PG 승인 1건, 포인트 1회",
               "원문 완료 기준: 원인 서술: 누가 왜 다시 보냈고, PG는 왜 두 번째 요청을 별개의 결제로 받았는가",
               "원문 완료 기준: 재현 테스트: 첫 승인 응답이 늦는 PG 모의로 충전 한 번을 보낸 뒤, 결과 불명 건을 재처리(`ChargeService.reconcile`)로 확정해도 PG 승인 1건·충전 원장 1건·잔액 1회분인지 보는 테스트(결함 상태에서 실패 → 수정 후 통과). 예: `src/test/java/com/example/board/payment/ChargeIdempotencyTest.java`",
-              "원문 완료 기준: 수정 diff"
+              "원문 완료 기준: 수정 diff",
+              "201은 충전 요청 접수이며 지급 완료가 아닙니다. 202도 결과 확정으로 표시하지 않습니다. 성공·실패 callback 뒤 pg_payment 상태, balance, CHARGE ledger를 각각 조회해 최종 반영을 확인합니다.",
+              "PG가 명시적으로 거절하면 FAILED로 기록하고 balance 및 CHARGE ledger는 변하지 않습니다. 결과를 알 수 없는 timeout은 UNKNOWN이며 같은 Idempotency-Key 재전송으로 PG 중복 호출을 만들지 않습니다. B10 결함 관찰은 정상 완료 정책과 분리합니다."
             ],
             "inputs": [
               "POST /api/me/points/charges JSON `{\"amount\":1000}`, header `Idempotency-Key: charge-0001`, USER Bearer token.",
@@ -208,7 +210,7 @@
           ],
           "brief": {
             "purpose": "PG 콜백을 HMAC 서명으로 확인해 UNKNOWN 충전 결과를 확정하고 중복 콜백에서도 포인트를 한 번만 적립합니다.",
-            "task": "요청 본문 원문 바이트의 서명을 검증한 뒤 orderId와 paymentKey에 맞는 충전 상태만 전이시키세요. 정상 재전송과 변조·미등록 주문을 확인합니다.",
+            "task": "서명된 callback으로 충전 결과를 확정하고 pg_payment·잔액·CHARGE ledger를 각각 대조합니다.",
             "preconditions": [
               "UNKNOWN인 pg_payment의 실제 orderId·요청 amount와 BOARD_PG_SECRET 설정이 필요하다. secret은 로그·파일·수업 답안에 출력하지 않는다.",
               "콜백 body 원문 byte array와 동일 바이트로 계산한 X-PG-Signature를 준비한다. B13은 D14 선택 Security 후보다."

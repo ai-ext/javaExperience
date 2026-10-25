@@ -2,7 +2,7 @@
   "version": 1,
   "id": "legacy-runtime",
   "title": "커뮤니티와 명세 프로젝트 실행 준비하기",
-  "summary": "0장 여덟 단계를 하나의 실행 흐름으로 묶어 route·path/query/header/body, DTO·Java type, annotation, stack trace, Gradle/YAML, Lombok, response JSON을 확인한다.",
+  "summary": "서버 실행·종료·재시작 뒤에도 준비 상태와 기존 API 응답이 유지되는지 확인합니다.",
   "difficulty": "기초",
   "prerequisites": [],
   "stages": [
@@ -36,7 +36,7 @@
           ],
           "brief": {
             "purpose": "0장 여덟 단계를 하나의 실행 흐름으로 묶어 route·path/query/header/body, DTO·Java type, annotation, stack trace, Gradle/YAML, Lombok, response JSON을 확인한다.",
-            "task": "원문에 있는 /api/start routes를 실제 요청하고 각 입력 위치와 응답 필드를 확인한다. 정확한 200/400/404/415 case를 recipe별로 비교한다.",
+            "task": "커뮤니티 앱을 실행해 준비 상태와 각 요청의 응답을 확인하고, 잘못된 route·입력은 정해진 오류로 돌려보냅니다.",
             "preconditions": [
               "community-board 서버와 원문 compose MySQL을 실행한다. 0-6 GET config 결과로 app 설정이 반영됐는지 본다.",
               "legacy:0-1..0-8 recipe를 선택해 id·path·request body를 원문 그대로 보낸다."
@@ -80,7 +80,8 @@
               "0-3 path/query/header/body는 각각 path=7, q=spring, X-Client=javaExperience, body={title:첫 요청,tags:[java,spring],extra:덤}; DTO mapping은 extra를 보존/제거하는 source case 차이를 관찰한다.",
               "JSON 숫자 age=20/15는 숫자로 보내고 \"스무살\" 문자열은 400. request DTO validation 실패는 저장 전 응답으로 처리한다.",
               "Gradle 의존성·YAML application 설정은 실제 프로젝트 파일에서 확인한다. Lombok annotation 사용이 생성하는 DTO getter/constructor와 Java type/method signature를 컴파일 결과와 연결한다.",
-              "404는 등록하지 않은 route/없는 resource를 구분한다. 0-2 `/api/start/pong`은 원문 recipe의 404이며 임의 경로를 만들지 않는다."
+              "404는 등록하지 않은 route/없는 resource를 구분한다. 0-2 `/api/start/pong`은 원문 recipe의 404이며 임의 경로를 만들지 않는다.",
+              "`GET /api/start/pong`은 0-2에 정의된 없는 route이므로 404입니다. 0-3 echo에서 필수 q가 없으면 400입니다. 두 요청은 저장 데이터를 바꾸지 않습니다."
             ],
             "inputs": [
               "GET /api/start/hello?name=김자바; GET /api/start/hello.",
@@ -381,16 +382,16 @@
           ],
           "brief": {
             "purpose": "spec-board 전용 DB·Flyway·공통 응답을 실행 확인해 커뮤니티 과정과 다른 project 설정 경계를 세운다.",
-            "task": "별도 application 설정을 확인하고 GET /api/v1/health 및 없는 route의 status와 ApiResponse envelope를 대조한다.",
+            "task": "명세 프로젝트를 실행하고 DB migration 적용 전후의 상태를 확인한 뒤 재기동해 결과를 비교합니다.",
             "preconditions": [
               "legacy 10장 spec-board용 project DB를 사용한다. community-board DB·application.yml과 합치지 않는다.",
               "10-1/10-2의 실제 health 경로·Flyway 설정·오류 envelope를 확인한다."
             ],
             "scenario": [
               {
-                "start": "앱 시작 전 datasource DB명과 flyway_schema_history version을 기록한다.",
-                "action": "spec-board를 띄우고 GET /api/v1/health와 원문 없는 경로 GET /api/v1/no-such-path를 요청한다.",
-                "result": "health 성공은 {status,message,data}; route 실패는 {status,message,code,errors,data:null} 형식으로 구분된다.",
+                "start": "원문에 지정된 명세 프로젝트와 DB 설정을 준비합니다.",
+                "action": "프로젝트를 시작해 제공된 정상·실패 요청을 호출하고, migration history를 기록한 뒤 재시작합니다.",
+                "result": "정상 요청은 원문 status와 JSON 필드를 반환하고 없는 route는 404, 잘못된 method는 계약이 정한 오류를 반환합니다. 재기동 전후 migration history가 유지됩니다.",
                 "after": "서버 재기동 후 같은 health와 schema version을 다시 확인한다."
               }
             ],
