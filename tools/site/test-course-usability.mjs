@@ -78,3 +78,66 @@ test('직접 만든 흐름의 번호는 일반 절차 목록 스타일과 겹치
  assert.match(dom.window.document.querySelector('.task-visual').textContent,/List<Post>/);
  dom.window.close();
 });
+
+test('일자 카드 진도는 선택 티켓과 저장 기록을 포함하고 원래 분모를 따른다', async () => {
+ const dom=open('course/spring/README.html');
+ dom.window.localStorage.setItem(KEY,JSON.stringify({version:1,steps:{'D05-1':true,'D05-2':true,'D14-1':true},selectedTicket:'B12'}));
+ await ready(dom);
+ const doc=dom.window.document;
+ assert.equal(doc.querySelectorAll('.schedule-card').length,46);
+ assert.equal(doc.querySelector('[data-schedule-count="D05"]').textContent,'구현 2/6');
+ const data=JSON.parse(doc.getElementById('course-schedule-data').textContent);
+ const day=data.find(day=>day.id==='D14');
+ const expected=day.steps.filter(step=>!step.extra||step.choiceTickets.includes('B12'));
+ assert.equal(doc.querySelector('[data-schedule-count="D14"]').textContent,`구현 1/${expected.length}`);
+ dom.window.close();
+});
+
+test('선택 티켓은 단일 Tab 정지점에서 방향키·Home·End로 선택하고 저장한다', async () => {
+ const dom=open('course/spring/D11.html'); await ready(dom);
+ const doc=dom.window.document, choice=doc.querySelector('[data-ticket-choice]');
+ const press=key=>choice.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key,bubbles:true,cancelable:true}));
+ assert.equal(choice.tabIndex,0);
+ const nativeOpen=new dom.window.KeyboardEvent('keydown',{key:'ArrowDown',altKey:true,bubbles:true,cancelable:true});
+ choice.dispatchEvent(nativeOpen); assert.equal(nativeOpen.defaultPrevented,false); assert.equal(choice.value,'');
+ choice.focus(); press('ArrowDown'); assert.equal(choice.value,'B12');
+ assert.equal(JSON.parse(dom.window.localStorage.getItem(KEY)).selectedTicket,'B12');
+ press('End'); assert.equal(choice.value,'B16');
+ press('ArrowUp'); assert.equal(choice.value,'B15');
+ press('Home'); assert.equal(choice.value,'');
+ assert.equal(JSON.parse(dom.window.localStorage.getItem(KEY)).selectedTicket,undefined);
+ dom.window.close();
+});
+
+test('진도 45일은 기본 공개하며 시각 완료 조건과 중복 목록을 함께 출력하지 않는다', async () => {
+ const home=open('README.html'); await ready(home);
+ assert.equal(home.window.document.querySelectorAll('.ch-phase-details:not([open])').length,0);
+ assert.equal(home.window.document.querySelectorAll('.ch-phase-details .ch-day').length,45);
+ home.window.close();
+ const {loadCourseSources}=await import('../course/sources.mjs');
+ for(const day of loadCourseSources().roadmap.days) {
+  const dom=open(`course/spring/${day.id}.html`);
+  for(const step of day.steps.filter(step=>step.visualGuide)) {
+   const panel=dom.window.document.getElementById(`step-${day.id.toLowerCase()}-${step.no}`);
+   assert.equal(panel.querySelectorAll(':scope > .task-visual, .task-target-files').length,0);
+   assert.ok(panel.querySelector('.fact-done > .task-visual'));
+   const covered=step.visualGuide.coversDone;
+   assert.equal(new Set(covered).size,covered.length);
+   assert.ok(covered.every(index=>Number.isInteger(index)&&index>=0&&index<step.done.length));
+   const remaining=[...panel.querySelectorAll('.fact-done [data-criterion-index]')];
+   assert.equal(remaining.length,step.done.length-covered.length);
+  }
+  dom.window.close();
+ }
+});
+
+test('J05의 현재 DTO 파일과 다음 쿠폰 조건은 별도 구획이다', () => {
+ const dom=open('course/java/J05.html'), doc=dom.window.document;
+ const current=doc.getElementById('만들-것').closest('section');
+ assert.equal(current.querySelectorAll('table tbody tr').length,2);
+ assert.ok(!/UNUSED|최소 주문 금액|CouponFinder/.test(current.textContent));
+ const next=doc.getElementById('다음-과제-쿠폰-조회삭제').closest('section');
+ assert.match(next.textContent,/CouponFinder/);
+ assert.match(next.textContent,/만료일 당일까지/);
+ dom.window.close();
+});

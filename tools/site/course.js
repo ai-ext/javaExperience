@@ -326,6 +326,22 @@
   }
 
   // 준비·선택 기록은 구현 체크와 별도로 관리한다. 저장 실패한 변경은 이 화면에서 보존한다.
+  function initSchedule() {
+    var data = document.getElementById('course-schedule-data');
+    if (!data) return;
+    var days = JSON.parse(data.textContent);
+    function paintSchedule() {
+      var state = readProgress(storage());
+      days.forEach(function (day) {
+        var steps = progressSteps(day, state.selectedTicket);
+        var count = steps.filter(function (step) { return state.done.has(step.id); }).length;
+        var node = document.querySelector('[data-schedule-count="' + day.id + '"]');
+        if (node) node.textContent = '구현 ' + count + '/' + steps.length;
+      });
+    }
+    paintSchedule();
+    window.addEventListener('storage', paintSchedule);
+  }
   function initRecords() {
     var store = storage(), pending = {}, pendingPrep = {};
     var choice = document.querySelector('[data-ticket-choice]');
@@ -376,6 +392,18 @@
       window.dispatchEvent(new CustomEvent('course-records-change', { detail: { selectedTicket: state.selectedTicket || '' } }));
     }
     if (choice) choice.addEventListener('change', function() { pending.selectedTicket = choice.value; save(); });
+    if (choice) choice.addEventListener('keydown', function(event) {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      var index = choice.selectedIndex;
+      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') index = Math.min(choice.options.length - 1, index + 1);
+      else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') index = Math.max(0, index - 1);
+      else if (event.key === 'Home') index = 0;
+      else if (event.key === 'End') index = choice.options.length - 1;
+      else return;
+      event.preventDefault();
+      choice.selectedIndex = index;
+      choice.dispatchEvent(new Event('change', {bubbles:true}));
+    });
     preps.forEach(function(input) { input.addEventListener('change', function() { pendingPrep[input.dataset.prep] = input.checked; save(); }); });
     window.addEventListener('pageshow', paint);
     window.addEventListener('storage', function(e) { if (e.key === null || e.key === KEY) paint(); });
@@ -490,7 +518,6 @@
       var state = readProgress(store);
       var pick = nextDay(days, state.done, state.selectedTicket);
       var day = pick.day;
-      home.querySelectorAll('.ch-phase-details').forEach(function (group) { group.open = group.dataset.phase === day.phase; });
       var tags = { first: '오늘 할 일 · 처음 시작', continue: '오늘 할 일 · 이어서', next: '오늘 할 일 · 다음 날', remaining: '오늘 할 일 · 남은 순서가 있는 날', complete: days.length + '일 과정 · 필수 구현 체크 끝 · 채점 결과 별도' };
       $('[data-today-tag]').textContent = tags[pick.mode];
       $('[data-today-id]').textContent = day.id;
@@ -764,6 +791,7 @@
     if (home) initHome(home);
     initCopy();
     initDaySql();
+    initSchedule();
     initRecords();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();

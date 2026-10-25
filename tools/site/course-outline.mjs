@@ -1,5 +1,8 @@
 import { JSDOM } from 'jsdom';
 import { marked } from 'marked';
+import { loadCourse } from './course-pages.mjs';
+import { fileURLToPath } from 'node:url';
+import { isExtraStep } from './course-pages.mjs';
 
 const guideType = source => {
   if (source === 'course/README.md') return { kind: 'overview', tag: '가이드', label: '과정 안내' };
@@ -122,6 +125,34 @@ export function renderCourseOutline(source, html) {
     list.append(item);
   }
   if (type.kind === 'days') {
+    const course = loadCourse(fileURLToPath(new URL('../../', import.meta.url)));
+    const schedule = [];
+    for (const item of article.querySelectorAll('.outline-schedule > li')) {
+      const heading = item.querySelector('h3');
+      const link = heading.querySelector('a');
+      const day = course.days.find(day => day.id === link?.textContent.trim() && day.id !== 'D00');
+      const optional = !day;
+      const title = doc.createElement('p');
+      title.className = 'schedule-title';
+      title.textContent = day?.title || 'Java 워밍업';
+      const status = doc.createElement('p');
+      status.className = 'schedule-status';
+      const count = doc.createElement('span');
+      count.dataset.scheduleCount = day?.id || 'D00';
+      count.textContent = optional ? '진도 제외' : `구현 0/${day.steps.filter(step => !isExtraStep(step, course)).length || day.steps.length}`;
+      const kind = doc.createElement('span');
+      kind.className = 'schedule-requirement';
+      kind.textContent = optional ? '선택' : '필수';
+      status.append(count, kind);
+      item.replaceChildren(heading, title, status);
+      item.classList.add('schedule-card');
+      if (day) schedule.push({id:day.id, steps:day.steps.map(step => ({id:step.id,extra:isExtraStep(step, course),choiceTickets:step.tickets || []}))});
+    }
+    const data = doc.createElement('script');
+    data.type = 'application/json';
+    data.id = 'course-schedule-data';
+    data.textContent = JSON.stringify(schedule);
+    article.append(data);
     const groups = new Map();
     for (const item of article.querySelectorAll('.outline-schedule > li')) {
       if (!groups.has(item.dataset.phase)) groups.set(item.dataset.phase, []);

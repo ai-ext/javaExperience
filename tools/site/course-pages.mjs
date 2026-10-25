@@ -266,7 +266,7 @@ export function renderVisualGuide(guide) {
     : `<div class="table-wrap"><table><thead><tr>${guide.headers.map(h => `<th scope="col">${inline(h)}</th>`).join('')}</tr></thead><tbody>${guide.rows.map(row => `<tr>${row.map((cell, i) => i ? `<td>${inline(cell)}</td>` : `<th scope="row">${inline(cell)}</th>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   return `<section class="task-visual task-visual-${guide.kind}" aria-label="${esc(guide.title)}"><h3>${inline(guide.title)}</h3>${body}${guide.note ? `<p class="task-visual-note">${inline(guide.note)}</p>` : ''}</section>`;
 }
-function renderFacts(segment, fromRel, course) {
+function renderFacts(segment, fromRel, course, guide) {
   const parts = segment.split(/(?=<p><strong>(?:이 순서에서 만들 층|만들 파일|겪을 것|완료 조건|명세|데이터 요구사항|티켓|원인과 정답)<\/strong>)/);
   const lead = parts[0].startsWith('<p><strong>') ? '' : parts.shift();
   const facts = parts.map((part) => {
@@ -277,6 +277,19 @@ function renderFacts(segment, fromRel, course) {
     const first = rest.match(/^<p>([\s\S]*?)<\/p>/);
     if (first && /^\(.*\)$/.test(first[1].trim())) { note = ` <small>${first[1].trim()}</small>`; rest = rest.slice(first[0].length); }
     rest = rest.replace(/^<p>\s*<\/p>/, '').trim();
+    if (key === 'done' && guide) {
+      const doc = new JSDOM(`<div>${rest}</div>`).window.document;
+      const list = doc.querySelector('div > ul');
+      if (list) {
+        [...list.children].forEach((item, index) => {
+          item.dataset.criterionIndex = index;
+          if (guide.coversDone?.includes(index)) item.remove();
+        });
+        if (!list.children.length) list.remove();
+      }
+      rest = renderVisualGuide(guide) + doc.querySelector('div').innerHTML;
+      doc.defaultView.close();
+    }
     if (key === 'tickets') {
       const ids = [...rest.matchAll(/<code>([BE]\d{2})<\/code>/g)].map((m) => m[1]);
       rest = `<p class="ticket-badges">${ids.map((id) => ticketBadge(course.tickets.find((t) => t.id === id), fromRel, course)).join('')}</p>`;
@@ -293,7 +306,12 @@ function renderFacts(segment, fromRel, course) {
   const order = ['layers', 'files', 'done', 'tickets', 'data-spec', 'spec', 'trap', 'answer-link'];
   facts.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
   const refs = facts.filter(f => ['spec', 'data-spec'].includes(f.key));
-  const body = facts.filter(f => !['spec', 'data-spec'].includes(f.key));
+  const body = facts.filter(f => !['spec', 'data-spec'].includes(f.key) && !(guide && f.key === 'layers'));
+  if (guide) {
+    const layers = facts.find(f => f.key === 'layers');
+    const files = body.find(f => f.key === 'files');
+    if (layers && files) files.html = files.html.replace(/(<p class="fact-label">[\s\S]*?<\/p>)/, `$1${layers.html}`);
+  }
   const refAt = body.findIndex(f => ['trap', 'answer-link'].includes(f.key));
   if (refs.length) body.splice(refAt < 0 ? body.length : refAt, 0, { html: `<details class="step-references"><summary>명세·데이터 요구사항 보기</summary>${refs.map(f => f.html).join('')}</details>` });
   return `${lead}${facts.length ? `<div class="step-facts">${body.map(f => f.html).join('')}</div>` : ''}`;
@@ -306,7 +324,7 @@ function renderStepSection(section, fromRel, course, step) {
     const candidates = ['<details', '<blockquote', '</section>'].map((tag) => section.indexOf(tag, headEnd)).filter((i) => i >= 0);
     return Math.min(...candidates);
   })();
-  let facts = renderFacts(section.slice(headEnd, bodyEnd).trim(), fromRel, course);
+  let facts = renderFacts(section.slice(headEnd, bodyEnd).trim(), fromRel, course, step.visualGuide);
   let tail = section.slice(bodyEnd).replace(/<\/section>\s*$/, '');
   const observationId = `observations-${step.id.toLowerCase()}`;
   if (/<details class="step-observations"[^>]*>\s*<summary>꼭 할 관찰/.test(tail)) {
@@ -320,8 +338,7 @@ function renderStepSection(section, fromRel, course, step) {
   const next = day.steps[day.steps.indexOf(step) + 1];
   const nextLink = `<a class="step-next" href="${next ? `#step-${next.id.toLowerCase()}` : '#오늘-순서'}">${next ? `다음 순서 ${NUMS[next.no - 1]} →` : '오늘 순서로 돌아가기 ↑'}</a>`;
   const done = `<p class="step-done"><label><input type="checkbox" class="step-check" data-step="${esc(step.id)}"> 이 순서를 끝냈다</label></p>`;
-  const currentFiles = step.visualGuide && step.files?.length ? `<div class="task-target-files" role="group" aria-label="현재 파일"><strong>현재 파일</strong>${step.files.map(file => `<code title="${esc(file)}">${esc(file.split('/').at(-1))}</code>`).join(' ')}</div>` : '';
-  return `${head}${currentFiles}${step.visualGuide ? renderVisualGuide(step.visualGuide) : ''}${facts}<div class="step-help">${titleDetail}${tail}</div><div class="step-footer">${done}${nextLink}</div></section>`;
+  return `${head}${facts}<div class="step-help">${titleDetail}${tail}</div><div class="step-footer">${done}${nextLink}</div></section>`;
 }
 
 function dayPager(day, fromRel, course) {
@@ -566,7 +583,7 @@ function renderDayStepper(html, day) {
       const branches = no === 1 ? {1:'B14',2:'B11'} : no === 3 ? {1:'B08',2:'B14',3:'B11'} : {};
       const list = step.querySelector('.fact-done > ul');
       if (list) for (const [index, item] of [...list.children].entries()) {
-        const ticket = branches[index];
+        const ticket = branches[Number(item.dataset.criterionIndex ?? index)];
         if (!ticket) continue;
         const fold = doc.createElement('details');
         fold.className = 'step-optional-criteria';
@@ -646,7 +663,7 @@ function renderDayStepper(html, day) {
   }
   const tools = doc.createElement('div');
   tools.className = 'day-stepper-tools';
-  tools.innerHTML = '<button type="button" data-day-expand aria-pressed="false" hidden><span data-expand-label>모두 펼쳐 보기</span><svg class="expand-chevron" viewBox="0 0 12 8" width="12" height="8" aria-hidden="true"><path d="m.75 .75 5.25 6.5 5.25-6.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><p data-day-position role="status" aria-live="polite"></p>';
+  tools.innerHTML = '<button type="button" data-day-expand aria-pressed="false" hidden><span data-expand-label>모두 펼쳐 보기</span><svg class="expand-chevron" viewBox="0 0 12 8" width="12" height="8" aria-hidden="true"><path d="m1 1 5 6 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><p data-day-position role="status" aria-live="polite"></p>';
   today.append(tools);
   const quick = doc.createElement('nav');
   quick.className = 'day-quick-links';
@@ -720,7 +737,7 @@ function renderWarmupStepper(html, day) {
   today.className = 'day-today';
   today.dataset.day = day.id;
   today.setAttribute('aria-labelledby', '오늘-순서');
-  today.innerHTML = '<div class="day-today-head"><p class="day-panel-label">선택 · Java 워밍업</p><h2 id="오늘-순서">오늘 순서</h2></div><p class="day-progress">확인 기록 · 구현 진도와 별도</p><div class="day-stepper-tools"><button type="button" data-day-expand aria-pressed="false" hidden><span data-expand-label>모두 펼쳐 보기</span><svg class="expand-chevron" viewBox="0 0 12 8" width="12" height="8" aria-hidden="true"><path d="m.75 .75 5.25 6.5 5.25-6.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><p data-day-position role="status" aria-live="polite"></p></div><ol class="day-steps day-chips"></ol><p class="day-progress-note">체크는 이 브라우저의 확인 기록이며 채점 결과가 아닙니다. 워밍업은 선택입니다.</p>';
+  today.innerHTML = '<div class="day-today-head"><p class="day-panel-label">선택 · Java 워밍업</p><h2 id="오늘-순서">오늘 순서</h2></div><p class="day-progress">확인 기록 · 구현 진도와 별도</p><div class="day-stepper-tools"><button type="button" data-day-expand aria-pressed="false" hidden><span data-expand-label>모두 펼쳐 보기</span><svg class="expand-chevron" viewBox="0 0 12 8" width="12" height="8" aria-hidden="true"><path d="m1 1 5 6 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><p data-day-position role="status" aria-live="polite"></p></div><ol class="day-steps day-chips"></ol><p class="day-progress-note">체크는 이 브라우저의 확인 기록이며 채점 결과가 아닙니다. 워밍업은 선택입니다.</p>';
   const list = today.querySelector('ol');
   panels.forEach((section, index) => {
     const label = headings[index].textContent.replace(/^#\s*/, '').trim();
@@ -805,7 +822,7 @@ export function renderCourseHome(course) {
       <p class="ch-progress-key"><span class="ch-key-current">추천 구현일</span><span class="ch-key-done">구현 체크 끝</span><span>각 칸의 수치 = 체크한 순서 / 집계 순서</span></p>
       ${phases.map(([phase, label]) => {
         const days = main.filter(d => d.phase === phase);
-        return `<details class="ch-phase-details" data-phase="${phase}"${phase === 'build' ? ' open' : ''}><summary>${label} · ${days[0].id}${days.length > 1 ? '–' + days.at(-1).id : ''}</summary><div class="ch-phase-row" data-phase="${phase}"><h3 class="ch-phase">${label}<small>${days[0].id}${days.length > 1 ? '–' + days.at(-1).id : ''}</small></h3><ol class="ch-days">${days.map(dayCell).join('')}</ol></div></details>`;
+        return `<details class="ch-phase-details" data-phase="${phase}" open><summary>${label} · ${days[0].id}${days.length > 1 ? '–' + days.at(-1).id : ''}</summary><div class="ch-phase-row" data-phase="${phase}"><h3 class="ch-phase">${label}<small>${days[0].id}${days.length > 1 ? '–' + days.at(-1).id : ''}</small></h3><ol class="ch-days">${days.map(dayCell).join('')}</ol></div></details>`;
       }).join('')}
       <p class="ch-progress-note">일자 페이지의 순서 체크가 이 브라우저에 저장되고, 여기서 다음 구현일을 추천합니다. 다른 기기·브라우저에서는 <a href="course/spring/README.html">일자 목록</a>에서 하던 날로 직접 재진입하세요. <span data-course-storage></span></p>
     </section>

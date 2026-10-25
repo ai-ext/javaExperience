@@ -7,14 +7,15 @@ import { renderCourseOutline } from './course-outline.mjs';
 
 const open = (source, html) => new JSDOM(renderCourseOutline(source, html)).window.document;
 
-test('과정 흐름으로 바꾸어도 모든 셀과 본문 링크를 보존한다', () => {
+test('일자 선택 카드는 현재 일자 진입과 제목·진도·필수 구분에 집중한다', () => {
   const html = '<h2 id="days">일자</h2><table><thead><tr><th>일</th><th>마일스톤</th><th>오늘의 Java</th></tr></thead><tbody><tr><td><a href="D05.html">D05</a></td><td>조회·수정·삭제</td><td><a href="J05.html">J05</a></td></tr></tbody></table>';
   const doc = open('course/spring/README.md', html);
   assert.equal(doc.querySelectorAll('table').length, 0);
   assert.equal(doc.querySelectorAll('ol.course-outline > li').length, 1);
   assert.equal(doc.querySelector('#days').textContent, '일자');
-  assert.deepEqual([...doc.querySelectorAll('.guide-content a')].map(a => [a.textContent, a.getAttribute('href')]), [['D05', 'D05.html'], ['J05', 'J05.html']]);
+  assert.deepEqual([...doc.querySelectorAll('.guide-content a')].map(a => [a.textContent, a.getAttribute('href')]), [['D05', 'D05.html']]);
   assert.match(doc.querySelector('.course-outline > li').textContent, /조회·수정·삭제/);
+  assert.match(doc.querySelector('.schedule-status').textContent, /구현 0\/6.*필수/);
   assert.equal(doc.querySelector('.guide-index a').getAttribute('href'), '#days');
 });
 
