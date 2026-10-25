@@ -32,4 +32,4 @@
 - [x] main 과정/설정 탭/home/navigation 및 개념26하네스/reader/dark/catalog, build·image/visual/version/parity 감사 실행.
 - [x] 실제 PC 다크에서 과정 홈→개념 검색→설명·장면 전환/검색 복귀, 코드 복사·그림 확대·목차·긴 표를 확인한다. 새 캡처는 JPG. 모바일·라이트 신규 작업 없음.
 - [x] 독립 Sol spec→quality 검수 후 결함을 해결하고 필요한 검사를 재실행한다.
-- [ ] 진행표에 통합한 범위·남은108개 보강·전수 미검증 범위를 기록한다. 의미 단위 로컬 후보 커밋과 merge 가능 상태를 보고한다. main 직접 merge/push/PR은 수행하지 않는다.
+- [x] 진행표에 통합한 범위·남은108개 보강·전수 미검증 범위를 기록한다. 의미 단위 로컬 후보 커밋과 merge 가능 상태를 보고한다. main 직접 merge/push/PR은 수행하지 않는다.

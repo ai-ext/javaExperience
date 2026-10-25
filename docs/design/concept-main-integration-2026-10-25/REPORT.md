@@ -8,7 +8,7 @@
 
 공통 build·package·메뉴·홈·수집기는 양쪽 기능을 결합했다. main의 45일 과정, 6개 메뉴, 과정 우선 홈, yml/properties 탭과 중립적인 Docker 런타임 안내를 유지한다. main 서버·과정 원본·학습 원문135개와 공통 JPG602개는 main 입력의 바이트를 유지했다. 기능 연결 외에 과정이나 학습자 서버의 답안을 새로 구현하지 않았다.
 
-공개 제외 캡처의 PNG/JPG를 복사하지 않았다. 과거 공통 PNG도 되살리지 않고 main JPG를 사용했다. 자산은 고정 입력 JPG2345개와 이번 검증 캡처9개이며 현재 공개 대상 PNG는0개다. 조상·제외 blob의 최종 검사는 로컬 커밋 뒤 재확인한다.
+공개 제외 캡처의 PNG/JPG를 복사하지 않았다. 과거 공통 PNG도 되살리지 않고 main JPG를 사용했다. 자산은 고정 입력 JPG2345개와 이번 검증 캡처10개이며 현재 공개 대상 PNG는0개다. 조상·제외 blob의 최종 검사는 로컬 커밋 뒤 재확인한다.
 
 ## 검증 기준을 옮긴 방법
 
@@ -32,7 +32,7 @@ main과 옛 개념 원문24개가 달라 과거 SHA를 현재 원문에 그대�
 | 통합 build | HTML459개·링크 오류0 |
 | 개념 하네스 | 26/26 통과, 현재460개 코드 manifest와 전후 지문 일치 |
 | 공통 검사 | course-pages26개·home·navigation·catalog14개·reader·dark 통과 |
-| 자산·감사 | 고정JPG2345개+QA9개·PNG0·raster·main image audit·visual·version-cards·parity 통과 |
+| 자산·감사 | 고정JPG2345개+QA10개·PNG0·raster·main image audit·visual·version-cards·parity 통과 |
 | 독립 Sol 검수 | spec→quality, 발견 항목 교정 후 미해결 C0/I0/M0 |
 | 실제 PC Chrome | 과정 홈·6메뉴·지도·설정 탭5개 동기화·진도1/4 표시/원복·DTO검색·P16읽기/검색복귀·4PC폭·복사·확대·긴 표·D12초점 확인 |
 
@@ -43,3 +43,9 @@ main과 옛 개념 원문24개가 달라 과거 SHA를 현재 원문에 그대�
 현재 수집기는 main의 과정52화면을 포함한391화면·53963항목을 수집한다. 기존 개념 근거가 있는 P09의 동일 원문/ID/label5개는 기존 implemented 상태와 근거를 유지했다. implemented910, 과거 verified6이며 새 verified 승격은0이다. main 장부와 새 개념 ID를 결합하고 같은 ID의 양쪽 과거 기록은 sidecar에 보존했다.
 
 진행표는 /Users/ds/code/javaExperience/.worktrees/concept-learning-integration/docs/design/concept-cycle-2026-10-24/PROGRESS.md 다. 개념26개 범위별 구현과134개 공통 reader 적용을, 나머지108개 맞춤 보강 및 개별 문서 전수 완료 승인과 구분한다. 기존 원본 브랜치의 직접 merge 보류와 새 main 기반 후보의 검증 상태도 분리한다. 다음은 검증한 후보의 로컬 커밋·생성물 재빌드 일치·제외 이력 최종 확인이다.
+
+## 로컬 구현 커밋 이후 확인
+
+구현 커밋은 `bc1651ec8fd15d99b69e1eff158643d30af2987b`이며 부모는 main a70f1bd5 하나다. 원본 common/source snapshot은 조상이 아니고 제외 캡처 blob 도달0, main 대비 가상병합 exit0·결과tree=후보tree를 확인했다. `npm run check:generated`는 커밋 후 재빌드한 HTML이 커밋과 같음을 확인했다. 이후 추가분은 검증 기록·장부·진행표뿐이다. main에서 원래 보이던 D04-5/D07-1 답안 경로 경고2건은 그대로다.
+
+원본 파일 읽기 차단 진단에서도26검사/86Node프로세스/시도0이었다. 역사자료1422개와 보완한rawHTML8개는 SHA/byte가원본과같다. Git 공백검사에는 원본로그·렌더HTML과 D08학습용 Git충돌문자열이경고로남는다. D08번들은 원본과byte동일하고Node문법검사·canonical검사가통과하며 실제미해결충돌이아니다. STAGED-HYGIENE.json에경고원문을기록했다. 제품소스 trailing whitespace는0이다.
