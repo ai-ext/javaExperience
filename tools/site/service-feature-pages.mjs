@@ -160,25 +160,35 @@ function exampleMarkup(item) {
 
 function briefMarkup(brief = {}) {
   const scenario = list(brief.scenario);
-  const scenarioMarkup = scenario.length ? `<section class="sf-brief-section" data-content-kind="guide"><h4>사용자 시나리오</h4><ol class="sf-scenario">${scenario.map((step) => `<li><dl>${[['시작', step.start], ['행동', step.action], ['결과', step.result], ['이후', step.after]].filter(([, value]) => value != null && value !== '').map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(human(value))}</dd></div>`).join('')}</dl></li>`).join('')}</ol></section>` : '';
+  const scenarioMarkup = scenario.length ? `<section class="sf-brief-section sf-scenario-section" data-content-kind="guide"><h3>4 · 사용자 시나리오</h3><div class="sf-scenario">${scenario.map((step) => `<article><dl>${[['시작 상태', step.start], ['요청', step.action], ['응답', step.result], ['이후 상태', step.after]].filter(([, value]) => value != null && value !== '').map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(human(value))}</dd></div>`).join('')}</dl></article>`).join('')}</div></section>` : '';
   const data = list(brief.data);
   const dataMarkup = data.length ? `<section class="sf-brief-section" data-content-kind="example"><h4>데이터와 이유</h4><dl class="sf-data-list">${data.map((item) => `<div><dt>${esc(human(item.name ?? item.label ?? '데이터'))}</dt><dd>${esc(human(item.reason ?? item.value ?? item.description))}</dd></div>`).join('')}</dl></section>` : '';
   const examples = list(brief.examples);
   const exampleBlock = examples.length ? `<section class="sf-brief-section" data-content-kind="example"><h4>입력 사례</h4><ul>${examples.map(exampleMarkup).join('')}</ul></section>` : '';
+  const requirementRows = [
+    ['입력과 출력', list(brief.inputs)], ['성공 기준', list(brief.success)], ['개발 과제', list(brief.work)],
+  ].filter(([, values]) => values.length).map(([label, values]) => `<tr><th scope="row">${label}</th><td><ul>${values.map((item) => `<li>${esc(human(item))}</li>`).join('')}</ul></td></tr>`).join('');
+  const policy = policyMarkup(brief.policies, brief.failures);
+  const requirementsContent = [requirementRows ? `<div class="sf-requirements-table-wrap"><table class="sf-requirements-table"><tbody>${requirementRows}</tbody></table></div>` : '', dataMarkup, policy, exampleBlock].filter(Boolean).join('');
+  const requirements = requirementsContent ? `<section class="sf-brief-section sf-requirements" data-content-kind="practice"><h3>3 · 세부 요구사항</h3>${requirementsContent}</section>` : '';
+  const taskContent = brief.task || list(brief.preconditions).length;
+  const taskSection = taskContent ? `<section class="sf-brief-section sf-task" data-content-kind="action"><h3>1 · 이번에 할 일</h3>${brief.task ? `<p>${esc(brief.task)}</p>` : ''}${list(brief.preconditions).length ? `<div class="sf-preconditions"><h4>2 · 시작 조건</h4><ul>${list(brief.preconditions).map((item) => `<li>${esc(human(item))}</li>`).join('')}</ul></div>` : ''}</section>` : '';
   return `<div class="sf-brief">
     ${brief.purpose ? `<p class="sf-purpose">${esc(brief.purpose)}</p>` : ''}
-    ${brief.task ? `<section class="sf-brief-section sf-task" data-content-kind="action"><h4>이번에 할 일</h4><p>${esc(brief.task)}</p></section>` : ''}
-    ${textList('시작 조건', brief.preconditions)}
+    <div class="sf-brief-core">${taskSection}${requirements}</div>
     ${scenarioMarkup}
-    ${dataMarkup}
-    ${textList('업무 정책', brief.policies, '', 'practice')}
-    ${textList('입력과 출력', brief.inputs, '', 'example')}
-    ${textList('성공 기준', brief.success, '', 'check')}
-    ${textList('실패와 데이터 보존', list(brief.failures).map((item) => `${item.when ?? '실패 조건'} → ${item.result ?? ''}${item.unchanged ? ` · 유지: ${item.unchanged}` : ''}`), '', 'practice')}
-    ${exampleBlock}
-    ${textList('개발 과제', brief.work, '', 'action')}
-    ${textList('완료 확인', brief.done, '', 'check')}
   </div>`;
+}
+
+function policyMarkup(policies, failures) {
+  const items = list(policies);
+  const rules = items.filter((item) => !String(human(item)).startsWith('원문 완료 기준:'));
+  const sourceCriteria = items.filter((item) => String(human(item)).startsWith('원문 완료 기준:'));
+  const cases = list(failures);
+  if (!rules.length && !cases.length && !sourceCriteria.length) return '';
+  const policyRows = cases.map((item) => `<tr><th scope="row">${esc(human(item.when || item.condition || '조건'))}</th><td>${esc(human(item.result || item.expected || ''))}</td><td>${esc(human(item.unchanged || ''))}</td></tr>`).join('');
+  const criteria = sourceCriteria.length ? `<section class="sf-source-criteria"><h5>원문 완료 기준·검증 메모</h5><ul>${sourceCriteria.map((item) => `<li>${esc(human(item).replace(/^원문 완료 기준:\s*/, ''))}</li>`).join('')}</ul></section>` : '';
+  return `<section class="sf-brief-section sf-policy" data-content-kind="practice"><h4>업무 정책</h4>${policyRows ? `<div class="sf-policy-table-wrap"><table><thead><tr><th>조건</th><th>결과</th><th>유지할 상태</th></tr></thead><tbody>${policyRows}</tbody></table></div>` : ''}${rules.length ? `<ul>${rules.map((item) => `<li>${esc(human(item))}</li>`).join('')}</ul>` : ''}${criteria}</section>`;
 }
 
 function sourceUnitsMarkup(ids, sourceIndex, rootPrefix) {
@@ -207,7 +217,7 @@ function executionChecksMarkup(stage, feature, variant) {
   const checks = list(stage.executionChecks);
   if (!checks.length) return '';
   const sid = `${feature.id}-${variant.id}-${stage.id}`.replace(/[^a-zA-Z0-9_-]/g, '-');
-  return `<section class="sf-execution"><h4>직접 실행하고 기록하기</h4><p>명령을 자동 실행하지 않습니다. 직접 실행한 뒤 결과를 기록하세요.</p><ol>${checks.map((check, index) => `<li><label><input type="checkbox" data-sf-execution-check="${index}"> <strong>${esc(check.title)}</strong></label>${check.command ? `<pre><code>${esc(check.command)}</code></pre>` : ''}${check.expected ? `<p><b>확인할 결과</b> · ${esc(check.expected)}</p>` : ''}<label class="sf-record-label" for="sf-record-${sid}-${index}">실행 기록</label><textarea id="sf-record-${sid}-${index}" rows="2" placeholder="직접 확인한 결과를 적어 두세요."></textarea></li>`).join('')}</ol></section>`;
+  return `<details class="sf-execution"><summary>직접 시도한 뒤 보기 · 실행 예시와 기록</summary><p>명령을 자동 실행하지 않습니다. 직접 실행한 뒤 결과를 기록하세요.</p><ol>${checks.map((check, index) => `<li><label><input type="checkbox" data-sf-execution-check="${index}"> <strong>${esc(check.title)}</strong></label>${check.command ? `<pre><code>${esc(check.command)}</code></pre>` : ''}${check.expected ? `<p><b>확인할 결과</b> · ${esc(check.expected)}</p>` : ''}<label class="sf-record-label" for="sf-record-${sid}-${index}">실행 기록</label><textarea id="sf-record-${sid}-${index}" rows="2" placeholder="직접 확인한 결과를 적어 두세요."></textarea></li>`).join('')}</ol></details>`;
 }
 
 function hintMarkup(stage) {
@@ -221,16 +231,15 @@ function stageMarkup(feature, variant, stage, stageIndex, variantIndex, apiRecip
   const contract = serviceContractMarkup(stageRecipes);
   const request = stageRecipes.length ? renderServiceRequestTool({ scopeKey: `feature-${feature.id}-${variant.id}-${stage.id}`, project: variant.project, recipes: stageRecipes, rootPrefix }) : '';
   const choices = list(stage.choices);
+  const done = textList('완료 확인', stage.brief?.done, '', 'check');
   return `<article class="sf-stage-panel" id="sf-stage-${esc(variant.id)}-${esc(stage.id)}" data-sf-stage-panel data-sf-variant="${esc(variant.id)}" data-sf-stage="${esc(stage.id)}" data-sf-stage-index="${stageIndex}" data-sf-variant-index="${variantIndex}">
     <header class="sf-stage-title"><p>${esc(variant.label || variant.project || '실습 단계')} · ${stageIndex + 1}단계</p><h2 tabindex="-1">${esc(stage.title)}</h2></header>
-    <label class="sf-stage-completion"><input type="checkbox" data-sf-stage-complete><span>이 단계의 완료 조건을 직접 확인했습니다</span></label>
-    ${briefMarkup(stage.brief || {})}
-    <section class="sf-aside-stage" data-sf-aside-stage data-sf-variant="${esc(variant.id)}" data-sf-stage="${esc(stage.id)}"><p class="sf-aside-progress" data-sf-aside-progress>이 단계의 완료 기록 없음</p>${hintMarkup(stage) || '<p>현재 단계에 등록된 질문형 힌트가 없습니다.</p>'}</section>
-    ${choices.length ? `<section class="sf-choices"><h4>선택해서 확장하기</h4><ul>${choices.map((choice) => `<li>${esc(human(choice))}</li>`).join('')}</ul></section>` : ''}
-    ${contract}
-    ${request ? `<section class="sf-stage-api"><h3>내 서버에서 직접 확인</h3>${request}</section>` : ''}
-    ${executionChecksMarkup(stage, feature, variant)}
-    ${referencesMarkup(stage, feature, sourceIndex, rootPrefix)}
+    <div class="sf-stage-materials">
+      ${briefMarkup(stage.brief || '')}${choices.length ? `<section class="sf-choices"><h4>선택해서 확장하기</h4><ul>${choices.map((choice) => `<li>${esc(human(choice))}</li>`).join('')}</ul></section>` : ''}
+      <section class="sf-stage-flow-section sf-stage-hints" aria-label="필요할 때 보는 힌트"><h3>5 · 필요할 때 보는 힌트</h3><section class="sf-aside-stage" data-sf-aside-stage data-sf-variant="${esc(variant.id)}" data-sf-stage="${esc(stage.id)}"><p class="sf-aside-progress" data-sf-aside-progress>이 단계의 완료 기록 없음</p>${hintMarkup(stage) || '<p>현재 단계에 등록된 질문형 힌트가 없습니다.</p>'}</section></section>
+      <section class="sf-stage-flow-section sf-stage-api" aria-label="직접 호출하기"><h3>6 · 직접 호출하기</h3><div class="sf-api-workspace">${request ? `<div class="sf-request-entry">${request}<ul class="sf-request-checklist"><li>요청 전 준비 데이터를 확인합니다.</li><li>응답의 생성 id를 다음 요청에 이어 씁니다.</li><li>요청 뒤 조회와 DB 확인 SQL을 함께 대조합니다.</li></ul></div>` : '<p>이 단계에 연결된 API 요청 사례가 없습니다.</p>'}${contract ? `<div class="sf-expected-contract">${contract}</div>` : ''}</div></section>
+      <section class="sf-stage-flow-section sf-stage-done" aria-label="완료 확인"><h3>7 · 완료 확인</h3>${done}<label class="sf-stage-completion"><input type="checkbox" data-sf-stage-complete><span>완료 조건을 직접 확인했습니다</span></label>${executionChecksMarkup(stage, feature, variant)}${referencesMarkup(stage, feature, sourceIndex, rootPrefix)}</section>
+    </div>
   </article>`;
 }
 
@@ -297,9 +306,23 @@ export function renderServiceCatalog({ features = [], sourceIndex = [], apiRecip
     const project = route.project || '프로젝트 미정';
     recipeGroups.set(project, [...(recipeGroups.get(project) || []), route]);
   }
-  const apiGroups = [...recipeGroups.entries()].map(([project, routes]) => `<section class="sf-api-group" data-sf-api-group data-sf-api-project="${esc(project)}"><h3><button type="button" data-sf-api-collapse aria-expanded="true"><span aria-hidden="true">⌄</span>${esc(project)} <small>${routes.length}개 API</small></button></h3><div data-sf-api-rows><div class="sf-api-table-head"><span>HTTP 메서드</span><span>경로</span><span>결과 요약</span><span>기능 기획서</span></div>${routes.map((route) => {
+  const routeOwner = (route) => {
     const cases = route.cases || [];
-    const owner = authored.find((feature) => feature.id === route.featureId || featureStages(feature).some(({ stage }) => list(stage.recipeIds).some((id) => cases.some((recipe) => recipe.id === id))));
+    return authored.find((feature) => feature.id === route.featureId || featureStages(feature).some(({ stage }) => list(stage.recipeIds).some((id) => cases.some((recipe) => recipe.id === id))));
+  };
+  const apiGroupMap = new Map();
+  for (const route of apiRoutes) {
+    const project = route.project || '프로젝트 미정';
+    const method = route.method || '미정';
+    const owner = routeOwner(route);
+    const featureKey = owner?.id || route.featureId || route.label || 'other';
+    const key = `${project}\u0000${featureKey}\u0000${method}`;
+    apiGroupMap.set(key, { project, method, featureTitle: owner?.title || route.label || '기능 미지정', routes: [...(apiGroupMap.get(key)?.routes || []), route] });
+  }
+  const apiRouteGroups = [...apiGroupMap.values()];
+  const apiGroups = apiRouteGroups.map(({ project, method, featureTitle, routes }) => `<section class="sf-api-group" data-sf-api-group data-sf-api-project="${esc(project)}" data-sf-api-method-group="${esc(method)}"><h3><button type="button" data-sf-api-collapse aria-expanded="false"><span aria-hidden="true">›</span>${esc(featureTitle)} · ${esc(method)} <small>${routes.length}개 API</small></button></h3><div data-sf-api-rows hidden><div class="sf-api-table-head"><span>HTTP 메서드</span><span>경로</span><span>결과 요약</span><span>기능 기획서</span></div>${routes.map((route) => {
+    const cases = route.cases || [];
+    const owner = routeOwner(route);
     const featureHref = owner ? detailHref(owner, rootPrefix) : '#visual-catalog';
     const label = owner?.title || route.label || cases[0]?.label || '기능 찾기';
     const expected = route.expected || cases[0]?.expected || {};

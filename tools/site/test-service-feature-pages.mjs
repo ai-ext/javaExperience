@@ -19,7 +19,7 @@ const feature = {
     { id: 'board', project: 'board', label: 'board 프로젝트', stages: [{ id: 'create', title: '기록 저장', sourceUnits: ['unit-record-create'], recipeIds: ['fixture-create'], hints: ['누가 이 기록을 작성하는지 서버는 어떻게 알까요?', '실패하면 기존 데이터는 어떻게 되나요?'], executionChecks: [{ title: '로컬 실행 확인', command: './gradlew bootRun', expected: '서버가 시작됨', record: true }], brief: {
       purpose: '저장된 기록을 나중에 다시 읽습니다.', task: '로그인한 사용자의 제목과 내용을 저장하세요.', preconditions: ['서버와 DB가 실행 중입니다.'],
       scenario: [{ start: '사용자가 로그인함', action: '기록을 제출함', result: '새 기록이 생성됨', after: '생성된 기록을 조회함' }],
-      data: [{ name: 'title', reason: '목록에서 구별합니다.' }], policies: ['작성자는 로그인한 사용자입니다.'], inputs: ['title · content'],
+      data: [{ name: 'title', reason: '목록에서 구별합니다.' }], policies: ['작성자는 로그인한 사용자입니다.', '원문 완료 기준: 글 등록 후 201 Created를 확인합니다.'], inputs: ['title · content'],
       success: ['201 Created'], failures: [{ when: '제목 누락', result: '400 응답', unchanged: '기존 기록을 유지' }], examples: ['요청 사례'], work: ['Controller와 Service를 작성합니다.'], done: ['저장 후 같은 데이터를 조회합니다.'],
     }, concepts: [{ label: 'DTO 개념', href: 'docs/knowledge/P16-json-jackson-practical.html' }], references: [{ label: '기존 시나리오', href: 'scenario/README.html#api-map-title' }], choices: ['로그인한 사용자 기준으로 처리'] }] },
     { id: 'community', project: 'community', label: 'community 프로젝트', stages: [{ id: 'create', title: '기록 생성', brief: { task: 'community variant fixture' }, hints: ['어떤 입력을 검증하나요?'] }] },
@@ -61,6 +61,10 @@ test('catalog renders one feature card, grouping, filters, Explorer routes and c
   assert.match(html, /data-sf-projects="board"/);
   const withRoutes = renderServiceCatalog({ features: [feature], sourceIndex, apiRecipes: { recipes: [recipe, relatedRecipe], routes: [{ project: 'board', method: 'POST', path: '/api/records', recipeIds: [recipe.id, relatedRecipe.id] }] }, rootPrefix: '../' });
   assert.equal((withRoutes.match(/data-sf-api-row data-sf-method=/g) || []).length, 1);
+  const otherProjectRecipe = { ...recipe, id: 'community-record', project: 'community', path: '/api/community' };
+  const grouped = renderServiceCatalog({ features: [feature], sourceIndex, apiRecipes: [recipe, otherProjectRecipe], rootPrefix: '../' });
+  assert.equal((grouped.match(/data-sf-api-rows hidden><div class="sf-api-table-head/g) || []).length, 2, '첫 페인트에서는 모든 기능·메서드 API 행을 접는다');
+  assert.match(grouped, /data-sf-api-collapse aria-expanded="false"/);
 });
 
 test('catalog search includes original day id, title, and aliases for linked course units', () => {
@@ -71,10 +75,10 @@ test('catalog search includes original day id, title, and aliases for linked cou
   for(const term of ['D30','API 변경 협의와 하위 호환','하위','호환'])assert.ok(searchText.includes(term),term);
 });
 
-test('feature renderer exposes full brief without script, hides hints until a click, and preserves root-relative references', () => {
+test('feature renderer follows the requirement sequence without content tabs and preserves root-relative references', () => {
   const html = renderServiceFeature({ feature, features: [feature, { id: 'members-auth', title: '회원 가입과 로그인' }], sourceIndex, apiRecipes: [recipe, relatedRecipe], rootPrefix: '../../' });
   assert.equal((html.match(/data-sf-stage-panel/g) || []).length, 2);
-  for (const text of ['이번에 할 일', '시작 조건', '사용자 시나리오', '데이터와 이유', '업무 정책', '입력과 출력', '성공 기준', '실패와 데이터 보존', '입력 사례', '개발 과제', '완료 확인']) assert.match(html, new RegExp(text));
+  for (const text of ['이번에 할 일', '시작 조건', '사용자 시나리오', '데이터와 이유', '업무 정책', '입력과 출력', '성공 기준', '입력 사례', '개발 과제', '완료 확인', '제목 누락']) assert.match(html, new RegExp(text));
   assert.match(html, /data-srq-root/);
   assert.match(html, /선택한 API 계약/);
   assert.match(html, /공백 불가/);
@@ -86,6 +90,18 @@ test('feature renderer exposes full brief without script, hides hints until a cl
   assert.match(html, /href="\.\.\/\.\.\/scenario\/ch1-create-post\/1-2-dto-response\.html#post"/);
   assert.match(html, /href="\.\.\/\.\.\/docs\/knowledge\/P16-json-jackson-practical\.html"/);
   assert.match(html, /data-sf-stage-complete/);
+  assert.doesNotMatch(html, /sf-content-tab|sf-content-panel|sf-content-switch/);
+  const order = ['1 · 이번에 할 일', '2 · 시작 조건', '3 · 세부 요구사항', '4 · 사용자 시나리오', '5 · 필요할 때 보는 힌트', '6 · 직접 호출하기', '7 · 완료 확인'];
+  const positions = order.map((label) => html.indexOf(label)).filter((position) => position >= 0);
+  assert.equal(positions.length, order.length, '요구사항서의 일곱 항목이 모두 있는 fixture');
+  assert.deepEqual(positions, [...positions].sort((left, right) => left - right));
+  assert.match(html, /class="sf-requirements-table"/);
+  assert.match(html, /class="sf-request-checklist"/);
+  assert.match(html, /<details class="sf-execution"><summary>직접 시도한 뒤 보기/);
+  assert.doesNotMatch(html, /<details class="sf-source-criteria"/);
+  assert.match(html, /class="sf-brief-section sf-policy"/);
+  assert.match(html, /<table><thead><tr><th>조건<\/th><th>결과<\/th><th>유지할 상태<\/th>/);
+  assert.match(html, /원문 완료 기준·검증 메모/);
   assert.doesNotMatch(html, /<script[^>]+src=/);
 });
 
@@ -208,6 +224,23 @@ test('catalog filtering exposes matching groups and reset restores the first gro
   await new Promise((resolve) => projectDom.window.setTimeout(resolve, 0));
   assert.equal(projectCatalog.querySelector('[data-sf-id="fixture-community"]').hidden, false);
   assert.equal(projectCatalog.querySelector('[data-sf-feature-group][data-sf-group-name="개발 준비"] [data-sf-group-cards]').hidden, false);
+});
+
+test('API Explorer는 첫 진입과 그룹 전환에서 선택한 기능·메서드 묶음만 펼친다', () => {
+  const otherProjectRecipe = { ...recipe, id: 'community-record', project: 'community', path: '/api/community' };
+  const markup = renderServiceCatalog({ features: [feature], sourceIndex, apiRecipes: [recipe, otherProjectRecipe], rootPrefix: '../' });
+  const html = renderInitialPage(`<main>${markup}</main>`, 'scenario/README.md');
+  const dom = new JSDOM(html, { url: 'https://learn.example/scenario/README.html', runScripts: 'outside-only' });
+  const state = [...dom.window.document.querySelectorAll('script')].find((script) => script.textContent.includes('prepareFirstPaint'));
+  dom.window.eval(state.textContent);
+  mountServiceFeaturePages(dom.window.document);
+  const groups = [...dom.window.document.querySelectorAll('[data-sf-api-group]')];
+  const opened = () => groups.filter((group) => !group.querySelector('[data-sf-api-rows]').hidden);
+  assert.equal(opened().length, 0, '첫 화면은 긴 API 행을 펼치지 않고 기능·메서드 묶음을 고르게 한다');
+  groups[1].querySelector('[data-sf-api-collapse]').click();
+  assert.equal(opened().length, 1, '다른 묶음을 고르면 이전 묶음을 접는다');
+  assert.equal(opened()[0], groups[1]);
+  dom.window.close();
 });
 
 // 서비스 원본 전체 열람 계약은 유지하면서 배포 HTML의 URL 선택은 첫 페인트 전에 인계한다.

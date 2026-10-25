@@ -8,6 +8,9 @@ const out = await checkOutput('reload');
 const stage = arg('stage') || 'after';
 export const pages = [['홈','index.html'],['일자 목록','course/spring/README.html'],['일자','course/spring/D05.html'],['지도','course/map.html'],['Java','course/java/J05.html'],['티켓','course/tickets/B01.html'],['출발 자료','course/start/README.html'],['개념','docs/knowledge/README.html'],['서비스 만들기','scenario/README.html'],['기능 상세','scenario/features/posts-create-read.html'],['기능 둘째 단계 쿼리','scenario/features/posts-create-read.html?variant=board&stage=read'],['기능 둘째 프로젝트 해시','scenario/features/posts-create-read.html#sf-stage-community-read'],['실전 미션','practice/MISSIONS.html'],['과정 안내','course/README.html'],['레슨','lessons/README.html'],['구현 티켓','tickets/README.html'],['설정 탭','course/spring/D01.html#step-d01-2'],['저장 설정','course/spring/D05.html#step-d05-2'],['더미 데이터','course/start/dummy/README.html'],['운영 실습','course/start/ops/README.html'],['서비스 상세','scenario/ch0-first-steps/0-1-ts-to-java.html'],['개념 상세','docs/knowledge/P16-json-jackson-practical.html'],['저장 진도 홈','index.html'],['선택 티켓 일자','course/spring/D14.html'],['입력 검증 상세','scenario/ch1-create-post/1-5-validation.html'],['DB 실습 상세','scenario/db-query-journey/db-01-response-to-query.html'],['JWT 상세','scenario/ch10-project/10-4-login-jwt.html']];
 pages.push(['일반 개념 리더','docs/knowledge/J01-types-string.html'],['장면 개념 리더','docs/knowledge/P09-java-syntax-basics.html'],['레슨 상세','lessons/A1-client-server-http.html'],['학습 순서','docs/knowledge/README.html#kc-sequence'],['Spring 분야','docs/knowledge/README.html#kc-category-spring'], ...CORE_UNITS.map(unit=>[unit.id,`lessons/concept-core.html?unit=${unit.id}`]), ['개념 원문','docs/knowledge/P16-json-jackson-practical.html?read=1']);
+const only=arg('only');
+const targets=only?pages.filter(([,file])=>file===only||file.startsWith(only)):pages;
+if(only&&!targets.length)throw new Error(`check-reload 대상 페이지가 없습니다: ${only}`);
 await fs.mkdir(path.join(out,stage),{recursive:true});
 const server = await startCheckServer();
 const base = server.base;
@@ -15,7 +18,7 @@ let browser;
 const results=[];
 try {
   browser = await chromium.launch({headless:true});
-  for (const [index,[type,file]] of pages.entries()) {
+  for (const [index,[type,file]] of targets.entries()) {
     const context=await browser.newContext({viewport:{width:1440,height:900},colorScheme:'dark'});
     const page=await context.newPage(); const errors=[];
     page.on('pageerror',error=>errors.push(error.message));
@@ -57,7 +60,7 @@ try {
       await new Promise(resolve=>setTimeout(resolve,Math.max(0,start+tick*40-Date.now())));
     }
     await page.waitForLoadState('networkidle');
-    const data=await page.evaluate(()=>({...window.__reload,height:document.documentElement.scrollHeight,elements:document.querySelectorAll('main *').length,overflow:document.documentElement.scrollWidth-innerWidth,nav:[...document.querySelectorAll('.site-topbar nav>a')].map(e=>({text:e.textContent,href:e.getAttribute('href'),top:e.getBoundingClientRect().top})),navOverflow:(()=>{const n=document.querySelector('.site-topbar nav');return n.scrollWidth-n.clientWidth;})()}));
+    const data=await page.evaluate(()=>({...window.__reload,height:document.documentElement.scrollHeight,elements:document.querySelectorAll('main *').length,overflow:document.documentElement.scrollWidth-innerWidth,serviceTabs:document.querySelectorAll('.sf-content-tab,.sf-content-panel,.sf-content-switch').length,serviceSequence:(()=>{const panel=document.querySelector('.sf-stage-panel:not([hidden])');return panel?[...panel.querySelectorAll('.sf-task h3,.sf-preconditions h4,.sf-requirements h3,.sf-scenario-section h3,.sf-stage-hints>h3,.sf-stage-api>h3,.sf-stage-done>h3')].map(e=>e.textContent.trim()):[];})(),nav:[...document.querySelectorAll('.site-topbar nav>a')].map(e=>({text:e.textContent,href:e.getAttribute('href'),top:e.getBoundingClientRect().top})),navOverflow:(()=>{const n=document.querySelector('.site-topbar nav');return n.scrollWidth-n.clientWidth;})()}));
     const white=data.samples.filter(s=>s.body==='rgb(255, 255, 255)'||(s.body==='rgba(0, 0, 0, 0)'&&['rgb(255, 255, 255)','rgba(0, 0, 0, 0)'].includes(s.html)));
     const selectionChanges=Math.max(0,new Set(data.samples.filter(s=>s.visible).map(s=>s.selected)).size-1);
     const fontChanges=Math.max(0,new Set(data.samples.map(s=>s.font)).size-1);
@@ -68,5 +71,5 @@ try {
   }
 } finally {try { await browser?.close(); } finally { await server.close(); }}
 await fs.writeFile(path.join(out,`${stage}.json`),JSON.stringify({date:new Date().toISOString(),base,viewport:{width:1440,height:900},scriptDelayMs:120,intervalMs:40,results},null,2));
-if(stage!=='before')for(const row of results){assert.equal(row.errors.length,0,`${row.file}: pageerror`);// 대주제는 지도 포함 5개이며 일자 과정은 서비스 참고 메뉴로 이동했다.
+if(stage!=='before')for(const row of results){assert.equal(row.errors.length,0,`${row.file}: pageerror`);if(row.file.startsWith('scenario/features/')){assert.equal(row.serviceTabs,0,`${row.file}: 단계 안 콘텐츠 탭 제거`);assert.deepEqual(row.serviceSequence,['1 · 이번에 할 일','2 · 시작 조건','3 · 세부 요구사항','4 · 사용자 시나리오','5 · 필요할 때 보는 힌트','6 · 직접 호출하기','7 · 완료 확인'],`${row.file}: 요구사항서 순서`);}// 대주제는 지도 포함 5개이며 일자 과정은 서비스 참고 메뉴로 이동했다.
 assert.deepEqual(row.nav.map(item=>item.text),['홈','과정 지도','서비스 만들기','실전 미션','개념 학습'],`${row.file}: 메뉴 이름·순서`);assert.equal(row.navOverflow,0,`${row.file}: 메뉴 넘침`);assert.equal(row.overflow,0,`${row.file}: 화면 넘침`);assert.ok(row.cls<0.00001,`${row.file}: CLS ${row.cls}`);assert.equal(row.flashed,0,`${row.file}: 보였다 사라짐 ${JSON.stringify(row.changed)}`);assert.equal(row.whiteMs,0,`${row.file}: 흰 화면`);assert.equal(row.selectionChanges,0,`${row.file}: 선택 상태 점프`);assert.equal(row.fontChanges,0,`${row.file}: 글꼴 교체`);}

@@ -109,6 +109,14 @@ test('서비스 인라인 초기화는 DOMContentLoaded 전에 한 번만 실행
  dom.window.close();
 });
 
+test('서비스 상세 첫 페인트는 전체 단계 흐름을 선택하고 단계 안 콘텐츠 탭을 만들지 않는다',()=>{
+ const source='<html><head></head><body><main><section data-sf-feature><article id="sf-stage-one-first" data-sf-stage-panel data-sf-variant="one" data-sf-stage="first"><h2>글 등록</h2><section data-sf-aside-stage data-sf-variant="one" data-sf-stage="first">힌트</section><section aria-label="직접 호출하기">요청 도구</section><section aria-label="완료 확인">완료 조건</section></article><article id="sf-stage-one-second" data-sf-stage-panel data-sf-variant="one" data-sf-stage="second"><h2>글 조회</h2></article></section></main></body></html>';
+ const html=renderInitialPage(source,'scenario/features/reload-fixture.md');
+ assert.match(html,/sf-stage-one-first/,'처음 선택한 단계 정보가 초기 렌더 스크립트에 전달된다');
+ assert.doesNotMatch(html,/data-sf-content-tab|data-sf-content-panel|sf-content-switch/,'단계 안에 내용을 전환하는 탭이 없다');
+ assert.doesNotMatch(html,/\[data-sf-aside-stage\]\[data-sf-variant=/,'힌트를 별도 탭 패널처럼 첫 페인트에서 분리하지 않는다');
+});
+
 // 대형 HTML은 body 끝 controller가 파싱되기 전에 먼저 페인트될 수 있다.
 test('개념 분야 해시는 늦게 도착하는 본문보다 먼저 패널과 사이드바 선택을 맞춘다',async()=>{
  const fixture='<html><head></head><body><main><section class="course-guide"><nav class="guide-index"><a href="#intro">소개</a><a href="#kc-browse-view">개념 분야</a></nav><div class="guide-content"><section class="guide-section kc-intro" id="intro"><h2>소개</h2></section><section class="guide-section" id="kc-browse-view"><h2>분야별 개념</h2><button data-kc-category="all" aria-pressed="true">전체</button><button data-kc-category="spring" aria-pressed="false">Spring</button></section></div></section></main></body></html>';
@@ -163,7 +171,7 @@ test('개념 흡수는 여섯 분류의 수·일자 근거와 공통 파일 부�
  assert.ok(tiles.every(tile=>tile.matches('.visual-file')));
  assert.ok(doc.querySelector('.kc-results.visual-file-grid'));
  assert.equal(doc.querySelectorAll('.kc-result.visual-file').length,134);
- assert.equal(doc.querySelector('.concept-nav-group[data-concept-nav="domains"]').open,true);
+ assert.equal(doc.querySelector('.concept-nav-group[data-concept-nav="domains"]').open,false,'목록은 본문 분야 타일로 고르므로 사이드바 분류는 접어 둔다');
  assert.equal(doc.querySelector('.concept-nav-group[data-concept-nav="units"]').open,false);
  dom.window.close();
 });
@@ -200,6 +208,7 @@ test('개념 목록의 직접 패널 주소는 첫 페인트 전에 기본 해�
   assert.ok(doc.getElementById('first-paint-state').textContent.includes(`#${id}{display:block`));
   win.dispatchEvent(new win.Event('load'));
   assert.equal(win.location.hash,`#${id}`,'URL 복원은 hashchange 없는 replaceState');
+  doc.getElementById('first-paint-state')?.stopEarlySelection?.();
   win.close();
  }
 });
